@@ -11,3 +11,5 @@ All of this will be done only in the theory finite-dimensional Hilbert spaces. R
 * Most quantum information theory is done in this setting anyway. Not to say that the infinite-dimensional work isn't important, just that this is what more researchers spend their time thinking about.
 * Infinite-dimensional quantum theory can be [weirdly behaved](https://en.wikipedia.org/wiki/Connes_embedding_problem).
 * Dealing with infinite-dimensional quantum theory is just hard. You need e.g. trace-class operators, CTC functions, and people often can't even agree on the definitions. (For instance, does a mixed state necessarily have a finite spectrum? I've seen it both ways.)
+
+There is a _tiny_ bit of infinite-dimensional theory in the `QuantumInfo/InfiniteDim` folder. But most stuff is in the `QuantumInfo/FiniteDim` folder.
