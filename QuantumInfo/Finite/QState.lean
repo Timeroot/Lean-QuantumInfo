@@ -102,6 +102,9 @@ instance instKetOfBra : Coe (Bra d) (Ket d) := ⟨ket_of_bra⟩
 theorem bra_eq_conj (ψ : Ket d) (x : d) :〈ψ∣ x = conj (∣ψ〉 x) :=
   rfl
 
+theorem bra_apply' (ψ : Ket d) (i : d) : 〈ψ∣ i = conj (ψ.vec i) :=
+  rfl
+
 def dot (ξ : Bra d) (ψ : Ket d) : ℂ := ∑ x, (ξ x) * (ψ x)
 
 local notation "〈" ξ:90 "∣" ψ:90 "〉" => dot (ξ : Bra _) (ψ : Ket _)
@@ -129,6 +132,22 @@ theorem dot_self_eq_one (ψ : Ket d) :〈ψ∣ψ〉= 1 := by
   have h₂ := congrArg Complex.ofReal ψ.normalized
   simpa using h₂
 
+
+section prod
+
+variable {d₁ d₂ : Type*} [Fintype d₁] [Fintype d₂]
+
+/-- The outer product of two kets, creating an unentangled state. -/
+def prod (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : Ket (d₁ × d₂) where
+  vec := fun (i,j) ↦ ψ₁ i * ψ₂ j
+  normalized' := by
+    simp only [Fintype.sum_prod_type, norm_mul, Complex.norm_eq_abs, mul_pow, ← Finset.mul_sum,
+      Complex.sq_abs, ψ₂.normalized, mul_one, ψ₁.normalized]
+
+notation ψ₁ "⊗" ψ₂ => prod ψ₁ ψ₂
+
+end prod
+
 end Braket
 
 namespace MState
@@ -140,7 +159,11 @@ variable {d₁ d₂ : Type*} [Fintype d₁] [Fintype d₂]
 theorem Hermitian (ρ : MState d) : ρ.m.IsHermitian :=
   ρ.pos.left
 
-theorem PosSemidef_outer_conj_self (v : d → ℂ) : Matrix.PosSemidef (Matrix.vecMulVec (conj v) v) := by
+@[ext]
+theorem ext {ρ₁ ρ₂ : MState d} (h : ρ₁.m = ρ₂.m) : ρ₁ = ρ₂ := by
+  rwa [MState.mk.injEq]
+
+theorem PosSemidef_outer_self_conj (v : d → ℂ) : Matrix.PosSemidef (Matrix.vecMulVec v (conj v)) := by
   constructor
   · ext
     simp [Matrix.vecMulVec_apply, mul_comm]
@@ -148,22 +171,26 @@ theorem PosSemidef_outer_conj_self (v : d → ℂ) : Matrix.PosSemidef (Matrix.v
     simp_rw [Matrix.dotProduct, Pi.star_apply, RCLike.star_def, Matrix.mulVec, Matrix.dotProduct,
       Matrix.vecMulVec_apply, mul_assoc, ← Finset.mul_sum, ← mul_assoc, ← Finset.sum_mul]
     change
-      0 ≤ (∑ i : d, (starRingEnd ℂ) (x i) * (starRingEnd ℂ) (v i)) * ∑ i : d, v i * x i
-    simp_rw [← map_mul]
-    have : (∑ x_1 : d, (starRingEnd ℂ) (x x_1 * v x_1)) =
-        (∑ x_1 : d, (starRingEnd ℂ) (v x_1 * x x_1)) := by simp_rw [mul_comm]
+      0 ≤ (∑ i : d, (starRingEnd ℂ) (x i) * v i) * ∑ i : d, (starRingEnd ℂ) (v i) * x i
+    have : (∑ i : d, (starRingEnd ℂ) (x i) * v i) =
+        (∑ i : d, (starRingEnd ℂ) ((starRingEnd ℂ) (v i) * x i)) := by
+          simp only [mul_comm ((starRingEnd ℂ) (x _)) (v _), map_mul,
+          RingHomCompTriple.comp_apply, RingHom.id_apply]
     rw [this, ← map_sum, ← Complex.normSq_eq_conj_mul_self, Complex.zero_le_real, ← Complex.sq_abs]
     exact sq_nonneg _
 
 /-- A mixed state as a pure state arising from a ket. -/
 def pure (ψ : Ket d) : MState d where
-  m := Matrix.vecMulVec (ψ : Bra d) ψ
-  pos := PosSemidef_outer_conj_self ψ
-  tr := Braket.dot_self_eq_one ψ
+  m := Matrix.vecMulVec ψ (ψ : Bra d)
+  pos := PosSemidef_outer_self_conj ψ
+  tr := by
+    have h₁ : ∀x, ψ x * conj (ψ x) = Complex.normSq (ψ x) := fun x ↦ by
+      rw [mul_comm, Complex.normSq_eq_conj_mul_self]
+    simp only [Matrix.trace, Matrix.diag_apply, Matrix.vecMulVec_apply, Braket.bra_eq_conj, h₁]
+    have h₂ := congrArg Complex.ofReal ψ.normalized
+    simpa using h₂
 
 section prod
-
-#check TensorProduct.toMatrix_map
 
 def prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : MState (d₁ × d₂) where
   m := ρ₁.m ⊗ₖ ρ₂.m
@@ -172,27 +199,71 @@ def prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : MState (d₁ × d₂) whe
 
 notation ρL "⊗" ρR => prod ρL ρR
 
--- TODO: Product of pure states is a pure state (specifically of the product ket.)
+/-- The product of pure states is a pure state (specifically of the product ket.) -/
+theorem pure_prod_pure (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : pure (ψ₁ ⊗ ψ₂) = ((pure ψ₁) ⊗ (pure ψ₂) : MState _) := by
+  dsimp [pure, prod, Braket.prod]
+  ext
+  simp [Matrix.vecMulVec_apply, Braket.ket_apply]
+  ring
 
 end prod
 
 section ptrace
 
+section mat_trace
+
+variable [AddCommMonoid R]
+
+def _root_.Matrix.trace_left (m : Matrix (d × d₁) (d × d₂) R) : Matrix d₁ d₂ R :=
+  Matrix.of fun i₁ j₁ ↦ ∑ i₂, m (i₂, i₁) (i₂, j₁)
+
+def _root_.Matrix.trace_right (m : Matrix (d₁ × d) (d₂ × d) R) : Matrix d₁ d₂ R :=
+  Matrix.of fun i₂ j₂ ↦ ∑ i₁, m (i₂, i₁) (j₂, i₁)
+
+@[simp]
+theorem _root_.Matrix.trace_of_trace_left (A : Matrix (d₁ × d₂) (d₁ × d₂) R) : A.trace_left.trace = A.trace := by
+  convert Fintype.sum_prod_type_right.symm
+  rfl
+
+@[simp]
+theorem _root_.Matrix.trace_of_trace_right (A : Matrix (d₁ × d₂) (d₁ × d₂) R) : A.trace_right.trace = A.trace := by
+  convert Fintype.sum_prod_type.symm
+  rfl
+
+variable [RCLike R] {A : Matrix (d₁ × d₂) (d₁ × d₂) R}
+
+theorem _root_.Matrix.PosSemidef.trace_left  (hA : A.PosSemidef) : A.trace_left.PosSemidef :=
+  sorry
+
+theorem _root_.Matrix.PosSemidef.trace_right  (hA : A.PosSemidef) : A.trace_right.PosSemidef :=
+  sorry
+
+end mat_trace
+
 -- TODO:
--- * Define partial trace
 -- * Partial trace of direct product is the original state
 
 /-- Partial tracing out the left half of a system. -/
-def trace_left (ρ : MState (d₁ × d₂)) : MState d₂ :=
-  sorry
+def trace_left (ρ : MState (d₁ × d₂)) : MState d₂ where
+  m := ρ.m.trace_left
+  pos := ρ.pos.trace_left
+  tr := ρ.tr ▸ ρ.m.trace_of_trace_left
 
 /-- Partial tracing out the right half of a system. -/
-def trace_right (ρ : MState (d₁ × d₂)) : MState d₁ :=
-  sorry
+def trace_right (ρ : MState (d₁ × d₂)) : MState d₁ where
+  m := ρ.m.trace_right
+  pos := ρ.pos.trace_right
+  tr := ρ.tr ▸ ρ.m.trace_of_trace_right
 
 /-- Taking the direct product on the left and tracing it back out gives the same state. -/
-theorem trace_left_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : trace_left (ρ₁ ⊗ ρ₂) = ρ₂ :=
-  sorry
+theorem trace_left_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : trace_left (ρ₁ ⊗ ρ₂) = ρ₂ := by
+  ext
+  rw [trace_left]
+  dsimp
+  rw [Matrix.trace_left, prod]
+  dsimp
+  have h : (∑ i : d₁, ρ₁.m i i) = 1 := ρ₁.tr
+  rw [← Finset.sum_mul, h, one_mul]
 
 /-- Taking the direct product on the right and tracing it back out gives the same state. -/
 theorem trace_right_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : trace_right (ρ₁ ⊗ ρ₂) = ρ₁ :=
@@ -200,7 +271,7 @@ theorem trace_right_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : trace_
 
 end ptrace
 
--- TODO: direct sum (by zero-padding), Ket → MState
+-- TODO: direct sum (by zero-padding)
 -- Mixing (convexity)
 
 /-- The eigenvalue spectrum of a mixed quantum state, as a `Distribution`. -/
@@ -215,8 +286,42 @@ def spectrum (ρ : MState d) : Distribution d :=
     rw [← h]
     rfl⟩
 
---TODO: Spectrum of ket is 1
---Spectrum of direct product / direct sum. Spectrum of partial trace?
+/-- The specturm of a pure state is (1,0,0,...), i.e. a constant distribution. -/
+theorem spectrum_pure_eq_constant (ψ : Ket d) :
+    ∃ i, (pure ψ).spectrum = Distribution.constant i := by
+  let ρ := pure ψ
+  let ρ_linMap := Matrix.toEuclideanLin ρ.m
+  -- have ρ_linMap_evals := Matrix.isHermitian_iff_isSymmetric.1 ρ.Hermitian
+  --Prove that "1" is in the spectrum by exhibiting an eigenvector with value 1.
+  have hasLinMapEigen1 : Module.End.HasEigenvalue ρ_linMap 1 := by
+    --The eigenvector 1 witness, which is ψ.
+    let x1 : EuclideanSpace ℂ d := ψ.vec
+    apply Module.End.hasEigenvalue_of_hasEigenvector (x := x1)
+    constructor --to show it's an eigenvector, show that it's scaled and nonzero.
+    · rw [Module.End.mem_eigenspace_iff, one_smul]
+      change (pure ψ).m *ᵥ ψ.vec = ψ.vec
+      ext
+      simp_rw [pure, Matrix.mulVec, Matrix.vecMulVec_apply, Matrix.dotProduct, Braket.bra_apply',
+        Braket.ket_apply, mul_assoc, ← Finset.mul_sum, ← Complex.normSq_eq_conj_mul_self,
+        ← Complex.ofReal_sum, ← Braket.ket_apply, ψ.normalized, Complex.ofReal_one, mul_one]
+    · have : ‖x1‖ = 1 := by
+        rw [PiLp.norm_eq_of_L2, ψ.normalized']
+        exact Real.sqrt_one
+      by_contra hz
+      simp only [hz, norm_zero, zero_ne_one] at this
+  --If 1 is in the spectrum of ρ_linMap, it's in the spectrum of pure ψ.
+  have : ∃i, (pure ψ).spectrum i = 1 := by
+    sorry
+  --If 1 is in a distribution, the distribution is a constant.
+  sorry
+
+/-- Spectrum of direct product. There is a permutation σ so that the spectrum of the direct product of
+  ρ₁ and ρ₂, as permuted under σ, is the pairwise products of the spectra of ρ₁ and ρ₂. -/
+theorem spectrum_prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : ∃(σ : d₁ × d₂ ≃ d₁ × d₂),
+    ∀i, ∀j, MState.spectrum (ρ₁ ⊗ ρ₂) (σ (i, j)) = (ρ₁.spectrum i) * (ρ₂.spectrum j) := by
+  sorry
+
+--TODO: Spectrum of direct sum. Spectrum of partial trace?
 
 /-- A mixed state is separable iff it can be written as a convex combination of product mixed states. -/
 def IsSeparable (ρ : MState (d₁ × d₂)) : Prop :=
@@ -228,8 +333,8 @@ def IsSeparable (ρ : MState (d₁ × d₂)) : Prop :=
 theorem IsSeparable_prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : IsSeparable (ρ₁ ⊗ ρ₂) := by
   let only := (ρ₁, ρ₂)
   use { only }
-  use Distribution.indicator ⟨only, Finset.mem_singleton_self only⟩
-  simp only [Finset.univ_unique, Distribution.indicator_eq, ite_smul, one_smul, zero_smul,
+  use Distribution.constant ⟨only, Finset.mem_singleton_self only⟩
+  simp only [Finset.univ_unique, Distribution.constant_eq, ite_smul, one_smul, zero_smul,
     Finset.sum_ite_eq, Finset.mem_singleton]
   simp only [Unique.eq_default, ite_true, prod]
 
@@ -238,40 +343,23 @@ theorem IsSeparable_prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : IsSeparab
 section purification
 
 /-- The purification of a mixed state. Always uses the full dimension of the Hilbert space (d) to
- purify, so e.g. an existing pure state with d=4 still becomes d=16 in the purification. -/
-def purify (ρ : MState d) : { ψ : Ket (d × d) // (pure ψ).trace_right = ρ } :=
+ purify, so e.g. an existing pure state with d=4 still becomes d=16 in the purification. The defining
+ property is `MState.trace_right_of_purify`; see also `MState.purify'` for the bundled version. -/
+def purify (ρ : MState d) : Ket (d × d) where
+  vec := fun (i,j) ↦
+    let ρ2 := ρ.Hermitian.eigenvectorMatrix i j
+    (ρ.Hermitian.eigenvalues j).sqrt
+  normalized' := sorry
+
+/-- The defining property of purification, that tracing out the purifying system gives the
+ original mixed state. -/
+theorem trace_right_of_purify (ρ : MState d) : (pure ρ.purify).trace_right = ρ :=
   sorry
+
+/-- `MState.purify` bundled with its defining property `MState.trace_right_of_purify`. -/
+def purify' (ρ : MState d) : { ψ : Ket (d × d) // (pure ψ).trace_right = ρ } :=
+  ⟨ρ.purify, ρ.trace_right_of_purify⟩
 
 end purification
 
 end MState
-
-variable (dIn dOut : Type*) [Fintype dIn] [Fintype dOut]
-
---TODO: Give an actual definition of a channel. These lets are just so that it
---      binds the surrounding necessary variables and has the right type signature.
-def QChannel : Type :=
-  let a : Fintype dIn := inferInstance
-  let b : Fintype dOut := inferInstance
-  sorry
-
-namespace QChannel
-
-instance instFunLikeQChannel : FunLike (QChannel dIn dOut) (MState dIn) (MState dOut) where
-  coe ψ := sorry
-  coe_injective' _ _ h := sorry
-
-/-- The identity channel leaves the input unchanged. -/
-def id : QChannel dIn dIn :=
-  sorry
-
-section prod
-
-variable {dI₁ dI₂ dO₁ dO₂ : Type*} [Fintype dI₁] [Fintype dI₂] [Fintype dO₁] [Fintype dO₂]
-
-def prod (Λ₁ : QChannel dI₁ dO₁) (Λ₂ : QChannel dI₂ dO₂) : QChannel (dI₁ × dI₂) (dO₁ × dI₂) :=
-  sorry
-
-end prod
-
-end QChannel

@@ -59,24 +59,25 @@ theorem ext_iff {p q : Distribution α} : p = q ↔ ∀ x, p x = q x :=
 theorem normalized (d : Distribution α) : Finset.sum Finset.univ d = 1 :=
   d.prop
 
-/-- Make an indicator distribution: supported on a single element. -/
-def indicator (x : α) : Distribution α :=
+/-- Make an constant distribution: supported on a single element. This is also called, variously, a
+ "One-point distribution", a "Degenerate distribution", a "Deterministic distribution", a
+ "Delta function", or a "Point mass distribution". -/
+def constant (x : α) : Distribution α :=
   ⟨fun y ↦ if x = y then 1 else 0,
     by simp only [Finset.sum_ite_eq, Finset.mem_univ, ite_true]⟩
 
-
-theorem indicator_def (x : α) : (indicator x : α → ℝ≥0) = fun y ↦ if x = y then 1 else 0 := by
+theorem constant_def (x : α) : (constant x : α → ℝ≥0) = fun y ↦ if x = y then 1 else 0 := by
   rfl
 
 @[simp]
-theorem indicator_eq (x : α) : indicator x y = if x = y then 1 else 0 := by
+theorem constant_eq (x : α) : constant x y = if x = y then 1 else 0 := by
   rfl
 
 @[simp]
-theorem indicator_def' (x y : α) : (indicator x : α → Prob) y = if x = y then 1 else 0 := by
+theorem constant_def' (x y : α) : (constant x : α → Prob) y = if x = y then 1 else 0 := by
   rw [← Prob.eq_iff_nnreal]
-  change (Prob.toNNReal ∘ (indicator x)) y = (if x = y then 1 else 0 : Prob)
-  rw [funLike_eq_funLike (indicator x), indicator_def x]
+  change (Prob.toNNReal ∘ (constant x)) y = (if x = y then 1 else 0 : Prob)
+  rw [funLike_eq_funLike (constant x), constant_def x]
   split_ifs with h
   <;> simp [h]
 

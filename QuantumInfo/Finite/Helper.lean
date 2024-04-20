@@ -127,10 +127,7 @@ theorem traceNorm_eq_neg  (A : Matrix m n R) : traceNorm (-A) = traceNorm A := b
   have : (-A)ᴴ * -A = (A)ᴴ * A := by
     rw [Matrix.conjTranspose_neg, Matrix.neg_mul, Matrix.mul_neg]
     exact neg_neg _
-  congr 2
-  apply congr_heq
-  rw [this]
-  exact heq_prop _ _
+  congr!
 
 end traceNorm
 

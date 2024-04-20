@@ -9,6 +9,16 @@ variable {α : Type u} [Fintype α]
 def H₁ : Prob → ℝ :=
   fun x ↦ -x * Real.log x
 
+/-- H₁ of 0 is zero.-/
+@[simp]
+def H₁_zero_eq_zero : H₁ 0 = 0 := by
+  norm_num [H₁]
+
+/-- H₁ of 1 is zero.-/
+@[simp]
+def H₁_one_eq_zero : H₁ 1 = 0 := by
+  norm_num [H₁]
+
 /-- Entropy is nonnegative. -/
 theorem H₁_pos (p : Prob) : 0 ≤ H₁ p := by
   rw [H₁, neg_mul, Left.nonneg_neg_iff]
@@ -60,9 +70,14 @@ theorem H₁_concave : ∀ x, ∀ y, ∀ (p : Prob), p.mix (H₁ x) (H₁ y) ≤
   · exact lt_of_le_of_ne p.zero_le_coe hp.symm
   · linarith (config := {splitNe := true}) [p.coe_le_one]
 
-/- The Shannon entropy of a discrete distribution, H(X) = ∑ H₁(p_x). -/
+/-- The Shannon entropy of a discrete distribution, H(X) = ∑ H₁(p_x). -/
 def Hₛ (d : Distribution α) : ℝ :=
   Finset.sum Finset.univ (fun x ↦ H₁ (d.prob x))
+
+/-- The shannon entropy of a constant variable is zero. -/
+@[simp]
+theorem Hₛ_constant_eq_zero {i : α} : Hₛ (Distribution.constant i) = 0 := by
+  simp [Hₛ, Distribution.constant_def', apply_ite]
 
 --TODO:
 -- * Shannon entropy is concave under mixing distributions.
