@@ -1,6 +1,7 @@
 import QuantumInfo.Finite.QEntropy
+import ClassicalInfo.Capacity
 
---Capacities... https://cs.uwaterloo.ca/~watrous/TQI/TQI.8.pdf
+--Quantum capacities... https://cs.uwaterloo.ca/~watrous/TQI/TQI.8.pdf
 -- * Quantum 1-shot capacity
 -- * Quantum capacity -- LSD theorem
 -- * Entanglement-assisted classical capacity

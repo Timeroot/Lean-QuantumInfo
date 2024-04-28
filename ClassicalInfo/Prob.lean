@@ -1,10 +1,15 @@
-import Mathlib
+import Mathlib.Data.Real.NNReal
+import Mathlib.Analysis.Convex.Mul
+
+/- This defines a type `Prob` which is a real number in the interval O to 1. This then comes with
+additional statements such as its application to convex sets, and it makes useful type alias for
+functions that only make sense on probabilities. -/
 
 noncomputable section
 open NNReal
 open Classical
 
-/-- Prob is a real number in the interval [0,1]. Similar to NNReal in many definitions, but this
+/-- `Prob` is a real number in the interval [0,1]. Similar to NNReal in many definitions, but this
   allows other nice things more 'safely' such as convex combination. -/
 @[reducible]
 def Prob := { p : ℝ // 0 ≤ p ∧ p ≤ 1 }
@@ -135,6 +140,10 @@ theorem toReal_zero : (0 : Prob) = (0 : ℝ) :=
 theorem toReal_one : (1 : Prob) = (1 : ℝ) :=
   rfl
 
+@[simp, norm_cast]
+theorem toReal_mul (x y : Prob): (x * y : Prob) = (x : ℝ) * (y : ℝ) :=
+  rfl
+
 /-- Coercion `Prob → ℝ≥0`. -/
 @[coe] def toNNReal : Prob → ℝ≥0 :=
   fun p ↦ ⟨p.val, zero_le_coe⟩
@@ -148,7 +157,7 @@ instance : Coe Prob ℝ≥0 := ⟨toNNReal⟩
 instance canLiftNN : CanLift ℝ≥0 Prob toNNReal fun r => r ≤ 1 :=
   ⟨fun x hx ↦ ⟨⟨x, ⟨x.2, hx⟩⟩, rfl⟩⟩
 
-protected theorem eq_iff_nnreal {n m : Prob} : (n : ℝ≥0) = (m : ℝ≥0) ↔ n = m := by
+protected theorem eq_iff_nnreal (n m : Prob) : (n : ℝ≥0) = (m : ℝ≥0) ↔ n = m := by
   obtain ⟨n,hn⟩ := n
   obtain ⟨m,hn⟩ := m
   simp
@@ -175,7 +184,7 @@ def NNReal.asProb' (p : ℝ≥0) (hp : p.1 ≤ 1) : Prob :=
 
 def one_minus (p : Prob) : Prob :=
   ⟨1 - p.val,
-    ⟨by simpa using p.2.2, by simpa using p.2.1⟩⟩
+    ⟨by simp [p.2.2], by simp [p.2.1]⟩⟩
 
 @[simp]
 theorem val_one_minus (p : Prob) : p.one_minus.val = 1-p.val :=
@@ -185,18 +194,92 @@ theorem val_one_minus (p : Prob) : p.one_minus.val = 1-p.val :=
 theorem coe_one_minus (p : Prob) : (p.one_minus : ℝ) = 1-(p : ℝ) :=
   rfl
 
-def mixP (p x y : Prob) : Prob :=
-  ⟨p * x + p.one_minus * y,
-    ⟨by
-      have := x.2.1
-      have := y.2.1
-      have := p.2.1
-      have := p.one_minus.2.1
-      positivity,
-    sorry
-    ⟩⟩
+@[simp]
+theorem add_one_minus (p : Prob) : p.val + p.one_minus.val = 1 := by
+  simp
 
-def mix (p : Prob) [HSMul ℝ α α] [CommSemiring α] (x y : α) : α :=
-  p.val • x + p.one_minus.val • y
+end Prob
+
+/-- A `Mixable T` typeclass instance gives a compact way of talking about the action of probabilities
+  for forming linear combinations in convex spaces. The notation `p [ x₁ ↔ x₂ ]` means to take a convex
+  combination, equal to `x₁` if `p=1` and to `x₂` if `p=0`.
+
+  Mixable is defined by an "underlying" data type `U` with addition and scalar multiplication, and a
+  bijection between the `T` and a convex set of `U`. For instance, in `Mixable (Distribution (Fin n))`,
+  `U` is `n`-element vectors (which form the probability simplex, degenerate in one dimension). For
+  `MState` density matrices in quantum mechanics, which are PSD matrices of trace 1, `U` is the
+  underlying matrix. -/
+class Mixable (T : Type*) where
+  /-- The underlying data type-/
+  U : Type*
+  /-- U needs additive and smul operations. We try to find these automatically. -/
+  instU1 : AddCommMonoid U := by infer_instance
+  instU2 : SMul ℝ U := by infer_instance
+  /-- Getter for the underlying data -/
+  to_U : T → U
+  /-- Proof that this getter is injective -/
+  to_U_inj : ∀ {T₁ T₂}, to_U T₁ = to_U T₂ → T₁ = T₂
+  /-- Proof that this image is convex -/
+  convex : Convex ℝ (Set.image to_U Set.univ)
+  /-- Function to get a T from a proof that U is in the set. `Mixable.default_mkT` always
+  works as a default (noncomputable) value, but typically a `T.mk` method will make
+  more sense. -/
+  mkT : {u : U} → (u ∈ to_U '' Set.univ) → { t : T // to_U t = u }
+
+namespace Mixable
+
+variable {T : Type*} [inst : Mixable T]
+
+def mix (p : Prob) (x₁ x₂ : T) :=
+  let _ := inst.instU1
+  let _ := inst.instU2
+  inst.mkT <| inst.convex (x := to_U x₁) (by simp) (y := to_U x₂) (by simp)
+      p.zero_le_coe p.one_minus.zero_le_coe p.add_one_minus
+
+notation p "[" x₁ "↔" x₂ "]" => mix p x₁ x₂
+
+--When T is the whole space U, and T is a suitable vector space over ℝ, we get a Mixable instance.
+instance instUniv [AddCommMonoid T] [SMul ℝ T] : Mixable T where
+  U := T
+  to_U := id
+  to_U_inj := id
+  convex := by
+    convert convex_univ
+    simp only [id_eq, Set.image_univ, Set.range_id']
+  mkT := fun {t} _ ↦ ⟨t, rfl⟩
+
+@[simp]
+theorem mkT_instUniv [AddCommMonoid T] [SMul ℝ T] (h) : @Mixable.mkT T instUniv t h = ⟨t, rfl⟩ :=
+  rfl
+
+@[simp]
+theorem to_U_instUniv [AddCommMonoid T] [SMul ℝ T] : @Mixable.to_U T instUniv t = t :=
+  rfl
+
+end Mixable
+
+namespace Prob
+
+instance mixable : Mixable Prob where
+  U := ℝ
+  to_U := Prob.toReal
+  to_U_inj := Prob.eq
+  convex := sorry
+  mkT := fun {r} h ↦ ⟨⟨r, sorry⟩, rfl⟩
+
+@[simp]
+theorem U_mixable [AddCommMonoid T] [SMul ℝ T] : @Mixable.U Prob mixable = ℝ :=
+  rfl
+
+@[simp]
+theorem to_U_mixable [AddCommMonoid T] [SMul ℝ T] : @Mixable.to_U Prob mixable t = t :=
+  rfl
+
+@[simp]
+theorem mkT_mixable : @Mixable.mkT Prob mixable t h = ⟨⟨t, sorry⟩, rfl⟩ :=
+  rfl
+
+/-- Alias of `Mixable.mix` so it can be accessed from a probability. -/
+abbrev mix [Mixable T] (p : Prob) (x₁ x₂ : T) := Mixable.mix p x₁ x₂
 
 end Prob

@@ -1,7 +1,8 @@
-import QuantumInfo.Finite.QState
+import QuantumInfo.Finite.MState
+import QuantumInfo.Finite.CPTPMap
 
 /-
-Distances between quantum states
+Distances between quantum states.
  * Fidelity
  * Trace distance
  * Bures metric
@@ -20,6 +21,29 @@ open Kronecker
 open scoped Matrix ComplexOrder
 
 variable {d : Type*} [Fintype d]
+
+/--The trace distance between two quantum states: half the trace norm of the difference (ρ - σ). -/
+def TrDistance (ρ σ : MState d) : ℝ :=
+  (1/2:ℝ) * (ρ.m - σ.m).traceNorm
+
+namespace TrDistance
+
+variable {d d₂ : Type*} [Fintype d] [Fintype d₂] (ρ σ : MState d)
+
+/-- The trace distance is a symmetric quantity. -/
+theorem symm : TrDistance ρ σ = TrDistance σ ρ := by
+  dsimp [TrDistance]
+  rw [← Matrix.traceNorm_eq_neg, neg_sub]
+
+/-- The trace distance is equal to half the 1-norm of the eigenvalues of their difference . -/
+theorem eq_abs_eigenvalues : TrDistance ρ σ =
+    (1/2:ℝ) * ∑ i, abs ((ρ.Hermitian.sub σ.Hermitian).eigenvalues i) :=
+  sorry
+
+-- Fuchs–van de Graaf inequalities
+-- Relation to classical TV distance
+
+end TrDistance
 
 /-- The fidelity of two quantum states. This is the quantum version of the Bhattacharyya coefficient. -/
 def Fidelity (ρ σ : MState d) : ℝ :=
@@ -44,6 +68,7 @@ theorem le_one : Fidelity ρ σ ≤ 1 :=
 def prob : Prob :=
   ⟨Fidelity ρ σ, ⟨ge_zero ρ σ, le_one ρ σ⟩⟩
 
+/-- A state has perfect fidelity with itself. -/
 theorem self_eq_one : Fidelity ρ ρ = 1 :=
   sorry --Break and recombine sqrts
 
@@ -58,7 +83,7 @@ theorem symm : Fidelity ρ σ = Fidelity σ ρ :=
   sorry --break into sqrts
 
 /-- The fidelity cannot increase under the application of a channel. -/
-theorem channel_nondecreasing (Λ : QChannel d d₂) : Fidelity (Λ ρ) (Λ σ) ≥ Fidelity ρ σ :=
+theorem channel_nondecreasing (Λ : CPTPMap d d₂) : Fidelity (Λ ρ) (Λ σ) ≥ Fidelity ρ σ :=
   sorry
 
 --TODO: Arccos ∘ Fidelity forms a metric (triangle inequality), the Fubini–Study metric.
@@ -67,26 +92,3 @@ theorem channel_nondecreasing (Λ : QChannel d d₂) : Fidelity (Λ ρ) (Λ σ) 
 --Uhlmann's theorem
 
 end Fidelity
-
-/--The trace distance between two quantum states: half the trace norm of the difference (ρ - σ). -/
-def TrDistance (ρ σ : MState d) : ℝ :=
-  (1/2:ℝ) * (ρ.m - σ.m).traceNorm
-
-namespace TrDistance
-
-variable {d d₂ : Type*} [Fintype d] [Fintype d₂] (ρ σ : MState d)
-
-/-- The trace distance is a symmetric quantity. -/
-theorem symm : TrDistance ρ σ = TrDistance σ ρ := by
-  dsimp [TrDistance]
-  rw [← Matrix.traceNorm_eq_neg, neg_sub]
-
-/-- The trace distance is equal to half the 1-norm of the eigenvalues of their difference . -/
-theorem eq_abs_eigenvalues : TrDistance ρ σ =
-    (1/2:ℝ) * ∑ i, abs ((ρ.Hermitian.sub σ.Hermitian).eigenvalues i) :=
-  sorry
-
--- Fuchs–van de Graaf inequalities
--- Relation to classical TV distance
-
-end TrDistance

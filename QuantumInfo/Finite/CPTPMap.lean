@@ -1,4 +1,4 @@
-import QuantumInfo.Finite.QState
+import QuantumInfo.Finite.MState
 
 
 --TODO: Give an actual definition of a channel. These lets are just so that it
@@ -91,13 +91,19 @@ structure PTPMap where
   trace_preserving : map_mat.IsTracePreserving
 
 /-- Quantum channels, aka CPTP maps: completely positive trace preserving linear maps. -/
-structure QChannel extends PTPMap dIn dOut where
+structure CPTPMap extends PTPMap dIn dOut where
   completely_pos : map_mat.IsCompletelyPositive
   pos := completely_pos.IsPositiveMap
 
 namespace PTPMap
 noncomputable section
 open ComplexOrder
+
+variable {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq dIn]
+
+@[ext]
+theorem ext {Λ₁ Λ₂ : PTPMap dIn dOut} (h : Λ₁.map_mat = Λ₂.map_mat) : Λ₁ = Λ₂ :=
+  PTPMap.mk.injEq Λ₁.map_mat _ _ _ _ _ ▸ h
 
 def apply (Λ : PTPMap dIn dOut) := Λ.map_mat.asMatrixMap
 
@@ -111,55 +117,120 @@ instance instFunLike : FunLike (PTPMap dIn dOut) (MState dIn) (MState dOut) wher
   coe Λ := fun ρ ↦ MState.mk (Λ.apply ρ.m) (Λ.apply_PosSemidef ρ.pos) (ρ.tr ▸ Λ.apply_trace ρ.m)
   coe_injective' _ _ h := sorry
 
+/-- Choi matrix of a given matrix mapping. Note that this is defined even for things that
+  aren't PTPMaps. It's just that no one ever cares about the Choi matrix otherwise, so it
+  goes in this namespace. -/
+def choi_matrix (M : Matrix (dOut × dOut) (dIn × dIn) R) : Matrix (dIn × dOut) (dIn × dOut) R :=
+  fun (i₁,j₁) (i₂,j₂) ↦ M (j₁,j₂) (i₁,i₂)
+
+def map_of_choi_matrix (M : Matrix (dIn × dOut) (dIn × dOut) R) :  Matrix (dOut × dOut) (dIn × dIn) R :=
+  fun (j₁,j₂) (i₁,i₂) ↦ M (i₁,j₁) (i₂,j₂)
+
+@[simp]
+theorem map_choi_inv (M : Matrix (dIn × dOut) (dIn × dOut) R) : choi_matrix (map_of_choi_matrix M) = M :=
+  rfl
+
+@[simp]
+theorem choi_map_inv (M : Matrix (dIn × dIn) (dOut × dOut) R) : map_of_choi_matrix (choi_matrix M) = M :=
+  rfl
+
 end
 end PTPMap
 
-namespace QChannel
+namespace CPTPMap
 noncomputable section
+open scoped Matrix ComplexOrder
+variable {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq dIn]
 
-instance instFunLike : FunLike (QChannel dIn dOut) (MState dIn) (MState dOut) where
+def choi (Λ : CPTPMap dIn dOut) := PTPMap.choi_matrix Λ.map_mat
+
+@[ext]
+theorem ext {Λ₁ Λ₂ : CPTPMap dIn dOut} (h : Λ₁.map_mat = Λ₂.map_mat) : Λ₁ = Λ₂ :=
+  CPTPMap.mk.injEq Λ₁.toPTPMap _ _ _ ▸ (PTPMap.ext h)
+
+/-- Choi's theorem on completely positive maps: Complete Positivity iff Choi Matrix is PSD. -/
+theorem choi_PSD_of_CP_map (M : Matrix (dOut × dOut) (dIn × dIn) ℂ) : M.IsCompletelyPositive
+    ↔ (PTPMap.choi_matrix M).PosSemidef :=
+  sorry
+
+/-- The trace of a Choi matrix of a TP map is the cardinality of the input space. -/
+theorem trace_choi_of_TP_map (M : Matrix (dOut × dOut) (dIn × dIn) ℂ) : M.IsTracePreserving
+    ↔ (PTPMap.choi_matrix M).trace = (Finset.univ (α := dIn)).card :=
+  sorry
+
+/-- The Choi matrix of a channel is PSD. -/
+theorem choi_PSD_of_CPTP (Λ : CPTPMap dIn dOut) : (PTPMap.choi_matrix Λ.map_mat).PosSemidef :=
+  (choi_PSD_of_CP_map Λ.map_mat).1 Λ.completely_pos
+
+/-- The trace of a Choi matrix of a CPTP map is the cardinality of the input space. -/
+theorem Tr_of_choi_of_CPTP (Λ : CPTPMap dIn dOut) : (PTPMap.choi_matrix Λ.map_mat).trace =
+    (Finset.univ (α := dIn)).card :=
+  (trace_choi_of_TP_map Λ.map_mat).1 Λ.trace_preserving
+
+/-- Build a CPTP map from a PSD Choi matrix with correct trace. -/
+def CPTP_of_choi_PSD_Tr {M : Matrix (dIn × dOut) (dIn × dOut) ℂ} (h₁ : M.PosSemidef)
+    (h₂ : M.trace = (Finset.univ (α := dIn)).card) : CPTPMap dIn dOut where
+  map_mat := PTPMap.map_of_choi_matrix M
+  trace_preserving := sorry
+  completely_pos := sorry
+
+/--  Choi's theorem on CPTP maps, stated as a state-channel correspondence between CPTP maps
+ and Choi matrices given as a mixed state. -/
+def choi_MState_iff_CPTP (M : Matrix (dIn × dOut) (dIn × dOut) ℂ) :
+    CPTPMap dIn dOut ≃ MState (dIn × dOut) := by
+  sorry
+
+@[simp]
+theorem apply_of_choi (M : Matrix (dIn × dOut) (dIn × dOut) ℂ) {h₁} {h₂} :
+    (CPTP_of_choi_PSD_Tr (M := M) h₁ h₂).apply x = (PTPMap.map_of_choi_matrix M).asMatrixMap x :=
+  rfl
+
+@[simp]
+theorem choi_of_CPTP_of_choi (M : Matrix (dIn × dOut) (dIn × dOut) ℂ) {h₁} {h₂} :
+    (CPTP_of_choi_PSD_Tr (M := M) h₁ h₂).choi = M :=
+  rfl
+
+instance instFunLike : FunLike (CPTPMap dIn dOut) (MState dIn) (MState dOut) where
   coe Λ := fun ρ ↦ MState.mk (Λ.apply ρ.m) (Λ.apply_PosSemidef ρ.pos) (ρ.tr ▸ Λ.apply_trace ρ.m)
   coe_injective' _ _ h := sorry
 
--- TODO: @[ext]
-
-/-- The matrix corresponding to the identity map. -/
-def id_mat : Matrix (dIn × dIn) (dIn × dIn) ℂ :=
-  fun (i₁,j₁) (i₂,j₂) ↦ if i₁ = i₂ then if j₁ = j₂ then 1 else 0 else 0
+/-- The identity channel, which leaves the input unchanged. -/
+def id : CPTPMap dIn dIn :=
+  CPTP_of_choi_PSD_Tr (M := PTPMap.choi_matrix 1) (by
+    constructor
+    · ext
+      simp [PTPMap.choi_matrix, Matrix.conjTranspose, Matrix.one_apply, and_comm]
+    · intro x
+      simp only [Matrix.dotProduct, Pi.star_apply, RCLike.star_def, Matrix.mulVec,
+        PTPMap.choi_matrix, Matrix.one_apply, Prod.mk.injEq, ite_mul, one_mul, zero_mul,
+        Fintype.sum_prod_type, Finset.mul_sum, mul_ite, mul_zero, ite_and, Finset.sum_ite_irrel,
+        Finset.sum_ite_eq', Finset.mem_univ, ite_true, Finset.sum_const_zero]
+      simp_rw [← Finset.mul_sum, ← Finset.sum_mul, ← map_sum, Complex.conj_mul']
+      positivity
+  ) (by
+    simp [PTPMap.choi_matrix, Matrix.trace, Matrix.one_apply]
+    rw [Finset.card_filter, Finset.sum_finset_product (s := Finset.univ) (t := fun _ ↦ Finset.univ) (h := by simp)]
+    simp
+  )
 
 /-- The map `id_mat` leaves the input unchanged. -/
-theorem id_mat_is_id (M : Matrix dIn dIn ℂ) : (id_mat dIn).asMatrixMap M = M := by
+@[simp]
+theorem CPTPMap_id_fun_id (M : Matrix dIn dIn ℂ) : CPTPMap.id.apply M = M := by
   ext
-  simp [Matrix.asMatrixMap, QChannel.id_mat, Matrix.mulVec, Matrix.dotProduct]
-
-theorem id_mat_IsCompletelyPositive : (id_mat dIn).IsCompletelyPositive := by
-  intro n x hx
-  sorry
-  --want to use Matrix.PosSemidef.PosSemidef_kronecker, but matrixMap_kron isn't actually
-  -- a Kronecker multiplication. Choi's theorem -> Kronecker map would work.
-
-theorem id_mat_IsTracePreserving : (id_mat dIn).IsTracePreserving :=
-  fun x ↦ congrArg Matrix.trace <| id_mat_is_id dIn x
-
-#print id_mat_IsTracePreserving
-
-/-- The identity channel leaves the input unchanged. -/
-def id : QChannel dIn dIn where
-  map_mat := id_mat dIn
-  completely_pos := id_mat_IsCompletelyPositive dIn
-  trace_preserving := id_mat_IsTracePreserving dIn
+  simp [id, Matrix.asMatrixMap]
 
 section prod
+open Kronecker
 
 variable {dI₁ dI₂ dO₁ dO₂ : Type*} [Fintype dI₁] [Fintype dI₂] [Fintype dO₁] [Fintype dO₂]
 variable [DecidableEq dI₁] [DecidableEq dI₂]
 
-def prod (Λ₁ : QChannel dI₁ dO₁) (Λ₂ : QChannel dI₂ dO₂) : QChannel (dI₁ × dI₂) (dO₁ × dO₂) where
-  map_mat := Matrix.matrixMap_kron Λ₁.map_mat Λ₂.map_mat
-  trace_preserving := sorry
-  completely_pos := sorry
+def prod (Λ₁ : CPTPMap dI₁ dO₁) (Λ₂ : CPTPMap dI₂ dO₂) : CPTPMap (dI₁ × dI₂) (dO₁ × dO₂) :=
+  CPTP_of_choi_PSD_Tr (M := sorry)--Λ₁.choi ⊗ₖ Λ₂.choi)
+    (sorry)
+    (sorry)
 
 end prod
 
 end
-end QChannel
+end CPTPMap

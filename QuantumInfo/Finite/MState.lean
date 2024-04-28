@@ -1,9 +1,11 @@
-import Mathlib
-import QuantumInfo.Finite.Helper
-import QuantumInfo.Finite.Entropy
+import ClassicalInfo.Helper
+import ClassicalInfo.Distribution
+import QuantumInfo.Finite.Braket
 
 /-
-Finite dimensional quantum states.
+Finite dimensional quantum mixed states, ρ.
+
+The same comments apply as in `Braket`:
 
 These could be done with a Hilbert space of Fintype, which would look like
 (H : Type*) [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H] [FiniteDimensional ℂ H]
@@ -21,139 +23,15 @@ open ComplexConjugate
 open Kronecker
 open scoped Matrix ComplexOrder
 
-section
-variable (d : Type*) [Fintype d]
-
-/-- A ket as a vector of unit norm. We follow the convention in `Matrix` of vectors as simple functions
- from a Fintype. -/
-structure Ket :=
-  vec : d → ℂ
-  normalized' : ∑ x, ‖vec x‖^2 = 1
-
-/-- A bra is definitionally identical to a ket, but are separate for type reasons. They can be interconverted
-  with the adjoint. -/
-structure Bra :=
-  vec : d → ℂ
-  normalized' : ∑ x, ‖vec x‖^2 =1
-
 /-- A mixed state as a PSD matrix with trace 1.-/
-structure MState :=
+structure MState (d : Type*) [Fintype d] :=
   m : Matrix d d ℂ
   pos : m.PosSemidef
   tr : m.trace = 1
 
-end section
-
-namespace Braket
-
-scoped notation:max "〈" ψ:90 "∣" => (ψ : Bra _)
-
-scoped notation:max "∣" ψ:90 "〉" => (ψ : Ket _)
-
-variable {d : Type*} [Fintype d]
-
-instance instFunLikeKet : FunLike (Ket d) d ℂ where
-  coe ψ := ψ.vec
-  coe_injective' _ _ h := by rwa [Ket.mk.injEq]
-
-instance instFunLikeBra : FunLike (Bra d) d ℂ where
-  coe ψ := ψ.vec
-  coe_injective' _ _ h := by rwa [Bra.mk.injEq]
-
-theorem ket_apply (ψ : Ket d) (i : d) : ψ i = ψ.vec i :=
-  rfl
-
-theorem bra_apply (ψ : Bra d) (i : d) : ψ i = ψ.vec i :=
-  rfl
-
-@[ext]
-theorem _root_.Ket.ext {ξ ψ : Ket d} (h : ∀ x, ξ x = ψ x) : ξ = ψ :=
-  DFunLike.ext ξ ψ h
-
-@[ext]
-theorem _root_.Bra.ext {ξ ψ : Bra d} (h : ∀ x, ξ x = ψ x) : ξ = ψ :=
-  DFunLike.ext ξ ψ h
-
-theorem _root_.Ket.normalized (ψ : Ket d) : ∑ x, Complex.normSq (ψ x) = 1 := by
-  convert ψ.normalized'
-  rw [Complex.norm_eq_abs, Complex.sq_abs]
-  rfl
-
-theorem _root_.Bra.normalized (ψ : Bra d) : ∑ x, Complex.normSq (ψ x) = 1 := by
-  convert ψ.normalized'
-  rw [Complex.norm_eq_abs, Complex.sq_abs]
-  rfl
-
-/-- Any Bra can be turned into a Ket by conjugating the elements. -/
-@[coe]
-def bra_of_ket (ψ : Ket d) : Bra d :=
-  ⟨conj ψ, by simpa using ψ.2⟩
-
-/-- Any Ket can be turned into a Bra by conjugating the elements. -/
-@[coe]
-def ket_of_bra (ψ : Bra d) : Ket d :=
-  ⟨conj ψ, by simpa using ψ.2⟩
-
-instance instBraOfKet : Coe (Ket d) (Bra d) := ⟨bra_of_ket⟩
-
-instance instKetOfBra : Coe (Bra d) (Ket d) := ⟨ket_of_bra⟩
-
-@[simp]
-theorem bra_eq_conj (ψ : Ket d) (x : d) :〈ψ∣ x = conj (∣ψ〉 x) :=
-  rfl
-
-theorem bra_apply' (ψ : Ket d) (i : d) : 〈ψ∣ i = conj (ψ.vec i) :=
-  rfl
-
-def dot (ξ : Bra d) (ψ : Ket d) : ℂ := ∑ x, (ξ x) * (ψ x)
-
-local notation "〈" ξ:90 "∣" ψ:90 "〉" => dot (ξ : Bra _) (ψ : Ket _)
-
-/-- Construct the Ket corresponding to a basis vector, with a +1 phase. -/
-def basisKet (i : d) : Ket d :=
-  ⟨fun j ↦ if i = j then 1 else 0, by simp [apply_ite]⟩
-
-/-- Construct the Bra corresponding to a basis vector, with a +1 phase. -/
-def basisBra (i : d) : Bra d :=
-  ⟨fun j ↦ if i = j then 1 else 0, by simp [apply_ite]⟩
-
-/-- A Bra can be viewed as a function from Ket's to ℂ. -/
-instance instFunLikeBraket : FunLike (Bra d) (Ket d) ℂ where
-  coe ξ := dot ξ
-  coe_injective' x y h := by
-    ext i
-    simpa [basisKet, dot, ket_apply] using congrFun h (basisKet i)
-
-/-- The inner product of any state with itself is 1. -/
-theorem dot_self_eq_one (ψ : Ket d) :〈ψ∣ψ〉= 1 := by
-  have h₁ : ∀x, conj (ψ x) * ψ x = Complex.normSq (ψ x) := fun x ↦ by
-    rw [Complex.normSq_eq_conj_mul_self]
-  simp only [dot, bra_eq_conj, h₁]
-  have h₂ := congrArg Complex.ofReal ψ.normalized
-  simpa using h₂
-
-
-section prod
-
-variable {d₁ d₂ : Type*} [Fintype d₁] [Fintype d₂]
-
-/-- The outer product of two kets, creating an unentangled state. -/
-def prod (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : Ket (d₁ × d₂) where
-  vec := fun (i,j) ↦ ψ₁ i * ψ₂ j
-  normalized' := by
-    simp only [Fintype.sum_prod_type, norm_mul, Complex.norm_eq_abs, mul_pow, ← Finset.mul_sum,
-      Complex.sq_abs, ψ₂.normalized, mul_one, ψ₁.normalized]
-
-notation ψ₁ "⊗" ψ₂ => prod ψ₁ ψ₂
-
-end prod
-
-end Braket
-
 namespace MState
 
-variable {d : Type*} [Fintype d]
-variable {d₁ d₂ : Type*} [Fintype d₁] [Fintype d₂]
+variable {d d₁ d₂ d₃ : Type*} [Fintype d] [Fintype d₁] [Fintype d₂] [Fintype d₃]
 
 /-- Every mixed state is Hermitian. -/
 theorem Hermitian (ρ : MState d) : ρ.m.IsHermitian :=
@@ -186,7 +64,7 @@ def pure (ψ : Ket d) : MState d where
   tr := by
     have h₁ : ∀x, ψ x * conj (ψ x) = Complex.normSq (ψ x) := fun x ↦ by
       rw [mul_comm, Complex.normSq_eq_conj_mul_self]
-    simp only [Matrix.trace, Matrix.diag_apply, Matrix.vecMulVec_apply, Braket.bra_eq_conj, h₁]
+    simp only [Matrix.trace, Matrix.diag_apply, Matrix.vecMulVec_apply, Bra.eq_conj, h₁]
     have h₂ := congrArg Complex.ofReal ψ.normalized
     simpa using h₂
 
@@ -203,7 +81,7 @@ notation ρL "⊗" ρR => prod ρL ρR
 theorem pure_prod_pure (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : pure (ψ₁ ⊗ ψ₂) = ((pure ψ₁) ⊗ (pure ψ₂) : MState _) := by
   dsimp [pure, prod, Braket.prod]
   ext
-  simp [Matrix.vecMulVec_apply, Braket.ket_apply]
+  simp [Matrix.vecMulVec_apply, Ket.apply]
   ring
 
 end prod
@@ -276,15 +154,14 @@ end ptrace
 
 /-- The eigenvalue spectrum of a mixed quantum state, as a `Distribution`. -/
 def spectrum (ρ : MState d) : Distribution d :=
-  ⟨fun i ↦ ⟨ρ.Hermitian.eigenvalues i, --The values are the eigenvalues
-    ρ.pos.eigenvalues_nonneg i⟩, --The values are all nonnegative
-  by --The values sum to 1
-    rw [← NNReal.eq_iff]
-    push_cast
-    have h := congrArg Complex.re (ρ.Hermitian.sum_eigenvalues_eq_trace)
-    simp only [ρ.tr, RCLike.ofReal_sum, Complex.re_sum, Complex.one_re] at h
-    rw [← h]
-    rfl⟩
+  Distribution.mk'
+    (fun i ↦ ρ.Hermitian.eigenvalues i) --The values are the eigenvalues
+    (fun i ↦ ρ.pos.eigenvalues_nonneg i) --The values are all nonnegative
+    (by --The values sum to 1
+      have h := congrArg Complex.re (ρ.Hermitian.sum_eigenvalues_eq_trace)
+      simp only [ρ.tr, RCLike.ofReal_sum, Complex.re_sum, Complex.one_re] at h
+      rw [← h]
+      rfl)
 
 /-- The specturm of a pure state is (1,0,0,...), i.e. a constant distribution. -/
 theorem spectrum_pure_eq_constant (ψ : Ket d) :
@@ -301,9 +178,9 @@ theorem spectrum_pure_eq_constant (ψ : Ket d) :
     · rw [Module.End.mem_eigenspace_iff, one_smul]
       change (pure ψ).m *ᵥ ψ.vec = ψ.vec
       ext
-      simp_rw [pure, Matrix.mulVec, Matrix.vecMulVec_apply, Matrix.dotProduct, Braket.bra_apply',
-        Braket.ket_apply, mul_assoc, ← Finset.mul_sum, ← Complex.normSq_eq_conj_mul_self,
-        ← Complex.ofReal_sum, ← Braket.ket_apply, ψ.normalized, Complex.ofReal_one, mul_one]
+      simp_rw [pure, Matrix.mulVec, Matrix.vecMulVec_apply, Matrix.dotProduct, Bra.apply',
+        Ket.apply, mul_assoc, ← Finset.mul_sum, ← Complex.normSq_eq_conj_mul_self,
+        ← Complex.ofReal_sum, ← Ket.apply, ψ.normalized, Complex.ofReal_one, mul_one]
     · have : ‖x1‖ = 1 := by
         rw [PiLp.norm_eq_of_L2, ψ.normalized']
         exact Real.sqrt_one
@@ -314,6 +191,8 @@ theorem spectrum_pure_eq_constant (ψ : Ket d) :
     sorry
   --If 1 is in a distribution, the distribution is a constant.
   sorry
+
+--TODO: Spectra of left- and right- partial traces of a pure state are equal.
 
 /-- Spectrum of direct product. There is a permutation σ so that the spectrum of the direct product of
   ρ₁ and ρ₂, as permuted under σ, is the pairwise products of the spectra of ρ₁ and ρ₂. -/
@@ -327,16 +206,14 @@ theorem spectrum_prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : ∃(σ : d�
 def IsSeparable (ρ : MState (d₁ × d₂)) : Prop :=
   ∃ ρLRs : Finset (MState d₁ × MState d₂), --Finite set of (ρL, ρR) pairs
     ∃ ps : Distribution ρLRs, --Distribution over those pairs, an ensemble
-      ρ.m = ∑ ρLR : ρLRs, (ps ρLR) • (Prod.fst ρLR.val).m ⊗ₖ (Prod.snd ρLR.val).m
+      ρ.m = ∑ ρLR : ρLRs, (ps ρLR : ℝ) • (Prod.fst ρLR.val).m ⊗ₖ (Prod.snd ρLR.val).m
 
 /-- A product state is separable -/
 theorem IsSeparable_prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : IsSeparable (ρ₁ ⊗ ρ₂) := by
   let only := (ρ₁, ρ₂)
-  use { only }
-  use Distribution.constant ⟨only, Finset.mem_singleton_self only⟩
-  simp only [Finset.univ_unique, Distribution.constant_eq, ite_smul, one_smul, zero_smul,
-    Finset.sum_ite_eq, Finset.mem_singleton]
-  simp only [Unique.eq_default, ite_true, prod]
+  use { only }, Distribution.constant ⟨only, Finset.mem_singleton_self only⟩
+  simp only [prod, Finset.univ_unique, Unique.eq_default, Distribution.constant_eq, ite_true,
+    Prob.toReal_one, Finset.default_singleton, one_smul, Finset.sum_const, Finset.card_singleton]
 
 --TODO: Separable states are convex
 
@@ -348,8 +225,17 @@ section purification
 def purify (ρ : MState d) : Ket (d × d) where
   vec := fun (i,j) ↦
     let ρ2 := ρ.Hermitian.eigenvectorMatrix i j
-    (ρ.Hermitian.eigenvalues j).sqrt
-  normalized' := sorry
+    ρ2 * (ρ.Hermitian.eigenvalues j).sqrt
+  normalized' := by
+    have h₁ := fun i ↦ ρ.pos.eigenvalues_nonneg i
+    simp [mul_pow, Real.sq_sqrt, h₁]
+    simp_rw [Matrix.IsHermitian.eigenvectorMatrix_apply]
+    rw [Finset.sum_comm]
+    simp_rw [← Finset.sum_mul]
+    have : ∀x, ∑ i : d, Complex.abs ((Matrix.IsHermitian.eigenvectorBasis ρ.Hermitian) x i) ^ 2 = 1 :=
+      sorry
+    -- rw [this]
+    sorry
 
 /-- The defining property of purification, that tracing out the purifying system gives the
  original mixed state. -/
@@ -361,5 +247,98 @@ def purify' (ρ : MState d) : { ψ : Ket (d × d) // (pure ψ).trace_right = ρ 
   ⟨ρ.purify, ρ.trace_right_of_purify⟩
 
 end purification
+
+/-- A representation of a classical distribution as a quantum state, diagonal in the given basis. -/
+def ofClassical (dist : Distribution d) : MState d where
+  m := Matrix.diagonal (fun x ↦ dist x)
+  pos := by simp [Matrix.posSemidef_diagonal_iff]
+  tr := by
+    simp [Matrix.trace_diagonal]
+    have h₃ := dist.2
+    norm_cast
+
+--TODO: Swap and assoc for kets.
+--TODO: Connect these to unitaries (when they can be)
+
+/-- The heterogeneous SWAP gate that exchanges the left and right halves of a quantum system.
+  This can apply even when the two "halves" are of different types, as opposed to (say) the SWAP
+  gate on quantum circuits that leaves the qubit dimensions unchanged. Notably, it is not unitary. -/
+def SWAP (ρ : MState (d₁ × d₂)) : MState (d₂ × d₁) where
+  m := Matrix.of fun (i₁,j₁) (i₂,j₂) ↦ ρ.m (j₁,i₁) (j₂,i₂)
+  pos := sorry
+  tr := by convert ρ.tr; simp [Matrix.trace]; rw [Finset.sum_comm]
+
+-- @[simp] --This theorem statement doesn't typecheck because spectrum reuses indices.
+-- theorem spectrum_SWAP (ρ : MState (d₁ × d₂)) : ρ.SWAP.spectrum = ρ.spectrum :=
+--   sorry
+
+@[simp]
+theorem SWAP_SWAP (ρ : MState (d₁ × d₂)) : ρ.SWAP.SWAP = ρ :=
+  sorry
+
+@[simp]
+theorem trace_left_SWAP (ρ : MState (d₁ × d₂)) : ρ.SWAP.trace_left = ρ.trace_right :=
+  sorry
+
+@[simp]
+theorem trace_right_SWAP (ρ : MState (d₁ × d₂)) : ρ.SWAP.trace_right = ρ.trace_left :=
+  sorry
+
+/-- The associator that re-clusters the parts of a quantum system. -/
+def assoc (ρ : MState ((d₁ × d₂) × d₃)) : MState (d₁ × d₂ × d₃) where
+  m := Matrix.of fun (i₁,(j₁,k₁)) (i₂,(j₂,k₂)) ↦ ρ.m ((i₁,j₁),k₁) ((i₂,j₂),k₂)
+  pos := sorry
+  tr := by convert ρ.tr; simp [Matrix.trace]
+
+/-- The associator that re-clusters the parts of a quantum system. -/
+def assoc' (ρ : MState (d₁ × d₂ × d₃)) : MState ((d₁ × d₂) × d₃) :=
+  ρ.SWAP.assoc.SWAP.assoc.SWAP
+
+@[simp]
+theorem assoc_assoc' (ρ : MState (d₁ × d₂ × d₃)) : ρ.assoc'.assoc = ρ := by
+  ext
+  simp [assoc', assoc, SWAP]
+
+@[simp]
+theorem assoc'_assoc (ρ : MState ((d₁ × d₂) × d₃)) : ρ.assoc.assoc' = ρ := by
+  have := ρ.SWAP.assoc_assoc'
+  unfold assoc' at this
+  rw [assoc', ← ρ.SWAP_SWAP, this]
+
+@[simp]
+theorem trace_left_right_assoc (ρ : MState ((d₁ × d₂) × d₃)) :
+    ρ.assoc.trace_left.trace_right = ρ.trace_right.trace_left := by
+  ext
+  simp [assoc, Matrix.trace_left, trace_left, Matrix.trace_right, trace_right]
+  rw [Finset.sum_comm]
+
+@[simp]
+theorem trace_right_left_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
+    ρ.assoc'.trace_right.trace_left = ρ.trace_left.trace_right := by
+  rw [← ρ.assoc'.trace_left_right_assoc, assoc_assoc']
+
+@[simp]
+theorem trace_right_assoc (ρ : MState ((d₁ × d₂) × d₃)) :
+    ρ.assoc.trace_right = ρ.trace_right.trace_right := by
+  ext
+  simp [assoc, Matrix.trace_right, trace_right]
+
+@[simp]
+theorem trace_left_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
+    ρ.assoc'.trace_left = ρ.trace_left.trace_left := by
+  convert ρ.SWAP.assoc.SWAP.trace_right_assoc
+  simp
+
+@[simp]
+theorem trace_left_left_assoc (ρ : MState ((d₁ × d₂) × d₃)) :
+    ρ.assoc.trace_left.trace_left = ρ.trace_left := by
+  ext
+  simp only [assoc, trace_left, Matrix.trace_left, Matrix.of_apply, Fintype.sum_prod_type]
+  rw [Finset.sum_comm]
+
+@[simp]
+theorem trace_right_right_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
+    ρ.assoc'.trace_right.trace_right = ρ.trace_right := by
+  simp [assoc']
 
 end MState
