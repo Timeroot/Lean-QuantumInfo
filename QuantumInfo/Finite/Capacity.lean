@@ -1,4 +1,4 @@
-import QuantumInfo.Finite.QEntropy
+import QuantumInfo.Finite.Entropy
 import ClassicalInfo.Capacity
 
 --Quantum capacities... https://cs.uwaterloo.ca/~watrous/TQI/TQI.8.pdf

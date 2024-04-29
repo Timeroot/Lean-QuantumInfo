@@ -1,4 +1,4 @@
-import ClassicalInfo.Helper
+import QuantumInfo.Mathlib.All
 import ClassicalInfo.Distribution
 
 /-

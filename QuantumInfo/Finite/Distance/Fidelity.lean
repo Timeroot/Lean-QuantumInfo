@@ -1,17 +1,6 @@
 import QuantumInfo.Finite.MState
 import QuantumInfo.Finite.CPTPMap
 
-/-
-Distances between quantum states.
- * Fidelity
- * Trace distance
- * Bures metric
- * Superfidelity
- * Quantum Wasserstein Distance
-
-All share some axioms: https://quantiki.org/wiki/distance-measures-between-states
--/
-
 noncomputable section
 
 open Classical
@@ -22,29 +11,6 @@ open scoped Matrix ComplexOrder
 
 variable {d : Type*} [Fintype d]
 
-/--The trace distance between two quantum states: half the trace norm of the difference (ρ - σ). -/
-def TrDistance (ρ σ : MState d) : ℝ :=
-  (1/2:ℝ) * (ρ.m - σ.m).traceNorm
-
-namespace TrDistance
-
-variable {d d₂ : Type*} [Fintype d] [Fintype d₂] (ρ σ : MState d)
-
-/-- The trace distance is a symmetric quantity. -/
-theorem symm : TrDistance ρ σ = TrDistance σ ρ := by
-  dsimp [TrDistance]
-  rw [← Matrix.traceNorm_eq_neg, neg_sub]
-
-/-- The trace distance is equal to half the 1-norm of the eigenvalues of their difference . -/
-theorem eq_abs_eigenvalues : TrDistance ρ σ =
-    (1/2:ℝ) * ∑ i, abs ((ρ.Hermitian.sub σ.Hermitian).eigenvalues i) :=
-  sorry
-
--- Fuchs–van de Graaf inequalities
--- Relation to classical TV distance
-
-end TrDistance
-
 /-- The fidelity of two quantum states. This is the quantum version of the Bhattacharyya coefficient. -/
 def Fidelity (ρ σ : MState d) : ℝ :=
   let ρσρ := ρ.pos.sqrt * σ.m * ρ.pos.sqrt
@@ -53,6 +19,8 @@ def Fidelity (ρ σ : MState d) : ℝ :=
     nth_rewrite 2 [← ρ.pos.posSemidef_sqrt.isHermitian]
     exact σ.pos.mul_mul_conjTranspose_same _
   (ρσρ_PosSemidef.sqrt.trace.re)^2
+
+#print Fidelity
 
 namespace Fidelity
 

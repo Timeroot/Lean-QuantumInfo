@@ -1,4 +1,4 @@
-import ClassicalInfo.Helper
+import QuantumInfo.Mathlib.All
 import ClassicalInfo.Distribution
 import QuantumInfo.Finite.Braket
 
@@ -40,6 +40,11 @@ theorem Hermitian (ρ : MState d) : ρ.m.IsHermitian :=
 @[ext]
 theorem ext {ρ₁ ρ₂ : MState d} (h : ρ₁.m = ρ₂.m) : ρ₁ = ρ₂ := by
   rwa [MState.mk.injEq]
+
+--An MState is a witness that d is nonempty.
+instance nonempty (ρ : MState d) : Nonempty d := by
+  by_contra h
+  simpa [not_nonempty_iff.mp h] using ρ.tr
 
 theorem PosSemidef_outer_self_conj (v : d → ℂ) : Matrix.PosSemidef (Matrix.vecMulVec v (conj v)) := by
   constructor
@@ -340,5 +345,12 @@ theorem trace_left_left_assoc (ρ : MState ((d₁ × d₂) × d₃)) :
 theorem trace_right_right_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
     ρ.assoc'.trace_right.trace_right = ρ.trace_right := by
   simp [assoc']
+
+
+theorem traceNorm_eq_1 (ρ : MState d) : ρ.m.traceNorm = 1 :=
+  have := calc (ρ.m.traceNorm : ℂ)
+    _ = ρ.m.trace := ρ.pos.traceNorm_PSD_eq_trace
+    _ = 1 := ρ.tr
+  Complex.ofReal_eq_one.mp this
 
 end MState

@@ -1,9 +1,5 @@
 import QuantumInfo.Finite.MState
 
-
---TODO: Give an actual definition of a channel. These lets are just so that it
---      binds the surrounding necessary variables and has the right type signature.
-
 namespace Matrix
 
 variable {A B C D E F R : Type*}
@@ -99,7 +95,7 @@ namespace PTPMap
 noncomputable section
 open ComplexOrder
 
-variable {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq dIn]
+variable {dIn dOut}
 
 @[ext]
 theorem ext {Λ₁ Λ₂ : PTPMap dIn dOut} (h : Λ₁.map_mat = Λ₂.map_mat) : Λ₁ = Λ₂ :=
@@ -134,6 +130,19 @@ theorem map_choi_inv (M : Matrix (dIn × dOut) (dIn × dOut) R) : choi_matrix (m
 theorem choi_map_inv (M : Matrix (dIn × dIn) (dOut × dOut) R) : map_of_choi_matrix (choi_matrix M) = M :=
   rfl
 
+--If we have a PTPMap, the input and output dimensions are always both nonempty (otherwise
+--we can't preserve trace) - or they're both empty. So `[Nonempty dIn]` will always suffice.
+-- This would be nice as an `instance` but that would leave `dIn` as a metavariable.
+theorem nonemptyOut (Λ : PTPMap dIn dOut) [hIn : Nonempty dIn] : Nonempty dOut := by
+  by_contra h
+  simp only [not_nonempty_iff] at h
+  let M := (1 : Matrix dIn dIn ℂ)
+  have := calc (Finset.univ.card (α := dIn) : ℂ)
+    _ = M.trace := by simp [Matrix.trace, M]
+    _ = (Λ.apply M).trace := (Λ.trace_preserving M).symm
+    _ = 0 := by simp only [Matrix.trace_eq_zero_of_isEmpty]
+  norm_num [Finset.univ_eq_empty_iff] at this
+
 end
 end PTPMap
 
@@ -163,7 +172,8 @@ theorem choi_PSD_of_CPTP (Λ : CPTPMap dIn dOut) : (PTPMap.choi_matrix Λ.map_ma
   (choi_PSD_of_CP_map Λ.map_mat).1 Λ.completely_pos
 
 /-- The trace of a Choi matrix of a CPTP map is the cardinality of the input space. -/
-theorem Tr_of_choi_of_CPTP (Λ : CPTPMap dIn dOut) : (PTPMap.choi_matrix Λ.map_mat).trace =
+@[simp]
+theorem Tr_of_choi_of_CPTP (Λ : CPTPMap dIn dOut) : Λ.choi.trace =
     (Finset.univ (α := dIn)).card :=
   (trace_choi_of_TP_map Λ.map_mat).1 Λ.trace_preserving
 
@@ -178,6 +188,19 @@ def CPTP_of_choi_PSD_Tr {M : Matrix (dIn × dOut) (dIn × dOut) ℂ} (h₁ : M.P
  and Choi matrices given as a mixed state. -/
 def choi_MState_iff_CPTP (M : Matrix (dIn × dOut) (dIn × dOut) ℂ) :
     CPTPMap dIn dOut ≃ MState (dIn × dOut) := by
+  constructor
+  case toFun =>
+    intro Λ
+    use (1 / (Finset.univ (α := dIn)).card : ℝ) • Λ.choi
+    sorry
+    simp
+    sorry
+  case invFun =>
+    intro ρ
+    apply CPTP_of_choi_PSD_Tr (M := (Finset.univ (α := dIn)).card • ρ.m)
+    sorry
+    sorry
+  sorry
   sorry
 
 @[simp]
@@ -219,6 +242,17 @@ theorem CPTPMap_id_fun_id (M : Matrix dIn dIn ℂ) : CPTPMap.id.apply M = M := b
   ext
   simp [id, Matrix.asMatrixMap]
 
+/-- There is a CPTP map that takes a system of any dimension and outputs the trivial Hilbert
+space, 1-dimensional, indexed by `Unit`. -/
+def destroy [Nonempty dIn] : CPTPMap dIn Unit :=
+  CPTP_of_choi_PSD_Tr (M := (1 / Finset.univ.card (α := dIn)) • 1) (sorry) (sorry)
+
+/-- A state can be viewed as a CPTP map from the trivial Hilbert space (indexed by `Unit`)
+ that outputs exactly that state. -/
+def of_state (ρ : MState dOut) : CPTPMap Unit dOut :=
+  sorry --need the canonical isomorphism from (Unit × d) ≃ d.
+  -- CPTP_of_choi_PSD_Tr (M := ρ.m) (ρ.pos) (ρ.tr)
+
 section prod
 open Kronecker
 
@@ -230,7 +264,28 @@ def prod (Λ₁ : CPTPMap dI₁ dO₁) (Λ₂ : CPTPMap dI₂ dO₂) : CPTPMap (
     (sorry)
     (sorry)
 
+notation ρL "⊗" ρR => prod ρL ρR
+
 end prod
+
+section trace
+variable {d₁ d₂ : Type*} [Fintype d₁] [Fintype d₂] [DecidableEq d₁] [DecidableEq d₂]
+
+/-- Partial tracing out the left, as a CPTP map. -/
+def trace_left : CPTPMap (d₁ × d₂) d₂ :=
+  sorry
+
+/-- Partial tracing out the right, as a CPTP map. -/
+def trace_right : CPTPMap (d₁ × d₂) d₁ :=
+  sorry
+
+theorem trace_left_eq_MState_trace_left (ρ : MState (d₁ × d₂)) : trace_left ρ = ρ.trace_left :=
+  sorry
+
+theorem trace_right_eq_MState_trace_right (ρ : MState (d₁ × d₂)) : trace_right ρ = ρ.trace_right :=
+  sorry
+
+end trace
 
 end
 end CPTPMap

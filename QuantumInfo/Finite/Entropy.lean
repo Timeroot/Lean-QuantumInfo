@@ -1,4 +1,3 @@
-import Mathlib.Tactic.WLOG
 import QuantumInfo.Finite.Braket
 import QuantumInfo.Finite.CPTPMap
 import ClassicalInfo.Entropy
@@ -19,7 +18,7 @@ def Sᵥₙ (ρ : MState d) : ℝ :=
 def QConditionalEnt (ρ : MState (d₁ × d₂)) : ℝ :=
   Sᵥₙ ρ - Sᵥₙ ρ.trace_left
 
-/-- The Quantum Mutual Information I(A:B) is given by S(A) + S(B) - S(AB). -/
+/-- The Quantum Mutual Information I(A:B) is given by S(ρᴬ) + S(ρᴮ) - S(ρᴬᴮ). -/
 def QMutualInfo (ρ : MState (d₁ × d₂)) : ℝ :=
   Sᵥₙ ρ.trace_left + Sᵥₙ ρ.trace_right - Sᵥₙ ρ
 
