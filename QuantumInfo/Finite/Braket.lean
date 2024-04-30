@@ -138,13 +138,17 @@ section prod
 variable {d₁ d₂ : Type*} [Fintype d₁] [Fintype d₂]
 
 /-- The outer product of two kets, creating an unentangled state. -/
-def Braket.prod (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : Ket (d₁ × d₂) where
+def Ket.prod (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : Ket (d₁ × d₂) where
   vec := fun (i,j) ↦ ψ₁ i * ψ₂ j
   normalized' := by
     simp only [Fintype.sum_prod_type, norm_mul, Complex.norm_eq_abs, mul_pow, ← Finset.mul_sum,
       Complex.sq_abs, ψ₂.normalized, mul_one, ψ₁.normalized]
 
-notation ψ₁ "⊗" ψ₂ => prod ψ₁ ψ₂
+notation ψ₁ "⊗" ψ₂ => Ket.prod ψ₁ ψ₂
+
+def Ket.IsProd (ψ : Ket (d₁ × d₂)) : Prop := ∃ ξ φ, ψ = ξ ⊗ φ
+
+def Ket.IsEntangled (ψ : Ket (d₁ × d₂)) : Prop := ¬ψ.IsProd
 
 end prod
 

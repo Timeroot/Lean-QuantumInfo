@@ -1,12 +1,15 @@
 import QuantumInfo.Finite.MState
 
 /- This file is lemmas about unitary matrices (Matrix.unitaryGroup) and how they apply to
-bras, kets, and MState matrices. -/
+bras, kets, and MState matrices.
+
+This is imported by CPTPMap to define things like unitary channels, Kraus operators, and
+complementary channels, so it doesn't discuss channels. -/
 noncomputable section
 
 namespace MState
 
-scoped notation "𝐔[" n "]" => Matrix.unitaryGroup n ℂ
+notation "𝐔[" n "]" => Matrix.unitaryGroup n ℂ
 
 variable {d d₁ d₂ d₃ : Type*}
 variable [Fintype d] [Fintype d₁] [Fintype d₂] [Fintype d₃]

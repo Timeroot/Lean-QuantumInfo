@@ -20,8 +20,6 @@ def Fidelity (ρ σ : MState d) : ℝ :=
     exact σ.pos.mul_mul_conjTranspose_same _
   (ρσρ_PosSemidef.sqrt.trace.re)^2
 
-#print Fidelity
-
 namespace Fidelity
 
 variable {d d₂ : Type*} [Fintype d] [Fintype d₂] (ρ σ : MState d)

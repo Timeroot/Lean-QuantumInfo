@@ -100,10 +100,6 @@ theorem traceNorm_smul (A : Matrix m n R) (c : R) : (c • A).traceNorm = ‖c�
 theorem traceNorm_triangleIneq (A B : Matrix m n R) : (A + B).traceNorm ≤ A.traceNorm + B.traceNorm :=
   sorry
 
---`ring` and `simp` can't solve this!?
-theorem floob [Ring k]: ∀(x y : k), x - y = x + (-y) := by
-  intro x y; apply sub_eq_add_neg
-
 theorem traceNorm_triangleIneq' (A B : Matrix m n R) : (A - B).traceNorm ≤ A.traceNorm + B.traceNorm := by
   rw [sub_eq_add_neg A B, ←traceNorm_eq_neg_self B]
   exact traceNorm_triangleIneq A (-B)
@@ -115,3 +111,5 @@ theorem PosSemidef.traceNorm_PSD_eq_trace {A : Matrix m m R} (hA : A.PosSemidef)
 end traceNorm
 
 end Matrix
+
+#check ENNReal.finset_card_const_le_le_of_tsum_le
