@@ -220,33 +220,43 @@ class Mixable (T : Type*) where
   /-- Proof that this getter is injective -/
   to_U_inj : ∀ {T₁ T₂}, to_U T₁ = to_U T₂ → T₁ = T₂
   /-- Proof that this image is convex -/
-  convex : Convex ℝ (Set.image to_U Set.univ)
+  convex : Convex ℝ (Set.range to_U)
   /-- Function to get a T from a proof that U is in the set. `Mixable.default_mkT` always
   works as a default (noncomputable) value, but typically a `T.mk` method will make
   more sense. -/
-  mkT : {u : U} → (u ∈ to_U '' Set.univ) → { t : T // to_U t = u }
+  mkT : {u : U} → (∃ t, to_U t = u) → { t : T // to_U t = u }
 
 namespace Mixable
 
-variable {T : Type*} [inst : Mixable T]
+variable {T : Type*}
 
-def mix (p : Prob) (x₁ x₂ : T) :=
+@[reducible]
+def mix_ab [inst : Mixable T] {a b : ℝ} (ha : 0 ≤ a) (hb : 0 ≤ b) (hab : a + b = 1) (x₁ x₂ : T) :=
   let _ := inst.instU1
   let _ := inst.instU2
-  inst.mkT <| inst.convex (x := to_U x₁) (by simp) (y := to_U x₂) (by simp)
-      p.zero_le_coe p.one_minus.zero_le_coe p.add_one_minus
+  inst.mkT <| inst.convex
+    (x := to_U x₁) (exists_apply_eq_apply _ _)
+    (y := to_U x₂) (exists_apply_eq_apply _ _)
+    ha hb hab
+
+def mix [Mixable T] (p : Prob) (x₁ x₂ : T) :=
+  mix_ab p.zero_le_coe p.one_minus.zero_le_coe p.add_one_minus x₁ x₂
+
+@[simp]
+theorem to_U_of_mkT [Mixable T] (u : U T) {h} : to_U (mkT (u := u) h).1 = u :=
+  (mkT (u := u) h).2
 
 notation p "[" x₁ "↔" x₂ "]" => mix p x₁ x₂
 
---When T is the whole space U, and T is a suitable vector space over ℝ, we get a Mixable instance.
+/--When T is the whole space U, and T is a suitable vector space over ℝ, we get a Mixable instance.-/
 instance instUniv [AddCommMonoid T] [SMul ℝ T] : Mixable T where
   U := T
   to_U := id
   to_U_inj := id
   convex := by
     convert convex_univ
-    simp only [id_eq, Set.image_univ, Set.range_id']
-  mkT := fun {t} _ ↦ ⟨t, rfl⟩
+    simp only [Set.range_id]
+  mkT := fun _ ↦ ⟨_, rfl⟩
 
 @[simp]
 theorem mkT_instUniv [AddCommMonoid T] [SMul ℝ T] (h) : @Mixable.mkT T instUniv t h = ⟨t, rfl⟩ :=
@@ -256,6 +266,25 @@ theorem mkT_instUniv [AddCommMonoid T] [SMul ℝ T] (h) : @Mixable.mkT T instUni
 theorem to_U_instUniv [AddCommMonoid T] [SMul ℝ T] : @Mixable.to_U T instUniv t = t :=
   rfl
 
+/-- Mixable instance on Pi types. Could be dependent but this is not. -/
+instance instPi (D : Type*) [inst : Mixable T] : Mixable (D → T) where
+  U := D → inst.U
+  instU1 := let k := inst.instU1; Pi.addCommMonoid
+  instU2 := let k := inst.instU2; Pi.instSMul
+  to_U x := fun d ↦ inst.to_U (x d)
+  to_U_inj h := funext fun d ↦ inst.to_U_inj (congrFun h d)
+  mkT := fun {t} h ↦ ⟨fun d ↦ inst.mkT (u := t d) (by
+      obtain ⟨t₂, h⟩ := h
+      use t₂ d
+      exact congrFun h d),
+    by funext d; simp⟩
+  convex := by
+    simp [Convex, StarConvex]
+    intro f₁ f₂ a b ha hb hab
+    use fun d ↦ mix_ab ha hb hab (f₁ d) (f₂ d)
+    funext d
+    simp only [to_U_of_mkT, Pi.add_apply, Pi.smul_apply]
+
 end Mixable
 
 namespace Prob
@@ -264,8 +293,8 @@ instance mixable : Mixable Prob where
   U := ℝ
   to_U := Prob.toReal
   to_U_inj := Prob.eq
+  mkT := fun h ↦ ⟨⟨_, Exists.casesOn h fun t ht => ht ▸ t.prop⟩, rfl⟩
   convex := sorry
-  mkT := fun {r} h ↦ ⟨⟨r, sorry⟩, rfl⟩
 
 @[simp]
 theorem U_mixable [AddCommMonoid T] [SMul ℝ T] : @Mixable.U Prob mixable = ℝ :=

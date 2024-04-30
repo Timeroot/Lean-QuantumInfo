@@ -48,5 +48,3 @@ structure BlockCode (io : I → O) extends FixedLengthCode A I O where
     sorry
   enc_maps_length := sorry
   dec_maps_length := sorry
-
-#check (inferInstance : Fintype (Fin 5 ⊕ Unit))

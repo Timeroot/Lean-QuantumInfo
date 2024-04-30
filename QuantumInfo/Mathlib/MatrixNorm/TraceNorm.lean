@@ -30,14 +30,9 @@ theorem traceNorm_Hermitian_eq_sum_abs_eigenvalues {A : Matrix n n R} (hA : A.Is
   sorry --Diagonalize A
 
 /-- The trace norm is nonnegative. Property 9.1.1 in Wilde -/
-theorem traceNorm_nonneg (A : Matrix m n R) : 0 ≤ A.traceNorm := by
-  unfold traceNorm
-  have : 0 ≤ A.posSemidef_conjTranspose_mul_self.sqrt.trace := by
-    rw [Matrix.trace]
-    apply Finset.sum_nonneg
-    simp_rw [Finset.mem_univ, forall_true_left]
-    exact A.posSemidef_conjTranspose_mul_self.posSemidef_sqrt.diag_nonneg
-  exact And.left $ RCLike.nonneg_iff.1 this
+theorem traceNorm_nonneg (A : Matrix m n R) : 0 ≤ A.traceNorm :=
+  And.left $ RCLike.nonneg_iff.1
+    A.posSemidef_conjTranspose_mul_self.posSemidef_sqrt.trace_nonneg
 
 /-- The trace norm is zero only if the matrix is zero. -/
 theorem traceNorm_zero_iff (A : Matrix m n R) : A.traceNorm = 0 ↔ A = 0 := by
@@ -57,22 +52,6 @@ theorem traceNorm_zero_iff (A : Matrix m n R) : A.traceNorm = 0 ↔ A = 0 := by
     have : (0 : Matrix m n R)ᴴ * (0 : Matrix m n R) = 0 := by simp
     rw [traceNorm, PosSemidef.sqrt_eq this _ Matrix.PosSemidef.zero]
     simp
-
-  -- apply Finset.sum_nonneg
-  --   simp_rw [Finset.mem_univ, forall_true_left]
-  --   exact A.posSemidef_conjTranspose_mul_self.posSemidef_sqrt.diag_nonneg
-  -- exact And.left $ RCLike.nonneg_iff.1 this
-
--- BACKPORT -- REMOVE LATER
-@[simp]
-lemma _root_.RCLike.ofReal_le_ofReal {K : Type*} [RCLike K] {x y : ℝ} : (x : K) ≤ (y : K) ↔ x ≤ y := by
-  rw [RCLike.le_iff_re_im]
-  simp
-
-@[simp]
-lemma _root_.RCLike.ofReal_nonneg {K : Type*} [RCLike K] {x : ℝ} : 0 ≤ (x : K) ↔ 0 ≤ x := by
-  rw [← RCLike.ofReal_zero, RCLike.ofReal_le_ofReal]
--- END BACKPORT
 
 /-- Trace norm is linear under scalar multiplication. Property 9.1.2 in Wilde -/
 theorem traceNorm_smul (A : Matrix m n R) (c : R) : (c • A).traceNorm = ‖c‖ * A.traceNorm := by
@@ -111,5 +90,3 @@ theorem PosSemidef.traceNorm_PSD_eq_trace {A : Matrix m m R} (hA : A.PosSemidef)
 end traceNorm
 
 end Matrix
-
-#check ENNReal.finset_card_const_le_le_of_tsum_le

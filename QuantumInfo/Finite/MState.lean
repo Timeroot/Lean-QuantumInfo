@@ -41,6 +41,22 @@ theorem Hermitian (ρ : MState d) : ρ.m.IsHermitian :=
 theorem ext {ρ₁ ρ₂ : MState d} (h : ρ₁.m = ρ₂.m) : ρ₁ = ρ₂ := by
   rwa [MState.mk.injEq]
 
+instance instMixable : Mixable (MState d) where
+  U := Matrix d d ℂ
+  to_U := MState.m
+  to_U_inj := ext
+  mkT := fun h ↦ ⟨⟨_,
+    Exists.casesOn h fun t ht => ht ▸ t.pos,
+    Exists.casesOn h fun t ht => ht ▸ t.tr⟩, rfl⟩
+  convex := by
+    simp only [Convex, Set.mem_range, StarConvex,
+      forall_exists_index, forall_apply_eq_imp_iff]
+    intro x y a b ha hb hab
+    replace ha : 0 ≤ (a : ℂ) := by norm_cast
+    replace hb : 0 ≤ (b : ℂ) := by norm_cast
+    replace hab : a + b = (1 : ℂ) := by norm_cast
+    exact ⟨⟨_, x.pos.convex_cone y.pos ha hb, by simpa [x.tr, y.tr] using hab⟩, rfl⟩
+
 --An MState is a witness that d is nonempty.
 instance nonempty (ρ : MState d) : Nonempty d := by
   by_contra h
@@ -62,6 +78,8 @@ theorem PosSemidef_outer_self_conj (v : d → ℂ) : Matrix.PosSemidef (Matrix.v
     rw [this, ← map_sum, ← Complex.normSq_eq_conj_mul_self, Complex.zero_le_real, ← Complex.sq_abs]
     exact sq_nonneg _
 
+section pure
+
 /-- A mixed state as a pure state arising from a ket. -/
 def pure (ψ : Ket d) : MState d where
   m := Matrix.vecMulVec ψ (ψ : Bra d)
@@ -73,6 +91,73 @@ def pure (ψ : Ket d) : MState d where
     have h₂ := congrArg Complex.ofReal ψ.normalized
     simpa using h₂
 
+def purity (ρ : MState d) : Prob :=
+  ⟨RCLike.re (ρ.m * ρ.m).trace, ⟨by
+    suffices 0 ≤ Matrix.trace (ρ.m * ρ.m) by
+      exact (RCLike.nonneg_iff.mp this).1
+    nth_rewrite 1 [← ρ.pos.1]
+    exact ρ.m.posSemidef_conjTranspose_mul_self.trace_nonneg,
+      by
+    nth_rewrite 1 [← ρ.pos.1]
+    convert ρ.pos.inner_le_mul_trace ρ.pos
+    simp [ρ.tr]
+    ⟩⟩
+
+/-- The eigenvalue spectrum of a mixed quantum state, as a `Distribution`. -/
+def spectrum (ρ : MState d) : Distribution d :=
+  Distribution.mk'
+    (fun i ↦ ρ.Hermitian.eigenvalues i) --The values are the eigenvalues
+    (fun i ↦ ρ.pos.eigenvalues_nonneg i) --The values are all nonnegative
+    (by --The values sum to 1
+      have h := congrArg Complex.re (ρ.Hermitian.sum_eigenvalues_eq_trace)
+      simp only [ρ.tr, RCLike.ofReal_sum, Complex.re_sum, Complex.one_re] at h
+      rw [← h]
+      rfl)
+
+/-- The specturm of a pure state is (1,0,0,...), i.e. a constant distribution. -/
+theorem spectrum_pure_eq_constant (ψ : Ket d) :
+    ∃ i, (pure ψ).spectrum = Distribution.constant i := by
+  let ρ := pure ψ
+  let ρ_linMap := Matrix.toEuclideanLin ρ.m
+  -- have ρ_linMap_evals := Matrix.isHermitian_iff_isSymmetric.1 ρ.Hermitian
+  --Prove that "1" is in the spectrum by exhibiting an eigenvector with value 1.
+  have hasLinMapEigen1 : Module.End.HasEigenvalue ρ_linMap 1 := by
+    --The eigenvector 1 witness, which is ψ.
+    let x1 : EuclideanSpace ℂ d := ψ.vec
+    apply Module.End.hasEigenvalue_of_hasEigenvector (x := x1)
+    constructor --to show it's an eigenvector, show that it's scaled and nonzero.
+    · rw [Module.End.mem_eigenspace_iff, one_smul]
+      change (pure ψ).m *ᵥ ψ.vec = ψ.vec
+      ext
+      simp_rw [pure, Matrix.mulVec, Matrix.vecMulVec_apply, Matrix.dotProduct, Bra.apply',
+        Ket.apply, mul_assoc, ← Finset.mul_sum, ← Complex.normSq_eq_conj_mul_self,
+        ← Complex.ofReal_sum, ← Ket.apply, ψ.normalized, Complex.ofReal_one, mul_one]
+    · have : ‖x1‖ = 1 := by
+        rw [PiLp.norm_eq_of_L2, ψ.normalized']
+        exact Real.sqrt_one
+      by_contra hz
+      simp only [hz, norm_zero, zero_ne_one] at this
+  --If 1 is in the spectrum of ρ_linMap, it's in the spectrum of pure ψ.
+  have : ∃i, (pure ψ).spectrum i = 1 := by
+    sorry
+  --If 1 is in a distribution, the distribution is a constant.
+  sorry
+
+/-- If the specturm of a mixed state is (1,0,0...) i.e. a constant distribution, it is
+ a pure state. -/
+theorem pure_of_constant_spectrum (ρ : MState d) (h : ∃ i, ρ.spectrum = Distribution.constant i) :
+    ∃ ψ, ρ = pure ψ :=
+  sorry
+
+theorem pure_iff_purity_one (ρ : MState d) : (∃ ψ, ρ = pure ψ) ↔ ρ.purity = 1 := by
+  --purity = exp(-Collision entropy)
+  --purity eq 1 iff collision entropy is zero
+  --entropy is zero iff distribution is constant
+  --disttibution is constant iff pure
+  sorry
+
+end pure
+
 section prod
 
 def prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : MState (d₁ × d₂) where
@@ -83,13 +168,25 @@ def prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : MState (d₁ × d₂) whe
 notation ρL "⊗" ρR => prod ρL ρR
 
 /-- The product of pure states is a pure state (specifically of the product ket.) -/
-theorem pure_prod_pure (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : pure (ψ₁ ⊗ ψ₂) = ((pure ψ₁) ⊗ (pure ψ₂) : MState _) := by
-  dsimp [pure, prod, Braket.prod]
+theorem pure_prod_pure (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : pure (ψ₁ ⊗ ψ₂) = (pure ψ₁) ⊗ (pure ψ₂) := by
   ext
-  simp [Matrix.vecMulVec_apply, Ket.apply]
+  simp only [pure, Ket.prod, Ket.apply, Matrix.vecMulVec_apply, Bra.eq_conj, map_mul, prod,
+    Matrix.kroneckerMap_apply]
   ring
 
 end prod
+
+/-- A representation of a classical distribution as a quantum state, diagonal in the given basis. -/
+def ofClassical (dist : Distribution d) : MState d where
+  m := Matrix.diagonal (fun x ↦ dist x)
+  pos := by simp [Matrix.posSemidef_diagonal_iff]
+  tr := by
+    simp [Matrix.trace_diagonal]
+    have h₃ := dist.2
+    norm_cast
+
+/-- The maximally mixed state. -/
+def uniform [Nonempty d] : MState d := ofClassical Distribution.uniform
 
 section ptrace
 
@@ -155,47 +252,6 @@ theorem trace_right_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : trace_
 end ptrace
 
 -- TODO: direct sum (by zero-padding)
--- Mixing (convexity)
-
-/-- The eigenvalue spectrum of a mixed quantum state, as a `Distribution`. -/
-def spectrum (ρ : MState d) : Distribution d :=
-  Distribution.mk'
-    (fun i ↦ ρ.Hermitian.eigenvalues i) --The values are the eigenvalues
-    (fun i ↦ ρ.pos.eigenvalues_nonneg i) --The values are all nonnegative
-    (by --The values sum to 1
-      have h := congrArg Complex.re (ρ.Hermitian.sum_eigenvalues_eq_trace)
-      simp only [ρ.tr, RCLike.ofReal_sum, Complex.re_sum, Complex.one_re] at h
-      rw [← h]
-      rfl)
-
-/-- The specturm of a pure state is (1,0,0,...), i.e. a constant distribution. -/
-theorem spectrum_pure_eq_constant (ψ : Ket d) :
-    ∃ i, (pure ψ).spectrum = Distribution.constant i := by
-  let ρ := pure ψ
-  let ρ_linMap := Matrix.toEuclideanLin ρ.m
-  -- have ρ_linMap_evals := Matrix.isHermitian_iff_isSymmetric.1 ρ.Hermitian
-  --Prove that "1" is in the spectrum by exhibiting an eigenvector with value 1.
-  have hasLinMapEigen1 : Module.End.HasEigenvalue ρ_linMap 1 := by
-    --The eigenvector 1 witness, which is ψ.
-    let x1 : EuclideanSpace ℂ d := ψ.vec
-    apply Module.End.hasEigenvalue_of_hasEigenvector (x := x1)
-    constructor --to show it's an eigenvector, show that it's scaled and nonzero.
-    · rw [Module.End.mem_eigenspace_iff, one_smul]
-      change (pure ψ).m *ᵥ ψ.vec = ψ.vec
-      ext
-      simp_rw [pure, Matrix.mulVec, Matrix.vecMulVec_apply, Matrix.dotProduct, Bra.apply',
-        Ket.apply, mul_assoc, ← Finset.mul_sum, ← Complex.normSq_eq_conj_mul_self,
-        ← Complex.ofReal_sum, ← Ket.apply, ψ.normalized, Complex.ofReal_one, mul_one]
-    · have : ‖x1‖ = 1 := by
-        rw [PiLp.norm_eq_of_L2, ψ.normalized']
-        exact Real.sqrt_one
-      by_contra hz
-      simp only [hz, norm_zero, zero_ne_one] at this
-  --If 1 is in the spectrum of ρ_linMap, it's in the spectrum of pure ψ.
-  have : ∃i, (pure ψ).spectrum i = 1 := by
-    sorry
-  --If 1 is in a distribution, the distribution is a constant.
-  sorry
 
 --TODO: Spectra of left- and right- partial traces of a pure state are equal.
 
@@ -252,15 +308,6 @@ def purify' (ρ : MState d) : { ψ : Ket (d × d) // (pure ψ).trace_right = ρ 
   ⟨ρ.purify, ρ.trace_right_of_purify⟩
 
 end purification
-
-/-- A representation of a classical distribution as a quantum state, diagonal in the given basis. -/
-def ofClassical (dist : Distribution d) : MState d where
-  m := Matrix.diagonal (fun x ↦ dist x)
-  pos := by simp [Matrix.posSemidef_diagonal_iff]
-  tr := by
-    simp [Matrix.trace_diagonal]
-    have h₃ := dist.2
-    norm_cast
 
 --TODO: Swap and assoc for kets.
 --TODO: Connect these to unitaries (when they can be)

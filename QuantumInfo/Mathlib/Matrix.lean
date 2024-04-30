@@ -20,6 +20,9 @@ namespace IsHermitian
 variable {A B}
 variable (hA : A.IsHermitian) (hB : B.IsHermitian)
 
+theorem smul {c : 𝕜} (h : RCLike.im c = 0) : (c • A).IsHermitian := by
+  rw [IsHermitian, Matrix.conjTranspose_smul, RCLike.star_def, RCLike.conj_eq_iff_im.mpr h, hA]
+
 @[simp]
 theorem re_trace_eq_trace : RCLike.re (A.trace) = A.trace := by
   rw [trace, map_sum, RCLike.ofReal_sum, IsHermitian.coe_re_diag hA]
@@ -85,21 +88,53 @@ variable {m n 𝕜 : Type*}
 variable [Fintype m] [Fintype n]
 variable [RCLike 𝕜] [DecidableEq n] [DecidableEq m]
 
-variable {A : Matrix m m 𝕜} {B : Matrix n n 𝕜} {C : Matrix m m 𝕜}
-variable (hA : A.PosSemidef) (hB : B.PosSemidef) (hC : C.PosSemidef)
+section
+variable {A : Matrix m m 𝕜} {B : Matrix m m 𝕜}
+variable (hA : A.PosSemidef) (hB : B.PosSemidef)
+
+theorem add : (A + B).PosSemidef := by
+  constructor
+  · exact hA.1.add hB.1
+  · intro x
+    rw [Matrix.add_mulVec, Matrix.dotProduct_add]
+    exact add_nonneg (hA.2 x) (hB.2 x)
+
+theorem smul {c : 𝕜} (h : 0 ≤ c): (c • A).PosSemidef := by
+  constructor
+  · apply hA.1.smul (RCLike.nonneg_iff.mp h).2
+  · intro x
+    rw [Matrix.smul_mulVec_assoc, Matrix.dotProduct_smul]
+    exact mul_nonneg h (hA.2 x)
+
+theorem convex_cone {c₁ c₂ : 𝕜} (hc₁ : 0 ≤ c₁) (hc₂ : 0 ≤ c₂) : (c₁ • A + c₂ • B).PosSemidef :=
+  (hA.smul hc₁).add (hB.smul hc₂)
 
 /-- The inner product for PSD matrices is nonnegative. -/
-theorem inner_ge_zero : 0 ≤ A.inner C :=
+theorem inner_ge_zero : 0 ≤ A.inner B :=
   let tmp₁ := hA
   let tmp₂ := hB
   sorry
 
-/-- The inner product for PSD matrices is at most the product of their
-  traces. -/
-theorem inner_le_mul_trace : A.inner C ≤ A.trace * C.trace :=
+/-- The inner product for PSD matrices is at most the product of their traces. -/
+theorem inner_le_mul_trace : A.inner B ≤ RCLike.re A.trace * RCLike.re B.trace :=
   let tmp₁ := hA
   let tmp₂ := hB
   sorry
+
+theorem diag_nonneg (hA : A.PosSemidef) : ∀i, 0 ≤ A.diag i := by
+  intro i
+  simpa [Matrix.mulVec, Matrix.dotProduct] using hA.2 (fun j ↦ if i = j then 1 else 0)
+
+theorem trace_nonneg : 0 ≤ A.trace := by
+  rw [Matrix.trace]
+  apply Finset.sum_nonneg
+  simp_rw [Finset.mem_univ, forall_true_left]
+  exact hA.diag_nonneg
+
+end
+
+variable {A : Matrix m m 𝕜} {B : Matrix n n 𝕜}
+variable (hA : A.PosSemidef) (hB : B.PosSemidef)
 
 theorem PosSemidef_kronecker : (A ⊗ₖ B).PosSemidef := by
   rw [hA.left.spectral_theorem', hB.left.spectral_theorem']
@@ -114,10 +149,6 @@ theorem PosSemidef_kronecker : (A ⊗ₖ B).PosSemidef := by
   convert mul_nonneg (hA.eigenvalues_nonneg i₁) (hB.eigenvalues_nonneg i₂)
   rw [RCLike.nonneg_iff]
   simp
-
-theorem diag_nonneg (hA : A.PosSemidef) : ∀i, 0 ≤ A.diag i := by
-  intro i
-  simpa [Matrix.mulVec, Matrix.dotProduct] using hA.2 (fun j ↦ if i = j then 1 else 0)
 
 lemma sqrt_eq {A B : Matrix m m 𝕜} (h : A = B) (hA : A.PosSemidef) (hB : B.PosSemidef) :
     hA.sqrt = hB.sqrt := by

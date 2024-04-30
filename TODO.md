@@ -125,8 +125,8 @@ Definition 4.1.1: Matrix trace.
 Exercise 4.1.1: The trace is cyclic.
 ✅ `Matrix.trace_mul_cycle` in Mathlib.
 
-Definition 4.1.2: The density operator.
-✅ `MState` in `QuantumInfo.Finite.MState`
+Definition 4.1.2: Defining the density operator of an ensemble.
+❓ We define density operators, but could write an "of_ensemble" function.
 
 Exercise 4.1.2: The density matrix of `pure (indicator 0)`.
 🤷 Feels specific and not like a useful lemma.
@@ -139,3 +139,67 @@ Exercise 4.1.4: Trace of operator functions, `Tr[f(GG*)] = Tr[f(G*G)]`.
 
 Exercise 4.1.5: Computing density operators of some particular ensembles.
 🤷
+
+Exercise 4.1.6: The spectrum of a density operator forms a distribution.
+✅ `MState.spectrum` is a `Distribution`, in `QuantumInfo.Finite.MState`.
+
+Definition 4.1.3: The density operator is a PSD operator with trace 1.
+✅ `MState` in `QuantumInfo.Finite.MState`.
+
+Definition 4.1.4: The maximally mixed state.
+✅ `MState.uniform` in `QuantumInfo.Finite.MState`.
+
+Exercise 4.1.7: A uniform ensemble of {|0⟩, |1⟩, |+⟩, |-⟩} is the maximally mixed state.
+🤷
+
+Exercise 4.1.8: The set of density operators is a convex set.
+✅ `MState.instMixable` in `QuantumInfo.Finite.MState`.
+
+Definition 4.1.5: Purity of a mixed state.
+✅ `MState.purity` in `QuantumInfo.Finite.MState`.
+
+Exercise 4.1.9: Purity is equal to 1 iff the state is pure.
+📝 `MState.pure_iff_purity_one` in `QuantumInfo.Finite.MState`.
+
+Exercise 4.1.10-4.1.13: Specific to qubits and the Bloch sphere.
+❓
+
+Unitary Evolution of a Mixed State
+✅ `MState.U_conj` in `QuantumInfo.Finite.Unitary`
+
+Evolution of an ensemble of mixed states
+❓ Could define ensemble as distribution over a finite set of MStates.
+
+Exercise 4.1.14, 4.1.15: Some facts about embedding classical probabilities into quantum states.
+🤷 Probably not useful for anything else.
+
+Definition 4.2.1: POVMs as PSD matrices that sum to the identity.
+✅ `POVM` in `QuantumInfo.Finite.POVM`.
+
+Exercise 4.2.1: The five "Chrysler" states on a qubit, scaled down by (2/5), form a POVM.
+🤷 Very specific.
+
+Exercise 4.2.2(a): Suppose an ensemble ρ_X has a bound τ, so that ∀(x ∈ X), τ ≽ p_x ρ(x). Then the maximum expected probability of a POVM identifying x from the distribution is at most Tr[τ].
+Exercise 4.2.2(b): In a d dimensional ensemble, no more than d possible symbols can be lossessly stored.
+❓ Seems unlikely to be used later but fine to state and prove.
+
+Definition 4.3.1: Product State (density operator).
+✅ `MState.prod` in `QuantumInfo.Finite.MState` constructs product states. No predicate form.
+
+Exercise 4.3.1(a): `ρ.purity = (U_swap * ρ ⊗ ρ).trace`.
+Exercise 4.3.1(b): For an operator function `f`, `Tr[f(ρ)] = ( f(ρ) ⊗ I(d) ).swap.trace`.
+❓ Should be an easy index chase.
+
+Exercise 4.3.2: Just a step of a scenario, not really a theorem.
+🤷
+
+Exercise 4.3.3: Every separable state `Σ x, ρx ⊗ σx` is also of the form `∑ x, pure (φ x) ⊗ pure (ψ x)`.
+
+Definition 4.3.2: Separable state.
+✅ `MState.IsSeparable` in `QuantumInfo.Finite.MState`.
+
+Definition 4.3.3: Entangled (mixed) state.
+✅ `MState.IsEntangled` in `QuantumInfo.Finite.MState`.
+
+Exercise 4.3.4: Convexity of separable states.
+❓ Will have to write this as `Mixable { ρ : MState (d₁ × d₂) // ρ.IsSeparable }`.
