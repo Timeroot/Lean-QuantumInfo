@@ -160,13 +160,7 @@ instance canLiftNN : CanLift ℝ≥0 Prob toNNReal fun r => r ≤ 1 :=
 protected theorem eq_iff_nnreal (n m : Prob) : (n : ℝ≥0) = (m : ℝ≥0) ↔ n = m := by
   obtain ⟨n,hn⟩ := n
   obtain ⟨m,hn⟩ := m
-  simp
-  constructor
-  · intro h
-    sorry
-  · intro h
-    subst h
-    rfl
+  simp only [toNNReal_mk, Subtype.mk.injEq, NNReal]
 
 @[simp, norm_cast]
 theorem toNNReal_zero : (0 : Prob) = (0 : ℝ≥0) :=
@@ -289,23 +283,29 @@ end Mixable
 
 namespace Prob
 
-instance mixable : Mixable Prob where
+instance instMixable : Mixable Prob where
   U := ℝ
   to_U := Prob.toReal
   to_U_inj := Prob.eq
   mkT := fun h ↦ ⟨⟨_, Exists.casesOn h fun t ht => ht ▸ t.prop⟩, rfl⟩
-  convex := sorry
+  convex := by
+    simp [Convex, StarConvex]
+    intro x hx0 hx1 y hy0 hy1 a b ha hb hab
+    constructor
+    · positivity
+    · nlinarith
 
 @[simp]
-theorem U_mixable [AddCommMonoid T] [SMul ℝ T] : @Mixable.U Prob mixable = ℝ :=
+theorem U_mixable [AddCommMonoid T] [SMul ℝ T] : Mixable.U Prob = ℝ :=
   rfl
 
 @[simp]
-theorem to_U_mixable [AddCommMonoid T] [SMul ℝ T] : @Mixable.to_U Prob mixable t = t :=
+theorem to_U_mixable [AddCommMonoid T] [SMul ℝ T] (t : Prob): Mixable.to_U t = t :=
   rfl
 
 @[simp]
-theorem mkT_mixable : @Mixable.mkT Prob mixable t h = ⟨⟨t, sorry⟩, rfl⟩ :=
+theorem mkT_mixable (u : ℝ) (h : ∃ t : Prob, Mixable.to_U t = u) : Mixable.mkT h =
+    ⟨⟨u,Exists.casesOn h fun t ht ↦ ht ▸ t.2⟩, rfl⟩ :=
   rfl
 
 /-- Alias of `Mixable.mix` so it can be accessed from a probability. -/

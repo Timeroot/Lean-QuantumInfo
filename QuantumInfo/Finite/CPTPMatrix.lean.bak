@@ -1,207 +1,139 @@
 import QuantumInfo.Finite.MState
 import QuantumInfo.Finite.Unitary
-import Mathlib.LinearAlgebra.TensorProduct.Matrix
-import Mathlib.Data.Set.Card
 
-/-- A `MatrixMap` is a linear map between squares matrices of size A to size B, over R. -/
-abbrev MatrixMap (A B R : Type*) [Semiring R] := Matrix A A R →ₗ[R] Matrix B B R
-
-namespace MatrixMap
-
-section matrix
-variable {A B C D E F R : Type*}
-  [Fintype A] [Fintype B] [Fintype C] [Fintype D] [Fintype E] [Fintype F] [Semiring R]
-  [DecidableEq A] [DecidableEq B] [DecidableEq C] [DecidableEq D]
-
-/-- Choi matrix of a given linear matrix map. Note that this is defined even for things that
-  aren't CPTP, it's just rarely talked about in those contexts. -/
-def choi_matrix (M : MatrixMap A B R) : Matrix (A × B) (A × B) R :=
-  fun (i₁,j₁) (i₂,j₂) ↦ M (Matrix.stdBasisMatrix i₁ i₂ 1) j₁ j₂
-
-def of_choi_matrix (M : Matrix (A × B) (A × B) R) : MatrixMap A B R :=
-  sorry
-  -- fun (j₁,j₂) (i₁,i₂) ↦ M (i₁,j₁) (i₂,j₂)
-
-@[simp]
-theorem map_choi_inv (M : Matrix (A × B) (A × B) R) : choi_matrix (of_choi_matrix M) = M :=
-  sorry--rfl
-
-@[simp]
-theorem choi_map_inv (M : MatrixMap A B R) : of_choi_matrix (choi_matrix M) = M :=
-  sorry
-
-  -- suffices asMatrixMap (matrixMap_kron M 1) x' = Matrix.submatrix (asMatrixMap M x) eqB eqB by
-  --   rw [← Matrix.posSemidef_submatrix_equiv eqB, ← this]
-  --   exact hM 1 (hx.PosSemidef_kronecker Matrix.PosSemidef.one)
-  -- unfold_let eqB x'
-  -- ext ⟨a1,aU⟩ ⟨b1,bU⟩
-  -- simp [submatrix, Fin.fin_one_eq_zero, Matrix.mulVec, Matrix.dotProduct, asMatrixMap, matrixMap_kron]
-
--- theorem asMatrixMap_mul (M₁ : Matrix (C × D) (A × B) R) (M₂ : Matrix (E × F) (C × D) R) :
---     (M₂ * M₁).asMatrixMap = M₂.asMatrixMap ∘ M₁.asMatrixMap := by
---   ext x i j
---   simp only [asMatrixMap, mulVec, dotProduct, Fintype.sum_prod_type, of_apply, mul_assoc,
---     Function.comp_apply, Prod.mk.eta, Matrix.mul_apply, Finset.mul_sum, Finset.sum_mul]
---   rw [Finset.sum_comm_3]
---   congr 1
---   ext c
---   rw [Finset.sum_comm_3]
-
-variable {R : Type*} [CommSemiring R]
-
-/-- Linear equivalence between MatrixMap's and matrices on a larger space. -/
-noncomputable def toMatrix : MatrixMap A B R ≃ₗ[R] Matrix (B × B) (A × A) R :=
-  LinearMap.toMatrix (Matrix.stdBasis R A A) (Matrix.stdBasis R B B)
-
-theorem toMatrix_comp (M₁ : MatrixMap A B R) (M₂ : MatrixMap B C R) : toMatrix (M₂ ∘ₗ M₁) = (toMatrix M₂) * (toMatrix M₁) :=
-  LinearMap.toMatrix_comp _ _ _ M₂ M₁
-
--- /-- The canonical tensor product on linear maps between matrices, where a map from
---   M[A,B] to M[C,D] is given by M[A×C,B×D]. This tensor product acts independently on
---   Kronecker products and gives Kronecker products as outputs. -/
--- def matrixMap_kron (M₁ : Matrix (A₁ × B₁) (C₁ × D₁) R) (M₂ : Matrix (A₂ × B₂) (C₂ × D₂) R) : Matrix ((A₁ × A₂) × (B₁ × B₂)) ((C₁ × C₂) × (D₁ × D₂)) R :=
---   Matrix.of fun ((a₁, a₂), (b₁, b₂)) ((c₁, c₂), (d₁, d₂)) ↦
---     (M₁ (a₁, b₁) (c₁, d₁)) * (M₂ (a₂, b₂) (c₂, d₂))
-
-theorem choi_matrix_inj : Function.Injective (@choi_matrix A B R _ _) := by
-  intro x y h
-  simpa only [choi_map_inv] using congrArg of_choi_matrix h
-
-end matrix
-
-section prod
-
-variable {A B C D R : Type*} [Fintype A] [Fintype B] [Fintype C] [Fintype D]
-variable [CommSemiring R] [DecidableEq A] [DecidableEq B] [DecidableEq C] [DecidableEq D]
-
-noncomputable def MatrixMap_Prod (M₁ : MatrixMap A B R) (M₂ : MatrixMap C D R) : MatrixMap (A × C) (B × D) R :=
-  let h₁ := (LinearMap.toMatrix (Basis.tensorProduct (Matrix.stdBasis R A A) (Matrix.stdBasis R C C))
-      (Basis.tensorProduct (Matrix.stdBasis R B B) (Matrix.stdBasis R D D)))
-    (TensorProduct.map M₁ M₂);
-  let r₁ := Equiv.prodProdProdComm B B D D;
-  let r₂ := Equiv.prodProdProdComm A A C C;
-  let h₂ := Matrix.reindex r₁ r₂ h₁;
-  Matrix.toLin (Matrix.stdBasis R (A × C) (A × C)) (Matrix.stdBasis R (B × D) (B × D)) h₂
-
-open BigOperators
-theorem MatrixMap_Prod_def (M₁ : MatrixMap A B R) (M₂ : MatrixMap C D R) (M : Matrix (A × C) (A × C) R) : MatrixMap_Prod M₁ M₂ M (b₁, d₁) (b₂, d₂) =
-  ∑ a₁, ∑ a₂, ∑ c₁, ∑ c₂, (M₁ (Matrix.stdBasisMatrix a₁ a₂ 1) b₁ b₂) * (M₂ (Matrix.stdBasisMatrix c₁ c₂ 1) d₁ d₂) * (M (a₁, c₁) (a₂, c₂)) := by
-  -- dsimp [MatrixMap_Prod]
-  -- rw [Matrix.toLin]
-  -- dsimp [LinearMap.toMatrix, MatrixMap, Matrix.stdBasis, Matrix.reindex]
-  -- simp [Matrix.submatrix, Pi.basis, Matrix.mulVec]
-  -- simp_rw [Matrix.dotProduct]
-  -- simp
-  sorry
-
-open Kronecker
-theorem MatrixMap_Prod_kron (M₁ : MatrixMap A B R) (M₂ : MatrixMap C D R) (MA : Matrix A A R) (MC : Matrix C C R) : MatrixMap_Prod M₁ M₂ (MA ⊗ₖ MC) = (M₁ MA) ⊗ₖ (M₂ MC) := by
-  ext bd₁ bd₂
-  let (b₁, d₁) := bd₁
-  let (b₂, d₂) := bd₂
-  rw [MatrixMap_Prod_def]
-  simp only [Matrix.kroneckerMap_apply]
-  simp_rw [mul_assoc, ← Finset.mul_sum]
-  simp_rw [mul_comm (M₂ _ _ _), mul_assoc, ← Finset.mul_sum, ← mul_assoc]
-  simp_rw [← Finset.sum_mul]
-  congr
-  -- simp_rw [← Matrix.stdBasis_eq_stdBasisMatrix ]
-  -- unfold Matrix.stdBasisMatrix
-  -- simp_rw [← LinearMap.sum_apply]
-  -- simp
-  sorry
-  sorry
-
-end prod
+namespace Matrix
 
 variable {A B C D E F R : Type*}
-  [Fintype A] [Fintype B] [Fintype C] [Fintype D] [Fintype E] [Fintype F]
-  [DecidableEq A] [DecidableEq B] [DecidableEq C] [DecidableEq D]
-
+  [Fintype A] [Fintype B] [Fintype C] [Fintype D] [Fintype E] [Fintype F] [DecidableEq A]
+  [NonUnitalNonAssocSemiring R]
 open Kronecker
-open TensorProduct
 
-/-- A linear matrix map is *trace preserving* if trace of the output equals trace of the input. -/
-def IsTracePreserving [Semiring R] (M : MatrixMap A B R) : Prop :=
+/-- Given a `Matrix (C × D) (A × B) R`, this can also be viewed as a (linear) map from
+  `Matrix A B R` → `Matrix C D R`.-/
+def asMatrixMap (M : Matrix (C × D) (A × B) R) : Matrix A B R → Matrix C D R :=
+    fun arg ↦
+    let arg_vec : (A × B) → R := (fun ((i, j) : Prod A B) ↦ arg i j)
+    Matrix.of (fun i j ↦ (M *ᵥ arg_vec) (i, j))
+
+variable {R : Type*} [NonUnitalSemiring R]
+
+theorem asMatrixMap_mul (M₁ : Matrix (C × D) (A × B) R) (M₂ : Matrix (E × F) (C × D) R) :
+    (M₂ * M₁).asMatrixMap = M₂.asMatrixMap ∘ M₁.asMatrixMap := by
+  ext x i j
+  simp only [asMatrixMap, mulVec, dotProduct, Fintype.sum_prod_type, of_apply, mul_assoc,
+    Function.comp_apply, Prod.mk.eta, Matrix.mul_apply, Finset.mul_sum, Finset.sum_mul]
+  rw [Finset.sum_comm_3]
+  congr 1
+  ext c
+  rw [Finset.sum_comm_3]
+
+/-- A matrix map is *trace preserving* if trace of the output equals trace of the input. -/
+def _root_.IsTracePreserving (M : Matrix A A R → Matrix B B R) : Prop :=
   ∀ (x : Matrix A A R), (M x).trace = x.trace
 
-/-- The trace of a Choi matrix of a TP map is the cardinality of the input space. -/
-theorem trace_choi_iff_TP_map [Semiring R] (M : MatrixMap A B R) : M.IsTracePreserving
-    ↔ M.choi_matrix.trace = (Finset.univ (α := A)).card :=
-  sorry
+/-- A linear matrix map is *trace preserving* if trace of the output equals trace of the input. -/
+@[reducible]
+def IsTracePreserving (M : Matrix (B × B) (A × A) R) : Prop :=
+  _root_.IsTracePreserving M.asMatrixMap
 
 open ComplexOrder
-variable [RCLike R]
+variable {R : Type*} [RCLike R]
 
-/-- A linear matrix map is *Hermitian preserving* if it maps `IsHermitian` matrices to `IsHermitian`.-/
-def IsHermitianPreserving (M : MatrixMap A B R) : Prop :=
-  ∀{x}, x.IsHermitian → (M x).IsHermitian
+/-- A matrix map is *positive* if it maps `PosSemidef` matrices to `PosSemidef`.-/
+def _root_.IsPositiveMatrixMap (M : Matrix A A R → Matrix B B R) : Prop :=
+  ∀{x}, x.PosSemidef → (M x).PosSemidef
 
 /-- A linear matrix map is *positive* if it maps `PosSemidef` matrices to `PosSemidef`.-/
-def IsPositive (M : MatrixMap A B R) : Prop :=
-  ∀{x}, x.PosSemidef → (M x).PosSemidef
+@[reducible]
+def IsPositiveMap (M : Matrix (B × B) (A × A) R) : Prop :=
+  _root_.IsPositiveMatrixMap M.asMatrixMap
+
+variable (M₁ : Matrix (A₁ × B₁) (C₁ × D₁) R)
+variable (M₂ : Matrix (A₂ × B₂) (C₂ × D₂) R)
+
+/-- The canonical tensor product on linear maps between matrices, where a map from
+  M[A,B] to M[C,D] is given by M[A×C,B×D]. This tensor product acts independently on
+  Kronecker products and gives Kronecker products as outputs. -/
+def matrixMap_kron : Matrix ((A₁ × A₂) × (B₁ × B₂)) ((C₁ × C₂) × (D₁ × D₂)) R :=
+  Matrix.of fun ((a₁, a₂), (b₁, b₂)) ((c₁, c₂), (d₁, d₂)) ↦
+    (M₁ (a₁, b₁) (c₁, d₁)) * (M₂ (a₂, b₂) (c₂, d₂))
 
 /-- A linear matrix map is *completely positive* if, for any integer n, the tensor product
 with `I(n)` is positive. -/
-def IsCompletelyPositive (M : MatrixMap A B R) : Prop :=
-  ∀ (n : ℕ), (MatrixMap_Prod M (LinearMap.id : MatrixMap (Fin n) (Fin n) R)).IsPositive
+def IsCompletelyPositive (M : Matrix (B × B) (A × A) R) : Prop :=
+  ∀ (n : ℕ), IsPositiveMap (matrixMap_kron M (1 : Matrix (Fin n × _) (Fin n × _) _))
 
-/-- Choi's theorem on completely positive maps: Complete Positivity iff Choi Matrix is PSD. -/
-theorem choi_PSD_iff_CP_map (M : MatrixMap A B ℂ) : M.IsCompletelyPositive
-    ↔ M.choi_matrix.PosSemidef :=
-  sorry
-
---TODO: Positive maps are all Hermitian preserving, because positive matrices generate the full
---set of Hermitian matrices (generate as a vector space). Concretely, every pair of elements
--- (i,j) and (j,i) must be conjugate because we can look at the PSD matrices with 1's on (i,i),
--- on (j,j), and on all 4 elements (i or j, i or j).
-theorem IsPositive.IsHermitianPreserving (M : MatrixMap A B R)
-    (hM : IsPositive M) : IsHermitianPreserving M := by
-  sorry
-
-theorem IsCompletelyPositive.IsPositiveMap (M : MatrixMap A B R)
-    (hM : IsCompletelyPositive M) : IsPositive M := by
+theorem IsCompletelyPositive.IsPositiveMap {M : Matrix (B × B) (A × A) R}
+    (hM : M.IsCompletelyPositive) : M.IsPositiveMap := by
   intro x hx
   let x' : Matrix (A × Fin 1) (A × Fin 1) R := x ⊗ₖ 1
   let eqB : (B × Fin 1) ≃ B :=
     (Equiv.prodCongrRight (fun _ ↦ finOneEquiv)).trans (Equiv.prodPUnit B)
-  sorry
+  suffices asMatrixMap (matrixMap_kron M 1) x' = Matrix.submatrix (asMatrixMap M x) eqB eqB by
+    rw [← Matrix.posSemidef_submatrix_equiv eqB, ← this]
+    exact hM 1 (hx.PosSemidef_kronecker Matrix.PosSemidef.one)
+  unfold_let eqB x'
+  ext ⟨a1,aU⟩ ⟨b1,bU⟩
+  simp [submatrix, Fin.fin_one_eq_zero, Matrix.mulVec, Matrix.dotProduct, asMatrixMap, matrixMap_kron]
 
-end MatrixMap
+end Matrix
 
 variable (dIn dOut : Type*) [Fintype dIn] [Fintype dOut] [DecidableEq dIn]
 
 /-- Positive trace-preserving linear maps. These includes all channels, but aren't
   necessarily *completely* positive, see `CPTPMap`. -/
 structure PTPMap where
-  map : MatrixMap dIn dOut ℂ
-  pos : map.IsPositive
-  trace_preserving : map.IsTracePreserving
+  map_mat : Matrix (dOut × dOut) (dIn × dIn) ℂ
+  pos : map_mat.IsPositiveMap
+  trace_preserving : map_mat.IsTracePreserving
 
 /-- Quantum channels, aka CPTP maps: completely positive trace preserving linear maps. -/
 structure CPTPMap extends PTPMap dIn dOut where
-  mk' ::
-    completely_pos : map.IsCompletelyPositive
-
-variable {dIn dOut}
+  completely_pos : map_mat.IsCompletelyPositive
+  pos := completely_pos.IsPositiveMap
 
 namespace PTPMap
 noncomputable section
 open ComplexOrder
 
-@[ext]
-theorem ext {Λ₁ Λ₂ : PTPMap dIn dOut} (h : Λ₁.map = Λ₂.map) : Λ₁ = Λ₂ :=
-  PTPMap.mk.injEq Λ₁.map _ _ _ _ _ ▸ h
+variable {dIn dOut}
 
-theorem apply_PosSemidef (Λ : PTPMap dIn dOut) (hρ : ρ.PosSemidef) : (Λ.map ρ).PosSemidef :=
+@[ext]
+theorem ext {Λ₁ Λ₂ : PTPMap dIn dOut} (h : Λ₁.map_mat = Λ₂.map_mat) : Λ₁ = Λ₂ :=
+  PTPMap.mk.injEq Λ₁.map_mat _ _ _ _ _ ▸ h
+
+def apply (Λ : PTPMap dIn dOut) := Λ.map_mat.asMatrixMap
+
+theorem apply_PosSemidef (Λ : PTPMap dIn dOut) (hρ : ρ.PosSemidef) : (Λ.apply ρ).PosSemidef :=
   Λ.pos hρ
 
-theorem apply_trace (Λ : PTPMap dIn dOut) (ρ : Matrix dIn dIn ℂ) : (Λ.map ρ).trace = ρ.trace :=
+theorem apply_trace (Λ : PTPMap dIn dOut) (ρ : Matrix dIn dIn ℂ) : (Λ.apply ρ).trace = ρ.trace :=
   Λ.trace_preserving ρ
 
 instance instFunLike : FunLike (PTPMap dIn dOut) (MState dIn) (MState dOut) where
-  coe Λ := fun ρ ↦ MState.mk (Λ.map ρ.m) (Λ.apply_PosSemidef ρ.pos) (ρ.tr ▸ Λ.apply_trace ρ.m)
+  coe Λ := fun ρ ↦ MState.mk (Λ.apply ρ.m) (Λ.apply_PosSemidef ρ.pos) (ρ.tr ▸ Λ.apply_trace ρ.m)
   coe_injective' _ _ h := sorry
+
+/-- Choi matrix of a given matrix mapping. Note that this is defined even for things that
+  aren't PTPMaps. It's just that no one ever cares about the Choi matrix otherwise, so it
+  goes in this namespace. -/
+def choi_matrix (M : Matrix (dOut × dOut) (dIn × dIn) R) : Matrix (dIn × dOut) (dIn × dOut) R :=
+  fun (i₁,j₁) (i₂,j₂) ↦ M (j₁,j₂) (i₁,i₂)
+
+def map_of_choi_matrix (M : Matrix (dIn × dOut) (dIn × dOut) R) :  Matrix (dOut × dOut) (dIn × dIn) R :=
+  fun (j₁,j₂) (i₁,i₂) ↦ M (i₁,j₁) (i₂,j₂)
+
+@[simp]
+theorem map_choi_inv (M : Matrix (dIn × dOut) (dIn × dOut) R) : choi_matrix (map_of_choi_matrix M) = M :=
+  rfl
+
+@[simp]
+theorem choi_map_inv (M : Matrix (dIn × dIn) (dOut × dOut) R) : map_of_choi_matrix (choi_matrix M) = M :=
+  rfl
+
+theorem choi_matrix_inj : Function.Injective (choi_matrix (dIn := dIn) (dOut := dOut) (R := R)) := by
+  intro x y h
+  simpa only [choi_map_inv] using congrArg map_of_choi_matrix h
 
 --If we have a PTPMap, the input and output dimensions are always both nonempty (otherwise
 --we can't preserve trace) - or they're both empty. So `[Nonempty dIn]` will always suffice.
@@ -212,7 +144,7 @@ theorem nonemptyOut (Λ : PTPMap dIn dOut) [hIn : Nonempty dIn] : Nonempty dOut 
   let M := (1 : Matrix dIn dIn ℂ)
   have := calc (Finset.univ.card (α := dIn) : ℂ)
     _ = M.trace := by simp [Matrix.trace, M]
-    _ = (Λ.map M).trace := (Λ.trace_preserving M).symm
+    _ = (Λ.apply M).trace := (Λ.trace_preserving M).symm
     _ = 0 := by simp only [Matrix.trace_eq_zero_of_isEmpty]
   norm_num [Finset.univ_eq_empty_iff] at this
 
@@ -223,53 +155,81 @@ namespace CPTPMap
 noncomputable section
 open scoped Matrix ComplexOrder
 
-def mk (map : MatrixMap dIn dOut ℂ) (h₁ : map.IsTracePreserving) (h₂ : map.IsCompletelyPositive) : CPTPMap dIn dOut :=
-  ⟨⟨map, h₂.IsPositiveMap, h₁⟩, h₂⟩
-
-@[simp]
-theorem map_mk (map : MatrixMap dIn dOut ℂ) (h₁) (h₂) : (CPTPMap.mk map h₁ h₂).map = map :=
-  rfl
-
+variable {dIn dOut}
 variable {dM : Type*} [Fintype dM] [DecidableEq dM]
 
-def choi (Λ : CPTPMap dIn dOut) := Λ.map.choi_matrix
+def choi (Λ : CPTPMap dIn dOut) := PTPMap.choi_matrix Λ.map_mat
 
-theorem map_ext {Λ₁ Λ₂ : CPTPMap dIn dOut} (h : Λ₁.map = Λ₂.map) : Λ₁ = Λ₂ :=
-  CPTPMap.mk'.injEq Λ₁.toPTPMap _ _ _ ▸ (PTPMap.ext h)
+theorem map_ext {Λ₁ Λ₂ : CPTPMap dIn dOut} (h : Λ₁.map_mat = Λ₂.map_mat) : Λ₁ = Λ₂ :=
+  CPTPMap.mk.injEq Λ₁.toPTPMap _ _ _ ▸ (PTPMap.ext h)
 
 theorem choi_ext {Λ₁ Λ₂ : CPTPMap dIn dOut} (h : Λ₁.choi = Λ₂.choi) : Λ₁ = Λ₂ :=
-  CPTPMap.mk'.injEq Λ₁.toPTPMap _ _ _ ▸ (PTPMap.ext (MatrixMap.choi_matrix_inj h))
+  CPTPMap.mk.injEq Λ₁.toPTPMap _ _ _ ▸ (PTPMap.ext (PTPMap.choi_matrix_inj h))
 
 -- theorem ext_iff {Λ₁ Λ₂ : CPTPMap dIn dOut} : Λ₁.map_mat = Λ₂.map_mat ↔ Λ₁ = Λ₂ :=
 --   CPTPMap.mk.injEq Λ₁.toPTPMap _ _ _ ▸ (PTPMap.ext h)
 
+/-- Choi's theorem on completely positive maps: Complete Positivity iff Choi Matrix is PSD. -/
+theorem choi_PSD_of_CP_map (M : Matrix (dOut × dOut) (dIn × dIn) ℂ) : M.IsCompletelyPositive
+    ↔ (PTPMap.choi_matrix M).PosSemidef :=
+  sorry
+
+/-- The trace of a Choi matrix of a TP map is the cardinality of the input space. -/
+theorem trace_choi_of_TP_map (M : Matrix (dOut × dOut) (dIn × dIn) ℂ) : M.IsTracePreserving
+    ↔ (PTPMap.choi_matrix M).trace = (Finset.univ (α := dIn)).card :=
+  sorry
+
 /-- The Choi matrix of a channel is PSD. -/
-theorem choi_PSD_of_CPTP (Λ : CPTPMap dIn dOut) : Λ.map.choi_matrix.PosSemidef :=
-  Λ.map.choi_PSD_iff_CP_map.1 Λ.completely_pos
+theorem choi_PSD_of_CPTP (Λ : CPTPMap dIn dOut) : (PTPMap.choi_matrix Λ.map_mat).PosSemidef :=
+  (choi_PSD_of_CP_map Λ.map_mat).1 Λ.completely_pos
 
 /-- The trace of a Choi matrix of a CPTP map is the cardinality of the input space. -/
 @[simp]
 theorem Tr_of_choi_of_CPTP (Λ : CPTPMap dIn dOut) : Λ.choi.trace =
     (Finset.univ (α := dIn)).card :=
-  (Λ.map.trace_choi_iff_TP_map).1 Λ.trace_preserving
+  (trace_choi_of_TP_map Λ.map_mat).1 Λ.trace_preserving
 
 /-- Build a CPTP map from a PSD Choi matrix with correct trace. -/
 def CPTP_of_choi_PSD_Tr {M : Matrix (dIn × dOut) (dIn × dOut) ℂ} (h₁ : M.PosSemidef)
-    (h₂ : M.trace = (Finset.univ (α := dIn)).card) : CPTPMap dIn dOut := CPTPMap.mk
-  (map := MatrixMap.of_choi_matrix M)
-  (h₁ := (MatrixMap.trace_choi_iff_TP_map _).2 (MatrixMap.map_choi_inv M ▸ h₂))
-  (h₂ := (MatrixMap.choi_PSD_iff_CP_map _).2 ((MatrixMap.map_choi_inv M).symm ▸ h₁))
+    (h₂ : M.trace = (Finset.univ (α := dIn)).card) : CPTPMap dIn dOut where
+  map_mat := PTPMap.map_of_choi_matrix M
+  trace_preserving := sorry
+  completely_pos := sorry
+
+/--  Choi's theorem on CPTP maps, stated as a state-channel correspondence between CPTP maps
+ and Choi matrices given as a mixed state. -/
+def choi_MState_iff_CPTP (M : Matrix (dIn × dOut) (dIn × dOut) ℂ) :
+    CPTPMap dIn dOut ≃ MState (dIn × dOut) := by
+  constructor
+  case toFun =>
+    intro Λ
+    use (1 / (Finset.univ (α := dIn)).card : ℝ) • Λ.choi
+    sorry
+    simp
+    sorry
+  case invFun =>
+    intro ρ
+    apply CPTP_of_choi_PSD_Tr (M := (Finset.univ (α := dIn)).card • ρ.m)
+    sorry
+    sorry
+  sorry
+  sorry
+
+@[simp]
+theorem apply_of_choi (M : Matrix (dIn × dOut) (dIn × dOut) ℂ) {h₁} {h₂} :
+    (CPTP_of_choi_PSD_Tr (M := M) h₁ h₂).apply x = (PTPMap.map_of_choi_matrix M).asMatrixMap x :=
+  rfl
 
 @[simp]
 theorem choi_of_CPTP_of_choi (M : Matrix (dIn × dOut) (dIn × dOut) ℂ) {h₁} {h₂} :
     (CPTP_of_choi_PSD_Tr (M := M) h₁ h₂).choi = M :=
-  sorry--rfl
+  rfl
 
 instance instFunLike : FunLike (CPTPMap dIn dOut) (MState dIn) (MState dOut) where
-  coe Λ := fun ρ ↦ MState.mk (Λ.map ρ.m) (Λ.apply_PosSemidef ρ.pos) (ρ.tr ▸ Λ.apply_trace ρ.m)
+  coe Λ := fun ρ ↦ MState.mk (Λ.apply ρ.m) (Λ.apply_PosSemidef ρ.pos) (ρ.tr ▸ Λ.apply_trace ρ.m)
   coe_injective' _ _ h := sorry
 
-theorem mat_coe_eq_apply_mat (Λ : CPTPMap dIn dOut) (ρ : MState dIn) : (Λ ρ).m = Λ.map ρ.m :=
+theorem mat_coe_eq_apply_mat (Λ : CPTPMap dIn dOut) (ρ : MState dIn) : (Λ ρ).m = Λ.apply ρ.m :=
   rfl
 
 @[ext]
@@ -282,27 +242,38 @@ theorem ext_iff {Λ₁ Λ₂ : CPTPMap dIn dOut} : (∀ ρ, Λ₁ ρ = Λ₂ ρ)
   ⟨ext, fun h _ ↦ h ▸rfl⟩
 
 def compose (Λ₂ : CPTPMap dM dOut) (Λ₁ : CPTPMap dIn dM) : CPTPMap dIn dOut :=
-  CPTPMap.mk (Λ₂.map ∘ₗ Λ₁.map)
-  sorry
   sorry
 
 theorem compose_eq {Λ₁ : CPTPMap dIn dM} {Λ₂ : CPTPMap dM dOut} : ∀ρ, Λ₂ (Λ₁ ρ) =
     (Λ₂.compose Λ₁) ρ :=
-  fun _ ↦ rfl
+  sorry
 
 /-- The identity channel, which leaves the input unchanged. -/
 def id : CPTPMap dIn dIn :=
-  CPTPMap.mk LinearMap.id
-  (by simp [MatrixMap.IsTracePreserving])
-  sorry
+  CPTP_of_choi_PSD_Tr (M := PTPMap.choi_matrix 1) (by
+    constructor
+    · ext
+      simp [PTPMap.choi_matrix, Matrix.conjTranspose, Matrix.one_apply, and_comm]
+    · intro x
+      simp only [Matrix.dotProduct, Pi.star_apply, RCLike.star_def, Matrix.mulVec,
+        PTPMap.choi_matrix, Matrix.one_apply, Prod.mk.injEq, ite_mul, one_mul, zero_mul,
+        Fintype.sum_prod_type, Finset.mul_sum, mul_ite, mul_zero, ite_and, Finset.sum_ite_irrel,
+        Finset.sum_ite_eq', Finset.mem_univ, ite_true, Finset.sum_const_zero]
+      simp_rw [← Finset.mul_sum, ← Finset.sum_mul, ← map_sum, Complex.conj_mul']
+      positivity
+  ) (by
+    simp [PTPMap.choi_matrix, Matrix.trace, Matrix.one_apply]
+    rw [Finset.card_filter, Finset.sum_finset_product (s := Finset.univ) (t := fun _ ↦ Finset.univ) (h := by simp)]
+    simp
+  )
 
-/-- The map `CPTPMap.id` leaves any matrix unchanged. -/
+/-- The map `id_mat` leaves the input unchanged. -/
 @[simp]
-theorem CPTPMap_id_fun_id (M : Matrix dIn dIn ℂ) : CPTPMap.id.map M = M := by
+theorem CPTPMap_id_fun_id (M : Matrix dIn dIn ℂ) : CPTPMap.id.apply M = M := by
   ext
-  simp [id]
+  simp [id, Matrix.asMatrixMap]
 
-/-- The map `CPTPMap.id` leaves the input state unchanged. -/
+/-- The map `id_mat` leaves the input unchanged. -/
 @[simp]
 theorem CPTPMap_id_MState (ρ : MState dIn) : CPTPMap.id ρ = ρ := by
   ext1
@@ -313,12 +284,6 @@ theorem CPTPMap_id_MState (ρ : MState dIn) : CPTPMap.id ρ = ρ := by
 space, 1-dimensional, indexed by `Unit`. -/
 def destroy [Nonempty dIn] : CPTPMap dIn Unit :=
   CPTP_of_choi_PSD_Tr (M := (1 / Finset.univ.card (α := dIn)) • 1) (sorry) (sorry)
-
---could go before destroy (in which case destroy is a special case), or after (building as a
--- composition with destroy and of_state)
--- /--The replacement channel that maps all inputs to a given state. -/
--- def replacement [Nonempty dIn] (ρ : MState dOut) : CPTPMap dIn dOut :=
---   CPTPMap.mk ...
 
 /-- A state can be viewed as a CPTP map from the trivial Hilbert space (indexed by `Unit`)
  that outputs exactly that state. -/

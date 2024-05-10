@@ -76,10 +76,28 @@ theorem traceNorm_smul (A : Matrix m n R) (c : R) : (c • A).traceNorm = ‖c�
     use ‖c‖
     simp [h]
 
-theorem traceNorm_triangleIneq (A B : Matrix m n R) : (A + B).traceNorm ≤ A.traceNorm + B.traceNorm :=
+/-- For square matrices, the trace norm is max Tr[U * A] over unitaries U.-/
+theorem traceNorm_eq_max_tr_U (A : Matrix n n R) : IsGreatest {x | ∃ (U : unitaryGroup n R), (U.1 * A).trace = x} A.traceNorm := by
   sorry
 
-theorem traceNorm_triangleIneq' (A B : Matrix m n R) : (A - B).traceNorm ≤ A.traceNorm + B.traceNorm := by
+/-- the trace norm satisfies the triangle inequality (for square matrices). TODO: Prove in general. -/
+theorem traceNorm_triangleIneq (A B : Matrix n n R) : (A + B).traceNorm ≤ A.traceNorm + B.traceNorm := by
+  obtain ⟨Uab, h₁⟩ := (traceNorm_eq_max_tr_U (A + B)).left
+  rw [Matrix.mul_add, Matrix.trace_add] at h₁
+  obtain h₂ := (traceNorm_eq_max_tr_U A).right
+  obtain h₃ := (traceNorm_eq_max_tr_U B).right
+  simp only [upperBounds, Subtype.exists, exists_prop, Set.mem_setOf_eq, forall_exists_index,
+    and_imp, forall_apply_eq_imp_iff₂] at h₂ h₃
+  replace h₂ := h₂ Uab.1 Uab.2
+  replace h₃ := h₃ Uab.1 Uab.2
+  rw [← RCLike.ofReal_le_ofReal (K := R)]
+  simp only [RCLike.ofReal_add]
+  calc _
+    _ = _ + _ := h₁.symm
+    _ ≤ ↑(traceNorm A) + trace (↑Uab * B) := by simp only [add_le_add_iff_right]; exact h₂
+    _ ≤ _ := by simp only [add_le_add_iff_left]; exact h₃
+
+theorem traceNorm_triangleIneq' (A B : Matrix n n R) : (A - B).traceNorm ≤ A.traceNorm + B.traceNorm := by
   rw [sub_eq_add_neg A B, ←traceNorm_eq_neg_self B]
   exact traceNorm_triangleIneq A (-B)
 
