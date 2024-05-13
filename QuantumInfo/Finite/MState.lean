@@ -2,6 +2,8 @@ import QuantumInfo.Mathlib.All
 import ClassicalInfo.Distribution
 import QuantumInfo.Finite.Braket
 
+import Mathlib.Logic.Equiv.Basic
+
 /-
 Finite dimensional quantum mixed states, ρ.
 
@@ -334,7 +336,7 @@ end purification
   gate on quantum circuits that leaves the qubit dimensions unchanged. Notably, it is not unitary. -/
 def SWAP (ρ : MState (d₁ × d₂)) : MState (d₂ × d₁) where
   m := Matrix.of fun (i₁,j₁) (i₂,j₂) ↦ ρ.m (j₁,i₁) (j₂,i₂)
-  pos := sorry
+  pos := (Matrix.posSemidef_submatrix_equiv (Equiv.prodComm d₁ d₂).symm).mpr ρ.pos
   tr := by convert ρ.tr; simp [Matrix.trace]; rw [Finset.sum_comm]
 
 -- @[simp] --This theorem statement doesn't typecheck because spectrum reuses indices.
@@ -343,20 +345,20 @@ def SWAP (ρ : MState (d₁ × d₂)) : MState (d₂ × d₁) where
 
 @[simp]
 theorem SWAP_SWAP (ρ : MState (d₁ × d₂)) : ρ.SWAP.SWAP = ρ :=
-  sorry
+  rfl
 
 @[simp]
 theorem trace_left_SWAP (ρ : MState (d₁ × d₂)) : ρ.SWAP.trace_left = ρ.trace_right :=
-  sorry
+  rfl
 
 @[simp]
 theorem trace_right_SWAP (ρ : MState (d₁ × d₂)) : ρ.SWAP.trace_right = ρ.trace_left :=
-  sorry
+  rfl
 
 /-- The associator that re-clusters the parts of a quantum system. -/
 def assoc (ρ : MState ((d₁ × d₂) × d₃)) : MState (d₁ × d₂ × d₃) where
   m := Matrix.of fun (i₁,(j₁,k₁)) (i₂,(j₂,k₂)) ↦ ρ.m ((i₁,j₁),k₁) ((i₂,j₂),k₂)
-  pos := sorry
+  pos := (Matrix.posSemidef_submatrix_equiv (Equiv.prodAssoc d₁ d₂ d₃).symm).mpr ρ.pos
   tr := by convert ρ.tr; simp [Matrix.trace]
 
 /-- The associator that re-clusters the parts of a quantum system. -/
@@ -365,14 +367,11 @@ def assoc' (ρ : MState (d₁ × d₂ × d₃)) : MState ((d₁ × d₂) × d₃
 
 @[simp]
 theorem assoc_assoc' (ρ : MState (d₁ × d₂ × d₃)) : ρ.assoc'.assoc = ρ := by
-  ext
-  simp [assoc', assoc, SWAP]
+  rfl
 
 @[simp]
 theorem assoc'_assoc (ρ : MState ((d₁ × d₂) × d₃)) : ρ.assoc.assoc' = ρ := by
-  have := ρ.SWAP.assoc_assoc'
-  unfold assoc' at this
-  rw [assoc', ← ρ.SWAP_SWAP, this]
+  rfl
 
 @[simp]
 theorem trace_left_right_assoc (ρ : MState ((d₁ × d₂) × d₃)) :
@@ -410,7 +409,7 @@ theorem trace_right_right_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
     ρ.assoc'.trace_right.trace_right = ρ.trace_right := by
   simp [assoc']
 
-
+@[simp]
 theorem traceNorm_eq_1 (ρ : MState d) : ρ.m.traceNorm = 1 :=
   have := calc (ρ.m.traceNorm : ℂ)
     _ = ρ.m.trace := ρ.pos.traceNorm_PSD_eq_trace
