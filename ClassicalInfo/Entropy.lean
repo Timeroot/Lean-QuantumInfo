@@ -54,12 +54,11 @@ theorem H₁_le_exp_m1 (p : Prob) : H₁ p ≤ Real.exp (-1) := by
 theorem H₁_concave : ∀ (x y : Prob), ∀ (p : Prob), p.mix (H₁ x) (H₁ y) ≤ H₁ (p.mix x y) := by
   intros x y p
   simp only [Prob.mix, Prob.val_eq_coe, H₁, smul_eq_mul, Prob.coe_one_minus, Mixable.mix, Mixable.mix_ab, Mixable.mkT_instUniv,
-    Prob.toReal_mk, Prob.mkT_mixable, Prob.to_U_mixable, Mixable.to_U_instUniv, Prob.U_mixable]
+    Prob.toReal_mk, Prob.mkT_mixable, Prob.to_U_mixable, Mixable.to_U_instUniv, Prob.to_U_mixable]
   by_cases hxy : x = y
   · subst hxy
     ring_nf
-    simp only [neg_add_le_iff_le_add, tsub_le_iff_right]
-    linarith
+    exact le_refl _
   by_cases hp : (p:ℝ) = 0
   · rw [hp]
     norm_num
@@ -69,9 +68,9 @@ theorem H₁_concave : ∀ (x y : Prob), ∀ (p : Prob), p.mix (H₁ x) (H₁ y)
   rw [← ne_eq] at hxy hp hp₁
   have := Real.strictConcaveOn_negMulLog.2
   replace := @this x ?_ y ?_ ?_ p (1-p) ?_ ?_ (by linarith)
-  simp only [smul_eq_mul, Real.negMulLog] at this
-  apply le_of_lt
-  convert this
+  · simp only [smul_eq_mul, Real.negMulLog] at this
+    apply le_of_lt
+    convert this
   · simp only [Set.mem_Ici, Prob.zero_le_coe]
   · simp only [Set.mem_Ici, Prob.zero_le_coe]
   · simpa only [Prob.ne_iff]

@@ -77,6 +77,22 @@ theorem constant_def' (x y : α) : (constant x : α → Prob) y = if x = y then 
   split_ifs with h
   <;> simp [h]
 
+/-- If a distribution has an element with probability 1, the distribution has a constant. -/
+theorem constant_of_exists_one {D : Distribution α} {x : α} (h : D x = 1) : D = Distribution.constant x := by
+  ext y
+  by_cases h₂ : x = y
+  · simp [h, ← h₂]
+  · simp only [constant_eq, h₂, ↓reduceIte, Prob.toReal_zero]
+    by_contra h₃
+    replace h₃ : 0 < (D y : ℝ) := by
+      linarith (config := {splitNe := true}) only [h₃, @Prob.zero_le_coe (D y)]
+    have := D.prop'
+    rw [← Finset.add_sum_erase _ _ (Finset.mem_univ x), h, Prob.toReal_one] at this
+    rw [← Finset.add_sum_erase _ _ (a := y) (by simpa using (Ne.symm h₂))] at this
+    have : 0 ≤ ∑ x ∈ Finset.erase (Finset.erase Finset.univ x) y, (D x : ℝ) :=
+      Finset.sum_nonneg' (fun _ ↦ Prob.zero_le_coe)
+    linarith
+
 /-- Make an uniform distribution. -/
 def uniform [Nonempty α] : Distribution α :=
   ⟨fun _ ↦ ⟨1 / (Finset.univ.card (α := α)), by
@@ -113,19 +129,15 @@ def extend_left (d : Distribution α) : Distribution (β ⊕ α) :=
   ⟨fun x ↦ Sum.casesOn x (Function.const _ 0) d.val, by simp⟩
 
 /-- Make a convex mixture of two distributions on the same set. -/
-instance mixable : Mixable (Distribution α) where
-  U := α → ℝ
-  to_U := fun d x ↦ d x
-  to_U_inj := by
-    intros x y a
-    ext
-    exact congrFun a _
-  convex := sorry
-  mkT := fun {r} h ↦ ⟨⟨fun i ↦ ⟨r i, sorry⟩, sorry⟩, rfl⟩
+instance instMixable : Mixable (α → ℝ) (Distribution α) :=
+  Mixable.instSubtype (inferInstance) (fun _ _ hab hx hy ↦ by
+    simp [Mixable.mix_ab, Finset.sum_add_distrib, ← Finset.mul_sum, hab, hx, hy]
+  )
 
 /-- Given a distribution on type α and an equivalence to type β, get the corresponding
 distribution on type β. -/
 def relabel (d : Distribution α) (σ : β ≃ α) : Distribution β :=
-  ⟨fun b ↦ d (σ b), by rw [Equiv.sum_comp σ (fun a ↦ (d a : ℝ))]; exact d.2⟩
+  ⟨fun b ↦ d (σ b),
+   by rw [Equiv.sum_comp σ (fun a ↦ (d a : ℝ))]; exact d.prop⟩
 
 end Distribution

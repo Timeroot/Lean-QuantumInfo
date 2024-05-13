@@ -41,8 +41,7 @@ theorem Hermitian (ρ : MState d) : ρ.m.IsHermitian :=
 theorem ext {ρ₁ ρ₂ : MState d} (h : ρ₁.m = ρ₂.m) : ρ₁ = ρ₂ := by
   rwa [MState.mk.injEq]
 
-instance instMixable : Mixable (MState d) where
-  U := Matrix d d ℂ
+instance instMixable : Mixable (Matrix d d ℂ) (MState d) where
   to_U := MState.m
   to_U_inj := ext
   mkT := fun h ↦ ⟨⟨_,
@@ -80,7 +79,7 @@ theorem PosSemidef_outer_self_conj (v : d → ℂ) : Matrix.PosSemidef (Matrix.v
 
 section pure
 
-/-- A mixed state as a pure state arising from a ket. -/
+/-- A mixed state can be constructed as a pure state arising from a ket. -/
 def pure (ψ : Ket d) : MState d where
   m := Matrix.vecMulVec ψ (ψ : Bra d)
   pos := PosSemidef_outer_self_conj ψ
@@ -91,6 +90,11 @@ def pure (ψ : Ket d) : MState d where
     have h₂ := congrArg Complex.ofReal ψ.normalized
     simpa using h₂
 
+@[simp]
+theorem pure_of (ψ : Ket d) : (pure ψ).m i j = (ψ i) * conj (ψ j) := by
+  rfl
+
+/-- The purity of a state is Tr[ρ^2]. This is a `Prob`, because it is always between zero and one. -/
 def purity (ρ : MState d) : Prob :=
   ⟨RCLike.re (ρ.m * ρ.m).trace, ⟨by
     suffices 0 ≤ Matrix.trace (ρ.m * ρ.m) by
@@ -141,7 +145,9 @@ theorem spectrum_pure_eq_constant (ψ : Ket d) :
   have : ∃i, (pure ψ).spectrum i = 1 := by
     sorry
   --If 1 is in a distribution, the distribution is a constant.
-  sorry
+  obtain ⟨i, hi⟩ := this
+  use i
+  exact Distribution.constant_of_exists_one hi
 
 /-- If the specturm of a mixed state is (1,0,0...) i.e. a constant distribution, it is
  a pure state. -/
@@ -236,18 +242,22 @@ def trace_right (ρ : MState (d₁ × d₂)) : MState d₁ where
   tr := ρ.tr ▸ ρ.m.trace_of_trace_right
 
 /-- Taking the direct product on the left and tracing it back out gives the same state. -/
+@[simp]
 theorem trace_left_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : trace_left (ρ₁ ⊗ ρ₂) = ρ₂ := by
   ext
-  rw [trace_left]
-  dsimp
-  rw [Matrix.trace_left, prod]
+  simp_rw [trace_left, Matrix.trace_left, prod]
   dsimp
   have h : (∑ i : d₁, ρ₁.m i i) = 1 := ρ₁.tr
   rw [← Finset.sum_mul, h, one_mul]
 
 /-- Taking the direct product on the right and tracing it back out gives the same state. -/
-theorem trace_right_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : trace_right (ρ₁ ⊗ ρ₂) = ρ₁ :=
-  sorry
+@[simp]
+theorem trace_right_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : trace_right (ρ₁ ⊗ ρ₂) = ρ₁ := by
+  ext
+  simp_rw [trace_right, Matrix.trace_right, prod]
+  dsimp
+  have h : (∑ i : d₂, ρ₂.m i i) = 1 := ρ₂.tr
+  rw [← Finset.mul_sum, h, mul_one]
 
 end ptrace
 
@@ -300,7 +310,13 @@ def purify (ρ : MState d) : Ket (d × d) where
 
 /-- The defining property of purification, that tracing out the purifying system gives the
  original mixed state. -/
-theorem trace_right_of_purify (ρ : MState d) : (pure ρ.purify).trace_right = ρ :=
+@[simp]
+theorem trace_right_of_purify (ρ : MState d) : (pure ρ.purify).trace_right = ρ := by
+  ext i j
+  simp_rw [purify, trace_right, Matrix.trace_right]
+  simp only [pure_of, Matrix.of_apply, Ket.apply]
+  simp only [map_mul]
+  simp_rw [mul_assoc, mul_comm, ← mul_assoc (Complex.ofReal' _), Complex.mul_conj]
   sorry
 
 /-- `MState.purify` bundled with its defining property `MState.trace_right_of_purify`. -/

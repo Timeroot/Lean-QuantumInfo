@@ -203,48 +203,45 @@ end Prob
   `U` is `n`-element vectors (which form the probability simplex, degenerate in one dimension). For
   `MState` density matrices in quantum mechanics, which are PSD matrices of trace 1, `U` is the
   underlying matrix. -/
-class Mixable (T : Type*) where
-  /-- The underlying data type-/
-  U : Type*
-  /-- U needs additive and smul operations. We try to find these automatically. -/
-  instU1 : AddCommMonoid U := by infer_instance
-  instU2 : SMul ℝ U := by infer_instance
+class Mixable (U : outParam (Type u)) (T : Type v) [AddCommMonoid U] [Module ℝ U] where
   /-- Getter for the underlying data -/
   to_U : T → U
   /-- Proof that this getter is injective -/
   to_U_inj : ∀ {T₁ T₂}, to_U T₁ = to_U T₂ → T₁ = T₂
   /-- Proof that this image is convex -/
   convex : Convex ℝ (Set.range to_U)
-  /-- Function to get a T from a proof that U is in the set. `Mixable.default_mkT` always
-  works as a default (noncomputable) value, but typically a `T.mk` method will make
-  more sense. -/
+  /-- Function to get a T from a proof that U is in the set. -/
   mkT : {u : U} → (∃ t, to_U t = u) → { t : T // to_U t = u }
 
 namespace Mixable
 
-variable {T : Type*}
+variable {T U : Type*} [AddCommMonoid U] [Module ℝ U]
 
 @[reducible]
-def mix_ab [inst : Mixable T] {a b : ℝ} (ha : 0 ≤ a) (hb : 0 ≤ b) (hab : a + b = 1) (x₁ x₂ : T) :=
-  let _ := inst.instU1
-  let _ := inst.instU2
+def mix_ab [inst : Mixable U T] {a b : ℝ} (ha : 0 ≤ a) (hb : 0 ≤ b) (hab : a + b = 1) (x₁ x₂ : T) : T :=
   inst.mkT <| inst.convex
     (x := to_U x₁) (exists_apply_eq_apply _ _)
     (y := to_U x₂) (exists_apply_eq_apply _ _)
     ha hb hab
 
-def mix [Mixable T] (p : Prob) (x₁ x₂ : T) :=
-  mix_ab p.zero_le_coe p.one_minus.zero_le_coe p.add_one_minus x₁ x₂
+def mix [inst : Mixable U T] (p : Prob) (x₁ x₂ : T) : T :=
+  inst.mix_ab p.zero_le_coe p.one_minus.zero_le_coe p.add_one_minus x₁ x₂
 
 @[simp]
-theorem to_U_of_mkT [Mixable T] (u : U T) {h} : to_U (mkT (u := u) h).1 = u :=
+theorem to_U_of_mkT [inst : Mixable U T] (u : U) {h} : inst.to_U (mkT (u := u) h).1 = u :=
   (mkT (u := u) h).2
 
-notation p "[" x₁ "↔" x₂ "]" => mix p x₁ x₂
+notation p "[" x₁:80 "↔" x₂ "]" => mix p x₁ x₂
 
-/--When T is the whole space U, and T is a suitable vector space over ℝ, we get a Mixable instance.-/
-instance instUniv [AddCommMonoid T] [SMul ℝ T] : Mixable T where
-  U := T
+notation p "[" x₁:80 "↔" x₂ ":" M "]" => mix (inst := M) p x₁ x₂
+
+@[simp]
+theorem mix_zero [inst : Mixable U T] (x₁ x₂ : T) : (0 : Prob) [ x₁ ↔ x₂ : inst] = x₂ := by
+  apply inst.to_U_inj
+  simp [mix, mix_ab]
+
+/--When T is the whole space, and T is a suitable vector space over ℝ, we get a Mixable instance.-/
+instance instUniv [AddCommMonoid T] [Module ℝ T] : Mixable T T where
   to_U := id
   to_U_inj := id
   convex := by
@@ -253,38 +250,69 @@ instance instUniv [AddCommMonoid T] [SMul ℝ T] : Mixable T where
   mkT := fun _ ↦ ⟨_, rfl⟩
 
 @[simp]
-theorem mkT_instUniv [AddCommMonoid T] [SMul ℝ T] (h) : @Mixable.mkT T instUniv t h = ⟨t, rfl⟩ :=
+theorem mkT_instUniv [AddCommMonoid T] [Module ℝ T] {t : T} (h : ∃ t', to_U t' = t) : instUniv.mkT h = ⟨t, rfl⟩ :=
   rfl
 
 @[simp]
-theorem to_U_instUniv [AddCommMonoid T] [SMul ℝ T] : @Mixable.to_U T instUniv t = t :=
+theorem to_U_instUniv [AddCommMonoid T] [Module ℝ T] {t : T} : instUniv.to_U t = t :=
   rfl
 
-/-- Mixable instance on Pi types. Could be dependent but this is not. -/
-instance instPi (D : Type*) [inst : Mixable T] : Mixable (D → T) where
-  U := D → inst.U
-  instU1 := let k := inst.instU1; Pi.addCommMonoid
-  instU2 := let k := inst.instU2; Pi.instSMul
+/-- Mixable instance on Pi types. Could be dependent pi, but this is not. -/
+instance instPi {D : Type*} [inst : Mixable U T] : Mixable (D → U) (D → T) where
   to_U x := fun d ↦ inst.to_U (x d)
   to_U_inj h := funext fun d ↦ inst.to_U_inj (congrFun h d)
-  mkT := fun {t} h ↦ ⟨fun d ↦ inst.mkT (u := t d) (by
-      obtain ⟨t₂, h⟩ := h
-      use t₂ d
+  mkT := fun {u} h ↦ ⟨fun d ↦ inst.mkT (u := u d) (by
+      obtain ⟨t, h⟩ := h
+      use t d
       exact congrFun h d),
     by funext d; simp⟩
   convex := by
     simp [Convex, StarConvex]
     intro f₁ f₂ a b ha hb hab
-    use fun d ↦ mix_ab ha hb hab (f₁ d) (f₂ d)
+    use fun d ↦ inst.mix_ab ha hb hab (f₁ d) (f₂ d)
     funext d
     simp only [to_U_of_mkT, Pi.add_apply, Pi.smul_apply]
+
+@[simp]
+theorem val_mkT_instPi (D : Type*) [inst : Mixable U T] {u : D → U} (h : ∃ t, to_U t = u) : (instPi.mkT h).val =
+    fun d ↦ (inst.mkT (instPi.proof_3 h d)).val :=
+  rfl
+
+@[simp]
+theorem to_U_instPi (D : Type*) [inst : Mixable U T] {t : D → T} : (instPi).to_U t = fun d ↦ inst.to_U (t d) :=
+  rfl
+
+/-- Mixable instances on subtypes (of other mixable types), assuming that they
+ have the correct closure properties. -/
+def instSubtype {T : Type*} {P : T → Prop} (inst : Mixable U T)
+    (h : ∀{x y:T},
+      ∀⦃a b : ℝ⦄, (ha : 0 ≤ a) → (hb : 0 ≤ b) → (hab : a + b = 1) →
+      P x → P y → P (inst.mix_ab ha hb hab x y))
+    : Mixable U { t // P t} where
+  to_U x := inst.to_U (x.val)
+  to_U_inj h := Subtype.ext (inst.to_U_inj h)
+  mkT := fun {u} h ↦ ⟨by
+    have ⟨t,hu⟩ := inst.mkT (u := u) $ h.casesOn fun t h ↦ ⟨t, h⟩
+    use t
+    have ⟨t₁,ht₁⟩ := h
+    exact (inst.to_U_inj $ hu.trans ht₁.symm) ▸ t₁.prop,
+    by simp only [to_U_of_mkT]⟩
+  convex := by
+    have hi := inst.convex
+    simp [Convex, StarConvex] at hi ⊢
+    intro x hx y hy a b ha hb hab
+    let ⟨z, hz⟩ := hi x y ha hb hab
+    refine ⟨z, ⟨?_, hz⟩⟩
+    convert h ha hb hab hx hy
+    apply inst.to_U_inj
+    convert hz
+    simp only [to_U_of_mkT]
 
 end Mixable
 
 namespace Prob
 
-instance instMixable : Mixable Prob where
-  U := ℝ
+instance instMixable : Mixable ℝ Prob where
   to_U := Prob.toReal
   to_U_inj := Prob.eq
   mkT := fun h ↦ ⟨⟨_, Exists.casesOn h fun t ht => ht ▸ t.prop⟩, rfl⟩
@@ -296,11 +324,7 @@ instance instMixable : Mixable Prob where
     · nlinarith
 
 @[simp]
-theorem U_mixable [AddCommMonoid T] [SMul ℝ T] : Mixable.U Prob = ℝ :=
-  rfl
-
-@[simp]
-theorem to_U_mixable [AddCommMonoid T] [SMul ℝ T] (t : Prob): Mixable.to_U t = t :=
+theorem to_U_mixable [AddCommMonoid T] [SMul ℝ T] (t : Prob) : instMixable.to_U t = t.val :=
   rfl
 
 @[simp]
@@ -309,6 +333,6 @@ theorem mkT_mixable (u : ℝ) (h : ∃ t : Prob, Mixable.to_U t = u) : Mixable.m
   rfl
 
 /-- Alias of `Mixable.mix` so it can be accessed from a probability. -/
-abbrev mix [Mixable T] (p : Prob) (x₁ x₂ : T) := Mixable.mix p x₁ x₂
+abbrev mix [AddCommMonoid U] [Module ℝ U] [inst : Mixable U T] (p : Prob) (x₁ x₂ : T) := inst.mix p x₁ x₂
 
 end Prob
