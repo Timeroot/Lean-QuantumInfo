@@ -295,18 +295,19 @@ section purification
  property is `MState.trace_right_of_purify`; see also `MState.purify'` for the bundled version. -/
 def purify (ρ : MState d) : Ket (d × d) where
   vec := fun (i,j) ↦
-    let ρ2 := ρ.Hermitian.eigenvectorMatrix i j
+    let ρ2 := ρ.Hermitian.eigenvectorUnitary i j
     ρ2 * (ρ.Hermitian.eigenvalues j).sqrt
   normalized' := by
     have h₁ := fun i ↦ ρ.pos.eigenvalues_nonneg i
     simp [mul_pow, Real.sq_sqrt, h₁]
-    simp_rw [Matrix.IsHermitian.eigenvectorMatrix_apply]
+    -- simp_rw [Matrix.IsHermitian.eigenvectoUnitary_apply]
     rw [Finset.sum_comm]
     simp_rw [← Finset.sum_mul]
     have : ∀x, ∑ i : d, Complex.abs ((Matrix.IsHermitian.eigenvectorBasis ρ.Hermitian) x i) ^ 2 = 1 :=
       sorry
-    -- rw [this]
-    sorry
+    apply @RCLike.ofReal_injective (Complex)
+    simp_rw [this, one_mul, Matrix.IsHermitian.sum_eigenvalues_eq_trace]
+    exact ρ.tr
 
 /-- The defining property of purification, that tracing out the purifying system gives the
  original mixed state. -/

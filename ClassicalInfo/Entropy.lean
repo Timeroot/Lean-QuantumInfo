@@ -97,9 +97,6 @@ theorem Hₛ_constant_eq_zero {i : α} : Hₛ (Distribution.constant i) = 0 := b
 /-- Shannon entropy of a uniform distribution is ln d. -/
 theorem Hₛ_uniform [Nonempty α] : Hₛ (Distribution.uniform (α := α)) = Real.log (Finset.card Finset.univ (α := α)) := by
   simp [Hₛ, Distribution.prob, H₁]
-  have : 0 < Finset.univ.card (α := α) :=
-    Finset.Nonempty.card_pos (Finset.univ_nonempty_iff.mpr inferInstance)
-  field_simp
 
 --TODO:
 -- * Shannon entropy is concave under mixing distributions.

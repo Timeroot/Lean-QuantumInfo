@@ -43,17 +43,10 @@ section eigenvalues
 
 /-- The sum of the eigenvalues of a Hermitian matrix is equal to its trace. -/
 theorem sum_eigenvalues_eq_trace : ∑ i, hA.eigenvalues i = A.trace := by
-  simp_rw [eigenvalues_eq, dotProduct, mulVec, dotProduct, ← map_sum, Finset.mul_sum]
-  simp_rw [mul_comm, mul_assoc, star, Matrix.transpose_apply]
-  rw [Finset.sum_comm, Finset.sum_comm_3, Finset.sum_comm]
-  have hinv := congrFun₂ hA.eigenvectorMatrix_mul_inv
-  simp_rw [← conjTranspose_eigenvectorMatrix, Matrix.mul_apply', dotProduct, Matrix.conjTranspose_apply]
-    at hinv
-  have h1 := congrFun₂ (Matrix.mul_one A)
-  simp_rw [Matrix.mul_apply', dotProduct] at h1
-  simp_rw [← Finset.mul_sum, hinv, h1, trace]
-  rw [← hA.coe_re_diag]
-  simp only [map_sum, RCLike.ofReal_sum, diag]
+  nth_rewrite 2 [hA.spectral_theorem]
+  rw [Matrix.trace_mul_comm]
+  rw [← mul_assoc]
+  simp [Matrix.trace_diagonal]
 
 end eigenvalues
 
@@ -137,10 +130,9 @@ variable {A : Matrix m m 𝕜} {B : Matrix n n 𝕜}
 variable (hA : A.PosSemidef) (hB : B.PosSemidef)
 
 theorem PosSemidef_kronecker : (A ⊗ₖ B).PosSemidef := by
-  rw [hA.left.spectral_theorem', hB.left.spectral_theorem']
+  rw [hA.left.spectral_theorem, hB.left.spectral_theorem]
   rw [Matrix.mul_kronecker_mul, Matrix.mul_kronecker_mul]
-  rw [← hA.left.conjTranspose_eigenvectorMatrix]
-  rw [← hB.left.conjTranspose_eigenvectorMatrix]
+  rw [Matrix.star_eq_conjTranspose, Matrix.star_eq_conjTranspose]
   rw [← kroneckerMap_conjTranspose]
   rw [Matrix.diagonal_kronecker_diagonal]
   apply mul_mul_conjTranspose_same
@@ -201,7 +193,8 @@ noncomputable section log
   *definite* matrices, and the nullspace of the image is exactly the (λ=1)-eigenspace of the
   original matrix. It coincides with the standard definition if A is positive definite. -/
 def log (hA : A.PosSemidef) : Matrix m m 𝕜 :=
-  hA.1.eigenvectorMatrix * diagonal ((↑) ∘ Real.log ∘ hA.1.eigenvalues) * hA.1.eigenvectorMatrixInv
+  (hA.1.eigenvectorUnitary : Matrix _ _ _) * diagonal (RCLike.ofReal ∘ Real.log ∘ hA.1.eigenvalues) *
+  (star hA.1.eigenvectorUnitary : Matrix _ _ _)
 
 --TODO: properties here https://en.wikipedia.org/wiki/Logarithm_of_a_matrix#Properties
 
