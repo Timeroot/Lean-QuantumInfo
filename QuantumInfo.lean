@@ -1,5 +1,6 @@
 import QuantumInfo.Finite.Braket
 import QuantumInfo.Finite.Capacity
+import QuantumInfo.Finite.Channel.DegradableOrder
 import QuantumInfo.Finite.CPTPMap
 import QuantumInfo.Finite.Distance.Distance
 import QuantumInfo.Finite.Entropy

@@ -169,7 +169,7 @@ theorem IsCompletelyPositive.IsPositiveMap (M : MatrixMap A B R)
 
 end MatrixMap
 
-variable (dIn dOut : Type*) [Fintype dIn] [Fintype dOut] [DecidableEq dIn]
+variable (dIn dOut dOut₂ : Type*) [Fintype dIn] [Fintype dOut] [Fintype dOut₂] [DecidableEq dIn]
 
 /-- Positive trace-preserving linear maps. These includes all channels, but aren't
   necessarily *completely* positive, see `CPTPMap`. -/
@@ -183,7 +183,7 @@ structure CPTPMap extends PTPMap dIn dOut where
   mk' ::
     completely_pos : map.IsCompletelyPositive
 
-variable {dIn dOut}
+variable {dIn dOut dOut₂}
 
 namespace PTPMap
 noncomputable section
@@ -231,6 +231,7 @@ theorem map_mk (map : MatrixMap dIn dOut ℂ) (h₁) (h₂) : (CPTPMap.mk map h�
   rfl
 
 variable {dM : Type*} [Fintype dM] [DecidableEq dM]
+variable {dM₂ : Type*} [Fintype dM₂] [DecidableEq dM₂]
 
 def choi (Λ : CPTPMap dIn dOut) := Λ.map.choi_matrix
 
@@ -286,9 +287,14 @@ def compose (Λ₂ : CPTPMap dM dOut) (Λ₁ : CPTPMap dIn dM) : CPTPMap dIn dOu
   sorry
   sorry
 
-theorem compose_eq {Λ₁ : CPTPMap dIn dM} {Λ₂ : CPTPMap dM dOut} : ∀ρ, Λ₂ (Λ₁ ρ) =
-    (Λ₂.compose Λ₁) ρ :=
+@[simp]
+theorem compose_eq {Λ₁ : CPTPMap dIn dM} {Λ₂ : CPTPMap dM dOut} : ∀ρ, (Λ₂.compose Λ₁) ρ = Λ₂ (Λ₁ ρ) :=
   fun _ ↦ rfl
+
+theorem compose_assoc  (Λ₃ : CPTPMap dM₂ dOut) (Λ₂ : CPTPMap dM dM₂) (Λ₁ : CPTPMap dIn dM) :
+    (Λ₃.compose Λ₂).compose Λ₁ = Λ₃.compose (Λ₂.compose Λ₁) := by
+  ext1 ρ
+  simp
 
 /-- The identity channel, which leaves the input unchanged. -/
 def id : CPTPMap dIn dIn :=
@@ -298,16 +304,26 @@ def id : CPTPMap dIn dIn :=
 
 /-- The map `CPTPMap.id` leaves any matrix unchanged. -/
 @[simp]
-theorem CPTPMap_id_fun_id (M : Matrix dIn dIn ℂ) : CPTPMap.id.map M = M := by
+theorem id_fun_id (M : Matrix dIn dIn ℂ) : CPTPMap.id.map M = M := by
   ext
   simp [id]
 
 /-- The map `CPTPMap.id` leaves the input state unchanged. -/
 @[simp]
-theorem CPTPMap_id_MState (ρ : MState dIn) : CPTPMap.id ρ = ρ := by
+theorem id_MState (ρ : MState dIn) : CPTPMap.id ρ = ρ := by
   ext1
   rw [mat_coe_eq_apply_mat]
-  exact CPTPMap_id_fun_id ρ.m
+  exact id_fun_id ρ.m
+
+/-- The map `CPTPMap.id` composed with any map is the same map. -/
+@[simp]
+theorem id_compose [DecidableEq dOut] (Λ : CPTPMap dIn dOut) : CPTPMap.id.compose Λ = Λ := by
+  simp only [← ext_iff, compose_eq, id_MState, implies_true]
+
+/-- Any map composed with `CPTPMap.id` is the same map. -/
+@[simp]
+theorem compose_id [DecidableEq dOut] (Λ : CPTPMap dIn dOut) : Λ.compose CPTPMap.id = Λ := by
+  simp only [← ext_iff, compose_eq, id_MState, implies_true]
 
 /-- There is a CPTP map that takes a system of any dimension and outputs the trivial Hilbert
 space, 1-dimensional, indexed by `Unit`. -/
@@ -484,17 +500,26 @@ def complementary (Λ : CPTPMap dIn dOut) : CPTPMap dIn (dIn × dOut) :=
 end purify
 
 section degradable
-variable [DecidableEq dOut] [Inhabited dOut]
+variable [DecidableEq dOut] [Inhabited dOut] [DecidableEq dOut₂] [Inhabited dOut₂]
 
-/-- A channel is *degradable* if its complementary channel can be written as a composition of
+/-- A channel is *degradable to* another, if the other can be written as a composition of
   a _degrading_ channel D with the original channel. -/
-def IsDegradable (Λ : CPTPMap dIn dOut) : Prop :=
-  ∃ (D : CPTPMap dOut (dIn × dOut)), D.compose Λ = Λ.complementary
+def IsDegradableTo (Λ : CPTPMap dIn dOut) (Λ₂ : CPTPMap dIn dOut₂) : Prop :=
+  ∃ (D : CPTPMap dOut (dOut₂)), D.compose Λ = Λ₂
 
-/-- A channel is *antidegradable* if it can be written as a composition of
-  a _degrading_ channel D with its complementary channel. -/
+/-- A channel is *antidegradable to* another, if the other `IsDegradableTo` this one. -/
+@[reducible]
+def IsAntidegradableTo (Λ : CPTPMap dIn dOut) (Λ₂ : CPTPMap dIn dOut₂) : Prop :=
+  IsDegradableTo Λ₂ Λ
+
+/-- A channel is *degradable* if it `IsDegradableTo` its complementary channel. -/
+def IsDegradable (Λ : CPTPMap dIn dOut) : Prop :=
+  IsDegradableTo Λ Λ.complementary
+
+/-- A channel is *antidegradable* if it `IsAntidegradableTo` its complementary channel. -/
+@[reducible]
 def IsAntidegradable (Λ : CPTPMap dIn dOut) : Prop :=
-  ∃ (D : CPTPMap (dIn × dOut) dOut), D.compose Λ.complementary = Λ
+  IsAntidegradableTo Λ Λ.complementary
 
 --Theorem (Wilde Exercise 13.5.7): Entanglement breaking channels are antidegradable.
 end degradable
