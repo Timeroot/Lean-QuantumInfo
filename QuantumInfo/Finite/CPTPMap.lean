@@ -116,7 +116,7 @@ end prod
 
 variable {A B C D E F R : Type*}
   [Fintype A] [Fintype B] [Fintype C] [Fintype D] [Fintype E] [Fintype F]
-  [DecidableEq A] [DecidableEq B] [DecidableEq C] [DecidableEq D]
+  [DecidableEq A] [DecidableEq B] [DecidableEq C] [DecidableEq D] [DecidableEq F]
 
 open Kronecker
 open TensorProduct
@@ -145,6 +145,24 @@ def IsPositive (M : MatrixMap A B R) : Prop :=
 with `I(n)` is positive. -/
 def IsCompletelyPositive (M : MatrixMap A B R) : Prop :=
   ∀ (n : ℕ), (MatrixMap_Prod M (LinearMap.id : MatrixMap (Fin n) (Fin n) R)).IsPositive
+
+namespace IsTracePreserving
+
+theorem comp [CommSemiring R] {M₁ : MatrixMap A B R} {M₂ : MatrixMap B C R} (h₁ : M₁.IsTracePreserving) (h₂ : M₂.IsTracePreserving) :
+    IsTracePreserving (M₂ ∘ₗ M₁) := by
+  sorry
+
+end IsTracePreserving
+
+namespace IsCompletelyPositive
+
+/-- A completely positive map, but with `Fintype F` instead of Fin. -/
+theorem IsCompletelyPositive_Fintype {M : MatrixMap A B R} (h : IsCompletelyPositive M)
+    (T : Type*) [Fintype T] [DecidableEq T ] :
+    (MatrixMap_Prod M (LinearMap.id : MatrixMap T T R)).IsPositive := by
+  sorry
+
+end IsCompletelyPositive
 
 /-- Choi's theorem on completely positive maps: Complete Positivity iff Choi Matrix is PSD. -/
 theorem choi_PSD_iff_CP_map (M : MatrixMap A B ℂ) : M.IsCompletelyPositive
@@ -263,12 +281,12 @@ def CPTP_of_choi_PSD_Tr {M : Matrix (dIn × dOut) (dIn × dOut) ℂ} (h₁ : M.P
 
 @[simp]
 theorem choi_of_CPTP_of_choi (M : Matrix (dIn × dOut) (dIn × dOut) ℂ) {h₁} {h₂} :
-    (CPTP_of_choi_PSD_Tr (M := M) h₁ h₂).choi = M :=
+    (CPTP_of_choi_PSD_Tr (M := M) h₁ h₂).choi = M := by
   sorry--rfl
 
 instance instFunLike : FunLike (CPTPMap dIn dOut) (MState dIn) (MState dOut) where
   coe Λ := fun ρ ↦ MState.mk (Λ.map ρ.m) (Λ.apply_PosSemidef ρ.pos) (ρ.tr ▸ Λ.apply_trace ρ.m)
-  coe_injective' _ _ h := sorry
+  coe_injective' _ _ h := by sorry
 
 theorem mat_coe_eq_apply_mat (Λ : CPTPMap dIn dOut) (ρ : MState dIn) : (Λ ρ).m = Λ.map ρ.m :=
   rfl
@@ -284,8 +302,8 @@ theorem ext_iff {Λ₁ Λ₂ : CPTPMap dIn dOut} : (∀ ρ, Λ₁ ρ = Λ₂ ρ)
 
 def compose (Λ₂ : CPTPMap dM dOut) (Λ₁ : CPTPMap dIn dM) : CPTPMap dIn dOut :=
   CPTPMap.mk (Λ₂.map ∘ₗ Λ₁.map)
-  sorry
-  sorry
+  (Λ₁.trace_preserving.comp Λ₂.trace_preserving)
+  (by sorry)
 
 @[simp]
 theorem compose_eq {Λ₁ : CPTPMap dIn dM} {Λ₂ : CPTPMap dM dOut} : ∀ρ, (Λ₂.compose Λ₁) ρ = Λ₂ (Λ₁ ρ) :=
@@ -300,7 +318,7 @@ theorem compose_assoc  (Λ₃ : CPTPMap dM₂ dOut) (Λ₂ : CPTPMap dM dM₂) (
 def id : CPTPMap dIn dIn :=
   CPTPMap.mk LinearMap.id
   (by simp [MatrixMap.IsTracePreserving])
-  sorry
+  (by sorry)
 
 /-- The map `CPTPMap.id` leaves any matrix unchanged. -/
 @[simp]
@@ -327,8 +345,19 @@ theorem compose_id [DecidableEq dOut] (Λ : CPTPMap dIn dOut) : Λ.compose CPTPM
 
 /-- There is a CPTP map that takes a system of any dimension and outputs the trivial Hilbert
 space, 1-dimensional, indexed by `Unit`. -/
-def destroy [Nonempty dIn] : CPTPMap dIn Unit :=
-  CPTP_of_choi_PSD_Tr (M := (1 / Finset.univ.card (α := dIn)) • 1) (sorry) (sorry)
+def destroy [Nonempty dIn] [Unique dOut] : CPTPMap dIn dOut :=
+  CPTP_of_choi_PSD_Tr
+    (M := (1 / Finset.univ.card (α := dIn) : ℂ) • 1)
+    (by sorry)
+    (by sorry)
+
+/-- Two CPTP maps into the same one-dimensional output space must be equal -/
+theorem eq_if_output_unique [Unique dOut] (Λ₁ Λ₂ : CPTPMap dIn dOut) : Λ₁ = Λ₂ :=
+  ext fun _ ↦ (Unique.eq_default _).trans (Unique.eq_default _).symm
+
+instance instUnique [Nonempty dIn] [Unique dOut] : Unique (CPTPMap dIn dOut) where
+  default := destroy
+  uniq := fun _ ↦ eq_if_output_unique _ _
 
 --could go before destroy (in which case destroy is a special case), or after (building as a
 -- composition with destroy and of_state)
@@ -346,16 +375,59 @@ section prod
 open Kronecker
 
 variable {dI₁ dI₂ dO₁ dO₂ : Type*} [Fintype dI₁] [Fintype dI₂] [Fintype dO₁] [Fintype dO₂]
-variable [DecidableEq dI₁] [DecidableEq dI₂]
+variable [DecidableEq dI₁] [DecidableEq dI₂] [DecidableEq dO₁] [DecidableEq dO₂]
 
+/-- The tensor product of two CPTPMaps. -/
 def prod (Λ₁ : CPTPMap dI₁ dO₁) (Λ₂ : CPTPMap dI₂ dO₂) : CPTPMap (dI₁ × dI₂) (dO₁ × dO₂) :=
-  CPTP_of_choi_PSD_Tr (M := sorry)--Λ₁.choi ⊗ₖ Λ₂.choi)
-    (sorry)
-    (sorry)
+  CPTPMap.mk
+    (MatrixMap.MatrixMap_Prod Λ₁.map Λ₂.map)
+    (by sorry)
+    (by
+      intro n M hM
+      have M' : Matrix (dI₁ × (dI₂ × Fin n)) (dI₁ × (dI₂ × Fin n)) ℂ := sorry --reorder indices of M
+      have hM' : M'.PosSemidef := sorry --PSD preserved under reordering
+      let Λ₁M := ((Λ₁.map.MatrixMap_Prod LinearMap.id) M')
+      have hΛ₁M : Λ₁M.PosSemidef := Λ₁.completely_pos.IsCompletelyPositive_Fintype (dI₂ × Fin n) hM'
+      have Λ₁M' : Matrix (dI₂ × (dO₁ × Fin n)) (dI₂ × (dO₁ × Fin n)) ℂ := sorry --reorder Λ₁M
+      have hΛ₁M' : Λ₁M'.PosSemidef := sorry --PSD preserved under reordering
+      let Λ₂Λ₁M := (Λ₂.map.MatrixMap_Prod LinearMap.id) Λ₁M'
+      have hΛ₂Λ₁M : Λ₂Λ₁M.PosSemidef := Λ₂.completely_pos.IsCompletelyPositive_Fintype (dO₁ × Fin n) hΛ₁M'
+      --PSD preserved under reordering to get (((Λ₁.map.MatrixMap_Prod Λ₂.map).MatrixMap_Prod LinearMap.id) M)
+      sorry
+    )
 
 notation ρL "⊗" ρR => prod ρL ρR
 
 end prod
+
+section finprod
+section
+
+variable {k : ℕ}
+variable {dI : Fin k → Type v} [∀(i : Fin k), Fintype (dI i)] [∀(i : Fin k), DecidableEq (dI i)]
+variable {dO : Fin k → Type w} [∀(i : Fin k), Fintype (dO i)] [∀(i : Fin k), DecidableEq (dO i)]
+
+/-- Finitely-indexed tensor products of CPTPMaps, when the indices are Fin n.  -/
+def fin_n_prod (Λi : (i : Fin k) → CPTPMap (dI i) (dO i)) : CPTPMap ((i:Fin k) → (dI i)) ((i:Fin k) → (dO i)) :=
+  sorry
+
+theorem fin_n_prod_1 {dI : Fin 1 → Type v} [Fintype (dI 0)] [DecidableEq (dI 0)] {dO : Fin 1 → Type w} [Fintype (dO 0)] [DecidableEq (dO 0)] (Λi : (i : Fin 1) → CPTPMap (dI 0) (dO 0)) :
+    fin_n_prod Λi = CPTPMap.compose sorry ((Λi 1).compose sorry) :=
+  sorry --TODO: permutations
+
+end
+section
+
+variable {ι : Type u} [DecidableEq ι] [Fintype ι]
+variable {dI : ι → Type v} [∀(i :ι), Fintype (dI i)] [∀(i :ι), DecidableEq (dI i)]
+variable {dO : ι → Type w} [∀(i :ι), Fintype (dO i)] [∀(i :ι), DecidableEq (dO i)]
+
+/-- Finitely-indexed tensor products of CPTPMaps.  -/
+def fintype_prod (Λi : ι → CPTPMap (dI i) (dO i)) : CPTPMap ((i:ι) → dI i) ((i:ι) → dO i) :=
+  sorry
+
+end
+end finprod
 
 section trace
 variable {d₁ d₂ : Type*} [Fintype d₁] [Fintype d₂] [DecidableEq d₁] [DecidableEq d₂]

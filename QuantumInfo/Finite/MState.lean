@@ -196,6 +196,17 @@ def ofClassical (dist : Distribution d) : MState d where
 /-- The maximally mixed state. -/
 def uniform [Nonempty d] : MState d := ofClassical Distribution.uniform
 
+/-- There is exactly one state on a dimension-1 system. -/
+instance instUnique [Unique d] : Unique (MState d) where
+  default := @uniform _ _ instNonemptyOfInhabited
+  uniq := by
+    intro ρ
+    ext
+    have h₁ := ρ.tr
+    have h₂ := (@uniform _ _ instNonemptyOfInhabited : MState d).tr
+    simp [Matrix.trace, Unique.eq_default] at h₁ h₂ ⊢
+    exact h₁.trans h₂.symm
+
 section ptrace
 
 section mat_trace

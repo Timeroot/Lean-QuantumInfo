@@ -9,7 +9,11 @@ open ComplexConjugate
 open Kronecker
 open scoped Matrix ComplexOrder
 
-variable {d : Type*} [Fintype d]
+variable {d d₂ : Type*} [Fintype d] [Fintype d₂] (ρ σ : MState d)
+
+--We put all of the fidelity defs and theorems in the MState namespace so that they have the
+--nice . syntax, i.e. `ρ.Fidelity σ = 1 ↔ ρ = σ`.
+namespace MState
 
 /-- The fidelity of two quantum states. This is the quantum version of the Bhattacharyya coefficient. -/
 def Fidelity (ρ σ : MState d) : ℝ :=
@@ -20,36 +24,32 @@ def Fidelity (ρ σ : MState d) : ℝ :=
     exact σ.pos.mul_mul_conjTranspose_same _
   (ρσρ_PosSemidef.sqrt.trace.re)^2
 
-namespace Fidelity
-
-variable {d d₂ : Type*} [Fintype d] [Fintype d₂] (ρ σ : MState d)
-
-theorem ge_zero : 0 ≤ Fidelity ρ σ :=
+theorem fidelity_ge_zero : 0 ≤ Fidelity ρ σ :=
   sq_nonneg _
 
-theorem le_one : Fidelity ρ σ ≤ 1 :=
+theorem fidelity_le_one : Fidelity ρ σ ≤ 1 :=
   sorry --submultiplicativity of trace and sqrt
 
 /-- The fidelity, as a `Prob` probability with value between 0 and 1. -/
-def prob : Prob :=
-  ⟨Fidelity ρ σ, ⟨ge_zero ρ σ, le_one ρ σ⟩⟩
+def fidelity_prob : Prob :=
+  ⟨Fidelity ρ σ, ⟨fidelity_ge_zero ρ σ, fidelity_le_one ρ σ⟩⟩
 
 /-- A state has perfect fidelity with itself. -/
-theorem self_eq_one : Fidelity ρ ρ = 1 :=
+theorem fidelity_self_eq_one : Fidelity ρ ρ = 1 :=
   sorry --Break and recombine sqrts
 
 /-- The fidelity is 1 if and only if the two states are the same. -/
-theorem eq_one_iff_self : ρ = σ ↔ Fidelity ρ σ = 1 :=
-  ⟨fun h ↦ h ▸ self_eq_one ρ,
-  sorry
+theorem fidelity_eq_one_iff_self : Fidelity ρ σ = 1 ↔ ρ = σ :=
+  ⟨sorry,
+  fun h ↦ h ▸ fidelity_self_eq_one ρ
   ⟩
 
 /-- The fidelity is a symmetric quantity. -/
-theorem symm : Fidelity ρ σ = Fidelity σ ρ :=
+theorem fidelity_symm : Fidelity ρ σ = Fidelity σ ρ :=
   sorry --break into sqrts
 
 /-- The fidelity cannot increase under the application of a channel. -/
-theorem channel_nondecreasing (Λ : CPTPMap d d₂) : Fidelity (Λ ρ) (Λ σ) ≥ Fidelity ρ σ :=
+theorem fidelity_channel_nondecreasing (Λ : CPTPMap d d₂) : Fidelity (Λ ρ) (Λ σ) ≥ Fidelity ρ σ :=
   sorry
 
 --TODO: Arccos ∘ Fidelity forms a metric (triangle inequality), the Fubini–Study metric.
@@ -57,4 +57,4 @@ theorem channel_nondecreasing (Λ : CPTPMap d d₂) : Fidelity (Λ ρ) (Λ σ) �
 --Invariance under unitaries
 --Uhlmann's theorem
 
-end Fidelity
+end MState
