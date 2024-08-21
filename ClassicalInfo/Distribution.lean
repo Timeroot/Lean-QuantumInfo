@@ -52,9 +52,6 @@ theorem fun_eq_val (d : Distribution α) (x : α): d.val x = d x :=
 theorem ext {p q : Distribution α} (h : ∀ x, p x = q x) : p = q :=
   DFunLike.ext p q h
 
-theorem ext_iff {p q : Distribution α} : p = q ↔ ∀ x, p x = q x :=
-  DFunLike.ext_iff
-
 /-- Make an constant distribution: supported on a single element. This is also called, variously, a
  "One-point distribution", a "Degenerate distribution", a "Deterministic distribution", a
  "Delta function", or a "Point mass distribution". -/

@@ -1,5 +1,4 @@
 import ClassicalInfo.Distribution
-import ClassicalInfo.Helper
 import Mathlib.MeasureTheory.Measure.MeasureSpaceDef
 
 open BigOperators

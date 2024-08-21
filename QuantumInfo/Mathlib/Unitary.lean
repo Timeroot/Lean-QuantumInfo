@@ -63,10 +63,11 @@ open Module.End
 variable {𝕜 : Type*} [RCLike 𝕜]
 variable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace 𝕜 E]
 variable [FiniteDimensional 𝕜 E]
-variable {T : E →ₗ[𝕜] E} (hT : T.IsSymmetric)
+variable {T : E →ₗ[𝕜] E}
 
 /-- A symmetric operator conjugated by a unitary is symmetric. -/
-theorem conj_unitary_IsSymmetric (U : unitary (E →ₗ[𝕜] E)) : (U.val * T * star U.val).IsSymmetric := by
+theorem conj_unitary_IsSymmetric (U : unitary (E →ₗ[𝕜] E)) (hT : T.IsSymmetric) :
+    (U.val * T * star U.val).IsSymmetric := by
   intro i j
   rw [mul_assoc, mul_apply, ← LinearMap.adjoint_inner_right]
   rw [mul_apply, mul_apply, mul_apply, ← LinearMap.adjoint_inner_left U.val]
@@ -76,8 +77,8 @@ variable {n : ℕ} (hn : FiniteDimensional.finrank 𝕜 E = n)
 
 /-- There is an equivalence between the eigenvalues of a finite dimensional symmetric operator,
 and the eigenvalues of that operator conjugated by a unitary. -/
-def conj_unitary_eigenvalue_equiv (U : unitary (E →ₗ[𝕜] E)) : { σ : Equiv.Perm (Fin n) //
-     (hT.conj_unitary_IsSymmetric U).eigenvalues hn = hT.eigenvalues hn ∘ σ } := by
+def conj_unitary_eigenvalue_equiv (U : unitary (E →ₗ[𝕜] E)) (hT : T.IsSymmetric) :
+    { σ : Equiv.Perm (Fin n) // (hT.conj_unitary_IsSymmetric U).eigenvalues hn = hT.eigenvalues hn ∘ σ } := by
   sorry --use conj_unitary_eigenspace_equiv
 
 end IsSymmetric

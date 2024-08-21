@@ -1,4 +1,4 @@
-import Mathlib.Data.Real.NNReal
+import Mathlib.Data.NNReal.Basic
 import Mathlib.Analysis.Convex.Mul
 
 /- This defines a type `Prob` which is a real number in the interval O to 1. This then comes with
@@ -122,11 +122,8 @@ instance canLift : CanLift ℝ Prob toReal fun r => 0 ≤ r ∧ r ≤ 1 :=
 @[ext] protected theorem eq {n m : Prob} : (n : ℝ) = (m : ℝ) → n = m :=
   Subtype.eq
 
-protected theorem eq_iff {n m : Prob} : (n : ℝ) = (m : ℝ) ↔ n = m :=
-  Subtype.ext_iff.symm
-
 theorem ne_iff {x y : Prob} : (x : ℝ) ≠ (y : ℝ) ↔ x ≠ y :=
-  not_congr <| Prob.eq_iff
+  not_congr <| Prob.eq_iff.symm
 
 @[simp]
 theorem toReal_mk : toReal { val := x, property := hx} = x :=

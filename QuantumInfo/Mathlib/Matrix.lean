@@ -8,11 +8,11 @@ open Classical
 
 namespace Matrix
 variable {n 𝕜 : Type*}
-variable [Fintype n] [RCLike 𝕜]
+variable [RCLike 𝕜]
 variable (A : Matrix n n 𝕜) (B : Matrix n n 𝕜)
 
 /-- Inner product of two square matrices. TODO: Rectangular? -/
-def inner (A : Matrix n n 𝕜) (B : Matrix n n 𝕜) : ℝ :=
+def inner [Fintype n] (A : Matrix n n 𝕜) (B : Matrix n n 𝕜) : ℝ :=
   RCLike.re (Aᴴ * B).trace
 
 namespace IsHermitian
@@ -20,13 +20,18 @@ namespace IsHermitian
 variable {A B}
 variable (hA : A.IsHermitian) (hB : B.IsHermitian)
 
+include hA in
 theorem smul {c : 𝕜} (h : RCLike.im c = 0) : (c • A).IsHermitian := by
   rw [IsHermitian, Matrix.conjTranspose_smul, RCLike.star_def, RCLike.conj_eq_iff_im.mpr h, hA]
 
+variable [Fintype n]
+
+include hA in
 @[simp]
 theorem re_trace_eq_trace : RCLike.re (A.trace) = A.trace := by
   rw [trace, map_sum, RCLike.ofReal_sum, IsHermitian.coe_re_diag hA]
 
+include hA hB in
 /-- The inner product for Hermtian matrices is equal to the trace of
   the product. -/
 theorem inner_eq_trace_mul : A.inner B = (A * B).trace := by
@@ -35,8 +40,6 @@ theorem inner_eq_trace_mul : A.inner B = (A * B).trace := by
       conjTranspose_smul, star_inv', star_ofNat, conjTranspose_conjTranspose]
     rw [add_comm]
   have : (A*B)ᴴ.trace = star (A*B).trace := sorry
-  let tmp₁ := hA
-  let tmp₂ := hB
   sorry
 
 section eigenvalues
@@ -56,8 +59,7 @@ section Kronecker
 
 open Kronecker
 
-variable [CommRing R] [PartialOrder R] [StarRing R] [StarOrderedRing R]
-variable [Fintype m] [Fintype n]
+variable [CommRing R] [StarRing R]
 variable (A : Matrix m m R) (B : Matrix n n R)
 
 theorem kroneckerMap_conjTranspose : (A ⊗ₖ B)ᴴ = (Aᴴ ⊗ₖ Bᴴ) := by
@@ -66,6 +68,7 @@ theorem kroneckerMap_conjTranspose : (A ⊗ₖ B)ᴴ = (Aᴴ ⊗ₖ Bᴴ) := by
 variable {A : Matrix m m R} {B : Matrix n n R}
 variable (hA : A.IsHermitian) (hB : B.IsHermitian)
 
+include hA hB in
 theorem kroneckerMap_IsHermitian : (A ⊗ₖ B).IsHermitian := by
   exact (hA ▸ hB ▸ kroneckerMap_conjTranspose A B : _ = _)
 
@@ -79,19 +82,13 @@ open scoped ComplexOrder
 
 variable {m n 𝕜 : Type*}
 variable [Fintype m] [Fintype n]
-variable [RCLike 𝕜] [DecidableEq n] [DecidableEq m]
+variable [RCLike 𝕜] [DecidableEq n]
 
 section
 variable {A : Matrix m m 𝕜} {B : Matrix m m 𝕜}
 variable (hA : A.PosSemidef) (hB : B.PosSemidef)
 
-theorem add : (A + B).PosSemidef := by
-  constructor
-  · exact hA.1.add hB.1
-  · intro x
-    rw [Matrix.add_mulVec, Matrix.dotProduct_add]
-    exact add_nonneg (hA.2 x) (hB.2 x)
-
+include hA in
 theorem smul {c : 𝕜} (h : 0 ≤ c): (c • A).PosSemidef := by
   constructor
   · apply hA.1.smul (RCLike.nonneg_iff.mp h).2
@@ -99,25 +96,30 @@ theorem smul {c : 𝕜} (h : 0 ≤ c): (c • A).PosSemidef := by
     rw [Matrix.smul_mulVec_assoc, Matrix.dotProduct_smul]
     exact mul_nonneg h (hA.2 x)
 
+include hA hB in
 theorem convex_cone {c₁ c₂ : 𝕜} (hc₁ : 0 ≤ c₁) (hc₂ : 0 ≤ c₂) : (c₁ • A + c₂ • B).PosSemidef :=
   (hA.smul hc₁).add (hB.smul hc₂)
 
+include hA hB in
 /-- The inner product for PSD matrices is nonnegative. -/
 theorem inner_ge_zero : 0 ≤ A.inner B :=
   let tmp₁ := hA
   let tmp₂ := hB
   sorry
 
+include hA hB in
 /-- The inner product for PSD matrices is at most the product of their traces. -/
 theorem inner_le_mul_trace : A.inner B ≤ RCLike.re A.trace * RCLike.re B.trace :=
   let tmp₁ := hA
   let tmp₂ := hB
   sorry
 
-theorem diag_nonneg (hA : A.PosSemidef) : ∀i, 0 ≤ A.diag i := by
+include hA in
+theorem diag_nonneg : ∀i, 0 ≤ A.diag i := by
   intro i
   simpa [Matrix.mulVec, Matrix.dotProduct] using hA.2 (fun j ↦ if i = j then 1 else 0)
 
+include hA in
 theorem trace_nonneg : 0 ≤ A.trace := by
   rw [Matrix.trace]
   apply Finset.sum_nonneg
@@ -129,6 +131,7 @@ end
 variable {A : Matrix m m 𝕜} {B : Matrix n n 𝕜}
 variable (hA : A.PosSemidef) (hB : B.PosSemidef)
 
+include hA hB in
 theorem PosSemidef_kronecker : (A ⊗ₖ B).PosSemidef := by
   rw [hA.left.spectral_theorem, hB.left.spectral_theorem]
   rw [Matrix.mul_kronecker_mul, Matrix.mul_kronecker_mul]
@@ -173,7 +176,15 @@ theorem nonneg_smul {c : 𝕜} (hA : (c • A).PosSemidef) (hc : 0 < c) : A.PosS
     rw [RCLike.pos_iff] at hc ⊢
     aesop
   convert hA.pos_smul (c := 1/c) this.le
-  rw [smul_smul, one_div, inv_mul_cancel hc.ne', one_smul]
+  rw [smul_smul, one_div, inv_mul_cancel₀ hc.ne', one_smul]
+
+theorem pos_Real_smul {c : ℝ} (hA : A.PosSemidef) (hc : 0 ≤ c) : (c • A).PosSemidef := by
+  rw [(RCLike.real_smul_eq_coe_smul c A : c • A = (c : 𝕜) • A)]
+  exact pos_smul hA (RCLike.ofReal_nonneg.mpr hc)
+
+theorem nonneg_Real_smul {c : ℝ} (hA : (c • A).PosSemidef) (hc : 0 < c) : A.PosSemidef := by
+  rw [(RCLike.real_smul_eq_coe_smul c A : c • A = (c : 𝕜) • A)] at hA
+  exact nonneg_smul hA (RCLike.ofReal_pos.mpr hc)
 
 theorem sqrt_nonneg_smul {c : 𝕜} (hA : (c^2 • A).PosSemidef) (hc : 0 < c) :
     hA.sqrt = c • (hA.nonneg_smul (sq_pos_of_pos hc) : A.PosSemidef).sqrt := by

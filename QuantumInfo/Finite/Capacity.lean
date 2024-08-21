@@ -78,9 +78,9 @@ Finally, showing that the n-copy coherent information converges to the capacity.
 namespace CPTPMap
 
 variable {d₁ d₂ d₃ d₄ d₅ d₆ : Type*}
-variable [Fintype d₁] [Fintype d₂] [Fintype d₃] [Fintype d₄] [Fintype d₅] [Fintype d₆]
-variable [DecidableEq d₁] [DecidableEq d₂] [DecidableEq d₃] [DecidableEq d₄] [DecidableEq d₅] [DecidableEq d₆]
+variable [Fintype d₁] [Fintype d₂] [Fintype d₃] [Fintype d₄] [Fintype d₅] [Fintype d₆] [DecidableEq d₁]
 
+variable [DecidableEq d₂] [DecidableEq d₃] [DecidableEq d₄] in
 /--
 A channel Λ₁ `Emulates` another channel Λ₂ if there are D and E such that D∘Λ₁∘E = Λ₂.
 -/
@@ -93,6 +93,7 @@ A channel A `εApproximates` channel B of the same dimensions if the for every s
 def εApproximates (A B : CPTPMap d₁ d₂) (ε : ℝ) : Prop :=
   ∀ (ρ : MState d₁), (A ρ).Fidelity (B ρ) ≥ 1-ε
 
+variable [DecidableEq d₂] in
 /--
 A channel A `AchievesRate` R:ℝ if for every ε>0, some n copies of A emulates a channel B such that log2(dimout(B))/n ≥ R, and that B εApproximates the identity channel.
 -/
@@ -103,10 +104,12 @@ def achievesRate (A : CPTPMap d₁ d₂) (R : ℝ) : Prop :=
       Real.logb 2 dimB ≥ R*n ∧
       B.εApproximates CPTPMap.id ε
 
+variable [DecidableEq d₂] in
 noncomputable def QuantumCapacity (A : CPTPMap d₁ d₂) : ℝ :=
   sSup { R : ℝ | achievesRate A R }
 
 section emulates
+variable [DecidableEq d₂] [DecidableEq d₃] [DecidableEq d₄] [DecidableEq d₅] [DecidableEq d₆]
 
 /-- Every quantum channel emulates itself. -/
 theorem emulates_self (Λ : CPTPMap d₁ d₂) : Λ.emulates Λ :=
@@ -135,6 +138,7 @@ theorem εApproximates_monotone {A B : CPTPMap d₁ d₂} {ε₀ : ℝ} (h : A.�
 end εApproximates
 
 section achievesRate
+variable [DecidableEq d₂]
 
 /-- Every quantum channel achieves a rate of zero. -/
 theorem achievesRate_0 (Λ : CPTPMap d₁ d₂) : Λ.achievesRate 0 := by
@@ -177,13 +181,14 @@ theorem BddAbove_achievesRate (Λ : CPTPMap d₁ d₂) : BddAbove {R | Λ.achiev
 end achievesRate
 
 section capacity
+variable [DecidableEq d₂]
 
 /-- Quantum channel capacity is nonnegative. -/
 theorem zero_le_QuantumCapacity (Λ : CPTPMap d₁ d₂) : 0 ≤ Λ.QuantumCapacity :=
   le_csSup (BddAbove_achievesRate Λ) (achievesRate_0 Λ)
 
 /-- Quantum channel capacity is at most log2(D), where D is the input dimension. -/
-theorem QuantumCapacitygt_log_dim_in (Λ : CPTPMap d₁ d₂) : Λ.QuantumCapacity ≤ Real.logb 2 (Fintype.card d₁) :=
+theorem QuantumCapacity_gt_log_dim_in (Λ : CPTPMap d₁ d₂) : Λ.QuantumCapacity ≤ Real.logb 2 (Fintype.card d₁) :=
   Real.sSup_le (by
     intro R h
     contrapose h

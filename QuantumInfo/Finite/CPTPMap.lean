@@ -11,7 +11,7 @@ namespace MatrixMap
 section matrix
 variable {A B C D E F R : Type*}
   [Fintype A] [Fintype B] [Fintype C] [Fintype D] [Fintype E] [Fintype F] [Semiring R]
-  [DecidableEq A] [DecidableEq B] [DecidableEq C] [DecidableEq D]
+  [DecidableEq A]
 
 /-- Choi matrix of a given linear matrix map. Note that this is defined even for things that
   aren't CPTP, it's just rarely talked about in those contexts. -/
@@ -53,7 +53,7 @@ variable {R : Type*} [CommSemiring R]
 noncomputable def toMatrix : MatrixMap A B R ≃ₗ[R] Matrix (B × B) (A × A) R :=
   LinearMap.toMatrix (Matrix.stdBasis R A A) (Matrix.stdBasis R B B)
 
-theorem toMatrix_comp (M₁ : MatrixMap A B R) (M₂ : MatrixMap B C R) : toMatrix (M₂ ∘ₗ M₁) = (toMatrix M₂) * (toMatrix M₁) :=
+theorem toMatrix_comp [DecidableEq B] (M₁ : MatrixMap A B R) (M₂ : MatrixMap B C R) : toMatrix (M₂ ∘ₗ M₁) = (toMatrix M₂) * (toMatrix M₁) :=
   LinearMap.toMatrix_comp _ _ _ M₂ M₁
 
 -- /-- The canonical tensor product on linear maps between matrices, where a map from
@@ -72,7 +72,7 @@ end matrix
 section prod
 
 variable {A B C D R : Type*} [Fintype A] [Fintype B] [Fintype C] [Fintype D]
-variable [CommSemiring R] [DecidableEq A] [DecidableEq B] [DecidableEq C] [DecidableEq D]
+variable [CommSemiring R] [DecidableEq A] [DecidableEq C]
 
 noncomputable def MatrixMap_Prod (M₁ : MatrixMap A B R) (M₂ : MatrixMap C D R) : MatrixMap (A × C) (B × D) R :=
   let h₁ := (LinearMap.toMatrix (Basis.tensorProduct (Matrix.stdBasis R A A) (Matrix.stdBasis R C C))
@@ -116,7 +116,7 @@ end prod
 
 variable {A B C D E F R : Type*}
   [Fintype A] [Fintype B] [Fintype C] [Fintype D] [Fintype E] [Fintype F]
-  [DecidableEq A] [DecidableEq B] [DecidableEq C] [DecidableEq D] [DecidableEq F]
+  [DecidableEq A]
 
 open Kronecker
 open TensorProduct
@@ -187,7 +187,7 @@ theorem IsCompletelyPositive.IsPositiveMap (M : MatrixMap A B R)
 
 end MatrixMap
 
-variable (dIn dOut dOut₂ : Type*) [Fintype dIn] [Fintype dOut] [Fintype dOut₂] [DecidableEq dIn]
+variable (dIn dOut dOut₂ : Type*) [Fintype dIn] [Fintype dOut] [Fintype dOut₂]
 
 /-- Positive trace-preserving linear maps. These includes all channels, but aren't
   necessarily *completely* positive, see `CPTPMap`. -/
@@ -197,7 +197,7 @@ structure PTPMap where
   trace_preserving : map.IsTracePreserving
 
 /-- Quantum channels, aka CPTP maps: completely positive trace preserving linear maps. -/
-structure CPTPMap extends PTPMap dIn dOut where
+structure CPTPMap [DecidableEq dIn] extends PTPMap dIn dOut where
   mk' ::
     completely_pos : map.IsCompletelyPositive
 
@@ -224,7 +224,7 @@ instance instFunLike : FunLike (PTPMap dIn dOut) (MState dIn) (MState dOut) wher
 --If we have a PTPMap, the input and output dimensions are always both nonempty (otherwise
 --we can't preserve trace) - or they're both empty. So `[Nonempty dIn]` will always suffice.
 -- This would be nice as an `instance` but that would leave `dIn` as a metavariable.
-theorem nonemptyOut (Λ : PTPMap dIn dOut) [hIn : Nonempty dIn] : Nonempty dOut := by
+theorem nonemptyOut (Λ : PTPMap dIn dOut) [hIn : Nonempty dIn] [DecidableEq dIn] : Nonempty dOut := by
   by_contra h
   simp only [not_nonempty_iff] at h
   let M := (1 : Matrix dIn dIn ℂ)
@@ -240,6 +240,8 @@ end PTPMap
 namespace CPTPMap
 noncomputable section
 open scoped Matrix ComplexOrder
+
+variable [DecidableEq dIn]
 
 def mk (map : MatrixMap dIn dOut ℂ) (h₁ : map.IsTracePreserving) (h₂ : map.IsCompletelyPositive) : CPTPMap dIn dOut :=
   ⟨⟨map, h₂.IsPositiveMap, h₁⟩, h₂⟩
@@ -297,9 +299,6 @@ theorem ext {Λ₁ Λ₂ : CPTPMap dIn dOut} (h : ∀ ρ, Λ₁ ρ = Λ₂ ρ) :
   funext
   exact (h _)
 
-theorem ext_iff {Λ₁ Λ₂ : CPTPMap dIn dOut} : (∀ ρ, Λ₁ ρ = Λ₂ ρ) ↔ Λ₁ = Λ₂ :=
-  ⟨ext, fun h _ ↦ h ▸rfl⟩
-
 def compose (Λ₂ : CPTPMap dM dOut) (Λ₁ : CPTPMap dIn dM) : CPTPMap dIn dOut :=
   CPTPMap.mk (Λ₂.map ∘ₗ Λ₁.map)
   (Λ₁.trace_preserving.comp Λ₂.trace_preserving)
@@ -336,20 +335,17 @@ theorem id_MState (ρ : MState dIn) : CPTPMap.id ρ = ρ := by
 /-- The map `CPTPMap.id` composed with any map is the same map. -/
 @[simp]
 theorem id_compose [DecidableEq dOut] (Λ : CPTPMap dIn dOut) : CPTPMap.id.compose Λ = Λ := by
-  simp only [← ext_iff, compose_eq, id_MState, implies_true]
+  simp only [CPTPMap.ext_iff, compose_eq, id_MState, implies_true]
 
 /-- Any map composed with `CPTPMap.id` is the same map. -/
 @[simp]
-theorem compose_id [DecidableEq dOut] (Λ : CPTPMap dIn dOut) : Λ.compose CPTPMap.id = Λ := by
-  simp only [← ext_iff, compose_eq, id_MState, implies_true]
+theorem compose_id (Λ : CPTPMap dIn dOut) : Λ.compose CPTPMap.id = Λ := by
+  simp only [CPTPMap.ext_iff, compose_eq, id_MState, implies_true]
 
-/-- There is a CPTP map that takes a system of any dimension and outputs the trivial Hilbert
-space, 1-dimensional, indexed by `Unit`. -/
+/-- There is a CPTP map that takes a system of any (nonzero) dimension and outputs the
+trivial Hilbert space, 1-dimensional, indexed by any `Unique` type. -/
 def destroy [Nonempty dIn] [Unique dOut] : CPTPMap dIn dOut :=
-  CPTP_of_choi_PSD_Tr
-    (M := (1 / Finset.univ.card (α := dIn) : ℂ) • 1)
-    (by sorry)
-    (by sorry)
+  CPTP_of_choi_PSD_Tr Matrix.PosSemidef.one (by simp)
 
 /-- Two CPTP maps into the same one-dimensional output space must be equal -/
 theorem eq_if_output_unique [Unique dOut] (Λ₁ Λ₂ : CPTPMap dIn dOut) : Λ₁ = Λ₂ :=

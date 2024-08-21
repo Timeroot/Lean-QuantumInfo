@@ -10,7 +10,7 @@ open scoped ComplexOrder
 
 variable {m n R : Type*}
 variable [Fintype m] [Fintype n]
-variable [RCLike R] [DecidableEq n] [DecidableEq m]
+variable [RCLike R]
 
 /-- The trace norm of a matrix: Tr[√(A† A)]. -/
 def traceNorm (A : Matrix m n R) : ℝ :=
