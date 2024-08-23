@@ -100,7 +100,7 @@ A channel A `AchievesRate` R:ℝ if for every ε>0, some n copies of A emulates 
 def achievesRate (A : CPTPMap d₁ d₂) (R : ℝ) : Prop :=
   ∀ ε : ℝ, ε > 0 →
     ∃ (n : ℕ) (dimB : ℕ) (B : CPTPMap (Fin dimB) (Fin dimB)),
-      (CPTPMap.fin_n_prod (fun (_ : Fin n) ↦ A)).emulates B ∧
+      (CPTPMap.fintype_prod (fun (_ : Fin n) ↦ A)).emulates B ∧
       Real.logb 2 dimB ≥ R*n ∧
       B.εApproximates CPTPMap.id ε
 

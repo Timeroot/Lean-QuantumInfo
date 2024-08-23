@@ -247,7 +247,7 @@ def fintype_prod (Λi : (i:ι) → CPTPMap (dI i) (dO i)) : CPTPMap ((i:ι) → 
   (sorry)
   (MatrixMap.IsCompletelyPositive.PiKron (fun i ↦ (Λi i).completely_pos))
 
-theorem fin_n_prod_1
+theorem fin_1_prod
   {dI : Fin 1 → Type v} [Fintype (dI 0)] [DecidableEq (dI 0)]
   {dO : Fin 1 → Type w} [Fintype (dO 0)] [DecidableEq (dO 0)]
   (Λi : (i : Fin 1) → CPTPMap (dI 0) (dO 0)) :
