@@ -1,6 +1,7 @@
 import QuantumInfo.Finite.MState
 import QuantumInfo.Finite.Unitary
 import Mathlib.LinearAlgebra.TensorProduct.Matrix
+import Mathlib.LinearAlgebra.PiTensorProduct
 import Mathlib.Data.Set.Card
 import Mathlib.Algebra.Module.LinearMap.Basic
 
@@ -128,9 +129,72 @@ variable [CommRing R] {Dl₁ Dl₂ Dl₃ Dr₁ Dr₂ Dr₃ : Type*}
 /-- For maps L₁, L₂, R₁, and R₂, the product (L₂ ∘ₗ L₁) ⊗ₖₘ (R₂ ∘ₗ R₁) = (L₂ ⊗ₖₘ R₂) ∘ₗ (L₁ ⊗ₖₘ R₁) -/
 theorem kron_comp_distrib (L₁ : MatrixMap Dl₁ Dl₂ R) (L₂ : MatrixMap Dl₂ Dl₃ R) (R₁ : MatrixMap Dr₁ Dr₂ R)
     (R₂ : MatrixMap Dr₂ Dr₃ R) : (L₂ ∘ₗ L₁) ⊗ₖₘ (R₂ ∘ₗ R₁) = (L₂ ⊗ₖₘ R₂) ∘ₗ (L₁ ⊗ₖₘ R₁) := by
+  --TensorProduct.map_tmul
+  sorry
+
+variable [CommSemiring R] [DecidableEq B] in
+theorem kron_id_id : (id A R ⊗ₖₘ id B R) = id (A × B) R := by
+  sorry
+
+variable [CommSemiring R] in
+theorem add_kron (M₁ M₂ : MatrixMap A B R) (M₃: MatrixMap C D R) : ((M₁ + M₂) ⊗ₖₘ M₃) = (M₁ ⊗ₖₘ M₃) + (M₂ ⊗ₖₘ M₃) := by
   sorry
 
 end kron
+
+section pi
+section basis
+
+--Missing from Mathlib
+
+variable {ι : Type*}
+variable {R : Type*} [CommSemiring R]
+variable {s : ι → Type*} [∀ i, AddCommMonoid (s i)] [∀ i, Module R (s i)]
+variable {L : ι → Type* }
+
+#check PiTensorProduct
+#check Classical.em
+
+/-- Like `Basis.tensorProduct`, but for `PiTensorProduct` -/
+def Basis.piTensorProduct [∀i, Fintype (L i)]  (b : (i:ι) → Basis (L i) R (s i)) :
+    Basis ((i:ι) → L i) R (PiTensorProduct R s) :=
+  Finsupp.basisSingleOne.map sorry
+
+end basis
+
+section equiv
+variable {ι : Type u}
+def Equiv.piProdProdPi (κ : ι → Type v) : ((i : ι) → κ i × κ i) ≃ ((i : ι) → κ i) × ((i : ι) → κ i) where
+  toFun := fun f ↦ ⟨fun i↦(f i).1,fun i↦(f i).2⟩
+  invFun := fun f i ↦⟨f.1 i, f.2 i⟩
+  left_inv := by intro; simp
+  right_inv := by intro; simp
+end equiv
+
+variable {R : Type*} [CommSemiring R]
+variable {ι : Type u} [DecidableEq ι] [fι : Fintype ι]
+variable {dI : ι → Type v} [∀i, Fintype (dI i)] [∀i, DecidableEq (dI i)]
+variable {dO : ι → Type w} [∀i, Fintype (dO i)] [∀i, DecidableEq (dO i)]
+
+/-- Finite Pi-type tensor product of MatrixMaps. Defined as `PiTensorProduct.tprod` of the underlying
+Linear maps. Notation `⨂ₜₘ[R] i, f i`, eventually. -/
+noncomputable def PiKron (Λi : ∀ i, MatrixMap (dI i) (dO i) R) : MatrixMap (∀i, dI i) (∀i, dO i) R :=
+  let map₁ := PiTensorProduct.map Λi;
+  let map₂ := LinearMap.toMatrix
+    (Basis.piTensorProduct (fun i ↦ Matrix.stdBasis R (dI i) (dI i)))
+    (Basis.piTensorProduct (fun i ↦ Matrix.stdBasis R (dO i) (dO i))) map₁
+  let r₁ : ((i : ι) → dO i × dO i) ≃ ((i : ι) → dO i) × ((i : ι) → dO i) := Equiv.piProdProdPi dO
+  let r₂ : ((i : ι) → dI i × dI i) ≃ ((i : ι) → dI i) × ((i : ι) → dI i) := Equiv.piProdProdPi dI
+  let map₃ := Matrix.reindex r₁ r₂ map₂;
+  Matrix.toLin
+    (Matrix.stdBasis R ((i:ι) → dI i) ((i:ι) → dI i))
+    (Matrix.stdBasis R ((i:ι) → dO i) ((i:ι) → dO i)) map₃
+
+-- notation3:100 "⨂ₜₘ "(...)", "r:(scoped f => tprod R f) => r
+-- syntax (name := bigsum) "∑ " bigOpBinders ("with " term)? ", " term:67 : term
+-- macro "∃" xs:explicitBinders ", " b:term : term => expandExplicitBinders ``Exists xs b
+
+end pi
 
 section trace_preserving
 

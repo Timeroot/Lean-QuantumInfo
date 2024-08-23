@@ -236,32 +236,24 @@ notation ρL "⊗" ρR => prod ρL ρR
 end prod
 
 section finprod
-section
 
-variable {k : ℕ}
-variable {dI : Fin k → Type v} [∀(i : Fin k), Fintype (dI i)] [∀(i : Fin k), DecidableEq (dI i)]
-variable {dO : Fin k → Type w} [∀(i : Fin k), Fintype (dO i)] [∀(i : Fin k), DecidableEq (dO i)]
-
-/-- Finitely-indexed tensor products of CPTPMaps, when the indices are Fin n.  -/
-def fin_n_prod (Λi : (i : Fin k) → CPTPMap (dI i) (dO i)) : CPTPMap ((i:Fin k) → (dI i)) ((i:Fin k) → (dO i)) :=
-  sorry
-
-theorem fin_n_prod_1 {dI : Fin 1 → Type v} [Fintype (dI 0)] [DecidableEq (dI 0)] {dO : Fin 1 → Type w} [Fintype (dO 0)] [DecidableEq (dO 0)] (Λi : (i : Fin 1) → CPTPMap (dI 0) (dO 0)) :
-    fin_n_prod Λi = CPTPMap.compose sorry ((Λi 1).compose sorry) :=
-  sorry --TODO: permutations
-
-end
-section
-
-variable {ι : Type u} [DecidableEq ι] [Fintype ι]
+variable {ι : Type u} [DecidableEq ι] [fι : Fintype ι]
 variable {dI : ι → Type v} [∀(i :ι), Fintype (dI i)] [∀(i :ι), DecidableEq (dI i)]
 variable {dO : ι → Type w} [∀(i :ι), Fintype (dO i)] [∀(i :ι), DecidableEq (dO i)]
 
 /-- Finitely-indexed tensor products of CPTPMaps.  -/
-def fintype_prod (Λi : ι → CPTPMap (dI i) (dO i)) : CPTPMap ((i:ι) → dI i) ((i:ι) → dO i) :=
-  sorry
+def fintype_prod (Λi : (i:ι) → CPTPMap (dI i) (dO i)) : CPTPMap ((i:ι) → dI i) ((i:ι) → dO i) :=
+  CPTPMap.mk (MatrixMap.PiKron (fun i ↦ (Λi i).map))
+  (sorry)
+  (MatrixMap.IsCompletelyPositive.PiKron (fun i ↦ (Λi i).completely_pos))
 
-end
+theorem fin_n_prod_1
+  {dI : Fin 1 → Type v} [Fintype (dI 0)] [DecidableEq (dI 0)]
+  {dO : Fin 1 → Type w} [Fintype (dO 0)] [DecidableEq (dO 0)]
+  (Λi : (i : Fin 1) → CPTPMap (dI 0) (dO 0)) :
+    fintype_prod Λi = CPTPMap.compose sorry ((Λi 1).compose sorry) :=
+  sorry --TODO: permutations
+
 end finprod
 
 section trace

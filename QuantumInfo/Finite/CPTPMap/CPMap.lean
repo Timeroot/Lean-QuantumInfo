@@ -74,12 +74,6 @@ theorem smul {M : MatrixMap A B R} (hM : M.IsPositive) {x : R} (hx : 0 ≤ x) :
     (x • M).IsPositive :=
   fun hm ↦ (hM hm).smul hx
 
-variable {D : Type*} [DecidableEq C] [DecidableEq A] [Fintype C] [Fintype D] in
-/-- The kronecker product of IsPositive maps is also positive. -/
-theorem kron {M₁ : MatrixMap A B R} {M₂ : MatrixMap C D R} (h₁ : M₁.IsPositive) (h₂ : M₂.IsPositive) :
-    (M₁ ⊗ₖₘ M₂).IsPositive := by
-  sorry
-
 end IsPositive
 
 namespace IsCompletelyPositive
@@ -107,13 +101,15 @@ theorem comp [DecidableEq B] {M₁ : MatrixMap A B R} {M₂ : MatrixMap B C R} (
   sorry
 
 /-- The identity MatrixMap IsCompletelyPositive. -/
-theorem id : (id A R).IsCompletelyPositive :=
-  fun _ ↦ IsPositive.id.kron IsPositive.id
+theorem id : (id A R).IsCompletelyPositive := by
+  intro n ρ h
+  rwa [show LinearMap.id = MatrixMap.id (Fin n) R from rfl, kron_id_id]
 
 /-- Sums of IsCompletelyPositive maps are IsCompletelyPositive. -/
 theorem add {M₁ M₂ : MatrixMap A B R} (h₁ : M₁.IsCompletelyPositive) (h₂ : M₂.IsCompletelyPositive) :
     (M₁ + M₂).IsCompletelyPositive :=
-  fun _ ↦ IsPositive.kron (IsPositive.add h₁.IsPositive h₂.IsPositive) IsPositive.id
+  fun n _ h ↦ by
+  simpa only [add_kron] using Matrix.PosSemidef.add (h₁ n h) (h₂ n h)
 
 /-- Nonnegative scalings of IsPositive maps are IsPositive. -/
 theorem smul {M : MatrixMap A B R} (hM : M.IsCompletelyPositive) {x : R} (hx : 0 ≤ x) :
@@ -143,6 +139,19 @@ theorem kron [DecidableEq C] [Fintype D] {M₁ : MatrixMap A B R} {M₂ : Matrix
       sorry
       -/
   sorry
+
+section PiKron
+
+variable {ι : Type u} [DecidableEq ι] [fι : Fintype ι]
+variable {dI : ι → Type v} [∀i, Fintype (dI i)] [∀i, DecidableEq (dI i)]
+variable {dO : ι → Type w} [∀i, Fintype (dO i)] [∀i, DecidableEq (dO i)]
+
+/-- The `PiKron` product of IsCompletelyPositive maps is also completely positive. -/
+theorem PiKron {Λi : ∀ i, MatrixMap (dI i) (dO i) R} (h₁ : ∀ i, (Λi i).IsCompletelyPositive) :
+    IsCompletelyPositive (MatrixMap.PiKron Λi) := by
+  sorry
+
+end PiKron
 
 end IsCompletelyPositive
 
