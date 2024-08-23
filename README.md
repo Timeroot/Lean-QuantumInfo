@@ -12,6 +12,6 @@ All of this will be done only in the theory finite-dimensional Hilbert spaces. R
 * Infinite-dimensional quantum theory can be [weirdly behaved](https://en.wikipedia.org/wiki/Connes_embedding_problem).
 * Dealing with infinite-dimensional quantum theory is just hard. You need e.g. trace-class operators, CTC functions, and people often can't even agree on the definitions. (For instance, does a mixed state necessarily have a finite spectrum? I've seen it both ways.)
 
-There is a _tiny_ bit of infinite-dimensional theory in the `QuantumInfo/InfiniteDim` folder. But most stuff is in the `QuantumInfo/FiniteDim` folder.
+Most stuff is in the `QuantumInfo/FiniteDim` folder. There was a _tiny_ bit of infinite-dimensional theory in the `QuantumInfo/InfiniteDim` folder, but it's mostly been cleared out.
 
 Docmentation of the main definitions can be found at [DOC.md](./DOC.md). A majority of the work will be outlining the major definitions and theorems from Mark Wilde's _Quantum Information Theory_. A correspondence to the definitions and theorems (mostly as todo-list!) are in [TODO.md](./TODO.md)

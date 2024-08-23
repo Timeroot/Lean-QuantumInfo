@@ -105,7 +105,7 @@ def purity (ρ : MState d) : Prob :=
     exact ρ.m.posSemidef_conjTranspose_mul_self.trace_nonneg,
       by
     nth_rewrite 1 [← ρ.pos.1]
-    convert ρ.pos.inner_le_mul_trace ρ.pos
+    convert ρ.pos.inner_le_mul_trace ρ.pos using 1
     simp [ρ.tr]
     ⟩⟩
 
@@ -231,10 +231,10 @@ theorem _root_.Matrix.trace_of_trace_right (A : Matrix (d₁ × d₂) (d₁ × d
 
 variable [RCLike R] {A : Matrix (d₁ × d₂) (d₁ × d₂) R}
 
-theorem _root_.Matrix.PosSemidef.trace_left  (hA : A.PosSemidef) : A.trace_left.PosSemidef :=
+theorem _root_.Matrix.PosSemidef.trace_left (hA : A.PosSemidef) : A.trace_left.PosSemidef :=
   sorry
 
-theorem _root_.Matrix.PosSemidef.trace_right  (hA : A.PosSemidef) : A.trace_right.PosSemidef :=
+theorem _root_.Matrix.PosSemidef.trace_right (hA : A.PosSemidef) : A.trace_right.PosSemidef :=
   sorry
 
 end mat_trace

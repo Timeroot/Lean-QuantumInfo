@@ -6,18 +6,14 @@ import QuantumInfo.Mathlib.Other
 open BigOperators
 open Classical
 
-namespace Matrix
 variable {n 𝕜 : Type*}
 variable [RCLike 𝕜]
-variable (A : Matrix n n 𝕜) (B : Matrix n n 𝕜)
 
-/-- Inner product of two square matrices. TODO: Rectangular? -/
-def inner [Fintype n] (A : Matrix n n 𝕜) (B : Matrix n n 𝕜) : ℝ :=
-  RCLike.re (Aᴴ * B).trace
+namespace Matrix
 
 namespace IsHermitian
 
-variable {A B}
+variable {A : Matrix n n 𝕜} {B : Matrix n n 𝕜}
 variable (hA : A.IsHermitian) (hB : B.IsHermitian)
 
 include hA in
@@ -30,17 +26,6 @@ include hA in
 @[simp]
 theorem re_trace_eq_trace : RCLike.re (A.trace) = A.trace := by
   rw [trace, map_sum, RCLike.ofReal_sum, IsHermitian.coe_re_diag hA]
-
-include hA hB in
-/-- The inner product for Hermtian matrices is equal to the trace of
-  the product. -/
-theorem inner_eq_trace_mul : A.inner B = (A * B).trace := by
-  have : IsHermitian ((1/2:𝕜) • ((A*B) + (A*B)ᴴ)) := by
-    simp only [IsHermitian, one_div, conjTranspose_mul, smul_add, conjTranspose_add,
-      conjTranspose_smul, star_inv', star_ofNat, conjTranspose_conjTranspose]
-    rw [add_comm]
-  have : (A*B)ᴴ.trace = star (A*B).trace := sorry
-  sorry
 
 section eigenvalues
 
@@ -89,32 +74,6 @@ variable {A : Matrix m m 𝕜} {B : Matrix m m 𝕜}
 variable (hA : A.PosSemidef) (hB : B.PosSemidef)
 
 include hA in
-theorem smul {c : 𝕜} (h : 0 ≤ c): (c • A).PosSemidef := by
-  constructor
-  · apply hA.1.smul (RCLike.nonneg_iff.mp h).2
-  · intro x
-    rw [Matrix.smul_mulVec_assoc, Matrix.dotProduct_smul]
-    exact mul_nonneg h (hA.2 x)
-
-include hA hB in
-theorem convex_cone {c₁ c₂ : 𝕜} (hc₁ : 0 ≤ c₁) (hc₂ : 0 ≤ c₂) : (c₁ • A + c₂ • B).PosSemidef :=
-  (hA.smul hc₁).add (hB.smul hc₂)
-
-include hA hB in
-/-- The inner product for PSD matrices is nonnegative. -/
-theorem inner_ge_zero : 0 ≤ A.inner B :=
-  let tmp₁ := hA
-  let tmp₂ := hB
-  sorry
-
-include hA hB in
-/-- The inner product for PSD matrices is at most the product of their traces. -/
-theorem inner_le_mul_trace : A.inner B ≤ RCLike.re A.trace * RCLike.re B.trace :=
-  let tmp₁ := hA
-  let tmp₂ := hB
-  sorry
-
-include hA in
 theorem diag_nonneg : ∀i, 0 ≤ A.diag i := by
   intro i
   simpa [Matrix.mulVec, Matrix.dotProduct] using hA.2 (fun j ↦ if i = j then 1 else 0)
@@ -125,6 +84,18 @@ theorem trace_nonneg : 0 ≤ A.trace := by
   apply Finset.sum_nonneg
   simp_rw [Finset.mem_univ, forall_true_left]
   exact hA.diag_nonneg
+
+include hA in
+theorem smul {c : 𝕜} (h : 0 ≤ c) : (c • A).PosSemidef := by
+  constructor
+  · apply hA.1.smul (RCLike.nonneg_iff.mp h).2
+  · intro x
+    rw [Matrix.smul_mulVec_assoc, Matrix.dotProduct_smul]
+    exact mul_nonneg h (hA.2 x)
+
+include hA hB in
+theorem convex_cone {c₁ c₂ : 𝕜} (hc₁ : 0 ≤ c₁) (hc₂ : 0 ≤ c₂) : (c₁ • A + c₂ • B).PosSemidef :=
+  (hA.smul hc₁).add (hB.smul hc₂)
 
 end
 
@@ -212,3 +183,48 @@ def log (hA : A.PosSemidef) : Matrix m m 𝕜 :=
 end log
 
 end PosSemidef
+
+section frobenius_inner_product
+open scoped ComplexOrder
+
+variable {A : Matrix n n 𝕜} {B : Matrix n n 𝕜} [Fintype n]
+
+/-- Inner product of two square matrices. TODO: Rectangular? -/
+def inner (A : Matrix n n 𝕜) (B : Matrix n n 𝕜) : 𝕜 :=
+  (Aᴴ * B).trace
+
+/-- The inner product for Hermtian matrices is equal to the trace of
+  the product. -/
+theorem inner_eq_trace_mul (hA : A.IsHermitian) : A.inner B = (A * B).trace := by
+  rw [inner, hA]
+
+variable (hA : A.PosSemidef) (hB : B.PosSemidef)
+
+include hA hB in
+/-- The inner product for PSD matrices is nonnegative. -/
+theorem PosSemidef.inner_ge_zero : 0 ≤ A.inner B := by
+  rw [inner, hA.left, ← hA.sqrt_mul_self, Matrix.trace_mul_cycle, Matrix.trace_mul_cycle]
+  nth_rewrite 1 [← hA.posSemidef_sqrt.left]
+  convert (hB.conjTranspose_mul_mul_same _).trace_nonneg
+
+include hA hB in
+/-- The inner product for PSD matrices is at most the product of their traces. -/
+theorem PosSemidef.inner_le_mul_trace : RCLike.re (A.inner B) ≤ RCLike.re A.trace * RCLike.re B.trace :=
+  sorry
+
+/-- The InnerProductSpace on Matrix n n 𝕜 defined by the Frobenius inner product, `Matrix.inner`.-/
+def MatrixInnerProduct :=
+  InnerProductSpace.ofCore (𝕜 := 𝕜) (F := Matrix n n 𝕜) {
+    inner := inner
+    conj_symm := fun x y ↦ by
+      simp [inner, starRingEnd_apply, ← Matrix.trace_conjTranspose,
+        conjTranspose_mul, conjTranspose_conjTranspose]
+    nonneg_re := fun x ↦ by
+      simp only [inner]
+      exact (RCLike.nonneg_iff.mp x.posSemidef_conjTranspose_mul_self.trace_nonneg).1
+    add_left := by simp [inner, add_mul]
+    smul_left := by simp [inner]
+    definite := sorry
+  }
+
+end frobenius_inner_product

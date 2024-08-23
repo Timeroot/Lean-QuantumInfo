@@ -31,7 +31,7 @@ def measurement_map (Λ : POVM X d) : CPTPMap d (d × X) :=
 
 /-- A POVM leads to a distribution of outcomes on any given mixed state ρ. -/
 def measure (Λ : POVM X d) (ρ : MState d) : Distribution X where
-  val := fun x ↦ ⟨ρ.m.inner (Λ.mats x),
+  val := fun x ↦ ⟨(ρ.m.inner (Λ.mats x)).re,
     sorry⟩--use Matrix.PosSemidef.inner_ge_zero and inner_le_mul_trace
   property := sorry
 
