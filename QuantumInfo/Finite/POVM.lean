@@ -22,18 +22,33 @@ structure POVM (X : Type*) (d : Type*) [Fintype X] [Fintype d] [DecidableEq d] w
 
 namespace POVM
 
-variable {X : Type*} {d : Type*} [Fintype X] [Fintype d] [DecidableEq d]
+variable {X : Type*} {d : Type*} [Fintype X] [Fintype d] [DecidableEq d] [DecidableEq X]
 
 /-- The act of measuring is a quantum channel, that maps a `d`-dimensional quantum
 state to an `d × X`-dimensional quantum-classical state. -/
-def measurement_map (Λ : POVM X d) : CPTPMap d (d × X) :=
-  CPTPMap.CPTP_of_choi_PSD_Tr (M := sorry) (sorry) (sorry)
+def measurement_map (Λ : POVM X d) : CPTPMap d (d × X) where
+  map := open Kronecker in {
+    toFun := fun ρ ↦ ∑ (i : X), (Λ.mats i).inner ρ • (Λ.mats i ⊗ₖ 1)
+    map_add' := by simp [Matrix.inner, mul_add, trace_add, add_smul, Finset.sum_add_distrib]
+    map_smul' := by simp [Matrix.inner, MulAction.mul_smul, Finset.smul_sum]
+  }
+  trace_preserving := sorry
+  completely_pos := sorry
 
 /-- A POVM leads to a distribution of outcomes on any given mixed state ρ. -/
 def measure (Λ : POVM X d) (ρ : MState d) : Distribution X where
-  val := fun x ↦ ⟨(ρ.m.inner (Λ.mats x)).re,
-    sorry⟩--use Matrix.PosSemidef.inner_ge_zero and inner_le_mul_trace
-  property := sorry
+  val := fun x ↦ ⟨((Λ.mats x).inner ρ.m).re,
+    ⟨And.left $ Complex.nonneg_iff.1 $ (Λ.pos x).inner_ge_zero ρ.pos,
+    by
+    -- That each observation probability is at most 1.
+    -- ρ.m.inner (∑ y, Λ.mats y) = ρ.m.inner 1 = ρ.m.trace = 1
+    -- ρ.m.inner (∑ y ≠ x, Λ.mats y) = ρ.m.inner (sum of PSD) ≥ 0
+    -- ρ.m.inner x = ρ.m.inner (∑ y, Λ.mats y) - ρ.m.inner (∑ y ≠ x, Λ.mats y) ≤ 1 - 0 ≤ 1
+    sorry
+    ⟩⟩
+  property := by
+    simp [← Complex.re_sum, Matrix.inner, ← trace_sum,
+    ← Finset.sum_mul, ← conjTranspose_sum, Λ.normalized, ρ.tr]
 
 /-- The quantum-classical `POVM.measurement_map`, gives a marginal on the right equal to `POVM.measure`.-/
 theorem measure_eq_measurement_map (Λ : POVM X d) (ρ : MState d) :

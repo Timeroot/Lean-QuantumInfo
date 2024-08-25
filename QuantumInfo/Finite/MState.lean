@@ -157,6 +157,12 @@ theorem pure_of_constant_spectrum (ρ : MState d) (h : ∃ i, ρ.spectrum = Dist
     ∃ ψ, ρ = pure ψ :=
   sorry
 
+/-- A state ρ is pure iff its spectrum is (1,0,0,...) i.e. a constant distribution. -/
+theorem pure_iff_constant_spectrum (ρ : MState d) : (∃ ψ, ρ = pure ψ) ↔
+    ∃ i, ρ.spectrum = Distribution.constant i :=
+  ⟨fun h ↦ h.rec fun ψ h₂ ↦ h₂ ▸ spectrum_pure_eq_constant ψ,
+  pure_of_constant_spectrum ρ⟩
+
 theorem pure_iff_purity_one (ρ : MState d) : (∃ ψ, ρ = pure ψ) ↔ ρ.purity = 1 := by
   --purity = exp(-Collision entropy)
   --purity eq 1 iff collision entropy is zero
@@ -175,7 +181,7 @@ def prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : MState (d₁ × d₂) whe
 
 notation ρL "⊗" ρR => prod ρL ρR
 
-/-- The product of pure states is a pure state (specifically of the product ket.) -/
+/-- The product of pure states is a pure product state , `Ket.prod`. -/
 theorem pure_prod_pure (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : pure (ψ₁ ⊗ ψ₂) = (pure ψ₁) ⊗ (pure ψ₂) := by
   ext
   simp only [pure, Ket.prod, Ket.apply, Matrix.vecMulVec_apply, Bra.eq_conj, map_mul, prod,
@@ -292,12 +298,22 @@ def IsSeparable (ρ : MState (d₁ × d₂)) : Prop :=
     ∃ ps : Distribution ρLRs, --Distribution over those pairs, an ensemble
       ρ.m = ∑ ρLR : ρLRs, (ps ρLR : ℝ) • (Prod.fst ρLR.val).m ⊗ₖ (Prod.snd ρLR.val).m
 
-/-- A product state is separable -/
+/-- A product state `MState.prod` is separable. -/
 theorem IsSeparable_prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : IsSeparable (ρ₁ ⊗ ρ₂) := by
   let only := (ρ₁, ρ₂)
   use { only }, Distribution.constant ⟨only, Finset.mem_singleton_self only⟩
   simp only [prod, Finset.univ_unique, Unique.eq_default, Distribution.constant_eq, ite_true,
     Prob.toReal_one, Finset.default_singleton, one_smul, Finset.sum_const, Finset.card_singleton]
+
+/-- A pure state is separable iff the ket is a product state. -/
+theorem pure_separable_iff_IsProd (ψ : Ket (d₁ × d₂)) :
+    IsSeparable (pure ψ) ↔ ψ.IsProd := by
+  sorry
+
+/-- A pure state is separable iff the partial trace on the left is pure. -/
+theorem pure_separable_iff_trace_left_pure (ψ : Ket (d₁ × d₂)) : IsSeparable (pure ψ) ↔
+    ∃ ψ₁, pure ψ₁ = (pure ψ).trace_left := by
+  sorry
 
 --TODO: Separable states are convex
 
@@ -325,7 +341,7 @@ def purify (ρ : MState d) : Ket (d × d) where
 /-- The defining property of purification, that tracing out the purifying system gives the
  original mixed state. -/
 @[simp]
-theorem trace_right_of_purify (ρ : MState d) : (pure ρ.purify).trace_right = ρ := by
+theorem purify_spec (ρ : MState d) : (pure ρ.purify).trace_right = ρ := by
   ext i j
   simp_rw [purify, trace_right, Matrix.trace_right]
   simp only [pure_of, Matrix.of_apply, Ket.apply]
@@ -334,8 +350,8 @@ theorem trace_right_of_purify (ρ : MState d) : (pure ρ.purify).trace_right = �
   sorry
 
 /-- `MState.purify` bundled with its defining property `MState.trace_right_of_purify`. -/
-def purify' (ρ : MState d) : { ψ : Ket (d × d) // (pure ψ).trace_right = ρ } :=
-  ⟨ρ.purify, ρ.trace_right_of_purify⟩
+def purifyX (ρ : MState d) : { ψ : Ket (d × d) // (pure ψ).trace_right = ρ } :=
+  ⟨ρ.purify, ρ.purify_spec⟩
 
 end purification
 

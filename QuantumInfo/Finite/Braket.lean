@@ -24,13 +24,14 @@ section
 variable (d : Type*) [Fintype d]
 
 /-- A ket as a vector of unit norm. We follow the convention in `Matrix` of vectors as simple functions
- from a Fintype. -/
+ from a Fintype. Kets are distinctly not a vector space in our notion, as they represent only normalized
+ states and so cannot (in general) be added or scaled. -/
 structure Ket :=
   vec : d → ℂ
   normalized' : ∑ x, ‖vec x‖^2 = 1
 
-/-- A bra is definitionally identical to a ket, but are separate for type reasons. They can be interconverted
-  with the adjoint. -/
+/-- A bra is definitionally identical to a `Ket`, but are separate to avoid complex conjugation confusion.
+ They can be interconverted with the adjoint: `Ket.to_bra` and `Bra.to_ket` -/
 structure Bra :=
   vec : d → ℂ
   normalized' : ∑ x, ‖vec x‖^2 =1
@@ -132,10 +133,8 @@ theorem Braket.dot_self_eq_one (ψ : Ket d) :〈ψ‖ψ〉= 1 := by
   have h₂ := congrArg Complex.ofReal ψ.normalized
   simpa using h₂
 
-
 section prod
-
-variable {d₁ d₂ : Type*} [Fintype d₁] [Fintype d₂]
+variable {d d₁ d₂ : Type*} [Fintype d] [Fintype d₁] [Fintype d₂]
 
 /-- The outer product of two kets, creating an unentangled state. -/
 def Ket.prod (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : Ket (d₁ × d₂) where
@@ -146,10 +145,70 @@ def Ket.prod (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : Ket (d₁ × d₂) where
 
 notation ψ₁ "⊗" ψ₂ => Ket.prod ψ₁ ψ₂
 
+/-- A Ket is a product if it's `Ket.prod` of two kets. -/
 def Ket.IsProd (ψ : Ket (d₁ × d₂)) : Prop := ∃ ξ φ, ψ = ξ ⊗ φ
 
+/-- A Ket is entangled if it's not `Ket.prod` of two kets. -/
 def Ket.IsEntangled (ψ : Ket (d₁ × d₂)) : Prop := ¬ψ.IsProd
+
+/-- `Ket.prod` states are product states. -/
+@[simp]
+theorem Ket.IsProd_prod (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : (ψ₁.prod ψ₂).IsProd :=
+  ⟨ψ₁, ψ₂, rfl⟩
+
+/-- `Ket.prod` states are not entangled states. -/
+@[simp]
+theorem Ket.not_IsEntangled_prod (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : ¬(ψ₁.prod ψ₂).IsEntangled :=
+  (· (ψ₁.IsProd_prod ψ₂))
+
+/-- A ket is a product state iff its components are cross-multiplicative. -/
+theorem Ket.IsProd_iff_mul_eq_mul (ψ : Ket (d₁ × d₂)) : ψ.IsProd ↔
+    ∀ i₁ i₂ j₁ j₂, ψ (i₁,j₁)  * ψ (i₂,j₂) = ψ (i₁,j₂) * ψ (i₂,j₁) := by
+  constructor
+  · rintro ⟨ξ,φ,rfl⟩ i₁ i₂ j₁ j₂
+    simp only [prod, apply]
+    ring_nf
+  · sorry
 
 end prod
 
+section mes
+/-- The Maximally Entangled State, or MES, on a d×d system. In principle there are many, this
+is specifically the MES with an all-positive phase. For instance on `d := Fin 2`, this is the
+Bell state -/
+def Ket.MES (d) [Fintype d] [Nonempty d] : Ket (d × d) where
+  vec := fun (i,j) ↦ if i = j then 1 / Real.sqrt (Fintype.card (α := d)) else 0
+  normalized' := by simp [apply_ite]
+
+/-- On any space of dimension at least two, the maximally entangled state `MES` is entangled. -/
+theorem Ket.MES_IsEntangled [Nontrivial d] : (Ket.MES d).IsEntangled := by
+  obtain ⟨x, y, h⟩ := @Nontrivial.exists_pair_ne d _
+  rw [IsEntangled, MES, IsProd_iff_mul_eq_mul]
+  push_neg
+  use x, y, x, y
+  simp [apply, h]
+
+end mes
+
+section equiv
+
+/-- The equivalence relation on `Ket` where two kets equivalent if they are equal up to a global phase, i.e. `∃ z, ‖z‖ = 1 ∧ a.vec = z • b.vec -/
+def Ket.PhaseEquiv : Setoid (Ket d) where
+  r a b := ∃ z : ℂ, ‖z‖ = 1 ∧ a.vec = z • b.vec
+  iseqv := {
+    refl := fun x ↦ ⟨1, by simp⟩,
+    symm := fun ⟨z,h₁,h₂⟩ ↦ ⟨conj z,
+      by simp [h₁],
+      by simp [h₂, smul_smul, ← Complex.normSq_eq_conj_mul_self, Complex.normSq_eq_norm_sq, h₁]⟩,
+    trans := fun ⟨z₁,h₁₁,h₁₂⟩ ⟨z₂,h₂₁,h₂₂⟩ ↦ ⟨z₁ * z₂,
+      by simp [h₁₁, h₂₁],
+      by simpa [h₁₂, h₂₂] using smul_smul _ _ _⟩
+  }
+
+variable (d) in
+/-- The type of `Ket`s up to a global phase equivalence, as given by `Ket.PhaseEquiv`. In particular, `MState`s really only care about a KetUpToPhase, and not Kets themselves. -/
+def KetUpToPhase :=
+  @Quotient (Ket d) Ket.PhaseEquiv
+
+end equiv
 end braket
