@@ -12,6 +12,11 @@ All of this will be done only in the theory finite-dimensional Hilbert spaces. R
 * Infinite-dimensional quantum theory can be [weirdly behaved](https://en.wikipedia.org/wiki/Connes_embedding_problem).
 * Dealing with infinite-dimensional quantum theory is just hard. You need e.g. trace-class operators, CTC functions, and people often can't even agree on the definitions. (For instance, does a mixed state necessarily have a finite spectrum? I've seen it both ways.)
 
-Most stuff is in the `QuantumInfo/FiniteDim` folder. There was a _tiny_ bit of infinite-dimensional theory in the `QuantumInfo/InfiniteDim` folder, but it's mostly been cleared out.
+Most stuff is in the `QuantumInfo/Finite` folder. There was a _tiny_ bit of infinite-dimensional theory in the `QuantumInfo/InfiniteDim` folder, but it's mostly been cleared out.
+
+The docgen is available on [my website](https://ohaithe.re/Lean-QuantumInfo/QuantumInfo.html), hopefully I remember to keep it well synced.
+
+(empty line)
+[comment]: # (Note to self, instructions for building docs: `rm -rf .lake/build/doc/QuantumInfo* .lake/build/doc/ClassicalInfo*; lake -R -Kenv=dev build ClassicalInfo:docs QuantumInfo:doc`. In order to view them, `cd .lake/build/doc; python3 -m http.server`.)
 
 Docmentation of the main definitions can be found at [DOC.md](./DOC.md). A majority of the work will be outlining the major definitions and theorems from Mark Wilde's _Quantum Information Theory_. A correspondence to the definitions and theorems (in the form of a todo-list) are in [TODO](./TODO.md)
