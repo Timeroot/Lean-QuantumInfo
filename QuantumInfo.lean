@@ -22,8 +22,8 @@ What follows is a top-level index to the major top-level definitions in this rep
  * `MState` for mixed quantum states
  * `MState.«term𝐔[_]»`, a notation for unitary matrices, acting on quantum states
  * `CPTPMap` for quantum channels
- * `traceNorm`, the trace norm between matrices (mostly for `MState` distance)
- * `MState.Fidelity`, the fidelity between quantum states
+ * `Matrix.traceNorm`, the trace norm between matrices (mostly for `MState` distance)
+ * `MState.fidelity`, the fidelity between quantum states
  * `Sᵥₙ`, `qConditionalEnt`, `qMutualInfo`, `coherentInfo`, etc. - different notions of entropy or information in quantum states
  * `DegradablePreorder` the degradable order on quantum channels (technically a preorder)
  * `CPTPMap.quantumCapacity`, the quantum capacity of a channel
