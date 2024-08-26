@@ -1,6 +1,7 @@
 import QuantumInfo.Finite.CPTPMap
 
-/-
+/-! # The Degradable Order
+
 We define the "degradable order" on channels, where M ≤ N if N can be degraded to M.
 This is a scoped instance, because there are other reasonable orders on channels.
 
@@ -9,6 +10,12 @@ each other are not necessarily equal. (For instance, unitary channels are degrad
 the identity and vice versa.) It can compare channels of different output dimensions, but
 they must have the same input dimension. For this reason the `DegradablePreorder` is parameterized
 by the channel input type.
+
+One might hope that if this was defined on the quotient type of "channels up to unitary equivalence"
+that it would become an order; but this is not the case. That is, there are channels `A → B` that
+are degradable to each other, but cannot be degraded to each other by unitary operations. For instance,
+let A be the replacement channel that goes to a mixed state, and B be a replacement channel that goes
+to a pure state.
 
 Technical notes: to model "channels of different output types", the preorder is on the Sigma
 type of channels parameterized by their output type. And since the output type needs to be a

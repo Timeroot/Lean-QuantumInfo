@@ -1,5 +1,18 @@
 import QuantumInfo.Finite.CPTPMap
 
+/-! # Positive Operator-Valued Measures
+
+A Positive Operator-Valued Measures, or POVM, is the most general notion of a quantum "measurement":
+a collection of positive semidefinite (PSD) operators that sum to the identity. These induce a distribution,
+`POVM.measure`, of measurement outcomes; and they induce a CPTP map, `POVM.measurement_map`, which changes the state
+but adds learned information.
+
+Developing this theory is important if one wants to discuss classical information across quantum channels, as POVMs
+are the route to get back to classical information (a `Distribution` of outcomes).
+
+TODO: They can also evolve under CPTP maps themselves (the Heisenberg picture of quantum evolution), they might commute
+with each other or not, they might be projective or not.
+-/
 open BigOperators
 open ComplexOrder
 open Matrix
@@ -52,7 +65,7 @@ def measure (Λ : POVM X d) (ρ : MState d) : Distribution X where
 
 /-- The quantum-classical `POVM.measurement_map`, gives a marginal on the right equal to `POVM.measure`.-/
 theorem measure_eq_measurement_map (Λ : POVM X d) (ρ : MState d) :
-    (Λ.measurement_map ρ).trace_left = MState.ofClassical (Λ.measure ρ) :=
+    (Λ.measurement_map ρ).traceLeft = MState.ofClassical (Λ.measure ρ) :=
   sorry
 
 end POVM

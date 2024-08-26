@@ -1,10 +1,14 @@
 import ClassicalInfo.Distribution
 import Mathlib.Analysis.SpecialFunctions.Log.NegMulLog
+import Mathlib.Analysis.SpecialFunctions.BinaryEntropy
 
-/- Definitions and facts about the Shannon entropy function -x*ln(x), both on a single
-variable and on a distribution. When first written, the author was unaware that
-`Mathlib.Analysis.SpecialFunctions.Log.NegMulLog` existed; this maybe should be refactored
-a bit using that. -/
+/-! # Shannon entropy
+
+Definitions and facts about the Shannon entropy function -x*ln(x), both on a single
+variable and on a distribution.
+
+There is significant overlap with `Real.negMulLog` and `Real.binEntropy` in Mathlib,
+and probably these files could be combined in some form. -/
 
 noncomputable section
 open NNReal

@@ -1,8 +1,27 @@
-import QuantumInfo.Finite.CPTPMap.CPMap
+import QuantumInfo.Finite.CPTPMap.CP
 
-/- Building on `MatrixMap`s, this defines `PTPMap` and `CPTPMap`, which describe important classes
-of quantum operations: `IsPositive` and `IsTracePreserving`, or `IsCompletelyPositive` and `IsTracePreserving`,
-respectively.
+/-! # Completely Positive Trace Preserving maps
+
+A `CPTPMap` is a `ℂ`-linear map between matrices (`MatrixMap` is an alias), bundled with the facts that it
+`IsCompletelyPositive` and `IsTracePreserving`. CPTP maps are typically regarded as the "most general quantum
+operation", as they map density matrices (`MState`s) to density matrices. The type `PTPMap`, for maps that are
+positive (but not necessarily completely positive) is also declared.
+
+A large portion of the theory is in terms of the Choi matrix (`MatrixMap.choi_matrix`), as the positive-definiteness
+of this matrix corresponds to being a CP map. This is [Choi's theorem on CP maps](https://en.wikipedia.org/wiki/Choi%27s_theorem_on_completely_positive_maps).
+
+This file also defines several important examples of, classes of, and operations on, CPTPMaps:
+ * `compose`: Composition of maps
+ * `id`: The identity map
+ * `replacement`: The replacement channel that always outputs the same state
+ * `prod`: Tensor product of two CPTP maps, with notation M₁ ⊗ M₂
+ * `piProd`: Tensor product of finitely many CPTP maps (Pi-type product)
+ * `of_unitary`: The CPTP map corresponding to a unitary opeation `U`
+ * `IsUnitary`: Predicate whether the map corresponds to any unitary
+ * `purify`: Purifying a channel into a unitary on a larger Hilbert space
+ * `complementary`: The complementary channel to its purification
+ * `IsEntanglementBreaking`, `IsDegradable`, `IsAntidegradable`: Entanglement breaking, degradable and antidegradable channels.
+ * `SWAP`, `assoc`, `assoc'`, `traceLeft`, `traceRight`: The CPTP maps corresponding to important operations on states. These correspond directly to `MState.SWAP`, `MState.assoc`, `MState.assoc'`, `MState.traceLeft`, and `MState.traceRight`.
 -/
 
 variable (dIn dOut dOut₂ : Type*) [Fintype dIn] [Fintype dOut] [Fintype dOut₂]
@@ -106,7 +125,7 @@ theorem Tr_of_choi_of_CPTP (Λ : CPTPMap dIn dOut) : Λ.choi.trace =
 
 /-- Construct a CPTP map from a PSD Choi matrix with correct partial trace. -/
 def CPTP_of_choi_PSD_Tr {M : Matrix (dIn × dOut) (dIn × dOut) ℂ} (h₁ : M.PosSemidef)
-    (h₂ : M.trace_right = 1) : CPTPMap dIn dOut := CPTPMap.mk
+    (h₂ : M.traceRight = 1) : CPTPMap dIn dOut := CPTPMap.mk
   (map := MatrixMap.of_choi_matrix M)
   (tp := (MatrixMap.of_choi_matrix M).IsTracePreserving_iff_trace_choi.2
     ((MatrixMap.map_choi_inv M).symm ▸ h₂))
@@ -183,7 +202,7 @@ theorem compose_id (Λ : CPTPMap dIn dOut) : Λ.compose CPTPMap.id = Λ := by
 trivial Hilbert space, 1-dimensional, indexed by any `Unique` type. -/
 def destroy [Nonempty dIn] [Unique dOut] : CPTPMap dIn dOut :=
   CPTP_of_choi_PSD_Tr Matrix.PosSemidef.one
-    (by ext i j;  simp [Matrix.trace_right, Matrix.one_apply])
+    (by ext i j;  simp [Matrix.traceRight, Matrix.one_apply])
 
 /-- Two CPTP maps into the same one-dimensional output space must be equal -/
 theorem eq_if_output_unique [Unique dOut] (Λ₁ Λ₂ : CPTPMap dIn dOut) : Λ₁ = Λ₂ :=
@@ -242,16 +261,16 @@ variable {dI : ι → Type v} [∀(i :ι), Fintype (dI i)] [∀(i :ι), Decidabl
 variable {dO : ι → Type w} [∀(i :ι), Fintype (dO i)] [∀(i :ι), DecidableEq (dO i)]
 
 /-- Finitely-indexed tensor products of CPTPMaps.  -/
-def fintype_prod (Λi : (i:ι) → CPTPMap (dI i) (dO i)) : CPTPMap ((i:ι) → dI i) ((i:ι) → dO i) :=
-  CPTPMap.mk (MatrixMap.PiKron (fun i ↦ (Λi i).map))
+def piProd (Λi : (i:ι) → CPTPMap (dI i) (dO i)) : CPTPMap ((i:ι) → dI i) ((i:ι) → dO i) :=
+  CPTPMap.mk (MatrixMap.piKron (fun i ↦ (Λi i).map))
   (sorry)
-  (MatrixMap.IsCompletelyPositive.PiKron (fun i ↦ (Λi i).completely_pos))
+  (MatrixMap.IsCompletelyPositive.piKron (fun i ↦ (Λi i).completely_pos))
 
-theorem fin_1_prod
+theorem fin_1_piProd
   {dI : Fin 1 → Type v} [Fintype (dI 0)] [DecidableEq (dI 0)]
   {dO : Fin 1 → Type w} [Fintype (dO 0)] [DecidableEq (dO 0)]
   (Λi : (i : Fin 1) → CPTPMap (dI 0) (dO 0)) :
-    fintype_prod Λi = CPTPMap.compose sorry ((Λi 1).compose sorry) :=
+    piProd Λi = CPTPMap.compose sorry ((Λi 1).compose sorry) :=
   sorry --TODO: permutations
 
 end finprod
@@ -260,17 +279,19 @@ section trace
 variable {d₁ d₂ : Type*} [Fintype d₁] [Fintype d₂] [DecidableEq d₁] [DecidableEq d₂]
 
 /-- Partial tracing out the left, as a CPTP map. -/
-def trace_left : CPTPMap (d₁ × d₂) d₂ :=
+def traceLeft : CPTPMap (d₁ × d₂) d₂ :=
   sorry
 
 /-- Partial tracing out the right, as a CPTP map. -/
-def trace_right : CPTPMap (d₁ × d₂) d₁ :=
+def traceRight : CPTPMap (d₁ × d₂) d₁ :=
   sorry
 
-theorem trace_left_eq_MState_trace_left (ρ : MState (d₁ × d₂)) : trace_left ρ = ρ.trace_left :=
+@[simp]
+theorem traceLeft_eq_MState_traceLeft (ρ : MState (d₁ × d₂)) : traceLeft ρ = ρ.traceLeft :=
   sorry
 
-theorem trace_right_eq_MState_trace_right (ρ : MState (d₁ × d₂)) : trace_right ρ = ρ.trace_right :=
+@[simp]
+theorem traceRight_eq_MState_traceRight (ρ : MState (d₁ × d₂)) : traceRight ρ = ρ.traceRight :=
   sorry
 
 end trace
@@ -306,14 +327,27 @@ def assoc : CPTPMap ((d₁ × d₂) × d₃) (d₁ × d₂ × d₃) :=
 def assoc' : CPTPMap (d₁ × d₂ × d₃) ((d₁ × d₂) × d₃) :=
   of_equiv (Equiv.prodAssoc d₁ d₂ d₃).symm
 
-theorem assoc_assoc' : (assoc (d₁ := d₁) (d₂ := d₂) (d₃ := d₃)).compose assoc' = id :=
+@[simp]
+theorem SWAP_eq_MState_SWAP (ρ : MState (d₁ × d₂)) : SWAP ρ = ρ.SWAP :=
   sorry
+
+@[simp]
+theorem assoc_eq_MState_assoc (ρ : MState ((d₁ × d₂) × d₃)) : assoc ρ = ρ.assoc :=
+  sorry
+
+@[simp]
+theorem assoc'_eq_MState_assoc' (ρ : MState (d₁ × d₂ × d₃)) : assoc' ρ = ρ.assoc' :=
+  sorry
+
+theorem assoc_assoc' : (assoc (d₁ := d₁) (d₂ := d₂) (d₃ := d₃)).compose assoc' = id := by
+  ext1 ρ
+  simp
 
 end equiv
 
 section unitary
 
-/-- Conjugating density matrices by a unitary as a channel, standard unitary evolution. -/
+/-- Conjugating density matrices by a unitary as a channel. This is standard unitary evolution. -/
 def of_unitary (U : 𝐔[dIn]) : CPTPMap dIn dIn :=
   CPTP_of_choi_PSD_Tr (M := sorry) --v v†
     (sorry)
@@ -339,7 +373,7 @@ end unitary
 
 /-- A channel is *entanglement breaking* iff its product with the identity channel
   only outputs separable states. -/
-def EntanglementBreaking (Λ : CPTPMap dIn dOut) : Prop :=
+def IsEntanglementBreaking (Λ : CPTPMap dIn dOut) : Prop :=
   ∀ (dR : Type u_1) [Fintype dR] [DecidableEq dR], ∀ (ρ : MState (dR × dIn)),
     ((id ⊗ Λ) ρ).IsSeparable
 
@@ -375,12 +409,13 @@ theorem purify_IsUnitary (Λ : CPTPMap dIn dOut) : Λ.purify.IsUnitary :=
  * Appending these to the input
  * Applying the purified unitary channel
  * Tracing out the two left parts of the output
-is equivalent to the original channel. -/
+is equivalent to the original channel. This theorem states that the channel output by `purify`
+has this property. -/
 theorem purify_trace (Λ : CPTPMap dIn dOut) : Λ = (
   let zero_prep : CPTPMap Unit (dOut × dOut) := const_state (MState.pure (Ket.basis default))
   let prep := (id ⊗ zero_prep)
   let append : CPTPMap dIn (dIn × Unit) := CPTPMap.of_equiv (Equiv.prodPUnit dIn).symm
-  CPTPMap.trace_left.compose $ CPTPMap.trace_left.compose $ Λ.purify.compose $ prep.compose append
+  CPTPMap.traceLeft.compose $ CPTPMap.traceLeft.compose $ Λ.purify.compose $ prep.compose append
   ) :=
   sorry
 
@@ -389,12 +424,12 @@ theorem purify_trace (Λ : CPTPMap dIn dOut) : Λ = (
 --TODO: Best to rewrite the "zero_prep / prep / append" as one CPTPMap.append channel when we
 -- define that.
 
-/-- The complementary channel comes from tracing out the other half of the purified channel. -/
+/-- The complementary channel comes from tracing out the other half (the right half) of the purified channel `purify`. -/
 def complementary (Λ : CPTPMap dIn dOut) : CPTPMap dIn (dIn × dOut) :=
   let zero_prep : CPTPMap Unit (dOut × dOut) := const_state (MState.pure (Ket.basis default))
   let prep := (id ⊗ zero_prep)
   let append : CPTPMap dIn (dIn × Unit) := CPTPMap.of_equiv (Equiv.prodPUnit dIn).symm
-  CPTPMap.trace_right.compose $ CPTPMap.assoc'.compose $ Λ.purify.compose $ prep.compose append
+  CPTPMap.traceRight.compose $ CPTPMap.assoc'.compose $ Λ.purify.compose $ prep.compose append
 
 end purify
 

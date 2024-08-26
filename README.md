@@ -14,4 +14,4 @@ All of this will be done only in the theory finite-dimensional Hilbert spaces. R
 
 Most stuff is in the `QuantumInfo/FiniteDim` folder. There was a _tiny_ bit of infinite-dimensional theory in the `QuantumInfo/InfiniteDim` folder, but it's mostly been cleared out.
 
-Docmentation of the main definitions can be found at [DOC.md](./DOC.md). A majority of the work will be outlining the major definitions and theorems from Mark Wilde's _Quantum Information Theory_. A correspondence to the definitions and theorems (mostly as todo-list!) are in [TODO.md](./TODO.md)
+Docmentation of the main definitions can be found at [DOC.md](./DOC.md). A majority of the work will be outlining the major definitions and theorems from Mark Wilde's _Quantum Information Theory_. A correspondence to the definitions and theorems (in the form of a todo-list) are in [TODO](./TODO.md)

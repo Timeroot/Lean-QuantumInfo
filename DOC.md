@@ -47,11 +47,11 @@ As another example, `QConditionalEnt (ρ : MState (d₁ × d₂)) → ℝ` compu
 
 ## States
 * `MState.pure (ψ : Ket d) : MState d`: Construct a pure mixed state from a ket.
-* `MState.trace_left (ρ : MState (d₁ × d₂)) : MState d₂`: Trace out the left half of a bipartite system.
-* `MState.trace_right (ρ : MState (d₁ × d₂)) : MState d₁`: Trace out the right half of a bipartite system.
+* `MState.traceLeft (ρ : MState (d₁ × d₂)) : MState d₂`: Trace out the left half of a bipartite system.
+* `MState.traceRight (ρ : MState (d₁ × d₂)) : MState d₁`: Trace out the right half of a bipartite system.
 * `MState.spectrum (ρ : MState d) : Distribution d`: The spectrum of eigenvalues of a mixed state, as a distribution (to indicate that they are positive and sum to 1.)
 * `MState.IsSeparable (ρ : MState (d₁ × d₂)) : Prop`: A proposition indicating whether a state is separable over the given bipartition.
-* `MState.purify (ρ : MState d) : Ket (d × d)`: Turn a mixed state into a pure state on a larger Hilbert space. The fact that this traces back down to the input is given by `MState.trace_right_of_purify`, or `MState.purify'` bundles this fact together.
+* `MState.purify (ρ : MState d) : Ket (d × d)`: Turn a mixed state into a pure state on a larger Hilbert space. The fact that this traces back down to the input is given by `MState.traceRight_of_purify`, or `MState.purify'` bundles this fact together.
 * `MState.ofClassical (dist : Distribution d) : MState d`: View a distribution as a mixed state, embedded in the standard basis.
 * `MState.SWAP (ρ : MState (d₁ × d₂)) : MState (d₂ × d₁)`: Exchange the left and right halves of a state.
 * `MState.assoc (ρ : MState ((d₁ × d₂) × d₃)) : MState (d₁ × d₂ × d₃)`: Regroup a state's dimensions, moving the canonical bipartition over to the left. Remember that `d₁ × d₂ × d₃` is defined as `(d₁ × d₂) × d₃`.

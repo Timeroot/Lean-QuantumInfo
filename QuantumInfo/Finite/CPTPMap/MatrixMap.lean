@@ -5,11 +5,19 @@ import Mathlib.LinearAlgebra.PiTensorProduct
 import Mathlib.Data.Set.Card
 import Mathlib.Algebra.Module.LinearMap.Basic
 
-/- This file works with `MatrixMap`s, that is, linear maps from square matrices to square matrices.
-They can be represented as a transfer matrix themselves, so that multiplication of the transfer matrix
-gives map composition; or as a Choi matrix, which is square and with a spectrum related to its Kraus operators.
+/-! # Linear maps of matrices
 
-We also prove basic facts about `MatrixMap.IsTracePreserving`.
+This file works with `MatrixMap`s, that is, linear maps from square matrices to square matrices.
+Although this is just a shorthand for `Matrix A A R →ₗ[R] Matrix B B R`, there are several
+concepts that specifically make sense in this context.
+
+ * `toMatrix` is the rectangular "transfer matrix", where matrix multiplication commutes with map composition.
+ * `choi_matrix` is the square "Choi matrix", see `MatrixMap.choi_PSD_iff_CP_map` for example usage
+ * `kron` is the Kronecker product of matrix maps
+ * `IsTracePreserving` states the trace of the output is always equal to the trace of the input.
+
+We provide simp lemmas for relating these facts, prove basic facts e.g. composition and identity, and some facts
+about `IsTracePreserving` maps.
 -/
 
 /-- A `MatrixMap` is a linear map between squares matrices of size A to size B, over R. -/
@@ -152,9 +160,6 @@ variable {R : Type*} [CommSemiring R]
 variable {s : ι → Type*} [∀ i, AddCommMonoid (s i)] [∀ i, Module R (s i)]
 variable {L : ι → Type* }
 
-#check PiTensorProduct
-#check Classical.em
-
 /-- Like `Basis.tensorProduct`, but for `PiTensorProduct` -/
 def Basis.piTensorProduct [∀i, Fintype (L i)]  (b : (i:ι) → Basis (L i) R (s i)) :
     Basis ((i:ι) → L i) R (PiTensorProduct R s) :=
@@ -178,7 +183,7 @@ variable {dO : ι → Type w} [∀i, Fintype (dO i)] [∀i, DecidableEq (dO i)]
 
 /-- Finite Pi-type tensor product of MatrixMaps. Defined as `PiTensorProduct.tprod` of the underlying
 Linear maps. Notation `⨂ₜₘ[R] i, f i`, eventually. -/
-noncomputable def PiKron (Λi : ∀ i, MatrixMap (dI i) (dO i) R) : MatrixMap (∀i, dI i) (∀i, dO i) R :=
+noncomputable def piKron (Λi : ∀ i, MatrixMap (dI i) (dO i) R) : MatrixMap (∀i, dI i) (∀i, dO i) R :=
   let map₁ := PiTensorProduct.map Λi;
   let map₂ := LinearMap.toMatrix
     (Basis.piTensorProduct (fun i ↦ Matrix.stdBasis R (dI i) (dI i)))
@@ -206,13 +211,13 @@ def IsTracePreserving (M : MatrixMap A B R) : Prop :=
 
 /-- A map is trace preserving iff the partial trace of the Choi matrix is the identity. -/
 theorem IsTracePreserving_iff_trace_choi (M : MatrixMap A B R) : M.IsTracePreserving
-    ↔ M.choi_matrix.trace_right = 1 := by
+    ↔ M.choi_matrix.traceRight = 1 := by
   constructor
   · intro h
     ext a₁ a₂
     replace h := h (Matrix.stdBasisMatrix a₁ a₂ 1)
     simp_rw [Matrix.trace, Matrix.diag] at h
-    simp [choi_matrix, Matrix.trace_right, h, Matrix.stdBasisMatrix, Matrix.one_apply]
+    simp [choi_matrix, Matrix.traceRight, h, Matrix.stdBasisMatrix, Matrix.one_apply]
     have : (fun x => a₁ = x ∧ a₂ = x) = (fun x => a₁ = a₂ ∧ a₂ = x) := by
       funext x
       rw [eq_iff_iff, and_congr_left_iff]
@@ -222,7 +227,7 @@ theorem IsTracePreserving_iff_trace_choi (M : MatrixMap A B R) : M.IsTracePreser
     <;> simp [this, h, Finset.filter_eq]
   · intro h X
     replace h := fun (a₁ a₂ : A) ↦ congrFun₂ h a₁ a₂
-    simp [Matrix.trace_right, Matrix.trace] at h ⊢
+    simp [Matrix.traceRight, Matrix.trace] at h ⊢
     rw [← M.choi_map_inv, of_choi_matrix]
     dsimp
     rw [Finset.sum_comm_3, Finset.sum_comm_3]
@@ -241,7 +246,7 @@ theorem apply_trace {M : MatrixMap A B R} (h : M.IsTracePreserving) (ρ : Matrix
 /-- The trace of a Choi matrix of a TP map is the cardinality of the input space. -/
 theorem trace_choi {M : MatrixMap A B R} (h : M.IsTracePreserving) :
     M.choi_matrix.trace = (Finset.univ (α := A)).card := by
-  rw [← Matrix.trace_of_trace_right, (IsTracePreserving_iff_trace_choi M).mp h,
+  rw [← Matrix.trace_of_traceRight, (IsTracePreserving_iff_trace_choi M).mp h,
     Matrix.trace_one, Finset.card_univ]
 
 variable {A : Type*} [Fintype A] in

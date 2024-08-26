@@ -1,7 +1,7 @@
 import QuantumInfo.Finite.Distance.Fidelity
 import QuantumInfo.Finite.Distance.TraceDistance
 
-/-
+/-!
 Distances between quantum states.
  * Fidelity
  * Trace distance

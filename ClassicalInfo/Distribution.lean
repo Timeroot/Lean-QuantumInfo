@@ -1,5 +1,11 @@
 import ClassicalInfo.Prob
 
+/-! # Distributions on finite sets
+
+We define the type `Distribution α` on a `Fintype α`. By restricting ourselves to distributoins on finite types,
+a lot of notation and casts are greatly simplified. This suffices for (most) finite-dimensional quantum theory.
+-/
+
 noncomputable section
 open NNReal
 open Classical
@@ -7,15 +13,14 @@ open BigOperators
 
 /--
 We define our own (discrete) probability distribution notion here, instead
-of using `PMF`, because that uses ENNReals everywhere to maintain compatibility
-with `MeasureTheory.measure`.
+of using `PMF` from Mathlib, because that uses ENNReals everywhere to maintain compatibility
+with `MeasureTheory.Measure`.
 
 The probabilities internal to a Distribution are NNReals. This lets us more easily
 write the statement that they sum to 1, since NNReals can be added. (Probabilities,
-on their own, cannot.) But the FunLke instance gives `Prob` out, which carry the
-information that they are all at most one: true probabilities.
+on their own, cannot.) But the FunLike instance gives `Prob` out, which carry the
+information that they are all in the range [0,1].
 -/
-
 def Distribution (α : Type u) [Fintype α] : Type u :=
   { f : α → Prob // Finset.sum Finset.univ (fun i ↦ (f i).toReal) = 1 }
 
@@ -24,13 +29,13 @@ namespace Distribution
 variable {α β : Type*} [Fintype α] [Fintype β]
 
 /-- Make a distribution, proving only that the values are nonnegative and that the
-sum is 1. (The fact that the values are at most is derived as a consequence.) -/
-def mk' (f : α → ℝ) (h₁ : ∀i, 0 ≤ f i) (h₂ : ∑ i, f i = 1) : Distribution α :=
+sum is 1. The fact that the values are at most 1 is derived as a consequence. -/
+def mk' (f : α → ℝ) (h₁ : ∀i, 0 ≤ f i) (hN : ∑ i, f i = 1) : Distribution α :=
   have h₃ : ∀x, f x ≤ 1 := by
     intro x
-    simp [← h₂, Fintype.sum_eq_sum_compl_add x]
+    simp [← hN, Fintype.sum_eq_sum_compl_add x]
     exact Finset.sum_nonneg' h₁
-  ⟨ fun i ↦ ⟨f i, ⟨h₁ i, h₃ i⟩⟩, h₂⟩
+  ⟨ fun i ↦ ⟨f i, ⟨h₁ i, h₃ i⟩⟩, hN⟩
 
 instance instFunLikeProb : FunLike (Distribution α) α Prob where
   coe p a := p.1 a
@@ -39,7 +44,7 @@ instance instFunLikeProb : FunLike (Distribution α) α Prob where
       simpa only [Subtype.mk.injEq, coe_inj] using congrFun h v
 
 @[simp]
-theorem prop' (d : Distribution α) : Finset.sum Finset.univ (fun i ↦ (d i).toReal) = 1 :=
+theorem normalized (d : Distribution α) : Finset.sum Finset.univ (fun i ↦ (d i).toReal) = 1 :=
   d.2
 
 abbrev prob (d : Distribution α) := (d : α → Prob)
@@ -83,7 +88,7 @@ theorem constant_of_exists_one {D : Distribution α} {x : α} (h : D x = 1) : D 
     by_contra h₃
     replace h₃ : 0 < (D y : ℝ) := by
       linarith (config := {splitNe := true}) only [h₃, @Prob.zero_le_coe (D y)]
-    have := D.prop'
+    have := D.normalized
     rw [← Finset.add_sum_erase _ _ (Finset.mem_univ x), h, Prob.toReal_one] at this
     rw [← Finset.add_sum_erase _ _ (a := y) (by simpa using (Ne.symm h₂))] at this
     have : 0 ≤ ∑ x ∈ Finset.erase (Finset.erase Finset.univ x) y, (D x : ℝ) :=
@@ -119,9 +124,11 @@ def prod (d1 : Distribution α) (d2 : Distribution β) : Distribution (Prod α �
 theorem prod_def (x : α) (y : β) : prod d1 d2 ⟨x, y⟩ = (d1 x) * (d2 y) :=
   rfl
 
+/-- Given a distribution on α, extend it to a distribution on `Sum α β` by giving it no support on `β`. -/
 def extend_right (d : Distribution α) : Distribution (α ⊕ β) :=
   ⟨fun x ↦ Sum.casesOn x d.val (Function.const _ 0), by simp⟩
 
+/-- Given a distribution on α, extend it to a distribution on `Sum β α` by giving it no support on `β`. -/
 def extend_left (d : Distribution α) : Distribution (β ⊕ α) :=
   ⟨fun x ↦ Sum.casesOn x (Function.const _ 0) d.val, by simp⟩
 

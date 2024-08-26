@@ -1,7 +1,7 @@
 import QuantumInfo.Finite.MState
 import QuantumInfo.Finite.CPTPMap
 
-import QuantumInfo.Mathlib.All
+import QuantumInfo.Mathlib
 
 noncomputable section
 

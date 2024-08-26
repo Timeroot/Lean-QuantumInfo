@@ -1,11 +1,13 @@
-import QuantumInfo.Mathlib.All
+import QuantumInfo.Mathlib
 import ClassicalInfo.Distribution
 
-/-
+/-!
 Finite dimensional quantum pure states, bra and kets. Mixed states are `MState` in that file.
 
 These could be done with a Hilbert space of Fintype, which would look like
+```lean4
 (H : Type*) [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H] [FiniteDimensional ℂ H]
+```
 or by choosing a particular `Basis` and asserting it is `Fintype`. But frankly it seems easier to
 mostly focus on the basis-dependent notion of `Matrix`, which has the added benefit of an obvious
 "classical" interpretation (as the basis elements, or diagonal elements of a mixed state). In that

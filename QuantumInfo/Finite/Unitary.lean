@@ -1,10 +1,13 @@
 import QuantumInfo.Finite.MState
 
-/- This file is lemmas about unitary matrices (Matrix.unitaryGroup) and how they apply to
-bras, kets, and MState matrices.
+/-! # Unitary operators on quantum state
 
-This is imported by CPTPMap to define things like unitary channels, Kraus operators, and
-complementary channels, so it doesn't discuss channels. -/
+This file is intended for lemmas about unitary matrices (`Matrix.unitaryGroup`) and how they apply to
+`Bra`s, `Ket`s, and `MState` mixed states.
+
+This is imported by `CPTPMap` to define things like unitary channels, Kraus operators, and
+complementary channels, so this file itself does not discuss channels yet.-/
+
 noncomputable section
 
 namespace MState

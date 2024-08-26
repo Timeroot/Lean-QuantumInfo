@@ -1,20 +1,29 @@
-import QuantumInfo.Mathlib.All
+import QuantumInfo.Mathlib
 import ClassicalInfo.Distribution
 import QuantumInfo.Finite.Braket
 
 import Mathlib.Logic.Equiv.Basic
 
-/-
+/-!
 Finite dimensional quantum mixed states, ρ.
 
 The same comments apply as in `Braket`:
 
 These could be done with a Hilbert space of Fintype, which would look like
+```lean4
 (H : Type*) [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H] [FiniteDimensional ℂ H]
+```
 or by choosing a particular `Basis` and asserting it is `Fintype`. But frankly it seems easier to
 mostly focus on the basis-dependent notion of `Matrix`, which has the added benefit of an obvious
 "classical" interpretation (as the basis elements, or diagonal elements of a mixed state). In that
 sense, this quantum theory comes with the a particular classical theory always preferred.
+
+Important definitions:
+ * `instMixable`: the `Mixable` instance allowing convex combinations of `MState`s
+ * `ofClassical`: Mixed states representing classical distributions
+ * `purity`: The purity `Tr[ρ^2]` of a state
+ * `spectrum`: The spectrum of the matrix
+ * `uniform`: The maximally mixed state
 -/
 
 noncomputable section
@@ -219,28 +228,28 @@ section mat_trace
 
 variable [AddCommMonoid R]
 
-def _root_.Matrix.trace_left (m : Matrix (d × d₁) (d × d₂) R) : Matrix d₁ d₂ R :=
+def _root_.Matrix.traceLeft (m : Matrix (d × d₁) (d × d₂) R) : Matrix d₁ d₂ R :=
   Matrix.of fun i₁ j₁ ↦ ∑ i₂, m (i₂, i₁) (i₂, j₁)
 
-def _root_.Matrix.trace_right (m : Matrix (d₁ × d) (d₂ × d) R) : Matrix d₁ d₂ R :=
+def _root_.Matrix.traceRight (m : Matrix (d₁ × d) (d₂ × d) R) : Matrix d₁ d₂ R :=
   Matrix.of fun i₂ j₂ ↦ ∑ i₁, m (i₂, i₁) (j₂, i₁)
 
 @[simp]
-theorem _root_.Matrix.trace_of_trace_left (A : Matrix (d₁ × d₂) (d₁ × d₂) R) : A.trace_left.trace = A.trace := by
+theorem _root_.Matrix.trace_of_traceLeft (A : Matrix (d₁ × d₂) (d₁ × d₂) R) : A.traceLeft.trace = A.trace := by
   convert Fintype.sum_prod_type_right.symm
   rfl
 
 @[simp]
-theorem _root_.Matrix.trace_of_trace_right (A : Matrix (d₁ × d₂) (d₁ × d₂) R) : A.trace_right.trace = A.trace := by
+theorem _root_.Matrix.trace_of_traceRight (A : Matrix (d₁ × d₂) (d₁ × d₂) R) : A.traceRight.trace = A.trace := by
   convert Fintype.sum_prod_type.symm
   rfl
 
 variable [RCLike R] {A : Matrix (d₁ × d₂) (d₁ × d₂) R}
 
-theorem _root_.Matrix.PosSemidef.trace_left (hA : A.PosSemidef) : A.trace_left.PosSemidef :=
+theorem _root_.Matrix.PosSemidef.traceLeft (hA : A.PosSemidef) : A.traceLeft.PosSemidef :=
   sorry
 
-theorem _root_.Matrix.PosSemidef.trace_right (hA : A.PosSemidef) : A.trace_right.PosSemidef :=
+theorem _root_.Matrix.PosSemidef.traceRight (hA : A.PosSemidef) : A.traceRight.PosSemidef :=
   sorry
 
 end mat_trace
@@ -249,31 +258,31 @@ end mat_trace
 -- * Partial trace of direct product is the original state
 
 /-- Partial tracing out the left half of a system. -/
-def trace_left (ρ : MState (d₁ × d₂)) : MState d₂ where
-  m := ρ.m.trace_left
-  pos := ρ.pos.trace_left
-  tr := ρ.tr ▸ ρ.m.trace_of_trace_left
+def traceLeft (ρ : MState (d₁ × d₂)) : MState d₂ where
+  m := ρ.m.traceLeft
+  pos := ρ.pos.traceLeft
+  tr := ρ.tr ▸ ρ.m.trace_of_traceLeft
 
 /-- Partial tracing out the right half of a system. -/
-def trace_right (ρ : MState (d₁ × d₂)) : MState d₁ where
-  m := ρ.m.trace_right
-  pos := ρ.pos.trace_right
-  tr := ρ.tr ▸ ρ.m.trace_of_trace_right
+def traceRight (ρ : MState (d₁ × d₂)) : MState d₁ where
+  m := ρ.m.traceRight
+  pos := ρ.pos.traceRight
+  tr := ρ.tr ▸ ρ.m.trace_of_traceRight
 
 /-- Taking the direct product on the left and tracing it back out gives the same state. -/
 @[simp]
-theorem trace_left_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : trace_left (ρ₁ ⊗ ρ₂) = ρ₂ := by
+theorem traceLeft_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : traceLeft (ρ₁ ⊗ ρ₂) = ρ₂ := by
   ext
-  simp_rw [trace_left, Matrix.trace_left, prod]
+  simp_rw [traceLeft, Matrix.traceLeft, prod]
   dsimp
   have h : (∑ i : d₁, ρ₁.m i i) = 1 := ρ₁.tr
   rw [← Finset.sum_mul, h, one_mul]
 
 /-- Taking the direct product on the right and tracing it back out gives the same state. -/
 @[simp]
-theorem trace_right_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : trace_right (ρ₁ ⊗ ρ₂) = ρ₁ := by
+theorem traceRight_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : traceRight (ρ₁ ⊗ ρ₂) = ρ₁ := by
   ext
-  simp_rw [trace_right, Matrix.trace_right, prod]
+  simp_rw [traceRight, Matrix.traceRight, prod]
   dsimp
   have h : (∑ i : d₂, ρ₂.m i i) = 1 := ρ₂.tr
   rw [← Finset.mul_sum, h, mul_one]
@@ -311,8 +320,8 @@ theorem pure_separable_iff_IsProd (ψ : Ket (d₁ × d₂)) :
   sorry
 
 /-- A pure state is separable iff the partial trace on the left is pure. -/
-theorem pure_separable_iff_trace_left_pure (ψ : Ket (d₁ × d₂)) : IsSeparable (pure ψ) ↔
-    ∃ ψ₁, pure ψ₁ = (pure ψ).trace_left := by
+theorem pure_separable_iff_traceLeft_pure (ψ : Ket (d₁ × d₂)) : IsSeparable (pure ψ) ↔
+    ∃ ψ₁, pure ψ₁ = (pure ψ).traceLeft := by
   sorry
 
 --TODO: Separable states are convex
@@ -321,7 +330,7 @@ section purification
 
 /-- The purification of a mixed state. Always uses the full dimension of the Hilbert space (d) to
  purify, so e.g. an existing pure state with d=4 still becomes d=16 in the purification. The defining
- property is `MState.trace_right_of_purify`; see also `MState.purify'` for the bundled version. -/
+ property is `MState.traceRight_of_purify`; see also `MState.purify'` for the bundled version. -/
 def purify (ρ : MState d) : Ket (d × d) where
   vec := fun (i,j) ↦
     let ρ2 := ρ.Hermitian.eigenvectorUnitary i j
@@ -341,16 +350,16 @@ def purify (ρ : MState d) : Ket (d × d) where
 /-- The defining property of purification, that tracing out the purifying system gives the
  original mixed state. -/
 @[simp]
-theorem purify_spec (ρ : MState d) : (pure ρ.purify).trace_right = ρ := by
+theorem purify_spec (ρ : MState d) : (pure ρ.purify).traceRight = ρ := by
   ext i j
-  simp_rw [purify, trace_right, Matrix.trace_right]
+  simp_rw [purify, traceRight, Matrix.traceRight]
   simp only [pure_of, Matrix.of_apply, Ket.apply]
   simp only [map_mul]
   simp_rw [mul_assoc, mul_comm, ← mul_assoc (Complex.ofReal' _), Complex.mul_conj]
   sorry
 
-/-- `MState.purify` bundled with its defining property `MState.trace_right_of_purify`. -/
-def purifyX (ρ : MState d) : { ψ : Ket (d × d) // (pure ψ).trace_right = ρ } :=
+/-- `MState.purify` bundled with its defining property `MState.traceRight_of_purify`. -/
+def purifyX (ρ : MState d) : { ψ : Ket (d × d) // (pure ψ).traceRight = ρ } :=
   ⟨ρ.purify, ρ.purify_spec⟩
 
 end purification
@@ -375,11 +384,11 @@ theorem SWAP_SWAP (ρ : MState (d₁ × d₂)) : ρ.SWAP.SWAP = ρ :=
   rfl
 
 @[simp]
-theorem trace_left_SWAP (ρ : MState (d₁ × d₂)) : ρ.SWAP.trace_left = ρ.trace_right :=
+theorem traceLeft_SWAP (ρ : MState (d₁ × d₂)) : ρ.SWAP.traceLeft = ρ.traceRight :=
   rfl
 
 @[simp]
-theorem trace_right_SWAP (ρ : MState (d₁ × d₂)) : ρ.SWAP.trace_right = ρ.trace_left :=
+theorem traceRight_SWAP (ρ : MState (d₁ × d₂)) : ρ.SWAP.traceRight = ρ.traceLeft :=
   rfl
 
 /-- The associator that re-clusters the parts of a quantum system. -/
@@ -401,39 +410,39 @@ theorem assoc'_assoc (ρ : MState ((d₁ × d₂) × d₃)) : ρ.assoc.assoc' = 
   rfl
 
 @[simp]
-theorem trace_left_right_assoc (ρ : MState ((d₁ × d₂) × d₃)) :
-    ρ.assoc.trace_left.trace_right = ρ.trace_right.trace_left := by
+theorem traceLeft_right_assoc (ρ : MState ((d₁ × d₂) × d₃)) :
+    ρ.assoc.traceLeft.traceRight = ρ.traceRight.traceLeft := by
   ext
-  simp [assoc, Matrix.trace_left, trace_left, Matrix.trace_right, trace_right]
+  simp [assoc, Matrix.traceLeft, traceLeft, Matrix.traceRight, traceRight]
   rw [Finset.sum_comm]
 
 @[simp]
-theorem trace_right_left_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
-    ρ.assoc'.trace_right.trace_left = ρ.trace_left.trace_right := by
-  rw [← ρ.assoc'.trace_left_right_assoc, assoc_assoc']
+theorem traceRight_left_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
+    ρ.assoc'.traceRight.traceLeft = ρ.traceLeft.traceRight := by
+  rw [← ρ.assoc'.traceLeft_right_assoc, assoc_assoc']
 
 @[simp]
-theorem trace_right_assoc (ρ : MState ((d₁ × d₂) × d₃)) :
-    ρ.assoc.trace_right = ρ.trace_right.trace_right := by
+theorem traceRight_assoc (ρ : MState ((d₁ × d₂) × d₃)) :
+    ρ.assoc.traceRight = ρ.traceRight.traceRight := by
   ext
-  simp [assoc, Matrix.trace_right, trace_right]
+  simp [assoc, Matrix.traceRight, traceRight]
 
 @[simp]
-theorem trace_left_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
-    ρ.assoc'.trace_left = ρ.trace_left.trace_left := by
-  convert ρ.SWAP.assoc.SWAP.trace_right_assoc
+theorem traceLeft_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
+    ρ.assoc'.traceLeft = ρ.traceLeft.traceLeft := by
+  convert ρ.SWAP.assoc.SWAP.traceRight_assoc
   simp
 
 @[simp]
-theorem trace_left_left_assoc (ρ : MState ((d₁ × d₂) × d₃)) :
-    ρ.assoc.trace_left.trace_left = ρ.trace_left := by
+theorem traceLeft_left_assoc (ρ : MState ((d₁ × d₂) × d₃)) :
+    ρ.assoc.traceLeft.traceLeft = ρ.traceLeft := by
   ext
-  simp only [assoc, trace_left, Matrix.trace_left, Matrix.of_apply, Fintype.sum_prod_type]
+  simp only [assoc, traceLeft, Matrix.traceLeft, Matrix.of_apply, Fintype.sum_prod_type]
   rw [Finset.sum_comm]
 
 @[simp]
-theorem trace_right_right_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
-    ρ.assoc'.trace_right.trace_right = ρ.trace_right := by
+theorem traceRight_right_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
+    ρ.assoc'.traceRight.traceRight = ρ.traceRight := by
   simp [assoc']
 
 @[simp]

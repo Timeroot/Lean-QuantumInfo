@@ -1,8 +1,11 @@
 import QuantumInfo.Finite.CPTPMap.MatrixMap
 
-/- Building on `MatrixMap`s, this defines `IsHermitianPreserving`, `IsPositive
+/-! # Completely Positive maps
+
+Building on `MatrixMap`s, this defines `IsHermitianPreserving`, `IsPositive`
 and `IsCompletelyPositive` maps. They have basic facts such as closure under composition,
 addition, and scaling.
+
 -/
 
 namespace MatrixMap
@@ -45,7 +48,7 @@ end IsHermitianPreserving
 namespace IsPositive
 variable [Fintype A] [Fintype B] [Fintype C]
 
-/- Every `MatrixMap` that `IsPositive` also `IsHermitianPreserving`. -/
+/- Every `MatrixMap` that `IsPositive` is also `IsHermitianPreserving`. -/
 theorem IsHermitianPreserving (M : MatrixMap A B R)
     (hM : IsPositive M) : IsHermitianPreserving M := by
 --sketch: Positive maps are all Hermitian preserving, because positive matrices generate the full
@@ -140,18 +143,18 @@ theorem kron [DecidableEq C] [Fintype D] {M₁ : MatrixMap A B R} {M₂ : Matrix
       -/
   sorry
 
-section PiKron
+section piKron
 
 variable {ι : Type u} [DecidableEq ι] [fι : Fintype ι]
 variable {dI : ι → Type v} [∀i, Fintype (dI i)] [∀i, DecidableEq (dI i)]
 variable {dO : ι → Type w} [∀i, Fintype (dO i)] [∀i, DecidableEq (dO i)]
 
-/-- The `PiKron` product of IsCompletelyPositive maps is also completely positive. -/
-theorem PiKron {Λi : ∀ i, MatrixMap (dI i) (dO i) R} (h₁ : ∀ i, (Λi i).IsCompletelyPositive) :
-    IsCompletelyPositive (MatrixMap.PiKron Λi) := by
+/-- The `piKron` product of IsCompletelyPositive maps is also completely positive. -/
+theorem piKron {Λi : ∀ i, MatrixMap (dI i) (dO i) R} (h₁ : ∀ i, (Λi i).IsCompletelyPositive) :
+    IsCompletelyPositive (MatrixMap.piKron Λi) := by
   sorry
 
-end PiKron
+end piKron
 
 end IsCompletelyPositive
 
