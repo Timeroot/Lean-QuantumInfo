@@ -40,13 +40,36 @@ variable {X : Type*} {d : Type*} [Fintype X] [Fintype d] [DecidableEq d] [Decida
 /-- The act of measuring is a quantum channel, that maps a `d`-dimensional quantum
 state to an `d × X`-dimensional quantum-classical state. -/
 def measurement_map (Λ : POVM X d) : CPTPMap d (d × X) where
-  map := open Kronecker in {
-    toFun := fun ρ ↦ ∑ (i : X), (Λ.mats i).inner ρ • (Λ.mats i ⊗ₖ 1)
-    map_add' := by simp [Matrix.inner, mul_add, trace_add, add_smul, Finset.sum_add_distrib]
-    map_smul' := by simp [Matrix.inner, MulAction.mul_smul, Finset.smul_sum]
+  map := ∑ (x : X), open Kronecker in {
+    toFun := fun ρ ↦ (((Λ.pos x).sqrt * ρ * (Λ.pos x).sqrt) ⊗ₖ Matrix.stdBasisMatrix x x 1)
+    map_add' := by simp [mul_add, add_mul, Matrix.kroneckerMap_add_left]
+    map_smul' := by simp [Matrix.smul_kronecker]
   }
-  trace_preserving := sorry
-  completely_pos := sorry
+  trace_preserving := by
+    intro x
+    simp [Matrix.trace_kronecker, Matrix.trace_mul_cycle]
+    rw [← trace_sum, ← Finset.sum_mul, Λ.normalized, one_mul]
+  completely_pos := by
+    apply Finset.sum_induction
+    · exact fun _ _ ha ↦ ha.add
+    · exact MatrixMap.IsCompletelyPositive.zero _ _
+    · intro x _
+      let M₁ : MatrixMap d d ℂ := ⟨⟨
+        fun ρ ↦ ((Λ.pos x).sqrt * ρ * (Λ.pos x).sqrt),
+        by simp [mul_add, add_mul]⟩,
+        by simp⟩
+      let M₂ : MatrixMap d (d × X) ℂ := ⟨⟨
+        fun ρ ↦ (ρ.kronecker (Matrix.stdBasisMatrix x x 1)),
+        by simp [mul_add, add_mul, Matrix.kroneckerMap_add_left]⟩,
+        by simp [Matrix.smul_kronecker]⟩
+      set M₃ := LinearMap.comp M₂ M₁ with hM₃
+      simp only [M₁, M₂, LinearMap.comp, kronecker, LinearMap.coe_mk, AddHom.coe_mk, Function.comp] at hM₃
+      rw [← hM₃]
+      apply MatrixMap.IsCompletelyPositive.comp
+      · intro n ρ h
+        sorry
+      · apply MatrixMap.IsCompletelyPositive.kron_kronecker_const
+        convert (Matrix.PosSemidef.stdBasisMatrix_iff_eq x x (zero_lt_one' ℂ)).2 rfl
 
 /-- A POVM leads to a distribution of outcomes on any given mixed state ρ. -/
 def measure (Λ : POVM X d) (ρ : MState d) : Distribution X where

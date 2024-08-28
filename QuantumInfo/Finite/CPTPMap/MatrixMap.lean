@@ -30,6 +30,7 @@ section matrix
 
 variable (A R) in
 /-- Alias of LinearMap.id, but specifically as a MatrixMap. -/
+@[reducible]
 def id : MatrixMap A A R := LinearMap.id
 
 /-- Choi matrix of a given linear matrix map. Note that this is defined even for things that
@@ -105,6 +106,43 @@ theorem kron_def [CommRing R] (M₁ : MatrixMap A B R) (M₂ : MatrixMap C D R) 
   simp [Matrix.stdBasis_eq_stdBasisMatrix]
   sorry
 
+section kron_lemmas
+variable [CommSemiring R]
+
+theorem add_kron (ML₁ ML₂ : MatrixMap A B R) (MR : MatrixMap C D R) : (ML₁ + ML₂) ⊗ₖₘ MR = ML₁ ⊗ₖₘ MR + ML₂ ⊗ₖₘ MR := by
+  simp [kron, TensorProduct.map_add_left, Matrix.submatrix_add]
+
+theorem kron_add (ML : MatrixMap A B R) (MR₁ MR₂ : MatrixMap C D R) : ML ⊗ₖₘ (MR₁ + MR₂) = ML ⊗ₖₘ MR₁ + ML ⊗ₖₘ  MR₂ := by
+  simp [kron, TensorProduct.map_add_right, Matrix.submatrix_add]
+
+theorem smul_kron (r : R) (ML : MatrixMap A B R) (MR : MatrixMap C D R) : (r • ML) ⊗ₖₘ MR = r • (ML ⊗ₖₘ MR) := by
+  simp [kron, TensorProduct.map_smul_left, Matrix.submatrix_smul]
+
+theorem kron_smul (r : R) (ML : MatrixMap A B R) (MR : MatrixMap C D R) : ML ⊗ₖₘ (r • MR) = r • (ML ⊗ₖₘ MR) := by
+  simp [kron, TensorProduct.map_smul_right, Matrix.submatrix_smul]
+
+@[simp]
+theorem zero_kron (MR : MatrixMap C D R) : (0 : MatrixMap A B R) ⊗ₖₘ MR = 0 := by
+  simp [kron]
+
+@[simp]
+theorem kron_zero (ML : MatrixMap A B R) : ML ⊗ₖₘ (0 : MatrixMap C D R) = 0 := by
+  simp [kron]
+
+variable [DecidableEq B] in
+theorem kron_id_id : (id A R ⊗ₖₘ id B R) = id (A × B) R := by
+  simp [kron]
+
+variable {Dl₁ Dl₂ Dl₃ Dr₁ Dr₂ Dr₃ : Type*}
+  [Fintype Dl₁] [Fintype Dl₂] [Fintype Dl₃] [Fintype Dr₁] [Fintype Dr₂] [Fintype Dr₃]
+  [DecidableEq Dl₁] [DecidableEq Dl₂] [DecidableEq Dr₁] [DecidableEq Dr₂] in
+/-- For maps L₁, L₂, R₁, and R₂, the product (L₂ ∘ₗ L₁) ⊗ₖₘ (R₂ ∘ₗ R₁) = (L₂ ⊗ₖₘ R₂) ∘ₗ (L₁ ⊗ₖₘ R₁) -/
+theorem kron_comp_distrib (L₁ : MatrixMap Dl₁ Dl₂ R) (L₂ : MatrixMap Dl₂ Dl₃ R) (R₁ : MatrixMap Dr₁ Dr₂ R)
+    (R₂ : MatrixMap Dr₂ Dr₃ R) : (L₂ ∘ₗ L₁) ⊗ₖₘ (R₂ ∘ₗ R₁) = (L₂ ⊗ₖₘ R₂) ∘ₗ (L₁ ⊗ₖₘ R₁) := by
+  simp [kron, TensorProduct.map_comp, ← Matrix.toLin_mul, Matrix.submatrix_mul_equiv, ← LinearMap.toMatrix_comp]
+
+end kron_lemmas
+
 -- /-- The canonical tensor product on linear maps between matrices, where a map from
 --   M[A,B] to M[C,D] is given by M[A×C,B×D]. This tensor product acts independently on
 --   Kronecker products and gives Kronecker products as outputs. -/
@@ -129,23 +167,6 @@ theorem kron_map_of_kron_state [CommRing R] (M₁ : MatrixMap A B R) (M₂ : Mat
   -- simp_rw [← LinearMap.sum_apply]
   -- simp
   sorry
-  sorry
-
-variable [CommRing R] {Dl₁ Dl₂ Dl₃ Dr₁ Dr₂ Dr₃ : Type*}
-  [Fintype Dl₁] [Fintype Dl₂] [Fintype Dl₃] [Fintype Dr₁] [Fintype Dr₂] [Fintype Dr₃]
-  [DecidableEq Dl₁] [DecidableEq Dl₂] [DecidableEq Dr₁] [DecidableEq Dr₂] in
-/-- For maps L₁, L₂, R₁, and R₂, the product (L₂ ∘ₗ L₁) ⊗ₖₘ (R₂ ∘ₗ R₁) = (L₂ ⊗ₖₘ R₂) ∘ₗ (L₁ ⊗ₖₘ R₁) -/
-theorem kron_comp_distrib (L₁ : MatrixMap Dl₁ Dl₂ R) (L₂ : MatrixMap Dl₂ Dl₃ R) (R₁ : MatrixMap Dr₁ Dr₂ R)
-    (R₂ : MatrixMap Dr₂ Dr₃ R) : (L₂ ∘ₗ L₁) ⊗ₖₘ (R₂ ∘ₗ R₁) = (L₂ ⊗ₖₘ R₂) ∘ₗ (L₁ ⊗ₖₘ R₁) := by
-  --TensorProduct.map_tmul
-  sorry
-
-variable [CommSemiring R] [DecidableEq B] in
-theorem kron_id_id : (id A R ⊗ₖₘ id B R) = id (A × B) R := by
-  sorry
-
-variable [CommSemiring R] in
-theorem add_kron (M₁ M₂ : MatrixMap A B R) (M₃: MatrixMap C D R) : ((M₁ + M₂) ⊗ₖₘ M₃) = (M₁ ⊗ₖₘ M₃) + (M₂ ⊗ₖₘ M₃) := by
   sorry
 
 end kron

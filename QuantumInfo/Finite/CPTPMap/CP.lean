@@ -114,9 +114,22 @@ theorem add {M₁ M₂ : MatrixMap A B R} (h₁ : M₁.IsCompletelyPositive) (h�
   fun n _ h ↦ by
   simpa only [add_kron] using Matrix.PosSemidef.add (h₁ n h) (h₂ n h)
 
-/-- Nonnegative scalings of IsPositive maps are IsPositive. -/
+/-- Nonnegative scalings of `IsCompletelyPositive` maps are `IsCompletelyPositive`. -/
 theorem smul {M : MatrixMap A B R} (hM : M.IsCompletelyPositive) {x : R} (hx : 0 ≤ x) :
-    (x • M).IsCompletelyPositive := by
+    (x • M).IsCompletelyPositive :=
+  fun n ρ h ↦ by
+    rw [MatrixMap.smul_kron]
+    exact (hM n h).smul hx
+
+variable (A B) in
+/-- The zero map `IsCompletelyPositive`. -/
+theorem zero : (0 : MatrixMap A B R).IsCompletelyPositive :=
+  fun _ _ _ ↦ by simpa using Matrix.PosSemidef.zero
+
+variable [Fintype d] [DecidableEq d]
+/-- The map that takes M and returns M ⊗ₖ C, where C is positive semidefinite, is a completely positive map. -/
+theorem kron_kronecker_const {C : Matrix d d R} (h : C.PosSemidef) {h₁ h₂ : _} : MatrixMap.IsCompletelyPositive
+    (⟨⟨fun M => M ⊗ₖ C, h₁⟩, h₂⟩ : MatrixMap A (A × d) R) := by
   sorry
 
 /-- Choi's theorem on completely positive maps: A map `IsCompletelyPositive` iff its Choi Matrix is PSD. -/
