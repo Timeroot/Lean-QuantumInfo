@@ -1,4 +1,4 @@
-import QuantumInfo.Mathlib.Matrix
+import QuantumInfo.ForMathlib.Matrix
 
 open BigOperators
 open Classical

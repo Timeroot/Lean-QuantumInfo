@@ -1,7 +1,7 @@
 --Mathlib imports
-import QuantumInfo.Mathlib
+import QuantumInfo.ForMathlib
 
---Functional code
+--Code
 import QuantumInfo.Finite.Braket
 import QuantumInfo.Finite.Capacity
 import QuantumInfo.Finite.Channel.DegradableOrder
@@ -11,6 +11,7 @@ import QuantumInfo.Finite.Entropy
 import QuantumInfo.Finite.MState
 import QuantumInfo.Finite.POVM
 import QuantumInfo.Finite.Unitary
+import QuantumInfo.Finite.Qubit.Basic
 
 --Documentation without code
 import QuantumInfo.Finite.Capacity_doc

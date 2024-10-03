@@ -1,7 +1,7 @@
 import Mathlib.Data.Matrix.Kronecker
 import Mathlib.LinearAlgebra.Matrix.PosDef
 
-import QuantumInfo.Mathlib.Other
+import QuantumInfo.ForMathlib.Other
 
 open BigOperators
 open Classical

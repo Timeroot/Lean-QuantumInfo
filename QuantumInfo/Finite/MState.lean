@@ -1,4 +1,4 @@
-import QuantumInfo.Mathlib
+import QuantumInfo.ForMathlib
 import ClassicalInfo.Distribution
 import QuantumInfo.Finite.Braket
 
