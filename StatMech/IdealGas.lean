@@ -28,12 +28,25 @@ variable (n : ℕ) {V β T : ℝ}
 theorem PartitionZ_eq (hV : 0 < V) (hβ : 0 < β) :
     IdealGas.PartitionZ (n,V) β = V^n * (2 * Real.pi / β)^(3 * n / 2 : ℝ) := by
   rw [PartitionZ, IdealGas]
-  simp only [Finset.univ_product_univ, one_div, Fintype.sum_prod_type, ite_eq_right_iff, neg_mul]
-  have : ∀ (config : IdealGas.dim (n,V) → ℝ),
-    ∑ x : Fin n, ∑ x_1 : Fin 3, (config (x, Sum.inr x_1) ^ 2 / (2 : ℝ) : WithTop ℝ) ≠ ⊤ := by
-    intro config
-    -- rw [WithTop.sum_eq_top]
+  simp only [Finset.univ_product_univ, one_div, ite_eq_right_iff, WithTop.sum_eq_top,
+    Finset.mem_univ, WithTop.coe_ne_top, and_false, exists_false, imp_false, not_forall, not_le,
+    neg_mul]
+  have h₀ : ∀ (config:Fin n × (Fin 3 ⊕ Fin 3) → ℝ) proof,
+      ((if ∀ (i : Fin n) (ax : Fin 3), |config (i, Sum.inl ax)| ≤ V ^ (3 : ℝ)⁻¹ / 2 then
+                  ∑ x : Fin n × Fin 3, config (x.1, Sum.inr x.2) ^ 2 / (2 :ℝ)
+                else ⊤) : WithTop ℝ).untop proof = ∑ x : Fin n × Fin 3, config (x.1, Sum.inr x.2) ^ 2 / (2 :ℝ) := by
+    intro config proof
+    rw [WithTop.untop_eq_iff]
+    split_ifs with h
+    · simp
+    · simp [h] at proof
+  simp only [h₀, dite_eq_ite]; clear h₀
+  let eq_pm : (Fin n × Fin 3 → ℝ) × (Fin n × Fin 3 → ℝ) ≃ (Fin n × (Fin 3 ⊕ Fin 3) → ℝ) :=
     sorry
+  -- let μ := MeasureTheory.MeasureSpace.toMeasurableSpace _
+  -- have : MeasureTheory.MeasurePreserving f (μ := MeasureTheory.volume μ) _ := by
+  --   sorry
+  rw [← MeasureTheory.MeasurePreserving.integral_comp (f := eq_pm) ?_ ?_]
   sorry
 
 /-- The Helmholtz Free Energy A for an ideal gas. -/

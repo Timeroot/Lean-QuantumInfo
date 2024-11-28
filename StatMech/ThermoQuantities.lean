@@ -51,6 +51,8 @@ This Prop defines the most common case of ZIntegrable, that it is integrable at 
 def PositiveβIntegrable : Prop :=
   ∀ β > 0, H.ZIntegrable d β
 
+variable {H d}
+
 /-
 Need the fact that the partition function Z is differentiable. Assume it's integrable.
 Letting μ⁻(H,E) be the measure of {x | H(x) ≤ E}, then for nonzero β,
@@ -69,8 +71,8 @@ For this we really want the fact that the Laplace transform is analytic wherever
 which is (as Wikipedia informs) an easy consequence of Fubini's theorem + Morera's theorem. However, Morera's
 theorem isn't in mathlib yet. So this is a sorry for now
 -/
-variable {H d} in
-theorem DifferentiableAt_Z_if_ZIntegrable {β : ℝ} (h : H.ZIntegrable d β) : ContDiffAt ℝ ⊤ (H.PartitionZ d) β :=
+open scoped ContDiff in
+theorem DifferentiableAt_Z_if_ZIntegrable {β : ℝ} (h : H.ZIntegrable d β) : ContDiffAt ℝ ω (H.PartitionZ d) β :=
   sorry
 
 /-- The two definitions of entropy, in terms of T or β, are equivalent. -/
@@ -85,7 +87,7 @@ theorem entropy_A_eq_entropy_Z (T β : ℝ) (hβT : T * β = 1) (hi : H.ZIntegra
   congr 1
   · rw [PartitionZT, hβT']
   simp_rw [PartitionZT]
-  have hdc := deriv.comp (h := fun T ↦ T⁻¹) (h₂ := fun β => Real.log (H.PartitionZ d β)) T ?_ ?_
+  have hdc := deriv_comp (h := fun T ↦ T⁻¹) (h₂ := fun β => Real.log (H.PartitionZ d β)) T ?_ ?_
   unfold Function.comp at hdc
   simp only [hdc, one_div, deriv_inv', mul_neg, neg_inj, hβT']
   field_simp
@@ -93,9 +95,9 @@ theorem entropy_A_eq_entropy_Z (T β : ℝ) (hβT : T * β = 1) (hi : H.ZIntegra
   --Show the differentiability side-goals
   · eta_reduce
     rw [← one_div, ← hβT']
-    have := hi.2
-    have := DifferentiableAt_Z_if_ZIntegrable hi
-    have := OrderTop.le_top (1 : ℕ∞)
+    have h₁ := hi.2
+    have h₂ := DifferentiableAt_Z_if_ZIntegrable hi
+    have h₃ := OrderTop.le_top (1 : WithTop ℕ∞)
     fun_prop (disch := assumption)
   · fun_prop (disch := assumption)
   · fun_prop
@@ -103,7 +105,7 @@ theorem entropy_A_eq_entropy_Z (T β : ℝ) (hβT : T * β = 1) (hi : H.ZIntegra
     rw [hβT'] at hi
     have := hi.2
     have := DifferentiableAt_Z_if_ZIntegrable hi
-    have := OrderTop.le_top (1 : ℕ∞)
+    have := OrderTop.le_top (1 : WithTop ℕ∞)
     fun_prop (disch := assumption)
 
 /--
@@ -115,6 +117,21 @@ as all our things are ultimately parameterized by β.
 theorem β_eq_deriv_S_U {β : ℝ} (hi : H.ZIntegrable d β) : β = (deriv (H.EntropySβ d) β) / deriv (H.InternalU d) β := by
   unfold EntropySβ
   unfold InternalU
+
+  --Show the differentiability side-goals
+  have : DifferentiableAt ℝ (fun β => Real.log (H.PartitionZ d β)) β := by
+    have := hi.2
+    have := DifferentiableAt_Z_if_ZIntegrable hi
+    have := OrderTop.le_top (1 : WithTop ℕ∞)
+    fun_prop (disch := assumption)
+  have : DifferentiableAt ℝ (deriv fun β => Real.log (H.PartitionZ d β)) β := by
+    have this := (DifferentiableAt_Z_if_ZIntegrable hi).log hi.2
+    replace this :=
+      (this.fderiv_right (m := ⊤) (OrderTop.le_top _)).differentiableAt (OrderTop.le_top _)
+    unfold deriv
+    fun_prop
+
+  --Main goal
   simp only [mul_neg, deriv.neg']
   rw [deriv_add]
   simp only [deriv.neg', differentiableAt_id']
@@ -122,20 +139,18 @@ theorem β_eq_deriv_S_U {β : ℝ} (hi : H.ZIntegrable d β) : β = (deriv (H.En
   simp only [deriv_id'', one_mul, neg_add_rev, add_neg_cancel_comm_assoc, neg_div_neg_eq]
   have : deriv (deriv fun β => Real.log (H.PartitionZ d β)) β ≠ 0 := ?_
   exact (mul_div_cancel_right₀ β this).symm
+  --Discharge those side-goals
   · sorry
-  · fun_prop
-  · have := DifferentiableAt_Z_if_ZIntegrable hi
-    replace this := ContDiffAt.log this hi.2
-    replace this :=
-      (this.fderiv_right (m := ⊤) (OrderTop.le_top _)).differentiableAt (OrderTop.le_top _)
-    unfold deriv
-    convert this
-    sorry
-  · have := hi.2
-    have := DifferentiableAt_Z_if_ZIntegrable hi
-    have := OrderTop.le_top (1 : ℕ∞)
-    fun_prop (disch := assumption)
-  · sorry
+  · fun_prop (disch := assumption)
+  · fun_prop (disch := assumption)
+  · fun_prop (disch := assumption)
+  · fun_prop (disch := assumption)
+
+open scoped ContDiff in
+example (x : ℝ) (f : ℝ → ℝ) (hf : ContDiffAt ℝ ω f x) : DifferentiableAt ℝ (deriv f) x := by
+  have := (hf.fderiv_right (m := ⊤) (OrderTop.le_top _)).differentiableAt (OrderTop.le_top _)
+  unfold deriv
+  fun_prop
 
 end MicroHamiltonian
 
