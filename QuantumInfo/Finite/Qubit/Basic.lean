@@ -93,8 +93,8 @@ def controllize {T : Type*} [Fintype T] [DecidableEq T] (g : 𝐔[T]) : 𝐔[Qub
       fin_cases qi
       <;> fin_cases qj
       rotate_right
-      · simpa [Matrix.mul_apply, Matrix.one_apply] using congrFun₂ g.2.2 ti tj
-      all_goals simp [Matrix.mul_apply, Matrix.one_apply, @Eq.comm _ tj ti]
+      · simpa [Matrix.mul_apply, Matrix.one_apply, Fintype.sum_prod_type] using congrFun₂ g.2.2 ti tj
+      all_goals simp [Matrix.mul_apply, Matrix.one_apply, @Eq.comm _ tj ti, Fintype.sum_prod_type]
     ⟩
 
 end Qubit

@@ -97,6 +97,8 @@ include hA hB in
 theorem convex_cone {c₁ c₂ : 𝕜} (hc₁ : 0 ≤ c₁) (hc₂ : 0 ≤ c₂) : (c₁ • A + c₂ • B).PosSemidef :=
   (hA.smul hc₁).add (hB.smul hc₂)
 
+set_option trace.split.failure true
+
 /-- A standard basis matrix (with a positive entry) is positive semidefinie iff the entry is on the diagonal. -/
 theorem stdBasisMatrix_iff_eq (i j : m) {c : 𝕜} (hc : 0 < c) : (Matrix.stdBasisMatrix i j c).PosSemidef ↔ i = j := by
   constructor
@@ -105,7 +107,7 @@ theorem stdBasisMatrix_iff_eq (i j : m) {c : 𝕜} (hc : 0 < c) : (Matrix.stdBas
     subst hij
     constructor
     · ext x y
-      simp only [conjTranspose_apply, RCLike.star_def, Matrix.stdBasisMatrix]
+      simp only [conjTranspose_apply, RCLike.star_def, Matrix.stdBasisMatrix, of_apply]
       split_ifs <;> try tauto
       · exact RCLike.conj_eq_iff_im.mpr (RCLike.pos_iff.1 hc).2
       · exact RingHom.map_zero (starRingEnd 𝕜)

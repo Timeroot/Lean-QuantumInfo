@@ -19,7 +19,7 @@ namespace MState
 def fidelity (ρ σ : MState d) : ℝ :=
   let ρσρ := ρ.pos.sqrt * σ.m * ρ.pos.sqrt
   let ρσρ_PosSemidef : ρσρ.PosSemidef := by
-    unfold_let ρσρ
+    unfold ρσρ
     nth_rewrite 2 [← ρ.pos.posSemidef_sqrt.isHermitian]
     exact σ.pos.mul_mul_conjTranspose_same _
   (ρσρ_PosSemidef.sqrt.trace.re)^2

@@ -63,7 +63,8 @@ def measurement_map (Λ : POVM X d) : CPTPMap d (d × X) where
         by simp [mul_add, add_mul, Matrix.kroneckerMap_add_left]⟩,
         by simp [Matrix.smul_kronecker]⟩
       set M₃ := LinearMap.comp M₂ M₁ with hM₃
-      simp only [M₁, M₂, LinearMap.comp, kronecker, LinearMap.coe_mk, AddHom.coe_mk, Function.comp] at hM₃
+      simp only [M₁, M₂, LinearMap.comp, kronecker, LinearMap.coe_mk, AddHom.coe_mk] at hM₃
+      unfold Function.comp at hM₃
       rw [← hM₃]
       apply MatrixMap.IsCompletelyPositive.comp
       · intro n ρ h

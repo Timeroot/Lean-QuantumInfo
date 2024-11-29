@@ -28,13 +28,13 @@ variable (d : Type*) [Fintype d]
 /-- A ket as a vector of unit norm. We follow the convention in `Matrix` of vectors as simple functions
  from a Fintype. Kets are distinctly not a vector space in our notion, as they represent only normalized
  states and so cannot (in general) be added or scaled. -/
-structure Ket :=
+structure Ket where
   vec : d → ℂ
   normalized' : ∑ x, ‖vec x‖^2 = 1
 
 /-- A bra is definitionally identical to a `Ket`, but are separate to avoid complex conjugation confusion.
  They can be interconverted with the adjoint: `Ket.to_bra` and `Bra.to_ket` -/
-structure Bra :=
+structure Bra where
   vec : d → ℂ
   normalized' : ∑ x, ‖vec x‖^2 =1
 
@@ -180,7 +180,8 @@ is specifically the MES with an all-positive phase. For instance on `d := Fin 2`
 Bell state -/
 def Ket.MES (d) [Fintype d] [Nonempty d] : Ket (d × d) where
   vec := fun (i,j) ↦ if i = j then 1 / Real.sqrt (Fintype.card (α := d)) else 0
-  normalized' := by simp [apply_ite]
+  normalized' := by
+    simp [apply_ite, Fintype.sum_prod_type]
 
 /-- On any space of dimension at least two, the maximally entangled state `MES` is entangled. -/
 theorem Ket.MES_IsEntangled [Nontrivial d] : (Ket.MES d).IsEntangled := by

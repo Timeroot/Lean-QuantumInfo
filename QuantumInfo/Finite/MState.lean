@@ -35,7 +35,7 @@ open Kronecker
 open scoped Matrix ComplexOrder
 
 /-- A mixed state as a PSD matrix with trace 1.-/
-structure MState (d : Type*) [Fintype d] :=
+structure MState (d : Type*) [Fintype d] where
   m : Matrix d d ℂ
   pos : m.PosSemidef
   tr : m.trace = 1
@@ -236,12 +236,12 @@ def _root_.Matrix.traceRight (m : Matrix (d₁ × d) (d₂ × d) R) : Matrix d�
 
 @[simp]
 theorem _root_.Matrix.trace_of_traceLeft (A : Matrix (d₁ × d₂) (d₁ × d₂) R) : A.traceLeft.trace = A.trace := by
-  convert Fintype.sum_prod_type_right.symm
+  convert (Fintype.sum_prod_type_right _).symm
   rfl
 
 @[simp]
 theorem _root_.Matrix.trace_of_traceRight (A : Matrix (d₁ × d₂) (d₁ × d₂) R) : A.traceRight.trace = A.trace := by
-  convert Fintype.sum_prod_type.symm
+  convert (Fintype.sum_prod_type _).symm
   rfl
 
 variable [RCLike R] {A : Matrix (d₁ × d₂) (d₁ × d₂) R}
@@ -337,9 +337,7 @@ def purify (ρ : MState d) : Ket (d × d) where
     ρ2 * (ρ.Hermitian.eigenvalues j).sqrt
   normalized' := by
     have h₁ := fun i ↦ ρ.pos.eigenvalues_nonneg i
-    simp [mul_pow, Real.sq_sqrt, h₁]
-    -- simp_rw [Matrix.IsHermitian.eigenvectoUnitary_apply]
-    rw [Finset.sum_comm]
+    simp [mul_pow, Real.sq_sqrt, h₁, Fintype.sum_prod_type_right]
     simp_rw [← Finset.sum_mul]
     have : ∀x, ∑ i : d, Complex.abs ((Matrix.IsHermitian.eigenvectorBasis ρ.Hermitian) x i) ^ 2 = 1 :=
       sorry
@@ -355,7 +353,7 @@ theorem purify_spec (ρ : MState d) : (pure ρ.purify).traceRight = ρ := by
   simp_rw [purify, traceRight, Matrix.traceRight]
   simp only [pure_of, Matrix.of_apply, Ket.apply]
   simp only [map_mul]
-  simp_rw [mul_assoc, mul_comm, ← mul_assoc (Complex.ofReal' _), Complex.mul_conj]
+  simp_rw [mul_assoc, mul_comm, ← mul_assoc (Complex.ofReal _), Complex.mul_conj]
   sorry
 
 /-- `MState.purify` bundled with its defining property `MState.traceRight_of_purify`. -/
@@ -373,7 +371,7 @@ end purification
 def SWAP (ρ : MState (d₁ × d₂)) : MState (d₂ × d₁) where
   m := Matrix.of fun (i₁,j₁) (i₂,j₂) ↦ ρ.m (j₁,i₁) (j₂,i₂)
   pos := (Matrix.posSemidef_submatrix_equiv (Equiv.prodComm d₁ d₂).symm).mpr ρ.pos
-  tr := by convert ρ.tr; simp [Matrix.trace]; rw [Finset.sum_comm]
+  tr := by convert ρ.tr; simp [Matrix.trace, Fintype.sum_prod_type]; rw [Finset.sum_comm]
 
 -- @[simp] --This theorem statement doesn't typecheck because spectrum reuses indices.
 -- theorem spectrum_SWAP (ρ : MState (d₁ × d₂)) : ρ.SWAP.spectrum = ρ.spectrum :=
@@ -395,7 +393,7 @@ theorem traceRight_SWAP (ρ : MState (d₁ × d₂)) : ρ.SWAP.traceRight = ρ.t
 def assoc (ρ : MState ((d₁ × d₂) × d₃)) : MState (d₁ × d₂ × d₃) where
   m := Matrix.of fun (i₁,(j₁,k₁)) (i₂,(j₂,k₂)) ↦ ρ.m ((i₁,j₁),k₁) ((i₂,j₂),k₂)
   pos := (Matrix.posSemidef_submatrix_equiv (Equiv.prodAssoc d₁ d₂ d₃).symm).mpr ρ.pos
-  tr := by convert ρ.tr; simp [Matrix.trace]
+  tr := by convert ρ.tr; simp [Matrix.trace, Fintype.sum_prod_type]
 
 /-- The associator that re-clusters the parts of a quantum system. -/
 def assoc' (ρ : MState (d₁ × d₂ × d₃)) : MState ((d₁ × d₂) × d₃) :=
@@ -425,7 +423,7 @@ theorem traceRight_left_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
 theorem traceRight_assoc (ρ : MState ((d₁ × d₂) × d₃)) :
     ρ.assoc.traceRight = ρ.traceRight.traceRight := by
   ext
-  simp [assoc, Matrix.traceRight, traceRight]
+  simp [assoc, Matrix.traceRight, traceRight, Fintype.sum_prod_type]
 
 @[simp]
 theorem traceLeft_assoc' (ρ : MState (d₁ × d₂ × d₃)) :

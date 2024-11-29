@@ -102,9 +102,9 @@ def uniform [Nonempty α] : Distribution α :=
       Finset.Nonempty.card_pos (Finset.univ_nonempty_iff.mpr inferInstance)
     constructor
     · positivity
-    · apply div_le_of_nonneg_of_le_mul (Nat.cast_nonneg Finset.univ.card)
-      · linarith
-      · simpa using this
+    · apply div_le_of_le_mul₀ (Nat.cast_nonneg Finset.univ.card)
+      · exact zero_le_one
+      · simpa only [one_mul, Nat.one_le_cast] using this
     ⟩, by
     have : 0 < Finset.univ.card (α := α) :=
       Finset.Nonempty.card_pos (Finset.univ_nonempty_iff.mpr inferInstance)
@@ -118,7 +118,7 @@ theorem uniform_def [Nonempty α] (y : α) : ((uniform y) : ℝ) = 1 / (Finset.u
 /-- Make a distribution on a product of two Fintypes. -/
 def prod (d1 : Distribution α) (d2 : Distribution β) : Distribution (Prod α β) :=
   ⟨fun x ↦ (d1 x.1) * (d2 x.2), by
-    simp [← Finset.mul_sum]⟩
+    simp [← Finset.mul_sum, Fintype.sum_prod_type]⟩
 
 @[simp]
 theorem prod_def (x : α) (y : β) : prod d1 d2 ⟨x, y⟩ = (d1 x) * (d2 y) :=

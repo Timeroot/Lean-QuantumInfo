@@ -174,7 +174,6 @@ theorem qcmi_nonneg (ρ : MState (dA × dB × dC)) :
     0 ≤ qcmi ρ := by
   simp [qcmi, qConditionalEnt]
   have := Sᵥₙ_strong_subadditivity ρ
-  unfold_let at this
   linarith
 
 /-- The quantum conditional mutual information `QCMI ρABC` is at most 2 log dA. -/

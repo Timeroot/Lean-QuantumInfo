@@ -238,14 +238,15 @@ theorem IsTracePreserving_iff_trace_choi (M : MatrixMap A B R) : M.IsTracePreser
     ext a₁ a₂
     replace h := h (Matrix.stdBasisMatrix a₁ a₂ 1)
     simp_rw [Matrix.trace, Matrix.diag] at h
-    simp [choi_matrix, Matrix.traceRight, h, Matrix.stdBasisMatrix, Matrix.one_apply]
+    simp only [Matrix.traceRight, choi_matrix, Matrix.of_apply, h]
+    simp only [Matrix.stdBasisMatrix, Matrix.of_apply, Finset.sum_boole, Matrix.one_apply]
     have : (fun x => a₁ = x ∧ a₂ = x) = (fun x => a₁ = a₂ ∧ a₂ = x) := by
       funext x
       rw [eq_iff_iff, and_congr_left_iff]
       rintro rfl
       trivial
     split_ifs with h
-    <;> simp [this, h, Finset.filter_eq]
+    <;> simp [this, h, Finset.filter_eq, Fintype.sum_prod_type]
   · intro h X
     replace h := fun (a₁ a₂ : A) ↦ congrFun₂ h a₁ a₂
     simp [Matrix.traceRight, Matrix.trace] at h ⊢

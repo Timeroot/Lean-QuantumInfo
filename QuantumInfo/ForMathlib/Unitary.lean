@@ -73,7 +73,7 @@ theorem conj_unitary_IsSymmetric (U : unitary (E →ₗ[𝕜] E)) (hT : T.IsSymm
   rw [mul_apply, mul_apply, mul_apply, ← LinearMap.adjoint_inner_left U.val]
   exact hT (star U.val <| i) (star U.val j)
 
-variable {n : ℕ} (hn : FiniteDimensional.finrank 𝕜 E = n)
+variable {n : ℕ} (hn : Module.finrank 𝕜 E = n)
 
 /-- There is an equivalence between the eigenvalues of a finite dimensional symmetric operator,
 and the eigenvalues of that operator conjugated by a unitary. -/

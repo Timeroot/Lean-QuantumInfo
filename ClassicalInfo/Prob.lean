@@ -30,7 +30,7 @@ instance instOne : One Prob :=
 
 instance instMul : Mul Prob :=
   ⟨fun x y ↦ ⟨x.1 * y.1,
-    ⟨mul_nonneg x.2.1 y.2.1, mul_le_one x.2.2 y.2.1 y.2.2⟩⟩⟩
+    ⟨mul_nonneg x.2.1 y.2.1, mul_le_one₀ x.2.2 y.2.1 y.2.2⟩⟩⟩
 
 @[simp]
 theorem val_zero : (0 : Prob).val = 0 :=
@@ -67,6 +67,8 @@ instance instOrderedCommMonoid : OrderedCommMonoid Prob where
     exact mul_le_mul_of_nonneg_left h c.2.1
 
 instance instDistribLattice : DistribLattice Prob where
+  sup x y := x ⊔ y
+  inf x y := x ⊓ y
   le_sup_left := by
     intros; rw [← Subtype.coe_le_coe, val_sup]; exact le_sup_left
   le_sup_right := by
