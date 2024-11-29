@@ -60,7 +60,6 @@ theorem PartitionZ_eq (hV : 0 < V) (hβ : 0 < β) :
   rw [← MeasurePreserving.integral_comp h_preserve eq_pm.measurableEmbedding]; clear h_preserve
 
   rw [show volume = Measure.prod volume volume from rfl]
-  rw [integral_prod]
 
   have h_eval_eq_pm : ∀ (x y i p_i), eq_pm (x, y) (i, Sum.inl p_i) = x (i, p_i) := by
     intros; rfl
@@ -69,8 +68,77 @@ theorem PartitionZ_eq (hV : 0 < V) (hβ : 0 < β) :
   simp_rw [h_eval_eq_pm, h_eval_eq_pm']
   clear h_eval_eq_pm h_eval_eq_pm'
 
-  simp_rw [← ite_not _ _ (0:ℝ), ← boole_mul _ (Real.exp _)]
-  simp_rw [MeasureTheory.integral_mul_left, MeasureTheory.integral_mul_right]
+  have h_measurable_box : Measurable fun (a : (Fin n × Fin 3 → ℝ))
+      => ∃ x_1 x_2, V ^ (3⁻¹:ℝ) / 2 < |a (x_1, x_2)| := by
+    simp_rw [← Classical.not_forall_not, not_not, not_lt, abs_le]
+    apply Measurable.not
+    apply Measurable.forall
+    intro i
+    apply Measurable.forall
+    intro j
+    -- refine Measurable.comp (g := fun (a:Fin n × Fin 3 → ℝ) ↦ _ ≤ a (i, j) ∧ a (i, j) ≤ _) ?_ measurable_fst
+    refine Measurable.comp (g := fun (a:ℝ) ↦ -(V ^ (3⁻¹ : ℝ) / 2) ≤ a ∧ a ≤ _) ?_ (measurable_pi_apply (i,j))
+    apply measurableSet_setOf.mp
+    exact measurableSet_Icc
+
+  have h_measurability : Measurable fun x : (Fin n × Fin 3 → ℝ) × (Fin n × Fin 3 → ℝ) =>
+      if ∃ x_1 x_2, V ^ (3⁻¹:ℝ) / 2 < |x.1 (x_1, x_2)| then 0
+      else Real.exp (-(β * ∑ x_1 : Fin n × Fin 3, x.2 (x_1.1, x_1.2) ^ 2 / 2)) := by
+    apply Measurable.ite
+    · simp_rw [measurableSet_setOf]
+      convert Measurable.comp h_measurable_box measurable_fst
+    · fun_prop
+    · fun_prop
+
+  rw [MeasureTheory.integral_eq_lintegral_of_nonneg_ae]
+  rotate_left
+  · apply Filter.Eventually.of_forall
+    intros
+    positivity
+  · apply Measurable.aestronglyMeasurable
+    fun_prop
+  rw [MeasureTheory.lintegral_prod_of_measurable]
+
+  conv =>
+    enter [1, 1, 2, x, 2, y]
+    rw [← ite_not _ _ (0:ℝ), ← boole_mul _ (Real.exp _)]
+    rw [ENNReal.ofReal_mul (by split_ifs <;> positivity)]
+  dsimp
+  conv =>
+    enter [1, 1, 2, x]
+    rw [MeasureTheory.lintegral_const_mul' _ _ (by exact ENNReal.ofReal_ne_top)]
+
+  swap
+  · exact Measurable.comp (g := ENNReal.ofReal) ENNReal.measurable_ofReal h_measurability
+
+  rw [MeasureTheory.lintegral_mul_const, ENNReal.toReal_mul]
+  rw [← MeasureTheory.integral_eq_lintegral_of_nonneg_ae]
+  rw [← MeasureTheory.integral_eq_lintegral_of_nonneg_ae]
+  rotate_left
+  · apply Filter.Eventually.of_forall
+    intros
+    positivity
+  · apply Measurable.aestronglyMeasurable
+    fun_prop
+  · apply Filter.Eventually.of_forall
+    intros
+    positivity
+  · apply Measurable.aestronglyMeasurable
+    apply Measurable.ite
+    · rw [measurableSet_setOf]
+      apply Measurable.not
+      exact h_measurable_box
+    · fun_prop
+    · fun_prop
+  · apply Measurable.comp ENNReal.measurable_ofReal
+    apply Measurable.ite
+    · rw [measurableSet_setOf]
+      apply Measurable.not
+      exact h_measurable_box
+    · fun_prop
+    · fun_prop
+
+  -- simp_rw [MeasureTheory.integral_mul_right]
   congr 1
   · --Volume of the box
     have h_integrand_prod : ∀ (a : Fin n × Fin 3 → ℝ),
@@ -100,16 +168,15 @@ theorem PartitionZ_eq (hV : 0 < V) (hβ : 0 < β) :
     have h_gaussian :=
       GaussianFourier.integral_rexp_neg_mul_sq_norm (V := PiLp 2 (fun (_ : Fin n × Fin 3) ↦ ℝ)) (half_pos hβ)
     apply (Eq.trans ?_ h_gaussian).trans ?_
-    · congr
-      · simp [measureSpaceOfInnerProductSpace, MeasureSpace.pi, PiLp, WithLp]
-        apply congrArg
-        sorry --Some MeasureTheory mess
-      · funext x
-        simp_rw [div_eq_inv_mul, ← Finset.mul_sum, ← mul_assoc, neg_mul, mul_comm, PiLp.norm_sq_eq_of_L2]
-        simp
+    · have := (EuclideanSpace.volume_preserving_measurableEquiv (Fin n × Fin 3))
+      rw [← this.integral_comp (MeasurableEquiv.measurableEmbedding _)]
+      congr! 3 with x
+      simp_rw [div_eq_inv_mul, ← Finset.mul_sum, ← mul_assoc, neg_mul, mul_comm, PiLp.norm_sq_eq_of_L2]
+      congr! 3
+      simp only [Prod.mk.eta, Real.norm_eq_abs, sq_abs]
+      congr
     · field_simp
       ring_nf
-  sorry --Show integrability?
 
 /-- The Helmholtz Free Energy A for an ideal gas. -/
 theorem HelmholtzA_eq (hV : 0 < V) (hT : 0 < T) : IdealGas.HelmholtzA (n,V) T =
