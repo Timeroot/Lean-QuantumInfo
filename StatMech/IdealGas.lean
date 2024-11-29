@@ -24,6 +24,7 @@ open NVEHamiltonian
 
 variable (n : ℕ) {V β T : ℝ}
 
+open MeasureTheory in
 /-- The partition function Z for an ideal gas. -/
 theorem PartitionZ_eq (hV : 0 < V) (hβ : 0 < β) :
     IdealGas.PartitionZ (n,V) β = V^n * (2 * Real.pi / β)^(3 * n / 2 : ℝ) := by
@@ -41,13 +42,74 @@ theorem PartitionZ_eq (hV : 0 < V) (hβ : 0 < β) :
     · simp
     · simp [h] at proof
   simp only [h₀, dite_eq_ite]; clear h₀
-  let eq_pm : (Fin n × Fin 3 → ℝ) × (Fin n × Fin 3 → ℝ) ≃ (Fin n × (Fin 3 ⊕ Fin 3) → ℝ) :=
-    sorry
-  -- let μ := MeasureTheory.MeasureSpace.toMeasurableSpace _
-  -- have : MeasureTheory.MeasurePreserving f (μ := MeasureTheory.volume μ) _ := by
-  --   sorry
-  rw [← MeasureTheory.MeasurePreserving.integral_comp (f := eq_pm) ?_ ?_]
-  sorry
+
+  let eq_pm : MeasurableEquiv ((Fin n × Fin 3 → ℝ) × (Fin n × Fin 3 → ℝ)) (Fin n × (Fin 3 ⊕ Fin 3) → ℝ) :=
+    let e1 := (MeasurableEquiv.sumPiEquivProdPi (α := fun (_ : (Fin n × Fin 3) ⊕ (Fin n × Fin 3)) ↦ ℝ))
+    let e2 := (MeasurableEquiv.piCongrLeft _ (MeasurableEquiv.prodSumDistrib (Fin n) (Fin 3) (Fin 3))).symm
+    e1.symm.trans e2
+
+  have h_preserve : MeasurePreserving eq_pm := by
+    unfold eq_pm
+    -- fun_prop --this *should* be a fun_prop!
+    rw [MeasurableEquiv.coe_trans]
+    apply MeasureTheory.MeasurePreserving.comp (μb := by volume_tac)
+    · apply MeasurePreserving.symm
+      apply MeasureTheory.volume_measurePreserving_piCongrLeft
+    · apply MeasurePreserving.symm
+      apply measurePreserving_sumPiEquivProdPi
+  rw [← MeasurePreserving.integral_comp h_preserve eq_pm.measurableEmbedding]; clear h_preserve
+
+  rw [show volume = Measure.prod volume volume from rfl]
+  rw [integral_prod]
+
+  have h_eval_eq_pm : ∀ (x y i p_i), eq_pm (x, y) (i, Sum.inl p_i) = x (i, p_i) := by
+    intros; rfl
+  have h_eval_eq_pm' : ∀ (x y i m_i), eq_pm (x, y) (i, Sum.inr m_i) = y (i, m_i) := by
+    intros; rfl
+  simp_rw [h_eval_eq_pm, h_eval_eq_pm']
+  clear h_eval_eq_pm h_eval_eq_pm'
+
+  simp_rw [← ite_not _ _ (0:ℝ), ← boole_mul _ (Real.exp _)]
+  simp_rw [MeasureTheory.integral_mul_left, MeasureTheory.integral_mul_right]
+  congr 1
+  · --Volume of the box
+    have h_integrand_prod : ∀ (a : Fin n × Fin 3 → ℝ),
+        (if ¬∃ x y, V ^ (3⁻¹ : ℝ) / 2 < |a (x, y)| then 1 else 0) =
+        (∏ xy, if |a xy| ≤ V ^ (3⁻¹ : ℝ) / 2 then 1 else 0 : ℝ) := by
+      intro a
+      push_neg
+      simp_rw [← Prod.forall (p := fun xy ↦ |a xy| ≤ V ^ (3⁻¹ : ℝ) / 2)]
+      exact Fintype.prod_boole.symm
+    simp_rw [h_integrand_prod]; clear h_integrand_prod
+    rw [MeasureTheory.integral_fintype_prod_eq_prod (𝕜 := ℝ)
+      (f := fun _ r ↦ if |r| ≤ V ^ (3⁻¹ : ℝ) / 2 then 1 else 0)]
+    rw [Finset.prod_const]
+    rw [Finset.card_univ, Fintype.card_prod, Fintype.card_fin, Fintype.card_fin]
+    have h_integral_1d : (∫ (x : ℝ), if |x| ≤ V ^ (3⁻¹ : ℝ) / 2 then 1 else 0) = V ^ (3⁻¹ : ℝ) := by
+      have h_indicator := integral_indicator (f := fun _ ↦ (1:ℝ)) (μ := by volume_tac)
+        (measurableSet_Icc (a := -(V ^ (3⁻¹ : ℝ) / 2)) (b := (V ^ (3⁻¹ : ℝ) / 2)))
+      simp_rw [Set.indicator] at h_indicator
+      simp_rw [abs_le, ← Set.mem_Icc, h_indicator]
+      simp
+      positivity
+    rw [h_integral_1d]; clear h_integral_1d
+    rw [← Real.rpow_mul_natCast]
+    field_simp
+    exact hV.le
+  · --Gaussian integral
+    have h_gaussian :=
+      GaussianFourier.integral_rexp_neg_mul_sq_norm (V := PiLp 2 (fun (_ : Fin n × Fin 3) ↦ ℝ)) (half_pos hβ)
+    apply (Eq.trans ?_ h_gaussian).trans ?_
+    · congr
+      · simp [measureSpaceOfInnerProductSpace, MeasureSpace.pi, PiLp, WithLp]
+        apply congrArg
+        sorry --Some MeasureTheory mess
+      · funext x
+        simp_rw [div_eq_inv_mul, ← Finset.mul_sum, ← mul_assoc, neg_mul, mul_comm, PiLp.norm_sq_eq_of_L2]
+        simp
+    · field_simp
+      ring_nf
+  sorry --Show integrability?
 
 /-- The Helmholtz Free Energy A for an ideal gas. -/
 theorem HelmholtzA_eq (hV : 0 < V) (hT : 0 < T) : IdealGas.HelmholtzA (n,V) T =
@@ -82,7 +144,7 @@ theorem IdealGasLaw (hV : 0 < V) (hT : 0 < T) :
   · exact fun _ hV' ↦ HelmholtzA_eq n hV' hT
   · exact HelmholtzA_eq n hV hT
 
--- Now proving Boyle's Law ("for an ideal gas with a fixed particle number, P and V are inversely proportional")
--- is a fast consequence of the ideal gas law.
+-- Now proving e.g. Boyle's Law ("for an ideal gas with a fixed particle number, P and V are inversely proportional")
+-- is a trivial consequence of the ideal gas law.
 
 end IdealGas
