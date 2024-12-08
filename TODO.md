@@ -159,7 +159,7 @@ Definition 4.1.5: Purity of a mixed state.
 ✅ `MState.purity` in `QuantumInfo.Finite.MState`.
 
 Exercise 4.1.9: Purity is equal to 1 iff the state is pure.
-📝 `MState.pure_iff_purity_one` in `QuantumInfo.Finite.MState`.
+✅ `MState.pure_iff_purity_one` in `QuantumInfo.Finite.MState`.
 
 Exercise 4.1.10-4.1.13: Specific to qubits and the Bloch sphere.
 ❓
