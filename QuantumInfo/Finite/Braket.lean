@@ -112,6 +112,64 @@ theorem Bra.eq_conj (ψ : Ket d) (x : d) :〈ψ∣ x = conj (∣ψ〉 x) :=
 theorem Bra.apply' (ψ : Ket d) (i : d) : 〈ψ∣ i = conj (ψ.vec i) :=
   rfl
 
+theorem Ket.exists_ne_zero (ψ : Ket d) : ∃ x, ψ x ≠ 0 := by
+  have hzerolt : ∑ x : d, Complex.normSq (ψ x) > ∑ x : d, 0 := by rw [ψ.normalized, Finset.sum_const_zero]; exact zero_lt_one
+  have hpos : ∃ x ∈ Finset.univ, 0 < Complex.normSq (ψ x) := Finset.exists_lt_of_sum_lt hzerolt
+  obtain ⟨x, _, hpos⟩ := hpos
+  rw [Complex.normSq_pos] at hpos
+  use x
+
+theorem Bra.exists_ne_zero (ψ : Bra d) : ∃ x, ψ x ≠ 0 := by
+  have hzerolt : ∑ x : d, Complex.normSq (ψ x) > ∑ x : d, 0 := by rw [ψ.normalized, Finset.sum_const_zero]; exact zero_lt_one
+  have hpos : ∃ x ∈ Finset.univ, 0 < Complex.normSq (ψ x) := Finset.exists_lt_of_sum_lt hzerolt
+  obtain ⟨x, _, hpos⟩ := hpos
+  rw [Complex.normSq_pos] at hpos
+  use x
+
+/-- Create a ket out of a vector given it has a nonzero component -/
+def Ket.normalize (v : d → ℂ) (h : ∃ x, v x ≠ 0) : Ket d :=
+  { vec := fun x ↦ v x / √(∑ x : d, ‖v x‖ ^ 2),
+    normalized' := by
+      simp only [Complex.norm_eq_abs, ←Complex.normSq_eq_abs, Complex.normSq_div,
+      Complex.normSq_ofReal, ←sq]
+      have hnonneg : ∑ x : d, Complex.normSq (v x) ≥ 0 := Fintype.sum_nonneg (fun x => Complex.normSq_nonneg (v x))
+      simp only [Real.sq_sqrt hnonneg, div_eq_inv_mul, ←Finset.mul_sum]
+      apply inv_mul_cancel₀
+      by_contra hzero
+      rw [Fintype.sum_eq_zero_iff_of_nonneg (fun x => Complex.normSq_nonneg (v x))] at hzero
+      obtain ⟨a, ha⟩ := h
+      have h₁ : (fun x => Complex.normSq (v x)) a ≠ 0 := by simp only [ne_eq, map_eq_zero]; exact ha
+      exact h₁ (congrFun hzero a)
+  }
+
+/-- A ket is already normalized -/
+theorem Ket.normalize_ket_eq_self (ψ : Ket d) : Ket.normalize (ψ.vec) (Ket.exists_ne_zero ψ) = ψ := by
+  ext x
+  unfold normalize
+  simp only [apply, ψ.normalized', Real.sqrt_one, Complex.ofReal_one, div_one]
+
+/-- Create a bra out of a vector given it has a nonzero component -/
+def Bra.normalize (v : d → ℂ) (h : ∃ x, v x ≠ 0) : Bra d :=
+  { vec := fun x ↦ v x / √(∑ x : d, ‖v x‖ ^ 2),
+    normalized' := by
+      simp only [Complex.norm_eq_abs, ←Complex.normSq_eq_abs, Complex.normSq_div,
+      Complex.normSq_ofReal, ←sq]
+      have hnonneg : ∑ x : d, Complex.normSq (v x) ≥ 0 := Fintype.sum_nonneg (fun x => Complex.normSq_nonneg (v x))
+      simp only [Real.sq_sqrt hnonneg, div_eq_inv_mul, ←Finset.mul_sum]
+      apply inv_mul_cancel₀
+      by_contra hzero
+      rw [Fintype.sum_eq_zero_iff_of_nonneg (fun x => Complex.normSq_nonneg (v x))] at hzero
+      obtain ⟨a, ha⟩ := h
+      have h₁ : (fun x => Complex.normSq (v x)) a ≠ 0 := by simp only [ne_eq, map_eq_zero]; exact ha
+      exact h₁ (congrFun hzero a)
+  }
+
+/-- A bra is already normalized -/
+def Bra.normalize_ket_eq_self (ψ : Bra d) : Bra.normalize (ψ.vec) (Bra.exists_ne_zero ψ) = ψ := by
+  ext x
+  unfold normalize
+  simp only [Ket.to_bra, apply, ψ.normalized', Real.sqrt_one, Complex.ofReal_one, div_one]
+
 /-- Construct the Ket corresponding to a basis vector, with a +1 phase. -/
 def Ket.basis (i : d) : Ket d :=
   ⟨fun j ↦ if i = j then 1 else 0, by simp [apply_ite]⟩
