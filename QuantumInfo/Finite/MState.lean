@@ -362,16 +362,19 @@ def purifyX (ρ : MState d) : { ψ : Ket (d × d) // (pure ψ).traceRight = ρ }
 
 end purification
 
+def relabel (ρ : MState d₁) (e : d₂ ≃ d₁) : MState d₂ where
+  m := ρ.m.submatrix e e
+  pos := (Matrix.posSemidef_submatrix_equiv e).mpr ρ.pos
+  tr := ρ.tr ▸ Fintype.sum_equiv _ _ _ (congrFun rfl)
+
 --TODO: Swap and assoc for kets.
 --TODO: Connect these to unitaries (when they can be)
 
 /-- The heterogeneous SWAP gate that exchanges the left and right halves of a quantum system.
   This can apply even when the two "halves" are of different types, as opposed to (say) the SWAP
   gate on quantum circuits that leaves the qubit dimensions unchanged. Notably, it is not unitary. -/
-def SWAP (ρ : MState (d₁ × d₂)) : MState (d₂ × d₁) where
-  m := Matrix.of fun (i₁,j₁) (i₂,j₂) ↦ ρ.m (j₁,i₁) (j₂,i₂)
-  pos := (Matrix.posSemidef_submatrix_equiv (Equiv.prodComm d₁ d₂).symm).mpr ρ.pos
-  tr := by convert ρ.tr; simp [Matrix.trace, Fintype.sum_prod_type]; rw [Finset.sum_comm]
+def SWAP (ρ : MState (d₁ × d₂)) : MState (d₂ × d₁) :=
+  ρ.relabel (Equiv.prodComm d₁ d₂).symm
 
 -- @[simp] --This theorem statement doesn't typecheck because spectrum reuses indices.
 -- theorem spectrum_SWAP (ρ : MState (d₁ × d₂)) : ρ.SWAP.spectrum = ρ.spectrum :=
@@ -390,10 +393,8 @@ theorem traceRight_SWAP (ρ : MState (d₁ × d₂)) : ρ.SWAP.traceRight = ρ.t
   rfl
 
 /-- The associator that re-clusters the parts of a quantum system. -/
-def assoc (ρ : MState ((d₁ × d₂) × d₃)) : MState (d₁ × d₂ × d₃) where
-  m := Matrix.of fun (i₁,(j₁,k₁)) (i₂,(j₂,k₂)) ↦ ρ.m ((i₁,j₁),k₁) ((i₂,j₂),k₂)
-  pos := (Matrix.posSemidef_submatrix_equiv (Equiv.prodAssoc d₁ d₂ d₃).symm).mpr ρ.pos
-  tr := by convert ρ.tr; simp [Matrix.trace, Fintype.sum_prod_type]
+def assoc (ρ : MState ((d₁ × d₂) × d₃)) : MState (d₁ × d₂ × d₃) :=
+  ρ.relabel (Equiv.prodAssoc d₁ d₂ d₃).symm
 
 /-- The associator that re-clusters the parts of a quantum system. -/
 def assoc' (ρ : MState (d₁ × d₂ × d₃)) : MState ((d₁ × d₂) × d₃) :=
@@ -411,8 +412,8 @@ theorem assoc'_assoc (ρ : MState ((d₁ × d₂) × d₃)) : ρ.assoc.assoc' = 
 theorem traceLeft_right_assoc (ρ : MState ((d₁ × d₂) × d₃)) :
     ρ.assoc.traceLeft.traceRight = ρ.traceRight.traceLeft := by
   ext
-  simp [assoc, Matrix.traceLeft, traceLeft, Matrix.traceRight, traceRight]
-  rw [Finset.sum_comm]
+  simpa [assoc, relabel, Matrix.traceLeft, traceLeft, Matrix.traceRight, traceRight]
+    using Finset.sum_comm
 
 @[simp]
 theorem traceRight_left_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
@@ -423,7 +424,7 @@ theorem traceRight_left_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
 theorem traceRight_assoc (ρ : MState ((d₁ × d₂) × d₃)) :
     ρ.assoc.traceRight = ρ.traceRight.traceRight := by
   ext
-  simp [assoc, Matrix.traceRight, traceRight, Fintype.sum_prod_type]
+  simp [assoc, relabel, Matrix.traceRight, traceRight, Fintype.sum_prod_type]
 
 @[simp]
 theorem traceLeft_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
@@ -435,8 +436,8 @@ theorem traceLeft_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
 theorem traceLeft_left_assoc (ρ : MState ((d₁ × d₂) × d₃)) :
     ρ.assoc.traceLeft.traceLeft = ρ.traceLeft := by
   ext
-  simp only [assoc, traceLeft, Matrix.traceLeft, Matrix.of_apply, Fintype.sum_prod_type]
-  rw [Finset.sum_comm]
+  simpa [assoc, relabel, traceLeft, Matrix.traceLeft, Matrix.of_apply, Fintype.sum_prod_type]
+    using Finset.sum_comm
 
 @[simp]
 theorem traceRight_right_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
