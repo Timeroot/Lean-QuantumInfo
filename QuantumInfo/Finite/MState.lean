@@ -297,6 +297,124 @@ instance instUnique [Unique d] : Unique (MState d) where
     simp [Matrix.trace, Unique.eq_default] at h₁ h₂ ⊢
     exact h₁.trans h₂.symm
 
+instance instInhabited [Nonempty d] : Inhabited (MState d) where
+  default := uniform
+
+section ensemble
+
+/-- -/
+
+abbrev MEnsemble (d : Type*) (α : Type*) [Fintype d] [Fintype α] := Distribution.RandVar α (MState d)
+
+abbrev PEnsemble (d : Type*) (α : Type*) [Fintype d] [Fintype α] := Distribution.RandVar α (Ket d)
+
+variable {α β: Type*} [Fintype α] [Fintype β]
+
+abbrev MEnsemble.states [Fintype α] : MEnsemble d α → (α → MState d) := Distribution.RandVar.var
+
+abbrev PEnsemble.states [Fintype α] : PEnsemble d α → (α → Ket d) := Distribution.RandVar.var
+
+namespace Ensemble
+
+@[coe] def toMEnsemble : PEnsemble d α → MEnsemble d α := Functor.map pure
+
+instance : Coe (PEnsemble d α) (MEnsemble d α) := ⟨toMEnsemble⟩
+
+@[simp]
+theorem toMEnsemble_mk : (toMEnsemble ⟨ps, distr⟩ : MEnsemble d α) = ⟨pure ∘ ps, distr⟩ :=
+  rfl
+
+theorem coe_PEnsemble_iff_pure_states (me : MEnsemble d α): (∃ pe : PEnsemble d α, ↑pe = me) ↔ (∃ ψ : α → Ket d, me.states = pure ∘ ψ) := by
+  constructor
+  · intro ⟨pe, hpe⟩
+    use pe.states
+    ext1 i
+    subst hpe
+    rfl
+  · intro ⟨ψ, hψ⟩
+    use ⟨ψ, me.distr⟩
+    simp only [toMEnsemble_mk]
+    congr
+    exact hψ.symm
+
+def mix (e : MEnsemble d α) : MState d := Distribution.exp_val e
+
+@[simp]
+theorem mix_of (e : MEnsemble d α) : (mix e).m = ∑ i, Prob.toReal (e.distr i) • (e.states i).m := by
+  rfl
+
+def congrMEnsemble (σ : α ≃ β) : MEnsemble d α ≃ MEnsemble d β := Distribution.congr_randVar σ
+
+def congrPEnsemble (σ : α ≃ β) : PEnsemble d α ≃ PEnsemble d β := Distribution.congr_randVar σ
+
+@[simp]
+theorem mix_congrMEnsemble_eq_mix (σ : α ≃ β) (e : MEnsemble d α) : mix (congrMEnsemble σ e) = mix e :=
+  Distribution.exp_val_congr_eq_exp_val σ e
+
+@[simp]
+theorem mix_congrPEnsemble_eq_mix (σ : α ≃ β) (e : PEnsemble d α) : mix ↑(congrPEnsemble σ e) = mix (↑e : MEnsemble d α) := by
+  unfold toMEnsemble congrPEnsemble mix
+  rw [Distribution.map_congr_eq_congr_map pure σ e]
+  exact Distribution.exp_val_congr_eq_exp_val σ (pure <$> e)
+
+def average {T : Type _} {U : Type*} [AddCommGroup U] [Module ℝ U] [inst : Mixable U T] (f : MState d → T) (e : MEnsemble d α) : T :=
+  Distribution.exp_val <| f <$> e
+
+def average_NNReal {d : Type _} [Fintype d] (f : MState d → NNReal) (e : MEnsemble d α) : NNReal :=
+  ⟨average (NNReal.toReal ∘ f) e,
+    Distribution.zero_le_exp_val e.distr (NNReal.toReal ∘ f ∘ e.states) (fun n => (f <| e.states n).2)⟩
+
+def pure_average {T : Type _} {U : Type*} [AddCommGroup U] [Module ℝ U] [inst : Mixable U T] (f : Ket d → T) (e : PEnsemble d α) : T :=
+  Distribution.exp_val <| f <$> e
+
+def pure_average_NNReal {d : Type _} [Fintype d] (f : Ket d → NNReal) (e : PEnsemble d α) : NNReal :=
+  ⟨pure_average (NNReal.toReal ∘ f) e,
+    Distribution.zero_le_exp_val e.distr (NNReal.toReal ∘ f ∘ e.states) (fun n => (f <| e.states n).2)⟩
+
+theorem average_of_pure_ensemble {T : Type _} {U : Type*} [AddCommGroup U] [Module ℝ U] [inst : Mixable U T] (f : MState d → T) (e : PEnsemble d α) :
+  average f (toMEnsemble e) = pure_average (f ∘ pure) e := by
+  simp only [average, pure_average, toMEnsemble, comp_map]
+
+theorem pure_ensemble_of_pure (ψ : Ket d) (e : PEnsemble d α) (hmix : mix ↑e = pure ψ) : ∃ i : α, e.states i = ψ ∧ e.distr = Distribution.constant x := by
+  sorry
+
+theorem ensemble_of_pure (ψ : Ket d) (e : MEnsemble d α) (hmix : mix e = pure ψ) : ∃ i : α, e.states i = pure ψ ∧ e.distr = Distribution.constant x := by
+  sorry
+
+def trivial_ensemble [Inhabited α] (ρ : MState d) : MEnsemble d α := ⟨fun _ ↦ ρ, Distribution.constant default⟩
+
+theorem trivial_ensemble_mix [Inhabited α] (ρ : MState d) : mix (trivial_ensemble ρ : MEnsemble d α) = ρ := by
+  ext1
+  simp only [trivial_ensemble, Distribution.constant, mix_of, DFunLike.coe, apply_ite,
+    Prob.toReal_one, Prob.toReal_zero, ite_smul, one_smul, zero_smul, Finset.sum_ite_eq,
+    Finset.mem_univ, ↓reduceIte]
+
+instance MEnsemble.instInhabited [Nonempty d] [Inhabited α] : Inhabited (MEnsemble d α) where
+  default := trivial_ensemble default
+
+def spectral_ensemble (ρ : MState d) : PEnsemble d d :=
+  { var := fun i ↦
+    { vec := ρ.Hermitian.eigenvectorBasis i
+      normalized' := by
+        rw [←one_pow 2, ←ρ.Hermitian.eigenvectorBasis.orthonormal.1 i]
+        have hnonneg : 0 ≤ ∑ x : d, Complex.abs (ρ.Hermitian.eigenvectorBasis i x) ^ 2 := by
+          apply Fintype.sum_nonneg
+          intro i
+          simp only [Pi.zero_apply, ←Complex.normSq_eq_abs, Complex.normSq_nonneg]
+        simp only [Complex.norm_eq_abs, EuclideanSpace.norm_eq, Real.sq_sqrt hnonneg]
+    }
+    distr := ρ.spectrum}
+
+instance PEnsemble.instInhabited [Inhabited d] : Inhabited (PEnsemble d d) where
+  default := spectral_ensemble default
+
+theorem spectral_ensemble_mix : mix (↑(spectral_ensemble ρ) : MEnsemble d d) = ρ := by
+  ext i j
+  sorry
+
+end Ensemble
+end ensemble
+
 section ptrace
 
 section mat_trace
