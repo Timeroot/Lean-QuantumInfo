@@ -151,7 +151,7 @@ def relabel (d : Distribution α) (σ : β ≃ α) : Distribution β :=
   ⟨fun b ↦ d (σ b),
    by rw [Equiv.sum_comp σ (fun a ↦ (d a : ℝ))]; exact d.prop⟩
 
--- The two properties below (and congr_randVar) follow from the fact that Distribution is a contravariant functor.
+-- The two properties below (and congrRandVar) follow from the fact that Distribution is a contravariant functor.
 -- However, mathlib does not seem to support that outside of the CategoryTheory namespace
 /-- Distributions on α and β are equivalent for equivalent types α ≃ β. -/
 def congr (σ : α ≃ β) : Distribution α ≃ Distribution β := by
@@ -170,7 +170,7 @@ def congr (σ : α ≃ β) : Distribution α ≃ Distribution β := by
     simp only [← fun_eq_val, Equiv.apply_symm_apply, Subtype.coe_eta]
 
 @[simp]
-def congr_apply (σ : α ≃ β) (d : Distribution α) (j : β): (congr σ d) j = d (σ.symm j) := by
+theorem congr_apply (σ : α ≃ β) (d : Distribution α) (j : β): (congr σ d) j = d (σ.symm j) := by
   rfl
 
 /-- The inverse and congruence operations for distributions commute -/
@@ -236,7 +236,7 @@ theorem zero_le_exp_val (d : Distribution α) (f : α → ℝ) (hpos : 0 ≤ f) 
   exact mul_nonneg Prob.zero_le_coe hpos
 
 /-- `T`-valued random variables on `α` and `β` are equivalent if `α ≃ β` -/
-def congr_randVar (σ : α ≃ β) : RandVar α T ≃ RandVar β T := by
+def congrRandVar (σ : α ≃ β) : RandVar α T ≃ RandVar β T := by
   constructor
   case toFun => exact fun X ↦ { var := X.var ∘ σ.symm, distr := Distribution.congr σ X.distr }
   case invFun => exact fun X ↦ { var := X.var ∘ σ, distr := Distribution.congr σ.symm X.distr }
@@ -255,13 +255,13 @@ def congr_randVar (σ : α ≃ β) : RandVar α T ≃ RandVar β T := by
 
 /-- Given a `T`-valued random variable `X` over `α`, mapping over `T` commutes with the equivalence over `α` -/
 def map_congr_eq_congr_map {S : Type _} [Mixable U S] (f : T → S) (σ : α ≃ β) (X : RandVar α T) :
-  f <$> congr_randVar σ X = congr_randVar σ (f <$> X) := by rfl
+  f <$> congrRandVar σ X = congrRandVar σ (f <$> X) := by rfl
 
 /-- The expectation value is invariant under equivalence of random variables -/
 @[simp]
-theorem exp_val_congr_eq_exp_val (σ : α ≃ β) (X : RandVar α T) : exp_val (congr_randVar σ X) = exp_val X := by
+theorem exp_val_congr_eq_exp_val (σ : α ≃ β) (X : RandVar α T) : exp_val (congrRandVar σ X) = exp_val X := by
   apply Mixable.to_U_inj
-  simp only [exp_val, congr_randVar, Equiv.coe_fn_mk, Function.comp_apply, Mixable.to_U_of_mkT,
+  simp only [exp_val, congrRandVar, Equiv.coe_fn_mk, Function.comp_apply, Mixable.to_U_of_mkT,
     congr_apply]
   rw [Equiv.sum_comp σ.symm (fun i : α ↦ Prob.toReal ↑(X.distr i) • Mixable.to_U (X.var i))]
 
