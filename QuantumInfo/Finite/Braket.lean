@@ -112,6 +112,22 @@ theorem Bra.eq_conj (ψ : Ket d) (x : d) :〈ψ∣ x = conj (∣ψ〉 x) :=
 theorem Bra.apply' (ψ : Ket d) (i : d) : 〈ψ∣ i = conj (ψ.vec i) :=
   rfl
 
+/-- Ket form by the superposition of all elements in `d`.
+Commonly denoted by |+⟩, especially for qubits -/
+def uniform_superposition [Nonempty d] : Ket d :=
+  { vec := fun _ ↦ 1 / √(Fintype.card d),
+    normalized' := by
+      simp only [one_div, norm_inv, Complex.norm_real, Real.norm_eq_abs, inv_pow, sq_abs,
+        Nat.cast_nonneg, Real.sq_sqrt, Finset.sum_const, Finset.card_univ, nsmul_eq_mul,
+        ne_eq, Nat.cast_eq_zero, Fintype.card_ne_zero, not_false_eq_true,
+        mul_inv_cancel₀]
+  }
+
+/-- There exists a ket for every nonempty `d`.
+Here, the uni-/
+instance instInhabited [Nonempty d] : Inhabited (Ket d) where
+  default := uniform_superposition
+
 theorem Ket.exists_ne_zero (ψ : Ket d) : ∃ x, ψ x ≠ 0 := by
   have hzerolt : ∑ x : d, Complex.normSq (ψ x) > ∑ x : d, 0 := by rw [ψ.normalized, Finset.sum_const_zero]; exact zero_lt_one
   have hpos : ∃ x ∈ Finset.univ, 0 < Complex.normSq (ψ x) := Finset.exists_lt_of_sum_lt hzerolt
