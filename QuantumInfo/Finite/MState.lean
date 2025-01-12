@@ -381,16 +381,27 @@ theorem pure_ensemble_of_pure (ψ : Ket d) (e : PEnsemble d α) (hmix : mix ↑e
 theorem ensemble_of_pure (ψ : Ket d) (e : MEnsemble d α) (hmix : mix e = pure ψ) : ∃ i : α, e.states i = pure ψ ∧ e.distr = Distribution.constant x := by
   sorry
 
-def trivial_ensemble [Inhabited α] (ρ : MState d) : MEnsemble d α := ⟨fun _ ↦ ρ, Distribution.constant default⟩
+def trivial_mEnsemble (ρ : MState d) (i : α) : MEnsemble d α := ⟨fun _ ↦ ρ, Distribution.constant i⟩
 
-theorem trivial_ensemble_mix [Inhabited α] (ρ : MState d) : mix (trivial_ensemble ρ : MEnsemble d α) = ρ := by
+theorem trivial_mEnsemble_mix (ρ : MState d) : ∀ i : α, mix (trivial_mEnsemble ρ i) = ρ := fun i ↦by
   ext1
-  simp only [trivial_ensemble, Distribution.constant, mix_of, DFunLike.coe, apply_ite,
+  simp only [trivial_mEnsemble, Distribution.constant, mix_of, DFunLike.coe, apply_ite,
     Prob.toReal_one, Prob.toReal_zero, ite_smul, one_smul, zero_smul, Finset.sum_ite_eq,
     Finset.mem_univ, ↓reduceIte]
 
 instance MEnsemble.instInhabited [Nonempty d] [Inhabited α] : Inhabited (MEnsemble d α) where
-  default := trivial_ensemble default
+  default := trivial_mEnsemble default default
+
+def trivial_pEnsemble [Inhabited α] (ψ : Ket d) (i : α) : PEnsemble d α := ⟨fun _ ↦ ψ, Distribution.constant i⟩
+
+theorem trivial_pEnsemble_mix [Inhabited α] (ψ : Ket d) : ∀ i : α, mix (trivial_pEnsemble ψ i) = pure ψ := fun i ↦ by
+  ext1
+  simp only [trivial_pEnsemble, Distribution.constant, toMEnsemble_mk, mix_of, DFunLike.coe,
+    apply_ite, Prob.toReal_one, Prob.toReal_zero, MEnsemble.states, Function.comp_apply, ite_smul,
+    one_smul, zero_smul, Finset.sum_ite_eq, Finset.mem_univ, ↓reduceIte]
+
+instance PEnsemble.instInhabited [Nonempty d] [Inhabited α] : Inhabited (PEnsemble d α) where
+  default := trivial_pEnsemble default default
 
 def spectral_ensemble (ρ : MState d) : PEnsemble d d :=
   { var := fun i ↦
@@ -404,9 +415,6 @@ def spectral_ensemble (ρ : MState d) : PEnsemble d d :=
         simp only [Complex.norm_eq_abs, EuclideanSpace.norm_eq, Real.sq_sqrt hnonneg]
     }
     distr := ρ.spectrum}
-
-instance PEnsemble.instInhabited [Inhabited d] : Inhabited (PEnsemble d d) where
-  default := spectral_ensemble default
 
 theorem spectral_ensemble_mix : mix (↑(spectral_ensemble ρ) : MEnsemble d d) = ρ := by
   ext i j
