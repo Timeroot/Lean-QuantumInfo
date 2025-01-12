@@ -102,7 +102,19 @@ set_option trace.split.failure true
 /-- A standard basis matrix (with a positive entry) is positive semidefinie iff the entry is on the diagonal. -/
 theorem stdBasisMatrix_iff_eq (i j : m) {c : 𝕜} (hc : 0 < c) : (Matrix.stdBasisMatrix i j c).PosSemidef ↔ i = j := by
   constructor
-  · sorry
+  · intro ⟨hherm, _⟩
+    rw [IsHermitian, ←Matrix.ext_iff] at hherm
+    replace hherm := hherm i j
+    simp only [stdBasisMatrix, conjTranspose_apply, of_apply, true_and, RCLike.star_def, if_true] at hherm
+    apply_fun (starRingEnd 𝕜) at hherm
+    have hcstar := RCLike.conj_eq_iff_im.mpr (RCLike.pos_iff.mp hc).right
+    rw [starRingEnd_self_apply, hcstar, ite_eq_left_iff] at hherm
+    contrapose! hherm
+    have hcnezero : 0 ≠ c := by
+      by_contra hczero
+      subst hczero
+      exact (lt_self_iff_false 0).mp hc
+    exact ⟨fun _ => hherm.symm, hcnezero⟩
   · intro hij
     subst hij
     constructor
@@ -111,7 +123,25 @@ theorem stdBasisMatrix_iff_eq (i j : m) {c : 𝕜} (hc : 0 < c) : (Matrix.stdBas
       split_ifs <;> try tauto
       · exact RCLike.conj_eq_iff_im.mpr (RCLike.pos_iff.1 hc).2
       · exact RingHom.map_zero (starRingEnd 𝕜)
-    · sorry
+    · intro x
+      simp only [dotProduct, Matrix.stdBasisMatrix, of_apply, mulVec]
+      convert_to 0 ≤ (star x i) * c * (x i)
+      · simp only [Finset.mul_sum]
+        rw [←Fintype.sum_prod_type']
+        have h₀ : ∀ x_1 : m × m, x_1 ≠ ⟨i, i⟩ → star x x_1.1 * ((if i = x_1.1 ∧ i = x_1.2 then c else 0) * x x_1.2) = 0 := fun z hz => by
+          have h₁ : ¬(i = z.1 ∧ i = z.2) := by
+            rw [ne_eq, Prod.mk.inj_iff] at hz
+            by_contra hz'
+            apply hz
+            exact ⟨hz'.left.symm, hz'.right.symm⟩
+          rw [ite_cond_eq_false _ _ (eq_false h₁)]
+          ring
+        rw [Fintype.sum_eq_single ⟨i, i⟩ h₀]
+        simp only [RCLike.star_def, and_self, reduceIte, mul_assoc]
+      · rw [mul_comm, ←mul_assoc]
+        have hpos : 0 ≤ x i * star x i := by simp only [Pi.star_apply, RCLike.star_def,
+          RCLike.mul_conj, RCLike.ofReal_nonneg, norm_nonneg, pow_nonneg]
+        exact (mul_nonneg hpos (le_of_lt hc))
 
 end
 
