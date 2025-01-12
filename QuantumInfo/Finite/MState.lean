@@ -134,27 +134,61 @@ theorem spectrum_pure_eq_constant (ψ : Ket d) :
     ∃ i, (pure ψ).spectrum = Distribution.constant i := by
   let ρ := pure ψ
   let ρ_linMap := Matrix.toEuclideanLin ρ.m
-  -- have ρ_linMap_evals := Matrix.isHermitian_iff_isSymmetric.1 ρ.Hermitian
-  --Prove that "1" is in the spectrum by exhibiting an eigenvector with value 1.
-  have hasLinMapEigen1 : Module.End.HasEigenvalue ρ_linMap 1 := by
-    --The eigenvector 1 witness, which is ψ.
-    let x1 : EuclideanSpace ℂ d := ψ.vec
-    apply Module.End.hasEigenvalue_of_hasEigenvector (x := x1)
-    constructor --to show it's an eigenvector, show that it's scaled and nonzero.
-    · rw [Module.End.mem_eigenspace_iff, one_smul]
-      change (pure ψ).m *ᵥ ψ.vec = ψ.vec
-      ext
-      simp_rw [pure, Matrix.mulVec, Matrix.vecMulVec_apply, Matrix.dotProduct, Bra.apply',
+  -- Prove 1 is in the spectrum of pure ψ by exhibiting an eigenvector with value 1.
+  have : ∃i, (pure ψ).spectrum i = 1 := by
+    simp [spectrum, Distribution.mk']
+    have hEig : ∃i, (pure ψ).Hermitian.eigenvalues i = 1 := by
+      -- Prove ψ is an eigenvector of ρ = pure ψ
+      have hv : ρ.m *ᵥ ψ = ψ := by
+        ext
+        simp_rw [ρ, pure, Matrix.mulVec, Matrix.vecMulVec_apply, Matrix.dotProduct, Bra.apply',
         Ket.apply, mul_assoc, ← Finset.mul_sum, ← Complex.normSq_eq_conj_mul_self,
         ← Complex.ofReal_sum, ← Ket.apply, ψ.normalized, Complex.ofReal_one, mul_one]
-    · have : ‖x1‖ = 1 := by
-        rw [PiLp.norm_eq_of_L2, ψ.normalized']
-        exact Real.sqrt_one
-      by_contra hz
-      simp only [hz, norm_zero, zero_ne_one] at this
-  --If 1 is in the spectrum of ρ_linMap, it's in the spectrum of pure ψ.
-  have : ∃i, (pure ψ).spectrum i = 1 := by
-    sorry
+      let U : Matrix.unitaryGroup d ℂ := star ρ.Hermitian.eigenvectorUnitary -- Diagonalizing unitary of ρ
+      let w : d → ℂ := U *ᵥ ψ
+      -- Prove w = U ψ is an eigenvector of the diagonalized matrix of ρ = pure ψ
+      have hDiag : Matrix.diagonal (RCLike.ofReal ∘ ρ.Hermitian.eigenvalues) *ᵥ w = w := by
+        simp_rw [←Matrix.IsHermitian.star_mul_self_mul_eq_diagonal, eq_comm,
+        ←Matrix.mulVec_mulVec, w, U, Matrix.mulVec_mulVec] -- Uses spectral theorem
+        simp_all
+        rw [←Matrix.mulVec_mulVec, hv]
+      -- Prove w = U ψ is nonzero by contradiction
+      have hwNonZero : ∃j, w j ≠ 0 := by
+        by_contra hwZero
+        simp at hwZero
+        rw [←funext_iff] at hwZero
+        -- If w is zero, then ψ is zero, since U is invertible
+        have hψZero : ∀x, ψ x = 0 := by
+          apply congr_fun
+          -- Prove U is invertible
+          have hUdetNonZero : (U : Matrix d d ℂ).det ≠ 0 := by
+            by_contra hDetZero
+            obtain ⟨u, huUni⟩ := U
+            have h0uni: 0 ∈ unitary ℂ := by
+              rw [←hDetZero]
+              simp
+              exact Matrix.det_of_mem_unitary huUni
+            rw [unitary.mem_iff] at h0uni
+            simp_all
+          exact Matrix.eq_zero_of_mulVec_eq_zero hUdetNonZero hwZero
+        -- Reach an contradiction that ψ has norm 0
+        have hψn := Ket.normalized ψ
+        have hnormZero : ∀ x : d, Complex.normSq (ψ x) = 0 := fun x => by
+          rw [hψZero x, Complex.normSq_zero]
+        have hsumZero : ∑ x : d, Complex.normSq (ψ x) = 0 := by
+          apply Finset.sum_eq_zero
+          intros x _
+          exact hnormZero x
+        simp_all
+      obtain ⟨j, hwNonZero'⟩ := hwNonZero
+      have hDiagj := congr_fun hDiag j
+      rw [Matrix.mulVec_diagonal, mul_eq_right₀ hwNonZero'] at hDiagj
+      use j
+      simp_all
+    obtain ⟨i, hEig'⟩ := hEig
+    use i
+    ext
+    exact hEig'
   --If 1 is in a distribution, the distribution is a constant.
   obtain ⟨i, hi⟩ := this
   use i
@@ -163,8 +197,49 @@ theorem spectrum_pure_eq_constant (ψ : Ket d) :
 /-- If the specturm of a mixed state is (1,0,0...) i.e. a constant distribution, it is
  a pure state. -/
 theorem pure_of_constant_spectrum (ρ : MState d) (h : ∃ i, ρ.spectrum = Distribution.constant i) :
-    ∃ ψ, ρ = pure ψ :=
-  sorry
+    ∃ ψ, ρ = pure ψ := by
+  obtain ⟨i, h'⟩ := h
+  -- Translate assumption to eigenvalues being (1,0,0,...)
+  have hEig : ρ.Hermitian.eigenvalues = fun x => if x = i then 1 else 0 := by
+    ext x
+    simp [spectrum, Distribution.constant, Distribution.mk'] at h'
+    rw [Subtype.mk.injEq] at h'
+    have h'x := congr_fun h' x
+    rw [if_congr (Eq.comm) (Eq.refl 1) (Eq.refl 0)]
+    rw [Prob.eq_iff, Prob.toReal_mk] at h'x
+    rw [h'x]
+    split_ifs
+    case pos => rfl
+    case neg => rfl
+  -- Choose the eigenvector v of ρ with eigenvalue 1 to make ψ
+  let ⟨u, huUni⟩ := ρ.Hermitian.eigenvectorUnitary -- Diagonalizing unitary of ρ
+  let D : Matrix d d ℂ := Matrix.diagonal (RCLike.ofReal ∘ ρ.Hermitian.eigenvalues) -- Diagonal matrix of ρ
+  let v : EuclideanSpace ℂ d := ρ.Hermitian.eigenvectorBasis i
+  -- Prove v is normalized
+  have hUvNorm : ∑ x, ‖v x‖^2 = 1 := by
+    have hinnerv : inner v v = (1:ℂ) := by
+      have := OrthonormalBasis.orthonormal ρ.Hermitian.eigenvectorBasis
+      rw [orthonormal_iff_ite] at this
+      specialize this i i
+      simp only [if_true] at this
+      exact this
+    simp_all [Complex.conj_mul']
+    rw [←Fintype.sum_equiv (Equiv.refl d) _ (fun x => (Complex.ofReal (Complex.abs (v x))) ^ 2) (fun x => Complex.ofReal_pow (Complex.abs (v x)) 2)] at hinnerv
+    rw [←Complex.ofReal_sum Finset.univ (fun x => (Complex.abs (v x)) ^ 2), Complex.ofReal_eq_one] at hinnerv
+    exact hinnerv
+  let ψ : Ket d := ⟨v, hUvNorm⟩ -- Construct ψ
+  use ψ
+  ext j k
+  simp
+  -- Use spectral theorem to prove that ρ = pure ψ
+  rw [Matrix.IsHermitian.spectral_theorem ρ.Hermitian, Matrix.mul_apply]
+  simp [ψ, Ket.apply, v, hEig]
+  have hsum : ∀ x ∈ Finset.univ, x ∉ ({i} : Finset d) → (ρ.Hermitian.eigenvectorBasis x j) * (↑(if x = i then 1 else 0) : ℝ) * (starRingEnd ℂ) (ρ.Hermitian.eigenvectorBasis x k) = 0 := by
+    intros x hx hxnoti
+    rw [Finset.mem_singleton] at hxnoti
+    rw [eq_false hxnoti, if_false, Complex.ofReal_zero]
+    ring
+  simp_rw [←Finset.sum_subset (Finset.subset_univ {i}) hsum, Finset.sum_singleton, reduceIte, Complex.ofReal_one, mul_one]
 
 /-- A state ρ is pure iff its spectrum is (1,0,0,...) i.e. a constant distribution. -/
 theorem pure_iff_constant_spectrum (ρ : MState d) : (∃ ψ, ρ = pure ψ) ↔
