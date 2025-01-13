@@ -52,20 +52,28 @@ theorem Hermitian (ρ : MState d) : ρ.m.IsHermitian :=
 theorem ext {ρ₁ ρ₂ : MState d} (h : ρ₁.m = ρ₂.m) : ρ₁ = ρ₂ := by
   rwa [MState.mk.injEq]
 
+/-- The map from mixed states to their matrices is injective -/
+theorem toMat_inj : (MState.m (d := d)).Injective :=
+  fun _ _ ↦ ext
+
+variable (d) in
+/-- The matrices corresponding to MStates are `Convex ℝ` -/
+theorem convex : Convex ℝ (Set.range (MState.m (d := d))) := by
+  simp only [Convex, Set.mem_range, StarConvex,
+    forall_exists_index, forall_apply_eq_imp_iff]
+  intro x y a b ha hb hab
+  replace ha : 0 ≤ (a : ℂ) := by norm_cast
+  replace hb : 0 ≤ (b : ℂ) := by norm_cast
+  replace hab : a + b = (1 : ℂ) := by norm_cast
+  exact ⟨⟨_, x.pos.convex_cone y.pos ha hb, by simpa [x.tr, y.tr] using hab⟩, rfl⟩
+
 instance instMixable : Mixable (Matrix d d ℂ) (MState d) where
   to_U := MState.m
   to_U_inj := ext
   mkT := fun h ↦ ⟨⟨_,
     Exists.casesOn h fun t ht => ht ▸ t.pos,
     Exists.casesOn h fun t ht => ht ▸ t.tr⟩, rfl⟩
-  convex := by
-    simp only [Convex, Set.mem_range, StarConvex,
-      forall_exists_index, forall_apply_eq_imp_iff]
-    intro x y a b ha hb hab
-    replace ha : 0 ≤ (a : ℂ) := by norm_cast
-    replace hb : 0 ≤ (b : ℂ) := by norm_cast
-    replace hab : a + b = (1 : ℂ) := by norm_cast
-    exact ⟨⟨_, x.pos.convex_cone y.pos ha hb, by simpa [x.tr, y.tr] using hab⟩, rfl⟩
+  convex := convex d
 
 --An MState is a witness that d is nonempty.
 instance nonempty (ρ : MState d) : Nonempty d := by
@@ -525,5 +533,21 @@ theorem traceNorm_eq_1 (ρ : MState d) : ρ.m.traceNorm = 1 :=
     _ = ρ.m.trace := ρ.pos.traceNorm_PSD_eq_trace
     _ = 1 := ρ.tr
   Complex.ofReal_eq_one.mp this
+
+section topology
+
+/-- Mixed states inherit the subspace topology from matrices -/
+instance instTopoMState : TopologicalSpace (MState d) :=
+  TopologicalSpace.induced (MState.m) instTopologicalSpaceMatrix
+
+/-- The projection from mixed states to their matrices is an embedding -/
+theorem toMat_IsEmbedding : Topology.IsEmbedding (MState.m (d := d)) where
+  eq_induced := rfl
+  injective := toMat_inj
+
+instance instT5MState : T3Space (MState d) :=
+  Topology.IsEmbedding.t3Space toMat_IsEmbedding
+
+end topology
 
 end MState
