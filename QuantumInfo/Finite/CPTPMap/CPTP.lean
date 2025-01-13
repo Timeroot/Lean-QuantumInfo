@@ -43,7 +43,7 @@ structure CPTPMap [DecidableEq dIn] extends PTPMap dIn dOut where
 variable {dIn dOut dOut₂}
 
 namespace PTPMap
-noncomputable section
+section
 open ComplexOrder
 
 @[ext]
@@ -170,6 +170,18 @@ theorem compose_assoc  (Λ₃ : CPTPMap dM₂ dOut) (Λ₂ : CPTPMap dM dM₂) (
     (Λ₃.compose Λ₂).compose Λ₁ = Λ₃.compose (Λ₂.compose Λ₁) := by
   ext1 ρ
   simp
+
+/-- CPTPMaps have a convex structure from their Choi matrices. -/
+instance instMixable : Mixable (Matrix (dIn × dOut) (dIn × dOut) ℂ) (CPTPMap dIn dOut) where
+  to_U := CPTPMap.choi
+  to_U_inj := choi_ext
+  mkT {u} h := ⟨CPTP_of_choi_PSD_Tr (M := u)
+    (Exists.recOn h fun t ht => ht ▸ t.choi_PSD_of_CPTP)
+    (Exists.recOn h fun t ht => (by
+      rw [← ht, ← MatrixMap.IsTracePreserving_iff_trace_choi]
+      exact t.trace_preserving)),
+    by apply choi_of_CPTP_of_choi⟩
+  convex := sorry
 
 /-- The identity channel, which leaves the input unchanged. -/
 def id : CPTPMap dIn dIn :=
@@ -457,6 +469,18 @@ def IsAntidegradable (Λ : CPTPMap dIn dOut) : Prop :=
 
 --Theorem (Wilde Exercise 13.5.7): Entanglement breaking channels are antidegradable.
 end degradable
+
+/-- `CPTPMap`s inherit a topology from their choi matrices. -/
+instance instTop : TopologicalSpace (CPTPMap dIn dOut) :=
+  TopologicalSpace.induced (CPTPMap.choi) instTopologicalSpaceMatrix
+
+/-- The projection from `CPTPMap` to the Choi matrix is an embedding -/
+theorem choi_IsEmbedding : Topology.IsEmbedding (CPTPMap.choi (dIn := dIn) (dOut := dOut)) where
+  eq_induced := rfl
+  injective _ _ := choi_ext
+
+instance instT5MState : T3Space (CPTPMap dIn dOut) :=
+  Topology.IsEmbedding.t3Space choi_IsEmbedding
 
 end
 end CPTPMap

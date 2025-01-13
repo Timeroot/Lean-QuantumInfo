@@ -34,6 +34,10 @@ def coherentInfo (ρ : MState d₁) (Λ : CPTPMap d₁ d₂) : ℝ :=
 def qRelativeEnt (ρ σ : MState d) [DecidableEq d] : ℝ :=
   (ρ.m * (ρ.pos.log - σ.pos.log)).trace.re
 
+/-- Quantum relative entropy is nonnegative. (TODO: Could be bundled into NNReal with `qRelativeEnt`?)-/
+theorem qRelativeEnt_nonneg (ρ σ : MState d) [DecidableEq d] : 0 ≤ qRelativeEnt ρ σ := by
+  sorry
+
 /-- The Quantum Conditional Mutual Information, I(A;C|B) = S(A|B) - S(A|BC). -/
 def qcmi (ρ : MState (dA × dB × dC)) : ℝ :=
   qConditionalEnt ρ.assoc'.traceRight - qConditionalEnt ρ
