@@ -20,14 +20,54 @@ open FreeStateTheory
 
 variable {ι : Type*}
 
-/-- Given a `FreeStateTheory`, there is always a set of free operations for which this is the minimal set
-of free states. That is the set of all operations that don't generate non-free states from free states. We
-call this the minimal resource theory. -/
-def minimal [FreeStateTheory ι] : ResourceTheory ι where
+/-- Given a `FreeStateTheory`, there is a maximal set of free operations compatible with the free states.
+That is the set of all operations that don't generate non-free states from free states. We
+call this the maximal resource theory. -/
+def maximal [FreeStateTheory ι] : ResourceTheory ι where
   freeOps i j := { f | ∀ ρ, IsFree ρ → IsFree (f ρ)}
   nongenerating := id
   free_id _ _ _ := by rwa [CPTPMap.id_MState]
   free_comp f g ρ h := f.prop _ (g.prop ρ h)
+
+/-- A resource theory `IsMaximal` if it includes all non-generating operations. -/
+def IsMaximal (r : ResourceTheory ι) : Prop :=
+  ∀ (i j), r.freeOps i j = { f | ∀ ρ, IsFree ρ → IsFree (f ρ)}
+
+/-- A resource theory `IsTensorial` if it includes tensor products of operations, creating
+free states, and discarding. This implies that includes a unit object. -/
+structure IsTensorial [ResourceTheory ι] [Unital ι] : Prop where
+  prod :  ∀ {i j k l : ι} {f g}, f ∈ freeOps i k → g ∈ freeOps j l → (f ⊗ᵣ g) ∈ freeOps (prod i j) (prod k l)
+  create : ∀ {i : ι} (ρ), IsFree ρ → CPTPMap.const_state ρ ∈ freeOps Unital.unit i
+  destroy : ∀ (i : ι), CPTPMap.destroy ∈ freeOps i Unital.unit
+
+/-- The theory `ResourceTheory.maximal` always `IsMaximal`. -/
+theorem maximal_IsMaximal [FreeStateTheory ι] : IsMaximal (maximal (ι := ι)) :=
+  fun _ _ ↦ rfl
+
+/-- Any `ResourceTheory.Unital` theory that `IsMaximal` also `IsTensorial`. Note that the converse
+is not true: the theory whose free operations are precisely the replacement channels is tensorial but
+not maximal. (That is the minimal tensorial operation set.) -/
+theorem IsTensorial_of_IsMaximal [r : ResourceTheory ι] [Unital ι] (h : r.IsMaximal) : r.IsTensorial where
+  prod {_ _ _ _ f g} hf hg := by
+    unfold IsMaximal at h
+    rw [h] at hf hg ⊢
+    dsimp at hf hg ⊢
+    intro ρ hρ
+    have hn := @r.nongenerating
+    simp_rw [h] at hn
+    dsimp at hn
+    --This might be wrong actually
+    sorry
+  create {_} ρ hρ := by
+    unfold IsMaximal at h
+    simp [h, hρ]
+  destroy {i} := by
+    unfold IsMaximal at h
+    rw [h]
+    intro _ _
+    obtain ⟨_, _, hσ⟩ := free_fullRank (ι := ι) Unital.unit
+    convert hσ
+    exact (Unique.eq_default _).trans (Unique.default_eq _)
 
 --Helper theorem for ResourceTheory.mk_of_ops
 private lemma convex_states_of_convex_ops [ResourcePretheory ι] (O : ∀ (i j : ι), Set (CPTPMap (H i) (H j)))
@@ -119,6 +159,8 @@ noncomputable def fullyFreeQRT : ResourceTheory { ι : Type // Finite ι ∧ Non
     H := Subtype.val
     FinH := fun i ↦ have := i.prop.left; Fintype.ofFinite i
     DecEqH := fun i a b ↦ Classical.propDecidable (a = b)
+    NonemptyH := fun i ↦ i.prop.right
+
     prod := fun ⟨i,⟨hi,hi2⟩⟩ ⟨j,⟨hj,hj2⟩⟩ ↦ ⟨i × j, ⟨Finite.instProd, instNonemptyProd⟩⟩
     prodEquiv := fun ⟨_,⟨_,_⟩⟩ ⟨_,⟨_,_⟩⟩ ↦ Equiv.refl _
 

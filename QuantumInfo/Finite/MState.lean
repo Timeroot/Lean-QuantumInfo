@@ -96,6 +96,14 @@ theorem PosSemidef_outer_self_conj (v : d → ℂ) : Matrix.PosSemidef (Matrix.v
     rw [this, ← map_sum, ← Complex.normSq_eq_conj_mul_self, Complex.zero_le_real, ← Complex.sq_abs]
     exact sq_nonneg _
 
+/-- The inner product of two MState's, as a real number between 0 and 1. -/
+def inner (ρ : MState d) (σ : MState d) : Prob :=
+  ⟨(ρ.m.inner σ.m).re,
+    -- 0 ≤ ...
+    ⟨And.left (ρ.pos.inner_ge_zero σ.pos),
+    -- ... ≤ 1
+    (ρ.pos.inner_le_mul_trace σ.pos).trans (by simp only [ρ.tr, σ.tr, RCLike.one_re, mul_one, le_refl])⟩⟩
+
 section pure
 
 /-- A mixed state can be constructed as a pure state arising from a ket. -/
@@ -225,7 +233,7 @@ theorem pure_of_constant_spectrum (ρ : MState d) (h : ∃ i, ρ.spectrum = Dist
   let v : EuclideanSpace ℂ d := ρ.Hermitian.eigenvectorBasis i
   -- Prove v is normalized
   have hUvNorm : ∑ x, ‖v x‖^2 = 1 := by
-    have hinnerv : inner v v = (1:ℂ) := by
+    have hinnerv : Inner.inner v v = (1:ℂ) := by
       have := OrthonormalBasis.orthonormal ρ.Hermitian.eigenvectorBasis
       rw [orthonormal_iff_ite] at this
       specialize this i i

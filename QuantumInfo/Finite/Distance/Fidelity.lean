@@ -48,7 +48,7 @@ theorem fidelity_eq_one_iff_self : fidelity ρ σ = 1 ↔ ρ = σ :=
 theorem fidelity_symm : fidelity ρ σ = fidelity σ ρ :=
   sorry --break into sqrts
 
-/-- The fidelity cannot increase under the application of a channel. -/
+/-- The fidelity cannot decrease under the application of a channel. -/
 theorem fidelity_channel_nondecreasing (Λ : CPTPMap d d₂) : fidelity (Λ ρ) (Λ σ) ≥ fidelity ρ σ :=
   sorry
 
