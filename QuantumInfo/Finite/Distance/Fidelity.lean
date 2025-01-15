@@ -22,7 +22,7 @@ def fidelity (ρ σ : MState d) : ℝ :=
     unfold ρσρ
     nth_rewrite 2 [← ρ.pos.posSemidef_sqrt.isHermitian]
     exact σ.pos.mul_mul_conjTranspose_same _
-  (ρσρ_PosSemidef.sqrt.trace.re)^2
+  (ρσρ_PosSemidef.posSemidef_sqrt.1.rtrace)^2
 
 theorem fidelity_ge_zero : 0 ≤ fidelity ρ σ :=
   sq_nonneg _

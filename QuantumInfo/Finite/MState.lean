@@ -48,6 +48,11 @@ variable {d d₁ d₂ d₃ : Type*} [Fintype d] [Fintype d₁] [Fintype d₂] [F
 theorem Hermitian (ρ : MState d) : ρ.m.IsHermitian :=
   ρ.pos.left
 
+/-- The real trace ()`Matrix.IsHermitian.rtrace`) of an MState is 1 -/
+theorem rtrace_one (ρ : MState d) : ρ.Hermitian.rtrace = 1 := by
+  rw [Matrix.IsHermitian.rtrace, ρ.tr]
+  rfl
+
 @[ext]
 theorem ext {ρ₁ ρ₂ : MState d} (h : ρ₁.m = ρ₂.m) : ρ₁ = ρ₂ := by
   rwa [MState.mk.injEq]
@@ -98,11 +103,11 @@ theorem PosSemidef_outer_self_conj (v : d → ℂ) : Matrix.PosSemidef (Matrix.v
 
 /-- The inner product of two MState's, as a real number between 0 and 1. -/
 def inner (ρ : MState d) (σ : MState d) : Prob :=
-  ⟨(ρ.m.inner σ.m).re,
+  ⟨(ρ.Hermitian.rinner σ.Hermitian),
     -- 0 ≤ ...
-    ⟨And.left (ρ.pos.inner_ge_zero σ.pos),
+    ⟨ρ.pos.rinner_ge_zero σ.pos,
     -- ... ≤ 1
-    (ρ.pos.inner_le_mul_trace σ.pos).trans (by simp only [ρ.tr, σ.tr, RCLike.one_re, mul_one, le_refl])⟩⟩
+    (ρ.pos.rinner_le_mul_trace σ.pos).trans (by simp only [ρ.rtrace_one, σ.rtrace_one, mul_one, le_refl])⟩⟩
 
 section pure
 
@@ -123,15 +128,11 @@ theorem pure_of (ψ : Ket d) : (pure ψ).m i j = (ψ i) * conj (ψ j) := by
 
 /-- The purity of a state is Tr[ρ^2]. This is a `Prob`, because it is always between zero and one. -/
 def purity (ρ : MState d) : Prob :=
-  ⟨RCLike.re (ρ.m * ρ.m).trace, ⟨by
-    suffices 0 ≤ Matrix.trace (ρ.m * ρ.m) by
-      exact (RCLike.nonneg_iff.mp this).1
-    nth_rewrite 1 [← ρ.pos.1]
-    exact ρ.m.posSemidef_conjTranspose_mul_self.trace_nonneg,
+  ⟨(ρ.pos.pow 2).1.rtrace, ⟨(ρ.pos.pow 2).rtrace_nonneg,
       by
-    nth_rewrite 1 [← ρ.pos.1]
-    convert ρ.pos.inner_le_mul_trace ρ.pos using 1
-    simp [ρ.tr]
+    convert ρ.pos.rinner_le_mul_trace ρ.pos using 1
+    · exact congrArg (RCLike.re ·.trace) (pow_two ρ.m)
+    · simp [ρ.rtrace_one]
     ⟩⟩
 
 /-- The eigenvalue spectrum of a mixed quantum state, as a `Distribution`. -/
