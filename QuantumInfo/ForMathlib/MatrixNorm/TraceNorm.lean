@@ -17,6 +17,7 @@ def traceNorm (A : Matrix m n R) : ℝ :=
   RCLike.re A.posSemidef_conjTranspose_mul_self.sqrt.trace
 
 /-- The trace norm of the negative is equal to the trace norm. -/
+@[simp]
 theorem traceNorm_eq_neg_self (A : Matrix m n R) : traceNorm (-A) = traceNorm A := by
   unfold traceNorm
   congr! 3

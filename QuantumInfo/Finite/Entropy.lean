@@ -32,7 +32,7 @@ def coherentInfo (ρ : MState d₁) (Λ : CPTPMap d₁ d₂) : ℝ :=
 
 /-- The quantum relative entropy S(ρ‖σ) = Tr[ρ (log ρ - log σ)]. -/
 def qRelativeEnt (ρ σ : MState d) [DecidableEq d] : ℝ :=
-  (ρ.m * (ρ.pos.log - σ.pos.log)).trace.re
+  ρ.Hermitian.rinner (ρ.pos.log_IsHermitian.sub σ.pos.log_IsHermitian)
 
 /-- Quantum relative entropy is nonnegative. (TODO: Could be bundled into NNReal with `qRelativeEnt`?)-/
 theorem qRelativeEnt_nonneg (ρ σ : MState d) [DecidableEq d] : 0 ≤ qRelativeEnt ρ σ := by
@@ -190,16 +190,15 @@ theorem qcmi_le_2_log_dim' (ρ : MState (dA × dB × dC)) :
     qcmi ρ ≤ 2 * Real.log (Fintype.card dC) := by
   sorry
 
--- /-- The chain rule for quantum conditional mutual information:
--- `I(A₁A₂ : C | B) = I(A₁:C|B) + I(A₂:C|BA₁).
-
--- ... Turns out this cannot be stated in terms of just `MState.SWAP`/`MState.assoc`/`MState.assoc'`. There's no way to permute the indices on `MState ((dA₁ × dA₂) × dB × dC)` to get it into the `MState (dA₂ × (dA₁ × dB) × dC)` form needed to state this. In other words, we'll need some other other operation to rearrange indices, or a better way to talk about tensor indices, to state this theorem.
--- -/
--- theorem qcmi_chain_rule (ρ : MState ((dA₁ × dA₂) × dB × dC)) :
---     let ρA₁BC := ρ.assoc.SWAP.assoc.traceLeft.SWAP;
---     let ρA₂BA₁C : MState (dA₂ × (dA₁ × dB) × dC) := sorry;
---     QCMI ρ = QCMI ρA₁BC + QCMI ρA₂BA₁C
---      := by
---   sorry
+/-- The chain rule for quantum conditional mutual information:
+`I(A₁A₂ : C | B) = I(A₁:C|B) + I(A₂:C|BA₁)`.
+-/
+theorem qcmi_chain_rule (ρ : MState ((dA₁ × dA₂) × dB × dC)) :
+    let ρA₁BC := ρ.assoc.SWAP.assoc.traceLeft.SWAP;
+    let ρA₂BA₁C : MState (dA₂ × (dA₁ × dB) × dC) :=
+      ((CPTPMap.id ⊗ CPTPMap.assoc').compose (CPTPMap.assoc.compose (CPTPMap.SWAP ⊗ CPTPMap.id))) ρ;
+    qcmi ρ = qcmi ρA₁BC + qcmi ρA₂BA₁C
+     := by
+  sorry
 
 end entropy

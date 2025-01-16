@@ -227,7 +227,7 @@ instance instUnique [Nonempty dIn] [Unique dOut] : Unique (CPTPMap dIn dOut) whe
 
 /-- A state can be viewed as a CPTP map from the trivial Hilbert space (indexed by `Unit`)
  that outputs exactly that state. -/
-def const_state (ρ : MState dOut) : CPTPMap Unit dOut where
+def const_state [Unique dIn] (ρ : MState dOut) : CPTPMap dIn dOut where
   map := MatrixMap.of_choi_matrix (Matrix.of fun (_,i) (_,j) ↦ ρ.m i j)
   trace_preserving x := by
     have := ρ.tr
@@ -237,16 +237,22 @@ def const_state (ρ : MState dOut) : CPTPMap Unit dOut where
 
 /-- The output of `const_state ρ` is always that `ρ`. -/
 @[simp]
-theorem const_state_apply (ρ : MState dOut) (ρ₀ : MState Unit) : (const_state ρ) ρ₀ = ρ := by
+theorem const_state_apply [Unique dIn] (ρ : MState dOut) (ρ₀ : MState dIn) : (const_state ρ) ρ₀ = ρ := by
+  ext
+  dsimp [const_state, MatrixMap.of_choi_matrix, MState.m, instFunLike]
+  simp only [Finset.univ_unique, Finset.sum_singleton]
+  rw [Unique.eq_default ρ₀]
+  convert one_mul _
+  --Should be a simp theorem
   sorry
 
 /--The replacement channel that maps all inputs to a given state. -/
 def replacement [Nonempty dIn] (ρ : MState dOut) : CPTPMap dIn dOut :=
-  (const_state ρ).compose destroy
+  (const_state (dIn := Unit) ρ).compose destroy
 
 /-- The output of `replacement ρ` is always that `ρ`. -/
 @[simp]
-theorem replacement_apply (ρ : MState dOut) (ρ₀ : MState Unit) : (replacement ρ) ρ₀ = ρ := by
+theorem replacement_apply [Nonempty dIn] (ρ : MState dOut) (ρ₀ : MState dIn) : (replacement ρ) ρ₀ = ρ := by
   simp only [replacement, compose_eq, const_state_apply]
 
 section prod

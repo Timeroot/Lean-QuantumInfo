@@ -12,6 +12,9 @@ import QuantumInfo.Finite.Entanglement
 import QuantumInfo.Finite.Entropy
 import QuantumInfo.Finite.MState
 import QuantumInfo.Finite.POVM
+import QuantumInfo.Finite.ResourceTheory.FreeState
+import QuantumInfo.Finite.ResourceTheory.ResourceTheory
+import QuantumInfo.Finite.ResourceTheory.SteinsLemma
 import QuantumInfo.Finite.Unitary
 import QuantumInfo.Finite.Qubit.Basic
 

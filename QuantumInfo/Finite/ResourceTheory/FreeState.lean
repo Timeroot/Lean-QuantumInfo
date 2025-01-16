@@ -15,6 +15,8 @@ class ResourcePretheory (ι : Type*) where
   FinH : ∀ i, Fintype (H i)
   /-- Each object has decidable equality -/
   DecEqH : ∀ i, DecidableEq (H i)
+  /-- Each space is nonempty (dimension at least 1) -/
+  NonemptyH : ∀ i, Nonempty (H i)
   /-- The Hilbert spaces must have a product structure. -/
   prod : ι → ι → ι
   /-- The product structure induces an isomorphism of Hilbert spaces -/
@@ -29,6 +31,7 @@ variable {ι : Type*} [ResourcePretheory ι]
 --Having a `ResourcePretheory ι` around should give us access to the `Fintype` and `DecidableEq` instances.
 instance instQRT_FintypeH (i : ι) : Fintype (H i) := FinH i
 instance instQRT_DecEqH (i : ι) : DecidableEq (H i) := DecEqH i
+instance instQRT_NonemptyH (i : ι) : Nonempty (H i) := NonemptyH i
 
 /-- The `prod` operation of `ResourcePretheory` gives the natural product operation on `MState`s. Accessible
 by the notation `ρ₁ ⊗ᵣ ρ₂`. -/
@@ -50,6 +53,19 @@ noncomputable def spacePow (i : ι) (n : ℕ+) : ι :=
   n.natPred.rec i (fun _ j ↦ prod i j)
 
 scoped notation i "⊗^[" n "]" => spacePow i n
+
+/-- Powers of states. Defined for `PNat`, so that we don't have zeroth powers -/
+noncomputable def statePow {i : ι} (ρ : MState (H i)) (n : ℕ+) : MState (H (i⊗^[n])) :=
+  (n.natPred.rec ρ (fun _ σ ↦ ρ ⊗ᵣ σ) : MState (H (i⊗^[n.natPred.succPNat])))
+
+scoped notation ρ "⊗^[" n "]" => statePow ρ n
+
+/-- A ResourcePretheory is `Unital` if it has a Hilbert space of size 1, i.e. `ℂ`. -/
+class Unital (ι : Type*) [ResourcePretheory ι] where
+  unit : ι
+  unit_unique : Unique (H unit)
+
+instance instUnitalUnique [ResourcePretheory ι] [u : Unital ι] : Unique (H u.unit) := u.unit_unique
 
 end ResourcePretheory
 

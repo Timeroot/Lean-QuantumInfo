@@ -68,14 +68,15 @@ def measurement_map (Λ : POVM X d) : CPTPMap d (d × X) where
       rw [← hM₃]
       apply MatrixMap.IsCompletelyPositive.comp
       · intro n ρ h
+        suffices M₁.IsCompletelyPositive from this n h
         sorry
       · apply MatrixMap.IsCompletelyPositive.kron_kronecker_const
         convert (Matrix.PosSemidef.stdBasisMatrix_iff_eq x x (zero_lt_one' ℂ)).2 rfl
 
 /-- A POVM leads to a distribution of outcomes on any given mixed state ρ. -/
 def measure (Λ : POVM X d) (ρ : MState d) : Distribution X where
-  val := fun x ↦ ⟨((Λ.mats x).inner ρ.m).re,
-    ⟨And.left $ Complex.nonneg_iff.1 $ (Λ.pos x).inner_ge_zero ρ.pos,
+  val := fun x ↦ ⟨(Λ.pos x).1.rinner ρ.Hermitian,
+    ⟨(Λ.pos x).rinner_ge_zero ρ.pos,
     by
     -- That each observation probability is at most 1.
     -- ρ.m.inner (∑ y, Λ.mats y) = ρ.m.inner 1 = ρ.m.trace = 1
@@ -84,8 +85,8 @@ def measure (Λ : POVM X d) (ρ : MState d) : Distribution X where
     sorry
     ⟩⟩
   property := by
-    simp [← Complex.re_sum, Matrix.inner, ← trace_sum,
-    ← Finset.sum_mul, ← conjTranspose_sum, Λ.normalized, ρ.tr]
+    simp [← Complex.re_sum, Matrix.IsHermitian.rinner, ← trace_sum,
+      ← Finset.sum_mul, Λ.normalized, ρ.tr]
 
 /-- The quantum-classical `POVM.measurement_map`, gives a marginal on the right equal to `POVM.measure`.-/
 theorem measure_eq_measurement_map (Λ : POVM X d) (ρ : MState d) :
