@@ -200,7 +200,7 @@ variable {T U : Type*} [AddCommGroup U] [Module ℝ U] [inst : Mixable U T]
 /-- `Distribution.exp_val` is the expectation value of a random variable `X`. Under the hood,
 it is the "convex combination over a finite family" on the type `T`, afforded by the `Mixable` instance,
 with the probability distribution of `X` as weights. -/
-def exp_val (X : RandVar α T) : T := by
+def expect_val (X : RandVar α T) : T := by
   let u : U := ∑ i ∈ Finset.univ, (Prob.toReal (X.distr i)) • (inst.to_U (X.var i))
   have ht : ∃ t : T, inst.to_U t = u := by
     have h₀ : ∀ i ∈ Finset.univ, 0 ≤ Prob.toReal (X.distr i) := by simp only [Finset.mem_univ, Prob.zero_le_coe, implies_true]
@@ -212,9 +212,9 @@ def exp_val (X : RandVar α T) : T := by
 
 /-- The expectation value of a random variable over `α = Fin 2` is the same as `Mixable.mix`
 with probabiliy weight `X.distr 0` -/
-theorem exp_val_eq_mixable_mix (d : Distribution (Fin 2)) (x₁ x₂ : T) : exp_val ⟨![x₁, x₂], d⟩ = Mixable.mix (d 0) x₁ x₂ := by
+theorem expect_val_eq_mixable_mix (d : Distribution (Fin 2)) (x₁ x₂ : T) : expect_val ⟨![x₁, x₂], d⟩ = Mixable.mix (d 0) x₁ x₂ := by
   apply Mixable.to_U_inj
-  simp only [Mixable.mix, exp_val, constant, DFunLike.coe, Mixable.to_U_of_mkT]
+  simp only [Mixable.mix, expect_val, constant, DFunLike.coe, Mixable.to_U_of_mkT]
   calc
     ∑ i : Fin (Nat.succ 0).succ, Prob.toReal (d i) • Mixable.to_U (![x₁, x₂] i) = ∑ i ∈ Finset.range 2, Prob.toReal (d i) • Mixable.to_U (![x₁, x₂] i) := by sorry
     _ = ∑ i ∈ Finset.range 1, Prob.toReal (d i) • Mixable.to_U (![x₁, x₂] i) + Prob.toReal (d 1) • Mixable.to_U (![x₁, x₂] 1) := by exact Finset.sum_range_succ (fun i => Prob.toReal (d i) • Mixable.to_U (![x₁, x₂] i)) 1
@@ -222,14 +222,14 @@ theorem exp_val_eq_mixable_mix (d : Distribution (Fin 2)) (x₁ x₂ : T) : exp_
     _ = Prob.toReal (d 0) • Mixable.to_U x₁ + Prob.toReal (d 0).one_minus • Mixable.to_U x₂  := by congr; sorry
 
 /-- The expectation value of a random variable with constant probability distribution `constant x` is its value at `x` -/
-theorem exp_val_constant (x : α) (f : α → T) : exp_val ⟨f, (constant x)⟩ = f x := by
+theorem expect_val_constant (x : α) (f : α → T) : expect_val ⟨f, (constant x)⟩ = f x := by
   apply Mixable.to_U_inj
-  simp only [exp_val, constant, DFunLike.coe, Mixable.to_U_of_mkT, apply_ite, Prob.toReal_one,
+  simp only [expect_val, constant, DFunLike.coe, Mixable.to_U_of_mkT, apply_ite, Prob.toReal_one,
     Prob.toReal_zero, ite_smul, one_smul, zero_smul, Finset.sum_ite_eq, Finset.mem_univ, ↓reduceIte]
 
 /-- The expectation value of a nonnegative real random variable is also nonnegative -/
-theorem zero_le_exp_val (d : Distribution α) (f : α → ℝ) (hpos : 0 ≤ f) : 0 ≤ exp_val ⟨f, d⟩ := by
-  simp only [exp_val, Mixable.mkT, Mixable.to_U, id]
+theorem zero_le_expect_val (d : Distribution α) (f : α → ℝ) (hpos : 0 ≤ f) : 0 ≤ expect_val ⟨f, d⟩ := by
+  simp only [expect_val, Mixable.mkT, Mixable.to_U, id]
   apply Fintype.sum_nonneg
   intro x
   specialize hpos x
@@ -259,9 +259,9 @@ def map_congr_eq_congr_map {S : Type _} [Mixable U S] (f : T → S) (σ : α ≃
 
 /-- The expectation value is invariant under equivalence of random variables -/
 @[simp]
-theorem exp_val_congr_eq_exp_val (σ : α ≃ β) (X : RandVar α T) : exp_val (congrRandVar σ X) = exp_val X := by
+theorem expect_val_congr_eq_expect_val (σ : α ≃ β) (X : RandVar α T) : expect_val (congrRandVar σ X) = expect_val X := by
   apply Mixable.to_U_inj
-  simp only [exp_val, congrRandVar, Equiv.coe_fn_mk, Function.comp_apply, Mixable.to_U_of_mkT,
+  simp only [expect_val, congrRandVar, Equiv.coe_fn_mk, Function.comp_apply, Mixable.to_U_of_mkT,
     congr_apply]
   rw [Equiv.sum_comp σ.symm (fun i : α ↦ Prob.toReal ↑(X.distr i) • Mixable.to_U (X.var i))]
 
