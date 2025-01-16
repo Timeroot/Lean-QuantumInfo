@@ -41,10 +41,6 @@ open NNReal
 open MState
 open MState.Ensemble
 
-variable {d d₁ d₂ : Type _} [Fintype d] [Fintype d₁] [Fintype d₂]
-variable (f : MState d → ℝ≥0)
-variable (g : Ket d → ℝ≥0)
-
 /-- Convex roof extension of a function `g : Ket d → ℝ≥0`, defined as the infimum of all pure-state
 ensembles of a given `ρ` of the average of `g` in that ensemble.
 
@@ -52,18 +48,25 @@ This is valued in the extended nonnegative real numbers `ℝ≥0∞` to have goo
 come from the fact that `ℝ≥0∞` is a complete lattice. For example, it is necessary for `le_iInf` and `iInf_le_of_le`.
 However, it is also proven in `convex_roof_ne_top` that the convex roof is never `∞`, so the definition `convex_roof` should
 be used in most applications. -/
-def convex_roof_ENNReal : MState d → ℝ≥0∞ := fun ρ =>
+def convex_roof_ENNReal {d : Type _} [Fintype d] (g : Ket d → ℝ≥0) : MState d → ℝ≥0∞ := fun ρ =>
   ⨅ (n : ℕ+) (e : PEnsemble d (Fin n)) (_ : mix (toMEnsemble e) = ρ), ↑(pure_average_NNReal g e)
 
-/-- Convex roof extension of a function `g : Ket d → ℝ≥0`, defined as the infimum of all pure-state
-ensembles of a given `ρ` of the average of `g` in that ensemble.
+/-- Mixed convex roof extension of a function `f : MState d → ℝ≥0`, defined as the infimum of all mixed-state
+ensembles of a given `ρ` of the average of `f` on that ensemble.
 
-This is valued in the nonnegative real numbers `ℝ≥0` by applying `ENNReal.toNNReal` to `convex_roof_ENNReal`. Hence,
-it should be used in proofs alongside `convex_roof_ne_top`. -/
-def convex_roof : MState d → ℝ≥0 := ENNReal.toNNReal ∘ convex_roof_ENNReal g
+This is valued in the extended nonnegative real numbers `ℝ≥0∞` to have good properties of the infimum, which
+come from the fact that `ℝ≥0∞` is a complete lattice (see `ENNReal.instCompleteLinearOrder`). However,
+it is also proven in `mixed_convex_roof_ne_top` that the mixed convex roof is never `∞`, so the definition `mixed_convex_roof` should
+be used in most applications. -/
+def mixed_convex_roof_ENNReal {d : Type _} [Fintype d] (f : MState d → ℝ≥0) : MState d → ℝ≥0∞ := fun ρ =>
+  ⨅ (n : ℕ+) (e : MEnsemble d (Fin n)) (_ : mix e = ρ), ↑(average_NNReal f e)
+
+variable {d d₁ d₂ : Type _} [Fintype d] [Fintype d₁] [Fintype d₂] [Nonempty d] [Nonempty d₁] [Nonempty d₂]
+variable (f : MState d → ℝ≥0)
+variable (g : Ket d → ℝ≥0)
 
 /-- The convex roof extension `convex_roof_ENNReal` is never ∞. -/
-theorem convex_roof_ne_top [instNE : Nonempty d] : ∀ ρ, convex_roof_ENNReal g ρ ≠ ∞ := fun ρ => by
+theorem convex_roof_ne_top : ∀ ρ, convex_roof_ENNReal g ρ ≠ ∞ := fun ρ => by
   simp only [convex_roof_ENNReal, ne_eq, iInf_eq_top, coe_ne_top, imp_false, not_forall, Decidable.not_not]
   use ⟨Fintype.card d, Fintype.card_pos⟩
   have ed : d ≃ Fin ↑(⟨Fintype.card d, Fintype.card_pos⟩ : ℕ+) := by
@@ -73,73 +76,71 @@ theorem convex_roof_ne_top [instNE : Nonempty d] : ∀ ρ, convex_roof_ENNReal g
   rw [mix_congrPEnsemble_eq_mix ed]
   exact spectral_ensemble_mix
 
-/-- Mixed convex roof extension of a function `f : MState d → ℝ≥0`, defined as the infimum of all mixed-state
-ensembles of a given `ρ` of the average of `f` on that ensemble.
+omit [Nonempty d] in
+/-- The convex roof extension `mixed_convex_roof_ENNReal` is never ∞. -/
+theorem mixed_convex_roof_ne_top : ∀ ρ, mixed_convex_roof_ENNReal f ρ ≠ ∞ := fun ρ => by
+  simp only [mixed_convex_roof_ENNReal, ne_eq, iInf_eq_top, coe_ne_top, imp_false, not_forall, Decidable.not_not]
+  use 1, trivial_mEnsemble ρ 0
+  exact trivial_mEnsemble_mix ρ 0
 
-This is valued in the extended nonnegative real numbers `ℝ≥0∞` to have good properties of the infimum, which
-come from the fact that `ℝ≥0∞` is a complete lattice (see `ENNReal.instCompleteLinearOrder`). However,
-it is also proven in `mixed_convex_roof_ne_top` that the mixed convex roof is never `∞`, so the definition `mixed_convex_roof` should
-be used in most applications. -/
-def mixed_convex_roof_ENNReal : MState d → ℝ≥0∞ := fun ρ =>
-  ⨅ (n : ℕ+) (e : MEnsemble d (Fin n)) (_ : mix e = ρ), ↑(average_NNReal f e)
+/-- Convex roof extension of a function `g : Ket d → ℝ≥0`, defined as the infimum of all pure-state
+ensembles of a given `ρ` of the average of `g` in that ensemble.
+
+This is valued in the nonnegative real numbers `ℝ≥0` by applying `ENNReal.toNNReal` to `convex_roof_ENNReal`. Hence,
+it should be used in proofs alongside `convex_roof_ne_top`. -/
+def convex_roof : MState d → ℝ≥0 := fun x ↦ (convex_roof_ENNReal g x).untop (convex_roof_ne_top g x)
 
 /-- Mixed convex roof extension of a function `f : MState d → ℝ≥0`, defined as the infimum of all mixed-state
 ensembles of a given `ρ` of the average of `f` on that ensemble.
 
 This is valued in the nonnegative real numbers `ℝ≥0` by applying `ENNReal.toNNReal` to `mixed_convex_roof_ENNReal`. Hence,
 it should be used in proofs alongside `mixed_convex_roof_ne_top`. -/
-def mixed_convex_roof : MState d → ℝ≥0 := ENNReal.toNNReal ∘ mixed_convex_roof_ENNReal f
-
-/-- The convex roof extension `mixed_convex_roof_ENNReal` is never ∞. -/
-theorem mixed_convex_roof_ne_top [Nonempty d] : ∀ ρ, mixed_convex_roof_ENNReal f ρ ≠ ∞ := fun ρ => by
-  simp only [mixed_convex_roof_ENNReal, ne_eq, iInf_eq_top, coe_ne_top, imp_false, not_forall, Decidable.not_not]
-  use 1, trivial_mEnsemble ρ 0
-  exact trivial_mEnsemble_mix ρ 0
+def mixed_convex_roof : MState d → ℝ≥0 := fun x ↦ (mixed_convex_roof_ENNReal f x).untop (mixed_convex_roof_ne_top f x)
 
 /-- Auxiliary function. Convex roof of a function `f : MState d → ℝ≥0` defined over mixed states by resctricting `f` to pure states -/
 def convex_roof_of_MState_fun : MState d → ℝ≥0 := convex_roof (f ∘ pure)
 
 -- TODO: make `le_convex_roof`, `convex_roof_le`, `le_mixed_convex_roof` and `mixed_convex_roof_le` if-and-only-if statements.
 
-theorem le_mixed_convex_roof [Nonempty d] (ρ : MState d) :
+omit [Nonempty d] in
+theorem le_mixed_convex_roof (ρ : MState d) :
   (∀ n > 0, ∀ e : MEnsemble d (Fin n), mix e = ρ → c ≤ average_NNReal f e) → (c ≤ mixed_convex_roof f ρ) := fun h => by
   unfold mixed_convex_roof
-  rw [Function.comp_apply]
-  apply ENNReal.le_toNNReal_of_coe_le _ (mixed_convex_roof_ne_top f ρ)
+  rw [WithTop.le_untop_iff]
   apply le_iInf; intro ⟨n, hnpos⟩; apply le_iInf; intro e; apply le_iInf; intro hmix
-  rw [ENNReal.coe_le_coe]
+  rw [some_eq_coe', ENNReal.coe_le_coe]
   exact h n hnpos e hmix
 
-theorem le_convex_roof [Nonempty d] (ρ : MState d) :
+theorem le_convex_roof (ρ : MState d) :
   (∀ n > 0, ∀ e : PEnsemble d (Fin n), mix (↑e) = ρ → c ≤ pure_average_NNReal g e) → (c ≤ convex_roof g ρ) := fun h => by
   unfold convex_roof
-  rw [Function.comp_apply]
-  apply ENNReal.le_toNNReal_of_coe_le _ (convex_roof_ne_top g ρ)
+  rw [WithTop.le_untop_iff]
   apply le_iInf; intro ⟨n, hnpos⟩; apply le_iInf; intro e; apply le_iInf; intro hmix
-  rw [ENNReal.coe_le_coe]
+  rw [some_eq_coe', ENNReal.coe_le_coe]
   exact h n hnpos e hmix
 
-theorem convex_roof_le [Nonempty d] (ρ : MState d):
+theorem convex_roof_le (ρ : MState d):
 (∃ n > 0, ∃ e : PEnsemble d (Fin n), mix (↑e) = ρ ∧ pure_average_NNReal g e ≤ c) → (convex_roof g ρ ≤ c) := fun h => by
   obtain ⟨n, hnpos, e, hmix, h⟩ := h
   unfold convex_roof
-  rw [Function.comp_apply, ←ENNReal.toNNReal_coe c, ENNReal.toNNReal_le_toNNReal (convex_roof_ne_top g ρ) (ENNReal.coe_ne_top)]
+  rw [WithTop.untop_le_iff]
   apply iInf_le_of_le ⟨n, hnpos⟩; apply iInf_le_of_le e; apply iInf_le_of_le hmix
-  rw [ENNReal.coe_le_coe]
+  rw [some_eq_coe', ENNReal.coe_le_coe]
   exact h
 
-theorem mixed_convex_roof_le [Nonempty d] (ρ : MState d):
+omit [Nonempty d] in
+theorem mixed_convex_roof_le (ρ : MState d):
 (∃ n > 0, ∃ e : MEnsemble d (Fin n), mix e = ρ ∧ average_NNReal f e ≤ c) → (mixed_convex_roof f ρ ≤ c) := fun h => by
   obtain ⟨n, hnpos, e, hmix, h⟩ := h
   unfold mixed_convex_roof
-  rw [Function.comp_apply, ←ENNReal.toNNReal_coe c, ENNReal.toNNReal_le_toNNReal (mixed_convex_roof_ne_top f ρ) (ENNReal.coe_ne_top)]
+  rw [WithTop.untop_le_iff]
   apply iInf_le_of_le ⟨n, hnpos⟩; apply iInf_le_of_le e; apply iInf_le_of_le hmix
-  rw [ENNReal.coe_le_coe]
+  rw [some_eq_coe', ENNReal.coe_le_coe]
   exact h
 
 /-- The mixed convex roof extension of `f` is smaller than or equal to its convex roof extension, since
 the former minimizes over a larger set of ensembles. -/
-theorem mixed_convex_roof_le_convex_roof [Nonempty d] : mixed_convex_roof f ≤ convex_roof_of_MState_fun f := by
+theorem mixed_convex_roof_le_convex_roof : mixed_convex_roof f ≤ convex_roof_of_MState_fun f := by
   intro ρ
   apply le_convex_roof (f ∘ pure) ρ
   intro n hnpos e hmix
@@ -151,7 +152,7 @@ theorem mixed_convex_roof_le_convex_roof [Nonempty d] : mixed_convex_roof f ≤ 
   exact le_of_eq <| NNReal.coe_inj.mp <| average_of_pure_ensemble (toReal ∘ f) e
 
 /-- The convex roof extension of `g : Ket d → ℝ≥0` applied to a pure state `ψ` is `g ψ`. -/
-theorem convex_roof_of_pure [Nonempty d] (ψ : Ket d) : convex_roof g (pure ψ) = g ψ := by
+theorem convex_roof_of_pure (ψ : Ket d) : convex_roof g (pure ψ) = g ψ := by
   rw [le_antisymm_iff]
   constructor
   · apply convex_roof_le
@@ -168,8 +169,9 @@ theorem convex_roof_of_pure [Nonempty d] (ψ : Ket d) : convex_roof g (pure ψ) 
     simp only [pure_average_NNReal, ← NNReal.coe_inj, coe_mk]
     rw [mix_pEnsemble_pure_average (toReal ∘ g) hmix, Function.comp_apply]
 
+omit [Nonempty d] in
 /-- The mixed convex roof extension of `f : MState d → ℝ≥0` applied to a pure state `ψ` is `f (pure ψ)`. -/
-theorem mixed_convex_roof_of_pure [Nonempty d] (ψ : Ket d) : mixed_convex_roof f (pure ψ) = f (pure ψ) := by
+theorem mixed_convex_roof_of_pure (ψ : Ket d) : mixed_convex_roof f (pure ψ) = f (pure ψ) := by
   rw [le_antisymm_iff]
   constructor
   · apply mixed_convex_roof_le
@@ -191,6 +193,6 @@ von Neumann entropy of one of the subsystems (here chosen to be the left one, bu
 def EoF : MState (d₁ × d₂) → ℝ≥0 := convex_roof (fun ψ ↦ ⟨Sᵥₙ (pure ψ).traceRight, Sᵥₙ_nonneg (pure ψ).traceRight⟩)
 
 /-- The entanglement of formation of the maximally entangled state with on-site dimension 𝕕 is log(𝕕). -/
-theorem EoF_of_MES [Nonempty d] : EoF (pure <| Ket.MES d) = Real.log (Finset.card Finset.univ (α := d)) := by
+theorem EoF_of_MES : EoF (pure <| Ket.MES d) = Real.log (Finset.card Finset.univ (α := d)) := by
   simp only [EoF, convex_roof_of_pure, coe_mk, Finset.card_univ]
   sorry
