@@ -7,6 +7,7 @@ import QuantumInfo.Finite.Capacity
 import QuantumInfo.Finite.Channel.DegradableOrder
 import QuantumInfo.Finite.CPTPMap
 import QuantumInfo.Finite.Distance
+import QuantumInfo.Finite.Ensemble
 import QuantumInfo.Finite.Entanglement
 import QuantumInfo.Finite.Entropy
 import QuantumInfo.Finite.MState

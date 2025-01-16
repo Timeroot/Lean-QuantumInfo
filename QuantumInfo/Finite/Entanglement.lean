@@ -1,4 +1,5 @@
 import QuantumInfo.Finite.Braket
+import QuantumInfo.Finite.Ensemble
 import QuantumInfo.Finite.Entropy
 import ClassicalInfo.Entropy
 
@@ -39,7 +40,7 @@ open Classical
 open ENNReal
 open NNReal
 open MState
-open MState.Ensemble
+open Ensemble
 
 /-- Convex roof extension of a function `g : Ket d → ℝ≥0`, defined as the infimum of all pure-state
 ensembles of a given `ρ` of the average of `g` in that ensemble.
