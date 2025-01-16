@@ -7,6 +7,8 @@ import QuantumInfo.Finite.Capacity
 import QuantumInfo.Finite.Channel.DegradableOrder
 import QuantumInfo.Finite.CPTPMap
 import QuantumInfo.Finite.Distance
+import QuantumInfo.Finite.Ensemble
+import QuantumInfo.Finite.Entanglement
 import QuantumInfo.Finite.Entropy
 import QuantumInfo.Finite.MState
 import QuantumInfo.Finite.POVM
@@ -25,6 +27,8 @@ What follows is a top-level index to the major top-level definitions in this rep
  * `Bra` and `Ket` for pure quantum states
  * `MState` for mixed quantum states
  * `MState.«term𝐔[_]»`, a notation for unitary matrices, acting on quantum states
+ * `MEnsemble` and `PEnsemble`: Ensemble of mixed and pure states, respectively
+ * `(mixed_)convex_roof` : (Mixed) convex roof extension
  * `CPTPMap` for quantum channels
  * `Matrix.traceNorm`, the trace norm between matrices (mostly for `MState` distance)
  * `MState.fidelity`, the fidelity between quantum states
