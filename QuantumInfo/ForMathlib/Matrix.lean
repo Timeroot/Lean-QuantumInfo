@@ -381,6 +381,14 @@ theorem rinner_zero_mul : hA.rinner Matrix.isHermitian_zero = 0 := by
 theorem rinner_mul_zero : Matrix.isHermitian_zero.rinner hA = 0 := by
   simp [rinner]
 
+@[simp]
+theorem rinner_mul_one : hA.rinner Matrix.isHermitian_one = hA.rtrace := by
+  simp only [rinner, mul_one, rtrace]
+
+@[simp]
+theorem one_rinner_mul : Matrix.isHermitian_one.rinner hA = hA.rtrace := by
+  simp only [rinner, one_mul, rtrace]
+
 theorem rinner_smul_selfAdjoint {c : 𝕜} (hc : _root_.IsSelfAdjoint c) :
     (hA.smul_selfAdjoint hc).rinner hB = c * hA.rinner hB := by
   simp [rinner, RCLike.conj_eq_iff_re.mp hc, RCLike.conj_eq_iff_im.mp hc]
@@ -398,6 +406,16 @@ theorem rinner_smul_real {c : ℝ} :
 theorem smul_inner_real {c : ℝ} :
     hA.rinner (hB.smul_real c) = c * hA.rinner hB := by
   simp [rinner, RCLike.smul_re]
+
+@[simp]
+theorem rinner_add : hA.rinner (IsHermitian.add hB hC) = hA.rinner hB + hA.rinner hC := by
+  unfold rinner
+  rw [left_distrib, trace_add, map_add]
+
+@[simp]
+theorem rinner_sub : hA.rinner (IsHermitian.sub hB hC) = hA.rinner hB - hA.rinner hC := by
+  unfold rinner
+  rw [sub_eq_add_neg, left_distrib, trace_add, map_add, mul_neg, trace_neg, map_neg, ←sub_eq_add_neg]
 
 end IsHermitian
 namespace PosSemidef
