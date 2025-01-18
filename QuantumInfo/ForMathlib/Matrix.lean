@@ -299,6 +299,32 @@ theorem sqrt_nonneg_smul {c : 𝕜} (hA : (c^2 • A).PosSemidef) (hc : 0 < c) :
     apply posSemidef_sqrt
   rw [pow_two, Algebra.mul_smul_comm, Algebra.smul_mul_assoc, sqrt_mul_self, pow_two, smul_smul]
 
+include hA in
+theorem zero_dotProduct_zero_iff : (∀ x : m → 𝕜, 0 = star x ⬝ᵥ A.mulVec x) ↔ A = 0 := by
+  constructor
+  · intro h0
+    replace h0 := fun x ↦(PosSemidef.dotProduct_mulVec_zero_iff hA x).mp (h0 x).symm
+    ext i j
+    specialize h0 (Pi.single j 1)
+    rw [mulVec_single] at h0
+    replace h0 := congrFun h0 i
+    simp_all only [mul_one, Pi.zero_apply, zero_apply]
+  · intro h0
+    rw [h0]
+    simp only [zero_mulVec, dotProduct_zero, implies_true]
+
+theorem zero_posSemidef_neg_posSemidef_iff : A.PosSemidef ∧ (-A).PosSemidef ↔ A = 0 := by
+  constructor
+  · intro ⟨hA, hNegA⟩
+    have h0 : ∀ x : m → 𝕜, 0 = star x ⬝ᵥ A.mulVec x := fun x ↦ by
+      have hNegA' := hNegA.right x
+      rw [neg_mulVec, dotProduct_neg, le_neg, neg_zero] at hNegA'
+      exact le_antisymm (hA.right x) hNegA'
+    exact (zero_dotProduct_zero_iff hA).mp h0
+  · intro h0
+    rw [h0]
+    simp only [neg_zero, and_self, PosSemidef.zero]
+
 noncomputable section log
 
 /-- Matrix logarithm (base e) of a positive semidefinite matrix, as given by the elementwise
