@@ -405,22 +405,6 @@ theorem trace_monotone : Monotone (@trace n 𝕜 _ _) := fun _ _ ↦
 
 theorem trace_mono : A ≤ B → A.trace ≤ B.trace := trace_monotone.imp
 
--- This one might need `Matrix.HermitianFunctionalCalculus`
-theorem le_smul_one_of_eigenvalues (hA : A.PosSemidef) (c : ℝ) (h : ∀ i, hA.1.eigenvalues i ≤ c) : A ≤ c • 1 := by
-  rw [le_iff_sub_posSemidef]
-  apply IsHermitian.posSemidef_of_eigenvalues_nonneg (IsHermitian.sub (IsHermitian.smul_real isHermitian_one c) hA.1)
-  intro i
-  sorry
-
-theorem le_trace_smul_one (hA : A.PosSemidef) : A ≤ hA.1.rtrace • 1 := by
-  have h : ∀ i, hA.1.eigenvalues i ≤ hA.1.rtrace := fun i ↦ by
-    rw [←IsHermitian.sum_eigenvalues_eq_rtrace hA.1]
-    convert @Finset.sum_le_sum_of_subset_of_nonneg n ℝ _ hA.1.eigenvalues {i} Finset.univ _ _
-    · rw [Finset.sum_singleton]
-    · exact Finset.subset_univ {i}
-    · exact fun j _ _ ↦ eigenvalues_nonneg hA j
-  exact le_smul_one_of_eigenvalues hA hA.1.rtrace h
-
 theorem mul_mul_conjTranspose_mono {m : Type*} [Fintype m] (C : Matrix m n 𝕜) :
   A ≤ B → C * A * C.conjTranspose ≤ C * B * C.conjTranspose := fun hAB ↦ by
     rw [le_iff_sub_posSemidef]
@@ -445,6 +429,57 @@ theorem diagonal_monotone : Monotone (diagonal : (n → 𝕜) → _) := fun _ _ 
   le_of_nonneg_imp' (diagonalAddMonoidHom n 𝕜) (fun _ ↦ PosSemidef.diagonal)
 
 theorem diagonal_mono {d₁ d₂ : n → 𝕜} : d₁ ≤ d₂ → diagonal d₁ ≤ diagonal d₂ := diagonal_monotone.imp
+
+theorem diagonal_le_iff {d₁ d₂ : n → 𝕜} : d₁ ≤ d₂ ↔ diagonal d₁ ≤ diagonal d₂ := ⟨diagonal_mono, by
+  intro hd
+  rw [le_iff_sub_posSemidef, diagonal_sub, posSemidef_diagonal_iff] at hd
+  simp only [sub_nonneg] at hd
+  exact hd⟩
+
+theorem le_smul_one_of_eigenvalues_iff (hA : A.PosSemidef) (c : ℝ) :
+  (∀ i, hA.1.eigenvalues i ≤ c) ↔ A ≤ c • (1 : Matrix n n 𝕜) := by
+  let U : Matrix n n 𝕜 := ↑hA.1.eigenvectorUnitary
+  have hU : U.conjTranspose = star U := by simp only [star]
+  have hU' : U * star U = 1 := by
+    simp only [SetLike.coe_mem, unitary.mul_star_self_of_mem, U]
+  have hc : c • (1 : Matrix n n 𝕜) = U * (c • 1) * U.conjTranspose := by
+    simp only [Algebra.mul_smul_comm, mul_one, hU, Algebra.smul_mul_assoc, hU']
+  have hc' : c • (1 : Matrix n n 𝕜) = Matrix.diagonal (RCLike.ofReal ∘ fun _ : n ↦ c) := by
+    ext i j
+    simp only [smul_apply, one_apply, smul_ite, RCLike.real_smul_eq_coe_mul, mul_one, smul_zero,
+      diagonal, Function.comp_apply, of_apply]
+  have hAST : A = U * diagonal (RCLike.ofReal ∘ hA.1.eigenvalues) * U.conjTranspose := by
+    rw [hU]
+    exact IsHermitian.spectral_theorem hA.1
+  constructor
+  · intro h
+    rw [hc, hc', hAST]
+    apply mul_mul_conjTranspose_mono
+    apply diagonal_mono
+    intro i
+    simp only [Function.comp_apply, algebraMap_le_algebraMap, h i]
+  intro hAc i
+  replace hAc := conjTranspose_mul_mul_mono U hAc
+  have hU'CT : star U * U = 1 := by
+    simp only [SetLike.coe_mem, unitary.star_mul_self_of_mem, U]
+  have hcCT : U.conjTranspose * (c • 1) * U = c • (1 : Matrix n n 𝕜) := by
+    simp only [Algebra.mul_smul_comm, mul_one, hU, Algebra.smul_mul_assoc, hU'CT]
+  have hASTCT : U.conjTranspose * A * U = diagonal (RCLike.ofReal ∘ hA.1.eigenvalues) := by
+    rw [hU]
+    exact IsHermitian.star_mul_self_mul_eq_diagonal hA.1
+  rw [hcCT, hc', hASTCT, ←diagonal_le_iff] at hAc
+  specialize hAc i
+  simp only [Function.comp_apply, algebraMap_le_algebraMap] at hAc
+  exact hAc
+
+theorem le_trace_smul_one (hA : A.PosSemidef) : A ≤ hA.1.rtrace • 1 := by
+  have h : ∀ i, hA.1.eigenvalues i ≤ hA.1.rtrace := fun i ↦ by
+    rw [←IsHermitian.sum_eigenvalues_eq_rtrace hA.1]
+    convert @Finset.sum_le_sum_of_subset_of_nonneg n ℝ _ hA.1.eigenvalues {i} Finset.univ _ _
+    · rw [Finset.sum_singleton]
+    · exact Finset.subset_univ {i}
+    · exact fun j _ _ ↦ eigenvalues_nonneg hA j
+  exact (le_smul_one_of_eigenvalues_iff hA hA.1.rtrace).mp h
 
 end partialOrder
 
