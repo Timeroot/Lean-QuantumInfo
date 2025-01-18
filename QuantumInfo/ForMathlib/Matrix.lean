@@ -61,6 +61,15 @@ theorem smul_real (c : ℝ) : (c • A).IsHermitian := by
   ext
   simp only [smul_apply, smul_eq_mul, RCLike.real_smul_eq_coe_mul]
 
+def HermitianSubspace (n 𝕜 : Type*) [Fintype n] [RCLike 𝕜] : Subspace ℝ (Matrix n n 𝕜) where
+  carrier := { A : Matrix n n 𝕜 | A.IsHermitian }
+  add_mem' _ _ := by simp_all only [Set.mem_setOf_eq, IsHermitian.add]
+  zero_mem' := by simp only [Set.mem_setOf_eq, isHermitian_zero]
+  smul_mem' c A := by
+    simp only [Set.mem_setOf_eq]
+    intro hA
+    exact IsHermitian.smul_real hA c
+
 variable [Fintype n]
 
 include hA in
