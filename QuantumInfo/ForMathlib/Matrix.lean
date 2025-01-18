@@ -95,6 +95,9 @@ theorem sum_eigenvalues_eq_trace : ∑ i, hA.eigenvalues i = A.trace := by
   rw [← mul_assoc]
   simp [Matrix.trace_diagonal]
 
+theorem sum_eigenvalues_eq_rtrace : ∑ i, hA.eigenvalues i = hA.rtrace := by
+  rw [rtrace, ←@RCLike.ofReal_inj 𝕜, sum_eigenvalues_eq_trace hA, re_trace_eq_trace hA]
+
 /-- If all eigenvalues are equal to zero, then the matrix is zero. -/
 theorem eigenvalues_zero_eq_zero (h : ∀ i, hA.eigenvalues i = 0) : A = 0 := by
   suffices A.rank = 0 from zero_rank_eq_zero this
@@ -345,17 +348,116 @@ theorem log_IsHermitian (hA : A.PosSemidef) : hA.log.IsHermitian :=
 --TODO: properties here https://en.wikipedia.org/wiki/Logarithm_of_a_matrix#Properties
 
 end log
+end PosSemidef
+
+namespace PosSemidef
+section partialOrder
+open scoped ComplexOrder
+
+variable {n 𝕜 : Type*} [Fintype n] [RCLike 𝕜]
+variable {A : Matrix n n 𝕜} {B : Matrix n n 𝕜}
+variable (hA : A.IsHermitian) (hB : B.IsHermitian)
+
+/-- Partial order of square matrices induced by positive-semi-definiteness:
+`A ≤ B ↔ (B - A).PosSemidef`
+TODO : Equivalence to CStarAlgebra.spectralOrder -/
+instance instPartialOrder : PartialOrder (Matrix n n 𝕜) where
+  le A B := (B - A).PosSemidef
+  le_refl A := by simp only [sub_self, PosSemidef.zero]
+  le_trans A B C hAB hBC := by
+    simp_all only
+    rw [←sub_add_sub_cancel _ B _]
+    exact PosSemidef.add hBC hAB
+  le_antisymm A B hAB hBA := by
+    simp_all only
+    rw [←neg_sub] at hAB
+    rw [←sub_eq_zero]
+    exact zero_posSemidef_neg_posSemidef_iff.mp ⟨hBA, hAB⟩
+
+theorem le_iff_sub_posSemidef : A ≤ B ↔ (B - A).PosSemidef := by rfl
+
+theorem zero_le_iff_posSemidef : 0 ≤ A ↔ A.PosSemidef := by
+  apply Iff.trans (le_iff_sub_posSemidef)
+  rw [sub_zero]
+
+theorem le_iff_sub_nonneg : A ≤ B ↔ 0 ≤ B - A := Iff.trans le_iff_sub_posSemidef zero_le_iff_posSemidef.symm
+
+theorem le_of_nonneg_imp {R : Type*} [OrderedAddCommGroup R] (f : Matrix n n 𝕜 →+ R) (h : ∀ A, A.PosSemidef → 0 ≤ f A) :
+  (A ≤ B → f A ≤ f B) := by
+  intro hAB
+  rw [←sub_nonneg, ←map_sub]
+  exact h (B - A) <| le_iff_sub_posSemidef.mp hAB
+
+theorem le_of_nonneg_imp' {R : Type*} [OrderedAddCommGroup R] {x y : R} (f : R →+ Matrix n n 𝕜) (h : ∀ x, 0 ≤ x → (f x).PosSemidef) :
+  (x ≤ y → f x ≤ f y) := by
+  intro hxy
+  rw [le_iff_sub_nonneg, ←map_sub]
+  rw [←sub_nonneg] at hxy
+  exact zero_le_iff_posSemidef.mpr <| h (y - x) hxy
+
+theorem diag_monotone : Monotone (diag : Matrix n n 𝕜 → (n → 𝕜)) := fun _ _ ↦
+  le_of_nonneg_imp (diagAddMonoidHom n 𝕜) (fun _ ↦ diag_nonneg)
+
+theorem diag_mono : A ≤ B → ∀ i, A.diag i ≤ B.diag i := diag_monotone.imp
+
+theorem trace_monotone : Monotone (@trace n 𝕜 _ _) := fun _ _ ↦
+  le_of_nonneg_imp (traceAddMonoidHom n 𝕜) (fun _ ↦ trace_nonneg)
+
+theorem trace_mono : A ≤ B → A.trace ≤ B.trace := trace_monotone.imp
+
+-- This one might need `Matrix.HermitianFunctionalCalculus`
+theorem le_smul_one_of_eigenvalues (hA : A.PosSemidef) (c : ℝ) (h : ∀ i, hA.1.eigenvalues i ≤ c) : A ≤ c • 1 := by
+  rw [le_iff_sub_posSemidef]
+  apply IsHermitian.posSemidef_of_eigenvalues_nonneg (IsHermitian.sub (IsHermitian.smul_real isHermitian_one c) hA.1)
+  intro i
+  sorry
+
+theorem le_trace_smul_one (hA : A.PosSemidef) : A ≤ hA.1.rtrace • 1 := by
+  have h : ∀ i, hA.1.eigenvalues i ≤ hA.1.rtrace := fun i ↦ by
+    rw [←IsHermitian.sum_eigenvalues_eq_rtrace hA.1]
+    convert @Finset.sum_le_sum_of_subset_of_nonneg n ℝ _ hA.1.eigenvalues {i} Finset.univ _ _
+    · rw [Finset.sum_singleton]
+    · exact Finset.subset_univ {i}
+    · exact fun j _ _ ↦ eigenvalues_nonneg hA j
+  exact le_smul_one_of_eigenvalues hA hA.1.rtrace h
+
+theorem mul_mul_conjTranspose_mono {m : Type*} [Fintype m] (C : Matrix m n 𝕜) :
+  A ≤ B → C * A * C.conjTranspose ≤ C * B * C.conjTranspose := fun hAB ↦ by
+    rw [le_iff_sub_posSemidef]
+    have hDistrib : C * B * Cᴴ - C * A * Cᴴ = C * (B - A) * Cᴴ := by
+      ext i j
+      simp only [sub_apply, mul_apply, conjTranspose_apply, RCLike.star_def, Finset.sum_mul,
+        ←Finset.sum_sub_distrib, mul_sub_left_distrib, mul_sub_right_distrib]
+    rw [hDistrib]
+    exact mul_mul_conjTranspose_same (le_iff_sub_posSemidef.mp hAB) C
+
+theorem conjTranspose_mul_mul_mono {m : Type*} [Fintype m] (C : Matrix n m 𝕜) :
+  A ≤ B → C.conjTranspose * A * C ≤ C.conjTranspose * B * C := fun hAB ↦ by
+    rw [le_iff_sub_posSemidef]
+    have hDistrib : Cᴴ * B * C - Cᴴ * A * C = Cᴴ * (B - A) * C := by
+      ext i j
+      simp only [sub_apply, mul_apply, conjTranspose_apply, RCLike.star_def, Finset.sum_mul,
+        ←Finset.sum_sub_distrib, mul_sub_left_distrib, mul_sub_right_distrib]
+    rw [hDistrib]
+    exact conjTranspose_mul_mul_same (le_iff_sub_posSemidef.mp hAB) C
+
+theorem diagonal_monotone : Monotone (diagonal : (n → 𝕜) → _) := fun _ _ ↦
+  le_of_nonneg_imp' (diagonalAddMonoidHom n 𝕜) (fun _ ↦ PosSemidef.diagonal)
+
+theorem diagonal_mono {d₁ d₂ : n → 𝕜} : d₁ ≤ d₂ → diagonal d₁ ≤ diagonal d₂ := diagonal_monotone.imp
+
+end partialOrder
 
 end PosSemidef
 
 section frobenius_inner_product
 open scoped ComplexOrder
-variable {A : Matrix n n 𝕜} {B : Matrix n n 𝕜} [Fintype n]
+variable {A : Matrix n n 𝕜} {B : Matrix n n 𝕜} {C : Matrix n n 𝕜} [Fintype n]
 
 namespace IsHermitian
 open scoped ComplexOrder
 
-variable (hA : A.IsHermitian) (hB : B.IsHermitian)
+variable (hA : A.IsHermitian) (hB : B.IsHermitian) (hC : C.IsHermitian)
 
 /-- Real inner product of two square matrices. Only defined for Hermitian matrices,
   as this lets us meaningfully interpret it as a real. -/
@@ -428,45 +530,19 @@ theorem rinner_ge_zero : 0 ≤ hA.1.rinner hB.1 := by
   nth_rewrite 1 [← hA.posSemidef_sqrt.left]
   exact (RCLike.nonneg_iff.mp (hB.conjTranspose_mul_mul_same _).trace_nonneg).left
 
+theorem rinner_mono {A B C : Matrix n n 𝕜} (hA : A.PosSemidef) (hB : B.IsHermitian) (hC : C.IsHermitian) :
+  B ≤ C → hA.1.rinner hB ≤ hA.1.rinner hC := fun hBC ↦ by
+  rw [le_iff_sub_posSemidef] at hBC
+  have hTr : 0 ≤ hA.1.rinner (IsHermitian.sub hC hB) := rinner_ge_zero hA hBC
+  rw [IsHermitian.rinner_sub] at hTr
+  linarith
+
 set_option pp.proofs.withType true in
 include hA hB in
 /-- The inner product for PSD matrices is at most the product of their traces. -/
 theorem rinner_le_mul_trace : hA.1.rinner hB.1 ≤ hA.1.rtrace * hB.1.rtrace := by
-  wlog ha : A.trace = 1
-  · by_cases ha₀ : A.trace = 0
-    · have h₁ : A = 0 := hA.trace_zero ha₀
-      subst A
-      simp
-      sorry
-    · let A' := A.trace⁻¹ • A
-      sorry
-      -- have h₁ : A'.PosSemidef := by
-      --   apply nonneg_smul hA (RCLike.inv_nonneg' hA.trace_nonneg)
-      -- have h₂ : A'.trace = 1 := by
-      --   simp [A', inv_mul_cancel₀ ha₀]
-      -- specialize this h₁ hB h₂
-      -- simp [A'] at this
-      -- have h₃ : 0 < A.trace⁻¹ :=
-      --   RCLike.inv_pos.mpr (lt_of_le_of_ne hA.trace_nonneg (Ne.symm ha₀))
-      -- rw [RCLike.conj_eq_iff_im (z := A.trace).mpr (RCLike.nonneg_iff.mp hA.trace_nonneg).right] at this
-      -- clear h₁ h₂ ha hA hB A'
-      -- sorry
-  wlog hb : B.trace = 1
-  · sorry
-  replace h : 0 ≤ (((A - B)ᴴ * (A - B)).trace) := by
-    exact (posSemidef_conjTranspose_mul_self (A - B)).trace_nonneg
-  simp only [conjTranspose_sub, sub_mul, mul_sub, ← sub_add, Matrix.trace_sub,
-    Matrix.trace_add] at h
-  replace h : (Bᴴ * A).trace + (Aᴴ * B).trace ≤ (Aᴴ * A).trace + (Bᴴ * B).trace := by
-    rw [RCLike.le_iff_re_im] at h ⊢
-    obtain ⟨h₁, h₂⟩ := h
-    simp only [map_add, map_sub, map_zero] at h₁ h₂ ⊢
-    constructor <;> linarith
-  have : (Aᴴ * A).trace ≤ 1 := by sorry
-  have : (Bᴴ * B).trace ≤ 1 := by sorry
-  -- rw [ha, hb, one_mul]
-  --add, divide by two, symmetrize, transitive.
-  sorry
+  convert rinner_mono hA hB.1 (IsHermitian.smul_real isHermitian_one hB.1.rtrace) (le_trace_smul_one hB)
+  rw [IsHermitian.smul_inner_real hA.1 isHermitian_one, IsHermitian.rinner_mul_one, mul_comm]
 
 -- /-- The InnerProductSpace on Matrix n n 𝕜 defined by the Frobenius inner product, `Matrix.inner`.-/
 -- def MatrixInnerProduct :=
