@@ -30,12 +30,65 @@ def coherentInfo (ρ : MState d₁) (Λ : CPTPMap d₁ d₂) : ℝ :=
   let ρImg : MState (d₂ × d₁) := Λ.prod CPTPMap.id ρPure
   (- qConditionalEnt ρImg)
 
-/-- The quantum relative entropy S(ρ‖σ) = Tr[ρ (log ρ - log σ)]. -/
-def qRelativeEnt (ρ σ : MState d) [DecidableEq d] : ℝ :=
-  ρ.Hermitian.rinner (ρ.pos.log_IsHermitian.sub σ.pos.log_IsHermitian)
+variable [DecidableEq d]
 
-/-- Quantum relative entropy is nonnegative. (TODO: Could be bundled into NNReal with `qRelativeEnt`?)-/
-theorem qRelativeEnt_nonneg (ρ σ : MState d) [DecidableEq d] : 0 ≤ qRelativeEnt ρ σ := by
+open Classical in
+/-- The quantum relative entropy S(ρ‖σ) = Tr[ρ (log ρ - log σ)]. -/
+def qRelativeEnt (ρ σ : MState d)  : EReal :=
+  (if
+    LinearMap.ker σ.m.toLin' ≤ LinearMap.ker ρ.m.toLin'
+  then
+    ρ.Hermitian.rinner (ρ.pos.log_IsHermitian.sub σ.pos.log_IsHermitian)
+  else
+    ⊤)
+
+/-- Quantum relative entropy as `Tr[ρ (log ρ - log σ)]` when supports are correct. -/
+theorem qRelativeEnt_ker {ρ σ : MState d} (h : LinearMap.ker σ.m.toLin' ≤ LinearMap.ker ρ.m.toLin') :
+    qRelativeEnt ρ σ = ρ.Hermitian.rinner (ρ.pos.log_IsHermitian.sub σ.pos.log_IsHermitian) := by
+  simp [qRelativeEnt, h]
+
+/-- Quantum relative entropy when σ has full rank -/
+theorem qRelativeEnt_rank {ρ σ : MState d} (h : σ.m.rank = Fintype.card d) :
+    qRelativeEnt ρ σ = ρ.Hermitian.rinner (ρ.pos.log_IsHermitian.sub σ.pos.log_IsHermitian) := by
+  apply qRelativeEnt_ker
+  suffices LinearMap.ker σ.m.toLin' = ⊥ by
+    simp only [this, bot_le]
+  --TODO this definitely belongs in Mathlib
+  rw [LinearMap.ker_eq_bot_iff_range_eq_top_of_finrank_eq_finrank rfl]
+  rw [← Matrix.toLin_eq_toLin' , Matrix.range_toLin_eq_top]
+  apply Ne.isUnit
+  rw [Matrix.IsHermitian.det_eq_prod_eigenvalues σ.pos.1]
+  rw [Finset.prod_ne_zero_iff]
+  intro a _
+  simp only [Complex.coe_algebraMap, ne_eq, Complex.ofReal_eq_zero]
+  rw [Matrix.IsHermitian.rank_eq_card_non_zero_eigs σ.pos.1, Fintype.card_subtype_compl] at h
+  have h₂ : Fintype.card { x // σ.pos.1.eigenvalues x = 0 } = 0 := by
+    have : 0 < Fintype.card d := @Fintype.card_pos _ _ σ.nonempty
+    omega
+  rw [Fintype.card_eq_zero_iff] at h₂
+  by_contra h'
+  exact h₂.elim ⟨_, h'⟩
+
+--∀ ⦃x⦄, x ∈ s → ∀ ⦃y⦄, y ∈ s → ∀ ⦃a b : 𝕜⦄, 0 ≤ a → 0 ≤ b → a + b = 1 →
+    --f (a • x + b • y) ≤ a • f x + b • f y
+
+/-- Quantum relative entropy is nonnegative. (TODO: Should be bundled into ENNReal with `qRelativeEnt`?).
+This can be proved by an application of Klein's inequality. -/
+theorem qRelativeEnt_nonneg (ρ σ : MState d) : 0 ≤ qRelativeEnt ρ σ := by
+  sorry
+
+/-- Joint convexity of Quantum relative entropy. We can't state this with `ConvexOn` because that requires
+an `AddCommMonoid`, which `MState`s are not. Instead we state it with `Mixable`.
+
+TODO:
+ * Add the `Mixable` instance that infers from the `Coe` so that the right hand side can be written as
+`p [qRelativeEnt ρ₁ σ₁ ↔ qRelativeEnt ρ₂ σ₂]`
+ * Define (joint) convexity as its own thing - a `ConvexOn` for `Mixable` types.
+ * Maybe, more broadly, find a way to make `ConvexOn` work with the subset of `Matrix` that corresponds to `MState`.
+-/
+theorem qRelativeEnt_joint_convexity :
+  ∀ (ρ₁ ρ₂ σ₁ σ₂ : MState d), ∀ (p : Prob),
+    qRelativeEnt (p [ρ₁ ↔ ρ₂]) (p [σ₁ ↔ σ₂]) ≤ p * qRelativeEnt ρ₁ σ₁ + (1 - p) * qRelativeEnt ρ₂ σ₂ := by
   sorry
 
 /-- The Quantum Conditional Mutual Information, I(A;C|B) = S(A|B) - S(A|BC). -/
