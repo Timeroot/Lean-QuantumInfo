@@ -24,6 +24,9 @@ Important definitions:
  * `purity`: The purity `Tr[ρ^2]` of a state
  * `spectrum`: The spectrum of the matrix
  * `uniform`: The maximally mixed state
+ * `MEnsemble` and `PEnsemble`: Ensemble of mixed and pure states, respectively
+ * `mix`: The total state corresponding to an ensemble
+ * `average`: Averages a function over an ensemble, with appropriate weights
 -/
 
 noncomputable section
@@ -313,6 +316,11 @@ instance instUnique [Unique d] : Unique (MState d) where
     have h₂ := (@uniform _ _ instNonemptyOfInhabited : MState d).tr
     simp [Matrix.trace, Unique.eq_default] at h₁ h₂ ⊢
     exact h₁.trans h₂.symm
+
+/-- There exists a mixed state for every nonempty `d`.
+Here, the maximally mixed one is chosen. -/
+instance instInhabited [Nonempty d] : Inhabited (MState d) where
+  default := uniform
 
 section ptrace
 
