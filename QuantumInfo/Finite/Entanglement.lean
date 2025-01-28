@@ -113,7 +113,7 @@ theorem le_mixed_convex_roof (ρ : MState d) :
   exact h n hnpos e hmix
 
 theorem le_convex_roof (ρ : MState d) :
-  (∀ n > 0, ∀ e : PEnsemble d (Fin n), mix (↑e) = ρ → c ≤ pure_average_NNReal g e) → (c ≤ convex_roof g ρ) := fun h => by
+  (∀ n > 0, ∀ e : PEnsemble d (Fin n), mix (toMEnsemble e) = ρ → c ≤ pure_average_NNReal g e) → (c ≤ convex_roof g ρ) := fun h => by
   unfold convex_roof
   rw [WithTop.le_untop_iff]
   apply le_iInf; intro ⟨n, hnpos⟩; apply le_iInf; intro e; apply le_iInf; intro hmix
@@ -121,7 +121,7 @@ theorem le_convex_roof (ρ : MState d) :
   exact h n hnpos e hmix
 
 theorem convex_roof_le (ρ : MState d):
-(∃ n > 0, ∃ e : PEnsemble d (Fin n), mix (↑e) = ρ ∧ pure_average_NNReal g e ≤ c) → (convex_roof g ρ ≤ c) := fun h => by
+(∃ n > 0, ∃ e : PEnsemble d (Fin n), mix (toMEnsemble e) = ρ ∧ pure_average_NNReal g e ≤ c) → (convex_roof g ρ ≤ c) := fun h => by
   obtain ⟨n, hnpos, e, hmix, h⟩ := h
   unfold convex_roof
   rw [WithTop.untop_le_iff]

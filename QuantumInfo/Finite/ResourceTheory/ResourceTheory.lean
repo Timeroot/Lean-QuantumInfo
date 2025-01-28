@@ -44,31 +44,6 @@ structure IsTensorial [ResourceTheory ι] [Unital ι] : Prop where
 theorem maximal_IsMaximal [FreeStateTheory ι] : IsMaximal (maximal (ι := ι)) :=
   fun _ _ ↦ rfl
 
-/-- Any `ResourceTheory.Unital` theory that `IsMaximal` also `IsTensorial`. Note that the converse
-is not true: the theory whose free operations are precisely the replacement channels is tensorial but
-not maximal. (That is the minimal tensorial operation set.) -/
-theorem IsTensorial_of_IsMaximal [r : ResourceTheory ι] [Unital ι] (h : r.IsMaximal) : r.IsTensorial where
-  prod {_ _ _ _ f g} hf hg := by
-    unfold IsMaximal at h
-    rw [h] at hf hg ⊢
-    dsimp at hf hg ⊢
-    intro ρ hρ
-    have hn := @r.nongenerating
-    simp_rw [h] at hn
-    dsimp at hn
-    --This might be wrong actually
-    sorry
-  create {_} ρ hρ := by
-    unfold IsMaximal at h
-    simp [h, hρ]
-  destroy {i} := by
-    unfold IsMaximal at h
-    rw [h]
-    intro _ _
-    obtain ⟨_, _, hσ⟩ := free_fullRank (ι := ι) Unital.unit
-    convert hσ
-    exact (Unique.eq_default _).trans (Unique.default_eq _)
-
 --Helper theorem for ResourceTheory.mk_of_ops
 private lemma convex_states_of_convex_ops [ResourcePretheory ι] (O : ∀ (i j : ι), Set (CPTPMap (H i) (H j)))
   (h_convex : ∀ {i j}, Convex ℝ (CPTPMap.choi '' O i j)) (i : ι) :
@@ -100,7 +75,7 @@ private lemma convex_states_of_convex_ops [ResourcePretheory ι] (O : ∀ (i j :
       simp only [Mixable.mix_ab, Mixable.mkT, MState.instMixable, CPTPMap.instFunLike,
         CPTPMap.CPTP_of_choi_PSD_Tr, CPTPMap.mk, MatrixMap.of_choi_matrix, Mixable.to_U]
       ext
-      change (Finset.sum _ _) = (_ + _)
+      change (Finset.sum _ _) = ((_ : ℂ) + _)
       simp only [Matrix.add_apply, Matrix.smul_apply, Complex.real_smul]
       simp_rw [mul_add, Finset.sum_add_distrib]
       congr
