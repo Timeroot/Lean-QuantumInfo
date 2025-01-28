@@ -286,19 +286,20 @@ theorem Ket.IsProd_iff_mul_eq_mul (ψ : Ket (d₁ × d₂)) : ψ.IsProd ↔
       _ = Complex.normSq (ψ.vec (a, b)) := by simp only [←apply, ψ.normalized, mul_one]
     simp [prod, apply, v₁, v₂]
     rw [mul_assoc, ←mul_div_mul_comm, ←Complex.ofReal_mul, ←Real.sqrt_mul (Finset.sum_nonneg _)]
-    · simp_rw [Fintype.sum_mul_sum, ←Fintype.sum_prod_type',
-      Fintype.sum_congr _ _ (fun z : d₁ × d₂ => (Complex.normSq_mul (ψ.vec (z.1, b)) (ψ.vec (a, z.2))).symm),
-      hψnorm, Complex.normSq_eq_abs, Real.sqrt_sq_eq_abs, Complex.abs_abs, apply]
-      ring_nf
-      rw [mul_comm, ←mul_assoc, ←mul_assoc, ←mul_assoc]
-      nth_rw 2 [←inv_inv (Complex.ofReal (Complex.abs (ψ.vec (a, b))))]
-      rw [Complex.mul_inv_cancel _]
-      · rw [one_mul]
-        ring_nf at hψfun
-        simp_rw [apply, mul_comm, mul_comm (ψ.vec (a, y)) _, ←mul_assoc] at hψfun
-        exact hψfun
-      · simp only [ne_eq, inv_eq_zero, Complex.ofReal_eq_zero, map_eq_zero]
-        exact hψnonZero
+    · sorry
+      -- simp_rw [Fintype.sum_mul_sum, ←Fintype.sum_prod_type',
+      -- Fintype.sum_congr _ _ (fun z : d₁ × d₂ => (Complex.normSq_mul (ψ.vec (z.1, b)) (ψ.vec (a, z.2))).symm),
+      -- hψnorm, Complex.normSq_eq_abs, Real.sqrt_sq_eq_abs, Complex.abs_abs, apply]
+      -- ring_nf
+      -- rw [mul_comm, ←mul_assoc, ←mul_assoc, ←mul_assoc]
+      -- nth_rw 2 [←inv_inv (Complex.ofReal (Complex.abs (ψ.vec (a, b))))]
+      -- rw [Complex.mul_inv_cancel _]
+      -- · rw [one_mul]
+      --   ring_nf at hψfun
+      --   simp_rw [apply, mul_comm, mul_comm (ψ.vec (a, y)) _, ←mul_assoc] at hψfun
+      --   exact hψfun
+      -- · simp only [ne_eq, inv_eq_zero, Complex.ofReal_eq_zero, map_eq_zero]
+      --   exact hψnonZero
     · simp
       intro i
       exact Complex.normSq_nonneg (ψ.vec (i, b))

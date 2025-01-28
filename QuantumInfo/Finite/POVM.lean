@@ -45,6 +45,8 @@ def measurement_map (Λ : POVM X d) : CPTPMap d (d × X) where
     map_add' := by simp [mul_add, add_mul, Matrix.kroneckerMap_add_left]
     map_smul' := by simp [Matrix.smul_kronecker]
   }
+  pos := --stupid, what
+    sorry
   trace_preserving := by
     intro x
     simp [Matrix.trace_kronecker, Matrix.trace_mul_cycle]

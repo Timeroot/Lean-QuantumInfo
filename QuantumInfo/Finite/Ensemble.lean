@@ -71,7 +71,7 @@ theorem mix_congrMEnsemble_eq_mix (σ : α ≃ β) (e : MEnsemble d α) : mix (c
 
 /-- Equivalence of pure-state ensembles leaves the resulting mixed state invariant -/
 @[simp]
-theorem mix_congrPEnsemble_eq_mix (σ : α ≃ β) (e : PEnsemble d α) : mix ↑(congrPEnsemble σ e) = mix (↑e : MEnsemble d α) := by
+theorem mix_congrPEnsemble_eq_mix (σ : α ≃ β) (e : PEnsemble d α) : mix (toMEnsemble (congrPEnsemble σ e)) = mix (↑e : MEnsemble d α) := by
   unfold toMEnsemble congrPEnsemble mix
   rw [Distribution.map_congr_eq_congr_map MState.pure σ e]
   exact Distribution.expect_val_congr_eq_expect_val σ (MState.pure <$> e)
@@ -108,11 +108,11 @@ theorem average_of_pure_ensemble {T : Type _} {U : Type*} [AddCommGroup U] [Modu
 /-- A pure-state ensemble mixes into a pure state if and only if
 the only states in the ensemble with nonzero probability are equal to `ψ`  -/
 theorem mix_pEnsemble_pure_iff_pure {ψ : Ket d} {e : PEnsemble d α} :
-  mix ↑e = MState.pure ψ ↔ ∀ i : α, e.distr i ≠ 0 → e.states i = ψ := by
+  mix (toMEnsemble e) = MState.pure ψ ↔ ∀ i : α, e.distr i ≠ 0 → e.states i = ψ := by
   sorry
 
 /-- The average of `f : Ket d → T` on an ensemble that mixes to a pure state `ψ` is `f ψ` -/
-theorem mix_pEnsemble_pure_average {ψ : Ket d} {e : PEnsemble d α} {T : Type _} {U : Type*} [AddCommGroup U] [Module ℝ U] [inst : Mixable U T] (f : Ket d → T) (hmix : mix ↑e = MState.pure ψ) :
+theorem mix_pEnsemble_pure_average {ψ : Ket d} {e : PEnsemble d α} {T : Type _} {U : Type*} [AddCommGroup U] [Module ℝ U] [inst : Mixable U T] (f : Ket d → T) (hmix : mix (toMEnsemble e) = MState.pure ψ) :
   pure_average f e = f ψ := by
   have hpure := mix_pEnsemble_pure_iff_pure.mp hmix
   simp only [pure_average, Functor.map, Distribution.expect_val]
@@ -199,7 +199,7 @@ probability 1. -/
 def trivial_pEnsemble (ψ : Ket d) (i : α) : PEnsemble d α := ⟨fun _ ↦ ψ, Distribution.constant i⟩
 
 /-- The trivial pure-state ensemble of `ψ` mixes to `ψ` -/
-theorem trivial_pEnsemble_mix (ψ : Ket d) : ∀ i : α, mix (trivial_pEnsemble ψ i) = MState.pure ψ := fun i ↦ by
+theorem trivial_pEnsemble_mix (ψ : Ket d) : ∀ i : α, mix (toMEnsemble (trivial_pEnsemble ψ i)) = MState.pure ψ := fun i ↦ by
   ext1
   simp only [trivial_pEnsemble, Distribution.constant, toMEnsemble_mk, mix_of, DFunLike.coe,
     apply_ite, Prob.toReal_one, Prob.toReal_zero, MEnsemble.states, Function.comp_apply, ite_smul,

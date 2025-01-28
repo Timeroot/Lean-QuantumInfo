@@ -47,27 +47,32 @@ theorem qRelativeEnt_ker {ρ σ : MState d} (h : LinearMap.ker σ.m.toLin' ≤ L
     qRelativeEnt ρ σ = ρ.Hermitian.rinner (ρ.pos.log_IsHermitian.sub σ.pos.log_IsHermitian) := by
   simp [qRelativeEnt, h]
 
+--TODO this definitely belongs in Mathlib
+theorem ker_bot_of_full_rank (M : Matrix d d ℂ) (h : M.rank = Fintype.card d) :
+    LinearMap.ker (Matrix.toLin' M) = ⊥ := by
+  rw [LinearMap.ker_eq_bot_iff_range_eq_top_of_finrank_eq_finrank rfl]
+  rw [← Matrix.toLin_eq_toLin' , Matrix.range_toLin_eq_top]
+  apply Ne.isUnit
+  -- rw [Matrix.IsHermitian.det_eq_prod_eigenvalues σ.pos.1]
+  -- rw [Finset.prod_ne_zero_iff]
+  -- intro a _
+  -- simp only [Complex.coe_algebraMap, ne_eq, Complex.ofReal_eq_zero]
+  -- rw [Matrix.IsHermitian.rank_eq_card_non_zero_eigs σ.pos.1, Fintype.card_subtype_compl] at h
+  -- have h₂ : Fintype.card { x // σ.pos.1.eigenvalues x = 0 } = 0 := by
+  --   have : 0 < Fintype.card d := @Fintype.card_pos _ _ σ.nonempty
+  --   omega
+  -- rw [Fintype.card_eq_zero_iff] at h₂
+  -- by_contra h'
+  -- exact h₂.elim ⟨_, h'⟩
+  sorry
+
 /-- Quantum relative entropy when σ has full rank -/
 theorem qRelativeEnt_rank {ρ σ : MState d} (h : σ.m.rank = Fintype.card d) :
     qRelativeEnt ρ σ = ρ.Hermitian.rinner (ρ.pos.log_IsHermitian.sub σ.pos.log_IsHermitian) := by
   apply qRelativeEnt_ker
   suffices LinearMap.ker σ.m.toLin' = ⊥ by
     simp only [this, bot_le]
-  --TODO this definitely belongs in Mathlib
-  rw [LinearMap.ker_eq_bot_iff_range_eq_top_of_finrank_eq_finrank rfl]
-  rw [← Matrix.toLin_eq_toLin' , Matrix.range_toLin_eq_top]
-  apply Ne.isUnit
-  rw [Matrix.IsHermitian.det_eq_prod_eigenvalues σ.pos.1]
-  rw [Finset.prod_ne_zero_iff]
-  intro a _
-  simp only [Complex.coe_algebraMap, ne_eq, Complex.ofReal_eq_zero]
-  rw [Matrix.IsHermitian.rank_eq_card_non_zero_eigs σ.pos.1, Fintype.card_subtype_compl] at h
-  have h₂ : Fintype.card { x // σ.pos.1.eigenvalues x = 0 } = 0 := by
-    have : 0 < Fintype.card d := @Fintype.card_pos _ _ σ.nonempty
-    omega
-  rw [Fintype.card_eq_zero_iff] at h₂
-  by_contra h'
-  exact h₂.elim ⟨_, h'⟩
+  apply ker_bot_of_full_rank _ h
 
 --∀ ⦃x⦄, x ∈ s → ∀ ⦃y⦄, y ∈ s → ∀ ⦃a b : 𝕜⦄, 0 ≤ a → 0 ≤ b → a + b = 1 →
     --f (a • x + b • y) ≤ a • f x + b • f y

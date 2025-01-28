@@ -1,5 +1,6 @@
 import Mathlib.CategoryTheory.FullSubcategory
 import Mathlib.CategoryTheory.Monoidal.Braided.Basic
+import Mathlib.Data.Real.EReal
 
 import QuantumInfo.Finite.CPTPMap
 import QuantumInfo.Finite.Entropy
@@ -102,7 +103,22 @@ open NNReal
 variable {ι : Type*} [FreeStateTheory ι]
 
 noncomputable def RelativeEntResource {i : ι} : MState (H i) → ℝ≥0 :=
-  fun ρ ↦ ⨅ (σ : MState (H i)), (⟨qRelativeEnt ρ σ, qRelativeEnt_nonneg ρ σ⟩ : ℝ≥0)
+    fun ρ ↦ (⨅ σ ∈ IsFree, EReal.toENNReal (qRelativeEnt ρ σ)).untop
+  (by
+    let ⟨w,h⟩ := free_fullRank i
+    apply ne_top_of_le_ne_top _ (iInf_le _ w)
+    simp only [ne_eq, iInf_eq_top, Classical.not_imp]
+    constructor
+    · exact h.2
+    · dsimp [qRelativeEnt]
+      split_ifs with h
+      · simpa using ne_of_beq_false rfl
+      · absurd h
+        rw [ker_bot_of_full_rank]
+        · exact OrderBot.bot_le (LinearMap.ker (Matrix.toLin' ρ.m))
+        · --should be in mathlib
+          sorry
+  )
 
 noncomputable def RegularizedRelativeEntResource {i : ι} : MState (H i) → ℝ≥0 :=
   --I want to define a general notion of "regularized quantity" and then use that here. That can then

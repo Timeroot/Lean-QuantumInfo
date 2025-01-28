@@ -93,7 +93,7 @@ theorem PosSemidef_outer_self_conj (v : d → ℂ) : Matrix.PosSemidef (Matrix.v
   · ext
     simp [Matrix.vecMulVec_apply, mul_comm]
   · intro x
-    simp_rw [Matrix.dotProduct, Pi.star_apply, RCLike.star_def, Matrix.mulVec, Matrix.dotProduct,
+    simp_rw [dotProduct, Pi.star_apply, RCLike.star_def, Matrix.mulVec, dotProduct,
       Matrix.vecMulVec_apply, mul_assoc, ← Finset.mul_sum, ← mul_assoc, ← Finset.sum_mul]
     change
       0 ≤ (∑ i : d, (starRingEnd ℂ) (x i) * v i) * ∑ i : d, (starRingEnd ℂ) (v i) * x i
@@ -161,7 +161,7 @@ theorem spectrum_pure_eq_constant (ψ : Ket d) :
       -- Prove ψ is an eigenvector of ρ = pure ψ
       have hv : ρ.m *ᵥ ψ = ψ := by
         ext
-        simp_rw [ρ, pure, Matrix.mulVec, Matrix.vecMulVec_apply, Matrix.dotProduct, Bra.apply',
+        simp_rw [ρ, pure, Matrix.mulVec, Matrix.vecMulVec_apply, dotProduct, Bra.apply',
         Ket.apply, mul_assoc, ← Finset.mul_sum, ← Complex.normSq_eq_conj_mul_self,
         ← Complex.ofReal_sum, ← Ket.apply, ψ.normalized, Complex.ofReal_one, mul_one]
       let U : Matrix.unitaryGroup d ℂ := star ρ.Hermitian.eigenvectorUnitary -- Diagonalizing unitary of ρ
@@ -412,7 +412,8 @@ theorem IsSeparable_prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : IsSeparab
   let only := (ρ₁, ρ₂)
   use { only }, Distribution.constant ⟨only, Finset.mem_singleton_self only⟩
   simp only [prod, Finset.univ_unique, Unique.eq_default, Distribution.constant_eq, ite_true,
-    Prob.toReal_one, Finset.default_singleton, one_smul, Finset.sum_const, Finset.card_singleton]
+    Prob.toReal_one, Finset.default_singleton, one_smul, Finset.sum_const, Finset.card_singleton,
+    only]
 
 /-- A pure state is separable iff the ket is a product state. -/
 theorem pure_separable_iff_IsProd (ψ : Ket (d₁ × d₂)) :

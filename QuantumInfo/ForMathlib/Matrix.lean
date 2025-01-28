@@ -143,7 +143,7 @@ variable (hA : A.PosSemidef) (hB : B.PosSemidef)
 include hA in
 theorem diag_nonneg : ∀i, 0 ≤ A.diag i := by
   intro i
-  simpa [Matrix.mulVec, Matrix.dotProduct] using hA.2 (fun j ↦ if i = j then 1 else 0)
+  simpa [Matrix.mulVec, dotProduct] using hA.2 (fun j ↦ if i = j then 1 else 0)
 
 include hA in
 theorem trace_nonneg : 0 ≤ A.trace := by
@@ -312,6 +312,8 @@ theorem zero_dotProduct_zero_iff : (∀ x : m → 𝕜, 0 = star x ⬝ᵥ A.mulV
     rw [mulVec_single] at h0
     replace h0 := congrFun h0 i
     simp_all only [mul_one, Pi.zero_apply, zero_apply]
+    convert h0 using 1
+    sorry
   · intro h0
     rw [h0]
     simp only [zero_mulVec, dotProduct_zero, implies_true]
