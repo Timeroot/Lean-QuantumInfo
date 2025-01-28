@@ -568,4 +568,36 @@ instance instT5MState : T3Space (MState d) :=
 
 end topology
 
+section finprod
+
+variable {ι : Type u} [DecidableEq ι] [fι : Fintype ι]
+variable {dI : ι → Type v} [∀(i :ι), Fintype (dI i)] [∀(i :ι), DecidableEq (dI i)]
+
+def piProd (ρi : (i:ι) → MState (dI i)) : MState ((i:ι) → dI i) where
+  m j k := ∏ (i : ι), (ρi i).m (j i) (k i)
+  pos := by
+    --Should be in Mathlib
+    constructor
+    · ext j k
+      dsimp
+      rw [map_prod]
+      congr! with i
+      exact Matrix.ext_iff.mpr ((ρi i).pos.isHermitian) (j i) (k i)
+    · intro v
+      sorry
+  tr := by
+    dsimp [Matrix.trace]
+    convert (Finset.prod_univ_sum (κ := dI) (fun _ ↦ Finset.univ) (fun i_1 x ↦ (ρi i_1).m x x)).symm
+    symm
+    apply Finset.prod_eq_one
+    intro x hx
+    exact (ρi x).tr
+
+def npow (ρ : MState d) (n : ℕ) : MState (Fin n → d) :=
+  piProd (fun _ ↦ ρ)
+
+notation "⊗^" => MState.npow
+
+end finprod
+
 end MState
