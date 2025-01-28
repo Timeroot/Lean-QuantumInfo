@@ -328,6 +328,31 @@ theorem zero_posSemidef_neg_posSemidef_iff : A.PosSemidef ∧ (-A).PosSemidef �
     rw [h0]
     simp only [neg_zero, and_self, PosSemidef.zero]
 
+noncomputable section pow
+
+/-- Matrix power of a positive semidefinite matrix, as given by the elementwise
+  real power of the diagonal in a diagonalized form.
+
+  Note that this has the usual `Real.rpow` caveats, such as 0 to the power -1 giving 0. -/
+def rpow (hA : A.PosSemidef) (p : ℝ) : Matrix m m 𝕜 :=
+  (hA.1.eigenvectorUnitary : Matrix _ _ _) * diagonal (RCLike.ofReal ∘ (· ^ p) ∘ hA.1.eigenvalues) *
+  (star hA.1.eigenvectorUnitary : Matrix _ _ _)
+
+theorem rpow_IsHermitian (hA : A.PosSemidef) (p : ℝ) : (hA.rpow p).IsHermitian :=
+  Matrix.isHermitian_mul_mul_conjTranspose _ (by simp
+    [isHermitian_diagonal_iff, RCLike.isSelfAdjoint_re_iff])
+
+theorem rpow_PosSemidef (hA : A.PosSemidef) (p : ℝ) : (hA.rpow p).PosSemidef := by
+  apply Matrix.PosSemidef.mul_mul_conjTranspose_same
+  refine posSemidef_diagonal_iff.mpr fun i ↦ ?_
+  rw [Function.comp_apply, RCLike.nonneg_iff]
+  constructor
+  · simp only [RCLike.ofReal_re]
+    exact Real.rpow_nonneg (hA.eigenvalues_nonneg i) p
+  · simp only [RCLike.ofReal_im]
+
+end pow
+
 noncomputable section log
 
 /-- Matrix logarithm (base e) of a positive semidefinite matrix, as given by the elementwise

@@ -196,4 +196,7 @@ def EoF : MState (d₁ × d₂) → ℝ≥0 := convex_roof (fun ψ ↦ ⟨Sᵥ�
 /-- The entanglement of formation of the maximally entangled state with on-site dimension 𝕕 is log(𝕕). -/
 theorem EoF_of_MES : EoF (pure <| Ket.MES d) = Real.log (Finset.card Finset.univ (α := d)) := by
   simp only [EoF, convex_roof_of_pure, coe_mk, Finset.card_univ]
+  simp only [traceRight, Matrix.traceRight, MState.pure, Ket.MES, one_div, Matrix.vecMulVec_apply,
+    Ket.apply, Bra.eq_conj, apply_ite, map_inv₀, Complex.conj_ofReal, map_zero, ite_mul, zero_mul,
+    mul_zero, Finset.sum_ite_eq, Finset.mem_univ, ↓reduceIte, ← Matrix.diagonal.eq_1]
   sorry
