@@ -206,7 +206,7 @@ theorem trivial_pEnsemble_mix (ψ : Ket d) : ∀ i : α, mix (toMEnsemble (trivi
     one_smul, zero_smul, Finset.sum_ite_eq, Finset.mem_univ, ↓reduceIte]
 
 /-- The average of `f : Ket d → T` on a trivial ensemble of `ψ` is `f ψ`-/
-theorem trivial_pEnsemble_average {T : Type _} {U : Type*} [AddCommGroup U] [Module ℝ U] [inst : Mixable U T] (f : Ket d → T) (ψ : Ket d):
+theorem trivial_pEnsemble_average {T : Type _} {U : Type*} [AddCommGroup U] [Module ℝ U] [inst : Mixable U T] (f : Ket d → T) (ψ : Ket d) :
   ∀ i : α, pure_average f (trivial_pEnsemble ψ i) = f ψ := fun i ↦ by
     simp only [pure_average, Functor.map, Distribution.expect_val, trivial_pEnsemble]
     apply Mixable.to_U_inj
@@ -219,7 +219,7 @@ instance PEnsemble.instInhabited [Nonempty d] [Inhabited α] : Inhabited (PEnsem
 
 /-- The spectral pure-state ensemble of `ρ`. The states are its eigenvectors, and the probabilities, eigenvalues. -/
 def spectral_ensemble (ρ : MState d) : PEnsemble d d :=
-  { var := fun i ↦
+  { var i :=
     { vec := ρ.Hermitian.eigenvectorBasis i
       normalized' := by
         rw [←one_pow 2, ←ρ.Hermitian.eigenvectorBasis.orthonormal.1 i]

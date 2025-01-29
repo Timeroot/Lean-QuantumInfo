@@ -12,11 +12,10 @@ variable {d : Type*} [Fintype d] [DecidableEq d]
 /-- The optimal hypothesis testing rate, for a tolerance ε: given a state ρ and a set of states S,
 the optimum distinguishing rate that allows a probability ε of errors. -/
 noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : ℝ) (S : Set (MState d)) : ℝ≥0 :=
-  ⨅ T : Matrix d d ℂ,
-  ⨅ h : T.PosSemidef ∧ T ≤ 1,
-  ⨅ _ : MState.exp_val (Matrix.isHermitian_one.sub h.1.1) ρ ≤ ε,
+  ⨅ T : { m : Matrix d d ℂ //
+    ∃ h : m.PosSemidef ∧ m ≤ 1, MState.exp_val (Matrix.isHermitian_one.sub h.1.1) ρ ≤ ε},
   ⨆ σ ∈ S,
-  ⟨MState.exp_val h.1.1 σ, MState.exp_val_nonneg h.1 σ⟩
+  ⟨MState.exp_val T.2.1.1.1 σ, MState.exp_val_nonneg T.2.1.1 σ⟩
 
 private theorem Lemma3 (ρ : MState d) (ε : ℝ) (S : Set (MState d)) :
     ⨆ σ ∈ S, OptimalHypothesisRate ρ ε {σ} = OptimalHypothesisRate ρ ε S
