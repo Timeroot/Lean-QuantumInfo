@@ -14,6 +14,17 @@ the optimum distinguishing rate that allows a probability ε of errors. -/
 noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : ℝ) (S : Set (MState d)) : ℝ≥0 :=
   ⨅ T ∈ {T : MState d | (Matrix.isHermitian_one.sub T.Hermitian).rinner ρ.Hermitian ≤ ε}, (⨆ σ ∈ S, (T.inner σ) )
 
+private theorem Lemma3 (ρ : MState d) (ε : ℝ) (S : Set (MState d)) :
+    ⨆ σ ∈ S, (
+      ⨅ T ∈ {
+        T : MState d |
+        (Matrix.isHermitian_one.sub T.Hermitian).rinner ρ.Hermitian ≤ ε
+      },
+        (T.inner σ).toReal)
+    = OptimalHypothesisRate ρ ε S
+  := by
+  sorry
+
 private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState d) (σm : MState (Fin m → d)) (hσf : σf.m.PosDef) (ε : ℝ)
     (hε : 0 < ε) :
     let σn (n : ℕ) : (MState (Fin n → d)) :=
