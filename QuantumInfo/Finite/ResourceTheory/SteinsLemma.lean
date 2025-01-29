@@ -3,9 +3,9 @@ import QuantumInfo.Finite.ResourceTheory.FreeState
 open ResourcePretheory
 open FreeStateTheory
 open NNReal
+open ComplexOrder
 
 section hypotesting
-open ComplexOrder
 
 variable {d : Type*} [Fintype d] [DecidableEq d]
 
@@ -14,6 +14,24 @@ the optimum distinguishing rate that allows a probability ε of errors. -/
 noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : ℝ) (S : Set (MState d)) : ℝ≥0 :=
   ⨅ T ∈ {T : MState d | (Matrix.isHermitian_one.sub T.Hermitian).rinner ρ.Hermitian ≤ ε}, (⨆ σ ∈ S, (T.inner σ) )
 
+end hypotesting
+
+variable {ι : Type*} [FreeStateTheory ι]
+variable {i : ι}
+
+-- This theorem should follow from "Fekete's subadditive lemma", which can be found in
+-- Lemma A.1 of Hayashi's book "Quantum Information Theory - Mathematical Foundation".
+--
+-- Also, the sequence of states S^(n) mentioned in the paper is implicitly defined here as
+-- IsFree (i := i⊗^[n]). It has all the properties we need plus some more (e.g., for this
+-- lemma, we don't need convexity).
+/-- Lemma 5 -/
+theorem limit_rel_entropy_exists (ρ : MState (H i)) :
+  ∃ d : ℝ, Filter.Tendsto (fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree (i := i⊗^[n]), qRelativeEnt (ρ⊗^[n]) σ)
+  Filter.atTop (nhds (↑d : EReal)) := by
+  sorry
+
+variable {d : Type*} [Fintype d] [DecidableEq d] in
 private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState d) (σm : MState (Fin m → d)) (hσf : σf.m.PosDef) (ε : ℝ)
     (hε : 0 < ε) :
     let σn (n : ℕ) : (MState (Fin n → d)) :=
@@ -35,21 +53,15 @@ private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState d) (σm : MState 
   := by
   sorry
 
-end hypotesting
-
-variable {ι : Type*} [FreeStateTheory ι]
-variable {i : ι}
-
--- This theorem should follow from "Fekete's subadditive lemma", which can be found in
--- Lemma A.1 of Hayashi's book "Quantum Information Theory - Mathematical Foundation".
---
--- Also, the sequence of states S^(n) mentioned in the paper is implicitly defined here as
--- IsFree (i := i⊗^[n]). It has all the properties we need plus some more (e.g., for this
--- lemma, we don't need convexity).
-/-- Lemma 5 -/
-theorem limit_rel_entropy_exists (ρ : MState (H i)) :
-  ∃ d : ℝ, Filter.Tendsto (fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree (i := i⊗^[n]), qRelativeEnt (ρ⊗^[n]) σ)
-  Filter.atTop (nhds (↑d : EReal)) := by
+/-- Theorem 4, which is _also_ called the Generalized Quantum Stein's Lemma in Hayashi & Yamasaki -/
+theorem limit_hypotesting_eq_limit_rel_entropy (ε : ℝ) (hε : 0 < ε ∧ ε < 1) :
+    ∃ d : ℝ,
+      Filter.Tendsto (fun n ↦ -(↑n)⁻¹ * Real.log (OptimalHypothesisRate (ρ⊗^[n]) ε IsFree))
+      Filter.atTop (nhds (d))
+      ∧
+      Filter.Tendsto (fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree (i := i⊗^[n]), qRelativeEnt (ρ⊗^[n]) σ)
+      Filter.atTop (nhds (d : EReal))
+      := by
   sorry
 
 theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) :
