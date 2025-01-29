@@ -596,7 +596,7 @@ def piProd (ρi : (i:ι) → MState (dI i)) : MState ((i:ι) → dI i) where
 def npow (ρ : MState d) (n : ℕ) : MState (Fin n → d) :=
   piProd (fun _ ↦ ρ)
 
-notation "⊗^" => MState.npow
+notation ρ "⊗^" n => MState.npow ρ n
 
 end finprod
 
