@@ -35,7 +35,7 @@ variable {i : ι}
 -- lemma, we don't need convexity).
 /-- Lemma 5 -/
 theorem limit_rel_entropy_exists (ρ : MState (H i)) :
-  ∃ d : ℝ, Filter.Tendsto (fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree (i := i⊗^[n]), qRelativeEnt (ρ⊗^[n]) σ)
+  ∃ d : ℝ, Filter.Tendsto (fun n ↦ (⨅ σ ∈ IsFree (i := i⊗^[n]), qRelativeEnt (ρ⊗^[n]) σ) / n)
   Filter.atTop (nhds (↑d : EReal)) := by
   sorry
 
@@ -57,7 +57,7 @@ private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState d) (σm : MState 
           |>.trans <|
           (Equiv.prodCongr (Equiv.curry ..) (Equiv.refl _))
       (σl.prod σr).relabel eqv
-    Filter.atTop.limsup (fun n ↦ -(OptimalHypothesisRate (ρ ⊗^ n) ε {σn n}) / n : ℕ → ℝ) ≤
+    Filter.atTop.limsup (fun n ↦ - Real.log (OptimalHypothesisRate (ρ ⊗^ n) ε {σn n}) / n : ℕ → ℝ) ≤
     (qRelativeEnt (ρ ⊗^ m) σm) / m
   := by
   sorry
@@ -65,10 +65,10 @@ private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState d) (σm : MState 
 /-- Theorem 4, which is _also_ called the Generalized Quantum Stein's Lemma in Hayashi & Yamasaki -/
 theorem limit_hypotesting_eq_limit_rel_entropy (ε : ℝ) (hε : 0 < ε ∧ ε < 1) :
     ∃ d : ℝ,
-      Filter.Tendsto (fun n ↦ -(↑n)⁻¹ * Real.log (OptimalHypothesisRate (ρ⊗^[n]) ε IsFree))
+      Filter.Tendsto (fun n ↦ -Real.log (OptimalHypothesisRate (ρ⊗^[n]) ε IsFree) / n)
       Filter.atTop (nhds (d))
       ∧
-      Filter.Tendsto (fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree (i := i⊗^[n]), qRelativeEnt (ρ⊗^[n]) σ)
+      Filter.Tendsto (fun n ↦ ⨅ σ ∈ IsFree (i := i⊗^[n]), qRelativeEnt (ρ⊗^[n]) σ / n)
       Filter.atTop (nhds (d : EReal))
       := by
   sorry
@@ -78,7 +78,7 @@ private theorem Lemma7 (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) 
   -- This is not exactly how R_{1, ε} is defined in Eq. (17), but it should be equal due to
   -- the monotonicity of log and Lemma 3.
   let R1 : ℝ :=
-    Filter.liminf (fun n ↦ -Real.log (OptimalHypothesisRate (ρ⊗^[n]) ε (IsFree (i := i⊗^[n]))) / n) Filter.atTop
+    Filter.liminf (fun n ↦ -Real.log (OptimalHypothesisRate (ρ⊗^[n]) ε IsFree) / n) Filter.atTop
   let R2 : EReal :=
     Filter.liminf (fun n ↦ qRelativeEnt (ρ⊗^[n]) (σ n) / n) Filter.atTop
   (R2 ≥ R1) →
@@ -92,6 +92,6 @@ private theorem Lemma7 (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) 
 
 theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) :
     Filter.Tendsto (fun n ↦
-      -Real.log (OptimalHypothesisRate (ρ⊗^[n]) ε (IsFree (i := i⊗^[n]))) / n
+      -Real.log (OptimalHypothesisRate (ρ⊗^[n]) ε IsFree) / n
     ) Filter.atTop (nhds (RegularizedRelativeEntResource ρ)) := by
   sorry
