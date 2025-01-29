@@ -71,8 +71,8 @@ private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState d) (σₘ : MStat
           |>.trans <|
           (Equiv.prodCongr (Equiv.curry ..) (Equiv.refl _))
       (σl.prod σr).relabel eqv
-    Filter.atTop.limsup (fun n ↦ -β_ ε(ρ ⊗^ n‖{σn n}) / n : ℕ → EReal) ≤
-    𝐃(ρ⊗^m‖σₘ) / m
+    Filter.atTop.limsup (fun n ↦ -Real.log β_ ε(ρ ⊗^ n‖{σn n}) / n : ℕ → EReal) ≤
+    𝐃(ρ⊗^m‖σₘ) / ma43b43e
   := by
   sorry
 
@@ -85,6 +85,23 @@ theorem limit_hypotesting_eq_limit_rel_entropy (ρ : MState (H i)) (ε : ℝ) (h
       Filter.Tendsto (fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree, 𝐃(ρ⊗^[n]‖σ))
       .atTop (𝓝 d)
       := by
+  sorry
+
+/-- Lemma 7 from the paper -/
+private theorem Lemma7 (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) (σ : (n : ℕ+) → IsFree (i := i⊗^[n])) :
+  -- This is not exactly how R_{1, ε} is defined in Eq. (17), but it should be equal due to
+  -- the monotonicity of log and Lemma 3.
+  let R1 : ℝ :=
+    Filter.liminf (fun n ↦ -Real.log β_ ε(ρ⊗^[n]‖IsFree) / n) Filter.atTop
+  let R2 : EReal :=
+    Filter.liminf (fun n ↦ 𝐃(ρ⊗^[n]‖σ n) / n) Filter.atTop
+  (R2 ≥ R1) →
+  ∀ ε' : ℝ, 0 < ε' ∧ ε' < ε → -- ε' is written as \tilde{ε} in the paper.
+  ∃ σ' : (n : ℕ+) → IsFree (i := i⊗^[n]),
+  let R2' : EReal :=
+    Filter.liminf (fun n ↦ 𝐃(ρ⊗^[n]‖σ' n) / n) Filter.atTop
+  R2' - R1 ≤ (1 - ε') * (R2 - R1)
+  := by
   sorry
 
 theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) :
