@@ -16,20 +16,20 @@ noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : ℝ) (S : Set (MSt
 
 private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState d) (σm : MState (Fin m → d)) (hσf : σf.m.PosDef) (ε : ℝ)
     (hε : 0 < ε) :
-    let σn : (n : ℕ) → (MState (Fin n → d)) := by
-      intro n
+    let σn (n : ℕ) : (MState (Fin n → d)) :=
       let l : ℕ := n / m
       let q : ℕ := n % m
       let σl := σm ⊗^ l
       let σr := σf ⊗^ q
-      let eqv : (Fin n → d) ≃ (Fin l → Fin m → d) × (Fin q → d) := by
-        dsimp [l, q] at *
-        refine Equiv.trans ?_ (Equiv.prodCongr (Equiv.curry ..) (Equiv.refl _))
-        refine Equiv.trans ?_ (Equiv.prodCongr (Equiv.piCongrLeft (fun _ ↦ d) finProdFinEquiv).symm (Equiv.refl _))
-        refine Equiv.trans ?_ (Equiv.sumArrowEquivProdArrow _ _ _)
-        refine Equiv.piCongrLeft (fun _ ↦ d) (Equiv.trans ?_ (finSumFinEquiv.symm))
-        apply finCongr (Eq.symm (Nat.div_add_mod' n m))
-      exact (σl.prod σr).relabel eqv
+      let eqv : (Fin n → d) ≃ (Fin l → Fin m → d) × (Fin q → d) :=
+        Equiv.piCongrLeft (fun _ ↦ d) ((finCongr (Eq.symm (Nat.div_add_mod' n m))).trans (finSumFinEquiv.symm))
+          |>.trans <|
+           (Equiv.sumArrowEquivProdArrow ..)
+          |>.trans <|
+           (Equiv.prodCongr (Equiv.piCongrLeft (fun _ ↦ d) finProdFinEquiv).symm (Equiv.refl _))
+          |>.trans <|
+          (Equiv.prodCongr (Equiv.curry ..) (Equiv.refl _))
+      (σl.prod σr).relabel eqv
     Filter.atTop.limsup (fun n ↦ -(OptimalHypothesisRate (ρ ⊗^ n) ε {σn n}) / n : ℕ → ℝ) ≤
     (qRelativeEnt (ρ ⊗^ m) σm) / m
   := by
