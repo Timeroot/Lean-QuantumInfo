@@ -1,5 +1,6 @@
 import Mathlib.Data.NNReal.Basic
 import Mathlib.Analysis.Convex.Mul
+import Mathlib.Data.Real.EReal
 
 /-! # Probabilities
 
@@ -60,44 +61,54 @@ instance instCommMonoidWithZero : CommMonoidWithZero Prob where
   mul_zero := by intros; ext; simp
   zero_mul := by intros; ext; simp
 
-instance instOrderedCommMonoid : OrderedCommMonoid Prob where
+instance instLinearOrder : LinearOrder Prob :=
+  inferInstance
+
+instance instOrderedCommMonoid : LinearOrderedCommMonoid Prob where
+  __ := Prob.instLinearOrder
   mul_le_mul_left := by
     intros a b h c
     rw [← Subtype.coe_le_coe]
     exact mul_le_mul_of_nonneg_left h c.2.1
 
-instance instDistribLattice : DistribLattice Prob where
-  sup x y := x ⊔ y
-  inf x y := x ⊓ y
-  le_sup_left := by
-    intros; rw [← Subtype.coe_le_coe, val_sup]; exact le_sup_left
-  le_sup_right := by
-    intros; rw [← Subtype.coe_le_coe, val_sup]; exact le_sup_right
-  inf_le_left := by
-    intros; rw [← Subtype.coe_le_coe, val_inf]; exact inf_le_left
-  inf_le_right := by
-    intros; rw [← Subtype.coe_le_coe, val_inf]; exact inf_le_right
-  sup_le := by
-    intros; rw [← Subtype.coe_le_coe, val_sup, sup_le_iff]; exact ⟨‹_›, ‹_›⟩
-  le_inf := by
-    intros; rw [← Subtype.coe_le_coe, val_inf, le_inf_iff]; exact ⟨‹_›, ‹_›⟩
-  le_sup_inf := by
-    intros
-    simp only [← Subtype.coe_le_coe, val_inf, val_sup, le_sup_iff, inf_le_iff, sup_le_iff, le_refl,
-      true_and, le_inf_iff, and_true, or_iff_not_imp_left]
-    intro h
-    push_neg at h
-    constructor <;> {intro; linarith}
-
-instance instInhabited : Inhabited Prob where
-  default := 0
-
 instance instDenselyOrdered : DenselyOrdered Prob :=
   show DenselyOrdered (Set.Icc 0 1) from Set.instDenselyOrdered
 
-instance instOrderBot : OrderBot Prob where
+instance instBoundedOrder : BoundedOrder Prob where
   bot := 0
+  top := 1
   bot_le a := a.2.1
+  le_top a := a.2.2
+
+instance instCompleteLinearOrder : CompleteLinearOrder Prob where
+  __ := Prob.instLinearOrder
+  __ : DistribLattice Prob := inferInstance
+  __ := Prob.instLinearOrder.toBiheytingAlgebra
+  sSup s := ⟨sSup (Subtype.val '' s),
+    Real.sSup_nonneg fun _ ⟨H1,H2⟩ ↦ H2.2 ▸ H1.2.1,
+    Real.sSup_le (fun _ ⟨H1,H2⟩ ↦ H2.2 ▸ H1.2.2) (zero_le_one' ℝ)⟩
+  le_sSup s a ha :=
+    le_csSup (a := a.val) ⟨1, fun _ ⟨c,d⟩ ↦ d.2 ▸ c.2.2⟩ ⟨a, ha, rfl⟩
+  sSup_le s a h :=
+    Real.sSup_le (fun _ ⟨p,hp1,hp2⟩ ↦ hp2 ▸ h p hp1) a.2.1
+  sInf s := if h : s.Nonempty then ⟨sInf (Subtype.val '' s),
+    Real.sInf_nonneg fun _ ⟨H1,H2⟩ ↦ H2.2 ▸ H1.2.1,
+      let ⟨x,hx⟩ := h
+      csInf_le_of_le ⟨0, fun _ ⟨c,d⟩ ↦ d.2 ▸ c.2.1⟩ ⟨x, hx, rfl⟩ x.2.2
+    ⟩ else 1
+  sInf_le s a ha := by
+    dsimp only [sInf]
+    split_ifs with h
+    · exact csInf_le (a := a.val) ⟨0, fun _ ⟨c,d⟩ ↦ d.2 ▸ c.2.1⟩ ⟨a, ha, rfl⟩
+    · exact (Set.not_mem_empty a (Set.not_nonempty_iff_eq_empty.mp h ▸ ha)).elim
+  le_sInf s a h := by
+    dsimp only [sInf]
+    split_ifs with h₂
+    · exact le_csInf (Set.Nonempty.image Subtype.val h₂) fun _ ⟨c,d⟩ ↦ d.2 ▸ h c d.1
+    · exact a.2.2
+
+instance instInhabited : Inhabited Prob where
+  default := 0
 
 /-- Coercion `Prob → ℝ`. -/
 @[coe] def toReal : Prob → ℝ := Subtype.val
