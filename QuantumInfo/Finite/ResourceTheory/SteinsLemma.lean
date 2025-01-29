@@ -73,6 +73,23 @@ theorem limit_hypotesting_eq_limit_rel_entropy (ε : ℝ) (hε : 0 < ε ∧ ε <
       := by
   sorry
 
+/-- Lemma 7 from the paper -/
+private theorem Lemma7 (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) (σ : (n : ℕ+) → IsFree (i := i⊗^[n])) :
+  -- This is not exactly how R_{1, ε} is defined in Eq. (17), but it should be equal due to
+  -- the monotonicity of log and Lemma 3.
+  let R1 : ℝ :=
+    Filter.liminf (fun n ↦ -Real.log (OptimalHypothesisRate (ρ⊗^[n]) ε (IsFree (i := i⊗^[n]))) / n) Filter.atTop
+  let R2 : EReal :=
+    Filter.liminf (fun n ↦ qRelativeEnt (ρ⊗^[n]) (σ n) / n) Filter.atTop
+  (R2 ≥ R1) →
+  ∀ ε' : ℝ, 0 < ε' ∧ ε' < ε → -- ε' is written as \tilde{ε} in the paper.
+  ∃ σ' : (n : ℕ+) → IsFree (i := i⊗^[n]),
+  let R2' : EReal :=
+    Filter.liminf (fun n ↦ qRelativeEnt (ρ⊗^[n]) (σ' n) / n) Filter.atTop
+  R2' - R1 ≤ (1 - ε') * (R2 - R1)
+  := by
+  sorry
+
 theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) :
     Filter.Tendsto (fun n ↦
       -Real.log (OptimalHypothesisRate (ρ⊗^[n]) ε (IsFree (i := i⊗^[n]))) / n
