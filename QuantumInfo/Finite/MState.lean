@@ -275,9 +275,8 @@ theorem pure_of_constant_spectrum (ρ : MState d) (h : ∃ i, ρ.spectrum = Dist
   have hsum : ∀ x ∈ Finset.univ, x ∉ ({i} : Finset d) → (ρ.Hermitian.eigenvectorBasis x j) * (↑(if x = i then 1 else 0) : ℝ) * (starRingEnd ℂ) (ρ.Hermitian.eigenvectorBasis x k) = 0 := by
     intros x hx hxnoti
     rw [Finset.mem_singleton] at hxnoti
-    --rw [eq_false hxnoti, if_false, Complex.ofReal_zero]
-    -- ring
-    sorry
+    rw [eq_false hxnoti, if_false, Complex.ofReal_zero]
+    ring
   simp_rw [←Finset.sum_subset (Finset.subset_univ {i}) hsum, Finset.sum_singleton, reduceIte, Complex.ofReal_one, mul_one]
 
 /-- A state ρ is pure iff its spectrum is (1,0,0,...) i.e. a constant distribution. -/
@@ -290,7 +289,7 @@ theorem pure_iff_purity_one (ρ : MState d) : (∃ ψ, ρ = pure ψ) ↔ ρ.puri
   --purity = exp(-Collision entropy)
   --purity eq 1 iff collision entropy is zero
   --entropy is zero iff distribution is constant
-  --disttibution is constant iff pure
+  --distribution is constant iff pure
   sorry
 
 end pure

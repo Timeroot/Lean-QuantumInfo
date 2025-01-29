@@ -4,6 +4,9 @@ open ResourcePretheory
 open FreeStateTheory
 open NNReal
 open ComplexOrder
+open Topology
+
+namespace SteinsLemma
 
 section hypotesting
 
@@ -17,9 +20,19 @@ noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : ℝ) (S : Set (MSt
   ⨆ σ ∈ S,
   ⟨MState.exp_val T.2.1.1.1 σ, MState.exp_val_prob T.2.1 σ⟩
 
+scoped notation "β_" ε " (" ρ "‖" S ")" =>  OptimalHypothesisRate ρ ε S
+
 private theorem Lemma3 (ρ : MState d) (ε : ℝ) (S : Set (MState d)) :
-    ⨆ σ ∈ S, OptimalHypothesisRate ρ ε {σ} = OptimalHypothesisRate ρ ε S
+    ⨆ σ ∈ S, β_ ε(ρ‖{σ}) = β_ ε(ρ‖S)
   := by
+  sorry
+
+/- This is from "Strong converse exponents for a quantum channel discrimination problem and
+quantum-feedback-assisted communication", Lemma 5. It will likely require some kind of
+special condition that α ≠ 1 to be completely true. -/
+private theorem Ref81Lem5 (ρ σ : MState d) (ε α : ℝ) (hε : 0 ≤ ε ∧ ε < 1) (hα : 0 < α) :
+    -Real.log β_ ε(ρ‖{σ}) ≤ (SandwichedRelRentropy α ρ σ : EReal) - Real.log (1 - ε) * α / (1 - α)
+    := by
   sorry
 
 end hypotesting
@@ -35,18 +48,19 @@ variable {i : ι}
 -- lemma, we don't need convexity).
 /-- Lemma 5 -/
 theorem limit_rel_entropy_exists (ρ : MState (H i)) :
-  ∃ d : ℝ, Filter.Tendsto (fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree (i := i⊗^[n]), qRelativeEnt (ρ⊗^[n]) σ)
-  Filter.atTop (nhds (↑d : EReal)) := by
+  ∃ d : ℝ≥0,
+    Filter.Tendsto (fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree (i := i⊗^[n]), 𝐃(ρ⊗^[n]‖σ))
+    .atTop (𝓝 d) := by
   sorry
 
 variable {d : Type*} [Fintype d] [DecidableEq d] in
 /-- Lemma 6 from the paper -/
-private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState d) (σm : MState (Fin m → d)) (hσf : σf.m.PosDef) (ε : ℝ)
+private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState d) (σₘ : MState (Fin m → d)) (hσf : σf.m.PosDef) (ε : ℝ)
     (hε : 0 < ε) :
     let σn (n : ℕ) : (MState (Fin n → d)) :=
       let l : ℕ := n / m
       let q : ℕ := n % m
-      let σl := σm ⊗^ l
+      let σl := σₘ ⊗^ l
       let σr := σf ⊗^ q
       let eqv : (Fin n → d) ≃ (Fin l → Fin m → d) × (Fin q → d) :=
         Equiv.piCongrLeft (fun _ ↦ d) ((finCongr (Eq.symm (Nat.div_add_mod' n m))).trans (finSumFinEquiv.symm))
@@ -57,24 +71,24 @@ private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState d) (σm : MState 
           |>.trans <|
           (Equiv.prodCongr (Equiv.curry ..) (Equiv.refl _))
       (σl.prod σr).relabel eqv
-    Filter.atTop.limsup (fun n ↦ -(OptimalHypothesisRate (ρ ⊗^ n) ε {σn n}) / n : ℕ → ℝ) ≤
-    (qRelativeEnt (ρ ⊗^ m) σm) / m
+    Filter.atTop.limsup (fun n ↦ -β_ ε(ρ ⊗^ n‖{σn n}) / n : ℕ → EReal) ≤
+    𝐃(ρ⊗^m‖σₘ) / m
   := by
   sorry
 
 /-- Theorem 4, which is _also_ called the Generalized Quantum Stein's Lemma in Hayashi & Yamasaki -/
-theorem limit_hypotesting_eq_limit_rel_entropy (ε : ℝ) (hε : 0 < ε ∧ ε < 1) :
-    ∃ d : ℝ,
-      Filter.Tendsto (fun n ↦ -(↑n)⁻¹ * Real.log (OptimalHypothesisRate (ρ⊗^[n]) ε IsFree))
-      Filter.atTop (nhds (d))
+theorem limit_hypotesting_eq_limit_rel_entropy (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) :
+    ∃ d : ℝ≥0,
+      Filter.Tendsto (fun n ↦ -Real.log β_ ε(ρ⊗^[n] ‖ IsFree) / n)
+      .atTop (𝓝 d)
       ∧
-      Filter.Tendsto (fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree (i := i⊗^[n]), qRelativeEnt (ρ⊗^[n]) σ)
-      Filter.atTop (nhds (d : EReal))
+      Filter.Tendsto (fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree, 𝐃(ρ⊗^[n]‖σ))
+      .atTop (𝓝 d)
       := by
   sorry
 
 theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) :
     Filter.Tendsto (fun n ↦
-      -Real.log (OptimalHypothesisRate (ρ⊗^[n]) ε (IsFree (i := i⊗^[n]))) / n
-    ) Filter.atTop (nhds (RegularizedRelativeEntResource ρ)) := by
+      -Real.log β_ ε(ρ⊗^[n]‖IsFree) / n
+    ) .atTop (𝓝 (RegularizedRelativeEntResource ρ)) := by
   sorry

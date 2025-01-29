@@ -34,26 +34,25 @@ variable [DecidableEq d]
 
 open Classical in
 /-- The quantum relative entropy S(ρ‖σ) = Tr[ρ (log ρ - log σ)]. -/
-def qRelativeEnt (ρ σ : MState d)  : EReal :=
+def qRelativeEnt (ρ σ : MState d) : ENNReal :=
   (if
     LinearMap.ker σ.m.toLin' ≤ LinearMap.ker ρ.m.toLin'
   then
-    ρ.Hermitian.rinner (ρ.pos.log_IsHermitian.sub σ.pos.log_IsHermitian)
+    some ⟨ρ.Hermitian.rinner (ρ.pos.log_IsHermitian.sub σ.pos.log_IsHermitian),
+    /- Quantum relative entropy is nonnegative. This can be proved by an application of
+    Klein's inequality. -/
+    sorry⟩
   else
     ⊤)
 
+notation "𝐃(" ρ "‖" σ ")" => qRelativeEnt ρ σ
+
 /-- Quantum relative entropy as `Tr[ρ (log ρ - log σ)]` when supports are correct. -/
 theorem qRelativeEnt_ker {ρ σ : MState d} (h : LinearMap.ker σ.m.toLin' ≤ LinearMap.ker ρ.m.toLin') :
-    qRelativeEnt ρ σ = ρ.Hermitian.rinner (ρ.pos.log_IsHermitian.sub σ.pos.log_IsHermitian) := by
-  simp [qRelativeEnt, h]
+    (𝐃(ρ‖σ) : EReal) = ρ.Hermitian.rinner (ρ.pos.log_IsHermitian.sub σ.pos.log_IsHermitian) := by
+  simp only [qRelativeEnt, h]
+  congr
 
---∀ ⦃x⦄, x ∈ s → ∀ ⦃y⦄, y ∈ s → ∀ ⦃a b : 𝕜⦄, 0 ≤ a → 0 ≤ b → a + b = 1 →
-    --f (a • x + b • y) ≤ a • f x + b • f y
-
-/-- Quantum relative entropy is nonnegative. (TODO: Should be bundled into ENNReal with `qRelativeEnt`?).
-This can be proved by an application of Klein's inequality. -/
-theorem qRelativeEnt_nonneg (ρ σ : MState d) : 0 ≤ qRelativeEnt ρ σ := by
-  sorry
 
 /-- Joint convexity of Quantum relative entropy. We can't state this with `ConvexOn` because that requires
 an `AddCommMonoid`, which `MState`s are not. Instead we state it with `Mixable`.
@@ -66,7 +65,7 @@ TODO:
 -/
 theorem qRelativeEnt_joint_convexity :
   ∀ (ρ₁ ρ₂ σ₁ σ₂ : MState d), ∀ (p : Prob),
-    qRelativeEnt (p [ρ₁ ↔ ρ₂]) (p [σ₁ ↔ σ₂]) ≤ p * qRelativeEnt ρ₁ σ₁ + (1 - p) * qRelativeEnt ρ₂ σ₂ := by
+    𝐃(p [ρ₁ ↔ ρ₂]‖p [σ₁ ↔ σ₂]) ≤ p * 𝐃(ρ₁‖σ₁) + (1 - p) * 𝐃(ρ₂‖σ₂) := by
   sorry
 
 /-- The Quantum Conditional Mutual Information, I(A;C|B) = S(A|B) - S(A|BC). -/
@@ -76,13 +75,15 @@ def qcmi (ρ : MState (dA × dB × dC)) : ℝ :=
 open ComplexOrder in
 /-- The Sandwiched Renyi Relative Entropy, defined with ln (nits). Note that at `α = 1` this definition
   switch to the standard Relative Entropy, for continuity. -/
-def SandwichedRelRentropy (α : ℝ) (ρ σ : MState d) : EReal :=
+def SandwichedRelRentropy (α : ℝ) (ρ σ : MState d) : ENNReal :=
   if α = 1 then
-    qRelativeEnt ρ σ
+    𝐃(ρ‖σ)
   else
-    Real.log (Complex.re (Matrix.trace ((
+    some ⟨Real.log (Complex.re (Matrix.trace ((
       ρ.pos.conjTranspose_mul_mul_same (σ.pos.rpow ((1 - α)/(2 * α)))).rpow α)
-    )) / (α - 1)
+    )) / (α - 1),
+      --Proof that this quantity is nonnegative
+      sorry⟩
 
 --QConditionalEnt chain rule
 
@@ -176,7 +177,7 @@ theorem ker_bot_of_full_rank (M : Matrix d d ℂ) (h : M.rank = Fintype.card d) 
 
 /-- Quantum relative entropy when σ has full rank -/
 theorem qRelativeEnt_rank {ρ σ : MState d} (h : σ.m.rank = Fintype.card d) :
-    qRelativeEnt ρ σ = ρ.Hermitian.rinner (ρ.pos.log_IsHermitian.sub σ.pos.log_IsHermitian) := by
+    (𝐃(ρ‖σ) : EReal) = ρ.Hermitian.rinner (ρ.pos.log_IsHermitian.sub σ.pos.log_IsHermitian) := by
   apply qRelativeEnt_ker
   suffices LinearMap.ker σ.m.toLin' = ⊥ by
     simp only [this, bot_le]
@@ -196,7 +197,7 @@ theorem qMutualInfo_symm (ρ : MState (d₁ × d₂)) :
 
 /-- I(A:B) = S(AB‖ρᴬ⊗ρᴮ) -/
 theorem qMutualInfo_as_qRelativeEnt (ρ : MState (dA × dB)) :
-    qMutualInfo ρ = qRelativeEnt ρ (ρ.traceRight ⊗ ρ.traceLeft) :=
+    qMutualInfo ρ = (𝐃(ρ‖ρ.traceRight ⊗ ρ.traceLeft) : EReal) :=
   sorry
 
 /-- "Ordinary" subadditivity of von Neumann entropy -/
