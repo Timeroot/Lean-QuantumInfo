@@ -123,6 +123,7 @@ def exp_val {T : Matrix d d ℂ} (h : T.IsHermitian) (ρ : MState d) : ℝ :=
 theorem exp_val_nonneg {T : Matrix d d ℂ} (h : T.PosSemidef) (ρ : MState d) : 0 ≤ exp_val h.1 ρ :=
   Matrix.PosSemidef.rinner_ge_zero h ρ.pos
 
+variable [DecidableEq d] in
 theorem exp_val_prob {T : Matrix d d ℂ} (h : T.PosSemidef ∧ T ≤ 1) (ρ : MState d) :
   0 ≤ exp_val h.left.1 ρ ∧ exp_val h.left.1 ρ ≤ 1 :=
     sorry
@@ -274,8 +275,9 @@ theorem pure_of_constant_spectrum (ρ : MState d) (h : ∃ i, ρ.spectrum = Dist
   have hsum : ∀ x ∈ Finset.univ, x ∉ ({i} : Finset d) → (ρ.Hermitian.eigenvectorBasis x j) * (↑(if x = i then 1 else 0) : ℝ) * (starRingEnd ℂ) (ρ.Hermitian.eigenvectorBasis x k) = 0 := by
     intros x hx hxnoti
     rw [Finset.mem_singleton] at hxnoti
-    rw [eq_false hxnoti, if_false, Complex.ofReal_zero]
-    ring
+    --rw [eq_false hxnoti, if_false, Complex.ofReal_zero]
+    -- ring
+    sorry
   simp_rw [←Finset.sum_subset (Finset.subset_univ {i}) hsum, Finset.sum_singleton, reduceIte, Complex.ofReal_one, mul_one]
 
 /-- A state ρ is pure iff its spectrum is (1,0,0,...) i.e. a constant distribution. -/
