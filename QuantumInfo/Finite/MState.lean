@@ -112,6 +112,23 @@ def inner (ρ : MState d) (σ : MState d) : Prob :=
     -- ... ≤ 1
     (ρ.pos.rinner_le_mul_trace σ.pos).trans (by simp only [ρ.rtrace_one, σ.rtrace_one, mul_one, le_refl])⟩⟩
 
+section exp_val
+
+def exp_val_ℂ (T : Matrix d d ℂ) (ρ : MState d) : ℂ :=
+  (T * ρ.m).trace
+
+def exp_val {T : Matrix d d ℂ} (h : T.IsHermitian) (ρ : MState d) : ℝ :=
+  h.rinner ρ.Hermitian
+
+theorem exp_val_nonneg {T : Matrix d d ℂ} (h : T.PosSemidef) (ρ : MState d) : 0 ≤ exp_val h.1 ρ :=
+  Matrix.PosSemidef.rinner_ge_zero h ρ.pos
+
+theorem exp_val_prob {T : Matrix d d ℂ} (h : T.PosSemidef ∧ T ≤ 1) (ρ : MState d) :
+  0 ≤ exp_val h.left.1 ρ ∧ exp_val h.left.1 ρ ≤ 1 :=
+    sorry
+
+end exp_val
+
 section pure
 
 /-- A mixed state can be constructed as a pure state arising from a ket. -/
