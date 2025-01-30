@@ -1,5 +1,7 @@
 import Mathlib.Data.Matrix.Kronecker
 import Mathlib.LinearAlgebra.Matrix.PosDef
+import Mathlib.LinearAlgebra.Matrix.HermitianFunctionalCalculus
+import Mathlib.Algebra.Algebra.Quasispectrum
 
 import QuantumInfo.ForMathlib.Other
 
@@ -385,10 +387,10 @@ variable {n 𝕜 : Type*} [Fintype n] [RCLike 𝕜]
 variable {A : Matrix n n 𝕜} {B : Matrix n n 𝕜}
 variable (hA : A.IsHermitian) (hB : B.IsHermitian)
 
-/-- Partial order of square matrices induced by positive-semi-definiteness:
-`A ≤ B ↔ (B - A).PosSemidef`
+/-- Loewner partial order of square matrices induced by positive-semi-definiteness:
+`A ≤ B ↔ (B - A).PosSemidef` alongside properties that make it an "OrderedCancelAddCommMonoid"
 TODO : Equivalence to CStarAlgebra.spectralOrder -/
-instance instPartialOrder : PartialOrder (Matrix n n 𝕜) where
+instance instOrderedCancelAddCommMonoid : OrderedCancelAddCommMonoid (Matrix n n 𝕜) where
   le A B := (B - A).PosSemidef
   le_refl A := by simp only [sub_self, PosSemidef.zero]
   le_trans A B C hAB hBC := by
@@ -400,12 +402,29 @@ instance instPartialOrder : PartialOrder (Matrix n n 𝕜) where
     rw [←neg_sub] at hAB
     rw [←sub_eq_zero]
     exact zero_posSemidef_neg_posSemidef_iff.mp ⟨hBA, hAB⟩
+  add_le_add_left A B hAB C := by simp_all only [add_sub_add_left_eq_sub]
+  le_of_add_le_add_left A B C hABAC:= by simp_all only [add_sub_add_left_eq_sub]
 
 theorem le_iff_sub_posSemidef : A ≤ B ↔ (B - A).PosSemidef := by rfl
 
 theorem zero_le_iff_posSemidef : 0 ≤ A ↔ A.PosSemidef := by
   apply Iff.trans (le_iff_sub_posSemidef)
   rw [sub_zero]
+
+/-- Basically, the instance states A ≤ B ↔ B = A + Sᴴ * S  -/
+instance instStarOrderedRing : StarOrderedRing (Matrix n n 𝕜) :=
+  StarOrderedRing.of_nonneg_iff'
+    (add_le_add_left)
+    (fun _ ↦ Iff.trans zero_le_iff_posSemidef Matrix.posSemidef_iff_eq_transpose_mul_self)
+
+/-- Basically, the instance states 0 ≤ A → ∀ x ∈ spectrum ℝ A, 0 ≤ x  -/
+instance instNonnegSpectrumClass : NonnegSpectrumClass ℝ (Matrix n n 𝕜) := by
+  apply NonnegSpectrumClass.of_spectrum_nonneg
+  intro A hA x hx
+  rw [IsHermitian.eigenvalues_eq_spectrum_real (zero_le_iff_posSemidef.mp hA).1, Set.mem_range] at hx
+  obtain ⟨i, hi⟩ := hx
+  rw [←hi]
+  exact Matrix.PosSemidef.eigenvalues_nonneg (zero_le_iff_posSemidef.mp hA) i
 
 theorem le_iff_sub_nonneg : A ≤ B ↔ 0 ≤ B - A := Iff.trans le_iff_sub_posSemidef zero_le_iff_posSemidef.symm
 
