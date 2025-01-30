@@ -564,10 +564,12 @@ theorem rinner_zero_mul : hA.rinner Matrix.isHermitian_zero = 0 := by
 theorem rinner_mul_zero : Matrix.isHermitian_zero.rinner hA = 0 := by
   simp [rinner]
 
+variable [DecidableEq n] in
 @[simp]
 theorem rinner_mul_one : hA.rinner Matrix.isHermitian_one = hA.rtrace := by
   simp only [rinner, mul_one, rtrace]
 
+variable [DecidableEq n] in
 @[simp]
 theorem one_rinner_mul : Matrix.isHermitian_one.rinner hA = hA.rtrace := by
   simp only [rinner, one_mul, rtrace]
