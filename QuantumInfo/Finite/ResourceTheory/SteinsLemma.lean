@@ -23,7 +23,7 @@ noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : ℝ) (S : Set (MSt
 scoped notation "β_" ε " (" ρ "‖" S ")" =>  OptimalHypothesisRate ρ ε S
 
 theorem OptimalHypothesisRate_singleton {ρ σ : MState d} {ε : ℝ}  :
-  β_ ε(ρ‖{σ}) = 
+  β_ ε(ρ‖{σ}) =
     ⨅ T : { m : Matrix d d ℂ //
     ∃ h : m.PosSemidef ∧ m ≤ 1, MState.exp_val (Matrix.isHermitian_one.sub h.1.1) ρ ≤ ε},
     ⟨MState.exp_val T.2.1.1.1 σ, MState.exp_val_prob T.2.1 σ⟩
@@ -95,6 +95,14 @@ theorem limit_hypotesting_eq_limit_rel_entropy (ρ : MState (H i)) (ε : ℝ) (h
       := by
   sorry
 
+section Lemma7
+
+/-- Lemma S1 -/
+private theorem optimalHypothesisRate_antitone {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq dIn]
+ [DecidableEq dOut] (ρ σ : MState dIn) (ℰ : CPTPMap dIn dOut) (ε3 : ℝ) (hε3 : ε3 ≥ 0) :
+  β_ ε3(ℰ ρ‖{ℰ σ}) ≥ β_ ε3(ρ‖{σ}) := by
+    sorry
+
 /-- Lemma 7 from the paper -/
 private theorem Lemma7 (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) (σ : (n : ℕ+) → IsFree (i := i⊗^[n])) :
   -- This is not exactly how R_{1, ε} is defined in Eq. (17), but it should be equal due to
@@ -111,6 +119,8 @@ private theorem Lemma7 (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) 
   R2' - R1 ≤ (1 - ε') * (R2 - R1)
   := by
   sorry
+
+end Lemma7
 
 theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) :
     Filter.Tendsto (fun n ↦
