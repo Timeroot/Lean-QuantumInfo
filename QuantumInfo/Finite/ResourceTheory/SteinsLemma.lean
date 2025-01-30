@@ -22,6 +22,14 @@ noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : ℝ) (S : Set (MSt
 
 scoped notation "β_" ε " (" ρ "‖" S ")" =>  OptimalHypothesisRate ρ ε S
 
+theorem OptimalHypothesisRate_singleton {ρ σ : MState d} {ε : ℝ}  :
+  β_ ε(ρ‖{σ}) = 
+    ⨅ T : { m : Matrix d d ℂ //
+    ∃ h : m.PosSemidef ∧ m ≤ 1, MState.exp_val (Matrix.isHermitian_one.sub h.1.1) ρ ≤ ε},
+    ⟨MState.exp_val T.2.1.1.1 σ, MState.exp_val_prob T.2.1 σ⟩
+  := by
+  simp only [OptimalHypothesisRate, iSup_singleton]
+
 private theorem Lemma3 (ρ : MState d) (ε : ℝ) (S : Set (MState d)) :
     ⨆ σ ∈ S, β_ ε(ρ‖{σ}) = β_ ε(ρ‖S)
   := by
