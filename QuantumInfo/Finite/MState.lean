@@ -124,8 +124,16 @@ theorem exp_val_nonneg {T : Matrix d d ℂ} (h : T.PosSemidef) (ρ : MState d) :
   Matrix.PosSemidef.rinner_ge_zero h ρ.pos
 
 theorem exp_val_prob {T : Matrix d d ℂ} (h : T.PosSemidef ∧ T ≤ 1) (ρ : MState d) :
-  0 ≤ exp_val h.left.1 ρ ∧ exp_val h.left.1 ρ ≤ 1 :=
-    sorry
+  0 ≤ exp_val h.1.1 ρ ∧ exp_val h.1.1 ρ ≤ 1 := by
+  constructor
+  case left =>
+    exact exp_val_nonneg h.1 ρ
+  case right =>
+    unfold exp_val
+    have hmono := Matrix.PosSemidef.rinner_mono ρ.pos h.1.1 Matrix.isHermitian_one h.2
+    rw [Matrix.IsHermitian.rinner_symm ρ.Hermitian h.1.1] at hmono
+    rw [Matrix.IsHermitian.rinner_mul_one ρ.Hermitian, ρ.rtrace_one] at hmono
+    exact hmono
 
 end exp_val
 
