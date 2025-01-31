@@ -1,3 +1,5 @@
+import QuantumInfo.Finite.MState
+import QuantumInfo.Finite.Unitary
 import QuantumInfo.Finite.CPTPMap.MatrixMap
 
 /-! # Completely Positive maps

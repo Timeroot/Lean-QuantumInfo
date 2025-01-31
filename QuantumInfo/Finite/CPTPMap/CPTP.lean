@@ -59,7 +59,7 @@ theorem apply_trace (Λ : PTPMap dIn dOut) (ρ : Matrix dIn dIn ℂ) : (Λ.map �
   Λ.trace_preserving ρ
 
 instance instFunLike : FunLike (PTPMap dIn dOut) (MState dIn) (MState dOut) where
-  coe Λ := fun ρ ↦ MState.mk (Λ.map ρ.m) (Λ.apply_PosSemidef ρ.pos) (ρ.tr ▸ Λ.apply_trace ρ.m)
+  coe Λ := fun ρ ↦ MState.mk ⟨Λ.map ρ.m, (Λ.apply_PosSemidef ρ.pos).1⟩ (Λ.apply_PosSemidef ρ.pos) (ρ.tr ▸ Λ.apply_trace ρ.m)
   coe_injective' _ _ h := sorry --Requires the fact the action on MStates determines action on all matrices
 
 --If we have a PTPMap, the input and output dimensions are always both nonempty (otherwise
@@ -138,7 +138,7 @@ theorem choi_of_CPTP_of_choi (M : Matrix (dIn × dOut) (dIn × dOut) ℂ) {h₁}
 
 /-- CPTPMaps are functions from MStates to MStates. -/
 instance instFunLike : FunLike (CPTPMap dIn dOut) (MState dIn) (MState dOut) where
-  coe Λ := fun ρ ↦ MState.mk (Λ.map ρ.m) (Λ.apply_PosSemidef ρ.pos) (ρ.tr ▸ Λ.apply_trace ρ.m)
+  coe Λ := fun ρ ↦ Λ.toPTPMap ρ
   coe_injective' _ _ h := by
     apply PTP_ext
     apply DFunLike.coe_injective'
@@ -242,7 +242,7 @@ theorem const_state_apply [Unique dIn] (ρ : MState dOut) (ρ₀ : MState dIn) :
   dsimp [const_state, MatrixMap.of_choi_matrix, MState.m, instFunLike]
   simp only [Finset.univ_unique, Finset.sum_singleton]
   rw [Unique.eq_default ρ₀]
-  convert one_mul _
+  -- convert one_mul _
   --Should be a simp theorem
   sorry
 

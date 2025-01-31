@@ -23,8 +23,7 @@ noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : ℝ) (S : Set (MSt
 scoped notation "β_" ε " (" ρ "‖" S ")" =>  OptimalHypothesisRate ρ ε S
 
 private theorem Lemma3 (ρ : MState d) (ε : ℝ) (S : Set (MState d)) :
-    ⨆ σ ∈ S, β_ ε(ρ‖{σ}) = β_ ε(ρ‖S)
-  := by
+    ⨆ σ ∈ S, β_ ε(ρ‖{σ}) = β_ ε(ρ‖S) := by
   sorry
 
 /- This is from "Strong converse exponents for a quantum channel discrimination problem and
@@ -72,7 +71,7 @@ private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState d) (σₘ : MStat
           (Equiv.prodCongr (Equiv.curry ..) (Equiv.refl _))
       (σl.prod σr).relabel eqv
     Filter.atTop.limsup (fun n ↦ -Real.log β_ ε(ρ ⊗^ n‖{σn n}) / n : ℕ → EReal) ≤
-    𝐃(ρ⊗^m‖σₘ) / ma43b43e
+    𝐃(ρ⊗^m‖σₘ) / m
   := by
   sorry
 

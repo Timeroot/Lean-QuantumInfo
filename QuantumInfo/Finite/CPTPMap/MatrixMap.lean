@@ -1,9 +1,8 @@
-import QuantumInfo.Finite.MState
-import QuantumInfo.Finite.Unitary
 import Mathlib.LinearAlgebra.TensorProduct.Matrix
 import Mathlib.LinearAlgebra.PiTensorProduct
 import Mathlib.Data.Set.Card
 import Mathlib.Algebra.Module.LinearMap.Basic
+import QuantumInfo.ForMathlib
 
 /-! # Linear maps of matrices
 

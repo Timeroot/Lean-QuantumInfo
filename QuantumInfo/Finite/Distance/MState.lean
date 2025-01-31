@@ -38,41 +38,27 @@ open Kronecker
 open scoped Matrix ComplexOrder
 
 /-- A mixed state as a PSD matrix with trace 1.-/
-structure MState (d : Type*) [Fintype d] extends HermitianMat d ℂ where
-  pos : val.PosSemidef
-  tr : val.trace = 1
+structure MState (d : Type*) [Fintype d] where
+  m : Matrix d d ℂ
+  pos : m.PosSemidef
+  tr : m.trace = 1
 
 namespace MState
 
 variable {d d₁ d₂ d₃ : Type*} [Fintype d] [Fintype d₁] [Fintype d₂] [Fintype d₃]
 
-/-- The underlying `Matrix` in an MState-/
-def m (ρ : MState d) : Matrix d d ℂ := ρ.val
-
-/-- The underlying `HermitianMat` in an MState-/
-@[reducible, coe]
-def M (ρ : MState d) : HermitianMat d ℂ := ρ.toSubtype
-
-instance instCoe : Coe (MState d) (HermitianMat d ℂ) := ⟨MState.M⟩
-
-@[simp]
-theorem toSubtype_eq_coe (ρ : MState d) : ρ.toSubtype = ρ.M :=
-  rfl
-
 /-- Every mixed state is Hermitian. -/
 theorem Hermitian (ρ : MState d) : ρ.m.IsHermitian :=
   ρ.pos.left
 
-/-- The real trace `Matrix.IsHermitian.rtrace` of an MState is 1 -/
+/-- The real trace ()`Matrix.IsHermitian.rtrace`) of an MState is 1 -/
 theorem rtrace_one (ρ : MState d) : ρ.Hermitian.rtrace = 1 := by
-  rw [Matrix.IsHermitian.rtrace, MState.m, ρ.tr]
+  rw [Matrix.IsHermitian.rtrace, ρ.tr]
   rfl
 
 @[ext]
 theorem ext {ρ₁ ρ₂ : MState d} (h : ρ₁.m = ρ₂.m) : ρ₁ = ρ₂ := by
-  rw [MState.mk.injEq]
-  ext1
-  exact h
+  rwa [MState.mk.injEq]
 
 /-- The map from mixed states to their matrices is injective -/
 theorem toMat_inj : (MState.m (d := d)).Injective :=
@@ -87,20 +73,14 @@ theorem convex : Convex ℝ (Set.range (MState.m (d := d))) := by
   replace ha : 0 ≤ (a : ℂ) := by norm_cast
   replace hb : 0 ≤ (b : ℂ) := by norm_cast
   replace hab : a + b = (1 : ℂ) := by norm_cast
-  sorry
-  -- exact ⟨⟨_, x.pos.convex_cone y.pos ha hb, by
-  --   sorry
-  --   -- simpa [x.tr, y.tr] using hab
-  --   ⟩, sorry--rfl
-  --   ⟩
+  exact ⟨⟨_, x.pos.convex_cone y.pos ha hb, by simpa [x.tr, y.tr] using hab⟩, rfl⟩
 
 instance instMixable : Mixable (Matrix d d ℂ) (MState d) where
   to_U := MState.m
   to_U_inj := ext
-  mkT {u} := fun h ↦
-    ⟨⟨⟨u, Exists.casesOn h fun t ht => ht ▸ t.pos.left⟩,
-      Exists.casesOn h fun t ht => ht ▸ t.pos,
-      Exists.casesOn h fun t ht => ht ▸ t.tr⟩, rfl⟩
+  mkT := fun h ↦ ⟨⟨_,
+    Exists.casesOn h fun t ht => ht ▸ t.pos,
+    Exists.casesOn h fun t ht => ht ▸ t.tr⟩, rfl⟩
   convex := convex d
 
 --An MState is a witness that d is nonempty.
@@ -154,8 +134,7 @@ section pure
 
 /-- A mixed state can be constructed as a pure state arising from a ket. -/
 def pure (ψ : Ket d) : MState d where
-  val := Matrix.vecMulVec ψ (ψ : Bra d)
-  property := (PosSemidef_outer_self_conj ψ).1
+  m := Matrix.vecMulVec ψ (ψ : Bra d)
   pos := PosSemidef_outer_self_conj ψ
   tr := by
     have h₁ : ∀x, ψ x * conj (ψ x) = Complex.normSq (ψ x) := fun x ↦ by
@@ -185,10 +164,8 @@ def spectrum (ρ : MState d) : Distribution d :=
     (by --The values sum to 1
       have h := congrArg Complex.re (ρ.Hermitian.sum_eigenvalues_eq_trace)
       simp only [ρ.tr, RCLike.ofReal_sum, Complex.re_sum, Complex.one_re] at h
-      sorry
-      -- rw [← h]
-      -- rfl
-      )
+      rw [← h]
+      rfl)
 
 /-- The specturm of a pure state is (1,0,0,...), i.e. a constant distribution. -/
 theorem spectrum_pure_eq_constant (ψ : Ket d) :
@@ -202,10 +179,9 @@ theorem spectrum_pure_eq_constant (ψ : Ket d) :
       -- Prove ψ is an eigenvector of ρ = pure ψ
       have hv : ρ.m *ᵥ ψ = ψ := by
         ext
-        -- simp_rw [ρ, pure, Matrix.mulVec, Matrix.vecMulVec_apply, dotProduct, Bra.apply',
-        -- Ket.apply, mul_assoc, ← Finset.mul_sum, ← Complex.normSq_eq_conj_mul_self,
-        -- ← Complex.ofReal_sum, ← Ket.apply, ψ.normalized, Complex.ofReal_one, mul_one]
-        sorry
+        simp_rw [ρ, pure, Matrix.mulVec, Matrix.vecMulVec_apply, dotProduct, Bra.apply',
+        Ket.apply, mul_assoc, ← Finset.mul_sum, ← Complex.normSq_eq_conj_mul_self,
+        ← Complex.ofReal_sum, ← Ket.apply, ψ.normalized, Complex.ofReal_one, mul_one]
       let U : Matrix.unitaryGroup d ℂ := star ρ.Hermitian.eigenvectorUnitary -- Diagonalizing unitary of ρ
       let w : d → ℂ := U *ᵥ ψ
       -- Prove w = U ψ is an eigenvector of the diagonalized matrix of ρ = pure ψ
@@ -321,10 +297,9 @@ end pure
 section prod
 
 def prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : MState (d₁ × d₂) where
-  val := ρ₁.m ⊗ₖ ρ₂.m
-  property := (ρ₁.pos.PosSemidef_kronecker ρ₂.pos).1
+  m := ρ₁.m ⊗ₖ ρ₂.m
   pos := ρ₁.pos.PosSemidef_kronecker ρ₂.pos
-  tr := by sorry--simpa [ρ₁.tr, ρ₂.tr] using Matrix.trace_kronecker ρ₁.m ρ₂.m
+  tr := by simpa [ρ₁.tr, ρ₂.tr] using Matrix.trace_kronecker ρ₁.m ρ₂.m
 
 notation ρL "⊗" ρR => prod ρL ρR
 
@@ -333,15 +308,13 @@ theorem pure_prod_pure (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : pure (ψ₁ ⊗ �
   ext
   simp only [pure, Ket.prod, Ket.apply, Matrix.vecMulVec_apply, Bra.eq_conj, map_mul, prod,
     Matrix.kroneckerMap_apply]
-  -- ring
-  sorry
+  ring
 
 end prod
 
 /-- A representation of a classical distribution as a quantum state, diagonal in the given basis. -/
 def ofClassical (dist : Distribution d) : MState d where
-  val := Matrix.diagonal (fun x ↦ dist x)
-  property := by simp [Matrix.isHermitian_diagonal_iff, IsSelfAdjoint]
+  m := Matrix.diagonal (fun x ↦ dist x)
   pos := by simp [Matrix.posSemidef_diagonal_iff]
   tr := by
     simp [Matrix.trace_diagonal]
@@ -369,20 +342,48 @@ instance instInhabited [Nonempty d] : Inhabited (MState d) where
 
 section ptrace
 
+section mat_trace
+
+variable [AddCommMonoid R]
+
+def _root_.Matrix.traceLeft (m : Matrix (d × d₁) (d × d₂) R) : Matrix d₁ d₂ R :=
+  Matrix.of fun i₁ j₁ ↦ ∑ i₂, m (i₂, i₁) (i₂, j₁)
+
+def _root_.Matrix.traceRight (m : Matrix (d₁ × d) (d₂ × d) R) : Matrix d₁ d₂ R :=
+  Matrix.of fun i₂ j₂ ↦ ∑ i₁, m (i₂, i₁) (j₂, i₁)
+
+@[simp]
+theorem _root_.Matrix.trace_of_traceLeft (A : Matrix (d₁ × d₂) (d₁ × d₂) R) : A.traceLeft.trace = A.trace := by
+  convert (Fintype.sum_prod_type_right _).symm
+  rfl
+
+@[simp]
+theorem _root_.Matrix.trace_of_traceRight (A : Matrix (d₁ × d₂) (d₁ × d₂) R) : A.traceRight.trace = A.trace := by
+  convert (Fintype.sum_prod_type _).symm
+  rfl
+
+variable [RCLike R] {A : Matrix (d₁ × d₂) (d₁ × d₂) R}
+
+theorem _root_.Matrix.PosSemidef.traceLeft (hA : A.PosSemidef) : A.traceLeft.PosSemidef :=
+  sorry
+
+theorem _root_.Matrix.PosSemidef.traceRight (hA : A.PosSemidef) : A.traceRight.PosSemidef :=
+  sorry
+
+end mat_trace
+
 -- TODO:
 -- * Partial trace of direct product is the original state
 
 /-- Partial tracing out the left half of a system. -/
 def traceLeft (ρ : MState (d₁ × d₂)) : MState d₂ where
-  val := ρ.m.traceLeft
-  property := ρ.pos.traceLeft.1
+  m := ρ.m.traceLeft
   pos := ρ.pos.traceLeft
   tr := ρ.tr ▸ ρ.m.trace_of_traceLeft
 
 /-- Partial tracing out the right half of a system. -/
 def traceRight (ρ : MState (d₁ × d₂)) : MState d₁ where
-  val := ρ.m.traceRight
-  property := ρ.pos.traceRight.1
+  m := ρ.m.traceRight
   pos := ρ.pos.traceRight
   tr := ρ.tr ▸ ρ.m.trace_of_traceRight
 
@@ -393,8 +394,7 @@ theorem traceLeft_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : traceLef
   simp_rw [traceLeft, Matrix.traceLeft, prod]
   dsimp
   have h : (∑ i : d₁, ρ₁.m i i) = 1 := ρ₁.tr
-  -- rw [← Finset.sum_mul, h, one_mul]
-  sorry
+  rw [← Finset.sum_mul, h, one_mul]
 
 /-- Taking the direct product on the right and tracing it back out gives the same state. -/
 @[simp]
@@ -403,8 +403,7 @@ theorem traceRight_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : traceRi
   simp_rw [traceRight, Matrix.traceRight, prod]
   dsimp
   have h : (∑ i : d₂, ρ₂.m i i) = 1 := ρ₂.tr
-  -- rw [← Finset.mul_sum, h, mul_one]
-  sorry
+  rw [← Finset.mul_sum, h, mul_one]
 
 end ptrace
 
@@ -433,7 +432,6 @@ theorem IsSeparable_prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : IsSeparab
   simp only [prod, Finset.univ_unique, Unique.eq_default, Distribution.constant_eq, ite_true,
     Prob.toReal_one, Finset.default_singleton, one_smul, Finset.sum_const, Finset.card_singleton,
     only]
-  sorry
 
 /-- A pure state is separable iff the ket is a product state. -/
 theorem pure_separable_iff_IsProd (ψ : Ket (d₁ × d₂)) :
@@ -484,8 +482,7 @@ def purifyX (ρ : MState d) : { ψ : Ket (d × d) // (pure ψ).traceRight = ρ }
 end purification
 
 def relabel (ρ : MState d₁) (e : d₂ ≃ d₁) : MState d₂ where
-  val := ρ.m.submatrix e e
-  property := ((Matrix.posSemidef_submatrix_equiv e).mpr ρ.pos).1
+  m := ρ.m.submatrix e e
   pos := (Matrix.posSemidef_submatrix_equiv e).mpr ρ.pos
   tr := ρ.tr ▸ Fintype.sum_equiv _ _ _ (congrFun rfl)
 
@@ -551,8 +548,7 @@ theorem traceRight_left_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
 theorem traceRight_assoc (ρ : MState ((d₁ × d₂) × d₃)) :
     ρ.assoc.traceRight = ρ.traceRight.traceRight := by
   ext
-  sorry
-  -- simp [assoc, relabel, Matrix.traceRight, traceRight, Fintype.sum_prod_type]
+  simp [assoc, relabel, Matrix.traceRight, traceRight, Fintype.sum_prod_type]
 
 @[simp]
 theorem traceLeft_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
@@ -601,8 +597,7 @@ variable {ι : Type u} [DecidableEq ι] [fι : Fintype ι]
 variable {dI : ι → Type v} [∀(i :ι), Fintype (dI i)] [∀(i :ι), DecidableEq (dI i)]
 
 def piProd (ρi : (i:ι) → MState (dI i)) : MState ((i:ι) → dI i) where
-  val j k := ∏ (i : ι), (ρi i).m (j i) (k i)
-  property := sorry
+  m j k := ∏ (i : ι), (ρi i).m (j i) (k i)
   pos := by
     --Should be in Mathlib
     constructor

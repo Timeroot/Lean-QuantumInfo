@@ -332,51 +332,6 @@ theorem zero_posSemidef_neg_posSemidef_iff : A.PosSemidef ∧ (-A).PosSemidef �
     rw [h0]
     simp only [neg_zero, and_self, PosSemidef.zero]
 
-noncomputable section pow
-
-/-- Matrix power of a positive semidefinite matrix, as given by the elementwise
-  real power of the diagonal in a diagonalized form.
-
-  Note that this has the usual `Real.rpow` caveats, such as 0 to the power -1 giving 0. -/
-def rpow (hA : A.PosSemidef) (p : ℝ) : Matrix m m 𝕜 :=
-  (hA.1.eigenvectorUnitary : Matrix _ _ _) * diagonal (RCLike.ofReal ∘ (· ^ p) ∘ hA.1.eigenvalues) *
-  (star hA.1.eigenvectorUnitary : Matrix _ _ _)
-
-theorem rpow_IsHermitian (hA : A.PosSemidef) (p : ℝ) : (hA.rpow p).IsHermitian :=
-  Matrix.isHermitian_mul_mul_conjTranspose _ (by simp
-    [isHermitian_diagonal_iff, RCLike.isSelfAdjoint_re_iff])
-
-theorem rpow_PosSemidef (hA : A.PosSemidef) (p : ℝ) : (hA.rpow p).PosSemidef := by
-  apply Matrix.PosSemidef.mul_mul_conjTranspose_same
-  refine posSemidef_diagonal_iff.mpr fun i ↦ ?_
-  rw [Function.comp_apply, RCLike.nonneg_iff]
-  constructor
-  · simp only [RCLike.ofReal_re]
-    exact Real.rpow_nonneg (hA.eigenvalues_nonneg i) p
-  · simp only [RCLike.ofReal_im]
-
-end pow
-
-noncomputable section log
-
-/-- Matrix logarithm (base e) of a positive semidefinite matrix, as given by the elementwise
-  real logarithm of the diagonal in a diagonalized form.
-
-  Note that this means that the nullspace of the image includes all of the nullspace of the
-  original matrix. This contrasts to the standard definition, which is only defined for positive
-  *definite* matrices, and the nullspace of the image is exactly the (λ=1)-eigenspace of the
-  original matrix. It coincides with the standard definition if A is positive definite. -/
-def log (hA : A.PosSemidef) : Matrix m m 𝕜 :=
-  (hA.1.eigenvectorUnitary : Matrix _ _ _) * diagonal (RCLike.ofReal ∘ Real.log ∘ hA.1.eigenvalues) *
-  (star hA.1.eigenvectorUnitary : Matrix _ _ _)
-
-theorem log_IsHermitian (hA : A.PosSemidef) : hA.log.IsHermitian :=
-  Matrix.isHermitian_mul_mul_conjTranspose _ (by simp
-    [isHermitian_diagonal_iff, RCLike.isSelfAdjoint_re_iff])
-
---TODO: properties here https://en.wikipedia.org/wiki/Logarithm_of_a_matrix#Properties
-
-end log
 end PosSemidef
 
 namespace PosSemidef
@@ -642,3 +597,37 @@ theorem rinner_le_mul_trace : hA.1.rinner hB.1 ≤ hA.1.rtrace * hB.1.rtrace := 
 
 end PosSemidef
 end frobenius_inner_product
+
+section mat_trace
+
+variable [AddCommMonoid R] [Fintype d]
+
+def _root_.Matrix.traceLeft (m : Matrix (d × d₁) (d × d₂) R) : Matrix d₁ d₂ R :=
+  Matrix.of fun i₁ j₁ ↦ ∑ i₂, m (i₂, i₁) (i₂, j₁)
+
+def _root_.Matrix.traceRight (m : Matrix (d₁ × d) (d₂ × d) R) : Matrix d₁ d₂ R :=
+  Matrix.of fun i₂ j₂ ↦ ∑ i₁, m (i₂, i₁) (j₂, i₁)
+
+variable [Fintype d₁] [Fintype d₂] in
+@[simp]
+theorem _root_.Matrix.trace_of_traceLeft (A : Matrix (d₁ × d₂) (d₁ × d₂) R) : A.traceLeft.trace = A.trace := by
+  convert (Fintype.sum_prod_type_right _).symm
+  rfl
+
+variable [Fintype d₁] [Fintype d₂] in
+@[simp]
+theorem _root_.Matrix.trace_of_traceRight (A : Matrix (d₁ × d₂) (d₁ × d₂) R) : A.traceRight.trace = A.trace := by
+  convert (Fintype.sum_prod_type _).symm
+  rfl
+
+open ComplexOrder
+
+variable [RCLike R] {A : Matrix (d₁ × d₂) (d₁ × d₂) R} [Fintype d₂] [Fintype d₁]
+
+theorem _root_.Matrix.PosSemidef.traceLeft (hA : A.PosSemidef) : A.traceLeft.PosSemidef :=
+  sorry
+
+theorem _root_.Matrix.PosSemidef.traceRight (hA : A.PosSemidef) : A.traceRight.PosSemidef :=
+  sorry
+
+end mat_trace

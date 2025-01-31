@@ -20,9 +20,10 @@ variable [DecidableEq d]
 
 /-- Conjugate a state by a unitary matrix (applying the unitary as an evolution). -/
 def U_conj (ρ : MState d) (U : 𝐔[d]) : MState d where
-  m := U * ρ.m * star U
-  tr := by simp [Matrix.trace_mul_cycle, ρ.tr]
-  pos := ⟨by simp [Matrix.IsHermitian, ρ.pos.1.eq, Matrix.star_eq_conjTranspose, mul_assoc],
+  val := U * ρ.m * star U
+  property := by simp [Matrix.IsHermitian, MState.m, ρ.pos.1.eq, Matrix.star_eq_conjTranspose, mul_assoc]
+  tr := by simp [Matrix.trace_mul_cycle, ρ.tr, MState.m]
+  pos := ⟨by simp [Matrix.IsHermitian, MState.m, ρ.pos.1.eq, Matrix.star_eq_conjTranspose, mul_assoc],
     by
     intro x
     rw [← Matrix.mulVec_mulVec, ← Matrix.mulVec_mulVec, Matrix.dotProduct_mulVec]
