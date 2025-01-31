@@ -96,11 +96,61 @@ theorem limit_hypotesting_eq_limit_rel_entropy (ρ : MState (H i)) (ε : ℝ) (h
 
 section Lemma7
 
+open MatrixMap
+open Matrix
+
+variable {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq dIn] [DecidableEq dOut]
+
+-- This should be moved to the files about matrix maps as soon as a good definition of "dual channel" can be made.
+theorem positive_dual_channel_exists (ℰ : CPTPMap dIn dOut) :
+  ∃ ℰdual : CPTPMap dOut dIn, ∀ ρ : MState dIn, ∀ T : Matrix dOut dOut ℂ, T.PosSemidef →
+  MState.exp_val hT.1 (ℰ ρ) = MState.exp_val (ℰdual.pos hT).1 ρ := by
+  -- The proof below was valid for a previous wrong version of the theorem. Nevertheless
+  -- it could still be useful for this version.
+  --------------------------------------------------
+  -- have hkraus := IsCompletelyPositive.exists_kraus ℰ.map ℰ.completely_pos
+  -- obtain ⟨r, M, hkraus⟩ := hkraus
+  -- let T' : Matrix dIn dIn ℂ := ∑ i : Fin r, (M i)ᴴ * T * (M i)
+  -- -- Should come from something like Matrix.PosSemidef.sum
+  -- have hT' : T'.PosSemidef := by
+  --   constructor
+  --   · unfold IsHermitian T'
+  --     rw [conjTranspose_sum]
+  --     simp only [IsHermitian, conjTranspose_mul, conjTranspose_conjTranspose, Matrix.mul_assoc]
+  --     rw [hT.1]
+  --   · intro x
+  --     unfold T'
+  --     -- rw [AddMonoidHom.finset_sum_apply (mulVec.addMonoidHomLeft : (dIn → ℂ) → (Matrix dIn dIn ℂ) →+ dIn → ℂ)]
+  --     sorry
+  -- use T', hT'
+  -- simp [MState.exp_val, IsHermitian.rinner, CPTPMap.mat_coe_eq_apply_mat, hkraus, of_kraus,
+  --   Finset.mul_sum, Finset.sum_mul, ←Matrix.mul_assoc, T']
+  -- conv =>
+  --   enter [1, 2, x]
+  --   rw [trace_mul_cycle, ←Matrix.mul_assoc]
+  sorry
+
+set_option pp.proofs true in
 /-- Lemma S1 -/
-private theorem optimalHypothesisRate_antitone {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq dIn]
- [DecidableEq dOut] (ρ σ : MState dIn) (ℰ : CPTPMap dIn dOut) (ε3 : ℝ) (hε3 : ε3 ≥ 0) :
-  β_ ε3(ℰ ρ‖{ℰ σ}) ≥ β_ ε3(ρ‖{σ}) := by
-    sorry
+private theorem optimalHypothesisRate_antitone (ρ σ : MState dIn) (ℰ : CPTPMap dIn dOut) (ε3 : ℝ) (hε3 : ε3 ≥ 0) :
+  β_ ε3(ρ‖{σ}) ≤ β_ ε3(ℰ ρ‖{ℰ σ}) := by
+  repeat rw [OptimalHypothesisRate_singleton]
+  obtain ⟨ℰdual, hℰdual⟩ := positive_dual_channel_exists ℰ
+  let ℰdualSubtype : { m : Matrix dOut dOut ℂ //
+    ∃ h : m.PosSemidef ∧ m ≤ 1, MState.exp_val (Matrix.isHermitian_one.sub h.1.1) (ℰ ρ) ≤ ε3} →
+    { m : Matrix dIn dIn ℂ //
+    ∃ h : m.PosSemidef ∧ m ≤ 1, MState.exp_val (Matrix.isHermitian_one.sub h.1.1) ρ ≤ ε3} := sorry
+  have h : ∀ x, (ℰdualSubtype x).val = ℰdual.map x.val := sorry
+  -- have h' : ∀ x, (h ▸ (ℰdualSubtype x).2.1.1) = ℰdual.pos x.2.1.1 := sorry
+  convert le_iInf_comp _ ℰdualSubtype
+  rename_i T'
+  specialize h T'
+  specialize hℰdual σ T' T'.2.1.1
+  -- simp [h]
+  -- conv =>
+  --   enter [2, 1, 1]
+  --   rw [h]
+  sorry
 
 /-- Lemma 7 from the paper -/
 private theorem Lemma7 (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) (σ : (n : ℕ+) → IsFree (i := i⊗^[n])) :
