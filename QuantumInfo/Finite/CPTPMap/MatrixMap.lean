@@ -76,6 +76,27 @@ theorem toMatrix_comp [Fintype B] [Fintype C] [DecidableEq B] (M₁ : MatrixMap 
 
 end matrix
 
+section kraus
+
+variable [SMulCommClass R R R] [Star R]
+variable {κ : Type*} [Fintype κ]
+
+/-- Construct a matrix map out of families of matrices M N : Σ → Matrix B A R
+indexed by κ via X ↦ ∑ k : κ, (M k) * X * (N k)ᴴ -/
+def of_kraus (M N : κ → Matrix B A R) : MatrixMap A B R where
+  toFun X := ∑ k, M k * X * (N k).conjTranspose
+  map_add' x y := by simp only [Matrix.mul_add, Matrix.add_mul, Finset.sum_add_distrib]
+  map_smul' r x := by
+    simp only [RingHom.id_apply, Finset.smul_sum]
+    conv =>
+      enter [1, 2, k]
+      rw [Matrix.mul_smul, Matrix.smul_mul]
+
+def exists_kraus (Φ : MatrixMap A B R) : ∃ r : ℕ, ∃ (M N : Fin r → Matrix B A R), Φ = of_kraus M N :=
+  sorry
+
+end kraus
+
 section kron
 open Kronecker
 
