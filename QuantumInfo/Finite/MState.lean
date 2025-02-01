@@ -349,7 +349,7 @@ end prod
 /-- A representation of a classical distribution as a quantum state, diagonal in the given basis. -/
 def ofClassical (dist : Distribution d) : MState d where
   val := Matrix.diagonal (fun x ↦ dist x)
-  property := by simp [Matrix.isHermitian_diagonal_iff, IsSelfAdjoint]
+  property : Matrix.IsHermitian _ := by simp [Matrix.isHermitian_diagonal_iff, IsSelfAdjoint]
   pos := by simp [Matrix.posSemidef_diagonal_iff]
   tr := by
     simp [Matrix.trace_diagonal]
