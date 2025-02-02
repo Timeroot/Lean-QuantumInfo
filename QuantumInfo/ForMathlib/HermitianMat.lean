@@ -3,7 +3,6 @@ import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.ExpLog
 import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Basic
 import Mathlib.LinearAlgebra.Matrix.HermitianFunctionalCalculus
 import Mathlib.Analysis.Matrix
-import Mathlib.Tactic.Clean
 
 section IsMaximalSelfAdjoint
 

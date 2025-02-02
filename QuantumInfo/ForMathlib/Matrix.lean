@@ -13,12 +13,6 @@ variable [RCLike 𝕜]
 
 namespace RCLike
 
-theorem isSelfAdjoint_re_iff {c : 𝕜} : IsSelfAdjoint c ↔ RCLike.re c = c  :=
-  RCLike.conj_eq_iff_re
-
-theorem isSelfAdjoint_im_zero_iff {c : 𝕜} : IsSelfAdjoint c ↔ RCLike.im c = 0  :=
-  RCLike.conj_eq_iff_im
-
 open ComplexOrder
 
 theorem inv_nonneg' {x : 𝕜} (h : 0 ≤ x) : 0 ≤ x⁻¹ := by
@@ -55,7 +49,7 @@ theorem smul_selfAdjoint {c : 𝕜} (hc : _root_.IsSelfAdjoint c) : (c • A).Is
 
 include hA in
 theorem smul_im_zero {c : 𝕜} (h : RCLike.im c = 0) : (c • A).IsHermitian :=
-  hA.smul_selfAdjoint (RCLike.isSelfAdjoint_im_zero_iff.mpr h)
+  hA.smul_selfAdjoint (RCLike.conj_eq_iff_im.mpr h)
 
 include hA in
 theorem smul_real (c : ℝ) : (c • A).IsHermitian := by
