@@ -45,7 +45,7 @@ variable (hA : A.IsHermitian) (hB : B.IsHermitian)
 
 include hA in
 theorem smul_selfAdjoint {c : 𝕜} (hc : _root_.IsSelfAdjoint c) : (c • A).IsHermitian := by
-  rw [IsHermitian, Matrix.conjTranspose_smul, hc, hA]
+  exact IsSelfAdjoint.smul hc hA
 
 include hA in
 theorem smul_im_zero {c : 𝕜} (h : RCLike.im c = 0) : (c • A).IsHermitian :=
@@ -177,7 +177,7 @@ theorem smul {c : 𝕜} (h : 0 ≤ c) : (c • A).PosSemidef := by
   constructor
   · apply hA.1.smul_im_zero (RCLike.nonneg_iff.mp h).2
   · intro x
-    rw [Matrix.smul_mulVec_assoc, Matrix.dotProduct_smul]
+    rw [Matrix.smul_mulVec_assoc, dotProduct_smul]
     exact mul_nonneg h (hA.2 x)
 
 include hA hB in
@@ -301,18 +301,13 @@ theorem sqrt_nonneg_smul {c : 𝕜} (hA : (c^2 • A).PosSemidef) (hc : 0 < c) :
 include hA in
 theorem zero_dotProduct_zero_iff : (∀ x : m → 𝕜, 0 = star x ⬝ᵥ A.mulVec x) ↔ A = 0 := by
   constructor
-  · intro h0
-    replace h0 := fun x ↦(PosSemidef.dotProduct_mulVec_zero_iff hA x).mp (h0 x).symm
+  · intro h
     ext i j
-    specialize h0 (Pi.single j 1)
-    rw [mulVec_single] at h0
-    replace h0 := congrFun h0 i
-    simp_all only [mul_one, Pi.zero_apply, zero_apply]
-    convert h0 using 1
-    sorry
-  · intro h0
-    rw [h0]
-    simp only [zero_mulVec, dotProduct_zero, implies_true]
+    have h₂ := fun x ↦ (PosSemidef.dotProduct_mulVec_zero_iff hA x).mp (h x).symm
+    convert congrFun (h₂ (Pi.single j 1)) i using 1
+    simp
+  · rintro rfl
+    simp
 
 theorem zero_posSemidef_neg_posSemidef_iff : A.PosSemidef ∧ (-A).PosSemidef ↔ A = 0 := by
   constructor
@@ -322,9 +317,8 @@ theorem zero_posSemidef_neg_posSemidef_iff : A.PosSemidef ∧ (-A).PosSemidef �
       rw [neg_mulVec, dotProduct_neg, le_neg, neg_zero] at hNegA'
       exact le_antisymm (hA.right x) hNegA'
     exact (zero_dotProduct_zero_iff hA).mp h0
-  · intro h0
-    rw [h0]
-    simp only [neg_zero, and_self, PosSemidef.zero]
+  · rintro rfl
+    simp [PosSemidef.zero]
 
 end PosSemidef
 
@@ -480,101 +474,101 @@ end partialOrder
 
 end PosSemidef
 
-section frobenius_inner_product
-open scoped ComplexOrder
-variable {A : Matrix n n 𝕜} {B : Matrix n n 𝕜} {C : Matrix n n 𝕜} [Fintype n]
+-- section frobenius_inner_product
+-- open scoped ComplexOrder
+-- variable {A : Matrix n n 𝕜} {B : Matrix n n 𝕜} {C : Matrix n n 𝕜} [Fintype n]
 
-namespace IsHermitian
-open scoped ComplexOrder
+-- namespace IsHermitian
+-- open scoped ComplexOrder
 
-variable (hA : A.IsHermitian) (hB : B.IsHermitian) (hC : C.IsHermitian)
+-- variable (hA : A.IsHermitian) (hB : B.IsHermitian) (hC : C.IsHermitian)
 
-/-- Real inner product of two square matrices. Only defined for Hermitian matrices,
-  as this lets us meaningfully interpret it as a real. -/
-def rinner (_ : A.IsHermitian) (_ : B.IsHermitian) : ℝ :=
-  RCLike.re (A * B).trace
+-- /-- Real inner product of two square matrices. Only defined for Hermitian matrices,
+--   as this lets us meaningfully interpret it as a real. -/
+-- def rinner (_ : A.IsHermitian) (_ : B.IsHermitian) : ℝ :=
+--   RCLike.re (A * B).trace
 
-/-- The inner product for Hermtian matrices is equal to the trace of
-  the product. -/
-theorem rinner_eq_trace_mul : hA.rinner hB = (A * B).trace := by
-  have h₁ := (RCLike.is_real_TFAE (A * B).trace).out 2 0
-  rw [rinner, h₁]
-  nth_rewrite 1 1 [← hA, ← hB]
-  simp [Matrix.trace, Matrix.mul_apply, Finset.sum_comm (f := fun x y ↦ A x y * _)]
+-- /-- The inner product for Hermtian matrices is equal to the trace of
+--   the product. -/
+-- theorem rinner_eq_trace_mul : hA.rinner hB = (A * B).trace := by
+--   have h₁ := (RCLike.is_real_TFAE (A * B).trace).out 2 0
+--   rw [rinner, h₁]
+--   nth_rewrite 1 1 [← hA, ← hB]
+--   simp [Matrix.trace, Matrix.mul_apply, Finset.sum_comm (f := fun x y ↦ A x y * _)]
 
-theorem rinner_symm : hA.rinner hB = hB.rinner hA := by
-  rw [rinner, rinner, Matrix.trace_mul_comm]
+-- theorem rinner_symm : hA.rinner hB = hB.rinner hA := by
+--   rw [rinner, rinner, Matrix.trace_mul_comm]
 
-@[simp]
-theorem rinner_zero_mul : hA.rinner Matrix.isHermitian_zero = 0 := by
-  simp [rinner]
+-- @[simp]
+-- theorem rinner_zero_mul : hA.rinner Matrix.isHermitian_zero = 0 := by
+--   simp [rinner]
 
-@[simp]
-theorem rinner_mul_zero : Matrix.isHermitian_zero.rinner hA = 0 := by
-  simp [rinner]
+-- @[simp]
+-- theorem rinner_mul_zero : Matrix.isHermitian_zero.rinner hA = 0 := by
+--   simp [rinner]
 
-variable [DecidableEq n] in
-@[simp]
-theorem rinner_mul_one : hA.rinner Matrix.isHermitian_one = hA.rtrace := by
-  simp only [rinner, mul_one, rtrace]
+-- variable [DecidableEq n] in
+-- @[simp]
+-- theorem rinner_mul_one : hA.rinner Matrix.isHermitian_one = hA.rtrace := by
+--   simp only [rinner, mul_one, rtrace]
 
-variable [DecidableEq n] in
-@[simp]
-theorem one_rinner_mul : Matrix.isHermitian_one.rinner hA = hA.rtrace := by
-  simp only [rinner, one_mul, rtrace]
+-- variable [DecidableEq n] in
+-- @[simp]
+-- theorem one_rinner_mul : Matrix.isHermitian_one.rinner hA = hA.rtrace := by
+--   simp only [rinner, one_mul, rtrace]
 
-theorem rinner_smul_selfAdjoint {c : 𝕜} (hc : _root_.IsSelfAdjoint c) :
-    (hA.smul_selfAdjoint hc).rinner hB = c * hA.rinner hB := by
-  simp [rinner, RCLike.conj_eq_iff_re.mp hc, RCLike.conj_eq_iff_im.mp hc]
+-- theorem rinner_smul_selfAdjoint {c : 𝕜} (hc : _root_.IsSelfAdjoint c) :
+--     (hA.smul_selfAdjoint hc).rinner hB = c * hA.rinner hB := by
+--   simp [rinner, RCLike.conj_eq_iff_re.mp hc, RCLike.conj_eq_iff_im.mp hc]
 
-theorem smul_rinner_selfAdjoint {c : 𝕜} (hc : _root_.IsSelfAdjoint c) :
-    hA.rinner (hB.smul_selfAdjoint hc) = c * hA.rinner hB := by
-  rwa [rinner_symm, rinner_symm hA, rinner_smul_selfAdjoint]
+-- theorem smul_rinner_selfAdjoint {c : 𝕜} (hc : _root_.IsSelfAdjoint c) :
+--     hA.rinner (hB.smul_selfAdjoint hc) = c * hA.rinner hB := by
+--   rwa [rinner_symm, rinner_symm hA, rinner_smul_selfAdjoint]
 
-@[simp]
-theorem rinner_smul_real {c : ℝ} :
-    (hA.smul_real c).rinner hB = c * hA.rinner hB := by
-  simp [rinner, RCLike.smul_re]
+-- @[simp]
+-- theorem rinner_smul_real {c : ℝ} :
+--     (hA.smul_real c).rinner hB = c * hA.rinner hB := by
+--   simp [rinner, RCLike.smul_re]
 
-@[simp]
-theorem smul_inner_real {c : ℝ} :
-    hA.rinner (hB.smul_real c) = c * hA.rinner hB := by
-  simp [rinner, RCLike.smul_re]
+-- @[simp]
+-- theorem smul_inner_real {c : ℝ} :
+--     hA.rinner (hB.smul_real c) = c * hA.rinner hB := by
+--   simp [rinner, RCLike.smul_re]
 
-@[simp]
-theorem rinner_add : hA.rinner (IsHermitian.add hB hC) = hA.rinner hB + hA.rinner hC := by
-  unfold rinner
-  rw [left_distrib, trace_add, map_add]
+-- @[simp]
+-- theorem rinner_add : hA.rinner (IsHermitian.add hB hC) = hA.rinner hB + hA.rinner hC := by
+--   unfold rinner
+--   rw [left_distrib, trace_add, map_add]
 
-@[simp]
-theorem rinner_sub : hA.rinner (IsHermitian.sub hB hC) = hA.rinner hB - hA.rinner hC := by
-  unfold rinner
-  rw [sub_eq_add_neg, left_distrib, trace_add, map_add, mul_neg, trace_neg, map_neg, ←sub_eq_add_neg]
+-- @[simp]
+-- theorem rinner_sub : hA.rinner (IsHermitian.sub hB hC) = hA.rinner hB - hA.rinner hC := by
+--   unfold rinner
+--   rw [sub_eq_add_neg, left_distrib, trace_add, map_add, mul_neg, trace_neg, map_neg, ←sub_eq_add_neg]
 
-end IsHermitian
-namespace PosSemidef
+-- end IsHermitian
+-- namespace PosSemidef
 
-variable (hA : A.PosSemidef) (hB : B.PosSemidef)
+-- variable (hA : A.PosSemidef) (hB : B.PosSemidef)
 
-/-- The inner product for PSD matrices is nonnegative. -/
-theorem rinner_ge_zero : 0 ≤ hA.1.rinner hB.1 := by
-  rw [IsHermitian.rinner, ← hA.sqrt_mul_self, Matrix.trace_mul_cycle, Matrix.trace_mul_cycle]
-  nth_rewrite 1 [← hA.posSemidef_sqrt.left]
-  exact (RCLike.nonneg_iff.mp (hB.conjTranspose_mul_mul_same _).trace_nonneg).left
+-- /-- The inner product for PSD matrices is nonnegative. -/
+-- theorem rinner_ge_zero : 0 ≤ hA.1.rinner hB.1 := by
+--   rw [IsHermitian.rinner, ← hA.sqrt_mul_self, Matrix.trace_mul_cycle, Matrix.trace_mul_cycle]
+--   nth_rewrite 1 [← hA.posSemidef_sqrt.left]
+--   exact (RCLike.nonneg_iff.mp (hB.conjTranspose_mul_mul_same _).trace_nonneg).left
 
-theorem rinner_mono {A B C : Matrix n n 𝕜} (hA : A.PosSemidef) (hB : B.IsHermitian) (hC : C.IsHermitian) :
-  B ≤ C → hA.1.rinner hB ≤ hA.1.rinner hC := fun hBC ↦ by
-  rw [le_iff_sub_posSemidef] at hBC
-  have hTr : 0 ≤ hA.1.rinner (IsHermitian.sub hC hB) := rinner_ge_zero hA hBC
-  rw [IsHermitian.rinner_sub] at hTr
-  linarith
+-- theorem rinner_mono {A B C : Matrix n n 𝕜} (hA : A.PosSemidef) (hB : B.IsHermitian) (hC : C.IsHermitian) :
+--   B ≤ C → hA.1.rinner hB ≤ hA.1.rinner hC := fun hBC ↦ by
+--   rw [le_iff_sub_posSemidef] at hBC
+--   have hTr : 0 ≤ hA.1.rinner (IsHermitian.sub hC hB) := rinner_ge_zero hA hBC
+--   rw [IsHermitian.rinner_sub] at hTr
+--   linarith
 
-set_option pp.proofs.withType true in
-include hA hB in
-/-- The inner product for PSD matrices is at most the product of their traces. -/
-theorem rinner_le_mul_trace : hA.1.rinner hB.1 ≤ hA.1.rtrace * hB.1.rtrace := by
-  convert rinner_mono hA hB.1 (IsHermitian.smul_real isHermitian_one hB.1.rtrace) (le_trace_smul_one hB)
-  rw [IsHermitian.smul_inner_real hA.1 isHermitian_one, IsHermitian.rinner_mul_one, mul_comm]
+-- set_option pp.proofs.withType true in
+-- include hA hB in
+-- /-- The inner product for PSD matrices is at most the product of their traces. -/
+-- theorem rinner_le_mul_trace : hA.1.rinner hB.1 ≤ hA.1.rtrace * hB.1.rtrace := by
+--   convert rinner_mono hA hB.1 (IsHermitian.smul_real isHermitian_one hB.1.rtrace) (le_trace_smul_one hB)
+--   rw [IsHermitian.smul_inner_real hA.1 isHermitian_one, IsHermitian.rinner_mul_one, mul_comm]
 
 -- /-- The InnerProductSpace on Matrix n n 𝕜 defined by the Frobenius inner product, `Matrix.inner`.-/
 -- def MatrixInnerProduct :=
@@ -591,39 +585,65 @@ theorem rinner_le_mul_trace : hA.1.rinner hB.1 ≤ hA.1.rtrace * hB.1.rtrace := 
 --     definite := sorry
 --   }
 
-end PosSemidef
-end frobenius_inner_product
+-- end PosSemidef
+-- end frobenius_inner_product
 
-section mat_trace
+section partial_trace
 
 variable [AddCommMonoid R] [Fintype d]
 
-def _root_.Matrix.traceLeft (m : Matrix (d × d₁) (d × d₂) R) : Matrix d₁ d₂ R :=
+def traceLeft (m : Matrix (d × d₁) (d × d₂) R) : Matrix d₁ d₂ R :=
   Matrix.of fun i₁ j₁ ↦ ∑ i₂, m (i₂, i₁) (i₂, j₁)
 
-def _root_.Matrix.traceRight (m : Matrix (d₁ × d) (d₂ × d) R) : Matrix d₁ d₂ R :=
+def traceRight (m : Matrix (d₁ × d) (d₂ × d) R) : Matrix d₁ d₂ R :=
   Matrix.of fun i₂ j₂ ↦ ∑ i₁, m (i₂, i₁) (j₂, i₁)
 
 variable [Fintype d₁] [Fintype d₂] in
 @[simp]
-theorem _root_.Matrix.trace_of_traceLeft (A : Matrix (d₁ × d₂) (d₁ × d₂) R) : A.traceLeft.trace = A.trace := by
+theorem traceLeft_trace (A : Matrix (d₁ × d₂) (d₁ × d₂) R) : A.traceLeft.trace = A.trace := by
   convert (Fintype.sum_prod_type_right _).symm
   rfl
 
 variable [Fintype d₁] [Fintype d₂] in
 @[simp]
-theorem _root_.Matrix.trace_of_traceRight (A : Matrix (d₁ × d₂) (d₁ × d₂) R) : A.traceRight.trace = A.trace := by
+theorem traceRight_trace (A : Matrix (d₁ × d₂) (d₁ × d₂) R) : A.traceRight.trace = A.trace := by
   convert (Fintype.sum_prod_type _).symm
   rfl
 
+variable [StarAddMonoid R] in
+theorem IsHermitian.traceLeft {A : Matrix (d × d₁) (d × d₁) R} (hA : A.IsHermitian) : A.traceLeft.IsHermitian := by
+  ext
+  simp only [Matrix.traceLeft, conjTranspose_apply, of_apply, star_sum]
+  congr!
+  exact congrFun₂ hA _ _
+
+variable [StarAddMonoid R] in
+theorem IsHermitian.traceRight {A : Matrix (d₁ × d) (d₁ × d) R} (hA : A.IsHermitian) : A.traceRight.IsHermitian := by
+  ext
+  simp only [Matrix.traceRight, conjTranspose_apply, of_apply, star_sum]
+  congr!
+  exact congrFun₂ hA _ _
+
 open ComplexOrder
 
-variable [RCLike R] {A : Matrix (d₁ × d₂) (d₁ × d₂) R} [Fintype d₂] [Fintype d₁]
+variable {A : Matrix (d₁ × d₂) (d₁ × d₂) 𝕜} [Fintype d₂] [Fintype d₁]
 
-theorem _root_.Matrix.PosSemidef.traceLeft (hA : A.PosSemidef) : A.traceLeft.PosSemidef :=
-  sorry
+theorem PosSemidef.traceLeft (hA : A.PosSemidef) : A.traceLeft.PosSemidef := by
+  constructor
+  · exact hA.1.traceLeft
+  · intro x
+    convert Finset.sum_nonneg' (s := .univ) (fun (i : d₁) ↦ hA.2 (fun (j,k) ↦ if i = j then x k else 0))
+    simp_rw [Matrix.traceLeft, dotProduct_mulVec]
+    simpa [dotProduct, vecMul_eq_sum, ite_apply, Fintype.sum_prod_type, Finset.mul_sum, Finset.sum_mul,
+      apply_ite] using Finset.sum_comm_3
 
-theorem _root_.Matrix.PosSemidef.traceRight (hA : A.PosSemidef) : A.traceRight.PosSemidef :=
-  sorry
+theorem PosSemidef.traceRight (hA : A.PosSemidef) : A.traceRight.PosSemidef := by
+  constructor
+  · exact hA.1.traceRight
+  · intro x
+    convert Finset.sum_nonneg' (s := .univ) (fun (i : d₂) ↦ hA.2 (fun (j,k) ↦ if i = k then x j else 0))
+    simp_rw [Matrix.traceRight, dotProduct_mulVec]
+    simpa [dotProduct, vecMul_eq_sum, ite_apply, Fintype.sum_prod_type, Finset.mul_sum, Finset.sum_mul,
+      apply_ite] using Finset.sum_comm_3
 
-end mat_trace
+end partial_trace

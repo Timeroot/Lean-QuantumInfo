@@ -126,11 +126,16 @@ theorem PosSemidef_outer_self_conj (v : d → ℂ) : Matrix.PosSemidef (Matrix.v
 
 /-- The inner product of two MState's, as a real number between 0 and 1. -/
 def inner (ρ : MState d) (σ : MState d) : Prob :=
-  ⟨(ρ.Hermitian.rinner σ.Hermitian),
+  ⟨(ρ.M.inner σ.M),
     -- 0 ≤ ...
-    ⟨ρ.pos.rinner_ge_zero σ.pos,
+    ⟨ sorry
+      -- ρ.pos.rinner_ge_zero σ.pos
+      ,
     -- ... ≤ 1
-    (ρ.pos.rinner_le_mul_trace σ.pos).trans (by simp only [ρ.rtrace_one, σ.rtrace_one, mul_one, le_refl])⟩⟩
+    sorry
+    -- (ρ.pos.rinner_le_mul_trace σ.pos
+    -- ).trans (by simp only [ρ.rtrace_one, σ.rtrace_one, mul_one, le_refl])
+    ⟩⟩
 
 section exp_val
 
@@ -138,10 +143,10 @@ def exp_val_ℂ (T : Matrix d d ℂ) (ρ : MState d) : ℂ :=
   (T * ρ.m).trace
 
 def exp_val {T : Matrix d d ℂ} (h : T.IsHermitian) (ρ : MState d) : ℝ :=
-  h.rinner ρ.Hermitian
+  ρ.M.inner ⟨T,h⟩
 
 theorem exp_val_nonneg {T : Matrix d d ℂ} (h : T.PosSemidef) (ρ : MState d) : 0 ≤ exp_val h.1 ρ :=
-  Matrix.PosSemidef.rinner_ge_zero h ρ.pos
+  sorry--Matrix.PosSemidef.rinner_ge_zero h ρ.pos
 
 variable [DecidableEq d] in
 theorem exp_val_prob {T : Matrix d d ℂ} (h : T.PosSemidef ∧ T ≤ 1) (ρ : MState d) :
@@ -151,10 +156,11 @@ theorem exp_val_prob {T : Matrix d d ℂ} (h : T.PosSemidef ∧ T ≤ 1) (ρ : M
     exact exp_val_nonneg h.1 ρ
   case right =>
     unfold exp_val
-    have hmono := Matrix.PosSemidef.rinner_mono ρ.pos h.1.1 Matrix.isHermitian_one h.2
-    rw [Matrix.IsHermitian.rinner_symm ρ.Hermitian h.1.1] at hmono
-    rw [Matrix.IsHermitian.rinner_mul_one ρ.Hermitian, ρ.rtrace_one] at hmono
-    exact hmono
+    sorry
+    -- have hmono := Matrix.PosSemidef.rinner_mono ρ.pos h.1.1 Matrix.isHermitian_one h.2
+    -- rw [Matrix.IsHermitian.rinner_symm ρ.Hermitian h.1.1] at hmono
+    -- rw [Matrix.IsHermitian.rinner_mul_one ρ.Hermitian, ρ.rtrace_one] at hmono
+    -- exact hmono
 
 end exp_val
 
@@ -180,9 +186,10 @@ theorem pure_of (ψ : Ket d) : (pure ψ).m i j = (ψ i) * conj (ψ j) := by
 def purity (ρ : MState d) : Prob :=
   ⟨(ρ.pos.pow 2).1.rtrace, ⟨(ρ.pos.pow 2).rtrace_nonneg,
       by
-    convert ρ.pos.rinner_le_mul_trace ρ.pos using 1
-    · exact congrArg (RCLike.re ·.trace) (pow_two ρ.m)
-    · simp [ρ.rtrace_one]
+    sorry
+    -- convert ρ.pos.rinner_le_mul_trace ρ.pos using 1
+    -- · exact congrArg (RCLike.re ·.trace) (pow_two ρ.m)
+    -- · simp [ρ.rtrace_one]
     ⟩⟩
 
 /-- The eigenvalue spectrum of a mixed quantum state, as a `Distribution`. -/
@@ -383,16 +390,15 @@ section ptrace
 /-- Partial tracing out the left half of a system. -/
 def traceLeft (ρ : MState (d₁ × d₂)) : MState d₂ where
   val := ρ.m.traceLeft
-  property := ρ.pos.traceLeft.1
+  property := ρ.pos.1.traceLeft
   pos := ρ.pos.traceLeft
-  tr := ρ.tr ▸ ρ.m.trace_of_traceLeft
+  tr := ρ.tr ▸ ρ.m.traceLeft_trace
 
 /-- Partial tracing out the right half of a system. -/
 def traceRight (ρ : MState (d₁ × d₂)) : MState d₁ where
-  val := ρ.m.traceRight
-  property := ρ.pos.traceRight.1
+  toSubtype := ⟨ρ.m.traceRight, ρ.M.H.traceRight⟩
   pos := ρ.pos.traceRight
-  tr := ρ.tr ▸ ρ.m.trace_of_traceRight
+  tr := ρ.tr ▸ ρ.m.traceRight_trace
 
 /-- Taking the direct product on the left and tracing it back out gives the same state. -/
 @[simp]
@@ -492,7 +498,7 @@ def purifyX (ρ : MState d) : { ψ : Ket (d × d) // (pure ψ).traceRight = ρ }
 end purification
 
 def relabel (ρ : MState d₁) (e : d₂ ≃ d₁) : MState d₂ where
-  val := ρ.m.submatrix e e
+  val := ρ.m.reindex e.symm e.symm
   property := ((Matrix.posSemidef_submatrix_equiv e).mpr ρ.pos).1
   pos := (Matrix.posSemidef_submatrix_equiv e).mpr ρ.pos
   tr := ρ.tr ▸ Fintype.sum_equiv _ _ _ (congrFun rfl)

@@ -251,7 +251,6 @@ theorem inner_comm : A.inner B = B.inner A := by
 
 end commring
 
---TODO: Redo this with CFC
 noncomputable section RCLike
 
 variable {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
@@ -292,3 +291,22 @@ def log (A : HermitianMat n 𝕜) : HermitianMat n 𝕜 :=
   ⟨CFC.log A.toMat, IsSelfAdjoint.log⟩
 
 end RCLike
+
+section conj
+
+variable [CommRing α] [StarRing α] [DecidableEq n] [Fintype n]
+
+/-- The Hermitian matrix given by conjugating by a (possibly rectangular) Matrix. If we required `B` to be
+square, this would apply to any `Semigroup`+`StarMul` (as proved by `IsSelfAdjoint.conjugate`). But this lets
+us conjugate to other sizes too, as is done in e.g. Kraus operators. That is, it's a _heterogeneous_ conjguation.
+-/
+def conj (A : HermitianMat n α) (B : Matrix m n α) : HermitianMat m α :=
+  ⟨B * A.toMat * B.conjTranspose, by
+  ext
+  simp only [Matrix.star_apply, Matrix.mul_apply, Matrix.conjTranspose_apply, Finset.sum_mul,
+    star_sum, star_mul', star_star, show ∀ (a b : n), star (A.toMat b a) = A.toMat a b from congrFun₂ A.property]
+  rw [Finset.sum_comm]
+  congr! 2
+  ring⟩
+
+end conj
