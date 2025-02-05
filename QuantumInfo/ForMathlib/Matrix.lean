@@ -11,22 +11,6 @@ open Classical
 variable {n 𝕜 : Type*}
 variable [RCLike 𝕜]
 
-namespace RCLike
-
-open ComplexOrder
-
-theorem inv_nonneg' {x : 𝕜} (h : 0 ≤ x) : 0 ≤ x⁻¹ := by
-  by_cases h0 : x = 0
-  · subst x
-    simp only [_root_.inv_zero, le_refl]
-  · exact (RCLike.inv_pos.mpr (lt_of_le_of_ne h (Ne.symm h0))).le
-
-@[simp]
-theorem inv_nonneg {x : 𝕜} : 0 ≤ x⁻¹ ↔ 0 ≤ x :=
-  ⟨by simpa only [inv_inv] using inv_nonneg' (x := x⁻¹), inv_nonneg'⟩
-
-end RCLike
-
 namespace Matrix
 
 theorem zero_rank_eq_zero {A : Matrix n n 𝕜} [Fintype n] (hA : A.rank = 0) : A = 0 := by

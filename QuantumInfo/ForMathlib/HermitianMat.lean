@@ -85,6 +85,34 @@ noncomputable instance instZPow : Pow (HermitianMat n α) ℤ :=
 
 end commring
 
+-- This belongs in Mathlib
+section rclike
+variable {α : Type*} [RCLike α]
+instance : StarModule ℝ α where
+  star_smul r a := by simp [RCLike.real_smul_eq_coe_mul]
+
+end rclike
+-- /mathlib
+
+section conj
+
+variable [CommRing α] [StarRing α] [DecidableEq n] [Fintype n]
+
+/-- The Hermitian matrix given by conjugating by a (possibly rectangular) Matrix. If we required `B` to be
+square, this would apply to any `Semigroup`+`StarMul` (as proved by `IsSelfAdjoint.conjugate`). But this lets
+us conjugate to other sizes too, as is done in e.g. Kraus operators. That is, it's a _heterogeneous_ conjguation.
+-/
+def conj (A : HermitianMat n α) (B : Matrix m n α) : HermitianMat m α :=
+  ⟨B * A.toMat * B.conjTranspose, by
+  ext
+  simp only [Matrix.star_apply, Matrix.mul_apply, Matrix.conjTranspose_apply, Finset.sum_mul,
+    star_sum, star_mul', star_star, show ∀ (a b : n), star (A.toMat b a) = A.toMat a b from congrFun₂ A.property]
+  rw [Finset.sum_comm]
+  congr! 2
+  ring⟩
+
+end conj
+
 section trace
 
 variable [Star R] [TrivialStar R] [Fintype n]
@@ -251,7 +279,69 @@ theorem inner_comm : A.inner B = B.inner A := by
 
 end commring
 
-noncomputable section RCLike
+section trivialstar
+variable [CommRing α] [StarRing α] [TrivialStar α]
+
+/-- `HermitianMat.inner` reduces to `Matrix.trace (A * B)` when the elements are a `TrivialStar`. -/
+theorem inner_eq_trace_trivial (A B : HermitianMat n α) : A.inner B = Matrix.trace (A.toMat * B.toMat) := by
+  rw [← inner_eq_trace_mul]
+  rfl
+
+end trivialstar
+
+section RCLike
+variable {n 𝕜 : Type*} [Fintype n] [RCLike 𝕜]
+
+theorem inner_eq_re_trace (A B : HermitianMat n 𝕜) : A.inner B = RCLike.re (Matrix.trace (A.toMat * B.toMat)) := by
+  rfl
+
+theorem inner_eq_trace_rc (A B : HermitianMat n 𝕜) : A.inner B = Matrix.trace (A.toMat * B.toMat) := by
+  change RCLike.ofReal (RCLike.re _) = _
+  rw [← RCLike.conj_eq_iff_re]
+  convert (Matrix.trace_conjTranspose (A.toMat * B.toMat)).symm using 1
+  rw [Matrix.conjTranspose_mul, A.H, B.H, Matrix.trace_mul_comm]
+
+end RCLike
+
+section possemidef
+open ComplexOrder
+
+variable [RCLike α] [DecidableEq n]
+variable {A B C : HermitianMat n α}
+
+theorem le_trace_smul_one (hA : A.toMat.PosSemidef) : A ≤ (A.trace : ℝ) • 1 := by
+  --mostly a copy of Matrix.PosSemidef.le_trace_smul_one from ForMathlib.Matrix.lean
+  sorry
+  -- have h : ∀ i, hA.1.eigenvalues i ≤ hA.1.rtrace := fun i ↦ by
+  --   rw [←IsHermitian.sum_eigenvalues_eq_rtrace hA.1]
+  --   convert @Finset.sum_le_sum_of_subset_of_nonneg n ℝ _ hA.1.eigenvalues {i} Finset.univ _ _
+  --   · rw [Finset.sum_singleton]
+  --   · exact Finset.subset_univ {i}
+  --   · exact fun j _ _ ↦ eigenvalues_nonneg hA j
+  -- exact (le_smul_one_of_eigenvalues_iff hA hA.1.rtrace).mp h
+
+/-- The inner product for PSD matrices is nonnegative. -/
+theorem inner_ge_zero (hA : A.toMat.PosSemidef) (hB : B.toMat.PosSemidef) : 0 ≤ A.inner B := by
+  open Classical in
+  rw [inner_eq_re_trace, ← hA.sqrt_mul_self, Matrix.trace_mul_cycle, Matrix.trace_mul_cycle]
+  nth_rewrite 1 [← hA.posSemidef_sqrt.left]
+  exact (RCLike.nonneg_iff.mp (hB.conjTranspose_mul_mul_same _).trace_nonneg).left
+
+theorem inner_mono (hA : A.toMat.PosSemidef) (B C) : B ≤ C → A.inner B ≤ A.inner C := fun hBC ↦ by
+  replace hBC := Matrix.PosSemidef.le_iff_sub_posSemidef.mp hBC
+  have hTr : 0 ≤ A.inner (C - B) := inner_ge_zero hA hBC
+  rw [inner_left_sub] at hTr
+  linarith
+
+/-- The inner product for PSD matrices is at most the product of their traces. -/
+theorem inner_le_mul_trace (hA : A.toMat.PosSemidef) (hB : B.toMat.PosSemidef) : A.inner B ≤ A.trace * B.trace := by
+  convert inner_mono hA _ _ (le_trace_smul_one hB)
+  simp [mul_comm]
+
+end possemidef
+
+--Matrix operations on RCLike matrices with the CFC
+noncomputable section CFC
 
 variable {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
 
@@ -290,23 +380,4 @@ def log (A : HermitianMat n 𝕜) : HermitianMat n 𝕜 :=
   let _ : NormedAlgebra ℝ (Matrix n n 𝕜) := Matrix.frobeniusNormedAlgebra
   ⟨CFC.log A.toMat, IsSelfAdjoint.log⟩
 
-end RCLike
-
-section conj
-
-variable [CommRing α] [StarRing α] [DecidableEq n] [Fintype n]
-
-/-- The Hermitian matrix given by conjugating by a (possibly rectangular) Matrix. If we required `B` to be
-square, this would apply to any `Semigroup`+`StarMul` (as proved by `IsSelfAdjoint.conjugate`). But this lets
-us conjugate to other sizes too, as is done in e.g. Kraus operators. That is, it's a _heterogeneous_ conjguation.
--/
-def conj (A : HermitianMat n α) (B : Matrix m n α) : HermitianMat m α :=
-  ⟨B * A.toMat * B.conjTranspose, by
-  ext
-  simp only [Matrix.star_apply, Matrix.mul_apply, Matrix.conjTranspose_apply, Finset.sum_mul,
-    star_sum, star_mul', star_star, show ∀ (a b : n), star (A.toMat b a) = A.toMat a b from congrFun₂ A.property]
-  rw [Finset.sum_comm]
-  congr! 2
-  ring⟩
-
-end conj
+end CFC

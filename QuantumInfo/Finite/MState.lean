@@ -56,17 +56,16 @@ def M (ρ : MState d) : HermitianMat d ℂ := ρ.toSubtype
 instance instCoe : Coe (MState d) (HermitianMat d ℂ) := ⟨MState.M⟩
 
 @[simp]
+theorem tr' (ρ : MState d) : ρ.M.trace = 1 := by
+  simp [HermitianMat.trace_eq_re_trace, ρ.tr]
+
+@[simp]
 theorem toSubtype_eq_coe (ρ : MState d) : ρ.toSubtype = ρ.M :=
   rfl
 
 /-- Every mixed state is Hermitian. -/
 theorem Hermitian (ρ : MState d) : ρ.m.IsHermitian :=
   ρ.pos.left
-
-/-- The real trace `Matrix.IsHermitian.rtrace` of an MState is 1 -/
-theorem rtrace_one (ρ : MState d) : ρ.Hermitian.rtrace = 1 := by
-  rw [Matrix.IsHermitian.rtrace, MState.m, ρ.tr]
-  rfl
 
 @[ext]
 theorem ext {ρ₁ ρ₂ : MState d} (h : ρ₁.m = ρ₂.m) : ρ₁ = ρ₂ := by
@@ -128,14 +127,9 @@ theorem PosSemidef_outer_self_conj (v : d → ℂ) : Matrix.PosSemidef (Matrix.v
 def inner (ρ : MState d) (σ : MState d) : Prob :=
   ⟨(ρ.M.inner σ.M),
     -- 0 ≤ ...
-    ⟨ sorry
-      -- ρ.pos.rinner_ge_zero σ.pos
-      ,
+    ⟨ρ.M.inner_ge_zero ρ.pos σ.pos,
     -- ... ≤ 1
-    sorry
-    -- (ρ.pos.rinner_le_mul_trace σ.pos
-    -- ).trans (by simp only [ρ.rtrace_one, σ.rtrace_one, mul_one, le_refl])
-    ⟩⟩
+    (ρ.M.inner_le_mul_trace ρ.pos σ.pos).trans (by simp)⟩⟩
 
 section exp_val
 
@@ -146,7 +140,7 @@ def exp_val {T : Matrix d d ℂ} (h : T.IsHermitian) (ρ : MState d) : ℝ :=
   ρ.M.inner ⟨T,h⟩
 
 theorem exp_val_nonneg {T : Matrix d d ℂ} (h : T.PosSemidef) (ρ : MState d) : 0 ≤ exp_val h.1 ρ :=
-  sorry--Matrix.PosSemidef.rinner_ge_zero h ρ.pos
+  HermitianMat.inner_ge_zero ρ.pos h
 
 variable [DecidableEq d] in
 theorem exp_val_prob {T : Matrix d d ℂ} (h : T.PosSemidef ∧ T ≤ 1) (ρ : MState d) :
@@ -156,10 +150,10 @@ theorem exp_val_prob {T : Matrix d d ℂ} (h : T.PosSemidef ∧ T ≤ 1) (ρ : M
     exact exp_val_nonneg h.1 ρ
   case right =>
     unfold exp_val
+    have hmono := HermitianMat.inner_mono ρ.pos ⟨T,h.1.1⟩ 1 h.2
+    rw [HermitianMat.inner_comm] at hmono
     sorry
-    -- have hmono := Matrix.PosSemidef.rinner_mono ρ.pos h.1.1 Matrix.isHermitian_one h.2
-    -- rw [Matrix.IsHermitian.rinner_symm ρ.Hermitian h.1.1] at hmono
-    -- rw [Matrix.IsHermitian.rinner_mul_one ρ.Hermitian, ρ.rtrace_one] at hmono
+    -- rw [HermitianMat.inner_mul_one ρ.M, ρ.trace_one] at hmono
     -- exact hmono
 
 end exp_val
@@ -198,11 +192,7 @@ def spectrum (ρ : MState d) : Distribution d :=
     (fun i ↦ ρ.Hermitian.eigenvalues i) --The values are the eigenvalues
     (fun i ↦ ρ.pos.eigenvalues_nonneg i) --The values are all nonnegative
     (by --The values sum to 1
-      have h := congrArg Complex.re (ρ.Hermitian.sum_eigenvalues_eq_trace)
-      simp only [ρ.tr, RCLike.ofReal_sum, Complex.re_sum, Complex.one_re] at h
-      sorry
-      -- rw [← h]
-      -- rfl
+      simpa [ρ.tr] using congrArg Complex.re (ρ.M.H.sum_eigenvalues_eq_trace)
       )
 
 /-- The specturm of a pure state is (1,0,0,...), i.e. a constant distribution. -/
