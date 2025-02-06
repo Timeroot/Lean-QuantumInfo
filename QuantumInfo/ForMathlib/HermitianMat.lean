@@ -54,6 +54,10 @@ instance : Coe (HermitianMat n α) (Matrix n n α) := ⟨toMat⟩
 theorem val_eq_coe (A : HermitianMat n α) : A.val = A := by
   rfl
 
+@[simp]
+theorem mk_toMat (x : Matrix n n α) (h) : HermitianMat.toMat (Subtype.mk x h) = x := by
+  rfl
+
 /-- Alias for HermitianMat.property or HermitianMat.2, this gets the fact that the value
   is actually `IsHermitian`.-/
 theorem H (A : HermitianMat n α) : A.toMat.IsHermitian :=
@@ -337,6 +341,14 @@ theorem inner_mono (hA : A.toMat.PosSemidef) (B C) : B ≤ C → A.inner B ≤ A
 theorem inner_le_mul_trace (hA : A.toMat.PosSemidef) (hB : B.toMat.PosSemidef) : A.inner B ≤ A.trace * B.trace := by
   convert inner_mono hA _ _ (le_trace_smul_one hB)
   simp [mul_comm]
+
+--There's a lot of facts about PosSemidef matrices that are convenient to come bundled with the HermitiatMat
+--type too.
+omit [DecidableEq n] in
+theorem convex_cone (hA : A.toMat.PosSemidef) (hB : B.toMat.PosSemidef) {c₁ c₂ : ℝ} (hc₁ : 0 ≤ c₁) (hc₂ : 0 ≤ c₂)
+    : (c₁ • A + c₂ • B).toMat.PosSemidef := by
+  convert (hA.smul (RCLike.ofReal_nonneg.mpr hc₁)).add (hB.smul (RCLike.ofReal_nonneg.mpr hc₂))
+  simp
 
 end possemidef
 

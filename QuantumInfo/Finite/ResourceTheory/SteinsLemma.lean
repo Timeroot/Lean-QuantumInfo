@@ -15,10 +15,10 @@ variable {d : Type*} [Fintype d] [DecidableEq d]
 /-- The optimal hypothesis testing rate, for a tolerance ε: given a state ρ and a set of states S,
 the optimum distinguishing rate that allows a probability ε of errors. -/
 noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : ℝ) (S : Set (MState d)) : Prob :=
-  ⨅ T : { m : Matrix d d ℂ //
-    ∃ h : m.PosSemidef ∧ m ≤ 1, MState.exp_val (Matrix.isHermitian_one.sub h.1.1) ρ ≤ ε},
+  ⨅ T : { m : HermitianMat d ℂ //
+    (m.toMat.PosSemidef ∧ m ≤ 1) ∧ ρ.exp_val (1 - m) ≤ ε},
   ⨆ σ ∈ S,
-  ⟨MState.exp_val T.2.1.1.1 σ, MState.exp_val_prob T.2.1 σ⟩
+  ⟨MState.exp_val T.1 σ, MState.exp_val_prob T.2.1 σ⟩
 
 scoped notation "β_" ε " (" ρ "‖" S ")" =>  OptimalHypothesisRate ρ ε S
 
@@ -51,9 +51,9 @@ scoped notation "—log " => Prob.negLog
 
 theorem OptimalHypothesisRate_singleton {ρ σ : MState d} {ε : ℝ}  :
   β_ ε(ρ‖{σ}) =
-    ⨅ T : { m : Matrix d d ℂ //
-    ∃ h : m.PosSemidef ∧ m ≤ 1, MState.exp_val (Matrix.isHermitian_one.sub h.1.1) ρ ≤ ε},
-    ⟨MState.exp_val T.2.1.1.1 σ, MState.exp_val_prob T.2.1 σ⟩
+    ⨅ T : { m : HermitianMat d ℂ //
+      (m.toMat.PosSemidef ∧ m ≤ 1) ∧ ρ.exp_val (1 - m) ≤ ε},
+    ⟨MState.exp_val T.1 σ, MState.exp_val_prob T.2.1 σ⟩
   := by
   simp only [OptimalHypothesisRate, iSup_singleton]
 
@@ -63,7 +63,10 @@ private theorem Lemma3 (ρ : MState d) (ε : ℝ) (S : Set (MState d)) :
 
 /- This is from "Strong converse exponents for a quantum channel discrimination problem and
 quantum-feedback-assisted communication", Lemma 5. It will likely require some kind of
-special condition that α ≠ 1 to be completely true. -/
+special condition that α ≠ 1 to be completely true. Also, if we restrict to α < 1, then
+the `- Real.log ...` part is an (E)NNReal, which will reduce the casting headaches. But,
+I think we need 1 < α too.
+-/
 private theorem Ref81Lem5 (ρ σ : MState d) (ε α : ℝ) (hε : 0 ≤ ε ∧ ε < 1) (hα : 0 < α) :
     —log β_ ε(ρ‖{σ}) ≤ (SandwichedRelRentropy α ρ σ : EReal) - Real.log (1 - ε) * α / (1 - α)
     := by

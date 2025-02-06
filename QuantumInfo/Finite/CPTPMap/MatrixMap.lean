@@ -188,12 +188,17 @@ def Basis.piTensorProduct [∀i, Fintype (L i)]  (b : (i:ι) → Basis (L i) R (
 end basis
 
 section equiv
+
 variable {ι : Type u}
+
+--This will just become prodArrow when #21518 is merged
+@[simps]
 def Equiv.piProdProdPi (κ : ι → Type v) : ((i : ι) → κ i × κ i) ≃ ((i : ι) → κ i) × ((i : ι) → κ i) where
   toFun := fun f ↦ ⟨fun i↦(f i).1,fun i↦(f i).2⟩
   invFun := fun f i ↦⟨f.1 i, f.2 i⟩
   left_inv := by intro; simp
   right_inv := by intro; simp
+
 end equiv
 
 variable {R : Type*} [CommSemiring R]
@@ -217,7 +222,6 @@ noncomputable def piKron (Λi : ∀ i, MatrixMap (dI i) (dO i) R) : MatrixMap (�
 
 -- notation3:100 "⨂ₜₘ "(...)", "r:(scoped f => tprod R f) => r
 -- syntax (name := bigsum) "∑ " bigOpBinders ("with " term)? ", " term:67 : term
--- macro "∃" xs:explicitBinders ", " b:term : term => expandExplicitBinders ``Exists xs b
 
 end pi
 
@@ -267,7 +271,7 @@ theorem apply_trace {M : MatrixMap A B R} (h : M.IsTracePreserving) (ρ : Matrix
 /-- The trace of a Choi matrix of a TP map is the cardinality of the input space. -/
 theorem trace_choi {M : MatrixMap A B R} (h : M.IsTracePreserving) :
     M.choi_matrix.trace = (Finset.univ (α := A)).card := by
-  rw [← Matrix.trace_of_traceRight, (IsTracePreserving_iff_trace_choi M).mp h,
+  rw [← Matrix.traceRight_trace, (IsTracePreserving_iff_trace_choi M).mp h,
     Matrix.trace_one, Finset.card_univ]
 
 variable {A : Type*} [Fintype A] in

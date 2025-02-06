@@ -13,11 +13,11 @@ class ResourcePretheory (ι : Type*) where
   /-- The indexing of each Hilbert space -/
   H : ι → Type*
   /-- Each space is finite -/
-  FinH : ∀ i, Fintype (H i)
+  [FinH : ∀ i, Fintype (H i)]
   /-- Each object has decidable equality -/
-  DecEqH : ∀ i, DecidableEq (H i)
+  [DecEqH : ∀ i, DecidableEq (H i)]
   /-- Each space is nonempty (dimension at least 1) -/
-  NonemptyH : ∀ i, Nonempty (H i)
+  [NonemptyH : ∀ i, Nonempty (H i)]
   /-- The Hilbert spaces must have a product structure. -/
   prod : ι → ι → ι
   /-- The product structure induces an isomorphism of Hilbert spaces -/

@@ -4,8 +4,8 @@ import QuantumInfo.Finite.CPTPMap.MatrixMap
 
 /-! # Completely Positive maps
 
-Building on `MatrixMap`s, this defines `IsHermitianPreserving`, `IsPositive`
-and `IsCompletelyPositive` maps. They have basic facts such as closure under composition,
+Building on `MatrixMap`s, this defines the Props: `IsHermitianPreserving`, `IsPositive`
+and `IsCompletelyPositive`. They have basic facts such as closure under composition,
 addition, and scaling.
 
 -/
@@ -85,7 +85,7 @@ namespace IsCompletelyPositive
 variable [Fintype A] [Fintype B] [Fintype C] [DecidableEq A]
 
 /-- Definition of a CP map, but with `Fintype T` in the definition instead of a `Fin n`. -/
-theorem def_Fintype  {M : MatrixMap A B R} (h : IsCompletelyPositive M)
+theorem of_Fintype  {M : MatrixMap A B R} (h : IsCompletelyPositive M)
     (T : Type*) [Fintype T] [DecidableEq T] :
     (M.kron (LinearMap.id : MatrixMap T T R)).IsPositive := by
   sorry
@@ -103,7 +103,13 @@ theorem IsPositive [DecidableEq A] {M : MatrixMap A B R}
 theorem comp [DecidableEq B] {M₁ : MatrixMap A B R} {M₂ : MatrixMap B C R} (h₁ : M₁.IsCompletelyPositive)
     (h₂ : M₂.IsCompletelyPositive) : IsCompletelyPositive (M₂ ∘ₗ M₁) := by
 --sketch: (M₂ ∘ₗ M₁) ⊗ₖₘ id[n] = (M₂ ⊗ₖₘ id[n]) ∘ₗ (M₁ ⊗ₖₘ id[n]), which is a composition of positive maps.
-  sorry
+  intro n x hx
+  specialize h₁ n hx
+  specialize h₂ n h₁
+  conv in LinearMap.id =>
+    change LinearMap.id ∘ₗ LinearMap.id
+  rw [kron_comp_distrib]
+  simpa using h₂
 
 /-- The identity MatrixMap IsCompletelyPositive. -/
 theorem id : (id A R).IsCompletelyPositive := by
