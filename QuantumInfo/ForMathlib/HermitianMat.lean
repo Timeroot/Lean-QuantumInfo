@@ -310,10 +310,19 @@ end RCLike
 section possemidef
 open ComplexOrder
 
-variable [RCLike α] [DecidableEq n]
-variable {A B C : HermitianMat n α}
+variable [RCLike α]
+variable {A B C : HermitianMat n α} {M N : Matrix n n α}
 
-theorem le_trace_smul_one (hA : A.toMat.PosSemidef) : A ≤ (A.trace : ℝ) • 1 := by
+theorem le_iff : A ≤ B ↔ (B - A).toMat.PosSemidef := by
+  rfl
+
+theorem zero_le_iff : 0 ≤ A ↔ A.toMat.PosSemidef := by
+  rw [← propext_iff]
+  apply congrArg Matrix.PosSemidef (sub_zero _)
+
+variable [DecidableEq n]
+
+theorem le_trace_smul_one (hA : 0 ≤ A) : A ≤ (A.trace : ℝ) • 1 := by
   --mostly a copy of Matrix.PosSemidef.le_trace_smul_one from ForMathlib.Matrix.lean
   sorry
   -- have h : ∀ i, hA.1.eigenvalues i ≤ hA.1.rtrace := fun i ↦ by
@@ -325,30 +334,36 @@ theorem le_trace_smul_one (hA : A.toMat.PosSemidef) : A ≤ (A.trace : ℝ) • 
   -- exact (le_smul_one_of_eigenvalues_iff hA hA.1.rtrace).mp h
 
 /-- The inner product for PSD matrices is nonnegative. -/
-theorem inner_ge_zero (hA : A.toMat.PosSemidef) (hB : B.toMat.PosSemidef) : 0 ≤ A.inner B := by
+theorem inner_ge_zero (hA : 0 ≤ A) (hB : 0 ≤ B) : 0 ≤ A.inner B := by
+  rw [zero_le_iff] at hA hB
   open Classical in
   rw [inner_eq_re_trace, ← hA.sqrt_mul_self, Matrix.trace_mul_cycle, Matrix.trace_mul_cycle]
   nth_rewrite 1 [← hA.posSemidef_sqrt.left]
   exact (RCLike.nonneg_iff.mp (hB.conjTranspose_mul_mul_same _).trace_nonneg).left
 
-theorem inner_mono (hA : A.toMat.PosSemidef) (B C) : B ≤ C → A.inner B ≤ A.inner C := fun hBC ↦ by
-  replace hBC := Matrix.PosSemidef.le_iff_sub_posSemidef.mp hBC
-  have hTr : 0 ≤ A.inner (C - B) := inner_ge_zero hA hBC
+theorem inner_mono (hA : 0 ≤ A) (B C) : B ≤ C → A.inner B ≤ A.inner C := fun hBC ↦ by
+  have hTr : 0 ≤ A.inner (C - B) := inner_ge_zero hA (zero_le_iff.mpr hBC)
   rw [inner_left_sub] at hTr
   linarith
 
 /-- The inner product for PSD matrices is at most the product of their traces. -/
-theorem inner_le_mul_trace (hA : A.toMat.PosSemidef) (hB : B.toMat.PosSemidef) : A.inner B ≤ A.trace * B.trace := by
+theorem inner_le_mul_trace (hA : 0 ≤ A) (hB : 0 ≤ B) : A.inner B ≤ A.trace * B.trace := by
   convert inner_mono hA _ _ (le_trace_smul_one hB)
   simp [mul_comm]
 
 --There's a lot of facts about PosSemidef matrices that are convenient to come bundled with the HermitiatMat
 --type too.
 omit [DecidableEq n] in
-theorem convex_cone (hA : A.toMat.PosSemidef) (hB : B.toMat.PosSemidef) {c₁ c₂ : ℝ} (hc₁ : 0 ≤ c₁) (hc₂ : 0 ≤ c₂)
-    : (c₁ • A + c₂ • B).toMat.PosSemidef := by
+theorem convex_cone (hA : 0 ≤ A) (hB : 0 ≤ B) {c₁ c₂ : ℝ} (hc₁ : 0 ≤ c₁) (hc₂ : 0 ≤ c₂)
+    : 0 ≤ (c₁ • A + c₂ • B) := by
+  rw [zero_le_iff] at hA hB ⊢
   convert (hA.smul (RCLike.ofReal_nonneg.mpr hc₁)).add (hB.smul (RCLike.ofReal_nonneg.mpr hc₂))
   simp
+
+omit [DecidableEq n] in
+theorem conj_le (hA : 0 ≤ A) [Fintype m] (M : Matrix m n α) : 0 ≤ A.conj M := by
+  rw [zero_le_iff] at hA ⊢
+  exact Matrix.PosSemidef.mul_mul_conjTranspose_same hA M
 
 end possemidef
 

@@ -59,7 +59,9 @@ theorem apply_trace (Λ : PTPMap dIn dOut) (ρ : Matrix dIn dIn ℂ) : (Λ.map �
   Λ.trace_preserving ρ
 
 instance instFunLike : FunLike (PTPMap dIn dOut) (MState dIn) (MState dOut) where
-  coe Λ := fun ρ ↦ MState.mk ⟨Λ.map ρ.m, (Λ.apply_PosSemidef ρ.pos).1⟩ (Λ.apply_PosSemidef ρ.pos) (ρ.tr ▸ Λ.apply_trace ρ.m)
+  coe Λ := fun ρ ↦ MState.mk
+    ⟨Λ.map ρ.m, (Λ.apply_PosSemidef ρ.pos).1⟩
+    (HermitianMat.zero_le_iff.mpr (Λ.apply_PosSemidef ρ.pos)) (ρ.tr ▸ Λ.apply_trace ρ.m)
   coe_injective' _ _ h := sorry --Requires the fact the action on MStates determines action on all matrices
 
 --If we have a PTPMap, the input and output dimensions are always both nonempty (otherwise
@@ -196,7 +198,7 @@ theorem id_fun_id (M : Matrix dIn dIn ℂ) : id.map M = M := by
 /-- The map `CPTPMap.id` leaves the input state unchanged. -/
 @[simp]
 theorem id_MState (ρ : MState dIn) : CPTPMap.id ρ = ρ := by
-  ext1
+  apply MState.ext_m
   rw [mat_coe_eq_apply_mat]
   exact id_fun_id ρ.m
 

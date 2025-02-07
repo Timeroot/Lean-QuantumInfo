@@ -15,10 +15,8 @@ variable {d : Type*} [Fintype d] [DecidableEq d]
 /-- The optimal hypothesis testing rate, for a tolerance ε: given a state ρ and a set of states S,
 the optimum distinguishing rate that allows a probability ε of errors. -/
 noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : ℝ) (S : Set (MState d)) : Prob :=
-  ⨅ T : { m : HermitianMat d ℂ //
-    (m.toMat.PosSemidef ∧ m ≤ 1) ∧ ρ.exp_val (1 - m) ≤ ε},
-  ⨆ σ ∈ S,
-  ⟨MState.exp_val T.1 σ, MState.exp_val_prob T.2.1 σ⟩
+  ⨅ T : { m : HermitianMat d ℂ // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1},
+    ⨆ σ ∈ S, ⟨_, σ.exp_val_prob T.2.right⟩
 
 scoped notation "β_" ε " (" ρ "‖" S ")" =>  OptimalHypothesisRate ρ ε S
 
@@ -51,9 +49,8 @@ scoped notation "—log " => Prob.negLog
 
 theorem OptimalHypothesisRate_singleton {ρ σ : MState d} {ε : ℝ}  :
   β_ ε(ρ‖{σ}) =
-    ⨅ T : { m : HermitianMat d ℂ //
-      (m.toMat.PosSemidef ∧ m ≤ 1) ∧ ρ.exp_val (1 - m) ≤ ε},
-    ⟨MState.exp_val T.1 σ, MState.exp_val_prob T.2.1 σ⟩
+    ⨅ T : { m : HermitianMat d ℂ // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1},
+      ⟨_, σ.exp_val_prob T.2.right⟩
   := by
   simp only [OptimalHypothesisRate, iSup_singleton]
 
