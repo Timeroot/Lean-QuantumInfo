@@ -128,6 +128,7 @@ instance instQRTCategory (ι : Type*) [ResourceTheory ι] : CategoryTheory.Categ
   comp_id := by simp
   assoc := fun f g h ↦ by simpa using CPTPMap.compose_assoc h.1 g.1 f.1
 
+open ComplexOrder in
 /-- The 'fully free' quantum resource theory: the category is all finite Hilbert spaces, all maps are
 free and all states are free. Marked noncomputable because we assume that all types have `DecidableEq`. -/
 noncomputable def fullyFreeQRT : ResourceTheory { ι : Type // Finite ι ∧ Nonempty ι} where
@@ -152,14 +153,16 @@ noncomputable def fullyFreeQRT : ResourceTheory { ι : Type // Finite ι ∧ Non
       let _ := Fintype.ofFinite i
       use MState.uniform --use the fully mixed state
       --The fact that the fully mixed state is PosDef should be stated somewhere else... TODO
+      suffices Matrix.PosDef (@MState.uniform (d := i.val) _ this).M.toMat by
+        change _ ∧ True
+        rw [and_true]
+        --need 0 < _ ↔ _.PosDef as a lemma
+        sorry
       simp only [MState.uniform, MState.ofClassical, Distribution.uniform_def, Set.univ]
-      constructor
-      · open ComplexOrder in
-        classical apply Matrix.PosDef.diagonal
-        intro
-        rw [Finset.card_univ, one_div, Complex.ofReal_inv]
-        exact RCLike.inv_pos_of_pos (Nat.cast_pos'.mpr Fintype.card_pos)
-      · trivial
+      classical apply Matrix.PosDef.diagonal
+      intro
+      rw [Finset.card_univ, one_div, Complex.ofReal_inv]
+      exact RCLike.inv_pos_of_pos (Nat.cast_pos'.mpr Fintype.card_pos)
 
     freeOps _ _ := Set.univ
     nongenerating _ _ _ := trivial

@@ -57,25 +57,6 @@ theorem qRelativeEnt_ker {ρ σ : MState d} (h : LinearMap.ker σ.val.toLin' ≤
   simp only [qRelativeEnt, h]
   congr
 
---TODO this definitely belongs in Mathlib
-theorem ker_bot_of_full_rank (M : Matrix d d ℂ) (h : M.rank = Fintype.card d) :
-    LinearMap.ker (Matrix.toLin' M) = ⊥ := by
-  rw [LinearMap.ker_eq_bot_iff_range_eq_top_of_finrank_eq_finrank rfl]
-  rw [← Matrix.toLin_eq_toLin' , Matrix.range_toLin_eq_top]
-  apply Ne.isUnit
-  -- rw [Matrix.IsHermitian.det_eq_prod_eigenvalues σ.pos.1]
-  -- rw [Finset.prod_ne_zero_iff]
-  -- intro a _
-  -- simp only [Complex.coe_algebraMap, ne_eq, Complex.ofReal_eq_zero]
-  -- rw [Matrix.IsHermitian.rank_eq_card_non_zero_eigs σ.pos.1, Fintype.card_subtype_compl] at h
-  -- have h₂ : Fintype.card { x // σ.pos.1.eigenvalues x = 0 } = 0 := by
-  --   have : 0 < Fintype.card d := @Fintype.card_pos _ _ σ.nonempty
-  --   omega
-  -- rw [Fintype.card_eq_zero_iff] at h₂
-  -- by_contra h'
-  -- exact h₂.elim ⟨_, h'⟩
-  sorry
-
 /-- The quantum relative entropy is unchanged by `MState.relabel` -/
 @[simp]
 theorem qRelativeEnt_relabel (ρ σ : MState d) (e : d₂ ≃ d) :
@@ -169,12 +150,10 @@ section entropy
 
 
 /-- Quantum relative entropy when σ has full rank -/
-theorem qRelativeEnt_rank {ρ σ : MState d} (h : σ.val.rank = Fintype.card d) :
+theorem qRelativeEnt_rank {ρ σ : MState d} (h : LinearMap.ker σ.val.toLin' = ⊥) :
     (𝐃(ρ‖σ) : EReal) = ρ.M.inner (HermitianMat.log ρ - HermitianMat.log σ) := by
   apply qRelativeEnt_ker
-  suffices LinearMap.ker σ.val.toLin' = ⊥ by
-    simp only [this, bot_le]
-  apply ker_bot_of_full_rank _ h
+  simp only [h, bot_le]
 
 /-- The quantum relative entropy is additive when the inputs are product states -/
 theorem qRelativeEnt_additive (ρ₁ σ₁ : MState d₁) (ρ₂ σ₂ : MState d₂) :
