@@ -219,6 +219,64 @@ private theorem optimalHypothesisRate_antitone {dIn dOut : Type*} [Fintype dIn] 
   β_ ε3(ℰ ρ‖{ℰ σ}) ≥ β_ ε3(ρ‖{σ}) := by
     sorry
 
+noncomputable section proj
+
+variable {n : Type*} [Fintype n] [DecidableEq n]
+variable {𝕜 : Type*} [RCLike 𝕜]
+
+-- Projection onto the non-negative eigenspace of B - A
+-- Note this is in the opposite direction as in the paper
+def proj_le (A B : HermitianMat n 𝕜) : HermitianMat n 𝕜 :=
+  ⟨Matrix.IsHermitian.cfc (B - A).H (fun x ↦ if x ≥ 0 then 1 else 0), by
+    rw [←Matrix.IsHermitian.cfc_eq]
+    exact IsSelfAdjoint.cfc
+  ⟩
+
+scoped notation "{" A "≥ₚ" B "}" => proj_le B A
+scoped notation "{" A "≤ₚ" B "}" => proj_le A B
+
+variable (A B : HermitianMat n 𝕜)
+
+theorem proj_le_cfc : {A ≤ₚ B} = cfc (fun x ↦ if x ≥ 0 then (1 : ℝ) else 0) (B - A).toMat := by
+  simp only [proj_le, ←Matrix.IsHermitian.cfc_eq]
+
+theorem proj_le_sq : {A ≤ₚ B}^2 = {A ≤ₚ B} := by
+  ext1
+  simp only [HermitianMat.val_eq_coe, selfAdjoint.val_pow, proj_le_cfc]
+  rw [←cfc_pow (hf := _)]
+  · simp only [ge_iff_le, ite_pow, one_pow, ne_eq, OfNat.ofNat_ne_zero, not_false_eq_true,
+    zero_pow, AddSubgroupClass.coe_sub, HermitianMat.val_eq_coe]
+  · simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology, implies_true]
+
+theorem proj_le_nonneg : 0 ≤ {A ≤ₚ B} := by
+  rw [←proj_le_sq]
+  exact HermitianMat.sq_nonneg
+
+theorem proj_le_mul_nonneg : 0 ≤ {A ≤ₚ B}.toMat * (B - A).toMat := by
+  rw [proj_le_cfc]
+  nth_rewrite 2 [←cfc_id ℝ (B - A).toMat]
+  rw [←cfc_mul (hf := _) (hg := _)]
+  · apply cfc_nonneg
+    intro x hx
+    simp only [ge_iff_le, id_eq, ite_mul, one_mul, zero_mul]
+    exact dite_nonneg (by simp only [imp_self]) (by simp only [not_le, le_refl, implies_true])
+  · simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology, implies_true]
+  · simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology, implies_true]
+
+theorem proj_le_mul_le : {A ≤ₚ B}.toMat * A.toMat ≤ {A ≤ₚ B}.toMat * B.toMat := by
+  rw [←sub_nonneg, ←mul_sub_left_distrib]
+  convert proj_le_mul_nonneg A B
+
+theorem proj_le_inner_nonneg : 0 ≤ {A ≤ₚ B}.inner (B - A) := HermitianMat.inner_mul_nonneg (proj_le_mul_nonneg A B)
+
+theorem proj_le_inner_le : {A ≤ₚ B}.inner A ≤ {A ≤ₚ B}.inner B := by
+  rw [←sub_nonneg, ←HermitianMat.inner_left_sub]
+  exact proj_le_inner_nonneg A B
+
+-- TODO: Commutation and order relations specified in the text between Eqs. (S77) and (S78)
+
+end proj
+
 /-- Lemma 7 from the paper -/
 private theorem Lemma7 (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) (σ : (n : ℕ+) → IsFree (i := i⊗^[n])) :
   -- This is not exactly how R_{1, ε} is defined in Eq. (17), but it should be equal due to

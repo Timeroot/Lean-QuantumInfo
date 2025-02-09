@@ -341,6 +341,11 @@ theorem inner_ge_zero (hA : 0 ≤ A) (hB : 0 ≤ B) : 0 ≤ A.inner B := by
   nth_rewrite 1 [← hA.posSemidef_sqrt.left]
   exact (RCLike.nonneg_iff.mp (hB.conjTranspose_mul_mul_same _).trace_nonneg).left
 
+omit [DecidableEq n] in
+theorem inner_mul_nonneg (h : 0 ≤ A.toMat * B.toMat) : 0 ≤ A.inner B := by
+  rw [Matrix.PosSemidef.zero_le_iff_posSemidef] at h
+  exact (RCLike.nonneg_iff.mp h.trace_nonneg).left
+
 theorem inner_mono (hA : 0 ≤ A) (B C) : B ≤ C → A.inner B ≤ A.inner C := fun hBC ↦ by
   have hTr : 0 ≤ A.inner (C - B) := inner_ge_zero hA (zero_le_iff.mpr hBC)
   rw [inner_left_sub] at hTr
@@ -364,6 +369,11 @@ omit [DecidableEq n] in
 theorem conj_le (hA : 0 ≤ A) [Fintype m] (M : Matrix m n α) : 0 ≤ A.conj M := by
   rw [zero_le_iff] at hA ⊢
   exact Matrix.PosSemidef.mul_mul_conjTranspose_same hA M
+
+theorem sq_nonneg : 0 ≤ A^2 := by
+  simp [zero_le_iff, pow_two]
+  nth_rewrite 1 [←Matrix.IsHermitian.eq A.H]
+  exact Matrix.posSemidef_conjTranspose_mul_self A.toMat
 
 end possemidef
 
