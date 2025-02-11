@@ -29,9 +29,9 @@ noncomputable section
  This measurement action can be composed with `MState.of_classical`, in which
  case it is equal to a CPTP map `measurement_map`. -/
 structure POVM (X : Type*) (d : Type*) [Fintype X] [Fintype d] [DecidableEq d] where
-  mats : X → Matrix d d ℂ
-  pos : ∀ x, (mats x).PosSemidef
-  normalized : ∑ x, mats x = (1 : Matrix d d ℂ)
+  mats : X → HermitianMat d ℂ
+  pos : ∀ x, (mats x).toMat.PosSemidef
+  normalized : ∑ x, mats x = 1
 
 namespace POVM
 
@@ -45,12 +45,16 @@ def measurement_map (Λ : POVM X d) : CPTPMap d (d × X) where
     map_add' := by simp [mul_add, add_mul, Matrix.kroneckerMap_add_left]
     map_smul' := by simp [Matrix.smul_kronecker]
   }
-  pos := --stupid, what
+  pos := --proving this seemed annoying atm
     sorry
   trace_preserving := by
     intro x
     simp [Matrix.trace_kronecker, Matrix.trace_mul_cycle]
-    rw [← trace_sum, ← Finset.sum_mul, Λ.normalized, one_mul]
+    rw [← trace_sum, ← Finset.sum_mul]
+    congr
+    convert one_mul x
+    rw [show (1 : Matrix d d ℂ) = (1 : HermitianMat d ℂ).toMat by rfl, ← Λ.normalized]
+    simp only [AddSubgroup.val_finset_sum, HermitianMat.val_eq_coe]
   completely_pos := by
     apply Finset.sum_induction
     · exact fun _ _ ha ↦ ha.add
@@ -70,15 +74,14 @@ def measurement_map (Λ : POVM X d) : CPTPMap d (d × X) where
       rw [← hM₃]
       apply MatrixMap.IsCompletelyPositive.comp
       · intro n ρ h
-        suffices M₁.IsCompletelyPositive from this n h
         sorry
       · apply MatrixMap.IsCompletelyPositive.kron_kronecker_const
         convert (Matrix.PosSemidef.stdBasisMatrix_iff_eq x x (zero_lt_one' ℂ)).2 rfl
 
 /-- A POVM leads to a distribution of outcomes on any given mixed state ρ. -/
 def measure (Λ : POVM X d) (ρ : MState d) : Distribution X where
-  val := fun x ↦ ⟨(Λ.pos x).1.rinner ρ.Hermitian,
-    ⟨(Λ.pos x).rinner_ge_zero ρ.pos,
+  val := fun x ↦ ⟨(Λ.mats x).inner ρ.M,
+    ⟨HermitianMat.inner_ge_zero (Λ.pos x) ρ.pos,
     by
     -- That each observation probability is at most 1.
     -- ρ.m.inner (∑ y, Λ.mats y) = ρ.m.inner 1 = ρ.m.trace = 1
@@ -87,8 +90,8 @@ def measure (Λ : POVM X d) (ρ : MState d) : Distribution X where
     sorry
     ⟩⟩
   property := by
-    simp [← Complex.re_sum, Matrix.IsHermitian.rinner, ← trace_sum,
-      ← Finset.sum_mul, Λ.normalized, ρ.tr]
+    simp [HermitianMat.inner_eq_re_trace, ← Complex.re_sum, ← trace_sum, ← Finset.sum_mul,
+      ← AddSubgroup.val_finset_sum, ← HermitianMat.val_eq_coe, Λ.normalized, ρ.tr]
 
 /-- The quantum-classical `POVM.measurement_map`, gives a marginal on the right equal to `POVM.measure`.-/
 theorem measure_eq_measurement_map (Λ : POVM X d) (ρ : MState d) :

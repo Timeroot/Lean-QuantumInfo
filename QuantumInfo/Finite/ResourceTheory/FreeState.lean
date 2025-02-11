@@ -1,3 +1,4 @@
+import Mathlib.Algebra.Module.Submodule.Lattice
 import Mathlib.CategoryTheory.FullSubcategory
 import Mathlib.CategoryTheory.Monoidal.Braided.Basic
 import Mathlib.Data.Real.EReal
@@ -13,11 +14,11 @@ class ResourcePretheory (ι : Type*) where
   /-- The indexing of each Hilbert space -/
   H : ι → Type*
   /-- Each space is finite -/
-  FinH : ∀ i, Fintype (H i)
+  [FinH : ∀ i, Fintype (H i)]
   /-- Each object has decidable equality -/
-  DecEqH : ∀ i, DecidableEq (H i)
+  [DecEqH : ∀ i, DecidableEq (H i)]
   /-- Each space is nonempty (dimension at least 1) -/
-  NonemptyH : ∀ i, Nonempty (H i)
+  [NonemptyH : ∀ i, Nonempty (H i)]
   /-- The Hilbert spaces must have a product structure. -/
   prod : ι → ι → ι
   /-- The product structure induces an isomorphism of Hilbert spaces -/
@@ -91,7 +92,7 @@ class FreeStateTheory (ι : Type*) extends ResourcePretheory ι where
   /-- The set of free states is closed under tensor product -/
   free_prod {ρ₁ : MState (H i)} {ρ₂ : MState (H j)} (h₁ : IsFree ρ₁) (h₂ : IsFree ρ₂) : IsFree (ρ₁ ⊗ᵣ ρ₂)
   /-- The set F(H) of free states contains a full-rank state `ρfull`, equivalently `ρfull` is positive definite. -/
-  free_fullRank (i : ι) : open ComplexOrder in ∃ (ρ : MState (H i)), ρ.m.PosDef ∧ IsFree ρ
+  free_fullRank (i : ι) : open ComplexOrder in ∃ (ρ : MState (H i)), 0 < ρ.M ∧ IsFree ρ
 
 open ResourcePretheory
 open FreeStateTheory
@@ -103,21 +104,17 @@ open NNReal
 variable {ι : Type*} [FreeStateTheory ι]
 
 noncomputable def RelativeEntResource {i : ι} : MState (H i) → ℝ≥0 :=
-    fun ρ ↦ (⨅ σ ∈ IsFree, EReal.toENNReal (qRelativeEnt ρ σ)).untop
+    fun ρ ↦ (⨅ σ ∈ IsFree, 𝐃(ρ‖σ)).untop
   (by
     let ⟨w,h⟩ := free_fullRank i
     apply ne_top_of_le_ne_top _ (iInf_le _ w)
     simp only [ne_eq, iInf_eq_top, Classical.not_imp]
     constructor
     · exact h.2
-    · dsimp [qRelativeEnt]
-      split_ifs with h
-      · simpa using ne_of_beq_false rfl
-      · absurd h
-        rw [ker_bot_of_full_rank]
-        · exact OrderBot.bot_le (LinearMap.ker (Matrix.toLin' ρ.m))
-        · --should be in mathlib
-          sorry
+    · refine ne_of_apply_ne ENNReal.toEReal (qRelativeEnt_ker (ρ := ρ) (?_) ▸ EReal.coe_ne_top _)
+      convert @bot_le _ _ (Submodule.instOrderBot) _
+      --Want the missing fact that 0 < w implies w.ker = ⊥
+      sorry
   )
 
 noncomputable def RegularizedRelativeEntResource {i : ι} : MState (H i) → ℝ≥0 :=

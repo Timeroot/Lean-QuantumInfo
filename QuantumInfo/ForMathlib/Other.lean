@@ -10,13 +10,11 @@ namespace Finset
 
 variable [CommMonoid β]
 
-/-- Cyclically permute 3 nested instances of `Finset.sum`. -/
+-- in #21524
+/-- Cyclically permute 3 nested instances of `Finset.prod`. -/
 @[to_additive]
 theorem prod_comm_3 {s : Finset γ} {t : Finset α} {u : Finset δ} {f : γ → α → δ → β} :
-    (∏ x in s, ∏ y in t, ∏ z in u, f x y z) = ∏ z in u, ∏ x in s, ∏ y in t, f x y z := by
-  nth_rewrite 2 [prod_comm]
-  congr 1
-  funext
-  exact prod_comm
+    (∏ x ∈ s, ∏ y ∈ t, ∏ z ∈ u, f x y z) = ∏ z ∈ u, ∏ x ∈ s, ∏ y ∈ t, f x y z := by
+  simp_rw [prod_comm (s := t), prod_comm (s := s)]
 
 end Finset
