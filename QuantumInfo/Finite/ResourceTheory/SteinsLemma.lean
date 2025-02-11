@@ -220,8 +220,8 @@ variable {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq dIn] [Deci
 
 -- This should be moved to the files about matrix maps as soon as a good definition of "dual channel" can be made.
 theorem positive_dual_channel_exists (ℰ : CPTPMap dIn dOut) :
-  ∃ ℰdual : CPTPMap dOut dIn, ∀ ρ : MState dIn, ∀ T : Matrix dOut dOut ℂ, T.PosSemidef →
-  MState.exp_val hT.1 (ℰ ρ) = MState.exp_val (ℰdual.pos hT).1 ρ := by
+  ∃ ℰdual : CPTPMap dOut dIn, ∀ ρ : MState dIn, ∀ T : HermitianMat dOut ℂ,
+  (ℰ ρ).exp_val T  = ρ.exp_val ⟨ℰdual.map T, ℰdual.H T.H⟩ := by
   -- The proof below was valid for a previous wrong version of the theorem. Nevertheless
   -- it could still be useful for this version.
   --------------------------------------------------
@@ -253,21 +253,17 @@ private theorem optimalHypothesisRate_antitone (ρ σ : MState dIn) (ℰ : CPTPM
   β_ ε3(ρ‖{σ}) ≤ β_ ε3(ℰ ρ‖{ℰ σ}) := by
   repeat rw [OptimalHypothesisRate_singleton]
   obtain ⟨ℰdual, hℰdual⟩ := positive_dual_channel_exists ℰ
-  let ℰdualSubtype : { m : Matrix dOut dOut ℂ //
-    ∃ h : m.PosSemidef ∧ m ≤ 1, MState.exp_val (Matrix.isHermitian_one.sub h.1.1) (ℰ ρ) ≤ ε3} →
-    { m : Matrix dIn dIn ℂ //
-    ∃ h : m.PosSemidef ∧ m ≤ 1, MState.exp_val (Matrix.isHermitian_one.sub h.1.1) ρ ≤ ε3} := sorry
-  have h : ∀ x, (ℰdualSubtype x).val = ℰdual.map x.val := sorry
-  -- have h' : ∀ x, (h ▸ (ℰdualSubtype x).2.1.1) = ℰdual.pos x.2.1.1 := sorry
+  let ℰdualSubtype :
+  { m : HermitianMat dOut ℂ // (ℰ ρ).exp_val (1 - m) ≤ ε3 ∧ 0 ≤ m ∧ m ≤ 1} →
+  { m : HermitianMat dIn ℂ // ρ.exp_val (1 - m) ≤ ε3 ∧ 0 ≤ m ∧ m ≤ 1} := sorry
+  have h : ∀ x, (↑(ℰdualSubtype x) : HermitianMat dIn ℂ) = ⟨ℰdual.map x, ℰdual.H x.1.H⟩ := fun x ↦ by
+    ext1
+    simp
+    sorry
   convert le_iInf_comp _ ℰdualSubtype
   rename_i T'
   specialize h T'
-  specialize hℰdual σ T' T'.2.1.1
-  -- simp [h]
-  -- conv =>
-  --   enter [2, 1, 1]
-  --   rw [h]
-  sorry
+  rw [h, hℰdual]
 
 noncomputable section proj
 

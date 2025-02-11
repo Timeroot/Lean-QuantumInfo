@@ -64,6 +64,13 @@ instance instFunLike : FunLike (PTPMap dIn dOut) (MState dIn) (MState dOut) wher
     (HermitianMat.zero_le_iff.mpr (Λ.apply_PosSemidef ρ.pos)) (ρ.tr ▸ Λ.apply_trace ρ.m)
   coe_injective' _ _ h := sorry --Requires the fact the action on MStates determines action on all matrices
 
+theorem H (Λ : PTPMap dIn dOut) : Λ.map.IsHermitianPreserving :=
+  MatrixMap.IsPositive.IsHermitianPreserving Λ.map Λ.pos
+
+-- instance instFunLikeHermitianMat : FunLike (PTPMap dIn dOut) (HermitianMat dIn ℂ) (HermitianMat dOut ℂ) where
+--   coe Λ := fun A ↦ ⟨Λ.map A.toMat, Λ.H A.H⟩
+--   coe_injective' _ _ h := sorry --Requires the fact the action on HermitianMat determines action on all matrices
+
 --If we have a PTPMap, the input and output dimensions are always both nonempty (otherwise
 --we can't preserve trace) - or they're both empty. So `[Nonempty dIn]` will always suffice.
 -- This would be nice as an `instance` but that would leave `dIn` as a metavariable.
