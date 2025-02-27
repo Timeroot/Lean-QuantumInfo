@@ -145,6 +145,16 @@ theorem _root_.MatrixMap.choi_PSD_iff_CP_map [DecidableEq A] (M : MatrixMap A B 
     M.IsCompletelyPositive ↔ M.choi_matrix.PosSemidef :=
   sorry
 
+/-- The channel X ↦ ∑ k : κ, (M k) * X * (N k)ᴴ formed by Kraus operators M : κ → Matrix B A R
+is completely positive -/
+theorem of_kraus_isCompletelyPositive {κ : Type*} [Fintype κ] (M : κ → Matrix B A R) :
+  (MatrixMap.of_kraus M M).IsCompletelyPositive :=
+  sorry
+
+def exists_kraus (Φ : MatrixMap A B R) (hCP : Φ.IsCompletelyPositive) :
+  ∃ r : ℕ, ∃ (M : Fin r → Matrix B A R), Φ = of_kraus M M :=
+  sorry
+
 /-- The Kronecker product of IsCompletelyPositive maps is also completely positive. -/
 theorem kron [DecidableEq C] [Fintype D] {M₁ : MatrixMap A B R} {M₂ : MatrixMap C D R}
     (h₁ : M₁.IsCompletelyPositive) (h₂ : M₂.IsCompletelyPositive) : IsCompletelyPositive (M₁ ⊗ₖₘ M₂) := by
