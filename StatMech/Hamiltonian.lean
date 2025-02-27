@@ -1,4 +1,5 @@
-import Mathlib
+import Mathlib.Data.Fintype.Defs
+import Mathlib.Data.Real.Basic
 
 section ThermodynamicEnsemble
 

@@ -1,4 +1,10 @@
 import StatMech.Hamiltonian
+import Mathlib.Analysis.SpecialFunctions.Log.Deriv
+import Mathlib.Data.Real.StarOrdered
+import Mathlib.MeasureTheory.Constructions.Pi
+import Mathlib.MeasureTheory.Integral.Bochner
+import Mathlib.MeasureTheory.Measure.Haar.OfBasis
+import Mathlib.Order.CompletePartialOrder
 
 noncomputable section
 namespace MicroHamiltonian
@@ -96,16 +102,14 @@ theorem entropy_A_eq_entropy_Z (T β : ℝ) (hβT : T * β = 1) (hi : H.ZIntegra
   · eta_reduce
     rw [← one_div, ← hβT']
     have h₁ := hi.2
-    have h₂ := DifferentiableAt_Z_if_ZIntegrable hi
-    have h₃ := OrderTop.le_top (1 : WithTop ℕ∞)
+    have := (DifferentiableAt_Z_if_ZIntegrable hi).differentiableAt (OrderTop.le_top 1)
     fun_prop (disch := assumption)
   · fun_prop (disch := assumption)
   · fun_prop
   · simp_rw [PartitionZT]
     rw [hβT'] at hi
     have := hi.2
-    have := DifferentiableAt_Z_if_ZIntegrable hi
-    have := OrderTop.le_top (1 : WithTop ℕ∞)
+    have := (DifferentiableAt_Z_if_ZIntegrable hi).differentiableAt (OrderTop.le_top 1)
     fun_prop (disch := assumption)
 
 /--
@@ -121,8 +125,7 @@ theorem β_eq_deriv_S_U {β : ℝ} (hi : H.ZIntegrable d β) : β = (deriv (H.En
   --Show the differentiability side-goals
   have : DifferentiableAt ℝ (fun β => Real.log (H.PartitionZ d β)) β := by
     have := hi.2
-    have := DifferentiableAt_Z_if_ZIntegrable hi
-    have := OrderTop.le_top (1 : WithTop ℕ∞)
+    have := (DifferentiableAt_Z_if_ZIntegrable hi).differentiableAt (OrderTop.le_top 1)
     fun_prop (disch := assumption)
   have : DifferentiableAt ℝ (deriv fun β => Real.log (H.PartitionZ d β)) β := by
     have this := (DifferentiableAt_Z_if_ZIntegrable hi).log hi.2

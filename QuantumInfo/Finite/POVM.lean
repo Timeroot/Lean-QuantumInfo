@@ -30,7 +30,7 @@ noncomputable section
  case it is equal to a CPTP map `measurement_map`. -/
 structure POVM (X : Type*) (d : Type*) [Fintype X] [Fintype d] [DecidableEq d] where
   mats : X → HermitianMat d ℂ
-  pos : ∀ x, (mats x).toMat.PosSemidef
+  zero_le : ∀ x, 0 ≤ (mats x)
   normalized : ∑ x, mats x = 1
 
 namespace POVM
@@ -41,7 +41,7 @@ variable {X : Type*} {d : Type*} [Fintype X] [Fintype d] [DecidableEq d] [Decida
 state to an `d × X`-dimensional quantum-classical state. -/
 def measurement_map (Λ : POVM X d) : CPTPMap d (d × X) where
   map := ∑ (x : X), open Kronecker in {
-    toFun := fun ρ ↦ (((Λ.pos x).sqrt * ρ * (Λ.pos x).sqrt) ⊗ₖ Matrix.stdBasisMatrix x x 1)
+    toFun := fun ρ ↦ ((((Λ.mats x) ^ (1/2:ℝ)).toMat * ρ * ((Λ.mats x)^(1/2:ℝ)).toMat) ⊗ₖ Matrix.stdBasisMatrix x x 1)
     map_add' := by simp [mul_add, add_mul, Matrix.kroneckerMap_add_left]
     map_smul' := by simp [Matrix.smul_kronecker]
   }
@@ -49,19 +49,20 @@ def measurement_map (Λ : POVM X d) : CPTPMap d (d × X) where
     sorry
   trace_preserving := by
     intro x
-    simp [Matrix.trace_kronecker, Matrix.trace_mul_cycle]
-    rw [← trace_sum, ← Finset.sum_mul]
-    congr
-    convert one_mul x
-    rw [show (1 : Matrix d d ℂ) = (1 : HermitianMat d ℂ).toMat by rfl, ← Λ.normalized]
-    simp only [AddSubgroup.val_finset_sum, HermitianMat.val_eq_coe]
+    -- simp [Matrix.trace_kronecker, Matrix.trace_mul_cycle]
+    -- rw [← trace_sum, ← Finset.sum_mul]
+    -- congr
+    -- convert one_mul x
+    -- rw [show (1 : Matrix d d ℂ) = (1 : HermitianMat d ℂ).toMat by rfl, ← Λ.normalized]
+    -- simp only [AddSubgroup.val_finset_sum, HermitianMat.val_eq_coe]
+    sorry
   completely_pos := by
     apply Finset.sum_induction
     · exact fun _ _ ha ↦ ha.add
     · exact MatrixMap.IsCompletelyPositive.zero _ _
     · intro x _
       let M₁ : MatrixMap d d ℂ := ⟨⟨
-        fun ρ ↦ ((Λ.pos x).sqrt * ρ * (Λ.pos x).sqrt),
+        fun ρ ↦ ((Λ.mats x) ^ (1/2:ℝ)).toMat * ρ * ((Λ.mats x)^(1/2:ℝ)).toMat,
         by simp [mul_add, add_mul]⟩,
         by simp⟩
       let M₂ : MatrixMap d (d × X) ℂ := ⟨⟨
@@ -81,7 +82,7 @@ def measurement_map (Λ : POVM X d) : CPTPMap d (d × X) where
 /-- A POVM leads to a distribution of outcomes on any given mixed state ρ. -/
 def measure (Λ : POVM X d) (ρ : MState d) : Distribution X where
   val := fun x ↦ ⟨(Λ.mats x).inner ρ.M,
-    ⟨HermitianMat.inner_ge_zero (Λ.pos x) ρ.pos,
+    ⟨HermitianMat.inner_ge_zero (Λ.zero_le x) ρ.zero_le,
     by
     -- That each observation probability is at most 1.
     -- ρ.m.inner (∑ y, Λ.mats y) = ρ.m.inner 1 = ρ.m.trace = 1

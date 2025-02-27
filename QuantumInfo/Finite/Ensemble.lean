@@ -177,7 +177,7 @@ def trivial_mEnsemble (ρ : MState d) (i : α) : MEnsemble d α := ⟨fun _ ↦ 
 
 /-- The trivial mixed-state ensemble of `ρ` mixes to `ρ` -/
 theorem trivial_mEnsemble_mix (ρ : MState d) : ∀ i : α, mix (trivial_mEnsemble ρ i) = ρ := fun i ↦by
-  ext1
+  apply MState.ext_m
   simp only [trivial_mEnsemble, Distribution.constant, mix_of, DFunLike.coe, apply_ite,
     Prob.toReal_one, Prob.toReal_zero, ite_smul, one_smul, zero_smul, Finset.sum_ite_eq,
     Finset.mem_univ, ↓reduceIte]
@@ -200,7 +200,7 @@ def trivial_pEnsemble (ψ : Ket d) (i : α) : PEnsemble d α := ⟨fun _ ↦ ψ,
 
 /-- The trivial pure-state ensemble of `ψ` mixes to `ψ` -/
 theorem trivial_pEnsemble_mix (ψ : Ket d) : ∀ i : α, mix (toMEnsemble (trivial_pEnsemble ψ i)) = MState.pure ψ := fun i ↦ by
-  ext1
+  apply MState.ext_m
   simp only [trivial_pEnsemble, Distribution.constant, toMEnsemble_mk, mix_of, DFunLike.coe,
     apply_ite, Prob.toReal_one, Prob.toReal_zero, MEnsemble.states, Function.comp_apply, ite_smul,
     one_smul, zero_smul, Finset.sum_ite_eq, Finset.mem_univ, ↓reduceIte]
@@ -223,11 +223,10 @@ def spectral_ensemble (ρ : MState d) : PEnsemble d d :=
     { vec := ρ.Hermitian.eigenvectorBasis i
       normalized' := by
         rw [←one_pow 2, ←ρ.Hermitian.eigenvectorBasis.orthonormal.1 i]
-        have hnonneg : 0 ≤ ∑ x : d, Complex.abs (ρ.Hermitian.eigenvectorBasis i x) ^ 2 := by
-          apply Fintype.sum_nonneg
-          intro i
-          simp only [Pi.zero_apply, ←Complex.normSq_eq_abs, Complex.normSq_nonneg]
-        simp only [Complex.norm_eq_abs, EuclideanSpace.norm_eq, Real.sq_sqrt hnonneg]
+        have hnonneg : 0 ≤ ∑ x : d, Complex.normSq (ρ.Hermitian.eigenvectorBasis i x) := by
+          simp_rw [Complex.normSq_eq_norm_sq]
+          positivity
+        simp only [← Complex.normSq_eq_norm_sq, EuclideanSpace.norm_eq, Real.sq_sqrt hnonneg]
     }
     distr := ρ.spectrum}
 

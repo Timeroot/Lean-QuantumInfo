@@ -1,4 +1,5 @@
 import StatMech.ThermoQuantities
+import Mathlib.Analysis.SpecialFunctions.Gaussian.FourierTransform
 
 noncomputable section
 
@@ -76,10 +77,7 @@ theorem PartitionZ_eq (hV : 0 < V) (hβ : 0 < β) :
     intro i
     apply Measurable.forall
     intro j
-    -- refine Measurable.comp (g := fun (a:Fin n × Fin 3 → ℝ) ↦ _ ≤ a (i, j) ∧ a (i, j) ≤ _) ?_ measurable_fst
-    refine Measurable.comp (g := fun (a:ℝ) ↦ -(V ^ (3⁻¹ : ℝ) / 2) ≤ a ∧ a ≤ _) ?_ (measurable_pi_apply (i,j))
-    apply measurableSet_setOf.mp
-    exact measurableSet_Icc
+    refine Measurable.comp (measurableSet_setOf.mp measurableSet_Icc) (measurable_pi_apply (i, j))
 
   have h_measurability : Measurable fun x : (Fin n × Fin 3 → ℝ) × (Fin n × Fin 3 → ℝ) =>
       if ∃ x_1 x_2, V ^ (3⁻¹:ℝ) / 2 < |x.1 (x_1, x_2)| then 0
@@ -138,7 +136,6 @@ theorem PartitionZ_eq (hV : 0 < V) (hβ : 0 < β) :
     · fun_prop
     · fun_prop
 
-  -- simp_rw [MeasureTheory.integral_mul_right]
   congr 1
   · --Volume of the box
     have h_integrand_prod : ∀ (a : Fin n × Fin 3 → ℝ),

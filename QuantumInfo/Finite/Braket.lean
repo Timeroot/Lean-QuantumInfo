@@ -83,12 +83,12 @@ theorem Bra.ext {ξ ψ : Bra d} (h : ∀ x, ξ x = ψ x) : ξ = ψ :=
 
 theorem Ket.normalized (ψ : Ket d) : ∑ x, Complex.normSq (ψ x) = 1 := by
   convert ψ.normalized'
-  rw [Complex.norm_eq_abs, Complex.sq_abs]
+  rw [Complex.normSq_eq_norm_sq]
   rfl
 
 theorem Bra.normalized (ψ : Bra d) : ∑ x, Complex.normSq (ψ x) = 1 := by
   convert ψ.normalized'
-  rw [Complex.norm_eq_abs, Complex.sq_abs]
+  rw [Complex.normSq_eq_norm_sq]
   rfl
 
 /-- Any Bra can be turned into a Ket by conjugating the elements. -/
@@ -130,8 +130,8 @@ theorem Bra.exists_ne_zero (ψ : Bra d) : ∃ x, ψ x ≠ 0 := by
 def Ket.normalize (v : d → ℂ) (h : ∃ x, v x ≠ 0) : Ket d :=
   { vec := fun x ↦ v x / √(∑ x : d, ‖v x‖ ^ 2),
     normalized' := by
-      simp only [Complex.norm_eq_abs, ←Complex.normSq_eq_abs, Complex.normSq_div,
-      Complex.normSq_ofReal, ←sq]
+      simp only [← Complex.normSq_eq_norm_sq, Complex.normSq_div,
+        Complex.normSq_ofReal, ←sq]
       have hnonneg : ∑ x : d, Complex.normSq (v x) ≥ 0 := Fintype.sum_nonneg (fun x => Complex.normSq_nonneg (v x))
       simp only [Real.sq_sqrt hnonneg, div_eq_inv_mul, ←Finset.mul_sum]
       apply inv_mul_cancel₀
@@ -152,7 +152,7 @@ theorem Ket.normalize_ket_eq_self (ψ : Ket d) : Ket.normalize (ψ.vec) (Ket.exi
 def Bra.normalize (v : d → ℂ) (h : ∃ x, v x ≠ 0) : Bra d :=
   { vec := fun x ↦ v x / √(∑ x : d, ‖v x‖ ^ 2),
     normalized' := by
-      simp only [Complex.norm_eq_abs, ←Complex.normSq_eq_abs, Complex.normSq_div,
+      simp only [← Complex.normSq_eq_norm_sq, Complex.normSq_div,
       Complex.normSq_ofReal, ←sq]
       have hnonneg : ∑ x : d, Complex.normSq (v x) ≥ 0 := Fintype.sum_nonneg (fun x => Complex.normSq_nonneg (v x))
       simp only [Real.sq_sqrt hnonneg, div_eq_inv_mul, ←Finset.mul_sum]
@@ -215,8 +215,8 @@ variable {d d₁ d₂ : Type*} [Fintype d] [Fintype d₁] [Fintype d₂]
 def Ket.prod (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : Ket (d₁ × d₂) where
   vec := fun (i,j) ↦ ψ₁ i * ψ₂ j
   normalized' := by
-    simp only [Fintype.sum_prod_type, norm_mul, Complex.norm_eq_abs, mul_pow, ← Finset.mul_sum,
-      Complex.sq_abs, ψ₂.normalized, mul_one, ψ₁.normalized]
+    simp only [Fintype.sum_prod_type, norm_mul, ← Complex.normSq_eq_norm_sq, mul_pow,
+      ← Finset.mul_sum, ψ₂.normalized, mul_one, ψ₁.normalized]
 
 notation ψ₁ "⊗" ψ₂ => Ket.prod ψ₁ ψ₂
 
@@ -249,7 +249,7 @@ theorem Ket.IsProd_iff_mul_eq_mul (ψ : Ket (d₁ × d₂)) : ψ.IsProd ↔
     let v₁ : d₁ → ℂ := fun x => (Complex.abs (ψ (a,b)) ) / (ψ (a,b)) * ((ψ (x, b)) /√(∑ i : d₁, Complex.normSq (ψ (i, b))))
     let v₂ : d₂ → ℂ := fun y => (ψ (a, y)) /√(∑ j : d₂, Complex.normSq (ψ (a, j)))
     have hv1Norm : ∑ x, ‖v₁ x‖^2 = 1 := by
-      simp only [Complex.norm_eq_abs, ←Complex.normSq_eq_abs, v₁, Complex.normSq_mul, Complex.normSq_div,
+      simp only [← Complex.normSq_eq_norm_sq, v₁, Complex.normSq_mul, Complex.normSq_div,
       Complex.normSq_ofReal, ←sq]
       rw [div_self _]
       have hnonneg : ∑ i : d₁, Complex.normSq (ψ (i, b)) ≥ 0 := Fintype.sum_nonneg (fun i => Complex.normSq_nonneg (ψ (i, b)))
@@ -262,7 +262,7 @@ theorem Ket.IsProd_iff_mul_eq_mul (ψ : Ket (d₁ × d₂)) : ψ.IsProd ↔
         exact h₁
       · simp_all only [ne_eq, map_eq_zero, not_false_eq_true]
     have hv2Norm : ∑ x, ‖v₂ x‖^2 = 1 := by
-      simp only [Complex.norm_eq_abs, ←Complex.normSq_eq_abs, v₂, Complex.normSq_div,
+      simp only [← Complex.normSq_eq_norm_sq, v₂, Complex.normSq_div,
       Complex.normSq_ofReal, ←sq]
       have hnonneg : ∑ j : d₂, Complex.normSq (ψ (a, j)) ≥ 0 := Fintype.sum_nonneg (fun j => Complex.normSq_nonneg (ψ (a, j)))
       simp_rw [Real.sq_sqrt hnonneg, div_eq_inv_mul, ←Finset.mul_sum]
