@@ -126,8 +126,11 @@ theorem PosSemidef_outer_self_conj (v : d → ℂ) : Matrix.PosSemidef (Matrix.v
         (∑ i : d, (starRingEnd ℂ) ((starRingEnd ℂ) (v i) * x i)) := by
           simp only [mul_comm ((starRingEnd ℂ) (x _)) (v _), map_mul,
           RingHomCompTriple.comp_apply, RingHom.id_apply]
-    rw [this, ← map_sum, ← Complex.normSq_eq_conj_mul_self, Complex.zero_le_real, ← Complex.sq_abs]
+    rw [this, ← map_sum, ← Complex.normSq_eq_conj_mul_self, Complex.zero_le_real, ← Complex.sq_norm]
     exact sq_nonneg _
+
+theorem le_one (ρ : MState d) : ρ.M ≤ 1 := by
+  sorry
 
 /-- The inner product of two MState's, as a real number between 0 and 1. -/
 def inner (ρ : MState d) (σ : MState d) : Prob :=

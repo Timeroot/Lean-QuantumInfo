@@ -157,7 +157,7 @@ theorem toReal_one : (1 : Prob) = (1 : ℝ) :=
   rfl
 
 @[simp, norm_cast]
-theorem toReal_mul (x y : Prob): (x * y : Prob) = (x : ℝ) * (y : ℝ) :=
+theorem toReal_mul (x y : Prob) : (x * y : Prob) = (x : ℝ) * (y : ℝ) :=
   rfl
 
 /-- Coercion `Prob → ℝ≥0`. -/

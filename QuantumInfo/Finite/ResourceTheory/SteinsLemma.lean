@@ -1,5 +1,7 @@
 import QuantumInfo.Finite.ResourceTheory.FreeState
 
+import Mathlib.Analysis.Subadditive
+
 open ResourcePretheory
 open FreeStateTheory
 open NNReal
@@ -20,16 +22,18 @@ noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : ℝ) (S : Set (MSt
 
 scoped notation "β_" ε " (" ρ "‖" S ")" =>  OptimalHypothesisRate ρ ε S
 
+-- TODO: Pull this definition out into another file? Maybe?
 /-- Map a probability [0,1] to [0,+∞] with -log p. Special case that 0 maps to +∞ (not 0, as Real.log
-does). This makes it Antitone.
-
-TODO: Pull out into another file? Maybe?
+does). This makes it `Antitone`.
 -/
 noncomputable def _root_.Prob.negLog : Prob → ENNReal :=
-  fun p ↦ if p = 0 then ⊤ else some ⟨-Real.log p,
+  fun p ↦ if p = 0 then ⊤ else .ofNNReal ⟨-Real.log p,
     Left.nonneg_neg_iff.mpr (Real.log_nonpos p.2.1 p.2.2)⟩
 
-theorem _root_.Prob.negLog_Antitone : Antitone (Prob.negLog) := by
+--TODO: simp lemmas for Prob.negLog when e.g. 0 < p. Obviously one for when p = 0.
+--For now can just do `simp [Prob.negLog, hp]`.
+
+theorem _root_.Prob.negLog_Antitone : Antitone Prob.negLog := by
   intro x y h
   dsimp [Prob.negLog]
   split_ifs with h₁ h₂ h₂
@@ -56,25 +60,152 @@ theorem OptimalHypothesisRate_singleton {ρ σ : MState d} {ε : ℝ}  :
 
 private theorem Lemma3 (ρ : MState d) (ε : ℝ) (S : Set (MState d)) :
     ⨆ σ ∈ S, β_ ε(ρ‖{σ}) = β_ ε(ρ‖S) := by
+  --Needs the minimax theorem.
   sorry
 
 /- This is from "Strong converse exponents for a quantum channel discrimination problem and
-quantum-feedback-assisted communication", Lemma 5. It will likely require some kind of
-special condition that α ≠ 1 to be completely true. Also, if we restrict to α < 1, then
-the `- Real.log ...` part is an (E)NNReal, which will reduce the casting headaches. But,
-I think we need 1 < α too.
+quantum-feedback-assisted communication", Lemma 5.
+
+This is actually true for all 0 < α (with appropriate modifications at α = 1), but we only need
+it for the case of 1 < α.
 -/
-private theorem Ref81Lem5 (ρ σ : MState d) (ε α : ℝ) (hε : 0 ≤ ε ∧ ε < 1) (hα : 0 < α) :
-    —log β_ ε(ρ‖{σ}) ≤ (SandwichedRelRentropy α ρ σ : EReal) - Real.log (1 - ε) * α / (1 - α)
+private theorem Ref81Lem5 (ρ σ : MState d) (ε α : ℝ) (hε : 0 ≤ ε ∧ ε < 1) (hα : 1 < α) :
+    —log β_ ε(ρ‖{σ}) ≤ D̃_ α(ρ‖σ) + —log ⟨(1 - ε), by constructor <;> linarith⟩ *
+      (.ofNNReal ⟨α, zero_le_one.trans hα.le⟩) / (.ofNNReal ⟨α - 1, sub_nonneg_of_le hα.le⟩)
     := by
+  generalize_proofs pf1 pf2 pf3
+  --If ρ isn't in the support of σ, the right hand side is just ⊤. (The left hand side is not, necessarily!)
+  by_cases h_supp : LinearMap.ker σ.val.toLin' ≤ LinearMap.ker ρ.val.toLin'
+  swap
+  · simp [SandwichedRelRentropy, h_supp]
   --Note that we actually only need this for 0 < ε, not 0 ≤ ε. This is also how it was proved in the original
   --reference. But Hayashi says it's true for ε = 0. Likely best handled with a special by_cases for ε = 0?
-  sorry
+  --If this case is too much of a pain we can drop it.
+  by_cases h : ε = 0
+  · subst h
+    clear hε
+    simp [OptimalHypothesisRate]
+    --Take m_opt to be the projector of ρ, i.e. 0 on ρ's kernel and 1 elsewhere.
+    let m_opt : HermitianMat d ℂ := sorry
+    sorry
+
+  rcases hε with ⟨hε₀, hε₁⟩
+  replace hε₀ : 0 < ε := lt_of_le_of_ne hε₀ fun a => h a.symm;
+  clear h
+
+  --Now we know that ρ.support ≤ σ.support, and 0 < ε. This is the main case we actually care about.
+  --Proof from https://link.springer.com/article/10.1007/s00220-016-2645-4 reproduced below.
+  /-
+  Lemma 5. Let ρ, σ ∈ S (H) be such that supp ρ ⊆ supp σ . For any Q ∈ B(H) such
+    that 0 ≤ Q ≤ I , and any α > 1,
+    − log Tr[Qσ] ≤ D˜α (ρ‖σ) − α / (α−1) * log Tr[Qρ]. (3.7)
+    In particular, for any α > 1 and any ε ∈ (0, 1),
+    D^ε_H (ρ‖σ) ≤ D˜α (ρ‖σ) + α / (α−1) * log(1 / (1−ε)). (3.8)
+    Proof. Let p ≡ Tr {Qρ} and q ≡ Tr {Qσ}. By the monotonicity of the sandwiched
+    Rényi relative entropy for α > 1, we find that
+    D˜α (ρ‖σ) ≥ D˜α ((p, 1 − p) ‖ (q, 1 − q)) (3.9)
+      = 1 / (α−1) * log[p^α * q^(1−α) + (1−p)^α * (1−q)^(1−α) ] (3.10)
+      ≥ 1 / (α−1) * log[p^α * q^(1−α) ] (3.11)
+      = α / (α−1) * log p − log q, (3.12)
+    from which (3.7) follows. The statement in (3.8) follows by optimizing over all Q such
+    that Tr {Qρ} ≥ 1 − ε.
+  -/
+  -- The "monotonicity of the ..." part here refers to the data processing inequality, and
+  -- the (p, 1-p) and (q,1-q) refer to states which are qubits ("coins") of probability p and
+  -- q, respectively. The states ρ and σ can be "processed" into these coins by measuring the optimal T.
+  let p : Prob := .one_minus ⟨ε, ⟨hε₀.le, hε₁.le⟩⟩
+  set q : Prob := β_ ε(ρ‖{σ})
+  let p2 : MState (Fin 2) := .ofClassical <| .coin p
+  let q2 : MState (Fin 2) := .ofClassical <| .coin q
+
+  have hp : 0 < p := show 0 < 1 - ε by linarith
+
+  --Show there's a lower bound on β_ε, that you can't do perfect discrimination
+  --It's possible that we actually don't want this here, that it should "follow"
+  --from the main proof.
+  have hq : 0 < q := by
+    --The optimal hypothesis rate is finite
+    simp_rw [q, OptimalHypothesisRate, Set.mem_singleton_iff, iSup_iSup_eq_left]
+    sorry
+
+  suffices —log q ≤ D̃_ α(p2‖q2) + —log ⟨1 - ε, pf1⟩ * (.ofNNReal ⟨α, pf2⟩) / (.ofNNReal ⟨α - 1, pf3⟩) by
+    refine this.trans (add_le_add_right ?_ _)
+    --This part needs the Data Processing Inequality
+    sorry
+
+  --The Renyi entropy is finite
+  rw [SandwichedRelRentropy, if_pos ?_, if_neg hα.ne']; swap
+  · suffices LinearMap.ker q2.val.toLin' = ⊥ by
+      simp only [MState.toSubtype_eq_coe, HermitianMat.val_eq_coe, this, bot_le]
+    --q2 has eigenvalues β_ ε(ρ‖{σ}) and 1-β_ ε(ρ‖{σ}), so as long as β_ ε(ρ‖{σ}) isn't 0 or 1,
+    --this is true.
+    sorry
+
+  --The logs are finite
+  rw [Prob.negLog, Prob.negLog, if_neg hq.ne', if_neg]
+  rotate_left
+  · change ¬(_ = Subtype.mk 0 _)
+    rw [Subtype.eq_iff]
+    dsimp
+    linarith
+
+  --Turn the ENNReal problem into a Real problem
+  simp only [Prob.toReal_mk]
+  have hα₂ : Subtype.mk _ pf3 ≠ 0 := by
+    change ¬(_ = Subtype.mk 0 _)
+    simp only [mk_zero, Nonneg.mk_eq_zero]
+    linarith
+  rw [← ENNReal.coe_mul, ← ENNReal.coe_div hα₂, ← ENNReal.coe_add, ENNReal.coe_le_coe]
+  clear hα₂
+  simp only [← coe_le_coe, coe_mk, NNReal.coe_add, NNReal.coe_div, NNReal.coe_mul, neg_mul]
+  clear pf1 pf2 pf3
+
+  rw [← add_div, ← sub_eq_add_neg]
+  conv =>
+    enter [2,1,1,1]
+    equals (p^α * q^(1-α) + (1-p)^α * (1-q)^(1-α) : ℝ)=>
+      --This unfolds some of it:
+      --simp [HermitianMat.trace_eq_re_trace, p2, q2, MState.ofClassical, MState.M, HermitianMat.conj]
+      --Really we need use that
+      -- (1) q2 ^ x = Matrix.diagonal [q^x, (1-q)^x]
+      -- (2) p2 is also a diagonal
+      -- (3) the product of diagonals is the diagonal of the products
+      -- (4) the HermitianMat.trace of a diagonal matrix is just the regular trace
+      -- (5) Write that trace as a sum of two things
+      sorry
+
+  trans (Real.log (p ^ α * q ^ (1 - α)) - Real.log (1 - ε) * α) / (α - 1)
+  · rw [Real.log_mul]
+    rotate_left
+    · exact (Real.rpow_pos_of_pos hp _).ne'
+    · exact (Real.rpow_pos_of_pos hq _).ne'
+    simp only [p, Prob.coe_one_minus, Prob.toReal_mk]
+    rw [Real.log_rpow (by linarith), mul_comm α, add_sub_cancel_left]
+    rw [Real.log_rpow (x := q.toReal) hq]
+    rw [mul_comm, ← mul_div, mul_comm, show (1 - α) = -(α - 1) by abel]
+    simp [-neg_sub, neg_div, div_self (a := α - 1) (by linarith)]
+  · rw [div_le_div_iff_of_pos_right (by linarith), tsub_le_iff_right, sub_add_cancel]
+    apply Real.log_le_log
+    · refine mul_pos (Real.rpow_pos_of_pos hp _) (Real.rpow_pos_of_pos hq _)
+    rw [le_add_iff_nonneg_right]
+    refine mul_nonneg (Real.rpow_nonneg ?_ _) (Real.rpow_nonneg ?_ _)
+    · exact sub_nonneg_of_le p.2.2
+    · exact sub_nonneg_of_le q.2.2
 
 end hypotesting
 
 variable {ι : Type*} [FreeStateTheory ι]
 variable {i : ι}
+
+--TODO maybe move this lemma outside. To FreeState.lean maybe? Or is it too specific
+/-- In a `FreeStateTheory`, we have free states of full rank, therefore the minimum relative entropy
+of any state `ρ` to a free state is finite. -/
+lemma min_free_relent_finite (ρ : MState (H i)) : ⨅ σ ∈ IsFree, 𝐃(ρ‖σ) ≠ ⊤ := by
+  simp only [ne_eq, iInf_eq_top, not_forall, Classical.not_imp]
+  obtain ⟨σ, hσ₁, hσ₂⟩ := FreeStateTheory.free_fullRank i
+  use σ, hσ₂
+  --At this point should be an easy fact (a separate theorem) using hσ₁, it's posdef.
+  sorry
 
 -- This theorem should follow from "Fekete's subadditive lemma", which can be found in
 -- Lemma A.1 of Hayashi's book "Quantum Information Theory - Mathematical Foundation".
@@ -87,6 +218,57 @@ theorem limit_rel_entropy_exists (ρ : MState (H i)) :
   ∃ d : ℝ≥0,
     Filter.Tendsto (fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree (i := i⊗^[n]), 𝐃(ρ⊗^[n]‖σ))
     .atTop (𝓝 d) := by
+  --Fekete's subadditive lemma is in Mathlib:
+  have := @Subadditive.tendsto_lim
+  --but with slightly different types...
+  --Try to unify it with our goal below
+  let u : ℕ+ → ENNReal := fun n ↦ ⨅ σ ∈ IsFree, 𝐃(ρ⊗^[n]‖σ)
+  let u' : ℕ → ℝ := fun n ↦ if hn : n = 0 then 0 else (u ⟨n, Nat.zero_lt_of_ne_zero hn⟩).toReal
+  have hu' : Subadditive u' := by
+    intro m n
+    unfold u'
+    rcases m with _|m
+    · simp
+    rcases n with _|n
+    · simp
+    simp [← NNReal.coe_add]
+    refine le_trans ?_ ENNReal.toReal_add_le
+    apply ENNReal.toReal_mono
+    · simpa only [ne_eq, ENNReal.add_eq_top, not_or, u] using
+        ⟨min_free_relent_finite _, min_free_relent_finite _⟩
+    --This is where we need to *really* show subadditivity.
+    sorry
+  have hu'_lim_nonneg : 0 ≤ hu'.lim := by
+    rw [Subadditive.lim]
+    apply le_csInf Set.Nonempty.of_subtype
+    intro b hb
+    simp only [Set.mem_image, Set.mem_Ici] at hb
+    obtain ⟨x, hx₁, rfl⟩ := hb
+    unfold u'
+    split_ifs
+    · simp
+    · positivity
+  have hu'_bddBelow : BddBelow (Set.range fun n => u' n / ↑n) := by
+    use 0
+    intro x hx
+    simp only [Set.mem_range, u'] at hx
+    obtain ⟨y, rfl⟩ := hx
+    split_ifs
+    · simp
+    · positivity
+  use ⟨hu'.lim, hu'_lim_nonneg⟩
+  have := Subadditive.tendsto_lim hu' hu'_bddBelow
+  /-
+  Now we need to change `this`, which is `@Filter.Tendsto ℕ ℝ`, into our goal, which is
+  `@Filter.Tendsto ℕ+ ENNReal`. This probably needs three steps, one where go from ℕ to ℕ+,
+  one where we go from ℝ to NNReal, and then one more from NNReal to ENNReal. Some lemmas that
+  might be useful:
+  - `Topology.IsClosedEmbedding.tendsto_nhds_iff`
+  - `Topology.IsEmbedding.tendsto_nhds_iff`
+  - `Filter.tendsto_Ici_atTop` (note that `NNReal` is defeq to `Set.Ici (0 : ℝ)`)
+  - `Filter.tendsto_congr`
+  - `tendsto_subtype_rng`
+  -/
   sorry
 
 variable {d : Type*} [Fintype d] [DecidableEq d] in
@@ -127,7 +309,7 @@ private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState d) (σₘ : MStat
   --</HACK>
 
   --This will probably need 1 < α actually
-  have h_α : ∀ α, (0 < α) → Filter.atTop.limsup (fun n ↦ —log β_ ε(ρ⊗^n‖{σn n}) / n) ≤
+  have h_α : ∀ α, (1 < α) → Filter.atTop.limsup (fun n ↦ —log β_ ε(ρ⊗^n‖{σn n}) / n) ≤
       D̃_ α(ρ⊗^m‖σn m) / m := by
     intro α hα
     apply le_of_le_of_eq (b := Filter.atTop.limsup (fun n ↦ D̃_ α(ρ⊗^n‖σn n) / n))

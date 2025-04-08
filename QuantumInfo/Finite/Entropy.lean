@@ -108,7 +108,7 @@ def SandwichedRelRentropy [Fintype d] (α : ℝ) (ρ σ : MState d) : ENNReal :=
     if α = 1 then
       𝐃(ρ‖σ)
     else
-      some ⟨
+      .ofNNReal ⟨
         ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).toMat) ^ α).trace.log / (α - 1)
       , by
         --Proof that this quantity is nonnegative

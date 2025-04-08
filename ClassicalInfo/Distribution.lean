@@ -52,7 +52,12 @@ theorem normalized (d : Distribution α) : Finset.sum Finset.univ (fun i ↦ (d 
 abbrev prob (d : Distribution α) := (d : α → Prob)
 
 @[simp]
-theorem fun_eq_val (d : Distribution α) (x : α): d.val x = d x :=
+theorem fun_eq_val (d : Distribution α) : d.val = d :=
+  rfl
+
+@[simp]
+theorem funlike_apply (d : α → Prob) (h : _) (x : α) :
+    DFunLike.coe (self := instFunLikeProb) ⟨d, h⟩ x = d x :=
   rfl
 
 @[ext]
@@ -178,6 +183,18 @@ theorem congr_apply (σ : α ≃ β) (d : Distribution α) (j : β): (congr σ d
 theorem congr_symm_apply (σ : α ≃ β) : (Distribution.congr σ).symm = Distribution.congr σ.symm := by
   rfl
 
+/-- The distribution on Fin 2 corresponding to a coin with probability p. Chance p of 1, 1-p of 0. -/
+def coin (p : Prob) : Distribution (Fin 2) :=
+  ⟨(if · = 0 then p else p.one_minus), by simp⟩
+
+@[simp]
+theorem coin_val_zero (p : Prob) : coin p 0 = p := by
+  simp [coin]
+
+@[simp]
+theorem coin_val_one (p : Prob) : coin p 1 = p.one_minus := by
+  simp [coin]
+
 section randvar
 
 /-- A `T`-valued random variable over `α` is a map `var : α → T` along
@@ -216,10 +233,15 @@ theorem expect_val_eq_mixable_mix (d : Distribution (Fin 2)) (x₁ x₂ : T) : e
   apply Mixable.to_U_inj
   simp only [Mixable.mix, expect_val, constant, DFunLike.coe, Mixable.to_U_of_mkT]
   calc
-    ∑ i : Fin (Nat.succ 0).succ, Prob.toReal (d i) • Mixable.to_U (![x₁, x₂] i) = ∑ i ∈ Finset.range 2, Prob.toReal (d i) • Mixable.to_U (![x₁, x₂] i) := by sorry
-    _ = ∑ i ∈ Finset.range 1, Prob.toReal (d i) • Mixable.to_U (![x₁, x₂] i) + Prob.toReal (d 1) • Mixable.to_U (![x₁, x₂] 1) := by exact Finset.sum_range_succ (fun i => Prob.toReal (d i) • Mixable.to_U (![x₁, x₂] i)) 1
-    _ = Prob.toReal (d 0) • Mixable.to_U (![x₁, x₂] 0) + Prob.toReal (d 1) • Mixable.to_U (![x₁, x₂] 1) := by simp [Finset.sum_range_one (fun i => Prob.toReal (d i) • Mixable.to_U (![x₁, x₂] i))]
-    _ = Prob.toReal (d 0) • Mixable.to_U x₁ + Prob.toReal (d 0).one_minus • Mixable.to_U x₂  := by congr; sorry
+    ∑ i : Fin (Nat.succ 0).succ, Prob.toReal (d i) • Mixable.to_U (![x₁, x₂] i) = ∑ i ∈ Finset.range 2, Prob.toReal (d i) • Mixable.to_U (![x₁, x₂] i) := by
+      simpa [Finset.range_succ] using add_comm _ _
+    _ = ∑ i ∈ Finset.range 1, Prob.toReal (d i) • Mixable.to_U (![x₁, x₂] i) + Prob.toReal (d 1) • Mixable.to_U (![x₁, x₂] 1) :=
+      Finset.sum_range_succ (fun i => Prob.toReal (d i) • Mixable.to_U (![x₁, x₂] i)) 1
+    _ = Prob.toReal (d 0) • Mixable.to_U (![x₁, x₂] 0) + Prob.toReal (d 1) • Mixable.to_U (![x₁, x₂] 1) := by
+      simp [Finset.sum_range_one (fun i => Prob.toReal (d i) • Mixable.to_U (![x₁, x₂] i))]
+    _ = Prob.toReal (d 0) • Mixable.to_U x₁ + Prob.toReal (d 0).one_minus • Mixable.to_U x₂ := by
+      congr
+      simpa only [Subtype.eq_iff, fun_eq_val, Fin.sum_univ_two, ← eq_sub_iff_add_eq'] using d.property
 
 /-- The expectation value of a random variable with constant probability distribution `constant x` is its value at `x` -/
 theorem expect_val_constant (x : α) (f : α → T) : expect_val ⟨f, (constant x)⟩ = f x := by
