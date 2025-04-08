@@ -1,7 +1,5 @@
 import QuantumInfo.Finite.ResourceTheory.FreeState
 
-import Mathlib.Analysis.Subadditive
-
 open ResourcePretheory
 open FreeStateTheory
 open NNReal
@@ -222,22 +220,16 @@ theorem limit_rel_entropy_exists (ρ : MState (H i)) :
   have := @Subadditive.tendsto_lim
   --but with slightly different types...
   --Try to unify it with our goal below
-  let u : ℕ+ → ENNReal := fun n ↦ ⨅ σ ∈ IsFree, 𝐃(ρ⊗^[n]‖σ)
+  let u : ℕ+ → ENNReal := fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree, 𝐃(ρ⊗^[n]‖σ)
   let u' : ℕ → ℝ := fun n ↦ if hn : n = 0 then 0 else (u ⟨n, Nat.zero_lt_of_ne_zero hn⟩).toReal
   have hu' : Subadditive u' := by
-    intro m n
-    unfold u'
-    rcases m with _|m
-    · simp
-    rcases n with _|n
-    · simp
-    simp [← NNReal.coe_add]
-    refine le_trans ?_ ENNReal.toReal_add_le
-    apply ENNReal.toReal_mono
-    · simpa only [ne_eq, ENNReal.add_eq_top, not_or, u] using
-        ⟨min_free_relent_finite _, min_free_relent_finite _⟩
-    --This is where we need to *really* show subadditivity.
-    sorry
+    unfold u' u
+    have hsub := RelativeEntResource.Subadditive ρ
+    dsimp [RelativeEntResource] at hsub
+    convert hsub
+    rw [ENNReal.toReal_mul]
+    congr
+    simp
   have hu'_lim_nonneg : 0 ≤ hu'.lim := by
     rw [Subadditive.lim]
     apply le_csInf Set.Nonempty.of_subtype
@@ -271,17 +263,17 @@ theorem limit_rel_entropy_exists (ρ : MState (H i)) :
   -/
   sorry
 
-variable {d : Type*} [Fintype d] [DecidableEq d] in
 /-- Lemma 6 from the paper -/
-private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState d) (σₘ : MState (Fin m → d)) (hσf : σf.m.PosDef) (ε : ℝ)
+private theorem Lemma6 (m : ℕ+) (ρ σf : MState (H i)) (σₘ : MState (H (i ⊗^[m]))) (hσf : σf.m.PosDef) (ε : ℝ)
     (hε : 0 < ε)
     (hε' : ε < 1) --Not stated in the paper's theorem statement but I think is necessary for the argument to go through
     :
-    let σn (n : ℕ) : (MState (Fin n → d)) :=
+    let σn (n : ℕ+) : (MState (H (i ⊗^[n]))) :=
+      --This needs to be reworked to be compatible with the FreeStateTheory framework.
       let l : ℕ := n / m
       let q : ℕ := n % m
-      let σl := σₘ ⊗^ l
-      let σr := σf ⊗^ q
+      let σl := σₘ ⊗^[ ⟨l, sorry⟩ ]
+      let σr := σf ⊗^[ ⟨q, sorry⟩ ]
       let eqv : (Fin n → d) ≃ (Fin l → Fin m → d) × (Fin q → d) :=
         Equiv.piCongrLeft (fun _ ↦ d) ((finCongr (Eq.symm (Nat.div_add_mod' n m))).trans (finSumFinEquiv.symm))
           |>.trans <|
@@ -290,11 +282,13 @@ private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState d) (σₘ : MStat
            (Equiv.prodCongr (Equiv.piCongrLeft (fun _ ↦ d) finProdFinEquiv).symm (Equiv.refl _))
           |>.trans <|
           (Equiv.prodCongr (Equiv.curry ..) (Equiv.refl _))
-      (σl.prod σr).relabel eqv
-    Filter.atTop.limsup (fun n ↦ —log β_ ε(ρ⊗^n‖{σn n}) / n) ≤
-    𝐃(ρ⊗^m‖σₘ) / m
+      -- (σl.prod σr).relabel eqv
+      sorry
+    Filter.atTop.limsup (fun (n : ℕ+) ↦ —log β_ ε(ρ⊗^[n]‖{σn n}) / n) ≤
+    𝐃(ρ⊗^[m]‖σₘ) / m
   := by
   intro σn
+  stop
   have h_add : ∀ α n, D̃_ α(ρ⊗^n‖σn n) = ↑(n/m) * D̃_ α(ρ⊗^m‖σₘ) + ↑(n%m) * D̃_ α(ρ‖σf):= by
     --"Break apart" σn, and apply additivity of `SandwichedRelRentropy`.
     sorry
@@ -505,27 +499,125 @@ theorem proj_le_inner_le : {A ≤ₚ B}.inner A ≤ {A ≤ₚ B}.inner B := by
 
 end proj
 
+private noncomputable def R1 (ρ : MState (H i)) (ε : ℝ) : ENNReal :=
+  Filter.liminf (fun n ↦ —log β_ ε(ρ⊗^[n]‖IsFree) / n) Filter.atTop
+
+private noncomputable def R2 (ρ : MState (H i)) : ((n : ℕ+) → IsFree (i := i⊗^[n])) → ENNReal :=
+  fun σ ↦ Filter.liminf (fun n ↦ 𝐃(ρ⊗^[n]‖σ n) / n) Filter.atTop
+
 /-- Lemma 7 from the paper -/
 private theorem Lemma7 (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) (σ : (n : ℕ+) → IsFree (i := i⊗^[n])) :
   -- This is not exactly how R_{1, ε} is defined in Eq. (17), but it should be equal due to
   -- the monotonicity of log and Lemma 3.
-  let R1 : ENNReal :=
-    Filter.liminf (fun n ↦ —log β_ ε(ρ⊗^[n]‖IsFree) / n) Filter.atTop
-  let R2 : ENNReal :=
-    Filter.liminf (fun n ↦ 𝐃(ρ⊗^[n]‖σ n) / n) Filter.atTop
-  (R2 ≥ R1) →
+  (R2 ρ σ ≥ R1 ρ ε) →
   ∀ ε' : ℝ, (hε' : 0 < ε' ∧ ε' < ε) → -- ε' is written as \tilde{ε} in the paper.
   ∃ σ' : (n : ℕ+) → IsFree (i := i⊗^[n]),
-  let R2' : ENNReal :=
-    Filter.liminf (fun n ↦ 𝐃(ρ⊗^[n]‖σ' n) / n) Filter.atTop
-  R2' - R1 ≤ ENNReal.ofNNReal (⟨1 - ε', by linarith⟩) * (R2 - R1)
+  R2 ρ σ' - R1 ρ ε ≤ .ofNNReal (⟨1 - ε', by linarith⟩) * (R2 ρ σ - R1 ρ ε)
   := by
   sorry
 
+/-- Lemma 7 gives us a way to repeatedly "improve" a sequence σ to one with a smaller gap between R2 and R1.
+The paper paints this as pretty much immediate from Lemma7, but we need to handle the case where R2 is below
+R1. -/
+private noncomputable def Lemma7_improver (ρ : MState (H i)) {ε : ℝ} (hε : 0 < ε ∧ ε < 1) {ε' : ℝ} (hε' : 0 < ε' ∧ ε' < ε) :
+    --The parameters above are the "fixed" parameters that we'll improve
+    --It takes one sequence of free states, `(n : ℕ+) → IsFree (i := i⊗^[n])`, and gives a new one
+    ((n : ℕ+) → IsFree (i := i⊗^[n])) → ((n : ℕ+) → IsFree (i := i⊗^[n])) :=
+  fun σ ↦
+    if h : R2 ρ σ ≥ R1 ρ ε then
+      (Lemma7 ρ ε hε σ h ε' hε').choose
+    else
+     σ --The gap was already 0 (or even, negative!) so leave it unchanged.
+
+/-- The Lemma7_improver does its job at shrinking the gap. -/
+theorem Lemma7_gap (ρ : MState (H i)) {ε : ℝ} (hε : 0 < ε ∧ ε < 1) {ε' : ℝ} (hε' : 0 < ε' ∧ ε' < ε) :
+    ∀ σ,
+      let σ' := Lemma7_improver ρ hε hε' σ;
+      R2 ρ σ' - R1 ρ ε ≤ .ofNNReal (⟨1 - ε', by linarith⟩) * (R2 ρ σ - R1 ρ ε) := by
+  intro σ
+  dsimp [SteinsLemma.Lemma7_improver]
+  split_ifs with h
+  · exact (SteinsLemma.Lemma7 ρ ε hε σ h ε' hε').choose_spec
+  · push_neg at h
+    conv_lhs => equals 0 =>
+      exact tsub_eq_zero_of_le h.le
+    exact zero_le _
+
 end Lemma7
+
+/-- Strengthening of `tendsto_of_limsup_eq_liminf`: instead of `limsup f = a = liminf f`, it suffices
+to just have `limsup f ≤ a ≤ liminf f`. -/
+theorem _root_.tendsto_of_limsup_le_liminf {α : Type u_2} {β : Type u_3} [ConditionallyCompleteLinearOrder α] [TopologicalSpace α]
+    [OrderTopology α] {f : Filter β} [f.NeBot] {u : β → α} {a : α}
+    (hsup : Filter.limsup u f ≤ a) (hinf : a ≤ Filter.liminf u f)
+    (h : Filter.IsBoundedUnder (fun x1 x2 => x1 ≤ x2) f u := by isBoundedDefault)
+    (h' : Filter.IsBoundedUnder (fun x1 x2 => x1 ≥ x2) f u := by isBoundedDefault) :
+    Filter.Tendsto u f (nhds a) := by
+  have h_le := Filter.liminf_le_limsup (u := u) (f := f)
+  have h_eq_inf : a = Filter.liminf u f :=
+    le_antisymm hinf (h_le.trans hsup)
+  have h_eq_sup : Filter.limsup u f = a :=
+    le_antisymm hsup (hinf.trans h_le)
+  exact tendsto_of_liminf_eq_limsup h_eq_inf.symm h_eq_sup
 
 theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) :
     Filter.Tendsto (fun n ↦
       —log β_ ε(ρ⊗^[n]‖IsFree) / n
     ) .atTop (𝓝 (RegularizedRelativeEntResource ρ)) := by
-  sorry
+  conv =>
+    enter [1, n, 1, 1]
+    rw [← Lemma3]
+  rw [RegularizedRelativeEntResource]
+  simp only
+  generalize_proofs pf1 pf2 pf3
+  simp_rw [RelativeEntResource]
+  --It suffices to show limsup LHS ≤ RHS and liminf LHS ≥ RHS.
+  refine tendsto_of_limsup_le_liminf ?_ ?_
+  · --the "strong converse" part first
+    --Let σₘ be the state minimizing 𝐃(ρ⊗^m‖σₘ) over free states. This is guaranteed to exist since
+    -- (1) the divergence is continuous and (2) the set of free states is compact.
+    have σₘ (m : ℕ+) := IsCompact.exists_isMinOn
+      (α := ENNReal)
+      (s := IsFree (i := i⊗^[m]))
+      (hs := by
+        --The set of free states is compact because it's a closed subset of a compact space.
+        --TODO pull out to own theorem
+        apply IsCompact.of_isClosed_subset ?_ free_closed (Set.subset_univ _)
+        sorry
+      )
+      (ne_s := by
+        --TODO pull out to own theorem
+        obtain ⟨ρ, hρ₁, hρ₂⟩ := free_fullRank (i⊗^[m])
+        exact ⟨ρ, hρ₂⟩)
+      (f := fun σ ↦ 𝐃(ρ⊗^[m]‖σ))
+      (hf := by
+        --Relative entropy is continuous (in each argument, actually, but we only need in the latter here).
+        --Will need the fact that all the cfc / eigenvalue stuff is continuous, which is going to make this
+        --a pain.
+        sorry
+      )
+    --Let σ₁ be the full-rank free state
+    have ⟨σ₁, hσ₁_pos, hσ₁_free⟩ := FreeStateTheory.free_fullRank i
+    replace hσ₁_pos : σ₁.m.PosDef := --we have this lemma, right?
+      sorry
+
+    obtain ⟨d, hd⟩ := limit_rel_entropy_exists ρ --Do we need this...?
+
+    have h (m : ℕ+) := Lemma6 (d := H i) m ρ σ₁ (σₘ m).choose hσ₁_pos ε hε.1 hε.2
+    dsimp at h
+
+    sorry
+  · --the other direction, the "key part" of the "opposite inequality"
+    set R₁ε := Filter.liminf (fun n => —log (⨆ σ ∈ IsFree, β_ ε(ρ⊗^[n]‖{σ})) / ↑↑n) Filter.atTop
+    --We need to pick an ε' (a \tilde{ε} in the paper). The only constraint(?) is that it's strictly
+    --less than ε. We take ε' := ε/2.
+    let ε' := ε/2
+    have hε' : 0 < ε' ∧ ε' < ε := by unfold ε'; constructor <;> linarith
+    have lem7 (σ h) := Lemma7 ρ ε hε σ h ε' hε'
+    dsimp at lem7
+    --Take some initial sequence σ₁. Can just take the full_rank one from each, if we want
+    let σ₁ : (n : ℕ+) → IsFree (i := i⊗^[n]) := sorry
+    --Repeat the Lemma7 improvement process to drive the gap down
+    let σₖ : ℕ → (n : ℕ+) → IsFree (i := i⊗^[n]) := fun k ↦
+      (Lemma7_improver ρ hε hε')^[k] σ₁
+    sorry

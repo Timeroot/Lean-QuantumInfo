@@ -1,4 +1,5 @@
 import Mathlib.Algebra.Module.Submodule.Lattice
+import Mathlib.Analysis.Subadditive
 import Mathlib.CategoryTheory.FullSubcategory
 import Mathlib.CategoryTheory.Monoidal.Braided.Basic
 import Mathlib.Data.Real.EReal
@@ -101,26 +102,45 @@ open NNReal
 --Things like asymptotically free operations, measures of non-freeness, etc. that can be stated
 --entirely in terms of the free states (without referring to operations) go here.
 
-variable {ι : Type*} [FreeStateTheory ι]
+variable {ι : Type*} [FreeStateTheory ι] {i : ι}
 
-noncomputable def RelativeEntResource {i : ι} : MState (H i) → ℝ≥0 :=
-    fun ρ ↦ (⨅ σ ∈ IsFree, 𝐃(ρ‖σ)).untop
-  (by
-    let ⟨w,h⟩ := free_fullRank i
-    apply ne_top_of_le_ne_top _ (iInf_le _ w)
-    simp only [ne_eq, iInf_eq_top, Classical.not_imp]
-    constructor
-    · exact h.2
-    · refine ne_of_apply_ne ENNReal.toEReal (qRelativeEnt_ker (ρ := ρ) (?_) ▸ EReal.coe_ne_top _)
-      convert @bot_le _ _ (Submodule.instOrderBot) _
-      --Want the missing fact that 0 < w implies w.ker = ⊥
-      sorry
-  )
+noncomputable def RelativeEntResource : MState (H i) → ℝ≥0 :=
+    fun ρ ↦ (⨅ σ ∈ IsFree, 𝐃(ρ‖σ)).toNNReal
+  --Instead of .toNNReal, which maps ⊤ to 0, we could use .untop which proves that it isn't ⊤.
+  --   .untop
+  -- (by
+  --   let ⟨w,h⟩ := free_fullRank i
+  --   apply ne_top_of_le_ne_top _ (iInf_le _ w)
+  --   simp only [ne_eq, iInf_eq_top, Classical.not_imp]
+  --   constructor
+  --   · exact h.2
+  --   · refine ne_of_apply_ne ENNReal.toEReal (qRelativeEnt_ker (ρ := ρ) (?_) ▸ EReal.coe_ne_top _)
+  --     convert @bot_le _ _ (Submodule.instOrderBot) _
+  --     --Want the missing fact that 0 < w implies w.ker = ⊥
+  --     sorry
+  -- )
 
-noncomputable def RegularizedRelativeEntResource {i : ι} : MState (H i) → ℝ≥0 :=
-  --I want to define a general notion of "regularized quantity" and then use that here. That can then
-  --also be used for things like capacity, asymptotic interconversion rates, etc.
+theorem RelativeEntResource.Subadditive (ρ : MState (H i)) : Subadditive (fun n ↦
+    if hn : n = 0 then 0 else
+      let np : ℕ+ := ⟨n, Nat.zero_lt_of_ne_zero hn⟩;
+      (↑n)⁻¹ * (RelativeEntResource (ρ⊗^[np])).toReal) := by
+  intro m n
+  rcases m with _|m
+  · simp
+    apply le_of_eq
+    congr!
+    · exact Nat.zero_add n
+    · exact Nat.zero_add n
+  rcases n with _|n
+  · simp
+  simp [← NNReal.coe_add]
+  field_simp
+  rw [div_le_div_iff₀ (by positivity) (by positivity)]
+  norm_cast
   sorry
+
+noncomputable def RegularizedRelativeEntResource (ρ : MState (H i)) : ℝ≥0 :=
+  ⟨(RelativeEntResource.Subadditive ρ).lim, by sorry⟩
 
 noncomputable def GlobalRobustness {i : ι} : MState (H i) → ℝ≥0 :=
   fun ρ ↦ sInf {s | ∃ σ, IsFree (
