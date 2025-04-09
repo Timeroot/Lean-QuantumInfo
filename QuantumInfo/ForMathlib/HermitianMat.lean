@@ -188,6 +188,9 @@ variable {n 𝕜 : Type*} [Fintype n] [RCLike 𝕜]
 theorem trace_eq_re_trace (A : HermitianMat n 𝕜) : A.trace = RCLike.re (Matrix.trace A.toMat) := by
   rfl
 
+theorem trace_eq_rtrace (A : HermitianMat n 𝕜) : A.trace = A.H.rtrace := by
+  rfl
+
 /-- `HermitianMat.trace` reduces to `Matrix.trace` when the elements are `RCLike`. -/
 @[simp]
 theorem trace_eq_trace_rc (A : HermitianMat n 𝕜) : A.trace = Matrix.trace A.toMat := by
