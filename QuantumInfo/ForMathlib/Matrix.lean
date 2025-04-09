@@ -304,6 +304,9 @@ theorem zero_posSemidef_neg_posSemidef_iff : A.PosSemidef ∧ (-A).PosSemidef �
   · rintro rfl
     simp [PosSemidef.zero]
 
+theorem posSemidef_iff_eigenvalues_nonneg {hA : A.IsHermitian} : A.PosSemidef ↔ ∀ x, 0 ≤ hA.eigenvalues x :=
+  ⟨PosSemidef.eigenvalues_nonneg, IsHermitian.posSemidef_of_eigenvalues_nonneg hA⟩
+
 end PosSemidef
 
 namespace PosSemidef
@@ -352,6 +355,8 @@ instance instNonnegSpectrumClass : NonnegSpectrumClass ℝ (Matrix n n 𝕜) := 
   obtain ⟨i, hi⟩ := hx
   rw [←hi]
   exact Matrix.PosSemidef.eigenvalues_nonneg (zero_le_iff_posSemidef.mp hA) i
+
+theorem nonneg_iff_eigenvalue_nonneg : 0 ≤ A ↔ ∀ x, 0 ≤ hA.eigenvalues x := Iff.trans zero_le_iff_posSemidef posSemidef_iff_eigenvalues_nonneg
 
 theorem le_iff_sub_nonneg : A ≤ B ↔ 0 ≤ B - A := Iff.trans le_iff_sub_posSemidef zero_le_iff_posSemidef.symm
 

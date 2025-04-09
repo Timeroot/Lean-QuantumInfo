@@ -79,6 +79,11 @@ theorem pos (ρ : MState d) : ρ.val.PosSemidef :=
 theorem Hermitian (ρ : MState d) : ρ.m.IsHermitian :=
   ρ.pos.left
 
+@[simp]
+theorem rtr (ρ : MState d) : ρ.Hermitian.rtrace = 1 := by
+  simp only [Matrix.IsHermitian.rtrace, m, toSubtype_eq_coe, HermitianMat.val_eq_coe, ρ.tr,
+    RCLike.one_re]
+
 theorem ext_m {ρ₁ ρ₂ : MState d} (h : ρ₁.m = ρ₂.m) : ρ₁ = ρ₂ := by
   rw [MState.mk.injEq]
   ext1
@@ -129,8 +134,27 @@ theorem PosSemidef_outer_self_conj (v : d → ℂ) : Matrix.PosSemidef (Matrix.v
     rw [this, ← map_sum, ← Complex.normSq_eq_conj_mul_self, Complex.zero_le_real, ← Complex.sq_norm]
     exact sq_nonneg _
 
+-- Could have used properties of ρ.spectrum
+theorem eigenvalue_nonneg (ρ : MState d) : ∀ i, 0 ≤ ρ.Hermitian.eigenvalues i := by
+  apply (Matrix.PosSemidef.nonneg_iff_eigenvalue_nonneg ρ.Hermitian).mp
+  exact ρ.zero_le
+
+-- Could have used properties of  ρ.spectrum
+theorem eigenvalue_le_one (ρ : MState d) : ∀ i, ρ.Hermitian.eigenvalues i ≤ 1 := by
+  intro i
+  have hsum : ρ.Hermitian.eigenvalues i ≤ ∑ x, ρ.Hermitian.eigenvalues x := by
+    have hnonneg : ∀ y ∈ Finset.univ, 0 ≤ ρ.Hermitian.eigenvalues y := fun y _ ↦ Matrix.PosSemidef.eigenvalues_nonneg ρ.pos y
+    have hi : i ∈ Finset.univ := Finset.mem_univ i
+    exact Finset.single_le_sum hnonneg hi
+  rw [Matrix.IsHermitian.sum_eigenvalues_eq_rtrace ρ.Hermitian, ρ.rtr] at hsum
+  exact hsum
+
 theorem le_one (ρ : MState d) : ρ.M ≤ 1 := by
-  sorry
+  rw [Subtype.mk_le_mk]
+  simp only [toSubtype_eq_coe, HermitianMat.val_eq_coe, selfAdjoint.val_one]
+  suffices h : (↑ρ.toSubtype : Matrix d d ℂ) ≤ (1 : ℝ) • 1 by simp_all only [toSubtype_eq_coe, one_smul]
+  apply (Matrix.PosSemidef.le_smul_one_of_eigenvalues_iff ρ.pos 1).mp
+  exact eigenvalue_le_one ρ
 
 /-- The inner product of two MState's, as a real number between 0 and 1. -/
 def inner (ρ : MState d) (σ : MState d) : Prob :=
