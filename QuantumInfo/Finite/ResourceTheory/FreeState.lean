@@ -104,6 +104,9 @@ open NNReal
 
 variable {ι : Type*} [FreeStateTheory ι] {i : ι}
 
+instance FreeStateTheory.IsFre_Nonempty : Nonempty (IsFree (i := i)) :=
+  (free_fullRank i).recOn (fun w h ↦ ⟨w, h.2⟩)
+
 noncomputable def RelativeEntResource : MState (H i) → ℝ≥0 :=
     fun ρ ↦ (⨅ σ ∈ IsFree, 𝐃(ρ‖σ)).toNNReal
   --Instead of .toNNReal, which maps ⊤ to 0, we could use .untop which proves that it isn't ⊤.

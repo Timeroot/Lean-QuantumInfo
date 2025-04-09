@@ -20,6 +20,17 @@ noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : ℝ) (S : Set (MSt
 
 scoped notation "β_" ε " (" ρ "‖" S ")" =>  OptimalHypothesisRate ρ ε S
 
+theorem OptimalHypothesisRate_le_of_subset (ρ : MState d) (ε : ℝ) {S1 S2 : Set (MState d)} (h : S1 ⊆ S2) :
+    β_ ε(ρ‖S1) ≤ β_ ε(ρ‖S2) :=
+  iInf_mono (fun _ ↦ iSup_le_iSup_of_subset h)
+
+theorem OptimalHypothesisRate_singleton {ρ σ : MState d} {ε : ℝ}  :
+  β_ ε(ρ‖{σ}) =
+    ⨅ T : { m : HermitianMat d ℂ // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1},
+      ⟨_, σ.exp_val_prob T.2.right⟩
+  := by
+  simp only [OptimalHypothesisRate, iSup_singleton]
+
 -- TODO: Pull this definition out into another file? Maybe?
 /-- Map a probability [0,1] to [0,+∞] with -log p. Special case that 0 maps to +∞ (not 0, as Real.log
 does). This makes it `Antitone`.
@@ -49,12 +60,12 @@ theorem _root_.Prob.negLog_Antitone : Antitone Prob.negLog := by
 
 scoped notation "—log " => Prob.negLog
 
-theorem OptimalHypothesisRate_singleton {ρ σ : MState d} {ε : ℝ}  :
-  β_ ε(ρ‖{σ}) =
-    ⨅ T : { m : HermitianMat d ℂ // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1},
-      ⟨_, σ.exp_val_prob T.2.right⟩
-  := by
-  simp only [OptimalHypothesisRate, iSup_singleton]
+theorem negLog_OptimalHypothesisRate_le_singleton (ρ : MState d) (ε : ℝ) (S : Set (MState d))
+    (σ : MState d) (h : σ ∈ S) :
+    —log β_ ε(ρ‖S) ≤ —log β_ ε(ρ‖{σ}) := by
+  apply Prob.negLog_Antitone
+  apply OptimalHypothesisRate_le_of_subset
+  exact Set.singleton_subset_iff.mpr h
 
 private theorem Lemma3 (ρ : MState d) (ε : ℝ) (S : Set (MState d)) :
     ⨆ σ ∈ S, β_ ε(ρ‖{σ}) = β_ ε(ρ‖S) := by
@@ -263,29 +274,36 @@ theorem limit_rel_entropy_exists (ρ : MState (H i)) :
   -/
   sorry
 
+/-- The \tilde{σ}_n defined in Lemma 6. -/
+def Lemma6_σn (m : ℕ+) (σf : MState (H i)) (σₘ : MState (H (i ⊗^[m]))) : (n : ℕ+) → (MState (H (i ⊗^[n]))) :=
+  fun n ↦
+    --This needs to be reworked to be compatible with the FreeStateTheory framework.
+    let l : ℕ := n / m
+    let q : ℕ := n % m
+    let σl := σₘ ⊗^[ ⟨l, sorry⟩ ]
+    let σr := σf ⊗^[ ⟨q, sorry⟩ ]
+    -- let eqv : (Fin n → d) ≃ (Fin l → Fin m → d) × (Fin q → d) :=
+    --   Equiv.piCongrLeft (fun _ ↦ d) ((finCongr (Eq.symm (Nat.div_add_mod' n m))).trans (finSumFinEquiv.symm))
+    --     |>.trans <|
+    --       (Equiv.sumArrowEquivProdArrow ..)
+    --     |>.trans <|
+    --       (Equiv.prodCongr (Equiv.piCongrLeft (fun _ ↦ d) finProdFinEquiv).symm (Equiv.refl _))
+    --     |>.trans <|
+    --     (Equiv.prodCongr (Equiv.curry ..) (Equiv.refl _))
+    -- (σl.prod σr).relabel eqv
+    sorry
+
+theorem Lemma6_σn_IsFree {σ₁ : MState (H i)} {σₘ : (m : ℕ+) → MState (H (i⊗^[m]))} (hσ₁_free : IsFree σ₁)
+    (hσₘ1 : ∀ (m : ℕ+), σₘ m ∈ IsFree) (m n : ℕ+) : Lemma6_σn m σ₁ (σₘ m) n ∈ IsFree := by
+  sorry
+
 /-- Lemma 6 from the paper -/
 private theorem Lemma6 (m : ℕ+) (ρ σf : MState (H i)) (σₘ : MState (H (i ⊗^[m]))) (hσf : σf.m.PosDef) (ε : ℝ)
     (hε : 0 < ε)
     (hε' : ε < 1) --Not stated in the paper's theorem statement but I think is necessary for the argument to go through
     :
-    let σn (n : ℕ+) : (MState (H (i ⊗^[n]))) :=
-      --This needs to be reworked to be compatible with the FreeStateTheory framework.
-      let l : ℕ := n / m
-      let q : ℕ := n % m
-      let σl := σₘ ⊗^[ ⟨l, sorry⟩ ]
-      let σr := σf ⊗^[ ⟨q, sorry⟩ ]
-      let eqv : (Fin n → d) ≃ (Fin l → Fin m → d) × (Fin q → d) :=
-        Equiv.piCongrLeft (fun _ ↦ d) ((finCongr (Eq.symm (Nat.div_add_mod' n m))).trans (finSumFinEquiv.symm))
-          |>.trans <|
-           (Equiv.sumArrowEquivProdArrow ..)
-          |>.trans <|
-           (Equiv.prodCongr (Equiv.piCongrLeft (fun _ ↦ d) finProdFinEquiv).symm (Equiv.refl _))
-          |>.trans <|
-          (Equiv.prodCongr (Equiv.curry ..) (Equiv.refl _))
-      -- (σl.prod σr).relabel eqv
-      sorry
-    Filter.atTop.limsup (fun (n : ℕ+) ↦ —log β_ ε(ρ⊗^[n]‖{σn n}) / n) ≤
-    𝐃(ρ⊗^[m]‖σₘ) / m
+    Filter.atTop.limsup (fun (n : ℕ+) ↦ (↑n)⁻¹ * —log β_ ε(ρ⊗^[n]‖{Lemma6_σn m σf σₘ n})) ≤
+    (↑m)⁻¹ * 𝐃(ρ⊗^[m]‖σₘ)
   := by
   intro σn
   stop
@@ -562,10 +580,10 @@ theorem _root_.tendsto_of_limsup_le_liminf {α : Type u_2} {β : Type u_3} [Cond
 
 theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) :
     Filter.Tendsto (fun n ↦
-      —log β_ ε(ρ⊗^[n]‖IsFree) / n
+      (↑n)⁻¹ * —log β_ ε(ρ⊗^[n]‖IsFree)
     ) .atTop (𝓝 (RegularizedRelativeEntResource ρ)) := by
   conv =>
-    enter [1, n, 1, 1]
+    enter [1, n, 2, 1]
     rw [← Lemma3]
   rw [RegularizedRelativeEntResource]
   simp only
@@ -576,7 +594,7 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0
   · --the "strong converse" part first
     --Let σₘ be the state minimizing 𝐃(ρ⊗^m‖σₘ) over free states. This is guaranteed to exist since
     -- (1) the divergence is continuous and (2) the set of free states is compact.
-    have σₘ (m : ℕ+) := IsCompact.exists_isMinOn
+    have σₘ_exists (m : ℕ+) := IsCompact.exists_isMinOn
       (α := ENNReal)
       (s := IsFree (i := i⊗^[m]))
       (hs := by
@@ -585,10 +603,7 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0
         apply IsCompact.of_isClosed_subset ?_ free_closed (Set.subset_univ _)
         sorry
       )
-      (ne_s := by
-        --TODO pull out to own theorem
-        obtain ⟨ρ, hρ₁, hρ₂⟩ := free_fullRank (i⊗^[m])
-        exact ⟨ρ, hρ₂⟩)
+      (ne_s := Set.Nonempty.of_subtype)
       (f := fun σ ↦ 𝐃(ρ⊗^[m]‖σ))
       (hf := by
         --Relative entropy is continuous (in each argument, actually, but we only need in the latter here).
@@ -596,17 +611,52 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0
         --a pain.
         sorry
       )
+
+    have hσₘ1 := fun m ↦ (σₘ_exists m).choose_spec.left
+    have hσₘ2 := fun m ↦ (σₘ_exists m).choose_spec.right
+    generalize σₘ_def : (fun m ↦ (σₘ_exists m).choose) = σₘ
+    simp_rw [congrFun σₘ_def] at hσₘ1 hσₘ2
+    clear σₘ_def σₘ_exists
+
     --Let σ₁ be the full-rank free state
     have ⟨σ₁, hσ₁_pos, hσ₁_free⟩ := FreeStateTheory.free_fullRank i
     replace hσ₁_pos : σ₁.m.PosDef := --we have this lemma, right?
       sorry
 
-    obtain ⟨d, hd⟩ := limit_rel_entropy_exists ρ --Do we need this...?
+    --`h` is Eq (14)
+    have h (m : ℕ+) := Lemma6 m ρ σ₁ (σₘ m) hσ₁_pos ε hε.1 hε.2
 
-    have h (m : ℕ+) := Lemma6 (d := H i) m ρ σ₁ (σₘ m).choose hσ₁_pos ε hε.1 hε.2
-    dsimp at h
+    --Update `h` to Eq (15)
+    have h₂ (m : ℕ+) : (fun n => (↑n)⁻¹ * —log β_ ε(ρ⊗^[n]‖IsFree)) ≤ᶠ[Filter.atTop]
+        (fun n => (↑n)⁻¹ * —log β_ ε(ρ⊗^[n]‖{(Lemma6_σn m σ₁ (σₘ m)) n})) := by
+      rw [Filter.EventuallyLE]
+      apply Filter.Eventually.of_forall
+      intro n
+      gcongr
+      apply negLog_OptimalHypothesisRate_le_singleton
+      apply Lemma6_σn_IsFree hσ₁_free hσₘ1
+    replace h (m) := (Filter.limsup_le_limsup (h₂ m)).trans (h m)
+    clear h₂
 
-    sorry
+    --Update `h` to Eq (16)
+    conv at h =>
+      enter [m, 2, 2]
+      exact (IsMinOn.iInf_eq (hσₘ1 m) (hσₘ2 m)).symm
+
+    obtain ⟨v_lem5, hv_lem5⟩ := limit_rel_entropy_exists ρ --Do we need this...? in this form? Feels wrong
+    conv_rhs =>
+      equals .ofNNReal v_lem5 =>
+        -- ??? ugh
+        sorry
+
+    apply le_of_tendsto_of_tendsto' tendsto_const_nhds hv_lem5
+    convert h using 6
+    · apply Lemma3
+    · symm
+      apply ciInf_subtype''
+      · exact Set.Nonempty.of_subtype
+      · exact OrderBot.bddBelow _
+      · simp
   · --the other direction, the "key part" of the "opposite inequality"
     set R₁ε := Filter.liminf (fun n => —log (⨆ σ ∈ IsFree, β_ ε(ρ⊗^[n]‖{σ})) / ↑↑n) Filter.atTop
     --We need to pick an ε' (a \tilde{ε} in the paper). The only constraint(?) is that it's strictly
