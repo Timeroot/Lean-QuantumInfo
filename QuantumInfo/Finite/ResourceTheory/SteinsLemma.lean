@@ -274,24 +274,38 @@ theorem limit_rel_entropy_exists (ρ : MState (H i)) :
   -/
   sorry
 
-/-- The \tilde{σ}_n defined in Lemma 6. -/
-def Lemma6_σn (m : ℕ+) (σf : MState (H i)) (σₘ : MState (H (i ⊗^[m]))) : (n : ℕ+) → (MState (H (i ⊗^[n]))) :=
+/-- The \tilde{σ}_n defined in Lemma 6.
+I've slightly changed the definition here: instead of `n / m` and `n % m`, I use `(n-1) / m` and `(n-1)%m + 1`.
+This means that we only ever need ℕ+ powers of states. It *would* be fine to just add the requirement to our
+notion of `ResourcePretheory` that we have a 0-dimensional space, so that we can take ℕ powers; or we could
+express this with if-statements (e.g. `if m ∣ n then σₘ ⊗^ [ n / m ] else (...) ⊗ᵣ (...)`) but that's messier
+to work with. This altered definition is easier to work with and still has all the properties we need. We still
+need one `if` statement for when `n ≤ m`, sadly.
+-/
+noncomputable def Lemma6_σn (m : ℕ+) (σf : MState (H i)) (σₘ : MState (H (i ⊗^[m]))) : (n : ℕ+) → (MState (H (i ⊗^[n]))) :=
   fun n ↦
     --This needs to be reworked to be compatible with the FreeStateTheory framework.
-    let l : ℕ := n / m
-    let q : ℕ := n % m
-    let σl := σₘ ⊗^[ ⟨l, sorry⟩ ]
-    let σr := σf ⊗^[ ⟨q, sorry⟩ ]
-    -- let eqv : (Fin n → d) ≃ (Fin l → Fin m → d) × (Fin q → d) :=
-    --   Equiv.piCongrLeft (fun _ ↦ d) ((finCongr (Eq.symm (Nat.div_add_mod' n m))).trans (finSumFinEquiv.symm))
-    --     |>.trans <|
-    --       (Equiv.sumArrowEquivProdArrow ..)
-    --     |>.trans <|
-    --       (Equiv.prodCongr (Equiv.piCongrLeft (fun _ ↦ d) finProdFinEquiv).symm (Equiv.refl _))
-    --     |>.trans <|
-    --     (Equiv.prodCongr (Equiv.curry ..) (Equiv.refl _))
-    -- (σl.prod σr).relabel eqv
-    sorry
+    let l : ℕ := n.natPred / m
+    let q : ℕ+ := (n.natPred % m).succPNat
+    let σr := σf ⊗^[q]
+    if h : n ≤ m then
+      σr.relabel <| .cast <| congrArg (H <| i⊗^[·]) (by
+        apply PNat.eq
+        simp [q, PNat.natPred]
+        have := (Nat.mod_eq_of_lt (Nat.sub_one_lt_of_le n.2 h)).symm
+        rwa [Nat.sub_eq_iff_eq_add n.2] at this
+      )
+    else
+      let σl := σₘ ⊗^[ ⟨l, by simpa [l] using Nat.le_sub_one_of_lt (lt_of_not_ge h)⟩ ];
+      (σl ⊗ᵣ σr).relabel <| .cast <| congrArg H <| (by
+        --This will require some real twiddling with our FreeStateTheory axioms for `prod`. We'll
+        --probably need some kind of monoidal structure ... In this case we just need to show that
+        -- i^n = (i^m)^(l) ⊗ i^q. These are both just expressions made from repeated products of
+        --the "base" Hilbert space i (remember that `⊗^[·]` is shorthand for iterated applications
+        -- of `ResourcePretheory.prod`), but the expressions are shaped differently; associativity of
+        --the product should be enough.
+        sorry
+      )
 
 theorem Lemma6_σn_IsFree {σ₁ : MState (H i)} {σₘ : (m : ℕ+) → MState (H (i⊗^[m]))} (hσ₁_free : IsFree σ₁)
     (hσₘ1 : ∀ (m : ℕ+), σₘ m ∈ IsFree) (m n : ℕ+) : Lemma6_σn m σ₁ (σₘ m) n ∈ IsFree := by
@@ -620,8 +634,6 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0
 
     --Let σ₁ be the full-rank free state
     have ⟨σ₁, hσ₁_pos, hσ₁_free⟩ := FreeStateTheory.free_fullRank i
-    replace hσ₁_pos : σ₁.m.PosDef := --we have this lemma, right?
-      sorry
 
     --`h` is Eq (14)
     have h (m : ℕ+) := Lemma6 m ρ σ₁ (σₘ m) hσ₁_pos ε hε.1 hε.2
@@ -665,8 +677,9 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0
     have hε' : 0 < ε' ∧ ε' < ε := by unfold ε'; constructor <;> linarith
     have lem7 (σ h) := Lemma7 ρ ε hε σ h ε' hε'
     dsimp at lem7
-    --Take some initial sequence σ₁. Can just take the full_rank one from each, if we want
-    let σ₁ : (n : ℕ+) → IsFree (i := i⊗^[n]) := sorry
+    --Take some initial sequence σ₁. Can just take the full_rank one from each, if we want (which is the `default`
+    -- instance that `Inhabited` derives, but the point is that it doesn't matter)
+    generalize (default : (n : ℕ+) → IsFree (i := i⊗^[n])) = σ₁
     --Repeat the Lemma7 improvement process to drive the gap down
     let σₖ : ℕ → (n : ℕ+) → IsFree (i := i⊗^[n]) := fun k ↦
       (Lemma7_improver ρ hε hε')^[k] σ₁

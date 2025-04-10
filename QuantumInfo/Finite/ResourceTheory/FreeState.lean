@@ -93,7 +93,7 @@ class FreeStateTheory (ι : Type*) extends ResourcePretheory ι where
   /-- The set of free states is closed under tensor product -/
   free_prod {ρ₁ : MState (H i)} {ρ₂ : MState (H j)} (h₁ : IsFree ρ₁) (h₂ : IsFree ρ₂) : IsFree (ρ₁ ⊗ᵣ ρ₂)
   /-- The set F(H) of free states contains a full-rank state `ρfull`, equivalently `ρfull` is positive definite. -/
-  free_fullRank (i : ι) : open ComplexOrder in ∃ (ρ : MState (H i)), 0 < ρ.M ∧ IsFree ρ
+  free_fullRank (i : ι) : open ComplexOrder in ∃ (ρ : MState (H i)), ρ.m.PosDef ∧ IsFree ρ
 
 open ResourcePretheory
 open FreeStateTheory
@@ -104,8 +104,8 @@ open NNReal
 
 variable {ι : Type*} [FreeStateTheory ι] {i : ι}
 
-instance FreeStateTheory.IsFre_Nonempty : Nonempty (IsFree (i := i)) :=
-  (free_fullRank i).recOn (fun w h ↦ ⟨w, h.2⟩)
+noncomputable instance FreeStateTheory.IsFree_Inhabited : Inhabited (IsFree (i := i)) :=
+  ⟨⟨(free_fullRank i).choose, (free_fullRank i).choose_spec.right⟩⟩
 
 noncomputable def RelativeEntResource : MState (H i) → ℝ≥0 :=
     fun ρ ↦ (⨅ σ ∈ IsFree, 𝐃(ρ‖σ)).toNNReal
@@ -119,7 +119,7 @@ noncomputable def RelativeEntResource : MState (H i) → ℝ≥0 :=
   --   · exact h.2
   --   · refine ne_of_apply_ne ENNReal.toEReal (qRelativeEnt_ker (ρ := ρ) (?_) ▸ EReal.coe_ne_top _)
   --     convert @bot_le _ _ (Submodule.instOrderBot) _
-  --     --Want the missing fact that 0 < w implies w.ker = ⊥
+  --     --Want the missing fact that w.PosDef implies w.ker = ⊥
   --     sorry
   -- )
 
