@@ -55,7 +55,7 @@ ensembles that mixes into it. -/
 def mix (e : MEnsemble d α) : MState d := Distribution.expect_val e
 
 @[simp]
-theorem mix_of (e : MEnsemble d α) : (mix e).m = ∑ i, Prob.toReal (e.distr i) • (e.states i).m := by
+theorem mix_of (e : MEnsemble d α) : (mix e).m = ∑ i, (e.distr i : ℝ) • (e.states i).m := by
   rfl
 
 /-- Two mixed-state ensembles indexed by `\alpha` and `\beta` are equivalent if `α ≃ β`. -/
@@ -119,9 +119,9 @@ theorem mix_pEnsemble_pure_average {ψ : Ket d} {e : PEnsemble d α} {T : Type _
   apply Mixable.to_U_inj
   rw [PEnsemble.states] at hpure
   simp only [Mixable.to_U_of_mkT, Function.comp_apply, smul_eq_mul, Mixable.mkT_instUniv]
-  have h1 : ∀ i ∈ Finset.univ, (Prob.toReal (e.distr i)) • (Mixable.to_U (f (e.var i))) ≠ 0 → e.var i = ψ := fun i hi ↦ by
-    have h2 : e.distr i = 0 → (Prob.toReal (e.distr i)) • (Mixable.to_U (f (e.var i))) = 0 := fun h0 ↦ by
-      simp only [h0, Prob.toReal_zero, zero_smul]
+  have h1 : ∀ i ∈ Finset.univ, (e.distr i : ℝ) • (Mixable.to_U (f (e.var i))) ≠ 0 → e.var i = ψ := fun i hi ↦ by
+    have h2 : e.distr i = 0 → (e.distr i : ℝ) • (Mixable.to_U (f (e.var i))) = 0 := fun h0 ↦ by
+      simp only [h0, Prob.coe_zero, zero_smul]
     exact (hpure i) ∘ h2.mt
   rw [←Finset.sum_filter_of_ne h1, Finset.sum_filter]
   conv =>
@@ -134,8 +134,8 @@ theorem mix_pEnsemble_pure_average {ψ : Ket d} {e : PEnsemble d α} {T : Type _
     rw [dite_eq_ite]
     rw [←ite_zero_smul]
   have hpure' : ∀ i ∈ Finset.univ, (↑(e.distr i) : ℝ) ≠ 0 → e.var i = ψ := fun i hi hne0 ↦ by
-    rw [←Prob.val_zero, ←Prob.toReal, Prob.ne_iff] at hne0
-    exact hpure i hne0
+    apply hpure i
+    simpa using hne0
   rw [←Finset.sum_smul, ←Finset.sum_filter, Finset.sum_filter_of_ne hpure', Distribution.normalized, one_smul]
 
 /-- A mixed-state ensemble mixes into a pure state if and only if
@@ -152,9 +152,9 @@ theorem mix_mEnsemble_pure_average {ψ : Ket d} {e : MEnsemble d α} {T : Type _
   apply Mixable.to_U_inj
   rw [MEnsemble.states] at hpure
   simp only [Mixable.to_U_of_mkT, Function.comp_apply, smul_eq_mul, Mixable.mkT_instUniv]
-  have h1 : ∀ i ∈ Finset.univ, (Prob.toReal (e.distr i)) • (Mixable.to_U (f (e.var i))) ≠ 0 → e.var i = pure ψ := fun i hi ↦ by
-    have h2 : e.distr i = 0 → (Prob.toReal (e.distr i)) • (Mixable.to_U (f (e.var i))) = 0 := fun h0 ↦ by
-      simp only [h0, Prob.toReal_zero, zero_smul]
+  have h1 : ∀ i ∈ Finset.univ, (e.distr i : ℝ) • (Mixable.to_U (f (e.var i))) ≠ 0 → e.var i = pure ψ := fun i hi ↦ by
+    have h2 : e.distr i = 0 → (e.distr i : ℝ) • (Mixable.to_U (f (e.var i))) = 0 := fun h0 ↦ by
+      simp only [h0, Prob.coe_zero, zero_smul]
     exact (hpure i) ∘ h2.mt
   rw [←Finset.sum_filter_of_ne h1, Finset.sum_filter]
   conv =>
@@ -167,8 +167,8 @@ theorem mix_mEnsemble_pure_average {ψ : Ket d} {e : MEnsemble d α} {T : Type _
     rw [dite_eq_ite]
     rw [←ite_zero_smul]
   have hpure' : ∀ i ∈ Finset.univ, (↑(e.distr i) : ℝ) ≠ 0 → e.var i = pure ψ := fun i hi hne0 ↦ by
-    rw [←Prob.val_zero, ←Prob.toReal, Prob.ne_iff] at hne0
-    exact hpure i hne0
+    apply hpure i
+    simpa using hne0
   rw [←Finset.sum_smul, ←Finset.sum_filter, Finset.sum_filter_of_ne hpure', Distribution.normalized, one_smul]
 
 /-- The trivial mixed-state ensemble of `ρ` consists of copies of `rho`, with the `i`-th one having
@@ -179,7 +179,7 @@ def trivial_mEnsemble (ρ : MState d) (i : α) : MEnsemble d α := ⟨fun _ ↦ 
 theorem trivial_mEnsemble_mix (ρ : MState d) : ∀ i : α, mix (trivial_mEnsemble ρ i) = ρ := fun i ↦by
   apply MState.ext_m
   simp only [trivial_mEnsemble, Distribution.constant, mix_of, DFunLike.coe, apply_ite,
-    Prob.toReal_one, Prob.toReal_zero, ite_smul, one_smul, zero_smul, Finset.sum_ite_eq,
+    Prob.coe_one, Prob.coe_zero, ite_smul, one_smul, zero_smul, Finset.sum_ite_eq,
     Finset.mem_univ, ↓reduceIte]
 
 /-- The average of `f : MState d → T` on a trivial ensemble of `ρ` is `f ρ`-/
@@ -187,9 +187,7 @@ theorem trivial_mEnsemble_average {T : Type _} {U : Type*} [AddCommGroup U] [Mod
   ∀ i : α, average f (trivial_mEnsemble ρ i) = f ρ := fun i ↦ by
     simp only [average, Functor.map, Distribution.expect_val, trivial_mEnsemble]
     apply Mixable.to_U_inj
-    simp only [Distribution.constant_eq, Function.comp_apply, Mixable.to_U_of_mkT, apply_ite,
-      Prob.toReal_one, Prob.toReal_zero, ite_smul, one_smul, zero_smul, Finset.sum_ite_eq,
-      Finset.mem_univ, ↓reduceIte]
+    simp [apply_ite]
 
 instance MEnsemble.instInhabited [Nonempty d] [Inhabited α] : Inhabited (MEnsemble d α) where
   default := trivial_mEnsemble default default
@@ -202,7 +200,7 @@ def trivial_pEnsemble (ψ : Ket d) (i : α) : PEnsemble d α := ⟨fun _ ↦ ψ,
 theorem trivial_pEnsemble_mix (ψ : Ket d) : ∀ i : α, mix (toMEnsemble (trivial_pEnsemble ψ i)) = MState.pure ψ := fun i ↦ by
   apply MState.ext_m
   simp only [trivial_pEnsemble, Distribution.constant, toMEnsemble_mk, mix_of, DFunLike.coe,
-    apply_ite, Prob.toReal_one, Prob.toReal_zero, MEnsemble.states, Function.comp_apply, ite_smul,
+    apply_ite, Prob.coe_one, Prob.coe_zero, MEnsemble.states, Function.comp_apply, ite_smul,
     one_smul, zero_smul, Finset.sum_ite_eq, Finset.mem_univ, ↓reduceIte]
 
 /-- The average of `f : Ket d → T` on a trivial ensemble of `ψ` is `f ψ`-/
@@ -210,9 +208,7 @@ theorem trivial_pEnsemble_average {T : Type _} {U : Type*} [AddCommGroup U] [Mod
   ∀ i : α, pure_average f (trivial_pEnsemble ψ i) = f ψ := fun i ↦ by
     simp only [pure_average, Functor.map, Distribution.expect_val, trivial_pEnsemble]
     apply Mixable.to_U_inj
-    simp only [Distribution.constant_eq, Function.comp_apply, Mixable.to_U_of_mkT, apply_ite,
-      Prob.toReal_one, Prob.toReal_zero, ite_smul, one_smul, zero_smul, Finset.sum_ite_eq,
-      Finset.mem_univ, ↓reduceIte]
+    simp [apply_ite]
 
 instance PEnsemble.instInhabited [Nonempty d] [Inhabited α] : Inhabited (PEnsemble d α) where
   default := trivial_pEnsemble default default

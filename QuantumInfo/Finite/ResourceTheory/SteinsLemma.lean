@@ -7,6 +7,7 @@ open ComplexOrder
 open Topology
 
 namespace SteinsLemma
+open scoped Prob
 
 section hypotesting
 
@@ -31,35 +32,6 @@ theorem OptimalHypothesisRate_singleton {ρ σ : MState d} {ε : ℝ}  :
   := by
   simp only [OptimalHypothesisRate, iSup_singleton]
 
--- TODO: Pull this definition out into another file? Maybe?
-/-- Map a probability [0,1] to [0,+∞] with -log p. Special case that 0 maps to +∞ (not 0, as Real.log
-does). This makes it `Antitone`.
--/
-noncomputable def _root_.Prob.negLog : Prob → ENNReal :=
-  fun p ↦ if p = 0 then ⊤ else .ofNNReal ⟨-Real.log p,
-    Left.nonneg_neg_iff.mpr (Real.log_nonpos p.2.1 p.2.2)⟩
-
---TODO: simp lemmas for Prob.negLog when e.g. 0 < p. Obviously one for when p = 0.
---For now can just do `simp [Prob.negLog, hp]`.
-
-theorem _root_.Prob.negLog_Antitone : Antitone Prob.negLog := by
-  intro x y h
-  dsimp [Prob.negLog]
-  split_ifs with h₁ h₂ h₂
-  · rfl
-  · subst y
-    exfalso
-    change x.1 ≤ 0 at h
-    have : ¬(x.1 = 0) := unitInterval.coe_ne_zero.mpr (by assumption)
-    have : 0 ≤ x.1 := Prob.zero_le
-    linarith +splitNe
-  · exact OrderTop.le_top _
-  · rw [ENNReal.coe_le_coe, ← NNReal.coe_le_coe, coe_mk, coe_mk, neg_le_neg_iff]
-    apply (Real.log_le_log_iff _ _).mpr h
-    <;> exact lt_of_le_of_ne (Prob.zero_le) (unitInterval.coe_ne_zero.mpr (by assumption)).symm
-
-scoped notation "—log " => Prob.negLog
-
 theorem negLog_OptimalHypothesisRate_le_singleton (ρ : MState d) (ε : ℝ) (S : Set (MState d))
     (σ : MState d) (h : σ ∈ S) :
     —log β_ ε(ρ‖S) ≤ —log β_ ε(ρ‖{σ}) := by
@@ -67,9 +39,90 @@ theorem negLog_OptimalHypothesisRate_le_singleton (ρ : MState d) (ε : ℝ) (S 
   apply OptimalHypothesisRate_le_of_subset
   exact Set.singleton_subset_iff.mpr h
 
-private theorem Lemma3 (ρ : MState d) (ε : ℝ) (S : Set (MState d)) :
+/-- The minimax theorem, at the level of generality we need. Convex, compact sets,
+ and a bilinear function on ℝ. -/
+theorem minimax {M : Type*} [AddCommMonoid M] [Module ℝ M] [TopologicalSpace M]
+    (f : LinearMap.BilinForm ℝ M) (S : Set M) (T : Set M)
+    (hS₁ : IsCompact S) (hT₁ : IsCompact T) (hS₂ : Convex ℝ S) (hT₂ : Convex ℝ T)
+    :
+    ⨆ x ∈ S, ⨅ y ∈ T, f x y =  ⨅ y ∈ T, ⨆ x ∈ S, f x y := by
+  sorry
+
+private theorem Lemma3 {ρ : MState d} {ε : ℝ} {S : Set (MState d)} (hS₁ : IsCompact S) (hS₂ : Convex ℝ (MState.M '' S)) :
     ⨆ σ ∈ S, β_ ε(ρ‖{σ}) = β_ ε(ρ‖S) := by
   --Needs the minimax theorem.
+  simp only [OptimalHypothesisRate, Set.mem_singleton_iff, iSup_iSup_eq_left]
+  have hmm := minimax (M := HermitianMat d ℂ)
+  --This will be the `MState.exp_val` function, but bundled as a bilinear form.
+  let f : LinearMap.BilinForm ℝ (HermitianMat d ℂ) := {
+      toFun ρ := {
+        toFun σ := ρ.inner σ
+        map_add' := sorry
+        map_smul' := sorry
+      }
+      map_add' := sorry
+      map_smul' := sorry
+    }
+  let S' : Set (HermitianMat d ℂ) := MState.M '' S
+  let T' : Set (HermitianMat d ℂ) := { m | MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 }
+  replace hS₁ : IsCompact S' := by
+    dsimp [S']
+    sorry
+  have hT₁ : IsCompact T' := by
+    sorry
+  have hT₂ : Convex ℝ T' := by
+    --We *could* get this from a more general fact that any linear subspace is convex,
+    --and the intersection of convex spaces is convex, and this is an intersection of
+    --three convex spaces.
+    dsimp [T']
+    rintro x ⟨hx₁, hx₂, hx₃⟩ y ⟨hy₁, hy₂, hy₃⟩ a b ha hb hab
+    refine And.intro ?_ (And.intro ?_ ?_)
+    · sorry
+    · sorry
+    · sorry
+  specialize hmm f S' T' hS₁ hT₁ hS₂ hT₂
+  ext
+  -- change Subtype.val _ = Subtype.val _
+  rw [← iSup_subtype'']
+  have hnS : Nonempty S := by
+    --Do we need a hypothesis for this?
+    sorry
+
+  --This is a terrible mess of unification
+  have h_inst :
+    let _ : Fact (0 ≤ (1 : ℝ)) := ⟨zero_le_one⟩;
+    @CompleteSemilatticeSup.toSupSet Prob CompleteLattice.toCompleteSemilatticeSup
+    =
+    @ConditionallyCompleteLattice.toSupSet (↑(Set.Icc 0 1)) (
+      @CompleteLattice.toConditionallyCompleteLattice _ Set.Icc.completeLattice)
+     := by
+    --This is terrible. We get two slightly different lattices, that turn out equal
+    simp [CompleteLattice.toConditionallyCompleteLattice,
+      CompleteLattice.toCompleteSemilatticeSup]
+    congr
+    simp [CompletelyDistribLattice.toCompleteLattice, CompleteLinearOrder.toCompletelyDistribLattice,
+      Prob.instCompleteLinearOrder, Set.Icc.completeLattice]
+    congr
+    · ext s
+      split_ifs with hs
+      . simp [hs]
+      · simp [hs]
+        rfl
+    · ext s
+      split_ifs with hs₁ hs₂ hs₂
+      · simp [hs₂] at hs₁
+      · simp [hs₁, hs₂]
+        rfl
+      · rfl
+      · push_neg at hs₁
+        simp [hs₁] at hs₂
+  -- let f'' : ↑S → Prob := fun i
+  --   ↦ ⨅ (T : { m // MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 }), ⟨MState.exp_val (Subtype.val T) (Subtype.val i),
+  --     OptimalHypothesisRate.proof_1 ρ ε T (Subtype.val i)⟩
+  -- have h_sub := @Set.Icc.coe_iSup (ι := S) (α := ℝ) (a := 0) (b := 1) _ (zero_le_one) _ (S := f'')
+  -- dsimp [f''] at h_sub
+  convert Eq.trans (Set.Icc.coe_iSup (ι := S) (zero_le_one (α := ℝ))) ?_
+  --No, this is stupid, there has to be a better way
   sorry
 
 /- This is from "Strong converse exponents for a quantum channel discrimination problem and
@@ -122,12 +175,12 @@ private theorem Ref81Lem5 (ρ σ : MState d) (ε α : ℝ) (hε : 0 ≤ ε ∧ �
   -- The "monotonicity of the ..." part here refers to the data processing inequality, and
   -- the (p, 1-p) and (q,1-q) refer to states which are qubits ("coins") of probability p and
   -- q, respectively. The states ρ and σ can be "processed" into these coins by measuring the optimal T.
-  let p : Prob := .one_minus ⟨ε, ⟨hε₀.le, hε₁.le⟩⟩
+  let p : Prob := 1 - ⟨ε, ⟨hε₀.le, hε₁.le⟩⟩
   set q : Prob := β_ ε(ρ‖{σ})
   let p2 : MState (Fin 2) := .ofClassical <| .coin p
   let q2 : MState (Fin 2) := .ofClassical <| .coin q
 
-  have hp : 0 < p := show 0 < 1 - ε by linarith
+  have hp : 0 < p := show (0 : ℝ) < p by simp [p, hε₁]
 
   --Show there's a lower bound on β_ε, that you can't do perfect discrimination
   --It's possible that we actually don't want this here, that it should "follow"
@@ -159,7 +212,6 @@ private theorem Ref81Lem5 (ρ σ : MState d) (ε α : ℝ) (hε : 0 ≤ ε ∧ �
     linarith
 
   --Turn the ENNReal problem into a Real problem
-  simp only [Prob.toReal_mk]
   have hα₂ : Subtype.mk _ pf3 ≠ 0 := by
     change ¬(_ = Subtype.mk 0 _)
     simp only [mk_zero, Nonneg.mk_eq_zero]
@@ -188,9 +240,9 @@ private theorem Ref81Lem5 (ρ σ : MState d) (ε α : ℝ) (hε : 0 ≤ ε ∧ �
     rotate_left
     · exact (Real.rpow_pos_of_pos hp _).ne'
     · exact (Real.rpow_pos_of_pos hq _).ne'
-    simp only [p, Prob.coe_one_minus, Prob.toReal_mk]
+    simp only [p, Prob.coe_one_minus]
     rw [Real.log_rpow (by linarith), mul_comm α, add_sub_cancel_left]
-    rw [Real.log_rpow (x := q.toReal) hq]
+    rw [Real.log_rpow (x := q.val) hq]
     rw [mul_comm, ← mul_div, mul_comm, show (1 - α) = -(α - 1) by abel]
     simp [-neg_sub, neg_div, div_self (a := α - 1) (by linarith)]
   · rw [div_le_div_iff_of_pos_right (by linarith), tsub_le_iff_right, sub_add_cancel]
@@ -531,6 +583,8 @@ theorem proj_le_inner_le : {A ≤ₚ B}.inner A ≤ {A ≤ₚ B}.inner B := by
 
 end proj
 
+-- This is not exactly how R_{1, ε} is defined in Eq. (17), but it should be equal due to
+-- the monotonicity of log and Lemma 3.
 private noncomputable def R1 (ρ : MState (H i)) (ε : ℝ) : ENNReal :=
   Filter.liminf (fun n ↦ —log β_ ε(ρ⊗^[n]‖IsFree) / n) Filter.atTop
 
@@ -539,13 +593,11 @@ private noncomputable def R2 (ρ : MState (H i)) : ((n : ℕ+) → IsFree (i := 
 
 /-- Lemma 7 from the paper -/
 private theorem Lemma7 (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) (σ : (n : ℕ+) → IsFree (i := i⊗^[n])) :
-  -- This is not exactly how R_{1, ε} is defined in Eq. (17), but it should be equal due to
-  -- the monotonicity of log and Lemma 3.
-  (R2 ρ σ ≥ R1 ρ ε) →
-  ∀ ε' : ℝ, (hε' : 0 < ε' ∧ ε' < ε) → -- ε' is written as \tilde{ε} in the paper.
-  ∃ σ' : (n : ℕ+) → IsFree (i := i⊗^[n]),
-  R2 ρ σ' - R1 ρ ε ≤ .ofNNReal (⟨1 - ε', by linarith⟩) * (R2 ρ σ - R1 ρ ε)
-  := by
+    (R2 ρ σ ≥ R1 ρ ε) →
+    ∀ ε' : ℝ, (hε' : 0 < ε' ∧ ε' < ε) → -- ε' is written as \tilde{ε} in the paper.
+    ∃ σ' : (n : ℕ+) → IsFree (i := i⊗^[n]),
+    R2 ρ σ' - R1 ρ ε ≤ .ofNNReal (⟨1 - ε', by linarith⟩) * (R2 ρ σ - R1 ρ ε)
+    := by
   sorry
 
 /-- Lemma 7 gives us a way to repeatedly "improve" a sequence σ to one with a smaller gap between R2 and R1.
@@ -598,7 +650,7 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0
     ) .atTop (𝓝 (RegularizedRelativeEntResource ρ)) := by
   conv =>
     enter [1, n, 2, 1]
-    rw [← Lemma3]
+    rw [← Lemma3 IsCompact_IsFree free_convex]
   rw [RegularizedRelativeEntResource]
   simp only
   generalize_proofs pf1 pf2 pf3
@@ -611,19 +663,10 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0
     have σₘ_exists (m : ℕ+) := IsCompact.exists_isMinOn
       (α := ENNReal)
       (s := IsFree (i := i⊗^[m]))
-      (hs := by
-        --The set of free states is compact because it's a closed subset of a compact space.
-        --TODO pull out to own theorem
-        apply IsCompact.of_isClosed_subset ?_ free_closed (Set.subset_univ _)
-        sorry
-      )
+      (hs := IsCompact_IsFree)
       (ne_s := Set.Nonempty.of_subtype)
       (f := fun σ ↦ 𝐃(ρ⊗^[m]‖σ))
-      (hf := by
-        --Relative entropy is continuous (in each argument, actually, but we only need in the latter here).
-        --Will need the fact that all the cfc / eigenvalue stuff is continuous, which is going to make this
-        --a pain.
-        sorry
+      (hf := by fun_prop
       )
 
     have hσₘ1 := fun m ↦ (σₘ_exists m).choose_spec.left
@@ -663,12 +706,13 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0
 
     apply le_of_tendsto_of_tendsto' tendsto_const_nhds hv_lem5
     convert h using 6
-    · apply Lemma3
+    · apply Lemma3 IsCompact_IsFree free_convex
     · symm
       apply ciInf_subtype''
       · exact Set.Nonempty.of_subtype
       · exact OrderBot.bddBelow _
       · simp
+
   · --the other direction, the "key part" of the "opposite inequality"
     set R₁ε := Filter.liminf (fun n => —log (⨆ σ ∈ IsFree, β_ ε(ρ⊗^[n]‖{σ})) / ↑↑n) Filter.atTop
     --We need to pick an ε' (a \tilde{ε} in the paper). The only constraint(?) is that it's strictly
@@ -683,4 +727,9 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0
     --Repeat the Lemma7 improvement process to drive the gap down
     let σₖ : ℕ → (n : ℕ+) → IsFree (i := i⊗^[n]) := fun k ↦
       (Lemma7_improver ρ hε hε')^[k] σ₁
+
+    --Should be: the gap between R_{1,ε} and R2 for `σₖ k` goes to 0 as `k → ∞`.
+    have hσₖ_gap : False := by
+      sorry
+
     sorry

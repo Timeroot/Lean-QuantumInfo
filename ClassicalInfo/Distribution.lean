@@ -24,7 +24,7 @@ on their own, cannot.) But the FunLike instance gives `Prob` out, which carry th
 information that they are all in the range [0,1].
 -/
 def Distribution (α : Type u) [Fintype α] : Type u :=
-  { f : α → Prob // Finset.sum Finset.univ (fun i ↦ (f i).toReal) = 1 }
+  { f : α → Prob // Finset.sum Finset.univ (fun i ↦ (f i : ℝ)) = 1 }
 
 namespace Distribution
 
@@ -46,7 +46,7 @@ instance instFunLikeProb : FunLike (Distribution α) α Prob where
       simpa only [Subtype.mk.injEq, coe_inj] using congrFun h v
 
 @[simp]
-theorem normalized (d : Distribution α) : Finset.sum Finset.univ (fun i ↦ (d i).toReal) = 1 :=
+theorem normalized (d : Distribution α) : Finset.sum Finset.univ (fun i ↦ (d i : ℝ)) = 1 :=
   d.2
 
 abbrev prob (d : Distribution α) := (d : α → Prob)
@@ -96,12 +96,12 @@ theorem constant_of_exists_one {D : Distribution α} {x : α} (h : D x = 1) : D 
   ext y
   by_cases h₂ : x = y
   · simp [h, ← h₂]
-  · simp only [constant_eq, h₂, ↓reduceIte, Prob.toReal_zero]
+  · simp only [constant_eq, h₂, ↓reduceIte, Prob.coe_zero]
     by_contra h₃
     replace h₃ : 0 < (D y : ℝ) := by
       linarith (config := {splitNe := true}) only [h₃, @Prob.zero_le_coe (D y)]
     have := D.normalized
-    rw [← Finset.add_sum_erase _ _ (Finset.mem_univ x), h, Prob.toReal_one] at this
+    rw [← Finset.add_sum_erase _ _ (Finset.mem_univ x), h, Prob.coe_one] at this
     rw [← Finset.add_sum_erase _ _ (a := y) (by simpa using (Ne.symm h₂))] at this
     have : 0 ≤ ∑ x ∈ Finset.erase (Finset.erase Finset.univ x) y, (D x : ℝ) :=
       Finset.sum_nonneg' (fun _ ↦ Prob.zero_le_coe)
@@ -185,15 +185,24 @@ theorem congr_symm_apply (σ : α ≃ β) : (Distribution.congr σ).symm = Distr
 
 /-- The distribution on Fin 2 corresponding to a coin with probability p. Chance p of 1, 1-p of 0. -/
 def coin (p : Prob) : Distribution (Fin 2) :=
-  ⟨(if · = 0 then p else p.one_minus), by simp⟩
+  ⟨(if · = 0 then p else 1 - p), by simp⟩
 
 @[simp]
 theorem coin_val_zero (p : Prob) : coin p 0 = p := by
   simp [coin]
 
 @[simp]
-theorem coin_val_one (p : Prob) : coin p 1 = p.one_minus := by
+theorem coin_val_one (p : Prob) : coin p 1 = 1 - p := by
   simp [coin]
+
+/-- Every distribution on two variable is some coin. -/
+theorem fin_two_eq_coin (d : Distribution (Fin 2)) : d = coin (d 0) := by
+  ext i
+  fin_cases i
+  · simp [coin]
+  · simpa only [coin, Fin.mk_one, funlike_apply, one_ne_zero, ↓reduceIte,
+    Prob.coe_one_minus, Subtype.eq_iff, Prob.coe_one_minus, eq_sub_iff_add_eq, add_comm,
+        fun_eq_val, Fin.sum_univ_two] using d.property
 
 section randvar
 
@@ -218,10 +227,10 @@ variable {T U : Type*} [AddCommGroup U] [Module ℝ U] [inst : Mixable U T]
 it is the "convex combination over a finite family" on the type `T`, afforded by the `Mixable` instance,
 with the probability distribution of `X` as weights. -/
 def expect_val (X : RandVar α T) : T := by
-  let u : U := ∑ i ∈ Finset.univ, (Prob.toReal (X.distr i)) • (inst.to_U (X.var i))
+  let u : U := ∑ i ∈ Finset.univ, (X.distr i : ℝ) • (inst.to_U (X.var i))
   have ht : ∃ t : T, inst.to_U t = u := by
-    have h₀ : ∀ i ∈ Finset.univ, 0 ≤ Prob.toReal (X.distr i) := by simp only [Finset.mem_univ, Prob.zero_le_coe, implies_true]
-    have h₁ : ∑ i ∈ Finset.univ, Prob.toReal (X.distr i) = 1 := by simp only [normalized]
+    have h₀ : ∀ i ∈ Finset.univ, 0 ≤ ↑(X.distr i) := by simp only [Prob.zero_le, imp_self, implies_true]
+    have h₁ : ∑ i ∈ Finset.univ, (X.distr i : ℝ) = 1 := by simp only [normalized]
     have hz : ∀ i ∈ Finset.univ, inst.to_U (X.var i) ∈ Set.range inst.to_U := by simp only [Finset.mem_univ, implies_true, Set.mem_range_self]
     have hu : u ∈ Set.range inst.to_U := Convex.sum_mem inst.convex h₀ h₁ hz
     exact Set.mem_range.mp hu
@@ -233,21 +242,22 @@ theorem expect_val_eq_mixable_mix (d : Distribution (Fin 2)) (x₁ x₂ : T) : e
   apply Mixable.to_U_inj
   simp only [Mixable.mix, expect_val, constant, DFunLike.coe, Mixable.to_U_of_mkT]
   calc
-    ∑ i : Fin (Nat.succ 0).succ, Prob.toReal (d i) • Mixable.to_U (![x₁, x₂] i) = ∑ i ∈ Finset.range 2, Prob.toReal (d i) • Mixable.to_U (![x₁, x₂] i) := by
+    ∑ i : Fin (Nat.succ 0).succ, (d i : ℝ) • Mixable.to_U (![x₁, x₂] i) = ∑ i ∈ Finset.range 2, (d i : ℝ) • Mixable.to_U (![x₁, x₂] i) := by
       simpa [Finset.range_succ] using add_comm _ _
-    _ = ∑ i ∈ Finset.range 1, Prob.toReal (d i) • Mixable.to_U (![x₁, x₂] i) + Prob.toReal (d 1) • Mixable.to_U (![x₁, x₂] 1) :=
-      Finset.sum_range_succ (fun i => Prob.toReal (d i) • Mixable.to_U (![x₁, x₂] i)) 1
-    _ = Prob.toReal (d 0) • Mixable.to_U (![x₁, x₂] 0) + Prob.toReal (d 1) • Mixable.to_U (![x₁, x₂] 1) := by
-      simp [Finset.sum_range_one (fun i => Prob.toReal (d i) • Mixable.to_U (![x₁, x₂] i))]
-    _ = Prob.toReal (d 0) • Mixable.to_U x₁ + Prob.toReal (d 0).one_minus • Mixable.to_U x₂ := by
+    _ = ∑ i ∈ Finset.range 1, (d i : ℝ) • Mixable.to_U (![x₁, x₂] i) + (d 1 : ℝ) • Mixable.to_U (![x₁, x₂] 1) :=
+      Finset.sum_range_succ (fun i => (d i : ℝ) • Mixable.to_U (![x₁, x₂] i)) 1
+    _ = (d 0 : ℝ) • Mixable.to_U (![x₁, x₂] 0) + (d 1 : ℝ) • Mixable.to_U (![x₁, x₂] 1) := by
+      simp [Finset.sum_range_one (fun i => (d i : ℝ) • Mixable.to_U (![x₁, x₂] i))]
+    _ = (d 0 : ℝ) • Mixable.to_U x₁ + (1 - d 0).val • Mixable.to_U x₂ := by
       congr
-      simpa only [Subtype.eq_iff, fun_eq_val, Fin.sum_univ_two, ← eq_sub_iff_add_eq'] using d.property
+      simpa only [Subtype.eq_iff, Prob.coe_one_minus, eq_sub_iff_add_eq, add_comm,
+        fun_eq_val, Fin.sum_univ_two] using d.property
 
 /-- The expectation value of a random variable with constant probability distribution `constant x` is its value at `x` -/
 theorem expect_val_constant (x : α) (f : α → T) : expect_val ⟨f, (constant x)⟩ = f x := by
   apply Mixable.to_U_inj
-  simp only [expect_val, constant, DFunLike.coe, Mixable.to_U_of_mkT, apply_ite, Prob.toReal_one,
-    Prob.toReal_zero, ite_smul, one_smul, zero_smul, Finset.sum_ite_eq, Finset.mem_univ, ↓reduceIte]
+  simp only [expect_val, constant, DFunLike.coe, Mixable.to_U_of_mkT, apply_ite, Prob.coe_one,
+    Prob.coe_zero, ite_smul, one_smul, zero_smul, Finset.sum_ite_eq, Finset.mem_univ, ↓reduceIte]
 
 /-- The expectation value of a nonnegative real random variable is also nonnegative -/
 theorem zero_le_expect_val (d : Distribution α) (f : α → ℝ) (hpos : 0 ≤ f) : 0 ≤ expect_val ⟨f, d⟩ := by
@@ -285,7 +295,7 @@ theorem expect_val_congr_eq_expect_val (σ : α ≃ β) (X : RandVar α T) : exp
   apply Mixable.to_U_inj
   simp only [expect_val, congrRandVar, Equiv.coe_fn_mk, Function.comp_apply, Mixable.to_U_of_mkT,
     congr_apply]
-  rw [Equiv.sum_comp σ.symm (fun i : α ↦ Prob.toReal ↑(X.distr i) • Mixable.to_U (X.var i))]
+  rw [Equiv.sum_comp σ.symm (fun i : α ↦ (X.distr i : ℝ) • Mixable.to_U (X.var i))]
 
 end randvar
 

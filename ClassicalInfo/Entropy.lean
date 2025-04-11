@@ -57,8 +57,8 @@ theorem H₁_le_exp_m1 (p : Prob) : H₁ p ≤ Real.exp (-1) := by
 
 theorem H₁_concave : ∀ (x y : Prob), ∀ (p : Prob), p.mix (H₁ x) (H₁ y) ≤ H₁ (p.mix x y) := by
   intros x y p
-  simp only [Prob.mix, Prob.val_eq_coe, H₁, smul_eq_mul, Prob.coe_one_minus, Mixable.mix, Mixable.mix_ab, Mixable.mkT_instUniv,
-    Prob.toReal_mk, Prob.mkT_mixable, Prob.to_U_mixable, Mixable.to_U_instUniv, Prob.to_U_mixable]
+  simp only [Prob.mix, H₁, smul_eq_mul, Prob.coe_one_minus, Mixable.mix, Mixable.mix_ab, Mixable.mkT_instUniv,
+    Prob.mkT_mixable, Prob.to_U_mixable, Mixable.to_U_instUniv, Prob.to_U_mixable]
   by_cases hxy : x = y
   · subst hxy
     ring_nf

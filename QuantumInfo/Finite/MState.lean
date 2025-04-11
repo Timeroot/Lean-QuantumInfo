@@ -291,7 +291,8 @@ theorem pure_of_constant_spectrum (ρ : MState d) (h : ∃ i, ρ.spectrum = Dist
     rw [Subtype.mk.injEq] at h'
     have h'x := congr_fun h' x
     rw [if_congr (Eq.comm) (Eq.refl 1) (Eq.refl 0)]
-    rw [Prob.eq_iff, Prob.toReal_mk] at h'x
+    rw [Prob.eq_iff] at h'x
+    dsimp at h'x
     rw [h'x]
     split_ifs
     case pos => rfl
@@ -450,7 +451,7 @@ theorem IsSeparable_prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : IsSeparab
   let only := (ρ₁, ρ₂)
   use { only }, Distribution.constant ⟨only, Finset.mem_singleton_self only⟩
   simp only [prod, Finset.univ_unique, Unique.eq_default, Distribution.constant_eq, ite_true,
-    Prob.toReal_one, Finset.default_singleton, one_smul, Finset.sum_const, Finset.card_singleton,
+    Prob.coe_one, Finset.default_singleton, one_smul, Finset.sum_const, Finset.card_singleton,
     only, MState.m]
 
 /-- A pure state is separable iff the ket is a product state. -/
@@ -608,6 +609,9 @@ theorem toMat_IsEmbedding : Topology.IsEmbedding (MState.m (d := d)) where
 
 instance instT5MState : T3Space (MState d) :=
   Topology.IsEmbedding.t3Space toMat_IsEmbedding
+
+instance instCompactSpace : CompactSpace (MState d) :=
+  sorry
 
 end topology
 

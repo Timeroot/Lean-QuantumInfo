@@ -1,6 +1,8 @@
-import Mathlib.Data.NNReal.Basic
 import Mathlib.Analysis.Convex.Mul
+import Mathlib.Analysis.SpecialFunctions.Log.Basic
+import Mathlib.Data.NNReal.Basic
 import Mathlib.Data.Real.EReal
+import Mathlib.Topology.UnitInterval
 
 /-! # Probabilities
 
@@ -23,6 +25,11 @@ def Prob := { p : ℝ // 0 ≤ p ∧ p ≤ 1 }
 
 namespace Prob
 
+instance : Coe Prob ℝ := ⟨Subtype.val⟩
+
+instance canLift : CanLift ℝ Prob Subtype.val fun r => 0 ≤ r ∧ r ≤ 1 :=
+  Subtype.canLift _
+
 instance instZero : Zero Prob :=
   ⟨0, by simp⟩
 
@@ -33,24 +40,24 @@ instance instMul : Mul Prob :=
   ⟨fun x y ↦ ⟨x.1 * y.1,
     ⟨mul_nonneg x.2.1 y.2.1, mul_le_one₀ x.2.2 y.2.1 y.2.2⟩⟩⟩
 
-@[simp]
-theorem val_zero : (0 : Prob).val = 0 :=
+@[simp, norm_cast]
+theorem coe_zero : (0 : Prob).val = 0 :=
   rfl
 
-@[simp]
-theorem val_one : (1 : Prob).val = 1 :=
+@[simp, norm_cast]
+theorem coe_one : (1 : Prob).val = 1 :=
   rfl
 
-@[simp]
-theorem val_mul (x y : Prob) : (x * y).val = x.val * y.val :=
+@[simp, norm_cast]
+theorem coe_mul (x y : Prob) : (x * y).val = x.val * y.val :=
   rfl
 
-@[simp]
-theorem val_inf (x y : Prob) : (x ⊓ y).val = x.val ⊓ y.val :=
+@[simp, norm_cast]
+theorem coe_inf (x y : Prob) : (x ⊓ y).val = x.val ⊓ y.val :=
   rfl
 
-@[simp]
-theorem val_sup (x y : Prob) : (x ⊔ y).val = x.val ⊔ y.val :=
+@[simp, norm_cast]
+theorem coe_sup (x y : Prob) : (x ⊔ y).val = x.val ⊔ y.val :=
   rfl
 
 instance instCommMonoidWithZero : CommMonoidWithZero Prob where
@@ -110,11 +117,6 @@ instance instCompleteLinearOrder : CompleteLinearOrder Prob where
 instance instInhabited : Inhabited Prob where
   default := 0
 
-/-- Coercion `Prob → ℝ`. -/
-@[coe] def toReal : Prob → ℝ := Subtype.val
-
-instance : Coe Prob ℝ := ⟨toReal⟩
-
 @[simp]
 theorem zero_le_coe {p : Prob} : 0 ≤ (p : ℝ) :=
   p.2.1
@@ -131,34 +133,15 @@ theorem zero_le {p : Prob} : 0 ≤ p :=
 theorem le_one {p : Prob} : p ≤ 1 :=
   coe_le_one
 
-@[simp]
-theorem val_eq_coe (n : Prob) : n.val = n :=
-  rfl
-
-instance canLift : CanLift ℝ Prob toReal fun r => 0 ≤ r ∧ r ≤ 1 :=
-  Subtype.canLift _
-
 @[ext] protected theorem eq {n m : Prob} : (n : ℝ) = (m : ℝ) → n = m :=
   Subtype.eq
 
 theorem ne_iff {x y : Prob} : (x : ℝ) ≠ (y : ℝ) ↔ x ≠ y :=
   not_congr <| Prob.eq_iff.symm
 
-@[simp]
-theorem toReal_mk : toReal { val := x, property := hx} = x :=
-  rfl
-
 @[simp, norm_cast]
-theorem toReal_zero : (0 : Prob) = (0 : ℝ) :=
-  rfl
-
-@[simp, norm_cast]
-theorem toReal_one : (1 : Prob) = (1 : ℝ) :=
-  rfl
-
-@[simp, norm_cast]
-theorem toReal_mul (x y : Prob) : (x * y : Prob) = (x : ℝ) * (y : ℝ) :=
-  rfl
+theorem toReal_mul (x y : Prob) : (x * y : Prob) = (x : ℝ) * (y : ℝ) := by
+  simp only [coe_mul]
 
 /-- Coercion `Prob → ℝ≥0`. -/
 @[coe] def toNNReal : Prob → ℝ≥0 :=
@@ -192,20 +175,27 @@ def NNReal.asProb (p : ℝ≥0) (hp : p ≤ 1) : Prob :=
 def NNReal.asProb' (p : ℝ≥0) (hp : p.1 ≤ 1) : Prob :=
   ⟨p, ⟨p.2, hp⟩⟩
 
-def one_minus (p : Prob) : Prob :=
-  ⟨1 - p.val,
-    ⟨by simp [p.2.2], by simp [p.2.1]⟩⟩
+/-- Subtract a probability from another. Truncates to zero, so this is often not great
+to work with, for the same reason that Nat subtraction is a pain. But, it lets you write
+`1 - p`, which is sufficiently useful on its own that this seems worth having. -/
+instance instSub : Sub Prob where
+  sub p q := ⟨(p - q) ⊔ (0 : ℝ), by
+    simpa using le_add_of_le_of_nonneg p.2.2 q.2.1
+  ⟩
 
-@[simp]
-theorem val_one_minus (p : Prob) : p.one_minus.val = 1-p.val :=
+theorem coe_sub (p q : Prob) : (p - q : Prob)  = (p.val - q.val) ⊔ (0 : ℝ) := by
   rfl
 
 @[simp, norm_cast]
-theorem coe_one_minus (p : Prob) : (p.one_minus : ℝ) = 1-(p : ℝ) :=
-  rfl
+theorem coe_one_minus (p : Prob) : (1 - p : Prob) = 1 - (p : ℝ) := by
+  simp [coe_sub]
+
+theorem add_one_minus (p : Prob) : p.val + (1 - p).val = 1 := by
+  simp
 
 @[simp]
-theorem add_one_minus (p : Prob) : p.val + p.one_minus.val = 1 := by
+theorem one_minus_inv (p : Prob) : 1 - (1 - p) = p := by
+  ext
   simp
 
 end Prob
@@ -249,7 +239,7 @@ def mix_ab [inst : Mixable U T] {a b : ℝ} (ha : 0 ≤ a) (hb : 0 ≤ b) (hab :
 /-- `Mixable.mix` represents the notion of "convex combination" on the type `T`, afforded by the `Mixable`
 instance. It takes a `Prob`, that is, a `Real` between 0 and 1. For working directly with a Real, use `mix_ab`. -/
 def mix [inst : Mixable U T] (p : Prob) (x₁ x₂ : T) : T :=
-  inst.mix_ab p.zero_le_coe p.one_minus.zero_le_coe p.add_one_minus x₁ x₂
+  inst.mix_ab p.zero_le_coe (1 - p).zero_le_coe p.add_one_minus x₁ x₂
 
 @[simp]
 theorem to_U_of_mkT [inst : Mixable U T] (u : U) {h} : inst.to_U (mkT (u := u) h).1 = u :=
@@ -339,7 +329,7 @@ namespace Prob
 
 /-- Probabilities `Prob` themselves are convex. -/
 instance instMixable : Mixable ℝ Prob where
-  to_U := Prob.toReal
+  to_U := Subtype.val
   to_U_inj := Prob.eq
   mkT := fun h ↦ ⟨⟨_, Exists.casesOn h fun t ht => ht ▸ t.prop⟩, rfl⟩
   convex := by
@@ -361,5 +351,46 @@ theorem mkT_mixable (u : ℝ) (h : ∃ t : Prob, Mixable.to_U t = u) : Mixable.m
 /-- `Prob.mix` is an alias of `Mixable.mix` so it can be accessed from a probability with
 dot notation, e.g. `p.mix x y`. -/
 abbrev mix [AddCommMonoid U] [Module ℝ U] [inst : Mixable U T] (p : Prob) (x₁ x₂ : T) := inst.mix p x₁ x₂
+
+/-- Map a probability [0,1] to [0,+∞] with -log p. Special case that 0 maps to +∞ (not 0, as Real.log
+does). This makes it `Antitone`.
+-/
+noncomputable def negLog : Prob → ENNReal :=
+  fun p ↦ if p = 0 then ⊤ else .ofNNReal ⟨-Real.log p,
+    Left.nonneg_neg_iff.mpr (Real.log_nonpos p.2.1 p.2.2)⟩
+
+--Note that this is an em-dash `—` and not a minus `-`, to make the notation work.
+scoped notation "—log " => Prob.negLog
+
+theorem negLog_Antitone : Antitone negLog := by
+  intro x y h
+  dsimp [Prob.negLog]
+  split_ifs with h₁ h₂ h₂
+  · rfl
+  · subst y
+    exfalso
+    change x.1 ≤ 0 at h
+    have : ¬(x.1 = 0) := unitInterval.coe_ne_zero.mpr (by assumption)
+    have : 0 ≤ x.1 := zero_le
+    linarith +splitNe
+  · exact OrderTop.le_top _
+  · rw [ENNReal.coe_le_coe, ← NNReal.coe_le_coe, coe_mk, coe_mk, neg_le_neg_iff]
+    apply (Real.log_le_log_iff _ _).mpr h
+    <;> exact lt_of_le_of_ne zero_le (unitInterval.coe_ne_zero.mpr (by assumption)).symm
+
+@[simp]
+theorem negLog_zero : —log (0 : Prob) = ⊤ := by
+  simp [negLog]
+
+theorem negLog_pos_ENNReal {p : Prob} (hp : p ≠ 0) : —log p = .ofNNReal ⟨-Real.log p,
+    Left.nonneg_neg_iff.mpr (Real.log_nonpos p.2.1 p.2.2)⟩ := by
+  simp [negLog, hp]
+
+@[simp]
+theorem negLog_pos_Real {p : Prob} : (—log p).toReal = -Real.log p := by
+  rw [negLog]
+  split_ifs with hp
+  · simp [negLog, hp]
+  · simp [hp]
 
 end Prob

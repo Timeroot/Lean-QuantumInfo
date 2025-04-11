@@ -164,6 +164,13 @@ theorem qRelativeEnt_additive (ρ₁ σ₁ : MState d₁) (ρ₂ σ₂ : MState 
   --rinner of ⊗ is mul of rinner
   sorry
 
+/-- Relative entropy is continuous (in each argument, actually, but we only need in the
+latter here). Will need the fact that all the cfc / eigenvalue stuff is continuous, which
+is going to make this a pain. -/
+@[fun_prop]
+theorem qRelativeEnt.Continuous (ρ : MState d) : Continuous fun σ => 𝐃(ρ‖σ) := by
+  sorry
+
 /-- Joint convexity of Quantum relative entropy. We can't state this with `ConvexOn` because that requires
 an `AddCommMonoid`, which `MState`s are not. Instead we state it with `Mixable`.
 

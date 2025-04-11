@@ -27,14 +27,13 @@ class ResourcePretheory (ι : Type*) where
   --Possible we want some fact like the associativity of `prod` or the existence of an identity space,
   -- which would then imply MonoidalCategory structure later (instead of just Category)
 
+attribute [instance] ResourcePretheory.FinH
+attribute [instance] ResourcePretheory.DecEqH
+attribute [instance] ResourcePretheory.NonemptyH
+
 namespace ResourcePretheory
 
 variable {ι : Type*} [ResourcePretheory ι]
-
---Having a `ResourcePretheory ι` around should give us access to the `Fintype` and `DecidableEq` instances.
-instance instQRT_FintypeH (i : ι) : Fintype (H i) := FinH i
-instance instQRT_DecEqH (i : ι) : DecidableEq (H i) := DecEqH i
-instance instQRT_NonemptyH (i : ι) : Nonempty (H i) := NonemptyH i
 
 /-- The `prod` operation of `ResourcePretheory` gives the natural product operation on `MState`s. Accessible
 by the notation `ρ₁ ⊗ᵣ ρ₂`. -/
@@ -72,9 +71,7 @@ instance instUnitalUnique [ResourcePretheory ι] [u : Unital ι] : Unique (H u.u
 
 end ResourcePretheory
 
-
 /- FreeStateTheories: theories defining some sets of "free states" within a collection of Hilbert spaces. -/
-
 
 open ResourcePretheory in
 /-- A `FreeStateTheory` is a collection of mixed states (`MState`s) in a `ResourcePretheory` that obeys
@@ -89,7 +86,7 @@ class FreeStateTheory (ι : Type*) extends ResourcePretheory ι where
   /-- The set F(H) of free states is closed -/
   free_closed : IsClosed (@IsFree i)
   /-- The set F(H) of free states is convex (more precisely, their matrices are) -/
-  free_convex : Convex ℝ (MState.m '' (@IsFree i))
+  free_convex : Convex ℝ (MState.M '' (@IsFree i))
   /-- The set of free states is closed under tensor product -/
   free_prod {ρ₁ : MState (H i)} {ρ₂ : MState (H j)} (h₁ : IsFree ρ₁) (h₂ : IsFree ρ₂) : IsFree (ρ₁ ⊗ᵣ ρ₂)
   /-- The set F(H) of free states contains a full-rank state `ρfull`, equivalently `ρfull` is positive definite. -/
@@ -99,13 +96,23 @@ open ResourcePretheory
 open FreeStateTheory
 open NNReal
 
+namespace FreeStateTheory
+
+variable {ι : Type*} [FreeStateTheory ι] {i : ι}
+
+noncomputable instance Inhabited_IsFree : Inhabited (IsFree (i := i)) :=
+  ⟨⟨(free_fullRank i).choose, (free_fullRank i).choose_spec.right⟩⟩
+
+/--The set of free states is compact because it's a closed subset of a compact space. -/
+theorem IsCompact_IsFree : IsCompact (IsFree (i := i)) :=
+  .of_isClosed_subset isCompact_univ free_closed (Set.subset_univ _)
+
+end FreeStateTheory
+
 --Things like asymptotically free operations, measures of non-freeness, etc. that can be stated
 --entirely in terms of the free states (without referring to operations) go here.
 
 variable {ι : Type*} [FreeStateTheory ι] {i : ι}
-
-noncomputable instance FreeStateTheory.IsFree_Inhabited : Inhabited (IsFree (i := i)) :=
-  ⟨⟨(free_fullRank i).choose, (free_fullRank i).choose_spec.right⟩⟩
 
 noncomputable def RelativeEntResource : MState (H i) → ℝ≥0 :=
     fun ρ ↦ (⨅ σ ∈ IsFree, 𝐃(ρ‖σ)).toNNReal
