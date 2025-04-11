@@ -463,119 +463,66 @@ end partialOrder
 
 end PosSemidef
 
--- section frobenius_inner_product
--- open scoped ComplexOrder
--- variable {A : Matrix n n 𝕜} {B : Matrix n n 𝕜} {C : Matrix n n 𝕜} [Fintype n]
+/- todo: pull out to somewhere else-/
+instance _root_.RCLike.instStarModule : StarModule ℝ 𝕜 where
+  star_smul r a := by
+    rw [Algebra.smul_def', Algebra.smul_def', star_trivial r, ← RCLike.re_add_im (Algebra.algebraMap r)]
+    simp [show RCLike.im (Algebra.algebraMap r) = 0 from RCLike.ofReal_im_ax r]
 
--- namespace IsHermitian
--- open scoped ComplexOrder
+noncomputable section frobenius_inner_product
+open scoped ComplexOrder
+variable {A : Matrix n n 𝕜} {B : Matrix n n 𝕜} {C : Matrix n n 𝕜} [Fintype n]
 
--- variable (hA : A.IsHermitian) (hB : B.IsHermitian) (hC : C.IsHermitian)
+/-- The InnerProductSpace on Matrix n n 𝕜 defined by the real part of the
+ Frobenius inner product. -/
+def InnerProductCore : InnerProductSpace.Core (𝕜 := ℝ) (F := Matrix n n 𝕜):=
+   {
+    inner A B := RCLike.re (Aᴴ * B).trace
+    conj_symm := fun x y ↦ by
+      simpa [inner, starRingEnd_apply, ← Matrix.trace_conjTranspose] using
+        RCLike.conj_re (xᴴ * y).trace
+    nonneg_re := fun x ↦
+      (RCLike.nonneg_iff.mp x.posSemidef_conjTranspose_mul_self.trace_nonneg).1
+    add_left := by simp [inner, add_mul]
+    smul_left x y r := by
+      simpa using RCLike.smul_re _ (xᴴ * y).trace
+    definite x h := by
+      ext i j
+      replace h : ∑ j, ∑ i, (RCLike.re (x i j) ^ 2 + RCLike.im (x i j) ^ 2) = 0 := by
+        simpa [trace, mul_apply, ← pow_two] using h
+      rw [Fintype.sum_eq_zero_iff_of_nonneg (fun i ↦ by positivity)] at h
+      replace h := congrFun h j
+      rw [Pi.zero_apply, Fintype.sum_eq_zero_iff_of_nonneg (fun i ↦ by positivity)] at h
+      replace h := congrFun h i
+      dsimp at h
+      rw [add_eq_zero_iff_of_nonneg (sq_nonneg _) (sq_nonneg _), sq_eq_zero_iff, sq_eq_zero_iff] at h
+      apply RCLike.ext (h.left.trans RCLike.zero_re'.symm) (h.right.trans (map_zero _).symm)
+  }
 
--- /-- Real inner product of two square matrices. Only defined for Hermitian matrices,
---   as this lets us meaningfully interpret it as a real. -/
--- def rinner (_ : A.IsHermitian) (_ : B.IsHermitian) : ℝ :=
---   RCLike.re (A * B).trace
+def instNormed : NormedAddCommGroup (Matrix n n 𝕜) :=
+  InnerProductCore.toNormedAddCommGroup
 
--- /-- The inner product for Hermtian matrices is equal to the trace of
---   the product. -/
--- theorem rinner_eq_trace_mul : hA.rinner hB = (A * B).trace := by
---   have h₁ := (RCLike.is_real_TFAE (A * B).trace).out 2 0
---   rw [rinner, h₁]
---   nth_rewrite 1 1 [← hA, ← hB]
---   simp [Matrix.trace, Matrix.mul_apply, Finset.sum_comm (f := fun x y ↦ A x y * _)]
+scoped[Frobenius] attribute [instance] Matrix.instNormed
 
--- theorem rinner_symm : hA.rinner hB = hB.rinner hA := by
---   rw [rinner, rinner, Matrix.trace_mul_comm]
+open scoped Frobenius in
+def instInnerProductSpace : InnerProductSpace ℝ (Matrix n n 𝕜) :=
+  InnerProductSpace.ofCore InnerProductCore
 
--- @[simp]
--- theorem rinner_zero_mul : hA.rinner Matrix.isHermitian_zero = 0 := by
---   simp [rinner]
+scoped[Frobenius] attribute [instance] Matrix.instInnerProductSpace
 
--- @[simp]
--- theorem rinner_mul_zero : Matrix.isHermitian_zero.rinner hA = 0 := by
---   simp [rinner]
+instance : Inner ℝ (Matrix n n 𝕜) :=
+  instInnerProductSpace.toInner
 
--- variable [DecidableEq n] in
--- @[simp]
--- theorem rinner_mul_one : hA.rinner Matrix.isHermitian_one = hA.rtrace := by
---   simp only [rinner, mul_one, rtrace]
+--Makes the `Inner ℝ` instance is globally accessible, but the norm instances
+--require `open scoped Frobenius`. e.g.
 
--- variable [DecidableEq n] in
--- @[simp]
--- theorem one_rinner_mul : Matrix.isHermitian_one.rinner hA = hA.rtrace := by
---   simp only [rinner, one_mul, rtrace]
+-- open scoped Frobenius in
+-- #synth InnerProductSpace ℝ (Matrix (Fin 5) (Fin 5) ℝ)
 
--- theorem rinner_smul_selfAdjoint {c : 𝕜} (hc : _root_.IsSelfAdjoint c) :
---     (hA.smul_selfAdjoint hc).rinner hB = c * hA.rinner hB := by
---   simp [rinner, RCLike.conj_eq_iff_re.mp hc, RCLike.conj_eq_iff_im.mp hc]
+-- (no `open` needed):
+-- #synth Inner ℝ (Matrix (Fin 5) (Fin 5) ℝ)
 
--- theorem smul_rinner_selfAdjoint {c : 𝕜} (hc : _root_.IsSelfAdjoint c) :
---     hA.rinner (hB.smul_selfAdjoint hc) = c * hA.rinner hB := by
---   rwa [rinner_symm, rinner_symm hA, rinner_smul_selfAdjoint]
-
--- @[simp]
--- theorem rinner_smul_real {c : ℝ} :
---     (hA.smul_real c).rinner hB = c * hA.rinner hB := by
---   simp [rinner, RCLike.smul_re]
-
--- @[simp]
--- theorem smul_inner_real {c : ℝ} :
---     hA.rinner (hB.smul_real c) = c * hA.rinner hB := by
---   simp [rinner, RCLike.smul_re]
-
--- @[simp]
--- theorem rinner_add : hA.rinner (IsHermitian.add hB hC) = hA.rinner hB + hA.rinner hC := by
---   unfold rinner
---   rw [left_distrib, trace_add, map_add]
-
--- @[simp]
--- theorem rinner_sub : hA.rinner (IsHermitian.sub hB hC) = hA.rinner hB - hA.rinner hC := by
---   unfold rinner
---   rw [sub_eq_add_neg, left_distrib, trace_add, map_add, mul_neg, trace_neg, map_neg, ←sub_eq_add_neg]
-
--- end IsHermitian
--- namespace PosSemidef
-
--- variable (hA : A.PosSemidef) (hB : B.PosSemidef)
-
--- /-- The inner product for PSD matrices is nonnegative. -/
--- theorem rinner_ge_zero : 0 ≤ hA.1.rinner hB.1 := by
---   rw [IsHermitian.rinner, ← hA.sqrt_mul_self, Matrix.trace_mul_cycle, Matrix.trace_mul_cycle]
---   nth_rewrite 1 [← hA.posSemidef_sqrt.left]
---   exact (RCLike.nonneg_iff.mp (hB.conjTranspose_mul_mul_same _).trace_nonneg).left
-
--- theorem rinner_mono {A B C : Matrix n n 𝕜} (hA : A.PosSemidef) (hB : B.IsHermitian) (hC : C.IsHermitian) :
---   B ≤ C → hA.1.rinner hB ≤ hA.1.rinner hC := fun hBC ↦ by
---   rw [le_iff_sub_posSemidef] at hBC
---   have hTr : 0 ≤ hA.1.rinner (IsHermitian.sub hC hB) := rinner_ge_zero hA hBC
---   rw [IsHermitian.rinner_sub] at hTr
---   linarith
-
--- set_option pp.proofs.withType true in
--- include hA hB in
--- /-- The inner product for PSD matrices is at most the product of their traces. -/
--- theorem rinner_le_mul_trace : hA.1.rinner hB.1 ≤ hA.1.rtrace * hB.1.rtrace := by
---   convert rinner_mono hA hB.1 (IsHermitian.smul_real isHermitian_one hB.1.rtrace) (le_trace_smul_one hB)
---   rw [IsHermitian.smul_inner_real hA.1 isHermitian_one, IsHermitian.rinner_mul_one, mul_comm]
-
--- /-- The InnerProductSpace on Matrix n n 𝕜 defined by the Frobenius inner product, `Matrix.inner`.-/
--- def MatrixInnerProduct :=
---   InnerProductSpace.ofCore (𝕜 := ℝ) (F := Matrix n n 𝕜) {
---     inner := rinner
---     conj_symm := fun x y ↦ by
---       simp [inner, starRingEnd_apply, ← Matrix.trace_conjTranspose,
---         conjTranspose_mul, conjTranspose_conjTranspose]
---     nonneg_re := fun x ↦ by
---       simp only [inner]
---       exact (RCLike.nonneg_iff.mp x.posSemidef_conjTranspose_mul_self.trace_nonneg).1
---     add_left := by simp [inner, add_mul]
---     smul_left := by simp [inner]
---     definite := sorry
---   }
-
--- end PosSemidef
--- end frobenius_inner_product
+end frobenius_inner_product
 
 section partial_trace
 
