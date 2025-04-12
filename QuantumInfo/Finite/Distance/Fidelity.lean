@@ -1,4 +1,3 @@
-import QuantumInfo.Finite.MState
 import QuantumInfo.Finite.CPTPMap
 
 noncomputable section

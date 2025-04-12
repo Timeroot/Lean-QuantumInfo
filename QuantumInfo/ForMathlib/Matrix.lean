@@ -513,6 +513,46 @@ scoped[Frobenius] attribute [instance] Matrix.instInnerProductSpace
 instance : Inner ℝ (Matrix n n 𝕜) :=
   instInnerProductSpace.toInner
 
+/-- The InnerProductSpace on Matrix n n 𝕜 defined by the Frobenius inner product. -/
+def CInnerProductCore : InnerProductSpace.Core (𝕜 := ℂ) (F := Matrix n n ℂ):=
+   {
+    inner A B := (Aᴴ * B).trace
+    conj_symm := fun x y ↦ by
+      simp [inner, starRingEnd_apply, ← Matrix.trace_conjTranspose]
+    nonneg_re := fun x ↦
+      (RCLike.nonneg_iff.mp x.posSemidef_conjTranspose_mul_self.trace_nonneg).1
+    add_left := by simp [inner, add_mul]
+    smul_left x y r := by simp
+    definite x h := by
+      ext i j
+      replace h : ∑ j, ∑ i, ((x i j).re ^ 2 + (x i j).im ^ 2) = (0 : ℂ) := by
+        convert h
+        simp only [Complex.ofReal_sum, Complex.ofReal_add, Complex.ofReal_pow, trace, diag_apply,
+          mul_apply, conjTranspose_apply, RCLike.star_def]
+        congr! 2
+        norm_cast
+        rw [Complex.conj_mul', ← Complex.sq_norm_sub_sq_re]
+        norm_cast
+        abel
+      rw [Complex.ofReal_eq_zero,
+        Fintype.sum_eq_zero_iff_of_nonneg (fun i ↦ by positivity)] at h
+      replace h := congrFun h j
+      rw [Pi.zero_apply, Fintype.sum_eq_zero_iff_of_nonneg (fun i ↦ by positivity)] at h
+      replace h := congrFun h i
+      dsimp at h
+      rw [add_eq_zero_iff_of_nonneg (sq_nonneg _) (sq_nonneg _), sq_eq_zero_iff, sq_eq_zero_iff] at h
+      apply RCLike.ext (h.left.trans RCLike.zero_re'.symm) (h.right.trans (map_zero _).symm)
+  }
+
+open scoped Frobenius in
+def instCInnerProductSpace : InnerProductSpace ℂ (Matrix n n ℂ) :=
+  InnerProductSpace.ofCore CInnerProductCore
+
+scoped[Frobenius] attribute [instance] Matrix.instCInnerProductSpace
+
+instance : Inner ℂ (Matrix n n ℂ) :=
+  instCInnerProductSpace.toInner
+
 --Makes the `Inner ℝ` instance is globally accessible, but the norm instances
 --require `open scoped Frobenius`. e.g.
 

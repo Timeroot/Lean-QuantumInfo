@@ -1,5 +1,4 @@
 import QuantumInfo.Finite.MState
-import QuantumInfo.Finite.CPTPMap
 
 import QuantumInfo.ForMathlib
 

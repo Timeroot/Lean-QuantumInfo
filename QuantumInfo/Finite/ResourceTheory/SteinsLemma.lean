@@ -476,54 +476,35 @@ section Lemma7
 open MatrixMap
 open Matrix
 
-variable {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq dIn] [DecidableEq dOut]
-
--- This should be moved to the files about matrix maps as soon as a good definition of "dual channel" can be made.
-theorem positive_dual_channel_exists (ℰ : CPTPMap dIn dOut) :
-  ∃ ℰdual : CPTPMap dOut dIn, ∀ ρ : MState dIn, ∀ T : HermitianMat dOut ℂ,
-  (ℰ ρ).exp_val T  = ρ.exp_val ⟨ℰdual.map T, ℰdual.H T.H⟩ := by
-  -- The proof below was valid for a previous wrong version of the theorem. Nevertheless
-  -- it could still be useful for this version.
-  --------------------------------------------------
-  -- have hkraus := IsCompletelyPositive.exists_kraus ℰ.map ℰ.completely_pos
-  -- obtain ⟨r, M, hkraus⟩ := hkraus
-  -- let T' : Matrix dIn dIn ℂ := ∑ i : Fin r, (M i)ᴴ * T * (M i)
-  -- -- Should come from something like Matrix.PosSemidef.sum
-  -- have hT' : T'.PosSemidef := by
-  --   constructor
-  --   · unfold IsHermitian T'
-  --     rw [conjTranspose_sum]
-  --     simp only [IsHermitian, conjTranspose_mul, conjTranspose_conjTranspose, Matrix.mul_assoc]
-  --     rw [hT.1]
-  --   · intro x
-  --     unfold T'
-  --     -- rw [AddMonoidHom.finset_sum_apply (mulVec.addMonoidHomLeft : (dIn → ℂ) → (Matrix dIn dIn ℂ) →+ dIn → ℂ)]
-  --     sorry
-  -- use T', hT'
-  -- simp [MState.exp_val, IsHermitian.rinner, CPTPMap.mat_coe_eq_apply_mat, hkraus, of_kraus,
-  --   Finset.mul_sum, Finset.sum_mul, ←Matrix.mul_assoc, T']
-  -- conv =>
-  --   enter [1, 2, x]
-  --   rw [trace_mul_cycle, ←Matrix.mul_assoc]
-  sorry
+variable {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq dIn] [DecidableEq dOut] {R : Type*}
 
 set_option pp.proofs true in
 /-- Lemma S1 -/
-private theorem optimalHypothesisRate_antitone (ρ σ : MState dIn) (ℰ : CPTPMap dIn dOut) (ε3 : ℝ) (hε3 : ε3 ≥ 0) :
-  β_ ε3(ρ‖{σ}) ≤ β_ ε3(ℰ ρ‖{ℰ σ}) := by
-  repeat rw [OptimalHypothesisRate_singleton]
-  obtain ⟨ℰdual, hℰdual⟩ := positive_dual_channel_exists ℰ
-  let ℰdualSubtype :
-  { m : HermitianMat dOut ℂ // (ℰ ρ).exp_val (1 - m) ≤ ε3 ∧ 0 ≤ m ∧ m ≤ 1} →
-  { m : HermitianMat dIn ℂ // ρ.exp_val (1 - m) ≤ ε3 ∧ 0 ≤ m ∧ m ≤ 1} := sorry
-  have h : ∀ x, (↑(ℰdualSubtype x) : HermitianMat dIn ℂ) = ⟨ℰdual.map x, ℰdual.H x.1.H⟩ := fun x ↦ by
-    ext1
-    simp
-    sorry
+private theorem optimalHypothesisRate_antitone (ρ σ : MState dIn) (ℰ : CPTPMap dIn dOut) {ε₃ : ℝ} (h₃ : ε₃ ≥ 0) :
+    β_ ε₃(ρ‖{σ}) ≤ β_ ε₃(ℰ ρ‖{ℰ σ}) := by
+  simp only [OptimalHypothesisRate_singleton]
+  obtain ⟨ℰdualSubtype, h⟩ :
+      ∃ e : ({ m : HermitianMat dOut ℂ // (ℰ ρ).exp_val (1 - m) ≤ ε₃ ∧ 0 ≤ m ∧ m ≤ 1} →
+      { m : HermitianMat dIn ℂ // ρ.exp_val (1 - m) ≤ ε₃ ∧ 0 ≤ m ∧ m ≤ 1}),
+      ∀ x, e x = ℰ.Dual.toHPMap x
+       := by
+    constructor; swap
+    · rintro ⟨m, hm₁, hm₂⟩
+      refine ⟨ℰ.Dual.toHPMap m, ?_, CPTPMap.Dual.PTP_POVM ℰ hm₂⟩
+      convert hm₁
+      symm
+      convert ℰ.exp_val_Dual ρ (1 - m)
+      symm
+      have : 1 = ℰ.Dual.toHPMap 1 := by symm; ext1; exact ℰ.Dual.unital
+      rw [this]
+      ext1
+      exact map_sub _ _ _
+    · rintro ⟨m, hm₁, hm₂⟩
+      rfl
   convert le_iInf_comp _ ℰdualSubtype
   rename_i T'
   specialize h T'
-  rw [h, hℰdual]
+  rw [h, ℰ.exp_val_Dual]
 
 noncomputable section proj
 
