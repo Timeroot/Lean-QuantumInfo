@@ -21,6 +21,10 @@ noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : ℝ) (S : Set (MSt
 
 scoped notation "β_" ε " (" ρ "‖" S ")" =>  OptimalHypothesisRate ρ ε S
 
+theorem OptimalHypothesisRate_ε_zero {ρ : MState d} {S : Set (MState d)} (hS : S.Nonempty) :
+  β_ 0(ρ‖S) = 1 := by
+  sorry
+
 theorem OptimalHypothesisRate_le_of_subset (ρ : MState d) (ε : ℝ) {S1 S2 : Set (MState d)} (h : S1 ⊆ S2) :
     β_ ε(ρ‖S1) ≤ β_ ε(ρ‖S2) :=
   iInf_mono (fun _ ↦ iSup_le_iSup_of_subset h)
@@ -561,6 +565,29 @@ theorem proj_le_inner_le : {A ≤ₚ B}.inner A ≤ {A ≤ₚ B}.inner B := by
   exact proj_le_inner_nonneg A B
 
 -- TODO: Commutation and order relations specified in the text between Eqs. (S77) and (S78)
+
+theorem LemmaS2 {ε3 : ℝ} (hε3 : 0 ≤ ε3 ∧ ε3 ≤ 1) {ε4 : ℝ} (hε4 : 0 < ε4)
+  {d : ℕ → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)] (ρ : (n : ℕ) → MState (d n)) (σ : (n : ℕ) → MState (d n))
+  {Rinf : ℝ} (hRinf : ENNReal.ofReal Rinf ≥ Filter.liminf (fun n ↦ —log β_ ε3(ρ n‖{σ n}) / n) Filter.atTop)
+  {Rsup : ℝ} (hRsup : ENNReal.ofReal Rsup ≥ Filter.limsup (fun n ↦ —log β_ ε3(ρ n‖{σ n}) / n) Filter.atTop)
+  :
+  (Filter.liminf (fun n ↦ {(ρ n).M ≥ₚ (Real.exp (↑n * (Rinf + ε4))) • (σ n).M}.inner (ρ n)) Filter.atTop ≤ 1 - ε3) ∧
+  (Filter.limsup (fun n ↦ {(ρ n).M ≥ₚ (Real.exp (↑n * (Rsup + ε4))) • (σ n).M}.inner (ρ n)) Filter.atTop ≤ 1 - ε3)
+  := by
+  constructor
+  · by_contra h
+    push_neg at h
+    replace h := Filter.eventually_lt_of_lt_liminf h ?_
+    · replace h := Filter.eventually_atTop.mp h
+      obtain ⟨n₀, h⟩ := h
+      let T := fun n ↦ {(ρ n).M ≥ₚ (Real.exp (↑n * (Rinf + ε4))) • (σ n).M}
+      have hT : ∀ n ≥ n₀, (ρ n).exp_val (1 - (T n)) ≤ ε3 := fun n hn ↦ by sorry
+      have hβ : ∀ n ≥ n₀, β_ ε3(ρ n‖{σ n}) ≤ Real.exp (-↑n * (Rsup + ε4)) := fun n hn ↦ by sorry
+      have h' : ∀ n ≥ n₀, ENNReal.ofReal (Rinf + ε4) ≤ —log β_ ε3(ρ n‖{σ n}) := fun n hn ↦ sorry
+      sorry
+    sorry
+  · -- Basically the same proof as the Rinf case
+    sorry
 
 end proj
 
