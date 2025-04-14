@@ -156,18 +156,17 @@ instance instUnique [Nonempty dIn] [Unique dOut] : Unique (CPTPMap dIn dOut) whe
 /-- A state can be viewed as a CPTP map from the trivial Hilbert space (indexed by `Unit`)
  that outputs exactly that state. -/
 def const_state [Unique dIn] (ρ : MState dOut) : CPTPMap dIn dOut where
-  toLinearMap := MatrixMap.of_choi_matrix (.of fun (_,i) (_,j) ↦ ρ.m i j)
+  toLinearMap := (MatrixMap.of_choi_matrix (.of fun (_,i) (_,j) ↦ ρ.m i j))
   cp := sorry
   TP x := by
-    have := ρ.tr
-    unfold Matrix.trace at this
-    simpa [MatrixMap.of_choi_matrix, Matrix.trace, ← Finset.mul_sum] using this ▸ mul_one _
+    have h : ∑ i : dOut, ρ.m i i = 1 := ρ.tr
+    simp [MatrixMap.of_choi_matrix, Matrix.trace, ← Finset.mul_sum, h]
 
 /-- The output of `const_state ρ` is always that `ρ`. -/
 @[simp]
 theorem const_state_apply [Unique dIn] (ρ : MState dOut) (ρ₀ : MState dIn) : (const_state ρ) ρ₀ = ρ := by
-  ext
-  dsimp [const_state, MatrixMap.of_choi_matrix, MState.m, instFunLike]
+  ext1
+  dsimp [const_state, MatrixMap.of_choi_matrix, MState.m, instMFunLike, PTPMap.instMFunLike]
   simp only [Finset.univ_unique, Finset.sum_singleton]
   rw [Unique.eq_default ρ₀]
   -- convert one_mul _
@@ -192,10 +191,10 @@ variable [DecidableEq dI₁] [DecidableEq dI₂] [DecidableEq dO₁] [DecidableE
 /-- The tensor product of two CPTPMaps. -/
 def prod (Λ₁ : CPTPMap dI₁ dO₁) (Λ₂ : CPTPMap dI₂ dO₂) : CPTPMap (dI₁ × dI₂) (dO₁ × dO₂) where
   toLinearMap := Λ₁.map.kron Λ₂.map
-  TP := Λ₁.TP.kron Λ₂.TP
   cp := Λ₁.cp.kron Λ₂.cp
+  TP := Λ₁.TP.kron Λ₂.TP
 
-notation ρL "⊗" ρR => prod ρL ρR
+infixl:70 "⊗ₖ" => CPTPMap.prod
 
 end prod
 
@@ -331,8 +330,8 @@ end unitary
 /-- A channel is *entanglement breaking* iff its product with the identity channel
   only outputs separable states. -/
 def IsEntanglementBreaking (Λ : CPTPMap dIn dOut) : Prop :=
-  ∀ (dR : Type u_1) [Fintype dR] [DecidableEq dR], ∀ (ρ : MState (dR × dIn)),
-    ((id ⊗ Λ) ρ).IsSeparable
+  ∀ (dR : Type u_1) [Fintype dR] [DecidableEq dR],
+  ∀ (ρ : MState (dR × dIn)), ((CPTPMap.id ⊗ₖ Λ) ρ).IsSeparable
 
 --TODO:
 --Theorem: entanglement breaking iff it holds for all channels, not just id.
@@ -372,7 +371,7 @@ is equivalent to the original channel. This theorem states that the channel outp
 has this property. -/
 theorem purify_trace (Λ : CPTPMap dIn dOut) : Λ = (
     let zero_prep : CPTPMap Unit (dOut × dOut) := const_state (MState.pure (Ket.basis default))
-    let prep := (id ⊗ zero_prep)
+    let prep := (id ⊗ₖ zero_prep)
     let append : CPTPMap dIn (dIn × Unit) := CPTPMap.of_equiv (Equiv.prodPUnit dIn).symm
     CPTPMap.traceLeft ∘ₘ CPTPMap.traceLeft ∘ₘ Λ.purify ∘ₘ prep ∘ₘ append
   ) :=
@@ -386,7 +385,7 @@ theorem purify_trace (Λ : CPTPMap dIn dOut) : Λ = (
 /-- The complementary channel comes from tracing out the other half (the right half) of the purified channel `purify`. -/
 def complementary (Λ : CPTPMap dIn dOut) : CPTPMap dIn (dIn × dOut) :=
   let zero_prep : CPTPMap Unit (dOut × dOut) := const_state (MState.pure (Ket.basis default))
-  let prep := (id ⊗ zero_prep)
+  let prep := (id ⊗ₖ zero_prep)
   let append : CPTPMap dIn (dIn × Unit) := CPTPMap.of_equiv (Equiv.prodPUnit dIn).symm
   CPTPMap.traceRight ∘ₘ CPTPMap.assoc' ∘ₘ Λ.purify ∘ₘ prep ∘ₘ append
 

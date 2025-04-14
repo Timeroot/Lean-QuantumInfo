@@ -36,7 +36,7 @@ def IsMaximal (r : ResourceTheory ι) : Prop :=
 /-- A resource theory `IsTensorial` if it includes tensor products of operations, creating
 free states, and discarding. This implies that includes a unit object. -/
 structure IsTensorial [ResourceTheory ι] [Unital ι] : Prop where
-  prod :  ∀ {i j k l : ι} {f g}, f ∈ freeOps i k → g ∈ freeOps j l → (f ⊗ᵣ g) ∈ freeOps (prod i j) (prod k l)
+  prod :  ∀ {i j k l : ι} {f g}, f ∈ freeOps i k → g ∈ freeOps j l → (f ⊗ₖᵣ g) ∈ freeOps (prod i j) (prod k l)
   create : ∀ {i : ι} (ρ), IsFree ρ → CPTPMap.const_state ρ ∈ freeOps Unital.unit i
   destroy : ∀ (i : ι), CPTPMap.destroy ∈ freeOps i Unital.unit
 
@@ -72,7 +72,7 @@ private lemma convex_states_of_convex_ops [ResourcePretheory ι] (O : ∀ (i j :
       exact this ▸ hw1
     · --Should be a theorem about CPTPMap.instMixable, really. Also, this proof is terrible.
       subst x y
-      simp only [Mixable.mix_ab, Mixable.mkT, MState.instMixable, CPTPMap.instFunLike,
+      simp only [Mixable.mix_ab, Mixable.mkT, MState.instMixable, CPTPMap.instMFunLike,
         CPTPMap.CPTP_of_choi_PSD_Tr, CPTPMap.mk, MatrixMap.of_choi_matrix, Mixable.to_U]
       ext
       change (Finset.sum _ _) = ((_ : ℂ) + _)
@@ -92,7 +92,7 @@ def mk_of_ops [ResourcePretheory ι] (O : ∀ (i j : ι), Set (CPTPMap (H i) (H 
     (h_comp : ∀ {i j k} (Y : O j k) (X : O i j), Y.1.compose X.1 ∈ O i k) --Operations include compositions
     (h_closed : ∀ {i j}, IsClosed (O i j)) -- Operations are topologically closed
     (h_convex : ∀ {i j}, Convex ℝ (CPTPMap.choi '' O i j)) -- (The choi matrices of) operations are convex
-    (h_prod : ∀ {i j k l f g} (hf : f ∈ O i k) (hg : g ∈ O j l), (f ⊗ᵣ g) ∈ O (prod i j) (prod k l)) --Closed under products
+    (h_prod : ∀ {i j k l f g} (hf : f ∈ O i k) (hg : g ∈ O j l), (f ⊗ₖᵣ g) ∈ O (prod i j) (prod k l)) --Closed under products
     (h_fullRank : ∀ {i : ι}, sorry) --Some statement about having full rank states as output
     (h_appendFree : ∀ {i j k : ι}, sorry) --Some statement that appending free states is free
     : ResourceTheory ι where

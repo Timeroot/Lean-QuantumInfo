@@ -21,92 +21,98 @@ variable {M : MatrixMap dIn dOut 𝕜}
 
 /-- The dual of a map between matrices, defined by `Tr[A M(B)] = Tr[(dual M)(A) B]`. Sometimes
  called the adjoint of the map instead. -/
-def Dual (M : MatrixMap dIn dOut R) : MatrixMap dOut dIn R :=
+@[irreducible]
+def dual (M : MatrixMap dIn dOut R) : MatrixMap dOut dIn R :=
   let iso1 := (Basis.toDualEquiv <| Matrix.stdBasis R dIn dIn).symm
   let iso2 := (Basis.toDualEquiv <| Matrix.stdBasis R dOut dOut)
   iso1 ∘ₗ LinearMap.dualMap M ∘ₗ iso2
 
-/-- The dual of a `IsHermitianPreserving` map also `IsHermitianPreserving`. -/
-theorem Dual.IsHermitianPreserving (h : M.IsHermitianPreserving) : M.Dual.IsHermitianPreserving := by
-  sorry
-
-/-- The dual of a `IsPositive` map also `IsPositive`. -/
-theorem Dual.IsPositive (h : M.IsPositive) : M.Dual.IsPositive := by
-  intro x hx
-  use Dual.IsHermitianPreserving h.IsHermitianPreserving hx.1
-  sorry
-
-/-- The dual of TracePreserving map is *not* trace-preserving, it's *unital*, that is, M*(I) = I. -/
-theorem Dual.Unital (h : M.IsTracePreserving) : M.Dual.Unital := by
-  sorry
-
---The dual of a CompletelyPositive map is always CP, more generally it's k-positive
--- see Lemma 3.1 of https://www.math.uwaterloo.ca/~krdavids/Preprints/CDPRpositivereal.pdf
-theorem Dual.IsCompletelyPositive (h : M.IsCompletelyPositive) : M.Dual.IsCompletelyPositive := by
-  sorry
-
 /-- The defining property of a dual map: inner products are preserved on the opposite argument. -/
-theorem Dual.inner_eq (M : MatrixMap dIn dOut R) (A : Matrix dIn dIn R) (B : Matrix dOut dOut R) :
-    (M A * B).trace = (A * M.Dual B).trace := by
-  dsimp [Matrix.trace, Dual]
+theorem Dual.trace_eq (M : MatrixMap dIn dOut R) (A : Matrix dIn dIn R) (B : Matrix dOut dOut R) :
+    (M A * B).trace = (A * M.dual B).trace := by
+  unfold dual
+  dsimp [Matrix.trace]
   rw [LinearMap.dualMap_apply']
   simp_rw [Matrix.mul_apply]
   sorry
+
+--all properties below should provable just from `inner_eq`, since the definition of `dual` itself
+-- is pretty hair (and maybe could be improved...)
+
+/-- The dual of a `IsHermitianPreserving` map also `IsHermitianPreserving`. -/
+theorem IsHermitianPreserving.dual (h : M.IsHermitianPreserving) : M.dual.IsHermitianPreserving := by
+  sorry
+
+/-- The dual of a `IsPositive` map also `IsPositive`. -/
+theorem IsPositive.dual (h : M.IsPositive) : M.dual.IsPositive := by
+  intro x hx
+  use IsHermitianPreserving.dual h.IsHermitianPreserving hx.1
+  sorry
+
+/-- The dual of TracePreserving map is *not* trace-preserving, it's *unital*, that is, M*(I) = I. -/
+theorem dual_Unital (h : M.IsTracePreserving) : M.dual.Unital := by
+  sorry
+
+alias IsTracePreserving.dual := dual_Unital
+
+--The dual of a CompletelyPositive map is always CP, more generally it's k-positive
+-- see Lemma 3.1 of https://www.math.uwaterloo.ca/~krdavids/Preprints/CDPRpositivereal.pdf
+theorem IsCompletelyPositive.dual (h : M.IsCompletelyPositive) : M.dual.IsCompletelyPositive := by
+  sorry
+
+@[simp]
+theorem dual_dual : M.dual.dual = M := by
+  rw [dual, dual]
+  simp only [← LinearMap.dualMap_comp_dualMap]
+  have h₁ : (Matrix.stdBasis 𝕜 dOut dOut).toDualEquiv.symm.toLinearMap ∘ₗ
+      ((Matrix.stdBasis 𝕜 dOut dOut).toDualEquiv).toLinearMap.dualMap =
+      (Module.evalEquiv 𝕜 (Matrix dOut dOut 𝕜)).symm.toLinearMap := by
+    sorry
+  have h₂ : (Matrix.stdBasis 𝕜 dIn dIn).toDualEquiv.symm.toLinearMap.dualMap ∘ₗ
+      (Matrix.stdBasis 𝕜 dIn dIn).toDualEquiv.toLinearMap =
+      (Module.evalEquiv 𝕜 (Matrix dIn dIn 𝕜)).toLinearMap := by
+    ext x y
+    simp
+    generalize Matrix.stdBasis 𝕜 dIn dIn = L
+    sorry
+  rw [← Module.Dual.eval_comp_comp_evalEquiv_eq]
+  rw [← Module.evalEquiv_toLinearMap]
+  simp only [← LinearMap.comp_assoc, LinearEquiv.comp_coe, LinearEquiv.self_trans_symm, LinearEquiv.refl_toLinearMap,
+    LinearMap.id_comp, h₁]
+  simp only [LinearMap.comp_assoc, LinearEquiv.comp_coe, LinearEquiv.self_trans_symm, LinearEquiv.refl_toLinearMap,
+    LinearMap.comp_id, h₂]
 
 end MatrixMap
 
 namespace CPTPMap
 
-def Dual (M : CPTPMap dIn dOut) : CPUMap dOut dIn where
-  toLinearMap := M.map.Dual
-  unital := MatrixMap.Dual.Unital M.TP
-  cp := MatrixMap.Dual.IsCompletelyPositive M.cp
+def dual (M : CPTPMap dIn dOut) : CPUMap dOut dIn where
+  toLinearMap := M.map.dual
+  unital := M.TP.dual
+  cp := .dual M.cp
 
-theorem Dual_pos (M : CPTPMap dIn dOut) {T : HermitianMat dOut ℂ} (hT : 0 ≤ T) :
-    0 ≤ M.Dual.toHPMap T := by
-  have hDT := M.Dual.pos (HermitianMat.zero_le_iff.mp hT)
-  exact HermitianMat.zero_le_iff.mpr hDT
+theorem dual_pos (M : CPTPMap dIn dOut) {T : HermitianMat dOut ℂ} (hT : 0 ≤ T) :
+    0 ≤ M.dual T := by
+  exact M.dual.pos_Hermitian hT
 
 -- set_option pp.all true
 
 /-- The dual of a CPTP map preserves POVMs. Stated here just for two-element POVMs, that is, an
 operator `T` between 0 and 1. -/
-theorem Dual.PTP_POVM (M : CPTPMap dIn dOut) {T : HermitianMat dOut ℂ} (hT : 0 ≤ T ∧ T ≤ 1) :
-    (0 ≤ M.Dual.toHPMap T ∧ M.Dual.toHPMap T ≤ 1) := by
+theorem dual.PTP_POVM (M : CPTPMap dIn dOut) {T : HermitianMat dOut ℂ} (hT : 0 ≤ T ∧ T ≤ 1) :
+    (0 ≤ M.dual T ∧ M.dual T ≤ 1) := by
   rcases hT with ⟨hT₁, hT₂⟩
   have hT_psd := HermitianMat.zero_le_iff.mp hT₁
-  have hDT := M.Dual_pos hT₁
-  have h1T : 0 ≤ 1 - T := HermitianMat.zero_le_iff.mpr hT₂
-  have hD1T := M.Dual_pos h1T
-  use hDT
-  clear hT₁ hT₂ hDT h1T hT_psd
-  have hu : M.Dual.map.Unital := M.Dual.unital
-  unfold CPUMap.map at hu
-  generalize M.Dual.toHPMap = mmm at *
-  clear M
-  replace hD1T : 0 ≤ mmm 1 - mmm T := by
-    --Again, NEED better simp lemmas for this. TODO
-    convert hD1T
-    ext1
-    symm
-    exact map_sub _ _ _
-  replace hD1T : 0 ≤ 1 - mmm T := by
-    convert hD1T
-    --TODO:
-    --Need a lemma to help do this - `.Unital` but for `(1 : HermitianMat)` instead of `(1 : Matrix)`.
-    symm
-    ext1
-    exact hu
-  --are we really missing this?
-  have i2 : AddRightMono (HermitianMat dIn ℂ) := by sorry--inferInstance
-  exact le_of_sub_nonneg hD1T
+  use M.dual.pos_Hermitian hT₁
+  simpa using ContinuousOrderHomClass.map_monotone M.dual hT₂
 
 /-- The defining property of a dual channel, as specialized to `MState.exp_val`. -/
 theorem exp_val_Dual (ℰ : CPTPMap dIn dOut) (ρ : MState dIn) (T : HermitianMat dOut ℂ) :
-    (ℰ ρ).exp_val T  = ρ.exp_val (ℰ.Dual.toHPMap T) := by
+    (ℰ ρ).exp_val T  = ρ.exp_val (ℰ.dual T) := by
   dsimp [MState.exp_val]
+  norm_cast
   simp only [HermitianMat.inner_eq_re_trace, HermitianMat.val_eq_coe, RCLike.re_to_complex]
   congr 1
-  apply MatrixMap.Dual.inner_eq
+  apply MatrixMap.Dual.trace_eq
 
 end CPTPMap

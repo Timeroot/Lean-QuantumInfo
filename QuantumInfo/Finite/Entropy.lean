@@ -320,7 +320,7 @@ theorem qcmi_le_2_log_dim' (ρ : MState (dA × dB × dC)) :
 theorem qcmi_chain_rule (ρ : MState ((dA₁ × dA₂) × dB × dC)) :
     let ρA₁BC := ρ.assoc.SWAP.assoc.traceLeft.SWAP;
     let ρA₂BA₁C : MState (dA₂ × (dA₁ × dB) × dC) :=
-      ((CPTPMap.id ⊗ CPTPMap.assoc').compose (CPTPMap.assoc.compose (CPTPMap.SWAP ⊗ CPTPMap.id))) ρ;
+      ((CPTPMap.id ⊗ₖ CPTPMap.assoc').compose (CPTPMap.assoc.compose (CPTPMap.SWAP ⊗ₖ CPTPMap.id))) ρ;
     qcmi ρ = qcmi ρA₁BC + qcmi ρA₂BA₁C
      := by
   sorry

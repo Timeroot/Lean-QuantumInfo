@@ -156,7 +156,7 @@ namespace IsPositive
 variable [Fintype A] [Fintype B] [Fintype C]
 
 /- Every `MatrixMap` that `IsPositive` is also `IsHermitianPreserving`. -/
-theorem IsHermitianPreserving (M : MatrixMap A B R)
+theorem IsHermitianPreserving {M : MatrixMap A B R}
     (hM : IsPositive M) : IsHermitianPreserving M := by
 --sketch: Positive maps are all Hermitian preserving, because positive matrices generate the full
 --set of Hermitian matrices (generate as a vector space). Concretely, every pair of elements

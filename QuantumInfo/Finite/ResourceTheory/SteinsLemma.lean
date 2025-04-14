@@ -490,19 +490,12 @@ private theorem optimalHypothesisRate_antitone (ρ σ : MState dIn) (ℰ : CPTPM
   obtain ⟨ℰdualSubtype, h⟩ :
       ∃ e : ({ m : HermitianMat dOut ℂ // (ℰ ρ).exp_val (1 - m) ≤ ε₃ ∧ 0 ≤ m ∧ m ≤ 1} →
       { m : HermitianMat dIn ℂ // ρ.exp_val (1 - m) ≤ ε₃ ∧ 0 ≤ m ∧ m ≤ 1}),
-      ∀ x, e x = ℰ.Dual.toHPMap x
+      ∀ x, e x = ℰ.dual x
        := by
     constructor; swap
     · rintro ⟨m, hm₁, hm₂⟩
-      refine ⟨ℰ.Dual.toHPMap m, ?_, CPTPMap.Dual.PTP_POVM ℰ hm₂⟩
-      convert hm₁
-      symm
-      convert ℰ.exp_val_Dual ρ (1 - m)
-      symm
-      have : 1 = ℰ.Dual.toHPMap 1 := by symm; ext1; exact ℰ.Dual.unital
-      rw [this]
-      ext1
-      exact map_sub _ _ _
+      refine ⟨ℰ.dual m, ?_, CPTPMap.dual.PTP_POVM ℰ hm₂⟩
+      simpa [ℰ.exp_val_Dual ρ (1 - m)] using hm₁
     · rintro ⟨m, hm₁, hm₂⟩
       rfl
   convert le_iInf_comp _ ℰdualSubtype
@@ -581,9 +574,12 @@ theorem LemmaS2 {ε3 : ℝ} (hε3 : 0 ≤ ε3 ∧ ε3 ≤ 1) {ε4 : ℝ} (hε4 :
     · replace h := Filter.eventually_atTop.mp h
       obtain ⟨n₀, h⟩ := h
       let T := fun n ↦ {(ρ n).M ≥ₚ (Real.exp (↑n * (Rinf + ε4))) • (σ n).M}
-      have hT : ∀ n ≥ n₀, (ρ n).exp_val (1 - (T n)) ≤ ε3 := fun n hn ↦ by sorry
-      have hβ : ∀ n ≥ n₀, β_ ε3(ρ n‖{σ n}) ≤ Real.exp (-↑n * (Rsup + ε4)) := fun n hn ↦ by sorry
-      have h' : ∀ n ≥ n₀, ENNReal.ofReal (Rinf + ε4) ≤ —log β_ ε3(ρ n‖{σ n}) := fun n hn ↦ sorry
+      have hT : ∀ n ≥ n₀, (ρ n).exp_val (1 - (T n)) ≤ ε3 := fun n hn ↦ by
+        sorry
+      have hβ : ∀ n ≥ n₀, β_ ε3(ρ n‖{σ n}) ≤ Real.exp (-↑n * (Rsup + ε4)) := fun n hn ↦ by
+        sorry
+      have h' : ∀ n ≥ n₀, ENNReal.ofReal (Rinf + ε4) ≤ —log β_ ε3(ρ n‖{σ n}) := fun n hn ↦ by
+        sorry
       sorry
     sorry
   · -- Basically the same proof as the Rinf case

@@ -46,9 +46,9 @@ scoped notation ρ₁ "⊗ᵣ" ρ₂ => prodRelabel ρ₁ ρ₂
 by the notation `M₁ ⊗ᵣ M₂`. -/
 noncomputable def prodCPTPMap {i j k l : ι} (M₁ : CPTPMap (H i) (H j)) (M₂ : CPTPMap (H k) (H l)) :
     CPTPMap (H (prod i k)) (H (prod j l)) :=
-  (CPTPMap.of_equiv (prodEquiv j l).symm).compose ((M₁ ⊗ M₂).compose (CPTPMap.of_equiv (prodEquiv i k)))
+  (CPTPMap.of_equiv (prodEquiv j l).symm).compose ((M₁ ⊗ₖ M₂).compose (CPTPMap.of_equiv (prodEquiv i k)))
 
-scoped notation M₁ "⊗ᵣ" M₂ => prodCPTPMap M₁ M₂
+scoped notation M₁ "⊗ₖᵣ" M₂ => prodCPTPMap M₁ M₂
 
 /-- Powers of spaces. Defined for `PNat` so that we don't have zeroth powers. -/
 noncomputable def spacePow (i : ι) (n : ℕ+) : ι :=

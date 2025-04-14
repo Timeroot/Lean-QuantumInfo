@@ -613,6 +613,9 @@ instance instT5MState : T3Space (MState d) :=
 instance instCompactSpace : CompactSpace (MState d) :=
   sorry
 
+theorem Continuous_Matrix : Continuous (MState.M (d := d)) :=
+  sorry
+
 end topology
 
 section finprod
