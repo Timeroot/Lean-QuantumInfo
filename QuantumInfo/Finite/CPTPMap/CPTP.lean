@@ -56,8 +56,8 @@ theorem Tr_of_choi_of_CPTP (Λ : CPTPMap dIn dOut) : Λ.choi.trace =
   Λ.TP.trace_choi
 
 /-- Construct a CPTP map from a PSD Choi matrix with correct partial trace. -/
-def CPTP_of_choi_PSD_Tr {M : Matrix (dIn × dOut) (dIn × dOut) ℂ} (h₁ : M.PosSemidef)
-    (h₂ : M.traceRight = 1) : CPTPMap dIn dOut where
+def CPTP_of_choi_PSD_Tr {M : Matrix (dOut × dIn) (dOut × dIn) ℂ} (h₁ : M.PosSemidef)
+    (h₂ : M.traceLeft = 1) : CPTPMap dIn dOut where
   toLinearMap := MatrixMap.of_choi_matrix M
   cp := (MatrixMap.choi_PSD_iff_CP_map (MatrixMap.of_choi_matrix M)).2
       ((MatrixMap.map_choi_inv M).symm ▸ h₁)
@@ -65,7 +65,7 @@ def CPTP_of_choi_PSD_Tr {M : Matrix (dIn × dOut) (dIn × dOut) ℂ} (h₁ : M.P
     ((MatrixMap.map_choi_inv M).symm ▸ h₂)
 
 @[simp]
-theorem choi_of_CPTP_of_choi (M : Matrix (dIn × dOut) (dIn × dOut) ℂ) {h₁} {h₂} :
+theorem choi_of_CPTP_of_choi (M : Matrix (dOut × dIn) (dOut × dIn) ℂ) {h₁} {h₂} :
     (CPTP_of_choi_PSD_Tr (M := M) h₁ h₂).choi = M := by
   simp only [choi, CPTP_of_choi_PSD_Tr, MatrixMap.map_choi_inv]
   sorry
@@ -97,7 +97,7 @@ theorem compose_assoc  (Λ₃ : CPTPMap dM₂ dOut) (Λ₂ : CPTPMap dM dM₂) (
   simp
 
 /-- CPTPMaps have a convex structure from their Choi matrices. -/
-instance instMixable : Mixable (Matrix (dIn × dOut) (dIn × dOut) ℂ) (CPTPMap dIn dOut) where
+instance instMixable : Mixable (Matrix (dOut × dIn) (dOut × dIn) ℂ) (CPTPMap dIn dOut) where
   to_U := CPTPMap.choi
   to_U_inj := choi_ext
   mkT {u} h := ⟨CPTP_of_choi_PSD_Tr (M := u)
@@ -142,7 +142,7 @@ theorem compose_id (Λ : CPTPMap dIn dOut) : Λ ∘ₘ id = Λ := by
 trivial Hilbert space, 1-dimensional, indexed by any `Unique` type. -/
 def destroy [Nonempty dIn] [Unique dOut] : CPTPMap dIn dOut :=
   CPTP_of_choi_PSD_Tr Matrix.PosSemidef.one
-    (by ext i j;  simp [Matrix.traceRight, Matrix.one_apply])
+    (by ext i j;  simp [Matrix.traceLeft, Matrix.one_apply])
 
 /-- Two CPTP maps into the same one-dimensional output space must be equal -/
 theorem eq_if_output_unique [Unique dOut] (Λ₁ Λ₂ : CPTPMap dIn dOut) : Λ₁ = Λ₂ :=
@@ -156,7 +156,7 @@ instance instUnique [Nonempty dIn] [Unique dOut] : Unique (CPTPMap dIn dOut) whe
 /-- A state can be viewed as a CPTP map from the trivial Hilbert space (indexed by `Unit`)
  that outputs exactly that state. -/
 def const_state [Unique dIn] (ρ : MState dOut) : CPTPMap dIn dOut where
-  toLinearMap := (MatrixMap.of_choi_matrix (.of fun (_,i) (_,j) ↦ ρ.m i j))
+  toLinearMap := (MatrixMap.of_choi_matrix (.of fun (i,_) (j,_) ↦ ρ.m i j))
   cp := sorry
   TP x := by
     have h : ∑ i : dOut, ρ.m i i = 1 := ρ.tr

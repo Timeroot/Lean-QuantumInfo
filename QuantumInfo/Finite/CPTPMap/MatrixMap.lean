@@ -35,13 +35,13 @@ def id : MatrixMap A A R := LinearMap.id
 /-- Choi matrix of a given linear matrix map. Note that this is defined even for things that
   aren't CPTP, it's just rarely talked about in those contexts. This is the inverse of
   `MatrixMap.of_choi_matrix`. Compare with `MatrixMap.toMatrix`, which gives the transfer matrix. -/
-def choi_matrix (M : MatrixMap A B R) : Matrix (A × B) (A × B) R :=
-  fun (i₁,j₁) (i₂,j₂) ↦ M (Matrix.stdBasisMatrix i₁ i₂ 1) j₁ j₂
+def choi_matrix (M : MatrixMap A B R) : Matrix (B × A) (B × A) R :=
+  fun (j₁,i₁) (j₂,i₂) ↦ M (Matrix.stdBasisMatrix i₁ i₂ 1) j₁ j₂
 
 /-- Given the Choi matrix, generate the corresponding R-linear map between matrices as a
 MatrixMap. This is the inverse of `MatrixMap.choi_matrix`. -/
-def of_choi_matrix (M : Matrix (A × B) (A × B) R) : MatrixMap A B R where
-  toFun X := fun b₁ b₂ ↦ ∑ (a₁ : A), ∑ (a₂ : A), X a₁ a₂ * M (a₁, b₁) (a₂, b₂)
+def of_choi_matrix (M : Matrix (B × A) (B × A) R) : MatrixMap A B R where
+  toFun X := fun b₁ b₂ ↦ ∑ (a₁ : A), ∑ (a₂ : A), X a₁ a₂ * M (b₁, a₁) (b₂, a₂)
   map_add' x y := by funext b₁ b₂; simp [add_mul, Finset.sum_add_distrib]
   map_smul' r x := by
     funext b₁ b₂
@@ -49,7 +49,7 @@ def of_choi_matrix (M : Matrix (A × B) (A × B) R) : MatrixMap A B R where
 
 /-- Proves that `MatrixMap.of_choi_matrix` and `MatrixMap.choi_matrix` inverses. -/
 @[simp]
-theorem map_choi_inv (M : Matrix (A × B) (A × B) R) : choi_matrix (of_choi_matrix M) = M := by
+theorem map_choi_inv (M : Matrix (B × A) (B × A) R) : choi_matrix (of_choi_matrix M) = M := by
   ext ⟨i₁,i₂⟩ ⟨j₁,j₂⟩
   simp [of_choi_matrix, choi_matrix, Matrix.stdBasisMatrix, ite_and]
 

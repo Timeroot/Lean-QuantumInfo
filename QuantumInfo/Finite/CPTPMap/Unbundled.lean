@@ -22,13 +22,13 @@ def IsTracePreserving (M : MatrixMap A B R) : Prop :=
 
 /-- A map is trace preserving iff the partial trace of the Choi matrix is the identity. -/
 theorem IsTracePreserving_iff_trace_choi (M : MatrixMap A B R) : M.IsTracePreserving
-    ↔ M.choi_matrix.traceRight = 1 := by
+    ↔ M.choi_matrix.traceLeft = 1 := by
   constructor
   · intro h
     ext a₁ a₂
     replace h := h (Matrix.stdBasisMatrix a₁ a₂ 1)
     simp_rw [Matrix.trace, Matrix.diag] at h
-    simp only [Matrix.traceRight, choi_matrix, Matrix.of_apply, h]
+    simp only [Matrix.traceLeft, choi_matrix, Matrix.of_apply, h]
     simp only [Matrix.stdBasisMatrix, Matrix.of_apply, Finset.sum_boole, Matrix.one_apply]
     have : (fun x => a₁ = x ∧ a₂ = x) = (fun x => a₁ = a₂ ∧ a₂ = x) := by
       funext x
@@ -39,7 +39,7 @@ theorem IsTracePreserving_iff_trace_choi (M : MatrixMap A B R) : M.IsTracePreser
     <;> simp [this, h, Finset.filter_eq, Fintype.sum_prod_type]
   · intro h X
     replace h := fun (a₁ a₂ : A) ↦ congrFun₂ h a₁ a₂
-    simp [Matrix.traceRight, Matrix.trace] at h ⊢
+    simp [Matrix.traceLeft, Matrix.trace] at h ⊢
     rw [← M.choi_map_inv, of_choi_matrix]
     dsimp
     rw [Finset.sum_comm_3, Finset.sum_comm_3]
@@ -58,7 +58,7 @@ theorem apply_trace {M : MatrixMap A B R} (h : M.IsTracePreserving) (ρ : Matrix
 /-- The trace of a Choi matrix of a TP map is the cardinality of the input space. -/
 theorem trace_choi {M : MatrixMap A B R} (h : M.IsTracePreserving) :
     M.choi_matrix.trace = (Finset.univ (α := A)).card := by
-  rw [← Matrix.traceRight_trace, (IsTracePreserving_iff_trace_choi M).mp h,
+  rw [← Matrix.traceLeft_trace, (IsTracePreserving_iff_trace_choi M).mp h,
     Matrix.trace_one, Finset.card_univ]
 
 variable {A : Type*} [Fintype A] in
