@@ -249,7 +249,14 @@ theorem kron_kronecker_const {C : Matrix d d R} (h : C.PosSemidef) {h₁ h₂ : 
 
 /-- Choi's theorem on completely positive maps: A map `IsCompletelyPositive` iff its Choi Matrix is PSD. -/
 theorem _root_.MatrixMap.choi_PSD_iff_CP_map [DecidableEq A] (M : MatrixMap A B ℂ) :
-    M.IsCompletelyPositive ↔ M.choi_matrix.PosSemidef :=
+    M.IsCompletelyPositive ↔ M.choi_matrix.PosSemidef := by
+  by_cases hA : Nonempty A
+  constructor
+  · intro hcp
+    rw [choi_matrix_state_rep]
+    apply Matrix.PosSemidef.smul _ (h := Linarith.natCast_nonneg ℂ (Fintype.card A))
+    exact of_Fintype hcp A (MState.pure (Ket.MES A)).pos
+  · sorry
   sorry
 
 /-- The channel X ↦ ∑ k : κ, (M k) * X * (N k)ᴴ formed by Kraus operators M : κ → Matrix B A R

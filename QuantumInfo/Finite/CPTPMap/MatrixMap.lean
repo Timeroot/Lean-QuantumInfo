@@ -3,6 +3,8 @@ import Mathlib.LinearAlgebra.PiTensorProduct
 import Mathlib.Data.Set.Card
 import Mathlib.Algebra.Module.LinearMap.Basic
 import QuantumInfo.ForMathlib
+import QuantumInfo.Finite.Braket
+import QuantumInfo.Finite.MState
 
 /-! # Linear maps of matrices
 
@@ -188,6 +190,32 @@ theorem kron_map_of_kron_state [CommRing R] (M₁ : MatrixMap A B R) (M₂ : Mat
   -- simp
   sorry
   sorry
+
+theorem choi_matrix_state_rep {B : Type*} [Fintype B] [Nonempty A] (M : MatrixMap A B ℂ) :
+  M.choi_matrix = (↑(Fintype.card (α := A)) : ℂ) • (M ⊗ₖₘ (LinearMap.id : MatrixMap A A ℂ)) (MState.pure (Ket.MES A)).m := by
+  ext i j
+  simp [choi_matrix, kron_def M _ _, Ket.MES, Ket.apply, Finset.mul_sum]
+  conv =>
+    rhs
+    conv =>
+      enter [2, x, 2, a_1]
+      conv =>
+        enter [2, a_2]
+        simp [apply_ite]
+      simp [Finset.sum_ite]
+      rw [←mul_inv, ←Complex.ofReal_mul, ←Real.sqrt_mul (Linarith.natCast_nonneg _ _), Real.sqrt_mul_self (Linarith.natCast_nonneg _ _), mul_comm, mul_assoc]
+      simp only [Complex.ofReal_natCast, ne_eq, Nat.cast_eq_zero, Fintype.card_ne_zero,
+        not_false_eq_true, inv_mul_cancel₀, mul_one]
+      conv =>
+        right
+        rw [Matrix.stdBasisMatrix, Matrix.of_apply]
+        enter [1]
+        rw [and_comm]
+      simp [apply_ite, ite_and]
+    conv =>
+      enter [2, x]
+      simp [Finset.sum_ite]
+    simp [Finset.sum_ite]
 
 end kron
 
