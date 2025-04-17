@@ -21,7 +21,14 @@ noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : ℝ) (S : Set (MSt
 
 scoped notation "β_" ε " (" ρ "‖" S ")" =>  OptimalHypothesisRate ρ ε S
 
-theorem OptimalHypothesisRate_ε_zero {ρ : MState d} {S : Set (MState d)} (hS : S.Nonempty) :
+theorem OptimalHypothesisRate_le {ρ : MState d} {ε : ℝ} {S : Set (MState d)}
+  (m : HermitianMat d ℂ) (hExp : ρ.exp_val (1 - m) ≤ ε) (hm : 0 ≤ m ∧ m ≤ 1) :
+  β_ ε(ρ‖S) ≤ ⨆ σ ∈ S, ⟨_, σ.exp_val_prob hm⟩ := by
+  unfold OptimalHypothesisRate
+  apply iInf_le_of_le ⟨m, ⟨hExp, hm⟩⟩ _
+  simp only [le_refl]
+
+theorem OptimalHypothesisRate_ε_zero {ρ : MState d} (hFull : ρ.m.PosDef) {S : Set (MState d)} (hS : S.Nonempty) :
   β_ 0(ρ‖S) = 1 := by
   sorry
 
@@ -42,6 +49,13 @@ theorem negLog_OptimalHypothesisRate_le_singleton (ρ : MState d) (ε : ℝ) (S 
   apply Prob.negLog_Antitone
   apply OptimalHypothesisRate_le_of_subset
   exact Set.singleton_subset_iff.mpr h
+
+theorem OptimalHypothesisRate_le_singleton {ρ σ : MState d} {ε : ℝ}
+  (m : HermitianMat d ℂ) (hExp : ρ.exp_val (1 - m) ≤ ε) (hm : 0 ≤ m ∧ m ≤ 1) :
+  β_ ε(ρ‖{σ}) ≤ ⟨_, σ.exp_val_prob hm⟩ := by
+  rw [OptimalHypothesisRate_singleton]
+  apply iInf_le_of_le ⟨m, ⟨hExp, hm⟩⟩ _
+  simp only [le_refl]
 
 /-- The minimax theorem, at the level of generality we need. Convex, compact sets,
  and a bilinear function on ℝ. -/
@@ -536,6 +550,9 @@ theorem proj_le_nonneg : 0 ≤ {A ≤ₚ B} := by
   rw [←proj_le_sq]
   exact HermitianMat.sq_nonneg
 
+theorem proj_le_le_one : {A ≤ₚ B} ≤ 1 := by
+  sorry
+
 theorem proj_le_mul_nonneg : 0 ≤ {A ≤ₚ B}.toMat * (B - A).toMat := by
   rw [proj_le_cfc]
   nth_rewrite 2 [←cfc_id ℝ (B - A).toMat]
@@ -559,10 +576,11 @@ theorem proj_le_inner_le : {A ≤ₚ B}.inner A ≤ {A ≤ₚ B}.inner B := by
 
 -- TODO: Commutation and order relations specified in the text between Eqs. (S77) and (S78)
 
-theorem LemmaS2 {ε3 : ℝ} (hε3 : 0 ≤ ε3 ∧ ε3 ≤ 1) {ε4 : ℝ} (hε4 : 0 < ε4)
-  {d : ℕ → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)] (ρ : (n : ℕ) → MState (d n)) (σ : (n : ℕ) → MState (d n))
-  {Rinf : ℝ} (hRinf : ENNReal.ofReal Rinf ≥ Filter.liminf (fun n ↦ —log β_ ε3(ρ n‖{σ n}) / n) Filter.atTop)
-  {Rsup : ℝ} (hRsup : ENNReal.ofReal Rsup ≥ Filter.limsup (fun n ↦ —log β_ ε3(ρ n‖{σ n}) / n) Filter.atTop)
+-- The assumption (hε3 : 0 ≤ ε3 ∧ ε3 ≤ 1) stated in the paper was not used
+theorem LemmaS2 {ε3 : ℝ} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
+  {d : PNat → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)] (ρ : (n : PNat) → MState (d n)) (σ : (n : PNat) → MState (d n))
+  {Rinf : ℝ≥0} (hRinf : ↑Rinf ≥ Filter.liminf (fun n ↦ (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n})) Filter.atTop)
+  {Rsup : ℝ≥0} (hRsup : ↑Rsup ≥ Filter.limsup (fun n ↦ (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n})) Filter.atTop)
   :
   (Filter.liminf (fun n ↦ {(ρ n).M ≥ₚ (Real.exp (↑n * (Rinf + ε4))) • (σ n).M}.inner (ρ n)) Filter.atTop ≤ 1 - ε3) ∧
   (Filter.limsup (fun n ↦ {(ρ n).M ≥ₚ (Real.exp (↑n * (Rsup + ε4))) • (σ n).M}.inner (ρ n)) Filter.atTop ≤ 1 - ε3)
@@ -574,16 +592,116 @@ theorem LemmaS2 {ε3 : ℝ} (hε3 : 0 ≤ ε3 ∧ ε3 ≤ 1) {ε4 : ℝ} (hε4 :
     · replace h := Filter.eventually_atTop.mp h
       obtain ⟨n₀, h⟩ := h
       let T := fun n ↦ {(ρ n).M ≥ₚ (Real.exp (↑n * (Rinf + ε4))) • (σ n).M}
-      have hT : ∀ n ≥ n₀, (ρ n).exp_val (1 - (T n)) ≤ ε3 := fun n hn ↦ by
-        sorry
-      have hβ : ∀ n ≥ n₀, β_ ε3(ρ n‖{σ n}) ≤ Real.exp (-↑n * (Rsup + ε4)) := fun n hn ↦ by
-        sorry
-      have h' : ∀ n ≥ n₀, ENNReal.ofReal (Rinf + ε4) ≤ —log β_ ε3(ρ n‖{σ n}) := fun n hn ↦ by
-        sorry
-      sorry
-    sorry
-  · -- Basically the same proof as the Rinf case
-    sorry
+      have hT : ∀ n ≥ n₀, (ρ n).exp_val (1 - (T n)) ≤ ε3 := fun n hn ↦ by -- Eq (S23)
+        unfold MState.exp_val T
+        rw [HermitianMat.inner_left_sub, HermitianMat.inner_one, MState.tr',
+          HermitianMat.inner_comm, tsub_le_iff_right, add_comm, ←tsub_le_iff_right]
+        apply le_of_lt
+        exact h n hn
+      have hβ : ∀ n ≥ n₀, β_ ε3(ρ n‖{σ n}) ≤ Real.exp (-↑n * (Rinf + ε4)) := fun n hn ↦ by -- Eq (S25)
+        calc
+          β_ ε3(ρ n‖{σ n}) ≤ (σ n).exp_val (T n) := by
+            have hβ' := OptimalHypothesisRate_le_singleton (σ := σ n) (T n) (hT n hn) ⟨proj_le_nonneg _ _, proj_le_le_one _ _⟩
+            simp only [Subtype.coe_le_coe.mpr hβ']
+          _ <= (T n).inner (Real.exp (-↑n * (Rinf + ε4)) • (ρ n).M) := by
+            rw [← mul_le_mul_left (Real.exp_pos ((↑n * (Rinf + ε4)))), HermitianMat.inner_smul, neg_mul, Real.exp_neg]
+            simp only [isUnit_iff_ne_zero, ne_eq, Real.exp_ne_zero, not_false_eq_true,
+              IsUnit.mul_inv_cancel_left]
+            rw [MState.exp_val, HermitianMat.inner_comm, ←HermitianMat.inner_smul]
+            unfold T
+            exact proj_le_inner_le (Real.exp (↑n * (Rinf + ε4)) • (σ n).M) (ρ n).M
+          _ <= Real.exp (-↑n * (Rinf + ε4)) := by
+            simp [HermitianMat.inner_smul]
+            rw [mul_comm]
+            apply (mul_le_iff_le_one_left (Real.exp_pos (-(↑n * (Rinf + ε4))))).mpr
+            rw [HermitianMat.inner_comm, ←MState.exp_val]
+            exact MState.exp_val_le_one (proj_le_le_one _ _) (ρ n)
+      have h' : ∀ n ≥ n₀, ↑Rinf + ↑ε4 ≤ (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n}):= fun n hn↦ by -- Eq (S26)
+        have hn1 : (↑↑n : ENNReal) ≠ 0 := by simp only [ne_eq, Nat.cast_eq_zero, PNat.ne_zero, not_false_eq_true]
+        have hn2 : (↑↑n : ENNReal) ≠ ⊤ := by simp only [ne_eq, ENNReal.natCast_ne_top, not_false_eq_true]
+        have hh : ↑↑n * (↑Rinf + ↑ε4) = ENNReal.ofReal (n *(Rinf + ε4)) := by
+          simp only [Nat.cast_nonneg, ENNReal.ofReal_mul, ENNReal.ofReal_natCast, zero_le_coe,
+            ENNReal.ofReal_add, ENNReal.ofReal_coe_nnreal]
+        apply (ENNReal.mul_le_mul_left (a := ↑↑n) (b := ↑Rinf + ↑ε4) (c := (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n})) hn1 hn2).mp
+        rw [←mul_assoc, ENNReal.mul_inv_cancel hn1 hn2, one_mul, hh]
+        apply Prob.le_negLog_of_le_exp
+        rw [←neg_mul]
+        exact hβ n hn
+      have hf : ∀ᶠ (n : ℕ+) in Filter.atTop, ↑Rinf + ↑ε4 ≤ (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n}) := by
+        rw [Filter.eventually_atTop]
+        use n₀
+      replace hf := Filter.le_liminf_of_le ?_ hf
+      · replace hf := le_trans hf hRinf
+        replace hf :=  tsub_eq_zero_iff_le.mpr hf
+        simp_all
+      apply Filter.IsCobounded.of_frequently_le (u := ⊤)
+      simp [Filter.frequently_atTop]
+      intro n; use n
+    apply Filter.isBoundedUnder_of
+    use 0; intro n
+    rw [HermitianMat.inner_comm, ←MState.exp_val, ge_iff_le]
+    exact MState.exp_val_nonneg (proj_le_nonneg (Real.exp (↑↑n * (↑Rinf + ↑ε4)) • (σ n).M) (ρ n).M) (ρ n)
+  · -- Basically the same proof as the Rinf case, but with liminf → limsup, ∀ᶠ → ∃ᶠ, etc.
+    by_contra h
+    push_neg at h
+    replace h := Filter.frequently_lt_of_lt_limsup ?_ h
+    · replace h := Filter.frequently_atTop.mp h
+      let T := fun n ↦ {(ρ n).M ≥ₚ (Real.exp (↑n * (Rsup + ε4))) • (σ n).M}
+      have hT : ∀ n₀, ∃ n ≥ n₀, (ρ n).exp_val (1 - (T n)) ≤ ε3 := fun n₀ ↦ by -- Eq (S30)
+        obtain ⟨n, ⟨hn, h⟩⟩ := h n₀
+        use n; use hn
+        unfold MState.exp_val T
+        rw [HermitianMat.inner_left_sub, HermitianMat.inner_one, MState.tr',
+          HermitianMat.inner_comm, tsub_le_iff_right, add_comm, ←tsub_le_iff_right]
+        apply le_of_lt
+        exact h
+      have hβ : ∀ n₀, ∃ n ≥ n₀, β_ ε3(ρ n‖{σ n}) ≤ Real.exp (-↑n * (Rsup + ε4)) := fun n₀ ↦ by -- Eq (S32)
+        obtain ⟨n, ⟨hn, hT⟩⟩ := hT n₀
+        use n; use hn
+        calc
+          β_ ε3(ρ n‖{σ n}) ≤ (σ n).exp_val (T n) := by
+            have hβ' := OptimalHypothesisRate_le_singleton (σ := σ n) (T n) hT ⟨proj_le_nonneg _ _, proj_le_le_one _ _⟩
+            simp only [Subtype.coe_le_coe.mpr hβ']
+          _ <= (T n).inner (Real.exp (-↑n * (Rsup + ε4)) • (ρ n).M) := by
+            rw [← mul_le_mul_left (Real.exp_pos ((↑n * (Rsup + ε4)))), HermitianMat.inner_smul, neg_mul, Real.exp_neg]
+            simp only [isUnit_iff_ne_zero, ne_eq, Real.exp_ne_zero, not_false_eq_true,
+              IsUnit.mul_inv_cancel_left]
+            rw [MState.exp_val, HermitianMat.inner_comm, ←HermitianMat.inner_smul]
+            unfold T
+            exact proj_le_inner_le (Real.exp (↑n * (Rsup + ε4)) • (σ n).M) (ρ n).M
+          _ <= Real.exp (-↑n * (Rsup + ε4)) := by
+            simp [HermitianMat.inner_smul]
+            rw [mul_comm]
+            apply (mul_le_iff_le_one_left (Real.exp_pos (-(↑n * (Rsup + ε4))))).mpr
+            rw [HermitianMat.inner_comm, ←MState.exp_val]
+            exact MState.exp_val_le_one (proj_le_le_one _ _) (ρ n)
+      have h' : ∀ n₀, ∃ n ≥ n₀, ↑Rsup + ↑ε4 ≤ (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n}):= fun n₀ ↦ by -- Eq (S33)
+        obtain ⟨n, ⟨hn, hβ⟩⟩ := hβ n₀
+        use n; use hn
+        have hn1 : (↑↑n : ENNReal) ≠ 0 := by simp only [ne_eq, Nat.cast_eq_zero, PNat.ne_zero, not_false_eq_true]
+        have hn2 : (↑↑n : ENNReal) ≠ ⊤ := by simp only [ne_eq, ENNReal.natCast_ne_top, not_false_eq_true]
+        have hh : ↑↑n * (↑Rsup + ↑ε4) = ENNReal.ofReal (n *(Rsup + ε4)) := by
+          simp only [Nat.cast_nonneg, ENNReal.ofReal_mul, ENNReal.ofReal_natCast, zero_le_coe,
+            ENNReal.ofReal_add, ENNReal.ofReal_coe_nnreal]
+        apply (ENNReal.mul_le_mul_left (a := ↑↑n) (b := ↑Rsup + ↑ε4) (c := (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n})) hn1 hn2).mp
+        rw [←mul_assoc, ENNReal.mul_inv_cancel hn1 hn2, one_mul, hh]
+        apply Prob.le_negLog_of_le_exp
+        rw [←neg_mul]
+        exact hβ
+      have hf : ∃ᶠ (n : ℕ+) in Filter.atTop, ↑Rsup + ↑ε4 ≤ (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n}) := by
+        rw [Filter.frequently_atTop]
+        exact h'
+      replace hf := Filter.le_limsup_of_frequently_le hf ?_
+      · replace hf := le_trans hf hRsup
+        replace hf :=  tsub_eq_zero_iff_le.mpr hf
+        simp_all
+      apply Filter.isBoundedUnder_of
+      use ⊤; intro n
+      exact le_top
+    apply Filter.isCoboundedUnder_le_of_le Filter.atTop (x := 0)
+    intro n
+    rw [HermitianMat.inner_comm, ←MState.exp_val]
+    exact MState.exp_val_nonneg (proj_le_nonneg (Real.exp (↑↑n * (↑Rsup + ↑ε4)) • (σ n).M) (ρ n).M) (ρ n)
 
 end proj
 

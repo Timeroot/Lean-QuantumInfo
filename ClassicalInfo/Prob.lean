@@ -393,7 +393,7 @@ theorem negLog_pos_Real {p : Prob} : (—log p).toReal = -Real.log p := by
   · simp [negLog, hp]
   · simp [hp]
 
-theorem le_negLog_of_le_exp {p : Prob} {x : ℝ} (h : p ≤ Real.exp x) : ENNReal.ofReal (-x) ≤ —log p := by
+theorem le_negLog_of_le_exp {p : Prob} {x : ℝ} (h : p ≤ Real.exp (-x) ) : ENNReal.ofReal x ≤ —log p := by
   sorry
 
 end Prob
