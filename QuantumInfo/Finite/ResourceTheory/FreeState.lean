@@ -1,8 +1,8 @@
 import Mathlib.Algebra.Module.Submodule.Lattice
 import Mathlib.Analysis.Subadditive
-import Mathlib.CategoryTheory.FullSubcategory
+import Mathlib.CategoryTheory.Functor.FullyFaithful
 import Mathlib.CategoryTheory.Monoidal.Braided.Basic
-import Mathlib.Data.Real.EReal
+import Mathlib.Data.EReal.Basic
 
 import QuantumInfo.Finite.CPTPMap
 import QuantumInfo.Finite.Entropy
@@ -82,7 +82,7 @@ some necessary axioms:
 -/
 class FreeStateTheory (ι : Type*) extends ResourcePretheory ι where
   /-- The set of states we're calling "free" -/
-  IsFree : Set (MState (H i))
+  IsFree : Set (MState (toResourcePretheory.H i))
   /-- The set F(H) of free states is closed -/
   free_closed : IsClosed (@IsFree i)
   /-- The set F(H) of free states is convex (more precisely, their matrices are) -/

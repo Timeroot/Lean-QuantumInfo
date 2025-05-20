@@ -42,7 +42,7 @@ state to an `d × X`-dimensional quantum-classical state. -/
 def measurement_map (Λ : POVM X d) : CPTPMap d (d × X) where
   toLinearMap :=
     ∑ (x : X), open Kronecker in {
-      toFun := fun ρ ↦ ((((Λ.mats x) ^ (1/2:ℝ)).toMat * ρ * ((Λ.mats x)^(1/2:ℝ)).toMat) ⊗ₖ Matrix.stdBasisMatrix x x 1)
+      toFun := fun ρ ↦ ((((Λ.mats x) ^ (1/2:ℝ)).toMat * ρ * ((Λ.mats x)^(1/2:ℝ)).toMat) ⊗ₖ Matrix.single x x 1)
       map_add' := by simp [mul_add, add_mul, Matrix.kroneckerMap_add_left]
       map_smul' := by simp [Matrix.smul_kronecker]
     }
@@ -71,11 +71,10 @@ def measurement_map (Λ : POVM X d) : CPTPMap d (d × X) where
     --     convert (Matrix.PosSemidef.stdBasisMatrix_iff_eq x x (zero_lt_one' ℂ)).2 rfl
   TP := by
     intro x
-    dsimp
     rw [LinearMap.sum_apply, trace_sum]
     dsimp
     simp only [Matrix.trace_kronecker, Matrix.trace_mul_cycle (B := x),
-      Matrix.StdBasisMatrix.trace_eq, mul_one]
+      Matrix.trace_single_eq_same, mul_one]
     rw [← trace_sum, ← Finset.sum_mul]
     congr
     convert one_mul x

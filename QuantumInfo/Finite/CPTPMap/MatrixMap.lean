@@ -38,7 +38,7 @@ def id : MatrixMap A A R := LinearMap.id
   aren't CPTP, it's just rarely talked about in those contexts. This is the inverse of
   `MatrixMap.of_choi_matrix`. Compare with `MatrixMap.toMatrix`, which gives the transfer matrix. -/
 def choi_matrix (M : MatrixMap A B R) : Matrix (B × A) (B × A) R :=
-  fun (j₁,i₁) (j₂,i₂) ↦ M (Matrix.stdBasisMatrix i₁ i₂ 1) j₁ j₂
+  fun (j₁,i₁) (j₂,i₂) ↦ M (Matrix.single i₁ i₂ 1) j₁ j₂
 
 /-- Given the Choi matrix, generate the corresponding R-linear map between matrices as a
 MatrixMap. This is the inverse of `MatrixMap.choi_matrix`. -/
@@ -53,7 +53,7 @@ def of_choi_matrix (M : Matrix (B × A) (B × A) R) : MatrixMap A B R where
 @[simp]
 theorem map_choi_inv (M : Matrix (B × A) (B × A) R) : choi_matrix (of_choi_matrix M) = M := by
   ext ⟨i₁,i₂⟩ ⟨j₁,j₂⟩
-  simp [of_choi_matrix, choi_matrix, Matrix.stdBasisMatrix, ite_and]
+  simp [of_choi_matrix, choi_matrix, Matrix.single, ite_and]
 
 /-- Proves that `MatrixMap.choi_matrix` and `MatrixMap.of_choi_matrix` inverses. -/
 @[simp]
@@ -120,12 +120,12 @@ scoped[MatrixMap] infixl:100 " ⊗ₖₘ " => MatrixMap.kron
 
 /-- The extensional definition of the Kronecker product `MatrixMap.kron`, in terms of the entries of its image. -/
 theorem kron_def [CommRing R] (M₁ : MatrixMap A B R) (M₂ : MatrixMap C D R) (M : Matrix (A × C) (A × C) R) : (M₁ ⊗ₖₘ M₂) M (b₁, d₁) (b₂, d₂) =
-  ∑ a₁, ∑ a₂, ∑ c₁, ∑ c₂, (M₁ (Matrix.stdBasisMatrix a₁ a₂ 1) b₁ b₂) * (M₂ (Matrix.stdBasisMatrix c₁ c₂ 1) d₁ d₂) * (M (a₁, c₁) (a₂, c₂)) := by
+  ∑ a₁, ∑ a₂, ∑ c₁, ∑ c₂, (M₁ (Matrix.single a₁ a₂ 1) b₁ b₂) * (M₂ (Matrix.single c₁ c₂ 1) d₁ d₂) * (M (a₁, c₁) (a₂, c₂)) := by
   rw [kron, TensorProduct.toMatrix_map]
   simp
   rw [Matrix.toLin_apply]
   simp [Equiv.prodProdProdComm, Matrix.kroneckerMap, Matrix.submatrix, LinearMap.toMatrix]
-  simp [Matrix.stdBasis_eq_stdBasisMatrix]
+  simp [Matrix.stdBasis_eq_single]
   sorry
 
 section kron_lemmas
@@ -208,7 +208,7 @@ theorem choi_matrix_state_rep {B : Type*} [Fintype B] [Nonempty A] (M : MatrixMa
         not_false_eq_true, inv_mul_cancel₀, mul_one]
       conv =>
         right
-        rw [Matrix.stdBasisMatrix, Matrix.of_apply]
+        rw [Matrix.single, Matrix.of_apply]
         enter [1]
         rw [and_comm]
       simp [apply_ite, ite_and]
@@ -230,7 +230,7 @@ variable {s : ι → Type*} [∀ i, AddCommMonoid (s i)] [∀ i, Module R (s i)]
 variable {L : ι → Type* }
 
 /-- Like `Basis.tensorProduct`, but for `PiTensorProduct` -/
-def Basis.piTensorProduct [∀i, Fintype (L i)]  (b : (i:ι) → Basis (L i) R (s i)) :
+noncomputable def Basis.piTensorProduct [∀i, Fintype (L i)]  (b : (i:ι) → Basis (L i) R (s i)) :
     Basis ((i:ι) → L i) R (PiTensorProduct R s) :=
   Finsupp.basisSingleOne.map sorry
 

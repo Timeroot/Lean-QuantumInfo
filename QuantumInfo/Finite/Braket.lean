@@ -30,13 +30,13 @@ variable (d : Type*) [Fintype d]
  states and so cannot (in general) be added or scaled. -/
 structure Ket where
   vec : d → ℂ
-  normalized' : ∑ x, ‖vec x‖^2 = 1
+  normalized' : ∑ x, ‖vec x‖ ^ 2 = 1
 
 /-- A bra is definitionally identical to a `Ket`, but are separate to avoid complex conjugation confusion.
  They can be interconverted with the adjoint: `Ket.to_bra` and `Bra.to_ket` -/
 structure Bra where
   vec : d → ℂ
-  normalized' : ∑ x, ‖vec x‖^2 =1
+  normalized' : ∑ x, ‖vec x‖ ^ 2 =1
 
 end section
 
@@ -246,11 +246,11 @@ theorem Ket.IsProd_iff_mul_eq_mul (ψ : Ket (d₁ × d₂)) : ψ.IsProd ↔
   · intro hcrossm
     obtain ⟨⟨a, b⟩, hψnonZero⟩ := Ket.exists_ne_zero ψ
     -- May be able to simplify proof below by using Ket.normalize
-    let v₁ : d₁ → ℂ := fun x => (Complex.abs (ψ (a,b)) ) / (ψ (a,b)) * ((ψ (x, b)) /√(∑ i : d₁, Complex.normSq (ψ (i, b))))
-    let v₂ : d₂ → ℂ := fun y => (ψ (a, y)) /√(∑ j : d₂, Complex.normSq (ψ (a, j)))
+    let v₁ : d₁ → ℂ := fun x => ‖ψ (a, b)‖ / (ψ (a, b)) * ((ψ (x, b)) / √(∑ i : d₁, ‖ψ (i, b)‖^2))
+    let v₂ : d₂ → ℂ := fun y => ψ (a, y) / √(∑ j : d₂, ‖ψ (a, j)‖^2)
     have hv1Norm : ∑ x, ‖v₁ x‖^2 = 1 := by
       simp only [← Complex.normSq_eq_norm_sq, v₁, Complex.normSq_mul, Complex.normSq_div,
-      Complex.normSq_ofReal, ←sq]
+      Complex.normSq_ofReal, ← sq]
       rw [div_self _]
       have hnonneg : ∑ i : d₁, Complex.normSq (ψ (i, b)) ≥ 0 := Fintype.sum_nonneg (fun i => Complex.normSq_nonneg (ψ (i, b)))
       · simp_rw [Real.sq_sqrt hnonneg, one_mul, div_eq_inv_mul, ←Finset.mul_sum]
@@ -263,7 +263,7 @@ theorem Ket.IsProd_iff_mul_eq_mul (ψ : Ket (d₁ × d₂)) : ψ.IsProd ↔
       · simp_all only [ne_eq, map_eq_zero, not_false_eq_true]
     have hv2Norm : ∑ x, ‖v₂ x‖^2 = 1 := by
       simp only [← Complex.normSq_eq_norm_sq, v₂, Complex.normSq_div,
-      Complex.normSq_ofReal, ←sq]
+      Complex.normSq_ofReal, ← sq]
       have hnonneg : ∑ j : d₂, Complex.normSq (ψ (a, j)) ≥ 0 := Fintype.sum_nonneg (fun j => Complex.normSq_nonneg (ψ (a, j)))
       simp_rw [Real.sq_sqrt hnonneg, div_eq_inv_mul, ←Finset.mul_sum]
       apply inv_mul_cancel₀
@@ -280,14 +280,13 @@ theorem Ket.IsProd_iff_mul_eq_mul (ψ : Ket (d₁ × d₂)) : ψ.IsProd ↔
     have hψnorm : (∑ z : d₁ × d₂, Complex.normSq (ψ.vec (z.1, b) * ψ.vec (a, z.2))) = Complex.normSq (ψ (a, b)) :=
     calc
       ∑ z : d₁ × d₂, Complex.normSq (ψ.vec (z.1, b) * ψ.vec (a, z.2)) =
-        ∑ z : d₁ × d₂, Complex.normSq (ψ.vec (a, b) * ψ.vec (z.1, z.2)) := by simp only [←apply, hcrossm, mul_comm]
+        ∑ z : d₁ × d₂, Complex.normSq (ψ.vec (a, b) * ψ.vec (z.1, z.2)) := by simp only [← apply, hcrossm, mul_comm]
       _ = ∑ z : d₁ × d₂, Complex.normSq (ψ.vec (a, b)) * Complex.normSq (ψ.vec (z.1, z.2)) := by simp only [Complex.normSq_mul]
       _ = Complex.normSq (ψ.vec (a, b)) * ∑ z : d₁ × d₂, Complex.normSq (ψ.vec z) := by rw [←Finset.mul_sum]
-      _ = Complex.normSq (ψ.vec (a, b)) := by simp only [←apply, ψ.normalized, mul_one]
+      _ = Complex.normSq (ψ.vec (a, b)) := by simp only [← apply, ψ.normalized, mul_one]
     simp [prod, apply, v₁, v₂]
     rw [mul_assoc, ←mul_div_mul_comm, ←Complex.ofReal_mul, ←Real.sqrt_mul (Finset.sum_nonneg _)]
-    · sorry
-      -- simp_rw [Fintype.sum_mul_sum, ←Fintype.sum_prod_type',
+    · -- simp_rw [Fintype.sum_mul_sum, ←Fintype.sum_prod_type',
       -- Fintype.sum_congr _ _ (fun z : d₁ × d₂ => (Complex.normSq_mul (ψ.vec (z.1, b)) (ψ.vec (a, z.2))).symm),
       -- hψnorm, Complex.normSq_eq_abs, Real.sqrt_sq_eq_abs, Complex.abs_abs, apply]
       -- ring_nf
@@ -300,9 +299,8 @@ theorem Ket.IsProd_iff_mul_eq_mul (ψ : Ket (d₁ × d₂)) : ψ.IsProd ↔
       --   exact hψfun
       -- · simp only [ne_eq, inv_eq_zero, Complex.ofReal_eq_zero, map_eq_zero]
       --   exact hψnonZero
+      sorry
     · simp
-      intro i
-      exact Complex.normSq_nonneg (ψ.vec (i, b))
 end prod
 
 section mes
@@ -333,10 +331,10 @@ def Ket.PhaseEquiv : Setoid (Ket d) where
     refl := fun x ↦ ⟨1, by simp⟩,
     symm := fun ⟨z,h₁,h₂⟩ ↦ ⟨conj z,
       by simp [h₁],
-      by simp [h₂, smul_smul, ← Complex.normSq_eq_conj_mul_self, Complex.normSq_eq_norm_sq, h₁]⟩,
+      by simp [h₁, h₂, smul_smul, ← Complex.normSq_eq_conj_mul_self, Complex.normSq_eq_norm_sq]⟩,
     trans := fun ⟨z₁,h₁₁,h₁₂⟩ ⟨z₂,h₂₁,h₂₂⟩ ↦ ⟨z₁ * z₂,
       by simp [h₁₁, h₂₁],
-      by simpa [h₁₂, h₂₂] using smul_smul _ _ _⟩
+      by simp [h₁₂, h₂₂, smul_smul]⟩
   }
 
 variable (d) in

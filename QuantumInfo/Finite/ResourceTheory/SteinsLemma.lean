@@ -22,14 +22,14 @@ noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : ℝ) (S : Set (MSt
 scoped notation "β_" ε " (" ρ "‖" S ")" =>  OptimalHypothesisRate ρ ε S
 
 theorem OptimalHypothesisRate_le {ρ : MState d} {ε : ℝ} {S : Set (MState d)}
-  (m : HermitianMat d ℂ) (hExp : ρ.exp_val (1 - m) ≤ ε) (hm : 0 ≤ m ∧ m ≤ 1) :
-  β_ ε(ρ‖S) ≤ ⨆ σ ∈ S, ⟨_, σ.exp_val_prob hm⟩ := by
+    (m : HermitianMat d ℂ) (hExp : ρ.exp_val (1 - m) ≤ ε) (hm : 0 ≤ m ∧ m ≤ 1) :
+    β_ ε(ρ‖S) ≤ ⨆ σ ∈ S, ⟨_, σ.exp_val_prob hm⟩ := by
   unfold OptimalHypothesisRate
   apply iInf_le_of_le ⟨m, ⟨hExp, hm⟩⟩ _
   simp only [le_refl]
 
 theorem OptimalHypothesisRate_ε_zero {ρ : MState d} (hFull : ρ.m.PosDef) {S : Set (MState d)} (hS : S.Nonempty) :
-  β_ 0(ρ‖S) = 1 := by
+    β_ 0(ρ‖S) = 1 := by
   sorry
 
 theorem OptimalHypothesisRate_le_of_subset (ρ : MState d) (ε : ℝ) {S1 S2 : Set (MState d)} (h : S1 ⊆ S2) :
@@ -37,15 +37,14 @@ theorem OptimalHypothesisRate_le_of_subset (ρ : MState d) (ε : ℝ) {S1 S2 : S
   iInf_mono (fun _ ↦ iSup_le_iSup_of_subset h)
 
 theorem OptimalHypothesisRate_singleton {ρ σ : MState d} {ε : ℝ}  :
-  β_ ε(ρ‖{σ}) =
-    ⨅ T : { m : HermitianMat d ℂ // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1},
-      ⟨_, σ.exp_val_prob T.2.right⟩
+    β_ ε(ρ‖{σ}) =
+      ⨅ T : { m : HermitianMat d ℂ // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1},
+        ⟨_, σ.exp_val_prob T.2.right⟩
   := by
   simp only [OptimalHypothesisRate, iSup_singleton]
 
 theorem negLog_OptimalHypothesisRate_le_singleton (ρ : MState d) (ε : ℝ) (S : Set (MState d))
-    (σ : MState d) (h : σ ∈ S) :
-    —log β_ ε(ρ‖S) ≤ —log β_ ε(ρ‖{σ}) := by
+    (σ : MState d) (h : σ ∈ S) : —log β_ ε(ρ‖S) ≤ —log β_ ε(ρ‖{σ}) := by
   apply Prob.negLog_Antitone
   apply OptimalHypothesisRate_le_of_subset
   exact Set.singleton_subset_iff.mpr h
@@ -498,7 +497,7 @@ variable {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq dIn] [Deci
 
 set_option pp.proofs true in
 /-- Lemma S1 -/
-private theorem optimalHypothesisRate_antitone (ρ σ : MState dIn) (ℰ : CPTPMap dIn dOut) {ε₃ : ℝ} (h₃ : ε₃ ≥ 0) :
+private theorem optimalHypothesisRate_antitone (ρ σ : MState dIn) (ℰ : CPTPMap dIn dOut) (ε₃ : ℝ) :
     β_ ε₃(ρ‖{σ}) ≤ β_ ε₃(ℰ ρ‖{ℰ σ}) := by
   simp only [OptimalHypothesisRate_singleton]
   obtain ⟨ℰdualSubtype, h⟩ :

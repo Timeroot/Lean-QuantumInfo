@@ -104,14 +104,12 @@ def mk_of_ops [ResourcePretheory ι] (O : ∀ (i j : ι), Set (CPTPMap (H i) (H 
   free_closed := sorry
   free_convex {i} := convex_states_of_convex_ops O @h_convex i
   free_prod {i j ρ σ} hρ hσ k ρ₀ := by
-    dsimp at hρ hσ ⊢
     obtain ⟨f,hf1⟩ := hρ ρ
     obtain ⟨g,hg⟩ := hσ σ
     sorry
   free_fullRank := sorry
   nongenerating := by
     intro i j f hf ρ hFree k σ
-    dsimp
     obtain ⟨g,hg1,hg2⟩ := hFree σ
     use f.compose g
     constructor

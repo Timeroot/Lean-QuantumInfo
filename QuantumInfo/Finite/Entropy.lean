@@ -297,6 +297,7 @@ theorem qMutualInfo_strong_subadditivity (ρ₁₂₃ : MState (d₁ × d₂ × 
   simp only [qMutualInfo, MState.traceRight_left_assoc', MState.traceRight_right_assoc']
   linarith
 
+omit [DecidableEq dC] in
 /-- The quantum conditional mutual information `QCMI` is nonnegative. -/
 theorem qcmi_nonneg (ρ : MState (dA × dB × dC)) :
     0 ≤ qcmi ρ := by

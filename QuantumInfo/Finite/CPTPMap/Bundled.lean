@@ -105,6 +105,7 @@ theorem injective_toHPMap : (PMap.toHPMap (dIn := dIn) (dOut := dOut) (𝕜 := �
 
 /-- Positive maps are functions from `HermitianMat`s to `HermitianMat`s. -/
 instance instFunLike : FunLike (PMap dIn dOut 𝕜) (HermitianMat dIn 𝕜) (HermitianMat dOut 𝕜) where
+  coe := DFunLike.coe ∘ toHPMap
   coe_injective' := DFunLike.coe_injective'.comp injective_toHPMap
 
 instance instLinearMapClass : LinearMapClass (PMap dIn dOut 𝕜) ℝ (HermitianMat dIn 𝕜) (HermitianMat dOut 𝕜) where
@@ -141,8 +142,10 @@ theorem injective_toPMap : (PTPMap.toPMap (dIn := dIn) (dOut := dOut) (𝕜 := �
 
 /-- Positive trace-preserving maps are functions from `HermitianMat`s to `HermitianMat`s. -/
 instance instHFunLike : FunLike (PTPMap dIn dOut 𝕜) (HermitianMat dIn 𝕜) (HermitianMat dOut 𝕜) where
+  coe := DFunLike.coe ∘ toPMap
   coe_injective' := DFunLike.coe_injective'.comp injective_toPMap
 
+set_option synthInstance.maxHeartbeats 40000 in
 instance instLinearMapClass : LinearMapClass (PTPMap dIn dOut 𝕜) ℝ (HermitianMat dIn 𝕜) (HermitianMat dOut 𝕜) where
   map_add f x y := by simp [instHFunLike]
   map_smulₛₗ f c x := by simp [instHFunLike]
@@ -208,8 +211,10 @@ theorem injective_toPTPMap : (CPTPMap.toPTPMap (dIn := dIn) (dOut := dOut) (𝕜
 
 /-- Positive trace-preserving maps are functions from `HermitianMat`s to `HermitianMat`s. -/
 instance instHFunLike : FunLike (CPTPMap dIn dOut 𝕜) (HermitianMat dIn 𝕜) (HermitianMat dOut 𝕜) where
+  coe :=  DFunLike.coe ∘ toPTPMap
   coe_injective' := DFunLike.coe_injective'.comp injective_toPTPMap
 
+set_option synthInstance.maxHeartbeats 40000 in
 instance instHLinearMapClass : LinearMapClass (CPTPMap dIn dOut 𝕜) ℝ (HermitianMat dIn 𝕜) (HermitianMat dOut 𝕜) where
   map_add f x y := by simp [instHFunLike]
   map_smulₛₗ f c x := by simp [instHFunLike]
@@ -227,6 +232,7 @@ theorem pos_Hermitian (M : CPTPMap dIn dOut 𝕜) {x : HermitianMat dIn 𝕜} (h
 
 /-- `CPTPMap`s are functions from `MState`s to `MState`s. -/
 instance instMFunLike : FunLike (CPTPMap dIn dOut) (MState dIn) (MState dOut) where
+  coe := DFunLike.coe ∘ toPTPMap
   coe_injective' := DFunLike.coe_injective'.comp injective_toPTPMap
 
 @[norm_cast]

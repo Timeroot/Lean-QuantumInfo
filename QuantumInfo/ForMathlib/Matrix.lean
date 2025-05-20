@@ -1,9 +1,11 @@
 import Mathlib.Data.Matrix.Kronecker
 import Mathlib.LinearAlgebra.Matrix.PosDef
 import Mathlib.LinearAlgebra.Matrix.HermitianFunctionalCalculus
-import Mathlib.Algebra.Algebra.Quasispectrum
+import Mathlib.Algebra.Algebra.Spectrum.Quasispectrum
 
 import QuantumInfo.ForMathlib.Other
+
+noncomputable section
 
 open BigOperators
 open Classical
@@ -171,12 +173,12 @@ theorem convex_cone {c₁ c₂ : 𝕜} (hc₁ : 0 ≤ c₁) (hc₂ : 0 ≤ c₂)
 set_option trace.split.failure true
 
 /-- A standard basis matrix (with a positive entry) is positive semidefinite iff the entry is on the diagonal. -/
-theorem stdBasisMatrix_iff_eq (i j : m) {c : 𝕜} (hc : 0 < c) : (Matrix.stdBasisMatrix i j c).PosSemidef ↔ i = j := by
+theorem stdBasisMatrix_iff_eq (i j : m) {c : 𝕜} (hc : 0 < c) : (Matrix.single i j c).PosSemidef ↔ i = j := by
   constructor
   · intro ⟨hherm, _⟩
     rw [IsHermitian, ←Matrix.ext_iff] at hherm
     replace hherm := hherm i j
-    simp only [stdBasisMatrix, conjTranspose_apply, of_apply, true_and, RCLike.star_def, if_true] at hherm
+    simp only [single, conjTranspose_apply, of_apply, true_and, RCLike.star_def, if_true] at hherm
     apply_fun (starRingEnd 𝕜) at hherm
     have hcstar := RCLike.conj_eq_iff_im.mpr (RCLike.pos_iff.mp hc).right
     rw [starRingEnd_self_apply, hcstar, ite_eq_left_iff] at hherm
@@ -190,18 +192,18 @@ theorem stdBasisMatrix_iff_eq (i j : m) {c : 𝕜} (hc : 0 < c) : (Matrix.stdBas
     subst hij
     constructor
     · ext x y
-      simp only [conjTranspose_apply, RCLike.star_def, Matrix.stdBasisMatrix, of_apply]
+      simp only [conjTranspose_apply, RCLike.star_def, Matrix.single, of_apply]
       split_ifs <;> try tauto
       · exact RCLike.conj_eq_iff_im.mpr (RCLike.pos_iff.1 hc).2
       · exact RingHom.map_zero (starRingEnd 𝕜)
     · intro x
-      simp only [dotProduct, Matrix.stdBasisMatrix, of_apply, mulVec]
+      simp only [dotProduct, Matrix.single, of_apply, mulVec]
       convert_to 0 ≤ (star x i) * c * (x i)
       · simp only [Finset.mul_sum]
         rw [←Fintype.sum_prod_type']
         have h₀ : ∀ x_1 : m × m, x_1 ≠ ⟨i, i⟩ → star x x_1.1 * ((if i = x_1.1 ∧ i = x_1.2 then c else 0) * x x_1.2) = 0 := fun z hz => by
           have h₁ : ¬(i = z.1 ∧ i = z.2) := by
-            rw [ne_eq, Prod.mk.inj_iff] at hz
+            rw [ne_eq, Prod.mk_inj] at hz
             by_contra hz'
             apply hz
             exact ⟨hz'.left.symm, hz'.right.symm⟩
@@ -243,11 +245,11 @@ lemma sqrt_eq' {A B : Matrix m m 𝕜} (h : A = B) (hA : A.PosSemidef) :
 
 @[simp]
 theorem sqrt_0 : (Matrix.PosSemidef.zero (n := n) (R := 𝕜)).sqrt = 0 :=
-  Eq.symm $ eq_sqrt_of_sq_eq Matrix.PosSemidef.zero _ (by simp)
+  (sqrt_eq_zero_iff PosSemidef.zero).mpr rfl
 
 @[simp]
 theorem sqrt_1 : (Matrix.PosSemidef.one (n := n) (R := 𝕜)).sqrt = 1 :=
-  Eq.symm $ eq_sqrt_of_sq_eq Matrix.PosSemidef.one _ (by simp)
+  (sqrt_eq_one_iff PosSemidef.one).mpr rfl
 
 theorem nonneg_smul {c : 𝕜} (hA : A.PosSemidef) (hc : 0 ≤ c) : (c • A).PosSemidef := by
   constructor
@@ -277,10 +279,10 @@ theorem pos_Real_smul {c : ℝ} (hA : (c • A).PosSemidef) (hc : 0 < c) : A.Pos
 theorem sqrt_nonneg_smul {c : 𝕜} (hA : (c^2 • A).PosSemidef) (hc : 0 < c) :
     hA.sqrt = c • (hA.pos_smul (sq_pos_of_pos hc) : A.PosSemidef).sqrt := by
   apply Eq.symm
-  apply eq_sqrt_of_sq_eq
+  apply (eq_sqrt_iff_sq_eq ?_ hA).mpr
+  · rw [pow_two, Algebra.mul_smul_comm, Algebra.smul_mul_assoc, sqrt_mul_self, pow_two, smul_smul]
   · apply nonneg_smul ?_ hc.le
     apply posSemidef_sqrt
-  rw [pow_two, Algebra.mul_smul_comm, Algebra.smul_mul_assoc, sqrt_mul_self, pow_two, smul_smul]
 
 include hA in
 theorem zero_dotProduct_zero_iff : (∀ x : m → 𝕜, 0 = star x ⬝ᵥ A.mulVec x) ↔ A = 0 := by
@@ -320,20 +322,24 @@ variable (hA : A.IsHermitian) (hB : B.IsHermitian)
 /-- Loewner partial order of square matrices induced by positive-semi-definiteness:
 `A ≤ B ↔ (B - A).PosSemidef` alongside properties that make it an "OrderedCancelAddCommMonoid"
 TODO : Equivalence to CStarAlgebra.spectralOrder -/
-instance instOrderedCancelAddCommMonoid : OrderedCancelAddCommMonoid (Matrix n n 𝕜) where
+instance loewnerOrder : PartialOrder (Matrix n n 𝕜) where
   le A B := (B - A).PosSemidef
   le_refl A := by simp only [sub_self, PosSemidef.zero]
   le_trans A B C hAB hBC := by
-    simp_all only
     rw [←sub_add_sub_cancel _ B _]
     exact PosSemidef.add hBC hAB
   le_antisymm A B hAB hBA := by
-    simp_all only
     rw [←neg_sub] at hAB
     rw [←sub_eq_zero]
     exact zero_posSemidef_neg_posSemidef_iff.mp ⟨hBA, hAB⟩
-  add_le_add_left A B hAB C := by simp_all only [add_sub_add_left_eq_sub]
-  le_of_add_le_add_left A B C hABAC:= by simp_all only [add_sub_add_left_eq_sub]
+
+instance instOrderedCancelAddCommMonoid : IsOrderedCancelAddMonoid (Matrix n n 𝕜) where
+  add_le_add_left A B hAB C := by
+    dsimp [loewnerOrder]
+    rwa [add_sub_add_left_eq_sub]
+  le_of_add_le_add_left A B C hABAC:= by
+    dsimp [loewnerOrder] at hABAC
+    rwa [add_sub_add_left_eq_sub] at hABAC
 
 theorem le_iff_sub_posSemidef : A ≤ B ↔ (B - A).PosSemidef := by rfl
 
@@ -345,7 +351,7 @@ theorem zero_le_iff_posSemidef : 0 ≤ A ↔ A.PosSemidef := by
 instance instStarOrderedRing : StarOrderedRing (Matrix n n 𝕜) :=
   StarOrderedRing.of_nonneg_iff'
     (add_le_add_left)
-    (fun _ ↦ Iff.trans zero_le_iff_posSemidef Matrix.posSemidef_iff_eq_transpose_mul_self)
+    (fun _ ↦ Iff.trans zero_le_iff_posSemidef Matrix.posSemidef_iff_eq_conjTranspose_mul_self)
 
 /-- Basically, the instance states 0 ≤ A → ∀ x ∈ spectrum ℝ A, 0 ≤ x  -/
 instance instNonnegSpectrumClass : NonnegSpectrumClass ℝ (Matrix n n 𝕜) := by
@@ -360,14 +366,16 @@ theorem nonneg_iff_eigenvalue_nonneg : 0 ≤ A ↔ ∀ x, 0 ≤ hA.eigenvalues x
 
 theorem le_iff_sub_nonneg : A ≤ B ↔ 0 ≤ B - A := Iff.trans le_iff_sub_posSemidef zero_le_iff_posSemidef.symm
 
-theorem le_of_nonneg_imp {R : Type*} [OrderedAddCommGroup R] (f : Matrix n n 𝕜 →+ R) (h : ∀ A, A.PosSemidef → 0 ≤ f A) :
-  (A ≤ B → f A ≤ f B) := by
+theorem le_of_nonneg_imp {R : Type*} [AddCommGroup R] [PartialOrder R] [IsOrderedAddMonoid R]
+    (f : Matrix n n 𝕜 →+ R) (h : ∀ A, A.PosSemidef → 0 ≤ f A) :
+    (A ≤ B → f A ≤ f B) := by
   intro hAB
   rw [←sub_nonneg, ←map_sub]
   exact h (B - A) <| le_iff_sub_posSemidef.mp hAB
 
-theorem le_of_nonneg_imp' {R : Type*} [OrderedAddCommGroup R] {x y : R} (f : R →+ Matrix n n 𝕜) (h : ∀ x, 0 ≤ x → (f x).PosSemidef) :
-  (x ≤ y → f x ≤ f y) := by
+theorem le_of_nonneg_imp' {R : Type*} [AddCommGroup R] [PartialOrder R] [IsOrderedAddMonoid R]
+    {x y : R} (f : R →+ Matrix n n 𝕜) (h : ∀ x, 0 ≤ x → (f x).PosSemidef) :
+    (x ≤ y → f x ≤ f y) := by
   intro hxy
   rw [le_iff_sub_nonneg, ←map_sub]
   rw [←sub_nonneg] at hxy
@@ -453,7 +461,7 @@ theorem le_smul_one_of_eigenvalues_iff (hA : A.PosSemidef) (c : ℝ) :
 theorem le_trace_smul_one (hA : A.PosSemidef) : A ≤ hA.1.rtrace • 1 := by
   have h : ∀ i, hA.1.eigenvalues i ≤ hA.1.rtrace := fun i ↦ by
     rw [←IsHermitian.sum_eigenvalues_eq_rtrace hA.1]
-    convert @Finset.sum_le_sum_of_subset_of_nonneg n ℝ _ hA.1.eigenvalues {i} Finset.univ _ _
+    convert @Finset.sum_le_sum_of_subset_of_nonneg n ℝ _ _ _ hA.1.eigenvalues {i} Finset.univ _ _
     · rw [Finset.sum_singleton]
     · exact Finset.subset_univ {i}
     · exact fun j _ _ ↦ eigenvalues_nonneg hA j
@@ -478,10 +486,10 @@ variable {A : Matrix n n 𝕜} {B : Matrix n n 𝕜} {C : Matrix n n 𝕜} [Fint
 def InnerProductCore : InnerProductSpace.Core (𝕜 := ℝ) (F := Matrix n n 𝕜):=
    {
     inner A B := RCLike.re (Aᴴ * B).trace
-    conj_symm := fun x y ↦ by
+    conj_inner_symm := fun x y ↦ by
       simpa [inner, starRingEnd_apply, ← Matrix.trace_conjTranspose] using
         RCLike.conj_re (xᴴ * y).trace
-    nonneg_re := fun x ↦
+    re_inner_nonneg := fun x ↦
       (RCLike.nonneg_iff.mp x.posSemidef_conjTranspose_mul_self.trace_nonneg).1
     add_left := by simp [inner, add_mul]
     smul_left x y r := by
@@ -517,9 +525,9 @@ instance : Inner ℝ (Matrix n n 𝕜) :=
 def CInnerProductCore : InnerProductSpace.Core (𝕜 := ℂ) (F := Matrix n n ℂ):=
    {
     inner A B := (Aᴴ * B).trace
-    conj_symm := fun x y ↦ by
+    conj_inner_symm := fun x y ↦ by
       simp [inner, starRingEnd_apply, ← Matrix.trace_conjTranspose]
-    nonneg_re := fun x ↦
+    re_inner_nonneg := fun x ↦
       (RCLike.nonneg_iff.mp x.posSemidef_conjTranspose_mul_self.trace_nonneg).1
     add_left := by simp [inner, add_mul]
     smul_left x y r := by simp

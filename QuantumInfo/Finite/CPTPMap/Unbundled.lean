@@ -26,10 +26,10 @@ theorem IsTracePreserving_iff_trace_choi (M : MatrixMap A B R) : M.IsTracePreser
   constructor
   · intro h
     ext a₁ a₂
-    replace h := h (Matrix.stdBasisMatrix a₁ a₂ 1)
+    replace h := h (Matrix.single a₁ a₂ 1)
     simp_rw [Matrix.trace, Matrix.diag] at h
     simp only [Matrix.traceLeft, choi_matrix, Matrix.of_apply, h]
-    simp only [Matrix.stdBasisMatrix, Matrix.of_apply, Finset.sum_boole, Matrix.one_apply]
+    simp only [Matrix.single, Matrix.of_apply, Finset.sum_boole, Matrix.one_apply]
     have : (fun x => a₁ = x ∧ a₂ = x) = (fun x => a₁ = a₂ ∧ a₂ = x) := by
       funext x
       rw [eq_iff_iff, and_congr_left_iff]

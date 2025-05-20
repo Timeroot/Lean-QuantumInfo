@@ -1,7 +1,7 @@
 import Mathlib.Analysis.Convex.Mul
 import Mathlib.Analysis.SpecialFunctions.Log.Basic
 import Mathlib.Data.NNReal.Basic
-import Mathlib.Data.Real.EReal
+import Mathlib.Data.EReal.Basic
 import Mathlib.Topology.UnitInterval
 
 /-! # Probabilities
@@ -71,8 +71,7 @@ instance instCommMonoidWithZero : CommMonoidWithZero Prob where
 instance instLinearOrder : LinearOrder Prob :=
   inferInstance
 
-instance instOrderedCommMonoid : LinearOrderedCommMonoid Prob where
-  __ := Prob.instLinearOrder
+instance instOrderedCommMonoid : IsOrderedMonoid Prob where
   mul_le_mul_left := by
     intros a b h c
     rw [← Subtype.coe_le_coe]
@@ -271,15 +270,20 @@ theorem mkT_instUniv [AddCommMonoid T] [Module ℝ T] {t : T} (h : ∃ t', to_U 
 theorem to_U_instUniv [AddCommMonoid T] [Module ℝ T] {t : T} : instUniv.to_U t = t :=
   rfl
 
+section pi
+
+theorem instPi.lem_1 {D : Type*} {T U : D → Type*} [∀i, AddCommMonoid (U i)] [∀ i, Module ℝ (U i)] [inst : ∀i, Mixable (U i) (T i)]
+    {u : (i : D) → U i} (h : ∃ (t : (i : D) → T i), (fun d => to_U (t d)) = u) (d : D) : ∃ (t : T d), to_U t = u d := by
+  obtain ⟨t, h⟩ := h
+  use t d
+  exact congrFun h d
+
 variable {D : Type*} {T U : D → Type*} [∀i, AddCommMonoid (U i)] [∀ i, Module ℝ (U i)] [inst : ∀i, Mixable (U i) (T i)] in
 /-- Mixable instance on Pi types. -/
 instance instPi : Mixable ((i:D) → U i) ((i:D) → T i) where
   to_U x := fun d ↦ (inst d).to_U (x d)
   to_U_inj h := funext fun d ↦ (inst d).to_U_inj (congrFun h d)
-  mkT := fun {u} h ↦ ⟨fun d ↦ (inst d).mkT (u := u d) (by
-      obtain ⟨t, h⟩ := h
-      use t d
-      exact congrFun h d),
+  mkT := fun {u} h ↦ ⟨fun d ↦ (inst d).mkT (u := u d) (instPi.lem_1 h d),
     by funext d; simp⟩
   convex := by
     simp [Convex, StarConvex]
@@ -290,12 +294,14 @@ instance instPi : Mixable ((i:D) → U i) ((i:D) → T i) where
 
 @[simp]
 theorem val_mkT_instPi (D : Type*) [inst : Mixable U T] {u : D → U} (h : ∃ t, to_U t = u) : (instPi.mkT h).val =
-    fun d ↦ (inst.mkT (instPi.proof_3 h d)).val :=
+    fun d ↦ (inst.mkT (instPi.lem_1 h d)).val :=
   rfl
 
 @[simp]
 theorem to_U_instPi (D : Type*) [inst : Mixable U T] {t : D → T} : (instPi).to_U t = fun d ↦ inst.to_U (t d) :=
   rfl
+
+end pi
 
 /-- Mixable instances on subtypes (of other mixable types), assuming that they
  have the correct closure properties. -/

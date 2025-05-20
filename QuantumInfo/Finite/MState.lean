@@ -303,15 +303,13 @@ theorem pure_of_constant_spectrum (ρ : MState d) (h : ∃ i, ρ.spectrum = Dist
   let v : EuclideanSpace ℂ d := ρ.M.H.eigenvectorBasis i
   -- Prove v is normalized
   have hUvNorm : ∑ x, ‖v x‖^2 = 1 := by
-    have hinnerv : Inner.inner v v = (1:ℂ) := by
+    have hinnerv : Inner.inner ℂ v v = 1 := by
       have := OrthonormalBasis.orthonormal ρ.M.H.eigenvectorBasis
       rw [orthonormal_iff_ite] at this
-      specialize this i i
-      simp only [if_true] at this
-      exact this
-    simp_all [Complex.conj_mul']
-    rw [←Fintype.sum_equiv (Equiv.refl d) _ (fun x => (Complex.ofReal (Complex.abs (v x))) ^ 2) (fun x => Complex.ofReal_pow (Complex.abs (v x)) 2)] at hinnerv
-    rw [←Complex.ofReal_sum Finset.univ (fun x => (Complex.abs (v x)) ^ 2), Complex.ofReal_eq_one] at hinnerv
+      simpa using this i i
+    simp only [PiLp.inner_apply, RCLike.inner_apply, Complex.mul_conj'] at hinnerv
+    rw [← Fintype.sum_equiv (Equiv.refl d) _ (fun x => (Complex.ofReal ‖v x‖) ^ 2) (fun x => Complex.ofReal_pow ‖v x‖ 2)] at hinnerv
+    rw [← Complex.ofReal_sum Finset.univ (fun x => ‖v x‖ ^ 2), Complex.ofReal_eq_one] at hinnerv
     exact hinnerv
   let ψ : Ket d := ⟨v, hUvNorm⟩ -- Construct ψ
   use ψ
@@ -479,7 +477,7 @@ def purify (ρ : MState d) : Ket (d × d) where
     have h₁ := fun i ↦ ρ.pos.eigenvalues_nonneg i
     simp [mul_pow, Real.sq_sqrt, h₁, Fintype.sum_prod_type_right]
     simp_rw [← Finset.sum_mul]
-    have : ∀x, ∑ i : d, Complex.abs ((Matrix.IsHermitian.eigenvectorBasis ρ.Hermitian) x i) ^ 2 = 1 :=
+    have : ∀x, ∑ i : d, ‖ρ.Hermitian.eigenvectorBasis x i‖ ^ 2 = 1 :=
       sorry
     apply @RCLike.ofReal_injective ℂ
     simp_rw [this, one_mul, Matrix.IsHermitian.sum_eigenvalues_eq_trace]
