@@ -28,10 +28,6 @@ theorem OptimalHypothesisRate_le {ρ : MState d} {ε : ℝ} {S : Set (MState d)}
   apply iInf_le_of_le ⟨m, ⟨hExp, hm⟩⟩ _
   simp only [le_refl]
 
-theorem OptimalHypothesisRate_ε_zero {ρ : MState d} (hFull : ρ.m.PosDef) {S : Set (MState d)} (hS : S.Nonempty) :
-    β_ 0(ρ‖S) = 1 := by
-  sorry
-
 theorem OptimalHypothesisRate_le_of_subset (ρ : MState d) (ε : ℝ) {S1 S2 : Set (MState d)} (h : S1 ⊆ S2) :
     β_ ε(ρ‖S1) ≤ β_ ε(ρ‖S2) :=
   iInf_mono (fun _ ↦ iSup_le_iSup_of_subset h)
@@ -39,8 +35,7 @@ theorem OptimalHypothesisRate_le_of_subset (ρ : MState d) (ε : ℝ) {S1 S2 : S
 theorem OptimalHypothesisRate_singleton {ρ σ : MState d} {ε : ℝ}  :
     β_ ε(ρ‖{σ}) =
       ⨅ T : { m : HermitianMat d ℂ // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1},
-        ⟨_, σ.exp_val_prob T.2.right⟩
-  := by
+        ⟨_, σ.exp_val_prob T.2.right⟩ := by
   simp only [OptimalHypothesisRate, iSup_singleton]
 
 theorem negLog_OptimalHypothesisRate_le_singleton (ρ : MState d) (ε : ℝ) (S : Set (MState d))
@@ -49,8 +44,8 @@ theorem negLog_OptimalHypothesisRate_le_singleton (ρ : MState d) (ε : ℝ) (S 
   apply OptimalHypothesisRate_le_of_subset
   exact Set.singleton_subset_iff.mpr h
 
-theorem OptimalHypothesisRate_le_singleton {ρ σ : MState d} {ε : ℝ}
-  (m : HermitianMat d ℂ) (hExp : ρ.exp_val (1 - m) ≤ ε) (hm : 0 ≤ m ∧ m ≤ 1) :
+theorem OptimalHypothesisRate_le_singleton {ρ σ : MState d} {ε : ℝ} (m : HermitianMat d ℂ)
+    (hExp : ρ.exp_val (1 - m) ≤ ε) (hm : 0 ≤ m ∧ m ≤ 1) :
   β_ ε(ρ‖{σ}) ≤ ⟨_, σ.exp_val_prob hm⟩ := by
   rw [OptimalHypothesisRate_singleton]
   apply iInf_le_of_le ⟨m, ⟨hExp, hm⟩⟩ _
@@ -141,6 +136,41 @@ private theorem Lemma3 {ρ : MState d} {ε : ℝ} {S : Set (MState d)} (hS₁ : 
   convert Eq.trans (Set.Icc.coe_iSup (ι := S) (zero_le_one (α := ℝ))) ?_
   --No, this is stupid, there has to be a better way
   sorry
+
+theorem Matrix.star_diagonal {T R : Type*} [DecidableEq T] [AddMonoid R] [StarAddMonoid R] (f : T → R) :
+    star (Matrix.diagonal f) = Matrix.diagonal (star <| f ·) := by
+  ext i j
+  simp only [Matrix.star_apply, Matrix.diagonal_apply]
+  split <;> simp_all [@eq_comm _ j i]
+
+def HermitianMat.diagonal {T : Type*} [DecidableEq T] (f : T → ℝ) : HermitianMat T ℂ :=
+  ⟨Matrix.diagonal (f ·), by simp [selfAdjoint.mem_iff, Matrix.star_diagonal]⟩
+
+theorem HermitianMat.diagonal_pow {T : Type*} [Fintype T] [DecidableEq T] (f : T → ℝ) (p : ℝ) :
+    (HermitianMat.diagonal f) ^ p = HermitianMat.diagonal fun i => (f i) ^ p := by
+  sorry
+
+@[simp]
+theorem MState.coe_ofClassical (d : Distribution d) :
+    (MState.ofClassical d).M = HermitianMat.diagonal (d ·) := by
+  sorry
+
+theorem MState.ofClassical_pow {T : Type*} [Fintype T] [DecidableEq T] (dist : Distribution T) (p : ℝ) :
+    (MState.ofClassical dist).M ^ p = HermitianMat.diagonal (fun i ↦ (dist i) ^ p) := by
+  simp
+  exact HermitianMat.diagonal_pow (dist ·) p
+
+theorem HermitianMat.diagonal_conj_diagonal {T : Type*} [Fintype T] [DecidableEq T] (f g : T → ℝ) :
+    (HermitianMat.diagonal f).conj (HermitianMat.diagonal g) =
+    HermitianMat.diagonal (fun i ↦ f i * (g i)^2) := by
+  simp [diagonal, HermitianMat.conj]
+  intro
+  ring
+
+theorem HermitianMat.trace_diagonal {T : Type*} [Fintype T] [DecidableEq T] (f : T → ℝ) :
+    (HermitianMat.diagonal f).trace = ∑ i, f i := by
+  rw [HermitianMat.trace_eq_re_trace]
+  simp [HermitianMat.diagonal, Matrix.trace]
 
 /- This is from "Strong converse exponents for a quantum channel discrimination problem and
 quantum-feedback-assisted communication", Lemma 5.
@@ -241,16 +271,22 @@ private theorem Ref81Lem5 (ρ σ : MState d) (ε α : ℝ) (hε : 0 ≤ ε ∧ �
   rw [← add_div, ← sub_eq_add_neg]
   conv =>
     enter [2,1,1,1]
-    equals (p^α * q^(1-α) + (1-p)^α * (1-q)^(1-α) : ℝ)=>
-      --This unfolds some of it:
-      --simp [HermitianMat.trace_eq_re_trace, p2, q2, MState.ofClassical, MState.M, HermitianMat.conj]
-      --Really we need use that
-      -- (1) q2 ^ x = Matrix.diagonal [q^x, (1-q)^x]
-      -- (2) p2 is also a diagonal
-      -- (3) the product of diagonals is the diagonal of the products
-      -- (4) the HermitianMat.trace of a diagonal matrix is just the regular trace
-      -- (5) Write that trace as a sum of two things
-      sorry
+    equals (p^α * q^(1-α) + (1-p)^α * (1-q)^(1-α) : ℝ) =>
+      unfold q2
+      rw [MState.ofClassical_pow]
+      unfold p2
+      rw [MState.coe_ofClassical]
+      rw [HermitianMat.diagonal_conj_diagonal, HermitianMat.diagonal_pow]
+      rw [HermitianMat.trace_diagonal]
+      simp only [Fin.sum_univ_two, Fin.isValue, Distribution.coin_val_zero,
+        Distribution.coin_val_one, Prob.coe_one_minus]
+      rw [Real.mul_rpow p.zero_le (by positivity)]
+      rw [← Real.rpow_natCast_mul (by have := q.zero_le_coe; positivity)]
+      rw [← Real.rpow_mul q.zero_le]
+      rw [Real.mul_rpow (sub_nonneg_of_le p.coe_le_one) (by positivity)]
+      rw [← Real.rpow_natCast_mul (by have := sub_nonneg_of_le q.coe_le_one; positivity)]
+      rw [← Real.rpow_mul (sub_nonneg_of_le q.coe_le_one)]
+      field_simp
 
   trans (Real.log (p ^ α * q ^ (1 - α)) - Real.log (1 - ε) * α) / (α - 1)
   · rw [Real.log_mul]
@@ -516,64 +552,8 @@ private theorem optimalHypothesisRate_antitone (ρ σ : MState dIn) (ℰ : CPTPM
   specialize h T'
   rw [h, ℰ.exp_val_Dual]
 
-noncomputable section proj
-
-variable {n : Type*} [Fintype n] [DecidableEq n]
-variable {𝕜 : Type*} [RCLike 𝕜]
-
--- Projection onto the non-negative eigenspace of B - A
--- Note this is in the opposite direction as in the paper
-def proj_le (A B : HermitianMat n 𝕜) : HermitianMat n 𝕜 :=
-  ⟨Matrix.IsHermitian.cfc (B - A).H (fun x ↦ if x ≥ 0 then 1 else 0), by
-    rw [←Matrix.IsHermitian.cfc_eq]
-    exact IsSelfAdjoint.cfc
-  ⟩
-
-scoped notation "{" A "≥ₚ" B "}" => proj_le B A
-scoped notation "{" A "≤ₚ" B "}" => proj_le A B
-
-variable (A B : HermitianMat n 𝕜)
-
-theorem proj_le_cfc : {A ≤ₚ B} = cfc (fun x ↦ if x ≥ 0 then (1 : ℝ) else 0) (B - A).toMat := by
-  simp only [proj_le, ←Matrix.IsHermitian.cfc_eq]
-
-theorem proj_le_sq : {A ≤ₚ B}^2 = {A ≤ₚ B} := by
-  ext1
-  simp only [HermitianMat.val_eq_coe, selfAdjoint.val_pow, proj_le_cfc]
-  rw [←cfc_pow (hf := _)]
-  · simp only [ge_iff_le, ite_pow, one_pow, ne_eq, OfNat.ofNat_ne_zero, not_false_eq_true,
-    zero_pow, AddSubgroupClass.coe_sub, HermitianMat.val_eq_coe]
-  · simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology, implies_true]
-
-theorem proj_le_nonneg : 0 ≤ {A ≤ₚ B} := by
-  rw [←proj_le_sq]
-  exact HermitianMat.sq_nonneg
-
-theorem proj_le_le_one : {A ≤ₚ B} ≤ 1 := by
-  sorry
-
-theorem proj_le_mul_nonneg : 0 ≤ {A ≤ₚ B}.toMat * (B - A).toMat := by
-  rw [proj_le_cfc]
-  nth_rewrite 2 [←cfc_id ℝ (B - A).toMat]
-  rw [←cfc_mul (hf := _) (hg := _)]
-  · apply cfc_nonneg
-    intro x hx
-    simp only [ge_iff_le, id_eq, ite_mul, one_mul, zero_mul]
-    exact dite_nonneg (by simp only [imp_self]) (by simp only [not_le, le_refl, implies_true])
-  · simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology, implies_true]
-  · simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology, implies_true]
-
-theorem proj_le_mul_le : {A ≤ₚ B}.toMat * A.toMat ≤ {A ≤ₚ B}.toMat * B.toMat := by
-  rw [←sub_nonneg, ←mul_sub_left_distrib]
-  convert proj_le_mul_nonneg A B
-
-theorem proj_le_inner_nonneg : 0 ≤ {A ≤ₚ B}.inner (B - A) := HermitianMat.inner_mul_nonneg (proj_le_mul_nonneg A B)
-
-theorem proj_le_inner_le : {A ≤ₚ B}.inner A ≤ {A ≤ₚ B}.inner B := by
-  rw [←sub_nonneg, ←HermitianMat.inner_left_sub]
-  exact proj_le_inner_nonneg A B
-
--- TODO: Commutation and order relations specified in the text between Eqs. (S77) and (S78)
+-- TODO: Commutation and order relations about `proj_le` specified in the text
+-- between Eqs. (S77) and (S78)
 
 -- The assumption (hε3 : 0 ≤ ε3 ∧ ε3 ≤ 1) stated in the paper was not used
 theorem LemmaS2 {ε3 : ℝ} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
@@ -701,8 +681,6 @@ theorem LemmaS2 {ε3 : ℝ} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
     intro n
     rw [HermitianMat.inner_comm, ←MState.exp_val]
     exact MState.exp_val_nonneg (proj_le_nonneg (Real.exp (↑↑n * (↑Rsup + ↑ε4)) • (σ n).M) (ρ n).M) (ρ n)
-
-end proj
 
 -- This is not exactly how R_{1, ε} is defined in Eq. (17), but it should be equal due to
 -- the monotonicity of log and Lemma 3.

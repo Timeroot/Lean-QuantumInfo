@@ -2,6 +2,7 @@ import Mathlib.Analysis.Convex.Mul
 import Mathlib.Analysis.SpecialFunctions.Log.Basic
 import Mathlib.Data.NNReal.Basic
 import Mathlib.Data.EReal.Basic
+import Mathlib.Tactic.Finiteness
 import Mathlib.Topology.UnitInterval
 
 /-! # Probabilities
@@ -358,11 +359,14 @@ theorem mkT_mixable (u : ℝ) (h : ∃ t : Prob, Mixable.to_U t = u) : Mixable.m
 dot notation, e.g. `p.mix x y`. -/
 abbrev mix [AddCommMonoid U] [Module ℝ U] [inst : Mixable U T] (p : Prob) (x₁ x₂ : T) := inst.mix p x₁ x₂
 
+section negLog
+open ENNReal
+
 /-- Map a probability [0,1] to [0,+∞] with -log p. Special case that 0 maps to +∞ (not 0, as Real.log
 does). This makes it `Antitone`.
 -/
 noncomputable def negLog : Prob → ENNReal :=
-  fun p ↦ if p = 0 then ⊤ else .ofNNReal ⟨-Real.log p,
+  fun p ↦ if p = 0 then ∞ else .ofNNReal ⟨-Real.log p,
     Left.nonneg_neg_iff.mpr (Real.log_nonpos p.2.1 p.2.2)⟩
 
 --Note that this is an em-dash `—` and not a minus `-`, to make the notation work.
@@ -400,6 +404,29 @@ theorem negLog_pos_Real {p : Prob} : (—log p).toReal = -Real.log p := by
   · simp [hp]
 
 theorem le_negLog_of_le_exp {p : Prob} {x : ℝ} (h : p ≤ Real.exp (-x) ) : ENNReal.ofReal x ≤ —log p := by
-  sorry
+  by_cases hx : 0 ≤ x
+  · rw [negLog]
+    split_ifs with hp
+    · exact le_top
+    · replace hp : 0 < p := lt_of_le_of_ne' p.zero_le hp
+      rw [le_iff_lt_or_eq] at h
+      rcases h with h|h
+      · apply le_of_lt
+        replace h := Real.strictMonoOn_log hp (Real.exp_pos _) h
+        rw [Real.log_exp] at h
+        rw [← ENNReal.toReal_lt_toReal ofReal_ne_top coe_ne_top, toReal_ofReal hx]
+        simpa using lt_neg_of_lt_neg h
+      · apply le_of_eq
+        rw [← ENNReal.toReal_eq_toReal ofReal_ne_top coe_ne_top,
+          coe_toReal, coe_mk, h, Real.log_exp, neg_neg, toReal_ofReal hx]
+  · trans 0
+    · simp only [nonpos_iff_eq_zero, ofReal_eq_zero, le_of_not_ge hx]
+    · exact _root_.zero_le _
+
+@[aesop (rule_sets := [finiteness]) safe apply]
+theorem negLog_ne_top {p : Prob} (hp : 0 < p.val) : —log p ≠ ∞ := by
+  simpa [negLog] using ne_of_gt hp
+
+end negLog
 
 end Prob
