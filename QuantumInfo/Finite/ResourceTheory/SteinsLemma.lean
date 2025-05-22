@@ -555,6 +555,8 @@ private theorem optimalHypothesisRate_antitone (ρ σ : MState dIn) (ℰ : CPTPM
 -- TODO: Commutation and order relations about `proj_le` specified in the text
 -- between Eqs. (S77) and (S78)
 
+open scoped _root_.HermitianMat --change to drop the _root_ when we fix names above
+
 -- The assumption (hε3 : 0 ≤ ε3 ∧ ε3 ≤ 1) stated in the paper was not used
 theorem LemmaS2 {ε3 : ℝ} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
   {d : PNat → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)] (ρ : (n : PNat) → MState (d n)) (σ : (n : PNat) → MState (d n))
