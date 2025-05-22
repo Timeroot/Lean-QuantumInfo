@@ -21,6 +21,23 @@ noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : ℝ) (S : Set (MSt
 
 scoped notation "β_" ε " (" ρ "‖" S ")" =>  OptimalHypothesisRate ρ ε S
 
+--PULLOUT
+instance : ZeroLEOneClass (HermitianMat d ℂ) := by
+  sorry
+
+--PULLOUT
+omit [DecidableEq d] in
+@[simp]
+theorem _root_.MState.exp_val_zero (ρ : MState d) : ρ.exp_val 0 = 0 := by
+  simp [MState.exp_val]
+
+/-- Provides an `Inhabited` instance for the quantification over `T` in `OptimalHypothesisRate`. Not
+an instance, because we need that `0 ≤ ε`. -/
+noncomputable def OptimalHypothesisRate_iInf_Inhabited (ρ : MState d) {ε : ℝ} (hε : 0 ≤ ε) :
+    Inhabited { m // MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } := by
+  use 1
+  simpa
+
 theorem OptimalHypothesisRate_le {ρ : MState d} {ε : ℝ} {S : Set (MState d)}
     (m : HermitianMat d ℂ) (hExp : ρ.exp_val (1 - m) ≤ ε) (hm : 0 ≤ m ∧ m ≤ 1) :
     β_ ε(ρ‖S) ≤ ⨆ σ ∈ S, ⟨_, σ.exp_val_prob hm⟩ := by
@@ -684,6 +701,87 @@ theorem LemmaS2 {ε3 : ℝ} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
     rw [HermitianMat.inner_comm, ←MState.exp_val]
     exact MState.exp_val_nonneg (proj_le_nonneg (Real.exp (↑↑n * (↑Rsup + ↑ε4)) • (σ n).M) (ρ n).M) (ρ n)
 
+--PULLOUT
+instance : OrderTopology Prob :=
+  orderTopology_of_ordConnected (ht := Set.ordConnected_Icc)
+
+--PULLOUT
+theorem _root_.Prob.zero_lt_coe {p : Prob} (hp : p ≠ 0) : (0 : ℝ) < p :=
+  lt_of_le_of_ne' p.zero_le (unitInterval.coe_ne_zero.mpr hp)
+
+--PULLOUT
+@[simp, norm_cast]
+theorem _root_.Prob.coe_iInf {ι : Type*} [Nonempty ι] (f : ι → Prob) : ↑(⨅ t, f t) = (⨅ t, f t : ℝ) := by
+  apply Monotone.map_ciInf_of_continuousAt
+  · fun_prop
+  · exact fun _ _ ↦ id
+  · exact OrderBot.bddBelow _
+
+/-- Lemma S3 from the paper. What they denote as σₙ and σₙ', we denote as σ₁ and σ₂. The `exp(-o(n))`
+we express as a function `f : ℕ+ → ℝ`, together with the fact that `f` is little-o of `n` (i.e. that
+`f =o[.atTop] id`), and then writing `exp(-f)`. We also split LemmaS3 into two parts, the `lim inf` part
+and the `lim sup` part. The theorem as written is true for any `f`, but we can restrict to nonnegative
+`f` (so, `ℕ+ → ℝ≥0`) which is easier to work with and more natural in the subsequent proofs. -/
+private theorem LemmaS3_inf (ρ σ₁ σ₂ : (n : ℕ+) → MState (H (i⊗^[n]))) {ε : ℝ} (hε : 0 ≤ ε)
+    (f : ℕ+ → ℝ≥0) (hf : (f · : ℕ+ → ℝ) =o[.atTop] (· : ℕ+ → ℝ))
+    (hσ : ∀ i, Real.exp (-f i) • (σ₂ i).M ≤ σ₁ i)
+    :
+    Filter.liminf (fun (n : ℕ+) ↦ (↑n)⁻¹ * —log β_ ε(ρ n‖{σ₁ n})) Filter.atTop ≤
+      Filter.liminf (fun (n : ℕ+) ↦ (↑n)⁻¹ * —log β_ ε(ρ n‖{σ₂ n})) Filter.atTop
+    := by
+  have h₁ (n : ℕ+) : —log β_ ε(ρ n‖{σ₁ n}) ≤ —log β_ ε(ρ n‖{σ₂ n}) + f n := by
+    have h₁ (T : HermitianMat (H (i⊗^[n])) ℂ) (hT : 0 ≤ T) :
+        Real.exp (-f n) * T.inner (σ₂ n).M ≤ T.inner (σ₁ n).M := by
+      simpa using HermitianMat.inner_mono hT _ _ (hσ n)
+    by_cases hσ₂ : β_ ε(ρ n‖{σ₂ n}) = 0
+    · simp [hσ₂]
+    replace hσ₂ := Prob.zero_lt_coe hσ₂
+    have hσ₁ : (0 : ℝ) < β_ ε(ρ n‖{σ₁ n}) := by
+      specialize hσ n
+      --use the fact that, sice σ₁ is at least a positive scalar times σ₂, and
+      --0 < β(ρ‖σ₂), also 0 < β(ρ‖σ₁). Maybe its own lemma to pull out
+      sorry
+    rw [← ENNReal.toReal_le_toReal (by finiteness) (by finiteness)]
+    rw [ENNReal.toReal_add (by finiteness) (by finiteness)]
+    simp only [Prob.negLog_pos_Real, ENNReal.coe_toReal, OptimalHypothesisRate,
+      Set.mem_singleton_iff, iSup_iSup_eq_left] at hσ₁ hσ₂ ⊢
+    rw [← neg_le_neg_iff]
+    simp only [neg_add_rev, neg_neg]
+    rw [← Real.log_exp (-(f n))]
+    rw [← Real.log_mul (by positivity) (by positivity)]
+    apply Real.log_le_log (by positivity)
+    have := OptimalHypothesisRate_iInf_Inhabited (ρ n) hε
+    simp only [Prob.coe_iInf]
+    rw [Real.mul_iInf_of_nonneg (by positivity)]
+    apply ciInf_mono
+    · use 0
+      simp_rw [lowerBounds, Set.mem_range]
+      rintro a ⟨y, rfl⟩
+      have : 0 ≤ MState.exp_val y (σ₂ n) := by
+        apply MState.exp_val_nonneg y.2.2.1
+      positivity
+    intro ⟨x, hx₁, hx₂, hx₃⟩
+    simp only [MState.exp_val] --dunno why `rw` won't rewrite the second one
+    rw [← HermitianMat.smul_inner]
+    --There should be an `inner_mono'` which is inner_mono in the other arguments
+    rw [HermitianMat.inner_comm _ x, HermitianMat.inner_comm _ x]
+    apply HermitianMat.inner_mono hx₂ _ _ (hσ n)
+
+  --Starting with h₁, divide by n and take the limits. Since f is o(n),
+  --the (↑n)⁻¹ * f n term will go to zero.
+  sorry
+
+private theorem LemmaS3_sup (ρ σ₁ σ₂ : (n : ℕ+) → MState (H (i⊗^[n]))) {ε : ℝ} (hε : 0 ≤ ε)
+    (f : ℕ+ → ℝ≥0) (hf : (f · : ℕ+ → ℝ) =o[.atTop] (· : ℕ+ → ℝ))
+    (hσ : ∀ i, Real.exp (-f i) • (σ₂ i).M ≤ σ₁ i)
+    :
+    Filter.limsup (fun (n : ℕ+) ↦ (↑n)⁻¹ * —log β_ ε(ρ n‖{σ₁ n})) Filter.atTop ≤
+      Filter.limsup (fun (n : ℕ+) ↦ (↑n)⁻¹ * —log β_ ε(ρ n‖{σ₂ n})) Filter.atTop
+    := by
+  --Probably best to pull the first `have h₁` out of `LemmaS3_inf` out into its (private) lemma,
+  -- and then use in both `_inf` and here in `_sup`. Or, to put these two theorems back together.
+  sorry
+
 -- This is not exactly how R_{1, ε} is defined in Eq. (17), but it should be equal due to
 -- the monotonicity of log and Lemma 3.
 private noncomputable def R1 (ρ : MState (H i)) (ε : ℝ) : ENNReal :=
@@ -699,6 +797,10 @@ private theorem Lemma7 (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) 
     ∃ σ' : (n : ℕ+) → IsFree (i := i⊗^[n]),
     R2 ρ σ' - R1 ρ ε ≤ .ofNNReal (⟨1 - ε', by linarith⟩) * (R2 ρ σ - R1 ρ ε)
     := by
+  --Split out LemmaS62: `lim inf n→∞ 1/n D(E_n(ρ^⊗n)‖σ''_n) − R1,ϵ ≤ (1 − ˜ϵ)(R2 − R1,ϵ).`
+  --This is proved in appendix C
+  --Then prove S61
+  --Then `rw [S61] at S62`
   sorry
 
 /-- Lemma 7 gives us a way to repeatedly "improve" a sequence σ to one with a smaller gap between R2 and R1.
