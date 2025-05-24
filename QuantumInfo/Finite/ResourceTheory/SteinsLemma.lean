@@ -396,7 +396,7 @@ theorem limit_rel_entropy_exists (ρ : MState (H i)) :
   -/
   sorry
 
-/-- The \tilde{σ}_n defined in Lemma 6.
+/-- The \tilde{σ}_n defined in Lemma 6, also in equation (S40) in Lemma 7.
 I've slightly changed the definition here: instead of `n / m` and `n % m`, I use `(n-1) / m` and `(n-1)%m + 1`.
 This means that we only ever need ℕ+ powers of states. It *would* be fine to just add the requirement to our
 notion of `ResourcePretheory` that we have a 0-dimensional space, so that we can take ℕ powers; or we could
@@ -722,7 +722,9 @@ we express as a function `f : ℕ+ → ℝ`, together with the fact that `f` is 
 `f =o[.atTop] id`), and then writing `exp(-f)`. We also split LemmaS3 into two parts, the `lim inf` part
 and the `lim sup` part. The theorem as written is true for any `f`, but we can restrict to nonnegative
 `f` (so, `ℕ+ → ℝ≥0`) which is easier to work with and more natural in the subsequent proofs. -/
-private theorem LemmaS3_inf (ρ σ₁ σ₂ : (n : ℕ+) → MState (H (i⊗^[n]))) {ε : ℝ} (hε : 0 ≤ ε)
+private theorem LemmaS3_inf {ε : ℝ} (hε : 0 ≤ ε)
+    {d : PNat → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)]
+    (ρ σ₁ σ₂ : (n : ℕ+) → MState (d n))
     (f : ℕ+ → ℝ≥0) (hf : (f · : ℕ+ → ℝ) =o[.atTop] (· : ℕ+ → ℝ))
     (hσ : ∀ i, Real.exp (-f i) • (σ₂ i).M ≤ σ₁ i)
     :
@@ -730,7 +732,7 @@ private theorem LemmaS3_inf (ρ σ₁ σ₂ : (n : ℕ+) → MState (H (i⊗^[n]
       Filter.liminf (fun (n : ℕ+) ↦ (↑n)⁻¹ * —log β_ ε(ρ n‖{σ₂ n})) Filter.atTop
     := by
   have h₁ (n : ℕ+) : —log β_ ε(ρ n‖{σ₁ n}) ≤ —log β_ ε(ρ n‖{σ₂ n}) + f n := by
-    have h₁ (T : HermitianMat (H (i⊗^[n])) ℂ) (hT : 0 ≤ T) :
+    have h₁ (T : HermitianMat (d n) ℂ) (hT : 0 ≤ T) :
         Real.exp (-f n) * T.inner (σ₂ n).M ≤ T.inner (σ₁ n).M := by
       simpa using HermitianMat.inner_mono hT _ _ (hσ n)
     by_cases hσ₂ : β_ ε(ρ n‖{σ₂ n}) = 0
@@ -771,7 +773,9 @@ private theorem LemmaS3_inf (ρ σ₁ σ₂ : (n : ℕ+) → MState (H (i⊗^[n]
   --the (↑n)⁻¹ * f n term will go to zero.
   sorry
 
-private theorem LemmaS3_sup (ρ σ₁ σ₂ : (n : ℕ+) → MState (H (i⊗^[n]))) {ε : ℝ} (hε : 0 ≤ ε)
+private theorem LemmaS3_sup {ε : ℝ} (hε : 0 ≤ ε)
+    {d : PNat → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)]
+    (ρ σ₁ σ₂ : (n : ℕ+) → MState (d n))
     (f : ℕ+ → ℝ≥0) (hf : (f · : ℕ+ → ℝ) =o[.atTop] (· : ℕ+ → ℝ))
     (hσ : ∀ i, Real.exp (-f i) • (σ₂ i).M ≤ σ₁ i)
     :
@@ -790,17 +794,105 @@ private noncomputable def R1 (ρ : MState (H i)) (ε : ℝ) : ENNReal :=
 private noncomputable def R2 (ρ : MState (H i)) : ((n : ℕ+) → IsFree (i := i⊗^[n])) → ENNReal :=
   fun σ ↦ Filter.liminf (fun n ↦ 𝐃(ρ⊗^[n]‖σ n) / n) Filter.atTop
 
-/-- Lemma 7 from the paper -/
+/-- Lemma 7 from the paper. We write `ε'` for their `\tilde{ε}`. -/
 private theorem Lemma7 (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) (σ : (n : ℕ+) → IsFree (i := i⊗^[n])) :
     (R2 ρ σ ≥ R1 ρ ε) →
     ∀ ε' : ℝ, (hε' : 0 < ε' ∧ ε' < ε) → -- ε' is written as \tilde{ε} in the paper.
     ∃ σ' : (n : ℕ+) → IsFree (i := i⊗^[n]),
     R2 ρ σ' - R1 ρ ε ≤ .ofNNReal (⟨1 - ε', by linarith⟩) * (R2 ρ σ - R1 ρ ε)
     := by
-  --Split out LemmaS62: `lim inf n→∞ 1/n D(E_n(ρ^⊗n)‖σ''_n) − R1,ϵ ≤ (1 − ˜ϵ)(R2 − R1,ϵ).`
-  --This is proved in appendix C
-  --Then prove S61
-  --Then `rw [S61] at S62`
+  --This proof naturally splits out into LemmaS62:
+  --  `lim inf n→∞ 1/n D(E_n(ρ^⊗n)‖σ''_n) − R1,ϵ ≤ (1 − ˜ϵ)(R2 − R1,ϵ).`
+  --This is proved in appendix C.
+  --Then we  prove S61, and the conclusion is just `rw [S61] at S62`. But splitting it like
+  --this requires first _defining_ the sequence σ''_n.
+
+  --First deal with the east case of R1 = R2.
+  intro hR1R2 ε' ⟨hε'₁, hε'₂⟩
+  rw [ge_iff_le, le_iff_lt_or_eq, or_comm] at hR1R2
+  rcases hR1R2 with hR1R2|hR1R2
+  · rw [hR1R2]
+    use σ
+    simp
+  --This leaves us with the stronger statement that R1 < R2 strictly.
+  --Before proceeding, let's reduce to the case that they're finite.
+  have hR1 : R1 ρ ε ≠ ⊤ := hR1R2.ne_top
+  rcases eq_or_ne (R2 ρ σ) ⊤ with hR2|hR2
+  · simp [hR2, hR1, ENNReal.mul_top', ← NNReal.coe_eq_zero, show 1 - ε' ≠ 0 by linarith]
+
+  --Start giving the definitions from the paper. Define ε₀
+  let ε₀ : ℝ := (R2 ρ σ - R1 ρ ε).toReal * (ε - ε') / (1 - ε)
+  have hε₀ : 0 < ε₀ :=
+    have := sub_pos.mpr hε.2
+    have := sub_pos.mpr hε'₂
+    have : 0 < (SteinsLemma.R2 ρ σ - SteinsLemma.R1 ρ ε).toReal :=
+      ENNReal.toReal_pos (tsub_pos_of_lt hR1R2).ne' (ENNReal.sub_ne_top hR2)
+    by positivity
+
+  -- m exists because R2 + ε₀ is strictly above R2, which is the liminf.
+  obtain ⟨m, hm⟩ :=
+    have h : R2 ρ σ < R2 ρ σ + .ofNNReal ⟨ε₀, hε₀.le⟩ :=
+      ENNReal.lt_add_right hR2 (by simp [← NNReal.coe_eq_zero, hε₀.ne'])
+    (Filter.frequently_lt_of_liminf_lt (h := h)).exists
+
+  -- Define σ̃ₙ in terms of σₘ
+  obtain ⟨σ₁, hσ₁_pos, hσ₁_free⟩ := FreeStateTheory.free_fullRank i
+  let «σ̃» (n) := Lemma6_σn m σ₁ (σ m) n
+  have «σ̃_free» (n) := Lemma6_σn_IsFree hσ₁_free (fun n ↦ (σ n).2) n
+
+  --Define σ⋆
+  have σ_max_exists (n : ℕ+) := IsCompact.exists_isMaxOn
+      (α := ENNReal)
+      (s := IsFree (i := i⊗^[n]))
+      (hs := IsCompact_IsFree)
+      (ne_s := Set.Nonempty.of_subtype)
+      (f := fun σ ↦ β_ ε(ρ⊗^[n]‖{σ}))
+      (hf := by
+        sorry
+        -- unfold OptimalHypothesisRate
+        -- simp only [Set.mem_singleton_iff, iSup_iSup_eq_left]
+        -- fun_prop
+      )
+  let «σ⋆» (n) := Classical.choose (σ_max_exists n)
+  have «hσ⋆₁» (n) := (σ_max_exists n).choose_spec.left
+  have «hσ⋆₂» (n) := (σ_max_exists n).choose_spec.right
+
+  --Finally define σ' as an even mixture of σ̃, σ⋆, and σ_full.
+  --TODO: would be nice to write a `Mixable` thing for mixing `k` things according to a distribution,
+  -- in this case `Distribution.uniform (Fin 3)`.
+  let σ' := fun n ↦ ⟨2/3, by norm_num⟩ [⟨1/2, by norm_num⟩ [«σ̃» n ↔ «σ⋆» n] ↔ σ₁⊗^[n]]
+  have σ'_free (n) : IsFree (σ' n) := by
+    --by convexity of `IsFree` and that the three constituents are free
+    sorry
+  have σ'_posdef (n) : (σ' n).m.PosDef := by
+    --because σ₁ is PosDef, so is σ₁⊗^[n], and so is any convex mixture.
+    sorry
+
+  -- λ_full, the minimum eigenvalue of σ_full
+  let mineig := ⨅ i, σ₁.M.H.eigenvalues i
+  have h_min_pos : 0 < mineig := by
+    --because σ₁ is PosDef, all eigenvalues are positive, so their minimum is positive
+    sorry
+  have h_min_le_one : mineig ≤ 1 := by
+    --all eigenvalues of a state are at most 1. (We might not actually need this fact.)
+    sorry
+
+  -- The sequence c_n given in (S44)
+  let c (n : ℕ+) := Real.log (1 / mineig) + (Real.log 3) / n
+
+  -- The function f_n(λ) in (S45)
+  let f (n : ℕ+) (lam : ℝ) := ⌈(Real.log lam + n * c n) / (c n)⌉ * c n - n * c n
+  --(S46)
+  have h_le_f (n) (lam) : Real.log lam ≤ f n lam := by
+    sorry
+  have h_f_le (n) (lam) : f n lam ≤ Real.log lam + c n := by
+    sorry
+
+  --Define σ'' first as the (unnormalized) cfc image of σ' under `λ → exp (f n λ)`.
+  let σ''_unnormalized (n) : HermitianMat (H (i⊗^[n])) ℂ := by sorry
+  --Then σ'' is the normalized version, which will work because σ''_unnormalized is PosDef
+  let σ'' (n) : MState (H (i⊗^[n])) := by sorry
+
   sorry
 
 /-- Lemma 7 gives us a way to repeatedly "improve" a sequence σ to one with a smaller gap between R2 and R1.
