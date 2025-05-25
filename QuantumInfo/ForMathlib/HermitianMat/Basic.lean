@@ -325,6 +325,11 @@ theorem zero_le_iff : 0 ≤ A ↔ A.toMat.PosSemidef := by
 
 variable [DecidableEq n]
 
+instance : ZeroLEOneClass (HermitianMat n ℂ) where
+  zero_le_one := by
+    rw [HermitianMat.zero_le_iff]
+    exact Matrix.PosSemidef.one
+
 theorem le_trace_smul_one (hA : 0 ≤ A) : A ≤ (A.trace : ℝ) • 1 := by
   --mostly a copy of Matrix.PosSemidef.le_trace_smul_one from ForMathlib.Matrix.lean
   sorry

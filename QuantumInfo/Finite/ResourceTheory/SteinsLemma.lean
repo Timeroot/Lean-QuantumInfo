@@ -21,16 +21,6 @@ noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : ℝ) (S : Set (MSt
 
 scoped notation "β_" ε " (" ρ "‖" S ")" =>  OptimalHypothesisRate ρ ε S
 
---PULLOUT
-instance : ZeroLEOneClass (HermitianMat d ℂ) := by
-  sorry
-
---PULLOUT
-omit [DecidableEq d] in
-@[simp]
-theorem _root_.MState.exp_val_zero (ρ : MState d) : ρ.exp_val 0 = 0 := by
-  simp [MState.exp_val]
-
 /-- Provides an `Inhabited` instance for the quantification over `T` in `OptimalHypothesisRate`. Not
 an instance, because we need that `0 ≤ ε`. -/
 noncomputable def OptimalHypothesisRate_iInf_Inhabited (ρ : MState d) {ε : ℝ} (hε : 0 ≤ ε) :
@@ -67,15 +57,6 @@ theorem OptimalHypothesisRate_le_singleton {ρ σ : MState d} {ε : ℝ} (m : He
   rw [OptimalHypothesisRate_singleton]
   apply iInf_le_of_le ⟨m, ⟨hExp, hm⟩⟩ _
   simp only [le_refl]
-
-/-- The minimax theorem, at the level of generality we need. Convex, compact sets,
- and a bilinear function on ℝ. -/
-theorem minimax {M : Type*} [AddCommMonoid M] [Module ℝ M] [TopologicalSpace M]
-    (f : LinearMap.BilinForm ℝ M) (S : Set M) (T : Set M)
-    (hS₁ : IsCompact S) (hT₁ : IsCompact T) (hS₂ : Convex ℝ S) (hT₂ : Convex ℝ T)
-    :
-    ⨆ x ∈ S, ⨅ y ∈ T, f x y =  ⨅ y ∈ T, ⨆ x ∈ S, f x y := by
-  sorry
 
 private theorem Lemma3 {ρ : MState d} {ε : ℝ} {S : Set (MState d)} (hS₁ : IsCompact S) (hS₂ : Convex ℝ (MState.M '' S)) :
     ⨆ σ ∈ S, β_ ε(ρ‖{σ}) = β_ ε(ρ‖S) := by
@@ -154,6 +135,7 @@ private theorem Lemma3 {ρ : MState d} {ε : ℝ} {S : Set (MState d)} (hS₁ : 
   --No, this is stupid, there has to be a better way
   sorry
 
+--PULLOUT...
 theorem Matrix.star_diagonal {T R : Type*} [DecidableEq T] [AddMonoid R] [StarAddMonoid R] (f : T → R) :
     star (Matrix.diagonal f) = Matrix.diagonal (star <| f ·) := by
   ext i j
@@ -188,6 +170,7 @@ theorem HermitianMat.trace_diagonal {T : Type*} [Fintype T] [DecidableEq T] (f :
     (HermitianMat.diagonal f).trace = ∑ i, f i := by
   rw [HermitianMat.trace_eq_re_trace]
   simp [HermitianMat.diagonal, Matrix.trace]
+--...PULLOUT
 
 /- This is from "Strong converse exponents for a quantum channel discrimination problem and
 quantum-feedback-assisted communication", Lemma 5.
@@ -572,7 +555,7 @@ private theorem optimalHypothesisRate_antitone (ρ σ : MState dIn) (ℰ : CPTPM
 -- TODO: Commutation and order relations about `proj_le` specified in the text
 -- between Eqs. (S77) and (S78)
 
-open scoped _root_.HermitianMat --change to drop the _root_ when we fix names above
+open scoped _root_.HermitianMat
 
 -- The assumption (hε3 : 0 ≤ ε3 ∧ ε3 ≤ 1) stated in the paper was not used
 theorem LemmaS2 {ε3 : ℝ} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
@@ -700,22 +683,6 @@ theorem LemmaS2 {ε3 : ℝ} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
     intro n
     rw [HermitianMat.inner_comm, ←MState.exp_val]
     exact MState.exp_val_nonneg (proj_le_nonneg (Real.exp (↑↑n * (↑Rsup + ↑ε4)) • (σ n).M) (ρ n).M) (ρ n)
-
---PULLOUT
-instance : OrderTopology Prob :=
-  orderTopology_of_ordConnected (ht := Set.ordConnected_Icc)
-
---PULLOUT
-theorem _root_.Prob.zero_lt_coe {p : Prob} (hp : p ≠ 0) : (0 : ℝ) < p :=
-  lt_of_le_of_ne' p.zero_le (unitInterval.coe_ne_zero.mpr hp)
-
---PULLOUT
-@[simp, norm_cast]
-theorem _root_.Prob.coe_iInf {ι : Type*} [Nonempty ι] (f : ι → Prob) : ↑(⨅ t, f t) = (⨅ t, f t : ℝ) := by
-  apply Monotone.map_ciInf_of_continuousAt
-  · fun_prop
-  · exact fun _ _ ↦ id
-  · exact OrderBot.bddBelow _
 
 /-- Lemma S3 from the paper. What they denote as σₙ and σₙ', we denote as σ₁ and σ₂. The `exp(-o(n))`
 we express as a function `f : ℕ+ → ℝ`, together with the fact that `f` is little-o of `n` (i.e. that

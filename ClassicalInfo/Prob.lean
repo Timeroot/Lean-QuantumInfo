@@ -175,6 +175,9 @@ def NNReal.asProb (p : ℝ≥0) (hp : p ≤ 1) : Prob :=
 def NNReal.asProb' (p : ℝ≥0) (hp : p.1 ≤ 1) : Prob :=
   ⟨p, ⟨p.2, hp⟩⟩
 
+theorem zero_lt_coe {p : Prob} (hp : p ≠ 0) : (0 : ℝ) < p :=
+  lt_of_le_of_ne' p.zero_le (unitInterval.coe_ne_zero.mpr hp)
+
 /-- Subtract a probability from another. Truncates to zero, so this is often not great
 to work with, for the same reason that Nat subtraction is a pain. But, it lets you write
 `1 - p`, which is sufficiently useful on its own that this seems worth having. -/
@@ -197,6 +200,16 @@ theorem add_one_minus (p : Prob) : p.val + (1 - p).val = 1 := by
 theorem one_minus_inv (p : Prob) : 1 - (1 - p) = p := by
   ext
   simp
+
+instance : OrderTopology Prob :=
+  orderTopology_of_ordConnected (ht := Set.ordConnected_Icc)
+
+@[simp, norm_cast]
+theorem coe_iInf {ι : Type*} [Nonempty ι] (f : ι → Prob) : ↑(⨅ t, f t) = (⨅ t, f t : ℝ) := by
+  apply Monotone.map_ciInf_of_continuousAt
+  · fun_prop
+  · exact fun _ _ ↦ id
+  · exact OrderBot.bddBelow _
 
 end Prob
 

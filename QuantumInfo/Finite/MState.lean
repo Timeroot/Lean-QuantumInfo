@@ -172,6 +172,10 @@ def exp_val (T : HermitianMat d ℂ) (ρ : MState d) : ℝ :=
 theorem exp_val_nonneg {T : HermitianMat d ℂ} (h : 0 ≤ T) (ρ : MState d) : 0 ≤ ρ.exp_val T :=
   HermitianMat.inner_ge_zero ρ.zero_le h
 
+@[simp]
+theorem exp_val_zero (ρ : MState d) : ρ.exp_val 0 = 0 := by
+  simp [MState.exp_val]
+
 variable [DecidableEq d]
 
 theorem exp_val_le_one {T : HermitianMat d ℂ} (h : T ≤ 1) (ρ : MState d) : ρ.exp_val T ≤ 1 := by
