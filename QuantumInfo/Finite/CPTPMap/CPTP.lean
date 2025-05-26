@@ -35,10 +35,11 @@ variable [DecidableEq dIn]
 
 variable {dM : Type*} [Fintype dM] [DecidableEq dM]
 variable {dM₂ : Type*} [Fintype dM₂] [DecidableEq dM₂]
+variable (Λ : CPTPMap dIn dOut)
 
 /-- The Choi matrix of a CPTPMap. -/
 @[reducible]
-def choi (Λ : CPTPMap dIn dOut) := Λ.map.choi_matrix
+def choi := Λ.map.choi_matrix
 
 /-- Two CPTPMaps are equal if their Choi matrices are equal. -/
 theorem choi_ext {Λ₁ Λ₂ : CPTPMap dIn dOut} (h : Λ₁.choi = Λ₂.choi) : Λ₁ = Λ₂ :=
@@ -46,12 +47,12 @@ theorem choi_ext {Λ₁ Λ₂ : CPTPMap dIn dOut} (h : Λ₁.choi = Λ₂.choi) 
   -- PTP_ext (PTPMap.ext (MatrixMap.choi_matrix_inj h))
 
 /-- The Choi matrix of a channel is PSD. -/
-theorem choi_PSD_of_CPTP (Λ : CPTPMap dIn dOut) : Λ.map.choi_matrix.PosSemidef :=
+theorem choi_PSD_of_CPTP : Λ.map.choi_matrix.PosSemidef :=
   Λ.map.choi_PSD_iff_CP_map.1 Λ.cp
 
 /-- The trace of a Choi matrix of a CPTP map is the cardinality of the input space. -/
 @[simp]
-theorem Tr_of_choi_of_CPTP (Λ : CPTPMap dIn dOut) : Λ.choi.trace =
+theorem Tr_of_choi_of_CPTP : Λ.choi.trace =
     (Finset.univ (α := dIn)).card :=
   Λ.TP.trace_choi
 
@@ -70,11 +71,11 @@ theorem choi_of_CPTP_of_choi (M : Matrix (dOut × dIn) (dOut × dIn) ℂ) {h₁}
   simp only [choi, CPTP_of_choi_PSD_Tr, MatrixMap.map_choi_inv]
   sorry
 
-theorem mat_coe_eq_apply_mat (Λ : CPTPMap dIn dOut) (ρ : MState dIn) : (Λ ρ).m = Λ.map ρ.m :=
+theorem mat_coe_eq_apply_mat [DecidableEq dOut] (ρ : MState dIn) : (Λ ρ).m = Λ.map ρ.m :=
   rfl
 
 @[ext]
-theorem funext {Λ₁ Λ₂ : CPTPMap dIn dOut} (h : ∀ ρ, Λ₁ ρ = Λ₂ ρ) : Λ₁ = Λ₂ :=
+theorem funext [DecidableEq dOut] {Λ₁ Λ₂ : CPTPMap dIn dOut} (h : ∀ ρ, Λ₁ ρ = Λ₂ ρ) : Λ₁ = Λ₂ :=
   DFunLike.ext _ _ h
 
 /-- The composition of CPTPMaps, as a CPTPMap. -/
@@ -87,12 +88,12 @@ infixl:75 "∘ₘ" => CPTPMap.compose
 
 /-- Composition of CPTPMaps by `CPTPMap.compose` is compatible with the `instFunLike` action. -/
 @[simp]
-theorem compose_eq {Λ₁ : CPTPMap dIn dM} {Λ₂ : CPTPMap dM dOut} : ∀ρ, (Λ₂ ∘ₘ Λ₁) ρ = Λ₂ (Λ₁ ρ) :=
+theorem compose_eq [DecidableEq dOut] {Λ₁ : CPTPMap dIn dM} {Λ₂ : CPTPMap dM dOut} : ∀ρ, (Λ₂ ∘ₘ Λ₁) ρ = Λ₂ (Λ₁ ρ) :=
   fun _ ↦ rfl
 
 /-- Composition of CPTPMaps is associative. -/
-theorem compose_assoc  (Λ₃ : CPTPMap dM₂ dOut) (Λ₂ : CPTPMap dM dM₂) (Λ₁ : CPTPMap dIn dM) :
-    (Λ₃ ∘ₘ Λ₂) ∘ₘ Λ₁ = Λ₃ ∘ₘ (Λ₂ ∘ₘ Λ₁) := by
+theorem compose_assoc [DecidableEq dOut] (Λ₃ : CPTPMap dM₂ dOut) (Λ₂ : CPTPMap dM dM₂)
+    (Λ₁ : CPTPMap dIn dM) : (Λ₃ ∘ₘ Λ₂) ∘ₘ Λ₁ = Λ₃ ∘ₘ (Λ₂ ∘ₘ Λ₁) := by
   ext1 ρ
   simp
 
@@ -121,7 +122,7 @@ theorem id_map : (id (dIn := dIn)).map = LinearMap.id := by
 
 /-- The map `CPTPMap.id` leaves the input state unchanged. -/
 @[simp]
-theorem id_MState (ρ : MState dIn) : CPTPMap.id ρ = ρ := by
+theorem id_MState (ρ : MState dIn) : CPTPMap.id (dIn := dIn) ρ = ρ := by
   apply MState.ext_m
   rw [mat_coe_eq_apply_mat]
   simp
@@ -135,7 +136,7 @@ theorem id_compose [DecidableEq dOut] (Λ : CPTPMap dIn dOut) : id ∘ₘ Λ = �
 /-- Any map composed with `CPTPMap.id` is the same map. -/
 @[simp]
 theorem compose_id (Λ : CPTPMap dIn dOut) : Λ ∘ₘ id = Λ := by
-  apply funext
+  classical ext1
   simp
 
 /-- There is a CPTP map that takes a system of any (nonzero) dimension and outputs the
@@ -155,7 +156,7 @@ instance instUnique [Nonempty dIn] [Unique dOut] : Unique (CPTPMap dIn dOut) whe
 
 /-- A state can be viewed as a CPTP map from the trivial Hilbert space (indexed by `Unit`)
  that outputs exactly that state. -/
-def const_state [Unique dIn] (ρ : MState dOut) : CPTPMap dIn dOut where
+def const_state [Unique dIn] [DecidableEq dOut] (ρ : MState dOut) : CPTPMap dIn dOut where
   toLinearMap := (MatrixMap.of_choi_matrix (.of fun (i,_) (j,_) ↦ ρ.m i j))
   cp := sorry
   TP x := by
@@ -164,7 +165,8 @@ def const_state [Unique dIn] (ρ : MState dOut) : CPTPMap dIn dOut where
 
 /-- The output of `const_state ρ` is always that `ρ`. -/
 @[simp]
-theorem const_state_apply [Unique dIn] (ρ : MState dOut) (ρ₀ : MState dIn) : (const_state ρ) ρ₀ = ρ := by
+theorem const_state_apply [Unique dIn] [DecidableEq dOut] (ρ : MState dOut) (ρ₀ : MState dIn) :
+    const_state ρ ρ₀ = ρ := by
   ext1
   dsimp [const_state, MatrixMap.of_choi_matrix, MState.m, instMFunLike, PTPMap.instMFunLike]
   simp only [Finset.univ_unique, Finset.sum_singleton]
@@ -174,12 +176,13 @@ theorem const_state_apply [Unique dIn] (ρ : MState dOut) (ρ₀ : MState dIn) :
   sorry
 
 /--The replacement channel that maps all inputs to a given state. -/
-def replacement [Nonempty dIn] (ρ : MState dOut) : CPTPMap dIn dOut :=
+def replacement [Nonempty dIn] [DecidableEq dOut] (ρ : MState dOut) : CPTPMap dIn dOut :=
   (const_state (dIn := Unit) ρ) ∘ₘ destroy
 
 /-- The output of `replacement ρ` is always that `ρ`. -/
 @[simp]
-theorem replacement_apply [Nonempty dIn] (ρ : MState dOut) (ρ₀ : MState dIn) : (replacement ρ) ρ₀ = ρ := by
+theorem replacement_apply [Nonempty dIn] [DecidableEq dOut] (ρ : MState dOut) (ρ₀ : MState dIn) :
+    replacement ρ ρ₀ = ρ := by
   simp only [replacement, compose_eq, const_state_apply]
 
 section prod
@@ -233,11 +236,13 @@ def traceRight : CPTPMap (d₁ × d₂) d₁ :=
   sorry
 
 @[simp]
-theorem traceLeft_eq_MState_traceLeft (ρ : MState (d₁ × d₂)) : traceLeft ρ = ρ.traceLeft :=
+theorem traceLeft_eq_MState_traceLeft (ρ : MState (d₁ × d₂)) :
+    traceLeft (d₁ := d₁) (d₂ := d₂) ρ = ρ.traceLeft :=
   sorry
 
 @[simp]
-theorem traceRight_eq_MState_traceRight (ρ : MState (d₁ × d₂)) : traceRight ρ = ρ.traceRight :=
+theorem traceRight_eq_MState_traceRight (ρ : MState (d₁ × d₂)) :
+    traceRight (d₁ := d₁) (d₂ := d₂) ρ = ρ.traceRight :=
   sorry
 
 end trace
@@ -259,7 +264,7 @@ def of_equiv (σ : dIn ≃ dOut) : CPTPMap dIn dOut where
     apply Fintype.sum_equiv σ
     simp
 
-theorem equiv_inverse (σ : dIn ≃ dOut)  : (of_equiv σ) ∘ (of_equiv σ.symm) = id :=
+theorem equiv_inverse (σ : dIn ≃ dOut)  : (of_equiv σ) ∘ (of_equiv σ.symm) = id (dIn := dOut) :=
   sorry
 
 variable {d₁ d₂ d₃ : Type*} [Fintype d₁] [Fintype d₂] [Fintype d₃]
@@ -281,15 +286,15 @@ def assoc' : CPTPMap (d₁ × d₂ × d₃) ((d₁ × d₂) × d₃) :=
   of_equiv (Equiv.prodAssoc d₁ d₂ d₃).symm
 
 @[simp]
-theorem SWAP_eq_MState_SWAP (ρ : MState (d₁ × d₂)) : SWAP ρ = ρ.SWAP :=
+theorem SWAP_eq_MState_SWAP (ρ : MState (d₁ × d₂)) : SWAP (d₁ := d₁) (d₂ := d₂) ρ = ρ.SWAP :=
   sorry
 
 @[simp]
-theorem assoc_eq_MState_assoc (ρ : MState ((d₁ × d₂) × d₃)) : assoc ρ = ρ.assoc :=
+theorem assoc_eq_MState_assoc (ρ : MState ((d₁ × d₂) × d₃)) : assoc (d₁ := d₁) (d₂ := d₂) (d₃ := d₃) ρ = ρ.assoc :=
   sorry
 
 @[simp]
-theorem assoc'_eq_MState_assoc' (ρ : MState (d₁ × d₂ × d₃)) : assoc' ρ = ρ.assoc' :=
+theorem assoc'_eq_MState_assoc' (ρ : MState (d₁ × d₂ × d₃)) : assoc' (d₁ := d₁) (d₂ := d₂) (d₃ := d₃) ρ = ρ.assoc' :=
   sorry
 
 @[simp]
@@ -327,11 +332,11 @@ theorem IsUnitary_equiv (σ : dIn ≃ dIn) : IsUnitary (of_equiv σ) :=
 
 end unitary
 
-/-- A channel is *entanglement breaking* iff its product with the identity channel
-  only outputs separable states. -/
-def IsEntanglementBreaking (Λ : CPTPMap dIn dOut) : Prop :=
-  ∀ (dR : Type u_1) [Fintype dR] [DecidableEq dR],
-  ∀ (ρ : MState (dR × dIn)), ((CPTPMap.id ⊗ₖ Λ) ρ).IsSeparable
+-- /-- A channel is *entanglement breaking* iff its product with the identity channel
+--   only outputs separable states. -/
+-- def IsEntanglementBreaking (Λ : CPTPMap dIn dOut) : Prop :=
+--   ∀ (dR : Type u_1) [Fintype dR] [DecidableEq dR],
+--   ∀ (ρ : MState (dR × dIn)), ((CPTPMap.id (dIn := dR) ⊗ₖ Λ) ρ).IsSeparable
 
 --TODO:
 --Theorem: entanglement breaking iff it holds for all channels, not just id.

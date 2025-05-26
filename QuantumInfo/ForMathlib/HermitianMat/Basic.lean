@@ -89,15 +89,6 @@ noncomputable instance instZPow : Pow (HermitianMat n α) ℤ :=
 
 end commring
 
--- This belongs in Mathlib
-section rclike
-variable {α : Type*} [RCLike α]
-instance : StarModule ℝ α where
-  star_smul r a := by simp [RCLike.real_smul_eq_coe_mul]
-
-end rclike
--- /mathlib
-
 section conj
 
 variable [CommRing α] [StarRing α] [DecidableEq n] [Fintype n]
@@ -116,6 +107,21 @@ def conj (A : HermitianMat n α) (B : Matrix m n α) : HermitianMat m α :=
   ring⟩
 
 end conj
+
+section diagonal
+
+--TODO: Generalize this more types than ℝ/ℂ
+def diagonal [DecidableEq n] (f : n → ℝ) : HermitianMat n ℂ :=
+  ⟨Matrix.diagonal (f ·), by simp [selfAdjoint.mem_iff, Matrix.star_diagonal]⟩
+
+theorem diagonal_conj_diagonal [Fintype n] [DecidableEq n] (f g : n → ℝ) :
+    (diagonal f).conj (diagonal g) =
+    diagonal (fun i ↦ f i * (g i)^2) := by
+  simp [diagonal, conj]
+  intro
+  ring
+
+end diagonal
 
 section trace
 
@@ -197,6 +203,11 @@ theorem trace_eq_trace_rc (A : HermitianMat n 𝕜) : ↑A.trace = Matrix.trace 
   rw [trace, Matrix.trace, map_sum, RCLike.ofReal_sum]
   congr 1
   exact Matrix.IsHermitian.coe_re_diag A.H
+
+theorem trace_diagonal {T : Type*} [Fintype T] [DecidableEq T] (f : T → ℝ) :
+    (diagonal f).trace = ∑ i, f i := by
+  rw [trace_eq_re_trace]
+  simp [HermitianMat.diagonal, Matrix.trace]
 
 end RCLike
 
@@ -323,14 +334,25 @@ theorem zero_le_iff : 0 ≤ A ↔ A.toMat.PosSemidef := by
   rw [← propext_iff]
   apply congrArg Matrix.PosSemidef (sub_zero _)
 
-variable [DecidableEq n]
+theorem inner_mul_nonneg (h : 0 ≤ A.toMat * B.toMat) : 0 ≤ A.inner B := by
+  rw [Matrix.PosSemidef.zero_le_iff_posSemidef] at h
+  classical exact (RCLike.nonneg_iff.mp h.trace_nonneg).left
 
-instance : ZeroLEOneClass (HermitianMat n ℂ) where
+
+instance [DecidableEq n] : ZeroLEOneClass (HermitianMat n ℂ) where
   zero_le_one := by
     rw [HermitianMat.zero_le_iff]
     exact Matrix.PosSemidef.one
 
-theorem le_trace_smul_one (hA : 0 ≤ A) : A ≤ (A.trace : ℝ) • 1 := by
+/-- The inner product for PSD matrices is nonnegative. -/
+theorem inner_ge_zero (hA : 0 ≤ A) (hB : 0 ≤ B) : 0 ≤ A.inner B := by
+  rw [zero_le_iff] at hA hB
+  open Classical in
+  rw [inner_eq_re_trace, ← hA.sqrt_mul_self, Matrix.trace_mul_cycle, Matrix.trace_mul_cycle]
+  nth_rewrite 1 [← hA.posSemidef_sqrt.left]
+  exact (RCLike.nonneg_iff.mp (hB.conjTranspose_mul_mul_same _).trace_nonneg).left
+
+theorem le_trace_smul_one [DecidableEq n] (hA : 0 ≤ A) : A ≤ (A.trace : ℝ) • 1 := by
   --mostly a copy of Matrix.PosSemidef.le_trace_smul_one from ForMathlib.Matrix.lean
   sorry
   -- have h : ∀ i, hA.1.eigenvalues i ≤ hA.1.rtrace := fun i ↦ by
@@ -341,44 +363,29 @@ theorem le_trace_smul_one (hA : 0 ≤ A) : A ≤ (A.trace : ℝ) • 1 := by
   --   · exact fun j _ _ ↦ eigenvalues_nonneg hA j
   -- exact (le_smul_one_of_eigenvalues_iff hA hA.1.rtrace).mp h
 
-/-- The inner product for PSD matrices is nonnegative. -/
-theorem inner_ge_zero (hA : 0 ≤ A) (hB : 0 ≤ B) : 0 ≤ A.inner B := by
-  rw [zero_le_iff] at hA hB
-  open Classical in
-  rw [inner_eq_re_trace, ← hA.sqrt_mul_self, Matrix.trace_mul_cycle, Matrix.trace_mul_cycle]
-  nth_rewrite 1 [← hA.posSemidef_sqrt.left]
-  exact (RCLike.nonneg_iff.mp (hB.conjTranspose_mul_mul_same _).trace_nonneg).left
-
-omit [DecidableEq n] in
-theorem inner_mul_nonneg (h : 0 ≤ A.toMat * B.toMat) : 0 ≤ A.inner B := by
-  rw [Matrix.PosSemidef.zero_le_iff_posSemidef] at h
-  exact (RCLike.nonneg_iff.mp h.trace_nonneg).left
-
 theorem inner_mono (hA : 0 ≤ A) (B C) : B ≤ C → A.inner B ≤ A.inner C := fun hBC ↦ by
-  have hTr : 0 ≤ A.inner (C - B) := inner_ge_zero hA (zero_le_iff.mpr hBC)
+  classical have hTr : 0 ≤ A.inner (C - B) := inner_ge_zero hA (zero_le_iff.mpr hBC)
   rw [inner_left_sub] at hTr
   linarith
 
+theorem conj_le (hA : 0 ≤ A) [Fintype m] (M : Matrix m n α) : 0 ≤ A.conj M := by
+  rw [zero_le_iff] at hA ⊢
+  exact Matrix.PosSemidef.mul_mul_conjTranspose_same hA M
+
 /-- The inner product for PSD matrices is at most the product of their traces. -/
 theorem inner_le_mul_trace (hA : 0 ≤ A) (hB : 0 ≤ B) : A.inner B ≤ A.trace * B.trace := by
-  convert inner_mono hA _ _ (le_trace_smul_one hB)
+  classical convert inner_mono hA _ _ (le_trace_smul_one hB)
   simp [mul_comm]
 
 --There's a lot of facts about PosSemidef matrices that are convenient to come bundled with the HermitiatMat
 --type too.
-omit [DecidableEq n] in
 theorem convex_cone (hA : 0 ≤ A) (hB : 0 ≤ B) {c₁ c₂ : ℝ} (hc₁ : 0 ≤ c₁) (hc₂ : 0 ≤ c₂)
     : 0 ≤ (c₁ • A + c₂ • B) := by
   rw [zero_le_iff] at hA hB ⊢
   convert (hA.smul (RCLike.ofReal_nonneg.mpr hc₁)).add (hB.smul (RCLike.ofReal_nonneg.mpr hc₂))
   simp
 
-omit [DecidableEq n] in
-theorem conj_le (hA : 0 ≤ A) [Fintype m] (M : Matrix m n α) : 0 ≤ A.conj M := by
-  rw [zero_le_iff] at hA ⊢
-  exact Matrix.PosSemidef.mul_mul_conjTranspose_same hA M
-
-theorem sq_nonneg : 0 ≤ A^2 := by
+theorem sq_nonneg [DecidableEq n] : 0 ≤ A^2 := by
   simp [zero_le_iff, pow_two]
   nth_rewrite 1 [←Matrix.IsHermitian.eq A.H]
   exact Matrix.posSemidef_conjTranspose_mul_self A.toMat
@@ -399,6 +406,15 @@ def rpow (A : HermitianMat n 𝕜) (p : ℝ) : HermitianMat n 𝕜 :=
 
 noncomputable instance instRPow : Pow (HermitianMat n 𝕜) ℝ :=
   ⟨rpow⟩
+
+theorem pow_eq_rpow (A : HermitianMat n 𝕜) (p : ℝ) : A ^ p = A.rpow p :=
+  rfl
+
+theorem diagonal_pow (f : n → ℝ) (p : ℝ) :
+    (diagonal f) ^ p = diagonal fun i => (f i) ^ p := by
+  simp [HermitianMat.ext_iff, pow_eq_rpow, diagonal, rpow]
+  --Missing simp theorem: `cfc f (Matrix.diagonal g) = Matrix.diagonal (f ∘ g)`
+  sorry
 
 open ComplexOrder in
 theorem rpow_PosSemidef {A : HermitianMat n 𝕜} (hA : A.val.PosSemidef) (p : ℝ) : (A ^ p).val.PosSemidef := by

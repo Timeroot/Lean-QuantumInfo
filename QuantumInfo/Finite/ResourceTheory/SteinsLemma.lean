@@ -135,43 +135,6 @@ private theorem Lemma3 {ρ : MState d} {ε : ℝ} {S : Set (MState d)} (hS₁ : 
   --No, this is stupid, there has to be a better way
   sorry
 
---PULLOUT...
-theorem Matrix.star_diagonal {T R : Type*} [DecidableEq T] [AddMonoid R] [StarAddMonoid R] (f : T → R) :
-    star (Matrix.diagonal f) = Matrix.diagonal (star <| f ·) := by
-  ext i j
-  simp only [Matrix.star_apply, Matrix.diagonal_apply]
-  split <;> simp_all [@eq_comm _ j i]
-
-def HermitianMat.diagonal {T : Type*} [DecidableEq T] (f : T → ℝ) : HermitianMat T ℂ :=
-  ⟨Matrix.diagonal (f ·), by simp [selfAdjoint.mem_iff, Matrix.star_diagonal]⟩
-
-theorem HermitianMat.diagonal_pow {T : Type*} [Fintype T] [DecidableEq T] (f : T → ℝ) (p : ℝ) :
-    (HermitianMat.diagonal f) ^ p = HermitianMat.diagonal fun i => (f i) ^ p := by
-  sorry
-
-@[simp]
-theorem MState.coe_ofClassical (d : Distribution d) :
-    (MState.ofClassical d).M = HermitianMat.diagonal (d ·) := by
-  sorry
-
-theorem MState.ofClassical_pow {T : Type*} [Fintype T] [DecidableEq T] (dist : Distribution T) (p : ℝ) :
-    (MState.ofClassical dist).M ^ p = HermitianMat.diagonal (fun i ↦ (dist i) ^ p) := by
-  simp
-  exact HermitianMat.diagonal_pow (dist ·) p
-
-theorem HermitianMat.diagonal_conj_diagonal {T : Type*} [Fintype T] [DecidableEq T] (f g : T → ℝ) :
-    (HermitianMat.diagonal f).conj (HermitianMat.diagonal g) =
-    HermitianMat.diagonal (fun i ↦ f i * (g i)^2) := by
-  simp [diagonal, HermitianMat.conj]
-  intro
-  ring
-
-theorem HermitianMat.trace_diagonal {T : Type*} [Fintype T] [DecidableEq T] (f : T → ℝ) :
-    (HermitianMat.diagonal f).trace = ∑ i, f i := by
-  rw [HermitianMat.trace_eq_re_trace]
-  simp [HermitianMat.diagonal, Matrix.trace]
---...PULLOUT
-
 /- This is from "Strong converse exponents for a quantum channel discrimination problem and
 quantum-feedback-assisted communication", Lemma 5.
 

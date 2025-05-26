@@ -31,20 +31,21 @@ Important definitions:
 
 noncomputable section
 
-open Classical
 open BigOperators
 open ComplexConjugate
 open Kronecker
 open scoped Matrix ComplexOrder
 
 /-- A mixed state as a PSD matrix with trace 1.-/
-structure MState (d : Type*) [Fintype d] extends HermitianMat d ℂ where
+structure MState (d : Type*) [Fintype d] [DecidableEq d] extends HermitianMat d ℂ where
   zero_le : 0 ≤ toSubtype
   tr : val.trace = 1
 
 namespace MState
 
-variable {d d₁ d₂ d₃ : Type*} [Fintype d] [Fintype d₁] [Fintype d₂] [Fintype d₃]
+variable {d d₁ d₂ d₃ : Type*}
+variable [Fintype d] [Fintype d₁] [Fintype d₂] [Fintype d₃]
+variable [DecidableEq d] [DecidableEq d₁] [DecidableEq d₂] [DecidableEq d₃]
 
 /-- The underlying `Matrix` in an MState-/
 def m (ρ : MState d) : Matrix d d ℂ := ρ.val
@@ -118,22 +119,6 @@ instance nonempty (ρ : MState d) : Nonempty d := by
   by_contra h
   simpa [not_nonempty_iff.mp h] using ρ.tr
 
-theorem PosSemidef_outer_self_conj (v : d → ℂ) : Matrix.PosSemidef (Matrix.vecMulVec v (conj v)) := by
-  constructor
-  · ext
-    simp [Matrix.vecMulVec_apply, mul_comm]
-  · intro x
-    simp_rw [dotProduct, Pi.star_apply, RCLike.star_def, Matrix.mulVec, dotProduct,
-      Matrix.vecMulVec_apply, mul_assoc, ← Finset.mul_sum, ← mul_assoc, ← Finset.sum_mul]
-    change
-      0 ≤ (∑ i : d, (starRingEnd ℂ) (x i) * v i) * ∑ i : d, (starRingEnd ℂ) (v i) * x i
-    have : (∑ i : d, (starRingEnd ℂ) (x i) * v i) =
-        (∑ i : d, (starRingEnd ℂ) ((starRingEnd ℂ) (v i) * x i)) := by
-          simp only [mul_comm ((starRingEnd ℂ) (x _)) (v _), map_mul,
-          RingHomCompTriple.comp_apply, RingHom.id_apply]
-    rw [this, ← map_sum, ← Complex.normSq_eq_conj_mul_self, Complex.zero_le_real, ← Complex.sq_norm]
-    exact sq_nonneg _
-
 -- Could have used properties of ρ.spectrum
 theorem eigenvalue_nonneg (ρ : MState d) : ∀ i, 0 ≤ ρ.Hermitian.eigenvalues i := by
   apply (Matrix.PosSemidef.nonneg_iff_eigenvalue_nonneg ρ.Hermitian).mp
@@ -176,8 +161,6 @@ theorem exp_val_nonneg {T : HermitianMat d ℂ} (h : 0 ≤ T) (ρ : MState d) : 
 theorem exp_val_zero (ρ : MState d) : ρ.exp_val 0 = 0 := by
   simp [MState.exp_val]
 
-variable [DecidableEq d]
-
 theorem exp_val_le_one {T : HermitianMat d ℂ} (h : T ≤ 1) (ρ : MState d) : ρ.exp_val T ≤ 1 := by
   have hmono := HermitianMat.inner_mono ρ.zero_le T 1 h
   rwa [HermitianMat.inner_one ρ.M, ρ.tr'] at hmono
@@ -193,8 +176,8 @@ section pure
 /-- A mixed state can be constructed as a pure state arising from a ket. -/
 def pure (ψ : Ket d) : MState d where
   val := Matrix.vecMulVec ψ (ψ : Bra d)
-  property := (PosSemidef_outer_self_conj ψ).1
-  zero_le := HermitianMat.zero_le_iff.mpr (PosSemidef_outer_self_conj ψ)
+  property := (Matrix.PosSemidef.outer_self_conj ψ).1
+  zero_le := HermitianMat.zero_le_iff.mpr (Matrix.PosSemidef.outer_self_conj ψ)
   tr := by
     have h₁ : ∀x, ψ x * conj (ψ x) = Complex.normSq (ψ x) := fun x ↦ by
       rw [mul_comm, Complex.normSq_eq_conj_mul_self]
@@ -212,7 +195,7 @@ def purity (ρ : MState d) : Prob :=
     by simpa [ρ.tr'] using  HermitianMat.inner_le_mul_trace ρ.zero_le ρ.zero_le⟩⟩
 
 /-- The eigenvalue spectrum of a mixed quantum state, as a `Distribution`. -/
-def spectrum (ρ : MState d) : Distribution d :=
+def spectrum [DecidableEq d] (ρ : MState d) : Distribution d :=
   Distribution.mk'
     (ρ.M.H.eigenvalues ·)
     (ρ.pos.eigenvalues_nonneg ·)
@@ -325,7 +308,7 @@ theorem pure_of_constant_spectrum (ρ : MState d) (h : ∃ i, ρ.spectrum = Dist
   have hsum : ∀ x ∈ Finset.univ, x ∉ ({i} : Finset d) → (ρ.M.H.eigenvectorBasis x j) * (↑(if x = i then 1 else 0) : ℝ) * (starRingEnd ℂ) (ρ.Hermitian.eigenvectorBasis x k) = 0 := by
     intros x hx hxnoti
     rw [Finset.mem_singleton] at hxnoti
-    rw [eq_false hxnoti, if_false, Complex.ofReal_zero]
+    rw [if_neg hxnoti, Complex.ofReal_zero]
     ring
   simp_rw [←Finset.sum_subset (Finset.subset_univ {i}) hsum, Finset.sum_singleton, reduceIte, Complex.ofReal_one, mul_one]
   rfl
@@ -374,17 +357,30 @@ def ofClassical (dist : Distribution d) : MState d where
     have h₃ := dist.2
     norm_cast
 
+@[simp]
+theorem coe_ofClassical (dist : Distribution d) :
+    (MState.ofClassical dist).M = HermitianMat.diagonal (dist ·) := by
+  rfl
+
+theorem ofClassical_pow (dist : Distribution d) (p : ℝ) :
+    (MState.ofClassical dist).M ^ p = HermitianMat.diagonal (fun i ↦ (dist i) ^ p) := by
+  rw [coe_ofClassical]
+  convert HermitianMat.diagonal_pow (dist ·) p
+
 /-- The maximally mixed state. -/
 def uniform [Nonempty d] : MState d := ofClassical Distribution.uniform
 
 /-- There is exactly one state on a dimension-1 system. -/
+--note that this still takes (and uses) the `Fintype d` and `DecidableEq d` instances on `MState d`.
+--Even though instances for those can be derived from `Unique d`, we want this `Unique` instance to
+--apply on `@MState d ?x ?y` for _any_ x and y.
 instance instUnique [Unique d] : Unique (MState d) where
-  default := @uniform _ _ instNonemptyOfInhabited
+  default := @uniform _ _ _ _
   uniq := by
     intro ρ
     ext
     have h₁ := ρ.tr
-    have h₂ := (@uniform _ _ instNonemptyOfInhabited : MState d).tr
+    have h₂ := (@uniform _ _ _ _ : MState d).tr
     simp [Matrix.trace, Unique.eq_default] at h₁ h₂ ⊢
     exact h₁.trans h₂.symm
 

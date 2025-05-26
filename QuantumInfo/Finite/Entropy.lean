@@ -10,7 +10,7 @@ noncomputable section
 
 variable {d d₁ d₂ d₃ : Type*}
 variable [Fintype d] [Fintype d₁] [Fintype d₂] [Fintype d₃]
-variable [DecidableEq d₁] [DecidableEq d₂]
+variable [DecidableEq d] [DecidableEq d₁] [DecidableEq d₂] [DecidableEq d₃]
 variable {dA dB dC dA₁ dA₂ : Type*}
 variable [Fintype dA] [Fintype dB] [Fintype dC] [Fintype dA₁] [Fintype dA₂]
 variable [DecidableEq dA] [DecidableEq dB] [DecidableEq dC] [DecidableEq dA₁] [DecidableEq dA₂]
@@ -31,10 +31,8 @@ def qMutualInfo (ρ : MState (dA × dB)) : ℝ :=
   entropy of the image under Λ of the purification of ρ. -/
 def coherentInfo (ρ : MState d₁) (Λ : CPTPMap d₁ d₂) : ℝ :=
   let ρPure : MState (d₁ × d₁) := MState.pure ρ.purify
-  let ρImg : MState (d₂ × d₁) := Λ.prod CPTPMap.id ρPure
+  let ρImg : MState (d₂ × d₁) := Λ.prod (CPTPMap.id (dIn := d₁)) ρPure
   (- qConditionalEnt ρImg)
-
-variable [DecidableEq d]
 
 open Classical in
 /-- The quantum relative entropy S(ρ‖σ) = Tr[ρ (log ρ - log σ)]. -/
@@ -185,8 +183,6 @@ theorem qRelativeEnt_joint_convexity :
     𝐃(p [ρ₁ ↔ ρ₂]‖p [σ₁ ↔ σ₂]) ≤ p * 𝐃(ρ₁‖σ₁) + (1 - p) * 𝐃(ρ₂‖σ₂) := by
   sorry
 
-omit [DecidableEq d]
-
 /-- von Neumman entropy is nonnegative. -/
 theorem Sᵥₙ_nonneg (ρ : MState d) : 0 ≤ Sᵥₙ ρ :=
   Hₛ_nonneg _
@@ -297,7 +293,6 @@ theorem qMutualInfo_strong_subadditivity (ρ₁₂₃ : MState (d₁ × d₂ × 
   simp only [qMutualInfo, MState.traceRight_left_assoc', MState.traceRight_right_assoc']
   linarith
 
-omit [DecidableEq dC] in
 /-- The quantum conditional mutual information `QCMI` is nonnegative. -/
 theorem qcmi_nonneg (ρ : MState (dA × dB × dC)) :
     0 ≤ qcmi ρ := by
@@ -315,15 +310,15 @@ theorem qcmi_le_2_log_dim' (ρ : MState (dA × dB × dC)) :
     qcmi ρ ≤ 2 * Real.log (Fintype.card dC) := by
   sorry
 
-/-- The chain rule for quantum conditional mutual information:
-`I(A₁A₂ : C | B) = I(A₁:C|B) + I(A₂:C|BA₁)`.
--/
-theorem qcmi_chain_rule (ρ : MState ((dA₁ × dA₂) × dB × dC)) :
-    let ρA₁BC := ρ.assoc.SWAP.assoc.traceLeft.SWAP;
-    let ρA₂BA₁C : MState (dA₂ × (dA₁ × dB) × dC) :=
-      ((CPTPMap.id ⊗ₖ CPTPMap.assoc').compose (CPTPMap.assoc.compose (CPTPMap.SWAP ⊗ₖ CPTPMap.id))) ρ;
-    qcmi ρ = qcmi ρA₁BC + qcmi ρA₂BA₁C
-     := by
-  sorry
+-- /-- The chain rule for quantum conditional mutual information:
+-- `I(A₁A₂ : C | B) = I(A₁:C|B) + I(A₂:C|BA₁)`.
+-- -/
+-- theorem qcmi_chain_rule (ρ : MState ((dA₁ × dA₂) × dB × dC)) :
+--     let ρA₁BC := ρ.assoc.SWAP.assoc.traceLeft.SWAP;
+--     let ρA₂BA₁C : MState (dA₂ × (dA₁ × dB) × dC) :=
+--       ((CPTPMap.id ⊗ₖ CPTPMap.assoc').compose (CPTPMap.assoc.compose (CPTPMap.SWAP ⊗ₖ CPTPMap.id))) ρ;
+--     qcmi ρ = qcmi ρA₁BC + qcmi ρA₂BA₁C
+--      := by
+--   sorry
 
 end entropy

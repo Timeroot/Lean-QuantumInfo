@@ -8,10 +8,9 @@ import QuantumInfo.ForMathlib.Other
 noncomputable section
 
 open BigOperators
-open Classical
 
 variable {n 𝕜 : Type*}
-variable [RCLike 𝕜]
+variable [RCLike 𝕜] [DecidableEq n]
 
 namespace Matrix
 
@@ -30,14 +29,17 @@ variable {A : Matrix n n 𝕜} {B : Matrix n n 𝕜}
 variable (hA : A.IsHermitian) (hB : B.IsHermitian)
 
 include hA in
+omit [DecidableEq n] in
 theorem smul_selfAdjoint {c : 𝕜} (hc : _root_.IsSelfAdjoint c) : (c • A).IsHermitian := by
   exact IsSelfAdjoint.smul hc hA
 
 include hA in
+omit [DecidableEq n] in
 theorem smul_im_zero {c : 𝕜} (h : RCLike.im c = 0) : (c • A).IsHermitian :=
   hA.smul_selfAdjoint (RCLike.conj_eq_iff_im.mpr h)
 
 include hA in
+omit [DecidableEq n] in
 theorem smul_real (c : ℝ) : (c • A).IsHermitian := by
   convert hA.smul_im_zero (RCLike.ofReal_im c) using 1
   ext
@@ -55,6 +57,7 @@ def HermitianSubspace (n 𝕜 : Type*) [Fintype n] [RCLike 𝕜] : Subspace ℝ 
 variable [Fintype n]
 
 include hA in
+omit [DecidableEq n] in
 @[simp]
 theorem re_trace_eq_trace : RCLike.re (A.trace) = A.trace := by
   rw [trace, map_sum, RCLike.ofReal_sum, IsHermitian.coe_re_diag hA]
@@ -64,6 +67,7 @@ def rtrace {A : Matrix n n 𝕜} (_ : A.IsHermitian) : ℝ :=
   RCLike.re (A.trace)
 
 include hA in
+omit [DecidableEq n] in
 @[simp]
 theorem rtrace_eq_trace : (hA.rtrace : 𝕜) = A.trace :=
   hA.re_trace_eq_trace
@@ -96,6 +100,7 @@ open Kronecker
 variable [CommRing R] [StarRing R]
 variable (A : Matrix m m R) (B : Matrix n n R)
 
+omit [DecidableEq n] in
 theorem kroneckerMap_conjTranspose : (A ⊗ₖ B)ᴴ = (Aᴴ ⊗ₖ Bᴴ) := by
   ext; simp
 
@@ -103,6 +108,7 @@ variable {A : Matrix m m R} {B : Matrix n n R}
 variable (hA : A.IsHermitian) (hB : B.IsHermitian)
 
 include hA hB in
+omit [DecidableEq n] in
 theorem kroneckerMap_IsHermitian : (A ⊗ₖ B).IsHermitian := by
   exact (hA ▸ hB ▸ kroneckerMap_conjTranspose A B : _ = _)
 
@@ -110,13 +116,12 @@ end Kronecker
 
 namespace PosSemidef
 
-open Classical
 open Kronecker
 open scoped ComplexOrder
 
 variable {m n 𝕜 : Type*}
 variable [Fintype m] [Fintype n]
-variable [RCLike 𝕜] [DecidableEq n]
+variable [RCLike 𝕜] [dm : DecidableEq m] [dn : DecidableEq n]
 
 section
 variable {A : Matrix m m 𝕜} {B : Matrix m m 𝕜}
@@ -158,7 +163,33 @@ theorem rtrace_zero_iff : hA.1.rtrace = 0 ↔ A = 0 :=
     (by simp [RCLike.nonneg_iff.mp hA.trace_nonneg])),
   (by simp [·, IsHermitian.rtrace])⟩
 
+--belongs somewhere else. compare with `Complex.normSq_eq_conj_mul_self`.
+open ComplexConjugate in
+theorem _root_.RCLike.normSq_eq_conj_mul_self {z : 𝕜} : RCLike.normSq z = conj z * z := by
+  rw [RCLike.ext_iff]
+  simp [RCLike.normSq]
+  ring_nf
+
+omit dn in
+open ComplexConjugate in
+theorem outer_self_conj (v : n → 𝕜) : Matrix.PosSemidef (Matrix.vecMulVec v (conj v)) := by
+  constructor
+  · ext
+    simp [Matrix.vecMulVec_apply, mul_comm]
+  · intro x
+    simp_rw [dotProduct, Pi.star_apply, RCLike.star_def, Matrix.mulVec, dotProduct,
+      Matrix.vecMulVec_apply, mul_assoc, ← Finset.mul_sum, ← mul_assoc, ← Finset.sum_mul]
+    change
+      0 ≤ (∑ i : n, conj (x i) * v i) * ∑ i : n, conj (v i) * x i
+    have : (∑ i : n, conj (x i) * v i) =
+        (∑ i : n, conj (conj (v i) * x i)) := by
+          simp only [mul_comm (conj (x _)) (v _), map_mul,
+          RingHomCompTriple.comp_apply, RingHom.id_apply]
+    rw [this, ← map_sum, ← RCLike.normSq_eq_conj_mul_self, RCLike.ofReal_nonneg]
+    exact RCLike.normSq_nonneg _
+
 include hA in
+omit [DecidableEq m] in
 theorem smul {c : 𝕜} (h : 0 ≤ c) : (c • A).PosSemidef := by
   constructor
   · apply hA.1.smul_im_zero (RCLike.nonneg_iff.mp h).2
@@ -167,6 +198,7 @@ theorem smul {c : 𝕜} (h : 0 ≤ c) : (c • A).PosSemidef := by
     exact mul_nonneg h (hA.2 x)
 
 include hA hB in
+omit [DecidableEq m] in
 theorem convex_cone {c₁ c₂ : 𝕜} (hc₁ : 0 ≤ c₁) (hc₂ : 0 ≤ c₂) : (c₁ • A + c₂ • B).PosSemidef :=
   (hA.smul hc₁).add (hB.smul hc₂)
 
@@ -251,6 +283,23 @@ theorem sqrt_0 : (Matrix.PosSemidef.zero (n := n) (R := 𝕜)).sqrt = 0 :=
 theorem sqrt_1 : (Matrix.PosSemidef.one (n := n) (R := 𝕜)).sqrt = 1 :=
   (sqrt_eq_one_iff PosSemidef.one).mpr rfl
 
+theorem posSemidef_iff_eigenvalues_nonneg {hA : A.IsHermitian} : A.PosSemidef ↔ ∀ x, 0 ≤ hA.eigenvalues x :=
+  ⟨PosSemidef.eigenvalues_nonneg, IsHermitian.posSemidef_of_eigenvalues_nonneg hA⟩
+
+omit [DecidableEq m]
+
+include hA in
+theorem zero_dotProduct_zero_iff : (∀ x : m → 𝕜, 0 = star x ⬝ᵥ A.mulVec x) ↔ A = 0 := by
+  constructor
+  · intro h
+    ext i j
+    have h₂ := fun x ↦ (PosSemidef.dotProduct_mulVec_zero_iff hA x).mp (h x).symm
+    classical have : DecidableEq m := inferInstance
+    convert congrFun (h₂ (Pi.single j 1)) i using 1
+    simp
+  · rintro rfl
+    simp
+
 theorem nonneg_smul {c : 𝕜} (hA : A.PosSemidef) (hc : 0 ≤ c) : (c • A).PosSemidef := by
   constructor
   · simp only [IsHermitian, conjTranspose_smul, RCLike.star_def]
@@ -276,6 +325,7 @@ theorem pos_Real_smul {c : ℝ} (hA : (c • A).PosSemidef) (hc : 0 < c) : A.Pos
   rw [(RCLike.real_smul_eq_coe_smul c A : c • A = (c : 𝕜) • A)] at hA
   exact pos_smul hA (RCLike.ofReal_pos.mpr hc)
 
+include dm in
 theorem sqrt_nonneg_smul {c : 𝕜} (hA : (c^2 • A).PosSemidef) (hc : 0 < c) :
     hA.sqrt = c • (hA.pos_smul (sq_pos_of_pos hc) : A.PosSemidef).sqrt := by
   apply Eq.symm
@@ -283,17 +333,6 @@ theorem sqrt_nonneg_smul {c : 𝕜} (hA : (c^2 • A).PosSemidef) (hc : 0 < c) :
   · rw [pow_two, Algebra.mul_smul_comm, Algebra.smul_mul_assoc, sqrt_mul_self, pow_two, smul_smul]
   · apply nonneg_smul ?_ hc.le
     apply posSemidef_sqrt
-
-include hA in
-theorem zero_dotProduct_zero_iff : (∀ x : m → 𝕜, 0 = star x ⬝ᵥ A.mulVec x) ↔ A = 0 := by
-  constructor
-  · intro h
-    ext i j
-    have h₂ := fun x ↦ (PosSemidef.dotProduct_mulVec_zero_iff hA x).mp (h x).symm
-    convert congrFun (h₂ (Pi.single j 1)) i using 1
-    simp
-  · rintro rfl
-    simp
 
 theorem zero_posSemidef_neg_posSemidef_iff : A.PosSemidef ∧ (-A).PosSemidef ↔ A = 0 := by
   constructor
@@ -306,16 +345,14 @@ theorem zero_posSemidef_neg_posSemidef_iff : A.PosSemidef ∧ (-A).PosSemidef �
   · rintro rfl
     simp [PosSemidef.zero]
 
-theorem posSemidef_iff_eigenvalues_nonneg {hA : A.IsHermitian} : A.PosSemidef ↔ ∀ x, 0 ≤ hA.eigenvalues x :=
-  ⟨PosSemidef.eigenvalues_nonneg, IsHermitian.posSemidef_of_eigenvalues_nonneg hA⟩
-
 end PosSemidef
 
 namespace PosSemidef
 section partialOrder
 open scoped ComplexOrder
 
-variable {n 𝕜 : Type*} [Fintype n] [RCLike 𝕜]
+variable {n m 𝕜 : Type*}
+variable [Fintype n] [Fintype m] [RCLike 𝕜] [DecidableEq m]
 variable {A : Matrix n n 𝕜} {B : Matrix n n 𝕜}
 variable (hA : A.IsHermitian) (hB : B.IsHermitian)
 
@@ -353,17 +390,6 @@ instance instStarOrderedRing : StarOrderedRing (Matrix n n 𝕜) :=
     (add_le_add_left)
     (fun _ ↦ Iff.trans zero_le_iff_posSemidef Matrix.posSemidef_iff_eq_conjTranspose_mul_self)
 
-/-- Basically, the instance states 0 ≤ A → ∀ x ∈ spectrum ℝ A, 0 ≤ x  -/
-instance instNonnegSpectrumClass : NonnegSpectrumClass ℝ (Matrix n n 𝕜) := by
-  apply NonnegSpectrumClass.of_spectrum_nonneg
-  intro A hA x hx
-  rw [IsHermitian.eigenvalues_eq_spectrum_real (zero_le_iff_posSemidef.mp hA).1, Set.mem_range] at hx
-  obtain ⟨i, hi⟩ := hx
-  rw [←hi]
-  exact Matrix.PosSemidef.eigenvalues_nonneg (zero_le_iff_posSemidef.mp hA) i
-
-theorem nonneg_iff_eigenvalue_nonneg : 0 ≤ A ↔ ∀ x, 0 ≤ hA.eigenvalues x := Iff.trans zero_le_iff_posSemidef posSemidef_iff_eigenvalues_nonneg
-
 theorem le_iff_sub_nonneg : A ≤ B ↔ 0 ≤ B - A := Iff.trans le_iff_sub_posSemidef zero_le_iff_posSemidef.symm
 
 theorem le_of_nonneg_imp {R : Type*} [AddCommGroup R] [PartialOrder R] [IsOrderedAddMonoid R]
@@ -381,17 +407,8 @@ theorem le_of_nonneg_imp' {R : Type*} [AddCommGroup R] [PartialOrder R] [IsOrder
   rw [←sub_nonneg] at hxy
   exact zero_le_iff_posSemidef.mpr <| h (y - x) hxy
 
-theorem diag_monotone : Monotone (diag : Matrix n n 𝕜 → (n → 𝕜)) := fun _ _ ↦
-  le_of_nonneg_imp (diagAddMonoidHom n 𝕜) (fun _ ↦ diag_nonneg)
-
-theorem diag_mono : A ≤ B → ∀ i, A.diag i ≤ B.diag i := diag_monotone.imp
-
-theorem trace_monotone : Monotone (@trace n 𝕜 _ _) := fun _ _ ↦
-  le_of_nonneg_imp (traceAddMonoidHom n 𝕜) (fun _ ↦ trace_nonneg)
-
-theorem trace_mono : A ≤ B → A.trace ≤ B.trace := trace_monotone.imp
-
-theorem mul_mul_conjTranspose_mono {m : Type*} [Fintype m] (C : Matrix m n 𝕜) :
+omit [DecidableEq m] in
+theorem mul_mul_conjTranspose_mono (C : Matrix m n 𝕜) :
   A ≤ B → C * A * C.conjTranspose ≤ C * B * C.conjTranspose := fun hAB ↦ by
     rw [le_iff_sub_posSemidef]
     have hDistrib : C * B * Cᴴ - C * A * Cᴴ = C * (B - A) * Cᴴ := by
@@ -401,7 +418,8 @@ theorem mul_mul_conjTranspose_mono {m : Type*} [Fintype m] (C : Matrix m n 𝕜)
     rw [hDistrib]
     exact mul_mul_conjTranspose_same (le_iff_sub_posSemidef.mp hAB) C
 
-theorem conjTranspose_mul_mul_mono {m : Type*} [Fintype m] (C : Matrix n m 𝕜) :
+omit [DecidableEq m] in
+theorem conjTranspose_mul_mul_mono (C : Matrix n m 𝕜) :
   A ≤ B → C.conjTranspose * A * C ≤ C.conjTranspose * B * C := fun hAB ↦ by
     rw [le_iff_sub_posSemidef]
     have hDistrib : Cᴴ * B * C - Cᴴ * A * C = Cᴴ * (B - A) * C := by
@@ -410,6 +428,29 @@ theorem conjTranspose_mul_mul_mono {m : Type*} [Fintype m] (C : Matrix n m 𝕜)
         ←Finset.sum_sub_distrib, mul_sub_left_distrib, mul_sub_right_distrib]
     rw [hDistrib]
     exact conjTranspose_mul_mul_same (le_iff_sub_posSemidef.mp hAB) C
+
+variable [DecidableEq n]
+
+/-- Basically, the instance states 0 ≤ A → ∀ x ∈ spectrum ℝ A, 0 ≤ x  -/
+instance instNonnegSpectrumClass : NonnegSpectrumClass ℝ (Matrix n n 𝕜) := by
+  apply NonnegSpectrumClass.of_spectrum_nonneg
+  intro A hA x hx
+  rw [IsHermitian.eigenvalues_eq_spectrum_real (zero_le_iff_posSemidef.mp hA).1, Set.mem_range] at hx
+  obtain ⟨i, hi⟩ := hx
+  rw [←hi]
+  exact Matrix.PosSemidef.eigenvalues_nonneg (zero_le_iff_posSemidef.mp hA) i
+
+theorem nonneg_iff_eigenvalue_nonneg : 0 ≤ A ↔ ∀ x, 0 ≤ hA.eigenvalues x := Iff.trans zero_le_iff_posSemidef posSemidef_iff_eigenvalues_nonneg
+
+theorem diag_monotone : Monotone (diag : Matrix n n 𝕜 → (n → 𝕜)) := fun _ _ ↦
+  le_of_nonneg_imp (diagAddMonoidHom n 𝕜) (fun _ ↦ diag_nonneg)
+
+theorem diag_mono : A ≤ B → ∀ i, A.diag i ≤ B.diag i := diag_monotone.imp
+
+theorem trace_monotone : Monotone (@trace n 𝕜 _ _) := fun _ _ ↦
+  le_of_nonneg_imp (traceAddMonoidHom n 𝕜) (fun _ ↦ trace_nonneg)
+
+theorem trace_mono : A ≤ B → A.trace ≤ B.trace := trace_monotone.imp
 
 theorem diagonal_monotone : Monotone (diagonal : (n → 𝕜) → _) := fun _ _ ↦
   le_of_nonneg_imp' (diagonalAddMonoidHom n 𝕜) (fun _ ↦ PosSemidef.diagonal)
@@ -471,11 +512,11 @@ end partialOrder
 
 end PosSemidef
 
-/- todo: pull out to somewhere else-/
-instance _root_.RCLike.instStarModule : StarModule ℝ 𝕜 where
-  star_smul r a := by
-    rw [Algebra.smul_def', Algebra.smul_def', star_trivial r, ← RCLike.re_add_im (Algebra.algebraMap r)]
-    simp [show RCLike.im (Algebra.algebraMap r) = 0 from RCLike.ofReal_im_ax r]
+theorem star_diagonal {T R : Type*} [DecidableEq T] [AddMonoid R] [StarAddMonoid R] (f : T → R) :
+    star (Matrix.diagonal f) = Matrix.diagonal (star <| f ·) := by
+  ext i j
+  simp only [Matrix.star_apply, Matrix.diagonal_apply]
+  split <;> simp_all [@eq_comm _ j i]
 
 noncomputable section frobenius_inner_product
 open scoped ComplexOrder
@@ -610,9 +651,10 @@ theorem IsHermitian.traceRight {A : Matrix (d₁ × d) (d₁ × d) R} (hA : A.Is
 
 open ComplexOrder
 
-variable {A : Matrix (d₁ × d₂) (d₁ × d₂) 𝕜} [Fintype d₂] [Fintype d₁]
+variable {d₁ d₂ : Type*} {A : Matrix (d₁ × d₂) (d₁ × d₂) 𝕜}
+variable [Fintype d₂] [Fintype d₁]
 
-theorem PosSemidef.traceLeft (hA : A.PosSemidef) : A.traceLeft.PosSemidef := by
+theorem PosSemidef.traceLeft [DecidableEq d₁] (hA : A.PosSemidef) : A.traceLeft.PosSemidef := by
   constructor
   · exact hA.1.traceLeft
   · intro x
@@ -621,7 +663,7 @@ theorem PosSemidef.traceLeft (hA : A.PosSemidef) : A.traceLeft.PosSemidef := by
     simpa [dotProduct, vecMul_eq_sum, ite_apply, Fintype.sum_prod_type, Finset.mul_sum, Finset.sum_mul,
       apply_ite] using Finset.sum_comm_3
 
-theorem PosSemidef.traceRight (hA : A.PosSemidef) : A.traceRight.PosSemidef := by
+theorem PosSemidef.traceRight [DecidableEq d₂] (hA : A.PosSemidef) : A.traceRight.PosSemidef := by
   constructor
   · exact hA.1.traceRight
   · intro x

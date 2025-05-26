@@ -17,7 +17,6 @@ thoroughly in their file CPTP.lean.
 
 variable (dIn dOut R : Type*) (𝕜 : Type := ℂ)
 variable [Fintype dIn] [Fintype dOut]
-variable [DecidableEq dIn] [DecidableEq dOut]
 variable [Semiring R] [RCLike 𝕜]
 
 /-- Hermitian-preserving linear maps. -/
@@ -25,7 +24,7 @@ structure HPMap extends MatrixMap dIn dOut 𝕜 where
   HP : MatrixMap.IsHermitianPreserving toLinearMap
 
 /-- Unital linear maps. -/
-structure UnitalMap extends MatrixMap dIn dOut R where
+structure UnitalMap [DecidableEq dIn] [DecidableEq dOut] extends MatrixMap dIn dOut R where
   unital : MatrixMap.Unital toLinearMap
 
 /-- Trace-preserving linear maps. -/
@@ -43,7 +42,7 @@ structure PMap extends HPMap dIn dOut 𝕜 where
   HP := pos.IsHermitianPreserving
 
 /-- Completely positive linear maps. -/
-structure CPMap extends PMap dIn dOut 𝕜 where
+structure CPMap [DecidableEq dIn] extends PMap dIn dOut 𝕜 where
   cp : MatrixMap.IsCompletelyPositive toLinearMap
   pos := cp.IsPositive
 
@@ -56,17 +55,17 @@ attribute [simp] PTPMap.TP
 /-- Completely positive trace-preserving linear maps. This is the most common
   meaning of "channel", often described as "the most general physically realizable
   quantum operation". -/
-structure CPTPMap extends PTPMap dIn dOut (𝕜 := 𝕜), CPMap dIn dOut 𝕜 where
+structure CPTPMap [DecidableEq dIn] extends PTPMap dIn dOut (𝕜 := 𝕜), CPMap dIn dOut 𝕜 where
 
 /-- Completely positive unital maps. These are important because they are the
   dual to `CPTPMap`: they are the most general way to map *observables*. -/
-structure CPUMap extends CPMap dIn dOut 𝕜, UnitalMap dIn dOut 𝕜
+structure CPUMap [DecidableEq dIn] [DecidableEq dOut] extends CPMap dIn dOut 𝕜, UnitalMap dIn dOut 𝕜
 
 variable {dIn dOut R} {𝕜 : Type} [RCLike 𝕜]
 
 --Hermitian-presering maps: continuous linear maps on HermitianMats.
 namespace HPMap
-omit [Fintype dIn] [Fintype dOut] [DecidableEq dIn] [DecidableEq dOut]
+omit [Fintype dIn] [Fintype dOut]
 
 abbrev map (M : HPMap dIn dOut 𝕜) : MatrixMap dIn dOut 𝕜 := M.toLinearMap
 
@@ -93,7 +92,6 @@ end HPMap
 
 --Positive-preserving maps: continuous linear order-preserving maps on HermitianMats.
 namespace PMap
-omit [DecidableEq dIn] [DecidableEq dOut]
 
 @[ext]
 theorem ext {Λ₁ Λ₂ : PMap dIn dOut 𝕜} (h : Λ₁.map = Λ₂.map) : Λ₁ = Λ₂ := by
@@ -130,7 +128,6 @@ end PMap
 --  * Continuous linear order-preserving maps on HermitianMats.
 --  * Continuous maps on MStates.
 namespace PTPMap
-omit [DecidableEq dIn] [DecidableEq dOut]
 
 @[ext]
 theorem ext {Λ₁ Λ₂ : PTPMap dIn dOut 𝕜} (h : Λ₁.map = Λ₂.map) : Λ₁ = Λ₂ := by
@@ -162,13 +159,15 @@ theorem pos_Hermitian (M : PTPMap dIn dOut 𝕜) {x : HermitianMat dIn 𝕜} (h 
   simpa only [map_zero] using ContinuousOrderHomClass.map_monotone M h
 
 /-- `PTPMap`s are functions from `MState`s to `MState`s. -/
-instance instMFunLike : FunLike (PTPMap dIn dOut) (MState dIn) (MState dOut) where
+instance instMFunLike [DecidableEq dIn] [DecidableEq dOut] :
+    FunLike (PTPMap dIn dOut) (MState dIn) (MState dOut) where
   coe Λ ρ := MState.mk
     (Λ.toHPMap ρ.M) (HermitianMat.zero_le_iff.mpr (Λ.pos ρ.pos)) (ρ.tr ▸ Λ.TP ρ.m)
   coe_injective' _ _ h := by
     sorry --Requires the fact the action on MStates determines action on all matrices
 
-instance instMContinuousMapClass : ContinuousMapClass (PTPMap dIn dOut) (MState dIn) (MState dOut) where
+instance instMContinuousMapClass [DecidableEq dIn] [DecidableEq dOut] :
+    ContinuousMapClass (PTPMap dIn dOut) (MState dIn) (MState dOut) where
   map_continuous f := by
     simp only [instMFunLike, MState.instTopoMState]
     rw [continuous_induced_rng]
@@ -177,8 +176,8 @@ instance instMContinuousMapClass : ContinuousMapClass (PTPMap dIn dOut) (MState 
     · exact map_continuous f.toHPMap
     · exact MState.Continuous_Matrix
 
-@[norm_cast]
-theorem val_apply_MState (M : PTPMap dIn dOut) (ρ : MState dIn) :
+-- @[norm_cast]
+theorem val_apply_MState [DecidableEq dIn] (M : PTPMap dIn dOut) (ρ : MState dIn) :
     (M ρ : HermitianMat dOut ℂ) = (instHFunLike.coe M) ρ := by
   rfl
 
@@ -198,7 +197,7 @@ theorem nonemptyOut (Λ : PTPMap dIn dOut) [hIn : Nonempty dIn] [DecidableEq dIn
 end PTPMap
 
 namespace CPTPMap
-omit [DecidableEq dOut]
+variable [DecidableEq dIn]
 
 /-- Two `CPTPMap`s are equal if their `MatrixMap`s are equal. -/
 @[ext]
@@ -209,36 +208,36 @@ theorem ext {Λ₁ Λ₂ : CPTPMap dIn dOut 𝕜} (h : Λ₁.map = Λ₂.map) : 
 theorem injective_toPTPMap : (CPTPMap.toPTPMap (dIn := dIn) (dOut := dOut) (𝕜 := 𝕜)).Injective :=
   fun _ _ ↦ (mk.injEq _ _ _ _).mpr
 
-/-- Positive trace-preserving maps are functions from `HermitianMat`s to `HermitianMat`s. -/
-instance instHFunLike : FunLike (CPTPMap dIn dOut 𝕜) (HermitianMat dIn 𝕜) (HermitianMat dOut 𝕜) where
-  coe :=  DFunLike.coe ∘ toPTPMap
-  coe_injective' := DFunLike.coe_injective'.comp injective_toPTPMap
+-- /-- Positive trace-preserving maps are functions from `HermitianMat`s to `HermitianMat`s. -/
+-- instance instHFunLike : FunLike (CPTPMap dIn dOut 𝕜) (HermitianMat dIn 𝕜) (HermitianMat dOut 𝕜) where
+--   coe :=  DFunLike.coe ∘ toPTPMap
+--   coe_injective' := DFunLike.coe_injective'.comp injective_toPTPMap
 
-set_option synthInstance.maxHeartbeats 40000 in
-instance instHLinearMapClass : LinearMapClass (CPTPMap dIn dOut 𝕜) ℝ (HermitianMat dIn 𝕜) (HermitianMat dOut 𝕜) where
-  map_add f x y := by simp [instHFunLike]
-  map_smulₛₗ f c x := by simp [instHFunLike]
+-- set_option synthInstance.maxHeartbeats 40000 in
+-- instance instHLinearMapClass : LinearMapClass (CPTPMap dIn dOut 𝕜) ℝ (HermitianMat dIn 𝕜) (HermitianMat dOut 𝕜) where
+--   map_add f x y := by simp [instHFunLike]
+--   map_smulₛₗ f c x := by simp [instHFunLike]
 
-instance instHContinuousOrderHomClass : ContinuousOrderHomClass (CPTPMap dIn dOut 𝕜)
-    (HermitianMat dIn 𝕜) (HermitianMat dOut 𝕜) where
-  map_continuous f := ContinuousMapClass.map_continuous f.toPMap
-  map_monotone f x y h := by
-    simpa using f.pos h
+-- instance instHContinuousOrderHomClass : ContinuousOrderHomClass (CPTPMap dIn dOut 𝕜)
+--     (HermitianMat dIn 𝕜) (HermitianMat dOut 𝕜) where
+--   map_continuous f := ContinuousMapClass.map_continuous f.toPMap
+--   map_monotone f x y h := by
+    -- simpa using f.pos h
 
-/-- PTP maps also preserve positivity on Hermitian matrices. -/
-@[simp]
-theorem pos_Hermitian (M : CPTPMap dIn dOut 𝕜) {x : HermitianMat dIn 𝕜} (h : 0 ≤ x) : 0 ≤ M x := by
-  simpa only [map_zero] using ContinuousOrderHomClass.map_monotone M h
+-- /-- PTP maps also preserve positivity on Hermitian matrices. -/
+-- @[simp]
+-- theorem pos_Hermitian (M : CPTPMap dIn dOut 𝕜) {x : HermitianMat dIn 𝕜} (h : 0 ≤ x) : 0 ≤ M x := by
+--   simpa only [map_zero] using ContinuousOrderHomClass.map_monotone M h
 
 /-- `CPTPMap`s are functions from `MState`s to `MState`s. -/
-instance instMFunLike : FunLike (CPTPMap dIn dOut) (MState dIn) (MState dOut) where
+instance instMFunLike [DecidableEq dOut] : FunLike (CPTPMap dIn dOut) (MState dIn) (MState dOut) where
   coe := DFunLike.coe ∘ toPTPMap
   coe_injective' := DFunLike.coe_injective'.comp injective_toPTPMap
 
-@[norm_cast]
-theorem val_apply_MState (M : CPTPMap dIn dOut) (ρ : MState dIn) :
-    (M ρ : HermitianMat dOut ℂ) = (instHFunLike.coe M) ρ := by
-  rfl
+-- @[norm_cast]
+-- theorem val_apply_MState [DecidableEq dOut] (M : CPTPMap dIn dOut) (ρ : MState dIn) :
+--     (M ρ : HermitianMat dOut ℂ) = (instHFunLike.coe M) ρ := by
+--   rfl
 
 @[simp]
 theorem IsTracePreserving (Λ : CPTPMap dIn dOut 𝕜) : Λ.map.IsTracePreserving :=
@@ -247,6 +246,7 @@ theorem IsTracePreserving (Λ : CPTPMap dIn dOut 𝕜) : Λ.map.IsTracePreservin
 end CPTPMap
 
 namespace CPUMap
+variable [DecidableEq dIn] [DecidableEq dOut]
 
 @[ext]
 theorem ext {Λ₁ Λ₂ : CPUMap dIn dOut 𝕜} (h : Λ₁.map = Λ₂.map) : Λ₁ = Λ₂ := by
@@ -286,6 +286,9 @@ end CPUMap
 
 --Tests to make sure that our `simp`s and classe are all working like we want them too
 
+section test
+variable [DecidableEq dIn] [DecidableEq dOut]
+
 #guard_msgs in
 example (M : HPMap dIn dOut 𝕜) : (M (Real.pi • 1)) = Real.pi • M 1 := by simp
 
@@ -297,3 +300,5 @@ example (M : CPTPMap dIn dOut 𝕜) (ρ : Matrix dIn dIn 𝕜) : (M.map ρ).trac
 
 #guard_msgs in
 example (M : CPUMap dIn dOut ℂ) (T : HermitianMat dIn ℂ) : M (1 + 2 • T) = 1 + 2 • M T := by simp
+
+end test

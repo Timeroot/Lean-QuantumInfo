@@ -2,7 +2,8 @@ import QuantumInfo.ForMathlib.HermitianMat.Basic
 
 /-! # Properties of the matrix logarithm
 
-In particular, the operator convexity -/
+In particular, operator concavity of the matrix logarithm.
+-/
 
 namespace HermitianMat
 
@@ -22,3 +23,9 @@ theorem log_smul {a : HermitianMat n 𝕜} {x : ℝ}  : (x • a).log = Real.log
   --easy when #25194 lands in Mathlib
   convert CFC.log_smul (r := x) (a := a.toMat) sorry sorry sorry
   rw [Algebra.algebraMap_eq_smul_one]
+
+/-- The matrix logarithm is operator concave. -/
+theorem log_concave {x y : HermitianMat n 𝕜} (hx : 0 < x) (hy : 0 < y) ⦃a b : ℝ⦄ (ha : 0 ≤ a)
+    (hb : 0 ≤ b) (hab : a + b = 1) :
+    (a • x + b • y).log ≤ a • x.log + b • y.log := by
+  sorry
