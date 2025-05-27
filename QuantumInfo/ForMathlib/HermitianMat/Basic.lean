@@ -221,10 +221,31 @@ variable [Ring α] [StarAddMonoid α] [CommSemiring R] [Algebra R α] [IsMaximal
 def inner (A B : HermitianMat n α) : R :=
   IsMaximalSelfAdjoint.selfadjMap ((A.toMat * B.toMat).trace)
 
+section semiring
+
+variable [CommSemiring R] [Ring α] [StarAddMonoid α] [Algebra R α] [IsMaximalSelfAdjoint R α]
+variable (A B C : HermitianMat n α)
+
+theorem inner_left_distrib : A.inner (B + C) = A.inner B + A.inner C := by
+  simp [inner, left_distrib]
+
+theorem inner_right_distrib : (A + B).inner C = A.inner C + B.inner C := by
+  simp [inner, right_distrib]
+
+@[simp]
+theorem inner_zero : A.inner 0 = 0 := by
+  simp [inner]
+
+@[simp]
+theorem zero_inner : HermitianMat.inner 0 A = 0 := by
+  simp [inner]
+
+end semiring
+
 section ring
 
 variable [CommRing R] [Ring α] [StarAddMonoid α] [Algebra R α] [IsMaximalSelfAdjoint R α]
-variable (A B : HermitianMat n α)
+variable (A B C : HermitianMat n α)
 
 @[simp]
 theorem inner_left_neg : (-A).inner B = -A.inner B := by
@@ -240,20 +261,6 @@ theorem inner_left_sub : A.inner (B - C) = A.inner B - A.inner C := by
 theorem inner_right_sub : (A - B).inner C = A.inner C - B.inner C := by
   simp [inner, sub_mul]
 
-@[simp]
-theorem inner_zero : A.inner 0 = 0 := by
-  simp [inner]
-
-@[simp]
-theorem zero_inner : HermitianMat.inner 0 A = 0 := by
-  simp [inner]
-
-theorem inner_left_distrib : A.inner (B + C) = A.inner B + A.inner C := by
-  simp [inner, left_distrib]
-
-theorem inner_right_distrib : (A + B).inner C = A.inner C + B.inner C := by
-  simp [inner, right_distrib]
-
 variable [StarModule R α]
 
 @[simp]
@@ -264,10 +271,29 @@ theorem smul_inner (r : R) : (r • A).inner B = r * A.inner B := by
 theorem inner_smul (r : R) : A.inner (r • B) = r * A.inner B := by
   simp [inner, IsMaximalSelfAdjoint.selfadj_smul]
 
+/-- The Hermitian inner product as bilinear form. -/
+def inner_BilinForm : LinearMap.BilinForm R (HermitianMat n α) := {
+      toFun A := {
+        toFun := A.inner
+        map_add' := A.inner_left_distrib
+        map_smul' r B := inner_smul A B r
+      }
+      map_add' := by intros; ext1; apply inner_right_distrib
+      map_smul' := by intros; ext1; apply smul_inner
+    }
+
+@[simp]
+theorem inner_BilinForm_coe_apply : ⇑(inner_BilinForm A) = A.inner :=
+  rfl
+
+@[simp]
+theorem inner_BilinForm_apply : inner_BilinForm A B = A.inner B :=
+  rfl
+
 end ring
 section starring
 
-variable [CommRing R] [Ring α] [StarRing α] [Algebra R α] [IsMaximalSelfAdjoint R α] [DecidableEq n]
+variable [CommSemiring R] [Ring α] [StarRing α] [Algebra R α] [IsMaximalSelfAdjoint R α] [DecidableEq n]
 variable (A B : HermitianMat n α)
 
 @[simp]

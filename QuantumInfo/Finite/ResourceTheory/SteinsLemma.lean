@@ -24,9 +24,34 @@ scoped notation "β_" ε " (" ρ "‖" S ")" =>  OptimalHypothesisRate ρ ε S
 /-- Provides an `Inhabited` instance for the quantification over `T` in `OptimalHypothesisRate`. Not
 an instance, because we need that `0 ≤ ε`. -/
 noncomputable def OptimalHypothesisRate_iInf_Inhabited (ρ : MState d) {ε : ℝ} (hε : 0 ≤ ε) :
-    Inhabited { m // MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } := by
-  use 1
-  simpa
+    Inhabited { m // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } :=
+  ⟨1, by simpa⟩
+
+/-- When `ε < 0`, the type is empty. -/
+theorem OptimalHypothesisRate_iInf_Empty_of_lt_zero (ρ : MState d) {ε : ℝ} (hε : ε < 0) :
+    IsEmpty { m // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } := by
+  by_contra h
+  rw [not_isEmpty_iff, nonempty_subtype] at h
+  let ⟨a, ha₁, ha₂, ha₃⟩ := h
+  replace ha₁ := lt_of_le_of_lt ha₁ hε
+  rw [← not_le] at ha₁
+  rw [← sub_nonneg] at ha₃
+  exact ha₁ (ρ.exp_val_nonneg ha₃)
+
+/-- When `ε < 0`, the `OptimalHypothesisRate` becomes 1, as a junk value. -/
+@[simp]
+theorem OptimalHypothesisRate_lt_zero {ρ : MState d} {ε : ℝ} {S : Set (MState d)} (hε : ε < 0) : β_ ε(ρ‖S) = 1 := by
+  rw [OptimalHypothesisRate]
+  have _ := OptimalHypothesisRate_iInf_Empty_of_lt_zero ρ hε
+  rw [iInf_of_empty] --TODO: should iInf_of_empty be tagged @[simp]? it feels like it should
+  rfl
+
+/-- When `S` is empty, the optimal hypothesis testing rate is zero. -/
+@[simp]
+theorem OptimalHypothesisRate_empty {ρ : MState d} (ε : ℝ) (hε : 0 ≤ ε) : β_ ε(ρ‖∅) = 0 := by
+  have := OptimalHypothesisRate_iInf_Inhabited ρ hε
+  simp [OptimalHypothesisRate]
+  rfl
 
 theorem OptimalHypothesisRate_le {ρ : MState d} {ε : ℝ} {S : Set (MState d)}
     (m : HermitianMat d ℂ) (hExp : ρ.exp_val (1 - m) ≤ ε) (hm : 0 ≤ m ∧ m ≤ 1) :
@@ -58,45 +83,96 @@ theorem OptimalHypothesisRate_le_singleton {ρ σ : MState d} {ε : ℝ} (m : He
   apply iInf_le_of_le ⟨m, ⟨hExp, hm⟩⟩ _
   simp only [le_refl]
 
-private theorem Lemma3 {ρ : MState d} {ε : ℝ} {S : Set (MState d)} (hS₁ : IsCompact S) (hS₂ : Convex ℝ (MState.M '' S)) :
-    ⨆ σ ∈ S, β_ ε(ρ‖{σ}) = β_ ε(ρ‖S) := by
-  --Needs the minimax theorem.
+--PULLOUT...
+noncomputable instance Prob.LinearOrderedCommMonoidWithZero : LinearOrderedCommMonoidWithZero Prob where
+  zero_le_one := Prob.le_one
+
+instance HermitianMat.FiniteDimensional [Fintype d] : FiniteDimensional ℝ (HermitianMat d ℂ) := by
+  sorry
+
+instance HermitianMat.ContinuousSMul [Fintype d] : ContinuousSMul ℝ (HermitianMat d ℂ) := by
+  sorry
+
+instance HermitianMat.OrderedSMul : OrderedSMul ℝ (HermitianMat d ℂ) := by
+  sorry
+
+/-- The PSD matrices that are `≤ 1` are a compact set. More generally, this is true of any closed interval,
+but stating that is a bit different because of how numerals are treated. The `0` and `1` here are already
+directly matrices, putting in an `(a : ℝ) ≤ m ∧ m ≤ (b : ℝ)` involves casts. But that theorem should follow
+easily from this.
+-/
+theorem HermitianMat.unitInterval_IsCompact : IsCompact {m : HermitianMat d ℂ | 0 ≤ m ∧ m ≤ 1} := by
+  sorry
+
+omit [DecidableEq d] in
+@[fun_prop] --fun_prop can actually prove this, should I leave this on or not?
+theorem inner_bilinForm_Continuous (A : HermitianMat d ℂ) : Continuous ⇑(HermitianMat.inner_BilinForm A) :=
+  LinearMap.continuous_of_finiteDimensional _
+
+omit [DecidableEq d] in
+@[fun_prop]
+theorem inner_continuous (A : HermitianMat d ℂ) : Continuous (A.inner) := by
+  exact inner_bilinForm_Continuous A
+--/PULLOUT
+
+private theorem Lemma3 {ρ : MState d} {ε : ℝ} {S : Set (MState d)} (hε : 0 ≤ ε) (hS₁ : IsCompact S)
+    (hS₂ : Convex ℝ (MState.M '' S)) : ⨆ σ ∈ S, β_ ε(ρ‖{σ}) = β_ ε(ρ‖S) := by
+
+  --Show that the set of T's is nonempty. Having this instance around is useful for later lemmas.
+  --(Maybe it should be pulled out else to earlier in the file.)
+  --Here we give the instance both for the Set and Subtype, I'm not actually sure which is more important here.
+  have _ := OptimalHypothesisRate_iInf_Inhabited ρ hε
+  have _ : Inhabited {m | MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1} := by
+    assumption
+
+  --Work out the case where S is empty, so we can now assume it's nonempty
+  rcases S.eq_empty_or_nonempty with rfl|hnS
+  · simp [hε]
+    exact bot_eq_zero''
+  --Upgrade this fact to an instance
+  have _ : Nonempty S := hnS.to_subtype
+
+  --Needs the minimax theorem. ... TODO: I think the statement of `minimax` is actually incorrect and requires
+  --some information about the sets `S` and `T` being nonempty. Also, maybe it should change from `⨅ x ∈ S` to
+  --`⨅ (x : ↑S)` or something.
   simp only [OptimalHypothesisRate, Set.mem_singleton_iff, iSup_iSup_eq_left]
   have hmm := minimax (M := HermitianMat d ℂ)
+
   --This will be the `MState.exp_val` function, but bundled as a bilinear form.
-  let f : LinearMap.BilinForm ℝ (HermitianMat d ℂ) := {
-      toFun ρ := {
-        toFun σ := ρ.inner σ
-        map_add' := sorry
-        map_smul' := sorry
-      }
-      map_add' := sorry
-      map_smul' := sorry
-    }
+  let f : LinearMap.BilinForm ℝ (HermitianMat d ℂ) := HermitianMat.inner_BilinForm
   let S' : Set (HermitianMat d ℂ) := MState.M '' S
   let T' : Set (HermitianMat d ℂ) := { m | MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 }
   replace hS₁ : IsCompact S' := by
-    dsimp [S']
-    sorry
+    exact hS₁.image MState.Continuous_Matrix
   have hT₁ : IsCompact T' := by
-    sorry
+    have hC₁ : IsCompact {m : HermitianMat d ℂ | 0 ≤ m ∧ m ≤ 1} :=
+      HermitianMat.unitInterval_IsCompact
+    have hC₂ : IsClosed {m | MState.exp_val (1 - m) ρ ≤ ε} := by
+      --This is a linear constraint and so has a closed image
+      change IsClosed ((fun m ↦ ρ.M.inner_BilinForm (1 - m)) ⁻¹' (Set.Iic ε))
+      refine IsClosed.preimage ?_ isClosed_Iic
+      fun_prop
+    convert hC₁.inter_left hC₂
   have hT₂ : Convex ℝ T' := by
     --We *could* get this from a more general fact that any linear subspace is convex,
     --and the intersection of convex spaces is convex, and this is an intersection of
-    --three convex spaces.
+    --three convex spaces. That would be more broken-down and lemmaified.
     dsimp [T']
     rintro x ⟨hx₁, hx₂, hx₃⟩ y ⟨hy₁, hy₂, hy₃⟩ a b ha hb hab
+    rw [← eq_sub_iff_add_eq'] at hab
+    subst b
     refine And.intro ?_ (And.intro ?_ ?_)
-    · sorry
-    · sorry
-    · sorry
+    · simp [MState.exp_val, HermitianMat.inner_left_sub, HermitianMat.inner_left_distrib] at hx₁ hy₁ ⊢
+      linear_combination a * hx₁ + (1 - a) * hy₁
+    · apply HermitianMat.convex_cone <;> assumption
+    · rw [← sub_nonneg] at hx₃ hy₃ ⊢
+      convert HermitianMat.convex_cone hx₃ hy₃ ha hb using 1
+      simp only [sub_smul, one_smul, smul_sub]
+      abel
+
   specialize hmm f S' T' hS₁ hT₁ hS₂ hT₂
   ext
-  -- change Subtype.val _ = Subtype.val _
   rw [← iSup_subtype'']
-  have hnS : Nonempty S := by
-    --Do we need a hypothesis for this?
-    sorry
 
   --This is a terrible mess of unification
   have h_inst :
@@ -875,7 +951,7 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0
     ) .atTop (𝓝 (RegularizedRelativeEntResource ρ)) := by
   conv =>
     enter [1, n, 2, 1]
-    rw [← Lemma3 IsCompact_IsFree free_convex]
+    rw [← Lemma3 hε.left.le IsCompact_IsFree free_convex]
   rw [RegularizedRelativeEntResource]
   simp only
   generalize_proofs pf1 pf2 pf3
@@ -931,7 +1007,7 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0
 
     apply le_of_tendsto_of_tendsto' tendsto_const_nhds hv_lem5
     convert h using 6
-    · apply Lemma3 IsCompact_IsFree free_convex
+    · apply Lemma3 hε.left.le IsCompact_IsFree free_convex
     · symm
       apply ciInf_subtype''
       · exact Set.Nonempty.of_subtype
