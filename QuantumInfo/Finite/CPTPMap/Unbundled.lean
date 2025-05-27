@@ -2,9 +2,11 @@ import QuantumInfo.Finite.CPTPMap.MatrixMap
 
 /-! # Properties of Matrix Maps
 
-Building on `MatrixMap`s, this defines the properties: `IsTracePreserving`, `Unital`,
-`IsHermitianPreserving`, `IsPositive` and `IsCompletelyPositive`. They have basic facts
-such as closure under composition, addition, and scaling.
+Building on `MatrixMap`s, this defines the properties: `IsTracePreserving`,
+`IsHermitianPreserving`, and `IsCompletelyPositive`. There is no `Unital` or `IsPositive`, which
+are other basic types of maps, because those are precisely `OneHom` and `Monotone`/`OrderHom`.
+
+They have basic facts such as closure under composition, addition, and scaling.
 
 These are the *unbundled* versions, which just state the relevant properties of a given `MatrixMap`.
 The bundled versions are `HPMap`, `UnitalMap`, `TPMap`, `PMap`, and `CPMap` respectively, given
@@ -14,7 +16,7 @@ in Bundled.lean.
 namespace MatrixMap
 
 section tp
-variable [Fintype A] [DecidableEq A] [Fintype B] [Fintype C] [Semiring R]
+variable {A B C R : Type*} [Fintype A] [DecidableEq A] [Fintype B] [Fintype C] [Semiring R]
 
 /-- A linear matrix map is *trace preserving* if trace of the output equals trace of the input. -/
 def IsTracePreserving (M : MatrixMap A B R) : Prop :=
@@ -91,32 +93,6 @@ theorem kron {M₁ : MatrixMap A B R} {M₂ : MatrixMap C D R} (h₁ : M₁.IsTr
 end IsTracePreserving
 end tp
 
-section unital
-
-variable [DecidableEq A] [DecidableEq B] [Semiring R]
-
-/-- A linear matrix map is *unital* if it preserves the identity. -/
-def Unital (M : MatrixMap A B R) : Prop :=
-  M 1 = 1
-
-namespace Unital
-
-variable {M : MatrixMap A B R}
-
-@[simp]
-theorem map_1 (h : M.Unital) : M 1 = 1 :=
-  h
-
-/-- The identity `MatrixMap` is `Unital`. -/
-@[simp]
-theorem id : (id A R).Unital := by
-  simp [Unital, MatrixMap.id]
-
---TODO: Closed under composition, kronecker products, it's iff M.choi_matrix.traceLeft = 1...
-
-end Unital
-end unital
-
 variable {A B C R : Type*}
 
 open Kronecker
@@ -129,20 +105,16 @@ variable [RCLike R]
 def IsHermitianPreserving (M : MatrixMap A B R) : Prop :=
   ∀{x}, x.IsHermitian → (M x).IsHermitian
 
-/-- A linear matrix map is *positive* if it maps `PosSemidef` matrices to `PosSemidef`.-/
-def IsPositive [Fintype A] [Fintype B] (M : MatrixMap A B R) : Prop :=
-  ∀{x}, x.PosSemidef → (M x).PosSemidef
-
 /-- A linear matrix map is *completely positive* if, for any integer n, the tensor product
 with `I(n)` is positive. -/
 def IsCompletelyPositive [Fintype A] [Fintype B] [DecidableEq A] (M : MatrixMap A B R) : Prop :=
-  ∀ (n : ℕ), (M ⊗ₖₘ (LinearMap.id : MatrixMap (Fin n) (Fin n) R)).IsPositive
+  ∀ (n : ℕ), Monotone (M ⊗ₖₘ (LinearMap.id : MatrixMap (Fin n) (Fin n) R))
 
 namespace IsHermitianPreserving
 
-variable {A : Type*} [Fintype A] in
+variable {A : Type*} in
 /-- The identity MatrixMap IsHermitianPreserving. -/
-theorem id : (id A R).IsPositive :=
+theorem id : (id A R).IsHermitianPreserving :=
   _root_.id
 
 /-- The composition of IsHermitianPreserving maps is also Hermitian preserving. -/
@@ -152,40 +124,34 @@ theorem comp {M₁ : MatrixMap A B R} {M₂ : MatrixMap B C R}
 
 end IsHermitianPreserving
 
-namespace IsPositive
+namespace Monotone
 variable [Fintype A] [Fintype B] [Fintype C]
 
-/- Every `MatrixMap` that `IsPositive` is also `IsHermitianPreserving`. -/
+/- Every `MatrixMap` that is `Monotone` is also `IsHermitianPreserving`. -/
 theorem IsHermitianPreserving {M : MatrixMap A B R}
-    (hM : IsPositive M) : IsHermitianPreserving M := by
+    (hM : Monotone M) : IsHermitianPreserving M := by
 --sketch: Positive maps are all Hermitian preserving, because positive matrices generate the full
 --set of Hermitian matrices (generate as a vector space). Concretely, every pair of elements
 -- (i,j) and (j,i) must be conjugate because we can look at the PSD matrices with 1's on (i,i),
 -- on (j,j), and on all 4 elements (i or j, i or j).
   sorry
 
-/-- The composition of IsPositive maps is also positive. -/
-theorem comp {M₁ : MatrixMap A B R} {M₂ : MatrixMap B C R} (h₁ : M₁.IsPositive)
-    (h₂ : M₂.IsPositive) : IsPositive (M₂ ∘ₗ M₁) :=
-  fun h ↦ h₂ (h₁ h)
+/-- Sums of Monotone maps are Monotone. -/
+theorem add {M₁ M₂ : MatrixMap A B R} (h₁ : Monotone M₁) (h₂ : Monotone M₂) :
+    Monotone (M₁ + M₂) := by
+  intro x y h
+  rw [Matrix.PosSemidef.le_iff_sub_posSemidef] at h ⊢
+  convert Matrix.PosSemidef.add (h₁ h) (h₂ h) using 1
+  simp; abel
 
-variable {A : Type*} [Fintype A] in
-/-- The identity MatrixMap IsPositive. -/
-@[simp]
-theorem id : (id A R).IsPositive :=
-  _root_.id
+/-- Nonnegative scalings of Monotone maps are Monotone. -/
+theorem smul {M : MatrixMap A B R} (hM : Monotone M) {x : R} (hx : 0 ≤ x) :
+    Monotone (x • M) :=
+  fun _ _ hm ↦ by
+    rw [Matrix.PosSemidef.le_iff_sub_posSemidef]
+    simpa [← smul_sub] using (hM hm).smul hx
 
-/-- Sums of IsPositive maps are IsPositive. -/
-theorem add {M₁ M₂ : MatrixMap A B R} (h₁ : M₁.IsPositive) (h₂ : M₂.IsPositive) :
-    (M₁ + M₂).IsPositive :=
-  fun x ↦ Matrix.PosSemidef.add (h₁ x) (h₂ x)
-
-/-- Nonnegative scalings of IsPositive maps are IsPositive. -/
-theorem smul {M : MatrixMap A B R} (hM : M.IsPositive) {x : R} (hx : 0 ≤ x) :
-    (x • M).IsPositive :=
-  fun hm ↦ (hM hm).smul hx
-
-end IsPositive
+end Monotone
 
 namespace IsCompletelyPositive
 variable [Fintype A] [Fintype B] [Fintype C] [DecidableEq A]
@@ -193,12 +159,12 @@ variable [Fintype A] [Fintype B] [Fintype C] [DecidableEq A]
 /-- Definition of a CP map, but with `Fintype T` in the definition instead of a `Fin n`. -/
 theorem of_Fintype  {M : MatrixMap A B R} (h : IsCompletelyPositive M)
     (T : Type*) [Fintype T] [DecidableEq T] :
-    (M.kron (LinearMap.id : MatrixMap T T R)).IsPositive := by
+    Monotone (M.kron (LinearMap.id : MatrixMap T T R)) := by
   sorry
 
-/- Every `MatrixMap` that `IsCompletelyPositive` also `IsPositiveMap`. -/
-theorem IsPositive [DecidableEq A] {M : MatrixMap A B R}
-    (hM : IsCompletelyPositive M) : IsPositive M := by
+/- Every `MatrixMap` that `IsCompletelyPositive` is also `Monotone`. -/
+theorem Monotone [DecidableEq A] {M : MatrixMap A B R}
+    (hM : IsCompletelyPositive M) : Monotone M := by
   intro x hx
   let x' : Matrix (A × Fin 1) (A × Fin 1) R := x ⊗ₖ 1
   let eqB : (B × Fin 1) ≃ B :=
@@ -209,42 +175,44 @@ theorem IsPositive [DecidableEq A] {M : MatrixMap A B R}
 theorem comp [DecidableEq B] {M₁ : MatrixMap A B R} {M₂ : MatrixMap B C R} (h₁ : M₁.IsCompletelyPositive)
     (h₂ : M₂.IsCompletelyPositive) : IsCompletelyPositive (M₂ ∘ₗ M₁) := by
 --sketch: (M₂ ∘ₗ M₁) ⊗ₖₘ id[n] = (M₂ ⊗ₖₘ id[n]) ∘ₗ (M₁ ⊗ₖₘ id[n]), which is a composition of positive maps.
-  intro n x hx
-  specialize h₁ n hx
-  specialize h₂ n h₁
-  conv in LinearMap.id =>
-    change LinearMap.id ∘ₗ LinearMap.id
-  rw [kron_comp_distrib]
-  simpa using h₂
+  intro n x _ hx
+  convert h₂ n (h₁ n hx)
+  all_goals {
+    rw [← LinearMap.comp_id (LinearMap.id), kron_comp_distrib]
+    simp
+  }
 
 /-- The identity MatrixMap IsCompletelyPositive. -/
 @[simp]
 theorem id : (id A R).IsCompletelyPositive := by
   intro n ρ h
-  rwa [show LinearMap.id = MatrixMap.id (Fin n) R from rfl, kron_id_id]
+  rw [show LinearMap.id = MatrixMap.id (Fin n) R from rfl]
+  simp
 
 /-- Sums of IsCompletelyPositive maps are IsCompletelyPositive. -/
 theorem add {M₁ M₂ : MatrixMap A B R} (h₁ : M₁.IsCompletelyPositive) (h₂ : M₂.IsCompletelyPositive) :
     (M₁ + M₂).IsCompletelyPositive :=
-  fun n _ h ↦ by
-  simpa only [add_kron] using Matrix.PosSemidef.add (h₁ n h) (h₂ n h)
+  fun n _ _ h ↦ by
+    rw [add_kron, LinearMap.add_apply, LinearMap.add_apply, Matrix.PosSemidef.le_iff_sub_posSemidef]
+    convert Matrix.PosSemidef.add (h₁ n h) (h₂ n h) using 1
+    abel
 
 /-- Nonnegative scalings of `IsCompletelyPositive` maps are `IsCompletelyPositive`. -/
 theorem smul {M : MatrixMap A B R} (hM : M.IsCompletelyPositive) {x : R} (hx : 0 ≤ x) :
     (x • M).IsCompletelyPositive :=
-  fun n ρ h ↦ by
-    rw [MatrixMap.smul_kron]
-    exact (hM n h).smul hx
+  fun n _ _ h ↦ by
+    rw [MatrixMap.smul_kron, Matrix.PosSemidef.le_iff_sub_posSemidef]
+    convert (hM n h).smul hx using 1
+    simp only [LinearMap.smul_apply, smul_sub]
 
 variable (A B) in
 /-- The zero map `IsCompletelyPositive`. -/
 theorem zero : (0 : MatrixMap A B R).IsCompletelyPositive :=
-  fun _ _ _ ↦ by simpa using Matrix.PosSemidef.zero
+  fun _ _ _ ↦ by simp
 
-variable [Fintype d] [DecidableEq d]
 /-- The map that takes M and returns M ⊗ₖ C, where C is positive semidefinite, is a completely positive map. -/
-theorem kron_kronecker_const {C : Matrix d d R} (h : C.PosSemidef) {h₁ h₂ : _} : MatrixMap.IsCompletelyPositive
-    (⟨⟨fun M => M ⊗ₖ C, h₁⟩, h₂⟩ : MatrixMap A (A × d) R) := by
+theorem kron_kronecker_const {C : Matrix B B R} (h : C.PosSemidef) {h₁ h₂ : _} : MatrixMap.IsCompletelyPositive
+    (⟨⟨fun M => M ⊗ₖ C, h₁⟩, h₂⟩ : MatrixMap A (A × B) R) := by
   sorry
 
 /-- Choi's theorem on completely positive maps: A map `IsCompletelyPositive` iff its Choi Matrix is PSD. -/
@@ -255,18 +223,20 @@ theorem _root_.MatrixMap.choi_PSD_iff_CP_map [DecidableEq A] (M : MatrixMap A B 
   · intro hcp
     rw [choi_matrix_state_rep]
     apply Matrix.PosSemidef.smul _ (h := Linarith.natCast_nonneg ℂ (Fintype.card A))
-    exact of_Fintype hcp A (MState.pure (Ket.MES A)).pos
+    rw [← Matrix.PosSemidef.zero_le_iff_posSemidef]
+    convert of_Fintype hcp A (MState.pure (Ket.MES A)).zero_le
+    simp
   · sorry
   sorry
 
 /-- The channel X ↦ ∑ k : κ, (M k) * X * (N k)ᴴ formed by Kraus operators M : κ → Matrix B A R
 is completely positive -/
 theorem of_kraus_isCompletelyPositive {κ : Type*} [Fintype κ] (M : κ → Matrix B A R) :
-  (MatrixMap.of_kraus M M).IsCompletelyPositive :=
+    (MatrixMap.of_kraus M M).IsCompletelyPositive :=
   sorry
 
 def exists_kraus (Φ : MatrixMap A B R) (hCP : Φ.IsCompletelyPositive) :
-  ∃ r : ℕ, ∃ (M : Fin r → Matrix B A R), Φ = of_kraus M M :=
+    ∃ r : ℕ, ∃ (M : Fin r → Matrix B A R), Φ = of_kraus M M :=
   sorry
 
 /-- The Kronecker product of IsCompletelyPositive maps is also completely positive. -/

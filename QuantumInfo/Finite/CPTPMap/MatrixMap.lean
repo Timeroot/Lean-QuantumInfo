@@ -152,6 +152,7 @@ theorem kron_zero (ML : MatrixMap A B R) : ML ⊗ₖₘ (0 : MatrixMap C D R) = 
   simp [kron]
 
 variable [DecidableEq B] in
+@[simp]
 theorem kron_id_id : (id A R ⊗ₖₘ id B R) = id (A × B) R := by
   simp [kron]
 
