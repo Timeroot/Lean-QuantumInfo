@@ -191,6 +191,10 @@ section RCLike
 
 variable {n 𝕜 : Type*} [Fintype n] [RCLike 𝕜]
 
+--strictly speaking this works over any division ring, not just ℝ + RCLike
+instance FiniteDimensional : FiniteDimensional ℝ (HermitianMat n 𝕜) :=
+  FiniteDimensional.finiteDimensional_submodule (selfAdjoint.submodule ℝ (Matrix n n 𝕜))
+
 theorem trace_eq_re_trace (A : HermitianMat n 𝕜) : A.trace = RCLike.re (Matrix.trace A.toMat) := by
   rfl
 

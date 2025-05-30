@@ -128,7 +128,7 @@ instance instQRTCategory (ι : Type*) [ResourceTheory ι] : CategoryTheory.Categ
 
 open ComplexOrder in
 /-- The 'fully free' quantum resource theory: the category is all finite Hilbert spaces, all maps are
-free and all states are free. Marked noncomputable because we assume that all types have `DecidableEq`. -/
+free and all states are free. Marked noncomputable because we use `Fintype.ofFinite`. -/
 noncomputable def fullyFreeQRT : ResourceTheory { ι : Type // Finite ι ∧ Nonempty ι} where
     H := Subtype.val
     FinH := fun i ↦ have := i.prop.left; Fintype.ofFinite i
@@ -149,13 +149,13 @@ noncomputable def fullyFreeQRT : ResourceTheory { ι : Type // Finite ι ∧ Non
       have := i.prop.left
       have := i.prop.right
       let _ := Fintype.ofFinite i
+      let _ : DecidableEq i := fun _ _ ↦ Classical.propDecidable _
       use MState.uniform --use the fully mixed state
       --The fact that the fully mixed state is PosDef should be stated somewhere else... TODO
-      suffices Matrix.PosDef (@MState.uniform (d := i.val) _ this).M.toMat by
+      suffices Matrix.PosDef (@MState.uniform (d := i.val) _ _ this).M.toMat by
         change _ ∧ True
         rw [and_true]
-        --need 0 < _ ↔ _.PosDef as a lemma
-        sorry
+        exact this
       simp only [MState.uniform, MState.ofClassical, Distribution.uniform_def, Set.univ]
       classical apply Matrix.PosDef.diagonal
       intro

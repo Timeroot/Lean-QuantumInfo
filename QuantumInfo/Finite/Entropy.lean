@@ -233,6 +233,12 @@ theorem SandwichedRelRentropy_additive (α) (ρ₁ σ₁ : MState d₁) (ρ₂ �
   -- · sorry
   -- · sorry
 
+/-- The Data Processing Inequality for the Sandwiched Renyi relative entropy.
+Proved in `https://arxiv.org/pdf/1306.5920`. Seems kind of involved. -/
+theorem SandwichedRenyiEntropy.DPI {d d₂ : Type*} [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂]
+    {α : ℝ} (hα : 1 < α) (ρ σ : MState d) (Φ : CPTPMap d d₂) : D̃_ α(Φ ρ‖Φ σ) ≤ D̃_ α(ρ‖σ) := by
+  sorry
+
 /-- Quantum conditional entropy is symmetric for pure states. -/
 @[simp]
 theorem qConditionalEnt_of_pure_symm (ψ : Ket (d₁ × d₂)) :

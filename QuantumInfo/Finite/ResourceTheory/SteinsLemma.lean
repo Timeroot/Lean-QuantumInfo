@@ -1,351 +1,15 @@
 import QuantumInfo.Finite.ResourceTheory.FreeState
+import QuantumInfo.Finite.ResourceTheory.HypothesisTesting
 
 open ResourcePretheory
 open FreeStateTheory
 open NNReal
 open ComplexOrder
 open Topology
+open scoped Prob
+open scoped OptimalHypothesisRate
 
 namespace SteinsLemma
-open scoped Prob
-
-section hypotesting
-
-variable {d : Type*} [Fintype d] [DecidableEq d]
-
-/-- The optimal hypothesis testing rate, for a tolerance ε: given a state ρ and a set of states S,
-the optimum distinguishing rate that allows a probability ε of errors. -/
-noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : ℝ) (S : Set (MState d)) : Prob :=
-  ⨅ T : { m : HermitianMat d ℂ // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1},
-    ⨆ σ ∈ S, ⟨_, σ.exp_val_prob T.2.right⟩
-
-scoped notation "β_" ε " (" ρ "‖" S ")" =>  OptimalHypothesisRate ρ ε S
-
-/-- Provides an `Inhabited` instance for the quantification over `T` in `OptimalHypothesisRate`. Not
-an instance, because we need that `0 ≤ ε`. -/
-noncomputable def OptimalHypothesisRate_iInf_Inhabited (ρ : MState d) {ε : ℝ} (hε : 0 ≤ ε) :
-    Inhabited { m // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } :=
-  ⟨1, by simpa⟩
-
-/-- When `ε < 0`, the type is empty. -/
-theorem OptimalHypothesisRate_iInf_Empty_of_lt_zero (ρ : MState d) {ε : ℝ} (hε : ε < 0) :
-    IsEmpty { m // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } := by
-  by_contra h
-  rw [not_isEmpty_iff, nonempty_subtype] at h
-  let ⟨a, ha₁, ha₂, ha₃⟩ := h
-  replace ha₁ := lt_of_le_of_lt ha₁ hε
-  rw [← not_le] at ha₁
-  rw [← sub_nonneg] at ha₃
-  exact ha₁ (ρ.exp_val_nonneg ha₃)
-
-/-- When `ε < 0`, the `OptimalHypothesisRate` becomes 1, as a junk value. -/
-@[simp]
-theorem OptimalHypothesisRate_lt_zero {ρ : MState d} {ε : ℝ} {S : Set (MState d)} (hε : ε < 0) : β_ ε(ρ‖S) = 1 := by
-  rw [OptimalHypothesisRate]
-  have _ := OptimalHypothesisRate_iInf_Empty_of_lt_zero ρ hε
-  rw [iInf_of_empty] --TODO: should iInf_of_empty be tagged @[simp]? it feels like it should
-  rfl
-
-/-- When `S` is empty, the optimal hypothesis testing rate is zero. -/
-@[simp]
-theorem OptimalHypothesisRate_empty {ρ : MState d} (ε : ℝ) (hε : 0 ≤ ε) : β_ ε(ρ‖∅) = 0 := by
-  have := OptimalHypothesisRate_iInf_Inhabited ρ hε
-  simp [OptimalHypothesisRate]
-  rfl
-
-theorem OptimalHypothesisRate_le {ρ : MState d} {ε : ℝ} {S : Set (MState d)}
-    (m : HermitianMat d ℂ) (hExp : ρ.exp_val (1 - m) ≤ ε) (hm : 0 ≤ m ∧ m ≤ 1) :
-    β_ ε(ρ‖S) ≤ ⨆ σ ∈ S, ⟨_, σ.exp_val_prob hm⟩ := by
-  unfold OptimalHypothesisRate
-  apply iInf_le_of_le ⟨m, ⟨hExp, hm⟩⟩ _
-  simp only [le_refl]
-
-theorem OptimalHypothesisRate_le_of_subset (ρ : MState d) (ε : ℝ) {S1 S2 : Set (MState d)} (h : S1 ⊆ S2) :
-    β_ ε(ρ‖S1) ≤ β_ ε(ρ‖S2) :=
-  iInf_mono (fun _ ↦ iSup_le_iSup_of_subset h)
-
-theorem OptimalHypothesisRate_singleton {ρ σ : MState d} {ε : ℝ}  :
-    β_ ε(ρ‖{σ}) =
-      ⨅ T : { m : HermitianMat d ℂ // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1},
-        ⟨_, σ.exp_val_prob T.2.right⟩ := by
-  simp only [OptimalHypothesisRate, iSup_singleton]
-
-theorem negLog_OptimalHypothesisRate_le_singleton (ρ : MState d) (ε : ℝ) (S : Set (MState d))
-    (σ : MState d) (h : σ ∈ S) : —log β_ ε(ρ‖S) ≤ —log β_ ε(ρ‖{σ}) := by
-  apply Prob.negLog_Antitone
-  apply OptimalHypothesisRate_le_of_subset
-  exact Set.singleton_subset_iff.mpr h
-
-theorem OptimalHypothesisRate_le_singleton {ρ σ : MState d} {ε : ℝ} (m : HermitianMat d ℂ)
-    (hExp : ρ.exp_val (1 - m) ≤ ε) (hm : 0 ≤ m ∧ m ≤ 1) :
-  β_ ε(ρ‖{σ}) ≤ ⟨_, σ.exp_val_prob hm⟩ := by
-  rw [OptimalHypothesisRate_singleton]
-  apply iInf_le_of_le ⟨m, ⟨hExp, hm⟩⟩ _
-  simp only [le_refl]
-
---PULLOUT...
-noncomputable instance Prob.LinearOrderedCommMonoidWithZero : LinearOrderedCommMonoidWithZero Prob where
-  zero_le_one := Prob.le_one
-
-instance HermitianMat.FiniteDimensional [Fintype d] : FiniteDimensional ℝ (HermitianMat d ℂ) := by
-  sorry
-
-instance HermitianMat.ContinuousSMul [Fintype d] : ContinuousSMul ℝ (HermitianMat d ℂ) := by
-  sorry
-
-instance HermitianMat.OrderedSMul : OrderedSMul ℝ (HermitianMat d ℂ) := by
-  sorry
-
-/-- The PSD matrices that are `≤ 1` are a compact set. More generally, this is true of any closed interval,
-but stating that is a bit different because of how numerals are treated. The `0` and `1` here are already
-directly matrices, putting in an `(a : ℝ) ≤ m ∧ m ≤ (b : ℝ)` involves casts. But that theorem should follow
-easily from this.
--/
-theorem HermitianMat.unitInterval_IsCompact : IsCompact {m : HermitianMat d ℂ | 0 ≤ m ∧ m ≤ 1} := by
-  sorry
-
-omit [DecidableEq d] in
-@[fun_prop] --fun_prop can actually prove this, should I leave this on or not?
-theorem inner_bilinForm_Continuous (A : HermitianMat d ℂ) : Continuous ⇑(HermitianMat.inner_BilinForm A) :=
-  LinearMap.continuous_of_finiteDimensional _
-
-omit [DecidableEq d] in
-@[fun_prop]
-theorem inner_continuous (A : HermitianMat d ℂ) : Continuous (A.inner) := by
-  exact inner_bilinForm_Continuous A
---/PULLOUT
-
-private theorem Lemma3 {ρ : MState d} {ε : ℝ} {S : Set (MState d)} (hε : 0 ≤ ε) (hS₁ : IsCompact S)
-    (hS₂ : Convex ℝ (MState.M '' S)) : ⨆ σ ∈ S, β_ ε(ρ‖{σ}) = β_ ε(ρ‖S) := by
-
-  --Show that the set of T's is nonempty. Having this instance around is useful for later lemmas.
-  --(Maybe it should be pulled out else to earlier in the file.)
-  --Here we give the instance both for the Set and Subtype, I'm not actually sure which is more important here.
-  have _ := OptimalHypothesisRate_iInf_Inhabited ρ hε
-  have _ : Inhabited {m | MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1} := by
-    assumption
-
-  --Work out the case where S is empty, so we can now assume it's nonempty
-  rcases S.eq_empty_or_nonempty with rfl|hnS
-  · simp [hε]
-    exact bot_eq_zero''
-  --Upgrade this fact to an instance
-  have _ : Nonempty S := hnS.to_subtype
-
-  --Needs the minimax theorem. ... TODO: I think the statement of `minimax` is actually incorrect and requires
-  --some information about the sets `S` and `T` being nonempty. Also, maybe it should change from `⨅ x ∈ S` to
-  --`⨅ (x : ↑S)` or something.
-  simp only [OptimalHypothesisRate, Set.mem_singleton_iff, iSup_iSup_eq_left]
-  have hmm := minimax (M := HermitianMat d ℂ)
-
-  --This will be the `MState.exp_val` function, but bundled as a bilinear form.
-  let f : LinearMap.BilinForm ℝ (HermitianMat d ℂ) := HermitianMat.inner_BilinForm
-  let S' : Set (HermitianMat d ℂ) := MState.M '' S
-  let T' : Set (HermitianMat d ℂ) := { m | MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 }
-  replace hS₁ : IsCompact S' := by
-    exact hS₁.image MState.Continuous_Matrix
-  have hT₁ : IsCompact T' := by
-    have hC₁ : IsCompact {m : HermitianMat d ℂ | 0 ≤ m ∧ m ≤ 1} :=
-      HermitianMat.unitInterval_IsCompact
-    have hC₂ : IsClosed {m | MState.exp_val (1 - m) ρ ≤ ε} := by
-      --This is a linear constraint and so has a closed image
-      change IsClosed ((fun m ↦ ρ.M.inner_BilinForm (1 - m)) ⁻¹' (Set.Iic ε))
-      refine IsClosed.preimage ?_ isClosed_Iic
-      fun_prop
-    convert hC₁.inter_left hC₂
-  have hT₂ : Convex ℝ T' := by
-    --We *could* get this from a more general fact that any linear subspace is convex,
-    --and the intersection of convex spaces is convex, and this is an intersection of
-    --three convex spaces. That would be more broken-down and lemmaified.
-    dsimp [T']
-    rintro x ⟨hx₁, hx₂, hx₃⟩ y ⟨hy₁, hy₂, hy₃⟩ a b ha hb hab
-    rw [← eq_sub_iff_add_eq'] at hab
-    subst b
-    refine And.intro ?_ (And.intro ?_ ?_)
-    · simp [MState.exp_val, HermitianMat.inner_left_sub, HermitianMat.inner_left_distrib] at hx₁ hy₁ ⊢
-      linear_combination a * hx₁ + (1 - a) * hy₁
-    · apply HermitianMat.convex_cone <;> assumption
-    · rw [← sub_nonneg] at hx₃ hy₃ ⊢
-      convert HermitianMat.convex_cone hx₃ hy₃ ha hb using 1
-      simp only [sub_smul, one_smul, smul_sub]
-      abel
-
-  specialize hmm f S' T' hS₁ hT₁ hS₂ hT₂
-  ext
-  rw [← iSup_subtype'']
-
-  --This is a terrible mess of unification
-  have h_inst :
-    let _ : Fact (0 ≤ (1 : ℝ)) := ⟨zero_le_one⟩;
-    @CompleteSemilatticeSup.toSupSet Prob CompleteLattice.toCompleteSemilatticeSup
-    =
-    @ConditionallyCompleteLattice.toSupSet (↑(Set.Icc 0 1)) (
-      @CompleteLattice.toConditionallyCompleteLattice _ Set.Icc.completeLattice)
-     := by
-    --This is terrible. We get two slightly different lattices, that turn out equal
-    simp [CompleteLattice.toConditionallyCompleteLattice,
-      CompleteLattice.toCompleteSemilatticeSup]
-    congr
-    simp [CompletelyDistribLattice.toCompleteLattice, CompleteLinearOrder.toCompletelyDistribLattice,
-      Prob.instCompleteLinearOrder, Set.Icc.completeLattice]
-    congr
-    · ext s
-      split_ifs with hs
-      . simp [hs]
-      · simp [hs]
-        rfl
-    · ext s
-      split_ifs with hs₁ hs₂ hs₂
-      · simp [hs₂] at hs₁
-      · simp [hs₁, hs₂]
-        rfl
-      · rfl
-      · push_neg at hs₁
-        simp [hs₁] at hs₂
-  -- let f'' : ↑S → Prob := fun i
-  --   ↦ ⨅ (T : { m // MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 }), ⟨MState.exp_val (Subtype.val T) (Subtype.val i),
-  --     OptimalHypothesisRate.proof_1 ρ ε T (Subtype.val i)⟩
-  -- have h_sub := @Set.Icc.coe_iSup (ι := S) (α := ℝ) (a := 0) (b := 1) _ (zero_le_one) _ (S := f'')
-  -- dsimp [f''] at h_sub
-  convert Eq.trans (Set.Icc.coe_iSup (ι := S) (zero_le_one (α := ℝ))) ?_
-  --No, this is stupid, there has to be a better way
-  sorry
-
-/- This is from "Strong converse exponents for a quantum channel discrimination problem and
-quantum-feedback-assisted communication", Lemma 5.
-
-This is actually true for all 0 < α (with appropriate modifications at α = 1), but we only need
-it for the case of 1 < α.
--/
-private theorem Ref81Lem5 (ρ σ : MState d) (ε α : ℝ) (hε : 0 ≤ ε ∧ ε < 1) (hα : 1 < α) :
-    —log β_ ε(ρ‖{σ}) ≤ D̃_ α(ρ‖σ) + —log ⟨(1 - ε), by constructor <;> linarith⟩ *
-      (.ofNNReal ⟨α, zero_le_one.trans hα.le⟩) / (.ofNNReal ⟨α - 1, sub_nonneg_of_le hα.le⟩)
-    := by
-  generalize_proofs pf1 pf2 pf3
-  --If ρ isn't in the support of σ, the right hand side is just ⊤. (The left hand side is not, necessarily!)
-  by_cases h_supp : LinearMap.ker σ.val.toLin' ≤ LinearMap.ker ρ.val.toLin'
-  swap
-  · simp [SandwichedRelRentropy, h_supp]
-  --Note that we actually only need this for 0 < ε, not 0 ≤ ε. This is also how it was proved in the original
-  --reference. But Hayashi says it's true for ε = 0. Likely best handled with a special by_cases for ε = 0?
-  --If this case is too much of a pain we can drop it.
-  by_cases h : ε = 0
-  · subst h
-    clear hε
-    simp [OptimalHypothesisRate]
-    --Take m_opt to be the projector of ρ, i.e. 0 on ρ's kernel and 1 elsewhere.
-    let m_opt : HermitianMat d ℂ := sorry
-    sorry
-
-  rcases hε with ⟨hε₀, hε₁⟩
-  replace hε₀ : 0 < ε := lt_of_le_of_ne hε₀ fun a => h a.symm;
-  clear h
-
-  --Now we know that ρ.support ≤ σ.support, and 0 < ε. This is the main case we actually care about.
-  --Proof from https://link.springer.com/article/10.1007/s00220-016-2645-4 reproduced below.
-  /-
-  Lemma 5. Let ρ, σ ∈ S (H) be such that supp ρ ⊆ supp σ . For any Q ∈ B(H) such
-    that 0 ≤ Q ≤ I , and any α > 1,
-    − log Tr[Qσ] ≤ D˜α (ρ‖σ) − α / (α−1) * log Tr[Qρ]. (3.7)
-    In particular, for any α > 1 and any ε ∈ (0, 1),
-    D^ε_H (ρ‖σ) ≤ D˜α (ρ‖σ) + α / (α−1) * log(1 / (1−ε)). (3.8)
-    Proof. Let p ≡ Tr {Qρ} and q ≡ Tr {Qσ}. By the monotonicity of the sandwiched
-    Rényi relative entropy for α > 1, we find that
-    D˜α (ρ‖σ) ≥ D˜α ((p, 1 − p) ‖ (q, 1 − q)) (3.9)
-      = 1 / (α−1) * log[p^α * q^(1−α) + (1−p)^α * (1−q)^(1−α) ] (3.10)
-      ≥ 1 / (α−1) * log[p^α * q^(1−α) ] (3.11)
-      = α / (α−1) * log p − log q, (3.12)
-    from which (3.7) follows. The statement in (3.8) follows by optimizing over all Q such
-    that Tr {Qρ} ≥ 1 − ε.
-  -/
-  -- The "monotonicity of the ..." part here refers to the data processing inequality, and
-  -- the (p, 1-p) and (q,1-q) refer to states which are qubits ("coins") of probability p and
-  -- q, respectively. The states ρ and σ can be "processed" into these coins by measuring the optimal T.
-  let p : Prob := 1 - ⟨ε, ⟨hε₀.le, hε₁.le⟩⟩
-  set q : Prob := β_ ε(ρ‖{σ})
-  let p2 : MState (Fin 2) := .ofClassical <| .coin p
-  let q2 : MState (Fin 2) := .ofClassical <| .coin q
-
-  have hp : 0 < p := show (0 : ℝ) < p by simp [p, hε₁]
-
-  --Show there's a lower bound on β_ε, that you can't do perfect discrimination
-  --It's possible that we actually don't want this here, that it should "follow"
-  --from the main proof.
-  have hq : 0 < q := by
-    --The optimal hypothesis rate is finite
-    simp_rw [q, OptimalHypothesisRate, Set.mem_singleton_iff, iSup_iSup_eq_left]
-    sorry
-
-  suffices —log q ≤ D̃_ α(p2‖q2) + —log ⟨1 - ε, pf1⟩ * (.ofNNReal ⟨α, pf2⟩) / (.ofNNReal ⟨α - 1, pf3⟩) by
-    refine this.trans (add_le_add_right ?_ _)
-    --This part needs the Data Processing Inequality
-    sorry
-
-  --The Renyi entropy is finite
-  rw [SandwichedRelRentropy, if_pos ?_, if_neg hα.ne']; swap
-  · suffices LinearMap.ker q2.val.toLin' = ⊥ by
-      simp only [MState.toSubtype_eq_coe, HermitianMat.val_eq_coe, this, bot_le]
-    --q2 has eigenvalues β_ ε(ρ‖{σ}) and 1-β_ ε(ρ‖{σ}), so as long as β_ ε(ρ‖{σ}) isn't 0 or 1,
-    --this is true.
-    sorry
-
-  --The logs are finite
-  rw [Prob.negLog, Prob.negLog, if_neg hq.ne', if_neg]
-  rotate_left
-  · change ¬(_ = Subtype.mk 0 _)
-    rw [Subtype.eq_iff]
-    dsimp
-    linarith
-
-  --Turn the ENNReal problem into a Real problem
-  have hα₂ : Subtype.mk _ pf3 ≠ 0 := by
-    change ¬(_ = Subtype.mk 0 _)
-    simp only [mk_zero, Nonneg.mk_eq_zero]
-    linarith
-  rw [← ENNReal.coe_mul, ← ENNReal.coe_div hα₂, ← ENNReal.coe_add, ENNReal.coe_le_coe]
-  clear hα₂
-  simp only [← coe_le_coe, coe_mk, NNReal.coe_add, NNReal.coe_div, NNReal.coe_mul, neg_mul]
-  clear pf1 pf2 pf3
-
-  rw [← add_div, ← sub_eq_add_neg]
-  conv =>
-    enter [2,1,1,1]
-    equals (p^α * q^(1-α) + (1-p)^α * (1-q)^(1-α) : ℝ) =>
-      unfold q2
-      rw [MState.ofClassical_pow]
-      unfold p2
-      rw [MState.coe_ofClassical]
-      rw [HermitianMat.diagonal_conj_diagonal, HermitianMat.diagonal_pow]
-      rw [HermitianMat.trace_diagonal]
-      simp only [Fin.sum_univ_two, Fin.isValue, Distribution.coin_val_zero,
-        Distribution.coin_val_one, Prob.coe_one_minus]
-      rw [Real.mul_rpow p.zero_le (by positivity)]
-      rw [← Real.rpow_natCast_mul (by have := q.zero_le_coe; positivity)]
-      rw [← Real.rpow_mul q.zero_le]
-      rw [Real.mul_rpow (sub_nonneg_of_le p.coe_le_one) (by positivity)]
-      rw [← Real.rpow_natCast_mul (by have := sub_nonneg_of_le q.coe_le_one; positivity)]
-      rw [← Real.rpow_mul (sub_nonneg_of_le q.coe_le_one)]
-      field_simp
-
-  trans (Real.log (p ^ α * q ^ (1 - α)) - Real.log (1 - ε) * α) / (α - 1)
-  · rw [Real.log_mul]
-    rotate_left
-    · exact (Real.rpow_pos_of_pos hp _).ne'
-    · exact (Real.rpow_pos_of_pos hq _).ne'
-    simp only [p, Prob.coe_one_minus]
-    rw [Real.log_rpow (by linarith), mul_comm α, add_sub_cancel_left]
-    rw [Real.log_rpow (x := q.val) hq]
-    rw [mul_comm, ← mul_div, mul_comm, show (1 - α) = -(α - 1) by abel]
-    simp [-neg_sub, neg_div, div_self (a := α - 1) (by linarith)]
-  · rw [div_le_div_iff_of_pos_right (by linarith), tsub_le_iff_right, sub_add_cancel]
-    apply Real.log_le_log
-    · refine mul_pos (Real.rpow_pos_of_pos hp _) (Real.rpow_pos_of_pos hq _)
-    rw [le_add_iff_nonneg_right]
-    refine mul_nonneg (Real.rpow_nonneg ?_ _) (Real.rpow_nonneg ?_ _)
-    · exact sub_nonneg_of_le p.2.2
-    · exact sub_nonneg_of_le q.2.2
-
-end hypotesting
 
 variable {ι : Type*} [FreeStateTheory ι]
 variable {i : ι}
@@ -463,21 +127,21 @@ private theorem Lemma6 (m : ℕ+) (ρ σf : MState (H i)) (σₘ : MState (H (i 
     Filter.atTop.limsup (fun (n : ℕ+) ↦ (↑n)⁻¹ * —log β_ ε(ρ⊗^[n]‖{Lemma6_σn m σf σₘ n})) ≤
     (↑m)⁻¹ * 𝐃(ρ⊗^[m]‖σₘ)
   := by
-  intro σn
-  stop
-  have h_add : ∀ α n, D̃_ α(ρ⊗^n‖σn n) = ↑(n/m) * D̃_ α(ρ⊗^m‖σₘ) + ↑(n%m) * D̃_ α(ρ‖σf):= by
+
+  have h_add : ∀ α n, D̃_ α(ρ⊗^[n]‖Lemma6_σn m σf σₘ n) = (n/m : ℕ) * D̃_ α(ρ⊗^[m]‖σₘ) + (n%m : ℕ) * D̃_ α(ρ‖σf):= by
     --"Break apart" σn, and apply additivity of `SandwichedRelRentropy`.
     sorry
 
-  --<HACK> Clear let value on σn so that it's readable. Cleans up the infoview a lot.
-  -- I'm sure there's a "clear_let" tactic or similar? Anyway this can be deleted
-  -- when the proof is done
-  let ⟨σn',hσn'⟩ := Exists.intro (p := (· = σn)) σn rfl
-  rw [← hσn'] at h_add ⊢
-  clear σn hσn'
-  rename' σn' => σn
-  --</HACK>
+  -- --<HACK> Clear let value on σn so that it's readable. Cleans up the infoview a lot.
+  -- -- I'm sure there's a "clear_let" tactic or similar? Anyway this can be deleted
+  -- -- when the proof is done
+  -- let ⟨σn',hσn'⟩ := Exists.intro (p := (· = σn)) σn rfl
+  -- rw [← hσn'] at h_add ⊢
+  -- clear σn hσn'
+  -- rename' σn' => σn
+  -- --</HACK>
 
+  stop
   --This will probably need 1 < α actually
   have h_α : ∀ α, (1 < α) → Filter.atTop.limsup (fun n ↦ —log β_ ε(ρ⊗^n‖{σn n}) / n) ≤
       D̃_ α(ρ⊗^m‖σn m) / m := by
@@ -570,32 +234,10 @@ open Matrix
 
 variable {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq dIn] [DecidableEq dOut] {R : Type*}
 
-set_option pp.proofs true in
-/-- Lemma S1 -/
-private theorem optimalHypothesisRate_antitone (ρ σ : MState dIn) (ℰ : CPTPMap dIn dOut) (ε₃ : ℝ) :
-    β_ ε₃(ρ‖{σ}) ≤ β_ ε₃(ℰ ρ‖{ℰ σ}) := by
-  simp only [OptimalHypothesisRate_singleton]
-  obtain ⟨ℰdualSubtype, h⟩ :
-      ∃ e : ({ m : HermitianMat dOut ℂ // (ℰ ρ).exp_val (1 - m) ≤ ε₃ ∧ 0 ≤ m ∧ m ≤ 1} →
-      { m : HermitianMat dIn ℂ // ρ.exp_val (1 - m) ≤ ε₃ ∧ 0 ≤ m ∧ m ≤ 1}),
-      ∀ x, e x = ℰ.dual x
-       := by
-    constructor; swap
-    · rintro ⟨m, hm₁, hm₂⟩
-      refine ⟨ℰ.dual m, ?_, CPTPMap.dual.PTP_POVM ℰ hm₂⟩
-      simpa [ℰ.exp_val_Dual ρ (1 - m)] using hm₁
-    · rintro ⟨m, hm₁, hm₂⟩
-      rfl
-  convert le_iInf_comp _ ℰdualSubtype
-  rename_i T'
-  specialize h T'
-  rw [h, ℰ.exp_val_Dual]
-
 -- TODO: Commutation and order relations about `proj_le` specified in the text
 -- between Eqs. (S77) and (S78)
 
-open scoped _root_.HermitianMat
-
+open scoped HermitianMat in
 -- The assumption (hε3 : 0 ≤ ε3 ∧ ε3 ≤ 1) stated in the paper was not used
 theorem LemmaS2 {ε3 : ℝ} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
   {d : PNat → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)] (ρ : (n : PNat) → MState (d n)) (σ : (n : PNat) → MState (d n))
@@ -621,7 +263,7 @@ theorem LemmaS2 {ε3 : ℝ} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
       have hβ : ∀ n ≥ n₀, β_ ε3(ρ n‖{σ n}) ≤ Real.exp (-↑n * (Rinf + ε4)) := fun n hn ↦ by -- Eq (S25)
         calc
           β_ ε3(ρ n‖{σ n}) ≤ (σ n).exp_val (T n) := by
-            have hβ' := OptimalHypothesisRate_le_singleton (σ := σ n) (T n) (hT n hn) ⟨proj_le_nonneg _ _, proj_le_le_one _ _⟩
+            have hβ' := OptimalHypothesisRate.singleton_le_exp_val (σ := σ n) (T n) (hT n hn) ⟨proj_le_nonneg _ _, proj_le_le_one _ _⟩
             simp only [Subtype.coe_le_coe.mpr hβ']
           _ <= (T n).inner (Real.exp (-↑n * (Rinf + ε4)) • (ρ n).M) := by
             rw [← mul_le_mul_left (Real.exp_pos ((↑n * (Rinf + ε4)))), HermitianMat.inner_smul, neg_mul, Real.exp_neg]
@@ -680,7 +322,7 @@ theorem LemmaS2 {ε3 : ℝ} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
         use n; use hn
         calc
           β_ ε3(ρ n‖{σ n}) ≤ (σ n).exp_val (T n) := by
-            have hβ' := OptimalHypothesisRate_le_singleton (σ := σ n) (T n) hT ⟨proj_le_nonneg _ _, proj_le_le_one _ _⟩
+            have hβ' := OptimalHypothesisRate.singleton_le_exp_val (σ := σ n) (T n) hT ⟨proj_le_nonneg _ _, proj_le_le_one _ _⟩
             simp only [Subtype.coe_le_coe.mpr hβ']
           _ <= (T n).inner (Real.exp (-↑n * (Rsup + ε4)) • (ρ n).M) := by
             rw [← mul_le_mul_left (Real.exp_pos ((↑n * (Rsup + ε4)))), HermitianMat.inner_smul, neg_mul, Real.exp_neg]
@@ -758,7 +400,7 @@ private theorem LemmaS3_inf {ε : ℝ} (hε : 0 ≤ ε)
     rw [← Real.log_exp (-(f n))]
     rw [← Real.log_mul (by positivity) (by positivity)]
     apply Real.log_le_log (by positivity)
-    have := OptimalHypothesisRate_iInf_Inhabited (ρ n) hε
+    have := OptimalHypothesisRate.iInf_Inhabited (ρ n) hε
     simp only [Prob.coe_iInf]
     rw [Real.mul_iInf_of_nonneg (by positivity)]
     apply ciInf_mono
@@ -951,7 +593,7 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0
     ) .atTop (𝓝 (RegularizedRelativeEntResource ρ)) := by
   conv =>
     enter [1, n, 2, 1]
-    rw [← Lemma3 hε.left.le IsCompact_IsFree free_convex]
+    rw [← OptimalHypothesisRate.Lemma3 hε.left.le IsCompact_IsFree free_convex]
   rw [RegularizedRelativeEntResource]
   simp only
   generalize_proofs pf1 pf2 pf3
@@ -989,7 +631,7 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0
       apply Filter.Eventually.of_forall
       intro n
       gcongr
-      apply negLog_OptimalHypothesisRate_le_singleton
+      apply OptimalHypothesisRate.negLog_le_singleton
       apply Lemma6_σn_IsFree hσ₁_free hσₘ1
     replace h (m) := (Filter.limsup_le_limsup (h₂ m)).trans (h m)
     clear h₂
@@ -1007,7 +649,7 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0
 
     apply le_of_tendsto_of_tendsto' tendsto_const_nhds hv_lem5
     convert h using 6
-    · apply Lemma3 hε.left.le IsCompact_IsFree free_convex
+    · apply OptimalHypothesisRate.Lemma3 hε.left.le IsCompact_IsFree free_convex
     · symm
       apply ciInf_subtype''
       · exact Set.Nonempty.of_subtype

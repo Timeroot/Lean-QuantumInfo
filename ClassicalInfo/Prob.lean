@@ -117,6 +117,9 @@ instance instCompleteLinearOrder : CompleteLinearOrder Prob where
 instance instInhabited : Inhabited Prob where
   default := 0
 
+instance : LinearOrderedCommMonoidWithZero Prob where
+  zero_le_one := (0 : Prob).2.2
+
 @[simp]
 theorem zero_le_coe {p : Prob} : 0 ≤ (p : ℝ) :=
   p.2.1
