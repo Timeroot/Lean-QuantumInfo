@@ -2,29 +2,30 @@ import QuantumInfo.Finite.CPTPMap
 
 noncomputable section
 
-open Classical
 open BigOperators
 open ComplexConjugate
 open Kronecker
 open scoped Matrix ComplexOrder
 
-variable {d d₂ : Type*} [Fintype d] [Fintype d₂] (ρ σ : MState d)
+variable {d d₂ : Type*} [Fintype d] [DecidableEq d] [Fintype d₂] (ρ σ : MState d)
 
 --We put all of the fidelity defs and theorems in the MState namespace so that they have the
---nice . syntax, i.e. `ρ.Fidelity σ = 1 ↔ ρ = σ`.
+--nice . syntax, i.e. `ρ.fidelity σ = 1 ↔ ρ = σ`.
 namespace MState
 
 /-- The fidelity of two quantum states. This is the quantum version of the Bhattacharyya coefficient. -/
 def fidelity (ρ σ : MState d) : ℝ :=
-  let ρσρ := ρ.pos.sqrt * σ.m * ρ.pos.sqrt
-  let ρσρ_PosSemidef : ρσρ.PosSemidef := by
-    unfold ρσρ
-    nth_rewrite 2 [← ρ.pos.posSemidef_sqrt.isHermitian]
-    exact σ.pos.mul_mul_conjTranspose_same _
-  (ρσρ_PosSemidef.posSemidef_sqrt.1.rtrace)^2
+  ((σ.M.conj ρ.pos.sqrt) ^ (1/2 : ℝ)).trace
+  -- let ρσρ := ρ.pos.sqrt * σ.m * ρ.pos.sqrt
+  -- let ρσρ_PosSemidef : ρσρ.PosSemidef := by
+  --   unfold ρσρ
+  --   nth_rewrite 2 [← ρ.pos.posSemidef_sqrt.isHermitian]
+  --   exact σ.pos.mul_mul_conjTranspose_same _
+  -- (ρσρ_PosSemidef.posSemidef_sqrt.1.rtrace)^2
 
 theorem fidelity_ge_zero : 0 ≤ fidelity ρ σ :=
-  sq_nonneg _
+  sorry
+  -- sq_nonneg _
 
 theorem fidelity_le_one : fidelity ρ σ ≤ 1 :=
   sorry --submultiplicativity of trace and sqrt
@@ -48,7 +49,7 @@ theorem fidelity_symm : fidelity ρ σ = fidelity σ ρ :=
   sorry --break into sqrts
 
 /-- The fidelity cannot decrease under the application of a channel. -/
-theorem fidelity_channel_nondecreasing (Λ : CPTPMap d d₂) : fidelity (Λ ρ) (Λ σ) ≥ fidelity ρ σ :=
+theorem fidelity_channel_nondecreasing [DecidableEq d₂] (Λ : CPTPMap d d₂) : fidelity (Λ ρ) (Λ σ) ≥ fidelity ρ σ :=
   sorry
 
 --TODO: Real.arccos ∘ fidelity forms a metric (triangle inequality), the Fubini–Study metric.

@@ -36,7 +36,6 @@ TODO:
 
 noncomputable section
 
-open Classical
 open ENNReal
 open NNReal
 open MState
@@ -49,7 +48,7 @@ This is valued in the extended nonnegative real numbers `ℝ≥0∞` to have goo
 come from the fact that `ℝ≥0∞` is a complete lattice. For example, it is necessary for `le_iInf` and `iInf_le_of_le`.
 However, it is also proven in `convex_roof_ne_top` that the convex roof is never `∞`, so the definition `convex_roof` should
 be used in most applications. -/
-def convex_roof_ENNReal {d : Type _} [Fintype d] (g : Ket d → ℝ≥0) : MState d → ℝ≥0∞ := fun ρ =>
+def convex_roof_ENNReal {d : Type _} [Fintype d] [DecidableEq d] (g : Ket d → ℝ≥0) : MState d → ℝ≥0∞ := fun ρ =>
   ⨅ (n : ℕ+) (e : PEnsemble d (Fin n)) (_ : mix (toMEnsemble e) = ρ), ↑(pure_average_NNReal g e)
 
 /-- Mixed convex roof extension of a function `f : MState d → ℝ≥0`, defined as the infimum of all mixed-state
@@ -59,10 +58,11 @@ This is valued in the extended nonnegative real numbers `ℝ≥0∞` to have goo
 come from the fact that `ℝ≥0∞` is a complete lattice (see `ENNReal.instCompleteLinearOrder`). However,
 it is also proven in `mixed_convex_roof_ne_top` that the mixed convex roof is never `∞`, so the definition `mixed_convex_roof` should
 be used in most applications. -/
-def mixed_convex_roof_ENNReal {d : Type _} [Fintype d] (f : MState d → ℝ≥0) : MState d → ℝ≥0∞ := fun ρ =>
+def mixed_convex_roof_ENNReal {d : Type _} [Fintype d] [DecidableEq d] (f : MState d → ℝ≥0) : MState d → ℝ≥0∞ := fun ρ =>
   ⨅ (n : ℕ+) (e : MEnsemble d (Fin n)) (_ : mix e = ρ), ↑(average_NNReal f e)
 
 variable {d d₁ d₂ : Type _} [Fintype d] [Fintype d₁] [Fintype d₂] [Nonempty d] [Nonempty d₁] [Nonempty d₂]
+variable [DecidableEq d] [DecidableEq d₁] [DecidableEq d₂]
 variable (f : MState d → ℝ≥0)
 variable (g : Ket d → ℝ≥0)
 
@@ -75,13 +75,15 @@ theorem convex_roof_ne_top : ∀ ρ, convex_roof_ENNReal g ρ ≠ ∞ := fun ρ 
     exact Fintype.equivFin d
   use (congrPEnsemble ed) <| spectral_ensemble ρ
   rw [mix_congrPEnsemble_eq_mix ed]
-  exact spectral_ensemble_mix
+  push_neg
+  convert spectral_ensemble_mix
 
 omit [Nonempty d] in
 /-- The convex roof extension `mixed_convex_roof_ENNReal` is never ∞. -/
 theorem mixed_convex_roof_ne_top : ∀ ρ, mixed_convex_roof_ENNReal f ρ ≠ ∞ := fun ρ => by
   simp only [mixed_convex_roof_ENNReal, ne_eq, iInf_eq_top, coe_ne_top, imp_false, not_forall, Decidable.not_not]
   use 1, trivial_mEnsemble ρ 0
+  push_neg
   exact trivial_mEnsemble_mix ρ 0
 
 /-- Convex roof extension of a function `g : Ket d → ℝ≥0`, defined as the infimum of all pure-state

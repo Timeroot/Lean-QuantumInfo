@@ -52,9 +52,9 @@ And other important theorems like superdense coding, nonadditivity, superactivat
 namespace CPTPMap
 
 variable {d₁ d₂ d₃ d₄ d₅ d₆ : Type*}
-variable [Fintype d₁] [Fintype d₂] [Fintype d₃] [Fintype d₄] [Fintype d₅] [Fintype d₆] [DecidableEq d₁]
+variable [Fintype d₁] [Fintype d₂] [Fintype d₃] [Fintype d₄] [Fintype d₅] [Fintype d₆] [DecidableEq d₁] [DecidableEq d₂]
 
-variable [DecidableEq d₂] [DecidableEq d₃] [DecidableEq d₄] in
+variable [DecidableEq d₃] [DecidableEq d₄] in
 /--
 A channel Λ₁ `Emulates` another channel Λ₂ if there are D and E such that D∘Λ₁∘E = Λ₂.
 -/
@@ -85,16 +85,18 @@ noncomputable def quantumCapacity (A : CPTPMap d₁ d₂) : ℝ :=
 section emulates
 variable [DecidableEq d₂] [DecidableEq d₃] [DecidableEq d₄] [DecidableEq d₅]
 
+set_option linter.unusedSectionVars false in
 /-- Every quantum channel emulates itself. -/
 theorem emulates_self (Λ : CPTPMap d₁ d₂) : Λ.Emulates Λ :=
   ⟨CPTPMap.id, CPTPMap.id, by simp⟩
 
+set_option linter.unusedSectionVars false in
 /-- If a quantum channel A emulates B, and B emulates C, then A emulates C. -/
 theorem emulates_trans (Λ₁ : CPTPMap d₁ d₂) (Λ₂ : CPTPMap d₃ d₄) (Λ₃ : CPTPMap d₅ d₆)
   (h₁₂ : Λ₁.Emulates Λ₂) (h₂₃ : Λ₂.Emulates Λ₃) : Λ₁.Emulates Λ₃ := by
   obtain ⟨E₁, D₁, hED₁⟩ := h₁₂
   obtain ⟨E₂, D₂, hED₂⟩ := h₂₃
-  exact ⟨E₁.compose E₂, D₂.compose D₁, by simp [← hED₁, ← hED₂, compose_assoc]⟩
+  exact ⟨E₁.compose E₂, D₂.compose D₁, by classical simp [← hED₁, ← hED₂, compose_assoc]⟩
 
 end emulates
 

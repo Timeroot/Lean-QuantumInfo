@@ -37,6 +37,7 @@ def DegradablePreorder (dIn : Type*) [Fintype dIn] [DecidableEq dIn] : Preorder
     ⟨CPTPMap.id, CPTPMap.compose_id Λ.snd⟩
   le_trans Λ₁ Λ₂ Λ₃ h₁₂ h₂₃ := by
     let _ := Λ₁.fst.snd.1;
+    let _ := Λ₁.fst.snd.2;
     let _ := Λ₂.fst.snd.1;
     let _ := Λ₂.fst.snd.2;
     let _ := Λ₃.fst.snd.1;
