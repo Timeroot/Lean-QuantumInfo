@@ -31,74 +31,74 @@ open Topology
 
 variable {d : Type*} [Fintype d] [DecidableEq d]
 
+/-- Provides an `Inhabited` instance for the quantification over `T` in `OptimalHypothesisRate`. Not
+an instance, because we need that `0 ≤ ε`. -/
+instance iInf_Inhabited (ρ : MState d) (ε : Prob) :
+    Inhabited { m // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } :=
+  ⟨1, by simp⟩
+
+-- have _ : Inhabited {m | MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1}
+
 /-- The optimal hypothesis testing rate, for a tolerance ε: given a state ρ and a set of states S,
 the optimum distinguishing rate that allows a probability ε of errors. -/
-noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : ℝ) (S : Set (MState d)) : Prob :=
+noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : Prob) (S : Set (MState d)) : Prob :=
   ⨅ T : { m : HermitianMat d ℂ // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1},
-    ⨆ σ ∈ S, ⟨_, σ.exp_val_prob T.2.right⟩
+    ⨆ σ ∈ S, ⟨_, σ.exp_val_prob T.prop.right⟩
 
 scoped[OptimalHypothesisRate] notation "β_" ε " (" ρ "‖" S ")" =>  OptimalHypothesisRate ρ ε S
 
 namespace OptimalHypothesisRate
 
-open scoped Prob
+-- /-- When `ε < 0`, the type is empty. -/
+-- theorem iInf_Empty_of_lt_zero (ρ : MState d) {ε : ℝ} (hε : ε < 0) :
+--     IsEmpty { m // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } := by
+--   by_contra h
+--   rw [not_isEmpty_iff, nonempty_subtype] at h
+--   let ⟨a, ha₁, ha₂, ha₃⟩ := h
+--   replace ha₁ := lt_of_le_of_lt ha₁ hε
+--   rw [← not_le] at ha₁
+--   rw [← sub_nonneg] at ha₃
+--   exact ha₁ (ρ.exp_val_nonneg ha₃)
 
-/-- Provides an `Inhabited` instance for the quantification over `T` in `OptimalHypothesisRate`. Not
-an instance, because we need that `0 ≤ ε`. -/
-noncomputable def iInf_Inhabited (ρ : MState d) {ε : ℝ} (hε : 0 ≤ ε) :
-    Inhabited { m // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } :=
-  ⟨1, by simpa⟩
-
-/-- When `ε < 0`, the type is empty. -/
-theorem iInf_Empty_of_lt_zero (ρ : MState d) {ε : ℝ} (hε : ε < 0) :
-    IsEmpty { m // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } := by
-  by_contra h
-  rw [not_isEmpty_iff, nonempty_subtype] at h
-  let ⟨a, ha₁, ha₂, ha₃⟩ := h
-  replace ha₁ := lt_of_le_of_lt ha₁ hε
-  rw [← not_le] at ha₁
-  rw [← sub_nonneg] at ha₃
-  exact ha₁ (ρ.exp_val_nonneg ha₃)
-
-/-- When `ε < 0`, the `OptimalHypothesisRate` becomes 1, as a junk value. -/
-@[simp]
-theorem lt_zero {ρ : MState d} {ε : ℝ} {S : Set (MState d)} (hε : ε < 0) : β_ ε(ρ‖S) = 1 := by
-  rw [OptimalHypothesisRate]
-  have _ := iInf_Empty_of_lt_zero ρ hε
-  rw [iInf_of_empty] --TODO: should iInf_of_empty be tagged @[simp]? it feels like it should
-  rfl
+-- /-- When `ε < 0`, the `OptimalHypothesisRate` becomes 1, as a junk value. -/
+-- @[simp]
+-- theorem lt_zero {ρ : MState d} {ε : ℝ} {S : Set (MState d)} (hε : ε < 0) : β_ ε(ρ‖S) = 1 := by
+--   rw [OptimalHypothesisRate]
+--   have _ := iInf_Empty_of_lt_zero ρ hε
+--   rw [iInf_of_empty] --TODO: should iInf_of_empty be tagged @[simp]? it feels like it should
+--   rfl
 
 /-- When `S` is empty, the optimal hypothesis testing rate is zero. -/
 @[simp]
-theorem of_empty {ρ : MState d} (ε : ℝ) (hε : 0 ≤ ε) : β_ ε(ρ‖∅) = 0 := by
-  have := iInf_Inhabited ρ hε
+theorem of_empty {ρ : MState d} (ε : Prob) : β_ ε(ρ‖∅) = 0 := by
   simp [OptimalHypothesisRate]
   rfl
 
-theorem le_sup_exp_val {ρ : MState d} {ε : ℝ} {S : Set (MState d)}
+theorem le_sup_exp_val {ρ : MState d} (ε : Prob) {S : Set (MState d)}
     (m : HermitianMat d ℂ) (hExp : ρ.exp_val (1 - m) ≤ ε) (hm : 0 ≤ m ∧ m ≤ 1) :
     β_ ε(ρ‖S) ≤ ⨆ σ ∈ S, ⟨_, σ.exp_val_prob hm⟩ := by
   unfold OptimalHypothesisRate
   apply iInf_le_of_le ⟨m, ⟨hExp, hm⟩⟩ _
   simp only [le_refl]
 
-theorem le_of_subset (ρ : MState d) (ε : ℝ) {S1 S2 : Set (MState d)} (h : S1 ⊆ S2) :
+theorem le_of_subset (ρ : MState d) (ε : Prob) {S1 S2 : Set (MState d)} (h : S1 ⊆ S2) :
     β_ ε(ρ‖S1) ≤ β_ ε(ρ‖S2) :=
   iInf_mono (fun _ ↦ iSup_le_iSup_of_subset h)
 
-theorem of_singleton {ρ σ : MState d} {ε : ℝ}  :
+theorem of_singleton {ρ σ : MState d} {ε : Prob} :
     β_ ε(ρ‖{σ}) =
       ⨅ T : { m : HermitianMat d ℂ // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1},
         ⟨_, σ.exp_val_prob T.2.right⟩ := by
   simp only [OptimalHypothesisRate, iSup_singleton]
 
-theorem negLog_le_singleton (ρ : MState d) (ε : ℝ) (S : Set (MState d))
+open scoped Prob in
+theorem negLog_le_singleton (ρ : MState d) (ε : Prob) (S : Set (MState d))
     (σ : MState d) (h : σ ∈ S) : —log β_ ε(ρ‖S) ≤ —log β_ ε(ρ‖{σ}) := by
   apply Prob.negLog_Antitone
   apply le_of_subset
   exact Set.singleton_subset_iff.mpr h
 
-theorem singleton_le_exp_val {ρ σ : MState d} {ε : ℝ} (m : HermitianMat d ℂ)
+theorem singleton_le_exp_val {ρ σ : MState d} {ε : Prob} (m : HermitianMat d ℂ)
     (hExp : ρ.exp_val (1 - m) ≤ ε) (hm : 0 ≤ m ∧ m ≤ 1) :
   β_ ε(ρ‖{σ}) ≤ ⟨_, σ.exp_val_prob hm⟩ := by
   rw [of_singleton]
@@ -106,20 +106,12 @@ theorem singleton_le_exp_val {ρ σ : MState d} {ε : ℝ} (m : HermitianMat d �
   simp only [le_refl]
 
 --Lemma 3 from Hayashi
-theorem Lemma3 {ρ : MState d} {ε : ℝ} {S : Set (MState d)} (hε : 0 ≤ ε) (hS₁ : IsCompact S)
+theorem Lemma3 {ρ : MState d} (ε : Prob) {S : Set (MState d)} (hS₁ : IsCompact S)
     (hS₂ : Convex ℝ (MState.M '' S)) : ⨆ σ ∈ S, β_ ε(ρ‖{σ}) = β_ ε(ρ‖S) := by
-
-  --Show that the set of T's is nonempty. Having this instance around is useful for later lemmas.
-  --(Maybe it should be pulled out else to earlier in the file.)
-  --Here we give the instance both for the Set and Subtype, I'm not actually sure which is more important here.
-  have _ := iInf_Inhabited ρ hε
-  have _ : Inhabited {m | MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1} := by
-    assumption
 
   --Work out the case where S is empty, so we can now assume it's nonempty
   rcases S.eq_empty_or_nonempty with rfl|hnS
-  · simp [hε]
-    exact bot_eq_zero''
+  · simpa using bot_eq_zero''
   --Upgrade this fact to an instance
   have _ : Nonempty S := hnS.to_subtype
 
@@ -165,40 +157,20 @@ theorem Lemma3 {ρ : MState d} {ε : ℝ} {S : Set (MState d)} (hε : 0 ≤ ε) 
   ext
   rw [← iSup_subtype'']
 
-  --This is a terrible mess of unification
-  have h_inst :
-    let _ : Fact (0 ≤ (1 : ℝ)) := ⟨zero_le_one⟩;
-    @CompleteSemilatticeSup.toSupSet Prob CompleteLattice.toCompleteSemilatticeSup
-    =
-    @ConditionallyCompleteLattice.toSupSet (↑(Set.Icc 0 1)) (
-      @CompleteLattice.toConditionallyCompleteLattice _ Set.Icc.completeLattice)
-     := by
-    --This is terrible. We get two slightly different lattices, that turn out equal
-    simp [CompleteLattice.toConditionallyCompleteLattice,
-      CompleteLattice.toCompleteSemilatticeSup]
+  convert Eq.trans (Set.Icc.coe_iSup (ι := S) (zero_le_one (α := ℝ))) ?_
+  · simp only [CompleteLattice.toCompleteSemilatticeSup, Prob.instCompleteLinearOrder,
+      CompleteLattice.toConditionallyCompleteLattice]
     congr
-    simp [CompletelyDistribLattice.toCompleteLattice, CompleteLinearOrder.toCompletelyDistribLattice,
-      Prob.instCompleteLinearOrder, Set.Icc.completeLattice]
-    congr
-    · ext s
-      split_ifs with hs
-      . simp [hs]
-      · simp [hs]
-        rfl
-    · ext s
-      split_ifs with hs₁ hs₂ hs₂
-      · simp [hs₂] at hs₁
-      · simp [hs₁, hs₂]
-        rfl
-      · rfl
-      · push_neg at hs₁
-        simp [hs₁] at hs₂
+    ext
+    split_ifs with hs
+    . simp [hs]
+    · simp [hs]
+      rfl
   -- let f'' : ↑S → Prob := fun i
   --   ↦ ⨅ (T : { m // MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 }), ⟨MState.exp_val (Subtype.val T) (Subtype.val i),
   --     OptimalHypothesisRate.proof_1 ρ ε T (Subtype.val i)⟩
   -- have h_sub := @Set.Icc.coe_iSup (ι := S) (α := ℝ) (a := 0) (b := 1) _ (zero_le_one) _ (S := f'')
   -- dsimp [f''] at h_sub
-  convert Eq.trans (Set.Icc.coe_iSup (ι := S) (zero_le_one (α := ℝ))) ?_
   --No, this is stupid, there has to be a better way
   sorry
 
@@ -215,12 +187,12 @@ theorem ker_diagonal_prob_eq_bot {q : Prob} (hq₁ : 0 < q) (hq₂ : q < 1) :
 
 variable {d₂ : Type*} [Fintype d₂] [DecidableEq d₂] in
 /-- Lemma S1 -/
-theorem optimalHypothesisRate_antitone (ρ σ : MState d) (ℰ : CPTPMap d d₂) (ε₃ : ℝ) :
-    β_ ε₃(ρ‖{σ}) ≤ β_ ε₃(ℰ ρ‖{ℰ σ}) := by
+theorem optimalHypothesisRate_antitone (ρ σ : MState d) (ℰ : CPTPMap d d₂) (ε : Prob) :
+    β_ ε(ρ‖{σ}) ≤ β_ ε(ℰ ρ‖{ℰ σ}) := by
   simp only [of_singleton]
   obtain ⟨ℰdualSubtype, h⟩ :
-      ∃ e : ({ m : HermitianMat d₂ ℂ // (ℰ ρ).exp_val (1 - m) ≤ ε₃ ∧ 0 ≤ m ∧ m ≤ 1} →
-      { m : HermitianMat d ℂ // ρ.exp_val (1 - m) ≤ ε₃ ∧ 0 ≤ m ∧ m ≤ 1}),
+      ∃ e : ({ m : HermitianMat d₂ ℂ // (ℰ ρ).exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1} →
+      { m : HermitianMat d ℂ // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1}),
       ∀ x, e x = ℰ.dual x
        := by
     constructor; swap
@@ -234,18 +206,31 @@ theorem optimalHypothesisRate_antitone (ρ σ : MState d) (ℰ : CPTPMap d d₂)
   specialize h T'
   rw [h, ℰ.exp_val_Dual]
 
+--PULLOUT
+instance : Nontrivial Prob where
+  exists_pair_ne := ⟨0, 1, by simp [← Prob.ne_iff]⟩
+
+@[simp]
+theorem _root_.Prob.sub_zero (p : Prob) : p - 0 = p := by
+  ext1; simp [Prob.coe_sub]
+
+@[simp]
+theorem _root_.Prob.negLog_one : Prob.negLog 1 = 0 := by
+  simp [Prob.negLog]
+
 open scoped HermitianMat in
+open scoped Prob in
 /-- This is from [Strong converse exponents for a quantum channel discrimination problem
 and quantum-feedback-assisted communication](https://doi.org/10.1007/s00220-016-2645-4), Lemma 5.
 
 It seems like this is actually true for all 0 < α (with appropriate modifications at α = 1), but we only need
 it for the case of 1 < α.
 -/
-theorem Ref81Lem5 (ρ σ : MState d) (ε α : ℝ) (hε : 0 ≤ ε ∧ ε < 1) (hα : 1 < α) :
-    —log β_ ε(ρ‖{σ}) ≤ D̃_ α(ρ‖σ) + —log ⟨(1 - ε), by constructor <;> linarith⟩ *
+theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα : 1 < α) :
+    —log β_ ε(ρ‖{σ}) ≤ D̃_ α(ρ‖σ) + —log (1 - ε) *
       (.ofNNReal ⟨α, zero_le_one.trans hα.le⟩) / (.ofNNReal ⟨α - 1, sub_nonneg_of_le hα.le⟩)
     := by
-  generalize_proofs pf1 pf2 pf3
+  generalize_proofs pf1 pf2
   --If ρ isn't in the support of σ, the right hand side is just ⊤. (The left hand side is not, necessarily!)
   by_cases h_supp : LinearMap.ker σ.val.toLin' ≤ LinearMap.ker ρ.val.toLin'
   swap
@@ -255,15 +240,16 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε α : ℝ) (hε : 0 ≤ ε ∧ ε < 1) (
   --If this case is too much of a pain we can drop it.
   by_cases h : ε = 0
   · subst h
-    clear hε
-    simp [OptimalHypothesisRate]
+    simp only [OptimalHypothesisRate, Set.Icc.coe_zero, Set.mem_singleton_iff, iSup_iSup_eq_left,
+      Prob.sub_zero, Prob.negLog_one, zero_mul, ENNReal.zero_div, add_zero]
     --Take m_opt to be the projector of ρ, i.e. 0 on ρ's kernel and 1 elsewhere.
     let m_opt : HermitianMat d ℂ := {0 ≤ₚ ρ}
     sorry
 
-  rcases hε with ⟨hε₀, hε₁⟩
-  replace hε₀ : 0 < ε := lt_of_le_of_ne hε₀ fun a => h a.symm;
-  clear h
+  replace h : 0 < ε := zero_lt_iff.mpr h
+  have h₂ : 0 < 1 - ε.val := by
+    change ε.val < 1 at hε
+    linarith
 
   --Now we know that ρ.support ≤ σ.support, and 0 < ε. This is the main case we actually care about.
   --Proof from https://link.springer.com/article/10.1007/s00220-016-2645-4 reproduced below.
@@ -285,12 +271,12 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε α : ℝ) (hε : 0 ≤ ε ∧ ε < 1) (
   -- The "monotonicity of the ..." part here refers to the data processing inequality, and
   -- the (p, 1-p) and (q,1-q) refer to states which are qubits ("coins") of probability p and
   -- q, respectively. The states ρ and σ can be "processed" into these coins by measuring the optimal T.
-  let p : Prob := 1 - ⟨ε, ⟨hε₀.le, hε₁.le⟩⟩
+  let p : Prob := 1 - ε
   set q : Prob := β_ ε(ρ‖{σ})
   let p2 : MState (Fin 2) := .ofClassical <| .coin p
   let q2 : MState (Fin 2) := .ofClassical <| .coin q
 
-  have hp : 0 < p := show (0 : ℝ) < p by simp [p, hε₁]
+  have hp : 0 < p := show (0 : ℝ) < p by simp [p, hε]
 
   --Show there's a lower bound on β_ε, that you can't do perfect discrimination
   --It's possible that we actually don't want this here, that it should "follow"
@@ -316,7 +302,7 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε α : ℝ) (hε : 0 ≤ ε ∧ ε < 1) (
     --we can freely add some more to
     sorry
 
-  suffices —log q ≤ D̃_ α(p2‖q2) + —log ⟨1 - ε, pf1⟩ * (.ofNNReal ⟨α, pf2⟩) / (.ofNNReal ⟨α - 1, pf3⟩) by
+  suffices —log q ≤ D̃_ α(p2‖q2) + —log (1 - ε) * (.ofNNReal ⟨α, pf1⟩) / (.ofNNReal ⟨α - 1, pf2⟩) by
     refine this.trans (add_le_add_right ?_ _)
     --Show that this is an instance of the Data Processing Inequality
     obtain ⟨Φ, hΦ₁, hΦ₂⟩ : ∃ (Φ : CPTPMap d (Fin 2)), p2 = Φ ρ ∧ q2 = Φ σ := by
@@ -342,21 +328,18 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε α : ℝ) (hε : 0 ≤ ε ∧ ε < 1) (
 
   --The logs are finite
   rw [Prob.negLog, Prob.negLog, if_neg hq.ne', if_neg]
-  rotate_left
-  · change ¬(_ = Subtype.mk 0 _)
-    rw [Subtype.eq_iff]
-    dsimp
-    linarith
+  swap
+  · simpa [Subtype.eq_iff, Prob.coe_sub] using h₂.ne'
 
   --Turn the ENNReal problem into a Real problem
-  have hα₂ : Subtype.mk _ pf3 ≠ 0 := by
+  have hα₂ : Subtype.mk _ pf2 ≠ 0 := by
     change ¬(_ = Subtype.mk 0 _)
     simp only [mk_zero, Nonneg.mk_eq_zero]
     linarith
   rw [← ENNReal.coe_mul, ← ENNReal.coe_div hα₂, ← ENNReal.coe_add, ENNReal.coe_le_coe]
   clear hα₂
   simp only [← coe_le_coe, coe_mk, NNReal.coe_add, NNReal.coe_div, NNReal.coe_mul, neg_mul]
-  clear pf1 pf2 pf3
+  clear pf1 pf2
 
   rw [← add_div, ← sub_eq_add_neg]
   conv =>
@@ -378,7 +361,7 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε α : ℝ) (hε : 0 ≤ ε ∧ ε < 1) (
       rw [← Real.rpow_mul (sub_nonneg_of_le q.coe_le_one)]
       field_simp
 
-  trans (Real.log (p ^ α * q ^ (1 - α)) - Real.log (1 - ε) * α) / (α - 1)
+  trans (Real.log (p ^ α * q ^ (1 - α)) - Real.log (1 - ε.val) * α) / (α - 1)
   · rw [Real.log_mul]
     rotate_left
     · exact (Real.rpow_pos_of_pos hp _).ne'
@@ -388,7 +371,9 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε α : ℝ) (hε : 0 ≤ ε ∧ ε < 1) (
     rw [Real.log_rpow (x := q.val) hq]
     rw [mul_comm, ← mul_div, mul_comm, show (1 - α) = -(α - 1) by abel]
     simp [-neg_sub, neg_div, div_self (a := α - 1) (by linarith)]
-  · rw [div_le_div_iff_of_pos_right (by linarith), tsub_le_iff_right, sub_add_cancel]
+  · rw [div_le_div_iff_of_pos_right (by linarith), tsub_le_iff_right]
+    nth_rewrite 4 [Prob.coe_sub]
+    simp only [Set.Icc.coe_one, sub_nonneg, Prob.coe_le_one, sup_of_le_left, sub_add_cancel]
     apply Real.log_le_log
     · refine mul_pos (Real.rpow_pos_of_pos hp _) (Real.rpow_pos_of_pos hq _)
     rw [le_add_iff_nonneg_right]

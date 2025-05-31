@@ -71,7 +71,7 @@ theorem limit_rel_entropy_exists (ρ : MState (H i)) :
   have := Subadditive.tendsto_lim hu' hu'_bddBelow
   /-
   Now we need to change `this`, which is `@Filter.Tendsto ℕ ℝ`, into our goal, which is
-  `@Filter.Tendsto ℕ+ ENNReal`. This probably needs three steps, one where go from ℕ to ℕ+,
+  `@Filter.Tendsto ℕ+ ENNReal`. This probably needs three steps, one where we go from ℕ to ℕ+,
   one where we go from ℝ to NNReal, and then one more from NNReal to ENNReal. Some lemmas that
   might be useful:
   - `Topology.IsClosedEmbedding.tendsto_nhds_iff`
@@ -120,7 +120,7 @@ theorem Lemma6_σn_IsFree {σ₁ : MState (H i)} {σₘ : (m : ℕ+) → MState 
   sorry
 
 /-- Lemma 6 from the paper -/
-private theorem Lemma6 (m : ℕ+) (ρ σf : MState (H i)) (σₘ : MState (H (i ⊗^[m]))) (hσf : σf.m.PosDef) (ε : ℝ)
+private theorem Lemma6 (m : ℕ+) (ρ σf : MState (H i)) (σₘ : MState (H (i ⊗^[m]))) (hσf : σf.m.PosDef) (ε : Prob)
     (hε : 0 < ε)
     (hε' : ε < 1) --Not stated in the paper's theorem statement but I think is necessary for the argument to go through
     :
@@ -217,7 +217,7 @@ private theorem Lemma6 (m : ℕ+) (ρ σf : MState (H i)) (σₘ : MState (H (i 
   sorry
 
 /-- Theorem 4, which is _also_ called the Generalized Quantum Stein's Lemma in Hayashi & Yamasaki -/
-theorem limit_hypotesting_eq_limit_rel_entropy (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) :
+theorem limit_hypotesting_eq_limit_rel_entropy (ρ : MState (H i)) (ε : Prob) (hε : 0 < ε ∧ ε < 1) :
     ∃ d : ℝ≥0,
       Filter.Tendsto (fun n ↦ —log β_ ε(ρ⊗^[n] ‖ IsFree) / n)
       .atTop (𝓝 d)
@@ -238,8 +238,7 @@ variable {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq dIn] [Deci
 -- between Eqs. (S77) and (S78)
 
 open scoped HermitianMat in
--- The assumption (hε3 : 0 ≤ ε3 ∧ ε3 ≤ 1) stated in the paper was not used
-theorem LemmaS2 {ε3 : ℝ} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
+theorem LemmaS2 {ε3 : Prob} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
   {d : PNat → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)] (ρ : (n : PNat) → MState (d n)) (σ : (n : PNat) → MState (d n))
   {Rinf : ℝ≥0} (hRinf : ↑Rinf ≥ Filter.liminf (fun n ↦ (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n})) Filter.atTop)
   {Rsup : ℝ≥0} (hRsup : ↑Rsup ≥ Filter.limsup (fun n ↦ (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n})) Filter.atTop)
@@ -370,7 +369,7 @@ we express as a function `f : ℕ+ → ℝ`, together with the fact that `f` is 
 `f =o[.atTop] id`), and then writing `exp(-f)`. We also split LemmaS3 into two parts, the `lim inf` part
 and the `lim sup` part. The theorem as written is true for any `f`, but we can restrict to nonnegative
 `f` (so, `ℕ+ → ℝ≥0`) which is easier to work with and more natural in the subsequent proofs. -/
-private theorem LemmaS3_inf {ε : ℝ} (hε : 0 ≤ ε)
+private theorem LemmaS3_inf {ε : Prob}
     {d : PNat → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)]
     (ρ σ₁ σ₂ : (n : ℕ+) → MState (d n))
     (f : ℕ+ → ℝ≥0) (hf : (f · : ℕ+ → ℝ) =o[.atTop] (· : ℕ+ → ℝ))
@@ -400,7 +399,6 @@ private theorem LemmaS3_inf {ε : ℝ} (hε : 0 ≤ ε)
     rw [← Real.log_exp (-(f n))]
     rw [← Real.log_mul (by positivity) (by positivity)]
     apply Real.log_le_log (by positivity)
-    have := OptimalHypothesisRate.iInf_Inhabited (ρ n) hε
     simp only [Prob.coe_iInf]
     rw [Real.mul_iInf_of_nonneg (by positivity)]
     apply ciInf_mono
@@ -421,7 +419,7 @@ private theorem LemmaS3_inf {ε : ℝ} (hε : 0 ≤ ε)
   --the (↑n)⁻¹ * f n term will go to zero.
   sorry
 
-private theorem LemmaS3_sup {ε : ℝ} (hε : 0 ≤ ε)
+private theorem LemmaS3_sup {ε : Prob}
     {d : PNat → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)]
     (ρ σ₁ σ₂ : (n : ℕ+) → MState (d n))
     (f : ℕ+ → ℝ≥0) (hf : (f · : ℕ+ → ℝ) =o[.atTop] (· : ℕ+ → ℝ))
@@ -436,18 +434,18 @@ private theorem LemmaS3_sup {ε : ℝ} (hε : 0 ≤ ε)
 
 -- This is not exactly how R_{1, ε} is defined in Eq. (17), but it should be equal due to
 -- the monotonicity of log and Lemma 3.
-private noncomputable def R1 (ρ : MState (H i)) (ε : ℝ) : ENNReal :=
+private noncomputable def R1 (ρ : MState (H i)) (ε : Prob) : ENNReal :=
   Filter.liminf (fun n ↦ —log β_ ε(ρ⊗^[n]‖IsFree) / n) Filter.atTop
 
 private noncomputable def R2 (ρ : MState (H i)) : ((n : ℕ+) → IsFree (i := i⊗^[n])) → ENNReal :=
   fun σ ↦ Filter.liminf (fun n ↦ 𝐃(ρ⊗^[n]‖σ n) / n) Filter.atTop
 
 /-- Lemma 7 from the paper. We write `ε'` for their `\tilde{ε}`. -/
-private theorem Lemma7 (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) (σ : (n : ℕ+) → IsFree (i := i⊗^[n])) :
+private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1) (σ : (n : ℕ+) → IsFree (i := i⊗^[n])) :
     (R2 ρ σ ≥ R1 ρ ε) →
-    ∀ ε' : ℝ, (hε' : 0 < ε' ∧ ε' < ε) → -- ε' is written as \tilde{ε} in the paper.
+    ∀ ε' : Prob, (hε' : 0 < ε' ∧ ε' < ε) → -- ε' is written as \tilde{ε} in the paper.
     ∃ σ' : (n : ℕ+) → IsFree (i := i⊗^[n]),
-    R2 ρ σ' - R1 ρ ε ≤ .ofNNReal (⟨1 - ε', by linarith⟩) * (R2 ρ σ - R1 ρ ε)
+    R2 ρ σ' - R1 ρ ε ≤ .ofNNReal (1 - ε' : Prob) * (R2 ρ σ - R1 ρ ε)
     := by
   --This proof naturally splits out into LemmaS62:
   --  `lim inf n→∞ 1/n D(E_n(ρ^⊗n)‖σ''_n) − R1,ϵ ≤ (1 − ˜ϵ)(R2 − R1,ϵ).`
@@ -466,13 +464,19 @@ private theorem Lemma7 (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) 
   --Before proceeding, let's reduce to the case that they're finite.
   have hR1 : R1 ρ ε ≠ ⊤ := hR1R2.ne_top
   rcases eq_or_ne (R2 ρ σ) ⊤ with hR2|hR2
-  · simp [hR2, hR1, ENNReal.mul_top', ← NNReal.coe_eq_zero, show 1 - ε' ≠ 0 by linarith]
+  · rw [hR2, ENNReal.top_sub hR1, ENNReal.mul_top', if_neg]
+    · simp only [le_top, exists_const]
+    · have : ε'.val < 1 := hε'₂.trans hε.2
+      rcases ε' with ⟨ε',hε'₁,hε'₂⟩
+      simp only [Prob.toNNReal, Prob.coe_one_minus, ENNReal.coe_eq_zero]
+      rw [Subtype.ext_iff, val_eq_coe, val_eq_coe, coe_zero, coe_mk]
+      linarith +splitNe
 
   --Start giving the definitions from the paper. Define ε₀
   let ε₀ : ℝ := (R2 ρ σ - R1 ρ ε).toReal * (ε - ε') / (1 - ε)
   have hε₀ : 0 < ε₀ :=
-    have := sub_pos.mpr hε.2
-    have := sub_pos.mpr hε'₂
+    have := sub_pos.mpr (show ε.val < 1 from hε.2)
+    have := sub_pos.mpr (show ε'.val < ε from hε'₂)
     have : 0 < (SteinsLemma.R2 ρ σ - SteinsLemma.R1 ρ ε).toReal :=
       ENNReal.toReal_pos (tsub_pos_of_lt hR1R2).ne' (ENNReal.sub_ne_top hR2)
     by positivity
@@ -546,25 +550,25 @@ private theorem Lemma7 (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) 
 /-- Lemma 7 gives us a way to repeatedly "improve" a sequence σ to one with a smaller gap between R2 and R1.
 The paper paints this as pretty much immediate from Lemma7, but we need to handle the case where R2 is below
 R1. -/
-private noncomputable def Lemma7_improver (ρ : MState (H i)) {ε : ℝ} (hε : 0 < ε ∧ ε < 1) {ε' : ℝ} (hε' : 0 < ε' ∧ ε' < ε) :
+private noncomputable def Lemma7_improver (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1) {ε' : Prob} (hε' : 0 < ε' ∧ ε' < ε) :
     --The parameters above are the "fixed" parameters that we'll improve
     --It takes one sequence of free states, `(n : ℕ+) → IsFree (i := i⊗^[n])`, and gives a new one
     ((n : ℕ+) → IsFree (i := i⊗^[n])) → ((n : ℕ+) → IsFree (i := i⊗^[n])) :=
   fun σ ↦
     if h : R2 ρ σ ≥ R1 ρ ε then
-      (Lemma7 ρ ε hε σ h ε' hε').choose
+      (Lemma7 ρ hε σ h ε' hε').choose
     else
      σ --The gap was already 0 (or even, negative!) so leave it unchanged.
 
 /-- The Lemma7_improver does its job at shrinking the gap. -/
-theorem Lemma7_gap (ρ : MState (H i)) {ε : ℝ} (hε : 0 < ε ∧ ε < 1) {ε' : ℝ} (hε' : 0 < ε' ∧ ε' < ε) :
+theorem Lemma7_gap (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1) {ε' : Prob} (hε' : 0 < ε' ∧ ε' < ε) :
     ∀ σ,
       let σ' := Lemma7_improver ρ hε hε' σ;
-      R2 ρ σ' - R1 ρ ε ≤ .ofNNReal (⟨1 - ε', by linarith⟩) * (R2 ρ σ - R1 ρ ε) := by
+      R2 ρ σ' - R1 ρ ε ≤ .ofNNReal (1 - ε' : Prob) * (R2 ρ σ - R1 ρ ε) := by
   intro σ
   dsimp [SteinsLemma.Lemma7_improver]
   split_ifs with h
-  · exact (SteinsLemma.Lemma7 ρ ε hε σ h ε' hε').choose_spec
+  · exact (SteinsLemma.Lemma7 ρ hε σ h ε' hε').choose_spec
   · push_neg at h
     conv_lhs => equals 0 =>
       exact tsub_eq_zero_of_le h.le
@@ -587,13 +591,13 @@ theorem _root_.tendsto_of_limsup_le_liminf {α : Type u_2} {β : Type u_3} [Cond
     le_antisymm hsup (hinf.trans h_le)
   exact tendsto_of_liminf_eq_limsup h_eq_inf.symm h_eq_sup
 
-theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0 < ε ∧ ε < 1) :
+theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : Prob) (hε : 0 < ε ∧ ε < 1) :
     Filter.Tendsto (fun n ↦
       (↑n)⁻¹ * —log β_ ε(ρ⊗^[n]‖IsFree)
     ) .atTop (𝓝 (RegularizedRelativeEntResource ρ)) := by
   conv =>
     enter [1, n, 2, 1]
-    rw [← OptimalHypothesisRate.Lemma3 hε.left.le IsCompact_IsFree free_convex]
+    rw [← OptimalHypothesisRate.Lemma3 ε IsCompact_IsFree free_convex]
   rw [RegularizedRelativeEntResource]
   simp only
   generalize_proofs pf1 pf2 pf3
@@ -649,6 +653,7 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0
 
     apply le_of_tendsto_of_tendsto' tendsto_const_nhds hv_lem5
     convert h using 6
+    stop
     · apply OptimalHypothesisRate.Lemma3 hε.left.le IsCompact_IsFree free_convex
     · symm
       apply ciInf_subtype''
@@ -660,10 +665,10 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : ℝ) (hε : 0
     set R₁ε := Filter.liminf (fun n => —log (⨆ σ ∈ IsFree, β_ ε(ρ⊗^[n]‖{σ})) / ↑↑n) Filter.atTop
     --We need to pick an ε' (a \tilde{ε} in the paper). The only constraint(?) is that it's strictly
     --less than ε. We take ε' := ε/2.
-    let ε' := ε/2
-    have hε' : 0 < ε' ∧ ε' < ε := by unfold ε'; constructor <;> linarith
-    have lem7 (σ h) := Lemma7 ρ ε hε σ h ε' hε'
-    dsimp at lem7
+     --TODO: Should we have an HDiv Prob Nat instance?
+    let ε' : Prob := ⟨ε/2, by constructor <;> linarith [ε.zero_le_coe, ε.coe_le_one]⟩
+    have hε' : 0 < ε' ∧ ε' < ε := by unfold ε'; constructor <;> change (_ : ℝ) < (_ : ℝ) <;> simpa using hε.1
+    have lem7 (σ h) := Lemma7 ρ hε σ h ε' hε'
     --Take some initial sequence σ₁. Can just take the full_rank one from each, if we want (which is the `default`
     -- instance that `Inhabited` derives, but the point is that it doesn't matter)
     generalize (default : (n : ℕ+) → IsFree (i := i⊗^[n])) = σ₁
