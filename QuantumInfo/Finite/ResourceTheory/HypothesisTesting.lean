@@ -37,7 +37,8 @@ instance iInf_Inhabited (ρ : MState d) (ε : Prob) :
     Inhabited { m // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } :=
   ⟨1, by simp⟩
 
--- have _ : Inhabited {m | MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1}
+instance (ρ : MState d) (ε : Prob) : Inhabited {m | MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1} :=
+  iInf_Inhabited ρ ε
 
 /-- The optimal hypothesis testing rate, for a tolerance ε: given a state ρ and a set of states S,
 the optimum distinguishing rate that allows a probability ε of errors. -/
@@ -125,9 +126,11 @@ theorem Lemma3 {ρ : MState d} (ε : Prob) {S : Set (MState d)} (hS₁ : IsCompa
   let f : LinearMap.BilinForm ℝ (HermitianMat d ℂ) := HermitianMat.inner_BilinForm
   let S' : Set (HermitianMat d ℂ) := MState.M '' S
   let T' : Set (HermitianMat d ℂ) := { m | MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 }
-  replace hS₁ : IsCompact S' := by
+
+  have hS'₁ : IsCompact S' := by
     exact hS₁.image MState.Continuous_Matrix
-  have hT₁ : IsCompact T' := by
+
+  have hT'₁ : IsCompact T' := by
     have hC₁ : IsCompact {m : HermitianMat d ℂ | 0 ≤ m ∧ m ≤ 1} :=
       HermitianMat.unitInterval_IsCompact
     have hC₂ : IsClosed {m | MState.exp_val (1 - m) ρ ≤ ε} := by
@@ -136,7 +139,8 @@ theorem Lemma3 {ρ : MState d} (ε : Prob) {S : Set (MState d)} (hS₁ : IsCompa
       refine IsClosed.preimage ?_ isClosed_Iic
       fun_prop
     convert hC₁.inter_left hC₂
-  have hT₂ : Convex ℝ T' := by
+
+  have hT'₂ : Convex ℝ T' := by
     --We *could* get this from a more general fact that any linear subspace is convex,
     --and the intersection of convex spaces is convex, and this is an intersection of
     --three convex spaces. That would be more broken-down and lemmaified.
@@ -153,26 +157,55 @@ theorem Lemma3 {ρ : MState d} (ε : Prob) {S : Set (MState d)} (hS₁ : IsCompa
       simp only [sub_smul, one_smul, smul_sub]
       abel
 
-  specialize hmm f S' T' hS₁ hT₁ hS₂ hT₂
-  ext
-  rw [← iSup_subtype'']
+  have hS'₃ : S'.Nonempty := by simpa only [Set.image_nonempty, S']
 
-  convert Eq.trans (Set.Icc.coe_iSup (ι := S) (zero_le_one (α := ℝ))) ?_
-  · simp only [CompleteLattice.toCompleteSemilatticeSup, Prob.instCompleteLinearOrder,
-      CompleteLattice.toConditionallyCompleteLattice]
+  have hT'₃ : T'.Nonempty := Set.Nonempty.of_subtype
+
+  --There's some issue below where the lemma `Set.Icc.coe_iSup` uses a particular order instance, and we've
+  --defined a different (but propositionally equivalent) one on `Prob`, and we need to convert between these.
+  --Someone's who's better with understanding type inference diamonds - or whatever these are called - could
+  --surely find a better solution. This hypothesis is implicitly used when we write `· congr` below.
+  have h_stupid : Prob.instCompleteLinearOrder = instCompleteLinearOrderElemIccOfFactLe := by
+    simp only [Prob.instCompleteLinearOrder, instCompleteLinearOrderElemIccOfFactLe]
     congr
-    ext
-    split_ifs with hs
-    . simp [hs]
-    · simp [hs]
-      rfl
-  -- let f'' : ↑S → Prob := fun i
-  --   ↦ ⨅ (T : { m // MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 }), ⟨MState.exp_val (Subtype.val T) (Subtype.val i),
-  --     OptimalHypothesisRate.proof_1 ρ ε T (Subtype.val i)⟩
-  -- have h_sub := @Set.Icc.coe_iSup (ι := S) (α := ℝ) (a := 0) (b := 1) _ (zero_le_one) _ (S := f'')
-  -- dsimp [f''] at h_sub
-  --No, this is stupid, there has to be a better way
-  sorry
+    · ext
+      split_ifs with hs
+      . simp [hs]
+      · simp [hs]
+        rfl
+    · ext s
+      split_ifs with hs₁ hs₂ hs₂
+      · simp [hs₂] at hs₁
+      · simp [hs₁, hs₂]
+        rfl
+      · rfl
+      · push_neg at hs₁
+        simp [hs₁] at hs₂
+
+  specialize hmm f S' T' hS'₁ hT'₁ hS₂ hT'₂ hS'₃ hT'₃
+  ext
+  convert hmm
+  · rw [← iSup_subtype'']
+    convert Eq.trans (c := ⨆ (x : S'), ⨅ (y : T'), (f ↑x) ↑y) (Set.Icc.coe_iSup (ι := S) (zero_le_one (α := ℝ))) ?_
+    · congr
+    unfold S'
+    have hi := iSup_range' (ι := S) (β := HermitianMat d ℂ) (g := fun x ↦ ⨅ (y : T'), (f x) ↑y) (·)
+    rw [← Set.image_eq_range] at hi
+    rw [hi]
+    congr! 2 with x
+    convert Eq.trans (Set.Icc.coe_iInf (ι := T') (zero_le_one (α := ℝ))) ?_
+    · congr
+    rfl
+  · convert Eq.trans (c := ⨅ (y : T'), ⨆ (x : S'), (f ↑x) ↑y) (Set.Icc.coe_iInf (ι := T') (zero_le_one (α := ℝ))) ?_
+    · congr
+    congr! 2 with y
+    rw [← iSup_subtype'']
+    convert Eq.trans (Set.Icc.coe_iSup (ι := S) (zero_le_one (α := ℝ))) ?_
+    · congr
+    have hi := iSup_range' (ι := S) (β := HermitianMat d ℂ) (g := fun x ↦ (f x) ↑y) (·)
+    rw [← Set.image_eq_range] at hi
+    rw [hi]
+    rfl
 
 --Maybe should be phrased in terms of `0 < ...` instead? Maybe belongs in another file? It's kiinnnd of specialized..
 theorem ker_diagonal_prob_eq_bot {q : Prob} (hq₁ : 0 < q) (hq₂ : q < 1) :
@@ -182,8 +215,7 @@ theorem ker_diagonal_prob_eq_bot {q : Prob} (hq₁ : 0 < q) (hq₂ : q < 1) :
     intro i; fin_cases i
     · simpa
     · simpa [← Complex.ofReal_one, Complex.real_lt_real]
-  --Use the fact that m.PosDef → LinearMap.ker M.toLin' = ⊥
-  sorry
+  exact h.toLin_ker_eq_bot
 
 variable {d₂ : Type*} [Fintype d₂] [DecidableEq d₂] in
 /-- Lemma S1 -/

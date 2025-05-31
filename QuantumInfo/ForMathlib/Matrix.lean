@@ -347,6 +347,22 @@ theorem zero_posSemidef_neg_posSemidef_iff : A.PosSemidef ∧ (-A).PosSemidef �
 
 end PosSemidef
 
+
+namespace PosDef
+open scoped ComplexOrder
+
+variable {n m 𝕜 : Type*}
+variable [Fintype n] [RCLike 𝕜] [DecidableEq n]
+variable {A : Matrix n n 𝕜}
+
+theorem toLin_ker_eq_bot (hA : A.PosDef) : LinearMap.ker A.toLin' = ⊥ := by
+  sorry
+
+theorem of_toLin_ker_eq_bot (hA : LinearMap.ker A.toLin' = ⊥) (hA₂ : A.PosSemidef) : A.PosDef := by
+  sorry
+
+end PosDef
+
 namespace PosSemidef
 section partialOrder
 open scoped ComplexOrder
