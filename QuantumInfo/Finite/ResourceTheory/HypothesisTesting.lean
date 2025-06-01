@@ -6,6 +6,7 @@ import Mathlib.Data.EReal.Basic
 
 import QuantumInfo.Finite.CPTPMap
 import QuantumInfo.Finite.Entropy
+import QuantumInfo.Finite.POVM
 
 /-!
 Defines `OptimalHypothesisRate`, the optimal rate of distinguishing an `MState` ρ from a set of other
@@ -31,15 +32,6 @@ open Topology
 
 variable {d : Type*} [Fintype d] [DecidableEq d]
 
-/-- Provides an `Inhabited` instance for the quantification over `T` in `OptimalHypothesisRate`. Not
-an instance, because we need that `0 ≤ ε`. -/
-instance iInf_Inhabited (ρ : MState d) (ε : Prob) :
-    Inhabited { m // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } :=
-  ⟨1, by simp⟩
-
-instance (ρ : MState d) (ε : Prob) : Inhabited {m | MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1} :=
-  iInf_Inhabited ρ ε
-
 /-- The optimal hypothesis testing rate, for a tolerance ε: given a state ρ and a set of states S,
 the optimum distinguishing rate that allows a probability ε of errors. -/
 noncomputable def OptimalHypothesisRate (ρ : MState d) (ε : Prob) (S : Set (MState d)) : Prob :=
@@ -50,24 +42,41 @@ scoped[OptimalHypothesisRate] notation "β_" ε " (" ρ "‖" S ")" =>  OptimalH
 
 namespace OptimalHypothesisRate
 
--- /-- When `ε < 0`, the type is empty. -/
--- theorem iInf_Empty_of_lt_zero (ρ : MState d) {ε : ℝ} (hε : ε < 0) :
---     IsEmpty { m // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } := by
---   by_contra h
---   rw [not_isEmpty_iff, nonempty_subtype] at h
---   let ⟨a, ha₁, ha₂, ha₃⟩ := h
---   replace ha₁ := lt_of_le_of_lt ha₁ hε
---   rw [← not_le] at ha₁
---   rw [← sub_nonneg] at ha₃
---   exact ha₁ (ρ.exp_val_nonneg ha₃)
+/-- The space of strategies `T` in `OptimalHypothesisRate` is inhabited, we always have some valid strategy. -/
+instance iInf_Inhabited (ρ : MState d) (ε : Prob) :
+    Inhabited { m // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } :=
+  ⟨1, by simp⟩
 
--- /-- When `ε < 0`, the `OptimalHypothesisRate` becomes 1, as a junk value. -/
--- @[simp]
--- theorem lt_zero {ρ : MState d} {ε : ℝ} {S : Set (MState d)} (hε : ε < 0) : β_ ε(ρ‖S) = 1 := by
---   rw [OptimalHypothesisRate]
---   have _ := iInf_Empty_of_lt_zero ρ hε
---   rw [iInf_of_empty] --TODO: should iInf_of_empty be tagged @[simp]? it feels like it should
---   rfl
+instance (ρ : MState d) (ε : Prob) : Inhabited {m | MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1} :=
+  iInf_Inhabited ρ ε
+
+/-- The space of strategies `T` in `OptimalHypothesisRate` is compact. -/
+theorem iInf_IsCompact (ρ : MState d) (ε : Prob) : IsCompact { m | MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } := by
+  have hC₁ : IsCompact {m : HermitianMat d ℂ | 0 ≤ m ∧ m ≤ 1} :=
+    HermitianMat.unitInterval_IsCompact
+  have hC₂ : IsClosed {m | MState.exp_val (1 - m) ρ ≤ ε} := by
+    --This is a linear constraint and so has a closed image
+    change IsClosed ((fun m ↦ ρ.M.inner_BilinForm (1 - m)) ⁻¹' (Set.Iic ε))
+    refine IsClosed.preimage ?_ isClosed_Iic
+    fun_prop
+  exact hC₁.inter_left hC₂
+
+/-- The space of strategies `T` in `OptimalHypothesisRate` is convex. -/
+theorem iInf_IsConvex (ρ : MState d) (ε : Prob) : Convex ℝ { m | MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } := by
+  --We *could* get this from a more general fact that any linear subspace is convex,
+  --and the intersection of convex spaces is convex, and this is an intersection of
+  --three convex spaces. That would be more broken-down and lemmaified.
+  rintro x ⟨hx₁, hx₂, hx₃⟩ y ⟨hy₁, hy₂, hy₃⟩ a b ha hb hab
+  rw [← eq_sub_iff_add_eq'] at hab
+  subst b
+  refine And.intro ?_ (And.intro ?_ ?_)
+  · simp [MState.exp_val, HermitianMat.inner_left_sub, HermitianMat.inner_left_distrib] at hx₁ hy₁ ⊢
+    linear_combination a * hx₁ + (1 - a) * hy₁
+  · apply HermitianMat.convex_cone <;> assumption
+  · rw [← sub_nonneg] at hx₃ hy₃ ⊢
+    convert HermitianMat.convex_cone hx₃ hy₃ ha hb using 1
+    simp only [sub_smul, one_smul, smul_sub]
+    abel
 
 /-- When `S` is empty, the optimal hypothesis testing rate is zero. -/
 @[simp]
@@ -106,6 +115,105 @@ theorem singleton_le_exp_val {ρ σ : MState d} {ε : Prob} (m : HermitianMat d 
   apply iInf_le_of_le ⟨m, ⟨hExp, hm⟩⟩ _
   simp only [le_refl]
 
+/-- There exists an optimal T for the hypothesis testing, that is, it's a minimum
+and not just an infimum. -/
+theorem exists_min (ρ : MState d) (ε : Prob) (S : Set (MState d)):
+    ∃ (T : { m : HermitianMat d ℂ // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1}),
+      ⨆ σ ∈ S, ⟨_, σ.exp_val_prob T.prop.right⟩ = β_ ε(ρ‖S) := by
+  have _ : Nonempty d := ρ.nonempty
+  convert IsCompact.exists_isMinOn (α := Prob) (β := {m // MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1}) (s := Set.univ)
+    ?_ ?_ (f := fun T ↦ ⨆ σ ∈ S, ⟨_, σ.exp_val_prob T.prop.right⟩) ?_
+  · rename_i T
+    simp only [Set.mem_univ, true_and]
+    constructor
+    · simp only [isMinOn_univ_iff]
+      intro h T₂
+      rw [h, OptimalHypothesisRate, iInf_le_iff]
+      exact fun _ a ↦ a T₂
+    · intro h
+      symm
+      convert h.iInf_eq (Set.mem_univ _)
+      exact Equiv.iInf_congr (Equiv.Set.univ _).symm (fun _ ↦ by rfl)
+  · rw [← isCompact_iff_isCompact_univ ]
+    exact iInf_IsCompact ρ ε
+  · exact Set.univ_nonempty
+  · rw [← continuous_iff_continuousOn_univ]
+    suffices Continuous
+        (fun (T : { m // MState.exp_val (1 - m) ρ ≤ ↑ε ∧ 0 ≤ m ∧ m ≤ 1 }) ↦ ⨆ σ ∈ S, σ.exp_val T) by
+      convert Continuous.subtype_mk this ?_
+      · --need the silly h_stupid below
+        sorry
+      · sorry
+        -- intro x
+        -- constructor
+        -- ·
+        --   sorry
+        -- · -- rw [← ciSup_subtype'']
+        --   rw [ciSup_le_iff]
+        --   intro x
+        --   classical rw [ciSup_eq_ite]
+        --   split
+        --   · sorry
+        --   · sorry
+    suffices h : Continuous (fun (T : HermitianMat d ℂ) ↦ ⨆ σ ∈ S, σ.exp_val T) from
+      Pi.continuous_restrict_apply _ h
+    unfold MState.exp_val
+    --Should be something `Continuous (fun x ↦ iSup (fun y ↦ f x y))` from `Continuous f`.
+    sorry
+
+--PULLOUT
+/-- The inner product of two PSD matrices is zero iff they have disjoint support, i.e., each lives entirely
+in the other's kernel. -/
+theorem _root_.HermitianMat.inner_zero_iff {A B : HermitianMat d ℂ} (hA₁ : 0 ≤ A) (hB₁ : 0 ≤ B)
+  : A.inner B = 0 ↔
+    (LinearMap.range A.toMat.toLin' ≤ LinearMap.ker B.toMat.toLin') ∧
+    (LinearMap.range B.toMat.toLin' ≤ LinearMap.ker A.toMat.toLin') :=
+  sorry
+
+@[simp]
+theorem _root_.MState.toMat_M (ρ : MState d) : ρ.M.toMat = ρ.m := by
+  rfl
+
+/-- If an observable `A` has expectation value of 1 on a state `ρ`, it must entirely contain the
+support of `ρ` in its 1-eigenspace. -/
+theorem _root_.MState.exp_val_eq_one_iff (ρ : MState d) {A : HermitianMat d ℂ} (hA₁ : 0 ≤ A) (hA₂ : A ≤ 1) :
+    ρ.exp_val A = 1 ↔ (LinearMap.range ρ.m.toLin' ≤ LinearMap.ker (1 - A).toMat.toLin') := by
+  sorry
+
+theorem ker_range_antitone {d : Type*} [Fintype d] [DecidableEq d] {A B : Matrix d d ℂ}
+  (hA : A.IsHermitian) (hB : B.IsHermitian) :
+    LinearMap.range A.toLin' ≤ LinearMap.range B.toLin' ↔
+    LinearMap.ker B.toLin' ≤ LinearMap.ker A.toLin' := by
+  sorry
+
+/-- When the allowed Type I error `ε` is less than 1 (so, we have some limit on our errors),
+and the kernel of the state `ρ` contains the kernel of some element in `S`, then the optimal
+hypothesis rate is positive - there is some lower bound on the type II errors we'll see. In
+other words, under these conditions, we cannot completely avoid type II errors. -/
+theorem pos_of_lt_one {ρ : MState d} (S : Set (MState d))
+  (hρ : ∃ σ ∈ S, LinearMap.ker (σ.m.toLin') ≤ LinearMap.ker ρ.m.toLin')
+  {ε : Prob} (hε : ε < 1) : 0 < β_ ε(ρ‖S) := by
+  obtain ⟨σ, hσ₁, hσ₂⟩ := hρ
+  --Assume the converse: that the infimum is zero. The set of such T's is inhabited
+  --and closed, so there is some T that attains the value zero. This T has zero
+  --inner product with σ (`σ.exp_val T = 0`), and yet (by definition of T's type) we
+  --also have that `ρ.exp_val (1 - T) ≤ ε < 1`. So `T` lives entirely in σ's kernel,
+  --which (by `h_supp`) is contained in ρ's kernel. So
+  --`ρ.exp_val (1 - T) = ρ.exp_val 1 - ρ.exp_val T = ρ.trace - 0 = 1`, a contradiction.
+  by_contra h
+  obtain ⟨⟨T, hT₁, hT₂, hT₃⟩, hT₄⟩ := exists_min ρ ε S
+  rw [← bot_eq_zero'', not_bot_lt_iff] at h
+  rw [h, iSup_eq_bot, bot_eq_zero''] at hT₄
+  specialize hT₄ σ
+  simp only [iSup_pos hσ₁, Subtype.ext_iff, Set.Icc.coe_zero, MState.exp_val] at hT₄
+  rw [HermitianMat.inner_zero_iff σ.zero_le hT₂] at hT₄
+  simp only [MState.toSubtype_eq_coe, MState.toMat_M] at hT₄
+  replace hT₁ : ρ.exp_val (1 - T) ≠ 1 := (lt_of_le_of_lt hT₁ hε).ne
+  absurd hT₁
+  rw [ρ.exp_val_eq_one_iff (HermitianMat.zero_le_iff.mpr hT₃) (sub_le_self 1 hT₂), sub_sub_cancel]
+  rw [← ker_range_antitone ρ.Hermitian σ.Hermitian] at hσ₂
+  exact le_trans hσ₂ hT₄.left
+
 --Lemma 3 from Hayashi
 theorem Lemma3 {ρ : MState d} (ε : Prob) {S : Set (MState d)} (hS₁ : IsCompact S)
     (hS₂ : Convex ℝ (MState.M '' S)) : ⨆ σ ∈ S, β_ ε(ρ‖{σ}) = β_ ε(ρ‖S) := by
@@ -116,46 +224,19 @@ theorem Lemma3 {ρ : MState d} (ε : Prob) {S : Set (MState d)} (hS₁ : IsCompa
   --Upgrade this fact to an instance
   have _ : Nonempty S := hnS.to_subtype
 
-  --Needs the minimax theorem. ... TODO: I think the statement of `minimax` is actually incorrect and requires
-  --some information about the sets `S` and `T` being nonempty. Also, maybe it should change from `⨅ x ∈ S` to
-  --`⨅ (x : ↑S)` or something.
   simp only [OptimalHypothesisRate, Set.mem_singleton_iff, iSup_iSup_eq_left]
-  have hmm := minimax (M := HermitianMat d ℂ)
 
-  --This will be the `MState.exp_val` function, but bundled as a bilinear form.
+  --This parts needs the minimax theorem. Set up the relevant sets and hypotheses.
+  --The function `f` will be the `MState.exp_val` function, but bundled as a bilinear form.
   let f : LinearMap.BilinForm ℝ (HermitianMat d ℂ) := HermitianMat.inner_BilinForm
   let S' : Set (HermitianMat d ℂ) := MState.M '' S
   let T' : Set (HermitianMat d ℂ) := { m | MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 }
 
-  have hS'₁ : IsCompact S' := by
-    exact hS₁.image MState.Continuous_Matrix
+  have hS'₁ : IsCompact S' := hS₁.image MState.Continuous_Matrix
 
-  have hT'₁ : IsCompact T' := by
-    have hC₁ : IsCompact {m : HermitianMat d ℂ | 0 ≤ m ∧ m ≤ 1} :=
-      HermitianMat.unitInterval_IsCompact
-    have hC₂ : IsClosed {m | MState.exp_val (1 - m) ρ ≤ ε} := by
-      --This is a linear constraint and so has a closed image
-      change IsClosed ((fun m ↦ ρ.M.inner_BilinForm (1 - m)) ⁻¹' (Set.Iic ε))
-      refine IsClosed.preimage ?_ isClosed_Iic
-      fun_prop
-    convert hC₁.inter_left hC₂
+  have hT'₁ : IsCompact T' := iInf_IsCompact ρ ε
 
-  have hT'₂ : Convex ℝ T' := by
-    --We *could* get this from a more general fact that any linear subspace is convex,
-    --and the intersection of convex spaces is convex, and this is an intersection of
-    --three convex spaces. That would be more broken-down and lemmaified.
-    dsimp [T']
-    rintro x ⟨hx₁, hx₂, hx₃⟩ y ⟨hy₁, hy₂, hy₃⟩ a b ha hb hab
-    rw [← eq_sub_iff_add_eq'] at hab
-    subst b
-    refine And.intro ?_ (And.intro ?_ ?_)
-    · simp [MState.exp_val, HermitianMat.inner_left_sub, HermitianMat.inner_left_distrib] at hx₁ hy₁ ⊢
-      linear_combination a * hx₁ + (1 - a) * hy₁
-    · apply HermitianMat.convex_cone <;> assumption
-    · rw [← sub_nonneg] at hx₃ hy₃ ⊢
-      convert HermitianMat.convex_cone hx₃ hy₃ ha hb using 1
-      simp only [sub_smul, one_smul, smul_sub]
-      abel
+  have hT'₂ : Convex ℝ T' := iInf_IsConvex ρ ε
 
   have hS'₃ : S'.Nonempty := by simpa only [Set.image_nonempty, S']
 
@@ -182,9 +263,10 @@ theorem Lemma3 {ρ : MState d} (ε : Prob) {S : Set (MState d)} (hS₁ : IsCompa
       · push_neg at hs₁
         simp [hs₁] at hs₂
 
-  specialize hmm f S' T' hS'₁ hT'₁ hS₂ hT'₂ hS'₃ hT'₃
-  ext
-  convert hmm
+  ext1 --turn it from Prob equality into ℝ equality
+  convert minimax (M := HermitianMat d ℂ) f S' T' hS'₁ hT'₁ hS₂ hT'₂ hS'₃ hT'₃
+  --The remaining twiddling is about moving the casts inside the iInf's and iSup's.
+  --In a better world, this would be mostly handled by some clever simps or push_cast's.
   · rw [← iSup_subtype'']
     convert Eq.trans (c := ⨆ (x : S'), ⨅ (y : T'), (f ↑x) ↑y) (Set.Icc.coe_iSup (ι := S) (zero_le_one (α := ℝ))) ?_
     · congr
@@ -243,12 +325,34 @@ instance : Nontrivial Prob where
   exists_pair_ne := ⟨0, 1, by simp [← Prob.ne_iff]⟩
 
 @[simp]
+theorem _root_.Prob.top_eq_one : (⊤ : Prob) = 1 := by
+  rfl
+
+@[simp]
 theorem _root_.Prob.sub_zero (p : Prob) : p - 0 = p := by
   ext1; simp [Prob.coe_sub]
 
 @[simp]
 theorem _root_.Prob.negLog_one : Prob.negLog 1 = 0 := by
   simp [Prob.negLog]
+
+@[fun_prop]
+theorem _root_.Prob.Continuous_negLog : Continuous Prob.negLog := by
+  --Kind of a mess to do with the `ite`, actually. Maybe Prob.negLog
+  --should be redone in terms of `ENNReal.log`.
+  sorry
+
+variable {X : Type*} {d : Type*} [Fintype X] [Fintype d] [DecidableEq d] [DecidableEq X] in
+/-- The action of measuring a state with the POVM `Λ`, discarding the resulting state, and keeping
+the mixed state recording the outcome. This resulting state is purely diagonal, as given in
+`POVM.measureDiscard_apply`. -/
+noncomputable def _root_.POVM.measureDiscard (Λ : POVM X d) : CPTPMap d X :=
+  CPTPMap.traceLeft ∘ₘ Λ.measurement_map
+
+variable {X : Type*} {d : Type*} [Fintype X] [Fintype d] [DecidableEq d] [DecidableEq X] in
+theorem _root_.POVM.measureDiscard_apply (Λ : POVM X d) (ρ : MState d) :
+    Λ.measureDiscard ρ = MState.ofClassical (Λ.measure ρ) := by
+  sorry
 
 open scoped HermitianMat in
 open scoped Prob in
@@ -264,26 +368,11 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
     := by
   generalize_proofs pf1 pf2
   --If ρ isn't in the support of σ, the right hand side is just ⊤. (The left hand side is not, necessarily!)
-  by_cases h_supp : LinearMap.ker σ.val.toLin' ≤ LinearMap.ker ρ.val.toLin'
+  by_cases h_supp : LinearMap.ker σ.m.toLin' ≤ LinearMap.ker ρ.m.toLin'
   swap
   · simp [SandwichedRelRentropy, h_supp]
-  --Note that we actually only need this for 0 < ε, not 0 ≤ ε. This is also how it was proved in the original
-  --reference. But Hayashi says it's true for ε = 0. Likely best handled with a special by_cases for ε = 0?
-  --If this case is too much of a pain we can drop it.
-  by_cases h : ε = 0
-  · subst h
-    simp only [OptimalHypothesisRate, Set.Icc.coe_zero, Set.mem_singleton_iff, iSup_iSup_eq_left,
-      Prob.sub_zero, Prob.negLog_one, zero_mul, ENNReal.zero_div, add_zero]
-    --Take m_opt to be the projector of ρ, i.e. 0 on ρ's kernel and 1 elsewhere.
-    let m_opt : HermitianMat d ℂ := {0 ≤ₚ ρ}
-    sorry
 
-  replace h : 0 < ε := zero_lt_iff.mpr h
-  have h₂ : 0 < 1 - ε.val := by
-    change ε.val < 1 at hε
-    linarith
-
-  --Now we know that ρ.support ≤ σ.support, and 0 < ε. This is the main case we actually care about.
+  --Now we know that ρ.support ≤ σ.support. This is the main case we actually care about.
   --Proof from https://link.springer.com/article/10.1007/s00220-016-2645-4 reproduced below.
   /-
   Lemma 5. Let ρ, σ ∈ S (H) be such that supp ρ ⊆ supp σ . For any Q ∈ B(H) such
@@ -303,36 +392,20 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
   -- The "monotonicity of the ..." part here refers to the data processing inequality, and
   -- the (p, 1-p) and (q,1-q) refer to states which are qubits ("coins") of probability p and
   -- q, respectively. The states ρ and σ can be "processed" into these coins by measuring the optimal T.
+
+  have h₂ : 0 < 1 - ε.val := by
+    change ε.val < 1 at hε
+    linarith
+
   let p : Prob := 1 - ε
   set q : Prob := β_ ε(ρ‖{σ})
   let p2 : MState (Fin 2) := .ofClassical <| .coin p
   let q2 : MState (Fin 2) := .ofClassical <| .coin q
 
-  have hp : 0 < p := show (0 : ℝ) < p by simp [p, hε]
-
   --Show there's a lower bound on β_ε, that you can't do perfect discrimination
   --It's possible that we actually don't want this here, that it should "follow"
   --from the main proof.
-  have hq : 0 < q := by
-    --The optimal hypothesis rate is positive
-    simp_rw [q, OptimalHypothesisRate, Set.mem_singleton_iff, iSup_iSup_eq_left]
-    --Assume the converse: that the infimum is zero. The set of such T's is inhabited
-    --and closed, so there is some T that attains the value zero. This T has zero
-    --inner product with σ (`σ.exp_val T = 0`), and yet (by definition of T's type) we
-    --also have that `ρ.exp_val (1 - T) ≤ ε < 1`. So `T` lives entirely in σ's kernel,
-    --which (by `h_supp`) is contained in ρ's kernel. So
-    --`ρ.exp_val (1 - T) = ρ.exp_val 1 - ρ.exp_val T = ρ.trace - 0 = 1`, a contradiction.
-    sorry
-
-  have hq₂ : q < 1 := by
-    --The optimal hypothesis rate is finite
-    simp_rw [q, OptimalHypothesisRate, Set.mem_singleton_iff, iSup_iSup_eq_left]
-    --Assume the converse: the infimum is exactly one. Then all T's get exactly 1. This can
-    --only happen if the support of σ is entirely contained in the support of T, where
-    --T is 1. By `h_supp`, the support of ρ is contained in the support of σ, so it is
-    --also contained, and then `ρ.exp_val T = 1` too, so `ρ.exp_val (1 - T) = 0`. Then
-    --we can freely add some more to
-    sorry
+  have hq : 0 < q := pos_of_lt_one {σ} ⟨σ, rfl, h_supp⟩ hε
 
   suffices —log q ≤ D̃_ α(p2‖q2) + —log (1 - ε) * (.ofNNReal ⟨α, pf1⟩) / (.ofNNReal ⟨α - 1, pf2⟩) by
     refine this.trans (add_le_add_right ?_ _)
@@ -346,9 +419,39 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
       --good as T by adding some more that increases its trace up to ε; and this can only
       --ever raise the detection probability on ρ. (The fact that this tight T exists should
       --be its own lemma, probably.)
-      sorry
+
+      --Get the measurement operator T.
+      --We actually need a stronger version of `exists_min` which guarantees that `ρ.exp_val T = ε`
+      obtain ⟨T, hT⟩ := exists_min ρ ε {σ}
+      --Turn it into a POVM (probably want to have lemmas around this ideally)
+      let Λ : POVM (Fin 2) d := {
+        mats i := if i = 0 then T else 1 - T
+        zero_le i := by
+          split
+          · exact T.prop.2.1
+          · exact HermitianMat.zero_le_iff.mpr T.prop.2.2
+        normalized := by simp
+      }
+      use Λ.measureDiscard
+      simp only [POVM.measureDiscard_apply, p2, q2]
+      constructor
+      · congr
+        --Could do `ext` now, would be nice to have a lemma for `Distribution.coin p = f` that
+        --requires only checking that `p = f 0`.
+        sorry
+      · congr
+        sorry
     rw [hΦ₁, hΦ₂]
     exact SandwichedRenyiEntropy.DPI hα ρ σ Φ
+
+  --If q = 1, this inequality is trivial
+  by_cases hq₂ : q = 1
+  · rw [hq₂]
+    simp
+
+  replace hq₂ : q < 1 := show q.val < 1 by
+    linarith +splitNe [q.coe_le_one, unitInterval.coe_ne_one.mpr hq₂]
+
 
   --The Renyi entropy is finite
   rw [SandwichedRelRentropy, if_pos ?_, if_neg hα.ne']; swap
@@ -393,6 +496,17 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
       rw [← Real.rpow_mul (sub_nonneg_of_le q.coe_le_one)]
       field_simp
 
+  by_cases h : ε = 0
+  · simp [h, p, @Real.zero_rpow α (by positivity)]
+    apply Eq.le
+    rw [Real.log_rpow hq]
+    have : α - 1 ≠ 0 := by linarith
+    field_simp
+    ring_nf
+
+  have hp : 0 < p := show (0 : ℝ) < p by simp [p, hε]
+
+  replace h : 0 < ε := zero_lt_iff.mpr h
   trans (Real.log (p ^ α * q ^ (1 - α)) - Real.log (1 - ε.val) * α) / (α - 1)
   · rw [Real.log_mul]
     rotate_left

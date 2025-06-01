@@ -21,6 +21,7 @@ lemma min_free_relent_finite (ρ : MState (H i)) : ⨅ σ ∈ IsFree, 𝐃(ρ‖
   simp only [ne_eq, iInf_eq_top, not_forall, Classical.not_imp]
   obtain ⟨σ, hσ₁, hσ₂⟩ := FreeStateTheory.free_fullRank i
   use σ, hσ₂
+  -- have := hσ₁.toLin_ker_eq_bot
   --At this point should be an easy fact (a separate theorem) using hσ₁, it's posdef.
   sorry
 
