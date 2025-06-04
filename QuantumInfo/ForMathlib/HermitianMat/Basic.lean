@@ -1,33 +1,9 @@
 import QuantumInfo.ForMathlib.Matrix
+import QuantumInfo.ForMathlib.IsMaximalSelfAdjoint
 import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.ExpLog
 import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Basic
 import Mathlib.LinearAlgebra.Matrix.HermitianFunctionalCalculus
 import Mathlib.Analysis.Matrix
-
-section IsMaximalSelfAdjoint
-
-/- We want to have `HermitianMat.trace` give 𝕜 when 𝕜 is already a TrivialStar field, but give the "clean" type
-otherwise -- for instance, ℝ when the input field is ℂ. This typeclass lets us do so. -/
-class IsMaximalSelfAdjoint (R : outParam Type*) (α : Type*) [Star α] [Star R] [CommSemiring R]
-    [Semiring α] [TrivialStar R] [Algebra R α] where
-  selfadjMap : α →+ R
-  selfadj_smul : ∀ (r : R) (a : α), selfadjMap (r • a) = r * (selfadjMap a)
-  selfadj_algebra : ∀ {a : α}, IsSelfAdjoint a → algebraMap _ _ (selfadjMap a) = a
-
-/-- Every `TrivialStar` `CommSemiring` is its own maximal self adjoints. -/
-instance instTrivialStar_IsMaximalSelfAdjoint [Star R] [TrivialStar R] [CommSemiring R] : IsMaximalSelfAdjoint R R where
-  selfadjMap := AddMonoidHom.id R
-  selfadj_smul _ __ := rfl
-  selfadj_algebra {_} _ := rfl
-
-/-- ℝ is the maximal self adjoint elements over RCLike -/
-instance instRCLike_IsMaximalSelfAdjoint [RCLike α] : IsMaximalSelfAdjoint ℝ α where
-  selfadjMap := RCLike.re
-  selfadj_smul := RCLike.smul_re
-  selfadj_algebra := RCLike.conj_eq_iff_re.mp
-
-end IsMaximalSelfAdjoint
----------
 
 /-- The type of Hermitian matrices, as a `Subtype`. Equivalent to a `Matrix n n α` bundled
 with the fact that `Matrix.IsHermitian`. -/
@@ -88,16 +64,32 @@ noncomputable instance instZPow : Pow (HermitianMat n α) ℤ :=
   ⟨fun x z ↦ ⟨x^z, Matrix.IsHermitian.zpow x.H z⟩⟩
 
 end commring
+section rclike
+
+variable [RCLike α]
+
+@[simp]
+theorem im_eq_zero (A : HermitianMat n α) (x : n) :
+    RCLike.im (A x x) = 0 := by
+  simpa [CharZero.eq_neg_self_iff] using congrArg (RCLike.im <| · x x) A.H.symm
+
+--Repeat it explicitly for ℂ so that simp can find it
+@[simp]
+theorem Complex_im_eq_zero (A : HermitianMat n ℂ) (x : n) :
+    (A x x).im = 0 :=
+  A.im_eq_zero x
+
+end rclike
 
 section conj
 
-variable [CommRing α] [StarRing α] [DecidableEq n] [Fintype n]
+variable [CommRing α] [StarRing α] [Fintype n]
 
 /-- The Hermitian matrix given by conjugating by a (possibly rectangular) Matrix. If we required `B` to be
 square, this would apply to any `Semigroup`+`StarMul` (as proved by `IsSelfAdjoint.conjugate`). But this lets
 us conjugate to other sizes too, as is done in e.g. Kraus operators. That is, it's a _heterogeneous_ conjguation.
 -/
-def conj (A : HermitianMat n α) (B : Matrix m n α) : HermitianMat m α :=
+def conj {m} (A : HermitianMat n α) (B : Matrix m n α) : HermitianMat m α :=
   ⟨B * A.toMat * B.conjTranspose, by
   ext
   simp only [Matrix.star_apply, Matrix.mul_apply, Matrix.conjTranspose_apply, Finset.sum_mul,
@@ -105,6 +97,11 @@ def conj (A : HermitianMat n α) (B : Matrix m n α) : HermitianMat m α :=
   rw [Finset.sum_comm]
   congr! 2
   ring⟩
+
+theorem conj_conj {m l} [Fintype m] (A : HermitianMat n α) (B : Matrix m n α) (C : Matrix l m α) :
+    (A.conj B).conj C = A.conj (C * B) := by
+  ext1
+  simp only [conj, mk_toMat, Matrix.conjTranspose_mul, Matrix.mul_assoc]
 
 end conj
 
@@ -212,6 +209,21 @@ theorem trace_diagonal {T : Type*} [Fintype T] [DecidableEq T] (f : T → ℝ) :
     (diagonal f).trace = ∑ i, f i := by
   rw [trace_eq_re_trace]
   simp [HermitianMat.diagonal, Matrix.trace]
+
+theorem sum_eigenvalues_eq_trace [DecidableEq n] (A : HermitianMat n 𝕜) :
+    ∑ i, A.H.eigenvalues i = A.trace := by
+  convert congrArg RCLike.re A.H.sum_eigenvalues_eq_trace
+  rw [RCLike.ofReal_re]
+
+--Proving that traces are 0 or 1 is common enough that we have a convenience lemma here for turning
+--statements about HermitianMat traces into Matrix traces.
+theorem trace_eq_zero_iff (A : HermitianMat n 𝕜) : A.trace = 0 ↔ A.toMat.trace = 0 := by
+  rw [← trace_eq_trace_rc]
+  use mod_cast id, mod_cast id
+
+theorem trace_eq_one_iff (A : HermitianMat n 𝕜) : A.trace = 1 ↔ A.toMat.trace = 1 := by
+  rw [← trace_eq_trace_rc]
+  use mod_cast id, mod_cast id
 
 end RCLike
 
@@ -407,6 +419,13 @@ theorem inner_le_mul_trace (hA : 0 ≤ A) (hB : 0 ≤ B) : A.inner B ≤ A.trace
   classical convert inner_mono hA _ _ (le_trace_smul_one hB)
   simp [mul_comm]
 
+/-- The inner product of two PSD matrices is zero iff they have disjoint support, i.e., each lives entirely
+in the other's kernel. -/
+theorem inner_zero_iff [DecidableEq n] (hA₁ : 0 ≤ A) (hB₁ : 0 ≤ B)
+  : A.inner B = 0 ↔
+    (LinearMap.range A.toMat.toLin' ≤ LinearMap.ker B.toMat.toLin') ∧
+    (LinearMap.range B.toMat.toLin' ≤ LinearMap.ker A.toMat.toLin') :=
+  sorry
 --There's a lot of facts about PosSemidef matrices that are convenient to come bundled with the HermitiatMat
 --type too.
 theorem convex_cone (hA : 0 ≤ A) (hB : 0 ≤ B) {c₁ c₂ : ℝ} (hc₁ : 0 ≤ c₁) (hc₂ : 0 ≤ c₂)

@@ -1,5 +1,6 @@
 import Mathlib.Analysis.Convex.Mul
 import Mathlib.Analysis.SpecialFunctions.Log.Basic
+import Mathlib.Analysis.SpecialFunctions.Log.ENNRealLog
 import Mathlib.Data.NNReal.Basic
 import Mathlib.Data.EReal.Basic
 import Mathlib.Tactic.Finiteness
@@ -214,6 +215,17 @@ theorem coe_iInf {ι : Type*} [Nonempty ι] (f : ι → Prob) : ↑(⨅ t, f t) 
   · exact fun _ _ ↦ id
   · exact OrderBot.bddBelow _
 
+instance : Nontrivial Prob where
+  exists_pair_ne := ⟨0, 1, by simp [← Prob.ne_iff]⟩
+
+@[simp]
+theorem top_eq_one : (⊤ : Prob) = 1 := by
+  rfl
+
+@[simp]
+theorem sub_zero (p : Prob) : p - 0 = p := by
+  ext1; simp [coe_sub]
+
 end Prob
 
 /-- A `Mixable T` typeclass instance gives a compact way of talking about the action of probabilities
@@ -386,11 +398,11 @@ noncomputable def negLog : Prob → ENNReal :=
     Left.nonneg_neg_iff.mpr (Real.log_nonpos p.2.1 p.2.2)⟩
 
 --Note that this is an em-dash `—` and not a minus `-`, to make the notation work.
-scoped notation "—log " => Prob.negLog
+scoped notation "—log " => negLog
 
 theorem negLog_Antitone : Antitone negLog := by
   intro x y h
-  dsimp [Prob.negLog]
+  dsimp [negLog]
   split_ifs with h₁ h₂ h₂
   · rfl
   · subst y
@@ -442,6 +454,27 @@ theorem le_negLog_of_le_exp {p : Prob} {x : ℝ} (h : p ≤ Real.exp (-x) ) : EN
 @[aesop (rule_sets := [finiteness]) safe apply]
 theorem negLog_ne_top {p : Prob} (hp : 0 < p.val) : —log p ≠ ∞ := by
   simpa [negLog] using ne_of_gt hp
+
+@[simp]
+theorem negLog_one : negLog 1 = 0 := by
+  simp [negLog]
+
+theorem negLog_eq_neg_ENNReal_log (p : Prob) : —log p = -ENNReal.log p := by
+  rw [negLog]
+  split_ifs with hp
+  · simp [hp]
+  · rw [log, if_neg, if_neg]
+    · norm_cast
+    · finiteness
+    · rw [Subtype.ext_iff] at hp
+      rw [toNNReal, ENNReal.coe_eq_zero]
+      exact NNReal.coe_ne_zero.mp hp
+
+@[fun_prop]
+theorem Continuous_negLog : Continuous negLog := by
+  --Kind of a mess to do with the `ite`, better to rewrite with
+  --`negLog_eq_neg_ENNReal_log` and then use `ENNReal.continuous_log`.
+  sorry
 
 end negLog
 

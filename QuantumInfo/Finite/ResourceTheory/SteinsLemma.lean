@@ -256,7 +256,7 @@ theorem LemmaS2 {ε3 : Prob} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
       let T := fun n ↦ {(ρ n).M ≥ₚ (Real.exp (↑n * (Rinf + ε4))) • (σ n).M}
       have hT : ∀ n ≥ n₀, (ρ n).exp_val (1 - (T n)) ≤ ε3 := fun n hn ↦ by -- Eq (S23)
         unfold MState.exp_val T
-        rw [HermitianMat.inner_left_sub, HermitianMat.inner_one, MState.tr',
+        rw [HermitianMat.inner_left_sub, HermitianMat.inner_one, MState.tr,
           HermitianMat.inner_comm, tsub_le_iff_right, add_comm, ←tsub_le_iff_right]
         apply le_of_lt
         exact h n hn
@@ -313,7 +313,7 @@ theorem LemmaS2 {ε3 : Prob} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
         obtain ⟨n, ⟨hn, h⟩⟩ := h n₀
         use n; use hn
         unfold MState.exp_val T
-        rw [HermitianMat.inner_left_sub, HermitianMat.inner_one, MState.tr',
+        rw [HermitianMat.inner_left_sub, HermitianMat.inner_one, MState.tr,
           HermitianMat.inner_comm, tsub_le_iff_right, add_comm, ←tsub_le_iff_right]
         apply le_of_lt
         exact h

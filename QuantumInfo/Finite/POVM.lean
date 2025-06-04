@@ -102,4 +102,14 @@ theorem measure_eq_measurement_map (Λ : POVM X d) (ρ : MState d) :
     (Λ.measurement_map ρ).traceLeft = MState.ofClassical (Λ.measure ρ) :=
   sorry
 
+/-- The action of measuring a state with the POVM `Λ`, discarding the resulting state, and keeping
+the mixed state recording the outcome. This resulting state is purely diagonal, as given in
+`POVM.measureDiscard_apply`. -/
+noncomputable def measureDiscard (Λ : POVM X d) : CPTPMap d X :=
+  CPTPMap.traceLeft ∘ₘ Λ.measurement_map
+
+theorem measureDiscard_apply (Λ : POVM X d) (ρ : MState d) :
+    Λ.measureDiscard ρ = MState.ofClassical (Λ.measure ρ) := by
+  sorry
+
 end POVM

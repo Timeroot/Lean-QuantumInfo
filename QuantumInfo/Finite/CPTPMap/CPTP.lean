@@ -160,7 +160,7 @@ def const_state [Unique dIn] [DecidableEq dOut] (ρ : MState dOut) : CPTPMap dIn
   toLinearMap := (MatrixMap.of_choi_matrix (.of fun (i,_) (j,_) ↦ ρ.m i j))
   cp := sorry
   TP x := by
-    have h : ∑ i : dOut, ρ.m i i = 1 := ρ.tr
+    have h : ∑ i : dOut, ρ.m i i = 1 := ρ.tr'
     simp [MatrixMap.of_choi_matrix, Matrix.trace, ← Finset.mul_sum, h]
 
 /-- The output of `const_state ρ` is always that `ρ`. -/
@@ -168,7 +168,8 @@ def const_state [Unique dIn] [DecidableEq dOut] (ρ : MState dOut) : CPTPMap dIn
 theorem const_state_apply [Unique dIn] [DecidableEq dOut] (ρ : MState dOut) (ρ₀ : MState dIn) :
     const_state ρ ρ₀ = ρ := by
   ext1
-  dsimp [const_state, MatrixMap.of_choi_matrix, MState.m, instMFunLike, PTPMap.instMFunLike]
+  dsimp [const_state, MatrixMap.of_choi_matrix, instMFunLike, PTPMap.instMFunLike, HPMap.instFunLike,
+    HPMap.map]
   simp only [Finset.univ_unique, Finset.sum_singleton]
   rw [Unique.eq_default ρ₀]
   -- convert one_mul _

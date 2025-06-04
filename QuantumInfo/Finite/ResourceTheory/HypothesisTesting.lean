@@ -143,55 +143,43 @@ theorem exists_min (ρ : MState d) (ε : Prob) (S : Set (MState d)):
       convert Continuous.subtype_mk this ?_
       · --need the silly h_stupid below
         sorry
-      · sorry
-        -- intro x
-        -- constructor
-        -- ·
-        --   sorry
-        -- · -- rw [← ciSup_subtype'']
-        --   rw [ciSup_le_iff]
-        --   intro x
-        --   classical rw [ciSup_eq_ite]
-        --   split
-        --   · sorry
-        --   · sorry
+      · --this part is REALLY stupid and definitely there's a better way. Maybe that way is making simp lemmas.
+        rcases S.eq_empty_or_nonempty with rfl|hnS
+        · simp
+        intro x
+        constructor
+        · apply le_ciSup_of_le ?_ ρ
+          classical rw [ciSup_eq_ite]
+          · split
+            · exact (ρ.exp_val_prob x.prop.right).left
+            · simp
+          use 1; simp [upperBounds]
+          all_goals (
+            intro y
+            classical rw [ciSup_eq_ite]
+            split
+            · exact (y.exp_val_prob x.prop.right).right
+            · simp)
+        · rw [ciSup_le_iff]
+          swap; use 1; simp [upperBounds]
+          all_goals (
+            intro y
+            classical rw [ciSup_eq_ite]
+            split
+            · exact (y.exp_val_prob x.prop.right).right
+            · simp)
     suffices h : Continuous (fun (T : HermitianMat d ℂ) ↦ ⨆ σ ∈ S, σ.exp_val T) from
       Pi.continuous_restrict_apply _ h
     unfold MState.exp_val
     --Should be something `Continuous (fun x ↦ iSup (fun y ↦ f x y))` from `Continuous f`.
     sorry
 
---PULLOUT
-/-- The inner product of two PSD matrices is zero iff they have disjoint support, i.e., each lives entirely
-in the other's kernel. -/
-theorem _root_.HermitianMat.inner_zero_iff {A B : HermitianMat d ℂ} (hA₁ : 0 ≤ A) (hB₁ : 0 ≤ B)
-  : A.inner B = 0 ↔
-    (LinearMap.range A.toMat.toLin' ≤ LinearMap.ker B.toMat.toLin') ∧
-    (LinearMap.range B.toMat.toLin' ≤ LinearMap.ker A.toMat.toLin') :=
-  sorry
-
-@[simp]
-theorem _root_.MState.toMat_M (ρ : MState d) : ρ.M.toMat = ρ.m := by
-  rfl
-
-/-- If an observable `A` has expectation value of 1 on a state `ρ`, it must entirely contain the
-support of `ρ` in its 1-eigenspace. -/
-theorem _root_.MState.exp_val_eq_one_iff (ρ : MState d) {A : HermitianMat d ℂ} (hA₁ : 0 ≤ A) (hA₂ : A ≤ 1) :
-    ρ.exp_val A = 1 ↔ (LinearMap.range ρ.m.toLin' ≤ LinearMap.ker (1 - A).toMat.toLin') := by
-  sorry
-
-theorem ker_range_antitone {d : Type*} [Fintype d] [DecidableEq d] {A B : Matrix d d ℂ}
-  (hA : A.IsHermitian) (hB : B.IsHermitian) :
-    LinearMap.range A.toLin' ≤ LinearMap.range B.toLin' ↔
-    LinearMap.ker B.toLin' ≤ LinearMap.ker A.toLin' := by
-  sorry
-
 /-- When the allowed Type I error `ε` is less than 1 (so, we have some limit on our errors),
 and the kernel of the state `ρ` contains the kernel of some element in `S`, then the optimal
 hypothesis rate is positive - there is some lower bound on the type II errors we'll see. In
 other words, under these conditions, we cannot completely avoid type II errors. -/
 theorem pos_of_lt_one {ρ : MState d} (S : Set (MState d))
-  (hρ : ∃ σ ∈ S, LinearMap.ker (σ.m.toLin') ≤ LinearMap.ker ρ.m.toLin')
+  (hρ : ∃ σ ∈ S, LinearMap.ker (σ.m.toEuclideanLin) ≤ LinearMap.ker ρ.m.toEuclideanLin)
   {ε : Prob} (hε : ε < 1) : 0 < β_ ε(ρ‖S) := by
   obtain ⟨σ, hσ₁, hσ₂⟩ := hρ
   --Assume the converse: that the infimum is zero. The set of such T's is inhabited
@@ -207,12 +195,14 @@ theorem pos_of_lt_one {ρ : MState d} (S : Set (MState d))
   specialize hT₄ σ
   simp only [iSup_pos hσ₁, Subtype.ext_iff, Set.Icc.coe_zero, MState.exp_val] at hT₄
   rw [HermitianMat.inner_zero_iff σ.zero_le hT₂] at hT₄
-  simp only [MState.toSubtype_eq_coe, MState.toMat_M] at hT₄
+  simp only [MState.toMat_M] at hT₄
   replace hT₁ : ρ.exp_val (1 - T) ≠ 1 := (lt_of_le_of_lt hT₁ hε).ne
   absurd hT₁
   rw [ρ.exp_val_eq_one_iff (HermitianMat.zero_le_iff.mpr hT₃) (sub_le_self 1 hT₂), sub_sub_cancel]
-  rw [← ker_range_antitone ρ.Hermitian σ.Hermitian] at hσ₂
-  exact le_trans hσ₂ hT₄.left
+  sorry
+  --fix when we change everything to toEuclideanLin
+  -- rw [← Matrix.ker_range_antitone ρ.Hermitian σ.Hermitian] at hσ₂
+  -- exact le_trans hσ₂ hT₄.left
 
 --Lemma 3 from Hayashi
 theorem Lemma3 {ρ : MState d} (ε : Prob) {S : Set (MState d)} (hS₁ : IsCompact S)
@@ -320,40 +310,6 @@ theorem optimalHypothesisRate_antitone (ρ σ : MState d) (ℰ : CPTPMap d d₂)
   specialize h T'
   rw [h, ℰ.exp_val_Dual]
 
---PULLOUT
-instance : Nontrivial Prob where
-  exists_pair_ne := ⟨0, 1, by simp [← Prob.ne_iff]⟩
-
-@[simp]
-theorem _root_.Prob.top_eq_one : (⊤ : Prob) = 1 := by
-  rfl
-
-@[simp]
-theorem _root_.Prob.sub_zero (p : Prob) : p - 0 = p := by
-  ext1; simp [Prob.coe_sub]
-
-@[simp]
-theorem _root_.Prob.negLog_one : Prob.negLog 1 = 0 := by
-  simp [Prob.negLog]
-
-@[fun_prop]
-theorem _root_.Prob.Continuous_negLog : Continuous Prob.negLog := by
-  --Kind of a mess to do with the `ite`, actually. Maybe Prob.negLog
-  --should be redone in terms of `ENNReal.log`.
-  sorry
-
-variable {X : Type*} {d : Type*} [Fintype X] [Fintype d] [DecidableEq d] [DecidableEq X] in
-/-- The action of measuring a state with the POVM `Λ`, discarding the resulting state, and keeping
-the mixed state recording the outcome. This resulting state is purely diagonal, as given in
-`POVM.measureDiscard_apply`. -/
-noncomputable def _root_.POVM.measureDiscard (Λ : POVM X d) : CPTPMap d X :=
-  CPTPMap.traceLeft ∘ₘ Λ.measurement_map
-
-variable {X : Type*} {d : Type*} [Fintype X] [Fintype d] [DecidableEq d] [DecidableEq X] in
-theorem _root_.POVM.measureDiscard_apply (Λ : POVM X d) (ρ : MState d) :
-    Λ.measureDiscard ρ = MState.ofClassical (Λ.measure ρ) := by
-  sorry
-
 open scoped HermitianMat in
 open scoped Prob in
 /-- This is from [Strong converse exponents for a quantum channel discrimination problem
@@ -368,7 +324,7 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
     := by
   generalize_proofs pf1 pf2
   --If ρ isn't in the support of σ, the right hand side is just ⊤. (The left hand side is not, necessarily!)
-  by_cases h_supp : LinearMap.ker σ.m.toLin' ≤ LinearMap.ker ρ.m.toLin'
+  by_cases h_supp : LinearMap.ker σ.m.toEuclideanLin ≤ LinearMap.ker ρ.m.toEuclideanLin
   swap
   · simp [SandwichedRelRentropy, h_supp]
 
@@ -455,8 +411,8 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
 
   --The Renyi entropy is finite
   rw [SandwichedRelRentropy, if_pos ?_, if_neg hα.ne']; swap
-  · suffices LinearMap.ker q2.val.toLin' = ⊥ by
-      simp only [MState.toSubtype_eq_coe, HermitianMat.val_eq_coe, this, bot_le]
+  · suffices LinearMap.ker q2.m.toEuclideanLin = ⊥ by
+      simp only [HermitianMat.val_eq_coe, this, bot_le]
     --q2 has eigenvalues β_ ε(ρ‖{σ}) and 1-β_ ε(ρ‖{σ}), so as long as β_ ε(ρ‖{σ}) isn't 0 or 1,
     --this is true.
     exact ker_diagonal_prob_eq_bot hq hq₂

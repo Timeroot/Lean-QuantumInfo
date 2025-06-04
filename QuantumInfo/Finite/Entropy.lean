@@ -38,7 +38,7 @@ open Classical in
 /-- The quantum relative entropy S(ρ‖σ) = Tr[ρ (log ρ - log σ)]. -/
 def qRelativeEnt (ρ σ : MState d) : ENNReal :=
   (if
-    LinearMap.ker σ.val.toLin' ≤ LinearMap.ker ρ.val.toLin'
+    LinearMap.ker σ.m.toEuclideanLin ≤ LinearMap.ker ρ.m.toEuclideanLin
   then
     some ⟨ρ.M.inner (HermitianMat.log ρ - HermitianMat.log σ),
     /- Quantum relative entropy is nonnegative. This can be proved by an application of
@@ -50,7 +50,7 @@ def qRelativeEnt (ρ σ : MState d) : ENNReal :=
 notation "𝐃(" ρ "‖" σ ")" => qRelativeEnt ρ σ
 
 /-- Quantum relative entropy as `Tr[ρ (log ρ - log σ)]` when supports are correct. -/
-theorem qRelativeEnt_ker {ρ σ : MState d} (h : LinearMap.ker σ.val.toLin' ≤ LinearMap.ker ρ.val.toLin') :
+theorem qRelativeEnt_ker {ρ σ : MState d} (h : LinearMap.ker σ.m.toEuclideanLin ≤ LinearMap.ker ρ.m.toEuclideanLin) :
     (𝐃(ρ‖σ) : EReal) = ρ.M.inner (HermitianMat.log ρ - HermitianMat.log σ) := by
   simp only [qRelativeEnt, h]
   congr
@@ -101,7 +101,7 @@ open Classical in
   switch to the standard Relative Entropy, for continuity. -/
 def SandwichedRelRentropy [Fintype d] (α : ℝ) (ρ σ : MState d) : ENNReal :=
   if
-    LinearMap.ker σ.val.toLin' ≤ LinearMap.ker ρ.val.toLin'
+    LinearMap.ker σ.m.toEuclideanLin ≤ LinearMap.ker ρ.m.toEuclideanLin
   then (
     if α = 1 then
       𝐃(ρ‖σ)
@@ -148,7 +148,7 @@ section entropy
 
 
 /-- Quantum relative entropy when σ has full rank -/
-theorem qRelativeEnt_rank {ρ σ : MState d} (h : LinearMap.ker σ.val.toLin' = ⊥) :
+theorem qRelativeEnt_rank {ρ σ : MState d} (h : LinearMap.ker σ.m.toEuclideanLin = ⊥) :
     (𝐃(ρ‖σ) : EReal) = ρ.M.inner (HermitianMat.log ρ - HermitianMat.log σ) := by
   apply qRelativeEnt_ker
   simp only [h, bot_le]

@@ -162,7 +162,9 @@ theorem pos_Hermitian (M : PTPMap dIn dOut 𝕜) {x : HermitianMat dIn 𝕜} (h 
 instance instMFunLike [DecidableEq dIn] [DecidableEq dOut] :
     FunLike (PTPMap dIn dOut) (MState dIn) (MState dOut) where
   coe Λ ρ := MState.mk
-    (Λ.toHPMap ρ.M) (HermitianMat.zero_le_iff.mpr (Λ.pos ρ.pos)) (ρ.tr ▸ Λ.TP ρ.m)
+    (Λ.toHPMap ρ.M) (HermitianMat.zero_le_iff.mpr (Λ.pos ρ.pos)) (by
+      rw [HermitianMat.trace_eq_one_iff, ← ρ.tr']
+      exact Λ.TP ρ)
   coe_injective' _ _ h := by
     sorry --Requires the fact the action on MStates determines action on all matrices
 

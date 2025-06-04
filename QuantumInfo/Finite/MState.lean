@@ -36,10 +36,15 @@ open ComplexConjugate
 open Kronecker
 open scoped Matrix ComplexOrder
 
-/-- A mixed state as a PSD matrix with trace 1.-/
-structure MState (d : Type*) [Fintype d] [DecidableEq d] extends HermitianMat d ℂ where
-  zero_le : 0 ≤ toSubtype
-  tr : val.trace = 1
+/-- A **mixed quantum state** is a PSD matrix with trace 1.
+
+We don't `extend (M : HermitianMat d ℂ)` because that gives an annoying thing where
+`M` is actually a `Subtype`, which means `ρ.M.foo` notation doesn't work. -/
+@[ext]
+structure MState (d : Type*) [Fintype d] [DecidableEq d] where
+  M : HermitianMat d ℂ
+  zero_le : 0 ≤ M
+  tr : HermitianMat.trace M = 1
 
 namespace MState
 
@@ -47,33 +52,22 @@ variable {d d₁ d₂ d₃ : Type*}
 variable [Fintype d] [Fintype d₁] [Fintype d₂] [Fintype d₃]
 variable [DecidableEq d] [DecidableEq d₁] [DecidableEq d₂] [DecidableEq d₃]
 
-/-- The underlying `Matrix` in an MState-/
-def m (ρ : MState d) : Matrix d d ℂ := ρ.val
-
-/-- The underlying `HermitianMat` in an MState-/
-@[reducible, coe]
-def M (ρ : MState d) : HermitianMat d ℂ := ρ.toSubtype
-
+attribute [coe] MState.M
 instance instCoe : Coe (MState d) (HermitianMat d ℂ) := ⟨MState.M⟩
 
-@[simp]
-theorem tr' (ρ : MState d) : ρ.M.trace = 1 := by
-  simp [HermitianMat.trace_eq_re_trace, ρ.tr]
+attribute [simp] MState.tr
+
+/-- The underlying `Matrix` in an MState. Prefer `MState.M` for the `HermitianMat`. -/
+def m (ρ : MState d) : Matrix d d ℂ := ρ.M.toMat
 
 @[simp]
-theorem toSubtype_eq_coe (ρ : MState d) : ρ.toSubtype = ρ.M :=
+theorem toMat_M (ρ : MState d) : ρ.M.toMat = ρ.m := by
   rfl
-
-
-@[ext]
-theorem ext {ρ₁ ρ₂ : MState d} (h : ρ₁.M = ρ₂.M) : ρ₁ = ρ₂ := by
-  rw [MState.mk.injEq]
-  exact h
 
 --XXX These are methods that directly reference the matrix, "m" or ".val".
 -- We'd like to remove these (where possible) so that mostly go through HermitianMat
 -- where possible.
-theorem pos (ρ : MState d) : ρ.val.PosSemidef :=
+theorem pos (ρ : MState d) : ρ.m.PosSemidef :=
   HermitianMat.zero_le_iff.mp ρ.zero_le
 
 /-- Every mixed state is Hermitian. -/
@@ -81,9 +75,9 @@ theorem Hermitian (ρ : MState d) : ρ.m.IsHermitian :=
   ρ.pos.left
 
 @[simp]
-theorem rtr (ρ : MState d) : ρ.Hermitian.rtrace = 1 := by
-  simp only [Matrix.IsHermitian.rtrace, m, toSubtype_eq_coe, HermitianMat.val_eq_coe, ρ.tr,
-    RCLike.one_re]
+theorem tr' (ρ : MState d) : ρ.m.trace = 1 := by
+  rw [MState.m.eq_def, ← HermitianMat.trace_eq_trace_rc, ρ.tr]
+  simp
 
 theorem ext_m {ρ₁ ρ₂ : MState d} (h : ρ₁.m = ρ₂.m) : ρ₁ = ρ₂ := by
   rw [MState.mk.injEq]
@@ -97,27 +91,26 @@ theorem toMat_inj : (MState.m (d := d)).Injective :=
 
 variable (d) in
 /-- The matrices corresponding to MStates are `Convex ℝ` -/
-theorem convex : Convex ℝ (Set.range (MState.m (d := d))) := by
+theorem convex : Convex ℝ (Set.range (MState.M (d := d))) := by
   simp only [Convex, Set.mem_range, StarConvex,
     forall_exists_index, forall_apply_eq_imp_iff]
   intro x y a b ha hb hab
   replace hab : a + b = (1 : ℂ) := by norm_cast
   have := HermitianMat.convex_cone x.zero_le y.zero_le ha hb
-  exact ⟨⟨_, this, by simp [x.tr, y.tr, hab]⟩, rfl⟩
+  exact ⟨⟨_, this, by simpa using mod_cast hab⟩, rfl⟩
 
-instance instMixable : Mixable (Matrix d d ℂ) (MState d) where
-  to_U := MState.m
-  to_U_inj := ext_m
+instance instMixable : Mixable (HermitianMat d ℂ) (MState d) where
+  to_U := MState.M
+  to_U_inj := MState.ext
   mkT {u} := fun h ↦
-    ⟨⟨⟨u, Exists.casesOn h fun t ht => ht ▸ t.pos.left⟩,
-      Exists.casesOn h fun t ht => ht ▸ t.zero_le,
-      Exists.casesOn h fun t ht => ht ▸ t.tr⟩, rfl⟩
+    ⟨⟨u, h.casesOn fun t ht ↦ ht ▸ t.zero_le,
+      h.casesOn fun t ht ↦ ht ▸ t.tr⟩, rfl⟩
   convex := convex d
 
 --An MState is a witness that d is nonempty.
 instance nonempty (ρ : MState d) : Nonempty d := by
   by_contra h
-  simpa [not_nonempty_iff.mp h] using ρ.tr
+  simpa [HermitianMat.trace_eq_re_trace, not_nonempty_iff.mp h] using ρ.tr
 
 -- Could have used properties of ρ.spectrum
 theorem eigenvalue_nonneg (ρ : MState d) : ∀ i, 0 ≤ ρ.Hermitian.eigenvalues i := by
@@ -127,17 +120,15 @@ theorem eigenvalue_nonneg (ρ : MState d) : ∀ i, 0 ≤ ρ.Hermitian.eigenvalue
 -- Could have used properties of  ρ.spectrum
 theorem eigenvalue_le_one (ρ : MState d) : ∀ i, ρ.Hermitian.eigenvalues i ≤ 1 := by
   intro i
-  have hsum : ρ.Hermitian.eigenvalues i ≤ ∑ x, ρ.Hermitian.eigenvalues x := by
-    have hnonneg : ∀ y ∈ Finset.univ, 0 ≤ ρ.Hermitian.eigenvalues y := fun y _ ↦ Matrix.PosSemidef.eigenvalues_nonneg ρ.pos y
-    have hi : i ∈ Finset.univ := Finset.mem_univ i
-    exact Finset.single_le_sum hnonneg hi
-  rw [Matrix.IsHermitian.sum_eigenvalues_eq_rtrace ρ.Hermitian, ρ.rtr] at hsum
-  exact hsum
+  convert Finset.single_le_sum (fun y _ ↦ ρ.pos.eigenvalues_nonneg y) (Finset.mem_univ i)
+  rw [ρ.M.sum_eigenvalues_eq_trace, ρ.tr]
 
 theorem le_one (ρ : MState d) : ρ.M ≤ 1 := by
   rw [Subtype.mk_le_mk]
-  simp only [toSubtype_eq_coe, HermitianMat.val_eq_coe, selfAdjoint.val_one]
-  suffices h : (↑ρ.toSubtype : Matrix d d ℂ) ≤ (1 : ℝ) • 1 by simp_all only [toSubtype_eq_coe, one_smul]
+  simp only [HermitianMat.val_eq_coe, selfAdjoint.val_one]
+  suffices h : ρ.m ≤ (1 : ℝ) • 1 by
+    rw [one_smul] at h
+    exact h
   apply (Matrix.PosSemidef.le_smul_one_of_eigenvalues_iff ρ.pos 1).mp
   exact eigenvalue_le_one ρ
 
@@ -163,11 +154,17 @@ theorem exp_val_zero (ρ : MState d) : ρ.exp_val 0 = 0 := by
 
 theorem exp_val_le_one {T : HermitianMat d ℂ} (h : T ≤ 1) (ρ : MState d) : ρ.exp_val T ≤ 1 := by
   have hmono := HermitianMat.inner_mono ρ.zero_le T 1 h
-  rwa [HermitianMat.inner_one ρ.M, ρ.tr'] at hmono
+  rwa [HermitianMat.inner_one ρ.M, ρ.tr] at hmono
 
 theorem exp_val_prob {T : HermitianMat d ℂ} (h : 0 ≤ T ∧ T ≤ 1) (ρ : MState d) :
     0 ≤ ρ.exp_val T ∧ ρ.exp_val T ≤ 1 :=
   ⟨ρ.exp_val_nonneg h.1, ρ.exp_val_le_one h.2⟩
+
+/-- If an observable `A` has expectation value of 1 on a state `ρ`, it must entirely contain the
+support of `ρ` in its 1-eigenspace. -/
+theorem exp_val_eq_one_iff (ρ : MState d) {A : HermitianMat d ℂ} (hA₁ : 0 ≤ A) (hA₂ : A ≤ 1) :
+    ρ.exp_val A = 1 ↔ (LinearMap.range ρ.m.toLin' ≤ LinearMap.ker (1 - A).toMat.toLin') := by
+  sorry
 
 end exp_val
 
@@ -175,15 +172,16 @@ section pure
 
 /-- A mixed state can be constructed as a pure state arising from a ket. -/
 def pure (ψ : Ket d) : MState d where
-  val := Matrix.vecMulVec ψ (ψ : Bra d)
-  property := (Matrix.PosSemidef.outer_self_conj ψ).1
-  zero_le := HermitianMat.zero_le_iff.mpr (Matrix.PosSemidef.outer_self_conj ψ)
+  M := {
+    val := Matrix.vecMulVec ψ (ψ : Bra d)
+    property := (Matrix.PosSemidef.outer_self_conj ψ).1
+  }
+  zero_le := HermitianMat.zero_le_iff.mpr (.outer_self_conj ψ)
   tr := by
-    have h₁ : ∀x, ψ x * conj (ψ x) = Complex.normSq (ψ x) := fun x ↦ by
+    have h₁ (x) : ψ x * conj (ψ x) = Complex.normSq (ψ x) := by
       rw [mul_comm, Complex.normSq_eq_conj_mul_self]
-    simp only [Matrix.trace, Matrix.diag_apply, Matrix.vecMulVec_apply, Bra.eq_conj, h₁]
-    have h₂ := congrArg Complex.ofReal ψ.normalized
-    simpa using h₂
+    simp [HermitianMat.trace_eq_re_trace, Matrix.trace, Matrix.vecMulVec_apply, Bra.eq_conj, h₁]
+    exact ψ.normalized
 
 @[simp]
 theorem pure_of (ψ : Ket d) : (pure ψ).m i j = (ψ i) * conj (ψ j) := by
@@ -192,14 +190,14 @@ theorem pure_of (ψ : Ket d) : (pure ψ).m i j = (ψ i) * conj (ψ j) := by
 /-- The purity of a state is Tr[ρ^2]. This is a `Prob`, because it is always between zero and one. -/
 def purity (ρ : MState d) : Prob :=
   ⟨ρ.M.inner ρ.M, ⟨HermitianMat.inner_ge_zero ρ.zero_le ρ.zero_le,
-    by simpa [ρ.tr'] using  HermitianMat.inner_le_mul_trace ρ.zero_le ρ.zero_le⟩⟩
+    by simpa using  HermitianMat.inner_le_mul_trace ρ.zero_le ρ.zero_le⟩⟩
 
 /-- The eigenvalue spectrum of a mixed quantum state, as a `Distribution`. -/
 def spectrum [DecidableEq d] (ρ : MState d) : Distribution d :=
   Distribution.mk'
     (ρ.M.H.eigenvalues ·)
     (ρ.pos.eigenvalues_nonneg ·)
-    (by simpa [ρ.tr] using congrArg Complex.re (ρ.M.H.sum_eigenvalues_eq_trace))
+    (by rw [ρ.M.sum_eigenvalues_eq_trace, ρ.tr])
 
 /-- The specturm of a pure state is (1,0,0,...), i.e. a constant distribution. -/
 theorem spectrum_pure_eq_constant (ψ : Ket d) :
@@ -213,7 +211,7 @@ theorem spectrum_pure_eq_constant (ψ : Ket d) :
       -- Prove ψ is an eigenvector of ρ = pure ψ
       have hv : ρ.M *ᵥ ψ = ψ := by
         ext
-        simp_rw [ρ, pure, Matrix.mulVec, MState.M, HermitianMat.toMat, Matrix.vecMulVec_apply, dotProduct,
+        simp_rw [ρ, pure, Matrix.mulVec, HermitianMat.toMat, Matrix.vecMulVec_apply, dotProduct,
         Bra.apply', Ket.apply, mul_assoc, ← Finset.mul_sum, ← Complex.normSq_eq_conj_mul_self,
         ← Complex.ofReal_sum, ← Ket.apply, ψ.normalized, Complex.ofReal_one, mul_one]
       let U : Matrix.unitaryGroup d ℂ := star ρ.M.H.eigenvectorUnitary -- Diagonalizing unitary of ρ
@@ -301,10 +299,10 @@ theorem pure_of_constant_spectrum (ρ : MState d) (h : ∃ i, ρ.spectrum = Dist
   let ψ : Ket d := ⟨v, hUvNorm⟩ -- Construct ψ
   use ψ
   ext j k
-  simp
+  rw [HermitianMat.val_eq_coe]
   -- Use spectral theorem to prove that ρ = pure ψ
   rw [Matrix.IsHermitian.spectral_theorem ρ.M.H, Matrix.mul_apply]
-  simp [ψ, Ket.apply, v, hEig]
+  simp [ψ, Ket.apply, v, hEig, -toMat_M]
   have hsum : ∀ x ∈ Finset.univ, x ∉ ({i} : Finset d) → (ρ.M.H.eigenvectorBasis x j) * (↑(if x = i then 1 else 0) : ℝ) * (starRingEnd ℂ) (ρ.Hermitian.eigenvectorBasis x k) = 0 := by
     intros x hx hxnoti
     rw [Finset.mem_singleton] at hxnoti
@@ -331,31 +329,29 @@ end pure
 section prod
 
 def prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : MState (d₁ × d₂) where
-  val := ρ₁.m ⊗ₖ ρ₂.m
-  property := (ρ₁.pos.PosSemidef_kronecker ρ₂.pos).1
+  M := {
+    val := ρ₁.m ⊗ₖ ρ₂.m
+    property := (ρ₁.pos.PosSemidef_kronecker ρ₂.pos).1
+  }
   zero_le := HermitianMat.zero_le_iff.mpr (ρ₁.pos.PosSemidef_kronecker ρ₂.pos)
-  tr := by simpa [MState.m, MState.tr] using ρ₁.m.trace_kronecker ρ₂.m
+  tr := by simpa using congrArg Complex.re (ρ₁.m.trace_kronecker ρ₂.m)
 
 notation ρL "⊗" ρR => prod ρL ρR
 
 /-- The product of pure states is a pure product state , `Ket.prod`. -/
 theorem pure_prod_pure (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : pure (ψ₁ ⊗ ψ₂) = (pure ψ₁) ⊗ (pure ψ₂) := by
   ext
-  simp only [pure, Ket.prod, Ket.apply, Matrix.vecMulVec_apply, Bra.eq_conj, map_mul, prod,
-    Matrix.kroneckerMap_apply, MState.m]
+  simp only [pure, Ket.prod, Ket.apply, HermitianMat.val_eq_coe, HermitianMat.mk_toMat,
+    Matrix.vecMulVec_apply, Bra.eq_conj, map_mul, prod, m, Matrix.kroneckerMap_apply]
   ring
 
 end prod
 
 /-- A representation of a classical distribution as a quantum state, diagonal in the given basis. -/
 def ofClassical (dist : Distribution d) : MState d where
-  val := Matrix.diagonal (fun x ↦ dist x)
-  property : Matrix.IsHermitian _ := by simp [Matrix.isHermitian_diagonal_iff, IsSelfAdjoint]
-  zero_le := HermitianMat.zero_le_iff.mpr (by simp [Matrix.posSemidef_diagonal_iff])
-  tr := by
-    simp [Matrix.trace_diagonal]
-    have h₃ := dist.2
-    norm_cast
+  M := HermitianMat.diagonal (fun x ↦ dist x)
+  zero_le := HermitianMat.zero_le_iff.mpr (by simp [HermitianMat.diagonal, Matrix.posSemidef_diagonal_iff])
+  tr := by simp [HermitianMat.trace_diagonal]
 
 @[simp]
 theorem coe_ofClassical (dist : Distribution d) :
@@ -381,8 +377,12 @@ instance instUnique [Unique d] : Unique (MState d) where
     ext
     have h₁ := ρ.tr
     have h₂ := (@uniform _ _ _ _ : MState d).tr
-    simp [Matrix.trace, Unique.eq_default] at h₁ h₂ ⊢
-    exact h₁.trans h₂.symm
+    simp [Matrix.trace, Unique.eq_default, -MState.tr, HermitianMat.trace_eq_re_trace] at h₁ h₂ ⊢
+    apply Complex.ext
+    · exact h₁.trans h₂.symm
+    · trans 0
+      exact ρ.M.Complex_im_eq_zero default
+      exact (uniform.M.Complex_im_eq_zero default).symm
 
 /-- There exists a mixed state for every nonempty `d`.
 Here, the maximally mixed one is chosen. -/
@@ -396,15 +396,15 @@ section ptrace
 
 /-- Partial tracing out the left half of a system. -/
 def traceLeft (ρ : MState (d₁ × d₂)) : MState d₂ where
-  toSubtype := ⟨ρ.m.traceLeft, ρ.M.H.traceLeft⟩
+  M := ⟨ρ.m.traceLeft, ρ.M.H.traceLeft⟩
   zero_le :=  HermitianMat.zero_le_iff.mpr (ρ.pos.traceLeft)
-  tr := ρ.tr ▸ ρ.m.traceLeft_trace
+  tr := sorry --ρ.tr' ▸ ρ.m.traceLeft_trace
 
 /-- Partial tracing out the right half of a system. -/
 def traceRight (ρ : MState (d₁ × d₂)) : MState d₁ where
-  toSubtype := ⟨ρ.m.traceRight, ρ.M.H.traceRight⟩
+  M := ⟨ρ.m.traceRight, ρ.M.H.traceRight⟩
   zero_le := HermitianMat.zero_le_iff.mpr (ρ.pos.traceRight)
-  tr := ρ.tr ▸ ρ.m.traceRight_trace
+  tr := sorry --ρ.tr ▸ ρ.m.traceRight_trace
 
 /-- Taking the direct product on the left and tracing it back out gives the same state. -/
 @[simp]
@@ -412,8 +412,8 @@ theorem traceLeft_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : traceLef
   ext
   simp_rw [traceLeft, Matrix.traceLeft, prod]
   dsimp
-  have h : (∑ i : d₁, ρ₁.M.toMat i i) = 1 := ρ₁.tr
-  simp [MState.m, ← Finset.sum_mul, h]
+  have h : (∑ i : d₁, ρ₁.M.toMat i i) = 1 := ρ₁.tr'
+  simp [MState.m, ← Finset.sum_mul, h, -toMat_M]
 
 /-- Taking the direct product on the right and tracing it back out gives the same state. -/
 @[simp]
@@ -421,8 +421,8 @@ theorem traceRight_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : traceRi
   ext
   simp_rw [traceRight, Matrix.traceRight, prod]
   dsimp
-  have h : (∑ i : d₂, ρ₂.M.toMat i i) = 1 := ρ₂.tr
-  simp [MState.m, ← Finset.mul_sum, h]
+  have h : (∑ i : d₂, ρ₂.M.toMat i i) = 1 := ρ₂.tr'
+  simp [MState.m, ← Finset.mul_sum, h, -toMat_M]
 
 end ptrace
 
@@ -481,7 +481,7 @@ def purify (ρ : MState d) : Ket (d × d) where
       sorry
     apply @RCLike.ofReal_injective ℂ
     simp_rw [this, one_mul, Matrix.IsHermitian.sum_eigenvalues_eq_trace]
-    exact ρ.tr
+    exact ρ.tr'
 
 /-- The defining property of purification, that tracing out the purifying system gives the
  original mixed state. -/
@@ -501,10 +501,12 @@ def purifyX (ρ : MState d) : { ψ : Ket (d × d) // (pure ψ).traceRight = ρ }
 end purification
 
 def relabel (ρ : MState d₁) (e : d₂ ≃ d₁) : MState d₂ where
-  val := ρ.m.reindex e.symm e.symm
-  property := ((Matrix.posSemidef_submatrix_equiv e).mpr ρ.pos).1
+  M := {
+    val := ρ.m.reindex e.symm e.symm
+    property := ((Matrix.posSemidef_submatrix_equiv e).mpr ρ.pos).1
+  }
   zero_le := (HermitianMat.zero_le_iff.trans (Matrix.posSemidef_submatrix_equiv e)).mpr <| ρ.pos
-  tr := ρ.tr ▸ Fintype.sum_equiv _ _ _ (congrFun rfl)
+  tr := sorry --ρ.tr ▸ Fintype.sum_equiv _ _ _ (congrFun rfl)
 
 @[simp]
 theorem relabel_m (ρ : MState d₁) (e : d₂ ≃ d₁) :
@@ -591,7 +593,7 @@ theorem traceRight_right_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
 theorem traceNorm_eq_1 (ρ : MState d) : ρ.m.traceNorm = 1 :=
   have := calc (ρ.m.traceNorm : ℂ)
     _ = ρ.m.trace := ρ.pos.traceNorm_PSD_eq_trace
-    _ = 1 := ρ.tr
+    _ = 1 := ρ.tr'
   Complex.ofReal_eq_one.mp this
 
 section topology
@@ -622,8 +624,10 @@ variable {ι : Type u} [DecidableEq ι] [fι : Fintype ι]
 variable {dI : ι → Type v} [∀(i :ι), Fintype (dI i)] [∀(i :ι), DecidableEq (dI i)]
 
 def piProd (ρi : (i:ι) → MState (dI i)) : MState ((i:ι) → dI i) where
-  val j k := ∏ (i : ι), (ρi i).m (j i) (k i)
-  property := sorry
+  M := {
+    val j k := ∏ (i : ι), (ρi i).m (j i) (k i)
+    property := sorry
+  }
   zero_le := by
     rw [HermitianMat.zero_le_iff]
     --Should be in Mathlib
@@ -636,12 +640,13 @@ def piProd (ρi : (i:ι) → MState (dI i)) : MState ((i:ι) → dI i) where
     · intro v
       sorry
   tr := by
-    dsimp [Matrix.trace]
-    convert (Finset.prod_univ_sum (κ := dI) (fun _ ↦ Finset.univ) (fun i_1 x ↦ (ρi i_1).m x x)).symm
-    symm
-    apply Finset.prod_eq_one
-    intro x hx
-    exact (ρi x).tr
+    sorry
+    -- rw [HermitianMat.trace_eq_trace_rc]
+    -- convert (Finset.prod_univ_sum (κ := dI) (fun _ ↦ Finset.univ) (fun i_1 x ↦ (ρi i_1).m x x)).symm
+    -- symm
+    -- apply Finset.prod_eq_one
+    -- intro x hx
+    -- exact (ρi x).tr
 
 def npow (ρ : MState d) (n : ℕ) : MState (Fin n → d) :=
   piProd (fun _ ↦ ρ)

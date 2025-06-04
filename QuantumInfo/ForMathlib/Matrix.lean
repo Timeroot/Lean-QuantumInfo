@@ -361,6 +361,49 @@ theorem toLin_ker_eq_bot (hA : A.PosDef) : LinearMap.ker A.toLin' = ⊥ := by
 theorem of_toLin_ker_eq_bot (hA : LinearMap.ker A.toLin' = ⊥) (hA₂ : A.PosSemidef) : A.PosDef := by
   sorry
 
+-- see https://leanprover.zulipchat.com/#narrow/channel/217875-Is-there-code-for-X.3F/topic/More.20stuff.20about.20kernels.2Franges.20of.20matrices/with/521587161
+-- --Doesn't require [FiniteDimensional] so it's on its own
+-- theorem LinearMap.ker_le_ker_of_range_antitone {V 𝕜 : Type*} [RCLike 𝕜] [NormedAddCommGroup V] [InnerProductSpace 𝕜 V]
+--     {A B : V →ₗ[𝕜] V} (hA : A.IsSymmetric) (hB : B.IsSymmetric) (h : range A ≤ range B) :
+--     ker B ≤ ker A := by
+--   intro v hv
+--   rw [mem_ker] at hv ⊢
+--   obtain ⟨y, hy⟩ : ∃ y, B y = A (A v) := by simpa using @h (A (A v))
+--   rw [← inner_self_eq_zero (𝕜 := 𝕜), ← hA, ← hy, hB, hv, inner_zero_right]
+
+-- theorem LinearMap.ker_range_antitone {V 𝕜 : Type*} [RCLike 𝕜] [NormedAddCommGroup V] [InnerProductSpace 𝕜 V]
+--   [FiniteDimensional 𝕜 V] {A B : V →ₗ[𝕜] V} (hA : A.IsSymmetric) (hB : B.IsSymmetric) :
+--     range A ≤ range B ↔ ker B ≤ ker A := by
+--   use ker_le_ker_of_range_antitone hA hB
+--   rintro h z ⟨y, rfl⟩
+--   let b := hB.eigenvectorBasis rfl
+--   have h₂ := OrthonormalBasis.sum_repr' b (A y)
+--   simp_rw [← hA _ y, ← Finset.sum_add_sum_compl (s := { i | hB.eigenvalues rfl i = 0 })] at h₂
+--   conv at h₂ =>
+--     enter [1]
+--     congr
+--     · rw [← Finset.sum_attach]
+--       enter [2, i]
+--       equals 0 =>
+--         obtain ⟨i, hi⟩ := i
+--         suffices B (b i) = 0 by simp [show A (b i) = 0 from h this]
+--         simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hi
+--         simp [b, hi]
+--     · rw [Finset.compl_filter, ← Finset.sum_attach (Finset.filter _ _)]
+--       enter [2, i, 2]
+--       equals (hB.eigenvalues rfl i : 𝕜)⁻¹ • B (b i) =>
+--         obtain ⟨i, hi⟩ := i
+--         rw [hB.apply_eigenvectorBasis rfl i, inv_smul_smul₀]
+--         simpa using hi
+--   simp only [Finset.sum_const_zero, smul_smul, zero_add, ← LinearMapClass.map_smul, ← map_sum] at h₂
+--   exact ⟨_, h₂⟩
+
+theorem ker_range_antitone {d : Type*} [Fintype d] [DecidableEq d] {A B : Matrix d d ℂ}
+  (hA : A.IsHermitian) (hB : B.IsHermitian) :
+    LinearMap.range A.toLin' ≤ LinearMap.range B.toLin' ↔
+    LinearMap.ker B.toLin' ≤ LinearMap.ker A.toLin' := by
+  sorry
+
 end PosDef
 
 namespace PosSemidef

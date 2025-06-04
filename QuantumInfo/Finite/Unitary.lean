@@ -10,9 +10,45 @@ complementary channels, so this file itself does not discuss channels yet.-/
 
 noncomputable section
 
+notation "𝐔[" n "]" => Matrix.unitaryGroup n ℂ
+
+namespace HermitianMat
+
+variable {𝕜 : Type*} [RCLike 𝕜] {n : Type*} [Fintype n] [DecidableEq n]
+variable (A B : HermitianMat n 𝕜) (U : Matrix.unitaryGroup n 𝕜)
+
+--PULLOUT
+omit [DecidableEq n] in
+theorem add_conj (M : Matrix m n 𝕜) : (A + B).conj M = A.conj M + B.conj M := by
+  ext1
+  simp [conj, Matrix.mul_add, Matrix.add_mul]
+
+omit [DecidableEq n] in
+theorem sub_conj (M : Matrix m n 𝕜) : (A - B).conj M = A.conj M - B.conj M := by
+  ext1
+  simp [conj, Matrix.mul_sub, Matrix.sub_mul]
+
+@[simp]
+theorem conj_one : A.conj (1 : Matrix n n 𝕜) = A := by
+  simp [conj]
+--PULLOUT
+
+@[simp]
+theorem trace_conj_unitary : (A.conj U.val).trace = A.trace := by
+  simp [Matrix.trace_mul_cycle, HermitianMat.conj, ← Matrix.star_eq_conjTranspose, HermitianMat.trace]
+
+@[simp]
+theorem le_conj_unitary : A.conj U.val ≤ B.conj U ↔ A ≤ B := by
+  rw [← sub_nonneg, ← sub_nonneg (b := A), ← sub_conj]
+  constructor
+  · intro h
+    simpa [HermitianMat.conj_conj] using HermitianMat.conj_le h (star U).val
+  · exact fun h ↦ HermitianMat.conj_le h U.val
+
+end HermitianMat
+
 namespace MState
 
-notation "𝐔[" n "]" => Matrix.unitaryGroup n ℂ
 
 variable {d d₁ d₂ d₃ : Type*}
 variable [Fintype d] [Fintype d₁] [Fintype d₂] [Fintype d₃]
@@ -20,16 +56,9 @@ variable [DecidableEq d]
 
 /-- Conjugate a state by a unitary matrix (applying the unitary as an evolution). -/
 def U_conj (ρ : MState d) (U : 𝐔[d]) : MState d where
-  val := U * ρ.m * star U
-  property : Matrix.IsHermitian _ := by simp [Matrix.IsHermitian, MState.m, ρ.pos.1.eq, Matrix.star_eq_conjTranspose, mul_assoc]
-  tr := by simp [Matrix.trace_mul_cycle, ρ.tr, MState.m]
-  zero_le := HermitianMat.zero_le_iff.mpr ⟨by simp [Matrix.IsHermitian, MState.m, ρ.pos.1.eq, Matrix.star_eq_conjTranspose, mul_assoc],
-    by
-    intro x
-    rw [← Matrix.mulVec_mulVec, ← Matrix.mulVec_mulVec, Matrix.dotProduct_mulVec]
-    convert ρ.pos.2 (Matrix.mulVec (↑(star U)) x)
-    simp [Matrix.star_mulVec, Matrix.star_eq_conjTranspose]
-    ⟩
+  M := ρ.M.conj U.val
+  tr := by simp
+  zero_le := HermitianMat.conj_le ρ.zero_le U.val
 
 theorem U_conj_spectrum_eq (ρ : MState d) (U : 𝐔[d]) : ∃ σ : d ≃ d,
     (ρ.U_conj U).spectrum = ρ.spectrum.relabel σ := by
