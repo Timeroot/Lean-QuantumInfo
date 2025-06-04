@@ -55,7 +55,7 @@ def mix (e : MEnsemble d α) : MState d := Distribution.expect_val e
 
 @[simp]
 theorem mix_of (e : MEnsemble d α) : (mix e).m = ∑ i, (e.distr i : ℝ) • (e.states i).m := by
-  rfl
+  apply AddSubgroup.val_finset_sum -- *laughs in defeq*
 
 /-- Two mixed-state ensembles indexed by `\alpha` and `\beta` are equivalent if `α ≃ β`. -/
 def congrMEnsemble (σ : α ≃ β) : MEnsemble d α ≃ MEnsemble d β := Distribution.congrRandVar σ
