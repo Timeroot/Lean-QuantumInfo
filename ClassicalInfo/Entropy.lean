@@ -54,11 +54,8 @@ theorem H₁_le_exp_m1 (p : Prob) : H₁ p ≤ Real.exp (-1) := by
   · subst h
     norm_num
     exact Real.exp_nonneg (-1)
-  · rw [<- Real.negMulLog]
-    have zero_lt_p : 0 < p.val := by
-      unfold Prob at p
-      exact Prob.zero_lt_coe h
-    exact Real.negMulLog_le_rexp_neg_one (↑p) zero_lt_p
+  · rw [← Real.negMulLog]
+    exact Real.negMulLog_le_rexp_neg_one (↑p) (Prob.zero_lt_coe h)
 
 theorem H₁_concave : ∀ (x y : Prob), ∀ (p : Prob), p.mix (H₁ x) (H₁ y) ≤ H₁ (p.mix x y) := by
   intros x y p

@@ -6,7 +6,6 @@ open NNReal
 
 theorem continuous_negMulLog : Continuous Real.negMulLog := by
   unfold Real.negMulLog
-  have := Continuous.neg Real.continuous_mul_log
   convert Continuous.neg Real.continuous_mul_log using 1
   ext x
   ring
@@ -16,20 +15,15 @@ theorem Real.negMulLog_monotoneOn : MonotoneOn Real.negMulLog (Set.Ioc (0 : ℝ)
   · exact convex_Ioc 0 (exp (-1))
   · apply Continuous.continuousOn
     exact continuous_negMulLog
-  · have := Real.differentiableOn_negMulLog
-    apply DifferentiableOn.mono this
-    aesop
+  · apply DifferentiableOn.mono Real.differentiableOn_negMulLog
+    simp only [interior_Ioc, Set.subset_compl_singleton_iff, Set.mem_Ioo, lt_self_iff_false, false_and,
+      not_false_eq_true]
+  -- Prove derivative positive
   intro x hx
-  simp at hx
-  rw [deriv_negMulLog]
-  simp
-  have : log x < log (Real.exp (-1)) := by
-    -- rw [Real.exp_neg]
-    apply Real.log_lt_log
-    exact hx.1
-    exact hx.2
+  simp only [interior_Ioc, Set.mem_Ioo] at hx
+  rw [deriv_negMulLog (by linarith), sub_nonneg]
+  have := log_lt_log hx.left hx.right
   simp at this
-  linarith
   linarith
 
 theorem Real.negMulLog_antitoneOn : AntitoneOn Real.negMulLog (Set.Ici (Real.exp (-1))) := by
@@ -37,20 +31,15 @@ theorem Real.negMulLog_antitoneOn : AntitoneOn Real.negMulLog (Set.Ici (Real.exp
   · exact convex_Ici (Real.exp (-1))
   · apply Continuous.continuousOn
     exact continuous_negMulLog
-  · have := Real.differentiableOn_negMulLog
-    apply DifferentiableOn.mono this
-    simp
+  · apply DifferentiableOn.mono Real.differentiableOn_negMulLog
+    simp only [Set.nonempty_Iio, interior_Ici', Set.subset_compl_singleton_iff, Set.mem_Ioi, not_lt]
     exact exp_nonneg (-1)
   intro x hx
-  simp at hx
+  simp only [Set.nonempty_Iio, interior_Ici', Set.mem_Ioi] at hx
   rw [deriv_negMulLog]
-  simp
-  have : log (Real.exp (-1)) < log x := by
-    -- rw [Real.exp_neg]
-    apply Real.log_lt_log
-    exact exp_pos (-1)
-    exact hx
-  simp at this
+  simp only [tsub_le_iff_right, zero_add]
+  have : log (Real.exp (-1)) < log x := log_lt_log (exp_pos (-1)) hx
+  simp only [log_exp] at this
   linarith
   contrapose! hx
   subst hx
@@ -59,7 +48,7 @@ theorem Real.negMulLog_antitoneOn : AntitoneOn Real.negMulLog (Set.Ici (Real.exp
 -- TODO Generalize to all `x`
 theorem Real.negMulLog_le_rexp_neg_one (x : ℝ) (hx : 0 < x) :
     Real.negMulLog x ≤ Real.exp (-1) := by
-  -- Case on the trichotomy of `x` being below, above, or equal to `1/e`.
+  -- Casework on the trichotomy of `x` being below, above, or equal to `1/e`.
   by_cases hp : x < Real.exp (-1)
   · have p_in_interval : x ∈ Set.Ioc (0 : ℝ) (Real.exp (-1)) := by
       simp only [Set.mem_Ioc]
@@ -70,7 +59,7 @@ theorem Real.negMulLog_le_rexp_neg_one (x : ℝ) (hx : 0 < x) :
       simp only [Set.mem_Ioc, le_refl, and_true]
       linarith
     have : x ≤ Real.exp (-1) := by
-      linarith (config := {splitNe := true}) [hp]
+      linarith only [hp]
     have := Real.negMulLog_monotoneOn p_in_interval einv_in_interval this
     convert this using 1
     simp [Real.negMulLog]
@@ -81,11 +70,11 @@ theorem Real.negMulLog_le_rexp_neg_one (x : ℝ) (hx : 0 < x) :
     have einv_in_interval : Real.exp (-1) ∈ Set.Ici (Real.exp (-1)) := by
       simp only [Set.mem_Ici, le_refl]
     have : Real.exp (-1) ≤ x := by
-      linarith (config := {splitNe := true}) [ hp']
+      linarith only [hp']
     have := Real.negMulLog_antitoneOn einv_in_interval p_in_interval this
     convert this using 1
     simp [Real.negMulLog]
   have : x = Real.exp (-1) := by
-    linarith (config := {splitNe := true}) [ hp, hp']
+    linarith only [hp, hp']
   rw [this]
   simp [Real.negMulLog]
