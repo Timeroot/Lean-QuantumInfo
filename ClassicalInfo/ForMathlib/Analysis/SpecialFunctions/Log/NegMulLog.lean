@@ -3,13 +3,6 @@ import Mathlib.Analysis.SpecialFunctions.Log.NegMulLog
 noncomputable section
 open NNReal
 
-
-theorem continuous_negMulLog : Continuous Real.negMulLog := by
-  unfold Real.negMulLog
-  convert Continuous.neg Real.continuous_mul_log using 1
-  ext x
-  ring
-
 theorem Real.negMulLog_monotoneOn : MonotoneOn Real.negMulLog (Set.Ioc (0 : ℝ) (Real.exp (-1))) := by
   apply monotoneOn_of_deriv_nonneg
   · exact convex_Ioc 0 (exp (-1))
