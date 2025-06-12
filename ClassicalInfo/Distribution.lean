@@ -242,12 +242,10 @@ theorem expect_val_eq_mixable_mix (d : Distribution (Fin 2)) (x₁ x₂ : T) : e
   apply Mixable.to_U_inj
   simp only [Mixable.mix, expect_val, constant, DFunLike.coe, Mixable.to_U_of_mkT]
   calc
-    ∑ i : Fin (Nat.succ 0).succ, (d i : ℝ) • Mixable.to_U (![x₁, x₂] i) = ∑ i ∈ Finset.range 2, (d i : ℝ) • Mixable.to_U (![x₁, x₂] i) := by
-      simpa [Finset.range_succ] using add_comm _ _
-    _ = ∑ i ∈ Finset.range 1, (d i : ℝ) • Mixable.to_U (![x₁, x₂] i) + (d 1 : ℝ) • Mixable.to_U (![x₁, x₂] 1) :=
-      Finset.sum_range_succ (fun i => (d i : ℝ) • Mixable.to_U (![x₁, x₂] i)) 1
+    ∑ i : Fin (Nat.succ 0).succ, (d i : ℝ) • Mixable.to_U (![x₁, x₂] i) = ∑ i, (d i : ℝ) • Mixable.to_U (![x₁, x₂] i) := by
+      simp
     _ = (d 0 : ℝ) • Mixable.to_U (![x₁, x₂] 0) + (d 1 : ℝ) • Mixable.to_U (![x₁, x₂] 1) := by
-      simp [Finset.sum_range_one (fun i => (d i : ℝ) • Mixable.to_U (![x₁, x₂] i))]
+      simp
     _ = (d 0 : ℝ) • Mixable.to_U x₁ + (1 - d 0).val • Mixable.to_U x₂ := by
       congr
       simpa only [Subtype.eq_iff, Prob.coe_one_minus, eq_sub_iff_add_eq, add_comm,
