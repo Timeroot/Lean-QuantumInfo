@@ -203,7 +203,6 @@ def spectrum [DecidableEq d] (ρ : MState d) : Distribution d :=
 theorem spectrum_pure_eq_constant (ψ : Ket d) :
     ∃ i, (pure ψ).spectrum = Distribution.constant i := by
   let ρ := pure ψ
-  let ρ_linMap := Matrix.toEuclideanLin ρ.m
   -- Prove 1 is in the spectrum of pure ψ by exhibiting an eigenvector with value 1.
   have : ∃i, (pure ψ).spectrum i = 1 := by
     simp [spectrum, Distribution.mk']
@@ -299,7 +298,6 @@ theorem pure_of_constant_spectrum (ρ : MState d) (h : ∃ i, ρ.spectrum = Dist
   let ψ : Ket d := ⟨v, hUvNorm⟩ -- Construct ψ
   use ψ
   ext j k
-  rw [HermitianMat.val_eq_coe]
   -- Use spectral theorem to prove that ρ = pure ψ
   rw [Matrix.IsHermitian.spectral_theorem ρ.M.H, Matrix.mul_apply]
   simp [ψ, Ket.apply, v, hEig, -toMat_M]

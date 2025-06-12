@@ -39,7 +39,7 @@ theorem mk_toMat (x : Matrix n n α) (h) : HermitianMat.toMat (Subtype.mk x h) =
 theorem H (A : HermitianMat n α) : A.toMat.IsHermitian :=
   A.2
 
-@[ext] protected theorem ext {A B : HermitianMat n α} : A.val = B.val → A = B :=
+@[ext] protected theorem ext {A B : HermitianMat n α} : A.toMat = B.toMat → A = B :=
   Subtype.eq
 
 instance instFun : FunLike (HermitianMat n α) n (n → α) where
@@ -79,6 +79,8 @@ theorem Complex_im_eq_zero (A : HermitianMat n ℂ) (x : n) :
     (A x x).im = 0 :=
   A.im_eq_zero x
 
+variable [Fintype n] [DecidableEq n]
+
 end rclike
 
 section conj
@@ -109,18 +111,51 @@ section eigenspace
 
 variable [RCLike α] [Fintype n] [DecidableEq n] (A : HermitianMat n α)
 
+--PULLOUT
 @[simp]
 theorem _root_.Matrix.toEuclideanLin_one : Matrix.toEuclideanLin (1 : Matrix n n α) = .id := by
   ext1 x
   simp [Matrix.toEuclideanLin]
 
+namespace ContinuousLinearMap
+
+variable {R : Type u_1} {S : Type u_2} [Semiring R] [Semiring S] (σ : R →+* S) (M : Type u_3) [TopologicalSpace M] [AddCommMonoid M] (M₂ : Type u_4) [TopologicalSpace M₂] [AddCommMonoid M₂] [Module R M] [Module S M₂]
+
+@[simp]
+theorem _root_.ContinuousLinearMap.range_zero [RingHomSurjective σ] : LinearMap.range (0 : M →SL[σ] M₂) = ⊥ := by
+  convert LinearMap.range_zero
+  assumption
+
+@[simp]
+theorem _root_.ContinuousLinearMap.ker_zero : LinearMap.ker (0 : M →SL[σ] M₂) = ⊤ :=
+  LinearMap.ker_zero
+
+end ContinuousLinearMap
+
+/-- The continuous linear map associated with a Hermitian matrix. -/
+def lin : EuclideanSpace α n →L[α] EuclideanSpace α n where
+  toLinearMap := A.toMat.toEuclideanLin
+  cont := LinearMap.continuous_of_finiteDimensional _
+
+@[simp]
+theorem IsSymmetric : A.lin.IsSymmetric :=
+  Matrix.isHermitian_iff_isSymmetric.mp A.H
+
+@[simp]
+theorem lin_zero : (0 : HermitianMat n α).lin = 0 := by
+  simp [lin]; rfl
+
+@[simp]
+theorem lin_one : (1 : HermitianMat n α).lin = 1 := by
+  simp [lin]; rfl
+
 noncomputable def eigenspace (μ : α) : Submodule α (EuclideanSpace α n) :=
-  Module.End.eigenspace A.toMat.toEuclideanLin μ
+  Module.End.eigenspace A.lin μ
 
 /-- The kernel of a Hermitian matrix `A` as a submodule of Euclidean space, defined by
 `LinearMap.ker A.toMat.toEuclideanLin`. Equivalently, the zero-eigenspace. -/
 def ker : Submodule α (EuclideanSpace α n) :=
-  LinearMap.ker A.toMat.toEuclideanLin
+  LinearMap.ker A.lin
 
 /-- The kernel of a Hermitian matrix is its zero eigenspace. -/
 theorem ker_eq_eigenspace_zero : A.ker = A.eigenspace 0 := by
@@ -133,12 +168,12 @@ theorem ker_zero : (0 : HermitianMat n α).ker = ⊤ := by
 
 @[simp]
 theorem ker_one : (1 : HermitianMat n α).ker = ⊥ := by
-  simp [ker]
+  simp [ker]; rfl
 
 /-- The support of a Hermitian matrix `A` as a submodule of Euclidean space, defined by
 `LinearMap.range A.toMat.toEuclideanLin`. Equivalently, the sum of all nonzero eigenspaces. -/
 def support : Submodule α (EuclideanSpace α n) :=
-  LinearMap.range A.toMat.toEuclideanLin
+  LinearMap.range A.lin
 
 /-- The support of a Hermitian matrix is the sum of its nonzero eigenspaces. -/
 theorem support_eq_sup_eigenspace_nonzero : A.support = ⨆ μ ≠ 0, A.eigenspace μ := by
@@ -150,19 +185,19 @@ theorem support_zero : (0 : HermitianMat n α).support = ⊥ := by
 
 @[simp]
 theorem support_one : (1 : HermitianMat n α).support = ⊤ := by
-  simp [support]
+  simpa [support] using LinearMap.ker_eq_bot_iff_range_eq_top.mp rfl
 
 @[simp]
 theorem ker_orthogonal_eq_support : A.kerᗮ = A.support := by
   rw [ker, support]
-  --easy with the stuff in #25417
-  sorry
+  convert ContinuousLinearMap.orthogonal_ker A.lin
+  simp
 
 @[simp]
 theorem support_orthogonal_eq_range : A.supportᗮ = A.ker := by
   rw [ker, support]
-  --easy with the stuff in #25417
-  sorry
+  convert ContinuousLinearMap.orthogonal_range A.lin
+  simp
 
 end eigenspace
 

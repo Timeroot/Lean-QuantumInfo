@@ -179,7 +179,7 @@ and the kernel of the state `ρ` contains the kernel of some element in `S`, the
 hypothesis rate is positive - there is some lower bound on the type II errors we'll see. In
 other words, under these conditions, we cannot completely avoid type II errors. -/
 theorem pos_of_lt_one {ρ : MState d} (S : Set (MState d))
-  (hρ : ∃ σ ∈ S, LinearMap.ker (σ.m.toEuclideanLin) ≤ LinearMap.ker ρ.m.toEuclideanLin)
+  (hρ : ∃ σ ∈ S, σ.M.ker ≤ ρ.M.ker)
   {ε : Prob} (hε : ε < 1) : 0 < β_ ε(ρ‖S) := by
   obtain ⟨σ, hσ₁, hσ₂⟩ := hρ
   --Assume the converse: that the infimum is zero. The set of such T's is inhabited
