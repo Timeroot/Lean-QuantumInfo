@@ -222,7 +222,7 @@ theorem Lemma3 {ρ : MState d} (ε : Prob) {S : Set (MState d)} (hS₁ : IsCompa
   let S' : Set (HermitianMat d ℂ) := MState.M '' S
   let T' : Set (HermitianMat d ℂ) := { m | MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 }
 
-  have hS'₁ : IsCompact S' := hS₁.image MState.Continuous_Matrix
+  have hS'₁ : IsCompact S' := hS₁.image MState.Continuous_HermitianMat
 
   have hT'₁ : IsCompact T' := iInf_IsCompact ρ ε
 
@@ -281,13 +281,12 @@ theorem Lemma3 {ρ : MState d} (ε : Prob) {S : Set (MState d)} (hS₁ : IsCompa
 
 --Maybe should be phrased in terms of `0 < ...` instead? Maybe belongs in another file? It's kiinnnd of specialized..
 theorem ker_diagonal_prob_eq_bot {q : Prob} (hq₁ : 0 < q) (hq₂ : q < 1) :
-    LinearMap.ker (HermitianMat.diagonal (Distribution.coin q ·)).val.toLin' = ⊥ := by
-  have h : (HermitianMat.diagonal (Distribution.coin q ·)).val.PosDef := by
-    apply Matrix.PosDef.diagonal
-    intro i; fin_cases i
-    · simpa
-    · simpa [← Complex.ofReal_one, Complex.real_lt_real]
-  exact h.toLin_ker_eq_bot
+    HermitianMat.ker (.diagonal (Distribution.coin q ·)) = ⊥ := by
+  apply Matrix.PosDef.toLin_ker_eq_bot
+  apply Matrix.PosDef.diagonal
+  intro i; fin_cases i
+  · simpa
+  · simpa [← Complex.ofReal_one, Complex.real_lt_real]
 
 variable {d₂ : Type*} [Fintype d₂] [DecidableEq d₂] in
 /-- Lemma S1 -/
@@ -324,7 +323,7 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
     := by
   generalize_proofs pf1 pf2
   --If ρ isn't in the support of σ, the right hand side is just ⊤. (The left hand side is not, necessarily!)
-  by_cases h_supp : LinearMap.ker σ.m.toEuclideanLin ≤ LinearMap.ker ρ.m.toEuclideanLin
+  by_cases h_supp : σ.M.ker ≤ ρ.M.ker
   swap
   · simp [SandwichedRelRentropy, h_supp]
 
@@ -411,7 +410,7 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
 
   --The Renyi entropy is finite
   rw [SandwichedRelRentropy, if_pos ?_, if_neg hα.ne']; swap
-  · suffices LinearMap.ker q2.m.toEuclideanLin = ⊥ by
+  · suffices q2.M.ker = ⊥ by
       simp only [HermitianMat.val_eq_coe, this, bot_le]
     --q2 has eigenvalues β_ ε(ρ‖{σ}) and 1-β_ ε(ρ‖{σ}), so as long as β_ ε(ρ‖{σ}) isn't 0 or 1,
     --this is true.

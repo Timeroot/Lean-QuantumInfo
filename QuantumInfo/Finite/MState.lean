@@ -163,7 +163,7 @@ theorem exp_val_prob {T : HermitianMat d ℂ} (h : 0 ≤ T ∧ T ≤ 1) (ρ : MS
 /-- If an observable `A` has expectation value of 1 on a state `ρ`, it must entirely contain the
 support of `ρ` in its 1-eigenspace. -/
 theorem exp_val_eq_one_iff (ρ : MState d) {A : HermitianMat d ℂ} (hA₁ : 0 ≤ A) (hA₂ : A ≤ 1) :
-    ρ.exp_val A = 1 ↔ (LinearMap.range ρ.m.toLin' ≤ LinearMap.ker (1 - A).toMat.toLin') := by
+    ρ.exp_val A = 1 ↔ ρ.M.support ≤ (1 - A).ker := by
   sorry
 
 end exp_val
@@ -599,22 +599,28 @@ theorem traceNorm_eq_1 (ρ : MState d) : ρ.m.traceNorm = 1 :=
 section topology
 
 /-- Mixed states inherit the subspace topology from matrices -/
-instance instTopoMState : TopologicalSpace (MState d) :=
-  TopologicalSpace.induced (MState.m) instTopologicalSpaceMatrix
+instance : TopologicalSpace (MState d) :=
+  TopologicalSpace.induced MState.M inferInstance
 
-/-- The projection from mixed states to their matrices is an embedding -/
-theorem toMat_IsEmbedding : Topology.IsEmbedding (MState.m (d := d)) where
+/-- The projection from mixed states to their Hermitian matrices is an embedding -/
+theorem toMat_IsEmbedding : Topology.IsEmbedding (MState.M (d := d)) where
   eq_induced := rfl
-  injective := toMat_inj
+  injective := @MState.ext _ _ _
 
-instance instT5MState : T3Space (MState d) :=
+instance : T3Space (MState d) :=
   Topology.IsEmbedding.t3Space toMat_IsEmbedding
 
-instance instCompactSpace : CompactSpace (MState d) :=
+instance : CompactSpace (MState d) :=
   sorry
 
-theorem Continuous_Matrix : Continuous (MState.M (d := d)) :=
-  sorry
+@[fun_prop]
+theorem Continuous_HermitianMat : Continuous (MState.M (d := d)) :=
+  continuous_iff_le_induced.mpr fun _ => id
+
+@[fun_prop]
+theorem Continuous_Matrix : Continuous (MState.m (d := d)) := by
+  unfold MState.m
+  fun_prop
 
 end topology
 

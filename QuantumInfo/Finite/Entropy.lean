@@ -37,9 +37,7 @@ def coherentInfo (ρ : MState d₁) (Λ : CPTPMap d₁ d₂) : ℝ :=
 open Classical in
 /-- The quantum relative entropy S(ρ‖σ) = Tr[ρ (log ρ - log σ)]. -/
 def qRelativeEnt (ρ σ : MState d) : ENNReal :=
-  (if
-    LinearMap.ker σ.m.toEuclideanLin ≤ LinearMap.ker ρ.m.toEuclideanLin
-  then
+  (if σ.M.ker ≤ ρ.M.ker then
     some ⟨ρ.M.inner (HermitianMat.log ρ - HermitianMat.log σ),
     /- Quantum relative entropy is nonnegative. This can be proved by an application of
     Klein's inequality. -/
@@ -50,7 +48,7 @@ def qRelativeEnt (ρ σ : MState d) : ENNReal :=
 notation "𝐃(" ρ "‖" σ ")" => qRelativeEnt ρ σ
 
 /-- Quantum relative entropy as `Tr[ρ (log ρ - log σ)]` when supports are correct. -/
-theorem qRelativeEnt_ker {ρ σ : MState d} (h : LinearMap.ker σ.m.toEuclideanLin ≤ LinearMap.ker ρ.m.toEuclideanLin) :
+theorem qRelativeEnt_ker {ρ σ : MState d} (h : σ.M.ker ≤ ρ.M.ker) :
     (𝐃(ρ‖σ) : EReal) = ρ.M.inner (HermitianMat.log ρ - HermitianMat.log σ) := by
   simp only [qRelativeEnt, h]
   congr
@@ -100,8 +98,7 @@ open Classical in
 /-- The Sandwiched Renyi Relative Entropy, defined with ln (nits). Note that at `α = 1` this definition
   switch to the standard Relative Entropy, for continuity. -/
 def SandwichedRelRentropy [Fintype d] (α : ℝ) (ρ σ : MState d) : ENNReal :=
-  if
-    LinearMap.ker σ.m.toEuclideanLin ≤ LinearMap.ker ρ.m.toEuclideanLin
+  if σ.M.ker ≤ ρ.M.ker
   then (
     if α = 1 then
       𝐃(ρ‖σ)
@@ -148,7 +145,7 @@ section entropy
 
 
 /-- Quantum relative entropy when σ has full rank -/
-theorem qRelativeEnt_rank {ρ σ : MState d} (h : LinearMap.ker σ.m.toEuclideanLin = ⊥) :
+theorem qRelativeEnt_rank {ρ σ : MState d} (h : σ.M.ker = ⊥) :
     (𝐃(ρ‖σ) : EReal) = ρ.M.inner (HermitianMat.log ρ - HermitianMat.log σ) := by
   apply qRelativeEnt_ker
   simp only [h, bot_le]

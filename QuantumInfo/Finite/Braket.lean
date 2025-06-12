@@ -31,8 +31,9 @@ variable (d : Type*) [Fintype d]
 structure Ket where
   vec : d → ℂ
   normalized' : ∑ x, ‖vec x‖ ^ 2 = 1
+  --TODO: change to `vec : EuclideanSpace ℂ d` / `normalized' : ‖vec‖ = 1`
 
-/-- A bra is definitionally identical to a `Ket`, but are separate to avoid complex conjugation confusion.
+/-- A bra is identical in definition to a `Ket`, but are separate to avoid complex conjugation confusion.
  They can be interconverted with the adjoint: `Ket.to_bra` and `Bra.to_ket` -/
 structure Bra where
   vec : d → ℂ

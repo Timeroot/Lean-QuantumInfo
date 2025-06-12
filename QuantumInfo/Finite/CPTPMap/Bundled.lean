@@ -171,12 +171,8 @@ instance instMFunLike [DecidableEq dIn] [DecidableEq dOut] :
 instance instMContinuousMapClass [DecidableEq dIn] [DecidableEq dOut] :
     ContinuousMapClass (PTPMap dIn dOut) (MState dIn) (MState dOut) where
   map_continuous f := by
-    simp only [instMFunLike, MState.instTopoMState]
     rw [continuous_induced_rng]
-    change Continuous (HermitianMat.toMat ∘ (f.toHPMap) ∘ MState.M)
-    refine (Continuous.comp ?_ ?_).subtype_val
-    · exact map_continuous f.toHPMap
-    · exact MState.Continuous_Matrix
+    exact (map_continuous f.toHPMap).comp MState.Continuous_HermitianMat
 
 -- @[norm_cast]
 theorem val_apply_MState [DecidableEq dIn] (M : PTPMap dIn dOut) (ρ : MState dIn) :

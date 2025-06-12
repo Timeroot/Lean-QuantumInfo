@@ -21,9 +21,12 @@ lemma min_free_relent_finite (ρ : MState (H i)) : ⨅ σ ∈ IsFree, 𝐃(ρ‖
   simp only [ne_eq, iInf_eq_top, not_forall, Classical.not_imp]
   obtain ⟨σ, hσ₁, hσ₂⟩ := FreeStateTheory.free_fullRank i
   use σ, hσ₂
-  -- have := hσ₁.toLin_ker_eq_bot
-  --At this point should be an easy fact (a separate theorem) using hσ₁, it's posdef.
-  sorry
+  rw [qRelativeEnt]
+  split_ifs with h
+  · simp --should be `finiteness`, TODO debug
+  contrapose! h
+  convert bot_le
+  exact hσ₁.toLin_ker_eq_bot
 
 -- This theorem should follow from "Fekete's subadditive lemma", which can be found in
 -- Lemma A.1 of Hayashi's book "Quantum Information Theory - Mathematical Foundation".

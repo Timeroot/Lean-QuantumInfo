@@ -105,6 +105,67 @@ theorem conj_conj {m l} [Fintype m] (A : HermitianMat n α) (B : Matrix m n α) 
 
 end conj
 
+section eigenspace
+
+variable [RCLike α] [Fintype n] [DecidableEq n] (A : HermitianMat n α)
+
+@[simp]
+theorem _root_.Matrix.toEuclideanLin_one : Matrix.toEuclideanLin (1 : Matrix n n α) = .id := by
+  ext1 x
+  simp [Matrix.toEuclideanLin]
+
+noncomputable def eigenspace (μ : α) : Submodule α (EuclideanSpace α n) :=
+  Module.End.eigenspace A.toMat.toEuclideanLin μ
+
+/-- The kernel of a Hermitian matrix `A` as a submodule of Euclidean space, defined by
+`LinearMap.ker A.toMat.toEuclideanLin`. Equivalently, the zero-eigenspace. -/
+def ker : Submodule α (EuclideanSpace α n) :=
+  LinearMap.ker A.toMat.toEuclideanLin
+
+/-- The kernel of a Hermitian matrix is its zero eigenspace. -/
+theorem ker_eq_eigenspace_zero : A.ker = A.eigenspace 0 := by
+  ext
+  simp [ker, eigenspace]
+
+@[simp]
+theorem ker_zero : (0 : HermitianMat n α).ker = ⊤ := by
+  simp [ker]
+
+@[simp]
+theorem ker_one : (1 : HermitianMat n α).ker = ⊥ := by
+  simp [ker]
+
+/-- The support of a Hermitian matrix `A` as a submodule of Euclidean space, defined by
+`LinearMap.range A.toMat.toEuclideanLin`. Equivalently, the sum of all nonzero eigenspaces. -/
+def support : Submodule α (EuclideanSpace α n) :=
+  LinearMap.range A.toMat.toEuclideanLin
+
+/-- The support of a Hermitian matrix is the sum of its nonzero eigenspaces. -/
+theorem support_eq_sup_eigenspace_nonzero : A.support = ⨆ μ ≠ 0, A.eigenspace μ := by
+  sorry
+
+@[simp]
+theorem support_zero : (0 : HermitianMat n α).support = ⊥ := by
+  simp [support]
+
+@[simp]
+theorem support_one : (1 : HermitianMat n α).support = ⊤ := by
+  simp [support]
+
+@[simp]
+theorem ker_orthogonal_eq_support : A.kerᗮ = A.support := by
+  rw [ker, support]
+  --easy with the stuff in #25417
+  sorry
+
+@[simp]
+theorem support_orthogonal_eq_range : A.supportᗮ = A.ker := by
+  rw [ker, support]
+  --easy with the stuff in #25417
+  sorry
+
+end eigenspace
+
 section diagonal
 
 --TODO: Generalize this more types than ℝ/ℂ
@@ -422,12 +483,9 @@ theorem inner_le_mul_trace (hA : 0 ≤ A) (hB : 0 ≤ B) : A.inner B ≤ A.trace
 /-- The inner product of two PSD matrices is zero iff they have disjoint support, i.e., each lives entirely
 in the other's kernel. -/
 theorem inner_zero_iff [DecidableEq n] (hA₁ : 0 ≤ A) (hB₁ : 0 ≤ B)
-  : A.inner B = 0 ↔
-    (LinearMap.range A.toMat.toLin' ≤ LinearMap.ker B.toMat.toLin') ∧
-    (LinearMap.range B.toMat.toLin' ≤ LinearMap.ker A.toMat.toLin') :=
+    : A.inner B = 0 ↔ (A.support ≤ B.ker) ∧ (B.support ≤ A.ker) :=
   sorry
---There's a lot of facts about PosSemidef matrices that are convenient to come bundled with the HermitiatMat
---type too.
+
 theorem convex_cone (hA : 0 ≤ A) (hB : 0 ≤ B) {c₁ c₂ : ℝ} (hc₁ : 0 ≤ c₁) (hc₂ : 0 ≤ c₂)
     : 0 ≤ (c₁ • A + c₂ • B) := by
   rw [zero_le_iff] at hA hB ⊢
