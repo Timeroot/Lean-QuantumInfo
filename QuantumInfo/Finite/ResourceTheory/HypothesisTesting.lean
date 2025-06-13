@@ -141,8 +141,22 @@ theorem exists_min (ρ : MState d) (ε : Prob) (S : Set (MState d)):
     suffices Continuous
         (fun (T : { m // MState.exp_val (1 - m) ρ ≤ ↑ε ∧ 0 ≤ m ∧ m ≤ 1 }) ↦ ⨆ σ ∈ S, σ.exp_val T) by
       convert Continuous.subtype_mk this ?_
-      · --need the silly h_stupid below
-        sorry
+      · rcases S.eq_empty_or_nonempty with rfl|hnS
+        · simpa using bot_eq_zero''
+        have : Nonempty ↑S := hnS.to_subtype
+        rw [← iSup_subtype'']
+        rw [Set.Icc.coe_iSup zero_le_one]
+        rename_i x'
+        have h_bdd : BddAbove (Set.range fun (i : S) => MState.exp_val x' i.val) := by
+          use 1
+          simp [upperBounds]
+          intro y hy
+          exact (y.exp_val_prob x'.prop.right).right
+        rw [← ciSup_subtype'' hnS h_bdd]
+        rw [Real.sSup_empty]
+        let some_i : S := Classical.choice ‹_›
+        refine le_ciSup_of_le h_bdd some_i ?_
+        exact (some_i.val.exp_val_prob x'.prop.right).left
       · --this part is REALLY stupid and definitely there's a better way. Maybe that way is making simp lemmas.
         rcases S.eq_empty_or_nonempty with rfl|hnS
         · simp
@@ -199,10 +213,8 @@ theorem pos_of_lt_one {ρ : MState d} (S : Set (MState d))
   replace hT₁ : ρ.exp_val (1 - T) ≠ 1 := (lt_of_le_of_lt hT₁ hε).ne
   absurd hT₁
   rw [ρ.exp_val_eq_one_iff (HermitianMat.zero_le_iff.mpr hT₃) (sub_le_self 1 hT₂), sub_sub_cancel]
-  sorry
-  --fix when we change everything to toEuclideanLin
-  -- rw [← Matrix.ker_range_antitone ρ.Hermitian σ.Hermitian] at hσ₂
-  -- exact le_trans hσ₂ hT₄.left
+  refine le_trans ?_ hT₄.left
+  exact (ContinuousLinearMap.ker_le_ker_iff_range_le_range (by simp) (by simp)).mp hσ₂ --todo cleanup
 
 --Lemma 3 from Hayashi
 theorem Lemma3 {ρ : MState d} (ε : Prob) {S : Set (MState d)} (hS₁ : IsCompact S)
@@ -232,51 +244,20 @@ theorem Lemma3 {ρ : MState d} (ε : Prob) {S : Set (MState d)} (hS₁ : IsCompa
 
   have hT'₃ : T'.Nonempty := Set.Nonempty.of_subtype
 
-  --There's some issue below where the lemma `Set.Icc.coe_iSup` uses a particular order instance, and we've
-  --defined a different (but propositionally equivalent) one on `Prob`, and we need to convert between these.
-  --Someone's who's better with understanding type inference diamonds - or whatever these are called - could
-  --surely find a better solution. This hypothesis is implicitly used when we write `· congr` below.
-  have h_stupid : Prob.instCompleteLinearOrder = instCompleteLinearOrderElemIccOfFactLe := by
-    simp only [Prob.instCompleteLinearOrder, instCompleteLinearOrderElemIccOfFactLe]
-    congr
-    · ext
-      split_ifs with hs
-      . simp [hs]
-      · simp [hs]
-        rfl
-    · ext s
-      split_ifs with hs₁ hs₂ hs₂
-      · simp [hs₂] at hs₁
-      · simp [hs₁, hs₂]
-        rfl
-      · rfl
-      · push_neg at hs₁
-        simp [hs₁] at hs₂
-
   ext1 --turn it from Prob equality into ℝ equality
   convert minimax (M := HermitianMat d ℂ) f S' T' hS'₁ hT'₁ hS₂ hT'₂ hS'₃ hT'₃
   --The remaining twiddling is about moving the casts inside the iInf's and iSup's.
   --In a better world, this would be mostly handled by some clever simps or push_cast's.
-  · rw [← iSup_subtype'']
-    convert Eq.trans (c := ⨆ (x : S'), ⨅ (y : T'), (f ↑x) ↑y) (Set.Icc.coe_iSup (ι := S) (zero_le_one (α := ℝ))) ?_
-    · congr
-    unfold S'
-    have hi := iSup_range' (ι := S) (β := HermitianMat d ℂ) (g := fun x ↦ ⨅ (y : T'), (f x) ↑y) (·)
+  · have hi := iSup_range' (ι := S) (fun x ↦ ⨅ (y : T'), (f x) ↑y) (·)
     rw [← Set.image_eq_range] at hi
-    rw [hi]
-    congr! 2 with x
-    convert Eq.trans (Set.Icc.coe_iInf (ι := T') (zero_le_one (α := ℝ))) ?_
-    · congr
-    rfl
-  · convert Eq.trans (c := ⨅ (y : T'), ⨆ (x : S'), (f ↑x) ↑y) (Set.Icc.coe_iInf (ι := T') (zero_le_one (α := ℝ))) ?_
-    · congr
+    rw [← iSup_subtype'', Set.Icc.coe_iSup (zero_le_one), hi]
+    congr!
+    exact Set.Icc.coe_iInf zero_le_one
+  · rw [Set.Icc.coe_iInf (ι := T') zero_le_one]
     congr! 2 with y
-    rw [← iSup_subtype'']
-    convert Eq.trans (Set.Icc.coe_iSup (ι := S) (zero_le_one (α := ℝ))) ?_
-    · congr
-    have hi := iSup_range' (ι := S) (β := HermitianMat d ℂ) (g := fun x ↦ (f x) ↑y) (·)
+    have hi := iSup_range' (ι := S) (fun x ↦ (f x) ↑y) (·)
     rw [← Set.image_eq_range] at hi
-    rw [hi]
+    rw [← iSup_subtype'', Set.Icc.coe_iSup zero_le_one, hi]
     rfl
 
 --Maybe should be phrased in terms of `0 < ...` instead? Maybe belongs in another file? It's kiinnnd of specialized..

@@ -18,21 +18,21 @@ variable {α : Type u} [Fintype α]
 
 /-- The one-event entropy function, H₁(p) = -p*ln(p). Uses nits. -/
 def H₁ : Prob → ℝ :=
-  fun x ↦ -x * Real.log x
+  fun x ↦ Real.negMulLog x
 
 /-- H₁ of 0 is zero.-/
 @[simp]
 def H₁_zero_eq_zero : H₁ 0 = 0 := by
-  norm_num [H₁]
+  simp [H₁]
 
 /-- H₁ of 1 is zero.-/
 @[simp]
 def H₁_one_eq_zero : H₁ 1 = 0 := by
-  norm_num [H₁]
+  simp [H₁]
 
 /-- Entropy is nonnegative. -/
 theorem H₁_nonneg (p : Prob) : 0 ≤ H₁ p := by
-  rw [H₁, neg_mul, Left.nonneg_neg_iff]
+  rw [H₁, Real.negMulLog, neg_mul, Left.nonneg_neg_iff]
   exact Real.mul_log_nonpos p.zero_le_coe p.coe_le_one
 
 /-- Entropy is less than 1. -/
@@ -41,23 +41,18 @@ theorem H₁_le_1 (p : Prob) : H₁ p < 1 := by
   by_cases h : 0 = p
   · subst h
     norm_num
-  · rw [← ne_eq] at h
-    have hp0 : 0 < p := lt_of_le_of_ne p.zero_le h
-    have := Real.abs_log_mul_self_lt p hp0 p.coe_le_one
-    rw [mul_comm, ← abs_neg, ← neg_mul] at this
-    exact lt_of_abs_lt this
+  · have hp0 : 0 < p := lt_of_le_of_ne p.zero_le h
+    have h₂ := Real.abs_log_mul_self_lt p hp0 p.coe_le_one
+    rw [mul_comm, ← abs_neg, ← neg_mul] at h₂
+    exact lt_of_abs_lt h₂
 
-/-- TODO: Entropy is at most 1/e. -/
+/-- Entropy is at most 1/e. -/
 theorem H₁_le_exp_m1 (p : Prob) : H₁ p ≤ Real.exp (-1) := by
-  rw [H₁]
   by_cases h : p = 0
-  · subst h
-    norm_num
-    exact Real.exp_nonneg (-1)
-  · rw [← Real.negMulLog]
-    exact Real.negMulLog_le_rexp_neg_one (↑p) (Prob.zero_lt_coe h)
+  · simp [h, Real.exp_nonneg (-1)]
+  · exact Real.negMulLog_le_rexp_neg_one (↑p) (Prob.zero_lt_coe h)
 
-theorem H₁_concave : ∀ (x y : Prob), ∀ (p : Prob), p.mix (H₁ x) (H₁ y) ≤ H₁ (p.mix x y) := by
+theorem H₁_concave : ∀ (x y : Prob), ∀ (p : Prob), p[H₁ x ↔ H₁ y] ≤ H₁ (p[x ↔ y]) := by
   intros x y p
   simp only [Prob.mix, H₁, smul_eq_mul, Prob.coe_one_minus, Mixable.mix, Mixable.mix_ab, Mixable.mkT_instUniv,
     Prob.mkT_mixable, Prob.to_U_mixable, Mixable.to_U_instUniv, Prob.to_U_mixable]
@@ -74,7 +69,7 @@ theorem H₁_concave : ∀ (x y : Prob), ∀ (p : Prob), p.mix (H₁ x) (H₁ y)
   rw [← ne_eq] at hxy hp hp₁
   have := Real.strictConcaveOn_negMulLog.2
   replace := @this x ?_ y ?_ ?_ p (1-p) ?_ ?_ (by linarith)
-  · simp only [smul_eq_mul, Real.negMulLog] at this
+  · simp only [smul_eq_mul] at this
     apply le_of_lt
     convert this
   · simp only [Set.mem_Ici, Prob.zero_le_coe]
@@ -101,10 +96,14 @@ theorem Hₛ_constant_eq_zero {i : α} : Hₛ (Distribution.constant i) = 0 := b
   simp [Hₛ, Distribution.constant_def', apply_ite]
 
 /-- Shannon entropy of a uniform distribution is ln d. -/
-theorem Hₛ_uniform [Nonempty α] : Hₛ (Distribution.uniform (α := α)) = Real.log (Finset.card Finset.univ (α := α)) := by
-  simp [Hₛ, Distribution.prob, H₁]
+theorem Hₛ_uniform [Nonempty α] :
+    Hₛ (Distribution.uniform (α := α)) = Real.log (Finset.card Finset.univ (α := α)) := by
+  simp [Hₛ, Distribution.prob, H₁, Real.negMulLog]
+
+/-- Shannon entropy of two-event distribution. -/
+theorem Hₛ_coin (p : Prob) : Hₛ (Distribution.coin p) = Real.binEntropy p := by
+  simp [Hₛ, H₁, Distribution.coin, Real.binEntropy_eq_negMulLog_add_negMulLog_one_sub]
 
 --TODO:
 -- * Shannon entropy is concave under mixing distributions.
--- * Shannon entropy is nonnegative and at most ln(d.card)/d
 -- * Shannon entropy as an expectation value
