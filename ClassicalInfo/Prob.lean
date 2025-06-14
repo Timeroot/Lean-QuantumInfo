@@ -365,6 +365,7 @@ noncomputable def negLog : Prob → ENNReal :=
 --Note that this is an em-dash `—` and not a minus `-`, to make the notation work.
 scoped notation "—log " => negLog
 
+--TODO: Upgrade to `StrictAnti`. Even better: bundle negLog as `Prob ≃o ENNRealᵒᵈ`.
 theorem negLog_Antitone : Antitone negLog := by
   intro x y h
   dsimp [negLog]
@@ -383,6 +384,14 @@ theorem negLog_Antitone : Antitone negLog := by
 
 @[simp]
 theorem negLog_zero : —log (0 : Prob) = ⊤ := by
+  simp [negLog]
+
+@[simp]
+theorem negLog_one : —log 1 = 0 := by
+  simp [negLog]
+
+@[simp]
+theorem negLog_eq_top_iff {p : Prob} : —log p = ⊤ ↔ p = 0 := by
   simp [negLog]
 
 theorem negLog_pos_ENNReal {p : Prob} (hp : p ≠ 0) : —log p = .ofNNReal ⟨-Real.log p,
@@ -419,10 +428,6 @@ theorem le_negLog_of_le_exp {p : Prob} {x : ℝ} (h : p ≤ Real.exp (-x) ) : EN
 @[aesop (rule_sets := [finiteness]) safe apply]
 theorem negLog_ne_top {p : Prob} (hp : 0 < p.val) : —log p ≠ ∞ := by
   simpa [negLog] using ne_of_gt hp
-
-@[simp]
-theorem negLog_one : negLog 1 = 0 := by
-  simp [negLog]
 
 theorem negLog_eq_neg_ENNReal_log (p : Prob) : —log p = -ENNReal.log p := by
   rw [negLog]

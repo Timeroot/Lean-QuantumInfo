@@ -139,10 +139,12 @@ def inner (ρ : MState d) (σ : MState d) : Prob :=
 
 section exp_val
 
-def exp_val_ℂ (T : Matrix d d ℂ) (ρ : MState d) : ℂ :=
+def exp_val_ℂ (ρ : MState d) (T : Matrix d d ℂ) : ℂ :=
   (T * ρ.m).trace
 
-def exp_val (T : HermitianMat d ℂ) (ρ : MState d) : ℝ :=
+--TODO: Bundle as a ContinuousLinearMap.
+/-- The **expectation value** of an operator on a quantum state. -/
+def exp_val (ρ : MState d) (T : HermitianMat d ℂ) : ℝ :=
   ρ.M.inner T
 
 theorem exp_val_nonneg {T : HermitianMat d ℂ} (h : 0 ≤ T) (ρ : MState d) : 0 ≤ ρ.exp_val T :=
@@ -150,6 +152,10 @@ theorem exp_val_nonneg {T : HermitianMat d ℂ} (h : 0 ≤ T) (ρ : MState d) : 
 
 @[simp]
 theorem exp_val_zero (ρ : MState d) : ρ.exp_val 0 = 0 := by
+  simp [MState.exp_val]
+
+@[simp]
+theorem exp_val_one (ρ : MState d) : ρ.exp_val 1 = 1 := by
   simp [MState.exp_val]
 
 theorem exp_val_le_one {T : HermitianMat d ℂ} (h : T ≤ 1) (ρ : MState d) : ρ.exp_val T ≤ 1 := by
@@ -160,11 +166,23 @@ theorem exp_val_prob {T : HermitianMat d ℂ} (h : 0 ≤ T ∧ T ≤ 1) (ρ : MS
     0 ≤ ρ.exp_val T ∧ ρ.exp_val T ≤ 1 :=
   ⟨ρ.exp_val_nonneg h.1, ρ.exp_val_le_one h.2⟩
 
+theorem exp_val_sub (ρ : MState d) (A B : HermitianMat d ℂ) :
+    ρ.exp_val (A - B) = ρ.exp_val A - ρ.exp_val B := by
+  simp [exp_val, HermitianMat.inner_left_sub]
+
+/-- If a PSD observable `A` has expectation value of 1 on a state `ρ`, it must entirely contain the
+support of `ρ` in its kernel. -/
+theorem exp_val_eq_zero_iff (ρ : MState d) {A : HermitianMat d ℂ} (hA₁ : 0 ≤ A)   :
+    ρ.exp_val A = 0 ↔ ρ.M.support ≤ A.ker := by
+  sorry
+
 /-- If an observable `A` has expectation value of 1 on a state `ρ`, it must entirely contain the
 support of `ρ` in its 1-eigenspace. -/
-theorem exp_val_eq_one_iff (ρ : MState d) {A : HermitianMat d ℂ} (hA₁ : 0 ≤ A) (hA₂ : A ≤ 1) :
+theorem exp_val_eq_one_iff (ρ : MState d) {A : HermitianMat d ℂ} (hA₂ : A ≤ 1) :
     ρ.exp_val A = 1 ↔ ρ.M.support ≤ (1 - A).ker := by
-  sorry
+  rw [← exp_val_eq_zero_iff ρ (A := 1 - A) (HermitianMat.zero_le_iff.mpr hA₂)]
+  rw [exp_val_sub, exp_val_one]
+  rw [sub_eq_zero, eq_comm]
 
 end exp_val
 
