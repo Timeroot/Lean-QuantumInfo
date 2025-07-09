@@ -29,6 +29,7 @@ Mario Berta et al. for a broader overview.
 open NNReal
 open ComplexOrder
 open Topology
+open Prob
 
 variable {d : Type*} [Fintype d] [DecidableEq d]
 
@@ -47,14 +48,14 @@ instance iInf_Inhabited (ρ : MState d) (ε : Prob) :
     Inhabited { m // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } :=
   ⟨1, by simp⟩
 
-instance (ρ : MState d) (ε : Prob) : Inhabited {m | MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1} :=
+instance (ρ : MState d) (ε : Prob) : Inhabited {m | ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1} :=
   iInf_Inhabited ρ ε
 
 /-- The space of strategies `T` in `OptimalHypothesisRate` is compact. -/
-theorem iInf_IsCompact (ρ : MState d) (ε : Prob) : IsCompact { m | MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } := by
+theorem iInf_IsCompact (ρ : MState d) (ε : Prob) : IsCompact { m | ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } := by
   have hC₁ : IsCompact {m : HermitianMat d ℂ | 0 ≤ m ∧ m ≤ 1} :=
     HermitianMat.unitInterval_IsCompact
-  have hC₂ : IsClosed {m | MState.exp_val (1 - m) ρ ≤ ε} := by
+  have hC₂ : IsClosed {m | ρ.exp_val (1 - m) ≤ ε} := by
     --This is a linear constraint and so has a closed image
     change IsClosed ((fun m ↦ ρ.M.inner_BilinForm (1 - m)) ⁻¹' (Set.Iic ε))
     refine IsClosed.preimage ?_ isClosed_Iic
@@ -62,7 +63,7 @@ theorem iInf_IsCompact (ρ : MState d) (ε : Prob) : IsCompact { m | MState.exp_
   exact hC₁.inter_left hC₂
 
 /-- The space of strategies `T` in `OptimalHypothesisRate` is convex. -/
-theorem iInf_IsConvex (ρ : MState d) (ε : Prob) : Convex ℝ { m | MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } := by
+theorem iInf_IsConvex (ρ : MState d) (ε : Prob) : Convex ℝ { m | ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } := by
   --We *could* get this from a more general fact that any linear subspace is convex,
   --and the intersection of convex spaces is convex, and this is an intersection of
   --three convex spaces. That would be more broken-down and lemmaified.
@@ -121,7 +122,7 @@ theorem exists_min (ρ : MState d) (ε : Prob) (S : Set (MState d)):
     ∃ (T : { m : HermitianMat d ℂ // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1}),
       ⨆ σ ∈ S, ⟨_, σ.exp_val_prob T.prop.right⟩ = β_ ε(ρ‖S) := by
   have _ : Nonempty d := ρ.nonempty
-  convert IsCompact.exists_isMinOn (α := Prob) (β := {m // MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1}) (s := Set.univ)
+  convert IsCompact.exists_isMinOn (α := Prob) (β := {m // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1}) (s := Set.univ)
     ?_ ?_ (f := fun T ↦ ⨆ σ ∈ S, ⟨_, σ.exp_val_prob T.prop.right⟩) ?_
   · rename_i T
     simp only [Set.mem_univ, true_and]
@@ -139,7 +140,7 @@ theorem exists_min (ρ : MState d) (ε : Prob) (S : Set (MState d)):
   · exact Set.univ_nonempty
   · rw [← continuous_iff_continuousOn_univ]
     suffices Continuous
-        (fun (T : { m // MState.exp_val (1 - m) ρ ≤ ↑ε ∧ 0 ≤ m ∧ m ≤ 1 }) ↦ ⨆ σ ∈ S, σ.exp_val T) by
+        (fun (T : { m // ρ.exp_val (1 - m) ≤ ↑ε ∧ 0 ≤ m ∧ m ≤ 1 }) ↦ ⨆ σ ∈ S, σ.exp_val T) by
       convert Continuous.subtype_mk this ?_
       · rcases S.eq_empty_or_nonempty with rfl|hnS
         · simpa using bot_eq_zero''
@@ -147,7 +148,7 @@ theorem exists_min (ρ : MState d) (ε : Prob) (S : Set (MState d)):
         rw [← iSup_subtype'']
         rw [Set.Icc.coe_iSup zero_le_one]
         rename_i x'
-        have h_bdd : BddAbove (Set.range fun (i : S) => MState.exp_val x' i.val) := by
+        have h_bdd : BddAbove (Set.range fun (i : S) => i.val.exp_val x') := by
           use 1
           simp [upperBounds]
           intro y hy
@@ -212,7 +213,7 @@ theorem pos_of_lt_one {ρ : MState d} (S : Set (MState d))
   simp only [MState.toMat_M] at hT₄
   replace hT₁ : ρ.exp_val (1 - T) ≠ 1 := (lt_of_le_of_lt hT₁ hε).ne
   absurd hT₁
-  rw [ρ.exp_val_eq_one_iff (HermitianMat.zero_le_iff.mpr hT₃) (sub_le_self 1 hT₂), sub_sub_cancel]
+  rw [ρ.exp_val_eq_one_iff (sub_le_self 1 hT₂), sub_sub_cancel]
   refine le_trans ?_ hT₄.left
   exact (ContinuousLinearMap.ker_le_ker_iff_range_le_range (by simp) (by simp)).mp hσ₂ --todo cleanup
 
@@ -232,7 +233,7 @@ theorem Lemma3 {ρ : MState d} (ε : Prob) {S : Set (MState d)} (hS₁ : IsCompa
   --The function `f` will be the `MState.exp_val` function, but bundled as a bilinear form.
   let f : LinearMap.BilinForm ℝ (HermitianMat d ℂ) := HermitianMat.inner_BilinForm
   let S' : Set (HermitianMat d ℂ) := MState.M '' S
-  let T' : Set (HermitianMat d ℂ) := { m | MState.exp_val (1 - m) ρ ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 }
+  let T' : Set (HermitianMat d ℂ) := { m | ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 }
 
   have hS'₁ : IsCompact S' := hS₁.image MState.Continuous_HermitianMat
 
