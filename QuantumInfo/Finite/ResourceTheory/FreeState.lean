@@ -69,6 +69,26 @@ class Unital (ι : Type*) [ResourcePretheory ι] where
 
 instance instUnitalUnique [ResourcePretheory ι] [u : Unital ι] : Unique (H u.unit) := u.unit_unique
 
+open ComplexOrder in
+theorem PosDef.prod {ι : Type*} [ResourcePretheory ι] {i j : ι}
+      {ρ : MState (H i)} {σ : MState (H j)} (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
+      : (ρ ⊗ᵣ σ).m.PosDef := by
+  have : (ρ ⊗ σ).m.PosDef := MState.PosDef.kron hρ hσ
+  rw [prodRelabel]
+  exact MState.PosDef.relabel this (prodEquiv i j)
+
+open ComplexOrder in
+theorem PosDef.npow {ι : Type*} [ResourcePretheory ι] {i : ι}
+      {ρ : MState (H i)} (hρ : ρ.m.PosDef) (n : ℕ+)
+      : (ρ⊗^[n]).m.PosDef := by
+  induction n
+  · exact hρ
+  · rename_i n ih
+    rcases n with ⟨(_|n), hn⟩
+    . simp at hn
+    exact ResourcePretheory.PosDef.prod hρ ih
+
+
 end ResourcePretheory
 
 /- FreeStateTheories: theories defining some sets of "free states" within a collection of Hilbert spaces. -/
@@ -106,6 +126,25 @@ noncomputable instance Inhabited_IsFree : Inhabited (IsFree (i := i)) :=
 /--The set of free states is compact because it's a closed subset of a compact space. -/
 theorem IsCompact_IsFree : IsCompact (IsFree (i := i)) :=
   .of_isClosed_subset isCompact_univ free_closed (Set.subset_univ _)
+
+--Also this needs to be generalized to other convex sets. I think it should work for any
+--(well-behaved?) Mixable instance, it certainly works for any `Convex` set (of which `IsFree`
+-- is one, the only relevant property here is `free_convex`.
+theorem IsFree.mix {ι : Type*} [FreeStateTheory ι] {i : ι} {σ₁ σ₂ : MState (H i)}
+    (hσ₁ : IsFree σ₁) (hσ₂ : IsFree σ₂) (p : Prob) : IsFree (p [σ₁ ↔ σ₂]) := by
+  obtain ⟨m, hm₁, hm₂⟩ := free_convex (i := i) ⟨σ₁, hσ₁, rfl⟩ ⟨σ₂, hσ₂, rfl⟩ p.zero_le (1 - p).zero_le (by simp)
+  simp [Mixable.mix, Mixable.mix_ab, MState.instMixable]
+  simp at hm₂
+  convert ← hm₁
+
+theorem IsFree.npow {ι : Type*} [FreeStateTheory ι] {i : ι} {ρ : MState (H i)}
+    (hρ : IsFree ρ) (n : ℕ+) : IsFree (ρ⊗^[n]) := by
+  induction n
+  · exact hρ
+  · rename_i n ih
+    rcases n with ⟨(_|n), hn⟩
+    . simp at hn
+    exact FreeStateTheory.free_prod hρ ih
 
 end FreeStateTheory
 

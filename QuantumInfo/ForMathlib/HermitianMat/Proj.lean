@@ -14,10 +14,7 @@ variable {𝕜 : Type*} [RCLike 𝕜]
 `{A ≤ₚ B}`, which is scoped to `HermitianMat`. This is the unique maximum operator `P`
 such that `P^2 = P` and `P * A * P ≤ P * B * P` in the Loewner order. -/
 def proj_le (A B : HermitianMat n 𝕜) : HermitianMat n 𝕜 :=
-  ⟨Matrix.IsHermitian.cfc (B - A).H (fun x ↦ if x ≥ 0 then 1 else 0), by
-    rw [←Matrix.IsHermitian.cfc_eq]
-    exact IsSelfAdjoint.cfc
-  ⟩
+  (B - A).cfc (fun x ↦ if 0 ≤ x then 1 else 0)
 
 -- Note this is in the opposite direction as in the Stein's Lemma paper, which uses `≥ₚ`
 -- as the default ordering. We offer the `≥ₚ` notation which is the same with the arguments
@@ -27,8 +24,8 @@ scoped[HermitianMat] notation "{" A " ≥ₚ " B "}" => proj_le B A
 
 variable (A B : HermitianMat n 𝕜)
 
-theorem proj_le_cfc : {A ≤ₚ B} = cfc (fun x ↦ if x ≥ 0 then (1 : ℝ) else 0) (B - A).toMat := by
-  simp only [proj_le, ← Matrix.IsHermitian.cfc_eq]
+theorem proj_le_cfc : {A ≤ₚ B} = cfc (fun x ↦ if 0 ≤ x then (1 : ℝ) else 0) (B - A).toMat := by
+  simp only [proj_le, ← Matrix.IsHermitian.cfc_eq, HermitianMat.cfc]
 
 theorem proj_le_sq : {A ≤ₚ B}^2 = {A ≤ₚ B} := by
   ext1

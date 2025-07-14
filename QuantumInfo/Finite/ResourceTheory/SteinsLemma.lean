@@ -11,232 +11,6 @@ open Topology
 open scoped Prob
 open scoped OptimalHypothesisRate
 
---PULLOUT (mathlib)
-theorem Filter.liminf_add_tendsTo_zero (f g : ℕ+ → ENNReal)
-      (hg : Filter.atTop.Tendsto g (𝓝 0)) :
-    Filter.atTop.liminf (f + g) = Filter.atTop.liminf f := by
-  -- Since $g$ tends to $0$, for any $\epsilon > 0$, there exists $N$ such that for all $n \geq N$, $g(n) < \epsilon$.
-  have h_eps : ∀ ε > 0, ∃ N, ∀ n ≥ N, g n < ε := by
-    intro ε hε;
-    simpa using ( hg.eventually ( gt_mem_nhds hε ) );
-  refine' le_antisymm _ _;
-  -- Case 1
-  · refine' le_of_forall_gt_imp_ge_of_dense fun b hb => _;
-    rw [ Filter.liminf_eq ] at *;
-    refine' csSup_le _ _;
-    -- Case 1
-    · -- Since $f$ and $g$ are non-negative, $0 \leq f n + g n$ for all $n$. Therefore, $0$ is in the set.
-      use 0
-      simp;
-    -- Case 2
-    · intro b_1 a
-      simp_all only [gt_iff_lt, ge_iff_le, eventually_atTop, Pi.add_apply, Set.mem_setOf_eq]
-      obtain ⟨w, h⟩ := a
-      contrapose! hb;
-      -- Since $b < b_1$, we can choose $\epsilon = b_1 - b$.
-      obtain ⟨N, hN⟩ : ∃ N, ∀ n ≥ N, g n < b_1 - b := by
-        exact h_eps _ ( tsub_pos_iff_lt.mpr hb );
-      refine' le_csSup _ _;
-      -- Case 1
-      · norm_num +zetaDelta at *;
-      -- Case 2
-      · use Max.max N w;
-        intro n hn; specialize h n ( le_of_max_le_right hn ) ; specialize hN n ( le_of_max_le_left hn ) ; aesop;
-        contrapose! hN;
-        exact tsub_le_iff_left.mpr ( by simpa only [ add_comm ] using le_trans h ( add_le_add_right hN.le _ ) );
-  -- Case 2
-  · refine' ( csSup_le _ _ );
-    -- Case 1
-    · norm_num;
-      exact ⟨ 0, ⟨ 1, fun _ _ => zero_le _ ⟩ ⟩;
-    -- Case 2
-    · -- Given that $b$ is a lower bound for $f$, we need to show that $b$ is also a lower bound for $f + g$.
-      intros b hb
-      have h_lower_bound : ∀ᶠ n in Filter.atTop, b ≤ f n + g n := by
-        simp_all only [gt_iff_lt, ge_iff_le, eventually_map, eventually_atTop, Set.mem_setOf_eq]
-        obtain ⟨w, h⟩ := hb
-        exact ⟨ w, fun n hn => le_add_right ( h n hn ) ⟩;
-      refine' le_csSup _ _;
-      -- Case 1
-      · simp;
-      -- Case 2
-      · bound
-
-theorem Filter.limsup_add_tendsTo_zero (f g : ℕ+ → ENNReal) (hg : Filter.atTop.Tendsto g (𝓝 0)) :
-    Filter.atTop.limsup (f + g) = Filter.atTop.limsup f := by
-  -- Since $g$ tends to $0$, for any $\epsilon > 0$, there exists an $N$ such that for all $n \geq N$, $g(n) < \epsilon$.
-  have h_eps : ∀ ε > 0, ∃ N, ∀ n ≥ N, g n < ε := by
-    intro ε hε;
-    simpa using ( hg.eventually ( gt_mem_nhds hε ) );
-  rw [ Filter.limsup_eq, Filter.limsup_eq ];
-  -- To prove the equality of the infimums, it suffices to show that for any $a$ in the set where $f n$ is eventually $\leq a$, there exists an $a'$ in the set where $f + g n$ is eventually $\leq a'$, and vice versa.
-  apply le_antisymm;
-  -- Case 1
-  · -- For any $a$ in the set where $f$ is eventually $\leq a$, we can find an $a' = a + \epsilon$ in the set where $f + g$ is eventually $\leq a'$.
-    have h_forall_a : ∀ a ∈ {a : ENNReal | ∀ᶠ n in Filter.atTop, f n ≤ a}, ∀ ε > 0, ∃ a' ∈ {a : ENNReal | ∀ᶠ n in Filter.atTop, (f + g) n ≤ a}, a' ≤ a + ε := by
-      simp +zetaDelta at *;
-      intro a x hx ε ε_pos; rcases h_eps ε ε_pos with ⟨ N, hN ⟩ ; exact ⟨ a + ε, ⟨ Max.max x N, fun n hn => add_le_add ( hx n ( le_of_max_le_left hn ) ) ( le_of_lt ( hN n ( le_of_max_le_right hn ) ) ) ⟩, le_rfl ⟩;
-    apply le_of_forall_le;
-    intro c a
-    simp_all only [gt_iff_lt, ge_iff_le, eventually_atTop, Set.mem_setOf_eq, Pi.add_apply, forall_exists_index,
-      le_sInf_iff]
-    intro b x h
-    contrapose! a;
-    rcases ENNReal.lt_iff_exists_add_pos_lt.1 a with ⟨ ε, ε_pos, hε ⟩;
-    rcases h_forall_a b x h ε ( by simpa using ε_pos ) with ⟨ a', ⟨ x', hx' ⟩, ha' ⟩ ; exact ⟨ a', x', hx', lt_of_le_of_lt ha' hε ⟩;
-  -- Case 2
-  · refine' le_csInf _ _;
-    -- Case 1
-    · simp_all only [gt_iff_lt, ge_iff_le, Pi.add_apply, eventually_atTop]
-      rcases h_eps 1 zero_lt_one with ⟨ N, hN ⟩;
-      -- Since $g(n) < 1$ for all $n \geq N$, we have $f(n) + g(n) \leq f(n) + 1$ for all $n \geq N$.
-      have h_le : ∀ n ≥ N, f n + g n ≤ f n + 1 := by
-        exact fun n hn => add_le_add_left ( le_of_lt ( hN n hn ) ) _;
-      exact ⟨ ⊤, ⟨ N, fun n hn => le_trans ( h_le n hn ) ( by norm_num ) ⟩ ⟩;
-    -- Case 2
-    · intro b a
-      simp_all only [gt_iff_lt, ge_iff_le, Pi.add_apply, eventually_atTop, Set.mem_setOf_eq]
-      refine' csInf_le _ _;
-      -- Case 1
-      · exact ⟨ 0, by rintro x ⟨ N, hN ⟩ ; exact zero_le _ ⟩;
-      -- Case 2
-      · obtain ⟨w, h⟩ := a
-        exact ⟨ w, fun n hn => le_trans ( le_add_right le_rfl ) ( h n hn ) ⟩
-
---PULLOUT (HypothesisTesting.leans)
-theorem rate_pos_of_smul_pos {ε : Prob} {d : Type*} [Fintype d] [DecidableEq d] {ρ σ₁ σ₂ : MState d}
-  (hσ₂ : 0 < β_ ε(ρ‖{σ₂})) {c : ℝ} (hc : 0 < c) (hσ : c • σ₂ ≤ σ₁.M) : 0 < β_ ε(ρ‖{σ₁}) := by
-sorry
-
---PULLOUT (HypothesisTesting.lean)
-@[fun_prop]
-theorem rate_Continuous {ε : Prob} {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) :
-    Continuous fun σ ↦ β_ ε(ρ‖{σ}) := by
-  sorry
-
---PULLOUT (FreeStateTheory.lean)
---Also this needs to be generalized to other convex sets. I think it should work for any
---(well-behaved?) Mixable instance, it certainly works for any `Convex` set (of which `IsFree`
--- is one, the only relevant property here is `free_convex`.
-theorem FreeStateTheory.IsFree.mix {ι : Type*} [FreeStateTheory ι] {i : ι} {σ₁ σ₂ : MState (H i)}
-    (hσ₁ : IsFree σ₁) (hσ₂ : IsFree σ₂) (p : Prob) : IsFree (p [σ₁ ↔ σ₂]) := by
-  obtain ⟨m, hm₁, hm₂⟩ := free_convex (i := i) ⟨σ₁, hσ₁, rfl⟩ ⟨σ₂, hσ₂, rfl⟩ p.zero_le (1 - p).zero_le (by simp)
-  simp [Mixable.mix, Mixable.mix_ab, MState.instMixable]
-  simp at hm₂
-  convert ← hm₁
-
---PULLOUT (FreeStateTheory.lean)
-theorem FreeStateTheory.IsFree.npow {ι : Type*} [FreeStateTheory ι] {i : ι} {ρ : MState (H i)}
-    (hρ : IsFree ρ) (n : ℕ+) : IsFree (ρ⊗^[n]) := by
-  induction n
-  · exact hρ
-  · rename_i n ih
-    rcases n with ⟨(_|n), hn⟩
-    . simp at hn
-    exact FreeStateTheory.free_prod hρ ih
-
---PULLOUT (Mathlib)
-theorem Matrix.PosDef.kron {d₁ d₂ : Type*} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
-    {σ₁ : Matrix d₁ d₁ ℂ} {σ₂ : Matrix d₂ d₂ ℂ} (hσ₁ : σ₁.PosDef) (hσ₂ : σ₂.PosDef) : (σ₁.kronecker σ₂).PosDef := by
-  sorry
-
---PULLOUT (Mathlib)
---TODO: Turn this into a simp form with an iff
-theorem Matrix.PosDef.reindex {d₁ d₂ : Type*} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
-    {M : Matrix d₁ d₁ ℂ} (hM : M.PosDef) (e : d₁ ≃ d₂) : (M.reindex e e).PosDef := by
-  sorry
-
---PULLOUT (MState.lean)
-theorem MState.PosDef.kron {d₁ d₂ : Type*} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
-    {σ₁ : MState d₁} {σ₂ : MState d₂} (hσ₁ : σ₁.m.PosDef) (hσ₂ : σ₂.m.PosDef) : (σ₁ ⊗ σ₂).m.PosDef :=
-  hσ₁.kron hσ₂
-
---PULLOUT (MState.lean)
-theorem MState.PosDef.relabel {d₁ d₂ : Type*} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
-    {ρ : MState d₁} (hρ : ρ.m.PosDef) (e : d₂ ≃ d₁) : (ρ.relabel e).m.PosDef :=
-  Matrix.PosDef.reindex hρ e.symm
-
---PULLOUT (FreeStateTheory.lean)
-theorem ResourcePretheory.PosDef.prod {ι : Type*} [ResourcePretheory ι] {i j : ι}
-      {ρ : MState (H i)} {σ : MState (H j)} (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
-      : (ρ ⊗ᵣ σ).m.PosDef := by
-  have : (ρ ⊗ σ).m.PosDef := MState.PosDef.kron hρ hσ
-  rw [prodRelabel]
-  exact MState.PosDef.relabel this (prodEquiv i j)
-
---PULLOUT (FreeStateTheory.lean)
-theorem ResourcePretheory.PosDef.npow {ι : Type*} [ResourcePretheory ι] {i : ι}
-      {ρ : MState (H i)} (hρ : ρ.m.PosDef) (n : ℕ+)
-      : (ρ⊗^[n]).m.PosDef := by
-  induction n
-  · exact hρ
-  · rename_i n ih
-    rcases n with ⟨(_|n), hn⟩
-    . simp at hn
-    exact ResourcePretheory.PosDef.prod hρ ih
-
---PULLOUT (Prob.lean)
-@[fun_prop]
-theorem Prob.toNNReal_Continuous : Continuous Prob.toNNReal := by
-  unfold Prob.toNNReal
-  fun_prop
-
---PULLOUT (Mathlib)
-theorem Matrix.PosDef.smul {n : Type*} [Fintype n] {M : Matrix n n ℂ} (hM : M.PosDef) {c : ℝ} (hc : 0 < c) :
-    (c • M).PosDef := by
-  constructor
-  · exact hM.1.smul_real c
-  · peel hM.2
-    rw [smul_mulVec_assoc, dotProduct_smul]
-    positivity
-
---PULLOUT (Mathlib)
-theorem Matrix.PosSemidef.rsmul {n : Type*} [Fintype n] {M : Matrix n n ℂ} (hM : M.PosSemidef) {c : ℝ} (hc : 0 ≤ c) :
-    (c • M).PosSemidef := by
-  constructor
-  · exact hM.1.smul_real c
-  · peel hM.2
-    rw [smul_mulVec_assoc, dotProduct_smul]
-    positivity
-
---PULLOUT (Mathlib)
-theorem Matrix.PosDef.Convex {n : Type*} [Fintype n] : Convex ℝ (Matrix.PosDef (n := n) (R := ℂ)) := by
-  intro A hA B hB a b ha hb hab
-  rcases ha.eq_or_lt with (rfl | ha)
-  · simp_all
-  rcases hb.eq_or_lt with (rfl | hb)
-  · simp_all
-  exact (hA.smul ha).add (hB.smul hb)
-
---PULLOUT (MState.lean)
-/-- If both states positive definite, so is their mixture. -/
-theorem MState.PosDef_mix {d : Type*} [Fintype d] [DecidableEq d] {σ₁ σ₂ : MState d}
-    (hσ₁ : σ₁.m.PosDef) (hσ₂ : σ₂.m.PosDef) (p : Prob) : (p [σ₁ ↔ σ₂]).m.PosDef :=
-  Matrix.PosDef.Convex hσ₁ hσ₂ p.zero_le (1 - p).zero_le (by simp)
-
---PULLOUT (MState.lean)
-/-- If one state is positive definite and the mixture is nondegenerate, their mixture is also positive definite. -/
-theorem MState.PosDef_mix_of_ne_zero {d : Type*} [Fintype d] [DecidableEq d] {σ₁ σ₂ : MState d}
-    (hσ₁ : σ₁.m.PosDef) (p : Prob) (hp : p ≠ 0) : (p [σ₁ ↔ σ₂]).m.PosDef := by
-  rw [← zero_lt_iff] at hp
-  exact (hσ₁.smul hp).add_posSemidef (σ₂.pos.rsmul (1 - p).zero_le)
-
---PULLOUT (MState.lean)
-/-- If the second state is positive definite and the mixture is nondegenerate, their mixture is also positive definite. -/
-theorem MState.PosDef_mix_of_ne_one {d : Type*} [Fintype d] [DecidableEq d] {σ₁ σ₂ : MState d}
-    (hσ₂ : σ₂.m.PosDef) (p : Prob) (hp : p ≠ 1) : (p [σ₁ ↔ σ₂]).m.PosDef := by
-  have : 0 < 1 - p := by
-    --TODO this is ridiculous, move to Prob
-    contrapose! hp
-    have : (1 : ℝ) - (p : ℝ) = (0 : ℝ) := by
-      have := le_antisymm hp (1 - p).zero_le
-      rw [Subtype.ext_iff] at this
-      simpa using this
-    ext
-    change (p : ℝ) = 1
-    linarith
-  exact (hσ₂.smul this).posSemidef_add (σ₁.pos.rsmul p.zero_le)
-
 namespace SteinsLemma
 
 variable {ι : Type*} [FreeStateTheory ι]
@@ -598,7 +372,7 @@ by_cases hσ₂ : β_ ε(ρ n‖{σ₂ n}) = 0
 · simp [hσ₂]
 replace hσ₂ := Prob.zero_lt_coe hσ₂
 have hσ₁ : (0 : ℝ) < β_ ε(ρ n‖{σ₁ n}) := by
-  refine rate_pos_of_smul_pos hσ₂ (Real.exp_pos (-↑(f n))) ?_
+  refine OptimalHypothesisRate.rate_pos_of_smul_pos hσ₂ (Real.exp_pos (-↑(f n))) ?_
   exact hσ n --For some reason turning these two lines into one `exact` causes timeouts
 rw [← ENNReal.toReal_le_toReal (by finiteness) (by finiteness)]
 rw [ENNReal.toReal_add (by finiteness) (by finiteness)]
@@ -740,8 +514,10 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
       ENNReal.lt_add_right hR2 (by simp [← NNReal.coe_eq_zero, hε₀.ne'])
     (Filter.frequently_lt_of_liminf_lt (h := h)).exists
 
-  -- Define σ̃ₙ in terms of σₘ
+  --Define σ₁
   obtain ⟨σ₁, hσ₁_pos, hσ₁_free⟩ := FreeStateTheory.free_fullRank i
+
+  -- Define σ̃ₙ in terms of σₘ
   let «σ̃» (n) := Lemma6_σn m σ₁ (σ m) n
   have «σ̃_free» (n) : IsFree («σ̃» (n)) := Lemma6_σn_IsFree hσ₁_free (fun n ↦ (σ n).2) m n
 
@@ -767,7 +543,6 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     apply IsFree.mix
     · exact («σ̃_free» n).mix («σ⋆_free» n) _
     · exact hσ₁_free.npow n
-
   have σ'_posdef (n) : (σ' n).m.PosDef := by
     --because σ₁ is PosDef, so is σ₁⊗^[n], and so is any convex mixture.
     unfold σ'
@@ -775,9 +550,13 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     · apply ResourcePretheory.PosDef.npow hσ₁_pos
     · norm_num [← Prob.ne_iff]
 
+  --Clean up the goal... a bit... still a mess!
+  clear «σ̃_free» «σ⋆_max» «σ⋆_free»
+
   -- λ_full, the minimum eigenvalue of σ_full
   let mineig := ⨅ i, σ₁.M.H.eigenvalues i
   obtain ⟨i_min, hi_min⟩ := exists_eq_ciInf_of_finite (f := (HermitianMat.H σ₁.M).eigenvalues)
+
   have h_min_pos : 0 < mineig := by
     --because σ₁ is PosDef, all eigenvalues are positive, so their minimum is positive
     unfold mineig
@@ -789,6 +568,8 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     unfold mineig
     rw [← hi_min]
     exact σ₁.eigenvalue_le_one i_min
+
+  clear i_min hi_min
 
   -- The sequence c_n given in (S44)
   let c (n : ℕ+) := Real.log (1 / mineig) + (Real.log 3) / n
@@ -818,11 +599,17 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
 
   --Define σ'' first as the (unnormalized) cfc image of σ' under `λ → exp (f n λ)`.
   let σ''_unnormalized (n) : HermitianMat (H (i⊗^[n])) ℂ := --TODO: Define a HermitianMat.cfc function that behaves nicely
-    ⟨cfc (fun e ↦ Real.exp (f n e)) (σ' n).M, cfc_predicate _ _⟩
+    (σ' n).M.cfc (fun e ↦ Real.exp (f n e))
+
   have σ''_unnormalized_PosDef (n) : Matrix.PosDef (σ''_unnormalized n).val := by
-    --(∀ x, 0 < f x) → (HermitianMat.cfc M f).val.PosDef
     dsimp [σ''_unnormalized]
+    rw [HermitianMat.cfc_PosDef]
+    intro
+    positivity
+
+  have σ''_tr_bounds (n) : 1 ≤ (σ''_unnormalized n).trace ∧ (σ''_unnormalized n).trace ≤ Real.exp (c n) := by
     sorry
+
   --Then σ'' is the normalized version, which will work because σ''_unnormalized is PosDef
   let σ'' (n) : MState (H (i⊗^[n])) := {
     --TODO make this its own definition
@@ -830,6 +617,11 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     zero_le := sorry
     tr := sorry
   }
+
+  have σ'_le_σ'' (n) : Real.exp (-(c n)) • (σ' n).M ≤ σ'' n := by
+    sorry
+  have σ''_le_σ' (n) : σ'' n ≤ Real.exp (c n) • (σ' n).M := by
+    sorry
 
   sorry
 

@@ -191,6 +191,11 @@ theorem top_eq_one : (⊤ : Prob) = 1 := by
 theorem sub_zero (p : Prob) : p - 0 = p := by
   ext1; simp [coe_sub]
 
+@[fun_prop]
+theorem toNNReal_Continuous : Continuous Prob.toNNReal := by
+  unfold Prob.toNNReal
+  fun_prop
+
 end Prob
 
 /-- A `Mixable T` typeclass instance gives a compact way of talking about the action of probabilities

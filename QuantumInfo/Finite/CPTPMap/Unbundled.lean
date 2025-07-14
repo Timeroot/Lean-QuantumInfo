@@ -42,7 +42,7 @@ theorem IsTracePreserving_iff_trace_choi (M : MatrixMap A B R) : M.IsTracePreser
     simp [Matrix.traceLeft, Matrix.trace] at h ⊢
     rw [← M.choi_map_inv, of_choi_matrix]
     dsimp
-    rw [Finset.sum_comm_3, Finset.sum_comm_3]
+    rw [Finset.sum_comm_cycle, Finset.sum_comm_cycle]
     simp_rw [← Finset.mul_sum, h, Matrix.one_apply]
     simp
 

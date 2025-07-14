@@ -463,3 +463,12 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
     refine mul_nonneg (Real.rpow_nonneg ?_ _) (Real.rpow_nonneg ?_ _)
     · exact sub_nonneg_of_le p.2.2
     · exact sub_nonneg_of_le q.2.2
+
+theorem rate_pos_of_smul_pos {ε : Prob} {d : Type*} [Fintype d] [DecidableEq d] {ρ σ₁ σ₂ : MState d}
+    (hσ₂ : 0 < β_ ε(ρ‖{σ₂})) {c : ℝ} (hc : 0 < c) (hσ : c • σ₂ ≤ σ₁.M) : 0 < β_ ε(ρ‖{σ₁}) := by
+sorry
+
+@[fun_prop]
+theorem rate_Continuous {ε : Prob} {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) :
+    Continuous fun σ ↦ β_ ε(ρ‖{σ}) := by
+  sorry

@@ -677,4 +677,42 @@ notation ρ "⊗^" n => MState.npow ρ n
 
 end finprod
 
+section posdef
+
+theorem PosDef.kron {d₁ d₂ : Type*} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
+    {σ₁ : MState d₁} {σ₂ : MState d₂} (hσ₁ : σ₁.m.PosDef) (hσ₂ : σ₂.m.PosDef) : (σ₁ ⊗ σ₂).m.PosDef :=
+  hσ₁.kron hσ₂
+
+theorem PosDef.relabel {d₁ d₂ : Type*} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
+    {ρ : MState d₁} (hρ : ρ.m.PosDef) (e : d₂ ≃ d₁) : (ρ.relabel e).m.PosDef :=
+  Matrix.PosDef.reindex hρ e.symm
+
+/-- If both states positive definite, so is their mixture. -/
+theorem PosDef_mix {d : Type*} [Fintype d] [DecidableEq d] {σ₁ σ₂ : MState d}
+    (hσ₁ : σ₁.m.PosDef) (hσ₂ : σ₂.m.PosDef) (p : Prob) : (p [σ₁ ↔ σ₂]).m.PosDef :=
+  Matrix.PosDef.Convex hσ₁ hσ₂ p.zero_le (1 - p).zero_le (by simp)
+
+/-- If one state is positive definite and the mixture is nondegenerate, their mixture is also positive definite. -/
+theorem PosDef_mix_of_ne_zero {d : Type*} [Fintype d] [DecidableEq d] {σ₁ σ₂ : MState d}
+    (hσ₁ : σ₁.m.PosDef) (p : Prob) (hp : p ≠ 0) : (p [σ₁ ↔ σ₂]).m.PosDef := by
+  rw [← zero_lt_iff] at hp
+  exact (hσ₁.smul hp).add_posSemidef (σ₂.pos.rsmul (1 - p).zero_le)
+
+/-- If the second state is positive definite and the mixture is nondegenerate, their mixture is also positive definite. -/
+theorem PosDef_mix_of_ne_one {d : Type*} [Fintype d] [DecidableEq d] {σ₁ σ₂ : MState d}
+    (hσ₂ : σ₂.m.PosDef) (p : Prob) (hp : p ≠ 1) : (p [σ₁ ↔ σ₂]).m.PosDef := by
+  have : 0 < 1 - p := by
+    --TODO this is ridiculous, move to Prob
+    contrapose! hp
+    have : (1 : ℝ) - (p : ℝ) = (0 : ℝ) := by
+      have := le_antisymm hp (1 - p).zero_le
+      rw [Subtype.ext_iff] at this
+      simpa using this
+    ext
+    change (p : ℝ) = 1
+    linarith
+  exact (hσ₂.smul this).posSemidef_add (σ₁.pos.rsmul p.zero_le)
+
+end posdef
+
 end MState
