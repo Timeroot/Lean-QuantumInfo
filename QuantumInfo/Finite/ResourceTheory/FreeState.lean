@@ -67,7 +67,7 @@ class Unital (ι : Type*) [ResourcePretheory ι] where
   unit : ι
   unit_unique : Unique (H unit)
 
-instance instUnitalUnique [ResourcePretheory ι] [u : Unital ι] : Unique (H u.unit) := u.unit_unique
+instance instUnitalUnique [u : Unital ι] : Unique (H u.unit) := u.unit_unique
 
 open ComplexOrder in
 theorem PosDef.prod {ι : Type*} [ResourcePretheory ι] {i j : ι}
@@ -88,6 +88,26 @@ theorem PosDef.npow {ι : Type*} [ResourcePretheory ι] {i : ι}
     . simp at hn
     exact ResourcePretheory.PosDef.prod hρ ih
 
+@[simp]
+theorem qRelEntropy_prodRelabel {i j : ι} (ρ₁ ρ₂ : MState (H i)) (σ₁ σ₂ : MState (H j)):
+    𝐃(ρ₁ ⊗ᵣ σ₁‖ρ₂ ⊗ᵣ σ₂) = 𝐃(ρ₁‖ρ₂) + 𝐃(σ₁‖σ₂) := by
+  simp [prodRelabel, qRelativeEnt_additive]
+
+/-- Cast from one Hilbert space to another using the associator. -/
+def statePow_cast {i : ι} {m n k : ℕ+} (h : m + n = k)
+    : MState (H (prod (i⊗^[m]) (i⊗^[n]))) → MState (H (i⊗^[k])) := by
+  sorry
+
+@[simp]
+theorem statePow_cast_eq_pow {i : ι} {m n k : ℕ+} (ρ : MState (H i)) (h : m + n = k) :
+    statePow_cast h (ρ⊗^[m] ⊗ᵣ ρ⊗^[n]) = ρ⊗^[k] := by
+  sorry
+
+@[simp]
+theorem qRelEntropy_statePow_cast {i : ι} {m n k : ℕ+} (ρ₁ ρ₂ : MState (H (prod (i⊗^[m]) (i⊗^[n]))))
+  (h₁ h₂ : m + n = k) :
+    𝐃(statePow_cast h₁ ρ₁‖statePow_cast h₂ ρ₂) = 𝐃(ρ₁‖ρ₂) := by
+  sorry
 
 end ResourcePretheory
 
@@ -146,6 +166,11 @@ theorem IsFree.npow {ι : Type*} [FreeStateTheory ι] {i : ι} {ρ : MState (H i
     . simp at hn
     exact FreeStateTheory.free_prod hρ ih
 
+@[simp]
+theorem statePow_cast_free {i : ι} {m n k : ℕ+} (ρ : MState (H (prod (i⊗^[m]) (i⊗^[n]))))
+    (h : m + n = k) : statePow_cast h ρ ∈ IsFree ↔ ρ ∈ IsFree := by
+  sorry
+
 end FreeStateTheory
 
 --Things like asymptotically free operations, measures of non-freeness, etc. that can be stated
@@ -153,26 +178,29 @@ end FreeStateTheory
 
 variable {ι : Type*} [FreeStateTheory ι] {i : ι}
 
-noncomputable def RelativeEntResource : MState (H i) → ℝ≥0 :=
-    fun ρ ↦ (⨅ σ ∈ IsFree, 𝐃(ρ‖σ)).toNNReal
-  --Instead of .toNNReal, which maps ⊤ to 0, we could use .untop which proves that it isn't ⊤.
-  --   .untop
-  -- (by
-  --   let ⟨w,h⟩ := free_fullRank i
-  --   apply ne_top_of_le_ne_top _ (iInf_le _ w)
-  --   simp only [ne_eq, iInf_eq_top, Classical.not_imp]
-  --   constructor
-  --   · exact h.2
-  --   · refine ne_of_apply_ne ENNReal.toEReal (qRelativeEnt_ker (ρ := ρ) (?_) ▸ EReal.coe_ne_top _)
-  --     convert @bot_le _ _ (Submodule.instOrderBot) _
-  --     --Want the missing fact that w.PosDef implies w.ker = ⊥
-  --     sorry
-  -- )
+lemma relativeEntResource_ne_top (ρ : MState (H i)) : ⨅ σ ∈ IsFree, 𝐃(ρ‖σ) ≠ ⊤ := by
+  let ⟨w,h⟩ := free_fullRank i
+  apply ne_top_of_le_ne_top _ (iInf_le _ w)
+  simp only [ne_eq, iInf_eq_top, Classical.not_imp]
+  constructor
+  · exact h.2
+  · refine ne_of_apply_ne ENNReal.toEReal (qRelativeEnt_ker (ρ := ρ) (?_) ▸ EReal.coe_ne_top _)
+    convert @bot_le _ _ (Submodule.instOrderBot) _
+    exact h.1.toLin_ker_eq_bot
 
-theorem RelativeEntResource.Subadditive (ρ : MState (H i)) : Subadditive (fun n ↦
-    if hn : n = 0 then 0 else
-      let np : ℕ+ := ⟨n, Nat.zero_lt_of_ne_zero hn⟩;
-      (↑n)⁻¹ * (RelativeEntResource (ρ⊗^[np])).toReal) := by
+noncomputable def RelativeEntResource : MState (H i) → ℝ≥0 :=
+    fun ρ ↦ (⨅ σ ∈ IsFree, 𝐃(ρ‖σ)).untop (relativeEntResource_ne_top ρ)
+
+theorem exists_isFree_relativeEntResource (ρ : MState (H i)) :
+    ∃ σ ∈ IsFree, 𝐃(ρ‖σ) = RelativeEntResource ρ := by
+  obtain ⟨σ, hσ₁, hσ₂⟩ := IsCompact_IsFree.exists_isMinOn (s := IsFree (i := i)) (f := fun σ ↦ 𝐃(ρ‖σ))
+    Set.Nonempty.of_subtype (by fun_prop)
+  use σ, hσ₁
+  rw [RelativeEntResource, ← hσ₂.iInf_eq hσ₁, ENNReal.ofNNReal, WithTop.coe_untop, iInf_subtype']
+
+theorem RelativeEntResource.Subadditive (ρ : MState (H i)) : Subadditive fun n ↦
+    NNReal.toReal <| if hn : n = 0 then 0 else
+      RelativeEntResource (ρ⊗^[⟨n, Nat.zero_lt_of_ne_zero hn⟩]) := by
   intro m n
   rcases m with _|m
   · simp
@@ -183,19 +211,30 @@ theorem RelativeEntResource.Subadditive (ρ : MState (H i)) : Subadditive (fun n
   rcases n with _|n
   · simp
   simp [← NNReal.coe_add]
-  field_simp
-  rw [div_le_div_iff₀ (by positivity) (by positivity)]
-  norm_cast
-  sorry
+  generalize_proofs pf1 pf2 pf3
+  obtain ⟨σ₂, hσ₂f, hσ₂d⟩ := exists_isFree_relativeEntResource (ρ⊗^[⟨_, pf2⟩])
+  obtain ⟨σ₃, hσ₃f, hσ₃d⟩ := exists_isFree_relativeEntResource (ρ⊗^[⟨_, pf3⟩])
+  rw [← ENNReal.coe_le_coe]
+  push_cast
+  simp only [RelativeEntResource, ENNReal.ofNNReal, WithTop.coe_untop] at hσ₂d hσ₃d ⊢
+  rw [← hσ₂d, ← hσ₃d]
+  clear hσ₂d hσ₃d
+  refine le_trans (biInf_le (i := ResourcePretheory.statePow_cast (by norm_cast) (σ₂ ⊗ᵣ σ₃)) _ ?_) ?_
+  · simpa using free_prod hσ₂f hσ₃f
+  · suffices hρp : ρ⊗^[⟨m + 1 + (n + 1), pf1⟩] = statePow_cast rfl (ρ⊗^[⟨m + 1, pf2⟩] ⊗ᵣ ρ⊗^[⟨n + 1, pf3⟩]) by
+      simp [hρp, -statePow_cast_eq_pow]
+    simp
+    congr
 
 noncomputable def RegularizedRelativeEntResource (ρ : MState (H i)) : ℝ≥0 :=
-  ⟨(RelativeEntResource.Subadditive ρ).lim, by sorry⟩
+  ⟨(RelativeEntResource.Subadditive ρ).lim, by
+    rw [Subadditive.lim]
+    apply Real.sInf_nonneg
+    rintro x ⟨x, hx, rfl⟩
+    positivity⟩
 
 noncomputable def GlobalRobustness {i : ι} : MState (H i) → ℝ≥0 :=
-  fun ρ ↦ sInf {s | ∃ σ, IsFree (
-    ⟨1 / (1+s),
-      by constructor <;> (first | rw [one_div_nonneg] | rw [one_div_le]) <;> linarith [show 0 ≤ toReal s from s.2]
-    ⟩ [ ρ ↔ σ ])}
+  fun ρ ↦ sInf {s | ∃ σ, (⟨1 / (1+s), by bound⟩ [ρ ↔ σ]) ∈ IsFree}
 
 /-- A sequence of operations `f_n` is asymptotically nongenerating if `lim_{n→∞} RG(f_n(ρ_n)) = 0`, where
 RG is `GlobalRobustness` and `ρ_n` is any sequence of free states. Equivalently, we can take the `max` (

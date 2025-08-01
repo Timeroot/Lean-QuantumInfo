@@ -116,6 +116,17 @@ theorem singleton_le_exp_val {ρ σ : MState d} {ε : Prob} (m : HermitianMat d 
   apply iInf_le_of_le ⟨m, ⟨hExp, hm⟩⟩ _
   simp only [le_refl]
 
+--PULLOUT
+/-- Minimizing a bilinear form in one argument over a compact set, given a continuous function in the
+other argument. -/
+--This can probably be generalized to rings besides ℝ, and I don't know if CompleteSpace is needed. I
+--actually only need it for the finite-dimensional case.
+theorem _root_.continuous_iSup_bilinear_of_IsCompact
+  {E : Type*} [AddCommGroup E] [Module ℝ E] [UniformSpace E] [CompleteSpace E]
+  (f : LinearMap.BilinForm ℝ E) {S : Set E} (hS : IsCompact S) :
+    Continuous fun x ↦ ⨆ y ∈ S, f y x := by
+  sorry
+
 /-- There exists an optimal T for the hypothesis testing, that is, it's a minimum
 and not just an infimum. -/
 theorem exists_min (ρ : MState d) (ε : Prob) (S : Set (MState d)):
@@ -187,7 +198,14 @@ theorem exists_min (ρ : MState d) (ε : Prob) (S : Set (MState d)):
       Pi.continuous_restrict_apply _ h
     unfold MState.exp_val
     --Should be something `Continuous (fun x ↦ iSup (fun y ↦ f x y))` from `Continuous f`.
-    sorry
+    suffices Continuous (fun T : HermitianMat d ℂ ↦  ⨆ σ ∈ S, HermitianMat.inner_BilinForm σ T) by
+      simpa using this
+    have := continuous_iSup_bilinear_of_IsCompact HermitianMat.inner_BilinForm (S := MState.M '' S) ?_
+    · convert this
+      sorry
+    · --Oh no, do we need to add some assumption to S to our hypotheses...?
+      --No, we shouldn't need that S is compact. We should only need that (the image of) S is bounded.
+      sorry
 
 /-- When the allowed Type I error `ε` is less than 1 (so, we have some limit on our errors),
 and the kernel of the state `ρ` contains the kernel of some element in `S`, then the optimal

@@ -846,6 +846,7 @@ theorem PosDef_iff_eigenvalues' (M : Matrix d d 𝕜) :
   ⟨fun h ↦ ⟨h.left, (PosDef_iff_eigenvalues h.left).mp h⟩,
     fun ⟨w, h⟩ ↦ (PosDef_iff_eigenvalues w).mpr h⟩
 
+
 theorem IsHermitian.charpoly_roots_eq_eigenvalues {M : Matrix d d 𝕜} (hM : M.IsHermitian) :
     M.charpoly.roots = Multiset.map (RCLike.ofReal ∘ hM.eigenvalues) Finset.univ.val := by
   -- Since M is Hermitian, its characteristic polynomial splits into linear factors over the reals.

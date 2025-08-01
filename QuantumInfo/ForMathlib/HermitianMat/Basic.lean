@@ -457,6 +457,16 @@ theorem inner_eq_trace_rc (A B : HermitianMat n 𝕜) : A.inner B = Matrix.trace
   convert (Matrix.trace_conjTranspose (A.toMat * B.toMat)).symm using 1
   rw [Matrix.conjTranspose_mul, A.H, B.H, Matrix.trace_mul_comm]
 
+theorem inner_self_nonneg (A : HermitianMat n 𝕜) : 0 ≤ A.inner A := by
+  have (i j) := congrFun₂ A.H i j
+  simp_rw [Matrix.conjTranspose_apply] at this
+  simp_rw [inner_eq_re_trace, Matrix.trace, Matrix.diag, Matrix.mul_apply, map_sum]
+  refine Finset.sum_nonneg fun i _ ↦ Finset.sum_nonneg fun j _ ↦ ?_
+  rw [← this]
+  refine And.left <| RCLike.nonneg_iff.mp ?_
+  open ComplexOrder in
+  exact star_mul_self_nonneg (A.toMat j i)
+
 end RCLike
 
 section possemidef

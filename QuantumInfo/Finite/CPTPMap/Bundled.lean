@@ -79,9 +79,11 @@ instance instFunLike : FunLike (HPMap dIn dOut 𝕜) (HermitianMat dIn 𝕜) (He
   coe_injective' _ _ h := by
     sorry --Requires the fact the action on HermitianMat's determines action on all matrices
 
+set_option synthInstance.maxHeartbeats 40000 in
 instance instLinearMapClass : LinearMapClass (HPMap dIn dOut 𝕜) ℝ (HermitianMat dIn 𝕜) (HermitianMat dOut 𝕜) where
   map_add f x y := HermitianMat.ext <| LinearMap.map_add f.toLinearMap x y
-  map_smulₛₗ f c x := HermitianMat.ext <| by simp [instFunLike]
+  map_smulₛₗ f c x := HermitianMat.ext <| by
+    simp [instFunLike]
 
 instance instContinuousMapClass : ContinuousMapClass (HPMap dIn dOut 𝕜) (HermitianMat dIn 𝕜) (HermitianMat dOut 𝕜) where
   map_continuous f :=
@@ -106,6 +108,7 @@ instance instFunLike : FunLike (PMap dIn dOut 𝕜) (HermitianMat dIn 𝕜) (Her
   coe := DFunLike.coe ∘ toHPMap
   coe_injective' := DFunLike.coe_injective'.comp injective_toHPMap
 
+set_option synthInstance.maxHeartbeats 40000 in
 instance instLinearMapClass : LinearMapClass (PMap dIn dOut 𝕜) ℝ (HermitianMat dIn 𝕜) (HermitianMat dOut 𝕜) where
   map_add f x y := HermitianMat.ext <| LinearMap.map_add f.toLinearMap x y
   map_smulₛₗ f c x := HermitianMat.ext <| by simp [instFunLike]
@@ -260,6 +263,7 @@ instance instFunLike : FunLike (CPUMap dIn dOut 𝕜) (HermitianMat dIn 𝕜) (H
   coe Λ := Λ.toPMap
   coe_injective' := (DFunLike.coe_injective' (F := PMap dIn dOut 𝕜)).comp injective_toPMap
 
+set_option synthInstance.maxHeartbeats 40000 in
 instance instLinearMapClass : LinearMapClass (CPUMap dIn dOut 𝕜) ℝ (HermitianMat dIn 𝕜) (HermitianMat dOut 𝕜) where
   map_add f x y := HermitianMat.ext <| LinearMap.map_add f.toLinearMap x y
   map_smulₛₗ f c x := HermitianMat.ext <| by simp [instFunLike]

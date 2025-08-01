@@ -1,12 +1,11 @@
-import Mathlib.Analysis.Normed.Group.Basic
-import Mathlib.Order.LiminfLimsup
+import Mathlib
 
 import Mathlib.Tactic.Bound
 
 open Topology
 
-theorem Filter.liminf_add_tendsTo_zero {T : Type*} [LinearOrder T] [Nonempty T] (f g : T → ENNReal)
-      (hg : Filter.atTop.Tendsto g (𝓝 0)) :
+theorem Filter.liminf_add_tendsTo_zero {T : Type*} [Preorder T] [IsDirected T fun x1 x2 => x1 ≤ x2] [Nonempty T]
+  (f g : T → ENNReal) (hg : Filter.atTop.Tendsto g (𝓝 0)) :
     Filter.atTop.liminf (f + g) = Filter.atTop.liminf f := by
   -- Since $g$ tends to $0$, for any $\epsilon > 0$, there exists $N$ such that for all $n \geq N$, $g(n) < \epsilon$.
   have h_eps : ∀ ε > 0, ∃ N, ∀ n ≥ N, g n < ε := by
@@ -15,7 +14,7 @@ theorem Filter.liminf_add_tendsTo_zero {T : Type*} [LinearOrder T] [Nonempty T] 
   refine' le_antisymm _ _;
   -- Case 1
   · refine' le_of_forall_gt_imp_ge_of_dense fun b hb => _;
-    rw [ Filter.liminf_eq ] at *;
+    simp only [ Filter.liminf_eq ] at *;
     refine' csSup_le _ _;
     -- Case 1
     · -- Since $f$ and $g$ are non-negative, $0 \leq f n + g n$ for all $n$. Therefore, $0$ is in the set.
@@ -33,10 +32,12 @@ theorem Filter.liminf_add_tendsTo_zero {T : Type*} [LinearOrder T] [Nonempty T] 
       -- Case 1
       · norm_num +zetaDelta at *;
       -- Case 2
-      · use Max.max N w;
+      · dsimp
+        obtain ⟨w_max, hw⟩ := directed_of (· ≤ ·) N w
+        use w_max
         intro n hn;
-        specialize h n ( le_of_max_le_right hn ) ;
-        specialize hN n ( le_of_max_le_left hn ) ;
+        specialize h n ( hw.2.trans hn );
+        specialize hN n ( hw.1.trans hn ) ;
         contrapose! hN;
         exact tsub_le_iff_left.mpr ( by simpa only [ add_comm ] using le_trans h ( add_le_add_right hN.le _ ) );
   -- Case 2
@@ -57,7 +58,8 @@ theorem Filter.liminf_add_tendsTo_zero {T : Type*} [LinearOrder T] [Nonempty T] 
       -- Case 2
       · bound
 
-theorem Filter.limsup_add_tendsTo_zero {T : Type*} [LinearOrder T] [Nonempty T] (f g : T → ENNReal) (hg : Filter.atTop.Tendsto g (𝓝 0)) :
+theorem Filter.limsup_add_tendsTo_zero {T : Type*} [Preorder T] [IsDirected T fun x1 x2 => x1 ≤ x2] [Nonempty T]
+  (f g : T → ENNReal) (hg : Filter.atTop.Tendsto g (𝓝 0)) :
     Filter.atTop.limsup (f + g) = Filter.atTop.limsup f := by
   -- Since $g$ tends to $0$, for any $\epsilon > 0$, there exists an $N$ such that for all $n \geq N$, $g(n) < \epsilon$.
   have h_eps : ∀ ε > 0, ∃ N, ∀ n ≥ N, g n < ε := by
@@ -70,7 +72,13 @@ theorem Filter.limsup_add_tendsTo_zero {T : Type*} [LinearOrder T] [Nonempty T] 
   · -- For any $a$ in the set where $f$ is eventually $\leq a$, we can find an $a' = a + \epsilon$ in the set where $f + g$ is eventually $\leq a'$.
     have h_forall_a : ∀ a ∈ {a : ENNReal | ∀ᶠ n in Filter.atTop, f n ≤ a}, ∀ ε > 0, ∃ a' ∈ {a : ENNReal | ∀ᶠ n in Filter.atTop, (f + g) n ≤ a}, a' ≤ a + ε := by
       simp +zetaDelta at *;
-      intro a x hx ε ε_pos; rcases h_eps ε ε_pos with ⟨ N, hN ⟩ ; exact ⟨ a + ε, ⟨ Max.max x N, fun n hn => add_le_add ( hx n ( le_of_max_le_left hn ) ) ( le_of_lt ( hN n ( le_of_max_le_right hn ) ) ) ⟩, le_rfl ⟩;
+      intro a x hx ε ε_pos;
+      rcases h_eps ε ε_pos with ⟨ N, hN ⟩ ;
+      refine ⟨ a + ε, ?_, le_rfl ⟩;
+      obtain ⟨ w_max , hw ⟩ := directed_of (· ≤ ·) x N
+      use w_max
+      intro n hn
+      exact add_le_add ( hx n ( hw.1.trans hn ) ) ( le_of_lt ( hN n ( hw.2.trans hn ) ) )
     apply le_of_forall_le;
     intro c a
     simp_all only [gt_iff_lt, ge_iff_le, eventually_atTop, Set.mem_setOf_eq, Pi.add_apply, forall_exists_index,

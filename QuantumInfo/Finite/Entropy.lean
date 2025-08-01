@@ -151,6 +151,7 @@ theorem qRelativeEnt_rank {ρ σ : MState d} (h : σ.M.ker = ⊥) :
   simp only [h, bot_le]
 
 /-- The quantum relative entropy is additive when the inputs are product states -/
+@[simp]
 theorem qRelativeEnt_additive (ρ₁ σ₁ : MState d₁) (ρ₂ σ₂ : MState d₂) :
     𝐃(ρ₁ ⊗ ρ₂‖σ₁ ⊗ σ₂) = 𝐃(ρ₁‖σ₁) + 𝐃(ρ₂‖σ₂) := by
   --handle the kernels of tensor products
