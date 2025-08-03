@@ -1,4 +1,4 @@
-import QuantumInfo.ForMathlib.HermitianMat.Basic
+import QuantumInfo.ForMathlib.HermitianMat.CFC
 
 /-! # Properties of the matrix logarithm
 

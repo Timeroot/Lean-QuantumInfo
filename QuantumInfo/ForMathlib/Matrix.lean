@@ -63,16 +63,6 @@ omit [DecidableEq n] in
 theorem re_trace_eq_trace : RCLike.re (A.trace) = A.trace := by
   rw [trace, map_sum, RCLike.ofReal_sum, IsHermitian.coe_re_diag hA]
 
-/-- The trace of a Hermitian matrix, as a real number. -/
-def rtrace {A : Matrix n n 𝕜} (_ : A.IsHermitian) : ℝ :=
-  RCLike.re (A.trace)
-
-include hA in
-omit [DecidableEq n] in
-@[simp]
-theorem rtrace_eq_trace : (hA.rtrace : 𝕜) = A.trace :=
-  hA.re_trace_eq_trace
-
 section eigenvalues
 
 /-- The sum of the eigenvalues of a Hermitian matrix is equal to its trace. -/
@@ -80,9 +70,6 @@ theorem sum_eigenvalues_eq_trace : ∑ i, hA.eigenvalues i = A.trace := by
   nth_rewrite 2 [hA.spectral_theorem]
   rw [trace_mul_comm, ← mul_assoc]
   simp [trace_diagonal]
-
-theorem sum_eigenvalues_eq_rtrace : ∑ i, hA.eigenvalues i = hA.rtrace := by
-  rw [rtrace, ←@RCLike.ofReal_inj 𝕜, sum_eigenvalues_eq_trace hA, re_trace_eq_trace hA]
 
 /-- If all eigenvalues are equal to zero, then the matrix is zero. -/
 theorem eigenvalues_zero_eq_zero (h : ∀ i, hA.eigenvalues i = 0) : A = 0 := by
@@ -121,7 +108,7 @@ open scoped ComplexOrder
 
 variable {m n 𝕜 : Type*}
 variable [Fintype m] [Fintype n]
-variable [RCLike 𝕜] [dm : DecidableEq m] [dn : DecidableEq n]
+variable [RCLike 𝕜] [dn : DecidableEq n]
 
 section
 variable {A : Matrix m m 𝕜} {B : Matrix m m 𝕜}
@@ -130,7 +117,7 @@ variable (hA : A.PosSemidef) (hB : B.PosSemidef)
 include hA in
 theorem diag_nonneg : ∀i, 0 ≤ A.diag i := by
   intro i
-  simpa [mulVec, dotProduct] using hA.2 (fun j ↦ if i = j then 1 else 0)
+  classical simpa [mulVec, dotProduct] using hA.2 (fun j ↦ if i = j then 1 else 0)
 
 include hA in
 theorem trace_nonneg : 0 ≤ A.trace := by
@@ -141,6 +128,7 @@ theorem trace_nonneg : 0 ≤ A.trace := by
 
 include hA in
 theorem trace_zero : A.trace = 0 → A = 0 := by
+  open Classical in
   intro h
   rw [← hA.isHermitian.sum_eigenvalues_eq_trace, RCLike.ofReal_eq_zero] at h
   rw [Finset.sum_eq_zero_iff_of_nonneg (fun i _ ↦ hA.eigenvalues_nonneg i)] at h
@@ -151,17 +139,6 @@ include hA in
 @[simp]
 theorem trace_zero_iff : A.trace = 0 ↔ A = 0 :=
   ⟨trace_zero hA, (by simp [·])⟩
-
-theorem rtrace_nonneg : 0 ≤ hA.1.rtrace := by
-  have := hA.trace_nonneg
-  rwa [← hA.1.rtrace_eq_trace, RCLike.ofReal_nonneg] at this
-
-@[simp]
-theorem rtrace_zero_iff : hA.1.rtrace = 0 ↔ A = 0 :=
-  ⟨fun h ↦ hA.trace_zero_iff.mp (RCLike.ext
-    (by simp [show RCLike.re A.trace = 0 from h])
-    (by simp [RCLike.nonneg_iff.mp hA.trace_nonneg])),
-  (by simp [·, IsHermitian.rtrace])⟩
 
 --belongs somewhere else. compare with `Complex.normSq_eq_conj_mul_self`.
 open ComplexConjugate in
@@ -189,7 +166,6 @@ theorem outer_self_conj (v : n → 𝕜) : PosSemidef (vecMulVec v (conj v)) := 
     exact RCLike.normSq_nonneg _
 
 include hA in
-omit [DecidableEq m] in
 theorem smul {c : 𝕜} (h : 0 ≤ c) : (c • A).PosSemidef := by
   constructor
   · apply hA.1.smul_im_zero (RCLike.nonneg_iff.mp h).2
@@ -198,11 +174,10 @@ theorem smul {c : 𝕜} (h : 0 ≤ c) : (c • A).PosSemidef := by
     exact mul_nonneg h (hA.2 x)
 
 include hA hB in
-omit [DecidableEq m] in
 theorem convex_cone {c₁ c₂ : 𝕜} (hc₁ : 0 ≤ c₁) (hc₂ : 0 ≤ c₂) : (c₁ • A + c₂ • B).PosSemidef :=
   (hA.smul hc₁).add (hB.smul hc₂)
 
-set_option trace.split.failure true
+variable [dm : DecidableEq m]
 
 /-- A standard basis matrix (with a positive entry) is positive semidefinite iff the entry is on the diagonal. -/
 theorem stdBasisMatrix_iff_eq (i j : m) {c : 𝕜} (hc : 0 < c) : (single i j c).PosSemidef ↔ i = j := by
@@ -255,6 +230,7 @@ variable (hA : A.PosSemidef) (hB : B.PosSemidef)
 
 include hA hB in
 theorem PosSemidef_kronecker : (A ⊗ₖ B).PosSemidef := by
+  open Classical in
   rw [hA.left.spectral_theorem, hB.left.spectral_theorem]
   rw [mul_kronecker_mul, mul_kronecker_mul]
   rw [star_eq_conjTranspose, star_eq_conjTranspose]
@@ -266,6 +242,8 @@ theorem PosSemidef_kronecker : (A ⊗ₖ B).PosSemidef := by
   convert mul_nonneg (hA.eigenvalues_nonneg i₁) (hB.eigenvalues_nonneg i₂)
   rw [RCLike.nonneg_iff]
   simp
+
+variable [dm : DecidableEq m]
 
 lemma sqrt_eq {A B : Matrix m m 𝕜} (h : A = B) (hA : A.PosSemidef) (hB : B.PosSemidef) :
     hA.sqrt = hB.sqrt := by
@@ -493,10 +471,9 @@ theorem conjTranspose_mul_mul_mono (C : Matrix n m 𝕜) :
     rw [hDistrib]
     exact conjTranspose_mul_mul_same (le_iff_sub_posSemidef.mp hAB) C
 
-variable [DecidableEq n]
-
 /-- Basically, the instance states 0 ≤ A → ∀ x ∈ spectrum ℝ A, 0 ≤ x  -/
 instance instNonnegSpectrumClass : NonnegSpectrumClass ℝ (Matrix n n 𝕜) := by
+  open Classical in
   apply NonnegSpectrumClass.of_spectrum_nonneg
   intro A hA x hx
   rw [IsHermitian.eigenvalues_eq_spectrum_real (zero_le_iff_posSemidef.mp hA).1, Set.mem_range] at hx
@@ -504,7 +481,8 @@ instance instNonnegSpectrumClass : NonnegSpectrumClass ℝ (Matrix n n 𝕜) := 
   rw [←hi]
   exact (zero_le_iff_posSemidef.mp hA).eigenvalues_nonneg i
 
-theorem nonneg_iff_eigenvalue_nonneg : 0 ≤ A ↔ ∀ x, 0 ≤ hA.eigenvalues x := Iff.trans zero_le_iff_posSemidef posSemidef_iff_eigenvalues_nonneg
+theorem nonneg_iff_eigenvalue_nonneg [DecidableEq n] : 0 ≤ A ↔ ∀ x, 0 ≤ hA.eigenvalues x :=
+  Iff.trans zero_le_iff_posSemidef posSemidef_iff_eigenvalues_nonneg
 
 theorem diag_monotone : Monotone (diag : Matrix n n 𝕜 → (n → 𝕜)) := fun _ _ ↦
   le_of_nonneg_imp (diagAddMonoidHom n 𝕜) (fun _ ↦ diag_nonneg)
@@ -515,6 +493,8 @@ theorem trace_monotone : Monotone (@trace n 𝕜 _ _) := fun _ _ ↦
   le_of_nonneg_imp (traceAddMonoidHom n 𝕜) (fun _ ↦ trace_nonneg)
 
 theorem trace_mono : A ≤ B → A.trace ≤ B.trace := trace_monotone.imp
+
+variable [DecidableEq n]
 
 theorem diagonal_monotone : Monotone (diagonal : (n → 𝕜) → _) := fun _ _ ↦
   le_of_nonneg_imp' (diagonalAddMonoidHom n 𝕜) (fun _ ↦ PosSemidef.diagonal)
@@ -563,108 +543,93 @@ theorem le_smul_one_of_eigenvalues_iff (hA : A.PosSemidef) (c : ℝ) :
   simp only [Function.comp_apply, algebraMap_le_algebraMap] at hAc
   exact hAc
 
-theorem le_trace_smul_one (hA : A.PosSemidef) : A ≤ hA.1.rtrace • 1 := by
-  have h : ∀ i, hA.1.eigenvalues i ≤ hA.1.rtrace := fun i ↦ by
-    rw [←IsHermitian.sum_eigenvalues_eq_rtrace hA.1]
-    convert @Finset.sum_le_sum_of_subset_of_nonneg n ℝ _ _ _ hA.1.eigenvalues {i} Finset.univ _ _
-    · rw [Finset.sum_singleton]
-    · exact Finset.subset_univ {i}
-    · exact fun j _ _ ↦ eigenvalues_nonneg hA j
-  exact (le_smul_one_of_eigenvalues_iff hA hA.1.rtrace).mp h
-
 end partialOrder
 
 end PosSemidef
 
-theorem star_diagonal {T R : Type*} [DecidableEq T] [AddMonoid R] [StarAddMonoid R] (f : T → R) :
-    star (diagonal f) = diagonal (star <| f ·) := by
-  ext i j
-  simp only [star_apply, diagonal_apply]
-  split <;> simp_all [@eq_comm _ j i]
+-- noncomputable section frobenius_inner_product
+-- open scoped ComplexOrder
+-- variable {A : Matrix n n 𝕜} {B : Matrix n n 𝕜} {C : Matrix n n 𝕜} [Fintype n]
 
-noncomputable section frobenius_inner_product
-open scoped ComplexOrder
-variable {A : Matrix n n 𝕜} {B : Matrix n n 𝕜} {C : Matrix n n 𝕜} [Fintype n]
+-- /-- The InnerProductSpace on Matrix n n 𝕜 defined by the real part of the
+--  Frobenius inner product. -/
+-- def InnerProductCore : InnerProductSpace.Core (𝕜 := ℝ) (F := Matrix n n 𝕜):=
+--    {
+--     inner A B := RCLike.re (Aᴴ * B).trace
+--     conj_inner_symm := fun x y ↦ by
+--       simpa [inner, starRingEnd_apply, ← trace_conjTranspose] using
+--         RCLike.conj_re (xᴴ * y).trace
+--     re_inner_nonneg := fun x ↦
+--       (RCLike.nonneg_iff.mp x.posSemidef_conjTranspose_mul_self.trace_nonneg).1
+--     add_left := by simp [inner, add_mul]
+--     smul_left x y r := by
+--       simpa using RCLike.smul_re _ (xᴴ * y).trace
+--     definite x h := by
+--       ext i j
+--       replace h : ∑ j, ∑ i, (RCLike.re (x i j) ^ 2 + RCLike.im (x i j) ^ 2) = 0 := by
+--         simpa [trace, mul_apply, ← pow_two] using h
+--       rw [Fintype.sum_eq_zero_iff_of_nonneg (fun i ↦ by positivity)] at h
+--       replace h := congrFun h j
+--       rw [Pi.zero_apply, Fintype.sum_eq_zero_iff_of_nonneg (fun i ↦ by positivity)] at h
+--       replace h := congrFun h i
+--       dsimp at h
+--       rw [add_eq_zero_iff_of_nonneg (sq_nonneg _) (sq_nonneg _), sq_eq_zero_iff, sq_eq_zero_iff] at h
+--       apply RCLike.ext (h.left.trans RCLike.zero_re.symm) (h.right.trans (map_zero _).symm)
+--   }
 
-/-- The InnerProductSpace on Matrix n n 𝕜 defined by the real part of the
- Frobenius inner product. -/
-def InnerProductCore : InnerProductSpace.Core (𝕜 := ℝ) (F := Matrix n n 𝕜):=
-   {
-    inner A B := RCLike.re (Aᴴ * B).trace
-    conj_inner_symm := fun x y ↦ by
-      simpa [inner, starRingEnd_apply, ← trace_conjTranspose] using
-        RCLike.conj_re (xᴴ * y).trace
-    re_inner_nonneg := fun x ↦
-      (RCLike.nonneg_iff.mp x.posSemidef_conjTranspose_mul_self.trace_nonneg).1
-    add_left := by simp [inner, add_mul]
-    smul_left x y r := by
-      simpa using RCLike.smul_re _ (xᴴ * y).trace
-    definite x h := by
-      ext i j
-      replace h : ∑ j, ∑ i, (RCLike.re (x i j) ^ 2 + RCLike.im (x i j) ^ 2) = 0 := by
-        simpa [trace, mul_apply, ← pow_two] using h
-      rw [Fintype.sum_eq_zero_iff_of_nonneg (fun i ↦ by positivity)] at h
-      replace h := congrFun h j
-      rw [Pi.zero_apply, Fintype.sum_eq_zero_iff_of_nonneg (fun i ↦ by positivity)] at h
-      replace h := congrFun h i
-      dsimp at h
-      rw [add_eq_zero_iff_of_nonneg (sq_nonneg _) (sq_nonneg _), sq_eq_zero_iff, sq_eq_zero_iff] at h
-      apply RCLike.ext (h.left.trans RCLike.zero_re.symm) (h.right.trans (map_zero _).symm)
-  }
+-- def instNormed : NormedAddCommGroup (Matrix n n 𝕜) :=
+--   InnerProductCore.toNormedAddCommGroup
 
-def instNormed : NormedAddCommGroup (Matrix n n 𝕜) :=
-  InnerProductCore.toNormedAddCommGroup
+-- scoped[Frobenius] attribute [instance] Matrix.instNormed
 
-scoped[Frobenius] attribute [instance] Matrix.instNormed
+-- open scoped Frobenius in
+-- def instInnerProductSpace : InnerProductSpace ℝ (Matrix n n 𝕜) :=
+--   InnerProductSpace.ofCore InnerProductCore
 
-open scoped Frobenius in
-def instInnerProductSpace : InnerProductSpace ℝ (Matrix n n 𝕜) :=
-  InnerProductSpace.ofCore InnerProductCore
+-- scoped[Frobenius] attribute [instance] Matrix.instInnerProductSpace
 
-scoped[Frobenius] attribute [instance] Matrix.instInnerProductSpace
+-- instance : Inner ℝ (Matrix n n 𝕜) :=
+--   instInnerProductSpace.toInner
 
-instance : Inner ℝ (Matrix n n 𝕜) :=
-  instInnerProductSpace.toInner
+-- /-- The InnerProductSpace on Matrix n n 𝕜 defined by the Frobenius inner product. -/
+-- def CInnerProductCore : InnerProductSpace.Core (𝕜 := ℂ) (F := Matrix n n ℂ):=
+--    {
+--     inner A B := (Aᴴ * B).trace
+--     conj_inner_symm := fun x y ↦ by
+--       simp [inner, starRingEnd_apply, ← Matrix.trace_conjTranspose]
+--     re_inner_nonneg := fun x ↦
+--       (RCLike.nonneg_iff.mp x.posSemidef_conjTranspose_mul_self.trace_nonneg).1
+--     add_left := by simp [inner, add_mul]
+--     smul_left x y r := by simp
+--     definite x h := by
+--       ext i j
+--       replace h : ∑ j, ∑ i, ((x i j).re ^ 2 + (x i j).im ^ 2) = (0 : ℂ) := by
+--         convert h
+--         simp only [Complex.ofReal_sum, Complex.ofReal_add, Complex.ofReal_pow, trace, diag_apply,
+--           mul_apply, conjTranspose_apply, RCLike.star_def]
+--         congr! 2
+--         norm_cast
+--         rw [Complex.conj_mul', ← Complex.sq_norm_sub_sq_re]
+--         norm_cast
+--         abel
+--       rw [Complex.ofReal_eq_zero,
+--         Fintype.sum_eq_zero_iff_of_nonneg (fun i ↦ by positivity)] at h
+--       replace h := congrFun h j
+--       rw [Pi.zero_apply, Fintype.sum_eq_zero_iff_of_nonneg (fun i ↦ by positivity)] at h
+--       replace h := congrFun h i
+--       dsimp at h
+--       rw [add_eq_zero_iff_of_nonneg (sq_nonneg _) (sq_nonneg _), sq_eq_zero_iff, sq_eq_zero_iff] at h
+--       apply RCLike.ext (h.left.trans RCLike.zero_re.symm) (h.right.trans (map_zero _).symm)
+--   }
 
-/-- The InnerProductSpace on Matrix n n 𝕜 defined by the Frobenius inner product. -/
-def CInnerProductCore : InnerProductSpace.Core (𝕜 := ℂ) (F := Matrix n n ℂ):=
-   {
-    inner A B := (Aᴴ * B).trace
-    conj_inner_symm := fun x y ↦ by
-      simp [inner, starRingEnd_apply, ← Matrix.trace_conjTranspose]
-    re_inner_nonneg := fun x ↦
-      (RCLike.nonneg_iff.mp x.posSemidef_conjTranspose_mul_self.trace_nonneg).1
-    add_left := by simp [inner, add_mul]
-    smul_left x y r := by simp
-    definite x h := by
-      ext i j
-      replace h : ∑ j, ∑ i, ((x i j).re ^ 2 + (x i j).im ^ 2) = (0 : ℂ) := by
-        convert h
-        simp only [Complex.ofReal_sum, Complex.ofReal_add, Complex.ofReal_pow, trace, diag_apply,
-          mul_apply, conjTranspose_apply, RCLike.star_def]
-        congr! 2
-        norm_cast
-        rw [Complex.conj_mul', ← Complex.sq_norm_sub_sq_re]
-        norm_cast
-        abel
-      rw [Complex.ofReal_eq_zero,
-        Fintype.sum_eq_zero_iff_of_nonneg (fun i ↦ by positivity)] at h
-      replace h := congrFun h j
-      rw [Pi.zero_apply, Fintype.sum_eq_zero_iff_of_nonneg (fun i ↦ by positivity)] at h
-      replace h := congrFun h i
-      dsimp at h
-      rw [add_eq_zero_iff_of_nonneg (sq_nonneg _) (sq_nonneg _), sq_eq_zero_iff, sq_eq_zero_iff] at h
-      apply RCLike.ext (h.left.trans RCLike.zero_re.symm) (h.right.trans (map_zero _).symm)
-  }
+-- open scoped Frobenius in
+-- def instCInnerProductSpace : InnerProductSpace ℂ (Matrix n n ℂ) :=
+--   InnerProductSpace.ofCore CInnerProductCore
 
-open scoped Frobenius in
-def instCInnerProductSpace : InnerProductSpace ℂ (Matrix n n ℂ) :=
-  InnerProductSpace.ofCore CInnerProductCore
+-- scoped[Frobenius] attribute [instance] Matrix.instCInnerProductSpace
 
-scoped[Frobenius] attribute [instance] Matrix.instCInnerProductSpace
-
-instance : Inner ℂ (Matrix n n ℂ) :=
-  instCInnerProductSpace.toInner
+-- instance : Inner ℂ (Matrix n n ℂ) :=
+--   instCInnerProductSpace.toInner
 
 --Makes the `Inner ℝ` instance is globally accessible, but the norm instances
 --require `open scoped Frobenius`. e.g.
@@ -675,7 +640,7 @@ instance : Inner ℂ (Matrix n n ℂ) :=
 -- (no `open` needed):
 -- #synth Inner ℝ (Matrix (Fin 5) (Fin 5) ℝ)
 
-end frobenius_inner_product
+-- end frobenius_inner_product
 
 section partial_trace
 

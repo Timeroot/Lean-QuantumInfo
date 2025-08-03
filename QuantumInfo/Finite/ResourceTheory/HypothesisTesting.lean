@@ -117,13 +117,13 @@ theorem singleton_le_exp_val {ρ σ : MState d} {ε : Prob} (m : HermitianMat d 
   simp only [le_refl]
 
 --PULLOUT
-/-- Minimizing a bilinear form in one argument over a compact set, given a continuous function in the
+/-- Minimizing a bilinear form in one argument over a bounded set, given a continuous function in the
 other argument. -/
 --This can probably be generalized to rings besides ℝ, and I don't know if CompleteSpace is needed. I
 --actually only need it for the finite-dimensional case.
 theorem _root_.continuous_iSup_bilinear_of_IsCompact
-  {E : Type*} [AddCommGroup E] [Module ℝ E] [UniformSpace E] [CompleteSpace E]
-  (f : LinearMap.BilinForm ℝ E) {S : Set E} (hS : IsCompact S) :
+  {E : Type*} [AddCommGroup E] [Module ℝ E] [MetricSpace E] [CompleteSpace E]
+  (f : LinearMap.BilinForm ℝ E) {S : Set E} (hS : Bornology.IsBounded S) :
     Continuous fun x ↦ ⨆ y ∈ S, f y x := by
   sorry
 
@@ -206,6 +206,13 @@ theorem exists_min (ρ : MState d) (ε : Prob) (S : Set (MState d)):
     · --Oh no, do we need to add some assumption to S to our hypotheses...?
       --No, we shouldn't need that S is compact. We should only need that (the image of) S is bounded.
       sorry
+
+--PULLOUT
+theorem _root_.Distribution.coin_eq_iff (p : Prob) (f : Distribution (Fin 2)) :
+    coin p = f ↔ p = f 0 := by
+  rw [fin_two_eq_coin f]
+  refine ⟨?_, congrFun coin⟩
+  sorry
 
 /-- When the allowed Type I error `ε` is less than 1 (so, we have some limit on our errors),
 and the kernel of the state `ρ` contains the kernel of some element in `S`, then the optimal
@@ -391,8 +398,7 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
       simp only [POVM.measureDiscard_apply, p2, q2]
       constructor
       · congr
-        --Could do `ext` now, would be nice to have a lemma for `Distribution.coin p = f` that
-        --requires only checking that `p = f 0`.
+        rw [Distribution.coin_eq_iff]
         sorry
       · congr
         sorry
