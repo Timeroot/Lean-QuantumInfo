@@ -62,6 +62,11 @@ theorem iInf_IsCompact (ρ : MState d) (ε : Prob) : IsCompact { m | ρ.exp_val 
     fun_prop
   exact hC₁.inter_left hC₂
 
+--PULLOUT
+--Shortcut instance? I guess??
+noncomputable instance : NormedAddCommGroup (HermitianMat d ℂ) :=
+  inferInstance
+
 /-- The space of strategies `T` in `OptimalHypothesisRate` is convex. -/
 theorem iInf_IsConvex (ρ : MState d) (ε : Prob) : Convex ℝ { m | ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 } := by
   --We *could* get this from a more general fact that any linear subspace is convex,
@@ -71,10 +76,13 @@ theorem iInf_IsConvex (ρ : MState d) (ε : Prob) : Convex ℝ { m | ρ.exp_val 
   rw [← eq_sub_iff_add_eq'] at hab
   subst b
   refine And.intro ?_ (And.intro ?_ ?_)
-  · simp [MState.exp_val, HermitianMat.inner_left_sub, HermitianMat.inner_left_distrib] at hx₁ hy₁ ⊢
+  · simp only [MState.exp_val, HermitianMat.inner_left_sub, HermitianMat.inner_one, MState.tr,
+      tsub_le_iff_right, HermitianMat.inner_left_distrib, HermitianMat.inner_smul] at hx₁ hy₁ ⊢
     linear_combination a * hx₁ + (1 - a) * hy₁
   · apply HermitianMat.convex_cone <;> assumption
-  · rw [← sub_nonneg] at hx₃ hy₃ ⊢
+  · --Something's wrong with type class inference that's taking wayyy longer than it should.
+    --DFunLike.coe is being unfolded tonnnnss of times.
+    rw [← sub_nonneg] at hx₃ hy₃ ⊢
     convert HermitianMat.convex_cone hx₃ hy₃ ha hb using 1
     simp only [sub_smul, one_smul, smul_sub]
     abel
@@ -116,7 +124,7 @@ theorem singleton_le_exp_val {ρ σ : MState d} {ε : Prob} (m : HermitianMat d 
   apply iInf_le_of_le ⟨m, ⟨hExp, hm⟩⟩ _
   simp only [le_refl]
 
---PULLOUT
+--PULLOUT to Mathlib
 /-- Minimizing a bilinear form in one argument over a bounded set, given a continuous function in the
 other argument. -/
 --This can probably be generalized to rings besides ℝ, and I don't know if CompleteSpace is needed. I
@@ -126,6 +134,30 @@ theorem _root_.continuous_iSup_bilinear_of_IsCompact
   (f : LinearMap.BilinForm ℝ E) {S : Set E} (hS : Bornology.IsBounded S) :
     Continuous fun x ↦ ⨆ y ∈ S, f y x := by
   sorry
+
+--PULLOUT to MState
+theorem _root_.MState.M_Injective : Function.Injective (MState.M (d := d)) := by
+  intro _ _
+  exact MState.ext
+noncomputable instance _root_.MState.MetricSpace : MetricSpace (MState d) :=
+  MetricSpace.induced MState.M MState.M_Injective inferInstance
+theorem _root_.MState.dist_eq (x y : MState d) : dist x y = dist x.M y.M := by
+  rfl
+instance _root_.MState.BoundedSpace (d : Type*) [Fintype d] [DecidableEq d] :
+    BoundedSpace (MState d) where
+  bounded_univ := by
+    rw [Metric.isBounded_iff]
+    use (Fintype.card d) ^ 2 --d^2 elements, so max distance is d^2
+    intro x _ y _
+    rw [MState.dist_eq, dist_eq_norm]
+    have hx := And.intro x.zero_le x.le_one
+    have hy := And.intro y.zero_le y.le_one
+    --at this point, this should be a theorem
+    sorry
+instance _root_.MState.image_IsBounded (S : Set (MState d)) :
+    Bornology.IsBounded (MState.M '' S) := by
+  rw [← Bornology.isBounded_induced]
+  exact Bornology.IsBounded.all S
 
 /-- There exists an optimal T for the hypothesis testing, that is, it's a minimum
 and not just an infimum. -/
@@ -197,22 +229,29 @@ theorem exists_min (ρ : MState d) (ε : Prob) (S : Set (MState d)):
     suffices h : Continuous (fun (T : HermitianMat d ℂ) ↦ ⨆ σ ∈ S, σ.exp_val T) from
       Pi.continuous_restrict_apply _ h
     unfold MState.exp_val
+    rcases isEmpty_or_nonempty S with (hS | hS)
+    · rw [Set.isEmpty_coe_sort] at hS
+      simpa [hS] using continuous_const
     --Should be something `Continuous (fun x ↦ iSup (fun y ↦ f x y))` from `Continuous f`.
     suffices Continuous (fun T : HermitianMat d ℂ ↦  ⨆ σ ∈ S, HermitianMat.inner_BilinForm σ T) by
       simpa using this
-    have := continuous_iSup_bilinear_of_IsCompact HermitianMat.inner_BilinForm (S := MState.M '' S) ?_
-    · convert this
+    convert continuous_iSup_bilinear_of_IsCompact HermitianMat.inner_BilinForm (S := MState.M '' S) (MState.image_IsBounded S)
+    rw [ciSup_image]
+    · exact Set.Nonempty.of_subtype
+    · --the image of a continuous function on a BoundedSpace is a bounded set in the bornology,
+      --and is therefore BddAbove
       sorry
-    · --Oh no, do we need to add some assumption to S to our hypotheses...?
-      --No, we shouldn't need that S is compact. We should only need that (the image of) S is bounded.
+    · simp
       sorry
 
---PULLOUT
+--PULLOUT to Distribution
 theorem _root_.Distribution.coin_eq_iff (p : Prob) (f : Distribution (Fin 2)) :
-    coin p = f ↔ p = f 0 := by
-  rw [fin_two_eq_coin f]
-  refine ⟨?_, congrFun coin⟩
-  sorry
+    Distribution.coin p = f ↔ p = f 0 := by
+  constructor
+  · rintro rfl
+    rfl
+  · rintro rfl
+    rw [← Distribution.fin_two_eq_coin f]
 
 /-- When the allowed Type I error `ε` is less than 1 (so, we have some limit on our errors),
 and the kernel of the state `ρ` contains the kernel of some element in `S`, then the optimal
@@ -238,9 +277,10 @@ theorem pos_of_lt_one {ρ : MState d} (S : Set (MState d))
   simp only [MState.toMat_M] at hT₄
   replace hT₁ : ρ.exp_val (1 - T) ≠ 1 := (lt_of_le_of_lt hT₁ hε).ne
   absurd hT₁
-  rw [ρ.exp_val_eq_one_iff (sub_le_self 1 hT₂), sub_sub_cancel]
-  refine le_trans ?_ hT₄.left
-  exact (ContinuousLinearMap.ker_le_ker_iff_range_le_range (by simp) (by simp)).mp hσ₂ --todo cleanup
+  rw [ρ.exp_val_eq_one_iff ?_, sub_sub_cancel]
+  · refine le_trans ?_ hT₄.left
+    exact (ContinuousLinearMap.ker_le_ker_iff_range_le_range (by simp) (by simp)).mp hσ₂ --todo cleanup
+  · exact (sub_le_self 1 hT₂)
 
 --Lemma 3 from Hayashi
 theorem Lemma3 {ρ : MState d} (ε : Prob) {S : Set (MState d)} (hS₁ : IsCompact S)
@@ -385,6 +425,7 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
       --Get the measurement operator T.
       --We actually need a stronger version of `exists_min` which guarantees that `ρ.exp_val T = ε`
       obtain ⟨T, hT⟩ := exists_min ρ ε {σ}
+      simp only [Set.mem_singleton_iff, iSup_iSup_eq_left] at hT
       --Turn it into a POVM (probably want to have lemmas around this ideally)
       let Λ : POVM (Fin 2) d := {
         mats i := if i = 0 then T else 1 - T
@@ -399,9 +440,21 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
       constructor
       · congr
         rw [Distribution.coin_eq_iff]
-        sorry
+        ext
+        dsimp [POVM.measure, Λ, p]
+        rw [coe_one_minus]
+        apply le_antisymm
+        · have h := T.2.1
+          rw [MState.exp_val, HermitianMat.inner_left_sub] at h
+          simp [HermitianMat.inner_one, MState.tr] at h ⊢
+          rwa [HermitianMat.inner_comm, add_comm]
+        · sorry
       · congr
-        sorry
+        rw [Distribution.coin_eq_iff]
+        ext
+        dsimp [POVM.measure, Λ, q]
+        rw [← hT]
+        exact HermitianMat.inner_comm _ _
     rw [hΦ₁, hΦ₂]
     exact SandwichedRenyiEntropy.DPI hα ρ σ Φ
 
@@ -490,7 +543,7 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
 
 theorem rate_pos_of_smul_pos {ε : Prob} {d : Type*} [Fintype d] [DecidableEq d] {ρ σ₁ σ₂ : MState d}
     (hσ₂ : 0 < β_ ε(ρ‖{σ₂})) {c : ℝ} (hc : 0 < c) (hσ : c • σ₂ ≤ σ₁.M) : 0 < β_ ε(ρ‖{σ₁}) := by
-sorry
+  sorry
 
 @[fun_prop]
 theorem rate_Continuous {ε : Prob} {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) :
