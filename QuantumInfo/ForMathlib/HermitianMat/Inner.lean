@@ -265,4 +265,11 @@ noncomputable instance instNormed : NormedAddCommGroup (HermitianMat d 𝕜) :=
 noncomputable instance instInnerProductSpace : InnerProductSpace ℝ (HermitianMat d 𝕜) :=
   InnerProductSpace.ofCoreOfTopology InnerProductCore topo_compat_1 topo_compat_2
 
+--Shortcut instances
+noncomputable instance : NormedAddCommGroup (HermitianMat d ℝ) :=
+  inferInstance
+
+noncomputable instance : NormedAddCommGroup (HermitianMat d ℂ) :=
+  inferInstance
+
 end innerproductspace

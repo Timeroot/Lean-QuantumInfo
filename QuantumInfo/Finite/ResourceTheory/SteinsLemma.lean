@@ -30,6 +30,13 @@ lemma min_free_relent_finite (ρ : MState (H i)) : ⨅ σ ∈ IsFree, 𝐃(ρ‖
   convert bot_le
   exact hσ₁.toLin_ker_eq_bot
 
+--PULLOUT
+theorem WithTop.untop_eq_untopD {α : Type*} {a : WithTop α} (h : a ≠ ⊤) (d : α) :
+    WithTop.untop a h = WithTop.untopD d a := by
+  cases a
+  · contradiction
+  · simp
+
 -- This theorem should follow from "Fekete's subadditive lemma", which can be found in
 -- Lemma A.1 of Hayashi's book "Quantum Information Theory - Mathematical Foundation".
 --
@@ -45,16 +52,15 @@ theorem limit_rel_entropy_exists (ρ : MState (H i)) :
   have := @Subadditive.tendsto_lim
   --but with slightly different types...
   --Try to unify it with our goal below
-  let u : ℕ+ → ENNReal := fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree, 𝐃(ρ⊗^[n]‖σ)
+  let u : ℕ+ → ENNReal := fun n ↦ ⨅ σ ∈ IsFree, 𝐃(ρ⊗^[n]‖σ)
   let u' : ℕ → ℝ := fun n ↦ if hn : n = 0 then 0 else (u ⟨n, Nat.zero_lt_of_ne_zero hn⟩).toReal
   have hu' : Subadditive u' := by
     unfold u' u
     have hsub := RelativeEntResource.Subadditive ρ
     dsimp [RelativeEntResource] at hsub
+    simp_rw [apply_dite NNReal.toReal] at hsub
     convert hsub
-    rw [ENNReal.toReal_mul]
-    congr
-    simp
+    rw [ENNReal.toReal, ENNReal.toNNReal, WithTop.untop_eq_untopD]
   have hu'_lim_nonneg : 0 ≤ hu'.lim := by
     rw [Subadditive.lim]
     apply le_csInf Set.Nonempty.of_subtype
@@ -86,6 +92,7 @@ theorem limit_rel_entropy_exists (ρ : MState (H i)) :
   - `Filter.tendsto_congr`
   - `tendsto_subtype_rng`
   -/
+  unfold u' u at this
   sorry
 
 /-- The \tilde{σ}_n defined in Lemma 6, also in equation (S40) in Lemma 7.
@@ -365,39 +372,39 @@ private theorem LemmaS3_helper {ε : Prob} {d : ℕ+ → Type*} [∀ n, Fintype 
   (ρ σ₁ σ₂ : (n : ℕ+) → MState (d n))
   (f : ℕ+ → ℝ≥0) (hσ : ∀ (i : ℕ+), Real.exp (-f i) • (σ₂ i).M ≤ (σ₁ i)) (n : ℕ+) :
     —log β_ ε(ρ n‖{σ₁ n}) ≤ —log β_ ε(ρ n‖{σ₂ n}) + ↑(f n) := by
-have h₁ (T : HermitianMat (d n) ℂ) (hT : 0 ≤ T) :
-        Real.exp (-f n) * T.inner (σ₂ n).M ≤ T.inner (σ₁ n).M := by
-  simpa using HermitianMat.inner_mono hT _ _ (hσ n)
-by_cases hσ₂ : β_ ε(ρ n‖{σ₂ n}) = 0
-· simp [hσ₂]
-replace hσ₂ := Prob.zero_lt_coe hσ₂
-have hσ₁ : (0 : ℝ) < β_ ε(ρ n‖{σ₁ n}) := by
-  refine OptimalHypothesisRate.rate_pos_of_smul_pos hσ₂ (Real.exp_pos (-↑(f n))) ?_
-  exact hσ n --For some reason turning these two lines into one `exact` causes timeouts
-rw [← ENNReal.toReal_le_toReal (by finiteness) (by finiteness)]
-rw [ENNReal.toReal_add (by finiteness) (by finiteness)]
-simp only [Prob.negLog_pos_Real, ENNReal.coe_toReal, OptimalHypothesisRate,
-  Set.mem_singleton_iff, iSup_iSup_eq_left] at hσ₁ hσ₂ ⊢
-rw [← neg_le_neg_iff]
-simp only [neg_add_rev, neg_neg]
-rw [← Real.log_exp (-(f n))]
-rw [← Real.log_mul (by positivity) (by positivity)]
-apply Real.log_le_log (by positivity)
-simp only [Prob.coe_iInf]
-rw [Real.mul_iInf_of_nonneg (by positivity)]
-apply ciInf_mono
-· use 0
-  simp_rw [lowerBounds, Set.mem_range]
-  rintro a ⟨y, rfl⟩
-  have : 0 ≤ (σ₂ n).exp_val y := by
-    apply MState.exp_val_nonneg y.2.2.1
-  positivity
-intro ⟨x, hx₁, hx₂, hx₃⟩
-simp only [MState.exp_val] --dunno why `rw` won't rewrite the second one
-rw [← HermitianMat.smul_inner]
---There should be an `inner_mono'` which is inner_mono in the other arguments
-rw [HermitianMat.inner_comm _ x, HermitianMat.inner_comm _ x]
-apply HermitianMat.inner_mono hx₂ _ _ (hσ n)
+  have h₁ (T : HermitianMat (d n) ℂ) (hT : 0 ≤ T) :
+          Real.exp (-f n) * T.inner (σ₂ n).M ≤ T.inner (σ₁ n).M := by
+    simpa using HermitianMat.inner_mono hT _ _ (hσ n)
+  by_cases hσ₂ : β_ ε(ρ n‖{σ₂ n}) = 0
+  · simp [hσ₂]
+  replace hσ₂ := Prob.zero_lt_coe hσ₂
+  have hσ₁ : (0 : ℝ) < β_ ε(ρ n‖{σ₁ n}) := by
+    refine OptimalHypothesisRate.rate_pos_of_smul_pos hσ₂ (Real.exp_pos (-↑(f n))) ?_
+    exact hσ n --For some reason turning these two lines into one `exact` causes timeouts
+  rw [← ENNReal.toReal_le_toReal (by finiteness) (by finiteness)]
+  rw [ENNReal.toReal_add (by finiteness) (by finiteness)]
+  simp only [Prob.negLog_pos_Real, ENNReal.coe_toReal, OptimalHypothesisRate,
+    Set.mem_singleton_iff, iSup_iSup_eq_left] at hσ₁ hσ₂ ⊢
+  rw [← neg_le_neg_iff]
+  simp only [neg_add_rev, neg_neg]
+  rw [← Real.log_exp (-(f n))]
+  rw [← Real.log_mul (by positivity) (by positivity)]
+  apply Real.log_le_log (by positivity)
+  simp only [Prob.coe_iInf]
+  rw [Real.mul_iInf_of_nonneg (by positivity)]
+  apply ciInf_mono
+  · use 0
+    simp_rw [lowerBounds, Set.mem_range]
+    rintro a ⟨y, rfl⟩
+    have : 0 ≤ (σ₂ n).exp_val y := by
+      apply MState.exp_val_nonneg y.2.2.1
+    positivity
+  intro ⟨x, hx₁, hx₂, hx₃⟩
+  simp only [MState.exp_val] --dunno why `rw` won't rewrite the second one
+  rw [← HermitianMat.smul_inner]
+  --There should be an `inner_mono'` which is inner_mono in the other arguments
+  rw [HermitianMat.inner_comm _ x, HermitianMat.inner_comm _ x]
+  apply HermitianMat.inner_mono hx₂ _ _ (hσ n)
 
 /-- Lemma S3 from the paper. What they denote as σₙ and σₙ', we denote as σ₁ and σ₂. The `exp(-o(n))`
 we express as a function `f : ℕ+ → ℝ`, together with the fact that `f` is little-o of `n` (i.e. that
@@ -480,7 +487,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
   --Then we  prove S61, and the conclusion is just `rw [S61] at S62`. But splitting it like
   --this requires first _defining_ the sequence σ''_n.
 
-  --First deal with the east case of R1 = R2.
+  --First deal with the easy case of R1 = R2.
   intro hR1R2 ε' ⟨hε'₁, hε'₂⟩
   rw [ge_iff_le, le_iff_lt_or_eq, or_comm] at hR1R2
   rcases hR1R2 with hR1R2|hR1R2
@@ -677,9 +684,8 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : Prob) (hε : 
     enter [1, n, 2, 1]
     rw [← OptimalHypothesisRate.Lemma3 ε IsCompact_IsFree free_convex]
   rw [RegularizedRelativeEntResource]
-  simp only
-  generalize_proofs pf1 pf2 pf3
   simp_rw [RelativeEntResource]
+  generalize_proofs pf1 pf2 pf3 pf4
   --It suffices to show limsup LHS ≤ RHS and liminf LHS ≥ RHS.
   refine tendsto_of_limsup_le_liminf ?_ ?_
   · --the "strong converse" part first
@@ -731,13 +737,9 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : Prob) (hε : 
 
     apply le_of_tendsto_of_tendsto' tendsto_const_nhds hv_lem5
     convert h using 6
-    stop
-    · apply OptimalHypothesisRate.Lemma3 hε.left.le IsCompact_IsFree free_convex
+    · apply OptimalHypothesisRate.Lemma3 ε IsCompact_IsFree free_convex
     · symm
-      apply ciInf_subtype''
-      · exact Set.Nonempty.of_subtype
-      · exact OrderBot.bddBelow _
-      · simp
+      apply iInf_subtype''
 
   · --the other direction, the "key part" of the "opposite inequality"
     set R₁ε := Filter.liminf (fun n => —log (⨆ σ ∈ IsFree, β_ ε(ρ⊗^[n]‖{σ})) / ↑↑n) Filter.atTop
