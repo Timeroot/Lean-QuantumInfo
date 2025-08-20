@@ -49,7 +49,6 @@ end HermitianMat
 
 namespace MState
 
-
 variable {d d₁ d₂ d₃ : Type*}
 variable [Fintype d] [Fintype d₁] [Fintype d₂] [Fintype d₃]
 variable [DecidableEq d]
@@ -60,12 +59,16 @@ def U_conj (ρ : MState d) (U : 𝐔[d]) : MState d where
   tr := by simp
   zero_le := HermitianMat.conj_le ρ.zero_le U.val
 
-theorem U_conj_spectrum_eq (ρ : MState d) (U : 𝐔[d]) : ∃ σ : d ≃ d,
-    (ρ.U_conj U).spectrum = ρ.spectrum.relabel σ := by
-  --Each eigenvector v for ρ yields an eigenvector U† v for U† ρ U.
-  --Applying this both ways, get a correspondence between the spectra.
-  --Sadly this doesn't prove multiplicities match up.
-  --Need a statement like "diagonalization is unique up to permutation".
-  sorry
+/-- You might think this should only be true up to permutation, so that it would read like
+`∃ σ : Equiv.Perm d, (ρ.U_conj U).spectrum = ρ.spectrum.relabel σ`. But since eigenvalues
+of a matrix are always canonically sorted, this is actually an equality.
+-/
+@[simp]
+theorem U_conj_spectrum_eq (ρ : MState d) (U : 𝐔[d]) :
+    (ρ.U_conj U).spectrum = ρ.spectrum := by
+  have (M : HermitianMat d ℂ) (U : 𝐔[d]) : (M.conj U).H.eigenvalues = M.H.eigenvalues := by
+    --missing simp lemma
+    sorry
+  simp [MState.spectrum, U_conj, this]
 
 end MState

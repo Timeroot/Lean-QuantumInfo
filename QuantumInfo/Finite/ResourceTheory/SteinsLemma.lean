@@ -3,20 +3,22 @@ import QuantumInfo.Finite.ResourceTheory.HypothesisTesting
 
 import Mathlib.Tactic.Bound
 
-open ResourcePretheory
-open FreeStateTheory
 open NNReal
 open ComplexOrder
 open Topology
 open scoped Prob
+open ResourcePretheory
+open FreeStateTheory
+open scoped UnitalPretheory
 open scoped OptimalHypothesisRate
+open UnitalFreeStateTheory
 
 namespace SteinsLemma
 
-variable {ι : Type*} [FreeStateTheory ι]
+variable {ι : Type*} [UnitalFreeStateTheory ι]
 variable {i : ι}
 
---TODO maybe move this lemma outside. To FreeState.lean maybe? Or is it too specific
+--Move to FreeState.lean
 /-- In a `FreeStateTheory`, we have free states of full rank, therefore the minimum relative entropy
 of any state `ρ` to a free state is finite. -/
 lemma min_free_relent_finite (ρ : MState (H i)) : ⨅ σ ∈ IsFree, 𝐃(ρ‖σ) ≠ ⊤ := by
@@ -46,53 +48,29 @@ theorem WithTop.untop_eq_untopD {α : Type*} {a : WithTop α} (h : a ≠ ⊤) (d
 /-- Lemma 5 -/
 theorem limit_rel_entropy_exists (ρ : MState (H i)) :
   ∃ d : ℝ≥0,
-    Filter.Tendsto (fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree (i := i⊗^[n]), 𝐃(ρ⊗^[n]‖σ))
+    Filter.Tendsto (fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree (i := i⊗^H[n]), 𝐃(ρ⊗^S[n]‖σ))
     .atTop (𝓝 d) := by
   --Fekete's subadditive lemma is in Mathlib:
-  have := @Subadditive.tendsto_lim
-  --but with slightly different types...
-  --Try to unify it with our goal below
-  let u : ℕ+ → ENNReal := fun n ↦ ⨅ σ ∈ IsFree, 𝐃(ρ⊗^[n]‖σ)
-  let u' : ℕ → ℝ := fun n ↦ if hn : n = 0 then 0 else (u ⟨n, Nat.zero_lt_of_ne_zero hn⟩).toReal
-  have hu' : Subadditive u' := by
-    unfold u' u
-    have hsub := RelativeEntResource.Subadditive ρ
-    dsimp [RelativeEntResource] at hsub
-    simp_rw [apply_dite NNReal.toReal] at hsub
-    convert hsub
-    rw [ENNReal.toReal, ENNReal.toNNReal, WithTop.untop_eq_untopD]
-  have hu'_lim_nonneg : 0 ≤ hu'.lim := by
-    rw [Subadditive.lim]
-    apply le_csInf Set.Nonempty.of_subtype
-    intro b hb
-    simp only [Set.mem_image, Set.mem_Ici] at hb
-    obtain ⟨x, hx₁, rfl⟩ := hb
-    unfold u'
-    split_ifs
-    · simp
-    · positivity
-  have hu'_bddBelow : BddBelow (Set.range fun n => u' n / ↑n) := by
+  have h := (RelativeEntResource.Subadditive ρ)
+  have h_bdd : BddBelow (Set.range fun n => (RelativeEntResource (ρ⊗^S[n])).toReal / ↑n) := by
     use 0
     intro x hx
-    simp only [Set.mem_range, u'] at hx
+    simp only [Set.mem_range, RelativeEntResource] at hx
     obtain ⟨y, rfl⟩ := hx
-    split_ifs
-    · simp
-    · positivity
-  use ⟨hu'.lim, hu'_lim_nonneg⟩
-  have := Subadditive.tendsto_lim hu' hu'_bddBelow
+    positivity
+  have := h.tendsto_lim h_bdd
+  use h.lim.toNNReal
+  convert this
   /-
-  Now we need to change `this`, which is `@Filter.Tendsto ℕ ℝ`, into our goal, which is
-  `@Filter.Tendsto ℕ+ ENNReal`. This probably needs three steps, one where we go from ℕ to ℕ+,
-  one where we go from ℝ to NNReal, and then one more from NNReal to ENNReal. Some lemmas that
+  We need to change `this`, which is `@Filter.Tendsto ℕ ℝ`, into our goal, which is
+  `@Filter.Tendsto ℕ ENNReal`. This probably needs two steps, one where we go from ℝ to NNReal,
+  and then one more from NNReal to ENNReal. Some lemmas that
   might be useful:
   - `Topology.IsClosedEmbedding.tendsto_nhds_iff`
   - `Topology.IsEmbedding.tendsto_nhds_iff`
-  - `Filter.tendsto_Ici_atTop` (note that `NNReal` is defeq to `Set.Ici (0 : ℝ)`)
   - `Filter.tendsto_congr`
-  - `tendsto_subtype_rng`
+  - `tendsto_subtype_rng` (note that `NNReal` is defeq to a `Subtype ℝ`)
   -/
-  unfold u' u at this
   sorry
 
 /-- The \tilde{σ}_n defined in Lemma 6, also in equation (S40) in Lemma 7.
@@ -103,21 +81,16 @@ express this with if-statements (e.g. `if m ∣ n then σₘ ⊗^ [ n / m ] else
 to work with. This altered definition is easier to work with and still has all the properties we need. We still
 need one `if` statement for when `n ≤ m`, sadly.
 -/
-noncomputable def Lemma6_σn (m : ℕ+) (σf : MState (H i)) (σₘ : MState (H (i ⊗^[m]))) : (n : ℕ+) → (MState (H (i ⊗^[n]))) :=
+noncomputable def Lemma6_σn (m : ℕ) (σf : MState (H i)) (σₘ : MState (H (i ⊗^H[m]))) : (n : ℕ) → (MState (H (i ⊗^H[n]))) :=
   fun n ↦
     --This needs to be reworked to be compatible with the FreeStateTheory framework.
-    let l : ℕ := n.natPred / m
-    let q : ℕ+ := (n.natPred % m).succPNat
-    let σr := σf ⊗^[q]
-    if h : n ≤ m then
-      σr.relabel <| .cast <| congrArg (H <| i⊗^[·]) (by
-        apply PNat.eq
-        simp [q, PNat.natPred]
-        have := (Nat.mod_eq_of_lt (Nat.sub_one_lt_of_le n.2 h)).symm
-        rwa [Nat.sub_eq_iff_eq_add n.2] at this
-      )
+    let l : ℕ := n / m
+    let q : ℕ := (n % m)
+    let σr := σf ⊗^S[q]
+    if h : n < m then
+      σr.relabel <| .cast <| congrArg (H <| i⊗^H[·]) (by simp [q, Nat.mod_eq_of_lt h])
     else
-      let σl := σₘ ⊗^[ ⟨l, by simpa [l] using Nat.le_sub_one_of_lt (lt_of_not_ge h)⟩ ];
+      let σl := σₘ ⊗^S[l]
       (σl ⊗ᵣ σr).relabel <| .cast <| congrArg H <| (by
         --This will require some real twiddling with our FreeStateTheory axioms for `prod`. We'll
         --probably need some kind of monoidal structure ... In this case we just need to show that
@@ -128,20 +101,20 @@ noncomputable def Lemma6_σn (m : ℕ+) (σf : MState (H i)) (σₘ : MState (H 
         sorry
       )
 
-theorem Lemma6_σn_IsFree {σ₁ : MState (H i)} {σₘ : (m : ℕ+) → MState (H (i⊗^[m]))} (hσ₁_free : IsFree σ₁)
+theorem Lemma6_σn_IsFree {σ₁ : MState (H i)} {σₘ : (m : ℕ) → MState (H (i⊗^H[m]))} (hσ₁_free : IsFree σ₁)
     (hσₘ1 : ∀ (m : ℕ+), σₘ m ∈ IsFree) (m n : ℕ+) : Lemma6_σn m σ₁ (σₘ m) n ∈ IsFree := by
   sorry
 
 /-- Lemma 6 from the paper -/
-private theorem Lemma6 (m : ℕ+) (ρ σf : MState (H i)) (σₘ : MState (H (i ⊗^[m]))) (hσf : σf.m.PosDef) (ε : Prob)
+private theorem Lemma6 (m : ℕ) (ρ σf : MState (H i)) (σₘ : MState (H (i⊗^H[m]))) (hσf : σf.m.PosDef) (ε : Prob)
     (hε : 0 < ε)
     (hε' : ε < 1) --Not stated in the paper's theorem statement but I think is necessary for the argument to go through
     :
-    Filter.atTop.limsup (fun (n : ℕ+) ↦ (↑n)⁻¹ * —log β_ ε(ρ⊗^[n]‖{Lemma6_σn m σf σₘ n})) ≤
-    (↑m)⁻¹ * 𝐃(ρ⊗^[m]‖σₘ)
+    Filter.atTop.limsup (fun (n : ℕ) ↦ (↑n)⁻¹ * —log β_ ε(ρ⊗^S[n]‖{Lemma6_σn m σf σₘ n})) ≤
+    (↑m)⁻¹ * 𝐃(ρ⊗^S[m]‖σₘ)
   := by
 
-  have h_add : ∀ α n, D̃_ α(ρ⊗^[n]‖Lemma6_σn m σf σₘ n) = (n/m : ℕ) * D̃_ α(ρ⊗^[m]‖σₘ) + (n%m : ℕ) * D̃_ α(ρ‖σf):= by
+  have h_add : ∀ α n, D̃_ α(ρ⊗^S[n]‖Lemma6_σn m σf σₘ n) = (n/m : ℕ) * D̃_ α(ρ⊗^S[m]‖σₘ) + (n%m : ℕ) * D̃_ α(ρ‖σf):= by
     --"Break apart" σn, and apply additivity of `SandwichedRelRentropy`.
     sorry
 
