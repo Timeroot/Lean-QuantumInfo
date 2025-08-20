@@ -106,8 +106,13 @@ theorem qRelEntropy_heq_congr {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d
 /-- A `ResourcePretheory` is a family of Hilbert spaces closed under tensor products, with an instance of
 `Fintype` and `DecidableEq` for each. It forms a pre-structure then on which to discuss resource
 theories. For instance, to talk about "two-party scenarios", we could write `ResourcePretheory (ℕ × ℕ)`,
-with `H (a,b) := (Fin a) × (Fin b)`. -/
-class ResourcePretheory (ι : Type*) where
+with `H (a,b) := (Fin a) × (Fin b)`.
+
+The `Semigroup ι` structure means we have a way to take products of our labels of Hilbert spaces
+in a way that is associative (with actual equality). The `prodEquiv` lets us reinterpret between
+a product-labelled Hilbert spaces, and an actual pair of Hilbert spaces.
+-/
+class ResourcePretheory (ι : Type*) extends Semigroup ι where
   /-- The indexing of each Hilbert space -/
   H : ι → Type*
   /-- Each space is finite -/
@@ -116,24 +121,22 @@ class ResourcePretheory (ι : Type*) where
   [DecEqH : ∀ i, DecidableEq (H i)]
   /-- Each space is nonempty (dimension at least 1) -/
   [NonemptyH : ∀ i, Nonempty (H i)]
-  /-- The Hilbert spaces must have a product structure. -/
-  prod : ι → ι → ι
   /-- The product structure induces an isomorphism of Hilbert spaces -/
-  prodEquiv i j : H (prod i j) ≃ (H i) × (H j)
+  prodEquiv i j : H (i * j) ≃ (H i) × (H j)
   --Possible we want some fact like the associativity of `prod` or the existence of an identity space,
   -- which would then imply MonoidalCategory structure later (instead of just Category). For now we
   -- take the (logically equivalent, in the appropriate model) assumption that the associator is
-  -- actually an equality.
-  pAssoc i j k : prod (prod i j) k = prod i (prod j k)
-  -- heqAssoc {i j k} (ρ : MState )
+  -- actually an equality. This is captured in the `Semigroup ι` assumption. If we wanted to turn
+  -- this into something more flexible, we would replace that with `Mul ι` (dropping `mul_assoc`)
+  -- and get an appropriate associator `Equiv` here.
   hAssoc i j k :
-    ((prodEquiv (prod i j) k).trans <|
+    ((prodEquiv (i * j) k).trans <|
       ((prodEquiv i j).prodCongr (Equiv.refl (H k))).trans <|
       (Equiv.prodAssoc _ _ _).trans <|
       ((Equiv.refl (H i)).prodCongr ((prodEquiv j k).symm)).trans
-      (prodEquiv i (prod j k)).symm
+      (prodEquiv i (j * k)).symm
     )
-     = Equiv.cast (congrArg H <| pAssoc i j k)
+     = Equiv.cast (congrArg H <| mul_assoc i j k)
 
 attribute [instance] ResourcePretheory.FinH
 attribute [instance] ResourcePretheory.DecEqH
@@ -143,9 +146,9 @@ namespace ResourcePretheory
 
 variable {ι : Type*} [ResourcePretheory ι]
 
-/-- The `prod` operation of `ResourcePretheory` gives the natural product operation on `MState`s. Accessible
-by the notation `ρ₁ ⊗ᵣ ρ₂`. -/
-def prodRelabel {i j : ι} (ρ₁ : MState (H i)) (ρ₂ : MState (H j)) : MState (H (prod i j)) :=
+/-- The `prod` operation of `ResourcePretheory` gives the natural product operation on `MState`s
+that puts us in a new Hilbert space of the category. Accessible by the notation `ρ₁ ⊗ᵣ ρ₂`. -/
+def prodRelabel {i j : ι} (ρ₁ : MState (H i)) (ρ₂ : MState (H j)) : MState (H (i * j)) :=
   (ρ₁ ⊗ ρ₂).relabel (prodEquiv i j)
 
 scoped infixl:65 "⊗ᵣ" => prodRelabel
@@ -158,10 +161,10 @@ theorem prodRelabel_assoc {i j k : ι} (ρ₁ : MState (H i)) (ρ₂ : MState (H
   rw [← Equiv.trans_assoc, Equiv.trans_cancel_right] at h_equiv
   have h_cong := congrArg (MState.relabel ((ρ₁⊗ρ₂)⊗ρ₃)) h_equiv
   rw [← eq_cast_iff_heq]; swap
-  · rw [pAssoc]
+  · rw [mul_assoc]
   convert h_cong; clear h_equiv h_cong
   rw [← MState.relabel_cast]; swap
-  · rw [pAssoc]
+  · rw [mul_assoc]
   rw [MState.kron_relabel, MState.prod_assoc]
   rw [MState.relabel_comp, MState.relabel_comp, MState.relabel_comp]
   rfl
@@ -169,7 +172,7 @@ theorem prodRelabel_assoc {i j k : ι} (ρ₁ : MState (H i)) (ρ₂ : MState (H
 /-- The `prod` operation of `ResourcePretheory` gives the natural product operation on `CPTPMap`s. Accessible
 by the notation `M₁ ⊗ᵣ M₂`. -/
 noncomputable def prodCPTPMap {i j k l : ι} (M₁ : CPTPMap (H i) (H j)) (M₂ : CPTPMap (H k) (H l)) :
-    CPTPMap (H (prod i k)) (H (prod j l)) :=
+    CPTPMap (H (i * k)) (H (j * l)) :=
   (CPTPMap.of_equiv (prodEquiv j l).symm).compose ((M₁ ⊗ₖ M₂).compose (CPTPMap.of_equiv (prodEquiv i k)))
 
 scoped notation M₁ "⊗ₖᵣ" M₂ => prodCPTPMap M₁ M₂
@@ -223,9 +226,7 @@ end ResourcePretheory
 open ResourcePretheory
 
 /-- A ResourcePretheory is `Unital` if it has a Hilbert space of size 1, i.e. `ℂ`. -/
-class UnitalPretheory (ι : Type*) extends ResourcePretheory ι, One ι, Unique (H 1) where
-  prod_one i : prod i 1 = i
-  one_prod i : prod 1 i = i
+class UnitalPretheory (ι : Type*) extends ResourcePretheory ι, MulOneClass ι, Unique (H 1) where
   prod_default {i} (ρ : MState (H i)) :
     (toResourcePretheory.prodRelabel ρ (Inhabited.default : MState (H 1))) ≍ ρ
   default_prod {i} (ρ : MState (H i)) :
@@ -233,37 +234,44 @@ class UnitalPretheory (ι : Type*) extends ResourcePretheory ι, One ι, Unique 
 
 namespace UnitalPretheory
 
-attribute [simp] prod_one
-attribute [simp] one_prod
-
 variable {ι : Type*} [UnitalPretheory ι]
 
-/-- Powers of spaces. Defined for `PNat` so that we don't have zeroth powers. -/
-noncomputable def spacePow (i : ι) (n : ℕ) : ι :=
-  n.rec 1 (fun _ j ↦ prod j i)
+instance : Monoid ι where
 
+/-- Powers of spaces.
+
+We define it for `Nat` in a `UnitalPretheory`. In principal this could be done for any
+`ResourcePretheory` and be defined for `PNat` so that we don't have zeroth powers. In
+anticipation that we might some day want that, and that we might do everything with a
+non-equality associator, we keep this as its own definition and keep our own names for
+rewriting theorems where possible.-/
+noncomputable def spacePow (i : ι) (n : ℕ) : ι :=
+  i ^ n
+
+--This notation is less necessary now since we can just write `i ^ n` as long as it's
+--a monoid.
 scoped notation i "⊗^H[" n "]" => spacePow i n
 
 @[simp]
-theorem spacePow_zero (i : ι) : i⊗^H[0] = 1 := by
+theorem spacePow_zero (i : ι) : i ^ 0 = 1 := by
   rfl
 
 @[simp]
-theorem spacePow_one (i : ι) : i⊗^H[1] = i := by
-  exact one_prod i
+theorem spacePow_one (i : ι) : i ^ 1 = i := by
+  simp
 
-theorem spacePow_succ (i : ι) (n : ℕ) : i⊗^H[n + 1] = prod (i⊗^H[n]) i := by
+theorem spacePow_succ (i : ι) (n : ℕ) : i ^ (n + 1) = (i ^ n) * i := by
   rfl
 
 theorem spacePow_add {i : ι} (m n : ℕ) :
-    i⊗^H[m + n] = prod (i⊗^H[m]) (i⊗^H[n]) := by
+    i ^ (m + n) = (i ^ m) * (i ^ n) := by
   induction n
   · simp
   · rename_i n ih
-    rw [spacePow_succ, ← pAssoc, ← add_assoc, ← ih, spacePow_succ]
+    rw [spacePow_succ, ← mul_assoc, ← add_assoc, ← ih, spacePow_succ]
 
 /-- Powers of states. Defined for `PNat`, so that we don't have zeroth powers -/
-noncomputable def statePow {i : ι} (ρ : MState (H i)) (n : ℕ) : MState (H (i⊗^H[n])) :=
+noncomputable def statePow {i : ι} (ρ : MState (H i)) (n : ℕ) : MState (H (i ^ n)) :=
   n.rec default (fun _ σ ↦ σ ⊗ᵣ ρ)
 
 scoped notation ρ "⊗^S[" n "]" => statePow ρ n
@@ -382,7 +390,7 @@ namespace UnitalFreeStateTheory
 
 variable {ι : Type*} [UnitalFreeStateTheory ι] {i : ι}
 
-theorem IsFree.npow {i : ι} {ρ : MState (H i)}
+theorem _root_.FreeStateTheory.IsFree.npow {i : ι} {ρ : MState (H i)}
     (hρ : IsFree ρ) (n : ℕ) : IsFree (ρ⊗^S[n]) := by
   induction n
   · rw [statePow_zero, spacePow_zero]
@@ -428,10 +436,9 @@ theorem RelativeEntResource.Subadditive (ρ : MState (H i)) : Subadditive fun n 
   simp [RelativeEntResource, ENNReal.ofNNReal] at hσ₂d hσ₃d ⊢
   rw [← hσ₂d, ← hσ₃d]
   clear hσ₂d hσ₃d
-  have ht₁ : i⊗^H[m + n] = prod (i⊗^H[m]) (i⊗^H[n]) :=
+  have ht₁ : i ^ (m + n) = i ^ m * i ^ n :=
     spacePow_add m n
-  have ht : H (i⊗^H[m + n]) = H (prod (i⊗^H[m]) (i⊗^H[n])) :=
-    congrArg H ht₁
+  have ht := congrArg H ht₁
   refine le_trans (biInf_le (i := (σ₂ ⊗ᵣ σ₃).relabel (Equiv.cast ht)) _ ?_) ?_
   · simpa [ht₁] using free_prod hσ₂f hσ₃f
   · apply le_of_eq

@@ -7,10 +7,10 @@ open NNReal
 open ComplexOrder
 open Topology
 open scoped Prob
+open scoped OptimalHypothesisRate
 open ResourcePretheory
 open FreeStateTheory
-open scoped UnitalPretheory
-open scoped OptimalHypothesisRate
+open UnitalPretheory
 open UnitalFreeStateTheory
 
 namespace SteinsLemma
@@ -48,7 +48,7 @@ theorem WithTop.untop_eq_untopD {α : Type*} {a : WithTop α} (h : a ≠ ⊤) (d
 /-- Lemma 5 -/
 theorem limit_rel_entropy_exists (ρ : MState (H i)) :
   ∃ d : ℝ≥0,
-    Filter.Tendsto (fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree (i := i⊗^H[n]), 𝐃(ρ⊗^S[n]‖σ))
+    Filter.Tendsto (fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree (i := i ^ n), 𝐃(ρ⊗^S[n]‖σ))
     .atTop (𝓝 d) := by
   --Fekete's subadditive lemma is in Mathlib:
   have h := (RelativeEntResource.Subadditive ρ)
@@ -81,32 +81,26 @@ express this with if-statements (e.g. `if m ∣ n then σₘ ⊗^ [ n / m ] else
 to work with. This altered definition is easier to work with and still has all the properties we need. We still
 need one `if` statement for when `n ≤ m`, sadly.
 -/
-noncomputable def Lemma6_σn (m : ℕ) (σf : MState (H i)) (σₘ : MState (H (i ⊗^H[m]))) : (n : ℕ) → (MState (H (i ⊗^H[n]))) :=
+noncomputable def Lemma6_σn (m : ℕ) (σf : MState (H i)) (σₘ : MState (H (i ^ m))) : (n : ℕ) → MState (H (i ^ n)) :=
   fun n ↦
     --This needs to be reworked to be compatible with the FreeStateTheory framework.
     let l : ℕ := n / m
     let q : ℕ := (n % m)
     let σr := σf ⊗^S[q]
     if h : n < m then
-      σr.relabel <| .cast <| congrArg (H <| i⊗^H[·]) (by simp [q, Nat.mod_eq_of_lt h])
+      σr.relabel <| .cast <| congrArg (H <| i ^ ·) (by simp [q, Nat.mod_eq_of_lt h])
     else
       let σl := σₘ ⊗^S[l]
-      (σl ⊗ᵣ σr).relabel <| .cast <| congrArg H <| (by
-        --This will require some real twiddling with our FreeStateTheory axioms for `prod`. We'll
-        --probably need some kind of monoidal structure ... In this case we just need to show that
-        -- i^n = (i^m)^(l) ⊗ i^q. These are both just expressions made from repeated products of
-        --the "base" Hilbert space i (remember that `⊗^[·]` is shorthand for iterated applications
-        -- of `ResourcePretheory.prod`), but the expressions are shaped differently; associativity of
-        --the product should be enough.
-        sorry
+      (σl ⊗ᵣ σr).relabel <| .cast <| congrArg H (by
+        rw [← pow_mul, ← spacePow_add, Nat.div_add_mod n m]
       )
 
-theorem Lemma6_σn_IsFree {σ₁ : MState (H i)} {σₘ : (m : ℕ) → MState (H (i⊗^H[m]))} (hσ₁_free : IsFree σ₁)
-    (hσₘ1 : ∀ (m : ℕ+), σₘ m ∈ IsFree) (m n : ℕ+) : Lemma6_σn m σ₁ (σₘ m) n ∈ IsFree := by
+theorem Lemma6_σn_IsFree {σ₁ : MState (H i)} {σₘ : (m : ℕ) → MState (H (i ^ m))} (hσ₁_free : IsFree σ₁)
+    (hσₘ1 : ∀ (m : ℕ), σₘ m ∈ IsFree) (m n : ℕ) : Lemma6_σn m σ₁ (σₘ m) n ∈ IsFree := by
   sorry
 
 /-- Lemma 6 from the paper -/
-private theorem Lemma6 (m : ℕ) (ρ σf : MState (H i)) (σₘ : MState (H (i⊗^H[m]))) (hσf : σf.m.PosDef) (ε : Prob)
+private theorem Lemma6 (m : ℕ) (ρ σf : MState (H i)) (σₘ : MState (H (i ^ m))) (hσf : σf.m.PosDef) (ε : Prob)
     (hε : 0 < ε)
     (hε' : ε < 1) --Not stated in the paper's theorem statement but I think is necessary for the argument to go through
     :
@@ -196,10 +190,10 @@ private theorem Lemma6 (m : ℕ) (ρ σf : MState (H i)) (σₘ : MState (H (i�
 /-- Theorem 4, which is _also_ called the Generalized Quantum Stein's Lemma in Hayashi & Yamasaki -/
 theorem limit_hypotesting_eq_limit_rel_entropy (ρ : MState (H i)) (ε : Prob) (hε : 0 < ε ∧ ε < 1) :
     ∃ d : ℝ≥0,
-      Filter.Tendsto (fun n ↦ —log β_ ε(ρ⊗^[n] ‖ IsFree) / n)
+      Filter.Tendsto (fun n ↦ —log β_ ε(ρ⊗^S[n]‖IsFree) / n)
       .atTop (𝓝 d)
       ∧
-      Filter.Tendsto (fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree, 𝐃(ρ⊗^[n]‖σ))
+      Filter.Tendsto (fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree, 𝐃(ρ⊗^S[n]‖σ))
       .atTop (𝓝 d)
       := by
   sorry
@@ -412,7 +406,7 @@ private theorem LemmaS3_inf {ε : Prob}
     ring_nf
 
 private theorem LemmaS3_sup {ε : Prob}
-    {d : PNat → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)]
+    {d : ℕ+ → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)]
     (ρ σ₁ σ₂ : (n : ℕ+) → MState (d n))
     (f : ℕ+ → ℝ≥0) (hf : (f · : ℕ+ → ℝ) =o[.atTop] (· : ℕ+ → ℝ))
     (hσ : ∀ i, Real.exp (-f i) • (σ₂ i).M ≤ σ₁ i)
@@ -442,16 +436,16 @@ private theorem LemmaS3_sup {ε : Prob}
 -- This is not exactly how R_{1, ε} is defined in Eq. (17), but it should be equal due to
 -- the monotonicity of log and Lemma 3.
 private noncomputable def R1 (ρ : MState (H i)) (ε : Prob) : ENNReal :=
-  Filter.liminf (fun n ↦ —log β_ ε(ρ⊗^[n]‖IsFree) / n) Filter.atTop
+  Filter.liminf (fun n ↦ —log β_ ε(ρ⊗^S[n]‖IsFree) / n) Filter.atTop
 
-private noncomputable def R2 (ρ : MState (H i)) : ((n : ℕ+) → IsFree (i := i⊗^[n])) → ENNReal :=
-  fun σ ↦ Filter.liminf (fun n ↦ 𝐃(ρ⊗^[n]‖σ n) / n) Filter.atTop
+private noncomputable def R2 (ρ : MState (H i)) : ((n : ℕ) → IsFree (i := i ^ n)) → ENNReal :=
+  fun σ ↦ Filter.liminf (fun n ↦ 𝐃(ρ⊗^S[n]‖σ n) / n) Filter.atTop
 
 /-- Lemma 7 from the paper. We write `ε'` for their `\tilde{ε}`. -/
-private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1) (σ : (n : ℕ+) → IsFree (i := i⊗^[n])) :
+private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1) (σ : (n : ℕ) → IsFree (i := i ^ n)) :
     (R2 ρ σ ≥ R1 ρ ε) →
     ∀ ε' : Prob, (hε' : 0 < ε' ∧ ε' < ε) → -- ε' is written as \tilde{ε} in the paper.
-    ∃ σ' : (n : ℕ+) → IsFree (i := i⊗^[n]),
+    ∃ σ' : (n : ℕ) → IsFree (i := i ^ n),
     R2 ρ σ' - R1 ρ ε ≤ .ofNNReal (1 - ε' : Prob) * (R2 ρ σ - R1 ρ ε)
     := by
   --This proof naturally splits out into LemmaS62:
@@ -502,12 +496,12 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
   have «σ̃_free» (n) : IsFree («σ̃» (n)) := Lemma6_σn_IsFree hσ₁_free (fun n ↦ (σ n).2) m n
 
   --Define σ⋆
-  have σ_max_exists (n : ℕ+) := IsCompact.exists_isMaxOn
+  have σ_max_exists (n : ℕ) := IsCompact.exists_isMaxOn
       (α := ENNReal)
-      (s := IsFree (i := i⊗^[n]))
+      (s := IsFree (i := i ^ n))
       (hs := IsCompact_IsFree)
       (ne_s := Set.Nonempty.of_subtype)
-      (f := fun σ ↦ β_ ε(ρ⊗^[n]‖{σ}))
+      (f := fun σ ↦ β_ ε(ρ⊗^S[n]‖{σ}))
       (hf := Continuous.continuousOn (by fun_prop))
   let «σ⋆» (n) := Classical.choose (σ_max_exists n)
   have «σ⋆_free» (n) : IsFree («σ⋆» n) := (σ_max_exists n).choose_spec.left
@@ -516,7 +510,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
   --Finally define σ' as an even mixture of σ̃, σ⋆, and σ_full.
   --TODO: would be nice to write a `Mixable` thing for mixing `k` things according to a distribution,
   -- in this case `Distribution.uniform (Fin 3)`.
-  let σ' := fun n ↦ ⟨2/3, by norm_num⟩ [⟨1/2, by norm_num⟩ [«σ̃» n ↔ «σ⋆» n] ↔ σ₁⊗^[n]]
+  let σ' := fun n ↦ ⟨2/3, by norm_num⟩ [⟨1/2, by norm_num⟩ [«σ̃» n ↔ «σ⋆» n] ↔ σ₁⊗^S[n]]
   have σ'_free (n) : IsFree (σ' n) := by
     --by convexity of `IsFree` and that the three constituents are free
     unfold σ'
@@ -527,7 +521,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     --because σ₁ is PosDef, so is σ₁⊗^[n], and so is any convex mixture.
     unfold σ'
     apply MState.PosDef_mix_of_ne_one
-    · apply ResourcePretheory.PosDef.npow hσ₁_pos
+    · apply UnitalPretheory.PosDef.npow hσ₁_pos
     · norm_num [← Prob.ne_iff]
 
   --Clean up the goal... a bit... still a mess!
@@ -551,14 +545,15 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
 
   clear i_min hi_min
 
-  -- The sequence c_n given in (S44)
-  let c (n : ℕ+) := Real.log (1 / mineig) + (Real.log 3) / n
+  -- The sequence c_n given in (S44). In order to handle when c = 0, I've replaced the
+  -- (Real.log 3) / n term with (Real.log 3) / (max n 1). I expect this will work down the line.
+  let c (n : ℕ) := Real.log (1 / mineig) + (Real.log 3) / (max n 1)
   have hc (n) : 0 < c n := by
     have h₁ : 0 ≤ Real.log (1 / mineig) := by bound
     positivity
 
   -- The function f_n(λ) in (S45)
-  let f (n : ℕ+) (lam : ℝ) := ⌈Real.log lam / c n⌉ * c n
+  let f (n : ℕ) (lam : ℝ) := ⌈Real.log lam / c n⌉ * c n
   --(S46)
   have h_le_f (n) (lam) : Real.log lam ≤ f n lam := calc
     _ ≤ (⌈Real.log lam / (c n)⌉) * c n := by
@@ -578,7 +573,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
       field_simp
 
   --Define σ'' first as the (unnormalized) cfc image of σ' under `λ → exp (f n λ)`.
-  let σ''_unnormalized (n) : HermitianMat (H (i⊗^[n])) ℂ := --TODO: Define a HermitianMat.cfc function that behaves nicely
+  let σ''_unnormalized (n) : HermitianMat (H (i ^ n)) ℂ := --TODO: Define a HermitianMat.cfc function that behaves nicely
     (σ' n).M.cfc (fun e ↦ Real.exp (f n e))
 
   have σ''_unnormalized_PosDef (n) : Matrix.PosDef (σ''_unnormalized n).val := by
@@ -591,7 +586,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     sorry
 
   --Then σ'' is the normalized version, which will work because σ''_unnormalized is PosDef
-  let σ'' (n) : MState (H (i⊗^[n])) := {
+  let σ'' (n) : MState (H (i ^ n)) := {
     --TODO make this its own definition
     M := (σ''_unnormalized n).trace⁻¹ • (σ''_unnormalized n)
     zero_le := sorry
@@ -610,8 +605,8 @@ The paper paints this as pretty much immediate from Lemma7, but we need to handl
 R1. -/
 private noncomputable def Lemma7_improver (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1) {ε' : Prob} (hε' : 0 < ε' ∧ ε' < ε) :
     --The parameters above are the "fixed" parameters that we'll improve
-    --It takes one sequence of free states, `(n : ℕ+) → IsFree (i := i⊗^[n])`, and gives a new one
-    ((n : ℕ+) → IsFree (i := i⊗^[n])) → ((n : ℕ+) → IsFree (i := i⊗^[n])) :=
+    --It takes one sequence of free states, `(n : ℕ) → IsFree (i := i ^ n)`, and gives a new one
+    ((n : ℕ) → IsFree (i := i ^ n)) → ((n : ℕ) → IsFree (i := i ^ n)) :=
   fun σ ↦
     if h : R2 ρ σ ≥ R1 ρ ε then
       (Lemma7 ρ hε σ h ε' hε').choose
@@ -651,7 +646,7 @@ theorem _root_.tendsto_of_limsup_le_liminf {α : Type u_2} {β : Type u_3} [Cond
 
 theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : Prob) (hε : 0 < ε ∧ ε < 1) :
     Filter.Tendsto (fun n ↦
-      (↑n)⁻¹ * —log β_ ε(ρ⊗^[n]‖IsFree)
+      (↑n)⁻¹ * —log β_ ε(ρ⊗^S[n]‖IsFree)
     ) .atTop (𝓝 (RegularizedRelativeEntResource ρ)) := by
   conv =>
     enter [1, n, 2, 1]
@@ -664,12 +659,12 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : Prob) (hε : 
   · --the "strong converse" part first
     --Let σₘ be the state minimizing 𝐃(ρ⊗^m‖σₘ) over free states. This is guaranteed to exist since
     -- (1) the divergence is continuous and (2) the set of free states is compact.
-    have σₘ_exists (m : ℕ+) := IsCompact.exists_isMinOn
+    have σₘ_exists (m : ℕ) := IsCompact.exists_isMinOn
       (α := ENNReal)
-      (s := IsFree (i := i⊗^[m]))
+      (s := IsFree (i := i ^ m))
       (hs := IsCompact_IsFree)
       (ne_s := Set.Nonempty.of_subtype)
-      (f := fun σ ↦ 𝐃(ρ⊗^[m]‖σ))
+      (f := fun σ ↦ 𝐃(ρ⊗^S[m]‖σ))
       (hf := by fun_prop
       )
 
@@ -683,11 +678,11 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : Prob) (hε : 
     have ⟨σ₁, hσ₁_pos, hσ₁_free⟩ := FreeStateTheory.free_fullRank i
 
     --`h` is Eq (14)
-    have h (m : ℕ+) := Lemma6 m ρ σ₁ (σₘ m) hσ₁_pos ε hε.1 hε.2
+    have h (m : ℕ) := Lemma6 m ρ σ₁ (σₘ m) hσ₁_pos ε hε.1 hε.2
 
     --Update `h` to Eq (15)
-    have h₂ (m : ℕ+) : (fun n => (↑n)⁻¹ * —log β_ ε(ρ⊗^[n]‖IsFree)) ≤ᶠ[Filter.atTop]
-        (fun n => (↑n)⁻¹ * —log β_ ε(ρ⊗^[n]‖{(Lemma6_σn m σ₁ (σₘ m)) n})) := by
+    have h₂ (m : ℕ) : (fun n => (↑n)⁻¹ * —log β_ ε(ρ⊗^S[n]‖IsFree)) ≤ᶠ[Filter.atTop]
+        (fun n => (↑n)⁻¹ * —log β_ ε(ρ⊗^S[n]‖{(Lemma6_σn m σ₁ (σₘ m)) n})) := by
       rw [Filter.EventuallyLE]
       apply Filter.Eventually.of_forall
       intro n
@@ -715,7 +710,7 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : Prob) (hε : 
       apply iInf_subtype''
 
   · --the other direction, the "key part" of the "opposite inequality"
-    set R₁ε := Filter.liminf (fun n => —log (⨆ σ ∈ IsFree, β_ ε(ρ⊗^[n]‖{σ})) / ↑↑n) Filter.atTop
+    set R₁ε := Filter.liminf (fun n => —log (⨆ σ ∈ IsFree, β_ ε(ρ⊗^S[n]‖{σ})) / ↑↑n) Filter.atTop
     --We need to pick an ε' (a \tilde{ε} in the paper). The only constraint(?) is that it's strictly
     --less than ε. We take ε' := ε/2.
      --TODO: Should we have an HDiv Prob Nat instance?
@@ -724,9 +719,9 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : Prob) (hε : 
     have lem7 (σ h) := Lemma7 ρ hε σ h ε' hε'
     --Take some initial sequence σ₁. Can just take the full_rank one from each, if we want (which is the `default`
     -- instance that `Inhabited` derives, but the point is that it doesn't matter)
-    generalize (default : (n : ℕ+) → IsFree (i := i⊗^[n])) = σ₁
+    generalize (default : (n : ℕ) → IsFree (i := i ^ n)) = σ₁
     --Repeat the Lemma7 improvement process to drive the gap down
-    let σₖ : ℕ → (n : ℕ+) → IsFree (i := i⊗^[n]) := fun k ↦
+    let σₖ : ℕ → (n : ℕ) → IsFree (i := i ^ n) := fun k ↦
       (Lemma7_improver ρ hε hε')^[k] σ₁
 
     --Should be: the gap between R_{1,ε} and R2 for `σₖ k` goes to 0 as `k → ∞`.
