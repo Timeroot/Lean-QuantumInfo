@@ -399,7 +399,7 @@ theorem _root_.FreeStateTheory.IsFree.npow {i : ι} {ρ : MState (H i)}
     exact FreeStateTheory.free_prod ‹_› hρ
 
 @[simp]
-theorem reabel_cast_isFree {i j : ι} (ρ : MState (H i)) (h : j = i) {h' : H j = H i}:
+theorem relabel_cast_isFree {i j : ι} (ρ : MState (H i)) (h : j = i) {h' : H j = H i}:
     ρ.relabel (Equiv.cast h') ∈ IsFree ↔ ρ ∈ IsFree := by
   subst h
   simp

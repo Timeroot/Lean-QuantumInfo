@@ -4,13 +4,6 @@ import QuantumInfo.Finite.ResourceTheory.HypothesisTesting
 import Mathlib.Tactic.Bound
 
 --PULLOUT
-theorem WithTop.untop_eq_untopD {α : Type*} {a : WithTop α} (h : a ≠ ⊤) (d : α) :
-    untop a h = untopD d a := by
-  cases a
-  · contradiction
-  · simp
-
---PULLOUT
 --Similar to `ENNReal.tendsto_toReal_iff` in `Mathlib/Topology/Instances/ENNReal/Lemmas`, but
 -- instead of requiring finiteness for all values, just eventually is needed.
 open Filter Topology ENNReal in
@@ -21,9 +14,9 @@ theorem ENNReal.tendsto_toReal_iff_of_eventually_ne_top
     rw [EventuallyEq]
     peel hf with h
     simp [h]
-  have he₂ : (fun n ↦ (f n).toReal) =ᶠ[fi] (fun n ↦ ENNReal.toReal ((f n).toNNReal)) := by
-    apply EventuallyEq.refl
-  rw [Filter.tendsto_congr' he₁, Filter.tendsto_congr' he₂]
+  have he₂ : (fun n ↦ (f n).toReal) = (fun n ↦ ((f n).toNNReal : ℝ≥0∞).toReal) :=
+    rfl
+  rw [Filter.tendsto_congr' he₁, he₂]
   exact tendsto_toReal_iff (by finiteness) hx
 
 open NNReal
@@ -100,14 +93,22 @@ noncomputable def Lemma6_σn (m : ℕ) (σf : MState (H i)) (σₘ : MState (H (
     if h : n < m then
       σr.relabel <| .cast <| congrArg (H <| i ^ ·) (by simp [q, Nat.mod_eq_of_lt h])
     else
-      let σl := σₘ ⊗^S[l]
-      (σl ⊗ᵣ σr).relabel <| .cast <| congrArg H (by
+      (σₘ ⊗^S[l] ⊗ᵣ σr).relabel <| .cast <| congrArg H (by
         rw [← pow_mul, ← spacePow_add, Nat.div_add_mod n m]
       )
 
 theorem Lemma6_σn_IsFree {σ₁ : MState (H i)} {σₘ : (m : ℕ) → MState (H (i ^ m))} (hσ₁_free : IsFree σ₁)
-    (hσₘ1 : ∀ (m : ℕ), σₘ m ∈ IsFree) (m n : ℕ) : Lemma6_σn m σ₁ (σₘ m) n ∈ IsFree := by
-  sorry
+    (hσₘ : ∀ (m : ℕ), σₘ m ∈ IsFree) (m n : ℕ) : Lemma6_σn m σ₁ (σₘ m) n ∈ IsFree := by
+  rw [Lemma6_σn]
+  split_ifs with hnm
+  · rw [relabel_cast_isFree]
+    · exact hσ₁_free.npow (n % m)
+    · rw [Nat.mod_eq_of_lt hnm]
+  · rw [relabel_cast_isFree]
+    · apply free_prod --pick a better name / alias for this
+      · exact (hσₘ m).npow (n / m)
+      · exact hσ₁_free.npow (n % m)
+    · rw [← pow_mul, ← spacePow_add, Nat.div_add_mod n m]
 
 /-- Lemma 6 from the paper -/
 private theorem Lemma6 (m : ℕ) (ρ σf : MState (H i)) (σₘ : MState (H (i ^ m))) (hσf : σf.m.PosDef) (ε : Prob)
