@@ -4,6 +4,7 @@ import QuantumInfo.Finite.ResourceTheory.HypothesisTesting
 import Mathlib.Tactic.Bound
 
 open NNReal
+open scoped ENNReal
 open ComplexOrder
 open Topology
 open scoped Prob
@@ -73,14 +74,7 @@ theorem limit_rel_entropy_exists (ρ : MState (H i)) :
   -/
   sorry
 
-/-- The \tilde{σ}_n defined in Lemma 6, also in equation (S40) in Lemma 7.
-I've slightly changed the definition here: instead of `n / m` and `n % m`, I use `(n-1) / m` and `(n-1)%m + 1`.
-This means that we only ever need ℕ+ powers of states. It *would* be fine to just add the requirement to our
-notion of `ResourcePretheory` that we have a 0-dimensional space, so that we can take ℕ powers; or we could
-express this with if-statements (e.g. `if m ∣ n then σₘ ⊗^ [ n / m ] else (...) ⊗ᵣ (...)`) but that's messier
-to work with. This altered definition is easier to work with and still has all the properties we need. We still
-need one `if` statement for when `n ≤ m`, sadly.
--/
+/-- The \tilde{σ}_n defined in Lemma 6, also in equation (S40) in Lemma 7. -/
 noncomputable def Lemma6_σn (m : ℕ) (σf : MState (H i)) (σₘ : MState (H (i ^ m))) : (n : ℕ) → MState (H (i ^ n)) :=
   fun n ↦
     --This needs to be reworked to be compatible with the FreeStateTheory framework.
@@ -210,7 +204,7 @@ variable {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq dIn] [Deci
 
 open scoped HermitianMat in
 theorem LemmaS2 {ε3 : Prob} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
-  {d : PNat → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)] (ρ : (n : PNat) → MState (d n)) (σ : (n : PNat) → MState (d n))
+  {d : ℕ → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)] (ρ : (n : ℕ) → MState (d n)) (σ : (n : ℕ) → MState (d n))
   {Rinf : ℝ≥0} (hRinf : ↑Rinf ≥ Filter.liminf (fun n ↦ (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n})) Filter.atTop)
   {Rsup : ℝ≥0} (hRsup : ↑Rsup ≥ Filter.limsup (fun n ↦ (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n})) Filter.atTop)
   :
@@ -223,6 +217,9 @@ theorem LemmaS2 {ε3 : Prob} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
     replace h := Filter.eventually_lt_of_lt_liminf h ?_
     · replace h := Filter.eventually_atTop.mp h
       obtain ⟨n₀, h⟩ := h
+      --Can assume that n₀ is positive. Then we don't have to worry about nonzero values down the line
+      wlog hn₀ : 0 < n₀
+      · exact this hε4 ρ σ hRinf hRsup 1 (fun b hb ↦ h _ <| by omega) zero_lt_one
       let T := fun n ↦ {(ρ n).M ≥ₚ (Real.exp (↑n * (Rinf + ε4))) • (σ n).M}
       have hT : ∀ n ≥ n₀, (ρ n).exp_val (1 - (T n)) ≤ ε3 := fun n hn ↦ by -- Eq (S23)
         unfold MState.exp_val T
@@ -249,17 +246,18 @@ theorem LemmaS2 {ε3 : Prob} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
             rw [HermitianMat.inner_comm, ←MState.exp_val]
             exact MState.exp_val_le_one (proj_le_le_one _ _) (ρ n)
       have h' : ∀ n ≥ n₀, ↑Rinf + ↑ε4 ≤ (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n}):= fun n hn↦ by -- Eq (S26)
-        have hn1 : (↑↑n : ENNReal) ≠ 0 := by simp only [ne_eq, Nat.cast_eq_zero, PNat.ne_zero, not_false_eq_true]
-        have hn2 : (↑↑n : ENNReal) ≠ ⊤ := by simp only [ne_eq, ENNReal.natCast_ne_top, not_false_eq_true]
-        have hh : ↑↑n * (↑Rinf + ↑ε4) = ENNReal.ofReal (n *(Rinf + ε4)) := by
+        have : 0 < n := by order
+        have hn1 : (n : ℝ≥0∞) ≠ 0 := by positivity
+        have hn2 : (n : ℝ≥0∞) ≠ ⊤ := by finiteness
+        have hh : n * (Rinf + ε4) = ENNReal.ofReal (n * (Rinf + ε4)) := by
           simp only [Nat.cast_nonneg, ENNReal.ofReal_mul, ENNReal.ofReal_natCast, zero_le_coe,
             ENNReal.ofReal_add, ENNReal.ofReal_coe_nnreal]
-        apply (ENNReal.mul_le_mul_left (a := ↑↑n) (b := ↑Rinf + ↑ε4) (c := (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n})) hn1 hn2).mp
-        rw [←mul_assoc, ENNReal.mul_inv_cancel hn1 hn2, one_mul, hh]
+        apply (ENNReal.mul_le_mul_left (a := n) (b := Rinf + ε4) (c := (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n})) hn1 hn2).mp
+        rw [← mul_assoc, ENNReal.mul_inv_cancel hn1 hn2, one_mul, hh]
         apply Prob.le_negLog_of_le_exp
-        rw [←neg_mul]
+        rw [← neg_mul]
         exact hβ n hn
-      have hf : ∀ᶠ (n : ℕ+) in Filter.atTop, ↑Rinf + ↑ε4 ≤ (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n}) := by
+      have hf : ∀ᶠ (n : ℕ) in Filter.atTop, Rinf + ε4 ≤ (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n}) := by
         rw [Filter.eventually_atTop]
         use n₀
       replace hf := Filter.le_liminf_of_le ?_ hf
@@ -272,7 +270,7 @@ theorem LemmaS2 {ε3 : Prob} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
     apply Filter.isBoundedUnder_of
     use 0; intro n
     rw [HermitianMat.inner_comm, ←MState.exp_val, ge_iff_le]
-    exact MState.exp_val_nonneg (proj_le_nonneg (Real.exp (↑↑n * (↑Rinf + ↑ε4)) • (σ n).M) (ρ n).M) (ρ n)
+    exact MState.exp_val_nonneg (proj_le_nonneg (Real.exp (↑n * (↑Rinf + ↑ε4)) • (σ n).M) (ρ n).M) (ρ n)
   · -- Basically the same proof as the Rinf case, but with liminf → limsup, ∀ᶠ → ∃ᶠ, etc.
     by_contra h
     push_neg at h
@@ -308,11 +306,12 @@ theorem LemmaS2 {ε3 : Prob} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
             rw [HermitianMat.inner_comm, ←MState.exp_val]
             exact MState.exp_val_le_one (proj_le_le_one _ _) (ρ n)
       have h' : ∀ n₀, ∃ n ≥ n₀, ↑Rsup + ↑ε4 ≤ (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n}):= fun n₀ ↦ by -- Eq (S33)
-        obtain ⟨n, ⟨hn, hβ⟩⟩ := hβ n₀
-        use n; use hn
-        have hn1 : (↑↑n : ENNReal) ≠ 0 := by simp only [ne_eq, Nat.cast_eq_zero, PNat.ne_zero, not_false_eq_true]
-        have hn2 : (↑↑n : ENNReal) ≠ ⊤ := by simp only [ne_eq, ENNReal.natCast_ne_top, not_false_eq_true]
-        have hh : ↑↑n * (↑Rsup + ↑ε4) = ENNReal.ofReal (n *(Rsup + ε4)) := by
+        obtain ⟨n, ⟨hn, hβ⟩⟩ := hβ (n₀ + 1)
+        use n; use by linarith
+        have hn0 : 0 < n := by omega
+        have hn1 : (n : ℝ≥0∞) ≠ 0 := by positivity
+        have hn2 : (n : ℝ≥0∞) ≠ ⊤ := by finiteness
+        have hh : n * (Rsup + ε4) = ENNReal.ofReal (n * (Rsup + ε4)) := by
           simp only [Nat.cast_nonneg, ENNReal.ofReal_mul, ENNReal.ofReal_natCast, zero_le_coe,
             ENNReal.ofReal_add, ENNReal.ofReal_coe_nnreal]
         apply (ENNReal.mul_le_mul_left (a := ↑↑n) (b := ↑Rsup + ↑ε4) (c := (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n})) hn1 hn2).mp
@@ -320,7 +319,7 @@ theorem LemmaS2 {ε3 : Prob} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
         apply Prob.le_negLog_of_le_exp
         rw [←neg_mul]
         exact hβ
-      have hf : ∃ᶠ (n : ℕ+) in Filter.atTop, ↑Rsup + ↑ε4 ≤ (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n}) := by
+      have hf : ∃ᶠ (n : ℕ) in Filter.atTop, ↑Rsup + ↑ε4 ≤ (↑n)⁻¹ * —log β_ ε3(ρ n‖{σ n}) := by
         rw [Filter.frequently_atTop]
         exact h'
       replace hf := Filter.le_limsup_of_frequently_le hf ?_
@@ -335,9 +334,9 @@ theorem LemmaS2 {ε3 : Prob} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
     rw [HermitianMat.inner_comm, ←MState.exp_val]
     exact MState.exp_val_nonneg (proj_le_nonneg (Real.exp (↑↑n * (↑Rsup + ↑ε4)) • (σ n).M) (ρ n).M) (ρ n)
 
-private theorem LemmaS3_helper {ε : Prob} {d : ℕ+ → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)]
-  (ρ σ₁ σ₂ : (n : ℕ+) → MState (d n))
-  (f : ℕ+ → ℝ≥0) (hσ : ∀ (i : ℕ+), Real.exp (-f i) • (σ₂ i).M ≤ (σ₁ i)) (n : ℕ+) :
+private theorem LemmaS3_helper {ε : Prob} {d : ℕ → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)]
+  (ρ σ₁ σ₂ : (n : ℕ) → MState (d n))
+  (f : ℕ → ℝ≥0) (hσ : ∀ (i : ℕ), Real.exp (-f i) • (σ₂ i).M ≤ (σ₁ i)) (n : ℕ) :
     —log β_ ε(ρ n‖{σ₁ n}) ≤ —log β_ ε(ρ n‖{σ₂ n}) + ↑(f n) := by
   have h₁ (T : HermitianMat (d n) ℂ) (hT : 0 ≤ T) :
           Real.exp (-f n) * T.inner (σ₂ n).M ≤ T.inner (σ₁ n).M := by
@@ -379,17 +378,17 @@ we express as a function `f : ℕ+ → ℝ`, together with the fact that `f` is 
 and the `lim sup` part. The theorem as written is true for any `f`, but we can restrict to nonnegative
 `f` (so, `ℕ+ → ℝ≥0`) which is easier to work with and more natural in the subsequent proofs. -/
 private theorem LemmaS3_inf {ε : Prob}
-    {d : ℕ+ → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)]
-    (ρ σ₁ σ₂ : (n : ℕ+) → MState (d n))
-    (f : ℕ+ → ℝ≥0) (hf : (f · : ℕ+ → ℝ) =o[.atTop] (· : ℕ+ → ℝ))
+    {d : ℕ → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)]
+    (ρ σ₁ σ₂ : (n : ℕ) → MState (d n))
+    (f : ℕ → ℝ≥0) (hf : (f · : ℕ → ℝ) =o[.atTop] (· : ℕ → ℝ))
     (hσ : ∀ i, Real.exp (-f i) • (σ₂ i).M ≤ σ₁ i)
     :
-    Filter.liminf (fun (n : ℕ+) ↦ (↑n)⁻¹ * —log β_ ε(ρ n‖{σ₁ n})) Filter.atTop ≤
-      Filter.liminf (fun (n : ℕ+) ↦ (↑n)⁻¹ * —log β_ ε(ρ n‖{σ₂ n})) Filter.atTop
+    Filter.liminf (fun (n : ℕ) ↦ (↑n)⁻¹ * —log β_ ε(ρ n‖{σ₁ n})) Filter.atTop ≤
+      Filter.liminf (fun (n : ℕ) ↦ (↑n)⁻¹ * —log β_ ε(ρ n‖{σ₂ n})) Filter.atTop
     := by
   --Starting with `helper`, divide by n and take the limits. Since f is o(n),
   --the (↑n)⁻¹ * f n term will go to zero.
-  trans Filter.liminf (fun n => (↑↑n)⁻¹ * (—log β_ ε(ρ n‖{σ₂ n}) + ↑(f n))) Filter.atTop
+  trans Filter.liminf (fun n => (↑n)⁻¹ * (—log β_ ε(ρ n‖{σ₂ n}) + ↑(f n))) Filter.atTop
   · refine Filter.liminf_le_liminf ?_
     apply Filter.Eventually.of_forall
     intro x
@@ -399,24 +398,32 @@ private theorem LemmaS3_inf {ε : Prob}
     simp_rw [mul_add]
     apply Filter.liminf_add_tendsTo_zero
     convert Asymptotics.IsLittleO.tendsto_div_nhds_zero hf
-    rw [← ENNReal.tendsto_toReal_iff (by finiteness) ENNReal.zero_ne_top]
-    simp only [ENNReal.toReal_mul, ENNReal.toReal_inv, ENNReal.toReal_natCast, ENNReal.coe_toReal,
-      ENNReal.toReal_zero]
-    congr! 2
-    ring_nf
+    rw [Filter.tendsto_congr' (f₂ := fun (n : ℕ) ↦ (↑(max n 1) : ℝ≥0∞)⁻¹ * ↑(f n))]
+    · rw [← ENNReal.tendsto_toReal_iff (by finiteness) ENNReal.zero_ne_top]
+      simp only [ENNReal.toReal_mul, ENNReal.toReal_inv, ENNReal.toReal_natCast, ENNReal.coe_toReal,
+        ENNReal.toReal_zero]
+      rw [Filter.tendsto_congr' (f₂ := fun (n : ℕ) ↦ (↑n : ℝ)⁻¹ * ↑(f n))]
+      · congr! 2
+        ring_nf
+      · simp [Filter.EventuallyEq]
+        tauto
+    · simp [Filter.EventuallyEq]
+      use 1
+      intro b hb
+      simp only [hb, sup_of_le_left]
 
 private theorem LemmaS3_sup {ε : Prob}
-    {d : ℕ+ → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)]
-    (ρ σ₁ σ₂ : (n : ℕ+) → MState (d n))
-    (f : ℕ+ → ℝ≥0) (hf : (f · : ℕ+ → ℝ) =o[.atTop] (· : ℕ+ → ℝ))
+    {d : ℕ → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)]
+    (ρ σ₁ σ₂ : (n : ℕ) → MState (d n))
+    (f : ℕ → ℝ≥0) (hf : (f · : ℕ → ℝ) =o[.atTop] (· : ℕ → ℝ))
     (hσ : ∀ i, Real.exp (-f i) • (σ₂ i).M ≤ σ₁ i)
     :
-    Filter.limsup (fun (n : ℕ+) ↦ (↑n)⁻¹ * —log β_ ε(ρ n‖{σ₁ n})) Filter.atTop ≤
-      Filter.limsup (fun (n : ℕ+) ↦ (↑n)⁻¹ * —log β_ ε(ρ n‖{σ₂ n})) Filter.atTop
+    Filter.limsup (fun (n : ℕ) ↦ (↑n)⁻¹ * —log β_ ε(ρ n‖{σ₁ n})) Filter.atTop ≤
+      Filter.limsup (fun (n : ℕ) ↦ (↑n)⁻¹ * —log β_ ε(ρ n‖{σ₂ n})) Filter.atTop
     := by
   --Starting with `helper`, divide by n and take the limits. Since f is o(n),
   --the (↑n)⁻¹ * f n term will go to zero.
-  trans Filter.limsup (fun n => (↑↑n)⁻¹ * (—log β_ ε(ρ n‖{σ₂ n}) + ↑(f n))) Filter.atTop
+  trans Filter.limsup (fun n => (↑n)⁻¹ * (—log β_ ε(ρ n‖{σ₂ n}) + ↑(f n))) Filter.atTop
   · refine Filter.limsup_le_limsup ?_
     apply Filter.Eventually.of_forall
     intro x
@@ -427,18 +434,26 @@ private theorem LemmaS3_sup {ε : Prob}
     simp_rw [mul_add]
     apply Filter.limsup_add_tendsTo_zero
     convert Asymptotics.IsLittleO.tendsto_div_nhds_zero hf
-    rw [← ENNReal.tendsto_toReal_iff (by finiteness) ENNReal.zero_ne_top]
-    simp only [ENNReal.toReal_mul, ENNReal.toReal_inv, ENNReal.toReal_natCast, ENNReal.coe_toReal,
-      ENNReal.toReal_zero]
-    congr! 2
-    ring_nf
+    rw [Filter.tendsto_congr' (f₂ := fun (n : ℕ) ↦ (↑(max n 1) : ℝ≥0∞)⁻¹ * ↑(f n))]
+    · rw [← ENNReal.tendsto_toReal_iff (by finiteness) ENNReal.zero_ne_top]
+      simp only [ENNReal.toReal_mul, ENNReal.toReal_inv, ENNReal.toReal_natCast, ENNReal.coe_toReal,
+        ENNReal.toReal_zero]
+      rw [Filter.tendsto_congr' (f₂ := fun (n : ℕ) ↦ (↑n : ℝ)⁻¹ * ↑(f n))]
+      · congr! 2
+        ring_nf
+      · simp [Filter.EventuallyEq]
+        tauto
+    · simp [Filter.EventuallyEq]
+      use 1
+      intro b hb
+      simp only [hb, sup_of_le_left]
 
 -- This is not exactly how R_{1, ε} is defined in Eq. (17), but it should be equal due to
 -- the monotonicity of log and Lemma 3.
-private noncomputable def R1 (ρ : MState (H i)) (ε : Prob) : ENNReal :=
+private noncomputable def R1 (ρ : MState (H i)) (ε : Prob) : ℝ≥0∞ :=
   Filter.liminf (fun n ↦ —log β_ ε(ρ⊗^S[n]‖IsFree) / n) Filter.atTop
 
-private noncomputable def R2 (ρ : MState (H i)) : ((n : ℕ) → IsFree (i := i ^ n)) → ENNReal :=
+private noncomputable def R2 (ρ : MState (H i)) : ((n : ℕ) → IsFree (i := i ^ n)) → ℝ≥0∞ :=
   fun σ ↦ Filter.liminf (fun n ↦ 𝐃(ρ⊗^S[n]‖σ n) / n) Filter.atTop
 
 /-- Lemma 7 from the paper. We write `ε'` for their `\tilde{ε}`. -/
@@ -496,13 +511,8 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
   have «σ̃_free» (n) : IsFree («σ̃» (n)) := Lemma6_σn_IsFree hσ₁_free (fun n ↦ (σ n).2) m n
 
   --Define σ⋆
-  have σ_max_exists (n : ℕ) := IsCompact.exists_isMaxOn
-      (α := ENNReal)
-      (s := IsFree (i := i ^ n))
-      (hs := IsCompact_IsFree)
-      (ne_s := Set.Nonempty.of_subtype)
-      (f := fun σ ↦ β_ ε(ρ⊗^S[n]‖{σ}))
-      (hf := Continuous.continuousOn (by fun_prop))
+  have σ_max_exists (n : ℕ) := IsCompact_IsFree.exists_isMaxOn Set.Nonempty.of_subtype
+      (f := fun σ ↦ β_ ε(ρ⊗^S[n]‖{σ})) (hf := Continuous.continuousOn (by fun_prop))
   let «σ⋆» (n) := Classical.choose (σ_max_exists n)
   have «σ⋆_free» (n) : IsFree («σ⋆» n) := (σ_max_exists n).choose_spec.left
   have «σ⋆_max» (n) : IsMaxOn _ IsFree («σ⋆» n) := (σ_max_exists n).choose_spec.right
@@ -659,14 +669,8 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : Prob) (hε : 
   · --the "strong converse" part first
     --Let σₘ be the state minimizing 𝐃(ρ⊗^m‖σₘ) over free states. This is guaranteed to exist since
     -- (1) the divergence is continuous and (2) the set of free states is compact.
-    have σₘ_exists (m : ℕ) := IsCompact.exists_isMinOn
-      (α := ENNReal)
-      (s := IsFree (i := i ^ m))
-      (hs := IsCompact_IsFree)
-      (ne_s := Set.Nonempty.of_subtype)
-      (f := fun σ ↦ 𝐃(ρ⊗^S[m]‖σ))
-      (hf := by fun_prop
-      )
+    have σₘ_exists (m : ℕ) := IsCompact_IsFree.exists_isMinOn Set.Nonempty.of_subtype
+      (f := fun σ ↦ 𝐃(ρ⊗^S[m]‖σ)) (by fun_prop)
 
     have hσₘ1 := fun m ↦ (σₘ_exists m).choose_spec.left
     have hσₘ2 := fun m ↦ (σₘ_exists m).choose_spec.right
@@ -710,7 +714,7 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : Prob) (hε : 
       apply iInf_subtype''
 
   · --the other direction, the "key part" of the "opposite inequality"
-    set R₁ε := Filter.liminf (fun n => —log (⨆ σ ∈ IsFree, β_ ε(ρ⊗^S[n]‖{σ})) / ↑↑n) Filter.atTop
+    set R₁ε := Filter.liminf (fun n => —log (⨆ σ ∈ IsFree, β_ ε(ρ⊗^S[n]‖{σ})) / ↑n) Filter.atTop
     --We need to pick an ε' (a \tilde{ε} in the paper). The only constraint(?) is that it's strictly
     --less than ε. We take ε' := ε/2.
      --TODO: Should we have an HDiv Prob Nat instance?
