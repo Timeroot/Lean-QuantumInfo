@@ -3,6 +3,29 @@ import QuantumInfo.Finite.ResourceTheory.HypothesisTesting
 
 import Mathlib.Tactic.Bound
 
+--PULLOUT
+theorem WithTop.untop_eq_untopD {α : Type*} {a : WithTop α} (h : a ≠ ⊤) (d : α) :
+    untop a h = untopD d a := by
+  cases a
+  · contradiction
+  · simp
+
+--PULLOUT
+--Similar to `ENNReal.tendsto_toReal_iff` in `Mathlib/Topology/Instances/ENNReal/Lemmas`, but
+-- instead of requiring finiteness for all values, just eventually is needed.
+open Filter Topology ENNReal in
+theorem ENNReal.tendsto_toReal_iff_of_eventually_ne_top
+  {ι} {fi : Filter ι} {f : ι → ℝ≥0∞} (hf : ∀ᶠ i in fi, f i ≠ ∞) {x : ℝ≥0∞}
+    (hx : x ≠ ∞) : Tendsto (fun n => (f n).toReal) fi (𝓝 x.toReal) ↔ Tendsto f fi (𝓝 x) := by
+  have he₁ : f =ᶠ[fi] (fun n ↦ (f n).toNNReal) := by
+    rw [EventuallyEq]
+    peel hf with h
+    simp [h]
+  have he₂ : (fun n ↦ (f n).toReal) =ᶠ[fi] (fun n ↦ ENNReal.toReal ((f n).toNNReal)) := by
+    apply EventuallyEq.refl
+  rw [Filter.tendsto_congr' he₁, Filter.tendsto_congr' he₂]
+  exact tendsto_toReal_iff (by finiteness) hx
+
 open NNReal
 open scoped ENNReal
 open ComplexOrder
@@ -32,13 +55,6 @@ lemma min_free_relent_finite (ρ : MState (H i)) : ⨅ σ ∈ IsFree, 𝐃(ρ‖
   contrapose! h
   convert bot_le
   exact hσ₁.toLin_ker_eq_bot
-
---PULLOUT
-theorem WithTop.untop_eq_untopD {α : Type*} {a : WithTop α} (h : a ≠ ⊤) (d : α) :
-    WithTop.untop a h = WithTop.untopD d a := by
-  cases a
-  · contradiction
-  · simp
 
 -- This theorem should follow from "Fekete's subadditive lemma", which can be found in
 -- Lemma A.1 of Hayashi's book "Quantum Information Theory - Mathematical Foundation".
@@ -372,28 +388,11 @@ private theorem LemmaS3_helper {ε : Prob} {d : ℕ → Type*} [∀ n, Fintype (
   rw [HermitianMat.inner_comm _ x, HermitianMat.inner_comm _ x]
   apply HermitianMat.inner_mono hx₂ _ _ (hσ n)
 
---PULLOUT
---Similar to `ENNReal.tendsto_toReal_iff` in `Mathlib/Topology/Instances/ENNReal/Lemmas`, but
--- instead of requiring finiteness for all values, just eventually is needed.
-open Filter in
-open ENNReal in
-theorem _root_.ENNReal.tendsto_toReal_iff_of_eventually_ne_top
-  {ι} {fi : Filter ι} {f : ι → ℝ≥0∞} (hf : ∀ᶠ i in fi, f i ≠ ∞) {x : ℝ≥0∞}
-    (hx : x ≠ ∞) : Tendsto (fun n => (f n).toReal) fi (𝓝 x.toReal) ↔ Tendsto f fi (𝓝 x) := by
-  have he₁ : f =ᶠ[fi] (fun n ↦ (f n).toNNReal) := by
-    rw [EventuallyEq]
-    peel hf with h
-    simp [h]
-  have he₂ : (fun n ↦ (f n).toReal) =ᶠ[fi] (fun n ↦ ENNReal.toReal ((f n).toNNReal)) := by
-    apply EventuallyEq.refl
-  rw [Filter.tendsto_congr' he₁, Filter.tendsto_congr' he₂]
-  exact tendsto_toReal_iff (by finiteness) hx
-
 /-- Lemma S3 from the paper. What they denote as σₙ and σₙ', we denote as σ₁ and σ₂. The `exp(-o(n))`
-we express as a function `f : ℕ+ → ℝ`, together with the fact that `f` is little-o of `n` (i.e. that
+we express as a function `f : ℕ → ℝ`, together with the fact that `f` is little-o of `n` (i.e. that
 `f =o[.atTop] id`), and then writing `exp(-f)`. We also split LemmaS3 into two parts, the `lim inf` part
 and the `lim sup` part. The theorem as written is true for any `f`, but we can restrict to nonnegative
-`f` (so, `ℕ+ → ℝ≥0`) which is easier to work with and more natural in the subsequent proofs. -/
+`f` (so, `ℕ → ℝ≥0`) which is easier to work with and more natural in the subsequent proofs. -/
 private theorem LemmaS3_inf {ε : Prob}
     {d : ℕ → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)]
     (ρ σ₁ σ₂ : (n : ℕ) → MState (d n))
