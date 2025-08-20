@@ -372,6 +372,23 @@ private theorem LemmaS3_helper {ε : Prob} {d : ℕ → Type*} [∀ n, Fintype (
   rw [HermitianMat.inner_comm _ x, HermitianMat.inner_comm _ x]
   apply HermitianMat.inner_mono hx₂ _ _ (hσ n)
 
+--PULLOUT
+--Similar to `ENNReal.tendsto_toReal_iff` in `Mathlib/Topology/Instances/ENNReal/Lemmas`, but
+-- instead of requiring finiteness for all values, just eventually is needed.
+open Filter in
+open ENNReal in
+theorem _root_.ENNReal.tendsto_toReal_iff_of_eventually_ne_top
+  {ι} {fi : Filter ι} {f : ι → ℝ≥0∞} (hf : ∀ᶠ i in fi, f i ≠ ∞) {x : ℝ≥0∞}
+    (hx : x ≠ ∞) : Tendsto (fun n => (f n).toReal) fi (𝓝 x.toReal) ↔ Tendsto f fi (𝓝 x) := by
+  have he₁ : f =ᶠ[fi] (fun n ↦ (f n).toNNReal) := by
+    rw [EventuallyEq]
+    peel hf with h
+    simp [h]
+  have he₂ : (fun n ↦ (f n).toReal) =ᶠ[fi] (fun n ↦ ENNReal.toReal ((f n).toNNReal)) := by
+    apply EventuallyEq.refl
+  rw [Filter.tendsto_congr' he₁, Filter.tendsto_congr' he₂]
+  exact tendsto_toReal_iff (by finiteness) hx
+
 /-- Lemma S3 from the paper. What they denote as σₙ and σₙ', we denote as σ₁ and σ₂. The `exp(-o(n))`
 we express as a function `f : ℕ+ → ℝ`, together with the fact that `f` is little-o of `n` (i.e. that
 `f =o[.atTop] id`), and then writing `exp(-f)`. We also split LemmaS3 into two parts, the `lim inf` part
@@ -398,19 +415,14 @@ private theorem LemmaS3_inf {ε : Prob}
     simp_rw [mul_add]
     apply Filter.liminf_add_tendsTo_zero
     convert Asymptotics.IsLittleO.tendsto_div_nhds_zero hf
-    rw [Filter.tendsto_congr' (f₂ := fun (n : ℕ) ↦ (↑(max n 1) : ℝ≥0∞)⁻¹ * ↑(f n))]
-    · rw [← ENNReal.tendsto_toReal_iff (by finiteness) ENNReal.zero_ne_top]
-      simp only [ENNReal.toReal_mul, ENNReal.toReal_inv, ENNReal.toReal_natCast, ENNReal.coe_toReal,
-        ENNReal.toReal_zero]
-      rw [Filter.tendsto_congr' (f₂ := fun (n : ℕ) ↦ (↑n : ℝ)⁻¹ * ↑(f n))]
-      · congr! 2
-        ring_nf
-      · simp [Filter.EventuallyEq]
-        tauto
-    · simp [Filter.EventuallyEq]
+    rw [← ENNReal.tendsto_toReal_iff_of_eventually_ne_top ?_ ENNReal.zero_ne_top]
+    · simp only [ENNReal.toReal_mul, ENNReal.toReal_inv, ENNReal.toReal_natCast, ENNReal.coe_toReal,
+      ENNReal.toReal_zero]
+      congr! 2
+      ring_nf
+    · rw [Filter.eventually_atTop]
       use 1
-      intro b hb
-      simp only [hb, sup_of_le_left]
+      finiteness
 
 private theorem LemmaS3_sup {ε : Prob}
     {d : ℕ → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)]
@@ -434,19 +446,14 @@ private theorem LemmaS3_sup {ε : Prob}
     simp_rw [mul_add]
     apply Filter.limsup_add_tendsTo_zero
     convert Asymptotics.IsLittleO.tendsto_div_nhds_zero hf
-    rw [Filter.tendsto_congr' (f₂ := fun (n : ℕ) ↦ (↑(max n 1) : ℝ≥0∞)⁻¹ * ↑(f n))]
-    · rw [← ENNReal.tendsto_toReal_iff (by finiteness) ENNReal.zero_ne_top]
-      simp only [ENNReal.toReal_mul, ENNReal.toReal_inv, ENNReal.toReal_natCast, ENNReal.coe_toReal,
+    rw [← ENNReal.tendsto_toReal_iff_of_eventually_ne_top ?_ ENNReal.zero_ne_top]
+    · simp only [ENNReal.toReal_mul, ENNReal.toReal_inv, ENNReal.toReal_natCast, ENNReal.coe_toReal,
         ENNReal.toReal_zero]
-      rw [Filter.tendsto_congr' (f₂ := fun (n : ℕ) ↦ (↑n : ℝ)⁻¹ * ↑(f n))]
-      · congr! 2
-        ring_nf
-      · simp [Filter.EventuallyEq]
-        tauto
-    · simp [Filter.EventuallyEq]
+      congr! 2
+      ring_nf
+    · rw [Filter.eventually_atTop]
       use 1
-      intro b hb
-      simp only [hb, sup_of_le_left]
+      finiteness
 
 -- This is not exactly how R_{1, ε} is defined in Eq. (17), but it should be equal due to
 -- the monotonicity of log and Lemma 3.
