@@ -17,6 +17,7 @@ import QuantumInfo.Finite.Entropy
 import QuantumInfo.Finite.MState
 import QuantumInfo.Finite.POVM
 import QuantumInfo.Finite.Unitary
+import QuantumInfo.Finite.Pinching
 
 --Documentation without code
 import QuantumInfo.Finite.Capacity_doc

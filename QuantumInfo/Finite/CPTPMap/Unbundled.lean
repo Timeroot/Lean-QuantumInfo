@@ -88,8 +88,23 @@ theorem kron {M₁ : MatrixMap A B R} {M₂ : MatrixMap C D R} (h₁ : M₁.IsTr
     (M₁ ⊗ₖₘ M₂).IsTracePreserving := by
   sorry
 
+variable [CommSemiring S] [Star S] [SMulCommClass S S S] in
+/-- The channel X ↦ ∑ k : κ, (M k) * X * (N k)ᴴ formed by Kraus operators M, N : κ → Matrix B A R
+is trace-preserving if ∑ k : κ, (N k)ᴴ * (M k) = 1 -/
+theorem of_kraus_isTracePreserving {κ : Type*} [Fintype κ]
+  (M N : κ → Matrix B A S)
+  (hTP : (∑ k, (N k).conjTranspose * (M k)) = 1) :
+  (MatrixMap.of_kraus M N).IsTracePreserving := by
+  intro x
+  simp only [of_kraus, LinearMap.coe_mk, AddHom.coe_mk, Matrix.trace_sum]
+  conv =>
+    enter [1,2,i]
+    rw [Matrix.trace_mul_cycle (M i) x (N i).conjTranspose]
+  rw [←Matrix.trace_sum, ←Finset.sum_mul, hTP, one_mul]
+
 end IsTracePreserving
 end tp
+
 
 section unital
 
@@ -259,7 +274,7 @@ theorem _root_.MatrixMap.choi_PSD_iff_CP_map [DecidableEq A] (M : MatrixMap A B 
   · sorry
   sorry
 
-/-- The channel X ↦ ∑ k : κ, (M k) * X * (N k)ᴴ formed by Kraus operators M : κ → Matrix B A R
+/-- The channel X ↦ ∑ k : κ, (M k) * X * (M k)ᴴ formed by Kraus operators M : κ → Matrix B A R
 is completely positive -/
 theorem of_kraus_isCompletelyPositive {κ : Type*} [Fintype κ] (M : κ → Matrix B A R) :
   (MatrixMap.of_kraus M M).IsCompletelyPositive :=

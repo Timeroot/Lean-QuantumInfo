@@ -1,5 +1,6 @@
 import QuantumInfo.Finite.ResourceTheory.FreeState
 import QuantumInfo.Finite.ResourceTheory.HypothesisTesting
+import QuantumInfo.Finite.Pinching
 
 import Mathlib.Tactic.Bound
 
@@ -614,6 +615,9 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     sorry
   have σ''_le_σ' (n) : σ'' n ≤ Real.exp (c n) • (σ' n).M := by
     sorry
+
+  -- Definition of the pinching map w.r.t. σ'' in Eq. (S55)
+  let ℰ (n) := pinching_map (σ'' n)
 
   sorry
 

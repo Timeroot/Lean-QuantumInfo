@@ -127,6 +127,14 @@ theorem pos_Hermitian (M : PMap dIn dOut 𝕜) {x : HermitianMat dIn 𝕜} (h : 
 end PMap
 
 
+namespace CPMap
+
+def of_kraus_CPMap {κ : Type*} [Fintype κ] [DecidableEq dIn] (M : κ → Matrix dOut dIn 𝕜) : CPMap dIn dOut 𝕜 where
+  toLinearMap := MatrixMap.of_kraus M M
+  cp := MatrixMap.IsCompletelyPositive.of_kraus_isCompletelyPositive M
+
+end CPMap
+
 --Positive trace-preserving maps:
 --  * Continuous linear order-preserving maps on HermitianMats.
 --  * Continuous maps on MStates.
@@ -243,6 +251,13 @@ instance instMFunLike [DecidableEq dOut] : FunLike (CPTPMap dIn dOut) (MState dI
 @[simp]
 theorem IsTracePreserving (Λ : CPTPMap dIn dOut 𝕜) : Λ.map.IsTracePreserving :=
   Λ.TP
+
+def of_kraus_CPTPMap {κ : Type*} [Fintype κ] [DecidableEq dIn]
+  (M : κ → Matrix dOut dIn 𝕜)
+  (hTP : (∑ k, (M k).conjTranspose * (M k)) = 1) : CPTPMap dIn dOut 𝕜 where
+  toLinearMap := MatrixMap.of_kraus M M
+  cp := MatrixMap.IsCompletelyPositive.of_kraus_isCompletelyPositive M
+  TP := MatrixMap.IsTracePreserving.of_kraus_isTracePreserving M M hTP
 
 end CPTPMap
 
