@@ -44,10 +44,17 @@ theorem le_trace_smul_one [DecidableEq n] (hA : 0 ≤ A) : A ≤ (A.trace : ℝ)
   --   · exact fun j _ _ ↦ eigenvalues_nonneg hA j
   -- exact (le_smul_one_of_eigenvalues_iff hA hA.1.rtrace).mp h
 
-theorem inner_mono (hA : 0 ≤ A) (B C) : B ≤ C → A.inner B ≤ A.inner C := fun hBC ↦ by
+theorem inner_mono (hA : 0 ≤ A): B ≤ C → A.inner B ≤ A.inner C := fun hBC ↦ by
   classical have hTr : 0 ≤ A.inner (C - B) := inner_ge_zero hA (zero_le_iff.mpr hBC)
   rw [inner_left_sub] at hTr
   linarith
+
+theorem inner_mono' (hA : 0 ≤ A) : B ≤ C → B.inner A ≤ C.inner A := fun hBC ↦ by
+  -- classical have hTr : 0 ≤ A.inner (C - B) := inner_ge_zero hA (zero_le_iff.mpr hBC)
+  -- rw [inner_left_sub] at hTr
+  -- linarith
+  rw [inner_comm B A, inner_comm C A]
+  exact inner_mono hA hBC
 
 theorem conj_le (hA : 0 ≤ A) [Fintype m] (M : Matrix m n α) : 0 ≤ A.conj M := by
   rw [zero_le_iff] at hA ⊢
@@ -55,7 +62,7 @@ theorem conj_le (hA : 0 ≤ A) [Fintype m] (M : Matrix m n α) : 0 ≤ A.conj M 
 
 /-- The inner product for PSD matrices is at most the product of their traces. -/
 theorem inner_le_mul_trace (hA : 0 ≤ A) (hB : 0 ≤ B) : A.inner B ≤ A.trace * B.trace := by
-  classical convert inner_mono hA _ _ (le_trace_smul_one hB)
+  classical convert inner_mono hA (le_trace_smul_one hB)
   simp [mul_comm]
 
 /-- The inner product of two PSD matrices is zero iff they have disjoint support, i.e., each lives entirely

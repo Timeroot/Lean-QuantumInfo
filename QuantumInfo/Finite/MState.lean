@@ -159,7 +159,7 @@ theorem exp_val_one (ρ : MState d) : ρ.exp_val 1 = 1 := by
   simp [MState.exp_val]
 
 theorem exp_val_le_one {T : HermitianMat d ℂ} (h : T ≤ 1) (ρ : MState d) : ρ.exp_val T ≤ 1 := by
-  have hmono := HermitianMat.inner_mono ρ.zero_le T 1 h
+  have hmono := HermitianMat.inner_mono ρ.zero_le h
   rwa [HermitianMat.inner_one ρ.M, ρ.tr] at hmono
 
 theorem exp_val_prob {T : HermitianMat d ℂ} (h : 0 ≤ T ∧ T ≤ 1) (ρ : MState d) :

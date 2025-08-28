@@ -358,7 +358,7 @@ private theorem LemmaS3_helper {ε : Prob} {d : ℕ → Type*} [∀ n, Fintype (
     —log β_ ε(ρ n‖{σ₁ n}) ≤ —log β_ ε(ρ n‖{σ₂ n}) + ↑(f n) := by
   have h₁ (T : HermitianMat (d n) ℂ) (hT : 0 ≤ T) :
           Real.exp (-f n) * T.inner (σ₂ n).M ≤ T.inner (σ₁ n).M := by
-    simpa using HermitianMat.inner_mono hT _ _ (hσ n)
+    simpa using HermitianMat.inner_mono hT (hσ n)
   by_cases hσ₂ : β_ ε(ρ n‖{σ₂ n}) = 0
   · simp [hσ₂]
   replace hσ₂ := Prob.zero_lt_coe hσ₂
@@ -387,8 +387,7 @@ private theorem LemmaS3_helper {ε : Prob} {d : ℕ → Type*} [∀ n, Fintype (
   simp only [MState.exp_val] --dunno why `rw` won't rewrite the second one
   rw [← HermitianMat.smul_inner]
   --There should be an `inner_mono'` which is inner_mono in the other arguments
-  rw [HermitianMat.inner_comm _ x, HermitianMat.inner_comm _ x]
-  apply HermitianMat.inner_mono hx₂ _ _ (hσ n)
+  exact HermitianMat.inner_mono' hx₂ (hσ n)
 
 /-- Lemma S3 from the paper. What they denote as σₙ and σₙ', we denote as σ₁ and σ₂. The `exp(-o(n))`
 we express as a function `f : ℕ → ℝ`, together with the fact that `f` is little-o of `n` (i.e. that
