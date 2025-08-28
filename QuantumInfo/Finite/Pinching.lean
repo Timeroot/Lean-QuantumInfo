@@ -54,6 +54,12 @@ def pinching_map (ρ : MState d) : CPTPMap d d ℂ :=
   rfl
   )
 
-/-- Exercise 2.8 of Hayashi's book. Used in (S59) -/
+/-- Exercise 2.8 of Hayashi's book "A group theoretic approach to Quantum Information".
+-- Used in (S59) -/
 theorem pinching_pythagoras (ρ σ : MState d) :  𝐃(ρ‖σ) = 𝐃(ρ‖pinching_map σ ρ) + 𝐃(pinching_map σ ρ‖σ) :=
+  sorry
+
+/-- Lemma 3.10 of Hayashi's book "Quantum Information Theory - Mathematical Foundations".
+-- Used in (S60) -/
+theorem pinching_bound (ρ σ : MState d) : ρ.M ≤ (↑(Fintype.card (spectrum ℝ σ.m)) : ℝ) • (pinching_map σ ρ).M :=
   sorry

@@ -89,6 +89,12 @@ theorem qRelativeEnt_relabel (ρ σ : MState d) (e : d₂ ≃ d) :
   -- case pos =>
   --   exact h₁ (Submodule.comap_mono h₂)
 
+/-- "Formula for conversion from operator inequality to quantum relative entropy",
+-- Proposition S17 of https://arxiv.org/pdf/2401.01926v2 -/
+theorem qRelativeEnt_op_le {ρ σ : MState d} {α : ℝ} (hpos : 0 < α) (h : ρ.M ≤ α • σ.M) :
+  𝐃(ρ‖σ) ≤ ENNReal.ofReal (Real.log α) := by
+  sorry
+
 /-- The Quantum Conditional Mutual Information, I(A;C|B) = S(A|B) - S(A|BC). -/
 def qcmi (ρ : MState (dA × dB × dC)) : ℝ :=
   qConditionalEnt ρ.assoc'.traceRight - qConditionalEnt ρ

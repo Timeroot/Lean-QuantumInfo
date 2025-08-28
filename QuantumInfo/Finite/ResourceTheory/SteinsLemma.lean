@@ -618,6 +618,40 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
   -- Definition of the pinching map w.r.t. σ'' in Eq. (S55)
   let ℰ (n) := pinching_map (σ'' n)
 
+  -- Number of distinct eigenvalues of σ'' in Eq. (S56) is
+  -- Fintype.card (spectrum ℝ (σ'' n).m), which is dₙ in the paper.
+  have hdle : ∀ n, Fintype.card (spectrum ℝ (σ'' n).m) ≤ n + 1 := by
+    sorry
+  have hdpos : ∀ n, 0 < Fintype.card (spectrum ℝ (σ'' n).m) := by
+    sorry
+
+  -- Eq (S59) has a minus sign, which gets complicated when one of the relative entropies is infinite.
+  -- However, I don't think we need this version with the minus sign
+  -----
+  -- have rel_ent_pinching (n) : 𝐃(ρ⊗^S[n]‖ℰ n (ρ⊗^S[n])) = 𝐃(ρ⊗^S[n]‖σ'' n) - 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) := by
+  --   unfold ℰ
+  --   rw [pinching_pythagoras (ρ⊗^S[n]) (σ'' n)]
+  --   have hDfin : 𝐃((pinching_map (σ'' n)) (ρ⊗^S[n])‖σ'' n) ≠ ∞ := by
+  --     sorry
+  --   rw [←ENNReal.coe_toNNReal hDfin]
+  --   simp only [ENNReal.addLECancellable_iff_ne, ne_eq, ENNReal.coe_ne_top, not_false_eq_true,
+  --     AddLECancellable.add_tsub_cancel_right]
+  have rel_ent_pinching (n) : 𝐃(ρ⊗^S[n]‖σ'' n) = 𝐃(ρ⊗^S[n]‖ℰ n (ρ⊗^S[n])) + 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) := by
+    unfold ℰ
+    exact pinching_pythagoras (ρ⊗^S[n]) (σ'' n)
+
+  have rel_ent_bound (n) : 𝐃(ρ⊗^S[n]‖ℰ n (ρ⊗^S[n])) ≤ ENNReal.ofReal (Real.log (n + 1)) := calc
+    𝐃(ρ⊗^S[n]‖ℰ n (ρ⊗^S[n])) ≤ ENNReal.ofReal (Real.log (Fintype.card (spectrum ℝ (σ'' n).m))) := by
+      unfold ℰ
+      exact qRelativeEnt_op_le (by simp only [Nat.cast_pos, hdpos n])
+                               (pinching_bound (ρ⊗^S[n]) (σ'' n))
+    _ ≤ ENNReal.ofReal (Real.log (n + 1)) := by
+      apply ENNReal.ofReal_le_ofReal
+      apply Real.log_le_log
+      · simp only [Nat.cast_pos, hdpos n]
+      · norm_cast
+        exact hdle n
+
   sorry
 
 /-- Lemma 7 gives us a way to repeatedly "improve" a sequence σ to one with a smaller gap between R2 and R1.
