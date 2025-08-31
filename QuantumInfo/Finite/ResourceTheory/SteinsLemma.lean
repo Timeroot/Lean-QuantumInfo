@@ -111,8 +111,214 @@ theorem Lemma6_σn_IsFree {σ₁ : MState (H i)} {σₘ : (m : ℕ) → MState (
       · exact hσ₁_free.npow (n % m)
     · rw [← pow_mul, ← spacePow_add, Nat.div_add_mod n m]
 
+--PULLOUT to MState.lean
+@[simp]
+theorem MState.relabel_relabel {d d₂ d₃ : Type*}
+    [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂] [Fintype d₃] [DecidableEq d₃]
+    (ρ : MState d) (e : d₂ ≃ d) (e₂ : d₃ ≃ d₂) : (ρ.relabel e).relabel e₂ = ρ.relabel (e₂.trans e) := by
+  rfl
+
+--PULLOUT to Mathlib
+@[aesop (rule_sets := [finiteness]) unsafe apply]
+theorem _root_.ite_eq_top {α : Type*} [Top α] (h : Prop) [Decidable h] {x y : α} (hx : x ≠ ⊤) (hy : y ≠ ⊤) :
+    (if h then x else y) ≠ ⊤ := by
+  split <;> assumption
+
+--PULLOUT to Mathlib. Also this is a stupid name for a stupid lemma
+theorem _root_.Filter.Tendsto_inv_nat_mul_div_real (m : ℕ)
+   : Filter.Tendsto (fun (x : ℕ) => ((↑x)⁻¹ * ↑(x / m) : ℝ)) Filter.atTop (𝓝 (1 / ↑m)) := by
+  --Thanks aristotle!
+  -- This simplifies to $\lim_{x \to \infty} \frac{\lfloor x / m \rfloor}{x} = \frac{1}{m}$ because the floor function grows asymptotically like $x / m$.
+  have h_floor : Filter.Tendsto (fun x : ℕ => (Nat.floor (x / m : ℝ) : ℝ) / x) Filter.atTop (nhds (1 / (m : ℝ))) := by
+    -- We'll use the fact that the floor function is bounded and apply the squeeze theorem.
+    have h_floor_bound : ∀ x : ℕ, x > 0 → (Nat.floor (x / m : ℝ) : ℝ) / x ≥ (1 / m - 1 / x) ∧ (Nat.floor (x / m : ℝ) : ℝ) / x ≤ 1 / m := by
+      cases eq_or_ne m 0
+      · rename_i h
+        intro x a
+        subst h
+        simp_all only [gt_iff_lt, CharP.cast_eq_zero, div_zero, Nat.floor_zero, zero_div, one_div, zero_sub, ge_iff_le,
+          Left.neg_nonpos_iff, inv_nonneg, Nat.cast_nonneg, le_refl, and_self]
+      · intro x a
+        simp_all only [ne_eq, gt_iff_lt, one_div, ge_iff_le, tsub_le_iff_right]
+        apply And.intro
+        · rw [ inv_eq_one_div, div_add', div_le_div_iff₀ ] <;> first | positivity | nlinarith [ Nat.lt_floor_add_one ( ( x : ℝ ) / m ), show ( x : ℝ ) ≥ 1 by exact Nat.one_le_cast.mpr a, mul_div_cancel₀ ( x : ℝ ) ( show ( m : ℝ ) ≠ 0 by positivity ), inv_mul_cancel₀ ( show ( x : ℝ ) ≠ 0 by positivity ) ] ;
+        · rw [ div_le_iff₀ ( by positivity ) ];
+          simpa [ div_eq_inv_mul ] using Nat.floor_le ( by positivity : 0 ≤ ( x : ℝ ) / m );
+    -- Apply the squeeze theorem to conclude the proof.
+    have h_squeeze : Filter.Tendsto (fun x : ℕ => (1 / m : ℝ) - 1 / x) Filter.atTop (nhds (1 / m)) := by
+      simpa using tendsto_const_nhds.sub ( _root_.tendsto_inverse_atTop_nhds_zero_nat );
+    exact tendsto_of_tendsto_of_tendsto_of_le_of_le' h_squeeze tendsto_const_nhds ( Filter.eventually_atTop.mpr ⟨ 1, fun x hx => h_floor_bound x hx |>.1 ⟩ ) ( Filter.eventually_atTop.mpr ⟨ 1, fun x hx => h_floor_bound x hx |>.2 ⟩ );
+  -- Apply the hypothesis `h_floor` to conclude the proof.
+  convert h_floor using 1;
+  -- By definition of floor function, we know that ⌊(x : ℝ) / m⌋₊ is the greatest integer less than or equal to (x : ℝ) / m.
+  funext x; simp [Nat.floor_div_natCast];
+  ring
+
+--PULLOUT to Entropy.lean
+@[simp]
+theorem sandwichedRelRentropy_relabel {d d₂ : Type*} [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂]
+      {α : ℝ} (ρ σ : MState d) (e : d₂ ≃ d) :
+    D̃_ α(ρ.relabel e‖σ.relabel e) = D̃_ α(ρ‖σ) := by
+  sorry
+
+--PULLOUT to Entropy.lean
+@[simp]
+theorem qRelEntropy_self {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) :
+    𝐃(ρ‖ρ) = 0 := by
+  simp [qRelativeEnt]
+
+--PULLOUT to Entropy.lean
+@[simp]
+theorem sandwichedRelRentropy_self {d : Type*} [Fintype d] [DecidableEq d] {α : ℝ} (ρ : MState d) :
+    D̃_ α(ρ‖ρ) = 0 := by
+  simp? [SandwichedRelRentropy, NNReal.eq_iff] says simp only
+    [SandwichedRelRentropy, le_refl, ↓reduceIte, qRelEntropy_self, ite_eq_left_iff,
+      ENNReal.coe_eq_zero, NNReal.eq_iff, coe_mk, coe_zero, div_eq_zero_iff, Real.log_eq_zero]
+  intro hα
+  sorry
+
+--PULLOUT to Entropy.lean
+@[aesop (rule_sets := [finiteness]) unsafe apply]
+theorem _root_.qRelativeEnt_ne_top {d : Type*} [Fintype d] [DecidableEq d] {ρ σ : MState d}
+    (hσ : σ.m.PosDef) : 𝐃(ρ‖σ) ≠ ⊤ := by
+  have : σ.M.ker = ⊥ := by sorry --TODO: PosDef -> HermitianMat.ker = ⊥
+  simp [qRelativeEnt, this]
+
+--PULLOUT to Entropy.lean
+@[aesop (rule_sets := [finiteness]) unsafe apply]
+theorem _root_.SandwichedRelEntropy_ne_top {α : ℝ} {d : Type*} [Fintype d] [DecidableEq d] {ρ σ : MState d}
+    (hσ : σ.m.PosDef) : D̃_ α(ρ‖σ) ≠ ⊤ := by
+  have : σ.M.ker = ⊥ := by sorry --TODO: PosDef -> HermitianMat.ker = ⊥
+  simp [SandwichedRelRentropy, this]
+  finiteness
+
+--PULLOUT to FreeState.lean
+theorem statePow_rw {n m : ℕ} (h : n = m) (ρ : MState (H i)) :
+    ρ⊗^S[n] = (ρ⊗^S[m]).relabel (Equiv.cast (by congr)) := by
+  subst n
+  simp
+
+--PULLOUT to FreeState.lean
+@[simp]
+theorem sandwichedRelRentropy_prodRelabel {i j : ι} {α : ℝ} (ρ₁ ρ₂ : MState (H i)) (σ₁ σ₂ : MState (H j)):
+    D̃_ α(ρ₁ ⊗ᵣ σ₁‖ρ₂ ⊗ᵣ σ₂) = D̃_ α(ρ₁‖ρ₂) + D̃_ α(σ₁‖σ₂) := by
+  simp [prodRelabel, SandwichedRelRentropy_additive]
+
+--PULLOUT to FreeState.lean
+@[simp]
+theorem sandwichedRelRentropy_statePow {i : ι} {α : ℝ} (ρ σ : MState (H i)) (n : ℕ) :
+    D̃_ α(ρ⊗^S[n] ‖ σ ⊗^S[n]) = n * D̃_ α(ρ‖σ) := by
+  induction n
+  · simp
+  · rename_i n ih
+    rw [statePow_succ, statePow_succ, sandwichedRelRentropy_prodRelabel]
+    simp [ih, add_mul]
+
+--PULLOUT to FreeState.lean
+theorem sandwichedRelRentropy_heq_congr {α : ℝ}
+      {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
+      {ρ₁ σ₁ : MState d₁} {ρ₂ σ₂ : MState d₂} (hd : d₁ = d₂) (hρ : ρ₁ ≍ ρ₂) (hσ : σ₁ ≍ σ₂) :
+    D̃_ α(ρ₁‖σ₁) = D̃_ α(ρ₂‖σ₂) := by
+  rw [heq_iff_exists_eq_cast] at hρ hσ
+  obtain ⟨_, rfl⟩ := hρ
+  obtain ⟨_, rfl⟩ := hσ
+  simp [← MState.relabel_cast _ hd]
+
+--PULLOUT to FreeState.lean
+@[gcongr]
+theorem sandwichedRelRentropy_congr {α : ℝ}
+      {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
+      {ρ₁ σ₁ : MState d₁} {ρ₂ σ₂ : MState d₂} (hd : d₁ = d₂)
+        (hρ : ρ₁ = ρ₂.relabel (Equiv.cast hd)) (hσ : σ₁ = σ₂.relabel (Equiv.cast hd)) :
+    D̃_ α(ρ₁‖σ₁) = D̃_ α(ρ₂‖σ₂) := by
+  subst ρ₁ σ₁
+  simp
+
+--PULLOUT to FreeState.lean
+theorem statePow_add_relabel {i : ι} (ρ : MState (H i)) (m n : ℕ) :
+    ρ⊗^S[m + n] = (ρ⊗^S[m] ⊗ᵣ ρ⊗^S[n]).relabel (Equiv.cast (by congr; exact pow_add i m n)) := by
+  have h := statePow_add ρ m n
+  rw [heq_iff_exists_eq_cast] at h
+  obtain ⟨h, h₂⟩ := h
+  rw [h₂, MState.relabel_cast]
+
+--PULLOUT to FreeState.lean
+theorem statePow_mul {i : ι} (ρ : MState (H i)) (m n : ℕ) : ρ⊗^S[m * n] ≍ (ρ⊗^S[m])⊗^S[n] := by
+  rw [← eq_cast_iff_heq]; swap
+  · sorry --rw [spacePow_mul]
+  rw [eq_cast_iff_heq]
+  induction n
+  · simp
+  · rename_i n ih
+    rw [statePow_succ, mul_add]
+    sorry
+
+--PULLOUT to FreeState.lean
+theorem statePow_mul_relabel {i : ι} (ρ : MState (H i)) (m n : ℕ) :
+   ρ⊗^S[m * n] = (ρ⊗^S[m])⊗^S[n].relabel (Equiv.cast (congrArg H (pow_mul i m n))) := by
+  have h := statePow_mul ρ m n
+  rw [heq_iff_exists_eq_cast] at h
+  obtain ⟨h, h₂⟩ := h
+  rw [h₂, MState.relabel_cast]
+
+--PULLOUT to FreeState.lean
+/-- A `MState.relabel` can be distributed across a `prodRelabel`, if you have proofs that the factors
+correspond correctly. -/
+theorem prodRelabel_relabel_cast_prod {i j k l : ι}
+    (ρ₁ : MState (H i)) (ρ₂ : MState (H j))
+    (h : H (k * l) = H (i * j)) (hik : k = i) (hlj : l = j) :
+    (ρ₁ ⊗ᵣ ρ₂).relabel (Equiv.cast h) =
+    (ρ₁.relabel (Equiv.cast (congrArg H hik))) ⊗ᵣ (ρ₂.relabel (Equiv.cast (congrArg H hlj))) := by
+  subst hik
+  subst hlj
+  rfl
+
+--PULLOUT to MState.lean
+theorem MState.eq_relabel_iff {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
+    (ρ : MState d₁) (σ : MState d₂) (h : d₁ ≃ d₂) :
+    ρ = σ.relabel h ↔ ρ.relabel h.symm = σ := by
+  sorry
+
+theorem extracted_limsup_inequality (z : ℝ≥0∞) (hz : z ≠ ⊤) (y x : ℕ → ℝ≥0∞) (h_lem5 : ∀ (n : ℕ), x n ≤ y n + z)
+ : Filter.limsup (fun n => x n / ↑n) Filter.atTop ≤ Filter.limsup (fun n => y n / ↑n) Filter.atTop := by
+  --Thanks Aristotle
+  simp_all ( config := { decide := Bool.true } ) [ add_div, Filter.limsup_eq ];
+  -- Taking the limit superior of both sides of the inequality $x_n / n \leq y_n / n + z / n$, we get $\limsup_{n \to \infty} x_n / n \leq \limsup_{n \to \infty} (y_n / n + z / n)$.
+  intro b n h_bn
+  have h_le : ∀ m ≥ n, x m / (m : ℝ≥0∞) ≤ b + z / (m : ℝ≥0∞) := by
+    intro m hm;
+    refine' le_trans ( ENNReal.div_le_div_right _ _ ) _;
+    exact y m + z;
+    · exact h_lem5 m;
+    · rw [ ENNReal.add_div ];
+      exact add_le_add_right ( h_bn m hm ) _;
+  -- Since $z$ is finite, we have $\lim_{n \to \infty} z / n = 0$.
+  have h_z_div_n_zero : Filter.Tendsto (fun n : ℕ => z / (n : ℝ≥0∞)) Filter.atTop (nhds 0) := by
+    rw [ ENNReal.tendsto_nhds_zero ];
+    intro ε hε;
+    rcases ENNReal.lt_iff_exists_real_btwn.mp hε with ⟨ ε', hε₁, hε₂ ⟩
+    simp_all only [ge_iff_le, gt_iff_lt, ENNReal.ofReal_pos, Filter.eventually_atTop]
+    obtain ⟨left, right⟩ := hε₂
+    -- Since $z$ is finite, we can choose $a$ such that for all $b \geq a$, $z \leq b \cdot \epsilon'$.
+    obtain ⟨a, ha⟩ : ∃ a : ℕ, ∀ b : ℕ, a ≤ b → z ≤ b * ENNReal.ofReal ε' := by
+      cases' ENNReal.lt_iff_exists_real_btwn.mp ( show z < ⊤ from lt_top_iff_ne_top.mpr hz ) with a ha
+      simp_all only [ENNReal.ofReal_lt_top, and_true]
+      obtain ⟨left_1, right_1⟩ := ha
+      exact ⟨ ⌈a / ε'⌉₊, fun n hn => le_trans right_1.le <| by rw [ ← ENNReal.ofReal_natCast ] ; rw [ ← ENNReal.ofReal_mul ( by positivity ) ] ; exact ENNReal.ofReal_le_ofReal <| by nlinarith [ Nat.ceil_le.mp hn, mul_div_cancel₀ a left.ne' ] ⟩;
+    -- Since $z \leq b \cdot \epsilon'$ for all $b \geq a$, dividing both sides by $b$ (which is positive) gives $z / b \leq \epsilon'$.
+    use a + 1; intros b hb_ge; exact (by
+    rw [ ENNReal.div_le_iff_le_mul ];
+    · exact le_trans ( ha b ( by linarith ) ) ( by rw [ mul_comm ] ; gcongr );
+    · aesop;
+    · norm_num +zetaDelta at *);
+  refine le_of_forall_pos_le_add fun ε ε_pos => ?_
+  rcases Filter.eventually_atTop.mp ( h_z_div_n_zero.eventually <| gt_mem_nhds ε_pos ) with ⟨ m, hm ⟩
+  refine le_trans ( csInf_le ⟨ 0, ?_ ⟩ ⟨ n + m, fun n hn => le_trans ( h_le _ <| by linarith ) <| add_le_add_left ( le_of_lt <| hm _ <| by linarith ) _ ⟩ ) <| by aesop;
+  rintro a ⟨ k, hk ⟩
+  exact le_trans ( zero_le _ ) ( hk _ le_rfl )
+
 /-- Lemma 6 from the paper -/
-private theorem Lemma6 (m : ℕ) (ρ σf : MState (H i)) (σₘ : MState (H (i ^ m))) (hσf : σf.m.PosDef) (ε : Prob)
+private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState (H i)) (σₘ : MState (H (i ^ m))) (hσf : σf.m.PosDef) (ε : Prob)
     (hε : 0 < ε)
     (hε' : ε < 1) --Not stated in the paper's theorem statement but I think is necessary for the argument to go through
     :
@@ -120,31 +326,76 @@ private theorem Lemma6 (m : ℕ) (ρ σf : MState (H i)) (σₘ : MState (H (i ^
     (↑m)⁻¹ * 𝐃(ρ⊗^S[m]‖σₘ)
   := by
 
-  have h_add : ∀ α n, D̃_ α(ρ⊗^S[n]‖Lemma6_σn m σf σₘ n) = (n/m : ℕ) * D̃_ α(ρ⊗^S[m]‖σₘ) + (n%m : ℕ) * D̃_ α(ρ‖σf):= by
-    --"Break apart" σn, and apply additivity of `SandwichedRelRentropy`.
-    sorry
+  set σn := Lemma6_σn m σf σₘ with hσn
 
-  stop
+  have h_add : ∀ α n, D̃_ α(ρ⊗^S[n]‖σn n) = (n/m : ℕ) * D̃_ α(ρ⊗^S[m]‖σₘ) + (n%m : ℕ) * D̃_ α(ρ‖σf):= by
+    --"Break apart" σn, and apply additivity of `SandwichedRelRentropy`.
+    intro α n
+    rw [hσn, Lemma6_σn]
+    split_ifs with hnm
+    · have hnm_div : n / m = 0 := Nat.div_eq_of_lt hnm
+      have hnm_mod : n % m = n := Nat.mod_eq_of_lt hnm
+      simp [hnm_div, hnm_mod, statePow_rw hnm_mod]
+    · have hnm_add := Nat.div_add_mod n m
+      rw [statePow_rw hnm_add.symm, statePow_add_relabel]
+      have hnm_eq : (i ^ (m * (n / m)) * i ^ (n % m)) = (i ^ m) ^ (n / m) * i ^ (n % m) := by
+        rw [pow_mul]
+      have h_Hn_eq : H (i ^ n) = H ((i ^ m) ^ (n / m) * i ^ (n % m)) := by
+        rw [← pow_mul, ← pow_add, hnm_add]
+      simp only [MState.relabel_relabel, Equiv.cast_trans]
+      rw [← sandwichedRelRentropy_statePow]
+      rw [← sandwichedRelRentropy_statePow]
+      rw [← sandwichedRelRentropy_prodRelabel]
+
+      gcongr
+      · rw [MState.eq_relabel_iff]
+        simp only [MState.relabel_relabel, Equiv.cast_symm, Equiv.cast_trans]
+        rw [prodRelabel_relabel_cast_prod _ _ _ ((pow_mul ..).symm) rfl]
+        congr
+        rw [statePow_mul_relabel]
+        simp
+      · simp
+
   --This will probably need 1 < α actually
-  have h_α : ∀ α, (1 < α) → Filter.atTop.limsup (fun n ↦ —log β_ ε(ρ⊗^n‖{σn n}) / n) ≤
-      D̃_ α(ρ⊗^m‖σn m) / m := by
+  have h_α : ∀ α, (1 < α) → Filter.atTop.limsup (fun n ↦ —log β_ ε(ρ⊗^S[n]‖{σn n}) / n) ≤
+      D̃_ α(ρ⊗^S[m]‖σn m) / m := by
     intro α hα
-    apply le_of_le_of_eq (b := Filter.atTop.limsup (fun n ↦ D̃_ α(ρ⊗^n‖σn n) / n))
+    apply le_of_le_of_eq (b := Filter.atTop.limsup (fun n ↦ D̃_ α(ρ⊗^S[n]‖σn n) / n))
     · --Apply the "[81] Lemma 5" to ρ⊗^n and σn
       have h_lem5 :=
-        fun (n:ℕ) ↦ Ref81Lem5 (ρ⊗^n) (σn n) ε α ⟨hε.le,hε'⟩ hα
+        fun (n:ℕ) ↦ OptimalHypothesisRate.Ref81Lem5 (ρ⊗^S[n]) (σn n) ε hε' α hα
 
       --Upper-bound β on the LHS with this lemma
       --Distribute the limsup over subtraction
       --The term on the right is a constant, divided by n, which converges to zero.
       --Dropping that leaves the identity
-      sorry
+      generalize_proofs pf1 pf2 at h_lem5
+      let x n :=  —log β_ ε(ρ⊗^S[n]‖{σn n})
+      let y n := D̃_ α(ρ⊗^S[n]‖σn n)
+      set z := —log (1 - ε) * (ENNReal.ofNNReal ⟨α, pf1⟩) / (ENNReal.ofNNReal ⟨α - 1, pf2⟩)
 
-    · suffices Filter.Tendsto (fun n => D̃_ α(ρ⊗^n‖σn n) * ((↑n)⁻¹)) .atTop (𝓝 (D̃_ α(ρ⊗^m‖σn m) / m))by
+      have hz : z ≠ ⊤ := by
+        unfold z
+        have hz1 : —log (1 - ε) ≠ ⊤ := by
+          --TODO: should be `bound`, ideally
+          simp [Subtype.eq_iff]
+          have : (ε : ℝ) < 1 := hε'
+          linarith
+        have hz2 : (ENNReal.ofNNReal ⟨α - 1, pf2⟩) ≠ 0 := by
+          --TODO: should be `bound`, ideally
+          simp [NNReal.eq_iff]
+          linarith
+        finiteness
+
+      change ∀ n, x n ≤ y n + z at h_lem5
+      change Filter.limsup (fun n => x n / ↑n) Filter.atTop ≤ Filter.limsup (fun n => y n / ↑n) Filter.atTop
+      exact extracted_limsup_inequality z hz y x h_lem5
+
+    · suffices Filter.Tendsto (fun n => D̃_ α(ρ⊗^S[n]‖σn n) * ((↑n)⁻¹)) .atTop (𝓝 (D̃_ α(ρ⊗^S[m]‖σn m) / m))by
         exact Filter.Tendsto.limsup_eq this
       conv =>
         enter [1,n]
-        equals ( (↑(n / m) * D̃_ α(ρ⊗^m‖σₘ)) * ((↑n)⁻¹) + (↑(n % m) * D̃_ α(ρ‖σf)) * ((↑n)⁻¹)) =>
+        equals ( (↑(n / m) * D̃_ α(ρ⊗^S[m]‖σₘ)) * ((↑n)⁻¹) + (↑(n % m) * D̃_ α(ρ‖σf)) * ((↑n)⁻¹)) =>
           simp_rw [h_add, right_distrib]
       conv => enter [3,1]; apply (add_zero _).symm
       apply Filter.Tendsto.add
@@ -154,7 +405,7 @@ private theorem Lemma6 (m : ℕ) (ρ σf : MState (H i)) (σₘ : MState (H (i ^
           enter [3,1]
           apply (one_mul _).symm
         rw [← ENNReal.mul_comm_div]
-        cases D̃_ α(ρ⊗^m‖σₘ)
+        cases D̃_ α(ρ⊗^S[m]‖σₘ)
         · simp
           --This is true for all x past m.
           apply tendsto_nhds_of_eventually_eq
@@ -169,10 +420,18 @@ private theorem Lemma6 (m : ℕ) (ρ σf : MState (H i)) (σₘ : MState (H (i ^
         · rename_i v
           suffices Filter.Tendsto (fun x => (x:ℝ)⁻¹ * ↑(x / m) * (v:ℝ) : ℕ → ℝ) Filter.atTop (𝓝 ((1 / ↑m) * (v : ℝ))) by
             --Similar to the "convert ENNReal.tendsto_ofReal this" below. Just push casts through
-            sorry
+            convert ENNReal.tendsto_ofReal this
+            · rename_i x
+              cases x
+              · simp
+              rw [ENNReal.ofReal_mul (by positivity), ENNReal.ofReal_mul (by positivity), ENNReal.ofReal_inv_of_pos (by positivity)]
+              simp
+              norm_cast
+            · rw [one_div, one_div, ENNReal.ofReal_mul (by positivity), ENNReal.ofReal_inv_of_pos (by positivity)]
+              simp
           apply Filter.Tendsto.mul ?_ tendsto_const_nhds
           --Should be an easy fact from here: x * (x/m) converges to 1/m.
-          sorry
+          exact Filter.Tendsto_inv_nat_mul_div_real m
       · suffices Filter.Tendsto (fun x => ↑(x % m) * (D̃_ α(ρ‖σf)).toReal * (↑x)⁻¹) Filter.atTop (𝓝 0) by
           --Convert a Tendsto over ENNReal to one over Real
           convert ENNReal.tendsto_ofReal this
@@ -182,9 +441,7 @@ private theorem Lemma6 (m : ℕ) (ρ σf : MState (H i)) (σₘ : MState (H (i ^
             rw [ENNReal.ofReal_mul (by positivity), ENNReal.ofReal_mul (by positivity)]
             congr
             · simp
-            · refine Eq.symm (ENNReal.ofReal_toReal ?_)
-              --This should be a lemma - that D̃_α(ρ‖σ) is nonzero when σ is PosDef.
-              sorry
+            · rw [ENNReal.ofReal_toReal (by finiteness)]
             · rw [ENNReal.ofReal_inv_of_pos (by positivity)]
               simp only [Nat.cast_add, Nat.cast_one, inv_inj]
               rw [ENNReal.ofReal_add (by positivity) (zero_le_one' ℝ)]
@@ -193,7 +450,7 @@ private theorem Lemma6 (m : ℕ) (ρ σf : MState (H i)) (σₘ : MState (H (i ^
         apply bdd_le_mul_tendsto_zero (b := 0) (B := m * D̃_ α(ρ‖σf).toReal)
         · exact Filter.Eventually.of_forall (fun _ ↦ by positivity)
         · apply Filter.Eventually.of_forall (fun _ ↦ ?_)
-          exact mul_le_mul_of_nonneg_right (Nat.cast_le.mpr (Nat.mod_lt _ hm).le) (by positivity)
+          exact mul_le_mul_of_nonneg_right (mod_cast (Nat.mod_lt _ hm).le) (by positivity)
         · exact tendsto_inverse_atTop_nhds_zero_nat
 
   --Take the limit as α → 1.
@@ -726,7 +983,8 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : Prob) (hε : 
     have ⟨σ₁, hσ₁_pos, hσ₁_free⟩ := FreeStateTheory.free_fullRank i
 
     --`h` is Eq (14)
-    have h (m : ℕ) := Lemma6 m ρ σ₁ (σₘ m) hσ₁_pos ε hε.1 hε.2
+    --We need to handle the case where m=0 separately. This will probably mean changing a bit of other stuff
+    have h (m : ℕ) := Lemma6 m (by sorry) ρ σ₁ (σₘ m) hσ₁_pos ε hε.1 hε.2
 
     --Update `h` to Eq (15)
     have h₂ (m : ℕ) : (fun n => (↑n)⁻¹ * —log β_ ε(ρ⊗^S[n]‖IsFree)) ≤ᶠ[Filter.atTop]
