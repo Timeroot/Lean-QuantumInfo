@@ -86,12 +86,13 @@ end rclike
 section conj
 
 variable [CommRing α] [StarRing α] [Fintype n]
+variable (A : HermitianMat n α)
 
 /-- The Hermitian matrix given by conjugating by a (possibly rectangular) Matrix. If we required `B` to be
 square, this would apply to any `Semigroup`+`StarMul` (as proved by `IsSelfAdjoint.conjugate`). But this lets
 us conjugate to other sizes too, as is done in e.g. Kraus operators. That is, it's a _heterogeneous_ conjguation.
 -/
-def conj {m} (A : HermitianMat n α) (B : Matrix m n α) : HermitianMat m α :=
+def conj {m} (B : Matrix m n α) : HermitianMat m α :=
   ⟨B * A.toMat * B.conjTranspose, by
   ext
   simp only [Matrix.star_apply, Matrix.mul_apply, Matrix.conjTranspose_apply, Finset.sum_mul,
@@ -100,22 +101,30 @@ def conj {m} (A : HermitianMat n α) (B : Matrix m n α) : HermitianMat m α :=
   congr! 2
   ring⟩
 
-theorem conj_conj {m l} [Fintype m] (A : HermitianMat n α) (B : Matrix m n α) (C : Matrix l m α) :
+theorem conj_conj {m l} [Fintype m] (B : Matrix m n α) (C : Matrix l m α) :
     (A.conj B).conj C = A.conj (C * B) := by
   ext1
   simp only [conj, mk_toMat, Matrix.conjTranspose_mul, Matrix.mul_assoc]
+
+variable (B : HermitianMat n α)
+
+theorem add_conj {m} (M : Matrix m n α) : (A + B).conj M = A.conj M + B.conj M := by
+  ext1
+  simp [conj, Matrix.mul_add, Matrix.add_mul]
+
+theorem sub_conj {m} (M : Matrix m n α) : (A - B).conj M = A.conj M - B.conj M := by
+  ext1
+  simp [conj, Matrix.mul_sub, Matrix.sub_mul]
+
+@[simp]
+theorem conj_one [DecidableEq n] : A.conj (1 : Matrix n n α) = A := by
+  simp [conj]
 
 end conj
 
 section eigenspace
 
 variable [RCLike α] [Fintype n] [DecidableEq n] (A : HermitianMat n α)
-
---PULLOUT
-@[simp]
-theorem _root_.Matrix.toEuclideanLin_one : Matrix.toEuclideanLin (1 : Matrix n n α) = .id := by
-  ext1 x
-  simp [Matrix.toEuclideanLin]
 
 namespace ContinuousLinearMap
 

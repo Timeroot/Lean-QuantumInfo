@@ -165,24 +165,6 @@ instance : RelEntropy min where
   of_kron := sorry
   normalized := sorry
 
---PULLOUT
-@[simp]
-theorem _root_.Prob.zero_le_negLog {p : Prob} : 0 < Prob.negLog p ↔ p ≠ 1 := by
-  --This is messy enough it's probably a sign we're missing other simp lemmas
-  rw [Prob.negLog]
-  split_ifs with h
-  · simp [h]
-  · constructor <;> intro h₂ <;> contrapose! h₂
-    · simp [h₂]
-    · simp only [nonpos_iff_eq_zero, ENNReal.coe_eq_zero] at h₂
-      rw [Subtype.ext_iff] at h₂
-      simp only [NNReal.val_eq_coe, NNReal.coe_zero, neg_eq_zero, Real.log_eq_zero,
-        Set.Icc.coe_eq_zero, Set.Icc.coe_eq_one] at h₂
-      rcases h₂ with h₂|h₂|h₂
-      · contradiction
-      · assumption
-      · linarith [Prob.zero_le_coe (p := p)]
-
 theorem not_Nontrivial_min : ¬Nontrivial min := by
   rintro ⟨h⟩
   obtain ⟨ρ, σ, h₁, h₂, h₃⟩ := h (ULift (Fin 2))

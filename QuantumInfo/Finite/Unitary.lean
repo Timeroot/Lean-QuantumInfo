@@ -17,22 +17,6 @@ namespace HermitianMat
 variable {𝕜 : Type*} [RCLike 𝕜] {n : Type*} [Fintype n] [DecidableEq n]
 variable (A B : HermitianMat n 𝕜) (U : Matrix.unitaryGroup n 𝕜)
 
---PULLOUT
-omit [DecidableEq n] in
-theorem add_conj (M : Matrix m n 𝕜) : (A + B).conj M = A.conj M + B.conj M := by
-  ext1
-  simp [conj, Matrix.mul_add, Matrix.add_mul]
-
-omit [DecidableEq n] in
-theorem sub_conj (M : Matrix m n 𝕜) : (A - B).conj M = A.conj M - B.conj M := by
-  ext1
-  simp [conj, Matrix.mul_sub, Matrix.sub_mul]
-
-@[simp]
-theorem conj_one : A.conj (1 : Matrix n n 𝕜) = A := by
-  simp [conj]
---PULLOUT
-
 @[simp]
 theorem trace_conj_unitary : (A.conj U.val).trace = A.trace := by
   simp [Matrix.trace_mul_cycle, HermitianMat.conj, ← Matrix.star_eq_conjTranspose, HermitianMat.trace]

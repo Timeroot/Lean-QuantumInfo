@@ -89,6 +89,10 @@ theorem ext_m {ρ₁ ρ₂ : MState d} (h : ρ₁.m = ρ₂.m) : ρ₁ = ρ₂ :
 theorem toMat_inj : (MState.m (d := d)).Injective :=
   fun _ _ h ↦ by ext1; ext1; exact h
 
+theorem M_Injective : Function.Injective (MState.M (d := d)) := by
+  intro _ _
+  exact MState.ext
+
 variable (d) in
 /-- The matrices corresponding to MStates are `Convex ℝ` -/
 theorem convex : Convex ℝ (Set.range (MState.M (d := d))) := by
@@ -529,6 +533,43 @@ theorem relabel_m (ρ : MState d₁) (e : d₂ ≃ d₁) :
     (ρ.relabel e).m = ρ.m.submatrix e e := by
   rfl
 
+@[simp]
+theorem relabel_refl {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) :
+    ρ.relabel (Equiv.refl d) = ρ := by
+  ext
+  simp
+
+@[simp]
+theorem relabel_relabel {d d₂ d₃ : Type*}
+    [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂] [Fintype d₃] [DecidableEq d₃]
+    (ρ : MState d) (e : d₂ ≃ d) (e₂ : d₃ ≃ d₂) : (ρ.relabel e).relabel e₂ = ρ.relabel (e₂.trans e) := by
+  rfl
+
+theorem eq_relabel_iff {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
+    (ρ : MState d₁) (σ : MState d₂) (h : d₁ ≃ d₂) :
+    ρ = σ.relabel h ↔ ρ.relabel h.symm = σ := by
+  sorry
+
+theorem relabel_comp {d₁ d₂ d₃ : Type*} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
+      [Fintype d₃] [DecidableEq d₃] (ρ : MState d₁) (e : d₂ ≃ d₁) (f : d₃ ≃ d₂) :
+    (ρ.relabel e).relabel f = ρ.relabel (f.trans e) := by
+  ext
+  simp
+
+theorem relabel_cast {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁]
+    [Fintype d₂] [DecidableEq d₂]
+       (ρ : MState d₁) (e : d₂ = d₁) :
+    ρ.relabel (Equiv.cast e) = cast (by have := e.symm; congr <;> (apply Subsingleton.helim; congr)) ρ := by
+  ext i j
+  simp
+  rw [eq_comm] at e
+  congr
+  · apply Subsingleton.helim; congr
+  · apply Subsingleton.helim; congr
+  · symm; apply cast_heq
+  · apply cast_heq
+  · apply cast_heq
+
 --TODO: Swap and assoc for kets.
 --TODO: Connect these to unitaries (when they can be)
 
@@ -612,6 +653,28 @@ theorem traceNorm_eq_1 (ρ : MState d) : ρ.m.traceNorm = 1 :=
     _ = 1 := ρ.tr'
   Complex.ofReal_eq_one.mp this
 
+--TODO: This naming is very inconsistent. Should be better about "prod" vs "kron"
+
+theorem relabel_kron {d₁ d₂ d₃ : Type*} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
+      [Fintype d₃] [DecidableEq d₃] (ρ : MState d₁) (σ : MState d₂) (e : d₃ ≃ d₁) :
+    ((ρ.relabel e) ⊗ σ) = (ρ ⊗ σ).relabel (e.prodCongr (Equiv.refl d₂)) := by
+  ext
+  rfl --is this defeq abuse? I don't know
+
+theorem kron_relabel {d₁ d₂ d₃ : Type*} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
+      [Fintype d₃] [DecidableEq d₃] (ρ : MState d₁) (σ : MState d₂) (e : d₃ ≃ d₂) :
+    (ρ ⊗ σ.relabel e) = (ρ ⊗ σ).relabel ((Equiv.refl d₁).prodCongr e) := by
+  ext
+  rfl
+
+theorem prod_assoc {d₁ d₂ d₃ : Type*} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
+      [Fintype d₃] [DecidableEq d₃] (ρ : MState d₁) (σ : MState d₂) (τ : MState d₃) :
+    (ρ ⊗ σ ⊗ τ) = ((ρ ⊗ σ) ⊗ τ).relabel (Equiv.prodAssoc d₁ d₂ d₃).symm := by
+  apply MState.ext
+  simp only [MState.prod, MState.relabel, Subtype.mk.injEq]
+  symm
+  exact Matrix.kronecker_assoc ρ.m σ.m τ.m
+
 section topology
 
 /-- Mixed states inherit the subspace topology from matrices -/
@@ -629,6 +692,23 @@ instance : T3Space (MState d) :=
 instance : CompactSpace (MState d) :=
   sorry
 
+noncomputable instance : MetricSpace (MState d) :=
+  MetricSpace.induced MState.M MState.M_Injective inferInstance
+
+theorem dist_eq (x y : MState d) : dist x y = dist x.M y.M := by
+  rfl
+
+instance : BoundedSpace (MState d) where
+  bounded_univ := by
+    rw [Metric.isBounded_iff]
+    use 2 * (Fintype.card d) ^ 2 --d^2 elements, so max distance is d^2
+    intro x _ y _
+    rw [dist_eq, dist_eq_norm]
+    have hx := And.intro x.zero_le x.le_one
+    have hy := And.intro y.zero_le y.le_one
+    --at this point, this should be a theorem
+    sorry
+
 @[fun_prop]
 theorem Continuous_HermitianMat : Continuous (MState.M (d := d)) :=
   continuous_iff_le_induced.mpr fun _ => id
@@ -637,6 +717,10 @@ theorem Continuous_HermitianMat : Continuous (MState.M (d := d)) :=
 theorem Continuous_Matrix : Continuous (MState.m (d := d)) := by
   unfold MState.m
   fun_prop
+
+theorem image_M_isBounded (S : Set (MState d)) : Bornology.IsBounded (MState.M '' S) := by
+  rw [← Bornology.isBounded_induced]
+  exact Bornology.IsBounded.all S
 
 end topology
 
@@ -712,6 +796,15 @@ theorem PosDef_mix_of_ne_one {d : Type*} [Fintype d] [DecidableEq d] {σ₁ σ�
     change (p : ℝ) = 1
     linarith
   exact (hσ₂.smul this).posSemidef_add (σ₁.pos.rsmul p.zero_le)
+
+theorem uniform_posDef {d : Type*} [Nonempty d] [Fintype d] [DecidableEq d] :
+    (uniform (d := d)).m.PosDef := by
+  simp [uniform, ofClassical, m, HermitianMat.diagonal]
+  exact Fintype.card_pos
+
+theorem posDef_of_unique {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) [Unique d] : ρ.m.PosDef := by
+  rw [Subsingleton.allEq ρ uniform]
+  exact uniform_posDef
 
 end posdef
 

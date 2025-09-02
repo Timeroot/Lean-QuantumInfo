@@ -204,6 +204,14 @@ theorem fin_two_eq_coin (d : Distribution (Fin 2)) : d = coin (d 0) := by
     Prob.coe_one_minus, Subtype.eq_iff, Prob.coe_one_minus, eq_sub_iff_add_eq, add_comm,
         fun_eq_val, Fin.sum_univ_two] using d.property
 
+theorem coin_eq_iff (p : Prob) (f : Distribution (Fin 2)) :
+    Distribution.coin p = f ↔ p = f 0 := by
+  constructor
+  · rintro rfl
+    rfl
+  · rintro rfl
+    rw [← Distribution.fin_two_eq_coin f]
+
 section randvar
 
 /-- A `T`-valued random variable over `α` is a map `var : α → T` along

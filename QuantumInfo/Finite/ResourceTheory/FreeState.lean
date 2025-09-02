@@ -8,101 +8,6 @@ import Mathlib.Tactic
 import QuantumInfo.Finite.CPTPMap
 import QuantumInfo.Finite.Entropy
 
---stuff that belongs in other files
-
---PULLOUT
-theorem Equiv.trans_cancel_left (α β γ : Type*) (e : α ≃ β) (f : β ≃ γ) (g : α ≃ γ) :
-    e.trans f = g ↔ f = e.symm.trans g := by
-  constructor <;> (rintro rfl; simp [← Equiv.trans_assoc])
-
-theorem Equiv.trans_cancel_right (α β γ : Type*) (e : α ≃ β) (f : β ≃ γ) (g : α ≃ γ) :
-    e.trans f = g ↔ e = g.trans f.symm := by
-  constructor <;> (rintro rfl; simp [Equiv.trans_assoc])
-
---PULLOUT
-theorem MState.relabel_comp {d₁ d₂ d₃ : Type*} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
-      [Fintype d₃] [DecidableEq d₃] (ρ : MState d₁) (e : d₂ ≃ d₁) (f : d₃ ≃ d₂) :
-    (ρ.relabel e).relabel f = ρ.relabel (f.trans e) := by
-  ext
-  simp
-
---PULLOUT
-@[simp]
-theorem MState.relabel_refl {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) :
-    ρ.relabel (Equiv.refl d) = ρ := by
-  ext
-  simp
-
---PULLOUT
-theorem MState.relabel_kron {d₁ d₂ d₃ : Type*} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
-      [Fintype d₃] [DecidableEq d₃] (ρ : MState d₁) (σ : MState d₂) (e : d₃ ≃ d₁) :
-    ((ρ.relabel e) ⊗ σ) = (ρ ⊗ σ).relabel (e.prodCongr (Equiv.refl d₂)) := by
-  ext
-  rfl --is this defeq abuse? I don't know
-
---PULLOUT
-theorem MState.kron_relabel {d₁ d₂ d₃ : Type*} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
-      [Fintype d₃] [DecidableEq d₃] (ρ : MState d₁) (σ : MState d₂) (e : d₃ ≃ d₂) :
-    (ρ ⊗ σ.relabel e) = (ρ ⊗ σ).relabel ((Equiv.refl d₁).prodCongr e) := by
-  ext
-  rfl
-
---PULLOUT
-theorem MState.prod_assoc {d₁ d₂ d₃ : Type*} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
-      [Fintype d₃] [DecidableEq d₃] (ρ : MState d₁) (σ : MState d₂) (τ : MState d₃) :
-    (ρ ⊗ σ ⊗ τ) = ((ρ ⊗ σ) ⊗ τ).relabel (Equiv.prodAssoc d₁ d₂ d₃).symm := by
-  apply MState.ext
-  simp only [MState.prod, MState.relabel, Subtype.mk.injEq]
-  symm
-  exact Matrix.kronecker_assoc ρ.m σ.m τ.m
-
---PULLOUT
-theorem MState.relabel_cast {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁]
-    [Fintype d₂] [DecidableEq d₂]
-       (ρ : MState d₁) (e : d₂ = d₁) :
-    ρ.relabel (Equiv.cast e) = cast (by have := e.symm; congr <;> (apply Subsingleton.helim; congr)) ρ := by
-  ext i j
-  simp
-  rw [eq_comm] at e
-  congr
-  · apply Subsingleton.helim; congr
-  · apply Subsingleton.helim; congr
-  · symm; apply cast_heq
-  · apply cast_heq
-  · apply cast_heq
-
---PULLOUT
-open ComplexOrder in
-theorem MState.uniform_posDef {d : Type*} [Nonempty d] [Fintype d] [DecidableEq d] :
-    (MState.uniform (d := d)).m.PosDef := by
-  simp [uniform, ofClassical, m, HermitianMat.diagonal]
-  exact Fintype.card_pos
-
---PULLOUT
-open ComplexOrder in
-theorem MState.posDef_of_unique {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) [Unique d] : ρ.m.PosDef := by
-  rw [Subsingleton.allEq ρ MState.uniform]
-  exact MState.uniform_posDef
-
---PULLOUT
-theorem heq_iff_exists_eq_cast {α β : Sort u} (a : α) (b : β) :
-    a ≍ b ↔ ∃ (h : β = α), a = cast h b := by
-  use fun h ↦ ⟨type_eq_of_heq h.symm, eq_cast_iff_heq.mpr h⟩
-  rintro ⟨rfl, h⟩
-  rw [h, cast_eq]
-
---PULLOUT
-@[gcongr]
-theorem qRelEntropy_heq_congr {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
-      {ρ₁ σ₁ : MState d₁} {ρ₂ σ₂ : MState d₂} (hd : d₁ = d₂) (hρ : ρ₁ ≍ ρ₂) (hσ : σ₁ ≍ σ₂) :
-    𝐃(ρ₁‖σ₁) = 𝐃(ρ₂‖σ₂) := by
-  rw [heq_iff_exists_eq_cast] at hρ hσ
-  obtain ⟨_, rfl⟩ := hρ
-  obtain ⟨_, rfl⟩ := hσ
-  simp [← MState.relabel_cast _ hd]
-
---now the actual file...
-
 /-- A `ResourcePretheory` is a family of Hilbert spaces closed under tensor products, with an instance of
 `Fintype` and `DecidableEq` for each. It forms a pre-structure then on which to discuss resource
 theories. For instance, to talk about "two-party scenarios", we could write `ResourcePretheory (ℕ × ℕ)`,
@@ -167,6 +72,17 @@ theorem prodRelabel_assoc {i j k : ι} (ρ₁ : MState (H i)) (ρ₂ : MState (H
   · rw [mul_assoc]
   rw [MState.kron_relabel, MState.prod_assoc]
   rw [MState.relabel_comp, MState.relabel_comp, MState.relabel_comp]
+  rfl
+
+/-- A `MState.relabel` can be distributed across a `prodRelabel`, if you have proofs that the factors
+correspond correctly. -/
+theorem prodRelabel_relabel_cast_prod {i j k l : ι}
+    (ρ₁ : MState (H i)) (ρ₂ : MState (H j))
+    (h : H (k * l) = H (i * j)) (hik : k = i) (hlj : l = j) :
+    (ρ₁ ⊗ᵣ ρ₂).relabel (Equiv.cast h) =
+    (ρ₁.relabel (Equiv.cast (congrArg H hik))) ⊗ᵣ (ρ₂.relabel (Equiv.cast (congrArg H hlj))) := by
+  subst hik
+  subst hlj
   rfl
 
 /-- The `prod` operation of `ResourcePretheory` gives the natural product operation on `CPTPMap`s. Accessible
@@ -234,7 +150,7 @@ class UnitalPretheory (ι : Type*) extends ResourcePretheory ι, MulOneClass ι,
 
 namespace UnitalPretheory
 
-variable {ι : Type*} [UnitalPretheory ι]
+variable {ι : Type*} [UnitalPretheory ι] {i j : ι}
 
 instance : Monoid ι where
 
@@ -263,34 +179,38 @@ theorem spacePow_one (i : ι) : i ^ 1 = i := by
 theorem spacePow_succ (i : ι) (n : ℕ) : i ^ (n + 1) = (i ^ n) * i := by
   rfl
 
-theorem spacePow_add {i : ι} (m n : ℕ) :
+theorem spacePow_add (m n : ℕ) :
     i ^ (m + n) = (i ^ m) * (i ^ n) := by
   induction n
   · simp
   · rename_i n ih
     rw [spacePow_succ, ← mul_assoc, ← add_assoc, ← ih, spacePow_succ]
 
+theorem spacePow_mul (m n : ℕ) :
+    i ^ (m * n) = (i ^ m) ^ n :=
+  pow_mul i m n
+
 /-- Powers of states. Defined for `PNat`, so that we don't have zeroth powers -/
-noncomputable def statePow {i : ι} (ρ : MState (H i)) (n : ℕ) : MState (H (i ^ n)) :=
+noncomputable def statePow (ρ : MState (H i)) (n : ℕ) : MState (H (i ^ n)) :=
   n.rec default (fun _ σ ↦ σ ⊗ᵣ ρ)
 
 scoped notation ρ "⊗^S[" n "]" => statePow ρ n
 
 @[simp]
-theorem statePow_zero {i : ι} (ρ : MState (H i)) : ρ⊗^S[0] = default :=
+theorem statePow_zero (ρ : MState (H i)) : ρ⊗^S[0] = default :=
   rfl
 
 @[simp]
-theorem statePow_one {i : ι} (ρ : MState (H i)) : ρ⊗^S[1] ≍ ρ := by
+theorem statePow_one (ρ : MState (H i)) : ρ⊗^S[1] ≍ ρ := by
   rw [← eq_cast_iff_heq]; swap
   · rw [spacePow_one]
   · rw [eq_cast_iff_heq, statePow]
     exact default_prod ρ
 
-theorem statePow_succ {i : ι} (ρ : MState (H i)) (n : ℕ) : ρ⊗^S[n + 1] = ρ⊗^S[n] ⊗ᵣ ρ := by
+theorem statePow_succ (ρ : MState (H i)) (n : ℕ) : ρ⊗^S[n + 1] = ρ⊗^S[n] ⊗ᵣ ρ := by
   rfl
 
-theorem statePow_add {i : ι} (ρ : MState (H i)) (m n : ℕ) : ρ⊗^S[m + n] ≍ ρ⊗^S[m] ⊗ᵣ ρ⊗^S[n] := by
+theorem statePow_add (ρ : MState (H i)) (m n : ℕ) : ρ⊗^S[m + n] ≍ ρ⊗^S[m] ⊗ᵣ ρ⊗^S[n] := by
   rw [← eq_cast_iff_heq]; swap
   · rw [spacePow_add]
   rw [eq_cast_iff_heq]
@@ -303,30 +223,96 @@ theorem statePow_add {i : ι} (ρ : MState (H i)) (m n : ℕ) : ρ⊗^S[m + n] �
     congr
     apply spacePow_add
 
-set_option maxHeartbeats 800000 in
+theorem statePow_add_relabel (ρ : MState (H i)) (m n : ℕ) :
+    ρ⊗^S[m + n] = (ρ⊗^S[m] ⊗ᵣ ρ⊗^S[n]).relabel (Equiv.cast (by congr; exact pow_add i m n)) := by
+  have h := statePow_add ρ m n
+  rw [heq_iff_exists_eq_cast] at h
+  obtain ⟨h, h₂⟩ := h
+  rw [h₂, MState.relabel_cast]
+
+theorem statePow_mul (ρ : MState (H i)) (m n : ℕ) : ρ⊗^S[m * n] ≍ (ρ⊗^S[m])⊗^S[n] := by
+  rw [← eq_cast_iff_heq]; swap
+  · rw [spacePow_mul]
+  rw [eq_cast_iff_heq]
+  induction n
+  · simp
+  · rename_i n ih
+    rw [statePow_succ, mul_add]
+    --This is TERRIBLE. There has to be a better way
+    trans ρ⊗^S[m * n] ⊗ᵣ ρ⊗^S[m * 1]
+    · apply statePow_add
+    · rw [← eq_cast_iff_heq] at ih; swap
+      · congr 2
+        · simp [pow_mul]
+        · simp [pow_mul]
+        · apply Subsingleton.helim
+          simp [pow_mul]
+      rw [← eq_cast_iff_heq]; swap
+      · congr 2
+        · simp [pow_mul]
+        · simp [pow_mul]
+        · apply Subsingleton.helim
+          simp [pow_mul]
+      rw [← MState.relabel_cast _ (by simp [pow_mul])]
+      rw [prodRelabel_relabel_cast_prod]
+      · congr
+        · rw [ih, MState.relabel_cast]
+        · rw [MState.relabel_cast]
+          rw [eq_cast_iff_heq]
+          · rw [mul_one]
+          · rw [mul_one]
+      · rw [pow_mul]
+
+theorem statePow_mul_relabel {i : ι} (ρ : MState (H i)) (m n : ℕ) :
+   ρ⊗^S[m * n] = (ρ⊗^S[m])⊗^S[n].relabel (Equiv.cast (congrArg H (pow_mul i m n))) := by
+  have h := statePow_mul ρ m n
+  rw [heq_iff_exists_eq_cast] at h
+  obtain ⟨h, h₂⟩ := h
+  rw [h₂, MState.relabel_cast]
+
 open ComplexOrder in
-theorem PosDef.npow {ι : Type*} [p : UnitalPretheory ι] {i : ι}
-      {ρ : MState (H i)} (hρ : ρ.m.PosDef) (n : ℕ)
-      : (ρ⊗^S[n]).m.PosDef := by
+theorem PosDef.npow {ρ : MState (H i)} (hρ : ρ.m.PosDef) (n : ℕ)
+    : (ρ⊗^S[n]).m.PosDef := by
   induction n
   · simp [MState.posDef_of_unique default]
   · apply ResourcePretheory.PosDef.prod ‹_› hρ
 
--- /-- Cast from one Hilbert space to another using the associator. -/
--- def statePow_cast {i : ι} {m n k : ℕ} (h : m + n = k)
---     : MState (H (prod (i⊗^H[m]) (i⊗^H[n]))) → MState (H (i⊗^H[k])) := by
---   sorry
+theorem statePow_rw {n m : ℕ} (h : n = m) (ρ : MState (H i)) :
+    ρ⊗^S[n] = (ρ⊗^S[m]).relabel (Equiv.cast (by congr)) := by
+  subst n
+  simp
 
--- @[simp]
--- theorem statePow_cast_eq_pow {i : ι} {m n k : ℕ} (ρ : MState (H i)) (h : m + n = k) :
---     statePow_cast h (ρ⊗^S[m] ⊗ᵣ ρ⊗^S[n]) = ρ⊗^S[k] := by
---   sorry
+@[simp]
+theorem sandwichedRelRentropy_prodRelabel {α : ℝ} (ρ₁ ρ₂ : MState (H i)) (σ₁ σ₂ : MState (H j)):
+    D̃_ α(ρ₁ ⊗ᵣ σ₁‖ρ₂ ⊗ᵣ σ₂) = D̃_ α(ρ₁‖ρ₂) + D̃_ α(σ₁‖σ₂) := by
+  simp [prodRelabel, SandwichedRelRentropy_additive]
 
--- @[simp]
--- theorem qRelEntropy_statePow_cast {i : ι} {m n k : ℕ} (ρ₁ ρ₂ : MState (H (prod (i⊗^H[m]) (i⊗^H[n]))))
---   (h₁ h₂ : m + n = k) :
---     𝐃(statePow_cast h₁ ρ₁‖statePow_cast h₂ ρ₂) = 𝐃(ρ₁‖ρ₂) := by
---   sorry
+@[simp]
+theorem sandwichedRelRentropy_statePow {α : ℝ} (ρ σ : MState (H i)) (n : ℕ) :
+    D̃_ α(ρ⊗^S[n] ‖ σ ⊗^S[n]) = n * D̃_ α(ρ‖σ) := by
+  induction n
+  · simp
+  · rename_i n ih
+    rw [statePow_succ, statePow_succ, sandwichedRelRentropy_prodRelabel]
+    simp [ih, add_mul]
+
+theorem sandwichedRelRentropy_heq_congr {α : ℝ}
+      {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
+      {ρ₁ σ₁ : MState d₁} {ρ₂ σ₂ : MState d₂} (hd : d₁ = d₂) (hρ : ρ₁ ≍ ρ₂) (hσ : σ₁ ≍ σ₂) :
+    D̃_ α(ρ₁‖σ₁) = D̃_ α(ρ₂‖σ₂) := by
+  rw [heq_iff_exists_eq_cast] at hρ hσ
+  obtain ⟨_, rfl⟩ := hρ
+  obtain ⟨_, rfl⟩ := hσ
+  simp [← MState.relabel_cast _ hd]
+
+@[gcongr]
+theorem sandwichedRelRentropy_congr {α : ℝ}
+      {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
+      {ρ₁ σ₁ : MState d₁} {ρ₂ σ₂ : MState d₂} (hd : d₁ = d₂)
+        (hρ : ρ₁ = ρ₂.relabel (Equiv.cast hd)) (hσ : σ₁ = σ₂.relabel (Equiv.cast hd)) :
+    D̃_ α(ρ₁‖σ₁) = D̃_ α(ρ₂‖σ₂) := by
+  subst ρ₁ σ₁
+  simp
 
 end UnitalPretheory
 

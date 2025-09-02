@@ -445,6 +445,23 @@ theorem negLog_eq_neg_ENNReal_log (p : Prob) : —log p = -ENNReal.log p := by
       rw [toNNReal, ENNReal.coe_eq_zero]
       exact NNReal.coe_ne_zero.mp hp
 
+@[simp]
+theorem zero_lt_negLog {p : Prob} : 0 < —log p ↔ p ≠ 1 := by
+  --This is messy enough it's probably a sign we're missing other simp lemmas
+  rw [Prob.negLog]
+  split_ifs with h
+  · simp [h]
+  · constructor <;> intro h₂ <;> contrapose! h₂
+    · simp [h₂]
+    · simp only [nonpos_iff_eq_zero, ENNReal.coe_eq_zero] at h₂
+      rw [Subtype.ext_iff] at h₂
+      simp only [NNReal.val_eq_coe, NNReal.coe_zero, neg_eq_zero, Real.log_eq_zero,
+        Set.Icc.coe_eq_zero, Set.Icc.coe_eq_one] at h₂
+      rcases h₂ with h₂|h₂|h₂
+      · contradiction
+      · assumption
+      · linarith [Prob.zero_le_coe (p := p)]
+
 @[fun_prop]
 theorem Continuous_negLog : Continuous negLog := by
   --Kind of a mess to do with the `ite`, better to rewrite with

@@ -149,6 +149,14 @@ notation "D̃_ " α "(" ρ "‖" σ ")" => SandwichedRelRentropy α ρ σ
 
 section entropy
 
+@[gcongr]
+theorem qRelEntropy_heq_congr {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
+      {ρ₁ σ₁ : MState d₁} {ρ₂ σ₂ : MState d₂} (hd : d₁ = d₂) (hρ : ρ₁ ≍ ρ₂) (hσ : σ₁ ≍ σ₂) :
+    𝐃(ρ₁‖σ₁) = 𝐃(ρ₂‖σ₂) := by
+  rw [heq_iff_exists_eq_cast] at hρ hσ
+  obtain ⟨_, rfl⟩ := hρ
+  obtain ⟨_, rfl⟩ := hσ
+  simp [← MState.relabel_cast _ hd]
 
 /-- Quantum relative entropy when σ has full rank -/
 theorem qRelativeEnt_rank {ρ σ : MState d} (h : σ.M.ker = ⊥) :
@@ -186,6 +194,18 @@ theorem qRelativeEnt_joint_convexity :
   ∀ (ρ₁ ρ₂ σ₁ σ₂ : MState d), ∀ (p : Prob),
     𝐃(p [ρ₁ ↔ ρ₂]‖p [σ₁ ↔ σ₂]) ≤ p * 𝐃(ρ₁‖σ₁) + (1 - p) * 𝐃(ρ₂‖σ₂) := by
   sorry
+
+@[simp]
+theorem qRelEntropy_self {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) :
+    𝐃(ρ‖ρ) = 0 := by
+  simp [qRelativeEnt]
+
+open ComplexOrder in
+@[aesop (rule_sets := [finiteness]) unsafe apply]
+theorem _root_.qRelativeEnt_ne_top {d : Type*} [Fintype d] [DecidableEq d] {ρ σ : MState d}
+    (hσ : σ.m.PosDef) : 𝐃(ρ‖σ) ≠ ⊤ := by
+  have : σ.M.ker = ⊥ := by sorry --TODO: PosDef -> HermitianMat.ker = ⊥
+  simp [qRelativeEnt, this]
 
 /-- von Neumman entropy is nonnegative. -/
 theorem Sᵥₙ_nonneg (ρ : MState d) : 0 ≤ Sᵥₙ ρ :=
@@ -237,9 +257,33 @@ theorem SandwichedRelRentropy_additive (α) (ρ₁ σ₁ : MState d₁) (ρ₂ �
   -- · sorry
   -- · sorry
 
+@[simp]
+theorem sandwichedRelRentropy_relabel {d d₂ : Type*} [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂]
+      {α : ℝ} (ρ σ : MState d) (e : d₂ ≃ d) :
+    D̃_ α(ρ.relabel e‖σ.relabel e) = D̃_ α(ρ‖σ) := by
+  sorry
+
+@[simp]
+theorem sandwichedRelRentropy_self {d : Type*} [Fintype d] [DecidableEq d] {α : ℝ} (ρ : MState d) :
+    D̃_ α(ρ‖ρ) = 0 := by
+  simp? [SandwichedRelRentropy, NNReal.eq_iff] says
+    simp only [SandwichedRelRentropy, le_refl, ↓reduceIte, qRelEntropy_self, ite_eq_left_iff,
+    ENNReal.coe_eq_zero, NNReal.eq_iff, NNReal.coe_mk, NNReal.coe_zero, div_eq_zero_iff,
+    Real.log_eq_zero]
+  intro hα
+  sorry
+
+open ComplexOrder in
+@[aesop (rule_sets := [finiteness]) unsafe apply]
+theorem sandwichedRelEntropy_ne_top {α : ℝ} {d : Type*} [Fintype d] [DecidableEq d] {ρ σ : MState d}
+    (hσ : σ.m.PosDef) : D̃_ α(ρ‖σ) ≠ ⊤ := by
+  have : σ.M.ker = ⊥ := by sorry --TODO: PosDef -> HermitianMat.ker = ⊥
+  simp [SandwichedRelRentropy, this]
+  finiteness
+
 /-- The Data Processing Inequality for the Sandwiched Renyi relative entropy.
 Proved in `https://arxiv.org/pdf/1306.5920`. Seems kind of involved. -/
-theorem SandwichedRenyiEntropy.DPI {d d₂ : Type*} [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂]
+theorem sandwichedRenyiEntropy_DPI {d d₂ : Type*} [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂]
     {α : ℝ} (hα : 1 < α) (ρ σ : MState d) (Φ : CPTPMap d d₂) : D̃_ α(Φ ρ‖Φ σ) ≤ D̃_ α(ρ‖σ) := by
   sorry
 

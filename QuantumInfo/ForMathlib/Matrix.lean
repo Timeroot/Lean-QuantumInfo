@@ -866,3 +866,14 @@ theorem IsHermitian.cfc_eigenvalues {M : Matrix d d 𝕜} (hM : M.IsHermitian) (
   sorry
 
 end eigenvalues
+
+section
+
+variable {α n : Type*} [RCLike α] [Fintype n] [DecidableEq n]
+
+@[simp]
+theorem toEuclideanLin_one : Matrix.toEuclideanLin (1 : Matrix n n α) = .id := by
+  ext1 x
+  simp [Matrix.toEuclideanLin]
+
+end

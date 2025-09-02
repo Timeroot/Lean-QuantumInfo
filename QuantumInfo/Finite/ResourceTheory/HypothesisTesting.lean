@@ -119,41 +119,6 @@ theorem singleton_le_exp_val {ρ σ : MState d} {ε : Prob} (m : HermitianMat d 
   apply iInf_le_of_le ⟨m, ⟨hExp, hm⟩⟩ _
   simp only [le_refl]
 
---PULLOUT to Mathlib
-/-- Minimizing a bilinear form in one argument over a bounded set, given a continuous function in the
-other argument. -/
---This can probably be generalized to rings besides ℝ, and I don't know if CompleteSpace is needed. I
---actually only need it for the finite-dimensional case.
-theorem _root_.continuous_iSup_bilinear_of_IsCompact
-  {E : Type*} [AddCommGroup E] [Module ℝ E] [MetricSpace E] [CompleteSpace E]
-  (f : LinearMap.BilinForm ℝ E) {S : Set E} (hS : Bornology.IsBounded S) :
-    Continuous fun x ↦ ⨆ y : S, f y x := by
-  sorry
-
---PULLOUT to MState
-theorem _root_.MState.M_Injective : Function.Injective (MState.M (d := d)) := by
-  intro _ _
-  exact MState.ext
-noncomputable instance _root_.MState.MetricSpace : MetricSpace (MState d) :=
-  MetricSpace.induced MState.M MState.M_Injective inferInstance
-theorem _root_.MState.dist_eq (x y : MState d) : dist x y = dist x.M y.M := by
-  rfl
-instance _root_.MState.BoundedSpace (d : Type*) [Fintype d] [DecidableEq d] :
-    BoundedSpace (MState d) where
-  bounded_univ := by
-    rw [Metric.isBounded_iff]
-    use 2 * (Fintype.card d) ^ 2 --d^2 elements, so max distance is d^2
-    intro x _ y _
-    rw [MState.dist_eq, dist_eq_norm]
-    have hx := And.intro x.zero_le x.le_one
-    have hy := And.intro y.zero_le y.le_one
-    --at this point, this should be a theorem
-    sorry
-instance _root_.MState.image_IsBounded (S : Set (MState d)) :
-    Bornology.IsBounded (MState.M '' S) := by
-  rw [← Bornology.isBounded_induced]
-  exact Bornology.IsBounded.all S
-
 /-- There exists an optimal T for the hypothesis testing, that is, it's a minimum
 and not just an infimum. Wlog it can be chosen to saturate the ⟪ρ,T⟫ = 1 - ε bound. -/
 theorem exists_min (ρ : MState d) (ε : Prob) (S : Set (MState d)):
@@ -228,7 +193,7 @@ theorem exists_min (ρ : MState d) (ε : Prob) (S : Set (MState d)):
   --   --Should be something `Continuous (fun x ↦ iSup (fun y ↦ f x y))` from `Continuous f`.
   --   suffices Continuous (fun T : HermitianMat d ℂ ↦ ⨆ σ : S, HermitianMat.inner_BilinForm σ T) by
   --     simpa using this
-  --   convert continuous_iSup_bilinear_of_IsCompact HermitianMat.inner_BilinForm (S := MState.M '' S) (MState.image_IsBounded S)
+  --   convert Bornology.IsBounded.continuous_bilinear HermitianMat.inner_BilinForm (S := MState.M '' S) (MState.image_M_isBounded S)
   --   sorry
   --   -- rw [ciSup_image]
   --   -- · exact Set.Nonempty.of_subtype
@@ -237,15 +202,6 @@ theorem exists_min (ρ : MState d) (ε : Prob) (S : Set (MState d)):
   --   --   sorry
   --   -- · simp
   --   --   sorry
-
---PULLOUT to Distribution
-theorem _root_.Distribution.coin_eq_iff (p : Prob) (f : Distribution (Fin 2)) :
-    Distribution.coin p = f ↔ p = f 0 := by
-  constructor
-  · rintro rfl
-    rfl
-  · rintro rfl
-    rw [← Distribution.fin_two_eq_coin f]
 
 /-- When the allowed Type I error `ε` is less than 1 (so, we have some limit on our errors),
 and the kernel of the state `ρ` contains the kernel of some element in `S`, then the optimal
@@ -443,7 +399,7 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
         rw [← hT₁]
         exact HermitianMat.inner_comm _ _
     rw [hΦ₁, hΦ₂]
-    exact SandwichedRenyiEntropy.DPI hα ρ σ Φ
+    exact sandwichedRenyiEntropy_DPI hα ρ σ Φ
 
   --If q = 1, this inequality is trivial
   by_cases hq₂ : q = 1
