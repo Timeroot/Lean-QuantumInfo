@@ -72,10 +72,12 @@ macro_rules
       fin_cases i
       <;> fin_cases j
       <;> simp [Complex.ext_iff,
-        Matrix.mul_apply, Fintype.sum_prod_type, Matrix.one_apply,
+        Matrix.mul_apply, Fintype.sum_prod_type, Matrix.one_apply, field,
         $rules',* ]
+      <;> norm_num
       <;> try field_simp
-      <;> try ring_nf))
+      <;> try ring_nf
+      ))
 
 namespace Qubit
 open Real

@@ -24,7 +24,7 @@ variable {i : ι}
 /-- In a `FreeStateTheory`, we have free states of full rank, therefore the minimum relative entropy
 of any state `ρ` to a free state is finite. -/
 lemma min_free_relent_finite (ρ : MState (H i)) : ⨅ σ ∈ IsFree, 𝐃(ρ‖σ) ≠ ⊤ := by
-  simp only [ne_eq, iInf_eq_top, not_forall, Classical.not_imp]
+  simp only [ne_eq, iInf_eq_top, not_forall]
   obtain ⟨σ, hσ₁, hσ₂⟩ := FreeStateTheory.free_fullRank i
   use σ, hσ₂
   rw [qRelativeEnt]
@@ -45,17 +45,14 @@ theorem limit_rel_entropy_exists (ρ : MState (H i)) :
   ∃ d : ℝ≥0,
     Filter.Tendsto (fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree (i := i ^ n), 𝐃(ρ⊗^S[n]‖σ))
     .atTop (𝓝 d) := by
-  --Fekete's subadditive lemma is in Mathlib:
-  have h := (RelativeEntResource.Subadditive ρ)
-  have h_bdd : BddBelow (Set.range fun n => (RelativeEntResource (ρ⊗^S[n])).toReal / ↑n) := by
-    use 0
-    intro x hx
-    simp only [Set.mem_range, RelativeEntResource] at hx
-    obtain ⟨y, rfl⟩ := hx
-    positivity
-  have := h.tendsto_lim h_bdd
+  --Fekete's subadditive lemma is in Mathlib as `Subadditive.tendsto_lim`
+  have h := RelativeEntResource.Subadditive ρ
   use h.lim.toNNReal
-  convert this
+  convert h.tendsto_lim (by
+    use 0
+    rintro _ ⟨y, rfl⟩
+    positivity
+  )
   /-
   We need to change `this`, which is `@Filter.Tendsto ℕ ℝ`, into our goal, which is
   `@Filter.Tendsto ℕ ENNReal`. This probably needs two steps, one where we go from ℝ to NNReal,
@@ -98,7 +95,7 @@ theorem Lemma6_σn_IsFree {σ₁ : MState (H i)} {σₘ : (m : ℕ) → MState (
 theorem extracted_limsup_inequality (z : ℝ≥0∞) (hz : z ≠ ⊤) (y x : ℕ → ℝ≥0∞) (h_lem5 : ∀ (n : ℕ), x n ≤ y n + z)
  : Filter.limsup (fun n => x n / ↑n) Filter.atTop ≤ Filter.limsup (fun n => y n / ↑n) Filter.atTop := by
   --Thanks Aristotle
-  simp_all ( config := { decide := Bool.true } ) [ add_div, Filter.limsup_eq ];
+  simp_all ( config := { decide := Bool.true } ) [Filter.limsup_eq];
   -- Taking the limit superior of both sides of the inequality $x_n / n \leq y_n / n + z / n$, we get $\limsup_{n \to \infty} x_n / n \leq \limsup_{n \to \infty} (y_n / n + z / n)$.
   intro b n h_bn
   have h_le : ∀ m ≥ n, x m / (m : ℝ≥0∞) ≤ b + z / (m : ℝ≥0∞) := by
@@ -324,7 +321,7 @@ theorem LemmaS2 {ε3 : Prob} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
             have hβ' := OptimalHypothesisRate.singleton_le_exp_val (σ := σ n) (T n) (hT n hn) ⟨proj_le_nonneg _ _, proj_le_le_one _ _⟩
             simp only [Subtype.coe_le_coe.mpr hβ']
           _ <= (T n).inner (Real.exp (-↑n * (Rinf + ε4)) • (ρ n).M) := by
-            rw [← mul_le_mul_left (Real.exp_pos ((↑n * (Rinf + ε4)))), HermitianMat.inner_smul, neg_mul, Real.exp_neg]
+            rw [← mul_le_mul_iff_right₀ (Real.exp_pos ((↑n * (Rinf + ε4)))), HermitianMat.inner_smul, neg_mul, Real.exp_neg]
             simp only [isUnit_iff_ne_zero, ne_eq, Real.exp_ne_zero, not_false_eq_true,
               IsUnit.mul_inv_cancel_left]
             rw [MState.exp_val, HermitianMat.inner_comm, ←HermitianMat.inner_smul]
@@ -384,7 +381,7 @@ theorem LemmaS2 {ε3 : Prob} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
             have hβ' := OptimalHypothesisRate.singleton_le_exp_val (σ := σ n) (T n) hT ⟨proj_le_nonneg _ _, proj_le_le_one _ _⟩
             simp only [Subtype.coe_le_coe.mpr hβ']
           _ <= (T n).inner (Real.exp (-↑n * (Rsup + ε4)) • (ρ n).M) := by
-            rw [← mul_le_mul_left (Real.exp_pos ((↑n * (Rsup + ε4)))), HermitianMat.inner_smul, neg_mul, Real.exp_neg]
+            rw [← mul_le_mul_iff_right₀ (Real.exp_pos ((↑n * (Rsup + ε4)))), HermitianMat.inner_smul, neg_mul, Real.exp_neg]
             simp only [isUnit_iff_ne_zero, ne_eq, Real.exp_ne_zero, not_false_eq_true,
               IsUnit.mul_inv_cancel_left]
             rw [MState.exp_val, HermitianMat.inner_comm, ←HermitianMat.inner_smul]
@@ -661,6 +658,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     _ ≤ Real.log lam + c n := by
       specialize hc n
       field_simp
+      rfl
 
   --Define σ'' first as the (unnormalized) cfc image of σ' under `λ → exp (f n λ)`.
   let σ''_unnormalized (n) : HermitianMat (H (i ^ n)) ℂ := --TODO: Define a HermitianMat.cfc function that behaves nicely
