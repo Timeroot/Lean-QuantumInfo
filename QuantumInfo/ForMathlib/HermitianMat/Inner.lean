@@ -204,7 +204,7 @@ variable {d : Type*} [Fintype d] {𝕜 : Type*} [RCLike 𝕜]
 /-- We define the Hermitian inner product as our "canonical" inner product, which does induce a norm.
 This disagrees slightly with Mathlib convention on the `Matrix` type, which avoids asserting one norm
 as there are several reasonable ones; for Hermitian matrices, though, this seem to be the right choice. -/
-noncomputable def InnerProductCore : InnerProductSpace.Core (𝕜 := ℝ) (F := HermitianMat d 𝕜) :=
+noncomputable def InnerProductCore : InnerProductSpace.Core ℝ (HermitianMat d 𝕜) :=
    {
     inner A B := A.inner B
     conj_inner_symm := fun x y ↦ by
@@ -230,21 +230,87 @@ noncomputable def InnerProductCore : InnerProductSpace.Core (𝕜 := ℝ) (F := 
       apply RCLike.ext (h.left.trans RCLike.zero_re.symm) (h.right.trans (map_zero _).symm)
   }
 
+/-
+It *should* be easier than this to construct the resulting `InnerProductSpace`. But there's a rub!
+
+An InnerProductSpace gives a natural topology, uniformity, and bornology (all of which carry data);
+but `HermitianMat` already inherits a topology and uniformity from `Matrix` and `Subtype`. (Thankfully,
+not a Bornology, although that could change in the future as Mathlib develops.) This can lead to
+issues where many theorems (or other types, like `CompleteSpace`) expect the uniformity structure
+to be defeq to the one coming from the `InnerProductSpace`.
+
+This is why constructors like `InnerProductSpace.ofCoreOfTopology` exist, which let you override the
+topology when you create it. You need to give a proof that it's propositionally equivalent, which
+is what the `topo_compat_1` / `2` / `uniformity_compat` theorems do.
+
+But there's a second issue. There a function for overriding the uniformity, or the bornology, or
+"all" of them ... which, oddly, means just the uniformity + bornology. Probably a relic of how it
+developed, and topology overrides were added later. This means we can't override the topology
+_and_ the uniformity, even though we need both.
+
+Eventually this should be fixed in Mathlib. But for now, it means we have to recreate the `ofCore`
+somewhat, adding in the overrides to the construction manually. This is why
+`instNormedGroup`, `instNormedSpace`, and `instInnerProductSpace` are so long and messy, and each
+repeats some proof from Mathlib.
+-/
+
 private theorem topo_compat_1 :
-    let _ : Inner ℝ (HermitianMat d 𝕜) := InnerProductCore.toInner;
+    letI : Inner ℝ (HermitianMat d 𝕜) := InnerProductCore.toInner;
     ContinuousAt (fun v : HermitianMat d 𝕜 ↦ Inner.inner ℝ v v) 0 := by
   sorry
 
 private theorem topo_compat_2 :
-    let _ : Inner ℝ (HermitianMat d 𝕜) := InnerProductCore.toInner;
+    letI : Inner ℝ (HermitianMat d 𝕜) := InnerProductCore.toInner;
     Bornology.IsVonNBounded ℝ {v : HermitianMat d 𝕜 | RCLike.re (Inner.inner ℝ v v) < 1} := by
   sorry
 
-noncomputable instance instNormed : NormedAddCommGroup (HermitianMat d 𝕜) :=
-  InnerProductCore.toNormedAddCommGroupOfTopology topo_compat_1 topo_compat_2
+private theorem uniformity_compat (s : Set (HermitianMat d 𝕜 × HermitianMat d 𝕜)) :
+  letI : Norm (HermitianMat d 𝕜) :=
+    InnerProductSpace.Core.toNorm (c := InnerProductCore.toCore);
+  (∃ t ∈ (@UniformSpace.uniformity (Matrix d d 𝕜) _), (fun p => (↑p.1, ↑p.2)) ⁻¹' t ⊆ s) ↔
+    s ∈ ⨅ r, ⨅ (_ : 0 < r), Filter.principal {x | ‖x.1 - x.2‖ < r} := by
+  sorry
+
+noncomputable instance instNormedGroup : NormedAddCommGroup (HermitianMat d 𝕜) :=
+  letI : Norm (HermitianMat d 𝕜) :=
+    InnerProductSpace.Core.toNorm (c := InnerProductCore.toCore);
+  letI : PseudoMetricSpace (HermitianMat d 𝕜) :=
+    ((
+      PseudoMetricSpace.ofSeminormedSpaceCore InnerProductCore.toNormedSpaceCore.toCore
+    ).replaceTopology
+      (InnerProductCore.topology_eq topo_compat_1 topo_compat_2)).replaceUniformity
+      (by ext s; exact uniformity_compat s);
+  { eq_of_dist_eq_zero := by
+      --This proof is from NormedAddCommGroup.ofCore
+      intro x y h
+      rw [← sub_eq_zero, ← InnerProductCore.toNormedSpaceCore.norm_eq_zero_iff]
+      exact h }
+
+noncomputable instance instNormedSpace : NormedSpace ℝ (HermitianMat d 𝕜) where
+  norm_smul_le r x := by
+    letI : InnerProductSpace.Core ℝ (HermitianMat d 𝕜) := InnerProductCore;
+    --This proof is from InnerProductSpace.Core.toNormedSpaceOfTopology
+    rw [InnerProductSpace.Core.norm_eq_sqrt_re_inner, InnerProductSpace.Core.inner_smul_left,
+      InnerProductSpace.Core.inner_smul_right, ← mul_assoc]
+    rw [RCLike.conj_mul, ← RCLike.ofReal_pow, RCLike.re_ofReal_mul, Real.sqrt_mul,
+      ← InnerProductSpace.Core.ofReal_normSq_eq_inner_self, RCLike.ofReal_re]
+    · simp [-Real.norm_eq_abs, InnerProductSpace.Core.sqrt_normSq_eq_norm]
+    · positivity
 
 noncomputable instance instInnerProductSpace : InnerProductSpace ℝ (HermitianMat d 𝕜) :=
-  InnerProductSpace.ofCoreOfTopology InnerProductCore topo_compat_1 topo_compat_2
+   letI : Inner ℝ (HermitianMat d 𝕜) := InnerProductCore.toInner;
+   letI : NormedSpace ℝ (HermitianMat d 𝕜) := instNormedSpace;
+  { InnerProductCore with
+    norm_sq_eq_re_inner := fun x => by
+      --This proof is from InnerProductSpace.ofCoreOfTopology
+      have h₁ : ‖x‖ ^ 2 = √(RCLike.re (InnerProductCore.inner x x)) ^ 2 := rfl
+      have h₂ : 0 ≤ RCLike.re (InnerProductCore.inner x x) :=
+        (letI : InnerProductSpace.Core ℝ (HermitianMat d 𝕜) := InnerProductCore;
+        InnerProductSpace.Core.inner_self_nonneg)
+      rwa [h₁, Real.sq_sqrt] }
+
+instance : CompleteSpace (HermitianMat d 𝕜) :=
+  inferInstance
 
 --Shortcut instances
 noncomputable instance : NormedAddCommGroup (HermitianMat d ℝ) :=
@@ -253,6 +319,7 @@ noncomputable instance : NormedAddCommGroup (HermitianMat d ℝ) :=
 noncomputable instance : NormedAddCommGroup (HermitianMat d ℂ) :=
   inferInstance
 
+/-- Equivalently: the matrices `X` such that `X - A` is PSD and `B - X` is PSD, form a compact set. -/
 instance : CompactIccSpace (HermitianMat d 𝕜) where
   isCompact_Icc := sorry
 
