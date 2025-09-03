@@ -38,7 +38,7 @@ theorem trace_eq_trace (A : HermitianMat n α) : algebraMap R α A.trace = Matri
 variable [StarModule R α] in
 @[simp]
 theorem trace_smul (A : HermitianMat n α) (r : R) : (r • A).trace = r * A.trace := by
-  simp [trace, Finset.mul_sum, IsMaximalSelfAdjoint.selfadj_smul]
+  simp [trace, IsMaximalSelfAdjoint.selfadj_smul]
 
 end star
 section semiring

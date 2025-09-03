@@ -224,7 +224,6 @@ theorem pos_of_lt_one {ρ : MState d} (S : Set (MState d))
   specialize hT₄ σ
   simp only [iSup_pos hσ₁, Subtype.ext_iff, Set.Icc.coe_zero, MState.exp_val] at hT₄
   rw [HermitianMat.inner_zero_iff σ.zero_le hT₂] at hT₄
-  simp only [MState.toMat_M] at hT₄
   replace hT₁ : ρ.exp_val (1 - T) ≠ 1 := (lt_of_le_of_lt hT₁ hε).ne
   absurd hT₁
   rw [ρ.exp_val_eq_one_iff ?_, sub_sub_cancel]
@@ -413,7 +412,7 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
   --The Renyi entropy is finite
   rw [SandwichedRelRentropy, if_pos ?_, if_neg hα.ne']; swap
   · suffices q2.M.ker = ⊥ by
-      simp only [HermitianMat.val_eq_coe, this, bot_le]
+      simp only [this, bot_le]
     --q2 has eigenvalues β_ ε(ρ‖{σ}) and 1-β_ ε(ρ‖{σ}), so as long as β_ ε(ρ‖{σ}) isn't 0 or 1,
     --this is true.
     exact ker_diagonal_prob_eq_bot hq hq₂
@@ -446,12 +445,12 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
       simp only [Fin.sum_univ_two, Fin.isValue, Distribution.coin_val_zero,
         Distribution.coin_val_one, Prob.coe_one_minus]
       rw [Real.mul_rpow p.zero_le (by positivity)]
-      rw [← Real.rpow_natCast_mul (by have := q.zero_le_coe; positivity)]
+      rw [← Real.rpow_natCast_mul (by bound)]
       rw [← Real.rpow_mul q.zero_le]
-      rw [Real.mul_rpow (sub_nonneg_of_le p.coe_le_one) (by positivity)]
-      rw [← Real.rpow_natCast_mul (by have := sub_nonneg_of_le q.coe_le_one; positivity)]
-      rw [← Real.rpow_mul (sub_nonneg_of_le q.coe_le_one)]
-      field_simp
+      rw [Real.mul_rpow (by bound) (by positivity)]
+      rw [← Real.rpow_natCast_mul (by bound)]
+      rw [← Real.rpow_mul (by bound)]
+      congr <;> simp [field]
 
   by_cases h : ε = 0
   · simp [h, p, @Real.zero_rpow α (by positivity)]
@@ -491,4 +490,8 @@ theorem rate_pos_of_smul_pos {ε : Prob} {d : Type*} [Fintype d] [DecidableEq d]
 @[fun_prop]
 theorem rate_Continuous_singleton {ε : Prob} {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) :
     Continuous fun σ ↦ β_ ε(ρ‖{σ}) := by
+  let f := HermitianMat.inner_BilinForm (R := ℝ) (n := d) (α := ℂ)
+  -- have := @Bornology.IsBounded.continuous_bilinear _ _ _ _
+  --   HermitianMat.instCompleteSpace f (S := Set.univ) (sorry)
+  simp [of_singleton]
   sorry

@@ -23,7 +23,7 @@ theorem cfc_eigenvalues (A : HermitianMat d 𝕜) (f : ℝ → ℝ) :
 open ComplexOrder in
 theorem cfc_PosDef (A : HermitianMat d ℂ) (f : ℝ → ℝ) :
     (A.cfc f).toMat.PosDef ↔ ∀ i, 0 < f (A.H.eigenvalues i) := by
-  rw [Matrix.PosDef_iff_eigenvalues (A.cfc f).H]
+  rw [(A.cfc f).H.posDef_iff_eigenvalues_pos]
   obtain ⟨e, he⟩ := A.cfc_eigenvalues f
   rw [he]
   refine ⟨fun h i ↦ ?_, fun h i ↦ h (e i)⟩

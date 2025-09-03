@@ -53,15 +53,14 @@ variable {ι : Type*} [ResourcePretheory ι]
 
 /-- The `prod` operation of `ResourcePretheory` gives the natural product operation on `MState`s
 that puts us in a new Hilbert space of the category. Accessible by the notation `ρ₁ ⊗ᵣ ρ₂`. -/
-def prodRelabel {i j : ι} (ρ₁ : MState (H i)) (ρ₂ : MState (H j)) : MState (H (i * j)) :=
+noncomputable def prodRelabel {i j : ι} (ρ₁ : MState (H i)) (ρ₂ : MState (H j)) : MState (H (i * j)) :=
   (ρ₁ ⊗ ρ₂).relabel (prodEquiv i j)
 
 scoped infixl:65 "⊗ᵣ" => prodRelabel
 
 theorem prodRelabel_assoc {i j k : ι} (ρ₁ : MState (H i)) (ρ₂ : MState (H j)) (ρ₃ : MState (H k)) :
     ρ₁ ⊗ᵣ ρ₂ ⊗ᵣ ρ₃ ≍ ρ₁ ⊗ᵣ (ρ₂ ⊗ᵣ ρ₃) := by
-  simp [prodRelabel]
-  simp [MState.relabel_kron, MState.relabel_comp]
+  simp [prodRelabel, MState.relabel_kron]
   have h_equiv := hAssoc i j k
   rw [← Equiv.trans_assoc, Equiv.trans_cancel_right] at h_equiv
   have h_cong := congrArg (MState.relabel ((ρ₁⊗ρ₂)⊗ρ₃)) h_equiv
@@ -242,17 +241,9 @@ theorem statePow_mul (ρ : MState (H i)) (m n : ℕ) : ρ⊗^S[m * n] ≍ (ρ⊗
     trans ρ⊗^S[m * n] ⊗ᵣ ρ⊗^S[m * 1]
     · apply statePow_add
     · rw [← eq_cast_iff_heq] at ih; swap
-      · congr 2
-        · simp [pow_mul]
-        · simp [pow_mul]
-        · apply Subsingleton.helim
-          simp [pow_mul]
+      · congr 2 <;> simp [pow_mul]
       rw [← eq_cast_iff_heq]; swap
-      · congr 2
-        · simp [pow_mul]
-        · simp [pow_mul]
-        · apply Subsingleton.helim
-          simp [pow_mul]
+      · congr 2 <;> simp [pow_mul]
       rw [← MState.relabel_cast _ (by simp [pow_mul])]
       rw [prodRelabel_relabel_cast_prod]
       · congr
@@ -274,7 +265,8 @@ open ComplexOrder in
 theorem PosDef.npow {ρ : MState (H i)} (hρ : ρ.m.PosDef) (n : ℕ)
     : (ρ⊗^S[n]).m.PosDef := by
   induction n
-  · simp [MState.posDef_of_unique default]
+  · rw [statePow_zero, spacePow_zero]
+    exact MState.posDef_of_unique default
   · apply ResourcePretheory.PosDef.prod ‹_› hρ
 
 theorem statePow_rw {n m : ℕ} (h : n = m) (ρ : MState (H i)) :

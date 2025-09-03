@@ -26,15 +26,14 @@ scoped[HermitianMat] notation "{" A " ≥ₚ " B "}" => proj_le B A
 variable (A B : HermitianMat n 𝕜)
 
 theorem proj_le_cfc : {A ≤ₚ B} = cfc (fun x ↦ if 0 ≤ x then (1 : ℝ) else 0) (B - A).toMat := by
-  simp only [proj_le, ← Matrix.IsHermitian.cfc_eq, HermitianMat.cfc]
+  simp only [proj_le, HermitianMat.cfc]
 
 theorem proj_le_sq : {A ≤ₚ B}^2 = {A ≤ₚ B} := by
   ext1
   simp only [HermitianMat.val_eq_coe, selfAdjoint.val_pow, proj_le_cfc]
-  rw [← cfc_pow (hf := _)]
-  · simp only [ge_iff_le, ite_pow, one_pow, ne_eq, OfNat.ofNat_ne_zero, not_false_eq_true,
-    zero_pow, AddSubgroupClass.coe_sub, HermitianMat.val_eq_coe]
-  · simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology, implies_true]
+  rw [← cfc_pow _ 2 (hf := _)]
+  · simp
+  · simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology]
 
 theorem proj_le_nonneg : 0 ≤ {A ≤ₚ B} := by
   rw [← proj_le_sq]
@@ -45,18 +44,20 @@ theorem proj_le_le_one : {A ≤ₚ B} ≤ 1 := by
 
 theorem proj_le_mul_nonneg : 0 ≤ {A ≤ₚ B}.toMat * (B - A).toMat := by
   rw [proj_le_cfc]
-  nth_rewrite 2 [←cfc_id ℝ (B - A).toMat]
+  nth_rewrite 2 [← cfc_id ℝ (B - A).toMat]
   rw [← cfc_mul (hf := _) (hg := _)]
   · apply cfc_nonneg
-    intro x hx
-    simp only [ge_iff_le, id_eq, ite_mul, one_mul, zero_mul]
-    exact dite_nonneg (by simp only [imp_self]) (by simp only [not_le, le_refl, implies_true])
-  · simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology, implies_true]
-  · simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology, implies_true]
+    aesop
+  · --TODO: It's a failure that cfc_cont_tac doesn't use these theorems. We could add
+    -- them to the `CStarAlgebra` aesop rule_set, but even then `fun_prop` doesn't try
+    -- the discharger once if it's stuck at the root, so we'd also need cfc_cont_tac
+    -- to try the aesop once itself first.
+    simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology]
+  · simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology]
 
 theorem proj_le_mul_le : {A ≤ₚ B}.toMat * A.toMat ≤ {A ≤ₚ B}.toMat * B.toMat := by
   rw [← sub_nonneg, ← mul_sub_left_distrib]
-  convert proj_le_mul_nonneg A B
+  exact proj_le_mul_nonneg A B
 
 theorem proj_le_inner_nonneg : 0 ≤ {A ≤ₚ B}.inner (B - A) :=
   HermitianMat.inner_mul_nonneg (proj_le_mul_nonneg A B)

@@ -24,7 +24,6 @@ Important definitions:
  * `purity`: The purity `Tr[ρ^2]` of a state
  * `spectrum`: The spectrum of the matrix
  * `uniform`: The maximally mixed state
- * `MEnsemble` and `PEnsemble`: Ensemble of mixed and pure states, respectively
  * `mix`: The total state corresponding to an ensemble
  * `average`: Averages a function over an ensemble, with appropriate weights
 -/
@@ -310,9 +309,10 @@ theorem pure_of_constant_spectrum (ρ : MState d) (h : ∃ i, ρ.spectrum = Dist
   -- Prove v is normalized
   have hUvNorm : ∑ x, ‖v x‖^2 = 1 := by
     have hinnerv : Inner.inner ℂ v v = 1 := by
-      have := OrthonormalBasis.orthonormal ρ.M.H.eigenvectorBasis
+      have := ρ.M.H.eigenvectorBasis.orthonormal
       rw [orthonormal_iff_ite] at this
-      simpa using this i i
+      convert this i i
+      simp
     simp only [PiLp.inner_apply, RCLike.inner_apply, Complex.mul_conj'] at hinnerv
     rw [← Fintype.sum_equiv (Equiv.refl d) _ (fun x => (Complex.ofReal ‖v x‖) ^ 2) (fun x => Complex.ofReal_pow ‖v x‖ 2)] at hinnerv
     rw [← Complex.ofReal_sum Finset.univ (fun x => ‖v x‖ ^ 2), Complex.ofReal_eq_one] at hinnerv
@@ -322,7 +322,7 @@ theorem pure_of_constant_spectrum (ρ : MState d) (h : ∃ i, ρ.spectrum = Dist
   ext j k
   -- Use spectral theorem to prove that ρ = pure ψ
   rw [Matrix.IsHermitian.spectral_theorem ρ.M.H, Matrix.mul_apply]
-  simp [ψ, Ket.apply, v, hEig, -toMat_M]
+  simp [ψ, v, hEig, -toMat_M]
   have hsum : ∀ x ∈ Finset.univ, x ∉ ({i} : Finset d) → (ρ.M.H.eigenvectorBasis x j) * (↑(if x = i then 1 else 0) : ℝ) * (starRingEnd ℂ) (ρ.Hermitian.eigenvectorBasis x k) = 0 := by
     intros x hx hxnoti
     rw [Finset.mem_singleton] at hxnoti
@@ -361,7 +361,7 @@ notation ρL "⊗" ρR => prod ρL ρR
 /-- The product of pure states is a pure product state , `Ket.prod`. -/
 theorem pure_prod_pure (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : pure (ψ₁ ⊗ ψ₂) = (pure ψ₁) ⊗ (pure ψ₂) := by
   ext
-  simp only [pure, Ket.prod, Ket.apply, HermitianMat.val_eq_coe, HermitianMat.mk_toMat,
+  simp only [pure, Ket.prod, Ket.apply, HermitianMat.mk_toMat,
     Matrix.vecMulVec_apply, Bra.eq_conj, map_mul, prod, m, Matrix.kroneckerMap_apply]
   ring
 
@@ -431,7 +431,6 @@ def traceRight (ρ : MState (d₁ × d₂)) : MState d₁ where
 theorem traceLeft_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : traceLeft (ρ₁ ⊗ ρ₂) = ρ₂ := by
   ext
   simp_rw [traceLeft, Matrix.traceLeft, prod]
-  dsimp
   have h : (∑ i : d₁, ρ₁.M.toMat i i) = 1 := ρ₁.tr'
   simp [MState.m, ← Finset.sum_mul, h, -toMat_M]
 
@@ -440,7 +439,6 @@ theorem traceLeft_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : traceLef
 theorem traceRight_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : traceRight (ρ₁ ⊗ ρ₂) = ρ₁ := by
   ext
   simp_rw [traceRight, Matrix.traceRight, prod]
-  dsimp
   have h : (∑ i : d₂, ρ₂.M.toMat i i) = 1 := ρ₂.tr'
   simp [MState.m, ← Finset.mul_sum, h, -toMat_M]
 
@@ -509,7 +507,7 @@ def purify (ρ : MState d) : Ket (d × d) where
 theorem purify_spec (ρ : MState d) : (pure ρ.purify).traceRight = ρ := by
   ext i j
   simp_rw [purify, traceRight, Matrix.traceRight]
-  simp only [pure_of, Matrix.of_apply, Ket.apply]
+  simp only [pure_of, Ket.apply]
   simp only [map_mul]
   simp_rw [mul_assoc, mul_comm, ← mul_assoc (Complex.ofReal _), Complex.mul_conj]
   sorry

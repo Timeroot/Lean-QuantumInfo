@@ -68,8 +68,8 @@ def CPTP_of_choi_PSD_Tr {M : Matrix (dOut × dIn) (dOut × dIn) ℂ} (h₁ : M.P
 @[simp]
 theorem choi_of_CPTP_of_choi (M : Matrix (dOut × dIn) (dOut × dIn) ℂ) {h₁} {h₂} :
     (CPTP_of_choi_PSD_Tr (M := M) h₁ h₂).choi = M := by
-  simp only [choi, CPTP_of_choi_PSD_Tr, MatrixMap.map_choi_inv]
-  sorry
+  simp only [choi, CPTP_of_choi_PSD_Tr]
+  rw [MatrixMap.map_choi_inv]
 
 theorem mat_coe_eq_apply_mat [DecidableEq dOut] (ρ : MState dIn) : (Λ ρ).m = Λ.map ρ.m :=
   rfl
@@ -192,6 +192,7 @@ open Kronecker
 variable {dI₁ dI₂ dO₁ dO₂ : Type*} [Fintype dI₁] [Fintype dI₂] [Fintype dO₁] [Fintype dO₂]
 variable [DecidableEq dI₁] [DecidableEq dI₂] [DecidableEq dO₁] [DecidableEq dO₂]
 
+set_option maxRecDepth 1000 in -- ??? what the heck is recursing
 /-- The tensor product of two CPTPMaps. -/
 def prod (Λ₁ : CPTPMap dI₁ dO₁) (Λ₂ : CPTPMap dI₂ dO₂) : CPTPMap (dI₁ × dI₂) (dO₁ × dO₂) where
   toLinearMap := Λ₁.map.kron Λ₂.map

@@ -74,8 +74,7 @@ theorem inner_zero_iff [DecidableEq n] (hA₁ : 0 ≤ A) (hB₁ : 0 ≤ B)
 theorem convex_cone (hA : 0 ≤ A) (hB : 0 ≤ B) {c₁ c₂ : ℝ} (hc₁ : 0 ≤ c₁) (hc₂ : 0 ≤ c₂)
     : 0 ≤ (c₁ • A + c₂ • B) := by
   rw [zero_le_iff] at hA hB ⊢
-  convert (hA.smul (RCLike.ofReal_nonneg.mpr hc₁)).add (hB.smul (RCLike.ofReal_nonneg.mpr hc₂))
-  simp
+  exact (hA.smul hc₁).add (hB.smul hc₂)
 
 theorem sq_nonneg [DecidableEq n] : 0 ≤ A^2 := by
   simp [zero_le_iff, pow_two]

@@ -23,8 +23,8 @@ variable {M : MatrixMap dIn dOut 𝕜}
  called the adjoint of the map instead. -/
 @[irreducible]
 def dual (M : MatrixMap dIn dOut R) : MatrixMap dOut dIn R :=
-  let iso1 := (Basis.toDualEquiv <| Matrix.stdBasis R dIn dIn).symm
-  let iso2 := (Basis.toDualEquiv <| Matrix.stdBasis R dOut dOut)
+  let iso1 := (Module.Basis.toDualEquiv <| Matrix.stdBasis R dIn dIn).symm
+  let iso2 := (Module.Basis.toDualEquiv <| Matrix.stdBasis R dOut dOut)
   iso1 ∘ₗ LinearMap.dualMap M ∘ₗ iso2
 
 /-- The defining property of a dual map: inner products are preserved on the opposite argument. -/
@@ -109,9 +109,8 @@ theorem dual.PTP_POVM (M : CPTPMap dIn dOut) {T : HermitianMat dOut ℂ} (hT : 0
 /-- The defining property of a dual channel, as specialized to `MState.exp_val`. -/
 theorem exp_val_Dual (ℰ : CPTPMap dIn dOut) (ρ : MState dIn) (T : HermitianMat dOut ℂ) :
     (ℰ ρ).exp_val T  = ρ.exp_val (ℰ.dual T) := by
-  dsimp [MState.exp_val]
-  norm_cast
-  simp only [HermitianMat.inner_eq_re_trace, HermitianMat.val_eq_coe, RCLike.re_to_complex]
+  simp only [MState.exp_val, HermitianMat.inner_eq_re_trace,
+    HermitianMat.val_eq_coe, RCLike.re_to_complex]
   congr 1
   apply MatrixMap.Dual.trace_eq
 

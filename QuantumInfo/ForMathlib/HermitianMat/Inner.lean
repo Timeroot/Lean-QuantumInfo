@@ -155,11 +155,9 @@ theorem inner_eq_trace_rc (A B : HermitianMat n 𝕜) : A.inner B = Matrix.trace
   rw [Matrix.conjTranspose_mul, A.H, B.H, Matrix.trace_mul_comm]
 
 theorem inner_self_nonneg (A : HermitianMat n 𝕜) : 0 ≤ A.inner A := by
-  have (i j) := congrFun₂ A.H i j
-  simp_rw [Matrix.conjTranspose_apply] at this
   simp_rw [inner_eq_re_trace, Matrix.trace, Matrix.diag, Matrix.mul_apply, map_sum]
   refine Finset.sum_nonneg fun i _ ↦ Finset.sum_nonneg fun j _ ↦ ?_
-  rw [← this]
+  rw [← congrFun₂ A.H, Matrix.conjTranspose_apply]
   refine And.left <| RCLike.nonneg_iff.mp ?_
   open ComplexOrder in
   exact star_mul_self_nonneg (A.toMat j i)
@@ -189,14 +187,6 @@ instance OrderedSMul : OrderedSMul ℝ (HermitianMat d 𝕜) := by
 #guard_msgs(drop info) in
 #synth ContractibleSpace (HermitianMat d ℂ)
 
-/-- The PSD matrices that are `≤ 1` are a compact set. More generally, this is true of any closed interval,
-but stating that is a bit different because of how numerals are treated. The `0` and `1` here are already
-directly matrices, putting in an `(a : ℝ) ≤ m ∧ m ≤ (b : ℝ)` involves casts. But that theorem should follow
-easily from this.
--/
-theorem unitInterval_IsCompact [DecidableEq d] : IsCompact {m : HermitianMat d 𝕜 | 0 ≤ m ∧ m ≤ 1} := by
-  sorry
-
 @[fun_prop] --fun_prop can actually prove this, should I leave this on or not?
 theorem inner_bilinForm_Continuous (A : HermitianMat d 𝕜) : Continuous ⇑(HermitianMat.inner_BilinForm A) :=
   LinearMap.continuous_of_finiteDimensional _
@@ -204,15 +194,6 @@ theorem inner_bilinForm_Continuous (A : HermitianMat d 𝕜) : Continuous ⇑(He
 @[fun_prop]
 theorem inner_continuous (A : HermitianMat d 𝕜) : Continuous (A.inner) := by
   exact inner_bilinForm_Continuous A
-
-instance : CompleteSpace (HermitianMat d 𝕜) :=
-  FiniteDimensional.complete ℝ _
-
-#guard_msgs(drop info) in
-#synth CompleteSpace (HermitianMat d ℂ)
-
-#guard_msgs(drop info) in
-#synth CompleteSpace (HermitianMat d ℝ)
 
 end topology
 
@@ -271,5 +252,17 @@ noncomputable instance : NormedAddCommGroup (HermitianMat d ℝ) :=
 
 noncomputable instance : NormedAddCommGroup (HermitianMat d ℂ) :=
   inferInstance
+
+instance : CompactIccSpace (HermitianMat d 𝕜) where
+  isCompact_Icc := sorry
+
+/-- The PSD matrices that are `≤ 1` are a compact set. More generally, this is true of any closed interval,
+but stating that is a bit different because of how numerals are treated. The `0` and `1` here are already
+directly matrices, putting in an `(a : ℝ) • 1 ≤ m ∧ m ≤ (b : ℝ) • 1` involves casts. But that theorem should follow
+easily from this. More generally `A ≤ m ∧ m ≤ B` is compact.
+-/
+theorem unitInterval_IsCompact [DecidableEq d] :
+    IsCompact {m : HermitianMat d 𝕜 | 0 ≤ m ∧ m ≤ 1} :=
+  CompactIccSpace.isCompact_Icc
 
 end innerproductspace

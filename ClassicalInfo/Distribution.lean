@@ -108,20 +108,11 @@ theorem constant_of_exists_one {D : Distribution α} {x : α} (h : D x = 1) : D 
     linarith
 
 /-- Make an uniform distribution. -/
-def uniform [Nonempty α] : Distribution α :=
+def uniform [n : Nonempty α] : Distribution α :=
   ⟨fun _ ↦ ⟨1 / (Finset.univ.card (α := α)), by
     have : 0 < Finset.univ.card (α := α) :=
-      Finset.Nonempty.card_pos (Finset.univ_nonempty_iff.mpr inferInstance)
-    constructor
-    · positivity
-    · apply div_le_of_le_mul₀ (Nat.cast_nonneg Finset.univ.card)
-      · exact zero_le_one
-      · simpa only [one_mul, Nat.one_le_cast] using this
-    ⟩, by
-    have : 0 < Finset.univ.card (α := α) :=
-      Finset.Nonempty.card_pos (Finset.univ_nonempty_iff.mpr inferInstance)
-    field_simp
-    ⟩
+      Finset.Nonempty.card_pos (Finset.univ_nonempty_iff.mpr n)
+    bound⟩, by simp⟩
 
 @[simp]
 theorem uniform_def [Nonempty α] (y : α) : ((uniform y) : ℝ) = 1 / (Finset.univ.card (α := α)) :=
@@ -237,18 +228,17 @@ with the probability distribution of `X` as weights. -/
 def expect_val (X : RandVar α T) : T := by
   let u : U := ∑ i ∈ Finset.univ, (X.distr i : ℝ) • (inst.to_U (X.var i))
   have ht : ∃ t : T, inst.to_U t = u := by
-    have h₀ : ∀ i ∈ Finset.univ, 0 ≤ ↑(X.distr i) := by simp only [Prob.zero_le, imp_self, implies_true]
-    have h₁ : ∑ i ∈ Finset.univ, (X.distr i : ℝ) = 1 := by simp only [normalized]
-    have hz : ∀ i ∈ Finset.univ, inst.to_U (X.var i) ∈ Set.range inst.to_U := by simp only [Finset.mem_univ, implies_true, Set.mem_range_self]
-    have hu : u ∈ Set.range inst.to_U := Convex.sum_mem inst.convex h₀ h₁ hz
-    exact Set.mem_range.mp hu
+    have h₀ : ∀ i ∈ Finset.univ, 0 ≤ ↑(X.distr i) := by simp
+    have h₁ : ∑ i ∈ Finset.univ, (X.distr i : ℝ) = 1 := by simp
+    have hz : ∀ i ∈ Finset.univ, inst.to_U (X.var i) ∈ Set.range inst.to_U := by simp [Finset.mem_univ]
+    exact Set.mem_range.mp (inst.convex.sum_mem h₀ h₁ hz)
   exact (inst.mkT ht).1
 
 /-- The expectation value of a random variable over `α = Fin 2` is the same as `Mixable.mix`
 with probabiliy weight `X.distr 0` -/
 theorem expect_val_eq_mixable_mix (d : Distribution (Fin 2)) (x₁ x₂ : T) : expect_val ⟨![x₁, x₂], d⟩ = Mixable.mix (d 0) x₁ x₂ := by
   apply Mixable.to_U_inj
-  simp only [Mixable.mix, expect_val, constant, DFunLike.coe, Mixable.to_U_of_mkT]
+  simp only [Mixable.mix, expect_val, DFunLike.coe, Mixable.to_U_of_mkT]
   calc
     ∑ i : Fin (Nat.succ 0).succ, (d i : ℝ) • Mixable.to_U (![x₁, x₂] i) = ∑ i, (d i : ℝ) • Mixable.to_U (![x₁, x₂] i) := by
       simp
@@ -280,16 +270,16 @@ def congrRandVar (σ : α ≃ β) : RandVar α T ≃ RandVar β T := by
   case invFun => exact fun X ↦ { var := X.var ∘ σ, distr := Distribution.congr σ.symm X.distr }
   case left_inv =>
     intro e
-    simp only
+    dsimp
     congr
-    · simp only [Function.comp_assoc, Subtype.coe_eta, Equiv.symm_comp_self, Function.comp_id]
-    · rw [←Distribution.congr_symm_apply, Equiv.symm_apply_apply]
+    · simp [Function.comp_assoc]
+    · rw [← Distribution.congr_symm_apply, Equiv.symm_apply_apply]
   case right_inv =>
     intro e
-    simp only
+    dsimp
     congr
-    · simp only [Function.comp_assoc, Subtype.coe_eta, Equiv.self_comp_symm, Function.comp_id]
-    · rw [←Distribution.congr_symm_apply, Equiv.apply_symm_apply]
+    · simp [Function.comp_assoc]
+    · rw [← Distribution.congr_symm_apply, Equiv.apply_symm_apply]
 
 /-- Given a `T`-valued random variable `X` over `α`, mapping over `T` commutes with the equivalence over `α` -/
 def map_congr_eq_congr_map {S : Type _} [Mixable U S] (f : T → S) (σ : α ≃ β) (X : RandVar α T) :

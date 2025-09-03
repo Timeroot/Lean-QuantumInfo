@@ -36,7 +36,7 @@ theorem IsTracePreserving_iff_trace_choi (M : MatrixMap A B R) : M.IsTracePreser
       rintro rfl
       trivial
     split_ifs with h
-    <;> simp [this, h, Finset.filter_eq, Fintype.sum_prod_type]
+    <;> simp [this, h, Finset.filter_eq]
   · intro h X
     replace h := fun (a₁ a₂ : A) ↦ congrFun₂ h a₁ a₂
     simp [Matrix.traceLeft, Matrix.trace] at h ⊢
@@ -177,6 +177,8 @@ theorem IsHermitianPreserving {M : MatrixMap A B R}
 --set of Hermitian matrices (generate as a vector space). Concretely, every pair of elements
 -- (i,j) and (j,i) must be conjugate because we can look at the PSD matrices with 1's on (i,i),
 -- on (j,j), and on all 4 elements (i or j, i or j).
+  --This "generate the full set" is already proved in Mathlib as `span_selfAdjoint` so this
+  --should be quick
   sorry
 
 /-- The composition of IsPositive maps is also positive. -/
@@ -266,13 +268,20 @@ theorem kron_kronecker_const {C : Matrix d d R} (h : C.PosSemidef) {h₁ h₂ : 
 theorem _root_.MatrixMap.choi_PSD_iff_CP_map [DecidableEq A] (M : MatrixMap A B ℂ) :
     M.IsCompletelyPositive ↔ M.choi_matrix.PosSemidef := by
   by_cases hA : Nonempty A
-  constructor
-  · intro hcp
-    rw [choi_matrix_state_rep]
-    apply Matrix.PosSemidef.smul _ (h := Linarith.natCast_nonneg ℂ (Fintype.card A))
-    exact of_Fintype hcp A (MState.pure (Ket.MES A)).pos
-  · sorry
-  sorry
+  · constructor
+    · intro hcp
+      rw [choi_matrix_state_rep]
+      apply Matrix.PosSemidef.smul _ (ha := by positivity)
+      exact of_Fintype hcp A (MState.pure (Ket.MES A)).pos
+    · sorry
+  · simp at hA
+    have : M = 0 := Subsingleton.elim M 0
+    subst M
+    have hx (x : B × A → ℂ) : x = 0 := Subsingleton.elim x 0
+    simp [Matrix.PosSemidef, Matrix.IsHermitian, IsCompletelyPositive,
+      MatrixMap.IsPositive, hx]
+    ext
+    simp [choi_matrix] --TODO: `choi_matrix 0 = 0` as simp
 
 /-- The channel X ↦ ∑ k : κ, (M k) * X * (M k)ᴴ formed by Kraus operators M : κ → Matrix B A R
 is completely positive -/

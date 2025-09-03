@@ -407,8 +407,8 @@ theorem negLog_pos_ENNReal {p : Prob} (hp : p ≠ 0) : —log p = .ofNNReal ⟨-
 theorem negLog_pos_Real {p : Prob} : (—log p).toReal = -Real.log p := by
   rw [negLog]
   split_ifs with hp
-  · simp [negLog, hp]
   · simp [hp]
+  · simp
 
 theorem le_negLog_of_le_exp {p : Prob} {x : ℝ} (h : p ≤ Real.exp (-x) ) : ENNReal.ofReal x ≤ —log p := by
   by_cases hx : 0 ≤ x
@@ -460,7 +460,7 @@ theorem zero_lt_negLog {p : Prob} : 0 < —log p ↔ p ≠ 1 := by
       rcases h₂ with h₂|h₂|h₂
       · contradiction
       · assumption
-      · linarith [Prob.zero_le_coe (p := p)]
+      · linarith [p.zero_le_coe]
 
 @[fun_prop]
 theorem Continuous_negLog : Continuous negLog := by

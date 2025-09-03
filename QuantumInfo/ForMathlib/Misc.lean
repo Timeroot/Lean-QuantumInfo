@@ -11,14 +11,17 @@ theorem ite_eq_top {α : Type*} [Top α] (h : Prop) [Decidable h] {x y : α} (hx
     (if h then x else y) ≠ ⊤ := by
   split <;> assumption
 
+--PR'ed in #29229
 theorem Equiv.trans_cancel_left (α β γ : Type*) (e : α ≃ β) (f : β ≃ γ) (g : α ≃ γ) :
     e.trans f = g ↔ f = e.symm.trans g := by
   constructor <;> (rintro rfl; simp [← Equiv.trans_assoc])
 
+--PR'ed in #29229
 theorem Equiv.trans_cancel_right (α β γ : Type*) (e : α ≃ β) (f : β ≃ γ) (g : α ≃ γ) :
     e.trans f = g ↔ e = g.trans f.symm := by
   constructor <;> (rintro rfl; simp [Equiv.trans_assoc])
 
+--PR'ed in #29228
 theorem heq_iff_exists_eq_cast {α β : Sort u} (a : α) (b : β) :
     a ≍ b ↔ ∃ (h : β = α), a = cast h b := by
   use fun h ↦ ⟨type_eq_of_heq h.symm, eq_cast_iff_heq.mpr h⟩

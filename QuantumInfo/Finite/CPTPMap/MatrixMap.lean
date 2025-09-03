@@ -108,8 +108,8 @@ variable [DecidableEq A] [DecidableEq C]
 /-- The Kronecker product of MatrixMaps. Defined here using `TensorProduct.map M₁ M₂`, with appropriate
 reindexing operations and `LinearMap.toMatrix`/`Matrix.toLin`. Notation `⊗ₖₘ`. -/
 noncomputable def kron [CommSemiring R] (M₁ : MatrixMap A B R) (M₂ : MatrixMap C D R) : MatrixMap (A × C) (B × D) R :=
-  let h₁ := (LinearMap.toMatrix (Basis.tensorProduct (Matrix.stdBasis R A A) (Matrix.stdBasis R C C))
-      (Basis.tensorProduct (Matrix.stdBasis R B B) (Matrix.stdBasis R D D)))
+  let h₁ := (LinearMap.toMatrix (Module.Basis.tensorProduct  (Matrix.stdBasis R A A) (Matrix.stdBasis R C C))
+      (Module.Basis.tensorProduct  (Matrix.stdBasis R B B) (Matrix.stdBasis R D D)))
     (TensorProduct.map M₁ M₂);
   let r₁ := Equiv.prodProdProdComm B B D D;
   let r₂ := Equiv.prodProdProdComm A A C C;
@@ -194,7 +194,7 @@ theorem kron_map_of_kron_state [CommRing R] (M₁ : MatrixMap A B R) (M₂ : Mat
 theorem choi_matrix_state_rep {B : Type*} [Fintype B] [Nonempty A] (M : MatrixMap A B ℂ) :
   M.choi_matrix = (↑(Fintype.card (α := A)) : ℂ) • (M ⊗ₖₘ (LinearMap.id : MatrixMap A A ℂ)) (MState.pure (Ket.MES A)).m := by
   ext i j
-  simp [choi_matrix, kron_def M _ _, Ket.MES, Ket.apply, Finset.mul_sum]
+  simp [choi_matrix, kron_def M, Ket.MES, Ket.apply, Finset.mul_sum]
   conv =>
     rhs
     conv =>
@@ -202,10 +202,10 @@ theorem choi_matrix_state_rep {B : Type*} [Fintype B] [Nonempty A] (M : MatrixMa
       conv =>
         enter [2, a_2]
         simp [apply_ite]
-      simp [Finset.sum_ite]
-      rw [←mul_inv, ←Complex.ofReal_mul, ←Real.sqrt_mul (Linarith.natCast_nonneg _ _), Real.sqrt_mul_self (Linarith.natCast_nonneg _ _), mul_comm, mul_assoc]
-      simp only [Complex.ofReal_natCast, ne_eq, Nat.cast_eq_zero, Fintype.card_ne_zero,
-        not_false_eq_true, inv_mul_cancel₀, mul_one]
+      simp only [Finset.sum_ite_eq, Finset.mem_univ, ↓reduceIte]
+      rw [← mul_inv, ← Complex.ofReal_mul, ← Real.sqrt_mul (Fintype.card A).cast_nonneg',
+        Real.sqrt_mul_self (Fintype.card A).cast_nonneg', mul_comm, mul_assoc]
+      simp
       conv =>
         right
         rw [Matrix.single, Matrix.of_apply]
@@ -230,8 +230,9 @@ variable {s : ι → Type*} [∀ i, AddCommMonoid (s i)] [∀ i, Module R (s i)]
 variable {L : ι → Type* }
 
 /-- Like `Basis.tensorProduct`, but for `PiTensorProduct` -/
-noncomputable def Basis.piTensorProduct [∀i, Fintype (L i)]  (b : (i:ι) → Basis (L i) R (s i)) :
-    Basis ((i:ι) → L i) R (PiTensorProduct R s) :=
+noncomputable def _root_.Module.Basis.piTensorProduct [∀i, Fintype (L i)]
+    (b : (i:ι) → Module.Basis (L i) R (s i)) :
+      Module.Basis ((i:ι) → L i) R (PiTensorProduct R s) :=
   Finsupp.basisSingleOne.map sorry
 
 end basis
@@ -260,8 +261,8 @@ Linear maps. Notation `⨂ₜₘ[R] i, f i`, eventually. -/
 noncomputable def piKron (Λi : ∀ i, MatrixMap (dI i) (dO i) R) : MatrixMap (∀i, dI i) (∀i, dO i) R :=
   let map₁ := PiTensorProduct.map Λi;
   let map₂ := LinearMap.toMatrix
-    (Basis.piTensorProduct (fun i ↦ Matrix.stdBasis R (dI i) (dI i)))
-    (Basis.piTensorProduct (fun i ↦ Matrix.stdBasis R (dO i) (dO i))) map₁
+    (Module.Basis.piTensorProduct (fun i ↦ Matrix.stdBasis R (dI i) (dI i)))
+    (Module.Basis.piTensorProduct (fun i ↦ Matrix.stdBasis R (dO i) (dO i))) map₁
   let r₁ : ((i : ι) → dO i × dO i) ≃ ((i : ι) → dO i) × ((i : ι) → dO i) := Equiv.piProdProdPi dO
   let r₂ : ((i : ι) → dI i × dI i) ≃ ((i : ι) → dI i) × ((i : ι) → dI i) := Equiv.piProdProdPi dI
   let map₃ := Matrix.reindex r₁ r₂ map₂;
