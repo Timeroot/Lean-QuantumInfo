@@ -58,6 +58,12 @@ theorem Filter.liminf_add_tendsTo_zero {T : Type*} [Preorder T] [IsDirected T fu
       -- Case 2
       · bound
 
+theorem Filter.liminf_add_tendsTo_zero' {T : Type*} [Preorder T] [IsDirected T fun x1 x2 => x1 ≤ x2] [Nonempty T]
+  (f g : T → ENNReal) (hf : Filter.atTop.Tendsto f (𝓝 0)) :
+    Filter.atTop.liminf (f + g) = Filter.atTop.liminf g := by
+  rw [ add_comm ];
+  exact Filter.liminf_add_tendsTo_zero g f hf;
+
 theorem Filter.limsup_add_tendsTo_zero {T : Type*} [Preorder T] [IsDirected T fun x1 x2 => x1 ≤ x2] [Nonempty T]
   (f g : T → ENNReal) (hg : Filter.atTop.Tendsto g (𝓝 0)) :
     Filter.atTop.limsup (f + g) = Filter.atTop.limsup f := by
@@ -105,3 +111,9 @@ theorem Filter.limsup_add_tendsTo_zero {T : Type*} [Preorder T] [IsDirected T fu
       -- Case 2
       · obtain ⟨w, h⟩ := a
         exact ⟨ w, fun n hn => le_trans ( le_add_right le_rfl ) ( h n hn ) ⟩
+
+theorem Filter.limsup_add_tendsTo_zero' {T : Type*} [Preorder T] [IsDirected T fun x1 x2 => x1 ≤ x2] [Nonempty T]
+  (f g : T → ENNReal) (hf : Filter.atTop.Tendsto f (𝓝 0)) :
+    Filter.atTop.limsup (f + g) = Filter.atTop.limsup g := by
+  rw [ add_comm ];
+  exact Filter.limsup_add_tendsTo_zero g f hf;
