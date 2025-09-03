@@ -483,7 +483,7 @@ private theorem LemmaS3_inf {ε : Prob}
     exact LemmaS3_helper _ _ _ _ hσ x
   · apply le_of_eq
     simp_rw [mul_add]
-    apply Filter.liminf_add_tendsTo_zero
+    apply ENNReal.liminf_add_of_right_tendsto_zero
     convert Asymptotics.IsLittleO.tendsto_div_nhds_zero hf
     rw [← ENNReal.tendsto_toReal_iff_of_eventually_ne_top ?_ ENNReal.zero_ne_top]
     · simp only [ENNReal.toReal_mul, ENNReal.toReal_inv, ENNReal.toReal_natCast, ENNReal.coe_toReal,
@@ -514,13 +514,11 @@ private theorem LemmaS3_sup {ε : Prob}
     exact LemmaS3_helper _ _ _ _ hσ x
   · apply le_of_eq
     simp_rw [mul_add]
-    apply Filter.limsup_add_tendsTo_zero
+    apply ENNReal.limsup_add_of_right_tendsto_zero
     convert Asymptotics.IsLittleO.tendsto_div_nhds_zero hf
     rw [← ENNReal.tendsto_toReal_iff_of_eventually_ne_top ?_ ENNReal.zero_ne_top]
-    · simp only [ENNReal.toReal_mul, ENNReal.toReal_inv, ENNReal.toReal_natCast, ENNReal.coe_toReal,
-        ENNReal.toReal_zero]
-      congr! 2
-      ring_nf
+    · congr!
+      simp [field]
     · rw [Filter.eventually_atTop]
       use 1
       finiteness
@@ -734,75 +732,48 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
         exact hdle n
 
   -- Eq. (S61)
-  have hliminf : Filter.liminf (fun n ↦ 𝐃(ρ⊗^S[n]‖σ' n) / n) Filter.atTop =
-                 Filter.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n) Filter.atTop := by
-    calc
-      Filter.liminf (fun n ↦ 𝐃(ρ⊗^S[n]‖σ' n) / n) Filter.atTop =
-      Filter.liminf (fun n ↦ 𝐃(ρ⊗^S[n]‖σ'' n) / n) Filter.atTop := by
-        apply le_antisymm
-        · rw [←Filter.liminf_add_tendsTo_zero (fun n => 𝐃(ρ⊗^S[n]‖σ'' n) / ↑n) (fun n => ENNReal.ofReal (c n) / ↑n) _]
-          · conv =>
-              enter [2, 1, n]
-              rw [Pi.add_apply, ←ENNReal.add_div]
-            apply Filter.liminf_le_liminf (β := ℝ≥0∞) (hu := ?_) (hv := ?_)
-            · rw [Filter.eventually_atTop]
-              use 1; intro n hn
-              apply ENNReal.div_le_div _ (by rfl)
-              exact qRel_σ'_le_σ'' n
-            · apply Filter.isBoundedUnder_of
-              use 0; intro n
-              exact zero_le _
-            · apply Filter.IsCobounded.of_frequently_le (u := ⊤)
-              simp [Filter.frequently_atTop]
-              intro n; use n
-          · rw [← ENNReal.tendsto_toReal_iff_of_eventually_ne_top ?_ ENNReal.zero_ne_top]
-            · rw [ENNReal.toReal_zero]
-              conv =>
-                enter [1, n]
-                rw [ENNReal.toReal_div, ENNReal.toReal_natCast, ENNReal.toReal_ofReal (le_of_lt (hc n))]
-              exact hc_lim
-            · rw [Filter.eventually_atTop]
-              use 1; intro n hn
-              simp [ENNReal.div_eq_top, hc, hn]
-              exact Nat.one_le_iff_ne_zero.mp hn
-        -- A copy of the · above with σ' and σ'' swapped
-        · rw [←Filter.liminf_add_tendsTo_zero (fun n => 𝐃(ρ⊗^S[n]‖σ' n) / ↑n) (fun n => ENNReal.ofReal (c n) / ↑n) _]
-          · conv =>
-              enter [2, 1, n]
-              rw [Pi.add_apply, ←ENNReal.add_div]
-            apply Filter.liminf_le_liminf (β := ℝ≥0∞) (hu := ?_) (hv := ?_)
-            · rw [Filter.eventually_atTop]
-              use 1; intro n hn
-              apply ENNReal.div_le_div _ (by rfl)
-              exact qRel_σ''_le_σ' n
-            · apply Filter.isBoundedUnder_of
-              use 0; intro n
-              exact zero_le _
-            · apply Filter.IsCobounded.of_frequently_le (u := ⊤)
-              simp [Filter.frequently_atTop]
-              intro n; use n
-          · rw [← ENNReal.tendsto_toReal_iff_of_eventually_ne_top ?_ ENNReal.zero_ne_top]
-            · rw [ENNReal.toReal_zero]
-              conv =>
-                enter [1, n]
-                rw [ENNReal.toReal_div, ENNReal.toReal_natCast, ENNReal.toReal_ofReal (le_of_lt (hc n))]
-              exact hc_lim
-            · rw [Filter.eventually_atTop]
-              use 1; intro n hn
-              simp [ENNReal.div_eq_top, hc, hn]
-              exact Nat.one_le_iff_ne_zero.mp hn
-      _ = Filter.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n) Filter.atTop := by
-        simp only [qRel_pinching_pythagoras, ENNReal.add_div, ←Pi.add_apply]
+  have hliminf : Filter.atTop.liminf (fun n ↦ 𝐃(ρ⊗^S[n]‖σ' n) / n)  =
+                 Filter.atTop.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n) := by
+    trans Filter.atTop.liminf (fun n ↦ 𝐃(ρ⊗^S[n]‖σ'' n) / n)
+    · have hg : Filter.atTop.Tendsto (fun n ↦ ENNReal.ofReal (c n) / n) (𝓝 0) := by
+        rw [← ENNReal.tendsto_toReal_iff_of_eventually_ne_top ?_ ENNReal.zero_ne_top]
+        · simpa [ENNReal.toReal_ofReal (hc _).le]
+        · rw [Filter.eventually_atTop]
+          use 1
+          intros
+          finiteness
+      apply le_antisymm
+      · nth_rw 2 [← ENNReal.liminf_add_of_right_tendsto_zero hg]
         conv =>
-          lhs
-          apply Filter.liminf_add_tendsTo_zero'
-          tactic =>
-            apply tendsto_of_tendsto_of_tendsto_of_le_of_le (g := (0 : ℕ → ℝ≥0∞)) (h := fun n ↦ ENNReal.ofReal (Real.log (↑n + 1)) / ↑n)
-            · exact tendsto_const_nhds
-            · sorry -- Basically that lim_n→∞ log n / n = 0
-            · simp only [zero_le]
-            · intro n; dsimp
-              exact ENNReal.div_le_div (qRel_ent_bound n) (by rfl)
+          enter [2, 1, n]
+          rw [Pi.add_apply, ← ENNReal.add_div]
+        apply Filter.liminf_le_liminf (β := ℝ≥0∞)
+        rw [Filter.eventually_atTop]
+        use 1
+        intro n _
+        exact ENNReal.div_le_div (qRel_σ'_le_σ'' n) (by rfl)
+      -- A copy of the · above with σ' and σ'' swapped
+      · nth_rw 2 [← ENNReal.liminf_add_of_right_tendsto_zero hg]
+        conv =>
+          enter [2, 1, n]
+          rw [Pi.add_apply, ← ENNReal.add_div]
+        apply Filter.liminf_le_liminf (β := ℝ≥0∞)
+        rw [Filter.eventually_atTop]
+        use 1
+        intro n _
+        exact ENNReal.div_le_div (qRel_σ''_le_σ' n) (by rfl)
+    · simp only [qRel_pinching_pythagoras, ENNReal.add_div, ← Pi.add_apply]
+      conv =>
+        lhs
+        apply ENNReal.liminf_add_of_left_tendsto_zero
+        tactic =>
+          apply tendsto_of_tendsto_of_tendsto_of_le_of_le
+            (g := (0 : ℕ → ℝ≥0∞)) (h := fun n ↦ ENNReal.ofReal (Real.log (n + 1)) / n)
+          · exact tendsto_const_nhds
+          · sorry -- Basically that lim_n→∞ log n / n = 0
+          · positivity
+          · intro n
+            exact ENNReal.div_le_div (qRel_ent_bound n) le_rfl
 
   -- Eq. (S62)
   have hliminfR : (Filter.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n) Filter.atTop) - R1 ρ ε ≤ .ofNNReal (1 - ε' : Prob) * (R2 ρ σ - R1 ρ ε) := by
@@ -811,7 +782,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
   use fun n ↦ ⟨σ' n, σ'_free n⟩
   rw [R2]
   dsimp only
-  rw [←hliminf] at hliminfR
+  rw [← hliminf] at hliminfR
   exact hliminfR
 
 /-- Lemma 7 gives us a way to repeatedly "improve" a sequence σ to one with a smaller gap between R2 and R1.
