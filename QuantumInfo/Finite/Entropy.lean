@@ -281,6 +281,13 @@ theorem sandwichedRelEntropy_ne_top {α : ℝ} {d : Type*} [Fintype d] [Decidabl
   simp [SandwichedRelRentropy, this]
   finiteness
 
+@[fun_prop]
+theorem SandwichedRelRentropy.continuousOn {d : Type*} [Fintype d] [DecidableEq d] (ρ σ : MState d) :
+    ContinuousOn (fun α => D̃_ α(ρ‖σ)) (Set.Ioi 0) := by
+  --If this turns out too hard, we just need `ContinousAt f 1`.
+  --If that's still too hard, we really _just_ need that `(𝓝[≠] 1).tendsto f (f 1)`.
+  sorry
+
 /-- The Data Processing Inequality for the Sandwiched Renyi relative entropy.
 Proved in `https://arxiv.org/pdf/1306.5920`. Seems kind of involved. -/
 theorem sandwichedRenyiEntropy_DPI {d d₂ : Type*} [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂]

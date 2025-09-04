@@ -8,6 +8,8 @@ import Mathlib.Tactic
 import QuantumInfo.Finite.CPTPMap
 import QuantumInfo.Finite.Entropy
 
+open scoped Topology
+
 /-- A `ResourcePretheory` is a family of Hilbert spaces closed under tensor products, with an instance of
 `Fintype` and `DecidableEq` for each. It forms a pre-structure then on which to discuss resource
 theories. For instance, to talk about "two-party scenarios", we could write `ResourcePretheory (ℕ × ℕ)`,
@@ -384,6 +386,9 @@ theorem relabel_cast_isFree {i j : ι} (ρ : MState (H i)) (h : j = i) {h' : H j
 
 open NNReal
 
+/-- In a `FreeStateTheory`, we have free states of full rank, therefore the minimum relative entropy
+of any state `ρ` to a free state is finite. -/
+@[aesop (rule_sets := [finiteness]) safe]
 lemma relativeEntResource_ne_top (ρ : MState (H i)) : ⨅ σ ∈ IsFree, 𝐃(ρ‖σ) ≠ ⊤ := by
   let ⟨w,h⟩ := free_fullRank i
   apply ne_top_of_le_ne_top _ (iInf_le _ w)
@@ -393,19 +398,31 @@ lemma relativeEntResource_ne_top (ρ : MState (H i)) : ⨅ σ ∈ IsFree, 𝐃(�
   · refine ne_of_apply_ne ENNReal.toEReal (qRelativeEnt_ker (ρ := ρ) (?_) ▸ EReal.coe_ne_top _)
     convert @bot_le _ _ (Submodule.instOrderBot) _
     exact h.1.toLin_ker_eq_bot
+  /-
+  simp only [ne_eq, iInf_eq_top, not_forall]
+  obtain ⟨σ, hσ₁, hσ₂⟩ := FreeStateTheory.free_fullRank i
+  use σ, hσ₂
+  rw [qRelativeEnt]
+  split_ifs with h
+  · simp --should be `finiteness`, TODO debug
+  contrapose! h
+  convert bot_le
+  exact hσ₁.toLin_ker_eq_bot
+  -/
 
 noncomputable def RelativeEntResource : MState (H i) → ℝ≥0 :=
     fun ρ ↦ (⨅ σ ∈ IsFree, 𝐃(ρ‖σ)).untop (relativeEntResource_ne_top ρ)
 
+scoped notation "𝑅ᵣ" => RelativeEntResource
+
 theorem exists_isFree_relativeEntResource (ρ : MState (H i)) :
-    ∃ σ ∈ IsFree, 𝐃(ρ‖σ) = RelativeEntResource ρ := by
+    ∃ σ ∈ IsFree, 𝐃(ρ‖σ) = 𝑅ᵣ ρ := by
   obtain ⟨σ, hσ₁, hσ₂⟩ := IsCompact_IsFree.exists_isMinOn (s := IsFree (i := i)) (f := fun σ ↦ 𝐃(ρ‖σ))
     Set.Nonempty.of_subtype (by fun_prop)
   use σ, hσ₁
   rw [RelativeEntResource, ← hσ₂.iInf_eq hσ₁, ENNReal.ofNNReal, WithTop.coe_untop, iInf_subtype']
 
-theorem RelativeEntResource.Subadditive (ρ : MState (H i)) : Subadditive fun n ↦
-    NNReal.toReal <| RelativeEntResource (ρ⊗^S[n]) := by
+theorem RelativeEntResource.Subadditive (ρ : MState (H i)) : Subadditive fun n ↦ 𝑅ᵣ (ρ⊗^S[n]) := by
   intro m n
   obtain ⟨σ₂, hσ₂f, hσ₂d⟩ := exists_isFree_relativeEntResource (ρ⊗^S[m])
   obtain ⟨σ₃, hσ₃f, hσ₃d⟩ := exists_isFree_relativeEntResource (ρ⊗^S[n])
@@ -433,6 +450,28 @@ noncomputable def RegularizedRelativeEntResource (ρ : MState (H i)) : ℝ≥0 :
     rintro x ⟨x, hx, rfl⟩
     positivity⟩
 
+scoped notation "𝑅ᵣ∞" => RegularizedRelativeEntResource
+
+/-- Lemma 5 -/
+theorem RelativeEntResource.tendsto (ρ : MState (H i)) :
+    Filter.atTop.Tendsto (fun n ↦ 𝑅ᵣ (ρ⊗^S[n]) / n) (𝓝 (𝑅ᵣ∞ ρ)) := by
+  rw [← NNReal.tendsto_coe]
+  apply (RelativeEntResource.Subadditive ρ).tendsto_lim
+  use 0
+  rintro _ ⟨y, rfl⟩
+  positivity
+
+/-- Alternate version of Lemma 5 which states the convergence with the `ENNReal`
+expression for `RelativeEntResource`, as opposed its `untop`-ped `NNReal` value. -/
+theorem RelativeEntResource.tendsto_ennreal (ρ : MState (H i)) :
+    Filter.atTop.Tendsto (fun n ↦ (⨅ σ ∈ IsFree, 𝐃(ρ⊗^S[n]‖σ)) / ↑n) (𝓝 (𝑅ᵣ∞ ρ)) := by
+  refine Filter.Tendsto.congr' ?_ (ENNReal.tendsto_coe.mpr <| RelativeEntResource.tendsto ρ)
+  rw [Filter.EventuallyEq, Filter.eventually_atTop]
+  use 1; intros
+  rw [RelativeEntResource, ENNReal.coe_div (by positivity), ENNReal.coe_natCast]
+  congr
+  apply WithTop.coe_untop
+
 noncomputable def GlobalRobustness {i : ι} : MState (H i) → ℝ≥0 :=
   fun ρ ↦ sInf {s | ∃ σ, (⟨1 / (1+s), by bound⟩ [ρ ↔ σ]) ∈ IsFree}
 
@@ -442,6 +481,6 @@ over operations and states) on the left-hand side inside the limit.
 -/
 def IsAsymptoticallyNongenerating (dI dO : ι) (f : (n : ℕ) → CPTPMap (H (dI⊗^H[n])) (H (dO⊗^H[n]))) : Prop :=
   ∀ (ρs : (n : ℕ) → MState (H (dI⊗^H[n]))), (∀ n, IsFree (ρs n)) →
-  Filter.Tendsto (fun n ↦ GlobalRobustness ((f n) (ρs n))) Filter.atTop (nhds 0)
+  Filter.atTop.Tendsto (fun n ↦ GlobalRobustness ((f n) (ρs n))) (𝓝 0)
 
 end UnitalFreeStateTheory

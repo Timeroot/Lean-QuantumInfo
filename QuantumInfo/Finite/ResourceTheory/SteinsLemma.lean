@@ -20,55 +20,9 @@ namespace SteinsLemma
 variable {ι : Type*} [UnitalFreeStateTheory ι]
 variable {i : ι}
 
---Move to FreeState.lean
-/-- In a `FreeStateTheory`, we have free states of full rank, therefore the minimum relative entropy
-of any state `ρ` to a free state is finite. -/
-lemma min_free_relent_finite (ρ : MState (H i)) : ⨅ σ ∈ IsFree, 𝐃(ρ‖σ) ≠ ⊤ := by
-  simp only [ne_eq, iInf_eq_top, not_forall]
-  obtain ⟨σ, hσ₁, hσ₂⟩ := FreeStateTheory.free_fullRank i
-  use σ, hσ₂
-  rw [qRelativeEnt]
-  split_ifs with h
-  · simp --should be `finiteness`, TODO debug
-  contrapose! h
-  convert bot_le
-  exact hσ₁.toLin_ker_eq_bot
-
--- This theorem should follow from "Fekete's subadditive lemma", which can be found in
--- Lemma A.1 of Hayashi's book "Quantum Information Theory - Mathematical Foundation".
---
--- Also, the sequence of states S^(n) mentioned in the paper is implicitly defined here as
--- IsFree (i := i⊗^[n]). It has all the properties we need plus some more (e.g., for this
--- lemma, we don't need convexity).
-/-- Lemma 5 -/
-theorem limit_rel_entropy_exists (ρ : MState (H i)) :
-  ∃ d : ℝ≥0,
-    Filter.Tendsto (fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree (i := i ^ n), 𝐃(ρ⊗^S[n]‖σ))
-    .atTop (𝓝 d) := by
-  --Fekete's subadditive lemma is in Mathlib as `Subadditive.tendsto_lim`
-  have h := RelativeEntResource.Subadditive ρ
-  use h.lim.toNNReal
-  convert h.tendsto_lim (by
-    use 0
-    rintro _ ⟨y, rfl⟩
-    positivity
-  )
-  /-
-  We need to change `this`, which is `@Filter.Tendsto ℕ ℝ`, into our goal, which is
-  `@Filter.Tendsto ℕ ENNReal`. This probably needs two steps, one where we go from ℝ to NNReal,
-  and then one more from NNReal to ENNReal. Some lemmas that
-  might be useful:
-  - `Topology.IsClosedEmbedding.tendsto_nhds_iff`
-  - `Topology.IsEmbedding.tendsto_nhds_iff`
-  - `Filter.tendsto_congr`
-  - `tendsto_subtype_rng` (note that `NNReal` is defeq to a `Subtype ℝ`)
-  -/
-  sorry
-
 /-- The \tilde{σ}_n defined in Lemma 6, also in equation (S40) in Lemma 7. -/
 noncomputable def Lemma6_σn (m : ℕ) (σf : MState (H i)) (σₘ : MState (H (i ^ m))) : (n : ℕ) → MState (H (i ^ n)) :=
   fun n ↦
-    --This needs to be reworked to be compatible with the FreeStateTheory framework.
     let l : ℕ := n / m
     let q : ℕ := (n % m)
     let σr := σf ⊗^S[q]
@@ -130,13 +84,12 @@ theorem extracted_limsup_inequality (z : ℝ≥0∞) (hz : z ≠ ⊤) (y x : ℕ
   rintro a ⟨ k, hk ⟩
   exact le_trans ( zero_le _ ) ( hk _ le_rfl )
 
-/-- Lemma 6 from the paper -/
-private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState (H i)) (σₘ : MState (H (i ^ m))) (hσf : σf.m.PosDef) (ε : Prob)
-    (hε : 0 < ε)
-    (hε' : ε < 1) --Not stated in the paper's theorem statement but I think is necessary for the argument to go through
-    :
-    Filter.atTop.limsup (fun (n : ℕ) ↦ (↑n)⁻¹ * —log β_ ε(ρ⊗^S[n]‖{Lemma6_σn m σf σₘ n})) ≤
-    (↑m)⁻¹ * 𝐃(ρ⊗^S[m]‖σₘ)
+/-- Lemma 6 from the paper.
+We _did_ end up doing the version that "works also in the case of ε = 0", which is nice.
+-/
+private theorem Lemma6 {m : ℕ} (hm : 0 < m) (ρ σf : MState (H i)) (σₘ : MState (H (i ^ m)))
+    (hσf : σf.m.PosDef) {ε : Prob} (hε : ε < 1) :
+  Filter.atTop.limsup (fun n ↦ —log β_ ε(ρ⊗^S[n]‖{Lemma6_σn m σf σₘ n}) / n) ≤ 𝐃(ρ⊗^S[m]‖σₘ) / m
   := by
 
   set σn := Lemma6_σn m σf σₘ with hσn
@@ -171,12 +124,12 @@ private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState (H i)) (σₘ : M
 
   --This will probably need 1 < α actually
   have h_α : ∀ α, (1 < α) → Filter.atTop.limsup (fun n ↦ —log β_ ε(ρ⊗^S[n]‖{σn n}) / n) ≤
-      D̃_ α(ρ⊗^S[m]‖σn m) / m := by
+      D̃_ α(ρ⊗^S[m]‖σₘ) / m := by
     intro α hα
     apply le_of_le_of_eq (b := Filter.atTop.limsup (fun n ↦ D̃_ α(ρ⊗^S[n]‖σn n) / n))
     · --Apply the "[81] Lemma 5" to ρ⊗^n and σn
       have h_lem5 :=
-        fun (n:ℕ) ↦ OptimalHypothesisRate.Ref81Lem5 (ρ⊗^S[n]) (σn n) ε hε' α hα
+        fun (n:ℕ) ↦ OptimalHypothesisRate.Ref81Lem5 (ρ⊗^S[n]) (σn n) ε hε α hα
 
       --Upper-bound β on the LHS with this lemma
       --Distribute the limsup over subtraction
@@ -192,7 +145,7 @@ private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState (H i)) (σₘ : M
         have hz1 : —log (1 - ε) ≠ ⊤ := by
           --TODO: should be `bound`, ideally
           simp [Subtype.eq_iff]
-          have : (ε : ℝ) < 1 := hε'
+          have : (ε : ℝ) < 1 := hε
           linarith
         have hz2 : (ENNReal.ofNNReal ⟨α - 1, pf2⟩) ≠ 0 := by
           --TODO: should be `bound`, ideally
@@ -204,7 +157,7 @@ private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState (H i)) (σₘ : M
       change Filter.limsup (fun n => x n / ↑n) Filter.atTop ≤ Filter.limsup (fun n => y n / ↑n) Filter.atTop
       exact extracted_limsup_inequality z hz y x h_lem5
 
-    · suffices Filter.Tendsto (fun n => D̃_ α(ρ⊗^S[n]‖σn n) * ((↑n)⁻¹)) .atTop (𝓝 (D̃_ α(ρ⊗^S[m]‖σn m) / m))by
+    · suffices Filter.Tendsto (fun n => D̃_ α(ρ⊗^S[n]‖σn n) * ((↑n)⁻¹)) .atTop (𝓝 (D̃_ α(ρ⊗^S[m]‖σₘ) / m))by
         exact Filter.Tendsto.limsup_eq this
       conv =>
         enter [1,n]
@@ -213,7 +166,6 @@ private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState (H i)) (σₘ : M
       conv => enter [3,1]; apply (add_zero _).symm
       apply Filter.Tendsto.add
       · simp_rw [mul_comm, ← mul_assoc]
-        simp only [h_add, Nat.mod_self, CharP.cast_eq_zero, zero_mul, add_zero, Nat.div_self hm, Nat.cast_one, one_mul]
         conv =>
           enter [3,1]
           apply (one_mul _).symm
@@ -243,7 +195,6 @@ private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState (H i)) (σₘ : M
             · rw [one_div, one_div, ENNReal.ofReal_mul (by positivity), ENNReal.ofReal_inv_of_pos (by positivity)]
               simp
           apply Filter.Tendsto.mul ?_ tendsto_const_nhds
-          --Should be an easy fact from here: x * (x/m) converges to 1/m.
           exact Filter.Tendsto_inv_nat_mul_div_real m
       · suffices Filter.Tendsto (fun x => ↑(x % m) * (D̃_ α(ρ‖σf)).toReal * (↑x)⁻¹) Filter.atTop (𝓝 0) by
           --Convert a Tendsto over ENNReal to one over Real
@@ -267,18 +218,21 @@ private theorem Lemma6 (m : ℕ) (hm : 0 < m) (ρ σf : MState (H i)) (σₘ : M
         · exact tendsto_inverse_atTop_nhds_zero_nat
 
   --Take the limit as α → 1.
-  sorry
+  replace h_α : Filter.atTop.limsup (fun n => —log β_ ε(ρ⊗^S[n]‖{σn n}) / n) ≤ 𝐃(ρ⊗^S[m]‖σₘ) / m := by
+    refine ge_of_tendsto (x :=  (𝓝[>] 1)) ?_ (eventually_nhdsWithin_of_forall h_α)
+    apply tendsto_nhdsWithin_of_tendsto_nhds
+    convert ContinuousAt.tendsto ?_ using 3
+    · unfold SandwichedRelRentropy
+      split
+      · simp
+      · --TODO this should actually be a theorem in Entropy.lean
+        simpa [qRelativeEnt]
+    · --The sandwiched relative Renyi entropy is continuous in α (at least, at α = 1).
+      have _ := ENNReal.continuous_div_const m (by positivity)
+      have _ := (SandwichedRelRentropy.continuousOn (ρ⊗^S[m]) σₘ).continuousAt (Ioi_mem_nhds zero_lt_one)
+      fun_prop
 
-/-- Theorem 4, which is _also_ called the Generalized Quantum Stein's Lemma in Hayashi & Yamasaki -/
-theorem limit_hypotesting_eq_limit_rel_entropy (ρ : MState (H i)) (ε : Prob) (hε : 0 < ε ∧ ε < 1) :
-    ∃ d : ℝ≥0,
-      Filter.Tendsto (fun n ↦ —log β_ ε(ρ⊗^S[n]‖IsFree) / n)
-      .atTop (𝓝 d)
-      ∧
-      Filter.Tendsto (fun n ↦ (↑n)⁻¹ * ⨅ σ ∈ IsFree, 𝐃(ρ⊗^S[n]‖σ))
-      .atTop (𝓝 d)
-      := by
-  sorry
+  exact h_α
 
 section Lemma7
 
@@ -829,16 +783,12 @@ theorem _root_.tendsto_of_limsup_le_liminf {α : Type u_2} {β : Type u_3} [Cond
     le_antisymm hsup (hinf.trans h_le)
   exact tendsto_of_liminf_eq_limsup h_eq_inf.symm h_eq_sup
 
-theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : Prob) (hε : 0 < ε ∧ ε < 1) :
-    Filter.Tendsto (fun n ↦
-      (↑n)⁻¹ * —log β_ ε(ρ⊗^S[n]‖IsFree)
-    ) .atTop (𝓝 (RegularizedRelativeEntResource ρ)) := by
+/-- Theorem 1 in https://arxiv.org/pdf/2408.02722v3 -/
+theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1) :
+    Filter.atTop.Tendsto (fun n ↦ —log β_ ε(ρ⊗^S[n]‖IsFree) / n) (𝓝 (𝑅ᵣ∞ ρ)) := by
   conv =>
-    enter [1, n, 2, 1]
+    enter [1, n, 1, 1]
     rw [← OptimalHypothesisRate.Lemma3 ε IsCompact_IsFree free_convex]
-  rw [RegularizedRelativeEntResource]
-  simp_rw [RelativeEntResource]
-  generalize_proofs pf1 pf2 pf3 pf4
   --It suffices to show limsup LHS ≤ RHS and liminf LHS ≥ RHS.
   refine tendsto_of_limsup_le_liminf ?_ ?_
   · --the "strong converse" part first
@@ -857,39 +807,38 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : Prob) (hε : 
     have ⟨σ₁, hσ₁_pos, hσ₁_free⟩ := FreeStateTheory.free_fullRank i
 
     --`h` is Eq (14)
-    --We need to handle the case where m=0 separately. This will probably mean changing a bit of other stuff
-    have h (m : ℕ) := Lemma6 m (by sorry) ρ σ₁ (σₘ m) hσ₁_pos ε hε.1 hε.2
+    have h (m : ℕ) (hm : m ≥ 1) := Lemma6 hm ρ σ₁ (σₘ m) hσ₁_pos hε.2
 
     --Update `h` to Eq (15)
-    have h₂ (m : ℕ) : (fun n => (↑n)⁻¹ * —log β_ ε(ρ⊗^S[n]‖IsFree)) ≤ᶠ[Filter.atTop]
-        (fun n => (↑n)⁻¹ * —log β_ ε(ρ⊗^S[n]‖{(Lemma6_σn m σ₁ (σₘ m)) n})) := by
+    have h₂ (m : ℕ) : (fun n => —log β_ ε(ρ⊗^S[n]‖IsFree) / n) ≤ᶠ[Filter.atTop]
+        (fun n => —log β_ ε(ρ⊗^S[n]‖{(Lemma6_σn m σ₁ (σₘ m)) n}) / n) := by
       rw [Filter.EventuallyLE]
       apply Filter.Eventually.of_forall
       intro n
       gcongr
       apply OptimalHypothesisRate.negLog_le_singleton
       apply Lemma6_σn_IsFree hσ₁_free hσₘ1
-    replace h (m) := (Filter.limsup_le_limsup (h₂ m)).trans (h m)
+    replace h (m) (hm) := (Filter.limsup_le_limsup (h₂ m)).trans (h m hm)
     clear h₂
 
     --Update `h` to Eq (16)
     conv at h =>
-      enter [m, 2, 2]
+      enter [m, hm, 2, 1]
       exact (IsMinOn.iInf_eq (hσₘ1 m) (hσₘ2 m)).symm
 
-    obtain ⟨v_lem5, hv_lem5⟩ := limit_rel_entropy_exists ρ --Do we need this...? in this form? Feels wrong
-    conv_rhs =>
-      equals .ofNNReal v_lem5 =>
-        -- ??? ugh
-        sorry
-
-    apply le_of_tendsto_of_tendsto' tendsto_const_nhds hv_lem5
-    convert h using 6
-    · apply OptimalHypothesisRate.Lemma3 ε IsCompact_IsFree free_convex
+    apply tendsto_le_of_eventuallyLE tendsto_const_nhds (RelativeEntResource.tendsto_ennreal ρ)
+    rw [Filter.EventuallyLE, Filter.eventually_atTop]
+    use 1
+    convert h using 7
+    · exact OptimalHypothesisRate.Lemma3 ε IsCompact_IsFree free_convex
     · symm
       apply iInf_subtype''
 
-  · --the other direction, the "key part" of the "opposite inequality"
+  · rw [RegularizedRelativeEntResource]
+    simp_rw [RelativeEntResource]
+    generalize_proofs pf1 pf2 pf3 pf4
+
+    --the other direction, the "key part" of the "opposite inequality"
     set R₁ε := Filter.liminf (fun n => —log (⨆ σ ∈ IsFree, β_ ε(ρ⊗^S[n]‖{σ})) / ↑n) Filter.atTop
     --We need to pick an ε' (a \tilde{ε} in the paper). The only constraint(?) is that it's strictly
     --less than ε. We take ε' := ε/2.
@@ -909,3 +858,18 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) (ε : Prob) (hε : 
       sorry
 
     sorry
+
+/-- Theorem 4, which is _also_ called the Generalized Quantum Stein's Lemma in Hayashi & Yamasaki.
+What they state as an equality of limits (which don't exist per se in Mathlib), we state as their
+existing a number (which happens to be `RegularizedRelativeEntResource`) which both sides converge to.
+-/
+theorem limit_hypotesting_eq_limit_rel_entropy (ρ : MState (H i)) (ε : Prob) (hε : 0 < ε ∧ ε < 1) :
+    ∃ d : ℝ≥0,
+      Filter.atTop.Tendsto (fun n ↦ —log β_ ε(ρ⊗^S[n]‖IsFree) / n) (𝓝 d)
+      ∧
+      Filter.atTop.Tendsto (fun n ↦ (⨅ σ ∈ IsFree, 𝐃(ρ⊗^S[n]‖σ)) / n) (𝓝 d)
+      := by
+  use 𝑅ᵣ∞ ρ
+  constructor
+  · exact GeneralizedQSteinsLemma ρ hε
+  · exact RelativeEntResource.tendsto_ennreal ρ
