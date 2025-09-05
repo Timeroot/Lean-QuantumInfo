@@ -51,16 +51,16 @@ attribute [instance] ResourcePretheory.NonemptyH
 
 namespace ResourcePretheory
 
-variable {ι : Type*} [ResourcePretheory ι]
+variable {ι : Type*} [ResourcePretheory ι] {i j k l : ι}
 
 /-- The `prod` operation of `ResourcePretheory` gives the natural product operation on `MState`s
 that puts us in a new Hilbert space of the category. Accessible by the notation `ρ₁ ⊗ᵣ ρ₂`. -/
-noncomputable def prodRelabel {i j : ι} (ρ₁ : MState (H i)) (ρ₂ : MState (H j)) : MState (H (i * j)) :=
+noncomputable def prodRelabel (ρ₁ : MState (H i)) (ρ₂ : MState (H j)) : MState (H (i * j)) :=
   (ρ₁ ⊗ ρ₂).relabel (prodEquiv i j)
 
 scoped infixl:65 "⊗ᵣ" => prodRelabel
 
-theorem prodRelabel_assoc {i j k : ι} (ρ₁ : MState (H i)) (ρ₂ : MState (H j)) (ρ₃ : MState (H k)) :
+theorem prodRelabel_assoc (ρ₁ : MState (H i)) (ρ₂ : MState (H j)) (ρ₃ : MState (H k)) :
     ρ₁ ⊗ᵣ ρ₂ ⊗ᵣ ρ₃ ≍ ρ₁ ⊗ᵣ (ρ₂ ⊗ᵣ ρ₃) := by
   simp [prodRelabel, MState.relabel_kron]
   have h_equiv := hAssoc i j k
@@ -77,7 +77,7 @@ theorem prodRelabel_assoc {i j k : ι} (ρ₁ : MState (H i)) (ρ₂ : MState (H
 
 /-- A `MState.relabel` can be distributed across a `prodRelabel`, if you have proofs that the factors
 correspond correctly. -/
-theorem prodRelabel_relabel_cast_prod {i j k l : ι}
+theorem prodRelabel_relabel_cast_prod
     (ρ₁ : MState (H i)) (ρ₂ : MState (H j))
     (h : H (k * l) = H (i * j)) (hik : k = i) (hlj : l = j) :
     (ρ₁ ⊗ᵣ ρ₂).relabel (Equiv.cast h) =
@@ -88,16 +88,15 @@ theorem prodRelabel_relabel_cast_prod {i j k l : ι}
 
 /-- The `prod` operation of `ResourcePretheory` gives the natural product operation on `CPTPMap`s. Accessible
 by the notation `M₁ ⊗ᵣ M₂`. -/
-noncomputable def prodCPTPMap {i j k l : ι} (M₁ : CPTPMap (H i) (H j)) (M₂ : CPTPMap (H k) (H l)) :
+noncomputable def prodCPTPMap (M₁ : CPTPMap (H i) (H j)) (M₂ : CPTPMap (H k) (H l)) :
     CPTPMap (H (i * k)) (H (j * l)) :=
   (CPTPMap.of_equiv (prodEquiv j l).symm).compose ((M₁ ⊗ₖ M₂).compose (CPTPMap.of_equiv (prodEquiv i k)))
 
 scoped notation M₁ "⊗ₖᵣ" M₂ => prodCPTPMap M₁ M₂
 
 open ComplexOrder in
-theorem PosDef.prod {ι : Type*} [ResourcePretheory ι] {i j : ι}
-      {ρ : MState (H i)} {σ : MState (H j)} (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
-      : (ρ ⊗ᵣ σ).m.PosDef := by
+theorem PosDef.prod {ρ : MState (H i)} {σ : MState (H j)} (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
+    : (ρ ⊗ᵣ σ).m.PosDef := by
   have : (ρ ⊗ σ).m.PosDef := MState.PosDef.kron hρ hσ
   rw [prodRelabel]
   exact MState.PosDef.relabel this (prodEquiv i j)
@@ -134,9 +133,14 @@ theorem PosDef.prod {ι : Type*} [ResourcePretheory ι] {i j : ι}
 --   · rfl
 
 @[simp]
-theorem qRelEntropy_prodRelabel {i j : ι} (ρ₁ ρ₂ : MState (H i)) (σ₁ σ₂ : MState (H j)):
+theorem qRelEntropy_prodRelabel (ρ₁ ρ₂ : MState (H i)) (σ₁ σ₂ : MState (H j)):
     𝐃(ρ₁ ⊗ᵣ σ₁‖ρ₂ ⊗ᵣ σ₂) = 𝐃(ρ₁‖ρ₂) + 𝐃(σ₁‖σ₂) := by
   simp [prodRelabel, qRelativeEnt_additive]
+
+@[simp]
+theorem sandwichedRelRentropy_prodRelabel {α : ℝ} (ρ₁ ρ₂ : MState (H i)) (σ₁ σ₂ : MState (H j)):
+    D̃_ α(ρ₁ ⊗ᵣ σ₁‖ρ₂ ⊗ᵣ σ₂) = D̃_ α(ρ₁‖ρ₂) + D̃_ α(σ₁‖σ₂) := by
+  simp [prodRelabel, SandwichedRelRentropy_additive]
 
 end ResourcePretheory
 
@@ -277,13 +281,17 @@ theorem statePow_rw {n m : ℕ} (h : n = m) (ρ : MState (H i)) :
   simp
 
 @[simp]
-theorem sandwichedRelRentropy_prodRelabel {α : ℝ} (ρ₁ ρ₂ : MState (H i)) (σ₁ σ₂ : MState (H j)):
-    D̃_ α(ρ₁ ⊗ᵣ σ₁‖ρ₂ ⊗ᵣ σ₂) = D̃_ α(ρ₁‖ρ₂) + D̃_ α(σ₁‖σ₂) := by
-  simp [prodRelabel, SandwichedRelRentropy_additive]
+theorem qRelEntropy_statePow (ρ σ : MState (H i)) (n : ℕ) :
+    𝐃(ρ⊗^S[n] ‖ σ ⊗^S[n]) = n * 𝐃(ρ‖σ) := by
+  induction n
+  · simp
+  · rename_i n ih
+    rw [statePow_succ, statePow_succ, qRelEntropy_prodRelabel]
+    simp [ih, add_mul]
 
 @[simp]
 theorem sandwichedRelRentropy_statePow {α : ℝ} (ρ σ : MState (H i)) (n : ℕ) :
-    D̃_ α(ρ⊗^S[n] ‖ σ ⊗^S[n]) = n * D̃_ α(ρ‖σ) := by
+    D̃_ α(ρ⊗^S[n] ‖ σ⊗^S[n]) = n * D̃_ α(ρ‖σ) := by
   induction n
   · simp
   · rename_i n ih

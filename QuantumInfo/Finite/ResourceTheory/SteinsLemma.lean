@@ -46,6 +46,9 @@ theorem Lemma6_σn_IsFree {σ₁ : MState (H i)} {σₘ : (m : ℕ) → MState (
       · exact hσ₁_free.npow (n % m)
     · rw [← pow_mul, ← spacePow_add, Nat.div_add_mod n m]
 
+--PULLOUT.
+--PR? This is "not specific to our repo", but might be a bit too specialized to be in Mathlib. Not sure.
+--Definitely would need to clean up the proof first
 theorem extracted_limsup_inequality (z : ℝ≥0∞) (hz : z ≠ ⊤) (y x : ℕ → ℝ≥0∞) (h_lem5 : ∀ (n : ℕ), x n ≤ y n + z)
  : Filter.limsup (fun n => x n / ↑n) Filter.atTop ≤ Filter.limsup (fun n => y n / ↑n) Filter.atTop := by
   --Thanks Aristotle
@@ -83,6 +86,32 @@ theorem extracted_limsup_inequality (z : ℝ≥0∞) (hz : z ≠ ⊤) (y x : ℕ
   refine le_trans ( csInf_le ⟨ 0, ?_ ⟩ ⟨ n + m, fun n hn => le_trans ( h_le _ <| by linarith ) <| add_le_add_left ( le_of_lt <| hm _ <| by linarith ) _ ⟩ ) <| by aesop;
   rintro a ⟨ k, hk ⟩
   exact le_trans ( zero_le _ ) ( hk _ le_rfl )
+
+--PULLOUT and PR
+open Filter in
+/-- Like `Filter.tendsto_add_atTop_iff_nat`, but with nat subtraction. -/
+theorem _root_.Filter.tendsto_sub_atTop_iff_nat {α : Type*} {f : ℕ → α} {l : Filter α} (k : ℕ) :
+    Tendsto (fun (n : ℕ) => f (n - k)) atTop l ↔ Tendsto f atTop l :=
+  show Tendsto (f ∘ fun n => n - k) atTop l ↔ Tendsto f atTop l by
+    rw [← tendsto_map'_iff, map_sub_atTop_eq_nat]
+
+--PULLOUT and PR
+open ENNReal Filter in
+/-- Sort of dual to `ENNReal.tendsto_const_sub_nhds_zero_iff`. Takes a substantially different form though, since
+we don't actually have equality of the limits, or even the fact that the other one converges, which is why we
+need to use `limsup`. -/
+theorem _root_.ENNReal.tendsto_sub_const_nhds_zero_iff {α : Type*} {l : Filter α} {f : α → ℝ≥0∞} {a : ℝ≥0∞}
+    : Tendsto (f · - a) l (𝓝 0) ↔ limsup f l ≤ a := by
+  rcases eq_or_ne a ⊤ with rfl | ha
+  · simp [tendsto_const_nhds]
+  rw [ENNReal.tendsto_nhds_zero, limsup_le_iff']
+  simp only [tsub_le_iff_left]
+  constructor
+  · intro h y hy
+    specialize h (y - a) (tsub_pos_of_lt hy)
+    rwa [add_comm, tsub_add_cancel_of_le hy.le] at h
+  · intro h ε hε
+    exact h (a + ε) (lt_add_right ha hε.ne')
 
 /-- Lemma 6 from the paper.
 We _did_ end up doing the version that "works also in the case of ε = 0", which is nice.
@@ -724,7 +753,23 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
           apply tendsto_of_tendsto_of_tendsto_of_le_of_le
             (g := (0 : ℕ → ℝ≥0∞)) (h := fun n ↦ ENNReal.ofReal (Real.log (n + 1)) / n)
           · exact tendsto_const_nhds
-          · sorry -- Basically that lim_n→∞ log n / n = 0
+          ·  -- Basically that lim_n→∞ log n / n = 0
+            rw [← Filter.tendsto_sub_atTop_iff_nat 1]
+            apply Filter.Tendsto.congr' (f₁ := fun (n : ℕ) ↦ ENNReal.ofReal (Real.log n / (n - 1)))
+            · simp only [Filter.EventuallyEq, ← ENNReal.ofReal_natCast, Filter.eventually_atTop]
+              use 2; intros b hb
+              convert ENNReal.ofReal_div_of_pos (y := b - 1) (by rify at b hb; linarith)
+              · norm_cast
+                omega
+              · norm_cast; symm; apply Int.subNatNat_of_le
+                omega
+            refine Filter.Tendsto.comp (g := fun r ↦ ENNReal.ofReal (Real.log r / (r - 1)))
+              ?_ tendsto_natCast_atTop_atTop
+            rw [← ENNReal.ofReal_zero]
+            apply ENNReal.tendsto_ofReal
+            convert Real.tendsto_pow_log_div_mul_add_atTop 1 (-1) 1 (zero_ne_one.symm) using 3
+            · simp
+            · ring
           · positivity
           · intro n
             exact ENNReal.div_le_div (qRel_ent_bound n) le_rfl
@@ -755,7 +800,7 @@ private noncomputable def Lemma7_improver (ρ : MState (H i)) {ε : Prob} (hε :
 /-- The Lemma7_improver does its job at shrinking the gap. -/
 theorem Lemma7_gap (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1) {ε' : Prob} (hε' : 0 < ε' ∧ ε' < ε) :
     ∀ σ,
-      let σ' := Lemma7_improver ρ hε hε' σ;
+      letI σ' := Lemma7_improver ρ hε hε' σ;
       R2 ρ σ' - R1 ρ ε ≤ .ofNNReal (1 - ε' : Prob) * (R2 ρ σ - R1 ρ ε) := by
   intro σ
   dsimp [SteinsLemma.Lemma7_improver]
@@ -768,30 +813,18 @@ theorem Lemma7_gap (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1) {ε
 
 end Lemma7
 
-/-- Strengthening of `tendsto_of_limsup_eq_liminf`: instead of `limsup f = a = liminf f`, it suffices
-to just have `limsup f ≤ a ≤ liminf f`. -/
-theorem _root_.tendsto_of_limsup_le_liminf {α : Type u_2} {β : Type u_3} [ConditionallyCompleteLinearOrder α] [TopologicalSpace α]
-    [OrderTopology α] {f : Filter β} [f.NeBot] {u : β → α} {a : α}
-    (hsup : Filter.limsup u f ≤ a) (hinf : a ≤ Filter.liminf u f)
-    (h : Filter.IsBoundedUnder (fun x1 x2 => x1 ≤ x2) f u := by isBoundedDefault)
-    (h' : Filter.IsBoundedUnder (fun x1 x2 => x1 ≥ x2) f u := by isBoundedDefault) :
-    Filter.Tendsto u f (nhds a) := by
-  have h_le := Filter.liminf_le_limsup (u := u) (f := f)
-  have h_eq_inf : a = Filter.liminf u f :=
-    le_antisymm hinf (h_le.trans hsup)
-  have h_eq_sup : Filter.limsup u f = a :=
-    le_antisymm hsup (hinf.trans h_le)
-  exact tendsto_of_liminf_eq_limsup h_eq_inf.symm h_eq_sup
-
 /-- Theorem 1 in https://arxiv.org/pdf/2408.02722v3 -/
 theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1) :
     Filter.atTop.Tendsto (fun n ↦ —log β_ ε(ρ⊗^S[n]‖IsFree) / n) (𝓝 (𝑅ᵣ∞ ρ)) := by
-  conv =>
-    enter [1, n, 1, 1]
-    rw [← OptimalHypothesisRate.Lemma3 ε IsCompact_IsFree free_convex]
+
   --It suffices to show limsup LHS ≤ RHS and liminf LHS ≥ RHS.
-  refine tendsto_of_limsup_le_liminf ?_ ?_
+  refine tendsto_of_le_liminf_of_limsup_le ?_ ?_; swap
+
   · --the "strong converse" part first
+    conv =>
+      enter [1, 1, n, 1, 1]
+      rw [← OptimalHypothesisRate.Lemma3 ε IsCompact_IsFree free_convex]
+
     --Let σₘ be the state minimizing 𝐃(ρ⊗^m‖σₘ) over free states. This is guaranteed to exist since
     -- (1) the divergence is continuous and (2) the set of free states is compact.
     have σₘ_exists (m : ℕ) := IsCompact_IsFree.exists_isMinOn Set.Nonempty.of_subtype
@@ -834,30 +867,79 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) {ε : Prob} (hε : 
     · symm
       apply iInf_subtype''
 
-  · rw [RegularizedRelativeEntResource]
-    simp_rw [RelativeEntResource]
-    generalize_proofs pf1 pf2 pf3 pf4
+  · -- --the other direction, the "key part" of the "opposite inequality"
 
-    --the other direction, the "key part" of the "opposite inequality"
-    set R₁ε := Filter.liminf (fun n => —log (⨆ σ ∈ IsFree, β_ ε(ρ⊗^S[n]‖{σ})) / ↑n) Filter.atTop
     --We need to pick an ε' (a \tilde{ε} in the paper). The only constraint(?) is that it's strictly
     --less than ε. We take ε' := ε/2.
      --TODO: Should we have an HDiv Prob Nat instance?
     let ε' : Prob := ⟨ε/2, by constructor <;> linarith [ε.zero_le_coe, ε.coe_le_one]⟩
     have hε' : 0 < ε' ∧ ε' < ε := by unfold ε'; constructor <;> change (_ : ℝ) < (_ : ℝ) <;> simpa using hε.1
-    have lem7 (σ h) := Lemma7 ρ hε σ h ε' hε'
-    --Take some initial sequence σ₁. Can just take the full_rank one from each, if we want (which is the `default`
-    -- instance that `Inhabited` derives, but the point is that it doesn't matter)
-    generalize (default : (n : ℕ) → IsFree (i := i ^ n)) = σ₁
+
+    --Take some initial sequence σ₁. We need to pick it so that `R2 ρ σ₁` is finite, otherwise we can't "shrink"
+    --it by applying Lemma 7. Taking the full-rank state of dimension `H i` and taking all powers of it, works.
+    set σ₁ : (n : ℕ) → IsFree (i := i ^ n) := fun n ↦
+      ⟨(free_fullRank i).choose ⊗^S[n], IsFree.npow (free_fullRank i).choose_spec.2 n⟩ with hσ₁
+    have hσ₁_top : R2 ρ σ₁ ≠ ⊤ := by
+      rw [R2, ← Filter.liminf_nat_add _ 1]
+      simp [σ₁, mul_comm _ (qRelativeEnt _ _)]
+      conv =>
+        enter [1,1,1,n]
+        rw [ENNReal.mul_div_cancel_right (by positivity) (by finiteness)]
+      simp [qRelativeEnt_ne_top (free_fullRank i).choose_spec.1]
+    clear hσ₁
     --Repeat the Lemma7 improvement process to drive the gap down
     let σₖ : ℕ → (n : ℕ) → IsFree (i := i ^ n) := fun k ↦
       (Lemma7_improver ρ hε hε')^[k] σ₁
 
-    --Should be: the gap between R_{1,ε} and R2 for `σₖ k` goes to 0 as `k → ∞`.
-    have hσₖ_gap : False := by
-      sorry
+    --The gap between R_{1,ε} and R2 for `σₖ k` goes to 0 as `k → ∞`.
+    have hσₖ_gap : Filter.atTop.Tendsto (fun k ↦ R2 ρ (σₖ k) - R1 ρ ε) (𝓝 0) := by
+      suffices h : ∀ (k : ℕ), R2 ρ (σₖ k) - R1 ρ ε ≤ ↑(1 - ε')^k * (R2 ρ σ₁ - R1 ρ ε) by
+        refine tendsto_nhds_bot_mono' ?_ h
+        conv =>
+          enter [3, 1]
+          equals 0 * (R2 ρ σ₁ - R1 ρ ε) => simp
+        apply ENNReal.Tendsto.mul_const
+        · simp only [ENNReal.tendsto_pow_atTop_nhds_zero_iff]
+          --This should just be `simp` or `bound` at this point. TODO.
+          simp [Prob.toNNReal, ← NNReal.coe_lt_coe, hε'.1]
+        · right; exact ENNReal.sub_ne_top hσ₁_top
+      suffices h : ∀ (m k : ℕ), R2 ρ (σₖ (m + k)) - R1 ρ ε ≤ ↑(1 - ε')^k * (R2 ρ (σₖ m) - R1 ρ ε) by
+        convert h 0; simp
+      intro m k; induction k generalizing m
+      · simp [σₖ]
+      rename_i k ih
+      have σₖ_succ (n) : σₖ (n + 1) = Lemma7_improver ρ hε hε' (σₖ n) :=
+        Function.iterate_succ_apply' ..
+      rw [← add_assoc, σₖ_succ, pow_succ]
+      grw [Lemma7_gap ρ hε hε' (σₖ (m + k)), ih m]
+      ring_nf
+      rfl
 
-    sorry
+    replace hσₖ_gap : Filter.liminf (fun k => R2 ρ (σₖ k)) Filter.atTop ≤ R1 ρ ε := by
+      rw [ENNReal.tendsto_sub_const_nhds_zero_iff] at hσₖ_gap
+      grw [Filter.liminf_le_limsup, hσₖ_gap]
+
+    rw [R1] at hσₖ_gap
+    grw [← hσₖ_gap]; clear hσₖ_gap
+
+    have hReg := RelativeEntResource.tendsto_ennreal ρ
+    replace hReg := Filter.Tendsto.liminf_eq hReg
+    rw [← hReg]; clear hReg
+
+    unfold R2
+    /- The idea is now that: the LHS is the liminf over all n, of the minimum free σ of dimension n;
+      the RHS is the liminf over a particular subsequence, given by σₖ, which is free. But then
+      the math is complicated a bit by the fact that the RHS is a _double_ liminf. This is what H&Y
+      deal with by talking about the sequences `σ_{n_k, ∗} = σ_{n_k, k}` (below Eq (26)). We don't
+      actually construct such a subsequence here, we just unfold the bounds repeatedly.
+    -/
+    refine Filter.le_liminf_of_le (by isBoundedDefault) ?_
+    apply Filter.Eventually.of_forall (fun _ ↦ ?_)
+    refine Filter.liminf_le_liminf ?_
+    apply Filter.Eventually.of_forall (fun _ ↦ ?_)
+    gcongr
+    rw [iInf_subtype']
+    exact iInf_le _ _
 
 /-- Theorem 4, which is _also_ called the Generalized Quantum Stein's Lemma in Hayashi & Yamasaki.
 What they state as an equality of limits (which don't exist per se in Mathlib), we state as their
