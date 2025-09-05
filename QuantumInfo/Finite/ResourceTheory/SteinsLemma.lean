@@ -51,41 +51,42 @@ theorem Lemma6_σn_IsFree {σ₁ : MState (H i)} {σₘ : (m : ℕ) → MState (
 --Definitely would need to clean up the proof first
 theorem extracted_limsup_inequality (z : ℝ≥0∞) (hz : z ≠ ⊤) (y x : ℕ → ℝ≥0∞) (h_lem5 : ∀ (n : ℕ), x n ≤ y n + z)
     : Filter.atTop.limsup (fun n ↦ x n / n) ≤ Filter.atTop.limsup (fun n ↦ y n / n) := by
-  --Thanks Aristotle
-  simp_all [Filter.limsup_eq]
-  -- Taking the limit superior of both sides of the inequality $x_n / n \leq y_n / n + z / n$, we get $\limsup_{n \to \infty} x_n / n \leq \limsup_{n \to \infty} (y_n / n + z / n)$.
+  --Thanks Aristotle!
+  simp? [Filter.limsup_eq] says simp only [Filter.limsup_eq, Filter.eventually_atTop,
+    ge_iff_le, le_sInf_iff, Set.mem_setOf_eq, forall_exists_index]
+  -- Taking the limit superior of both sides of the inequality x n / n ≤ y_n / n + z / n, we
+  -- get limsup x n / n ≤ limsup (y n / n + z / n).
   intro b n h_bn
   have h_le : ∀ m ≥ n, x m / (m : ℝ≥0∞) ≤ b + z / (m : ℝ≥0∞) := by
-    intro m hm;
-    refine' le_trans (ENNReal.div_le_div_right _ _ ) _
-    exact y m + z
-    · exact h_lem5 m
-    · rw [ ENNReal.add_div ]
-      exact add_le_add_right ( h_bn m hm ) _
-  -- Since $z$ is finite, we have $\lim_{n \to \infty} z / n = 0$.
+    intro m hm
+    grw [← h_bn m hm, ← ENNReal.add_div, h_lem5 m]
+  -- Since z is finite, we have lim z / n = 0.
   have h_z_div_n_zero : Filter.atTop.Tendsto (fun n : ℕ ↦ z / (n : ℝ≥0∞)) (𝓝 0) := by
-    rw [ ENNReal.tendsto_nhds_zero ]
+    rw [ENNReal.tendsto_nhds_zero]
     intro ε hε
-    rcases ENNReal.lt_iff_exists_real_btwn.mp hε with ⟨ ε', hε₁, hε₂ ⟩
-    simp_all only [ge_iff_le, gt_iff_lt, ENNReal.ofReal_pos, Filter.eventually_atTop]
-    obtain ⟨left, right⟩ := hε₂
-    -- Since $z$ is finite, we can choose $a$ such that for all $b \geq a$, $z \leq b \cdot \epsilon'$.
-    obtain ⟨a, ha⟩ : ∃ a : ℕ, ∀ b : ℕ, a ≤ b → z ≤ b * ENNReal.ofReal ε' := by
-      cases' ENNReal.lt_iff_exists_real_btwn.mp ( show z < ⊤ from lt_top_iff_ne_top.mpr hz ) with a ha
-      simp_all only [ENNReal.ofReal_lt_top, and_true]
-      obtain ⟨left_1, right_1⟩ := ha
-      exact ⟨ ⌈a / ε'⌉₊, fun n hn ↦ le_trans right_1.le <| by rw [ ← ENNReal.ofReal_natCast ] ; rw [ ← ENNReal.ofReal_mul ( by positivity ) ] ; exact ENNReal.ofReal_le_ofReal <| by nlinarith [ Nat.ceil_le.mp hn, mul_div_cancel₀ a left.ne' ] ⟩
-    -- Since $z \leq b \cdot \epsilon'$ for all $b \geq a$, dividing both sides by $b$ (which is positive) gives $z / b \leq \epsilon'$.
-    use a + 1; intros b hb_ge; exact (by
-    rw [ ENNReal.div_le_iff_le_mul ]
-    · exact le_trans ( ha b ( by linarith ) ) ( by rw [ mul_comm ] ; gcongr )
-    · aesop
-    · norm_num)
-  refine le_of_forall_pos_le_add fun ε ε_pos ↦ ?_
-  rcases Filter.eventually_atTop.mp ( h_z_div_n_zero.eventually <| gt_mem_nhds ε_pos ) with ⟨ m, hm ⟩
-  refine le_trans ( csInf_le ⟨ 0, ?_ ⟩ ⟨ n + m, fun n hn ↦ le_trans ( h_le _ <| by linarith ) <| add_le_add_left ( le_of_lt <| hm _ <| by linarith ) _ ⟩ ) <| by aesop
-  rintro a ⟨ k, hk ⟩
-  exact le_trans ( zero_le _ ) ( hk _ le_rfl )
+    rw [gt_iff_lt, ENNReal.lt_iff_exists_real_btwn] at hε
+    rcases hε with ⟨ε', hε₁, hε₂⟩
+    rw [ENNReal.ofReal_pos] at hε₂
+    -- Since z is finite, we can choose k such that for all b ≥ k, z ≤ b * ε'.
+    obtain ⟨k, hk⟩ : ∃ k : ℕ, ∀ b ≥ k, z ≤ b * ENNReal.ofReal ε' := by
+      rcases ENNReal.lt_iff_exists_real_btwn.mp (show z < ⊤ by finiteness) with ⟨a, _, ha, _⟩
+      use ⌈a / ε'⌉₊
+      intro n hn
+      grw [ha.le, ← ENNReal.ofReal_natCast, ← ENNReal.ofReal_mul (by positivity)]
+      gcongr
+      nlinarith [Nat.ceil_le.mp hn, mul_div_cancel₀ a hε₂.1.ne']
+    -- Since z ≤ b * ε' for all b ≥ k, dividing both sides by b (which is positive) gives z / b ≤ ε'.
+    rw [Filter.eventually_atTop]
+    use k + 1
+    intros b _
+    grw [ENNReal.div_le_iff_le_mul (by aesop) (by simp), hk b (by omega), mul_comm, hε₂.right.le]
+  refine le_of_forall_pos_le_add fun ε hε ↦ ?_
+  rcases Filter.eventually_atTop.mp (h_z_div_n_zero.eventually <| gt_mem_nhds hε) with ⟨m, hm⟩
+  apply sInf_le
+  use n + m
+  intro n hn
+  grw [h_le n (by omega), (hm n (by omega)).le]
+
 
 --PULLOUT and PR
 open Filter in
@@ -413,22 +414,17 @@ private theorem LemmaS3_helper {ε : Prob} {d : ℕ → Type*} [∀ n, Fintype (
     Set.mem_singleton_iff, iSup_iSup_eq_left] at hσ₁ hσ₂ ⊢
   rw [← neg_le_neg_iff]
   simp only [neg_add_rev, neg_neg]
-  rw [← Real.log_exp (-(f n))]
-  rw [← Real.log_mul (by positivity) (by positivity)]
+  rw [← Real.log_exp (-f n), ← Real.log_mul (by positivity) (by positivity)]
   apply Real.log_le_log (by positivity)
   simp only [Prob.coe_iInf]
   rw [Real.mul_iInf_of_nonneg (by positivity)]
   apply ciInf_mono
   · use 0
-    simp_rw [lowerBounds, Set.mem_range]
     rintro a ⟨y, rfl⟩
-    have : 0 ≤ (σ₂ n).exp_val y := by
-      apply MState.exp_val_nonneg y.2.2.1
+    have := (σ₂ n).exp_val_nonneg y.2.2.1
     positivity
   intro ⟨x, hx₁, hx₂, hx₃⟩
-  simp only [MState.exp_val] --dunno why `rw` won't rewrite the second one
-  rw [← HermitianMat.smul_inner]
-  --There should be an `inner_mono'` which is inner_mono in the other arguments
+  simp only [MState.exp_val, ← HermitianMat.smul_inner]
   exact HermitianMat.inner_mono' hx₂ (hσ n)
 
 /-- Lemma S3 from the paper. What they denote as σₙ and σₙ', we denote as σ₁ and σ₂. The `exp(-o(n))`
@@ -448,11 +444,9 @@ private theorem LemmaS3_inf {ε : Prob}
   --Starting with `helper`, divide by n and take the limits. Since f is o(n),
   --the (f n) / n term will go to zero.
   trans Filter.atTop.liminf fun n ↦ (—log β_ ε(ρ n‖{σ₂ n}) + f n) / n
-  · refine Filter.liminf_le_liminf ?_
-    apply Filter.Eventually.of_forall
-    intro x
-    gcongr
-    exact LemmaS3_helper _ _ _ _ hσ x
+  · refine Filter.liminf_le_liminf (.of_forall ?_)
+    intro
+    grw [LemmaS3_helper _ _ _ _ hσ]
   · apply le_of_eq
     simp_rw [ENNReal.add_div]
     apply ENNReal.liminf_add_of_right_tendsto_zero
@@ -475,12 +469,10 @@ private theorem LemmaS3_sup {ε : Prob}
   --Starting with `helper`, divide by n and take the limits. Since f is o(n),
   --the (f n) / n term will go to zero.
   trans Filter.atTop.limsup fun n ↦ (—log β_ ε(ρ n‖{σ₂ n}) + f n) / n
-  · refine Filter.limsup_le_limsup ?_
-    apply Filter.Eventually.of_forall
-    intro x
+  · refine Filter.limsup_le_limsup (.of_forall ?_)
     dsimp
-    gcongr
-    exact LemmaS3_helper _ _ _ _ hσ x
+    intro x
+    grw [LemmaS3_helper _ _ _ _ hσ]
   · apply le_of_eq
     simp_rw [ENNReal.add_div]
     apply ENNReal.limsup_add_of_right_tendsto_zero
@@ -524,7 +516,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
   have hR1 : R1 ρ ε ≠ ⊤ := hR1R2.ne_top
   rcases eq_or_ne (R2 ρ σ) ⊤ with hR2|hR2
   · rw [hR2, ENNReal.top_sub hR1, ENNReal.mul_top', if_neg]
-    · simp only [le_top, exists_const]
+    · simp
     · have : ε'.val < 1 := hε'₂.trans hε.2
       rcases ε' with ⟨ε',hε'₁,hε'₂⟩
       simp only [Prob.toNNReal, Prob.coe_one_minus, ENNReal.coe_eq_zero]
@@ -650,7 +642,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     tr := sorry
   }
 
-  have σ'_le_σ'' (n) : Real.exp (-(c n)) • (σ' n).M ≤ σ'' n := by
+  have σ'_le_σ'' (n) : Real.exp (-c n) • (σ' n).M ≤ σ'' n := by
     sorry
   have σ''_le_σ' (n) : σ'' n ≤ Real.exp (c n) • (σ' n).M := by
     sorry
