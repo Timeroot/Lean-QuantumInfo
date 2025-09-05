@@ -63,7 +63,7 @@ theorem extracted_limsup_inequality (z : ℝ≥0∞) (hz : z ≠ ⊤) (y x : ℕ
     · rw [ ENNReal.add_div ];
       exact add_le_add_right ( h_bn m hm ) _;
   -- Since $z$ is finite, we have $\lim_{n \to \infty} z / n = 0$.
-  have h_z_div_n_zero : Filter.Tendsto (fun n : ℕ => z / (n : ℝ≥0∞)) Filter.atTop (nhds 0) := by
+  have h_z_div_n_zero : Filter.atTop.Tendsto (fun n : ℕ => z / (n : ℝ≥0∞)) (𝓝 0) := by
     rw [ ENNReal.tendsto_nhds_zero ];
     intro ε hε;
     rcases ENNReal.lt_iff_exists_real_btwn.mp hε with ⟨ ε', hε₁, hε₂ ⟩
@@ -186,19 +186,19 @@ private theorem Lemma6 {m : ℕ} (hm : 0 < m) (ρ σf : MState (H i)) (σₘ : M
       change Filter.limsup (fun n => x n / ↑n) Filter.atTop ≤ Filter.limsup (fun n => y n / ↑n) Filter.atTop
       exact extracted_limsup_inequality z hz y x h_lem5
 
-    · suffices Filter.Tendsto (fun n => D̃_ α(ρ⊗^S[n]‖σn n) * ((↑n)⁻¹)) .atTop (𝓝 (D̃_ α(ρ⊗^S[m]‖σₘ) / m))by
-        exact Filter.Tendsto.limsup_eq this
+    · suffices Filter.atTop.Tendsto (fun n => D̃_ α(ρ⊗^S[n]‖σn n) / n)  (𝓝 (D̃_ α(ρ⊗^S[m]‖σₘ) / m))by
+        exact this.limsup_eq
       conv =>
         enter [1,n]
-        equals ( (↑(n / m) * D̃_ α(ρ⊗^S[m]‖σₘ)) * ((↑n)⁻¹) + (↑(n % m) * D̃_ α(ρ‖σf)) * ((↑n)⁻¹)) =>
-          simp_rw [h_add, right_distrib]
+        equals ( (↑(n / m) * D̃_ α(ρ⊗^S[m]‖σₘ)) / n + (↑(n % m) * D̃_ α(ρ‖σf)) / n) =>
+          simp_rw [h_add, ENNReal.add_div]
       conv => enter [3,1]; apply (add_zero _).symm
       apply Filter.Tendsto.add
-      · simp_rw [mul_comm, ← mul_assoc]
+      · simp_rw [div_eq_mul_inv, mul_comm, ← mul_assoc]
         conv =>
           enter [3,1]
           apply (one_mul _).symm
-        rw [← ENNReal.mul_comm_div]
+        rw [← mul_assoc]
         cases D̃_ α(ρ⊗^S[m]‖σₘ)
         · simp
           --This is true for all x past m.
@@ -212,7 +212,7 @@ private theorem Lemma6 {m : ℕ} (hm : 0 < m) (ρ σf : MState (H i)) (σₘ : M
           · simp
             omega
         · rename_i v
-          suffices Filter.Tendsto (fun x => (x:ℝ)⁻¹ * ↑(x / m) * (v:ℝ) : ℕ → ℝ) Filter.atTop (𝓝 ((1 / ↑m) * (v : ℝ))) by
+          suffices Filter.atTop.Tendsto (fun x => (x:ℝ)⁻¹ * ↑(x / m) * (v:ℝ) : ℕ → ℝ) (𝓝 ((1 / ↑m) * (v : ℝ))) by
             --Similar to the "convert ENNReal.tendsto_ofReal this" below. Just push casts through
             convert ENNReal.tendsto_ofReal this
             · rename_i x
@@ -221,24 +221,20 @@ private theorem Lemma6 {m : ℕ} (hm : 0 < m) (ρ σf : MState (H i)) (σₘ : M
               rw [ENNReal.ofReal_mul (by positivity), ENNReal.ofReal_mul (by positivity), ENNReal.ofReal_inv_of_pos (by positivity)]
               simp
               norm_cast
-            · rw [one_div, one_div, ENNReal.ofReal_mul (by positivity), ENNReal.ofReal_inv_of_pos (by positivity)]
+            · rw [ENNReal.ofReal_mul (by positivity), one_div, ENNReal.ofReal_inv_of_pos (by positivity)]
               simp
-          apply Filter.Tendsto.mul ?_ tendsto_const_nhds
-          exact Filter.Tendsto_inv_nat_mul_div_real m
-      · suffices Filter.Tendsto (fun x => ↑(x % m) * (D̃_ α(ρ‖σf)).toReal * (↑x)⁻¹) Filter.atTop (𝓝 0) by
+          exact (Filter.Tendsto_inv_nat_mul_div_real m).mul tendsto_const_nhds
+      · suffices Filter.atTop.Tendsto (fun x => (x % m : ℕ) * (D̃_ α(ρ‖σf)).toReal / x) (𝓝 0) by
           --Convert a Tendsto over ENNReal to one over Real
           convert ENNReal.tendsto_ofReal this
           · rename_i x
             cases x
             · simp
-            rw [ENNReal.ofReal_mul (by positivity), ENNReal.ofReal_mul (by positivity)]
+            rw [ENNReal.ofReal_div_of_pos (by positivity), ENNReal.ofReal_mul (by positivity)]
             congr
             · simp
             · rw [ENNReal.ofReal_toReal (by finiteness)]
-            · rw [ENNReal.ofReal_inv_of_pos (by positivity)]
-              simp only [Nat.cast_add, Nat.cast_one, inv_inj]
-              rw [ENNReal.ofReal_add (by positivity) (zero_le_one' ℝ)]
-              simp
+            · rw [ENNReal.ofReal_natCast]
           · simp
         apply bdd_le_mul_tendsto_zero (b := 0) (B := m * D̃_ α(ρ‖σf).toReal)
         · exact Filter.Eventually.of_forall (fun _ ↦ by positivity)
@@ -775,7 +771,8 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
             exact ENNReal.div_le_div (qRel_ent_bound n) le_rfl
 
   -- Eq. (S62)
-  have hliminfR : (Filter.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n) Filter.atTop) - R1 ρ ε ≤ .ofNNReal (1 - ε' : Prob) * (R2 ρ σ - R1 ρ ε) := by
+  have hliminfR : Filter.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n) Filter.atTop - R1 ρ ε ≤
+      ↑(1 - ε') * (R2 ρ σ - R1 ρ ε) := by
     sorry
 
   use fun n ↦ ⟨σ' n, σ'_free n⟩
@@ -923,7 +920,7 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) {ε : Prob} (hε : 
     grw [← hσₖ_gap]; clear hσₖ_gap
 
     have hReg := RelativeEntResource.tendsto_ennreal ρ
-    replace hReg := Filter.Tendsto.liminf_eq hReg
+    replace hReg := hReg.liminf_eq
     rw [← hReg]; clear hReg
 
     unfold R2
