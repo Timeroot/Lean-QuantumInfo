@@ -22,29 +22,17 @@ variable {i : ι}
 
 /-- The \tilde{σ}_n defined in Lemma 6, also in equation (S40) in Lemma 7. -/
 noncomputable def Lemma6_σn (m : ℕ) (σf : MState (H i)) (σₘ : MState (H (i ^ m))) : (n : ℕ) → MState (H (i ^ n)) :=
-  fun n ↦
-    let l : ℕ := n / m
-    let q : ℕ := (n % m)
-    let σr := σf ⊗^S[q]
-    if h : n < m then
-      σr.relabel <| .cast <| congrArg (H <| i ^ ·) (by simp [q, Nat.mod_eq_of_lt h])
-    else
-      (σₘ ⊗^S[l] ⊗ᵣ σr).relabel <| .cast <| congrArg H (by
-        rw [← pow_mul, ← spacePow_add, Nat.div_add_mod n m]
-      )
+  fun n ↦ (σₘ⊗^S[n / m] ⊗ᵣ σf⊗^S[n % m]).relabel <| .cast <| congrArg H (by
+    rw [← pow_mul, ← spacePow_add, Nat.div_add_mod n m]
+  )
 
 theorem Lemma6_σn_IsFree {σ₁ : MState (H i)} {σₘ : (m : ℕ) → MState (H (i ^ m))} (hσ₁_free : IsFree σ₁)
     (hσₘ : ∀ (m : ℕ), σₘ m ∈ IsFree) (m n : ℕ) : Lemma6_σn m σ₁ (σₘ m) n ∈ IsFree := by
-  rw [Lemma6_σn]
-  split_ifs with hnm
-  · rw [relabel_cast_isFree]
+  rw [Lemma6_σn, relabel_cast_isFree]
+  · apply free_prod --pick a better name / alias for this
+    · exact (hσₘ m).npow (n / m)
     · exact hσ₁_free.npow (n % m)
-    · rw [Nat.mod_eq_of_lt hnm]
-  · rw [relabel_cast_isFree]
-    · apply free_prod --pick a better name / alias for this
-      · exact (hσₘ m).npow (n / m)
-      · exact hσ₁_free.npow (n % m)
-    · rw [← pow_mul, ← spacePow_add, Nat.div_add_mod n m]
+  · rw [← pow_mul, ← spacePow_add, Nat.div_add_mod n m]
 
 --PULLOUT.
 --PR? This is "not specific to our repo", but might be a bit too specialized to be in Mathlib. Not sure.
@@ -128,29 +116,25 @@ private theorem Lemma6 {m : ℕ} (hm : 0 < m) (ρ σf : MState (H i)) (σₘ : M
     --"Break apart" σn, and apply additivity of `SandwichedRelRentropy`.
     intro α n
     rw [hσn, Lemma6_σn]
-    split_ifs with hnm
-    · have hnm_div : n / m = 0 := Nat.div_eq_of_lt hnm
-      have hnm_mod : n % m = n := Nat.mod_eq_of_lt hnm
-      simp [hnm_div, hnm_mod, statePow_rw hnm_mod]
-    · have hnm_add := Nat.div_add_mod n m
-      rw [statePow_rw hnm_add.symm, statePow_add_relabel]
-      have hnm_eq : (i ^ (m * (n / m)) * i ^ (n % m)) = (i ^ m) ^ (n / m) * i ^ (n % m) := by
-        rw [pow_mul]
-      have h_Hn_eq : H (i ^ n) = H ((i ^ m) ^ (n / m) * i ^ (n % m)) := by
-        rw [← pow_mul, ← pow_add, hnm_add]
-      simp only [MState.relabel_relabel, Equiv.cast_trans]
-      rw [← sandwichedRelRentropy_statePow]
-      rw [← sandwichedRelRentropy_statePow]
-      rw [← sandwichedRelRentropy_prodRelabel]
+    have hnm_add := Nat.div_add_mod n m
+    rw [statePow_rw hnm_add.symm, statePow_add_relabel]
+    have hnm_eq : (i ^ (m * (n / m)) * i ^ (n % m)) = (i ^ m) ^ (n / m) * i ^ (n % m) := by
+      rw [pow_mul]
+    have h_Hn_eq : H (i ^ n) = H ((i ^ m) ^ (n / m) * i ^ (n % m)) := by
+      rw [← pow_mul, ← pow_add, hnm_add]
+    simp only [MState.relabel_relabel, Equiv.cast_trans]
+    rw [← sandwichedRelRentropy_statePow]
+    rw [← sandwichedRelRentropy_statePow]
+    rw [← sandwichedRelRentropy_prodRelabel]
 
-      gcongr
-      · rw [MState.eq_relabel_iff]
-        simp only [MState.relabel_relabel, Equiv.cast_symm, Equiv.cast_trans]
-        rw [prodRelabel_relabel_cast_prod _ _ _ ((pow_mul ..).symm) rfl]
-        congr
-        rw [statePow_mul_relabel]
-        simp
-      · simp
+    gcongr
+    · rw [MState.eq_relabel_iff]
+      simp only [MState.relabel_relabel, Equiv.cast_symm, Equiv.cast_trans]
+      rw [prodRelabel_relabel_cast_prod _ _ _ ((pow_mul ..).symm) rfl]
+      congr
+      rw [statePow_mul_relabel]
+      simp
+    · simp
 
   --This will probably need 1 < α actually
   have h_α : ∀ α, (1 < α) → Filter.atTop.limsup (fun n ↦ —log β_ ε(ρ⊗^S[n]‖{σn n}) / n) ≤
