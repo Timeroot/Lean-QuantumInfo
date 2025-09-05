@@ -675,21 +675,16 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
   --   simp only [ENNReal.addLECancellable_iff_ne, ne_eq, ENNReal.coe_ne_top, not_false_eq_true,
   --     AddLECancellable.add_tsub_cancel_right]
   have qRel_pinching_pythagoras (n) : 𝐃(ρ⊗^S[n]‖σ'' n) = 𝐃(ρ⊗^S[n]‖ℰ n (ρ⊗^S[n])) + 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) := by
-    unfold ℰ
     exact pinching_pythagoras (ρ⊗^S[n]) (σ'' n)
 
   -- Eq. (S60)
   have qRel_ent_bound (n) : 𝐃(ρ⊗^S[n]‖ℰ n (ρ⊗^S[n])) ≤ ENNReal.ofReal (Real.log (n + 1)) := calc
-    𝐃(ρ⊗^S[n]‖ℰ n (ρ⊗^S[n])) ≤ ENNReal.ofReal (Real.log (Fintype.card (spectrum ℝ (σ'' n).m))) := by
-      unfold ℰ
-      exact qRelativeEnt_op_le (by simp only [Nat.cast_pos, hdpos n])
-                               (pinching_bound (ρ⊗^S[n]) (σ'' n))
+    𝐃(ρ⊗^S[n]‖ℰ n (ρ⊗^S[n])) ≤ ENNReal.ofReal (Real.log (Fintype.card (spectrum ℝ (σ'' n).m))) :=
+      qRelativeEnt_op_le (by simp [hdpos n]) (pinching_bound ..)
     _ ≤ ENNReal.ofReal (Real.log (n + 1)) := by
-      apply ENNReal.ofReal_le_ofReal
-      apply Real.log_le_log
-      · simp only [Nat.cast_pos, hdpos n]
-      · norm_cast
-        exact hdle n
+      grw [hdle n]
+      · exact_mod_cast le_rfl
+      · simp [hdpos n]
 
   -- Eq. (S61)
   have hliminf : Filter.atTop.liminf (fun n ↦ 𝐃(ρ⊗^S[n]‖σ' n) / n) =
