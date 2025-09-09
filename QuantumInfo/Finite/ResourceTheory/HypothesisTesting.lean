@@ -134,8 +134,8 @@ theorem exists_min' (ρ : MState d) (ε : Prob) (S : Set (MState d)):
     (isCompact_iff_isCompact_univ.mp (iInf_IsCompact ρ ε)) Set.univ_nonempty
     (f := fun T ↦ ⨆ σ ∈ S, ⟨_, σ.exp_val_prob T.prop.right⟩)
     (by
-      have h := Bornology.IsBounded.continuous_bilinear
-        (f := HermitianMat.inner_BilinForm) (Bornology.isBounded_induced.mp (Bornology.IsBounded.all S))
+      have h := HermitianMat.inner_BilinForm.continuous_iSup_fst
+        (Bornology.isBounded_induced.mp (Bornology.IsBounded.all S))
       apply Continuous.continuousOn
       simp_rw [← iSup_subtype'', subtype_val_iSup' (ι := S)]
       refine Continuous.subtype_mk ?_ _
@@ -513,13 +513,32 @@ theorem rate_pos_of_smul_pos {ε : Prob} {d : Type*} [Fintype d] [DecidableEq d]
   grw [min_le_left]
   refine hb.trans (HermitianMat.inner_mono' i.2.2.1 hσ)
 
+--PULLOUT to QuantumInfo.ForMathlib.Misc
+section iInf
+variable {ι α : Type*} [i : Nonempty ι] [ConditionallyCompleteLattice α]
+  {f : ι → α} {a b : α} [Fact (a ≤ b)]
+
+/- This isn't marked as `simp` because rewriting from a sup over a `CompleteLattice` into a
+`ConditionallyCompleteLattice` would, pretty often, be undesirable. -/
+theorem subtype_val_iInf (h : ∀ i, f i ∈ Set.Icc a b) :
+    (⨅ i, (⟨f i, h i⟩ : ↑(Set.Icc a b))).val = ⨅ i, f i := by
+  simp only [iInf, sInf, Set.range_eq_empty_iff, not_isEmpty_of_nonempty, reduceDIte]
+  congr 1; ext1
+  simp
+
+theorem subtype_val_iInf' (h : ∀ i, f i ∈ Set.Icc a b) :
+    ⨅ i, (⟨f i, h i⟩ : ↑(Set.Icc a b)) =
+      ⟨⨅ i, f i, ⟨le_ciInf (h ·|>.1), (ciInf_le ⟨a, by intro; grind⟩ _).trans (h i.some).2⟩⟩ := by
+  rw [Subtype.eq_iff, subtype_val_iInf]
+
+end iInf
+
 @[fun_prop]
 theorem rate_Continuous_singleton {ε : Prob} {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) :
     Continuous fun σ ↦ β_ ε(ρ‖{σ}) := by
-  let f := HermitianMat.inner_BilinForm (R := ℝ) (n := d) (α := ℂ)
-  simp [of_singleton]
-  --Need to switch this from sup to inf for this application
-  have := @Bornology.IsBounded.continuous_bilinear _ _ _ _
-    HermitianMat.instCompleteSpace f (S := { m | ρ.exp_val (1 - m) ≤ ↑ε ∧ 0 ≤ m ∧ m ≤ 1 })
-    (by sorry)
-  sorry
+  have h := LinearMap.BilinForm.continuous_iInf_fst
+    HermitianMat.inner_BilinForm.flip (S := { m | ρ.exp_val (1 - m) ≤ ↑ε ∧ 0 ≤ m ∧ m ≤ 1 })
+    ((Metric.isBounded_Icc 0 1).subset (Set.setOf_subset_setOf_of_imp fun _ ↦ And.right))
+  simp only [of_singleton]
+  conv => enter [1, σ]; rw [subtype_val_iInf']
+  exact Continuous.subtype_mk (h.comp MState.Continuous_HermitianMat) _

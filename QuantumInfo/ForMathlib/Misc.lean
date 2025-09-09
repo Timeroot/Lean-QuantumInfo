@@ -28,16 +28,7 @@ theorem heq_iff_exists_eq_cast {α β : Sort u} (a : α) (b : β) :
   rintro ⟨rfl, h⟩
   rw [h, cast_eq]
 
-/-- Minimizing a bilinear form in one argument over a bounded set, given a continuous function in the
-other argument. -/
---This can probably be generalized to rings besides ℝ, and I don't know if CompleteSpace is needed. I
---actually only need it for the finite-dimensional case.
-theorem Bornology.IsBounded.continuous_bilinear
-  {E : Type*} [AddCommGroup E] [Module ℝ E] [MetricSpace E] [CompleteSpace E]
-  (f : LinearMap.BilinForm ℝ E) {S : Set E} (hS : Bornology.IsBounded S) :
-    Continuous fun x ↦ ⨆ y : S, f y x := by
-  sorry
-
+section subtype_val_iSup
 /-
 When
 https://leanprover.zulipchat.com/#narrow/channel/287929-mathlib4/topic/diamond.20in.20ConditionallyCompleteLattice/near/538053239
@@ -56,16 +47,20 @@ theorem subtype_val_iSup' {ι α : Type*} [ConditionallyCompleteLattice α] {s :
 Sadly, though, there's a "diamond" and we need it with the other data (the one we specify more narrowly
 below).
 -/
-theorem subtype_val_iSup {ι α : Type*} [i : Nonempty ι] [ConditionallyCompleteLattice α]
+variable {ι α : Type*} [i : Nonempty ι] [ConditionallyCompleteLattice α]
   {f : ι → α} {a b : α} [Fact (a ≤ b)]
-  (h : ∀ i, f i ∈ Set.Icc a b) :
+
+/- This isn't marked as `simp` because rewriting from a sup over a `CompleteLattice` into a
+`ConditionallyCompleteLattice` would, pretty often, be undesirable. -/
+theorem subtype_val_iSup (h : ∀ i, f i ∈ Set.Icc a b) :
     (⨆ i, (⟨f i, h i⟩ : ↑(Set.Icc a b))).val = ⨆ i, f i := by
   simp only [iSup, sSup, Set.range_eq_empty_iff, not_isEmpty_of_nonempty, reduceDIte]
   congr 1; ext1
   simp
 
-theorem subtype_val_iSup' {ι α : Type*} [i : Nonempty ι] [ConditionallyCompleteLattice α]
-  {f : ι → α} {a b : α} [Fact (a ≤ b)] (h : ∀ i, f i ∈ Set.Icc a b) :
+theorem subtype_val_iSup' (h : ∀ i, f i ∈ Set.Icc a b) :
     ⨆ i, (⟨f i, h i⟩ : ↑(Set.Icc a b)) =
       ⟨⨆ i, f i, ⟨(h i.some).1.trans (le_ciSup ⟨b, by intro; grind⟩ _), ciSup_le (h ·|>.2)⟩⟩ := by
   rw [Subtype.eq_iff, subtype_val_iSup]
+
+end subtype_val_iSup
