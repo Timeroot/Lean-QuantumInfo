@@ -736,9 +736,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     sorry
 
   use fun n ↦ ⟨σ' n, σ'_free n⟩
-  rw [R2]
-  dsimp only
-  rw [← hliminf] at hliminfR
+  rw [R2, hliminf]
   exact hliminfR
 
 /-- Lemma 7 gives us a way to repeatedly "improve" a sequence σ to one with a smaller gap between R2 and R1.

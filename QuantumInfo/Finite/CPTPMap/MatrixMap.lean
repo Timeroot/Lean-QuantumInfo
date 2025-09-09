@@ -237,20 +237,6 @@ noncomputable def _root_.Module.Basis.piTensorProduct [∀i, Fintype (L i)]
 
 end basis
 
-section equiv
-
-variable {ι : Type u}
-
---This will just become prodArrow when #21518 is merged
-@[simps]
-def Equiv.piProdProdPi (κ : ι → Type v) : ((i : ι) → κ i × κ i) ≃ ((i : ι) → κ i) × ((i : ι) → κ i) where
-  toFun := fun f ↦ ⟨fun i↦(f i).1,fun i↦(f i).2⟩
-  invFun := fun f i ↦⟨f.1 i, f.2 i⟩
-  left_inv := by intro; simp
-  right_inv := by intro; simp
-
-end equiv
-
 variable {R : Type*} [CommSemiring R]
 variable {ι : Type u} [DecidableEq ι] [fι : Fintype ι]
 variable {dI : ι → Type v} [∀i, Fintype (dI i)] [∀i, DecidableEq (dI i)]
@@ -263,8 +249,8 @@ noncomputable def piKron (Λi : ∀ i, MatrixMap (dI i) (dO i) R) : MatrixMap (�
   let map₂ := LinearMap.toMatrix
     (Module.Basis.piTensorProduct (fun i ↦ Matrix.stdBasis R (dI i) (dI i)))
     (Module.Basis.piTensorProduct (fun i ↦ Matrix.stdBasis R (dO i) (dO i))) map₁
-  let r₁ : ((i : ι) → dO i × dO i) ≃ ((i : ι) → dO i) × ((i : ι) → dO i) := Equiv.piProdProdPi dO
-  let r₂ : ((i : ι) → dI i × dI i) ≃ ((i : ι) → dI i) × ((i : ι) → dI i) := Equiv.piProdProdPi dI
+  let r₁ : ((i : ι) → dO i × dO i) ≃ ((i : ι) → dO i) × ((i : ι) → dO i) := Equiv.arrowProdEquivProdArrow _ dO dO
+  let r₂ : ((i : ι) → dI i × dI i) ≃ ((i : ι) → dI i) × ((i : ι) → dI i) := Equiv.arrowProdEquivProdArrow _ dI dI
   let map₃ := Matrix.reindex r₁ r₂ map₂;
   Matrix.toLin
     (Matrix.stdBasis R ((i:ι) → dI i) ((i:ι) → dI i))

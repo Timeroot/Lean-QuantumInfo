@@ -17,7 +17,7 @@ it uses the real part.
 
 namespace HermitianMat
 
-variable {R n α : Type*} [Star R] [TrivialStar R] [Fintype n]
+variable {R n m α : Type*} [Star R] [TrivialStar R] [Fintype n] [Fintype m]
 
 section star
 variable [AddGroup α] [StarAddMonoid α] [CommSemiring R] [Semiring α] [Algebra R α] [IsMaximalSelfAdjoint R α]
@@ -65,6 +65,29 @@ theorem trace_sub (A B : HermitianMat n α) : (A - B).trace = A.trace - B.trace 
   simp [trace]
 
 end ring
+section starring
+
+variable [CommRing R] [CommRing α] [StarRing α] [Algebra R α] [IsMaximalSelfAdjoint R α]
+
+--PULLOUT
+theorem _root_.Matrix.IsHermitian.isSelfAdjoint_trace {A : Matrix n n α} (hA : A.IsHermitian) :
+    IsSelfAdjoint A.trace := by
+  simp [Matrix.trace, IsSelfAdjoint, ← Matrix.star_apply, show star A = A from hA]
+
+variable (A : HermitianMat m α) (B : HermitianMat n α)
+
+@[simp]
+theorem trace_kronecker [FaithfulSMul R α] : (A ⊗ₖ B).trace = A.trace * B.trace := by
+  apply FaithfulSMul.algebraMap_injective R α
+  simp only [trace, kronecker_coe]
+  rw [Matrix.trace_kronecker A.toMat B.toMat]
+  simp only [map_mul]
+  have hA := A.H.isSelfAdjoint_trace
+  have hB := B.H.isSelfAdjoint_trace
+  open IsMaximalSelfAdjoint in
+  rw [selfadj_algebra hA, selfadj_algebra hB, selfadj_algebra (hA.mul hB)]
+
+end starring
 
 section trivialstar
 
@@ -86,12 +109,12 @@ variable {n 𝕜 : Type*} [Fintype n] [RCLike 𝕜]
 instance FiniteDimensional : FiniteDimensional ℝ (HermitianMat n 𝕜) :=
   FiniteDimensional.finiteDimensional_submodule (selfAdjoint.submodule ℝ (Matrix n n 𝕜))
 
-theorem trace_eq_re_trace (A : HermitianMat n 𝕜) : A.trace = RCLike.re (Matrix.trace A.toMat) := by
+theorem trace_eq_re_trace (A : HermitianMat n 𝕜) : A.trace = RCLike.re A.toMat.trace := by
   rfl
 
 /-- `HermitianMat.trace` reduces to `Matrix.trace` when the elements are `RCLike`. -/
 @[simp]
-theorem trace_eq_trace_rc (A : HermitianMat n 𝕜) : ↑A.trace = Matrix.trace A.toMat := by
+theorem trace_eq_trace_rc (A : HermitianMat n 𝕜) : ↑A.trace = A.toMat.trace := by
   rw [trace, Matrix.trace, map_sum, RCLike.ofReal_sum]
   congr 1
   exact Matrix.IsHermitian.coe_re_diag A.H

@@ -219,7 +219,7 @@ def Ket.prod (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : Ket (d₁ × d₂) where
     simp only [Fintype.sum_prod_type, norm_mul, ← Complex.normSq_eq_norm_sq, mul_pow,
       ← Finset.mul_sum, ψ₂.normalized, mul_one, ψ₁.normalized]
 
-notation ψ₁ "⊗" ψ₂ => Ket.prod ψ₁ ψ₂
+infixl:100 " ⊗ " => Ket.prod
 
 /-- A Ket is a product if it's `Ket.prod` of two kets. -/
 def Ket.IsProd (ψ : Ket (d₁ × d₂)) : Prop := ∃ ξ φ, ψ = ξ ⊗ φ
@@ -307,14 +307,14 @@ end prod
 section mes
 /-- The Maximally Entangled State, or MES, on a d×d system. In principle there are many, this
 is specifically the MES with an all-positive phase. For instance on `d := Fin 2`, this is the
-Bell state -/
+Bell state. -/
 def Ket.MES (d) [Fintype d] [Nonempty d] : Ket (d × d) where
   vec := fun (i,j) ↦ if i = j then 1 / Real.sqrt (Fintype.card (α := d)) else 0
   normalized' := by
     simp [apply_ite, Fintype.sum_prod_type]
 
 /-- On any space of dimension at least two, the maximally entangled state `MES` is entangled. -/
-theorem Ket.MES_IsEntangled [Nontrivial d] : (Ket.MES d).IsEntangled := by
+theorem Ket.MES_isEntangled [Nontrivial d] : (Ket.MES d).IsEntangled := by
   obtain ⟨x, y, h⟩ := @Nontrivial.exists_pair_ne d _
   rw [IsEntangled, MES, IsProd_iff_mul_eq_mul]
   push_neg

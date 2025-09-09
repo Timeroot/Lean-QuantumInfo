@@ -120,88 +120,99 @@ theorem singleton_le_exp_val {ρ σ : MState d} {ε : Prob} (m : HermitianMat d 
   simp only [le_refl]
 
 /-- There exists an optimal T for the hypothesis testing, that is, it's a minimum
-and not just an infimum. Wlog it can be chosen to saturate the ⟪ρ,T⟫ = 1 - ε bound. -/
+and not just an infimum. This states we have `1 - ε ≤ ρ.exp_val T`, but we can always
+"worsen" T to make that bound tight, which is `exists_min`. -/
+theorem exists_min' (ρ : MState d) (ε : Prob) (S : Set (MState d)):
+    ∃ (T : { m : HermitianMat d ℂ // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1}),
+      (⨆ σ ∈ S, ⟨_, σ.exp_val_prob T.prop.right⟩ = β_ ε(ρ‖S))
+      ∧ 1 - ε ≤ ρ.exp_val T := by
+  have _ : Nonempty d := ρ.nonempty
+  rcases S.eq_empty_or_nonempty with rfl | hS
+  · simpa [-Subtype.exists] using ⟨rfl, ⟨1, by simp⟩, by simp⟩
+  rw [← Set.nonempty_coe_sort] at hS
+  obtain ⟨T, hT₁, hT₂⟩ := IsCompact.exists_isMinOn (α := Prob)
+    (isCompact_iff_isCompact_univ.mp (iInf_IsCompact ρ ε)) Set.univ_nonempty
+    (f := fun T ↦ ⨆ σ ∈ S, ⟨_, σ.exp_val_prob T.prop.right⟩)
+    (by
+      have h := Bornology.IsBounded.continuous_bilinear
+        (f := HermitianMat.inner_BilinForm) (Bornology.isBounded_induced.mp (Bornology.IsBounded.all S))
+      apply Continuous.continuousOn
+      simp_rw [← iSup_subtype'', subtype_val_iSup' (ι := S)]
+      refine Continuous.subtype_mk ?_ _
+      refine Continuous.comp (g := fun T ↦ ⨆ (i : S), i.val.exp_val T) ?_ continuous_subtype_val
+      convert h with T
+      rw [← sSup_image' (s := S) (f := fun i ↦ i.exp_val T)]
+      rw [← sSup_image' (s := (MState.M '' S)) (f := fun i ↦ i.inner_BilinForm T)]
+      simp [Set.image, MState.exp_val]
+    )
+  clear hT₁
+
+  use T
+  constructor
+  · simp only [isMinOn_univ_iff] at hT₂
+    rw [OptimalHypothesisRate]
+    --Why is the following three bundled together not a theorem? Is it, and I can't find it? TODO
+    apply le_antisymm
+    · exact le_iInf hT₂
+    · exact iInf_le_iff.mpr fun _ a ↦ a T
+  · simpa [MState.exp_val_sub, add_comm (ε : ℝ) _] using T.2.1
+
+--TODO: Maybe we should define these two instances.
+-- Then we can get rid of `Prob.sub_zero` and use the generic `tsub_zero`.
+-- #synth AddCommMonoid Prob
+-- #synth OrderedSub Prob
+
+/-- There exists an optimal T for the hypothesis testing, that is, it's a minimum and
+not just an infimum. This tightens the `T` from `exists_min'` to a `⟪ρ,T⟫ = 1 - ε` bound. -/
 theorem exists_min (ρ : MState d) (ε : Prob) (S : Set (MState d)):
     ∃ (T : { m : HermitianMat d ℂ // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1}),
       (⨆ σ ∈ S, ⟨_, σ.exp_val_prob T.prop.right⟩ = β_ ε(ρ‖S))
       ∧ ρ.exp_val T = 1 - ε := by
-  have _ : Nonempty d := ρ.nonempty
-  obtain ⟨T, hT⟩ := IsCompact.exists_isMinOn (α := Prob) (β := {m // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1})
-    (s := Set.univ) (by
-      rw [← isCompact_iff_isCompact_univ ]
-      exact iInf_IsCompact ρ ε
-    ) Set.univ_nonempty (f := fun T ↦ ⨆ σ ∈ S, ⟨_, σ.exp_val_prob T.prop.right⟩) (by sorry)
-  --Before we `use T`, we (may) have to add something more to it so that it saturates the ⟪ρ,T⟫ = 1 - ε bound.
-  --We also need to be more careful about `⊔ σ : S` vs `⊔ σ ∈ S`; the latter is poorly behaved in a
-  --`ConditionallyCompleteLattice` (i.e. ℝ), it only does what you want in a `CompleteLattice` (i.e. Prob).
-  sorry
-  -- · rename_i T
-  --   simp only [Set.mem_univ, true_and]
-  --   constructor
-  --   · simp only [isMinOn_univ_iff]
-  --     intro h T₂
-  --     rw [h, OptimalHypothesisRate, iInf_le_iff]
-  --     exact fun _ a ↦ a T₂
-  --   · intro h
-  --     symm
-  --     convert h.iInf_eq (Set.mem_univ _)
-  --     exact Equiv.iInf_congr (Equiv.Set.univ _).symm (fun _ ↦ by rfl)
-  -- · rw [← isCompact_iff_isCompact_univ ]
-  --   exact iInf_IsCompact ρ ε
-  -- · exact Set.univ_nonempty
-  -- · rw [← continuous_iff_continuousOn_univ]
-  --   suffices Continuous
-  --       (fun (T : { m // ρ.exp_val (1 - m) ≤ ↑ε ∧ 0 ≤ m ∧ m ≤ 1 }) ↦ ⨆ σ : S, σ.val.exp_val T) by
-  --     convert Continuous.subtype_mk this ?_
-  --     · rcases S.eq_empty_or_nonempty with rfl|hnS
-  --       · simpa using bot_eq_zero''
-  --       have : Nonempty ↑S := hnS.to_subtype
-  --       rw [← iSup_subtype'']
-  --       rw [Set.Icc.coe_iSup zero_le_one]
-  --     · --this part is REALLY stupid and definitely there's a better way. Maybe that way is making simp lemmas.
-  --       rcases S.eq_empty_or_nonempty with rfl|hnS
-  --       · simp
-  --       intro x
-  --       sorry
-  --       -- constructor
-  --       -- · apply le_ciSup_of_le ?_ ρ
-  --       --   classical rw [ciSup_eq_ite]
-  --       --   · split
-  --       --     · exact (ρ.exp_val_prob x.prop.right).left
-  --       --     · simp
-  --       --   use 1; simp [upperBounds]
-  --       --   all_goals (
-  --       --     intro y
-  --       --     classical rw [ciSup_eq_ite]
-  --       --     split
-  --       --     · exact (y.exp_val_prob x.prop.right).right
-  --       --     · simp)
-  --       -- · rw [ciSup_le_iff]
-  --       --   swap; use 1; simp [upperBounds]
-  --       --   all_goals (
-  --       --     intro y
-  --       --     classical rw [ciSup_eq_ite]
-  --       --     split
-  --       --     · exact (y.exp_val_prob x.prop.right).right
-  --       --     · simp)
-  --   suffices h : Continuous (fun (T : HermitianMat d ℂ) ↦ ⨆ σ : S, σ.val.exp_val T) from
-  --     Pi.continuous_restrict_apply _ h
-  --   unfold MState.exp_val
-  --   rcases isEmpty_or_nonempty S with (hS | hS)
-  --   · rw [Set.isEmpty_coe_sort] at hS
-  --     simpa [hS] using continuous_const
-  --   --Should be something `Continuous (fun x ↦ iSup (fun y ↦ f x y))` from `Continuous f`.
-  --   suffices Continuous (fun T : HermitianMat d ℂ ↦ ⨆ σ : S, HermitianMat.inner_BilinForm σ T) by
-  --     simpa using this
-  --   convert Bornology.IsBounded.continuous_bilinear HermitianMat.inner_BilinForm (S := MState.M '' S) (MState.image_M_isBounded S)
-  --   sorry
-  --   -- rw [ciSup_image]
-  --   -- · exact Set.Nonempty.of_subtype
-  --   -- · --the image of a continuous function on a BoundedSpace is a bounded set in the bornology,
-  --   --   --and is therefore BddAbove
-  --   --   sorry
-  --   -- · simp
-  --   --   sorry
+  obtain ⟨T, hT₁, hT₂⟩ := exists_min' ρ ε S
+
+  --Instead of just `use T`, we (may) have to reduce it so that it saturates the ⟪ρ,T⟫ = 1 - ε bound.
+  --We do this by multiplying it by a scalar less than 1 to get a `T'`. Since this operator is less
+  --than T, it's still optimal in terms of achieving `β_ ε(ρ‖S)`, but it can get the `1 - ε` bound instead.
+  set δ := ρ.exp_val ↑T - (1 - ε)-- with δ_def
+  by_cases hδ : δ = 0
+  · use T, hT₁
+    linarith
+  replace hδ : 0 < δ := by linarith +splitNe
+  have hδ_le : δ ≤ 1 := by
+    linarith [ρ.exp_val_le_one T.2.2.2, ε.2]
+
+  have hTr : 0 < ρ.exp_val T := by
+    linarith [ε.coe_le_one]
+
+  set T' : HermitianMat d ℂ :=
+    (1 - δ / ρ.exp_val T) • T with hT'_def
+  have hT'_le : T' ≤ T := by
+    rw [← one_smul ℝ T.val, hT'_def]
+    gcongr
+    · exact T.2.2.1
+    · simp; positivity
+  have hρT' : ρ.exp_val (1 - T') = ε := by
+    simp [T', MState.exp_val_sub, δ, field]
+
+  have hT' : ρ.exp_val (1 - T') ≤ ε ∧ 0 ≤ T' ∧ T' ≤ 1 := by
+    use hρT'.le
+    constructor
+    · simp [T']
+      refine smul_nonneg ?_ T.2.2.1
+      bound
+    · exact hT'_le.trans T.2.2.2
+  use ⟨T', hT'⟩
+
+  constructor
+  · rw [OptimalHypothesisRate] at hT₁ ⊢
+    apply le_antisymm
+    · apply le_iInf
+      intro i
+      refine le_trans ?_ (le_of_eq_of_le hT₁ ?_)
+      · gcongr
+      · exact iInf_le_iff.mpr fun _ a ↦ a i
+    · exact iInf_le_iff.mpr fun _ a ↦ a ⟨T', hT'⟩
+  · simp [MState.exp_val_sub, ← hρT']
 
 /-- When the allowed Type I error `ε` is less than 1 (so, we have some limit on our errors),
 and the kernel of the state `ρ` contains the kernel of some element in `S`, then the optimal
@@ -227,9 +238,11 @@ theorem pos_of_lt_one {ρ : MState d} (S : Set (MState d))
   replace hT₁ : ρ.exp_val (1 - T) ≠ 1 := (lt_of_le_of_lt hT₁ hε).ne
   absurd hT₁
   rw [ρ.exp_val_eq_one_iff ?_, sub_sub_cancel]
-  · refine le_trans ?_ hT₄.left
-    exact (ContinuousLinearMap.ker_le_ker_iff_range_le_range (by simp) (by simp)).mp hσ₂ --todo cleanup
-  · exact (sub_le_self 1 hT₂)
+  · grw [← hT₄]
+    rwa [HermitianMat.ker, HermitianMat.ker, ContinuousLinearMap.ker_le_ker_iff_range_le_range] at hσ₂
+    · simp
+    · simp
+  · exact sub_le_self 1 hT₂
 
 --Lemma 3 from Hayashi
 theorem Lemma3 {ρ : MState d} (ε : Prob) {S : Set (MState d)} (hS₁ : IsCompact S)
@@ -485,13 +498,28 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
 
 theorem rate_pos_of_smul_pos {ε : Prob} {d : Type*} [Fintype d] [DecidableEq d] {ρ σ₁ σ₂ : MState d}
     (hσ₂ : 0 < β_ ε(ρ‖{σ₂})) {c : ℝ} (hc : 0 < c) (hσ : c • σ₂ ≤ σ₁.M) : 0 < β_ ε(ρ‖{σ₁}) := by
-  sorry
+  simp only [of_singleton, lt_iInf_iff] at hσ₂ ⊢
+  rcases hσ₂ with ⟨⟨b, _, hb_le⟩, hb_pos, hb⟩
+  change 0 < b at hb_pos --TODO simp thm / lemma
+  use ⟨(min c 1) * b, by positivity, by bound⟩
+  constructor
+  · change 0 < (min c 1) * b --TODO simp thm / lemma
+    positivity
+  intro i
+  specialize hb i
+  rw [Subtype.mk_le_mk, MState.exp_val] at hb ⊢
+  replace hb : c * b ≤ (c • σ₂.M).inner i := by
+    rwa [← mul_le_mul_iff_of_pos_left hc, ← HermitianMat.smul_inner] at hb
+  grw [min_le_left]
+  refine hb.trans (HermitianMat.inner_mono' i.2.2.1 hσ)
 
 @[fun_prop]
 theorem rate_Continuous_singleton {ε : Prob} {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) :
     Continuous fun σ ↦ β_ ε(ρ‖{σ}) := by
   let f := HermitianMat.inner_BilinForm (R := ℝ) (n := d) (α := ℂ)
-  -- have := @Bornology.IsBounded.continuous_bilinear _ _ _ _
-  --   HermitianMat.instCompleteSpace f (S := Set.univ) (sorry)
   simp [of_singleton]
+  --Need to switch this from sup to inf for this application
+  have := @Bornology.IsBounded.continuous_bilinear _ _ _ _
+    HermitianMat.instCompleteSpace f (S := { m | ρ.exp_val (1 - m) ≤ ↑ε ∧ 0 ≤ m ∧ m ≤ 1 })
+    (by sorry)
   sorry

@@ -32,7 +32,7 @@ noncomputable section
 
 open BigOperators
 open ComplexConjugate
-open Kronecker
+open HermitianMat
 open scoped Matrix ComplexOrder
 
 /-- A **mixed quantum state** is a PSD matrix with trace 1.
@@ -173,11 +173,11 @@ theorem exp_val_sub (ρ : MState d) (A B : HermitianMat d ℂ) :
     ρ.exp_val (A - B) = ρ.exp_val A - ρ.exp_val B := by
   simp [exp_val, HermitianMat.inner_left_sub]
 
-/-- If a PSD observable `A` has expectation value of 1 on a state `ρ`, it must entirely contain the
+/-- If a PSD observable `A` has expectation value of 0 on a state `ρ`, it must entirely contain the
 support of `ρ` in its kernel. -/
 theorem exp_val_eq_zero_iff (ρ : MState d) {A : HermitianMat d ℂ} (hA₁ : 0 ≤ A)   :
     ρ.exp_val A = 0 ↔ ρ.M.support ≤ A.ker := by
-  sorry
+  exact ρ.M.inner_zero_iff ρ.zero_le hA₁
 
 /-- If an observable `A` has expectation value of 1 on a state `ρ`, it must entirely contain the
 support of `ρ` in its 1-eigenspace. -/
@@ -186,6 +186,21 @@ theorem exp_val_eq_one_iff (ρ : MState d) {A : HermitianMat d ℂ} (hA₂ : A �
   rw [← exp_val_eq_zero_iff ρ (A := 1 - A) (HermitianMat.zero_le_iff.mpr hA₂)]
   rw [exp_val_sub, exp_val_one]
   rw [sub_eq_zero, eq_comm]
+
+theorem exp_val_add (ρ : MState d) (A B : HermitianMat d ℂ) :
+    ρ.exp_val (A + B) = ρ.exp_val A + ρ.exp_val B := by
+  simp [MState.exp_val, HermitianMat.inner_left_distrib]
+
+@[simp]
+theorem exp_val_smul (ρ : MState d) (r : ℝ) (A : HermitianMat d ℂ) :
+    ρ.exp_val (r • A) = r * ρ.exp_val A := by
+  simp [MState.exp_val]
+
+@[gcongr]
+theorem exp_val_le_exp_val (ρ : MState d) {A B : HermitianMat d ℂ} (h : A ≤ B) :
+    ρ.exp_val A ≤ ρ.exp_val B := by
+  simp only [MState.exp_val]
+  refine ρ.M.inner_mono ρ.zero_le h
 
 end exp_val
 
@@ -349,21 +364,17 @@ end pure
 section prod
 
 def prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : MState (d₁ × d₂) where
-  M := {
-    val := ρ₁.m ⊗ₖ ρ₂.m
-    property := (ρ₁.pos.PosSemidef_kronecker ρ₂.pos).1
-  }
+  M := ρ₁.M ⊗ₖ ρ₂.M
   zero_le := HermitianMat.zero_le_iff.mpr (ρ₁.pos.PosSemidef_kronecker ρ₂.pos)
-  tr := by simpa using congrArg Complex.re (ρ₁.m.trace_kronecker ρ₂.m)
+  tr := by simp
 
-notation ρL "⊗" ρR => prod ρL ρR
+infixl:100 " ⊗ " => MState.prod
 
 /-- The product of pure states is a pure product state , `Ket.prod`. -/
 theorem pure_prod_pure (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : pure (ψ₁ ⊗ ψ₂) = (pure ψ₁) ⊗ (pure ψ₂) := by
   ext
-  simp only [pure, Ket.prod, Ket.apply, HermitianMat.mk_toMat,
-    Matrix.vecMulVec_apply, Bra.eq_conj, map_mul, prod, m, Matrix.kroneckerMap_apply]
-  ring
+  simp [Ket.prod, Ket.apply, prod]
+  ac_rfl
 
 end prod
 
@@ -460,15 +471,13 @@ theorem spectrum_prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : ∃(σ : d�
 def IsSeparable (ρ : MState (d₁ × d₂)) : Prop :=
   ∃ ρLRs : Finset (MState d₁ × MState d₂), --Finite set of (ρL, ρR) pairs
     ∃ ps : Distribution ρLRs, --Distribution over those pairs, an ensemble
-      ρ.m = ∑ ρLR : ρLRs, (ps ρLR : ℝ) • (Prod.fst ρLR.val).m ⊗ₖ (Prod.snd ρLR.val).m
+      ρ.M = ∑ ρLR : ρLRs, (ps ρLR : ℝ) • (Prod.fst ρLR.val).M ⊗ₖ (Prod.snd ρLR.val).M
 
 /-- A product state `MState.prod` is separable. -/
 theorem IsSeparable_prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : IsSeparable (ρ₁ ⊗ ρ₂) := by
   let only := (ρ₁, ρ₂)
   use { only }, Distribution.constant ⟨only, Finset.mem_singleton_self only⟩
-  simp only [prod, Finset.univ_unique, Unique.eq_default, Distribution.constant_eq, ite_true,
-    Prob.coe_one, Finset.default_singleton, one_smul, Finset.sum_const, Finset.card_singleton,
-    only, MState.m]
+  simp [prod, Unique.eq_default, only]
 
 /-- A pure state is separable iff the ket is a product state. -/
 theorem pure_separable_iff_IsProd (ψ : Ket (d₁ × d₂)) :
@@ -667,11 +676,10 @@ theorem kron_relabel {d₁ d₂ d₃ : Type*} [Fintype d₁] [DecidableEq d₁] 
 
 theorem prod_assoc {d₁ d₂ d₃ : Type*} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
       [Fintype d₃] [DecidableEq d₃] (ρ : MState d₁) (σ : MState d₂) (τ : MState d₃) :
-    (ρ ⊗ σ ⊗ τ) = ((ρ ⊗ σ) ⊗ τ).relabel (Equiv.prodAssoc d₁ d₂ d₃).symm := by
-  apply MState.ext
-  simp only [MState.prod, MState.relabel, Subtype.mk.injEq]
-  symm
-  exact Matrix.kronecker_assoc ρ.m σ.m τ.m
+    (ρ ⊗ (σ ⊗ τ)) = (ρ ⊗ σ ⊗ τ).relabel (Equiv.prodAssoc d₁ d₂ d₃).symm := by
+  ext1; ext1; symm
+  simpa [MState.prod, MState.relabel, -Matrix.kronecker_assoc']
+    using Matrix.kronecker_assoc' ρ.m σ.m τ.m
 
 section topology
 
@@ -687,8 +695,20 @@ theorem toMat_IsEmbedding : Topology.IsEmbedding (MState.M (d := d)) where
 instance : T3Space (MState d) :=
   Topology.IsEmbedding.t3Space toMat_IsEmbedding
 
-instance : CompactSpace (MState d) :=
-  sorry
+instance : CompactSpace (MState d) := by
+  constructor
+  rw [(Topology.IsInducing.induced MState.M).isCompact_iff]
+  suffices IsCompact (Set.Icc 0 1 ∩ { m | m.trace = 1} : Set (HermitianMat d ℂ)) by
+    convert this
+    ext1 m
+    constructor
+    · rintro ⟨ρ, _, rfl⟩
+      simp [ρ.zero_le, ρ.le_one]
+    · simpa using fun m_pos _ m_tr ↦ ⟨⟨m, m_pos, m_tr⟩, rfl⟩
+  apply isCompact_Icc.inter_right
+  refine isClosed_eq ?_ continuous_const
+  rw [funext trace_eq_re_trace]
+  fun_prop
 
 noncomputable instance : MetricSpace (MState d) :=
   MetricSpace.induced MState.M MState.M_Injective inferInstance
@@ -752,10 +772,12 @@ def piProd (ρi : (i:ι) → MState (dI i)) : MState ((i:ι) → dI i) where
     -- intro x hx
     -- exact (ρi x).tr
 
+/-- The n-copy "power" of a mixed state, with the standard basis indexed by pi types. -/
 def npow (ρ : MState d) (n : ℕ) : MState (Fin n → d) :=
   piProd (fun _ ↦ ρ)
 
-notation ρ "⊗^" n => MState.npow ρ n
+@[inherit_doc]
+infixl:110 "⊗^" => MState.npow
 
 end finprod
 

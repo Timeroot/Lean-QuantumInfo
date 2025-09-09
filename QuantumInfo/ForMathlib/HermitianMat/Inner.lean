@@ -1,4 +1,4 @@
-import QuantumInfo.ForMathlib.HermitianMat.Trace
+import QuantumInfo.ForMathlib.HermitianMat.Order
 
 import Mathlib.Analysis.Convex.Contractible
 
@@ -133,7 +133,7 @@ theorem inner_comm : A.inner B = B.inner A := by
 end commring
 
 section trivialstar
-variable [CommRing α] [StarRing α] [TrivialStar α]
+variable {α} [CommRing α] [StarRing α] [TrivialStar α]
 
 /-- `HermitianMat.inner` reduces to `Matrix.trace (A * B)` when the elements are a `TrivialStar`. -/
 theorem inner_eq_trace_trivial (A B : HermitianMat n α) : A.inner B = Matrix.trace (A.toMat * B.toMat) := by
@@ -143,24 +143,59 @@ theorem inner_eq_trace_trivial (A B : HermitianMat n α) : A.inner B = Matrix.tr
 end trivialstar
 
 section RCLike
-variable {n 𝕜 : Type*} [Fintype n] [RCLike 𝕜]
+open ComplexOrder
+variable {n 𝕜 : Type*} [Fintype n] [RCLike 𝕜] (A B C : HermitianMat n 𝕜)
 
-theorem inner_eq_re_trace (A B : HermitianMat n 𝕜) : A.inner B = RCLike.re (Matrix.trace (A.toMat * B.toMat)) := by
+theorem inner_eq_re_trace : A.inner B = RCLike.re (Matrix.trace (A.toMat * B.toMat)) := by
   rfl
 
-theorem inner_eq_trace_rc (A B : HermitianMat n 𝕜) : A.inner B = Matrix.trace (A.toMat * B.toMat) := by
+theorem inner_eq_trace_rc : A.inner B = Matrix.trace (A.toMat * B.toMat) := by
   change RCLike.ofReal (RCLike.re _) = _
   rw [← RCLike.conj_eq_iff_re]
   convert (Matrix.trace_conjTranspose (A.toMat * B.toMat)).symm using 1
   rw [Matrix.conjTranspose_mul, A.H, B.H, Matrix.trace_mul_comm]
 
-theorem inner_self_nonneg (A : HermitianMat n 𝕜) : 0 ≤ A.inner A := by
+theorem inner_self_nonneg: 0 ≤ A.inner A := by
   simp_rw [inner_eq_re_trace, Matrix.trace, Matrix.diag, Matrix.mul_apply, map_sum]
   refine Finset.sum_nonneg fun i _ ↦ Finset.sum_nonneg fun j _ ↦ ?_
   rw [← congrFun₂ A.H, Matrix.conjTranspose_apply]
   refine And.left <| RCLike.nonneg_iff.mp ?_
   open ComplexOrder in
   exact star_mul_self_nonneg (A.toMat j i)
+
+variable {A B C}
+
+theorem inner_mul_nonneg (h : 0 ≤ A.toMat * B.toMat) : 0 ≤ A.inner B := by
+  rw [Matrix.PosSemidef.zero_le_iff_posSemidef] at h
+  exact (RCLike.nonneg_iff.mp h.trace_nonneg).left
+
+/-- The inner product for PSD matrices is nonnegative. -/
+theorem inner_ge_zero (hA : 0 ≤ A) (hB : 0 ≤ B) : 0 ≤ A.inner B := by
+  rw [zero_le_iff] at hA hB
+  open Classical in
+  rw [inner_eq_re_trace, ← hA.sqrt_mul_self, Matrix.trace_mul_cycle, Matrix.trace_mul_cycle]
+  nth_rewrite 1 [← hA.posSemidef_sqrt.left]
+  exact (RCLike.nonneg_iff.mp (hB.conjTranspose_mul_mul_same _).trace_nonneg).left
+
+theorem inner_mono (hA : 0 ≤ A) : B ≤ C → A.inner B ≤ A.inner C := fun hBC ↦ by
+  classical have hTr : 0 ≤ A.inner (C - B) := inner_ge_zero hA (zero_le_iff.mpr hBC)
+  rw [inner_left_sub] at hTr
+  linarith
+
+theorem inner_mono' (hA : 0 ≤ A) : B ≤ C → B.inner A ≤ C.inner A := fun hBC ↦ by
+  rw [inner_comm B A, inner_comm C A]
+  exact inner_mono hA hBC
+
+/-- The inner product for PSD matrices is at most the product of their traces. -/
+theorem inner_le_mul_trace (hA : 0 ≤ A) (hB : 0 ≤ B) : A.inner B ≤ A.trace * B.trace := by
+  classical convert inner_mono hA (le_trace_smul_one hB)
+  simp [mul_comm]
+
+/-- The inner product of two PSD matrices is zero iff they have disjoint support, i.e., each lives entirely
+in the other's kernel. -/
+theorem inner_zero_iff [DecidableEq n] (hA₁ : 0 ≤ A) (hB₁ : 0 ≤ B)
+    : A.inner B = 0 ↔ A.support ≤ B.ker :=
+  sorry
 
 end RCLike
 
@@ -178,11 +213,10 @@ variable {d : Type*} [Fintype d] {𝕜 : Type*} [RCLike 𝕜]
 #guard_msgs(drop info) in
 #synth ContinuousAdd (HermitianMat d ℂ)
 
-instance ContinuousSMul : ContinuousSMul ℝ (HermitianMat d 𝕜) := by
-  sorry
-
-instance OrderedSMul : OrderedSMul ℝ (HermitianMat d 𝕜) := by
-  sorry
+instance : ContinuousSMul ℝ (HermitianMat d 𝕜) where
+  continuous_smul := by
+    rw [continuous_induced_rng]
+    exact continuous_smul.comp <| continuous_fst.prodMk (by fun_prop)
 
 #guard_msgs(drop info) in
 #synth ContractibleSpace (HermitianMat d ℂ)
@@ -321,7 +355,14 @@ noncomputable instance : NormedAddCommGroup (HermitianMat d ℂ) :=
 
 /-- Equivalently: the matrices `X` such that `X - A` is PSD and `B - X` is PSD, form a compact set. -/
 instance : CompactIccSpace (HermitianMat d 𝕜) where
-  isCompact_Icc := sorry
+  isCompact_Icc := by
+    intros
+    --One option:
+    -- apply IsSeqCompact.isCompact
+    -- intro s n
+    --Another:
+    -- apply Metric.isCompact_of_isClosed_isBounded
+    sorry
 
 /-- The PSD matrices that are `≤ 1` are a compact set. More generally, this is true of any closed interval,
 but stating that is a bit different because of how numerals are treated. The `0` and `1` here are already

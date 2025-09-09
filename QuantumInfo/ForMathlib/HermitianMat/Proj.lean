@@ -1,5 +1,5 @@
 import QuantumInfo.ForMathlib.HermitianMat.CFC
-import QuantumInfo.ForMathlib.HermitianMat.Order
+import QuantumInfo.ForMathlib.HermitianMat.Inner
 
 /-!
 The positive parts, or equivalently the projections, of Hermitian matrices onto each other.
