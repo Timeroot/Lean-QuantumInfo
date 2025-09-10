@@ -2,7 +2,6 @@ import QuantumInfo.ForMathlib.ContinuousLinearMap
 import QuantumInfo.ForMathlib.ContinuousSup
 import QuantumInfo.ForMathlib.Filter
 import QuantumInfo.ForMathlib.HermitianMat
-import QuantumInfo.ForMathlib.MatrixNorm.TraceNorm
 import QuantumInfo.ForMathlib.Matrix
 import QuantumInfo.ForMathlib.Minimax
 import QuantumInfo.ForMathlib.Misc

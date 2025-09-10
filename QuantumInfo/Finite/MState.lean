@@ -653,13 +653,6 @@ theorem traceRight_right_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
     ρ.assoc'.traceRight.traceRight = ρ.traceRight := by
   simp [assoc']
 
-@[simp]
-theorem traceNorm_eq_1 (ρ : MState d) : ρ.m.traceNorm = 1 :=
-  have := calc (ρ.m.traceNorm : ℂ)
-    _ = ρ.m.trace := ρ.pos.traceNorm_PSD_eq_trace
-    _ = 1 := ρ.tr'
-  Complex.ofReal_eq_one.mp this
-
 --TODO: This naming is very inconsistent. Should be better about "prod" vs "kron"
 
 theorem relabel_kron {d₁ d₂ d₃ : Type*} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]

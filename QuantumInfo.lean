@@ -2,27 +2,17 @@
 import QuantumInfo.ForMathlib
 
 --Code
-import QuantumInfo.Finite.Channel.DegradableOrder
 import QuantumInfo.Finite.CPTPMap
-import QuantumInfo.Finite.Distance
 import QuantumInfo.Finite.Qubit.Basic
 import QuantumInfo.Finite.ResourceTheory.FreeState
 -- import QuantumInfo.Finite.ResourceTheory.ResourceTheory --Commenting out for now -- pretty broken
 import QuantumInfo.Finite.ResourceTheory.SteinsLemma
 import QuantumInfo.Finite.Braket
-import QuantumInfo.Finite.Capacity
-import QuantumInfo.Finite.Ensemble
-import QuantumInfo.Finite.Entanglement
 import QuantumInfo.Finite.Entropy
--- import QuantumInfo.Finite.Entropy.Defs --Experimental
--- import QuantumInfo.Finite.Entropy.Renyi --Experimental
 import QuantumInfo.Finite.MState
 import QuantumInfo.Finite.Pinching
 import QuantumInfo.Finite.POVM
 import QuantumInfo.Finite.Unitary
-
---Documentation without code
-import QuantumInfo.Finite.Capacity_doc
 
 /-! # Quantum Information in Lean
 
