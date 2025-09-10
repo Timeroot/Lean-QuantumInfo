@@ -893,9 +893,9 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) {ε : Prob} (hε : 
     · symm
       apply iInf_subtype''
 
-/-- Theorem 4, which is _also_ called the Generalized Quantum Stein's Lemma in Hayashi & Yamasaki.
-What they state as an equality of limits (which don't exist per se in Mathlib), we state as their
-existing a number (which happens to be `RegularizedRelativeEntResource`) which both sides converge to.
+/-- Theorem 4, which is also called the Generalized quantum Stein's lemma in Hayashi & Yamasaki.
+What they state as an equality of limits, which don't exist per se in Mathlib, we state as the existence
+of a number (which happens to be `RegularizedRelativeEntResource`) to which both sides converge.
 -/
 theorem limit_hypotesting_eq_limit_rel_entropy (ρ : MState (H i)) (ε : Prob) (hε : 0 < ε ∧ ε < 1) :
     ∃ d : ℝ≥0,
@@ -903,7 +903,7 @@ theorem limit_hypotesting_eq_limit_rel_entropy (ρ : MState (H i)) (ε : Prob) (
       ∧
       Filter.atTop.Tendsto (fun n ↦ (⨅ σ ∈ IsFree, 𝐃(ρ⊗^S[n]‖σ)) / n) (𝓝 d)
       := by
-  use 𝑅ᵣ∞ ρ
+  use 𝑅ᵣ∞ ρ -- Regularized relative entropy of resource (RegularizedRelativeEntResource) as an NNReal
   constructor
-  · exact GeneralizedQSteinsLemma ρ hε
-  · exact RelativeEntResource.tendsto_ennreal ρ
+  · exact GeneralizedQSteinsLemma ρ hε -- Theorem 1 in Hayashi & Yamasaki
+  · exact RelativeEntResource.tendsto_ennreal ρ -- The regularized relative entropy of resource is not infinity
