@@ -513,26 +513,6 @@ theorem rate_pos_of_smul_pos {ε : Prob} {d : Type*} [Fintype d] [DecidableEq d]
   grw [min_le_left]
   refine hb.trans (HermitianMat.inner_mono' i.2.2.1 hσ)
 
---PULLOUT to QuantumInfo.ForMathlib.Misc
-section iInf
-variable {ι α : Type*} [i : Nonempty ι] [ConditionallyCompleteLattice α]
-  {f : ι → α} {a b : α} [Fact (a ≤ b)]
-
-/- This isn't marked as `simp` because rewriting from a sup over a `CompleteLattice` into a
-`ConditionallyCompleteLattice` would, pretty often, be undesirable. -/
-theorem subtype_val_iInf (h : ∀ i, f i ∈ Set.Icc a b) :
-    (⨅ i, (⟨f i, h i⟩ : ↑(Set.Icc a b))).val = ⨅ i, f i := by
-  simp only [iInf, sInf, Set.range_eq_empty_iff, not_isEmpty_of_nonempty, reduceDIte]
-  congr 1; ext1
-  simp
-
-theorem subtype_val_iInf' (h : ∀ i, f i ∈ Set.Icc a b) :
-    ⨅ i, (⟨f i, h i⟩ : ↑(Set.Icc a b)) =
-      ⟨⨅ i, f i, ⟨le_ciInf (h ·|>.1), (ciInf_le ⟨a, by intro; grind⟩ _).trans (h i.some).2⟩⟩ := by
-  rw [Subtype.eq_iff, subtype_val_iInf]
-
-end iInf
-
 @[fun_prop]
 theorem rate_Continuous_singleton {ε : Prob} {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) :
     Continuous fun σ ↦ β_ ε(ρ‖{σ}) := by

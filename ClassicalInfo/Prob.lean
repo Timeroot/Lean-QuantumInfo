@@ -464,9 +464,52 @@ theorem zero_lt_negLog {p : Prob} : 0 < —log p ↔ p ≠ 1 := by
 
 @[fun_prop]
 theorem Continuous_negLog : Continuous negLog := by
-  --Kind of a mess to do with the `ite`, better to rewrite with
-  --`negLog_eq_neg_ENNReal_log` and then use `ENNReal.continuous_log`.
-  sorry
+  --Thanks Aristotle
+  rw [← continuousOn_univ]
+  -- To prove continuity, it suffices to show that negLog is continuous at p=0 and on (0,1].
+  have h_cont_at_zero : ContinuousAt negLog 0 := by
+    rw [ ContinuousAt ];
+    unfold Prob.negLog;
+    rw [if_pos rfl]
+    rw [ ENNReal.tendsto_nhds_top_iff_nnreal ];
+    intro x
+    erw [ Metric.eventually_nhds_iff ]
+    simp_all only [gt_iff_lt, Subtype.forall]
+    refine' ⟨ Real.exp ( -x ), Real.exp_pos _, fun a ha ha' => _ ⟩
+    obtain ⟨left, right⟩ := ha
+    split
+    next h => simp
+    next h =>
+      rw [ Subtype.dist_eq ] at ha'
+      rw [ Subtype.mk_eq_mk ] at *
+      simp_all only [Set.Icc.coe_zero, dist_zero_right, Real.norm_eq_abs, ENNReal.coe_lt_coe]
+      exact show ( x : ℝ ) < -Real.log a from by have := Real.log_lt_log ( by positivity ) ( show a < Real.exp ( -x ) from lt_of_le_of_lt ( le_abs_self _ ) ha' ) ; norm_num at * ; linarith;
+  -- To prove continuity, it suffices to show that negLog is continuous on (0,1].
+  have h_cont_on_pos : ContinuousOn negLog (Set.Ioi 0) := by
+    intro p hp;
+    refine' Filter.Tendsto.congr' _ _;
+    exact fun x => ENNReal.ofReal ( -Real.log x.1 );
+    · filter_upwards [ self_mem_nhdsWithin ] with x hx
+      obtain ⟨val_1, ⟨left_1, right_1⟩⟩ := x
+      unfold Prob.negLog
+      split
+      next h => simp_all
+      next h => exact ENNReal.ofReal_eq_coe_nnreal ( neg_nonneg_of_nonpos ( Real.log_nonpos left_1 right_1 ) );
+    · rw [ show p.negLog = ENNReal.ofReal ( -Real.log p ) from ?_ ];
+      · exact ENNReal.continuous_ofReal.continuousAt.tendsto.comp ( Filter.Tendsto.neg ( Filter.Tendsto.log ( continuous_subtype_val.continuousWithinAt ) ( by aesop ) ) );
+      · unfold Prob.negLog;
+        split
+        next h => simp_all
+        next h => exact Eq.symm (ofReal_eq_coe_nnreal (negLog._proof_1 p))
+  refine' continuousOn_of_forall_continuousAt fun p hp => _;
+  cases lt_trichotomy p 0
+  · rename_i h
+    obtain ⟨val, ⟨left, right⟩⟩ := p
+    exact False.elim <| h.not_ge <| Subtype.mk_le_mk.mpr left;
+  · rename_i h
+    cases h with
+    | inl h_1 => simp_all only
+    | inr h_2 => exact h_cont_on_pos.continuousAt <| Ioi_mem_nhds h_2
 
 end negLog
 
