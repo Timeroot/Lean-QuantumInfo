@@ -38,37 +38,32 @@ theorem H₁_nonneg (p : Prob) : 0 ≤ H₁ p := by
 /-- Entropy is less than 1. -/
 theorem H₁_le_1 (p : Prob) : H₁ p < 1 := by
   rw [H₁]
-  by_cases h : 0 = p
-  · subst h
-    norm_num
-  · have hp0 : 0 < p := lt_of_le_of_ne p.zero_le h
+  by_cases h : p = 0
+  · norm_num [h]
+  · have hp0 : 0 < p := lt_of_le_of_ne' p.zero_le h
     have h₂ := Real.abs_log_mul_self_lt p hp0 p.coe_le_one
     rw [mul_comm, ← abs_neg, ← neg_mul] at h₂
     exact lt_of_abs_lt h₂
 
 /-- Entropy is at most 1/e. -/
-theorem H₁_le_exp_m1 (p : Prob) : H₁ p ≤ Real.exp (-1) := by
-  by_cases h : p = 0
-  · simp [h, Real.exp_nonneg (-1)]
-  · exact Real.negMulLog_le_rexp_neg_one (↑p) (Prob.zero_lt_coe h)
+theorem H₁_le_exp_m1 (p : Prob) : H₁ p ≤ Real.exp (-1) :=
+  Real.negMulLog_le_rexp_neg_one p.zero_le_coe
 
 theorem H₁_concave : ∀ (x y : Prob), ∀ (p : Prob), p[H₁ x ↔ H₁ y] ≤ H₁ (p[x ↔ y]) := by
   intros x y p
-  simp only [Prob.mix, H₁, smul_eq_mul, Prob.coe_one_minus, Mixable.mix, Mixable.mix_ab, Mixable.mkT_instUniv,
+  simp only [H₁, smul_eq_mul, Prob.coe_one_minus, Mixable.mix, Mixable.mix_ab, Mixable.mkT_instUniv,
     Prob.mkT_mixable, Prob.to_U_mixable, Mixable.to_U_instUniv, Prob.to_U_mixable]
   by_cases hxy : x = y
   · subst hxy
     ring_nf
     exact le_refl _
   by_cases hp : (p:ℝ) = 0
-  · rw [hp]
-    norm_num
+  · norm_num [hp]
   by_cases hp₁ : (p:ℝ) = 1
-  · rw [hp₁]
-    norm_num
+  · norm_num [hp₁]
   rw [← ne_eq] at hxy hp hp₁
   have := Real.strictConcaveOn_negMulLog.2
-  replace := @this x ?_ y ?_ ?_ p (1-p) ?_ ?_ (by linarith)
+  replace := @this x ?_ y ?_ ?_ p (1 - p) ?_ ?_ (by linarith)
   · simp only [smul_eq_mul] at this
     apply le_of_lt
     convert this
@@ -87,17 +82,32 @@ theorem Hₛ_nonneg (d : Distribution α) : 0 ≤ Hₛ d :=
   Finset.sum_nonneg' fun _ ↦ H₁_nonneg _
 
 /-- Shannon entropy of a distribution is at most ln d. -/
-theorem Hₛ_le_log_d (d : Distribution α) : Hₛ d ≤ Real.log (Finset.card Finset.univ (α := α)) :=
-  sorry
+theorem Hₛ_le_log_d (d : Distribution α) : Hₛ d ≤ Real.log (Fintype.card α) := by
+  --Thanks Aristotle
+  by_cases h : Fintype.card α = 0
+  · simp_all [Hₛ, Fintype.card_eq_zero_iff.mp h]
+  -- Since the sum of the probabilities is 1, we can apply Jensen's inequality for the convex function -x log x.
+  have h_jensen {p : α → ℝ} (hsum : ∑ i, p i = 1) (hp : ∀ i, 0 ≤ p i ∧ p i ≤ 1) :
+      -∑ i, p i * (p i).log ≤ Real.log (Fintype.card α) := by
+    have h_jensen : (∑ i, (Fintype.card α : ℝ)⁻¹ * p i) * (∑ i, (Fintype.card α : ℝ)⁻¹ * p i).log ≤
+          (∑ i, (Fintype.card α : ℝ)⁻¹ * (p i * (p i).log)) := by
+      have h_convex : ConvexOn ℝ (Set.Icc 0 1) (fun x ↦ x * Real.log x) :=
+        Real.convexOn_mul_log.subset Set.Icc_subset_Ici_self (convex_Icc 0 1)
+      convert h_convex.map_sum_le _ _ _ <;> aesop
+    simp_rw [← Finset.mul_sum, hsum, mul_one, Real.log_inv] at h_jensen
+    have : 0 < (Fintype.card α : ℝ)⁻¹ := by positivity
+    have := mul_inv_cancel₀ <| show (Fintype.card α : ℝ) ≠ 0 by positivity
+    nlinarith
+  simpa [Hₛ, H₁, Real.negMulLog] using h_jensen d.2 (by grind)
 
 /-- The shannon entropy of a constant variable is zero. -/
 @[simp]
 theorem Hₛ_constant_eq_zero {i : α} : Hₛ (Distribution.constant i) = 0 := by
-  simp [Hₛ, Distribution.constant_def', apply_ite]
+  simp [Hₛ, apply_ite]
 
 /-- Shannon entropy of a uniform distribution is ln d. -/
 theorem Hₛ_uniform [Nonempty α] :
-    Hₛ (Distribution.uniform (α := α)) = Real.log (Finset.card Finset.univ (α := α)) := by
+    Hₛ (Distribution.uniform (α := α)) = Real.log (Finset.univ.card (α := α)) := by
   simp [Hₛ, Distribution.prob, H₁, Real.negMulLog]
 
 /-- Shannon entropy of two-event distribution. -/
