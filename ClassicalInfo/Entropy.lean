@@ -82,30 +82,23 @@ theorem Hₛ_nonneg (d : Distribution α) : 0 ≤ Hₛ d :=
   Finset.sum_nonneg' fun _ ↦ H₁_nonneg _
 
 /-- Shannon entropy of a distribution is at most ln d. -/
-theorem Hₛ_le_log_d (d : Distribution α) : Hₛ d ≤ Real.log (Finset.card Finset.univ (α := α)) := by
+theorem Hₛ_le_log_d (d : Distribution α) : Hₛ d ≤ Real.log (Fintype.card α) := by
   --Thanks Aristotle
   by_cases h : Fintype.card α = 0
-  · simp_all only [Finset.card_univ, CharP.cast_eq_zero, Real.log_zero]
-    obtain ⟨val, property⟩ := d
-    simp_all only [Distribution.funlike_apply, Hₛ]
-    rw [ Fintype.card_eq_zero_iff ] at h
-    aesop
-  · -- Since the sum of the probabilities is 1, we can apply Jensen's inequality for the convex function $-x \log x$.
-    have h_jensen : ∀ (p : α → ℝ), (∀ i, 0 ≤ p i ∧ p i ≤ 1) → (∑ i, p i = 1) → (∑ i, p i * Real.log (p i)) ≥ -Real.log (Fintype.card α) := by
-      intros p hp hsum
-      have h_jensen : (∑ i, p i * Real.log (p i)) ≥ -Real.log (Fintype.card α) := by
-        have h_convex : ConvexOn ℝ (Set.Icc 0 1) (fun x => x * Real.log x) := by
-          exact ( Real.convexOn_mul_log.subset ( Set.Icc_subset_Ici_self ) ( convex_Icc _ _ ) )
-        -- By Jensen's inequality for the convex function $x \mapsto x \log x$, we have:
-        have h_jensen : (∑ i, (1 / Fintype.card α : ℝ) • (p i * Real.log (p i))) ≥ ((∑ i, (1 / Fintype.card α : ℝ) • p i) * Real.log (∑ i, (1 / Fintype.card α : ℝ) • p i)) := by
-          convert h_convex.map_sum_le _ _ _ <;> aesop;
-        simp_all [← Finset.mul_sum];
-        nlinarith [ inv_pos.mpr ( by positivity : 0 < ( Fintype.card α : ℝ ) ), mul_inv_cancel₀ ( by positivity : ( Fintype.card α : ℝ ) ≠ 0 ) ];
-      exact h_jensen;
-    simp_all only [Finset.card_univ]
-    obtain ⟨val, property⟩ := d
-    simp_all only [Distribution.funlike_apply, Hₛ, H₁]
-    simpa [ Real.negMulLog ] using neg_le_neg ( h_jensen _ ( fun i => ⟨ ( val i ) |>.2.1, ( val i ) |>.2.2 ⟩ ) property )
+  · simp_all [Hₛ, Fintype.card_eq_zero_iff.mp h]
+  -- Since the sum of the probabilities is 1, we can apply Jensen's inequality for the convex function -x log x.
+  have h_jensen {p : α → ℝ} (hsum : ∑ i, p i = 1) (hp : ∀ i, 0 ≤ p i ∧ p i ≤ 1) :
+      -∑ i, p i * (p i).log ≤ Real.log (Fintype.card α) := by
+    have h_jensen : (∑ i, (Fintype.card α : ℝ)⁻¹ * p i) * (∑ i, (Fintype.card α : ℝ)⁻¹ * p i).log ≤
+          (∑ i, (Fintype.card α : ℝ)⁻¹ * (p i * (p i).log)) := by
+      have h_convex : ConvexOn ℝ (Set.Icc 0 1) (fun x ↦ x * Real.log x) :=
+        Real.convexOn_mul_log.subset Set.Icc_subset_Ici_self (convex_Icc 0 1)
+      convert h_convex.map_sum_le _ _ _ <;> aesop
+    simp_rw [← Finset.mul_sum, hsum, mul_one, Real.log_inv] at h_jensen
+    have : 0 < (Fintype.card α : ℝ)⁻¹ := by positivity
+    have := mul_inv_cancel₀ <| show (Fintype.card α : ℝ) ≠ 0 by positivity
+    nlinarith
+  simpa [Hₛ, H₁, Real.negMulLog] using h_jensen d.2 (by grind)
 
 /-- The shannon entropy of a constant variable is zero. -/
 @[simp]
