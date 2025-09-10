@@ -37,40 +37,6 @@ variable {dM : Type*} [Fintype dM] [DecidableEq dM]
 variable {dM₂ : Type*} [Fintype dM₂] [DecidableEq dM₂]
 variable (Λ : CPTPMap dIn dOut)
 
-/-- The Choi matrix of a CPTPMap. -/
-@[reducible]
-def choi := Λ.map.choi_matrix
-
-/-- Two CPTPMaps are equal if their Choi matrices are equal. -/
-theorem choi_ext {Λ₁ Λ₂ : CPTPMap dIn dOut} (h : Λ₁.choi = Λ₂.choi) : Λ₁ = Λ₂ :=
-  sorry
-  -- PTP_ext (PTPMap.ext (MatrixMap.choi_matrix_inj h))
-
-/-- The Choi matrix of a channel is PSD. -/
-theorem choi_PSD_of_CPTP : Λ.map.choi_matrix.PosSemidef :=
-  Λ.map.choi_PSD_iff_CP_map.1 Λ.cp
-
-/-- The trace of a Choi matrix of a CPTP map is the cardinality of the input space. -/
-@[simp]
-theorem Tr_of_choi_of_CPTP : Λ.choi.trace =
-    (Finset.univ (α := dIn)).card :=
-  Λ.TP.trace_choi
-
-/-- Construct a CPTP map from a PSD Choi matrix with correct partial trace. -/
-def CPTP_of_choi_PSD_Tr {M : Matrix (dOut × dIn) (dOut × dIn) ℂ} (h₁ : M.PosSemidef)
-    (h₂ : M.traceLeft = 1) : CPTPMap dIn dOut where
-  toLinearMap := MatrixMap.of_choi_matrix M
-  cp := (MatrixMap.choi_PSD_iff_CP_map (MatrixMap.of_choi_matrix M)).2
-      ((MatrixMap.map_choi_inv M).symm ▸ h₁)
-  TP := (MatrixMap.of_choi_matrix M).IsTracePreserving_iff_trace_choi.2
-    ((MatrixMap.map_choi_inv M).symm ▸ h₂)
-
-@[simp]
-theorem choi_of_CPTP_of_choi (M : Matrix (dOut × dIn) (dOut × dIn) ℂ) {h₁} {h₂} :
-    (CPTP_of_choi_PSD_Tr (M := M) h₁ h₂).choi = M := by
-  simp only [choi, CPTP_of_choi_PSD_Tr]
-  rw [MatrixMap.map_choi_inv]
-
 theorem mat_coe_eq_apply_mat [DecidableEq dOut] (ρ : MState dIn) : (Λ ρ).m = Λ.map ρ.m :=
   rfl
 
@@ -96,18 +62,6 @@ theorem compose_assoc [DecidableEq dOut] (Λ₃ : CPTPMap dM₂ dOut) (Λ₂ : C
     (Λ₁ : CPTPMap dIn dM) : (Λ₃ ∘ₘ Λ₂) ∘ₘ Λ₁ = Λ₃ ∘ₘ (Λ₂ ∘ₘ Λ₁) := by
   ext1 ρ
   simp
-
-/-- CPTPMaps have a convex structure from their Choi matrices. -/
-instance instMixable : Mixable (Matrix (dOut × dIn) (dOut × dIn) ℂ) (CPTPMap dIn dOut) where
-  to_U := CPTPMap.choi
-  to_U_inj := choi_ext
-  mkT {u} h := ⟨CPTP_of_choi_PSD_Tr (M := u)
-    (Exists.recOn h fun t ht => ht ▸ t.choi_PSD_of_CPTP)
-    (Exists.recOn h fun t ht => (by
-      rw [← ht, ← MatrixMap.IsTracePreserving_iff_trace_choi]
-      exact t.TP)),
-    by apply choi_of_CPTP_of_choi⟩
-  convex := sorry
 
 /-- The identity channel, which leaves the input unchanged. -/
 def id : CPTPMap dIn dIn where
@@ -139,20 +93,9 @@ theorem compose_id (Λ : CPTPMap dIn dOut) : Λ ∘ₘ id = Λ := by
   classical ext1
   simp
 
-/-- There is a CPTP map that takes a system of any (nonzero) dimension and outputs the
-trivial Hilbert space, 1-dimensional, indexed by any `Unique` type. -/
-def destroy [Nonempty dIn] [Unique dOut] : CPTPMap dIn dOut :=
-  CPTP_of_choi_PSD_Tr Matrix.PosSemidef.one
-    (by ext i j;  simp [Matrix.traceLeft, Matrix.one_apply])
-
 /-- Two CPTP maps into the same one-dimensional output space must be equal -/
 theorem eq_if_output_unique [Unique dOut] (Λ₁ Λ₂ : CPTPMap dIn dOut) : Λ₁ = Λ₂ :=
   funext fun _ ↦ (Unique.eq_default _).trans (Unique.eq_default _).symm
-
-/-- There is exactly one CPTPMap to a 1-dimensional space. -/
-instance instUnique [Nonempty dIn] [Unique dOut] : Unique (CPTPMap dIn dOut) where
-  default := destroy
-  uniq := fun _ ↦ eq_if_output_unique _ _
 
 /-- A state can be viewed as a CPTP map from the trivial Hilbert space (indexed by `Unit`)
  that outputs exactly that state. -/
@@ -176,16 +119,6 @@ theorem const_state_apply [Unique dIn] [DecidableEq dOut] (ρ : MState dOut) (ρ
   --Should be a simp theorem
   sorry
 
-/--The replacement channel that maps all inputs to a given state. -/
-def replacement [Nonempty dIn] [DecidableEq dOut] (ρ : MState dOut) : CPTPMap dIn dOut :=
-  (const_state (dIn := Unit) ρ) ∘ₘ destroy
-
-/-- The output of `replacement ρ` is always that `ρ`. -/
-@[simp]
-theorem replacement_apply [Nonempty dIn] [DecidableEq dOut] (ρ : MState dOut) (ρ₀ : MState dIn) :
-    replacement ρ ρ₀ = ρ := by
-  simp only [replacement, compose_eq, const_state_apply]
-
 section prod
 open Kronecker
 
@@ -208,19 +141,6 @@ section finprod
 variable {ι : Type u} [DecidableEq ι] [fι : Fintype ι]
 variable {dI : ι → Type v} [∀(i :ι), Fintype (dI i)] [∀(i :ι), DecidableEq (dI i)]
 variable {dO : ι → Type w} [∀(i :ι), Fintype (dO i)] [∀(i :ι), DecidableEq (dO i)]
-
-/-- Finitely-indexed tensor products of CPTPMaps.  -/
-def piProd (Λi : (i:ι) → CPTPMap (dI i) (dO i)) : CPTPMap ((i:ι) → dI i) ((i:ι) → dO i) where
-  toLinearMap := MatrixMap.piKron (fun i ↦ (Λi i).map)
-  cp := MatrixMap.IsCompletelyPositive.piKron (fun i ↦ (Λi i).cp)
-  TP := sorry
-
-theorem fin_1_piProd
-  {dI : Fin 1 → Type v} [Fintype (dI 0)] [DecidableEq (dI 0)]
-  {dO : Fin 1 → Type w} [Fintype (dO 0)] [DecidableEq (dO 0)]
-  (Λi : (i : Fin 1) → CPTPMap (dI 0) (dO 0)) :
-    piProd Λi = sorry ∘ₘ ((Λi 1) ∘ₘ sorry) :=
-  sorry --TODO: permutations
 
 end finprod
 
@@ -422,18 +342,6 @@ def IsAntidegradable (Λ : CPTPMap dIn dOut) : Prop :=
 
 --Theorem (Wilde Exercise 13.5.7): Entanglement breaking channels are antidegradable.
 end degradable
-
-/-- `CPTPMap`s inherit a topology from their choi matrices. -/
-instance instTop : TopologicalSpace (CPTPMap dIn dOut) :=
-  TopologicalSpace.induced (CPTPMap.choi) instTopologicalSpaceMatrix
-
-/-- The projection from `CPTPMap` to the Choi matrix is an embedding -/
-theorem choi_IsEmbedding : Topology.IsEmbedding (CPTPMap.choi (dIn := dIn) (dOut := dOut)) where
-  eq_induced := rfl
-  injective _ _ := choi_ext
-
-instance instT5MState : T3Space (CPTPMap dIn dOut) :=
-  Topology.IsEmbedding.t3Space choi_IsEmbedding
 
 end
 end CPTPMap

@@ -20,32 +20,6 @@ variable [Fintype A] [DecidableEq A] [Fintype B] [Fintype C] [Semiring R]
 def IsTracePreserving (M : MatrixMap A B R) : Prop :=
   ∀ (x : Matrix A A R), (M x).trace = x.trace
 
-/-- A map is trace preserving iff the partial trace of the Choi matrix is the identity. -/
-theorem IsTracePreserving_iff_trace_choi (M : MatrixMap A B R) : M.IsTracePreserving
-    ↔ M.choi_matrix.traceLeft = 1 := by
-  constructor
-  · intro h
-    ext a₁ a₂
-    replace h := h (Matrix.single a₁ a₂ 1)
-    simp_rw [Matrix.trace, Matrix.diag] at h
-    simp only [Matrix.traceLeft, choi_matrix, Matrix.of_apply, h]
-    simp only [Matrix.single, Matrix.of_apply, Finset.sum_boole, Matrix.one_apply]
-    have : (fun x => a₁ = x ∧ a₂ = x) = (fun x => a₁ = a₂ ∧ a₂ = x) := by
-      funext x
-      rw [eq_iff_iff, and_congr_left_iff]
-      rintro rfl
-      trivial
-    split_ifs with h
-    <;> simp [this, h, Finset.filter_eq]
-  · intro h X
-    replace h := fun (a₁ a₂ : A) ↦ congrFun₂ h a₁ a₂
-    simp [Matrix.traceLeft, Matrix.trace] at h ⊢
-    rw [← M.choi_map_inv, of_choi_matrix]
-    dsimp
-    rw [Finset.sum_comm_cycle, Finset.sum_comm_cycle]
-    simp_rw [← Finset.mul_sum, h, Matrix.one_apply]
-    simp
-
 namespace IsTracePreserving
 
 variable {A : Type*} [Fintype A] in
@@ -54,12 +28,6 @@ variable {A : Type*} [Fintype A] in
 theorem apply_trace {M : MatrixMap A B R} (h : M.IsTracePreserving) (ρ : Matrix A A R)
     : (M ρ).trace = ρ.trace :=
   h ρ
-
-/-- The trace of a Choi matrix of a TP map is the cardinality of the input space. -/
-theorem trace_choi {M : MatrixMap A B R} (h : M.IsTracePreserving) :
-    M.choi_matrix.trace = (Finset.univ (α := A)).card := by
-  rw [← Matrix.traceLeft_trace, (IsTracePreserving_iff_trace_choi M).mp h,
-    Matrix.trace_one, Finset.card_univ]
 
 variable {A : Type*} [Fintype A] in
 /-- The composition of IsTracePreserving maps is also trace preserving. -/
@@ -207,12 +175,6 @@ end IsPositive
 namespace IsCompletelyPositive
 variable [Fintype A] [Fintype B] [Fintype C] [DecidableEq A]
 
-/-- Definition of a CP map, but with `Fintype T` in the definition instead of a `Fin n`. -/
-theorem of_Fintype  {M : MatrixMap A B R} (h : IsCompletelyPositive M)
-    (T : Type*) [Fintype T] [DecidableEq T] :
-    (M.kron (LinearMap.id : MatrixMap T T R)).IsPositive := by
-  sorry
-
 /- Every `MatrixMap` that `IsCompletelyPositive` also `IsPositiveMap`. -/
 theorem IsPositive [DecidableEq A] {M : MatrixMap A B R}
     (hM : IsCompletelyPositive M) : IsPositive M := by
@@ -264,25 +226,6 @@ theorem kron_kronecker_const {C : Matrix d d R} (h : C.PosSemidef) {h₁ h₂ : 
     (⟨⟨fun M => M ⊗ₖ C, h₁⟩, h₂⟩ : MatrixMap A (A × d) R) := by
   sorry
 
-/-- Choi's theorem on completely positive maps: A map `IsCompletelyPositive` iff its Choi Matrix is PSD. -/
-theorem _root_.MatrixMap.choi_PSD_iff_CP_map [DecidableEq A] (M : MatrixMap A B ℂ) :
-    M.IsCompletelyPositive ↔ M.choi_matrix.PosSemidef := by
-  by_cases hA : Nonempty A
-  · constructor
-    · intro hcp
-      rw [choi_matrix_state_rep]
-      apply Matrix.PosSemidef.smul _ (ha := by positivity)
-      exact of_Fintype hcp A (MState.pure (Ket.MES A)).pos
-    · sorry
-  · simp at hA
-    have : M = 0 := Subsingleton.elim M 0
-    subst M
-    have hx (x : B × A → ℂ) : x = 0 := Subsingleton.elim x 0
-    simp [Matrix.PosSemidef, Matrix.IsHermitian, IsCompletelyPositive,
-      MatrixMap.IsPositive, hx]
-    ext
-    simp [choi_matrix] --TODO: `choi_matrix 0 = 0` as simp
-
 /-- The channel X ↦ ∑ k : κ, (M k) * X * (M k)ᴴ formed by Kraus operators M : κ → Matrix B A R
 is completely positive -/
 theorem of_kraus_isCompletelyPositive {κ : Type*} [Fintype κ] (M : κ → Matrix B A R) :
@@ -311,19 +254,6 @@ theorem kron [DecidableEq C] [Fintype D] {M₁ : MatrixMap A B R} {M₂ : Matrix
       sorry
       -/
   sorry
-
-section piKron
-
-variable {ι : Type u} [DecidableEq ι] [fι : Fintype ι]
-variable {dI : ι → Type v} [∀i, Fintype (dI i)] [∀i, DecidableEq (dI i)]
-variable {dO : ι → Type w} [∀i, Fintype (dO i)] [∀i, DecidableEq (dO i)]
-
-/-- The `piKron` product of IsCompletelyPositive maps is also completely positive. -/
-theorem piKron {Λi : ∀ i, MatrixMap (dI i) (dO i) R} (h₁ : ∀ i, (Λi i).IsCompletelyPositive) :
-    IsCompletelyPositive (MatrixMap.piKron Λi) := by
-  sorry
-
-end piKron
 
 end IsCompletelyPositive
 
