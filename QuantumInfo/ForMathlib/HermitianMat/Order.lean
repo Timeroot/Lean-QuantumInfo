@@ -39,15 +39,11 @@ instance : PosSMulMono ℝ (HermitianMat n α) := inferInstance
 instance : SMulPosMono ℝ (HermitianMat n α) := inferInstance
 
 theorem le_trace_smul_one [DecidableEq n] (hA : 0 ≤ A) : A ≤ (A.trace : ℝ) • 1 := by
-  --mostly a copy of Matrix.PosSemidef.le_trace_smul_one from ForMathlib.Matrix.lean
-  sorry
-  -- have h : ∀ i, hA.1.eigenvalues i ≤ hA.1.rtrace := fun i ↦ by
-  --   rw [←IsHermitian.sum_eigenvalues_eq_rtrace hA.1]
-  --   convert @Finset.sum_le_sum_of_subset_of_nonneg n ℝ _ hA.1.eigenvalues {i} Finset.univ _ _
-  --   · rw [Finset.sum_singleton]
-  --   · exact Finset.subset_univ {i}
-  --   · exact fun j _ _ ↦ eigenvalues_nonneg hA j
-  -- exact (le_smul_one_of_eigenvalues_iff hA hA.1.rtrace).mp h
+  have hA' : A.toMat.PosSemidef := zero_le_iff.mp hA
+  refine (Matrix.PosSemidef.le_smul_one_of_eigenvalues_iff hA' A.trace).mp ?_
+  rw [← A.sum_eigenvalues_eq_trace]
+  intro i
+  exact Finset.single_le_sum (fun j _ ↦ hA'.eigenvalues_nonneg j) (Finset.mem_univ i)
 
 theorem conj_le (hA : 0 ≤ A) [Fintype m] (M : Matrix m n α) : 0 ≤ A.conj M := by
   rw [zero_le_iff] at hA ⊢
