@@ -40,7 +40,11 @@ theorem proj_le_nonneg : 0 ≤ {A ≤ₚ B} := by
   exact HermitianMat.sq_nonneg
 
 theorem proj_le_le_one : {A ≤ₚ B} ≤ 1 := by
-  sorry
+  --The whole `rw` line is a defeq, i.e. `change _root_.cfc _ (B - A).toMat ≤ 1` works too.
+  --TODO better API.
+  rw [← Subtype.coe_le_coe, val_eq_coe, selfAdjoint.val_one, proj_le_cfc]
+  apply cfc_le_one (f := fun x ↦ if 0 ≤ x then 1 else 0)
+  intros; split <;> norm_num
 
 theorem proj_le_mul_nonneg : 0 ≤ {A ≤ₚ B}.toMat * (B - A).toMat := by
   rw [proj_le_cfc]
