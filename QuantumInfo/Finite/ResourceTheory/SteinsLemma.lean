@@ -238,7 +238,7 @@ private theorem Lemma6 {m : ℕ} (hm : 0 < m) (ρ σf : MState (H i)) (σₘ : M
         simpa [qRelativeEnt]
     · --The sandwiched relative Renyi entropy is continuous in α (at least, at α = 1).
       have _ := ENNReal.continuous_div_const m (by positivity)
-      have _ := (SandwichedRelRentropy.continuousOn (ρ⊗^S[m]) σₘ).continuousAt (Ioi_mem_nhds zero_lt_one)
+      have _ := (sandwichedRelRentropy.continuousOn (ρ⊗^S[m]) σₘ).continuousAt (Ioi_mem_nhds zero_lt_one)
       fun_prop
 
   exact h_α
