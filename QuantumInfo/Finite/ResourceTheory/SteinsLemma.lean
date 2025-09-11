@@ -231,15 +231,9 @@ private theorem Lemma6 {m : ℕ} (hm : 0 < m) (ρ σf : MState (H i)) (σₘ : M
     refine ge_of_tendsto (x :=  (𝓝[>] 1)) ?_ (eventually_nhdsWithin_of_forall h_α)
     apply tendsto_nhdsWithin_of_tendsto_nhds
     convert ContinuousAt.tendsto ?_ using 3
-    · unfold SandwichedRelRentropy
-      split
-      · simp
-      · --TODO this should actually be a theorem in Entropy.lean
-        simpa [qRelativeEnt]
-    · --The sandwiched relative Renyi entropy is continuous in α (at least, at α = 1).
-      have _ := ENNReal.continuous_div_const m (by positivity)
-      have _ := (sandwichedRelRentropy.continuousOn (ρ⊗^S[m]) σₘ).continuousAt (Ioi_mem_nhds zero_lt_one)
-      fun_prop
+    have _ := ENNReal.continuous_div_const m (by positivity)
+    have _ := (sandwichedRelRentropy.continuousOn (ρ⊗^S[m]) σₘ).continuousAt (Ioi_mem_nhds zero_lt_one)
+    fun_prop
 
   exact h_α
 
