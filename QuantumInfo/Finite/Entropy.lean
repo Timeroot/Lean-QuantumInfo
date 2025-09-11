@@ -4,120 +4,19 @@ import ClassicalInfo.Entropy
 
 /-!
 Quantum notions of information and entropy.
+
+We start with quantities of _entropy_, namely the von Neumann entropy and its derived quantities:
+ * Quantum conditional entropy, `qConditionalEnt`
+ * Quantum mutual information, `qMutualInfo`
+ * Coherent information, `coherentInfo`
+ * Quantum conditional mutual information, `qcmi`.
+and then prove facts about them.
+
+The second half of the file is quantities of _relative entropy_, namely the (standard) quantum relative
+entropy, and generalizations.
 -/
 
-noncomputable section
-
-variable {d d₁ d₂ d₃ : Type*}
-variable [Fintype d] [Fintype d₁] [Fintype d₂] [Fintype d₃]
-variable [DecidableEq d] [DecidableEq d₁] [DecidableEq d₂] [DecidableEq d₃]
-variable {dA dB dC dA₁ dA₂ : Type*}
-variable [Fintype dA] [Fintype dB] [Fintype dC] [Fintype dA₁] [Fintype dA₂]
-variable [DecidableEq dA] [DecidableEq dB] [DecidableEq dC] [DecidableEq dA₁] [DecidableEq dA₂]
-
-/-- Von Neumann entropy of a mixed state. -/
-def Sᵥₙ (ρ : MState d) : ℝ :=
-  Hₛ (ρ.spectrum)
-
-/-- The Quantum Conditional Entropy S(ρᴬ|ρᴮ) is given by S(ρᴬᴮ) - S(ρᴮ). -/
-def qConditionalEnt (ρ : MState (dA × dB)) : ℝ :=
-  Sᵥₙ ρ - Sᵥₙ ρ.traceLeft
-
-/-- The Quantum Mutual Information I(A:B) is given by S(ρᴬ) + S(ρᴮ) - S(ρᴬᴮ). -/
-def qMutualInfo (ρ : MState (dA × dB)) : ℝ :=
-  Sᵥₙ ρ.traceLeft + Sᵥₙ ρ.traceRight - Sᵥₙ ρ
-
-/-- The Coherent Information of a state ρ pasing through a channel Λ is the negative conditional
-  entropy of the image under Λ of the purification of ρ. -/
-def coherentInfo (ρ : MState d₁) (Λ : CPTPMap d₁ d₂) : ℝ :=
-  let ρPure : MState (d₁ × d₁) := MState.pure ρ.purify
-  let ρImg : MState (d₂ × d₁) := Λ.prod (CPTPMap.id (dIn := d₁)) ρPure
-  (- qConditionalEnt ρImg)
-
-open Classical in
-/-- The quantum relative entropy S(ρ‖σ) = Tr[ρ (log ρ - log σ)]. -/
-def qRelativeEnt (ρ σ : MState d) : ENNReal :=
-  (if σ.M.ker ≤ ρ.M.ker then
-    some ⟨ρ.M.inner (HermitianMat.log ρ - HermitianMat.log σ),
-    /- Quantum relative entropy is nonnegative. This can be proved by an application of
-    Klein's inequality. -/
-    sorry⟩
-  else
-    ⊤)
-
-notation "𝐃(" ρ "‖" σ ")" => qRelativeEnt ρ σ
-
-/-- Quantum relative entropy as `Tr[ρ (log ρ - log σ)]` when supports are correct. -/
-theorem qRelativeEnt_ker {ρ σ : MState d} (h : σ.M.ker ≤ ρ.M.ker) :
-    (𝐃(ρ‖σ) : EReal) = ρ.M.inner (HermitianMat.log ρ - HermitianMat.log σ) := by
-  simp only [qRelativeEnt, h]
-  congr
-
-/-- The quantum relative entropy is unchanged by `MState.relabel` -/
-@[simp]
-theorem qRelativeEnt_relabel (ρ σ : MState d) (e : d₂ ≃ d) :
-    𝐃(ρ.relabel e‖σ.relabel e) = 𝐃(ρ‖σ) := by
-  unfold qRelativeEnt
-  split_ifs with h₁ h₂ h₂
-  · congr 2
-    simp only [HermitianMat.inner, MState.relabel_m, RCLike.re_to_complex]
-    congr 1
-    --Push relabels through matrix log
-    --Use the fact that Matrix.trace (m.submatrix ⇑e ⇑e) = Matrix.trace m
-    sorry
-  rotate_right
-  · rfl
-  --The rest of this is about kernels of linear maps under equivs. Probably belongs elsewhere
-  all_goals
-    dsimp [MState.relabel] at h₁
-    sorry
-    -- simp only [Matrix.toLin'_submatrix] at h₁
-    -- have hbot : LinearMap.ker (LinearMap.funLeft ℂ ℂ ⇑e) = ⊥ := by
-    --   apply LinearMap.ker_eq_bot_of_inverse
-    --   rw [← LinearMap.funLeft_comp, Equiv.self_comp_symm]
-    --   rfl
-    -- rw [LinearMap.ker_comp_of_ker_eq_bot _ hbot, LinearMap.ker_comp] at h₁
-    -- rw [LinearMap.ker_comp_of_ker_eq_bot _ hbot, LinearMap.ker_comp] at h₁
-  -- case neg =>
-  --   apply h₂
-  --   have hsurj : Function.Surjective ⇑(LinearMap.funLeft ℂ ℂ ⇑e.symm) :=
-  --     LinearMap.funLeft_surjective_of_injective _ _ _ e.symm.injective
-  --   replace h₁ := Submodule.map_mono h₁ (f := LinearMap.funLeft ℂ ℂ ⇑e.symm)
-  --   rw [Submodule.map_comap_eq_of_surjective hsurj] at h₁
-  --   rw [Submodule.map_comap_eq_of_surjective hsurj] at h₁
-  --   exact h₁
-  -- case pos =>
-  --   exact h₁ (Submodule.comap_mono h₂)
-
-/-- "Formula for conversion from operator inequality to quantum relative entropy",
--- Proposition S17 of https://arxiv.org/pdf/2401.01926v2 -/
-theorem qRelativeEnt_op_le {ρ σ : MState d} {α : ℝ} (hpos : 0 < α) (h : ρ.M ≤ α • σ.M) :
-  𝐃(ρ‖σ) ≤ ENNReal.ofReal (Real.log α) := by
-  sorry
-
-/-- The Quantum Conditional Mutual Information, I(A;C|B) = S(A|B) - S(A|BC). -/
-def qcmi (ρ : MState (dA × dB × dC)) : ℝ :=
-  qConditionalEnt ρ.assoc'.traceRight - qConditionalEnt ρ
-
-open ComplexOrder in
-open Classical in
-/-- The Sandwiched Renyi Relative Entropy, defined with ln (nits). Note that at `α = 1` this definition
-  switch to the standard Relative Entropy, for continuity. -/
-def SandwichedRelRentropy [Fintype d] (α : ℝ) (ρ σ : MState d) : ENNReal :=
-  if σ.M.ker ≤ ρ.M.ker
-  then (
-    if α = 1 then
-      𝐃(ρ‖σ)
-    else
-      .ofNNReal ⟨
-        ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).toMat) ^ α).trace.log / (α - 1)
-      , by
-        --Proof that this quantity is nonnegative
-        sorry
-          ⟩)
-  else ⊤
-
-notation "D̃_ " α "(" ρ "‖" σ ")" => SandwichedRelRentropy α ρ σ
+/- # TODO / Goals:
 
 --QConditionalEnt chain rule
 
@@ -146,66 +45,41 @@ notation "D̃_ " α "(" ρ "‖" σ ")" => SandwichedRelRentropy α ρ σ
 -- * Classical conditional entropy is nonnegative
 -- * Not true of QConditionalS
 -- * These measures track their classical values
+-/
+
+noncomputable section
+
+variable {d d₁ d₂ d₃ : Type*}
+variable [Fintype d] [Fintype d₁] [Fintype d₂] [Fintype d₃]
+variable [DecidableEq d] [DecidableEq d₁] [DecidableEq d₂] [DecidableEq d₃]
+variable {dA dB dC dA₁ dA₂ : Type*}
+variable [Fintype dA] [Fintype dB] [Fintype dC] [Fintype dA₁] [Fintype dA₂]
+variable [DecidableEq dA] [DecidableEq dB] [DecidableEq dC] [DecidableEq dA₁] [DecidableEq dA₂]
 
 section entropy
 
-@[gcongr]
-theorem qRelEntropy_heq_congr {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
-      {ρ₁ σ₁ : MState d₁} {ρ₂ σ₂ : MState d₂} (hd : d₁ = d₂) (hρ : ρ₁ ≍ ρ₂) (hσ : σ₁ ≍ σ₂) :
-    𝐃(ρ₁‖σ₁) = 𝐃(ρ₂‖σ₂) := by
-  rw [heq_iff_exists_eq_cast] at hρ hσ
-  obtain ⟨_, rfl⟩ := hρ
-  obtain ⟨_, rfl⟩ := hσ
-  simp [← MState.relabel_cast _ hd]
+/-- Von Neumann entropy of a mixed state. -/
+def Sᵥₙ (ρ : MState d) : ℝ :=
+  Hₛ (ρ.spectrum)
 
-/-- Quantum relative entropy when σ has full rank -/
-theorem qRelativeEnt_rank {ρ σ : MState d} (h : σ.M.ker = ⊥) :
-    (𝐃(ρ‖σ) : EReal) = ρ.M.inner (HermitianMat.log ρ - HermitianMat.log σ) := by
-  apply qRelativeEnt_ker
-  simp only [h, bot_le]
+/-- The Quantum Conditional Entropy S(ρᴬ|ρᴮ) is given by S(ρᴬᴮ) - S(ρᴮ). -/
+def qConditionalEnt (ρ : MState (dA × dB)) : ℝ :=
+  Sᵥₙ ρ - Sᵥₙ ρ.traceLeft
 
-/-- The quantum relative entropy is additive when the inputs are product states -/
-@[simp]
-theorem qRelativeEnt_additive (ρ₁ σ₁ : MState d₁) (ρ₂ σ₂ : MState d₂) :
-    𝐃(ρ₁ ⊗ ρ₂‖σ₁ ⊗ σ₂) = 𝐃(ρ₁‖σ₁) + 𝐃(ρ₂‖σ₂) := by
-  --handle the kernels of tensor products
-  --log of ⊗ is (log A ⊗ I) + (I ⊗ log B)
-  --rinner distributes over sub and add
-  --rinner of ⊗ is mul of rinner
-  sorry
+/-- The Quantum Mutual Information I(A:B) is given by S(ρᴬ) + S(ρᴮ) - S(ρᴬᴮ). -/
+def qMutualInfo (ρ : MState (dA × dB)) : ℝ :=
+  Sᵥₙ ρ.traceLeft + Sᵥₙ ρ.traceRight - Sᵥₙ ρ
 
-/-- Relative entropy is continuous (in each argument, actually, but we only need in the
-latter here). Will need the fact that all the cfc / eigenvalue stuff is continuous, which
-is going to make this a pain. -/
-@[fun_prop]
-theorem qRelativeEnt.Continuous (ρ : MState d) : Continuous fun σ => 𝐃(ρ‖σ) := by
-  sorry
+/-- The Coherent Information of a state ρ pasing through a channel Λ is the negative conditional
+  entropy of the image under Λ of the purification of ρ. -/
+def coherentInfo (ρ : MState d₁) (Λ : CPTPMap d₁ d₂) : ℝ :=
+  let ρPure : MState (d₁ × d₁) := MState.pure ρ.purify
+  let ρImg : MState (d₂ × d₁) := Λ.prod (CPTPMap.id (dIn := d₁)) ρPure
+  (- qConditionalEnt ρImg)
 
-/-- Joint convexity of Quantum relative entropy. We can't state this with `ConvexOn` because that requires
-an `AddCommMonoid`, which `MState`s are not. Instead we state it with `Mixable`.
-
-TODO:
- * Add the `Mixable` instance that infers from the `Coe` so that the right hand side can be written as
-`p [qRelativeEnt ρ₁ σ₁ ↔ qRelativeEnt ρ₂ σ₂]`
- * Define (joint) convexity as its own thing - a `ConvexOn` for `Mixable` types.
- * Maybe, more broadly, find a way to make `ConvexOn` work with the subset of `Matrix` that corresponds to `MState`.
--/
-theorem qRelativeEnt_joint_convexity :
-  ∀ (ρ₁ ρ₂ σ₁ σ₂ : MState d), ∀ (p : Prob),
-    𝐃(p [ρ₁ ↔ ρ₂]‖p [σ₁ ↔ σ₂]) ≤ p * 𝐃(ρ₁‖σ₁) + (1 - p) * 𝐃(ρ₂‖σ₂) := by
-  sorry
-
-@[simp]
-theorem qRelEntropy_self {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) :
-    𝐃(ρ‖ρ) = 0 := by
-  simp [qRelativeEnt]
-
-open ComplexOrder in
-@[aesop (rule_sets := [finiteness]) unsafe apply]
-theorem _root_.qRelativeEnt_ne_top {d : Type*} [Fintype d] [DecidableEq d] {ρ σ : MState d}
-    (hσ : σ.m.PosDef) : 𝐃(ρ‖σ) ≠ ⊤ := by
-  have : σ.M.ker = ⊥ := by sorry --TODO: PosDef -> HermitianMat.ker = ⊥
-  simp [qRelativeEnt, this]
+/-- The Quantum Conditional Mutual Information, I(A;C|B) = S(A|B) - S(A|BC). -/
+def qcmi (ρ : MState (dA × dB × dC)) : ℝ :=
+  qConditionalEnt ρ.assoc'.traceRight - qConditionalEnt ρ
 
 /-- von Neumman entropy is nonnegative. -/
 theorem Sᵥₙ_nonneg (ρ : MState d) : 0 ≤ Sᵥₙ ρ :=
@@ -247,53 +121,6 @@ theorem Sᵥₙ_weak_monotonicity (ρ : MState (dA × dB × dC)) :
     0 ≤ qConditionalEnt ρAB + qConditionalEnt ρAC :=
   sorry
 
-/-- The Sandwiched Renyi Relative entropy is additive when the inputs are product states -/
-theorem SandwichedRelRentropy_additive (α) (ρ₁ σ₁ : MState d₁) (ρ₂ σ₂ : MState d₂) :
-    D̃_ α(ρ₁ ⊗ ρ₂‖σ₁ ⊗ σ₂) = D̃_ α(ρ₁‖σ₁) + D̃_ α(ρ₂‖σ₂) := by
-  dsimp [SandwichedRelRentropy]
-  sorry
-  -- split_ifs
-  -- · sorry
-  -- · sorry
-  -- · sorry
-
-@[simp]
-theorem sandwichedRelRentropy_relabel {d d₂ : Type*} [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂]
-      {α : ℝ} (ρ σ : MState d) (e : d₂ ≃ d) :
-    D̃_ α(ρ.relabel e‖σ.relabel e) = D̃_ α(ρ‖σ) := by
-  sorry
-
-@[simp]
-theorem sandwichedRelRentropy_self {d : Type*} [Fintype d] [DecidableEq d] {α : ℝ} (ρ : MState d) :
-    D̃_ α(ρ‖ρ) = 0 := by
-  simp? [SandwichedRelRentropy, NNReal.eq_iff] says
-    simp only [SandwichedRelRentropy, le_refl, ↓reduceIte, qRelEntropy_self, ite_eq_left_iff,
-    ENNReal.coe_eq_zero, NNReal.eq_iff, NNReal.coe_mk, NNReal.coe_zero, div_eq_zero_iff,
-    Real.log_eq_zero]
-  intro hα
-  sorry
-
-open ComplexOrder in
-@[aesop (rule_sets := [finiteness]) unsafe apply]
-theorem sandwichedRelEntropy_ne_top {α : ℝ} {d : Type*} [Fintype d] [DecidableEq d] {ρ σ : MState d}
-    (hσ : σ.m.PosDef) : D̃_ α(ρ‖σ) ≠ ⊤ := by
-  have : σ.M.ker = ⊥ := by sorry --TODO: PosDef -> HermitianMat.ker = ⊥
-  simp [SandwichedRelRentropy, this]
-  finiteness
-
-@[fun_prop]
-theorem SandwichedRelRentropy.continuousOn {d : Type*} [Fintype d] [DecidableEq d] (ρ σ : MState d) :
-    ContinuousOn (fun α => D̃_ α(ρ‖σ)) (Set.Ioi 0) := by
-  --If this turns out too hard, we just need `ContinousAt f 1`.
-  --If that's still too hard, we really _just_ need that `(𝓝[≠] 1).tendsto f (f 1)`.
-  sorry
-
-/-- The Data Processing Inequality for the Sandwiched Renyi relative entropy.
-Proved in `https://arxiv.org/pdf/1306.5920`. Seems kind of involved. -/
-theorem sandwichedRenyiEntropy_DPI {d d₂ : Type*} [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂]
-    {α : ℝ} (hα : 1 < α) (ρ σ : MState d) (Φ : CPTPMap d d₂) : D̃_ α(Φ ρ‖Φ σ) ≤ D̃_ α(ρ‖σ) := by
-  sorry
-
 /-- Quantum conditional entropy is symmetric for pure states. -/
 @[simp]
 theorem qConditionalEnt_of_pure_symm (ψ : Ket (d₁ × d₂)) :
@@ -305,11 +132,6 @@ theorem qConditionalEnt_of_pure_symm (ψ : Ket (d₁ × d₂)) :
 theorem qMutualInfo_symm (ρ : MState (d₁ × d₂)) :
     qMutualInfo ρ.SWAP = qMutualInfo ρ := by
   simp [qMutualInfo, add_comm]
-
-/-- I(A:B) = S(AB‖ρᴬ⊗ρᴮ) -/
-theorem qMutualInfo_as_qRelativeEnt (ρ : MState (dA × dB)) :
-    qMutualInfo ρ = (𝐃(ρ‖ρ.traceRight ⊗ ρ.traceLeft) : EReal) :=
-  sorry
 
 /-- "Ordinary" subadditivity of von Neumann entropy -/
 theorem Sᵥₙ_subadditivity (ρ : MState (d₁ × d₂)) :
@@ -383,3 +205,238 @@ theorem qcmi_le_2_log_dim' (ρ : MState (dA × dB × dC)) :
 --   sorry
 
 end entropy
+
+section relative_entropy
+
+/-!
+To do relative entropies, we start with the _sandwiched Renyi Relative Entropy_ which is a nice general form.
+Then instead of proving many theorems (like DPI, relabelling, additivity, etc.) several times, we just prove
+it for this one quantity, then it follows for other quantities (like the relative entropy) as a special case.
+
+We could even imagine restructuring the file so that relative entropy comes first, then (some) properties
+about other quantities can be derived, since they can pretty much all be expressed in terms of appropriate
+special cases of relative entropies.
+-/
+
+/-- The Sandwiched Renyi Relative Entropy, defined with ln (nits). Note that at `α = 1` this definition
+  switch to the standard Relative Entropy, for continuity. -/
+def SandwichedRelRentropy [Fintype d] (α : ℝ) (ρ σ : MState d) : ENNReal :=
+  open ComplexOrder Classical in
+  if σ.M.ker ≤ ρ.M.ker
+  then (.ofNNReal ⟨
+    if α = 1 then
+      ρ.M.inner (HermitianMat.log ρ - HermitianMat.log σ)
+    else
+      ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).toMat) ^ α).trace.log / (α - 1)
+    , by
+      --Proof that this quantity is nonnegative
+      sorry
+     ⟩)
+  else ⊤
+
+notation "D̃_" α "(" ρ "‖" σ ")" => SandwichedRelRentropy α ρ σ
+
+/-- The Sandwiched Renyi Relative entropy is additive when the inputs are product states -/
+@[simp]
+theorem sandwichedRelRentropy_additive (α) (ρ₁ σ₁ : MState d₁) (ρ₂ σ₂ : MState d₂) :
+    D̃_ α(ρ₁ ⊗ ρ₂‖σ₁ ⊗ σ₂) = D̃_ α(ρ₁‖σ₁) + D̃_ α(ρ₂‖σ₂) := by
+  dsimp [SandwichedRelRentropy]
+  sorry
+  -- split_ifs
+  -- · sorry
+  -- · sorry
+  -- · sorry
+  /-
+  handle the kernels of tensor products
+  log of ⊗ is (log A ⊗ I) + (I ⊗ log B)
+  rinner distributes over sub and add
+  rinner of ⊗ is mul of rinner
+  -/
+
+@[simp]
+theorem sandwichedRelRentropy_relabel {d d₂ : Type*} [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂]
+      {α : ℝ} (ρ σ : MState d) (e : d₂ ≃ d) :
+    D̃_ α(ρ.relabel e‖σ.relabel e) = D̃_ α(ρ‖σ) := by
+  sorry
+  /-
+  unfold qRelativeEnt
+  split_ifs with h₁ h₂ h₂
+  · congr 2
+    simp only [HermitianMat.inner, MState.relabel_m, RCLike.re_to_complex]
+    congr 1
+    --Push relabels through matrix log
+    --Use the fact that Matrix.trace (m.submatrix ⇑e ⇑e) = Matrix.trace m
+    sorry
+  rotate_right
+  · rfl
+  --The rest of this is about kernels of linear maps under equivs. Probably belongs elsewhere
+  all_goals
+    dsimp [MState.relabel] at h₁
+    sorry
+    -- simp only [Matrix.toLin'_submatrix] at h₁
+    -- have hbot : LinearMap.ker (LinearMap.funLeft ℂ ℂ ⇑e) = ⊥ := by
+    --   apply LinearMap.ker_eq_bot_of_inverse
+    --   rw [← LinearMap.funLeft_comp, Equiv.self_comp_symm]
+    --   rfl
+    -- rw [LinearMap.ker_comp_of_ker_eq_bot _ hbot, LinearMap.ker_comp] at h₁
+    -- rw [LinearMap.ker_comp_of_ker_eq_bot _ hbot, LinearMap.ker_comp] at h₁
+  -- case neg =>
+  --   apply h₂
+  --   have hsurj : Function.Surjective ⇑(LinearMap.funLeft ℂ ℂ ⇑e.symm) :=
+  --     LinearMap.funLeft_surjective_of_injective _ _ _ e.symm.injective
+  --   replace h₁ := Submodule.map_mono h₁ (f := LinearMap.funLeft ℂ ℂ ⇑e.symm)
+  --   rw [Submodule.map_comap_eq_of_surjective hsurj] at h₁
+  --   rw [Submodule.map_comap_eq_of_surjective hsurj] at h₁
+  --   exact h₁
+  -- case pos =>
+  --   exact h₁ (Submodule.comap_mono h₂)
+  -/
+
+@[simp]
+theorem sandwichedRelRentropy_self {d : Type*} [Fintype d] [DecidableEq d] {α : ℝ} (ρ : MState d) :
+    D̃_ α(ρ‖ρ) = 0 := by
+  simp? [SandwichedRelRentropy, NNReal.eq_iff] says
+    simp only [SandwichedRelRentropy, le_refl, ↓reduceIte, sub_self, HermitianMat.inner_zero,
+    ENNReal.coe_eq_zero, NNReal.eq_iff, NNReal.coe_mk, NNReal.coe_zero, ite_eq_left_iff,
+    div_eq_zero_iff, Real.log_eq_zero]
+  intro hα
+  left; right; left
+  simp [HermitianMat.conj, HermitianMat.pow_eq_rpow, HermitianMat.rpow, HermitianMat.cfc]
+  simp [HermitianMat.trace_eq_re_trace]
+  conv =>
+    enter [1, 1, 1, 2, 1, 2]
+    rw [← cfc_id ℝ ρ.m ρ.M.H]
+  have := cfc_mul (fun x => x ^ ((1 - α) / (2 * α)) : ℝ → ℝ) id ρ.m
+    (by rw [continuousOn_iff_continuous_restrict]; fun_prop) (by fun_prop)
+  -- rw [← this] --Why doesn't this work?
+  conv =>
+    enter [1, 1, 1, 2, 1]
+    -- rw [← this] --This explains why
+    exact this.symm
+  conv =>
+    enter [1, 1, 1, 2]
+    rw [Matrix.IsHermitian.eq]
+    exact (cfc_mul _ _ _ (by rw [continuousOn_iff_continuous_restrict]; fun_prop)
+      (by rw [continuousOn_iff_continuous_restrict]; fun_prop)).symm
+    exact cfc_predicate _ _
+  rw [← cfc_comp (ha := ?_) (hg := ?_) (hf := ?_)]; rotate_left
+  · exact ρ.M.H
+  · rw [continuousOn_iff_continuous_restrict]; fun_prop
+  · rw [continuousOn_iff_continuous_restrict]; fun_prop
+  conv =>
+    enter [1, 1, 1, 1]
+    equals id =>
+      ext x
+      --This actually fails when `x < 0`, we need to specialize this to be specifically on nonnegspectrum
+      sorry
+  conv =>
+    enter [1, 1, 1]
+    exact cfc_id ℝ ρ.m ρ.M.H --Ugghh
+  simp
+
+open ComplexOrder in
+@[aesop (rule_sets := [finiteness]) unsafe apply]
+theorem sandwichedRelEntropy_ne_top {α : ℝ} {d : Type*} [Fintype d] [DecidableEq d] {ρ σ : MState d}
+    (hσ : σ.m.PosDef) : D̃_ α(ρ‖σ) ≠ ⊤ := by
+  have h : σ.M.ker = ⊥ := hσ.toLin_ker_eq_bot
+  simp [SandwichedRelRentropy, h]
+
+@[fun_prop]
+theorem sandwichedRelRentropy.continuousOn {d : Type*} [Fintype d] [DecidableEq d] (ρ σ : MState d) :
+    ContinuousOn (fun α => D̃_ α(ρ‖σ)) (Set.Ioi 0) := by
+  --If this turns out too hard, we just need `ContinousAt f 1`.
+  --If that's still too hard, we really _just_ need that `(𝓝[≠] 1).tendsto f (f 1)`.
+  sorry
+
+/-- The Data Processing Inequality for the Sandwiched Renyi relative entropy.
+Proved in `https://arxiv.org/pdf/1306.5920`. Seems kind of involved. -/
+theorem sandwichedRenyiEntropy_DPI {d d₂ : Type*} [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂]
+    {α : ℝ} (hα : 1 ≤ α) (ρ σ : MState d) (Φ : CPTPMap d d₂) : D̃_ α(Φ ρ‖Φ σ) ≤ D̃_ α(ρ‖σ) := by
+  --If we want, we can prove this just for 1 < α, and then use continuity (above) to take the limit as
+  -- α → 1.
+  sorry
+
+open Classical in
+/-- The quantum relative entropy `𝐃(ρ‖σ) := Tr[ρ (log ρ - log σ)]`. -/
+def qRelativeEnt (ρ σ : MState d) : ENNReal :=
+  D̃_1(ρ‖σ)
+
+notation "𝐃(" ρ "‖" σ ")" => qRelativeEnt ρ σ
+
+/-- Quantum relative entropy as `Tr[ρ (log ρ - log σ)]` when supports are correct. -/
+theorem qRelativeEnt_ker {ρ σ : MState d} (h : σ.M.ker ≤ ρ.M.ker) :
+    𝐃(ρ‖σ).toEReal = ρ.M.inner (HermitianMat.log ρ - HermitianMat.log σ) := by
+  simp [qRelativeEnt, SandwichedRelRentropy, h, EReal.coe_nnreal_eq_coe_real]
+
+/-- The quantum relative entropy is unchanged by `MState.relabel` -/
+@[simp]
+theorem qRelativeEnt_relabel (ρ σ : MState d) (e : d₂ ≃ d) :
+    𝐃(ρ.relabel e‖σ.relabel e) = 𝐃(ρ‖σ) := by
+  simp [qRelativeEnt]
+
+/-- "Formula for conversion from operator inequality to quantum relative entropy",
+-- Proposition S17 of https://arxiv.org/pdf/2401.01926v2 -/
+theorem qRelativeEnt_op_le {ρ σ : MState d} {α : ℝ} (hpos : 0 < α) (h : ρ.M ≤ α • σ.M) :
+    𝐃(ρ‖σ) ≤ ENNReal.ofReal (Real.log α) := by
+  sorry
+
+@[gcongr]
+theorem qRelEntropy_heq_congr {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
+      {ρ₁ σ₁ : MState d₁} {ρ₂ σ₂ : MState d₂} (hd : d₁ = d₂) (hρ : ρ₁ ≍ ρ₂) (hσ : σ₁ ≍ σ₂) :
+    𝐃(ρ₁‖σ₁) = 𝐃(ρ₂‖σ₂) := by
+  rw [heq_iff_exists_eq_cast] at hρ hσ
+  obtain ⟨_, rfl⟩ := hρ
+  obtain ⟨_, rfl⟩ := hσ
+  simp [← MState.relabel_cast _ hd]
+
+/-- Quantum relative entropy when σ has full rank -/
+theorem qRelativeEnt_rank {ρ σ : MState d} (h : σ.M.ker = ⊥) :
+    (𝐃(ρ‖σ) : EReal) = ρ.M.inner (HermitianMat.log ρ - HermitianMat.log σ) := by
+  apply qRelativeEnt_ker
+  simp only [h, bot_le]
+
+/-- The quantum relative entropy is additive when the inputs are product states -/
+@[simp]
+theorem qRelativeEnt_additive (ρ₁ σ₁ : MState d₁) (ρ₂ σ₂ : MState d₂) :
+    𝐃(ρ₁ ⊗ ρ₂‖σ₁ ⊗ σ₂) = 𝐃(ρ₁‖σ₁) + 𝐃(ρ₂‖σ₂) := by
+  simp [qRelativeEnt]
+
+/-- Relative entropy is continuous (in each argument, actually, but we only need in the
+latter here). Will need the fact that all the cfc / eigenvalue stuff is continuous, which
+is going to make this a pain. -/
+@[fun_prop]
+theorem qRelativeEnt.Continuous (ρ : MState d) : Continuous fun σ => 𝐃(ρ‖σ) := by
+  sorry
+
+/-- Joint convexity of Quantum relative entropy. We can't state this with `ConvexOn` because that requires
+an `AddCommMonoid`, which `MState`s are not. Instead we state it with `Mixable`.
+
+TODO:
+ * Add the `Mixable` instance that infers from the `Coe` so that the right hand side can be written as
+`p [𝐃(ρ₁‖σ₁) ↔ 𝐃(ρ₂‖σ₂)]`
+ * Define (joint) convexity as its own thing - a `ConvexOn` for `Mixable` types.
+ * Maybe, more broadly, find a way to make `ConvexOn` work with the subset of `Matrix` that corresponds to `MState`.
+-/
+theorem qRelativeEnt_joint_convexity :
+  ∀ (ρ₁ ρ₂ σ₁ σ₂ : MState d), ∀ (p : Prob),
+    𝐃(p [ρ₁ ↔ ρ₂]‖p [σ₁ ↔ σ₂]) ≤ p * 𝐃(ρ₁‖σ₁) + (1 - p) * 𝐃(ρ₂‖σ₂) := by
+  sorry
+
+@[simp]
+theorem qRelEntropy_self {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) :
+    𝐃(ρ‖ρ) = 0 := by
+  simp [qRelativeEnt]
+
+open ComplexOrder in
+@[aesop (rule_sets := [finiteness]) unsafe apply]
+theorem qRelativeEnt_ne_top {d : Type*} [Fintype d] [DecidableEq d] {ρ σ : MState d}
+    (hσ : σ.m.PosDef) : 𝐃(ρ‖σ) ≠ ⊤ := by
+  rw [qRelativeEnt]
+  finiteness
+
+/-- `I(A:B) = 𝐃(ρᴬᴮ‖ρᴬ ⊗ ρᴮ)` -/
+theorem qMutualInfo_as_qRelativeEnt (ρ : MState (dA × dB)) :
+    qMutualInfo ρ = (𝐃(ρ‖ρ.traceRight ⊗ ρ.traceLeft) : EReal) :=
+  sorry
+
+end relative_entropy

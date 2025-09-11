@@ -378,11 +378,7 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
       --The relevant map here is to take the T that optimizes inside β_ ε (ρ‖{σ}),
       --and use the projective measurement onto {T, 1 - T}. This achieves the optimum
       --discrimination rate on σ, and so gives the outcome distribution q2. And it
-      --is tight on the bound that Tr[ρ T] = ε, which is what gives the outcome distribution
-      --p2. Why is it tight? Well, if it's not, then we can find another T' at least as
-      --good as T by adding some more that increases its trace up to ε; and this can only
-      --ever raise the detection probability on ρ. (The fact that this tight T exists should
-      --be its own lemma, probably.)
+      --is tight on the bound that Tr[ρ T] = ε.
 
       --Get the measurement operator T.
       obtain ⟨T, hT₁, hT₂⟩ := exists_min ρ ε {σ}
@@ -402,8 +398,8 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
       · congr
         rw [Distribution.coin_eq_iff]
         ext
-        dsimp [POVM.measure, Λ, p, MState.exp_val] at hT₂ ⊢
-        rw [coe_one_minus, ← hT₂, HermitianMat.inner_comm]
+        dsimp [MState.exp_val] at hT₂
+        simp [POVM.measure, Λ, p, Distribution.mk', coe_one_minus, ← hT₂, HermitianMat.inner_comm]
       · congr
         rw [Distribution.coin_eq_iff]
         ext
@@ -411,7 +407,7 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
         rw [← hT₁]
         exact HermitianMat.inner_comm _ _
     rw [hΦ₁, hΦ₂]
-    exact sandwichedRenyiEntropy_DPI hα ρ σ Φ
+    exact sandwichedRenyiEntropy_DPI hα.le ρ σ Φ
 
   --If q = 1, this inequality is trivial
   by_cases hq₂ : q = 1
@@ -423,17 +419,18 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
 
 
   --The Renyi entropy is finite
-  rw [SandwichedRelRentropy, if_pos ?_, if_neg hα.ne']; swap
+  rw [SandwichedRelRentropy, if_pos ?_]; swap
   · suffices q2.M.ker = ⊥ by
       simp only [this, bot_le]
     --q2 has eigenvalues β_ ε(ρ‖{σ}) and 1-β_ ε(ρ‖{σ}), so as long as β_ ε(ρ‖{σ}) isn't 0 or 1,
     --this is true.
     exact ker_diagonal_prob_eq_bot hq hq₂
 
+  conv => enter [2, 1, 1, 1]; rw [if_neg hα.ne']
+
   --The logs are finite
-  rw [Prob.negLog, Prob.negLog, if_neg hq.ne', if_neg]
-  swap
-  · simpa [Subtype.eq_iff, Prob.coe_sub] using h₂.ne'
+  rw [Prob.negLog, Prob.negLog, if_neg hq.ne']
+  rw [if_neg (show 1 - ε ≠ 0 by simpa [Subtype.eq_iff, Prob.coe_sub] using h₂.ne')]
 
   --Turn the ENNReal problem into a Real problem
   have hα₂ : Subtype.mk _ pf2 ≠ 0 := by

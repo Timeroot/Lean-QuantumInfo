@@ -1,5 +1,6 @@
 import Mathlib.Algebra.Algebra.Spectrum.Quasispectrum
 import Mathlib.Analysis.CStarAlgebra.Matrix
+import Mathlib.Data.Multiset.Functor --Can't believe I'm having to import this
 import Mathlib.LinearAlgebra.Matrix.Kronecker
 import Mathlib.LinearAlgebra.Matrix.HermitianFunctionalCalculus
 import Mathlib.LinearAlgebra.Matrix.PosDef
@@ -316,10 +317,12 @@ variable [Fintype n] [RCLike 𝕜] [DecidableEq n]
 variable {A : Matrix n n 𝕜}
 
 theorem toLin_ker_eq_bot (hA : A.PosDef) : LinearMap.ker A.toLin' = ⊥ := by
-  sorry
+  ext v
+  have := hA.right v
+  grind [mulVec_zero, dotProduct_zero, LinearMap.mem_ker, toLin'_apply, Submodule.mem_bot]
 
 theorem of_toLin_ker_eq_bot (hA : LinearMap.ker A.toLin' = ⊥) (hA₂ : A.PosSemidef) : A.PosDef := by
-  sorry
+  rwa [hA₂.posDef_iff_isUnit, ← Matrix.isUnit_toLin'_iff, LinearMap.isUnit_iff_ker_eq_bot]
 
 theorem ker_range_antitone {d : Type*} [Fintype d] [DecidableEq d] {A B : Matrix d d ℂ}
   (hA : A.IsHermitian) (hB : B.IsHermitian) :
@@ -773,9 +776,83 @@ theorem IsHermitian.charpoly_roots_eq_eigenvalues {M : Matrix d d 𝕜} (hM : M.
   · -- Since the eigenvalues are real, and we're working over the complex numbers (since 𝕜 is a real closed field), the polynomial X - C(e) would be zero only if e is zero. But if e is zero, then the polynomial would be X, which isn't zero. So 0 can't be in the multiset.
     simp [Polynomial.X_sub_C_ne_zero]
 
+--These two are disgusting atm. There's cleaner versions of them headed to Mathlib. See #29526 and follow-ups
+lemma _root_.Multiset.map_univ_eq_iff {α β : Type*} [Fintype α] [DecidableEq β] (f g : α → β) :
+    Multiset.map f Finset.univ.val = Multiset.map g Finset.univ.val ↔ ∃ (e : α ≃ α), f = g ∘ e := by
+  apply Iff.intro
+  · intro a
+    -- Since these two multisets are equal, their elements must be equal up to permutation.
+    have h_perm : ∃ e : α ≃ α, ∀ x, f x = g (e x) := by
+      have h_count_eq : ∀ y : β, Finset.card (Finset.filter (fun x => f x = y) Finset.univ) = Finset.card (Finset.filter (fun x => g x = y) Finset.univ) := by
+        intro y;
+        replace a := congr_arg ( fun m => m.count y ) a;
+        simp_all ( config := { decide := Bool.true } ) [ Multiset.count_map ];
+        simpa [ eq_comm, Finset.filter_congr ] using a;
+      have h_perm : ∀ y : β, ∃ e : { x : α // f x = y } ≃ { x : α // g x = y }, True := by
+        intro y
+        simp_all only [exists_const_iff, and_true]
+        exact ⟨ Fintype.equivOfCardEq <| by simpa [ Fintype.card_subtype ] using h_count_eq y ⟩;
+      choose e he using h_perm;
+      refine' ⟨ _, _ ⟩;
+      exact ( Equiv.sigmaFiberEquiv f ).symm.trans ( Equiv.sigmaCongrRight e ) |> Equiv.trans <| Equiv.sigmaFiberEquiv g;
+      intro x
+      specialize e ( f x )
+      rename_i e_1
+      simp_all only [implies_true, Equiv.trans_apply, Equiv.sigmaCongrRight_apply,
+        Equiv.sigmaFiberEquiv_symm_apply_fst, Equiv.sigmaFiberEquiv_apply]
+      exact Eq.symm ( e_1 ( f x ) ⟨ x, rfl ⟩ |>.2 );
+    exact ⟨ h_perm.choose, funext h_perm.choose_spec ⟩;
+  · intro a
+    obtain ⟨w, h⟩ := a
+    subst h
+    simp_all only [Function.comp_apply, Finset.univ]
+    -- Since $w$ is a bijection, the multiset of $w(x)$ for $x$ in the original multiset is just a permutation of the original multiset.
+    have h_perm : Multiset.map (fun x => w x) (Finset.val Fintype.elems) = Finset.val Fintype.elems := by
+      exact Multiset.map_univ_val_equiv w;
+    conv_rhs => rw [ ← h_perm ];
+    simp +zetaDelta at *
+
 theorem IsHermitian.cfc_eigenvalues {M : Matrix d d 𝕜} (hM : M.IsHermitian) (f : ℝ → ℝ) :
-    ∃ (e : d ≃ d), IsHermitian.eigenvalues (cfc_predicate f M) = f ∘ hM.eigenvalues ∘ e := by
-  sorry
+    ∃ (e : d ≃ d), Matrix.IsHermitian.eigenvalues (cfc_predicate f M) = f ∘ hM.eigenvalues ∘ e := by
+  have h_eigenvalues : Multiset.map hM.eigenvalues Finset.univ.val = Multiset.map (fun i => hM.eigenvalues i) Finset.univ.val := by
+    rfl
+  generalize_proofs at *;
+  have h_eigenvalues_cfc : (IsHermitian.cfc hM f).charpoly.roots = Multiset.map (fun i => (f (hM.eigenvalues i) : 𝕜)) Finset.univ.val := by
+    rw [ Matrix.IsHermitian.cfc, Matrix.charpoly ];
+    -- Since $U$ is unitary, we have $U^* U = I$, and thus the characteristic polynomial of $U D U^*$ is the same as the characteristic polynomial of $D$.
+    have h_charpoly : Matrix.det ((hM.eigenvectorUnitary : Matrix d d 𝕜) * Matrix.diagonal (RCLike.ofReal ∘ f ∘ hM.eigenvalues) * Star.star (hM.eigenvectorUnitary : Matrix d d 𝕜)).charmatrix = Matrix.det (Matrix.diagonal (RCLike.ofReal ∘ f ∘ hM.eigenvalues)).charmatrix := by
+      -- Since $U$ is unitary, we have $U^* U = I$, and thus the characteristic polynomial of $U D U^*$ is the same as the characteristic polynomial of $D$ by the properties of determinants.
+      have h_char_poly : ∀ (t : 𝕜), Matrix.det (t • 1 - (hM.eigenvectorUnitary : Matrix d d 𝕜) * Matrix.diagonal (RCLike.ofReal ∘ f ∘ hM.eigenvalues) * star (hM.eigenvectorUnitary : Matrix d d 𝕜)) = Matrix.det (t • 1 - Matrix.diagonal (RCLike.ofReal ∘ f ∘ hM.eigenvalues)) := by
+        intro t;
+        -- Since $U$ is unitary, we have $U^* U = I$, and thus the determinant of $tI - UDU^*$ is the same as the determinant of $tI - D$.
+        have h_det : Matrix.det (t • 1 - (hM.eigenvectorUnitary : Matrix d d 𝕜) * Matrix.diagonal (RCLike.ofReal ∘ f ∘ hM.eigenvalues) * star (hM.eigenvectorUnitary : Matrix d d 𝕜)) = Matrix.det ((hM.eigenvectorUnitary : Matrix d d 𝕜) * (t • 1 - Matrix.diagonal (RCLike.ofReal ∘ f ∘ hM.eigenvalues)) * star (hM.eigenvectorUnitary : Matrix d d 𝕜)) := by
+          simp [ mul_sub, sub_mul, mul_assoc ];
+        rw [ h_det, Matrix.det_mul, Matrix.det_mul ];
+        rw [ mul_right_comm, ← Matrix.det_mul, mul_comm ];
+        norm_num +zetaDelta at *;
+      refine' Polynomial.funext fun t => _;
+      convert h_char_poly t using 1;
+      · simp [ Matrix.det_apply', Polynomial.eval_finset_sum ];
+        simp [ Matrix.one_apply, Polynomial.eval_prod ];
+        congr! 3;
+        aesop;
+      · simp [ Matrix.det_apply', Polynomial.eval_finset_sum ];
+        simp [ Matrix.one_apply, Polynomial.eval_prod ];
+        exact Finset.sum_congr rfl fun _ _ => by congr; ext; aesop;
+    simp_all [ Matrix.charmatrix, Matrix.det_diagonal ];
+    rw [ Polynomial.roots_prod ];
+    · bound;
+    · exact Finset.prod_ne_zero_iff.mpr fun i _ => Polynomial.X_sub_C_ne_zero _;
+  have := IsHermitian.charpoly_roots_eq_eigenvalues (cfc_predicate f M);
+  rw [← Matrix.IsHermitian.cfc_eq] at h_eigenvalues_cfc
+  rw [ h_eigenvalues_cfc ] at this;
+  simp [ Function.comp ] at this;
+  rw [ Multiset.map_univ_eq_iff ] at this;
+  obtain ⟨ e, he ⟩ := this;
+  use e.symm
+  ext x
+  have := congr_fun he ( e.symm x );
+  simp_all only [Function.comp_apply, Equiv.apply_symm_apply, algebraMap.coe_inj]
 
 end eigenvalues
 

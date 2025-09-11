@@ -46,29 +46,29 @@ def measurement_map (Λ : POVM X d) : CPTPMap d (d × X) where
       map_add' := by simp [mul_add, add_mul, Matrix.kroneckerMap_add_left]
       map_smul' := by simp [Matrix.smul_kronecker]
     }
-  cp :=
-    sorry
-    -- apply Finset.sum_induction
-    -- · exact fun _ _ ha ↦ ha.add
-    -- · exact MatrixMap.IsCompletelyPositive.zero _ _
-    -- · intro x _
-    --   let M₁ : MatrixMap d d ℂ := ⟨⟨
-    --     fun ρ ↦ ((Λ.mats x) ^ (1/2:ℝ)).toMat * ρ * ((Λ.mats x)^(1/2:ℝ)).toMat,
-    --     by simp [mul_add, add_mul]⟩,
-    --     by simp⟩
-    --   let M₂ : MatrixMap d (d × X) ℂ := ⟨⟨
-    --     fun ρ ↦ (ρ.kronecker (Matrix.stdBasisMatrix x x 1)),
-    --     by simp [mul_add, add_mul, Matrix.kroneckerMap_add_left]⟩,
-    --     by simp [Matrix.smul_kronecker]⟩
-    --   set M₃ := LinearMap.comp M₂ M₁ with hM₃
-    --   simp only [M₁, M₂, LinearMap.comp, kronecker, LinearMap.coe_mk, AddHom.coe_mk] at hM₃
-    --   unfold Function.comp at hM₃
-    --   rw [← hM₃]
-    --   apply MatrixMap.IsCompletelyPositive.comp
-    --   · intro n ρ h
-    --     sorry
-    --   · apply MatrixMap.IsCompletelyPositive.kron_kronecker_const
-    --     convert (Matrix.PosSemidef.stdBasisMatrix_iff_eq x x (zero_lt_one' ℂ)).2 rfl
+  cp := by
+    apply Finset.sum_induction
+    · exact fun _ _ ha ↦ ha.add
+    · exact MatrixMap.IsCompletelyPositive.zero _ _
+    · intro x _
+      --Note: this map M₁ would do as well as an object on its own, it's "measure and forget the result".
+      let M₁ : MatrixMap d d ℂ := ⟨⟨
+        fun ρ ↦ ((Λ.mats x) ^ (1/2:ℝ)).toMat * ρ * ((Λ.mats x)^(1/2:ℝ)).toMat,
+        by simp [mul_add, add_mul]⟩,
+        by simp⟩
+      let M₂ : MatrixMap d (d × X) ℂ := ⟨⟨
+        fun ρ ↦ (ρ.kronecker (Matrix.single x x 1)),
+        by simp [add_mul, Matrix.kroneckerMap_add_left]⟩,
+        by simp [Matrix.smul_kronecker]⟩
+      set M₃ := LinearMap.comp M₂ M₁ with hM₃
+      simp only [M₁, M₂, LinearMap.comp, kronecker, LinearMap.coe_mk, AddHom.coe_mk] at hM₃
+      unfold Function.comp at hM₃
+      rw [← hM₃]
+      apply MatrixMap.IsCompletelyPositive.comp
+      · intro n ρ h
+        sorry
+      · apply MatrixMap.IsCompletelyPositive.kron_kronecker_const
+        convert (Matrix.PosSemidef.stdBasisMatrix_iff_eq x x (zero_lt_one' ℂ)).2 rfl
   TP := by
     intro x
     rw [LinearMap.sum_apply, trace_sum]
@@ -84,22 +84,16 @@ def measurement_map (Λ : POVM X d) : CPTPMap d (d × X) where
     sorry -- x ^ (1/2) * x ^ (1/2) = x when x is a PSD HermitiatMat
 
 /-- A POVM leads to a distribution of outcomes on any given mixed state ρ. -/
-def measure (Λ : POVM X d) (ρ : MState d) : Distribution X where
-  val := fun x ↦ ⟨(Λ.mats x).inner ρ.M,
-    ⟨HermitianMat.inner_ge_zero (Λ.zero_le x) ρ.zero_le,
-    by
-    -- That each observation probability is at most 1.
-    -- Should follow from the fact they're nonnegative (above) and sum to 1 (below);
-    -- so maybe we want a different Distribution constructor for that?
-    sorry
-    ⟩⟩
-  property := by
-    simp [HermitianMat.inner_eq_re_trace, ← Complex.re_sum, ← trace_sum, ← Finset.sum_mul,
-      ← AddSubgroup.val_finset_sum, ← HermitianMat.val_eq_coe, Λ.normalized, ρ.tr]
+def measure (Λ : POVM X d) (ρ : MState d) : Distribution X := .mk'
+    (f := fun x ↦ (Λ.mats x).inner ρ.M)
+    (h₁ := fun x ↦ HermitianMat.inner_ge_zero (Λ.zero_le x) ρ.zero_le)
+    (hN := by
+      simp [HermitianMat.inner_eq_re_trace, ← Complex.re_sum, ← trace_sum, ← Finset.sum_mul,
+      ← AddSubgroup.val_finset_sum, ← HermitianMat.val_eq_coe, Λ.normalized])
 
 /-- The quantum-classical `POVM.measurement_map`, gives a marginal on the right equal to `POVM.measure`.-/
 theorem measure_eq_measurement_map (Λ : POVM X d) (ρ : MState d) :
-    (Λ.measurement_map ρ).traceLeft = MState.ofClassical (Λ.measure ρ) :=
+    (Λ.measurement_map ρ).traceLeft = MState.ofClassical (Λ.measure ρ) := by
   sorry
 
 /-- The action of measuring a state with the POVM `Λ`, discarding the resulting state, and keeping
@@ -110,6 +104,6 @@ noncomputable def measureDiscard (Λ : POVM X d) : CPTPMap d X :=
 
 theorem measureDiscard_apply (Λ : POVM X d) (ρ : MState d) :
     Λ.measureDiscard ρ = MState.ofClassical (Λ.measure ρ) := by
-  sorry
+  simp [measureDiscard, measure_eq_measurement_map]
 
 end POVM
