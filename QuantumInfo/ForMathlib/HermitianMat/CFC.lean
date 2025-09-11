@@ -14,7 +14,47 @@ noncomputable nonrec def cfc (A : HermitianMat d 𝕜) (f : ℝ → ℝ) : Hermi
 @[simp]
 theorem cfc_diagonal (g : d → ℝ) (f : ℝ → ℝ) :
     cfc (HermitianMat.diagonal g) f = HermitianMat.diagonal (f ∘ g) := by
-  sorry
+  ext1
+  dsimp [cfc, HermitianMat, HermitianMat.diagonal, HermitianMat.toMat]
+  --Thanks Aristotle, for this mess
+  rw [ _root_.cfc ];
+  split_ifs;
+  · -- By definition of the continuous functional calculus for diagonal matrices, we have that the cfc of a diagonal matrix is the diagonal matrix with the function applied to each entry.
+    change cfcHom (show IsSelfAdjoint (Matrix.diagonal (fun x => (g x : ℂ))) from by
+      -- Since $g(x)$ is real, the diagonal matrix with entries $g(x)$ is Hermitian.
+      -- Since the entries of the diagonal matrix are real, the conjugate transpose of the diagonal matrix is the same as the original matrix.
+      simp [IsSelfAdjoint, Star.star, Matrix.conjTranspose]
+      ext i j; by_cases hij : i = j <;> aesop) ⟨fun x => f x, continuous_of_discreteTopology⟩ = Matrix.diagonal (fun x => (f (g x) : ℂ))
+    erw [ cfcHom_eq_of_continuous_of_map_id ];
+    rotate_left;
+    refine' { .. };
+    use fun f => Matrix.diagonal fun x => f ⟨ g x, by
+      intro h;
+      obtain ⟨ u, hu ⟩ := h.exists_left_inv;
+      replace hu := congr_arg ( fun m => m x x ) hu ; simp_all ( config := { decide := Bool.true } ) [ Matrix.mul_apply ];
+      simp_all ( config := { decide := Bool.true } ) [ Matrix.algebraMap_eq_diagonal, Matrix.diagonal_apply ] ⟩;
+    simp +zetaDelta only [ContinuousMap.one_apply, Complex.ofReal_one, Matrix.diagonal_one] at *;
+    all_goals norm_num [ funext_iff, Matrix.diagonal ];
+    all_goals norm_num [ ← Matrix.ext_iff, Finset.mul_sum _ _ _, Finset.sum_mul, Matrix.mul_apply, Matrix.diagonal ];
+    · intros
+      split <;> simp_all only
+    · intros
+      split <;> simp_all only [add_zero]
+    · exact fun r i j => rfl;
+    · intros
+      split
+      · simp_all only [↓reduceIte, Complex.conj_ofReal]
+      · split <;> simp_all only [not_true_eq_false, map_zero]
+    · refine' continuous_pi_iff.mpr fun i => _
+      exact continuous_apply i |> Continuous.comp <| by continuity;
+  · rename_i h
+    rw [not_and] at h
+    -- Since the matrix is diagonal with real entries, it is self-adjoint.
+    have h_self_adjoint : IsSelfAdjoint (Matrix.diagonal (fun x => (g x : ℂ))) := by
+      change Matrix.conjTranspose _ = _
+      simp [Matrix.conjTranspose]
+    apply_mod_cast False.elim ( h h_self_adjoint _ );
+    exact continuousOn_iff_continuous_restrict.mpr continuous_of_discreteTopology
 
 theorem cfc_eigenvalues (A : HermitianMat d 𝕜) (f : ℝ → ℝ) :
     ∃ (e : d ≃ d), (A.cfc f).H.eigenvalues = f ∘ A.H.eigenvalues ∘ e :=

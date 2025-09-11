@@ -576,7 +576,13 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     positivity
 
   have hc_lim : Filter.atTop.Tendsto (fun n ↦ (c n) / n) (𝓝 0) := by
-    sorry
+    have h_const : Filter.atTop.Tendsto (fun n : ℕ ↦ Real.log (1 / mineig) / n) (𝓝 0) :=
+        tendsto_const_nhds.div_atTop tendsto_natCast_atTop_atTop;
+    -- We can split the limit into two parts: the constant term and the term involving log(3).
+    have h_div : Filter.atTop.Tendsto (fun n : ℕ ↦ Real.log 3 / (max n 1 * n)) (𝓝 0) :=
+      tendsto_const_nhds.div_atTop <| Filter.tendsto_atTop_mono (fun n ↦ by
+        norm_cast; nlinarith [le_max_left n 1, le_max_right n 1]) tendsto_natCast_atTop_atTop
+    convert h_const.add h_div using 2 <;> ring
 
   -- The function f_n(λ) in (S45)
   let f (n : ℕ) (lam : ℝ) := ⌈Real.log lam / c n⌉ * c n
