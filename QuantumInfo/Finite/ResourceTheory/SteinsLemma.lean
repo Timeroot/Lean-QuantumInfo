@@ -649,15 +649,6 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
 
   -- Eq (S59) has a minus sign, which gets complicated when one of the relative entropies is infinite.
   -- However, I don't think we need this version with the minus sign
-  -----
-  -- have rel_ent_pinching (n) : 𝐃(ρ⊗^S[n]‖ℰ n (ρ⊗^S[n])) = 𝐃(ρ⊗^S[n]‖σ'' n) - 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) := by
-  --   unfold ℰ
-  --   rw [pinching_pythagoras (ρ⊗^S[n]) (σ'' n)]
-  --   have hDfin : 𝐃((pinching_map (σ'' n)) (ρ⊗^S[n])‖σ'' n) ≠ ∞ := by
-  --     sorry
-  --   rw [← ENNReal.coe_toNNReal hDfin]
-  --   simp only [ENNReal.addLECancellable_iff_ne, ne_eq, ENNReal.coe_ne_top, not_false_eq_true,
-  --     AddLECancellable.add_tsub_cancel_right]
   have qRel_pinching_pythagoras (n) : 𝐃(ρ⊗^S[n]‖σ'' n) = 𝐃(ρ⊗^S[n]‖ℰ n (ρ⊗^S[n])) + 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) := by
     exact pinching_pythagoras (ρ⊗^S[n]) (σ'' n)
 
