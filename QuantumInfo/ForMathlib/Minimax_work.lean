@@ -1,6 +1,12 @@
 import Mathlib
 
-/-- The max-min theorem. A version of `iSup_iInf_le_iInf_iSup` for conditionally complete lattices. -/
+@[simp]
+theorem Set.image2_flip {α β γ : Type*} {f : α → β → γ} (s : Set α) (t : Set β) :
+    image2 (flip f) t s = image2 f s t := by
+  simp only [image2, flip]
+  grind
+
+/-- The **max-min theorem**. A version of `iSup_iInf_le_iInf_iSup` for conditionally complete lattices. -/
 theorem ciSup_ciInf_le_ciInf_ciSup {ι ι' α : Type*} [ConditionallyCompleteLattice α ] [Nonempty ι]
   (f : ι → ι' → α) (Ha : ∀ j, BddAbove (Set.range (f · j))) (Hb : ∀ i, BddBelow (Set.range (f i))) :
     ⨆ i, ⨅ j, f i j ≤ ⨅ j, ⨆ i, f i j :=
@@ -103,15 +109,27 @@ theorem segment.isConnected {E : Type u_1} [AddCommGroup E] [Module ℝ E] [Topo
   rw [← Path.range_segment a b]
   exact isConnected_range (Path.segment a b).continuous
 
-theorem IsPreconnected.subset_or_of_closed_inter_empty {M : Type*} [TopologicalSpace M] {A B C: Set M}
-  [hA : IsClosed A] [hB : IsClosed B] (hAB : A ∩ B = ∅) (hABC : C ⊆ A ∪ B) (hC : IsPreconnected C) : C ⊆ A ∨ C ⊆ B := by
-  open Set in
-  rw [IsPreconnected] at hC
-  contrapose! hC
-  refine ⟨Bᶜ, Aᶜ, hB.isOpen_compl, hA.isOpen_compl, ?_, C.not_subset.mp hC.2, C.not_subset.mp hC.1, ?_⟩
-  · simp only [Set.ext_iff, mem_inter_iff, mem_empty_iff_false, subset_def, mem_union, mem_compl_iff] at *
-    grind only
-  · simpa [Set.ext_iff] using fun _ ↦ (hABC · |> Or.resolve_right <| ·)
+theorem BddAbove.range_inf_of_image2 {M N α : Type*} {f : M → N → α} [ConditionallyCompleteLinearOrder α]
+  {S : Set M} {T : Set N} (h_bddA : BddAbove (Set.image2 f S T)) (h_bddB : BddBelow (Set.image2 f S T)) :
+    BddAbove (Set.range fun y : T ↦ ⨅ x : S, f x y) := by
+  rcases isEmpty_or_nonempty T with hT | hT
+  · aesop
+  rcases S.eq_empty_or_nonempty with rfl | hS
+  · simp [Set.range, iInf]
+  rw [← Set.nonempty_coe_sort, nonempty_subtype] at hS
+  rcases hS with ⟨x, hx⟩
+  choose z hz using h_bddA
+  choose w hw using h_bddB
+  have h_inf_le_M : ∀ y ∈ T, ⨅ x : S, f x y ≤ z := by
+    intro y hy
+    apply (ciInf_le ⟨_, Set.forall_mem_range.2 (hw <| Set.mem_image2_of_mem ·.2 hy)⟩ ⟨x, hx⟩).trans
+    exact hz (Set.mem_image2_of_mem hx hy)
+  exact ⟨_, Set.forall_mem_range.2 (h_inf_le_M _ ·.2)⟩
+
+theorem BddBelow.range_sup_of_image2 {M N α : Type*} {f : M → N → α} [ConditionallyCompleteLinearOrder α]
+  {S : Set M} {T : Set N} (h_bddA : BddAbove (Set.image2 f S T)) (h_bddB : BddBelow (Set.image2 f S T)) :
+      BddBelow (Set.range fun y : T ↦ ⨆ x : S, f x y) :=
+  BddAbove.range_inf_of_image2 (α := αᵒᵈ) h_bddB h_bddA
 
 section extracted
 
@@ -122,7 +140,29 @@ variable {M : Type*} [NormedAddCommGroup M] [Module ℝ M] [ContinuousAdd M] [Co
   (hfq₁ : ∀ x, x ∈ S → QuasiconcaveOn ℝ T (f x))
   (hfc₂ : ∀ y, y ∈ T → LowerSemicontinuousOn (f · y) S)
   (hfq₂ : ∀ y, y ∈ T → QuasiconvexOn ℝ S (f · y))
-  (hS₁ : IsCompact S) (hS₂ : Convex ℝ S) (hT₂ : Convex ℝ T) (hS₃ : S.Nonempty) (hT₃ : T.Nonempty)
+  (hS₁ : IsCompact S)
+  (hS₂ : Convex ℝ S) (hT₂ : Convex ℝ T)
+  (hS₃ : S.Nonempty) (hT₃ : T.Nonempty)
+
+theorem sion_minimax.extracted_1_1 {f : M → N → ℝ} {S : Set M} {T : Set N}
+  -- (hfc₁ : ∀ x ∈ S, UpperSemicontinuousOn (f x) T) (hfq₁ : ∀ x ∈ S, QuasiconcaveOn ℝ T (f x))
+  -- (hfc₂ : ∀ y ∈ T, LowerSemicontinuousOn (fun x => f x y) S) (hfq₂ : ∀ y ∈ T, QuasiconvexOn ℝ S fun x => f x y)
+  (hS₁ : IsCompact S) (hS₃ : S.Nonempty) (hT₃ : T.Nonempty)
+  (h_bddA : BddAbove (Set.image2 f S T))
+  (h_bddB : BddBelow (Set.image2 f S T))
+  (a : ℝ) (ha₂ : a < ⨅ x : S, ⨆ y : T, f ↑x ↑y) (u : Finset ↑T)
+  (hu' : u.Nonempty)
+  (h_fin : ∀ (ys : Finset N), ys.Nonempty → ↑ys ⊆ T → ∀ a < ⨅ x : S, ⨆ yi : { x // x ∈ ys }, f ↑x ↑yi, ∃ y₀ ∈ T, a < ⨅ x : S, f (↑x) y₀)
+  (hu : ⨅ x : S, ⨆ yi : { x // x ∈ u.map ⟨_, Subtype.val_injective⟩ }, f ↑x ↑yi ≤ a) : (S ∩ ⋂ i ∈ u, {x | x ∈ S ∧ f x ↑i ≤ a}).Nonempty := by
+  have h_bdd_0 (i : T) : BddBelow (Set.range fun j : S ↦ f j i) :=
+    h_bddB.mono (S.range_restrict (f · i) ▸ Set.image_subset_image2_left i.coe_prop)
+  have h_bdd_1 (j : S) : BddAbove (Set.range fun (x : T) => f j x) :=
+    h_bddA.mono (T.range_restrict (f j) ▸ Set.image_subset_image2_right j.coe_prop)
+  have h_bdd_2 : BddAbove (Set.range fun y : T ↦ ⨅ x : S, f x y) :=
+    h_bddA.range_inf_of_image2 h_bddB
+  have h_bdd_3 : BddBelow (Set.range fun x : S ↦ ⨆ y : T, f x y) :=
+    BddBelow.range_sup_of_image2 (f := flip f) (by simpa) (by simpa)
+  sorry
 
 include hfc₁ hfq₁ hfc₂ hfq₂ hS₁ hS₂ hT₂ hS₃ hT₃ in
 theorem sion_exists_min_2.extracted_1_4 (y₁ y₂ : N)
@@ -138,6 +178,76 @@ theorem sion_exists_min_2.extracted_1_4 (y₁ y₂ : N)
   (∀ z ∈ segment ℝ y₁ y₂, Convex ℝ (C' z)) → let I := {z | z ∈ segment ℝ y₁ y₂ ∧ C z ⊆ A};
     IsClosed I := by
   sorry
+
+theorem ciSup_sum {α β γ : Type*} [ConditionallyCompleteLinearOrder α] {f : β ⊕ γ → α} :
+    ⨆ x, f x = (⨆ i, f (Sum.inl i)) ⊔ ⨆ j, f (Sum.inr j) := by
+  by_cases h : BddAbove (Set.range f)
+  · sorry
+  · sorry
+
+theorem ciInf_le_ciInf_of_subset {α β : Type*} [ConditionallyCompleteLattice α]
+  {f : β → α} {s t : Set β} (hs : s.Nonempty) (hf : BddBelow (f '' t)) :
+    s ⊆ t → ⨅ x ∈ t, f x ≤ ⨅ x ∈ s, f x := by
+  sorry
+
+theorem ciInf_le_ciInf_map {α β γ : Type*} [ConditionallyCompleteLattice α] {f : β → α} {g : γ → α}
+  (hf : BddBelow (Set.range f)) (h_map : ∃ h : γ → β, ∀ i, f (h i) ≤ g i) :
+    iInf f ≤ iInf g := by
+  have hg : BddBelow (Set.range g) := by sorry
+  sorry
+
+theorem sion_exists_min_fin.extracted_1_3.extracted_1_1 {M N : Type*}
+  {f : M → N → ℝ} {T : Set N}
+  (hT₃ : T.Nonempty) (a : ℝ) (yₙ : N) {S : Set M} (hS₃ : S.Nonempty)
+   (hyₙ : yₙ ∈ T) (y₀ : N) (hy₀ : y₀ ∈ T) :
+  let S' := {z | z ∈ S ∧ f z yₙ ≤ a};
+  ⨅ (x : { x : S // f x yₙ ≤ a }), f (↑↑x) y₀ = ⨅ (x : { x // x ∈ S ∧ f x yₙ ≤ a }), f (↑x) y₀ := sorry
+
+open Classical in
+theorem sion_exists_min_fin.extracted_1_3 {f : M → N → ℝ} {T : Set N} (hT₂ : Convex ℝ T) (hT₃ : T.Nonempty) (a : ℝ) (yₙ : N)
+  (t : Finset N) (hxt : yₙ ∉ t) (htn : t.Nonempty) {S : Set M} (hS₃ : S.Nonempty) (ha : a < ⨅ x : S, ⨆ yi : { x // x ∈ insert yₙ t }, f ↑x ↑yi)
+  (hyₙ : yₙ ∈ T) (ht : ↑t ⊆ T) :
+  let S' := {z | z ∈ S ∧ f z yₙ ≤ a};
+    S' ⊆ S → S'.Nonempty → ∀ y₀' ∈ T, a < ⨅ x : S' , f (↑x) y₀' → a < ⨅ x : S, max (f (↑x) y₀') (f (↑x) yₙ) := by
+  intros S' hS' hS'₂ y₀ hy₀T hy₀a
+  --Before trying this again, should add stronger BddBelow and BddAbove assumptions
+
+  -- conv at ha =>
+  --   enter [2, 1, x]
+  --   rw [(have _ : Nonempty { x // x ∈ insert yₙ t } := (by sorry;); ciSup_subtype (by sorry) (by simp; sorry))]
+  --   enter [1, i]
+  --   rfl --ciSup_or'
+
+  -- conv at ha =>
+  --   enter [2, 1, x]
+  --   equals ⨆ (yi : { m // m = yₙ ∨ m ∈ t }), f x yi =>
+  --     convert rfl <;> simp
+  -- conv at ha =>
+  --   enter [2, 1, x]
+  --   rw [← (subtypeOrEquiv (· = yₙ) (· ∈ t) (by rw [Set.disjoint_left]; rintro _ rfl; exact hxt)).symm.iSup_comp]
+  --   rw [ciSup_sum]
+  --   simp only [subtypeOrEquiv_symm_inl, ciSup_unique, subtypeOrEquiv_symm_inr]
+
+  conv at hy₀a =>
+    enter [2]
+    dsimp [S']
+    equals ⨅ (x : { x : S // f x yₙ ≤ a }), f (↑x) y₀ =>
+      symm
+      apply sion_exists_min_fin.extracted_1_3.extracted_1_1 hT₃ a yₙ hS₃ hyₙ y₀ hy₀T
+  by_cases hsub : Nonempty { x : S // f (↑x) yₙ ≤ a }; swap
+  · sorry --this means that every x gives at least a?
+  apply hy₀a.trans_le
+  apply ciInf_le_ciInf_map
+  · sorry
+  use (fun x ↦ if h : f x yₙ ≤ a then ⟨x, h⟩ else hsub.some)
+  intro x
+  simp
+  split_ifs with h_le
+  · simp
+  · --right
+    simp at h_le
+    have := hsub.some.prop
+    sorry
 
 end extracted
 
@@ -241,14 +351,16 @@ private lemma sion_exists_min_2 (y₁ y₂ : N) (hy₁ : y₁ ∈ T) (hy₂ : y�
     exact ciInf_le h ⟨x, hx⟩
   have hfxz (x) (hx : x ∈ S) (z) (hz : z ∈ segment ℝ y₁ y₂) : min (f x y₁) (f x y₂) ≤ f x z :=
     (hfq₁ x hx).min_le_mem_segment hy₁ hy₂ hz
-  have hC'zAB (z) (hz : z ∈ segment ℝ y₁ y₂) : C' z ⊆ A ∪ B := by grind [inf_le_iff, le_trans]
+  have hC'zAB (z) (hz : z ∈ segment ℝ y₁ y₂) : C' z ⊆ A ∪ B := by
+    sorry
+    -- grind [inf_le_iff, le_trans]
   have hC'z (z) (hz : z ∈ segment ℝ y₁ y₂) : Convex ℝ (C' z) :=
     hfq₂ z (hT₂.segment_subset hy₁ hy₂ hz) β
   have hCzAB (z) (hz : z ∈ segment ℝ y₁ y₂) : C z ⊆ A ∨ C z ⊆ B := by
     specialize hC_subset_C' z
     specialize hC'z z hz
     have hC' : IsPreconnected (C' z) :=
-      ((hC'z).isConnected ((hC_nonempty z hz).mono hC_subset_C')).isPreconnected;
+      ((hC'z).isConnected ((hC_nonempty z hz).mono hC_subset_C')).isPreconnected
     rw [isPreconnected_iff_subset_of_disjoint_closed] at hC'
     rcases hC' A B hA_closed hB_closed (hC'zAB z hz) (by simp [hAB]) with h | h
     · exact .inl (hC_subset_C'.trans h)
@@ -351,24 +463,30 @@ private lemma sion_exists_min_fin (ys : Finset N) (hys_n : ys.Nonempty) (hys : (
     obtain ⟨y₀', hy₀'_mem, hy₀'⟩ := ih
     apply sion_exists_min_2 hfc₁ hfq₁ hfc₂ hfq₂
       hS₁ hS₂ hT₂ hS₃ hT₃ y₀' yₙ hy₀'_mem hyₙ a
-    sorry
-
+    clear hfc₁ hfq₁ hfc₂ hfq₂ hS₁ hS₂ hS'₁ hS'₂
+    apply sion_exists_min_fin.extracted_1_3 <;> try assumption
 
 include hfc₁ hfq₁ hfc₂ hfq₂ hS₁ hS₂ hT₂ hS₃ hT₃ in
-/-- **Sion's Minimax theorem**. Because of `ciSup` junk values when f isn't bounded,
-we need to assume that it's bounded above on one of its arguments. -/
-theorem sion_minimax (h_bdd : ∀ j : S, BddAbove (Set.range fun x : T ↦ f j x))
+/-- **Sion's Minimax theorem**. Because of `ciSup` and `ciInf` junk values when f isn't
+bounded, we need to assume that it's bounded above and below. -/
+theorem sion_minimax
+  (h_bddA : BddAbove (Set.image2 f S T))
+  (h_bddB : BddBelow (Set.image2 f S T))
     : ⨅ x : S, ⨆ y : T, f x y = ⨆ y : T, ⨅ x : S, f x y := by
-  have := hT₃.to_subtype
-  have h_bdd_1 (i : T) : BddBelow (Set.range fun j : S ↦ f j i) := by
+  have _ := hS₁.isClosed
+  have _ := hT₃.to_subtype
+  have h_bdd_0 (i : T) : BddBelow (Set.range fun j : S ↦ f j i) := by
+    --This one actually doesn't require h_bddB
     convert (hfc₂ i i.2).bddBelow hS₁
     ext; simp
-  have h_bdd_2 : BddAbove (Set.range fun y : T ↦ ⨅ x : S, f x y) := by
-    sorry
-  have h_bdd_3 : BddBelow (Set.range fun x : S ↦ ⨆ y : T, f x y) := by
-    sorry
+  have h_bdd_1 (j : S) : BddAbove (Set.range fun (x : T) => f j x) :=
+    h_bddA.mono (T.range_restrict (f j) ▸ Set.image_subset_image2_right j.coe_prop)
+  have h_bdd_2 : BddAbove (Set.range fun y : T ↦ ⨅ x : S, f x y) :=
+    h_bddA.range_inf_of_image2 h_bddB
+  have h_bdd_3 : BddBelow (Set.range fun x : S ↦ ⨆ y : T, f x y) :=
+    BddBelow.range_sup_of_image2 (f := flip f) (by simpa) (by simpa)
   apply le_antisymm; swap
-  · exact ciSup_ciInf_le_ciInf_ciSup _ h_bdd h_bdd_1
+  · exact ciSup_ciInf_le_ciInf_ciSup _ h_bdd_1 h_bdd_0
   by_contra! h
   obtain ⟨a, ha₁, ha₂⟩ := exists_between h; clear h
   revert ha₁
@@ -376,21 +494,16 @@ theorem sion_minimax (h_bdd : ∀ j : S, BddAbove (Set.range fun x : T ↦ f j x
   have := hS₁.elim_finite_subfamily_closed (fun (y : T) ↦ { x | x ∈ S ∧ f x y ≤ a}) ?_ ?_
   · rcases this with ⟨u, hu⟩
     have hu' : u.Nonempty := by
-      by_contra hu'
-      rw [Finset.not_nonempty_iff_eq_empty] at hu'
-      simp [hu'] at hu
-      simp [hu] at hS₃
+      grind [Finset.not_nonempty_iff_eq_empty, Set.iInter_univ,
+        Set.inter_univ, Set.not_nonempty_empty]
     have h_fin := sion_exists_min_fin hfc₁ hfq₁ hfc₂ hfq₂ hS₁ hS₂ hT₂ hS₃ hT₃
     specialize h_fin (u.map ⟨_, Subtype.val_injective⟩) (by simpa) (by simp) a ?_
     · contrapose! hu
-      sorry
+      apply sion_minimax.extracted_1_1 <;> try assumption
     rcases h_fin with ⟨y₀, hy₀T, hy₀⟩
-    refine hy₀.le.trans ?_
-    exact le_ciSup h_bdd_2 ⟨y₀, hy₀T⟩
+    exact hy₀.le.trans (le_ciSup h_bdd_2 ⟨y₀, hy₀T⟩)
   · intro i
     specialize hfc₂ i i.2
-    dsimp
-    have _ := hS₁.isClosed
     rw [lowerSemicontinuousOn_iff_isClosed_preimage] at hfc₂
     exact hfc₂ a
   · convert Set.inter_empty _
@@ -398,12 +511,7 @@ theorem sion_minimax (h_bdd : ∀ j : S, BddAbove (Set.range fun x : T ↦ f j x
     simp? [Set.iInter_eq_empty_iff] says simp only [
       Set.iInter_coe_set, Set.iInter_eq_empty_iff, Set.mem_iInter, Set.mem_setOf_eq,
       Classical.not_imp, not_and, not_le, not_forall, not_exists, not_lt] at hu
-    have _ := hS₃.to_subtype
-    rw [lt_ciInf_iff h_bdd_3] at ha₂
-    rcases hu with ⟨x, hx⟩
-    rcases ha₂ with ⟨b, hab, hb⟩
-    specialize hx _ hT₃.some_mem
-    rcases hx with ⟨hx, hb2⟩
-    specialize hb ⟨x, hx⟩
-    dsimp at hb
-    sorry
+    obtain ⟨x, hx⟩ := hu
+    apply ha₂.not_ge
+    apply (ciInf_le h_bdd_3 ⟨x, hx _ hT₃.some_mem |>.1⟩).trans _
+    apply ciSup_le (hx _ ·.2 |>.2)

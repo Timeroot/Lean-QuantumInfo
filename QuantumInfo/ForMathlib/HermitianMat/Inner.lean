@@ -191,11 +191,93 @@ theorem inner_le_mul_trace (hA : 0 ≤ A) (hB : 0 ≤ B) : A.inner B ≤ A.trace
   classical convert inner_mono hA (le_trace_smul_one hB)
   simp [mul_comm]
 
+--TODO cleanup
+private theorem inner_zero_iff_aux_lemma [DecidableEq n] (hA₁ : A.val.PosSemidef) (hB₁ : B.val.PosSemidef) :
+  RCLike.re (A.val * B.val).trace = 0 ↔
+    LinearMap.range (Matrix.toEuclideanLin A.val) ≤
+      LinearMap.ker (Matrix.toEuclideanLin B.val) := by
+  have h_trace_zero : (RCLike.re ((A.val * B.val).trace)) = 0 ↔ (A.val * B.val) = 0 := by
+    -- Since $A$ and $B$ are positive semidefinite, we can write them as $A = C^* C$ and $B = D^* D$ for some matrices $C$ and $D$.
+    obtain ⟨C, hC⟩ : ∃ C : Matrix n n 𝕜, A.val = C.conjTranspose * C := by
+      exact Matrix.posSemidef_iff_eq_conjTranspose_mul_self.mp hA₁
+    obtain ⟨D, hD⟩ : ∃ D : Matrix n n 𝕜, B.val = D.conjTranspose * D := by
+      exact Matrix.posSemidef_iff_eq_conjTranspose_mul_self.mp hB₁
+    have h_trace_zero_iff : (RCLike.re ((A.val * B.val).trace)) = 0 ↔ (D * C.conjTranspose) = 0 := by
+      -- Since $\operatorname{Tr}((DC)^* DC) = \sum_{i,j} |(DC)_{ij}|^2$, and this sum is zero if and only if each term is zero, we have $\operatorname{Tr}((DC)^* DC) = 0$ if and only if $DC = 0$.
+      have h_trace_zero_iff : (RCLike.re ((D * C.conjTranspose).conjTranspose * (D * C.conjTranspose)).trace) = 0 ↔ (D * C.conjTranspose) = 0 := by
+        have h_trace_zero_iff : ∀ (M : Matrix n n 𝕜), (RCLike.re (M.conjTranspose * M).trace) = 0 ↔ M = 0 := by
+          simp [ Matrix.trace, Matrix.mul_apply ];
+          intro M
+          simp_all only
+          obtain ⟨val, property⟩ := A
+          obtain ⟨val_1, property_1⟩ := B
+          subst hD hC
+          apply Iff.intro
+          · intro a
+            rw [ Finset.sum_eq_zero_iff_of_nonneg fun i _ => Finset.sum_nonneg fun j _ => add_nonneg ( mul_self_nonneg _ ) ( mul_self_nonneg _ )] at a
+            ext i j
+            specialize a j
+            rw [ Finset.sum_eq_zero_iff_of_nonneg fun _ _ => add_nonneg ( mul_self_nonneg _ ) ( mul_self_nonneg _ ) ] at a
+            simp_all only [Finset.mem_univ, forall_const, Matrix.zero_apply]
+            exact RCLike.ext ( by norm_num; nlinarith only [ a i ] ) ( by norm_num; nlinarith only [ a i ] );
+          · intro a
+            subst a
+            simp_all only [Matrix.zero_apply, map_zero, mul_zero, add_zero, Finset.sum_const_zero]
+        exact h_trace_zero_iff _;
+      convert h_trace_zero_iff using 3 ; simp [ hC, hD, Matrix.mul_assoc ];
+      rw [ ← Matrix.trace_mul_comm ] ; simp [ Matrix.mul_assoc ];
+    simp_all only
+    obtain ⟨val, property⟩ := A
+    obtain ⟨val_1, property_1⟩ := B
+    subst hD hC
+    apply Iff.intro
+    · intro a
+      simp_all only [iff_true]
+      simp ( config := { decide := Bool.true } ) [ ← Matrix.mul_assoc, ← Matrix.conjTranspose_inj, a ];
+    · intro a
+      simp_all only [Matrix.trace_zero, map_zero, true_iff]
+  have h_range_ker : (LinearMap.range (Matrix.toEuclideanLin A.val)) ≤ (LinearMap.ker (Matrix.toEuclideanLin B.val)) → (A.val * B.val) = 0 := by
+    intro h_range_ker
+    have hAB_zero : ∀ v, (Matrix.toEuclideanLin B.val) ((Matrix.toEuclideanLin A.val) v) = 0 := by
+      exact fun v => h_range_ker ( LinearMap.mem_range_self _ v )
+    have h_herm : A.val * B.val = (B.val * A.val).conjTranspose := by
+      simp [Matrix.conjTranspose_mul]
+      congr
+      · exact A.2.symm
+      · exact B.2.symm
+    have hBA_zero : (B.val * A.val) = 0 := by
+      ext i j
+      specialize hAB_zero (Pi.single j 1)
+      convert congr_fun hAB_zero i using 1
+      simp [Matrix.toEuclideanLin, dotProduct, Matrix.mulVec, Matrix.mul_apply, Pi.single_apply]
+    rw [h_herm, hBA_zero, Matrix.conjTranspose_zero]
+  simp_all only
+  obtain ⟨val, property⟩ := A
+  obtain ⟨val_1, property_1⟩ := B
+  simp_all only
+  apply Iff.intro
+  · rintro a _ ⟨y, rfl⟩
+    have h_comm : val_1 * val = 0 := by
+      rw [← Matrix.conjTranspose_inj]
+      have h_conj_transpose : val.conjTranspose = val ∧ val_1.conjTranspose = val_1 := by
+        aesop
+      simp [h_conj_transpose, Matrix.conjTranspose_mul, a]
+    simp only [LinearMap.mem_ker]
+    convert congr_arg (fun x => Matrix.mulVec x y) h_comm using 1
+    · simp [Matrix.toEuclideanLin_apply, Matrix.mulVec_mulVec]
+      rfl
+    · simp
+  · grind
+
 /-- The inner product of two PSD matrices is zero iff they have disjoint support, i.e., each lives entirely
 in the other's kernel. -/
 theorem inner_zero_iff [DecidableEq n] (hA₁ : 0 ≤ A) (hB₁ : 0 ≤ B)
-    : A.inner B = 0 ↔ A.support ≤ B.ker :=
-  sorry
+    : A.inner B = 0 ↔ A.support ≤ B.ker := by
+  rw [zero_le_iff] at hA₁ hB₁
+  dsimp [support, ker, lin]
+  rw [inner_eq_re_trace]
+  change selfAdjoint (Matrix n n 𝕜) at A B
+  exact inner_zero_iff_aux_lemma hA₁ hB₁
 
 end RCLike
 
