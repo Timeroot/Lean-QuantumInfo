@@ -280,11 +280,13 @@ theorem qRelativeEnt_additive (ρ₁ σ₁ : MState d₁) (ρ₂ σ₂ : MState 
     𝐃(ρ₁ ⊗ ρ₂‖σ₁ ⊗ σ₂) = 𝐃(ρ₁‖σ₁) + 𝐃(ρ₂‖σ₂) := by
   simp [qRelativeEnt]
 
+attribute [fun_prop] LowerSemicontinuous
+
 /-- Relative entropy is continuous (in each argument, actually, but we only need in the
 latter here). Will need the fact that all the cfc / eigenvalue stuff is continuous, which
 is going to make this a pain. -/
 @[fun_prop]
-theorem qRelativeEnt.Continuous (ρ : MState d) : Continuous fun σ => 𝐃(ρ‖σ) := by
+theorem qRelativeEnt.LowerSemicontinuous (ρ : MState d) : LowerSemicontinuous fun σ => 𝐃(ρ‖σ) := by
   sorry
 
 @[simp]
