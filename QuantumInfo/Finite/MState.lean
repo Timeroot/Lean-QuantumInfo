@@ -640,15 +640,8 @@ theorem dist_eq (x y : MState d) : dist x y = dist x.M y.M := by
   rfl
 
 instance : BoundedSpace (MState d) where
-  bounded_univ := by
-    rw [Metric.isBounded_iff]
-    use 2 * (Fintype.card d) ^ 2 --d^2 elements, so max distance is d^2
-    intro x _ y _
-    rw [dist_eq, dist_eq_norm]
-    have hx := And.intro x.zero_le x.le_one
-    have hy := And.intro y.zero_le y.le_one
-    --at this point, this should be a theorem
-    sorry
+  bounded_univ :=
+    CompactSpace.isCompact_univ.isBounded
 
 @[fun_prop]
 theorem Continuous_HermitianMat : Continuous (MState.M (d := d)) :=
