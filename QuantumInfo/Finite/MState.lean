@@ -496,7 +496,8 @@ theorem relabel_relabel {d d₂ d₃ : Type*}
 theorem eq_relabel_iff {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
     (ρ : MState d₁) (σ : MState d₂) (h : d₁ ≃ d₂) :
     ρ = σ.relabel h ↔ ρ.relabel h.symm = σ := by
-  sorry
+  simp only [MState.ext_iff, HermitianMat.ext_iff, toMat_M, relabel_m]
+  exact ⟨(by simp[·]), (by simp[← ·])⟩
 
 theorem relabel_comp {d₁ d₂ d₃ : Type*} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
       [Fintype d₃] [DecidableEq d₃] (ρ : MState d₁) (e : d₂ ≃ d₁) (f : d₃ ≃ d₂) :
