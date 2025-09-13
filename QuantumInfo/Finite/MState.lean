@@ -429,13 +429,13 @@ section ptrace
 def traceLeft (ρ : MState (d₁ × d₂)) : MState d₂ where
   M := ⟨ρ.m.traceLeft, ρ.M.H.traceLeft⟩
   zero_le :=  HermitianMat.zero_le_iff.mpr (ρ.pos.traceLeft)
-  tr := sorry --ρ.tr' ▸ ρ.m.traceLeft_trace
+  tr := by simp [trace]
 
 /-- Partial tracing out the right half of a system. -/
 def traceRight (ρ : MState (d₁ × d₂)) : MState d₁ where
   M := ⟨ρ.m.traceRight, ρ.M.H.traceRight⟩
   zero_le := HermitianMat.zero_le_iff.mpr (ρ.pos.traceRight)
-  tr := sorry --ρ.tr ▸ ρ.m.traceRight_trace
+  tr := by simp [trace]
 
 /-- Taking the direct product on the left and tracing it back out gives the same state. -/
 @[simp]
@@ -527,13 +527,21 @@ def purifyX (ρ : MState d) : { ψ : Ket (d × d) // (pure ψ).traceRight = ρ }
 
 end purification
 
+--PULLOUT
+omit [DecidableEq d₁] [DecidableEq d₂] in
+@[simp]
+theorem _root_.Matrix.trace_submatrix {α : Type*} [AddCommMonoid α]
+  (A : Matrix d₁ d₁ α) (e : d₂ ≃ d₁) :
+    (A.submatrix e e).trace = A.trace := by
+  simpa [Matrix.trace] using e.sum_comp (fun x ↦ A x x)
+
 def relabel (ρ : MState d₁) (e : d₂ ≃ d₁) : MState d₂ where
   M := {
     val := ρ.m.reindex e.symm e.symm
     property := ((Matrix.posSemidef_submatrix_equiv e).mpr ρ.pos).1
   }
   zero_le := (HermitianMat.zero_le_iff.trans (Matrix.posSemidef_submatrix_equiv e)).mpr <| ρ.pos
-  tr := sorry --ρ.tr ▸ Fintype.sum_equiv _ _ _ (congrFun rfl)
+  tr := by simp [trace]
 
 @[simp]
 theorem relabel_m (ρ : MState d₁) (e : d₂ ≃ d₁) :
