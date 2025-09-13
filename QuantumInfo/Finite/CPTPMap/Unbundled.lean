@@ -242,16 +242,15 @@ theorem kron [DecidableEq C] [Fintype D] {M₁ : MatrixMap A B R} {M₂ : Matrix
 --sketch: the Choi matrix of the Kron is the Kron of the Choi matrix, and Kron of PSD matrices is PSD.
 /-
       intro n M hM
-      let M' : Matrix (dI₁ × (dI₂ × Fin n)) (dI₁ × (dI₂ × Fin n)) ℂ := sorry --reorder indices of M
-      have hM' : M'.PosSemidef := sorry --PSD preserved under reordering
+      let M' : Matrix (dI₁ × (dI₂ × Fin n)) (dI₁ × (dI₂ × Fin n)) ℂ :=? --reorder indices of M
+      have hM' : M'.PosSemidef :=? --PSD preserved under reordering
       let Λ₁M := ((Λ₁.map.kron LinearMap.id) M')
       have hΛ₁M : Λ₁M.PosSemidef := Λ₁.completely_pos.def_Fintype (dI₂ × Fin n) hM'
-      let Λ₁M' : Matrix (dI₂ × (dO₁ × Fin n)) (dI₂ × (dO₁ × Fin n)) ℂ := sorry --reorder Λ₁M
-      have hΛ₁M' : Λ₁M'.PosSemidef := sorry --PSD preserved under reordering
+      let Λ₁M' : Matrix (dI₂ × (dO₁ × Fin n)) (dI₂ × (dO₁ × Fin n)) ℂ :=? --reorder Λ₁M
+      have hΛ₁M' : Λ₁M'.PosSemidef := ? --PSD preserved under reordering
       let Λ₂Λ₁M := (Λ₂.map.kron LinearMap.id) Λ₁M'
       have hΛ₂Λ₁M : Λ₂Λ₁M.PosSemidef := Λ₂.completely_pos.def_Fintype (dO₁ × Fin n) hΛ₁M'
       --PSD preserved under reordering to get (((Λ₁.map.MatrixMap_Prod Λ₂.map).MatrixMap_Prod LinearMap.id) M)
-      sorry
       -/
   sorry
 
