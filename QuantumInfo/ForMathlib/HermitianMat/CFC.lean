@@ -1,6 +1,66 @@
-import QuantumInfo.ForMathlib.HermitianMat.Basic
+import QuantumInfo.ForMathlib.HermitianMat.Order
 
---Matrix operations on RCLike matrices with the CFC
+--Matrix operations on HermitianMats with the CFC
+
+namespace Matrix
+
+open ComplexOrder
+
+variable {d 𝕜 : Type*} [Fintype d] [DecidableEq d] [RCLike 𝕜]
+
+@[simp]
+theorem cfc_diagonal (g : d → ℝ) (f : ℝ → ℝ) :
+    cfc f (Matrix.diagonal (fun x ↦ (g x : 𝕜))) = diagonal (RCLike.ofReal ∘ f ∘ g) := by
+  --Thanks Aristotle
+  have h_self_adjoint : _root_.IsSelfAdjoint (diagonal (fun x => (g x : 𝕜))) := by
+      change Matrix.conjTranspose _ = _
+      simp [Matrix.conjTranspose]
+  --TODO cfc_cont_tac
+  rw [cfc, dif_pos ⟨h_self_adjoint, continuousOn_iff_continuous_restrict.mpr <| by fun_prop⟩]
+  rw [cfcHom_eq_of_continuous_of_map_id]
+  rotate_left
+  · refine' { .. }
+    use fun f ↦ Matrix.diagonal fun x ↦ f ⟨g x, (by
+      simpa [algebraMap_eq_diagonal, diagonal_apply] using
+        congr_arg (· x x) ·.exists_left_inv.choose_spec
+      )⟩
+    · simp
+    · simp [diagonal, ← Matrix.ext_iff, mul_apply]
+      grind
+    · simp
+    · simp [diagonal, funext_iff]
+      grind [add_zero]
+    · simp [← ext_iff, diagonal]
+      exact fun r i j ↦ rfl
+    · simp [← ext_iff, diagonal]
+      grind [RCLike.conj_ofReal, map_zero]
+  · dsimp [diagonal]
+    continuity
+  · simp [diagonal]
+  · simp [diagonal]
+
+--PULLOUT
+theorem PosSemidef.pos_of_mem_spectrum {A : Matrix d d 𝕜} (hA : A.PosSemidef) (r : ℝ) :
+    r ∈ spectrum ℝ A → 0 ≤ r := by
+  intro hr
+  rw [hA.left.spectrum_real_eq_range_eigenvalues] at hr
+  rcases hr with ⟨i, rfl⟩
+  exact hA.eigenvalues_nonneg i
+
+--PULLOUT
+theorem PosSemidef.pow_add {A : Matrix d d 𝕜} (hA : A.PosSemidef) {x y : ℝ} (hxy : x + y ≠ 0) :
+    cfc (· ^ (x + y) : ℝ → ℝ) A = cfc (fun r ↦ r ^ x * r ^ y : ℝ → ℝ) A := by
+  refine cfc_congr fun r hr ↦ ?_
+  exact Real.rpow_add' (hA.pos_of_mem_spectrum r hr) hxy
+
+--PULLOUT
+theorem PosSemidef.pow_mul {A : Matrix d d 𝕜} {x y : ℝ} (hA : A.PosSemidef) :
+    cfc (· ^ (x * y) : ℝ → ℝ) A = cfc (fun r ↦ (r ^ x) ^ y : ℝ → ℝ) A := by
+  refine cfc_congr fun r hr ↦ ?_
+  exact Real.rpow_mul (hA.pos_of_mem_spectrum r hr) x y
+
+end Matrix
+
 
 namespace HermitianMat
 
@@ -15,46 +75,7 @@ noncomputable nonrec def cfc (A : HermitianMat d 𝕜) (f : ℝ → ℝ) : Hermi
 theorem cfc_diagonal (g : d → ℝ) (f : ℝ → ℝ) :
     cfc (HermitianMat.diagonal g) f = HermitianMat.diagonal (f ∘ g) := by
   ext1
-  dsimp [cfc, HermitianMat, HermitianMat.diagonal, HermitianMat.toMat]
-  --Thanks Aristotle, for this mess
-  rw [ _root_.cfc ];
-  split_ifs;
-  · -- By definition of the continuous functional calculus for diagonal matrices, we have that the cfc of a diagonal matrix is the diagonal matrix with the function applied to each entry.
-    change cfcHom (show IsSelfAdjoint (Matrix.diagonal (fun x => (g x : ℂ))) from by
-      -- Since $g(x)$ is real, the diagonal matrix with entries $g(x)$ is Hermitian.
-      -- Since the entries of the diagonal matrix are real, the conjugate transpose of the diagonal matrix is the same as the original matrix.
-      simp [IsSelfAdjoint, Star.star, Matrix.conjTranspose]
-      ext i j; by_cases hij : i = j <;> aesop) ⟨fun x => f x, continuous_of_discreteTopology⟩ = Matrix.diagonal (fun x => (f (g x) : ℂ))
-    erw [ cfcHom_eq_of_continuous_of_map_id ];
-    rotate_left;
-    refine' { .. };
-    use fun f => Matrix.diagonal fun x => f ⟨ g x, by
-      intro h;
-      obtain ⟨ u, hu ⟩ := h.exists_left_inv;
-      replace hu := congr_arg ( fun m => m x x ) hu ; simp_all ( config := { decide := Bool.true } ) [ Matrix.mul_apply ];
-      simp_all ( config := { decide := Bool.true } ) [ Matrix.algebraMap_eq_diagonal, Matrix.diagonal_apply ] ⟩;
-    simp +zetaDelta only [ContinuousMap.one_apply, Complex.ofReal_one, Matrix.diagonal_one] at *;
-    all_goals norm_num [ funext_iff, Matrix.diagonal ];
-    all_goals norm_num [ ← Matrix.ext_iff, Finset.mul_sum _ _ _, Finset.sum_mul, Matrix.mul_apply, Matrix.diagonal ];
-    · intros
-      split <;> simp_all only
-    · intros
-      split <;> simp_all only [add_zero]
-    · exact fun r i j => rfl;
-    · intros
-      split
-      · simp_all only [↓reduceIte, Complex.conj_ofReal]
-      · split <;> simp_all only [not_true_eq_false, map_zero]
-    · refine' continuous_pi_iff.mpr fun i => _
-      exact continuous_apply i |> Continuous.comp <| by continuity;
-  · rename_i h
-    rw [not_and] at h
-    -- Since the matrix is diagonal with real entries, it is self-adjoint.
-    have h_self_adjoint : IsSelfAdjoint (Matrix.diagonal (fun x => (g x : ℂ))) := by
-      change Matrix.conjTranspose _ = _
-      simp [Matrix.conjTranspose]
-    apply_mod_cast False.elim ( h h_self_adjoint _ );
-    exact continuousOn_iff_continuous_restrict.mpr continuous_of_discreteTopology
+  exact Matrix.cfc_diagonal g f
 
 theorem cfc_eigenvalues (A : HermitianMat d 𝕜) (f : ℝ → ℝ) :
     ∃ (e : d ≃ d), (A.cfc f).H.eigenvalues = f ∘ A.H.eigenvalues ∘ e :=
@@ -89,10 +110,20 @@ noncomputable instance instRPow : Pow (HermitianMat n 𝕜) ℝ :=
 theorem pow_eq_rpow (A : HermitianMat n 𝕜) (p : ℝ) : A ^ p = A.rpow p :=
   rfl
 
+theorem coe_pow_eq_cfc (A : HermitianMat n 𝕜) (p : ℝ) :
+    (A ^ p).toMat = _root_.cfc (· ^ p : ℝ → ℝ) A.toMat :=
+  rfl
+
 theorem diagonal_pow (f : n → ℝ) (p : ℝ) :
     (diagonal f) ^ p = diagonal fun i => (f i) ^ p := by
   simp [pow_eq_rpow, rpow]
   rfl
+
+@[simp]
+theorem pow_one (A : HermitianMat n 𝕜) : A ^ (1 : ℝ) = A := by
+  rw [HermitianMat.ext_iff, coe_pow_eq_cfc]
+  convert cfc_id ℝ A.toMat using 2
+  simp; rfl
 
 open ComplexOrder in
 theorem rpow_PosSemidef {A : HermitianMat n 𝕜} (hA : A.val.PosSemidef) (p : ℝ) : (A ^ p).val.PosSemidef := by
@@ -106,6 +137,40 @@ theorem rpow_PosSemidef {A : HermitianMat n 𝕜} (hA : A.val.PosSemidef) (p : �
   · simp only [RCLike.ofReal_re]
     exact Real.rpow_nonneg (hA.eigenvalues_nonneg i) p
   · simp only [RCLike.ofReal_im]
+
+theorem coe_rpow_add {A : HermitianMat n 𝕜} (hA : 0 ≤ A) {p q : ℝ} (hpq : p + q ≠ 0) :
+    (A ^ (p + q)).toMat = (A ^ p).toMat * (A ^ q).toMat := by
+  rw [zero_le_iff] at hA
+  rw [coe_pow_eq_cfc, coe_pow_eq_cfc, coe_pow_eq_cfc]
+  rw [hA.pow_add hpq]
+  apply cfc_mul
+  --TODO cfc_cont_tac
+  · exact continuousOn_iff_continuous_restrict.mpr <| by fun_prop
+  · exact continuousOn_iff_continuous_restrict.mpr <| by fun_prop
+
+theorem coe_rpow_mul {A : HermitianMat n 𝕜} (hA : 0 ≤ A) {p q : ℝ} :
+    (A ^ (p * q)) = ((A ^ p) ^ q) := by
+  rw [zero_le_iff] at hA
+  rw [HermitianMat.ext_iff, coe_pow_eq_cfc, coe_pow_eq_cfc, coe_pow_eq_cfc]
+  rw [hA.pow_mul]
+  apply cfc_comp (g := (· ^ q : ℝ → ℝ)) (f := (· ^ p : ℝ → ℝ)) A.toMat (hg := ?_) (hf := ?_)
+  --TODO cfc_cont_tac
+  · exact continuousOn_iff_continuous_restrict.mpr <| by fun_prop
+  · exact continuousOn_iff_continuous_restrict.mpr <| by fun_prop
+
+--PULLOUT
+@[simp]
+theorem conjTranspose_toMat {n α : Type*} [AddGroup α] [StarAddMonoid α]
+  (A : HermitianMat n α) :
+    A.toMat.conjTranspose = A :=
+  A.H
+
+theorem conj_rpow {A : HermitianMat n 𝕜} (hA : 0 ≤ A) {p q : ℝ}
+  (h₁ : p + q ≠ 0) (h₂ : p + 2 * q ≠ 0) :
+    (A ^ p).conj (A ^ q) = A ^ (p + 2 * q) := by
+  simp only [HermitianMat.ext_iff, conj, val_eq_coe, mk_toMat, conjTranspose_toMat]
+  rw [← coe_rpow_add hA, ← coe_rpow_add hA]
+  <;> ring_nf at * <;> assumption
 
 /-- Matrix logarithm (base e) of a Hermitian matrix, as given by the elementwise
   real logarithm of the diagonal in a diagonalized form, using `Real.log`
