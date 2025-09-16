@@ -401,11 +401,58 @@ theorem qRelativeEnt_additive (ρ₁ σ₁ : MState d₁) (ρ₂ σ₂ : MState 
     𝐃(ρ₁ ⊗ ρ₂‖σ₁ ⊗ σ₂) = 𝐃(ρ₁‖σ₁) + 𝐃(ρ₂‖σ₂) := by
   simp [qRelativeEnt]
 
-/-- Relative entropy is continuous (in each argument, actually, but we only need in the
-latter here). Will need the fact that all the cfc / eigenvalue stuff is continuous, which
-is going to make this a pain. -/
+--PULLOUT
+attribute [fun_prop] LowerSemicontinuous
+attribute [fun_prop] LowerSemicontinuousOn
+attribute [fun_prop] LowerSemicontinuous.lowerSemicontinuousOn
+
+theorem _root_.IsCompact.exists_isMinOn_lowerSemicontinuousOn {α β : Type*}
+  [LinearOrder α] [TopologicalSpace α] [TopologicalSpace β] [ClosedIicTopology α]
+  {s : Set β} (hs : IsCompact s) (ne_s : s.Nonempty) {f : β → α} (hf : LowerSemicontinuousOn f s) :
+    ∃ x ∈ s, IsMinOn f s x := by
+  --Thanks Aristotle
+  -- By the Extreme Value Theorem for lower semicontinuous functions on compact sets, there exists x in s such that f(x) is the minimum value of f on s.
+  have h_extreme : ∃ x ∈ s, ∀ y ∈ s, f x ≤ f y := by
+    by_contra! h;
+    choose! g hg using h;
+    -- For each $x \in s$, since $f$ is lower semicontinuous at $x$, there exists a neighborhood $U_x$ of $x$ such that $f(y) > f(g(x))$ for all $y \in U_x \cap s$.
+    have h_neighborhood : ∀ x ∈ s, ∃ U : Set β, IsOpen U ∧ x ∈ U ∧ ∀ y ∈ U ∩ s, f y > f (g x) := by
+      intro x hx;
+      have := hf x hx;
+      rcases mem_nhdsWithin_iff_exists_mem_nhds_inter.mp ( this ( f ( g x ) ) ( hg x hx |>.2 ) ) with ⟨ U, hU, hU' ⟩;
+      exact ⟨ interior U, isOpen_interior, mem_interior_iff_mem_nhds.mpr hU, fun y hy => hU' ⟨ interior_subset hy.1, hy.2 ⟩ ⟩;
+    choose! U hU using h_neighborhood;
+    -- Since $s$ is compact, the open cover $\{U_x \cap s \mid x \in s\}$ has a finite subcover.
+    obtain ⟨t, ht⟩ : ∃ t : Finset β, (∀ x ∈ t, x ∈ s) ∧ s ⊆ ⋃ x ∈ t, U x ∩ s := by
+      -- Since $s$ is compact, the open cover $\{U_x \mid x \in s\}$ has a finite subcover.
+      obtain ⟨t, ht⟩ : ∃ t : Finset β, (∀ x ∈ t, x ∈ s) ∧ s ⊆ ⋃ x ∈ t, U x := by
+        exact hs.elim_nhds_subcover U fun x hx => IsOpen.mem_nhds ( hU x hx |>.1 ) ( hU x hx |>.2.1 );
+      exact ⟨ t, ht.1, fun x hx => by rcases Set.mem_iUnion₂.1 ( ht.2 hx ) with ⟨ y, hy, hy' ⟩ ; exact Set.mem_iUnion₂.2 ⟨ y, hy, ⟨ hy', hx ⟩ ⟩ ⟩;
+    -- Since $t$ is finite, there exists $x \in t$ such that $f(g(x))$ is minimal.
+    obtain ⟨x, hx⟩ : ∃ x ∈ t, ∀ y ∈ t, f (g x) ≤ f (g y) := by
+      apply_rules [ Finset.exists_min_image ];
+      -- Since $s$ is nonempty, there exists some $y \in s$.
+      obtain ⟨y, hy⟩ : ∃ y, y ∈ s := ne_s;
+      exact Exists.elim ( Set.mem_iUnion₂.1 ( ht.2 hy ) ) fun x hx => ⟨ x, hx.1 ⟩;
+    obtain ⟨ y, hy ⟩ := ht.2 ( hg x ( ht.1 x hx.1 ) |>.1 );
+    simp_all only [Set.mem_inter_iff, and_self, and_true, gt_iff_lt, and_imp, Set.mem_range]
+    obtain ⟨left, right⟩ := ht
+    obtain ⟨left_1, right_1⟩ := hx
+    obtain ⟨⟨w, rfl⟩, right_2⟩ := hy
+    simp_all only [Set.mem_iUnion, Set.mem_inter_iff, and_true, exists_prop]
+    obtain ⟨left_2, right_2⟩ := right_2
+    exact lt_irrefl _ ( lt_of_le_of_lt ( right_1 _ left_2 ) ( hU _ ( left _ left_2 ) |>.2.2 _ right_2 ( hg _ ( left _ left_1 ) ) ) );
+  -- By definition of IsMinOn, we need to show that for all y in s, f(x) ≤ f(y). This is exactly what h_extreme provides.
+  obtain ⟨x, hx_s, hx_min⟩ := h_extreme;
+  use x, hx_s;
+  exact hx_min
+
+
+/-- Relative entropy is lower semicontinuous (in each argument, actually, but we only need in the
+latter here). Will need the fact that all the cfc / eigenvalue stuff is continuous, plus
+carefully handling what happens with the kernel subspace, which will make this a pain. -/
 @[fun_prop]
-theorem qRelativeEnt.Continuous (ρ : MState d) : Continuous fun σ => 𝐃(ρ‖σ) := by
+theorem qRelativeEnt.LowerSemicontinuous (ρ : MState d) : LowerSemicontinuous fun σ => 𝐃(ρ‖σ) := by
   sorry
 
 /-- Joint convexity of Quantum relative entropy. We can't state this with `ConvexOn` because that requires

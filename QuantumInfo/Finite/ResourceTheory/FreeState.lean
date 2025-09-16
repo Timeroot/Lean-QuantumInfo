@@ -425,7 +425,8 @@ scoped notation "𝑅ᵣ" => RelativeEntResource
 
 theorem exists_isFree_relativeEntResource (ρ : MState (H i)) :
     ∃ σ ∈ IsFree, 𝐃(ρ‖σ) = 𝑅ᵣ ρ := by
-  obtain ⟨σ, hσ₁, hσ₂⟩ := IsCompact_IsFree.exists_isMinOn (s := IsFree (i := i)) (f := fun σ ↦ 𝐃(ρ‖σ))
+  obtain ⟨σ, hσ₁, hσ₂⟩ := IsCompact_IsFree.exists_isMinOn_lowerSemicontinuousOn
+    (s := IsFree (i := i)) (f := fun σ ↦ 𝐃(ρ‖σ))
     Set.Nonempty.of_subtype (by fun_prop)
   use σ, hσ₁
   rw [RelativeEntResource, ← hσ₂.iInf_eq hσ₁, ENNReal.ofNNReal, WithTop.coe_untop, iInf_subtype']

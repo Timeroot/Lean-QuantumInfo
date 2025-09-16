@@ -853,8 +853,8 @@ theorem GeneralizedQSteinsLemma {i : ι} (ρ : MState (H i)) {ε : Prob} (hε : 
 
     --Let σₘ be the state minimizing 𝐃(ρ⊗^m‖σₘ) over free states. This is guaranteed to exist since
     -- (1) the divergence is continuous and (2) the set of free states is compact.
-    have σₘ_exists (m : ℕ) := IsCompact_IsFree.exists_isMinOn Set.Nonempty.of_subtype
-      (f := fun σ ↦ 𝐃(ρ⊗^S[m]‖σ)) (by fun_prop)
+    have σₘ_exists (m : ℕ) := IsCompact_IsFree.exists_isMinOn_lowerSemicontinuousOn
+      Set.Nonempty.of_subtype (f := fun σ ↦ 𝐃(ρ⊗^S[m]‖σ)) (by fun_prop)
 
     have hσₘ1 (m) := (σₘ_exists m).choose_spec.left
     have hσₘ2 (m) := (σₘ_exists m).choose_spec.right
