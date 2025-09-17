@@ -20,8 +20,9 @@ def proj_le (A B : HermitianMat n 𝕜) : HermitianMat n 𝕜 :=
 -- Note this is in the opposite direction as in the Stein's Lemma paper, which uses `≥ₚ`
 -- as the default ordering. We offer the `≥ₚ` notation which is the same with the arguments
 -- flipped, similar to how `GT.gt` is defeq to `LT.lt` with arguments flipped.
-scoped[HermitianMat] notation "{" A " ≤ₚ " B "}" => proj_le A B
+-- We put the ≥ₚ first, since both can delaborate and we want to show the ≤ₚ one.
 scoped[HermitianMat] notation "{" A " ≥ₚ " B "}" => proj_le B A
+scoped[HermitianMat] notation "{" A " ≤ₚ " B "}" => proj_le A B
 
 variable (A B : HermitianMat n 𝕜)
 
