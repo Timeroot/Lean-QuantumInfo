@@ -1,66 +1,8 @@
 import QuantumInfo.ForMathlib.HermitianMat.Order
+import QuantumInfo.ForMathlib.HermitianMat.Reindex
+import QuantumInfo.ForMathlib.Isometry
 
---Matrix operations on HermitianMats with the CFC
-
-namespace Matrix
-
-open ComplexOrder
-
-variable {d 𝕜 : Type*} [Fintype d] [DecidableEq d] [RCLike 𝕜]
-
---PULLOUT
-@[simp]
-theorem cfc_diagonal (g : d → ℝ) (f : ℝ → ℝ) :
-    cfc f (Matrix.diagonal (fun x ↦ (g x : 𝕜))) = diagonal (RCLike.ofReal ∘ f ∘ g) := by
-  --Thanks Aristotle
-  have h_self_adjoint : _root_.IsSelfAdjoint (diagonal (fun x => (g x : 𝕜))) := by
-      change Matrix.conjTranspose _ = _
-      simp [Matrix.conjTranspose]
-  --TODO cfc_cont_tac
-  rw [cfc, dif_pos ⟨h_self_adjoint, continuousOn_iff_continuous_restrict.mpr <| by fun_prop⟩]
-  rw [cfcHom_eq_of_continuous_of_map_id]
-  rotate_left
-  · refine' { .. }
-    use fun f ↦ Matrix.diagonal fun x ↦ f ⟨g x, (by
-      simpa [algebraMap_eq_diagonal, diagonal_apply] using
-        congr_arg (· x x) ·.exists_left_inv.choose_spec
-      )⟩
-    · simp
-    · simp [diagonal, ← Matrix.ext_iff, mul_apply]
-      grind
-    · simp
-    · simp [diagonal, funext_iff]
-      grind [add_zero]
-    · simp [← ext_iff, diagonal]
-      exact fun r i j ↦ rfl
-    · simp [← ext_iff, diagonal]
-      grind [RCLike.conj_ofReal, map_zero]
-  · dsimp [diagonal]
-    continuity
-  · simp [diagonal]
-  · simp [diagonal]
-
---PULLOUT
-theorem PosSemidef.pos_of_mem_spectrum {A : Matrix d d 𝕜} (hA : A.PosSemidef) (r : ℝ) :
-    r ∈ spectrum ℝ A → 0 ≤ r := by
-  intro hr
-  rw [hA.left.spectrum_real_eq_range_eigenvalues] at hr
-  rcases hr with ⟨i, rfl⟩
-  exact hA.eigenvalues_nonneg i
-
---PULLOUT
-theorem PosSemidef.pow_add {A : Matrix d d 𝕜} (hA : A.PosSemidef) {x y : ℝ} (hxy : x + y ≠ 0) :
-    cfc (· ^ (x + y) : ℝ → ℝ) A = cfc (fun r ↦ r ^ x * r ^ y : ℝ → ℝ) A := by
-  refine cfc_congr fun r hr ↦ ?_
-  exact Real.rpow_add' (hA.pos_of_mem_spectrum r hr) hxy
-
---PULLOUT
-theorem PosSemidef.pow_mul {A : Matrix d d 𝕜} {x y : ℝ} (hA : A.PosSemidef) :
-    cfc (· ^ (x * y) : ℝ → ℝ) A = cfc (fun r ↦ (r ^ x) ^ y : ℝ → ℝ) A := by
-  refine cfc_congr fun r hr ↦ ?_
-  exact Real.rpow_mul (hA.pos_of_mem_spectrum r hr) x y
-
-end Matrix
+/-! Matrix operations on HermitianMats with the CFC -/
 
 namespace HermitianMat
 
@@ -85,15 +27,12 @@ variable (A : HermitianMat d 𝕜) (f : ℝ → ℝ) (g : ℝ → ℝ) (r : ℝ)
 theorem cfc_toMat : (cfc A f).toMat = _root_.cfc f A.toMat := by
   rfl
 
---PULLOUT
-@[simps]
-def reindex (e : d ≃ d₂) : HermitianMat d₂ 𝕜 :=
-  ⟨A.toMat.reindex e e, A.H.submatrix e.symm⟩
-
 /-- Reindexing a matrix commutes with applying the CFC. -/
 @[simp]
-theorem cfc_relabel (e : d ≃ d₂) : cfc (A.reindex e) f = (cfc A f).reindex e := by
-  sorry
+theorem cfc_reindex (e : d ≃ d₂) : cfc (A.reindex e) f = (cfc A f).reindex e := by
+  rw [HermitianMat.ext_iff]
+  simp only [cfc_toMat, reindex_coe]
+  exact Matrix.cfc_reindex f e
 
 -- @[fun_prop]
 -- protected theorem cfc_continuous (hf : Continuous f) :
@@ -102,7 +41,7 @@ theorem cfc_relabel (e : d ≃ d₂) : cfc (A.reindex e) f = (cfc A f).reindex e
 --   have := Continuous.cfc
 --   fun_prop
 
-/-! Here we git HermitianMat versions of many cfc theorems, like `cfc_id`, `cfc_sub`, `cfc_comp`,
+/-! Here we give HermitianMat versions of many cfc theorems, like `cfc_id`, `cfc_sub`, `cfc_comp`,
 etc. We need these because (as above) `HermitianMat.cfc` is different from `_root_.cfc`. -/
 
 @[simp]
@@ -257,6 +196,11 @@ theorem diagonal_pow (f : d → ℝ) (p : ℝ) :
 theorem pow_one : A ^ (1 : ℝ) = A := by
   simp [pow_eq_cfc]
 
+@[simp]
+theorem reindex_pow (A : HermitianMat d ℂ) (e : d ≃ d₂) (p : ℝ) :
+    A.reindex e ^ p = (A ^ p).reindex e := by
+  apply A.cfc_reindex
+
 --TODO Commented out because don't think I need it. Keeping it around a bit in case I need it later though...
 -- open ComplexOrder in
 -- theorem rpow_PosSemidef {A : HermitianMat n 𝕜} (hA : A.val.PosSemidef) (p : ℝ) : (A ^ p).val.PosSemidef := by
@@ -304,6 +248,6 @@ def log : HermitianMat d 𝕜 :=
 
 @[simp]
 theorem reindex_log (e : d ≃ d₂) : (A.reindex e).log = A.log.reindex e :=
-  cfc_relabel A Real.log e
+  cfc_reindex A Real.log e
 
 end CFC

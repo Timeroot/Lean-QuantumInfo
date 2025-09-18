@@ -527,14 +527,6 @@ def purifyX (ρ : MState d) : { ψ : Ket (d × d) // (pure ψ).traceRight = ρ }
 
 end purification
 
---PULLOUT
-omit [DecidableEq d₁] [DecidableEq d₂] in
-@[simp]
-theorem _root_.Matrix.trace_submatrix {α : Type*} [AddCommMonoid α]
-  (A : Matrix d₁ d₁ α) (e : d₂ ≃ d₁) :
-    (A.submatrix e e).trace = A.trace := by
-  simpa [Matrix.trace] using e.sum_comp (fun x ↦ A x x)
-
 @[simps]
 def relabel (ρ : MState d₁) (e : d₂ ≃ d₁) : MState d₂ where
   M := ρ.M.reindex e.symm

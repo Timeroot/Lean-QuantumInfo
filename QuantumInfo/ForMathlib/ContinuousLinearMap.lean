@@ -1,4 +1,4 @@
---For the first two lemmas
+--For the first three lemmas
 import Mathlib.Topology.Algebra.Module.LinearMap
 
 --For the third lemma
@@ -8,7 +8,9 @@ import Mathlib.Order.CompletePartialOrder
 
 namespace ContinuousLinearMap
 
-variable {R S : Type*} [Semiring R] [Semiring S] (σ : R →+* S) (M M₂ : Type*) [TopologicalSpace M] [AddCommMonoid M] [TopologicalSpace M₂] [AddCommMonoid M₂] [Module R M] [Module S M₂]
+variable {R S : Type*} [Semiring R] [Semiring S] (σ : R →+* S) (M M₂ : Type*)
+variable [TopologicalSpace M] [AddCommMonoid M] [TopologicalSpace M₂] [AddCommMonoid M₂]
+variable [Module R M] [Module S M₂]
 
 --These two theorems might look a bit silly as aliases of `LinearMap.____`, but they don't `simp` on their
 @[simp]
@@ -18,6 +20,10 @@ theorem range_zero [RingHomSurjective σ] : LinearMap.range (0 : M →SL[σ] M�
 @[simp]
 theorem ker_zero : LinearMap.ker (0 : M →SL[σ] M₂) = ⊤ :=
   LinearMap.ker_zero
+
+theorem ker_mk (f : M →ₛₗ[σ] M₂) (hf : Continuous f.toFun) :
+    LinearMap.ker (ContinuousLinearMap.mk f hf) = LinearMap.ker f := by
+  rfl
 
 end ContinuousLinearMap
 

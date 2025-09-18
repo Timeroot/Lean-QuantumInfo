@@ -866,3 +866,72 @@ theorem toEuclideanLin_one : Matrix.toEuclideanLin (1 : Matrix n n α) = .id := 
   simp [Matrix.toEuclideanLin]
 
 end
+
+section more_cfc
+
+open ComplexOrder
+
+variable {d 𝕜 : Type*} [Fintype d] [DecidableEq d] [RCLike 𝕜]
+
+@[simp]
+theorem cfc_diagonal (g : d → ℝ) (f : ℝ → ℝ) :
+    cfc f (Matrix.diagonal (fun x ↦ (g x : 𝕜))) = diagonal (RCLike.ofReal ∘ f ∘ g) := by
+  --Thanks Aristotle
+  have h_self_adjoint : _root_.IsSelfAdjoint (diagonal (fun x => (g x : 𝕜))) := by
+      change Matrix.conjTranspose _ = _
+      simp [Matrix.conjTranspose]
+  --TODO cfc_cont_tac
+  rw [cfc, dif_pos ⟨h_self_adjoint, continuousOn_iff_continuous_restrict.mpr <| by fun_prop⟩]
+  rw [cfcHom_eq_of_continuous_of_map_id]
+  rotate_left
+  · refine' { .. }
+    use fun f ↦ Matrix.diagonal fun x ↦ f ⟨g x, (by
+      simpa [algebraMap_eq_diagonal, diagonal_apply] using
+        congr_arg (· x x) ·.exists_left_inv.choose_spec
+      )⟩
+    · simp
+    · simp [diagonal, ← Matrix.ext_iff, mul_apply]
+      grind
+    · simp
+    · simp [diagonal, funext_iff]
+      grind [add_zero]
+    · simp [← ext_iff, diagonal]
+      exact fun r i j ↦ rfl
+    · simp [← ext_iff, diagonal]
+      grind [RCLike.conj_ofReal, map_zero]
+  · dsimp [diagonal]
+    continuity
+  · simp [diagonal]
+  · simp [diagonal]
+
+theorem PosSemidef.pos_of_mem_spectrum {A : Matrix d d 𝕜} (hA : A.PosSemidef) (r : ℝ) :
+    r ∈ spectrum ℝ A → 0 ≤ r := by
+  intro hr
+  rw [hA.left.spectrum_real_eq_range_eigenvalues] at hr
+  rcases hr with ⟨i, rfl⟩
+  exact hA.eigenvalues_nonneg i
+
+theorem PosSemidef.pow_add {A : Matrix d d 𝕜} (hA : A.PosSemidef) {x y : ℝ} (hxy : x + y ≠ 0) :
+    cfc (· ^ (x + y) : ℝ → ℝ) A = cfc (fun r ↦ r ^ x * r ^ y : ℝ → ℝ) A := by
+  refine cfc_congr fun r hr ↦ ?_
+  exact Real.rpow_add' (hA.pos_of_mem_spectrum r hr) hxy
+
+theorem PosSemidef.pow_mul {A : Matrix d d 𝕜} {x y : ℝ} (hA : A.PosSemidef) :
+    cfc (· ^ (x * y) : ℝ → ℝ) A = cfc (fun r ↦ (r ^ x) ^ y : ℝ → ℝ) A := by
+  refine cfc_congr fun r hr ↦ ?_
+  exact Real.rpow_mul (hA.pos_of_mem_spectrum r hr) x y
+
+end more_cfc
+
+section subm
+
+variable {α : Type*} [AddCommMonoid α]
+variable {d₁ d₂ : Type*} [Fintype d₁] [Fintype d₂]
+
+@[simp]
+theorem trace_submatrix
+  (A : Matrix d₁ d₁ α) (e : d₂ ≃ d₁) :
+    (A.submatrix e e).trace = A.trace := by
+  simpa [Matrix.trace] using e.sum_comp (fun x ↦ A x x)
+
+end subm
