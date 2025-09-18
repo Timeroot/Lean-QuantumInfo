@@ -254,10 +254,97 @@ theorem sandwichedRelRentropy_additive (α) (ρ₁ σ₁ : MState d₁) (ρ₂ �
   -/
 
 --PULLOUT
+section linearEquiv
+variable {d d₂ d₃ d₄ R 𝕜 : Type*} [CommSemiring R] [RCLike 𝕜]
+variable [Fintype d]
+variable [Fintype d₂] [DecidableEq d₂]
+
+variable (R) in
+@[simps]
+def LinearEquiv.of_relabel (e : d ≃ d₂) : (d₂ → R) ≃ₗ[R] (d → R) := by
+  refine' { e.symm.piCongrLeft (fun _ ↦ R) with .. }
+  <;> (intros; ext; simp [Equiv.piCongrLeft_apply])
+
+variable (𝕜) in
+@[simps!]
+def LinearEquiv.euclidean_of_relabel (e : d ≃ d₂) : EuclideanSpace 𝕜 d₂ ≃ₗ[𝕜] EuclideanSpace 𝕜 d :=
+  of_relabel 𝕜 e
+
+omit [Fintype d] in
+@[simp]
+theorem LinearEquiv.of_relabel_refl : of_relabel R (.refl d) = LinearEquiv.refl R (d → R) := by
+  rfl
+
+@[simp]
+theorem LinearEquiv.euclidean_of_relabel_refl : euclidean_of_relabel 𝕜 (.refl d) =
+    LinearEquiv.refl 𝕜 (EuclideanSpace 𝕜 d) := by
+  rfl
+
+variable [DecidableEq d] in
+theorem Matrix.reindex_toLin' (e : d₄ ≃ d₃) (f : d₂ ≃ d) (M : Matrix d₄ d₂ R) :
+    (M.reindex e f).toLin' = (LinearEquiv.of_relabel R e.symm) ∘ₗ
+      M.toLin' ∘ₗ (LinearEquiv.of_relabel R f) := by
+  ext
+  simp [mulVec, dotProduct, Equiv.piCongrLeft_apply]
+
+variable [DecidableEq d] [Fintype d₃] [Fintype d₄] in
+theorem Matrix.reindex_toEuclideanLin (e : d₄ ≃ d₃) (f : d₂ ≃ d) (M : Matrix d₄ d₂ 𝕜) :
+    (M.reindex e f).toEuclideanLin = (LinearEquiv.euclidean_of_relabel 𝕜 e.symm) ∘ₗ
+      M.toEuclideanLin ∘ₗ (LinearEquiv.euclidean_of_relabel 𝕜 f) :=
+  Matrix.reindex_toLin' e f M
+
+variable [DecidableEq d] in
+theorem Matrix.reindex_right_toLin' (e : d ≃ d₂) (M : Matrix d₃ d R) :
+    (M.reindex (.refl d₃) e).toLin' = M.toLin' ∘ₗ (LinearEquiv.of_relabel R e) := by
+  rw [Matrix.reindex_toLin']
+  simp
+
+omit [Fintype d] in
+theorem Matrix.reindex_left_toLin' (e : d ≃ d₃) (M : Matrix d d₂ R) :
+    (M.reindex e (.refl d₂)).toLin' = (LinearEquiv.of_relabel R e.symm) ∘ M.toLin' := by
+  rw [Matrix.reindex_toLin']
+  simp
+
+variable [DecidableEq d] in
+theorem Matrix.reindex_right_toEuclideanLin (e : d ≃ d₂) (M : Matrix d₃ d 𝕜) :
+    (M.reindex (.refl d₃) e).toEuclideanLin =
+      M.toEuclideanLin ∘ₗ (LinearEquiv.euclidean_of_relabel 𝕜 e) :=
+  Matrix.reindex_right_toLin' e M
+
+variable [Fintype d₃] in
+theorem Matrix.reindex_left_toEuclideanLin (e : d ≃ d₃) (M : Matrix d d₂ 𝕜) :
+    (M.reindex e (.refl d₂)).toEuclideanLin =
+      (LinearEquiv.euclidean_of_relabel 𝕜 e.symm) ∘ M.toEuclideanLin := by
+  rw [Matrix.reindex_toEuclideanLin]
+  simp
+
+end linearEquiv
+section ker
+
+variable {R S M M₂ : Type*} [Semiring R] [Semiring S] {σ : R →+* S}
+  [TopologicalSpace M] [AddCommMonoid M]
+  [TopologicalSpace M₂] [AddCommMonoid M₂]
+  [Module R M] [Module S M₂]
+theorem ContinuousLinearMap.ker_mk (f : M →ₛₗ[σ] M₂) (hf : Continuous f.toFun) :
+    LinearMap.ker (ContinuousLinearMap.mk f hf) = LinearMap.ker f := by
+  rfl
+
+end ker
+
+--PULLOUT
+theorem _root_.HermitianMat.ker_reindex (A : HermitianMat d ℂ) (e : d ≃ d₂) :
+    (A.reindex e).ker = A.ker.comap (LinearEquiv.euclidean_of_relabel ℂ e) := by
+  dsimp only [HermitianMat.reindex, HermitianMat.ker, HermitianMat.lin]
+  simp only [ContinuousLinearMap.ker_mk, HermitianMat.val_eq_coe, HermitianMat.mk_toMat]
+  rw [Matrix.reindex_toEuclideanLin, LinearEquiv.ker_comp, LinearMap.ker_comp]
+  rfl
+
 @[simp]
 theorem _root_.HermitianMat.ker_reindex_le (A B : HermitianMat d ℂ) (e : d ≃ d₂) :
     (A.reindex e).ker ≤ (B.reindex e).ker ↔ A.ker ≤ B.ker := by
-  sorry
+  rw [HermitianMat.ker_reindex, HermitianMat.ker_reindex]
+  apply Submodule.comap_le_comap_iff_of_surjective
+  exact LinearEquiv.surjective (LinearEquiv.euclidean_of_relabel ℂ e)
 
 omit [DecidableEq d] [DecidableEq d₂] in
 @[simp]
