@@ -54,6 +54,11 @@ instance instStar : Star (HermitianMat n α) :=
 instance instTrivialStar : TrivialStar (HermitianMat n α) :=
   ⟨(refl ·)⟩
 
+@[simp]
+theorem conjTranspose_toMat (A : HermitianMat n α) :
+    A.toMat.conjTranspose = A :=
+  A.H
+
 end addgroup
 section commring
 

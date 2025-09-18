@@ -253,47 +253,86 @@ theorem sandwichedRelRentropy_additive (α) (ρ₁ σ₁ : MState d₁) (ρ₂ �
   rinner of ⊗ is mul of rinner
   -/
 
+--PULLOUT
 @[simp]
-theorem sandwichedRelRentropy_relabel {d d₂ : Type*} [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂]
-      {α : ℝ} (ρ σ : MState d) (e : d₂ ≃ d) :
-    D̃_ α(ρ.relabel e‖σ.relabel e) = D̃_ α(ρ‖σ) := by
+theorem _root_.HermitianMat.ker_reindex_le (A B : HermitianMat d ℂ) (e : d ≃ d₂) :
+    (A.reindex e).ker ≤ (B.reindex e).ker ↔ A.ker ≤ B.ker := by
   sorry
-  /-
-  unfold qRelativeEnt
-  split_ifs with h₁ h₂ h₂
-  · congr 2
-    simp only [HermitianMat.inner, MState.relabel_m, RCLike.re_to_complex]
-    congr 1
-    --Push relabels through matrix log
-    --Use the fact that Matrix.trace (m.submatrix ⇑e ⇑e) = Matrix.trace m
-    sorry
-  rotate_right
-  · rfl
-  --The rest of this is about kernels of linear maps under equivs. Probably belongs elsewhere
-  all_goals
-    dsimp [MState.relabel] at h₁
-    sorry
-    -- simp only [Matrix.toLin'_submatrix] at h₁
-    -- have hbot : LinearMap.ker (LinearMap.funLeft ℂ ℂ ⇑e) = ⊥ := by
-    --   apply LinearMap.ker_eq_bot_of_inverse
-    --   rw [← LinearMap.funLeft_comp, Equiv.self_comp_symm]
-    --   rfl
-    -- rw [LinearMap.ker_comp_of_ker_eq_bot _ hbot, LinearMap.ker_comp] at h₁
-    -- rw [LinearMap.ker_comp_of_ker_eq_bot _ hbot, LinearMap.ker_comp] at h₁
-  -- case neg =>
-  --   apply h₂
-  --   have hsurj : Function.Surjective ⇑(LinearMap.funLeft ℂ ℂ ⇑e.symm) :=
-  --     LinearMap.funLeft_surjective_of_injective _ _ _ e.symm.injective
-  --   replace h₁ := Submodule.map_mono h₁ (f := LinearMap.funLeft ℂ ℂ ⇑e.symm)
-  --   rw [Submodule.map_comap_eq_of_surjective hsurj] at h₁
-  --   rw [Submodule.map_comap_eq_of_surjective hsurj] at h₁
-  --   exact h₁
-  -- case pos =>
-  --   exact h₁ (Submodule.comap_mono h₂)
-  -/
+
+omit [DecidableEq d] [DecidableEq d₂] in
+@[simp]
+theorem _root_.HermitianMat.reindex_inner (A : HermitianMat d ℂ) (B : HermitianMat d₂ ℂ) (e : d ≃ d₂) :
+    (A.reindex e).inner B = A.inner (B.reindex e.symm) := by
+  dsimp [HermitianMat.inner]
+  congr
+  rw (occs := [3,4]) [← e.symm_symm]
+  rw [← Matrix.submatrix_id_mul_right]
+  rw (occs := [2]) [Matrix.trace_mul_comm]
+  rw [Matrix.submatrix_id_mul_right, Matrix.trace_mul_comm, Equiv.symm_symm]
+
+omit [Fintype d] [Fintype d₂] [DecidableEq d] [DecidableEq d₂] in
+/-- Our simp-normal form for expressions involving `HermitianMat.reindex` is that we try to push
+the index as far out as possible; and in places where it commutes (like `HermitianMat.inner`) we
+push it to the right side. -/
+@[simp]
+theorem _root_.HermitianMat.reindex_sub (A B : HermitianMat d ℂ) (e : d ≃ d₂) :
+    A.reindex e - B.reindex e = (A - B).reindex e := by
+  simp [HermitianMat.ext_iff, Matrix.submatrix_sub]
 
 @[simp]
-theorem sandwichedRelRentropy_self {d : Type*} [Fintype d] [DecidableEq d] {α : ℝ} (ρ : MState d) :
+theorem _root_.HermitianMat.reindex_pow (A : HermitianMat d ℂ) (e : d ≃ d₂) (p : ℝ) :
+    A.reindex e ^ p = (A ^ p).reindex e := by
+  apply A.cfc_relabel
+
+omit [Fintype d₃] [DecidableEq d] [DecidableEq d₂] [DecidableEq d₃] in
+@[simp]
+theorem _root_.HermitianMat.reindex_conj (A : HermitianMat d ℂ) (B : Matrix d₃ d₂ ℂ) (e : d ≃ d₂) :
+    (A.reindex e).conj B = A.conj (B.submatrix id e) := by
+  ext1
+  simp only [HermitianMat.conj, HermitianMat.reindex_coe, Matrix.reindex_apply, HermitianMat.mk_toMat]
+  rw [← Matrix.submatrix_id_mul_right, Matrix.mul_assoc]
+  rw [← Matrix.submatrix_id_mul_left, ← Matrix.mul_assoc]
+  simp
+
+omit [Fintype d₂] [Fintype d₃] [DecidableEq d] [DecidableEq d₂] [DecidableEq d₃] in
+@[simp]
+theorem _root_.HermitianMat.conj_submatrix (A : HermitianMat d ℂ) (B : Matrix d₂ d₄ ℂ)
+  (e : d₃ ≃ d₂) (f : d → d₄) :
+    A.conj (B.submatrix e f) = (A.conj (B.submatrix id f)).reindex e.symm := by
+  ext1
+  simp [HermitianMat.conj, ← Matrix.submatrix_mul_equiv (e₂ := .refl d)]
+
+omit [Fintype d] [Fintype d₂] [Fintype d₃] [DecidableEq d] [DecidableEq d₂] [DecidableEq d₃] in
+@[simp]
+theorem _root_.HermitianMat.reindex_redinex (A : HermitianMat d ℂ) (e : d ≃ d₂) (f : d₂ ≃ d₃) :
+    (A.reindex e).reindex f = A.reindex (e.trans f) := by
+  ext1; simp; rfl
+
+omit [Fintype d] [DecidableEq d] in
+@[simp]
+theorem _root_.HermitianMat.reindex_refl (A : HermitianMat d ℂ) :
+    A.reindex (.refl _) = A := by
+  rfl
+
+omit [DecidableEq d] [DecidableEq d₂] in
+@[simp]
+theorem _root_.HermitianMat.trace_reindex (A : HermitianMat d ℂ) (e : d ≃ d₂) :
+    (A.reindex e).trace = A.trace := by
+  simp [HermitianMat.reindex, HermitianMat.trace_eq_re_trace]
+--END PULLOUT SECTION
+
+@[simp]
+theorem sandwichedRelRentropy_relabel {α : ℝ} (ρ σ : MState d) (e : d₂ ≃ d) :
+    D̃_ α(ρ.relabel e‖σ.relabel e) = D̃_ α(ρ‖σ) := by
+  simp only [SandwichedRelRentropy, MState.relabel_M]
+  rw [HermitianMat.ker_reindex_le] --Why doesn't this `simp`? Because it's an if condition, I'm guessing
+  simp
+
+@[simp]
+theorem sandwichedRelRentropy_self {d : Type*} [Fintype d] [DecidableEq d] {α : ℝ}
+    (hα : 0 < α) (ρ : MState d) :
+  --Technically this holds for all α except for `-1` and `0`. But those are stupid.
+  --TODO: Maybe SandwichedRelRentropy should actually be defined differently for α = 0?
     D̃_ α(ρ‖ρ) = 0 := by
   simp? [SandwichedRelRentropy, NNReal.eq_iff] says
     simp only [SandwichedRelRentropy, le_refl, ↓reduceIte, sub_self, HermitianMat.inner_zero,
@@ -301,37 +340,21 @@ theorem sandwichedRelRentropy_self {d : Type*} [Fintype d] [DecidableEq d] {α :
     div_eq_zero_iff, Real.log_eq_zero]
   intro hα
   left; right; left
-  simp [HermitianMat.conj, HermitianMat.pow_eq_rpow, HermitianMat.rpow, HermitianMat.cfc]
-  simp [HermitianMat.trace_eq_re_trace]
+  rw [HermitianMat.pow_eq_cfc, HermitianMat.pow_eq_cfc]
+  nth_rw 1 [← HermitianMat.cfc_id ρ.M]
+  rw [HermitianMat.cfc_conj, ← HermitianMat.cfc_comp]
   conv =>
-    enter [1, 1, 1, 2, 1, 2]
-    rw [← cfc_id ℝ ρ.m ρ.M.H]
-  have := cfc_mul (fun x => x ^ ((1 - α) / (2 * α)) : ℝ → ℝ) id ρ.m
-    (by rw [continuousOn_iff_continuous_restrict]; fun_prop) (by fun_prop)
-  -- rw [← this] --Why doesn't this work?
-  conv =>
-    enter [1, 1, 1, 2, 1]
-    -- rw [← this] --This explains why
-    exact this.symm
-  conv =>
-    enter [1, 1, 1, 2]
-    rw [Matrix.IsHermitian.eq]
-    exact (cfc_mul _ _ _ (by rw [continuousOn_iff_continuous_restrict]; fun_prop)
-      (by rw [continuousOn_iff_continuous_restrict]; fun_prop)).symm
-    exact cfc_predicate _ _
-  rw [← cfc_comp (ha := ?_) (hg := ?_) (hf := ?_)]; rotate_left
-  · exact ρ.M.H
-  · rw [continuousOn_iff_continuous_restrict]; fun_prop
-  · rw [continuousOn_iff_continuous_restrict]; fun_prop
-  conv =>
-    enter [1, 1, 1, 1]
-    equals id =>
-      ext x
-      --This actually fails when `x < 0`, we need to specialize this to be specifically on nonnegspectrum
-      sorry
-  conv =>
-    enter [1, 1, 1]
-    exact cfc_id ℝ ρ.m ρ.M.H --Ugghh
+    enter [1, 1]
+    equals ρ.M.cfc id =>
+      apply HermitianMat.cfc_congr_of_zero_le ρ.zero_le
+      intro i (hi : 0 ≤ i)
+      simp
+      rw [← Real.rpow_mul_natCast hi, ← Real.rpow_one_add' hi]
+      · rw [← Real.rpow_mul hi]
+        field_simp
+        ring_nf
+        exact Real.rpow_one i
+      · field_simp; ring_nf; positivity
   simp
 
 open ComplexOrder in

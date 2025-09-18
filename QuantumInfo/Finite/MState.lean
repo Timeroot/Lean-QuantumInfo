@@ -535,11 +535,9 @@ theorem _root_.Matrix.trace_submatrix {α : Type*} [AddCommMonoid α]
     (A.submatrix e e).trace = A.trace := by
   simpa [Matrix.trace] using e.sum_comp (fun x ↦ A x x)
 
+@[simps]
 def relabel (ρ : MState d₁) (e : d₂ ≃ d₁) : MState d₂ where
-  M := {
-    val := ρ.m.reindex e.symm e.symm
-    property := ((Matrix.posSemidef_submatrix_equiv e).mpr ρ.pos).1
-  }
+  M := ρ.M.reindex e.symm
   zero_le := (HermitianMat.zero_le_iff.trans (Matrix.posSemidef_submatrix_equiv e)).mpr <| ρ.pos
   tr := by simp [trace]
 

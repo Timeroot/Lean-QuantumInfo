@@ -289,11 +289,40 @@ theorem qRelEntropy_statePow (ρ σ : MState (H i)) (n : ℕ) :
     rw [statePow_succ, statePow_succ, qRelEntropy_prodRelabel]
     simp [ih, add_mul]
 
+--PULLOUT: MState.lean
+@[simp]
+theorem _root_.MState.default_M [Fintype d] [DecidableEq d] [Unique d] : (default : MState d).M = 1 := by
+  simp [MState.instInhabited, MState.uniform]
+  rfl
+
+--PULLOUT: HermitianMat/CFC.lean
+@[simp]
+theorem _root_.HermitianMat.one_rpow [Fintype d] [DecidableEq d] (r : ℝ) :
+    (1 : HermitianMat d ℂ) ^ r = 1 := by
+  rcases isEmpty_or_nonempty d
+  · apply Subsingleton.allEq
+  · nth_rw 2 [← HermitianMat.cfc_id (1 : HermitianMat d ℂ)]
+    exact HermitianMat.cfc_congr 1 (by simp)
+
+--PULLOUT: HermitianMat/Trace.lean
+@[simp]
+theorem _root_.HermitianMat.trace_one [Fintype d] [DecidableEq d] :
+    (1 : HermitianMat d ℂ).trace = (Fintype.card d) := by
+  simp [HermitianMat.trace_eq_re_trace]
+
+--PULLOUT: Entropy.lean
+@[simp]
+theorem _root_.sandwichedRelRentropy_of_unique [Fintype d] [DecidableEq d] [Unique d]
+  (ρ σ : MState d) (α : ℝ) :
+    D̃_α(ρ‖σ) = 0 := by
+  simp [Subsingleton.allEq ρ default, Subsingleton.allEq σ default, SandwichedRelRentropy]
+
 @[simp]
 theorem sandwichedRelRentropy_statePow {α : ℝ} (ρ σ : MState (H i)) (n : ℕ) :
     D̃_ α(ρ⊗^S[n] ‖ σ⊗^S[n]) = n * D̃_ α(ρ‖σ) := by
   induction n
-  · simp
+  · rw [statePow_zero, statePow_zero, spacePow_zero]
+    simp
   · rename_i n ih
     rw [statePow_succ, statePow_succ, sandwichedRelRentropy_prodRelabel]
     simp [ih, add_mul]

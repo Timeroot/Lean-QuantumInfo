@@ -242,9 +242,6 @@ private theorem inner_zero_iff_aux_lemma [DecidableEq n] (hA₁ : A.val.PosSemid
       exact fun v => h_range_ker ( LinearMap.mem_range_self _ v )
     have h_herm : A.val * B.val = (B.val * A.val).conjTranspose := by
       simp [Matrix.conjTranspose_mul]
-      congr
-      · exact A.2.symm
-      · exact B.2.symm
     have hBA_zero : (B.val * A.val) = 0 := by
       ext i j
       specialize hAB_zero (Pi.single j 1)
