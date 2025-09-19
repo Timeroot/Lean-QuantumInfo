@@ -10,13 +10,16 @@ variable [CommRing R] [StarRing R]
 
 variable {𝕜 : Type*} [RCLike 𝕜] {A B : Matrix d d 𝕜}
 
-/-- An isometry is a matrix `A` such that `AAᴴ = 1`. Compare with a
-unitary, which requires `AAᴴ = AᴴA = 1`. -/
+/-- An isometry is a matrix `A` such that `AAᴴ = 1`. Compare with a unitary, which
+requires `AAᴴ = AᴴA = 1`. It is common to claim that, in a finite-dimensional vector
+space, a two-sided isometry (`A.Isometry ∧ Aᴴ.Isometry`) must be square and therefore unitary;
+this is does not work out so well here, since a `Matrix m n R` can be a two-sided isometry,
+but cannot be a `unitary` since the rows and columns are index by different labels. -/
 def Matrix.Isometry (A : Matrix d d₂ R) : Prop :=
-  A * Aᴴ = 1
+  Aᴴ * A = 1
 
-omit [Fintype d₂] [DecidableEq d₃] in
-theorem Matrix.submatrix_one_isometry {e : d₂ → d} {f : d₃ → d} (he : e.Injective) (hf : f.Bijective) :
+omit [Fintype d₃] [DecidableEq d₂] in
+theorem Matrix.submatrix_one_isometry {e : d₂ → d} {f : d₃ → d} (he : e.Bijective) (hf : f.Injective) :
     (submatrix (α := R) 1 e f).Isometry := by
   -- Since $e$ is injective and $f$ is bijective, the submatrix of the identity matrix formed by $e$ and $f$ is a permutation matrix.
   have h_perm : ∀ i j, (Matrix.submatrix (1 : Matrix d d R) e f) i j = if e i = f j then 1 else 0 := by
@@ -24,42 +27,43 @@ theorem Matrix.submatrix_one_isometry {e : d₂ → d} {f : d₃ → d} (he : e.
     simp [Matrix.submatrix, Matrix.one_apply];
   ext i j
   -- Since $e$ is injective and $f$ is bijective, the product $A * Aᴴ$ will have 1s on the diagonal and 0s elsewhere, which is the identity matrix.
-  change ∑ k, (Matrix.submatrix (1 : Matrix d d R) e f) i k * (Matrix.conjTranspose (Matrix.submatrix (1 : Matrix d d R) e f)) k j = if i = j then 1 else 0
-  simp_all only [Multiset.bijective_iff_map_univ_eq_univ, submatrix_apply, conjTranspose_apply, ite_mul, one_mul,
-      zero_mul]
-  split
+  change ∑ k, (Matrix.conjTranspose (Matrix.submatrix (1 : Matrix d d R) e f)) i k *
+    (Matrix.submatrix (1 : Matrix d d R) e f) k j = if i = j then 1 else 0
+  simp_all only [Multiset.bijective_iff_map_univ_eq_univ, submatrix_apply, conjTranspose_apply, one_apply]
+  symm; split <;> symm
   next h =>
     subst h
-    simp_all only [↓reduceIte, star_one, Finset.sum_boole]
-    have h_unique : ∀ i, ∃! x, f x = e i := by
+    simp_all only [implies_true, mul_ite, ↓reduceIte, star_one, mul_one, star_zero, mul_zero,
+      Finset.sum_boole]
+    have h_unique : ∀ i, ∃! x, e x = f i := by
       intro i
-      obtain ⟨x, hx⟩ : ∃ x, f x = e i := by
-        replace hf := congr_arg Multiset.toFinset hf; rw [ Finset.ext_iff ] at hf; specialize hf ( e i ) ; aesop;
+      obtain ⟨x, hx⟩ : ∃ x, e x = f i := by
+        replace he := congr_arg Multiset.toFinset he; rw [ Finset.ext_iff ] at he; specialize he ( f i ) ; aesop;
       use x
       simp_all only [true_and]
       intro y a
-      have := Fintype.bijective_iff_injective_and_card f
+      have := Fintype.bijective_iff_injective_and_card e
       aesop
     obtain ⟨ x, hx ⟩ := h_unique i;
-    rw [ show ( Finset.univ.filter fun y => e i = f y ) = { x } from Finset.eq_singleton_iff_unique_mem.2 ⟨ by aesop, fun y hy => hx.2 y <| Eq.symm <| Finset.mem_filter.1 hy |>.2 ⟩ ] ; simp ( config := { decide := Bool.true } );
+    rw [ show ( Finset.univ.filter fun y => e y = f i ) = { x } from Finset.eq_singleton_iff_unique_mem.2 ⟨ by aesop, fun y hy => hx.2 y <| Eq.symm <| Finset.mem_filter.1 hy |>.2.symm ⟩ ] ; simp ( config := { decide := Bool.true } );
   next h => -- Since $e$ is injective and $e i \neq e j$, there is no $x$ such that $e i = f x$ and $e j = f x$.
-    have h_no_x : ∀ x : d₃, ¬(e i = f x ∧ e j = f x) := by
-      exact fun x hx => h ( he ( hx.1.trans hx.2.symm ) );
+    have h_no_x : ∀ x : d₂, ¬(e x = f i ∧ e x = f j) := by
+      exact fun x hx => h ( hf ( hx.1.symm.trans hx.2 ) );
     exact Finset.sum_eq_zero fun x hx => by specialize h_no_x x; aesop
 
 omit [DecidableEq d₂] in
 theorem Matrix.submatrix_one_id_left_isometry {e : d₂ → d} (he : e.Bijective) :
-    (submatrix (1 : Matrix d d R) id e).Isometry :=
-  submatrix_one_isometry Function.injective_id he
+    (submatrix (1 : Matrix d d R) e id).Isometry :=
+  submatrix_one_isometry he Function.injective_id
 
 omit [Fintype d₂] in
 theorem Matrix.submatrix_one_id_right_isometry {e : d₂ → d} (he : e.Injective) :
-    (submatrix (1 : Matrix d d R) e id).Isometry :=
-  submatrix_one_isometry he Function.bijective_id
+    (submatrix (1 : Matrix d d R) id e).Isometry :=
+  submatrix_one_isometry Function.bijective_id he
 
 theorem Matrix.mem_unitaryGroup_iff_isometry (A : Matrix d d R) :
     A ∈ unitaryGroup d R ↔ A.Isometry ∧ Aᴴ.Isometry := by
-  rw [Isometry, Isometry, and_comm, conjTranspose_conjTranspose]
+  rw [Isometry, Isometry, conjTranspose_conjTranspose]
   rfl
 
 theorem Equiv.Perm.permMatrix_mem_unitaryGroup (e : Perm d) :
@@ -77,7 +81,7 @@ theorem Equiv.Perm.permMatrix_mem_unitaryGroup (e : Perm d) :
     convert h_perm_ortho using 2;
     simp ( config := { decide := Bool.true } ) [ Matrix.star_eq_conjTranspose, Equiv.Perm.permMatrix ]
 
-omit [Fintype d₂] [DecidableEq d₃] in
+omit [Fintype d₃] [DecidableEq d₂] in
 theorem Matrix.reindex_one_isometry (e : d ≃ d₂) (f : d ≃ d₃) :
     (reindex (α := R) e f 1).Isometry := by
   -- Since $e$ and $f$ are bijections, the reindexing of the identity matrix by $e$ and $f$ is a permutation matrix, which is unitary.
@@ -110,11 +114,6 @@ theorem Matrix.reindex_eq_conj_unitaryGroup' (A : Matrix d d R) (e : Equiv.Perm 
   simp ( config := { decide := Bool.true } ) [ Matrix.mul_apply ];
   rw [ Finset.sum_eq_single ( e.symm j ) ] <;> aesop
 
-theorem Matrix.IsHermitian.conj_isometry {A : Matrix d d R} {u : Matrix d d₂ R}
-  (hA : A.IsHermitian) (hu : u.Isometry) :
-    (uᴴ * A * u).IsHermitian := by
-  sorry
-
 theorem Matrix.IsHermitian.eigenvalue_ext (hA : A.IsHermitian)
   (h : ∀ (v : d → 𝕜) (lam : 𝕜), A *ᵥ v = lam • v → B *ᵥ v = lam • v) :
     A = B := by
@@ -133,7 +132,7 @@ theorem Matrix.IsHermitian.eigenvalue_ext (hA : A.IsHermitian)
         exact h_diag v;
       refine' ⟨ c, fun i => ( hA.eigenvalues i ), hc, fun i => _ ⟩;
       convert hA.mulVec_eigenvectorBasis i;
-      ext; simp ( config := { decide := Bool.true } ) [ Matrix.mulVec, dotProduct ];
+      ext; simp ( config := { decide := Bool.true } ) [ ];
       (expose_names; exact Eq.symm (RCLike.real_smul_eq_coe_mul (hA.eigenvalues i) (x i_1)));
     -- By linearity of A and B, we can distribute them over the sum.
     intros v
@@ -141,7 +140,7 @@ theorem Matrix.IsHermitian.eigenvalue_ext (hA : A.IsHermitian)
     have hAv : A *ᵥ v = ∑ i, c i • lam i • (hA.eigenvectorBasis i) := by
       -- By linearity of matrix multiplication, we can distribute A over the sum.
       have hAv : A *ᵥ (∑ i, c i • (hA.eigenvectorBasis i)) = ∑ i, c i • A *ᵥ (hA.eigenvectorBasis i) := by
-        simp ( config := { decide := Bool.true } ) [ funext_iff, Matrix.mulVec_smul ];
+        simp ( config := { decide := Bool.true } ) [ funext_iff ];
         simp ( config := { decide := Bool.true } ) [ Matrix.mulVec, dotProduct, Finset.mul_sum _ _ _ ];
         exact fun _ => Finset.sum_comm.trans ( Finset.sum_congr rfl fun _ _ => Finset.sum_congr rfl fun _ _ => by ring );
       aesop
@@ -150,7 +149,7 @@ theorem Matrix.IsHermitian.eigenvalue_ext (hA : A.IsHermitian)
         -- By linearity of matrix multiplication, we can distribute $B$ over the sum.
         have hBv : B *ᵥ v = B *ᵥ (∑ i, c i • (hA.eigenvectorBasis i)) := by
           rw [hv];
-        simp ( config := { decide := Bool.true } ) [ hBv, funext_iff, Matrix.mulVec_smul ];
+        simp ( config := { decide := Bool.true } ) [ hBv, funext_iff ];
         simp ( config := { decide := Bool.true } ) [ Matrix.mulVec, dotProduct, Finset.mul_sum _ _ _ ];
         exact fun _ => Finset.sum_comm.trans ( Finset.sum_congr rfl fun _ _ => Finset.sum_congr rfl fun _ _ => by ring );
       exact hBv.trans ( Finset.sum_congr rfl fun i _ => by rw [ h _ _ ( hlam i ) ] )
@@ -158,14 +157,54 @@ theorem Matrix.IsHermitian.eigenvalue_ext (hA : A.IsHermitian)
   -- By the definition of matrix equality, if $A * v = B * v$ for all $v$, then $A = B$.
   apply Matrix.ext; intro i j; exact (by
   simpa using congr_fun ( h_diag ( Pi.single j 1 ) ) i)
+set_option pp.proofs.withType true
+/-- Generalizes `Matrix.IsHermitian.cfc.eq_1`, which gives a definition for the matrix CFC in terms of
+`Matrix.IsHermitian.eigenvalues` and `Matrix.IsHermitian.eigenvectorUnitary`, to show that the CFC works
+similarly for _any_ diagonalization by a two-sided isometry.
+-/
+theorem Matrix.IsHermitian.cfc_eq_any_isometry {n m 𝕜 : Type*}
+  [RCLike 𝕜] [Fintype n] [DecidableEq n] [Fintype m] [DecidableEq m]
+  {A : Matrix n n 𝕜} (hA : A.IsHermitian) {U : Matrix n m 𝕜}
+  (hU₁ : U * Uᴴ = 1) (hU₂ : Uᴴ * U = 1) {D : m → ℝ}
+  (hUD : A = U * diagonal (RCLike.ofReal ∘ D) * Uᴴ) (f : ℝ → ℝ) :
+    hA.cfc f = U * diagonal (RCLike.ofReal ∘ f ∘ D) * Uᴴ := by
+  sorry
+
+/-- Generalizes `Matrix.IsHermitian.cfc.eq_1`, which gives a definition for the matrix CFC in terms of
+`Matrix.IsHermitian.eigenvalues` and `Matrix.IsHermitian.eigenvectorUnitary`, to show that the CFC works
+similarly for _any_ diagonalization.
+-/
+theorem Matrix.IsHermitian.cfc_eq_any_unitary {n 𝕜 : Type*} [RCLike 𝕜] [Fintype n] [DecidableEq n]
+  {A : Matrix n n 𝕜} (hA : A.IsHermitian) {U : unitaryGroup n 𝕜} {D : n → ℝ}
+  (hUD : A = U.val * diagonal (RCLike.ofReal ∘ D) * star U.val) (f : ℝ → ℝ) :
+    hA.cfc f = U.val * diagonal (RCLike.ofReal ∘ f ∘ D) * star U.val :=
+  Matrix.IsHermitian.cfc_eq_any_isometry hA U.2.2 U.2.1 hUD f
 
 private theorem Matrix.cfc_conj_isometry' (hA : A.IsHermitian) (f : ℝ → ℝ) {u : Matrix d₂ d 𝕜}
   (hu₁ : u.Isometry) (hu₂ : uᴴ.Isometry) :
     cfc f (u * A * uᴴ) = u * (cfc f A) * uᴴ := by
-  apply Matrix.IsHermitian.eigenvalue_ext
-  · exact cfc_predicate f (u * A * uᴴ)
-  intro v lam h
-  sorry
+
+  let D := hA.eigenvalues
+  let U' := u * hA.eigenvectorUnitary.val
+  have := IsHermitian.cfc_eq_any_isometry
+    (A := u * A * uᴴ) (D := D) (n := d₂) (m := d) (U := U') ?_ ?_ ?_ ?_ f; rotate_left
+  · simpa using isHermitian_conjTranspose_mul_mul uᴴ hA
+  · dsimp [U']
+    rw [conjTranspose_mul, Matrix.mul_assoc]
+    nth_rw 2 [← Matrix.mul_assoc]
+    rw [show _ * _ᴴ = 1 from hA.eigenvectorUnitary.2.2, Matrix.one_mul]
+    simpa [Isometry] using hu₂
+  · dsimp [U']
+    rw [conjTranspose_mul, Matrix.mul_assoc]
+    nth_rw 2 [← Matrix.mul_assoc]
+    rw [hu₁, Matrix.one_mul]
+    exact hA.eigenvectorUnitary.2.1
+  · rw [hA.spectral_theorem]
+    simp [U', Matrix.mul_assoc]
+    rfl
+  rw [Matrix.IsHermitian.cfc_eq, this]
+  rw [hA.cfc_eq, Matrix.IsHermitian.cfc.eq_1]
+  simp [U', D, Matrix.star_eq_conjTranspose, Matrix.mul_assoc]
 
 theorem Matrix.cfc_conj_isometry (f : ℝ → ℝ) {u : Matrix d₂ d 𝕜}
   (hu₁ : u.Isometry) (hu₂ : uᴴ.Isometry) :
@@ -176,8 +215,8 @@ theorem Matrix.cfc_conj_isometry (f : ℝ → ℝ) {u : Matrix d₂ d 𝕜}
   · simp
   · exact hA
   · contrapose! hA
-    convert Matrix.IsHermitian.conj_isometry (A := u * A * uᴴ) (u := u) hA hu₁
-    have hu₃ : uᴴ * u = 1 := by rw [← hu₂]; simp
+    convert isHermitian_conjTranspose_mul_mul u hA
+    have hu₃ : uᴴ * u = 1 := by simpa [Isometry] using hu₁
     simp only [Matrix.mul_assoc, hu₃]
     simp [← Matrix.mul_assoc, hu₃]
 
