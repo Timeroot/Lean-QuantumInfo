@@ -1,4 +1,4 @@
-import QuantumInfo.ForMathlib.HermitianMat.Basic
+import QuantumInfo.ForMathlib.HermitianMat.Reindex
 
 /-! # Trace of Hermitian Matrices
 
@@ -103,7 +103,7 @@ end trivialstar
 
 section RCLike
 
-variable {n 𝕜 : Type*} [Fintype n] [RCLike 𝕜]
+variable {n m 𝕜 : Type*} [Fintype n] [Fintype m] [RCLike 𝕜]
 
 --strictly speaking this works over any division ring, not just ℝ + RCLike
 instance FiniteDimensional : FiniteDimensional ℝ (HermitianMat n 𝕜) :=
@@ -138,5 +138,10 @@ theorem trace_eq_zero_iff (A : HermitianMat n 𝕜) : A.trace = 0 ↔ A.toMat.tr
 theorem trace_eq_one_iff (A : HermitianMat n 𝕜) : A.trace = 1 ↔ A.toMat.trace = 1 := by
   rw [← trace_eq_trace_rc]
   use mod_cast id, mod_cast id
+
+@[simp]
+theorem trace_reindex (A : HermitianMat n ℂ) (e : n ≃ m) :
+    (A.reindex e).trace = A.trace := by
+  simp [reindex, trace_eq_re_trace]
 
 end RCLike

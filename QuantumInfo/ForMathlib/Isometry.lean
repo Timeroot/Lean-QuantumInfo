@@ -157,6 +157,7 @@ theorem Matrix.IsHermitian.eigenvalue_ext (hA : A.IsHermitian)
   -- By the definition of matrix equality, if $A * v = B * v$ for all $v$, then $A = B$.
   apply Matrix.ext; intro i j; exact (by
   simpa using congr_fun ( h_diag ( Pi.single j 1 ) ) i)
+
 set_option pp.proofs.withType true
 /-- Generalizes `Matrix.IsHermitian.cfc.eq_1`, which gives a definition for the matrix CFC in terms of
 `Matrix.IsHermitian.eigenvalues` and `Matrix.IsHermitian.eigenvectorUnitary`, to show that the CFC works

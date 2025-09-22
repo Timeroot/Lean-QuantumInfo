@@ -37,64 +37,6 @@ theorem HermitianMat.trace_pos {n 𝕜 : Type*} [Fintype n] [RCLike 𝕜]
   rw [RCLike.pos_iff] at h_pos
   exact h_pos.left
 
---PULLOUT to Proj.lean
-section
-open HermitianMat
-
-variable {n 𝕜 : Type*} [RCLike 𝕜] [Fintype n] [DecidableEq n]
-
-/-- Projector onto the positive eigenspace of `B - A`. Accessible by the notation
-`{A <ₚ B}`, which is scoped to `HermitianMat`. Compare with `proj_le`. -/
-noncomputable def proj_lt (A B : HermitianMat n 𝕜) : HermitianMat n 𝕜 :=
-  (B - A).cfc (fun x ↦ if 0 < x then 1 else 0)
-
-scoped[HermitianMat] notation "{" A " >ₚ " B "}" => proj_lt B A
-scoped[HermitianMat] notation "{" A " <ₚ " B "}" => proj_lt A B
-
-variable (A B : HermitianMat n 𝕜)
-
-theorem proj_lt_cfc : {A <ₚ B} = cfc (fun x ↦ if 0 < x then (1 : ℝ) else 0) (B - A).toMat := by
-  simp only [proj_lt, HermitianMat.cfc]
-
-theorem proj_lt_zero_cfc : {A <ₚ 0} = cfc (fun x ↦ if x < 0 then (1 : ℝ) else 0) A.toMat := by
-  simp only [proj_lt, HermitianMat.cfc, mk_toMat]
-  simp only [zero_sub, NegMemClass.coe_neg, val_eq_coe]
-  rw [← cfc_comp_neg (hf := ?_)]
-  · grind
-  --TODO cfc_cont_tac
-  · simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology]
-
-theorem proj_lt_sq : {A <ₚ B}^2 = {A <ₚ B} := by
-  ext1
-  simp only [HermitianMat.val_eq_coe, selfAdjoint.val_pow, proj_lt_cfc]
-  rw [← cfc_pow _ 2 (hf := _)]
-  · simp
-  · simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology]
-
-theorem proj_lt_nonneg : 0 ≤ {A <ₚ B} := by
-  rw [← proj_lt_sq]
-  exact HermitianMat.sq_nonneg
-
-@[simp]
-theorem proj_le_add_lt : {A <ₚ B} + {B ≤ₚ A} = 1 := by
-  sorry
-
-theorem conj_le_add_conj_lt : A.conj {A <ₚ 0} + A.conj {0 ≤ₚ A} = A := by
-  rw [HermitianMat.ext_iff]
-  rw [proj_lt_zero_cfc, proj_le_cfc, conj, conj]
-  simp only [val_eq_coe, sub_zero, AddMemClass.mk_add_mk, mk_toMat]
-  rw (occs := [2, 5, 7]) [← cfc_id ℝ A.toMat]
-  rw [← cfc_mul (hf := ?_) (hg := ?_)]
-  rw [← cfc_mul (hf := ?_) (hg := ?_)]
-  --This is getting silly
-  sorry
-  · simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology]
-  · simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology]
-  · simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology]
-  · simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology]
-
-end
-
 variable (dIn dOut R : Type*) (𝕜 : Type := ℂ)
 variable [Fintype dIn] [Fintype dOut]
 variable [Semiring R] [RCLike 𝕜]
@@ -172,9 +114,10 @@ theorem funext_pos [Fintype dIn] (h : ∀ M : HermitianMat dIn ℂ, 0 ≤ M → 
   open scoped HermitianMat in
   apply funext_hermitian
   intro M
-  have hNonneg := h (M.conj {0 ≤ₚ M}) sorry--(proj_le_nonneg 0 M)
-  have hNeg := h ({M <ₚ 0}) (proj_lt_nonneg M 0)
-  sorry
+  have hPos := h M⁺ M.zero_le_posPart
+  have hNeg := h M⁻ M.negPart_le_zero --TODO: this is named incorrectly
+  rw [← M.posPart_add_negPart]
+  simp [hPos, hNeg]
 
 /-- Two maps are equal if they agree on all positive inputs with trace one -/
 theorem funext_pos_trace [Fintype dIn]
@@ -217,7 +160,6 @@ instance : ContinuousLinearMapClass
 
 end HPMap
 
-
 --Positive-preserving maps: continuous linear order-preserving maps on HermitianMats.
 namespace PMap
 
@@ -251,7 +193,6 @@ theorem pos_Hermitian (M : PMap dIn dOut ℂ) {x : HermitianMat dIn ℂ} (h : 0 
   simpa only [map_zero] using ContinuousOrderHomClass.map_monotone M h
 
 end PMap
-
 
 namespace CPMap
 

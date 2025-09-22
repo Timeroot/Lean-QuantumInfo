@@ -273,6 +273,7 @@ theorem LemmaS2 {ε3 : Prob} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
         apply le_of_lt
         exact h n hn
       have hβ : ∀ n ≥ n₀, β_ ε3(ρ n‖{σ n}) ≤ Real.exp (-n * (Rinf + ε4)) := fun n hn ↦ by -- Eq (S25)
+        open HermitianMat in
         calc
           β_ ε3(ρ n‖{σ n}) ≤ (σ n).exp_val (T n) := by
             have hβ' := OptimalHypothesisRate.singleton_le_exp_val (σ := σ n) (T n) (hT n hn) ⟨proj_le_nonneg _ _, proj_le_le_one _ _⟩
@@ -315,7 +316,7 @@ theorem LemmaS2 {ε3 : Prob} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
     apply Filter.isBoundedUnder_of
     use 0; intro n
     rw [HermitianMat.inner_comm, ← MState.exp_val]
-    exact MState.exp_val_nonneg (proj_le_nonneg (Real.exp (n * (Rinf + ε4)) • (σ n).M) (ρ n).M) (ρ n)
+    exact MState.exp_val_nonneg (HermitianMat.proj_le_nonneg (Real.exp (n * (Rinf + ε4)) • (σ n).M) (ρ n).M) (ρ n)
   · -- Basically the same proof as the Rinf case, but with liminf → limsup, ∀ᶠ → ∃ᶠ, etc.
     by_contra h
     push_neg at h
@@ -333,6 +334,7 @@ theorem LemmaS2 {ε3 : Prob} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
       have hβ (n₀) : ∃ n ≥ n₀, β_ ε3(ρ n‖{σ n}) ≤ Real.exp (-n * (Rsup + ε4)) := by -- Eq (S32)
         obtain ⟨n, hn, hT⟩ := hT n₀
         use n, hn
+        open HermitianMat in
         calc
           β_ ε3(ρ n‖{σ n}) ≤ (σ n).exp_val (T n) := by
             have hβ' := OptimalHypothesisRate.singleton_le_exp_val (σ := σ n) (T n) hT ⟨proj_le_nonneg _ _, proj_le_le_one _ _⟩
@@ -371,7 +373,7 @@ theorem LemmaS2 {ε3 : Prob} {ε4 : ℝ≥0} (hε4 : 0 < ε4)
     apply Filter.atTop.isCoboundedUnder_le_of_le (x := 0)
     intro n
     rw [HermitianMat.inner_comm, ← MState.exp_val]
-    exact MState.exp_val_nonneg (proj_le_nonneg (Real.exp (n * (Rsup + ε4)) • (σ n).M) (ρ n).M) (ρ n)
+    exact MState.exp_val_nonneg (HermitianMat.proj_le_nonneg (Real.exp (n * (Rsup + ε4)) • (σ n).M) (ρ n).M) (ρ n)
 
 private theorem LemmaS3_helper {ε : Prob} {d : ℕ → Type*} [∀ n, Fintype (d n)] [∀ n, DecidableEq (d n)]
   (ρ σ₁ σ₂ : (n : ℕ) → MState (d n))

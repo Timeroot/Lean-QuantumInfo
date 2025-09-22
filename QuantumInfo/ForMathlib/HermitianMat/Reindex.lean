@@ -1,4 +1,4 @@
-import QuantumInfo.ForMathlib.HermitianMat.Inner
+import QuantumInfo.ForMathlib.HermitianMat.Basic
 import QuantumInfo.ForMathlib.ContinuousLinearMap
 import QuantumInfo.ForMathlib.LinearEquiv
 
@@ -62,24 +62,7 @@ theorem conj_submatrix (A : HermitianMat d ℂ) (B : Matrix d₂ d₄ ℂ)
   ext1
   simp [conj, ← Matrix.submatrix_mul_equiv (e₂ := .refl d)]
 
-variable [Fintype d₂]
-
-@[simp]
-theorem trace_reindex (A : HermitianMat d ℂ) (e : d ≃ d₂) :
-    (A.reindex e).trace = A.trace := by
-  simp [reindex, trace_eq_re_trace]
-
-@[simp]
-theorem reindex_inner (B : HermitianMat d₂ 𝕜) :
-    (A.reindex e).inner B = A.inner (B.reindex e.symm) := by
-  dsimp [inner]
-  congr
-  rw (occs := [3,4]) [← e.symm_symm]
-  rw [← Matrix.submatrix_id_mul_right]
-  rw (occs := [2]) [Matrix.trace_mul_comm]
-  rw [Matrix.submatrix_id_mul_right, Matrix.trace_mul_comm, Equiv.symm_symm]
-
-variable [DecidableEq d] [DecidableEq d₂]
+variable [Fintype d₂] [DecidableEq d] [DecidableEq d₂]
 
 theorem ker_reindex :
     (A.reindex e).ker = A.ker.comap (LinearEquiv.euclidean_of_relabel 𝕜 e) := by
