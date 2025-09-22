@@ -196,6 +196,7 @@ private theorem inner_zero_iff_aux_lemma [DecidableEq n] (hA₁ : A.val.PosSemid
   RCLike.re (A.val * B.val).trace = 0 ↔
     LinearMap.range (Matrix.toEuclideanLin A.val) ≤
       LinearMap.ker (Matrix.toEuclideanLin B.val) := by
+  --Thanks Aristotle
   have h_trace_zero : (RCLike.re ((A.val * B.val).trace)) = 0 ↔ (A.val * B.val) = 0 := by
     -- Since $A$ and $B$ are positive semidefinite, we can write them as $A = C^* C$ and $B = D^* D$ for some matrices $C$ and $D$.
     obtain ⟨C, hC⟩ : ∃ C : Matrix n n 𝕜, A.val = C.conjTranspose * C := by
@@ -317,8 +318,9 @@ theorem inner_bilinForm_Continuous (A : HermitianMat d 𝕜) : Continuous ⇑(He
   LinearMap.continuous_of_finiteDimensional _
 
 @[fun_prop]
-theorem inner_continuous (A : HermitianMat d 𝕜) : Continuous (A.inner) := by
-  exact inner_bilinForm_Continuous A
+theorem inner_continuous : Continuous ((HermitianMat.inner (n := d) (α := 𝕜)).uncurry) := by
+  rw [funext₂ inner_eq_re_trace]
+  fun_prop
 
 end topology
 
@@ -382,12 +384,120 @@ repeats some proof from Mathlib.
 private theorem topo_compat_1 :
     letI : Inner ℝ (HermitianMat d 𝕜) := InnerProductCore.toInner;
     ContinuousAt (fun v : HermitianMat d 𝕜 ↦ Inner.inner ℝ v v) 0 := by
-  sorry
+  change ContinuousAt (fun v ↦ HermitianMat.inner v v) 0
+  fun_prop
+
+private theorem topo_compat_2_aux {d 𝕜 : Type*} [Fintype d] [RCLike 𝕜]
+  (x : Set ↥(selfAdjoint (Matrix d d 𝕜))) (h : x ∈ nhds 0) :
+  ∃ a, ∀ (b : ℝ), a ≤ b →
+    {v : (selfAdjoint (Matrix d d 𝕜)) | RCLike.re (v.val * v.val).trace < 1} ⊆ (open Pointwise in b • x) := by
+  --Thanks Aristotle
+  rw [ mem_nhds_iff ] at h;
+  cases' h with t ht;
+  -- Since $t$ is open and contains $0$, there exists an $\epsilon > 0$ such that the ball of radius $\epsilon$ around $0$ is contained in $t$.
+  obtain ⟨ε, hε⟩ : ∃ ε > 0, ∀ v : selfAdjoint (Matrix d d 𝕜), (RCLike.re (Matrix.trace (v.val * v.val))) < ε → v ∈ t := by
+    have := ht.2.1.mem_nhds ht.2.2;
+    rw [ mem_nhds_iff ] at this;
+    obtain ⟨ U, hU₁, hU₂, hU₃ ⟩ := this;
+    rw [ isOpen_induced_iff ] at hU₂;
+    simp_all only [gt_iff_lt, val_eq_coe, Subtype.forall, mk_toMat]
+    obtain ⟨left, right⟩ := ht
+    obtain ⟨w, h⟩ := hU₂
+    obtain ⟨left_1, right⟩ := right
+    obtain ⟨left_2, right_1⟩ := h
+    subst right_1
+    simp_all only [Set.mem_preimage, val_eq_coe, ZeroMemClass.coe_zero]
+    -- Since $w$ is open and contains $0$, there exists an $\epsilon > 0$ such that the ball of radius $\epsilon$ in the Frobenius norm is contained in $w$.
+    obtain ⟨ε, hε⟩ : ∃ ε > 0, ∀ a : Matrix d d 𝕜, (∑ i, ∑ j, ‖a i j‖ ^ 2) < ε → a ∈ w := by
+      have := left_2.mem_nhds hU₃;
+      -- Since $w$ is open and contains $0$, there exists a $\delta > 0$ such that the ball of radius $\delta$ in the Frobenius norm is contained in $w$.
+      obtain ⟨δ, hδ⟩ : ∃ δ > 0, ∀ a : Matrix d d 𝕜, (∑ i, ∑ j, ‖a i j‖ ^ 2) < δ ^ 2 → a ∈ w := by
+        rw [ mem_nhds_iff ] at this;
+        obtain ⟨ t, ht₁, ht₂, ht₃ ⟩ := this;
+        rw [ isOpen_pi_iff ] at ht₂;
+        obtain ⟨ I, u, hu₁, hu₂ ⟩ := ht₂ 0 ht₃;
+        -- Since $u$ is a neighborhood of $0$ in the product topology, there exists a $\delta > 0$ such that the ball of radius $\delta$ in the product topology is contained in $u$.
+        obtain ⟨δ, hδ⟩ : ∃ δ > 0, ∀ a : d → d → 𝕜, (∀ i ∈ I, ∀ j, ‖a i j‖ < δ) → a ∈ (I : Set d).pi u := by
+          have hδ : ∀ i ∈ I, ∃ δ_i > 0, ∀ a : d → 𝕜, (∀ j, ‖a j‖ < δ_i) → a ∈ u i := by
+            intro i hi;
+            have := hu₁ i hi;
+            rcases Metric.isOpen_iff.1 this.1 ( 0 : d → 𝕜 ) this.2 with ⟨ δ, δpos, hδ ⟩;
+            -- Since the ball of radius δ in the product topology is contained in u i, we can take δ_i = δ.
+            use δ, δpos;
+            intro a ha;
+            -- Since $a$ is such that for all $j$, $\|a j\| < \delta$, we have $a \in \text{ball}(0, \delta)$.
+            have ha_ball : a ∈ Metric.ball (0 : d → 𝕜) δ := by
+              simp ( config := { decide := Bool.true } ) [ Metric.mem_ball, dist_eq_norm ];
+              exact (pi_norm_lt_iff δpos).mpr ha;
+            exact hδ ha_ball;
+          choose! δ hδ₁ hδ₂ using hδ;
+          -- Since $I$ is finite, we can take the minimum of the $\delta_i$'s.
+          obtain ⟨δ_min, hδ_min⟩ : ∃ δ_min > 0, ∀ i ∈ I, δ_min ≤ δ i := by
+            by_cases hI : I.Nonempty;
+            · exact ⟨ Finset.min' ( I.image δ ) ⟨ _, Finset.mem_image_of_mem δ hI.choose_spec ⟩, by have := Finset.min'_mem ( I.image δ ) ⟨ _, Finset.mem_image_of_mem δ hI.choose_spec ⟩ ; aesop, fun i hi => Finset.min'_le _ _ ( Finset.mem_image_of_mem δ hi ) ⟩;
+            · exact ⟨ 1, zero_lt_one, fun i hi => False.elim <| hI ⟨ i, hi ⟩ ⟩;
+          -- Since δ_min is positive and for each i in I, δ_min ≤ δ i, we can use δ_min as our δ.
+          use δ_min;
+          exact ⟨ hδ_min.1, fun a ha => fun i hi => hδ₂ i hi ( fun j => a i j ) fun j => lt_of_lt_of_le ( ha i hi j ) ( hδ_min.2 i hi ) ⟩;
+        refine' ⟨ δ / ( Finset.card I + 1 ), div_pos hδ.1 ( Nat.cast_add_one_pos _ ), fun a ha => ht₁ ( hu₂ ( hδ.2 a fun i hi j => _ ) ) ⟩;
+        contrapose! ha;
+        refine' le_trans _ ( Finset.single_le_sum ( fun i _ => Finset.sum_nonneg fun j _ => _root_.sq_nonneg ( ‖a i j‖ ) ) ( Finset.mem_univ i ) |> le_trans ( Finset.single_le_sum ( fun j _ => _root_.sq_nonneg ( ‖a i j‖ ) ) ( Finset.mem_univ j ) ) );
+        exact pow_le_pow_left₀ ( div_nonneg hδ.1.le ( by positivity ) ) ( le_trans ( div_le_self hδ.1.le ( by linarith ) ) ha ) _;
+      exact ⟨ δ ^ 2, sq_pos_of_pos hδ.1, hδ.2 ⟩;
+    refine' ⟨ ε, hε.1, fun a ha ha' => hU₁ <| hε.2 a _ ⟩;
+    -- Since $a$ is self-adjoint, the trace of $a^2$ is equal to the sum of the squares of its entries.
+    have h_trace_sq : Matrix.trace (a * a) = ∑ i, ∑ j, ‖a i j‖ ^ 2 := by
+      simp [ Matrix.trace, Matrix.mul_apply, sq ];
+      -- Since $a$ is self-adjoint, we have $a j x = \overline{a x j}$.
+      have h_self_adjoint : ∀ x j, a j x = starRingEnd 𝕜 (a x j) := by
+        -- Since $a$ is self-adjoint, we have $a = a^*$, which implies $a j x = \overline{a x j}$ for all $x$ and $j$.
+        have h_self_adjoint : a = star a := by
+          exact ha.symm;
+        exact fun x j => congr_fun ( congr_fun h_self_adjoint j ) x;
+      -- Since $a$ is self-adjoint, we have $a j x = \overline{a x j}$, so $a x j * a j x = a x j * \overline{a x j} = \|a x j\|^2$.
+      have h_self_adjoint : ∀ x j, a x j * a j x = ‖a x j‖ ^ 2 := by
+        intro x j; rw [ h_self_adjoint x j ] ; simp [ sq ] ;
+        simp[ ← sq, RCLike.mul_conj ];
+      exact Finset.sum_congr rfl fun i hi => Finset.sum_congr rfl fun j hj => by rw [ h_self_adjoint i j, sq ] ;
+    simp_all only [Matrix.zero_apply, norm_zero, ne_eq, OfNat.ofNat_ne_zero, not_false_eq_true, zero_pow,
+      Finset.sum_const_zero, gt_iff_lt, map_sum, map_pow]
+    convert ha' using 1;
+    norm_cast;
+  use 1 / ε + 1;
+  intro b hb v hv;
+  refine' ⟨ b⁻¹ • v, _, _ ⟩ <;> simp_all [ smul_smul ];
+  · refine' ht.1 ( hε.2 _ _ _ );
+    simp [ ← smul_assoc, RCLike.smul_re ];
+    rw [ ← mul_inv, inv_mul_lt_iff₀ ] <;> nlinarith [ inv_pos.2 hε.1, mul_inv_cancel₀ hε.1.ne' ];
+  · rw [ mul_inv_cancel₀ ( by linarith [ inv_pos.2 hε.1 ] ), one_smul ]
 
 private theorem topo_compat_2 :
     letI : Inner ℝ (HermitianMat d 𝕜) := InnerProductCore.toInner;
     Bornology.IsVonNBounded ℝ {v : HermitianMat d 𝕜 | RCLike.re (Inner.inner ℝ v v) < 1} := by
-  sorry
+  intro x h
+  rw [Absorbs]
+  simp only [RCLike.re_to_real, Real.cobounded_eq, Filter.eventually_sup, Filter.eventually_atBot,
+    Filter.eventually_atTop, ge_iff_le]
+  --This is two directions, which is redundant, we only need one
+  revert x h
+  suffices ∀ (x : Set (HermitianMat d 𝕜)), x ∈ nhds 0 → ∃ a, ∀ (b : ℝ), a ≤ b → {v : HermitianMat d 𝕜 |
+    letI : Inner ℝ (HermitianMat d 𝕜) := InnerProductCore.toInner; Inner.inner ℝ v v < 1} ⊆
+      (open Pointwise in b • x) by
+    intro x h
+    constructor
+    · specialize this (-x) (neg_mem_nhds_zero _ h)
+      rcases this with ⟨a, ha⟩
+      use -a
+      intro b hb
+      specialize ha (-b) (le_neg_of_le_neg hb)
+      simpa using ha
+    · exact this x h
+  intro x h
+  unfold HermitianMat at x
+  unfold Inner.inner InnerProductCore
+  dsimp
+  simp_rw [inner_eq_re_trace]
+  exact topo_compat_2_aux x h
 
 private theorem uniformity_compat (s : Set (HermitianMat d 𝕜 × HermitianMat d 𝕜)) :
   letI : Norm (HermitianMat d 𝕜) :=

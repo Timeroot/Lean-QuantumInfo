@@ -15,6 +15,7 @@ open ComplexOrder in
 theorem IsHermitian.spectrum_subset_Ici_of_sub {d 𝕜 : Type*} [Fintype d] [DecidableEq d] [RCLike 𝕜]
   {A x: Matrix d d 𝕜} (hA : A.IsHermitian) (hl : (x - A).PosSemidef) :
     spectrum ℝ x ⊆ Set.Ici (⨅ i, hA.eigenvalues i) := by
+  --Thanks Aristotle
   intro μ hμ
   obtain ⟨v, hv₁, hv₂⟩ : ∃ v : d → 𝕜, v ≠ 0 ∧ x.mulVec v = μ • v := by
     have h_singular : ∃ v : d → 𝕜, v ≠ 0 ∧ (μ • 1 - x).mulVec v = 0 := by
@@ -124,10 +125,8 @@ theorem IsHermitian.spectrum_subset_Iic_of_sub {d 𝕜 : Type*} [Fintype d] [Dec
     intro μ hμ
     specialize h (Set.neg_mem_neg.mpr hμ)
     rw [← Set.mem_neg, Set.neg_Ici] at h
-    convert h; clear h hμ μ
-    rw [iInf, iSup]
-    rw [← spectrum_real_eq_range_eigenvalues]
-    rw [← spectrum_real_eq_range_eigenvalues]
+    convert h
+    rw [iInf, iSup, ← spectrum_real_eq_range_eigenvalues, ← spectrum_real_eq_range_eigenvalues]
     rw [← spectrum.neg_eq, csInf_neg ?_ (A.finite_real_spectrum.bddAbove), neg_neg]
     exact IsSelfAdjoint.spectrum_nonempty hA
   · convert hl using 1
@@ -172,42 +171,6 @@ theorem cfc_reindex (e : d ≃ d₂) : cfc (A.reindex e) f = (cfc A f).reindex e
   rw [HermitianMat.ext_iff]
   simp only [cfc_toMat, reindex_coe]
   exact Matrix.cfc_reindex f e
-
-/- Here's the mess.
-
-We would like to get the following facts:
-1) CompactIccSpace - `{ M | A ≤ M ∧ M ≤ B}` is compact (and therefore also closed).
-2) The CFC is continuous, when the function `f : ℝ → ℝ` is continuous.
-3) Accordingly, the positive part function `A⁺` is continuous. (And the negative part `A⁻`.)
-4) Closed and half-infinite intervals (Set.Icc/Set.Ici/Set.Iic), `{ M | A ≤ M }` etc., are closed.
-  This is closed `ClosedIciTopology` and `ClosedIicTopology`.
-5) The space has `OrderClosedTopology`, so `{ (X, Y) : H × H | X ≤ Y }` is closed.
-
-Of course 1 and 5 both imply 4, and 2 implies 3. 2 "should" be unrelated to the rest.
-
-Note the following relations:
-7) The preimage of `{0}` under `A⁻` is precisely the PSD matrices, and since it's the preimage of a
-  closed set under a continuous map, this would prove `{ M | 0 ≤ M }` is closed, so we'd get the
-  ClosedIciTopology and ClosedIicTopology. So (3) gets us (4).
-8) More strongly, the preimage of `{0}` under `fun xy ↦ (x - y)⁺` is `{ (X, Y) : H × H | X ≤ Y }`, so
-  we would get the OrderClosedTopology too, so (3) actually gets us (5).
-9) We can prove the CompactIccSpace from boundedness (easy, with norms) and closedness. The latter
-  is precisely requiring Set.Icc is closed, so (1) follows from (4).
-
-So if we just prove (2), we're all good. But the way `Continuous.cfc` works, we can only get it on
-a compact set, not the whole space of operators, at once. We can show a function is continuous if
-we show that it's continuous an every set in some open cover, so then we would need to find an open
-cover such that each open set is contained in a compact set. (This exists precisely if the space
-is locally compact, `LocallyCompactSpace`.) But with no information right now about which set are
-compact, this is hard, so having CompactIccSpace would make this easier.v
-
-One way to do this then would be to "manually" prove that the set `{ M | 0 ≤ M }` is closed by
-going into the definition of Matrix.PosSemidef. (At the time of writing, this fact is not in Mathlib.)
-
-Another one is to the use `LocallyCompactSpace (HermitianMat d 𝕜)` instance derived from the
-MetricSpace structure. That's the one I'm going to do right now. This means that the continuity of
-the CFC only comes after getting the MetricSpace structure.
--/
 
 --Ensure we get this instance:
 /-- info: locallyCompact_of_proper -/
@@ -260,7 +223,7 @@ section frobenius
 open Matrix.Norms.Frobenius
 
 --This seems annoying. Matrices aren't a CStarAlgebra when 𝕜 = ℝ, of course. But if we get super stuck,
---we could just switchi this to being only for ℂ (so that the relevant facts in Mathlib make this easy),
+--we could just switch this to being only for ℂ (so that the relevant facts in Mathlib make this easy),
 --but this means also specializing a bunch of downtstream stuff.
 def _root_.Matrix.instIsometric : IsometricContinuousFunctionalCalculus ℝ (Matrix d d 𝕜) IsSelfAdjoint where
   isometric a ha := by
@@ -443,11 +406,6 @@ theorem pow_eq_rpow (p : ℝ) : A ^ p = A.rpow p :=
 theorem pow_eq_cfc (p : ℝ) : A ^ p = cfc A (· ^ p) :=
   rfl
 
---TODO Commented out because don't think I need it. Keeping it around a bit in case I need it later though...
--- theorem coe_pow_eq_cfc (p : ℝ) :
---     (A ^ p).toMat = _root_.cfc (· ^ p : ℝ → ℝ) A.toMat :=
---   rfl
-
 theorem diagonal_pow (f : d → ℝ) (p : ℝ) :
     (diagonal f) ^ p = diagonal fun i => (f i) ^ p := by
   simp [pow_eq_cfc]
@@ -461,20 +419,6 @@ theorem pow_one : A ^ (1 : ℝ) = A := by
 theorem reindex_pow (A : HermitianMat d ℂ) (e : d ≃ d₂) (p : ℝ) :
     A.reindex e ^ p = (A ^ p).reindex e := by
   apply A.cfc_reindex
-
---TODO Commented out because don't think I need it. Keeping it around a bit in case I need it later though...
--- open ComplexOrder in
--- theorem rpow_PosSemidef {A : HermitianMat n 𝕜} (hA : A.val.PosSemidef) (p : ℝ) : (A ^ p).val.PosSemidef := by
---   --TODO: Should prove the more general versions for f mapping ℝ≥0 → ℝ≥0 (if hA is PSD) or ℝ → ℝ≥0.
---   change (_root_.cfc _ A.toMat).PosSemidef
---   rw [A.H.cfc_eq, Matrix.IsHermitian.cfc]
---   apply Matrix.PosSemidef.mul_mul_conjTranspose_same
---   refine Matrix.posSemidef_diagonal_iff.mpr fun i ↦ ?_
---   rw [Function.comp_apply, RCLike.nonneg_iff]
---   constructor
---   · simp only [RCLike.ofReal_re]
---     exact Real.rpow_nonneg (hA.eigenvalues_nonneg i) p
---   · simp only [RCLike.ofReal_im]
 
 variable {A} in
 theorem coe_rpow_add (hA : 0 ≤ A) {p q : ℝ} (hpq : p + q ≠ 0) :
