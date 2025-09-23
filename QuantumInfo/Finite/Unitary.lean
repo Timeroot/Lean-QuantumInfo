@@ -43,16 +43,4 @@ def U_conj (ρ : MState d) (U : 𝐔[d]) : MState d where
   tr := by simp
   zero_le := HermitianMat.conj_le ρ.zero_le U.val
 
-/-- You might think this should only be true up to permutation, so that it would read like
-`∃ σ : Equiv.Perm d, (ρ.U_conj U).spectrum = ρ.spectrum.relabel σ`. But since eigenvalues
-of a matrix are always canonically sorted, this is actually an equality.
--/
-@[simp]
-theorem U_conj_spectrum_eq (ρ : MState d) (U : 𝐔[d]) :
-    (ρ.U_conj U).spectrum = ρ.spectrum := by
-  have (M : HermitianMat d ℂ) (U : 𝐔[d]) : (M.conj U).H.eigenvalues = M.H.eigenvalues := by
-    --missing simp lemma
-    sorry
-  simp [MState.spectrum, U_conj, this]
-
 end MState

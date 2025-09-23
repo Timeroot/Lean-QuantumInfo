@@ -37,11 +37,11 @@ is fixed, the declarations below should be changed to
 theorem subtype_val_iSup {ι α : Type*} [ConditionallyCompleteLattice α] {s : Set α} {f : ι → α}
     [Inhabited ↑s] [s.OrdConnected] (h : ∀ i, f i ∈ s) :
     (⨆ i, (⟨f i, h i⟩ : ↑s)).val = ⨆ i, f i := by
-  sorry
+  <snip>
 
 theorem subtype_val_iSup' {ι α : Type*} [ConditionallyCompleteLattice α] {s : Set α} {f : ι → α}
     [Inhabited ↑s] [s.OrdConnected] (h : ∀ i, f i ∈ s) :
-    ⨆ i, (⟨f i, h i⟩ : ↑s) = ⟨⨆ i, f i, by sorry⟩ := by
+    ⨆ i, (⟨f i, h i⟩ : ↑s) = ⟨⨆ i, f i, by <snip>⟩ := by
   rw [Subtype.eq_iff, subtype_val_iSup]
 ```
 Sadly, though, there's a "diamond" and we need it with the other data (the one we specify more narrowly

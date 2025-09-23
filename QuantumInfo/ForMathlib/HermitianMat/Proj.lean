@@ -228,16 +228,6 @@ theorem negPart_Continuous : Continuous (·⁻ : HermitianMat n 𝕜 → _) := b
   simp_rw [negPart_eq_cfc_min]
   fun_prop
 
--- --PULLOUT
--- theorem posPart_le_zero_iff [DecidableEq d] : A⁺ ≤ 0 ↔ A ≤ 0 := by
---   sorry
-
--- --PULLOUT
--- theorem posPart_eq_zero_iff [DecidableEq d] : A⁺ = 0 ↔ A ≤ 0 := by
---   rw [← posPart_le_zero_iff]
---   have := zero_le_posPart A
---   constructor <;> order
-
 --Many missing lemmas: see `Mathlib.Algebra.Order.Group.PosPart` for examples
 -- (They don't apply here since it's not a Lattice, and there's no well-defined `max` in
 --   the Loewner order.)

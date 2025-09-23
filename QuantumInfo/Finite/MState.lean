@@ -352,13 +352,6 @@ theorem pure_iff_constant_spectrum (ρ : MState d) : (∃ ψ, ρ = pure ψ) ↔
   ⟨fun h ↦ h.rec fun ψ h₂ ↦ h₂ ▸ spectrum_pure_eq_constant ψ,
   pure_of_constant_spectrum ρ⟩
 
-theorem pure_iff_purity_one (ρ : MState d) : (∃ ψ, ρ = pure ψ) ↔ ρ.purity = 1 := by
-  --purity = exp(-Collision entropy)
-  --purity eq 1 iff collision entropy is zero
-  --entropy is zero iff distribution is constant
-  --distribution is constant iff pure
-  sorry
-
 end pure
 
 section prod
@@ -455,18 +448,6 @@ theorem traceRight_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : traceRi
 
 end ptrace
 
--- TODO: direct sum (by zero-padding)
-
---TODO: Spectra of left- and right- partial traces of a pure state are equal.
-
-/-- Spectrum of direct product. There is a permutation σ so that the spectrum of the direct product of
-  ρ₁ and ρ₂, as permuted under σ, is the pairwise products of the spectra of ρ₁ and ρ₂. -/
-theorem spectrum_prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : ∃(σ : d₁ × d₂ ≃ d₁ × d₂),
-    ∀i, ∀j, MState.spectrum (ρ₁ ⊗ ρ₂) (σ (i, j)) = (ρ₁.spectrum i) * (ρ₂.spectrum j) := by
-  sorry
-
---TODO: Spectrum of direct sum. Spectrum of partial trace?
-
 /-- A mixed state is separable iff it can be written as a convex combination of product mixed states. -/
 def IsSeparable (ρ : MState (d₁ × d₂)) : Prop :=
   ∃ ρLRs : Finset (MState d₁ × MState d₂), --Finite set of (ρL, ρR) pairs
@@ -478,54 +459,6 @@ theorem IsSeparable_prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : IsSeparab
   let only := (ρ₁, ρ₂)
   use { only }, Distribution.constant ⟨only, Finset.mem_singleton_self only⟩
   simp [prod, Unique.eq_default, only]
-
-/-- A pure state is separable iff the ket is a product state. -/
-theorem pure_separable_iff_IsProd (ψ : Ket (d₁ × d₂)) :
-    IsSeparable (pure ψ) ↔ ψ.IsProd := by
-  sorry
-
-/-- A pure state is separable iff the partial trace on the left is pure. -/
-theorem pure_separable_iff_traceLeft_pure (ψ : Ket (d₁ × d₂)) : IsSeparable (pure ψ) ↔
-    ∃ ψ₁, pure ψ₁ = (pure ψ).traceLeft := by
-  sorry
-
---TODO: Separable states are convex
-
-section purification
-
-/-- The purification of a mixed state. Always uses the full dimension of the Hilbert space (d) to
- purify, so e.g. an existing pure state with d=4 still becomes d=16 in the purification. The defining
- property is `MState.traceRight_of_purify`; see also `MState.purify'` for the bundled version. -/
-def purify (ρ : MState d) : Ket (d × d) where
-  vec := fun (i,j) ↦
-    let ρ2 := ρ.Hermitian.eigenvectorUnitary i j
-    ρ2 * (ρ.Hermitian.eigenvalues j).sqrt
-  normalized' := by
-    have h₁ := fun i ↦ ρ.pos.eigenvalues_nonneg i
-    simp [mul_pow, Real.sq_sqrt, h₁, Fintype.sum_prod_type_right]
-    simp_rw [← Finset.sum_mul]
-    have : ∀x, ∑ i : d, ‖ρ.Hermitian.eigenvectorBasis x i‖ ^ 2 = 1 :=
-      sorry
-    apply @RCLike.ofReal_injective ℂ
-    simp_rw [this, one_mul, Matrix.IsHermitian.sum_eigenvalues_eq_trace]
-    exact ρ.tr'
-
-/-- The defining property of purification, that tracing out the purifying system gives the
- original mixed state. -/
-@[simp]
-theorem purify_spec (ρ : MState d) : (pure ρ.purify).traceRight = ρ := by
-  ext i j
-  simp_rw [purify, traceRight, Matrix.traceRight]
-  simp only [pure_of, Ket.apply]
-  simp only [map_mul]
-  simp_rw [mul_assoc, mul_comm, ← mul_assoc (Complex.ofReal _), Complex.mul_conj]
-  sorry
-
-/-- `MState.purify` bundled with its defining property `MState.traceRight_of_purify`. -/
-def purifyX (ρ : MState d) : { ψ : Ket (d × d) // (pure ψ).traceRight = ρ } :=
-  ⟨ρ.purify, ρ.purify_spec⟩
-
-end purification
 
 @[simps]
 def relabel (ρ : MState d₁) (e : d₂ ≃ d₁) : MState d₂ where
@@ -584,9 +517,6 @@ theorem relabel_cast {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁]
   gate on quantum circuits that leaves the qubit dimensions unchanged. Notably, it is not unitary. -/
 def SWAP (ρ : MState (d₁ × d₂)) : MState (d₂ × d₁) :=
   ρ.relabel (Equiv.prodComm d₁ d₂).symm
-
-def spectrum_SWAP (ρ : MState (d₁ × d₂)) : ∃ e, ρ.SWAP.spectrum.relabel e = ρ.spectrum := by
-  sorry
 
 @[simp]
 theorem SWAP_SWAP (ρ : MState (d₁ × d₂)) : ρ.SWAP.SWAP = ρ :=
@@ -651,13 +581,6 @@ theorem traceLeft_left_assoc (ρ : MState ((d₁ × d₂) × d₃)) :
 theorem traceRight_right_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
     ρ.assoc'.traceRight.traceRight = ρ.traceRight := by
   simp [assoc']
-
-@[simp]
-theorem traceNorm_eq_1 (ρ : MState d) : ρ.m.traceNorm = 1 :=
-  have := calc (ρ.m.traceNorm : ℂ)
-    _ = ρ.m.trace := ρ.pos.traceNorm_PSD_eq_trace
-    _ = 1 := ρ.tr'
-  Complex.ofReal_eq_one.mp this
 
 --TODO: This naming is very inconsistent. Should be better about "prod" vs "kron"
 
@@ -733,45 +656,6 @@ theorem image_M_isBounded (S : Set (MState d)) : Bornology.IsBounded (MState.M '
   exact Bornology.IsBounded.all S
 
 end topology
-
-section finprod
-
-variable {ι : Type u} [DecidableEq ι] [fι : Fintype ι]
-variable {dI : ι → Type v} [∀(i :ι), Fintype (dI i)] [∀(i :ι), DecidableEq (dI i)]
-
-def piProd (ρi : (i:ι) → MState (dI i)) : MState ((i:ι) → dI i) where
-  M := {
-    val j k := ∏ (i : ι), (ρi i).m (j i) (k i)
-    property := sorry
-  }
-  zero_le := by
-    rw [HermitianMat.zero_le_iff]
-    --Should be in Mathlib
-    constructor
-    · ext j k
-      dsimp
-      rw [map_prod]
-      congr! with i
-      exact Matrix.ext_iff.mpr ((ρi i).pos.isHermitian) (j i) (k i)
-    · intro v
-      sorry
-  tr := by
-    sorry
-    -- rw [HermitianMat.trace_eq_trace_rc]
-    -- convert (Finset.prod_univ_sum (κ := dI) (fun _ ↦ Finset.univ) (fun i_1 x ↦ (ρi i_1).m x x)).symm
-    -- symm
-    -- apply Finset.prod_eq_one
-    -- intro x hx
-    -- exact (ρi x).tr
-
-/-- The n-copy "power" of a mixed state, with the standard basis indexed by pi types. -/
-def npow (ρ : MState d) (n : ℕ) : MState (Fin n → d) :=
-  piProd (fun _ ↦ ρ)
-
-@[inherit_doc]
-infixl:110 "⊗^" => MState.npow
-
-end finprod
 
 section posdef
 
