@@ -84,9 +84,6 @@ def of_kraus (M N : κ → Matrix B A R) : MatrixMap A B R where
       enter [1, 2, k]
       rw [Matrix.mul_smul, Matrix.smul_mul]
 
-def exists_kraus (Φ : MatrixMap A B R) : ∃ r : ℕ, ∃ (M N : Fin r → Matrix B A R), Φ = of_kraus M N :=
-  sorry
-
 end kraus
 
 section kron
