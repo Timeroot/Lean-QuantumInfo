@@ -39,7 +39,7 @@ variable {X : Type*} {d : Type*} [Fintype X] [Fintype d] [DecidableEq d] [Decida
 
 /-- The act of measuring is a quantum channel, that maps a `d`-dimensional quantum
 state to an `d × X`-dimensional quantum-classical state. -/
-def measurement_map (Λ : POVM X d) : CPTPMap d (d × X) where
+def MeasurementMap (Λ : POVM X d) : CPTPMap d (d × X) where
   toLinearMap :=
     ∑ (x : X), open Kronecker in {
       toFun := fun ρ ↦ ((((Λ.mats x) ^ (1/2:ℝ)).toMat * ρ * ((Λ.mats x)^(1/2:ℝ)).toMat) ⊗ₖ Matrix.single x x 1)
@@ -65,10 +65,13 @@ def measurement_map (Λ : POVM X d) : CPTPMap d (d × X) where
       unfold Function.comp at hM₃
       rw [← hM₃]
       apply MatrixMap.IsCompletelyPositive.comp
-      · intro n ρ h
-        sorry
+      · dsimp [M₁]
+        conv =>
+          enter [1, 1, 1, ρ, 2]
+          rw [← HermitianMat.conjTranspose_toMat]
+        exact MatrixMap.IsCompletelyPositive.conj_isCompletelyPositive (Λ.mats x ^ (1 / 2)).toMat
       · apply MatrixMap.IsCompletelyPositive.kron_kronecker_const
-        convert (Matrix.PosSemidef.stdBasisMatrix_iff_eq x x (zero_lt_one' ℂ)).2 rfl
+        exact (Matrix.PosSemidef.stdBasisMatrix_iff_eq x x (zero_lt_one' ℂ)).2 rfl
   TP := by
     intro x
     rw [LinearMap.sum_apply, trace_sum]
@@ -81,10 +84,31 @@ def measurement_map (Λ : POVM X d) : CPTPMap d (d × X) where
     rw [show (1 : Matrix d d ℂ) = (1 : HermitianMat d ℂ).toMat by rfl, ← Λ.normalized]
     push_cast
     congr! with i _
-    sorry -- x ^ (1/2) * x ^ (1/2) = x when x is a PSD HermitiatMat
+    exact HermitianMat.pow_half_mul (Λ.zero_le i)
+
+open Kronecker in
+theorem MeasurementMap_apply_matrix (Λ : POVM X d) (m : Matrix d d ℂ) :
+  Λ.MeasurementMap.map m =  ∑ x : X,
+    ((((Λ.mats x) ^ (1/2:ℝ)).toMat * m * ((Λ.mats x)^(1/2:ℝ)).toMat) ⊗ₖ Matrix.single x x 1) := by
+  dsimp [MeasurementMap, HPMap.map]
+  rw [LinearMap.sum_apply]
+  rfl
+
+open HermitianMat in
+theorem MeasurementMap_apply_hermitianMat (Λ : POVM X d) (m : HermitianMat d ℂ) :
+  Λ.MeasurementMap.toHPMap m = ∑ x : X,
+    --TODO: Something like `HermitianMat.single` to make this better
+    ((m.conj ((Λ.mats x)^(1/2:ℝ)).toMat : HermitianMat d ℂ) ⊗ₖ .diagonal (fun y ↦ ite (x = y) 1 0)) := by
+  ext1
+  convert Λ.MeasurementMap_apply_matrix m.toMat
+  simp [HermitianMat.conj]
+  congr!
+  ext i j
+  simp [HermitianMat.diagonal, Matrix.diagonal_apply, Matrix.single]
+  split_ifs <;> (try grind) <;> norm_num
 
 /-- A POVM leads to a distribution of outcomes on any given mixed state ρ. -/
-def measure (Λ : POVM X d) (ρ : MState d) : Distribution X := .mk'
+def Measure (Λ : POVM X d) (ρ : MState d) : Distribution X := .mk'
     (f := fun x ↦ (Λ.mats x).inner ρ.M)
     (h₁ := fun x ↦ HermitianMat.inner_ge_zero (Λ.zero_le x) ρ.zero_le)
     (hN := by
@@ -92,18 +116,38 @@ def measure (Λ : POVM X d) (ρ : MState d) : Distribution X := .mk'
       ← AddSubgroup.val_finset_sum, ← HermitianMat.val_eq_coe, Λ.normalized])
 
 /-- The quantum-classical `POVM.measurement_map`, gives a marginal on the right equal to `POVM.measure`.-/
-theorem measure_eq_measurement_map (Λ : POVM X d) (ρ : MState d) :
-    (Λ.measurement_map ρ).traceLeft = MState.ofClassical (Λ.measure ρ) := by
-  sorry
+theorem traceLeft_measurementMap_eq_measure (Λ : POVM X d) (ρ : MState d) :
+    (Λ.MeasurementMap ρ).traceLeft = MState.ofClassical (Λ.Measure ρ) := by
+  open Kronecker in
+  ext i j
+  rcases ρ with ⟨⟨ρ, ρH⟩, hρ0, hρ1⟩
+  change (Matrix.traceLeft (Λ.MeasurementMap.map ρ)) i j = _
+  rw [MeasurementMap_apply_matrix]
+  --TODO: a lemma for Matrix.traceLeft (∑ x, _) = ∑ x, (Matrix.traceLeft _)
+  simp_rw [Matrix.traceLeft, Matrix.of_apply, Matrix.sum_apply]
+  rw [Finset.sum_comm]
+  simp only [kroneckerMap_apply, MState.coe_ofClassical]
+  simp only [single, of_apply, mul_ite, mul_one, mul_zero, Finset.sum_ite_irrel,
+    Finset.sum_const_zero]
+  simp only [HermitianMat.diagonal, HermitianMat.mk_toMat, diagonal_apply]
+  symm; split
+  · subst j
+    simp only [Measure, Distribution.mk', Distribution.funlike_apply, and_self, Finset.sum_ite_eq',
+      Finset.mem_univ, ↓reduceIte]
+    change _ = Matrix.trace _
+    rw [Matrix.trace_mul_cycle, HermitianMat.pow_half_mul (Λ.zero_le i)]
+    exact HermitianMat.inner_eq_trace_rc _ _
+  · conv => enter [2, 2, x]; rw [if_neg (by grind)]
+    simp
 
 /-- The action of measuring a state with the POVM `Λ`, discarding the resulting state, and keeping
 the mixed state recording the outcome. This resulting state is purely diagonal, as given in
 `POVM.measureDiscard_apply`. -/
-noncomputable def measureDiscard (Λ : POVM X d) : CPTPMap d X :=
-  CPTPMap.traceLeft ∘ₘ Λ.measurement_map
+noncomputable def MeasureDiscard (Λ : POVM X d) : CPTPMap d X :=
+  CPTPMap.traceLeft ∘ₘ Λ.MeasurementMap
 
 theorem measureDiscard_apply (Λ : POVM X d) (ρ : MState d) :
-    Λ.measureDiscard ρ = MState.ofClassical (Λ.measure ρ) := by
-  simp [measureDiscard, measure_eq_measurement_map]
+    Λ.MeasureDiscard ρ = MState.ofClassical (Λ.Measure ρ) := by
+  simp [MeasureDiscard, traceLeft_measurementMap_eq_measure]
 
 end POVM
