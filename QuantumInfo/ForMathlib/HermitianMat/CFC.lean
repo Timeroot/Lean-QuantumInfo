@@ -441,6 +441,13 @@ theorem conj_rpow (hA : 0 ≤ A) {p q : ℝ}
   rw [pow_two, Real.rpow_add' hi hpq, two_mul, Real.rpow_add' hi (by simpa)]
   rfl
 
+theorem pow_half_mul {d 𝕜 : Type*} [Fintype d] [DecidableEq d] [RCLike 𝕜]
+  {A : HermitianMat d 𝕜} (hA : 0 ≤ A) :
+    (A ^ (1/2 : ℝ)).toMat * (A ^ (1/2 : ℝ)).toMat = A := by
+  rw [← coe_rpow_add hA]
+  · norm_num
+  · norm_num
+
 /-- Matrix logarithm (base e) of a Hermitian matrix, as given by the elementwise
   real logarithm of the diagonal in a diagonalized form, using `Real.log`
 

@@ -54,6 +54,9 @@ variable {D R : Type*} [CommSemiring R] [DecidableEq C] [Fintype D] in
 /-- The kronecker product of IsTracePreserving maps is also trace preserving. -/
 theorem kron {M₁ : MatrixMap A B R} {M₂ : MatrixMap C D R} (h₁ : M₁.IsTracePreserving) (h₂ : M₂.IsTracePreserving) :
     (M₁ ⊗ₖₘ M₂).IsTracePreserving := by
+  unfold MatrixMap.kron
+  intro x
+  simp
   sorry
 
 variable [CommSemiring S] [Star S] [SMulCommClass S S S] in
@@ -64,11 +67,12 @@ theorem of_kraus_isTracePreserving {κ : Type*} [Fintype κ]
   (hTP : (∑ k, (N k).conjTranspose * (M k)) = 1) :
   (MatrixMap.of_kraus M N).IsTracePreserving := by
   intro x
-  simp only [of_kraus, LinearMap.coe_mk, AddHom.coe_mk, Matrix.trace_sum]
+  simp only [of_kraus, LinearMap.coeFn_sum, LinearMap.coe_mk, AddHom.coe_mk, Finset.sum_apply,
+    Matrix.trace_sum]
   conv =>
     enter [1,2,i]
     rw [Matrix.trace_mul_cycle (M i) x (N i).conjTranspose]
-  rw [←Matrix.trace_sum, ←Finset.sum_mul, hTP, one_mul]
+  rw [← Matrix.trace_sum, ← Finset.sum_mul, hTP, one_mul]
 
 end IsTracePreserving
 end tp
@@ -141,13 +145,15 @@ variable [Fintype A] [Fintype B] [Fintype C]
 /- Every `MatrixMap` that `IsPositive` is also `IsHermitianPreserving`. -/
 theorem IsHermitianPreserving {M : MatrixMap A B R}
     (hM : IsPositive M) : IsHermitianPreserving M := by
---sketch: Positive maps are all Hermitian preserving, because positive matrices generate the full
---set of Hermitian matrices (generate as a vector space). Concretely, every pair of elements
--- (i,j) and (j,i) must be conjugate because we can look at the PSD matrices with 1's on (i,i),
--- on (j,j), and on all 4 elements (i or j, i or j).
-  --This "generate the full set" is already proved in Mathlib as `span_selfAdjoint` so this
-  --should be quick
-  sorry
+  intro x hx
+  let xH : HermitianMat _ _ := ⟨x, hx⟩
+  classical --because PosPart requires DecidableEq
+  have hMPos := hM (HermitianMat.zero_le_iff.mp xH.zero_le_posPart)
+  have hMNeg := hM (HermitianMat.zero_le_iff.mp xH.negPart_le_zero)
+  have hSub := hMPos.isHermitian.sub hMNeg.isHermitian
+  rw [← map_sub] at hSub
+  convert ← hSub
+  exact HermitianMat.ext_iff.1 (HermitianMat.posPart_add_negPart xH)
 
 /-- The composition of IsPositive maps is also positive. -/
 theorem comp {M₁ : MatrixMap A B R} {M₂ : MatrixMap B C R} (h₁ : M₁.IsPositive)
@@ -180,14 +186,19 @@ theorem IsPositive [DecidableEq A] {M : MatrixMap A B R}
     (hM : IsCompletelyPositive M) : IsPositive M := by
   intro x hx
   let x' : Matrix (A × Fin 1) (A × Fin 1) R := x ⊗ₖ 1
+  let eqA : (A × Fin 1) ≃ A :=
+    (Equiv.prodCongrRight (fun _ ↦ finOneEquiv)).trans (Equiv.prodPUnit A)
   let eqB : (B × Fin 1) ≃ B :=
     (Equiv.prodCongrRight (fun _ ↦ finOneEquiv)).trans (Equiv.prodPUnit B)
+  specialize @hM 1 (x.submatrix eqA eqA) (Matrix.PosSemidef.submatrix hx _)
+  replace hM := Matrix.PosSemidef.submatrix hM eqB.symm
+  convert hM
   sorry
 
 /-- The composition of IsCompletelyPositive maps is also completely positive. -/
 theorem comp [DecidableEq B] {M₁ : MatrixMap A B R} {M₂ : MatrixMap B C R} (h₁ : M₁.IsCompletelyPositive)
     (h₂ : M₂.IsCompletelyPositive) : IsCompletelyPositive (M₂ ∘ₗ M₁) := by
---sketch: (M₂ ∘ₗ M₁) ⊗ₖₘ id[n] = (M₂ ⊗ₖₘ id[n]) ∘ₗ (M₁ ⊗ₖₘ id[n]), which is a composition of positive maps.
+  --sketch: (M₂ ∘ₗ M₁) ⊗ₖₘ id[n] = (M₂ ⊗ₖₘ id[n]) ∘ₗ (M₁ ⊗ₖₘ id[n]), which is a composition of positive maps.
   intro n x hx
   specialize h₁ n hx
   specialize h₂ n h₁
@@ -220,20 +231,35 @@ variable (A B) in
 theorem zero : (0 : MatrixMap A B R).IsCompletelyPositive :=
   fun _ _ _ ↦ by simpa using Matrix.PosSemidef.zero
 
+/-- A finite sum of completely positive maps is completely positive. -/
+theorem finset_sum {ι : Type*} [Fintype ι] {m : ι → MatrixMap A B R} (hm : ∀ i, (m i).IsCompletelyPositive) :
+    (∑ i, m i).IsCompletelyPositive :=
+  Finset.sum_induction m _ (fun _ _ ↦ add) (.zero A B) (by simpa)
+
 variable [Fintype d] [DecidableEq d]
 /-- The map that takes M and returns M ⊗ₖ C, where C is positive semidefinite, is a completely positive map. -/
 theorem kron_kronecker_const {C : Matrix d d R} (h : C.PosSemidef) {h₁ h₂ : _} : MatrixMap.IsCompletelyPositive
     (⟨⟨fun M => M ⊗ₖ C, h₁⟩, h₂⟩ : MatrixMap A (A × d) R) := by
   sorry
 
+/-- The act of conjugating (not necessarily by a unitary, just by any matrix at all) is completely positive. -/
+theorem conj_isCompletelyPositive (M : Matrix B A R) :
+  IsCompletelyPositive {
+    toFun := fun (x : Matrix A A R) ↦ M * x * M.conjTranspose,
+    map_add' x y := by rw [Matrix.mul_add, Matrix.add_mul]
+    map_smul' r x := by rw [RingHom.id_apply, Matrix.mul_smul, Matrix.smul_mul]
+  } := by
+  sorry
+
 /-- The channel X ↦ ∑ k : κ, (M k) * X * (M k)ᴴ formed by Kraus operators M : κ → Matrix B A R
 is completely positive -/
 theorem of_kraus_isCompletelyPositive {κ : Type*} [Fintype κ] (M : κ → Matrix B A R) :
-  (MatrixMap.of_kraus M M).IsCompletelyPositive :=
-  sorry
+    (MatrixMap.of_kraus M M).IsCompletelyPositive := by
+  rw [of_kraus]
+  exact finset_sum (fun i ↦ conj_isCompletelyPositive (M i))
 
 def exists_kraus (Φ : MatrixMap A B R) (hCP : Φ.IsCompletelyPositive) :
-  ∃ r : ℕ, ∃ (M : Fin r → Matrix B A R), Φ = of_kraus M M :=
+    ∃ r : ℕ, ∃ (M : Fin r → Matrix B A R), Φ = of_kraus M M :=
   sorry
 
 /-- The Kronecker product of IsCompletelyPositive maps is also completely positive. -/

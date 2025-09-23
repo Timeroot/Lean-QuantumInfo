@@ -75,14 +75,12 @@ variable {κ : Type*} [Fintype κ]
 
 /-- Construct a matrix map out of families of matrices M N : Σ → Matrix B A R
 indexed by κ via X ↦ ∑ k : κ, (M k) * X * (N k)ᴴ -/
-def of_kraus (M N : κ → Matrix B A R) : MatrixMap A B R where
-  toFun X := ∑ k, M k * X * (N k).conjTranspose
-  map_add' x y := by simp only [Matrix.mul_add, Matrix.add_mul, Finset.sum_add_distrib]
-  map_smul' r x := by
-    simp only [RingHom.id_apply, Finset.smul_sum]
-    conv =>
-      enter [1, 2, k]
-      rw [Matrix.mul_smul, Matrix.smul_mul]
+def of_kraus (M N : κ → Matrix B A R) : MatrixMap A B R :=
+  ∑ k : κ, {
+    toFun X := M k * X * (N k).conjTranspose
+    map_add' x y := by rw [Matrix.mul_add, Matrix.add_mul]
+    map_smul' r x := by rw [RingHom.id_apply, Matrix.mul_smul, Matrix.smul_mul]
+  }
 
 end kraus
 
