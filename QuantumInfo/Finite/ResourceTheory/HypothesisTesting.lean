@@ -305,18 +305,21 @@ theorem optimalHypothesisRate_antitone (ρ σ : MState d) (ℰ : CPTPMap d d₂)
   obtain ⟨ℰdualSubtype, h⟩ :
       ∃ e : ({ m : HermitianMat d₂ ℂ // (ℰ ρ).exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1} →
       { m : HermitianMat d ℂ // ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1}),
-      ∀ x, e x = ℰ.dual x
+      ∀ x, e x = ℰ.hermDual x
        := by
     constructor; swap
     · rintro ⟨m, hm₁, hm₂⟩
-      refine ⟨ℰ.dual m, ?_, CPTPMap.dual.PTP_POVM ℰ hm₂⟩
-      simpa [ℰ.exp_val_Dual ρ (1 - m)] using hm₁
+      refine ⟨ℰ.toPTPMap.hermDual m, ?_, PTPMap.hermDual.PTP_POVM ℰ.toPTPMap hm₂⟩
+      have hℰd : (ℰ ρ).exp_val (1 - m) = ρ.exp_val (ℰ.hermDual (1 - m)) :=
+        ℰ.exp_val_hermDual ρ (1 - m)
+      simpa [hℰd] using hm₁
     · rintro ⟨m, hm₁, hm₂⟩
       rfl
   convert le_iInf_comp _ ℰdualSubtype
   rename_i T'
   specialize h T'
-  rw [h, ℰ.exp_val_Dual]
+  rw [h]
+  exact ℰ.exp_val_hermDual σ T'
 
 open scoped HermitianMat in
 open scoped Prob in
