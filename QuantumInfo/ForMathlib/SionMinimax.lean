@@ -21,11 +21,6 @@ theorem ciSup_ciInf_le_ciInf_ciSup {ι': Type*} [Nonempty ι]
     ⨆ i, ⨅ j, f i j ≤ ⨅ j, ⨆ i, f i j :=
   ciSup_le fun i ↦ ciInf_mono (Hb i) fun j ↦ le_ciSup (Ha j) i
 
-theorem lt_ciInf_iff {α : Type*} {ι : Sort*} [Nonempty ι] [ConditionallyCompleteLattice α] {f : ι → α} {a : α}
-    (hf : BddBelow (Set.range f)) :
-    a < iInf f ↔ ∃ b, a < b ∧ ∀ (i : ι), b ≤ f i :=
-  ⟨(⟨iInf f, ·, (ciInf_le hf ·)⟩), fun ⟨_, hb₁, hb₂⟩ ↦ lt_of_lt_of_le hb₁ (le_ciInf hb₂)⟩
-
 theorem BddAbove.range_max (hf : BddAbove (Set.range f)) (hg : BddAbove (Set.range g)) :
     BddAbove (Set.range (max f g)) := by
   rcases hf with ⟨a, ha⟩
@@ -41,7 +36,30 @@ theorem BddBelow.range_min (hf : BddBelow (Set.range f)) (hg : BddBelow (Set.ran
     BddBelow (Set.range (min f g)) :=
   BddAbove.range_max (α := αᵒᵈ) hf hg
 
+theorem ciInf_eq_min_cInf_inter_diff (S T : Set ι)
+  [Nonempty (S ∩ T : Set ι)] [Nonempty (S \ T : Set ι)] (hf : BddBelow (f '' S)) :
+    ⨅ i : S, f i = (⨅ i : (S ∩ T : Set ι), f i) ⊓ ⨅ i : (S \ T : Set ι), f i := by
+  apply le_antisymm
+  · rw [le_inf_iff]
+    constructor
+    <;> (
+      apply_rules [ciInf_le, le_ciInf]
+      simp only [Subtype.forall, Set.mem_diff, Set.mem_inter_iff, and_imp]
+      refine fun a ha hb ↦ ciInf_le ?_ (⟨a, ha⟩ : S)
+      simpa [Set.range] using hf;
+    )
+  · have _ : Nonempty S := .map (fun (x : (S ∩ T : Set _)) ↦ ⟨x, x.2.1⟩) ‹_›
+    apply le_csInf (Set.range_nonempty _)
+    rintro i ⟨⟨b, hb⟩, rfl⟩
+    by_cases hiT : b ∈ T
+    · exact inf_le_left.trans (csInf_le (hf.mono (by grind)) (by aesop))
+    · exact inf_le_right.trans (csInf_le (hf.mono (by grind)) (by aesop))
+
 variable [Nonempty ι]
+
+theorem lt_ciInf_iff (hf : BddBelow (Set.range f)) :
+    a < iInf f ↔ ∃ b, a < b ∧ ∀ (i : ι), b ≤ f i :=
+  ⟨(⟨iInf f, ·, (ciInf_le hf ·)⟩), fun ⟨_, hb₁, hb₂⟩ ↦ lt_of_lt_of_le hb₁ (le_ciInf hb₂)⟩
 
 theorem ciSup_sup_eq (hf : BddAbove (Set.range f)) (hg : BddAbove (Set.range g)) : ⨆ x, f x ⊔ g x = (⨆ x, f x) ⊔ ⨆ x, g x :=
   le_antisymm (ciSup_le fun _ => sup_le_sup (le_ciSup hf _) <| le_ciSup hg _)
@@ -63,32 +81,6 @@ theorem ciInf_sup_ciInf_le (hf : BddBelow (Set.range f)) (hg : BddBelow (Set.ran
 theorem le_ciSup_inf_ciSup (hf : BddAbove (Set.range f)) (hg : BddAbove (Set.range g)) :
     ⨆ (i : ι), f i ⊓ g i ≤ (⨆ (i : ι), f i) ⊓ ⨆ (i : ι), g i :=
   ciInf_sup_ciInf_le (α := αᵒᵈ) hf hg
-
-omit [Nonempty ι] in
-theorem ciInf_eq_min_cInf_inter_diff (S T : Set ι)
-  [Nonempty (S ∩ T : Set ι)] [Nonempty (S \ T : Set ι)] (hf : BddBelow (f '' S)) :
-    ⨅ i : S, f i = (⨅ i : (S ∩ T : Set ι), f i) ⊓ ⨅ i : (S \ T : Set ι), f i := by
-  refine' le_antisymm _ _;
-  · rw [le_inf_iff]
-    apply And.intro
-    · apply_rules [ ciInf_le, le_ciInf ];
-      simp only [Subtype.forall, Set.mem_inter_iff, and_imp]
-      exact fun a ha hb => ciInf_le ( show BddBelow ( Set.range fun i : S => f i ) by simpa [ Set.range ] using hf ) ⟨ a, ha ⟩;
-    · apply_rules [ ciInf_le, le_ciInf ];
-      simp only [Subtype.forall, Set.mem_diff, and_imp]
-      exact fun a ha hb => ciInf_le ( show BddBelow ( Set.range fun i : S => f i ) by simpa [ Set.range ] using hf ) ⟨ a, ha ⟩;
-  · have _ : Nonempty S := .map (fun (x : (S ∩ T : Set _)) ↦ ⟨x, x.2.1⟩) ‹_›
-    apply le_csInf (Set.range_nonempty _)
-    rintro i ⟨b, rfl⟩
-    by_cases hiT : b.1 ∈ T
-    · refine' le_trans ( inf_le_left ) _;
-      refine' csInf_le _ _;
-      · exact ⟨ hf.choose, Set.forall_mem_range.2 fun i => hf.choose_spec ⟨ i, i.2.1, rfl ⟩ ⟩;
-      · aesop
-    · refine' le_trans ( inf_le_right ) _;
-      refine' csInf_le _ _
-      · exact ⟨ hf.choose, Set.forall_mem_range.2 fun x => hf.choose_spec ⟨ x, by aesop ⟩ ⟩
-      · aesop
 
 end ciSup
 
@@ -372,8 +364,8 @@ private theorem sion_exists_min_lowerSemi (a : ℝ) (hc : ∀ y₀ : T, ⨅ (x :
   specialize h_lower_bound x
   order
 
-variable [Module ℝ M] [ContinuousAdd M] [ContinuousSMul ℝ M]
-variable [NormedAddCommGroup N] [Module ℝ N] [ContinuousAdd N] [ContinuousSMul ℝ N]
+variable [Module ℝ M] [ContinuousSMul ℝ M]
+variable [AddCommGroup N] [TopologicalSpace N] [SequentialSpace N] [T2Space N] [ContinuousAdd N] [Module ℝ N] [ContinuousSMul ℝ N]
 variable
   (hfc₁ : ∀ x, x ∈ S → UpperSemicontinuousOn (f x) T)
   (hfq₂ : ∀ y, y ∈ T → QuasiconvexOn ℝ S (f · y))

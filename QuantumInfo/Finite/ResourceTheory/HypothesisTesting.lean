@@ -273,7 +273,7 @@ theorem Lemma3 {ρ : MState d} (ε : Prob) {S : Set (MState d)} (hS₁ : IsCompa
   have hT'₃ : T'.Nonempty := Set.Nonempty.of_subtype
 
   ext1 --turn it from Prob equality into ℝ equality
-  convert minimax (M := HermitianMat d ℂ) f S' T' hS'₁ hT'₁ hS₂ hT'₂ hS'₃ hT'₃
+  convert LinearMap.BilinForm.minimax' (M := HermitianMat d ℂ) f S' T' hS'₁ hT'₁ hS₂ hT'₂ hS'₃ hT'₃
   --The remaining twiddling is about moving the casts inside the iInf's and iSup's.
   --In a better world, this would be mostly handled by some clever simps or push_cast's.
   · have hi := iSup_range' (ι := S) (fun x ↦ ⨅ (y : T'), (f x) ↑y) (·)
