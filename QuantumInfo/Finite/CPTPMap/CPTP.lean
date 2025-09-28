@@ -119,23 +119,6 @@ theorem const_state_apply [Unique dIn] [DecidableEq dOut] (ρ : MState dOut) (ρ
   --Should be a simp theorem
   sorry
 
-section prod
-open Kronecker
-
-variable {dI₁ dI₂ dO₁ dO₂ : Type*} [Fintype dI₁] [Fintype dI₂] [Fintype dO₁] [Fintype dO₂]
-variable [DecidableEq dI₁] [DecidableEq dI₂] [DecidableEq dO₁] [DecidableEq dO₂]
-
-set_option maxRecDepth 1000 in -- ??? what the heck is recursing
-/-- The tensor product of two CPTPMaps. -/
-def prod (Λ₁ : CPTPMap dI₁ dO₁) (Λ₂ : CPTPMap dI₂ dO₂) : CPTPMap (dI₁ × dI₂) (dO₁ × dO₂) where
-  toLinearMap := Λ₁.map.kron Λ₂.map
-  cp := Λ₁.cp.kron Λ₂.cp
-  TP := Λ₁.TP.kron Λ₂.TP
-
-infixl:70 "⊗ₖ" => CPTPMap.prod
-
-end prod
-
 section finprod
 
 variable {ι : Type u} [DecidableEq ι] [fι : Fintype ι]

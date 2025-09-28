@@ -262,24 +262,6 @@ def exists_kraus (Φ : MatrixMap A B R) (hCP : Φ.IsCompletelyPositive) :
     ∃ r : ℕ, ∃ (M : Fin r → Matrix B A R), Φ = of_kraus M M :=
   sorry
 
-/-- The Kronecker product of IsCompletelyPositive maps is also completely positive. -/
-theorem kron [DecidableEq C] [Fintype D] {M₁ : MatrixMap A B R} {M₂ : MatrixMap C D R}
-    (h₁ : M₁.IsCompletelyPositive) (h₂ : M₂.IsCompletelyPositive) : IsCompletelyPositive (M₁ ⊗ₖₘ M₂) := by
---sketch: the Choi matrix of the Kron is the Kron of the Choi matrix, and Kron of PSD matrices is PSD.
-/-
-      intro n M hM
-      let M' : Matrix (dI₁ × (dI₂ × Fin n)) (dI₁ × (dI₂ × Fin n)) ℂ :=? --reorder indices of M
-      have hM' : M'.PosSemidef :=? --PSD preserved under reordering
-      let Λ₁M := ((Λ₁.map.kron LinearMap.id) M')
-      have hΛ₁M : Λ₁M.PosSemidef := Λ₁.completely_pos.def_Fintype (dI₂ × Fin n) hM'
-      let Λ₁M' : Matrix (dI₂ × (dO₁ × Fin n)) (dI₂ × (dO₁ × Fin n)) ℂ :=? --reorder Λ₁M
-      have hΛ₁M' : Λ₁M'.PosSemidef := ? --PSD preserved under reordering
-      let Λ₂Λ₁M := (Λ₂.map.kron LinearMap.id) Λ₁M'
-      have hΛ₂Λ₁M : Λ₂Λ₁M.PosSemidef := Λ₂.completely_pos.def_Fintype (dO₁ × Fin n) hΛ₁M'
-      --PSD preserved under reordering to get (((Λ₁.map.MatrixMap_Prod Λ₂.map).MatrixMap_Prod LinearMap.id) M)
-      -/
-  sorry
-
 end IsCompletelyPositive
 
 end MatrixMap
