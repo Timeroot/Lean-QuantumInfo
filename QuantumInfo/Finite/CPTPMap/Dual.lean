@@ -202,15 +202,54 @@ theorem HPMap.inner_hermDual' (B : HermitianMat dOut ℂ) :
   HPMap.inner_hermDual f A B
 
 open RealInnerProductSpace in
-theorem inner_negPart_nonpos [DecidableEq dIn] : ⟪A, A⁻⟫ ≤ 0 := by
-  sorry
+theorem HermitianMat.inner_negPart_nonpos [DecidableEq dIn] : ⟪A, A⁻⟫ ≤ 0 := by
+  rw [← neg_le_neg_iff, neg_zero, ← inner_neg_right]
+  apply inner_mul_nonneg
+  nth_rw 1 [← A.cfc_id]
+  rw [negPart_eq_cfc_ite]
+  rw [← cfc_neg]
+  rw [← coe_cfc_mul]
+  change 0 ≤ A.cfc _
+  rw [zero_le_cfc]
+  intro i
+  dsimp
+  split_ifs with h
+  · rw [neg_neg]
+    exact mul_self_nonneg _
+  · simp
+
+theorem HermitianMat.cfc_eq_cfc_iff_eqOn [DecidableEq dIn] (A : HermitianMat dIn ℂ) (f g : ℝ → ℝ) :
+    cfc A f = cfc A g ↔ Set.EqOn f g (spectrum ℝ A.toMat) := by
+  rw [HermitianMat.ext_iff, cfc_toMat, cfc_toMat]
+  exact _root_.cfc_eq_cfc_iff_eqOn A.H herm_cont herm_cont
 
 open RealInnerProductSpace in
-theorem inner_negPart_zero_iff [DecidableEq dIn] : ⟪A, A⁻⟫ = 0 ↔ 0 ≤ A := by
-  sorry
+theorem HermitianMat.inner_negPart_zero_iff [DecidableEq dIn] : ⟪A, A⁻⟫ = 0 ↔ 0 ≤ A := by
+  constructor
+  · intro h
+    have h2 : ⟪A⁺, A⁻⟫ = 0 := by
+      --TODO own thm?
+      have hi := inner_eq_trace_rc A⁺ A⁻
+      rw [posPart_mul_negPart, Matrix.trace_zero] at hi
+      exact congr(Complex.re ($hi))
+    nth_rw 1 [← posPart_add_negPart A] at h
+    rw [inner_sub_left, sub_eq_zero, h2, eq_comm, inner_self_eq_zero] at h
+    rw [← zero_smul ℝ 1, ← cfc_const A, negPart_eq_cfc_ite] at h --TODO cfc_zero
+    rw [cfc_eq_cfc_iff_eqOn, A.H.spectrum_real_eq_range_eigenvalues] at h
+    simp only [Set.eqOn_range] at h
+    replace h (i) := congrFun h i
+    simp only [Function.comp_apply, ite_eq_right_iff, neg_eq_zero] at h
+    rw [zero_le_iff, A.H.posSemidef_iff_eigenvalues_nonneg]
+    intro i
+    contrapose! h
+    use i, h.le, h.ne
+  · intro h
+    apply le_antisymm
+    · exact inner_negPart_nonpos A
+    · exact inner_ge_zero' _ _ h (negPart_le_zero A)
 
 open RealInnerProductSpace in
-theorem inner_negPart_neg_iff [DecidableEq dIn] : ⟪A, A⁻⟫ < 0 ↔ ¬0 ≤ A := by
+theorem HermitianMat.inner_negPart_neg_iff [DecidableEq dIn] : ⟪A, A⁻⟫ < 0 ↔ ¬0 ≤ A := by
   simp [← inner_negPart_zero_iff, lt_iff_le_and_ne, inner_negPart_nonpos A]
 
 --PULLOUT
