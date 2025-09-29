@@ -178,6 +178,10 @@ noncomputable def eigenspace (μ : 𝕜) : Submodule 𝕜 (EuclideanSpace 𝕜 n
 def ker : Submodule 𝕜 (EuclideanSpace 𝕜 n) :=
   LinearMap.ker A.lin
 
+theorem mem_ker_iff_mulVec_zero (x : EuclideanSpace 𝕜 n) : x ∈ A.ker ↔ A.toMat.mulVec x = 0 := by
+  simp [ker, LinearMap.mem_ker, lin, Matrix.toEuclideanLin_apply]
+  norm_cast
+
 /-- The kernel of a Hermitian matrix is its zero eigenspace. -/
 theorem ker_eq_eigenspace_zero : A.ker = A.eigenspace 0 := by
   ext
@@ -190,6 +194,10 @@ theorem ker_zero : (0 : HermitianMat n 𝕜).ker = ⊤ := by
 @[simp]
 theorem ker_one : (1 : HermitianMat n 𝕜).ker = ⊥ := by
   simp [ker]; rfl
+
+theorem ker_pos_smul {c : ℝ} (hc : 0 < c) : (c • A).ker = A.ker := by
+  ext x
+  simp [mem_ker_iff_mulVec_zero, Matrix.smul_mulVec, hc.ne']
 
 /-- The support of a Hermitian matrix `A` as a submodule of Euclidean space, defined by
 `LinearMap.range A.toMat.toEuclideanLin`. Equivalently, the sum of all nonzero eigenspaces. -/
