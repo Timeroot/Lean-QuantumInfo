@@ -735,6 +735,44 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
   -- Eq. (S62)
   have hliminfR : Filter.atTop.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n) - R1 ρ ε ≤
       ↑(1 - ε') * (R2 ρ σ - R1 ρ ε) := by
+    have hliminfleq : Filter.atTop.liminf (fun n ↦ —log β_ ε(ℰ n (ρ⊗^S[n])‖{σ'' n}) / n) ≤ R1 ρ ε := by
+      sorry
+    -- Is ε_1 > 0 necessary here?
+    have hlimsupleq : ∀ ε₁ > 0, Filter.atTop.limsup (fun n ↦ —log β_ (1-ε₁)(ℰ n (ρ⊗^S[n])‖{σ'' n}) / n) ≤ (R2 ρ σ) + ENNReal.ofNNReal ⟨ε₀, hε₀.le⟩:= by
+      sorry
+
+    open scoped HermitianMat in
+    let P1 ε2 n := {(ℰ n (ρ⊗^S[n])).M ≥ₚ (Real.exp (↑n*((R1 ρ ε).toReal + ε2))) • (σ'' n).M}
+    let P2 ε2 n := {(ℰ n (ρ⊗^S[n])).M ≥ₚ (Real.exp (↑n*((R2 ρ σ).toReal + ε₀ + ε2))) • (σ'' n).M}
+
+    have hPcomm : ∀ ε2 n, Commute (P1 ε2 n).toMat (P2 ε2 n).toMat := by
+      sorry
+
+    let E1 := 1 - P1
+    let E2 := P1 - P2
+    let E3 := P2
+
+    have hE1proj : ∀ ε2 n, E1 ε2 n = {(ℰ n (ρ⊗^S[n])).M <ₚ (Real.exp (↑n*((R1 ρ ε).toReal + ε2))) • (σ'' n).M} := fun ε2 n ↦ by
+      dsimp [E1, P1]
+      rw [sub_eq_iff_eq_add]
+      simp only [HermitianMat.proj_le_add_lt]
+
+    have hE2leProj : ∀ ε2 n, E2 ε2 n ≤ {(ℰ n (ρ⊗^S[n])).M <ₚ (Real.exp (↑n*((R2 ρ σ).toReal + ε₀ + ε2))) • (σ'' n).M} := by
+      sorry
+
+    -- Missing here: S81, S82
+    -- Note to self: v4 of arxiv is more step-by-step
+
+    let c' ε2 n := (c n + (c n) / n) ⊔ ((R2 ρ σ).toReal + ε₀ + ε2)
+
+    have hc' ε2 : (c' ε2) =O[.atTop] (1 : ℕ → ℝ) := by
+      sorry
+
+    have hσ'' ε2 n : (σ'' n).M ≥ Real.exp (-↑n*(c' ε2 n)) • 1 := by
+      sorry
+
+    -- Mising here: S85 -> S92
+
     sorry
 
   use fun n ↦ ⟨σ' n, σ'_free n⟩

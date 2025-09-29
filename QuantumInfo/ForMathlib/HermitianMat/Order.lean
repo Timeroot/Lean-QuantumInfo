@@ -15,6 +15,10 @@ theorem zero_le_iff : 0 ≤ A ↔ A.toMat.PosSemidef := by
   rw [← propext_iff]
   apply congrArg Matrix.PosSemidef (sub_zero _)
 
+theorem le_iff_mulVec_le : A ≤ B ↔ ∀ x, star x ⬝ᵥ A.toMat.mulVec x ≤ star x ⬝ᵥ B.toMat.mulVec x := by
+  have hH : (B.toMat - A.toMat).IsHermitian := Matrix.IsHermitian.sub B.H A.H
+  simp [le_iff, Matrix.PosSemidef, hH, Matrix.sub_mulVec]
+
 instance [DecidableEq n] : ZeroLEOneClass (HermitianMat n ℂ) where
   zero_le_one := by
     rw [HermitianMat.zero_le_iff]
@@ -58,3 +62,10 @@ theorem sq_nonneg [DecidableEq n] : 0 ≤ A^2 := by
   simp [zero_le_iff, pow_two]
   nth_rewrite 1 [←Matrix.IsHermitian.eq A.H]
   exact Matrix.posSemidef_conjTranspose_mul_self A.toMat
+
+theorem ker_antitone [DecidableEq n] (hA : 0 ≤ A) : A ≤ B → B.ker ≤ A.ker := fun h x hB ↦ by
+  rw [HermitianMat.mem_ker_iff_mulVec_zero] at *
+  replace h := (le_iff_mulVec_le.mp h) x
+  rw [hB, dotProduct_zero] at h
+  apply (Matrix.PosSemidef.dotProduct_mulVec_zero_iff (zero_le_iff.mp hA) x).mp
+  exact eq_of_le_of_ge h ((zero_le_iff.mp hA).2 x)
