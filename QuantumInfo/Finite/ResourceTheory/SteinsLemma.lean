@@ -735,6 +735,16 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
   -- Eq. (S62)
   have hliminfR : Filter.atTop.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n) - R1 ρ ε ≤
       ↑(1 - ε') * (R2 ρ σ - R1 ρ ε) := by
+    have hliminfleq : Filter.atTop.liminf (fun n ↦ —log β_ ε(ℰ n (ρ⊗^S[n])‖{σ'' n}) / n) ≤ R1 ρ ε := by
+      sorry
+    -- Is ε_1 > 0 necessary here?
+    have hlimsupleq : ∀ ε₁ > 0, Filter.atTop.limsup (fun n ↦ —log β_ (1-ε₁)(ℰ n (ρ⊗^S[n])‖{σ'' n}) / n) ≤ (R2 ρ σ) + ENNReal.ofNNReal ⟨ε₀, hε₀.le⟩:= by
+      sorry
+
+    open scoped HermitianMat in
+    let P₁ n ε₂ := {(ℰ n (ρ⊗^S[n])).M ≥ₚ (Real.exp (↑n*((R1 ρ ε).toReal + ε₂))) • (σ'' n).M}
+    let P₂ n ε₂ := {(ℰ n (ρ⊗^S[n])).M ≥ₚ (Real.exp (↑n*((R2 ρ σ).toReal + ε₀ + ε₂))) • (σ'' n).M}
+
     sorry
 
   use fun n ↦ ⟨σ' n, σ'_free n⟩
