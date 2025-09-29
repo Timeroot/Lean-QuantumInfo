@@ -150,7 +150,7 @@ def HPMap.ofHermitianMat (f : HermitianMat dIn ℂ →ₗ[ℝ] HermitianMat dOut
       Complex.ofReal_im, Complex.I, Complex.mul_im, Complex.add_im, Complex.sub_im]
     ring_nf
     simp
-  HP h := by
+  HP _ h := by
     apply Matrix.IsHermitian.add
     · apply HermitianMat.H
     · simp [IsSelfAdjoint.imaginaryPart h]
@@ -302,9 +302,7 @@ variable [DecidableEq dIn] [DecidableEq dOut]
 
 def hermDual (M : PTPMap dIn dOut) : PUMap dOut dIn where
   toHPMap := M.toHPMap.hermDual
-  pos := by
-    apply MatrixMap.IsPositive.hermDual --TODO: fix the implictness on IsPositive's arguments
-    exact @M.pos
+  pos := M.pos.hermDual
   unital := M.TP.hermDual
 
 theorem hermDual_pos (M : PTPMap dIn dOut) {T : HermitianMat dOut ℂ} (hT : 0 ≤ T) :

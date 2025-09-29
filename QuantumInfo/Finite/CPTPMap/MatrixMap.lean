@@ -117,14 +117,62 @@ noncomputable def kron [CommSemiring R] (M₁ : MatrixMap A B R) (M₂ : MatrixM
 scoped[MatrixMap] infixl:100 " ⊗ₖₘ " => MatrixMap.kron
 
 /-- The extensional definition of the Kronecker product `MatrixMap.kron`, in terms of the entries of its image. -/
-theorem kron_def [CommRing R] (M₁ : MatrixMap A B R) (M₂ : MatrixMap C D R) (M : Matrix (A × C) (A × C) R) : (M₁ ⊗ₖₘ M₂) M (b₁, d₁) (b₂, d₂) =
-  ∑ a₁, ∑ a₂, ∑ c₁, ∑ c₂, (M₁ (Matrix.single a₁ a₂ 1) b₁ b₂) * (M₂ (Matrix.single c₁ c₂ 1) d₁ d₂) * (M (a₁, c₁) (a₂, c₂)) := by
-  rw [kron, TensorProduct.toMatrix_map]
-  simp
-  rw [Matrix.toLin_apply]
-  simp [Equiv.prodProdProdComm, Matrix.kroneckerMap, Matrix.submatrix, LinearMap.toMatrix]
-  simp [Matrix.stdBasis_eq_single]
-  sorry
+theorem kron_def [CommSemiring R] (M₁ : MatrixMap A B R) (M₂ : MatrixMap C D R) (M : Matrix (A × C) (A × C) R) :
+    (M₁ ⊗ₖₘ M₂) M (b₁, d₁) (b₂, d₂) = ∑ a₁, ∑ a₂, ∑ c₁, ∑ c₂,
+      (M₁ (Matrix.single a₁ a₂ 1) b₁ b₂) * (M₂ (Matrix.single c₁ c₂ 1) d₁ d₂) * (M (a₁, c₁) (a₂, c₂)) := by
+  rw [kron]
+  have h_expand : (Matrix.toLin (Matrix.stdBasis R (A × C) (A × C)) (Matrix.stdBasis R (B × D) (B × D))) ((Matrix.reindex (Equiv.prodProdProdComm B B D D) (Equiv.prodProdProdComm A A C C)) ((LinearMap.toMatrix ((Matrix.stdBasis R A A).tensorProduct (Matrix.stdBasis R C C)) ((Matrix.stdBasis R B B).tensorProduct (Matrix.stdBasis R D D))) (TensorProduct.map M₁ M₂))) M = ∑ a₁ : A, ∑ a₂ : A, ∑ c₁ : C, ∑ c₂ : C, M (a₁, c₁) (a₂, c₂) • (Matrix.toLin (Matrix.stdBasis R (A × C) (A × C)) (Matrix.stdBasis R (B × D) (B × D))) ((Matrix.reindex (Equiv.prodProdProdComm B B D D) (Equiv.prodProdProdComm A A C C)) ((LinearMap.toMatrix ((Matrix.stdBasis R A A).tensorProduct (Matrix.stdBasis R C C)) ((Matrix.stdBasis R B B).tensorProduct (Matrix.stdBasis R D D))) (TensorProduct.map M₁ M₂))) (Matrix.single (a₁, c₁) (a₂, c₂) 1) := by
+    have h_expand : M = ∑ a₁ : A, ∑ a₂ : A, ∑ c₁ : C, ∑ c₂ : C, M (a₁, c₁) (a₂, c₂) • Matrix.single (a₁, c₁) (a₂, c₂) 1 := by
+      ext ⟨a₁, c₁⟩ ⟨a₂, c₂⟩
+      simp only [Matrix.single, Matrix.sum_apply]
+      rw [Finset.sum_eq_single a₁, Finset.sum_eq_single a₂, Finset.sum_eq_single c₁, Finset.sum_eq_single c₂]
+      <;> simp +contextual
+    nth_rw 1 [h_expand]
+    simp only [map_sum, LinearMap.map_smulₛₗ]
+    rfl
+  rw [h_expand]
+  clear h_expand
+  simp only [Matrix.sum_apply]
+  congr! 8 with a₁ _ a₂ _ c₁ _ c₂ _
+  rw [Matrix.smul_apply, smul_eq_mul, mul_comm]
+  congr
+  classical
+  simp only [Matrix.stdBasis,
+    Matrix.reindex_apply, Equiv.prodProdProdComm_symm, Matrix.toLin_apply,
+    Matrix.mulVec, dotProduct, Matrix.submatrix_apply, Equiv.prodProdProdComm_apply, LinearMap.toMatrix_apply,
+    Module.Basis.tensorProduct_apply, Module.Basis.map_apply, Module.Basis.coe_reindex, Function.comp_apply,
+    Equiv.sigmaEquivProd_symm_apply, Pi.basis_apply, Pi.basisFun_apply, Matrix.coe_ofLinearEquiv, TensorProduct.map_tmul,
+    Module.Basis.tensorProduct_repr_tmul_apply, Module.Basis.map_repr, LinearEquiv.trans_apply, Matrix.coe_ofLinearEquiv_symm,
+    Module.Basis.repr_reindex, Finsupp.mapDomain_equiv_apply, Pi.basis_repr, Pi.basisFun_repr, Matrix.of_symm_apply, smul_eq_mul,
+    Matrix.of_symm_single, Pi.single_apply, Matrix.smul_of, Matrix.sum_apply, Matrix.of_apply, Pi.smul_apply]
+  rw [ Finset.sum_eq_single ( ( b₁, d₁ ), ( b₂, d₂ ) ) ]
+  · rw [ Finset.sum_eq_single ( ( a₁, c₁ ), ( a₂, c₂ ) ) ]
+    · simp only [↓reduceIte, Pi.single_eq_same, mul_one]
+      rw [ mul_comm ]
+      congr! 2
+      · ext i j
+        by_cases hi : i = a₁
+        <;> by_cases hj : j = a₂
+        <;> simp only [hi, hj, Matrix.of_apply, ne_eq, not_false_eq_true, Pi.single_eq_of_ne,
+              Pi.single_eq_same, Pi.zero_apply, Matrix.single]
+        <;> grind only
+      · ext i j
+        by_cases hi : i = c₁
+        <;> by_cases hj : j = c₂
+        <;> simp only [hi, hj, Matrix.of_apply, ne_eq, not_false_eq_true, Pi.single_eq_of_ne,
+              Pi.single_eq_same, Pi.zero_apply, Matrix.single]
+        <;> grind only
+    · intros
+      split
+      · grind [Prod.mk.injEq, Pi.single_eq_of_ne, mul_zero]
+      · simp
+    · simp
+  · simp only [Finset.mem_univ, ne_eq, forall_const, Prod.forall, Prod.mk.injEq, not_and, and_imp]
+    intro a b c d h
+    split_ifs
+    · simp_all
+    · simp
+  · simp
 
 section kron_lemmas
 variable [CommSemiring R]
