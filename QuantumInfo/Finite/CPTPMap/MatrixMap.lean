@@ -116,6 +116,7 @@ noncomputable def kron [CommSemiring R] (M₁ : MatrixMap A B R) (M₂ : MatrixM
 
 scoped[MatrixMap] infixl:100 " ⊗ₖₘ " => MatrixMap.kron
 
+set_option maxHeartbeats 400000 in
 /-- The extensional definition of the Kronecker product `MatrixMap.kron`, in terms of the entries of its image. -/
 theorem kron_def [CommSemiring R] (M₁ : MatrixMap A B R) (M₂ : MatrixMap C D R) (M : Matrix (A × C) (A × C) R) :
     (M₁ ⊗ₖₘ M₂) M (b₁, d₁) (b₂, d₂) = ∑ a₁, ∑ a₂, ∑ c₁, ∑ c₂,
