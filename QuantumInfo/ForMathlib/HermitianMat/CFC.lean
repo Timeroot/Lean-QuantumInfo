@@ -52,8 +52,8 @@ theorem IsHermitian.spectrum_subset_Ici_of_sub {d 𝕜 : Type*} [Fintype d] [Dec
             have h_induction : ∀ (n : ℕ) (M : Fin n → Matrix d d 𝕜) (v : d → 𝕜), Star.star v ⬝ᵥ (∑ i, M i).mulVec v = ∑ i, Star.star v ⬝ᵥ (M i).mulVec v := by
               intro n M v
               induction n
-              · simp [ Fin.sum_univ_succ, * ]
-              · simp [ Fin.sum_univ_succ, * ]
+              · simp [*]
+              · simp [Fin.sum_univ_succ, *]
             convert h_induction ( Fintype.card d ) ( fun i => Matrix.of ( hA.eigenvalues ( Fintype.equivFin d |>.symm i ) • fun j k => hA.eigenvectorBasis ( Fintype.equivFin d |>.symm i ) j * starRingEnd 𝕜 ( hA.eigenvectorBasis ( Fintype.equivFin d |>.symm i ) k ) ) ) v using 1;
             · rw [ ← Equiv.sum_comp ( Fintype.equivFin d ) ];
               simp [ Fintype.equivFin ];

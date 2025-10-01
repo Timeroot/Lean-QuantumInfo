@@ -90,7 +90,7 @@ theorem prodRelabel_relabel_cast_prod
 by the notation `M₁ ⊗ᵣ M₂`. -/
 noncomputable def prodCPTPMap (M₁ : CPTPMap (H i) (H j)) (M₂ : CPTPMap (H k) (H l)) :
     CPTPMap (H (i * k)) (H (j * l)) :=
-  (CPTPMap.of_equiv (prodEquiv j l).symm).compose ((M₁ ⊗ₖ M₂).compose (CPTPMap.of_equiv (prodEquiv i k)))
+  (CPTPMap.ofEquiv (prodEquiv j l).symm).compose ((M₁ ⊗ₖ M₂).compose (CPTPMap.ofEquiv (prodEquiv i k)))
 
 scoped notation M₁ "⊗ₖᵣ" M₂ => prodCPTPMap M₁ M₂
 

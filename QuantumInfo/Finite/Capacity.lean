@@ -67,7 +67,6 @@ A channel A `εApproximates` channel B of the same dimensions if the for every s
 def εApproximates (A B : CPTPMap d₁ d₂) (ε : ℝ) : Prop :=
   ∀ (ρ : MState d₁), (A ρ).fidelity (B ρ) ≥ 1-ε
 
-variable [DecidableEq d₂] in
 /--
 A channel A `AchievesRate` R:ℝ if for every ε>0, some n copies of A emulates a channel B such that log2(dimout(B))/n ≥ R, and that B εApproximates the identity channel.
 -/
@@ -78,12 +77,11 @@ def AchievesRate (A : CPTPMap d₁ d₂) (R : ℝ) : Prop :=
       Real.logb 2 dimB ≥ R*n ∧
       B.εApproximates CPTPMap.id ε
 
-variable [DecidableEq d₂] in
 noncomputable def quantumCapacity (A : CPTPMap d₁ d₂) : ℝ :=
   sSup { R : ℝ | AchievesRate A R }
 
 section emulates
-variable [DecidableEq d₂] [DecidableEq d₃] [DecidableEq d₄] [DecidableEq d₅]
+variable [DecidableEq d₃] [DecidableEq d₄] [DecidableEq d₅]
 
 set_option linter.unusedSectionVars false in
 /-- Every quantum channel emulates itself. -/
@@ -114,13 +112,10 @@ theorem εApproximates_monotone {A B : CPTPMap d₁ d₂} {ε₀ : ℝ} (h : A.�
 end εApproximates
 
 section AchievesRate
-variable [DecidableEq d₂]
 
 /-- Every quantum channel achieves a rate of zero. -/
 theorem achievesRate_0 (Λ : CPTPMap d₁ d₂) : Λ.AchievesRate 0 := by
   intro ε hε
-  let _ : Nonempty (Fin 1) := Fin.pos_iff_nonempty.mp Nat.one_pos
-  let _ : Nonempty (Fin 0 → d₂) := instNonemptyOfInhabited
   use 0, 1, default
   constructor
   · exact ⟨default, default, Unique.eq_default _⟩
@@ -157,7 +152,6 @@ theorem bddAbove_achievesRate (Λ : CPTPMap d₁ d₂) : BddAbove {R | Λ.Achiev
 end AchievesRate
 
 section capacity
-variable [DecidableEq d₂]
 
 /-- Quantum channel capacity is nonnegative. -/
 theorem zero_le_quantumCapacity (Λ : CPTPMap d₁ d₂) : 0 ≤ Λ.quantumCapacity :=
