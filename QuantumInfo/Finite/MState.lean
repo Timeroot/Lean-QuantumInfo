@@ -366,7 +366,7 @@ infixl:100 " ⊗ " => MState.prod
 /-- The product of pure states is a pure product state , `Ket.prod`. -/
 theorem pure_prod_pure (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : pure (ψ₁ ⊗ ψ₂) = (pure ψ₁) ⊗ (pure ψ₂) := by
   ext
-  simp [Ket.prod, Ket.apply, prod]
+  simp [Ket.prod, Ket.apply, prod, -toMat_apply]
   ac_rfl
 
 end prod
@@ -436,7 +436,7 @@ theorem traceLeft_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : traceLef
   ext
   simp_rw [traceLeft, Matrix.traceLeft, prod]
   have h : (∑ i : d₁, ρ₁.M.toMat i i) = 1 := ρ₁.tr'
-  simp [MState.m, ← Finset.sum_mul, h, -toMat_M]
+  simp [MState.m, ← Finset.sum_mul, h, -toMat_M, -toMat_apply]
 
 /-- Taking the direct product on the right and tracing it back out gives the same state. -/
 @[simp]
@@ -444,7 +444,7 @@ theorem traceRight_prod_eq (ρ₁ : MState d₁) (ρ₂ : MState d₂) : traceRi
   ext
   simp_rw [traceRight, Matrix.traceRight, prod]
   have h : (∑ i : d₂, ρ₂.M.toMat i i) = 1 := ρ₂.tr'
-  simp [MState.m, ← Finset.mul_sum, h, -toMat_M]
+  simp [MState.m, ← Finset.mul_sum, h, -toMat_M, -toMat_apply]
 
 end ptrace
 
@@ -500,7 +500,8 @@ theorem relabel_cast {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁]
        (ρ : MState d₁) (e : d₂ = d₁) :
     ρ.relabel (Equiv.cast e) = cast (by have := e.symm; congr <;> (apply Subsingleton.helim; congr)) ρ := by
   ext i j
-  simp
+  simp only [relabel_M, Equiv.cast_symm, val_eq_coe, reindex_coe, toMat_M, Matrix.reindex_apply,
+    Matrix.submatrix_apply, Equiv.cast_apply]
   rw [eq_comm] at e
   congr
   · apply Subsingleton.helim; congr

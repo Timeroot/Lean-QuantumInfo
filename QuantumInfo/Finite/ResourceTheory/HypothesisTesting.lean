@@ -395,18 +395,18 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
           · exact HermitianMat.zero_le_iff.mpr T.prop.2.2
         normalized := by simp
       }
-      use Λ.MeasureDiscard
+      use Λ.measureDiscard
       simp only [POVM.measureDiscard_apply, p2, q2]
       constructor
       · congr
         rw [Distribution.coin_eq_iff]
         ext
         dsimp [MState.exp_val] at hT₂
-        simp [POVM.Measure, Λ, p, Distribution.mk', coe_one_minus, ← hT₂, HermitianMat.inner_comm]
+        simp [POVM.measure, Λ, p, Distribution.mk', coe_one_minus, ← hT₂, HermitianMat.inner_comm]
       · congr
         rw [Distribution.coin_eq_iff]
         ext
-        dsimp [POVM.Measure, Λ, q]
+        dsimp [POVM.measure, Λ, q]
         rw [← hT₁]
         exact HermitianMat.inner_comm _ _
     rw [hΦ₁, hΦ₂]
