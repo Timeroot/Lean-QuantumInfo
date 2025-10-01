@@ -24,7 +24,7 @@ about `IsTracePreserving` maps.
 /-- A `MatrixMap` is a linear map between squares matrices of size A to size B, over R. -/
 abbrev MatrixMap (A B R : Type*) [Semiring R] := Matrix A A R →ₗ[R] Matrix B B R
 
-variable {A B C D E F R : Type*} [Fintype A] [Semiring R] [DecidableEq A]
+variable {A B C D E F R R₂ : Type*} [Fintype A] [Semiring R] [DecidableEq A] [CommSemiring R₂]
 
 namespace MatrixMap
 section matrix
@@ -58,11 +58,32 @@ theorem map_choi_inv (M : Matrix (B × A) (B × A) R) : choi_matrix (of_choi_mat
 /-- Proves that `MatrixMap.choi_matrix` and `MatrixMap.of_choi_matrix` inverses. -/
 @[simp]
 theorem choi_map_inv (M : MatrixMap A B R) : of_choi_matrix (choi_matrix M) = M := by
-  sorry
+  -- By definition of `MatrixMap.of_choi_matrix`, we know that applying it to the Choi matrix of `M` reconstructs `M`.
+  ext X b₁ b₂; simp [MatrixMap.of_choi_matrix, MatrixMap.choi_matrix];
+  -- By linearity of $M$, we can distribute $M$ over the sum.
+  have h_linear : M X = ∑ x : A, ∑ x_1 : A, X x x_1 • M (Matrix.single x x_1 1) := by
+    have h_linear : M X = M (∑ x : A, ∑ x_1 : A, X x x_1 • Matrix.single x x_1 1) := by
+      congr with i j ; simp ( config := { decide := Bool.true } ) [ Matrix.sum_apply ];
+      simp ( config := { decide := Bool.true } ) [ Matrix.single ];
+      rw [ Finset.sum_eq_single i ] <;> aesop;
+    simp +decide only [h_linear, map_sum, LinearMap.map_smulₛₗ];
+    simp +zetaDelta at *;
+  -- By linearity of $M$, we can distribute $M$ over the sum and then apply it to each term.
+  simp [h_linear, Matrix.sum_apply]
+
+/-- The linear equivalence between linear maps of matrices,and Choi matrices.-/
+@[simps]
+def choi_equiv : MatrixMap A B R₂ ≃ₗ[R₂] Matrix (B × A) (B × A) R₂ where
+  toFun := choi_matrix
+  invFun := of_choi_matrix
+  left_inv _ := by simp
+  right_inv _ := by simp
+  map_add' _ _ := by ext; simp [choi_matrix]
+  map_smul' _ _ := by ext; simp [choi_matrix]
 
 /-- The correspondence induced by `MatrixMap.of_choi_matrix` is injective. -/
 theorem choi_matrix_inj : Function.Injective (@choi_matrix A B R _ _) := by
-  intro x y h
+  intro _ _ h
   simpa only [choi_map_inv] using congrArg of_choi_matrix h
 
 variable {R : Type*} [CommSemiring R]
