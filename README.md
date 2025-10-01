@@ -25,3 +25,12 @@ Docmentation of the main definitions can be found at [DOC.md](./DOC.md). A major
 # Major Goal: Generalized Quantum Stein's Lemma
 
 At the moment, the major goal of this repository is completing a proof of the [Generalized Quantum Stein's Lemma](https://arxiv.org/abs/2408.02722v1), following the proof in that link. The first milestone will be to formalize all the arguments _in that paper_ (while relying on standard or "obvious" results), and then the second milestone will be filling in all those other results so that the whole theorem is free of sorries. The first milestone is, at the moment (Aug 2025), quite close.
+
+# Stats
+
+As of Sept 29 2025:
+ * 1059 Theorems <!-- git grep -E "(^| )(theorem|instance|lemma) " | grep ".lean:" | wc -l -->
+ * 248 Definitions <!-- git grep -E "(^| )(def|abbrev|irreducible_def) " | grep ".lean:" | wc -l -->
+ * 13992 Lines of Code <!-- git ls-files | grep '\.lean' | xargs wc -l -->
+
+This doesn't include various code snippets that have been upstreamed to Mathlib.

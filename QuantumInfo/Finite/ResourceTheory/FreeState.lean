@@ -249,8 +249,8 @@ theorem statePow_mul (ρ : MState (H i)) (m n : ℕ) : ρ⊗^S[m * n] ≍ (ρ⊗
         · rw [MState.relabel_cast]
           rw [eq_cast_iff_heq]
           · rw [mul_one]
-          · rw [mul_one]
       · rw [pow_mul]
+      · rw [mul_one]
 
 theorem statePow_mul_relabel {i : ι} (ρ : MState (H i)) (m n : ℕ) :
    ρ⊗^S[m * n] = (ρ⊗^S[m])⊗^S[n].relabel (Equiv.cast (congrArg H (pow_mul i m n))) := by
@@ -472,6 +472,7 @@ theorem RelativeEntResource.Subadditive (ρ : MState (H i)) : Subadditive fun n 
     · apply statePow_add
     · rw [← eq_cast_iff_heq]
       apply MState.relabel_cast
+      rw [spacePow_add]
 
 noncomputable def RegularizedRelativeEntResource (ρ : MState (H i)) : ℝ≥0 :=
   ⟨(RelativeEntResource.Subadditive ρ).lim, by

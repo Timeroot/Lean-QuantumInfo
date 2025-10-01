@@ -471,6 +471,26 @@ private noncomputable def R1 (ρ : MState (H i)) (ε : Prob) : ℝ≥0∞ :=
 private noncomputable def R2 (ρ : MState (H i)) : ((n : ℕ) → IsFree (i := i ^ n)) → ℝ≥0∞ :=
   fun σ ↦ Filter.atTop.liminf fun n ↦ 𝐃(ρ⊗^S[n]‖σ n) / n
 
+--PULLOUT
+theorem _root_.Matrix.PosDef.zero_lt {n : Type*} [Nonempty n] [Fintype n] {A : Matrix n n ℂ} (hA : A.PosDef) : 0 < A := by
+  apply lt_of_le_of_ne
+  · replace hA := hA.posSemidef
+    rwa [Matrix.PosSemidef.zero_le_iff_posSemidef]
+  · rintro rfl
+    --wtf do better
+    have : ¬(0 < 0) := by trivial
+    classical rw [← Matrix.posDef_natCast_iff (n := n) (R := ℂ)] at this
+    revert hA
+    convert this
+    ext; simp
+    trans ((0 : ℕ) : ℂ)
+    · simp
+    classical
+    change _ = ite _ _ _
+    simp
+
+
+set_option maxHeartbeats 400000 in
 /-- Lemma 7 from the paper. We write `ε'` for their `\tilde{ε}`. -/
 private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1) (σ : (n : ℕ) → IsFree (i := i ^ n)) :
     (R2 ρ σ ≥ R1 ρ ε) →
@@ -608,7 +628,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
       rfl
 
   --Define σ'' first as the (unnormalized) cfc image of σ' under `λ → exp (f n λ)`.
-  let σ''_unnormalized (n) : HermitianMat (H (i ^ n)) ℂ := --TODO: Define a HermitianMat.cfc function that behaves nicely
+  let σ''_unnormalized (n) : HermitianMat (H (i ^ n)) ℂ :=
     (σ' n).M.cfc fun e ↦ Real.exp (f n e)
 
   have σ''_unnormalized_PosDef (n) : Matrix.PosDef (σ''_unnormalized n).val := by
@@ -617,15 +637,48 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     intro
     positivity
 
-  have σ''_tr_bounds (n) : 1 ≤ (σ''_unnormalized n).trace ∧ (σ''_unnormalized n).trace ≤ Real.exp (c n) := by
-    sorry
+  have h_exp_f (n) (x : ℝ) (hx : 0 < x) : x ≤ Real.exp (f n x) ∧ (Real.exp (f n x) < Real.exp (c n) * x) := by
+    constructor
+    · convert Real.exp_monotone (h_le_f n x)
+      rw [Real.exp_log hx]
+    · convert Real.exp_strictMono (h_f_le n x) using 1
+      rw [Real.exp_add (Real.log x), Real.exp_log hx, mul_comm]
+
+  have σ''_tr_bounds (n) : 1 ≤ (σ''_unnormalized n).trace ∧ (σ''_unnormalized n).trace < Real.exp (c n) := by
+    have hσ' := (σ' n).tr
+    constructor
+    · rw [← HermitianMat.sum_eigenvalues_eq_trace] at hσ' ⊢
+      rw [← hσ']
+      obtain ⟨e, he⟩ := (σ' n).M.cfc_eigenvalues fun e ↦ Real.exp (f n e)
+      rw [he]
+      simp only [HermitianMat.val_eq_coe, MState.toMat_M, Function.comp_apply]
+      rw [Equiv.sum_comp e (fun i ↦ Real.exp (f n (Matrix.IsHermitian.eigenvalues _ i)))]
+      gcongr
+      refine (h_exp_f n _ ?_).left
+      exact (σ'_posdef n).eigenvalues_pos _
+    · rw [← HermitianMat.sum_eigenvalues_eq_trace] at hσ' ⊢
+      rw [← mul_one (Real.exp (c n)), ← hσ', Finset.mul_sum]
+      obtain ⟨e, he⟩ := (σ' n).M.cfc_eigenvalues fun e ↦ Real.exp (f n e)
+      rw [he]; clear he
+      dsimp
+      rw [Equiv.sum_comp e (fun i ↦ Real.exp (f n (Matrix.IsHermitian.eigenvalues _ i)))]
+      gcongr
+      · exact Finset.univ_nonempty
+      · refine (h_exp_f n _ ?_).right
+        exact (σ'_posdef n).eigenvalues_pos _
 
   --Then σ'' is the normalized version, which will work because σ''_unnormalized is PosDef
   let σ'' (n) : MState (H (i ^ n)) := {
     --TODO make this its own definition
     M := (σ''_unnormalized n).trace⁻¹ • (σ''_unnormalized n)
-    zero_le := sorry
-    tr := sorry
+    zero_le := by
+      have h1 : 0 < (σ''_unnormalized n).trace := zero_lt_one.trans_le (σ''_tr_bounds n).left
+      have h2 : 0 < σ''_unnormalized n := (σ''_unnormalized_PosDef n).zero_lt
+      exact smul_nonneg (inv_nonneg_of_nonneg h1.le) h2.le
+    tr := by
+      simp only [HermitianMat.trace_smul]
+      apply inv_mul_cancel₀
+      exact (zero_lt_one.trans_le (σ''_tr_bounds n).left).ne'
   }
 
   have σ'_le_σ'' (n) : Real.exp (-c n) • (σ' n).M ≤ σ'' n := by
@@ -646,8 +699,10 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
   -- Fintype.card (spectrum ℝ (σ'' n).m), which is dₙ in the paper.
   have hdle : ∀ n, Fintype.card (spectrum ℝ (σ'' n).m) ≤ n + 1 := by
     sorry
-  have hdpos : ∀ n, 0 < Fintype.card (spectrum ℝ (σ'' n).m) := by
-    sorry
+  have hdpos (n) : 0 < Fintype.card (spectrum ℝ (σ'' n).m) := by
+    rw [Fintype.card_pos_iff, Set.nonempty_coe_sort]
+    apply IsSelfAdjoint.spectrum_nonempty
+    exact (σ'' n).M.H
 
   -- Eq (S59) has a minus sign, which gets complicated when one of the relative entropies is infinite.
   -- However, I don't think we need this version with the minus sign
@@ -726,6 +781,44 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
   -- Eq. (S62)
   have hliminfR : Filter.atTop.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n) - R1 ρ ε ≤
       ↑(1 - ε') * (R2 ρ σ - R1 ρ ε) := by
+    have hliminfleq : Filter.atTop.liminf (fun n ↦ —log β_ ε(ℰ n (ρ⊗^S[n])‖{σ'' n}) / n) ≤ R1 ρ ε := by
+      sorry
+    -- Is ε_1 > 0 necessary here?
+    have hlimsupleq : ∀ ε₁ > 0, Filter.atTop.limsup (fun n ↦ —log β_ (1-ε₁)(ℰ n (ρ⊗^S[n])‖{σ'' n}) / n) ≤ (R2 ρ σ) + ENNReal.ofNNReal ⟨ε₀, hε₀.le⟩:= by
+      sorry
+
+    open scoped HermitianMat in
+    let P1 ε2 n := {(ℰ n (ρ⊗^S[n])).M ≥ₚ (Real.exp (↑n*((R1 ρ ε).toReal + ε2))) • (σ'' n).M}
+    let P2 ε2 n := {(ℰ n (ρ⊗^S[n])).M ≥ₚ (Real.exp (↑n*((R2 ρ σ).toReal + ε₀ + ε2))) • (σ'' n).M}
+
+    have hPcomm (ε2) (n) : Commute (P1 ε2 n).toMat (P2 ε2 n).toMat := by
+      sorry
+
+    let E1 := 1 - P1
+    let E2 := P1 - P2
+    let E3 := P2
+
+    have hE1proj : ∀ ε2 n, E1 ε2 n = {(ℰ n (ρ⊗^S[n])).M <ₚ (Real.exp (↑n*((R1 ρ ε).toReal + ε2))) • (σ'' n).M} := fun ε2 n ↦ by
+      dsimp [E1, P1]
+      rw [sub_eq_iff_eq_add]
+      simp only [HermitianMat.proj_le_add_lt]
+
+    have hE2leProj : ∀ ε2 n, E2 ε2 n ≤ {(ℰ n (ρ⊗^S[n])).M <ₚ (Real.exp (↑n*((R2 ρ σ).toReal + ε₀ + ε2))) • (σ'' n).M} := by
+      sorry
+
+    -- Missing here: S81, S82
+    -- Note to self: v4 of arxiv is more step-by-step
+
+    let c' ε2 n := (c n + (c n) / n) ⊔ ((R2 ρ σ).toReal + ε₀ + ε2)
+
+    have hc' ε2 : (c' ε2) =O[.atTop] (1 : ℕ → ℝ) := by
+      sorry
+
+    have hσ'' ε2 n : (σ'' n).M ≥ Real.exp (-↑n*(c' ε2 n)) • 1 := by
+      sorry
+
+    -- Mising here: S85 -> S92
+
     sorry
 
   use fun n ↦ ⟨σ' n, σ'_free n⟩

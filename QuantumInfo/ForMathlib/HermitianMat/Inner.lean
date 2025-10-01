@@ -1,6 +1,6 @@
 import QuantumInfo.ForMathlib.HermitianMat.Order
-
 import Mathlib.Analysis.Convex.Contractible
+import Mathlib.Topology.Instances.Real.Lemmas
 
 /-! # Inner product of Hermitian Matrices
 
@@ -393,7 +393,7 @@ private theorem topo_compat_2_aux {d 𝕜 : Type*} [Fintype d] [RCLike 𝕜]
     {v : (selfAdjoint (Matrix d d 𝕜)) | RCLike.re (v.val * v.val).trace < 1} ⊆ (open Pointwise in b • x) := by
   --Thanks Aristotle
   rw [ mem_nhds_iff ] at h;
-  cases' h with t ht;
+  rcases h with ⟨t, ht⟩
   -- Since $t$ is open and contains $0$, there exists an $\epsilon > 0$ such that the ball of radius $\epsilon$ around $0$ is contained in $t$.
   obtain ⟨ε, hε⟩ : ∃ ε > 0, ∀ v : selfAdjoint (Matrix d d 𝕜), (RCLike.re (Matrix.trace (v.val * v.val))) < ε → v ∈ t := by
     have := ht.2.1.mem_nhds ht.2.2;
