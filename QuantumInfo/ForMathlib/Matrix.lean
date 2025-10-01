@@ -86,11 +86,12 @@ section Kronecker
 open Kronecker
 
 variable [CommRing R] [StarRing R]
-variable (A : Matrix m m R) (B : Matrix n n R)
+variable{m m' n'} (A : Matrix m m' R) (B : Matrix n n' R)
 
 omit [DecidableEq n] in
 theorem kroneckerMap_conjTranspose : (A ⊗ₖ B)ᴴ = (Aᴴ ⊗ₖ Bᴴ) := by
   ext; simp
+
 
 variable {A : Matrix m m R} {B : Matrix n n R}
 variable (hA : A.IsHermitian) (hB : B.IsHermitian)

@@ -299,14 +299,46 @@ theorem _root_.MatrixMap.choi_PSD_iff_CP_map [DecidableEq A] (M : MatrixMap A B 
     ext
     simp [choi_matrix] --TODO: `choi_matrix 0 = 0` as simp
 
-/-- The act of conjugating (not necessarily by a unitary, just by any matrix at all) is completely positive. -/
-theorem conj_isCompletelyPositive (M : Matrix B A R) :
-  IsCompletelyPositive {
+
+def conj_map (M : Matrix B A R): MatrixMap A B R := {
     toFun := fun (x : Matrix A A R) ↦ M * x * M.conjTranspose,
     map_add' x y := by rw [Matrix.mul_add, Matrix.add_mul]
     map_smul' r x := by rw [RingHom.id_apply, Matrix.mul_smul, Matrix.smul_mul]
-  } := by
+  }
+
+
+omit [DecidableEq A] in theorem conj_isPositive (M : Matrix B A R) :
+  MatrixMap.IsPositive (conj_map M) := by
+  intro X hX
+  constructor
+  · simp [conj_map]
+    unfold Matrix.IsHermitian
+    simp [hX.1.eq, Matrix.mul_assoc]
+  · intro x
+    simp [conj_map]
+    rw [Matrix.mul_assoc, ←Matrix.mulVec_mulVec, Matrix.dotProduct_mulVec]
+    rw [←(star_star (Matrix.vecMul _ _)), Matrix.star_vecMul, star_star]
+    rw [←Matrix.mulVec_mulVec]
+    apply hX.2
+
+theorem conj_tensorIsConj {n : ℕ} (M : Matrix B A R):
+  (conj_map M) ⊗ₖₘ (LinearMap.id : MatrixMap (Fin n) (Fin n) R) =
+  conj_map (M ⊗ₖ (1 : Matrix (Fin n) (Fin n) R)) := by
   sorry
+
+
+/-- The act of conjugating (not necessarily by a unitary, just by any matrix at all) is completely positive. -/
+
+theorem conj_isCompletelyPositive (M : Matrix B A R) :
+  IsCompletelyPositive (conj_map M) := by
+  intro n
+  rw [conj_tensorIsConj]
+  apply conj_isPositive
+
+
+
+
+
 
 /-- The channel X ↦ ∑ k : κ, (M k) * X * (M k)ᴴ formed by Kraus operators M : κ → Matrix B A R
 is completely positive -/
