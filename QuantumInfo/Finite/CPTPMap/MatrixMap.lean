@@ -118,6 +118,28 @@ def exists_kraus (Φ : MatrixMap A B R) : ∃ r : ℕ, ∃ (M N : Fin r → Matr
 
 end kraus
 
+section submatrix
+
+variable {A B : Type*} (R : Type*) [Semiring R]
+
+/-- The `MatrixMap` corresponding to applying a `submatrix` operation on each side. -/
+@[simps]
+def submatrix (f : B → A) : MatrixMap A B R where
+  toFun x := x.submatrix f f
+  map_add' := by simp [Matrix.submatrix_add]
+  map_smul' := by simp [Matrix.submatrix_smul]
+
+@[simp]
+theorem submatrix_id : submatrix R _root_.id = id A R := by
+  ext1; simp
+
+@[simp]
+theorem submatrix_comp (f : C → B) (g : B → A) :
+    submatrix R f ∘ₗ submatrix R g = submatrix R (g ∘ f) := by
+  ext1; simp
+
+end submatrix
+
 section kron
 open Kronecker
 
@@ -260,7 +282,7 @@ theorem kron_map_of_kron_state [CommRing R] (M₁ : MatrixMap A B R) (M₂ : Mat
   sorry
 
 theorem choi_matrix_state_rep {B : Type*} [Fintype B] [Nonempty A] (M : MatrixMap A B ℂ) :
-  M.choi_matrix = (↑(Fintype.card (α := A)) : ℂ) • (M ⊗ₖₘ (LinearMap.id : MatrixMap A A ℂ)) (MState.pure (Ket.MES A)).m := by
+    M.choi_matrix = (↑(Fintype.card (α := A)) : ℂ) • (M ⊗ₖₘ (LinearMap.id : MatrixMap A A ℂ)) (MState.pure (Ket.MES A)).m := by
   ext i j
   simp [choi_matrix, kron_def M, Ket.MES, Ket.apply, Finset.mul_sum]
   conv =>
@@ -284,6 +306,20 @@ theorem choi_matrix_state_rep {B : Type*} [Fintype B] [Nonempty A] (M : MatrixMa
       enter [2, x]
       simp [Finset.sum_ite]
     simp [Finset.sum_ite]
+
+theorem submatrix_kron_submatrix [CommSemiring R] (f : B → A) (g : D → C) :
+    submatrix R f ⊗ₖₘ submatrix R g = submatrix R (Prod.map f g) := by
+  ext m i j
+  rw [kron_def]
+  simp [Prod.map, Matrix.single, ite_and]
+
+theorem submatrix_kron_id [CommSemiring R] (f : B → A) :
+    submatrix R f ⊗ₖₘ id C R = submatrix R (Prod.map f _root_.id) := by
+  simp [← submatrix_kron_submatrix]
+
+theorem id_kron_submatrix [CommSemiring R] (f : B → A) :
+    id C R ⊗ₖₘ submatrix R f = submatrix R (Prod.map _root_.id f) := by
+  simp [← submatrix_kron_submatrix]
 
 end kron
 

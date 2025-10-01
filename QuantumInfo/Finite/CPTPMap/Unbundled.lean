@@ -124,6 +124,11 @@ theorem of_kraus_isTracePreserving {κ : Type*} [Fintype κ]
     rw [Matrix.trace_mul_cycle (M i) x (N i).conjTranspose]
   rw [← Matrix.trace_sum, ← Finset.sum_mul, hTP, one_mul]
 
+omit [DecidableEq A] in
+/-- `MatrixMap.submatrix` is trace-preserving when the function is an equivalence. -/
+theorem submatrix (e : A ≃ B) : (MatrixMap.submatrix R e).IsTracePreserving := by
+  intro; simp
+
 end IsTracePreserving
 end tp
 
@@ -418,6 +423,19 @@ theorem conj_isCompletelyPositive (M : Matrix B A R) : (conj M).IsCompletelyPosi
   ext
   simp +contextual [Matrix.one_apply, apply_ite]
   tauto
+
+--TODO: PULLOUT and then use this to rewrite `Matrix.reindex_eq_conj` too.
+theorem _root_.Matrix.submatrix_eq_mul_mul {d₂ d₃ : Type*} [DecidableEq d] (A : Matrix d d R) (e : d₂ → d) (f : d₃ → d) :
+    A.submatrix e f = (Matrix.submatrix (α := R) 1 e _root_.id : Matrix d₂ d R) * A *
+      (Matrix.submatrix (α := R) 1 _root_.id f) := by
+  rw [show _root_.id = Equiv.refl d by rfl, Matrix.mul_submatrix_one, Matrix.one_submatrix_mul]
+  simp
+
+/-- `MatrixMap.submatrix` is completely positive -/
+theorem submatrix (f : B → A) : (MatrixMap.submatrix R f).IsCompletelyPositive := by
+  convert conj_isCompletelyPositive (Matrix.submatrix (α := R) 1 f _root_.id : Matrix B A R)
+  ext1 m
+  simp [m.submatrix_eq_mul_mul]
 
 /-- The channel X ↦ ∑ k : κ, (M k) * X * (M k)ᴴ formed by Kraus operators M : κ → Matrix B A R
 is completely positive -/
