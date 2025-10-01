@@ -426,7 +426,7 @@ theorem of_kraus_isCompletelyPositive {κ : Type*} [Fintype κ] (M : κ → Matr
   rw [of_kraus]
   exact finset_sum (fun i ↦ conj_isCompletelyPositive (M i))
 
-def exists_kraus (Φ : MatrixMap A B R) (hCP : Φ.IsCompletelyPositive) :
+theorem exists_kraus (Φ : MatrixMap A B R) (hCP : Φ.IsCompletelyPositive) :
     ∃ r : ℕ, ∃ (M : Fin r → Matrix B A R), Φ = of_kraus M M :=
   sorry
 
