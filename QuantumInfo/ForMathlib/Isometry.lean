@@ -205,7 +205,8 @@ private theorem Matrix.cfc_conj_isometry' (hA : A.IsHermitian) (f : ℝ → ℝ)
     rfl
   rw [Matrix.IsHermitian.cfc_eq, this]
   rw [hA.cfc_eq, Matrix.IsHermitian.cfc.eq_1]
-  simp [U', D, Matrix.star_eq_conjTranspose, Matrix.mul_assoc]
+  simp only [Matrix.mul_assoc, conjTranspose_mul, star_eq_conjTranspose, U', D]
+  exact isHermitian_mul_mul_conjTranspose _ hA
 
 theorem Matrix.cfc_conj_isometry (f : ℝ → ℝ) {u : Matrix d₂ d 𝕜}
   (hu₁ : u.Isometry) (hu₂ : uᴴ.Isometry) :

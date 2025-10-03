@@ -24,14 +24,15 @@ theorem pinching_sq_eq_self (ρ : MState d) : ∀ k, (pinching_kraus ρ k)^2 = (
   ext1
   push_cast
   rw [pow_two, pinching_kraus, HermitianMat.cfc, ←cfc_mul
-  (hf := by simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology, implies_true])
-  (hg := by simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology, implies_true])]
+  (hf := by simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology])
+  (hg := by simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology])]
   simp only [← pow_two, ite_pow, one_pow, ne_eq, OfNat.ofNat_ne_zero, not_false_eq_true,
     zero_pow]
 
 theorem pinching_sum (ρ : MState d) : ∑ k, pinching_kraus ρ k = 1 := by
   ext i j
-  simp [pinching_kraus, HermitianMat.cfc]
+  simp only [pinching_kraus, HermitianMat.cfc, HermitianMat.val_eq_coe, MState.toMat_M, AddSubgroup.val_finset_sum,
+    selfAdjoint.val_one]
   have heq : Set.EqOn (fun x => ∑ i : spectrum ℝ ρ.m, if x = ↑i then (1 : ℝ) else 0) 1 (spectrum ℝ ρ.m) := by
     unfold Set.EqOn; intro x hx
     dsimp

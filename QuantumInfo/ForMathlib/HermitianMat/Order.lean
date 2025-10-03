@@ -27,18 +27,26 @@ instance [DecidableEq n] : ZeroLEOneClass (HermitianMat n ℂ) where
 theorem lt_iff_posdef : A < B ↔ (B - A).toMat.PosSemidef ∧ A ≠ B :=
   lt_iff_le_and_ne
 
-instance : OrderedSMul ℝ (HermitianMat n α) where
-  smul_lt_smul_of_pos hab hc := by
-    rw [HermitianMat.lt_iff_posdef] at hab ⊢
-    simp [← smul_sub, smul_right_inj hc.ne']
-    exact ⟨hab.left.smul hc.le, hab.right⟩
-  lt_of_smul_lt_smul_of_pos hab hc := by
-    rw [HermitianMat.lt_iff_posdef] at hab ⊢
-    convert And.intro (hab.left.smul (inv_pos_of_pos hc).le) hab.right using 1
-    · simp [← smul_sub, smul_smul, inv_mul_cancel₀ hc.ne']
-    · simp [smul_right_inj hc.ne']
+instance : IsStrictOrderedModule ℝ (HermitianMat n α) where
+    smul_lt_smul_of_pos_left a ha b b₂ hb := by
+      rw [HermitianMat.lt_iff_posdef] at hb ⊢
+      simp only [← smul_sub, selfAdjoint.val_smul, val_eq_coe, AddSubgroupClass.coe_sub, ne_eq,
+        smul_right_inj ha.ne']
+      exact ⟨hb.left.smul ha.le, hb.right⟩
+    smul_lt_smul_of_pos_right a ha b b2 hb := by
+      rw [HermitianMat.lt_iff_posdef] at ha ⊢
+      rw [sub_zero] at ha
+      rw [← sub_pos] at hb
+      convert And.intro (ha.left.smul hb.le) ha.right using 1
+      · simp [← sub_smul]
+      simp only [ne_eq, not_iff_not]
+      constructor
+      · intro h
+        rw [eq_comm, ← sub_eq_zero, ← sub_smul] at h
+        simpa [eq_comm, hb.ne'] using h
+      · rintro rfl; simp
 
---Without these shortcut instances, `gcongr` fails to close certain goals...? Why?
+--Without these shortcut instances, `gcongr` fails to close certain goals...? Why? TODO
 instance : PosSMulMono ℝ (HermitianMat n α) := inferInstance
 instance : SMulPosMono ℝ (HermitianMat n α) := inferInstance
 

@@ -117,7 +117,7 @@ theorem mix_pEnsemble_pure_average {ψ : Ket d} {e : PEnsemble d α} {T : Type _
   simp only [pure_average, Functor.map, Distribution.expect_val]
   apply Mixable.to_U_inj
   rw [PEnsemble.states] at hpure
-  simp only [Mixable.to_U_of_mkT, Function.comp_apply, smul_eq_mul, Mixable.mkT_instUniv]
+  simp only [Mixable.to_U_of_mkT, Function.comp_apply]
   have h1 : ∀ i ∈ Finset.univ, (e.distr i : ℝ) • (Mixable.to_U (f (e.var i))) ≠ 0 → e.var i = ψ := fun i hi ↦ by
     have h2 : e.distr i = 0 → (e.distr i : ℝ) • (Mixable.to_U (f (e.var i))) = 0 := fun h0 ↦ by
       simp only [h0, Prob.coe_zero, zero_smul]
@@ -150,7 +150,7 @@ theorem mix_mEnsemble_pure_average {ψ : Ket d} {e : MEnsemble d α} {T : Type _
   simp only [average, Functor.map, Distribution.expect_val]
   apply Mixable.to_U_inj
   rw [MEnsemble.states] at hpure
-  simp only [Mixable.to_U_of_mkT, Function.comp_apply, smul_eq_mul, Mixable.mkT_instUniv]
+  simp only [Mixable.to_U_of_mkT, Function.comp_apply]
   have h1 : ∀ i ∈ Finset.univ, (e.distr i : ℝ) • (Mixable.to_U (f (e.var i))) ≠ 0 → e.var i = pure ψ := fun i hi ↦ by
     have h2 : e.distr i = 0 → (e.distr i : ℝ) • (Mixable.to_U (f (e.var i))) = 0 := fun h0 ↦ by
       simp only [h0, Prob.coe_zero, zero_smul]
