@@ -752,6 +752,10 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     let E2 := P1 - P2
     let E3 := P2
 
+    have Esum : E1 + E2 + E3 = 1 := by
+      unfold E1 E2 E3
+      abel
+
     have hE1proj : ∀ ε2 n, E1 ε2 n = {(ℰ n (ρ⊗^S[n])).M <ₚ (Real.exp (↑n*((R1 ρ ε).toReal + ε2))) • (σ'' n).M} := fun ε2 n ↦ by
       dsimp [E1, P1]
       rw [sub_eq_iff_eq_add]
@@ -763,6 +767,12 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     -- Missing here: S81, S82
     -- Note to self: v4 of arxiv is more step-by-step
 
+    have hE1leq : ∀ ε2 n, (1/n) • (E1 ε2 n).toMat * (HermitianMat.log (ℰ n (ρ⊗^S[n])) - HermitianMat.log (σ'' n)).toMat ≤ ((R1 ρ ε).toReal + ε2) • (E1 ε2 n).toMat := by
+      sorry
+
+    have hE2leq : ∀ ε2 n, (1/n) •  (E2 ε2 n).toMat * (HermitianMat.log (ℰ n (ρ⊗^S[n])) - HermitianMat.log (σ'' n)).toMat ≤ ((R2 ρ σ).toReal + ε₀ + ε2) • (E2 ε2 n).toMat := by
+      sorry
+
     let c' ε2 n := (c n + (c n) / n) ⊔ ((R2 ρ σ).toReal + ε₀ + ε2)
 
     have hc' ε2 : (c' ε2) =O[.atTop] (1 : ℕ → ℝ) := by
@@ -771,7 +781,14 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     have hσ'' ε2 n : (σ'' n).M ≥ Real.exp (-↑n*(c' ε2 n)) • 1 := by
       sorry
 
-    -- Mising here: S85 -> S92
+    -- Leo: I think there's a typo in the third eq. of this step: ρ should be ρ^n.
+    -- The next set of equations also have ρ_n instead of ρ^n.
+    have hDleq : ∀ ε2 n, (𝐃(ℰ n (ρ⊗^S[n])‖σ'' n).toReal / n : Real) ≤ ((R1 ρ ε).toReal + ε2) +
+         (P1 ε2 n).inner (ℰ n (ρ⊗^S[n])) * (((R2 ρ σ).toReal + ε₀ + ε2) - ((R1 ρ ε).toReal + ε2)) +
+         (P2 ε2 n).inner (ℰ n (ρ⊗^S[n])) * (c' ε2 n - ((R2 ρ σ).toReal + ε₀ + ε2)) := by
+      sorry
+
+    -- Mising here: S89 -> S92
 
     sorry
 
