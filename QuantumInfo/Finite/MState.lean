@@ -359,6 +359,29 @@ theorem pure_iff_purity_one (ρ : MState d) : (∃ ψ, ρ = pure ψ) ↔ ρ.puri
   --distribution is constant iff pure
   sorry
 
+--PULLOUT
+theorem _root_.Matrix.unitaryGroup_row_norm (U : Matrix.unitaryGroup d ℂ) (i : d) :
+    ∑ j, ‖U j i‖^2 = 1 := by
+  suffices ∑ j, ‖U j i‖^2 = (1 : ℂ) by exact_mod_cast this
+  simpa [Matrix.mul_apply, Complex.sq_norm, Complex.normSq_eq_conj_mul_self]
+    using congr($(U.prop.left) i i)
+
+--TODO: Would be better if there was an `MState.eigenstate` or similar (maybe extending
+-- a similar thing for `HermitianMat`) and then this could be an equality with that, as
+-- an explicit formula, instead of this `Exists`.
+theorem spectralDecomposition (ρ : MState d) :
+    ∃ (ψs : d → Ket d), ρ.M = ∑ i, (ρ.spectrum i : ℝ) • (MState.pure (ψs i)).M := by
+  use (fun i ↦ ⟨(ρ.M.H.eigenvectorUnitary · i), Matrix.unitaryGroup_row_norm _ i⟩)
+  ext i j
+  nth_rw 1 [ρ.M.H.spectral_theorem]
+  simp only [toMat_M, Complex.coe_algebraMap, spectrum, Distribution.mk',
+    Distribution.funlike_apply, pure, Matrix.IsHermitian.eigenvectorUnitary_apply,
+    PiLp.ofLp_apply, AddSubgroup.val_finset_sum, val_eq_coe, selfAdjoint.val_smul]
+  rw [Finset.sum_apply, Finset.sum_apply, Matrix.mul_apply]
+  congr!
+  simp [Matrix.vecMulVec_apply, Ket.apply, Matrix.mul_diagonal]
+  ac_rfl
+
 end pure
 
 section prod

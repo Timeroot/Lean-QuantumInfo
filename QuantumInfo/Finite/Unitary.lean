@@ -6,7 +6,7 @@ This file is intended for lemmas about unitary matrices (`Matrix.unitaryGroup`) 
 `Bra`s, `Ket`s, and `MState` mixed states.
 
 This is imported by `CPTPMap` to define things like unitary channels, Kraus operators, and
-complementary channels, so this file itself does not discuss channels yet.-/
+complementary channels, so this file itself does not discuss channels yet. -/
 
 noncomputable section
 
@@ -23,7 +23,7 @@ theorem trace_conj_unitary : (A.conj U.val).trace = A.trace := by
 
 @[simp]
 theorem le_conj_unitary : A.conj U.val ≤ B.conj U ↔ A ≤ B := by
-  rw [← sub_nonneg, ← sub_nonneg (b := A), ← sub_conj]
+  rw [← sub_nonneg, ← sub_nonneg (b := A), ← map_sub]
   constructor
   · intro h
     simpa [HermitianMat.conj_conj] using HermitianMat.conj_le h (star U).val
