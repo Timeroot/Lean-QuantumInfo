@@ -66,12 +66,13 @@ theorem no_cloning (ψ φ f : Ket d) (U : 𝐔[d × d]) (hψ : (pure (ψ ⊗ f))
   let ρψ := pure ψ
   let ρφ := pure φ
   have h1 : (((pure (ψ ⊗ ψ)).inner (pure (φ ⊗ φ))) : ℂ) = ρψ.inner ρφ * ρψ.inner ρφ := by
-    simp [pure_prod_pure]
+    simp only [pure_prod_pure]
     -- see `MState.lean` for
-    -- `inner_sep.apply : ((ξ1⊗ξ2).inner (ψ1⊗ψ2) : ℂ) = (ξ1.inner ψ1) * (ξ2.inner ψ2)`
-    exact inner_sep.apply ρψ ρφ ρψ ρφ
+    -- `inner_sep_apply : ((ξ1⊗ξ2).inner (ψ1⊗ψ2) : ℂ) = (ξ1.inner ψ1) * (ξ2.inner ψ2)`
+    rw [inner_sep_apply ρψ ρφ ρψ ρφ]
+    simp only [Prob.coe_mul, Complex.ofReal_mul]
   have h2 : (((pure (ψ ⊗ ψ)).inner (pure (φ ⊗ φ))) : ℝ) = ((pure (ψ ⊗ f)).U_conj U).inner ((pure (φ ⊗ f)).U_conj U) := by
-    simp [pure_prod_pure] at hψ hφ ⊢
+    simp only [pure_prod_pure] at hψ hφ ⊢
     rw [hψ, hφ]
   simp [MState.inner, HermitianMat.inner] at h1 h2 ⊢
   simp [U_conj] at h2
@@ -92,7 +93,7 @@ theorem no_cloning (ψ φ f : Ket d) (U : 𝐔[d × d]) (hψ : (pure (ψ ⊗ f))
         simp [mul_one]
   have hinner : MState.inner (pure ψ ⊗ pure f) (pure φ ⊗ pure f) = ((pure ψ ⊗ pure f).m * (pure φ ⊗ pure f).m).trace.re := by
     simp [MState.inner, HermitianMat.inner, IsMaximalSelfAdjoint.selfadjMap, RCLike.re]
-  apply_fun (fun r => (r : ℂ)) at hinner
+  -- apply_fun (fun r => (r : ℂ)) at hinner
   conv at h2 =>
     rhs
     congr
@@ -115,9 +116,9 @@ theorem no_cloning (ψ φ f : Ket d) (U : 𝐔[d × d]) (hψ : (pure (ψ ⊗ f))
       rw [← Matrix.star_eq_conjTranspose]
       rw [Matrix.UnitaryGroup.star_mul_self U]
     simp [pure_prod_pure]
-  apply_fun (fun r => (r : ℂ)) at h2
-  rw [← hinner] at h2
-  rw [inner_sep.apply] at h2
+  -- apply_fun (fun r => (r : ℂ)) at h2
+  rw [← hinner, inner_sep_apply] at h2
+  rw [Prob.coe_mul] at h2
   -- see `MState.lean` for
   -- `pure_inner : (pure ψ).inner (pure φ) = Braket.dot ψ φ`
   conv at h2 =>
@@ -125,13 +126,11 @@ theorem no_cloning (ψ φ f : Ket d) (U : 𝐔[d × d]) (hψ : (pure (ψ ⊗ f))
     rw [pure_inner ψ φ, pure_inner f f]
     congr; rfl
     unfold Braket.dot
-    congr; rfl; ext
-    simp [← Complex.normSq_eq_conj_mul_self]
+    simp only [Bra.eq_conj, ← Complex.normSq_eq_conj_mul_self, Complex.ofReal_pow]
   conv at h2 =>
     rhs
-    congr; rfl
-    congr; rfl
-    -- rw [Ket.normalized f]
+    rw [← Complex.ofReal_sum, Ket.normalized f]
+    simp only [Complex.ofReal_one, norm_one, one_pow, mul_one]
   sorry
 
 end MState

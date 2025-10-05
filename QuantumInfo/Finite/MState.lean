@@ -43,7 +43,7 @@ We don't `extend (M : HermitianMat d ℂ)` because that gives an annoying thing 
 structure MState (d : Type*) [Fintype d] [DecidableEq d] where
   M : HermitianMat d ℂ
   zero_le : 0 ≤ M
-  tr : HermitianMat.trace M = 1
+  tr : M.trace = 1
 
 namespace MState
 
@@ -219,10 +219,11 @@ def pure (ψ : Ket d) : MState d where
     simp [HermitianMat.trace_eq_re_trace, Matrix.trace, Matrix.vecMulVec_apply, Bra.eq_conj, h₁]
     exact ψ.normalized
 
-theorem pure_inner (ψ φ : Ket d) : (pure ψ).inner (pure φ) = Braket.dot ψ φ := by sorry
+theorem pure_inner (ψ φ : Ket d) : (pure ψ).inner (pure φ) = ‖Braket.dot ψ φ‖^2 := by
+  sorry
 
 @[simp]
-theorem pure_of (ψ : Ket d) : (pure ψ).m i j = (ψ i) * conj (ψ j) := by
+theorem pure_apply {i j : d} (ψ : Ket d) : (pure ψ).m i j = (ψ i) * conj (ψ j) := by
   rfl
 
 /-- The purity of a state is Tr[ρ^2]. This is a `Prob`, because it is always between zero and one. -/
@@ -395,9 +396,15 @@ def prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : MState (d₁ × d₂) whe
 
 infixl:100 " ⊗ " => MState.prod
 
-theorem inner_sep.apply (ξ1 ψ1 : MState d₁) (ξ2 ψ2 : MState d₂) :
-((ξ1⊗ξ2).inner (ψ1⊗ψ2) : ℂ) = (ξ1.inner ψ1) * (ξ2.inner ψ2) := by
-  sorry
+theorem inner_sep_apply (ξ1 ψ1 : MState d₁) (ξ2 ψ2 : MState d₂) :
+    (ξ1 ⊗ ξ2).inner (ψ1 ⊗ ψ2) = (ξ1.inner ψ1) * (ξ2.inner ψ2) := by
+  ext1
+  simp only [MState.inner, Prob.coe_mul, ← Complex.ofReal_inj]
+  --Lots of this should actually be facts about HermitianMat first
+  simp only [prod, Complex.ofReal_mul]
+  simp only [← RCLike.ofReal_eq_complex_ofReal, inner_eq_trace_rc]
+  simp only [kronecker, ← Matrix.trace_kronecker]
+  simp only [Matrix.mul_kronecker_mul]
 
 /-- The product of pure states is a pure product state , `Ket.prod`. -/
 theorem pure_prod_pure (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : pure (ψ₁ ⊗ ψ₂) = (pure ψ₁) ⊗ (pure ψ₂) := by
@@ -531,10 +538,12 @@ def purify (ρ : MState d) : Ket (d × d) where
     ρ2 * (ρ.Hermitian.eigenvalues j).sqrt
   normalized' := by
     have h₁ := fun i ↦ ρ.pos.eigenvalues_nonneg i
-    simp [mul_pow, Real.sq_sqrt, h₁, Fintype.sum_prod_type_right]
+    simp only [Complex.norm_mul,
+      Complex.norm_real, Real.norm_eq_abs, mul_pow, sq_abs, h₁, Real.sq_sqrt,
+      Fintype.sum_prod_type_right]
     simp_rw [← Finset.sum_mul]
-    have : ∀x, ∑ i : d, ‖ρ.Hermitian.eigenvectorBasis x i‖ ^ 2 = 1 :=
-      sorry
+    have : ∀ x, ∑ i : d, ‖ρ.Hermitian.eigenvectorUnitary i x‖ ^ 2 = 1 :=
+      Matrix.unitaryGroup_row_norm ρ.Hermitian.eigenvectorUnitary
     apply @RCLike.ofReal_injective ℂ
     simp_rw [this, one_mul, Matrix.IsHermitian.sum_eigenvalues_eq_trace]
     exact ρ.tr'
@@ -545,7 +554,7 @@ def purify (ρ : MState d) : Ket (d × d) where
 theorem purify_spec (ρ : MState d) : (pure ρ.purify).traceRight = ρ := by
   ext i j
   simp_rw [purify, traceRight, Matrix.traceRight]
-  simp only [pure_of, Ket.apply]
+  simp only [pure_apply, Ket.apply]
   simp only [map_mul]
   simp_rw [mul_assoc, mul_comm, ← mul_assoc (Complex.ofReal _), Complex.mul_conj]
   sorry
