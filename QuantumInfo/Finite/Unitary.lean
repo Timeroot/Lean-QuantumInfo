@@ -61,7 +61,7 @@ theorem U_conj_spectrum_eq (ρ : MState d) (U : 𝐔[d]) :
 --   sorry
 
 /-- No-cloning -/
-theorem no_cloning (ψ φ f : Ket d) (U : 𝐔[d × d]) (hψ : (pure (ψ ⊗ f)).U_conj U = pure (ψ ⊗ ψ)) (hφ : (pure (φ ⊗ f)).U_conj U = pure (φ ⊗ φ)) (H : ψ ≠ φ) :
+theorem no_cloning (ψ φ f : Ket d) (U : 𝐔[d × d]) (hψ : (pure (ψ ⊗ f)).U_conj U = pure (ψ ⊗ ψ)) (hφ : (pure (φ ⊗ f)).U_conj U = pure (φ ⊗ φ)) (H : (pure ψ).inner (pure φ) < (1 : ℝ)) :
   (pure ψ).inner (pure φ) = (0 : ℝ) := by
   let ρψ := pure ψ
   let ρφ := pure φ
@@ -74,7 +74,7 @@ theorem no_cloning (ψ φ f : Ket d) (U : 𝐔[d × d]) (hψ : (pure (ψ ⊗ f))
   have h2 : (((pure (ψ ⊗ ψ)).inner (pure (φ ⊗ φ))) : ℝ) = ((pure (ψ ⊗ f)).U_conj U).inner ((pure (φ ⊗ f)).U_conj U) := by
     simp only [pure_prod_pure] at hψ hφ ⊢
     rw [hψ, hφ]
-  simp [MState.inner, HermitianMat.inner] at h1 h2 ⊢
+  simp [MState.inner, HermitianMat.inner] at h2
   simp [U_conj] at h2
   have hU :
     U.val * (pure (ψ ⊗ f)).m * U.val.conjTranspose * (U.val * (pure (φ ⊗ f)).m * U.val.conjTranspose) =
@@ -93,7 +93,6 @@ theorem no_cloning (ψ φ f : Ket d) (U : 𝐔[d × d]) (hψ : (pure (ψ ⊗ f))
         simp [mul_one]
   have hinner : MState.inner (pure ψ ⊗ pure f) (pure φ ⊗ pure f) = ((pure ψ ⊗ pure f).m * (pure φ ⊗ pure f).m).trace.re := by
     simp [MState.inner, HermitianMat.inner, IsMaximalSelfAdjoint.selfadjMap, RCLike.re]
-  -- apply_fun (fun r => (r : ℂ)) at hinner
   conv at h2 =>
     rhs
     congr
@@ -105,32 +104,36 @@ theorem no_cloning (ψ φ f : Ket d) (U : 𝐔[d × d]) (hψ : (pure (ψ ⊗ f))
       congr; rfl
       rw [MState.m]; dsimp
       simp [HermitianMat.conj]
-    dsimp [MState.m]
-    simp [Matrix.UnitaryGroup.star_mul_self]
     rw [hU]
     rw [Matrix.trace_mul_comm (U.val * (pure (ψ ⊗ f)).m * (pure (φ ⊗ f)).m) (U.val).conjTranspose]
     repeat rw [← mul_assoc]
     conv =>
       congr; congr
       lhs
-      rw [← Matrix.star_eq_conjTranspose]
-      rw [Matrix.UnitaryGroup.star_mul_self U]
+      rw [← Matrix.star_eq_conjTranspose, Matrix.UnitaryGroup.star_mul_self U]
     simp [pure_prod_pure]
-  -- apply_fun (fun r => (r : ℂ)) at h2
-  rw [← hinner, inner_sep_apply] at h2
-  rw [Prob.coe_mul] at h2
-  -- see `MState.lean` for
-  -- `pure_inner : (pure ψ).inner (pure φ) = Braket.dot ψ φ`
+    congr; congr
+    . rw [prod]; dsimp [MState.m]; simp
+    . rw [prod]; dsimp [MState.m]; simp
   conv at h2 =>
     rhs
-    rw [pure_inner ψ φ, pure_inner f f]
-    congr; rfl
-    unfold Braket.dot
-    simp only [Bra.eq_conj, ← Complex.normSq_eq_conj_mul_self, Complex.ofReal_pow]
-  conv at h2 =>
-    rhs
-    rw [← Complex.ofReal_sum, Ket.normalized f]
-    simp only [Complex.ofReal_one, norm_one, one_pow, mul_one]
-  sorry
+    congr; congr
+    rw [← Matrix.mul_kronecker_mul (pure ψ).m (pure φ).m (pure f).m (pure f).m]
+    arg 3
+    rw [pure_mul_self f]
+  conv_rhs at h2 =>
+    rw [Matrix.trace_kronecker]
+    simp only [toMat_M, tr', mul_one]
+  apply_fun (fun r => (r : ℂ)) at h2
+  have h3 := Eq.trans h1.symm h2
+  have h4 : ((ρψ.m * ρφ.m).trace.re) * (((pure ψ).m * (pure φ).m).trace.re - 1) = (0 : ℝ) := by
+    sorry
+  have H' : (pure ψ).inner (pure φ) ≠ (1 : ℝ) := by
+    exact H.ne
+  apply mul_eq_zero.mp at h4
+  apply Or.resolve_right at h4
+  have h5 : ¬((pure ψ).m * (pure φ).m).trace.re - 1 = 0 := by
+    exact sub_ne_zero_of_ne H'
+  exact h4 h5
 
 end MState

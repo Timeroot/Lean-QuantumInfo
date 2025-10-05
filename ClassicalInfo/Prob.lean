@@ -138,6 +138,9 @@ theorem toNNReal_zero : (0 : Prob) = (0 : ℝ≥0) :=
 theorem toNNReal_one : (1 : Prob) = (1 : ℝ≥0) :=
   rfl
 
+theorem ofNNReal_toNNReal : ENNReal.ofNNReal (toNNReal p) = ENNReal.ofReal (p : ℝ) := by
+  simp [toNNReal, ENNReal.ofReal_eq_coe_nnreal]
+
 def NNReal.asProb (p : ℝ≥0) (hp : p ≤ 1) : Prob :=
   ⟨p, ⟨p.2, hp⟩⟩
 
