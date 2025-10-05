@@ -219,6 +219,8 @@ def pure (ψ : Ket d) : MState d where
     simp [HermitianMat.trace_eq_re_trace, Matrix.trace, Matrix.vecMulVec_apply, Bra.eq_conj, h₁]
     exact ψ.normalized
 
+theorem pure_inner (ψ φ : Ket d) : (pure ψ).inner (pure φ) = Braket.dot ψ φ := by sorry
+
 @[simp]
 theorem pure_of (ψ : Ket d) : (pure ψ).m i j = (ψ i) * conj (ψ j) := by
   rfl
@@ -392,6 +394,10 @@ def prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : MState (d₁ × d₂) whe
   tr := by simp
 
 infixl:100 " ⊗ " => MState.prod
+
+theorem inner_sep.apply (ξ1 ψ1 : MState d₁) (ξ2 ψ2 : MState d₂) :
+((ξ1⊗ξ2).inner (ψ1⊗ψ2) : ℂ) = (ξ1.inner ψ1) * (ξ2.inner ψ2) := by
+  sorry
 
 /-- The product of pure states is a pure product state , `Ket.prod`. -/
 theorem pure_prod_pure (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : pure (ψ₁ ⊗ ψ₂) = (pure ψ₁) ⊗ (pure ψ₂) := by

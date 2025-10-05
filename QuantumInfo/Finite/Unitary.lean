@@ -55,4 +55,83 @@ theorem U_conj_spectrum_eq (ρ : MState d) (U : 𝐔[d]) :
     sorry
   simp [MState.spectrum, U_conj, this]
 
+-- theorem inner_conj_unitary {n : Type*} [Fintype n] [DecidableEq n]
+--   (A B : HermitianMat n ℂ) (U : 𝐔[n]) :
+--   (A.conj U.val).inner (B.conj U.val) = A.inner B := by
+--   sorry
+
+/-- No-cloning -/
+theorem no_cloning (ψ φ f : Ket d) (U : 𝐔[d × d]) (hψ : (pure (ψ ⊗ f)).U_conj U = pure (ψ ⊗ ψ)) (hφ : (pure (φ ⊗ f)).U_conj U = pure (φ ⊗ φ)) (H : ψ ≠ φ) :
+  (pure ψ).inner (pure φ) = (0 : ℝ) := by
+  let ρψ := pure ψ
+  let ρφ := pure φ
+  have h1 : (((pure (ψ ⊗ ψ)).inner (pure (φ ⊗ φ))) : ℂ) = ρψ.inner ρφ * ρψ.inner ρφ := by
+    simp [pure_prod_pure]
+    -- see `MState.lean` for
+    -- `inner_sep.apply : ((ξ1⊗ξ2).inner (ψ1⊗ψ2) : ℂ) = (ξ1.inner ψ1) * (ξ2.inner ψ2)`
+    exact inner_sep.apply ρψ ρφ ρψ ρφ
+  have h2 : (((pure (ψ ⊗ ψ)).inner (pure (φ ⊗ φ))) : ℝ) = ((pure (ψ ⊗ f)).U_conj U).inner ((pure (φ ⊗ f)).U_conj U) := by
+    simp [pure_prod_pure] at hψ hφ ⊢
+    rw [hψ, hφ]
+  simp [MState.inner, HermitianMat.inner] at h1 h2 ⊢
+  simp [U_conj] at h2
+  have hU :
+    U.val * (pure (ψ ⊗ f)).m * U.val.conjTranspose * (U.val * (pure (φ ⊗ f)).m * U.val.conjTranspose) =
+      U.val * (pure (ψ ⊗ f)).m * (pure (φ ⊗ f)).m * U.val.conjTranspose := by
+    calc
+      U.val * (pure (ψ ⊗ f)).m * U.val.conjTranspose * (U.val * (pure (φ ⊗ f)).m * U.val.conjTranspose)
+          = U.val * (pure (ψ ⊗ f)).m * (U.val.conjTranspose * U.val) * (pure (φ ⊗ f)).m * U.val.conjTranspose := by
+        repeat rw [← mul_assoc]
+      _ = U.val * (pure (ψ ⊗ f)).m * ((star U.val) * U.val) * (pure (φ ⊗ f)).m * U.val.conjTranspose := by
+        -- replace conjTranspose by Matrix.star
+        rw [← Matrix.star_eq_conjTranspose]
+      _ = U.val * (pure (ψ ⊗ f)).m * (1 : Matrix (d × d) (d × d) ℂ) * (pure (φ ⊗ f)).m * U.val.conjTranspose := by
+        -- use the unitary property Matrix.star U * U = 1
+        rw [Matrix.UnitaryGroup.star_mul_self U]
+      _ = U.val * (pure (ψ ⊗ f)).m * (pure (φ ⊗ f)).m * U.val.conjTranspose := by
+        simp [mul_one]
+  have hinner : MState.inner (pure ψ ⊗ pure f) (pure φ ⊗ pure f) = ((pure ψ ⊗ pure f).m * (pure φ ⊗ pure f).m).trace.re := by
+    simp [MState.inner, HermitianMat.inner, IsMaximalSelfAdjoint.selfadjMap, RCLike.re]
+  apply_fun (fun r => (r : ℂ)) at hinner
+  conv at h2 =>
+    rhs
+    congr
+    simp [HermitianMat.conj, HermitianMat.trace_conj_unitary]
+    rw [MState.m]; dsimp
+    simp [HermitianMat.conj]
+    conv =>
+      rhs
+      congr; rfl
+      rw [MState.m]; dsimp
+      simp [HermitianMat.conj]
+    dsimp [MState.m]
+    simp [Matrix.UnitaryGroup.star_mul_self]
+    rw [hU]
+    rw [Matrix.trace_mul_comm (U.val * (pure (ψ ⊗ f)).m * (pure (φ ⊗ f)).m) (U.val).conjTranspose]
+    repeat rw [← mul_assoc]
+    conv =>
+      congr; congr
+      lhs
+      rw [← Matrix.star_eq_conjTranspose]
+      rw [Matrix.UnitaryGroup.star_mul_self U]
+    simp [pure_prod_pure]
+  apply_fun (fun r => (r : ℂ)) at h2
+  rw [← hinner] at h2
+  rw [inner_sep.apply] at h2
+  -- see `MState.lean` for
+  -- `pure_inner : (pure ψ).inner (pure φ) = Braket.dot ψ φ`
+  conv at h2 =>
+    rhs
+    rw [pure_inner ψ φ, pure_inner f f]
+    congr; rfl
+    unfold Braket.dot
+    congr; rfl; ext
+    simp [← Complex.normSq_eq_conj_mul_self]
+  conv at h2 =>
+    rhs
+    congr; rfl
+    congr; rfl
+    -- rw [Ket.normalized f]
+  sorry
+
 end MState
