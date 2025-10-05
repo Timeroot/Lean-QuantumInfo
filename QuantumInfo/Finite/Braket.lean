@@ -321,6 +321,10 @@ theorem Ket.MES_isEntangled [Nontrivial d] : (Ket.MES d).IsEntangled := by
   use x, y, x, y
   simp [apply, h]
 
+/-- The transpose trick -/
+theorem TransposeTrick {d} [Fintype d] [Nonempty d] (M : Matrix d d ℂ) (φ : Ket (d × d)) (h : φ = Ket.MES d) :
+(M ⊗ₖ 1) *ᵥ φ = (1 ⊗ₖ M.transpose) *ᵥ φ := by sorry
+
 end mes
 
 section equiv
