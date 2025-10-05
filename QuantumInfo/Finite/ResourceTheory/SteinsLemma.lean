@@ -790,10 +790,10 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
   -- Eq. (S62)
   have hliminfR : Filter.atTop.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n) - R1 ρ ε ≤
       ↑(1 - ε') * (R2 ρ σ - R1 ρ ε) := by
-    have hliminfleq : Filter.atTop.liminf (fun n ↦ —log β_ ε(ℰ n (ρ⊗^S[n])‖{σ'' n}) / n) ≤ R1 ρ ε := by
+    have hliminfleq : Filter.atTop.liminf (fun n ↦ —log β_ ε(ℰ n (ρ⊗^S[n])‖{σ'' n}) / n) ≤ (R1 ρ ε).toNNReal := by
       sorry
-    -- Is ε_1 > 0 necessary here?
-    have hlimsupleq : ∀ ε₁ > 0, Filter.atTop.limsup (fun n ↦ —log β_ (1-ε₁)(ℰ n (ρ⊗^S[n])‖{σ'' n}) / n) ≤ (R2 ρ σ) + ENNReal.ofNNReal ⟨ε₀, hε₀.le⟩:= by
+    -- ε₁ here is the 1-ε₁ from the paper
+    have hlimsupleq : ∀ ε₁ < 1, Filter.atTop.limsup (fun n ↦ —log β_ ε₁(ℰ n (ρ⊗^S[n])‖{σ'' n}) / n) ≤ ((R2 ρ σ).toNNReal + ⟨ε₀, hε₀.le⟩ : NNReal) := by
       sorry
 
     open scoped HermitianMat in
@@ -803,7 +803,8 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     have hPcomm (ε2) (n) : Commute (P1 ε2 n).toMat (P2 ε2 n).toMat := by
       sorry
 
-    -- Missing: S84 and S85
+    -- S76 and S77 together
+    have hlimP ε2 (hε2 : 0 < ε2) := LemmaS2 hε2 (fun n ↦ ℰ n (ρ⊗^S[n])) (σ'') hliminfleq (hlimsupleq ε hε.right)
 
     let E1 := 1 - P1
     let E2 := P1 - P2
@@ -820,8 +821,6 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
 
     have hE2leProj ε2 n : E2 ε2 n ≤ {(ℰ n (ρ⊗^S[n])).M <ₚ (Real.exp (↑n*((R2 ρ σ).toReal + ε₀ + ε2))) • (σ'' n).M} := by
       sorry
-
-    -- Note to self: v4 of arxiv is more step-by-step
 
     have hE1leq ε2 n : (1/n) • (E1 ε2 n).toMat * (HermitianMat.log (ℰ n (ρ⊗^S[n])) - HermitianMat.log (σ'' n)).toMat ≤ ((R1 ρ ε).toReal + ε2) • (E1 ε2 n).toMat := by
       sorry
@@ -852,7 +851,6 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
       apply ne_of_gt
       simp [hε.2]
 
-    -- ENNReal.liminf_toReal_eq
     simp only [tsub_le_iff_right]
     convert hliminfDleq
     rw [ENNReal.ofReal_add, ENNReal.ofReal_toReal hR1, add_comm, ENNReal.add_right_inj hR1]
@@ -861,8 +859,6 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
       rw [add_sub_right_comm, ←ENNReal.toReal_sub_of_le hR1R2.le hR2, mul_add]
       unfold ε₀
       rw [mul_div_cancel₀ _ hεneone, mul_comm, mul_sub, mul_sub, sub_add_sub_cancel, ←mul_sub, mul_comm]
-    -- ENNReal.ofReal_mul (by simp only [sub_nonneg, Prob.coe_le_one])
-    -- rw [ENNReal.ofReal_add, ENNReal.ofReal_mul_ofNNReal, ENNReal.ofReal_toReal (tsub_nonneg.mpr (le_of_lt hR1R2)), ← Prob.toNNReal, ← Prob.toNNReal, ← Prob.toNNReal]
     rw [ENNReal.ofReal_mul, Prob.ofNNReal_toNNReal, ENNReal.ofReal_toReal, Prob.coe_one_minus]
     · simp [hR1, hR2]
     · simp only [sub_nonneg, Prob.coe_le_one]
