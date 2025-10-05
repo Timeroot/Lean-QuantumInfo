@@ -790,6 +790,8 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
           · intro n
             exact ENNReal.div_le_div (qRel_ent_bound n) le_rfl
 
+  clear qRel_ent_bound qRel_pinching_pythagoras hdpos hdle qRel_σ'_le_σ'' qRel_σ''_le_σ'
+
   -- Eq. (S62)
   have hliminfR : Filter.atTop.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n) - R1 ρ ε ≤
       ↑(1 - ε') * (R2 ρ σ - R1 ρ ε) := by
@@ -807,8 +809,6 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     have hPcomm (ε2) (n) : Commute (P1 ε2 n).toMat (P2 ε2 n).toMat := by
       sorry
 
-    -- S76 and S77 together
-    -- have hlimP ε2 (hε2 : 0 < ε2) := LemmaS2 hε2 (fun n ↦ ℰ n (ρ⊗^S[n])) (σ'') hliminfleq (hlimsupleq ε hε.right)
     have hliminfP1 ε2 (hε2 : 0 < ε2) := LemmaS2liminf hε2 (fun n ↦ ℰ n (ρ⊗^S[n])) (σ'') hliminfleq
     have hlimsupP2 (ε1 : Prob) ε2 (hε1 : 0 < (ε1 : ℝ) ∧ (ε1 : ℝ) < 1) (hε2 : 0 < ε2) :=
       LemmaS2limsup hε2 (fun n ↦ ℰ n (ρ⊗^S[n])) (σ'') (hlimsupleq (1-ε1) (by simp [hε1]))
