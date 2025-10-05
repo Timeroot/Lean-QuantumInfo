@@ -55,10 +55,9 @@ theorem U_conj_spectrum_eq (ρ : MState d) (U : 𝐔[d]) :
     sorry
   simp [MState.spectrum, U_conj, this]
 
--- theorem inner_conj_unitary {n : Type*} [Fintype n] [DecidableEq n]
---   (A B : HermitianMat n ℂ) (U : 𝐔[n]) :
---   (A.conj U.val).inner (B.conj U.val) = A.inner B := by
---   sorry
+proof_wanted inner_conj_unitary {n : Type*} [Fintype n] [DecidableEq n]
+  (A B : HermitianMat n ℂ) (U : 𝐔[n]) :
+    (A.conj U.val).inner (B.conj U.val) = A.inner B
 
 /-- No-cloning -/
 theorem no_cloning (ψ φ f : Ket d) (U : 𝐔[d × d]) (hψ : (pure (ψ ⊗ f)).U_conj U = pure (ψ ⊗ ψ)) (hφ : (pure (φ ⊗ f)).U_conj U = pure (φ ⊗ φ)) (H : (pure ψ).inner (pure φ) < (1 : ℝ)) :
@@ -126,8 +125,10 @@ theorem no_cloning (ψ φ f : Ket d) (U : 𝐔[d × d]) (hψ : (pure (ψ ⊗ f))
     simp only [toMat_M, tr', mul_one]
   apply_fun (fun r => (r : ℂ)) at h2
   have h3 := Eq.trans h1.symm h2
-  have h4 : ((ρψ.m * ρφ.m).trace.re) * (((pure ψ).m * (pure φ).m).trace.re - 1) = (0 : ℝ) := by
-    sorry
+  have h4 : ((ρψ.m * ρφ.m).trace.re) * ((ρψ.m * ρφ.m).trace.re - 1) = (0 : ℝ) := by
+    rw [← Complex.ofReal_mul, Complex.ofReal_inj] at h3
+    rw [mul_sub, sub_eq_zero, mul_one]
+    exact h3
   have H' : (pure ψ).inner (pure φ) ≠ (1 : ℝ) := by
     exact H.ne
   apply mul_eq_zero.mp at h4

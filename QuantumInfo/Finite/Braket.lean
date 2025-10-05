@@ -61,6 +61,9 @@ def dot (ξ : Bra d) (ψ : Ket d) : ℂ := ∑ x, (ξ x) * (ψ x)
 
 scoped notation "〈" ξ:90 "‖" ψ:90 "〉" => dot (ξ : Bra _) (ψ : Ket _)
 
+theorem dot_eq_dotProduct (ψ : Bra d) (φ : Ket d) :〈ψ‖φ〉= dotProduct (m := d) ψ φ := by
+  rfl
+
 end Braket
 
 section braket
@@ -202,12 +205,11 @@ instance instFunLikeBraket : FunLike (Bra d) (Ket d) ℂ where
     simpa [Ket.basis, dot, Ket.apply] using congrFun h (Ket.basis i)
 
 /-- The inner product of any state with itself is 1. -/
+@[simp]
 theorem Braket.dot_self_eq_one (ψ : Ket d) :〈ψ‖ψ〉= 1 := by
-  have h₁ : ∀x, conj (ψ x) * ψ x = Complex.normSq (ψ x) := fun x ↦ by
+  have h₁ x : conj (ψ x) * ψ x = Complex.normSq (ψ x) := by
     rw [Complex.normSq_eq_conj_mul_self]
-  simp only [dot, Bra.eq_conj, h₁]
-  have h₂ := congrArg Complex.ofReal ψ.normalized
-  simpa using h₂
+  simpa [dot, Bra.eq_conj, h₁] using congr(Complex.ofReal $ψ.normalized)
 
 section prod
 variable {d d₁ d₂ : Type*} [Fintype d] [Fintype d₁] [Fintype d₂]
@@ -216,8 +218,8 @@ variable {d d₁ d₂ : Type*} [Fintype d] [Fintype d₁] [Fintype d₂]
 def Ket.prod (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : Ket (d₁ × d₂) where
   vec := fun (i,j) ↦ ψ₁ i * ψ₂ j
   normalized' := by
-    simp only [Fintype.sum_prod_type, norm_mul, ← Complex.normSq_eq_norm_sq, mul_pow,
-      ← Finset.mul_sum, ψ₂.normalized, mul_one, ψ₁.normalized]
+    simp [Fintype.sum_prod_type, ← Complex.normSq_eq_norm_sq, mul_pow,
+      ← Finset.mul_sum, ψ₁.normalized, ψ₂.normalized]
 
 infixl:100 " ⊗ " => Ket.prod
 

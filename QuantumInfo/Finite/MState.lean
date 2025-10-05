@@ -226,22 +226,8 @@ theorem pure_apply {i j : d} (ψ : Ket d) : (pure ψ).m i j = (ψ i) * conj (ψ 
   rfl
 
 theorem pure_mul_self (ψ : Ket d) : (pure ψ).m * (pure ψ).m = (pure ψ : Matrix d d ℂ) := by
-  refine Matrix.ext ?_
-  intro i j
-  simp [Matrix.mul_apply, pure_apply]
-  conv_lhs =>
-    congr; rfl
-    intro x
-    rw [mul_comm (ψ i) ((starRingEnd ℂ) (ψ x))]
-    rw [← mul_assoc]
-    rw [mul_comm ((starRingEnd ℂ) (ψ x) * ψ i) (ψ x)]
-    rw [← mul_assoc]
-    -- rw [mul_comm (ψ x * (starRingEnd ℂ) (ψ x))]
-    -- rw [← mul_comm ((starRingEnd ℂ) (ψ j)), ← mul_assoc]
-  -- conv_lhs =>
-    -- rw [Fintype.sum_smul_sum (ψ x * (starRingEnd ℂ) (ψ x)) (ψ i * (starRingEnd ℂ) (ψ j))]
-    -- simp [Finset.sum_cons (ψ i * (starRingEnd ℂ) (ψ j))]
-  sorry
+  dsimp [pure, MState.m, HermitianMat.toMat]
+  simp [Matrix.vecMulVec_mul_vecMulVec, ← Braket.dot_eq_dotProduct]
 
 /-- The purity of a state is Tr[ρ^2]. This is a `Prob`, because it is always between zero and one. -/
 def purity (ρ : MState d) : Prob :=
