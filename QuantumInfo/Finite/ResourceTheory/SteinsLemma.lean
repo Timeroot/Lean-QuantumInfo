@@ -803,6 +803,8 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     have hPcomm (ε2) (n) : Commute (P1 ε2 n).toMat (P2 ε2 n).toMat := by
       sorry
 
+    -- Missing: S84 and S85
+
     let E1 := 1 - P1
     let E2 := P1 - P2
     let E3 := P2
@@ -819,7 +821,6 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     have hE2leProj ε2 n : E2 ε2 n ≤ {(ℰ n (ρ⊗^S[n])).M <ₚ (Real.exp (↑n*((R2 ρ σ).toReal + ε₀ + ε2))) • (σ'' n).M} := by
       sorry
 
-    -- Missing here: S81, S82
     -- Note to self: v4 of arxiv is more step-by-step
 
     have hE1leq ε2 n : (1/n) • (E1 ε2 n).toMat * (HermitianMat.log (ℰ n (ρ⊗^S[n])) - HermitianMat.log (σ'' n)).toMat ≤ ((R1 ρ ε).toReal + ε2) • (E1 ε2 n).toMat := by
@@ -838,14 +839,37 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
 
     -- Leo: I think there's a typo in the third eq. of this step: ρ should be ρ^n.
     -- The next set of equations also have ρ_n instead of ρ^n.
-    have hDleq ε2 n : (𝐃(ℰ n (ρ⊗^S[n])‖σ'' n).toReal / n : Real) ≤ ((R1 ρ ε).toReal + ε2) +
+    have hDleq ε2 n : (𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n : ENNReal) ≤ .ofReal (((R1 ρ ε).toReal + ε2) +
          (P1 ε2 n).inner (ℰ n (ρ⊗^S[n])) * (((R2 ρ σ).toReal + ε₀ + ε2) - ((R1 ρ ε).toReal + ε2)) +
-         (P2 ε2 n).inner (ℰ n (ρ⊗^S[n])) * (c' ε2 n - ((R2 ρ σ).toReal + ε₀ + ε2)) := by
+         (P2 ε2 n).inner (ℰ n (ρ⊗^S[n])) * (c' ε2 n - ((R2 ρ σ).toReal + ε₀ + ε2))) := by
       sorry
 
-    -- Mising here: S89 -> S92
+    have hliminfDleq : Filter.atTop.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n) ≤ .ofReal (
+         (R1 ρ ε).toReal + (1 - ε.val) * ((R2 ρ σ).toReal + ε₀ - (R1 ρ ε).toReal)) := by
+      sorry
 
-    sorry
+    have hεneone: 1 - ε.val ≠ 0 := by
+      apply ne_of_gt
+      simp [hε.2]
+
+    -- ENNReal.liminf_toReal_eq
+    simp only [tsub_le_iff_right]
+    convert hliminfDleq
+    rw [ENNReal.ofReal_add, ENNReal.ofReal_toReal hR1, add_comm, ENNReal.add_right_inj hR1]
+    conv =>
+      enter [2,1]
+      rw [add_sub_right_comm, ←ENNReal.toReal_sub_of_le hR1R2.le hR2, mul_add]
+      unfold ε₀
+      rw [mul_div_cancel₀ _ hεneone, mul_comm, mul_sub, mul_sub, sub_add_sub_cancel, ←mul_sub, mul_comm]
+    -- ENNReal.ofReal_mul (by simp only [sub_nonneg, Prob.coe_le_one])
+    -- rw [ENNReal.ofReal_add, ENNReal.ofReal_mul_ofNNReal, ENNReal.ofReal_toReal (tsub_nonneg.mpr (le_of_lt hR1R2)), ← Prob.toNNReal, ← Prob.toNNReal, ← Prob.toNNReal]
+    rw [ENNReal.ofReal_mul, Prob.ofNNReal_toNNReal, ENNReal.ofReal_toReal, Prob.coe_one_minus]
+    · simp [hR1, hR2]
+    · simp only [sub_nonneg, Prob.coe_le_one]
+    · exact ENNReal.toReal_nonneg
+    · apply mul_nonneg (by simp only [sub_nonneg, Prob.coe_le_one])
+      rw [add_sub_right_comm, ←ENNReal.toReal_sub_of_le hR1R2.le hR2]
+      positivity
 
   use fun n ↦ ⟨σ' n, σ'_free n⟩
   rw [R2, hliminf]
