@@ -41,9 +41,6 @@ end HermitianMat
 
 namespace MState
 
-@[inherit_doc]
-scoped[MState] notation:max "⟪" x ", " y "⟫" => MState.inner x y
-
 variable {d d₁ d₂ d₃ : Type*}
 variable [Fintype d] [Fintype d₁] [Fintype d₂] [Fintype d₃]
 variable [DecidableEq d]
@@ -88,8 +85,8 @@ theorem no_cloning {ψ φ f : Ket d} {U : 𝐔[d × d]}
   set ρψ := pure ψ
   set ρφ := pure φ
   have h1 : ⟪ρψ, ρφ⟫ * ⟪ρψ, ρφ⟫ = ⟪pure (ψ ⊗ ψ), pure (φ ⊗ φ)⟫ := by
-    -- From `MState.lean`: `inner_sep_apply : ⟪ξ1⊗ξ2, ψ1⊗ψ2⟫ = ⟪ξ1, ψ1» * ⟪ξ2, ψ2⟫`
-    grind only [pure_prod_pure, inner_sep_apply]
+    -- From `MState.lean`: `prod_inner_prod : ⟪ξ1⊗ξ2, ψ1⊗ψ2⟫ = ⟪ξ1, ψ1» * ⟪ξ2, ψ2⟫`
+    grind only [pure_prod_pure, prod_inner_prod]
   have h2 : (⟪pure (ψ ⊗ ψ), pure (φ ⊗ φ)⟫ : ℝ) = ⟪U ◃ pure (ψ ⊗ f), U ◃ pure (φ ⊗ f)⟫ := by
     grind only [pure_prod_pure]
   replace h2 : ((pure (ψ ⊗ ψ)).m * (pure (φ ⊗ φ)).m).trace.re = (ρψ.m * ρφ.m).trace.re := by

@@ -140,6 +140,11 @@ def inner (ρ : MState d) (σ : MState d) : Prob :=
   ⟨ρ.M.inner σ.M, ρ.M.inner_ge_zero ρ.zero_le σ.zero_le,
     (ρ.M.inner_le_mul_trace ρ.zero_le σ.zero_le).trans (by simp)⟩
 
+--TODO: Should we actually switch to use `Inner.inner` in a better way here? But I don't
+--want to have to write `⟪ρ, σ⟫_Prob` each time.
+@[inherit_doc]
+scoped[MState] notation:max "⟪" x ", " y "⟫" => MState.inner x y
+
 section exp_val
 
 def exp_val_ℂ (ρ : MState d) (T : Matrix d d ℂ) : ℂ :=
@@ -219,7 +224,7 @@ def pure (ψ : Ket d) : MState d where
     simp [HermitianMat.trace_eq_re_trace, Matrix.trace, Matrix.vecMulVec_apply, Bra.eq_conj, h₁]
     exact ψ.normalized
 
-proof_wanted pure_inner (ψ φ : Ket d) : (pure ψ).inner (pure φ) = ‖Braket.dot ψ φ‖^2
+proof_wanted pure_inner (ψ φ : Ket d) : ⟪pure ψ, pure φ⟫ = ‖Braket.dot ψ φ‖^2
 
 @[simp]
 theorem pure_apply {i j : d} (ψ : Ket d) : (pure ψ).m i j = (ψ i) * conj (ψ j) := by
@@ -230,9 +235,7 @@ theorem pure_mul_self (ψ : Ket d) : (pure ψ).m * (pure ψ).m = (pure ψ : Matr
   simp [Matrix.vecMulVec_mul_vecMulVec, ← Braket.dot_eq_dotProduct]
 
 /-- The purity of a state is Tr[ρ^2]. This is a `Prob`, because it is always between zero and one. -/
-def purity (ρ : MState d) : Prob :=
-  ⟨ρ.M.inner ρ.M, ⟨HermitianMat.inner_ge_zero ρ.zero_le ρ.zero_le,
-    by simpa using  HermitianMat.inner_le_mul_trace ρ.zero_le ρ.zero_le⟩⟩
+def purity (ρ : MState d) : Prob := ⟪ρ, ρ⟫
 
 /-- The eigenvalue spectrum of a mixed quantum state, as a `Distribution`. -/
 def spectrum [DecidableEq d] (ρ : MState d) : Distribution d :=
@@ -399,8 +402,8 @@ def prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : MState (d₁ × d₂) whe
 
 infixl:100 " ⊗ " => MState.prod
 
-theorem inner_sep_apply (ξ1 ψ1 : MState d₁) (ξ2 ψ2 : MState d₂) :
-    (ξ1 ⊗ ξ2).inner (ψ1 ⊗ ψ2) = (ξ1.inner ψ1) * (ξ2.inner ψ2) := by
+theorem prod_inner_prod (ξ1 ψ1 : MState d₁) (ξ2 ψ2 : MState d₂) :
+    ⟪ξ1 ⊗ ξ2, ψ1 ⊗ ψ2⟫ = ⟪ξ1, ψ1⟫ * ⟪ξ2, ψ2⟫ := by
   ext1
   simp only [MState.inner, Prob.coe_mul, ← Complex.ofReal_inj]
   --Lots of this should actually be facts about HermitianMat first
