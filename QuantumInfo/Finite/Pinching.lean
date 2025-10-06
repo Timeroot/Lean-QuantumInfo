@@ -55,12 +55,97 @@ def pinching_map (ρ : MState d) : CPTPMap d d ℂ :=
   rfl
   )
 
+theorem pinchingMap_apply_M (σ ρ : MState d) : (pinching_map σ ρ).M =
+  ⟨_, (MatrixMap.IsCompletelyPositive.of_kraus_isCompletelyPositive
+    (HermitianMat.toMat ∘ pinching_kraus σ)).IsPositive.IsHermitianPreserving ρ.M.H⟩ := by
+  rfl
+
 /-- Exercise 2.8 of Hayashi's book "A group theoretic approach to Quantum Information".
 -- Used in (S59) -/
 theorem pinching_pythagoras (ρ σ : MState d) :  𝐃(ρ‖σ) = 𝐃(ρ‖pinching_map σ ρ) + 𝐃(pinching_map σ ρ‖σ) :=
   sorry
 
+omit [DecidableEq d] in
+open ComplexOrder in
+theorem HermitianMat.le_iff_mulVec_le_mulVec {𝕜 : Type*} [RCLike 𝕜] (A B : HermitianMat d 𝕜) :
+    A ≤ B ↔ ∀ v : d → 𝕜, star v ⬝ᵥ A.toMat.mulVec v ≤ star v ⬝ᵥ B.toMat.mulVec v := by
+  rw [← sub_nonneg, HermitianMat.zero_le_iff]
+  conv_rhs => enter [v]; rw [← sub_nonneg]
+  have h := (B - A).H
+  simp only [AddSubgroupClass.coe_sub] at h
+  simp [Matrix.PosSemidef, Matrix.sub_mulVec, h]
+
 /-- Lemma 3.10 of Hayashi's book "Quantum Information Theory - Mathematical Foundations".
+Also, Lemma 5 in https://arxiv.org/pdf/quant-ph/0107004.
 -- Used in (S60) -/
-theorem pinching_bound (ρ σ : MState d) : ρ.M ≤ (↑(Fintype.card (spectrum ℝ σ.m)) : ℝ) • (pinching_map σ ρ).M :=
-  sorry
+theorem pinching_bound (ρ σ : MState d) : ρ.M ≤ (↑(Fintype.card (spectrum ℝ σ.m)) : ℝ) • (pinching_map σ ρ).M := by
+  rw [pinchingMap_apply_M]
+  suffices ρ.M ≤ (Fintype.card (spectrum ℝ σ.m) : ℝ) • ∑ c, ρ.M.conj (pinching_kraus σ c) by
+    convert this
+    simp [MatrixMap.of_kraus, HermitianMat.conj]
+  --Rewrite ρ as its spectral decomposition
+  obtain ⟨ψs, hρm⟩ := ρ.spectralDecomposition
+  simp only [hρm, map_sum, Finset.smul_sum]
+  rw [Finset.sum_comm (α := d)]
+  gcongr with i _
+  --
+  open ComplexOrder in
+  rw [HermitianMat.le_iff_mulVec_le_mulVec]
+  intro v
+  simp [← Finset.smul_sum, smul_comm _ (ρ.spectrum i : ℝ), Matrix.smul_mulVec, dotProduct_smul]
+  gcongr
+  · --The spectrum of a MState is always positive.
+    --Should be a helper lemma, it's only like two lines though.
+    --*Could* be a positivity extension.
+    dsimp [MState.spectrum, Distribution.mk']
+    rw [Complex.zero_le_real]
+    exact (HermitianMat.zero_le_iff.mp ρ.zero_le).eigenvalues_nonneg _
+  have h1 : (1 : Matrix d d ℂ) = (1 : HermitianMat d ℂ) := by exact selfAdjoint.val_one
+  conv_lhs =>
+    enter [2, 1]
+    rw [← one_mul (MState.m _), h1, ← congr(HermitianMat.toMat $(pinching_sum σ))]
+    enter [2]
+    rw [← mul_one (MState.m _), h1, ← congr(HermitianMat.toMat $(pinching_sum σ))]
+  simp only [AddSubgroup.val_finset_sum, HermitianMat.val_eq_coe]
+  simp only [Matrix.mul_sum, Matrix.sum_mul, Matrix.sum_mulVec, dotProduct_sum]
+  simp only [MState.pure]
+  dsimp [MState.m]
+  --This out to be Cauchy-Schwarz.
+  have hschwarz := inner_mul_inner_self_le (𝕜 := ℂ) (E := EuclideanSpace ℂ (↑(spectrum ℝ σ.m)))
+    (x := fun i ↦ 1) (y := fun k ↦ (
+      star v ⬝ᵥ ((pinching_kraus σ k).toMat.mulVec (ψs i))
+    ))
+  rw [← Complex.real_le_real] at hschwarz
+  simp only [PiLp.inner_apply] at hschwarz
+  simp only [RCLike.inner_apply, map_one, mul_one, one_mul, Complex.ofReal_mul, Finset.sum_const,
+    Finset.card_univ, nsmul_eq_mul, RCLike.natCast_re, map_sum, RCLike.re_to_complex,
+    Complex.ofReal_natCast, Complex.ofReal_sum] at hschwarz
+  simp only [HermitianMat.mk_toMat] at ⊢
+  have h_mul (x y : spectrum ℝ σ.m) :
+      star v ⬝ᵥ ((pinching_kraus σ y).toMat *
+        (Matrix.vecMulVec ⇑(ψs i) ((ψs i).to_bra) : Matrix d d ℂ)
+        * (pinching_kraus σ x).toMat).mulVec v =
+      star v ⬝ᵥ (pinching_kraus σ y).toMat.mulVec (ψs i)
+        * (starRingEnd ℂ) (star v ⬝ᵥ (pinching_kraus σ x).toMat.mulVec (ψs i)) := by
+    rw [← Matrix.mulVec_mulVec, ← Matrix.mulVec_mulVec]
+    rw [Matrix.vecMulVec_mulVec, op_smul_eq_smul]
+    rw [Matrix.mulVec_smul, dotProduct_smul, smul_eq_mul, mul_comm]
+    congr
+    rw [starRingEnd_apply, ← Matrix.star_dotProduct, Matrix.star_mulVec]
+    rw [← Matrix.dotProduct_mulVec, HermitianMat.conjTranspose_toMat]
+    --Uses the defeq of `star (_ : Bra)` and `(_ : Ket)`. Would be good to have a lemma
+    -- so that we don't 'abuse' this defeq, TODO. (Maybe even make the coercions between
+    -- kets and bras irreducible?)
+    rfl
+  convert hschwarz with x <;> clear hschwarz
+  · rw [← map_sum, ← Complex.ofReal_mul, ← norm_mul]
+    rw [Complex.mul_conj, Complex.norm_real, Real.norm_of_nonneg (Complex.normSq_nonneg _)]
+    simp_rw [← Complex.mul_conj, map_sum, Finset.mul_sum, Finset.sum_mul]
+    congr! with x _ y _
+    rw [← Matrix.mul_assoc]
+    exact h_mul x y
+  · have hc (c d : ℂ) : d = starRingEnd ℂ d  → c = d → c = d.re := by
+      rintro h rfl; simp [Complex.ext_iff] at h ⊢; linarith
+    apply hc <;> clear hc
+    · simpa using mul_comm _ _
+    · exact h_mul x x

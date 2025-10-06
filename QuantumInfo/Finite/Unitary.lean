@@ -6,7 +6,7 @@ This file is intended for lemmas about unitary matrices (`Matrix.unitaryGroup`) 
 `Bra`s, `Ket`s, and `MState` mixed states.
 
 This is imported by `CPTPMap` to define things like unitary channels, Kraus operators, and
-complementary channels, so this file itself does not discuss channels yet.-/
+complementary channels, so this file itself does not discuss channels yet. -/
 
 noncomputable section
 
@@ -23,11 +23,19 @@ theorem trace_conj_unitary : (A.conj U.val).trace = A.trace := by
 
 @[simp]
 theorem le_conj_unitary : A.conj U.val ≤ B.conj U ↔ A ≤ B := by
-  rw [← sub_nonneg, ← sub_nonneg (b := A), ← sub_conj]
+  rw [← sub_nonneg, ← sub_nonneg (b := A), ← map_sub]
   constructor
   · intro h
     simpa [HermitianMat.conj_conj] using HermitianMat.conj_le h (star U).val
   · exact fun h ↦ HermitianMat.conj_le h U.val
+
+@[simp]
+theorem inner_conj_unitary : (A.conj U.val).inner (B.conj U.val) = A.inner B := by
+  dsimp [conj]
+  simp only [val_eq_coe, inner_eq_re_trace, mk_toMat]
+  rw [← mul_assoc, ← mul_assoc, mul_assoc _ _ U.val]
+  rw [Matrix.trace_mul_cycle, ← mul_assoc, ← mul_assoc _ _ A.toMat]
+  simp [← Matrix.star_eq_conjTranspose]
 
 end HermitianMat
 
@@ -42,5 +50,42 @@ def U_conj (ρ : MState d) (U : 𝐔[d]) : MState d where
   M := ρ.M.conj U.val
   tr := by simp
   zero_le := HermitianMat.conj_le ρ.zero_le U.val
+
+/-- `MState.U_conj`, the action of a unitary on a mixed state by conjugation.
+The ◃ notation comes from the theory of racks and quandles, where this is a
+conjugation-like operation. -/
+scoped[MState] notation:80 U:80 " ◃ " ρ:81 => MState.U_conj ρ U
+
+@[simp]
+theorem inner_U_conj (ρ σ : MState d) (U : 𝐔[d]) : ⟪U ◃ ρ, U ◃ σ⟫ = ⟪ρ, σ⟫ := by
+  simp [U_conj, MState.inner]
+
+open Matrix in
+/-- The **No-cloning theorem**, saying that if states `ψ` and `φ` can both be perfectly cloned using a
+unitary `U` and a fiducial state `f`, and they aren't identical (their inner product is less than 1),
+then the two states must be orthogonal to begin with. In short: only orthogonal states can be simultaneously
+cloned. -/
+theorem no_cloning {ψ φ f : Ket d} {U : 𝐔[d × d]}
+  (hψ : U ◃ pure (ψ ⊗ f) = pure (ψ ⊗ ψ))
+  (hφ : U ◃ pure (φ ⊗ f) = pure (φ ⊗ φ))
+  (H : ⟪pure ψ, pure φ⟫ < (1 : ℝ)) :
+    ⟪pure ψ, pure φ⟫ = (0 : ℝ) := by
+  set ρψ := pure ψ
+  set ρφ := pure φ
+  have h1 : ⟪ρψ, ρφ⟫ * ⟪ρψ, ρφ⟫ = ⟪pure (ψ ⊗ ψ), pure (φ ⊗ φ)⟫ := by
+    -- From `MState.lean`: `prod_inner_prod : ⟪ξ1⊗ξ2, ψ1⊗ψ2⟫ = ⟪ξ1, ψ1» * ⟪ξ2, ψ2⟫`
+    grind only [pure_prod_pure, prod_inner_prod]
+  have h2 : (⟪pure (ψ ⊗ ψ), pure (φ ⊗ φ)⟫ : ℝ) = ⟪U ◃ pure (ψ ⊗ f), U ◃ pure (φ ⊗ f)⟫ := by
+    grind only [pure_prod_pure]
+  replace h2 : ((pure (ψ ⊗ ψ)).m * (pure (φ ⊗ φ)).m).trace.re = (ρψ.m * ρφ.m).trace.re := by
+    convert ← h2
+    simp +zetaDelta only [inner_U_conj, pure_prod_pure, prod]
+    simp [inner, HermitianMat.inner_eq_re_trace, ← mul_kronecker_mul, pure_mul_self, trace_kronecker]
+  have h3 : ((ρψ.m * ρφ.m).trace.re) * ((ρψ.m * ρφ.m).trace.re - 1) = 0 := by
+    rw [mul_sub, sub_eq_zero, mul_one]
+    exact congr(Subtype.val $h1).trans h2
+  rw [mul_eq_zero] at h3
+  apply h3.resolve_right
+  exact sub_ne_zero_of_ne H.ne
 
 end MState

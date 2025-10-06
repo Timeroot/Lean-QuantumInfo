@@ -304,7 +304,7 @@ nonrec theorem cfc_comp : cfc A (g ∘ f) = cfc (cfc A f) g := by
   exact cfc_comp (hf := herm_cont) (hg := herm_cont)
 
 nonrec theorem cfc_conj : (cfc A f).conj (cfc A g) = cfc A (f * g^2) := by
-  rw [HermitianMat.ext_iff, conj]
+  rw [HermitianMat.ext_iff, conj_apply]
   simp only [cfc_toMat, val_eq_coe, mk_toMat, conjTranspose_cfc]
   rw [← cfc_mul (hf := herm_cont) (hg := herm_cont)]
   rw [← cfc_mul (hf := herm_cont) (hg := herm_cont)]

@@ -121,9 +121,9 @@ theorem proj_le_add_lt : {A <ₚ B} + {B ≤ₚ A} = 1 := by
   · simp
 
 theorem conj_lt_add_conj_le : A.conj {A <ₚ 0} + A.conj {0 ≤ₚ A} = A := by
-  rw (occs := [1, 3, 5]) [← cfc_id A]
+  rw (occs := [2, 4, 5]) [← cfc_id A]
   rw [proj_lt_zero_cfc, proj_zero_le_cfc, cfc_conj, cfc_conj, ← cfc_add]
-  congr; ext x
+  congr; ext
   simp; grind
 
 /-- The positive part of a Hermitian matrix: the projection onto its positive eigenvalues. -/

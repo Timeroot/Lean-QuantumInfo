@@ -154,7 +154,7 @@ theorem sandwichedRelRentropy_self {d : Type*} [Fintype d] [DecidableEq d] {α :
   intro hα
   left; right; left
   rw [HermitianMat.pow_eq_cfc, HermitianMat.pow_eq_cfc]
-  nth_rw 1 [← HermitianMat.cfc_id ρ.M]
+  nth_rw 2 [← HermitianMat.cfc_id ρ.M]
   rw [HermitianMat.cfc_conj, ← HermitianMat.cfc_comp]
   conv =>
     enter [1, 1]
