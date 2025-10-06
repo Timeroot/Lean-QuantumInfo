@@ -188,85 +188,28 @@ theorem inner_eq_trace_mul' (A B : HermitianMat d 𝕜) :
     ⟪A, B⟫ = RCLike.re (Matrix.trace (A.toMat * B.toMat)) := by
   exact inner_eq_re_trace A B
 
+--PULLOUT to Inner.lean
 @[simp]
 theorem norm_one : ‖(1 : HermitianMat d 𝕜)‖ = √(Fintype.card d : ℝ) := by
   simp [norm_eq_sqrt_real_inner, inner_eq_trace_mul']
 
-variable {A} in
-theorem lt_smul_of_norm_lt {r : ℝ} (h : ‖A‖ ≤ r) : A ≤ r • 1 := by
-  rcases lt_or_ge r 0 with _ | hr
-  · have := norm_nonneg A
-    order
-  rcases isEmpty_or_nonempty d
-  · exact le_of_subsingleton
-  contrapose! h
-  -- open ComplexOrder in
-  -- rw [le_iff, Matrix.PosSemidef] at h
-  -- simp at h
-  -- specialize h (r • 1 - A).H
-  -- rcases h with ⟨x, hx⟩
-  -- simp at hx
-  sorry
+theorem cfc_eigenvalues (A : HermitianMat d 𝕜) :
+    ∃ (e : d ≃ d), (A.cfc f).H.eigenvalues = f ∘ A.H.eigenvalues ∘ e :=
+  A.H.cfc_eigenvalues f
 
-theorem ball_subset_Icc (r : ℝ) : Metric.ball A r ⊆ Set.Icc (A - r • 1) (A + r • 1) := by
-  intro x
-  simp only [Metric.mem_ball, dist_eq_norm, Set.mem_Icc, tsub_le_iff_right]
-  intro h
-  constructor
-  · rw [← norm_neg] at h
-    grw [← lt_smul_of_norm_lt h.le]
-    simp
-  · grw [← lt_smul_of_norm_lt h.le]
-    simp
-
-section frobenius
---Okay. To get `Continuous.cfc` to play along, we need an `IsometricContinuousFunctionalCalculus`
--- on `Matrix` (because we need a topology, sure). This in turn means we need a choice of norm on
--- matrices. We'll use the Frobenius norm and scope it there.
-open Matrix.Norms.Frobenius
-
---This seems annoying. Matrices aren't a CStarAlgebra when 𝕜 = ℝ, of course. But if we get super stuck,
---we could just switch this to being only for ℂ (so that the relevant facts in Mathlib make this easy),
---but this means also specializing a bunch of downtstream stuff.
-def _root_.Matrix.instIsometric : IsometricContinuousFunctionalCalculus ℝ (Matrix d d 𝕜) IsSelfAdjoint where
-  isometric a ha := by
-    intro f₁ f₂
-    sorry
-
-scoped[Matrix.Norms.Frobenius] attribute [instance] Matrix.instIsometric
-
-end frobenius
-
-theorem spectrum_subset_of_mem_Icc (A B : HermitianMat d 𝕜) :
-    ∃ a b, ∀ x, A ≤ x ∧ x ≤ B → spectrum ℝ x.toMat ⊆ Set.Icc a b := by
-  use ⨅ i, A.H.eigenvalues i, ⨆ i, B.H.eigenvalues i
-  rintro x ⟨hl, hr⟩
-  exact A.H.spectrum_subset_of_mem_Icc B.H hl hr
-
-@[fun_prop]
-protected theorem cfc_continuous {f : ℝ → ℝ} (hf : Continuous f) :
-    Continuous (cfc · f : HermitianMat d 𝕜 → HermitianMat d 𝕜) := by
-  unfold cfc
-  suffices Continuous (fun A : HermitianMat d 𝕜 ↦ _root_.cfc f (toMat A)) by
-    fun_prop
-  --Why is this so messy? Well `Continuous.cfc` only works on _compact_ sets of spectra,
-  --but for operators with finite spectrum (like matrices), we obviously want it to work
-  --for any functions. So we start by saying that `cfc · f` is continuous if it works
-  --on any open cover, use open intervals, then we can take the closures of these to get
-  --closed intervals, and then these are valid compact sets.
-  have h_compact_cover := LocallyCompactSpace.local_compact_nhds (X := HermitianMat d 𝕜)
-  apply continuous_of_continuousOn_iUnion_of_isOpen (ι := HermitianMat d 𝕜 × {x : ℝ // 0 < x})
-    (s := fun ab ↦ Metric.ball ab.1 ab.2)
-  · rintro ⟨A, r, hr⟩
-    apply ContinuousOn.mono ?_ (ball_subset_Icc A r)
-    obtain ⟨a, b, hab⟩ := spectrum_subset_of_mem_Icc (A - r • 1) (A + r • 1)
-    open Matrix.Norms.Frobenius in
-    exact ContinuousOn.cfc isCompact_Icc f (by fun_prop) hab (fun x _ ↦ x.H)
-  · simp
-  · ext x
-    simp only [Set.mem_iUnion, Set.mem_univ, iff_true]
-    use ⟨x, 1⟩
-    simp
+--PULLOUT to Inner.lean
+theorem norm_eq_trace_sq (A : HermitianMat d 𝕜) :
+    ‖A‖ ^ 2 = (A.toMat ^ 2).trace := by
+  rw [norm_eq_frobenius, ← RCLike.ofReal_pow, ← Real.rpow_two, ← Real.rpow_mul (by positivity)]
+  simp only [one_div, ne_eq, OfNat.ofNat_ne_zero, not_false_eq_true, inv_mul_cancel₀, Real.rpow_one]
+  simp only [sq A.toMat, map_sum, map_pow, Matrix.trace, Matrix.diag_apply, Matrix.mul_apply, toMat_apply]
+  congr! with i _ j _
+  --ew ew ew make this better
+  rw [← star_star (A j i)]
+  conv => enter [2, 2, 1]; exact (Matrix.conjTranspose_apply A.toMat j i).symm
+  rw [A.H]
+  symm
+  exact RCLike.mul_conj (A.toMat i j)
 
 /-! Here we give HermitianMat versions of many cfc theorems, like `cfc_id`, `cfc_sub`, `cfc_comp`,
 etc. We need these because (as above) `HermitianMat.cfc` is different from `_root_.cfc`. -/
@@ -310,6 +253,12 @@ nonrec theorem cfc_conj : (cfc A f).conj (cfc A g) = cfc A (f * g^2) := by
   rw [← cfc_mul (hf := herm_cont) (hg := herm_cont)]
   rw [Pi.mul_def, Pi.pow_def]
   congr! 2; ring
+
+theorem cfc_sq : cfc A (· ^ 2) = A ^ 2 := by
+  ext1
+  simp_rw [selfAdjoint.val_pow, sq]
+  conv_lhs => exact coe_cfc_mul A (f := id) (g := id)
+  rw [cfc_id]
 
 @[simp]
 nonrec theorem cfc_const : (cfc A (fun _ ↦ r)) = r • 1 := by
@@ -367,10 +316,6 @@ theorem cfc_diagonal (g : d → ℝ) :
   ext1
   exact Matrix.cfc_diagonal g f
 
-theorem cfc_eigenvalues (A : HermitianMat d 𝕜) :
-    ∃ (e : d ≃ d), (A.cfc f).H.eigenvalues = f ∘ A.H.eigenvalues ∘ e :=
-  A.H.cfc_eigenvalues f
-
 theorem zero_le_cfc : 0 ≤ A.cfc f ↔ ∀ i, 0 ≤ f (A.H.eigenvalues i) := by
   rw [cfc, ← Subtype.coe_le_coe]
   dsimp
@@ -392,6 +337,75 @@ theorem cfc_PosDef : (A.cfc f).toMat.PosDef ↔ ∀ i, 0 < f (A.H.eigenvalues i)
   refine ⟨fun h i ↦ ?_, fun h i ↦ h (e i)⟩
   convert h (e.symm i)
   simp
+
+theorem norm_eq_sum_eigenvalues_sq (A : HermitianMat d 𝕜) :
+    ‖A‖ ^ 2 = ∑ i, (A.H.eigenvalues i)^2 := by
+  rw [← RCLike.ofReal_inj (K := 𝕜), RCLike.ofReal_pow, norm_eq_trace_sq]
+  conv_lhs => change (A ^ 2).toMat.trace; rw [(A ^ 2).H.trace_eq_sum_eigenvalues]
+  simp only [map_sum, map_pow]
+  rw [← cfc_sq]
+  obtain ⟨e, he⟩ := cfc_eigenvalues (· ^ 2) A
+  simp only [he, Function.comp_apply, map_pow]
+  exact e.sum_comp (fun x ↦ (algebraMap ℝ 𝕜) (A.H.eigenvalues x) ^ 2)
+
+variable {A} in
+theorem lt_smul_of_norm_lt {r : ℝ} (h : ‖A‖ ≤ r) : A ≤ r • 1 := by
+  rcases lt_or_ge r 0 with _ | hr
+  · have := norm_nonneg A
+    order
+  rcases isEmpty_or_nonempty d
+  · exact le_of_subsingleton
+  have h' := (sq_le_sq₀ (by positivity) (by positivity)).mpr h
+  rw [norm_eq_sum_eigenvalues_sq] at h'
+  nth_rw 1 [← cfc_const A, ← cfc_id A]
+  rw [le_iff, ← cfc_sub]
+  rw [(HermitianMat.H _).posSemidef_iff_eigenvalues_nonneg]
+  intro i; rw [Pi.zero_apply]
+  obtain ⟨e, he⟩ := cfc_eigenvalues ((fun x ↦ r) - id) A
+  rw [he]; clear he
+  dsimp only [Function.comp_apply, Pi.sub_apply, id_eq]
+  rw [sub_nonneg]
+  apply le_of_sq_le_sq _ hr
+  refine le_trans ?_ h'
+  exact Finset.single_le_sum (f := fun x ↦ (A.H.eigenvalues x)^2) (by intros; positivity) (Finset.mem_univ _)
+
+theorem ball_subset_Icc (r : ℝ) : Metric.ball A r ⊆ Set.Icc (A - r • 1) (A + r • 1) := by
+  intro x
+  simp only [Metric.mem_ball, dist_eq_norm, Set.mem_Icc, tsub_le_iff_right]
+  intro h
+  constructor
+  · rw [← norm_neg] at h
+    grw [← lt_smul_of_norm_lt h.le]
+    simp
+  · grw [← lt_smul_of_norm_lt h.le]
+    simp
+
+theorem spectrum_subset_of_mem_Icc (A B : HermitianMat d 𝕜) :
+    ∃ a b, ∀ x, A ≤ x ∧ x ≤ B → spectrum ℝ x.toMat ⊆ Set.Icc a b := by
+  use ⨅ i, A.H.eigenvalues i, ⨆ i, B.H.eigenvalues i
+  rintro x ⟨hl, hr⟩
+  exact A.H.spectrum_subset_of_mem_Icc B.H hl hr
+
+@[fun_prop]
+protected theorem cfc_continuous {f : ℝ → ℝ} (hf : Continuous f) :
+    Continuous (cfc · f : HermitianMat d ℂ → HermitianMat d ℂ) := by
+  unfold cfc
+  suffices Continuous (fun A : HermitianMat d ℂ ↦ _root_.cfc f (toMat A)) by
+    fun_prop
+  have h_compact_cover := LocallyCompactSpace.local_compact_nhds (X := HermitianMat d ℂ)
+  apply continuous_of_continuousOn_iUnion_of_isOpen (ι := HermitianMat d ℂ × {x : ℝ // 0 < x})
+    (s := fun ab ↦ Metric.ball ab.1 ab.2)
+  · rintro ⟨A, r, hr⟩
+    apply ContinuousOn.mono ?_ (ball_subset_Icc A r)
+    obtain ⟨a, b, hab⟩ := spectrum_subset_of_mem_Icc (A - r • 1) (A + r • 1)
+    open ComplexOrder in
+    have := ContinuousOn.cfc (A := CStarMatrix d d ℂ) isCompact_Icc f (by fun_prop) hab (fun x _ ↦ x.H)
+    convert this
+  · simp
+  · ext x
+    simp only [Set.mem_iUnion, Set.mem_univ, iff_true]
+    use ⟨x, 1⟩
+    simp
 
 /-- Matrix power of a positive semidefinite matrix, as given by the elementwise
   real power of the diagonal in a diagonalized form.

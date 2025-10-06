@@ -218,15 +218,25 @@ open RealInnerProductSpace in
 theorem inner_proj_le_le : ⟪{A ≤ₚ B}, A⟫ ≤ ⟪{A ≤ₚ B}, B⟫ :=
   proj_le_inner_le A B
 
+--TODO: When we upgrade `cfc_continuous` from 𝕜 to ℂ, we upgrade these too.
 @[fun_prop]
-theorem posPart_Continuous : Continuous (·⁺ : HermitianMat n 𝕜 → _) := by
+theorem posPart_Continuous : Continuous (·⁺ : HermitianMat n ℂ → _) := by
   simp_rw [posPart_eq_cfc_max]
   fun_prop
 
 @[fun_prop]
-theorem negPart_Continuous : Continuous (·⁻ : HermitianMat n 𝕜 → _) := by
+theorem negPart_Continuous : Continuous (·⁻ : HermitianMat n ℂ → _) := by
   simp_rw [negPart_eq_cfc_min]
   fun_prop
+
+proof_wanted posPart_le_zero_iff : A⁺ ≤ 0 ↔ A ≤ 0
+
+proof_wanted posPart_eq_zero_iff : A⁺ = 0 ↔ A ≤ 0
+/- := by
+   rw [← posPart_le_zero_iff]
+   have := zero_le_posPart A
+   constructor <;> order
+-/
 
 --Many missing lemmas: see `Mathlib.Algebra.Order.Group.PosPart` for examples
 -- (They don't apply here since it's not a Lattice, and there's no well-defined `max` in
