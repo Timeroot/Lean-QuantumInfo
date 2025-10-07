@@ -17,6 +17,23 @@ variable {d : Type*} [Fintype d] [DecidableEq d]
 def pinching_kraus (ρ : MState d) : spectrum ℝ ρ.m → HermitianMat d ℂ :=
   fun x ↦ ρ.M.cfc (fun y ↦ if y = x then 1 else 0)
 
+theorem pinching_kraus_commutes (ρ : MState d) (i : spectrum ℝ ρ.m) :
+    Commute (pinching_kraus ρ i).toMat ρ.m := by
+  rw [MState.m, ← ρ.M.cfc_id, commute_iff_eq, pinching_kraus]
+  rw [← ρ.M.coe_cfc_mul, ← ρ.M.coe_cfc_mul]
+  congr 2; ext; simp
+
+theorem pinching_kraus_mul_self (ρ : MState d) (i : spectrum ℝ ρ.m) :
+    (pinching_kraus ρ i).toMat * ρ.m = i.val • pinching_kraus ρ i := by
+  dsimp [MState.m]
+  nth_rw 1 [← ρ.M.cfc_id]
+  rw [pinching_kraus]
+  rw [← ρ.M.coe_cfc_mul]
+  conv_rhs => change HermitianMat.toMat (i.val • _)
+  rw [← ρ.M.cfc_const_mul]
+  congr! 3
+  simp +contextual
+
 instance finite_spectrum_inst (ρ : MState d) : Fintype (spectrum ℝ ρ.m) :=
   Fintype.ofFinite (spectrum ℝ ρ.m)
 
@@ -60,14 +77,38 @@ theorem pinchingMap_apply_M (σ ρ : MState d) : (pinching_map σ ρ).M =
     (HermitianMat.toMat ∘ pinching_kraus σ)).IsPositive.IsHermitianPreserving ρ.M.H⟩ := by
   rfl
 
-theorem pinching_commutes {n : Type*} [DecidableEq n] [Fintype n] (ρ σ : MState n) :
+theorem pinching_commutes (ρ σ : MState d) :
     Commute (pinching_map σ ρ).m σ.m := by
-  sorry
+  dsimp [MState.m, Commute, SemiconjBy]
+  rw [pinchingMap_apply_M]
+  simp only [MatrixMap.of_kraus, Function.comp_apply]
+  simp only [HermitianMat.conjTranspose_toMat, MState.toMat_M, LinearMap.coeFn_sum,
+    LinearMap.coe_mk, AddHom.coe_mk, Finset.sum_apply, HermitianMat.mk_toMat]
+  simp only [Finset.sum_mul, Finset.mul_sum]
+  congr! 1 with i
+  have hl : (pinching_kraus σ i) * σ.m = i.val • (pinching_kraus σ i) :=
+    pinching_kraus_mul_self σ i
+  have hr : σ.m * (pinching_kraus σ i) = i.val • (pinching_kraus σ i) := by
+    rwa [pinching_kraus_commutes] at hl
+  simp only [mul_assoc, hl]
+  simp only [← mul_assoc, hr]
+  simp
 
 @[simp]
-theorem pinching_self {n : Type*} [DecidableEq n] [Fintype n] (ρ : MState n) :
-    pinching_map ρ ρ = ρ := by
-  sorry
+theorem pinching_self (ρ : MState d) : pinching_map ρ ρ = ρ := by
+  ext1
+  rw [pinchingMap_apply_M]
+  simp only [MatrixMap.of_kraus, Function.comp_apply]
+  simp only [HermitianMat.conjTranspose_toMat, MState.toMat_M, LinearMap.coeFn_sum,
+    LinearMap.coe_mk, AddHom.coe_mk, Finset.sum_apply]
+  simp_rw [(pinching_kraus_commutes ρ _).eq, mul_assoc, ← sq]
+  conv_lhs =>
+    enter [1, 2, x, 2]
+    change (pinching_kraus ρ x ^ 2).toMat
+    rw [pinching_sq_eq_self]
+  simp_rw [← Finset.mul_sum, ← AddSubgroup.val_finset_sum]
+  simp only [pinching_sum, selfAdjoint.val_one, mul_one]
+  rfl
 
 /-- Exercise 2.8 of Hayashi's book "A group theoretic approach to Quantum Information".
 -- Used in (S59) -/
