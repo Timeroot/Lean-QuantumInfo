@@ -60,6 +60,15 @@ theorem pinchingMap_apply_M (σ ρ : MState d) : (pinching_map σ ρ).M =
     (HermitianMat.toMat ∘ pinching_kraus σ)).IsPositive.IsHermitianPreserving ρ.M.H⟩ := by
   rfl
 
+theorem pinching_commutes {n : Type*} [DecidableEq n] [Fintype n] (ρ σ : MState n) :
+    Commute (pinching_map σ ρ).m σ.m := by
+  sorry
+
+@[simp]
+theorem pinching_self {n : Type*} [DecidableEq n] [Fintype n] (ρ : MState n) :
+    pinching_map ρ ρ = ρ := by
+  sorry
+
 /-- Exercise 2.8 of Hayashi's book "A group theoretic approach to Quantum Information".
 -- Used in (S59) -/
 theorem pinching_pythagoras (ρ σ : MState d) :  𝐃(ρ‖σ) = 𝐃(ρ‖pinching_map σ ρ) + 𝐃(pinching_map σ ρ‖σ) :=

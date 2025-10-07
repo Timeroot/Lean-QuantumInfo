@@ -394,4 +394,10 @@ theorem qMutualInfo_as_qRelativeEnt (ρ : MState (dA × dB)) :
     qMutualInfo ρ = (𝐃(ρ‖ρ.traceRight ⊗ ρ.traceLeft) : EReal) :=
   sorry
 
+theorem qRelEntropy_le_add_of_le_smul {d : Type*} [Fintype d] [DecidableEq d]
+  (ρ : MState d) {σ₁ σ₂ : MState d} (r : ℝ) (hσ : σ₁.M ≤ r • σ₂.M) :
+    𝐃(ρ‖σ₁) ≤ 𝐃(ρ‖σ₂) + ENNReal.ofReal (Real.log r)
+    := by
+  sorry
+
 end relative_entropy
