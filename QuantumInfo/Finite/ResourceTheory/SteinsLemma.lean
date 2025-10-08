@@ -1093,7 +1093,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
       conv =>
         enter [1, 1, n]
         rw [add_assoc]
-      rw [liminf_const_add]
+      rw [liminf_const_add (Filter.atTop) _ (R1 ρ ε) (by isBoundedDefault) (by isBoundedDefault)]
       conv =>
         enter [1, 2, 1]
         rw [←Pi.add_def]
