@@ -1081,8 +1081,31 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     have hliminfDleq : Filter.atTop.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n) ≤
          (R1 ρ ε) + .ofReal (1 - ε.val) * ((R2 ρ σ) + .ofReal ε₀ - (R1 ρ ε)) := by
       let a (n : ℕ) : ℝ := 1 /(OfNat.ofNat n + 1 : ℝ)
-      have := Filter.liminf_le_liminf (Filter.Eventually.of_forall (f := .atTop) (fun (n : ℕ) ↦ hDleq (a n) n))
-      sorry
+      replace hDleq := Filter.liminf_le_liminf (Filter.Eventually.of_forall (f := .atTop) (fun (n : ℕ) ↦ hDleq (a n) n))
+      apply le_trans hDleq
+      have hP2zero : Filter.Tendsto (fun n ↦ ENNReal.ofReal ((P2 (a n) n).inner ↑((ℰ n) (ρ⊗^S[n]))) *
+          (ENNReal.ofReal (c' (a n) n) - (R2 ρ σ + ENNReal.ofReal ε₀ + ENNReal.ofReal (a n)))) (Filter.atTop) (nhds 0) := by
+          sorry
+      conv =>
+        enter [1, 1]
+        rw [←Pi.add_def]
+      rw [ENNReal.liminf_add_of_right_tendsto_zero hP2zero _]
+      conv =>
+        enter [1, 1, n]
+        rw [add_assoc]
+      rw [liminf_const_add]
+      conv =>
+        enter [1, 2, 1]
+        rw [←Pi.add_def]
+        enter [2, n]
+        rw [mul_comm]
+      rw [ENNReal.liminf_add_of_left_tendsto_zero ?_ _]
+      · rw [ENNReal.add_le_add_iff_left hR1]
+        apply le_trans (ENNReal.liminf_mul_le ?_ ?_)
+        · sorry
+        · sorry
+        · sorry
+      · sorry -- 1 / (n + 1) tends to 0
 
     have hεneone: 1 - ε.val ≠ 0 := by
       apply ne_of_gt
