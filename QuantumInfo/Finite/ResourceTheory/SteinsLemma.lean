@@ -1009,7 +1009,10 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
       simp only [HermitianMat.proj_le_add_lt]
 
     have hE2leProj ε2 n : E2 ε2 n ≤ {(ℰ n (ρ⊗^S[n])).M <ₚ (Real.exp (↑n*((R2 ρ σ).toReal + ε₀ + ε2))) • (σ'' n).M} := by
-      sorry
+      dsimp [E2, P1, P2]
+      rw [sub_le_iff_le_add]
+      simp only [HermitianMat.proj_le_add_lt]
+      exact HermitianMat.proj_le_le_one _ _
 
     have hE1leq ε2 n : (1/n) • (E1 ε2 n).toMat * (HermitianMat.log (ℰ n (ρ⊗^S[n])) - HermitianMat.log (σ'' n)).toMat ≤ ((R1 ρ ε).toReal + ε2) • (E1 ε2 n).toMat := by
       sorry
