@@ -522,6 +522,68 @@ theorem _root_.Matrix.PosDef.zero_lt {n : Type*} [Nonempty n] [Fintype n] {A : M
     change _ = ite _ _ _
     simp
 
+
+theorem _root_.HermitianMat.cfc_le_cfc_of_PosDef {d : Type*} [Fintype d] [DecidableEq d]
+  {f g : ℝ → ℝ} (hfg : ∀ i, 0 < i → f i ≤ g i) (A : HermitianMat d ℂ) (hA : A.toMat.PosDef) :
+    A.cfc f ≤ A.cfc g := by
+  rw [← sub_nonneg, ← HermitianMat.cfc_sub, HermitianMat.zero_le_cfc]
+  intro i
+  rw [Pi.sub_apply, sub_nonneg]
+  rw [A.H.posDef_iff_eigenvalues_pos] at hA
+  apply hfg
+  apply hA
+
+/- Scratch work ... hmph
+--PULLOUT to HermitianMat/CFC.lean
+--TODO: Make Iff version.
+/-- If two Hermitian matrices commute, there exists a common matrix that they are both a CFC of. -/
+theorem _root_.Commute.exists_cfc {d : Type*} [Fintype d] [DecidableEq d]
+  {A B : Matrix d d ℂ} (hA : A.IsHermitian) (hB : B.IsHermitian) (hAB : Commute A B) :
+    ∃ C : Matrix d d ℂ, (∃ f : ℝ → ℝ, A = cfc f C) ∧ (∃ g : ℝ → ℝ, B = cfc g C) := by
+  sorry
+
+--TODO: Make Iff version.
+theorem _root_.Commute.exists_HermitianMat_cfc {d : Type*} [Fintype d] [DecidableEq d]
+  (A B : HermitianMat d ℂ) (hAB : Commute A.toMat B.toMat) :
+    ∃ C : HermitianMat d ℂ, (∃ f : ℝ → ℝ, A = C.cfc f) ∧ (∃ g : ℝ → ℝ, B = C.cfc g) := by
+  obtain ⟨C, ⟨g₁, hg₁⟩, ⟨g₂, hg₂⟩⟩ := hAB.exists_cfc A.H B.H
+  by_cases hC : C.IsHermitian
+  · use ⟨C, hC⟩
+    constructor
+    · exact ⟨g₁, by simp [HermitianMat.ext_iff, hg₁]⟩
+    · exact ⟨g₂, by simp [HermitianMat.ext_iff, hg₂]⟩
+  · change ¬(IsSelfAdjoint C) at hC
+    rw [cfc_apply_of_not_predicate C hC] at hg₁ hg₂
+    use 0
+    constructor
+    · exact ⟨0, by simp [HermitianMat.ext_iff, hg₁]⟩
+    · exact ⟨0, by simp [HermitianMat.ext_iff, hg₂]⟩
+
+--PULLOUT to HermitianMat/CFC.lean
+/- TODO: Write a version of this that holds more broadly for some sets. Esp closed intervals of reals,
+which correspond nicely to closed intervals of matrices. Write the specialization to Set.univ (Monotone
+instead of MonotoneOn). Also a version that works for StrictMonoOn. -/
+theorem _root_.HermitianMat.cfc_le_cfc_of_commute_monoOn {d : Type*} [Fintype d] [DecidableEq d]
+  {f : ℝ → ℝ} (hf : MonotoneOn f (Set.Ioi 0)) (A B : HermitianMat d ℂ) (hAB₁ : Commute A.toMat B.toMat)
+  (hAB₂ : A ≤ B) (hA : A.toMat.PosDef) (hB : B.toMat.PosDef) :
+    A.cfc f ≤ B.cfc f := by
+  -- obtain ⟨C, ⟨g₁, hg₁⟩, ⟨g₂, hg₂⟩⟩ := hAB₁.exists_HermitianMat_cfc
+  -- rw [hg₁, hg₂]
+  --Need to show that g₁ ≤ g₂ on spectrum ℝ C
+  -- rw [← C.cfc_comp, ← C.cfc_comp] --?
+  -- apply C.cfc_le_cfc_of_PosDef
+  sorry
+-/
+
+--This is the more general version that requires operator concave functions but doesn't require the inputs
+-- to commute.
+proof_wanted _root_.HermitianMat.cfc_monoOn_pos_of_monoOn_posDef {d : Type*} [Fintype d] [DecidableEq d]
+  {f : ℝ → ℝ} (hf_is_operator_convex : True) :
+    MonotoneOn (HermitianMat.cfc · f) { A : HermitianMat d ℂ | A.toMat.PosDef }
+
+proof_wanted _root_.HermitianMat.log_monoOn_posDef {d : Type*} [Fintype d] [DecidableEq d] :
+    MonotoneOn HermitianMat.log { A : HermitianMat d ℂ | A.toMat.PosDef }
+
 set_option maxHeartbeats 400000 in
 /-- Lemma 7 from the paper. We write `ε'` for their `\tilde{ε}`. -/
 private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1) (σ : (n : ℕ) → IsFree (i := i ^ n)) :
@@ -991,12 +1053,18 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
         · exact (h.symm.sub_right ((Commute.refl _).smul_right _)).smul_left _
       exact pinching_commutes (ρ⊗^S[n]) (σ'' n)
 
-    have hliminfP1 ε2 (hε2 : 0 < ε2) := LemmaS2liminf hε2 (fun n ↦ ℰ n (ρ⊗^S[n])) (σ'') hliminf_le
-    have hlimsupP2  ε2 (hε2 : 0 < ε2) (ε1 : Prob) (hε1 : 0 < (ε1 : ℝ) ∧ (ε1 : ℝ) < 1) :=
+    have hliminfP1 ε2 (hε2 : 0 < ε2) := --(S76)
+      LemmaS2liminf hε2 (fun n ↦ ℰ n (ρ⊗^S[n])) (σ'') hliminf_le
+
+    conv at hliminfP1 =>
+      enter [ε2, hε2, 1, 1, n, 1]
+      change P1 _ _
+
+    have hlimsupP2  ε2 (hε2 : 0 < ε2) (ε1 : Prob) (hε1 : 0 < (ε1 : ℝ) ∧ (ε1 : ℝ) < 1) := --(S77)
       LemmaS2limsup hε2 (fun n ↦ ℰ n (ρ⊗^S[n])) (σ'') (hlimsup_le ε1 (by simp [hε1]))
 
     have hlimsupP2' ε2 (hε2 : 0 < ε2) :
-      Filter.limsup (fun n => (P2 ε2 n).inner (ℰ n (ρ⊗^S[n])).M) Filter.atTop = 0 := by
+        Filter.atTop.limsup (fun n ↦ (P2 ε2 n).inner (ℰ n (ρ⊗^S[n])).M) = 0 := by
       apply le_antisymm
       · apply le_of_forall_pos_le_add
         intro ε1' hε1'
@@ -1026,9 +1094,9 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
             _ = ((ℰ n) (ρ⊗^S[n])).M.trace := HermitianMat.one_inner _
             _ = 1 := MState.tr _
 
-    let E1 := 1 - P1
-    let E2 := P1 - P2
-    let E3 := P2
+    let E1 := 1 - P1 -- (S78)
+    let E2 := P1 - P2 -- (S79)
+    let E3 := P2 -- (S80)
 
     have Esum : E1 + E2 + E3 = 1 := by
       unfold E1 E2 E3
@@ -1045,12 +1113,17 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
       simp only [HermitianMat.proj_le_add_lt]
       exact HermitianMat.proj_le_le_one _ _
 
+    -- (S81)
     have hE1leq ε2 n : (1/n) • (E1 ε2 n).toMat * (HermitianMat.log (ℰ n (ρ⊗^S[n])) - HermitianMat.log (σ'' n)).toMat ≤ ((R1 ρ ε).toReal + ε2) • (E1 ε2 n).toMat := by
+      --needs HermitianMat.cfc_le_cfc_of_commute_monoOn applied to the log function
       sorry
 
+    -- (S82)
     have hE2leq ε2 n : (1/n) •  (E2 ε2 n).toMat * (HermitianMat.log (ℰ n (ρ⊗^S[n])) - HermitianMat.log (σ'' n)).toMat ≤ ((R2 ρ σ).toReal + ε₀ + ε2) • (E2 ε2 n).toMat := by
+      --needs HermitianMat.cfc_le_cfc_of_commute_monoOn applied to the log function
       sorry
 
+    -- (S83)
     let c' ε2 n := (c n + (c n) / n) ⊔ ((R2 ρ σ).toReal + ε₀ + ε2)
 
     have hc' ε2 : (c' ε2) =O[.atTop] (1 : ℕ → ℝ) := by
@@ -1068,27 +1141,31 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
         CStarRing.norm_of_mem_unitary, mul_one] at h_bounded ⊢
       exact h_bounded
 
+    -- (S84)
     have hσ'' ε2 n : (σ'' n).M ≥ Real.exp (-↑n*(c' ε2 n)) • 1 := by
       sorry
 
     -- Leo: I think there's a typo in the third eq. of this step: ρ should be ρ^n.
     -- The next set of equations also have ρ_n instead of ρ^n.
-    have hDleq ε2 n : (𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n : ENNReal) ≤  ((R1 ρ ε) + .ofReal ε2) +
-         .ofReal ((P1 ε2 n).inner (ℰ n (ρ⊗^S[n]))) * (((R2 ρ σ) + .ofReal ε₀ + .ofReal ε2) - ((R1 ρ ε) + .ofReal ε2)) +
-         .ofReal ((P2 ε2 n).inner (ℰ n (ρ⊗^S[n]))) * (.ofReal (c' ε2 n) - ((R2 ρ σ) + .ofReal ε₀ + .ofReal ε2)) := by
+    -- (S88)
+    have hDleq ε2 n : (𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n : ℝ≥0∞) ≤  ((R1 ρ ε) + .ofReal ε2) +
+         .ofReal ((P1 ε2 n).inner (ℰ n (ρ⊗^S[n]))) * ((R2 ρ σ + .ofReal ε₀ + .ofReal ε2) - (R1 ρ ε + .ofReal ε2)) +
+         .ofReal ((P2 ε2 n).inner (ℰ n (ρ⊗^S[n]))) * (.ofReal (c' ε2 n) - (R2 ρ σ + .ofReal ε₀ + .ofReal ε2)) := by
+      -- (S85, S86, S87)
       sorry
 
+    -- (S91)
     have hliminfDleq : Filter.atTop.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n) ≤
-         (R1 ρ ε) + .ofReal (1 - ε.val) * ((R2 ρ σ) + .ofReal ε₀ - (R1 ρ ε)) := by
-      let a (n : ℕ) : ℝ := 1 /(OfNat.ofNat n + 1 : ℝ)
-      replace hDleq := Filter.liminf_le_liminf (Filter.Eventually.of_forall (f := .atTop) (fun (n : ℕ) ↦ hDleq (a n) n))
-      apply le_trans hDleq
-      have hP2zero : Filter.Tendsto (fun n ↦ ENNReal.ofReal ((P2 (a n) n).inner ↑((ℰ n) (ρ⊗^S[n]))) *
-          (ENNReal.ofReal (c' (a n) n) - (R2 ρ σ + ENNReal.ofReal ε₀ + ENNReal.ofReal (a n)))) (Filter.atTop) (nhds 0) := by
-          sorry
+         (R1 ρ ε) + .ofReal (1 - ε.val) * (R2 ρ σ + .ofReal ε₀ - R1 ρ ε) := by
+      let ε2 (n : ℕ) : ℝ := 1 / (n + 1) -- our choice of ε2. Anything positive that goes to zero will suffice
+      replace hDleq := Filter.liminf_le_liminf (Filter.Eventually.of_forall (f := .atTop) (fun (n : ℕ) ↦ hDleq (ε2 n) n))
+      apply le_trans hDleq -- (S89)
+      have hP2zero : Filter.atTop.Tendsto (fun n ↦ .ofReal ((P2 (ε2 n) n).inner (ℰ n (ρ⊗^S[n]))) *
+          (.ofReal (c' (ε2 n) n) - (R2 ρ σ + .ofReal ε₀ + .ofReal (ε2 n)))) (𝓝 0) := by
+        sorry
       conv =>
         enter [1, 1]
-        rw [←Pi.add_def]
+        rw [← Pi.add_def]
       rw [ENNReal.liminf_add_of_right_tendsto_zero hP2zero _]
       conv =>
         enter [1, 1, n]
@@ -1096,36 +1173,69 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
       rw [liminf_const_add (Filter.atTop) _ (R1 ρ ε) (by isBoundedDefault) (by isBoundedDefault)]
       conv =>
         enter [1, 2, 1]
-        rw [←Pi.add_def]
+        rw [← Pi.add_def]
         enter [2, n]
         rw [mul_comm]
       rw [ENNReal.liminf_add_of_left_tendsto_zero ?_ _]
       · rw [ENNReal.add_le_add_iff_left hR1]
         apply le_trans (ENNReal.liminf_mul_le ?_ ?_)
-        · sorry
-        · sorry
-        · sorry
-      · sorry -- 1 / (n + 1) tends to 0
-
-    have hεneone: 1 - ε.val ≠ 0 := by
-      apply ne_of_gt
-      simp [hε.2]
+        · rw [mul_comm]
+          gcongr
+          · -- apply hliminfP1
+            -- Alex: This is hard to prove with hliminfP1, because in hliminfP1 the ε2 is fixed inside
+            --  the liminf, but here it is allowed to vary with n. We need to 'upgrade' hliminfP1 with
+            --  the following fact, which should (in some form) be its own theorem:
+            /- (∀ x, x > 0 → liminf (n ↦ f x n) ≤ y) →
+              ∃ g : ℕ → ℝ, (∀ x, g x > 0) ∧ (liminf g = 0) ∧ (liminf (n ↦ f (g n) n) ≤ y)
+            -/
+            sorry
+          · conv =>
+              enter [1, 1, n]
+              rw [ENNReal.add_sub_add_eq_sub_right (by finiteness)]
+            rw [Filter.limsup_const]
+        · left
+          apply ne_bot_of_le_ne_bot (b := ENNReal.ofReal ε₀)
+          · rwa [← bot_lt_iff_ne_bot, ENNReal.bot_eq_zero, ENNReal.ofReal_pos]
+          apply Filter.le_limsup_of_frequently_le'
+          apply Filter.Eventually.frequently
+          apply Filter.Eventually.of_forall
+          intro x
+          rw [add_right_comm, ← ENNReal.sub_add_eq_add_sub (add_le_add_right hR1R2.le _) (by finiteness)]
+          exact le_add_self
+        · left
+          apply ne_top_of_le_ne_top (b := R2 ρ σ + ENNReal.ofReal ε₀ + 1) (by finiteness)
+          apply Filter.limsup_le_of_le (by isBoundedDefault) ?_
+          apply Filter.Eventually.of_forall
+          intro x
+          suffices h : ε2 x ≤ 1 by
+            nth_grw 1 [h]
+            simp
+          simp only [one_div, ε2]
+          apply inv_le_one_of_one_le₀
+          simp
+      · rw [← ENNReal.ofReal_zero ]
+        apply ENNReal.tendsto_ofReal
+        exact tendsto_one_div_add_atTop_nhds_zero_nat
 
     simp only [tsub_le_iff_right]
     convert hliminfDleq using 1
     rw [add_comm, ENNReal.add_right_inj hR1]
+    --Rewriting through the ENNReal madness to get (S92)
     conv =>
       rhs
-      rw [←ENNReal.sub_add_eq_add_sub hR1R2.le hR1, ←ENNReal.ofReal_toReal hR1,
-          ←ENNReal.ofReal_toReal hR2, ←ENNReal.ofReal_sub _ (ENNReal.toReal_nonneg),
-          ←ENNReal.ofReal_add (sub_nonneg.mpr (ENNReal.toReal_mono hR2 hR1R2.le)) hε₀.le, ←ENNReal.ofReal_mul (by simp)]
+      rw [← ENNReal.sub_add_eq_add_sub hR1R2.le hR1, ← ENNReal.ofReal_toReal hR1,
+          ← ENNReal.ofReal_toReal hR2, ← ENNReal.ofReal_sub _ (ENNReal.toReal_nonneg),
+          ← ENNReal.ofReal_add (sub_nonneg.mpr (ENNReal.toReal_mono hR2 hR1R2.le)) hε₀.le,
+          ← ENNReal.ofReal_mul (by simp)]
       rhs
-      rw [←ENNReal.toReal_sub_of_le hR1R2.le hR2, mul_add]
-      unfold ε₀
-      rw [mul_div_cancel₀ _ hεneone, mul_comm, mul_sub, mul_sub, sub_add_sub_cancel, ←mul_sub, mul_comm]
-    rw [ENNReal.ofReal_mul, Prob.ofNNReal_toNNReal, ENNReal.ofReal_toReal, Prob.coe_one_minus]
-    · simp [hR1, hR2]
-    · simp only [sub_nonneg, Prob.coe_le_one]
+      rw [← ENNReal.toReal_sub_of_le hR1R2.le hR2]
+
+      equals (1 - ε'.val) * (R2 ρ σ - R1 ρ ε).toReal =>
+        unfold ε₀
+        field_simp [show 1 - ε.val ≠ 0 from ne_of_gt (sub_pos.mpr hε.2)]
+        ring_nf
+    rw [ENNReal.ofReal_mul (by simp), Prob.ofNNReal_toNNReal,
+      ENNReal.ofReal_toReal (by simp [hR1, hR2]), Prob.coe_one_minus]
 
   use fun n ↦ ⟨σ' n, σ'_free n⟩
   rw [R2, hliminf]
