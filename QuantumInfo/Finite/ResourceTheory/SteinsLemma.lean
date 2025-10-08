@@ -1050,10 +1050,8 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     have hliminfDleq : Filter.atTop.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n) ≤
          (R1 ρ ε) + .ofReal (1 - ε.val) * ((R2 ρ σ) + .ofReal ε₀ - (R1 ρ ε)) := by
       let a (n : ℕ) : ℝ := 1 /(OfNat.ofNat n + 1 : ℝ)
-      have := Filter.liminf_le_liminf (Filter.Eventually.of_forall (f := .atTop) (fun (n : ℕ) ↦ hDleq (a n) n)) ?_ ?_
+      have := Filter.liminf_le_liminf (Filter.Eventually.of_forall (f := .atTop) (fun (n : ℕ) ↦ hDleq (a n) n))
       sorry
-      · sorry
-      · sorry
 
     have hεneone: 1 - ε.val ≠ 0 := by
       apply ne_of_gt
