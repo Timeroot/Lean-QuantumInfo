@@ -997,8 +997,34 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
 
     have hlimsupP2' ε2 (hε2 : 0 < ε2) :
       Filter.limsup (fun n => (P2 ε2 n).inner (ℰ n (ρ⊗^S[n])).M) Filter.atTop = 0 := by
-      sorry
-
+      apply le_antisymm
+      · apply le_of_forall_pos_le_add
+        intro ε1' hε1'
+        let ε1 := min ε1' (1/2)
+        have hε1 : 0 < (ε1 : ℝ) ∧ (ε1 : ℝ) < 1 := by
+          constructor
+          · rw [lt_min_iff]
+            exact ⟨hε1', by norm_num⟩
+          · rw [min_lt_iff]
+            exact Or.inr (by norm_num)
+        specialize hlimsupP2 ⟨ε2, hε2.le⟩ hε2 ⟨ε1, ⟨hε1.1.le, hε1.2.le⟩⟩ hε1
+        trans ε1
+        · convert hlimsupP2
+          simp only [Prob.coe_one_minus, sub_sub_cancel]
+        · simp only [one_div, zero_add, inf_le_left, ε1]
+      · apply Filter.le_limsup_of_frequently_le ?_ ?_
+        · rw [Filter.frequently_atTop]
+          intro n; use n
+          exact ⟨by rfl, HermitianMat.inner_ge_zero (HermitianMat.proj_le_nonneg _ _)
+                                                    (HermitianMat.zero_le_iff.mpr ((ℰ n) (ρ⊗^S[n])).pos)⟩
+        · apply Filter.isBoundedUnder_of
+          use 1; intro n
+          calc
+            (P2 ε2 n).inner ↑((ℰ n) (ρ⊗^S[n])) ≤ HermitianMat.inner 1 ((ℰ n) (ρ⊗^S[n])).M :=
+              HermitianMat.inner_mono' (HermitianMat.zero_le_iff.mpr ((ℰ n) (ρ⊗^S[n])).pos)
+                                       (HermitianMat.proj_le_le_one _ _)
+            _ = ((ℰ n) (ρ⊗^S[n])).M.trace := HermitianMat.one_inner _
+            _ = 1 := MState.tr _
 
     let E1 := 1 - P1
     let E2 := P1 - P2
