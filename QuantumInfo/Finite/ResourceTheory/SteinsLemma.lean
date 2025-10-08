@@ -992,8 +992,13 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
       exact pinching_commutes (ρ⊗^S[n]) (σ'' n)
 
     have hliminfP1 ε2 (hε2 : 0 < ε2) := LemmaS2liminf hε2 (fun n ↦ ℰ n (ρ⊗^S[n])) (σ'') hliminf_le
-    have hlimsupP2 (ε1 : Prob) ε2 (hε1 : 0 < (ε1 : ℝ) ∧ (ε1 : ℝ) < 1) (hε2 : 0 < ε2) :=
-      LemmaS2limsup hε2 (fun n ↦ ℰ n (ρ⊗^S[n])) (σ'') (hlimsup_le (1-ε1) (by simp [hε1]))
+    have hlimsupP2  ε2 (hε2 : 0 < ε2) (ε1 : Prob) (hε1 : 0 < (ε1 : ℝ) ∧ (ε1 : ℝ) < 1) :=
+      LemmaS2limsup hε2 (fun n ↦ ℰ n (ρ⊗^S[n])) (σ'') (hlimsup_le ε1 (by simp [hε1]))
+
+    have hlimsupP2' ε2 (hε2 : 0 < ε2) :
+      Filter.limsup (fun n => (P2 ε2 n).inner (ℰ n (ρ⊗^S[n])).M) Filter.atTop = 0 := by
+      sorry
+
 
     let E1 := 1 - P1
     let E2 := P1 - P2
