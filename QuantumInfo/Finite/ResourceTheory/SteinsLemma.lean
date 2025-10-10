@@ -1,6 +1,7 @@
 import QuantumInfo.Finite.ResourceTheory.FreeState
 import QuantumInfo.Finite.ResourceTheory.HypothesisTesting
 import QuantumInfo.Finite.Pinching
+import QuantumInfo.ForMathlib.Matrix
 
 import Mathlib.Tactic.Bound
 
@@ -795,6 +796,15 @@ lemma sInf_spectrum_spacePow (σ : MState (H i)) (n : ℕ) :
     sInf (spectrum ℝ (σ⊗^S[n]).m) = sInf (spectrum ℝ σ.m) ^ n := by
   sorry
 
+lemma iInf_eigenvalues_smul_one_le {d : Type*} [Fintype d] [DecidableEq d] {A : Matrix d d ℂ}
+  (hA : A.IsHermitian) : iInf hA.eigenvalues • 1 ≤ A :=
+  (Matrix.PosSemidef.smul_one_le_of_eigenvalues_iff hA (iInf hA.eigenvalues)).mp (ciInf_le (Finite.bddBelow_range _))
+
+lemma c_identity (mineig : ℝ) :
+  let c : ℕ → ℝ := fun n ↦ Real.log (1 / mineig) + Real.log 3 / (max n 1);
+  ∀ n : ℕ, (Real.exp (-c n) * (1 / 3) * mineig ^ n) = Real.exp (-↑n * (c n + c n / ↑n)) := by
+  sorry
+
 set_option maxHeartbeats 400000 in
 /-- Lemma 7 from the paper. We write `ε'` for their `\tilde{ε}`. -/
 private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1) (σ : (n : ℕ) → IsFree (i := i ^ n)) :
@@ -1411,7 +1421,29 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
 
     -- (S84)
     have hσ'' ε2 n : Real.exp (-n * c' ε2 n) • 1 ≤ (σ'' n).M := by
-      sorry
+      calc
+        (σ'' n).M ≥ Real.exp (- c n) • (σ' n).M := σ'_le_σ'' n
+        _ ≥ (Real.exp (- c n) * (1 / 3)) • (σ₁⊗^S[n]).M := by
+          grw [← hσ₁_le_σ' n, smul_smul]
+        _ ≥ (Real.exp (- c n) * (1 / 3)) • ((iInf (σ₁⊗^S[n]).M.H.eigenvalues) • 1) := by
+          apply smul_le_smul_of_nonneg_left
+          · exact iInf_eigenvalues_smul_one_le (σ₁⊗^S[n]).M.H
+          · positivity
+        _ = (Real.exp (- c n) * (1 / 3) * mineig^n) • 1 := by
+          dsimp [mineig, iInf]
+          rw [← Matrix.IsHermitian.spectrum_real_eq_range_eigenvalues]
+          rw [← Matrix.IsHermitian.spectrum_real_eq_range_eigenvalues]
+          rw [MState.toMat_M, sInf_spectrum_spacePow σ₁ n, MState.toMat_M, smul_smul]
+        _ = Real.exp (- n * (c n + (c n) / n)) • 1 := by
+          rw [c_identity mineig]
+        _ ≥ Real.exp (-n * c' ε2 n) • 1 := by
+          apply smul_le_smul_of_nonneg_right
+          · apply Real.exp_le_exp_of_le
+            simp only [neg_mul, neg_le_neg_iff]
+            apply mul_le_mul_of_nonneg_left _ (by positivity)
+            dsimp [c']
+            exact le_sup_left
+          · exact zero_le_one
 
     -- Leo: I think there's a typo in the third eq. of this step: ρ should be ρ^n.
     -- The next set of equations also have ρ_n instead of ρ^n.

@@ -132,7 +132,7 @@ theorem le_one (ρ : MState d) : ρ.M ≤ 1 := by
   suffices h : ρ.m ≤ (1 : ℝ) • 1 by
     rw [one_smul] at h
     exact h
-  apply (Matrix.PosSemidef.le_smul_one_of_eigenvalues_iff ρ.pos 1).mp
+  apply (Matrix.PosSemidef.le_smul_one_of_eigenvalues_iff ρ.pos.1 1).mp
   exact eigenvalue_le_one ρ
 
 /-- The inner product of two MState's, as a real number between 0 and 1. -/

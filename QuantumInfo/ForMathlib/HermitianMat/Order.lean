@@ -52,7 +52,7 @@ instance : SMulPosMono ℝ (HermitianMat n α) := inferInstance
 
 theorem le_trace_smul_one [DecidableEq n] (hA : 0 ≤ A) : A ≤ (A.trace : ℝ) • 1 := by
   have hA' : A.toMat.PosSemidef := zero_le_iff.mp hA
-  refine (Matrix.PosSemidef.le_smul_one_of_eigenvalues_iff hA' A.trace).mp ?_
+  refine (Matrix.PosSemidef.le_smul_one_of_eigenvalues_iff hA'.1 A.trace).mp ?_
   rw [← A.sum_eigenvalues_eq_trace]
   intro i
   exact Finset.single_le_sum (fun j _ ↦ hA'.eigenvalues_nonneg j) (Finset.mem_univ i)
