@@ -579,6 +579,93 @@ proof_wanted _root_.HermitianMat.cfc_monoOn_pos_of_monoOn_posDef {d : Type*} [Fi
 proof_wanted _root_.HermitianMat.log_monoOn_posDef {d : Type*} [Fintype d] [DecidableEq d] :
     MonotoneOn HermitianMat.log { A : HermitianMat d ℂ | A.toMat.PosDef }
 
+/-- Monotonicity of log on commuting operators. -/
+proof_wanted _root_.HermitianMat.log_le_log_of_commute {d : Type*} [Fintype d] [DecidableEq d]
+  {A B : HermitianMat d ℂ} (hAB₁ : Commute A.toMat B.toMat) (hAB₂ : A ≤ B) (hA : A.toMat.PosDef) :
+    A.log ≤ B.log
+
+/-- Monotonicity of exp on commuting operators. -/
+proof_wanted _root_.HermitianMat.exp_le_exp_of_commute {d : Type*} [Fintype d] [DecidableEq d]
+  {A B : HermitianMat d ℂ} (hAB₁ : Commute A.toMat B.toMat) (hAB₂ : A.cfc Real.exp ≤ B.cfc Real.exp) :
+    A ≤ B
+
+section proj_le
+
+open scoped HermitianMat
+
+variable {d : Type*} [Fintype d] [DecidableEq d] (A B : HermitianMat d ℂ)
+
+theorem _root_.HermitianMat.proj_lt_mul_nonneg : 0 ≤ {A <ₚ B}.toMat * (B - A).toMat := by
+  rw [HermitianMat.proj_lt]
+  nth_rewrite 2 [← HermitianMat.cfc_id (B - A)]
+  rw [← HermitianMat.coe_cfc_mul]
+  apply cfc_nonneg
+  intro x a
+  simp only [AddSubgroupClass.coe_sub, Pi.mul_apply, id_eq, ite_mul, one_mul, zero_mul] at *
+  obtain ⟨val, property⟩ := A
+  obtain ⟨val_1, property_1⟩ := B
+  split
+  next h => exact h.le
+  next h => exact le_refl 0
+
+theorem _root_.HermitianMat.proj_lt_mul_lt : {A <ₚ B}.toMat * A.toMat ≤ {A <ₚ B}.toMat * B.toMat := by
+  rw [← sub_nonneg, ← mul_sub_left_distrib]
+  exact HermitianMat.proj_lt_mul_nonneg A B
+
+theorem _root_.HermitianMat.one_sub_proj_le : 1 - {B ≤ₚ A} = {A <ₚ B} := by
+  rw [sub_eq_iff_eq_add, HermitianMat.proj_le_add_lt]
+
+private lemma rexp_mul_smul_proj_lt_mul_sub_le_mul_sub {n : ℕ} {x : ℝ}
+  {E ℰ σ : HermitianMat d ℂ} (hℰσ : Commute ℰ.toMat σ.toMat) (hx : 0 < x)
+  (hE : E = 1 - {Real.exp (n * x) • σ ≤ₚ ℰ})
+    : (1 / n : ℝ) • E.toMat * (ℰ.log.toMat - σ.log.toMat) ≤ x • E := by
+  rcases n.eq_zero_or_pos with rfl | hn
+  · have hE' : 0 ≤ E.toMat := by
+      rw [hE, HermitianMat.one_sub_proj_le]
+      apply HermitianMat.proj_lt_nonneg
+    simp
+    positivity
+  rw [one_div, smul_mul_assoc, inv_smul_le_iff_of_pos (by positivity)]
+
+  --needs HermitianMat.cfc_le_cfc_of_commute_monoOn applied to the log function
+  --apply exp_le_exp_of_commute
+  /- --Sketch--
+  Goal:
+  (1 / n) • ↑(E1 ε2 n) * ↑(↑((ℰ n) (ρ⊗^S[n]))).log - (1 / n) • ↑(E1 ε2 n) * ↑(↑(σ'' n)).log ≤
+    ((R1 ρ ε).toReal + ε2) • ↑(E1 ε2 n)
+  aka
+    (1 / n) • E1 * (ℰ ρ^n).log - (1 / n) • E1 * σ''.log ≤ (R1 + ε2) • E1
+
+  Hypotheses:
+  E1 := 1 - P1
+  P1 := { rexp (n * (R1 + ε2)) • σ'' ≤ₚ  (ℰ ρ^n)  }
+  E1 = {ℰ ρ^n <ₚ rexp (n * (R1 + ε2)) • σ''} --hE1proj above
+  Fact: `Commute (ℰ ρ^n) σ''`. Proof: `exact pinching_commutes (ρ⊗^S[n]) (σ'' n)`. Also `E1` and `P1` commute.
+
+  From monotonicity of log,
+  E1 = {(ℰ ρ^n).log <ₚ (rexp (n * (R1 + ε2)) • σ'').log}
+      = {(ℰ ρ^n).log <ₚ n * (R1 + ε2) • 1 + σ''.log}
+
+  From an appropriate `lt` version of `proj_le_mul_le`, we know that `{A <ₚ B} * A ≤ {A <ₚ B} * B`.
+  So applying to E1 we get
+
+  E1 * (ℰ ρ^n).log ≤ E1 * (n * (R1 + ε2) • 1) + E1 * σ''.log
+  E1 * (ℰ ρ^n).log - E1 * σ''.log ≤ n * (R1 + ε2) • E1
+  E1 * ((ℰ ρ^n).log - σ''.log) ≤ n * (R1 + ε2) • E1
+  (1/n) • E1 * ((ℰ ρ^n).log - σ''.log) ≤ (R1 + ε2) • E1
+  -/
+  sorry
+
+private lemma rexp_mul_smul_proj_lt_mul_sub_le_mul_sub' {n : ℕ} {x : ℝ} {y : ℝ}
+  {E ℰ σ : HermitianMat d ℂ} (hℰσ : Commute ℰ.toMat σ.toMat) (hx : 0 < y) (hy : y ≤ x)
+  (hE : E = {Real.exp (n * y) • σ ≤ₚ ℰ} - {Real.exp (n * x) • σ ≤ₚ ℰ})
+    : (1 / n : ℝ) • E.toMat * (ℰ.log.toMat - σ.log.toMat) ≤ x • E := by
+  --Another version of the above. Once we've proved one it's probably very easy to adapt the
+  --code for the other.
+  sorry
+
+end proj_le
+
 lemma _root_.Matrix.card_spectrum_eq_image {d : Type*} [Fintype d] [DecidableEq d] (A : Matrix d d ℂ)
   (hA : A.IsHermitian) [Fintype (spectrum ℝ A)] :
     Fintype.card (spectrum ℝ A) = (Finset.univ.image hA.eigenvalues).card := by
@@ -749,6 +836,19 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     have : 0 < (SteinsLemma.R2 ρ σ - SteinsLemma.R1 ρ ε).toReal :=
       ENNReal.toReal_pos (tsub_pos_of_lt hR1R2).ne' (ENNReal.sub_ne_top hR2)
     by positivity
+  have hε₀' : (R1 ρ ε).toReal ≤ (R2 ρ σ).toReal + ε₀ := by
+    dsimp [ε₀]
+    rw [← sub_nonneg]
+    have _ := sub_pos.mpr (show ε.val < 1 from hε.2)
+    have _ := sub_pos.mpr (show ε'.val < ε from hε'₂)
+    rw [ENNReal.toReal_sub_of_le hR1R2.le (by finiteness)]
+    field_simp
+    suffices h : 0 ≤ ((R2 ρ σ).toReal - (R1 ρ ε).toReal) * ((↑ε - ↑ε') + (1 - ↑ε)) by
+      convert h using 1
+      · exact zero_mul _
+      · ring_nf
+    rw [← ENNReal.toReal_sub_of_le hR1R2.le (by finiteness)]
+    positivity
 
   -- m exists because R2 + ε₀ is strictly above R2, which is the liminf.
   obtain ⟨m, hm⟩ :=
@@ -1279,14 +1379,17 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
       exact HermitianMat.proj_le_le_one _ _
 
     -- (S81)
-    have hE1leq ε2 n : (1/n) • (E1 ε2 n).toMat * (HermitianMat.log (ℰ n (ρ⊗^S[n])) - HermitianMat.log (σ'' n)).toMat ≤ ((R1 ρ ε).toReal + ε2) • (E1 ε2 n).toMat := by
-      --needs HermitianMat.cfc_le_cfc_of_commute_monoOn applied to the log function
-      sorry
+    have hE1leq ε2 (n : ℕ) (hε2 : 0 < ε2) : (1/n : ℝ) • (E1 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ ((R1 ρ ε).toReal + ε2) • (E1 ε2 n).toMat := by
+      apply rexp_mul_smul_proj_lt_mul_sub_le_mul_sub
+      · exact pinching_commutes (ρ⊗^S[n]) (σ'' n)
+      · positivity
+      · rfl
 
     -- (S82)
-    have hE2leq ε2 n : (1/n) •  (E2 ε2 n).toMat * (HermitianMat.log (ℰ n (ρ⊗^S[n])) - HermitianMat.log (σ'' n)).toMat ≤ ((R2 ρ σ).toReal + ε₀ + ε2) • (E2 ε2 n).toMat := by
-      --needs HermitianMat.cfc_le_cfc_of_commute_monoOn applied to the log function
-      sorry
+    have hE2leq ε2 (n : ℕ) (hε2 : 0 < ε2) : (1/n : ℝ) • (E2 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ ((R2 ρ σ).toReal + ε₀ + ε2) • (E2 ε2 n).toMat := by
+      refine rexp_mul_smul_proj_lt_mul_sub_le_mul_sub'
+        (pinching_commutes (ρ⊗^S[n]) (σ'' n)) (by positivity) ?_ rfl
+      grw [hε₀']
 
     -- (S83)
     let c' ε2 n := (c n + (c n) / n) ⊔ ((R2 ρ σ).toReal + ε₀ + ε2)
@@ -1307,7 +1410,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
       exact h_bounded
 
     -- (S84)
-    have hσ'' ε2 n : (σ'' n).M ≥ Real.exp (-↑n*(c' ε2 n)) • 1 := by
+    have hσ'' ε2 n : Real.exp (-n * c' ε2 n) • 1 ≤ (σ'' n).M := by
       sorry
 
     -- Leo: I think there's a typo in the third eq. of this step: ρ should be ρ^n.
