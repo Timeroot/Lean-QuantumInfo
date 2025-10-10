@@ -679,7 +679,7 @@ lemma _root_.Matrix.card_spectrum_eq_image {d : Type*} [Fintype d] [DecidableEq 
 
 /- (∀ x, x > 0 → liminf (n ↦ f x n) ≤ y) →
   ∃ g : ℕ → ℝ, (∀ x, g x > 0) ∧ (liminf g = 0) ∧ (liminf (n ↦ f (g n) n) ≤ y) -/
-lemma exists_liminf_zero_of_forall_liminf_le (y : ℝ) (f : ℝ≥0 → ℕ → ℝ)
+lemma exists_liminf_zero_of_forall_liminf_le (y : ℝ≥0) (f : ℝ≥0 → ℕ → ℝ≥0∞)
   (hf : ∀ x, x > 0 → Filter.atTop.liminf (f x) ≤ y) :
     ∃ g : ℕ → ℝ≥0, (∀ x, g x > 0) ∧ (Filter.atTop.Tendsto g (𝓝 0)) ∧
       (Filter.atTop.liminf (fun n ↦ f (g n) n) ≤ y) := by
@@ -687,7 +687,8 @@ lemma exists_liminf_zero_of_forall_liminf_le (y : ℝ) (f : ℝ≥0 → ℕ → 
 
 /- Version of `exists_liminf_zero_of_forall_liminf_le` that lets you also require `g`
 to have an upper bound. -/
-lemma exists_liminf_zero_of_forall_liminf_le_with_UB (y : ℝ) (f : ℝ≥0 → ℕ → ℝ) {z : ℝ≥0} (hz : 0 < z)
+lemma exists_liminf_zero_of_forall_liminf_le_with_UB (y : ℝ≥0) (f : ℝ≥0 → ℕ → ℝ≥0∞)
+  {z : ℝ≥0} (hz : 0 < z)
   (hf : ∀ x, x > 0 → Filter.atTop.liminf (f x) ≤ y) :
     ∃ g : ℕ → ℝ≥0, (∀ x, g x > 0) ∧ (∀ x, g x < z) ∧ (Filter.atTop.Tendsto g (𝓝 0)) ∧
       (Filter.atTop.liminf (fun n ↦ f (g n) n) ≤ y) := by
@@ -700,6 +701,18 @@ lemma exists_liminf_zero_of_forall_liminf_le_with_UB (y : ℝ) (f : ℝ≥0 → 
     have h := hg₁.eventually (gt_mem_nhds <| half_pos hz)
     peel h with h
     rw [min_eq_left h.le]
+
+/- Version of `exists_liminf_zero_of_forall_liminf_le_with_UB` that lets you stipulate it for
+two different functions simultaneously, one with liminf and one with limsup. -/
+lemma exists_liminf_zero_of_forall_liminf_limsup_le_with_UB (y₁ y₂ : ℝ≥0) (f₁ f₂ : ℝ≥0 → ℕ → ℝ≥0∞)
+  {z : ℝ≥0} (hz : 0 < z)
+  (hf₁ : ∀ x, x > 0 → Filter.atTop.liminf (f₁ x) ≤ y₁)
+  (hf₂ : ∀ x, x > 0 → Filter.atTop.limsup (f₂ x) ≤ y₂) :
+    ∃ g : ℕ → ℝ≥0, (∀ x, g x > 0) ∧ (∀ x, g x < z) ∧
+      (Filter.atTop.Tendsto g (𝓝 0)) ∧
+      (Filter.atTop.liminf (fun n ↦ f₁ (g n) n) ≤ y₁) ∧
+      (Filter.atTop.limsup (fun n ↦ f₂ (g n) n) ≤ y₂) := by
+  sorry
 
 private lemma f_image_bound (mineig : ℝ) (n : ℕ) (h : 0 < mineig) (hn : 0 < n) :
   let c : ℕ → ℝ := fun n ↦ Real.log (1 / mineig) + Real.log 3 / (max n 1);
@@ -800,12 +813,15 @@ lemma iInf_eigenvalues_smul_one_le {d : Type*} [Fintype d] [DecidableEq d] {A : 
   (hA : A.IsHermitian) : iInf hA.eigenvalues • 1 ≤ A :=
   (Matrix.PosSemidef.smul_one_le_of_eigenvalues_iff hA (iInf hA.eigenvalues)).mp (ciInf_le (Finite.bddBelow_range _))
 
-lemma c_identity (mineig : ℝ) :
+private lemma c_identity {mineig : ℝ} (h_mineig : 0 < mineig) {n : ℕ} (hn : 0 < n):
   let c : ℕ → ℝ := fun n ↦ Real.log (1 / mineig) + Real.log 3 / (max n 1);
-  ∀ n : ℕ, (Real.exp (-c n) * (1 / 3) * mineig ^ n) = Real.exp (-↑n * (c n + c n / ↑n)) := by
-  sorry
+    (Real.exp (-c n) * (1 / 3) * mineig ^ n) = Real.exp (-↑n * (c n + c n / ↑n)) := by
+  have h (x : ℝ) : n * (x / n) = x := by field_simp
+  simp only [neg_mul, show ((max n 1 : ℕ) : ℝ) = n from mod_cast (max_eq_left hn)]
+  simp only [Real.exp_add, mul_add, neg_add_rev, mul_assoc, h]
+  simp [Real.exp_neg, Real.exp_log, Real.exp_log h_mineig, Real.exp_nat_mul]
 
-set_option maxHeartbeats 400000 in
+set_option maxHeartbeats 500000 in
 /-- Lemma 7 from the paper. We write `ε'` for their `\tilde{ε}`. -/
 private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1) (σ : (n : ℕ) → IsFree (i := i ^ n)) :
     (R2 ρ σ ≥ R1 ρ ε) →
@@ -1421,6 +1437,12 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
 
     -- (S84)
     have hσ'' ε2 n : Real.exp (-n * c' ε2 n) • 1 ≤ (σ'' n).M := by
+      rcases n.eq_zero_or_pos with rfl | hn
+      · have _ : Unique (H (i ^ 0)) := by
+          rw [spacePow_zero]
+          infer_instance
+        apply le_of_eq
+        simp [Unique.eq_default (σ'' 0)]
       calc
         (σ'' n).M ≥ Real.exp (- c n) • (σ' n).M := σ'_le_σ'' n
         _ ≥ (Real.exp (- c n) * (1 / 3)) • (σ₁⊗^S[n]).M := by
@@ -1435,7 +1457,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
           rw [← Matrix.IsHermitian.spectrum_real_eq_range_eigenvalues]
           rw [MState.toMat_M, sInf_spectrum_spacePow σ₁ n, MState.toMat_M, smul_smul]
         _ = Real.exp (- n * (c n + (c n) / n)) • 1 := by
-          rw [c_identity mineig]
+          rw [c_identity h_min_pos hn]
         _ ≥ Real.exp (-n * c' ε2 n) • 1 := by
           apply smul_le_smul_of_nonneg_right
           · apply Real.exp_le_exp_of_le
@@ -1458,13 +1480,30 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     have hliminfDleq : Filter.atTop.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n) ≤
          (R1 ρ ε) + .ofReal (1 - ε.val) * (R2 ρ σ + .ofReal ε₀ - R1 ρ ε) := by
 
-      obtain ⟨ε2, hg₁, hg₂, hg₃, hliminf_g⟩ := exists_liminf_zero_of_forall_liminf_le_with_UB
-        (1 - ε) (fun x n ↦ (P1 x n).inner (ℰ n (ρ⊗^S[n])).M) zero_lt_one hliminfP1
+      --Pick a sequence `ε2 n` that converges slowly enough that we ensure both the P1 and P2 terms,
+      -- which otherwise depend on a 'constant' ε₁ and ε₂, both converge to zero as well. We do this
+      -- by looking at the max of the P1 and P2 terms.
+      have this :=
+        exists_liminf_zero_of_forall_liminf_limsup_le_with_UB (1 - ε) 0
+        (fun x n ↦ ENNReal.ofNNReal ⟨(P1 x n).inner (ℰ n (ρ⊗^S[n])).M,
+          HermitianMat.inner_ge_zero (HermitianMat.proj_le_nonneg _ _) (ℰ n (ρ⊗^S[n])).zero_le⟩)
+        (fun x n ↦ ENNReal.ofNNReal ⟨(P2 x n).inner (ℰ n (ρ⊗^S[n])).M,
+          HermitianMat.inner_ge_zero (HermitianMat.proj_le_nonneg _ _) (ℰ n (ρ⊗^S[n])).zero_le⟩)
+        zero_lt_one ?_ ?_; rotate_left
+      · --hliminfP1, up to stupid casting
+        sorry
+      · --hlimsupP2', up to stupid casting
+        sorry
+      rcases this with ⟨ε2, hg₁, hg₂, hg₃, hliminf_g₁, hliminf_g₂⟩
 
       replace hDleq := Filter.liminf_le_liminf (Filter.Eventually.of_forall (f := .atTop) (fun (n : ℕ) ↦ hDleq (ε2 n) n))
       apply le_trans hDleq -- (S89)
       have hP2zero : Filter.atTop.Tendsto (fun n ↦ .ofReal ((P2 (ε2 n) n).inner (ℰ n (ρ⊗^S[n]))) *
           (.ofReal (c' (ε2 n) n) - (R2 ρ σ + .ofReal ε₀ + .ofReal (ε2 n)))) (𝓝 0) := by
+        have hf : Filter.atTop.Tendsto (fun n ↦ .ofReal ((P2 (ε2 n) n).inner (ℰ n (ρ⊗^S[n])))) (𝓝 (0 : ℝ≥0∞)) := by
+          refine tendsto_of_le_liminf_of_limsup_le bot_le ?_
+          convert hliminf_g₂
+          apply ENNReal.ofReal_eq_coe_nnreal
         sorry
       conv =>
         enter [1, 1]
@@ -1494,24 +1533,8 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
             --this is stated above as exists_liminf_zero_of_forall_liminf_le.
             -- ... but then this needs to match up with the ε2 ...
             --Ahh, no, so actually this `g` is how we want to pick our `ε2` above!
-            convert ← ENNReal.ofReal_mono hliminf_g using 1
-            refine ENNReal.ofReal_mono.map_liminf_of_continuousAt _ ?_ ?_ ?_-- (fun x n ↦ (P1 x n).inner (ℰ n (ρ⊗^S[n])).M)
-            · apply ENNReal.continuous_ofReal.continuousAt
-            · use 1
-              simp only [ge_iff_le, Filter.eventually_map, Filter.eventually_atTop,
-                forall_exists_index]
-              intro a x hx
-              apply (hx x le_rfl).trans
-              rw [← (ℰ x (ρ⊗^S[x])).tr, ← HermitianMat.one_inner]
-              apply HermitianMat.inner_mono' (ℰ x (ρ⊗^S[x])).zero_le
-              apply HermitianMat.proj_le_le_one
-            · use 0
-              simp only [ge_iff_le, Filter.eventually_map, Filter.eventually_atTop]
-              use 0
-              intro _ _
-              apply HermitianMat.inner_ge_zero
-              · apply HermitianMat.proj_le_nonneg
-              · apply MState.zero_le
+            convert hliminf_g₁ using 3 with n
+            apply ENNReal.ofReal_eq_coe_nnreal
           · conv =>
               enter [1, 1, n]
               rw [ENNReal.add_sub_add_eq_sub_right (by finiteness)]
