@@ -601,17 +601,13 @@ theorem _root_.HermitianMat.proj_lt_mul_nonneg : 0 ≤ {A <ₚ B}.toMat * (B - A
   nth_rewrite 2 [← HermitianMat.cfc_id (B - A)]
   rw [← HermitianMat.coe_cfc_mul]
   apply cfc_nonneg
-  intro x a
-  simp only [AddSubgroupClass.coe_sub, Pi.mul_apply, id_eq, ite_mul, one_mul, zero_mul] at *
-  obtain ⟨val, property⟩ := A
-  obtain ⟨val_1, property_1⟩ := B
-  split
-  next h => exact h.le
-  next h => exact le_refl 0
+  intros
+  simp only [Pi.mul_apply, id_eq, ite_mul, one_mul, zero_mul]
+  split <;> order
 
 theorem _root_.HermitianMat.proj_lt_mul_lt : {A <ₚ B}.toMat * A.toMat ≤ {A <ₚ B}.toMat * B.toMat := by
   rw [← sub_nonneg, ← mul_sub_left_distrib]
-  exact HermitianMat.proj_lt_mul_nonneg A B
+  exact A.proj_lt_mul_nonneg B
 
 theorem _root_.HermitianMat.one_sub_proj_le : 1 - {B ≤ₚ A} = {A <ₚ B} := by
   rw [sub_eq_iff_eq_add, HermitianMat.proj_le_add_lt]
@@ -680,38 +676,134 @@ lemma _root_.Matrix.card_spectrum_eq_image {d : Type*} [Fintype d] [DecidableEq 
 /- (∀ x, x > 0 → liminf (n ↦ f x n) ≤ y) →
   ∃ g : ℕ → ℝ, (∀ x, g x > 0) ∧ (liminf g = 0) ∧ (liminf (n ↦ f (g n) n) ≤ y) -/
 lemma exists_liminf_zero_of_forall_liminf_le (y : ℝ≥0) (f : ℝ≥0 → ℕ → ℝ≥0∞)
-  (hf : ∀ x, x > 0 → Filter.atTop.liminf (f x) ≤ y) :
-    ∃ g : ℕ → ℝ≥0, (∀ x, g x > 0) ∧ (Filter.atTop.Tendsto g (𝓝 0)) ∧
-      (Filter.atTop.liminf (fun n ↦ f (g n) n) ≤ y) := by
+  (hf : ∀ x > 0, Filter.atTop.liminf (f x) ≤ y) :
+    ∃ g : ℕ → ℝ≥0, (∀ x, g x > 0) ∧ Filter.atTop.Tendsto g (𝓝 0) ∧
+      Filter.atTop.liminf (fun n ↦ f (g n) n) ≤ y := by
   conv at hf =>
     enter [x, h]
     exact propext (Filter.liminf_le_iff (by isBoundedDefault) (by isBoundedDefault))
-  replace hf x hx := Filter.exists_seq_forall_of_frequently
-    (hf x hx (y + x) (mod_cast (lt_add_of_pos_right y hx)))
+  replace hf x hx z hz := Filter.exists_seq_forall_of_frequently (hf x hx z hz)
   choose! c hc hc₂ using hf
   classical
-  use (fun n ↦ if h : ∃ k ≥ n, ∃ m, c (k + 1)⁻¹ m = n then (h.choose + 1)⁻¹ else (n + 1)⁻¹)
-  constructor
-  · bound
-  constructor
-  · admit
-  · sorry
-
-  -- simp only [Filter.tendsto_atTop_atTop] at hc
-
-
-  -- choose! e he using hc
-
-  -- conv =>
-  --   enter [1, g]
-  --   rw [Filter.liminf_le_iff (by isBoundedDefault) (by isBoundedDefault)]
-  /-
-  At a given n, we can take `g n = 1 / k`, if we know that `c (1/k) 0 = n`.
-  This is given by `he x hx (b := n) (a := 0)`
-  -/
-
-  -- have hc' x hx b a := Filter.exists_lt_of_tendsto_atTop (hc x hx) b a
-  -- choose! e he₁ he₂ using hc'
+  sorry
+  -- let ff : ℕ → ℕ → ℝ≥0 := sorry
+  -- let gg : ℕ → ℕ → ℝ≥0∞ := sorry
+  -- let hh : ℕ → ℕ → ℝ≥0 := sorry
+  -- let ii : ℕ → ℝ≥0∞ → ℝ≥0 := sorry
+  -- let jj : ℕ → ℝ≥0∞ → ℕ := sorry
+  -- use (fun n ↦ if h : ∃ k ≥ n, ∃ m, c (ff n k) (gg n k) m = n then (hh n h.choose) else (n + 1)⁻¹)
+  -- constructor
+  -- · sorry
+  -- constructor
+  -- · sorry
+  -- rw [Filter.liminf_le_iff (by isBoundedDefault) (by isBoundedDefault)]
+  -- intro k hk
+  -- rw [Filter.frequently_iff_seq_forall]
+  -- have he := hc; simp only [Filter.tendsto_atTop_atTop] at he
+  -- choose! e he using he
+  -- use fun n ↦ c (ii n k) k (n + e (ii n k) k (jj n k))
+  -- constructor
+  -- · apply (hc _ hx_pos).comp
+  --   sorry
+  -- intro n
+  -- rw [dif_pos]; swap
+  -- · /-
+  --   ∃ k_1 ≥ c (ii n k) k (n + e (ii n k) k (jj n k)),
+  --     c (ff (c (ii n k) k (n + e (ii n k) k (jj n k))) k_1)
+  --       (gg (c (ii n k) k (n + e (ii n k) k (jj n k))) k_1)
+  --       (c (ii n k) k (n + e (ii n k) k (jj n k))) =
+  --     c (ii n k)
+  --       k
+  --       (n + e (ii n k) k (jj n k))
+  --     -/
+  --   sorry
+  -- generalize_proofs pf1
+  -- obtain ⟨hp₁, ⟨m, hp₂⟩⟩ := pf1.choose_spec
+  -- -- nth_rw 6 [← hp₂]
+  -- refine (hc₂ ?_ ?_ k hk _)
+  -- replace hp₁ := (he x hx_pos _ _ (Nat.le_add_left (e x ⌈x⁻¹⌉₊) n)).trans hp₁
+  -- suffices ((↑⌈x⁻¹⌉₊ + 1 : ℝ≥0∞)⁻¹ + y : ℝ≥0∞) ≤ ↑x + ↑y by
+  --   grw [← hp₁, hxy, add_comm]
+  --   simpa
+  -- have h_ceil : (⌈x⁻¹⌉₊ + 1 : ℝ≥0∞)⁻¹ ≤ (x⁻¹ + 1 : ℝ≥0∞)⁻¹ :=
+  --   ENNReal.inv_le_inv.mpr (add_le_add_right ( mod_cast Nat.le_ceil _ ) _)
+  -- have h_inv : (x⁻¹ + 1 : ℝ≥0∞)⁻¹ ≤ x := by
+  --   rw [ENNReal.inv_le_iff_le_mul]
+  --   · norm_cast
+  --     simp [add_mul, inv_mul_cancel₀ hx_pos.ne']
+  --   · --The fact that `intro; positivity` doesn't work
+  --     --here seems like a bug with positivity. TODO
+  --     norm_num [hx_pos]
+  --   · intro; exact_mod_cast hx_pos.ne'
+  -- exact add_le_add_right ( h_ceil.trans h_inv ) _
+  -- sorry
+  -- --ALTERNATE
+  -- replace hf x hx := Filter.exists_seq_forall_of_frequently
+  --   (hf x hx (y + x) (mod_cast (lt_add_of_pos_right y hx)))
+  -- choose! c hc hc₂ using hf
+  -- classical
+  -- use (fun n ↦ if h : ∃ k ≥ n, ∃ m, c (k + 1)⁻¹ m = n then (h.choose + 1)⁻¹ else (n + 1)⁻¹)
+  -- constructor
+  -- · bound
+  -- constructor
+  -- · refine' tendsto_iff_dist_tendsto_zero.mpr _;
+  --   refine' squeeze_zero ( fun _ => by positivity ) ( fun n => _ ) ( tendsto_one_div_add_atTop_nhds_zero_nat );
+  --   split_ifs <;> norm_num [ Nat.dist_eq ];
+  --   · -- Since $k \geq n$, we have $k + 1 \geq n + 1$, thus $(k + 1)^{-1} \leq (n + 1)^{-1}$.
+  --     have h_inv : (↑(Classical.choose ‹∃ k ≥ n, ∃ m, c ((↑k : ℝ≥0) + 1)⁻¹ m = n›) + 1 : ℝ)⁻¹ ≤ (↑n + 1 : ℝ)⁻¹ := by
+  --       exact inv_anti₀ ( by positivity ) ( by norm_cast; linarith [ Classical.choose_spec ‹∃ k ≥ n, ∃ m, c ( ( k : ℝ≥0 ) + 1 ) ⁻¹ m = n› |>.1 ] );
+  --     erw [ Real.dist_eq ] ; aesop;
+  --     rw [ abs_of_nonneg ( by positivity ) ] ; exact h_inv;
+  --   · -- The distance between $(n + 1)^{-1}$ and $0$ is just $(n + 1)^{-1}$ itself.
+  --     simp [dist];
+  --     rw [ abs_of_nonneg ( by positivity ) ]
+  -- rw [Filter.liminf_le_iff (by isBoundedDefault) (by isBoundedDefault)]
+  -- intro k hk
+  -- set x : ℝ≥0 := if k = ⊤ then 1 else k.toNNReal - y with hx
+  -- have hxy : k ≥ x + y := by
+  --   rcases k with _|k₀
+  --   · simp [x]
+  --   · simp [x]
+  --     rw [tsub_add_cancel_of_le]
+  --     simp_all only [gt_iff_lt, ENNReal.some_eq_coe, ENNReal.coe_lt_coe, x,
+  --       ENNReal.coe_ne_top, ↓reduceIte, ENNReal.toNNReal_coe, ENNReal.coe_le_coe]
+  --     apply le_of_lt hk
+  -- have hx_pos : 0 < x := by
+  --   simp [x]
+  --   split_ifs with h
+  --   · exact zero_lt_one
+  --   · rcases k with _ | h
+  --     · simp at h
+  --     · simpa using ENNReal.coe_lt_coe.mp hk
+  -- rw [Filter.frequently_iff_seq_forall]
+  -- have he := hc; simp only [Filter.tendsto_atTop_atTop] at he
+  -- choose! e he using he
+  -- use fun n ↦ c x (n + e x ⌈x⁻¹⌉₊)
+  -- constructor
+  -- · apply (hc _ hx_pos).comp
+  --   sorry
+  -- intro n
+  -- rw [dif_pos]; swap
+  -- · sorry
+  -- generalize_proofs pf1
+  -- obtain ⟨hp₁, ⟨m, hp₂⟩⟩ := pf1.choose_spec
+  -- nth_rw 3 [← hp₂]
+  -- refine (hc₂ _ (by positivity) m).trans_le ?_
+  -- replace hp₁ := (he x hx_pos _ _ (Nat.le_add_left (e x ⌈x⁻¹⌉₊) n)).trans hp₁
+  -- suffices ((↑⌈x⁻¹⌉₊ + 1 : ℝ≥0∞)⁻¹ + y : ℝ≥0∞) ≤ ↑x + ↑y by
+  --   grw [← hp₁, hxy, add_comm]
+  --   simpa
+  -- have h_ceil : (⌈x⁻¹⌉₊ + 1 : ℝ≥0∞)⁻¹ ≤ (x⁻¹ + 1 : ℝ≥0∞)⁻¹ :=
+  --   ENNReal.inv_le_inv.mpr (add_le_add_right ( mod_cast Nat.le_ceil _ ) _)
+  -- have h_inv : (x⁻¹ + 1 : ℝ≥0∞)⁻¹ ≤ x := by
+  --   rw [ENNReal.inv_le_iff_le_mul]
+  --   · norm_cast
+  --     simp [add_mul, inv_mul_cancel₀ hx_pos.ne']
+  --   · --The fact that `intro; positivity` doesn't work
+  --     --here seems like a bug with positivity. TODO
+  --     norm_num [hx_pos]
+  --   · intro; exact_mod_cast hx_pos.ne'
+  -- exact add_le_add_right ( h_ceil.trans h_inv ) _
 
 /- Version of `exists_liminf_zero_of_forall_liminf_le` that lets you also require `g`
 to have an upper bound. -/
@@ -730,16 +822,24 @@ lemma exists_liminf_zero_of_forall_liminf_le_with_UB (y : ℝ≥0) (f : ℝ≥0 
     peel h with h
     rw [min_eq_left h.le]
 
+/- (∀ x, x > 0 → liminf (n ↦ f x n) ≤ y) →
+  ∃ g : ℕ → ℝ, (∀ x, g x > 0) ∧ (liminf g = 0) ∧ (liminf (n ↦ f (g n) n) ≤ y) -/
+lemma exists_limsup_zero_of_forall_limsup_le (y : ℝ≥0) (f : ℝ≥0 → ℕ → ℝ≥0∞)
+  (hf : ∀ x, x > 0 → Filter.atTop.limsup (f x) ≤ y) :
+    ∃ g : ℕ → ℝ≥0, (∀ x, g x > 0) ∧ (Filter.atTop.Tendsto g (𝓝 0)) ∧
+      (Filter.atTop.limsup (fun n ↦ f (g n) n) ≤ y) := by
+  sorry
+
 /- Version of `exists_liminf_zero_of_forall_liminf_le_with_UB` that lets you stipulate it for
 two different functions simultaneously, one with liminf and one with limsup. -/
 lemma exists_liminf_zero_of_forall_liminf_limsup_le_with_UB (y₁ y₂ : ℝ≥0) (f₁ f₂ : ℝ≥0 → ℕ → ℝ≥0∞)
   {z : ℝ≥0} (hz : 0 < z)
-  (hf₁ : ∀ x, x > 0 → Filter.atTop.liminf (f₁ x) ≤ y₁)
-  (hf₂ : ∀ x, x > 0 → Filter.atTop.limsup (f₂ x) ≤ y₂) :
+  (hf₁ : ∀ x > 0, Filter.atTop.liminf (f₁ x) ≤ y₁)
+  (hf₂ : ∀ x > 0, Filter.atTop.limsup (f₂ x) ≤ y₂) :
     ∃ g : ℕ → ℝ≥0, (∀ x, g x > 0) ∧ (∀ x, g x < z) ∧
-      (Filter.atTop.Tendsto g (𝓝 0)) ∧
-      (Filter.atTop.liminf (fun n ↦ f₁ (g n) n) ≤ y₁) ∧
-      (Filter.atTop.limsup (fun n ↦ f₂ (g n) n) ≤ y₂) := by
+      Filter.atTop.Tendsto g (𝓝 0) ∧
+      Filter.atTop.liminf (fun n ↦ f₁ (g n) n) ≤ y₁ ∧
+      Filter.atTop.limsup (fun n ↦ f₂ (g n) n) ≤ y₂ := by
   sorry
 
 private lemma f_image_bound (mineig : ℝ) (n : ℕ) (h : 0 < mineig) (hn : 0 < n) :
@@ -823,17 +923,69 @@ private lemma f_image_bound (mineig : ℝ) (n : ℕ) (h : 0 < mineig) (hn : 0 < 
       nlinarith [ Real.log_pos ( show ( 3 : ℝ ) > 1 by norm_num ), mul_div_cancel₀ ( Real.log 3 ) ( show ( n + 1 : ℝ ) ≠ 0 by positivity ) ] ),
         Real.log_pos ( show ( 3 : ℝ ) > 1 by norm_num ), mul_div_cancel₀ ( Real.log 3 ) ( show ( n + 1 : ℝ ) ≠ 0 by positivity ) ]
 
+set_option maxHeartbeats 400000 in
 lemma sub_iInf_eignevalues {d : Type*} [Fintype d] [DecidableEq d] {A : Matrix d d ℂ}
   (hA : A.IsHermitian) :
     (A - iInf hA.eigenvalues • 1).PosSemidef := by
-  sorry
+  constructor;
+  · simpa [ Matrix.IsHermitian, sub_eq_add_neg ] using hA
+  · intro x
+    have h_eigenvalue : ∀ i, hA.eigenvalues i ≥ iInf hA.eigenvalues := by
+      -- By definition of infimum, for any eigenvalue $i$, we have $hA.eigenvalues i \geq iInf hA.eigenvalues$.
+      intros i
+      apply le_of_forall_le
+      intro j a
+      exact le_trans a (ciInf_le ( Finite.bddBelow_range hA.eigenvalues ) i );
+    -- Since $A$ is Hermitian, we can diagonalize it as $A = Q \Lambda Q^*$, where $Q$ is unitary and $\Lambda$ is diagonal with the eigenvalues on the diagonal.
+    obtain ⟨Q, Λ, hQ, hΛ⟩ : ∃ Q : Matrix d d ℂ, ∃ Λ : d → ℂ, Q.conjTranspose * Q = 1 ∧ A = Q * Matrix.diagonal Λ * Q.conjTranspose ∧ ∀ i, Λ i = Matrix.IsHermitian.eigenvalues hA i := by
+      have := hA.spectral_theorem;
+      refine' ⟨ _, _, _, this, _ ⟩;
+      · simp [ ← Matrix.ext_iff ];
+        intro i j; erw [ Matrix.mul_apply ] ; simp [ Matrix.one_apply ] ;
+        have := hA.eigenvectorBasis.orthonormal;
+        rw [ orthonormal_iff_ite ] at this;
+        rw [← this i j]
+        simp [PiLp.inner_apply, mul_comm]
+      · simp
+    -- Since $Q$ is unitary, we have $Q^* Q = I$, and thus $Q^* (A - \lambda_{\min} I) Q = \Lambda - \lambda_{\min} I$.
+    have h_diag : Q.conjTranspose * (A - (iInf (Matrix.IsHermitian.eigenvalues hA)) • 1) * Q = Matrix.diagonal (fun i => Λ i - (iInf (Matrix.IsHermitian.eigenvalues hA))) := by
+      simp [ hΛ, mul_sub, sub_mul, mul_assoc, hQ ];
+      simp [ ← mul_assoc, hQ];
+      ext i j ; by_cases hij : i = j <;> aesop;
+    -- Since $Q$ is unitary, we have $Q^* (A - \lambda_{\min} I) Q = \Lambda - \lambda_{\min} I$, and thus $x^* (A - \lambda_{\min} I) x = (Q^* x)^* (\Lambda - \lambda_{\min} I) (Q^* x)$.
+    have h_quad_form : Star.star x ⬝ᵥ (A - (iInf (Matrix.IsHermitian.eigenvalues hA)) • 1).mulVec x = Star.star (Q.conjTranspose.mulVec x) ⬝ᵥ (Matrix.diagonal (fun i => Λ i - (iInf (Matrix.IsHermitian.eigenvalues hA)))).mulVec (Q.conjTranspose.mulVec x) := by
+      rw [ ← h_diag ];
+      simp [ Matrix.mul_assoc, Matrix.dotProduct_mulVec, Matrix.mul_eq_one_comm.mp hQ];
+      simp only [mulVec_conjTranspose, star_star, vecMul_vecMul];
+      rw [ ← Matrix.mul_assoc, Matrix.mul_eq_one_comm.mp hQ, one_mul ];
+    simp_all only [ge_iff_le, dotProduct, Pi.star_apply, RCLike.star_def, mulVec, sub_apply,
+      smul_apply, Complex.real_smul, conjTranspose_apply, star_sum, star_mul',
+      RingHomCompTriple.comp_apply, RingHom.id_apply];
+    simp_all only [implies_true, and_self, diagonal_apply, ite_mul, zero_mul, Finset.sum_ite_eq, ↓reduceIte];
+    -- Since the eigenvalues are real and the sums involving Q and x are complex, the product of a complex number and its conjugate is non-negative.
+    have h_nonneg : ∀ i, 0 ≤ (∑ x_2, Q x_2 i * star (x x_2)) * (∑ x_2, star (Q x_2 i) * x x_2) := by
+      intro i
+      have h_nonneg : 0 ≤ (∑ x_2, Q x_2 i * star (x x_2)) * star (∑ x_2, Q x_2 i * star (x x_2)) := by
+        exact mul_star_self_nonneg (∑ x_2, Q x_2 i * star (x x_2))
+      convert h_nonneg using 1;
+      simp [ mul_comm, Finset.mul_sum _ _ _];
+    -- Since each term in the sum is a product of a non-negative number and a non-negative eigenvalue difference, the entire sum is non-negative.
+    have h_sum_nonneg : ∀ i, 0 ≤ (∑ x_2, Q x_2 i * star (x x_2)) * (((↑(hA.eigenvalues i) : ℂ) - (↑(iInf hA.eigenvalues) : ℂ)) * ∑ x_2, star (Q x_2 i) * x x_2) := by
+      intro i
+      specialize h_nonneg i
+      simp_all only [mul_assoc, mul_comm, mul_left_comm, RCLike.star_def] ;
+      rw [ ← mul_assoc ];
+      exact mul_nonneg h_nonneg ( sub_nonneg_of_le <| mod_cast h_eigenvalue i );
+    convert Finset.sum_nonneg fun i _ => h_sum_nonneg i;
+    rw [ hΛ.1 ]
 
 lemma iInf_eigenvalues_le_dotProduct_mulVec {d : Type*} [Fintype d] [DecidableEq d] {A : Matrix d d ℂ}
   (hA : A.IsHermitian) (v : d → ℂ) :
     iInf hA.eigenvalues * (star v ⬝ᵥ v) ≤ star v ⬝ᵥ A *ᵥ v := by
   conv_lhs =>
     equals (star v ⬝ᵥ (iInf hA.eigenvalues • 1) *ᵥ v) =>
-      sorry
+      simp only [dotProduct, Pi.star_apply, RCLike.star_def, mul_comm, mulVec]
+      simp [Matrix.one_apply, mul_assoc, mul_left_comm, Finset.mul_sum]
   rw [← sub_nonneg, ← dotProduct_sub, ← Matrix.sub_mulVec]
   exact (sub_iInf_eignevalues hA).right v
 
@@ -881,12 +1033,43 @@ private lemma c_identity {mineig : ℝ} (h_mineig : 0 < mineig) {n : ℕ} (hn : 
   simp only [Real.exp_add, mul_add, neg_add_rev, mul_assoc, h]
   simp [Real.exp_neg, Real.exp_log, Real.exp_log h_mineig, Real.exp_nat_mul]
 
+private lemma c'_bounded {mineig : ℝ} {ε2 : ℕ → ℝ≥0}
+    (hε2 : ∀ (n : ℕ), ε2 n < 1) (o : ℝ) :
+  let c : ℕ → ℝ := fun n => Real.log (1 / mineig) + Real.log 3 / ↑(max n 1);
+  let c' : ℝ → ℕ → ℝ := fun  ε2 n ↦ (c n + (c n) / n) ⊔ (o + ε2);
+  (∀ (n : ℕ), 0 < c n) →
+    ∃ (C : NNReal), ∀ᶠ (n : ℕ) in Filter.atTop, c' (↑(ε2 n)) n ≤ ↑C := by
+  have h_bound : ∃ C : ℝ, ∀ᶠ n in Filter.atTop, Real.log (1 / mineig) + Real.log 3 / (Max.max n 1) + (Real.log (1 / mineig) + Real.log 3 / (Max.max n 1)) / n ≤ C := by
+    have h_bound : Filter.Tendsto (fun n => Real.log (1 / mineig) + Real.log 3 / (Max.max n 1) + (Real.log (1 / mineig) + Real.log 3 / (Max.max n 1)) / n) Filter.atTop (nhds (Real.log (1 / mineig) + Real.log 3 / 0 + (Real.log (1 / mineig) + Real.log 3 / 0) / 0)) := by
+      exact le_trans ( Filter.Tendsto.add ( tendsto_const_nhds.add <| Filter.Tendsto.mul tendsto_const_nhds <| Filter.Tendsto.inv_tendsto_atTop <| Filter.tendsto_atTop_atTop.mpr fun x => ⟨ x + 1, fun y hy => le_max_of_le_left <| by linarith ⟩ ) <| Filter.Tendsto.mul ( tendsto_const_nhds.add <| Filter.Tendsto.mul tendsto_const_nhds <| Filter.Tendsto.inv_tendsto_atTop <| Filter.tendsto_atTop_atTop.mpr fun x => ⟨ x + 1, fun y hy => le_max_of_le_left <| by linarith ⟩ ) <| tendsto_inv_atTop_zero ) <| by norm_num;
+    exact ⟨ _, h_bound.eventually ( ge_mem_nhds <| lt_add_one _ ) ⟩;
+  intro c c' a
+  simp_all only [one_div, Real.log_inv, Filter.eventually_atTop, ge_iff_le, Nat.cast_max, Nat.cast_one,
+    lt_neg_add_iff_add_lt, add_zero, sup_le_iff, c, c']
+  obtain ⟨w, ⟨w_1, h⟩⟩ := h_bound
+  use ⌈w⌉₊ + ⌈o⌉₊ + 1, ⌈w_1⌉₊
+  intro n hn
+  constructor
+  · norm_num
+    linarith [ Nat.le_ceil w, h n ( Nat.le_of_ceil_le hn ) ]
+  · norm_num
+    linarith [ Nat.le_ceil o, show ( ε2 n : ℝ ) ≤ 1 by exact_mod_cast le_of_lt ( hε2 n ) ]
+
 protected lemma _root_.ENNReal.bdd_le_mul_tendsto_zero
   {α : Type u_2} {l : Filter α} {f g : α → ℝ≥0∞} {b : ℝ≥0∞}
   (hb : b ≠ ⊤) (hf : Filter.Tendsto f l (nhds 0))
   (hg : ∀ᶠ (x : α) in l, g x ≤ b) :
     Filter.Tendsto (fun x => f x * g x) l (nhds 0) := by
-  sorry
+  rw [ ENNReal.tendsto_nhds_zero ] at *;
+  intro ε hεpos
+  by_cases hb_pos : 0 < b;
+  · have := hf ( ε := ε / b ) (by simp [hb, hεpos.ne'])
+    simp_all only [ne_eq, gt_iff_lt]
+    filter_upwards [ this, hg ] with x hx₁ hx₂ using le_trans ( mul_le_mul' hx₁ hx₂ ) ( by rw [ ENNReal.div_mul_cancel ] <;> aesop );
+  · simp_all only [ne_eq, gt_iff_lt, not_lt, nonpos_iff_eq_zero, ENNReal.zero_ne_top, not_false_eq_true]
+    subst hb_pos
+    filter_upwards [ hg ] with x hx
+    simp [hx]
 
 set_option maxHeartbeats 500000 in
 /-- Lemma 7 from the paper. We write `ε'` for their `\tilde{ε}`. -/
@@ -1487,20 +1670,9 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     -- (S83)
     let c' ε2 n := (c n + (c n) / n) ⊔ ((R2 ρ σ).toReal + ε₀ + ε2)
 
-    have hc' ε2 : (c' ε2) =O[.atTop] (1 : ℕ → ℝ) := by
-      have h_limit : Filter.Tendsto (fun n => max (c n + c n / (n : ℝ)) ((R2 ρ σ).toReal + ε₀ + ε2)) Filter.atTop (nhds (max (Real.log (1 / mineig)) ((R2 ρ σ).toReal + ε₀ + ε2))) := by
-        have h_c_n : Filter.Tendsto c Filter.atTop (nhds (Real.log (1 / mineig))) := by
-          norm_num [ div_eq_mul_inv ]
-          refine le_trans ( tendsto_const_nhds.add <| tendsto_const_nhds.mul <| tendsto_inv_atTop_zero.comp <| Filter.tendsto_atTop_atTop.mpr fun y => ⟨ ⌈y⌉₊, fun n hn => ?_ ⟩ ) ( by norm_num );
-          simp only [Nat.cast_max]
-          exact le_max_of_le_left <| Nat.le_of_ceil_le hn
-        exact Filter.Tendsto.max ( by simpa using Filter.Tendsto.add h_c_n <| Filter.Tendsto.div_atTop h_c_n <| tendsto_natCast_atTop_atTop ) tendsto_const_nhds;
-      have h_bounded : ∃ C, ∀ᶠ n in Filter.atTop, |max (c n + c n / (n : ℝ)) ((R2 ρ σ).toReal + ε₀ + ε2)| ≤ C := by
-        exact ⟨ _, h_limit.abs.eventually ( ge_mem_nhds <| lt_add_one _ ) ⟩;
-      refine' Asymptotics.isBigO_iff.mpr _;
-      simp only [Filter.eventually_atTop, ge_iff_le, Real.norm_eq_abs, Pi.one_apply, one_mem,
-        CStarRing.norm_of_mem_unitary, mul_one] at h_bounded ⊢
-      exact h_bounded
+    have hc' (ε2 : ℕ → ℝ≥0) (hε2 : ∀ n, ε2 n < 1) :
+        ∃ (C : ℝ≥0), ∀ᶠ (n : ℕ) in Filter.atTop, c' (ε2 n) n ≤ C := by
+      apply c'_bounded hε2 _ hc
 
     -- (S84)
     have hσ'' ε2 n : Real.exp (-n * c' ε2 n) • 1 ≤ (σ'' n).M := by
@@ -1622,11 +1794,11 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
           refine tendsto_of_le_liminf_of_limsup_le bot_le ?_
           convert hliminf_g₂
           apply ENNReal.ofReal_eq_coe_nnreal
-        -- obtain ⟨C, hC⟩ := hc'.bound
-        refine ENNReal.bdd_le_mul_tendsto_zero (b := ?_) ?_ hf ?_
-        · sorry
-        · sorry
-        · sorry
+        obtain ⟨C, hC⟩ := hc' ε2 hg₂
+        refine ENNReal.bdd_le_mul_tendsto_zero (b := C) (by finiteness) hf ?_
+        filter_upwards [hC] with a ha
+        grw [ha]
+        simp
       conv =>
         enter [1, 1]
         rw [← Pi.add_def]
