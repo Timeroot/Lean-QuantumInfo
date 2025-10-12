@@ -2,7 +2,9 @@ import StatMech.Hamiltonian
 import Mathlib.Analysis.SpecialFunctions.Log.Deriv
 import Mathlib.Data.Real.StarOrdered
 import Mathlib.MeasureTheory.Constructions.Pi
-import Mathlib.MeasureTheory.Integral.Bochner
+import Mathlib.MeasureTheory.Integral.Bochner.Basic
+import Mathlib.MeasureTheory.Integral.Bochner.L1
+import Mathlib.MeasureTheory.Integral.Bochner.VitaliCaratheodory
 import Mathlib.MeasureTheory.Measure.Haar.OfBasis
 import Mathlib.Order.CompletePartialOrder
 
@@ -89,7 +91,8 @@ theorem entropy_A_eq_entropy_Z (T β : ℝ) (hβT : T * β = 1) (hi : H.ZIntegra
   have hβT' := eq_one_div_of_mul_eq_one_right hβT
   dsimp [EntropyS, EntropySβ, InternalU, PartitionZT]
   unfold HelmholtzA
-  rw [deriv_mul, deriv_neg'', neg_mul, one_mul, neg_add_rev, neg_neg, mul_neg, add_comm]
+  erw [deriv_mul]
+  rw [deriv_neg'', neg_mul, one_mul, neg_add_rev, neg_neg, mul_neg, add_comm]
   congr 1
   · rw [PartitionZT, hβT']
   simp_rw [PartitionZT]
@@ -99,8 +102,7 @@ theorem entropy_A_eq_entropy_Z (T β : ℝ) (hβT : T * β = 1) (hi : H.ZIntegra
   field_simp
   ring_nf
   --Show the differentiability side-goals
-  · eta_reduce
-    rw [← one_div, ← hβT']
+  · rw [← one_div, ← hβT']
     have h₁ := hi.2
     have := (DifferentiableAt_Z_if_ZIntegrable hi).differentiableAt (OrderTop.le_top 1)
     fun_prop (disch := assumption)
@@ -135,10 +137,10 @@ theorem β_eq_deriv_S_U {β : ℝ} (hi : H.ZIntegrable d β) : β = (deriv (H.En
     fun_prop
 
   --Main goal
-  simp only [mul_neg, deriv.neg']
-  rw [deriv_add]
-  simp only [deriv.neg', differentiableAt_id']
-  rw [deriv_mul]
+  simp only [mul_neg]
+  erw [deriv.neg', deriv_add, deriv.neg']
+  dsimp
+  erw [deriv_mul]
   simp only [deriv_id'', one_mul, neg_add_rev, add_neg_cancel_comm_assoc, neg_div_neg_eq]
   have : deriv (deriv fun β => Real.log (H.PartitionZ d β)) β ≠ 0 := ?_
   exact (mul_div_cancel_right₀ β this).symm

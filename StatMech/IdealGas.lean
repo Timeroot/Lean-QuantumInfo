@@ -95,7 +95,9 @@ theorem PartitionZ_eq (hV : 0 < V) (hβ : 0 < β) :
     positivity
   · apply Measurable.aestronglyMeasurable
     fun_prop
-  rw [MeasureTheory.lintegral_prod_of_measurable]
+  rw [MeasureTheory.lintegral_prod]; swap
+  · exact (Measurable.comp (g := ENNReal.ofReal)
+      ENNReal.measurable_ofReal h_measurability).aemeasurable
 
   conv =>
     enter [1, 1, 2, x, 2, y]
@@ -104,10 +106,8 @@ theorem PartitionZ_eq (hV : 0 < V) (hβ : 0 < β) :
   dsimp
   conv =>
     enter [1, 1, 2, x]
-    rw [MeasureTheory.lintegral_const_mul' _ _ (by exact ENNReal.ofReal_ne_top)]
+    rw [MeasureTheory.lintegral_const_mul' _ _ (ENNReal.ofReal_ne_top)]
 
-  swap
-  · exact Measurable.comp (g := ENNReal.ofReal) ENNReal.measurable_ofReal h_measurability
 
   rw [MeasureTheory.lintegral_mul_const, ENNReal.toReal_mul]
   rw [← MeasureTheory.integral_eq_lintegral_of_nonneg_ae]
@@ -146,8 +146,9 @@ theorem PartitionZ_eq (hV : 0 < V) (hβ : 0 < β) :
       simp_rw [← Prod.forall (p := fun xy ↦ |a xy| ≤ V ^ (3⁻¹ : ℝ) / 2)]
       exact Fintype.prod_boole.symm
     simp_rw [h_integrand_prod]; clear h_integrand_prod
-    rw [MeasureTheory.integral_fintype_prod_eq_prod (𝕜 := ℝ)
-      (f := fun _ r ↦ if |r| ≤ V ^ (3⁻¹ : ℝ) / 2 then 1 else 0)]
+    convert ← MeasureTheory.integral_fintype_prod_eq_prod (ι := Fin n × Fin 3) (𝕜 := ℝ)
+      (f := fun _ r ↦ if |r| ≤ V ^ (3⁻¹ : ℝ) / 2 then 1 else 0); swap
+    · infer_instance
     rw [Finset.prod_const]
     rw [Finset.card_univ, Fintype.card_prod, Fintype.card_fin, Fintype.card_fin]
     have h_integral_1d : (∫ (x : ℝ), if |x| ≤ V ^ (3⁻¹ : ℝ) / 2 then 1 else 0) = V ^ (3⁻¹ : ℝ) := by
@@ -158,9 +159,9 @@ theorem PartitionZ_eq (hV : 0 < V) (hβ : 0 < β) :
       simp
       positivity
     rw [h_integral_1d]; clear h_integral_1d
-    rw [← Real.rpow_mul_natCast]
+    rw [← Real.rpow_mul_natCast hV.le]
     field_simp
-    exact hV.le
+    simp
   · --Gaussian integral
     have h_gaussian :=
       GaussianFourier.integral_rexp_neg_mul_sq_norm (V := PiLp 2 (fun (_ : Fin n × Fin 3) ↦ ℝ)) (half_pos hβ)
@@ -173,6 +174,8 @@ theorem PartitionZ_eq (hV : 0 < V) (hβ : 0 < β) :
       simp only [Prod.mk.eta, Real.norm_eq_abs, sq_abs]
       congr
     · field_simp
+      congr
+      simp
       ring_nf
 
 /-- The Helmholtz Free Energy A for an ideal gas. -/
@@ -202,10 +205,13 @@ theorem IdealGasLaw (hV : 0 < V) (hT : 0 < T) :
   rw [← derivWithin_of_isOpen (s := Set.Ioi 0) isOpen_Ioi hV]
   rw [derivWithin_congr (f := fun V' ↦ -n * T * (Real.log V' + (3/2) * Real.log (2 * Real.pi * T))) ?_ ?_]
   rw [derivWithin_of_isOpen (s := Set.Ioi 0) isOpen_Ioi hV]
-  rw [deriv_mul (by fun_prop) (by fun_prop (disch := exact hV.ne'))]
-  field_simp
+  erw [deriv_mul (by fun_prop) (by fun_prop (disch := exact hV.ne'))]
+  simp [field]
   ring_nf
-  · exact fun _ hV' ↦ HelmholtzA_eq n hV' hT
+  · intro _ hV'
+    dsimp
+    rw [HelmholtzA_eq n hV' hT]
+    ring_nf
   · exact HelmholtzA_eq n hV hT
 
 -- Now proving e.g. Boyle's Law ("for an ideal gas with a fixed particle number, P and V are inversely proportional")
