@@ -683,7 +683,35 @@ lemma exists_liminf_zero_of_forall_liminf_le (y : ℝ≥0) (f : ℝ≥0 → ℕ 
   (hf : ∀ x, x > 0 → Filter.atTop.liminf (f x) ≤ y) :
     ∃ g : ℕ → ℝ≥0, (∀ x, g x > 0) ∧ (Filter.atTop.Tendsto g (𝓝 0)) ∧
       (Filter.atTop.liminf (fun n ↦ f (g n) n) ≤ y) := by
-  sorry
+  conv at hf =>
+    enter [x, h]
+    exact propext (Filter.liminf_le_iff (by isBoundedDefault) (by isBoundedDefault))
+  replace hf x hx := Filter.exists_seq_forall_of_frequently
+    (hf x hx (y + x) (mod_cast (lt_add_of_pos_right y hx)))
+  choose! c hc hc₂ using hf
+  classical
+  use (fun n ↦ if h : ∃ k ≥ n, ∃ m, c (k + 1)⁻¹ m = n then (h.choose + 1)⁻¹ else (n + 1)⁻¹)
+  constructor
+  · bound
+  constructor
+  · admit
+  · sorry
+
+  -- simp only [Filter.tendsto_atTop_atTop] at hc
+
+
+  -- choose! e he using hc
+
+  -- conv =>
+  --   enter [1, g]
+  --   rw [Filter.liminf_le_iff (by isBoundedDefault) (by isBoundedDefault)]
+  /-
+  At a given n, we can take `g n = 1 / k`, if we know that `c (1/k) 0 = n`.
+  This is given by `he x hx (b := n) (a := 0)`
+  -/
+
+  -- have hc' x hx b a := Filter.exists_lt_of_tendsto_atTop (hc x hx) b a
+  -- choose! e he₁ he₂ using hc'
 
 /- Version of `exists_liminf_zero_of_forall_liminf_le` that lets you also require `g`
 to have an upper bound. -/
@@ -795,10 +823,42 @@ private lemma f_image_bound (mineig : ℝ) (n : ℕ) (h : 0 < mineig) (hn : 0 < 
       nlinarith [ Real.log_pos ( show ( 3 : ℝ ) > 1 by norm_num ), mul_div_cancel₀ ( Real.log 3 ) ( show ( n + 1 : ℝ ) ≠ 0 by positivity ) ] ),
         Real.log_pos ( show ( 3 : ℝ ) > 1 by norm_num ), mul_div_cancel₀ ( Real.log 3 ) ( show ( n + 1 : ℝ ) ≠ 0 by positivity ) ]
 
+lemma sub_iInf_eignevalues {d : Type*} [Fintype d] [DecidableEq d] {A : Matrix d d ℂ}
+  (hA : A.IsHermitian) :
+    (A - iInf hA.eigenvalues • 1).PosSemidef := by
+  sorry
+
+lemma iInf_eigenvalues_le_dotProduct_mulVec {d : Type*} [Fintype d] [DecidableEq d] {A : Matrix d d ℂ}
+  (hA : A.IsHermitian) (v : d → ℂ) :
+    iInf hA.eigenvalues * (star v ⬝ᵥ v) ≤ star v ⬝ᵥ A *ᵥ v := by
+  conv_lhs =>
+    equals (star v ⬝ᵥ (iInf hA.eigenvalues • 1) *ᵥ v) =>
+      sorry
+  rw [← sub_nonneg, ← dotProduct_sub, ← Matrix.sub_mulVec]
+  exact (sub_iInf_eignevalues hA).right v
+
 lemma iInf_eigenvalues_le_of_posSemidef {d : Type*} [Fintype d] [DecidableEq d] {A B : Matrix d d ℂ}
   (hAB : (B - A).PosSemidef) (hA : A.IsHermitian) (hB : B.IsHermitian) :
     iInf hA.eigenvalues ≤ iInf hB.eigenvalues := by
-  sorry
+  rcases isEmpty_or_nonempty d
+  · simp
+  contrapose! hAB
+  rw [PosSemidef]
+  push_neg
+  intro _
+  apply exists_lt_of_ciInf_lt at hAB
+  rcases hAB with ⟨i, hi⟩
+  use WithLp.ofLp (hB.eigenvectorBasis i)
+  simp only [sub_mulVec, dotProduct_sub, sub_nonneg]
+  rw [hB.mulVec_eigenvectorBasis i]
+  simp only [dotProduct_smul, Complex.real_smul]
+  nth_rw 2 [dotProduct_comm]
+  rw [← EuclideanSpace.inner_eq_star_dotProduct]
+  intro h
+  replace h := (iInf_eigenvalues_le_dotProduct_mulVec hA _).trans h
+  rw [dotProduct_comm, ← EuclideanSpace.inner_eq_star_dotProduct] at h
+  simp only [OrthonormalBasis.inner_eq_one, mul_one, Complex.real_le_real] at h
+  order
 
 lemma iInf_eigenvalues_le {d : Type*} [Fintype d] [DecidableEq d] {A B : Matrix d d ℂ}
   (hAB : A ≤ B) (hA : A.IsHermitian) (hB : B.IsHermitian) :
@@ -820,6 +880,13 @@ private lemma c_identity {mineig : ℝ} (h_mineig : 0 < mineig) {n : ℕ} (hn : 
   simp only [neg_mul, show ((max n 1 : ℕ) : ℝ) = n from mod_cast (max_eq_left hn)]
   simp only [Real.exp_add, mul_add, neg_add_rev, mul_assoc, h]
   simp [Real.exp_neg, Real.exp_log, Real.exp_log h_mineig, Real.exp_nat_mul]
+
+protected lemma _root_.ENNReal.bdd_le_mul_tendsto_zero
+  {α : Type u_2} {l : Filter α} {f g : α → ℝ≥0∞} {b : ℝ≥0∞}
+  (hb : b ≠ ⊤) (hf : Filter.Tendsto f l (nhds 0))
+  (hg : ∀ᶠ (x : α) in l, g x ≤ b) :
+    Filter.Tendsto (fun x => f x * g x) l (nhds 0) := by
+  sorry
 
 set_option maxHeartbeats 500000 in
 /-- Lemma 7 from the paper. We write `ε'` for their `\tilde{ε}`. -/
@@ -1491,9 +1558,60 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
           HermitianMat.inner_ge_zero (HermitianMat.proj_le_nonneg _ _) (ℰ n (ρ⊗^S[n])).zero_le⟩)
         zero_lt_one ?_ ?_; rotate_left
       · --hliminfP1, up to stupid casting
-        sorry
+        intro x hx
+        specialize hliminfP1 ⟨x, hx.le⟩ hx
+        apply ENNReal.ofReal_mono at hliminfP1
+        convert ← hliminfP1 using 1
+        dsimp
+        conv =>
+          enter [2, 1, n]
+          rw [← ENNReal.ofReal_eq_coe_nnreal]
+        refine ENNReal.ofReal_mono.map_liminf_of_continuousAt _ ?_ ?_ ?_
+        · apply ENNReal.continuous_ofReal.continuousAt
+        · use 1
+          simp only [ge_iff_le, Filter.eventually_map, Filter.eventually_atTop,
+            forall_exists_index]
+          intro a x hx
+          apply (hx x le_rfl).trans
+          rw [← (ℰ x (ρ⊗^S[x])).tr, ← HermitianMat.one_inner]
+          apply HermitianMat.inner_mono' (ℰ x (ρ⊗^S[x])).zero_le
+          apply HermitianMat.proj_le_le_one
+        · use 0
+          simp only [ge_iff_le, Filter.eventually_map, Filter.eventually_atTop]
+          use 0
+          intro _ _
+          apply HermitianMat.inner_ge_zero
+          · apply HermitianMat.proj_le_nonneg
+          · apply MState.zero_le
       · --hlimsupP2', up to stupid casting
-        sorry
+        intro x hx
+        specialize hlimsupP2' x hx
+        apply le_of_eq at hlimsupP2'
+        apply ENNReal.ofReal_mono at hlimsupP2'
+        convert ← hlimsupP2' using 1
+        dsimp
+        conv =>
+          enter [2, 1, n]
+          exact (ENNReal.ofReal_eq_coe_nnreal _).symm
+        swap
+        · simp
+        refine ENNReal.ofReal_mono.map_limsup_of_continuousAt _ ?_ ?_ ?_
+        · apply ENNReal.continuous_ofReal.continuousAt
+        · use 1
+          simp only [ge_iff_le, Filter.eventually_map, Filter.eventually_atTop]
+          use 0
+          intro x hx
+          rw [← (ℰ x (ρ⊗^S[x])).tr, ← HermitianMat.one_inner]
+          apply HermitianMat.inner_mono' (ℰ x (ρ⊗^S[x])).zero_le
+          apply HermitianMat.proj_le_le_one
+        · use 0
+          simp only [ge_iff_le, Filter.eventually_map, Filter.eventually_atTop,
+            forall_exists_index]
+          intro a x hx
+          refine le_trans ?_ (hx x le_rfl)
+          apply HermitianMat.inner_ge_zero
+          · apply HermitianMat.proj_le_nonneg
+          · apply MState.zero_le
       rcases this with ⟨ε2, hg₁, hg₂, hg₃, hliminf_g₁, hliminf_g₂⟩
 
       replace hDleq := Filter.liminf_le_liminf (Filter.Eventually.of_forall (f := .atTop) (fun (n : ℕ) ↦ hDleq (ε2 n) n))
@@ -1504,7 +1622,11 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
           refine tendsto_of_le_liminf_of_limsup_le bot_le ?_
           convert hliminf_g₂
           apply ENNReal.ofReal_eq_coe_nnreal
-        sorry
+        -- obtain ⟨C, hC⟩ := hc'.bound
+        refine ENNReal.bdd_le_mul_tendsto_zero (b := ?_) ?_ hf ?_
+        · sorry
+        · sorry
+        · sorry
       conv =>
         enter [1, 1]
         rw [← Pi.add_def]
