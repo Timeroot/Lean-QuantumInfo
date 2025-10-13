@@ -686,10 +686,11 @@ private lemma rexp_mul_smul_proj_lt_mul_sub_le_mul_sub {n : ℕ} {x : ℝ}
 
 private lemma rexp_mul_smul_proj_lt_mul_sub_le_mul_sub' {n : ℕ} {x : ℝ} {y : ℝ}
   {E ℰ σ : HermitianMat d ℂ} (hℰσ : Commute ℰ.toMat σ.toMat) (hx : 0 < y) (hy : y ≤ x)
+  (hℰ : ℰ.toMat.PosSemidef) (hσ : σ.toMat.PosDef)
   (hE : E = {Real.exp (n * y) • σ ≤ₚ ℰ} - {Real.exp (n * x) • σ ≤ₚ ℰ})
     : (1 / n : ℝ) • E.toMat * (ℰ.log.toMat - σ.log.toMat) ≤ x • E := by
   --Another version of the above. Once we've proved one it's probably very easy to adapt the
-  --code for the other.
+  --code for the other. This doesn't suffer from the zero eigenvalue issue as much.
   sorry
 
 end proj_le
@@ -1188,6 +1189,11 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
       exact (zero_lt_one.trans_le (σ''_tr_bounds n).left).ne'
   }
 
+  have σ''_posdef n : (σ'' n).M.toMat.PosDef := by
+    apply (σ''_unnormalized_PosDef n).smul
+    have := (σ''_tr_bounds n).left
+    positivity
+
   have σ'_le_σ'' (n) : Real.exp (-c n) • (σ' n).M ≤ σ'' n := by
     dsimp [σ'']
     set x := (σ''_unnormalized n).trace
@@ -1568,25 +1574,25 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     (S88): both sides are traced against `ℰ n (ρ⊗^S[n]`, so that the 0 eigenvalues becomes irrelevant. This
     is the version we state and prove, then.
 
-    TODO: We need to make similar adjustments to (S82) and (S85) as well.
+    Luckily, (S82) and (S85) are correct as written (in a particular interpretation), because
+    there the problematic subspaces are indeed projected out by the E₂ and E₃ operators.
     -/
     have hE1leq ε2 (n : ℕ) (hε2 : 0 < ε2) :
         (ℰ n (ρ⊗^S[n])).M.inner (HermitianMat.mul_commute
           (commute_aux n (E := E1 ε2 n) (pinching_commutes (ρ⊗^S[n]) (σ'' n)) rfl)) ≤
           (ℰ n (ρ⊗^S[n])).M.inner (((R1 ρ ε).toReal + ε2) • (E1 ε2 n)) := by
-      apply rexp_mul_smul_proj_lt_mul_sub_le_mul_sub
-      · exact pinching_commutes (ρ⊗^S[n]) (σ'' n)
-      · positivity
-      · apply MState.zero_le
-      · apply (σ'_posdef n).smul
-        sorry
-      · rfl
+      refine rexp_mul_smul_proj_lt_mul_sub_le_mul_sub
+        (pinching_commutes (ρ⊗^S[n]) (σ'' n)) (by positivity) ?_ (σ''_posdef n) rfl
+      rw [← HermitianMat.zero_le_iff]
+      apply MState.zero_le
 
     -- (S82) -- see (S81) for comments
     have hE2leq ε2 (n : ℕ) (hε2 : 0 < ε2) : (1/n : ℝ) • (E2 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ ((R2 ρ σ).toReal + ε₀ + ε2) • (E2 ε2 n).toMat := by
       refine rexp_mul_smul_proj_lt_mul_sub_le_mul_sub'
-        (pinching_commutes (ρ⊗^S[n]) (σ'' n)) (by positivity) ?_ rfl
-      grw [hε₀']
+        (pinching_commutes (ρ⊗^S[n]) (σ'' n)) (by positivity) ?_ ?_ (σ''_posdef n) rfl
+      · grw [hε₀']
+      · rw [← HermitianMat.zero_le_iff]
+        apply MState.zero_le
 
     -- (S83)
     let c' ε2 n := (c n + (c n) / n) ⊔ ((R2 ρ σ).toReal + ε₀ + ε2)
