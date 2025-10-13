@@ -536,15 +536,15 @@ theorem _root_.HermitianMat.cfc_le_cfc_of_PosDef {d : Type*} [Fintype d] [Decida
 --PULLOUT to HermitianMat/CFC.lean
 --TODO: Make Iff version.
 /-- If two Hermitian matrices commute, there exists a common matrix that they are both a CFC of. -/
-proof_wanted _root_.Commute.exists_cfc {d : Type*} [Fintype d] [DecidableEq d]
+theorem _root_.Commute.exists_cfc {d : Type*} [Fintype d] [DecidableEq d]
   {A B : Matrix d d ℂ} (hA : A.IsHermitian) (hB : B.IsHermitian) (hAB : Commute A B) :
-    ∃ C : Matrix d d ℂ, (∃ f : ℝ → ℝ, A = cfc f C) ∧ (∃ g : ℝ → ℝ, B = cfc g C)
+    ∃ C : Matrix d d ℂ, (∃ f : ℝ → ℝ, A = cfc f C) ∧ (∃ g : ℝ → ℝ, B = cfc g C) := by
+  sorry
 
-proof_wanted _root_.Commute.exists_HermitianMat_cfc {d : Type*} [Fintype d] [DecidableEq d]
+theorem _root_.Commute.exists_HermitianMat_cfc {d : Type*} [Fintype d] [DecidableEq d]
   (A B : HermitianMat d ℂ) (hAB : Commute A.toMat B.toMat) :
-    ∃ C : HermitianMat d ℂ, (∃ f : ℝ → ℝ, A = C.cfc f) ∧ (∃ g : ℝ → ℝ, B = C.cfc g)
---Given the `Commute.exists_cfc` above, this becomes easy:
-/-  obtain ⟨C, ⟨g₁, hg₁⟩, ⟨g₂, hg₂⟩⟩ := hAB.exists_cfc A.H B.H
+    ∃ C : HermitianMat d ℂ, (∃ f : ℝ → ℝ, A = C.cfc f) ∧ (∃ g : ℝ → ℝ, B = C.cfc g) := by
+  obtain ⟨C, ⟨g₁, hg₁⟩, ⟨g₂, hg₂⟩⟩ := hAB.exists_cfc A.H B.H
   by_cases hC : C.IsHermitian
   · use ⟨C, hC⟩
     constructor
@@ -555,7 +555,7 @@ proof_wanted _root_.Commute.exists_HermitianMat_cfc {d : Type*} [Fintype d] [Dec
     use 0
     constructor
     · exact ⟨0, by simp [HermitianMat.ext_iff, hg₁]⟩
-    · exact ⟨0, by simp [HermitianMat.ext_iff, hg₂]⟩ -/
+    · exact ⟨0, by simp [HermitianMat.ext_iff, hg₂]⟩
 
 --PULLOUT to HermitianMat/CFC.lean
 /- TODO: Write a version of this that holds more broadly for some sets. Esp closed intervals of reals,
@@ -590,9 +590,9 @@ proof_wanted _root_.HermitianMat.exp_le_exp_of_commute {d : Type*} [Fintype d] [
   {A B : HermitianMat d ℂ} (hAB₁ : Commute A.toMat B.toMat) (hAB₂ : A.cfc Real.exp ≤ B.cfc Real.exp) :
     A ≤ B
 
-section proj_le
-
 open scoped HermitianMat
+
+section proj_le
 
 variable {d : Type*} [Fintype d] [DecidableEq d] (A B : HermitianMat d ℂ)
 
@@ -612,46 +612,77 @@ theorem _root_.HermitianMat.proj_lt_mul_lt : {A <ₚ B}.toMat * A.toMat ≤ {A <
 theorem _root_.HermitianMat.one_sub_proj_le : 1 - {B ≤ₚ A} = {A <ₚ B} := by
   rw [sub_eq_iff_eq_add, HermitianMat.proj_le_add_lt]
 
+noncomputable abbrev HermitianMat.mul_commute {A B : HermitianMat d ℂ} (hAB : Commute A.toMat B.toMat) :
+    HermitianMat d ℂ :=
+  ⟨A.toMat * B.toMat, (A.H.commute_iff B.H).mp hAB⟩
+
+private lemma commute_aux (n : ℕ) {x : ℝ}
+  {E ℰ σ : HermitianMat d ℂ} (hℰσ : Commute ℰ.toMat σ.toMat)
+  (hE : E = 1 - {Real.exp (n * x) • σ ≤ₚ ℰ})
+    : Commute ((1 / n : ℝ) • E).toMat (ℰ.log - σ.log).toMat := by
+  sorry
+
 private lemma rexp_mul_smul_proj_lt_mul_sub_le_mul_sub {n : ℕ} {x : ℝ}
   {E ℰ σ : HermitianMat d ℂ} (hℰσ : Commute ℰ.toMat σ.toMat) (hx : 0 < x)
+  (hℰ : ℰ.toMat.PosSemidef) (hσ : σ.toMat.PosDef)
   (hE : E = 1 - {Real.exp (n * x) • σ ≤ₚ ℰ})
-    : (1 / n : ℝ) • E.toMat * (ℰ.log.toMat - σ.log.toMat) ≤ x • E := by
+    : ℰ.inner (HermitianMat.mul_commute (commute_aux n hℰσ hE)) ≤ ℰ.inner (x • E) := by
+  rw [HermitianMat.inner_eq_re_trace, HermitianMat.inner_eq_re_trace]
   rcases n.eq_zero_or_pos with rfl | hn
   · have hE' : 0 ≤ E.toMat := by
       rw [hE, HermitianMat.one_sub_proj_le]
       apply HermitianMat.proj_lt_nonneg
-    simp
+    have hℰ : 0 ≤ ℰ := by rwa [HermitianMat.zero_le_iff]
+    replace hℰ : 0 ≤ ℰ.inner E := HermitianMat.inner_ge_zero hℰ hE'
+    simp [-RCLike.re_to_complex]
+    rw [← HermitianMat.inner_eq_re_trace]
     positivity
-  rw [one_div, smul_mul_assoc, inv_smul_le_iff_of_pos (by positivity)]
-
-  --needs HermitianMat.cfc_le_cfc_of_commute_monoOn applied to the log function
-  --apply exp_le_exp_of_commute
-  /- --Sketch--
-  Goal:
-  (1 / n) • ↑(E1 ε2 n) * ↑(↑((ℰ n) (ρ⊗^S[n]))).log - (1 / n) • ↑(E1 ε2 n) * ↑(↑(σ'' n)).log ≤
-    ((R1 ρ ε).toReal + ε2) • ↑(E1 ε2 n)
-  aka
-    (1 / n) • E1 * (ℰ ρ^n).log - (1 / n) • E1 * σ''.log ≤ (R1 + ε2) • E1
-
-  Hypotheses:
-  E1 := 1 - P1
-  P1 := { rexp (n * (R1 + ε2)) • σ'' ≤ₚ  (ℰ ρ^n)  }
-  E1 = {ℰ ρ^n <ₚ rexp (n * (R1 + ε2)) • σ''} --hE1proj above
-  Fact: `Commute (ℰ ρ^n) σ''`. Proof: `exact pinching_commutes (ρ⊗^S[n]) (σ'' n)`. Also `E1` and `P1` commute.
-
-  From monotonicity of log,
-  E1 = {(ℰ ρ^n).log <ₚ (rexp (n * (R1 + ε2)) • σ'').log}
-      = {(ℰ ρ^n).log <ₚ n * (R1 + ε2) • 1 + σ''.log}
-
-  From an appropriate `lt` version of `proj_le_mul_le`, we know that `{A <ₚ B} * A ≤ {A <ₚ B} * B`.
-  So applying to E1 we get
-
-  E1 * (ℰ ρ^n).log ≤ E1 * (n * (R1 + ε2) • 1) + E1 * σ''.log
-  E1 * (ℰ ρ^n).log - E1 * σ''.log ≤ n * (R1 + ε2) • E1
-  E1 * ((ℰ ρ^n).log - σ''.log) ≤ n * (R1 + ε2) • E1
-  (1/n) • E1 * ((ℰ ρ^n).log - σ''.log) ≤ (R1 + ε2) • E1
-  -/
-  sorry
+  dsimp [HermitianMat.mul_commute, HermitianMat.toMat]
+  repeat rw [HermitianMat.val_eq_coe]
+  gcongr
+  apply Matrix.PosSemidef.trace_mono
+  rw [one_div, smul_mul_assoc, mul_smul_comm, inv_smul_le_iff_of_pos (by positivity)]
+  rw [mul_smul_comm]
+  obtain ⟨C, ⟨f, hf⟩, ⟨g, hg⟩⟩ := hℰσ.exists_HermitianMat_cfc
+  rw [hf, hg] at hE ⊢
+  rw [HermitianMat.one_sub_proj_le, HermitianMat.proj_lt_def] at hE
+  rw [← HermitianMat.cfc_const_mul, ← HermitianMat.cfc_sub] at hE
+  rw [← HermitianMat.cfc_comp] at hE
+  unfold Function.comp at hE
+  dsimp at hE
+  rw [HermitianMat.log, HermitianMat.log]
+  rw [← HermitianMat.cfc_comp, ← HermitianMat.cfc_comp, smul_smul]
+  change _ * (E.toMat * HermitianMat.toMat (_ - _)) ≤ _
+  rw [← HermitianMat.cfc_sub]
+  subst E
+  rw [← HermitianMat.coe_cfc_mul, ← HermitianMat.coe_cfc_mul]
+  rw [← HermitianMat.coe_cfc_mul]
+  change _ ≤ HermitianMat.toMat ((n * x) • C.cfc _)
+  rw [← HermitianMat.cfc_const_mul]
+  change (C.cfc _ : HermitianMat _ _) ≤ C.cfc _
+  rw [← sub_nonneg, ← HermitianMat.cfc_sub, HermitianMat.zero_le_cfc]
+  intro i
+  simp only [mul_ite, Pi.sub_apply, Pi.mul_apply, ite_mul]
+  rw [ite_sub_ite]
+  simp only [sub_pos, mul_one, Function.comp_apply, one_mul, mul_zero, zero_mul, sub_self]
+  split_ifs with h; swap
+  · rfl
+  set fi := f (C.H.eigenvalues i) with hfi
+  set gi := g (C.H.eigenvalues i) with hgi
+  have hfi₀ : 0 ≤ fi := by
+    rw [hf, ← HermitianMat.zero_le_iff, HermitianMat.zero_le_cfc] at hℰ
+    exact hℰ i
+  have hgi₀ : 0 < gi := by
+    rw [hg, HermitianMat.cfc_PosDef] at hσ
+    exact hσ i
+  rcases hfi₀.eq_or_lt with hfi₂ | hfi₂
+  · simp [← hfi₂]
+  · simp [mul_comm fi]
+    suffices Real.log fi < n * x + Real.log gi by nlinarith
+    rw [← Real.log_exp (n * x), ← Real.log_mul (by positivity) (by positivity)]
+    apply Real.strictMonoOn_log hfi₂ ?_ h
+    change 0 < Real.exp (n * x) * gi
+    positivity
 
 private lemma rexp_mul_smul_proj_lt_mul_sub_le_mul_sub' {n : ℕ} {x : ℝ} {y : ℝ}
   {E ℰ σ : HermitianMat d ℂ} (hℰσ : Commute ℰ.toMat σ.toMat) (hx : 0 < y) (hy : y ≤ x)
@@ -923,7 +954,7 @@ private lemma f_image_bound (mineig : ℝ) (n : ℕ) (h : 0 < mineig) (hn : 0 < 
       nlinarith [ Real.log_pos ( show ( 3 : ℝ ) > 1 by norm_num ), mul_div_cancel₀ ( Real.log 3 ) ( show ( n + 1 : ℝ ) ≠ 0 by positivity ) ] ),
         Real.log_pos ( show ( 3 : ℝ ) > 1 by norm_num ), mul_div_cancel₀ ( Real.log 3 ) ( show ( n + 1 : ℝ ) ≠ 0 by positivity ) ]
 
-set_option maxHeartbeats 400000 in
+set_option maxHeartbeats 200000 in
 lemma sub_iInf_eignevalues {d : Type*} [Fintype d] [DecidableEq d] {A : Matrix d d ℂ}
   (hA : A.IsHermitian) :
     (A - iInf hA.eigenvalues • 1).PosSemidef := by
@@ -1576,7 +1607,6 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
           simpa using hε1.left
       _ ≤ _ := hm.right.le --(S73)
 
-    open scoped HermitianMat in
     let P1 ε2 n := {(ℰ n (ρ⊗^S[n])).M ≥ₚ (Real.exp (↑n*((R1 ρ ε).toReal + ε2))) • (σ'' n).M}
     let P2 ε2 n := {(ℰ n (ρ⊗^S[n])).M ≥ₚ (Real.exp (↑n*((R2 ρ σ).toReal + ε₀ + ε2))) • (σ'' n).M}
 
@@ -1655,13 +1685,30 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
       exact HermitianMat.proj_le_le_one _ _
 
     -- (S81)
-    have hE1leq ε2 (n : ℕ) (hε2 : 0 < ε2) : (1/n : ℝ) • (E1 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ ((R1 ρ ε).toReal + ε2) • (E1 ε2 n).toMat := by
+    /- A literal translation of the paper would read:
+       (1/n : ℝ) • (E1 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ ((R1 ρ ε).toReal + ε2) • (E1 ε2 n).toMat
+    But this is simply not true! Because what happens when `ℰ n (ρ⊗^S[n])` has a zero eigenvalue, which
+    it can? Then (S81) is an inequality of operators where the LHS has an operator with a "negative
+    infinity" eigenvalue, intuitively. This isn't something very well defined, certainly not supported
+    in our definitions. This only becomes mathematically meaningful when we see how it's used later, in
+    (S88): both sides are traced against `ℰ n (ρ⊗^S[n]`, so that the 0 eigenvalues becomes irrelevant. This
+    is the version we state and prove, then.
+
+    TODO: We need to make similar adjustments to (S82) and (S85) as well.
+    -/
+    have hE1leq ε2 (n : ℕ) (hε2 : 0 < ε2) :
+        (ℰ n (ρ⊗^S[n])).M.inner (HermitianMat.mul_commute
+          (commute_aux n (E := E1 ε2 n) (pinching_commutes (ρ⊗^S[n]) (σ'' n)) rfl)) ≤
+          (ℰ n (ρ⊗^S[n])).M.inner (((R1 ρ ε).toReal + ε2) • (E1 ε2 n)) := by
       apply rexp_mul_smul_proj_lt_mul_sub_le_mul_sub
       · exact pinching_commutes (ρ⊗^S[n]) (σ'' n)
       · positivity
+      · apply MState.zero_le
+      · apply (σ'_posdef n).smul
+        sorry
       · rfl
 
-    -- (S82)
+    -- (S82) -- see (S81) for comments
     have hE2leq ε2 (n : ℕ) (hε2 : 0 < ε2) : (1/n : ℝ) • (E2 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ ((R2 ρ σ).toReal + ε₀ + ε2) • (E2 ε2 n).toMat := by
       refine rexp_mul_smul_proj_lt_mul_sub_le_mul_sub'
         (pinching_commutes (ρ⊗^S[n]) (σ'' n)) (by positivity) ?_ rfl
@@ -1713,6 +1760,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
          .ofReal ((P1 ε2 n).inner (ℰ n (ρ⊗^S[n]))) * ((R2 ρ σ + .ofReal ε₀ + .ofReal ε2) - (R1 ρ ε + .ofReal ε2)) +
          .ofReal ((P2 ε2 n).inner (ℰ n (ρ⊗^S[n]))) * (.ofReal (c' ε2 n) - (R2 ρ σ + .ofReal ε₀ + .ofReal ε2)) := by
       -- (S85, S86, S87)
+      -- see (S81) for comments
       sorry
 
     -- (S91)
