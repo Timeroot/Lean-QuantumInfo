@@ -1803,7 +1803,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
 
       -- see (S81) for comments on why that statement had to be changed
       --(S85)
-      have hE3leq ε2 (n : ℕ) (hε2 : 0 < ε2) : (1/n : ℝ) • (E3 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ (c' ε2 n) • (E2 ε2 n).toMat := by
+      have hE3leq ε2 (n : ℕ) (hε2 : 0 < ε2) : (1/n : ℝ) • (E3 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ (c' ε2 n) • (E3 ε2 n).toMat := by
         sorry
 
       --Linearly combine S81, S82, S85:
