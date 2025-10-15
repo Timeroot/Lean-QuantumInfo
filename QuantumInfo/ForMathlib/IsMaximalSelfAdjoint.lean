@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2025 Alex Meiburg. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Alex Meiburg
+-/
 import Mathlib.Analysis.Matrix
 
 /- We want to have `HermitianMat.trace` give 𝕜 when 𝕜 is already a TrivialStar field, but give the "clean" type

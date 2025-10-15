@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2025 Alex Meiburg. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Alex Meiburg, Leonardo A. Lessa, Rodolfo R. Soldati
+-/
 import QuantumInfo.Finite.ResourceTheory.FreeState
 
 /-- A quantum resource theory extends a `FreeStateTheory` with a collection of free operations. It is

@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2025 Alex Meiburg. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Alex Meiburg
+-/
 import Mathlib.Algebra.Algebra.Spectrum.Quasispectrum
 import Mathlib.Analysis.CStarAlgebra.Matrix
 import Mathlib.Data.Multiset.Functor --Can't believe I'm having to import this

@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2025 Alex Meiburg. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Alex Meiburg
+-/
 import Mathlib.Analysis.Convex.Mul
 import Mathlib.Analysis.SpecialFunctions.Log.Basic
 import Mathlib.Analysis.SpecialFunctions.Log.ENNRealLog

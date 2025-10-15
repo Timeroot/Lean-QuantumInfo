@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2025 Alex Meiburg. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Alex Meiburg, Leonardo A. Lessa, Rodolfo R. Soldati
+-/
 import QuantumInfo.Finite.ResourceTheory.FreeState
 import QuantumInfo.Finite.ResourceTheory.HypothesisTesting
 import QuantumInfo.Finite.Pinching
