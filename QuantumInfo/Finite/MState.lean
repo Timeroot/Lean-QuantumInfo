@@ -1,7 +1,7 @@
 /-
 Copyright (c) 2025 Alex Meiburg. All rights reserved.
 Released under MIT license as described in the file LICENSE.
-Authors: Alex Meiburg
+Authors: Alex Meiburg, Leonardo A. Lessa
 -/
 import QuantumInfo.ForMathlib
 import ClassicalInfo.Distribution
