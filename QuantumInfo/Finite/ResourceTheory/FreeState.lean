@@ -195,7 +195,7 @@ theorem spacePow_mul (m n : ℕ) :
     i ^ (m * n) = (i ^ m) ^ n :=
   pow_mul i m n
 
-/-- Powers of states. Defined for `PNat`, so that we don't have zeroth powers -/
+/-- Powers of states, using the resource theory's notion of product. -/
 noncomputable def statePow (ρ : MState (H i)) (n : ℕ) : MState (H (i ^ n)) :=
   n.rec default (fun _ σ ↦ σ ⊗ᵣ ρ)
 
