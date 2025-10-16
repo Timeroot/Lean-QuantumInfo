@@ -1011,16 +1011,6 @@ theorem _root_.MState.spectrum_relabel {d d₂ : Type*}
   rw [Matrix.isUnit_submatrix_equiv]
   rw [← Algebra.algebraMap_eq_smul_one v, ← spectrum.mem_iff]
 
-open Kronecker in
-open scoped Pointwise in
-theorem Matrix.spectrum_prod {d d₂ : Type*}
-  [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂]
-  {A : Matrix d d ℂ} {B : Matrix d₂ d₂ ℂ}
-  (hA : A.IsHermitian) (hB : B.IsHermitian) :
-    spectrum ℝ (A ⊗ₖ B) = spectrum ℝ A * spectrum ℝ B := by
-  --I have a terrible proof of this fact that there heartbeats are too small to contain.
-  sorry
-
 open scoped HermitianMat in
 open scoped Pointwise in
 theorem HermitianMat.spectrum_prod {d d₂ : Type*}
