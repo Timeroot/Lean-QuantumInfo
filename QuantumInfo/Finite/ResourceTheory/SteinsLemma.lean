@@ -543,14 +543,6 @@ theorem _root_.HermitianMat.cfc_commute {d : Type*} [Fintype d] [DecidableEq d]
     Commute (A.cfc f).toMat (A.cfc g).toMat := by
   rw [commute_iff_eq, ← HermitianMat.coe_cfc_mul, ← HermitianMat.coe_cfc_mul, mul_comm f g]
 
---PULLOUT to HermitianMat/CFC.lean
---TODO: Make Iff version.
-/-- If two Hermitian matrices commute, there exists a common matrix that they are both a CFC of. -/
-theorem _root_.Commute.exists_cfc {d : Type*} [Fintype d] [DecidableEq d]
-  {A B : Matrix d d ℂ} (hA : A.IsHermitian) (hB : B.IsHermitian) (hAB : Commute A B) :
-    ∃ C : Matrix d d ℂ, (∃ f : ℝ → ℝ, A = cfc f C) ∧ (∃ g : ℝ → ℝ, B = cfc g C) := by
-  sorry
-
 theorem _root_.Commute.exists_HermitianMat_cfc {d : Type*} [Fintype d] [DecidableEq d]
   (A B : HermitianMat d ℂ) (hAB : Commute A.toMat B.toMat) :
     ∃ C : HermitianMat d ℂ, (∃ f : ℝ → ℝ, A = C.cfc f) ∧ (∃ g : ℝ → ℝ, B = C.cfc g) := by

@@ -5,6 +5,9 @@ Authors: Alex Meiburg
 -/
 import Mathlib.LinearAlgebra.Matrix.HermitianFunctionalCalculus
 import Mathlib.LinearAlgebra.Matrix.Permutation
+import Mathlib.LinearAlgebra.Matrix.IsDiag
+
+import QuantumInfo.ForMathlib.Matrix
 
 open scoped Matrix
 
@@ -256,6 +259,10 @@ theorem Matrix.cfc_conj_unitary (f : ℝ → ℝ) (u : unitaryGroup d 𝕜) :
   rw [mem_unitaryGroup_iff_isometry] at hu
   exact Matrix.cfc_conj_isometry f hu.left hu.right
 
+theorem Matrix.cfc_conj_unitary' (f : ℝ → ℝ) (u : unitaryGroup d 𝕜) :
+    cfc f (uᴴ * A * u.val) = uᴴ * (cfc f A) * u.val := by
+  simpa only [inv_inv] using cfc_conj_unitary f u⁻¹
+
 theorem Matrix.cfc_reindex (f : ℝ → ℝ) (e : d ≃ d₂) :
     cfc f (reindex e e A) = reindex e e (cfc f A) := by
   rw [reindex_eq_conj, reindex_eq_conj]
@@ -265,3 +272,52 @@ theorem Matrix.cfc_reindex (f : ℝ → ℝ) (e : d ≃ d₂) :
   · apply reindex_one_isometry
   · rw [conjTranspose_reindex, conjTranspose_one]
     apply reindex_one_isometry
+
+theorem Commute.exists_unitary (hA : A.IsHermitian) (hB : B.IsHermitian) (hAB : Commute A B) :
+    ∃ U : Matrix.unitaryGroup d 𝕜, (U.val * A * Uᴴ).IsDiag ∧ (U.val * B * Uᴴ).IsDiag := by
+  sorry
+
+instance instInvertibleUnitaryGroup (U : Matrix.unitaryGroup d 𝕜) : Invertible U :=
+  invertibleOfGroup U
+
+instance (U : Matrix.unitaryGroup d 𝕜) : Invertible U.val :=
+  ⟨star U.val, U.2.1, U.2.2⟩
+
+--TODO: Make Iff version.
+/-- If two Hermitian matrices commute, there exists a common matrix that they are both a CFC of. -/
+theorem Commute.exists_cfc (hA : A.IsHermitian) (hB : B.IsHermitian) (hAB : Commute A B) :
+    ∃ C : Matrix d d 𝕜, (∃ f : ℝ → ℝ, A = cfc f C) ∧ (∃ g : ℝ → ℝ, B = cfc g C) := by
+  obtain ⟨U, hU₁, hU₂⟩ := hAB.exists_unitary hA hB
+  let e := Fintype.equivFin d
+  let D : Matrix d d 𝕜 := Matrix.diagonal (e ·) --index d into a ℕ, then a 𝕜
+  use Uᴴ * D * U.val
+  suffices h : ∀{M}, M.IsHermitian → (U.val * M * (U)ᴴ).IsDiag →
+      ∃ f : ℝ → ℝ, M = cfc f (Uᴴ * D * U.val) by
+    constructor
+    · exact h hA hU₁
+    · exact h hB hU₂
+  clear * -
+  intro M hM hU
+  use fun x ↦ if hn : ∃ n : Fin (Fintype.card d), n = x
+    then RCLike.re (Matrix.diag (U.val * M * Uᴴ : Matrix d d 𝕜) (e.symm hn.choose)) else 0
+  rw [Matrix.cfc_conj_unitary']
+  rw [Matrix.isDiag_iff_diagonal_diag] at hU
+  rw [← Matrix.mul_inv_eq_iff_eq_mul_of_invertible] at hU
+  rw [← Matrix.inv_mul_eq_iff_eq_mul_of_invertible] at hU
+  rw [← hU, ← Matrix.mul_assoc]
+  congr; rotate_right
+  · exact Matrix.inv_eq_right_inv U.2.1
+  · exact Matrix.inv_eq_left_inv U.2.1
+  have hD : D = Matrix.diagonal (RCLike.ofReal <| e ·) := by simp [D]
+  rw [hD, Matrix.cfc_diagonal]
+  congr
+  ext i
+  simp only [Matrix.diag_apply, Function.comp_apply, Nat.cast_inj, exists_apply_eq_apply,
+    ↓reduceDIte]
+  rw [← (Matrix.isHermitian_mul_mul_conjTranspose U.val hM).coe_re_apply_self i]
+  congr!
+  · rw [mul_assoc, hU]
+  all_goals
+  ( rw [e.eq_symm_apply]
+    symm; convert Classical.choose_eq _
+    exact Fin.val_inj)
