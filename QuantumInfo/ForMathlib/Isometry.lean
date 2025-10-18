@@ -3,6 +3,7 @@ Copyright (c) 2025 Alex Meiburg. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Alex Meiburg
 -/
+import Mathlib.Analysis.InnerProductSpace.JointEigenspace
 import Mathlib.LinearAlgebra.Matrix.HermitianFunctionalCalculus
 import Mathlib.LinearAlgebra.Matrix.Permutation
 import Mathlib.LinearAlgebra.Matrix.IsDiag
@@ -167,7 +168,6 @@ theorem Matrix.IsHermitian.eigenvalue_ext (hA : A.IsHermitian)
   apply Matrix.ext; intro i j; exact (by
   simpa using congr_fun ( h_diag ( Pi.single j 1 ) ) i)
 
-set_option pp.proofs.withType true
 /-- Generalizes `Matrix.IsHermitian.cfc.eq_1`, which gives a definition for the matrix CFC in terms of
 `Matrix.IsHermitian.eigenvalues` and `Matrix.IsHermitian.eigenvectorUnitary`, to show that the CFC works
 similarly for _any_ diagonalization by a two-sided isometry.
@@ -273,9 +273,141 @@ theorem Matrix.cfc_reindex (f : ℝ → ℝ) (e : d ≃ d₂) :
   · rw [conjTranspose_reindex, conjTranspose_one]
     apply reindex_one_isometry
 
+theorem Matrix.commute_euclideanLin (hAB : Commute A B) :
+    Commute A.toEuclideanLin B.toEuclideanLin := by
+  rw [commute_iff_eq] at hAB ⊢
+  ext v i
+  convert congr(($hAB).mulVec (WithLp.ofLp v) i) using 0
+  simp only [Module.End.mul_apply, ← Matrix.mulVec_mulVec];
+  simp only [← Matrix.ofLp_toEuclideanLin_apply, PiLp.ofLp_apply]
+
+section commute_module
+open Module.End
+
+--TODO: All of these have Pi versions (instead of the "just two" operators versions below),
+--  see the tail end of `JointEigenspace.lean` to see how it should generalize. This would
+--  also give a Pi version for Matrix. That would be useful for e.g. we have a large number
+--  of projectors that all pairwise commute, and we want to simultaneously diagonalize all
+--  of them.
+
+/-- Similar to `LinearMap.IsSymmetric.orthogonalFamily_eigenspace_inf_eigenspace`, but here the direct sum
+is indexed by only the pairs of eigenvalues, as opposed to all pairs of `𝕜` values, giving a finite
+decomposition. -/
+theorem LinearMap.IsSymmetric.orthogonalFamily_eigenspace_inf_eigenspace' {𝕜 E : Type*} [RCLike 𝕜]
+  [NormedAddCommGroup E] [InnerProductSpace 𝕜 E] {A B : E →ₗ[𝕜] E}
+  (hA : A.IsSymmetric) (hB : B.IsSymmetric) :
+    OrthogonalFamily 𝕜 (fun (μ₁₂ : Eigenvalues A × Eigenvalues B) ↦
+      ↥(eigenspace A μ₁₂.1 ⊓ eigenspace B μ₁₂.2)) fun μ₁₂ ↦
+    (eigenspace A μ₁₂.1 ⊓ eigenspace B μ₁₂.2).subtypeₗᵢ := by
+  have h := LinearMap.IsSymmetric.orthogonalFamily_eigenspace_inf_eigenspace hA hB
+  simp only [OrthogonalFamily, Submodule.coe_subtypeₗᵢ, Submodule.subtype_apply,
+    Subtype.forall, Submodule.mem_inf, mem_genEigenspace_one, and_imp] at h ⊢
+  intro i j hij a ha hb a' ha' hb'
+  contrapose! h
+  simp only [Pairwise, ne_eq, Prod.forall, Prod.mk.injEq, not_and, not_forall]
+  refine ⟨_, _, _, _, ?_, a, ha, hb, a', ha', hb', h⟩
+  intro h' h''
+  exact hij (Prod.ext (Subtype.ext h'') (Subtype.ext h'))
+
+/-- Variant of `iSup_mono'` that allows for an easier handling of bottom elements. -/
+theorem iSup_mono_bot {α : Type*} {ι ι' : Sort*} [CompleteLattice α]
+  {f : ι → α} {g : ι' → α} (h : ∀ (i : ι), f i = ⊥ ∨ ∃ i', f i ≤ g i') :
+    iSup f ≤ iSup g := by
+  rcases isEmpty_or_nonempty ι'
+  · simp only [IsEmpty.exists_iff, or_false] at h
+    simp [h]
+  · refine iSup_mono' (fun i ↦ ?_)
+    rcases h i with h | h <;> simp [h]
+
+noncomputable def Commute.isSymmetric_directSumDecomposition  {𝕜 E : Type*} [RCLike 𝕜]
+  [NormedAddCommGroup E] [InnerProductSpace 𝕜 E] {A B : E →ₗ[𝕜] E} [FiniteDimensional 𝕜 E]
+  (hA : A.IsSymmetric) (hB : B.IsSymmetric) (hAB : Commute A B) :
+    DirectSum.Decomposition fun (μ₁₂ : Eigenvalues A × Eigenvalues B) ↦
+      (eigenspace A μ₁₂.1 ⊓ eigenspace B μ₁₂.2) := by
+  apply (LinearMap.IsSymmetric.orthogonalFamily_eigenspace_inf_eigenspace' hA hB).decomposition
+  have h := LinearMap.IsSymmetric.iSup_iSup_eigenspace_inf_eigenspace_eq_top_of_commute
+    hA hB hAB
+  rw [iSup_prod'] at h
+  apply le_antisymm le_top
+  rw [← h, iSup_le_iff]
+  rintro ⟨fst, snd⟩
+  by_cases h₁ : Module.End.HasEigenvalue A fst
+  · by_cases h₂ : Module.End.HasEigenvalue B snd
+    · exact le_iSup_of_le ⟨⟨fst, h₁⟩, ⟨snd, h₂⟩⟩ le_rfl
+    · replace h₂ : eigenspace B snd = ⊥ := by simpa [Module.End.HasUnifEigenvalue] using h₂
+      simp [h₂]
+  · replace h₁ : eigenspace A fst = ⊥ := by simpa [Module.End.HasUnifEigenvalue] using h₁
+    simp [h₁]
+
+/-- Similar to `LinearMap.IsSymmetric.directSum_isInternal_of_commute`, but here the direct sum
+is indexed by only the pairs of eigenvalues, as opposed to all pairs of `𝕜` values, giving a finite
+decomposition. -/
+theorem LinearMap.IsSymmetric.directSum_isInternal_of_commute' {𝕜 E : Type*} [RCLike 𝕜]
+  [NormedAddCommGroup E] [InnerProductSpace 𝕜 E] {A B : E →ₗ[𝕜] E} [FiniteDimensional 𝕜 E]
+  (hA : A.IsSymmetric) (hB : B.IsSymmetric) (hAB : Commute A B) :
+    DirectSum.IsInternal fun (μ₁₂ : Eigenvalues A × Eigenvalues B) ↦
+      eigenspace A μ₁₂.1 ⊓ eigenspace B μ₁₂.2 := by
+  classical
+  have h := LinearMap.IsSymmetric.directSum_isInternal_of_commute hA hB hAB
+  constructor
+  · intro x y hxy
+    -- Since the subspaces are orthogonal, the only way their sum can be zero is if each component is zero. Hence, x - y = 0, which implies x = y.
+    rw [← sub_eq_zero]
+    suffices h_diff_zero : ∀ (x : DirectSum (Eigenvalues A × Eigenvalues B) fun μ₁₂ ↦ ↥(eigenspace A μ₁₂.1 ⊓ eigenspace B μ₁₂.2)), x.coeAddMonoidHom _ = 0 → x = 0 from
+      h_diff_zero (x - y) (by simp [hxy])
+    clear x y hxy; intro x hx;
+    ext μ₁₂
+    simp only [DirectSum.zero_apply, ZeroMemClass.coe_zero]
+    rw [← inner_self_eq_zero (𝕜 := 𝕜)]
+    have h_inner_zero : inner 𝕜 (x μ₁₂ : E) (x.coeAddMonoidHom _) = 0 := by
+      simp [hx]
+    rw [← h_inner_zero]
+    simp only [DirectSum.coeAddMonoidHom_eq_dfinsuppSum, ZeroMemClass.coe_zero, implies_true,
+      DFinsupp.sum_eq_sum_fintype, DFinsupp.equivFunOnFintype_apply]
+    -- Since the decomposition is orthogonal, the inner product of x μ₁₂ with any other component is zero. Therefore, the sum simplifies to just the inner product of x μ₁₂ with itself.
+    rw [inner_sum, Finset.sum_eq_add_sum_diff_singleton (Finset.mem_univ μ₁₂)]
+    rw [Finset.sdiff_singleton_eq_erase, left_eq_add]
+    apply Finset.sum_eq_zero
+    intro μ hμ
+    exact orthogonalFamily_eigenspace_inf_eigenspace' hA hB (Finset.ne_of_mem_erase hμ).symm _ _
+  · -- Since the decomposition is orthogonal, the direct sum of the intersections is isomorphic to their sum. Therefore, the isomorphism implies that the sum is equal to E.
+    have h_sum : ⨆ (μ₁₂ : Eigenvalues A × Eigenvalues B), eigenspace A μ₁₂.1 ⊓ eigenspace B μ₁₂.2 = ⊤ := by
+      rw [eq_top_iff]
+      intro x hx
+      obtain ⟨y, rfl⟩ := h.2 x
+      rw [DirectSum.coeAddMonoidHom_eq_dfinsuppSum]
+      refine Submodule.sum_mem _ fun i hi ↦ ?_
+      have hyi := Submodule.coe_mem (y i)
+      simp only [Submodule.mem_inf, mem_genEigenspace_one] at hyi
+      refine Submodule.mem_iSup_of_mem ⟨⟨i.2, ?_⟩, ⟨i.1, ?_⟩⟩ (by simp)
+      <;> simp only [HasUnifEigenvalue, ne_eq, Submodule.eq_bot_iff, mem_genEigenspace_one, not_forall]
+      <;> refine ⟨y i, by tauto, by simpa using hi⟩
+    intro x
+    rw [Submodule.eq_top_iff'] at h_sum
+    specialize h_sum x
+    rw [Submodule.mem_iSup_iff_exists_finsupp] at h_sum
+    rcases h_sum with ⟨f, hf₁, hf₂⟩
+    exact ⟨∑ i ∈ f.support, .of _ i ⟨f i, hf₁ i⟩, by simpa using hf₂⟩
+
+end commute_module
+
 theorem Commute.exists_unitary (hA : A.IsHermitian) (hB : B.IsHermitian) (hAB : Commute A B) :
     ∃ U : Matrix.unitaryGroup d 𝕜, (U.val * A * Uᴴ).IsDiag ∧ (U.val * B * Uᴴ).IsDiag := by
-  sorry
+  replace hA := Matrix.isHermitian_iff_isSymmetric.mp hA
+  replace hB := Matrix.isHermitian_iff_isSymmetric.mp hB
+  replace hAB := Matrix.commute_euclideanLin hAB
+  have h_eigensum := LinearMap.IsSymmetric.directSum_isInternal_of_commute' hA hB hAB
+  let sharedBasis : OrthonormalBasis _ 𝕜 (EuclideanSpace 𝕜 d) :=
+    (h_eigensum.subordinateOrthonormalBasis rfl)
+      (LinearMap.IsSymmetric.orthogonalFamily_eigenspace_inf_eigenspace' hA hB)
+  let sharedBasis_d : OrthonormalBasis d 𝕜 (EuclideanSpace 𝕜 d) :=
+    sharedBasis.reindex (Fintype.equivOfCardEq (by simp))
+  use ⟨(EuclideanSpace.basisFun d 𝕜).toBasis.toMatrix sharedBasis_d.toBasis,
+    (EuclideanSpace.basisFun d 𝕜).toMatrix_orthonormalBasis_mem_unitary sharedBasis_d⟩
+  constructor
+  --These two goals are identical up to the A/B swap
+  · sorry
+  · sorry
 
 instance instInvertibleUnitaryGroup (U : Matrix.unitaryGroup d 𝕜) : Invertible U :=
   invertibleOfGroup U
