@@ -581,9 +581,9 @@ proof_wanted _root_.HermitianMat.log_monoOn_posDef {d : Type*} [Fintype d] [Deci
     MonotoneOn HermitianMat.log { A : HermitianMat d ℂ | A.toMat.PosDef }
 
 /-- Monotonicity of log on commuting operators. -/
-proof_wanted _root_.HermitianMat.log_le_log_of_commute {d : Type*} [Fintype d] [DecidableEq d]
+theorem _root_.HermitianMat.log_le_log_of_commute {d : Type*} [Fintype d] [DecidableEq d]
   {A B : HermitianMat d ℂ} (hAB₁ : Commute A.toMat B.toMat) (hAB₂ : A ≤ B) (hA : A.toMat.PosDef) :
-    A.log ≤ B.log
+    A.log ≤ B.log := by sorry
 
 /-- Monotonicity of exp on commuting operators. -/
 proof_wanted _root_.HermitianMat.exp_le_exp_of_commute {d : Type*} [Fintype d] [DecidableEq d]
@@ -1571,7 +1571,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     it can? Then (S81) is an inequality of operators where the LHS has an operator with a "negative
     infinity" eigenvalue, intuitively. This isn't something very well defined, certainly not supported
     in our definitions. This only becomes mathematically meaningful when we see how it's used later, in
-    (S88): both sides are traced against `ℰ n (ρ⊗^S[n]`, so that the 0 eigenvalues becomes irrelevant. This
+    (S88): both sides are traced against `ℰ n (ρ⊗^S[n])`, so that the 0 eigenvalues becomes irrelevant. This
     is the version we state and prove, then.
 
     Luckily, (S82) and (S85) are correct as written (in a particular interpretation), because
@@ -1641,10 +1641,18 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
          .ofReal ((P2 ε2 n).inner (ℰ n (ρ⊗^S[n]))) * (.ofReal (c' ε2 n) - (R2 ρ σ + .ofReal ε₀ + .ofReal ε2)) := by
 
       -- see (S81) for comments on why that statement had to be changed
-      --(S85)
-      have hE3leq ε2 (n : ℕ) (hε2 : 0 < ε2) : (1/n : ℝ) • (E3 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ (c' ε2 n) • (E2 ε2 n).toMat := by
-        sorry
-
+      -- (S85) (first inequality should have $\sigma_n''$ instead of $\tilde{\sigma}_n''$; corrected in v4, where $\tilde{\sigma}_n'$ takes the place of $\sigma_n''$)
+      have hE3leq ε2 (n : ℕ) (hε2 : 0 < ε2) : (1/n : ℝ) • (E3 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ (c' ε2 n) • (E3 ε2 n).toMat := by
+        calc
+          (1/n : ℝ) • (E3 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ (1/n) • (E3 ε2 n).toMat * (- (σ'' n).M.log.toMat) := by
+            sorry
+          _ ≤ (1/n) • (E3 ε2 n).toMat * (- (Real.exp (-n * c' ε2 n) • (1 : HermitianMat (H (i ^ n)) ℂ)).log.toMat) := by
+            simp
+            have hlog : (Real.exp (-(n * c' ε2 n)) • 1 : HermitianMat (H (i ^ n)) ℂ).log.toMat ≤ ((σ'' n).M).log.toMat := by
+              rw [HermitianMat.log_le_log_of_commute (Commute.smul_left (Commute.one_left (σ'' n).M.toMat) (Real.exp (-(n * c' ε2 n)))) (hσ'' ε2 n) (Matrix.PosDef.smul Matrix.PosDef.one (Real.exp_pos (-n * c' ε2 n)))]
+              sorry
+            sorry
+          _ ≤ (c' ε2 n) • (E3 ε2 n).toMat := by sorry
       --Linearly combine S81, S82, S85:
       --(S86)
       --(S87)
