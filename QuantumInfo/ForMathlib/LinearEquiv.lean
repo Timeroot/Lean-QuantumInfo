@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2025 Alex Meiburg. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Alex Meiburg
+-/
 import Mathlib.Analysis.InnerProductSpace.PiL2
 
 variable {d d₁ d₂ d₃ R 𝕜 : Type*} [RCLike 𝕜]

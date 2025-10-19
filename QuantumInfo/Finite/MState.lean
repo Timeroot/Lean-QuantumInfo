@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2025 Alex Meiburg. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Alex Meiburg, Leonardo A. Lessa
+-/
 import QuantumInfo.ForMathlib
 import ClassicalInfo.Distribution
 import QuantumInfo.Finite.Braket
@@ -43,7 +48,7 @@ We don't `extend (M : HermitianMat d ℂ)` because that gives an annoying thing 
 structure MState (d : Type*) [Fintype d] [DecidableEq d] where
   M : HermitianMat d ℂ
   zero_le : 0 ≤ M
-  tr : HermitianMat.trace M = 1
+  tr : M.trace = 1
 
 namespace MState
 
@@ -132,13 +137,18 @@ theorem le_one (ρ : MState d) : ρ.M ≤ 1 := by
   suffices h : ρ.m ≤ (1 : ℝ) • 1 by
     rw [one_smul] at h
     exact h
-  apply (Matrix.PosSemidef.le_smul_one_of_eigenvalues_iff ρ.pos 1).mp
+  apply (Matrix.PosSemidef.le_smul_one_of_eigenvalues_iff ρ.pos.1 1).mp
   exact eigenvalue_le_one ρ
 
 /-- The inner product of two MState's, as a real number between 0 and 1. -/
 def inner (ρ : MState d) (σ : MState d) : Prob :=
   ⟨ρ.M.inner σ.M, ρ.M.inner_ge_zero ρ.zero_le σ.zero_le,
     (ρ.M.inner_le_mul_trace ρ.zero_le σ.zero_le).trans (by simp)⟩
+
+--TODO: Should we actually switch to use `Inner.inner` in a better way here? But I don't
+--want to have to write `⟪ρ, σ⟫_Prob` each time.
+@[inherit_doc]
+scoped[MState] notation:max "⟪" x ", " y "⟫" => MState.inner x y
 
 section exp_val
 
@@ -219,32 +229,18 @@ def pure (ψ : Ket d) : MState d where
     simp [HermitianMat.trace_eq_re_trace, Matrix.trace, Matrix.vecMulVec_apply, Bra.eq_conj, h₁]
     exact ψ.normalized
 
+proof_wanted pure_inner (ψ φ : Ket d) : ⟪pure ψ, pure φ⟫ = ‖Braket.dot ψ φ‖^2
+
 @[simp]
-theorem pure_of (ψ : Ket d) : (pure ψ).m i j = (ψ i) * conj (ψ j) := by
+theorem pure_apply {i j : d} (ψ : Ket d) : (pure ψ).m i j = (ψ i) * conj (ψ j) := by
   rfl
 
 theorem pure_mul_self (ψ : Ket d) : (pure ψ).m * (pure ψ).m = (pure ψ : Matrix d d ℂ) := by
-  refine Matrix.ext ?_
-  intro i j
-  simp [Matrix.mul_apply, pure_of]
-  conv_lhs =>
-    congr; rfl
-    intro x
-    rw [mul_comm (ψ i) ((starRingEnd ℂ) (ψ x))]
-    rw [← mul_assoc]
-    rw [mul_comm ((starRingEnd ℂ) (ψ x) * ψ i) (ψ x)]
-    rw [← mul_assoc]
-    -- rw [mul_comm (ψ x * (starRingEnd ℂ) (ψ x))]
-    -- rw [← mul_comm ((starRingEnd ℂ) (ψ j)), ← mul_assoc]
-  -- conv_lhs =>
-    -- rw [Fintype.sum_smul_sum (ψ x * (starRingEnd ℂ) (ψ x)) (ψ i * (starRingEnd ℂ) (ψ j))]
-    -- simp [Finset.sum_cons (ψ i * (starRingEnd ℂ) (ψ j))]
-  sorry
+  dsimp [pure, MState.m, HermitianMat.toMat]
+  simp [Matrix.vecMulVec_mul_vecMulVec, ← Braket.dot_eq_dotProduct]
 
 /-- The purity of a state is Tr[ρ^2]. This is a `Prob`, because it is always between zero and one. -/
-def purity (ρ : MState d) : Prob :=
-  ⟨ρ.M.inner ρ.M, ⟨HermitianMat.inner_ge_zero ρ.zero_le ρ.zero_le,
-    by simpa using  HermitianMat.inner_le_mul_trace ρ.zero_le ρ.zero_le⟩⟩
+def purity (ρ : MState d) : Prob := ⟪ρ, ρ⟫
 
 /-- The eigenvalue spectrum of a mixed quantum state, as a `Distribution`. -/
 def spectrum [DecidableEq d] (ρ : MState d) : Distribution d :=
@@ -377,6 +373,29 @@ theorem pure_iff_purity_one (ρ : MState d) : (∃ ψ, ρ = pure ψ) ↔ ρ.puri
   --distribution is constant iff pure
   sorry
 
+--PULLOUT
+theorem _root_.Matrix.unitaryGroup_row_norm (U : Matrix.unitaryGroup d ℂ) (i : d) :
+    ∑ j, ‖U j i‖^2 = 1 := by
+  suffices ∑ j, ‖U j i‖^2 = (1 : ℂ) by exact_mod_cast this
+  simpa [Matrix.mul_apply, Complex.sq_norm, Complex.normSq_eq_conj_mul_self]
+    using congr($(U.prop.left) i i)
+
+--TODO: Would be better if there was an `MState.eigenstate` or similar (maybe extending
+-- a similar thing for `HermitianMat`) and then this could be an equality with that, as
+-- an explicit formula, instead of this `Exists`.
+theorem spectralDecomposition (ρ : MState d) :
+    ∃ (ψs : d → Ket d), ρ.M = ∑ i, (ρ.spectrum i : ℝ) • (MState.pure (ψs i)).M := by
+  use (fun i ↦ ⟨(ρ.M.H.eigenvectorUnitary · i), Matrix.unitaryGroup_row_norm _ i⟩)
+  ext i j
+  nth_rw 1 [ρ.M.H.spectral_theorem]
+  simp only [toMat_M, Complex.coe_algebraMap, spectrum, Distribution.mk',
+    Distribution.funlike_apply, pure, Matrix.IsHermitian.eigenvectorUnitary_apply,
+    PiLp.ofLp_apply, AddSubgroup.val_finset_sum, val_eq_coe, selfAdjoint.val_smul]
+  rw [Finset.sum_apply, Finset.sum_apply, Matrix.mul_apply]
+  congr!
+  simp [Matrix.vecMulVec_apply, Ket.apply, Matrix.mul_diagonal]
+  ac_rfl
+
 end pure
 
 section prod
@@ -388,9 +407,15 @@ def prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : MState (d₁ × d₂) whe
 
 infixl:100 " ⊗ " => MState.prod
 
-theorem inner_sep.apply (ξ1 ψ1 : MState d₁) (ξ2 ψ2 : MState d₂) :
-((ξ1⊗ξ2).inner (ψ1⊗ψ2) : ℂ) = (ξ1.inner ψ1) * (ξ2.inner ψ2) := by
-  sorry
+theorem prod_inner_prod (ξ1 ψ1 : MState d₁) (ξ2 ψ2 : MState d₂) :
+    ⟪ξ1 ⊗ ξ2, ψ1 ⊗ ψ2⟫ = ⟪ξ1, ψ1⟫ * ⟪ξ2, ψ2⟫ := by
+  ext1
+  simp only [MState.inner, Prob.coe_mul, ← Complex.ofReal_inj]
+  --Lots of this should actually be facts about HermitianMat first
+  simp only [prod, Complex.ofReal_mul]
+  simp only [← RCLike.ofReal_eq_complex_ofReal, inner_eq_trace_rc]
+  simp only [kronecker, ← Matrix.trace_kronecker]
+  simp only [Matrix.mul_kronecker_mul]
 
 /-- The product of pure states is a pure product state , `Ket.prod`. -/
 theorem pure_prod_pure (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : pure (ψ₁ ⊗ ψ₂) = (pure ψ₁) ⊗ (pure ψ₂) := by
@@ -524,10 +549,12 @@ def purify (ρ : MState d) : Ket (d × d) where
     ρ2 * (ρ.Hermitian.eigenvalues j).sqrt
   normalized' := by
     have h₁ := fun i ↦ ρ.pos.eigenvalues_nonneg i
-    simp [mul_pow, Real.sq_sqrt, h₁, Fintype.sum_prod_type_right]
+    simp only [Complex.norm_mul,
+      Complex.norm_real, Real.norm_eq_abs, mul_pow, sq_abs, h₁, Real.sq_sqrt,
+      Fintype.sum_prod_type_right]
     simp_rw [← Finset.sum_mul]
-    have : ∀x, ∑ i : d, ‖ρ.Hermitian.eigenvectorBasis x i‖ ^ 2 = 1 :=
-      sorry
+    have : ∀ x, ∑ i : d, ‖ρ.Hermitian.eigenvectorUnitary i x‖ ^ 2 = 1 :=
+      Matrix.unitaryGroup_row_norm ρ.Hermitian.eigenvectorUnitary
     apply @RCLike.ofReal_injective ℂ
     simp_rw [this, one_mul, Matrix.IsHermitian.sum_eigenvalues_eq_trace]
     exact ρ.tr'
@@ -538,7 +565,7 @@ def purify (ρ : MState d) : Ket (d × d) where
 theorem purify_spec (ρ : MState d) : (pure ρ.purify).traceRight = ρ := by
   ext i j
   simp_rw [purify, traceRight, Matrix.traceRight]
-  simp only [pure_of, Ket.apply]
+  simp only [pure_apply, Ket.apply]
   simp only [map_mul]
   simp_rw [mul_assoc, mul_comm, ← mul_assoc (Complex.ofReal _), Complex.mul_conj]
   sorry

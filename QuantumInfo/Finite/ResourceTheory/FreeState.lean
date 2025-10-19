@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2025 Alex Meiburg. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Alex Meiburg, Leonardo A. Lessa, Rodolfo R. Soldati
+-/
 import Mathlib.Algebra.Module.Submodule.Lattice
 import Mathlib.Analysis.Subadditive
 import Mathlib.CategoryTheory.Functor.FullyFaithful
@@ -195,7 +200,7 @@ theorem spacePow_mul (m n : ℕ) :
     i ^ (m * n) = (i ^ m) ^ n :=
   pow_mul i m n
 
-/-- Powers of states. Defined for `PNat`, so that we don't have zeroth powers -/
+/-- Powers of states, using the resource theory's notion of product. -/
 noncomputable def statePow (ρ : MState (H i)) (n : ℕ) : MState (H (i ^ n)) :=
   n.rec default (fun _ σ ↦ σ ⊗ᵣ ρ)
 

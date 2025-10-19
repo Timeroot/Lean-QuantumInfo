@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2025 Leonardo A Lessa. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Leonardo A Lessa, Alex Meiburg
+-/
 import QuantumInfo.ForMathlib.HermitianMat.CFC
 
 import Mathlib.Analysis.CStarAlgebra.Classes
@@ -121,9 +126,9 @@ theorem proj_le_add_lt : {A <ₚ B} + {B ≤ₚ A} = 1 := by
   · simp
 
 theorem conj_lt_add_conj_le : A.conj {A <ₚ 0} + A.conj {0 ≤ₚ A} = A := by
-  rw (occs := [1, 3, 5]) [← cfc_id A]
+  rw (occs := [2, 4, 5]) [← cfc_id A]
   rw [proj_lt_zero_cfc, proj_zero_le_cfc, cfc_conj, cfc_conj, ← cfc_add]
-  congr; ext x
+  congr; ext
   simp; grind
 
 /-- The positive part of a Hermitian matrix: the projection onto its positive eigenvalues. -/
@@ -218,25 +223,25 @@ open RealInnerProductSpace in
 theorem inner_proj_le_le : ⟪{A ≤ₚ B}, A⟫ ≤ ⟪{A ≤ₚ B}, B⟫ :=
   proj_le_inner_le A B
 
+--TODO: When we upgrade `cfc_continuous` from 𝕜 to ℂ, we upgrade these too.
 @[fun_prop]
-theorem posPart_Continuous : Continuous (·⁺ : HermitianMat n 𝕜 → _) := by
+theorem posPart_Continuous : Continuous (·⁺ : HermitianMat n ℂ → _) := by
   simp_rw [posPart_eq_cfc_max]
   fun_prop
 
 @[fun_prop]
-theorem negPart_Continuous : Continuous (·⁻ : HermitianMat n 𝕜 → _) := by
+theorem negPart_Continuous : Continuous (·⁻ : HermitianMat n ℂ → _) := by
   simp_rw [negPart_eq_cfc_min]
   fun_prop
 
--- --PULLOUT
--- theorem posPart_le_zero_iff [DecidableEq d] : A⁺ ≤ 0 ↔ A ≤ 0 := by
---   sorry
+proof_wanted posPart_le_zero_iff : A⁺ ≤ 0 ↔ A ≤ 0
 
--- --PULLOUT
--- theorem posPart_eq_zero_iff [DecidableEq d] : A⁺ = 0 ↔ A ≤ 0 := by
---   rw [← posPart_le_zero_iff]
---   have := zero_le_posPart A
---   constructor <;> order
+proof_wanted posPart_eq_zero_iff : A⁺ = 0 ↔ A ≤ 0
+/- := by
+   rw [← posPart_le_zero_iff]
+   have := zero_le_posPart A
+   constructor <;> order
+-/
 
 --Many missing lemmas: see `Mathlib.Algebra.Order.Group.PosPart` for examples
 -- (They don't apply here since it's not a Lattice, and there's no well-defined `max` in

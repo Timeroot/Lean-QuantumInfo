@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2025 Alex Meiburg. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Alex Meiburg
+-/
 import QuantumInfo.ForMathlib.HermitianMat.Basic
 import QuantumInfo.ForMathlib.ContinuousLinearMap
 import QuantumInfo.ForMathlib.LinearEquiv
@@ -48,7 +53,7 @@ theorem reindex_sub  :
 theorem reindex_conj [Fintype d₂] [Fintype d] (B : Matrix d₃ d₂ 𝕜) :
     (A.reindex e).conj B = A.conj (B.submatrix id e) := by
   ext1
-  simp only [conj, reindex_coe, Matrix.reindex_apply, mk_toMat]
+  simp only [conj_apply, reindex_coe, Matrix.reindex_apply, mk_toMat]
   rw [← Matrix.submatrix_id_mul_right, Matrix.mul_assoc]
   rw [← Matrix.submatrix_id_mul_left, ← Matrix.mul_assoc]
   simp
@@ -60,7 +65,7 @@ theorem conj_submatrix (A : HermitianMat d ℂ) (B : Matrix d₂ d₄ ℂ)
   (e : d₃ ≃ d₂) (f : d → d₄) :
     A.conj (B.submatrix e f) = (A.conj (B.submatrix id f)).reindex e.symm := by
   ext1
-  simp [conj, ← Matrix.submatrix_mul_equiv (e₂ := .refl d)]
+  simp [conj_apply, ← Matrix.submatrix_mul_equiv (e₂ := .refl d)]
 
 variable [Fintype d₂] [DecidableEq d] [DecidableEq d₂]
 

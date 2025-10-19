@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2025 Alex Meiburg. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Alex Meiburg
+-/
 import QuantumInfo.Finite.Braket
 import QuantumInfo.Finite.CPTPMap
 import ClassicalInfo.Entropy
@@ -273,7 +278,7 @@ theorem sandwichedRelRentropy_self {d : Type*} [Fintype d] [DecidableEq d] {α :
   intro hα
   left; right; left
   rw [HermitianMat.pow_eq_cfc, HermitianMat.pow_eq_cfc]
-  nth_rw 1 [← HermitianMat.cfc_id ρ.M]
+  nth_rw 2 [← HermitianMat.cfc_id ρ.M]
   rw [HermitianMat.cfc_conj, ← HermitianMat.cfc_comp]
   conv =>
     enter [1, 1]
@@ -392,6 +397,12 @@ theorem qRelativeEnt_ne_top {d : Type*} [Fintype d] [DecidableEq d] {ρ σ : MSt
 /-- `I(A:B) = 𝐃(ρᴬᴮ‖ρᴬ ⊗ ρᴮ)` -/
 theorem qMutualInfo_as_qRelativeEnt (ρ : MState (dA × dB)) :
     qMutualInfo ρ = (𝐃(ρ‖ρ.traceRight ⊗ ρ.traceLeft) : EReal) :=
+  sorry
+
+theorem qRelEntropy_le_add_of_le_smul {d : Type*} [Fintype d] [DecidableEq d]
+  (ρ : MState d) {σ₁ σ₂ : MState d} (r : ℝ) (hσ : σ₁.M ≤ r • σ₂.M) :
+    𝐃(ρ‖σ₁) ≤ 𝐃(ρ‖σ₂) + ENNReal.ofReal (Real.log r)
+    := by
   sorry
 
 end relative_entropy

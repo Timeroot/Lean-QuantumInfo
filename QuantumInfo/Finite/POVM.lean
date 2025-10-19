@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2025 Alex Meiburg. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Alex Meiburg
+-/
 import QuantumInfo.Finite.CPTPMap
 
 /-! # Positive Operator-Valued Measures
@@ -101,7 +106,8 @@ theorem measurementMap_apply_hermitianMat (Λ : POVM X d) (m : HermitianMat d �
     ((m.conj ((Λ.mats x)^(1/2:ℝ)).toMat : HermitianMat d ℂ) ⊗ₖ .diagonal (fun y ↦ ite (x = y) 1 0)) := by
   ext1
   convert Λ.measurementMap_apply_matrix m.toMat
-  simp [HermitianMat.conj]
+  simp only [conj_apply, conjTranspose_toMat, AddSubgroup.val_finset_sum,
+    kronecker_coe, mk_toMat]
   congr!
   ext i j
   simp only [HermitianMat.diagonal, mk_toMat, diagonal_apply, single, of_apply]

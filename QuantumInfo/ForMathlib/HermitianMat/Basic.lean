@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2025 Alex Meiburg. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Alex Meiburg
+-/
 import QuantumInfo.ForMathlib.Matrix
 import QuantumInfo.ForMathlib.IsMaximalSelfAdjoint
 import QuantumInfo.ForMathlib.ContinuousLinearMap
@@ -115,33 +120,56 @@ variable (A : HermitianMat n α)
 square, this would apply to any `Semigroup`+`StarMul` (as proved by `IsSelfAdjoint.conjugate`). But this lets
 us conjugate to other sizes too, as is done in e.g. Kraus operators. That is, it's a _heterogeneous_ conjguation.
 -/
-def conj {m} (B : Matrix m n α) : HermitianMat m α :=
-  ⟨B * A.toMat * B.conjTranspose, by
-  ext
-  simp only [Matrix.star_apply, Matrix.mul_apply, Matrix.conjTranspose_apply, Finset.sum_mul,
-    star_sum, star_mul', star_star, show ∀ (a b : n), star (A.toMat b a) = A.toMat a b from congrFun₂ A.property]
-  rw [Finset.sum_comm]
-  congr! 2
-  ring⟩
+def conj {m} (B : Matrix m n α) : HermitianMat n α →+ HermitianMat m α where
+  toFun A :=
+    ⟨B * A.toMat * B.conjTranspose, by
+    ext
+    simp only [Matrix.star_apply, Matrix.mul_apply, Matrix.conjTranspose_apply, Finset.sum_mul,
+      star_sum, star_mul', star_star, show ∀ (a b : n), star (A.toMat b a) = A.toMat a b from congrFun₂ A.property]
+    rw [Finset.sum_comm]
+    congr! 2
+    ring⟩
+  map_add' _ _ := by ext1; simp [Matrix.mul_add, Matrix.add_mul]
+  map_zero' := by simp
+
+theorem conj_apply (B : Matrix m n α) (A : HermitianMat n α) :
+    conj B A = ⟨B * A.toMat * B.conjTranspose, (conj B A).2⟩ := by
+  rfl
+
+@[simp]
+theorem conj_apply_toMat (B : Matrix m n α) (A : HermitianMat n α) :
+    (conj B A).toMat = B * A.toMat * B.conjTranspose := by
+  rfl
 
 theorem conj_conj {m l} [Fintype m] (B : Matrix m n α) (C : Matrix l m α) :
     (A.conj B).conj C = A.conj (C * B) := by
   ext1
-  simp only [conj, mk_toMat, Matrix.conjTranspose_mul, Matrix.mul_assoc]
+  simp [Matrix.conjTranspose_mul, Matrix.mul_assoc]
 
 variable (B : HermitianMat n α)
 
-theorem add_conj {m} (M : Matrix m n α) : (A + B).conj M = A.conj M + B.conj M := by
-  ext1
-  simp [conj, Matrix.mul_add, Matrix.add_mul]
-
-theorem sub_conj {m} (M : Matrix m n α) : (A - B).conj M = A.conj M - B.conj M := by
-  ext1
-  simp [conj, Matrix.mul_sub, Matrix.sub_mul]
+@[simp]
+theorem conj_zero [DecidableEq n] : A.conj (0 : Matrix n n α) = 0 := by
+  simp [conj_apply]
 
 @[simp]
 theorem conj_one [DecidableEq n] : A.conj (1 : Matrix n n α) = A := by
-  simp [conj]
+  simp [conj_apply]
+
+variable (R : Type*) [Star R] [TrivialStar R] [CommSemiring R] [Algebra R α] [StarModule R α]
+
+/-- `HermitianMat.conj` as an `R`-linear map, where `R` is the ring of relevant reals. -/
+def conjLinear {m} (B : Matrix m n α) : HermitianMat n α →ₗ[R] HermitianMat m α where
+  toAddHom := conj B
+  map_smul' _ _ := by
+    ext1
+    --Squeezing this simp because otherwise we run out of heartbeats fast
+    simp only [AddHom.toFun_eq_coe, AddHom.coe_coe, conj_apply_toMat,
+      selfAdjoint.val_smul, val_eq_coe, Matrix.mul_smul, Matrix.smul_mul, RingHom.id_apply]
+
+@[simp]
+theorem conjLinear_apply (B : Matrix m n α) : conjLinear R B A = conj B A  := by
+  rfl
 
 end conj
 

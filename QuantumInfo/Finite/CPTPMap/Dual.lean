@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2025 Alex Meiburg. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Alex Meiburg
+-/
 import QuantumInfo.Finite.CPTPMap.Bundled
 import Mathlib.LinearAlgebra.Matrix.FiniteDimensional
 
