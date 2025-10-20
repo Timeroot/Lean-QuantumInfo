@@ -331,37 +331,18 @@ theorem Ket.MES_isEntangled [Nontrivial d] : (Ket.MES d).IsEntangled := by
 /-- The transpose trick -/
 theorem TransposeTrick {d} [Fintype d] [Nonempty d] [DecidableEq d] {M : Matrix d d ℂ} :
     (M ⊗ₖ 1) *ᵥ (Ket.MES d).vec = (1 ⊗ₖ M.transpose) *ᵥ (Ket.MES d).vec := by
-  have LHS : (M ⊗ₖ 1) *ᵥ (Ket.MES d).vec = fun (i,j) => M i j * 1/√(Fintype.card d) := by
-    ext i
-    simp only [Ket.MES, Matrix.mulVec, dotProduct]
-    simp
-    simp only [Matrix.one_apply]
-    simp
-    simp only [Finset.sum_ite]
-    simp
-    rw [Finset.sum_filter, Finset.sum_filter]
-    conv =>
-      enter [1, 2, a]
-      equals if (i.2, i.2) = a then (M i.1 i.2) / (↑√↑(Fintype.card d)) else 0 =>
-        grind
-    simp
-  have RHS : (1 ⊗ₖ Mᵀ) *ᵥ (Ket.MES d).vec = fun (i,j) => M i j * 1/√(Fintype.card d) := by
-    ext i
-    simp only [Ket.MES, Matrix.mulVec, dotProduct]
-    simp
-    simp only [Matrix.one_apply]
-    simp
-    simp only [Finset.sum_ite]
-    simp
-    rw [Finset.sum_filter, Finset.sum_filter]
-    conv =>
-      enter [1]
-      enter [2]
-      enter [a]
-      equals if (i.1,i.1) = a then (M i.1 i.2) / (↑√↑(Fintype.card d)) else 0 =>
-        grind
-    simp
-  rw [LHS, RHS]
+  ext i
+  simp only [Ket.MES, Matrix.mulVec, dotProduct, Matrix.kroneckerMap, Matrix.one_apply]
+  simp
+  conv =>
+    enter [1, 2, a]
+    equals if (i.2, i.2) = a then (M i.1 i.2) / √(Fintype.card d) else 0 =>
+      grind
+  conv =>
+    enter [2, 2, a]
+    equals if (i.1, i.1) = a then (M i.1 i.2) / √(Fintype.card d) else 0 =>
+      grind
+  simp
 
 end mes
 
