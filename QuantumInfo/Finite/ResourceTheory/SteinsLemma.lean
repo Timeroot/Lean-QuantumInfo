@@ -1649,8 +1649,11 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
           _ ≤ (1/n) • (E3 ε2 n).toMat * (- (Real.exp (-n * c' ε2 n) • (1 : HermitianMat (H (i ^ n)) ℂ)).log.toMat) := by
             simp
             have hlog : (Real.exp (-(n * c' ε2 n)) • 1 : HermitianMat (H (i ^ n)) ℂ).log.toMat ≤ ((σ'' n).M).log.toMat := by
-              rw [HermitianMat.log_le_log_of_commute (Commute.smul_left (Commute.one_left (σ'' n).M.toMat) (Real.exp (-(n * c' ε2 n)))) (hσ'' ε2 n) (Matrix.PosDef.smul Matrix.PosDef.one (Real.exp_pos (-n * c' ε2 n)))]
-              sorry
+              rw [Subtype.coe_le_coe]
+              have h_comm : Commute ((Real.exp _ • 1 : HermitianMat _ ℂ).toMat) _ :=
+                Commute.smul_left (Commute.one_left (σ'' n).M.toMat) (Real.exp (-(n * c' ε2 n)))
+              exact HermitianMat.log_le_log_of_commute h_comm (by simpa using hσ'' ε2 n)
+                (Matrix.PosDef.smul Matrix.PosDef.one (Real.exp_pos (-(n * c' ε2 n))))
             sorry
           _ ≤ (c' ε2 n) • (E3 ε2 n).toMat := by sorry
       --Linearly combine S81, S82, S85:
