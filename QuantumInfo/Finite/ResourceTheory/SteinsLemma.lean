@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2025 Alex Meiburg. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Alex Meiburg, Leonardo A. Lessa, Rodolfo R. Soldati
+-/
 import QuantumInfo.Finite.ResourceTheory.FreeState
 import QuantumInfo.Finite.ResourceTheory.HypothesisTesting
 import QuantumInfo.Finite.Pinching
@@ -534,13 +539,10 @@ theorem _root_.HermitianMat.cfc_le_cfc_of_PosDef {d : Type*} [Fintype d] [Decida
   apply hfg
   apply hA
 
---PULLOUT to HermitianMat/CFC.lean
---TODO: Make Iff version.
-/-- If two Hermitian matrices commute, there exists a common matrix that they are both a CFC of. -/
-theorem _root_.Commute.exists_cfc {d : Type*} [Fintype d] [DecidableEq d]
-  {A B : Matrix d d ℂ} (hA : A.IsHermitian) (hB : B.IsHermitian) (hAB : Commute A B) :
-    ∃ C : Matrix d d ℂ, (∃ f : ℝ → ℝ, A = cfc f C) ∧ (∃ g : ℝ → ℝ, B = cfc g C) := by
-  sorry
+theorem _root_.HermitianMat.cfc_commute {d : Type*} [Fintype d] [DecidableEq d]
+  (A : HermitianMat d ℂ) (f g : ℝ → ℝ) :
+    Commute (A.cfc f).toMat (A.cfc g).toMat := by
+  rw [commute_iff_eq, ← HermitianMat.coe_cfc_mul, ← HermitianMat.coe_cfc_mul, mul_comm f g]
 
 theorem _root_.Commute.exists_HermitianMat_cfc {d : Type*} [Fintype d] [DecidableEq d]
   (A B : HermitianMat d ℂ) (hAB : Commute A.toMat B.toMat) :
@@ -621,7 +623,15 @@ private lemma commute_aux (n : ℕ) {x : ℝ}
   {E ℰ σ : HermitianMat d ℂ} (hℰσ : Commute ℰ.toMat σ.toMat)
   (hE : E = 1 - {Real.exp (n * x) • σ ≤ₚ ℰ})
     : Commute ((1 / n : ℝ) • E).toMat (ℰ.log - σ.log).toMat := by
-  sorry
+  rw [HermitianMat.one_sub_proj_le] at hE
+  obtain ⟨C, ⟨f, rfl⟩, ⟨g, rfl⟩⟩ := hℰσ.exists_HermitianMat_cfc
+  rw [HermitianMat.log, HermitianMat.log]
+  rw [← HermitianMat.cfc_comp, ← HermitianMat.cfc_comp, ← HermitianMat.cfc_sub]
+  rw [HermitianMat.proj_lt_def, ← HermitianMat.cfc_const_mul] at hE
+  rw [← HermitianMat.cfc_sub, ← HermitianMat.cfc_comp] at hE
+  subst E
+  rw [← HermitianMat.cfc_const_mul]
+  apply HermitianMat.cfc_commute
 
 private lemma rexp_mul_smul_proj_lt_mul_sub_le_mul_sub {n : ℕ} {x : ℝ}
   {E ℰ σ : HermitianMat d ℂ} (hℰσ : Commute ℰ.toMat σ.toMat) (hx : 0 < x)
@@ -692,7 +702,55 @@ private lemma rexp_mul_smul_proj_lt_mul_sub_le_mul_sub' {n : ℕ} {x : ℝ} {y :
     : (1 / n : ℝ) • E.toMat * (ℰ.log.toMat - σ.log.toMat) ≤ x • E := by
   --Another version of the above. Once we've proved one it's probably very easy to adapt the
   --code for the other. This doesn't suffer from the zero eigenvalue issue as much.
-  sorry
+  rcases n.eq_zero_or_pos with rfl | hn
+  · simp_all
+  obtain ⟨C, ⟨f, hf⟩, ⟨g, hg⟩⟩ := hℰσ.exists_HermitianMat_cfc
+  rw [hf, hg] at hE ⊢
+  rw [HermitianMat.proj_le_def, HermitianMat.proj_le_def] at hE
+  rw [← HermitianMat.cfc_const_mul, ← HermitianMat.cfc_sub] at hE
+  rw [← HermitianMat.cfc_comp, ← HermitianMat.cfc_const_mul] at hE
+  rw [← HermitianMat.cfc_sub, ← HermitianMat.cfc_comp, ← HermitianMat.cfc_sub] at hE
+  subst E
+  rw [HermitianMat.log, HermitianMat.log]
+  rw [← HermitianMat.cfc_comp, ← HermitianMat.cfc_comp]
+  conv =>
+    enter [1]
+    congr
+    · change HermitianMat.toMat ((1 / (n : ℝ)) • _)
+    · change HermitianMat.toMat (_ - _)
+  change _ ≤ HermitianMat.toMat (x • C.cfc _)
+  rw [← HermitianMat.cfc_sub, ← HermitianMat.cfc_const_mul, ← HermitianMat.coe_cfc_mul]
+  rw [← HermitianMat.cfc_const_mul, ← sub_nonneg]
+  change 0 ≤ HermitianMat.toMat (_ - _)
+  rw [← HermitianMat.cfc_sub]
+  change (0 : HermitianMat d ℂ) ≤ _
+  rw [HermitianMat.zero_le_cfc]
+  intro i
+  simp only [Pi.sub_apply, Function.comp_apply, one_div, Pi.mul_apply]
+  set fi := f (C.H.eigenvalues i) with hfi
+  set gi := g (C.H.eigenvalues i) with hgi
+  have hfi₀ : 0 ≤ fi := by
+    rw [hf, ← HermitianMat.zero_le_iff, HermitianMat.zero_le_cfc] at hℰ
+    exact hℰ i
+  have hgi₀ : 0 < gi := by
+    rw [hg, HermitianMat.cfc_PosDef] at hσ
+    exact hσ i
+  split_ifs with ha hb hb <;> simp only [← hfi, ← hgi] at ha hb ⊢
+  · simp
+  · simp only [sub_nonneg, not_le, sub_zero, mul_one] at ha hb ⊢
+    rw [inv_mul_le_iff₀ (by positivity)]
+    rw [← Real.exp_le_exp, Real.exp_sub]
+    rw [Real.exp_log (lt_of_lt_of_le (by positivity) ha), Real.exp_log hgi₀]
+    rw [div_le_iff₀ hgi₀]
+    exact hb.le
+  · simp only [sub_nonneg, not_le, zero_sub, mul_neg, mul_one, neg_mul, sub_neg_eq_add,
+      le_neg_add_iff_add_le, add_zero] at ha hb ⊢
+    rw [le_inv_mul_iff₀ (by positivity)]
+    rw [← Real.exp_le_exp, Real.exp_sub]
+    rw [Real.exp_log (lt_of_lt_of_le (by positivity) hb), Real.exp_log hgi₀]
+    rw [le_div_iff₀ hgi₀]
+    exact hb
+  · simp
 
 end proj_le
 
@@ -932,9 +990,94 @@ lemma iInf_eigenvalues_le {d : Type*} [Fintype d] [DecidableEq d] {A B : Matrix 
     iInf hA.eigenvalues ≤ iInf hB.eigenvalues :=
   iInf_eigenvalues_le_of_posSemidef hAB hA hB
 
+@[simp]
+theorem _root_.MState.spectrum_relabel {d d₂ : Type*}
+  [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂]
+  {ρ : MState d} (e : d₂ ≃ d) :
+    spectrum ℝ (ρ.relabel e).m = spectrum ℝ ρ.m := by
+  ext1 v
+  rw [spectrum.mem_iff] --TODO make a plain `Matrix` version of this
+  rw [Algebra.algebraMap_eq_smul_one v]
+  rw [MState.relabel_m, ← Matrix.submatrix_one_equiv e]
+  rw [← smul_apply, ← Matrix.submatrix_smul]
+  rw [← sub_apply, ← Matrix.submatrix_sub]
+  rw [Matrix.isUnit_submatrix_equiv]
+  rw [← Algebra.algebraMap_eq_smul_one v, ← spectrum.mem_iff]
+
+open scoped HermitianMat in
+open scoped Pointwise in
+theorem HermitianMat.spectrum_prod {d d₂ : Type*}
+  [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂]
+  {A : HermitianMat d ℂ} {B : HermitianMat d₂ ℂ} :
+    spectrum ℝ (A ⊗ₖ B).toMat = spectrum ℝ A.toMat * spectrum ℝ B.toMat :=
+  Matrix.spectrum_prod A.H B.H
+
+--PULLOUT: Belongs in Mathlib/Algebra/Order/Group/Pointwise/CompleteLattice.lean
+-- (after appropriately generalizing to MulPosMono)
+open scoped Pointwise in
+theorem csInf_mul_nonneg {s t : Set ℝ}
+  (hs₀ : s.Nonempty) (hs₁ : ∀ x ∈ s, 0 ≤ x) (ht₀ : t.Nonempty) (ht₁ : ∀ x ∈ t, 0 ≤ x) :
+    sInf (s * t) = sInf s * sInf t := by
+  --TODO Cleanup
+  have h_ge : sInf (s * t) ≥ sInf s * sInf t := by
+    have h_lower_bound : ∀ x ∈ s, ∀ y ∈ t, x * y ≥ (sInf s) * (sInf t) := by
+      intro x a y a_1
+      gcongr
+      · apply Real.sInf_nonneg; intro x hx; exact ht₁ x hx;
+      · exact hs₁ x a;
+      · exact csInf_le ⟨ 0, fun z hz => hs₁ z hz ⟩ a;
+      · exact csInf_le ⟨ 0, fun z hz => ht₁ z hz ⟩ a_1;
+    have h_inf_le : ∀ z ∈ s * t, z ≥ (sInf s) * (sInf t) := by
+      rintro _ ⟨ x, hx, y, hy, rfl ⟩ ; exact h_lower_bound x hx y hy;
+    exact le_csInf ( Set.Nonempty.mul hs₀ ht₀ ) h_inf_le
+  have h_le : sInf (s * t) ≤ sInf s * sInf t := by
+    set a := sInf s
+    set b := sInf t
+    have h_eps : ∀ ε > 0, ∃ x ∈ s, x < a + ε ∧ ∃ y ∈ t, y < b + ε := by
+      exact fun ε ε_pos => by rcases exists_lt_of_csInf_lt ( hs₀ ) ( lt_add_of_pos_right a ε_pos ) with ⟨ x, hx₁, hx₂ ⟩ ; rcases exists_lt_of_csInf_lt ( ht₀ ) ( lt_add_of_pos_right b ε_pos ) with ⟨ y, hy₁, hy₂ ⟩ ; exact ⟨ x, hx₁, hx₂, y, hy₁, hy₂ ⟩ ;
+    have h_prod_eps : ∀ ε > 0, ∃ x ∈ s, ∃ y ∈ t, x * y < (a + ε) * (b + ε) := by
+      exact fun ε hε => by obtain ⟨ x, hx₁, hx₂, y, hy₁, hy₂ ⟩ := h_eps ε hε; exact ⟨ x, hx₁, y, hy₁, by nlinarith [ hs₁ x hx₁, ht₁ y hy₁ ] ⟩ ;
+    have h_lim : Filter.Tendsto (fun ε => (a + ε) * (b + ε)) (nhdsWithin 0 (Set.Ioi 0)) (nhds (a * b)) := by
+      exact tendsto_nhdsWithin_of_tendsto_nhds ( Continuous.tendsto' ( by continuity ) _ _ ( by norm_num ) );
+    refine' le_of_tendsto_of_tendsto tendsto_const_nhds h_lim _;
+    filter_upwards [ self_mem_nhdsWithin ] with ε hε using le_trans ( csInf_le ⟨ 0, by rintro x ⟨ u, hu, v, hv, rfl ⟩ ; exact mul_nonneg ( hs₁ u hu ) ( ht₁ v hv ) ⟩ ⟨ _, h_prod_eps ε hε |> Classical.choose_spec |> And.left, _, h_prod_eps ε hε |> Classical.choose_spec |> And.right |> Classical.choose_spec |> And.left, rfl ⟩ ) ( h_prod_eps ε hε |> Classical.choose_spec |> And.right |> Classical.choose_spec |> And.right |> le_of_lt )
+  exact le_antisymm h_le h_ge
+
+theorem sInf_spectrum_prod {d d₂ : Type*}
+  [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂]
+  {ρ : MState d} {σ : MState d₂} :
+    sInf (spectrum ℝ (ρ ⊗ σ).m) = sInf (spectrum ℝ ρ.m) * sInf (spectrum ℝ σ.m) := by
+  rcases isEmpty_or_nonempty d with _ | _; · simp
+  rcases isEmpty_or_nonempty d₂ with _ | _; · simp
+  rw [MState.m, MState.prod, HermitianMat.spectrum_prod, ← MState.m, ← MState.m]
+  rw [csInf_mul_nonneg]
+  · exact IsSelfAdjoint.spectrum_nonempty ρ.M.H
+  · rw [MState.m, ρ.M.H.spectrum_real_eq_range_eigenvalues]
+    rintro _ ⟨i, rfl⟩
+    apply ρ.eigenvalue_nonneg
+  · exact IsSelfAdjoint.spectrum_nonempty σ.M.H
+  · rw [MState.m, σ.M.H.spectrum_real_eq_range_eigenvalues]
+    rintro _ ⟨i, rfl⟩
+    apply σ.eigenvalue_nonneg
+
+theorem sInf_spectrum_rprod {j : ι} {ρ : MState (H i)} {σ : MState (H j)} :
+    sInf (spectrum ℝ (ρ ⊗ᵣ σ).m) = sInf (spectrum ℝ ρ.m) * sInf (spectrum ℝ σ.m) := by
+  rw [← sInf_spectrum_prod, prodRelabel, MState.spectrum_relabel]
+
 lemma sInf_spectrum_spacePow (σ : MState (H i)) (n : ℕ) :
     sInf (spectrum ℝ (σ⊗^S[n]).m) = sInf (spectrum ℝ σ.m) ^ n := by
-  sorry
+  induction n
+  · simp only [statePow_zero, pow_zero]
+    conv =>
+      enter [1, 1, 2]
+      equals 1 =>
+        change MState.uniform.m = 1 --TODO simp
+        ext i j
+        simp [MState.uniform, MState.ofClassical, MState.m, HermitianMat.diagonal]
+        rfl
+    rw [spectrum.one_eq, csInf_singleton]
+  · rename_i n ih
+    rw [statePow_succ, sInf_spectrum_rprod, ih, pow_succ]
 
 lemma iInf_eigenvalues_smul_one_le {d : Type*} [Fintype d] [DecidableEq d] {A : Matrix d d ℂ}
   (hA : A.IsHermitian) : iInf hA.eigenvalues • 1 ≤ A :=

@@ -1,3 +1,4 @@
+--Copyright 2024: https://github.com/dupuisf/LFTCM2024TraceClass
 -- import Mathlib
 -- -- import QuantumInfo.InfiniteDim.TraceClass
 

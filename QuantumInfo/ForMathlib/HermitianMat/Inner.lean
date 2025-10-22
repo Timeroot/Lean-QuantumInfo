@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2025 Alex Meiburg. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Alex Meiburg
+-/
 import QuantumInfo.ForMathlib.HermitianMat.Order
 import Mathlib.Analysis.Convex.Contractible
 import Mathlib.Topology.Instances.Real.Lemmas

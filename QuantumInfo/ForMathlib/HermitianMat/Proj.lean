@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2025 Leonardo A Lessa. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Leonardo A Lessa, Alex Meiburg
+-/
 import QuantumInfo.ForMathlib.HermitianMat.CFC
 
 import Mathlib.Analysis.CStarAlgebra.Classes

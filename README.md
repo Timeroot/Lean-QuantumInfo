@@ -24,7 +24,9 @@ Docmentation of the main definitions can be found at [DOC.md](./DOC.md). A major
 
 # Major Goal: Generalized Quantum Stein's Lemma
 
-At the moment, the major goal of this repository is completing a proof of the [Generalized Quantum Stein's Lemma](https://arxiv.org/abs/2408.02722v1), following the proof in that link. The first milestone will be to formalize all the arguments _in that paper_ (while relying on standard or "obvious" results), and then the second milestone will be filling in all those other results so that the whole theorem is sorry-free. The first milestone is, at the moment (Aug 2025), quite close.
+At the moment, the major goal of this repository is completing a proof of the [Generalized Quantum Stein's Lemma](https://arxiv.org/abs/2408.02722v1), following the proof in that link. The first milestone will be to formalize all the arguments _in that paper_ (while relying on standard or "obvious" results), and then the second milestone will be filling in all those other results so that the whole theorem is sorry-free. The first milestone is, at the moment (October 2025), quite close.
+
+See our report on the project at [this link](https://arxiv.org/abs/2510.08672).
 
 # Stats
 
@@ -34,3 +36,19 @@ As of Sept 29 2025:
  * 13992 Lines of Code <!-- git ls-files | grep '\.lean' | xargs wc -l -->
 
 This doesn't include various code snippets that have been upstreamed to Mathlib.
+
+# Attribution
+
+This repository is released under the MIT License, as found in the [LICENSE](./LICENSE) file. Please cite as:
+
+```
+@misc{meiburg2024quantuminfo,
+  author = {Meiburg, Alex},
+  title = {Quantum Information in Lean},
+  year = {2024},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  howpublished = {\url{https://github.com/Meiburg/Lean-QuantumInfo}},
+}
+```
+or cite [the report](https://arxiv.org/abs/2510.08672) for the Stein's Lemma work in particular. Thanks to all contributors, especially Leonardo Lessa and Rodolfo Soldati.

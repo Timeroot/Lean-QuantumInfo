@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2025 Alex Meiburg. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Alex Meiburg, Rodolfo Soldati
+-/
 import QuantumInfo.ForMathlib
 import ClassicalInfo.Distribution
 
@@ -322,6 +327,22 @@ theorem Ket.MES_isEntangled [Nontrivial d] : (Ket.MES d).IsEntangled := by
   push_neg
   use x, y, x, y
   simp [apply, h]
+
+/-- The transpose trick -/
+theorem TransposeTrick {d} [Fintype d] [Nonempty d] [DecidableEq d] {M : Matrix d d ℂ} :
+    (M ⊗ₖ 1) *ᵥ (Ket.MES d).vec = (1 ⊗ₖ M.transpose) *ᵥ (Ket.MES d).vec := by
+  ext i
+  simp only [Ket.MES, Matrix.mulVec, dotProduct, Matrix.kroneckerMap, Matrix.one_apply]
+  simp
+  conv =>
+    enter [1, 2, a]
+    equals if (i.2, i.2) = a then (M i.1 i.2) / √(Fintype.card d) else 0 =>
+      grind
+  conv =>
+    enter [2, 2, a]
+    equals if (i.1, i.1) = a then (M i.1 i.2) / √(Fintype.card d) else 0 =>
+      grind
+  simp
 
 end mes
 
