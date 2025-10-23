@@ -1801,14 +1801,15 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
                 (Matrix.PosDef.smul Matrix.PosDef.one (Real.exp_pos (-(n * c' ε2 n))))
             rw [← sub_nonneg] at hlog
             rw [← sub_nonneg, ← mul_sub_left_distrib]
-            have comm_aux2 : Commute (E3 ε2 n).toMat ((σ'' n).M.log.toMat - (Real.exp (-(n * c' ε2 n)) • 1 : HermitianMat _ ℂ).log.toMat) := by sorry
+            have comm_aux2 : Commute (E3 ε2 n).toMat ((σ'' n).M.log.toMat - (Real.exp (-(n * c' ε2 n)) • 1 : HermitianMat _ ℂ).log.toMat) := by
+              sorry
             rw [Matrix.mul_assoc]
             have hElog : 0 ≤ (E3 ε2 n).toMat * ((σ'' n).M.log.toMat - (Real.exp (-(n * c' ε2 n)) • 1 : HermitianMat _ ℂ).log.toMat) := by
               apply Commute.mul_nonneg _ hlog comm_aux2
               -- Show 0 ≤ E3
               sorry
             apply Commute.mul_nonneg _ hElog _
-            simp only [zero_le_iff_posSemidef, (Matrix.PosSemidef.natCast (1 / n))]
+            simp only [nonneg_iff_posSemidef, (Matrix.PosSemidef.natCast (1 / n))]
             simp only [Nat.cast_commute (1/n) _]
           _ ≤ (c' ε2 n) • (E3 ε2 n).toMat := by sorry
       --Linearly combine S81, S82, S85:
