@@ -170,16 +170,18 @@ theorem inner_self_nonneg: 0 ≤ A.inner A := by
 
 variable {A B C}
 
+open MatrixOrder in
 theorem inner_mul_nonneg (h : 0 ≤ A.toMat * B.toMat) : 0 ≤ A.inner B := by
-  rw [Matrix.PosSemidef.zero_le_iff_posSemidef] at h
+  rw [Matrix.nonneg_iff_posSemidef] at h
   exact (RCLike.nonneg_iff.mp h.trace_nonneg).left
 
 /-- The inner product for PSD matrices is nonnegative. -/
 theorem inner_ge_zero (hA : 0 ≤ A) (hB : 0 ≤ B) : 0 ≤ A.inner B := by
-  rw [zero_le_iff] at hA hB
+  rw [zero_le_iff] at hB
+  open MatrixOrder in
   open Classical in
-  rw [inner_eq_re_trace, ← hA.sqrt_mul_self, Matrix.trace_mul_cycle, Matrix.trace_mul_cycle]
-  nth_rewrite 1 [← hA.posSemidef_sqrt.left]
+  rw [inner_eq_re_trace, ← CFC.sqrt_mul_sqrt_self A.toMat hA, Matrix.trace_mul_cycle, Matrix.trace_mul_cycle]
+  nth_rewrite 1 [← (Matrix.nonneg_iff_posSemidef.mp (CFC.sqrt_nonneg A.toMat)).left]
   exact (RCLike.nonneg_iff.mp (hB.conjTranspose_mul_mul_same _).trace_nonneg).left
 
 theorem inner_mono (hA : 0 ≤ A) : B ≤ C → A.inner B ≤ A.inner C := fun hBC ↦ by
@@ -201,13 +203,16 @@ private theorem inner_zero_iff_aux_lemma [DecidableEq n] (hA₁ : A.val.PosSemid
   RCLike.re (A.val * B.val).trace = 0 ↔
     LinearMap.range (Matrix.toEuclideanLin A.val) ≤
       LinearMap.ker (Matrix.toEuclideanLin B.val) := by
+  open MatrixOrder in
   --Thanks Aristotle
   have h_trace_zero : (RCLike.re ((A.val * B.val).trace)) = 0 ↔ (A.val * B.val) = 0 := by
     -- Since $A$ and $B$ are positive semidefinite, we can write them as $A = C^* C$ and $B = D^* D$ for some matrices $C$ and $D$.
     obtain ⟨C, hC⟩ : ∃ C : Matrix n n 𝕜, A.val = C.conjTranspose * C := by
-      exact Matrix.posSemidef_iff_eq_conjTranspose_mul_self.mp hA₁
+      rw [← Matrix.nonneg_iff_posSemidef] at hA₁
+      exact CStarAlgebra.nonneg_iff_eq_star_mul_self.mp hA₁
     obtain ⟨D, hD⟩ : ∃ D : Matrix n n 𝕜, B.val = D.conjTranspose * D := by
-      exact Matrix.posSemidef_iff_eq_conjTranspose_mul_self.mp hB₁
+      erw [← Matrix.nonneg_iff_posSemidef] at hB₁
+      exact CStarAlgebra.nonneg_iff_eq_star_mul_self.mp hB₁
     have h_trace_zero_iff : (RCLike.re ((A.val * B.val).trace)) = 0 ↔ (D * C.conjTranspose) = 0 := by
       -- Since $\operatorname{Tr}((DC)^* DC) = \sum_{i,j} |(DC)_{ij}|^2$, and this sum is zero if and only if each term is zero, we have $\operatorname{Tr}((DC)^* DC) = 0$ if and only if $DC = 0$.
       have h_trace_zero_iff : (RCLike.re ((D * C.conjTranspose).conjTranspose * (D * C.conjTranspose)).trace) = 0 ↔ (D * C.conjTranspose) = 0 := by

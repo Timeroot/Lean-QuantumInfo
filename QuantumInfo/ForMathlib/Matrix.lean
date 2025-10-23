@@ -5,6 +5,7 @@ Authors: Alex Meiburg
 -/
 import Mathlib.Algebra.Algebra.Spectrum.Quasispectrum
 import Mathlib.Analysis.CStarAlgebra.Matrix
+import Mathlib.Analysis.Matrix.Order
 import Mathlib.Data.Multiset.Functor --Can't believe I'm having to import this
 import Mathlib.LinearAlgebra.Matrix.Kronecker
 import Mathlib.LinearAlgebra.Matrix.HermitianFunctionalCalculus
@@ -237,21 +238,8 @@ theorem PosSemidef_kronecker : (A ⊗ₖ B).PosSemidef := by
 
 variable [dm : DecidableEq m]
 
-lemma sqrt_eq {A B : Matrix m m 𝕜} (h : A = B) (hA : A.PosSemidef) (hB : B.PosSemidef) :
-    hA.sqrt = hB.sqrt := by
-  congr!
-
-lemma sqrt_eq' {A B : Matrix m m 𝕜} (h : A = B) (hA : A.PosSemidef) :
-    hA.sqrt = (h ▸ hA).sqrt := by
-  congr!
-
-@[simp]
-theorem sqrt_0 : (PosSemidef.zero (n := n) (R := 𝕜)).sqrt = 0 :=
-  (sqrt_eq_zero_iff PosSemidef.zero).mpr rfl
-
-@[simp]
-theorem sqrt_1 : (PosSemidef.one (n := n) (R := 𝕜)).sqrt = 1 :=
-  (sqrt_eq_one_iff PosSemidef.one).mpr rfl
+open MatrixOrder
+open ComplexOrder
 
 omit [DecidableEq m]
 
@@ -291,15 +279,6 @@ theorem nonneg_smul_Real_smul {c : ℝ} (hA : A.PosSemidef) (hc : 0 ≤ c) : (c 
 theorem pos_Real_smul {c : ℝ} (hA : (c • A).PosSemidef) (hc : 0 < c) : A.PosSemidef := by
   rw [(RCLike.real_smul_eq_coe_smul c A : c • A = (c : 𝕜) • A)] at hA
   exact pos_smul hA (RCLike.ofReal_pos.mpr hc)
-
-include dm in
-theorem sqrt_nonneg_smul {c : 𝕜} (hA : (c^2 • A).PosSemidef) (hc : 0 < c) :
-    hA.sqrt = c • (hA.pos_smul (sq_pos_of_pos hc) : A.PosSemidef).sqrt := by
-  apply Eq.symm
-  apply (eq_sqrt_iff_sq_eq ?_ hA).mpr
-  · rw [pow_two, Algebra.mul_smul_comm, Algebra.smul_mul_assoc, sqrt_mul_self, pow_two, smul_smul]
-  · apply nonneg_smul ?_ hc.le
-    apply posSemidef_sqrt
 
 theorem zero_posSemidef_neg_posSemidef_iff : A.PosSemidef ∧ (-A).PosSemidef ↔ A = 0 := by
   constructor
@@ -344,97 +323,61 @@ end PosDef
 namespace PosSemidef
 section partialOrder
 open scoped ComplexOrder
+open scoped MatrixOrder
 
 variable {n m 𝕜 : Type*}
 variable [Fintype n] [Fintype m] [RCLike 𝕜] [DecidableEq m]
 variable {A : Matrix n n 𝕜} {B : Matrix n n 𝕜}
 variable (hA : A.IsHermitian) (hB : B.IsHermitian)
 
-/-- Loewner partial order of square matrices induced by positive-semi-definiteness:
-`A ≤ B ↔ (B - A).PosSemidef` alongside properties that make it an "OrderedCancelAddCommMonoid"
-TODO : Equivalence to CStarAlgebra.spectralOrder -/
-instance loewnerOrder : PartialOrder (Matrix n n 𝕜) where
-  le A B := (B - A).PosSemidef
-  le_refl A := by simp only [sub_self, PosSemidef.zero]
-  le_trans A B C hAB hBC := by
-    rw [←sub_add_sub_cancel _ B _]
-    exact PosSemidef.add hBC hAB
-  le_antisymm A B hAB hBA := by
-    rw [←neg_sub] at hAB
-    rw [←sub_eq_zero]
-    exact zero_posSemidef_neg_posSemidef_iff.mp ⟨hBA, hAB⟩
-
 instance instOrderedCancelAddCommMonoid : IsOrderedCancelAddMonoid (Matrix n n 𝕜) where
   add_le_add_left A B hAB C := by
-    dsimp [loewnerOrder]
+    rw [Matrix.le_iff]
     rwa [add_sub_add_left_eq_sub]
   le_of_add_le_add_left A B C hABAC:= by
-    dsimp [loewnerOrder] at hABAC
+    rw [Matrix.le_iff] at hABAC
     rwa [add_sub_add_left_eq_sub] at hABAC
-
-theorem le_iff_sub_posSemidef : A ≤ B ↔ (B - A).PosSemidef := by rfl
-
-theorem zero_le_iff_posSemidef : 0 ≤ A ↔ A.PosSemidef := by
-  apply Iff.trans (le_iff_sub_posSemidef)
-  rw [sub_zero]
 
 /-- Basically, the instance states A ≤ B ↔ B = A + Sᴴ * S  -/
 instance instStarOrderedRing : StarOrderedRing (Matrix n n 𝕜) :=
   StarOrderedRing.of_nonneg_iff'
     (add_le_add_left)
-    (fun _ ↦ zero_le_iff_posSemidef.trans posSemidef_iff_eq_conjTranspose_mul_self)
-
-theorem le_iff_sub_nonneg : A ≤ B ↔ 0 ≤ B - A := Iff.trans le_iff_sub_posSemidef zero_le_iff_posSemidef.symm
+    (fun _ ↦ by classical apply CStarAlgebra.nonneg_iff_eq_star_mul_self)
 
 theorem le_of_nonneg_imp {R : Type*} [AddCommGroup R] [PartialOrder R] [IsOrderedAddMonoid R]
     (f : Matrix n n 𝕜 →+ R) (h : ∀ A, A.PosSemidef → 0 ≤ f A) :
     (A ≤ B → f A ≤ f B) := by
   intro hAB
   rw [←sub_nonneg, ←map_sub]
-  exact h (B - A) <| le_iff_sub_posSemidef.mp hAB
+  exact h (B - A) <| by rwa [← Matrix.le_iff]
 
 theorem le_of_nonneg_imp' {R : Type*} [AddCommGroup R] [PartialOrder R] [IsOrderedAddMonoid R]
     {x y : R} (f : R →+ Matrix n n 𝕜) (h : ∀ x, 0 ≤ x → (f x).PosSemidef) :
     (x ≤ y → f x ≤ f y) := by
   intro hxy
-  rw [le_iff_sub_nonneg, ←map_sub]
-  rw [←sub_nonneg] at hxy
-  exact zero_le_iff_posSemidef.mpr <| h (y - x) hxy
+  rw [← sub_nonneg, ← map_sub, Matrix.nonneg_iff_posSemidef]
+  rw [← sub_nonneg] at hxy
+  exact h (y - x) hxy
 
 omit [DecidableEq m] in
 theorem mul_mul_conjTranspose_mono (C : Matrix m n 𝕜) :
   A ≤ B → C * A * C.conjTranspose ≤ C * B * C.conjTranspose := fun hAB ↦ by
-    rw [le_iff_sub_posSemidef]
+    rw [Matrix.le_iff] at hAB ⊢
     have hDistrib : C * B * Cᴴ - C * A * Cᴴ = C * (B - A) * Cᴴ := by
       ext i j
       simp only [sub_apply, mul_apply, conjTranspose_apply, RCLike.star_def, Finset.sum_mul,
         ←Finset.sum_sub_distrib, mul_sub_left_distrib, mul_sub_right_distrib]
     rw [hDistrib]
-    exact mul_mul_conjTranspose_same (le_iff_sub_posSemidef.mp hAB) C
+    exact mul_mul_conjTranspose_same hAB C
 
 omit [DecidableEq m] in
 theorem conjTranspose_mul_mul_mono (C : Matrix n m 𝕜) :
   A ≤ B → C.conjTranspose * A * C ≤ C.conjTranspose * B * C := fun hAB ↦ by
-    rw [le_iff_sub_posSemidef]
-    have hDistrib : Cᴴ * B * C - Cᴴ * A * C = Cᴴ * (B - A) * C := by
-      ext i j
-      simp only [sub_apply, mul_apply, conjTranspose_apply, RCLike.star_def, Finset.sum_mul,
-        ←Finset.sum_sub_distrib, mul_sub_left_distrib, mul_sub_right_distrib]
-    rw [hDistrib]
-    exact conjTranspose_mul_mul_same (le_iff_sub_posSemidef.mp hAB) C
-
-/-- Basically, the instance states 0 ≤ A → ∀ x ∈ spectrum ℝ A, 0 ≤ x  -/
-instance instNonnegSpectrumClass : NonnegSpectrumClass ℝ (Matrix n n 𝕜) := by
-  open Classical in
-  apply NonnegSpectrumClass.of_spectrum_nonneg
-  intro A hA x hx
-  rw [(zero_le_iff_posSemidef.mp hA).1.spectrum_real_eq_range_eigenvalues, Set.mem_range] at hx
-  obtain ⟨i, hi⟩ := hx
-  rw [←hi]
-  exact (zero_le_iff_posSemidef.mp hA).eigenvalues_nonneg i
+    convert mul_mul_conjTranspose_mono Cᴴ hAB
+    <;> rw [conjTranspose_conjTranspose]
 
 theorem nonneg_iff_eigenvalue_nonneg [DecidableEq n] : 0 ≤ A ↔ ∀ x, 0 ≤ hA.eigenvalues x :=
-  Iff.trans zero_le_iff_posSemidef hA.posSemidef_iff_eigenvalues_nonneg
+  Iff.trans Matrix.nonneg_iff_posSemidef hA.posSemidef_iff_eigenvalues_nonneg
 
 theorem diag_monotone : Monotone (diag : Matrix n n 𝕜 → (n → 𝕜)) := fun _ _ ↦
   le_of_nonneg_imp (diagAddMonoidHom n 𝕜) (fun _ ↦ diag_nonneg)
@@ -455,7 +398,7 @@ theorem diagonal_mono {d₁ d₂ : n → 𝕜} : d₁ ≤ d₂ → diagonal d₁
 
 theorem diagonal_le_iff {d₁ d₂ : n → 𝕜} : d₁ ≤ d₂ ↔ diagonal d₁ ≤ diagonal d₂ := ⟨diagonal_mono, by
   intro hd
-  rw [le_iff_sub_posSemidef, diagonal_sub, posSemidef_diagonal_iff] at hd
+  rw [Matrix.le_iff, diagonal_sub, posSemidef_diagonal_iff] at hd
   simp only [sub_nonneg] at hd
   exact hd⟩
 
@@ -996,7 +939,7 @@ private lemma spectrum_prod_complex {d d₂ : Type*}
   have h_det : Matrix.det (A ⊗ₖ B - x • 1) = 0 := by
     rw [ spectrum.mem_iff, Matrix.isUnit_iff_isUnit_det ] at hx;
     rw [ ← neg_sub, Matrix.det_neg ]
-    simp_all only [Set.mem_compl_iff, isUnit_iff_ne_zero, ne_eq, Decidable.not_not, Fintype.card_prod,
+    simp_all only [isUnit_iff_ne_zero, ne_eq, Decidable.not_not, Fintype.card_prod,
       mul_eq_zero, pow_eq_zero_iff', neg_eq_zero, one_ne_zero, not_or, false_and, false_or]
     convert hx using 1;
     congr! 1;
@@ -1011,7 +954,7 @@ private lemma spectrum_prod_complex {d d₂ : Type*}
     · -- Since $U$ is unitary, $U⁻¹ = U*$, and thus $U⁻¹ * U = I$.
       have h_unitary : (hA.eigenvectorUnitary : Matrix d d ℂ)⁻¹ = star (hA.eigenvectorUnitary : Matrix d d ℂ) := by
         rw [ Matrix.inv_eq_left_inv ];
-        simp [ Matrix.mul_eq_one_comm ];
+        simp
       -- Substitute h_unitary into the equation.
       rw [h_unitary];
       exact Matrix.IsHermitian.star_mul_self_mul_eq_diagonal hA
@@ -1024,11 +967,11 @@ private lemma spectrum_prod_complex {d d₂ : Type*}
         -- Since the eigenvector unitary matrix is unitary, its determinant is non-zero.
         have h_unitary_det : ∀ (U : Matrix d₂ d₂ ℂ), U * star U = 1 → U.det ≠ 0 :=
           fun U hU => Matrix.det_ne_zero_of_right_inverse hU;
-        exact h_unitary_det _ ( by simp [ ← Matrix.mul_assoc, ← this, hB ] ) h_det_zero;
+        exact h_unitary_det _ ( by simp) h_det_zero;
       · exact isDiag_diagonal (RCLike.ofReal ∘ hB.eigenvalues);
       · convert this using 1;
         rw [ Matrix.inv_eq_left_inv ];
-        simp [ Matrix.mul_eq_one_comm ];
+        simp
     refine ⟨ Q, hQ_unitary, D, hD_diag, ?_ ⟩
     simp [ hQ, mul_assoc, hQ_unitary, isUnit_iff_ne_zero ];
   -- Then $(P \otimes Q)^{-1}(A \otimes B)(P \otimes Q) = D \otimes E$, where $D$ and $E$ are diagonal matrices.
@@ -1036,7 +979,7 @@ private lemma spectrum_prod_complex {d d₂ : Type*}
     -- Using the properties of the Kronecker product and the fact that $P$ and $Q$ are invertible, we can simplify the expression.
     have h_kronecker : (P.kronecker Q)⁻¹ * (A.kronecker B) * (P.kronecker Q) = (P⁻¹ * A * P).kronecker (Q⁻¹ * B * Q) := by
       have h_kronecker : ∀ (X Y : Matrix d d ℂ) (Z W : Matrix d₂ d₂ ℂ), (X.kronecker Z) * (Y.kronecker W) = (X * Y).kronecker (Z * W) := by
-        intro X Y Z W; ext i j; simp [ Matrix.mul_apply, Matrix.kronecker_apply ] ;
+        intro X Y Z W; ext i j; simp [ Matrix.mul_apply ] ;
         simp only [mul_left_comm, mul_comm, Finset.mul_sum _ _ _];
         exact Fintype.sum_prod_type_right _
       rw [Matrix.inv_eq_right_inv, h_kronecker, h_kronecker];
@@ -1055,7 +998,7 @@ private lemma spectrum_prod_complex {d d₂ : Type*}
     have h_det_diag : Matrix.det (D ⊗ₖ E - x • 1) = ∏ i : d, ∏ j : d₂, (D i i * E j j - x) := by
       have h_det_diag : Matrix.det (D ⊗ₖ E - x • 1) = Matrix.det (Matrix.diagonal (fun p : d × d₂ => D p.1 p.1 * E p.2 p.2 - x)) := by
         congr with p q
-        simp_all only [Set.mem_compl_iff, ne_eq, exists_eq_right', and_true, kronecker, sub_apply,
+        simp_all only [ne_eq, kronecker, sub_apply,
           kroneckerMap_apply, smul_apply, smul_eq_mul]
         obtain ⟨fst, snd⟩ := p
         obtain ⟨fst_1, snd_1⟩ := q
@@ -1070,7 +1013,7 @@ private lemma spectrum_prod_complex {d d₂ : Type*}
       exact Fintype.prod_prod_type fun (x_2 : d × d₂) => D x_2.1 x_2.1 * E x_2.2 x_2.2 - x
     exact h_det_diag.symm ▸ Finset.prod_ne_zero_iff.mpr fun i _ => Finset.prod_ne_zero_iff.mpr fun j _ => sub_ne_zero_of_ne <| by solve_by_elim;
   refine' ⟨ D i i, _, E j j, _, _ ⟩
-  · simp_all [ spectrum.mem_iff, Matrix.nonsing_inv_apply_not_isUnit ];
+  · simp_all [ spectrum.mem_iff ];
     simp_all [ Matrix.isUnit_iff_isUnit_det ];
     have h_det_diag : Matrix.det (P⁻¹ * (D i i • 1 - A) * P) = 0 := by
       simp_all [ mul_sub, sub_mul, mul_assoc ];
@@ -1080,12 +1023,12 @@ private lemma spectrum_prod_complex {d d₂ : Type*}
       simp_all only [map_mul, sub_apply, smul_apply, smul_eq_mul]
       obtain ⟨left, rfl⟩ := hD
       obtain ⟨left_1, rfl⟩ := hE
-      by_cases hij : i = j_1 <;> simp_all [ Matrix.one_apply, sub_eq_zero ];
+      by_cases hij : i = j_1 <;> simp_all [ Matrix.one_apply ];
       exact left hij;
-    simp_all [ Matrix.det_mul, isUnit_iff_ne_zero ];
+    simp_all [ Matrix.det_mul];
     convert h_det_diag using 1;
     exact congr_arg Matrix.det ( by ext i j; by_cases hi : i = j <;> simp [ hi, Algebra.smul_def ] );
-  · simp_all [ spectrum.mem_iff, Matrix.nonsing_inv_apply_not_isUnit ];
+  · simp_all [ spectrum.mem_iff ];
     -- Since $E$ is diagonal, $E j j - B$ is singular, hence not invertible.
     have h_singular : Matrix.det (E j j • 1 - B) = 0 := by
       have h_singular : Matrix.det (Q⁻¹ * (E j j • 1 - B) * Q) = 0 := by
@@ -1102,7 +1045,7 @@ private lemma spectrum_prod_complex {d d₂ : Type*}
     simp_all [ Matrix.isUnit_iff_isUnit_det ];
     convert h_singular using 1;
     simp [ Algebra.smul_def ];
-  · simp_all [ spectrum.mem_iff, Matrix.nonsing_inv_apply_not_isUnit ];
+  · simp_all [ spectrum.mem_iff ];
 
 private lemma spectrum_prod_le {d d₂ : Type*}
   [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂]
@@ -1126,14 +1069,14 @@ private lemma spectrum_prod_le {d d₂ : Type*}
         rw [ spectrum.mem_iff ] at hx;
         simp_all [ Matrix.isUnit_iff_isUnit_det ];
         obtain ⟨ v, hv ⟩ := Matrix.exists_mulVec_eq_zero_iff.mpr hx;
-        simp_all [ sub_mul, Matrix.sub_mulVec ];
+        simp_all [ Matrix.sub_mulVec ];
         simp_all [ sub_eq_zero, Algebra.algebraMap_eq_smul_one ];
         exact ⟨ v, hv.1, by simpa [ Matrix.smul_eq_diagonal_mul ] using hv.2.symm ⟩;
       -- Since $A$ is Hermitian, we have $v^* A v = (A v)^* v$.
       have h_herm : dotProduct (star v) (Matrix.mulVec A v) = dotProduct (star (Matrix.mulVec A v)) v := by
-        simp [ dotProduct, Matrix.mulVec, hA.eq ];
-        simp [ Matrix.mulVec, dotProduct, Finset.mul_sum _ _ _, mul_assoc, mul_comm, mul_left_comm ];
-        rw [ Finset.sum_comm ] ; congr ; ext i ; congr ; ext j ; rw [ ← congr_fun ( congr_fun hA i ) j ] ; simp [ mul_assoc, mul_comm, mul_left_comm ] ;
+        simp [ dotProduct, Matrix.mulVec ];
+        simp [ Finset.mul_sum _ _ _, mul_assoc, mul_comm];
+        rw [ Finset.sum_comm ] ; congr ; ext i ; congr ; ext j ; rw [ ← congr_fun ( congr_fun hA i ) j ] ; simp [mul_left_comm ] ;
       simp_all [ Complex.ext_iff ];
       norm_num [ dotProduct ] at h_herm;
       exact Eq.symm ( by linarith [ h_herm.resolve_right fun h => hv.1 <| funext fun i => by norm_num [ Complex.ext_iff ] ; constructor <;> nlinarith [ h.1 ▸ Finset.single_le_sum ( fun i _ => add_nonneg ( mul_self_nonneg ( v i |> Complex.re ) ) ( mul_self_nonneg ( v i |> Complex.im ) ) ) ( Finset.mem_univ i ) ] ] )
@@ -1144,7 +1087,7 @@ private lemma spectrum_prod_le {d d₂ : Type*}
         simp_all [ Matrix.isUnit_iff_isUnit_det ];
         have := Matrix.exists_mulVec_eq_zero_iff.mpr hx;
         simp_all [ sub_eq_iff_eq_add, Matrix.sub_mulVec ];
-        simp_all [ Algebra.algebraMap_eq_smul_one, Matrix.mulVec ];
+        simp_all [ Algebra.algebraMap_eq_smul_one];
         simp_all [ funext_iff, Matrix.mulVec, dotProduct ];
         simp_all [ Matrix.one_apply, mul_comm ];
         exact ⟨ this.choose, this.choose_spec.1, fun i => this.choose_spec.2 i ▸ rfl ⟩;
@@ -1156,7 +1099,7 @@ private lemma spectrum_prod_le {d d₂ : Type*}
       have h_inner_conj : star (v) ⬝ᵥ B.mulVec v = star (star (v) ⬝ᵥ B.mulVec v) := by
         simp [ Matrix.mulVec, dotProduct, Finset.mul_sum _ _ _, mul_assoc, mul_comm, mul_left_comm ];
         rw [ Finset.sum_comm ];
-        exact Finset.sum_congr rfl fun i _ => Finset.sum_congr rfl fun j _ => by rw [ ← congr_fun ( congr_fun hB j ) i ] ; simp [ mul_assoc, mul_comm, mul_left_comm ] ;
+        exact Finset.sum_congr rfl fun i _ => Finset.sum_congr rfl fun j _ => by rw [ ← congr_fun ( congr_fun hB j ) i ] ; simp [ mul_left_comm ] ;
       norm_num [ Complex.ext_iff ] at *;
       norm_num [ dotProduct ] at *;
       norm_num [ mul_comm ] at *;
@@ -1192,17 +1135,17 @@ theorem spectrum_prod {d d₂ : Type*}
       rw [ spectrum.mem_iff ] at hz;
       simp_all [ Matrix.isUnit_iff_isUnit_det ];
       have := Matrix.exists_mulVec_eq_zero_iff.mpr hz;
-      simp_all [ sub_mul, Matrix.sub_mulVec ];
+      simp_all [ Matrix.sub_mulVec ];
       obtain ⟨ w, hw, hw' ⟩ := this; use w; simp_all [ sub_eq_zero, Algebra.algebraMap_eq_smul_one ] ;
       simp_all [ funext_iff, Matrix.mulVec, dotProduct ];
-      simp_all [ Matrix.one_apply, Finset.mul_sum _ _ _ ];
+      simp_all [ Matrix.one_apply];
     refine' spectrum.mem_iff.mpr _;
     -- Consider the vector $v \otimes w$.
     set v_tensor_w : (d × d₂) → ℂ := fun p => v p.1 * w p.2;
     -- We need to show that $v \otimes w$ is an eigenvector of $A \otimes B$ with eigenvalue $yz$.
     have h_eigenvector : (Matrix.kroneckerMap (· * ·) A B).mulVec v_tensor_w = (y * z) • v_tensor_w := by
       ext ⟨ i, j ⟩ ;
-      simp [ Matrix.mulVec, dotProduct, Finset.mul_sum _ _ _, mul_left_comm, mul_comm ] at *
+      simp [ Matrix.mulVec, dotProduct] at *
       simp [ funext_iff, Matrix.mulVec, dotProduct ] at hv hw ⊢
       erw [ Finset.sum_product ]
       simp_all only [v_tensor_w]

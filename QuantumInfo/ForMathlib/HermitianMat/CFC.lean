@@ -302,6 +302,7 @@ variable {f g A} in
 nonrec theorem cfc_congr_of_zero_le (hA : 0 ≤ A) (hfg : Set.EqOn f g (Set.Ici 0)) :
     cfc A f = cfc A g := by
   refine cfc_congr A (hfg.mono ?_)
+  open MatrixOrder in
   exact fun i hi ↦ spectrum_nonneg_of_nonneg hA hi
 
 open ComplexOrder
@@ -322,6 +323,7 @@ theorem cfc_diagonal (g : d → ℝ) :
   exact Matrix.cfc_diagonal g f
 
 theorem zero_le_cfc : 0 ≤ A.cfc f ↔ ∀ i, 0 ≤ f (A.H.eigenvalues i) := by
+  open MatrixOrder in
   rw [cfc, ← Subtype.coe_le_coe]
   dsimp
   rw [cfc_nonneg_iff (hf := herm_cont), A.H.spectrum_real_eq_range_eigenvalues]

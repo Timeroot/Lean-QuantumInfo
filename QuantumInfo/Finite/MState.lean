@@ -132,6 +132,7 @@ theorem eigenvalue_le_one (ρ : MState d) : ∀ i, ρ.Hermitian.eigenvalues i �
   rw [ρ.M.sum_eigenvalues_eq_trace, ρ.tr]
 
 theorem le_one (ρ : MState d) : ρ.M ≤ 1 := by
+  open MatrixOrder in
   rw [Subtype.mk_le_mk]
   simp only [HermitianMat.val_eq_coe, selfAdjoint.val_one]
   suffices h : ρ.m ≤ (1 : ℝ) • 1 by

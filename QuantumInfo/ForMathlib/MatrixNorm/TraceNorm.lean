@@ -19,7 +19,12 @@ variable [RCLike R]
 
 /-- The trace norm of a matrix: Tr[√(A† A)]. -/
 def traceNorm (A : Matrix m n R) : ℝ :=
-  RCLike.re A.posSemidef_conjTranspose_mul_self.sqrt.trace
+  open MatrixOrder in
+  RCLike.re (CFC.sqrt (Aᴴ * A)).trace
+
+@[simp]
+theorem traceNorm_zero : traceNorm (0 : Matrix m n R) = 0 := by
+  simp [traceNorm]
 
 /-- The trace norm of the negative is equal to the trace norm. -/
 @[simp]
@@ -37,26 +42,25 @@ theorem traceNorm_Hermitian_eq_sum_abs_eigenvalues {A : Matrix n n R} (hA : A.Is
 
 /-- The trace norm is nonnegative. Property 9.1.1 in Wilde -/
 theorem traceNorm_nonneg (A : Matrix m n R) : 0 ≤ A.traceNorm :=
+  open MatrixOrder in
   And.left $ RCLike.nonneg_iff.1
-    A.posSemidef_conjTranspose_mul_self.posSemidef_sqrt.trace_nonneg
+    (Matrix.nonneg_iff_posSemidef.mp (CFC.sqrt_nonneg (Aᴴ * A))).trace_nonneg
 
 /-- The trace norm is zero only if the matrix is zero. -/
 theorem traceNorm_zero_iff (A : Matrix m n R) : A.traceNorm = 0 ↔ A = 0 := by
+  open MatrixOrder in
   constructor
   · intro h
-    have h₂ : ∀ i, A.posSemidef_conjTranspose_mul_self.posSemidef_sqrt.1.eigenvalues i = 0 :=
+    have h₂ : ∀ i, (Matrix.nonneg_iff_posSemidef.mp (CFC.sqrt_nonneg (Aᴴ * A))).1.eigenvalues i = 0 :=
       sorry --sum of nonnegative values to zero
-    have h₃ : A.posSemidef_conjTranspose_mul_self.sqrt = 0 :=
+    have h₃ : CFC.sqrt (Aᴴ * A) = 0 :=
       sorry --all eigenvalues are zero iff matrix is zero
     have h₄ : Aᴴ * A = 0 :=
       sorry --sqrt is zero iff matrix is zero
     have h₅ : A = 0 :=
       sorry --conj_mul_self is zero iff A is zero
     exact h₅
-  · intro hA
-    subst hA
-    have : (0 : Matrix m n R)ᴴ * (0 : Matrix m n R) = 0 := by simp
-    rw [traceNorm, PosSemidef.sqrt_eq this _ Matrix.PosSemidef.zero]
+  · rintro rfl
     simp
 
 /-- Trace norm is linear under scalar multiplication. Property 9.1.2 in Wilde -/
@@ -64,23 +68,18 @@ theorem traceNorm_smul (A : Matrix m n R) (c : R) : (c • A).traceNorm = ‖c�
   have h : (c • A)ᴴ * (c • A) = (‖c‖^2:R) • (Aᴴ * A) := by
     rw [conjTranspose_smul, RCLike.star_def, mul_smul, smul_mul, smul_smul]
     rw [RCLike.mul_conj c]
-  rw [traceNorm, PosSemidef.sqrt_eq' h]
-  have : RCLike.re (trace (‖c‖ • A.posSemidef_conjTranspose_mul_self.sqrt)) = ‖c‖ * traceNorm A := by
+  rw [traceNorm, h]
+  open MatrixOrder in
+  have : RCLike.re (trace (‖c‖ • CFC.sqrt (Aᴴ * A))) = ‖c‖ * traceNorm A := by
     simp [RCLike.smul_re]
     apply Or.inl
     rfl
-  convert this
+  convert this using 3
   rw [RCLike.real_smul_eq_coe_smul (K := R) ‖c‖]
   by_cases h : c = 0
-  · nth_rewrite 8 [h]
-    simp only [norm_zero, algebraMap.coe_zero, zero_smul]
-    rw [← PosSemidef.sqrt_0]
-    apply PosSemidef.sqrt_eq
-    simp [h]
-  · apply PosSemidef.sqrt_nonneg_smul _
-    rw [RCLike.pos_iff_exists_ofReal]
-    use ‖c‖
-    simp [h]
+  · subst c
+    simp
+  · sorry --need `CFC.sqrt_smul` or similar
 
 /-- For square matrices, the trace norm is max Tr[U * A] over unitaries U.-/
 theorem traceNorm_eq_max_tr_U (A : Matrix n n R) : IsGreatest {x | ∃ (U : unitaryGroup n R), (U.1 * A).trace = x} A.traceNorm := by
@@ -109,7 +108,8 @@ theorem traceNorm_triangleIneq' (A B : Matrix n n R) : (A - B).traceNorm ≤ A.t
 
 theorem PosSemidef.traceNorm_PSD_eq_trace {A : Matrix m m R} (hA : A.PosSemidef) : A.traceNorm = A.trace := by
   have : Aᴴ * A = A^2 := by rw [hA.1, pow_two]
-  rw [traceNorm, Matrix.PosSemidef.sqrt_eq' this, Matrix.PosSemidef.sqrt_sq hA, hA.1.re_trace_eq_trace]
+  open MatrixOrder in
+  rw [traceNorm, this, CFC.sqrt_sq A, hA.1.re_trace_eq_trace]
 
 end traceNorm
 

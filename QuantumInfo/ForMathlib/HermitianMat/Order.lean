@@ -13,6 +13,12 @@ variable {α : Type*} [RCLike α]
 variable {n : Type*} [Fintype n]
 variable  {A B C : HermitianMat n α} {M N : Matrix n n α}
 
+open MatrixOrder in
+/-- The `MatrixOrder` instance for Matrix (the Loewner order) we keep open for
+HermitianMat, always. -/
+instance : PartialOrder (HermitianMat n α) :=
+  inferInstance
+
 theorem le_iff : A ≤ B ↔ (B - A).toMat.PosSemidef := by
   rfl
 

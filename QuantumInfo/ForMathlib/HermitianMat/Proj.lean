@@ -100,10 +100,12 @@ theorem proj_lt_nonneg : 0 ≤ {A <ₚ B} := by
 theorem proj_le_le_one : {A ≤ₚ B} ≤ 1 := by
   --The whole `rw` line is a defeq, i.e. `change _root_.cfc _ (B - A).toMat ≤ 1` works too.
   --TODO better API.
+  open MatrixOrder in
   rw [← Subtype.coe_le_coe, val_eq_coe, selfAdjoint.val_one]
   apply cfc_le_one (f := fun x ↦ if 0 ≤ x then 1 else 0)
   intros; split <;> norm_num
 
+open MatrixOrder in
 theorem proj_le_mul_nonneg : 0 ≤ {A ≤ₚ B}.toMat * (B - A).toMat := by
   rw [proj_le]
   nth_rewrite 2 [← cfc_id (B - A)]
@@ -111,6 +113,7 @@ theorem proj_le_mul_nonneg : 0 ≤ {A ≤ₚ B}.toMat * (B - A).toMat := by
   apply cfc_nonneg
   aesop
 
+open MatrixOrder in
 theorem proj_le_mul_le : {A ≤ₚ B}.toMat * A.toMat ≤ {A ≤ₚ B}.toMat * B.toMat := by
   rw [← sub_nonneg, ← mul_sub_left_distrib]
   exact proj_le_mul_nonneg A B

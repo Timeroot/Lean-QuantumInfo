@@ -510,11 +510,13 @@ instance {d 𝕜 : Type*} [Fintype d] [DecidableEq d] [RCLike 𝕜] :
     PosSMulReflectLE ℝ (HermitianMat d 𝕜) :=
   PosSMulMono.toPosSMulReflectLE
 
+open MatrixOrder
+
 --PULLOUT
 theorem _root_.Matrix.PosDef.zero_lt {n : Type*} [Nonempty n] [Fintype n] {A : Matrix n n ℂ} (hA : A.PosDef) : 0 < A := by
   apply lt_of_le_of_ne
   · replace hA := hA.posSemidef
-    rwa [Matrix.PosSemidef.zero_le_iff_posSemidef]
+    rwa [Matrix.nonneg_iff_posSemidef]
   · rintro rfl
     --wtf do better. TODO
     have : ¬(0 < 0) := by trivial
@@ -695,7 +697,7 @@ private lemma rexp_mul_smul_proj_lt_mul_sub_le_mul_sub {n : ℕ} {x : ℝ}
     positivity
 
 private lemma rexp_mul_smul_proj_lt_mul_sub_le_mul_sub' {n : ℕ} {x : ℝ} {y : ℝ}
-  {E ℰ σ : HermitianMat d ℂ} (hℰσ : Commute ℰ.toMat σ.toMat) (hx : 0 < y) (hy : y ≤ x)
+  {E ℰ σ : HermitianMat d ℂ} (hℰσ : Commute ℰ.toMat σ.toMat)
   (hℰ : ℰ.toMat.PosSemidef) (hσ : σ.toMat.PosDef)
   (hE : E = {Real.exp (n * y) • σ ≤ₚ ℰ} - {Real.exp (n * x) • σ ≤ₚ ℰ})
     : (1 / n : ℝ) • E.toMat * (ℰ.log.toMat - σ.log.toMat) ≤ x • E := by
@@ -1732,10 +1734,9 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     -- (S82) -- see (S81) for comments
     have hE2leq ε2 (n : ℕ) (hε2 : 0 < ε2) : (1/n : ℝ) • (E2 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ ((R2 ρ σ).toReal + ε₀ + ε2) • (E2 ε2 n).toMat := by
       refine rexp_mul_smul_proj_lt_mul_sub_le_mul_sub'
-        (pinching_commutes (ρ⊗^S[n]) (σ'' n)) (by positivity) ?_ ?_ (σ''_posdef n) rfl
-      · grw [hε₀']
-      · rw [← HermitianMat.zero_le_iff]
-        apply MState.zero_le
+        (pinching_commutes (ρ⊗^S[n]) (σ'' n)) ?_ (σ''_posdef n) rfl
+      rw [← HermitianMat.zero_le_iff]
+      apply MState.zero_le
 
     -- (S83)
     let c' ε2 n := (c n + (c n) / n) ⊔ ((R2 ρ σ).toReal + ε₀ + ε2)
