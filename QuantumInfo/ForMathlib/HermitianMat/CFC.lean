@@ -8,6 +8,7 @@ import QuantumInfo.ForMathlib.Isometry
 
 import Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Continuity
 import Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Basic
+import Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Instances
 import Mathlib.Analysis.CStarAlgebra.CStarMatrix
 import Mathlib.Algebra.Order.Group.Pointwise.CompleteLattice
 
