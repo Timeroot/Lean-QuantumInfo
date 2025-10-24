@@ -1789,9 +1789,9 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
       -- (S85) (first inequality should have $\sigma_n''$ instead of $\tilde{\sigma}_n''$; corrected in v4, where $\tilde{\sigma}_n'$ takes the place of $\sigma_n''$)
       have hE3leq ε2 (n : ℕ) (hε2 : 0 < ε2) : (1/n : ℝ) • (E3 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ (c' ε2 n) • (E3 ε2 n).toMat := by
         calc
-          (1/n : ℝ) • (E3 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ (1/n) • (E3 ε2 n).toMat * (- (σ'' n).M.log.toMat) := by
+          (1/n : ℝ) • (E3 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ (1/n : ℝ) • (E3 ε2 n).toMat * (- (σ'' n).M.log.toMat) := by
             sorry -- first inequality of (S85)
-          _ ≤ (1/n) • (E3 ε2 n).toMat * (- (Real.exp (-n * c' ε2 n) • (1 : HermitianMat (H (i ^ n)) ℂ)).log.toMat) := by -- towards 2nd (S85)ineq
+          _ ≤ (1/n : ℝ) • (E3 ε2 n).toMat * (- (Real.exp (-n * c' ε2 n) • (1 : HermitianMat (H (i ^ n)) ℂ)).log.toMat) := by -- towards 2nd (S85)ineq
             simp only [nsmul_eq_mul, mul_neg, neg_mul, neg_le_neg_iff]
             have hlog : (Real.exp (-(n * c' ε2 n)) • 1 : HermitianMat (H (i ^ n)) ℂ).log.toMat ≤ ((σ'' n).M).log.toMat := by
               rw [Subtype.coe_le_coe]
@@ -1801,17 +1801,15 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
                 (Matrix.PosDef.smul Matrix.PosDef.one (Real.exp_pos (-(n * c' ε2 n))))
             rw [← sub_nonneg] at hlog
             rw [← sub_nonneg, ← mul_sub_left_distrib]
+            simp only [one_div, Algebra.smul_mul_assoc]
             have comm_aux2 : Commute (E3 ε2 n).toMat ((σ'' n).M.log.toMat - (Real.exp (-(n * c' ε2 n)) • 1 : HermitianMat _ ℂ).log.toMat) := by
               sorry
-            rw [Matrix.mul_assoc]
             have hElog : 0 ≤ (E3 ε2 n).toMat * ((σ'' n).M.log.toMat - (Real.exp (-(n * c' ε2 n)) • 1 : HermitianMat _ ℂ).log.toMat) := by
               apply Commute.mul_nonneg _ hlog comm_aux2
-              -- Show 0 ≤ E3
-              sorry
-            apply Commute.mul_nonneg _ hElog _
-            simp only [nonneg_iff_posSemidef, (Matrix.PosSemidef.natCast (1 / n))]
-            simp only [Nat.cast_commute (1/n) _]
-          _ ≤ (c' ε2 n) • (E3 ε2 n).toMat := by sorry
+              apply HermitianMat.proj_le_nonneg
+            apply smul_nonneg (inv_nonneg_of_nonneg (Nat.cast_nonneg' n)) hElog
+          _ = (c' ε2 n) • (E3 ε2 n).toMat := by
+            sorry
       --Linearly combine S81, S82, S85:
       --(S86)
       --(S87)
