@@ -1788,11 +1788,13 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
       -- see (S81) for comments on why that statement had to be changed
       -- (S85) (first inequality should have $\sigma_n''$ instead of $\tilde{\sigma}_n''$; corrected in v4, where $\tilde{\sigma}_n'$ takes the place of $\sigma_n''$)
       have hE3leq ε2 (n : ℕ) (hε2 : 0 < ε2) : (1/n : ℝ) • (E3 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ (c' ε2 n) • (E3 ε2 n).toMat := by
+        rcases n.eq_zero_or_pos with rfl | hn
+        . skip
         calc
           (1/n : ℝ) • (E3 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ (1/n : ℝ) • (E3 ε2 n).toMat * (- (σ'' n).M.log.toMat) := by
             sorry -- first inequality of (S85)
           _ ≤ (1/n : ℝ) • (E3 ε2 n).toMat * (- (Real.exp (-n * c' ε2 n) • (1 : HermitianMat (H (i ^ n)) ℂ)).log.toMat) := by -- towards 2nd (S85)ineq
-            simp only [nsmul_eq_mul, mul_neg, neg_mul, neg_le_neg_iff]
+            simp only [mul_neg, neg_mul, neg_le_neg_iff]
             have hlog : (Real.exp (-(n * c' ε2 n)) • 1 : HermitianMat (H (i ^ n)) ℂ).log.toMat ≤ ((σ'' n).M).log.toMat := by
               rw [Subtype.coe_le_coe]
               have h_comm : Commute ((Real.exp _ • 1 : HermitianMat _ ℂ).toMat) _ :=
@@ -1803,13 +1805,37 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
             rw [← sub_nonneg, ← mul_sub_left_distrib]
             simp only [one_div, Algebra.smul_mul_assoc]
             have comm_aux2 : Commute (E3 ε2 n).toMat ((σ'' n).M.log.toMat - (Real.exp (-(n * c' ε2 n)) • 1 : HermitianMat _ ℂ).log.toMat) := by
+              apply Commute.sub_right _ _
+              swap
+              conv =>
+                rhs
+                simp only [
+                  HermitianMat.log_smul (1 : HermitianMat _ ℂ) (Real.exp _),
+                  Real.log_exp, neg_smul, HermitianMat.log_one,
+                  add_zero, NegMemClass.coe_neg,
+                  HermitianMat.val_eq_coe, selfAdjoint.val_smul,
+                  selfAdjoint.val_one
+                  ]
+              simp only [Commute.neg_right_iff, Commute.smul_right (Commute.one_right _) _]
+              -- show that Commute (E3 _) (σ'' _).log
               sorry
             have hElog : 0 ≤ (E3 ε2 n).toMat * ((σ'' n).M.log.toMat - (Real.exp (-(n * c' ε2 n)) • 1 : HermitianMat _ ℂ).log.toMat) := by
               apply Commute.mul_nonneg _ hlog comm_aux2
               apply HermitianMat.proj_le_nonneg
             apply smul_nonneg (inv_nonneg_of_nonneg (Nat.cast_nonneg' n)) hElog
           _ = (c' ε2 n) • (E3 ε2 n).toMat := by
-            sorry
+            conv =>
+              lhs; congr; rfl
+              simp only [
+                neg_mul, HermitianMat.log_smul _ _, Real.log_exp, neg_smul,
+                HermitianMat.log_one, add_zero, NegMemClass.coe_neg,
+                HermitianMat.val_eq_coe,
+                selfAdjoint.val_smul, selfAdjoint.val_one, neg_neg
+                ]
+              rfl
+            simp only [one_div, Algebra.mul_smul_comm, mul_one, smul_smul]
+            rw [mul_comm, ← mul_assoc, ← one_div, one_div_mul_cancel, one_mul]
+            simp only [ne_eq, Nat.cast_eq_zero, ne_zero_of_lt hn, not_false_eq_true]
       --Linearly combine S81, S82, S85:
       --(S86)
       --(S87)
