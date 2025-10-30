@@ -566,15 +566,36 @@ theorem _root_.Commute.exists_HermitianMat_cfc {d : Type*} [Fintype d] [Decidabl
 /- TODO: Write a version of this that holds more broadly for some sets. Esp closed intervals of reals,
 which correspond nicely to closed intervals of matrices. Write the specialization to Set.univ (Monotone
 instead of MonotoneOn). Also a version that works for StrictMonoOn. -/
-proof_wanted _root_.HermitianMat.cfc_le_cfc_of_commute_monoOn {d : Type*} [Fintype d] [DecidableEq d]
-  {f : ℝ → ℝ} (hf : MonotoneOn f (Set.Ioi 0)) (A B : HermitianMat d ℂ) (hAB₁ : Commute A.toMat B.toMat)
+theorem _root_.HermitianMat.cfc_le_cfc_of_commute_monoOn {d : Type*} [Fintype d] [DecidableEq d]
+  {f : ℝ → ℝ} (hf : MonotoneOn f (Set.Ioi 0)) {A B : HermitianMat d ℂ} (hAB₁ : Commute A.toMat B.toMat)
   (hAB₂ : A ≤ B) (hA : A.toMat.PosDef) (hB : B.toMat.PosDef) :
-    A.cfc f ≤ B.cfc f
-  -- obtain ⟨C, ⟨g₁, hg₁⟩, ⟨g₂, hg₂⟩⟩ := hAB₁.exists_HermitianMat_cfc
-  -- rw [hg₁, hg₂]
-  --Need to show that g₁ ≤ g₂ on spectrum ℝ C
-  -- rw [← C.cfc_comp, ← C.cfc_comp] --?
-  -- apply C.cfc_le_cfc_of_PosDef ... but now you need to facts about the g's. bad approach maybe.
+    A.cfc f ≤ B.cfc f := by
+  obtain ⟨C, ⟨g₁, rfl⟩, ⟨g₂, rfl⟩⟩ := hAB₁.exists_HermitianMat_cfc
+  -- Need to show that g₁ ≤ g₂ on spectrum ℝ C
+  rw [← C.cfc_comp, ← C.cfc_comp]
+  rw [← sub_nonneg, ← C.cfc_sub, C.zero_le_cfc] at hAB₂ ⊢
+  intro i
+  simp only [HermitianMat.val_eq_coe, Pi.sub_apply, Function.comp_apply, sub_nonneg]
+  apply hf
+  · rw [HermitianMat.cfc_PosDef] at hA
+    exact hA i
+  · rw [HermitianMat.cfc_PosDef] at hB
+    exact hB i
+  · simpa using hAB₂ i
+
+/-- TODO: See above -/
+theorem _root_.HermitianMat.cfc_le_cfc_of_commute {d : Type*} [Fintype d] [DecidableEq d]
+  {f : ℝ → ℝ} (hf : Monotone f) {A B : HermitianMat d ℂ} (hAB₁ : Commute A.toMat B.toMat)
+  (hAB₂ : A ≤ B) :
+    A.cfc f ≤ B.cfc f := by
+  obtain ⟨C, ⟨g₁, rfl⟩, ⟨g₂, rfl⟩⟩ := hAB₁.exists_HermitianMat_cfc
+  -- Need to show that g₁ ≤ g₂ on spectrum ℝ C
+  rw [← C.cfc_comp, ← C.cfc_comp]
+  rw [← sub_nonneg, ← C.cfc_sub, C.zero_le_cfc] at hAB₂ ⊢
+  intro i
+  simp only [HermitianMat.val_eq_coe, Pi.sub_apply, Function.comp_apply, sub_nonneg]
+  apply hf
+  simpa using hAB₂ i
 
 --This is the more general version that requires operator concave functions but doesn't require the inputs
 -- to commute. Requires the correct statement of operator convexity though, which we don't have right now.
@@ -588,12 +609,34 @@ proof_wanted _root_.HermitianMat.log_monoOn_posDef {d : Type*} [Fintype d] [Deci
 /-- Monotonicity of log on commuting operators. -/
 theorem _root_.HermitianMat.log_le_log_of_commute {d : Type*} [Fintype d] [DecidableEq d]
   {A B : HermitianMat d ℂ} (hAB₁ : Commute A.toMat B.toMat) (hAB₂ : A ≤ B) (hA : A.toMat.PosDef) :
-    A.log ≤ B.log := by sorry
+    A.log ≤ B.log := by
+  refine HermitianMat.cfc_le_cfc_of_commute_monoOn ?_ hAB₁ hAB₂ hA ?_
+  · exact Real.strictMonoOn_log.monotoneOn
+  · --The fact that `A ≤ B` and `A.PosDef` implies `B.PosDef`. Should be a theorem, TODO
+    -- This almost works but not quite:
+    -- rw [← Matrix.isStrictlyPositive_iff_posDef] at hA ⊢
+    -- exact hA.of_le hAB₂
+    simpa using Matrix.PosDef.add_posSemidef hA hAB₂ --ew. abuse
+
+@[simp]
+theorem Real.log_comp_exp : Real.log ∘ Real.exp = _root_.id := by
+  ext
+  simp
 
 /-- Monotonicity of exp on commuting operators. -/
-proof_wanted _root_.HermitianMat.exp_le_exp_of_commute {d : Type*} [Fintype d] [DecidableEq d]
+theorem _root_.HermitianMat.exp_le_exp_of_commute {d : Type*} [Fintype d] [DecidableEq d]
   {A B : HermitianMat d ℂ} (hAB₁ : Commute A.toMat B.toMat) (hAB₂ : A.cfc Real.exp ≤ B.cfc Real.exp) :
-    A ≤ B
+    A ≤ B := by
+  have hA : A = (A.cfc Real.exp).cfc Real.log := by simp [← HermitianMat.cfc_comp]
+  have hB : B = (B.cfc Real.exp).cfc Real.log := by simp [← HermitianMat.cfc_comp]
+  rw [hA, hB]
+  apply HermitianMat.log_le_log_of_commute
+  · sorry--apply HermitianMat.cfc_commute --Need the version for two commuting matrices
+  · exact hAB₂
+  · rw [HermitianMat.cfc_PosDef]
+    intro
+    positivity
+
 
 open scoped HermitianMat
 
