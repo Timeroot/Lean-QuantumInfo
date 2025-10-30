@@ -541,11 +541,6 @@ theorem _root_.HermitianMat.cfc_le_cfc_of_PosDef {d : Type*} [Fintype d] [Decida
   apply hfg
   apply hA
 
-theorem _root_.HermitianMat.cfc_commute {d : Type*} [Fintype d] [DecidableEq d]
-  (A : HermitianMat d ℂ) (f g : ℝ → ℝ) :
-    Commute (A.cfc f).toMat (A.cfc g).toMat := by
-  rw [commute_iff_eq, ← HermitianMat.coe_cfc_mul, ← HermitianMat.coe_cfc_mul, mul_comm f g]
-
 theorem _root_.Commute.exists_HermitianMat_cfc {d : Type*} [Fintype d] [DecidableEq d]
   (A B : HermitianMat d ℂ) (hAB : Commute A.toMat B.toMat) :
     ∃ C : HermitianMat d ℂ, (∃ f : ℝ → ℝ, A = C.cfc f) ∧ (∃ g : ℝ → ℝ, B = C.cfc g) := by
@@ -561,6 +556,17 @@ theorem _root_.Commute.exists_HermitianMat_cfc {d : Type*} [Fintype d] [Decidabl
     constructor
     · exact ⟨0, by simp [HermitianMat.ext_iff, hg₁]⟩
     · exact ⟨0, by simp [HermitianMat.ext_iff, hg₂]⟩
+
+theorem _root_.HermitianMat.cfc_commute {d : Type*} [Fintype d] [DecidableEq d]
+  (A B : HermitianMat d ℂ) (f g : ℝ → ℝ) (hAB : Commute A.toMat B.toMat) :
+    Commute (A.cfc f).toMat (B.cfc g).toMat := by
+  obtain ⟨C, ⟨h₁, rfl⟩, ⟨h₂, rfl⟩⟩ := hAB.exists_HermitianMat_cfc
+  rw [commute_iff_eq, ← HermitianMat.cfc_comp, ← HermitianMat.cfc_comp, ← HermitianMat.coe_cfc_mul, ← HermitianMat.coe_cfc_mul, mul_comm (f ∘ h₁) (g ∘ h₂)]
+
+theorem _root_.HermitianMat.cfc_self_commute {d : Type*} [Fintype d] [DecidableEq d]
+  (A : HermitianMat d ℂ) (f g : ℝ → ℝ) :
+    Commute (A.cfc f).toMat (A.cfc g).toMat := by
+  rw [commute_iff_eq, ← HermitianMat.coe_cfc_mul, ← HermitianMat.coe_cfc_mul, mul_comm f g]
 
 --PULLOUT to HermitianMat/CFC.lean
 /- TODO: Write a version of this that holds more broadly for some sets. Esp closed intervals of reals,
@@ -633,7 +639,7 @@ private lemma commute_aux (n : ℕ) {x : ℝ}
   rw [← HermitianMat.cfc_sub, ← HermitianMat.cfc_comp] at hE
   subst E
   rw [← HermitianMat.cfc_const_mul]
-  apply HermitianMat.cfc_commute
+  apply HermitianMat.cfc_self_commute
 
 private lemma rexp_mul_smul_proj_lt_mul_sub_le_mul_sub {n : ℕ} {x : ℝ}
   {E ℰ σ : HermitianMat d ℂ} (hℰσ : Commute ℰ.toMat σ.toMat) (hx : 0 < x)
@@ -1131,7 +1137,7 @@ protected lemma _root_.ENNReal.bdd_le_mul_tendsto_zero
     filter_upwards [ hg ] with x hx
     simp [hx]
 
-set_option maxHeartbeats 500000 in
+set_option maxHeartbeats 600000 in
 /-- Lemma 7 from the paper. We write `ε'` for their `\tilde{ε}`. -/
 private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1) (σ : (n : ℕ) → IsFree (i := i ^ n)) :
     (R2 ρ σ ≥ R1 ρ ε) →
@@ -1786,25 +1792,53 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
          .ofReal ((P2 ε2 n).inner (ℰ n (ρ⊗^S[n]))) * (.ofReal (c' ε2 n) - (R2 ρ σ + .ofReal ε₀ + .ofReal ε2)) := by
 
       -- see (S81) for comments on why that statement had to be changed
-      -- (S85) (first inequality should have $\sigma_n''$ instead of $\tilde{\sigma}_n''$; corrected in v4, where $\tilde{\sigma}_n'$ takes the place of $\sigma_n''$)
+      -- (S85) (first inequality should have $\sigma_n''$ instead of $\tilde{\sigma}_n''$; corrected in v4, where $\tilde{\sigma}_n'$ takes the place of $\sigma_n''$) in this and other steps
       have hE3leq ε2 (n : ℕ) (hε2 : 0 < ε2) : (1/n : ℝ) • (E3 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ (c' ε2 n) • (E3 ε2 n).toMat := by
         rcases n.eq_zero_or_pos with rfl | hn
-        . skip
-        calc
+        swap
+        · calc
           (1/n : ℝ) • (E3 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ (1/n : ℝ) • (E3 ε2 n).toMat * (- (σ'' n).M.log.toMat) := by
-            sorry -- first inequality of (S85)
-          _ ≤ (1/n : ℝ) • (E3 ε2 n).toMat * (- (Real.exp (-n * c' ε2 n) • (1 : HermitianMat (H (i ^ n)) ℂ)).log.toMat) := by -- towards 2nd (S85)ineq
+            -- first inequality of (S85)
+            have hℰρlognonpos : 0 ≤ -(ℰ n (ρ⊗^S[n])).M.log.toMat := by
+              -- log of state is non-positive
+              simp only [HermitianMat.log]
+              rw [← AddSubgroup.coe_neg _, ← HermitianMat.cfc_neg (ℰ n (ρ⊗^S[n])).M]
+              change (HermitianMat.toMat 0) ≤ _
+              rw [Subtype.coe_le_coe, HermitianMat.zero_le_cfc (ℰ n (ρ⊗^S[n])).M (-Real.log)]
+              intro i
+              simp
+              apply Real.log_nonpos
+              · apply MState.eigenvalue_nonneg _
+              · apply MState.eigenvalue_le_one
+            rw [← sub_nonneg, ← mul_sub_left_distrib]
+            conv =>
+              rhs
+              congr; rfl
+              rw [← sub_add (-(σ'' n).M.log.toMat) ((ℰ n (ρ⊗^S[n])).M.log.toMat) ((σ'' n).M.log.toMat)]
+              rw [add_comm_sub]
+              rw [← add_sub_assoc]
+              simp [sub_self (σ'' n).M.log.toMat]
+            have hE3commℰ : Commute (E3 ε2 n).toMat (-(ℰ n (ρ⊗^S[n])).M.log.toMat) := by sorry
+            simp only [Algebra.smul_mul_assoc, one_div]
+            have hE3ℰnonneg : 0 ≤ (E3 ε2 n).toMat * -(ℰ n (ρ⊗^S[n])).M.log.toMat := by
+              apply Commute.mul_nonneg _ hℰρlognonpos hE3commℰ
+              apply HermitianMat.proj_le_nonneg
+            apply smul_nonneg (inv_nonneg_of_nonneg (Nat.cast_nonneg' n)) hE3ℰnonneg
+          _ ≤ (1/n : ℝ) • (E3 ε2 n).toMat * (- (Real.exp (-n * c' ε2 n) • (1 : HermitianMat (H (i ^ n)) ℂ)).log.toMat) := by
+            -- intermediate step in 2nd ineq of S85
             simp only [mul_neg, neg_mul, neg_le_neg_iff]
-            have hlog : (Real.exp (-(n * c' ε2 n)) • 1 : HermitianMat (H (i ^ n)) ℂ).log.toMat ≤ ((σ'' n).M).log.toMat := by
+            have h1logleq : (Real.exp (-(n * c' ε2 n)) • 1 : HermitianMat (H (i ^ n)) ℂ).log.toMat ≤ ((σ'' n).M).log.toMat := by
+              -- apply hσ'' ε2 n to log by monotonicity
               rw [Subtype.coe_le_coe]
               have h_comm : Commute ((Real.exp _ • 1 : HermitianMat _ ℂ).toMat) _ :=
                 Commute.smul_left (Commute.one_left (σ'' n).M.toMat) (Real.exp (-(n * c' ε2 n)))
               exact HermitianMat.log_le_log_of_commute h_comm (by simpa using hσ'' ε2 n)
                 (Matrix.PosDef.smul Matrix.PosDef.one (Real.exp_pos (-(n * c' ε2 n))))
-            rw [← sub_nonneg] at hlog
+            rw [← sub_nonneg] at h1logleq
             rw [← sub_nonneg, ← mul_sub_left_distrib]
             simp only [one_div, Algebra.smul_mul_assoc]
-            have comm_aux2 : Commute (E3 ε2 n).toMat ((σ'' n).M.log.toMat - (Real.exp (-(n * c' ε2 n)) • 1 : HermitianMat _ ℂ).log.toMat) := by
+            have hE3commlog : Commute (E3 ε2 n).toMat ((σ'' n).M.log.toMat - (Real.exp (-(n * c' ε2 n)) • 1 : HermitianMat _ ℂ).log.toMat) := by
+              -- projector commutes with logs
               apply Commute.sub_right _ _
               swap
               conv =>
@@ -1817,13 +1851,23 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
                   selfAdjoint.val_one
                   ]
               simp only [Commute.neg_right_iff, Commute.smul_right (Commute.one_right _) _]
-              -- show that Commute (E3 _) (σ'' _).log
-              sorry
-            have hElog : 0 ≤ (E3 ε2 n).toMat * ((σ'' n).M.log.toMat - (Real.exp (-(n * c' ε2 n)) • 1 : HermitianMat _ ℂ).log.toMat) := by
-              apply Commute.mul_nonneg _ hlog comm_aux2
+              -- prove Commute (E3 _) (σ'' _).log
+              unfold E3 P2
+              rw [HermitianMat.proj_le_def]
+              apply HermitianMat.cfc_commute
+              -- have hcommℰσ : Commute (((ℰ n) (ρ⊗^S[n]))).M.toMat (σ'' n).M.toMat := by sorry
+              apply Commute.sub_left
+              · exact pinching_commutes (ρ⊗^S[n]) (σ'' n)
+              · apply Commute.smul_left
+                · rfl
+            have hElognonneg : 0 ≤ (E3 ε2 n).toMat * ((σ'' n).M.log.toMat - (Real.exp (-(n * c' ε2 n)) • 1 : HermitianMat _ ℂ).log.toMat) := by
+              -- factors are positive and commute (hE3commlog),
+              -- so product is positive too (Commute.mul_nonneg)
+              apply Commute.mul_nonneg _ h1logleq hE3commlog
               apply HermitianMat.proj_le_nonneg
-            apply smul_nonneg (inv_nonneg_of_nonneg (Nat.cast_nonneg' n)) hElog
+            apply smul_nonneg (inv_nonneg_of_nonneg (Nat.cast_nonneg' n)) hElognonneg
           _ = (c' ε2 n) • (E3 ε2 n).toMat := by
+            -- simplify log(1)
             conv =>
               lhs; congr; rfl
               simp only [
@@ -1836,6 +1880,12 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
             simp only [one_div, Algebra.mul_smul_comm, mul_one, smul_smul]
             rw [mul_comm, ← mul_assoc, ← one_div, one_div_mul_cancel, one_mul]
             simp only [ne_eq, Nat.cast_eq_zero, ne_zero_of_lt hn, not_false_eq_true]
+        · simp only [CharP.cast_eq_zero, div_zero, zero_smul, statePow_zero, zero_mul]
+          apply smul_nonneg
+          · simp [c']
+            left
+            apply (hc 0).le
+          · apply HermitianMat.proj_le_nonneg
       --Linearly combine S81, S82, S85:
       --(S86)
       --(S87)
