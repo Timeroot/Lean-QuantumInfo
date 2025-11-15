@@ -71,7 +71,7 @@ Exercise 3.5.2: Asking that`〈ξ1⊗ξ2‖ψ1⊗ψ2〉=〈ξ1‖ψ1〉〈ξ2‖
 ❓ Basic fact about braket products types.
 
 Exercise 3.5.3: Matrix representation of CNOT gate as [1,0,0,0;0,1...] etc.
-❓ If we define "CNOT" as "Controlled(X)", this could potentially be a fact to give.
+✅ In `Qubits.Basic`, defined using `Qubit.controllize` and proven equivalent to the above matrix
 
 Exercise 3.5.4: Prove `(H⊗H)(CNOT)(H⊗H) = |+⟩⟨+|⊗I + |-⟩⟨-|⊗Z`.
 🤷 Very specific equality.
