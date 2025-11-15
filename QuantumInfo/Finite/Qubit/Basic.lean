@@ -190,6 +190,21 @@ def controllize (g : 𝐔[k]) : 𝐔[Qubit × k] :=
 
 scoped notation "C[" g "]" => controllize g
 
+/-- Controlled-NOT gate on two qubits.
+The first qubit is the control and the second qubit is the target. -/
+def CNOT : 𝐔[Fin 2 × Fin 2] := C[X]
+
+/-- The matrix representation of CNOT is the standard 4×4 permutation matrix. -/
+lemma CNOT_matrix :
+    Matrix.reindex finProdFinEquiv finProdFinEquiv CNOT.val =
+      ![![(1:ℂ), 0, 0, 0],
+        ![0, 1, 0, 0],
+        ![0, 0, 0, 1],
+        ![0, 0, 1, 0]] := by
+        ext i j
+        simp only [CNOT, Qubit.X, Matrix.reindex_apply]
+        fin_cases i <;> fin_cases j <;> rfl
+
 variable (g : 𝐔[k]) (j₁ j₂ : k)
 
 @[simp]
