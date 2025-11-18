@@ -1180,7 +1180,7 @@ protected lemma _root_.ENNReal.bdd_le_mul_tendsto_zero
     filter_upwards [ hg ] with x hx
     simp [hx]
 
-set_option maxHeartbeats 600000 in
+set_option maxHeartbeats 800000 in
 /-- Lemma 7 from the paper. We write `ε'` for their `\tilde{ε}`. -/
 private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1) (σ : (n : ℕ) → IsFree (i := i ^ n)) :
     (R2 ρ σ ≥ R1 ρ ε) →
@@ -2082,7 +2082,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
           · apply MState.zero_le
       rcases this with ⟨ε2, hg₁, hg₂, hg₃, hliminf_g₁, hliminf_g₂⟩
 
-      replace hDleq := Filter.liminf_le_liminf (Filter.Eventually.of_forall (f := .atTop) (fun (n : ℕ) ↦ hDleq (ε2 n) n))
+      replace hDleq := Filter.liminf_le_liminf (Filter.Eventually.of_forall (f := .atTop) (fun (n : ℕ) ↦ hDleq (ε2 n) n (hg₁ n)))
       apply le_trans hDleq -- (S89)
       have hP2zero : Filter.atTop.Tendsto (fun n ↦ .ofReal ((P2 (ε2 n) n).inner (ℰ n (ρ⊗^S[n]))) *
           (.ofReal (c' (ε2 n) n) - (R2 ρ σ + .ofReal ε₀ + .ofReal (ε2 n)))) (𝓝 0) := by
