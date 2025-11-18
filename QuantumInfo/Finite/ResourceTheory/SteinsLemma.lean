@@ -1940,48 +1940,76 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
             left
             apply (hc 0).le
           · apply HermitianMat.proj_le_nonneg
-
       --Linearly combine S81, S82, S85:
-      -- (S86) to (S88)
-      unfold qRelativeEnt SandwichedRelRentropy
-      simp only [↓reduceIte, ge_iff_le]
-      split
-      case isTrue hker =>
-        -- one branch of (S86)
-        have hMulOne : (1 : Matrix (H (i ^ n)) (H (i ^ n)) ℂ) * ((ℰ n) (ρ⊗^S[n])).M.toMat = ((ℰ n) (ρ⊗^S[n])).M.toMat := Matrix.one_mul ((ℰ n) (ρ⊗^S[n])).M.toMat
-        have hOneMulCommute : Commute (1 : HermitianMat _ ℂ).toMat ((ℰ n) (ρ⊗^S[n])).M.toMat := Commute.one_left ((ℰ n) (ρ⊗^S[n])).M.toMat
-        /- Need (1 ε2 n) = 1 : HermitianMat _ ℂ -/
-        have hOneIsOne : ∀ (ε : ℝ) (n : ℕ), (1 : ℝ → ℕ → HermitianMat (H (i ^ n)) ℂ) ε n = (1 : HermitianMat (H (i ^ n)) ℂ) := by
-          intro ε n; rfl
-        /- convert Esum to the HermitianMat equality at point (ε2, n) -/
-        -- specialize E1 ε2 n
-        -- specialize E2 ε2 n
-        -- specialize E3 ε2 n
-        have Esum' : (E1 ε2 n).toMat + (E2 ε2 n).toMat + (E3 ε2 n).toMat = 1 := by
-          /- should use hOneIsOne? -/
-          -- rw [(congrFun (congrFun Esum ε2) n)]
-          -- rw [hOneIsOne] at Esum
+      calc
+        𝐃((ℰ n) (ρ⊗^S[n])‖σ'' n) / (n : ENNReal) ≤
+          ENNReal.ofReal (((ℰ n (ρ⊗^S[n])).M.inner (((R1 ρ ε).toReal + ε2) • (E1 ε2 n)))
+          + ((ℰ n (ρ⊗^S[n])).M.inner (((R2 ρ σ).toReal + ε₀ + ε2) • (E2 ε2 n)))
+          + ((ℰ n (ρ⊗^S[n])).M.inner ((c' ε2 n) • (E3 ε2 n))))
+        := by
+          -- (S86) to (S88)
+          unfold qRelativeEnt SandwichedRelRentropy
+          simp only [↓reduceIte]
+          split
+          case isTrue hker => -- one branch of (S86)
+            have hMulOne : ((ℰ n) (ρ⊗^S[n])).M.toMat * (1 : Matrix (H (i ^ n)) (H (i ^ n)) ℂ) = ((ℰ n) (ρ⊗^S[n])).M.toMat := Matrix.mul_one ((ℰ n) (ρ⊗^S[n])).M.toMat
+            have hOneMulCommute : Commute (1 : HermitianMat _ ℂ).toMat ((ℰ n) (ρ⊗^S[n])).M.toMat := Commute.one_left ((ℰ n) (ρ⊗^S[n])).M.toMat
+            have hOneIsOne : ∀ (ε : ℝ) (n : ℕ), (1 : ℝ → ℕ → HermitianMat (H (i ^ n)) ℂ) ε n = (1 : HermitianMat (H (i ^ n)) ℂ) := by
+              intro ε n; rfl
+            /- convert Esum to the HermitianMat equality at point (ε2, n) -/
+            have Esum' : (E1 ε2 n).toMat + (E2 ε2 n).toMat + (E3 ε2 n).toMat = 1 := by
+              /- should use hOneIsOne? -/
+              -- rw [(congrFun (congrFun Esum ε2) n)]
+              -- rw [hOneIsOne] at Esum
+              sorry
+            conv =>
+              enter [1, 1, 1, 1]
+              unfold HermitianMat.inner
+              rw [← hMulOne]
+              rw [← Esum']
+            -- (S87)
+            /- Use hE1leq, hE2leq, hE3leq -/
+            unfold HermitianMat.inner at hE1leq
+            simp at hE1leq
+            simp at hE2leq
+            have hE2leqInner : (n : ℝ)⁻¹ * (((ℰ n) (ρ⊗^S[n])).M.toMat * (E2 ε2 n).toMat * (((ℰ n) (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat)).trace.re ≤ ((R2 ρ σ).toReal + ε₀ + ε2) * (((ℰ n) (ρ⊗^S[n])).M).inner (E2 ε2 n) := by
+              -- apply HermitianMat.inner_mono (((ℰ n) (ρ⊗^S[n]))).pos
+              sorry
+            simp at hE3leq
+            have hE3leqInner : (n : ℝ)⁻¹ * (((ℰ n) (ρ⊗^S[n])).M.toMat * (E3 ε2 n).toMat * (((ℰ n) (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat)).trace.re ≤ (c' ε2 n) * (((ℰ n) (ρ⊗^S[n])).M).inner (E3 ε2 n) := by
+              -- apply HermitianMat.inner_mono (((ℰ n) (ρ⊗^S[n]))).pos
+              sorry
+            simp
+            conv =>
+              enter [1, 1, 1, 1]
+              rw [mul_add, mul_add, add_mul, add_mul, trace_add, trace_add]
+            simp [← ENNReal.ofReal_coe_nnreal, NNReal.toReal]
+            rcases n.eq_zero_or_pos with rfl | hn
+            · sorry -- case: n = 0
+            · rw [← ENNReal.ofReal_natCast, ← ENNReal.ofReal_div_of_pos (by simp [hn]), div_eq_inv_mul]
+              rw [ENNReal.ofReal_le_ofReal_iff']
+              · left
+                rw [mul_add, mul_add]
+                apply add_le_add_three
+                · unfold HermitianMat.inner
+                  simp
+                  conv at hE1leq =>
+                    intro ε2 n hε2
+                    rw [← mul_assoc]
+                    enter [1, 2, 1, 1, 2, 1, 1, 1, 1, 1] -- T_T
+                    change (ℰ n)
+                  -- commute E1 with ℰ
+                  apply (hE1leq ε2 n hε2)
+                · apply hE2leqInner
+                · apply hE3leqInner
+          case isFalse nhker => -- other branch of (S86)
+          --(S87)
           sorry
-        conv =>
-          enter [1, 1, 1, 1]
-          unfold HermitianMat.inner
-          rw [← hMulOne]
-          rw [← Esum']
-        -- (S87)
-        /- Use hE1leq, hE2leq, hE3leq -/
-        unfold HermitianMat.inner at hE1leq
-        /-
-        hE1leq needs other developments to be comparable to hE2leq and hE3leq
-        -/
-        simp at hE1leq
-        simp
-        conv =>
-          enter [1, 1, 1, 1]
-          simp [Matrix.add_mul]
-        -- apply hE3leq ε2 n hε2
-      case isFalse nhker =>
-      --(S87)
-      sorry
+        _ = R1 ρ ε + ENNReal.ofReal ε2 +
+                ENNReal.ofReal ((P1 ε2 n).inner ↑((ℰ n) (ρ⊗^S[n]))) *
+                  (R2 ρ σ + ENNReal.ofReal ε₀ + ENNReal.ofReal ε2 - (R1 ρ ε + ENNReal.ofReal ε2)) +
+              ENNReal.ofReal ((P2 ε2 n).inner ↑((ℰ n) (ρ⊗^S[n]))) *
+                (ENNReal.ofReal (c' ε2 n) - (R2 ρ σ + ENNReal.ofReal ε₀ + ENNReal.ofReal ε2)) := by sorry
 
     -- (S91)
     have hliminfDleq : Filter.atTop.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n) ≤
