@@ -1949,11 +1949,8 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
             have hOneIsOne : ∀ (ε : ℝ) (n : ℕ), (1 : ℝ → ℕ → HermitianMat (H (i ^ n)) ℂ) ε n = (1 : HermitianMat (H (i ^ n)) ℂ) := by
               intro ε n; rfl
             /- convert Esum to the HermitianMat equality at point (ε2, n) -/
-            have Esum' : (E1 ε2 n).toMat + (E2 ε2 n).toMat + (E3 ε2 n).toMat = 1 := by
-              /- should use hOneIsOne? -/
-              -- rw [(congrFun (congrFun Esum ε2) n)]
-              -- rw [hOneIsOne] at Esum
-              sorry
+            have Esum' : (E1 ε2 n).toMat + (E2 ε2 n).toMat + (E3 ε2 n).toMat = 1 :=
+              congrArg HermitianMat.toMat (congrFun (congrFun Esum ε2) n)
             conv =>
               enter [1, 1, 1, 1]
               unfold HermitianMat.inner
