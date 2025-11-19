@@ -1965,10 +1965,12 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
           simp at hE2leq
           have hE2leqInner : (n : ℝ)⁻¹ * (((ℰ n) (ρ⊗^S[n])).M.toMat * (E2 ε2 n).toMat * (((ℰ n) (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat)).trace.re ≤ ((R2 ρ σ).toReal + ε₀ + ε2) * (((ℰ n) (ρ⊗^S[n])).M).inner (E2 ε2 n) := by
             -- apply HermitianMat.inner_mono (((ℰ n) (ρ⊗^S[n]))).pos
+            rw [← Complex.re_ofReal_mul (↑n)⁻¹ _, ← smul_eq_mul, ← Matrix.trace_smul]
             sorry
           simp at hE3leq
           have hE3leqInner : (n : ℝ)⁻¹ * (((ℰ n) (ρ⊗^S[n])).M.toMat * (E3 ε2 n).toMat * (((ℰ n) (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat)).trace.re ≤ (c' ε2 n) * (((ℰ n) (ρ⊗^S[n])).M).inner (E3 ε2 n) := by
             -- apply HermitianMat.inner_mono (((ℰ n) (ρ⊗^S[n]))).pos
+            rw [← Complex.re_ofReal_mul (↑n)⁻¹ _, ← smul_eq_mul, ← Matrix.trace_smul]
             sorry
           simp
           conv =>
