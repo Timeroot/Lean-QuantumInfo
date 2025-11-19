@@ -13,6 +13,8 @@ A pinching channel decoheres in the eigenspaces of a given state.
 More precisely, given a state ρ, the pinching channel with respect to ρ is defined as
   E(σ) = ∑ Pᵢ σ Pᵢ
 where the P_i are the projectors onto the i-th eigenspaces of ρ = ∑ᵢ pᵢ Pᵢ, with i ≠ j → pᵢ ≠ pⱼ.
+
+TODO: Generalize to pinching with respect to arbitrary P(O)VM.
 -/
 
 noncomputable section
@@ -204,3 +206,7 @@ theorem pinching_bound (ρ σ : MState d) : ρ.M ≤ (↑(Fintype.card (spectrum
     apply hc <;> clear hc
     · simpa using mul_comm _ _
     · exact h_mul x x
+
+open ComplexOrder in
+theorem ker_le_ker_pinching_of_PosDef (ρ σ : MState d) (hpos : σ.m.PosDef) : σ.M.ker ≤ (pinching_map σ ρ).M.ker := by
+  sorry
