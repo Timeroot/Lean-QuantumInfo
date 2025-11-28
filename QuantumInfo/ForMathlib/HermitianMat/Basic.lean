@@ -64,6 +64,11 @@ theorem conjTranspose_toMat (A : HermitianMat n α) :
     A.toMat.conjTranspose = A :=
   A.H
 
+@[simp]
+theorem smul_toMat (A : HermitianMat n ℂ) (c : ℝ) :
+  ((Complex.ofReal c) • A.toMat) = (c • A).toMat := by
+  rfl
+
 end addgroup
 section commring
 

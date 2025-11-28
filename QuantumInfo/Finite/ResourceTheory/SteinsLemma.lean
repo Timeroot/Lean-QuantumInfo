@@ -1963,16 +1963,75 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
           unfold HermitianMat.inner at hE1leq
           simp at hE1leq
           simp at hE2leq
+          /-the next two `have`s are duplicates-/
+          -- TODO streamline what's below
+          /-it should transform a HermitianMat inequality into a reals inequality with HermitianMat.inner_mono,
+          the difficulty here is that inner_mono relies on the entries being HermitianMat, but the inequalities are expressed as matrices-/
+          have hE2comm : Commute (E2 ε2 n).toMat ((((ℰ n) (ρ⊗^S[n])).M.log - (σ'' n).M.log).toMat) := by
+          -- TODO this needs to be extracted from here, it's badly redundant
+            apply Commute.sub_right
+            · unfold E2 P1 P2
+              simp
+              rw [HermitianMat.proj_le_def, HermitianMat.proj_le_def]
+              apply Commute.sub_left
+              · apply HermitianMat.cfc_commute
+                apply Commute.sub_left
+                · rfl
+                · simp
+                  apply Commute.symm
+                  exact pinching_commutes (ρ⊗^S[n]) (σ'' n)
+              · apply HermitianMat.cfc_commute
+                apply Commute.sub_left
+                · rfl
+                · simp
+                  apply Commute.symm
+                  exact pinching_commutes (ρ⊗^S[n]) (σ'' n)
+            · unfold E2 P1 P2
+              simp
+              rw [HermitianMat.proj_le_def, HermitianMat.proj_le_def]
+              apply Commute.sub_left
+              · apply HermitianMat.cfc_commute
+                apply Commute.sub_left
+                · exact pinching_commutes (ρ⊗^S[n]) (σ'' n)
+                · simp
+              · apply HermitianMat.cfc_commute
+                apply Commute.sub_left
+                · exact pinching_commutes (ρ⊗^S[n]) (σ'' n)
+                · simp
           have hE2leqInner : (n : ℝ)⁻¹ * (((ℰ n) (ρ⊗^S[n])).M.toMat * (E2 ε2 n).toMat * (((ℰ n) (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat)).trace.re ≤ ((R2 ρ σ).toReal + ε₀ + ε2) * (((ℰ n) (ρ⊗^S[n])).M).inner (E2 ε2 n) := by
-            -- apply HermitianMat.inner_mono (((ℰ n) (ρ⊗^S[n]))).pos
             rw [← Complex.re_ofReal_mul (↑n)⁻¹ _, ← smul_eq_mul, ← Matrix.trace_smul]
-            sorry
+            rw [← RCLike.re_to_complex]
+            conv =>
+              enter [1, 2]
+              rw [mul_assoc]
+              enter [1, 2, 2]
+              norm_cast
+              rw [← Subtype.coe_mk _ ((((E2 ε2 n)).H.commute_iff (((((ℰ n) (ρ⊗^S[n]))).M.log - ((σ'' n)).M.log)).H).mp hE2comm)]
+              enter [1]
+              change (HermitianMat.mul_commute hE2comm)
+            conv at hE2leq =>
+              enter [ε2, n, hε2, 1, 2, 2]
+              norm_cast
+            specialize hE2leq ε2 n hε2
+            rw [← Subtype.coe_mk _ ((((E2 ε2 n)).H.commute_iff (((((ℰ n) (ρ⊗^S[n]))).M.log - ((σ'' n)).M.log)).H).mp hE2comm)] at hE2leq
+            conv at hE2leq =>
+              enter [1, 2, 1]
+              change (HermitianMat.mul_commute hE2comm)
+            rw [← Matrix.mul_smul ((ℰ n) (ρ⊗^S[n])).M.toMat (Complex.ofReal (n : ℝ)⁻¹) (HermitianMat.mul_commute hE2comm).toMat]
+            simp only [HermitianMat.smul_toMat]
+            -- rw [← HermitianMat.inner_eq_re_trace ((ℰ n) (ρ⊗^S[n])).M.toMat ((n : ℝ)⁻¹ • (HermitianMat.mul_commute hE2comm)).toMat]
+            -- simp [(HermitianMat.inner_mono (((ℰ n) (ρ⊗^S[n]))).zero_le)]
+            sorry -- l7
           simp at hE3leq
+          /-this and the `have` above are duplicates-/
           have hE3leqInner : (n : ℝ)⁻¹ * (((ℰ n) (ρ⊗^S[n])).M.toMat * (E3 ε2 n).toMat * (((ℰ n) (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat)).trace.re ≤ (c' ε2 n) * (((ℰ n) (ρ⊗^S[n])).M).inner (E3 ε2 n) := by
             -- apply HermitianMat.inner_mono (((ℰ n) (ρ⊗^S[n]))).pos
             rw [← Complex.re_ofReal_mul (↑n)⁻¹ _, ← smul_eq_mul, ← Matrix.trace_smul]
-            sorry
-          simp
+            sorry -- l7
+          simp only [IsMaximalSelfAdjoint.RCLike_selfadjMap, MState.toMat_M,
+            AddSubgroupClass.coe_sub, HermitianMat.val_eq_coe,
+            RCLike.re_to_complex,
+            HermitianMat.inner_smul, ge_iff_le]
           conv =>
             enter [1, 1, 1, 1]
             rw [mul_add, mul_add, add_mul, add_mul, trace_add, trace_add]
@@ -1987,17 +2046,24 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
               conv at hE1leq =>
                 intro ε2 n hε2
                 rw [← mul_assoc]
-                enter [1, 2, 1, 1, 2, 1, 1, 1, 1, 1] -- T_T
+                pattern (pinching_map (σ'' n))
                 change (ℰ n)
-              -- commute E1 with ℰ
               apply (hE1leq ε2 n hε2)
             · apply hE2leqInner
             · apply hE3leqInner
+        -- (S88)
         _ = R1 ρ ε + ENNReal.ofReal ε2 +
                 ENNReal.ofReal ((P1 ε2 n).inner ↑((ℰ n) (ρ⊗^S[n]))) *
                   (R2 ρ σ + ENNReal.ofReal ε₀ + ENNReal.ofReal ε2 - (R1 ρ ε + ENNReal.ofReal ε2)) +
               ENNReal.ofReal ((P2 ε2 n).inner ↑((ℰ n) (ρ⊗^S[n]))) *
-                (ENNReal.ofReal (c' ε2 n) - (R2 ρ σ + ENNReal.ofReal ε₀ + ENNReal.ofReal ε2)) := by sorry
+                (ENNReal.ofReal (c' ε2 n) - (R2 ρ σ + ENNReal.ofReal ε₀ + ENNReal.ofReal ε2)) := by
+                unfold E1 E2 E3
+                simp [HermitianMat.inner_left_sub]
+                ring_nf
+                repeat rw [ENNReal.ofReal_add] -- 46 goals !!!
+                any_goals try positivity
+                -- any_goals try linarith
+                sorry -- l7
 
     -- (S91)
     have hliminfDleq : Filter.atTop.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' n) / n) ≤
