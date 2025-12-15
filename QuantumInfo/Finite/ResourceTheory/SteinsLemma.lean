@@ -2017,11 +2017,19 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
             conv at hE2leq =>
               enter [1, 2, 1]
               change (HermitianMat.mul_commute hE2comm)
+            conv at hE2leq =>
+              lhs
+              change (Complex.ofReal (_ : ℝ)) • _
+              rw [HermitianMat.smul_toMat (HermitianMat.mul_commute hE2comm) (n : ℝ)⁻¹]
+            conv at hE2leq =>
+              rhs
+              change (Complex.ofReal (_ : ℝ)) • _
+              rw [HermitianMat.smul_toMat (E2 ε2 n) _]
             rw [← Matrix.mul_smul ((ℰ n) (ρ⊗^S[n])).M.toMat (Complex.ofReal (n : ℝ)⁻¹) (HermitianMat.mul_commute hE2comm).toMat]
             simp only [HermitianMat.smul_toMat]
-            -- rw [← HermitianMat.inner_eq_re_trace ((ℰ n) (ρ⊗^S[n])).M.toMat ((n : ℝ)⁻¹ • (HermitianMat.mul_commute hE2comm)).toMat]
-            -- simp [(HermitianMat.inner_mono (((ℰ n) (ρ⊗^S[n]))).zero_le)]
-            sorry -- l7
+            rw [← HermitianMat.inner_eq_re_trace ((ℰ n) (ρ⊗^S[n])).M ((n : ℝ)⁻¹ • (HermitianMat.mul_commute hE2comm))]
+            rw [← HermitianMat.inner_smul]
+            exact ((HermitianMat.inner_mono (((ℰ n) (ρ⊗^S[n]))).zero_le) hE2leq)
           simp at hE3leq
           /-this and the `have` above are duplicates-/
           have hE3leqInner : (n : ℝ)⁻¹ * (((ℰ n) (ρ⊗^S[n])).M.toMat * (E3 ε2 n).toMat * (((ℰ n) (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat)).trace.re ≤ (c' ε2 n) * (((ℰ n) (ρ⊗^S[n])).M).inner (E3 ε2 n) := by
@@ -2061,8 +2069,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
                 simp [HermitianMat.inner_left_sub]
                 ring_nf
                 repeat rw [ENNReal.ofReal_add] -- 46 goals !!!
-                any_goals try positivity
-                -- any_goals try linarith
+                any_goals try positivity -- 11 goals T_T
                 sorry -- l7
 
     -- (S91)
