@@ -2120,10 +2120,10 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
                 ring_nf
                 repeat rw [ENNReal.ofReal_add] -- 46 goals !!! --RSS
                 · sorry -- l7
-                · --It seems like this works(?) on later versions of Lean but not here...?
-                  --I'm confused, I'm not getting the 46 goals either. --Alex, v4.24.0
-                  any_goals try positivity -- 11 goals T_T --RSS
-                  all_goals sorry --so for now I'm closing everything with sorry
+                --It seems like this works(?) on later versions of Lean but not here...?
+                --I'm confused, I'm not getting the 46 goals either. --Alex, v4.24.0
+                any_goals try positivity -- 11 goals T_T --RSS
+                all_goals sorry --so for now I'm closing everything with sorry
 
 
     -- (S91)
