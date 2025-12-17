@@ -53,7 +53,7 @@ theorem HermitianMat.trace_nonneg {n 𝕜 : Type*} [Fintype n] [RCLike 𝕜]
         simp [Matrix.trace];
       -- Since the trace is equal to the sum of the diagonal entries, we can rewrite the goal using this equality.
       rw [← h_trace_eq_sum];
-      exact?
+      exact Iff.symm RCLike.ofReal_nonneg
 
 --DUPE? PULLOUT
 theorem HermitianMat.rpow_nonneg {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
