@@ -1180,7 +1180,7 @@ protected lemma _root_.ENNReal.bdd_le_mul_tendsto_zero
     filter_upwards [ hg ] with x hx
     simp [hx]
 
-set_option maxHeartbeats 800000 in
+set_option maxHeartbeats 1200000 in
 /-- Lemma 7 from the paper. We write `ε'` for their `\tilde{ε}`. -/
 private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1) (σ : (n : ℕ) → IsFree (i := i ^ n)) :
     (R2 ρ σ ≥ R1 ρ ε) →
@@ -2057,12 +2057,6 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
                   (R2 ρ σ + ENNReal.ofReal ε₀ + ENNReal.ofReal ε2 - (R1 ρ ε + ENNReal.ofReal ε2)) +
               ENNReal.ofReal ((P2 ε2 n).inner ↑((ℰ n) (ρ⊗^S[n]))) *
                 (ENNReal.ofReal (c' ε2 n) - (R2 ρ σ + ENNReal.ofReal ε₀ + ENNReal.ofReal ε2)) := by
-                unfold E1 E2 E3
-                simp [HermitianMat.inner_left_sub]
-                ring_nf
-                repeat rw [ENNReal.ofReal_add] -- 46 goals !!!
-                any_goals try positivity
-                -- any_goals try linarith
                 sorry -- l7
 
     -- (S91)

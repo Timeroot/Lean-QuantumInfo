@@ -421,7 +421,8 @@ noncomputable def sharedEigenvalueA (j : d) : ℝ :=
 
 /-- Analogous to `Matrix.IsHermitian.mulVec_eigenvectorBasis` for the shared basis. -/
 theorem mulVec_sharedEigenbasis (j : d) :
-    A *ᵥ WithLp.ofLp (sharedEigenbasis hA hB hAB j) = (sharedEigenvalueA hA hB HAB) j • WithLp.ofLp (sharedEigenbasis hA hB hAB j) := by
+    A *ᵥ (sharedEigenbasis hA hB hAB j) =
+    (sharedEigenvalueA hA hB hAB) j • WithLp.ofLp (sharedEigenbasis hA hB hAB j) := by
   sorry
 
 /-- Analogous to `Matrix.IsHermitian.star_mul_self_mul_eq_diagonal` for the shared basis. -/
@@ -434,12 +435,10 @@ theorem star_mul_self_mul_IsDiag : IsDiag
   intro i
   simp only [toEuclideanLin_apply, OrthonormalBasis.coe_toBasis, EuclideanSpace.basisFun_apply,
     EuclideanSpace.ofLp_single, ← mulVec_mulVec, sharedEigenvectorUnitary_mulVec, ← mulVec_mulVec,
-    mulVec_sharedEigenbasis, Matrix.diagonal_mulVec_single, mulVec_smul,
-    star_eigenvectorUnitary_mulVec, RCLike.real_smul_eq_coe_smul (K := 𝕜), WithLp.toLp_smul,
-    EuclideanSpace.toLp_single, Function.comp_apply, mul_one]
+    Matrix.diagonal_mulVec_single, mul_one]
   apply PiLp.ext
   intro j
-  simp only [PiLp.smul_apply, EuclideanSpace.single_apply, smul_eq_mul, mul_ite, mul_one, mul_zero]
+  sorry
 
 end Matrix.SharedEigenbasis
 
@@ -464,7 +463,7 @@ theorem Commute.exists_unitary (hA : A.IsHermitian) (hB : B.IsHermitian) (hAB : 
     simp only [OrthonormalBasis.coe_reindex, OrthonormalBasis.coe_toBasis,
       EuclideanSpace.basisFun_apply, toEuclideanLin_apply, EuclideanSpace.ofLp_single,
       mulVec_single, MulOpposite.op_one, one_smul, col_diagonal, diag_apply,
-      EuclideanSpace.toLp_single, sharedBasis_d, sharedBasis]
+      EuclideanSpace.toLp_single]
     sorry
   · sorry
 
