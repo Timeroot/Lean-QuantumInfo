@@ -168,7 +168,7 @@ theorem convex_roof_of_pure (ψ : Ket d) : convex_roof g (pure ψ) = g ψ := by
     constructor
     · exact trivial_pEnsemble_mix ψ 0
     · simp only [pure_average_NNReal, Fin.isValue, ← NNReal.coe_le_coe, coe_mk]
-      rw [trivial_pEnsemble_average _ ψ 0]
+      rw [trivial_pEnsemble_average ψ _ 0]
       rfl
   · apply le_convex_roof
     intro n hnpos e hmix
@@ -200,11 +200,74 @@ theorem mixed_convex_roof_of_pure (ψ : Ket d) : mixed_convex_roof f (pure ψ) =
 von Neumann entropy of one of the subsystems (here chosen to be the left one, but see `Entropy.Sᵥₙ_of_partial_eq`). -/
 def EoF : MState (d₁ × d₂) → ℝ≥0 := convex_roof (fun ψ ↦ ⟨Sᵥₙ (pure ψ).traceRight, Sᵥₙ_nonneg (pure ψ).traceRight⟩)
 
+/-
+The partial trace of the maximally entangled state is the maximally mixed state.
+-/
+theorem traceRight_pure_MES (d : Type*) [Fintype d] [DecidableEq d] [Nonempty d] :
+    (MState.pure (Ket.MES d)).traceRight = MState.uniform := by
+  -- By definition of partial trace, we sum over the second system.
+  have h_partial_trace : ∀ (i j : d), ∑ k : d, (Ket.MES d).vec (i, k) * (star (Ket.MES d).vec (j, k)) = (1 / Fintype.card d : ℝ) * (if i = j then 1 else 0) := by
+    unfold Ket.MES
+    intro i j
+    simp only [one_div, Pi.star_apply, RCLike.star_def, ite_mul, zero_mul, Finset.sum_ite_eq,
+      Finset.mem_univ, ↓reduceIte, Complex.ofReal_inv]
+    split
+    · subst i
+      simp only [map_inv₀, Complex.conj_ofReal]
+      ring_nf; norm_cast; norm_num;
+    · grind [map_zero]
+  unfold MState.pure MState.traceRight MState.uniform
+  ext i j
+  convert h_partial_trace i j
+  simp_all only [Pi.star_apply, RCLike.star_def, one_div, Complex.ofReal_inv,
+    Complex.ofReal_natCast, mul_ite, mul_one, mul_zero, HermitianMat.toMat_apply,
+    coe_ofClassical, Distribution.uniform_def, Finset.card_univ]
+  unfold HermitianMat.diagonal
+  simp_all only [Complex.ofReal_inv, Complex.ofReal_natCast]
+  rfl
+
+/-
+The von Neumann entropy of a state is equal to the trace of `ρ log ρ` (technically `cfc ρ negMulLog`).
+-/
+theorem Sᵥₙ_eq_trace_cfc {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) :
+    Sᵥₙ ρ = (HermitianMat.cfc ρ.M Real.negMulLog).trace := by
+  -- By definition of von Neumann entropy, we have Sᵥₙ ρ = Finset.sum Finset.univ (fun x ↦ Real.negMulLog (ρ.M.H.eigenvalues x)).
+  have h_def : Sᵥₙ ρ = Finset.sum Finset.univ (fun x ↦ Real.negMulLog (ρ.M.H.eigenvalues x)) := by
+    rfl
+  -- By definition of trace, the trace of `cfc ρ.M Real.negMulLog` is the sum of its eigenvalues.
+  have h_trace : (ρ.M.cfc Real.negMulLog).trace =
+      ∑ x, (ρ.M.cfc Real.negMulLog).H.eigenvalues x := by
+    exact (HermitianMat.sum_eigenvalues_eq_trace _).symm
+  obtain ⟨e, he⟩ : ∃ e : d ≃ d, (ρ.M.cfc Real.negMulLog).H.eigenvalues =
+      Real.negMulLog ∘ ρ.M.H.eigenvalues ∘ e := by
+   exact Matrix.IsHermitian.cfc_eigenvalues _ _
+  rw [h_def, h_trace, he]
+  simp only [Function.comp_apply]
+  conv_lhs => rw [ ← Equiv.sum_comp e ]
+
+/-
+The von Neumann entropy of a classical state (diagonal in the basis) is equal to the Shannon entropy of the corresponding distribution.
+-/
+theorem Sᵥₙ_ofClassical {d : Type*} [Fintype d] [DecidableEq d] (dist : Distribution d) :
+    Sᵥₙ (MState.ofClassical dist) = Hₛ dist := by
+  -- Let's unfold the definition of `Sᵥₙ` using `Sᵥₙ_eq_trace_cfc`.
+  have h_def : Sᵥₙ (MState.ofClassical dist) = (HermitianMat.cfc (MState.ofClassical dist).M Real.negMulLog).trace := by
+    exact Sᵥₙ_eq_trace_cfc (ofClassical dist);
+  convert h_def using 1;
+  -- By definition of $MState.ofClassical$, we know that $(MState.ofClassical dist).M$ is a diagonal matrix with entries $dist i$.
+  have h_diag : (MState.ofClassical dist).M = HermitianMat.diagonal (fun x => dist x) := by
+    exact rfl;
+  rw [ h_diag, HermitianMat.cfc_diagonal, HermitianMat.trace_diagonal ] ; aesop
+
 /-- The entanglement of formation of the maximally entangled state with on-site dimension 𝕕 is log(𝕕). -/
 theorem EoF_of_MES : EoF (pure <| Ket.MES d) = Real.log (Finset.card Finset.univ (α := d)) := by
   simp only [EoF, convex_roof_of_pure, coe_mk, Finset.card_univ]
   simp only [traceRight, Matrix.traceRight, MState.pure, Ket.MES, one_div]
-  -- simp [Matrix.vecMulVec_apply,
-    -- Ket.apply, Bra.eq_conj, apply_ite, map_inv₀, Complex.conj_ofReal, map_zero, ite_mul, zero_mul,
-    -- mul_zero, Finset.sum_ite_eq, Finset.mem_univ, ↓reduceIte, ← Matrix.diagonal.eq_1]
-  sorry
+  -- The von Neumann entropy of the maximally mixed state is log(d).
+  have h_von_neumann : Sᵥₙ (MState.uniform : MState d) = Real.log (Fintype.card d) := by
+    rw [MState.uniform, Sᵥₙ_ofClassical Distribution.uniform, Hₛ_uniform, Finset.card_univ]
+  convert h_von_neumann using 2;
+  convert traceRight_pure_MES d using 1;
+  unfold Ket.MES;
+  simp_all only [one_div]
+  rfl
