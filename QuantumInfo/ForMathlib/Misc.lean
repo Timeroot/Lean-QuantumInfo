@@ -3,12 +3,8 @@ Copyright (c) 2025 Alex Meiburg. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Alex Meiburg
 -/
-import Mathlib.Order.Notation
-import Mathlib.Tactic.Finiteness
-
-import Mathlib.LinearAlgebra.BilinearMap
-import Mathlib.Topology.MetricSpace.Defs
-import Mathlib.Topology.UniformSpace.Cauchy
+import Mathlib.Analysis.SpecialFunctions.Log.Basic
+import Mathlib.Order.CompletePartialOrder
 
 --Can this be rewritten more generally? For `finiteness` to work, I don't know how.
 @[aesop (rule_sets := [finiteness]) unsafe apply]
@@ -65,3 +61,8 @@ theorem subtype_val_iInf' (h : ∀ i, f i ∈ Set.Icc a b) :
   rw [Subtype.eq_iff, subtype_val_iInf]
 
 end subtype_val_iSup
+
+@[simp]
+theorem Real.log_comp_exp : Real.log ∘ Real.exp = _root_.id := by
+  ext
+  simp

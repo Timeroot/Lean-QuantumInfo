@@ -8,6 +8,8 @@ import QuantumInfo.Finite.ResourceTheory.HypothesisTesting
 import QuantumInfo.Finite.Pinching
 import QuantumInfo.ForMathlib.Matrix
 import QuantumInfo.ForMathlib.LimSupInf
+import QuantumInfo.ForMathlib.HermitianMat.Jordan
+import QuantumInfo.ForMathlib.HermitianMat.CfcOrder
 
 import Mathlib.Tactic.Bound
 
@@ -438,144 +440,7 @@ private noncomputable def R1 (ρ : MState (H i)) (ε : Prob) : ℝ≥0∞ :=
 private noncomputable def R2 (ρ : MState (H i)) : ((n : ℕ) → IsFree (i := i ^ n)) → ℝ≥0∞ :=
   fun σ ↦ Filter.atTop.liminf fun n ↦ 𝐃(ρ⊗^S[n]‖σ n) / n
 
---Without explicitly giving this instance, Lean times out trying to find it in Lemma 7.
---PULLLOUT to ... HermitianMat/Order.lean?
-instance {d 𝕜 : Type*} [Fintype d] [DecidableEq d] [RCLike 𝕜] :
-    PosSMulReflectLE ℝ (HermitianMat d 𝕜) :=
-  PosSMulMono.toPosSMulReflectLE
-
 open MatrixOrder
-
---PULLOUT
-theorem _root_.Matrix.PosDef.zero_lt {n : Type*} [Nonempty n] [Fintype n] {A : Matrix n n ℂ} (hA : A.PosDef) : 0 < A := by
-  apply lt_of_le_of_ne
-  · replace hA := hA.posSemidef
-    rwa [Matrix.nonneg_iff_posSemidef]
-  · rintro rfl
-    --wtf do better. TODO
-    have : ¬(0 < 0) := by trivial
-    classical rw [← Matrix.posDef_natCast_iff (n := n) (R := ℂ)] at this
-    revert hA
-    convert this
-    ext; simp
-    trans ((0 : ℕ) : ℂ)
-    · simp
-    classical
-    change _ = ite _ _ _
-    simp
-
-theorem _root_.HermitianMat.cfc_le_cfc_of_PosDef {d : Type*} [Fintype d] [DecidableEq d]
-  {f g : ℝ → ℝ} (hfg : ∀ i, 0 < i → f i ≤ g i) (A : HermitianMat d ℂ) (hA : A.toMat.PosDef) :
-    A.cfc f ≤ A.cfc g := by
-  rw [← sub_nonneg, ← HermitianMat.cfc_sub, HermitianMat.zero_le_cfc]
-  intro i
-  rw [Pi.sub_apply, sub_nonneg]
-  rw [A.H.posDef_iff_eigenvalues_pos] at hA
-  apply hfg
-  apply hA
-
-theorem _root_.Commute.exists_HermitianMat_cfc {d : Type*} [Fintype d] [DecidableEq d]
-  (A B : HermitianMat d ℂ) (hAB : Commute A.toMat B.toMat) :
-    ∃ C : HermitianMat d ℂ, (∃ f : ℝ → ℝ, A = C.cfc f) ∧ (∃ g : ℝ → ℝ, B = C.cfc g) := by
-  obtain ⟨C, ⟨g₁, hg₁⟩, ⟨g₂, hg₂⟩⟩ := hAB.exists_cfc A.H B.H
-  by_cases hC : C.IsHermitian
-  · use ⟨C, hC⟩
-    constructor
-    · exact ⟨g₁, by simp [HermitianMat.ext_iff, hg₁]⟩
-    · exact ⟨g₂, by simp [HermitianMat.ext_iff, hg₂]⟩
-  · change ¬(IsSelfAdjoint C) at hC
-    rw [cfc_apply_of_not_predicate C hC] at hg₁ hg₂
-    use 0
-    constructor
-    · exact ⟨0, by simp [HermitianMat.ext_iff, hg₁]⟩
-    · exact ⟨0, by simp [HermitianMat.ext_iff, hg₂]⟩
-
-theorem _root_.HermitianMat.cfc_commute {d : Type*} [Fintype d] [DecidableEq d]
-  (A B : HermitianMat d ℂ) (f g : ℝ → ℝ) (hAB : Commute A.toMat B.toMat) :
-    Commute (A.cfc f).toMat (B.cfc g).toMat := by
-  obtain ⟨C, ⟨h₁, rfl⟩, ⟨h₂, rfl⟩⟩ := hAB.exists_HermitianMat_cfc
-  rw [commute_iff_eq, ← HermitianMat.cfc_comp, ← HermitianMat.cfc_comp, ← HermitianMat.coe_cfc_mul, ← HermitianMat.coe_cfc_mul, mul_comm (f ∘ h₁) (g ∘ h₂)]
-
-theorem _root_.HermitianMat.cfc_self_commute {d : Type*} [Fintype d] [DecidableEq d]
-  (A : HermitianMat d ℂ) (f g : ℝ → ℝ) :
-    Commute (A.cfc f).toMat (A.cfc g).toMat := by
-  rw [commute_iff_eq, ← HermitianMat.coe_cfc_mul, ← HermitianMat.coe_cfc_mul, mul_comm f g]
-
---PULLOUT to HermitianMat/CFC.lean
-/- TODO: Write a version of this that holds more broadly for some sets. Esp closed intervals of reals,
-which correspond nicely to closed intervals of matrices. Write the specialization to Set.univ (Monotone
-instead of MonotoneOn). Also a version that works for StrictMonoOn. -/
-theorem _root_.HermitianMat.cfc_le_cfc_of_commute_monoOn {d : Type*} [Fintype d] [DecidableEq d]
-  {f : ℝ → ℝ} (hf : MonotoneOn f (Set.Ioi 0)) {A B : HermitianMat d ℂ} (hAB₁ : Commute A.toMat B.toMat)
-  (hAB₂ : A ≤ B) (hA : A.toMat.PosDef) (hB : B.toMat.PosDef) :
-    A.cfc f ≤ B.cfc f := by
-  obtain ⟨C, ⟨g₁, rfl⟩, ⟨g₂, rfl⟩⟩ := hAB₁.exists_HermitianMat_cfc
-  -- Need to show that g₁ ≤ g₂ on spectrum ℝ C
-  rw [← C.cfc_comp, ← C.cfc_comp]
-  rw [← sub_nonneg, ← C.cfc_sub, C.zero_le_cfc] at hAB₂ ⊢
-  intro i
-  simp only [HermitianMat.val_eq_coe, Pi.sub_apply, Function.comp_apply, sub_nonneg]
-  apply hf
-  · rw [HermitianMat.cfc_PosDef] at hA
-    exact hA i
-  · rw [HermitianMat.cfc_PosDef] at hB
-    exact hB i
-  · simpa using hAB₂ i
-
-/-- TODO: See above -/
-theorem _root_.HermitianMat.cfc_le_cfc_of_commute {d : Type*} [Fintype d] [DecidableEq d]
-  {f : ℝ → ℝ} (hf : Monotone f) {A B : HermitianMat d ℂ} (hAB₁ : Commute A.toMat B.toMat)
-  (hAB₂ : A ≤ B) :
-    A.cfc f ≤ B.cfc f := by
-  obtain ⟨C, ⟨g₁, rfl⟩, ⟨g₂, rfl⟩⟩ := hAB₁.exists_HermitianMat_cfc
-  -- Need to show that g₁ ≤ g₂ on spectrum ℝ C
-  rw [← C.cfc_comp, ← C.cfc_comp]
-  rw [← sub_nonneg, ← C.cfc_sub, C.zero_le_cfc] at hAB₂ ⊢
-  intro i
-  simp only [HermitianMat.val_eq_coe, Pi.sub_apply, Function.comp_apply, sub_nonneg]
-  apply hf
-  simpa using hAB₂ i
-
---This is the more general version that requires operator concave functions but doesn't require the inputs
--- to commute. Requires the correct statement of operator convexity though, which we don't have right now.
-proof_wanted _root_.HermitianMat.cfc_monoOn_pos_of_monoOn_posDef {d : Type*} [Fintype d] [DecidableEq d]
-  {f : ℝ → ℝ} (hf_is_operator_convex : False) :
-    MonotoneOn (HermitianMat.cfc · f) { A : HermitianMat d ℂ | A.toMat.PosDef }
-
-proof_wanted _root_.HermitianMat.log_monoOn_posDef {d : Type*} [Fintype d] [DecidableEq d] :
-    MonotoneOn HermitianMat.log { A : HermitianMat d ℂ | A.toMat.PosDef }
-
-/-- Monotonicity of log on commuting operators. -/
-theorem _root_.HermitianMat.log_le_log_of_commute {d : Type*} [Fintype d] [DecidableEq d]
-  {A B : HermitianMat d ℂ} (hAB₁ : Commute A.toMat B.toMat) (hAB₂ : A ≤ B) (hA : A.toMat.PosDef) :
-    A.log ≤ B.log := by
-  refine HermitianMat.cfc_le_cfc_of_commute_monoOn ?_ hAB₁ hAB₂ hA ?_
-  · exact Real.strictMonoOn_log.monotoneOn
-  · --The fact that `A ≤ B` and `A.PosDef` implies `B.PosDef`. Should be a theorem, TODO
-    -- This almost works but not quite:
-    -- rw [← Matrix.isStrictlyPositive_iff_posDef] at hA ⊢
-    -- exact hA.of_le hAB₂
-    simpa using Matrix.PosDef.add_posSemidef hA hAB₂ --ew. abuse
-
-@[simp]
-theorem Real.log_comp_exp : Real.log ∘ Real.exp = _root_.id := by
-  ext
-  simp
-
-/-- Monotonicity of exp on commuting operators. -/
-theorem _root_.HermitianMat.exp_le_exp_of_commute {d : Type*} [Fintype d] [DecidableEq d]
-  {A B : HermitianMat d ℂ} (hAB₁ : Commute A.toMat B.toMat) (hAB₂ : A.cfc Real.exp ≤ B.cfc Real.exp) :
-    A ≤ B := by
-  have hA : A = (A.cfc Real.exp).cfc Real.log := by simp [← HermitianMat.cfc_comp]
-  have hB : B = (B.cfc Real.exp).cfc Real.log := by simp [← HermitianMat.cfc_comp]
-  rw [hA, hB]
-  apply HermitianMat.log_le_log_of_commute
-  · sorry--apply HermitianMat.cfc_commute --Need the version for two commuting matrices
-  · exact hAB₂
-  · rw [HermitianMat.cfc_PosDef]
-    intro
-    positivity
-
 
 open scoped HermitianMat
 
@@ -599,10 +464,6 @@ theorem _root_.HermitianMat.proj_lt_mul_lt : {A <ₚ B}.toMat * A.toMat ≤ {A <
 theorem _root_.HermitianMat.one_sub_proj_le : 1 - {B ≤ₚ A} = {A <ₚ B} := by
   rw [sub_eq_iff_eq_add, HermitianMat.proj_le_add_lt]
 
-noncomputable abbrev HermitianMat.mul_commute {A B : HermitianMat d ℂ} (hAB : Commute A.toMat B.toMat) :
-    HermitianMat d ℂ :=
-  ⟨A.toMat * B.toMat, (A.H.commute_iff B.H).mp hAB⟩
-
 private lemma commute_aux (n : ℕ) {x : ℝ}
   {E ℰ σ : HermitianMat d ℂ} (hℰσ : Commute ℰ.toMat σ.toMat)
   (hE : E = 1 - {Real.exp (n * x) • σ ≤ₚ ℰ})
@@ -617,11 +478,21 @@ private lemma commute_aux (n : ℕ) {x : ℝ}
   rw [← HermitianMat.cfc_const_mul]
   apply HermitianMat.cfc_self_commute
 
+noncomputable instance : AddCommMonoid (HermitianMat d ℂ) :=
+  inferInstance
+
+instance : PosSMulMono ℝ (Matrix d d ℂ) :=
+  inferInstance
+
+instance : PosSMulReflectLE ℝ (Matrix d d ℂ) :=
+  inferInstance
+
+open HermMul in
 private lemma rexp_mul_smul_proj_lt_mul_sub_le_mul_sub {n : ℕ} {x : ℝ}
   {E ℰ σ : HermitianMat d ℂ} (hℰσ : Commute ℰ.toMat σ.toMat) (hx : 0 < x)
   (hℰ : ℰ.toMat.PosSemidef) (hσ : σ.toMat.PosDef)
   (hE : E = 1 - {Real.exp (n * x) • σ ≤ₚ ℰ})
-    : ℰ.inner (HermitianMat.mul_commute (commute_aux n hℰσ hE)) ≤ ℰ.inner (x • E) := by
+    : ℰ.inner (((1 / n : ℝ) • E) * (ℰ.log - σ.log)) ≤ ℰ.inner (x • E) := by
   rw [HermitianMat.inner_eq_re_trace, HermitianMat.inner_eq_re_trace]
   rcases n.eq_zero_or_pos with rfl | hn
   · have hE' : 0 ≤ E.toMat := by
@@ -629,14 +500,22 @@ private lemma rexp_mul_smul_proj_lt_mul_sub_le_mul_sub {n : ℕ} {x : ℝ}
       apply HermitianMat.proj_lt_nonneg
     have hℰ : 0 ≤ ℰ := by rwa [HermitianMat.zero_le_iff]
     replace hℰ : 0 ≤ ℰ.inner E := HermitianMat.inner_ge_zero hℰ hE'
-    simp [-RCLike.re_to_complex]
-    rw [← HermitianMat.inner_eq_re_trace]
-    positivity
-  dsimp [HermitianMat.mul_commute, HermitianMat.toMat]
+    rw [HermMul.mul_eq_symmMul, HermitianMat.symmMul_of_commute]
+    · simp only [HermitianMat.val_eq_coe, CharP.cast_eq_zero, div_zero, zero_smul,
+        ZeroMemClass.coe_zero, AddSubgroupClass.coe_sub, zero_mul, mul_zero, Matrix.trace_zero,
+        map_zero, selfAdjoint.val_smul, Algebra.mul_smul_comm, trace_smul, Complex.real_smul,
+        RCLike.mul_re, RCLike.im_to_complex, Complex.ofReal_im, sub_zero, ge_iff_le]
+      rw [← HermitianMat.inner_eq_re_trace]
+      positivity
+    · simp only [CharP.cast_eq_zero, div_zero, zero_smul, HermitianMat.val_eq_coe,
+        ZeroMemClass.coe_zero, AddSubgroupClass.coe_sub, Commute.zero_left, Commute.sub_right]
+  rw [HermMul.mul_eq_symmMul, HermitianMat.symmMul_of_commute (commute_aux n hℰσ hE)]
+  dsimp
   repeat rw [HermitianMat.val_eq_coe]
   gcongr
   apply Matrix.PosSemidef.trace_mono
-  rw [one_div, smul_mul_assoc, mul_smul_comm, inv_smul_le_iff_of_pos (by positivity)]
+  rw [one_div, smul_mul_assoc, mul_smul_comm]
+  rw [inv_smul_le_iff_of_pos (mod_cast hn)]
   rw [mul_smul_comm]
   obtain ⟨C, ⟨f, hf⟩, ⟨g, hg⟩⟩ := hℰσ.exists_HermitianMat_cfc
   rw [hf, hg] at hE ⊢
@@ -673,7 +552,9 @@ private lemma rexp_mul_smul_proj_lt_mul_sub_le_mul_sub {n : ℕ} {x : ℝ}
   rcases hfi₀.eq_or_lt with hfi₂ | hfi₂
   · simp [← hfi₂]
   · simp [mul_comm fi]
-    suffices Real.log fi < n * x + Real.log gi by nlinarith
+    suffices Real.log fi < n * x + Real.log gi by
+      grw [this]
+      simp only [add_sub_cancel_right, le_refl]
     rw [← Real.log_exp (n * x), ← Real.log_mul (by positivity) (by positivity)]
     apply Real.strictMonoOn_log hfi₂ ?_ h
     change 0 < Real.exp (n * x) * gi
@@ -1673,6 +1554,7 @@ private theorem EquationS62
               · exact pinching_commutes (ρ⊗^S[n]) (σ'' ρ ε m σ n)
               · simp
         have hE2leqInner : (n : ℝ)⁻¹ * ((ℰ n (ρ⊗^S[n])).M.toMat * (E2 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' ρ ε m σ n).M.log.toMat)).trace.re ≤ ((R2 ρ σ).toReal + ε₀ + ε2) * ((ℰ n (ρ⊗^S[n])).M).inner (E2 ε2 n) := by
+          open HermMul in
           -- (S82) -- see (S81) for comments
           have hE2leq ε2 (n : ℕ) (hε2 : 0 < ε2) : (1/n : ℝ) • (E2 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' ρ ε m σ n).M.log.toMat) ≤ ((R2 ρ σ).toReal + ε₀ + ε2) • (E2 ε2 n).toMat := by
             refine rexp_mul_smul_proj_lt_mul_sub_le_mul_sub'
@@ -1687,26 +1569,21 @@ private theorem EquationS62
             rw [mul_assoc]
             enter [1, 2, 2]
             norm_cast
-            rw [← Subtype.coe_mk _ ((((E2 ε2 n)).H.commute_iff ((((ℰ n (ρ⊗^S[n]))).M.log - ((σ'' ρ ε m σ n)).M.log)).H).mp hE2comm)]
-            enter [1]
-            change (HermitianMat.mul_commute hE2comm)
+            rw [← HermitianMat.symmMul_of_commute hE2comm]
           conv at hE2leq =>
             enter [ε2, n, hε2, 1, 2, 2]
             norm_cast
           specialize hE2leq ε2 n hε2
-          rw [← Subtype.coe_mk _ ((((E2 ε2 n)).H.commute_iff ((((ℰ n (ρ⊗^S[n]))).M.log - ((σ'' ρ ε m σ n)).M.log)).H).mp hE2comm)] at hE2leq
-          conv at hE2leq =>
-            enter [1, 2, 1]
-            change (HermitianMat.mul_commute hE2comm)
+          rw [← HermitianMat.symmMul_of_commute hE2comm] at hE2leq
           conv_lhs at hE2leq =>
             change (Complex.ofReal (_ : ℝ)) • _
-            rw [HermitianMat.smul_toMat (HermitianMat.mul_commute hE2comm) (n : ℝ)⁻¹]
+            rw [HermitianMat.smul_toMat (HermitianMat.symmMul _ _) (n : ℝ)⁻¹]
           conv_rhs at hE2leq =>
             change (Complex.ofReal (_ : ℝ)) • _
             rw [HermitianMat.smul_toMat (E2 ε2 n) _]
-          rw [← Matrix.mul_smul (ℰ n (ρ⊗^S[n])).M.toMat (Complex.ofReal (n : ℝ)⁻¹) (HermitianMat.mul_commute hE2comm).toMat]
+          rw [← Matrix.mul_smul (ℰ n (ρ⊗^S[n])).M.toMat (Complex.ofReal (n : ℝ)⁻¹) (HermitianMat.symmMul _ _).toMat]
           simp only [HermitianMat.smul_toMat]
-          rw [← HermitianMat.inner_eq_re_trace (ℰ n (ρ⊗^S[n])).M ((n : ℝ)⁻¹ • (HermitianMat.mul_commute hE2comm))]
+          rw [← HermitianMat.inner_eq_re_trace (ℰ n (ρ⊗^S[n])).M ((n : ℝ)⁻¹ • (HermitianMat.symmMul _ _))]
           rw [← HermitianMat.inner_smul]
           exact ((HermitianMat.inner_mono ((ℰ n (ρ⊗^S[n]))).zero_le) hE2leq)
         simp at hE3leq
@@ -1723,6 +1600,7 @@ private theorem EquationS62
             · simp
         /- hE3commℰ -/
         have hE3leqInner : (n : ℝ)⁻¹ * ((ℰ n (ρ⊗^S[n])).M.toMat * (E3 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' ρ ε m σ n).M.log.toMat)).trace.re ≤ (c' ε2 n) * ((ℰ n (ρ⊗^S[n])).M).inner (E3 ε2 n) := by
+          open HermMul in
           rw [← Complex.re_ofReal_mul (↑n)⁻¹ _, ← smul_eq_mul, ← Matrix.trace_smul]
           rw [← RCLike.re_to_complex]
           conv =>
@@ -1732,27 +1610,22 @@ private theorem EquationS62
             norm_cast
           conv =>
             enter [1, 2, 1, 2, 2]
-            rw [← Subtype.coe_mk _ ((((E3 ε2 n)).H.commute_iff ((((ℰ n (ρ⊗^S[n]))).M.log - ((σ'' ρ ε m σ n)).M.log)).H).mp hE3comm)]
-            enter [1]
-            change (HermitianMat.mul_commute hE3comm)
+            rw [← HermitianMat.symmMul_of_commute hE3comm]
           conv at hE3leq =>
             enter [1, 2, 2]
             norm_cast
-          rw [← Subtype.coe_mk _ ((((E3 ε2 n)).H.commute_iff ((((ℰ n (ρ⊗^S[n]))).M.log - ((σ'' ρ ε m σ n)).M.log)).H).mp hE3comm)] at hE3leq
-          conv at hE3leq =>
-            enter [1, 2, 1]
-            change (HermitianMat.mul_commute hE3comm)
+          rw [← HermitianMat.symmMul_of_commute hE3comm] at hE3leq
           conv at hE3leq =>
             lhs
             change (Complex.ofReal (_ : ℝ)) • _
-            rw [HermitianMat.smul_toMat (HermitianMat.mul_commute hE3comm) (n : ℝ)⁻¹]
+            rw [HermitianMat.smul_toMat (HermitianMat.symmMul _ _) (n : ℝ)⁻¹]
           conv at hE3leq =>
             rhs
             change (Complex.ofReal (_ : ℝ)) • _
             rw [HermitianMat.smul_toMat (E3 ε2 n) _]
-          rw [← Matrix.mul_smul (ℰ n (ρ⊗^S[n])).M.toMat (Complex.ofReal (n : ℝ)⁻¹) (HermitianMat.mul_commute hE3comm).toMat]
+          rw [← Matrix.mul_smul (ℰ n (ρ⊗^S[n])).M.toMat (Complex.ofReal (n : ℝ)⁻¹) (HermitianMat.symmMul _ _).toMat]
           simp only [HermitianMat.smul_toMat]
-          rw [← HermitianMat.inner_eq_re_trace (ℰ n (ρ⊗^S[n])).M ((n : ℝ)⁻¹ • (HermitianMat.mul_commute hE3comm))]
+          rw [← HermitianMat.inner_eq_re_trace (ℰ n (ρ⊗^S[n])).M ((n : ℝ)⁻¹ • (HermitianMat.symmMul _ _))]
           rw [← HermitianMat.inner_smul]
           exact ((HermitianMat.inner_mono ((ℰ n (ρ⊗^S[n]))).zero_le) hE3leq)
         simp only [IsMaximalSelfAdjoint.RCLike_selfadjMap, MState.toMat_M,
@@ -1785,8 +1658,8 @@ private theorem EquationS62
             there the problematic subspaces are indeed projected out by the E₂ and E₃ operators.
             -/
             have hE1leq ε2 (n : ℕ) (hε2 : 0 < ε2) :
-                (ℰ n (ρ⊗^S[n])).M.inner (HermitianMat.mul_commute
-                  (commute_aux n (E := E1 ε2 n) (pinching_commutes (ρ⊗^S[n]) (σ'' ρ ε m σ n)) rfl)) ≤
+                (ℰ n (ρ⊗^S[n])).M.inner (((1 / (n : ℝ)) • (E1 ε2 n)).symmMul
+                  ((((pinching_map (σ'' ρ ε m σ n)) (ρ⊗^S[n])).M).log - ((σ'' ρ ε m σ n).M).log : HermitianMat _ ℂ)) ≤
                   (ℰ n (ρ⊗^S[n])).M.inner (((R1 ρ ε).toReal + ε2) • (E1 ε2 n)) := by
               refine rexp_mul_smul_proj_lt_mul_sub_le_mul_sub
                 (pinching_commutes (ρ⊗^S[n]) (σ'' ρ ε m σ n)) (by positivity) ?_ (σ''_posdef ρ ε m σ n) rfl
@@ -1794,6 +1667,9 @@ private theorem EquationS62
               apply MState.zero_le
 
             unfold HermitianMat.inner at hE1leq
+            conv at hE1leq =>
+              enter [ε2, n, hε2, 1]
+              rw [HermitianMat.symmMul_of_commute (commute_aux n (E := E1 ε2 n) (pinching_commutes (ρ⊗^S[n]) (σ'' ρ ε m σ n)) rfl)]
             simp at hE1leq
             conv at hE1leq =>
               intro ε2 n hε2

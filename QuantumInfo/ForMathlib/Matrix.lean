@@ -1175,3 +1175,22 @@ theorem spectrum_prod {d d₂ : Type*}
     simp [ Algebra.smul_def ]
 
 end spectrum_kron
+
+open ComplexOrder in
+open MatrixOrder in
+theorem PosDef.zero_lt {n : Type*} [Nonempty n] [Fintype n] {A : Matrix n n ℂ} (hA : A.PosDef) : 0 < A := by
+  apply lt_of_le_of_ne
+  · replace hA := hA.posSemidef
+    rwa [Matrix.nonneg_iff_posSemidef]
+  · rintro rfl
+    --wtf do better. TODO
+    have : ¬(0 < 0) := by trivial
+    classical rw [← Matrix.posDef_natCast_iff (n := n) (R := ℂ)] at this
+    revert hA
+    convert this
+    ext; simp
+    trans ((0 : ℕ) : ℂ)
+    · simp
+    classical
+    change _ = ite _ _ _
+    simp

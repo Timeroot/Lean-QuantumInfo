@@ -1,0 +1,139 @@
+/-
+Copyright (c) 2025 Alex Meiburg. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Alex Meiburg
+-/
+import Mathlib.Algebra.Jordan.Basic
+
+import QuantumInfo.ForMathlib.HermitianMat.CFC
+import QuantumInfo.ForMathlib.HermitianMat.Order
+
+/-!
+Hermitian matrices have a Jordan algebra structure given by
+`A * B := 2⁻¹ • (A.toMat * B.toMat + B.toMat * A.toMat)`. We call this operation
+`HermitianMat.symmMul`, but it's available as `*` multiplication scoped under
+`HermMul`. When `A` and `B` commute, this reduces to standard matrix multiplication.
+-/
+
+noncomputable section
+
+section starRing
+
+variable {d 𝕜 : Type*} [Fintype d] [Field 𝕜] [StarRing 𝕜]
+variable (A B : HermitianMat d 𝕜)
+
+namespace HermitianMat
+
+def symmMul : HermitianMat d 𝕜 :=
+  ⟨(2 : 𝕜)⁻¹ • (A.toMat * B.toMat + B.toMat * A.toMat),
+    by simp [selfAdjoint, IsSelfAdjoint, add_comm]⟩
+
+theorem symmMul_comm : A.symmMul B = B.symmMul A := by
+  rw [symmMul, symmMul, Subtype.mk.injEq, add_comm]
+
+@[simp]
+theorem symmMul_zero : A.symmMul 0 = 0:= by
+  simp [symmMul]
+
+@[simp]
+theorem zero_symmMul : symmMul 0 A = 0 := by
+  simp [symmMul]
+
+theorem symmMul_toMat : (A.symmMul B).toMat =
+    (2 : 𝕜)⁻¹ • (A.toMat * B.toMat + B.toMat * A.toMat) := by
+  rfl
+
+variable [Invertible (2 : 𝕜)]
+
+variable {A B} in
+@[simp]
+theorem symmMul_of_commute (hAB : Commute A.toMat B.toMat) :
+    (A.symmMul B).toMat = A.toMat * B.toMat := by
+  rw [symmMul_toMat, hAB]
+  rw [smul_add, ← add_smul, inv_eq_one_div, ← add_div]
+  rw [add_self_div_two, one_smul]
+
+theorem symmMul_self : (symmMul A A).toMat = A.toMat * A.toMat := by
+  simp
+
+variable [DecidableEq d]
+
+@[simp]
+theorem symmMul_one : A.symmMul 1 = A := by
+  ext1; simp
+
+@[simp]
+theorem one_symmMul : symmMul 1 A = A := by
+  ext1; simp
+
+@[simp]
+theorem symmMul_neg_one : A.symmMul (-1) = -A := by
+  ext1; simp
+
+@[simp]
+theorem neg_one_symmMul : symmMul (-1) A = -A := by
+  ext1; simp
+
+end HermitianMat
+end starRing
+
+namespace HermMul
+
+section starRing
+
+variable {d 𝕜 : Type*} [Fintype d] [Field 𝕜] [StarRing 𝕜]
+variable (A B : HermitianMat d 𝕜)
+
+scoped instance : CommMagma (HermitianMat d 𝕜) where
+  mul := HermitianMat.symmMul
+  mul_comm := HermitianMat.symmMul_comm
+
+--Stupid shortcut that actually helps a lot
+scoped instance : Mul (HermitianMat d 𝕜) :=
+  CommMagma.toMul
+
+theorem mul_eq_symmMul : A * B = A.symmMul B := by
+  rfl
+
+variable {𝕜 : Type*} [RCLike 𝕜]
+
+scoped instance : IsCommJordan (HermitianMat d 𝕜) where
+  lmul_comm_rmul_rmul a b := by
+    ext1
+    simp only [mul_eq_symmMul, HermitianMat.symmMul_toMat, smul_add,
+      mul_add, add_mul, Matrix.mul_smul, Matrix.smul_mul, Matrix.mul_assoc]
+    abel
+
+end starRing
+
+section rclike
+
+variable {d 𝕜 : Type*} [Fintype d] [Field 𝕜] [StarRing 𝕜]
+
+scoped instance : NonUnitalNonAssocRing (HermitianMat d 𝕜) where
+  zero_mul := by simp [mul_eq_symmMul]
+  mul_zero := by simp [mul_eq_symmMul]
+  left_distrib a b c := by
+    ext1
+    simp [mul_eq_symmMul, HermitianMat.symmMul_toMat, mul_add, add_mul]
+    abel
+  right_distrib a b c := by
+    ext1
+    simp [mul_eq_symmMul, HermitianMat.symmMul_toMat, mul_add, add_mul]
+    abel
+
+variable {d 𝕜 : Type*} [Fintype d] [RCLike 𝕜] [StarRing 𝕜]
+variable [DecidableEq d]
+
+--TODO: Upgrade this to NonAssocCommRing, see #28604 in Mathlib
+scoped instance : NonAssocRing (HermitianMat d 𝕜) where
+  one_mul := by simp [mul_eq_symmMul]
+  mul_one := by simp [mul_eq_symmMul]
+  natCast_zero := by sorry
+  natCast_succ := by sorry
+  intCast_ofNat := by sorry
+  intCast_negSucc := by sorry
+
+end rclike
+
+end HermMul

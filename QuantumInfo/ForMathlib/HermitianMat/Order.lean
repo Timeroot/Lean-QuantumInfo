@@ -61,6 +61,11 @@ instance : IsStrictOrderedModule ℝ (HermitianMat n α) where
 instance : PosSMulMono ℝ (HermitianMat n α) := inferInstance
 instance : SMulPosMono ℝ (HermitianMat n α) := inferInstance
 
+--Without explicitly giving this instance, Lean times out trying to find it sometimes.
+instance {d 𝕜 : Type*} [Fintype d] [DecidableEq d] [RCLike 𝕜] :
+    PosSMulReflectLE ℝ (HermitianMat d 𝕜) :=
+  PosSMulMono.toPosSMulReflectLE
+
 theorem le_trace_smul_one [DecidableEq n] (hA : 0 ≤ A) : A ≤ (A.trace : ℝ) • 1 := by
   have hA' : A.toMat.PosSemidef := zero_le_iff.mp hA
   refine (Matrix.PosSemidef.le_smul_one_of_eigenvalues_iff hA'.1 A.trace).mp ?_
