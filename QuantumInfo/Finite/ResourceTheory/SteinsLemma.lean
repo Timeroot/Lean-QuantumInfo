@@ -829,7 +829,6 @@ private lemma f_image_bound (mineig : ℝ) (n : ℕ) (h : 0 < mineig) (hn : 0 < 
       nlinarith [ Real.log_pos ( show ( 3 : ℝ ) > 1 by norm_num ), mul_div_cancel₀ ( Real.log 3 ) ( show ( n + 1 : ℝ ) ≠ 0 by positivity ) ] ),
         Real.log_pos ( show ( 3 : ℝ ) > 1 by norm_num ), mul_div_cancel₀ ( Real.log 3 ) ( show ( n + 1 : ℝ ) ≠ 0 by positivity ) ]
 
-set_option maxHeartbeats 200000 in
 lemma sub_iInf_eignevalues {d : Type*} [Fintype d] [DecidableEq d] {A : Matrix d d ℂ}
   (hA : A.IsHermitian) :
     (A - iInf hA.eigenvalues • 1).PosSemidef := by
@@ -1154,6 +1153,19 @@ private lemma σ₁_c_identity {n : ℕ} (hn : 0 < n) :
   simp only [Real.exp_add, mul_add, neg_add_rev, mul_assoc, h]
   simp [Real.exp_neg, Real.exp_log, Real.exp_log (mineig_pos i), Real.exp_nat_mul]
 
+theorem σ₁_c_littleO : (fun n : ℕ ↦ σ₁_c i n + Real.log 3) =o[Filter.atTop] (fun x ↦ (x : ℝ)) := by
+  apply Asymptotics.IsLittleO.add
+  · rw [Asymptotics.isLittleO_iff_tendsto']
+    · exact σ₁_c_div_lim i
+    simp only [Nat.cast_eq_zero, Filter.eventually_atTop]
+    use 1
+    grind
+  · --This `(fun x => Real.log 3) =o[Filter.atTop] fun x => x` really should be its own fact, TODO
+    refine Asymptotics.isLittleO_const_left.2 <| Or.inr ?_
+    convert tendsto_natCast_atTop_atTop (R := ℝ)
+    ext
+    simp
+
 /-- (S46), part 1 -/
 private theorem log_le_f (n : ℕ) (lam : ℝ) : Real.log lam ≤ f_map i n lam :=
   calc
@@ -1329,23 +1341,7 @@ private lemma σ''_le_σ' (n) : σ'' ρ ε m σ n ≤ Real.exp (σ₁_c i n) •
     suffices 0 ≤ 1 - x⁻¹ by positivity
     simpa using inv_le_one_of_one_le₀ (σ''_tr_bounds ρ ε m σ n).left
 
-private abbrev ε₀_func (ε' : Prob) : ℝ := (R2 ρ σ - R1 ρ ε).toReal * (ε - ε') / (1 - ε)
-
-set_option maxHeartbeats 1000000 in
-private theorem EquationS62
-    {ε : Prob} (hε : 0 < ε ∧ ε < 1)
-    {ε' : Prob} (hε'₁ : 0 < ε') (hε'₂ : ε' < ε)
-    (hR1R2 : R1 ρ ε < R2 ρ σ) (hR1 : R1 ρ ε ≠ ⊤) (hR2 : R2 ρ σ ≠ ⊤)
-    (hε₀ : 0 < ε₀_func ρ ε σ ε') (hε₀' : (R1 ρ ε).toReal ≤ (R2 ρ σ).toReal + ε₀_func ρ ε σ ε')
-    (m : ℕ) (hm : m ≥ 1 ∧ 𝐃(ρ⊗^S[m]‖↑(σ m)) / ↑m < R2 ρ σ + (.ofNNReal ⟨ε₀_func ρ ε σ ε', hε₀.le⟩))
-    :
-  let ℰ n := pinching_map (σ'' ρ ε m σ n);
-    Filter.atTop.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' ρ ε m σ n) / n) - R1 ρ ε ≤
-      ↑(1 - ε') * (R2 ρ σ - R1 ρ ε) := by
-
-  intro ℰ
-  set ε₀ := ε₀_func ρ ε σ ε'
-  have «hσ''_ge_σ⋆» n : σ'' ρ ε m σ n ≥ (Real.exp (-σ₁_c i n) / 3) • («σ⋆» ρ ε n).M := by
+private theorem «σ''_ge_σ⋆» n : σ'' ρ ε m σ n ≥ (Real.exp (-σ₁_c i n) / 3) • («σ⋆» ρ ε n).M := by
     grw [ge_iff_le, ← σ'_le_σ'', div_eq_mul_inv, ← smul_smul, ← one_div]
     rw [smul_le_smul_iff_of_pos_left (by positivity), hσ'n_eq_sum_third]
     apply le_add_of_le_of_nonneg
@@ -1353,8 +1349,9 @@ private theorem EquationS62
       have := («σ̃» m σ n).zero_le
       positivity
     · have := ((σ₁ i)⊗^S[n]).zero_le
-      positivity --TODO: It would be so cool if this could be done by *just* positivity.
-  have «hσ''_ge_σ̃» n : σ'' ρ ε m σ n ≥ (Real.exp (-σ₁_c i n) / 3) • («σ̃» m σ n).M := by
+      positivity
+
+private theorem «σ''_ge_σ̃» n : σ'' ρ ε m σ n ≥ (Real.exp (-σ₁_c i n) / 3) • («σ̃» m σ n).M := by
     grw [ge_iff_le, ← σ'_le_σ'', div_eq_mul_inv, ← smul_smul, ← one_div]
     rw [smul_le_smul_iff_of_pos_left (by positivity), hσ'n_eq_sum_third]
     apply le_add_of_le_of_nonneg
@@ -1362,30 +1359,37 @@ private theorem EquationS62
       have := («σ⋆» ρ ε n).zero_le
       positivity
     · have := ((σ₁ i)⊗^S[n]).zero_le
-      positivity --TODO: It would be so cool if this could be done by *just* positivity.
-  have hσ''_ge_σ₁ n : σ'' ρ ε m σ n ≥ (Real.exp (-σ₁_c i n) / 3) • ((σ₁ i)⊗^S[n]).M := by
+      positivity
+
+private theorem σ''_ge_σ₁ n : σ'' ρ ε m σ n ≥ (Real.exp (-σ₁_c i n) / 3) • ((σ₁ i)⊗^S[n]).M := by
     grw [ge_iff_le, ← σ'_le_σ'', div_eq_mul_inv, ← smul_smul, ← one_div]
     rw [smul_le_smul_iff_of_pos_left (by positivity)]
     exact hσ₁_le_σ' ρ ε m σ n
 
-  have hc_littleO : (fun n : ℕ ↦ σ₁_c i n + Real.log 3) =o[Filter.atTop] (fun x ↦ (x : ℝ)) := by
-    apply Asymptotics.IsLittleO.add
-    · rw [Asymptotics.isLittleO_iff_tendsto']
-      · exact σ₁_c_div_lim i
-      simp only [Nat.cast_eq_zero, Filter.eventually_atTop]
-      use 1
-      grind
-    · --This really should be its own fact, TODO
-      refine Asymptotics.isLittleO_const_left.2 <| Or.inr ?_
-      convert tendsto_natCast_atTop_atTop (R := ℝ)
-      ext; simp
+private abbrev ε₀_func (ε' : Prob) : ℝ := (R2 ρ σ - R1 ρ ε).toReal * (ε - ε') / (1 - ε)
+
+end sigmas
+
+set_option maxHeartbeats 600000 in
+private theorem EquationS62
+    (ρ : MState (H i)) (σ : (n : ℕ) → IsFree (i := i ^ n))
+    {ε ε' : Prob} (hε'₁ : 0 < ε') (hε'₂ : ε' < ε) (hε : ε < 1)
+    (hR1R2 : R1 ρ ε < R2 ρ σ) (hR1 : R1 ρ ε ≠ ⊤) (hR2 : R2 ρ σ ≠ ⊤)
+    (hε₀ : 0 < ε₀_func ρ ε σ ε') (hε₀' : (R1 ρ ε).toReal ≤ (R2 ρ σ).toReal + ε₀_func ρ ε σ ε')
+    (m : ℕ) (hm : m ≥ 1 ∧ 𝐃(ρ⊗^S[m]‖↑(σ m)) / ↑m < R2 ρ σ + (.ofNNReal ⟨ε₀_func ρ ε σ ε', hε₀.le⟩))
+    :
+  let ℰ n := pinching_map (σ'' ρ ε m σ n);
+    Filter.atTop.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' ρ ε m σ n) / n) - R1 ρ ε ≤
+      ↑(1 - ε') * (R2 ρ σ - R1 ρ ε) := by
+  intro ℰ
+  set ε₀ := ε₀_func ρ ε σ ε'
 
   have hliminf_le : Filter.atTop.liminf (fun n ↦
       —log β_ ε(ℰ n (ρ⊗^S[n])‖{σ'' ρ ε m σ n}) / n) ≤ (R1 ρ ε).toNNReal := by --(S66)
     rw [ENNReal.coe_toNNReal hR1R2.ne_top]
     unfold R1
     calc _ = Filter.atTop.liminf (fun n => —log
-      β_ ε((ℰ n) (ρ⊗^S[n])‖{(pinching_map (σ'' ρ ε m σ n)) (σ'' ρ ε m σ n)}) / ↑n) := by conv =>
+      β_ ε(ℰ n (ρ⊗^S[n])‖{(pinching_map (σ'' ρ ε m σ n)) (σ'' ρ ε m σ n)}) / ↑n) := by conv =>
         enter [1, 1, n]
         rw [← pinching_self (σ'' ρ ε m σ n)]
     _ ≤ Filter.atTop.liminf (fun n => —log β_ ε(ρ⊗^S[n]‖{(σ'' ρ ε m σ n)}) / ↑n) := by --(S67)
@@ -1397,11 +1401,11 @@ private theorem EquationS62
       apply OptimalHypothesisRate.optimalHypothesisRate_antitone
     _ ≤ Filter.atTop.liminf (fun n => —log β_ ε(ρ⊗^S[n]‖{(«σ⋆» ρ ε n)}) / ↑n) := by --(S68)
       apply LemmaS3_inf _ _ _
-        (f := fun n ↦ ⟨σ₁_c i n + Real.log 3, add_nonneg (σ₁_c_pos i n).le (Real.log_nonneg (by norm_num))⟩) hc_littleO
-      intro i
-      dsimp only [coe_mk]
-      rw [neg_add', Real.exp_sub, Real.exp_log (by positivity)]
-      exact «hσ''_ge_σ⋆» i
+        (f := fun n ↦ ⟨σ₁_c i n + Real.log 3, add_nonneg (σ₁_c_pos i n).le (Real.log_nonneg (by norm_num))⟩)
+        (σ₁_c_littleO i)
+      intro n
+      rw [coe_mk, neg_add', Real.exp_sub, Real.exp_log (by positivity)]
+      exact «σ''_ge_σ⋆» ρ ε m σ n
     _ = _ := by --(S69)
       congr! 4 with n
       rw [← OptimalHypothesisRate.Lemma3 ε IsCompact_IsFree free_convex]
@@ -1414,7 +1418,7 @@ private theorem EquationS62
     rw [ENNReal.coe_add, ENNReal.coe_toNNReal hR2]
     unfold R2
     calc _ = Filter.atTop.limsup (fun n => —log
-      β_ (1-ε1)((ℰ n) (ρ⊗^S[n])‖{(pinching_map (σ'' ρ ε m σ n)) (σ'' ρ ε m σ n)}) / ↑n) := by conv =>
+      β_ (1-ε1)(ℰ n (ρ⊗^S[n])‖{(pinching_map (σ'' ρ ε m σ n)) (σ'' ρ ε m σ n)}) / ↑n) := by conv =>
         enter [1, 1, n]
         rw [← pinching_self (σ'' ρ ε m σ n)]
     _ ≤ Filter.atTop.limsup (fun n => —log β_ (1-ε1)(ρ⊗^S[n]‖{(σ'' ρ ε m σ n)}) / ↑n) := by
@@ -1426,11 +1430,11 @@ private theorem EquationS62
       apply OptimalHypothesisRate.optimalHypothesisRate_antitone
     _ ≤ Filter.atTop.limsup (fun n => —log β_ (1-ε1)(ρ⊗^S[n]‖{(«σ̃» m σ n)}) / ↑n) := by --(S71)
       apply LemmaS3_sup _ _ _
-        (f := fun n ↦ ⟨σ₁_c i n + Real.log 3, add_nonneg (σ₁_c_pos i n).le (Real.log_nonneg (by norm_num))⟩) hc_littleO
-      intro i
-      dsimp only [coe_mk]
-      rw [neg_add', Real.exp_sub, Real.exp_log (by positivity)]
-      exact «hσ''_ge_σ̃» i
+        (f := fun n ↦ ⟨σ₁_c i n + Real.log 3, add_nonneg (σ₁_c_pos i n).le (Real.log_nonneg (by norm_num))⟩)
+        (σ₁_c_littleO i)
+      intro n
+      rw [coe_mk, neg_add', Real.exp_sub, Real.exp_log (by positivity)]
+      exact «σ''_ge_σ̃» ρ ε m σ n
     _ ≤ _ := by --(S72)
       apply Lemma6
       · exact hm.left
@@ -1450,7 +1454,7 @@ private theorem EquationS62
     apply IsSelfAdjoint.commute_cfc
     · apply HermitianMat.H
     simp only [AddSubgroupClass.coe_sub, MState.toMat_M, selfAdjoint.val_smul]
-    suffices h : Commute ((ℰ n) (ρ⊗^S[n])).m (σ'' ρ ε m σ n).m by
+    suffices h : Commute (ℰ n (ρ⊗^S[n])).m (σ'' ρ ε m σ n).m by
       apply Commute.sub_left
       · exact (Commute.refl _).sub_right (h.smul_right _)
       · exact (h.symm.sub_right ((Commute.refl _).smul_right _)).smul_left _
@@ -1474,35 +1478,6 @@ private theorem EquationS62
     rw [sub_le_iff_le_add]
     simp only [HermitianMat.proj_le_add_lt]
     exact HermitianMat.proj_le_le_one _ _
-
-  -- (S81)
-  /- A literal translation of the paper would read:
-      (1/n : ℝ) • (E1 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ ((R1 ρ ε).toReal + ε2) • (E1 ε2 n).toMat
-  But this is simply not true! Because what happens when `ℰ n (ρ⊗^S[n])` has a zero eigenvalue, which
-  it can? Then (S81) is an inequality of operators where the LHS has an operator with a "negative
-  infinity" eigenvalue, intuitively. This isn't something very well defined, certainly not supported
-  in our definitions. This only becomes mathematically meaningful when we see how it's used later, in
-  (S88): both sides are traced against `ℰ n (ρ⊗^S[n])`, so that the 0 eigenvalues becomes irrelevant. This
-  is the version we state and prove, then.
-
-  Luckily, (S82) and (S85) are correct as written (in a particular interpretation), because
-  there the problematic subspaces are indeed projected out by the E₂ and E₃ operators.
-  -/
-  have hE1leq ε2 (n : ℕ) (hε2 : 0 < ε2) :
-      (ℰ n (ρ⊗^S[n])).M.inner (HermitianMat.mul_commute
-        (commute_aux n (E := E1 ε2 n) (pinching_commutes (ρ⊗^S[n]) (σ'' ρ ε m σ n)) rfl)) ≤
-        (ℰ n (ρ⊗^S[n])).M.inner (((R1 ρ ε).toReal + ε2) • (E1 ε2 n)) := by
-    refine rexp_mul_smul_proj_lt_mul_sub_le_mul_sub
-      (pinching_commutes (ρ⊗^S[n]) (σ'' ρ ε m σ n)) (by positivity) ?_ (σ''_posdef ρ ε m σ n) rfl
-    rw [← HermitianMat.zero_le_iff]
-    apply MState.zero_le
-
-  -- (S82) -- see (S81) for comments
-  have hE2leq ε2 (n : ℕ) (hε2 : 0 < ε2) : (1/n : ℝ) • (E2 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' ρ ε m σ n).M.log.toMat) ≤ ((R2 ρ σ).toReal + ε₀ + ε2) • (E2 ε2 n).toMat := by
-    refine rexp_mul_smul_proj_lt_mul_sub_le_mul_sub'
-      (pinching_commutes (ρ⊗^S[n]) (σ'' ρ ε m σ n)) ?_ (σ''_posdef ρ ε m σ n) rfl
-    rw [← HermitianMat.zero_le_iff]
-    apply MState.zero_le
 
   -- (S83)
   let c' ε2 n := (σ₁_c i n + (σ₁_c i n) / n) ⊔ ((R2 ρ σ).toReal + ε₀ + ε2)
@@ -1608,10 +1583,16 @@ private theorem EquationS62
         have hE3commlog : Commute (E3 ε2 n).toMat ((σ'' ρ ε m σ n).M.log.toMat - (Real.exp (-(n * c' ε2 n)) • 1 : HermitianMat _ ℂ).log.toMat) := by
           -- projector commutes with logs
           apply Commute.sub_right
-          swap
-          -- prove `Commute (E3 _) (_ 1).log`
-          · conv =>
-              rhs
+          · -- prove Commute (E3 _) (σ'' _).log
+            unfold E3 P2
+            rw [HermitianMat.proj_le_def]
+            apply HermitianMat.cfc_commute
+            apply Commute.sub_left
+            · exact pinching_commutes (ρ⊗^S[n]) (σ'' ρ ε m σ n)
+            · apply Commute.smul_left
+              · rfl
+          · -- prove `Commute (E3 _) (_ 1).log`
+            conv_rhs =>
               simp only [
                 HermitianMat.log_smul (1 : HermitianMat _ ℂ) (Real.exp _),
                 Real.log_exp, neg_smul, HermitianMat.log_one,
@@ -1620,37 +1601,15 @@ private theorem EquationS62
                 selfAdjoint.val_one
                 ]
             simp only [Commute.neg_right_iff, Commute.smul_right (Commute.one_right _) _]
-          -- prove Commute (E3 _) (σ'' _).log
-          · unfold E3 P2
-            rw [HermitianMat.proj_le_def]
-            apply HermitianMat.cfc_commute
-            apply Commute.sub_left
-            · exact pinching_commutes (ρ⊗^S[n]) (σ'' ρ ε m σ n)
-            · apply Commute.smul_left
-              · rfl
-        have hElognonneg : 0 ≤ (E3 ε2 n).toMat * ((σ'' ρ ε m σ n).M.log.toMat - (Real.exp (-(n * c' ε2 n)) • 1 : HermitianMat _ ℂ).log.toMat) := by
-          -- factors are positive and commute (hE3commlog),
-          -- so product is positive too (Commute.mul_nonneg)
-          apply Commute.mul_nonneg _ h1logleq hE3commlog
-          apply HermitianMat.proj_le_nonneg
-        apply smul_nonneg (inv_nonneg_of_nonneg (Nat.cast_nonneg' n)) hElognonneg
+        apply smul_nonneg (inv_nonneg_of_nonneg (Nat.cast_nonneg' n))
+        apply Commute.mul_nonneg _ h1logleq hE3commlog
+        apply HermitianMat.proj_le_nonneg
       _ = (c' ε2 n) • (E3 ε2 n).toMat := by
-        -- simplify log(1)
-        conv =>
-          lhs; congr; rfl
-          simp only [
-            neg_mul, HermitianMat.log_smul _ _, Real.log_exp, neg_smul,
-            HermitianMat.log_one, add_zero, NegMemClass.coe_neg,
-            HermitianMat.val_eq_coe,
-            selfAdjoint.val_smul, selfAdjoint.val_one, neg_neg
-            ]
-          rfl
-        simp only [one_div, Algebra.mul_smul_comm, mul_one, smul_smul]
-        rw [mul_comm, ← mul_assoc, ← one_div, one_div_mul_cancel, one_mul]
-        simp only [ne_eq, Nat.cast_eq_zero, ne_zero_of_lt hn, not_false_eq_true]
+        simp [HermitianMat.log_smul, smul_smul]
+        field_simp
     --Linearly combine S81, S82, S85:
     calc
-      𝐃((ℰ n) (ρ⊗^S[n])‖σ'' ρ ε m σ n) / (n : ENNReal) ≤
+      𝐃(ℰ n (ρ⊗^S[n])‖σ'' ρ ε m σ n) / (n : ENNReal) ≤
         ENNReal.ofReal (((ℰ n (ρ⊗^S[n])).M.inner (((R1 ρ ε).toReal + ε2) • (E1 ε2 n)))
         + ((ℰ n (ρ⊗^S[n])).M.inner (((R2 ρ σ).toReal + ε₀ + ε2) • (E2 ε2 n)))
         + ((ℰ n (ρ⊗^S[n])).M.inner ((c' ε2 n) • (E3 ε2 n))))
@@ -1663,8 +1622,8 @@ private theorem EquationS62
         have hker : (σ'' ρ ε m σ n).M.ker ≤ (ℰ n (ρ⊗^S[n])).M.ker :=
           ker_le_ker_pinching_of_PosDef (ρ⊗^S[n]) (σ'' ρ ε m σ n) (σ''_pd n)
         simp only [hker, if_true]
-        have hMulOne : ((ℰ n) (ρ⊗^S[n])).M.toMat * (1 : Matrix (H (i ^ n)) (H (i ^ n)) ℂ) = ((ℰ n) (ρ⊗^S[n])).M.toMat := Matrix.mul_one ((ℰ n) (ρ⊗^S[n])).M.toMat
-        have hOneMulCommute : Commute (1 : HermitianMat _ ℂ).toMat ((ℰ n) (ρ⊗^S[n])).M.toMat := Commute.one_left ((ℰ n) (ρ⊗^S[n])).M.toMat
+        have hMulOne : (ℰ n (ρ⊗^S[n])).M.toMat * (1 : Matrix (H (i ^ n)) (H (i ^ n)) ℂ) = (ℰ n (ρ⊗^S[n])).M.toMat := Matrix.mul_one (ℰ n (ρ⊗^S[n])).M.toMat
+        have hOneMulCommute : Commute (1 : HermitianMat _ ℂ).toMat (ℰ n (ρ⊗^S[n])).M.toMat := Commute.one_left (ℰ n (ρ⊗^S[n])).M.toMat
         have hOneIsOne : ∀ (ε : ℝ) (n : ℕ), (1 : ℝ → ℕ → HermitianMat (H (i ^ n)) ℂ) ε n = (1 : HermitianMat (H (i ^ n)) ℂ) := by
           intro ε n; rfl
         /- convert Esum to the HermitianMat equality at point (ε2, n) -/
@@ -1677,14 +1636,12 @@ private theorem EquationS62
           rw [← Esum']
         -- (S87)
         /- Use hE1leq, hE2leq, hE3leq -/
-        unfold HermitianMat.inner at hE1leq
-        simp at hE1leq
-        simp at hE2leq
+
         /-the next two `have`s are duplicates-/
         -- TODO streamline what's below
         /-it should transform a HermitianMat inequality into a reals inequality with HermitianMat.inner_mono,
         the difficulty here is that inner_mono relies on the entries being HermitianMat, but the inequalities are expressed as matrices-/
-        have hE2comm : Commute (E2 ε2 n).toMat ((((ℰ n) (ρ⊗^S[n])).M.log - (σ'' ρ ε m σ n).M.log).toMat) := by
+        have hE2comm : Commute (E2 ε2 n).toMat (((ℰ n (ρ⊗^S[n])).M.log - (σ'' ρ ε m σ n).M.log).toMat) := by
         -- TODO this needs to be extracted from here, it's badly redundant
           apply Commute.sub_right
           · unfold E2 P1 P2
@@ -1715,41 +1672,46 @@ private theorem EquationS62
               apply Commute.sub_left
               · exact pinching_commutes (ρ⊗^S[n]) (σ'' ρ ε m σ n)
               · simp
-        have hE2leqInner : (n : ℝ)⁻¹ * (((ℰ n) (ρ⊗^S[n])).M.toMat * (E2 ε2 n).toMat * (((ℰ n) (ρ⊗^S[n])).M.log.toMat - (σ'' ρ ε m σ n).M.log.toMat)).trace.re ≤ ((R2 ρ σ).toReal + ε₀ + ε2) * (((ℰ n) (ρ⊗^S[n])).M).inner (E2 ε2 n) := by
-          rw [← Complex.re_ofReal_mul (↑n)⁻¹ _, ← smul_eq_mul, ← Matrix.trace_smul]
+        have hE2leqInner : (n : ℝ)⁻¹ * ((ℰ n (ρ⊗^S[n])).M.toMat * (E2 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' ρ ε m σ n).M.log.toMat)).trace.re ≤ ((R2 ρ σ).toReal + ε₀ + ε2) * ((ℰ n (ρ⊗^S[n])).M).inner (E2 ε2 n) := by
+          -- (S82) -- see (S81) for comments
+          have hE2leq ε2 (n : ℕ) (hε2 : 0 < ε2) : (1/n : ℝ) • (E2 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' ρ ε m σ n).M.log.toMat) ≤ ((R2 ρ σ).toReal + ε₀ + ε2) • (E2 ε2 n).toMat := by
+            refine rexp_mul_smul_proj_lt_mul_sub_le_mul_sub'
+              (pinching_commutes (ρ⊗^S[n]) (σ'' ρ ε m σ n)) ?_ (σ''_posdef ρ ε m σ n) rfl
+            rw [← HermitianMat.zero_le_iff]
+            apply MState.zero_le
+          simp at hE2leq
+          rw [← Complex.re_ofReal_mul (↑n)⁻¹, ← smul_eq_mul, ← Matrix.trace_smul]
           rw [← RCLike.re_to_complex]
           conv =>
             enter [1, 2]
             rw [mul_assoc]
             enter [1, 2, 2]
             norm_cast
-            rw [← Subtype.coe_mk _ ((((E2 ε2 n)).H.commute_iff (((((ℰ n) (ρ⊗^S[n]))).M.log - ((σ'' ρ ε m σ n)).M.log)).H).mp hE2comm)]
+            rw [← Subtype.coe_mk _ ((((E2 ε2 n)).H.commute_iff ((((ℰ n (ρ⊗^S[n]))).M.log - ((σ'' ρ ε m σ n)).M.log)).H).mp hE2comm)]
             enter [1]
             change (HermitianMat.mul_commute hE2comm)
           conv at hE2leq =>
             enter [ε2, n, hε2, 1, 2, 2]
             norm_cast
           specialize hE2leq ε2 n hε2
-          rw [← Subtype.coe_mk _ ((((E2 ε2 n)).H.commute_iff (((((ℰ n) (ρ⊗^S[n]))).M.log - ((σ'' ρ ε m σ n)).M.log)).H).mp hE2comm)] at hE2leq
+          rw [← Subtype.coe_mk _ ((((E2 ε2 n)).H.commute_iff ((((ℰ n (ρ⊗^S[n]))).M.log - ((σ'' ρ ε m σ n)).M.log)).H).mp hE2comm)] at hE2leq
           conv at hE2leq =>
             enter [1, 2, 1]
             change (HermitianMat.mul_commute hE2comm)
-          conv at hE2leq =>
-            lhs
+          conv_lhs at hE2leq =>
             change (Complex.ofReal (_ : ℝ)) • _
             rw [HermitianMat.smul_toMat (HermitianMat.mul_commute hE2comm) (n : ℝ)⁻¹]
-          conv at hE2leq =>
-            rhs
+          conv_rhs at hE2leq =>
             change (Complex.ofReal (_ : ℝ)) • _
             rw [HermitianMat.smul_toMat (E2 ε2 n) _]
-          rw [← Matrix.mul_smul ((ℰ n) (ρ⊗^S[n])).M.toMat (Complex.ofReal (n : ℝ)⁻¹) (HermitianMat.mul_commute hE2comm).toMat]
+          rw [← Matrix.mul_smul (ℰ n (ρ⊗^S[n])).M.toMat (Complex.ofReal (n : ℝ)⁻¹) (HermitianMat.mul_commute hE2comm).toMat]
           simp only [HermitianMat.smul_toMat]
-          rw [← HermitianMat.inner_eq_re_trace ((ℰ n) (ρ⊗^S[n])).M ((n : ℝ)⁻¹ • (HermitianMat.mul_commute hE2comm))]
+          rw [← HermitianMat.inner_eq_re_trace (ℰ n (ρ⊗^S[n])).M ((n : ℝ)⁻¹ • (HermitianMat.mul_commute hE2comm))]
           rw [← HermitianMat.inner_smul]
-          exact ((HermitianMat.inner_mono (((ℰ n) (ρ⊗^S[n]))).zero_le) hE2leq)
+          exact ((HermitianMat.inner_mono ((ℰ n (ρ⊗^S[n]))).zero_le) hE2leq)
         simp at hE3leq
         /-this and the `have` above are duplicates-/
-        have hE3comm : Commute (E3 ε2 n).toMat ((((ℰ n) (ρ⊗^S[n])).M.log - (σ'' ρ ε m σ n).M.log).toMat) := by
+        have hE3comm : Commute (E3 ε2 n).toMat (((ℰ n (ρ⊗^S[n])).M.log - (σ'' ρ ε m σ n).M.log).toMat) := by
           apply Commute.sub_right
           · simp [(hE3commℰ ε2 n)]
           · unfold E3 P2
@@ -1760,7 +1722,7 @@ private theorem EquationS62
             · exact pinching_commutes (ρ⊗^S[n]) (σ'' ρ ε m σ n)
             · simp
         /- hE3commℰ -/
-        have hE3leqInner : (n : ℝ)⁻¹ * (((ℰ n) (ρ⊗^S[n])).M.toMat * (E3 ε2 n).toMat * (((ℰ n) (ρ⊗^S[n])).M.log.toMat - (σ'' ρ ε m σ n).M.log.toMat)).trace.re ≤ (c' ε2 n) * (((ℰ n) (ρ⊗^S[n])).M).inner (E3 ε2 n) := by
+        have hE3leqInner : (n : ℝ)⁻¹ * ((ℰ n (ρ⊗^S[n])).M.toMat * (E3 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' ρ ε m σ n).M.log.toMat)).trace.re ≤ (c' ε2 n) * ((ℰ n (ρ⊗^S[n])).M).inner (E3 ε2 n) := by
           rw [← Complex.re_ofReal_mul (↑n)⁻¹ _, ← smul_eq_mul, ← Matrix.trace_smul]
           rw [← RCLike.re_to_complex]
           conv =>
@@ -1770,13 +1732,13 @@ private theorem EquationS62
             norm_cast
           conv =>
             enter [1, 2, 1, 2, 2]
-            rw [← Subtype.coe_mk _ ((((E3 ε2 n)).H.commute_iff (((((ℰ n) (ρ⊗^S[n]))).M.log - ((σ'' ρ ε m σ n)).M.log)).H).mp hE3comm)]
+            rw [← Subtype.coe_mk _ ((((E3 ε2 n)).H.commute_iff ((((ℰ n (ρ⊗^S[n]))).M.log - ((σ'' ρ ε m σ n)).M.log)).H).mp hE3comm)]
             enter [1]
             change (HermitianMat.mul_commute hE3comm)
           conv at hE3leq =>
             enter [1, 2, 2]
             norm_cast
-          rw [← Subtype.coe_mk _ ((((E3 ε2 n)).H.commute_iff (((((ℰ n) (ρ⊗^S[n]))).M.log - ((σ'' ρ ε m σ n)).M.log)).H).mp hE3comm)] at hE3leq
+          rw [← Subtype.coe_mk _ ((((E3 ε2 n)).H.commute_iff ((((ℰ n (ρ⊗^S[n]))).M.log - ((σ'' ρ ε m σ n)).M.log)).H).mp hE3comm)] at hE3leq
           conv at hE3leq =>
             enter [1, 2, 1]
             change (HermitianMat.mul_commute hE3comm)
@@ -1788,11 +1750,11 @@ private theorem EquationS62
             rhs
             change (Complex.ofReal (_ : ℝ)) • _
             rw [HermitianMat.smul_toMat (E3 ε2 n) _]
-          rw [← Matrix.mul_smul ((ℰ n) (ρ⊗^S[n])).M.toMat (Complex.ofReal (n : ℝ)⁻¹) (HermitianMat.mul_commute hE3comm).toMat]
+          rw [← Matrix.mul_smul (ℰ n (ρ⊗^S[n])).M.toMat (Complex.ofReal (n : ℝ)⁻¹) (HermitianMat.mul_commute hE3comm).toMat]
           simp only [HermitianMat.smul_toMat]
-          rw [← HermitianMat.inner_eq_re_trace ((ℰ n) (ρ⊗^S[n])).M ((n : ℝ)⁻¹ • (HermitianMat.mul_commute hE3comm))]
+          rw [← HermitianMat.inner_eq_re_trace (ℰ n (ρ⊗^S[n])).M ((n : ℝ)⁻¹ • (HermitianMat.mul_commute hE3comm))]
           rw [← HermitianMat.inner_smul]
-          exact ((HermitianMat.inner_mono (((ℰ n) (ρ⊗^S[n]))).zero_le) hE3leq)
+          exact ((HermitianMat.inner_mono ((ℰ n (ρ⊗^S[n]))).zero_le) hE3leq)
         simp only [IsMaximalSelfAdjoint.RCLike_selfadjMap, MState.toMat_M,
           AddSubgroupClass.coe_sub, HermitianMat.val_eq_coe,
           RCLike.re_to_complex,
@@ -1808,29 +1770,50 @@ private theorem EquationS62
           apply add_le_add_three
           · unfold HermitianMat.inner
             simp
+
+            -- (S81)
+            /- A literal translation of the paper would read:
+                (1/n : ℝ) • (E1 ε2 n).toMat * ((ℰ n (ρ⊗^S[n])).M.log.toMat - (σ'' n).M.log.toMat) ≤ ((R1 ρ ε).toReal + ε2) • (E1 ε2 n).toMat
+            But this is simply not true! Because what happens when `ℰ n (ρ⊗^S[n])` has a zero eigenvalue, which
+            it can? Then (S81) is an inequality of operators where the LHS has an operator with a "negative
+            infinity" eigenvalue, intuitively. This isn't something very well defined, certainly not supported
+            in our definitions. This only becomes mathematically meaningful when we see how it's used later, in
+            (S88): both sides are traced against `ℰ n (ρ⊗^S[n])`, so that the 0 eigenvalues becomes irrelevant. This
+            is the version we state and prove, then.
+
+            Luckily, (S82) and (S85) are correct as written (in a particular interpretation), because
+            there the problematic subspaces are indeed projected out by the E₂ and E₃ operators.
+            -/
+            have hE1leq ε2 (n : ℕ) (hε2 : 0 < ε2) :
+                (ℰ n (ρ⊗^S[n])).M.inner (HermitianMat.mul_commute
+                  (commute_aux n (E := E1 ε2 n) (pinching_commutes (ρ⊗^S[n]) (σ'' ρ ε m σ n)) rfl)) ≤
+                  (ℰ n (ρ⊗^S[n])).M.inner (((R1 ρ ε).toReal + ε2) • (E1 ε2 n)) := by
+              refine rexp_mul_smul_proj_lt_mul_sub_le_mul_sub
+                (pinching_commutes (ρ⊗^S[n]) (σ'' ρ ε m σ n)) (by positivity) ?_ (σ''_posdef ρ ε m σ n) rfl
+              rw [← HermitianMat.zero_le_iff]
+              apply MState.zero_le
+
+            unfold HermitianMat.inner at hE1leq
+            simp at hE1leq
             conv at hE1leq =>
               intro ε2 n hε2
               rw [← mul_assoc]
               pattern (pinching_map (σ'' ρ ε m σ n))
-              change (ℰ n)
+              change ℰ n
             apply (hE1leq ε2 n hε2)
           · apply hE2leqInner
           · apply hE3leqInner
       -- (S88)
-      _ = R1 ρ ε + ENNReal.ofReal ε2 +
-              ENNReal.ofReal ((P1 ε2 n).inner ↑((ℰ n) (ρ⊗^S[n]))) *
-                (R2 ρ σ + ENNReal.ofReal ε₀ + ENNReal.ofReal ε2 - (R1 ρ ε + ENNReal.ofReal ε2)) +
-            ENNReal.ofReal ((P2 ε2 n).inner ↑((ℰ n) (ρ⊗^S[n]))) *
-              (ENNReal.ofReal (c' ε2 n) - (R2 ρ σ + ENNReal.ofReal ε₀ + ENNReal.ofReal ε2)) := by
-              unfold E1 E2 E3
-              simp [HermitianMat.inner_left_sub]
-              ring_nf
-              repeat rw [ENNReal.ofReal_add] -- 46 goals !!! --RSS
-              · sorry -- l7
-              --It seems like this works(?) on later versions of Lean but not here...?
-              --I'm confused, I'm not getting the 46 goals either. --Alex, v4.24.0
-              -- any_goals try positivity -- 11 goals T_T --RSS
-              all_goals sorry --so for now I'm closing everything with sorry
+      _ = _ := by
+        unfold E1 E2 E3
+        simp [HermitianMat.inner_left_sub]
+        ring_nf
+        repeat rw [ENNReal.ofReal_add] -- 46 goals !!! --RSS
+        · sorry -- l7
+        --It seems like this works(?) on later versions of Lean but not here...?
+        --I'm confused, I'm not getting the 46 goals either. --Alex, v4.24.0
+        -- any_goals try positivity -- 11 goals T_T --RSS
+        all_goals sorry --so for now I'm closing everything with sorry
 
   -- (S91)
   have hliminfDleq : Filter.atTop.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' ρ ε m σ n) / n) ≤
@@ -1901,41 +1884,38 @@ private theorem EquationS62
             intro n
             refine ⟨n, le_rfl, ?_⟩
             exact HermitianMat.inner_ge_zero (HermitianMat.proj_le_nonneg _ _)
-                                            (HermitianMat.zero_le_iff.mpr ((ℰ n) (ρ⊗^S[n])).pos)
+              (ℰ n (ρ⊗^S[n])).zero_le
           · apply Filter.isBoundedUnder_of
-            use 1; intro n
-            calc
-              (P2 ε2 n).inner ↑((ℰ n) (ρ⊗^S[n])) ≤ HermitianMat.inner 1 ((ℰ n) (ρ⊗^S[n])).M :=
-                HermitianMat.inner_mono' (HermitianMat.zero_le_iff.mpr ((ℰ n) (ρ⊗^S[n])).pos)
-                                          (HermitianMat.proj_le_le_one _ _)
-              _ = ((ℰ n) (ρ⊗^S[n])).M.trace := HermitianMat.one_inner _
-              _ = 1 := MState.tr _
+            use 1
+            intro n
+            rw [← (ℰ n (ρ⊗^S[n])).tr, ← HermitianMat.one_inner]
+            exact HermitianMat.inner_mono' (ℰ n (ρ⊗^S[n])).zero_le
+              (HermitianMat.proj_le_le_one _ _)
       --The goal is now hlimsupP2', up to stupid casting
       intro x hx
       specialize hlimsupP2' x hx
       apply le_of_eq at hlimsupP2'
       apply ENNReal.ofReal_mono at hlimsupP2'
       convert ← hlimsupP2' using 1
+      swap
+      · simp
       dsimp
       conv =>
         enter [2, 1, n]
         exact (ENNReal.ofReal_eq_coe_nnreal _).symm
-      swap
-      · simp
       refine ENNReal.ofReal_mono.map_limsup_of_continuousAt _ ?_ ?_ ?_
       · apply ENNReal.continuous_ofReal.continuousAt
       · use 1
-        simp only [ge_iff_le, Filter.eventually_map, Filter.eventually_atTop]
+        simp only [Filter.eventually_map, Filter.eventually_atTop]
         use 0
         intro x hx
         rw [← (ℰ x (ρ⊗^S[x])).tr, ← HermitianMat.one_inner]
         apply HermitianMat.inner_mono' (ℰ x (ρ⊗^S[x])).zero_le
         apply HermitianMat.proj_le_le_one
       · use 0
-        simp only [ge_iff_le, Filter.eventually_map, Filter.eventually_atTop,
-          forall_exists_index]
+        simp only [Filter.eventually_map, Filter.eventually_atTop, forall_exists_index]
         intro a x hx
-        refine le_trans ?_ (hx x le_rfl)
+        grw [← hx x le_rfl]
         apply HermitianMat.inner_ge_zero
         · apply HermitianMat.proj_le_nonneg
         · apply MState.zero_le
@@ -1972,8 +1952,7 @@ private theorem EquationS62
       apply le_trans (ENNReal.liminf_mul_le ?_ ?_)
       · rw [mul_comm]
         gcongr
-        · -- apply hliminfP1
-          -- Alex: This is hard to prove with hliminfP1, because in hliminfP1 the ε2 is fixed inside
+        · -- Alex: This is hard to prove with hliminfP1, because in hliminfP1 the ε2 is fixed inside
           --  the liminf, but here it is allowed to vary with n. We need to 'upgrade' hliminfP1 with
           --  the following fact, which should (in some form) be its own theorem:
           /- (∀ x, x > 0 → liminf (n ↦ f x n) ≤ y) →
@@ -2026,12 +2005,10 @@ private theorem EquationS62
 
     equals (1 - ε'.val) * (R2 ρ σ - R1 ρ ε).toReal =>
       unfold ε₀
-      field_simp [show 1 - ε.val ≠ 0 from ne_of_gt (sub_pos.mpr hε.2)]
+      field_simp [show 1 - ε.val ≠ 0 from ne_of_gt (sub_pos.mpr hε)]
       ring_nf
   rw [ENNReal.ofReal_mul (by simp), Prob.ofNNReal_toNNReal,
     ENNReal.ofReal_toReal (by simp [hR1, hR2]), Prob.coe_one_minus]
-
-end sigmas
 
 /-- Lemma 7 from the paper. We write `ε'` for their `\tilde{ε}`. -/
 private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1) (σ : (n : ℕ) → IsFree (i := i ^ n)) :
@@ -2042,17 +2019,15 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     := by
   --This proof naturally splits out into LemmaS62:
   --  `lim inf n→∞ 1/n D(E_n(ρ^⊗n)‖σ''_n) − R1,ϵ ≤ (1 − ˜ϵ)(R2 − R1,ϵ).`
-  --This is proved in appendix C.
-  --Then we prove S61, and the conclusion is just `rw [S61] at S62`. But splitting it like
-  --this requires first _defining_ the sequence σ''_n.
+  --which is proved above. Here, set up the preliminiaries (appropriate finiteness
+  -- conditions, nonzeroness, etc.) get S62, prove S61, and the conclusion is just `rw [S61] at S62`.
 
   --First deal with the easy case of R1 = R2.
   intro hR1R2 ε' ⟨hε'₁, hε'₂⟩
   rw [ge_iff_le, le_iff_lt_or_eq, or_comm] at hR1R2
   rcases hR1R2 with hR1R2|hR1R2
-  · rw [hR1R2]
-    use σ
-    simp
+  · use σ
+    simp [hR1R2]
   --This leaves us with the stronger statement that R1 < R2 strictly.
   --Before proceeding, let's reduce to the case that they're finite.
   have hR1 : R1 ρ ε ≠ ⊤ := hR1R2.ne_top
@@ -2060,12 +2035,11 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
   · rw [hR2, ENNReal.top_sub hR1, ENNReal.mul_top', if_neg]
     · simp
     · have : ε'.val < 1 := hε'₂.trans hε.2
-      rcases ε' with ⟨ε',hε'₁,hε'₂⟩
+      rcases ε' with ⟨ε', hε'₁, hε'₂⟩
       simp only [Prob.toNNReal, Prob.coe_one_minus, ENNReal.coe_eq_zero]
       rw [Subtype.ext_iff, val_eq_coe, val_eq_coe, coe_zero, coe_mk]
-      linarith +splitNe
+      grind
 
-  --Start giving the definitions from the paper. Define ε₀
   let ε₀ : ℝ := (R2 ρ σ - R1 ρ ε).toReal * (ε - ε') / (1 - ε)
   have hε₀ : 0 < ε₀ :=
     have := sub_pos.mpr (show ε.val < 1 from hε.2)
@@ -2149,21 +2123,12 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     rw [← Matrix.IsHermitian.spectrum_real_eq_range_eigenvalues]
     rw [spectrum.smul_eq_smul _ _ (CFC.spectrum_nonempty ℝ _ ((σ₁ i)⊗^S[n]).M.H)]
     rw [Real.sInf_smul_of_nonneg (by norm_num)]
-    simp only [MState.toMat_M, smul_eq_mul, div_eq_inv_mul,
-      mul_one, inv_pos, Nat.ofNat_pos, mul_le_mul_iff_right₀]
-    apply le_of_eq
-    -- sInf (spectrum ℝ σ₁.m) ^ n = sInf (spectrum ℝ σ₁⊗^S[n].m)
-    symm
-    apply sInf_spectrum_spacePow
+    simp [MState.toMat_M, div_eq_inv_mul, sInf_spectrum_spacePow]
+
   have hdpos n : 0 < Fintype.card (spectrum ℝ (σ'' ρ ε m σ n).m) := by
     rw [Fintype.card_pos_iff, Set.nonempty_coe_sort]
     apply IsSelfAdjoint.spectrum_nonempty
     exact (σ'' ρ ε m σ n).M.H
-
-  -- Eq (S59) has a minus sign, which gets complicated when one of the relative entropies is infinite.
-  -- However, I don't think we need this version with the minus sign.
-  have qRel_pinching_pythagoras n : 𝐃(ρ⊗^S[n]‖σ'' ρ ε m σ n) = 𝐃(ρ⊗^S[n]‖ℰ n (ρ⊗^S[n])) + 𝐃(ℰ n (ρ⊗^S[n])‖σ'' ρ ε m σ n) := by
-    exact pinching_pythagoras (ρ⊗^S[n]) (σ'' ρ ε m σ n)
 
   -- Eq. (S60)
   have qRel_ent_bound n : 𝐃(ρ⊗^S[n]‖ℰ n (ρ⊗^S[n])) ≤ ENNReal.ofReal (Real.log (n + 1)) := calc
@@ -2206,9 +2171,11 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
         use 1
         intro n _
         exact ENNReal.div_le_div (qRel_σ''_le_σ' n) (by rfl)
-    · simp only [qRel_pinching_pythagoras, ENNReal.add_div, ← Pi.add_apply]
-      conv =>
-        lhs
+    · -- Eq (S59) has a minus sign, which gets complicated when one of the relative entropies is infinite.
+      -- However, I don't think we need this version with the minus sign.
+      have h_pinching := fun n ↦ pinching_pythagoras (ρ⊗^S[n]) (σ'' ρ ε m σ n)
+      simp only [h_pinching, ENNReal.add_div, ← Pi.add_apply]
+      conv_lhs =>
         apply ENNReal.liminf_add_of_left_tendsto_zero
         tactic =>
           apply tendsto_of_tendsto_of_tendsto_of_le_of_le
@@ -2237,7 +2204,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
 
   use fun n ↦ ⟨σ' ρ ε m σ n, σ'_free ρ ε m σ n⟩
   rw [R2, hliminf]
-  exact EquationS62 ρ σ hε hε'₁ hε'₂ hR1R2 hR1 hR2 hε₀ hε₀' m hm
+  exact EquationS62 ρ σ hε'₁ hε'₂ hε.2 hR1R2 hR1 hR2 hε₀ hε₀' m hm
 
 /-- Lemma 7 gives us a way to repeatedly "improve" a sequence σ to one with a smaller gap between R2 and R1.
 The paper paints this as pretty much immediate from Lemma7, but we need to handle the case where R2 is below
