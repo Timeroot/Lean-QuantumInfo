@@ -77,7 +77,7 @@ A channel A `AchievesRate` R:ℝ if for every ε>0, some n copies of A emulates 
 -/
 def AchievesRate (A : CPTPMap d₁ d₂) (R : ℝ) : Prop :=
   ∀ ε : ℝ, ε > 0 →
-    ∃ (n : ℕ) (dimB : ℕ) (B : CPTPMap (Fin dimB) (Fin dimB)),
+    ∃ n > 0, ∃ (dimB : ℕ) (B : CPTPMap (Fin dimB) (Fin dimB)),
       (CPTPMap.piProd (fun (_ : Fin n) ↦ A)).Emulates B ∧
       Real.logb 2 dimB ≥ R*n ∧
       B.εApproximates CPTPMap.id ε
@@ -88,13 +88,13 @@ noncomputable def quantumCapacity (A : CPTPMap d₁ d₂) : ℝ :=
 section emulates
 variable [DecidableEq d₃] [DecidableEq d₄] [DecidableEq d₅]
 
-set_option linter.unusedSectionVars false in
 /-- Every quantum channel emulates itself. -/
+@[refl]
 theorem emulates_self (Λ : CPTPMap d₁ d₂) : Λ.Emulates Λ :=
   ⟨CPTPMap.id, CPTPMap.id, by simp⟩
 
-set_option linter.unusedSectionVars false in
 /-- If a quantum channel A emulates B, and B emulates C, then A emulates C. -/
+@[trans]
 theorem emulates_trans (Λ₁ : CPTPMap d₁ d₂) (Λ₂ : CPTPMap d₃ d₄) (Λ₃ : CPTPMap d₅ d₆)
   (h₁₂ : Λ₁.Emulates Λ₂) (h₂₃ : Λ₂.Emulates Λ₃) : Λ₁.Emulates Λ₃ := by
   obtain ⟨E₁, D₁, hED₁⟩ := h₁₂
@@ -118,12 +118,19 @@ end εApproximates
 
 section AchievesRate
 
+--PULLOUT
+instance [Nonempty d₁] [Nonempty d₂] : Nonempty (CPTPMap d₁ d₂) := by
+  sorry
+
 /-- Every quantum channel achieves a rate of zero. -/
 theorem achievesRate_0 (Λ : CPTPMap d₁ d₂) : Λ.AchievesRate 0 := by
   intro ε hε
-  use 0, 1, default
+  use 1, zero_lt_one, 1, default
   constructor
-  · exact ⟨default, default, Unique.eq_default _⟩
+  · have : Nonempty d₁ := by sorry--having a CPTPMap should be enough to conclude in- and out-spaces are nonempty
+    have : Nonempty d₂ := by sorry
+    use Classical.ofNonempty, Classical.ofNonempty
+    exact Unique.eq_default _
   constructor
   · norm_num
   · rw [Unique.eq_default id]
@@ -132,20 +139,84 @@ theorem achievesRate_0 (Λ : CPTPMap d₁ d₂) : Λ.AchievesRate 0 := by
 /-- The identity channel on D dimensional space achieves a rate of log2(D). -/
 theorem id_achievesRate_log_dim : (id (dIn := d₁)).AchievesRate (Real.logb 2 (Fintype.card d₁)) := by
   intro ε hε
-  use 1, Fintype.card d₁, id
+  use 1, zero_lt_one, Fintype.card d₁, id
   constructor
-  · sorry--they are equivalent up to permutation
+  · --they are equivalent up to permutation
+    -- TODO: Instead this proof should be `@[simp] piProd (fun x => id) = id` and `emulates_self`
+    refine' ⟨ _, _, _ ⟩;
+    exact CPTPMap.ofEquiv ( Fintype.equivFinOfCardEq ( by simp +decide ) ).symm;
+    exact CPTPMap.ofEquiv ( Fintype.equivFinOfCardEq ( by simp +decide ) );
+    apply CPTPMap.ext;
+    ext; simp +decide [ CPTPMap.piProd ];
+    unfold MatrixMap.piKron
+    simp_all only [gt_iff_lt, PiTensorProduct.map_id, LinearMap.toMatrix_id_eq_basis_toMatrix,
+      Module.Basis.toMatrix_self, Matrix.reindex_apply, Matrix.submatrix_one_equiv, Matrix.toLin_one]
+    erw [ MatrixMap.submatrix_apply ]
+    simp_all only [Equiv.symm_symm, Equiv.apply_symm_apply, Matrix.submatrix_apply]
   constructor
   · norm_num
   · exact εApproximates_monotone (εApproximates_self id) hε.le
 
 /-- A channel cannot achieve a rate greater than log2(D), where D is the input dimension. -/
-theorem not_achievesRate_gt_log_dim_in (Λ : CPTPMap d₁ d₂) {R : ℝ} (hR : Real.logb 2 (Fintype.card d₁) < R): ¬Λ.AchievesRate R := by
+theorem not_achievesRate_gt_log_dim_in (Λ : CPTPMap d₁ d₂) {R : ℝ} (hR : Real.logb 2 (Fintype.card d₁) < R) :
+    ¬Λ.AchievesRate R := by
   sorry
+
+noncomputable section AristotleLemmas
+
+--PULLOUT
+/-
+Composition of `piKron` maps distributes over the tensor product.
+-/
+theorem _root_.MatrixMap.piKron_comp {ι : Type*} [Fintype ι] [DecidableEq ι]
+  {R : Type*} [CommSemiring R]
+  {d₁ d₂ d₃ : ι → Type*}
+  [∀ i, Fintype (d₁ i)] [∀ i, DecidableEq (d₁ i)]
+  [∀ i, Fintype (d₂ i)] [∀ i, DecidableEq (d₂ i)]
+  [∀ i, Fintype (d₃ i)] [∀ i, DecidableEq (d₃ i)]
+  (Λ₁ : ∀ i, MatrixMap (d₁ i) (d₂ i) R) (Λ₂ : ∀ i, MatrixMap (d₂ i) (d₃ i) R) :
+    MatrixMap.piKron (fun i => (Λ₂ i) ∘ₗ (Λ₁ i)) = (MatrixMap.piKron Λ₂) ∘ₗ (MatrixMap.piKron Λ₁) := by
+  simp +decide [ MatrixMap.piKron, PiTensorProduct.map_comp, ← Matrix.toLin_mul ];
+  rw [ ← LinearMap.toMatrix_comp ]
+
+--PULLOUT
+/-
+The tensor product of composed maps is the composition of the tensor products.
+-/
+theorem piProd_compose {ι : Type*} [Fintype ι] [DecidableEq ι]
+  {d₁ d₂ d₃ : ι → Type*}
+  [∀ i, Fintype (d₁ i)] [∀ i, DecidableEq (d₁ i)]
+  [∀ i, Fintype (d₂ i)] [∀ i, DecidableEq (d₂ i)]
+  [∀ i, Fintype (d₃ i)] [∀ i, DecidableEq (d₃ i)]
+  (Λ₁ : ∀ i, CPTPMap (d₁ i) (d₂ i)) (Λ₂ : ∀ i, CPTPMap (d₂ i) (d₃ i)) :
+  CPTPMap.piProd (fun i => (Λ₂ i) ∘ₘ (Λ₁ i)) = (CPTPMap.piProd Λ₂) ∘ₘ (CPTPMap.piProd Λ₁) := by
+    refine' ( CPTPMap.ext _ );
+    convert MatrixMap.piKron_comp _ _;
+    infer_instance
+
+end AristotleLemmas
 
 /-- A channel cannot achieve a rate greater than log2(D), where D is the output dimension. -/
 theorem not_achievesRate_gt_log_dim_out (Λ : CPTPMap d₁ d₂) {R : ℝ} (hR : Real.logb 2 (Fintype.card d₂) < R): ¬Λ.AchievesRate R := by
-  sorry
+  intro h;
+  -- We show that the identity channel on the output space `d₂` emulates `Λ`. Since capacity is monotonic under emulation, `Q(Λ) ≤ Q(id_{d₂})`.
+  have h_emulate : (CPTPMap.id (dIn := d₂)).Emulates Λ := by
+    exact ⟨Λ, CPTPMap.id, by simp⟩
+  -- If `Λ` achieves rate `R`, then `id_{d₂}` achieves rate `R`. This follows because if `Λ^{\otimes n}` emulates `B`, and `id^{\otimes n}` emulates `Λ^{\otimes n}` (by functoriality of tensor product), then `id^{\otimes n}` emulates `B`.
+  have h_id_achieves : (CPTPMap.id (dIn := d₂)).AchievesRate R := by
+    intro ε hε_pos
+    obtain ⟨n, hn, dimB, B, hB_emulate, hB_rate, hB_approx⟩ := h ε hε_pos
+    have h_id_emulate : (CPTPMap.piProd (fun (_ : Fin n) => CPTPMap.id (dIn := d₂))).Emulates B := by
+      -- Since `id_{d₂}` emulates `Λ`, we can use the fact that the tensor product of emulations is an emulation.
+      have h_tensor_emulate : ∀ (n : ℕ), (CPTPMap.piProd (fun (_ : Fin n) => CPTPMap.id (dIn := d₂))).Emulates (CPTPMap.piProd (fun (_ : Fin n) => Λ)) := by
+        intro n
+        obtain ⟨E, D, hD⟩ := h_emulate
+        use CPTPMap.piProd (fun (_ : Fin n) => E), CPTPMap.piProd (fun (_ : Fin n) => D);
+        simp [ ← hD, ← CPTPMap.piProd_compose ];
+      exact emulates_trans _ _ _ ( h_tensor_emulate n ) hB_emulate;
+    exact ⟨ n, hn, dimB, B, h_id_emulate, hB_rate, hB_approx ⟩;
+  refine not_le_of_gt hR <| not_lt.mp fun h => ?_
+  exact not_lt_of_ge ( le_of_not_gt fun h' => not_achievesRate_gt_log_dim_in _ h' h_id_achieves ) h
 
 /-- The achievable rates are a bounded set. -/
 theorem bddAbove_achievesRate (Λ : CPTPMap d₁ d₂) : BddAbove {R | Λ.AchievesRate R} := by
@@ -181,7 +252,7 @@ theorem coherentInfo_le_quantumCapacity (Λ : CPTPMap d₁ d₂) (ρ : MState d�
   sorry
 
 /-- The quantum capacity is the limit of the coherent information of n-copy uses of the channel. -/
-theorem quantumCapacity_eq_piProd_coherentInfo (Λ : CPTPMap d₁ d₂) (ρ : MState d₁) : Λ.quantumCapacity =
+theorem quantumCapacity_eq_piProd_coherentInfo (Λ : CPTPMap d₁ d₂) : Λ.quantumCapacity =
     sSup { r : ℝ | ∃ n ρ, r = coherentInfo ρ (CPTPMap.piProd (fun (_ : Fin n) ↦ Λ))} := by
   sorry
 

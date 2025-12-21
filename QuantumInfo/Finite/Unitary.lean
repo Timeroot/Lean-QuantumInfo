@@ -77,7 +77,6 @@ theorem U_conj_spectrum_eq (ρ : MState d) (U : 𝐔[d]) :
 theorem inner_U_conj (ρ σ : MState d) (U : 𝐔[d]) : ⟪U ◃ ρ, U ◃ σ⟫ = ⟪ρ, σ⟫ := by
   simp [U_conj, MState.inner]
 
-open Matrix in
 /-- The **No-cloning theorem**, saying that if states `ψ` and `φ` can both be perfectly cloned using a
 unitary `U` and a fiducial state `f`, and they aren't identical (their inner product is less than 1),
 then the two states must be orthogonal to begin with. In short: only orthogonal states can be simultaneously
@@ -97,7 +96,8 @@ theorem no_cloning {ψ φ f : Ket d} {U : 𝐔[d × d]}
   replace h2 : ((pure (ψ ⊗ ψ)).m * (pure (φ ⊗ φ)).m).trace.re = (ρψ.m * ρφ.m).trace.re := by
     convert ← h2
     simp +zetaDelta only [inner_U_conj, pure_prod_pure, prod]
-    simp [inner, HermitianMat.inner_eq_re_trace, ← mul_kronecker_mul, pure_mul_self, trace_kronecker]
+    simp [inner, HermitianMat.inner_eq_re_trace, ← Matrix.mul_kronecker_mul, pure_mul_self,
+      Matrix.trace_kronecker]
   have h3 : ((ρψ.m * ρφ.m).trace.re) * ((ρψ.m * ρφ.m).trace.re - 1) = 0 := by
     rw [mul_sub, sub_eq_zero, mul_one]
     exact congr(Subtype.val $h1).trans h2

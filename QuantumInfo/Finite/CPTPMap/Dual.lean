@@ -60,14 +60,185 @@ theorem IsPositive.dual (h : M.IsPositive) : M.dual.IsPositive := by
 
 /-- The dual of TracePreserving map is *not* trace-preserving, it's *unital*, that is, M*(I) = I. -/
 theorem dual_Unital (h : M.IsTracePreserving) : M.dual.Unital := by
-  sorry
+  -- By definition of dual, we know that for any matrix A, Tr(M(A) * I) = Tr(A * M*(I)).
+  have h_dual_trace : ∀ A : Matrix dIn dIn 𝕜, (M A * 1).trace = (A * M.dual 1).trace := by
+    exact fun A => Dual.trace_eq M A 1;
+  ext i j
+  specialize h_dual_trace ( Matrix.of ( fun k l => if k = j then if l = i then 1 else 0 else 0 ) )
+  simp_all [ Matrix.trace, Matrix.mul_apply ] ;
+  specialize h ( Matrix.of ( fun k l => if k = j then if l = i then 1 else 0 else 0 ) )
+  simp_all [ Matrix.trace ]
+  simp [ Matrix.one_apply, eq_comm ]
 
 alias IsTracePreserving.dual := dual_Unital
+
+/--
+If two matrix maps satisfy the trace duality property, they are equal.
+-/
+lemma dual_unique {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq dIn] [DecidableEq dOut]
+    {𝕜 : Type*} [RCLike 𝕜]
+    (M : MatrixMap dIn dOut 𝕜) (M' : MatrixMap dOut dIn 𝕜)
+    (h : ∀ A B, (M A * B).trace = (A * M' B).trace) : M.dual = M' := by
+  -- By definition of dual, we know that for any A and B, the trace of (M A) * B equals the trace of A * (M.dual B).
+  have h_dual : ∀ A : Matrix dIn dIn 𝕜, ∀ B : Matrix dOut dOut 𝕜, (M A * B).trace = (A * M.dual B).trace := by
+    exact fun A B => Dual.trace_eq M A B;
+  -- Since these two linear maps agree on all bases, they must be equal.
+  have h_eq : ∀ A : Matrix dIn dIn 𝕜, ∀ B : Matrix dOut dOut 𝕜, (A * M.dual B).trace = (A * M' B).trace := by
+    exact fun A B => h_dual A B ▸ h A B;
+  refine' LinearMap.ext fun B => _;
+  exact Matrix.ext_iff_trace_mul_left.mpr fun x => h_eq x B
+
+/--
+The Choi matrix of the dual map is the transpose of the reindexed Choi matrix of the original map.
+-/
+lemma dual_choi_matrix {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq dIn] [DecidableEq dOut]
+    {𝕜 : Type*} [RCLike 𝕜] (M : MatrixMap dIn dOut 𝕜) :
+  M.dual.choi_matrix = (M.choi_matrix.transpose).reindex (Equiv.prodComm dOut dIn) (Equiv.prodComm dOut dIn) := by
+    -- By definition of dual, we know that $(M.dual (single j₁ j₂ 1)) i₁ i₂ = (M (single i₂ i₁ 1)) j₂ j₁$.
+    have h_dual_def : ∀ (i₁ : dIn) (j₁ : dOut) (i₂ : dIn) (j₂ : dOut), (M.dual (Matrix.single j₁ j₂ 1)) i₁ i₂ = (M (Matrix.single i₂ i₁ 1)) j₂ j₁ := by
+      intro i₁ j₁ i₂ j₂
+      have h_dual_def : (M.dual (Matrix.single j₁ j₂ 1)) i₁ i₂ = Matrix.trace (Matrix.single i₂ i₁ 1 * M.dual (Matrix.single j₁ j₂ 1)) := by
+        simp [ Matrix.trace, Matrix.mul_apply ];
+        simp [ Matrix.single];
+        rw [ Finset.sum_eq_single i₂ ]
+        · aesop
+        · intro b a a_1
+          simp [a_1.symm]
+        · aesop
+      rw [ h_dual_def, ← Dual.trace_eq ];
+      rw [ Matrix.trace ];
+      rw [ Finset.sum_eq_single j₂ ] <;> aesop;
+    aesop
+
+/--
+If the Choi matrix of a map is positive semidefinite, then the Choi matrix of its dual is also positive semidefinite.
+-/
+lemma dual_choi_matrix_posSemidef_of_posSemidef {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq dIn] [DecidableEq dOut]
+    {𝕜 : Type*} [RCLike 𝕜] (M : MatrixMap dIn dOut 𝕜) (h : M.choi_matrix.PosSemidef) :
+    M.dual.choi_matrix.PosSemidef := by
+  rw [ dual_choi_matrix ];
+  simp +zetaDelta at *;
+  apply_rules [ Matrix.PosSemidef.submatrix ];
+  convert h.transpose using 1
+
+/--
+The Choi matrix of a map M is the image of the unnormalized maximally entangled state under M ⊗ id.
+-/
+lemma choi_matrix_eq_map_proj {A B : Type*} [Fintype A] [Fintype B] [DecidableEq A]
+    {𝕜 : Type*} [RCLike 𝕜] (M : MatrixMap A B 𝕜) :
+    M.choi_matrix = (M ⊗ₖₘ MatrixMap.id A 𝕜) (Matrix.vecMulVec (fun (i, j) => if i = j then (1 : 𝕜) else 0) (fun (i, j) => if i = j then (1 : 𝕜) else 0)) := by
+  refine' Matrix.ext fun ⟨ b1, a1 ⟩ ⟨ b2, a2 ⟩ => _;
+  simp [ Matrix.vecMulVec, MatrixMap.kron_def ];
+  rw [ Finset.sum_eq_single a1 ]
+  · rw [ Finset.sum_eq_single a2 ] <;> aesop
+  · simp +contextual
+  · simp +contextual
+
+/--
+The dual of the identity map is the identity map.
+-/
+lemma dual_id {A : Type*} [Fintype A] [DecidableEq A] {𝕜 : Type*} [RCLike 𝕜] :
+    (MatrixMap.id A 𝕜).dual = MatrixMap.id A 𝕜 := by
+  exact dual_unique (id A 𝕜) (id A 𝕜) fun A_1 => congrFun rfl
+
+set_option maxHeartbeats 600000 in
+/--
+The dual of a Kronecker product of maps is the Kronecker product of their duals.
+-/
+lemma dual_kron {A B C D : Type*} [Fintype A] [Fintype B] [Fintype C] [Fintype D]
+    [DecidableEq A] [DecidableEq B] [DecidableEq C] [DecidableEq D]
+    {𝕜 : Type*} [RCLike 𝕜]
+    (M : MatrixMap A B 𝕜) (N : MatrixMap C D 𝕜) :
+    (M ⊗ₖₘ N).dual = M.dual ⊗ₖₘ N.dual := by
+  have h_trace : ∀ (X : Matrix (A × C) (A × C) 𝕜) (Y : Matrix (B × D) (B × D) 𝕜), ( (M ⊗ₖₘ N) X * Y ).trace = ( X * (M.dual ⊗ₖₘ N.dual) Y ).trace := by
+    -- By definition of dual, we know that $(M x1 * y1).trace = (x1 * M.dual y1).trace$ and $(N x2 * y2).trace = (x2 * N.dual y2).trace$.
+    have h_dual : ∀ (x1 : Matrix A A 𝕜) (y1 : Matrix B B 𝕜), (M x1 * y1).trace = (x1 * M.dual y1).trace := by
+      intro x1 y1
+      convert MatrixMap.Dual.trace_eq M x1 y1 using 1
+    have h_dual_N : ∀ (x2 : Matrix C C 𝕜) (y2 : Matrix D D 𝕜), (N x2 * y2).trace = (x2 * N.dual y2).trace := by
+      exact fun x2 y2 => MatrixMap.Dual.trace_eq N x2 y2;
+    intro X Y;
+    -- By definition of Kronecker product, we can write X and Y as sums of Kronecker products.
+    obtain ⟨X_sum, hX_sum⟩ : ∃ X_sum : Finset (Matrix A A 𝕜 × Matrix C C 𝕜), X = ∑ p ∈ X_sum, (Matrix.kroneckerMap (fun a b => a * b) p.1 p.2) := by
+      refine' ⟨ Finset.univ.image fun p : A × A × C × C => ( Matrix.of fun i j => if i = p.1 ∧ j = p.2.1 then X ( p.1, p.2.2.1 ) ( p.2.1, p.2.2.2 ) else 0, Matrix.of fun i j => if i = p.2.2.1 ∧ j = p.2.2.2 then 1 else 0 ), _ ⟩;
+      ext ⟨a, c⟩ ⟨a', c'⟩;
+      rw [ Finset.sum_apply, Finset.sum_apply ];
+      rw [ Finset.sum_eq_single ( ( Matrix.of fun i j => if i = a ∧ j = a' then X ( a, c ) ( a', c' ) else 0, Matrix.of fun i j => if i = c ∧ j = c' then 1 else 0 ) ) ] <;> simp;
+      · intro a_1 b x x_1 x_2 x_3 a_2 a_3 a_4
+        subst a_3 a_2
+        contrapose! a_4; aesop;
+      · exact fun h => False.elim ( h a a' c c' ( by ext i j; aesop ) ( by ext i j; aesop ) )
+    obtain ⟨Y_sum, hY_sum⟩ : ∃ Y_sum : Finset (Matrix B B 𝕜 × Matrix D D 𝕜), Y = ∑ p ∈ Y_sum, (Matrix.kroneckerMap (fun a b => a * b) p.1 p.2) := by
+      use Finset.image (fun p => (Matrix.of (fun i j => Y (i, p.1) (j, p.2)), Matrix.of (fun i j => if i = p.1 ∧ j = p.2 then 1 else 0))) (Finset.univ : Finset (D × D));
+      ext ⟨i, j⟩ ⟨k, l⟩; simp [ Matrix.kroneckerMap ] ;
+      rw [ Finset.sum_image ] <;> simp [ Matrix.sum_apply ];
+      · rw [ Finset.sum_eq_single ( j, l ) ] <;> aesop;
+      · intro p hp q hq h
+        subst hX_sum
+        simp_all only [Set.mem_univ, Prod.mk.injEq, EmbeddingLike.apply_eq_iff_eq]
+        obtain ⟨fst, snd⟩ := p
+        obtain ⟨fst_1, snd_1⟩ := q
+        obtain ⟨left, right⟩ := h
+        simp_all only [Prod.mk.injEq]
+        apply And.intro
+        · have := congr_fun ( congr_fun right fst ) snd; aesop;
+        · replace right := congr_fun ( congr_fun right fst ) snd; aesop;
+    -- By linearity of the trace and the properties of the Kronecker product, we can expand both sides of the equation.
+    have h_expand : ∀ (x1 y1 : Matrix A A 𝕜) (x2 y2 : Matrix C C 𝕜) (x3 y3 : Matrix B B 𝕜) (x4 y4 : Matrix D D 𝕜), ( (M ⊗ₖₘ N) (Matrix.kroneckerMap (fun a b => a * b) x1 x2) * Matrix.kroneckerMap (fun a b => a * b) x3 x4 ).trace = ( Matrix.kroneckerMap (fun a b => a * b) x1 x2 * (M.dual ⊗ₖₘ N.dual) (Matrix.kroneckerMap (fun a b => a * b) x3 x4) ).trace := by
+      intro x1 y1 x2 y2 x3 y3 x4 y4
+      simp [MatrixMap.kron_map_of_kron_state]
+      convert congr_arg₂ ( · * · ) ( h_dual x1 x3 ) ( h_dual_N x2 x4 ) using 1 <;> simp [ Matrix.trace, Matrix.mul_apply, Matrix.kroneckerMap_apply ]
+      · simp only [Finset.sum_sigma', Finset.sum_mul _ _ _, Finset.mul_sum];
+        refine' Finset.sum_bij ( fun x _ => ⟨ ⟨ x.fst.1, x.snd.1 ⟩, ⟨ x.fst.2, x.snd.2 ⟩ ⟩ ) _ _ _ _ <;> simp [ mul_assoc, mul_comm, mul_left_comm ];
+        · bound;
+        · exact fun b => ⟨ _, _, _, _, rfl ⟩;
+      · simp only [mul_assoc, Finset.mul_sum _ _ _, Finset.sum_mul];
+        simp only [← Finset.sum_product', mul_left_comm];
+        refine' Finset.sum_bij ( fun x _ => ( x.1.2, x.2.2, x.1.1, x.2.1 ) ) _ _ _ _ <;> simp;
+    simp_all [ Matrix.trace_sum, Finset.sum_mul _ _ _ ];
+    simp [Matrix.mul_sum, h_expand]
+  apply dual_unique; assumption;
 
 --The dual of a CompletelyPositive map is always CP, more generally it's k-positive
 -- see Lemma 3.1 of https://www.math.uwaterloo.ca/~krdavids/Preprints/CDPRpositivereal.pdf
 theorem IsCompletelyPositive.dual (h : M.IsCompletelyPositive) : M.dual.IsCompletelyPositive := by
-  sorry
+  intro n
+  have h_dual_pos : (MatrixMap.dual (M ⊗ₖₘ MatrixMap.id (Fin n) 𝕜)).IsPositive := by
+    exact IsPositive.dual (h n);
+  -- By definition of complete positivity, we know that $(M ⊗ₖₘ id) dually map = M.dual ⊗ₖₘ id.dual$.
+  have h_dual_kron : (MatrixMap.dual (M ⊗ₖₘ MatrixMap.id (Fin n) 𝕜)) = (MatrixMap.dual M) ⊗ₖₘ (MatrixMap.dual (MatrixMap.id (Fin n) 𝕜)) := by
+    convert dual_kron M ( MatrixMap.id ( Fin n ) 𝕜 ) using 1;
+  convert h_dual_pos using 1;
+  rw [ h_dual_kron, dual_id ]
+
+/--
+The composition of the dual of the inverse of the dual basis isomorphism with the dual basis isomorphism is the evaluation map.
+-/
+lemma Module.Basis.dualMap_toDualEquiv_symm_comp_toDualEquiv {ι R M : Type*} [Fintype ι] [DecidableEq ι] [CommRing R] [AddCommGroup M] [Module R M] [Module.IsReflexive R M] (b : Module.Basis ι R M) :
+    b.toDualEquiv.symm.toLinearMap.dualMap ∘ₗ b.toDualEquiv.toLinearMap = (Module.evalEquiv R M).toLinearMap := by
+  ext x f;
+  -- Since $b.toDual$ and $b.toDualEquiv.symm$ are inverses, we have $b.toDual (b.toDualEquiv.symm f) = f$.
+  have h_inv : b.toDual (b.toDualEquiv.symm f) = f := by
+    convert LinearEquiv.apply_symm_apply b.toDualEquiv f;
+  convert congr_arg ( fun g => g x ) h_inv using 1;
+  -- By definition of the dual basis, we know that $(b.toDual x) (b.toDualEquiv.symm f) = f x$.
+  simp [Module.Basis.toDual];
+  ac_rfl
+
+/--
+The composition of the inverse of the dual basis isomorphism with the dual of the dual basis isomorphism is the inverse of the evaluation map.
+-/
+lemma Module.Basis.toDualEquiv_symm_comp_dualMap_toDualEquiv {ι R M : Type*} [Fintype ι] [DecidableEq ι] [CommRing R] [AddCommGroup M] [Module R M] [Module.IsReflexive R M] (b : Module.Basis ι R M) :
+    b.toDualEquiv.symm.toLinearMap ∘ₗ b.toDualEquiv.toLinearMap.dualMap = (Module.evalEquiv R M).symm.toLinearMap := by
+  simp [ LinearMap.ext_iff ];
+  intro x
+  obtain ⟨y, hy⟩ : ∃ y, x = (Module.evalEquiv R M).toLinearMap y := by
+    exact ⟨ _, Eq.symm <| LinearEquiv.apply_symm_apply ( Module.evalEquiv R M ) x ⟩;
+  rw [ hy ];
+  simp [ Module.evalEquiv, LinearEquiv.symm_apply_eq ];
+  ext; simp [ Module.Dual.eval ] ;
+  simp [ Module.Basis.toDual ];
+  ac_rfl
 
 @[simp]
 theorem dual_dual : M.dual.dual = M := by
@@ -76,14 +247,32 @@ theorem dual_dual : M.dual.dual = M := by
   have h₁ : (Matrix.stdBasis 𝕜 dOut dOut).toDualEquiv.symm.toLinearMap ∘ₗ
       ((Matrix.stdBasis 𝕜 dOut dOut).toDualEquiv).toLinearMap.dualMap =
       (Module.evalEquiv 𝕜 (Matrix dOut dOut 𝕜)).symm.toLinearMap := by
-    sorry
+    apply Module.Basis.toDualEquiv_symm_comp_dualMap_toDualEquiv
   have h₂ : (Matrix.stdBasis 𝕜 dIn dIn).toDualEquiv.symm.toLinearMap.dualMap ∘ₗ
       (Matrix.stdBasis 𝕜 dIn dIn).toDualEquiv.toLinearMap =
       (Module.evalEquiv 𝕜 (Matrix dIn dIn 𝕜)).toLinearMap := by
     ext x y
     simp
     generalize Matrix.stdBasis 𝕜 dIn dIn = L
-    sorry
+    -- Since $L$ is a basis, we can write $y$ as a linear combination of the basis elements.
+    obtain ⟨c, hc⟩ : ∃ c : dIn × dIn → 𝕜, y = ∑ i, c i • L.toDual (L i) := by
+      have h_dual_basis : ∀ y : Module.Dual 𝕜 (Matrix dIn dIn 𝕜), ∃ c : dIn × dIn → 𝕜, y = ∑ i, c i • L.toDual (L i) := by
+        intro y
+        have h_dual_basis : y ∈ Submodule.span 𝕜 (Set.range (fun i => L.toDual (L i))) := by
+          have h_dual_basis : Submodule.span 𝕜 (Set.range (fun i => L.toDual (L i))) = ⊤ := by
+            refine' Submodule.eq_top_of_finrank_eq _;
+            rw [ finrank_span_eq_card ];
+            · simp [ Module.finrank_eq_card_basis L ];
+            · convert L.dualBasis.linearIndependent;
+          exact h_dual_basis.symm ▸ Submodule.mem_top
+        rw [ Finsupp.mem_span_range_iff_exists_finsupp ] at h_dual_basis;
+        exact ⟨ h_dual_basis.choose, by simpa [ Finsupp.sum_fintype ] using h_dual_basis.choose_spec.symm ⟩;
+      exact h_dual_basis y;
+    subst hc
+    simp [ map_sum, map_smul ];
+    congr! 2;
+    simp [ Module.Basis.toDualEquiv ];
+    simp [ Module.Basis.toDual ]
   rw [← Module.Dual.eval_comp_comp_evalEquiv_eq]
   rw [← Module.evalEquiv_toLinearMap]
   simp only [← LinearMap.comp_assoc, LinearEquiv.comp_coe, LinearEquiv.self_trans_symm, LinearEquiv.refl_toLinearMap,

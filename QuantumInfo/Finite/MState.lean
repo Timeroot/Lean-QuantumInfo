@@ -372,7 +372,46 @@ theorem pure_iff_purity_one (ρ : MState d) : (∃ ψ, ρ = pure ψ) ↔ ρ.puri
   --purity eq 1 iff collision entropy is zero
   --entropy is zero iff distribution is constant
   --distribution is constant iff pure
-  sorry
+  constructor <;> intro h;
+  · obtain ⟨w, h⟩ := h
+    subst h
+    unfold MState.purity;
+    unfold MState.inner;
+    unfold HermitianMat.inner;
+    -- Since the product of the pure state with itself is the pure state itself, the trace of this product is the same as the trace of the pure state.
+    have h_trace : Matrix.trace ((MState.pure w).M.toMat * (MState.pure w).M.toMat) = Matrix.trace (MState.pure w).M.toMat := by
+      convert congr_arg Matrix.trace ( MState.pure_mul_self w );
+    aesop;
+  · -- Apply the theorem that states a mixed state is pure if and only if its spectrum is constant.
+    apply (pure_iff_constant_spectrum ρ).mpr;
+    have h_eigenvalues : ∑ i, (ρ.spectrum i).val ^ 2 = 1 := by
+      -- By definition of purity, we know that the sum of the squares of the eigenvalues is equal to the trace of ρ squared.
+      have h_trace_sq : ∑ i, (ρ.spectrum i).val ^ 2 = ρ.purity := by
+        have h_eigenvalues : ∑ i, (ρ.M.H.eigenvalues i) ^ 2 = Matrix.trace (ρ.M.toMat * ρ.M.toMat) := by
+          have := Matrix.IsHermitian.spectral_theorem ρ.M.H;
+          conv_rhs => rw [ this ];
+          simp +decide [ Matrix.trace_mul_comm, Matrix.mul_assoc ];
+          exact Finset.sum_congr rfl fun _ _ => by ring;
+        convert congr_arg Complex.re h_eigenvalues using 1;
+      aesop;
+    have h_eigenvalues : ∑ i, (ρ.spectrum i).val * ((ρ.spectrum i).val - 1) = 0 := by
+      simp_all +decide [ sq, mul_sub ];
+    -- Since each term in the sum is non-positive and their sum is zero, each term must be zero.
+    have h_each_zero : ∀ i, (ρ.spectrum i).val * ((ρ.spectrum i).val - 1) = 0 := by
+      have h_each_zero : ∀ i, (ρ.spectrum i).val * ((ρ.spectrum i).val - 1) ≤ 0 := by
+        exact fun i => by nlinarith only [ show ( ρ.spectrum i : ℝ ) ≥ 0 by exact_mod_cast ( ρ.spectrum i ) |>.2.1, show ( ρ.spectrum i : ℝ ) ≤ 1 by exact_mod_cast ( ρ.spectrum i ) |>.2.2 ] ;
+      exact fun i => le_antisymm ( h_each_zero i ) ( by simpa [ h_eigenvalues ] using Finset.single_le_sum ( fun i _ => neg_nonneg.mpr ( h_each_zero i ) ) ( Finset.mem_univ i ) );
+    -- Since each term in the sum is non-positive and their sum is zero, each term must be zero. Therefore, for each i, either (ρ.spectrum i).val = 0 or (ρ.spectrum i).val = 1.
+    have h_each_zero : ∀ i, (ρ.spectrum i).val = 0 ∨ (ρ.spectrum i).val = 1 := by
+      exact fun i => mul_eq_zero.mp ( h_each_zero i ) |> Or.imp id fun h => by linarith;
+    have h_sum_one : ∑ i, (ρ.spectrum i).val = 1 := by
+      grind;
+    obtain ⟨i, hi⟩ : ∃ i, (ρ.spectrum i).val = 1 := by
+      contrapose! h_sum_one; aesop;
+    -- Since the sum of the eigenvalues is 1 and one of them is 1, the remaining eigenvalues must sum to 0. Given that each eigenvalue is either 0 or 1, the only way their sum can be 0 is if all of them are 0.
+    have h_sum_zero : ∑ j ∈ Finset.univ.erase i, (ρ.spectrum j).val = 0 := by
+      rw [ ← Finset.sum_erase_add _ _ ( Finset.mem_univ i ), hi ] at h_sum_one ; linarith;
+    rw [ Finset.sum_eq_zero_iff_of_nonneg ] at h_sum_zero <;> aesop
 
 --PULLOUT
 theorem _root_.Matrix.unitaryGroup_row_norm (U : Matrix.unitaryGroup d ℂ) (i : d) :
@@ -507,11 +546,91 @@ end ptrace
 
 --TODO: Spectra of left- and right- partial traces of a pure state are equal.
 
+set_option maxHeartbeats 0 in
+--PULLOUT to Matrix.lean. Should be combined with `IsHermitian.cfc_eigenvalues`.
+/-
+If a Hermitian matrix A is unitarily similar to a diagonal matrix with real entries f, then the eigenvalues of A are a permutation of f.
+-/
+lemma Matrix.IsHermitian.eigenvalues_eq_of_unitary_similarity_diagonal {d 𝕜 : Type*}
+    [Fintype d] [DecidableEq d] [RCLike 𝕜]
+    {A : Matrix d d 𝕜} (hA : A.IsHermitian)
+    {U : Matrix d d 𝕜} (hU : U ∈ Matrix.unitaryGroup d 𝕜)
+    {f : d → ℝ}
+    (h : A = U * Matrix.diagonal (fun i => (RCLike.ofReal (f i) : 𝕜)) * Matrix.conjTranspose U) :
+    ∃ σ : d ≃ d, hA.eigenvalues ∘ σ = f := by
+  -- Since A is unitarily similar to D, they have the same characteristic polynomial.
+  have h_char_poly : Matrix.charpoly A = Matrix.charpoly (Matrix.diagonal fun i => (f i : 𝕜)) := by
+    have h_char_poly : Matrix.charpoly (U * Matrix.diagonal (fun i => (f i : 𝕜)) * Uᴴ) = Matrix.charpoly (Matrix.diagonal (fun i => (f i : 𝕜))) := by
+      have h_det : ∀ (t : 𝕜), Matrix.det (t • 1 - U * Matrix.diagonal (fun i => (f i : 𝕜)) * Uᴴ) = Matrix.det (t • 1 - Matrix.diagonal (fun i => (f i : 𝕜))) := by
+        intro t
+        have h_det : Matrix.det (t • 1 - U * Matrix.diagonal (fun i => (f i : 𝕜)) * Uᴴ) = Matrix.det (U * (t • 1 - Matrix.diagonal (fun i => (f i : 𝕜))) * Uᴴ) := by
+          simp +decide [ mul_sub, sub_mul, Matrix.mul_assoc ];
+          rw [ show U * Uᴴ = 1 from by simpa [ Matrix.mul_eq_one_comm ] using hU.2 ];
+        have := congr_arg Matrix.det hU.2; norm_num at this; simp_all +decide [ mul_assoc, mul_comm ] ;
+        simp_all +decide [ ← mul_assoc ];
+        simp_all +decide [ Star.star ]
+      refine' Polynomial.funext fun t => _;
+      convert h_det t using 1 <;> simp +decide [ Matrix.charpoly, Matrix.det_apply' ];
+      · simp +decide [ Polynomial.eval_finset_sum, Polynomial.eval_mul, Polynomial.eval_prod, Matrix.one_apply ];
+        exact Finset.sum_congr rfl fun _ _ => by congr; ext; aesop;
+      · simp +decide [ Polynomial.eval_finset_sum, Polynomial.eval_mul, Polynomial.eval_prod, Matrix.one_apply ];
+        exact Finset.sum_congr rfl fun _ _ => by congr; ext; aesop;
+    rw [ h, h_char_poly ];
+  -- The roots of the characteristic polynomial of A are its eigenvalues (by `IsHermitian.charpoly_roots_eq_eigenvalues`).
+  have h_eigenvalues : (Matrix.charpoly A).roots = Multiset.map (RCLike.ofReal ∘ hA.eigenvalues) Finset.univ.val := by
+    exact Matrix.IsHermitian.roots_charpoly_eq_eigenvalues hA;
+  -- The roots of the characteristic polynomial of D are the diagonal entries f.
+  have h_diag_roots : (Matrix.charpoly (Matrix.diagonal fun i => (f i : 𝕜))).roots = Multiset.map (fun i => (f i : 𝕜)) Finset.univ.val := by
+    simp +decide [ Matrix.charpoly, Matrix.det_diagonal ];
+    rw [ Polynomial.roots_prod ];
+    · aesop;
+    · exact Finset.prod_ne_zero_iff.mpr fun i _ => Polynomial.X_sub_C_ne_zero _;
+  have := Multiset.map_univ_eq_iff ( RCLike.ofReal ∘ hA.eigenvalues ) f
+  subst h
+  simp_all only [Function.comp_apply, RCLike.ofReal_real_eq_id, id_eq, CompTriple.comp_eq]
+  refine' this.mp _ |> fun ⟨ e, he ⟩ => ⟨ e.symm, _ ⟩
+  · simpa [ Function.comp ] using congr_arg ( Multiset.map ( RCLike.re : 𝕜 → ℝ ) ) h_eigenvalues.symm
+  · exact funext fun x => by simpa using congr_fun he ( e.symm x ) ;
+
 /-- Spectrum of direct product. There is a permutation σ so that the spectrum of the direct product of
   ρ₁ and ρ₂, as permuted under σ, is the pairwise products of the spectra of ρ₁ and ρ₂. -/
 theorem spectrum_prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : ∃(σ : d₁ × d₂ ≃ d₁ × d₂),
     ∀i, ∀j, MState.spectrum (ρ₁ ⊗ ρ₂) (σ (i, j)) = (ρ₁.spectrum i) * (ρ₂.spectrum j) := by
-  sorry
+  by_contra! h;
+  -- Apply `Matrix.IsHermitian.eigenvalues_eq_of_unitary_similarity_diagonal` to $A \otimes B$ and $U_A \otimes U_B$ and the diagonal entries.
+  obtain ⟨σ, hσ⟩ : ∃ σ : d₁ × d₂ ≃ d₁ × d₂, (ρ₁.prod ρ₂).M.H.eigenvalues ∘ σ = fun (i, j) => ((ρ₁.spectrum i) * (ρ₂.spectrum j)) := by
+    have h_unitary : ∃ U : Matrix (d₁ × d₂) (d₁ × d₂) ℂ, U ∈ Matrix.unitaryGroup (d₁ × d₂) ℂ ∧ (ρ₁.prod ρ₂).M = U * Matrix.diagonal (fun (i, j) => ((ρ₁.spectrum i) * (ρ₂.spectrum j)) : d₁ × d₂ → ℂ) * Matrix.conjTranspose U := by
+      -- Let $U_A$ and $U_B$ be the eigenvector unitaries of $\rho_1$ and $\rho_2$, respectively.
+      obtain ⟨U_A, hU_A⟩ : ∃ U_A : Matrix d₁ d₁ ℂ, U_A ∈ Matrix.unitaryGroup d₁ ℂ ∧ ρ₁.M = U_A * Matrix.diagonal (fun i => (ρ₁.spectrum i : ℂ)) * Matrix.conjTranspose U_A := by
+        have := ρ₁.M.H.spectral_theorem;
+        refine' ⟨ _, _, this ⟩;
+        grind
+      obtain ⟨U_B, hU_B⟩ : ∃ U_B : Matrix d₂ d₂ ℂ, U_B ∈ Matrix.unitaryGroup d₂ ℂ ∧ ρ₂.M = U_B * Matrix.diagonal (fun j => (ρ₂.spectrum j : ℂ)) * Matrix.conjTranspose U_B := by
+        have := ρ₂.M.H.spectral_theorem;
+        refine' ⟨ _, _, this ⟩;
+        grind;
+      refine' ⟨ Matrix.kroneckerMap ( fun x y => x * y ) U_A U_B, _, _ ⟩;
+      · simp_all +decide [ Matrix.mem_unitaryGroup_iff ];
+        have h_unitary : Matrix.kroneckerMap (fun x y => x * y) U_A U_B * Matrix.kroneckerMap (fun x y => x * y) (Star.star U_A) (Star.star U_B) = 1 := by
+          have h_unitary : Matrix.kroneckerMap (fun x y => x * y) U_A U_B * Matrix.kroneckerMap (fun x y => x * y) (Star.star U_A) (Star.star U_B) = Matrix.kroneckerMap (fun x y => x * y) (U_A * Star.star U_A) (U_B * Star.star U_B) := by
+            ext ⟨ i, j ⟩ ⟨ k, l ⟩ ; simp +decide [ Matrix.mul_apply, Matrix.kroneckerMap_apply ]
+            ring_nf
+            erw [ Finset.sum_product ] ; simp +decide [ mul_assoc, mul_comm, mul_left_comm, Finset.mul_sum _ _ _ ] ;
+            exact Finset.sum_comm.trans ( Finset.sum_congr rfl fun _ _ => Finset.sum_congr rfl fun _ _ => by ring );
+          aesop;
+        convert h_unitary using 2;
+        ext i j; simp +decide [ Matrix.kroneckerMap ] ;
+      · simp_all +decide [ MState.prod, Matrix.mul_assoc, Matrix.mul_kronecker_mul ];
+        congr 2;
+        · ext ⟨ i, j ⟩ ⟨ i', j' ⟩ ; by_cases hi : i = i' <;> by_cases hj : j = j' <;> simp +decide [ hi, hj ];
+        · ext i j; simp +decide [ Matrix.conjTranspose_apply, Matrix.kroneckerMap_apply ] ;
+    obtain ⟨ U, hU₁, hU₂ ⟩ := h_unitary;
+    apply Matrix.IsHermitian.eigenvalues_eq_of_unitary_similarity_diagonal;
+    exact hU₁;
+    convert hU₂ using 1;
+    norm_num +zetaDelta at *;
+  obtain ⟨ i, j, h ⟩ := h σ; have := congr_fun hσ ( i, j ) ; simp_all +decide [ MState.spectrum ] ;
+  exact h ( by exact Subtype.ext this )
 
 --TODO: Spectrum of direct sum. Spectrum of partial trace?
 
@@ -527,15 +646,308 @@ theorem IsSeparable_prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : IsSeparab
   use { only }, Distribution.constant ⟨only, Finset.mem_singleton_self only⟩
   simp [prod, Unique.eq_default, only]
 
+theorem eq_of_sum_eq_pure {d : Type*} [Fintype d] [DecidableEq d]
+    {ι : Type*} {s : Finset ι} {p : ι → ℝ} {ρs : ι → MState d}
+    {ρ : MState d} (h_pure : ρ.purity = 1) (h_sum : ρ.M = ∑ i ∈ s, p i • (ρs i).M)
+    (hp_nonneg : ∀ i ∈ s, 0 ≤ p i) (hp_sum : ∑ i ∈ s, p i = 1) (i : ι) (hi : i ∈ s) (hpi : 0 < p i) :
+    ρs i = ρ := by
+      have h_trace : ∀ j ∈ s, 0 < p j → (ρ.M.inner (ρs j).M = 1) := by
+        have h_tr_pure : ∑ j ∈ s, p j • ρ.M.inner (ρs j).M = 1 := by
+          have h_tr_pure : ρ.M.inner (∑ j ∈ s, p j • (ρs j).M) = ∑ j ∈ s, p j • ρ.M.inner (ρs j).M := by
+            simp +decide [ Finset.mul_sum _ _ _, HermitianMat.inner ];
+          rw [ ← h_tr_pure, ← h_sum ];
+          convert h_pure using 1;
+          exact beq_eq_beq.mp rfl;
+        have h_tr_le_one : ∀ j ∈ s, ρ.M.inner (ρs j).M ≤ 1 := by
+          intro j hj
+          have h_tr_le_one_j : ρ.M.inner (ρs j).M ≤ ρ.M.trace * (ρs j).M.trace := by
+            apply_rules [ HermitianMat.inner_le_mul_trace ];
+            · exact ρ.zero_le;
+            · exact (ρs j).zero_le;
+          simp_all only [smul_eq_mul, tr, mul_one, ge_iff_le]
+          exact h_tr_le_one_j.trans ( h_sum ▸ ρ.tr.le );
+        intro j hj hj_pos
+        by_contra h_contra;
+        have h_tr_lt_one : ∑ j ∈ s, p j • ρ.M.inner (ρs j).M < ∑ j ∈ s, p j := by
+          apply Finset.sum_lt_sum;
+          · exact fun i hi => mul_le_of_le_one_right ( hp_nonneg i hi ) ( h_tr_le_one i hi );
+          · exact ⟨ j, hj, mul_lt_of_lt_one_right hj_pos ( lt_of_le_of_ne ( h_tr_le_one j hj ) h_contra ) ⟩;
+        linarith;
+      have h_eq : ρ.M = (ρs i).M := by
+        have h_eq : (ρ.M - (ρs i).M).inner (ρ.M - (ρs i).M) = 0 := by
+          have h_eq : (ρ.M - (ρs i).M).inner (ρ.M - (ρs i).M) = ρ.M.inner ρ.M - 2 * ρ.M.inner (ρs i).M + (ρs i).M.inner (ρs i).M := by
+            simp [ HermitianMat.inner ];
+            simp +decide [ Matrix.mul_sub, Matrix.sub_mul, Matrix.trace_sub, Matrix.trace_mul_comm ( ρ.m ) ] ; ring;
+          have h_eq : ρ.M.inner ρ.M = 1 ∧ (ρs i).M.inner (ρs i).M ≤ 1 := by
+            have h_eq : ρ.M.inner ρ.M = 1 := by
+              convert h_pure using 1;
+              exact beq_eq_beq.mp rfl;
+            have h_eq : ∀ (A : HermitianMat d ℂ), 0 ≤ A → A.trace = 1 → A.inner A ≤ 1 := by
+              intros A hA_nonneg hA_trace
+              have h_eq : A.inner A ≤ A.trace * A.trace := by
+                apply HermitianMat.inner_le_mul_trace hA_nonneg hA_nonneg;
+              aesop;
+            exact ⟨ by assumption, h_eq _ ( ρs i |>.2 ) ( ρs i |>.3 ) ⟩;
+          linarith [ h_trace i hi hpi, show 0 ≤ ( ρ.M - ( ρs i |> MState.M ) |> HermitianMat.inner ) ( ρ.M - ( ρs i |> MState.M ) ) from HermitianMat.inner_self_nonneg _ ];
+        -- Since the inner product of a matrix with itself is zero if and only if the matrix is zero, we have ρ.M - (ρs i).M = 0.
+        have h_zero : ρ.M - (ρs i).M = 0 := by
+          apply inner_self_eq_zero.mp h_eq;
+        exact eq_of_sub_eq_zero h_zero;
+      exact MState.ext h_eq.symm
+
+theorem purity_prod {d₁ d₂ : Type*} [Fintype d₁] [Fintype d₂] [DecidableEq d₁] [DecidableEq d₂]
+    (ρ₁ : MState d₁) (ρ₂ : MState d₂) : (ρ₁ ⊗ ρ₂).purity = ρ₁.purity * ρ₂.purity := by
+  exact prod_inner_prod ρ₁ ρ₁ ρ₂ ρ₂
+
+theorem Prob.mul_eq_one_iff (p q : Prob) : p * q = 1 ↔ p = 1 ∧ q = 1 := by
+  obtain ⟨val, property⟩ := p
+  obtain ⟨val_1, property_1⟩ := q
+  apply Iff.intro
+  · intro a
+    apply And.intro
+    · erw [ Subtype.mk_eq_mk ] at a ⊢
+      nlinarith
+    · erw [ Subtype.mk_eq_mk ] at a ⊢
+      nlinarith
+  · intro a
+    simp_all only [mul_one]
+
+theorem pure_eq_pure_iff {d : Type*} [Fintype d] [DecidableEq d] (ψ φ : Ket d) :
+    pure ψ = pure φ ↔ ∃ z : ℂ, ‖z‖ = 1 ∧ ψ.vec = z • φ.vec := by
+  refine' ⟨ fun h => _, fun h => _ ⟩;
+  · -- By definition of pure state, we have that ψ.vec * conj ψ.vec = φ.vec * conj φ.vec.
+    have h_eq : ∀ i j, ψ.vec i * starRingEnd ℂ (ψ.vec j) = φ.vec i * starRingEnd ℂ (φ.vec j) := by
+      intro i j;
+      replace h := congr_arg ( fun ρ => ρ.M.toMat i j ) h ; aesop;
+    -- Let $k$ be such that $\varphi_k \neq 0$.
+    obtain ⟨k, hk⟩ : ∃ k, φ.vec k ≠ 0 := by
+      exact φ.exists_ne_zero;
+    -- Let $z = \frac{\psi_k}{\varphi_k}$. Then $|z| = 1$.
+    obtain ⟨z, hz⟩ : ∃ z : ℂ, ψ.vec k = z * φ.vec k ∧ ‖z‖ = 1 := by
+      specialize h_eq k k
+      simp_all only [ne_eq]
+      refine' ⟨ ψ.vec k / φ.vec k, _, _ ⟩ <;> simp_all [ Complex.mul_conj, Complex.normSq_eq_norm_sq ];
+      rw [ div_eq_iff ] <;> norm_cast at * <;> aesop;
+    refine' ⟨ z, hz.2, funext fun i => _ ⟩;
+    specialize h_eq i k
+    simp_all
+    -- Since $\overline{z} \cdot \overline{\varphi_k} \neq 0$, we can divide both sides of the equation by $\overline{z} \cdot \overline{\varphi_k}$.
+    have h_div : ψ.vec i * starRingEnd ℂ z = φ.vec i := by
+      exact mul_left_cancel₀ ( show starRingEnd ℂ ( φ.vec k ) ≠ 0 from by simpa [ Complex.ext_iff ] using hk ) ( by linear_combination' h_eq );
+    rw [ ← h_div, mul_left_comm, Complex.mul_conj, Complex.normSq_eq_norm_sq ] ; aesop;
+  · cases h
+    rename_i h
+    obtain ⟨left, right⟩ := h
+    -- Since $|w| = 1$, we have $w \overline{w} = 1$, which simplifies the matrix to $\phi \overline{\phi}^T$.
+    have h_simp : ∀ i j, ψ.vec i * star (ψ.vec j) = φ.vec i * star (φ.vec j) := by
+      simp +decide [ *, Complex.ext_iff ];
+      intro i j; rw [ Complex.norm_def ] at left; simp_all +decide [ Complex.normSq ];
+      grind +ring;
+    exact MState.ext_m ( by ext i j; simpa [ Matrix.vecMulVec ] using h_simp i j )
+
+theorem pure_separable_imp_IsProd {d₁ d₂ : Type*} [Fintype d₁] [Fintype d₂] [DecidableEq d₁] [DecidableEq d₂]
+    (ψ : Ket (d₁ × d₂)) (h : IsSeparable (pure ψ)) : ψ.IsProd := by
+      obtain ⟨ ρLRs, ps, hps ⟩ := h;
+      -- Since `pure ψ` is pure (`purity = 1`), by `MState.eq_of_sum_eq_pure`, for any `k` with `p_k > 0`, we have `pure ψ = ρL_k ⊗ ρR_k`.
+      obtain ⟨k, hk⟩ : ∃ k : { x : MState d₁ × MState d₂ // x ∈ ρLRs }, 0 < (ps k : ℝ) ∧ (MState.pure ψ).M = (k.val.1).M ⊗ₖ (k.val.2).M := by
+        have h_pure : (MState.pure ψ).purity = 1 := by
+          exact ( pure_iff_purity_one _ ).mp ⟨ ψ, rfl ⟩;
+        obtain ⟨k, hk⟩ : ∃ k : { x : MState d₁ × MState d₂ // x ∈ ρLRs }, 0 < (ps k : ℝ) := by
+          exact ⟨ Classical.choose ( show ∃ k : ρLRs, 0 < ( ps k : ℝ ) from by exact not_forall_not.mp fun h => by have := ps.2; simp_all ), Classical.choose_spec ( show ∃ k : ρLRs, 0 < ( ps k : ℝ ) from by exact not_forall_not.mp fun h => by have := ps.2; simp_all) ⟩;
+        refine' ⟨ k, hk, _ ⟩;
+        convert MState.eq_of_sum_eq_pure h_pure _ _ _ k _ _;
+        rotate_left;
+        exact Finset.univ;
+        use fun x => ( ps x : ℝ );
+        use fun x => MState.prod x.val.1 x.val.2;
+        all_goals norm_cast;
+        · exact fun i a => unitInterval.nonneg (ps i);
+        · exact ps.2;
+        · exact Finset.mem_univ k;
+        · obtain ⟨val, property⟩ := k
+          obtain ⟨fst, snd⟩ := val
+          have fwd : 0 ≤ (ps ⟨(fst, snd), property⟩).1 := le_of_lt hk
+          apply Iff.intro
+          · intro a
+            exact MState.ext_iff.mpr a.symm
+          · intro a
+            rw [← a]
+            rfl
+      -- Since `pure ψ` is pure (`purity = 1`), by `MState.pure_iff_purity_one`, `ρL_k = pure ξ` and `ρR_k = pure φ` for some `ξ, φ`.
+      obtain ⟨ξ, hξ⟩ : ∃ ξ : MState d₁, k.val.1 = ξ ∧ ξ.purity = 1 := by
+        have h_purity : (MState.pure ψ).purity = (k.val.1).purity * (k.val.2).purity := by
+          convert MState.purity_prod _ _;
+          exact MState.ext hk.2;
+        have h_purity_one : (MState.pure ψ).purity = 1 := by
+          exact ( pure_iff_purity_one _ ).mp ⟨ ψ, rfl ⟩;
+        rw [ h_purity, Prob.mul_eq_one_iff ] at h_purity_one ; aesop
+      obtain ⟨φ, hφ⟩ : ∃ φ : MState d₂, k.val.2 = φ ∧ φ.purity = 1 := by
+        have h_purity_prod : (MState.pure ψ).purity = (k.val.1).purity * (k.val.2).purity := by
+          convert MState.purity_prod _ _;
+          exact MState.ext hk.2;
+        have h_purity_one : (MState.pure ψ).purity = 1 := by
+          exact pure_iff_purity_one _ |>.1 ⟨ ψ, rfl ⟩;
+        aesop;
+      -- Since `ξ` and `φ` are pure states, we have `ξ = pure ξ'` and `φ = pure φ'` for some `ξ', φ'`.
+      obtain ⟨ξ', hξ'⟩ : ∃ ξ' : Ket d₁, ξ = MState.pure ξ' := by
+        have := MState.pure_iff_purity_one ξ;
+        exact this.mpr hξ.2
+      obtain ⟨φ', hφ'⟩ : ∃ φ' : Ket d₂, φ = MState.pure φ' := by
+        have := MState.pure_iff_purity_one φ; aesop;
+      -- Since `pure ψ = pure ξ ⊗ pure φ`, we have `ψ = ξ ⊗ φ` up to a global phase `z`.
+      have h_eq : (MState.pure ψ).M = (MState.pure (ξ' ⊗ φ')).M := by
+        rw [ hk.2, hξ.1, hξ', hφ.1, hφ', MState.pure_prod_pure ];
+        exact rfl;
+      -- Since `pure ψ = pure (ξ' ⊗ φ')`, we have `ψ = ξ' ⊗ φ'` up to a global phase `z`.
+      have h_eq_ket : ∃ z : ℂ, ‖z‖ = 1 ∧ ψ.vec = z • (ξ' ⊗ φ').vec := by
+        have := MState.pure_eq_pure_iff ψ ( ξ' ⊗ φ' );
+        exact this.mp ( MState.ext h_eq );
+      obtain ⟨ z, hz₁, hz₂ ⟩ := h_eq_ket;
+      use ⟨ fun i => z * ξ' i, ?_ ⟩, φ';
+      ext ⟨ i, j ⟩ ; simp [ Ket.prod ];
+      convert congr_fun hz₂ ( i, j ) using 1;
+      exact mul_assoc _ _ _;
+      simp [ hz₁]
+      simpa [ Complex.normSq_eq_norm_sq ] using ξ'.normalized'
+
 /-- A pure state is separable iff the ket is a product state. -/
 theorem pure_separable_iff_IsProd (ψ : Ket (d₁ × d₂)) :
     IsSeparable (pure ψ) ↔ ψ.IsProd := by
-  sorry
+  apply Iff.intro
+  · exact pure_separable_imp_IsProd ψ
+  · rintro ⟨ ξ, φ, rfl ⟩
+    rw [pure_prod_pure ξ φ]
+    exact IsSeparable_prod _ _;
+
+/--
+A mixed state is pure if and only if its rank is 1.
+-/
+theorem pure_iff_rank_eq_one {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) :
+    (∃ ψ, ρ = pure ψ) ↔ ρ.m.rank = 1 := by
+  constructor <;> intro h;
+  · obtain ⟨w, rfl⟩ := h
+    -- The rank of the outer product of a vector with itself is 1.
+    have h_rank : ∀ (v : d → ℂ), v ≠ 0 → Matrix.rank (Matrix.vecMulVec v (conj v)) = 1 := by
+      intro v hv_ne_zero
+      have h_outer_product : ∀ (u : d → ℂ), ∃ (c : ℂ), Matrix.mulVec (Matrix.vecMulVec v (conj v)) u = c • v := by
+        intro u
+        use ∑ i, (starRingEnd ℂ (v i)) * (u i);
+        ext i; simp +decide [ Matrix.vecMulVec, Matrix.mulVec, dotProduct, mul_comm, mul_left_comm, Finset.mul_sum _ _ _ ] ;
+      apply le_antisymm
+      · have h_outer_product : LinearMap.range (Matrix.mulVecLin (Matrix.vecMulVec v (conj v))) ≤ Submodule.span ℂ {v} := by
+          rintro x ⟨ u, rfl ⟩ ; obtain ⟨ c, hc ⟩ := h_outer_product u; aesop;
+        exact le_trans ( Submodule.finrank_mono h_outer_product ) ( finrank_span_le_card _ ) |> le_trans <| by simp +decide ;
+      · contrapose! hv_ne_zero; simp_all +decide [ Matrix.rank, Submodule.eq_bot_iff ] ;
+        ext i; specialize hv_ne_zero ( Pi.single i 1 ) ; simp_all +decide [ Matrix.vecMulVec ] ;
+        simpa using congr_fun hv_ne_zero i;
+    exact h_rank _ ( fun h => by simpa [ h ] using w.exists_ne_zero );
+  · -- Since ρ is Hermitian and has rank 1, it must be of the form |ψ⟩⟨ψ| for some ket ψ.
+    obtain ⟨ψ, hψ⟩ : ∃ ψ : d → ℂ, ρ.m = Matrix.of (fun i j => ψ i * star (ψ j)) := by
+      -- Since ρ is Hermitian and has rank 1, it must be of the form |ψ⟩⟨ψ| for some ket ψ. Use this fact.
+      have h_pure : ∃ ψ : d → ℂ, ρ.m = Matrix.of (fun i j => ψ i * star (ψ j)) := by
+        have h_rank : ρ.m.rank = 1 := h
+        have h_herm : ρ.m.IsHermitian := by
+          exact ρ.M.property
+        have := h_herm.spectral_theorem;
+        -- Since the rank of ρ.m is 1, the diagonal matrix in the spectral theorem must have exactly one non-zero entry.
+        obtain ⟨i, hi⟩ : ∃ i : d, h_herm.eigenvalues i ≠ 0 ∧ ∀ j : d, j ≠ i → h_herm.eigenvalues j = 0 := by
+          have h_diag : ∑ i : d, (if h_herm.eigenvalues i = 0 then 0 else 1) = 1 := by
+            have h_diag : Matrix.rank (Matrix.diagonal (h_herm.eigenvalues)) = 1 := by
+              have h_diag : Matrix.rank (Matrix.diagonal (h_herm.eigenvalues)) = Matrix.rank (ρ.m) := by
+                exact Eq.symm (Matrix.IsHermitian.rank_eq_rank_diagonal h_herm);
+              exact h_diag.trans h_rank;
+            rw [ Matrix.rank_diagonal ] at h_diag;
+            simp +decide [ Finset.sum_ite ];
+            rw [ Fintype.card_subtype ] at h_diag ; exact h_diag;
+          obtain ⟨i, hi⟩ : ∃ i : d, h_herm.eigenvalues i ≠ 0 := by
+            exact not_forall.mp fun h => by simp +decide [ h ] at h_diag;
+          rw [ Finset.sum_eq_add_sum_diff_singleton ( Finset.mem_univ i ) ] at h_diag;
+          exact ⟨ i, hi, fun j hj => Classical.not_not.1 fun hj' => absurd h_diag ( by rw [ if_neg hi ] ; exact ne_of_gt ( lt_add_of_pos_right _ ( lt_of_lt_of_le ( by simp +decide [ hj' ] ) ( Finset.single_le_sum ( fun x _ => by positivity ) ( Finset.mem_sdiff.2 ⟨ Finset.mem_univ j, by simp [ hj ] ⟩ ) ) ) ) ) ⟩;
+        -- Since the diagonal matrix in the spectral theorem has exactly one non-zero entry, we can write ρ.m as |ψ⟩⟨ψ| for some ket ψ.
+        use fun j => (h_herm.eigenvectorUnitary : Matrix d d ℂ) j i * Real.sqrt (h_herm.eigenvalues i);
+        convert this using 1;
+        ext j k; simp +decide [ Matrix.mul_apply, Matrix.diagonal ]
+        ring_nf
+        rw [ Finset.sum_eq_single i ] <;> simp +contextual [ hi ];
+        exact Or.inl <| Or.inl <| mod_cast Real.sq_sqrt <| by
+          have := ρ.pos.eigenvalues_nonneg i;
+          convert this using 1;
+      exact h_pure;
+    have h_norm : ∑ x, Complex.normSq (ψ x) = 1 := by
+      have := ρ.tr';
+      simp_all +decide [ Complex.ext_iff, Matrix.trace ];
+      simpa only [ Complex.normSq_apply, mul_comm ] using this.1;
+    use ⟨ψ, by
+      simpa [ Complex.normSq_eq_norm_sq ] using h_norm⟩
+    generalize_proofs at *;
+    refine' MState.ext_m _ ; aesop
+
+/-
+A ket on a product space is a product state if and only if its coefficient matrix has rank 1.
+-/
+theorem Ket.IsProd_iff_rank_eq_one {d₁ d₂ : Type*} [Fintype d₁] [Fintype d₂] [DecidableEq d₁] [DecidableEq d₂]
+    (ψ : Ket (d₁ × d₂)) :
+    ψ.IsProd ↔ (Matrix.of (fun i j => ψ (i, j))).rank = 1 := by
+      rw [ Ket.IsProd_iff_mul_eq_mul ];
+      constructor;
+      · intro h;
+        obtain ⟨ξ, ψ', hξψ'⟩ : ∃ ξ : d₁ → ℂ, ∃ ψ' : d₂ → ℂ, ∀ i j, ψ (i, j) = ξ i * ψ' j := by
+          -- Let's choose any $j₀$ such that $\psi(i, j₀) \neq 0$ for some $i$.
+          obtain ⟨j₀, hj₀⟩ : ∃ j₀ : d₂, ∃ i₀ : d₁, ψ (i₀, j₀) ≠ 0 := by
+            have := ψ.exists_ne_zero;
+            exact ⟨ this.choose.2, this.choose.1, this.choose_spec ⟩;
+          choose i₀ hi₀ using hj₀;
+          exact ⟨ fun i => ψ ( i, j₀ ) / ψ ( i₀, j₀ ), fun j => ψ ( i₀, j ), fun i j => by rw [ div_mul_eq_mul_div, eq_div_iff hi₀ ] ; linear_combination h i i₀ j j₀ ⟩;
+        -- Since the matrix is a product of two vectors, its rank is 1.
+        have h_rank : Matrix.rank (Matrix.of (fun i j => ξ i * ψ' j)) ≤ 1 := by
+          -- The range of the matrix is spanned by the single vector ξ.
+          have h_range : LinearMap.range (Matrix.mulVecLin (Matrix.of (fun i j => ξ i * ψ' j))) ≤ Submodule.span ℂ {ξ} := by
+            rintro x ⟨ y, rfl ⟩;
+            rw [ Submodule.mem_span_singleton ];
+            exact ⟨ ∑ j, ψ' j * y j, by ext i; simp +decide [ Matrix.mulVec, dotProduct, mul_comm, mul_left_comm, Finset.mul_sum _ _ _ ] ⟩;
+          exact le_trans ( Submodule.finrank_mono h_range ) ( finrank_span_le_card _ ) |> le_trans <| by norm_num;
+        cases h_rank.eq_or_lt <;> simp_all +decide [ Matrix.rank, Submodule.eq_bot_iff ];
+        · convert ‹Module.finrank ℂ ( LinearMap.range ( Matrix.mulVecLin ( Matrix.of fun i j => ξ i * ψ' j ) ) ) = 1› using 3 ; aesop;
+          · aesop;
+          · ext; simp [hξψ'];
+        · have := ψ.exists_ne_zero
+          simp_all only [ne_eq, mul_eq_zero, not_or, Prod.exists, exists_and_left, exists_and_right]
+          obtain ⟨left, right⟩ := this
+          obtain ⟨w, h_2⟩ := left
+          obtain ⟨w_1, h_3⟩ := right
+          rename_i h_1
+          specialize h_1 ( Pi.single w_1 1 )
+          simp_all [ funext_iff]
+      · rw [ Matrix.rank ];
+        rw [ finrank_eq_one_iff' ]
+        intro a i₁ i₂ j₁ j₂
+        simp_all only [ne_eq, Subtype.forall, LinearMap.mem_range, Matrix.mulVecBilin_apply, forall_exists_index,
+          Subtype.exists, Submodule.mk_eq_zero, SetLike.mk_smul_mk, Subtype.mk.injEq, forall_apply_eq_imp_iff,
+          exists_and_left, exists_prop]
+        obtain ⟨w, h⟩ := a
+        obtain ⟨left, right⟩ := h
+        obtain ⟨left_1, right⟩ := right
+        obtain ⟨w_1, h⟩ := left_1
+        subst h
+        obtain ⟨ c, hc ⟩ := right ( Pi.single j₁ 1 ) ;
+        obtain ⟨ d, hd ⟩ := right ( Pi.single j₂ 1 ) ;
+        simp_all +decide [ funext_iff, Matrix.mulVec ] ;
+        rw [ ← hc i₁, ← hd i₁, ← hc i₂, ← hd i₂ ] ; ring
 
 /-- A pure state is separable iff the partial trace on the left is pure. -/
 theorem pure_separable_iff_traceLeft_pure (ψ : Ket (d₁ × d₂)) : IsSeparable (pure ψ) ↔
     ∃ ψ₁, pure ψ₁ = (pure ψ).traceLeft := by
-  sorry
+  have h1 := MState.pure_separable_iff_IsProd ψ;
+  have h2 := Ket.IsProd_iff_rank_eq_one ψ;
+  have h3 := MState.pure_iff_rank_eq_one ( ( MState.pure ψ ).traceLeft )
+  simp_all
+  have h4 : Matrix.rank ((MState.pure ψ).traceLeft.m) = Matrix.rank (Matrix.of (fun i j => ψ (i, j))) := by
+    have h4 : (MState.pure ψ).traceLeft.m = Matrix.transpose (Matrix.conjTranspose (Matrix.of (fun i j => ψ (i, j))) * Matrix.of (fun i j => ψ (i, j))) := by
+      ext i j
+      simp [ MState.traceLeft, Matrix.traceLeft, Matrix.mul_apply ] ;
+      exact Finset.sum_congr rfl fun _ _ => mul_comm _ _;
+    rw [ h4, Matrix.rank_transpose, Matrix.rank_conjTranspose_mul_self ];
+  grind
 
 --TODO: Separable states are convex
 
@@ -569,7 +981,20 @@ theorem purify_spec (ρ : MState d) : (pure ρ.purify).traceRight = ρ := by
   simp only [pure_apply, Ket.apply]
   simp only [map_mul]
   simp_rw [mul_assoc, mul_comm, ← mul_assoc (Complex.ofReal _), Complex.mul_conj]
-  sorry
+  -- By definition of eigenvectorUnitary and the properties of the unitary matrix and the eigenvalues, we can show that the matrix constructed from the purification is equal to ρ.
+  have h_eigenvectorUnitary : ∀ i j, ∑ x, ρ.Hermitian.eigenvectorUnitary i x * ((ρ.Hermitian.eigenvalues x).sqrt ^ 2) * starRingEnd ℂ (ρ.Hermitian.eigenvectorUnitary j x) = ρ.M i j := by
+    intro i j
+    have h_eigenvectorUnitary : ρ.M = Matrix.of (fun i j => ∑ x, ρ.Hermitian.eigenvectorUnitary i x * ρ.Hermitian.eigenvalues x * starRingEnd ℂ (ρ.Hermitian.eigenvectorUnitary j x)) := by
+      have := ρ.Hermitian.spectral_theorem;
+      convert this using 1;
+      ext i j; simp +decide [ Matrix.mul_apply, Matrix.diagonal ] ;
+    replace h_eigenvectorUnitary := congr_fun ( congr_fun h_eigenvectorUnitary i ) j
+    simp_all only [toMat_apply, Matrix.IsHermitian.eigenvectorUnitary_apply, PiLp.ofLp_apply, Matrix.of_apply]
+    congr! 2;
+    norm_num [ Complex.ext_iff, sq ];
+    exact Or.inl ( Real.mul_self_sqrt ( by exact ( ρ.pos.eigenvalues_nonneg _ ) ) );
+  simp_all +decide [ Complex.normSq, sq ];
+  simpa only [ mul_assoc ] using h_eigenvectorUnitary i j
 
 /-- `MState.purify` bundled with its defining property `MState.traceRight_of_purify`. -/
 def purifyX (ρ : MState d) : { ψ : Ket (d × d) // (pure ψ).traceRight = ρ } :=
@@ -636,8 +1061,66 @@ theorem relabel_cast {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁]
 def SWAP (ρ : MState (d₁ × d₂)) : MState (d₂ × d₁) :=
   ρ.relabel (Equiv.prodComm d₁ d₂).symm
 
+--PULLOUT
+/--
+If two functions from finite types have the same multiset of values, there exists a bijection between the domains that commutes with the functions.
+-/
+lemma exists_equiv_of_multiset_map_eq {α β γ : Type*} [Fintype α] [Fintype β] [DecidableEq γ]
+    (f : α → γ) (g : β → γ) (h : Multiset.map f Finset.univ.val = Multiset.map g Finset.univ.val) :
+    ∃ e : α ≃ β, f = g ∘ e := by
+  -- Since the multisets of values are equal, the cardinalities of the domains must be equal (as the multiset size is the cardinality of the domain). Thus there exists a bijection `σ : α ≃ β`.
+  obtain ⟨σ, hσ⟩ : ∃ σ : α ≃ β, Multiset.map f Finset.univ.val = Multiset.map (g ∘ σ) Finset.univ.val := by
+    have h_card : Fintype.card α = Fintype.card β := by
+      simpa using congr_arg Multiset.card h;
+    obtain σ := Fintype.equivOfCardEq h_card
+    use σ
+    have h_multiset_eq : Multiset.map g Finset.univ.val = Multiset.map (g ∘ σ) Finset.univ.val := by
+      rw [ ← Multiset.map_univ_val_equiv σ ] ;
+      rw [ Multiset.map_map ]
+    exact h.trans h_multiset_eq;
+  -- By `Multiset.map_univ_eq_iff`, there exists `e' : α ≃ α` such that `f = (g ∘ σ) ∘ e'`.
+  obtain ⟨e', he'⟩ : ∃ e' : α ≃ α, f = (g ∘ σ) ∘ e' := by
+    exact (Multiset.map_univ_eq_iff f (g ∘ ⇑σ)).mp hσ;
+  exact ⟨ e'.trans σ, by simpa [ Function.comp ] using he' ⟩
+
+/--
+The multiset of values in the spectrum of a relabeled state is the same as the multiset of values in the spectrum of the original state.
+-/
+lemma multiset_spectrum_relabel_eq {d₁ d₂ : Type*} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
+    (ρ : MState d₁) (e : d₂ ≃ d₁) :
+    Multiset.map (ρ.relabel e).spectrum Finset.univ.val = Multiset.map ρ.spectrum Finset.univ.val := by
+  have h_charpoly : Matrix.charpoly (ρ.relabel e).m = Matrix.charpoly ρ.m := by
+    exact Matrix.charpoly_reindex e.symm ρ.m
+  have h_eigenvalues : Multiset.map (ρ.relabel e).M.H.eigenvalues Finset.univ.val = Multiset.map ρ.M.H.eigenvalues Finset.univ.val := by
+    have h_eigenvalues : Polynomial.roots (Matrix.charpoly (ρ.relabel e).m) = Polynomial.roots (Matrix.charpoly ρ.m) := by
+      rw [h_charpoly];
+    have := ρ.M.H.charpoly_roots_eq_eigenvalues ; have := ( ρ.relabel e ).M.H.charpoly_roots_eq_eigenvalues
+    simp_all only [relabel_m, toMat_M, Complex.coe_algebraMap, Function.comp_apply, relabel_M, val_eq_coe,
+      reindex_coe, Matrix.reindex_apply, Equiv.symm_symm]
+    replace this := congr_arg ( fun m => m.map ( fun x => x.re ) ) this
+    aesop;
+  unfold MState.spectrum;
+  ext
+  rename_i a
+  simp_all only [relabel_m, relabel_M, val_eq_coe, reindex_coe, toMat_M, Matrix.reindex_apply, Equiv.symm_symm]
+  obtain ⟨val, property⟩ := a
+  obtain ⟨left, right⟩ := property
+  convert congr_arg ( fun m => Multiset.count val m ) h_eigenvalues using 1;
+  · rw [ Multiset.count_map, Multiset.count_map ];
+    simp +decide [ Subtype.ext_iff ];
+    congr! 2;
+  · erw [ Multiset.count_map, Multiset.count_map ];
+    congr! 2;
+    exact beq_eq_beq.mp rfl
+
 def spectrum_SWAP (ρ : MState (d₁ × d₂)) : ∃ e, ρ.SWAP.spectrum.relabel e = ρ.spectrum := by
-  sorry
+  -- Apply the lemma exists_equiv_of_multiset_map_eq with the appropriate parameters.
+  obtain ⟨w, h⟩ := exists_equiv_of_multiset_map_eq (fun p => ρ.spectrum p) (fun p => ρ.SWAP.spectrum p)
+    (MState.multiset_spectrum_relabel_eq ρ ( Equiv.prodComm _ _ ).symm ▸ rfl)
+  use w
+  ext x
+  simp_rw [h]
+  rfl
 
 @[simp]
 theorem SWAP_SWAP (ρ : MState (d₁ × d₂)) : ρ.SWAP.SWAP = ρ :=

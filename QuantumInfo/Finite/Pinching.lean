@@ -209,4 +209,7 @@ theorem pinching_bound (ρ σ : MState d) : ρ.M ≤ (↑(Fintype.card (spectrum
 
 open ComplexOrder in
 theorem ker_le_ker_pinching_of_PosDef (ρ σ : MState d) (hpos : σ.m.PosDef) : σ.M.ker ≤ (pinching_map σ ρ).M.ker := by
-  sorry
+  have h_ker : σ.M.ker = ⊥ :=
+    hpos.toLin_ker_eq_bot
+  rw [h_ker]
+  exact bot_le
