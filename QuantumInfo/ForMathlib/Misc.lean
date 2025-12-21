@@ -7,6 +7,7 @@ import Mathlib.Analysis.SpecialFunctions.Log.Basic
 import Mathlib.Order.CompletePartialOrder
 
 --Can this be rewritten more generally? For `finiteness` to work, I don't know how.
+--PR'ed in #33105
 @[aesop (rule_sets := [finiteness]) unsafe apply]
 theorem ite_eq_top {α : Type*} [Top α] (h : Prop) [Decidable h] {x y : α} (hx : x ≠ ⊤) (hy : y ≠ ⊤) :
     (if h then x else y) ≠ ⊤ := by
@@ -62,6 +63,7 @@ theorem subtype_val_iInf' (h : ∀ i, f i ∈ Set.Icc a b) :
 
 end subtype_val_iSup
 
+--PR'ed in #33106
 @[simp]
 theorem Real.log_comp_exp : Real.log ∘ Real.exp = _root_.id := by
   ext

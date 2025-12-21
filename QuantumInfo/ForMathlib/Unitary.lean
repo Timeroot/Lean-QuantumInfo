@@ -31,34 +31,19 @@ theorem unitary_apply_star_eq (U : unitary (E →ₗ[𝕜] E)) (v : E) :
 /-- Conjugating a linear map by a unitary operator gives a map whose μ-eigenspace is
   isomorphic (same dimension) as those of the original linear map. -/
 noncomputable def conj_unitary_eigenspace_equiv (T : E →ₗ[𝕜] E) (U : unitary (E →ₗ[𝕜] E)) (μ : 𝕜) :
-    eigenspace T μ ≃ₗ[𝕜] eigenspace (U.val * T * star (U.val)) μ := by
-  constructor
-  case toLinearMap =>
-    constructor
-    case toAddHom =>
-      constructor
-      case toFun =>
-        rintro ⟨v,hv⟩
-        use U.val v
-        rw [mem_eigenspace_iff] at hv ⊢
-        simp [mul_apply, hv]
-      case map_add' =>
-        intro x y
-        simp
-    intro m x
-    simp
-  case invFun =>
-    rintro ⟨v,hv⟩
-    use (star U.val) v
+    eigenspace T μ ≃ₗ[𝕜] eigenspace (U.val * T * star (U.val)) μ where
+  toFun v := ⟨U.val v.val, by
+    have hv := v.2
     rw [mem_eigenspace_iff] at hv ⊢
-    simpa using congrArg ((star U.val) ·) hv
-  case left_inv =>
-    intro v
-    simp
-  case right_inv =>
-    intro v
-    simp
-
+    simp [hv]⟩
+  invFun v := ⟨(star U.val) v, by
+    have hv := v.2
+    rw [mem_eigenspace_iff] at hv ⊢
+    simpa using congrArg ((star U.val) ·) hv⟩
+  map_add' := by simp
+  map_smul' := by simp
+  left_inv _ := by simp
+  right_inv _ := by simp
 
 end unitary
 namespace IsSymmetric
