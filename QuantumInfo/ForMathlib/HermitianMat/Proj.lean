@@ -259,3 +259,23 @@ proof_wanted posPart_eq_zero_iff : A⁺ = 0 ↔ A ≤ 0
 -- simp: 0⁺ = 0, 0⁻ = 0, 1⁺ = 1, 1⁻ = 0
 --   (-A)⁺ = A⁻, (-A)⁻ = A⁺
 --  A⁺⁺ = A⁺, A⁺⁻ = 0
+
+-- variable {d : Type*} [Fintype d] [DecidableEq d] (A B : HermitianMat d ℂ)
+
+theorem one_sub_proj_le : 1 - {B ≤ₚ A} = {A <ₚ B} := by
+  rw [sub_eq_iff_eq_add, HermitianMat.proj_le_add_lt]
+
+open MatrixOrder ComplexOrder
+
+theorem proj_lt_mul_nonneg : 0 ≤ {A <ₚ B}.toMat * (B - A).toMat := by
+  rw [HermitianMat.proj_lt]
+  nth_rewrite 2 [← HermitianMat.cfc_id (B - A)]
+  rw [← HermitianMat.coe_cfc_mul]
+  apply cfc_nonneg
+  intros
+  simp only [Pi.mul_apply, id_eq, ite_mul, one_mul, zero_mul]
+  split <;> order
+
+theorem proj_lt_mul_lt : {A <ₚ B}.toMat * A.toMat ≤ {A <ₚ B}.toMat * B.toMat := by
+  rw [← sub_nonneg, ← mul_sub_left_distrib]
+  exact A.proj_lt_mul_nonneg B

@@ -294,6 +294,25 @@ theorem qRelEntropy_statePow (ρ σ : MState (H i)) (n : ℕ) :
     rw [statePow_succ, statePow_succ, qRelEntropy_prodRelabel]
     simp [ih, add_mul]
 
+theorem sInf_spectrum_rprod {j : ι} (ρ : MState (H i)) (σ : MState (H j)) :
+    sInf (spectrum ℝ (ρ ⊗ᵣ σ).m) = sInf (spectrum ℝ ρ.m) * sInf (spectrum ℝ σ.m) := by
+  rw [← MState.sInf_spectrum_prod, prodRelabel, MState.spectrum_relabel]
+
+lemma sInf_spectrum_spacePow (σ : MState (H i)) (n : ℕ) :
+    sInf (spectrum ℝ (σ⊗^S[n]).m) = sInf (spectrum ℝ σ.m) ^ n := by
+  induction n
+  · simp only [statePow_zero, pow_zero]
+    conv =>
+      enter [1, 1, 2]
+      equals 1 =>
+        change MState.uniform.m = 1 --TODO simp
+        ext i j
+        simp [MState.uniform, MState.ofClassical, MState.m, HermitianMat.diagonal]
+        rfl
+    rw [spectrum.one_eq, csInf_singleton]
+  · rename_i n ih
+    rw [statePow_succ, sInf_spectrum_rprod, ih, pow_succ]
+
 --PULLOUT: MState.lean
 @[simp]
 theorem _root_.MState.default_M [Fintype d] [DecidableEq d] [Unique d] : (default : MState d).M = 1 := by

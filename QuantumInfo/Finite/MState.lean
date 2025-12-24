@@ -632,6 +632,21 @@ theorem spectrum_prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : ∃(σ : d�
   obtain ⟨ i, j, h ⟩ := h σ; have := congr_fun hσ ( i, j ) ; simp_all +decide [ MState.spectrum ] ;
   exact h ( by exact Subtype.ext this )
 
+theorem sInf_spectrum_prod (ρ : MState d) (σ : MState d₂) :
+    sInf (_root_.spectrum ℝ (ρ ⊗ σ).m) = sInf (_root_.spectrum ℝ ρ.m) * sInf (_root_.spectrum ℝ σ.m) := by
+  rcases isEmpty_or_nonempty d with _ | _; · simp
+  rcases isEmpty_or_nonempty d₂ with _ | _; · simp
+  rw [MState.m, MState.prod, HermitianMat.spectrum_prod, ← MState.m, ← MState.m]
+  apply csInf_mul_nonneg
+  · exact IsSelfAdjoint.spectrum_nonempty ρ.M.H
+  · rw [MState.m, ρ.M.H.spectrum_real_eq_range_eigenvalues]
+    rintro _ ⟨i, rfl⟩
+    apply ρ.eigenvalue_nonneg
+  · exact IsSelfAdjoint.spectrum_nonempty σ.M.H
+  · rw [MState.m, σ.M.H.spectrum_real_eq_range_eigenvalues]
+    rintro _ ⟨i, rfl⟩
+    apply σ.eigenvalue_nonneg
+
 --TODO: Spectrum of direct sum. Spectrum of partial trace?
 
 /-- A mixed state is separable iff it can be written as a convex combination of product mixed states. -/
@@ -651,49 +666,49 @@ theorem eq_of_sum_eq_pure {d : Type*} [Fintype d] [DecidableEq d]
     {ρ : MState d} (h_pure : ρ.purity = 1) (h_sum : ρ.M = ∑ i ∈ s, p i • (ρs i).M)
     (hp_nonneg : ∀ i ∈ s, 0 ≤ p i) (hp_sum : ∑ i ∈ s, p i = 1) (i : ι) (hi : i ∈ s) (hpi : 0 < p i) :
     ρs i = ρ := by
-      have h_trace : ∀ j ∈ s, 0 < p j → (ρ.M.inner (ρs j).M = 1) := by
-        have h_tr_pure : ∑ j ∈ s, p j • ρ.M.inner (ρs j).M = 1 := by
-          have h_tr_pure : ρ.M.inner (∑ j ∈ s, p j • (ρs j).M) = ∑ j ∈ s, p j • ρ.M.inner (ρs j).M := by
-            simp +decide [ Finset.mul_sum _ _ _, HermitianMat.inner ];
-          rw [ ← h_tr_pure, ← h_sum ];
+  have h_trace : ∀ j ∈ s, 0 < p j → (ρ.M.inner (ρs j).M = 1) := by
+    have h_tr_pure : ∑ j ∈ s, p j • ρ.M.inner (ρs j).M = 1 := by
+      have h_tr_pure : ρ.M.inner (∑ j ∈ s, p j • (ρs j).M) = ∑ j ∈ s, p j • ρ.M.inner (ρs j).M := by
+        simp +decide [ Finset.mul_sum _ _ _, HermitianMat.inner ];
+      rw [ ← h_tr_pure, ← h_sum ];
+      convert h_pure using 1;
+      exact beq_eq_beq.mp rfl;
+    have h_tr_le_one : ∀ j ∈ s, ρ.M.inner (ρs j).M ≤ 1 := by
+      intro j hj
+      have h_tr_le_one_j : ρ.M.inner (ρs j).M ≤ ρ.M.trace * (ρs j).M.trace := by
+        apply_rules [ HermitianMat.inner_le_mul_trace ];
+        · exact ρ.zero_le;
+        · exact (ρs j).zero_le;
+      simp_all only [smul_eq_mul, tr, mul_one, ge_iff_le]
+      exact h_tr_le_one_j.trans ( h_sum ▸ ρ.tr.le );
+    intro j hj hj_pos
+    by_contra h_contra;
+    have h_tr_lt_one : ∑ j ∈ s, p j • ρ.M.inner (ρs j).M < ∑ j ∈ s, p j := by
+      apply Finset.sum_lt_sum;
+      · exact fun i hi => mul_le_of_le_one_right ( hp_nonneg i hi ) ( h_tr_le_one i hi );
+      · exact ⟨ j, hj, mul_lt_of_lt_one_right hj_pos ( lt_of_le_of_ne ( h_tr_le_one j hj ) h_contra ) ⟩;
+    linarith;
+  have h_eq : ρ.M = (ρs i).M := by
+    have h_eq : (ρ.M - (ρs i).M).inner (ρ.M - (ρs i).M) = 0 := by
+      have h_eq : (ρ.M - (ρs i).M).inner (ρ.M - (ρs i).M) = ρ.M.inner ρ.M - 2 * ρ.M.inner (ρs i).M + (ρs i).M.inner (ρs i).M := by
+        simp [ HermitianMat.inner ];
+        simp +decide [ Matrix.mul_sub, Matrix.sub_mul, Matrix.trace_sub, Matrix.trace_mul_comm ( ρ.m ) ] ; ring;
+      have h_eq : ρ.M.inner ρ.M = 1 ∧ (ρs i).M.inner (ρs i).M ≤ 1 := by
+        have h_eq : ρ.M.inner ρ.M = 1 := by
           convert h_pure using 1;
           exact beq_eq_beq.mp rfl;
-        have h_tr_le_one : ∀ j ∈ s, ρ.M.inner (ρs j).M ≤ 1 := by
-          intro j hj
-          have h_tr_le_one_j : ρ.M.inner (ρs j).M ≤ ρ.M.trace * (ρs j).M.trace := by
-            apply_rules [ HermitianMat.inner_le_mul_trace ];
-            · exact ρ.zero_le;
-            · exact (ρs j).zero_le;
-          simp_all only [smul_eq_mul, tr, mul_one, ge_iff_le]
-          exact h_tr_le_one_j.trans ( h_sum ▸ ρ.tr.le );
-        intro j hj hj_pos
-        by_contra h_contra;
-        have h_tr_lt_one : ∑ j ∈ s, p j • ρ.M.inner (ρs j).M < ∑ j ∈ s, p j := by
-          apply Finset.sum_lt_sum;
-          · exact fun i hi => mul_le_of_le_one_right ( hp_nonneg i hi ) ( h_tr_le_one i hi );
-          · exact ⟨ j, hj, mul_lt_of_lt_one_right hj_pos ( lt_of_le_of_ne ( h_tr_le_one j hj ) h_contra ) ⟩;
-        linarith;
-      have h_eq : ρ.M = (ρs i).M := by
-        have h_eq : (ρ.M - (ρs i).M).inner (ρ.M - (ρs i).M) = 0 := by
-          have h_eq : (ρ.M - (ρs i).M).inner (ρ.M - (ρs i).M) = ρ.M.inner ρ.M - 2 * ρ.M.inner (ρs i).M + (ρs i).M.inner (ρs i).M := by
-            simp [ HermitianMat.inner ];
-            simp +decide [ Matrix.mul_sub, Matrix.sub_mul, Matrix.trace_sub, Matrix.trace_mul_comm ( ρ.m ) ] ; ring;
-          have h_eq : ρ.M.inner ρ.M = 1 ∧ (ρs i).M.inner (ρs i).M ≤ 1 := by
-            have h_eq : ρ.M.inner ρ.M = 1 := by
-              convert h_pure using 1;
-              exact beq_eq_beq.mp rfl;
-            have h_eq : ∀ (A : HermitianMat d ℂ), 0 ≤ A → A.trace = 1 → A.inner A ≤ 1 := by
-              intros A hA_nonneg hA_trace
-              have h_eq : A.inner A ≤ A.trace * A.trace := by
-                apply HermitianMat.inner_le_mul_trace hA_nonneg hA_nonneg;
-              aesop;
-            exact ⟨ by assumption, h_eq _ ( ρs i |>.2 ) ( ρs i |>.3 ) ⟩;
-          linarith [ h_trace i hi hpi, show 0 ≤ ( ρ.M - ( ρs i |> MState.M ) |> HermitianMat.inner ) ( ρ.M - ( ρs i |> MState.M ) ) from HermitianMat.inner_self_nonneg _ ];
-        -- Since the inner product of a matrix with itself is zero if and only if the matrix is zero, we have ρ.M - (ρs i).M = 0.
-        have h_zero : ρ.M - (ρs i).M = 0 := by
-          apply inner_self_eq_zero.mp h_eq;
-        exact eq_of_sub_eq_zero h_zero;
-      exact MState.ext h_eq.symm
+        have h_eq : ∀ (A : HermitianMat d ℂ), 0 ≤ A → A.trace = 1 → A.inner A ≤ 1 := by
+          intros A hA_nonneg hA_trace
+          have h_eq : A.inner A ≤ A.trace * A.trace := by
+            apply HermitianMat.inner_le_mul_trace hA_nonneg hA_nonneg;
+          aesop;
+        exact ⟨ by assumption, h_eq _ ( ρs i |>.2 ) ( ρs i |>.3 ) ⟩;
+      linarith [ h_trace i hi hpi, show 0 ≤ ( ρ.M - ( ρs i |> MState.M ) |> HermitianMat.inner ) ( ρ.M - ( ρs i |> MState.M ) ) from HermitianMat.inner_self_nonneg _ ];
+    -- Since the inner product of a matrix with itself is zero if and only if the matrix is zero, we have ρ.M - (ρs i).M = 0.
+    have h_zero : ρ.M - (ρs i).M = 0 := by
+      apply inner_self_eq_zero.mp h_eq;
+    exact eq_of_sub_eq_zero h_zero;
+  exact MState.ext h_eq.symm
 
 theorem purity_prod {d₁ d₂ : Type*} [Fintype d₁] [Fintype d₂] [DecidableEq d₁] [DecidableEq d₂]
     (ρ₁ : MState d₁) (ρ₂ : MState d₂) : (ρ₁ ⊗ ρ₂).purity = ρ₁.purity * ρ₂.purity := by
@@ -1051,6 +1066,18 @@ theorem relabel_cast {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁]
   · symm; apply cast_heq
   · apply cast_heq
   · apply cast_heq
+
+@[simp]
+theorem spectrum_relabel {ρ : MState d} (e : d₂ ≃ d) :
+    _root_.spectrum ℝ (ρ.relabel e).m = _root_.spectrum ℝ ρ.m := by
+  ext1 v
+  rw [spectrum.mem_iff] --TODO make a plain `Matrix` version of this
+  rw [Algebra.algebraMap_eq_smul_one v]
+  rw [MState.relabel_m, ← Matrix.submatrix_one_equiv e]
+  rw [← Matrix.smul_apply, ← Matrix.submatrix_smul]
+  rw [← Matrix.sub_apply, ← Matrix.submatrix_sub]
+  rw [Matrix.isUnit_submatrix_equiv]
+  rw [← Algebra.algebraMap_eq_smul_one v, ← spectrum.mem_iff]
 
 --TODO: Swap and assoc for kets.
 --TODO: Connect these to unitaries (when they can be)

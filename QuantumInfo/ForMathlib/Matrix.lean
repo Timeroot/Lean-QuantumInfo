@@ -1194,3 +1194,148 @@ theorem PosDef.zero_lt {n : Type*} [Nonempty n] [Fintype n] {A : Matrix n n ℂ}
     classical
     change _ = ite _ _ _
     simp
+
+
+lemma IsHermitian.spectrum_eq_image_eigenvalues [Fintype n] {A : Matrix n n ℂ} (hA : A.IsHermitian) :
+    spectrum ℝ A = Finset.univ.image hA.eigenvalues := by
+  simpa using hA.spectrum_real_eq_range_eigenvalues
+
+/- This lemma looks "wrong" in the sense that it's specifically about `Fintype.card foo = Finset.card bar`,
+why not just use the underyling fact `foo = ↑bar`? It turns out this actually gives annoying issues
+with dependent rewrites, given the necessary `Fintype` instance. Using the above theorem for example,
+trying `rw [hA.spectrum_eq_image_eigenvalues]` fails because of dependent types. -/
+lemma IsHermitian.card_spectrum_eq_image [Fintype n] {A : Matrix n n ℂ} (hA : A.IsHermitian)
+  [Fintype (spectrum ℝ A)] :
+    Fintype.card (spectrum ℝ A) = (Finset.univ.image hA.eigenvalues).card := by
+  trans (Set.univ.image hA.eigenvalues).toFinset.card
+  · symm
+    convert Set.toFinset_card _
+    rw [Set.image_univ]
+    exact Matrix.IsHermitian.spectrum_real_eq_range_eigenvalues hA
+  · simp
+
+section iInf_iSup
+namespace IsHermitian
+
+variable {d : Type*} [Fintype d] [DecidableEq d] {A B : Matrix d d ℂ}
+
+open ComplexOrder
+
+lemma sub_iInf_eignevalues (hA : A.IsHermitian) :
+    (A - iInf hA.eigenvalues • 1).PosSemidef := by
+  constructor
+  · simpa [ Matrix.IsHermitian, sub_eq_add_neg ] using hA
+  · intro x
+    have h_eigenvalue : ∀ i, hA.eigenvalues i ≥ iInf hA.eigenvalues := by
+      -- By definition of infimum, for any eigenvalue $i$, we have $hA.eigenvalues i \geq iInf hA.eigenvalues$.
+      intros i
+      apply le_of_forall_le
+      intro j a
+      exact le_trans a (ciInf_le ( Finite.bddBelow_range hA.eigenvalues ) i );
+    -- Since $A$ is Hermitian, we can diagonalize it as $A = Q \Lambda Q^*$, where $Q$ is unitary and $\Lambda$ is diagonal with the eigenvalues on the diagonal.
+    obtain ⟨Q, Λ, hQ, hΛ⟩ : ∃ Q : Matrix d d ℂ, ∃ Λ : d → ℂ, Q.conjTranspose * Q = 1 ∧ A = Q * Matrix.diagonal Λ * Q.conjTranspose ∧ ∀ i, Λ i = Matrix.IsHermitian.eigenvalues hA i := by
+      have := hA.spectral_theorem;
+      refine' ⟨ _, _, _, this, _ ⟩;
+      · simp [ ← Matrix.ext_iff ];
+        intro i j; erw [ Matrix.mul_apply ] ; simp [ Matrix.one_apply ] ;
+        have := hA.eigenvectorBasis.orthonormal;
+        rw [ orthonormal_iff_ite ] at this;
+        rw [← this i j]
+        simp [PiLp.inner_apply, mul_comm]
+      · simp
+    -- Since $Q$ is unitary, we have $Q^* Q = I$, and thus $Q^* (A - \lambda_{\min} I) Q = \Lambda - \lambda_{\min} I$.
+    have h_diag : Q.conjTranspose * (A - (iInf (Matrix.IsHermitian.eigenvalues hA)) • 1) * Q = Matrix.diagonal (fun i => Λ i - (iInf (Matrix.IsHermitian.eigenvalues hA))) := by
+      simp [ hΛ, mul_sub, sub_mul, mul_assoc, hQ ];
+      simp [ ← mul_assoc, hQ];
+      ext i j ; by_cases hij : i = j <;> aesop;
+    -- Since $Q$ is unitary, we have $Q^* (A - \lambda_{\min} I) Q = \Lambda - \lambda_{\min} I$, and thus $x^* (A - \lambda_{\min} I) x = (Q^* x)^* (\Lambda - \lambda_{\min} I) (Q^* x)$.
+    have h_quad_form : Star.star x ⬝ᵥ (A - (iInf (Matrix.IsHermitian.eigenvalues hA)) • 1).mulVec x = Star.star (Q.conjTranspose.mulVec x) ⬝ᵥ (Matrix.diagonal (fun i => Λ i - (iInf (Matrix.IsHermitian.eigenvalues hA)))).mulVec (Q.conjTranspose.mulVec x) := by
+      rw [ ← h_diag ];
+      simp [ Matrix.mul_assoc, Matrix.dotProduct_mulVec, Matrix.mul_eq_one_comm.mp hQ];
+      simp only [mulVec_conjTranspose, star_star, vecMul_vecMul];
+      rw [ ← Matrix.mul_assoc, Matrix.mul_eq_one_comm.mp hQ, one_mul ];
+    simp_all only [ge_iff_le, dotProduct, Pi.star_apply, RCLike.star_def, mulVec, sub_apply,
+      smul_apply, Complex.real_smul, conjTranspose_apply, star_sum, star_mul',
+      RingHomCompTriple.comp_apply, RingHom.id_apply];
+    simp_all only [implies_true, and_self, diagonal_apply, ite_mul, zero_mul, Finset.sum_ite_eq, ↓reduceIte];
+    -- Since the eigenvalues are real and the sums involving Q and x are complex, the product of a complex number and its conjugate is non-negative.
+    have h_nonneg : ∀ i, 0 ≤ (∑ x_2, Q x_2 i * star (x x_2)) * (∑ x_2, star (Q x_2 i) * x x_2) := by
+      intro i
+      have h_nonneg : 0 ≤ (∑ x_2, Q x_2 i * star (x x_2)) * star (∑ x_2, Q x_2 i * star (x x_2)) := by
+        exact mul_star_self_nonneg (∑ x_2, Q x_2 i * star (x x_2))
+      convert h_nonneg using 1;
+      simp [ mul_comm, Finset.mul_sum _ _ _];
+    -- Since each term in the sum is a product of a non-negative number and a non-negative eigenvalue difference, the entire sum is non-negative.
+    have h_sum_nonneg : ∀ i, 0 ≤ (∑ x_2, Q x_2 i * star (x x_2)) * (((↑(hA.eigenvalues i) : ℂ) - (↑(iInf hA.eigenvalues) : ℂ)) * ∑ x_2, star (Q x_2 i) * x x_2) := by
+      intro i
+      specialize h_nonneg i
+      simp_all only [mul_assoc, mul_comm, mul_left_comm, RCLike.star_def] ;
+      rw [ ← mul_assoc ];
+      exact mul_nonneg h_nonneg ( sub_nonneg_of_le <| mod_cast h_eigenvalue i );
+    convert Finset.sum_nonneg fun i _ => h_sum_nonneg i;
+    rw [ hΛ.1 ]
+
+lemma iInf_eigenvalues_le_dotProduct_mulVec (hA : A.IsHermitian) (v : d → ℂ) :
+    iInf hA.eigenvalues * (star v ⬝ᵥ v) ≤ star v ⬝ᵥ A *ᵥ v := by
+  conv_lhs =>
+    equals (star v ⬝ᵥ (iInf hA.eigenvalues • 1) *ᵥ v) =>
+      simp only [dotProduct, Pi.star_apply, RCLike.star_def, mul_comm, mulVec]
+      simp [Matrix.one_apply, mul_assoc, mul_left_comm, Finset.mul_sum]
+  rw [← sub_nonneg, ← dotProduct_sub, ← Matrix.sub_mulVec]
+  exact (sub_iInf_eignevalues hA).right v
+
+lemma iInf_eigenvalues_le_of_posSemidef
+  (hAB : (B - A).PosSemidef) (hA : A.IsHermitian) (hB : B.IsHermitian) :
+    iInf hA.eigenvalues ≤ iInf hB.eigenvalues := by
+  rcases isEmpty_or_nonempty d
+  · simp
+  contrapose! hAB
+  rw [PosSemidef]
+  push_neg
+  intro _
+  apply exists_lt_of_ciInf_lt at hAB
+  rcases hAB with ⟨i, hi⟩
+  use WithLp.ofLp (hB.eigenvectorBasis i)
+  simp only [sub_mulVec, dotProduct_sub, sub_nonneg]
+  rw [hB.mulVec_eigenvectorBasis i]
+  simp only [dotProduct_smul, Complex.real_smul]
+  nth_rw 2 [dotProduct_comm]
+  rw [← EuclideanSpace.inner_eq_star_dotProduct]
+  intro h
+  replace h := (iInf_eigenvalues_le_dotProduct_mulVec hA _).trans h
+  rw [dotProduct_comm, ← EuclideanSpace.inner_eq_star_dotProduct] at h
+  simp only [OrthonormalBasis.inner_eq_one, mul_one, Complex.real_le_real] at h
+  order
+
+open MatrixOrder in
+lemma iInf_eigenvalues_le (hAB : A ≤ B) (hA : A.IsHermitian) (hB : B.IsHermitian) :
+    iInf hA.eigenvalues ≤ iInf hB.eigenvalues :=
+  iInf_eigenvalues_le_of_posSemidef hAB hA hB
+
+open MatrixOrder in
+lemma iInf_eigenvalues_smul_one_le (hA : A.IsHermitian) : iInf hA.eigenvalues • 1 ≤ A :=
+  (PosSemidef.smul_one_le_of_eigenvalues_iff hA (iInf hA.eigenvalues)).mp
+    (ciInf_le (Finite.bddBelow_range _))
+
+end IsHermitian
+end iInf_iSup
+
+section matrix_order
+
+--Shortcut instances. Having these around speeds things out considerably, in some cases?
+open MatrixOrder
+
+variable {d : Type*} [Fintype d]
+
+lemma _shortcut_posSMulMono : PosSMulMono ℝ (Matrix d d ℂ) :=
+  inferInstance
+
+lemma _shortcut_posSmulReflectLE : PosSMulReflectLE ℝ (Matrix d d ℂ) :=
+  inferInstance
+
+scoped[MatrixOrder] attribute [instance] Matrix._shortcut_posSMulMono
+scoped[MatrixOrder] attribute [instance] Matrix._shortcut_posSmulReflectLE
+
+end matrix_order
+
+end Matrix

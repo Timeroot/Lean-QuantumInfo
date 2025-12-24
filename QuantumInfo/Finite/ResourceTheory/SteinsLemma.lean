@@ -448,22 +448,6 @@ section proj_le
 
 variable {d : Type*} [Fintype d] [DecidableEq d] (A B : HermitianMat d ℂ)
 
-theorem _root_.HermitianMat.proj_lt_mul_nonneg : 0 ≤ {A <ₚ B}.toMat * (B - A).toMat := by
-  rw [HermitianMat.proj_lt]
-  nth_rewrite 2 [← HermitianMat.cfc_id (B - A)]
-  rw [← HermitianMat.coe_cfc_mul]
-  apply cfc_nonneg
-  intros
-  simp only [Pi.mul_apply, id_eq, ite_mul, one_mul, zero_mul]
-  split <;> order
-
-theorem _root_.HermitianMat.proj_lt_mul_lt : {A <ₚ B}.toMat * A.toMat ≤ {A <ₚ B}.toMat * B.toMat := by
-  rw [← sub_nonneg, ← mul_sub_left_distrib]
-  exact A.proj_lt_mul_nonneg B
-
-theorem _root_.HermitianMat.one_sub_proj_le : 1 - {B ≤ₚ A} = {A <ₚ B} := by
-  rw [sub_eq_iff_eq_add, HermitianMat.proj_le_add_lt]
-
 private lemma commute_aux (n : ℕ) {x : ℝ}
   {E ℰ σ : HermitianMat d ℂ} (hℰσ : Commute ℰ.toMat σ.toMat)
   (hE : E = 1 - {Real.exp (n * x) • σ ≤ₚ ℰ})
@@ -477,15 +461,6 @@ private lemma commute_aux (n : ℕ) {x : ℝ}
   subst E
   rw [← HermitianMat.cfc_const_mul]
   apply HermitianMat.cfc_self_commute
-
-noncomputable instance : AddCommMonoid (HermitianMat d ℂ) :=
-  inferInstance
-
-instance : PosSMulMono ℝ (Matrix d d ℂ) :=
-  inferInstance
-
-instance : PosSMulReflectLE ℝ (Matrix d d ℂ) :=
-  inferInstance
 
 open HermMul in
 private lemma rexp_mul_smul_proj_lt_mul_sub_le_mul_sub {n : ℕ} {x : ℝ}
@@ -619,16 +594,6 @@ private lemma rexp_mul_smul_proj_lt_mul_sub_le_mul_sub' {n : ℕ} {x : ℝ} {y :
 
 end proj_le
 
-lemma _root_.Matrix.card_spectrum_eq_image {d : Type*} [Fintype d] [DecidableEq d] (A : Matrix d d ℂ)
-  (hA : A.IsHermitian) [Fintype (spectrum ℝ A)] :
-    Fintype.card (spectrum ℝ A) = (Finset.univ.image hA.eigenvalues).card := by
-  trans (Set.univ.image hA.eigenvalues).toFinset.card
-  · symm
-    convert Set.toFinset_card _
-    rw [Set.image_univ]
-    exact Matrix.IsHermitian.spectrum_real_eq_range_eigenvalues hA
-  · simp
-
 private lemma f_image_bound (mineig : ℝ) (n : ℕ) (h : 0 < mineig) (hn : 0 < n) :
   let c : ℕ → ℝ := fun n ↦ Real.log (1 / mineig) + Real.log 3 / (max n 1);
   let f : ℕ → ℝ → ℝ := fun n lam => ↑⌈Real.log lam / c n⌉ * c n;
@@ -710,192 +675,6 @@ private lemma f_image_bound (mineig : ℝ) (n : ℕ) (h : 0 < mineig) (hn : 0 < 
       nlinarith [ Real.log_pos ( show ( 3 : ℝ ) > 1 by norm_num ), mul_div_cancel₀ ( Real.log 3 ) ( show ( n + 1 : ℝ ) ≠ 0 by positivity ) ] ),
         Real.log_pos ( show ( 3 : ℝ ) > 1 by norm_num ), mul_div_cancel₀ ( Real.log 3 ) ( show ( n + 1 : ℝ ) ≠ 0 by positivity ) ]
 
-lemma sub_iInf_eignevalues {d : Type*} [Fintype d] [DecidableEq d] {A : Matrix d d ℂ}
-  (hA : A.IsHermitian) :
-    (A - iInf hA.eigenvalues • 1).PosSemidef := by
-  constructor;
-  · simpa [ Matrix.IsHermitian, sub_eq_add_neg ] using hA
-  · intro x
-    have h_eigenvalue : ∀ i, hA.eigenvalues i ≥ iInf hA.eigenvalues := by
-      -- By definition of infimum, for any eigenvalue $i$, we have $hA.eigenvalues i \geq iInf hA.eigenvalues$.
-      intros i
-      apply le_of_forall_le
-      intro j a
-      exact le_trans a (ciInf_le ( Finite.bddBelow_range hA.eigenvalues ) i );
-    -- Since $A$ is Hermitian, we can diagonalize it as $A = Q \Lambda Q^*$, where $Q$ is unitary and $\Lambda$ is diagonal with the eigenvalues on the diagonal.
-    obtain ⟨Q, Λ, hQ, hΛ⟩ : ∃ Q : Matrix d d ℂ, ∃ Λ : d → ℂ, Q.conjTranspose * Q = 1 ∧ A = Q * Matrix.diagonal Λ * Q.conjTranspose ∧ ∀ i, Λ i = Matrix.IsHermitian.eigenvalues hA i := by
-      have := hA.spectral_theorem;
-      refine' ⟨ _, _, _, this, _ ⟩;
-      · simp [ ← Matrix.ext_iff ];
-        intro i j; erw [ Matrix.mul_apply ] ; simp [ Matrix.one_apply ] ;
-        have := hA.eigenvectorBasis.orthonormal;
-        rw [ orthonormal_iff_ite ] at this;
-        rw [← this i j]
-        simp [PiLp.inner_apply, mul_comm]
-      · simp
-    -- Since $Q$ is unitary, we have $Q^* Q = I$, and thus $Q^* (A - \lambda_{\min} I) Q = \Lambda - \lambda_{\min} I$.
-    have h_diag : Q.conjTranspose * (A - (iInf (Matrix.IsHermitian.eigenvalues hA)) • 1) * Q = Matrix.diagonal (fun i => Λ i - (iInf (Matrix.IsHermitian.eigenvalues hA))) := by
-      simp [ hΛ, mul_sub, sub_mul, mul_assoc, hQ ];
-      simp [ ← mul_assoc, hQ];
-      ext i j ; by_cases hij : i = j <;> aesop;
-    -- Since $Q$ is unitary, we have $Q^* (A - \lambda_{\min} I) Q = \Lambda - \lambda_{\min} I$, and thus $x^* (A - \lambda_{\min} I) x = (Q^* x)^* (\Lambda - \lambda_{\min} I) (Q^* x)$.
-    have h_quad_form : Star.star x ⬝ᵥ (A - (iInf (Matrix.IsHermitian.eigenvalues hA)) • 1).mulVec x = Star.star (Q.conjTranspose.mulVec x) ⬝ᵥ (Matrix.diagonal (fun i => Λ i - (iInf (Matrix.IsHermitian.eigenvalues hA)))).mulVec (Q.conjTranspose.mulVec x) := by
-      rw [ ← h_diag ];
-      simp [ Matrix.mul_assoc, Matrix.dotProduct_mulVec, Matrix.mul_eq_one_comm.mp hQ];
-      simp only [mulVec_conjTranspose, star_star, vecMul_vecMul];
-      rw [ ← Matrix.mul_assoc, Matrix.mul_eq_one_comm.mp hQ, one_mul ];
-    simp_all only [ge_iff_le, dotProduct, Pi.star_apply, RCLike.star_def, mulVec, sub_apply,
-      smul_apply, Complex.real_smul, conjTranspose_apply, star_sum, star_mul',
-      RingHomCompTriple.comp_apply, RingHom.id_apply];
-    simp_all only [implies_true, and_self, diagonal_apply, ite_mul, zero_mul, Finset.sum_ite_eq, ↓reduceIte];
-    -- Since the eigenvalues are real and the sums involving Q and x are complex, the product of a complex number and its conjugate is non-negative.
-    have h_nonneg : ∀ i, 0 ≤ (∑ x_2, Q x_2 i * star (x x_2)) * (∑ x_2, star (Q x_2 i) * x x_2) := by
-      intro i
-      have h_nonneg : 0 ≤ (∑ x_2, Q x_2 i * star (x x_2)) * star (∑ x_2, Q x_2 i * star (x x_2)) := by
-        exact mul_star_self_nonneg (∑ x_2, Q x_2 i * star (x x_2))
-      convert h_nonneg using 1;
-      simp [ mul_comm, Finset.mul_sum _ _ _];
-    -- Since each term in the sum is a product of a non-negative number and a non-negative eigenvalue difference, the entire sum is non-negative.
-    have h_sum_nonneg : ∀ i, 0 ≤ (∑ x_2, Q x_2 i * star (x x_2)) * (((↑(hA.eigenvalues i) : ℂ) - (↑(iInf hA.eigenvalues) : ℂ)) * ∑ x_2, star (Q x_2 i) * x x_2) := by
-      intro i
-      specialize h_nonneg i
-      simp_all only [mul_assoc, mul_comm, mul_left_comm, RCLike.star_def] ;
-      rw [ ← mul_assoc ];
-      exact mul_nonneg h_nonneg ( sub_nonneg_of_le <| mod_cast h_eigenvalue i );
-    convert Finset.sum_nonneg fun i _ => h_sum_nonneg i;
-    rw [ hΛ.1 ]
-
-lemma iInf_eigenvalues_le_dotProduct_mulVec {d : Type*} [Fintype d] [DecidableEq d] {A : Matrix d d ℂ}
-  (hA : A.IsHermitian) (v : d → ℂ) :
-    iInf hA.eigenvalues * (star v ⬝ᵥ v) ≤ star v ⬝ᵥ A *ᵥ v := by
-  conv_lhs =>
-    equals (star v ⬝ᵥ (iInf hA.eigenvalues • 1) *ᵥ v) =>
-      simp only [dotProduct, Pi.star_apply, RCLike.star_def, mul_comm, mulVec]
-      simp [Matrix.one_apply, mul_assoc, mul_left_comm, Finset.mul_sum]
-  rw [← sub_nonneg, ← dotProduct_sub, ← Matrix.sub_mulVec]
-  exact (sub_iInf_eignevalues hA).right v
-
-lemma iInf_eigenvalues_le_of_posSemidef {d : Type*} [Fintype d] [DecidableEq d] {A B : Matrix d d ℂ}
-  (hAB : (B - A).PosSemidef) (hA : A.IsHermitian) (hB : B.IsHermitian) :
-    iInf hA.eigenvalues ≤ iInf hB.eigenvalues := by
-  rcases isEmpty_or_nonempty d
-  · simp
-  contrapose! hAB
-  rw [PosSemidef]
-  push_neg
-  intro _
-  apply exists_lt_of_ciInf_lt at hAB
-  rcases hAB with ⟨i, hi⟩
-  use WithLp.ofLp (hB.eigenvectorBasis i)
-  simp only [sub_mulVec, dotProduct_sub, sub_nonneg]
-  rw [hB.mulVec_eigenvectorBasis i]
-  simp only [dotProduct_smul, Complex.real_smul]
-  nth_rw 2 [dotProduct_comm]
-  rw [← EuclideanSpace.inner_eq_star_dotProduct]
-  intro h
-  replace h := (iInf_eigenvalues_le_dotProduct_mulVec hA _).trans h
-  rw [dotProduct_comm, ← EuclideanSpace.inner_eq_star_dotProduct] at h
-  simp only [OrthonormalBasis.inner_eq_one, mul_one, Complex.real_le_real] at h
-  order
-
-lemma iInf_eigenvalues_le {d : Type*} [Fintype d] [DecidableEq d] {A B : Matrix d d ℂ}
-  (hAB : A ≤ B) (hA : A.IsHermitian) (hB : B.IsHermitian) :
-    iInf hA.eigenvalues ≤ iInf hB.eigenvalues :=
-  iInf_eigenvalues_le_of_posSemidef hAB hA hB
-
-@[simp]
-theorem _root_.MState.spectrum_relabel {d d₂ : Type*}
-  [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂]
-  {ρ : MState d} (e : d₂ ≃ d) :
-    spectrum ℝ (ρ.relabel e).m = spectrum ℝ ρ.m := by
-  ext1 v
-  rw [spectrum.mem_iff] --TODO make a plain `Matrix` version of this
-  rw [Algebra.algebraMap_eq_smul_one v]
-  rw [MState.relabel_m, ← Matrix.submatrix_one_equiv e]
-  rw [← smul_apply, ← Matrix.submatrix_smul]
-  rw [← sub_apply, ← Matrix.submatrix_sub]
-  rw [Matrix.isUnit_submatrix_equiv]
-  rw [← Algebra.algebraMap_eq_smul_one v, ← spectrum.mem_iff]
-
-open scoped HermitianMat in
-open scoped Pointwise in
-theorem HermitianMat.spectrum_prod {d d₂ : Type*}
-  [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂]
-  {A : HermitianMat d ℂ} {B : HermitianMat d₂ ℂ} :
-    spectrum ℝ (A ⊗ₖ B).toMat = spectrum ℝ A.toMat * spectrum ℝ B.toMat :=
-  Matrix.spectrum_prod A.H B.H
-
---PULLOUT: Belongs in Mathlib/Algebra/Order/Group/Pointwise/CompleteLattice.lean
--- (after appropriately generalizing to MulPosMono)
-open scoped Pointwise in
-theorem csInf_mul_nonneg {s t : Set ℝ}
-  (hs₀ : s.Nonempty) (hs₁ : ∀ x ∈ s, 0 ≤ x) (ht₀ : t.Nonempty) (ht₁ : ∀ x ∈ t, 0 ≤ x) :
-    sInf (s * t) = sInf s * sInf t := by
-  --TODO Cleanup
-  have h_ge : sInf (s * t) ≥ sInf s * sInf t := by
-    have h_lower_bound : ∀ x ∈ s, ∀ y ∈ t, x * y ≥ (sInf s) * (sInf t) := by
-      intro x a y a_1
-      gcongr
-      · apply Real.sInf_nonneg; intro x hx; exact ht₁ x hx;
-      · exact hs₁ x a;
-      · exact csInf_le ⟨ 0, fun z hz => hs₁ z hz ⟩ a;
-      · exact csInf_le ⟨ 0, fun z hz => ht₁ z hz ⟩ a_1;
-    have h_inf_le : ∀ z ∈ s * t, z ≥ (sInf s) * (sInf t) := by
-      rintro _ ⟨ x, hx, y, hy, rfl ⟩ ; exact h_lower_bound x hx y hy;
-    exact le_csInf ( Set.Nonempty.mul hs₀ ht₀ ) h_inf_le
-  have h_le : sInf (s * t) ≤ sInf s * sInf t := by
-    set a := sInf s
-    set b := sInf t
-    have h_eps : ∀ ε > 0, ∃ x ∈ s, x < a + ε ∧ ∃ y ∈ t, y < b + ε := by
-      exact fun ε ε_pos => by rcases exists_lt_of_csInf_lt ( hs₀ ) ( lt_add_of_pos_right a ε_pos ) with ⟨ x, hx₁, hx₂ ⟩ ; rcases exists_lt_of_csInf_lt ( ht₀ ) ( lt_add_of_pos_right b ε_pos ) with ⟨ y, hy₁, hy₂ ⟩ ; exact ⟨ x, hx₁, hx₂, y, hy₁, hy₂ ⟩ ;
-    have h_prod_eps : ∀ ε > 0, ∃ x ∈ s, ∃ y ∈ t, x * y < (a + ε) * (b + ε) := by
-      exact fun ε hε => by obtain ⟨ x, hx₁, hx₂, y, hy₁, hy₂ ⟩ := h_eps ε hε; exact ⟨ x, hx₁, y, hy₁, by nlinarith [ hs₁ x hx₁, ht₁ y hy₁ ] ⟩ ;
-    have h_lim : Filter.Tendsto (fun ε => (a + ε) * (b + ε)) (nhdsWithin 0 (Set.Ioi 0)) (nhds (a * b)) := by
-      exact tendsto_nhdsWithin_of_tendsto_nhds ( Continuous.tendsto' ( by continuity ) _ _ ( by norm_num ) );
-    refine' le_of_tendsto_of_tendsto tendsto_const_nhds h_lim _;
-    filter_upwards [ self_mem_nhdsWithin ] with ε hε using le_trans ( csInf_le ⟨ 0, by rintro x ⟨ u, hu, v, hv, rfl ⟩ ; exact mul_nonneg ( hs₁ u hu ) ( ht₁ v hv ) ⟩ ⟨ _, h_prod_eps ε hε |> Classical.choose_spec |> And.left, _, h_prod_eps ε hε |> Classical.choose_spec |> And.right |> Classical.choose_spec |> And.left, rfl ⟩ ) ( h_prod_eps ε hε |> Classical.choose_spec |> And.right |> Classical.choose_spec |> And.right |> le_of_lt )
-  exact le_antisymm h_le h_ge
-
-theorem sInf_spectrum_prod {d d₂ : Type*}
-  [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂]
-  {ρ : MState d} {σ : MState d₂} :
-    sInf (spectrum ℝ (ρ ⊗ σ).m) = sInf (spectrum ℝ ρ.m) * sInf (spectrum ℝ σ.m) := by
-  rcases isEmpty_or_nonempty d with _ | _; · simp
-  rcases isEmpty_or_nonempty d₂ with _ | _; · simp
-  rw [MState.m, MState.prod, HermitianMat.spectrum_prod, ← MState.m, ← MState.m]
-  rw [csInf_mul_nonneg]
-  · exact IsSelfAdjoint.spectrum_nonempty ρ.M.H
-  · rw [MState.m, ρ.M.H.spectrum_real_eq_range_eigenvalues]
-    rintro _ ⟨i, rfl⟩
-    apply ρ.eigenvalue_nonneg
-  · exact IsSelfAdjoint.spectrum_nonempty σ.M.H
-  · rw [MState.m, σ.M.H.spectrum_real_eq_range_eigenvalues]
-    rintro _ ⟨i, rfl⟩
-    apply σ.eigenvalue_nonneg
-
-theorem sInf_spectrum_rprod {j : ι} {ρ : MState (H i)} {σ : MState (H j)} :
-    sInf (spectrum ℝ (ρ ⊗ᵣ σ).m) = sInf (spectrum ℝ ρ.m) * sInf (spectrum ℝ σ.m) := by
-  rw [← sInf_spectrum_prod, prodRelabel, MState.spectrum_relabel]
-
-lemma sInf_spectrum_spacePow (σ : MState (H i)) (n : ℕ) :
-    sInf (spectrum ℝ (σ⊗^S[n]).m) = sInf (spectrum ℝ σ.m) ^ n := by
-  induction n
-  · simp only [statePow_zero, pow_zero]
-    conv =>
-      enter [1, 1, 2]
-      equals 1 =>
-        change MState.uniform.m = 1 --TODO simp
-        ext i j
-        simp [MState.uniform, MState.ofClassical, MState.m, HermitianMat.diagonal]
-        rfl
-    rw [spectrum.one_eq, csInf_singleton]
-  · rename_i n ih
-    rw [statePow_succ, sInf_spectrum_rprod, ih, pow_succ]
-
-lemma iInf_eigenvalues_smul_one_le {d : Type*} [Fintype d] [DecidableEq d] {A : Matrix d d ℂ}
-  (hA : A.IsHermitian) : iInf hA.eigenvalues • 1 ≤ A :=
-  (Matrix.PosSemidef.smul_one_le_of_eigenvalues_iff hA (iInf hA.eigenvalues)).mp (ciInf_le (Finite.bddBelow_range _))
-
 private lemma c'_bounded {mineig : ℝ} {ε2 : ℕ → ℝ≥0}
     (hε2 : ∀ (n : ℕ), ε2 n < 1) (o : ℝ) :
   let c : ℕ → ℝ := fun n => Real.log (1 / mineig) + Real.log 3 / ↑(max n 1);
@@ -917,22 +696,6 @@ private lemma c'_bounded {mineig : ℝ} {ε2 : ℕ → ℝ≥0}
     linarith [ Nat.le_ceil w, h n ( Nat.le_of_ceil_le hn ) ]
   · norm_num
     linarith [ Nat.le_ceil o, show ( ε2 n : ℝ ) ≤ 1 by exact_mod_cast le_of_lt ( hε2 n ) ]
-
-protected lemma _root_.ENNReal.bdd_le_mul_tendsto_zero
-  {α : Type u_2} {l : Filter α} {f g : α → ℝ≥0∞} {b : ℝ≥0∞}
-  (hb : b ≠ ⊤) (hf : Filter.Tendsto f l (nhds 0))
-  (hg : ∀ᶠ (x : α) in l, g x ≤ b) :
-    Filter.Tendsto (fun x => f x * g x) l (nhds 0) := by
-  rw [ ENNReal.tendsto_nhds_zero ] at *;
-  intro ε hεpos
-  by_cases hb_pos : 0 < b;
-  · have := hf ( ε := ε / b ) (by simp [hb, hεpos.ne'])
-    simp_all only [ne_eq, gt_iff_lt]
-    filter_upwards [ this, hg ] with x hx₁ hx₂ using le_trans ( mul_le_mul' hx₁ hx₂ ) ( by rw [ ENNReal.div_mul_cancel ] <;> aesop );
-  · simp_all only [ne_eq, gt_iff_lt, not_lt, nonpos_iff_eq_zero, ENNReal.zero_ne_top, not_false_eq_true]
-    subst hb_pos
-    filter_upwards [ hg ] with x hx
-    simp [hx]
 
 noncomputable section sigmas
 
@@ -1381,7 +1144,7 @@ private theorem EquationS62
         grw [← hσ₁_le_σ' ρ ε m σ n, smul_smul]
       _ ≥ (Real.exp (- σ₁_c i n) * (1 / 3)) • ((iInf ((σ₁ i)⊗^S[n]).M.H.eigenvalues) • 1) := by
         apply smul_le_smul_of_nonneg_left
-        · exact iInf_eigenvalues_smul_one_le ((σ₁ i)⊗^S[n]).M.H
+        · exact ((σ₁ i)⊗^S[n]).M.H.iInf_eigenvalues_smul_one_le
         · positivity
       _ = (Real.exp (- σ₁_c i n) * (1 / 3) * (σ₁_mineig i)^n) • 1 := by
         dsimp [σ₁_mineig, iInf]
@@ -1960,7 +1723,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
   -- Number of distinct eigenvalues of σ'' in Eq. (S56) is
   -- Fintype.card (spectrum ℝ (σ'' n).m), which is dₙ in the paper.
   have hdle n : Fintype.card (spectrum ℝ (σ'' ρ ε m σ n).m) ≤ n + 1 := by
-    rw [Matrix.card_spectrum_eq_image (σ'' ρ ε m σ n).m (σ'' ρ ε m σ n).M.H]
+    rw [(σ'' ρ ε m σ n).M.H.card_spectrum_eq_image (A := (σ'' ρ ε m σ n).m)]
     rcases n.eq_zero_or_pos with rfl | hn
     · have _ : Unique (H (i ^ 0)) := by
         rw [spacePow_zero]
@@ -1993,7 +1756,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
     rintro _ ⟨k, rfl⟩
     refine ⟨?_, MState.eigenvalue_le_one _ _⟩
     refine le_trans ?_ (ciInf_le (Finite.bddBelow_range _) k)
-    refine le_trans ?_ (iInf_eigenvalues_le (hσ₁_le_σ' ρ ε m σ n) (HermitianMat.H _) _)
+    refine le_trans ?_ ((HermitianMat.H _).iInf_eigenvalues_le (hσ₁_le_σ' ρ ε m σ n) _)
     dsimp [σ₁_mineig, iInf]
     rw [← Matrix.IsHermitian.spectrum_real_eq_range_eigenvalues]
     rw [← Matrix.IsHermitian.spectrum_real_eq_range_eigenvalues]

@@ -129,10 +129,22 @@ variable [DecidableEq d]
 scoped instance : NonAssocRing (HermitianMat d 𝕜) where
   one_mul := by simp [mul_eq_symmMul]
   mul_one := by simp [mul_eq_symmMul]
-  natCast_zero := by sorry
-  natCast_succ := by sorry
-  intCast_ofNat := by sorry
-  intCast_negSucc := by sorry
+  natCast_zero := by --CLEANUP:
+    erw [Subtype.mk_eq_mk]
+    simp
+  natCast_succ n := by
+    simp [Subtype.ext_iff]
+    exact Nat.cast_add_one n
+  intCast_ofNat n := by
+    simp [IntCast.intCast]
+    rfl
+  intCast_negSucc n := by
+    simp only [IntCast.intCast, Int.negSucc_eq, neg_add_rev, Int.reduceNeg,
+      Int.cast_add, Int.cast_neg, Int.cast_one, Int.cast_natCast,
+      Subtype.ext_iff, HermitianMat.val_eq_coe, NegMemClass.coe_neg]
+    rw [← neg_add, add_comm]
+    congr! 1
+    norm_cast
 
 end rclike
 

@@ -315,3 +315,13 @@ theorem kronecker_add : A ⊗ₖ (B + C) = A ⊗ₖ B + A ⊗ₖ C := by
   ext1; simp [Matrix.kronecker_add]
 
 end kronecker
+
+open scoped Pointwise in
+theorem spectrum_prod [Fintype m] [DecidableEq m] [Fintype n] [DecidableEq n]
+  {A : HermitianMat m ℂ} {B : HermitianMat n ℂ} :
+    spectrum ℝ (A ⊗ₖ B).toMat = spectrum ℝ A.toMat * spectrum ℝ B.toMat :=
+  Matrix.spectrum_prod A.H B.H
+
+--Shortcut instance
+noncomputable instance : AddCommMonoid (HermitianMat d ℂ) :=
+  inferInstance
