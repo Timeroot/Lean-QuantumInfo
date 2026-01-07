@@ -18,58 +18,49 @@ Several 'bespoke' facts about limsup and liminf on ENNReal / NNReal needed in St
 /-
 There exists a strictly increasing sequence of indices $n_k$ such that $f(1/(k+1), n_k) \le y + 1/(k+1)$.
 -/
-lemma exists_strictMono_seq_le (y : ℝ≥0) (f : ℝ≥0 → ℕ → ℝ≥0∞)
-    (hf : ∀ x > 0, Filter.atTop.liminf (f x) ≤ y) :
+lemma exists_strictMono_seq_le (y : ℝ≥0) (f : ℝ≥0 → ℕ → ℝ≥0∞) (hf : ∀ x > 0, Filter.atTop.liminf (f x) ≤ y) :
     ∃ n : ℕ → ℕ, StrictMono n ∧ ∀ k : ℕ, f ((k : ℝ≥0) + 1)⁻¹ (n k) ≤ (y : ℝ≥0∞) + ((k : ℝ≥0) + 1)⁻¹ := by
-  -- For each $k$, since $\liminf_{n \to \infty} f(\epsilon_k, n) \le y$, there exists $n_k$ such that $f(\epsilon_k, n_k) \le y + \epsilon_k$.
-  have h_exists_n : ∀ k : ℕ, ∃ n : ℕ, f ((k + 1 : ℝ≥0)⁻¹) n ≤ y + (k + 1 : ℝ≥0)⁻¹ := by
-    intro k; specialize hf ( ( k + 1 : ℝ≥0 ) ⁻¹ ) ( by positivity ) ; norm_cast at * ;
-    rw [ Filter.liminf_eq ] at hf
-    simp only [Nat.cast_add, Nat.cast_one, ENNReal.coe_add, ne_eq, add_eq_zero, Nat.cast_eq_zero,
-      one_ne_zero, and_false, not_false_eq_true, ENNReal.coe_inv, ENNReal.coe_natCast,
-      ENNReal.coe_one]
-    simp only [Nat.cast_add, Nat.cast_one, Filter.eventually_atTop, ge_iff_le, sSup_le_iff,
-      Set.mem_setOf_eq, forall_exists_index] at hf
-    contrapose! hf;
-    exact ⟨ _, 0, fun _ _ => le_of_lt ( hf _ ), ENNReal.lt_add_right ( by norm_num ) ( by norm_num ) ⟩;
-  -- Since the property holds frequently (for infinitely many $n$), there exists $n_{k+1} > n_k$ such that $f(\epsilon_{k+1}, n_{k+1}) \le y + \epsilon_{k+1}$.
-  have h_exists_n_succ : ∀ k : ℕ, ∀ n : ℕ, ∃ m : ℕ, m > n ∧ f ((k + 1 : ℝ≥0)⁻¹) m ≤ y + (k + 1 : ℝ≥0)⁻¹ := by
-    intro k n
-    specialize hf ( ( k + 1 : ℝ≥0 ) ⁻¹ ) ( by positivity )
-    rw [ Filter.liminf_eq ] at hf
-    simp_all only [ne_eq, add_eq_zero, Nat.cast_eq_zero, one_ne_zero, and_false, not_false_eq_true, ENNReal.coe_inv,
-      ENNReal.coe_add, ENNReal.coe_natCast, ENNReal.coe_one, Filter.eventually_atTop, ge_iff_le, sSup_le_iff,
-      Set.mem_setOf_eq, forall_exists_index, gt_iff_lt]
-    -- By contradiction, assume there exists $n$ such that for all $m > n$, $f(\epsilon_k, m) > y + \epsilon_k$.
-    by_contra! h_contra
-    exact absurd ( hf ( y + ( ( k : ℝ≥0∞ ) + 1 ) ⁻¹ ) ( n + 1 ) fun m hm => le_of_lt ( h_contra m hm ) ) ( by exact not_le_of_gt ( ENNReal.lt_add_right ( by norm_num ) ( by norm_num ) ) )
-  exact ⟨ fun k => Nat.recOn k ( Classical.choose ( h_exists_n 0 ) ) fun k ih => Nat.find ( h_exists_n_succ ( k + 1 ) ih ), strictMono_nat_of_lt_succ fun k => Nat.find_spec ( h_exists_n_succ ( k + 1 ) _ ) |>.1, fun k => Nat.recOn k ( Classical.choose_spec ( h_exists_n 0 ) ) fun k ih => Nat.find_spec ( h_exists_n_succ ( k + 1 ) _ ) |>.2 ⟩
-
+  -- Since the liminf is ≤ y, for any ε > 0 and index n, there frequently exists an m > n satisfying the bound.
+  have h_freq (k n : ℕ) : ∃ m > n, f ((k + 1 : ℝ≥0)⁻¹) m ≤ y + (k + 1 : ℝ≥0)⁻¹ := by
+    specialize hf ((k + 1 : ℝ≥0)⁻¹) (by positivity)
+    rw [Filter.liminf_eq] at hf
+    simp only [Filter.eventually_atTop, ge_iff_le, sSup_le_iff, Set.mem_setOf_eq, forall_exists_index] at hf
+    contrapose! hf
+    refine ⟨_, n + 1, fun m hm ↦ (hf m hm).le, ENNReal.lt_add_right (by norm_num) (by norm_num)⟩
+  refine ⟨fun k ↦ k.recOn (Classical.choose (h_freq 0 0))
+    (fun i ih ↦ Nat.find (h_freq (i + 1) ih)), ?_, ?_⟩
+  · exact strictMono_nat_of_lt_succ fun k ↦ (Nat.find_spec (h_freq (k + 1) _)).1
+  · rintro (_ | k)
+    · exact (Classical.choose_spec (h_freq 0 _)).2
+    · exact (Nat.find_spec (h_freq (k + 1) _)).2
 /-
 There exists a strictly increasing sequence M such that for all k, and all n ≥ M k, f (1/(k+1)) n is close to y.
 -/
-lemma exists_seq_bound (y : ℝ≥0) (f : ℝ≥0 → ℕ → ℝ≥0∞)
-  (hf : ∀ x > 0, Filter.atTop.limsup (f x) ≤ y) :
-  ∃ M : ℕ → ℕ, StrictMono M ∧ ∀ k, ∀ n ≥ M k, f ((k + 1 : ℝ≥0)⁻¹) n ≤ y + (k + 1 : ℝ≥0∞)⁻¹ := by
-    simp
-    have h_M : ∀ k : ℕ, ∃ M_k : ℕ, ∀ n ≥ M_k, f ((k + 1 : ℝ≥0)⁻¹) n ≤ y + (k + 1 : ℝ≥0∞)⁻¹ := by
-      intro k
-      specialize hf ((k + 1 : ℝ≥0)⁻¹) (by
-      positivity);
-      contrapose! hf;
-      refine' lt_of_lt_of_le _ ( le_csInf _ _ );
-      rotate_left;
-      exact ( y : ℝ≥0∞ ) + ( k + 1 : ℝ≥0∞ ) ⁻¹;
-      · exact ⟨ ⊤, by simp +decide ⟩;
-      · intro b a
-        simp_all only [ge_iff_le, Filter.eventually_map, Filter.eventually_atTop, Set.mem_setOf_eq]
-        obtain ⟨w, h⟩ := a
-        exact le_trans ( le_of_lt ( hf w |> Classical.choose_spec |> And.right ) ) ( h _ ( hf w |> Classical.choose_spec |> And.left ) );
-      · exact ENNReal.lt_add_right ( by norm_num ) ( by norm_num );
-    choose M hM using h_M;
-    refine' ⟨ fun k => Nat.recOn k ( M 0 ) fun k ih => Max.max ( M ( k + 1 ) ) ( ih + 1 ), strictMono_nat_of_lt_succ fun k => _, fun k n hn => hM k n <| _ ⟩
-    · simp_all only [lt_sup_iff, lt_add_iff_pos_right, zero_lt_one, or_true]
-    · exact le_trans ( by induction k <;> aesop ) hn
+lemma exists_seq_bound (y : ℝ≥0) (f : ℝ≥0 → ℕ → ℝ≥0∞) (hf : ∀ x > 0, Filter.atTop.limsup (f x) ≤ y) :
+    ∃ M : ℕ → ℕ, StrictMono M ∧ ∀ k, ∀ n ≥ M k, f ((k + 1 : ℝ≥0)⁻¹) n ≤ y + (k + 1 : ℝ≥0∞)⁻¹ := by
+  have h_M (k : ℕ) : ∃ M_k, ∀ n ≥ M_k, f (k + 1)⁻¹ n ≤ y + (k + 1 : ℝ≥0∞)⁻¹ := by
+    specialize hf (k + 1)⁻¹ (by positivity)
+    contrapose! hf
+    refine lt_of_lt_of_le (b := ?_) ?_ (le_csInf ⟨⊤, by simp⟩ ?_)
+    · exact y + (k + 1 : ℝ≥0∞)⁻¹
+    · exact ENNReal.lt_add_right (by norm_num) (by norm_num)
+    · intro b hb
+      simp only [Filter.eventually_map, Filter.eventually_atTop, Set.mem_setOf_eq] at hb
+      obtain ⟨w, h⟩ := hb
+      obtain ⟨_, hw_left, hw_right⟩ := hf w
+      grw [hw_right]
+      exact h _ hw_left
+  choose M hM using h_M
+  use Nat.rec (M 0) fun k ih ↦ M (k + 1) ⊔ (ih + 1)
+  constructor
+  · apply strictMono_nat_of_lt_succ
+    exact fun _ ↦ lt_sup_of_lt_right (lt_add_one _)
+  · intro k n hn
+    apply hM
+    grw [hn]
+    cases k
+    · rfl
+    · apply le_max_left
 
 /- (∀ x, x > 0 → liminf (n ↦ f x n) ≤ y) →
   ∃ g : ℕ → ℝ, (∀ x, g x > 0) ∧ (liminf g = 0) ∧ (liminf (n ↦ f (g n) n) ≤ y) -/
@@ -244,22 +235,29 @@ lemma exists_limsup_zero_of_forall_limsup_le (y : ℝ≥0) (f : ℝ≥0 → ℕ 
 /-
 If x_k tends to L and g(n) = x_k for n in [T_k, T_{k+1}) where T is strictly increasing, then g(n) tends to L.
 -/
-lemma tendsto_of_block_sequence {α : Type*} [TopologicalSpace α] {x : ℕ → α} {T : ℕ → ℕ} (hT : StrictMono T) {L : α} (hx : Filter.atTop.Tendsto x (𝓝 L)) (g : ℕ → α) (hg : ∀ k, ∀ n ∈ Set.Ico (T k) (T (k + 1)), g n = x k) :
-  Filter.atTop.Tendsto g (𝓝 L) := by
-    rw [ Filter.tendsto_atTop' ] at *;
-    -- Fix a neighborhood `s` of `L`.
-    intro s hs;
-    -- Let `a` be the witness from the definition of `Tendsto`.
-    rcases hx s hs with ⟨a, ha⟩;
-    -- Since `T` is strictly monotone, `T a` is well-defined.
-    use T a; intros n hn; (
-    -- Let `k` be such that `T k ≤ n < T (k + 1)`.
-    obtain ⟨k, hk⟩ : ∃ k, T k ≤ n ∧ n < T (k + 1) := by
-      -- Since $T$ is strictly increasing, the set $\{k \mid T k \leq n\}$ is finite and non-empty.
-      have h_finite : Set.Finite {k | T k ≤ n} := by
-        exact Set.finite_iff_bddAbove.2 ⟨ n, fun k hk => le_trans ( hT.id_le _ ) hk ⟩;
-      exact ⟨ Finset.max' ( h_finite.toFinset ) ⟨ a, h_finite.mem_toFinset.mpr hn ⟩, h_finite.mem_toFinset.mp ( Finset.max'_mem _ _ ), not_le.mp fun h => not_lt_of_ge ( Finset.le_max' _ _ ( h_finite.mem_toFinset.mpr h ) ) ( Nat.lt_succ_self _ ) ⟩;
-    rw [ hg k n ⟨ hk.1, hk.2 ⟩ ] ; exact ha k ( le_of_not_gt fun hk' => by linarith [ hT.monotone hk'.nat_succ_le ] ) ;)
+lemma tendsto_of_block_sequence {α : Type*} [TopologicalSpace α] {x : ℕ → α} {T : ℕ → ℕ}
+    (hT : StrictMono T) {L : α} (hx : Filter.atTop.Tendsto x (𝓝 L)) (g : ℕ → α) (hg : ∀ k, ∀ n ∈ Set.Ico (T k) (T (k + 1)), g n = x k) :
+      Filter.atTop.Tendsto g (𝓝 L) := by
+  rw [Filter.tendsto_atTop'] at hx ⊢
+  intro s hs
+  -- Let `a` be the witness from the definition of `Tendsto`.
+  rcases hx s hs with ⟨a, ha⟩
+  use T a
+  intros n hn
+  -- Let `k` be such that `T k ≤ n < T (k + 1)`.
+  obtain ⟨k, hk⟩ : ∃ k, T k ≤ n ∧ n < T (k + 1) := by
+    -- Since $T$ is strictly increasing, the set $\{k \mid T k \leq n\}$ is finite and non-empty.
+    have h_finite : Set.Finite {k | T k ≤ n} := by
+      rw [Set.finite_iff_bddAbove]
+      exact ⟨_, (hT.id_le · |>.trans)⟩
+    use h_finite.toFinset.max' ⟨a, h_finite.mem_toFinset.mpr hn⟩
+    constructor
+    · exact h_finite.mem_toFinset.mp (Finset.max'_mem _ _)
+    · rw [← not_le]
+      intro h
+      exact not_lt_of_ge (Finset.le_max' _ _ (h_finite.mem_toFinset.mpr h)) (Nat.lt_succ_self _)
+  rw [hg k n hk]
+  exact ha k (le_of_not_gt fun hk' ↦ by linarith [hT.monotone hk'])
 
 /-
 Given a lower bound sequence M and a property P that can always be satisfied eventually, there exists a strictly increasing sequence T bounded by M such that each interval [T_k, T_{k+1}) contains a witness for P.
