@@ -1014,6 +1014,96 @@ private abbrev ε₀_func (ε' : Prob) : ℝ := (R2 ρ σ - R1 ρ ε).toReal * (
 
 end sigmas
 
+private theorem EquationS88 (ρ : MState (H i)) (σ : (n : ℕ) → ↑IsFree) {ε ε' : Prob} (hε'₁ : 0 < ε') (hε'₂ : ε' < ε) (hε : ε < 1)
+  (hR1R2 : R1 ρ ε < R2 ρ σ) (hR1 : R1 ρ ε ≠ ⊤) (hR2 : R2 ρ σ ≠ ⊤) (hε₀_1 : 0 < ε₀_func ρ ε σ ε') (m : ℕ)
+  :
+  let ℰ := fun n => pinching_map (σ'' ρ ε m σ n);
+  let ε₀ := ε₀_func ρ ε σ ε';
+  ∀ (hε₀ : 0 < ε₀),
+    (R1 ρ ε).toReal ≤ (R2 ρ σ).toReal + ε₀ →
+      let P1 := fun ε2 (n : ℕ) ↦ {Real.exp (↑n * ((R1 ρ ε).toReal + ε2)) • ↑(σ'' ρ ε m σ n) ≤ₚ ((ℰ n) (ρ⊗^S[n]))};
+      let P2 := fun ε2 (n : ℕ) ↦ {Real.exp (↑n * ((R2 ρ σ).toReal + ε₀ + ε2)) • ↑(σ'' ρ ε m σ n) ≤ₚ ((ℰ n) (ρ⊗^S[n]))};
+      let E1 := 1 - P1;
+      let E2 := P1 - P2;
+      let E3 := P2;
+      E1 + E2 + E3 = 1 →
+    (∀ (ε2 : ℝ) (n : ℕ), E1 ε2 n = {↑((ℰ n) (ρ⊗^S[n])) <ₚ Real.exp (↑n * ((R1 ρ ε).toReal + ε2)) • ↑(σ'' ρ ε m σ n)}) →
+    (∀ (ε2 : ℝ) (n : ℕ), E2 ε2 n ≤ {↑((ℰ n) (ρ⊗^S[n])) <ₚ Real.exp (↑n * ((R2 ρ σ).toReal + ε₀ + ε2)) • ↑(σ'' ρ ε m σ n)}) →
+    let c' : ℝ → ℕ → ℝ := fun ε2 n => max (σ₁_c i n + σ₁_c i n / ↑n) ((R2 ρ σ).toReal + ε₀ + ε2);
+    ∀ (ε2 : ℝ) (n : ℕ), 0 < ε2 → 0 < n →
+    (1 / n : ℝ) • (E3 ε2 n).toMat * ((((ℰ n) (ρ⊗^S[n])).M).log - ((σ'' ρ ε m σ n).M).log).toMat ≤ c' ε2 n • (E3 ε2 n).toMat →
+
+    ENNReal.ofReal
+        ((R1 ρ ε).toReal - (R1 ρ ε).toReal * (((ℰ n) (ρ⊗^S[n])).M).inner (P1 ε2 n) +
+                  (ε2 - ε2 * (((ℰ n) (ρ⊗^S[n])).M).inner (P2 ε2 n)) +
+                (((ℰ n) (ρ⊗^S[n])).M).inner (P1 ε2 n) * (R2 ρ σ).toReal +
+              (((ℰ n) (ρ⊗^S[n])).M).inner (P1 ε2 n) * ε₀ +
+            (-((R2 ρ σ).toReal * (((ℰ n) (ρ⊗^S[n])).M).inner (P2 ε2 n)) -
+              ε₀ * (((ℰ n) (ρ⊗^S[n])).M).inner (P2 ε2 n)) +
+          (((ℰ n) (ρ⊗^S[n])).M).inner (P2 ε2 n) * c' ε2 n) =
+      R1 ρ ε + ENNReal.ofReal ε2 +
+          ENNReal.ofReal ((P1 ε2 n).inner ↑((ℰ n) (ρ⊗^S[n]))) *
+            (ENNReal.ofReal ε2 + R2 ρ σ + ENNReal.ofReal ε₀ -
+              (R1 ρ ε + ENNReal.ofReal ε2)) +
+        ENNReal.ofReal ((P2 ε2 n).inner ↑((ℰ n) (ρ⊗^S[n]))) *
+          (ENNReal.ofReal (c' ε2 n) -
+            (ENNReal.ofReal ε2 + R2 ρ σ + ENNReal.ofReal ε₀)) := by
+  intros ℰ ε₀ hε₀ h₁ P1 P2 E1 E2 E3 hE hexp1 hexp2 c' ε2 n hε2 hn hlog
+  repeat rw [HermitianMat.inner_comm (P1 ε2 n)]
+  repeat rw [HermitianMat.inner_comm (P2 ε2 n)]
+  ring_nf
+  rw [← ENNReal.toReal_eq_toReal_iff' (by finiteness) (by finiteness)]
+  repeat rw [ENNReal.toReal_ofReal]; swap
+  · apply add_nonneg
+    · rw [← mul_one_sub, ← mul_one_sub, add_assoc, add_assoc, add_assoc]
+      apply add_nonneg
+      · apply mul_nonneg
+        · positivity
+        · sorry
+      · nth_rw 2 [sub_eq_add_neg]
+        rw [← add_assoc, add_comm, add_assoc]
+        apply add_nonneg
+        · apply mul_nonneg
+          · positivity
+          · sorry
+        · rw [← mul_add, ← neg_add, ← mul_add, add_comm, ← sub_eq_add_neg]
+          rw [← sub_mul]
+          apply mul_nonneg
+          · rw [sub_nonneg]
+            apply HermitianMat.inner_mono
+            · apply MState.zero_le
+            · sorry
+          · positivity
+    · apply mul_nonneg
+      · apply HermitianMat.inner_ge_zero
+        · apply MState.zero_le
+        · apply HermitianMat.proj_le_nonneg
+      · positivity
+  repeat rw [ENNReal.toReal_add (by finiteness) (by finiteness)]
+  rw [ENNReal.toReal_mul, ENNReal.toReal_mul]
+  rw [ENNReal.toReal_sub_of_le ?_ (by finiteness)]; swap
+  · grw [hR1R2, ← hε₀, ENNReal.ofReal_zero, add_zero, add_comm]
+  repeat rw [ENNReal.toReal_ofReal]
+  rotate_left
+  · apply HermitianMat.inner_ge_zero --TODO: Positivity extension for HermitianMat.inner
+    · apply MState.zero_le  --TODO: Positivity extension for MState
+    · apply HermitianMat.proj_le_nonneg --TODO: Positivity extension for projections
+  · apply HermitianMat.inner_ge_zero
+    · apply MState.zero_le
+    · apply HermitianMat.proj_le_nonneg
+  · exact hε2.le
+  rw [ENNReal.toReal_sub_of_le ?_ (by finiteness)]; swap
+  · dsimp [c']
+    rw [ENNReal.ofReal_max]
+    convert le_max_right _ _
+    rw [ENNReal.ofReal_add (by positivity) (by positivity),
+      ENNReal.ofReal_add (by positivity) (by positivity)]
+    rw [ENNReal.ofReal_toReal (by finiteness)]
+    abel
+  repeat rw [ENNReal.toReal_add (by finiteness) (by finiteness)]
+  repeat rw [ENNReal.toReal_ofReal (by positivity)]
+  ring
+
 set_option maxHeartbeats 600000 in
 private theorem EquationS62
     (ρ : MState (H i)) (σ : (n : ℕ) → IsFree (i := i ^ n))
@@ -1237,8 +1327,8 @@ private theorem EquationS62
               · rfl
           · -- prove `Commute (E3 _) (_ 1).log`
             conv_rhs =>
+              rw [HermitianMat.log_smul (by positivity) (by simp [PosDef.one])]
               simp only [
-                HermitianMat.log_smul (1 : HermitianMat _ ℂ) (Real.exp _),
                 Real.log_exp, neg_smul, HermitianMat.log_one,
                 add_zero, NegMemClass.coe_neg,
                 HermitianMat.val_eq_coe, selfAdjoint.val_smul,
@@ -1249,7 +1339,8 @@ private theorem EquationS62
         apply Commute.mul_nonneg _ h1logleq hE3commlog
         apply HermitianMat.proj_le_nonneg
       _ = (c' ε2 n) • (E3 ε2 n).toMat := by
-        simp [HermitianMat.log_smul, smul_smul]
+        rw [HermitianMat.log_smul (by positivity) (by simp [PosDef.one])]
+        simp [smul_smul]
         field_simp
     --Linearly combine S81, S82, S85:
     calc
@@ -1447,12 +1538,7 @@ private theorem EquationS62
         unfold E1 E2 E3
         simp [HermitianMat.inner_left_sub]
         ring_nf
-        repeat rw [ENNReal.ofReal_add] -- 46 goals !!! --RSS
-        · sorry -- l7
-        --It seems like this works(?) on later versions of Lean but not here...?
-        --I'm confused, I'm not getting the 46 goals either. --Alex, v4.24.0
-        -- any_goals try positivity -- 11 goals T_T --RSS
-        all_goals sorry --so for now I'm closing everything with sorry
+        apply EquationS88 <;> assumption
 
   -- (S91)
   have hliminfDleq : Filter.atTop.liminf (fun n ↦ 𝐃(ℰ n (ρ⊗^S[n])‖σ'' ρ ε m σ n) / n) ≤

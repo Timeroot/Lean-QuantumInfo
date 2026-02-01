@@ -103,27 +103,41 @@ theorem Sᵥₙ_of_pure_zero (ψ : Ket d) : Sᵥₙ (MState.pure ψ) = 0 := by
 /-- von Neumann entropy is unchanged under SWAP. TODO: All unitaries-/
 @[simp]
 theorem Sᵥₙ_of_SWAP_eq (ρ : MState (d₁ × d₂)) : Sᵥₙ ρ.SWAP = Sᵥₙ ρ := by
-  sorry
+  apply Hₛ_eq_of_multiset_map_eq
+  exact ρ.multiset_spectrum_relabel_eq (Equiv.prodComm d₁ d₂).symm
 
 /-- von Neumann entropy is unchanged under assoc. -/
 @[simp]
 theorem Sᵥₙ_of_assoc_eq (ρ : MState ((d₁ × d₂) × d₃)) : Sᵥₙ ρ.assoc = Sᵥₙ ρ := by
-  sorry
+  apply Hₛ_eq_of_multiset_map_eq
+  apply ρ.multiset_spectrum_relabel_eq
 
 /-- von Neumann entropy is unchanged under assoc'. -/
+@[simp]
 theorem Sᵥₙ_of_assoc'_eq (ρ : MState (d₁ × (d₂ × d₃))) : Sᵥₙ ρ.assoc' = Sᵥₙ ρ := by
-  sorry
+  rw [← Sᵥₙ_of_assoc_eq, ρ.assoc_assoc']
+
+open Lean Meta Elab Tactic in
+elab "revert_all" : tactic => do
+  let goals ← getGoals
+  let mut newGoals : List MVarId := []
+  for mvarId in goals do
+    newGoals := newGoals.append [(← mvarId.revertAll)]
+  setGoals newGoals
+
+open Lean.Elab.Tactic in
+macro "negate_state" : tactic => `(tactic|
+  (
+    guard_goal_nums 1
+    revert_all
+    refine @(((by admit) : ∀ {p : Prop}, ¬p → p) ?_)
+    try (push_neg; guard_goal_nums 1)
+  )
+)
 
 /-- von Neumman entropies of the left- and right- partial trace of pure states are equal. -/
 theorem Sᵥₙ_of_partial_eq (ψ : Ket (d₁ × d₂)) :
-    Sᵥₙ (MState.pure ψ).traceLeft = Sᵥₙ (MState.pure ψ).traceRight :=
-  sorry
-
-/-- Weak monotonicity of quantum conditional entropy. S(A|B) + S(A|C) ≥ 0 -/
-theorem Sᵥₙ_weak_monotonicity (ρ : MState (dA × dB × dC)) :
-    let ρAB := ρ.assoc'.traceRight
-    let ρAC := ρ.SWAP.assoc.traceLeft.SWAP
-    0 ≤ qConditionalEnt ρAB + qConditionalEnt ρAC :=
+    Sᵥₙ (MState.pure ψ).traceLeft = Sᵥₙ (MState.pure ψ).traceRight := by
   sorry
 
 /-- Quantum conditional entropy is symmetric for pure states. -/
@@ -163,6 +177,13 @@ theorem Sᵥₙ_strong_subadditivity (ρ₁₂₃ : MState (d₁ × d₂ × d₃
     Sᵥₙ ρ₁₂₃ + Sᵥₙ ρ₂ ≤ Sᵥₙ ρ₁₂ + Sᵥₙ ρ₂₃ :=
   sorry
 
+/-- Weak monotonicity of quantum conditional entropy. S(A|B) + S(A|C) ≥ 0 -/
+theorem Sᵥₙ_weak_monotonicity (ρ : MState (dA × dB × dC)) :
+    let ρAB := ρ.assoc'.traceRight
+    let ρAC := ρ.SWAP.assoc.traceLeft.SWAP
+    0 ≤ qConditionalEnt ρAB + qConditionalEnt ρAC :=
+  sorry
+
 /-- Strong subadditivity, stated in terms of conditional entropies.
   Also called the data processing inequality. H(A|BC) ≤ H(A|B). -/
 theorem qConditionalEnt_strong_subadditivity (ρ₁₂₃ : MState (d₁ × d₂ × d₃)) :
@@ -191,12 +212,19 @@ theorem qcmi_nonneg (ρ : MState (dA × dB × dC)) :
 /-- The quantum conditional mutual information `QCMI ρABC` is at most 2 log dA. -/
 theorem qcmi_le_2_log_dim (ρ : MState (dA × dB × dC)) :
     qcmi ρ ≤ 2 * Real.log (Fintype.card dA) := by
-  sorry
+  have := Sᵥₙ_subadditivity ρ.assoc'.traceRight
+  have := abs_le.mp (Sᵥₙ_triangle_subaddivity ρ)
+  grind [qcmi, qConditionalEnt, Sᵥₙ_nonneg, Sᵥₙ_le_log_d]
 
 /-- The quantum conditional mutual information `QCMI ρABC` is at most 2 log dC. -/
 theorem qcmi_le_2_log_dim' (ρ : MState (dA × dB × dC)) :
     qcmi ρ ≤ 2 * Real.log (Fintype.card dC) := by
-  sorry
+  have h_araki_lieb_assoc' : Sᵥₙ ρ.assoc'.traceRight - Sᵥₙ ρ.traceLeft.traceLeft ≤ Sᵥₙ ρ := by
+    apply le_of_abs_le
+    rw [← ρ.traceLeft_assoc', ← Sᵥₙ_of_assoc'_eq ρ]
+    exact Sᵥₙ_triangle_subaddivity ρ.assoc'
+  have := Sᵥₙ_subadditivity ρ.traceLeft
+  grind [qcmi, qConditionalEnt, Sᵥₙ_le_log_d, MState.traceRight_left_assoc']
 
 -- /-- The chain rule for quantum conditional mutual information:
 -- `I(A₁A₂ : C | B) = I(A₁:C|B) + I(A₂:C|BA₁)`.

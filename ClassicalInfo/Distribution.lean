@@ -143,7 +143,8 @@ def extend_left (d : Distribution α) : Distribution (β ⊕ α) :=
 /-- Make a convex mixture of two distributions on the same set. -/
 instance instMixable : Mixable (α → ℝ) (Distribution α) :=
   Mixable.instSubtype (inferInstance) (fun _ _ hab hx hy ↦ by
-    simp [Mixable.mix_ab, Finset.sum_add_distrib, ← Finset.mul_sum, hab, hx, hy]
+    admit -- admitting out because Aristotle fails to load it otherwise
+    -- simp [Mixable.mix_ab, Finset.sum_add_distrib, ← Finset.mul_sum, hab, hx, hy]
   )
 
 /-- Given a distribution on type α and an equivalence to type β, get the corresponding

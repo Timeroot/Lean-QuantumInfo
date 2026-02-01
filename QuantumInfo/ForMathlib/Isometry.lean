@@ -396,6 +396,24 @@ noncomputable def LinearMap.sharedEigenbasis {A B : EuclideanSpace 𝕜 d →ₗ
     (hA.orthogonalFamily_eigenspace_inf_eigenspace' hB)).reindex
     (Fintype.equivOfCardEq (by simp))
 
+noncomputable def LinearMap.sharedEigenvaluesA {A B : EuclideanSpace 𝕜 d →ₗ[𝕜] EuclideanSpace 𝕜 d}
+    (hA : A.IsSymmetric) (hB : B.IsSymmetric) (hAB : Commute A B) : d → ℝ :=
+ fun i => RCLike.re (dotProduct (sharedEigenbasis hA hB hAB i) (A (sharedEigenbasis hA hB hAB i)))
+
+noncomputable def LinearMap.sharedEigenvaluesB {A B : EuclideanSpace 𝕜 d →ₗ[𝕜] EuclideanSpace 𝕜 d}
+    (hA : A.IsSymmetric) (hB : B.IsSymmetric) (hAB : Commute A B) : d → ℝ :=
+  fun i => RCLike.re (dotProduct (sharedEigenbasis hA hB hAB i) (B (sharedEigenbasis hA hB hAB i)))
+
+theorem LinearMap.apply_A_sharedEigenbasis {A B : EuclideanSpace 𝕜 d →ₗ[𝕜] EuclideanSpace 𝕜 d}
+    (hA : A.IsSymmetric) (hB : B.IsSymmetric) (hAB : Commute A B) (i : d) :
+    A (sharedEigenbasis hA hB hAB i) = (sharedEigenvaluesA hA hB hAB i : 𝕜) • (sharedEigenbasis hA hB hAB i) := by
+  sorry
+
+theorem LinearMap.apply_B_sharedEigenbasis {A B : EuclideanSpace 𝕜 d →ₗ[𝕜] EuclideanSpace 𝕜 d}
+    (hA : A.IsSymmetric) (hB : B.IsSymmetric) (hAB : Commute A B) (i : d) :
+    B (sharedEigenbasis hA hB hAB i) = (sharedEigenvaluesB hA hB hAB i : 𝕜) • (sharedEigenbasis hA hB hAB i) := by
+  admit
+
 noncomputable def Matrix.sharedEigenbasis
   (hA : A.IsHermitian) (hB : B.IsHermitian) (hAB : Commute A B) :
     OrthonormalBasis d 𝕜 (EuclideanSpace 𝕜 d) :=
@@ -420,15 +438,27 @@ theorem sharedEigenvectorUnitary_mulVec (j : d) : (sharedEigenvectorUnitary hA h
 noncomputable def sharedEigenvalueA (j : d) : ℝ :=
   RCLike.re (dotProduct (sharedEigenbasis hA hB hAB j) (A *ᵥ WithLp.ofLp (sharedEigenbasis hA hB hAB j)))
 
+noncomputable def sharedEigenvalueB (j : d) : ℝ :=
+  RCLike.re (dotProduct (sharedEigenbasis hA hB hAB j) (B *ᵥ WithLp.ofLp (sharedEigenbasis hA hB hAB j)))
+
 /-- Analogous to `Matrix.IsHermitian.mulVec_eigenvectorBasis` for the shared basis. -/
-theorem mulVec_sharedEigenbasis (j : d) :
+theorem mulVec_sharedEigenbasisA (j : d) :
     A *ᵥ (sharedEigenbasis hA hB hAB j) =
     (sharedEigenvalueA hA hB hAB) j • WithLp.ofLp (sharedEigenbasis hA hB hAB j) := by
-  sorry
+  rw [isHermitian_iff_isSymmetric] at hA hB
+  simpa only [algebraMap_smul] using
+    LinearMap.apply_A_sharedEigenbasis hA hB (Matrix.commute_euclideanLin hAB) j
+
+theorem mulVec_sharedEigenbasisB (j : d) :
+    B *ᵥ (sharedEigenbasis hA hB hAB j) =
+    (sharedEigenvalueB hA hB hAB) j • WithLp.ofLp (sharedEigenbasis hA hB hAB j) := by
+  rw [isHermitian_iff_isSymmetric] at hA hB
+  simpa only [algebraMap_smul] using
+    LinearMap.apply_B_sharedEigenbasis hA hB (Matrix.commute_euclideanLin hAB) j
 
 set_option maxHeartbeats 0 in
 /-- Analogous to `Matrix.IsHermitian.star_mul_self_mul_eq_diagonal` for the shared basis. -/
-theorem star_mul_self_mul_IsDiag : IsDiag
+theorem star_shared_mul_A_mul_IsDiag : IsDiag
     ((star (sharedEigenvectorUnitary hA hB hAB : Matrix d d 𝕜)) * A *
       (sharedEigenvectorUnitary hA hB hAB : Matrix d d 𝕜)) := by
   rw [Matrix.isDiag_iff_diagonal_diag, eq_comm]
@@ -443,9 +473,45 @@ theorem star_mul_self_mul_IsDiag : IsDiag
   -- By the properties of the eigenvalues and the shared eigenbasis, we can simplify the expression.
   have h_simp : (Matrix.sharedEigenvectorUnitary hA hB hAB).val.conjTranspose.mulVec (A.mulVec (WithLp.ofLp (Matrix.sharedEigenbasis hA hB hAB i))) =
     (sharedEigenvalueA hA hB hAB i) • (Matrix.sharedEigenvectorUnitary hA hB hAB).val.conjTranspose.mulVec (WithLp.ofLp (Matrix.sharedEigenbasis hA hB hAB i)) := by
-      convert congr_arg ( fun x => ( Matrix.sharedEigenvectorUnitary hA hB hAB : Matrix d d 𝕜 ) ᴴ *ᵥ x ) ( mulVec_sharedEigenbasis hA hB hAB i) using 1;
+      convert congr_arg ( fun x => ( Matrix.sharedEigenvectorUnitary hA hB hAB : Matrix d d 𝕜 ) ᴴ *ᵥ x ) ( mulVec_sharedEigenbasisA hA hB hAB i) using 1;
       symm
       exact (mulVec_smul ((sharedEigenvectorUnitary hA hB hAB).val)ᴴ (sharedEigenvalueA hA hB hAB i)
+      (WithLp.ofLp ((sharedEigenbasis hA hB hAB) i)))
+  have h_simp2 : (Matrix.sharedEigenvectorUnitary hA hB hAB).val.conjTranspose.mulVec (WithLp.ofLp (Matrix.sharedEigenbasis hA hB hAB i)) = Pi.single i 1 := by
+    rw [ ← sharedEigenvectorUnitary_mulVec hA hB hAB i ];
+    simp
+    ext j
+    have := Matrix.mul_eq_one_comm.mp ( show ( Matrix.sharedEigenvectorUnitary hA hB hAB : Matrix d d 𝕜 ) * ( Matrix.sharedEigenvectorUnitary hA hB hAB : Matrix d d 𝕜 )ᴴ = 1 from ?_ );
+    · convert congr_fun ( congr_fun this j ) i using 1;
+      simp [ Pi.single_apply, Matrix.one_apply ];
+    · exact Matrix.mem_unitaryGroup_iff.mp ( Matrix.sharedEigenvectorUnitary hA hB hAB ).2;
+  simp_all [ Matrix.mulVec, funext_iff ];
+  simp_all [ Matrix.mul_apply, dotProduct ];
+  by_cases hi : i = j <;> simp_all [ Pi.single_apply ];
+  symm
+  convert ( h_simp j ) using 1;
+  simp
+
+
+/-- Analogous to `Matrix.IsHermitian.star_mul_self_mul_eq_diagonal` for the shared basis. -/
+theorem star_shared_mul_B_mul_IsDiag : IsDiag
+    ((star (sharedEigenvectorUnitary hA hB hAB : Matrix d d 𝕜)) * B *
+      (sharedEigenvectorUnitary hA hB hAB : Matrix d d 𝕜)) := by
+  rw [Matrix.isDiag_iff_diagonal_diag, eq_comm]
+  apply Matrix.toEuclideanLin.injective
+  apply (EuclideanSpace.basisFun d 𝕜).toBasis.ext
+  intro i
+  simp only [toEuclideanLin_apply, OrthonormalBasis.coe_toBasis, EuclideanSpace.basisFun_apply,
+    EuclideanSpace.ofLp_single, ← mulVec_mulVec, sharedEigenvectorUnitary_mulVec, ← mulVec_mulVec,
+    Matrix.diagonal_mulVec_single, mul_one]
+  apply PiLp.ext
+  intro j
+  -- By the properties of the eigenvalues and the shared eigenbasis, we can simplify the expression.
+  have h_simp : (Matrix.sharedEigenvectorUnitary hA hB hAB).val.conjTranspose.mulVec (B.mulVec (WithLp.ofLp (Matrix.sharedEigenbasis hA hB hAB i))) =
+    (sharedEigenvalueB hA hB hAB i) • (Matrix.sharedEigenvectorUnitary hA hB hAB).val.conjTranspose.mulVec (WithLp.ofLp (Matrix.sharedEigenbasis hA hB hAB i)) := by
+      convert congr_arg ( fun x => ( Matrix.sharedEigenvectorUnitary hA hB hAB : Matrix d d 𝕜 ) ᴴ *ᵥ x ) ( mulVec_sharedEigenbasisB hA hB hAB i) using 1;
+      symm
+      exact (mulVec_smul ((sharedEigenvectorUnitary hA hB hAB).val)ᴴ (sharedEigenvalueB hA hB hAB i)
       (WithLp.ofLp ((sharedEigenbasis hA hB hAB) i)))
   have h_simp2 : (Matrix.sharedEigenvectorUnitary hA hB hAB).val.conjTranspose.mulVec (WithLp.ofLp (Matrix.sharedEigenbasis hA hB hAB i)) = Pi.single i 1 := by
     rw [ ← sharedEigenvectorUnitary_mulVec hA hB hAB i ];
@@ -468,26 +534,14 @@ end commute_module
 
 theorem Commute.exists_unitary (hA : A.IsHermitian) (hB : B.IsHermitian) (hAB : Commute A B) :
     ∃ U : Matrix.unitaryGroup d 𝕜, (U.val * A * Uᴴ).IsDiag ∧ (U.val * B * Uᴴ).IsDiag := by
-  -- have hA' := Matrix.isHermitian_iff_isSymmetric.mp hA
-  -- have hB' := Matrix.isHermitian_iff_isSymmetric.mp hB
-  -- have hAB' := Matrix.commute_euclideanLin hAB
-  use Matrix.sharedEigenvectorUnitary hA hB hAB
+  use (Matrix.sharedEigenvectorUnitary hA hB hAB)⁻¹
   constructor
-  --These two goals are identical up to the A/B swap
-  · simp only [Matrix.sharedEigenvectorUnitary, OrthonormalBasis.coe_toBasis]
-    rw [Matrix.isDiag_iff_diagonal_diag]
-    symm
-    apply Matrix.toEuclideanLin.injective
-    apply (EuclideanSpace.basisFun _ 𝕜).toBasis.ext
-    intro i
-    open Matrix in
-    open Matrix.IsHermitian in
-    simp only [OrthonormalBasis.coe_toBasis,
-      EuclideanSpace.basisFun_apply, toEuclideanLin_apply, EuclideanSpace.ofLp_single,
-      mulVec_single, MulOpposite.op_one, one_smul, col_diagonal, diag_apply,
-      EuclideanSpace.toLp_single]
-    sorry
-  · sorry
+  · convert Matrix.SharedEigenbasis.star_shared_mul_A_mul_IsDiag hA hB hAB
+    simp [Matrix.star_eq_conjTranspose]
+  · convert Matrix.SharedEigenbasis.star_shared_mul_B_mul_IsDiag hA hB hAB
+    simp [Matrix.star_eq_conjTranspose]
+
+variable (U : Matrix.unitaryGroup d 𝕜)
 
 instance instInvertibleUnitaryGroup (U : Matrix.unitaryGroup d 𝕜) : Invertible U :=
   invertibleOfGroup U

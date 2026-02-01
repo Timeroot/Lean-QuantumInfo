@@ -693,13 +693,14 @@ theorem PosSemidef.rsmul {n : Type*} [Fintype n] {M : Matrix n n ℂ} (hM : M.Po
     rw [smul_mulVec, dotProduct_smul]
     positivity
 
-theorem PosDef.Convex {n : Type*} [Fintype n] : Convex ℝ (Matrix.PosDef (n := n) (R := ℂ)) := by
+theorem PosDef.Convex {n 𝕜 : Type*} [Fintype n] [RCLike 𝕜] : Convex ℝ (Matrix.PosDef (n := n) (R := 𝕜)) := by
   intro A hA B hB a b ha hb hab
-  rcases ha.eq_or_lt with (rfl | ha)
-  · simp_all
-  rcases hb.eq_or_lt with (rfl | hb)
-  · simp_all
-  exact (hA.smul ha).add (hB.smul hb)
+  rcases ha.lt_or_eq with ha | rfl
+  · apply (hA.smul ha).add_posSemidef
+    exact hB.posSemidef.smul hb
+  · apply Matrix.PosDef.posSemidef_add
+    · simp [Matrix.PosSemidef.zero]
+    · exact hB.smul (by linarith)
 
 end posdef
 

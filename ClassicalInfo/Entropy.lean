@@ -19,7 +19,7 @@ and probably these files could be combined in some form. -/
 noncomputable section
 open NNReal
 
-variable {α : Type u} [Fintype α]
+variable {α β : Type*} [Fintype α] [Fintype β]
 
 /-- The one-event entropy function, H₁(p) = -p*ln(p). Uses nits. -/
 def H₁ : Prob → ℝ :=
@@ -118,6 +118,12 @@ theorem Hₛ_uniform [Nonempty α] :
 /-- Shannon entropy of two-event distribution. -/
 theorem Hₛ_coin (p : Prob) : Hₛ (Distribution.coin p) = Real.binEntropy p := by
   simp [Hₛ, H₁, Distribution.coin, Real.binEntropy_eq_negMulLog_add_negMulLog_one_sub]
+
+lemma Hₛ_eq_of_multiset_map_eq (d₁ : Distribution α) (d₂ : Distribution β)
+    (h : Multiset.map d₁.prob Finset.univ.val = Multiset.map d₂.prob Finset.univ.val) :
+    Hₛ d₁ = Hₛ d₂ := by
+  convert congr_arg (fun m ↦ m.map (fun x ↦ -Real.log x.1 * x.1 ) |> Multiset.sum ) h using 1
+  <;> simp [Hₛ, H₁, mul_comm, Real.negMulLog]
 
 --TODO:
 -- * Shannon entropy is concave under mixing distributions.

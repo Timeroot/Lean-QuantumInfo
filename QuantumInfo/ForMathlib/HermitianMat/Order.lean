@@ -93,3 +93,45 @@ theorem ker_antitone [DecidableEq n] (hA : 0 ≤ A) : A ≤ B → B.ker ≤ A.ke
   rw [hB, dotProduct_zero] at h
   apply (Matrix.PosSemidef.dotProduct_mulVec_zero_iff (zero_le_iff.mp hA) x).mp
   exact eq_of_le_of_ge h ((zero_le_iff.mp hA).2 x)
+
+section uncategorized_cleanup
+
+open ComplexOrder
+
+theorem conj_mono {n m 𝕜 : Type*} [Fintype n] [Fintype m] [DecidableEq n] [RCLike 𝕜]
+    {A B : HermitianMat n 𝕜} (M : Matrix m n 𝕜) (h : A ≤ B) : A.conj M ≤ B.conj M := by
+  -- Since $B - A \geq 0$, we have $M(B - A)M^* \geq 0$.
+  have h_conj_pos : (M * (B - A).toMat * Matrix.conjTranspose M).PosSemidef := by
+    exact Matrix.PosSemidef.mul_mul_conjTranspose_same h M;
+  constructor;
+  · unfold HermitianMat.conj; simp +decide [ Matrix.IsHermitian, Matrix.mul_assoc ] ;
+  · intro x; have := h_conj_pos.2; simp_all +decide [ Matrix.mul_assoc, Matrix.dotProduct_mulVec]
+    simpa only [ Matrix.mul_sub, Matrix.sub_mul ] using this x
+
+lemma conj_posDef {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
+    (A : HermitianMat n 𝕜) (hA : A.toMat.PosDef) (M : Matrix n n 𝕜) (hM : IsUnit M) :
+    (A.conj M).toMat.PosDef := by
+  refine' ⟨ _, _ ⟩;
+  · simp +decide [ Matrix.IsHermitian, Matrix.mul_assoc ];
+  · intro x hx_ne_zero
+    have h_pos : 0 < star (M.conjTranspose.mulVec x) ⬝ᵥ A.toMat.mulVec (M.conjTranspose.mulVec x) := by
+      apply hA.2;
+      exact fun h => hx_ne_zero <| by simpa [ hM ] using Matrix.eq_zero_of_mulVec_eq_zero ( show M.conjTranspose.det ≠ 0 from by simpa [ Matrix.det_conjTranspose ] using hM.map ( Matrix.detMonoidHom ) ) h;
+    convert h_pos using 1;
+    simp [ Matrix.mul_assoc, Matrix.dotProduct_mulVec];
+    simp [ Matrix.mulVec_conjTranspose ]
+
+set_option maxHeartbeats 1000000 in
+lemma inv_conj {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜] (A : HermitianMat n 𝕜) (M : Matrix n n 𝕜) (hM : IsUnit M) :
+    (A.conj M)⁻¹ = A⁻¹.conj (M⁻¹).conjTranspose := by
+  -- Since $M$ is invertible, we have $M^{-1} * M = I$ and $(M^{-1})^* M^* = I$.
+  have h_inv : (M⁻¹).conjTranspose * M.conjTranspose = 1 := by
+    simp only [Matrix.isUnit_iff_isUnit_det, isUnit_iff_ne_zero, ne_eq] at hM
+    simp [Matrix.conjTranspose_nonsing_inv, hM]
+  unfold HermitianMat.conj;
+  simp only [AddMonoidHom.coe_mk, ZeroHom.coe_mk, val_eq_coe, Matrix.conjTranspose_conjTranspose]
+  apply Subtype.ext
+  field_simp
+  convert Matrix.mul_inv_rev _ _ using 1;
+  rw [ Matrix.mul_inv_rev, Matrix.inv_eq_left_inv h_inv, mul_assoc ];
+  rfl
