@@ -398,21 +398,59 @@ noncomputable def LinearMap.sharedEigenbasis {A B : EuclideanSpace 𝕜 d →ₗ
 
 noncomputable def LinearMap.sharedEigenvaluesA {A B : EuclideanSpace 𝕜 d →ₗ[𝕜] EuclideanSpace 𝕜 d}
     (hA : A.IsSymmetric) (hB : B.IsSymmetric) (hAB : Commute A B) : d → ℝ :=
- fun i => RCLike.re (dotProduct (sharedEigenbasis hA hB hAB i) (A (sharedEigenbasis hA hB hAB i)))
+  fun i => RCLike.re (inner 𝕜 (LinearMap.sharedEigenbasis hA hB hAB i) (A (LinearMap.sharedEigenbasis hA hB hAB i)))
 
 noncomputable def LinearMap.sharedEigenvaluesB {A B : EuclideanSpace 𝕜 d →ₗ[𝕜] EuclideanSpace 𝕜 d}
     (hA : A.IsSymmetric) (hB : B.IsSymmetric) (hAB : Commute A B) : d → ℝ :=
-  fun i => RCLike.re (dotProduct (sharedEigenbasis hA hB hAB i) (B (sharedEigenbasis hA hB hAB i)))
+  fun i => RCLike.re (inner 𝕜 (LinearMap.sharedEigenbasis hA hB hAB i) (B (LinearMap.sharedEigenbasis hA hB hAB i)))
 
+omit [DecidableEq d] in
+theorem LinearMap.mem_eigenspace_inf_of_sharedEigenbasis {A B : EuclideanSpace 𝕜 d →ₗ[𝕜] EuclideanSpace 𝕜 d}
+    (hA : A.IsSymmetric) (hB : B.IsSymmetric) (hAB : Commute A B) (i : d) :
+    ∃ (μ : Module.End.Eigenvalues A) (ν : Module.End.Eigenvalues B),
+      LinearMap.sharedEigenbasis hA hB hAB i ∈ Module.End.eigenspace A μ ⊓ Module.End.eigenspace B ν := by
+  rw [LinearMap.sharedEigenbasis]
+  rw [OrthonormalBasis.reindex_apply]
+  let hV := hA.directSum_isInternal_of_commute' hB hAB
+  let hV' := hA.orthogonalFamily_eigenspace_inf_eigenspace' hB
+  let hn : Module.finrank 𝕜 (EuclideanSpace 𝕜 d) = Module.finrank 𝕜 (EuclideanSpace 𝕜 d) := rfl
+  let e := Fintype.equivOfCardEq (show Fintype.card (Fin (Module.finrank 𝕜 (EuclideanSpace 𝕜 d))) = Fintype.card d by simp)
+  let j := e.symm i
+  let idx := hV.subordinateOrthonormalBasisIndex hn j hV'
+  exists idx.1, idx.2
+  exact hV.subordinateOrthonormalBasis_subordinate hn j hV'
+
+omit [DecidableEq d] in
 theorem LinearMap.apply_A_sharedEigenbasis {A B : EuclideanSpace 𝕜 d →ₗ[𝕜] EuclideanSpace 𝕜 d}
     (hA : A.IsSymmetric) (hB : B.IsSymmetric) (hAB : Commute A B) (i : d) :
     A (sharedEigenbasis hA hB hAB i) = (sharedEigenvaluesA hA hB hAB i : 𝕜) • (sharedEigenbasis hA hB hAB i) := by
-  sorry
+  obtain ⟨μ, ν, h⟩ := mem_eigenspace_inf_of_sharedEigenbasis hA hB hAB i
+  have h₂ := Module.End.mem_eigenspace_iff.mp h.1
+  rw [h₂]
+  congr; symm
+  simp only [sharedEigenvaluesA, h₂, inner_smul_right, OrthonormalBasis.inner_eq_one,
+    mul_one, ← RCLike.conj_eq_iff_re, ← RCLike.star_def]
+  have h₃ : (sharedEigenbasis hA hB hAB) i ≠ 0 := by
+    have := (sharedEigenbasis hA hB hAB).orthonormal.1 i
+    grind [norm_zero, zero_ne_one]
+  simpa [inner_smul_left, inner_smul_right, h₂, h₃] using
+    hA ((sharedEigenbasis hA hB hAB) i) ((sharedEigenbasis hA hB hAB) i)
 
+omit [DecidableEq d] in
 theorem LinearMap.apply_B_sharedEigenbasis {A B : EuclideanSpace 𝕜 d →ₗ[𝕜] EuclideanSpace 𝕜 d}
     (hA : A.IsSymmetric) (hB : B.IsSymmetric) (hAB : Commute A B) (i : d) :
     B (sharedEigenbasis hA hB hAB i) = (sharedEigenvaluesB hA hB hAB i : 𝕜) • (sharedEigenbasis hA hB hAB i) := by
-  admit
+  obtain ⟨μ, ν, h⟩ := mem_eigenspace_inf_of_sharedEigenbasis hA hB hAB i
+  have h₂ := Module.End.mem_eigenspace_iff.mp h.2
+  rw [h₂]
+  congr; symm
+  simp only [sharedEigenvaluesB, h₂, inner_smul_right, OrthonormalBasis.inner_eq_one,
+    mul_one, ← RCLike.conj_eq_iff_re, ← RCLike.star_def]
+  have h₃ : (sharedEigenbasis hA hB hAB) i ≠ 0 := by
+    have := (sharedEigenbasis hA hB hAB).orthonormal.1 i
+    grind [norm_zero, zero_ne_one]
+  simpa [inner_smul_left, inner_smul_right, h₂, h₃] using
+    hB ((sharedEigenbasis hA hB hAB) i) ((sharedEigenbasis hA hB hAB) i)
 
 noncomputable def Matrix.sharedEigenbasis
   (hA : A.IsHermitian) (hB : B.IsHermitian) (hAB : Commute A B) :
@@ -436,10 +474,16 @@ theorem sharedEigenvectorUnitary_mulVec (j : d) : (sharedEigenvectorUnitary hA h
   rfl
 
 noncomputable def sharedEigenvalueA (j : d) : ℝ :=
-  RCLike.re (dotProduct (sharedEigenbasis hA hB hAB j) (A *ᵥ WithLp.ofLp (sharedEigenbasis hA hB hAB j)))
+  LinearMap.sharedEigenvaluesA
+    (isHermitian_iff_isSymmetric.mp hA)
+    (isHermitian_iff_isSymmetric.mp hB)
+    (commute_euclideanLin hAB) j
 
 noncomputable def sharedEigenvalueB (j : d) : ℝ :=
-  RCLike.re (dotProduct (sharedEigenbasis hA hB hAB j) (B *ᵥ WithLp.ofLp (sharedEigenbasis hA hB hAB j)))
+  LinearMap.sharedEigenvaluesB
+    (isHermitian_iff_isSymmetric.mp hA)
+    (isHermitian_iff_isSymmetric.mp hB)
+    (commute_euclideanLin hAB) j
 
 /-- Analogous to `Matrix.IsHermitian.mulVec_eigenvectorBasis` for the shared basis. -/
 theorem mulVec_sharedEigenbasisA (j : d) :
@@ -549,23 +593,14 @@ instance instInvertibleUnitaryGroup (U : Matrix.unitaryGroup d 𝕜) : Invertibl
 instance (U : Matrix.unitaryGroup d 𝕜) : Invertible U.val :=
   ⟨star U.val, U.2.1, U.2.2⟩
 
---TODO: Make Iff version.
-/-- If two Hermitian matrices commute, there exists a common matrix that they are both a CFC of. -/
-theorem Commute.exists_cfc (hA : A.IsHermitian) (hB : B.IsHermitian) (hAB : Commute A B) :
-    ∃ C : Matrix d d 𝕜, (∃ f : ℝ → ℝ, A = cfc f C) ∧ (∃ g : ℝ → ℝ, B = cfc g C) := by
-  obtain ⟨U, hU₁, hU₂⟩ := hAB.exists_unitary hA hB
-  let e := Fintype.equivFin d
-  let D : Matrix d d 𝕜 := Matrix.diagonal (e ·) --index d into a ℕ, then a 𝕜
-  use Uᴴ * D * U.val
-  suffices h : ∀{M}, M.IsHermitian → (U.val * M * (U)ᴴ).IsDiag →
-      ∃ f : ℝ → ℝ, M = cfc f (Uᴴ * D * U.val) by
-    constructor
-    · exact h hA hU₁
-    · exact h hB hU₂
-  clear * -
-  intro M hM hU
+/-- If a matrix is diagonalized by a unitary matrix, then it can be written as a
+CFC of a (particular, canonical) diagonal matrix. -/
+theorem Matrix.IsDiag.exists_cfc {U : Matrix.unitaryGroup d 𝕜} {M : Matrix d d 𝕜}
+  (hU : (U.val * M * Uᴴ).IsDiag) (hM : M.IsHermitian) (e : d ≃ Fin (Fintype.card d)) :
+       ∃ f : ℝ → ℝ,
+    M = cfc f (Uᴴ * (Matrix.diagonal fun x => ↑↑(e x)) * U.val) := by
   use fun x ↦ if hn : ∃ n : Fin (Fintype.card d), n = x
-    then RCLike.re (Matrix.diag (U.val * M * Uᴴ : Matrix d d 𝕜) (e.symm hn.choose)) else 0
+    then RCLike.re (Matrix.diag (U.val * M * Uᴴ) (e.symm hn.choose)) else 0
   rw [Matrix.cfc_conj_unitary']
   rw [Matrix.isDiag_iff_diagonal_diag] at hU
   rw [← Matrix.mul_inv_eq_iff_eq_mul_of_invertible] at hU
@@ -574,8 +609,9 @@ theorem Commute.exists_cfc (hA : A.IsHermitian) (hB : B.IsHermitian) (hAB : Comm
   congr; rotate_right
   · exact Matrix.inv_eq_right_inv U.2.1
   · exact Matrix.inv_eq_left_inv U.2.1
-  have hD : D = Matrix.diagonal (RCLike.ofReal <| e ·) := by simp [D]
-  rw [hD, Matrix.cfc_diagonal]
+  conv in Nat.cast (e _) =>
+    equals (RCLike.ofReal <| e x) => simp only [map_natCast]
+  rw [Matrix.cfc_diagonal]
   congr
   ext i
   simp only [Matrix.diag_apply, Function.comp_apply, Nat.cast_inj, exists_apply_eq_apply,
@@ -587,3 +623,11 @@ theorem Commute.exists_cfc (hA : A.IsHermitian) (hB : B.IsHermitian) (hAB : Comm
   ( rw [e.eq_symm_apply]
     symm; convert Classical.choose_eq _
     exact Fin.val_inj)
+
+--TODO: Make Iff version.
+/-- If two Hermitian matrices commute, there exists a common matrix that they are both a CFC of. -/
+theorem Commute.exists_cfc (hA : A.IsHermitian) (hB : B.IsHermitian) (hAB : Commute A B) :
+    ∃ C : Matrix d d 𝕜, (∃ f : ℝ → ℝ, A = cfc f C) ∧ (∃ g : ℝ → ℝ, B = cfc g C) := by
+  obtain ⟨U, hU₁, hU₂⟩ := hAB.exists_unitary hA hB
+  let D : Matrix d d 𝕜 := Matrix.diagonal (Fintype.equivFin d ·)
+  exact ⟨Uᴴ * D * U.val, hU₁.exists_cfc hA _, hU₂.exists_cfc hB _⟩
