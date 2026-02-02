@@ -24,7 +24,7 @@ Docmentation of the main definitions can be found at [DOC.md](./DOC.md). A major
 
 # Major Goal: Generalized Quantum Stein's Lemma
 
-At the moment, the major goal of this repository is completing a proof of the [Generalized Quantum Stein's Lemma](https://arxiv.org/abs/2408.02722v1), following the proof in that link. The first milestone will be to formalize all the arguments _in that paper_ (while relying on standard or "obvious" results), and then the second milestone will be filling in all those other results so that the whole theorem is sorry-free. The first milestone is, at the moment (October 2025), quite close.
+At the moment, the major goal of this repository is completing a proof of the [Generalized Quantum Stein's Lemma](https://arxiv.org/abs/2408.02722v1), following the proof in that link. The first milestone will be to formalize all the arguments _in that paper_ (while relying on standard or "obvious" results), and then the second milestone will be filling in all those other results so that the whole theorem is free of sorries. The first milestone is, at the moment (October 2025), quite close.
 
 See our report on the project at [this link](https://arxiv.org/abs/2510.08672).
 

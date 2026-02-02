@@ -388,59 +388,11 @@ theorem ball_subset_Icc (r : ℝ) : Metric.ball A r ⊆ Set.Icc (A - r • 1) (A
   · grw [← lt_smul_of_norm_lt h.le]
     simp
 
-/-
---This section was, essentially, wrong. It's not the frobenius, norm, but the norm
--- Matrix.instL2OpMetricSpace you get by opening Matrix.Norms.L2Operator. This induces the same topology
--- (of course) for finite dimensional operators, so this would suffice to eventually prove continuity,
--- but it's /not/ an isometry for matrices equipped with the Frobenius norm.
--- This could be fixed later (and I'm tagged `proof_wanted` / TODO for searchability here), but for now
--- we'll prove continuity of the CFC through different means.
-section frobenius
---Okay. To get `Continuous.cfc` to play along, we need an `IsometricContinuousFunctionalCalculus`
--- on `Matrix` (because we need a topology, sure). This in turn means we need a choice of norm on
--- matrices. We'll use the Frobenius norm and scope it there.
-open Matrix.Norms.Frobenius
-
-def _root_.Matrix.instIsometric : IsometricContinuousFunctionalCalculus ℝ (Matrix d d 𝕜) IsSelfAdjoint where
-  isometric a ha := by
-    intro f₁ f₂
-    sorry
-
-scoped[Matrix.Norms.Frobenius] attribute [instance] Matrix.instIsometric
-
-end frobenius
--/
-
 theorem spectrum_subset_of_mem_Icc (A B : HermitianMat d 𝕜) :
     ∃ a b, ∀ x, A ≤ x ∧ x ≤ B → spectrum ℝ x.toMat ⊆ Set.Icc a b := by
   use ⨅ i, A.H.eigenvalues i, ⨆ i, B.H.eigenvalues i
   rintro x ⟨hl, hr⟩
   exact A.H.spectrum_subset_of_mem_Icc B.H hl hr
-
---TODO: Generalize this to real matrices (really, RCLike) too. The theorem below
--- gives it for complex matrices only.
--- @[fun_prop]
--- protected theorem cfc_continuous {f : ℝ → ℝ} (hf : Continuous f) :
---     Continuous (cfc · f : HermitianMat d 𝕜 → HermitianMat d 𝕜) := by
---   rcases isEmpty_or_nonempty d
---   · sorry
---   rw [Metric.continuous_iff] at hf ⊢
---   intro x ε hε
---   have _ : Nonempty (spectrum ℝ x.toMat) := by
---     sorry
---   replace hf b := hf b ε hε
---   choose fc hfc₀ hfc using hf
---   let δ : ℝ := ⨆ e : spectrum ℝ x.toMat, fc e
---   refine ⟨δ, ?_, ?_⟩
---   · --This whole block should just be `positivity`. TODO fix.
---     dsimp [δ]
---     --Why doesn't just `classical` make ths happen automatically?
---     replace h_fin := Fintype.ofFinite (spectrum ℝ x.toMat)
---     rw [← Finset.sup'_univ_eq_ciSup, gt_iff_lt, Finset.lt_sup'_iff]
---     simp [hfc₀]
---   intro a ha
---   simp only [dist, AddSubgroupClass.subtype_apply, val_eq_coe, cfc_toMat] at ha ⊢
---   sorry
 
 @[fun_prop]
 protected theorem cfc_continuous {f : ℝ → ℝ} (hf : Continuous f) :

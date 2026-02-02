@@ -1,6 +1,6 @@
 Each of the items below is an item in Mark Wilde's book, "Quantum Information Theory". The following emoji indicate possible status:
- * ✅ - Completed, and proved with no `sorry`s.
- * 📝 - All required definitions are present and the question is stated / the theorem is in a form that could be used, but it is unproved / depends on `sorry`.
+ * ✅ - Completed, and proved with no sorries.
+ * 📝 - All required definitions are present and the question is stated / the theorem is in a form that could be used, but it is unproved / depends on sorries.
  * ❓ - This has not yet been stated or fully defined.
  * 🤷 - This is unlikely / undesirable to be formalized.
  * 😂 - This didn't need to be proved, because it was just the definition (or something similar).

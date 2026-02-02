@@ -11,5 +11,3 @@ require «doc-gen4» from git "https://github.com/leanprover/doc-gen4" @ "main"
 lean_lib QuantumInfo
 
 lean_lib ClassicalInfo
-
-lean_lib StatMech

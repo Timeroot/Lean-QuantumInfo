@@ -118,9 +118,6 @@ def of_kraus (M N : κ → Matrix B A R) : MatrixMap A B R :=
     map_smul' r x := by rw [RingHom.id_apply, Matrix.mul_smul, Matrix.smul_mul]
   }
 
-def exists_kraus (Φ : MatrixMap A B R) : ∃ r : ℕ, ∃ (M N : Fin r → Matrix B A R), Φ = of_kraus M N :=
-  sorry
-
 end kraus
 
 section submatrix
@@ -260,13 +257,6 @@ theorem kron_comp_distrib (L₁ : MatrixMap Dl₁ Dl₂ R) (L₂ : MatrixMap Dl�
 
 end kron_lemmas
 
--- /-- The canonical tensor product on linear maps between matrices, where a map from
---   M[A,B] to M[C,D] is given by M[A×C,B×D]. This tensor product acts independently on
---   Kronecker products and gives Kronecker products as outputs. -/
--- def matrixMap_kron (M₁ : Matrix (A₁ × B₁) (C₁ × D₁) R) (M₂ : Matrix (A₂ × B₂) (C₂ × D₂) R) : Matrix ((A₁ × A₂) × (B₁ × B₂)) ((C₁ × C₂) × (D₁ × D₂)) R :=
---   Matrix.of fun ((a₁, a₂), (b₁, b₂)) ((c₁, c₂), (d₁, d₂)) ↦
---     (M₁ (a₁, b₁) (c₁, d₁)) * (M₂ (a₂, b₂) (c₂, d₂))
-
 /-- The operational definition of the Kronecker product `MatrixMap.kron`, that it maps a Kronecker product of
 inputs to the Kronecker product of outputs. It is the unique bilinear map doing so. -/
 theorem kron_map_of_kron_state [CommRing R] (M₁ : MatrixMap A B R) (M₂ : MatrixMap C D R) (MA : Matrix A A R) (MC : Matrix C C R) : (M₁ ⊗ₖₘ M₂) (MA ⊗ₖ MC) = (M₁ MA) ⊗ₖ (M₂ MC) := by
@@ -279,12 +269,8 @@ theorem kron_map_of_kron_state [CommRing R] (M₁ : MatrixMap A B R) (M₂ : Mat
   simp_rw [mul_comm (M₂ _ _ _), mul_assoc, ← Finset.mul_sum, ← mul_assoc]
   simp_rw [← Finset.sum_mul]
   congr
-  -- simp_rw [← Matrix.stdBasis_eq_stdBasisMatrix ]
-  -- unfold Matrix.stdBasisMatrix
-  -- simp_rw [← LinearMap.sum_apply]
-  -- simp
-  sorry
-  sorry
+  · sorry
+  · sorry
 
 theorem choi_matrix_state_rep {B : Type*} [Fintype B] [Nonempty A] (M : MatrixMap A B ℂ) :
     M.choi_matrix = (↑(Fintype.card (α := A)) : ℂ) • (M ⊗ₖₘ (LinearMap.id : MatrixMap A A ℂ)) (MState.pure (Ket.MES A)).m := by
@@ -338,34 +324,6 @@ variable {R : Type*} [CommSemiring R]
 variable {s : ι → Type*} [∀ i, AddCommMonoid (s i)] [∀ i, Module R (s i)]
 variable {L : ι → Type* }
 
-/-- Like `Basis.tensorProduct`, but for `PiTensorProduct` -/
-noncomputable def _root_.Module.Basis.piTensorProduct [∀i, Fintype (L i)]
-    (b : (i:ι) → Module.Basis (L i) R (s i)) :
-      Module.Basis ((i:ι) → L i) R (PiTensorProduct R s) :=
-  Finsupp.basisSingleOne.map sorry
-
 end basis
-
-variable {R : Type*} [CommSemiring R]
-variable {ι : Type u} [DecidableEq ι] [fι : Fintype ι]
-variable {dI : ι → Type v} [∀i, Fintype (dI i)] [∀i, DecidableEq (dI i)]
-variable {dO : ι → Type w} [∀i, Fintype (dO i)] [∀i, DecidableEq (dO i)]
-
-/-- Finite Pi-type tensor product of MatrixMaps. Defined as `PiTensorProduct.tprod` of the underlying
-Linear maps. Notation `⨂ₜₘ[R] i, f i`, eventually. -/
-noncomputable def piKron (Λi : ∀ i, MatrixMap (dI i) (dO i) R) : MatrixMap (∀i, dI i) (∀i, dO i) R :=
-  let map₁ := PiTensorProduct.map Λi;
-  let map₂ := LinearMap.toMatrix
-    (Module.Basis.piTensorProduct (fun i ↦ Matrix.stdBasis R (dI i) (dI i)))
-    (Module.Basis.piTensorProduct (fun i ↦ Matrix.stdBasis R (dO i) (dO i))) map₁
-  let r₁ : ((i : ι) → dO i × dO i) ≃ ((i : ι) → dO i) × ((i : ι) → dO i) := Equiv.arrowProdEquivProdArrow _ dO dO
-  let r₂ : ((i : ι) → dI i × dI i) ≃ ((i : ι) → dI i) × ((i : ι) → dI i) := Equiv.arrowProdEquivProdArrow _ dI dI
-  let map₃ := Matrix.reindex r₁ r₂ map₂;
-  Matrix.toLin
-    (Matrix.stdBasis R ((i:ι) → dI i) ((i:ι) → dI i))
-    (Matrix.stdBasis R ((i:ι) → dO i) ((i:ι) → dO i)) map₃
-
--- notation3:100 "⨂ₜₘ "(...)", "r:(scoped f => tprod R f) => r
--- syntax (name := bigsum) "∑ " bigOpBinders ("with " term)? ", " term:67 : term
-
 end pi
+end MatrixMap

@@ -65,11 +65,5 @@ theorem conj_unitary_IsSymmetric (U : unitary (E →ₗ[𝕜] E)) (hT : T.IsSymm
 
 variable {n : ℕ} (hn : Module.finrank 𝕜 E = n)
 
-/-- There is an equivalence between the eigenvalues of a finite dimensional symmetric operator,
-and the eigenvalues of that operator conjugated by a unitary. -/
-def conj_unitary_eigenvalue_equiv (U : unitary (E →ₗ[𝕜] E)) (hT : T.IsSymmetric) :
-    { σ : Equiv.Perm (Fin n) // (hT.conj_unitary_IsSymmetric U).eigenvalues hn = hT.eigenvalues hn ∘ σ } := by
-  sorry --use conj_unitary_eigenspace_equiv
-
 end IsSymmetric
 end LinearMap

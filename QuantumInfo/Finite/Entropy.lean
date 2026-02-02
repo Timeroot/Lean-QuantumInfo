@@ -157,13 +157,6 @@ theorem Sᵥₙ_subadditivity (ρ : MState (d₁ × d₂)) :
     Sᵥₙ ρ ≤ Sᵥₙ ρ.traceRight + Sᵥₙ ρ.traceLeft :=
   sorry
 
--- section triangle_tmp
--- open Lean.Elab.Command
--- aux_def wlog : ∀ (d₁ : Type _) {d₂ : Type _} [Fintype d₁] [Fintype d₂]
---       (ρ : MState (d₁ × d₂)), Sᵥₙ (MState.traceRight ρ) - Sᵥₙ (MState.traceLeft ρ) ≤ Sᵥₙ ρ :=
---     sorry
--- end triangle_tmp
-
 /-- Araki-Lieb triangle inequality on von Neumann entropy -/
 theorem Sᵥₙ_triangle_subaddivity (ρ : MState (d₁ × d₂)) :
     abs (Sᵥₙ ρ.traceRight - Sᵥₙ ρ.traceLeft) ≤ Sᵥₙ ρ :=
@@ -226,17 +219,6 @@ theorem qcmi_le_2_log_dim' (ρ : MState (dA × dB × dC)) :
   have := Sᵥₙ_subadditivity ρ.traceLeft
   grind [qcmi, qConditionalEnt, Sᵥₙ_le_log_d, MState.traceRight_left_assoc']
 
--- /-- The chain rule for quantum conditional mutual information:
--- `I(A₁A₂ : C | B) = I(A₁:C|B) + I(A₂:C|BA₁)`.
--- -/
--- theorem qcmi_chain_rule (ρ : MState ((dA₁ × dA₂) × dB × dC)) :
---     let ρA₁BC := ρ.assoc.SWAP.assoc.traceLeft.SWAP;
---     let ρA₂BA₁C : MState (dA₂ × (dA₁ × dB) × dC) :=
---       ((CPTPMap.id ⊗ₖ CPTPMap.assoc').compose (CPTPMap.assoc.compose (CPTPMap.SWAP ⊗ₖ CPTPMap.id))) ρ;
---     qcmi ρ = qcmi ρA₁BC + qcmi ρA₂BA₁C
---      := by
---   sorry
-
 end entropy
 
 section relative_entropy
@@ -275,16 +257,6 @@ theorem sandwichedRelRentropy_additive (α) (ρ₁ σ₁ : MState d₁) (ρ₂ �
     D̃_ α(ρ₁ ⊗ ρ₂‖σ₁ ⊗ σ₂) = D̃_ α(ρ₁‖σ₁) + D̃_ α(ρ₂‖σ₂) := by
   dsimp [SandwichedRelRentropy]
   sorry
-  -- split_ifs
-  -- · sorry
-  -- · sorry
-  -- · sorry
-  /-
-  handle the kernels of tensor products
-  log of ⊗ is (log A ⊗ I) + (I ⊗ log B)
-  rinner distributes over sub and add
-  rinner of ⊗ is mul of rinner
-  -/
 
 @[simp]
 theorem sandwichedRelRentropy_relabel {α : ℝ} (ρ σ : MState d) (e : d₂ ≃ d) :

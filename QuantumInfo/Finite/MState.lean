@@ -1213,13 +1213,6 @@ theorem traceRight_right_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
     ρ.assoc'.traceRight.traceRight = ρ.traceRight := by
   simp [assoc']
 
-@[simp]
-theorem traceNorm_eq_1 (ρ : MState d) : ρ.m.traceNorm = 1 :=
-  have := calc (ρ.m.traceNorm : ℂ)
-    _ = ρ.m.trace := ρ.pos.traceNorm_PSD_eq_trace
-    _ = 1 := ρ.tr'
-  Complex.ofReal_eq_one.mp this
-
 --TODO: This naming is very inconsistent. Should be better about "prod" vs "kron"
 
 theorem relabel_kron {d₁ d₂ d₃ : Type*} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
@@ -1318,12 +1311,6 @@ def piProd (ρi : (i:ι) → MState (dI i)) : MState ((i:ι) → dI i) where
       sorry
   tr := by
     sorry
-    -- rw [HermitianMat.trace_eq_trace_rc]
-    -- convert (Finset.prod_univ_sum (κ := dI) (fun _ ↦ Finset.univ) (fun i_1 x ↦ (ρi i_1).m x x)).symm
-    -- symm
-    -- apply Finset.prod_eq_one
-    -- intro x hx
-    -- exact (ρi x).tr
 
 /-- The n-copy "power" of a mixed state, with the standard basis indexed by pi types. -/
 def npow (ρ : MState d) (n : ℕ) : MState (Fin n → d) :=

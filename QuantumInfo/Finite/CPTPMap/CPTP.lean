@@ -21,7 +21,6 @@ This file also defines several important examples of, classes of, and operations
  * `id`: The identity map
  * `replacement`: The replacement channel that always outputs the same state
  * `prod`: Tensor product of two CPTP maps, with notation M₁ ⊗ M₂
- * `piProd`: Tensor product of finitely many CPTP maps (Pi-type product)
  * `of_unitary`: The CPTP map corresponding to a unitary opeation `U`
  * `IsUnitary`: Predicate whether the map corresponds to any unitary
  * `purify`: Purifying a channel into a unitary on a larger Hilbert space
@@ -319,27 +318,6 @@ def prod (Λ₁ : CPTPMap dI₁ dO₁) (Λ₂ : CPTPMap dI₂ dO₂) : CPTPMap (
 infixl:70 "⊗ₖ" => CPTPMap.prod
 
 end prod
-
-section finprod
-
-variable {ι : Type u} [DecidableEq ι] [fι : Fintype ι]
-variable {dI : ι → Type v} [∀(i :ι), Fintype (dI i)] [∀(i :ι), DecidableEq (dI i)]
-variable {dO : ι → Type w} [∀(i :ι), Fintype (dO i)] [∀(i :ι), DecidableEq (dO i)]
-
-/-- Finitely-indexed tensor products of CPTPMaps.  -/
-def piProd (Λi : (i:ι) → CPTPMap (dI i) (dO i)) : CPTPMap ((i:ι) → dI i) ((i:ι) → dO i) where
-  toLinearMap := MatrixMap.piKron (fun i ↦ (Λi i).map)
-  cp := MatrixMap.IsCompletelyPositive.piKron (fun i ↦ (Λi i).cp)
-  TP := sorry
-
-theorem fin_1_piProd
-  {dI : Fin 1 → Type v} [Fintype (dI 0)] [DecidableEq (dI 0)]
-  {dO : Fin 1 → Type w} [Fintype (dO 0)] [DecidableEq (dO 0)]
-  (Λi : (i : Fin 1) → CPTPMap (dI 0) (dO 0)) :
-    piProd Λi = sorry ∘ₘ ((Λi 1) ∘ₘ sorry) :=
-  sorry --TODO: permutations
-
-end finprod
 
 section unitary
 
