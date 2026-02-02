@@ -49,20 +49,9 @@ The eigenvalues of a Hermitian matrix conjugated by a unitary matrix are the sam
 theorem eigenvalues_conj {n : Type*} [Fintype n] [DecidableEq n]
     (A : HermitianMat n ℂ) (U : Matrix.unitaryGroup n ℂ) :
     (A.conj U.val).H.eigenvalues = A.H.eigenvalues := by
-  -- Since $U$ is unitary, $U * A * Uᴴ$ is similar to $A$.
-  have h_similar : (U.val * A.toMat * U.val.conjTranspose).charpoly = A.toMat.charpoly := by
-    have h_charpoly : (U.val * A.toMat * U.val.conjTranspose).charpoly = (A.toMat).charpoly := by
-      have h_unitary : U.val * U.val.conjTranspose = 1 := by
-        exact U.2.2
-      have h_charpoly : (U.val * A.toMat * U.val.conjTranspose).charpoly = (A.toMat * U.val.conjTranspose * U.val).charpoly := by
-        convert Matrix.charpoly_mul_comm _ _ using 2 ; simp +decide [ Matrix.mul_assoc ];
-        simp +decide [ ← mul_assoc, h_unitary ];
-        rw [ Matrix.mul_eq_one_comm.mp h_unitary ] ; simp +decide [ mul_assoc ];
-        rw [ Matrix.mul_eq_one_comm.mp h_unitary, mul_one ];
-      rw [ h_charpoly, Matrix.mul_assoc ];
-      rw [ Matrix.mul_eq_one_comm.mp h_unitary, mul_one ];
-    exact h_charpoly;
-  exact?
+  rw [Matrix.IsHermitian.eigenvalues_eq_eigenvalues_iff]
+  change (U.val * A.toMat * star U.val).charpoly = _
+  rw [Matrix.charpoly_mul_comm, ← mul_assoc, U.2.1, one_mul]
 
 end HermitianMat
 
