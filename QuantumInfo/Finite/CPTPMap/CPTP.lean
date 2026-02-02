@@ -111,7 +111,30 @@ instance instMixable : Mixable (Matrix (dOut × dIn) (dOut × dIn) ℂ) (CPTPMap
       rw [← ht, ← MatrixMap.IsTracePreserving_iff_trace_choi]
       exact t.TP)),
     by apply choi_of_CPTP_of_choi⟩
-  convex := sorry
+  convex := by
+    have h_convex : ∀ (M₁ M₂ : Matrix (dOut × dIn) (dOut × dIn) ℂ), M₁.PosSemidef → M₂.PosSemidef → ∀ (t : ℝ), 0 ≤ t → t ≤ 1 → (t • M₁ + (1 - t) • M₂).PosSemidef := by
+      intro M₁ M₂ h₁ h₂ t ht₁ ht₂;
+      convert Matrix.PosSemidef.add ( h₁.smul ht₁ ) ( h₂.smul ( sub_nonneg.mpr ht₂ ) ) using 1;
+    intro M hM N hN a b ha hb hab;
+    obtain ⟨Λ₁, hΛ₁⟩ := hM
+    obtain ⟨Λ₂, hΛ₂⟩ := hN;
+    obtain ⟨Λ, hΛ⟩ : ∃ Λ : MatrixMap dIn dOut ℂ, (a • M + b • N).traceLeft = 1 ∧ (a • M + b • N).PosSemidef ∧ Λ = MatrixMap.of_choi_matrix (a • M + b • N) := by
+      refine ⟨_, ?_, ?_, rfl⟩
+      · have h_trace_M : M.traceLeft = 1 := by
+          convert Λ₁.TP using 1;
+          rw [ ← hΛ₁, MatrixMap.IsTracePreserving_iff_trace_choi ]
+        have h_trace_N : N.traceLeft = 1 := by
+          convert Λ₂.map.IsTracePreserving_iff_trace_choi.1 Λ₂.TP;
+          exact hΛ₂.symm;
+        convert congr_arg₂ ( fun x y : Matrix dIn dIn ℂ => a • x + b • y ) h_trace_M h_trace_N using 1;
+        · ext i j
+          simp [ Matrix.traceLeft ]
+          simp only [Finset.sum_add_distrib, Finset.mul_sum _ _ _];
+        · rw [ ← add_smul, hab, one_smul ];
+      · convert h_convex M N ( by simpa [ ← hΛ₁ ] using Λ₁.choi_PSD_of_CPTP ) ( by simpa [ ← hΛ₂ ] using Λ₂.choi_PSD_of_CPTP ) a ha ( by linarith ) using 1 ; rw [ ← hab ]
+        ring_nf
+    use CPTP_of_choi_PSD_Tr hΛ.2.1 hΛ.1;
+    exact MatrixMap.map_choi_inv (a • M + b • N)
 
 /-- The identity channel, which leaves the input unchanged. -/
 def id : CPTPMap dIn dIn where
@@ -340,8 +363,26 @@ def IsUnitary (Λ : CPTPMap dIn dIn) : Prop :=
 theorem IsUnitary_iff_U_conj (Λ : CPTPMap dIn dIn) : IsUnitary Λ ↔ ∃ U, ∀ ρ, Λ ρ = ρ.U_conj U := by
   simp_rw [IsUnitary, ← ofUnitary_eq_conj, CPTPMap.funext_iff]
 
-theorem IsUnitary_equiv (σ : dIn ≃ dIn) : IsUnitary (ofEquiv σ) :=
-  sorry
+theorem IsUnitary_equiv (σ : dIn ≃ dIn) : IsUnitary (ofEquiv σ) := by
+  have h_unitary : ∃ U : Matrix dIn dIn ℂ, U * U.conjTranspose = 1 ∧ U.conjTranspose * U = 1 ∧ ∀ x : dIn, (∀ y : dIn, (U y x = 1) ↔ (y = σ x)) ∧ ∀ y : dIn, (U y x = 0) ↔ (y ≠ σ x) := by
+    simp only [Matrix.conjTranspose, RCLike.star_def];
+    refine' ⟨ fun y x => if y = σ x then 1 else 0, ?_, ?_, by simp⟩
+    · ext y x
+      simp [Matrix.mul_apply, Matrix.transpose_apply];
+      rw [Finset.sum_eq_single ( σ.symm x )] <;> aesop
+    · ext y x
+      simp [Matrix.mul_apply, Matrix.transpose_apply, Matrix.map_apply];
+      simp [Matrix.one_apply, eq_comm]
+  obtain ⟨U, hU_unitary, hU_eq⟩ := h_unitary;
+  use ⟨U, Matrix.mem_unitaryGroup_iff.mpr hU_unitary⟩
+  have h_mul : ∀ ρ : Matrix dIn dIn ℂ, U * ρ * Uᴴ = Matrix.submatrix ρ σ.symm σ.symm := by
+    intro ρ
+    ext i j
+    have hU_i_x : ∀ x : dIn, U i x = if x = σ.symm i then 1 else 0 := by grind
+    have hU_j_x : ∀ x : dIn, U j x = if x = σ.symm j then 1 else 0 := by grind
+    simp [Matrix.mul_apply, Matrix.submatrix, hU_i_x, hU_j_x]
+  ext ρ : 3
+  exact (h_mul ρ).symm
 
 end unitary
 
@@ -443,7 +484,7 @@ theorem choi_IsEmbedding : Topology.IsEmbedding (CPTPMap.choi (dIn := dIn) (dOut
   eq_induced := rfl
   injective _ _ := choi_ext
 
-instance instT5MState : T3Space (CPTPMap dIn dOut) :=
+instance instT3Space : T3Space (CPTPMap dIn dOut) :=
   Topology.IsEmbedding.t3Space choi_IsEmbedding
 
 end

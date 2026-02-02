@@ -42,6 +42,17 @@ theorem inner_conj_unitary : (A.conj U.val).inner (B.conj U.val) = A.inner B := 
   rw [Matrix.trace_mul_cycle, ← mul_assoc, ← mul_assoc _ _ A.toMat]
   simp [← Matrix.star_eq_conjTranspose]
 
+/--
+The eigenvalues of a Hermitian matrix conjugated by a unitary matrix are the same as the eigenvalues of the original matrix.
+-/
+@[simp]
+theorem eigenvalues_conj {n : Type*} [Fintype n] [DecidableEq n]
+    (A : HermitianMat n ℂ) (U : Matrix.unitaryGroup n ℂ) :
+    (A.conj U.val).H.eigenvalues = A.H.eigenvalues := by
+  rw [Matrix.IsHermitian.eigenvalues_eq_eigenvalues_iff]
+  change (U.val * A.toMat * star U.val).charpoly = _
+  rw [Matrix.charpoly_mul_comm, ← mul_assoc, U.2.1, one_mul]
+
 end HermitianMat
 
 namespace MState
@@ -68,10 +79,7 @@ of a matrix are always canonically sorted, this is actually an equality.
 @[simp]
 theorem U_conj_spectrum_eq (ρ : MState d) (U : 𝐔[d]) :
     (ρ.U_conj U).spectrum = ρ.spectrum := by
-  have (M : HermitianMat d ℂ) (U : 𝐔[d]) : (M.conj U).H.eigenvalues = M.H.eigenvalues := by
-    --missing simp lemma
-    sorry
-  simp [MState.spectrum, U_conj, this]
+  simp [MState.spectrum, U_conj]
 
 @[simp]
 theorem inner_U_conj (ρ σ : MState d) (U : 𝐔[d]) : ⟪U ◃ ρ, U ◃ σ⟫ = ⟪ρ, σ⟫ := by
