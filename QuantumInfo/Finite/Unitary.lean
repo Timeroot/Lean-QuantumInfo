@@ -42,6 +42,28 @@ theorem inner_conj_unitary : (A.conj U.val).inner (B.conj U.val) = A.inner B := 
   rw [Matrix.trace_mul_cycle, ← mul_assoc, ← mul_assoc _ _ A.toMat]
   simp [← Matrix.star_eq_conjTranspose]
 
+/--
+The eigenvalues of a Hermitian matrix conjugated by a unitary matrix are the same as the eigenvalues of the original matrix.
+-/
+@[simp]
+theorem eigenvalues_conj {n : Type*} [Fintype n] [DecidableEq n]
+    (A : HermitianMat n ℂ) (U : Matrix.unitaryGroup n ℂ) :
+    (A.conj U.val).H.eigenvalues = A.H.eigenvalues := by
+  -- Since $U$ is unitary, $U * A * Uᴴ$ is similar to $A$.
+  have h_similar : (U.val * A.toMat * U.val.conjTranspose).charpoly = A.toMat.charpoly := by
+    have h_charpoly : (U.val * A.toMat * U.val.conjTranspose).charpoly = (A.toMat).charpoly := by
+      have h_unitary : U.val * U.val.conjTranspose = 1 := by
+        exact U.2.2
+      have h_charpoly : (U.val * A.toMat * U.val.conjTranspose).charpoly = (A.toMat * U.val.conjTranspose * U.val).charpoly := by
+        convert Matrix.charpoly_mul_comm _ _ using 2 ; simp +decide [ Matrix.mul_assoc ];
+        simp +decide [ ← mul_assoc, h_unitary ];
+        rw [ Matrix.mul_eq_one_comm.mp h_unitary ] ; simp +decide [ mul_assoc ];
+        rw [ Matrix.mul_eq_one_comm.mp h_unitary, mul_one ];
+      rw [ h_charpoly, Matrix.mul_assoc ];
+      rw [ Matrix.mul_eq_one_comm.mp h_unitary, mul_one ];
+    exact h_charpoly;
+  exact?
+
 end HermitianMat
 
 namespace MState
@@ -68,10 +90,7 @@ of a matrix are always canonically sorted, this is actually an equality.
 @[simp]
 theorem U_conj_spectrum_eq (ρ : MState d) (U : 𝐔[d]) :
     (ρ.U_conj U).spectrum = ρ.spectrum := by
-  have (M : HermitianMat d ℂ) (U : 𝐔[d]) : (M.conj U).H.eigenvalues = M.H.eigenvalues := by
-    --missing simp lemma
-    sorry
-  simp [MState.spectrum, U_conj, this]
+  simp [MState.spectrum, U_conj]
 
 @[simp]
 theorem inner_U_conj (ρ σ : MState d) (U : 𝐔[d]) : ⟪U ◃ ρ, U ◃ σ⟫ = ⟪ρ, σ⟫ := by

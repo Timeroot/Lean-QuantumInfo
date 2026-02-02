@@ -465,7 +465,7 @@ theorem choi_IsEmbedding : Topology.IsEmbedding (CPTPMap.choi (dIn := dIn) (dOut
   eq_induced := rfl
   injective _ _ := choi_ext
 
-instance instT5MState : T3Space (CPTPMap dIn dOut) :=
+instance instT3Space : T3Space (CPTPMap dIn dOut) :=
   Topology.IsEmbedding.t3Space choi_IsEmbedding
 
 end

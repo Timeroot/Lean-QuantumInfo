@@ -279,12 +279,28 @@ theorem kron_map_of_kron_state [CommRing R] (M₁ : MatrixMap A B R) (M₂ : Mat
   simp_rw [mul_comm (M₂ _ _ _), mul_assoc, ← Finset.mul_sum, ← mul_assoc]
   simp_rw [← Finset.sum_mul]
   congr
-  -- simp_rw [← Matrix.stdBasis_eq_stdBasisMatrix ]
-  -- unfold Matrix.stdBasisMatrix
-  -- simp_rw [← LinearMap.sum_apply]
-  -- simp
-  sorry
-  sorry
+  --TODO: Cleanup, these two branches are nearly identical (separate lemma?)
+  · have h_linear : M₁ MA = ∑ i : A, ∑ i_1 : A, MA i i_1 • M₁ (Matrix.single i i_1 1) := by
+      have h_linear : M₁ MA = M₁ (∑ i : A, ∑ i_1 : A, Matrix.single i i_1 (MA i i_1)) := by
+        congr;
+        exact Matrix.matrix_eq_sum_single MA
+      simp [ h_linear, Matrix.single]
+      congr! 2 with i _ j _
+      convert M₁.map_smul (MA i j) (Matrix.of fun i' j' ↦ if i = i' ∧ j = j' then 1 else 0) using 2
+      ext
+      simp
+    simp [h_linear, mul_comm, Matrix.sum_apply]
+  · have h_expand : M₂ MC = ∑ i : C, ∑ j : C, MC i j • M₂ (Matrix.single i j 1) := by
+      have h_expand : MC = ∑ i : C, ∑ j : C, MC i j • Matrix.single i j 1 := by
+        ext i j
+        simp [Matrix.sum_apply, Matrix.single]
+        rw [ Finset.sum_eq_single i ] <;> aesop
+      conv_lhs => rw [ h_expand ];
+      simp [map_sum]
+      congr! 2 with i _ j _
+      rw [← M₂.map_smul (MC i j) (Matrix.single i j 1)]
+      exact congr_arg _ (by ext; simp [Matrix.single])
+    simp [h_expand, Matrix.sum_apply]
 
 theorem choi_matrix_state_rep {B : Type*} [Fintype B] [Nonempty A] (M : MatrixMap A B ℂ) :
     M.choi_matrix = (↑(Fintype.card (α := A)) : ℂ) • (M ⊗ₖₘ (LinearMap.id : MatrixMap A A ℂ)) (MState.pure (Ket.MES A)).m := by
