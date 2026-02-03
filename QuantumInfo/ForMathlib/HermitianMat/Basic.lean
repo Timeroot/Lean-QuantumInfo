@@ -53,6 +53,10 @@ instance instFun : FunLike (HermitianMat n α) n (n → α) where
   coe M := (M : Matrix n n α)
   coe_injective' _ _ h := HermitianMat.ext h
 
+@[simp]
+theorem toMat_apply {A : HermitianMat n α} {i j : n} : A.toMat i j = A i j := by
+  rfl
+
 instance instStar : Star (HermitianMat n α) :=
   ⟨(·)⟩
 
@@ -154,12 +158,19 @@ theorem conj_conj {m l} [Fintype m] (B : Matrix m n α) (C : Matrix l m α) :
 variable (B : HermitianMat n α)
 
 @[simp]
-theorem conj_zero [DecidableEq n] : A.conj (0 : Matrix n n α) = 0 := by
+theorem conj_zero [DecidableEq n] : A.conj (0 : Matrix m n α) = 0 := by
   simp [conj_apply]
 
 @[simp]
-theorem conj_one [DecidableEq n] : A.conj (1 : Matrix n n α) = A := by
+theorem conj_one [DecidableEq n] : A.conj 1 = A := by
   simp [conj_apply]
+
+@[simp]
+lemma conj_one_unitary [DecidableEq n] (U : Matrix.unitaryGroup n α) :
+    conj U.val 1 = 1 := by
+  ext1
+  have h : U * U.val.conjTranspose = 1 := U.prop.2
+  simp [h]
 
 variable (R : Type*) [Star R] [TrivialStar R] [CommSemiring R] [Algebra R α] [StarModule R α]
 
@@ -184,7 +195,7 @@ variable {𝕜} [RCLike 𝕜] [Fintype n] [DecidableEq n] (A : HermitianMat n �
 
 instance [i : Nonempty n] : FaithfulSMul ℝ (HermitianMat n 𝕜) where
   eq_of_smul_eq_smul h := by
-    simpa [RCLike.smul_re] using congr(RCLike.re ($(h 1).val i.some i.some))
+    simpa [RCLike.smul_re, -toMat_apply] using congr(RCLike.re ($(h 1).val i.some i.some))
 
 /-- The continuous linear map associated with a Hermitian matrix. -/
 def lin : EuclideanSpace 𝕜 n →L[𝕜] EuclideanSpace 𝕜 n where
@@ -265,14 +276,27 @@ end eigenspace
 
 section diagonal
 
---TODO: Generalize this more types than ℝ/ℂ
-def diagonal [DecidableEq n] (f : n → ℝ) : HermitianMat n ℂ :=
+variable {𝕜 : Type*} [RCLike 𝕜] [DecidableEq n]
+
+variable (𝕜) in
+def diagonal (f : n → ℝ) : HermitianMat n 𝕜 :=
   ⟨Matrix.diagonal (f ·),
     by simp [selfAdjoint.mem_iff, Matrix.star_eq_conjTranspose, Matrix.diagonal_conjTranspose]⟩
 
-theorem diagonal_conj_diagonal [Fintype n] [DecidableEq n] (f g : n → ℝ) :
-    (diagonal f).conj (diagonal g) =
-    diagonal (fun i ↦ f i * (g i)^2) := by
+variable (f g : n → ℝ)
+
+@[simp]
+theorem diagonal_toMat : (diagonal 𝕜 f).toMat = Matrix.diagonal (f · : n → 𝕜) := by
+  rfl
+
+lemma diagonal_add : diagonal 𝕜 (f + g) = diagonal 𝕜 f + diagonal 𝕜 g := by
+  ext1; simp
+
+lemma diagonal_one [Fintype n] : (diagonal 𝕜 1) = (1 : HermitianMat n 𝕜) := by
+  ext1; simp
+
+theorem diagonal_conj_diagonal [Fintype n] :
+    (diagonal 𝕜 f).conj (diagonal 𝕜 g) = diagonal 𝕜 (fun i ↦ f i * (g i)^2) := by
   simp [diagonal, conj]
   intro
   ring
@@ -313,6 +337,26 @@ theorem add_kronecker : (A + B) ⊗ₖ C = A ⊗ₖ C + B ⊗ₖ C := by
 variable (A : HermitianMat m α) (B C : HermitianMat n α) in
 theorem kronecker_add : A ⊗ₖ (B + C) = A ⊗ₖ B + A ⊗ₖ C := by
   ext1; simp [Matrix.kronecker_add]
+
+variable {𝕜 : Type*} [RCLike 𝕜] in
+lemma kronecker_diagonal [DecidableEq m] [DecidableEq n] (d₁ : m → ℝ) (d₂ : n → ℝ) :
+    (diagonal 𝕜 d₁ ⊗ₖ diagonal 𝕜 d₂) = diagonal 𝕜 (fun (i : m × n) => d₁ i.1 * d₂ i.2) := by
+  ext1
+  simp [Matrix.diagonal_kronecker_diagonal]
+
+/--
+A ⊗ₖ 1 always commutes with 1 ⊗ₖ B
+-/
+theorem kron_id_commute_id_kron {m n : Type*} [Fintype m] [Fintype n] [DecidableEq m] [DecidableEq n]
+    (A : HermitianMat m α) (B : HermitianMat n α) :
+    Commute (A ⊗ₖ (1 : HermitianMat n α)).toMat ((1 : HermitianMat m α) ⊗ₖ B).toMat := by
+  ext ⟨i, j⟩ ⟨k, l⟩
+  simp only [kronecker_coe, selfAdjoint.val_one, Matrix.mul_apply, Matrix.kroneckerMap_apply,
+    toMat_apply]
+  ring_nf
+  simp only [Matrix.one_apply, mul_comm, ite_mul, one_mul, zero_mul, mul_ite, mul_one, mul_zero,
+    ite_self];
+  rw [Finset.sum_eq_single (k, j), Finset.sum_eq_single (i, l)] <;> grind
 
 end kronecker
 
