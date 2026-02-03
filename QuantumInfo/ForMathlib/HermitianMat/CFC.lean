@@ -181,6 +181,27 @@ theorem cfc_reindex (e : d ≃ d₂) : cfc (A.reindex e) f = (cfc A f).reindex e
   simp only [cfc_toMat, reindex_coe]
   exact Matrix.cfc_reindex f e
 
+
+/--
+Spectral decomposition of `cfc A f` as a sum of scaled projections (matrix version).
+-/
+theorem cfc_toMat_eq_sum_smul_proj : (cfc A f).toMat =
+    ∑ i, f (A.H.eigenvalues i) • (A.H.eigenvectorUnitary.val * (Matrix.single i i 1) * A.H.eigenvectorUnitary.val.conjTranspose) := by
+  rw [A.cfc_toMat]
+  rw [ A.H.cfc_eq ];
+  rw [ Matrix.IsHermitian.cfc ];
+  have h : ( Matrix.diagonal ( RCLike.ofReal ∘ f ∘ Matrix.IsHermitian.eigenvalues A.H ) : Matrix d d 𝕜 ) = ∑ i, f ( A.H.eigenvalues i ) • Matrix.single i i 1 := by
+    ext i j ; by_cases hij : i = j <;> simp [ hij ];
+    · simp [ Matrix.sum_apply, Matrix.single ];
+      simp [ Algebra.smul_def ];
+    · rw [ Finset.sum_apply, Finset.sum_apply ] ; aesop
+  rw [h]
+  simp [ Matrix.mul_sum, Matrix.sum_mul ];
+  simp [ Matrix.single, Matrix.mul_assoc ];
+  congr! 1
+  ext j k
+  simp [Matrix.mul_apply,Finset.mul_sum, Finset.smul_sum, smul_ite, smul_zero]
+
 --Ensure we get this instance:
 /-- info: locallyCompact_of_proper -/
 #guard_msgs in
@@ -319,9 +340,14 @@ nonrec theorem cfc_congr_of_posDef (hA : A.toMat.PosDef) (hfg : Set.EqOn f g (Se
 
 @[simp]
 theorem cfc_diagonal (g : d → ℝ) :
-    cfc (HermitianMat.diagonal g) f = HermitianMat.diagonal (f ∘ g) := by
+    cfc (HermitianMat.diagonal 𝕜 g) f = HermitianMat.diagonal 𝕜 (f ∘ g) := by
   ext1
   exact Matrix.cfc_diagonal g f
+
+theorem cfc_conj_unitary (f : ℝ → ℝ) (U : Matrix.unitaryGroup d 𝕜) :
+  cfc (A.conj U.val) f = (cfc A f).conj U := by
+  ext1
+  exact Matrix.cfc_conj_unitary f U
 
 theorem zero_le_cfc : 0 ≤ A.cfc f ↔ ∀ i, 0 ≤ f (A.H.eigenvalues i) := by
   open MatrixOrder in
@@ -463,6 +489,40 @@ protected theorem cfc_continuous {f : ℝ → ℝ} (hf : Continuous f) :
     use ⟨x, 1⟩
     simp
 
+/--
+The inverse of the CFC is the CFC of the inverse function.
+-/
+lemma inv_cfc_eq_cfc_inv (f : ℝ → ℝ) (hf : ∀ i, f (A.H.eigenvalues i) ≠ 0) :
+    (cfc A f)⁻¹ = cfc A (fun u => (f u)⁻¹) := by
+  -- By definition of $cfc$, we can write
+  have h_def : (A.cfc f).toMat = ∑ i, f (A.H.eigenvalues i) • (A.H.eigenvectorUnitary.val * (Matrix.single i i 1) * A.H.eigenvectorUnitary.val.conjTranspose) := by
+    exact cfc_toMat_eq_sum_smul_proj A f;
+  -- Substitute the definition of $cfc$ into the goal.
+  have h_subst : (A.cfc f).toMat⁻¹ = (A.cfc (fun u => 1 / f u)).toMat := by
+    have h_subst : (A.cfc (fun u => 1 / f u)).toMat = ∑ i, (1 / f (A.H.eigenvalues i)) • (A.H.eigenvectorUnitary.val * (Matrix.single i i 1) * A.H.eigenvectorUnitary.val.conjTranspose) := by
+      exact cfc_toMat_eq_sum_smul_proj A fun u => 1 / f u;
+    have h_inv : (A.cfc f).toMat * (A.cfc (fun u => 1 / f u)).toMat = 1 := by
+      -- Since the eigenvectorUnitary is unitary, we have that the product of the projections is the identity matrix.
+      have h_unitary : A.H.eigenvectorUnitary.val * A.H.eigenvectorUnitary.val.conjTranspose = 1 := by
+        simp [ Matrix.IsHermitian.eigenvectorUnitary ];
+      have h_inv : ∀ i j, (A.H.eigenvectorUnitary.val * (Matrix.single i i 1) * A.H.eigenvectorUnitary.val.conjTranspose) * (A.H.eigenvectorUnitary.val * (Matrix.single j j 1) * A.H.eigenvectorUnitary.val.conjTranspose) = if i = j then A.H.eigenvectorUnitary.val * (Matrix.single i i 1) * A.H.eigenvectorUnitary.val.conjTranspose else 0 := by
+        simp [ ← Matrix.mul_assoc ];
+        intro i j; split_ifs <;> simp_all [ Matrix.mul_assoc, Matrix.mul_eq_one_comm.mp h_unitary ] ;
+      simp_all [ Finset.sum_mul _ _ _, Finset.mul_sum ];
+      have h_sum : ∑ i, (A.H.eigenvectorUnitary.val * (Matrix.single i i 1) * A.H.eigenvectorUnitary.val.conjTranspose) = A.H.eigenvectorUnitary.val * (∑ i, Matrix.single i i 1) * A.H.eigenvectorUnitary.val.conjTranspose := by
+        simp [ Finset.mul_sum _ _ _, Finset.sum_mul, Matrix.mul_assoc ];
+      simp_all [ Matrix.single ];
+      convert h_unitary using 2;
+      ext i j; simp [ Matrix.mul_apply]
+      simp [ Matrix.sum_apply, Finset.filter_eq', Finset.filter_and ];
+      rw [ Finset.sum_eq_single j ] <;> aesop;
+    rw [ Matrix.inv_eq_right_inv h_inv ];
+  ext i j; simpa using congr_fun ( congr_fun h_subst i ) j;
+
+theorem cfc_inv (hf : ∀ i, A.H.eigenvalues i ≠ 0) :
+    cfc A (fun u => u⁻¹) = A⁻¹ := by
+  simpa using (inv_cfc_eq_cfc_inv A id hf).symm
+
 /-- Matrix power of a positive semidefinite matrix, as given by the elementwise
   real power of the diagonal in a diagonalized form.
 
@@ -480,7 +540,7 @@ theorem pow_eq_cfc (p : ℝ) : A ^ p = cfc A (· ^ p) :=
   rfl
 
 theorem diagonal_pow (f : d → ℝ) (p : ℝ) :
-    (diagonal f) ^ p = diagonal fun i => (f i) ^ p := by
+    (diagonal 𝕜 f) ^ p = diagonal 𝕜 (fun i => (f i) ^ p) := by
   simp [pow_eq_cfc]
   rfl
 
@@ -535,4 +595,104 @@ def log : HermitianMat d 𝕜 :=
 theorem reindex_log (e : d ≃ d₂) : (A.reindex e).log = A.log.reindex e :=
   cfc_reindex A Real.log e
 
+section integral
+
+open MeasureTheory
+open scoped Matrix.Norms.Frobenius
+
+/--
+The integral of a Hermitian matrix function commutes with `toMat`.
+-/
+lemma integral_toMat {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
+    (A : ℝ → HermitianMat n 𝕜) (T : ℝ)
+    (hA : IntervalIntegrable A volume 0 T) :
+    (∫ t in (0)..T, A t).toMat = ∫ t in (0)..T, (A t).toMat := by
+  have h_cont : Continuous (fun x : HermitianMat n 𝕜 => x.toMat) := by
+      exact continuous_subtype_val
+  have h_integral_linear : ∀ (f : HermitianMat n 𝕜 →L[ℝ] Matrix n n 𝕜), ∫ a in (0)..T, f (A a) = f (∫ t in (0)..T, A t) := by
+    exact fun f => ContinuousLinearMap.intervalIntegral_comp_comm f hA
+  symm
+  exact h_integral_linear ( ContinuousLinearMap.mk ( show HermitianMat n 𝕜 →ₗ[ℝ] Matrix n n 𝕜 from { toFun := fun x => x.toMat, map_add' := fun x y => by aesop, map_smul' := fun c x => by aesop } ) h_cont )
+
+/--
+A sum of scaled constant matrices is integrable if the scalar functions are integrable.
+-/
+lemma intervalIntegrable_sum_smul_const {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
+    (T : ℝ) (g : ℝ → n → ℝ) (P : n → Matrix n n 𝕜)
+    (hg : ∀ i, IntervalIntegrable (fun t => g t i) volume 0 T) :
+    IntervalIntegrable (fun t => ∑ i, g t i • P i) volume 0 T := by
+  simp_all [ intervalIntegrable_iff ];
+  exact MeasureTheory.integrable_finset_sum _ fun i _ => MeasureTheory.Integrable.smul_const ( hg i ) _
+
+/--
+A function to Hermitian matrices is integrable iff its matrix values are integrable.
+-/
+lemma intervalIntegrable_toMat_iff {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
+    (A : ℝ → HermitianMat n 𝕜) (T : ℝ) :
+    IntervalIntegrable (fun t => (A t).toMat) volume 0 T ↔ IntervalIntegrable A volume 0 T := by
+  simp [ intervalIntegrable_iff ];
+  constructor <;> intro h;
+  · -- Since `toMat` is a linear isometry, the integrability of `A.toMat` implies the integrability of `A`.
+    have h_toMat_integrable : IntegrableOn (fun t => (A t).toMat) (Set.uIoc 0 T) volume → IntegrableOn A (Set.uIoc 0 T) volume := by
+      intro h_toMat_integrable
+      have h_toMat_linear : ∃ (L : HermitianMat n 𝕜 →ₗ[ℝ] Matrix n n 𝕜), ∀ x, L x = x.toMat := by
+        refine' ⟨ _, _ ⟩;
+        refine' { .. };
+        exacts [ fun x => x.toMat, fun x y => rfl, fun m x => rfl, fun x => rfl ];
+      obtain ⟨L, hL⟩ := h_toMat_linear;
+      have h_toMat_linear : IntegrableOn (fun t => L (A t)) (Set.uIoc 0 T) volume → IntegrableOn A (Set.uIoc 0 T) volume := by
+        intro h_toMat_integrable
+        have h_toMat_linear : ∃ (L_inv : Matrix n n 𝕜 →ₗ[ℝ] HermitianMat n 𝕜), ∀ x, L_inv (L x) = x := by
+          have h_toMat_linear : Function.Injective L := by
+            intro x y hxy; aesop;
+          have h_toMat_linear : ∃ (L_inv : Matrix n n 𝕜 →ₗ[ℝ] HermitianMat n 𝕜), L_inv.comp L = LinearMap.id := by
+            exact IsSemisimpleModule.extension_property L h_toMat_linear LinearMap.id;
+          exact ⟨ h_toMat_linear.choose, fun x => by simpa using LinearMap.congr_fun h_toMat_linear.choose_spec x ⟩;
+        obtain ⟨ L_inv, hL_inv ⟩ := h_toMat_linear;
+        have h_toMat_linear : IntegrableOn (fun t => L_inv (L (A t))) (Set.uIoc 0 T) volume := by
+          exact ContinuousLinearMap.integrable_comp ( L_inv.toContinuousLinearMap ) h_toMat_integrable;
+        aesop;
+      aesop;
+    exact h_toMat_integrable h;
+  · refine' h.norm.mono' _ _;
+    · have := h.aestronglyMeasurable;
+      -- Since the identity function is continuous, and A is AE-strongly measurable, the composition A.toMat is AE-strongly measurable.
+      have h_cont : Continuous (fun x : HermitianMat n 𝕜 => x.toMat) := by
+        fun_prop
+      exact h_cont.comp_aestronglyMeasurable this;
+    · filter_upwards with t using le_rfl
+
+/--
+The CFC of an integrable function family is integrable.
+-/
+lemma integrable_cfc {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
+    (x : HermitianMat n 𝕜) (T : ℝ) (f : ℝ → ℝ → ℝ)
+    (hf : ∀ i, IntervalIntegrable (fun t => f t (x.H.eigenvalues i)) volume 0 T) :
+    IntervalIntegrable (fun t => cfc x (f t)) volume 0 T := by
+      -- Use `cfc_toMat_eq_sum_smul_proj` to expand `(cfc x (f t)).toMat` as `∑ i, f t (λ_i) • P_i`.
+      have h_expand : ∀ t, (cfc x (f t)).toMat = ∑ i, f t (x.H.eigenvalues i) • (x.H.eigenvectorUnitary.val * (Matrix.single i i 1) * x.H.eigenvectorUnitary.val.conjTranspose) := by
+        exact fun t => cfc_toMat_eq_sum_smul_proj x (f t);
+      rw [ ← intervalIntegrable_toMat_iff ];
+      rw [ funext h_expand ];
+      apply intervalIntegrable_sum_smul_const
+      exact hf
+
+/--
+The integral of the CFC is the CFC of the integral.
+-/
+lemma integral_cfc_eq_cfc_integral {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
+    (x : HermitianMat n 𝕜) (T : ℝ) (f : ℝ → ℝ → ℝ)
+    (hf : ∀ i, IntervalIntegrable (fun t => f t (x.H.eigenvalues i)) volume 0 T) :
+    ∫ t in (0)..T, cfc x (f t) = cfc x (fun u => ∫ t in (0)..T, f t u) := by
+  -- Apply `HermitianMat.ext` to check equality of matrices.
+  apply HermitianMat.ext;
+  rw [ integral_toMat ];
+  · rw [ intervalIntegral.integral_congr fun t ht => HermitianMat.cfc_toMat_eq_sum_smul_proj x ( f t ), intervalIntegral.integral_finset_sum ];
+    · rw [ Finset.sum_congr rfl fun i _ => intervalIntegral.integral_smul_const _ _ ];
+      exact Eq.symm (cfc_toMat_eq_sum_smul_proj x fun u => ∫ (t : ℝ) in 0..T, f t u);
+    · simp_all [ intervalIntegrable_iff ];
+      exact fun i => ( hf i ).smul_const _;
+  · exact integrable_cfc x T f hf
+
+end integral
 end CFC

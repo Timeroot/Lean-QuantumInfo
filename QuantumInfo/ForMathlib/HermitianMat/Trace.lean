@@ -125,7 +125,7 @@ theorem trace_eq_trace_rc (A : HermitianMat n 𝕜) : ↑A.trace = A.toMat.trace
   exact Matrix.IsHermitian.coe_re_diag A.H
 
 theorem trace_diagonal {T : Type*} [Fintype T] [DecidableEq T] (f : T → ℝ) :
-    (diagonal f).trace = ∑ i, f i := by
+    (diagonal 𝕜 f).trace = ∑ i, f i := by
   rw [trace_eq_re_trace]
   simp [HermitianMat.diagonal, Matrix.trace]
 

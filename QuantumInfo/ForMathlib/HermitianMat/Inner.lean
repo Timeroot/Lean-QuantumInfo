@@ -355,8 +355,8 @@ noncomputable def InnerProductCore : InnerProductSpace.Core ℝ (HermitianMat d 
         simp only [inner_eq_re_trace, Matrix.trace, Matrix.diag_apply, Matrix.mul_apply, map_sum,
           RCLike.mul_re, sub_eq_add_neg]
         congr! 2 with i _ j
-        simp [← congrFun₂ x.H i j, pow_two]
-        rfl
+        simp only [Matrix.conjTranspose_apply, ← congrFun₂ x.H i j]
+        simp [pow_two]
       ext i j
       rw [Fintype.sum_eq_zero_iff_of_nonneg (fun i ↦ by positivity)] at h
       replace h := congrFun h j
@@ -378,12 +378,6 @@ theorem norm_eq_frobenius (A : HermitianMat d 𝕜) :
     ‖A‖ = (∑ i : d, ∑ j : d, ‖A i j‖ ^ 2) ^ (1 / 2 : ℝ) := by
   convert ← Matrix.frobenius_norm_def A.toMat
   exact Real.rpow_ofNat _ 2
-
---PULLOUT
-omit [Fintype d] in
-@[simp]
-theorem toMat_apply {A : HermitianMat d 𝕜} {i j : d} : A.toMat i j = A i j := by
-  rfl
 
 theorem norm_eq_sqrt_inner_self (A : HermitianMat d 𝕜) : ‖A‖ = √(A.inner A) := by
   rw [norm_eq_frobenius, ← Real.sqrt_eq_rpow]

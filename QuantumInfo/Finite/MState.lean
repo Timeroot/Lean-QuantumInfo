@@ -467,19 +467,19 @@ end prod
 
 /-- A representation of a classical distribution as a quantum state, diagonal in the given basis. -/
 def ofClassical (dist : Distribution d) : MState d where
-  M := HermitianMat.diagonal (fun x ↦ dist x)
+  M := HermitianMat.diagonal ℂ (fun x ↦ dist x)
   zero_le := HermitianMat.zero_le_iff.mpr (by simp [HermitianMat.diagonal, Matrix.posSemidef_diagonal_iff])
   tr := by simp [HermitianMat.trace_diagonal]
 
 @[simp]
 theorem coe_ofClassical (dist : Distribution d) :
-    (MState.ofClassical dist).M = HermitianMat.diagonal (dist ·) := by
+    (MState.ofClassical dist).M = HermitianMat.diagonal ℂ (dist ·) := by
   rfl
 
 theorem ofClassical_pow (dist : Distribution d) (p : ℝ) :
-    (MState.ofClassical dist).M ^ p = HermitianMat.diagonal (fun i ↦ (dist i) ^ p) := by
+    (MState.ofClassical dist).M ^ p = HermitianMat.diagonal ℂ (fun i ↦ (dist i) ^ p) := by
   rw [coe_ofClassical]
-  convert HermitianMat.diagonal_pow (dist ·) p
+  exact HermitianMat.diagonal_pow (dist ·) p
 
 /-- The maximally mixed state. -/
 def uniform [Nonempty d] : MState d := ofClassical Distribution.uniform

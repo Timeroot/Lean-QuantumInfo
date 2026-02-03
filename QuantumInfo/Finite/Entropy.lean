@@ -117,24 +117,6 @@ theorem Sᵥₙ_of_assoc_eq (ρ : MState ((d₁ × d₂) × d₃)) : Sᵥₙ ρ.
 theorem Sᵥₙ_of_assoc'_eq (ρ : MState (d₁ × (d₂ × d₃))) : Sᵥₙ ρ.assoc' = Sᵥₙ ρ := by
   rw [← Sᵥₙ_of_assoc_eq, ρ.assoc_assoc']
 
-open Lean Meta Elab Tactic in
-elab "revert_all" : tactic => do
-  let goals ← getGoals
-  let mut newGoals : List MVarId := []
-  for mvarId in goals do
-    newGoals := newGoals.append [(← mvarId.revertAll)]
-  setGoals newGoals
-
-open Lean.Elab.Tactic in
-macro "negate_state" : tactic => `(tactic|
-  (
-    guard_goal_nums 1
-    revert_all
-    refine @(((by admit) : ∀ {p : Prop}, ¬p → p) ?_)
-    try (push_neg; guard_goal_nums 1)
-  )
-)
-
 /-- von Neumman entropies of the left- and right- partial trace of pure states are equal. -/
 theorem Sᵥₙ_of_partial_eq (ψ : Ket (d₁ × d₂)) :
     Sᵥₙ (MState.pure ψ).traceLeft = Sᵥₙ (MState.pure ψ).traceRight := by
@@ -255,7 +237,7 @@ special cases of relative entropies.
   switch to the standard Relative Entropy, for continuity. -/
 def SandwichedRelRentropy [Fintype d] (α : ℝ) (ρ σ : MState d) : ENNReal :=
   open ComplexOrder Classical in
-  if σ.M.ker ≤ ρ.M.ker
+  if h : σ.M.ker ≤ ρ.M.ker
   then (.ofNNReal ⟨
     if α = 1 then
       ρ.M.inner (HermitianMat.log ρ - HermitianMat.log σ)
@@ -300,7 +282,7 @@ theorem sandwichedRelRentropy_self {d : Type*} [Fintype d] [DecidableEq d] {α :
   --TODO: Maybe SandwichedRelRentropy should actually be defined differently for α = 0?
     D̃_ α(ρ‖ρ) = 0 := by
   simp? [SandwichedRelRentropy, NNReal.eq_iff] says
-    simp only [SandwichedRelRentropy, le_refl, ↓reduceIte, sub_self, HermitianMat.inner_zero,
+    simp only [SandwichedRelRentropy, le_refl, ↓reduceDIte, sub_self, HermitianMat.inner_zero,
     ENNReal.coe_eq_zero, NNReal.eq_iff, NNReal.coe_mk, NNReal.coe_zero, ite_eq_left_iff,
     div_eq_zero_iff, Real.log_eq_zero]
   intro hα
@@ -389,12 +371,25 @@ theorem qRelativeEnt_additive (ρ₁ σ₁ : MState d₁) (ρ₂ σ₂ : MState 
     𝐃(ρ₁ ⊗ ρ₂‖σ₁ ⊗ σ₂) = 𝐃(ρ₁‖σ₁) + 𝐃(ρ₂‖σ₂) := by
   simp [qRelativeEnt]
 
+lemma closed_ker_le (ρ : MState d) : IsClosed {x : MState d | x.M.ker ≤ ρ.M.ker} := by
+  sorry
+
+lemma lowerSemicontinuous_inner (ρ : MState d) :
+    LowerSemicontinuous (fun x : { x : MState d // x.M.ker ≤ ρ.M.ker } =>
+      ρ.M.inner (ρ.M.log - x.val.M.log)) := by
+  sorry
+
 /-- Relative entropy is lower semicontinuous (in each argument, actually, but we only need in the
 latter here). Will need the fact that all the cfc / eigenvalue stuff is continuous, plus
 carefully handling what happens with the kernel subspace, which will make this a pain. -/
 @[fun_prop]
-theorem qRelativeEnt.LowerSemicontinuous (ρ : MState d) : LowerSemicontinuous fun σ => 𝐃(ρ‖σ) := by
-  sorry
+theorem qRelativeEnt.lowerSemicontinuous (ρ : MState d) : LowerSemicontinuous fun σ => 𝐃(ρ‖σ) := by
+  simp_rw [qRelativeEnt, SandwichedRelRentropy, ← lowerSemicontinuousOn_univ_iff]
+  classical apply LowerSemicontinuousOn.dite_top (α := MState d) (β := ENNReal)
+  · simp [lowerSemicontinuousOn_univ_iff]
+    refine ENNReal.continuous_coe.comp_lowerSemicontinuous ?_ ENNReal.coe_mono
+    exact fun x y ↦ lowerSemicontinuous_inner ρ x y.toReal
+  · simp [closed_ker_le]
 
 /-- Joint convexity of Quantum relative entropy. We can't state this with `ConvexOn` because that requires
 an `AddCommMonoid`, which `MState`s are not. Instead we state it with `Mixable`.
