@@ -117,11 +117,6 @@ theorem pinching_self (ρ : MState d) : pinching_map ρ ρ = ρ := by
   simp only [pinching_sum, selfAdjoint.val_one, mul_one]
   rfl
 
-/-- Exercise 2.8 of Hayashi's book "A group theoretic approach to Quantum Information".
--- Used in (S59) -/
-theorem pinching_pythagoras (ρ σ : MState d) :  𝐃(ρ‖σ) = 𝐃(ρ‖pinching_map σ ρ) + 𝐃(pinching_map σ ρ‖σ) :=
-  sorry
-
 omit [DecidableEq d] in
 open ComplexOrder in
 theorem HermitianMat.le_iff_mulVec_le_mulVec {𝕜 : Type*} [RCLike 𝕜] (A B : HermitianMat d 𝕜) :
@@ -213,3 +208,8 @@ theorem ker_le_ker_pinching_of_PosDef (ρ σ : MState d) (hpos : σ.m.PosDef) : 
     hpos.toLin_ker_eq_bot
   rw [h_ker]
   exact bot_le
+
+/-- Exercise 2.8 of Hayashi's book "A group theoretic approach to Quantum Information".
+-- Used in (S59) -/
+theorem pinching_pythagoras (ρ σ : MState d) :  𝐃(ρ‖σ) = 𝐃(ρ‖pinching_map σ ρ) + 𝐃(pinching_map σ ρ‖σ) :=
+  sorry

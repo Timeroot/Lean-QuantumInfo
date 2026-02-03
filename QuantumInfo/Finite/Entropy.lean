@@ -139,10 +139,53 @@ theorem Sᵥₙ_subadditivity (ρ : MState (d₁ × d₂)) :
     Sᵥₙ ρ ≤ Sᵥₙ ρ.traceRight + Sᵥₙ ρ.traceLeft :=
   sorry
 
+/--
+The purity of a state is invariant under relabeling of the basis.
+-/
+@[simp]
+theorem purity_relabel (ρ : MState d₁) (e : d₂ ≃ d₁) : (ρ.relabel e).purity = ρ.purity := by
+  simp [MState.purity, MState.inner]
+
+/-
+Relabeling a pure state by a bijection yields another pure state.
+-/
+theorem relabel_pure_exists (ψ : Ket d₁) (e : d₂ ≃ d₁) :
+    ∃ ψ' : Ket d₂, (MState.pure ψ).relabel e = MState.pure ψ' := by
+  refine ⟨⟨fun i => ψ (e i), ?_⟩, rfl⟩
+  rw [← ψ.normalized', Fintype.sum_equiv e]
+  congr!
+
+/--
+Triangle inequality for pure tripartite states: S(A) ≤ S(B) + S(C).
+-/
+private theorem Sᵥₙ_pure_tripartite_triangle {d₁ d₂ d₃ : Type*} [Fintype d₁] [Fintype d₂] [Fintype d₃]
+    [DecidableEq d₁] [DecidableEq d₂] [DecidableEq d₃] (ψ : Ket ((d₁ × d₂) × d₃)) :
+    Sᵥₙ (MState.pure ψ).traceRight.traceRight ≤
+    Sᵥₙ (MState.pure ψ).traceRight.traceLeft + Sᵥₙ (MState.pure ψ).traceLeft := by
+  have h_subadd : Sᵥₙ ((MState.pure ψ).assoc.traceLeft) ≤ Sᵥₙ ((MState.pure ψ).assoc.traceLeft.traceRight) + Sᵥₙ ((MState.pure ψ).assoc.traceLeft.traceLeft) := by
+    apply Sᵥₙ_subadditivity;
+  obtain ⟨ψ', hψ'⟩ : ∃ ψ', (MState.pure ψ).assoc = MState.pure ψ' :=
+    relabel_pure_exists ψ (Equiv.prodAssoc d₁ d₂ d₃).symm
+  grind [Sᵥₙ_of_partial_eq, MState.traceLeft_left_assoc, MState.traceLeft_right_assoc, MState.traceRight_assoc]
+
+/--
+One direction of the Araki-Lieb triangle inequality: S(A) ≤ S(B) + S(AB).
+-/
+theorem Sᵥₙ_triangle_ineq_one_way (ρ : MState (d₁ × d₂)) : Sᵥₙ ρ.traceRight ≤ Sᵥₙ ρ.traceLeft + Sᵥₙ ρ := by
+  have := Sᵥₙ_pure_tripartite_triangle (ρ.purify)
+  have := Sᵥₙ_of_partial_eq ρ.purify
+  aesop
+
 /-- Araki-Lieb triangle inequality on von Neumann entropy -/
 theorem Sᵥₙ_triangle_subaddivity (ρ : MState (d₁ × d₂)) :
-    abs (Sᵥₙ ρ.traceRight - Sᵥₙ ρ.traceLeft) ≤ Sᵥₙ ρ :=
-  sorry
+    abs (Sᵥₙ ρ.traceRight - Sᵥₙ ρ.traceLeft) ≤ Sᵥₙ ρ := by
+  rw [abs_sub_le_iff]
+  constructor
+  · have := Sᵥₙ_triangle_ineq_one_way ρ
+    grind only
+  · have := Sᵥₙ_triangle_ineq_one_way ρ.SWAP
+    grind only [Sᵥₙ_triangle_ineq_one_way, Sᵥₙ_of_SWAP_eq, MState.traceRight_SWAP,
+      MState.traceLeft_SWAP]
 
 /-- Strong subadditivity on a tripartite system -/
 theorem Sᵥₙ_strong_subadditivity (ρ₁₂₃ : MState (d₁ × d₂ × d₃)) :

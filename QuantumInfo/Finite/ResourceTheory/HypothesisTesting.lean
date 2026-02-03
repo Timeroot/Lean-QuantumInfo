@@ -295,7 +295,7 @@ theorem Lemma3 {ρ : MState d} (ε : Prob) {S : Set (MState d)} (hS₁ : IsCompa
 
 --Maybe should be phrased in terms of `0 < ...` instead? Maybe belongs in another file? It's kiinnnd of specialized..
 theorem ker_diagonal_prob_eq_bot {q : Prob} (hq₁ : 0 < q) (hq₂ : q < 1) :
-    HermitianMat.ker (.diagonal (Distribution.coin q ·)) = ⊥ := by
+    HermitianMat.ker (.diagonal ℂ (Distribution.coin q ·)) = ⊥ := by
   apply Matrix.PosDef.toLin_ker_eq_bot
   apply Matrix.PosDef.diagonal
   intro i; fin_cases i
@@ -427,7 +427,7 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
 
 
   --The Renyi entropy is finite
-  rw [SandwichedRelRentropy, if_pos ?_]; swap
+  rw [SandwichedRelRentropy, dif_pos ?_]; swap
   · suffices q2.M.ker = ⊥ by
       simp only [this, bot_le]
     --q2 has eigenvalues β_ ε(ρ‖{σ}) and 1-β_ ε(ρ‖{σ}), so as long as β_ ε(ρ‖{σ}) isn't 0 or 1,

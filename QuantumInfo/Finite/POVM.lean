@@ -103,7 +103,7 @@ open HermitianMat in
 theorem measurementMap_apply_hermitianMat (Λ : POVM X d) (m : HermitianMat d ℂ) :
   Λ.measurementMap.toHPMap m = ∑ x : X,
     --TODO: Something like `HermitianMat.single` to make this better
-    ((m.conj ((Λ.mats x)^(1/2:ℝ)).toMat : HermitianMat d ℂ) ⊗ₖ .diagonal (fun y ↦ ite (x = y) 1 0)) := by
+    ((m.conj ((Λ.mats x)^(1/2:ℝ)).toMat : HermitianMat d ℂ) ⊗ₖ HermitianMat.diagonal ℂ (fun y ↦ ite (x = y) 1 0)) := by
   ext1
   convert Λ.measurementMap_apply_matrix m.toMat
   simp only [conj_apply, conjTranspose_toMat, AddSubgroup.val_finset_sum,
