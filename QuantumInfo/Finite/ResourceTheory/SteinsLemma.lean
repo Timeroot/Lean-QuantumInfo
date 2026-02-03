@@ -1380,7 +1380,7 @@ private theorem EquationS62
         simp only [MState.toMat_M] at σ''_pd
         have hker : (σ'' ρ ε m σ n).M.ker ≤ (ℰ n (ρ⊗^S[n])).M.ker :=
           ker_le_ker_pinching_of_PosDef (ρ⊗^S[n]) (σ'' ρ ε m σ n) (σ''_pd n)
-        simp only [hker, if_true]
+        simp only [hker, ↓reduceDIte]
         have hMulOne : (ℰ n (ρ⊗^S[n])).M.toMat * (1 : Matrix (H (i ^ n)) (H (i ^ n)) ℂ) = (ℰ n (ρ⊗^S[n])).M.toMat := Matrix.mul_one (ℰ n (ρ⊗^S[n])).M.toMat
         have hOneMulCommute : Commute (1 : HermitianMat _ ℂ).toMat (ℰ n (ρ⊗^S[n])).M.toMat := Commute.one_left (ℰ n (ρ⊗^S[n])).M.toMat
         have hOneIsOne : ∀ (ε : ℝ) (n : ℕ), (1 : ℝ → ℕ → HermitianMat (H (i ^ n)) ℂ) ε n = (1 : HermitianMat (H (i ^ n)) ℂ) := by

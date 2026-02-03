@@ -223,7 +223,7 @@ theorem traceRight_pure_MES (d : Type*) [Fintype d] [DecidableEq d] [Nonempty d]
     Complex.ofReal_natCast, mul_ite, mul_one, mul_zero, HermitianMat.toMat_apply,
     coe_ofClassical, Distribution.uniform_def, Finset.card_univ]
   unfold HermitianMat.diagonal
-  simp_all only [Complex.ofReal_inv, Complex.ofReal_natCast]
+  simp_all only [map_inv₀, map_natCast]
   rfl
 
 /-
@@ -255,7 +255,7 @@ theorem Sᵥₙ_ofClassical {d : Type*} [Fintype d] [DecidableEq d] (dist : Dist
     exact Sᵥₙ_eq_trace_cfc (ofClassical dist);
   convert h_def using 1;
   -- By definition of $MState.ofClassical$, we know that $(MState.ofClassical dist).M$ is a diagonal matrix with entries $dist i$.
-  have h_diag : (MState.ofClassical dist).M = HermitianMat.diagonal (fun x => dist x) := by
+  have h_diag : (MState.ofClassical dist).M = HermitianMat.diagonal ℂ (fun x => dist x) := by
     exact rfl;
   rw [ h_diag, HermitianMat.cfc_diagonal, HermitianMat.trace_diagonal ] ; aesop
 
