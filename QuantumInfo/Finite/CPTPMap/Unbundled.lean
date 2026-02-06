@@ -521,12 +521,27 @@ theorem exists_kraus_of_choi_PSD
   refine Finset.sum_congr rfl fun _ _ => ?_
   rw [ ← RCLike.ofReal_pow, Real.sq_sqrt ( hC.eigenvalues_nonneg _ ) ]
 
+/-
+The Choi matrix of M is the image of the unnormalized maximally entangled state projector under M ⊗ id.
+-/
+theorem choi_matrix_eq_map_proj (M : MatrixMap A B R) :
+    M.choi_matrix = (M ⊗ₖₘ MatrixMap.id A R) (Matrix.vecMulVec (fun (x : A × A) => if x.1 = x.2 then 1 else 0) (fun (x : A × A) => star (if x.1 = x.2 then 1 else 0))) := by
+  have h_choi : ∀ (M : MatrixMap A B R), MatrixMap.kron M (MatrixMap.id A R) (Matrix.vecMulVec (fun (x : A × A) => if x.1 = x.2 then 1 else 0) (fun (x : A × A) => star (if x.1 = x.2 then 1 else 0))) = MatrixMap.choi_matrix M := by
+    intro M
+    ext ⟨b₁, d₁⟩ ⟨b₂, d₂⟩
+    simp [MatrixMap.kron_def, MatrixMap.choi_matrix];
+    simp +decide [ Matrix.single, Matrix.vecMulVec ];
+    rw [ Finset.sum_eq_single d₁ ] <;> aesop;
+  convert h_choi M |> Eq.symm
+
 /-- Choi's theorem on completely positive maps: A map `IsCompletelyPositive` iff its Choi Matrix is PSD. -/
 theorem choi_PSD_iff_CP_map (M : MatrixMap A B R) :
     M.IsCompletelyPositive ↔ M.choi_matrix.PosSemidef := by
   constructor
   · intro hcp
-    sorry
+    have := MatrixMap.IsCompletelyPositive.of_Fintype hcp A
+    rw [ MatrixMap.choi_matrix_eq_map_proj ] at *;
+    exact this ( Matrix.PosSemidef.outer_self_conj _ )
   · intro h_psd
     obtain ⟨K, hK⟩ := exists_kraus_of_choi_PSD M.choi_matrix h_psd
     rw [choi_matrix_inj hK]
