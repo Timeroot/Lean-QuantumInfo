@@ -284,7 +284,7 @@ def replacement [Nonempty dIn] [DecidableEq dOut] (ρ : MState dOut) : CPTPMap d
       toFun := fun M => Matrix.kroneckerMap (fun x1 x2 => x1 * x2) M ρ.m
       map_add' := by simp [Matrix.add_kronecker]
       map_smul' := by simp [Matrix.smul_kronecker]
-      cp := MatrixMap.IsCompletelyPositive.kron_kronecker_const ρ.pos
+      cp := MatrixMap.kron_kronecker_const ρ.pos
       TP := by intro; simp [Matrix.trace_kronecker]
       }
 
@@ -368,8 +368,8 @@ section unitary
 
 /-- Conjugating density matrices by a unitary as a channel. This is standard unitary evolution. -/
 def ofUnitary (U : 𝐔[dIn]) : CPTPMap dIn dIn where
-  toLinearMap := MatrixMap.IsCompletelyPositive.conj U
-  cp := MatrixMap.IsCompletelyPositive.conj_isCompletelyPositive U.val
+  toLinearMap := MatrixMap.conj U
+  cp := MatrixMap.conj_isCompletelyPositive U.val
   TP := by intro; simp [Matrix.trace_mul_cycle U.val, ← Matrix.star_eq_conjTranspose]
 
 /-- The unitary channel U conjugated by U. -/

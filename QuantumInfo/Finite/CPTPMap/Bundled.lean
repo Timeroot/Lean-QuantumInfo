@@ -207,7 +207,7 @@ namespace CPMap
 
 def of_kraus_CPMap {κ : Type*} [Fintype κ] [DecidableEq dIn] (M : κ → Matrix dOut dIn 𝕜) : CPMap dIn dOut 𝕜 where
   toLinearMap := MatrixMap.of_kraus M M
-  cp := MatrixMap.IsCompletelyPositive.of_kraus_isCompletelyPositive M
+  cp := MatrixMap.of_kraus_isCompletelyPositive M
 
 end CPMap
 
@@ -333,7 +333,7 @@ def of_kraus_CPTPMap {κ : Type*} [Fintype κ] [DecidableEq dIn]
   (M : κ → Matrix dOut dIn 𝕜)
   (hTP : (∑ k, (M k).conjTranspose * (M k)) = 1) : CPTPMap dIn dOut 𝕜 where
   toLinearMap := MatrixMap.of_kraus M M
-  cp := MatrixMap.IsCompletelyPositive.of_kraus_isCompletelyPositive M
+  cp := MatrixMap.of_kraus_isCompletelyPositive M
   TP := MatrixMap.IsTracePreserving.of_kraus_isTracePreserving M M hTP
 
 end CPTPMap
