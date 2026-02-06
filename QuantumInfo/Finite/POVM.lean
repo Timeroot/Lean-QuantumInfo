@@ -74,8 +74,8 @@ def measurementMap (Λ : POVM X d) : CPTPMap d (d × X) where
         conv =>
           enter [1, 1, 1, ρ, 2]
           rw [← HermitianMat.conjTranspose_toMat]
-        exact MatrixMap.IsCompletelyPositive.conj_isCompletelyPositive (Λ.mats x ^ (1 / 2)).toMat
-      · apply MatrixMap.IsCompletelyPositive.kron_kronecker_const
+        exact MatrixMap.conj_isCompletelyPositive (Λ.mats x ^ (1 / 2)).toMat
+      · apply MatrixMap.kron_kronecker_const
         exact (Matrix.PosSemidef.stdBasisMatrix_iff_eq x x (zero_lt_one' ℂ)).2 rfl
   TP := by
     intro x
