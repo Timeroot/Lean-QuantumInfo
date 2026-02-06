@@ -29,10 +29,12 @@ about `IsTracePreserving` maps.
 /-- A `MatrixMap` is a linear map between squares matrices of size A to size B, over R. -/
 abbrev MatrixMap (A B R : Type*) [Semiring R] := Matrix A A R →ₗ[R] Matrix B B R
 
-variable {A B C D E F R R₂ : Type*} [Fintype A] [Semiring R] [DecidableEq A] [CommSemiring R₂]
+variable {A B C D E F R : Type*} [Fintype A] [DecidableEq A]
 
 namespace MatrixMap
 section matrix
+
+variable [Semiring R]
 
 variable (A R) in
 /-- Alias of LinearMap.id, but specifically as a MatrixMap. -/
@@ -76,22 +78,23 @@ theorem choi_map_inv (M : MatrixMap A B R) : of_choi_matrix (choi_matrix M) = M 
   -- By linearity of $M$, we can distribute $M$ over the sum and then apply it to each term.
   simp [h_linear, Matrix.sum_apply]
 
+/-- The correspondence induced by `MatrixMap.of_choi_matrix` is injective. -/
+theorem choi_matrix_inj : Function.Injective (@choi_matrix A B R _ _) := by
+  intro _ _ h
+  simpa only [choi_map_inv] using congrArg of_choi_matrix h
+
+
+variable {R : Type*} [CommSemiring R]
+
 /-- The linear equivalence between linear maps of matrices,and Choi matrices.-/
 @[simps]
-def choi_equiv : MatrixMap A B R₂ ≃ₗ[R₂] Matrix (B × A) (B × A) R₂ where
+def choi_equiv : MatrixMap A B R ≃ₗ[R] Matrix (B × A) (B × A) R where
   toFun := choi_matrix
   invFun := of_choi_matrix
   left_inv _ := by simp
   right_inv _ := by simp
   map_add' _ _ := by ext; simp [choi_matrix]
   map_smul' _ _ := by ext; simp [choi_matrix]
-
-/-- The correspondence induced by `MatrixMap.of_choi_matrix` is injective. -/
-theorem choi_matrix_inj : Function.Injective (@choi_matrix A B R _ _) := by
-  intro _ _ h
-  simpa only [choi_map_inv] using congrArg of_choi_matrix h
-
-variable {R : Type*} [CommSemiring R]
 
 /-- The linear equivalence between MatrixMap's and transfer matrices on a larger space.
 Compare with `MatrixMap.choi_matrix`, which gives the Choi matrix instead of the transfer matrix. -/
@@ -106,7 +109,7 @@ end matrix
 
 section kraus
 
-variable [SMulCommClass R R R] [Star R]
+variable [Star R] [CommSemiring R]
 variable {κ : Type*} [Fintype κ]
 
 /-- Construct a matrix map out of families of matrices M N : Σ → Matrix B A R

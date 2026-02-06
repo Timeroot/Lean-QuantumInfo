@@ -283,7 +283,7 @@ def replacement [Nonempty dIn] [DecidableEq dOut] (ρ : MState dOut) : CPTPMap d
       toFun := fun M => Matrix.kroneckerMap (fun x1 x2 => x1 * x2) M ρ.m
       map_add' := by simp [Matrix.add_kronecker]
       map_smul' := by simp [Matrix.smul_kronecker]
-      cp := MatrixMap.IsCompletelyPositive.kron_kronecker_const ρ.pos
+      cp := MatrixMap.kron_kronecker_const ρ.pos
       TP := by intro; simp [Matrix.trace_kronecker]
       }
 
@@ -346,8 +346,8 @@ section unitary
 
 /-- Conjugating density matrices by a unitary as a channel. This is standard unitary evolution. -/
 def ofUnitary (U : 𝐔[dIn]) : CPTPMap dIn dIn where
-  toLinearMap := MatrixMap.IsCompletelyPositive.conj U
-  cp := MatrixMap.IsCompletelyPositive.conj_isCompletelyPositive U.val
+  toLinearMap := MatrixMap.conj U
+  cp := MatrixMap.conj_isCompletelyPositive U.val
   TP := by intro; simp [Matrix.trace_mul_cycle U.val, ← Matrix.star_eq_conjTranspose]
 
 /-- The unitary channel U conjugated by U. -/
@@ -401,6 +401,18 @@ end unitary
 section purify
 variable [DecidableEq dOut] [Inhabited dOut]
 
+theorem exists_purify (Λ : CPTPMap dIn dOut) :
+    ∃ (Λ' : CPTPMap (dIn × dOut × dOut) (dIn × dOut × dOut)),
+      Λ'.IsUnitary ∧
+      Λ = (
+      let zero_prep : CPTPMap Unit (dOut × dOut) := replacement (MState.pure (Ket.basis default))
+      let prep := (id ⊗ₖ zero_prep)
+      let append : CPTPMap dIn (dIn × Unit) := CPTPMap.ofEquiv (Equiv.prodPUnit dIn).symm
+      CPTPMap.traceLeft ∘ₘ CPTPMap.traceLeft ∘ₘ Λ' ∘ₘ prep ∘ₘ append
+    ) := by
+  obtain ⟨M, hM⟩ := MatrixMap.IsCompletelyPositive.exists_kraus Λ.map Λ.cp
+  sorry
+
 /-- Every channel can be written as a unitary channel on a larger system. In general, if
  the original channel was A→B, we may need to go as big as dilating the output system (the
  environment) by a factor of A*B. One way of stating this would be that it forms an
@@ -411,15 +423,18 @@ variable [DecidableEq dOut] [Inhabited dOut]
 
  Furthermore, since we need a canonical "0" state on B in order to add with the input,
  we require a typeclass instance [Inhabited dOut]. -/
-def purify (Λ : CPTPMap dIn dOut) : CPTPMap (dIn × dOut × dOut) (dIn × dOut × dOut) where
-  toLinearMap := sorry
-  cp := sorry
-  TP := sorry
+def purify (Λ : CPTPMap dIn dOut) : CPTPMap (dIn × dOut × dOut) (dIn × dOut × dOut) :=
+  exists_purify Λ |>.choose
+-- where
+  -- toLinearMap := by
+  --   sorry
+  -- cp := sorry
+  -- TP := sorry
 
 --TODO: Constructing this will probably need Kraus operators first.
 
 theorem purify_IsUnitary (Λ : CPTPMap dIn dOut) : Λ.purify.IsUnitary :=
-  sorry
+  exists_purify Λ |>.choose_spec.1
 
 /-- With a channel Λ : A → B, a valid purification (A×B×B)→(A×B×B) is such that:
  * Preparing the default ∣0⟩ state on two copies of B
@@ -434,7 +449,7 @@ theorem purify_trace (Λ : CPTPMap dIn dOut) : Λ = (
     let append : CPTPMap dIn (dIn × Unit) := CPTPMap.ofEquiv (Equiv.prodPUnit dIn).symm
     CPTPMap.traceLeft ∘ₘ CPTPMap.traceLeft ∘ₘ Λ.purify ∘ₘ prep ∘ₘ append
   ) :=
-  sorry
+  exists_purify Λ |>.choose_spec.2
 
 --TODO Theorem: `purify` is unique up to unitary equivalence.
 
