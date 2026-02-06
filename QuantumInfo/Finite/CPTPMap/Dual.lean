@@ -75,8 +75,7 @@ alias IsTracePreserving.dual := dual_Unital
 /--
 If two matrix maps satisfy the trace duality property, they are equal.
 -/
-lemma dual_unique {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq dIn] [DecidableEq dOut]
-    {𝕜 : Type*} [RCLike 𝕜]
+lemma dual_unique
     (M : MatrixMap dIn dOut 𝕜) (M' : MatrixMap dOut dIn 𝕜)
     (h : ∀ A B, (M A * B).trace = (A * M' B).trace) : M.dual = M' := by
   -- By definition of dual, we know that for any A and B, the trace of (M A) * B equals the trace of A * (M.dual B).
@@ -91,30 +90,28 @@ lemma dual_unique {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq d
 /--
 The Choi matrix of the dual map is the transpose of the reindexed Choi matrix of the original map.
 -/
-lemma dual_choi_matrix {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq dIn] [DecidableEq dOut]
-    {𝕜 : Type*} [RCLike 𝕜] (M : MatrixMap dIn dOut 𝕜) :
-  M.dual.choi_matrix = (M.choi_matrix.transpose).reindex (Equiv.prodComm dOut dIn) (Equiv.prodComm dOut dIn) := by
-    -- By definition of dual, we know that $(M.dual (single j₁ j₂ 1)) i₁ i₂ = (M (single i₂ i₁ 1)) j₂ j₁$.
-    have h_dual_def : ∀ (i₁ : dIn) (j₁ : dOut) (i₂ : dIn) (j₂ : dOut), (M.dual (Matrix.single j₁ j₂ 1)) i₁ i₂ = (M (Matrix.single i₂ i₁ 1)) j₂ j₁ := by
-      intro i₁ j₁ i₂ j₂
-      have h_dual_def : (M.dual (Matrix.single j₁ j₂ 1)) i₁ i₂ = Matrix.trace (Matrix.single i₂ i₁ 1 * M.dual (Matrix.single j₁ j₂ 1)) := by
-        simp [ Matrix.trace, Matrix.mul_apply ];
-        simp [ Matrix.single];
-        rw [ Finset.sum_eq_single i₂ ]
-        · aesop
-        · intro b a a_1
-          simp [a_1.symm]
-        · aesop
-      rw [ h_dual_def, ← Dual.trace_eq ];
-      rw [ Matrix.trace ];
-      rw [ Finset.sum_eq_single j₂ ] <;> aesop;
-    aesop
+lemma dual_choi_matrix (M : MatrixMap dIn dOut 𝕜) :
+    M.dual.choi_matrix = (M.choi_matrix.transpose).reindex (Equiv.prodComm dOut dIn) (Equiv.prodComm dOut dIn) := by
+  -- By definition of dual, we know that $(M.dual (single j₁ j₂ 1)) i₁ i₂ = (M (single i₂ i₁ 1)) j₂ j₁$.
+  have h_dual_def : ∀ (i₁ : dIn) (j₁ : dOut) (i₂ : dIn) (j₂ : dOut), (M.dual (Matrix.single j₁ j₂ 1)) i₁ i₂ = (M (Matrix.single i₂ i₁ 1)) j₂ j₁ := by
+    intro i₁ j₁ i₂ j₂
+    have h_dual_def : (M.dual (Matrix.single j₁ j₂ 1)) i₁ i₂ = Matrix.trace (Matrix.single i₂ i₁ 1 * M.dual (Matrix.single j₁ j₂ 1)) := by
+      simp [ Matrix.trace, Matrix.mul_apply ];
+      simp [ Matrix.single];
+      rw [ Finset.sum_eq_single i₂ ]
+      · aesop
+      · intro b a a_1
+        simp [a_1.symm]
+      · aesop
+    rw [ h_dual_def, ← Dual.trace_eq ];
+    rw [ Matrix.trace ];
+    rw [ Finset.sum_eq_single j₂ ] <;> aesop;
+  aesop
 
 /--
 If the Choi matrix of a map is positive semidefinite, then the Choi matrix of its dual is also positive semidefinite.
 -/
-lemma dual_choi_matrix_posSemidef_of_posSemidef {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq dIn] [DecidableEq dOut]
-    {𝕜 : Type*} [RCLike 𝕜] (M : MatrixMap dIn dOut 𝕜) (h : M.choi_matrix.PosSemidef) :
+lemma dual_choi_matrix_posSemidef_of_posSemidef (M : MatrixMap dIn dOut 𝕜) (h : M.choi_matrix.PosSemidef) :
     M.dual.choi_matrix.PosSemidef := by
   rw [ dual_choi_matrix ];
   simp +zetaDelta at *;
@@ -122,24 +119,10 @@ lemma dual_choi_matrix_posSemidef_of_posSemidef {dIn dOut : Type*} [Fintype dIn]
   convert h.transpose using 1
 
 /--
-The Choi matrix of a map M is the image of the unnormalized maximally entangled state under M ⊗ id.
--/
-lemma choi_matrix_eq_map_proj {A B : Type*} [Fintype A] [Fintype B] [DecidableEq A]
-    {𝕜 : Type*} [RCLike 𝕜] (M : MatrixMap A B 𝕜) :
-    M.choi_matrix = (M ⊗ₖₘ MatrixMap.id A 𝕜) (Matrix.vecMulVec (fun (i, j) => if i = j then (1 : 𝕜) else 0) (fun (i, j) => if i = j then (1 : 𝕜) else 0)) := by
-  refine' Matrix.ext fun ⟨ b1, a1 ⟩ ⟨ b2, a2 ⟩ => _;
-  simp [ Matrix.vecMulVec, MatrixMap.kron_def ];
-  rw [ Finset.sum_eq_single a1 ]
-  · rw [ Finset.sum_eq_single a2 ] <;> aesop
-  · simp +contextual
-  · simp +contextual
-
-/--
 The dual of the identity map is the identity map.
 -/
-lemma dual_id {A : Type*} [Fintype A] [DecidableEq A] {𝕜 : Type*} [RCLike 𝕜] :
-    (MatrixMap.id A 𝕜).dual = MatrixMap.id A 𝕜 := by
-  exact dual_unique (id A 𝕜) (id A 𝕜) fun A_1 => congrFun rfl
+lemma dual_id : (MatrixMap.id dIn 𝕜).dual = MatrixMap.id dIn 𝕜 := by
+  exact dual_unique (id dIn 𝕜) (id dIn 𝕜) fun A_1 => congrFun rfl
 
 set_option maxHeartbeats 600000 in
 /--
@@ -147,7 +130,6 @@ The dual of a Kronecker product of maps is the Kronecker product of their duals.
 -/
 lemma dual_kron {A B C D : Type*} [Fintype A] [Fintype B] [Fintype C] [Fintype D]
     [DecidableEq A] [DecidableEq B] [DecidableEq C] [DecidableEq D]
-    {𝕜 : Type*} [RCLike 𝕜]
     (M : MatrixMap A B 𝕜) (N : MatrixMap C D 𝕜) :
     (M ⊗ₖₘ N).dual = M.dual ⊗ₖₘ N.dual := by
   have h_trace : ∀ (X : Matrix (A × C) (A × C) 𝕜) (Y : Matrix (B × D) (B × D) 𝕜), ( (M ⊗ₖₘ N) X * Y ).trace = ( X * (M.dual ⊗ₖₘ N.dual) Y ).trace := by
