@@ -136,7 +136,7 @@ theorem qMutualInfo_symm (ρ : MState (d₁ × d₂)) :
 
 /-- "Ordinary" subadditivity of von Neumann entropy -/
 theorem Sᵥₙ_subadditivity (ρ : MState (d₁ × d₂)) :
-    Sᵥₙ ρ ≤ Sᵥₙ ρ.traceRight + Sᵥₙ ρ.traceLeft :=
+    Sᵥₙ ρ ≤ Sᵥₙ ρ.traceRight + Sᵥₙ ρ.traceLeft := by
   sorry
 
 /--
@@ -192,14 +192,14 @@ theorem Sᵥₙ_strong_subadditivity (ρ₁₂₃ : MState (d₁ × d₂ × d₃
     let ρ₁₂ := ρ₁₂₃.assoc'.traceRight;
     let ρ₂₃ := ρ₁₂₃.traceLeft;
     let ρ₂ := ρ₁₂₃.traceLeft.traceRight;
-    Sᵥₙ ρ₁₂₃ + Sᵥₙ ρ₂ ≤ Sᵥₙ ρ₁₂ + Sᵥₙ ρ₂₃ :=
+    Sᵥₙ ρ₁₂₃ + Sᵥₙ ρ₂ ≤ Sᵥₙ ρ₁₂ + Sᵥₙ ρ₂₃ := by
   sorry
 
 /-- Weak monotonicity of quantum conditional entropy. S(A|B) + S(A|C) ≥ 0 -/
 theorem Sᵥₙ_weak_monotonicity (ρ : MState (dA × dB × dC)) :
     let ρAB := ρ.assoc'.traceRight
     let ρAC := ρ.SWAP.assoc.traceLeft.SWAP
-    0 ≤ qConditionalEnt ρAB + qConditionalEnt ρAC :=
+    0 ≤ qConditionalEnt ρAB + qConditionalEnt ρAC := by
   sorry
 
 /-- Strong subadditivity, stated in terms of conditional entropies.
@@ -269,20 +269,27 @@ about other quantities can be derived, since they can pretty much all be express
 special cases of relative entropies.
 -/
 
+theorem inner_log_sub_log_nonneg (ρ σ : MState d) (h : σ.M.ker ≤ ρ.M.ker) :
+    0 ≤ ρ.M.inner (ρ.M.log - σ.M.log) := by
+  sorry
+
+theorem sandwichedRelRentropy_nonneg (α : ℝ) (ρ σ : MState d) (h : σ.M.ker ≤ ρ.M.ker) :
+    0 ≤ if α = 1 then ρ.M.inner (ρ.M.log - σ.M.log)
+      else ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).toMat) ^ α).trace.log / (α - 1) := by
+  split_ifs
+  · exact inner_log_sub_log_nonneg ρ σ h
+  sorry
+
 /-- The Sandwiched Renyi Relative Entropy, defined with ln (nits). Note that at `α = 1` this definition
   switch to the standard Relative Entropy, for continuity. -/
 def SandwichedRelRentropy [Fintype d] (α : ℝ) (ρ σ : MState d) : ENNReal :=
-  open ComplexOrder Classical in
+  open Classical in
   if h : σ.M.ker ≤ ρ.M.ker
-  then (.ofNNReal ⟨
-    if α = 1 then
+  then (.ofNNReal ⟨if α = 1 then
       ρ.M.inner (HermitianMat.log ρ - HermitianMat.log σ)
     else
-      ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).toMat) ^ α).trace.log / (α - 1)
-    , by
-      --Proof that this quantity is nonnegative
-      sorry
-     ⟩)
+      ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).toMat) ^ α).trace.log / (α - 1),
+    by exact sandwichedRelRentropy_nonneg α ρ σ h  ⟩)
   else ⊤
 
 notation "D̃_" α "(" ρ "‖" σ ")" => SandwichedRelRentropy α ρ σ
@@ -308,7 +315,7 @@ theorem sandwichedRelRentropy_additive (α) (ρ₁ σ₁ : MState d₁) (ρ₂ �
 theorem sandwichedRelRentropy_relabel {α : ℝ} (ρ σ : MState d) (e : d₂ ≃ d) :
     D̃_ α(ρ.relabel e‖σ.relabel e) = D̃_ α(ρ‖σ) := by
   simp only [SandwichedRelRentropy, MState.relabel_M]
-  rw [HermitianMat.ker_reindex_le_iff] --Why doesn't this `simp`? Because it's an if condition, I'm guessing
+  rw! [HermitianMat.ker_reindex_le_iff] --Why doesn't this `simp`? Because it's an if condition, I'm guessing
   simp
 
 @[simp]
@@ -407,12 +414,19 @@ theorem qRelativeEnt_additive (ρ₁ σ₁ : MState d₁) (ρ₂ σ₂ : MState 
     𝐃(ρ₁ ⊗ ρ₂‖σ₁ ⊗ σ₂) = 𝐃(ρ₁‖σ₁) + 𝐃(ρ₂‖σ₂) := by
   simp [qRelativeEnt]
 
-lemma closed_ker_le (ρ : MState d) : IsClosed {x : MState d | x.M.ker ≤ ρ.M.ker} := by
+--BACKPORT
+private theorem lowerSemicontinuous_iff {α : Type u_1} {β : Type u_2} [TopologicalSpace α] [Preorder β] {f : α → β} :
+    LowerSemicontinuous f ↔ ∀ (x : α), LowerSemicontinuousAt f x := by
+  rfl
+
+lemma lowerSemicontinuous_inner (ρ x : MState d) (hx : x.M.ker ≤ ρ.M.ker):
+    LowerSemicontinuousAt (fun x ↦ ρ.M.inner (ρ.M.log - x.M.log)) x := by
   sorry
 
-lemma lowerSemicontinuous_inner (ρ : MState d) :
-    LowerSemicontinuous (fun x : { x : MState d // x.M.ker ≤ ρ.M.ker } =>
-      ρ.M.inner (ρ.M.log - x.val.M.log)) := by
+open Classical in
+theorem qRelativeEnt_lowerSemicontinuous_2 (ρ x : MState d) (hx : ¬(x.M.ker ≤ ρ.M.ker)) (y : ENNReal) (hy : y < ⊤) :
+    ∀ᶠ (x' : MState d) in nhds x,
+      y < (if x'.M.ker ≤ ρ.M.ker then ρ.M.inner (ρ.M.log - x'.M.log) else ⊤ : EReal) := by
   sorry
 
 /-- Relative entropy is lower semicontinuous (in each argument, actually, but we only need in the
@@ -420,12 +434,15 @@ latter here). Will need the fact that all the cfc / eigenvalue stuff is continuo
 carefully handling what happens with the kernel subspace, which will make this a pain. -/
 @[fun_prop]
 theorem qRelativeEnt.lowerSemicontinuous (ρ : MState d) : LowerSemicontinuous fun σ => 𝐃(ρ‖σ) := by
-  simp_rw [qRelativeEnt, SandwichedRelRentropy, ← lowerSemicontinuousOn_univ_iff]
-  classical apply LowerSemicontinuousOn.dite_top (α := MState d) (β := ENNReal)
-  · simp [lowerSemicontinuousOn_univ_iff]
-    refine ENNReal.continuous_coe.comp_lowerSemicontinuous ?_ ENNReal.coe_mono
-    exact fun x y ↦ lowerSemicontinuous_inner ρ x y.toReal
-  · simp [closed_ker_le]
+  simp_rw [qRelativeEnt, SandwichedRelRentropy, if_true, lowerSemicontinuous_iff]
+  intro x
+  by_cases hx : x.M.ker ≤ ρ.M.ker
+  · have h₂ := lowerSemicontinuous_inner ρ x hx
+    sorry
+  · intro y hy
+    simp only [hx, ↓reduceDIte] at hy ⊢
+    have h₂ := qRelativeEnt_lowerSemicontinuous_2 ρ x hx y hy
+    sorry
 
 /-- Joint convexity of Quantum relative entropy. We can't state this with `ConvexOn` because that requires
 an `AddCommMonoid`, which `MState`s are not. Instead we state it with `Mixable`.
