@@ -61,6 +61,8 @@ variable {dA dB dC dA₁ dA₂ : Type*}
 variable [Fintype dA] [Fintype dB] [Fintype dC] [Fintype dA₁] [Fintype dA₂]
 variable [DecidableEq dA] [DecidableEq dB] [DecidableEq dC] [DecidableEq dA₁] [DecidableEq dA₂]
 
+variable {𝕜 : Type*} [RCLike 𝕜]
+
 section entropy
 
 /-- Von Neumann entropy of a mixed state. -/
@@ -116,6 +118,60 @@ theorem Sᵥₙ_of_assoc_eq (ρ : MState ((d₁ × d₂) × d₃)) : Sᵥₙ ρ.
 @[simp]
 theorem Sᵥₙ_of_assoc'_eq (ρ : MState (d₁ × (d₂ × d₃))) : Sᵥₙ ρ.assoc' = Sᵥₙ ρ := by
   rw [← Sᵥₙ_of_assoc_eq, ρ.assoc_assoc']
+
+--PULLOUT
+theorem HermitianMat.trace_mul_cfc (A : HermitianMat d 𝕜) (f : ℝ → ℝ) :
+    (A.toMat * (A.cfc f).toMat).trace = ∑ i, A.H.eigenvalues i * f (A.H.eigenvalues i) := by
+  conv_lhs => rw [A.eq_conj_diagonal]
+  rw [cfc_conj_unitary]
+  simp [conj, Matrix.mul_assoc, A.H.eigenvectorUnitary.val.trace_mul_comm]
+  simp [← Matrix.mul_assoc, Matrix.IsHermitian.eigenvectorUnitary ]
+
+omit [DecidableEq dA] in
+open scoped Kronecker in
+/--
+`Tr(M (A ⊗ I)) = Tr(Tr_B(M) A)`
+-/
+theorem Matrix.trace_mul_kron_one_right {R : Type*} [Ring R]
+    (M : Matrix (dA × dB) (dA × dB) R) (A : Matrix dA dA R) :
+    (M * (A ⊗ₖ (1 : Matrix dB dB R))).trace = (M.traceRight * A).trace := by
+  simp [trace, mul_apply, kroneckerMap_apply, traceRight, one_apply,
+    Fintype.sum_prod_type, Finset.sum_mul]
+  exact Finset.sum_congr rfl fun _ _ => Finset.sum_comm
+
+omit [DecidableEq dB] in
+open scoped Kronecker in
+/--
+`Tr(M (I ⊗ B)) = Tr(Tr_A(M) B)`
+-/
+theorem Matrix.trace_mul_one_kron_right {R : Type*} [Ring R]
+    (M : Matrix (dA × dB) (dA × dB) R) (B : Matrix dB dB R) :
+    (M * ((1 : Matrix dA dA R) ⊗ₖ B)).trace = (M.traceLeft * B).trace := by
+  simp [trace, mul_apply, kroneckerMap_apply, traceLeft, one_apply,
+    Fintype.sum_prod_type, Finset.sum_mul]
+  rw [Finset.sum_comm]
+  exact Finset.sum_congr rfl fun _ _ => Finset.sum_comm
+
+open ComplexOrder in
+theorem HermitianMat.inner_log_smul_of_posDef
+    {ρ σ : HermitianMat d 𝕜} (hσ : σ.toMat.PosDef)
+    {x : ℝ} (hx : x ≠ 0) :
+    ρ.inner (x • σ).log = Real.log x * ρ.trace + ρ.inner σ.log := by
+  have h_log_smul : (x • σ).log = Real.log x • 1 + σ.log := by
+    convert HermitianMat.log_smul hx hσ using 1;
+  simp [ h_log_smul, HermitianMat.inner, mul_add, Matrix.trace_smul, RCLike.smul_re ]
+  exact Or.inl rfl
+
+theorem Sᵥₙ_eq_neg_trace_log (ρ : MState d) : Sᵥₙ ρ = - ρ.M.inner (ρ.M.log) := by
+  open HermitianMat in
+  rw [log, inner_eq_re_trace]
+  nth_rw 1 [← cfc_id ρ.M]
+  rw [← coe_cfc_mul]
+  simp only [Sᵥₙ, Hₛ, H₁, Real.negMulLog, neg_mul, Finset.sum_neg_distrib, neg_inj]
+  rw [← trace_eq_re_trace, ← sum_eigenvalues_eq_trace]
+  obtain ⟨e, he⟩ := ρ.M.cfc_eigenvalues (id * Real.log)
+  apply Finset.sum_equiv e.symm (by simp)
+  simp [MState.spectrum, Distribution.mk', he]
 
 /-- von Neumman entropies of the left- and right- partial trace of pure states are equal. -/
 theorem Sᵥₙ_of_partial_eq (ψ : Ket (d₁ × d₂)) :
@@ -386,6 +442,20 @@ theorem qRelativeEnt_ker {ρ σ : MState d} (h : σ.M.ker ≤ ρ.M.ker) :
 theorem qRelativeEnt_relabel (ρ σ : MState d) (e : d₂ ≃ d) :
     𝐃(ρ.relabel e‖σ.relabel e) = 𝐃(ρ‖σ) := by
   simp [qRelativeEnt]
+
+--PULLOUT
+@[simp]
+theorem HermitianMat.ker_smul (ρ : HermitianMat d 𝕜) {α : ℝ} (hα : α ≠ 0) :
+    (α • ρ).ker = ρ.ker := by
+  ext
+  simp only [ker, lin]
+  simp [Matrix.toEuclideanLin, funext_iff, Matrix.mulVec,
+    RCLike.real_smul_eq_coe_mul, dotProduct, mul_assoc, ← Finset.mul_sum, hα]
+
+theorem HermitianMat.ker_le_of_le_smul {ρ σ : HermitianMat d 𝕜} {α : ℝ} (hα : α ≠ 0) (hρ : 0 ≤ ρ)
+    (h : ρ ≤ α • σ) : σ.ker ≤ ρ.ker := by
+  rw [← ker_smul σ hα]
+  exact ker_antitone hρ h
 
 /-- "Formula for conversion from operator inequality to quantum relative entropy",
 -- Proposition S17 of https://arxiv.org/pdf/2401.01926v2 -/

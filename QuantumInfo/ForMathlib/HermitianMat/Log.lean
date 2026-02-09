@@ -43,7 +43,7 @@ theorem log_one : (1 : HermitianMat n 𝕜).log = 0 := by
   simp [log, cfc]
 
 open ComplexOrder in
-theorem log_smul {A : HermitianMat n 𝕜} {x : ℝ} (hx : 0 < x) (hA : A.toMat.PosDef) :
+theorem log_smul {A : HermitianMat n 𝕜} {x : ℝ} (hx : x ≠ 0) (hA : A.toMat.PosDef) :
     (x • A).log = Real.log x • 1 + A.log := by
   have h_cfc_log : (x • A).log = cfc A (fun t => Real.log (x * t)) := by
     have h_cfc_log : (x • A).log = cfc (x • A) Real.log := by
@@ -57,7 +57,7 @@ theorem log_smul {A : HermitianMat n 𝕜} {x : ℝ} (hx : 0 < x) (hA : A.toMat.
     rw [ h_cfc_log, ← cfc_comp ];
     rfl;
   have h_log_mul : ∀ t > 0, Real.log (x * t) = Real.log x + Real.log t := by
-    exact fun t ht => Real.log_mul hx.ne' ht.ne';
+    exact fun t ht => Real.log_mul hx ht.ne';
   have h_cfc_log_mul : cfc A (fun t => Real.log (x * t)) = cfc A (fun t => Real.log x + Real.log t) := by
     apply_rules [ cfc_congr_of_posDef ];
   have h_cfc_add : cfc A (fun t => Real.log x + Real.log t) = cfc A (fun t => Real.log x) + cfc A (fun t => Real.log t) := by
