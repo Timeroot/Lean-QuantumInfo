@@ -121,3 +121,63 @@ theorem csInf_mul_nonneg {s t : Set ℝ}
     · exact csInf_le ⟨0, ht₁⟩ hy
     · exact Real.sInf_nonneg ht₁
     · exact hs₁ x hx
+
+/--
+If two functions from finite types have the same multiset of values, there exists a bijection between the domains that commutes with the functions.
+-/
+lemma Multiset.map_univ_eq_iff {α β : Type*} [Fintype α] (f g : α → β) :
+    Multiset.map f Finset.univ.val = Multiset.map g Finset.univ.val ↔ ∃ (e : α ≃ α), f = g ∘ e := by
+  apply Iff.intro
+  · intro a
+    classical
+    -- Since these two multisets are equal, their elements must be equal up to permutation.
+    have h_perm : ∃ e : α ≃ α, ∀ x, f x = g (e x) := by
+      have h_count_eq : ∀ y : β, Finset.card (Finset.filter (fun x => f x = y) Finset.univ) = Finset.card (Finset.filter (fun x => g x = y) Finset.univ) := by
+        intro y;
+        replace a := congr_arg ( fun m => m.count y ) a;
+        simp_all ( config := { decide := Bool.true } ) [ Multiset.count_map ];
+        simpa [ eq_comm, Finset.filter_congr ] using a;
+      have h_perm : ∀ y : β, ∃ e : { x : α // f x = y } ≃ { x : α // g x = y }, True := by
+        intro y
+        simp_all only [exists_const_iff, and_true]
+        exact ⟨ Fintype.equivOfCardEq <| by simpa [ Fintype.card_subtype ] using h_count_eq y ⟩;
+      choose e he using h_perm;
+      refine' ⟨ _, _ ⟩;
+      exact ( Equiv.sigmaFiberEquiv f ).symm.trans ( Equiv.sigmaCongrRight e ) |> Equiv.trans <| Equiv.sigmaFiberEquiv g;
+      intro x
+      specialize e ( f x )
+      rename_i e_1
+      simp_all only [implies_true, Equiv.trans_apply, Equiv.sigmaCongrRight_apply,
+        Equiv.sigmaFiberEquiv_symm_apply_fst, Equiv.sigmaFiberEquiv_apply]
+      exact Eq.symm ( e_1 ( f x ) ⟨ x, rfl ⟩ |>.2 );
+    exact ⟨ h_perm.choose, funext h_perm.choose_spec ⟩;
+  · intro a
+    obtain ⟨w, h⟩ := a
+    subst h
+    simp_all only [Function.comp_apply, Finset.univ]
+    -- Since $w$ is a bijection, the multiset of $w(x)$ for $x$ in the original multiset is just a permutation of the original multiset.
+    have h_perm : Multiset.map (fun x => w x) (Finset.val Fintype.elems) = Finset.val Fintype.elems := by
+      exact Multiset.map_univ_val_equiv w;
+    conv_rhs => rw [ ← h_perm ];
+    simp +zetaDelta at *
+
+/--
+If two functions from finite types have the same multiset of values, there exists a bijection between the domains that commutes with the functions.
+-/
+lemma exists_equiv_of_multiset_map_eq {α β γ : Type*} [Fintype α] [Fintype β] [DecidableEq γ]
+    (f : α → γ) (g : β → γ) (h : Multiset.map f Finset.univ.val = Multiset.map g Finset.univ.val) :
+    ∃ e : α ≃ β, f = g ∘ e := by
+  -- Since the multisets of values are equal, the cardinalities of the domains must be equal (as the multiset size is the cardinality of the domain). Thus there exists a bijection `σ : α ≃ β`.
+  obtain ⟨σ, hσ⟩ : ∃ σ : α ≃ β, Multiset.map f Finset.univ.val = Multiset.map (g ∘ σ) Finset.univ.val := by
+    have h_card : Fintype.card α = Fintype.card β := by
+      simpa using congr_arg Multiset.card h;
+    obtain σ := Fintype.equivOfCardEq h_card
+    use σ
+    have h_multiset_eq : Multiset.map g Finset.univ.val = Multiset.map (g ∘ σ) Finset.univ.val := by
+      rw [ ← Multiset.map_univ_val_equiv σ ] ;
+      rw [ Multiset.map_map ]
+    exact h.trans h_multiset_eq;
+  -- By `Multiset.map_univ_eq_iff`, there exists `e' : α ≃ α` such that `f = (g ∘ σ) ∘ e'`.
+  obtain ⟨e', he'⟩ : ∃ e' : α ≃ α, f = (g ∘ σ) ∘ e' := by
+    exact (Multiset.map_univ_eq_iff f (g ∘ ⇑σ)).mp hσ;
+  exact ⟨ e'.trans σ, by simpa [ Function.comp ] using he' ⟩

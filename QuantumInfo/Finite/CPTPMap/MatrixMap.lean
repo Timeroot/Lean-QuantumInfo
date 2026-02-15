@@ -372,7 +372,7 @@ variable {dO : ι → Type w} [∀i, Fintype (dO i)] [∀i, DecidableEq (dO i)]
 
 /-- Finite Pi-type tensor product of MatrixMaps. Defined as `PiTensorProduct.tprod` of the underlying
 Linear maps. Notation `⨂ₜₘ[R] i, f i`, eventually. -/
-noncomputable def piKron (Λi : ∀ i, MatrixMap (dI i) (dO i) R) : MatrixMap (∀i, dI i) (∀i, dO i) R :=
+noncomputable def piProd (Λi : ∀ i, MatrixMap (dI i) (dO i) R) : MatrixMap (∀i, dI i) (∀i, dO i) R :=
   let map₁ := PiTensorProduct.map Λi;
   let map₂ := LinearMap.toMatrix
     (Module.Basis.piTensorProduct (fun i ↦ Matrix.stdBasis R (dI i) (dI i)))
@@ -386,5 +386,18 @@ noncomputable def piKron (Λi : ∀ i, MatrixMap (dI i) (dO i) R) : MatrixMap (�
 
 -- notation3:100 "⨂ₜₘ "(...)", "r:(scoped f => tprod R f) => r
 -- syntax (name := bigsum) "∑ " bigOpBinders ("with " term)? ", " term:67 : term
+
+/--
+Composition of `MatrixMap.piProd` maps distributes over the tensor product.
+-/
+theorem piProd_comp
+  {d₁ d₂ d₃ : ι → Type*}
+  [∀ i, Fintype (d₁ i)] [∀ i, DecidableEq (d₁ i)]
+  [∀ i, Fintype (d₂ i)] [∀ i, DecidableEq (d₂ i)]
+  [∀ i, Fintype (d₃ i)] [∀ i, DecidableEq (d₃ i)]
+  (Λ₁ : ∀ i, MatrixMap (d₁ i) (d₂ i) R) (Λ₂ : ∀ i, MatrixMap (d₂ i) (d₃ i) R) :
+    piProd (fun i ↦ (Λ₂ i) ∘ₗ (Λ₁ i)) = (piProd Λ₂) ∘ₗ (piProd Λ₁) := by
+  simp [piProd, PiTensorProduct.map_comp, ← Matrix.toLin_mul]
+  rw [← LinearMap.toMatrix_comp]
 
 end pi

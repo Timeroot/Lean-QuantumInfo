@@ -51,19 +51,17 @@ theorem proj_le_sq : {A ≤ₚ B}^2 = {A ≤ₚ B} := by
   rw [proj_le_def]
   --TODO: Should do a `HermitianMat.cfc_pow`.
   ext1
-  simp only [selfAdjoint.val_pow, cfc]
-  rw [← cfc_pow _ 2 (hf := _)]
-  · simp
-  · simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology]
+  simp only [cfc, mat_pow, mat_mk]
+  rw [← cfc_pow _ 2 (hf := by cfc_cont_tac)]
+  simp
 
 theorem proj_lt_sq : {A <ₚ B}^2 = {A <ₚ B} := by
   rw [proj_lt_def]
   --TODO: Should do a `HermitianMat.cfc_pow`.
   ext1
-  simp only [selfAdjoint.val_pow, cfc]
-  rw [← cfc_pow _ 2 (hf := _)]
-  · simp
-  · simp only [continuousOn_iff_continuous_restrict, continuous_of_discreteTopology]
+  simp only [cfc, mat_pow, mat_mk]
+  rw [← cfc_pow _ 2 (hf := by cfc_cont_tac)]
+  simp
 
 theorem proj_zero_le_cfc : {0 ≤ₚ A} = cfc A (fun x ↦ if 0 ≤ x then 1 else 0) := by
   simp only [proj_le, sub_zero]
@@ -73,7 +71,7 @@ theorem proj_zero_lt_cfc : {0 <ₚ A} = cfc A (fun x ↦ if 0 < x then 1 else 0)
 
 theorem proj_le_zero_cfc : {A ≤ₚ 0} = cfc A (fun x ↦ if x ≤ 0 then 1 else 0) := by
   simp only [proj_le, zero_sub]
-  --TODO: Should do a `HermitianMat.cfc_comp_neg`.
+  --TODO: Should do a `HermitianMat.cfc_comp_neg`?
   nth_rw 1 [← cfc_id A]
   rw [← cfc_neg, ← cfc_comp]
   congr! 2 with x
@@ -81,7 +79,7 @@ theorem proj_le_zero_cfc : {A ≤ₚ 0} = cfc A (fun x ↦ if x ≤ 0 then 1 els
 
 theorem proj_lt_zero_cfc : {A <ₚ 0} = cfc A (fun x ↦ if x < 0 then 1 else 0) := by
   simp only [proj_lt, zero_sub]
-  --TODO: Should do a `HermitianMat.cfc_comp_neg`.
+  --TODO: Should do a `HermitianMat.cfc_comp_neg`?
   nth_rw 1 [← cfc_id A]
   rw [← cfc_neg, ← cfc_comp]
   congr! 2 with x
@@ -98,7 +96,7 @@ theorem proj_lt_nonneg : 0 ≤ {A <ₚ B} := by
   apply ite_nonneg <;> norm_num
 
 theorem proj_le_le_one : {A ≤ₚ B} ≤ 1 := by
-  --The whole `rw` line is a defeq, i.e. `change _root_.cfc _ (B - A).toMat ≤ 1` works too.
+  --The whole `rw` line is a defeq, i.e. `change _root_.cfc _ (B - A).mat ≤ 1` works too.
   --TODO better API.
   open MatrixOrder in
   rw [← Subtype.coe_le_coe, val_eq_coe, selfAdjoint.val_one]
@@ -106,15 +104,15 @@ theorem proj_le_le_one : {A ≤ₚ B} ≤ 1 := by
   intros; split <;> norm_num
 
 open MatrixOrder in
-theorem proj_le_mul_nonneg : 0 ≤ {A ≤ₚ B}.toMat * (B - A).toMat := by
+theorem proj_le_mul_nonneg : 0 ≤ {A ≤ₚ B}.mat * (B - A).mat := by
   rw [proj_le]
   nth_rewrite 2 [← cfc_id (B - A)]
-  rw [← coe_cfc_mul]
+  rw [← mat_cfc_mul]
   apply cfc_nonneg
   aesop
 
 open MatrixOrder in
-theorem proj_le_mul_le : {A ≤ₚ B}.toMat * A.toMat ≤ {A ≤ₚ B}.toMat * B.toMat := by
+theorem proj_le_mul_le : {A ≤ₚ B}.mat * A.mat ≤ {A ≤ₚ B}.mat * B.mat := by
   rw [← sub_nonneg, ← mul_sub_left_distrib]
   exact proj_le_mul_nonneg A B
 
@@ -164,13 +162,13 @@ theorem negPart_eq_cfc_ite : A⁻ = A.cfc (fun x ↦ if x ≤ 0 then -x else 0) 
 
 /-- There is an existing (very slow) `PosPart` instance on `Matrix n n 𝕜`, this shows
 that this is equal. -/
-theorem posPart_eq_posPart_toMat : A⁺ = A.toMat⁺ := by
+theorem posPart_eq_posPart_toMat : A⁺ = A.mat⁺ := by
   rw [CFC.posPart_def, cfcₙ_eq_cfc]
   rfl
 
 /-- There is an existing (very slow) `PosPart` instance on `Matrix n n 𝕜`, this shows
 that this is equal. -/
-theorem negPart_eq_negPart_toMat : A⁻ = A.toMat⁻ := by
+theorem negPart_eq_negPart_toMat : A⁻ = A.mat⁻ := by
   rw [CFC.negPart_def, cfcₙ_eq_cfc]
   rfl
 
@@ -204,18 +202,20 @@ theorem posPart_le : A ≤ A⁺ := by
   rw [posPart_eq_cfc_ite, ← sub_nonneg, ← cfc_sub, zero_le_cfc]
   intro; simp; split <;> order
 
-theorem posPart_mul_negPart : A⁺.toMat * A⁻.toMat = 0 := by
-  rw [posPart_eq_cfc_ite, negPart_eq_cfc_ite, ← coe_cfc_mul]
-  convert congrArg toMat (cfc_const A 0)
-  · simp; order
+theorem posPart_mul_negPart : A⁺.mat * A⁻.mat = 0 := by
+  rw [posPart_eq_cfc_ite, negPart_eq_cfc_ite, ← mat_cfc_mul]
+  convert congrArg mat (cfc_const A 0)
+  · grind [Pi.mul_apply, mul_eq_zero]
   · simp
 
-theorem proj_le_inner_nonneg  : 0 ≤ {A ≤ₚ B}.inner (B - A) :=
-  --This inner is equal to `(B - A)⁺.trace`, could be better way to describe it
-  HermitianMat.inner_mul_nonneg (proj_le_mul_nonneg A B)
+open RealInnerProductSpace
 
-theorem proj_le_inner_le : {A ≤ₚ B}.inner A ≤ {A ≤ₚ B}.inner B := by
-  rw [← sub_nonneg, ← HermitianMat.inner_left_sub]
+theorem proj_le_inner_nonneg  : 0 ≤ ⟪{A ≤ₚ B}, (B - A)⟫ :=
+  --This inner is equal to `(B - A)⁺.trace`, could be better way to describe it
+  inner_mul_nonneg (proj_le_mul_nonneg A B)
+
+theorem proj_le_inner_le : ⟪{A ≤ₚ B}, A⟫ ≤ ⟪{A ≤ₚ B}, B⟫ := by
+  rw [← sub_nonneg, ← inner_sub_right]
   exact proj_le_inner_nonneg A B
 
 open RealInnerProductSpace in
@@ -263,19 +263,19 @@ proof_wanted posPart_eq_zero_iff : A⁺ = 0 ↔ A ≤ 0
 -- variable {d : Type*} [Fintype d] [DecidableEq d] (A B : HermitianMat d ℂ)
 
 theorem one_sub_proj_le : 1 - {B ≤ₚ A} = {A <ₚ B} := by
-  rw [sub_eq_iff_eq_add, HermitianMat.proj_le_add_lt]
+  rw [sub_eq_iff_eq_add, proj_le_add_lt]
 
 open MatrixOrder ComplexOrder
 
-theorem proj_lt_mul_nonneg : 0 ≤ {A <ₚ B}.toMat * (B - A).toMat := by
-  rw [HermitianMat.proj_lt]
-  nth_rewrite 2 [← HermitianMat.cfc_id (B - A)]
-  rw [← HermitianMat.coe_cfc_mul]
+theorem proj_lt_mul_nonneg : 0 ≤ {A <ₚ B}.mat * (B - A).mat := by
+  rw [proj_lt]
+  nth_rewrite 2 [← cfc_id (B - A)]
+  rw [← mat_cfc_mul]
   apply cfc_nonneg
   intros
   simp only [Pi.mul_apply, id_eq, ite_mul, one_mul, zero_mul]
   split <;> order
 
-theorem proj_lt_mul_lt : {A <ₚ B}.toMat * A.toMat ≤ {A <ₚ B}.toMat * B.toMat := by
+theorem proj_lt_mul_lt : {A <ₚ B}.mat * A.mat ≤ {A <ₚ B}.mat * B.mat := by
   rw [← sub_nonneg, ← mul_sub_left_distrib]
   exact A.proj_lt_mul_nonneg B

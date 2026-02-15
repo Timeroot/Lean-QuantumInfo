@@ -118,10 +118,6 @@ end εApproximates
 
 section AchievesRate
 
---PULLOUT
-instance [Nonempty d₁] [Nonempty d₂] : Nonempty (CPTPMap d₁ d₂) := by
-  sorry
-
 /-- Every quantum channel achieves a rate of zero. -/
 theorem achievesRate_0 (Λ : CPTPMap d₁ d₂) : Λ.AchievesRate 0 := by
   intro ε hε
@@ -163,36 +159,6 @@ theorem not_achievesRate_gt_log_dim_in (Λ : CPTPMap d₁ d₂) {R : ℝ} (hR : 
   sorry
 
 noncomputable section AristotleLemmas
-
---PULLOUT
-/-
-Composition of `piKron` maps distributes over the tensor product.
--/
-theorem _root_.MatrixMap.piKron_comp {ι : Type*} [Fintype ι] [DecidableEq ι]
-  {R : Type*} [CommSemiring R]
-  {d₁ d₂ d₃ : ι → Type*}
-  [∀ i, Fintype (d₁ i)] [∀ i, DecidableEq (d₁ i)]
-  [∀ i, Fintype (d₂ i)] [∀ i, DecidableEq (d₂ i)]
-  [∀ i, Fintype (d₃ i)] [∀ i, DecidableEq (d₃ i)]
-  (Λ₁ : ∀ i, MatrixMap (d₁ i) (d₂ i) R) (Λ₂ : ∀ i, MatrixMap (d₂ i) (d₃ i) R) :
-    MatrixMap.piKron (fun i => (Λ₂ i) ∘ₗ (Λ₁ i)) = (MatrixMap.piKron Λ₂) ∘ₗ (MatrixMap.piKron Λ₁) := by
-  simp +decide [ MatrixMap.piKron, PiTensorProduct.map_comp, ← Matrix.toLin_mul ];
-  rw [ ← LinearMap.toMatrix_comp ]
-
---PULLOUT
-/-
-The tensor product of composed maps is the composition of the tensor products.
--/
-theorem piProd_compose {ι : Type*} [Fintype ι] [DecidableEq ι]
-  {d₁ d₂ d₃ : ι → Type*}
-  [∀ i, Fintype (d₁ i)] [∀ i, DecidableEq (d₁ i)]
-  [∀ i, Fintype (d₂ i)] [∀ i, DecidableEq (d₂ i)]
-  [∀ i, Fintype (d₃ i)] [∀ i, DecidableEq (d₃ i)]
-  (Λ₁ : ∀ i, CPTPMap (d₁ i) (d₂ i)) (Λ₂ : ∀ i, CPTPMap (d₂ i) (d₃ i)) :
-  CPTPMap.piProd (fun i => (Λ₂ i) ∘ₘ (Λ₁ i)) = (CPTPMap.piProd Λ₂) ∘ₘ (CPTPMap.piProd Λ₁) := by
-    refine' ( CPTPMap.ext _ );
-    convert MatrixMap.piKron_comp _ _;
-    infer_instance
 
 end AristotleLemmas
 

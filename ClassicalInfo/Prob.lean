@@ -204,6 +204,14 @@ theorem toNNReal_Continuous : Continuous Prob.toNNReal := by
   unfold Prob.toNNReal
   fun_prop
 
+@[simp]
+theorem mul_eq_one_iff (p q : Prob) : p * q = 1 ↔ p = 1 ∧ q = 1 := by
+  cases p
+  cases q
+  refine ⟨fun h ↦ ?_, fun h ↦ by simp [h]⟩
+  simp [Prob.eq_iff] at h ⊢
+  constructor <;> nlinarith
+
 end Prob
 
 /-- A `Mixable T` typeclass instance gives a compact way of talking about the action of probabilities

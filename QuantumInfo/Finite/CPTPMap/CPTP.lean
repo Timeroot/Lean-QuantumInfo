@@ -298,12 +298,17 @@ theorem replacement_apply [Nonempty dIn] [DecidableEq dOut] (ρ : MState dOut) (
   ext i j
   simp
   rw [HermitianMat.instFun]
-  simp [-HermitianMat.toMat_apply, Matrix.traceLeft]
-  rw [MState.m]
-  dsimp --disgusting...
-  simp [-HermitianMat.toMat_apply, ← Finset.sum_mul]
+  simp [-HermitianMat.mat_apply, Matrix.traceLeft, ← Finset.sum_mul]
   convert one_mul _
   exact ρ₀.tr'
+
+--In principle we can relax the `Nonempty dIn`: for the case where `IsEmpty dIn`, we just take the
+-- 0 map, and it's CPTP.
+instance [Nonempty dIn] [Nonempty dOut] [DecidableEq dOut] : Inhabited (CPTPMap dIn dOut) :=
+  ⟨replacement default⟩
+
+instance [Nonempty dIn] [Nonempty dOut] : Nonempty (CPTPMap dIn dOut) := by
+  classical infer_instance
 
 /-- There is a CPTP map that takes a system of any (nonzero) dimension and outputs the
 trivial Hilbert space, 1-dimensional, indexed by any `Unique` type. We can think of this
@@ -351,8 +356,8 @@ variable {dO : ι → Type w} [∀(i :ι), Fintype (dO i)] [∀(i :ι), Decidabl
 
 /-- Finitely-indexed tensor products of CPTPMaps.  -/
 def piProd (Λi : (i:ι) → CPTPMap (dI i) (dO i)) : CPTPMap ((i:ι) → dI i) ((i:ι) → dO i) where
-  toLinearMap := MatrixMap.piKron (fun i ↦ (Λi i).map)
-  cp := MatrixMap.IsCompletelyPositive.piKron (fun i ↦ (Λi i).cp)
+  toLinearMap := MatrixMap.piProd (fun i ↦ (Λi i).map)
+  cp := MatrixMap.IsCompletelyPositive.piProd (fun i ↦ (Λi i).cp)
   TP := sorry
 
 theorem fin_1_piProd
@@ -361,6 +366,20 @@ theorem fin_1_piProd
   (Λi : (i : Fin 1) → CPTPMap (dI 0) (dO 0)) :
     piProd Λi = sorry ∘ₘ ((Λi 1) ∘ₘ sorry) :=
   sorry --TODO: permutations
+
+/--
+The tensor product of composed maps is the composition of the tensor products.
+-/
+theorem piProd_comp
+  {d₁ d₂ d₃ : ι → Type*}
+  [∀ i, Fintype (d₁ i)] [∀ i, DecidableEq (d₁ i)]
+  [∀ i, Fintype (d₂ i)] [∀ i, DecidableEq (d₂ i)]
+  [∀ i, Fintype (d₃ i)] [∀ i, DecidableEq (d₃ i)]
+  (Λ₁ : ∀ i, CPTPMap (d₁ i) (d₂ i)) (Λ₂ : ∀ i, CPTPMap (d₂ i) (d₃ i)) :
+  piProd (fun i => (Λ₂ i) ∘ₘ (Λ₁ i)) = (piProd Λ₂) ∘ₘ (piProd Λ₁) := by
+    apply CPTPMap.ext
+    convert MatrixMap.piProd_comp _ _;
+    infer_instance
 
 end finprod
 

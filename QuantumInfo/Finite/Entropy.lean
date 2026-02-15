@@ -60,8 +60,10 @@ variable [DecidableEq d] [DecidableEq d₁] [DecidableEq d₂] [DecidableEq d₃
 variable {dA dB dC dA₁ dA₂ : Type*}
 variable [Fintype dA] [Fintype dB] [Fintype dC] [Fintype dA₁] [Fintype dA₂]
 variable [DecidableEq dA] [DecidableEq dB] [DecidableEq dC] [DecidableEq dA₁] [DecidableEq dA₂]
-
 variable {𝕜 : Type*} [RCLike 𝕜]
+variable {α : ℝ}
+
+open scoped InnerProductSpace RealInnerProductSpace
 
 section entropy
 
@@ -121,57 +123,29 @@ theorem Sᵥₙ_of_assoc'_eq (ρ : MState (d₁ × (d₂ × d₃))) : Sᵥₙ ρ
 
 --PULLOUT
 theorem HermitianMat.trace_mul_cfc (A : HermitianMat d 𝕜) (f : ℝ → ℝ) :
-    (A.toMat * (A.cfc f).toMat).trace = ∑ i, A.H.eigenvalues i * f (A.H.eigenvalues i) := by
+    (A.mat * (A.cfc f).mat).trace = ∑ i, A.H.eigenvalues i * f (A.H.eigenvalues i) := by
   conv_lhs => rw [A.eq_conj_diagonal]
   rw [cfc_conj_unitary]
   simp [conj, Matrix.mul_assoc, A.H.eigenvectorUnitary.val.trace_mul_comm]
   simp [← Matrix.mul_assoc, Matrix.IsHermitian.eigenvectorUnitary ]
 
-omit [DecidableEq dA] in
-open scoped Kronecker in
-/--
-`Tr(M (A ⊗ I)) = Tr(Tr_B(M) A)`
--/
-theorem Matrix.trace_mul_kron_one_right {R : Type*} [Ring R]
-    (M : Matrix (dA × dB) (dA × dB) R) (A : Matrix dA dA R) :
-    (M * (A ⊗ₖ (1 : Matrix dB dB R))).trace = (M.traceRight * A).trace := by
-  simp [trace, mul_apply, kroneckerMap_apply, traceRight, one_apply,
-    Fintype.sum_prod_type, Finset.sum_mul]
-  exact Finset.sum_congr rfl fun _ _ => Finset.sum_comm
-
-omit [DecidableEq dB] in
-open scoped Kronecker in
-/--
-`Tr(M (I ⊗ B)) = Tr(Tr_A(M) B)`
--/
-theorem Matrix.trace_mul_one_kron_right {R : Type*} [Ring R]
-    (M : Matrix (dA × dB) (dA × dB) R) (B : Matrix dB dB R) :
-    (M * ((1 : Matrix dA dA R) ⊗ₖ B)).trace = (M.traceLeft * B).trace := by
-  simp [trace, mul_apply, kroneckerMap_apply, traceLeft, one_apply,
-    Fintype.sum_prod_type, Finset.sum_mul]
-  rw [Finset.sum_comm]
-  exact Finset.sum_congr rfl fun _ _ => Finset.sum_comm
-
-open ComplexOrder in
+--PULLOUT
 theorem HermitianMat.inner_log_smul_of_posDef
-    {ρ σ : HermitianMat d 𝕜} (hσ : σ.toMat.PosDef)
+    {ρ σ : HermitianMat d 𝕜} [NonSingular σ]
     {x : ℝ} (hx : x ≠ 0) :
-    ρ.inner (x • σ).log = Real.log x * ρ.trace + ρ.inner σ.log := by
-  have h_log_smul : (x • σ).log = Real.log x • 1 + σ.log := by
-    convert HermitianMat.log_smul hx hσ using 1;
-  simp [ h_log_smul, HermitianMat.inner, mul_add, Matrix.trace_smul, RCLike.smul_re ]
-  exact Or.inl rfl
+    ⟪(x • σ).log, ρ⟫ = Real.log x * ρ.trace + ⟪σ.log, ρ⟫ := by
+  simp [log_smul hx, inner_add_left]
 
-theorem Sᵥₙ_eq_neg_trace_log (ρ : MState d) : Sᵥₙ ρ = - ρ.M.inner (ρ.M.log) := by
+theorem Sᵥₙ_eq_neg_trace_log (ρ : MState d) : Sᵥₙ ρ = - ⟪ρ.M.log, ρ.M⟫ := by
   open HermitianMat in
   rw [log, inner_eq_re_trace]
-  nth_rw 1 [← cfc_id ρ.M]
-  rw [← coe_cfc_mul]
+  nth_rw 2 [← cfc_id ρ.M]
+  rw [← mat_cfc_mul]
   simp only [Sᵥₙ, Hₛ, H₁, Real.negMulLog, neg_mul, Finset.sum_neg_distrib, neg_inj]
   rw [← trace_eq_re_trace, ← sum_eigenvalues_eq_trace]
-  obtain ⟨e, he⟩ := ρ.M.cfc_eigenvalues (id * Real.log)
+  obtain ⟨e, he⟩ := ρ.M.cfc_eigenvalues (Real.log * id)
   apply Finset.sum_equiv e.symm (by simp)
-  simp [MState.spectrum, Distribution.mk', he]
+  simp [MState.spectrum, Distribution.mk', he, mul_comm]
 
 /-- von Neumman entropies of the left- and right- partial trace of pure states are equal. -/
 theorem Sᵥₙ_of_partial_eq (ψ : Ket (d₁ × d₂)) :
@@ -200,7 +174,7 @@ The purity of a state is invariant under relabeling of the basis.
 -/
 @[simp]
 theorem purity_relabel (ρ : MState d₁) (e : d₂ ≃ d₁) : (ρ.relabel e).purity = ρ.purity := by
-  simp [MState.purity, MState.inner]
+  simp [MState.purity, MState.inner_def]
 
 /-
 Relabeling a pure state by a bijection yields another pure state.
@@ -214,15 +188,14 @@ theorem relabel_pure_exists (ψ : Ket d₁) (e : d₂ ≃ d₁) :
 /--
 Triangle inequality for pure tripartite states: S(A) ≤ S(B) + S(C).
 -/
-private theorem Sᵥₙ_pure_tripartite_triangle {d₁ d₂ d₃ : Type*} [Fintype d₁] [Fintype d₂] [Fintype d₃]
-    [DecidableEq d₁] [DecidableEq d₂] [DecidableEq d₃] (ψ : Ket ((d₁ × d₂) × d₃)) :
+private theorem Sᵥₙ_pure_tripartite_triangle (ψ : Ket ((d₁ × d₂) × d₃)) :
     Sᵥₙ (MState.pure ψ).traceRight.traceRight ≤
     Sᵥₙ (MState.pure ψ).traceRight.traceLeft + Sᵥₙ (MState.pure ψ).traceLeft := by
-  have h_subadd : Sᵥₙ ((MState.pure ψ).assoc.traceLeft) ≤ Sᵥₙ ((MState.pure ψ).assoc.traceLeft.traceRight) + Sᵥₙ ((MState.pure ψ).assoc.traceLeft.traceLeft) := by
-    apply Sᵥₙ_subadditivity;
-  obtain ⟨ψ', hψ'⟩ : ∃ ψ', (MState.pure ψ).assoc = MState.pure ψ' :=
-    relabel_pure_exists ψ (Equiv.prodAssoc d₁ d₂ d₃).symm
-  grind [Sᵥₙ_of_partial_eq, MState.traceLeft_left_assoc, MState.traceLeft_right_assoc, MState.traceRight_assoc]
+  have h_subadd := Sᵥₙ_subadditivity (MState.pure ψ).assoc.traceLeft
+  obtain ⟨ψ', hψ'⟩ : ∃ ψ', (MState.pure ψ).assoc = _ :=
+    relabel_pure_exists ψ _
+  grind [Sᵥₙ_of_partial_eq, MState.traceLeft_left_assoc,
+    MState.traceLeft_right_assoc, MState.traceRight_assoc]
 
 /--
 One direction of the Araki-Lieb triangle inequality: S(A) ≤ S(B) + S(AB).
@@ -326,26 +299,26 @@ special cases of relative entropies.
 -/
 
 theorem inner_log_sub_log_nonneg (ρ σ : MState d) (h : σ.M.ker ≤ ρ.M.ker) :
-    0 ≤ ρ.M.inner (ρ.M.log - σ.M.log) := by
+    0 ≤ ⟪ρ.M, ρ.M.log - σ.M.log⟫ := by
   sorry
 
 theorem sandwichedRelRentropy_nonneg (α : ℝ) (ρ σ : MState d) (h : σ.M.ker ≤ ρ.M.ker) :
-    0 ≤ if α = 1 then ρ.M.inner (ρ.M.log - σ.M.log)
-      else ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).toMat) ^ α).trace.log / (α - 1) := by
+    0 ≤ if α = 1 then ⟪ρ.M, ρ.M.log - σ.M.log⟫
+      else ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).mat) ^ α).trace.log / (α - 1) := by
   split_ifs
   · exact inner_log_sub_log_nonneg ρ σ h
   sorry
 
 /-- The Sandwiched Renyi Relative Entropy, defined with ln (nits). Note that at `α = 1` this definition
   switch to the standard Relative Entropy, for continuity. -/
-def SandwichedRelRentropy [Fintype d] (α : ℝ) (ρ σ : MState d) : ENNReal :=
+def SandwichedRelRentropy (α : ℝ) (ρ σ : MState d) : ENNReal :=
   open Classical in
   if h : σ.M.ker ≤ ρ.M.ker
   then (.ofNNReal ⟨if α = 1 then
-      ρ.M.inner (HermitianMat.log ρ - HermitianMat.log σ)
+      ⟪ρ.M, ρ.M.log - σ.M.log⟫
     else
-      ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).toMat) ^ α).trace.log / (α - 1),
-    by exact sandwichedRelRentropy_nonneg α ρ σ h  ⟩)
+      ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).mat) ^ α).trace.log / (α - 1),
+    sandwichedRelRentropy_nonneg α ρ σ h⟩)
   else ⊤
 
 notation "D̃_" α "(" ρ "‖" σ ")" => SandwichedRelRentropy α ρ σ
@@ -353,7 +326,7 @@ notation "D̃_" α "(" ρ "‖" σ ")" => SandwichedRelRentropy α ρ σ
 /-- The Sandwiched Renyi Relative entropy is additive when the inputs are product states -/
 @[simp]
 theorem sandwichedRelRentropy_additive (α) (ρ₁ σ₁ : MState d₁) (ρ₂ σ₂ : MState d₂) :
-    D̃_ α(ρ₁ ⊗ ρ₂‖σ₁ ⊗ σ₂) = D̃_ α(ρ₁‖σ₁) + D̃_ α(ρ₂‖σ₂) := by
+    D̃_ α(ρ₁ ⊗ᴹ ρ₂‖σ₁ ⊗ᴹ σ₂) = D̃_ α(ρ₁‖σ₁) + D̃_ α(ρ₂‖σ₂) := by
   dsimp [SandwichedRelRentropy]
   sorry
   -- split_ifs
@@ -368,20 +341,19 @@ theorem sandwichedRelRentropy_additive (α) (ρ₁ σ₁ : MState d₁) (ρ₂ �
   -/
 
 @[simp]
-theorem sandwichedRelRentropy_relabel {α : ℝ} (ρ σ : MState d) (e : d₂ ≃ d) :
+theorem sandwichedRelRentropy_relabel (ρ σ : MState d) (e : d₂ ≃ d) :
     D̃_ α(ρ.relabel e‖σ.relabel e) = D̃_ α(ρ‖σ) := by
   simp only [SandwichedRelRentropy, MState.relabel_M]
   rw! [HermitianMat.ker_reindex_le_iff] --Why doesn't this `simp`? Because it's an if condition, I'm guessing
-  simp
+  simp [HermitianMat.conj_submatrix]
 
 @[simp]
-theorem sandwichedRelRentropy_self {d : Type*} [Fintype d] [DecidableEq d] {α : ℝ}
-    (hα : 0 < α) (ρ : MState d) :
+theorem sandwichedRelRentropy_self (hα : 0 < α) (ρ : MState d) :
   --Technically this holds for all α except for `-1` and `0`. But those are stupid.
   --TODO: Maybe SandwichedRelRentropy should actually be defined differently for α = 0?
     D̃_ α(ρ‖ρ) = 0 := by
   simp? [SandwichedRelRentropy, NNReal.eq_iff] says
-    simp only [SandwichedRelRentropy, le_refl, ↓reduceDIte, sub_self, HermitianMat.inner_zero,
+    simp only [SandwichedRelRentropy, le_refl, ↓reduceDIte, sub_self, HermitianMat.inner_zero_right,
     ENNReal.coe_eq_zero, NNReal.eq_iff, NNReal.coe_mk, NNReal.coe_zero, ite_eq_left_iff,
     div_eq_zero_iff, Real.log_eq_zero]
   intro hα
@@ -403,15 +375,12 @@ theorem sandwichedRelRentropy_self {d : Type*} [Fintype d] [DecidableEq d] {α :
       · field_simp; ring_nf; positivity
   simp
 
-open ComplexOrder in
 @[aesop (rule_sets := [finiteness]) unsafe apply]
-theorem sandwichedRelEntropy_ne_top {α : ℝ} {d : Type*} [Fintype d] [DecidableEq d] {ρ σ : MState d}
-    (hσ : σ.m.PosDef) : D̃_ α(ρ‖σ) ≠ ⊤ := by
-  have h : σ.M.ker = ⊥ := hσ.toLin_ker_eq_bot
-  simp [SandwichedRelRentropy, h]
+theorem sandwichedRelEntropy_ne_top {ρ σ : MState d} [σ.M.NonSingular] : D̃_ α(ρ‖σ) ≠ ⊤ := by
+  simp [SandwichedRelRentropy, HermitianMat.nonSingular_ker_bot]
 
 @[fun_prop]
-theorem sandwichedRelRentropy.continuousOn {d : Type*} [Fintype d] [DecidableEq d] (ρ σ : MState d) :
+theorem sandwichedRelRentropy.continuousOn (ρ σ : MState d) :
     ContinuousOn (fun α => D̃_ α(ρ‖σ)) (Set.Ioi 0) := by
   --If this turns out too hard, we just need `ContinousAt f 1`.
   --If that's still too hard, we really _just_ need that `(𝓝[≠] 1).tendsto f (f 1)`.
@@ -419,13 +388,12 @@ theorem sandwichedRelRentropy.continuousOn {d : Type*} [Fintype d] [DecidableEq 
 
 /-- The Data Processing Inequality for the Sandwiched Renyi relative entropy.
 Proved in `https://arxiv.org/pdf/1306.5920`. Seems kind of involved. -/
-theorem sandwichedRenyiEntropy_DPI {d d₂ : Type*} [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂]
-    {α : ℝ} (hα : 1 ≤ α) (ρ σ : MState d) (Φ : CPTPMap d d₂) : D̃_ α(Φ ρ‖Φ σ) ≤ D̃_ α(ρ‖σ) := by
+theorem sandwichedRenyiEntropy_DPI (hα : 1 ≤ α) (ρ σ : MState d) (Φ : CPTPMap d d₂) :
+    D̃_ α(Φ ρ‖Φ σ) ≤ D̃_ α(ρ‖σ) := by
   --If we want, we can prove this just for 1 < α, and then use continuity (above) to take the limit as
   -- α → 1.
   sorry
 
-open Classical in
 /-- The quantum relative entropy `𝐃(ρ‖σ) := Tr[ρ (log ρ - log σ)]`. -/
 def qRelativeEnt (ρ σ : MState d) : ENNReal :=
   D̃_1(ρ‖σ)
@@ -434,7 +402,7 @@ notation "𝐃(" ρ "‖" σ ")" => qRelativeEnt ρ σ
 
 /-- Quantum relative entropy as `Tr[ρ (log ρ - log σ)]` when supports are correct. -/
 theorem qRelativeEnt_ker {ρ σ : MState d} (h : σ.M.ker ≤ ρ.M.ker) :
-    𝐃(ρ‖σ).toEReal = ρ.M.inner (HermitianMat.log ρ - HermitianMat.log σ) := by
+    𝐃(ρ‖σ).toEReal = ⟪ρ.M, ρ.M.log - σ.M.log⟫ := by
   simp [qRelativeEnt, SandwichedRelRentropy, h, EReal.coe_nnreal_eq_coe_real]
 
 /-- The quantum relative entropy is unchanged by `MState.relabel` -/
@@ -444,44 +412,88 @@ theorem qRelativeEnt_relabel (ρ σ : MState d) (e : d₂ ≃ d) :
   simp [qRelativeEnt]
 
 --PULLOUT
-@[simp]
-theorem HermitianMat.ker_smul (ρ : HermitianMat d 𝕜) {α : ℝ} (hα : α ≠ 0) :
-    (α • ρ).ker = ρ.ker := by
-  ext
-  simp only [ker, lin]
-  simp [Matrix.toEuclideanLin, funext_iff, Matrix.mulVec,
-    RCLike.real_smul_eq_coe_mul, dotProduct, mul_assoc, ← Finset.mul_sum, hα]
-
-theorem HermitianMat.ker_le_of_le_smul {ρ σ : HermitianMat d 𝕜} {α : ℝ} (hα : α ≠ 0) (hρ : 0 ≤ ρ)
+theorem HermitianMat.ker_le_of_le_smul {ρ σ : HermitianMat d 𝕜} (hα : α ≠ 0) (hρ : 0 ≤ ρ)
     (h : ρ ≤ α • σ) : σ.ker ≤ ρ.ker := by
-  rw [← ker_smul σ hα]
+  rw [← ker_pos_smul σ hα]
   exact ker_antitone hρ h
 
 /-- "Formula for conversion from operator inequality to quantum relative entropy",
 -- Proposition S17 of https://arxiv.org/pdf/2401.01926v2 -/
-theorem qRelativeEnt_op_le {ρ σ : MState d} {α : ℝ} (hpos : 0 < α) (h : ρ.M ≤ α • σ.M) :
+theorem qRelativeEnt_op_le {ρ σ : MState d} (hpos : 0 < α) (h : ρ.M ≤ α • σ.M) :
     𝐃(ρ‖σ) ≤ ENNReal.ofReal (Real.log α) := by
   sorry
 
-@[gcongr]
-theorem qRelEntropy_heq_congr {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
+--PULLOUT: HermitianMat/CFC.lean
+@[simp]
+theorem _root_.HermitianMat.one_rpow {d 𝕜 : Type*} [Fintype d] [DecidableEq d] [RCLike 𝕜] (r : ℝ) :
+    (1 : HermitianMat d 𝕜) ^ r = 1 := by
+  rcases isEmpty_or_nonempty d
+  · apply Subsingleton.allEq
+  · nth_rw 2 [← HermitianMat.cfc_id (1 : HermitianMat d 𝕜)]
+    exact HermitianMat.cfc_congr 1 (by simp)
+
+--PULLOUT: HermitianMat/Trace.lean
+@[simp]
+theorem _root_.HermitianMat.trace_one {d 𝕜 : Type*} [Fintype d] [DecidableEq d] [RCLike 𝕜] :
+    (1 : HermitianMat d 𝕜).trace = (Fintype.card d) := by
+  simp [HermitianMat.trace_eq_re_trace]
+
+--PULLOUT: MState.lean
+@[simp]
+theorem _root_.MState.default_unique {d : Type*} [Fintype d] [DecidableEq d] [Unique d] : (default : MState d).M = 1 := by
+  simp [MState.instInhabited, MState.uniform]
+  rfl
+
+@[simp]
+theorem sandwichedRelRentropy_of_unique [Unique d] (ρ σ : MState d) :
+    D̃_α(ρ‖σ) = 0 := by
+  rcases Subsingleton.allEq ρ default
+  rcases Subsingleton.allEq σ default
+  simp [SandwichedRelRentropy]
+
+@[simp]
+theorem qRelEntropy_of_unique [Unique d] (ρ σ : MState d) :
+    𝐃(ρ‖σ) = 0 := by
+  exact sandwichedRelRentropy_of_unique ρ σ
+
+theorem sandwichedRelRentropy_heq_congr
+      {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
       {ρ₁ σ₁ : MState d₁} {ρ₂ σ₂ : MState d₂} (hd : d₁ = d₂) (hρ : ρ₁ ≍ ρ₂) (hσ : σ₁ ≍ σ₂) :
-    𝐃(ρ₁‖σ₁) = 𝐃(ρ₂‖σ₂) := by
+    D̃_ α(ρ₁‖σ₁) = D̃_ α(ρ₂‖σ₂) := by
+  --Why does this thm need to exist? Why not just `subst d₁` and `simp [heq_eq_eq]`? Well, even though d₁
+  --and d₂ are equal, we then end up with two distinct instances of `Fintype d₁` and `DecidableEq d₁`,
+  --and ρ₁ and ρ₂ refer to them each and so have different types. And then we'd need to `subst` those away
+  --too. This is kind of tedious, so it's better to just have this theorem around.
   rw [heq_iff_exists_eq_cast] at hρ hσ
   obtain ⟨_, rfl⟩ := hρ
   obtain ⟨_, rfl⟩ := hσ
   simp [← MState.relabel_cast _ hd]
 
+@[gcongr]
+theorem sandwichedRelRentropy_congr {α : ℝ}
+      {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
+      {ρ₁ σ₁ : MState d₁} {ρ₂ σ₂ : MState d₂} (hd : d₁ = d₂)
+        (hρ : ρ₁ = ρ₂.relabel (Equiv.cast hd)) (hσ : σ₁ = σ₂.relabel (Equiv.cast hd)) :
+    D̃_ α(ρ₁‖σ₁) = D̃_ α(ρ₂‖σ₂) := by
+  subst ρ₁ σ₁
+  simp
+
+@[gcongr]
+theorem qRelEntropy_heq_congr {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
+      {ρ₁ σ₁ : MState d₁} {ρ₂ σ₂ : MState d₂} (hd : d₁ = d₂) (hρ : ρ₁ ≍ ρ₂) (hσ : σ₁ ≍ σ₂) :
+    𝐃(ρ₁‖σ₁) = 𝐃(ρ₂‖σ₂) := by
+  exact sandwichedRelRentropy_heq_congr hd hρ hσ
+
 /-- Quantum relative entropy when σ has full rank -/
-theorem qRelativeEnt_rank {ρ σ : MState d} (h : σ.M.ker = ⊥) :
-    (𝐃(ρ‖σ) : EReal) = ρ.M.inner (HermitianMat.log ρ - HermitianMat.log σ) := by
+theorem qRelativeEnt_rank {ρ σ : MState d} [σ.M.NonSingular] :
+    (𝐃(ρ‖σ) : EReal) = ⟪ρ.M, ρ.M.log - σ.M.log⟫ := by
   apply qRelativeEnt_ker
-  simp only [h, bot_le]
+  simp [HermitianMat.nonSingular_ker_bot]
 
 /-- The quantum relative entropy is additive when the inputs are product states -/
 @[simp]
 theorem qRelativeEnt_additive (ρ₁ σ₁ : MState d₁) (ρ₂ σ₂ : MState d₂) :
-    𝐃(ρ₁ ⊗ ρ₂‖σ₁ ⊗ σ₂) = 𝐃(ρ₁‖σ₁) + 𝐃(ρ₂‖σ₂) := by
+    𝐃(ρ₁ ⊗ᴹ ρ₂‖σ₁ ⊗ᴹ σ₂) = 𝐃(ρ₁‖σ₁) + 𝐃(ρ₂‖σ₂) := by
   simp [qRelativeEnt]
 
 --BACKPORT
@@ -490,13 +502,13 @@ private theorem lowerSemicontinuous_iff {α : Type u_1} {β : Type u_2} [Topolog
   rfl
 
 lemma lowerSemicontinuous_inner (ρ x : MState d) (hx : x.M.ker ≤ ρ.M.ker):
-    LowerSemicontinuousAt (fun x ↦ ρ.M.inner (ρ.M.log - x.M.log)) x := by
+    LowerSemicontinuousAt (fun x ↦ ⟪ρ.M, ρ.M.log - x.M.log⟫) x := by
   sorry
 
 open Classical in
 theorem qRelativeEnt_lowerSemicontinuous_2 (ρ x : MState d) (hx : ¬(x.M.ker ≤ ρ.M.ker)) (y : ENNReal) (hy : y < ⊤) :
     ∀ᶠ (x' : MState d) in nhds x,
-      y < (if x'.M.ker ≤ ρ.M.ker then ρ.M.inner (ρ.M.log - x'.M.log) else ⊤ : EReal) := by
+      y < (if x'.M.ker ≤ ρ.M.ker then ⟪ρ.M, ρ.M.log - x'.M.log⟫ else ⊤ : EReal) := by
   sorry
 
 /-- Relative entropy is lower semicontinuous (in each argument, actually, but we only need in the
@@ -529,25 +541,21 @@ theorem qRelativeEnt_joint_convexity :
   sorry
 
 @[simp]
-theorem qRelEntropy_self {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) :
-    𝐃(ρ‖ρ) = 0 := by
+theorem qRelEntropy_self (ρ : MState d) : 𝐃(ρ‖ρ) = 0 := by
   simp [qRelativeEnt]
 
-open ComplexOrder in
 @[aesop (rule_sets := [finiteness]) unsafe apply]
-theorem qRelativeEnt_ne_top {d : Type*} [Fintype d] [DecidableEq d] {ρ σ : MState d}
-    (hσ : σ.m.PosDef) : 𝐃(ρ‖σ) ≠ ⊤ := by
+theorem qRelativeEnt_ne_top {ρ σ : MState d} [σ.M.NonSingular] : 𝐃(ρ‖σ) ≠ ⊤ := by
   rw [qRelativeEnt]
   finiteness
 
 /-- `I(A:B) = 𝐃(ρᴬᴮ‖ρᴬ ⊗ ρᴮ)` -/
 theorem qMutualInfo_as_qRelativeEnt (ρ : MState (dA × dB)) :
-    qMutualInfo ρ = (𝐃(ρ‖ρ.traceRight ⊗ ρ.traceLeft) : EReal) :=
+    qMutualInfo ρ = (𝐃(ρ‖ρ.traceRight ⊗ᴹ ρ.traceLeft) : EReal) :=
   sorry
 
-theorem qRelEntropy_le_add_of_le_smul {d : Type*} [Fintype d] [DecidableEq d]
-  (ρ : MState d) {σ₁ σ₂ : MState d} (r : ℝ) (hσ : σ₁.M ≤ r • σ₂.M) :
-    𝐃(ρ‖σ₁) ≤ 𝐃(ρ‖σ₂) + ENNReal.ofReal (Real.log r)
+theorem qRelEntropy_le_add_of_le_smul (ρ : MState d) {σ₁ σ₂ : MState d} (hσ : σ₁.M ≤ α • σ₂.M) :
+    𝐃(ρ‖σ₁) ≤ 𝐃(ρ‖σ₂) + ENNReal.ofReal (Real.log α)
     := by
   sorry
 

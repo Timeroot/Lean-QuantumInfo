@@ -226,10 +226,10 @@ def Ket.prod (ψ₁ : Ket d₁) (ψ₂ : Ket d₂) : Ket (d₁ × d₂) where
     simp [Fintype.sum_prod_type, ← Complex.normSq_eq_norm_sq, mul_pow,
       ← Finset.mul_sum, ψ₁.normalized, ψ₂.normalized]
 
-infixl:100 " ⊗ " => Ket.prod
+infixl:100 " ⊗ᵠ " => Ket.prod
 
 /-- A Ket is a product if it's `Ket.prod` of two kets. -/
-def Ket.IsProd (ψ : Ket (d₁ × d₂)) : Prop := ∃ ξ φ, ψ = ξ ⊗ φ
+def Ket.IsProd (ψ : Ket (d₁ × d₂)) : Prop := ∃ ξ φ, ψ = ξ ⊗ᵠ φ
 
 /-- A Ket is entangled if it's not `Ket.prod` of two kets. -/
 def Ket.IsEntangled (ψ : Ket (d₁ × d₂)) : Prop := ¬ψ.IsProd
@@ -329,7 +329,7 @@ theorem Ket.MES_isEntangled [Nontrivial d] : (Ket.MES d).IsEntangled := by
   simp [apply, h]
 
 /-- The transpose trick -/
-theorem TransposeTrick {d} [Fintype d] [Nonempty d] [DecidableEq d] {M : Matrix d d ℂ} :
+theorem transposeTrick {d} [Fintype d] [Nonempty d] [DecidableEq d] {M : Matrix d d ℂ} :
     (M ⊗ₖ 1) *ᵥ (Ket.MES d).vec = (1 ⊗ₖ M.transpose) *ᵥ (Ket.MES d).vec := by
   ext i
   simp only [Ket.MES, Matrix.mulVec, dotProduct, Matrix.kroneckerMap, Matrix.one_apply]
@@ -348,7 +348,8 @@ end mes
 
 section equiv
 
-/-- The equivalence relation on `Ket` where two kets equivalent if they are equal up to a global phase, i.e. `∃ z, ‖z‖ = 1 ∧ a.vec = z • b.vec -/
+/-- The equivalence relation on `Ket` where two kets equivalent if they are equal up to a
+global phase, i.e. `∃ z, ‖z‖ = 1 ∧ a.vec = z • b.vec -/
 def Ket.PhaseEquiv : Setoid (Ket d) where
   r a b := ∃ z : ℂ, ‖z‖ = 1 ∧ a.vec = z • b.vec
   iseqv := {
@@ -362,7 +363,8 @@ def Ket.PhaseEquiv : Setoid (Ket d) where
   }
 
 variable (d) in
-/-- The type of `Ket`s up to a global phase equivalence, as given by `Ket.PhaseEquiv`. In particular, `MState`s really only care about a KetUpToPhase, and not Kets themselves. -/
+/-- The type of `Ket`s up to a global phase equivalence, as given by `Ket.PhaseEquiv`.
+In particular, `MState`s really only care about a KetUpToPhase, and not Kets themselves. -/
 def KetUpToPhase :=
   @Quotient (Ket d) Ket.PhaseEquiv
 
