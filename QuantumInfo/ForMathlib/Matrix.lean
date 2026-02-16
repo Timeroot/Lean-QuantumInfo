@@ -1607,4 +1607,18 @@ theorem submatrix_eq_mul_mul {d d₂ d₃ R : Type*} [DecidableEq d] [Fintype d]
   rw [show id = Equiv.refl d by rfl, Matrix.mul_submatrix_one, Matrix.one_submatrix_mul]
   simp
 
+open scoped Matrix Kronecker in
+/--
+The conjugate of a Kronecker product by a Kronecker product is the Kronecker product of the conjugates (for matrices).
+-/
+lemma kronecker_conj_eq {m n p q α : Type*} [CommSemiring α] [StarRing α] [Fintype m] [Fintype n]
+    (A : Matrix m m α) (B : Matrix n n α) (C : Matrix p m α) (D : Matrix q n α) :
+    (C ⊗ₖ D) * (A ⊗ₖ B) * (C ⊗ₖ D)ᴴ = (C * A * Cᴴ) ⊗ₖ (D * B * Dᴴ) := by
+  rw [← Matrix.mul_kronecker_mul]
+  ext1
+  simp only [Matrix.mul_apply, Matrix.kroneckerMap_apply, Matrix.conjTranspose_apply, star_mul']
+  simp only [← starRingEnd_apply, mul_comm, Finset.mul_sum, mul_left_comm]
+  simp only [Finset.sum_mul, mul_assoc, Finset.mul_sum, mul_left_comm]
+  rw [Fintype.sum_prod_type_right]
+
 end Matrix

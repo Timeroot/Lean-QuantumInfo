@@ -114,7 +114,7 @@ scoped instance : MulZeroOneClass (HermitianMat d 𝕜) where
 
 end starRing
 
-section rclike
+section field
 
 variable {d 𝕜 : Type*} [Fintype d] [Field 𝕜] [StarRing 𝕜]
 
@@ -132,6 +132,19 @@ variable [Invertible (2 : 𝕜)] [DecidableEq d]
 
 --TODO: Upgrade this to NonAssocCommRing, see #28604 in Mathlib
 scoped instance : NonAssocRing (HermitianMat d 𝕜) where
+
+end field
+
+section rclike
+
+variable {d 𝕜 : Type*} [Fintype d] [RCLike 𝕜]
+
+scoped instance : IsScalarTower ℝ (HermitianMat d 𝕜) (HermitianMat d 𝕜) where
+  smul_assoc r x y := by
+    ext : 2
+    simp only [smul_eq_mul, mul_eq_symmMul, HermitianMat.symmMul_toMat,
+      HermitianMat.mat_smul, smul_add]
+    simp
 
 end rclike
 

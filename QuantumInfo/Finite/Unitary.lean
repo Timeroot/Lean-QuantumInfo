@@ -34,8 +34,8 @@ theorem le_conj_unitary : A.conj U.val ≤ B.conj U ↔ A ≤ B := by
   rw [← sub_nonneg, ← sub_nonneg (b := A), ← map_sub]
   constructor
   · intro h
-    simpa [HermitianMat.conj_conj] using HermitianMat.conj_le (star U).val h
-  · exact fun h ↦ HermitianMat.conj_le U.val h
+    simpa [HermitianMat.conj_conj] using HermitianMat.conj_nonneg (star U).val h
+  · exact fun h ↦ HermitianMat.conj_nonneg U.val h
 
 @[simp]
 theorem inner_conj_unitary : ⟪A.conj U.val, B.conj U.val⟫ = ⟪A, B⟫ := by
@@ -69,7 +69,7 @@ variable {ψ φ f : Ket d}
 def U_conj (ρ : MState d) (U : 𝐔[d]) : MState d where
   M := ρ.M.conj U.val
   tr := by simp
-  zero_le := HermitianMat.conj_le U.val ρ.zero_le
+  zero_le := HermitianMat.conj_nonneg U.val ρ.zero_le
 
 /-- `MState.U_conj`, the action of a unitary on a mixed state by conjugation.
 The ◃ notation comes from the theory of racks and quandles, where this is a

@@ -44,29 +44,6 @@ theorem Lemma6_σn_IsFree {σ₁ : MState (H i)} {σₘ : (m : ℕ) → MState (
     · exact hσ₁_free.npow (n % m)
   · rw [← pow_mul, ← spacePow_add, Nat.div_add_mod n m]
 
---Didn't end up actually needing this for the proof, but I suppose it's a good fact to have
---all the same. On the 1D Hilbert space, the optimal hypothesis testing rate is simply 1 - ε,
---since there's nothing to learn. (More generally this would hold whenever ρ=σ.)
---PULLOUT to HypothesisTesting.lean
-theorem optimalHypothesisRate_unique {d : Type*} [Fintype d] [DecidableEq d]
-    (ε : Prob) (ρ σ : MState d) [Unique d] : β_ ε(ρ‖{σ}) = 1 - ε := by
-  obtain rfl := Unique.eq_default ρ
-  obtain rfl := Unique.eq_default σ
-  rw [OptimalHypothesisRate.of_singleton]
-  apply le_antisymm
-  · refine iInf_le_of_le ⟨((1 - ε : Prob) : ℝ) • 1, ⟨?_, ?_, ?_⟩⟩ ?_
-    · simp [MState.exp_val_sub]
-    · apply smul_nonneg ?_ zero_le_one
-      simp
-    · apply smul_le_of_le_one_left zero_le_one
-      simp
-    · simp [-Prob.coe_one_minus]
-  · simp
-    intro a he1 ha0 ha1
-    rw [MState.exp_val_sub, MState.exp_val_one, tsub_le_iff_right] at he1
-    rw [← tsub_le_iff_left, ← Prob.coe_one_minus] at he1
-    exact he1
-
 /-- Lemma 6 from the paper.
 We _did_ end up doing the version that "works also in the case of ε = 0", which is nice.
 -/
@@ -462,16 +439,6 @@ private lemma commute_aux (n : ℕ) {x : ℝ}
   subst E
   rw [← HermitianMat.cfc_const_mul]
   apply HermitianMat.cfc_self_commute
-
---PULLOUT
-open HermMul in
-scoped instance _root_.HermMul.instScalarTower {𝕜 d : Type*} [Fintype d] [DecidableEq d] [RCLike 𝕜] :
-    IsScalarTower ℝ (HermitianMat d 𝕜) (HermitianMat d 𝕜) where
-  smul_assoc r x y := by
-    ext : 2
-    simp only [smul_eq_mul, mul_eq_symmMul, HermitianMat.symmMul_toMat, HermitianMat.mat_smul,
-      Algebra.mul_smul_comm, smul_add]
-    simp
 
 open HermMul in
 private lemma rexp_mul_smul_proj_lt_mul_sub_le_mul_sub {n : ℕ} {x : ℝ}

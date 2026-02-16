@@ -279,3 +279,56 @@ theorem proj_lt_mul_nonneg : 0 ≤ {A <ₚ B}.mat * (B - A).mat := by
 theorem proj_lt_mul_lt : {A <ₚ B}.mat * A.mat ≤ {A <ₚ B}.mat * B.mat := by
   rw [← sub_nonneg, ← mul_sub_left_distrib]
   exact A.proj_lt_mul_nonneg B
+
+theorem inner_negPart_nonpos : ⟪A, A⁻⟫ ≤ 0 := by
+  rw [← neg_le_neg_iff, neg_zero, ← inner_neg_right]
+  apply inner_mul_nonneg
+  nth_rw 1 [← A.cfc_id]
+  rw [negPart_eq_cfc_ite]
+  rw [← cfc_neg]
+  rw [← mat_cfc_mul]
+  change 0 ≤ A.cfc _
+  rw [zero_le_cfc]
+  intro i
+  dsimp
+  split_ifs with h
+  · rw [neg_neg]
+    exact mul_self_nonneg _
+  · simp
+
+@[simp]
+theorem posPart_inner_negPart_zero : ⟪A⁺, A⁻⟫ = 0 := by
+  have hi := inner_eq_trace_rc A⁺ A⁻
+  rw [posPart_mul_negPart, Matrix.trace_zero] at hi
+  simpa only [map_eq_zero] using hi
+
+theorem inner_negPart_zero_iff : ⟪A, A⁻⟫ = 0 ↔ 0 ≤ A := by
+  constructor
+  · intro h
+    nth_rw 1 [← posPart_add_negPart A] at h
+    rw [inner_sub_left, sub_eq_zero, posPart_inner_negPart_zero, eq_comm, inner_self_eq_zero] at h
+    rw [← zero_smul ℝ 1, ← cfc_const A, negPart_eq_cfc_ite] at h --TODO cfc_zero
+    rw [cfc_eq_cfc_iff_eqOn, A.H.spectrum_real_eq_range_eigenvalues] at h
+    simp only [Set.eqOn_range] at h
+    replace h (i) := congrFun h i
+    simp only [Function.comp_apply, ite_eq_right_iff, neg_eq_zero] at h
+    rw [zero_le_iff, A.H.posSemidef_iff_eigenvalues_nonneg]
+    intro i
+    contrapose! h
+    use i, h.le, h.ne
+  · intro h
+    apply le_antisymm
+    · exact inner_negPart_nonpos A
+    · exact inner_ge_zero h (negPart_le_zero A)
+
+theorem inner_negPart_neg_iff : ⟪A, A⁻⟫ < 0 ↔ ¬0 ≤ A := by
+  simp [← inner_negPart_zero_iff, lt_iff_le_and_ne, inner_negPart_nonpos A]
+
+theorem zero_le_iff_inner_pos (A : HermitianMat n 𝕜) :
+    0 ≤ A ↔ ∀ B, 0 ≤ B → 0 ≤ ⟪A, B⟫ := by
+  use fun h _ ↦ inner_ge_zero h
+  intro h
+  contrapose! h
+  classical
+  use A⁻, negPart_le_zero A
+  rwa [inner_negPart_neg_iff]

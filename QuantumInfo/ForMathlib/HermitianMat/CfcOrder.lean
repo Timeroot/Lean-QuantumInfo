@@ -45,16 +45,6 @@ theorem cfc_le_cfc_of_PosDef (hfg : ∀ i, 0 < i → f i ≤ g i) (hA : A.mat.Po
   apply hfg
   apply hA
 
-theorem cfc_commute (f g : ℝ → ℝ) (hAB : Commute A.mat B.mat) :
-    Commute (A.cfc f).mat (B.cfc g).mat := by
-  obtain ⟨C, ⟨h₁, rfl⟩, ⟨h₂, rfl⟩⟩ := hAB.exists_HermitianMat_cfc
-  rw [commute_iff_eq, ← HermitianMat.cfc_comp, ← HermitianMat.cfc_comp,
-    ← HermitianMat.mat_cfc_mul, ← HermitianMat.mat_cfc_mul, mul_comm (f ∘ h₁) (g ∘ h₂)]
-
-theorem cfc_self_commute (A : HermitianMat d 𝕜) (f g : ℝ → ℝ) :
-    Commute (A.cfc f).mat (A.cfc g).mat := by
-  rw [commute_iff_eq, ← HermitianMat.mat_cfc_mul, ← HermitianMat.mat_cfc_mul, mul_comm f g]
-
 /- TODO: Write a version of this that holds more broadly for some sets. Esp closed intervals of reals,
 which correspond nicely to closed intervals of matrices. Write the specialization to Set.univ (Monotone
 instead of MonotoneOn). Also a version that works for StrictMonoOn. -/
@@ -97,14 +87,10 @@ theorem log_le_log_of_commute (hAB₁ : Commute A.mat B.mat) (hAB₂ : A ≤ B) 
     A.log ≤ B.log := by
   refine HermitianMat.cfc_le_cfc_of_commute_monoOn ?_ hAB₁ hAB₂ hA ?_
   · exact Real.strictMonoOn_log.monotoneOn
-  · --The fact that `A ≤ B` and `A.PosDef` implies `B.PosDef`. Should be a theorem, TODO
-    -- This almost works but not quite:
-    -- rw [← Matrix.isStrictlyPositive_iff_posDef] at hA ⊢
-    -- exact hA.of_le hAB₂
-    simpa using Matrix.PosDef.add_posSemidef hA hAB₂ --ew. abuse
+  · simpa using Matrix.PosDef.add_posSemidef hA hAB₂ --ew. abuse. TODO Cleanup
 
 /-- Monotonicity of exp on commuting operators. -/
-theorem exp_le_exp_of_commute (hAB₁ : Commute A.mat B.mat) (hAB₂ : A.exp ≤ B.exp) :
+theorem le_of_exp_commute (hAB₁ : Commute A.mat B.mat) (hAB₂ : A.exp ≤ B.exp) :
     A ≤ B := by
   have hA : A = (A.exp).log := by simp [exp, log, ← HermitianMat.cfc_comp]
   have hB : B = (B.exp).log := by simp [exp, log, ← HermitianMat.cfc_comp]
@@ -118,6 +104,10 @@ theorem exp_le_exp_of_commute (hAB₁ : Commute A.mat B.mat) (hAB₂ : A.exp ≤
     positivity
 
 section uncategorized_cleanup
+
+theorem rpow_nonneg (hA : 0 ≤ A) {p : ℝ} : 0 ≤ A ^ p := by
+  convert HermitianMat.zero_le_cfc_of_zero_le hA _;
+  exact fun i hi => Real.rpow_nonneg hi p
 
 theorem inv_eq_rpow_neg_one (hA : A.mat.PosDef) : A⁻¹ = A ^ (-1 : ℝ) := by
   have := nonSingular_of_posDef hA

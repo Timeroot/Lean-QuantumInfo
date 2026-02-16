@@ -10,6 +10,7 @@ import QuantumInfo.ForMathlib.Isometry
 import Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Continuity
 import Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Basic
 import Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Instances
+import Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Commute
 import Mathlib.Analysis.CStarAlgebra.CStarMatrix
 import Mathlib.Algebra.Order.Group.Pointwise.CompleteLattice
 
@@ -44,6 +45,33 @@ nonrec def cfc : HermitianMat d 𝕜 :=
 @[simp]
 theorem mat_cfc : (A.cfc f).mat = _root_.cfc f A.mat := by
   rfl
+
+theorem cfc_eq_cfc_iff_eqOn (f g : ℝ → ℝ) :
+    cfc A f = cfc A g ↔ Set.EqOn f g (spectrum ℝ A.mat) := by
+  rw [HermitianMat.ext_iff, mat_cfc, mat_cfc]
+  exact _root_.cfc_eq_cfc_iff_eqOn A.H
+
+section commute
+variable {A B : HermitianMat d 𝕜}
+
+theorem _root_.Commute.cfc_left (hAB : Commute A.mat B.mat) :
+    Commute (A.cfc f).mat B.mat := by
+  exact hAB.cfc_real f
+
+theorem _root_.Commute.cfc_right (hAB : Commute A.mat B.mat) :
+    Commute A.mat (B.cfc f).mat :=
+  (hAB.symm.cfc_left f).symm
+
+theorem cfc_commute (f g : ℝ → ℝ) (hAB : Commute A.mat B.mat) :
+    Commute (A.cfc f).mat (B.cfc g).mat := by
+  exact (hAB.cfc_right g).cfc_left f
+
+theorem cfc_self_commute (A : HermitianMat d 𝕜) (f g : ℝ → ℝ) :
+    Commute (A.cfc f).mat (A.cfc g).mat := by
+  apply cfc_commute
+  rfl
+
+end commute
 
 /-- Reindexing a matrix commutes with applying the CFC. -/
 @[simp]
@@ -214,6 +242,13 @@ theorem cfc_PosDef : (A.cfc f).mat.PosDef ↔ ∀ i, 0 < f (A.H.eigenvalues i) :
   refine ⟨fun h i ↦ ?_, fun h i ↦ h (e i)⟩
   simpa using h (e.symm i)
 
+theorem trace_mul_cfc (A : HermitianMat d 𝕜) (f : ℝ → ℝ) :
+    (A.mat * (A.cfc f).mat).trace = ∑ i, A.H.eigenvalues i * f (A.H.eigenvalues i) := by
+  conv_lhs => rw [A.eq_conj_diagonal]
+  rw [cfc_conj_unitary]
+  simp [conj, Matrix.mul_assoc, A.H.eigenvectorUnitary.val.trace_mul_comm]
+  simp [← Matrix.mul_assoc, Matrix.IsHermitian.eigenvectorUnitary ]
+
 theorem norm_eq_sum_eigenvalues_sq (A : HermitianMat d 𝕜) :
     ‖A‖ ^ 2 = ∑ i, (A.H.eigenvalues i)^2 := by
   rw [← RCLike.ofReal_inj (K := 𝕜), RCLike.ofReal_pow, norm_eq_trace_sq]
@@ -309,7 +344,7 @@ protected theorem cfc_continuous (hf : Continuous f) :
     use ⟨x, 1⟩
     simp
 
-variable {A}
+variable {A B : HermitianMat d 𝕜}
 
 /--
 The inverse of the CFC is the CFC of the inverse function.
@@ -368,6 +403,13 @@ theorem diagonal_pow (f : d → ℝ) :
 theorem rpow_one : A ^ (1 : ℝ) = A := by
   simp [pow_eq_cfc]
 
+@[simp]
+theorem one_rpow : (1 : HermitianMat d 𝕜) ^ r = 1 := by
+  rcases isEmpty_or_nonempty d
+  · apply Subsingleton.allEq
+  · nth_rw 2 [← HermitianMat.cfc_id (1 : HermitianMat d 𝕜)]
+    exact HermitianMat.cfc_congr 1 (by simp)
+
 /-- Keeps in line with our simp-normal form for moving reindex outwards. -/
 @[simp]
 theorem reindex_rpow (e : d ≃ d₂) :
@@ -411,6 +453,24 @@ def log (A : HermitianMat d 𝕜) : HermitianMat d 𝕜 :=
 
 def exp (A : HermitianMat d 𝕜) : HermitianMat d 𝕜 :=
   A.cfc Real.exp
+
+theorem _root_.Commute.log_left (hAB : Commute A.mat B.mat) :
+    Commute (A.log).mat B.mat := by
+  exact hAB.cfc_left Real.log
+
+theorem _root_.Commute.log_right (hAB : Commute A.mat B.mat) :
+    Commute A.mat (B.log).mat := by
+  exact hAB.cfc_right Real.log
+
+/-- Primed because `Commute.exp_left` refers to `NormedSpace.exp` instead of `HermitianMat.exp`. -/
+theorem _root_.Commute.exp_left' (hAB : Commute A.mat B.mat) :
+    Commute (A.exp).mat B.mat := by
+  exact hAB.cfc_left Real.exp
+
+/-- Primed because `Commute.exp_right` refers to `NormedSpace.exp` instead of `HermitianMat.exp`. -/
+theorem _root_.Commute.exp_right' (hAB : Commute A.mat B.mat) :
+    Commute A.mat (B.exp).mat := by
+  exact hAB.cfc_right Real.exp
 
 @[simp]
 theorem reindex_log (e : d ≃ d₂) : (A.reindex e).log = A.log.reindex e :=
@@ -456,6 +516,7 @@ A function to Hermitian matrices is integrable iff its matrix values are integra
 -/
 lemma intervalIntegrable_toMat_iff (A : ℝ → HermitianMat d 𝕜) (T₁ T₂ : ℝ) {μ : Measure ℝ} :
     IntervalIntegrable (fun t ↦ (A t).mat) μ T₁ T₂ ↔ IntervalIntegrable A μ T₁ T₂ := by
+  --TODO Cleanup
   simp [ intervalIntegrable_iff ];
   constructor <;> intro h;
   · -- Since `toMat` is a linear isometry, the integrability of `A.toMat` implies the integrability of `A`.

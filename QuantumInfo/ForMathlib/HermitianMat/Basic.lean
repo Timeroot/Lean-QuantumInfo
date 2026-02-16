@@ -173,6 +173,11 @@ variable [AddCommGroup α] [StarAddMonoid α]
 instance : AddCommGroup (HermitianMat n α) :=
   AddSubgroup.toAddCommGroup _
 
+@[simp, norm_cast]
+theorem mat_finset_sum (f : ι → HermitianMat n α) (s : Finset ι) :
+    (∑ i ∈ s, f i).mat = ∑ i ∈ s, (f i).mat := by
+  apply AddSubgroup.val_finset_sum
+
 section module
 
 variable [Semiring R] [Module R α] [StarModule R α]
@@ -508,11 +513,20 @@ theorem diagonal_conj_diagonal [Fintype n] :
   intro
   ring
 
+/--
+A Hermitian matrix is equal to its diagonalization conjugated by its eigenvector unitary matrix.
+-/
+lemma eq_conj_diagonal [Fintype n] (A : HermitianMat n 𝕜) :
+    A = (diagonal 𝕜 A.H.eigenvalues).conj A.H.eigenvectorUnitary := by
+  ext1
+  exact Matrix.IsHermitian.spectral_theorem A.2
+
 end diagonal
 
 section kronecker
 open Kronecker
 
+variable {p q : Type*}
 variable [CommRing α] [StarRing α]
 
 /-- The kronecker product of two HermitianMats, see `Matrix.kroneckerMap`. -/
@@ -549,7 +563,6 @@ variable (A : HermitianMat m α) (B C : HermitianMat n α) in
 theorem kronecker_add : A ⊗ₖ (B + C) = A ⊗ₖ B + A ⊗ₖ C := by
   ext1; simp [Matrix.kronecker_add]
 
-variable {𝕜 : Type*} [RCLike 𝕜] in
 lemma kronecker_diagonal [DecidableEq m] [DecidableEq n] (d₁ : m → ℝ) (d₂ : n → ℝ) :
     (diagonal 𝕜 d₁ ⊗ₖ diagonal 𝕜 d₂) = diagonal 𝕜 (fun (i : m × n) => d₁ i.1 * d₂ i.2) := by
   ext1
@@ -558,13 +571,22 @@ lemma kronecker_diagonal [DecidableEq m] [DecidableEq n] (d₁ : m → ℝ) (d�
 /--
 A ⊗ₖ 1 always commutes with 1 ⊗ₖ B
 -/
-theorem kron_id_commute_id_kron {m n : Type*} [Fintype m] [Fintype n] [DecidableEq m] [DecidableEq n]
+theorem kron_id_commute_id_kro [Fintype m] [Fintype n] [DecidableEq m] [DecidableEq n]
     (A : HermitianMat m α) (B : HermitianMat n α) :
     Commute (A ⊗ₖ (1 : HermitianMat n α)).mat ((1 : HermitianMat m α) ⊗ₖ B).mat := by
   ext ⟨i, j⟩ ⟨k, l⟩
   simp only [kronecker_mat, Matrix.mul_apply, Matrix.kroneckerMap_apply,
     one_apply, Matrix.one_apply, mat_apply]
   rw [Finset.sum_eq_single (k, j), Finset.sum_eq_single (i, l)] <;> grind
+
+/-
+The conjugate of a Kronecker product by a Kronecker product is the Kronecker product of the conjugates.
+-/
+lemma kronecker_conj [Fintype m] [Fintype n]
+    (A : HermitianMat m α) (B : HermitianMat n α) (C : Matrix p m α) (D : Matrix q n α) :
+    (A ⊗ₖ B).conj (C ⊗ₖ D) = (A.conj C) ⊗ₖ (B.conj D) := by
+  ext1
+  exact Matrix.kronecker_conj_eq A.mat B.mat C D
 
 end kronecker
 

@@ -121,21 +121,6 @@ theorem Sᵥₙ_of_assoc_eq (ρ : MState ((d₁ × d₂) × d₃)) : Sᵥₙ ρ.
 theorem Sᵥₙ_of_assoc'_eq (ρ : MState (d₁ × (d₂ × d₃))) : Sᵥₙ ρ.assoc' = Sᵥₙ ρ := by
   rw [← Sᵥₙ_of_assoc_eq, ρ.assoc_assoc']
 
---PULLOUT
-theorem HermitianMat.trace_mul_cfc (A : HermitianMat d 𝕜) (f : ℝ → ℝ) :
-    (A.mat * (A.cfc f).mat).trace = ∑ i, A.H.eigenvalues i * f (A.H.eigenvalues i) := by
-  conv_lhs => rw [A.eq_conj_diagonal]
-  rw [cfc_conj_unitary]
-  simp [conj, Matrix.mul_assoc, A.H.eigenvectorUnitary.val.trace_mul_comm]
-  simp [← Matrix.mul_assoc, Matrix.IsHermitian.eigenvectorUnitary ]
-
---PULLOUT
-theorem HermitianMat.inner_log_smul_of_posDef
-    {ρ σ : HermitianMat d 𝕜} [NonSingular σ]
-    {x : ℝ} (hx : x ≠ 0) :
-    ⟪(x • σ).log, ρ⟫ = Real.log x * ρ.trace + ⟪σ.log, ρ⟫ := by
-  simp [log_smul hx, inner_add_left]
-
 theorem Sᵥₙ_eq_neg_trace_log (ρ : MState d) : Sᵥₙ ρ = - ⟪ρ.M.log, ρ.M⟫ := by
   open HermitianMat in
   rw [log, inner_eq_re_trace]
@@ -411,38 +396,11 @@ theorem qRelativeEnt_relabel (ρ σ : MState d) (e : d₂ ≃ d) :
     𝐃(ρ.relabel e‖σ.relabel e) = 𝐃(ρ‖σ) := by
   simp [qRelativeEnt]
 
---PULLOUT
-theorem HermitianMat.ker_le_of_le_smul {ρ σ : HermitianMat d 𝕜} (hα : α ≠ 0) (hρ : 0 ≤ ρ)
-    (h : ρ ≤ α • σ) : σ.ker ≤ ρ.ker := by
-  rw [← ker_pos_smul σ hα]
-  exact ker_antitone hρ h
-
 /-- "Formula for conversion from operator inequality to quantum relative entropy",
 -- Proposition S17 of https://arxiv.org/pdf/2401.01926v2 -/
 theorem qRelativeEnt_op_le {ρ σ : MState d} (hpos : 0 < α) (h : ρ.M ≤ α • σ.M) :
     𝐃(ρ‖σ) ≤ ENNReal.ofReal (Real.log α) := by
   sorry
-
---PULLOUT: HermitianMat/CFC.lean
-@[simp]
-theorem _root_.HermitianMat.one_rpow {d 𝕜 : Type*} [Fintype d] [DecidableEq d] [RCLike 𝕜] (r : ℝ) :
-    (1 : HermitianMat d 𝕜) ^ r = 1 := by
-  rcases isEmpty_or_nonempty d
-  · apply Subsingleton.allEq
-  · nth_rw 2 [← HermitianMat.cfc_id (1 : HermitianMat d 𝕜)]
-    exact HermitianMat.cfc_congr 1 (by simp)
-
---PULLOUT: HermitianMat/Trace.lean
-@[simp]
-theorem _root_.HermitianMat.trace_one {d 𝕜 : Type*} [Fintype d] [DecidableEq d] [RCLike 𝕜] :
-    (1 : HermitianMat d 𝕜).trace = (Fintype.card d) := by
-  simp [HermitianMat.trace_eq_re_trace]
-
---PULLOUT: MState.lean
-@[simp]
-theorem _root_.MState.default_unique {d : Type*} [Fintype d] [DecidableEq d] [Unique d] : (default : MState d).M = 1 := by
-  simp [MState.instInhabited, MState.uniform]
-  rfl
 
 @[simp]
 theorem sandwichedRelRentropy_of_unique [Unique d] (ρ σ : MState d) :

@@ -314,11 +314,9 @@ def HPMap.ofHermitianMat (f : HermitianMat dIn ℂ →ₗ[ℝ] HermitianMat dOut
       ring_nf
       simp
     ext
-    simp only [h_expand, map_sub, map_smul, AddSubgroupClass.coe_sub,
-      selfAdjoint.val_smul, map_add, AddSubgroup.coe_add, smul_add, Matrix.add_apply,
-      Matrix.sub_apply, Matrix.smul_apply, Complex.real_smul, smul_eq_mul, RingHom.id_apply,
-      Complex.ext_iff, Complex.add_re, Complex.sub_re, Complex.mul_re, Complex.ofReal_re,
-      Complex.ofReal_im, Complex.I, Complex.mul_im, Complex.add_im, Complex.sub_im]
+    simp only [h_expand, map_sub, map_smul, map_add, Matrix.add_apply, Matrix.smul_apply,
+      smul_eq_mul, RingHom.id_apply, Complex.ext_iff, Complex.add_re, Complex.mul_re,
+      Complex.I, Complex.mul_im, Complex.add_im]
     simp only [HermitianMat.mat_sub, HermitianMat.mat_smul, Matrix.sub_apply, Matrix.smul_apply,
       Complex.real_smul, Complex.sub_re, Complex.mul_re, Complex.ofReal_re, Complex.ofReal_im,
       zero_mul, sub_zero, HermitianMat.mat_add, Matrix.add_apply, Complex.add_re, Complex.add_im,
@@ -331,6 +329,7 @@ def HPMap.ofHermitianMat (f : HermitianMat dIn ℂ →ₗ[ℝ] HermitianMat dOut
     · simp [IsSelfAdjoint.imaginaryPart h]
 
 --PULLOUT
+omit [Fintype dOut] in
 @[simp]
 theorem HPMap.linearMap_ofHermitianMat (f : HermitianMat dIn ℂ →ₗ[ℝ] HermitianMat dOut ℂ) :
     LinearMapClass.linearMap (HPMap.ofHermitianMat f) = f := by
@@ -379,68 +378,6 @@ theorem HPMap.inner_hermDual' (B : HermitianMat dOut ℂ) :
     ⟪f A, B⟫ = ⟪A, f.hermDual B⟫ :=
   HPMap.inner_hermDual f A B
 
-open RealInnerProductSpace in
-theorem HermitianMat.inner_negPart_nonpos [DecidableEq dIn] : ⟪A, A⁻⟫ ≤ 0 := by
-  rw [← neg_le_neg_iff, neg_zero, ← inner_neg_right]
-  apply inner_mul_nonneg
-  nth_rw 1 [← A.cfc_id]
-  rw [negPart_eq_cfc_ite]
-  rw [← cfc_neg]
-  rw [← mat_cfc_mul]
-  change 0 ≤ A.cfc _
-  rw [zero_le_cfc]
-  intro i
-  dsimp
-  split_ifs with h
-  · rw [neg_neg]
-    exact mul_self_nonneg _
-  · simp
-
-theorem HermitianMat.cfc_eq_cfc_iff_eqOn [DecidableEq dIn] (A : HermitianMat dIn ℂ) (f g : ℝ → ℝ) :
-    cfc A f = cfc A g ↔ Set.EqOn f g (spectrum ℝ A.mat) := by
-  rw [HermitianMat.ext_iff, mat_cfc, mat_cfc]
-  exact _root_.cfc_eq_cfc_iff_eqOn A.H
-
-open RealInnerProductSpace in
-theorem HermitianMat.inner_negPart_zero_iff [DecidableEq dIn] : ⟪A, A⁻⟫ = 0 ↔ 0 ≤ A := by
-  constructor
-  · intro h
-    have h2 : ⟪A⁺, A⁻⟫ = 0 := by
-      --TODO own thm?
-      have hi := inner_eq_trace_rc A⁺ A⁻
-      rw [posPart_mul_negPart, Matrix.trace_zero] at hi
-      exact congr(Complex.re ($hi))
-    nth_rw 1 [← posPart_add_negPart A] at h
-    rw [inner_sub_left, sub_eq_zero, h2, eq_comm, inner_self_eq_zero] at h
-    rw [← zero_smul ℝ 1, ← cfc_const A, negPart_eq_cfc_ite] at h --TODO cfc_zero
-    rw [cfc_eq_cfc_iff_eqOn, A.H.spectrum_real_eq_range_eigenvalues] at h
-    simp only [Set.eqOn_range] at h
-    replace h (i) := congrFun h i
-    simp only [Function.comp_apply, ite_eq_right_iff, neg_eq_zero] at h
-    rw [zero_le_iff, A.H.posSemidef_iff_eigenvalues_nonneg]
-    intro i
-    contrapose! h
-    use i, h.le, h.ne
-  · intro h
-    apply le_antisymm
-    · exact inner_negPart_nonpos A
-    · exact inner_ge_zero h (negPart_le_zero A)
-
-open RealInnerProductSpace in
-theorem HermitianMat.inner_negPart_neg_iff [DecidableEq dIn] : ⟪A, A⁻⟫ < 0 ↔ ¬0 ≤ A := by
-  simp [← inner_negPart_zero_iff, lt_iff_le_and_ne, inner_negPart_nonpos A]
-
---PULLOUT
-open RealInnerProductSpace in
-theorem HermitianMat.zero_le_iff_inner_pos (A : HermitianMat dIn ℂ) :
-    0 ≤ A ↔ ∀ B, 0 ≤ B → 0 ≤ ⟪A, B⟫ := by
-  use fun h _ ↦ inner_ge_zero h
-  intro h
-  contrapose! h
-  classical
-  use A⁻, negPart_le_zero A
-  rwa [inner_negPart_neg_iff]
-
 /-- The dual of a `IsPositive` map also `IsPositive`. -/
 theorem MatrixMap.IsPositive.hermDual (h : MatrixMap.IsPositive f.map) : f.hermDual.map.IsPositive := by
   unfold IsPositive at h ⊢
@@ -449,6 +386,7 @@ theorem MatrixMap.IsPositive.hermDual (h : MatrixMap.IsPositive f.map) : f.hermD
   have hx' : x = xH := rfl; clear_value xH; subst x; clear hxH
   change Matrix.PosSemidef (f.hermDual xH).mat
   rw [← HermitianMat.zero_le_iff] at hx ⊢
+  classical
   rw [HermitianMat.zero_le_iff_inner_pos]
   intro y hy
   rw [HermitianMat.zero_le_iff] at hy

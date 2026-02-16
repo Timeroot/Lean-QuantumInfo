@@ -141,14 +141,6 @@ theorem le_one : ρ.M ≤ 1 := by
   rw [← Matrix.PosSemidef.le_smul_one_of_eigenvalues_iff ρ.Hermitian]
   exact eigenvalue_le_one ρ
 
---PULLOUT
-@[simp, norm_cast]
-theorem _root_.HermitianMat.mat_finset_sum {R ι d : Type*}
-    [AddCommGroup R] [StarAddMonoid R] (f : ι → HermitianMat d R) (s : Finset ι) :
-    (∑ i ∈ s, f i).mat = ∑ i ∈ s, (f i).mat := by
-  simp only [← HermitianMat.val_eq_coe]
-  erw [AddSubgroup.val_finset_sum]
-
 open scoped RealInnerProductSpace InnerProductSpace
 
 /-- The inner product of two MState's, as a real number between 0 and 1. -/
@@ -511,6 +503,11 @@ instance instUnique [Unique d] : Unique (MState d) where
 Here, the maximally mixed one is chosen. -/
 instance instInhabited [Nonempty d] : Inhabited (MState d) where
   default := uniform
+
+@[simp]
+theorem M_default [Unique d] : (default : MState d).M = 1 := by
+  simp [instInhabited, uniform]
+  rfl
 
 section ptrace
 

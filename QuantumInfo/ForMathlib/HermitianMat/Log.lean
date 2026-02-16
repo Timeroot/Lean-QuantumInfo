@@ -32,7 +32,7 @@ is operator antitone for positive definite matrices.
 
 namespace HermitianMat
 
-variable {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
+variable {m n 𝕜 : Type*} [Fintype n] [DecidableEq n] [Fintype m] [DecidableEq m] [RCLike 𝕜]
 variable {A B : HermitianMat n 𝕜} {x : ℝ}
 
 @[simp]
@@ -230,10 +230,10 @@ theorem scalarLogApprox_eq (x T : ℝ) (hx : 0 < x) (hT : 0 < T) :
   unfold scalarLogApprox; norm_num
 
 open ComplexOrder in
-/-
+/--
 The integrand in the log approximation is the CFC of the scalar integrand.
 -/
-lemma integrand_eq
+private lemma integrand_eq
     (x : HermitianMat n 𝕜) (hx : x.mat.PosDef) (t : ℝ) (ht : 0 ≤ t) :
     ((1 + t)⁻¹ • (1 : HermitianMat n 𝕜) - (x + t • 1)⁻¹) = cfc x (fun u => (1 + t)⁻¹ - (u + t)⁻¹) := by
   have h_cfc_add : cfc x (fun u => u + t) = cfc x (fun u => u) + cfc x (fun u => t) :=
@@ -491,8 +491,7 @@ theorem logApprox_concave {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike �
 /--
 The matrix logarithm is operator concave.
 -/
-theorem log_concave {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
-    {x y : HermitianMat n 𝕜} (hx : x.mat.PosDef) (hy : y.mat.PosDef)
+theorem log_concave {x y : HermitianMat n 𝕜} (hx : x.mat.PosDef) (hy : y.mat.PosDef)
     ⦃a b : ℝ⦄ (ha : 0 ≤ a) (hb : 0 ≤ b) (hab : a + b = 1) :
     a • x.log + b • y.log ≤ (a • x + b • y).log := by
   apply le_of_tendsto_of_tendsto (b := .atTop) (f := fun T => a • x.logApprox T + b • y.logApprox T) (g := (a • x + b • y).logApprox)
@@ -547,59 +546,21 @@ lemma log_kron_diagonal {m n 𝕜 : Type*} [Fintype m] [DecidableEq m] [Fintype 
 /--
 The logarithm of a Hermitian matrix conjugated by a unitary matrix is the conjugate of the logarithm.
 -/
-lemma log_conj_unitary {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
-    (A : HermitianMat n 𝕜) (U : Matrix.unitaryGroup n 𝕜) :
+lemma log_conj_unitary (A : HermitianMat n 𝕜) (U : Matrix.unitaryGroup n 𝕜) :
     (A.conj U.val).log = A.log.conj U.val :=
   cfc_conj_unitary _ Real.log U
-
-/--
-The conjugate of a Kronecker product by a Kronecker product is the Kronecker product of the conjugates (for matrices).
--/
-lemma _root_.Matrix.kronecker_conj_eq {m n p q 𝕜 : Type*} [Fintype m] [DecidableEq m] [Fintype n] [DecidableEq n]
-    [Fintype p] [DecidableEq p] [Fintype q] [DecidableEq q] [RCLike 𝕜]
-    (A : Matrix m m 𝕜) (B : Matrix n n 𝕜)
-    (C : Matrix p m 𝕜) (D : Matrix q n 𝕜) :
-    (Matrix.kroneckerMap (· * ·) C D) * (Matrix.kroneckerMap (· * ·) A B) * (Matrix.kroneckerMap (· * ·) C D).conjTranspose =
-    Matrix.kroneckerMap (· * ·) (C * A * C.conjTranspose) (D * B * D.conjTranspose) := by
-  rw [← Matrix.mul_kronecker_mul]
-  ext i j
-  simp [ Matrix.mul_apply, Matrix.conjTranspose_apply ]
-  ring_nf!
-  simp only [mul_comm, Finset.mul_sum, mul_left_comm]
-  simp only [Finset.sum_mul, mul_assoc, Finset.mul_sum _ _ _, mul_left_comm]
-  rw [Fintype.sum_prod_type_right]
-
-/-
-The conjugate of a Kronecker product by a Kronecker product is the Kronecker product of the conjugates.
--/
-lemma kronecker_conj {m n p q 𝕜 : Type*} [Fintype m] [DecidableEq m] [Fintype n] [DecidableEq n]
-    [Fintype p] [DecidableEq p] [Fintype q] [DecidableEq q] [RCLike 𝕜]
-    (A : HermitianMat m 𝕜) (B : HermitianMat n 𝕜)
-    (C : Matrix p m 𝕜) (D : Matrix q n 𝕜) :
-    (A ⊗ₖ B).conj (Matrix.kroneckerMap (· * ·) C D) = (A.conj C) ⊗ₖ (B.conj D) := by
-  convert Matrix.kronecker_conj_eq A.mat B.mat C D using 1;
-  constructor <;> intro h <;> rw [ ← Subtype.coe_inj ] at * <;> aesop ( simp_config := { decide := true } )
-
-/--
-A Hermitian matrix is equal to its diagonalization conjugated by its eigenvector unitary matrix.
--/
-lemma eq_conj_diagonal (A : HermitianMat n 𝕜) :
-    A = (diagonal 𝕜 A.H.eigenvalues).conj A.H.eigenvectorUnitary := by
-  ext1
-  exact Matrix.IsHermitian.spectral_theorem A.2
 
 /-
 The matrix logarithm of the Kronecker product of two positive definite Hermitian matrices is the sum of the Kronecker products of their logarithms with the identity matrix.
 -/
-theorem log_kron {m n 𝕜 : Type*} [Fintype m] [DecidableEq m] [Fintype n] [DecidableEq n] [RCLike 𝕜]
-    (A : HermitianMat m 𝕜) (B : HermitianMat n 𝕜)
-    (hA : A.mat.PosDef) (hB : B.mat.PosDef) :
+theorem log_kron {A : HermitianMat m 𝕜} (hA : A.mat.PosDef) (hB : B.mat.PosDef) :
     (A ⊗ₖ B).log = (A.log ⊗ₖ 1) + (1 ⊗ₖ B.log) := by
+  --TODO Cleanup
   -- Let's diagonalize A and B using their eigenvector unitary matrices.
   obtain ⟨U, hU⟩ : ∃ U : Matrix.unitaryGroup m 𝕜, A = (diagonal 𝕜 A.H.eigenvalues).conj U.val := by
-    exact ⟨ A.H.eigenvectorUnitary, eq_conj_diagonal A ⟩
+    exact ⟨A.H.eigenvectorUnitary, eq_conj_diagonal A⟩
   obtain ⟨V, hV⟩ : ∃ V : Matrix.unitaryGroup n 𝕜, B = (diagonal 𝕜 B.H.eigenvalues).conj V.val := by
-    exact ⟨ B.H.eigenvectorUnitary, by exact eq_conj_diagonal B ⟩;
+    exact ⟨B.H.eigenvectorUnitary, eq_conj_diagonal B⟩
   -- By the properties of the logarithm and the Kronecker product, we can simplify the expression.
   have h_log_simplified : (diagonal 𝕜 (fun (i : m × n) => A.H.eigenvalues i.1 * B.H.eigenvalues i.2) : HermitianMat (m × n) 𝕜).log =
     (diagonal 𝕜 A.H.eigenvalues).log ⊗ₖ 1 + 1 ⊗ₖ (diagonal 𝕜 B.H.eigenvalues).log := by
@@ -627,3 +588,8 @@ theorem log_kron {m n 𝕜 : Type*} [Fintype m] [DecidableEq m] [Fintype n] [Dec
   · rw [ hU, hV ]
     simp [ log_conj_unitary, kronecker_conj ]
     congr
+
+open RealInnerProductSpace in
+theorem inner_log_smul_of [NonSingular A] {x : ℝ} (hx : x ≠ 0) :
+    ⟪(x • A).log, B⟫ = Real.log x * B.trace + ⟪A.log, B⟫ := by
+  simp [log_smul hx, inner_add_left]

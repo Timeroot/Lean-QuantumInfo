@@ -526,3 +526,24 @@ theorem rate_Continuous_singleton {ε : Prob} {d : Type*} [Fintype d] [Decidable
   simp only [of_singleton]
   conv => enter [1, σ]; rw [subtype_val_iInf']
   exact Continuous.subtype_mk (h.comp MState.Continuous_HermitianMat) _
+
+/-- On the 1D Hilbert space, the optimal hypothesis testing rate is simply 1 - ε,
+since there's nothing to learn. (More generally this would hold whenever ρ=σ.) --/
+theorem optimalHypothesisRate_unique {d : Type*} [Fintype d] [DecidableEq d]
+    (ε : Prob) (ρ σ : MState d) [Unique d] : β_ ε(ρ‖{σ}) = 1 - ε := by
+  obtain rfl := Unique.eq_default ρ
+  obtain rfl := Unique.eq_default σ
+  rw [OptimalHypothesisRate.of_singleton]
+  apply le_antisymm
+  · refine iInf_le_of_le ⟨((1 - ε : Prob) : ℝ) • 1, ⟨?_, ?_, ?_⟩⟩ ?_
+    · simp [MState.exp_val_sub]
+    · apply smul_nonneg ?_ zero_le_one
+      simp
+    · apply smul_le_of_le_one_left zero_le_one
+      simp
+    · simp [-Prob.coe_one_minus]
+  · simp
+    intro a he1 ha0 ha1
+    rw [MState.exp_val_sub, MState.exp_val_one, tsub_le_iff_right] at he1
+    rw [← tsub_le_iff_left, ← Prob.coe_one_minus] at he1
+    exact he1

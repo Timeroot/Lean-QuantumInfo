@@ -144,16 +144,6 @@ theorem pinching_self (ρ : MState d) : pinching_map ρ ρ = ρ := by
   simp only [pinching_sum, HermitianMat.mat_one, mul_one]
   rfl
 
-omit [DecidableEq d] in
-open ComplexOrder in
-theorem HermitianMat.le_iff_mulVec_le_mulVec {𝕜 : Type*} [RCLike 𝕜] (A B : HermitianMat d 𝕜) :
-    A ≤ B ↔ ∀ v : d → 𝕜, star v ⬝ᵥ A.mat *ᵥ v ≤ star v ⬝ᵥ B.mat *ᵥ v := by
-  rw [← sub_nonneg, HermitianMat.zero_le_iff]
-  conv_rhs => enter [v]; rw [← sub_nonneg]
-  have h := (B - A).H
-  simp only [HermitianMat.mat_sub] at h
-  simp [Matrix.PosSemidef, Matrix.sub_mulVec, h]
-
 /-- Lemma 3.10 of Hayashi's book "Quantum Information Theory - Mathematical Foundations".
 Also, Lemma 5 in https://arxiv.org/pdf/quant-ph/0107004.
 -- Used in (S60) -/
@@ -246,16 +236,6 @@ theorem pinching_idempotent (ρ σ : MState d) :
   ext1
   grind [pinching_eq_sum_conj]
 
-theorem Commute.cfc_left_commute {d : Type*} [Fintype d] [DecidableEq d]
-  {A B : HermitianMat d ℂ} (f : ℝ → ℝ) (hAB : Commute A.mat B.mat) :
-    Commute (A.cfc f).mat B.mat := by
-  exact IsSelfAdjoint.commute_cfc A.H hAB f
-
-theorem Commute.cfc_right_commute {d : Type*} [Fintype d] [DecidableEq d]
-  {A B : HermitianMat d ℂ} (f : ℝ → ℝ) (hAB : Commute A.mat B.mat) :
-    Commute A.mat (B.cfc f).mat :=
-  (hAB.symm.cfc_left_commute f).symm
-
 theorem inner_cfc_pinching (ρ σ : MState d) (f : ℝ → ℝ) :
     ⟪ρ.M, (pinching_map σ ρ).M.cfc f⟫ = ⟪(pinching_map σ ρ).M, (pinching_map σ ρ).M.cfc f⟫ := by
   nth_rw 2 [pinchingMap_apply_M]
@@ -272,7 +252,7 @@ theorem inner_cfc_pinching (ρ σ : MState d) (f : ℝ → ℝ) :
   conv_rhs =>
     rw [← Matrix.trace_sum, ← Finset.mul_sum]
     enter [1, 2, 2, x]
-    rw [(pinching_commutes_kraus σ ρ x).symm.cfc_right_commute]
+    rw [(pinching_commutes_kraus σ ρ x).symm.cfc_right]
     rw [mul_assoc, ← sq]
     change _ * (pinching_kraus σ x ^ 2).mat
     rw [pinching_sq_eq_self σ x]
@@ -284,14 +264,15 @@ theorem inner_cfc_pinching (ρ σ : MState d) (f : ℝ → ℝ) :
 
 theorem inner_cfc_pinching_right (ρ σ : MState d) (f : ℝ → ℝ) :
     ⟪(pinching_map σ ρ).M, σ.M.cfc f⟫ = ⟪ρ.M, σ.M.cfc f⟫ := by
+  --TODO Cleanup
   -- By definition of pinching_map, we have pinching_map σ ρ = ∑ k, (pinching_kraus σ k).toMat * ρ.toMat * (pinching_kraus σ k).toMat.
   have h_pinching_def : (pinching_map σ ρ).M = ∑ k, (pinching_kraus σ k).mat * ρ.M.mat * (pinching_kraus σ k).mat := by
     exact pinching_eq_sum_conj σ ρ
   -- By definition of pinching_map, we know that (pinching_kraus σ k).toMat * (σ.M.cfc f).toMat = (σ.M.cfc f).toMat * (pinching_kraus σ k).toMat.
   have h_comm_cfc : ∀ k, (pinching_kraus σ k).mat * (σ.M.cfc f).mat = (σ.M.cfc f).mat * (pinching_kraus σ k).mat := by
     intro k
-    apply Commute.cfc_left_commute;
-    exact Commute.cfc_right_commute f rfl;
+    apply Commute.cfc_left
+    exact Commute.cfc_right f rfl
   simp_all [ HermitianMat.inner_def, Matrix.mul_assoc ];
   simp [Finset.sum_mul, Matrix.mul_assoc]
   simp only [h_comm_cfc, ← Matrix.mul_assoc];
@@ -309,143 +290,18 @@ theorem inner_cfc_pinching_right (ρ σ : MState d) (f : ℝ → ℝ) :
     rw [ ← Matrix.trace_mul_comm ] ; simp [ Matrix.mul_assoc ] ;
   · simp [ Matrix.trace ]
 
-noncomputable section AristotleLemmas
-
-open ComplexOrder
-
-variable {d : Type*} [Fintype d]
-
---PULLOUT
-theorem HermitianMat.inner_mulVec_nonneg {A : HermitianMat d ℂ} (hA : 0 ≤ A) (v : d → ℂ) :
-    0 ≤ star v ⬝ᵥ A.mat *ᵥ v := by
-  convert hA using 1;
-  constructor <;> intro h <;> rw [le_iff_mulVec_le_mulVec] at * <;> aesop
-
-variable [DecidableEq d]
-
---PULLOUT
-theorem HermitianMat.mem_ker_of_inner_mulVec_zero {A : HermitianMat d ℂ} (hA : 0 ≤ A) (v : d → ℂ)
-    (h : star v ⬝ᵥ A.mat *ᵥ v = 0) : v ∈ A.ker := by
-  -- Since $A$ is positive semidefinite, there exists a matrix $B$ such that $A = B^* B$.
-  obtain ⟨B, hB⟩ : ∃ B : Matrix d d ℂ, A.mat = B.conjTranspose * B := by
-    have h_pos_semidef : Matrix.IsHermitian A.mat ∧ ∀ v : d → ℂ, 0 ≤ star v ⬝ᵥ A.mat *ᵥ v := by
-      exact ⟨ A.H, fun v => by simpa [ Matrix.mulVec, dotProduct ] using hA.2 v ⟩;
-    exact Matrix.posSemidef_iff_eq_conjTranspose_mul_self.mp h_pos_semidef;
-  -- Since $v^* A v = 0$, we have $v^* B^* B v = 0$, which implies $B v = 0$.
-  have hBv : B.mulVec v = 0 := by
-    have hBv : star (B.mulVec v) ⬝ᵥ (B.mulVec v) = 0 := by
-      simp_all [  Matrix.dotProduct_mulVec];
-      simp_all [ Matrix.vecMul, dotProduct, mul_comm ];
-      simp_all [ Matrix.mul_apply, Matrix.mulVec, dotProduct ];
-      convert h using 3 ; simp [ mul_comm, mul_left_comm, Finset.mul_sum];
-      exact Finset.sum_comm.trans ( Finset.sum_congr rfl fun _ _ => Finset.sum_congr rfl fun _ _ => by ring );
-    simp_all [ dotProduct, Complex.ext_iff ];
-    exact funext fun x => by norm_num [ Complex.ext_iff ] ; constructor <;> nlinarith only [ hBv.1 ▸ Finset.single_le_sum ( fun x _ => add_nonneg ( mul_self_nonneg ( ( B *ᵥ v ) x |> Complex.re ) ) ( mul_self_nonneg ( ( B *ᵥ v ) x |> Complex.im ) ) ) ( Finset.mem_univ x ) ] ;
-  simp_all [← Matrix.mulVec_mulVec]
-  replace hB := congr_arg ( fun m => m.mulVec v ) hB; simp_all [ ← Matrix.mulVec_mulVec ] ;
-  exact hB
-
---PULLOUT
-theorem HermitianMat.ker_add {A B : HermitianMat d ℂ} (hA : 0 ≤ A) (hB : 0 ≤ B) :
-    (A + B).ker = A.ker ⊓ B.ker := by
-  -- If $(A + B)v = 0$, then $Av + Bv = 0$. Since $A$ and $B$ are positive semidefinite, this implies $Av = 0$ and $Bv = 0$.
-  have h_subset : ∀ v : d → ℂ, (A + B).mat *ᵥ v = 0 → A.mat *ᵥ v = 0 ∧ B.mat *ᵥ v = 0 := by
-    intro v hv
-    have h_pos : 0 ≤ star v ⬝ᵥ A.mat *ᵥ v ∧ 0 ≤ star v ⬝ᵥ B.mat *ᵥ v := by
-      exact ⟨inner_mulVec_nonneg hA v, inner_mulVec_nonneg hB v⟩
-    have h_eq_zero : star v ⬝ᵥ A.mat *ᵥ v + star v ⬝ᵥ B.mat *ᵥ v = 0 := by
-      convert congr_arg ( fun w => star v ⬝ᵥ w ) hv using 1 ;
-      simp [ Matrix.add_mulVec ] ; ring_nf!;
-      aesop;
-    have h_eq_zero : star v ⬝ᵥ A.mat *ᵥ v = 0 ∧ star v ⬝ᵥ B.mat *ᵥ v = 0 := by
-      exact ⟨ by simpa using le_antisymm ( le_trans ( le_add_of_nonneg_right h_pos.2 ) h_eq_zero.le ) h_pos.1, by simpa using le_antisymm ( le_trans ( le_add_of_nonneg_left h_pos.1 ) h_eq_zero.le ) h_pos.2 ⟩
-    exact ⟨mem_ker_of_inner_mulVec_zero hA v h_eq_zero.1, mem_ker_of_inner_mulVec_zero hB v h_eq_zero.2 ⟩
-  apply le_antisymm
-  · exact fun v hv => ⟨ h_subset v hv |>.1, h_subset v hv |>.2 ⟩;
-  · rintro v ⟨hvA, hvB⟩
-    change (A + B).mat *ᵥ v = 0
-    convert congr_arg₂ ( · + · ) hvA hvB using 1
-    · ext1
-      simp [ Matrix.add_mulVec ]
-      ring!
-    · norm_num +zetaDelta at *
-
---PULLOUT
-theorem HermitianMat.ker_sum {ι : Type*} [Fintype ι] (f : ι → HermitianMat d ℂ) (hf : ∀ i, 0 ≤ f i) :
-    (∑ i, f i).ker = ⨅ i, (f i).ker := by
-  -- By definition of sum, we know that if $v \in \ker(\sum_{i \in s} f_i)$, then $\sum_{i \in s} (f_i v, v) = 0$.
-  have h_sum_zero : ∀ v : d → ℂ, (∑ i, f i).mat *ᵥ v = 0 ↔ ∀ i, (f i).mat *ᵥ v = 0 := by
-    intro v
-    constructor
-    · intro hv_zero
-      have h_inner_zero : ∑ i, star v ⬝ᵥ (f i).mat *ᵥ v = 0 := by
-        have h_inner_zero : star v ⬝ᵥ (∑ i, (f i).mat) *ᵥ v = 0 := by
-          aesop
-        convert h_inner_zero using 1
-        simp [Matrix.mulVec, dotProduct];
-        simp only [Finset.mul_sum _ _ _, Matrix.sum_apply, Finset.sum_mul];
-        exact Finset.sum_comm.trans ( Finset.sum_congr rfl fun _ _ => Finset.sum_comm )
-      have h_inner_zero_i : ∀ i, star v ⬝ᵥ (f i).mat *ᵥ v = 0 := by
-        have h_inner_zero_i : ∀ i, 0 ≤ star v ⬝ᵥ (f i).mat *ᵥ v := by
-          exact fun i => inner_mulVec_nonneg (hf i) v;
-        exact fun i => le_antisymm ( le_trans ( Finset.single_le_sum ( fun i _ => h_inner_zero_i i ) ( Finset.mem_univ i ) ) h_inner_zero.le ) ( h_inner_zero_i i )
-      exact fun i ↦ mem_ker_of_inner_mulVec_zero (hf i) v (h_inner_zero_i i)
-    · simp +contextual [Matrix.sum_mulVec]
-  ext v
-  simp
-  exact h_sum_zero v
-
---PULLOUT
-theorem HermitianMat.ker_conj {A : HermitianMat d ℂ} (hA : 0 ≤ A) (B : Matrix d d ℂ) :
-    (A.conj B).ker = Submodule.comap (Matrix.toEuclideanLin B.conjTranspose) A.ker := by
-  ext v; simp [HermitianMat.conj];
-  constructor <;> intro h;
-  · -- By definition of $A$, we know that $⟨w, A w⟩ = 0$ implies $w \in \ker A$.
-    have h_inner_zero : ∀ w : EuclideanSpace ℂ d, 0 ≤ A → (star w ⬝ᵥ A.mat *ᵥ w) = 0 → w ∈ A.ker := by
-      intro w hw h_zero
-      apply HermitianMat.mem_ker_of_inner_mulVec_zero hw w h_zero;
-    convert h_inner_zero ( Bᴴ *ᵥ v ) hA _;
-    convert congr_arg ( fun w => star v ⬝ᵥ w ) h using 1;
-    · simp [ Matrix.mulVec_mulVec,dotProduct_comm ];
-      simp [ Matrix.mulVec, dotProduct, Finset.mul_sum, mul_assoc, mul_comm, mul_left_comm, HermitianMat.lin ];
-      simp [ Matrix.toEuclideanLin, Matrix.mulVec, dotProduct, Finset.mul_sum, mul_comm, mul_left_comm, Matrix.mul_apply ];
-      exact Finset.sum_comm.trans ( Finset.sum_congr rfl fun _ _ => Finset.sum_comm.trans ( Finset.sum_congr rfl fun _ _ => Finset.sum_congr rfl fun _ _ => Finset.sum_congr rfl fun _ _ => by ring ) );
-    · simp [ dotProduct ];
-  · simp_all [ HermitianMat.ker, Matrix.mul_assoc ];
-    convert congr_arg ( Matrix.toEuclideanLin B ) h using 1;
-    · simp [HermitianMat.lin, Matrix.toEuclideanLin];
-    · exact Eq.symm (LinearMap.map_zero (Matrix.toEuclideanLin B))
-
+open ComplexOrder in
 theorem pinching_map_eq_sum_conj_hermitian (σ ρ : MState d) :
     (pinching_map σ ρ).M = ∑ k, ρ.M.conj (pinching_kraus σ k).mat := by
   ext1
   simp [pinching_eq_sum_conj σ ρ]
 
-variable {d d₂ : Type*} [Fintype d] [Fintype d₂]
-
---PULLOUT
-theorem HermitianMat.conj_nonneg {A : HermitianMat d ℂ} (hA : 0 ≤ A) (B : Matrix d₂ d ℂ) :
-    0 ≤ A.conj B := by
-  convert Matrix.PosSemidef.mul_mul_conjTranspose_same ( show Matrix.PosSemidef A.mat from ?_ ) using 1;
-  convert iff_of_true ?_ ?_;
-  all_goals try assumption;
-  · exact conj_le B hA
-  · rw [zero_le_iff] at hA
-    exact Matrix.PosSemidef.mul_mul_conjTranspose_same hA
-  · rwa [zero_le_iff] at hA
-
-end AristotleLemmas
-
 theorem pinching_map_ker_le (ρ σ : MState d) : (pinching_map σ ρ).M.ker ≤ ρ.M.ker := by
-  -- By definition of pinching map, we can write it as a sum of terms ρ.M.conj (pinching_kraus σ k).toMat.
-  have h_sum : (pinching_map σ ρ).M = ∑ k, ρ.M.conj (pinching_kraus σ k).mat := by
-    exact pinching_map_eq_sum_conj_hermitian σ ρ
+  --TODO Cleanup
   -- By `HermitianMat.ker_sum`, the kernel of the sum is the intersection of the kernels of the terms.
   have h_ker_sum : (∑ k, ρ.M.conj (pinching_kraus σ k).mat).ker = ⨅ k, (ρ.M.conj (pinching_kraus σ k).mat).ker := by
-    convert HermitianMat.ker_sum _ _;
-    have h_conj_nonneg : 0 ≤ ρ.M := by
-      exact ρ.zero_le
-    exact fun i ↦ HermitianMat.conj_nonneg h_conj_nonneg (pinching_kraus σ i).mat;
+    apply HermitianMat.ker_sum
+    exact fun i ↦ HermitianMat.conj_nonneg (pinching_kraus σ i).mat ρ.zero_le
   -- By `HermitianMat.ker_conj`, the kernel of `ρ.M.conj P_k` (where $P_k$ is the Kraus operator) is `Submodule.comap P_k.conjTranspose ρ.M.ker`.
   have h_ker_conj : ∀ k, (ρ.M.conj (pinching_kraus σ k).mat).ker = Submodule.comap (Matrix.toEuclideanLin (pinching_kraus σ k).mat.conjTranspose) ρ.M.ker := by
     intro k;
@@ -460,7 +316,7 @@ theorem pinching_map_ker_le (ρ σ : MState d) : (pinching_map σ ρ).M.ker ≤ 
     convert congr_arg ( fun m => m *ᵥ v ) h_sum_eq_one.symm using 1 ;
     · simp
     · rw [Matrix.sum_mulVec]
-  rw [h_sum, h_ker_sum] at hv
+  rw [pinching_map_eq_sum_conj_hermitian σ ρ, h_ker_sum] at hv
   simp at h_ker_conj hv ⊢
   rw [hv_sum]
   exact Submodule.sum_mem _ fun k _ => by simpa [h_ker_conj _ k.2] using hv _ k.2
@@ -491,6 +347,7 @@ end AristotleLemmas
 set_option maxHeartbeats 2000000 in
 theorem ker_le_ker_pinching_map_ker (ρ σ : MState d) (h : σ.M.ker ≤ ρ.M.ker) :
     σ.M.ker ≤ (pinching_map σ ρ).M.ker := by
+  --TODO Cleanup
   intro v hv;
   -- Since $v \in \ker \sigma$, we have $P_k v = 0$ for all $k$ where the eigenvalue of $k$ is non-zero.
   have h_proj_zero : ∀ k : spectrum ℝ σ.m, k.val ≠ 0 → (pinching_kraus σ k).mat *ᵥ v = 0 := by
