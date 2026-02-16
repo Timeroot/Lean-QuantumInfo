@@ -337,16 +337,4 @@ theorem id_kron_submatrix [CommSemiring R] (f : B → A) :
 
 end kron
 
-section pi
-section basis
-
---Missing from Mathlib
-
-variable {ι : Type*}
-variable {R : Type*} [CommSemiring R]
-variable {s : ι → Type*} [∀ i, AddCommMonoid (s i)] [∀ i, Module R (s i)]
-variable {L : ι → Type* }
-
-end basis
-end pi
 end MatrixMap

@@ -20,27 +20,6 @@ The majority of quantum theory revolves around `CPTPMap`s, so those are explored
 thoroughly in their file CPTP.lean.
 -/
 
---PULLOUT
-open ComplexOrder in
-theorem Matrix.PosSemidef.trace_pos {n 𝕜 : Type*} [Fintype n] [RCLike 𝕜]
-    {A : Matrix n n 𝕜} (hA : A.PosSemidef) (h : A ≠ 0) : 0 < A.trace := by
-  classical
-  apply hA.trace_nonneg.lt_of_ne'
-  rw [hA.left.trace_eq_sum_eigenvalues]
-  suffices ∑ i, hA.left.eigenvalues i ≠ 0 from mod_cast this
-  rwa [ne_eq, Fintype.sum_eq_zero_iff_of_nonneg hA.eigenvalues_nonneg,
-    hA.left.eigenvalues_eq_zero_iff]
-
---PULLOUT
-open ComplexOrder in
-theorem HermitianMat.trace_pos {n 𝕜 : Type*} [Fintype n] [RCLike 𝕜]
-    {A : HermitianMat n 𝕜} (hA : 0 < A) : 0 < A.trace := by
-  have hA' := hA.le
-  rw [HermitianMat.zero_le_iff] at hA'
-  have h_pos := Matrix.PosSemidef.trace_pos hA' (by simpa using hA.ne')
-  rw [HermitianMat.trace_eq_re_trace]
-  rw [RCLike.pos_iff] at h_pos
-  exact h_pos.left
 
 variable (dIn dOut R : Type*) (𝕜 : Type := ℂ)
 variable [Fintype dIn] [Fintype dOut]
@@ -114,7 +93,7 @@ theorem funext_hermitian (h : ∀ M : HermitianMat dIn ℂ, CΛ₁.map M = CΛ�
   have hA := h (imaginaryPart M)
   convert congr($hH + Complex.I • $hA)
   <;> rw (occs := [1]) [← realPart_add_I_smul_imaginaryPart M, map_add, map_smul]
-
+  <;> rfl
 
 /-- Two maps are equal if they agree on all positive inputs. -/
 theorem funext_pos [Fintype dIn] (h : ∀ M : HermitianMat dIn ℂ, 0 ≤ M → CΛ₁.map M = CΛ₂.map M) :
@@ -138,7 +117,7 @@ theorem funext_pos_trace [Fintype dIn]
   · simp
   have h_tr : 0 < M.trace := M.trace_pos hM
   have := h (M.trace⁻¹ • M) ?_ ?_
-  · simp only [selfAdjoint.val_smul, LinearMap.map_smul_of_tower] at this
+  · simp only [HermitianMat.mat_smul, LinearMap.map_smul_of_tower] at this
     convert congr(M.trace • $this)
     · rw [smul_smul]
       field_simp

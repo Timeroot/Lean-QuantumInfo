@@ -297,12 +297,17 @@ theorem replacement_apply [Nonempty dIn] [DecidableEq dOut] (ρ : MState dOut) (
   ext i j
   simp
   rw [HermitianMat.instFun]
-  simp [-HermitianMat.toMat_apply, Matrix.traceLeft]
-  rw [MState.m]
-  dsimp --disgusting...
-  simp [-HermitianMat.toMat_apply, ← Finset.sum_mul]
+  simp [-HermitianMat.mat_apply, Matrix.traceLeft, ← Finset.sum_mul]
   convert one_mul _
   exact ρ₀.tr'
+
+--In principle we can relax the `Nonempty dIn`: for the case where `IsEmpty dIn`, we just take the
+-- 0 map, and it's CPTP.
+instance [Nonempty dIn] [Nonempty dOut] [DecidableEq dOut] : Inhabited (CPTPMap dIn dOut) :=
+  ⟨replacement default⟩
+
+instance [Nonempty dIn] [Nonempty dOut] : Nonempty (CPTPMap dIn dOut) := by
+  classical infer_instance
 
 /-- There is a CPTP map that takes a system of any (nonzero) dimension and outputs the
 trivial Hilbert space, 1-dimensional, indexed by any `Unique` type. We can think of this

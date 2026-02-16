@@ -61,16 +61,17 @@ variable {ι : Type*} [ResourcePretheory ι] {i j k l : ι}
 /-- The `prod` operation of `ResourcePretheory` gives the natural product operation on `MState`s
 that puts us in a new Hilbert space of the category. Accessible by the notation `ρ₁ ⊗ᵣ ρ₂`. -/
 noncomputable def prodRelabel (ρ₁ : MState (H i)) (ρ₂ : MState (H j)) : MState (H (i * j)) :=
-  (ρ₁ ⊗ ρ₂).relabel (prodEquiv i j)
+  (ρ₁ ⊗ᴹ ρ₂).relabel (prodEquiv i j)
 
-scoped infixl:65 "⊗ᵣ" => prodRelabel
+@[inherit_doc]
+scoped infixl:65 " ⊗ᵣ " => prodRelabel
 
 theorem prodRelabel_assoc (ρ₁ : MState (H i)) (ρ₂ : MState (H j)) (ρ₃ : MState (H k)) :
     ρ₁ ⊗ᵣ ρ₂ ⊗ᵣ ρ₃ ≍ ρ₁ ⊗ᵣ (ρ₂ ⊗ᵣ ρ₃) := by
   simp [prodRelabel, MState.relabel_kron]
   have h_equiv := hAssoc i j k
   rw [← Equiv.trans_assoc, Equiv.trans_cancel_right] at h_equiv
-  have h_cong := congrArg (MState.relabel ((ρ₁⊗ρ₂)⊗ρ₃)) h_equiv
+  have h_cong := congrArg (MState.relabel ((ρ₁ ⊗ᴹ ρ₂) ⊗ᴹ ρ₃)) h_equiv
   rw [← eq_cast_iff_heq]; swap
   · rw [mul_assoc]
   convert h_cong; clear h_equiv h_cong
@@ -92,17 +93,18 @@ theorem prodRelabel_relabel_cast_prod
   rfl
 
 /-- The `prod` operation of `ResourcePretheory` gives the natural product operation on `CPTPMap`s. Accessible
-by the notation `M₁ ⊗ᵣ M₂`. -/
+by the notation `M₁ ⊗ₖᵣ M₂`. -/
 noncomputable def prodCPTPMap (M₁ : CPTPMap (H i) (H j)) (M₂ : CPTPMap (H k) (H l)) :
     CPTPMap (H (i * k)) (H (j * l)) :=
   (CPTPMap.ofEquiv (prodEquiv j l).symm).compose ((M₁ ⊗ₖ M₂).compose (CPTPMap.ofEquiv (prodEquiv i k)))
 
-scoped notation M₁ "⊗ₖᵣ" M₂ => prodCPTPMap M₁ M₂
+@[inherit_doc]
+scoped notation M₁ " ⊗ₖᵣ " M₂ => prodCPTPMap M₁ M₂
 
 open ComplexOrder in
 theorem PosDef.prod {ρ : MState (H i)} {σ : MState (H j)} (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
     : (ρ ⊗ᵣ σ).m.PosDef := by
-  have : (ρ ⊗ σ).m.PosDef := MState.PosDef.kron hρ hσ
+  have : (ρ ⊗ᴹ σ).m.PosDef := MState.PosDef.kron hρ hσ
   rw [prodRelabel]
   exact MState.PosDef.relabel this (prodEquiv i j)
 
@@ -126,13 +128,13 @@ theorem PosDef.prod {ρ : MState (H i)} {σ : MState (H j)} (hρ : ρ.m.PosDef) 
 -- noncomputable def statePow {i : ι} (ρ : MState (H i)) (n : ℕ+) : MState (H (i⊗^H[n])) :=
 --   (n.natPred.rec ρ (fun _ σ ↦ σ ⊗ᵣ ρ) : MState (H (i⊗^H[n.natPred.succPNat])))
 
--- scoped notation ρ "⊗^S[" n "]" => statePow ρ n
+-- scoped notation ρ " ⊗ᵣ^[" n "]" => statePow ρ n
 
 -- @[simp]
--- theorem statePow_one {i : ι} (ρ : MState (H i)) : ρ⊗^S[1] = ρ :=
+-- theorem statePow_one {i : ι} (ρ : MState (H i)) : ρ ⊗ᵣ^[1] = ρ :=
 --   rfl
 
--- theorem statePow_succ {i : ι} (ρ : MState (H i)) (n : ℕ+) : ρ⊗^S[n + 1] = ρ⊗^S[n] ⊗ᵣ ρ := by
+-- theorem statePow_succ {i : ι} (ρ : MState (H i)) (n : ℕ+) : ρ ⊗ᵣ^[n + 1] = ρ ⊗ᵣ^[n] ⊗ᵣ ρ := by
 --   rcases n with ⟨_|n, hn⟩
 --   · contradiction
 --   · rfl
@@ -200,27 +202,29 @@ theorem spacePow_mul (m n : ℕ) :
     i ^ (m * n) = (i ^ m) ^ n :=
   pow_mul i m n
 
-/-- Powers of states, using the resource theory's notion of product. -/
+/-- Powers of states, using the resource theory's notion of product. Accessible via the notation
+`ρ ⊗ᵣ^[n]`.-/
 noncomputable def statePow (ρ : MState (H i)) (n : ℕ) : MState (H (i ^ n)) :=
   n.rec default (fun _ σ ↦ σ ⊗ᵣ ρ)
 
-scoped notation ρ "⊗^S[" n "]" => statePow ρ n
+@[inherit_doc]
+scoped notation ρ " ⊗ᵣ^[" n "]" => statePow ρ n
 
 @[simp]
-theorem statePow_zero (ρ : MState (H i)) : ρ⊗^S[0] = default :=
+theorem statePow_zero (ρ : MState (H i)) : ρ ⊗ᵣ^[0] = default :=
   rfl
 
 @[simp]
-theorem statePow_one (ρ : MState (H i)) : ρ⊗^S[1] ≍ ρ := by
+theorem statePow_one (ρ : MState (H i)) : ρ ⊗ᵣ^[1] ≍ ρ := by
   rw [← eq_cast_iff_heq]; swap
   · rw [spacePow_one]
   · rw [eq_cast_iff_heq, statePow]
     exact default_prod ρ
 
-theorem statePow_succ (ρ : MState (H i)) (n : ℕ) : ρ⊗^S[n + 1] = ρ⊗^S[n] ⊗ᵣ ρ := by
+theorem statePow_succ (ρ : MState (H i)) (n : ℕ) : ρ ⊗ᵣ^[n + 1] = ρ ⊗ᵣ^[n] ⊗ᵣ ρ := by
   rfl
 
-theorem statePow_add (ρ : MState (H i)) (m n : ℕ) : ρ⊗^S[m + n] ≍ ρ⊗^S[m] ⊗ᵣ ρ⊗^S[n] := by
+theorem statePow_add (ρ : MState (H i)) (m n : ℕ) : ρ ⊗ᵣ^[m + n] ≍ ρ ⊗ᵣ^[m] ⊗ᵣ ρ ⊗ᵣ^[n] := by
   rw [← eq_cast_iff_heq]; swap
   · rw [spacePow_add]
   rw [eq_cast_iff_heq]
@@ -234,13 +238,13 @@ theorem statePow_add (ρ : MState (H i)) (m n : ℕ) : ρ⊗^S[m + n] ≍ ρ⊗^
     apply spacePow_add
 
 theorem statePow_add_relabel (ρ : MState (H i)) (m n : ℕ) :
-    ρ⊗^S[m + n] = (ρ⊗^S[m] ⊗ᵣ ρ⊗^S[n]).relabel (Equiv.cast (by congr; exact pow_add i m n)) := by
+    ρ ⊗ᵣ^[m + n] = (ρ ⊗ᵣ^[m] ⊗ᵣ ρ ⊗ᵣ^[n]).relabel (Equiv.cast (by congr; exact pow_add i m n)) := by
   have h := statePow_add ρ m n
   rw [heq_iff_exists_eq_cast] at h
   obtain ⟨h, h₂⟩ := h
   rw [h₂, MState.relabel_cast]
 
-theorem statePow_mul (ρ : MState (H i)) (m n : ℕ) : ρ⊗^S[m * n] ≍ (ρ⊗^S[m])⊗^S[n] := by
+theorem statePow_mul (ρ : MState (H i)) (m n : ℕ) : ρ ⊗ᵣ^[m * n] ≍ (ρ ⊗ᵣ^[m]) ⊗ᵣ^[n] := by
   rw [← eq_cast_iff_heq]; swap
   · rw [spacePow_mul]
   rw [eq_cast_iff_heq]
@@ -248,8 +252,8 @@ theorem statePow_mul (ρ : MState (H i)) (m n : ℕ) : ρ⊗^S[m * n] ≍ (ρ⊗
   · simp
   · rename_i n ih
     rw [statePow_succ, mul_add]
-    --This is TERRIBLE. There has to be a better way
-    trans ρ⊗^S[m * n] ⊗ᵣ ρ⊗^S[m * 1]
+    --This is TERRIBLE. There has to be a better way. TODO Cleanup
+    trans ρ ⊗ᵣ^[m * n] ⊗ᵣ ρ ⊗ᵣ^[m * 1]
     · apply statePow_add
     · rw [← eq_cast_iff_heq] at ih; swap
       · congr 2 <;> simp [pow_mul]
@@ -266,7 +270,7 @@ theorem statePow_mul (ρ : MState (H i)) (m n : ℕ) : ρ⊗^S[m * n] ≍ (ρ⊗
       · rw [mul_one]
 
 theorem statePow_mul_relabel {i : ι} (ρ : MState (H i)) (m n : ℕ) :
-   ρ⊗^S[m * n] = (ρ⊗^S[m])⊗^S[n].relabel (Equiv.cast (congrArg H (pow_mul i m n))) := by
+   ρ ⊗ᵣ^[m * n] = (ρ ⊗ᵣ^[m]) ⊗ᵣ^[n].relabel (Equiv.cast (congrArg H (pow_mul i m n))) := by
   have h := statePow_mul ρ m n
   rw [heq_iff_exists_eq_cast] at h
   obtain ⟨h, h₂⟩ := h
@@ -274,20 +278,20 @@ theorem statePow_mul_relabel {i : ι} (ρ : MState (H i)) (m n : ℕ) :
 
 open ComplexOrder in
 theorem PosDef.npow {ρ : MState (H i)} (hρ : ρ.m.PosDef) (n : ℕ)
-    : (ρ⊗^S[n]).m.PosDef := by
+    : (ρ ⊗ᵣ^[n]).m.PosDef := by
   induction n
   · rw [statePow_zero, spacePow_zero]
     exact MState.posDef_of_unique default
   · apply ResourcePretheory.PosDef.prod ‹_› hρ
 
 theorem statePow_rw {n m : ℕ} (h : n = m) (ρ : MState (H i)) :
-    ρ⊗^S[n] = (ρ⊗^S[m]).relabel (Equiv.cast (by congr)) := by
+    ρ ⊗ᵣ^[n] = (ρ ⊗ᵣ^[m]).relabel (Equiv.cast (by congr)) := by
   subst n
   simp
 
 @[simp]
 theorem qRelEntropy_statePow (ρ σ : MState (H i)) (n : ℕ) :
-    𝐃(ρ⊗^S[n] ‖ σ ⊗^S[n]) = n * 𝐃(ρ‖σ) := by
+    𝐃(ρ ⊗ᵣ^[n] ‖ σ  ⊗ᵣ^[n]) = n * 𝐃(ρ‖σ) := by
   induction n
   · simp
   · rename_i n ih
@@ -299,75 +303,27 @@ theorem sInf_spectrum_rprod {j : ι} (ρ : MState (H i)) (σ : MState (H j)) :
   rw [← MState.sInf_spectrum_prod, prodRelabel, MState.spectrum_relabel]
 
 lemma sInf_spectrum_spacePow (σ : MState (H i)) (n : ℕ) :
-    sInf (spectrum ℝ (σ⊗^S[n]).m) = sInf (spectrum ℝ σ.m) ^ n := by
+    sInf (spectrum ℝ (σ ⊗ᵣ^[n]).m) = sInf (spectrum ℝ σ.m) ^ n := by
   induction n
   · simp only [statePow_zero, pow_zero]
     conv =>
       enter [1, 1, 2]
       equals 1 =>
-        change MState.uniform.m = 1 --TODO simp
-        ext i j
-        simp [MState.uniform, MState.ofClassical, MState.m, HermitianMat.diagonal]
-        rfl
+        ext1
+        simp [default, MState.uniform, MState.ofClassical, MState.m, HermitianMat.diagonal]
     rw [spectrum.one_eq, csInf_singleton]
   · rename_i n ih
     rw [statePow_succ, sInf_spectrum_rprod, ih, pow_succ]
 
---PULLOUT: MState.lean
-@[simp]
-theorem _root_.MState.default_M [Fintype d] [DecidableEq d] [Unique d] : (default : MState d).M = 1 := by
-  simp [MState.instInhabited, MState.uniform]
-  rfl
-
---PULLOUT: HermitianMat/CFC.lean
-@[simp]
-theorem _root_.HermitianMat.one_rpow [Fintype d] [DecidableEq d] (r : ℝ) :
-    (1 : HermitianMat d ℂ) ^ r = 1 := by
-  rcases isEmpty_or_nonempty d
-  · apply Subsingleton.allEq
-  · nth_rw 2 [← HermitianMat.cfc_id (1 : HermitianMat d ℂ)]
-    exact HermitianMat.cfc_congr 1 (by simp)
-
---PULLOUT: HermitianMat/Trace.lean
-@[simp]
-theorem _root_.HermitianMat.trace_one [Fintype d] [DecidableEq d] :
-    (1 : HermitianMat d ℂ).trace = (Fintype.card d) := by
-  simp [HermitianMat.trace_eq_re_trace]
-
---PULLOUT: Entropy.lean
-@[simp]
-theorem _root_.sandwichedRelRentropy_of_unique [Fintype d] [DecidableEq d] [Unique d]
-  (ρ σ : MState d) (α : ℝ) :
-    D̃_α(ρ‖σ) = 0 := by
-  simp [Subsingleton.allEq ρ default, Subsingleton.allEq σ default, SandwichedRelRentropy]
-
 @[simp]
 theorem sandwichedRelRentropy_statePow {α : ℝ} (ρ σ : MState (H i)) (n : ℕ) :
-    D̃_ α(ρ⊗^S[n] ‖ σ⊗^S[n]) = n * D̃_ α(ρ‖σ) := by
+    D̃_ α(ρ ⊗ᵣ^[n] ‖ σ ⊗ᵣ^[n]) = n * D̃_ α(ρ‖σ) := by
   induction n
   · rw [statePow_zero, statePow_zero, spacePow_zero]
     simp
   · rename_i n ih
     rw [statePow_succ, statePow_succ, sandwichedRelRentropy_prodRelabel]
     simp [ih, add_mul]
-
-theorem sandwichedRelRentropy_heq_congr {α : ℝ}
-      {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
-      {ρ₁ σ₁ : MState d₁} {ρ₂ σ₂ : MState d₂} (hd : d₁ = d₂) (hρ : ρ₁ ≍ ρ₂) (hσ : σ₁ ≍ σ₂) :
-    D̃_ α(ρ₁‖σ₁) = D̃_ α(ρ₂‖σ₂) := by
-  rw [heq_iff_exists_eq_cast] at hρ hσ
-  obtain ⟨_, rfl⟩ := hρ
-  obtain ⟨_, rfl⟩ := hσ
-  simp [← MState.relabel_cast _ hd]
-
-@[gcongr]
-theorem sandwichedRelRentropy_congr {α : ℝ}
-      {d₁ d₂ : Type u} [Fintype d₁] [DecidableEq d₁] [Fintype d₂] [DecidableEq d₂]
-      {ρ₁ σ₁ : MState d₁} {ρ₂ σ₂ : MState d₂} (hd : d₁ = d₂)
-        (hρ : ρ₁ = ρ₂.relabel (Equiv.cast hd)) (hσ : σ₁ = σ₂.relabel (Equiv.cast hd)) :
-    D̃_ α(ρ₁‖σ₁) = D̃_ α(ρ₂‖σ₂) := by
-  subst ρ₁ σ₁
-  simp
 
 end UnitalPretheory
 
@@ -432,7 +388,7 @@ namespace UnitalFreeStateTheory
 variable {ι : Type*} [UnitalFreeStateTheory ι] {i : ι}
 
 theorem _root_.FreeStateTheory.IsFree.npow {i : ι} {ρ : MState (H i)}
-    (hρ : IsFree ρ) (n : ℕ) : IsFree (ρ⊗^S[n]) := by
+    (hρ : IsFree ρ) (n : ℕ) : IsFree (ρ ⊗ᵣ^[n]) := by
   induction n
   · rw [statePow_zero, spacePow_zero]
     apply IsFree.of_unique
@@ -484,10 +440,10 @@ theorem exists_isFree_relativeEntResource (ρ : MState (H i)) :
   use σ, hσ₁
   rw [RelativeEntResource, ← hσ₂.iInf_eq hσ₁, ENNReal.ofNNReal, WithTop.coe_untop, iInf_subtype']
 
-theorem RelativeEntResource.Subadditive (ρ : MState (H i)) : Subadditive fun n ↦ 𝑅ᵣ (ρ⊗^S[n]) := by
+theorem RelativeEntResource.Subadditive (ρ : MState (H i)) : Subadditive fun n ↦ 𝑅ᵣ (ρ ⊗ᵣ^[n]) := by
   intro m n
-  obtain ⟨σ₂, hσ₂f, hσ₂d⟩ := exists_isFree_relativeEntResource (ρ⊗^S[m])
-  obtain ⟨σ₃, hσ₃f, hσ₃d⟩ := exists_isFree_relativeEntResource (ρ⊗^S[n])
+  obtain ⟨σ₂, hσ₂f, hσ₂d⟩ := exists_isFree_relativeEntResource (ρ ⊗ᵣ^[m])
+  obtain ⟨σ₃, hσ₃f, hσ₃d⟩ := exists_isFree_relativeEntResource (ρ ⊗ᵣ^[n])
   simp only [RelativeEntResource, ← NNReal.coe_add, coe_le_coe]
   rw [← ENNReal.coe_le_coe]
   simp [RelativeEntResource, ENNReal.ofNNReal] at hσ₂d hσ₃d ⊢
@@ -517,7 +473,7 @@ scoped notation "𝑅ᵣ∞" => RegularizedRelativeEntResource
 
 /-- Lemma 5 -/
 theorem RelativeEntResource.tendsto (ρ : MState (H i)) :
-    Filter.atTop.Tendsto (fun n ↦ 𝑅ᵣ (ρ⊗^S[n]) / n) (𝓝 (𝑅ᵣ∞ ρ)) := by
+    Filter.atTop.Tendsto (fun n ↦ 𝑅ᵣ (ρ ⊗ᵣ^[n]) / n) (𝓝 (𝑅ᵣ∞ ρ)) := by
   rw [← NNReal.tendsto_coe]
   apply (RelativeEntResource.Subadditive ρ).tendsto_lim
   use 0
@@ -527,7 +483,7 @@ theorem RelativeEntResource.tendsto (ρ : MState (H i)) :
 /-- Alternate version of Lemma 5 which states the convergence with the `ENNReal`
 expression for `RelativeEntResource`, as opposed its `untop`-ped `NNReal` value. -/
 theorem RelativeEntResource.tendsto_ennreal (ρ : MState (H i)) :
-    Filter.atTop.Tendsto (fun n ↦ (⨅ σ ∈ IsFree, 𝐃(ρ⊗^S[n]‖σ)) / ↑n) (𝓝 (𝑅ᵣ∞ ρ)) := by
+    Filter.atTop.Tendsto (fun n ↦ (⨅ σ ∈ IsFree, 𝐃(ρ ⊗ᵣ^[n]‖σ)) / ↑n) (𝓝 (𝑅ᵣ∞ ρ)) := by
   refine Filter.Tendsto.congr' ?_ (ENNReal.tendsto_coe.mpr <| RelativeEntResource.tendsto ρ)
   rw [Filter.EventuallyEq, Filter.eventually_atTop]
   use 1; intros

@@ -22,6 +22,7 @@ noncomputable section
 open BigOperators
 open ComplexOrder
 open Matrix
+open scoped RealInnerProductSpace
 
 /-- A POVM is a (finite) collection of PSD matrices on the same Hilbert space
  that sum to the identity. Here `X` indexes the matrices, and `d` is the space
@@ -47,7 +48,7 @@ state to an `d × X`-dimensional quantum-classical state. -/
 def measurementMap (Λ : POVM X d) : CPTPMap d (d × X) where
   toLinearMap :=
     ∑ (x : X), open Kronecker in {
-      toFun := fun ρ ↦ ((((Λ.mats x) ^ (1/2:ℝ)).toMat * ρ * ((Λ.mats x)^(1/2:ℝ)).toMat) ⊗ₖ Matrix.single x x 1)
+      toFun := fun ρ ↦ ((((Λ.mats x) ^ (1/2:ℝ)).mat * ρ * ((Λ.mats x)^(1/2:ℝ)).mat) ⊗ₖ Matrix.single x x 1)
       map_add' := by simp [mul_add, add_mul, Matrix.kroneckerMap_add_left]
       map_smul' := by simp [Matrix.smul_kronecker]
     }
@@ -58,7 +59,7 @@ def measurementMap (Λ : POVM X d) : CPTPMap d (d × X) where
     · intro x _
       --Note: this map M₁ would do as well as an object on its own, it's "measure and forget the result".
       let M₁ : MatrixMap d d ℂ := ⟨⟨
-        fun ρ ↦ ((Λ.mats x) ^ (1/2:ℝ)).toMat * ρ * ((Λ.mats x)^(1/2:ℝ)).toMat,
+        fun ρ ↦ ((Λ.mats x) ^ (1/2:ℝ)).mat * ρ * ((Λ.mats x)^(1/2:ℝ)).mat,
         by simp [mul_add, add_mul]⟩,
         by simp⟩
       let M₂ : MatrixMap d (d × X) ℂ := ⟨⟨
@@ -73,8 +74,8 @@ def measurementMap (Λ : POVM X d) : CPTPMap d (d × X) where
       · dsimp [M₁]
         conv =>
           enter [1, 1, 1, ρ, 2]
-          rw [← HermitianMat.conjTranspose_toMat]
-        exact MatrixMap.conj_isCompletelyPositive (Λ.mats x ^ (1 / 2)).toMat
+          rw [← HermitianMat.conjTranspose_mat]
+        exact MatrixMap.conj_isCompletelyPositive (Λ.mats x ^ (1 / 2)).mat
       · apply MatrixMap.kron_kronecker_const
         exact (Matrix.PosSemidef.stdBasisMatrix_iff_eq x x (zero_lt_one' ℂ)).2 rfl
   TP := by
@@ -86,15 +87,15 @@ def measurementMap (Λ : POVM X d) : CPTPMap d (d × X) where
     rw [← trace_sum, ← Finset.sum_mul]
     congr
     convert one_mul x
-    rw [show (1 : Matrix d d ℂ) = (1 : HermitianMat d ℂ).toMat by rfl, ← Λ.normalized]
-    push_cast
+    rw [show (1 : Matrix d d ℂ) = (1 : HermitianMat d ℂ).mat by rfl, ← Λ.normalized]
+    rw [HermitianMat.mat_finset_sum]
     congr! with i _
     exact HermitianMat.pow_half_mul (Λ.zero_le i)
 
 open Kronecker in
 theorem measurementMap_apply_matrix (Λ : POVM X d) (m : Matrix d d ℂ) :
   Λ.measurementMap.map m =  ∑ x : X,
-    ((((Λ.mats x) ^ (1/2:ℝ)).toMat * m * ((Λ.mats x)^(1/2:ℝ)).toMat) ⊗ₖ Matrix.single x x 1) := by
+    ((((Λ.mats x) ^ (1/2:ℝ)).mat * m * ((Λ.mats x)^(1/2:ℝ)).mat) ⊗ₖ Matrix.single x x 1) := by
   dsimp [measurementMap, HPMap.map]
   rw [LinearMap.sum_apply]
   rfl
@@ -103,23 +104,23 @@ open HermitianMat in
 theorem measurementMap_apply_hermitianMat (Λ : POVM X d) (m : HermitianMat d ℂ) :
   Λ.measurementMap.toHPMap m = ∑ x : X,
     --TODO: Something like `HermitianMat.single` to make this better
-    ((m.conj ((Λ.mats x)^(1/2:ℝ)).toMat : HermitianMat d ℂ) ⊗ₖ HermitianMat.diagonal ℂ (fun y ↦ ite (x = y) 1 0)) := by
+    ((m.conj ((Λ.mats x)^(1/2:ℝ)).mat : HermitianMat d ℂ) ⊗ₖ HermitianMat.diagonal ℂ (fun y ↦ ite (x = y) 1 0)) := by
   ext1
-  convert Λ.measurementMap_apply_matrix m.toMat
-  simp only [conj_apply, conjTranspose_toMat, AddSubgroup.val_finset_sum,
-    kronecker_coe, mk_toMat]
+  convert Λ.measurementMap_apply_matrix m.mat
+  simp only [conj_apply, conjTranspose_mat, HermitianMat.mat_finset_sum,
+    kronecker_mat, mat_mk]
   congr!
   ext i j
-  simp only [HermitianMat.diagonal, mk_toMat, diagonal_apply, single, of_apply]
+  simp only [HermitianMat.diagonal, mat_mk, diagonal_apply, single, of_apply]
   split_ifs <;> (try grind) <;> norm_num
 
 /-- A POVM leads to a distribution of outcomes on any given mixed state ρ. -/
 def measure (Λ : POVM X d) (ρ : MState d) : Distribution X := .mk'
-    (f := fun x ↦ (Λ.mats x).inner ρ.M)
+    (f := fun x ↦ ⟪Λ.mats x, ρ.M⟫)
     (h₁ := fun x ↦ HermitianMat.inner_ge_zero (Λ.zero_le x) ρ.zero_le)
     (hN := by
       simp [HermitianMat.inner_eq_re_trace, ← Complex.re_sum, ← trace_sum, ← Finset.sum_mul,
-      ← AddSubgroup.val_finset_sum, ← HermitianMat.val_eq_coe, Λ.normalized])
+        ← HermitianMat.mat_finset_sum, Λ.normalized])
 
 /-- The quantum-classical `POVM.measurement_map`, gives a marginal on the right equal to `POVM.measure`.-/
 theorem traceLeft_measurementMap_eq_measure (Λ : POVM X d) (ρ : MState d) :
@@ -135,7 +136,7 @@ theorem traceLeft_measurementMap_eq_measure (Λ : POVM X d) (ρ : MState d) :
   simp only [kroneckerMap_apply, MState.coe_ofClassical]
   simp only [single, of_apply, mul_ite, mul_one, mul_zero, Finset.sum_ite_irrel,
     Finset.sum_const_zero]
-  simp only [HermitianMat.diagonal, HermitianMat.mk_toMat, diagonal_apply]
+  simp only [HermitianMat.diagonal, HermitianMat.mat_mk, diagonal_apply]
   symm; split
   · subst j
     simp only [measure, Distribution.mk', Distribution.funlike_apply, and_self, Finset.sum_ite_eq',

@@ -151,6 +151,8 @@ namespace Unital
 
 variable {M : MatrixMap A B R}
 
+omit [Fintype A] [Fintype B]
+
 @[simp]
 theorem map_1 (h : M.Unital) : M 1 = 1 :=
   h
@@ -434,44 +436,44 @@ theorem of_kraus_isPositive (K : κ → Matrix B A ℂ) :
   exact conj_isPositive (K k)
 
 theorem conj_kron (M : Matrix B A 𝕜) (N : Matrix D C 𝕜) [DecidableEq C] :
-  conj M ⊗ₖₘ conj N = conj (M ⊗ₖ N) := by
-    apply LinearMap.ext;
+    conj M ⊗ₖₘ conj N = conj (M ⊗ₖ N) := by
+  apply LinearMap.ext
+  intro x
+  have h_eq : ∀ (X : Matrix A A 𝕜) (Y : Matrix C C 𝕜), (conj M ⊗ₖₘ conj N) (X ⊗ₖ Y) = (conj (Matrix.kroneckerMap (fun x1 x2 => x1 * x2) M N)) (X ⊗ₖ Y) := by
+    intro X Y;
+    convert MatrixMap.kron_map_of_kron_state _ _ X Y using 1;
+    ext ⟨ b₁, d₁ ⟩ ⟨ b₂, d₂ ⟩
+    simp only [Matrix.kroneckerMap]
+    ring_nf
+    simp [conj, Matrix.mul_apply]
+    simp only [mul_left_comm, mul_comm, Finset.mul_sum, mul_assoc]
+    simp only [← Finset.univ_product_univ, ← Finset.sum_product'];
+    apply Finset.sum_bij (fun x _ ↦ (x.1.2, x.2.2, x.1.1, x.2.1)) <;> simp
+  -- By linearity, it suffices to show that the maps agree on a basis.
+  have h_basis : ∀ (x : Matrix (A × C) (A × C) 𝕜), x ∈ Submodule.span 𝕜 (Set.range (fun (p : Matrix A A 𝕜 × Matrix C C 𝕜) => p.1 ⊗ₖ p.2)) → (conj M ⊗ₖₘ conj N) x = (conj (Matrix.kroneckerMap (fun x1 x2 => x1 * x2) M N)) x := by
+    intro x hx;
+    induction hx using Submodule.span_induction;
+    · rename_i h
+      simp only [Set.mem_range, Prod.exists] at h
+      obtain ⟨w, ⟨w', rfl⟩⟩ := h
+      apply h_eq
+    · simp [conj];
+    · simp_all only [map_add]
+    · simp_all only [map_smul]
+  convert h_basis x _;
+  -- By definition of matrix multiplication and the properties of the Kronecker product, we can express any matrix as a sum of Kronecker products of basis matrices.
+  have h_decomp : ∀ (x : Matrix (A × C) (A × C) 𝕜), ∃ (coeffs : A → C → A → C → 𝕜), x = ∑ a₁, ∑ c₁, ∑ a₂, ∑ c₂, coeffs a₁ c₁ a₂ c₂ • Matrix.kroneckerMap (fun x1 x2 => x1 * x2) (Matrix.single a₁ a₂ 1) (Matrix.single c₁ c₂ 1) := by
     intro x
-    have h_eq : ∀ (X : Matrix A A 𝕜) (Y : Matrix C C 𝕜), (conj M ⊗ₖₘ conj N) (X ⊗ₖ Y) = (conj (Matrix.kroneckerMap (fun x1 x2 => x1 * x2) M N)) (X ⊗ₖ Y) := by
-      intro X Y;
-      convert MatrixMap.kron_map_of_kron_state _ _ X Y using 1;
-      ext ⟨ b₁, d₁ ⟩ ⟨ b₂, d₂ ⟩
-      simp only [Matrix.kroneckerMap]
-      ring_nf
-      simp [conj, Matrix.mul_apply]
-      simp only [mul_left_comm, mul_comm, Finset.mul_sum _ _ _, mul_assoc, Finset.sum_mul];
-      simp only [← Finset.univ_product_univ, ← Finset.sum_product'];
-      refine' Finset.sum_bij (fun x _ => ( x.1.2, x.2.2, x.1.1, x.2.1 )) _ _ _ _ <;> simp;
-    -- By linearity, it suffices to show that the maps agree on a basis.
-    have h_basis : ∀ (x : Matrix (A × C) (A × C) 𝕜), x ∈ Submodule.span 𝕜 (Set.range (fun (p : Matrix A A 𝕜 × Matrix C C 𝕜) => p.1 ⊗ₖ p.2)) → (conj M ⊗ₖₘ conj N) x = (conj (Matrix.kroneckerMap (fun x1 x2 => x1 * x2) M N)) x := by
-      intro x hx;
-      induction hx using Submodule.span_induction;
-      · rename_i h
-        simp only [Set.mem_range, Prod.exists] at h
-        obtain ⟨w, ⟨w', rfl⟩⟩ := h
-        apply h_eq
-      · simp [conj];
-      · simp_all only [map_add]
-      · simp_all only [map_smul]
-    convert h_basis x _;
-    -- By definition of matrix multiplication and the properties of the Kronecker product, we can express any matrix as a sum of Kronecker products of basis matrices.
-    have h_decomp : ∀ (x : Matrix (A × C) (A × C) 𝕜), ∃ (coeffs : A → C → A → C → 𝕜), x = ∑ a₁, ∑ c₁, ∑ a₂, ∑ c₂, coeffs a₁ c₁ a₂ c₂ • Matrix.kroneckerMap (fun x1 x2 => x1 * x2) (Matrix.single a₁ a₂ 1) (Matrix.single c₁ c₂ 1) := by
-      intro x
-      use fun a₁ c₁ a₂ c₂ => x (a₁, c₁) (a₂, c₂);
-      ext ⟨ a₁, c₁ ⟩ ⟨ a₂, c₂ ⟩
-      simp only [Matrix.single]
-      simp only [Matrix.sum_apply, Matrix.kroneckerMap]
-      rw [ Finset.sum_eq_single a₁ ] <;> simp [Finset.sum_ite]
-      · rw [ Finset.sum_eq_single c₁ ] <;> simp +contextual
-        rw [ Finset.sum_eq_single c₂ ] <;> simp +contextual;
-      · simp +contextual [Finset.filter_eq', Finset.filter_and ];
-    obtain ⟨ coeffs, rfl ⟩ := h_decomp x;
-    exact Submodule.sum_mem _ fun a₁ _ => Submodule.sum_mem _ fun c₁ _ => Submodule.sum_mem _ fun a₂ _ => Submodule.sum_mem _ fun c₂ _ => Submodule.smul_mem _ _ ( Submodule.subset_span ⟨ ( Matrix.single a₁ a₂ 1, Matrix.single c₁ c₂ 1 ), rfl ⟩ )
+    use fun a₁ c₁ a₂ c₂ => x (a₁, c₁) (a₂, c₂);
+    ext ⟨ a₁, c₁ ⟩ ⟨ a₂, c₂ ⟩
+    simp only [Matrix.single]
+    simp only [Matrix.sum_apply, Matrix.kroneckerMap]
+    rw [ Finset.sum_eq_single a₁ ] <;> simp [Finset.sum_ite]
+    · rw [ Finset.sum_eq_single c₁ ] <;> simp +contextual
+      rw [ Finset.sum_eq_single c₂ ] <;> simp +contextual;
+    · simp +contextual [Finset.filter_eq', Finset.filter_and ];
+  obtain ⟨ coeffs, rfl ⟩ := h_decomp x;
+  exact Submodule.sum_mem _ fun a₁ _ => Submodule.sum_mem _ fun c₁ _ => Submodule.sum_mem _ fun a₂ _ => Submodule.sum_mem _ fun c₂ _ => Submodule.smul_mem _ _ ( Submodule.subset_span ⟨ ( Matrix.single a₁ a₂ 1, Matrix.single c₁ c₂ 1 ), rfl ⟩ )
 
 theorem congruence_one_eq_id : conj (1 : Matrix A A ℂ) = MatrixMap.id A ℂ := by
   ext x
@@ -592,13 +594,6 @@ theorem conj_isCompletelyPositive (M : Matrix B A R) : (conj M).IsCompletelyPosi
   simp +contextual [Matrix.one_apply, apply_ite]
   tauto
 
---TODO: PULLOUT and then use this to rewrite `Matrix.reindex_eq_conj` too.
-theorem _root_.Matrix.submatrix_eq_mul_mul {d₂ d₃ : Type*} [DecidableEq d] (A : Matrix d d R) (e : d₂ → d) (f : d₃ → d) :
-    A.submatrix e f = (Matrix.submatrix (α := R) 1 e _root_.id : Matrix d₂ d R) * A *
-      (Matrix.submatrix (α := R) 1 _root_.id f) := by
-  rw [show _root_.id = Equiv.refl d by rfl, Matrix.mul_submatrix_one, Matrix.one_submatrix_mul]
-  simp
-
 /-- `MatrixMap.submatrix` is completely positive -/
 theorem IsCompletelyPositive.submatrix (f : B → A) : (MatrixMap.submatrix R f).IsCompletelyPositive := by
   convert conj_isCompletelyPositive (Matrix.submatrix (α := R) 1 f _root_.id : Matrix B A R)
@@ -612,7 +607,8 @@ theorem of_kraus_isCompletelyPositive (M : κ → Matrix B A R) :
   rw [of_kraus]
   exact IsCompletelyPositive.finset_sum (fun i ↦ conj_isCompletelyPositive (M i))
 
-/-
+omit [Fintype B] [DecidableEq A] in
+/--
 The Choi matrix of a map in symmetric Kraus form is a sum of rank-1 projectors.
 -/
 theorem choi_of_kraus_R [DecidableEq A] (K : κ → Matrix B A 𝕜) :
@@ -624,7 +620,7 @@ theorem choi_of_kraus_R [DecidableEq A] (K : κ → Matrix B A 𝕜) :
   simp +contextual [ Finset.sum_ite, Finset.filter_and ];
   congr! with k
   simp_all [Finset.filter_eq]
-  rw [ Finset.sum_eq_single j.2 ]
+  rw [Finset.sum_eq_single j.2]
   · simp
   · aesop
   · simp

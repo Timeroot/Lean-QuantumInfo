@@ -35,6 +35,7 @@ open NNReal
 open ComplexOrder
 open Topology
 open Prob
+open scoped RealInnerProductSpace InnerProductSpace
 
 variable {d : Type*} [Fintype d] [DecidableEq d]
 
@@ -62,7 +63,7 @@ theorem iInf_IsCompact (ρ : MState d) (ε : Prob) : IsCompact { m | ρ.exp_val 
     HermitianMat.unitInterval_IsCompact
   have hC₂ : IsClosed {m | ρ.exp_val (1 - m) ≤ ε} := by
     --This is a linear constraint and so has a closed image
-    change IsClosed ((fun m ↦ ρ.M.inner_BilinForm (1 - m)) ⁻¹' (Set.Iic ε))
+    change IsClosed ((fun m ↦ ρ.M.innerₗ (1 - m)) ⁻¹' (Set.Iic ε))
     refine IsClosed.preimage ?_ isClosed_Iic
     fun_prop
   exact hC₁.inter_left hC₂
@@ -76,13 +77,11 @@ theorem iInf_IsConvex (ρ : MState d) (ε : Prob) : Convex ℝ { m | ρ.exp_val 
   rw [← eq_sub_iff_add_eq'] at hab
   subst b
   refine And.intro ?_ (And.intro ?_ ?_)
-  · simp only [MState.exp_val, HermitianMat.inner_left_sub, HermitianMat.inner_one, MState.tr,
-      tsub_le_iff_right, HermitianMat.inner_left_distrib, HermitianMat.inner_smul] at hx₁ hy₁ ⊢
+  · simp only [MState.exp_val, inner_sub_right, HermitianMat.inner_one, MState.tr,
+      tsub_le_iff_right, inner_add_right, inner_smul_right] at hx₁ hy₁ ⊢
     linear_combination a * hx₁ + (1 - a) * hy₁
   · apply HermitianMat.convex_cone <;> assumption
-  · --Something's wrong with type class inference that's taking wayyy longer than it should.
-    --DFunLike.coe is being unfolded tonnnnss of times.
-    rw [← sub_nonneg] at hx₃ hy₃ ⊢
+  · rw [← sub_nonneg] at hx₃ hy₃ ⊢
     convert HermitianMat.convex_cone hx₃ hy₃ ha hb using 1
     simp only [sub_smul, one_smul, smul_sub]
     abel
@@ -139,7 +138,7 @@ theorem exists_min' (ρ : MState d) (ε : Prob) (S : Set (MState d)):
     (isCompact_iff_isCompact_univ.mp (iInf_IsCompact ρ ε)) Set.univ_nonempty
     (f := fun T ↦ ⨆ σ ∈ S, ⟨_, σ.exp_val_prob T.prop.right⟩)
     (by
-      have h := HermitianMat.inner_BilinForm.continuous_iSup_fst
+      have h := HermitianMat.innerₗ.continuous_iSup_fst
         (Bornology.isBounded_induced.mp (Bornology.IsBounded.all S))
       apply Continuous.continuousOn
       simp_rw [← iSup_subtype'', subtype_val_iSup' (ι := S)]
@@ -147,8 +146,8 @@ theorem exists_min' (ρ : MState d) (ε : Prob) (S : Set (MState d)):
       refine Continuous.comp (g := fun T ↦ ⨆ (i : S), i.val.exp_val T) ?_ continuous_subtype_val
       convert h with T
       rw [← sSup_image' (s := S) (f := fun i ↦ i.exp_val T)]
-      rw [← sSup_image' (s := (MState.M '' S)) (f := fun i ↦ i.inner_BilinForm T)]
-      simp [Set.image, MState.exp_val]
+      rw [← sSup_image' (s := (MState.M '' S)) (f := fun i ↦ i.innerₗ T)]
+      simp [Set.image, MState.exp_val, HermitianMat.innerₗ]
     )
   clear hT₁
 
@@ -263,7 +262,7 @@ theorem Lemma3 {ρ : MState d} (ε : Prob) {S : Set (MState d)} (hS₁ : IsCompa
 
   --This parts needs the minimax theorem. Set up the relevant sets and hypotheses.
   --The function `f` will be the `MState.exp_val` function, but bundled as a bilinear form.
-  let f : LinearMap.BilinForm ℝ (HermitianMat d ℂ) := HermitianMat.inner_BilinForm
+  let f : LinearMap.BilinForm ℝ (HermitianMat d ℂ) := HermitianMat.innerₗ
   let S' : Set (HermitianMat d ℂ) := MState.M '' S
   let T' : Set (HermitianMat d ℂ) := { m | ρ.exp_val (1 - m) ≤ ε ∧ 0 ≤ m ∧ m ≤ 1 }
 
@@ -513,17 +512,38 @@ theorem rate_pos_of_smul_pos {ε : Prob} {d : Type*} [Fintype d] [DecidableEq d]
   intro i
   specialize hb i
   rw [Subtype.mk_le_mk, MState.exp_val] at hb ⊢
-  replace hb : c * b ≤ (c • σ₂.M).inner i := by
-    rwa [← mul_le_mul_iff_of_pos_left hc, ← HermitianMat.smul_inner] at hb
+  replace hb : c * b ≤ ⟪c • σ₂.M, i⟫ := by
+    rwa [← mul_le_mul_iff_of_pos_left hc, ← HermitianMat.inner_smul_left] at hb
   grw [min_le_left]
   refine hb.trans (HermitianMat.inner_mono' i.2.2.1 hσ)
 
 @[fun_prop]
 theorem rate_Continuous_singleton {ε : Prob} {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) :
     Continuous fun σ ↦ β_ ε(ρ‖{σ}) := by
-  have h := LinearMap.BilinForm.continuous_iInf_fst
-    HermitianMat.inner_BilinForm.flip (S := { m | ρ.exp_val (1 - m) ≤ ↑ε ∧ 0 ≤ m ∧ m ≤ 1 })
+  have h := HermitianMat.innerₗ.flip.continuous_iInf_fst
+    (S := { m | ρ.exp_val (1 - m) ≤ ↑ε ∧ 0 ≤ m ∧ m ≤ 1 })
     ((Metric.isBounded_Icc 0 1).subset (Set.setOf_subset_setOf_of_imp fun _ ↦ And.right))
   simp only [of_singleton]
   conv => enter [1, σ]; rw [subtype_val_iInf']
   exact Continuous.subtype_mk (h.comp MState.Continuous_HermitianMat) _
+
+/-- On the 1D Hilbert space, the optimal hypothesis testing rate is simply 1 - ε,
+since there's nothing to learn. (More generally this would hold whenever ρ=σ.) --/
+theorem optimalHypothesisRate_unique {d : Type*} [Fintype d] [DecidableEq d]
+    (ε : Prob) (ρ σ : MState d) [Unique d] : β_ ε(ρ‖{σ}) = 1 - ε := by
+  obtain rfl := Unique.eq_default ρ
+  obtain rfl := Unique.eq_default σ
+  rw [OptimalHypothesisRate.of_singleton]
+  apply le_antisymm
+  · refine iInf_le_of_le ⟨((1 - ε : Prob) : ℝ) • 1, ⟨?_, ?_, ?_⟩⟩ ?_
+    · simp [MState.exp_val_sub]
+    · apply smul_nonneg ?_ zero_le_one
+      simp
+    · apply smul_le_of_le_one_left zero_le_one
+      simp
+    · simp [-Prob.coe_one_minus]
+  · simp
+    intro a he1 ha0 ha1
+    rw [MState.exp_val_sub, MState.exp_val_one, tsub_le_iff_right] at he1
+    rw [← tsub_le_iff_left, ← Prob.coe_one_minus] at he1
+    exact he1

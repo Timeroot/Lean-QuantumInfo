@@ -25,8 +25,8 @@ variable (A B : HermitianMat d 𝕜)
 namespace HermitianMat
 
 def symmMul : HermitianMat d 𝕜 :=
-  ⟨(2 : 𝕜)⁻¹ • (A.toMat * B.toMat + B.toMat * A.toMat),
-    by simp [selfAdjoint, IsSelfAdjoint, add_comm]⟩
+  ⟨(2 : 𝕜)⁻¹ • (A.mat * B.mat + B.mat * A.mat),
+    by simp [selfAdjoint, IsSelfAdjoint, add_comm, Matrix.star_eq_conjTranspose]⟩
 
 theorem symmMul_comm : A.symmMul B = B.symmMul A := by
   rw [symmMul, symmMul, Subtype.mk.injEq, add_comm]
@@ -39,21 +39,21 @@ theorem symmMul_zero : A.symmMul 0 = 0:= by
 theorem zero_symmMul : symmMul 0 A = 0 := by
   simp [symmMul]
 
-theorem symmMul_toMat : (A.symmMul B).toMat =
-    (2 : 𝕜)⁻¹ • (A.toMat * B.toMat + B.toMat * A.toMat) := by
+theorem symmMul_toMat : (A.symmMul B).mat =
+    (2 : 𝕜)⁻¹ • (A.mat * B.mat + B.mat * A.mat) := by
   rfl
 
 variable [Invertible (2 : 𝕜)]
 
 variable {A B} in
 @[simp]
-theorem symmMul_of_commute (hAB : Commute A.toMat B.toMat) :
-    (A.symmMul B).toMat = A.toMat * B.toMat := by
+theorem symmMul_of_commute (hAB : Commute A.mat B.mat) :
+    (A.symmMul B).mat = A.mat * B.mat := by
   rw [symmMul_toMat, hAB]
   rw [smul_add, ← add_smul, inv_eq_one_div, ← add_div]
   rw [add_self_div_two, one_smul]
 
-theorem symmMul_self : (symmMul A A).toMat = A.toMat * A.toMat := by
+theorem symmMul_self : (symmMul A A).mat = A.mat * A.mat := by
   simp
 
 variable [DecidableEq d]
@@ -88,14 +88,12 @@ scoped instance : CommMagma (HermitianMat d 𝕜) where
   mul := HermitianMat.symmMul
   mul_comm := HermitianMat.symmMul_comm
 
---Stupid shortcut that actually helps a lot
-scoped instance : Mul (HermitianMat d 𝕜) :=
-  CommMagma.toMul
+-- --Stupid shortcut that might actually help a lot
+-- scoped instance : Mul (HermitianMat d 𝕜) :=
+  -- CommMagma.toMul
 
 theorem mul_eq_symmMul : A * B = A.symmMul B := by
   rfl
-
-variable {𝕜 : Type*} [RCLike 𝕜]
 
 scoped instance : IsCommJordan (HermitianMat d 𝕜) where
   lmul_comm_rmul_rmul a b := by
@@ -104,15 +102,23 @@ scoped instance : IsCommJordan (HermitianMat d 𝕜) where
       mul_add, add_mul, Matrix.mul_smul, Matrix.smul_mul, Matrix.mul_assoc]
     abel
 
+scoped instance : MulZeroClass (HermitianMat d 𝕜) where
+  zero_mul := by simp [mul_eq_symmMul]
+  mul_zero := by simp [mul_eq_symmMul]
+
+variable [DecidableEq d] [Invertible (2 : 𝕜)]
+
+scoped instance : MulZeroOneClass (HermitianMat d 𝕜) where
+  one_mul := by simp [mul_eq_symmMul]
+  mul_one := by simp [mul_eq_symmMul]
+
 end starRing
 
-section rclike
+section field
 
 variable {d 𝕜 : Type*} [Fintype d] [Field 𝕜] [StarRing 𝕜]
 
 scoped instance : NonUnitalNonAssocRing (HermitianMat d 𝕜) where
-  zero_mul := by simp [mul_eq_symmMul]
-  mul_zero := by simp [mul_eq_symmMul]
   left_distrib a b c := by
     ext1
     simp [mul_eq_symmMul, HermitianMat.symmMul_toMat, mul_add, add_mul]
@@ -122,29 +128,23 @@ scoped instance : NonUnitalNonAssocRing (HermitianMat d 𝕜) where
     simp [mul_eq_symmMul, HermitianMat.symmMul_toMat, mul_add, add_mul]
     abel
 
-variable {d 𝕜 : Type*} [Fintype d] [RCLike 𝕜] [StarRing 𝕜]
-variable [DecidableEq d]
+variable [Invertible (2 : 𝕜)] [DecidableEq d]
 
 --TODO: Upgrade this to NonAssocCommRing, see #28604 in Mathlib
 scoped instance : NonAssocRing (HermitianMat d 𝕜) where
-  one_mul := by simp [mul_eq_symmMul]
-  mul_one := by simp [mul_eq_symmMul]
-  natCast_zero := by --CLEANUP:
-    erw [Subtype.mk_eq_mk]
+
+end field
+
+section rclike
+
+variable {d 𝕜 : Type*} [Fintype d] [RCLike 𝕜]
+
+scoped instance : IsScalarTower ℝ (HermitianMat d 𝕜) (HermitianMat d 𝕜) where
+  smul_assoc r x y := by
+    ext : 2
+    simp only [smul_eq_mul, mul_eq_symmMul, HermitianMat.symmMul_toMat,
+      HermitianMat.mat_smul, smul_add]
     simp
-  natCast_succ n := by
-    simp [Subtype.ext_iff]
-    exact Nat.cast_add_one n
-  intCast_ofNat n := by
-    simp [IntCast.intCast]
-    rfl
-  intCast_negSucc n := by
-    simp only [IntCast.intCast, Int.negSucc_eq, neg_add_rev, Int.reduceNeg,
-      Int.cast_add, Int.cast_neg, Int.cast_one, Int.cast_natCast,
-      Subtype.ext_iff, HermitianMat.val_eq_coe, NegMemClass.coe_neg]
-    rw [← neg_add, add_comm]
-    congr! 1
-    norm_cast
 
 end rclike
 

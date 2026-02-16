@@ -32,7 +32,8 @@ is operator antitone for positive definite matrices.
 
 namespace HermitianMat
 
-variable {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
+variable {m n 𝕜 : Type*} [Fintype n] [DecidableEq n] [Fintype m] [DecidableEq m] [RCLike 𝕜]
+variable {A B : HermitianMat n 𝕜} {x : ℝ}
 
 @[simp]
 theorem log_zero : (0 : HermitianMat n 𝕜).log = 0 := by
@@ -43,44 +44,29 @@ theorem log_one : (1 : HermitianMat n 𝕜).log = 0 := by
   simp [log, cfc]
 
 open ComplexOrder in
-theorem log_smul {A : HermitianMat n 𝕜} {x : ℝ} (hx : 0 < x) (hA : A.toMat.PosDef) :
+theorem log_smul {A : HermitianMat n 𝕜} {x : ℝ} (hx : x ≠ 0) [NonSingular A] :
     (x • A).log = Real.log x • 1 + A.log := by
-  have h_cfc_log : (x • A).log = cfc A (fun t => Real.log (x * t)) := by
-    have h_cfc_log : (x • A).log = cfc (x • A) Real.log := by
-      rfl;
-    convert h_cfc_log using 1;
-    have h_cfc_log : (x • A).toMat = cfc A (fun t => x * t) := by
-      convert cfc_const_mul_id A x using 1 ;
-      grind;
-    have h_cfc_log : cfc (x • A) Real.log = cfc (cfc A (fun t => x * t)) Real.log := by
-      grind;
-    rw [ h_cfc_log, ← cfc_comp ];
-    rfl;
-  have h_log_mul : ∀ t > 0, Real.log (x * t) = Real.log x + Real.log t := by
-    exact fun t ht => Real.log_mul hx.ne' ht.ne';
-  have h_cfc_log_mul : cfc A (fun t => Real.log (x * t)) = cfc A (fun t => Real.log x + Real.log t) := by
-    apply_rules [ cfc_congr_of_posDef ];
-  have h_cfc_add : cfc A (fun t => Real.log x + Real.log t) = cfc A (fun t => Real.log x) + cfc A (fun t => Real.log t) := by
-    convert cfc_add A ( fun t => Real.log x ) ( fun t => Real.log t ) using 1;
-  aesop
+  have := A.nonSingular_zero_notMem_spectrum
+  rw [← cfc_const_mul_id, log, ← cfc_comp_apply]
+  rw [← cfc_const A x.log, log, ← cfc_add]
+  apply cfc_congr
+  grind [Set.EqOn, Real.log_mul, Pi.add_apply]
 
 /-
 The inverse function is operator antitone for positive definite matrices.
 -/
 open ComplexOrder in
-theorem inv_antitone {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
-    {A B : HermitianMat n 𝕜} (hA : A.toMat.PosDef)
-    (h : A ≤ B) : B⁻¹ ≤ A⁻¹ := by
+theorem inv_antitone (hA : A.mat.PosDef) (h : A ≤ B) : B⁻¹ ≤ A⁻¹ := by
   -- Since $B - A$ is positive semidefinite, we can write it as $C^*C$ for some matrix $C$.
-  obtain ⟨C, hC⟩ : ∃ C : Matrix n n 𝕜, B.toMat - A.toMat = C.conjTranspose * C :=
+  obtain ⟨C, hC⟩ : ∃ C : Matrix n n 𝕜, B.mat - A.mat = C.conjTranspose * C :=
     Matrix.posSemidef_iff_eq_conjTranspose_mul_self.mp h
   -- Using the fact that $B = A + C^*C$, we can write $B^{-1}$ as $(A + C^*C)^{-1}$.
-  have h_inv_posDef : (1 + C * A.toMat⁻¹ * C.conjTranspose).PosDef := by
+  have h_inv_posDef : (1 + C * A.mat⁻¹ * C.conjTranspose).PosDef := by
     exact Matrix.PosDef.one.add_posSemidef (hA.inv.posSemidef.mul_mul_conjTranspose_same C)
-  have hB_inv : B.toMat⁻¹ = A.toMat⁻¹ - A.toMat⁻¹ * C.conjTranspose * (1 + C * A.toMat⁻¹ * C.conjTranspose)⁻¹ * C * A.toMat⁻¹ := by
-    have hB_inv : (A.toMat + C.conjTranspose * C)⁻¹ = A.toMat⁻¹ - A.toMat⁻¹ * C.conjTranspose * (1 + C * A.toMat⁻¹ * C.conjTranspose)⁻¹ * C * A.toMat⁻¹ := by
-      have hB_inv : (A.toMat + C.conjTranspose * C) * (A.toMat⁻¹ - A.toMat⁻¹ * C.conjTranspose * (1 + C * A.toMat⁻¹ * C.conjTranspose)⁻¹ * C * A.toMat⁻¹) = 1 := by
-        have h_inv : (1 + C * A.toMat⁻¹ * C.conjTranspose) * (1 + C * A.toMat⁻¹ * C.conjTranspose)⁻¹ = 1 := by
+  have hB_inv : B.mat⁻¹ = A.mat⁻¹ - A.mat⁻¹ * C.conjTranspose * (1 + C * A.mat⁻¹ * C.conjTranspose)⁻¹ * C * A.mat⁻¹ := by
+    have hB_inv : (A.mat + C.conjTranspose * C)⁻¹ = A.mat⁻¹ - A.mat⁻¹ * C.conjTranspose * (1 + C * A.mat⁻¹ * C.conjTranspose)⁻¹ * C * A.mat⁻¹ := by
+      have hB_inv : (A.mat + C.conjTranspose * C) * (A.mat⁻¹ - A.mat⁻¹ * C.conjTranspose * (1 + C * A.mat⁻¹ * C.conjTranspose)⁻¹ * C * A.mat⁻¹) = 1 := by
+        have h_inv : (1 + C * A.mat⁻¹ * C.conjTranspose) * (1 + C * A.mat⁻¹ * C.conjTranspose)⁻¹ = 1 := by
           exact Matrix.mul_nonsing_inv _ ( show IsUnit _ from by simpa [ Matrix.isUnit_iff_isUnit_det ] using h_inv_posDef.det_pos.ne' );
         simp only [mul_assoc, Matrix.mul_sub] at *
         simp only [← Matrix.mul_assoc, add_mul, one_mul] at *
@@ -92,13 +78,13 @@ theorem inv_antitone {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
       rw [ Matrix.inv_eq_right_inv hB_inv ];
     rw [ ← hB_inv, ← hC, add_sub_cancel ];
   -- Since $(1 + C * A⁻¹ * C.conjTranspose)$ is positive definite, its inverse is also positive definite.
-  have h_inv_pos : (A.toMat⁻¹ * C.conjTranspose * (1 + C * A.toMat⁻¹ * C.conjTranspose)⁻¹ * C * A.toMat⁻¹).PosSemidef := by
-    have h_inv_pos : (C * A.toMat⁻¹).conjTranspose * (1 + C * A.toMat⁻¹ * C.conjTranspose)⁻¹ * (C * A.toMat⁻¹) = A.toMat⁻¹ * C.conjTranspose * (1 + C * A.toMat⁻¹ * C.conjTranspose)⁻¹ * C * A.toMat⁻¹ := by
+  have h_inv_pos : (A.mat⁻¹ * C.conjTranspose * (1 + C * A.mat⁻¹ * C.conjTranspose)⁻¹ * C * A.mat⁻¹).PosSemidef := by
+    have h_inv_pos : (C * A.mat⁻¹).conjTranspose * (1 + C * A.mat⁻¹ * C.conjTranspose)⁻¹ * (C * A.mat⁻¹) = A.mat⁻¹ * C.conjTranspose * (1 + C * A.mat⁻¹ * C.conjTranspose)⁻¹ * C * A.mat⁻¹ := by
       simp [ Matrix.mul_assoc, Matrix.conjTranspose_mul ];
       rw [ Matrix.conjTranspose_nonsing_inv, A.H ];
     rw [ ← h_inv_pos ];
     exact Matrix.PosSemidef.conjTranspose_mul_mul_same h_inv_posDef.inv.posSemidef _
-  have h_inv_pos : (A.toMat⁻¹ - B.toMat⁻¹).PosSemidef := by
+  have h_inv_pos : (A.mat⁻¹ - B.mat⁻¹).PosSemidef := by
     simp_all [ Matrix.PosSemidef ];
   exact h_inv_pos
 
@@ -139,8 +125,7 @@ open ComplexOrder MeasureTheory intervalIntegral in
 /--
 Monotonicity of the finite integral approximation of the logarithm.
 -/
-theorem logApprox_mono {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
-    {x y : HermitianMat n 𝕜} (hx : x.toMat.PosDef) (hy : y.toMat.PosDef)
+theorem logApprox_mono {x y : HermitianMat n 𝕜} (hx : x.mat.PosDef) (hy : y.mat.PosDef)
     (hxy : x ≤ y) (T : ℝ) (hT : 0 < T) :
     ∫ t in (0)..T, ((1 + t)⁻¹ • (1 : HermitianMat n 𝕜) - (x + t • 1)⁻¹) ≤
     ∫ t in (0)..T, ((1 + t)⁻¹ • (1 : HermitianMat n 𝕜) - (y + t • 1)⁻¹) := by
@@ -150,7 +135,7 @@ theorem logApprox_mono {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜
     · constructor;
       · simp [ Matrix.IsHermitian];
       · intro v hv_ne_zero
-        have h_pos : 0 < star v ⬝ᵥ x.toMat.mulVec v + t * star v ⬝ᵥ v := by
+        have h_pos : 0 < star v ⬝ᵥ x.mat.mulVec v + t * star v ⬝ᵥ v := by
           have := hx.2 v hv_ne_zero;
           exact add_pos_of_pos_of_nonneg this ( mul_nonneg ( mod_cast ht.1 ) ( dotProduct_star_self_nonneg v ) );
         simp_all [ Matrix.add_mulVec ];
@@ -162,14 +147,14 @@ theorem logApprox_mono {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜
   have h_integral_limit : ∫ t in (0)..T, (1 + t)⁻¹ • 1 - (x + t • 1)⁻¹ ≤ ∫ t in (0)..T, (1 + t)⁻¹ • 1 - (y + t • 1)⁻¹ := by
     have h_integrable : ContinuousOn (fun t : ℝ => (1 + t)⁻¹ • (1 : HermitianMat n 𝕜)) (Set.Icc 0 T) ∧ ContinuousOn (fun t : ℝ => (x + t • 1)⁻¹) (Set.Icc 0 T) ∧ ContinuousOn (fun t : ℝ => (y + t • 1)⁻¹) (Set.Icc 0 T) := by
       refine' ⟨ ContinuousOn.smul ( ContinuousOn.inv₀ ( continuousOn_const.add continuousOn_id ) fun t ht => by linarith [ ht.1 ] ) continuousOn_const, _, _ ⟩;
-      · refine' ContinuousOn.comp ( show ContinuousOn ( fun m : HermitianMat n 𝕜 => m⁻¹ ) ( { m : HermitianMat n 𝕜 | m.toMat.PosDef } ) from _ ) _ _;
+      · refine' ContinuousOn.comp ( show ContinuousOn ( fun m : HermitianMat n 𝕜 => m⁻¹ ) ( { m : HermitianMat n 𝕜 | m.mat.PosDef } ) from _ ) _ _;
         · intro m hm;
           refine' ContinuousAt.continuousWithinAt _;
-          have h_inv_cont : ContinuousAt (fun m : Matrix n n 𝕜 => m⁻¹) m.toMat := by
-            have h_inv_cont : ContinuousAt (fun m : Matrix n n 𝕜 => m⁻¹) m.toMat := by
-              have h_det_cont : ContinuousAt (fun m : Matrix n n 𝕜 => m.det) m.toMat := by
+          have h_inv_cont : ContinuousAt (fun m : Matrix n n 𝕜 => m⁻¹) m.mat := by
+            have h_inv_cont : ContinuousAt (fun m : Matrix n n 𝕜 => m⁻¹) m.mat := by
+              have h_det_cont : ContinuousAt (fun m : Matrix n n 𝕜 => m.det) m.mat := by
                 exact Continuous.continuousAt ( continuous_id.matrix_det )
-              have h_adj_cont : ContinuousAt (fun m : Matrix n n 𝕜 => m.adjugate) m.toMat := by
+              have h_adj_cont : ContinuousAt (fun m : Matrix n n 𝕜 => m.adjugate) m.mat := by
                 exact Continuous.continuousAt ( continuous_id.matrix_adjugate )
               simp_all [ Matrix.inv_def ];
               exact ContinuousAt.smul ( h_det_cont.inv₀ ( by simpa using hm.det_pos.ne' ) ) h_adj_cont;
@@ -182,7 +167,7 @@ theorem logApprox_mono {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜
           refine' ⟨ _, _ ⟩;
           · exact H ((fun t => x + t • 1) t);
           · intro v hv_ne_zero
-            have h_pos : 0 < star v ⬝ᵥ x.toMat.mulVec v + t * star v ⬝ᵥ (1 : Matrix n n 𝕜).mulVec v := by
+            have h_pos : 0 < star v ⬝ᵥ x.mat.mulVec v + t * star v ⬝ᵥ (1 : Matrix n n 𝕜).mulVec v := by
               have := hx.2 v hv_ne_zero;
               refine' add_pos_of_pos_of_nonneg this _;
               exact mul_nonneg ( mod_cast ht.1 ) ( Finset.sum_nonneg fun i _ => by simp [ mul_comm, RCLike.mul_conj ] );
@@ -193,12 +178,12 @@ theorem logApprox_mono {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜
       · have h_cont : ContinuousOn (fun t : ℝ => (y + t • 1 : Matrix n n 𝕜)⁻¹) (Set.Icc 0 T) := by
           have h_inv : ∀ t ∈ Set.Icc 0 T, (y + t • 1 : Matrix n n 𝕜).det ≠ 0 := by
             intro t ht;
-            have h_det_pos : ∀ t ∈ Set.Icc (0 : ℝ) T, Matrix.PosDef (y.toMat + t • 1) := by
+            have h_det_pos : ∀ t ∈ Set.Icc (0 : ℝ) T, Matrix.PosDef (y.mat + t • 1) := by
               intro t ht;
               refine' ⟨ _, _ ⟩;
               · simp [ Matrix.IsHermitian, Matrix.conjTranspose_add, Matrix.conjTranspose_smul ];
               · intro x hx_ne_zero
-                have h_pos : 0 < star x ⬝ᵥ y.toMat.mulVec x + t * star x ⬝ᵥ x := by
+                have h_pos : 0 < star x ⬝ᵥ y.mat.mulVec x + t * star x ⬝ᵥ x := by
                   have := hy.2 x hx_ne_zero;
                   exact add_pos_of_pos_of_nonneg this ( mul_nonneg ( mod_cast ht.1 ) ( by simp [ dotProduct_comm ] ) );
                 simp_all [ Matrix.add_mulVec ]
@@ -226,9 +211,6 @@ theorem logApprox_mono {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜
     · filter_upwards [ MeasureTheory.ae_restrict_mem measurableSet_Ioc ] with t ht using h_integral_limit t ht;
   exact h_integral_limit
 
-variable {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
-variable (A : Matrix n n 𝕜) (hA : A.IsHermitian)
-
 /-
 Definition of the finite integral approximation of the logarithm.
 -/
@@ -248,16 +230,16 @@ theorem scalarLogApprox_eq (x T : ℝ) (hx : 0 < x) (hT : 0 < T) :
   unfold scalarLogApprox; norm_num
 
 open ComplexOrder in
-/-
+/--
 The integrand in the log approximation is the CFC of the scalar integrand.
 -/
-lemma integrand_eq {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
-    (x : HermitianMat n 𝕜) (hx : x.toMat.PosDef) (t : ℝ) (ht : 0 ≤ t) :
+private lemma integrand_eq
+    (x : HermitianMat n 𝕜) (hx : x.mat.PosDef) (t : ℝ) (ht : 0 ≤ t) :
     ((1 + t)⁻¹ • (1 : HermitianMat n 𝕜) - (x + t • 1)⁻¹) = cfc x (fun u => (1 + t)⁻¹ - (u + t)⁻¹) := by
   have h_cfc_add : cfc x (fun u => u + t) = cfc x (fun u => u) + cfc x (fun u => t) :=
     x.cfc_add id _
   have h_cfc_sub : (x + t • 1)⁻¹ = cfc x (fun u => (u + t)⁻¹) := by
-    convert inv_cfc_eq_cfc_inv x ( fun u => u + t ) _ using 1;
+    convert inv_cfc_eq_cfc_inv (fun u => u + t) ?_ using 1;
     · simp [h_cfc_add]
     · exact fun i => ne_of_gt ( add_pos_of_pos_of_nonneg ( hx.eigenvalues_pos i ) ht );
   rw [← cfc_const x (1 + t)⁻¹, h_cfc_sub, ← cfc_sub ];
@@ -267,12 +249,12 @@ open ComplexOrder MeasureTheory intervalIntegral in
 /--
 The matrix log approximation is the CFC of the scalar log approximation.
 -/
-theorem logApprox_eq_cfc_scalar {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
-    (x : HermitianMat n 𝕜) (hx : x.toMat.PosDef) (T : ℝ) (hT : 0 < T) :
+theorem logApprox_eq_cfc_scalar
+    (x : HermitianMat n 𝕜) (hx : x.mat.PosDef) (T : ℝ) (hT : 0 < T) :
     logApprox x T = cfc x (scalarLogApprox T) := by
   unfold scalarLogApprox logApprox;
   rw [ intervalIntegral.integral_congr fun t ht => ?_ ];
-  convert integral_cfc_eq_cfc_integral x T ( fun t u => ( 1 + t ) ⁻¹ - ( u + t ) ⁻¹ ) ?_ using 1;
+  convert integral_cfc_eq_cfc_integral 0 T ( fun t u => ( 1 + t ) ⁻¹ - ( u + t ) ⁻¹ ) ?_ using 1;
   · intro i;
     apply_rules [ ContinuousOn.intervalIntegrable ];
     field_simp;
@@ -289,7 +271,7 @@ open ComplexOrder in
 The log approximation is the log plus an error term.
 -/
 theorem logApprox_eq_log_add_error {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
-    (x : HermitianMat n 𝕜) (hx : x.toMat.PosDef) (T : ℝ) (hT : 0 < T) :
+    (x : HermitianMat n 𝕜) (hx : x.mat.PosDef) (T : ℝ) (hT : 0 < T) :
     logApprox x T = x.log + cfc x (fun u => Real.log ((1 + T) / (u + T))) := by
   have h_logApprox : ∫ t in (0)..T, ((1 + t)⁻¹ • (1 : HermitianMat n 𝕜) - (x + t • 1)⁻¹) = cfc x (fun u => Real.log u + Real.log ((1 + T) / (u + T))) := by
     convert logApprox_eq_cfc_scalar x hx T hT using 1;
@@ -307,8 +289,8 @@ The error term in the log approximation tends to 0 as T goes to infinity.
 lemma tendsto_cfc_log_div_add_atTop {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
     (x : HermitianMat n 𝕜) :
     Tendsto (fun T => cfc x (fun u => Real.log ((1 + T) / (u + T)))) atTop (nhds 0) := by
-  -- Expand `(cfc x ...).toMat` using `cfc_toMat_eq_sum_smul_proj`.
-  have h_expand : ∀ T : ℝ, ((cfc x (fun u => Real.log ((1 + T) / (u + T)))).toMat) = ∑ i, Real.log ((1 + T) / (x.H.eigenvalues i + T)) • (x.H.eigenvectorUnitary.val * (Matrix.single i i 1) * x.H.eigenvectorUnitary.val.conjTranspose) := by
+  -- Expand `(cfc x ...).mat` using `cfc_toMat_eq_sum_smul_proj`.
+  have h_expand : ∀ T : ℝ, ((cfc x (fun u => Real.log ((1 + T) / (u + T)))).mat) = ∑ i, Real.log ((1 + T) / (x.H.eigenvalues i + T)) • (x.H.eigenvectorUnitary.val * (Matrix.single i i 1) * x.H.eigenvectorUnitary.val.conjTranspose) := by
     exact fun T => cfc_toMat_eq_sum_smul_proj x fun u => Real.log ((1 + T) / (u + T));
   -- The limit of a sum is the sum of the limits.
   have h_sum : Filter.Tendsto (fun T : ℝ => ∑ i, Real.log ((1 + T) / (x.H.eigenvalues i + T)) • (x.H.eigenvectorUnitary.val * (Matrix.single i i 1) * x.H.eigenvectorUnitary.val.conjTranspose)) Filter.atTop (nhds (∑ i, 0 • (x.H.eigenvectorUnitary.val * (Matrix.single i i 1) * x.H.eigenvectorUnitary.val.conjTranspose))) := by
@@ -317,14 +299,15 @@ lemma tendsto_cfc_log_div_add_atTop {n 𝕜 : Type*} [Fintype n] [DecidableEq n]
     all_goals try infer_instance;
     norm_num +zetaDelta at *
   rw [ tendsto_iff_norm_sub_tendsto_zero ] at *;
-  convert h_sum using 2 ; simp [ ← h_expand ]
+  convert h_sum using 2 ; simp [ ← h_expand]
+  rfl
 
 open ComplexOrder Filter in
 /--
 The log approximation converges to the matrix logarithm.
 -/
 lemma tendsto_logApprox {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
-    {x : HermitianMat n 𝕜} (hx : x.toMat.PosDef) :
+    {x : HermitianMat n 𝕜} (hx : x.mat.PosDef) :
   Tendsto (fun T => logApprox x T) atTop (nhds x.log) := by
     have h_log_approx_eq : ∀ᶠ T in Filter.atTop, x.logApprox T = x.log + cfc x (fun u => Real.log ((1 + T) / (u + T))) := by
       filter_upwards [ Filter.eventually_gt_atTop 0 ] with T hT using logApprox_eq_log_add_error x hx T hT;
@@ -335,26 +318,25 @@ open ComplexOrder in
 /--
 The matrix logarithm is operator monotone.
 -/
-theorem log_mono {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
-    {x y : HermitianMat n 𝕜} (hx : x.toMat.PosDef) (hy : y.toMat.PosDef)
-    (ha : x ≤ y) : x.log ≤ y.log := by
-  apply le_of_tendsto_of_tendsto (tendsto_logApprox hx) (tendsto_logApprox hy)
+theorem log_mono (hA : A.mat.PosDef) (hB : B.mat.PosDef)
+    (hAB : A ≤ B) : A.log ≤ B.log := by
+  apply le_of_tendsto_of_tendsto (tendsto_logApprox hA) (tendsto_logApprox hB)
   rw [Filter.EventuallyLE, Filter.eventually_atTop]
-  exact ⟨1, fun T hT => by simpa using logApprox_mono hx hy ha T ( zero_lt_one.trans_le hT )⟩
+  exact ⟨1, fun T hT => by simpa using logApprox_mono hA hB hAB T ( zero_lt_one.trans_le hT )⟩
 
 set_option maxHeartbeats 10000000 in
 open ComplexOrder Matrix in
 /--
 The inverse function is operator convex on positive definite matrices.
 -/
-lemma inv_convex {x y : HermitianMat n 𝕜} (hx : x.toMat.PosDef) (hy : y.toMat.PosDef)
+lemma inv_convex {x y : HermitianMat n 𝕜} (hx : x.mat.PosDef) (hy : y.mat.PosDef)
     ⦃a b : ℝ⦄ (ha : 0 ≤ a) (hb : 0 ≤ b) (hab : a + b = 1) :
     (a • x + b • y)⁻¹ ≤ a • x⁻¹ + b • y⁻¹ := by
   -- Using the fact that the set of positive semidefinite matrices is a convex cone, we can show that the matrix
   -- $\begin{pmatrix} a \bullet x + b \bullet y & I \\ I & a \bullet x^{-1} + b \bullet y^{-1} \end{pmatrix}$
   -- is positive semidefinite.
   have h_pos_semidef :
-    (Matrix.fromBlocks (a • x.toMat + b • y.toMat) (1 : Matrix n n 𝕜) (1 : Matrix n n 𝕜) (a • (x.toMat)⁻¹ + b • (y.toMat)⁻¹)).PosSemidef := by
+    (Matrix.fromBlocks (a • x.mat + b • y.mat) (1 : Matrix n n 𝕜) (1 : Matrix n n 𝕜) (a • (x.mat)⁻¹ + b • (y.mat)⁻¹)).PosSemidef := by
       -- Since $a + b = 1$, we can use the fact that the block matrix $\begin{pmatrix} A & I \\ I & A^{-1} \end{pmatrix}$ is positive semidefinite for any positive definite $A$.
       have h_block_pos : ∀ A : Matrix n n 𝕜, A.PosDef → (Matrix.fromBlocks A 1 1 A⁻¹).PosSemidef := by
         intro A hA
@@ -400,30 +382,30 @@ lemma inv_convex {x y : HermitianMat n 𝕜} (hx : x.toMat.PosDef) (hy : y.toMat
             exact h_y.symm ▸ h_block_pos.2 y;
         exact h_block_pos;
       -- Since $a + b = 1$, we can use the fact that the block matrix $\begin{pmatrix} a \bullet x + b \bullet y & I \\ I & a \bullet x^{-1} + b \bullet y^{-1} \end{pmatrix}$ is positive semidefinite.
-      have h_convex : Matrix.PosSemidef ((a • Matrix.fromBlocks (x.toMat) (1 : Matrix n n 𝕜) (1 : Matrix n n 𝕜) (x.toMat)⁻¹) + (b • Matrix.fromBlocks (y.toMat) (1 : Matrix n n 𝕜) (1 : Matrix n n 𝕜) (y.toMat)⁻¹)) := by
+      have h_convex : Matrix.PosSemidef ((a • Matrix.fromBlocks (x.mat) (1 : Matrix n n 𝕜) (1 : Matrix n n 𝕜) (x.mat)⁻¹) + (b • Matrix.fromBlocks (y.mat) (1 : Matrix n n 𝕜) (1 : Matrix n n 𝕜) (y.mat)⁻¹)) := by
         apply_rules [ Matrix.PosSemidef.add, Matrix.PosSemidef.smul ];
       convert h_convex using 1;
       ext i j ; simp [ Matrix.fromBlocks ];
       rcases i with ( i | i ) <;> rcases j with ( j | j ) <;> simp [ Matrix.one_apply ];
       · split_ifs <;> simp_all [ ← add_smul ];
       · split_ifs <;> simp_all [ ← add_smul ];
-  have h_schur : (a • x.toMat + b • y.toMat).PosDef := by
+  have h_schur : (a • x.mat + b • y.mat).PosDef := by
     by_cases ha' : a = 0 <;> by_cases hb' : b = 0 <;> simp_all [ Matrix.PosSemidef ];
     constructor;
     · simp_all [ Matrix.IsHermitian, Matrix.conjTranspose_add, Matrix.conjTranspose_smul ];
     · intro v hv_ne_zero
-      have h_pos : 0 < a * (star v ⬝ᵥ x.toMat.mulVec v) + b * (star v ⬝ᵥ y.toMat.mulVec v) := by
+      have h_pos : 0 < a * (star v ⬝ᵥ x.mat.mulVec v) + b * (star v ⬝ᵥ y.mat.mulVec v) := by
         have := hx.2 v hv_ne_zero; have := hy.2 v hv_ne_zero; simp_all [ Matrix.mulVec, dotProduct ] ;
         exact add_pos_of_nonneg_of_pos ( mul_nonneg ( mod_cast ha ) ( le_of_lt ‹_› ) ) ( mul_pos ( mod_cast lt_of_le_of_ne hb ( Ne.symm hb' ) ) ( mod_cast this ) );
       convert h_pos using 1 ; simp [ Matrix.add_mulVec]
       ring_nf
       simp [ Matrix.mulVec, dotProduct, Finset.mul_sum, mul_left_comm];
       simp [mul_left_comm, Algebra.smul_def ];
-  change (a • (x.toMat)⁻¹ + b • (y.toMat)⁻¹ - (a • x.toMat + b • y.toMat)⁻¹).PosSemidef
+  change (a • (x.mat)⁻¹ + b • (y.mat)⁻¹ - (a • x.mat + b • y.mat)⁻¹).PosSemidef
   refine' ⟨ _, fun v => _ ⟩;
   · simp_all [ Matrix.IsHermitian, Matrix.conjTranspose_nonsing_inv ];
   · have := h_pos_semidef.2;
-    specialize this (Sum.elim (- (a • x.toMat + b • y.toMat)⁻¹.mulVec v) v);
+    specialize this (Sum.elim (- (a • x.mat + b • y.mat)⁻¹.mulVec v) v);
     simp_all [ Matrix.fromBlocks_mulVec ];
     simp_all [ Matrix.mul_nonsing_inv _ ( show IsUnit ( Matrix.det ( a • ( x : Matrix n n 𝕜 ) + b • ( y : Matrix n n 𝕜 ) ) ) from isUnit_iff_ne_zero.mpr <| h_schur.det_pos.ne' ), Matrix.mulVec_neg];
     simp_all [ dotProduct, Matrix.sub_mulVec ];
@@ -432,11 +414,11 @@ lemma inv_convex {x y : HermitianMat n 𝕜} (hx : x.toMat.PosDef) (hy : y.toMat
 /--
 The shifted inverse function is operator convex.
 -/
-lemma inv_shift_convex {x y : HermitianMat n 𝕜} (hx : x.toMat.PosDef) (hy : y.toMat.PosDef)
+lemma inv_shift_convex {x y : HermitianMat n 𝕜} (hx : x.mat.PosDef) (hy : y.mat.PosDef)
     ⦃a b : ℝ⦄ (ha : 0 ≤ a) (hb : 0 ≤ b) (hab : a + b = 1) (t : ℝ) (ht : 0 ≤ t) :
     (a • x + b • y + t • 1)⁻¹ ≤ a • (x + t • 1)⁻¹ + b • (y + t • 1)⁻¹ := by
-  have hx' : (x + t • 1).toMat.PosDef := hx.add_posSemidef (.smul .one ht)
-  have hy' : (y + t • 1).toMat.PosDef := hy.add_posSemidef (.smul .one ht)
+  have hx' : (x + t • 1).mat.PosDef := hx.add_posSemidef (.smul .one ht)
+  have hy' : (y + t • 1).mat.PosDef := hy.add_posSemidef (.smul .one ht)
   convert inv_convex hx' hy' ha hb hab using 1
   ext
   simp [add_assoc, add_left_comm, hab, ← add_smul]
@@ -446,7 +428,7 @@ open scoped Matrix.Norms.Frobenius in
 /--
 Definition of the approximation of the matrix logarithm.
 -/
-lemma integrable_inv_shift {A : HermitianMat n 𝕜} (hA : A.toMat.PosDef) (b : ℝ) (hb : 0 ≤ b) :
+lemma integrable_inv_shift {A : HermitianMat n 𝕜} (hA : A.mat.PosDef) (b : ℝ) (hb : 0 ≤ b) :
     IntervalIntegrable (fun t => (A + t • 1)⁻¹) volume 0 b := by
   -- The function $t \mapsto (A + tI)^{-1}$ is continuous on $[0, b]$ because $A + tI$ is invertible for all $t \geq 0$.
   have h_cont : ContinuousOn (fun t : ℝ => (A + t • 1 : HermitianMat n 𝕜)⁻¹) (Set.Icc 0 b) := by
@@ -478,10 +460,10 @@ open ComplexOrder in
 The finite integral approximation of the matrix logarithm is operator concave.
 -/
 theorem logApprox_concave {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
-    {x y : HermitianMat n 𝕜} (hx : x.toMat.PosDef) (hy : y.toMat.PosDef)
+    {x y : HermitianMat n 𝕜} (hx : x.mat.PosDef) (hy : y.mat.PosDef)
     ⦃a b : ℝ⦄ (ha : 0 ≤ a) (hb : 0 ≤ b) (hab : a + b = 1) (T : ℝ) (hT : 0 ≤ T) :
     a • x.logApprox T + b • y.logApprox T ≤ (a • x + b • y).logApprox T := by
-  have h_integrable {z : HermitianMat n 𝕜} : z.toMat.PosDef → IntervalIntegrable (fun t => (1 + t)⁻¹ • (1 : HermitianMat n 𝕜) - (z + t • 1)⁻¹) MeasureTheory.volume 0 T := by
+  have h_integrable {z : HermitianMat n 𝕜} : z.mat.PosDef → IntervalIntegrable (fun t => (1 + t)⁻¹ • (1 : HermitianMat n 𝕜) - (z + t • 1)⁻¹) MeasureTheory.volume 0 T := by
     intro hz
     have h_integrable := integrable_inv_shift hz T hT
     rw [ intervalIntegrable_iff_integrableOn_Ioc_of_le hT ] at *
@@ -509,8 +491,7 @@ theorem logApprox_concave {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike �
 /--
 The matrix logarithm is operator concave.
 -/
-theorem log_concave {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
-    {x y : HermitianMat n 𝕜} (hx : x.toMat.PosDef) (hy : y.toMat.PosDef)
+theorem log_concave {x y : HermitianMat n 𝕜} (hx : x.mat.PosDef) (hy : y.mat.PosDef)
     ⦃a b : ℝ⦄ (ha : 0 ≤ a) (hb : 0 ≤ b) (hab : a + b = 1) :
     a • x.log + b • y.log ≤ (a • x + b • y).log := by
   apply le_of_tendsto_of_tendsto (b := .atTop) (f := fun T => a • x.logApprox T + b • y.logApprox T) (g := (a • x + b • y).logApprox)
@@ -543,7 +524,8 @@ lemma log_kron_diagonal {m n 𝕜 : Type*} [Fintype m] [DecidableEq m] [Fintype 
   rw [ h_rhs ];
   have h_rhs : (diagonal 𝕜 (fun (i : m × n) => Real.log (d₁ i.1) + Real.log (d₂ i.2))) =
     (diagonal 𝕜 (fun (i : m × n) => Real.log (d₁ i.1))) + (diagonal 𝕜 (fun (i : m × n) => Real.log (d₂ i.2))) := by
-      simp +decide [ diagonal ]
+      ext1
+      simp [ diagonal ]
   rw [ h_rhs ];
   congr! 1;
   · rw [ show ( diagonal 𝕜 d₁ |> log ) = diagonal 𝕜 ( Real.log ∘ d₁ ) from ?_ ];
@@ -564,59 +546,21 @@ lemma log_kron_diagonal {m n 𝕜 : Type*} [Fintype m] [DecidableEq m] [Fintype 
 /--
 The logarithm of a Hermitian matrix conjugated by a unitary matrix is the conjugate of the logarithm.
 -/
-lemma log_conj_unitary {n 𝕜 : Type*} [Fintype n] [DecidableEq n] [RCLike 𝕜]
-    (A : HermitianMat n 𝕜) (U : Matrix.unitaryGroup n 𝕜) :
+lemma log_conj_unitary (A : HermitianMat n 𝕜) (U : Matrix.unitaryGroup n 𝕜) :
     (A.conj U.val).log = A.log.conj U.val :=
   cfc_conj_unitary _ Real.log U
-
-/--
-The conjugate of a Kronecker product by a Kronecker product is the Kronecker product of the conjugates (for matrices).
--/
-lemma _root_.Matrix.kronecker_conj_eq {m n p q 𝕜 : Type*} [Fintype m] [DecidableEq m] [Fintype n] [DecidableEq n]
-    [Fintype p] [DecidableEq p] [Fintype q] [DecidableEq q] [RCLike 𝕜]
-    (A : Matrix m m 𝕜) (B : Matrix n n 𝕜)
-    (C : Matrix p m 𝕜) (D : Matrix q n 𝕜) :
-    (Matrix.kroneckerMap (· * ·) C D) * (Matrix.kroneckerMap (· * ·) A B) * (Matrix.kroneckerMap (· * ·) C D).conjTranspose =
-    Matrix.kroneckerMap (· * ·) (C * A * C.conjTranspose) (D * B * D.conjTranspose) := by
-  rw [← Matrix.mul_kronecker_mul]
-  ext i j
-  simp [ Matrix.mul_apply, Matrix.conjTranspose_apply ]
-  ring_nf!
-  simp only [mul_comm, Finset.mul_sum, mul_left_comm]
-  simp only [Finset.sum_mul, mul_assoc, Finset.mul_sum _ _ _, mul_left_comm]
-  rw [Fintype.sum_prod_type_right]
-
-/-
-The conjugate of a Kronecker product by a Kronecker product is the Kronecker product of the conjugates.
--/
-lemma kronecker_conj {m n p q 𝕜 : Type*} [Fintype m] [DecidableEq m] [Fintype n] [DecidableEq n]
-    [Fintype p] [DecidableEq p] [Fintype q] [DecidableEq q] [RCLike 𝕜]
-    (A : HermitianMat m 𝕜) (B : HermitianMat n 𝕜)
-    (C : Matrix p m 𝕜) (D : Matrix q n 𝕜) :
-    (A ⊗ₖ B).conj (Matrix.kroneckerMap (· * ·) C D) = (A.conj C) ⊗ₖ (B.conj D) := by
-  convert Matrix.kronecker_conj_eq A.toMat B.toMat C D using 1;
-  constructor <;> intro h <;> rw [ ← Subtype.coe_inj ] at * <;> aesop ( simp_config := { decide := true } )
-
-/--
-A Hermitian matrix is equal to its diagonalization conjugated by its eigenvector unitary matrix.
--/
-lemma eq_conj_diagonal (A : HermitianMat n 𝕜) :
-    A = (diagonal 𝕜 A.H.eigenvalues).conj A.H.eigenvectorUnitary := by
-  ext1
-  exact Matrix.IsHermitian.spectral_theorem A.2
 
 /-
 The matrix logarithm of the Kronecker product of two positive definite Hermitian matrices is the sum of the Kronecker products of their logarithms with the identity matrix.
 -/
-theorem log_kron {m n 𝕜 : Type*} [Fintype m] [DecidableEq m] [Fintype n] [DecidableEq n] [RCLike 𝕜]
-    (A : HermitianMat m 𝕜) (B : HermitianMat n 𝕜)
-    (hA : A.toMat.PosDef) (hB : B.toMat.PosDef) :
+theorem log_kron {A : HermitianMat m 𝕜} (hA : A.mat.PosDef) (hB : B.mat.PosDef) :
     (A ⊗ₖ B).log = (A.log ⊗ₖ 1) + (1 ⊗ₖ B.log) := by
+  --TODO Cleanup
   -- Let's diagonalize A and B using their eigenvector unitary matrices.
   obtain ⟨U, hU⟩ : ∃ U : Matrix.unitaryGroup m 𝕜, A = (diagonal 𝕜 A.H.eigenvalues).conj U.val := by
-    exact ⟨ A.H.eigenvectorUnitary, eq_conj_diagonal A ⟩
+    exact ⟨A.H.eigenvectorUnitary, eq_conj_diagonal A⟩
   obtain ⟨V, hV⟩ : ∃ V : Matrix.unitaryGroup n 𝕜, B = (diagonal 𝕜 B.H.eigenvalues).conj V.val := by
-    exact ⟨ B.H.eigenvectorUnitary, by exact eq_conj_diagonal B ⟩;
+    exact ⟨B.H.eigenvectorUnitary, eq_conj_diagonal B⟩
   -- By the properties of the logarithm and the Kronecker product, we can simplify the expression.
   have h_log_simplified : (diagonal 𝕜 (fun (i : m × n) => A.H.eigenvalues i.1 * B.H.eigenvalues i.2) : HermitianMat (m × n) 𝕜).log =
     (diagonal 𝕜 A.H.eigenvalues).log ⊗ₖ 1 + 1 ⊗ₖ (diagonal 𝕜 B.H.eigenvalues).log := by
@@ -644,3 +588,8 @@ theorem log_kron {m n 𝕜 : Type*} [Fintype m] [DecidableEq m] [Fintype n] [Dec
   · rw [ hU, hV ]
     simp [ log_conj_unitary, kronecker_conj ]
     congr
+
+open RealInnerProductSpace in
+theorem inner_log_smul_of [NonSingular A] {x : ℝ} (hx : x ≠ 0) :
+    ⟪(x • A).log, B⟫ = Real.log x * B.trace + ⟪A.log, B⟫ := by
+  simp [log_smul hx, inner_add_left]

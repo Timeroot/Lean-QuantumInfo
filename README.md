@@ -48,7 +48,7 @@ This repository is released under the MIT License, as found in the [LICENSE](./L
   year = {2024},
   publisher = {GitHub},
   journal = {GitHub repository},
-  howpublished = {\url{https://github.com/Meiburg/Lean-QuantumInfo}},
+  howpublished = {\url{https://github.com/Timeroot/Lean-QuantumInfo}},
 }
 ```
 or cite [the report](https://arxiv.org/abs/2510.08672) for the Stein's Lemma work in particular. Thanks to all contributors, especially Leonardo Lessa and Rodolfo Soldati.
