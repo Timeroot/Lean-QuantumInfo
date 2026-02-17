@@ -17,6 +17,145 @@ namespace HermitianMat
 
 variable {n : Type*} [Fintype n] [DecidableEq n]
 variable {𝕜 : Type*} [RCLike 𝕜]
+variable {ι : Type*} [Fintype ι] (S : Submodule 𝕜 (EuclideanSpace 𝕜 n))
+
+variable (A B : HermitianMat n 𝕜)
+
+open scoped InnerProductSpace
+
+/--
+Given a Submodule (EuclideanSpace ...) to HermitianMat, this gives the projector onto that subspace,
+i.e. a matrix that squares to itself, preserves vectors in the submodule, and zeroes out anything
+in the orthogonal complement of that submodule.
+-/
+noncomputable def projector (S : Submodule 𝕜 (EuclideanSpace 𝕜 n)) : HermitianMat n 𝕜 :=
+  let P := S.subtypeL.comp S.orthogonalProjection
+  ⟨P.toMatrix (EuclideanSpace.basisFun n 𝕜).toBasis (EuclideanSpace.basisFun n 𝕜).toBasis, by
+    ext i j
+    simpa [EuclideanSpace.inner_single_right, EuclideanSpace.inner_single_left] using
+      S.inner_starProjection_left_eq_right (EuclideanSpace.single i 1) (EuclideanSpace.single j 1)⟩
+
+theorem projector_add_orthogonal : projector S + projector Sᗮ = 1 := by
+  have h_decomp v : v = S.subtype (S.orthogonalProjection v) + Sᗮ.subtype (Sᗮ.orthogonalProjection v) := by
+    simp
+  ext i j : 2
+  specialize h_decomp (Pi.single j 1)
+  convert congr_arg (fun x => x i) h_decomp.symm using 1
+  simp [Matrix.one_apply, Pi.single_apply]
+
+@[simp]
+theorem trace_projector : (projector S).trace = (Module.finrank 𝕜 S : ℝ) := by
+  suffices h_trace : ((S.subtype ∘ₗ S.orthogonalProjection).toMatrix (EuclideanSpace.basisFun n 𝕜).toBasis (EuclideanSpace.basisFun n 𝕜).toBasis).trace = Module.finrank 𝕜 S by
+    simp [projector, trace_eq_re_trace, h_trace]
+  suffices h_trace : ((S.subtype ∘ₗ S.orthogonalProjection).toMatrix (EuclideanSpace.basisFun n 𝕜).toBasis (EuclideanSpace.basisFun n 𝕜).toBasis).trace = (LinearMap.id.toMatrix (Module.finBasis 𝕜 S) (Module.finBasis 𝕜 S)).trace by
+    simp [h_trace]
+  rw [LinearMap.toMatrix_comp _ (Module.finBasis 𝕜 ↥S), Matrix.trace_mul_comm, ← LinearMap.toMatrix_comp]
+  congr 2
+  ext1
+  simp [Submodule.orthogonalProjection_mem_subspace_eq_self]
+
+/--
+The `HermitianMat.projector` for the `HermitianMat.support` submodule.
+-/
+noncomputable def supportProj (A : HermitianMat n 𝕜) : HermitianMat n 𝕜 := projector A.support
+
+/--
+The `HermitianMat.projector` for the `HermitianMat.ker` submodule.
+-/
+noncomputable def kerProj (A : HermitianMat n 𝕜) : HermitianMat n 𝕜 := projector A.ker
+
+@[simp]
+theorem kerProj_add_supportProj : A.kerProj + A.supportProj = 1 := by
+  rw [← projector_add_orthogonal A.ker, ker_orthogonal_eq_support, kerProj, supportProj]
+
+/--
+The projector onto a submodule S is the sum of the outer products of the vectors in an orthonormal basis of S.
+-/
+theorem projector_eq_sum_rankOne (b : OrthonormalBasis ι 𝕜 S) :
+    (projector S).mat = ∑ i, Matrix.vecMulVec (S.subtype (b i)) (star (S.subtype (b i))) := by
+  ext i j : 1
+  have h_proj v : S.orthogonalProjection v = ∑ i, ⟪(b i).val, v⟫_𝕜 • (b i).val := by
+    simpa using congr($((OrthonormalBasis.sum_repr' b  (S.orthogonalProjection v)).symm).val)
+  specialize h_proj (Pi.single j 1)
+  simp only [Matrix.vecMulVec, Matrix.sum_apply]
+  refine (congr_fun h_proj i).trans ?_
+  rw [Finset.sum_apply]
+  simp [Pi.single_apply, inner, mul_comm]
+
+/--
+The projector onto the support of A is the sum of the projections onto the eigenvectors with non-zero eigenvalues.
+-/
+lemma projector_support_eq_sum : A.supportProj.mat =
+    ∑ i, (if A.H.eigenvalues i = 0 then 0 else 1) •
+      Matrix.vecMulVec (A.H.eigenvectorBasis i) (star (A.H.eigenvectorBasis i)) := by
+  --TODO Cleanup
+  -- The support of A is the span of the eigenvectors corresponding to non-zero eigenvalues.
+  have h_support : A.support = Submodule.span 𝕜 (Set.range (fun i => if A.H.eigenvalues i = 0 then 0 else A.H.eigenvectorBasis i)) := by
+    ext x;
+    constructor;
+    · intro hx
+      obtain ⟨y, hy⟩ : ∃ y : EuclideanSpace 𝕜 n, x = A.mat.mulVec y := by
+        obtain ⟨ y, rfl ⟩ := hx;
+        exact ⟨ y, rfl ⟩;
+      -- Since $y$ is in the span of the eigenvectors of $A$, we can write $y$ as a linear combination of the eigenvectors.
+      obtain ⟨c, hc⟩ : ∃ c : n → 𝕜, y = ∑ i, c i • A.H.eigenvectorBasis i := by
+        have := A.H.eigenvectorBasis.sum_repr y;
+        exact ⟨ _, this.symm ⟩;
+      -- Since $A$ is Hermitian, we can write $A.mulVec (c i • eigenvectorBasis i)$ as $c i • eigenvalues i • eigenvectorBasis i$.
+      have h_mulVec : ∀ i, A.mat.mulVec (c i • A.H.eigenvectorBasis i) = c i • A.H.eigenvalues i • A.H.eigenvectorBasis i := by
+        intro i
+        have h_mulVec : A.mat.mulVec (A.H.eigenvectorBasis i) = A.H.eigenvalues i • A.H.eigenvectorBasis i := by
+          convert A.H.mulVec_eigenvectorBasis i;
+        rw [ ← h_mulVec, Matrix.mulVec_smul ];
+      simp_all [ Submodule.mem_span_range_iff_exists_fun ];
+      use fun i => c i * A.H.eigenvalues i;
+      rw [ Matrix.mulVec_sum ];
+      exact Finset.sum_congr rfl fun i _ => by split_ifs <;> simp_all [ MulAction.mul_smul ] ;
+    · intro hx;
+      refine' Submodule.span_le.mpr _ hx;
+      rintro _ ⟨ i, rfl ⟩ ; by_cases hi : A.H.eigenvalues i = 0 <;> simp +decide [ hi ];
+      have := A.H.mulVec_eigenvectorBasis i;
+      refine' ⟨ _, _ ⟩;
+      exact ( A.H.eigenvalues i ) ⁻¹ • WithLp.ofLp ( A.H.eigenvectorBasis i );
+      convert congr_arg ( fun x => ( A.H.eigenvalues i ) ⁻¹ • x ) this using 1 <;> simp +decide [ hi, smul_smul ];
+      · congr! 1;
+      · exact rfl;
+  rw [ supportProj, h_support ];
+  convert projector_eq_sum_rankOne _ _ using 1;
+  rotate_left;
+  exact { i : n // A.H.eigenvalues i ≠ 0 };
+  exact inferInstance;
+  refine' OrthonormalBasis.mk _ _;
+  use fun i => ⟨ A.H.eigenvectorBasis i, Submodule.subset_span ⟨ i, by simp +decide [ i.2 ] ⟩ ⟩;
+  all_goals simp +decide [ orthonormal_iff_ite ];
+  · intro i hi j hj; split_ifs with h <;> simp_all
+  · rw [ Submodule.eq_top_iff' ];
+    rintro ⟨ x, hx ⟩;
+    rw [ Submodule.mem_span ] at hx ⊢;
+    intro p hp;
+    convert hx ( p.map ( Submodule.subtype _ ) ) _;
+    · simp +decide [ Submodule.mem_map ];
+      exact ⟨ fun h => ⟨ by assumption, h ⟩, fun ⟨ _, h ⟩ => h ⟩;
+    · rintro _ ⟨ i, rfl ⟩;
+      by_cases hi : A.H.eigenvalues i = 0 <;> simp +decide [ hi ];
+      exact ⟨ Submodule.subset_span ⟨ i, by aesop ⟩, hp ⟨ ⟨ i, hi ⟩, rfl ⟩ ⟩;
+  · rw [ ← Finset.sum_subset ( Finset.subset_univ ( Finset.univ.filter fun i => A.H.eigenvalues i ≠ 0 ) ) ];
+    · refine' Finset.sum_bij ( fun i hi => ⟨ i, by aesop ⟩ ) _ _ _ _ <;> aesop;
+    · aesop
+
+/-
+`HermitianMat.supportProj` as a cfc.
+-/
+theorem supportProj_eq_cfc : A.supportProj = A.cfc (if · = 0 then 0 else 1) := by
+  apply HermitianMat.ext;
+  rw [HermitianMat.cfc_toMat_eq_sum_smul_proj];
+  convert projector_support_eq_sum A using 1;
+  refine' Finset.sum_congr rfl fun i _ => _;
+  ext x y
+  simp [ Matrix.vecMulVec, Matrix.mul_apply ] ;
+  simp [ Matrix.single ];
+  simp [ Finset.sum_ite, Finset.filter_eq, Finset.filter_and ];
+  rw [ Finset.sum_eq_single i ] <;> aesop
 
 /-- Projector onto the non-negative eigenspace of `B - A`. Accessible by the notation
 `{A ≤ₚ B}`, which is scoped to `HermitianMat`. This is the unique maximum operator `P`
@@ -38,8 +177,6 @@ scoped notation "{" A " ≤ₚ " B "}" => proj_le A B
 
 scoped notation "{" A " >ₚ " B "}" => proj_lt B A
 scoped notation "{" A " <ₚ " B "}" => proj_lt A B
-
-variable (A B : HermitianMat n 𝕜)
 
 theorem proj_le_def : {A ≤ₚ B} = (B - A).cfc (fun x ↦ if 0 ≤ x then 1 else 0) := by
   rfl
@@ -131,6 +268,16 @@ theorem conj_lt_add_conj_le : A.conj {A <ₚ 0} + A.conj {0 ≤ₚ A} = A := by
   rw [proj_lt_zero_cfc, proj_zero_le_cfc, cfc_conj, cfc_conj, ← cfc_add]
   congr; ext
   simp; grind
+
+/-
+The projection onto the support can be split into the projection onto positive
+and negative eigenvalues.
+-/
+theorem supportProj_eq_proj_lt_add_proj_lt (A : HermitianMat n 𝕜) :
+    A.supportProj = {A <ₚ 0} + {0 <ₚ A} := by
+  rw [supportProj_eq_cfc, proj_lt_zero_cfc, proj_zero_lt_cfc, ← cfc_add A]
+  congr 1
+  grind only [Pi.add_apply]
 
 /-- The positive part of a Hermitian matrix: the projection onto its positive eigenvalues. -/
 def proj_pos : HermitianMat n 𝕜 :=
