@@ -69,7 +69,7 @@ section entropy
 
 /-- Von Neumann entropy of a mixed state. -/
 def Sᵥₙ (ρ : MState d) : ℝ :=
-  Hₛ (ρ.spectrum)
+  Hₛ ρ.spectrum
 
 /-- The Quantum Conditional Entropy S(ρᴬ|ρᴮ) is given by S(ρᴬᴮ) - S(ρᴮ). -/
 def qConditionalEnt (ρ : MState (dA × dB)) : ℝ :=
@@ -104,23 +104,6 @@ theorem Sᵥₙ_of_pure_zero (ψ : Ket d) : Sᵥₙ (MState.pure ψ) = 0 := by
   obtain ⟨i, hi⟩ := MState.spectrum_pure_eq_constant ψ
   rw [Sᵥₙ, hi, Hₛ_constant_eq_zero]
 
-/-- von Neumann entropy is unchanged under SWAP. TODO: All unitaries-/
-@[simp]
-theorem Sᵥₙ_of_SWAP_eq (ρ : MState (d₁ × d₂)) : Sᵥₙ ρ.SWAP = Sᵥₙ ρ := by
-  apply Hₛ_eq_of_multiset_map_eq
-  exact ρ.multiset_spectrum_relabel_eq (Equiv.prodComm d₁ d₂).symm
-
-/-- von Neumann entropy is unchanged under assoc. -/
-@[simp]
-theorem Sᵥₙ_of_assoc_eq (ρ : MState ((d₁ × d₂) × d₃)) : Sᵥₙ ρ.assoc = Sᵥₙ ρ := by
-  apply Hₛ_eq_of_multiset_map_eq
-  apply ρ.multiset_spectrum_relabel_eq
-
-/-- von Neumann entropy is unchanged under assoc'. -/
-@[simp]
-theorem Sᵥₙ_of_assoc'_eq (ρ : MState (d₁ × (d₂ × d₃))) : Sᵥₙ ρ.assoc' = Sᵥₙ ρ := by
-  rw [← Sᵥₙ_of_assoc_eq, ρ.assoc_assoc']
-
 theorem Sᵥₙ_eq_neg_trace_log (ρ : MState d) : Sᵥₙ ρ = - ⟪ρ.M.log, ρ.M⟫ := by
   open HermitianMat in
   rw [log, inner_eq_re_trace]
@@ -132,9 +115,30 @@ theorem Sᵥₙ_eq_neg_trace_log (ρ : MState d) : Sᵥₙ ρ = - ⟪ρ.M.log, �
   apply Finset.sum_equiv e.symm (by simp)
   simp [MState.spectrum, Distribution.mk', he, mul_comm]
 
-/--
-The von Neumann entropy is the trace of the matrix function `x ↦ -x log x`.
--/
+/-- Von Neumann entropy is invariant under relabeling of the basis. -/
+@[simp]
+theorem Sᵥₙ_relabel (ρ : MState d₁) (e : d₂ ≃ d₁) :
+    Sᵥₙ (ρ.relabel e) = Sᵥₙ ρ := by
+  simp [Sᵥₙ_eq_neg_trace_log]
+
+/-- Von Neumann entropy is unchanged under SWAP. TODO: All unitaries-/
+@[simp]
+theorem Sᵥₙ_of_SWAP_eq (ρ : MState (d₁ × d₂)) : Sᵥₙ ρ.SWAP = Sᵥₙ ρ := by
+  apply Hₛ_eq_of_multiset_map_eq
+  exact ρ.multiset_spectrum_relabel_eq (Equiv.prodComm d₁ d₂).symm
+
+/-- Von Neumann entropy is unchanged under assoc. -/
+@[simp]
+theorem Sᵥₙ_of_assoc_eq (ρ : MState ((d₁ × d₂) × d₃)) : Sᵥₙ ρ.assoc = Sᵥₙ ρ := by
+  apply Hₛ_eq_of_multiset_map_eq
+  apply ρ.multiset_spectrum_relabel_eq
+
+/-- Von Neumann entropy is unchanged under assoc'. -/
+@[simp]
+theorem Sᵥₙ_of_assoc'_eq (ρ : MState (d₁ × (d₂ × d₃))) : Sᵥₙ ρ.assoc' = Sᵥₙ ρ := by
+  rw [← Sᵥₙ_of_assoc_eq, ρ.assoc_assoc']
+
+/-- Von Neumann entropy is the trace of the matrix function `x ↦ -x log x`. -/
 theorem Sᵥₙ_eq_trace_cfc_negMulLog (ρ : MState d) :
     Sᵥₙ ρ = (ρ.M.cfc Real.negMulLog).trace := by
   open HermitianMat in
@@ -185,25 +189,27 @@ theorem Sᵥₙ_subadditivity (ρ : MState (d₁ × d₂)) :
     Sᵥₙ ρ ≤ Sᵥₙ ρ.traceRight + Sᵥₙ ρ.traceLeft := by
   sorry
 
-/--
-The purity of a state is invariant under relabeling of the basis.
--/
+/-- The purity of a state is invariant under relabeling of the basis. -/
 @[simp]
 theorem purity_relabel (ρ : MState d₁) (e : d₂ ≃ d₁) : (ρ.relabel e).purity = ρ.purity := by
   simp [MState.purity, MState.inner_def]
 
-/-
-Relabeling a pure state by a bijection yields another pure state.
--/
+/-- Relabeling a pure state by a bijection yields another pure state. -/
 theorem relabel_pure_exists (ψ : Ket d₁) (e : d₂ ≃ d₁) :
     ∃ ψ' : Ket d₂, (MState.pure ψ).relabel e = MState.pure ψ' := by
   refine ⟨⟨fun i => ψ (e i), ?_⟩, rfl⟩
   rw [← ψ.normalized', Fintype.sum_equiv e]
   congr!
 
-/--
-Triangle inequality for pure tripartite states: S(A) ≤ S(B) + S(C).
--/
+/-- For a pure state, the entropy of one subsystem equals the entropy of its complement,
+even after relabeling. -/
+@[simp]
+theorem Sᵥₙ_pure_complement (ψ : Ket d₁) (e : d₂ × d₃ ≃ d₁) :
+    Sᵥₙ ((MState.pure ψ).relabel e).traceLeft = Sᵥₙ ((MState.pure ψ).relabel e).traceRight := by
+  obtain ⟨ψ', hψ'⟩ := relabel_pure_exists ψ e
+  simp only [hψ', Sᵥₙ_of_partial_eq]
+
+/-- Triangle inequality for pure tripartite states: S(A) ≤ S(B) + S(C). -/
 private theorem Sᵥₙ_pure_tripartite_triangle (ψ : Ket ((d₁ × d₂) × d₃)) :
     Sᵥₙ (MState.pure ψ).traceRight.traceRight ≤
     Sᵥₙ (MState.pure ψ).traceRight.traceLeft + Sᵥₙ (MState.pure ψ).traceLeft := by
@@ -213,11 +219,9 @@ private theorem Sᵥₙ_pure_tripartite_triangle (ψ : Ket ((d₁ × d₂) × d�
   grind [Sᵥₙ_of_partial_eq, MState.traceLeft_left_assoc,
     MState.traceLeft_right_assoc, MState.traceRight_assoc]
 
-/--
-One direction of the Araki-Lieb triangle inequality: S(A) ≤ S(B) + S(AB).
--/
+/-- One direction of the Araki-Lieb triangle inequality: S(A) ≤ S(B) + S(AB). -/
 theorem Sᵥₙ_triangle_ineq_one_way (ρ : MState (d₁ × d₂)) : Sᵥₙ ρ.traceRight ≤ Sᵥₙ ρ.traceLeft + Sᵥₙ ρ := by
-  have := Sᵥₙ_pure_tripartite_triangle (ρ.purify)
+  have := Sᵥₙ_pure_tripartite_triangle ρ.purify
   have := Sᵥₙ_of_partial_eq ρ.purify
   aesop
 
@@ -240,17 +244,189 @@ theorem Sᵥₙ_strong_subadditivity (ρ₁₂₃ : MState (d₁ × d₂ × d₃
     Sᵥₙ ρ₁₂₃ + Sᵥₙ ρ₂ ≤ Sᵥₙ ρ₁₂ + Sᵥₙ ρ₂₃ := by
   sorry
 
-/-- Weak monotonicity of quantum conditional entropy. S(A|B) + S(A|C) ≥ 0 -/
-theorem Sᵥₙ_weak_monotonicity (ρ : MState (dA × dB × dC)) :
+section weak_monotonicity
+
+variable (ρ : MState (dA × dB × dC))
+
+/-
+Permutations of the purification system for use in the proof of weak monotonicity.
+-/
+private def perm_B_ACR : (dA × dB × dC) × (dA × dB × dC) ≃ dB × (dA × dC × (dA × dB × dC)) where
+  toFun x := let ((a,b,c), r) := x; (b, (a,c,r))
+  invFun x := let (b, (a,c,r)) := x; ((a,b,c), r)
+  left_inv := by intro x; simp
+  right_inv := by intro x; simp
+
+private def perm_C_ABR : (dA × dB × dC) × (dA × dB × dC) ≃ dC × (dA × dB × (dA × dB × dC)) where
+  toFun x := let ((a,b,c), r) := x; (c, (a,b,r))
+  invFun x := let (c, (a,b,r)) := x; ((a,b,c), r)
+  left_inv := by intro x; simp
+  right_inv := by intro x; simp
+
+private def perm_AC_BR : (dA × dB × dC) × (dA × dB × dC) ≃ (dA × dC) × (dB × (dA × dB × dC)) where
+  toFun x := let ((a,b,c), r) := x; ((a,c), (b,r))
+  invFun x := let ((a,c), (b,r)) := x; ((a,b,c), r)
+  left_inv := by intro x; simp
+  right_inv := by intro x; simp
+
+private def perm_AB_CR : (dA × dB × dC) × (dA × dB × dC) ≃ (dA × dB) × (dC × (dA × dB × dC)) where
+  toFun x := let ((a,b,c), r) := x; ((a,b), (c,r))
+  invFun x := let ((a,b), (c,r)) := x; ((a,b,c), r)
+  left_inv := by intro x; simp
+  right_inv := by intro x; simp
+
+/-- The state on systems A, B, and R, obtained by purifying ρ and tracing out C. -/
+private def ρABR (ρ : MState (dA × dB × dC)) : MState (dA × dB × (dA × dB × dC)) :=
+  ((MState.pure ρ.purify).relabel perm_C_ABR.symm).traceLeft
+
+private lemma traceRight_relabel_perm_C_ABR
+    (ρ : MState ((dA × dB × dC) × (dA × dB × dC))) :
+    (ρ.relabel perm_C_ABR.symm).traceRight = ρ.traceRight.traceLeft.traceLeft := by
+  ext i j;
+  simp [ HermitianMat.traceRight, HermitianMat.traceLeft, perm_C_ABR ];
+  simp [ Matrix.traceRight, Matrix.traceLeft ];
+  simp [ Fintype.sum_prod_type ];
+  exact Finset.sum_comm.trans ( Finset.sum_congr rfl fun _ _ => Finset.sum_congr rfl fun _ _ => by ac_rfl )
+
+private lemma trace_relabel_purify_eq_rho_C :
+    ((MState.pure ρ.purify).relabel perm_C_ABR.symm).traceRight = ρ.traceLeft.traceLeft := by
+  have := MState.purify_spec ρ;
+  convert traceRight_relabel_perm_C_ABR _ using 1;
+  rw [ this ]
+
+private theorem S_B_eq_S_ACR (ρ : MState (dA × dB × dC)) :
+    Sᵥₙ ((MState.pure ρ.purify).relabel perm_B_ACR.symm).traceRight = Sᵥₙ ρ.traceLeft.traceRight := by
+  have := @MState.purify_spec;
+  convert congr_arg Sᵥₙ ( this ρ |> congr_arg ( fun ρ => ρ.traceLeft.traceRight ) ) using 1;
+  convert Sᵥₙ_relabel _ _ using 2;
+  swap;
+  exact Equiv.refl dB;
+  ext; simp [ MState.traceRight, MState.traceLeft ] ;
+  simp [HermitianMat.traceLeft, HermitianMat.traceRight ];
+  simp [ Matrix.traceRight, Matrix.traceLeft ];
+  simp [ Fintype.sum_prod_type ];
+  exact Finset.sum_comm.trans ( Finset.sum_congr rfl fun _ _ => Finset.sum_congr rfl fun _ _ => by ac_rfl )
+
+/-
+The entropy of the B marginal of the purification is equal to the entropy of the B marginal of the original state.
+-/
+private lemma S_B_eq_S_B :
+    Sᵥₙ (ρABR ρ).traceLeft.traceRight = Sᵥₙ ρ.assoc'.traceRight.traceLeft := by
+  convert S_B_eq_S_ACR ρ using 1;
+  · congr 1
+    ext1
+    unfold ρABR;
+    ext
+    simp [MState.traceLeft, MState.traceRight]
+    unfold perm_C_ABR perm_B_ACR
+    simp [HermitianMat.traceLeft, HermitianMat.traceRight]
+    simp [Matrix.traceLeft, Matrix.traceRight]
+    simp [ ← Finset.sum_product']
+    exact Finset.sum_bij ( fun x _ => ( x.2.1, x.2.2, x.1 ) ) ( by aesop ) ( by aesop ) ( by aesop ) ( by aesop );
+  · simp
+
+/-
+The entropy of the ABR state is equal to the entropy of C, since ABCR is pure.
+-/
+private theorem S_ABR_eq_S_C : Sᵥₙ (ρABR ρ) = Sᵥₙ ρ.traceLeft.traceLeft := by
+  rw [ρABR, Sᵥₙ_pure_complement, trace_relabel_purify_eq_rho_C]
+
+/-
+The BR marginal of ρABR is equal to the BR marginal of the purification relabeled.
+-/
+private lemma traceLeft_ρABR_eq_traceLeft_relabel :
+    (ρABR ρ).traceLeft = ((MState.pure ρ.purify).relabel perm_AC_BR.symm).traceLeft := by
+  unfold ρABR;
+  unfold MState.traceLeft;
+  congr;
+  ext i j
+  simp [ HermitianMat.traceLeft];
+  simp [ Matrix.traceLeft];
+  simp [ perm_C_ABR, perm_AC_BR ];
+  simp [ Fintype.sum_prod_type ]
+
+/-
+Tracing out B and R from the relabeled state is equivalent to tracing out R, then B from the original state (with appropriate permutations).
+-/
+private lemma traceRight_relabel_perm_AC_BR (ρ : MState ((dA × dB × dC) × (dA × dB × dC))) :
+    (ρ.relabel perm_AC_BR.symm).traceRight = ρ.traceRight.SWAP.assoc.traceLeft.SWAP := by
+  unfold MState.traceRight MState.SWAP MState.assoc MState.relabel
+  simp [ HermitianMat.traceRight, HermitianMat.traceLeft ];
+  simp [ Matrix.traceLeft, Matrix.traceRight, HermitianMat.reindex, Matrix.submatrix ];
+  simp [ perm_AC_BR ];
+  simp [ Fintype.sum_prod_type ]
+
+/-
+Tracing out B and R from the purification gives the marginal state on A and C.
+-/
+private lemma traceRight_relabel_perm_AC_BR_eq_rho_AC :
+    ((MState.pure ρ.purify).relabel perm_AC_BR.symm).traceRight = ρ.SWAP.assoc.traceLeft.SWAP := by
+  rw [traceRight_relabel_perm_AC_BR]
+  rw [MState.purify_spec]
+
+/-
+The entropy of the BR marginal of the purification is equal to the entropy of the AC marginal of the original state.
+-/
+private lemma S_BR_eq_S_AC :
+    Sᵥₙ (ρABR ρ).traceLeft = Sᵥₙ ρ.SWAP.assoc.traceLeft.SWAP := by
+  rw [traceLeft_ρABR_eq_traceLeft_relabel]
+  rw [Sᵥₙ_pure_complement, traceRight_relabel_perm_AC_BR_eq_rho_AC]
+
+private theorem S_AB_purify_eq_S_AB_rho :
+    Sᵥₙ ((MState.pure ρ.purify).relabel perm_AB_CR.symm).traceRight = Sᵥₙ ρ.assoc'.traceRight := by
+  have h_trace : ((MState.pure ρ.purify).relabel perm_AB_CR.symm).traceRight = ((MState.pure ρ.purify).traceRight).assoc'.traceRight := by
+    ext; simp [MState.traceRight, MState.assoc'];
+    simp [HermitianMat.traceRight]
+    simp [ Matrix.submatrix, Matrix.traceRight ];
+    congr! 2;
+    ext i j; simp [ perm_AB_CR ] ;
+    exact
+      Fintype.sum_prod_type fun x =>
+        ρ.purify ((i.1, i.2, x.1), x.2) * (starRingEnd ℂ) (ρ.purify ((j.1, j.2, x.1), x.2));
+  aesop
+
+/-
+The entropy of the AB marginal of the purification is equal to the entropy of the AB marginal of the original state.
+-/
+private lemma S_AB_eq_S_AB :
+    Sᵥₙ (ρABR ρ).assoc'.traceRight = Sᵥₙ ρ.assoc'.traceRight := by
+  have h_marginal : Sᵥₙ ((MState.pure ρ.purify).relabel perm_AB_CR.symm).traceRight = Sᵥₙ ρ.assoc'.traceRight := by
+    exact S_AB_purify_eq_S_AB_rho ρ
+  convert h_marginal using 2;
+  convert MState.ext ?_;
+  ext i j; simp [ ρABR ] ;
+  simp [ MState.traceLeft, MState.relabel, MState.assoc', perm_AB_CR, perm_C_ABR ];
+  simp [ MState.SWAP, MState.assoc]
+  simp [ MState.pure ];
+  simp [ HermitianMat.traceLeft, HermitianMat.traceRight, HermitianMat.reindex ];
+  simp [ Matrix.traceLeft, Matrix.traceRight, Matrix.submatrix, Matrix.vecMulVec ];
+  simp [ Fintype.sum_prod_type ];
+  simp only [Finset.sum_sigma'];
+  refine' Finset.sum_bij ( fun x _ => ⟨ x.snd.snd.snd, x.fst, x.snd.fst, x.snd.snd.fst ⟩ ) _ _ _ _ <;> simp
+  · aesop;
+  · exact fun b => ⟨ b.2.1, b.2.2.1, b.2.2.2, b.1, rfl ⟩
+
+/-- Weak monotonicity of quantum conditional entropy: S(A|B) + S(A|C) ≥ 0. -/
+theorem Sᵥₙ_weak_monotonicity :
     let ρAB := ρ.assoc'.traceRight
     let ρAC := ρ.SWAP.assoc.traceLeft.SWAP
     0 ≤ qConditionalEnt ρAB + qConditionalEnt ρAC := by
-  sorry
+  -- Apply strong subadditivity to the state ρABR.
+  have h_strong_subadditivity := Sᵥₙ_strong_subadditivity (ρABR ρ)
+  -- Substitute the equalities for the entropies of the purifications.
+  have _ := S_ABR_eq_S_C ρ
+  have _ := S_B_eq_S_B ρ
+  have _ := S_AB_eq_S_AB ρ
+  have _ := S_BR_eq_S_AC ρ
+  grind [qConditionalEnt, MState.traceRight_left_assoc', Sᵥₙ_of_SWAP_eq,
+    MState.traceLeft_SWAP, MState.traceLeft_right_assoc, MState.traceRight_SWAP]
+
+end weak_monotonicity
 
 /-- Strong subadditivity, stated in terms of conditional entropies.
   Also called the data processing inequality. H(A|BC) ≤ H(A|B). -/
 theorem qConditionalEnt_strong_subadditivity (ρ₁₂₃ : MState (d₁ × d₂ × d₃)) :
-    qConditionalEnt ρ₁₂₃ ≤ qConditionalEnt (ρ₁₂₃.assoc'.traceRight) := by
+    qConditionalEnt ρ₁₂₃ ≤ qConditionalEnt ρ₁₂₃.assoc'.traceRight := by
   have := Sᵥₙ_strong_subadditivity ρ₁₂₃
   dsimp at this
   simp only [qConditionalEnt, MState.traceRight_left_assoc']
@@ -259,7 +435,7 @@ theorem qConditionalEnt_strong_subadditivity (ρ₁₂₃ : MState (d₁ × d₂
 /-- Strong subadditivity, stated in terms of quantum mutual information.
   I(A;BC) ≥ I(A;B). -/
 theorem qMutualInfo_strong_subadditivity (ρ₁₂₃ : MState (d₁ × d₂ × d₃)) :
-    qMutualInfo ρ₁₂₃ ≥ qMutualInfo (ρ₁₂₃.assoc'.traceRight) := by
+    qMutualInfo ρ₁₂₃ ≥ qMutualInfo ρ₁₂₃.assoc'.traceRight := by
   have := Sᵥₙ_strong_subadditivity ρ₁₂₃
   dsimp at this
   simp only [qMutualInfo, MState.traceRight_left_assoc', MState.traceRight_right_assoc']
@@ -418,14 +594,15 @@ lemma HermitianMat.continuousOn_iff_coe {X : Type*} [TopologicalSpace X] {s : Se
     ContinuousOn f s ↔ ContinuousOn (fun x => (f x).mat) s := by
   apply Iff.intro;
   · intro hf
-    apply ContinuousOn.comp (continuous_subtype_val.continuousOn) hf
+    apply ContinuousOn.comp continuous_subtype_val.continuousOn hf
     exact Set.mapsTo_iff_image_subset.mpr fun _ a => a
   · intro h;
     rw [continuousOn_iff_continuous_restrict] at *
     apply Continuous.subtype_mk h
 
 /--
-If a parameter-dependent function `f x` is continuous in `x` when evaluated at the eigenvalues of `A`, then `A.cfc (f x)` is continuous in `x`.
+If a parameter-dependent function `f x` is continuous in `x` when evaluated at
+the eigenvalues of `A`, then `A.cfc (f x)` is continuous in `x`.
 -/
 lemma HermitianMat.continuousOn_cfc_param {X : Type*} [TopologicalSpace X] {S : Set X}
     (A : HermitianMat d 𝕜) {f : X → ℝ → ℝ}
