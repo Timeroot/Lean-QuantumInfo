@@ -306,17 +306,6 @@ theorem complex_im_eq_zero (A : HermitianMat n ℂ) (x : n) :
     (A x x).im = 0 :=
   A.im_diag_eq_zero x
 
-variable [DecidableEq n] [Fintype n]
-
-/-- Unlike for `Matrix`, this is always true for `HermitianMat`: the 0 eigenvalue
-gets mapped to 0 and then back again to 0. --/
-@[simp]
-theorem inv_inv (A : HermitianMat n 𝕜) : (A⁻¹)⁻¹ = A := by
-  sorry
-
-noncomputable instance : InvolutiveInv (HermitianMat n 𝕜) :=
-  ⟨inv_inv⟩
-
 end rclike
 
 section conj

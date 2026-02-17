@@ -21,6 +21,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Alex Meiburg
 -/
 import QuantumInfo.ForMathlib.HermitianMat.CfcOrder
+import QuantumInfo.ForMathlib.HermitianMat.Proj
 import Batteries.Tactic.ShowUnused
 
 /-! # Properties of the matrix logarithm
@@ -573,14 +574,14 @@ theorem log_kron {A : HermitianMat m 𝕜} (hA : A.mat.PosDef) (hB : B.mat.PosDe
     · convert log_conj_unitary _ _;
       rotate_right;
       use Matrix.kroneckerMap ( · * · ) U.val V.val;
-      all_goals simp +decide [ Matrix.mem_unitaryGroup_iff ];
+      all_goals simp [ Matrix.mem_unitaryGroup_iff ];
       have h_unitary : U.val * U.val.conjTranspose = 1 := by
         exact U.2.2
       have h_unitary' : V.val * V.val.conjTranspose = 1 := by
         exact V.2.2
       convert congr_arg₂ ( fun x y => Matrix.kroneckerMap ( · * · ) x y ) h_unitary h_unitary' using 1;
-      · ext i j; simp +decide [ Matrix.mul_apply, Matrix.kroneckerMap_apply ] ;
-        simp +decide only [mul_assoc, Finset.mul_sum _ _ _, mul_comm, mul_left_comm];
+      · ext i j; simp [ Matrix.mul_apply, Matrix.kroneckerMap_apply ] ;
+        simp only [mul_assoc, Finset.mul_sum _ _ _, mul_comm, mul_left_comm];
         rw [ Finset.sum_sigma' ];
         refine' Finset.sum_bij ( fun x _ => ⟨ x.2, x.1 ⟩ ) _ _ _ _ <;> simp
       · simp
@@ -593,3 +594,90 @@ open RealInnerProductSpace in
 theorem inner_log_smul_of [NonSingular A] {x : ℝ} (hx : x ≠ 0) :
     ⟪(x • A).log, B⟫ = Real.log x * B.trace + ⟪A.log, B⟫ := by
   simp [log_smul hx, inner_add_left]
+
+/--
+Scalar identity for log of product with "support" terms.
+-/
+lemma Real.log_mul_eq_add_support (x y : ℝ) :
+    Real.log (x * y) = Real.log x * (if y = 0 then 0 else 1) + (if x = 0 then 0 else 1) * Real.log y := by
+  by_cases hx0 : x = 0 <;> by_cases hy0 : y = 0 <;> simp_all [ Real.log_mul ]
+
+lemma Real.log_mul_eq_add_log_of_ne_zero {x t : ℝ} (hx : x ≠ 0) :
+    Real.log (x * t) = Real.log x * (if t ≠ 0 then 1 else 0) + Real.log t := by
+  simp [Real.log_mul_eq_add_support, hx]
+
+open Matrix ComplexOrder
+theorem Matrix.log_smul_of_pos {A : Matrix n n 𝕜} (hA : A.PosSemidef) (hx : x ≠ 0) :
+    _root_.cfc Real.log (x • A) = (Real.log x) • _root_.cfc (fun t => if 0 < t then (1 : ℝ) else 0) A + _root_.cfc Real.log A := by
+  have hCFC : _root_.cfc (Real.log ∘ (fun t => x * t)) A = _root_.cfc Real.log (x • A) := by
+    convert cfc_comp_smul _ _ _ _ _ using 1;
+    all_goals try infer_instance;
+    · rfl;
+    · exact continuousOn_finite Real.log ((fun x_1 => x • x_1) '' spectrum ℝ A);
+    · exact hA.1;
+  rw [ ← hCFC, ← cfc_smul ];
+  rw [ ← _root_.cfc_add ];
+  apply _root_.cfc_congr;
+  intro t ht; by_cases h : 0 < t <;> simp [*]
+  · exact Real.log_mul hx h.ne'
+  · rw [ spectrum.mem_iff ] at ht;
+    contrapose! ht;
+    have h_inv : ∀ (v : n → 𝕜), v ≠ 0 → (t • 1 - A).mulVec v ≠ 0 := by
+      intro v hv h; have := hA.2; simp_all [ Matrix.mulVec, dotProduct ] ;
+      have h_inv : ∑ i, (starRingEnd 𝕜) (v i) * ∑ j, A i j * v j = t * ∑ i, (starRingEnd 𝕜) (v i) * v i := by
+        have h_inv : ∑ i, (starRingEnd 𝕜) (v i) * ∑ j, (t • 1 - A) i j * v j = 0 := by
+          simp_all [ funext_iff, Matrix.mulVec, dotProduct ];
+        simp_all [ Matrix.one_apply, sub_mul, mul_sub, Finset.mul_sum _ _ _, mul_left_comm, sub_eq_iff_eq_add ];
+        simp_all [ mul_assoc, mul_comm, mul_left_comm, Algebra.smul_def ];
+      have h_inv : ∑ i, (starRingEnd 𝕜) (v i) * v i > 0 := by
+        have h_inv : ∑ i, (starRingEnd 𝕜) (v i) * v i = ∑ i, ‖v i‖ ^ 2 := by
+          simp [ mul_comm, RCLike.mul_conj];
+        exact h_inv.symm ▸ mod_cast lt_of_lt_of_le ( by exact lt_of_le_of_ne ( Finset.sum_nonneg fun _ _ => by positivity) ( Ne.symm <| by intro H; exact hv <| funext fun i => by simpa [ sq ] using Finset.sum_eq_zero_iff_of_nonneg ( fun _ _ => by positivity ) |>.1 H i ) ) le_rfl;
+      exact absurd ( this v ) ( by rw [ ‹∑ i, ( starRingEnd 𝕜 ) ( v i ) * ∑ j, A i j * v j = ↑t * ∑ i, ( starRingEnd 𝕜 ) ( v i ) * v i› ] ; exact not_le_of_gt ( by exact mul_neg_of_neg_of_pos ( mod_cast lt_of_le_of_ne ‹_› ( by aesop ) ) ‹_› ) );
+    rw [ Matrix.isUnit_iff_isUnit_det ];
+    rw [ isUnit_iff_ne_zero ];
+    intro h_det_zero;
+    have := Matrix.exists_mulVec_eq_zero_iff.mpr h_det_zero;
+    exact h_inv _ this.choose_spec.1 ( by simpa [ Algebra.algebraMap_eq_smul_one ] using this.choose_spec.2 )
+
+open HermitianMat Matrix ComplexOrder
+theorem log_smul_of_pos (hA : 0 ≤ A) (hx : x ≠ 0) :
+    (x • A).log = Real.log x • (proj_lt 0 A) + A.log := by
+  ext1
+  rw [HermitianMat.zero_le_iff] at hA
+  convert Matrix.log_smul_of_pos hA hx
+  simp [proj_lt, cfc, log]
+
+lemma mul_indicator_eq_id_of_nonneg (x : ℝ) (hx : 0 ≤ x) :
+    (if 0 < x then (1 : ℝ) else 0) * x = x := by
+  cases lt_or_eq_of_le hx <;> aesop
+
+lemma log_kron_diagonal_with_proj {d₁ : m → ℝ} {d₂ : n → ℝ}  :
+    (diagonal 𝕜 d₁ ⊗ₖ diagonal 𝕜 d₂).log =
+    (diagonal 𝕜 d₁).log ⊗ₖ (diagonal 𝕜 d₂).cfc (fun x => if x = 0 then 0 else 1) +
+    (diagonal 𝕜 d₁).cfc (fun x => if x = 0 then 0 else 1) ⊗ₖ (diagonal 𝕜 d₂).log := by
+  have h_diag_kron : (diagonal 𝕜 d₁ ⊗ₖ diagonal 𝕜 d₂).log = diagonal 𝕜 (fun (i : m × n) => Real.log (d₁ i.1 * d₂ i.2)) := by
+    rw [kronecker_diagonal, log]
+    exact cfc_diagonal _ _
+  simp_all [ HermitianMat.ext_iff, cfc_diagonal, log ];
+  ext ⟨ i, j ⟩ ⟨ i', j' ⟩
+  by_cases hi' : i = i'; swap
+  · simp [hi']
+  by_cases hj' : j = j'; swap
+  · simp [hj']
+  simp [hi', hj']
+  split_ifs <;> simp_all [Real.log_mul]
+
+/--
+Generalization of log_kron for possibly singular matrices.
+-/
+lemma log_kron_with_proj {A : HermitianMat m 𝕜} {B : HermitianMat n 𝕜} :
+    (A ⊗ₖ B).log = (A.log ⊗ₖ B.cfc (fun x => if x = 0 then 0 else 1)) +
+                   (A.cfc (fun x => if x = 0 then 0 else 1) ⊗ₖ B.log) := by
+  obtain ⟨UA, DA, rfl⟩ : ∃ UA : Matrix.unitaryGroup m 𝕜, ∃ DA, A = (diagonal 𝕜 DA).conj UA.val :=
+    ⟨_, _, eq_conj_diagonal A⟩
+  obtain ⟨UB, DB, rfl⟩ : ∃ UB : Matrix.unitaryGroup n 𝕜, ∃ DB , B = (diagonal 𝕜 DB).conj UB.val :=
+    ⟨_, _, eq_conj_diagonal B⟩
+  rw [← kronecker_conj, log_conj_unitary _ ⟨_, Matrix.kronecker_mem_unitary UA.2 UB.2⟩]
+  rw [log_kron_diagonal_with_proj, map_add (conj _)]
+  congr 1 <;> rw [cfc_conj_unitary, log_conj_unitary, kronecker_conj]

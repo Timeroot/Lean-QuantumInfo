@@ -42,17 +42,42 @@ theorem Dual.trace_eq (M : MatrixMap dIn dOut R) (A : Matrix dIn dIn R) (B : Mat
   sorry
 
 --all properties below should provable just from `inner_eq`, since the definition of `dual` itself
--- is pretty hair (and maybe could be improved...)
+-- is pretty hairy (and maybe could be improved...)
 
 /-- The dual of a `IsHermitianPreserving` map also `IsHermitianPreserving`. -/
 theorem IsHermitianPreserving.dual (h : M.IsHermitianPreserving) : M.dual.IsHermitianPreserving := by
   sorry
 
+--TODO Cleanup, find home, abstract out to HermitianMats...?
+theorem _root_.Matrix.PosSemidef.trace_mul_nonneg {n : Type*} [Fintype n] [DecidableEq n]
+    {A B : Matrix n n 𝕜} (hA : A.PosSemidef) (hB : B.PosSemidef) :
+    0 ≤ (A * B).trace := by
+  open scoped Matrix in
+  obtain ⟨sqrtB, rfl⟩ : ∃ sqrtB : Matrix n n 𝕜, B = sqrtBᴴ * sqrtB := by
+    exact Matrix.posSemidef_iff_eq_conjTranspose_mul_self.mp hB;
+  simp only [← Matrix.mul_assoc, ← Matrix.trace_mul_comm sqrtB]
+  have h : (sqrtB * A * sqrtBᴴ).PosSemidef := by
+    convert hA.conjTranspose_mul_mul_same sqrtBᴴ using 1
+    simp [Matrix.mul_assoc]
+  simpa [Matrix.mulVec, dotProduct, Matrix.trace, Pi.single_apply] using
+    Finset.sum_nonneg fun i _ ↦ h.2 (Pi.single i 1)
+
 /-- The dual of a `IsPositive` map also `IsPositive`. -/
 theorem IsPositive.dual (h : M.IsPositive) : M.dual.IsPositive := by
   intro x hx
   use IsHermitianPreserving.dual h.IsHermitianPreserving hx.1
-  sorry
+  intro v
+  have h_dual_pos : 0 ≤ (M (Matrix.vecMulVec v (star v)) * x).trace := by
+    --TODO Cleanup. Should be all in terms of HermitianMat
+    apply Matrix.PosSemidef.trace_mul_nonneg;
+    · apply h;
+      exact Matrix.posSemidef_vecMulVec_self_star v;
+    · exact hx;
+  convert h_dual_pos using 1;
+  rw [ MatrixMap.Dual.trace_eq ];
+  simp [ Matrix.vecMulVec, Matrix.mul_apply, Matrix.trace ];
+  simp [ Matrix.mulVec, dotProduct, Finset.mul_sum _ _ _, mul_assoc, mul_comm, mul_left_comm ];
+  exact Finset.sum_comm.trans ( Finset.sum_congr rfl fun _ _ => Finset.sum_congr rfl fun _ _ => by ring )
 
 /-- The dual of TracePreserving map is *not* trace-preserving, it's *unital*, that is, M*(I) = I. -/
 theorem dual_Unital (h : M.IsTracePreserving) : M.dual.Unital := by
@@ -343,15 +368,22 @@ theorem HPMap.linearMap_ofHermitianMat (f : HermitianMat dIn ℂ →ₗ[ℝ] Her
   simp [imaginaryPart, skewAdjoint.negISMul, show star x = x from hx]
 
 --PULLOUT
+omit [Fintype dOut] in
 @[simp]
 theorem HPMap.ofHermitianMat_linearMap (f : HPMap dIn dOut ℂ) :
     ofHermitianMat (LinearMapClass.linearMap f) = f := by
-  ext : 2
+  ext : 3
   simp only [map, ofHermitianMat, instFunLike, LinearMap.coe_coe, HermitianMat.val_eq_coe,
     HermitianMat.mat_mk, LinearMap.coe_mk, AddHom.coe_mk,
     ← map_smul, ← map_add]
-  simp only [map_add, map_smul]
-  sorry
+  simp only [map_add, map_smul, realPart, imaginaryPart, LinearMap.coe_comp, Function.comp_apply]
+  simp only [selfAdjointPart,  LinearMap.coe_mk, AddHom.coe_mk,
+    HermitianMat.mat_mk,LinearMap.map_smul_of_tower, skewAdjoint.negISMul]
+  simp only [Matrix.add_apply, Matrix.smul_apply, smul_eq_mul]
+  ring_nf
+  simp
+  ring
+
 
 variable (f : HPMap dIn dOut) (A : HermitianMat dIn ℂ)
 

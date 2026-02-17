@@ -132,6 +132,37 @@ theorem Sᵥₙ_eq_neg_trace_log (ρ : MState d) : Sᵥₙ ρ = - ⟪ρ.M.log, �
   apply Finset.sum_equiv e.symm (by simp)
   simp [MState.spectrum, Distribution.mk', he, mul_comm]
 
+/--
+The von Neumann entropy is the trace of the matrix function `x ↦ -x log x`.
+-/
+theorem Sᵥₙ_eq_trace_cfc_negMulLog (ρ : MState d) :
+    Sᵥₙ ρ = (ρ.M.cfc Real.negMulLog).trace := by
+  open HermitianMat in
+  unfold Real.negMulLog
+  rw [Sᵥₙ_eq_neg_trace_log, trace, log, inner_eq_re_trace, IsMaximalSelfAdjoint.RCLike_selfadjMap]
+  nth_rw 2 [← cfc_id ρ.M]
+  rw [← mat_cfc_mul, RCLike.re_to_complex, ← Complex.neg_re, ← Matrix.trace_neg]
+  rw [← mat_neg, ← ρ.M.cfc_neg]
+  congr! 5
+  simp [mul_comm]
+
+@[fun_prop]
+theorem selfAdjointMap_Continuous {𝕜 : Type*} [RCLike 𝕜] :
+    Continuous (IsMaximalSelfAdjoint.selfadjMap : 𝕜 →+ ℝ) := by
+  rw [IsMaximalSelfAdjoint.RCLike_selfadjMap]
+  fun_prop
+
+@[fun_prop]
+theorem HermitianMat.trace_Continuous {d 𝕜 : Type*} [Fintype d] [RCLike 𝕜]  :
+    Continuous (HermitianMat.trace : HermitianMat d 𝕜 → ℝ) := by
+  rw [funext HermitianMat.trace_eq_re_trace]
+  fun_prop
+
+@[fun_prop]
+theorem Sᵥₙ_continuous : Continuous (Sᵥₙ (d := d)) := by
+  rw [funext Sᵥₙ_eq_trace_cfc_negMulLog]
+  fun_prop
+
 /-- von Neumman entropies of the left- and right- partial trace of pure states are equal. -/
 theorem Sᵥₙ_of_partial_eq (ψ : Ket (d₁ × d₂)) :
     Sᵥₙ (MState.pure ψ).traceLeft = Sᵥₙ (MState.pure ψ).traceRight := by
@@ -365,10 +396,78 @@ theorem sandwichedRelEntropy_ne_top {ρ σ : MState d} [σ.M.NonSingular] : D̃_
   simp [SandwichedRelRentropy, HermitianMat.nonSingular_ker_bot]
 
 @[fun_prop]
+lemma continuousOn_exponent : ContinuousOn (fun α : ℝ => (1 - α) / (2 * α)) (Set.Ioi 1) := by
+  fun_prop (disch := intros; linarith [Set.mem_Ioi.mp ‹_›])
+
+omit [Fintype d₂] [DecidableEq d] [DecidableEq d₂] in
+@[fun_prop]
+lemma continuous_conj (ρ : HermitianMat d 𝕜) : Continuous (ρ.conj (m := d₂) ·) := by
+  simp only [HermitianMat.conj, AddMonoidHom.coe_mk, ZeroHom.coe_mk]
+  fun_prop
+
+@[fun_prop]
+lemma Complex.continuousOn_cpow_const_Ioi (z : ℂ) :
+    ContinuousOn (fun r : ℝ => z ^ (r : ℂ)) (Set.Ioi 0) := by
+  apply ContinuousOn.const_cpow (f := Complex.ofReal)
+  · fun_prop
+  · grind [ofReal_ne_zero]
+
+omit [Fintype d] [DecidableEq d] in
+lemma HermitianMat.continuousOn_iff_coe {X : Type*} [TopologicalSpace X] {s : Set X}
+    (f : X → HermitianMat d 𝕜) :
+    ContinuousOn f s ↔ ContinuousOn (fun x => (f x).mat) s := by
+  apply Iff.intro;
+  · intro hf
+    apply ContinuousOn.comp (continuous_subtype_val.continuousOn) hf
+    exact Set.mapsTo_iff_image_subset.mpr fun _ a => a
+  · intro h;
+    rw [continuousOn_iff_continuous_restrict] at *
+    apply Continuous.subtype_mk h
+
+/--
+If a parameter-dependent function `f x` is continuous in `x` when evaluated at the eigenvalues of `A`, then `A.cfc (f x)` is continuous in `x`.
+-/
+lemma HermitianMat.continuousOn_cfc_param {X : Type*} [TopologicalSpace X] {S : Set X}
+    (A : HermitianMat d 𝕜) {f : X → ℝ → ℝ}
+    (hf : ∀ i, ContinuousOn (fun x => f x (A.H.eigenvalues i)) S) :
+    ContinuousOn (fun x => A.cfc (f x)) S := by
+  simp_rw [continuousOn_iff_coe, cfc_toMat_eq_sum_smul_proj A]
+  fun_prop
+
+/--
+For a fixed Hermitian matrix A, the function x ↦ A^x is continuous for x < 0.
+-/
+lemma HermitianMat.continuousOn_rpow_neg (A : HermitianMat d ℂ) :
+    ContinuousOn (fun x : ℝ => A ^ x) (Set.Iio 0) := by
+  apply A.continuousOn_cfc_param
+  intro i x hx
+  exact (Real.continuousAt_const_rpow' hx.ne).continuousWithinAt
+
+/--
+For a fixed Hermitian matrix A, the function x ↦ A^x is continuous for x < 0.
+-/
+lemma HermitianMat.continuousOn_rpow_pos (A : HermitianMat d 𝕜) :
+    ContinuousOn (fun x : ℝ => A ^ x) (Set.Ioi 0) := by
+  apply A.continuousOn_cfc_param
+  intro i x hx
+  exact (Real.continuousAt_const_rpow' hx.ne').continuousWithinAt
+
+/--
+The function α ↦ (1 - α) / (2 * α) maps the interval (1, ∞) to (-∞, 0).
+-/
+lemma maps_to_Iio_of_Ioi_1 : Set.MapsTo (fun α : ℝ => (1 - α) / (2 * α)) (Set.Ioi 1) (Set.Iio 0) := by
+  intro x hx
+  rw [Set.mem_Ioi] at hx
+  rw [Set.mem_Iio]
+  have h1 : 1 - x < 0 := by linarith
+  have h2 : 0 < 2 * x := by linarith
+  exact div_neg_of_neg_of_pos h1 h2
+
+@[fun_prop]
 theorem sandwichedRelRentropy.continuousOn (ρ σ : MState d) :
     ContinuousOn (fun α => D̃_ α(ρ‖σ)) (Set.Ioi 0) := by
   --If this turns out too hard, we just need `ContinousAt f 1`.
-  --If that's still too hard, we really _just_ need that `(𝓝[≠] 1).tendsto f (f 1)`.
+  --If that's still too hard, we really _just_ need that `(𝓝[≠] 1).tendsto (f 1)`.
   sorry
 
 /-- The Data Processing Inequality for the Sandwiched Renyi relative entropy.
@@ -389,6 +488,16 @@ notation "𝐃(" ρ "‖" σ ")" => qRelativeEnt ρ σ
 theorem qRelativeEnt_ker {ρ σ : MState d} (h : σ.M.ker ≤ ρ.M.ker) :
     𝐃(ρ‖σ).toEReal = ⟪ρ.M, ρ.M.log - σ.M.log⟫ := by
   simp [qRelativeEnt, SandwichedRelRentropy, h, EReal.coe_nnreal_eq_coe_real]
+
+open Classical in
+theorem qRelativeEnt_eq_neg_Sᵥₙ_add (ρ σ : MState d) :
+    (qRelativeEnt ρ σ).toEReal = -(Sᵥₙ ρ : EReal) +
+      if σ.M.ker ≤ ρ.M.ker then (-⟪ρ.M, σ.M.log⟫ : EReal) else (⊤ : EReal) := by
+  by_cases h : σ.M.ker ≤ ρ.M.ker
+  · simp [h, Sᵥₙ_eq_neg_trace_log, qRelativeEnt_ker, inner_sub_right]
+    rw [real_inner_comm, sub_eq_add_neg]
+  · simp [h]
+    exact dif_neg h
 
 /-- The quantum relative entropy is unchanged by `MState.relabel` -/
 @[simp]
@@ -460,7 +569,7 @@ private theorem lowerSemicontinuous_iff {α : Type u_1} {β : Type u_2} [Topolog
   rfl
 
 lemma lowerSemicontinuous_inner (ρ x : MState d) (hx : x.M.ker ≤ ρ.M.ker):
-    LowerSemicontinuousAt (fun x ↦ ⟪ρ.M, ρ.M.log - x.M.log⟫) x := by
+    LowerSemicontinuousAt (fun x ↦ ⟪ρ.M, x.M.log⟫) x := by
   sorry
 
 open Classical in
@@ -509,7 +618,7 @@ theorem qRelativeEnt_ne_top {ρ σ : MState d} [σ.M.NonSingular] : 𝐃(ρ‖σ
 
 /-- `I(A:B) = 𝐃(ρᴬᴮ‖ρᴬ ⊗ ρᴮ)` -/
 theorem qMutualInfo_as_qRelativeEnt (ρ : MState (dA × dB)) :
-    qMutualInfo ρ = (𝐃(ρ‖ρ.traceRight ⊗ᴹ ρ.traceLeft) : EReal) :=
+    qMutualInfo ρ = (𝐃(ρ‖ρ.traceRight ⊗ᴹ ρ.traceLeft) : EReal) := by
   sorry
 
 theorem qRelEntropy_le_add_of_le_smul (ρ : MState d) {σ₁ σ₂ : MState d} (hσ : σ₁.M ≤ α • σ₂.M) :

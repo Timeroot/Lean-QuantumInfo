@@ -324,6 +324,8 @@ theorem inner_negPart_zero_iff : ⟪A, A⁻⟫ = 0 ↔ 0 ≤ A := by
 theorem inner_negPart_neg_iff : ⟪A, A⁻⟫ < 0 ↔ ¬0 ≤ A := by
   simp [← inner_negPart_zero_iff, lt_iff_le_and_ne, inner_negPart_nonpos A]
 
+/-- The self-duality of the PSD cone: a matrix is PSD iff its inner product with all
+nonnegative matrices is non-negative. -/
 theorem zero_le_iff_inner_pos (A : HermitianMat n 𝕜) :
     0 ≤ A ↔ ∀ B, 0 ≤ B → 0 ≤ ⟪A, B⟫ := by
   use fun h _ ↦ inner_ge_zero h
