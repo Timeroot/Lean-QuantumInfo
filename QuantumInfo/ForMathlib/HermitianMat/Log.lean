@@ -610,11 +610,7 @@ open Matrix ComplexOrder
 theorem Matrix.log_smul_of_pos {A : Matrix n n 𝕜} (hA : A.PosSemidef) (hx : x ≠ 0) :
     _root_.cfc Real.log (x • A) = (Real.log x) • _root_.cfc (fun t => if 0 < t then (1 : ℝ) else 0) A + _root_.cfc Real.log A := by
   have hCFC : _root_.cfc (Real.log ∘ (fun t => x * t)) A = _root_.cfc Real.log (x • A) := by
-    convert cfc_comp_smul _ _ _ _ _ using 1;
-    all_goals try infer_instance;
-    · rfl;
-    · exact continuousOn_finite Real.log ((fun x_1 => x • x_1) '' spectrum ℝ A);
-    · exact hA.1;
+    exact cfc_comp_smul x Real.log _ (by fun_prop) hA.1
   rw [ ← hCFC, ← cfc_smul ];
   rw [ ← _root_.cfc_add ];
   apply _root_.cfc_congr;
