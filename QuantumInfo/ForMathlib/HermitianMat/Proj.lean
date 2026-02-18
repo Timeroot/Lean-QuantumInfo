@@ -68,6 +68,15 @@ noncomputable def kerProj (A : HermitianMat n 𝕜) : HermitianMat n 𝕜 := pro
 theorem kerProj_add_supportProj : A.kerProj + A.supportProj = 1 := by
   rw [← projector_add_orthogonal A.ker, ker_orthogonal_eq_support, kerProj, supportProj]
 
+@[simp]
+theorem kerProj_of_nonSingular [NonSingular A] : A.kerProj = 0 := by
+  simp only [kerProj, nonSingular_ker_bot, HermitianMat.ext_iff]
+  simp [projector]
+
+@[simp]
+theorem supportProj_of_nonSingular [NonSingular A] : A.supportProj = 1 := by
+  simpa using A.kerProj_add_supportProj
+
 /--
 The projector onto a submodule S is the sum of the outer products of the vectors in an orthonormal basis of S.
 -/

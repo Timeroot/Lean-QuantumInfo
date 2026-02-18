@@ -113,14 +113,8 @@ theorem sandwichedRelEntropy_ne_top {ρ σ : MState d} [σ.M.NonSingular] : D̃_
   simp [SandwichedRelRentropy, HermitianMat.nonSingular_ker_bot]
 
 @[fun_prop]
-lemma continuousOn_exponent : ContinuousOn (fun α : ℝ => (1 - α) / (2 * α)) (Set.Ioi 1) := by
+lemma continuousOn_exponent : ContinuousOn (fun α : ℝ => (1 - α) / (2 * α)) (Set.Ioi 0) := by
   fun_prop (disch := intros; linarith [Set.mem_Ioi.mp ‹_›])
-
-omit [Fintype d₂] [DecidableEq d] [DecidableEq d₂] in
-@[fun_prop]
-lemma continuous_conj (ρ : HermitianMat d 𝕜) : Continuous (ρ.conj (m := d₂) ·) := by
-  simp only [HermitianMat.conj, AddMonoidHom.coe_mk, ZeroHom.coe_mk]
-  fun_prop
 
 @[fun_prop]
 lemma Complex.continuousOn_cpow_const_Ioi (z : ℂ) :
@@ -128,47 +122,6 @@ lemma Complex.continuousOn_cpow_const_Ioi (z : ℂ) :
   apply ContinuousOn.const_cpow (f := Complex.ofReal)
   · fun_prop
   · grind [ofReal_ne_zero]
-
-omit [Fintype d] [DecidableEq d] in
-lemma HermitianMat.continuousOn_iff_coe {X : Type*} [TopologicalSpace X] {s : Set X}
-    (f : X → HermitianMat d 𝕜) :
-    ContinuousOn f s ↔ ContinuousOn (fun x => (f x).mat) s := by
-  apply Iff.intro;
-  · intro hf
-    apply ContinuousOn.comp continuous_subtype_val.continuousOn hf
-    exact Set.mapsTo_iff_image_subset.mpr fun _ a => a
-  · intro h;
-    rw [continuousOn_iff_continuous_restrict] at *
-    apply Continuous.subtype_mk h
-
-/--
-If a parameter-dependent function `f x` is continuous in `x` when evaluated at
-the eigenvalues of `A`, then `A.cfc (f x)` is continuous in `x`.
--/
-lemma HermitianMat.continuousOn_cfc_param {X : Type*} [TopologicalSpace X] {S : Set X}
-    (A : HermitianMat d 𝕜) {f : X → ℝ → ℝ}
-    (hf : ∀ i, ContinuousOn (fun x => f x (A.H.eigenvalues i)) S) :
-    ContinuousOn (fun x => A.cfc (f x)) S := by
-  simp_rw [continuousOn_iff_coe, cfc_toMat_eq_sum_smul_proj A]
-  fun_prop
-
-/--
-For a fixed Hermitian matrix A, the function x ↦ A^x is continuous for x < 0.
--/
-lemma HermitianMat.continuousOn_rpow_neg (A : HermitianMat d ℂ) :
-    ContinuousOn (fun x : ℝ => A ^ x) (Set.Iio 0) := by
-  apply A.continuousOn_cfc_param
-  intro i x hx
-  exact (Real.continuousAt_const_rpow' hx.ne).continuousWithinAt
-
-/--
-For a fixed Hermitian matrix A, the function x ↦ A^x is continuous for x < 0.
--/
-lemma HermitianMat.continuousOn_rpow_pos (A : HermitianMat d 𝕜) :
-    ContinuousOn (fun x : ℝ => A ^ x) (Set.Ioi 0) := by
-  apply A.continuousOn_cfc_param
-  intro i x hx
-  exact (Real.continuousAt_const_rpow' hx.ne').continuousWithinAt
 
 /--
 The function α ↦ (1 - α) / (2 * α) maps the interval (1, ∞) to (-∞, 0).

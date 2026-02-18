@@ -35,10 +35,19 @@ theorem Sᵥₙ_strong_subadditivity (ρ₁₂₃ : MState (d₁ × d₂ × d₃
 /-- "Ordinary" subadditivity of von Neumann entropy -/
 theorem Sᵥₙ_subadditivity (ρ : MState (d₁ × d₂)) :
     Sᵥₙ ρ ≤ Sᵥₙ ρ.traceRight + Sᵥₙ ρ.traceLeft := by
-  sorry
+  have := Sᵥₙ_strong_subadditivity (ρ.relabel (d₂ := d₁ × Unit × d₂)
+    ⟨fun x ↦ (x.1, x.2.2), fun x ↦ (x.1, ⟨(), x.2⟩), fun x ↦ by simp, fun x ↦ by simp⟩)
+  simp [Sᵥₙ_relabel] at this
+  convert le_trans _ this using 1;
+  · congr 1
+    · convert Sᵥₙ_relabel _ (Equiv.prodPUnit _).symm
+      exact rfl
+    · convert Sᵥₙ_relabel _ (Equiv.punitProd _).symm
+      exact rfl
+  · exact le_add_of_nonneg_right (Sᵥₙ_nonneg _)
 
 /-- Triangle inequality for pure tripartite states: S(A) ≤ S(B) + S(C). -/
-private theorem Sᵥₙ_pure_tripartite_triangle (ψ : Ket ((d₁ × d₂) × d₃)) :
+theorem Sᵥₙ_pure_tripartite_triangle (ψ : Ket ((d₁ × d₂) × d₃)) :
     Sᵥₙ (MState.pure ψ).traceRight.traceRight ≤
     Sᵥₙ (MState.pure ψ).traceRight.traceLeft + Sᵥₙ (MState.pure ψ).traceLeft := by
   have h_subadd := Sᵥₙ_subadditivity (MState.pure ψ).assoc.traceLeft
@@ -295,4 +304,4 @@ theorem qcmi_le_2_log_dim' (ρ : MState (dA × dB × dC)) :
 --       ((CPTPMap.id ⊗ₖ CPTPMap.assoc').compose (CPTPMap.assoc.compose (CPTPMap.SWAP ⊗ₖ CPTPMap.id))) ρ;
 --     qcmi ρ = qcmi ρA₁BC + qcmi ρA₂BA₁C
 --      := by
---   sorry
+--   admit

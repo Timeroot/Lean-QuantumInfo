@@ -124,6 +124,11 @@ theorem Sᵥₙ_eq_trace_cfc_negMulLog (ρ : MState d) :
   congr! 5
   simp [mul_comm]
 
+@[simp]
+theorem Sᵥₙ_unit_zero [Unique d] (ρ : MState d) : Sᵥₙ ρ = 0 := by
+  refine le_antisymm ?_ (Sᵥₙ_nonneg ρ)
+  simpa using Sᵥₙ_le_log_d ρ
+
 /-- Von Neumann entropy is invariant under relabeling of the basis. -/
 @[simp]
 theorem Sᵥₙ_relabel (ρ : MState d₁) (e : d₂ ≃ d₁) :

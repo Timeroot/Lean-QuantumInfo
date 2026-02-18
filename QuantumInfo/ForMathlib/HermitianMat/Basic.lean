@@ -128,6 +128,15 @@ applications of the tactic. -/
 theorem continuous_mat : Continuous (HermitianMat.mat : HermitianMat n α → Matrix n n α) := by
   fun_prop
 
+lemma continuousOn_iff_coe {X : Type*} [TopologicalSpace X] {s : Set X}
+    (f : X → HermitianMat n α) :
+    ContinuousOn f s ↔ ContinuousOn (fun x => (f x).mat) s := by
+  constructor
+  · intro; fun_prop
+  · intro h
+    rw [continuousOn_iff_continuous_restrict] at *
+    apply Continuous.subtype_mk h
+
 variable [IsTopologicalAddGroup α]
 
 --In principle, ContinuousAdd and ContinuousNeg just need corresponding instances for α,
@@ -372,6 +381,11 @@ def conjLinear {m} (B : Matrix m n α) : HermitianMat n α →ₗ[R] HermitianMa
 @[simp]
 theorem conjLinear_apply (B : Matrix m n α) : conjLinear R B A = conj B A  := by
   rfl
+
+@[fun_prop]
+lemma continuous_conj (ρ : HermitianMat n 𝕜) : Continuous (ρ.conj (m := m) ·) := by
+  simp only [HermitianMat.conj, AddMonoidHom.coe_mk, ZeroHom.coe_mk]
+  fun_prop
 
 end conj
 

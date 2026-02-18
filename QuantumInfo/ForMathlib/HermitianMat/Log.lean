@@ -31,10 +31,21 @@ These are proved using `inv_antitone`, so, first showing that the matrix inverse
 is operator antitone for positive definite matrices.
 -/
 
-namespace HermitianMat
-
 variable {m n 𝕜 : Type*} [Fintype n] [DecidableEq n] [Fintype m] [DecidableEq m] [RCLike 𝕜]
 variable {A B : HermitianMat n 𝕜} {x : ℝ}
+
+theorem Matrix.IsHermitian.log_smul_of_ne_zero {A : Matrix n n 𝕜} (hA : A.IsHermitian) (hx : x ≠ 0) :
+    cfc Real.log (x • A) = (Real.log x) • cfc (if · = 0 then (0 : ℝ) else 1) A + cfc Real.log A := by
+  have hCFC : cfc (Real.log ∘ (x * ·)) A = cfc Real.log (x • A) := by
+    exact cfc_comp_smul x Real.log _ (by fun_prop) hA
+  rw [← hCFC, ← cfc_smul, ← cfc_add]
+  apply cfc_congr
+  intro t ht
+  by_cases h : t = 0
+  · simp [*]
+  · simp [*, Real.log_mul]
+
+namespace HermitianMat
 
 @[simp]
 theorem log_zero : (0 : HermitianMat n 𝕜).log = 0 := by
@@ -44,14 +55,15 @@ theorem log_zero : (0 : HermitianMat n 𝕜).log = 0 := by
 theorem log_one : (1 : HermitianMat n 𝕜).log = 0 := by
   simp [log, cfc]
 
-open ComplexOrder in
+theorem log_smul_of_pos (A : HermitianMat n 𝕜) (hx : x ≠ 0) :
+    (x • A).log = Real.log x • A.supportProj + A.log := by
+  ext1
+  convert A.H.log_smul_of_ne_zero hx
+  simp [cfc, log, supportProj_eq_cfc]
+
 theorem log_smul {A : HermitianMat n 𝕜} {x : ℝ} (hx : x ≠ 0) [NonSingular A] :
     (x • A).log = Real.log x • 1 + A.log := by
-  have := A.nonSingular_zero_notMem_spectrum
-  rw [← cfc_const_mul_id, log, ← cfc_comp_apply]
-  rw [← cfc_const A x.log, log, ← cfc_add]
-  apply cfc_congr
-  grind [Set.EqOn, Real.log_mul, Pi.add_apply]
+  simp [log_smul_of_pos A hx]
 
 /-
 The inverse function is operator antitone for positive definite matrices.
@@ -551,112 +563,22 @@ lemma log_conj_unitary (A : HermitianMat n 𝕜) (U : Matrix.unitaryGroup n 𝕜
     (A.conj U.val).log = A.log.conj U.val :=
   cfc_conj_unitary _ Real.log U
 
-/-
-The matrix logarithm of the Kronecker product of two positive definite Hermitian matrices is the sum of the Kronecker products of their logarithms with the identity matrix.
--/
-theorem log_kron {A : HermitianMat m 𝕜} (hA : A.mat.PosDef) (hB : B.mat.PosDef) :
-    (A ⊗ₖ B).log = (A.log ⊗ₖ 1) + (1 ⊗ₖ B.log) := by
-  --TODO Cleanup
-  -- Let's diagonalize A and B using their eigenvector unitary matrices.
-  obtain ⟨U, hU⟩ : ∃ U : Matrix.unitaryGroup m 𝕜, A = (diagonal 𝕜 A.H.eigenvalues).conj U.val := by
-    exact ⟨A.H.eigenvectorUnitary, eq_conj_diagonal A⟩
-  obtain ⟨V, hV⟩ : ∃ V : Matrix.unitaryGroup n 𝕜, B = (diagonal 𝕜 B.H.eigenvalues).conj V.val := by
-    exact ⟨B.H.eigenvectorUnitary, eq_conj_diagonal B⟩
-  -- By the properties of the logarithm and the Kronecker product, we can simplify the expression.
-  have h_log_simplified : (diagonal 𝕜 (fun (i : m × n) => A.H.eigenvalues i.1 * B.H.eigenvalues i.2) : HermitianMat (m × n) 𝕜).log =
-    (diagonal 𝕜 A.H.eigenvalues).log ⊗ₖ 1 + 1 ⊗ₖ (diagonal 𝕜 B.H.eigenvalues).log := by
-      rw [← kronecker_diagonal]
-      exact log_kron_diagonal hA.eigenvalues_pos hB.eigenvalues_pos
-  convert congr_arg ( fun x : HermitianMat ( m × n ) 𝕜 => x.conj ( Matrix.kroneckerMap ( · * · ) U.val V.val ) ) h_log_simplified using 1;
-  · conv_lhs => rw [ hU, hV ];
-    rw [ ← kronecker_conj ];
-    rw [ show ( diagonal 𝕜 ( fun i => A.H.eigenvalues i.1 * B.H.eigenvalues i.2 ) : HermitianMat ( m × n ) 𝕜 ) = ( diagonal 𝕜 A.H.eigenvalues ⊗ₖ diagonal 𝕜 B.H.eigenvalues ) from ?_ ];
-    · convert log_conj_unitary _ _;
-      rotate_right;
-      use Matrix.kroneckerMap ( · * · ) U.val V.val;
-      all_goals simp [ Matrix.mem_unitaryGroup_iff ];
-      have h_unitary : U.val * U.val.conjTranspose = 1 := by
-        exact U.2.2
-      have h_unitary' : V.val * V.val.conjTranspose = 1 := by
-        exact V.2.2
-      convert congr_arg₂ ( fun x y => Matrix.kroneckerMap ( · * · ) x y ) h_unitary h_unitary' using 1;
-      · ext i j; simp [ Matrix.mul_apply, Matrix.kroneckerMap_apply ] ;
-        simp only [mul_assoc, Finset.mul_sum _ _ _, mul_comm, mul_left_comm];
-        rw [ Finset.sum_sigma' ];
-        refine' Finset.sum_bij ( fun x _ => ⟨ x.2, x.1 ⟩ ) _ _ _ _ <;> simp
-      · simp
-    · exact Eq.symm (kronecker_diagonal (H A).eigenvalues (H B).eigenvalues);
-  · rw [ hU, hV ]
-    simp [ log_conj_unitary, kronecker_conj ]
-    congr
-
 open RealInnerProductSpace in
 theorem inner_log_smul_of [NonSingular A] {x : ℝ} (hx : x ≠ 0) :
     ⟪(x • A).log, B⟫ = Real.log x * B.trace + ⟪A.log, B⟫ := by
   simp [log_smul hx, inner_add_left]
 
-/--
-Scalar identity for log of product with "support" terms.
--/
-lemma Real.log_mul_eq_add_support (x y : ℝ) :
-    Real.log (x * y) = Real.log x * (if y = 0 then 0 else 1) + (if x = 0 then 0 else 1) * Real.log y := by
-  by_cases hx0 : x = 0 <;> by_cases hy0 : y = 0 <;> simp_all [ Real.log_mul ]
-
-lemma Real.log_mul_eq_add_log_of_ne_zero {x t : ℝ} (hx : x ≠ 0) :
-    Real.log (x * t) = Real.log x * (if t ≠ 0 then 1 else 0) + Real.log t := by
-  simp [Real.log_mul_eq_add_support, hx]
-
-open Matrix ComplexOrder
-theorem Matrix.log_smul_of_pos {A : Matrix n n 𝕜} (hA : A.PosSemidef) (hx : x ≠ 0) :
-    _root_.cfc Real.log (x • A) = (Real.log x) • _root_.cfc (fun t => if 0 < t then (1 : ℝ) else 0) A + _root_.cfc Real.log A := by
-  have hCFC : _root_.cfc (Real.log ∘ (fun t => x * t)) A = _root_.cfc Real.log (x • A) := by
-    exact cfc_comp_smul x Real.log _ (by fun_prop) hA.1
-  rw [ ← hCFC, ← cfc_smul ];
-  rw [ ← _root_.cfc_add ];
-  apply _root_.cfc_congr;
-  intro t ht; by_cases h : 0 < t <;> simp [*]
-  · exact Real.log_mul hx h.ne'
-  · rw [ spectrum.mem_iff ] at ht;
-    contrapose! ht;
-    have h_inv : ∀ (v : n → 𝕜), v ≠ 0 → (t • 1 - A).mulVec v ≠ 0 := by
-      intro v hv h; have := hA.2; simp_all [ Matrix.mulVec, dotProduct ] ;
-      have h_inv : ∑ i, (starRingEnd 𝕜) (v i) * ∑ j, A i j * v j = t * ∑ i, (starRingEnd 𝕜) (v i) * v i := by
-        have h_inv : ∑ i, (starRingEnd 𝕜) (v i) * ∑ j, (t • 1 - A) i j * v j = 0 := by
-          simp_all [ funext_iff, Matrix.mulVec, dotProduct ];
-        simp_all [ Matrix.one_apply, sub_mul, mul_sub, Finset.mul_sum _ _ _, mul_left_comm, sub_eq_iff_eq_add ];
-        simp_all [ mul_assoc, mul_comm, mul_left_comm, Algebra.smul_def ];
-      have h_inv : ∑ i, (starRingEnd 𝕜) (v i) * v i > 0 := by
-        have h_inv : ∑ i, (starRingEnd 𝕜) (v i) * v i = ∑ i, ‖v i‖ ^ 2 := by
-          simp [ mul_comm, RCLike.mul_conj];
-        exact h_inv.symm ▸ mod_cast lt_of_lt_of_le ( by exact lt_of_le_of_ne ( Finset.sum_nonneg fun _ _ => by positivity) ( Ne.symm <| by intro H; exact hv <| funext fun i => by simpa [ sq ] using Finset.sum_eq_zero_iff_of_nonneg ( fun _ _ => by positivity ) |>.1 H i ) ) le_rfl;
-      exact absurd ( this v ) ( by rw [ ‹∑ i, ( starRingEnd 𝕜 ) ( v i ) * ∑ j, A i j * v j = ↑t * ∑ i, ( starRingEnd 𝕜 ) ( v i ) * v i› ] ; exact not_le_of_gt ( by exact mul_neg_of_neg_of_pos ( mod_cast lt_of_le_of_ne ‹_› ( by aesop ) ) ‹_› ) );
-    rw [ Matrix.isUnit_iff_isUnit_det ];
-    rw [ isUnit_iff_ne_zero ];
-    intro h_det_zero;
-    have := Matrix.exists_mulVec_eq_zero_iff.mpr h_det_zero;
-    exact h_inv _ this.choose_spec.1 ( by simpa [ Algebra.algebraMap_eq_smul_one ] using this.choose_spec.2 )
-
-open HermitianMat Matrix ComplexOrder
-theorem log_smul_of_pos (hA : 0 ≤ A) (hx : x ≠ 0) :
-    (x • A).log = Real.log x • (proj_lt 0 A) + A.log := by
-  ext1
-  rw [HermitianMat.zero_le_iff] at hA
-  convert Matrix.log_smul_of_pos hA hx
-  simp [proj_lt, cfc, log]
-
-lemma mul_indicator_eq_id_of_nonneg (x : ℝ) (hx : 0 ≤ x) :
-    (if 0 < x then (1 : ℝ) else 0) * x = x := by
-  cases lt_or_eq_of_le hx <;> aesop
+section kron
 
 lemma log_kron_diagonal_with_proj {d₁ : m → ℝ} {d₂ : n → ℝ}  :
     (diagonal 𝕜 d₁ ⊗ₖ diagonal 𝕜 d₂).log =
-    (diagonal 𝕜 d₁).log ⊗ₖ (diagonal 𝕜 d₂).cfc (fun x => if x = 0 then 0 else 1) +
-    (diagonal 𝕜 d₁).cfc (fun x => if x = 0 then 0 else 1) ⊗ₖ (diagonal 𝕜 d₂).log := by
-  have h_diag_kron : (diagonal 𝕜 d₁ ⊗ₖ diagonal 𝕜 d₂).log = diagonal 𝕜 (fun (i : m × n) => Real.log (d₁ i.1 * d₂ i.2)) := by
+    (diagonal 𝕜 d₁).log ⊗ₖ (diagonal 𝕜 d₂).supportProj +
+    (diagonal 𝕜 d₁).supportProj ⊗ₖ (diagonal 𝕜 d₂).log := by
+  have h_diag_kron : (diagonal 𝕜 d₁ ⊗ₖ diagonal 𝕜 d₂).log = diagonal 𝕜 (fun i ↦ Real.log (d₁ i.1 * d₂ i.2)) := by
     rw [kronecker_diagonal, log]
     exact cfc_diagonal _ _
-  simp_all [ HermitianMat.ext_iff, cfc_diagonal, log ];
-  ext ⟨ i, j ⟩ ⟨ i', j' ⟩
+  simp_all [ HermitianMat.ext_iff, cfc_diagonal, log, supportProj_eq_cfc ];
+  ext ⟨i, j⟩ ⟨i', j'⟩
   by_cases hi' : i = i'; swap
   · simp [hi']
   by_cases hj' : j = j'; swap
@@ -664,16 +586,26 @@ lemma log_kron_diagonal_with_proj {d₁ : m → ℝ} {d₂ : n → ℝ}  :
   simp [hi', hj']
   split_ifs <;> simp_all [Real.log_mul]
 
+variable {A : HermitianMat m 𝕜} {B : HermitianMat n 𝕜}
+
 /--
-Generalization of log_kron for possibly singular matrices.
+Generalization of `HermitianMat.log_kron` for possibly singular matrices.
 -/
-lemma log_kron_with_proj {A : HermitianMat m 𝕜} {B : HermitianMat n 𝕜} :
-    (A ⊗ₖ B).log = (A.log ⊗ₖ B.cfc (fun x => if x = 0 then 0 else 1)) +
-                   (A.cfc (fun x => if x = 0 then 0 else 1) ⊗ₖ B.log) := by
+lemma log_kron_with_proj : (A ⊗ₖ B).log = A.log ⊗ₖ B.supportProj + A.supportProj ⊗ₖ B.log := by
   obtain ⟨UA, DA, rfl⟩ : ∃ UA : Matrix.unitaryGroup m 𝕜, ∃ DA, A = (diagonal 𝕜 DA).conj UA.val :=
     ⟨_, _, eq_conj_diagonal A⟩
   obtain ⟨UB, DB, rfl⟩ : ∃ UB : Matrix.unitaryGroup n 𝕜, ∃ DB , B = (diagonal 𝕜 DB).conj UB.val :=
     ⟨_, _, eq_conj_diagonal B⟩
   rw [← kronecker_conj, log_conj_unitary _ ⟨_, Matrix.kronecker_mem_unitary UA.2 UB.2⟩]
   rw [log_kron_diagonal_with_proj, map_add (conj _)]
-  congr 1 <;> rw [cfc_conj_unitary, log_conj_unitary, kronecker_conj]
+  congr 1
+  <;> rw [supportProj_eq_cfc, supportProj_eq_cfc, cfc_conj_unitary, log_conj_unitary, kronecker_conj]
+
+/--
+The matrix logarithm of the Kronecker product of two nonsingular Hermitian matrices is
+the sum of the Kronecker products of their logarithms with the identity matrix.
+-/
+theorem log_kron [NonSingular A] [NonSingular B] : (A ⊗ₖ B).log = A.log ⊗ₖ 1 + 1 ⊗ₖ B.log := by
+  simp [log_kron_with_proj]
+
+end kron
