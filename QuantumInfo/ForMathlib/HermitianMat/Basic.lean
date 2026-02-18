@@ -128,6 +128,15 @@ applications of the tactic. -/
 theorem continuous_mat : Continuous (HermitianMat.mat : HermitianMat n α → Matrix n n α) := by
   fun_prop
 
+lemma continuousOn_iff_coe {X : Type*} [TopologicalSpace X] {s : Set X}
+    (f : X → HermitianMat n α) :
+    ContinuousOn f s ↔ ContinuousOn (fun x => (f x).mat) s := by
+  constructor
+  · intro; fun_prop
+  · intro h
+    rw [continuousOn_iff_continuous_restrict] at *
+    apply Continuous.subtype_mk h
+
 variable [IsTopologicalAddGroup α]
 
 --In principle, ContinuousAdd and ContinuousNeg just need corresponding instances for α,
@@ -306,17 +315,6 @@ theorem complex_im_eq_zero (A : HermitianMat n ℂ) (x : n) :
     (A x x).im = 0 :=
   A.im_diag_eq_zero x
 
-variable [DecidableEq n] [Fintype n]
-
-/-- Unlike for `Matrix`, this is always true for `HermitianMat`: the 0 eigenvalue
-gets mapped to 0 and then back again to 0. --/
-@[simp]
-theorem inv_inv (A : HermitianMat n 𝕜) : (A⁻¹)⁻¹ = A := by
-  sorry
-
-noncomputable instance : InvolutiveInv (HermitianMat n 𝕜) :=
-  ⟨inv_inv⟩
-
 end rclike
 
 section conj
@@ -383,6 +381,11 @@ def conjLinear {m} (B : Matrix m n α) : HermitianMat n α →ₗ[R] HermitianMa
 @[simp]
 theorem conjLinear_apply (B : Matrix m n α) : conjLinear R B A = conj B A  := by
   rfl
+
+@[fun_prop]
+lemma continuous_conj (ρ : HermitianMat n 𝕜) : Continuous (ρ.conj (m := m) ·) := by
+  simp only [HermitianMat.conj, AddMonoidHom.coe_mk, ZeroHom.coe_mk]
+  fun_prop
 
 end conj
 

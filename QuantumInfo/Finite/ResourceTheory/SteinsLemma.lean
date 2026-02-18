@@ -185,8 +185,6 @@ open MatrixMap
 open Matrix
 open PosSemidef
 
-variable {dIn dOut : Type*} [Fintype dIn] [Fintype dOut] [DecidableEq dIn] [DecidableEq dOut] {R : Type*}
-
 -- TODO: Commutation and order relations about `proj_le` specified in the text
 -- between Eqs. (S77) and (S78)
 

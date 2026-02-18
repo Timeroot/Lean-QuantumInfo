@@ -20,6 +20,7 @@ namespace HermitianMat
 noncomputable section CFC
 
 variable {d d₂ 𝕜 : Type*} [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂] [RCLike 𝕜]
+variable {X : Type*} [TopologicalSpace X]
 variable (A : HermitianMat d 𝕜) (f : ℝ → ℝ) (g : ℝ → ℝ) (q r : ℝ)
 
 /- Adding this to `CStarAlgebra` allows `cfc_tac` to use it. -/
@@ -299,7 +300,7 @@ theorem spectrum_subset_of_mem_Icc (A B : HermitianMat d 𝕜) :
 
 variable {f} in
 @[fun_prop]
-protected theorem cfc_continuous (hf : Continuous f) :
+protected theorem cfc_continuous {f : ℝ → ℝ} (hf : Continuous f) :
     Continuous (cfc · f : HermitianMat d ℂ → HermitianMat d ℂ) := by
   unfold cfc
   suffices Continuous (fun A : HermitianMat d ℂ ↦ _root_.cfc f A.mat) by
@@ -319,7 +320,79 @@ protected theorem cfc_continuous (hf : Continuous f) :
     use ⟨x, 1⟩
     simp
 
-variable {A B : HermitianMat d 𝕜}
+theorem Matrix.PosDef.spectrum_subset_Ioi {d 𝕜 : Type*} [Fintype d] [DecidableEq d] [RCLike 𝕜]
+    {A : Matrix d d 𝕜} (hA : A.PosDef) : spectrum ℝ A ⊆ Set.Ioi 0 := by
+  --TODO Cleanup. Surely SURELY this is already in Mathlib? (Esp. as an Iff)
+  intro x hx
+  obtain ⟨v, hv⟩ : ∃ v : d → 𝕜, v ≠ 0 ∧ A.mulVec v = x • v := by
+    have h_eigenvalue : ∃ v : d → 𝕜, v ≠ 0 ∧ (A - x • 1).mulVec v = 0 := by
+      rw [ spectrum.mem_iff ] at hx;
+      simp_all [ Matrix.isUnit_iff_isUnit_det ];
+      have := Matrix.exists_mulVec_eq_zero_iff.mpr hx;
+      obtain ⟨ v, hv, hv' ⟩ := this; use v; simp_all [ Matrix.sub_mulVec ] ;
+      simp_all [ sub_eq_zero, Algebra.algebraMap_eq_smul_one ];
+    obtain ⟨ v, hv, hv' ⟩ := h_eigenvalue; use v; simp_all [ sub_eq_iff_eq_add, Matrix.sub_mulVec ] ;
+    ext i
+    simp [ Matrix.mulVec, dotProduct]
+    simp [ Matrix.one_apply]
+  have := hA.2 v hv.1
+  aesop
+
+/--
+If f is a continuous family of functions parameterized by x, then (fun x => A.cfc (f x)) is also continuous.
+-/
+@[fun_prop]
+theorem continuous_cfc_fun {f : X → ℝ → ℝ} (hf : ∀ i, Continuous (f · i)) :
+    Continuous (fun x ↦ A.cfc (f x)) := by
+  apply Continuous.subtype_mk
+  conv => enter [1, x]; apply A.cfc_toMat_eq_sum_smul_proj (f x)
+  fun_prop
+
+variable {f : X → ℝ → ℝ} {S : Set X}
+/--
+ContinuousOn variant for when all the matrices (A x) have a spectrum in a set T, and f is continuous on a set S.
+-/
+@[fun_prop]
+theorem continuousOn_cfc_fun {T : Set ℝ}
+  (hf : ∀ i ∈ T, ContinuousOn (f · i) S) (hA : spectrum ℝ A.mat ⊆ T) :
+    ContinuousOn (fun x ↦ A.cfc (f x)) S := by
+  simp_rw [continuousOn_iff_continuous_restrict] at hf ⊢
+  apply Continuous.subtype_mk
+  conv => enter [1, x]; apply A.cfc_toMat_eq_sum_smul_proj (f x)
+  unfold Set.restrict at hf
+  apply continuous_finset_sum _
+  rw [A.H.spectrum_real_eq_range_eigenvalues] at hA
+  refine fun i _ ↦ Continuous.smul (hf _ (by grind)) (by fun_prop)
+
+/-- Specialization of `continuousOn_cfc_fun` for nonsingular matrices. -/
+@[fun_prop]
+theorem continuousOn_cfc_fun_nonsingular {f : X → ℝ → ℝ} {S : Set X}
+  (hf : ∀ i ≠ 0, ContinuousOn (f · i) S) [NonSingular A] :
+    ContinuousOn (fun x ↦ A.cfc (f x)) S := by
+  apply continuousOn_cfc_fun (T := {0}ᶜ)
+  · exact hf
+  · grind [nonSingular_zero_notMem_spectrum]
+
+/-- Specialization of `continuousOn_cfc_fun` for positive semidefinite matrices. -/
+@[fun_prop]
+theorem continuousOn_cfc_fun_nonneg {f : X → ℝ → ℝ} {S : Set X}
+  (hf : ∀ i ≥ 0, ContinuousOn (f · i) S) (hA : 0 ≤ A) :
+    ContinuousOn (fun x ↦ A.cfc (f x)) S := by
+  apply continuousOn_cfc_fun (T := Set.Ici 0)
+  · exact hf
+  · rw [zero_le_iff] at hA
+    exact hA.pos_of_mem_spectrum
+
+/-- Specialization of `continuousOn_cfc_fun` for positive definite matrices. -/
+@[fun_prop]
+theorem continuousOn_cfc_fun_posDef {f : X → ℝ → ℝ} {S : Set X}
+  (hf : ∀ i > 0, ContinuousOn (f · i) S) (hA : A.mat.PosDef) :
+    ContinuousOn (fun x ↦ A.cfc (f x)) S := by
+  apply continuousOn_cfc_fun (T := Set.Ioi 0)
+  · exact hf
+  · exact Matrix.PosDef.spectrum_subset_Ioi hA
+
+variable {A B : HermitianMat d 𝕜} (f : ℝ → ℝ)
 
 /--
 The inverse of the CFC is the CFC of the inverse function.
@@ -373,6 +446,42 @@ theorem diagonal_pow (f : d → ℝ) :
     (diagonal 𝕜 f) ^ r = diagonal 𝕜 (fun i ↦ (f i) ^ r) := by
   simp [pow_eq_cfc]
   rfl
+
+@[fun_prop]
+theorem rpow_const_continuous {r : ℝ} (hr : 0 ≤ r): Continuous (fun A : HermitianMat d ℂ ↦ A ^ r) := by
+  exact HermitianMat.cfc_continuous (Real.continuous_rpow_const hr)
+
+@[fun_prop]
+theorem const_rpow_continuous_nonsingular [NonSingular A] : Continuous (fun r : ℝ ↦ A ^ r) := by
+  rw [← continuousOn_univ]
+  apply continuousOn_cfc_fun_nonsingular
+  simp only [Real.rpow_eq_pow]
+  fun_prop (disch := assumption)
+
+@[fun_prop]
+theorem const_rpow_continuous [NonSingular A] : Continuous (fun r : ℝ ↦ A ^ r) := by
+  rw [← continuousOn_univ]
+  apply continuousOn_cfc_fun_nonsingular
+  simp only [Real.rpow_eq_pow]
+  fun_prop (disch := assumption)
+
+/--
+For a fixed Hermitian matrix A, the function x ↦ A^x is continuous for x > 0.
+-/
+@[fun_prop]
+theorem continuousOn_rpow_pos (A : HermitianMat d ℂ) : ContinuousOn (fun x : ℝ ↦ A ^ x) (Set.Ioi 0) := by
+  apply A.continuousOn_cfc_fun (hA := subset_rfl)
+  intro i _ x hx
+  exact (Real.continuousAt_const_rpow' hx.ne').continuousWithinAt
+
+/--
+For a fixed Hermitian matrix A, the function x ↦ A^x is continuous for x < 0.
+-/
+@[fun_prop]
+theorem continuousOn_rpow_neg (A : HermitianMat d ℂ) : ContinuousOn (fun x : ℝ ↦ A ^ x) (Set.Iio 0) := by
+  apply A.continuousOn_cfc_fun (hA := subset_rfl)
+  intro i _ x hx
+  exact (Real.continuousAt_const_rpow' hx.ne).continuousWithinAt
 
 @[simp]
 theorem rpow_one : A ^ (1 : ℝ) = A := by

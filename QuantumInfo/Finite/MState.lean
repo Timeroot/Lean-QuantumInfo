@@ -979,6 +979,13 @@ theorem relabel_refl {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) :
   ext
   simp
 
+/-- Relabeling a pure state by a bijection yields another pure state. -/
+theorem relabel_pure_exists (ψ : Ket d₁) (e : d₂ ≃ d₁) :
+    ∃ ψ' : Ket d₂, (pure ψ).relabel e = pure ψ' := by
+  refine ⟨⟨fun i => ψ (e i), ?_⟩, rfl⟩
+  rw [← ψ.normalized', Fintype.sum_equiv e]
+  congr!
+
 @[simp]
 theorem relabel_relabel {d d₂ d₃ : Type*}
     [Fintype d] [DecidableEq d] [Fintype d₂] [DecidableEq d₂] [Fintype d₃] [DecidableEq d₃]
@@ -1022,6 +1029,10 @@ theorem spectrum_relabel {ρ : MState d} (e : d₂ ≃ d) :
   rw [Matrix.isUnit_submatrix_equiv]
   rw [← Algebra.algebraMap_eq_smul_one v, ← spectrum.mem_iff]
 
+/-- The purity of a state is invariant under relabeling of the basis. -/
+@[simp]
+theorem purity_relabel (ρ : MState d₁) (e : d₂ ≃ d₁) : (ρ.relabel e).purity = ρ.purity := by
+  simp [purity, inner_def]
 --TODO: Swap and assoc for kets.
 --TODO: Connect these to unitaries (when they can be)
 

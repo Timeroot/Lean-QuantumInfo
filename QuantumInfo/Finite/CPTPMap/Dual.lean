@@ -86,15 +86,22 @@ theorem HPMap.linearMap_ofHermitianMat (f : HermitianMat dIn ℂ →ₗ[ℝ] Her
   simp [imaginaryPart, skewAdjoint.negISMul, show star x = x from hx]
 
 --PULLOUT
+omit [Fintype dOut] in
 @[simp]
 theorem HPMap.ofHermitianMat_linearMap (f : HPMap dIn dOut ℂ) :
     ofHermitianMat (LinearMapClass.linearMap f) = f := by
-  ext : 2
+  ext : 3
   simp only [map, ofHermitianMat, instFunLike, LinearMap.coe_coe, HermitianMat.val_eq_coe,
     HermitianMat.mat_mk, LinearMap.coe_mk, AddHom.coe_mk,
     ← map_smul, ← map_add]
-  simp only [map_add, map_smul]
-  sorry
+  simp only [map_add, map_smul, realPart, imaginaryPart, LinearMap.coe_comp, Function.comp_apply]
+  simp only [selfAdjointPart,  LinearMap.coe_mk, AddHom.coe_mk,
+    HermitianMat.mat_mk,LinearMap.map_smul_of_tower, skewAdjoint.negISMul]
+  simp only [Matrix.add_apply, Matrix.smul_apply, smul_eq_mul]
+  ring_nf
+  simp
+  ring
+
 
 variable (f : HPMap dIn dOut) (A : HermitianMat dIn ℂ)
 
