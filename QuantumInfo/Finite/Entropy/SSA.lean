@@ -38,13 +38,12 @@ theorem Sᵥₙ_subadditivity (ρ : MState (d₁ × d₂)) :
   have := Sᵥₙ_strong_subadditivity (ρ.relabel (d₂ := d₁ × Unit × d₂)
     ⟨fun x ↦ (x.1, x.2.2), fun x ↦ (x.1, ⟨(), x.2⟩), fun x ↦ by simp, fun x ↦ by simp⟩)
   simp [Sᵥₙ_relabel] at this
-  convert le_trans _ this using 1;
-  · congr 1
-    · convert Sᵥₙ_relabel _ (Equiv.prodPUnit _).symm
-      exact rfl
-    · convert Sᵥₙ_relabel _ (Equiv.punitProd _).symm
-      exact rfl
-  · exact le_add_of_nonneg_right (Sᵥₙ_nonneg _)
+  convert this using 1
+  congr 1
+  · convert Sᵥₙ_relabel _ (Equiv.prodPUnit _).symm
+    exact rfl
+  · convert Sᵥₙ_relabel _ (Equiv.punitProd _).symm
+    exact rfl
 
 /-- Triangle inequality for pure tripartite states: S(A) ≤ S(B) + S(C). -/
 theorem Sᵥₙ_pure_tripartite_triangle (ψ : Ket ((d₁ × d₂) × d₃)) :
