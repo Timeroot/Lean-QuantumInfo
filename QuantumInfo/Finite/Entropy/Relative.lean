@@ -26,12 +26,12 @@ it for this one quantity, then it follows for other quantities (like the relativ
 
 theorem inner_log_sub_log_nonneg (h : σ.M.ker ≤ ρ.M.ker) :
     0 ≤ ⟪ρ.M, ρ.M.log - σ.M.log⟫ := by
-  sorry
+  sorry -- Nonnegativity of Umegaki quantum relative entropy.
 
 --PULLOUT to CfcOrder.lean
 theorem HermitianMat.cfc_pos_of_pos {A : HermitianMat d ℂ} {f : ℝ → ℝ} (hA : 0 < A)
     (hf : ∀ i > 0, 0 < f i) (hf₂ : 0 ≤ f 0) : 0 < A.cfc f := by
-  sorry
+  sorry --easy CFC lemma
 
 --PULLOUT to CfcOrder.lean
 theorem HermitianMat.rpow_pos {A : HermitianMat d ℂ} (hA : 0 < A) {p : ℝ} : 0 < A ^ p := by
@@ -43,7 +43,7 @@ theorem HermitianMat.rpow_pos {A : HermitianMat d ℂ} (hA : 0 < A) {p : ℝ} : 
 --TODO: Upgrade to an Iff
 theorem HermitianMat.conj_ne_zero {A : HermitianMat d ℂ} {M : Matrix d d ℂ}
     (h : LinearMap.ker M.toEuclideanLin ≤ A.ker) : A.conj M ≠ 0 := by
-  sorry
+  sorry --easy CFC lemma
 
 --PULLOUT to HermitianMat/Order.lean
 theorem HermitianMat.conj_pos {A : HermitianMat d ℂ} {M : Matrix d d ℂ} (hA : 0 < A)
@@ -61,13 +61,13 @@ theorem MState.pos' {ρ : MState d} : 0 < ρ.M := by
 theorem HermitianMat.ker_cfc_of_iff_zero {A : HermitianMat d ℂ} {f : ℝ → ℝ}
     (h : ∀ i, f i = 0 → i = 0) :
     (A.cfc f).ker = A.ker := by
-  sorry
+  sorry --easy CFC lemma
 
 --PULLOUT to HermitianMat/CFC.lean
 theorem HermitianMat.ker_cfc_of_nonneg_iff_zero {A : HermitianMat d ℂ} {f : ℝ → ℝ} (hA : 0 ≤ A)
     (h : ∀ i ≥ 0, f i = 0 → i = 0) :
     (A.cfc f).ker = A.ker := by
-  sorry
+  sorry --easy CFC lemma
 
 --PULLOUT to HermitianMat/CFC.lean
 theorem HermitianMat.ker_rpow_of_nonneg {A : HermitianMat d ℂ} {p : ℝ} (hA : 0 ≤ A):
@@ -86,11 +86,11 @@ private theorem sandwiched_trace_pos (h : σ.M.ker ≤ ρ.M.ker) :
 
 private theorem sandwiched_trace_of_lt_1 (h : σ.M.ker ≤ ρ.M.ker) (hα : α < 1) :
     ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).mat) ^ α).trace ≤ 1 := by
-  sorry
+  sorry -- part of sandwichedRelRentropy_nonneg
 
 private theorem sandwiched_trace_of_gt_1 (h : σ.M.ker ≤ ρ.M.ker) (hα : α > 1) :
     1 ≤ ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).mat) ^ α).trace := by
-  sorry
+  sorry -- part of sandwichedRelRentropy_nonneg
 
 private theorem sandwichedRelRentropy_nonneg_α_lt_1 (h : σ.M.ker ≤ ρ.M.ker) (hα : α < 1) :
     0 ≤ ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).mat) ^ α).trace.log / (α - 1) := by
@@ -508,17 +508,7 @@ end additivity
 theorem sandwichedRelRentropy_additive (α) (ρ₁ σ₁ : MState d₁) (ρ₂ σ₂ : MState d₂) :
     D̃_ α(ρ₁ ⊗ᴹ ρ₂‖σ₁ ⊗ᴹ σ₂) = D̃_ α(ρ₁‖σ₁) + D̃_ α(ρ₂‖σ₂) := by
   dsimp [SandwichedRelRentropy]
-  sorry
-  -- split_ifs
-  -- · sorry
-  -- · sorry
-  -- · sorry
-  /-
-  handle the kernels of tensor products
-  log of ⊗ is (log A ⊗ I) + (I ⊗ log B)
-  rinner distributes over sub and add
-  rinner of ⊗ is mul of rinner
-  -/
+  sorry --Additivity of the Sandwiched Renyi Relative entropy.
 
 /-- The quantum relative entropy is additive when the inputs are product states -/
 @[simp]
@@ -622,7 +612,7 @@ private theorem sandwichedRelRentropy.continuousOn_Ioi_1 (ρ σ : MState d) :
       · apply ContinuousOn.log
         · apply HermitianMat.trace_Continuous.comp_continuousOn
           simp only [HermitianMat.conj, AddMonoidHom.coe_mk, ZeroHom.coe_mk]
-          sorry
+          sorry -- α-continuity of sandwiched relative Renyi entropy.
         · intro x hx
           apply LT.lt.ne'
           grw [← sandwiched_trace_of_gt_1 hρ hx]
@@ -636,7 +626,7 @@ theorem sandwichedRelRentropy.continuousOn (ρ σ : MState d) :
     ContinuousOn (fun α => D̃_ α(ρ‖σ)) (Set.Ioi 0) := by
   --If this turns out too hard, we just need `ContinousAt f 1`.
   --If that's still too hard, we really _just_ need that `(𝓝[≠] 1).tendsto (f 1)`.
-  sorry
+  sorry -- α-continuity of sandwiched relative Renyi entropy.
 
 /-- The Data Processing Inequality for the Sandwiched Renyi relative entropy.
 Proved in `https://arxiv.org/pdf/1306.5920`. Seems kind of involved. -/
@@ -644,7 +634,7 @@ theorem sandwichedRenyiEntropy_DPI (hα : 1 ≤ α) (ρ σ : MState d) (Φ : CPT
     D̃_ α(Φ ρ‖Φ σ) ≤ D̃_ α(ρ‖σ) := by
   --If we want, we can prove this just for 1 < α, and then use continuity (above) to take the limit as
   -- α → 1.
-  sorry
+  sorry -- Data Processing Inequality for the Sandwiched Renyi relative entropy.
 
 /-- Quantum relative entropy as `Tr[ρ (log ρ - log σ)]` when supports are correct. -/
 theorem qRelativeEnt_ker {ρ σ : MState d} (h : σ.M.ker ≤ ρ.M.ker) :
@@ -720,13 +710,13 @@ private theorem lowerSemicontinuous_iff {α : Type u_1} {β : Type u_2} [Topolog
 
 lemma lowerSemicontinuous_inner (ρ x : MState d) (hx : x.M.ker ≤ ρ.M.ker):
     LowerSemicontinuousAt (fun x ↦ ⟪ρ.M, x.M.log⟫) x := by
-  sorry
+  sorry --Lower semicontinuity of the inner product with log of something in a greater kernel.
 
 open Classical in
 theorem qRelativeEnt_lowerSemicontinuous_2 (ρ x : MState d) (hx : ¬(x.M.ker ≤ ρ.M.ker)) (y : ENNReal) (hy : y < ⊤) :
     ∀ᶠ (x' : MState d) in nhds x,
       y < (if x'.M.ker ≤ ρ.M.ker then ⟪ρ.M, ρ.M.log - x'.M.log⟫ else ⊤ : EReal) := by
-  sorry
+  sorry --Lower semicontinuity of the quantum relative entropy on the infinite case
 
 /-- Relative entropy is lower semicontinuous (in each argument, actually, but we only need in the
 latter here). Will need the fact that all the cfc / eigenvalue stuff is continuous, plus
@@ -737,7 +727,7 @@ theorem qRelativeEnt.lowerSemicontinuous (ρ : MState d) : LowerSemicontinuous f
   intro x
   by_cases hx : x.M.ker ≤ ρ.M.ker
   · have h₂ := lowerSemicontinuous_inner ρ x hx
-    sorry
+    sorry -- Concluding lower semicontinuity of the Umegaki quantum relative entropy.
   · intro y hy
     simp only [hx, ↓reduceDIte] at hy ⊢
     have h₂ := qRelativeEnt_lowerSemicontinuous_2 ρ x hx y hy
@@ -746,20 +736,6 @@ theorem qRelativeEnt.lowerSemicontinuous (ρ : MState d) : LowerSemicontinuous f
     · simpa [← EReal.coe_ennreal_lt_coe_ennreal_iff, h₁] using hx'
     · simp at junk
     · exact hy
-
-/-- Joint convexity of Quantum relative entropy. We can't state this with `ConvexOn` because that requires
-an `AddCommMonoid`, which `MState`s are not. Instead we state it with `Mixable`.
-
-TODO:
- * Add the `Mixable` instance that infers from the `Coe` so that the right hand side can be written as
-`p [𝐃(ρ₁‖σ₁) ↔ 𝐃(ρ₂‖σ₂)]`
- * Define (joint) convexity as its own thing - a `ConvexOn` for `Mixable` types.
- * Maybe, more broadly, find a way to make `ConvexOn` work with the subset of `Matrix` that corresponds to `MState`.
--/
-theorem qRelativeEnt_joint_convexity :
-  ∀ (ρ₁ ρ₂ σ₁ σ₂ : MState d), ∀ (p : Prob),
-    𝐃(p [ρ₁ ↔ ρ₂]‖p [σ₁ ↔ σ₂]) ≤ p * 𝐃(ρ₁‖σ₁) + (1 - p) * 𝐃(ρ₂‖σ₂) := by
-  sorry
 
 @[simp]
 theorem qRelEntropy_self (ρ : MState d) : 𝐃(ρ‖ρ) = 0 := by
@@ -770,18 +746,13 @@ theorem qRelativeEnt_ne_top {ρ σ : MState d} [σ.M.NonSingular] : 𝐃(ρ‖σ
   rw [qRelativeEnt]
   finiteness
 
-/-- `I(A:B) = 𝐃(ρᴬᴮ‖ρᴬ ⊗ ρᴮ)` -/
-theorem qMutualInfo_as_qRelativeEnt (ρ : MState (dA × dB)) :
-    qMutualInfo ρ = (𝐃(ρ‖ρ.traceRight ⊗ᴹ ρ.traceLeft) : EReal) := by
-  sorry
-
 theorem qRelEntropy_le_add_of_le_smul (ρ : MState d) {σ₁ σ₂ : MState d} (hσ : σ₁.M ≤ α • σ₂.M) :
     𝐃(ρ‖σ₁) ≤ 𝐃(ρ‖σ₂) + ENNReal.ofReal (Real.log α)
     := by
-  sorry
+  sorry -- (σ₁ ≤ α • σ₂) → 𝐃(ρ‖σ₁) ≤ 𝐃(ρ‖σ₂) + Real.log α
 
 /-- "Formula for conversion from operator inequality to quantum relative entropy",
 -- Proposition S17 of https://arxiv.org/pdf/2401.01926v2 -/
 theorem qRelativeEnt_op_le {ρ σ : MState d} (hpos : 0 < α) (h : ρ.M ≤ α • σ.M) :
     𝐃(ρ‖σ) ≤ ENNReal.ofReal (Real.log α) := by
-  sorry
+  sorry -- ρ ≤ α • σ → 𝐃(ρ‖σ) ≤ Real.log α

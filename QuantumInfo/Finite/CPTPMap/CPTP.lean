@@ -430,11 +430,6 @@ theorem exists_purify (Λ : CPTPMap dIn dOut) :
  we require a typeclass instance [Inhabited dOut]. -/
 def purify (Λ : CPTPMap dIn dOut) : CPTPMap (dIn × dOut × dOut) (dIn × dOut × dOut) :=
   exists_purify Λ |>.choose
--- where
-  -- toLinearMap := by
-  --   sorry
-  -- cp := sorry
-  -- TP := sorry
 
 --TODO: Constructing this will probably need Kraus operators first.
 
