@@ -547,6 +547,10 @@ theorem pow_half_mul (hA : 0 ≤ A) :
   · norm_num
   · norm_num
 
+theorem rpow_conj_unitary (A : HermitianMat d 𝕜) (U : Matrix.unitaryGroup d 𝕜) (r : ℝ) :
+    (HermitianMat.conj U.val A) ^ r = HermitianMat.conj U.val (A ^ r) := by
+  exact A.cfc_conj_unitary (· ^ r) U
+
 /-- Matrix logarithm (base e) of a Hermitian matrix, as given by the elementwise
   real logarithm of the diagonal in a diagonalized form, using `Real.log`
 
