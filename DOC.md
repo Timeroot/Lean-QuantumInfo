@@ -1353,7 +1353,7 @@ Kronecker products (tensor products) are fundamental in quantum information theo
 | **Ket** | `⊗ᵠ` | `Ket d₁`, `Ket d₂` | `Ket (d₁ × d₂)` | default |
 | **MState** | `⊗ᴹ` | `MState d₁`, `MState d₂` | `MState (d₁ × d₂)` | default |
 | **HermitianMat** | `⊗ₖ` | `HermitianMat m 𝕜`, `HermitianMat n 𝕜` | `HermitianMat (m × n) 𝕜` | `HermitianMat` |
-| **CPTPMap** | `⊗ₖ` | `CPTPMap dIn₁ dOut₁`, `CPTPMap dIn₂ dOut₂` | `CPTPMap (dIn₁×dIn₂) (dOut₁×dOut₂)` | default |
+| **CPTPMap** | `⊗ᶜᵖ` | `CPTPMap dIn₁ dOut₁`, `CPTPMap dIn₂ dOut₂` | `CPTPMap (dIn₁×dIn₂) (dOut₁×dOut₂)` | default |
 | **MatrixMap** | `⊗ₖₘ` | `MatrixMap A B R`, `MatrixMap C D R` | `MatrixMap (A×C) (B×D) R` | `MatrixMap` |
 | **Unitary** | `⊗ᵤ` | Unitary, Unitary | Unitary on product | qubit-specific |
 
