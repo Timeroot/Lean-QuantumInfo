@@ -343,7 +343,7 @@ def prod (Λ₁ : CPTPMap dI₁ dO₁) (Λ₂ : CPTPMap dI₂ dO₂) : CPTPMap (
   cp := Λ₁.cp.kron Λ₂.cp
   TP := Λ₁.TP.kron Λ₂.TP
 
-infixl:70 "⊗ₖ" => CPTPMap.prod
+infixl:70 "⊗ᶜᵖ" => CPTPMap.prod
 
 end prod
 
@@ -411,7 +411,7 @@ theorem exists_purify (Λ : CPTPMap dIn dOut) :
       Λ'.IsUnitary ∧
       Λ = (
       let zero_prep : CPTPMap Unit (dOut × dOut) := replacement (MState.pure (Ket.basis default))
-      let prep := (id ⊗ₖ zero_prep)
+      let prep := (id ⊗ᶜᵖ zero_prep)
       let append : CPTPMap dIn (dIn × Unit) := CPTPMap.ofEquiv (Equiv.prodPUnit dIn).symm
       CPTPMap.traceLeft ∘ₘ CPTPMap.traceLeft ∘ₘ Λ' ∘ₘ prep ∘ₘ append
     ) := by
@@ -450,7 +450,7 @@ is equivalent to the original channel. This theorem states that the channel outp
 has this property. -/
 theorem purify_trace (Λ : CPTPMap dIn dOut) : Λ = (
     let zero_prep : CPTPMap Unit (dOut × dOut) := replacement (MState.pure (Ket.basis default))
-    let prep := (id ⊗ₖ zero_prep)
+    let prep := (id ⊗ᶜᵖ zero_prep)
     let append : CPTPMap dIn (dIn × Unit) := CPTPMap.ofEquiv (Equiv.prodPUnit dIn).symm
     CPTPMap.traceLeft ∘ₘ CPTPMap.traceLeft ∘ₘ Λ.purify ∘ₘ prep ∘ₘ append
   ) :=
@@ -464,7 +464,7 @@ theorem purify_trace (Λ : CPTPMap dIn dOut) : Λ = (
 /-- The complementary channel comes from tracing out the other half (the right half) of the purified channel `purify`. -/
 def complementary (Λ : CPTPMap dIn dOut) : CPTPMap dIn (dIn × dOut) :=
   let zero_prep : CPTPMap Unit (dOut × dOut) := replacement (MState.pure (Ket.basis default))
-  let prep := (id ⊗ₖ zero_prep)
+  let prep := (id ⊗ᶜᵖ zero_prep)
   let append : CPTPMap dIn (dIn × Unit) := CPTPMap.ofEquiv (Equiv.prodPUnit dIn).symm
   CPTPMap.traceRight ∘ₘ CPTPMap.assoc' ∘ₘ Λ.purify ∘ₘ prep ∘ₘ append
 

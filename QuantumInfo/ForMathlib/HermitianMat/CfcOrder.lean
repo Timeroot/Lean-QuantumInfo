@@ -106,7 +106,7 @@ theorem le_of_exp_commute (hAB₁ : Commute A.mat B.mat) (hAB₂ : A.exp ≤ B.e
 section uncategorized_cleanup
 
 theorem rpow_nonneg (hA : 0 ≤ A) {p : ℝ} : 0 ≤ A ^ p := by
-  convert HermitianMat.zero_le_cfc_of_zero_le hA _;
+  convert zero_le_cfc_of_zero_le hA _
   exact fun i hi => Real.rpow_nonneg hi p
 
 theorem inv_eq_rpow_neg_one (hA : A.mat.PosDef) : A⁻¹ = A ^ (-1 : ℝ) := by

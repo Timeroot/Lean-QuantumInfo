@@ -41,7 +41,7 @@ def IsMaximal (r : ResourceTheory ι) : Prop :=
 /-- A resource theory `IsTensorial` if it includes tensor products of operations, creating
 free states, and discarding. This implies that includes a unit object. -/
 structure IsTensorial [UnitalPretheory ι] : Prop where
-  prod :  ∀ {i j k l : ι} {f g}, f ∈ freeOps i k → g ∈ freeOps j l → (f ⊗ₖᵣ g) ∈ freeOps (prod i j) (prod k l)
+  prod :  ∀ {i j k l : ι} {f g}, f ∈ freeOps i k → g ∈ freeOps j l → (f ⊗ᶜᵖᵣ g) ∈ freeOps (prod i j) (prod k l)
   create : ∀ {i : ι} (ρ), IsFree ρ → CPTPMap.replacement ρ ∈ freeOps Unital.unit i
   destroy : ∀ (i : ι), CPTPMap.destroy ∈ freeOps i Unital.unit
 

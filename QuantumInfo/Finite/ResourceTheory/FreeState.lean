@@ -93,13 +93,13 @@ theorem prodRelabel_relabel_cast_prod
   rfl
 
 /-- The `prod` operation of `ResourcePretheory` gives the natural product operation on `CPTPMap`s. Accessible
-by the notation `M₁ ⊗ₖᵣ M₂`. -/
+by the notation `M₁ ⊗ᶜᵖᵣ M₂`. -/
 noncomputable def prodCPTPMap (M₁ : CPTPMap (H i) (H j)) (M₂ : CPTPMap (H k) (H l)) :
     CPTPMap (H (i * k)) (H (j * l)) :=
-  (CPTPMap.ofEquiv (prodEquiv j l).symm).compose ((M₁ ⊗ₖ M₂).compose (CPTPMap.ofEquiv (prodEquiv i k)))
+  (CPTPMap.ofEquiv (prodEquiv j l).symm).compose ((M₁ ⊗ᶜᵖ M₂).compose (CPTPMap.ofEquiv (prodEquiv i k)))
 
 @[inherit_doc]
-scoped notation M₁ " ⊗ₖᵣ " M₂ => prodCPTPMap M₁ M₂
+scoped notation M₁ " ⊗ᶜᵖᵣ " M₂ => prodCPTPMap M₁ M₂
 
 open ComplexOrder in
 theorem PosDef.prod {ρ : MState (H i)} {σ : MState (H j)} (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
