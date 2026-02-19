@@ -1349,13 +1349,17 @@ Kronecker products (tensor products) are fundamental in quantum information theo
 ### Product Notations by Type
 
 | Type | Notation | Input Types | Output Type | Scope |
-|------|----------|-------------|-------------|-------|
+|------|----------|-------------|-------------|-------|a
+| **Matrix** | `⊗ₖ` | `Matrix A B R`, `Matrix C D R` | `Matrix (A×B) (C×D) R` | `Kronecker` |
 | **Ket** | `⊗ᵠ` | `Ket d₁`, `Ket d₂` | `Ket (d₁ × d₂)` | default |
 | **MState** | `⊗ᴹ` | `MState d₁`, `MState d₂` | `MState (d₁ × d₂)` | default |
-| **HermitianMat** | `⊗ₖ` | `HermitianMat m 𝕜`, `HermitianMat n 𝕜` | `HermitianMat (m × n) 𝕜` | `HermitianMat` |
+| **HermitianMat** | `⊗ₖ` | `HermitianMat m 𝕜`, `Hermitia(nMat n 𝕜` | `HermitianMat (m × n) 𝕜` | `HermitianMat` |
 | **CPTPMap** | `⊗ᶜᵖ` | `CPTPMap dIn₁ dOut₁`, `CPTPMap dIn₂ dOut₂` | `CPTPMap (dIn₁×dIn₂) (dOut₁×dOut₂)` | default |
 | **MatrixMap** | `⊗ₖₘ` | `MatrixMap A B R`, `MatrixMap C D R` | `MatrixMap (A×C) (B×D) R` | `MatrixMap` |
-| **Unitary** | `⊗ᵤ` | Unitary, Unitary | Unitary on product | qubit-specific |
+| **Unitary** | `⊗ᵤ` | Unitary, Unitary | Unitary on product | `Matrix` |
+| **Categorical** | `⊗ᵣ` | `MState (H i)`, `MState (H j)` | MState (H (i * j)) | `ResourcePretheory` |
+
+The first of these, for bare matrices, comes from Mathlib. The last of these is used in the context of quantum resource theories (or, more generally, categorical quantum mechanics) where there is a _product isomorphism_; this product gives a state on the corresponding Hilbert space identified by the category, as opposed to a Hilbert space indexed by Lean's `Prod` type.
 
 **Why different notations?**
 - Avoids ambiguity when multiple products are in scope
@@ -1462,7 +1466,7 @@ Creates `n` identical copies on the type `Fin n → d`.
 | Notation | Meaning | Type | Scope |
 |----------|---------|------|-------|
 | `ρ₁ ⊗ᵣ ρ₂` | Resource-theoretic product | `MState (H (i * j))` | resource theory |
-| `M₁ ⊗ₖᵣ M₂` | RT channel product | `CPTPMap ...` | resource theory |
+| `M₁ ⊗ᶜᵖᵣ M₂` | RT channel product | `CPTPMap ...` | resource theory |
 | `i ⊗^H[n]` | n-fold RT space power | Space type | resource theory |
 | `ρ ⊗ᵣ^[n]` | n-fold RT state power | `MState (H (i ^ n))` | resource theory |
 | `𝑅ᵣ` | Relative entropy resource measure | `ℝ` | resource theory |
@@ -1481,7 +1485,7 @@ open scoped Braket        -- enables ∣ψ〉, 〈ψ∣, etc.
 
 ---
 
-## Major Theorems
+## Some Theorems
 
 ### Operator Theory
 
