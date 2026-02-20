@@ -24,31 +24,173 @@ Then instead of proving many theorems (like DPI, relabelling, additivity, etc.) 
 it for this one quantity, then it follows for other quantities (like the relative entropy) as a special case.
 -/
 
-theorem inner_log_sub_log_nonneg (h : σ.M.ker ≤ ρ.M.ker) :
-    0 ≤ ⟪ρ.M, ρ.M.log - σ.M.log⟫ := by
-  sorry
+--PULLOUT to CFC.lean
+theorem HermitianMat.spectrum_cfc_eq_image (A : HermitianMat d 𝕜) (f : ℝ → ℝ) :
+    spectrum ℝ (A.cfc f).mat = f '' (spectrum ℝ A.mat) := by
+  exact cfc_map_spectrum f A.mat
+
+theorem Matrix.IsHermitian.spectrum_rcLike {A : Matrix d d 𝕜} (hA : A.IsHermitian) :
+    RCLike.ofReal '' spectrum ℝ A = spectrum 𝕜 A := by
+  rw [hA.spectrum_eq_image_range, hA.spectrum_real_eq_range_eigenvalues]
+
+/-- We fix a simp-normal form that, for HermitianMat, we always work in terms
+of the real spectrum. -/
+@[simp]
+theorem HermitianMat.spectrum_rcLike (A : HermitianMat d 𝕜) :
+    spectrum 𝕜 A.mat = RCLike.ofReal '' spectrum ℝ A.mat := by
+  exact A.H.spectrum_rcLike.symm
+
+theorem HermitianMat.posSemidef_iff_spectrum_Ici (A : HermitianMat d 𝕜) :
+    0 ≤ A ↔ spectrum ℝ A.mat ⊆ Set.Ici 0 := by
+  rw [zero_le_iff, Matrix.posSemidef_iff_isHermitian_and_spectrum_nonneg]
+  simp [A.H, Set.Ici.eq_1]
+
+theorem HermitianMat.posSemidef_iff_spectrum_nonneg (A : HermitianMat d 𝕜) :
+    0 ≤ A ↔ ∀ x ∈ spectrum ℝ A.mat, 0 ≤ x := by
+  exact A.posSemidef_iff_spectrum_Ici
+
+theorem HermitianMat.ne_zero_iff_ne_zero_spectrum (A : HermitianMat d 𝕜) :
+    A ≠ 0 ↔ ∃ x ∈ spectrum ℝ A.mat, x ≠ 0 := by
+  constructor;
+  · intro h_nonzero
+    contrapose! h_nonzero
+    simp only [HermitianMat.ext_iff, mat_zero]
+    rw [A.H.spectral_theorem]
+    ext i j
+    simp [Matrix.mul_apply, Matrix.diagonal]
+    refine Finset.sum_eq_zero fun x _ ↦ ?_
+    simp [h_nonzero _ <| A.H.spectrum_real_eq_range_eigenvalues.symm ▸ Set.mem_range_self _]
+  · rintro ⟨x, hx, hx'⟩ h
+    simp [h, spectrum, resolventSet, Algebra.algebraMap_eq_smul_one,
+      hx', Matrix.isUnit_iff_isUnit_det] at hx
 
 --PULLOUT to CfcOrder.lean
-theorem HermitianMat.cfc_pos_of_pos {A : HermitianMat d ℂ} {f : ℝ → ℝ} (hA : 0 < A)
+theorem HermitianMat.cfc_pos_of_pos {A : HermitianMat d 𝕜} {f : ℝ → ℝ} (hA : 0 < A)
     (hf : ∀ i > 0, 0 < f i) (hf₂ : 0 ≤ f 0) : 0 < A.cfc f := by
-  sorry
+  have h_pos := (posSemidef_iff_spectrum_nonneg A).mp hA.le
+  have h_f_pos : ∃ x ∈ spectrum ℝ (A.cfc f).mat, x ≠ 0 := by
+    obtain ⟨ x, hx₁, hx₂ ⟩ := ne_zero_iff_ne_zero_spectrum A |>.1 hA.ne'
+    exact ⟨ f x, by simpa using HermitianMat.spectrum_cfc_eq_image A f ▸ Set.mem_image_of_mem f hx₁, by cases lt_or_gt_of_ne hx₂ <;> linarith [ hf x ( lt_of_le_of_ne ( h_pos x hx₁ ) ( Ne.symm hx₂ ) ) ] ⟩;
+  have h_f_nonneg : 0 ≤ A.cfc f := by
+    rw [HermitianMat.posSemidef_iff_spectrum_nonneg];
+    rw [ HermitianMat.spectrum_cfc_eq_image ];
+    rintro _ ⟨ x, hx, rfl ⟩ ; exact if hx0 : x = 0 then by simpa [ hx0 ] using hf₂ else hf x ( lt_of_le_of_ne ( h_pos x hx ) ( Ne.symm hx0 ) ) |> le_of_lt;
+  have h_f_nonzero : A.cfc f ≠ 0 := by
+    contrapose! h_f_pos;
+    simp [h_f_pos, spectrum.mem_iff, Matrix.isUnit_iff_isUnit_det, Algebra.algebraMap_eq_smul_one]
+  exact lt_of_le_of_ne h_f_nonneg h_f_nonzero.symm
 
 --PULLOUT to CfcOrder.lean
-theorem HermitianMat.rpow_pos {A : HermitianMat d ℂ} (hA : 0 < A) {p : ℝ} : 0 < A ^ p := by
+theorem HermitianMat.rpow_pos {A : HermitianMat d 𝕜} (hA : 0 < A) {p : ℝ} : 0 < A ^ p := by
   convert cfc_pos_of_pos hA _ _
   · exact fun i hi => Real.rpow_pos_of_pos hi _
   · rcases eq_or_ne p 0 with h | h <;> simp [h]
 
---PULLOUT to HermitianMat/Order.lean
---TODO: Upgrade to an Iff
-theorem HermitianMat.conj_ne_zero {A : HermitianMat d ℂ} {M : Matrix d d ℂ}
-    (h : LinearMap.ker M.toEuclideanLin ≤ A.ker) : A.conj M ≠ 0 := by
-  sorry
+/-
+If the range of a Hermitian matrix is contained in its kernel, the matrix is zero.
+-/
+theorem HermitianMat.range_le_ker_imp_zero {A : HermitianMat d 𝕜}
+    (h : LinearMap.range A.mat.toEuclideanLin ≤ LinearMap.ker A.mat.toEuclideanLin) : A = 0 := by
+  rw [HermitianMat.ext_iff, mat_zero]
+  ext i j
+  have hA_sq : (A.mat * A.mat) = 0 := by
+    simp_all only [SetLike.le_def, LinearMap.mem_range, LinearMap.mem_ker, forall_exists_index,
+      forall_apply_eq_imp_iff]
+    simp_all only [← Matrix.ext_iff, Matrix.mul_apply, mat_apply, Matrix.zero_apply]
+    intro i j
+    specialize h ( EuclideanSpace.single j 1 )
+    simp_all only [Matrix.toEuclideanLin, LinearEquiv.trans_apply, LinearEquiv.arrowCongr_apply,
+      LinearEquiv.symm_symm, WithLp.linearEquiv_apply, EuclideanSpace.ofLp_single,
+      Matrix.toLin'_apply, Matrix.mulVec_single, MulOpposite.op_one, one_smul,
+      WithLp.linearEquiv_symm_apply, WithLp.ofLp_toLp, WithLp.toLp_eq_zero] ;
+    simpa [ Matrix.mulVec, dotProduct ] using congr_fun h i;
+  simp_all only [mat_apply, Matrix.zero_apply]
+  replace hA_sq := congr_fun ( congr_fun hA_sq i ) i
+  simp_all only [Matrix.mul_apply, mat_apply, Matrix.zero_apply] ;
+  -- Since $A$ is Hermitian, we have $A i x * A x i = |A i x|^2$.
+  have h_abs : ∀ x, (A i x) * (A x i) = ‖A i x‖ ^ 2 := by
+    intro x; have := A.2
+    simp_all only [val_eq_coe, sq] ;
+    have := congr_fun ( congr_fun this i ) x
+    simp_all only [Matrix.star_apply, mat_apply, RCLike.star_def] ;
+    simp only [← this, mul_comm, RCLike.norm_conj];
+    simp [ ← sq, RCLike.mul_conj ];
+  simp_rw [h_abs] at hA_sq
+  norm_cast at hA_sq
+  simp_all [Finset.sum_eq_zero_iff_of_nonneg]
+
+/--
+If ker M ⊆ ker A, then range (A Mᴴ) = range A.
+-/
+theorem Matrix.range_mul_conjTranspose_of_ker_le_ker {A : Matrix d d 𝕜} {M : Matrix d₂ d 𝕜}
+    (h : LinearMap.ker M.toEuclideanLin ≤ LinearMap.ker A.toEuclideanLin) :
+    LinearMap.range (A * M.conjTranspose).toEuclideanLin = LinearMap.range A.toEuclideanLin := by
+  apply le_antisymm
+  · rintro x ⟨y, rfl⟩
+    use (M.conjTranspose.toEuclideanLin) y;
+    simp [Matrix.toEuclideanLin]
+  · intro x hx;
+    -- Since $x \in \text{range}(A)$, there exists $y \in \text{range}(Mᴴ)$ such that $A y = x$.
+    obtain ⟨y, hy⟩ : ∃ y ∈ LinearMap.range (Matrix.toEuclideanLin (M.conjTranspose)), A.toEuclideanLin y = x := by
+      have h_range_MH : LinearMap.range (Matrix.toEuclideanLin (M.conjTranspose)) = (LinearMap.ker (Matrix.toEuclideanLin M))ᗮ := by
+        have h_orthogonal : (LinearMap.range (Matrix.toEuclideanLin (M.conjTranspose)))ᗮ = LinearMap.ker (Matrix.toEuclideanLin M) := by
+          ext x;
+          simp only [toEuclideanLin, LinearEquiv.trans_apply, Submodule.mem_orthogonal',
+            LinearMap.mem_range, LinearEquiv.arrowCongr_apply, LinearEquiv.symm_symm,
+            WithLp.linearEquiv_apply, toLin'_apply, WithLp.linearEquiv_symm_apply,
+            forall_exists_index, forall_apply_eq_imp_iff, LinearMap.mem_ker, WithLp.toLp_eq_zero];
+          simp only [EuclideanSpace.inner_eq_star_dotProduct, dotProduct, PiLp.ofLp_apply,
+            PiLp.toLp_apply, mulVec, conjTranspose_apply, RCLike.star_def, Pi.star_apply];
+          simp only [funext_iff, mulVec, dotProduct, PiLp.ofLp_apply, Pi.zero_apply];
+          constructor <;> intro h;
+          · intro i; specialize h ( Pi.single i 1 )
+            simp_all only [LinearMap.mem_range] ;
+            simp_all only [Pi.single_apply, mul_ite, mul_one, mul_zero, Finset.sum_ite_eq',
+              Finset.mem_univ, ↓reduceIte];
+            simpa [ ← map_sum, ← map_mul ] using congr_arg Star.star h;
+          · simp [ mul_comm, mul_left_comm, Finset.mul_sum]
+            intro a
+            rw [Finset.sum_comm]
+            simp only [← Finset.mul_sum]
+            simp_all [← map_mul, ← map_sum ];
+        rw [← h_orthogonal, Submodule.orthogonal_orthogonal]
+      obtain ⟨ y, rfl ⟩ := hx;
+      -- Since $y$ is in the range of $Mᴴ$, we can write $y$ as $y = y_1 + y_2$ where $y_1 \in \text{range}(Mᴴ)$ and $y_2 \in \text{ker}(M)$.
+      obtain ⟨y1, y2, hy1, hy2, hy⟩ : ∃ y1 y2 : EuclideanSpace 𝕜 d, y1 ∈ LinearMap.range (Matrix.toEuclideanLin (M.conjTranspose)) ∧ y2 ∈ LinearMap.ker (Matrix.toEuclideanLin M) ∧ y = y1 + y2 := by
+        have h_decomp : ∀ y : EuclideanSpace 𝕜 d, ∃ y1 ∈ LinearMap.range (Matrix.toEuclideanLin (M.conjTranspose)), ∃ y2 ∈ LinearMap.ker (Matrix.toEuclideanLin M), y = y1 + y2 := by
+          intro y
+          have h_decomp : y ∈ (LinearMap.range (Matrix.toEuclideanLin (M.conjTranspose))) ⊔ (LinearMap.ker (Matrix.toEuclideanLin M)) := by
+            rw [ h_range_MH ];
+            rw [ sup_comm, Submodule.sup_orthogonal_of_hasOrthogonalProjection ];
+            exact Submodule.mem_top;
+          rw [ Submodule.mem_sup ] at h_decomp ; tauto;
+        exact ⟨ _, _, h_decomp y |> Classical.choose_spec |> And.left, h_decomp y |> Classical.choose_spec |> And.right |> Classical.choose_spec |> And.left, h_decomp y |> Classical.choose_spec |> And.right |> Classical.choose_spec |> And.right ⟩;
+      exact ⟨ y1, hy1, by rw [ hy, map_add, LinearMap.mem_ker.mp ( h hy2 ) ] ; simp ⟩;
+    obtain ⟨ z, rfl ⟩ := hy.1;
+    exact ⟨ z, by simpa [ Matrix.toEuclideanLin ] using hy.2 ⟩
 
 --PULLOUT to HermitianMat/Order.lean
-theorem HermitianMat.conj_pos {A : HermitianMat d ℂ} {M : Matrix d d ℂ} (hA : 0 < A)
+theorem HermitianMat.conj_ne_zero {A : HermitianMat d 𝕜} {M : Matrix d₂ d 𝕜} (hA : A ≠ 0)
+    (h : LinearMap.ker M.toEuclideanLin ≤ A.ker) : A.conj M ≠ 0 := by
+  by_contra h_contra
+  have h_range : LinearMap.range A.mat.toEuclideanLin ≤ LinearMap.ker A.mat.toEuclideanLin := by
+    have h_range : LinearMap.range (A.mat * M.conjTranspose).toEuclideanLin ≤ LinearMap.ker M.toEuclideanLin := by
+      rintro x ⟨y, rfl⟩
+      replace h_contra := congr($(h_contra).mat)
+      simp_all [Matrix.toEuclideanLin_apply, Matrix.mul_assoc]
+    rw [← Matrix.range_mul_conjTranspose_of_ker_le_ker h]
+    exact h_range.trans h
+  exact hA (range_le_ker_imp_zero h_range)
+
+theorem HermitianMat.conj_ne_zero_iff {A : HermitianMat d 𝕜} {M : Matrix d₂ d 𝕜}
+    (h : LinearMap.ker M.toEuclideanLin ≤ A.ker) : A.conj M ≠ 0 ↔ A ≠ 0  := by
+  refine ⟨?_, (conj_ne_zero · h)⟩
+  intro h rfl; simp at h--should be grind[= map_zero] but I don't know why. TODO.
+
+--PULLOUT to HermitianMat/Order.lean
+theorem HermitianMat.conj_pos {A : HermitianMat d 𝕜} {M : Matrix d₂ d 𝕜} (hA : 0 < A)
     (h : LinearMap.ker M.toEuclideanLin ≤ A.ker) : 0 < A.conj M := by
-  exact (A.conj_nonneg M hA.le).lt_of_ne' (A.conj_ne_zero h)
+  exact (A.conj_nonneg M hA.le).lt_of_ne' (A.conj_ne_zero hA.ne' h)
 
 --PULLOUT to MState.lean. TODO: Rename to `pos`, and rename the existing `MState.pos` to `nonneg`.
 theorem MState.pos' {ρ : MState d} : 0 < ρ.M := by
@@ -57,22 +199,152 @@ theorem MState.pos' {ρ : MState d} : 0 < ρ.M := by
   have := ρ.tr
   simp [h] at this
 
---PULLOUT to HermitianMat/CFC.lean
-theorem HermitianMat.ker_cfc_of_iff_zero {A : HermitianMat d ℂ} {f : ℝ → ℝ}
-    (h : ∀ i, f i = 0 → i = 0) :
-    (A.cfc f).ker = A.ker := by
-  sorry
+lemma HermitianMat.mulVec_eq_zero_iff_inner_eigenvector_zero
+    (A : HermitianMat d ℂ) (x : EuclideanSpace ℂ d) :
+    A.mat.mulVec x = 0 ↔ ∀ i, A.H.eigenvalues i ≠ 0 → inner ℂ (A.H.eigenvectorBasis i) x = 0 := by
+  constructor <;> intro h
+  · simp only [ne_eq]
+    intro i hi; have := A.2;
+    simp_all only [val_eq_coe] ;
+    have := Matrix.IsHermitian.mulVec_eigenvectorBasis A.2 i;
+    replace this := congr_arg ( fun y => inner ℂ y x ) this
+    simp only [val_eq_coe, CStarModule.inner_smul_left_real, Complex.real_smul] at this;
+    rename_i this1
+    simp only [selfAdjoint, AddSubgroup.mem_mk, AddSubmonoid.mem_mk, AddSubsemigroup.mem_mk,
+      Set.mem_setOf_eq] at this1
+    simp only [IsSelfAdjoint] at this1
+    simp only [inner, Matrix.mulVec, dotProduct, mat_apply, PiLp.ofLp_apply, map_sum,
+      map_mul] at this ⊢
+    simp only [funext_iff, Pi.zero_apply, ← Matrix.ext_iff, Matrix.star_apply, mat_apply,
+      RCLike.star_def] at this this1 h
+    simp_all only [Matrix.mulVec, dotProduct, mat_apply, mul_comm, Finset.mul_sum, mul_left_comm];
+    rw [ Finset.sum_comm ] at this
+    simp_all only [← mul_assoc, ← Finset.sum_mul, zero_mul, Finset.sum_const_zero] ;
+    rw [ eq_comm ] at this
+    simp_all only [mul_assoc] ;
+    rw [ ← Finset.sum_congr rfl fun _ _ => by rw [ mul_left_comm ] ] at this
+    simp_all [← Finset.mul_sum]
+  · ext i
+    replace this := congr_arg ( fun m => m.mulVec x i ) A.H.spectral_theorem
+    simp_all only [ne_eq, Matrix.mulVec, mat_apply, Complex.coe_algebraMap,
+      Matrix.mul_assoc, Pi.zero_apply];
+    simp_all only [dotProduct, Matrix.mul_apply, Matrix.IsHermitian.eigenvectorUnitary_apply,
+      PiLp.ofLp_apply, Matrix.star_apply, RCLike.star_def];
+    simp_all only [Matrix.diagonal, Function.comp_apply, Matrix.of_apply, ite_mul,
+      zero_mul, Finset.sum_ite_eq, ↓reduceIte, mul_left_comm, Finset.sum_mul, mul_assoc];
+    rw [ Finset.sum_comm ];
+    refine' Finset.sum_eq_zero fun j hj => _;
+    by_cases h2 : A.H.eigenvalues j = 0
+    · simp_all only [mul_comm, mul_left_comm, Finset.mem_univ, Complex.ofReal_zero, zero_mul,
+        mul_zero, Finset.sum_const_zero];
+    simp_all only [mul_comm, mul_left_comm, Finset.mem_univ];
+    convert congr_arg (fun y => A.H.eigenvalues j * (A.H.eigenvectorBasis j i) * y) (h j h2) using 1
+    · simp [mul_comm, mul_left_comm, Finset.mul_sum, inner]
+    · ring
+
+lemma HermitianMat.cfc_mulVec_expansion (A : HermitianMat d ℂ) (f : ℝ → ℝ) (x : EuclideanSpace ℂ d) :
+    (A.cfc f).mat.mulVec x = ∑ i, (f (A.H.eigenvalues i) : ℂ) • inner ℂ (A.H.eigenvectorBasis i) x • A.H.eigenvectorBasis i := by
+  have h_apply : ∀ i, (Matrix.mulVec (A.H.eigenvectorUnitary.val * (Matrix.single i i 1) * A.H.eigenvectorUnitary.val.conjTranspose) x) = (⟪(A.H.eigenvectorBasis i), x⟫_ℂ) • (A.H.eigenvectorBasis i) := by
+    intro i
+    have h_apply : (Matrix.mulVec (A.H.eigenvectorUnitary.val * (Matrix.single i i 1) * A.H.eigenvectorUnitary.val.conjTranspose) x) = (A.H.eigenvectorUnitary.val * (Matrix.single i i 1) * A.H.eigenvectorUnitary.val.conjTranspose).mulVec x := by
+      rfl;
+    ext j; simp [ Matrix.mulVec, dotProduct, inner ]
+    ring_nf
+    simp [ Matrix.mul_apply, Matrix.single, Finset.sum_mul _ _ _ ]
+    ring_nf
+    rw [ Finset.sum_congr rfl fun _ _ => Finset.sum_congr rfl fun _ _ => Finset.sum_eq_single i ( by aesop ) ( by aesop ) ]
+    simp [ mul_comm, mul_left_comm ]
+  have h_apply : (A.cfc f).mat = ∑ i, (f (A.H.eigenvalues i) : ℂ) • (A.H.eigenvectorUnitary.val * (Matrix.single i i 1) * A.H.eigenvectorUnitary.val.conjTranspose) := by
+    exact cfc_toMat_eq_sum_smul_proj A f;
+  simp only [h_apply, Complex.coe_smul];
+  simp only [mul_assoc, ← ‹∀ i, _›];
+  ext i; simp only [Matrix.mulVec, dotProduct] ;
+  simp only [Matrix.sum_apply, Matrix.smul_apply, Complex.real_smul, Finset.sum_mul];
+  rw [ Finset.sum_apply ];
+  rw [ Finset.sum_comm ];
+  simp only [mul_assoc, PiLp.smul_apply, Matrix.mulVec, dotProduct, Complex.real_smul,
+    Finset.mul_sum]
+
+section ker_cfc
+
+variable {A : HermitianMat d ℂ} {f : ℝ → ℝ} {s : Set ℝ}
+
+lemma HermitianMat.ker_cfc_le_ker_on_set
+    (hs : spectrum ℝ A.mat ⊆ s)
+    (h : ∀ i ∈ s, f i = 0 → i = 0) :
+    (A.cfc f).ker ≤ A.ker := by
+  intro x hx
+  have h_f_nonzero : ∀ i, A.H.eigenvalues i ≠ 0 → f (A.H.eigenvalues i) ≠ 0 := by
+    refine fun i hi => fun hi' => hi (h _ ?_ hi')
+    rw [A.H.spectrum_real_eq_range_eigenvalues] at hs
+    grind only [= Set.mem_range, = Set.subset_def]
+  apply (A.mulVec_eq_zero_iff_inner_eigenvector_zero x).mpr
+  intro i hi
+  have h_coeff : (f (A.H.eigenvalues i) : ℂ) • inner ℂ (A.H.eigenvectorBasis i) x = 0 := by
+    have h_coeff : ∑ j, (f (A.H.eigenvalues j) : ℂ) • inner ℂ (A.H.eigenvectorBasis j) x • A.H.eigenvectorBasis j = 0 := by
+      convert congr_arg ( fun y => y ) ( show ( A.cfc f ).mat.mulVec x = 0 from by simpa [ Matrix.mulVec ] using hx ) using 1;
+      convert A.cfc_mulVec_expansion f x |> Eq.symm using 1;
+    apply_fun (fun y => inner ℂ (A.H.eigenvectorBasis i) y) at h_coeff;
+    simp_all [ orthonormal_iff_ite.mp ( A.H.eigenvectorBasis.orthonormal ) ];
+  exact smul_eq_zero.mp h_coeff |> Or.resolve_left <| mod_cast h_f_nonzero i hi
+
+lemma HermitianMat.ker_cfc_le_ker (h : ∀ i, f i = 0 → i = 0) :
+    (A.cfc f).ker ≤ A.ker := by
+  exact ker_cfc_le_ker_on_set (Set.subset_univ _) (by simpa using h)
+
+lemma HermitianMat.ker_cfc_le_ker_nonneg (hA : 0 ≤ A) (h : ∀ i ≥ 0, f i = 0 → i = 0) :
+    (A.cfc f).ker ≤ A.ker := by
+  rw [posSemidef_iff_spectrum_Ici] at hA
+  exact ker_cfc_le_ker_on_set hA h
+
+lemma HermitianMat.ker_le_ker_cfc_on_set (hs : spectrum ℝ A.mat ⊆ s) (h : ∀ i ∈ s, i = 0 → f i = 0) :
+    A.ker ≤ (A.cfc f).ker := by
+  intro x hx;
+  have h_inner_zero : ∀ i, f (A.H.eigenvalues i) ≠ 0 → inner ℂ (A.H.eigenvectorBasis i) x = 0 := by
+    intro i hi
+    have h_inner_zero : A.H.eigenvalues i ≠ 0 := by
+      refine fun hi' => hi <| h _ ?_ hi'
+      rw [A.H.spectrum_real_eq_range_eigenvalues] at hs
+      grind only [= Set.mem_range, = Set.subset_def]
+    exact HermitianMat.mulVec_eq_zero_iff_inner_eigenvector_zero A x |>.1 hx i h_inner_zero;
+  have h_inner_zero : (A.cfc f).mat.mulVec x = 0 := by
+    rw [HermitianMat.cfc_mulVec_expansion];
+    refine Finset.sum_eq_zero fun i _ => ?_
+    by_cases hi : f ( A.H.eigenvalues i ) = 0
+    · simp_all only [ne_eq, Finset.mem_univ, Complex.coe_smul, smul_eq_zero, true_or]
+    · simp_all only [ne_eq, Finset.mem_univ, not_false_eq_true, zero_smul, smul_zero]
+  exact h_inner_zero
+
+lemma HermitianMat.ker_le_ker_cfc (h : ∀ i, i = 0 → f i = 0) :
+    A.ker ≤ (A.cfc f).ker := by
+  exact ker_le_ker_cfc_on_set (Set.subset_univ _) (by simpa using h)
+
+lemma HermitianMat.ker_le_ker_cfc_nonneg (hA : 0 ≤ A) (h : ∀ i ≥ 0, i = 0 → f i = 0) :
+    A.ker ≤ (A.cfc f).ker := by
+  rw [posSemidef_iff_spectrum_Ici] at hA
+  exact ker_le_ker_cfc_on_set hA h
 
 --PULLOUT to HermitianMat/CFC.lean
-theorem HermitianMat.ker_cfc_of_nonneg_iff_zero {A : HermitianMat d ℂ} {f : ℝ → ℝ} (hA : 0 ≤ A)
-    (h : ∀ i ≥ 0, f i = 0 → i = 0) :
+theorem HermitianMat.ker_cfc_eq_ker (h : ∀ i, f i = 0 ↔ i = 0) :
     (A.cfc f).ker = A.ker := by
-  sorry
+  refine le_antisymm (ker_cfc_le_ker ?_) (ker_le_ker_cfc ?_)
+  <;> grind only
 
 --PULLOUT to HermitianMat/CFC.lean
-theorem HermitianMat.ker_rpow_of_nonneg {A : HermitianMat d ℂ} {p : ℝ} (hA : 0 ≤ A):
+theorem HermitianMat.ker_cfc_eq_ker_nonneg (hA : 0 ≤ A) (h : ∀ i ≥ 0, f i = 0 ↔ i = 0) :
+    (A.cfc f).ker = A.ker := by
+  refine le_antisymm (ker_cfc_le_ker_nonneg hA ?_) (ker_le_ker_cfc_nonneg hA ?_)
+  <;> grind only
+
+--PULLOUT to HermitianMat/CFC.lean
+theorem HermitianMat.ker_rpow_eq_of_nonneg {A : HermitianMat d ℂ} {p : ℝ} (hA : 0 ≤ A) (hp : p ≠ 0):
     (A ^ p).ker = A.ker := by
-  apply A.ker_cfc_of_nonneg_iff_zero hA
+  apply A.ker_cfc_eq_ker_nonneg hA
+  grind [Real.rpow_eq_zero_iff_of_nonneg, Real.rpow_eq_pow]
+
+theorem HermitianMat.ker_rpow_le_of_nonneg {A : HermitianMat d ℂ} {p : ℝ} (hA : 0 ≤ A):
+    (A ^ p).ker ≤ A.ker := by
+  apply A.ker_cfc_le_ker_nonneg hA
   grind [Real.rpow_eq_zero_iff_of_nonneg, Real.rpow_eq_pow]
 
 --Note: without the assumption `h`, we could still get nonnegativity, just not strict positivity.
@@ -81,8 +353,8 @@ private theorem sandwiched_trace_pos (h : σ.M.ker ≤ ρ.M.ker) :
   apply HermitianMat.trace_pos
   apply HermitianMat.rpow_pos
   apply HermitianMat.conj_pos ρ.pos'
-  convert h using 1
-  exact HermitianMat.ker_rpow_of_nonneg σ.zero_le
+  grw [← h]
+  exact HermitianMat.ker_rpow_le_of_nonneg σ.zero_le
 
 private theorem sandwiched_trace_of_lt_1 (h : σ.M.ker ≤ ρ.M.ker) (hα : α < 1) :
     ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).mat) ^ α).trace ≤ 1 := by
@@ -105,6 +377,10 @@ private theorem sandwichedRelRentropy_nonneg_α_gt_1 (h : σ.M.ker ≤ ρ.M.ker)
   grw [← sandwiched_trace_of_gt_1 h hα]
   · simp
   · linarith
+
+theorem inner_log_sub_log_nonneg (h : σ.M.ker ≤ ρ.M.ker) :
+    0 ≤ ⟪ρ.M, ρ.M.log - σ.M.log⟫ := by
+  sorry
 
 theorem sandwichedRelRentropy_nonneg (α : ℝ) (h : σ.M.ker ≤ ρ.M.ker) :
     0 ≤ if α = 1 then ⟪ρ.M, ρ.M.log - σ.M.log⟫
@@ -463,6 +739,31 @@ lemma HermitianMat.inner_supportProj_of_ker_le (A B : HermitianMat d ℂ)
   (h : LinearMap.ker B.lin ≤ LinearMap.ker A.lin) :
     ⟪A, B.supportProj⟫ = A.trace := by
   rw [inner_def, mul_supportProj_of_ker_le A B h, trace]
+
+attribute [fun_prop] ContinuousAt.rpow
+
+lemma continuousOn_rpow_uniform {K : Set ℝ} (hK : IsCompact K) :
+    ContinuousOn (fun r : ℝ ↦ UniformOnFun.ofFun {K} (fun t : ℝ ↦ t ^ r)) (Set.Ioi 0) := by
+  refine continuousOn_of_forall_continuousAt fun r hr => ?_
+  rw [Set.mem_Ioi] at hr
+  apply UniformOnFun.tendsto_iff_tendstoUniformlyOn.mpr
+  simp only [Set.mem_singleton_iff, UniformOnFun.toFun_ofFun, Metric.tendstoUniformlyOn_iff,
+    Function.comp_apply, forall_eq]
+  intro ε hεpos;
+  have h_unif_cont : UniformContinuousOn (fun (p : ℝ × ℝ) => p.1 ^ p.2) (K ×ˢ Set.Icc (r / 2) (r * 2)) := by
+    apply IsCompact.uniformContinuousOn_of_continuous
+    · exact hK.prod CompactIccSpace.isCompact_Icc
+    · refine continuousOn_of_forall_continuousAt fun p ⟨hp₁, ⟨hp₂₁, hp₂₂⟩⟩ ↦ ?_
+      have _ : p.1 ≠ 0 ∨ 0 < p.2 := by right; linarith
+      fun_prop (disch := assumption)
+  rw [Metric.uniformContinuousOn_iff] at h_unif_cont
+  obtain ⟨δ, hδpos, H⟩ := h_unif_cont ε hεpos
+  filter_upwards [Ioo_mem_nhds (show r / 2 < r by linarith) (show r < r * 2 by linarith), Ioo_mem_nhds (show r - δ < r by linarith) (show r < r + δ by linarith)] with n ⟨_, _⟩ ⟨_, _⟩ x hx
+  refine H (x, r) ⟨hx, ?_⟩ (x, n) ⟨hx, ?_⟩ ?_
+  · constructor <;> linarith
+  · constructor <;> linarith
+  · have : |r - n| < δ := abs_lt.mpr ⟨by linarith, by linarith⟩
+    simpa
 
 theorem sandwichedRelRentropy_additive_alpha_one_aux (ρ₁ σ₁ : MState d₁) (ρ₂ σ₂ : MState d₂)
   (h1 : σ₁.M.ker ≤ ρ₁.M.ker) (h2 : σ₂.M.ker ≤ ρ₂.M.ker) :
