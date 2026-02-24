@@ -22,12 +22,11 @@ namespace MState
 def fidelity (ρ σ : MState d) : ℝ :=
   ((σ.M.conj ρ.pos.sqrt) ^ (1/2 : ℝ)).trace
 
-set_option maxHeartbeats 0 in
 theorem fidelity_ge_zero : 0 ≤ fidelity ρ σ := by
   -- Apply `HermitianMat.trace_nonneg` to the term inside the square root.
     have h_trace_nonneg : 0 ≤ (σ.M.conj ρ.pos.sqrt) ^ (1 / 2 : ℝ) := by
       apply HermitianMat.rpow_nonneg
-      apply HermitianMat.conj_nonneg σ.zero_le _
+      apply HermitianMat.conj_nonneg _ σ.zero_le
     -- Apply the fact that the trace of a positive semidefinite matrix is non-negative.
     apply HermitianMat.trace_nonneg; assumption
 
@@ -43,7 +42,7 @@ def fidelity_prob : Prob :=
 The square root of the positive semidefinite matrix of a state `ρ` is equal to `ρ` raised to the power of 1/2.
 -/
 theorem MState.pos_sqrt_eq_rpow {d : Type*} [Fintype d] [DecidableEq d] (ρ : MState d) :
-    ρ.pos.sqrt = (ρ.M ^ (1/2 : ℝ)).toMat := by
+    ρ.pos.sqrt = (ρ.M ^ (1/2 : ℝ)).mat := by
   symm
   convert ( ρ.pos.isHermitian.cfc_eq _ ) using 1;
   refine' congr_arg₂ _ ( congr_arg₂ _ rfl _ ) rfl;
@@ -53,9 +52,9 @@ theorem MState.pos_sqrt_eq_rpow {d : Type*} [Fintype d] [DecidableEq d] (ρ : MS
 /-- A state has perfect fidelity with itself. -/
 theorem fidelity_self_eq_one : fidelity ρ ρ = 1 := by
   -- Now use the given definition to simplify the expression.
-    have h_simp : ((ρ.M.conj (ρ.pos.sqrt)) ^ (1/2 : ℝ)).trace = ((ρ.M.conj ((ρ.M ^ (1/2 : ℝ)).toMat)) ^ (1/2 : ℝ)).trace := by
+    have h_simp : ((ρ.M.conj (ρ.pos.sqrt)) ^ (1/2 : ℝ)).trace = ((ρ.M.conj ((ρ.M ^ (1/2 : ℝ)).mat)) ^ (1/2 : ℝ)).trace := by
       rw [ MState.pos_sqrt_eq_rpow ];
-    have h_simp2 : (ρ.M.conj ((ρ.M ^ (1/2 : ℝ)).toMat)) = ρ.M ^ (1 + 2 * (1/2) : ℝ) := by
+    have h_simp2 : (ρ.M.conj ((ρ.M ^ (1/2 : ℝ)).mat)) = ρ.M ^ (1 + 2 * (1/2) : ℝ) := by
       convert HermitianMat.conj_rpow _ _ _;
       · norm_num;
       · exact ρ.zero_le;

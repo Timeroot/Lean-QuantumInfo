@@ -197,12 +197,13 @@ theorem MState.exp_val_pure_eq_one_iff {d : Type*} [Fintype d] [DecidableEq d] (
 theorem mix_mEnsemble_pure_iff_pure {e : MEnsemble d α} :
     mix e = pure ψ ↔ ∀ i : α, e.distr i ≠ 0 → e.states i = MState.pure ψ := by
   have h : (mix e).exp_val ↑(MState.pure ψ) = ∑ i, ↑(e.distr i) * (e.states i).exp_val ↑(MState.pure ψ) := by
-    simp [MState.exp_val, HermitianMat.inner, Finset.sum_mul]
+    simp [MState.exp_val, HermitianMat.inner_def, Finset.sum_mul]
   rw [← MState.exp_val_pure_eq_one_iff, h, sum_prob_mul_eq_one_iff]
   · simp only [MState.exp_val_pure_eq_one_iff, ne_eq, Set.Icc.coe_eq_zero]
   · exact fun i => ( e.distr i ).2.1;
   · simp
-  · exact fun i => MState.exp_val_le_one (MState.le_one _) _
+  · intro i
+    apply (e.states i).exp_val_le_one (MState.le_one _)
 
 /-- The average of `f : MState d → T` on an ensemble that mixes to a pure state `ψ` is `f (pure ψ)` -/
 theorem mix_mEnsemble_pure_average {e : MEnsemble d α} {T : Type _} {U : Type*} [AddCommGroup U] [Module ℝ U] [inst : Mixable U T] (f : MState d → T) (hmix : mix e = pure ψ) :
@@ -277,8 +278,8 @@ instance PEnsemble.instInhabited [Nonempty d] [Inhabited α] : Inhabited (PEnsem
   default := trivial_pEnsemble default default
 
 /-- The spectral pure-state ensemble of `ρ`. The states are its eigenvectors, and the probabilities, eigenvalues. -/
-def spectral_ensemble (ρ : MState d) : PEnsemble d d :=
-  { var i :=
+def spectral_ensemble (ρ : MState d) : PEnsemble d d where
+  var i :=
     { vec := ρ.Hermitian.eigenvectorBasis i
       normalized' := by
         rw [←one_pow 2, ←ρ.Hermitian.eigenvectorBasis.orthonormal.1 i]
@@ -287,7 +288,7 @@ def spectral_ensemble (ρ : MState d) : PEnsemble d d :=
           positivity
         simp only [← Complex.normSq_eq_norm_sq, EuclideanSpace.norm_eq, Real.sq_sqrt hnonneg]
     }
-    distr := ρ.spectrum}
+  distr := ρ.spectrum
 
 --PULLOUT
 theorem spectral_decomposition_sum {d 𝕜 : Type*} [Fintype d] [DecidableEq d] [RCLike 𝕜]

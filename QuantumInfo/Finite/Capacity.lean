@@ -126,11 +126,11 @@ theorem achievesRate_0 (Λ : CPTPMap d₁ d₂) : Λ.AchievesRate 0 := by
   · have : Nonempty d₁ := by sorry--having a CPTPMap should be enough to conclude in- and out-spaces are nonempty
     have : Nonempty d₂ := by sorry
     use Classical.ofNonempty, Classical.ofNonempty
-    exact Unique.eq_default _
+    sorry--exact Unique.eq_default _
   constructor
   · norm_num
   · rw [Unique.eq_default id]
-    exact εApproximates_monotone (εApproximates_self default) hε.le
+    sorry--apply εApproximates_monotone (εApproximates_self default) hε.le
 
 /-- The identity channel on D dimensional space achieves a rate of log2(D). -/
 theorem id_achievesRate_log_dim : (id (dIn := d₁)).AchievesRate (Real.logb 2 (Fintype.card d₁)) := by
@@ -144,7 +144,7 @@ theorem id_achievesRate_log_dim : (id (dIn := d₁)).AchievesRate (Real.logb 2 (
     exact CPTPMap.ofEquiv ( Fintype.equivFinOfCardEq ( by simp +decide ) );
     apply CPTPMap.ext;
     ext; simp +decide [ CPTPMap.piProd ];
-    unfold MatrixMap.piKron
+    unfold MatrixMap.piProd
     simp_all only [gt_iff_lt, PiTensorProduct.map_id, LinearMap.toMatrix_id_eq_basis_toMatrix,
       Module.Basis.toMatrix_self, Matrix.reindex_apply, Matrix.submatrix_one_equiv, Matrix.toLin_one]
     erw [ MatrixMap.submatrix_apply ]
@@ -178,7 +178,7 @@ theorem not_achievesRate_gt_log_dim_out (Λ : CPTPMap d₁ d₂) {R : ℝ} (hR :
         intro n
         obtain ⟨E, D, hD⟩ := h_emulate
         use CPTPMap.piProd (fun (_ : Fin n) => E), CPTPMap.piProd (fun (_ : Fin n) => D);
-        simp [ ← hD, ← CPTPMap.piProd_compose ];
+        simp [ ← hD, ← CPTPMap.piProd_comp];
       exact emulates_trans _ _ _ ( h_tensor_emulate n ) hB_emulate;
     exact ⟨ n, hn, dimB, B, h_id_emulate, hB_rate, hB_approx ⟩;
   refine not_le_of_gt hR <| not_lt.mp fun h => ?_

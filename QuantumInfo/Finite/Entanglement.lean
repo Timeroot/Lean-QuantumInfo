@@ -220,7 +220,7 @@ theorem traceRight_pure_MES (d : Type*) [Fintype d] [DecidableEq d] [Nonempty d]
   ext i j
   convert h_partial_trace i j
   simp_all only [Pi.star_apply, RCLike.star_def, one_div, Complex.ofReal_inv,
-    Complex.ofReal_natCast, mul_ite, mul_one, mul_zero, HermitianMat.toMat_apply,
+    Complex.ofReal_natCast, mul_ite, mul_one, mul_zero, HermitianMat.mat_apply,
     coe_ofClassical, Distribution.uniform_def, Finset.card_univ]
   unfold HermitianMat.diagonal
   simp_all only [map_inv₀, map_natCast]
@@ -262,7 +262,7 @@ theorem Sᵥₙ_ofClassical {d : Type*} [Fintype d] [DecidableEq d] (dist : Dist
 /-- The entanglement of formation of the maximally entangled state with on-site dimension 𝕕 is log(𝕕). -/
 theorem EoF_of_MES : EoF (pure <| Ket.MES d) = Real.log (Finset.card Finset.univ (α := d)) := by
   simp only [EoF, convex_roof_of_pure, coe_mk, Finset.card_univ]
-  simp only [traceRight, Matrix.traceRight, MState.pure, Ket.MES, one_div]
+  simp only [traceRight, MState.pure, Ket.MES, one_div]
   -- The von Neumann entropy of the maximally mixed state is log(d).
   have h_von_neumann : Sᵥₙ (MState.uniform : MState d) = Real.log (Fintype.card d) := by
     rw [MState.uniform, Sᵥₙ_ofClassical Distribution.uniform, Hₛ_uniform, Finset.card_univ]
