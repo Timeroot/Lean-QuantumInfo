@@ -1,0 +1,18 @@
+/-
+Copyright (c) 2026 Alex Meiburg. All rights reserved.
+Released under MIT license as described in the file LICENSE.
+Authors: Alex Meiburg
+-/
+
+import Mathlib.Init
+import Aesop.Frontend.Command
+
+/-!
+# Commutes Rule Set
+
+This module defines the `Commutes` Aesop rule set which is used by the
+`commutes` tactic. Aesop rule sets only become visible once the file in which
+they're declared is imported, so we must put this declaration into its own file.
+-/
+
+declare_aesop_rule_sets [Commutes] (default := false)

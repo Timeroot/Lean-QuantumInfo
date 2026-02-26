@@ -61,6 +61,15 @@ instance : IsStrictOrderedModule ℝ (HermitianMat n 𝕜) where
       simpa [eq_comm, hb.ne'] using h
     · rintro rfl; simp
 
+theorem posSemidef_iff_spectrum_Ici [DecidableEq n] (A : HermitianMat n 𝕜) :
+    0 ≤ A ↔ spectrum ℝ A.mat ⊆ Set.Ici 0 := by
+  rw [zero_le_iff, Matrix.posSemidef_iff_isHermitian_and_spectrum_nonneg]
+  simp [A.H, Set.Ici.eq_1]
+
+theorem posSemidef_iff_spectrum_nonneg [DecidableEq n] (A : HermitianMat n 𝕜) :
+    0 ≤ A ↔ ∀ x ∈ spectrum ℝ A.mat, 0 ≤ x := by
+  exact A.posSemidef_iff_spectrum_Ici
+
 theorem trace_nonneg (hA : 0 ≤ A) : 0 ≤ A.trace := by
   --TODO Cleanup
   -- Since A is positive semidefinite, each term in the sum is non-negative. Therefore, the sum itself is non-negative.
@@ -114,6 +123,10 @@ variable (M) in
 theorem conj_nonneg (hA : 0 ≤ A) : 0 ≤ A.conj M := by
   rw [zero_le_iff] at hA ⊢
   exact Matrix.PosSemidef.mul_mul_conjTranspose_same hA M
+
+ theorem conj_pos [DecidableEq n] {A : HermitianMat n 𝕜} {M : Matrix m n 𝕜} (hA : 0 < A)
+    (h : LinearMap.ker M.toEuclideanLin ≤ A.ker) : 0 < A.conj M := by
+  classical exact (A.conj_nonneg M hA.le).lt_of_ne' (A.conj_ne_zero hA.ne' h)
 
 theorem convex_cone (hA : 0 ≤ A) (hB : 0 ≤ B) {c₁ c₂ : ℝ} (hc₁ : 0 ≤ c₁) (hc₂ : 0 ≤ c₂) :
     0 ≤ (c₁ • A + c₂ • B) := by

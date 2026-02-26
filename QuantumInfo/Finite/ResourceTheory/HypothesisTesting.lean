@@ -238,7 +238,7 @@ theorem pos_of_lt_one {ρ : MState d} (S : Set (MState d))
   rw [h, iSup_eq_bot, bot_eq_zero''] at hT₄
   specialize hT₄ σ
   simp only [iSup_pos hσ₁, Subtype.ext_iff, Set.Icc.coe_zero, MState.exp_val] at hT₄
-  rw [HermitianMat.inner_zero_iff σ.zero_le hT₂] at hT₄
+  rw [HermitianMat.inner_zero_iff σ.nonneg hT₂] at hT₄
   replace hT₁ : ρ.exp_val (1 - T) ≠ 1 := (lt_of_le_of_lt hT₁ hε).ne
   absurd hT₁
   rw [ρ.exp_val_eq_one_iff ?_, sub_sub_cancel]
@@ -393,7 +393,7 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
       --Turn it into a POVM (probably want to have lemmas around this ideally)
       let Λ : POVM (Fin 2) d := {
         mats i := if i = 0 then T else 1 - T
-        zero_le i := by
+        nonneg i := by
           split
           · exact T.prop.2.1
           · exact HermitianMat.zero_le_iff.mpr T.prop.2.2

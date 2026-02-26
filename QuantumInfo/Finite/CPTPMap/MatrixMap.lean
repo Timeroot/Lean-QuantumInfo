@@ -358,9 +358,11 @@ variable {s : ι → Type*} [∀ i, AddCommMonoid (s i)] [∀ i, Module R (s i)]
 variable {L : ι → Type* }
 
 /-- Like `Basis.tensorProduct`, but for `PiTensorProduct` -/
-noncomputable def _root_.Module.Basis.piTensorProduct [∀i, Fintype (L i)]
+noncomputable opaque _root_.Module.Basis.piTensorProduct [∀i, Fintype (L i)]
     (b : (i:ι) → Module.Basis (L i) R (s i)) :
       Module.Basis ((i:ι) → L i) R (PiTensorProduct R s) :=
+  --Marking as opaque so that ATPs don't run into unpacking the sorried data.
+  --TODO: This is actually defined appropriately in a later Mathlib version.
   Finsupp.basisSingleOne.map sorry
 
 end basis

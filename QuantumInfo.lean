@@ -19,8 +19,8 @@ import QuantumInfo.Finite.Capacity
 import QuantumInfo.Finite.Ensemble
 import QuantumInfo.Finite.Entanglement
 import QuantumInfo.Finite.Entropy
--- import QuantumInfo.Finite.Entropy.Defs --Experimental
--- import QuantumInfo.Finite.Entropy.Renyi --Experimental
+-- import QuantumInfo.Finite.AxiomatizedEntropy.Defs --Experimental
+-- import QuantumInfo.Finite.AxiomatizedEntropy.Renyi --Experimental
 import QuantumInfo.Finite.MState
 import QuantumInfo.Finite.Pinching
 import QuantumInfo.Finite.POVM

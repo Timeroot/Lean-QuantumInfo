@@ -102,10 +102,8 @@ theorem funext_pos [Fintype dIn] (h : ∀ M : HermitianMat dIn ℂ, 0 ≤ M → 
   open scoped HermitianMat in
   apply funext_hermitian
   intro M
-  have hPos := h M⁺ M.zero_le_posPart
-  have hNeg := h M⁻ M.negPart_le_zero --TODO: this is named incorrectly
   rw [← M.posPart_add_negPart]
-  simp [hPos, hNeg]
+  simp [HermitianMat.posPart_nonneg, HermitianMat.negPart_nonneg, h]
 
 /-- Two maps are equal if they agree on all positive inputs with trace one -/
 theorem funext_pos_trace [Fintype dIn]
@@ -227,7 +225,7 @@ theorem pos_Hermitian (M : PTPMap dIn dOut ℂ) {x : HermitianMat dIn ℂ} (h : 
 instance instMFunLike [DecidableEq dIn] [DecidableEq dOut] :
     FunLike (PTPMap dIn dOut) (MState dIn) (MState dOut) where
   coe Λ ρ := MState.mk
-    (Λ.toHPMap ρ.M) (HermitianMat.zero_le_iff.mpr (Λ.pos ρ.pos)) (by
+    (Λ.toHPMap ρ.M) (HermitianMat.zero_le_iff.mpr (Λ.pos ρ.psd)) (by
       rw [HermitianMat.trace_eq_one_iff, ← ρ.tr']
       exact Λ.TP ρ)
   coe_injective' x y h := injective_toPMap <| PMap.injective_toHPMap <|

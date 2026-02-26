@@ -169,7 +169,7 @@ theorem pinching_bound (ρ σ : MState d) : ρ.M ≤ (↑(Fintype.card (spectrum
     --*Could* be a positivity extension.
     dsimp [MState.spectrum, Distribution.mk']
     rw [Complex.zero_le_real]
-    exact (HermitianMat.zero_le_iff.mp ρ.zero_le).eigenvalues_nonneg _
+    exact (HermitianMat.zero_le_iff.mp ρ.nonneg).eigenvalues_nonneg _
   have h1 : (1 : Matrix d d ℂ) = (1 : HermitianMat d ℂ) := by exact selfAdjoint.val_one
   conv_lhs =>
     enter [2, 1]
@@ -297,29 +297,16 @@ theorem pinching_map_eq_sum_conj_hermitian (σ ρ : MState d) :
   simp [pinching_eq_sum_conj σ ρ]
 
 theorem pinching_map_ker_le (ρ σ : MState d) : (pinching_map σ ρ).M.ker ≤ ρ.M.ker := by
-  --TODO Cleanup
-  -- By `HermitianMat.ker_sum`, the kernel of the sum is the intersection of the kernels of the terms.
   have h_ker_sum : (∑ k, ρ.M.conj (pinching_kraus σ k).mat).ker = ⨅ k, (ρ.M.conj (pinching_kraus σ k).mat).ker := by
     apply HermitianMat.ker_sum
-    exact fun i ↦ HermitianMat.conj_nonneg (pinching_kraus σ i).mat ρ.zero_le
-  -- By `HermitianMat.ker_conj`, the kernel of `ρ.M.conj P_k` (where $P_k$ is the Kraus operator) is `Submodule.comap P_k.conjTranspose ρ.M.ker`.
-  have h_ker_conj : ∀ k, (ρ.M.conj (pinching_kraus σ k).mat).ker = Submodule.comap (Matrix.toEuclideanLin (pinching_kraus σ k).mat.conjTranspose) ρ.M.ker := by
-    intro k;
-    apply HermitianMat.ker_conj;
-    exact ρ.zero_le
-  -- Since $\sum_k P_k = 1$ (by `pinching_sum`), we have $v = \sum_k P_k v$.
-  have h_sum_eq_one : ∑ k : (spectrum ℝ σ.m), (pinching_kraus σ k).mat = 1 := by
-    convert pinching_sum σ using 1;
-    simp [ ← Matrix.ext_iff, HermitianMat.ext_iff ];
+    exact fun i ↦ HermitianMat.conj_nonneg (pinching_kraus σ i).mat ρ.nonneg
   intro v hv
-  have hv_sum : v = ∑ k : (spectrum ℝ σ.m), (pinching_kraus σ k).mat *ᵥ v := by
-    convert congr_arg ( fun m => m *ᵥ v ) h_sum_eq_one.symm using 1 ;
-    · simp
-    · rw [Matrix.sum_mulVec]
-  rw [pinching_map_eq_sum_conj_hermitian σ ρ, h_ker_sum] at hv
-  simp at h_ker_conj hv ⊢
-  rw [hv_sum]
-  exact Submodule.sum_mem _ fun k _ => by simpa [h_ker_conj _ k.2] using hv _ k.2
+  have hv_sum : ∑ k : (spectrum ℝ σ.m), (pinching_kraus σ k).mat *ᵥ v = v := by
+    rw [← Matrix.sum_mulVec, ← HermitianMat.mat_finset_sum, pinching_sum σ,
+      HermitianMat.mat_one, Matrix.one_mulVec]
+  rw [pinching_map_eq_sum_conj_hermitian σ ρ, h_ker_sum, Submodule.mem_iInf] at hv
+  rw [← hv_sum]
+  exact Submodule.sum_mem _ fun k _ ↦ by simpa [HermitianMat.ker_conj ρ.nonneg] using hv k
 
 noncomputable section AristotleLemmas
 

@@ -9,12 +9,13 @@ import QuantumInfo.Finite.Unitary
 /-! # Completely Positive Trace Preserving maps
 
 A `CPTPMap` is a `ℂ`-linear map between matrices (`MatrixMap` is an alias), bundled with the facts that it
-`IsCompletelyPositive` and `IsTracePreserving`. CPTP maps are typically regarded as the "most general quantum
-operation", as they map density matrices (`MState`s) to density matrices. The type `PTPMap`, for maps that are
-positive (but not necessarily completely positive) is also declared.
+`IsCompletelyPositive` and `IsTracePreserving`. CPTP maps are typically regarded as the "most general
+quantum operation", as they map density matrices (`MState`s) to density matrices. The type `PTPMap`,
+for maps that are positive (but not necessarily completely positive) is also declared.
 
-A large portion of the theory is in terms of the Choi matrix (`MatrixMap.choi_matrix`), as the positive-definiteness
-of this matrix corresponds to being a CP map. This is [Choi's theorem on CP maps](https://en.wikipedia.org/wiki/Choi%27s_theorem_on_completely_positive_maps).
+A large portion of the theory is in terms of the Choi matrix (`MatrixMap.choi_matrix`), as the
+positive-definiteness of this matrix corresponds to being a CP map. This is
+[Choi's theorem on CP maps](https://en.wikipedia.org/wiki/Choi%27s_theorem_on_completely_positive_maps).
 
 This file also defines several important examples of, classes of, and operations on, CPTPMaps:
  * `compose`: Composition of maps
@@ -26,8 +27,11 @@ This file also defines several important examples of, classes of, and operations
  * `IsUnitary`: Predicate whether the map corresponds to any unitary
  * `purify`: Purifying a channel into a unitary on a larger Hilbert space
  * `complementary`: The complementary channel to its purification
- * `IsEntanglementBreaking`, `IsDegradable`, `IsAntidegradable`: Entanglement breaking, degradable and antidegradable channels.
- * `SWAP`, `assoc`, `assoc'`, `traceLeft`, `traceRight`: The CPTP maps corresponding to important operations on states. These correspond directly to `MState.SWAP`, `MState.assoc`, `MState.assoc'`, `MState.traceLeft`, and `MState.traceRight`.
+ * `IsEntanglementBreaking`, `IsDegradable`, `IsAntidegradable`: Entanglement breaking, degradable
+    and antidegradable channels.
+ * `SWAP`, `assoc`, `assoc'`, `traceLeft`, `traceRight`: The CPTP maps corresponding to important
+    operations on states. These correspond directly to `MState.SWAP`, `MState.assoc`, `MState.assoc'`,
+    `MState.traceLeft`, and `MState.traceRight`.
 -/
 
 variable {dIn dOut dOut₂ : Type*} [Fintype dIn] [Fintype dOut] [Fintype dOut₂]
@@ -284,7 +288,7 @@ def replacement [Nonempty dIn] [DecidableEq dOut] (ρ : MState dOut) : CPTPMap d
       toFun := fun M => Matrix.kroneckerMap (fun x1 x2 => x1 * x2) M ρ.m
       map_add' := by simp [Matrix.add_kronecker]
       map_smul' := by simp [Matrix.smul_kronecker]
-      cp := MatrixMap.kron_kronecker_const ρ.pos
+      cp := MatrixMap.kron_kronecker_const ρ.psd
       TP := by intro; simp [Matrix.trace_kronecker]
       }
 
