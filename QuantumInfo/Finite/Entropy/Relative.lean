@@ -35,20 +35,209 @@ private theorem sandwiched_trace_pos (h : σ.M.ker ≤ ρ.M.ker) :
   grw [← h]
   exact HermitianMat.ker_rpow_le_of_nonneg σ.nonneg
 
-private theorem sandwiched_trace_of_lt_1 (h : σ.M.ker ≤ ρ.M.ker) (hα : α < 1) :
-    ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).mat) ^ α).trace ≤ 1 := by
+/--
+The Schatten p-norm of a matrix A is (Tr[(A*A)^(p/2)])^(1/p).
+-/
+noncomputable def schattenNorm {d : Type*} [Fintype d] [DecidableEq d] (A : Matrix d d ℂ) (p : ℝ) : ℝ :=
+  RCLike.re (Matrix.IsHermitian.cfc (Matrix.isHermitian_mul_conjTranspose_self A.conjTranspose) (fun x => x ^ (p/2))).trace ^ (1/p)
+
+/-
+For a positive Hermitian matrix A, (A^2)^(p/2) = A^p, expressed using functional calculus.
+-/
+theorem HermitianMat.cfc_sq_rpow_eq_cfc_rpow
+    (A : HermitianMat d ℂ) (hA : 0 ≤ A) (p : ℝ) (hp : 0 < p) :
+    (A ^ 2).cfc (fun x => x ^ (p/2)) = A.cfc (fun x => x ^ p) := by
+  have h_sqrt : (A ^ 2).cfc (fun x => x ^ (p / 2)) = (A.cfc (fun x => x ^ 2)).cfc (fun x => x ^ (p / 2)) := by
+    convert rfl;
+    exact cfc_pow A;
+  rw [ h_sqrt ];
+  have h_sqrt : ∀ (f g : ℝ → ℝ), Continuous f → Continuous g → ∀ (A : HermitianMat d ℂ), (A.cfc f).cfc g = A.cfc (fun x => g (f x)) := by
+    exact fun f g a a A => Eq.symm (cfc_comp_apply A f g);
+  rw [ h_sqrt ];
+  · have h_sqrt : ∀ x : ℝ, 0 ≤ x → (x ^ 2) ^ (p / 2) = x ^ p := by
+      intro x hx
+      rw [ ← Real.rpow_natCast, ← Real.rpow_mul hx ]
+      ring_nf
+    exact cfc_congr_of_nonneg hA h_sqrt;
+  · continuity;
+  · exact continuous_id.rpow_const fun x => Or.inr <| by positivity
+
+/--
+For a positive Hermitian matrix A, ||A||_p = (Tr(A^p))^(1/p).
+-/
+theorem schattenNorm_hermitian_pow {A : HermitianMat d ℂ} (hA : 0 ≤ A) {p : ℝ} (hp : 0 < p) :
+    schattenNorm A.mat p = (A ^ p).trace ^ (1/p) := by
+  convert congr_arg ( fun x : ℝ => x ^ ( 1 / p ) ) _ using 1;
+  convert congr_arg _ ( HermitianMat.cfc_sq_rpow_eq_cfc_rpow A hA p hp ) using 1;
+  unfold HermitianMat.trace;
+  convert rfl;
+  convert HermitianMat.mat_cfc ( A ^ 2 ) ( fun x => x ^ ( p / 2 ) );
   sorry
 
+lemma schattenNorm_pow_eq
+  (A : HermitianMat d ℂ) (hA : 0 ≤ A) (p k : ℝ) (hp : 0 < p) (hk : 0 < k) :
+    schattenNorm (A ^ k).mat p = (schattenNorm A.mat (k * p)) ^ k := by
+  rw [ schattenNorm_hermitian_pow, schattenNorm_hermitian_pow ] <;> try positivity;
+  · rw [ ← Real.rpow_mul ] <;> ring_nf <;> norm_num [ hp.ne', hk.ne' ];
+    · rw [ mul_comm, ← HermitianMat.rpow_mul ];
+      exact hA;
+    · -- Since $A$ is positive, $A^{k*p}$ is also positive, and the trace of a positive matrix is non-negative.
+      have h_pos : 0 ≤ A ^ (k * p) := by
+        exact HermitianMat.rpow_nonneg hA;
+      exact HermitianMat.trace_nonneg h_pos;
+  · exact HermitianMat.rpow_nonneg hA
+
+lemma trace_eq_schattenNorm_rpow
+    (A : HermitianMat d ℂ) (hA : 0 ≤ A) (r : ℝ) (hr : 0 < r) :
+    (A ^ r).trace = (schattenNorm A.mat r) ^ r := by
+  rw [schattenNorm_hermitian_pow hA hr, ← Real.rpow_mul] <;> norm_num [hr.ne']
+  apply HermitianMat.trace_nonneg
+  exact HermitianMat.rpow_nonneg hA
+
+def singularValues (A : Matrix d d ℂ) : d → ℝ :=
+  fun i => Real.sqrt ((Matrix.isHermitian_mul_conjTranspose_self A).eigenvalues i)
+
+lemma singularValues_nonneg (A : Matrix d d ℂ) (i : d) :
+    0 ≤ singularValues A i := by
+  apply Real.sqrt_nonneg
+
+/--
+Hermitian trace Hölder inequality: for PSD A, B and conjugate exponents p, q > 1,
+⟪A, B⟫ ≤ Tr[A^p]^(1/p) * Tr[B^q]^(1/q).
+This follows from the von Neumann trace inequality combined with the scalar Hölder inequality.
+-/
+lemma HermitianMat.inner_le_trace_rpow_mul
+    (A B : HermitianMat d ℂ) (hA : 0 ≤ A) (hB : 0 ≤ B)
+    (p q : ℝ) (hp : 1 < p) (hpq : 1/p + 1/q = 1) :
+    ⟪A, B⟫_ℝ ≤ (A ^ p).trace ^ (1/p) * (B ^ q).trace ^ (1/q) := by
+  sorry
+
+/--
+Trace subadditivity (Rotfel'd inequality): for PSD A, B and 0 < p ≤ 1,
+Tr[(A + B)^p] ≤ Tr[A^p] + Tr[B^p].
+This is a consequence of the concavity of x^p for 0 < p ≤ 1.
+-/
+lemma HermitianMat.trace_rpow_add_le
+    (A B : HermitianMat d ℂ) (hA : 0 ≤ A) (hB : 0 ≤ B)
+    (p : ℝ) (hp : 0 < p) (hp1 : p ≤ 1) :
+    ((A + B) ^ p).trace ≤ (A ^ p).trace + (B ^ p).trace := by
+  sorry
+
+/-
+PROBLEM
+For a density matrix σ and r > 0, show σ.M ^ r ≤ 1.
+
+PROVIDED SOLUTION
+Since σ is PSD with eigenvalues in [0,1] (from MState.le_one and σ.nonneg),
+we have σ^r has eigenvalues λ_i^r ∈ [0,1] for r > 0.
+Use HermitianMat.le_iff and show (1 - σ^r) is PSD.
+Express 1 - σ^r using CFC: 1 - σ^r = σ.M.cfc(fun x => 1 - x^r) (via cfc_sub_apply, rpow_eq_cfc).
+Then use cfc_nonneg_iff to reduce to showing 1 - λ_i^r ≥ 0 for each eigenvalue.
+Since λ_i ∈ [0,1] (from le_one) and r > 0, this follows from Real.rpow_le_one.
+-/
+lemma MState.rpow_le_one' {r : ℝ} (hσ : 0 < r) : σ.M ^ r ≤ 1 := by
+  rw [HermitianMat.le_iff]
+  have h1 : 1 - σ.M ^ r = σ.M.cfc (fun x => 1 - x ^ r) := by
+    rw [HermitianMat.rpow_eq_cfc]
+    have : σ.M.cfc (fun _ => (1:ℝ)) = 1 := by ext1; simp
+    rw [← this, ← HermitianMat.cfc_sub_apply]
+  rw [h1, ← HermitianMat.zero_le_iff, HermitianMat.cfc_nonneg_iff]
+  intro i
+  have hge : 0 ≤ σ.M.H.eigenvalues i :=
+    (HermitianMat.zero_le_iff.mp σ.nonneg).eigenvalues_nonneg i
+  have hle : σ.M.H.eigenvalues i ≤ 1 := σ.eigenvalue_le_one i
+  linarith [Real.rpow_le_one hge hle hσ.le]
+
+/--
+For positive A ≤ 1 with Tr[A] ≤ 1 and p ≥ 1, we have Tr[A^p] ≤ Tr[A].
+This is because each eigenvalue λ ∈ [0,1] satisfies λ^p ≤ λ for p ≥ 1.
+-/
+lemma HermitianMat.trace_rpow_le_trace_of_le_one
+    (A : HermitianMat d ℂ) (hA : 0 ≤ A) (hA1 : A ≤ 1)
+    (p : ℝ) (hp : 1 ≤ p) :
+    (A ^ p).trace ≤ A.trace := by
+  sorry
+
+/-
+PROBLEM
+Show that for density matrices ρ, σ (PSD with trace 1) and 0 < α < 1,
+Tr[(σ^t ρ σ^t)^α] ≤ 1, where t = (1-α)/(2α).
+
+PROVIDED SOLUTION
+Step 1: Since ρ ≤ I (density matrix), by conj_mono:
+  σ^t ρ σ^t ≤ σ^t I σ^t = σ^{2t}
+
+Step 2: Since σ ≤ I and 2t > 0 (because 0 < α < 1), we have σ^{2t} ≤ I.
+  So A := σ^t ρ σ^t ≤ I with all eigenvalues in [0,1].
+
+Step 3: Tr[A] = Tr[σ^{2t} ρ] ≤ Tr[I · ρ] = Tr[ρ] = 1 (using σ^{2t} ≤ I).
+
+Step 4: Since 0 < α < 1 and A ≤ I with Tr[A] ≤ 1, we use trace subadditivity
+  (Rotfel'd inequality) on the spectral decomposition of A, combined with the
+  scalar Hölder inequality, to conclude Tr[A^α] ≤ 1.
+
+  More precisely, decompose the problem using the spectral decomposition of σ:
+  σ^{2t} = Σ_i d_i^{2t} P_i where P_i are rank-1 projectors.
+  Then ρ^{1/2} σ^{2t} ρ^{1/2} = Σ_i d_i^{2t} (ρ^{1/2} P_i ρ^{1/2}).
+  By trace subadditivity: Tr[(Σ ...)^α] ≤ Σ_i Tr[(d_i^{2t} ρ^{1/2} P_i ρ^{1/2})^α]
+    = Σ_i d_i^{2tα} ⟨f_i,ρ f_i⟩^α = Σ_i d_i^{1-α} R_ii^α.
+  By scalar Hölder: Σ_i d_i^{1-α} R_ii^α ≤ (Σ d_i)^{1-α} (Σ R_ii)^α = 1.
+
+  Alternatively, since A ≤ I and A ≥ 0, we have Tr[A^α] ≤ 1 by noting that
+  the eigenvalues μ_i ∈ [0,1] satisfy: Σ μ_i^α is maximized (subject to
+  Σ μ_i ≤ 1 and μ_i ∈ [0,1]) when there is a single nonzero eigenvalue equal to 1,
+  giving Σ μ_i^α ≤ 1. This is proved by the Schatten norm monotonicity argument.
+-/
+private theorem sandwiched_trace_of_lt_1 (h : σ.M.ker ≤ ρ.M.ker) (hα₀ : 0 < α) (hα : α < 1) :
+    ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).mat) ^ α).trace ≤ 1 := by
+  -- The sandwiched expression is PSD and ≤ 1
+  -- The proof uses Schatten norm theory:
+  -- Step 1: A := σ^t ρ σ^t ≤ σ^{2t} ≤ 1 (using conj_mono with ρ ≤ 1, and rpow_le_one')
+  -- Step 2: Q_α = ||σ^t ρ^{1/2}||_{2α}^{2α} ≤ ||σ^t||_{1/t}^{2α} · ||ρ^{1/2}||_2^{2α} = 1
+  --   (Hölder for Schatten norms with p = 1/t, q = 2, r = 2α)
+  sorry
+
+/-
+PROBLEM
+Show that for density matrices ρ, σ (PSD with trace 1) and α > 1,
+Tr[(σ^t ρ σ^t)^α] ≥ 1, where t = (1-α)/(2α).
+
+PROVIDED SOLUTION
+Let A = σ^t ρ σ^t (which is PSD). We use the trace Hölder inequality.
+
+Step 1: Show that Tr[A · σ^{-2t}] = Tr[ρ] = 1.
+  We have A · σ^{-2t} = σ^t ρ σ^t · σ^{-2t} = σ^t ρ σ^{-t}.
+  By cyclicity: Tr[σ^t ρ σ^{-t}] = Tr[σ^{-t} σ^t ρ] = Tr[P_σ ρ] = Tr[ρ] = 1,
+  where P_σ is the projection onto σ's support, and P_σ ρ = ρ by the kernel condition.
+  Equivalently: ⟪A, σ^{-2t}⟫ = 1.
+
+Step 2: Apply the trace Hölder inequality with p = α, q = α/(α-1):
+  ⟪A, σ^{-2t}⟫ ≤ Tr[A^α]^{1/α} · Tr[σ^{-2t·q}]^{1/q}
+
+Step 3: Compute -2t · q = -(1-α)/α · α/(α-1) = (α-1)/α · α/(α-1) = 1.
+  So Tr[σ^{-2t·q}] = Tr[σ^1] = Tr[σ] = 1.
+
+Step 4: From 1 ≤ Tr[A^α]^{1/α} · 1, we get Tr[A^α] ≥ 1.
+-/
 private theorem sandwiched_trace_of_gt_1 (h : σ.M.ker ≤ ρ.M.ker) (hα : α > 1) :
     1 ≤ ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).mat) ^ α).trace := by
+  -- A is PSD
+  have hA_nonneg : 0 ≤ ρ.M.conj (σ.M ^ ((1 - α)/(2 * α))).mat :=
+    HermitianMat.conj_nonneg _ ρ.nonneg
+  -- The proof uses the trace Hölder inequality:
+  -- Step 1: ⟪A, σ^{-2t}⟫ = Tr[ρ] = 1 (via kernel condition and rpow algebra)
+  -- Step 2: By Hölder with p = α, q = α/(α-1):
+  --   1 ≤ Tr[A^α]^{1/α} · Tr[σ^{-2t·q}]^{1/q}
+  -- Step 3: The exponent -2t·q = 1, so Tr[σ] = 1
+  -- Step 4: 1 ≤ Tr[A^α]^{1/α}, hence Tr[A^α] ≥ 1
   sorry
 
-private theorem sandwichedRelRentropy_nonneg_α_lt_1 (h : σ.M.ker ≤ ρ.M.ker) (hα : α < 1) :
+private theorem sandwichedRelRentropy_nonneg_α_lt_1 (h : σ.M.ker ≤ ρ.M.ker) (hα0 : 0 < α) (hα : α < 1) :
     0 ≤ ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).mat) ^ α).trace.log / (α - 1) := by
   apply div_nonneg_of_nonpos
   · apply Real.log_nonpos
     · exact (sandwiched_trace_pos h).le
-    · exact sandwiched_trace_of_lt_1 h hα
+    · exact sandwiched_trace_of_lt_1 h hα0 hα
   · linarith
 
 private theorem sandwichedRelRentropy_nonneg_α_gt_1 (h : σ.M.ker ≤ ρ.M.ker) (hα : α > 1) :
@@ -61,26 +250,31 @@ theorem inner_log_sub_log_nonneg (h : σ.M.ker ≤ ρ.M.ker) :
     0 ≤ ⟪ρ.M, ρ.M.log - σ.M.log⟫ := by
   sorry
 
-theorem sandwichedRelRentropy_nonneg (α : ℝ) (h : σ.M.ker ≤ ρ.M.ker) :
+theorem sandwichedRelRentropy_nonneg {α : ℝ} (hα : 0 < α) (h : σ.M.ker ≤ ρ.M.ker) :
     0 ≤ if α = 1 then ⟪ρ.M, ρ.M.log - σ.M.log⟫
       else ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).mat) ^ α).trace.log / (α - 1) := by
-  split_ifs
+  split_ifs with h1
   · exact inner_log_sub_log_nonneg h
-  by_cases hα : α > 1
-  · exact sandwichedRelRentropy_nonneg_α_gt_1 h hα
-  · exact sandwichedRelRentropy_nonneg_α_lt_1 h (by clear h; grind)
+  by_cases hα₂ : α > 1
+  · exact sandwichedRelRentropy_nonneg_α_gt_1 h hα₂
+  · have : α < 1 := by push_neg at hα₂; exact lt_of_le_of_ne hα₂ h1
+    exact sandwichedRelRentropy_nonneg_α_lt_1 h hα this
 
 /-- The Sandwiched Renyi Relative Entropy, defined with ln (nits). Note that at `α = 1` this definition
-  switch to the standard Relative Entropy, for continuity. -/
+  switch to the standard Relative Entropy, for continuity. For α ≤ 0, this gives junk value 0. (There
+  is no conventional value for α < 0; there is a continuous limit at α = 0, but it is complicated and
+  unneeded at the moment.)-/
 def SandwichedRelRentropy (α : ℝ) (ρ σ : MState d) : ENNReal :=
   open Classical in
-  if h : σ.M.ker ≤ ρ.M.ker
-  then (.ofNNReal ⟨if α = 1 then
-      ⟪ρ.M, ρ.M.log - σ.M.log⟫
-    else
-      ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).mat) ^ α).trace.log / (α - 1),
-    sandwichedRelRentropy_nonneg α h⟩)
-  else ⊤
+  if hα : 0 < α then
+    if h : σ.M.ker ≤ ρ.M.ker
+    then (.ofNNReal ⟨if α = 1 then
+        ⟪ρ.M, ρ.M.log - σ.M.log⟫
+      else
+        ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).mat) ^ α).trace.log / (α - 1),
+      sandwichedRelRentropy_nonneg hα h⟩)
+    else ⊤
+  else 0
 
 notation "D̃_" α "(" ρ "‖" σ ")" => SandwichedRelRentropy α ρ σ
 
@@ -469,16 +663,16 @@ private theorem sandwichedRelRentropy_additive_alpha_one (ρ₁ σ₁ : MState d
     split_ifs <;> simp_all [ ker_prod_le_iff ];
     simp only [sandwichedRelRentropy_additive_alpha_one_aux ρ₁ σ₁ ρ₂ σ₂ h1 h2]
     rfl
-  · simp only [SandwichedRelRentropy, ↓reduceIte, ↓reduceDIte, add_top,
-      dite_eq_right_iff, ENNReal.coe_ne_top, imp_false, h1, h2]
+  · simp only [SandwichedRelRentropy, zero_lt_one, ↓reduceDIte, ↓reduceIte, h1, h2,
+      add_top, dite_eq_right_iff, ENNReal.coe_ne_top, imp_false]
     have := ker_prod_le_iff ρ₁ σ₁ ρ₂ σ₂
     tauto
-  · simp only [SandwichedRelRentropy, ↓reduceIte, ↓reduceDIte, top_add,
-      dite_eq_right_iff, ENNReal.coe_ne_top, imp_false, h1, h2]
+  · simp only [SandwichedRelRentropy, zero_lt_one, ↓reduceDIte, ↓reduceIte, h1, h2,
+      top_add, dite_eq_right_iff, ENNReal.coe_ne_top, imp_false]
     contrapose! h1
     exact (ker_le_of_ker_kron_le_left ρ₁ σ₁ ρ₂ σ₂) h1
-  · simp only [SandwichedRelRentropy, ↓reduceIte, ↓reduceDIte, add_top,
-      dite_eq_right_iff, ENNReal.coe_ne_top, imp_false, h1, h2]
+  · simp only [SandwichedRelRentropy, zero_lt_one, ↓reduceDIte, ↓reduceIte, h1, h2,
+      add_top, dite_eq_right_iff, ENNReal.coe_ne_top, imp_false]
     contrapose! h1
     exact (ker_le_of_ker_kron_le_left ρ₁ σ₁ ρ₂ σ₂) h1
 
@@ -541,34 +735,25 @@ The Sandwiched Renyi Relative entropy is additive for alpha != 1.
 -/
 theorem sandwichedRelRentropy_additive_alpha_ne_one {α : ℝ} (hα : α ≠ 1) (ρ₁ σ₁ : MState d₁) (ρ₂ σ₂ : MState d₂) :
     D̃_ α(ρ₁ ⊗ᴹ ρ₂‖σ₁ ⊗ᴹ σ₂) = D̃_ α(ρ₁‖σ₁) + D̃_ α(ρ₂‖σ₂) := by
-  by_cases h_ker : σ₁.M.ker ≤ ρ₁.M.ker ∧ σ₂.M.ker ≤ ρ₂.M.ker;
-  · by_cases hα0 : α = 0 <;> simp_all [ SandwichedRelRentropy ];
-    · split_ifs <;> simp_all
-      · erw [ ENNReal.coe_inj ];
-        ext
-        norm_num
-        rw [ Real.log_mul ]
-        · ring_nf
-        · simp only [ne_eq, Nat.cast_eq_zero]
-          cases isEmpty_or_nonempty d₁ <;> simp_all
-          exact ρ₁.pos.ne' |> fun h => h ( by ext i; exact isEmptyElim i );
-        · simp only [ne_eq, Nat.cast_eq_zero, Fintype.card_eq_zero_iff, not_isEmpty_iff, ρ₂.nonempty]
-      · exact False.elim ( ‹¬ ( σ₁ ⊗ᴹ σ₂ ).M.ker ≤ ( ρ₁ ⊗ᴹ ρ₂ ).M.ker› ( ker_prod_le_iff _ _ _ _ |>.2 h_ker ) );
-    · -- Apply the additivity of the trace term to split the logarithm into the sum of the logarithms.
-      have h_trace_add : Real.log ((ρ₁ ⊗ᴹ ρ₂).M.conj ((σ₁ ⊗ᴹ σ₂).M ^ ((1 - α) / (2 * α))).mat ^ α).trace = Real.log ((ρ₁.M.conj (σ₁.M ^ ((1 - α) / (2 * α))).mat) ^ α).trace + Real.log ((ρ₂.M.conj (σ₂.M ^ ((1 - α) / (2 * α))).mat) ^ α).trace := by
-        rw [ sandwiched_term_product, Real.log_mul ];
-        · exact (sandwiched_trace_pos h_ker.1).ne'
-        · exact (sandwiched_trace_pos h_ker.2).ne'
-      split_ifs <;> simp_all
-      · norm_num [ add_div ];
-        exact rfl;
-      · exact False.elim ( ‹¬ ( σ₁ ⊗ᴹ σ₂ |> MState.M |> HermitianMat.ker ) ≤ ( ρ₁ ⊗ᴹ ρ₂ |> MState.M |> HermitianMat.ker ) › ( by simpa [ HermitianMat.ker ] using ker_prod_le_iff _ _ _ _ |>.2 h_ker ) );
-  · by_cases h_ker_prod : (σ₁ ⊗ᴹ σ₂).M.ker ≤ (ρ₁ ⊗ᴹ ρ₂).M.ker;
-    · simp_all +decide [ ker_prod_le_iff ];
-    · rw [not_and_or] at h_ker
-      rcases h_ker with h_ker | h_ker
-      · simp [SandwichedRelRentropy, h_ker_prod, h_ker]
-      · simp [SandwichedRelRentropy, h_ker_prod, h_ker]
+  by_cases hα0 : 0 < α; swap
+  · simp [SandwichedRelRentropy, hα0]
+  by_cases h_ker : σ₁.M.ker ≤ ρ₁.M.ker ∧ σ₂.M.ker ≤ ρ₂.M.ker
+  · simp_all [SandwichedRelRentropy]
+    -- Apply the additivity of the trace term to split the logarithm into the sum of the logarithms.
+    have h_trace_add : Real.log ((ρ₁ ⊗ᴹ ρ₂).M.conj ((σ₁ ⊗ᴹ σ₂).M ^ ((1 - α) / (2 * α))).mat ^ α).trace = Real.log ((ρ₁.M.conj (σ₁.M ^ ((1 - α) / (2 * α))).mat) ^ α).trace + Real.log ((ρ₂.M.conj (σ₂.M ^ ((1 - α) / (2 * α))).mat) ^ α).trace := by
+      rw [ sandwiched_term_product, Real.log_mul ];
+      · exact (sandwiched_trace_pos h_ker.1).ne'
+      · exact (sandwiched_trace_pos h_ker.2).ne'
+    split_ifs <;> simp_all
+    · norm_num [ add_div ];
+      exact rfl;
+    · exact False.elim ( ‹¬ ( σ₁ ⊗ᴹ σ₂ |> MState.M |> HermitianMat.ker ) ≤ ( ρ₁ ⊗ᴹ ρ₂ |> MState.M |> HermitianMat.ker ) › ( by simpa [ HermitianMat.ker ] using ker_prod_le_iff _ _ _ _ |>.2 h_ker ) );
+  · have h_ker_prod : ¬((σ₁ ⊗ᴹ σ₂).M.ker ≤ (ρ₁ ⊗ᴹ ρ₂).M.ker) := by
+      simp_all  [ ker_prod_le_iff ]
+    rw [not_and_or] at h_ker
+    rcases h_ker with h_ker | h_ker
+    · simp [SandwichedRelRentropy, h_ker_prod, h_ker, hα0]
+    · simp [SandwichedRelRentropy, h_ker_prod, h_ker, hα0]
 
 end additivity
 
@@ -600,7 +785,7 @@ theorem sandwichedRelRentropy_self (hα : 0 < α) (ρ : MState d) :
   --TODO: Maybe SandwichedRelRentropy should actually be defined differently for α = 0?
     D̃_ α(ρ‖ρ) = 0 := by
   simp? [SandwichedRelRentropy, NNReal.eq_iff] says
-    simp only [SandwichedRelRentropy, le_refl, ↓reduceDIte, sub_self, HermitianMat.inner_zero_right,
+    simp only [SandwichedRelRentropy, hα, ↓reduceDIte, le_refl, sub_self, inner_zero_right,
     ENNReal.coe_eq_zero, NNReal.eq_iff, NNReal.coe_mk, NNReal.coe_zero, ite_eq_left_iff,
     div_eq_zero_iff, Real.log_eq_zero]
   intro hα
@@ -624,7 +809,9 @@ theorem sandwichedRelRentropy_self (hα : 0 < α) (ρ : MState d) :
 
 @[aesop (rule_sets := [finiteness]) unsafe apply]
 theorem sandwichedRelEntropy_ne_top {ρ σ : MState d} [σ.M.NonSingular] : D̃_ α(ρ‖σ) ≠ ⊤ := by
-  simp [SandwichedRelRentropy, HermitianMat.nonSingular_ker_bot]
+  by_cases 0 < α
+  · simp [SandwichedRelRentropy, HermitianMat.nonSingular_ker_bot, *]
+  · simp [SandwichedRelRentropy, *]
 
 @[fun_prop]
 lemma continuousOn_exponent : ContinuousOn (fun α : ℝ => (1 - α) / (2 * α)) (Set.Ioi 0) := by
@@ -659,25 +846,9 @@ private theorem sandwichedRelRentropy.continuousOn_Ioi_1 (ρ σ : MState d) :
   dsimp [SandwichedRelRentropy]
   split_ifs with hρ
   · simp [← ENNReal.ofReal_eq_coe_nnreal]
-    apply (ENNReal.continuous_ofReal).comp_continuousOn
-    apply ContinuousOn.if'
-    · --These two branches are trivial in this version of the theorem,
-      --because we restrict to the Ioi 1, so α ≠ 1. In the "full" theorem,
-      --this is the statements about correctly handling the limit at α = 1.
-      intro α hα
-      exfalso
-      simp at hα
-      linarith
-    · intro α hα
-      exfalso
-      simp at hα
-      linarith
-    · simp only [Set.setOf_eq_eq_singleton]
-      --BUMP note: Set.inter_singleton_of_notMem will make this just `simp`.
-      rw [Set.inter_singleton_eq_empty.mpr ?_]
-      · simp
-      · simp
-    · conv in _ ∩ _ => equals Set.Ioi 1 => clear hρ; grind
+    rw [continuousOn_congr (f := fun α ↦ ENNReal.ofReal
+      (Real.log ((HermitianMat.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ρ.M ^ α).trace / (α - 1)))]
+    · apply (ENNReal.continuous_ofReal).comp_continuousOn
       apply ContinuousOn.div₀
       · apply ContinuousOn.log
         · apply HermitianMat.trace_Continuous.comp_continuousOn
@@ -689,7 +860,13 @@ private theorem sandwichedRelRentropy.continuousOn_Ioi_1 (ρ σ : MState d) :
           exact zero_lt_one
       · fun_prop
       · clear hρ; grind
-  · fun_prop
+    · intro α (hα : 1 < α)
+      dsimp only
+      rw [if_pos (zero_lt_one.trans hα), if_neg hα.ne']
+  · rw [continuousOn_congr (f := fun α ↦ ⊤)]
+    · fun_prop
+    · clear ρ σ hρ;
+      grind only [→ Set.EqOn.eq_of_mem, = Set.mem_Ioi, Set.EqOn, cases Or]
 
 @[fun_prop]
 theorem sandwichedRelRentropy.continuousOn (ρ σ : MState d) :
@@ -710,8 +887,7 @@ theorem qRelativeEnt_eq_neg_Sᵥₙ_add (ρ σ : MState d) :
   by_cases h : σ.M.ker ≤ ρ.M.ker
   · simp [h, Sᵥₙ_eq_neg_trace_log, qRelativeEnt_ker, inner_sub_right]
     rw [real_inner_comm, sub_eq_add_neg]
-  · simp [h]
-    exact dif_neg h
+  · simp [h, qRelativeEnt, SandwichedRelRentropy]
 
 /-- The quantum relative entropy is unchanged by `MState.relabel` -/
 @[simp]
@@ -786,6 +962,7 @@ carefully handling what happens with the kernel subspace, which will make this a
 @[fun_prop]
 theorem qRelativeEnt.lowerSemicontinuous (ρ : MState d) : LowerSemicontinuous fun σ => 𝐃(ρ‖σ) := by
   simp_rw [qRelativeEnt, SandwichedRelRentropy, if_true, lowerSemicontinuous_iff]
+  simp only [zero_lt_one, ↓reduceDIte]
   intro x
   by_cases hx : x.M.ker ≤ ρ.M.ker
   · have h₂ := lowerSemicontinuous_inner ρ x hx

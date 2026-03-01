@@ -341,7 +341,7 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
   --If ρ isn't in the support of σ, the right hand side is just ⊤. (The left hand side is not, necessarily!)
   by_cases h_supp : σ.M.ker ≤ ρ.M.ker
   swap
-  · simp [SandwichedRelRentropy, h_supp]
+  · simp [SandwichedRelRentropy, h_supp, zero_lt_one.trans hα]
 
   --Now we know that ρ.support ≤ σ.support. This is the main case we actually care about.
   --Proof from https://link.springer.com/article/10.1007/s00220-016-2645-4 reproduced below.
@@ -426,7 +426,7 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
 
 
   --The Renyi entropy is finite
-  rw [SandwichedRelRentropy, dif_pos ?_]; swap
+  rw [SandwichedRelRentropy, dif_pos (zero_lt_one.trans hα), dif_pos ?_]; swap
   · suffices q2.M.ker = ⊥ by
       simp only [this, bot_le]
     --q2 has eigenvalues β_ ε(ρ‖{σ}) and 1-β_ ε(ρ‖{σ}), so as long as β_ ε(ρ‖{σ}) isn't 0 or 1,
