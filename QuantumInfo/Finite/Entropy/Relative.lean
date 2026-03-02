@@ -62,17 +62,21 @@ theorem HermitianMat.cfc_sq_rpow_eq_cfc_rpow
   · continuity;
   · exact continuous_id.rpow_const fun x => Or.inr <| by positivity
 
-/--
+/-
 For a positive Hermitian matrix A, ||A||_p = (Tr(A^p))^(1/p).
 -/
 theorem schattenNorm_hermitian_pow {A : HermitianMat d ℂ} (hA : 0 ≤ A) {p : ℝ} (hp : 0 < p) :
     schattenNorm A.mat p = (A ^ p).trace ^ (1/p) := by
-  convert congr_arg ( fun x : ℝ => x ^ ( 1 / p ) ) _ using 1;
-  convert congr_arg _ ( HermitianMat.cfc_sq_rpow_eq_cfc_rpow A hA p hp ) using 1;
-  unfold HermitianMat.trace;
-  convert rfl;
-  convert HermitianMat.mat_cfc ( A ^ 2 ) ( fun x => x ^ ( p / 2 ) );
-  sorry
+  convert congr_arg (· ^ (1 / p)) _ using 1
+  convert congr_arg _ (A.cfc_sq_rpow_eq_cfc_rpow hA p hp) using 1
+  unfold HermitianMat.trace
+  convert rfl
+  convert (A ^ 2).mat_cfc (· ^ (p / 2))
+  ext
+  simp only [HermitianMat.conjTranspose_mat, HermitianMat.mat_pow]
+  convert rfl using 2
+  rw [sq]
+  exact Matrix.IsHermitian.cfc_eq _ _
 
 lemma schattenNorm_pow_eq
   (A : HermitianMat d ℂ) (hA : 0 ≤ A) (p k : ℝ) (hp : 0 < p) (hk : 0 < k) :
@@ -101,10 +105,62 @@ lemma singularValues_nonneg (A : Matrix d d ℂ) (i : d) :
     0 ≤ singularValues A i := by
   apply Real.sqrt_nonneg
 
-/--
+/-- The trace of cfc(f, A) equals the sum of f applied to eigenvalues. -/
+lemma HermitianMat.trace_cfc_eq (A : HermitianMat d ℂ) (f : ℝ → ℝ) :
+    (A.cfc f).trace = ∑ i, f (A.H.eigenvalues i) := by
+  have h1 := HermitianMat.trace_eq_trace (A.cfc f)
+  obtain ⟨e, he⟩ := HermitianMat.cfc_eigenvalues f A
+  have h2 := (A.cfc f).H.trace_eq_sum_eigenvalues
+  rw [he] at h2
+  simp [Function.comp] at h2
+  rw [HermitianMat.mat_cfc] at h1
+  rw [h2] at h1
+  have h3 : (Complex.ofReal) (A.cfc f).trace = Complex.ofReal (∑ i, f (A.H.eigenvalues (e i))) := by
+    convert h1 using 1
+    simp
+  have h4 := Complex.ofReal_injective h3
+  rw [h4]
+  exact Equiv.sum_comp e (fun x => f (A.H.eigenvalues x))
+
+/-- Tr[A^p] = ∑ᵢ λᵢ^p for a Hermitian matrix A. -/
+lemma HermitianMat.trace_rpow_eq_sum (A : HermitianMat d ℂ) (p : ℝ) :
+    (A ^ p).trace = ∑ i, (A.H.eigenvalues i) ^ p := by
+  exact A.trace_cfc_eq (· ^ p)
+
+/-
+PROBLEM
 Hermitian trace Hölder inequality: for PSD A, B and conjugate exponents p, q > 1,
 ⟪A, B⟫ ≤ Tr[A^p]^(1/p) * Tr[B^q]^(1/q).
-This follows from the von Neumann trace inequality combined with the scalar Hölder inequality.
+
+PROVIDED SOLUTION
+By inner_eq_re_trace, ⟪A, B⟫_ℝ = Re(Tr[AB]).
+Since A, B are PSD, Tr[AB] is real and nonneg (inner_self_nonneg for PSD), so ⟪A, B⟫_ℝ = Tr[AB] as a real.
+
+Using eq_conj_diagonal: A = U diag(a) U^*, B = V diag(b) V^* where a = A.H.eigenvalues, b = B.H.eigenvalues.
+
+Then AB = U diag(a) U^* V diag(b) V^* and Tr[AB] = Tr[diag(a) C diag(b) C^*]
+where C = U^* V is unitary.
+
+Tr[diag(a) C diag(b) C^*] = ∑_{ij} a_i b_j |C_{ij}|^2.
+
+Since C is unitary: ∑_j |C_{ij}|^2 = 1 and ∑_i |C_{ij}|^2 = 1.
+So the matrix (|C_{ij}|^2)_{ij} is doubly stochastic.
+
+Now ∑_{ij} a_i b_j |C_{ij}|^2 = ∑_i a_i (∑_j b_j |C_{ij}|^2).
+
+For each i, using weighted power mean (Real.inner_le_weight_mul_Lp_of_nonneg
+with weights w_j = |C_{ij}|^2 and values f_j = b_j):
+∑_j b_j |C_{ij}|^2 ≤ (∑_j |C_{ij}|^2)^{1-1/q} * (∑_j |C_{ij}|^2 * b_j^q)^{1/q}
+= 1^{1-1/q} * (∑_j |C_{ij}|^2 * b_j^q)^{1/q}
+= (∑_j |C_{ij}|^2 * b_j^q)^{1/q}
+
+Let g_i = (∑_j |C_{ij}|^2 * b_j^q)^{1/q}. Then:
+∑_i a_i * g_i ≤ (∑_i a_i^p)^{1/p} * (∑_i g_i^{p/(p-1)})^{(p-1)/p}
+= (∑_i a_i^p)^{1/p} * (∑_i g_i^q)^{1/q}   [since p/(p-1) = q and (p-1)/p = 1/q]
+
+And ∑_i g_i^q = ∑_i ∑_j |C_{ij}|^2 * b_j^q = ∑_j b_j^q * (∑_i |C_{ij}|^2) = ∑_j b_j^q.
+
+So ⟪A, B⟫ ≤ (∑_i a_i^p)^{1/p} * (∑_j b_j^q)^{1/q} = Tr[A^p]^{1/p} * Tr[B^q]^{1/q}.
 -/
 lemma HermitianMat.inner_le_trace_rpow_mul
     (A B : HermitianMat d ℂ) (hA : 0 ≤ A) (hB : 0 ≤ B)
@@ -112,10 +168,25 @@ lemma HermitianMat.inner_le_trace_rpow_mul
     ⟪A, B⟫_ℝ ≤ (A ^ p).trace ^ (1/p) * (B ^ q).trace ^ (1/q) := by
   sorry
 
-/--
-Trace subadditivity (Rotfel'd inequality): for PSD A, B and 0 < p ≤ 1,
+/-
+PROBLEM
+Trace subadditivity (Rotfeld's inequality): for PSD A, B and 0 < p ≤ 1,
 Tr[(A + B)^p] ≤ Tr[A^p] + Tr[B^p].
-This is a consequence of the concavity of x^p for 0 < p ≤ 1.
+
+PROVIDED SOLUTION
+Use trace_rpow_eq_sum to express each side as sums of eigenvalues.
+Then use the operator concavity of x^p on [0,∞) for 0 < p ≤ 1.
+
+More specifically, use the CFC approach: since x ↦ x^p is concave on [0,∞),
+by the Loewner-Heinz theorem / operator concavity:
+  (A + B)^p ≤ A^p + B^p  (as operators)
+for 0 < p ≤ 1 and A, B ≥ 0. This is exactly HermitianMat.cfc_concave_le
+(if available) or can be proved from the operator concavity of t^p.
+
+Taking traces preserves the ordering since trace is monotone on PSD matrices.
+So Tr[(A+B)^p] ≤ Tr[A^p + B^p] = Tr[A^p] + Tr[B^p].
+
+I DON'T THINK THIS IS ACTUALLY NEEDED.
 -/
 lemma HermitianMat.trace_rpow_add_le
     (A B : HermitianMat d ℂ) (hA : 0 ≤ A) (hB : 0 ≤ B)
@@ -148,15 +219,62 @@ lemma MState.rpow_le_one' {r : ℝ} (hσ : 0 < r) : σ.M ^ r ≤ 1 := by
   have hle : σ.M.H.eigenvalues i ≤ 1 := σ.eigenvalue_le_one i
   linarith [Real.rpow_le_one hge hle hσ.le]
 
-/--
-For positive A ≤ 1 with Tr[A] ≤ 1 and p ≥ 1, we have Tr[A^p] ≤ Tr[A].
-This is because each eigenvalue λ ∈ [0,1] satisfies λ^p ≤ λ for p ≥ 1.
+/-
+If A ≥ 0 and A ≤ 1, then each eigenvalue of A is in [0, 1].
+-/
+lemma HermitianMat.eigenvalues_le_one_of_le_one
+    (A : HermitianMat d ℂ) (hA1 : A ≤ 1) (i : d) :
+    A.H.eigenvalues i ≤ 1 := by
+  by_contra! h
+  obtain ⟨v, hv₁, hv₂⟩ : ∃ v : EuclideanSpace ℂ d, ‖v‖ = 1 ∧ A.mat.mulVec v = (A.H.eigenvalues i) • v := by
+    use A.H.eigenvectorBasis i
+    exact ⟨A.H.eigenvectorBasis.orthonormal.1 i, A.H.mulVec_eigenvectorBasis i⟩
+  have h_eigenvalue : star v ⬝ᵥ A.mat.mulVec v = (A.H.eigenvalues i) * star v ⬝ᵥ v := by
+    rw [hv₂, dotProduct_smul, Complex.real_smul]
+  have h_unit : star v ⬝ᵥ v = 1 := by
+    simp only [EuclideanSpace.norm_eq, Real.sqrt_eq_one, dotProduct, Pi.star_apply,
+      RCLike.star_def]  at hv₁ ⊢
+    simp only [sq, Complex.ext_iff, Complex.re_sum, Complex.mul_re, Complex.conj_re,
+      Complex.conj_im, Complex.mul_im, neg_mul, sub_neg_eq_add, Complex.im_sum,
+      Complex.one_re, Complex.one_im] at hv₁ ⊢
+    simp only [Complex.norm_def, Complex.normSq, MonoidWithZeroHom.coe_mk, ZeroHom.coe_mk,
+      mul_comm, add_neg_cancel, Finset.sum_const_zero, and_true] at hv₁ ⊢
+    rw [← hv₁]
+    refine Finset.sum_congr rfl fun _ _ => ?_
+    rw [Real.mul_self_sqrt (add_nonneg (mul_self_nonneg _) (mul_self_nonneg _))]
+  have := hA1.2 v
+  simp only [val_eq_coe, mul_one, mat_one, Matrix.sub_mulVec,
+    Matrix.one_mulVec, dotProduct_sub, h_eigenvalue, h_unit] at this
+  norm_cast at this
+  linarith
+
+/-
+PROBLEM
+For positive A ≤ 1 and p ≥ 1, show Tr[A^p] ≤ Tr[A].
+
+PROVIDED SOLUTION
+Rewrite both sides using trace_rpow_eq_sum: Tr[A^p] = ∑ λ_i^p and Tr[A] = ∑ λ_i
+(using trace_rpow_eq_sum and rpow_one for the latter).
+Then apply Finset.sum_le_sum pointwise.
+Each λ_i ∈ [0,1] (from eigenvalues_le_one_of_le_one and eigenvalues_nonneg),
+so λ_i^p ≤ λ_i^1 = λ_i by Real.rpow_le_rpow_of_exponent_ge.
 -/
 lemma HermitianMat.trace_rpow_le_trace_of_le_one
     (A : HermitianMat d ℂ) (hA : 0 ≤ A) (hA1 : A ≤ 1)
     (p : ℝ) (hp : 1 ≤ p) :
     (A ^ p).trace ≤ A.trace := by
-  sorry
+  -- Rewrite both sides using trace_rpow_eq_sum: Tr[A^p] = ∑ λ_i^p and Tr[A] = ∑ λ_i (using trace_rpow_eq_sum and rpow_one for the latter).
+  have h_trace_eq_sum : (A ^ p).trace = ∑ i, (A.H.eigenvalues i) ^ p ∧ A.trace = ∑ i, (A.H.eigenvalues i) := by
+    exact ⟨ by rw [ HermitianMat.trace_rpow_eq_sum ], by rw [ show A.trace = ∑ i, ( A.H.eigenvalues i ) by simpa using HermitianMat.trace_rpow_eq_sum A 1 ] ⟩;
+  rw [ h_trace_eq_sum.1, h_trace_eq_sum.2 ];
+  apply_rules [ Finset.sum_le_sum ];
+  intro i hi; by_cases hi0 : A.H.eigenvalues i = 0 <;> simp_all
+  · rw [ Real.zero_rpow ( by positivity ) ];
+  · conv_rhs => rw [← (A.H.eigenvalues i).rpow_one]
+    apply Real.rpow_le_rpow_of_exponent_ge
+    · exact lt_of_le_of_ne' (le_of_not_gt fun hi => hi0 <| by linarith [ show 0 ≤ A.H.eigenvalues i by simpa using hA.eigenvalues_nonneg i ] ) hi0
+    · exact A.eigenvalues_le_one_of_le_one hA1 i
+    · exact hp
 
 /-
 PROBLEM
@@ -203,33 +321,25 @@ Show that for density matrices ρ, σ (PSD with trace 1) and α > 1,
 Tr[(σ^t ρ σ^t)^α] ≥ 1, where t = (1-α)/(2α).
 
 PROVIDED SOLUTION
-Let A = σ^t ρ σ^t (which is PSD). We use the trace Hölder inequality.
+Let A = σ^t ρ σ^t (PSD) with t = (1-α)/(2α) < 0 (since α > 1).
+Use inner_le_trace_rpow_mul (Hermitian trace Hölder inequality) with the pair
+(A, σ^{-2t}) and exponents p = α, q = α/(α-1).
 
-Step 1: Show that Tr[A · σ^{-2t}] = Tr[ρ] = 1.
-  We have A · σ^{-2t} = σ^t ρ σ^t · σ^{-2t} = σ^t ρ σ^{-t}.
-  By cyclicity: Tr[σ^t ρ σ^{-t}] = Tr[σ^{-t} σ^t ρ] = Tr[P_σ ρ] = Tr[ρ] = 1,
-  where P_σ is the projection onto σ's support, and P_σ ρ = ρ by the kernel condition.
-  Equivalently: ⟪A, σ^{-2t}⟫ = 1.
+Step 1: Compute ⟪A, σ^{-2t}⟫_ℝ = 1.
+  A = σ^t ρ σ^t, so A * σ^{-2t} = σ^t ρ σ^{t-2t} = σ^t ρ σ^{-t}.
+  Tr[σ^t ρ σ^{-t}] = Tr[σ^{-t} σ^t ρ] = Tr[P_σ ρ] = Tr[ρ] = 1
+  (where P_σ is the support projection of σ, and P_σ ρ = ρ by kernel condition).
 
-Step 2: Apply the trace Hölder inequality with p = α, q = α/(α-1):
-  ⟪A, σ^{-2t}⟫ ≤ Tr[A^α]^{1/α} · Tr[σ^{-2t·q}]^{1/q}
+Step 2: By inner_le_trace_rpow_mul:
+  ⟪A, σ^{-2t}⟫_ℝ ≤ Tr[A^α]^{1/α} * Tr[σ^{-2t*q}]^{1/q}
 
-Step 3: Compute -2t · q = -(1-α)/α · α/(α-1) = (α-1)/α · α/(α-1) = 1.
-  So Tr[σ^{-2t·q}] = Tr[σ^1] = Tr[σ] = 1.
+Step 3: Compute -2t * q = -(1-α)/α * α/(α-1) = 1.
+  So Tr[σ^1] = 1.
 
-Step 4: From 1 ≤ Tr[A^α]^{1/α} · 1, we get Tr[A^α] ≥ 1.
+Step 4: From 1 = ⟪A, σ^{-2t}⟫_ℝ ≤ Tr[A^α]^{1/α} * 1, get Tr[A^α] ≥ 1.
 -/
 private theorem sandwiched_trace_of_gt_1 (h : σ.M.ker ≤ ρ.M.ker) (hα : α > 1) :
     1 ≤ ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).mat) ^ α).trace := by
-  -- A is PSD
-  have hA_nonneg : 0 ≤ ρ.M.conj (σ.M ^ ((1 - α)/(2 * α))).mat :=
-    HermitianMat.conj_nonneg _ ρ.nonneg
-  -- The proof uses the trace Hölder inequality:
-  -- Step 1: ⟪A, σ^{-2t}⟫ = Tr[ρ] = 1 (via kernel condition and rpow algebra)
-  -- Step 2: By Hölder with p = α, q = α/(α-1):
-  --   1 ≤ Tr[A^α]^{1/α} · Tr[σ^{-2t·q}]^{1/q}
-  -- Step 3: The exponent -2t·q = 1, so Tr[σ] = 1
-  -- Step 4: 1 ≤ Tr[A^α]^{1/α}, hence Tr[A^α] ≥ 1
   sorry
 
 private theorem sandwichedRelRentropy_nonneg_α_lt_1 (h : σ.M.ker ≤ ρ.M.ker) (hα0 : 0 < α) (hα : α < 1) :
