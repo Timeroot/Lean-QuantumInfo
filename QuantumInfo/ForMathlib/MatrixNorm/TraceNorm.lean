@@ -130,6 +130,15 @@ theorem PosSemidef.traceNorm_PSD_eq_trace {A : Matrix m m R} (hA : A.PosSemidef)
   open MatrixOrder in
   rw [traceNorm, this, CFC.sqrt_sq A, hA.1.re_trace_eq_trace]
 
+/-- The trace norm is convex. Property 9.1.5 in Wilde -/
+theorem traceNorm_convex (M N : Matrix n n R) (l : ℝ) (hl : 0 ≤ l ∧ l ≤ 1) :
+  ((l:R) • M + ((1 - l) : R) • N).traceNorm ≤ l * M.traceNorm + (1-l) * N.traceNorm := by
+  refine (traceNorm_triangleIneq _ _).trans ?_
+  simp_rw [traceNorm_smul]
+  nth_rw 1 [← RCLike.ofReal_one]
+  simp_rw [← RCLike.ofReal_sub, RCLike.norm_ofReal]
+  rw [abs_of_nonneg (hl.1), abs_of_nonneg (sub_nonneg.mpr (hl.2))]
+
 end traceNorm
 
 end Matrix
