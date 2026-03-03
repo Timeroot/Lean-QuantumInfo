@@ -46,20 +46,32 @@ theorem traceNorm_nonneg (A : Matrix m n R) : 0 ≤ A.traceNorm :=
   And.left $ RCLike.nonneg_iff.1
     (Matrix.nonneg_iff_posSemidef.mp (CFC.sqrt_nonneg (Aᴴ * A))).trace_nonneg
 
-/-- The trace norm is zero only if the matrix is zero. -/
+/-- The trace norm is zero iff. the matrix is zero. -/
 theorem traceNorm_zero_iff (A : Matrix m n R) : A.traceNorm = 0 ↔ A = 0 := by
   open MatrixOrder in
+  set B := CFC.sqrt (Aᴴ * A) with hB_de
+  have hB_posSemidef := Matrix.nonneg_iff_posSemidef.mp (CFC.sqrt_nonneg (Aᴴ * A))
+  have hB_hermitian : B.IsHermitian := hB_posSemidef.1
+  have hB_pos : B.PosSemidef := ⟨hB_hermitian, hB_posSemidef.2⟩
   constructor
   · intro h
-    have h₂ : ∀ i, (Matrix.nonneg_iff_posSemidef.mp (CFC.sqrt_nonneg (Aᴴ * A))).1.eigenvalues i = 0 :=
-      sorry --sum of nonnegative values to zero
-    have h₃ : CFC.sqrt (Aᴴ * A) = 0 :=
-      sorry --all eigenvalues are zero iff matrix is zero
-    have h₄ : Aᴴ * A = 0 :=
-      sorry --sqrt is zero iff matrix is zero
-    have h₅ : A = 0 :=
-      sorry --conj_mul_self is zero iff A is zero
-    exact h₅
+    have h₂ : ∀ i, hB_hermitian.eigenvalues i = 0 := by
+      have h_sum : (↑(∑ j, hB_hermitian.eigenvalues j) : R) = 0 := by
+        rw [hB_hermitian.sum_eigenvalues_eq_trace, ← hB_hermitian.re_trace_eq_trace]
+        unfold traceNorm at h
+        norm_cast
+      have : ∑ j, hB_hermitian.eigenvalues j = 0 := by exact_mod_cast h_sum
+      intro i
+      exact Finset.sum_eq_zero_iff_of_nonneg (λ j _ => hB_pos.eigenvalues_nonneg j)
+        |>.mp this i (Finset.mem_univ i)
+    have h₃ : CFC.sqrt (Aᴴ * A) = 0 := hB_hermitian.eigenvalues_zero_eq_zero h₂
+    have h₄ : Aᴴ * A = 0 := by
+      simpa [h₃] using (
+        CFC.nnrpow_sqrt_two (Aᴴ * A)
+        (Matrix.nonneg_iff_posSemidef.mpr A.posSemidef_conjTranspose_mul_self)
+      ).symm
+    rw [Matrix.conjTranspose_mul_self_eq_zero] at h₄
+    exact h₄
   · rintro rfl
     simp
 
@@ -79,7 +91,14 @@ theorem traceNorm_smul (A : Matrix m n R) (c : R) : (c • A).traceNorm = ‖c�
   by_cases h : c = 0
   · subst c
     simp
-  · sorry --need `CFC.sqrt_smul` or similar
+  · have hM_pd : (Aᴴ * A).PosSemidef := by apply posSemidef_conjTranspose_mul_self
+    set M := (Aᴴ * A)
+    rw [sq]
+    simp [MulAction.mul_smul]
+    apply CFC.sqrt_unique;
+    · simp; rw [CFC.sqrt_mul_sqrt_self M hM_pd.nonneg]
+    · exact le_trans ( by norm_num ) (
+        smul_le_smul_of_nonneg_left ( show 0 ≤ CFC.sqrt M from by exact (CFC.sqrt_nonneg M) ) ( norm_nonneg c ) );
 
 /-- For square matrices, the trace norm is max Tr[U * A] over unitaries U.-/
 theorem traceNorm_eq_max_tr_U (A : Matrix n n R) : IsGreatest {x | ∃ (U : unitaryGroup n R), (U.1 * A).trace = x} A.traceNorm := by
@@ -110,6 +129,15 @@ theorem PosSemidef.traceNorm_PSD_eq_trace {A : Matrix m m R} (hA : A.PosSemidef)
   have : Aᴴ * A = A^2 := by rw [hA.1, pow_two]
   open MatrixOrder in
   rw [traceNorm, this, CFC.sqrt_sq A, hA.1.re_trace_eq_trace]
+
+/-- The trace norm is convex. Property 9.1.5 in Wilde -/
+theorem traceNorm_convex (M N : Matrix n n R) (l : ℝ) (hl : 0 ≤ l ∧ l ≤ 1) :
+  ((l:R) • M + ((1 - l) : R) • N).traceNorm ≤ l * M.traceNorm + (1-l) * N.traceNorm := by
+  refine (traceNorm_triangleIneq _ _).trans ?_
+  simp_rw [traceNorm_smul]
+  nth_rw 1 [← RCLike.ofReal_one]
+  simp_rw [← RCLike.ofReal_sub, RCLike.norm_ofReal]
+  rw [abs_of_nonneg (hl.1), abs_of_nonneg (sub_nonneg.mpr (hl.2))]
 
 end traceNorm
 
