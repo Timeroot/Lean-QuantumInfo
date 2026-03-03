@@ -91,7 +91,14 @@ theorem traceNorm_smul (A : Matrix m n R) (c : R) : (c • A).traceNorm = ‖c�
   by_cases h : c = 0
   · subst c
     simp
-  · sorry --need `CFC.sqrt_smul` or similar
+  · have hM_pd : (Aᴴ * A).PosSemidef := by apply posSemidef_conjTranspose_mul_self
+    set M := (Aᴴ * A)
+    rw [sq]
+    simp [MulAction.mul_smul]
+    apply CFC.sqrt_unique;
+    · simp; rw [CFC.sqrt_mul_sqrt_self M hM_pd.nonneg]
+    · exact le_trans ( by norm_num ) (
+        smul_le_smul_of_nonneg_left ( show 0 ≤ CFC.sqrt M from by exact (CFC.sqrt_nonneg M) ) ( norm_nonneg c ) );
 
 /-- For square matrices, the trace norm is max Tr[U * A] over unitaries U.-/
 theorem traceNorm_eq_max_tr_U (A : Matrix n n R) : IsGreatest {x | ∃ (U : unitaryGroup n R), (U.1 * A).trace = x} A.traceNorm := by
