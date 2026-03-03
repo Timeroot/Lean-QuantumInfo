@@ -211,8 +211,8 @@ theorem IsHermitianPreserving {M : MatrixMap A B R}
   intro x hx
   let xH : HermitianMat _ _ := ⟨x, hx⟩
   classical --because PosPart requires DecidableEq
-  have hMPos := hM (HermitianMat.zero_le_iff.mp xH.zero_le_posPart)
-  have hMNeg := hM (HermitianMat.zero_le_iff.mp xH.negPart_le_zero)
+  have hMPos := hM (HermitianMat.zero_le_iff.mp xH.posPart_nonneg)
+  have hMNeg := hM (HermitianMat.zero_le_iff.mp xH.negPart_nonneg)
   have hSub := hMPos.isHermitian.sub hMNeg.isHermitian
   rw [← map_sub] at hSub
   convert ← hSub

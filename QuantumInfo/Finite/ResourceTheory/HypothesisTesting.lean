@@ -238,7 +238,7 @@ theorem pos_of_lt_one {ρ : MState d} (S : Set (MState d))
   rw [h, iSup_eq_bot, bot_eq_zero''] at hT₄
   specialize hT₄ σ
   simp only [iSup_pos hσ₁, Subtype.ext_iff, Set.Icc.coe_zero, MState.exp_val] at hT₄
-  rw [HermitianMat.inner_zero_iff σ.zero_le hT₂] at hT₄
+  rw [HermitianMat.inner_zero_iff σ.nonneg hT₂] at hT₄
   replace hT₁ : ρ.exp_val (1 - T) ≠ 1 := (lt_of_le_of_lt hT₁ hε).ne
   absurd hT₁
   rw [ρ.exp_val_eq_one_iff ?_, sub_sub_cancel]
@@ -341,7 +341,7 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
   --If ρ isn't in the support of σ, the right hand side is just ⊤. (The left hand side is not, necessarily!)
   by_cases h_supp : σ.M.ker ≤ ρ.M.ker
   swap
-  · simp [SandwichedRelRentropy, h_supp]
+  · simp [SandwichedRelRentropy, h_supp, zero_lt_one.trans hα]
 
   --Now we know that ρ.support ≤ σ.support. This is the main case we actually care about.
   --Proof from https://link.springer.com/article/10.1007/s00220-016-2645-4 reproduced below.
@@ -393,7 +393,7 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
       --Turn it into a POVM (probably want to have lemmas around this ideally)
       let Λ : POVM (Fin 2) d := {
         mats i := if i = 0 then T else 1 - T
-        zero_le i := by
+        nonneg i := by
           split
           · exact T.prop.2.1
           · exact HermitianMat.zero_le_iff.mpr T.prop.2.2
@@ -426,7 +426,7 @@ theorem Ref81Lem5 (ρ σ : MState d) (ε : Prob) (hε : ε < 1) (α : ℝ) (hα 
 
 
   --The Renyi entropy is finite
-  rw [SandwichedRelRentropy, dif_pos ?_]; swap
+  rw [SandwichedRelRentropy, dif_pos (zero_lt_one.trans hα), dif_pos ?_]; swap
   · suffices q2.M.ker = ⊥ by
       simp only [this, bot_le]
     --q2 has eigenvalues β_ ε(ρ‖{σ}) and 1-β_ ε(ρ‖{σ}), so as long as β_ ε(ρ‖{σ}) isn't 0 or 1,

@@ -36,7 +36,7 @@ open scoped RealInnerProductSpace
  case it is equal to a CPTP map `measurement_map`. -/
 structure POVM (X : Type*) (d : Type*) [Fintype X] [Fintype d] [DecidableEq d] where
   mats : X → HermitianMat d ℂ
-  zero_le : ∀ x, 0 ≤ (mats x)
+  nonneg : ∀ x, 0 ≤ (mats x)
   normalized : ∑ x, mats x = 1
 
 namespace POVM
@@ -90,7 +90,7 @@ def measurementMap (Λ : POVM X d) : CPTPMap d (d × X) where
     rw [show (1 : Matrix d d ℂ) = (1 : HermitianMat d ℂ).mat by rfl, ← Λ.normalized]
     rw [HermitianMat.mat_finset_sum]
     congr! with i _
-    exact HermitianMat.pow_half_mul (Λ.zero_le i)
+    exact HermitianMat.pow_half_mul (Λ.nonneg i)
 
 open Kronecker in
 theorem measurementMap_apply_matrix (Λ : POVM X d) (m : Matrix d d ℂ) :
@@ -117,7 +117,7 @@ theorem measurementMap_apply_hermitianMat (Λ : POVM X d) (m : HermitianMat d �
 /-- A POVM leads to a distribution of outcomes on any given mixed state ρ. -/
 def measure (Λ : POVM X d) (ρ : MState d) : Distribution X := .mk'
     (f := fun x ↦ ⟪Λ.mats x, ρ.M⟫)
-    (h₁ := fun x ↦ HermitianMat.inner_ge_zero (Λ.zero_le x) ρ.zero_le)
+    (h₁ := fun x ↦ HermitianMat.inner_ge_zero (Λ.nonneg x) ρ.nonneg)
     (hN := by
       simp [HermitianMat.inner_eq_re_trace, ← Complex.re_sum, ← trace_sum, ← Finset.sum_mul,
         ← HermitianMat.mat_finset_sum, Λ.normalized])
@@ -142,7 +142,7 @@ theorem traceLeft_measurementMap_eq_measure (Λ : POVM X d) (ρ : MState d) :
     simp only [measure, Distribution.mk', Distribution.funlike_apply, and_self, Finset.sum_ite_eq',
       Finset.mem_univ, ↓reduceIte]
     change _ = Matrix.trace _
-    rw [Matrix.trace_mul_cycle, HermitianMat.pow_half_mul (Λ.zero_le i)]
+    rw [Matrix.trace_mul_cycle, HermitianMat.pow_half_mul (Λ.nonneg i)]
     exact HermitianMat.inner_eq_trace_rc _ _
   · conv => enter [2, 2, x]; rw [if_neg (by grind)]
     simp
@@ -164,7 +164,7 @@ noncomputable def measureForget (Λ : POVM X d) : CPTPMap d d :=
 
 proof_wanted measureForget_eq_kraus (Λ : POVM X d) :
     Λ.measureForget = CPTPMap.of_kraus_CPTPMap (fun i ↦ (Λ.mats i) ^ (1/2 : ℝ)) (by
-      simpa [-one_div, fun x ↦ HermitianMat.pow_half_mul (Λ.zero_le x), HermitianMat.ext_iff]
+      simpa [-one_div, fun x ↦ HermitianMat.pow_half_mul (Λ.nonneg x), HermitianMat.ext_iff]
         using Λ.normalized
     )
 

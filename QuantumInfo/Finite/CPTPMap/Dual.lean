@@ -419,7 +419,7 @@ theorem MatrixMap.IsPositive.hermDual (h : MatrixMap.IsPositive f.map) : f.hermD
   change Matrix.PosSemidef (f.hermDual xH).mat
   rw [← HermitianMat.zero_le_iff] at hx ⊢
   classical
-  rw [HermitianMat.zero_le_iff_inner_pos]
+  rw [HermitianMat.nonneg_iff_inner_nonneg]
   intro y hy
   rw [HermitianMat.zero_le_iff] at hy
   specialize h hy

@@ -9,7 +9,19 @@ import Mathlib.Analysis.CStarAlgebra.Classes
 import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.PosPart.Basic
 
 /-!
-The positive parts, or equivalently the projections, of Hermitian matrices onto each other.
+
+# Projectors associated to Hermitian matrices
+
+ * `projector`: The `HermitianMat` that projects onto a given submodule
+ * `supportProj`: The `HermitianMat` that projects onto the range (nonzero eigenvalues)
+ * `kerProj`: The `HermitianMat` that projects onto the kernel
+ * `projLE`: With notation `{A ≤ₚ B}`, `projLE A B` is the projector onto the nonnegative
+   eigenspace of `B - A`.
+ * `projLT`: With notation `{A <ₚ B}`, `projLT A B` is the projector onto the positive
+   eigenspace of `B - A`.
+ * Positive and negative part, written `A⁺` and `A⁻`, give the restriction of a HermitianMat
+   onto its positive (resp. negative) eigenvalues; equivalently, it's nonnegative (resp.
+   nonpositive) eigenvalues.
 -/
 
 noncomputable section
@@ -169,79 +181,73 @@ theorem supportProj_eq_cfc : A.supportProj = A.cfc (if · = 0 then 0 else 1) := 
 /-- Projector onto the non-negative eigenspace of `B - A`. Accessible by the notation
 `{A ≤ₚ B}`, which is scoped to `HermitianMat`. This is the unique maximum operator `P`
 such that `P^2 = P` and `P * A * P ≤ P * B * P` in the Loewner order. -/
-def proj_le (A B : HermitianMat n 𝕜) : HermitianMat n 𝕜 :=
+def projLE (A B : HermitianMat n 𝕜) : HermitianMat n 𝕜 :=
   (B - A).cfc (fun x ↦ if 0 ≤ x then 1 else 0)
 
 /-- Projector onto the positive eigenspace of `B - A`. Accessible by the notation
 `{A <ₚ B}`, which is scoped to `HermitianMat`. Compare with `proj_le`. -/
-noncomputable def proj_lt (A B : HermitianMat n 𝕜) : HermitianMat n 𝕜 :=
+noncomputable def projLT (A B : HermitianMat n 𝕜) : HermitianMat n 𝕜 :=
   (B - A).cfc (fun x ↦ if 0 < x then 1 else 0)
 
 -- Note this is in the opposite direction as in the Stein's Lemma paper, which uses `≥ₚ`
 -- as the default ordering. We offer the `≥ₚ` notation which is the same with the arguments
 -- flipped, similar to how `GT.gt` is defeq to `LT.lt` with arguments flipped.
 -- We put the ≥ₚ first, since both can delaborate and we want to show the ≤ₚ one.
-scoped notation "{" A " ≥ₚ " B "}" => proj_le B A
-scoped notation "{" A " ≤ₚ " B "}" => proj_le A B
+scoped notation "{" A " ≥ₚ " B "}" => projLE B A
+scoped notation "{" A " ≤ₚ " B "}" => projLE A B
 
-scoped notation "{" A " >ₚ " B "}" => proj_lt B A
-scoped notation "{" A " <ₚ " B "}" => proj_lt A B
+scoped notation "{" A " >ₚ " B "}" => projLT B A
+scoped notation "{" A " <ₚ " B "}" => projLT A B
 
-theorem proj_le_def : {A ≤ₚ B} = (B - A).cfc (fun x ↦ if 0 ≤ x then 1 else 0) := by
+theorem projLE_def : {A ≤ₚ B} = (B - A).cfc (fun x ↦ if 0 ≤ x then 1 else 0) := by
   rfl
 
-theorem proj_lt_def : {A <ₚ B} = (B - A).cfc (fun x ↦ if 0 < x then 1 else 0) := by
+theorem projLT_def : {A <ₚ B} = (B - A).cfc (fun x ↦ if 0 < x then 1 else 0) := by
   rfl
 
-theorem proj_le_sq : {A ≤ₚ B}^2 = {A ≤ₚ B} := by
-  rw [proj_le_def]
-  --TODO: Should do a `HermitianMat.cfc_pow`.
-  ext1
-  simp only [cfc, mat_pow, mat_mk]
-  rw [← cfc_pow _ 2 (hf := by cfc_cont_tac)]
+theorem projLE_sq : {A ≤ₚ B}^2 = {A ≤ₚ B} := by
+  rw [projLE_def, ← cfc_pow, ← cfc_comp]
+  congr! 2 with x
   simp
 
-theorem proj_lt_sq : {A <ₚ B}^2 = {A <ₚ B} := by
-  rw [proj_lt_def]
-  --TODO: Should do a `HermitianMat.cfc_pow`.
-  ext1
-  simp only [cfc, mat_pow, mat_mk]
-  rw [← cfc_pow _ 2 (hf := by cfc_cont_tac)]
+theorem projLT_sq : {A <ₚ B}^2 = {A <ₚ B} := by
+  rw [projLT_def, ← cfc_pow, ← cfc_comp]
+  congr! 2 with x
   simp
 
-theorem proj_zero_le_cfc : {0 ≤ₚ A} = cfc A (fun x ↦ if 0 ≤ x then 1 else 0) := by
-  simp only [proj_le, sub_zero]
+theorem projLE_zero_cfc : {0 ≤ₚ A} = A.cfc (fun x ↦ if 0 ≤ x then 1 else 0) := by
+  simp only [projLE_def, sub_zero]
 
-theorem proj_zero_lt_cfc : {0 <ₚ A} = cfc A (fun x ↦ if 0 < x then 1 else 0) := by
-  simp only [proj_lt, sub_zero]
+theorem projLT_zero_cfc : {0 <ₚ A} = A.cfc (fun x ↦ if 0 < x then 1 else 0) := by
+  simp only [projLT_def, sub_zero]
 
-theorem proj_le_zero_cfc : {A ≤ₚ 0} = cfc A (fun x ↦ if x ≤ 0 then 1 else 0) := by
-  simp only [proj_le, zero_sub]
+theorem projLE_zero_cfc' : {A ≤ₚ 0} = A.cfc (fun x ↦ if x ≤ 0 then 1 else 0) := by
+  simp only [projLE_def, zero_sub]
   --TODO: Should do a `HermitianMat.cfc_comp_neg`?
   nth_rw 1 [← cfc_id A]
   rw [← cfc_neg, ← cfc_comp]
   congr! 2 with x
   simp
 
-theorem proj_lt_zero_cfc : {A <ₚ 0} = cfc A (fun x ↦ if x < 0 then 1 else 0) := by
-  simp only [proj_lt, zero_sub]
+theorem projLT_zero_cfc' : {A <ₚ 0} = A.cfc (fun x ↦ if x < 0 then 1 else 0) := by
+  simp only [projLT_def, zero_sub]
   --TODO: Should do a `HermitianMat.cfc_comp_neg`?
   nth_rw 1 [← cfc_id A]
   rw [← cfc_neg, ← cfc_comp]
   congr! 2 with x
   simp
 
-theorem proj_le_nonneg : 0 ≤ {A ≤ₚ B} := by
-  rw [proj_le, zero_le_cfc]
+theorem projLE_nonneg : 0 ≤ {A ≤ₚ B} := by
+  rw [projLE_def, cfc_nonneg_iff]
   intro i
   apply ite_nonneg <;> norm_num
 
-theorem proj_lt_nonneg : 0 ≤ {A <ₚ B} := by
-  rw [proj_lt, zero_le_cfc]
+theorem projLT_nonneg : 0 ≤ {A <ₚ B} := by
+  rw [projLT_def, cfc_nonneg_iff]
   intro i
   apply ite_nonneg <;> norm_num
 
-theorem proj_le_le_one : {A ≤ₚ B} ≤ 1 := by
+theorem projLE_le_one : {A ≤ₚ B} ≤ 1 := by
   --The whole `rw` line is a defeq, i.e. `change _root_.cfc _ (B - A).mat ≤ 1` works too.
   --TODO better API.
   open MatrixOrder in
@@ -250,21 +256,21 @@ theorem proj_le_le_one : {A ≤ₚ B} ≤ 1 := by
   intros; split <;> norm_num
 
 open MatrixOrder in
-theorem proj_le_mul_nonneg : 0 ≤ {A ≤ₚ B}.mat * (B - A).mat := by
-  rw [proj_le]
+theorem projLE_mul_nonneg : 0 ≤ {A ≤ₚ B}.mat * (B - A).mat := by
+  rw [projLE_def]
   nth_rewrite 2 [← cfc_id (B - A)]
   rw [← mat_cfc_mul]
   apply cfc_nonneg
   aesop
 
 open MatrixOrder in
-theorem proj_le_mul_le : {A ≤ₚ B}.mat * A.mat ≤ {A ≤ₚ B}.mat * B.mat := by
+theorem projLE_mul_le : {A ≤ₚ B}.mat * A.mat ≤ {A ≤ₚ B}.mat * B.mat := by
   rw [← sub_nonneg, ← mul_sub_left_distrib]
-  exact proj_le_mul_nonneg A B
+  exact projLE_mul_nonneg A B
 
 @[simp]
 theorem proj_le_add_lt : {A <ₚ B} + {B ≤ₚ A} = 1 := by
-  rw [proj_le, proj_lt]
+  rw [projLE_def, projLT_def]
   rw [← neg_sub A B]
   nth_rw 1 [← cfc_id (A - B)]
   rw[← cfc_neg, ← cfc_comp, ← cfc_add]
@@ -274,7 +280,7 @@ theorem proj_le_add_lt : {A <ₚ B} + {B ≤ₚ A} = 1 := by
 
 theorem conj_lt_add_conj_le : A.conj {A <ₚ 0} + A.conj {0 ≤ₚ A} = A := by
   rw (occs := [2, 4, 5]) [← cfc_id A]
-  rw [proj_lt_zero_cfc, proj_zero_le_cfc, cfc_conj, cfc_conj, ← cfc_add]
+  rw [projLT_zero_cfc', projLE_zero_cfc, cfc_conj, cfc_conj, ← cfc_add]
   congr; ext
   simp; grind
 
@@ -284,23 +290,17 @@ and negative eigenvalues.
 -/
 theorem supportProj_eq_proj_lt_add_proj_lt (A : HermitianMat n 𝕜) :
     A.supportProj = {A <ₚ 0} + {0 <ₚ A} := by
-  rw [supportProj_eq_cfc, proj_lt_zero_cfc, proj_zero_lt_cfc, ← cfc_add A]
+  rw [supportProj_eq_cfc, projLT_zero_cfc, projLT_zero_cfc', ← cfc_add A]
   congr 1
   grind only [Pi.add_apply]
 
 /-- The positive part of a Hermitian matrix: the projection onto its positive eigenvalues. -/
-def proj_pos : HermitianMat n 𝕜 :=
-  A.cfc (fun x ↦ x ⊔ 0)
+instance : PosPart (HermitianMat n 𝕜) where
+  posPart A := A.cfc (fun x ↦ x ⊔ 0)
 
 /-- The negative part of a Hermitian matrix: the projection onto its negative eigenvalues. -/
-def proj_neg : HermitianMat n 𝕜 :=
-  A.cfc (fun x ↦ -x ⊔ 0)
-
-instance : PosPart (HermitianMat n 𝕜) where
-  posPart := proj_pos
-
 instance : NegPart (HermitianMat n 𝕜) where
-  negPart := proj_neg
+  negPart A := A.cfc (fun x ↦ -x ⊔ 0)
 
 theorem posPart_eq_cfc_max : A⁺ = A.cfc (fun x ↦ x ⊔ 0) := by
   rfl
@@ -345,17 +345,23 @@ theorem posPart_add_negPart : A⁺ - A⁻ = A := by
   convert cfc_id A
   ext; dsimp; grind
 
-theorem zero_le_posPart : 0 ≤ A⁺ := by
-  rw [posPart_eq_cfc_ite, zero_le_cfc]
+theorem posPart_eq_self {A : HermitianMat n 𝕜} (hA : 0 ≤ A) :
+    A⁺ = A := by
+  nth_rw 2 [← cfc_id A]
+  apply cfc_congr_of_nonneg hA
+  grind [Set.EqOn]
+
+theorem posPart_nonneg : 0 ≤ A⁺ := by
+  rw [posPart_eq_cfc_ite, cfc_nonneg_iff]
   intro; split <;> order
 
-theorem negPart_le_zero : 0 ≤ A⁻ := by
-  rw [negPart_eq_cfc_ite, zero_le_cfc]
+theorem negPart_nonneg : 0 ≤ A⁻ := by
+  rw [negPart_eq_cfc_ite, cfc_nonneg_iff]
   intro; split <;> grind
 
 theorem posPart_le : A ≤ A⁺ := by
   nth_rw 1 [← cfc_id A]
-  rw [posPart_eq_cfc_ite, ← sub_nonneg, ← cfc_sub, zero_le_cfc]
+  rw [posPart_eq_cfc_ite, ← sub_nonneg, ← cfc_sub, cfc_nonneg_iff]
   intro; simp; split <;> order
 
 theorem posPart_mul_negPart : A⁺.mat * A⁻.mat = 0 := by
@@ -366,21 +372,21 @@ theorem posPart_mul_negPart : A⁺.mat * A⁻.mat = 0 := by
 
 open RealInnerProductSpace
 
-theorem proj_le_inner_nonneg  : 0 ≤ ⟪{A ≤ₚ B}, (B - A)⟫ :=
+theorem projLE_inner_nonneg  : 0 ≤ ⟪{A ≤ₚ B}, (B - A)⟫ :=
   --This inner is equal to `(B - A)⁺.trace`, could be better way to describe it
-  inner_mul_nonneg (proj_le_mul_nonneg A B)
+  inner_mul_nonneg (projLE_mul_nonneg A B)
 
-theorem proj_le_inner_le : ⟪{A ≤ₚ B}, A⟫ ≤ ⟪{A ≤ₚ B}, B⟫ := by
+theorem projLE_inner_le : ⟪{A ≤ₚ B}, A⟫ ≤ ⟪{A ≤ₚ B}, B⟫ := by
   rw [← sub_nonneg, ← inner_sub_right]
-  exact proj_le_inner_nonneg A B
+  exact projLE_inner_nonneg A B
 
 open RealInnerProductSpace in
-theorem inner_proj_le_nonneg : 0 ≤ ⟪{A ≤ₚ B}, (B - A)⟫ :=
-  proj_le_inner_nonneg A B
+theorem inner_projLE_nonneg : 0 ≤ ⟪{A ≤ₚ B}, (B - A)⟫ :=
+  projLE_inner_nonneg A B
 
 open RealInnerProductSpace in
-theorem inner_proj_le_le : ⟪{A ≤ₚ B}, A⟫ ≤ ⟪{A ≤ₚ B}, B⟫ :=
-  proj_le_inner_le A B
+theorem inner_projLE_le : ⟪{A ≤ₚ B}, A⟫ ≤ ⟪{A ≤ₚ B}, B⟫ :=
+  projLE_inner_le A B
 
 --TODO: When we upgrade `cfc_continuous` from 𝕜 to ℂ, we upgrade these too.
 @[fun_prop]
@@ -418,13 +424,12 @@ proof_wanted posPart_eq_zero_iff : A⁺ = 0 ↔ A ≤ 0
 
 -- variable {d : Type*} [Fintype d] [DecidableEq d] (A B : HermitianMat d ℂ)
 
-theorem one_sub_proj_le : 1 - {B ≤ₚ A} = {A <ₚ B} := by
+theorem one_sub_projLT : 1 - {B ≤ₚ A} = {A <ₚ B} := by
   rw [sub_eq_iff_eq_add, proj_le_add_lt]
 
-open MatrixOrder ComplexOrder
-
-theorem proj_lt_mul_nonneg : 0 ≤ {A <ₚ B}.mat * (B - A).mat := by
-  rw [proj_lt]
+open MatrixOrder ComplexOrder in
+theorem projLT_mul_nonneg : 0 ≤ {A <ₚ B}.mat * (B - A).mat := by
+  rw [projLT_def]
   nth_rewrite 2 [← cfc_id (B - A)]
   rw [← mat_cfc_mul]
   apply cfc_nonneg
@@ -432,9 +437,10 @@ theorem proj_lt_mul_nonneg : 0 ≤ {A <ₚ B}.mat * (B - A).mat := by
   simp only [Pi.mul_apply, id_eq, ite_mul, one_mul, zero_mul]
   split <;> order
 
+open MatrixOrder ComplexOrder in
 theorem proj_lt_mul_lt : {A <ₚ B}.mat * A.mat ≤ {A <ₚ B}.mat * B.mat := by
   rw [← sub_nonneg, ← mul_sub_left_distrib]
-  exact A.proj_lt_mul_nonneg B
+  exact A.projLT_mul_nonneg B
 
 theorem inner_negPart_nonpos : ⟪A, A⁻⟫ ≤ 0 := by
   rw [← neg_le_neg_iff, neg_zero, ← inner_neg_right]
@@ -444,7 +450,7 @@ theorem inner_negPart_nonpos : ⟪A, A⁻⟫ ≤ 0 := by
   rw [← cfc_neg]
   rw [← mat_cfc_mul]
   change 0 ≤ A.cfc _
-  rw [zero_le_cfc]
+  rw [cfc_nonneg_iff]
   intro i
   dsimp
   split_ifs with h
@@ -464,8 +470,7 @@ theorem inner_negPart_zero_iff : ⟪A, A⁻⟫ = 0 ↔ 0 ≤ A := by
     nth_rw 1 [← posPart_add_negPart A] at h
     rw [inner_sub_left, sub_eq_zero, posPart_inner_negPart_zero, eq_comm, inner_self_eq_zero] at h
     rw [← zero_smul ℝ 1, ← cfc_const A, negPart_eq_cfc_ite] at h --TODO cfc_zero
-    rw [cfc_eq_cfc_iff_eqOn, A.H.spectrum_real_eq_range_eigenvalues] at h
-    simp only [Set.eqOn_range] at h
+    rw [cfc_eq_cfc_iff_eqOn, A.H.spectrum_real_eq_range_eigenvalues, Set.eqOn_range] at h
     replace h (i) := congrFun h i
     simp only [Function.comp_apply, ite_eq_right_iff, neg_eq_zero] at h
     rw [zero_le_iff, A.H.posSemidef_iff_eigenvalues_nonneg]
@@ -475,18 +480,18 @@ theorem inner_negPart_zero_iff : ⟪A, A⁻⟫ = 0 ↔ 0 ≤ A := by
   · intro h
     apply le_antisymm
     · exact inner_negPart_nonpos A
-    · exact inner_ge_zero h (negPart_le_zero A)
+    · exact inner_ge_zero h (negPart_nonneg A)
 
 theorem inner_negPart_neg_iff : ⟪A, A⁻⟫ < 0 ↔ ¬0 ≤ A := by
   simp [← inner_negPart_zero_iff, lt_iff_le_and_ne, inner_negPart_nonpos A]
 
 /-- The self-duality of the PSD cone: a matrix is PSD iff its inner product with all
 nonnegative matrices is non-negative. -/
-theorem zero_le_iff_inner_pos (A : HermitianMat n 𝕜) :
+theorem nonneg_iff_inner_nonneg (A : HermitianMat n 𝕜) :
     0 ≤ A ↔ ∀ B, 0 ≤ B → 0 ≤ ⟪A, B⟫ := by
   use fun h _ ↦ inner_ge_zero h
   intro h
   contrapose! h
   classical
-  use A⁻, negPart_le_zero A
+  use A⁻, negPart_nonneg A
   rwa [inner_negPart_neg_iff]

@@ -5,6 +5,7 @@ Authors: Alex Meiburg
 -/
 import Mathlib.LinearAlgebra.Matrix.Kronecker
 import Mathlib.LinearAlgebra.Matrix.PosDef
+import QuantumInfo.ForMathlib.HermitianMat.Unitary
 
 open BigOperators
 open Classical

@@ -47,10 +47,8 @@ We don't `extend (M : HermitianMat d ℂ)` because that gives an annoying thing 
 @[ext]
 structure MState (d : Type*) [Fintype d] [DecidableEq d] where
   M : HermitianMat d ℂ
-  zero_le : 0 ≤ M
+  nonneg : 0 ≤ M
   tr : M.trace = 1
-
-namespace MState
 
 variable {d d₁ d₂ d₃ : Type*}
 variable [Fintype d] [Fintype d₁] [Fintype d₂] [Fintype d₃]
@@ -58,6 +56,8 @@ variable [DecidableEq d] [DecidableEq d₁] [DecidableEq d₂] [DecidableEq d₃
 
 variable (ψ φ : Ket d)
 variable (ρ σ : MState d)
+
+namespace MState
 
 attribute [coe] MState.M
 instance instCoe : Coe (MState d) (HermitianMat d ℂ) := ⟨MState.M⟩
@@ -71,15 +71,35 @@ def m (ρ : MState d) : Matrix d d ℂ := ρ.M.mat
 theorem mat_M : ρ.M.mat = ρ.m := by
   rfl
 
+theorem pos (ρ : MState d) : 0 < ρ.M := by
+  apply ρ.nonneg.lt_of_ne'
+  intro h
+  have := ρ.tr
+  simp [h] at this
+
+open Lean Meta Mathlib.Meta.Positivity in
+/-- Positivity extension for `MState.M`: it is always positive (`0 < ρ.M`).
+Note: we must not call `whnfR` on `e` because `MState.M` is a structure
+projection (reducible), so `whnfR` would reduce it and destroy the pattern. -/
+@[positivity MState.M _]
+def evalMStateM : PositivityExt where eval {_u _α} _zα _pα e := do
+  let ρ := e.appArg!
+  pure (.positive (← mkAppM ``MState.pos #[ρ]))
+
+--TODO: There should be a bunch of places where we can use `positivity` to prove things,
+-- that are currently proved manually.
+example (ρ : MState d) : 0 < ρ.M := by positivity
+
 --XXX These are methods that directly reference the matrix, "m" or ".val".
 -- We'd like to remove these (where possible) so that mostly go through HermitianMat
 -- where possible.
-theorem pos : ρ.m.PosSemidef :=
-  HermitianMat.zero_le_iff.mp ρ.zero_le
+theorem psd : ρ.m.PosSemidef :=
+  HermitianMat.zero_le_iff.mp ρ.nonneg
+
 
 /-- Every mixed state is Hermitian. -/
 theorem Hermitian : ρ.m.IsHermitian :=
-  ρ.pos.left
+  ρ.M.H
 
 @[simp]
 theorem tr' : ρ.m.trace = 1 := by
@@ -106,14 +126,14 @@ theorem convex : Convex ℝ (Set.range (MState.M (d := d))) := by
     forall_exists_index, forall_apply_eq_imp_iff]
   intro x y a b ha hb hab
   replace hab : a + b = (1 : ℂ) := by norm_cast
-  have := HermitianMat.convex_cone x.zero_le y.zero_le ha hb
+  have := HermitianMat.convex_cone x.nonneg y.nonneg ha hb
   exact ⟨⟨_, this, by simpa using mod_cast hab⟩, rfl⟩
 
 instance instMixable : Mixable (HermitianMat d ℂ) (MState d) where
   to_U := MState.M
   to_U_inj := MState.ext
   mkT {u} := fun h ↦
-    ⟨⟨u, h.casesOn fun t ht ↦ ht ▸ t.zero_le,
+    ⟨⟨u, h.casesOn fun t ht ↦ ht ▸ t.nonneg,
       h.casesOn fun t ht ↦ ht ▸ t.tr⟩, rfl⟩
   convex := convex d
 
@@ -125,12 +145,12 @@ instance nonempty : Nonempty d := by
 -- Could have used properties of ρ.spectrum
 theorem eigenvalue_nonneg : ∀ i, 0 ≤ ρ.Hermitian.eigenvalues i := by
   rw [← Matrix.PosSemidef.nonneg_iff_eigenvalue_nonneg ρ.Hermitian]
-  exact ρ.zero_le
+  exact ρ.nonneg
 
--- Could have used properties of  ρ.spectrum
+-- Could have used properties of ρ.spectrum
 theorem eigenvalue_le_one : ∀ i, ρ.Hermitian.eigenvalues i ≤ 1 := by
   intro i
-  convert Finset.single_le_sum (fun y _ ↦ ρ.pos.eigenvalues_nonneg y) (Finset.mem_univ i)
+  convert Finset.single_le_sum (fun y _ ↦ ρ.psd.eigenvalues_nonneg y) (Finset.mem_univ i)
   rw [ρ.M.sum_eigenvalues_eq_trace, ρ.tr]
 
 theorem le_one : ρ.M ≤ 1 := by
@@ -146,12 +166,12 @@ open scoped RealInnerProductSpace InnerProductSpace
 /-- The inner product of two MState's, as a real number between 0 and 1. -/
 scoped instance : Inner Prob (MState d) where
   inner := fun ρ σ ↦ ⟨⟪ρ.M, σ.M⟫,
-    inner_ge_zero ρ.zero_le σ.zero_le,
-    (inner_le_mul_trace ρ.zero_le σ.zero_le).trans (by simp)⟩
+    inner_ge_zero ρ.nonneg σ.nonneg,
+    (inner_le_mul_trace ρ.nonneg σ.nonneg).trans (by simp)⟩
 
 theorem inner_def : ⟪ρ, σ⟫_Prob = ⟨⟪ρ.M, σ.M⟫,
-    inner_ge_zero ρ.zero_le σ.zero_le,
-    (inner_le_mul_trace ρ.zero_le σ.zero_le).trans (by simp)⟩ := by
+    inner_ge_zero ρ.nonneg σ.nonneg,
+    (inner_le_mul_trace ρ.nonneg σ.nonneg).trans (by simp)⟩ := by
   rfl
 
 theorem val_inner : (⟪ρ, σ⟫_Prob : ℝ) = ⟪ρ.M, σ.M⟫ := by
@@ -168,7 +188,10 @@ def exp_val (T : HermitianMat d ℂ) : ℝ :=
   ⟪ρ.M, T⟫
 
 theorem exp_val_nonneg {T : HermitianMat d ℂ} (h : 0 ≤ T) : 0 ≤ ρ.exp_val T :=
-  inner_ge_zero ρ.zero_le h
+  inner_ge_zero ρ.nonneg h
+
+--TODO: Positivity extension for `MState.exp_val`. (Use the `inner` extension that we need
+-- to write first.)
 
 @[simp]
 theorem exp_val_zero : ρ.exp_val 0 = 0 := by
@@ -179,7 +202,7 @@ theorem exp_val_one : ρ.exp_val 1 = 1 := by
   simp [MState.exp_val]
 
 theorem exp_val_le_one {T : HermitianMat d ℂ} (h : T ≤ 1) : ρ.exp_val T ≤ 1 := by
-  have hmono := inner_mono ρ.zero_le h
+  have hmono := inner_mono ρ.nonneg h
   rwa [inner_one ρ.M, ρ.tr] at hmono
 
 theorem exp_val_prob {T : HermitianMat d ℂ} (h : 0 ≤ T ∧ T ≤ 1) :
@@ -192,9 +215,9 @@ theorem exp_val_sub (A B : HermitianMat d ℂ) :
 
 /-- If a PSD observable `A` has expectation value of 0 on a state `ρ`, it must entirely contain the
 support of `ρ` in its kernel. -/
-theorem exp_val_eq_zero_iff {A : HermitianMat d ℂ} (hA₁ : 0 ≤ A)   :
+theorem exp_val_eq_zero_iff {A : HermitianMat d ℂ} (hA₁ : 0 ≤ A) :
     ρ.exp_val A = 0 ↔ ρ.M.support ≤ A.ker := by
-  exact inner_zero_iff ρ.zero_le hA₁
+  exact inner_zero_iff ρ.nonneg hA₁
 
 /-- If an observable `A` has expectation value of 1 on a state `ρ`, it must entirely contain the
 support of `ρ` in its 1-eigenspace. -/
@@ -217,7 +240,7 @@ theorem exp_val_smul (r : ℝ) (A : HermitianMat d ℂ) :
 theorem exp_val_le_exp_val (ρ : MState d) {A B : HermitianMat d ℂ} (h : A ≤ B) :
     ρ.exp_val A ≤ ρ.exp_val B := by
   simp only [MState.exp_val]
-  refine inner_mono ρ.zero_le h
+  refine inner_mono ρ.nonneg h
 
 end exp_val
 
@@ -229,7 +252,7 @@ def pure (ψ : Ket d) : MState d where
     val := Matrix.vecMulVec ψ (ψ : Bra d)
     property := (Matrix.PosSemidef.outer_self_conj ψ).1
   }
-  zero_le := HermitianMat.zero_le_iff.mpr (.outer_self_conj ψ)
+  nonneg := HermitianMat.zero_le_iff.mpr (.outer_self_conj ψ)
   tr := by
     have h₁ (x) : ψ x * conj (ψ x) = Complex.normSq (ψ x) := by
       rw [mul_comm, Complex.normSq_eq_conj_mul_self]
@@ -254,7 +277,7 @@ def purity (ρ : MState d) : Prob := ⟪ρ, ρ⟫_Prob
 def spectrum (ρ : MState d) : Distribution d :=
   Distribution.mk'
     (ρ.M.H.eigenvalues ·)
-    (ρ.pos.eigenvalues_nonneg ·)
+    (ρ.psd.eigenvalues_nonneg ·)
     (by rw [sum_eigenvalues_eq_trace, ρ.tr])
 
 /-- The specturm of a pure state is (1,0,0,...), i.e. a constant distribution. -/
@@ -441,7 +464,7 @@ section prod
 
 def prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : MState (d₁ × d₂) where
   M := ρ₁.M ⊗ₖ ρ₂.M
-  zero_le := HermitianMat.zero_le_iff.mpr (ρ₁.pos.PosSemidef_kronecker ρ₂.pos)
+  nonneg := HermitianMat.zero_le_iff.mpr (ρ₁.psd.PosSemidef_kronecker ρ₂.psd)
   tr := by simp
 
 infixl:100 " ⊗ᴹ " => MState.prod
@@ -467,7 +490,7 @@ end prod
 /-- A representation of a classical distribution as a quantum state, diagonal in the given basis. -/
 def ofClassical (dist : Distribution d) : MState d where
   M := diagonal ℂ (fun x ↦ dist x)
-  zero_le := by simp [zero_le_iff, diagonal, Matrix.posSemidef_diagonal_iff]
+  nonneg := by simp [zero_le_iff, diagonal, Matrix.posSemidef_diagonal_iff]
   tr := by simp [trace_diagonal]
 
 @[simp]
@@ -511,21 +534,18 @@ theorem M_default [Unique d] : (default : MState d).M = 1 := by
 
 section ptrace
 
--- TODO:
--- * Partial trace of direct product is the original state
-
 /-- Partial tracing out the left half of a system. -/
 @[simps]
 def traceLeft (ρ : MState (d₁ × d₂)) : MState d₂ where
   M := ρ.M.traceLeft
-  zero_le := zero_le_iff.mpr ρ.pos.traceLeft
+  nonneg := zero_le_iff.mpr ρ.psd.traceLeft
   tr := by simp [trace]
 
 /-- Partial tracing out the right half of a system. -/
 @[simps]
 def traceRight (ρ : MState (d₁ × d₂)) : MState d₁ where
   M := ρ.M.traceRight
-  zero_le := zero_le_iff.mpr ρ.pos.traceRight
+  nonneg := zero_le_iff.mpr ρ.psd.traceRight
   tr := by simp [trace]
 
 /-- Taking the direct product on the left and tracing it back out gives the same state. -/
@@ -550,6 +570,7 @@ end ptrace
   ρ₁ and ρ₂, as permuted under σ, is the pairwise products of the spectra of ρ₁ and ρ₂. -/
 theorem spectrum_prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : ∃(σ : d₁ × d₂ ≃ d₁ × d₂),
     ∀i, ∀j, (ρ₁ ⊗ᴹ ρ₂).spectrum (σ (i, j)) = (ρ₁.spectrum i) * (ρ₂.spectrum j) := by
+  --TODO Cleanup
   by_contra! h;
   -- Apply `Matrix.IsHermitian.eigenvalues_eq_of_unitary_similarity_diagonal` to $A \otimes B$ and $U_A \otimes U_B$ and the diagonal entries.
   obtain ⟨σ, hσ⟩ : ∃ σ : d₁ × d₂ ≃ d₁ × d₂, (ρ₁.prod ρ₂).M.H.eigenvalues ∘ σ = fun (i, j) => ((ρ₁.spectrum i) * (ρ₂.spectrum j)) := by
@@ -569,11 +590,11 @@ theorem spectrum_prod (ρ₁ : MState d₁) (ρ₂ : MState d₂) : ∃(σ : d�
           have h_unitary : Matrix.kroneckerMap (fun x y => x * y) U_A U_B * Matrix.kroneckerMap (fun x y => x * y) (Star.star U_A) (Star.star U_B) = Matrix.kroneckerMap (fun x y => x * y) (U_A * Star.star U_A) (U_B * Star.star U_B) := by
             ext ⟨ i, j ⟩ ⟨ k, l ⟩ ; simp [ Matrix.mul_apply, Matrix.kroneckerMap_apply ]
             ring_nf
-            erw [ Finset.sum_product ] ; simp [ mul_assoc, mul_comm, mul_left_comm, Finset.mul_sum _ _ _ ] ;
+            erw [ Finset.sum_product ]
+            simp [ mul_assoc, mul_comm, mul_left_comm, Finset.mul_sum]
             exact Finset.sum_comm.trans ( Finset.sum_congr rfl fun _ _ => Finset.sum_congr rfl fun _ _ => by ring );
           aesop;
-        convert h_unitary using 2;
-        ext i j; simp [ Matrix.kroneckerMap ] ;
+        exact h_unitary
       · simp_all [ MState.prod, Matrix.mul_assoc, Matrix.mul_kronecker_mul ];
         congr 2;
         · ext ⟨ i, j ⟩ ⟨ i', j' ⟩ ; by_cases hi : i = i' <;> by_cases hj : j = j' <;> simp [ hi, hj ];
@@ -632,9 +653,9 @@ theorem eq_of_sum_eq_pure {d : Type*} [Fintype d] [DecidableEq d]
     have h_tr_le_one : ∀ j ∈ s, ⟪ρ.M, (ρs j).M⟫ ≤ 1 := by
       intro j hj
       have h_tr_le_one_j : ⟪ρ.M, (ρs j).M⟫ ≤ ρ.M.trace * (ρs j).M.trace := by
-        apply_rules [ HermitianMat.inner_le_mul_trace ];
-        · exact ρ.zero_le;
-        · exact (ρs j).zero_le;
+        apply HermitianMat.inner_le_mul_trace
+        · exact ρ.nonneg;
+        · exact (ρs j).nonneg;
       simp_all only [smul_eq_mul, tr, mul_one, ge_iff_le]
       exact h_tr_le_one_j.trans ( h_sum ▸ ρ.tr.le );
     intro j hj hj_pos
@@ -823,13 +844,13 @@ theorem pure_iff_rank_eq_one {d : Type*} [Fintype d] [DecidableEq d] (ρ : MStat
           exact ⟨ i, hi, fun j hj => Classical.not_not.1 fun hj' => absurd h_diag ( by rw [ if_neg hi ] ; exact ne_of_gt ( lt_add_of_pos_right _ ( lt_of_lt_of_le ( by simp [ hj' ] ) ( Finset.single_le_sum ( fun x _ => by positivity ) ( Finset.mem_sdiff.2 ⟨ Finset.mem_univ j, by simp [ hj ] ⟩ ) ) ) ) ) ⟩;
         -- Since the diagonal matrix in the spectral theorem has exactly one non-zero entry, we can write ρ.m as |ψ⟩⟨ψ| for some ket ψ.
         use fun j => (h_herm.eigenvectorUnitary : Matrix d d ℂ) j i * Real.sqrt (h_herm.eigenvalues i);
-        convert this using 1;
+        convert this using 1
         ext j k; simp [ Matrix.mul_apply, Matrix.diagonal ]
         ring_nf
         rw [ Finset.sum_eq_single i ] <;> simp +contextual [ hi ];
         exact Or.inl <| Or.inl <| mod_cast Real.sq_sqrt <| by
-          have := ρ.pos.eigenvalues_nonneg i;
-          convert this using 1;
+          have := ρ.psd.eigenvalues_nonneg i;
+          exact this
       exact h_pure;
     have h_norm : ∑ x, Complex.normSq (ψ x) = 1 := by
       have := ρ.tr';
@@ -919,7 +940,7 @@ def purify (ρ : MState d) : Ket (d × d) where
     let ρ2 := ρ.Hermitian.eigenvectorUnitary i j
     ρ2 * (ρ.Hermitian.eigenvalues j).sqrt
   normalized' := by
-    have h₁ := fun i ↦ ρ.pos.eigenvalues_nonneg i
+    have h₁ := fun i ↦ ρ.psd.eigenvalues_nonneg i
     simp only [Complex.norm_mul,
       Complex.norm_real, Real.norm_eq_abs, mul_pow, sq_abs, h₁, Real.sq_sqrt,
       Fintype.sum_prod_type_right]
@@ -952,7 +973,7 @@ theorem purify_spec (ρ : MState d) : (pure ρ.purify).traceRight = ρ := by
     simp_all only [mat_apply, Matrix.IsHermitian.eigenvectorUnitary_apply, PiLp.ofLp_apply, Matrix.of_apply]
     congr! 2;
     norm_num [ Complex.ext_iff, sq ];
-    exact Or.inl ( Real.mul_self_sqrt ( by exact ( ρ.pos.eigenvalues_nonneg _ ) ) );
+    exact Or.inl (Real.mul_self_sqrt (ρ.psd.eigenvalues_nonneg _))
   simp_all [ Complex.normSq, sq ];
   simpa only [ mul_assoc ] using h_eigenvectorUnitary i j
 
@@ -965,7 +986,7 @@ end purification
 @[simps]
 def relabel (ρ : MState d₁) (e : d₂ ≃ d₁) : MState d₂ where
   M := ρ.M.reindex e.symm
-  zero_le := by simp [zero_le_iff, ρ.pos]
+  nonneg := by simp [zero_le_iff, ρ.psd]
   tr := by simp [trace]
 
 @[simp]
@@ -1146,7 +1167,7 @@ theorem traceRight_right_assoc' (ρ : MState (d₁ × d₂ × d₃)) :
 @[simp]
 theorem traceNorm_eq_1 (ρ : MState d) : ρ.m.traceNorm = 1 :=
   have := calc (ρ.m.traceNorm : ℂ)
-    _ = ρ.m.trace := ρ.pos.traceNorm_PSD_eq_trace
+    _ = ρ.m.trace := ρ.psd.traceNorm_PSD_eq_trace
     _ = 1 := ρ.tr'
   Complex.ofReal_eq_one.mp this
 
@@ -1188,7 +1209,7 @@ instance : CompactSpace (MState d) := by
     ext1 m
     constructor
     · rintro ⟨ρ, _, rfl⟩
-      simp [ρ.zero_le, ρ.le_one]
+      simp [ρ.nonneg, ρ.le_one]
     · simpa using fun m_pos _ m_tr ↦ ⟨⟨m, m_pos, m_tr⟩, rfl⟩
   apply isCompact_Icc.inter_right
   refine isClosed_eq ?_ continuous_const
@@ -1230,9 +1251,9 @@ def piProd (ρi : (i:ι) → MState (dI i)) : MState ((i:ι) → dI i) where
     val := Matrix.piProd (fun i ↦ (ρi i).m)
     property := Matrix.IsHermitian.piProd (fun i ↦ (ρi i).Hermitian)
   }
-  zero_le := by
+  nonneg := by
     rw [zero_le_iff]
-    exact Matrix.PosSemidef.piProd (fun i => pos (ρi i))
+    exact Matrix.PosSemidef.piProd (fun i => psd (ρi i))
   tr := by simp [trace, Matrix.trace_piProd]
 
 /-- The n-copy "power" of a mixed state, with the standard basis indexed by pi types. -/
@@ -1263,7 +1284,7 @@ theorem PosDef_mix {d : Type*} [Fintype d] [DecidableEq d] {σ₁ σ₂ : MState
 theorem PosDef_mix_of_ne_zero {d : Type*} [Fintype d] [DecidableEq d] {σ₁ σ₂ : MState d}
     (hσ₁ : σ₁.m.PosDef) (p : Prob) (hp : p ≠ 0) : (p [σ₁ ↔ σ₂]).m.PosDef := by
   rw [← zero_lt_iff] at hp
-  exact (hσ₁.smul hp).add_posSemidef (σ₂.pos.rsmul (1 - p).zero_le)
+  exact (hσ₁.smul hp).add_posSemidef (σ₂.psd.rsmul (1 - p).zero_le)
 
 /-- If the second state is positive definite and the mixture is nondegenerate, their mixture is also positive definite. -/
 theorem PosDef_mix_of_ne_one {d : Type*} [Fintype d] [DecidableEq d] {σ₁ σ₂ : MState d}
@@ -1278,7 +1299,7 @@ theorem PosDef_mix_of_ne_one {d : Type*} [Fintype d] [DecidableEq d] {σ₁ σ�
     ext
     change (p : ℝ) = 1
     linarith
-  exact (hσ₂.smul this).posSemidef_add (σ₁.pos.rsmul p.zero_le)
+  exact (hσ₂.smul this).posSemidef_add (σ₁.psd.rsmul p.zero_le)
 
 theorem uniform_posDef {d : Type*} [Nonempty d] [Fintype d] [DecidableEq d] :
     (uniform (d := d)).m.PosDef := by

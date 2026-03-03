@@ -9,6 +9,8 @@ open ComplexOrder
 
 universe u v
 
+instance AddZero.ulift {α : Type u} [AddZero α] : AddZero (ULift.{v, u} α) where
+
 instance ULift.instStar {𝕜 : Type u} [Star 𝕜] : Star (ULift.{v,u} 𝕜) where
   star x := .up (star x.down)
 
@@ -43,27 +45,26 @@ theorem AddEquiv.ulift_apply {α : Type u} [Add α] (x : ULift.{v, u} α) :
   rfl
 
 noncomputable instance {𝕜 : Type u} [RCLike 𝕜] : RCLike (ULift.{v,u} 𝕜) where
-  re := RCLike.re.comp AddEquiv.ulift.toAddMonoidHom
-  im := RCLike.im.comp AddEquiv.ulift.toAddMonoidHom
+  re := RCLike.re.comp AddEquiv.ulift.toAddMonoidHom (N := 𝕜)
+  im := RCLike.im.comp AddEquiv.ulift.toAddMonoidHom (N := 𝕜)
   I := .up RCLike.I
   I_re_ax := by simp
   I_mul_I_ax := by
-    rcases RCLike.I_mul_I_ax (K := 𝕜) with h₁|h₂
+    rcases RCLike.I_mul_I_ax (K := 𝕜) with h |h
     · left
-      ext
-      convert h₁
+      ext1
+      exact h
     · right
-      ext
-      convert h₂
-  re_add_im_ax z := by
-    convert congrArg ULift.up (RCLike.re_add_im_ax z.down)
+      ext1
+      exact h
+  re_add_im_ax z := by exact congrArg ULift.up (RCLike.re_add_im_ax z.down)
   ofReal_re_ax r := by simp
   ofReal_im_ax := by simp
   mul_re_ax z w := by simp
   mul_im_ax := by simp
   conj_re_ax x := by simp
   conj_im_ax := by simp
-  conj_I_ax := by ext; simp
+  conj_I_ax := by ext1; simp
   norm_sq_eq_def_ax x := by simpa using RCLike.norm_sq_eq_def_ax x.down
   mul_im_I_ax := by simp
   le_iff_re_im {z w} := by simpa using RCLike.le_iff_re_im (z := z.down) (w := w.down)
