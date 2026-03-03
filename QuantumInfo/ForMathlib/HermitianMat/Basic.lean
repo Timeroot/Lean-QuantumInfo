@@ -84,6 +84,10 @@ theorem mat_zero : (0 : HermitianMat n α).mat = 0 := by
 theorem mk_zero (h : (0 : Matrix n n α).IsHermitian) : ⟨0, h⟩ = (0 : HermitianMat n α) := by
   rfl
 
+@[simp]
+theorem zero_apply (i j : n) : (0 : HermitianMat n 𝕜) i j = 0 := by
+  rfl
+
 @[simp, norm_cast]
 theorem mat_add (A B : HermitianMat n α) :
     (A + B).mat = A.mat + B.mat := by
@@ -226,6 +230,13 @@ theorem mk_one (h : (1 : Matrix n n α).IsHermitian) : ⟨1, h⟩ = (1 : Hermiti
 @[simp]
 theorem one_apply (i j : n) : (1 : HermitianMat n α) i j = (1 : Matrix n n α) i j := by
   rfl
+
+noncomputable instance : AddCommMonoidWithOne (HermitianMat n 𝕜) where
+
+instance [i : Nonempty n] : NeZero (1 : HermitianMat n 𝕜) := by
+  constructor
+  intro h
+  simpa using congr($h i.some i.some)
 
 end ring
 section commring

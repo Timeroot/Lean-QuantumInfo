@@ -50,14 +50,14 @@ structure MState (d : Type*) [Fintype d] [DecidableEq d] where
   nonneg : 0 ≤ M
   tr : M.trace = 1
 
-namespace MState
-
 variable {d d₁ d₂ d₃ : Type*}
 variable [Fintype d] [Fintype d₁] [Fintype d₂] [Fintype d₃]
 variable [DecidableEq d] [DecidableEq d₁] [DecidableEq d₂] [DecidableEq d₃]
 
 variable (ψ φ : Ket d)
 variable (ρ σ : MState d)
+
+namespace MState
 
 attribute [coe] MState.M
 instance instCoe : Coe (MState d) (HermitianMat d ℂ) := ⟨MState.M⟩
@@ -71,11 +71,24 @@ def m (ρ : MState d) : Matrix d d ℂ := ρ.M.mat
 theorem mat_M : ρ.M.mat = ρ.m := by
   rfl
 
-theorem pos {ρ : MState d} : 0 < ρ.M := by
+theorem pos (ρ : MState d) : 0 < ρ.M := by
   apply ρ.nonneg.lt_of_ne'
   intro h
   have := ρ.tr
   simp [h] at this
+
+open Lean Meta Mathlib.Meta.Positivity in
+/-- Positivity extension for `MState.M`: it is always positive (`0 < ρ.M`).
+Note: we must not call `whnfR` on `e` because `MState.M` is a structure
+projection (reducible), so `whnfR` would reduce it and destroy the pattern. -/
+@[positivity MState.M _]
+def evalMStateM : PositivityExt where eval {_u _α} _zα _pα e := do
+  let ρ := e.appArg!
+  pure (.positive (← mkAppM ``MState.pos #[ρ]))
+
+--TODO: There should be a bunch of places where we can use `positivity` to prove things,
+-- that are currently proved manually.
+example (ρ : MState d) : 0 < ρ.M := by positivity
 
 --XXX These are methods that directly reference the matrix, "m" or ".val".
 -- We'd like to remove these (where possible) so that mostly go through HermitianMat
@@ -134,7 +147,7 @@ theorem eigenvalue_nonneg : ∀ i, 0 ≤ ρ.Hermitian.eigenvalues i := by
   rw [← Matrix.PosSemidef.nonneg_iff_eigenvalue_nonneg ρ.Hermitian]
   exact ρ.nonneg
 
--- Could have used properties of  ρ.spectrum
+-- Could have used properties of ρ.spectrum
 theorem eigenvalue_le_one : ∀ i, ρ.Hermitian.eigenvalues i ≤ 1 := by
   intro i
   convert Finset.single_le_sum (fun y _ ↦ ρ.psd.eigenvalues_nonneg y) (Finset.mem_univ i)
@@ -176,6 +189,9 @@ def exp_val (T : HermitianMat d ℂ) : ℝ :=
 
 theorem exp_val_nonneg {T : HermitianMat d ℂ} (h : 0 ≤ T) : 0 ≤ ρ.exp_val T :=
   inner_ge_zero ρ.nonneg h
+
+--TODO: Positivity extension for `MState.exp_val`. (Use the `inner` extension that we need
+-- to write first.)
 
 @[simp]
 theorem exp_val_zero : ρ.exp_val 0 = 0 := by
@@ -517,9 +533,6 @@ theorem M_default [Unique d] : (default : MState d).M = 1 := by
   rfl
 
 section ptrace
-
--- TODO:
--- * Partial trace of direct product is the original state
 
 /-- Partial tracing out the left half of a system. -/
 @[simps]

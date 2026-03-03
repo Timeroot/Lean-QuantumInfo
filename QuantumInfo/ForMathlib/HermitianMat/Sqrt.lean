@@ -66,3 +66,23 @@ theorem sqrt_posDef {A : HermitianMat d 𝕜} (hA : A.mat.PosDef) :
     A.sqrt.mat.PosDef := by
   rw [sqrt, cfc_posDef]
   simp [hA.eigenvalues_pos]
+
+open Lean Meta Mathlib.Meta.Positivity in
+/-- Positivity extension for `HermitianMat.sqrt` -/
+@[positivity HermitianMat.sqrt _]
+def evalHermitianMatSqrt : PositivityExt where eval {_u _α} _zα _pα e := do
+  let .app _sqrt (A : Expr) ← whnfR e | throwError "not sqrt application"
+  try
+    let (isStrictA, pfA) ← bestResult A
+    if isStrictA then
+      pure (.positive (← mkAppM ``HermitianMat.sqrt_pos #[pfA]))
+    else
+      throwError "Not strictly positive, falling back to nonnegativity"
+  catch _ =>
+    pure (.nonnegative (← mkAppM ``HermitianMat.sqrt_nonneg #[A]))
+
+example {A : HermitianMat d ℂ} : 0 ≤ A.sqrt := by
+  positivity
+
+example [Nonempty d] {A : HermitianMat d ℂ} : 0 < (1 + A.sqrt).sqrt  := by
+  positivity

@@ -55,8 +55,32 @@ theorem _root_.Commute.exp_right' (hAB : Commute A.mat B.mat) :
 theorem reindex_exp (e : d ≃ d₂) : (A.reindex e).exp = A.exp.reindex e :=
   cfc_reindex A Real.exp e
 
+variable (A) in
 instance nonSingular_exp : NonSingular A.exp := by
   exact cfc_nonSingular A Real.exp (fun i ↦ by positivity)
+
+/-- The matrix exponential of a Hermitian matrix is nonnegative. -/
+theorem exp_nonneg (A : HermitianMat d 𝕜) : 0 ≤ A.exp := by
+  rw [exp, HermitianMat.cfc_nonneg_iff]
+  exact fun i ↦ le_of_lt (Real.exp_pos _)
+
+/-- The matrix exponential of a Hermitian matrix is strictly positive (Loewner order).
+Requires `Nonempty` since over an empty index type every matrix equals zero and `0 < 0`
+is false. -/
+theorem exp_pos [i : Nonempty d] (A : HermitianMat d 𝕜) : 0 < A.exp := by
+  apply A.exp_nonneg.lt_of_ne'
+  intro h
+  simpa [h] using A.nonSingular_exp.isUnit
+
+open Lean Meta Mathlib.Meta.Positivity in
+/-- Positivity extension for `HermitianMat.exp`: always strictly positive if `Nonempty d`.
+TODO: We could add a fallback to give `nonnegative` if `Nonempty d` is not available,
+possibly also print a warning. (Users might often not have `Nonempty d` in context, and
+they probably want to.) -/
+@[positivity HermitianMat.exp _]
+def evalHermitianMatExp : PositivityExt where eval {_u _α} _zα _pα e := do
+  let .app _exp (A : Expr) ← whnfR e | throwError "not HermitianMat.exp"
+  pure (.positive (← mkAppM ``HermitianMat.exp_pos #[A]))
 
 end exp
 
