@@ -724,6 +724,26 @@ theorem pure_eq_pure_iff {d : Type*} [Fintype d] [DecidableEq d] (ψ φ : Ket d)
       grind +ring;
     exact MState.ext_m ( by ext i j; simpa [ Matrix.vecMulVec ] using h_simp i j )
 
+/-- Two kets are phase-equivalent if and only if their pure states are equal. -/
+theorem PhaseEquiv_iff_pure_eq {d : Type*} [Fintype d] [DecidableEq d] (ψ φ : Ket d) :
+    Ket.PhaseEquiv.r ψ φ ↔ MState.pure ψ = MState.pure φ := by
+  exact (pure_eq_pure_iff ψ φ).symm
+
+/-- `MState.pure` descends to the quotient `KetUpToPhase`. -/
+def pureQ {d : Type*} [Fintype d] [DecidableEq d] : KetUpToPhase d → MState d :=
+  @Quotient.lift _ _ Ket.PhaseEquiv MState.pure (fun a b h => (PhaseEquiv_iff_pure_eq a b).mp h)
+
+@[simp]
+theorem pureQ_mk {d : Type*} [Fintype d] [DecidableEq d] (ψ : Ket d) :
+    pureQ (Quotient.mk Ket.PhaseEquiv ψ) = MState.pure ψ := rfl
+
+theorem pureQ_injective {d : Type*} [Fintype d] [DecidableEq d] : Function.Injective (pureQ (d := d)) := by
+  intro a b h
+  induction a using Quotient.ind
+  induction b using Quotient.ind
+  simp [pureQ] at h
+  exact Quotient.sound ((PhaseEquiv_iff_pure_eq _ _).mpr h)
+
 theorem pure_separable_imp_IsProd {d₁ d₂ : Type*} [Fintype d₁] [Fintype d₂] [DecidableEq d₁] [DecidableEq d₂]
     (ψ : Ket (d₁ × d₂)) (h : IsSeparable (pure ψ)) : ψ.IsProd := by
   obtain ⟨ ρLRs, ps, hps ⟩ := h;
