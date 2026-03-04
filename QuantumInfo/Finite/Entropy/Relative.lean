@@ -129,44 +129,282 @@ lemma HermitianMat.trace_rpow_eq_sum (A : HermitianMat d ℂ) (p : ℝ) :
 
 /-
 PROBLEM
+The inner product ⟪A, B⟫ equals ∑_{ij} a_i b_j w_{ij} where a_i, b_j are eigenvalues
+and w_{ij} = ‖C_{ij}‖² for C = U_A^* U_B unitary.
+
+PROVIDED SOLUTION
+Use A.eq_conj_diagonal and B.eq_conj_diagonal to write
+A = U_A diag(a) U_A^* and B = U_B diag(b) U_B^*.
+Then inner_eq_trace_rc gives ⟪A,B⟫ = Tr[AB] as a complex number cast to real.
+AB = U_A diag(a) (U_A^* U_B) diag(b) U_B^*.
+Tr[AB] = Tr[diag(a) C diag(b) C^*] where C = U_A^* U_B.
+Expand the trace as ∑_i [diag(a) C diag(b) C^*]_{ii}
+= ∑_i a_i ∑_j b_j |C_{ij}|^2.
+Use Matrix.trace_mul_comm, Matrix.diagonal_mul, Matrix.mul_diagonal,
+Matrix.conjTranspose_mul, star_star, and Complex.normSq_eq_abs.
+-/
+lemma HermitianMat.inner_eq_doubly_stochastic_sum
+    (A B : HermitianMat d ℂ) :
+    let C := A.H.eigenvectorUnitary.val.conjTranspose * B.H.eigenvectorUnitary.val
+    ⟪A, B⟫_ℝ = ∑ i, ∑ j,
+      A.H.eigenvalues i * B.H.eigenvalues j * (‖C i j‖^2) := by
+  -- By the properties of the trace and diagonalization, we can rewrite the trace of AB as the sum of the products of the eigenvalues of A and B, multiplied by the squared norms of the entries of the product of their eigenvector matrices.
+  have h_trace_diag : Matrix.trace (A.mat * B.mat) = Matrix.trace ((A.H.eigenvectorUnitary : Matrix d d ℂ).conjTranspose * A.mat * (A.H.eigenvectorUnitary : Matrix d d ℂ) * ((A.H.eigenvectorUnitary : Matrix d d ℂ).conjTranspose * B.mat * (A.H.eigenvectorUnitary : Matrix d d ℂ))) := by
+    have h_trace_diag : Matrix.trace (A.mat * B.mat) = Matrix.trace ((A.H.eigenvectorUnitary : Matrix d d ℂ) * ((A.H.eigenvectorUnitary : Matrix d d ℂ).conjTranspose * A.mat * (A.H.eigenvectorUnitary : Matrix d d ℂ)) * ((A.H.eigenvectorUnitary : Matrix d d ℂ).conjTranspose * B.mat * (A.H.eigenvectorUnitary : Matrix d d ℂ)) * (A.H.eigenvectorUnitary : Matrix d d ℂ).conjTranspose) := by
+      simp +decide [ Matrix.mul_assoc ];
+      simp +decide [ ← Matrix.mul_assoc, Matrix.IsHermitian.eigenvectorUnitary ];
+    rw [ h_trace_diag, Matrix.trace_mul_comm ];
+    simp +decide [ ← mul_assoc, Matrix.IsHermitian.eigenvectorUnitary ];
+  -- Since $A$ is Hermitian, its eigenvector matrix is unitary, and thus $(A.H.eigenvectorUnitary : Matrix d d ℂ).conjTranspose * A.mat * (A.H.eigenvectorUnitary : Matrix d d ℂ)$ is diagonal with the eigenvalues of $A$ on the diagonal.
+  have h_diag_A : (A.H.eigenvectorUnitary : Matrix d d ℂ).conjTranspose * A.mat * (A.H.eigenvectorUnitary : Matrix d d ℂ) = Matrix.diagonal (fun i => A.H.eigenvalues i : d → ℂ) := by
+    have := A.H.spectral_theorem;
+    convert congr_arg ( fun x : Matrix d d ℂ => ( A.H.eigenvectorUnitary : Matrix d d ℂ ).conjTranspose * x * ( A.H.eigenvectorUnitary : Matrix d d ℂ ) ) this using 1 ; simp +decide [ Matrix.mul_assoc ];
+    simp +decide [ ← Matrix.mul_assoc, Matrix.IsHermitian.eigenvectorUnitary ];
+  -- Since $B$ is Hermitian, its eigenvector matrix is unitary, and thus $(A.H.eigenvectorUnitary : Matrix d d ℂ).conjTranspose * B.mat * (A.H.eigenvectorUnitary : Matrix d d ℂ)$ is diagonal with the eigenvalues of $B$ on the diagonal.
+  have h_diag_B : (A.H.eigenvectorUnitary : Matrix d d ℂ).conjTranspose * B.mat * (A.H.eigenvectorUnitary : Matrix d d ℂ) = (A.H.eigenvectorUnitary : Matrix d d ℂ).conjTranspose * (B.H.eigenvectorUnitary : Matrix d d ℂ) * Matrix.diagonal (fun i => B.H.eigenvalues i : d → ℂ) * (B.H.eigenvectorUnitary : Matrix d d ℂ).conjTranspose * (A.H.eigenvectorUnitary : Matrix d d ℂ) := by
+    have h_diag_B : B.mat = (B.H.eigenvectorUnitary : Matrix d d ℂ) * Matrix.diagonal (fun i => B.H.eigenvalues i : d → ℂ) * (B.H.eigenvectorUnitary : Matrix d d ℂ).conjTranspose := by
+      convert B.H.spectral_theorem using 1;
+    grind;
+  -- Since $C = U_A^* U_B$ is unitary, we have $C_{ij} = \langle u_i, v_j \rangle$ where $u_i$ and $v_j$ are the eigenvectors of $A$ and $B$, respectively.
+  set C : Matrix d d ℂ := (A.H.eigenvectorUnitary : Matrix d d ℂ).conjTranspose * (B.H.eigenvectorUnitary : Matrix d d ℂ)
+  have hC_unitary : C * C.conjTranspose = 1 := by
+    simp +zetaDelta at *;
+    simp +decide [ Matrix.mul_assoc, Matrix.mul_eq_one_comm ];
+    simp +decide [ ← Matrix.mul_assoc, Matrix.IsHermitian.eigenvectorUnitary ]
+  have hC_norm : ∀ i j, ‖C i j‖ ^ 2 = (C i j) * (star (C i j)) := by
+    simp +decide [ Complex.mul_conj, Complex.normSq_eq_norm_sq ]
+  have hC_trace : Matrix.trace (Matrix.diagonal (fun i => A.H.eigenvalues i : d → ℂ) * C * Matrix.diagonal (fun i => B.H.eigenvalues i : d → ℂ) * C.conjTranspose) = ∑ i, ∑ j, A.H.eigenvalues i * B.H.eigenvalues j * ‖C i j‖ ^ 2 := by
+    simp +decide [ Matrix.trace, Matrix.mul_apply, Finset.mul_sum _ _ _, Finset.sum_mul, hC_norm ];
+    simp +decide [ Matrix.diagonal, Finset.sum_ite_eq, Finset.filter_eq, Finset.filter_ne ];
+    exact Finset.sum_congr rfl fun _ _ => Finset.sum_congr rfl fun _ _ => by ring;
+  convert congr_arg Complex.re hC_trace using 1;
+  convert congr_arg Complex.re h_trace_diag using 1;
+  rw [ h_diag_A, h_diag_B ] ; simp +decide [ Matrix.mul_assoc ] ;
+  simp +zetaDelta at *
+
+/-
+PROBLEM
+For a unitary matrix C, the row sums of ‖C i j‖^2 equal 1.
+
+PROVIDED SOLUTION
+Since C * C^* = 1, the (i,i) entry of C * C^* is 1.
+(C * C^*)_{ii} = ∑_j C_{ij} * conj(C_{ij}) = ∑_j ‖C_{ij}‖^2.
+Use Matrix.mul_apply, Matrix.conjTranspose_apply, mul_star_self_eq_norm_sq.
+-/
+lemma unitary_row_sum_norm_sq (C : Matrix d d ℂ) (hC : C * C.conjTranspose = 1) (i : d) :
+    ∑ j, ‖C i j‖ ^ 2 = 1 := by
+  replace hC := congr_arg ( fun m => m i i ) hC ; simp_all +decide [ Matrix.mul_apply, Complex.normSq_eq_norm_sq, Complex.mul_conj ];
+  exact_mod_cast hC
+
+/-
+PROBLEM
+For a unitary matrix C, the column sums of ‖C i j‖^2 equal 1.
+
+PROVIDED SOLUTION
+Since C^* * C = 1, the (j,j) entry of C^* * C is 1.
+(C^* * C)_{jj} = ∑_i conj(C_{ij}) * C_{ij} = ∑_i ‖C_{ij}‖^2.
+Use Matrix.mul_apply, Matrix.conjTranspose_apply, star_mul_self_eq_norm_sq.
+-/
+lemma unitary_col_sum_norm_sq (C : Matrix d d ℂ) (hC : C.conjTranspose * C = 1) (j : d) :
+    ∑ i, ‖C i j‖ ^ 2 = 1 := by
+  rw [ ← Matrix.ext_iff ] at hC; specialize hC j j; simp_all +decide [ Matrix.mul_apply, Complex.mul_conj ] ;
+  simp_all +decide [ Complex.ext_iff, sq ];
+  simpa [ ← sq, Complex.normSq_apply, Complex.sq_norm ] using hC.1
+
+/-
+PROBLEM
+Scalar trace Young inequality for PSD matrices:
+⟪A, B⟫ ≤ Tr[A^p]/p + Tr[B^q]/q for PSD A, B and conjugate p, q > 1.
+
+PROVIDED SOLUTION
+Step 1: By inner_eq_doubly_stochastic_sum,
+  ⟪A, B⟫ = ∑_{ij} a_i * b_j * w_{ij}
+where a_i = A.H.eigenvalues i, b_j = B.H.eigenvalues j,
+w_{ij} = ‖C_{ij}‖^2 ≥ 0 with ∑_j w_{ij} = 1 and ∑_i w_{ij} = 1
+(by unitary_row_sum_norm_sq and unitary_col_sum_norm_sq,
+since C = U_A^* U_B is unitary because U_A and U_B are).
+
+Step 2: By Young's inequality (NNReal.young_inequality / pointwise):
+For each (i,j): a_i * b_j ≤ a_i^p / p + b_j^q / q
+(using a_i ≥ 0 from hA, b_j ≥ 0 from hB).
+
+Step 3: Multiply by w_{ij} ≥ 0 and sum:
+∑_{ij} a_i * b_j * w_{ij}
+≤ ∑_{ij} (a_i^p / p + b_j^q / q) * w_{ij}
+= (1/p) ∑_i a_i^p * (∑_j w_{ij}) + (1/q) ∑_j b_j^q * (∑_i w_{ij})
+= (1/p) ∑_i a_i^p + (1/q) ∑_j b_j^q
+= Tr[A^p] / p + Tr[B^q] / q.
+
+Use trace_rpow_eq_sum for the last step.
+-/
+lemma HermitianMat.trace_young
+    (A B : HermitianMat d ℂ) (hA : 0 ≤ A) (hB : 0 ≤ B)
+    (p q : ℝ) (hp : 1 < p) (hpq : 1/p + 1/q = 1) :
+    ⟪A, B⟫_ℝ ≤ (A ^ p).trace / p + (B ^ q).trace / q := by
+  have h_schatten : ∀ (i j : d), (A.H.eigenvalues i) * (B.H.eigenvalues j) ≤ (A.H.eigenvalues i)^p / p + (B.H.eigenvalues j)^q / q := by
+    intro i j
+    have h_young : ∀ (a b : ℝ), 0 ≤ a → 0 ≤ b → (1 < p → 1 / p + 1 / q = 1 → a * b ≤ (a^p) / p + (b^q) / q) := by
+      intro a b ha hb hp hpq
+      have h_young : a * b ≤ (a^p) / p + (b^q) / q := by
+        have h_conj : 1 / p + 1 / q = 1 := hpq
+        have h_pos : 0 < p ∧ 0 < q := by
+          exact ⟨ lt_trans zero_lt_one hp, lt_of_not_ge fun h => by rw [ div_eq_mul_inv, div_eq_mul_inv ] at h_conj; nlinarith [ inv_nonpos.2 h, inv_mul_cancel₀ ( by linarith : p ≠ 0 ) ] ⟩
+          skip
+        have := @Real.geom_mean_le_arith_mean
+        generalize_proofs at *;
+        specialize this { 0, 1 } ( fun i => if i = 0 then p⁻¹ else q⁻¹ ) ( fun i => if i = 0 then a ^ p else b ^ q ) ; simp_all +decide [ ne_of_gt ];
+        simpa only [ div_eq_inv_mul ] using this h_pos.1.le h_pos.2.le ( Real.rpow_nonneg ha _ ) ( Real.rpow_nonneg hb _ )
+      generalize_proofs at *; (
+      exact h_young)
+    generalize_proofs at *; (
+    apply h_young; exact (by
+    convert hA.eigenvalues_nonneg i using 1
+    (generalize_proofs at *; aesop ( simp_config := { decide := true } ) ;)); exact (by
+    apply Matrix.PosSemidef.eigenvalues_nonneg;
+    exact?) ; exact hp; exact hpq
+    skip);
+  convert Finset.sum_le_sum fun i _ => Finset.sum_le_sum fun j _ => mul_le_mul_of_nonneg_right ( h_schatten i j ) ( show 0 ≤ ‖(A.H.eigenvectorUnitary.val.conjTranspose * B.H.eigenvectorUnitary.val) i j‖ ^ 2 by positivity ) using 1;
+  convert HermitianMat.inner_eq_doubly_stochastic_sum A B using 1;
+  simp +decide [ Finset.sum_add_distrib, add_mul, Finset.mul_sum _ _ _, Finset.sum_mul, div_eq_mul_inv, mul_assoc, mul_comm, mul_left_comm, Finset.sum_mul, Finset.sum_div, HermitianMat.trace_rpow_eq_sum ];
+  simp +decide [ ← Finset.mul_sum _ _ _, ← Finset.sum_mul, ← Finset.sum_comm, ← Finset.sum_add_distrib ];
+  congr! 2;
+  · refine' Finset.sum_congr rfl fun i _ => _;
+    have := unitary_row_sum_norm_sq ( A.H.eigenvectorUnitary.val.conjTranspose * B.H.eigenvectorUnitary.val ) ?_ i;
+    · rw [ this, mul_one ];
+    · simp +decide [ Matrix.mul_assoc, Matrix.mul_eq_one_comm ];
+      simp +decide [ ← Matrix.mul_assoc, Matrix.IsHermitian.eigenvectorUnitary ];
+  · refine' Finset.sum_congr rfl fun i _ => _;
+    have := unitary_col_sum_norm_sq ( A.H.eigenvectorUnitary.val.conjTranspose * B.H.eigenvectorUnitary.val ) ?_ i <;> simp_all +decide [ Matrix.mul_assoc, Matrix.conjTranspose_mul ];
+    simp +decide [ ← Matrix.mul_assoc, Matrix.IsHermitian.eigenvectorUnitary ]
+
+/-
+PROBLEM
+Weighted Jensen inequality: for weights w_j ≥ 0 with ∑ w_j = 1, values b_j ≥ 0,
+and q ≥ 1: (∑_j w_j * b_j)^q ≤ ∑_j w_j * b_j^q.
+
+PROVIDED SOLUTION
+This is exactly Real.rpow_arith_mean_le_arith_mean_rpow applied to
+Finset.univ with weights w and values b.
+-/
+lemma weighted_jensen_rpow (b w : d → ℝ)
+    (hb : ∀ j, 0 ≤ b j) (hw : ∀ j, 0 ≤ w j) (hsum : ∑ j, w j = 1)
+    (q : ℝ) (hq : 1 ≤ q) :
+    (∑ j, w j * b j) ^ q ≤ ∑ j, w j * b j ^ q := by
+  have := @Real.rpow_arith_mean_le_arith_mean_rpow;
+  exact this Finset.univ w b ( fun i _ => hw i ) hsum ( fun i _ => hb i ) hq
+
+/-
+PROBLEM
+Doubly stochastic Hölder inequality: for nonneg a, b, doubly stochastic w,
+and conjugate p, q > 1:
+∑_{ij} a_i * b_j * w_{ij} ≤ (∑ a_i^p)^{1/p} * (∑ b_j^q)^{1/q}.
+
+PROVIDED SOLUTION
+Step 1: Rewrite as ∑_i a_i * g_i where g_i = ∑_j w_{ij} * b_j.
+
+Step 2: By weighted_jensen_rpow with weights w_{ij} (summing to 1 over j):
+  g_i^q = (∑_j w_{ij} b_j)^q ≤ ∑_j w_{ij} b_j^q.
+  So ∑_i g_i^q ≤ ∑_i ∑_j w_{ij} b_j^q = ∑_j b_j^q (∑_i w_{ij}) = ∑_j b_j^q.
+  Hence (∑_i g_i^q)^{1/q} ≤ (∑_j b_j^q)^{1/q}.
+
+Step 3: By NNReal.inner_le_Lp_mul_Lq (scalar Hölder) or Real.inner_le_Lp_mul_Lq:
+  ∑_i a_i * g_i ≤ (∑ |a_i|^p)^{1/p} * (∑ |g_i|^q)^{1/q}
+  Since a_i ≥ 0 and g_i ≥ 0, the absolute values are redundant.
+  = (∑ a_i^p)^{1/p} * (∑ g_i^q)^{1/q}
+  ≤ (∑ a_i^p)^{1/p} * (∑ b_j^q)^{1/q}.
+
+Use Real.HolderConjugate / Real.HolderTriple for the exponent condition,
+and monotonicity of x^{1/q} (rpow_le_rpow) for Step 2.
+-/
+lemma doubly_stochastic_holder (a b : d → ℝ) (w : d → d → ℝ)
+    (ha : ∀ i, 0 ≤ a i) (hb : ∀ j, 0 ≤ b j)
+    (hw : ∀ i j, 0 ≤ w i j)
+    (hrow : ∀ i, ∑ j, w i j = 1) (hcol : ∀ j, ∑ i, w i j = 1)
+    (p q : ℝ) (hp : 1 < p) (hpq : 1/p + 1/q = 1) :
+    ∑ i, ∑ j, a i * b j * w i j ≤ (∑ i, a i ^ p) ^ (1/p) * (∑ j, b j ^ q) ^ (1/q) := by
+  by_contra h_contra; contrapose! h_contra with h_contra; simp_all +decide [ ← Finset.mul_sum _ _ _, ← Finset.sum_mul, mul_assoc, sub_eq_iff_eq_add ] ; (
+  -- Apply Hölder's inequality with the sequences $a_i$ and $g_i = \sum_j w_{ij} b_j$.
+  have h_holder : (∑ i, a i * (∑ j, w i j * b j)) ≤ (∑ i, a i ^ p) ^ (1 / p) * (∑ i, (∑ j, w i j * b j) ^ q) ^ (1 / q) := by
+    have := @Real.inner_le_Lp_mul_Lq; simp_all +decide [ Real.rpow_neg_one ] ;
+    convert this Finset.univ ( fun i => a i ) ( fun i => ∑ j, w i j * b j ) ( show p.HolderConjugate q from ?_ ) using 1 <;> norm_num [ abs_of_nonneg, ha, hb, hw ];
+    · exact Or.inl ( by congr; ext i; rw [ abs_of_nonneg ( Finset.sum_nonneg fun _ _ => mul_nonneg ( hw _ _ ) ( hb _ ) ) ] );
+    · constructor <;> try linarith;
+      exact inv_pos.mp ( by nlinarith [ inv_pos.mpr ( zero_lt_one.trans hp ), mul_inv_cancel₀ ( ne_of_gt ( zero_lt_one.trans hp ) ), mul_inv_cancel₀ ( show q ≠ 0 by rintro rfl; norm_num at hpq; linarith ) ] )
+  generalize_proofs at *; (
+  -- By Fubini's theorem, we can interchange the order of summation.
+  have h_fubini : ∑ i, (∑ j, w i j * b j) ^ q ≤ ∑ j, b j ^ q := by
+    -- Apply Jensen's inequality to the convex function $x^q$ with weights $w_{ij}$.
+    have h_jensen : ∀ i, (∑ j, w i j * b j) ^ q ≤ ∑ j, w i j * b j ^ q := by
+      intro i
+      have h_jensen : ConvexOn ℝ (Set.Ici 0) (fun x : ℝ => x ^ q) := by
+        exact ( convexOn_rpow ( by nlinarith [ inv_pos.2 ( zero_lt_one.trans hp ), inv_pos.2 ( show 0 < q by exact lt_of_le_of_ne ( le_of_not_gt fun hq => by { rw [ inv_eq_one_div, div_eq_mul_inv ] at hpq; nlinarith [ inv_mul_cancel₀ ( by linarith : ( p : ℝ ) ≠ 0 ), inv_lt_zero.2 hq ] } ) ( Ne.symm <| by rintro rfl; norm_num at hpq; linarith ) ), mul_inv_cancel₀ ( by linarith : ( p : ℝ ) ≠ 0 ), mul_inv_cancel₀ ( show q ≠ 0 by exact ne_of_gt <| lt_of_le_of_ne ( le_of_not_gt fun hq => by { rw [ inv_eq_one_div, div_eq_mul_inv ] at hpq; nlinarith [ inv_mul_cancel₀ ( by linarith : ( p : ℝ ) ≠ 0 ), inv_lt_zero.2 hq ] } ) ( Ne.symm <| by rintro rfl; norm_num at hpq; linarith ) ) ] ) )
+      generalize_proofs at *; (
+      convert h_jensen.map_sum_le _ _ _ <;> aesop
+      skip)
+    generalize_proofs at *; (
+    refine' le_trans ( Finset.sum_le_sum fun i _ => h_jensen i ) _;
+    rw [ Finset.sum_comm ] ; simp +decide [ ← Finset.mul_sum _ _ _, ← Finset.sum_mul, hrow, hcol ] ;)
+  generalize_proofs at *; (
+  simp_all +decide only [mul_comm];
+  simpa using h_holder.trans ( mul_le_mul_of_nonneg_left ( Real.rpow_le_rpow ( Finset.sum_nonneg fun _ _ => Real.rpow_nonneg ( Finset.sum_nonneg fun _ _ => mul_nonneg ( hb _ ) ( hw _ _ ) ) _ ) h_fubini ( by exact one_div_nonneg.mpr ( show 0 ≤ q by exact le_of_not_gt fun h => by rw [ inv_eq_one_div, inv_eq_one_div, div_add_div, div_eq_iff ] at hpq <;> nlinarith ) ) ) ( Real.rpow_nonneg ( Finset.sum_nonneg fun _ _ => Real.rpow_nonneg ( ha _ ) _ ) _ ) ) |> le_trans <| by simp +decide [ mul_comm ] ;)));
+
+/-
+PROBLEM
 Hermitian trace Hölder inequality: for PSD A, B and conjugate exponents p, q > 1,
 ⟪A, B⟫ ≤ Tr[A^p]^(1/p) * Tr[B^q]^(1/q).
 
 PROVIDED SOLUTION
-By inner_eq_re_trace, ⟪A, B⟫_ℝ = Re(Tr[AB]).
-Since A, B are PSD, Tr[AB] is real and nonneg (inner_self_nonneg for PSD), so ⟪A, B⟫_ℝ = Tr[AB] as a real.
+By inner_eq_doubly_stochastic_sum:
+  ⟪A, B⟫ = ∑_{ij} a_i * b_j * w_{ij}
+where a_i = A.H.eigenvalues i, b_j = B.H.eigenvalues j, w_{ij} = ‖C_{ij}‖^2.
 
-Using eq_conj_diagonal: A = U diag(a) U^*, B = V diag(b) V^* where a = A.H.eigenvalues, b = B.H.eigenvalues.
+The matrix w is doubly stochastic:
+  ∑_j w_{ij} = 1 (by unitary_row_sum_norm_sq, since C = U_A^* U_B is unitary)
+  ∑_i w_{ij} = 1 (by unitary_col_sum_norm_sq)
+And a_i ≥ 0, b_j ≥ 0 (from hA, hB positive semidefinite), w_{ij} ≥ 0 (norms squared).
 
-Then AB = U diag(a) U^* V diag(b) V^* and Tr[AB] = Tr[diag(a) C diag(b) C^*]
-where C = U^* V is unitary.
+By doubly_stochastic_holder:
+  ∑_{ij} a_i b_j w_{ij} ≤ (∑ a_i^p)^{1/p} * (∑ b_j^q)^{1/q}
 
-Tr[diag(a) C diag(b) C^*] = ∑_{ij} a_i b_j |C_{ij}|^2.
-
-Since C is unitary: ∑_j |C_{ij}|^2 = 1 and ∑_i |C_{ij}|^2 = 1.
-So the matrix (|C_{ij}|^2)_{ij} is doubly stochastic.
-
-Now ∑_{ij} a_i b_j |C_{ij}|^2 = ∑_i a_i (∑_j b_j |C_{ij}|^2).
-
-For each i, using weighted power mean (Real.inner_le_weight_mul_Lp_of_nonneg
-with weights w_j = |C_{ij}|^2 and values f_j = b_j):
-∑_j b_j |C_{ij}|^2 ≤ (∑_j |C_{ij}|^2)^{1-1/q} * (∑_j |C_{ij}|^2 * b_j^q)^{1/q}
-= 1^{1-1/q} * (∑_j |C_{ij}|^2 * b_j^q)^{1/q}
-= (∑_j |C_{ij}|^2 * b_j^q)^{1/q}
-
-Let g_i = (∑_j |C_{ij}|^2 * b_j^q)^{1/q}. Then:
-∑_i a_i * g_i ≤ (∑_i a_i^p)^{1/p} * (∑_i g_i^{p/(p-1)})^{(p-1)/p}
-= (∑_i a_i^p)^{1/p} * (∑_i g_i^q)^{1/q}   [since p/(p-1) = q and (p-1)/p = 1/q]
-
-And ∑_i g_i^q = ∑_i ∑_j |C_{ij}|^2 * b_j^q = ∑_j b_j^q * (∑_i |C_{ij}|^2) = ∑_j b_j^q.
-
-So ⟪A, B⟫ ≤ (∑_i a_i^p)^{1/p} * (∑_j b_j^q)^{1/q} = Tr[A^p]^{1/p} * Tr[B^q]^{1/q}.
+By trace_rpow_eq_sum: (∑ a_i^p) = Tr[A^p] and (∑ b_j^q) = Tr[B^q].
+So ⟪A, B⟫ ≤ Tr[A^p]^{1/p} * Tr[B^q]^{1/q}.
 -/
 lemma HermitianMat.inner_le_trace_rpow_mul
     (A B : HermitianMat d ℂ) (hA : 0 ≤ A) (hB : 0 ≤ B)
     (p q : ℝ) (hp : 1 < p) (hpq : 1/p + 1/q = 1) :
     ⟪A, B⟫_ℝ ≤ (A ^ p).trace ^ (1/p) * (B ^ q).trace ^ (1/q) := by
-  sorry
+  by_cases hq : q > 1;
+  · -- Apply the doubly_stochastic_holder lemma with the weights $w_{ij} = \|C_{ij}\|^2$.
+    have h_holder : ⟪A, B⟫_ℝ ≤ (∑ i, (A.H.eigenvalues i) ^ p) ^ (1 / p) * (∑ j, (B.H.eigenvalues j) ^ q) ^ (1 / q) := by
+      have h_holder : ∀ i j, 0 ≤ ‖(A.H.eigenvectorUnitary.val.conjTranspose * B.H.eigenvectorUnitary.val) i j‖^2 := by
+        bound;
+      have h_holder : ∀ i, ∑ j, ‖(A.H.eigenvectorUnitary.val.conjTranspose * B.H.eigenvectorUnitary.val) i j‖^2 = 1 := by
+        intro i
+        have h_unitary : (A.H.eigenvectorUnitary.val.conjTranspose * B.H.eigenvectorUnitary.val) * (A.H.eigenvectorUnitary.val.conjTranspose * B.H.eigenvectorUnitary.val).conjTranspose = 1 := by
+          simp +decide [ Matrix.mul_assoc, Matrix.mul_eq_one_comm ];
+          simp +decide [ ← Matrix.mul_assoc, Matrix.IsHermitian.eigenvectorUnitary ]
+        exact unitary_row_sum_norm_sq _ h_unitary i
+      have h_holder' : ∀ j, ∑ i, ‖(A.H.eigenvectorUnitary.val.conjTranspose * B.H.eigenvectorUnitary.val) i j‖^2 = 1 := by
+        convert unitary_col_sum_norm_sq ( A.H.eigenvectorUnitary.val.conjTranspose * B.H.eigenvectorUnitary.val ) _ using 1;
+        simp +decide [ Matrix.mul_assoc, Matrix.conjTranspose_mul ];
+        simp +decide [ ← mul_assoc, Matrix.IsHermitian.eigenvectorUnitary ]
+      have h_holder'' : ∀ i j, 0 ≤ (A.H.eigenvalues i) ∧ 0 ≤ (B.H.eigenvalues j) := by
+        exact fun i j => ⟨ by simpa using hA.eigenvalues_nonneg i, by simpa using hB.eigenvalues_nonneg j ⟩
+      have h_holder''' : ∀ i j, 0 ≤ ‖(A.H.eigenvectorUnitary.val.conjTranspose * B.H.eigenvectorUnitary.val) i j‖^2 := by
+        assumption
+      have h_holder'''' : 1 / p + 1 / q = 1 := by
+        exact hpq
+      have h_holder''''' : 1 < p ∧ 1 < q := by
+        exact ⟨ hp, hq ⟩
+      have h_holder'''''' : ⟪A, B⟫_ℝ = ∑ i, ∑ j, (A.H.eigenvalues i) * (B.H.eigenvalues j) * ‖(A.H.eigenvectorUnitary.val.conjTranspose * B.H.eigenvectorUnitary.val) i j‖^2 := by
+        convert HermitianMat.inner_eq_doubly_stochastic_sum A B using 1;
+      have := @doubly_stochastic_holder d;
+      convert this ( fun i => A.H.eigenvalues i ) ( fun j => B.H.eigenvalues j ) ( fun i j => ‖( A.H.eigenvectorUnitary.val.conjTranspose * B.H.eigenvectorUnitary.val ) i j‖ ^ 2 ) ( fun i => h_holder'' i i |>.1 ) ( fun j => h_holder'' j j |>.2 ) ( fun i j => h_holder''' i j ) h_holder h_holder' p q h_holder'''''.1 h_holder'''' using 1;
+    convert h_holder using 1;
+    rw [ HermitianMat.trace_rpow_eq_sum, HermitianMat.trace_rpow_eq_sum ];
+  · rcases eq_or_ne q 0 with ( rfl | hq' ) <;> simp_all +decide [ division_def ];
+    field_simp at hpq;
+    cases lt_or_gt_of_ne hq' <;> nlinarith [ inv_mul_cancel₀ hq' ]
 
 /-
 PROBLEM
@@ -320,6 +558,10 @@ PROBLEM
 Show that for density matrices ρ, σ (PSD with trace 1) and α > 1,
 Tr[(σ^t ρ σ^t)^α] ≥ 1, where t = (1-α)/(2α).
 
+Show ⟪σ^t ρ σ^t, σ^{-2t}⟫ = 1 for density matrices ρ, σ with ker(σ) ≤ ker(ρ).
+
+For PSD A and p ≠ 0: A^{-p} * A^p = A.supportProj.
+
 PROVIDED SOLUTION
 Let A = σ^t ρ σ^t (PSD) with t = (1-α)/(2α) < 0 (since α > 1).
 Use inner_le_trace_rpow_mul (Hermitian trace Hölder inequality) with the pair
@@ -337,6 +579,132 @@ Step 3: Compute -2t * q = -(1-α)/α * α/(α-1) = 1.
   So Tr[σ^1] = 1.
 
 Step 4: From 1 = ⟪A, σ^{-2t}⟫_ℝ ≤ Tr[A^α]^{1/α} * 1, get Tr[A^α] ≥ 1.
+Set t = (1-α)/(2α) and A = ρ.M.conj (σ^t).mat = σ^t ρ σ^t.
+We compute ⟪A, σ^{-2t}⟫ = Tr[A · σ^{-2t}].
+
+A.mat = (σ^t).mat * ρ.mat * ((σ^t).mat)^* = (σ^t).mat * ρ.mat * (σ^t).mat
+(since σ^t is Hermitian).
+
+Tr[A · σ^{-2t}] = Tr[σ^t ρ σ^t σ^{-2t}]
+= Tr[σ^t ρ σ^{t-2t}] = Tr[σ^t ρ σ^{-t}]
+= Tr[σ^{-t} σ^t ρ] (cyclicity of trace)
+
+Now σ^{-t} σ^t = supportProj σ (the support projection of σ), by
+HermitianMat.rpow_neg_mul_rpow_self for positive definite σ,
+or more generally by the CFC: σ^{-t} σ^t = σ.cfc(λ x, if x = 0 then 0 else 1)
+which is the support projection.
+
+Tr[supportProj(σ) · ρ] = Tr[ρ] = 1 since ker(σ) ≤ ker(ρ) implies
+ρ is supported on the support of σ.
+
+Key lemmas: mat_rpow_add, rpow_neg_mul_rpow_self,
+supportProj_mul (or the kernel condition),
+HermitianMat.conjTranspose_mat, MState.tr.
+By rpow_eq_cfc: A^{-p} = A.cfc(·^{-p}) and A^p = A.cfc(·^p).
+The product A^{-p}.mat * A^p.mat = (A.cfc(·^{-p}) * A.cfc(·^p)).mat
+= (A.cfc(fun x => x^{-p} * x^p)).mat (by mat_cfc_mul and cfc_mul_apply or cfc_comp).
+Now x^{-p} * x^p = if x = 0 then 0 else 1 for p ≠ 0:
+  - For x > 0: x^{-p} * x^p = x^0 = 1 (by rpow_add or rpow_neg_mul).
+  - For x = 0: 0^{-p} * 0^p = 0 * 0 = 0 (since p ≠ 0, rpow 0 ≠₀ = 0).
+And A.cfc(if · = 0 then 0 else 1) = A.supportProj (by supportProj_eq_cfc).
+Use cfc_congr_of_nonneg with hA to match the functions on the spectrum.
+-/
+lemma HermitianMat.rpow_neg_mul_rpow_eq_supportProj
+    (A : HermitianMat d ℂ) (hA : 0 ≤ A) (p : ℝ) (hp : p ≠ 0) :
+    (A ^ (-p)).mat * (A ^ p).mat = A.supportProj.mat := by
+  unfold HermitianMat.supportProj;
+  have h_cfc : (A ^ (-p)).mat * (A ^ p).mat = (A.cfc (fun x => x ^ (-p))) * (A.cfc (fun x => x ^ p)) := by
+    congr! 1;
+  rw [ h_cfc, ← mat_cfc_mul ];
+  have h_cfc : ∀ x : ℝ, 0 ≤ x → x ^ (-p) * x ^ p = if x = 0 then 0 else 1 := by
+    intro x hx; by_cases hx' : x = 0 <;> simp +decide [ hx', Real.rpow_neg, hx, hp ] ;
+  have h_cfc_eq : (A.cfc (fun x => x ^ (-p) * x ^ p)) = (A.cfc (fun x => if x = 0 then 0 else 1)) := by
+    apply cfc_congr_of_nonneg hA;
+    exact fun x hx => h_cfc x hx;
+  convert congr_arg ( fun x : HermitianMat d ℂ => x.val ) h_cfc_eq using 1;
+  convert congr_arg ( fun x : HermitianMat d ℂ => x.val ) ( supportProj_eq_cfc A ) using 1
+
+/-
+PROBLEM
+For a density matrix ρ and PSD σ with ker(σ) ≤ ker(ρ):
+Tr[σ.supportProj * ρ] = Tr[ρ] = 1.
+
+PROVIDED SOLUTION
+The support projection projects onto the orthogonal complement of ker(σ).
+Since ker(σ) ≤ ker(ρ), ρ is zero on ker(σ), so σ.supportProj * ρ = ρ.
+More precisely: σ.supportProj + σ.kerProj = 1 (by kerProj_add_supportProj).
+So Tr[σ.supportProj * ρ] = Tr[(1 - σ.kerProj) * ρ]
+= Tr[ρ] - Tr[σ.kerProj * ρ].
+Since ker(σ) ≤ ker(ρ), the projector σ.kerProj projects onto a subspace
+of ker(ρ), so σ.kerProj * ρ = 0. Hence Tr[σ.supportProj * ρ] = Tr[ρ] = 1.
+Use kerProj_add_supportProj, kernel condition, MState.tr.
+-/
+lemma supportProj_inner_density (h : σ.M.ker ≤ ρ.M.ker) :
+    ⟪σ.M.supportProj, ρ.M⟫_ℝ = 1 := by
+  sorry
+
+/-
+PROBLEM
+⟪σ^t ρ σ^t, σ^{-2t}⟫ = 1 for density matrices ρ, σ with ker(σ) ≤ ker(ρ).
+
+PROVIDED SOLUTION
+By definition (conj_apply), A = ρ.M.conj (σ^t).mat has:
+  A.mat = (σ^t).mat * ρ.mat * (σ^t).mat  (using conjTranspose_mat and Hermitian property).
+
+By inner_eq_trace_rc:
+  ⟪A, σ^{-2t}⟫ = Tr[A.mat * (σ^{-2t}).mat]
+  = Tr[(σ^t).mat * ρ.mat * (σ^t).mat * (σ^{-2t}).mat]
+
+Using Matrix.trace_mul_cycle / Matrix.trace_mul_comm to rearrange:
+  = Tr[ρ.mat * (σ^t).mat * (σ^{-2t}).mat * (σ^t).mat]
+  = Tr[ρ.mat * (σ^t).mat * ((σ^{-2t}).mat * (σ^t).mat)]
+  Hmm, this is getting complex. Better:
+  = Tr[(σ^{-2t}).mat * (σ^t).mat * ρ.mat * (σ^t).mat]  (cyclicity)
+  = Tr[((σ^{-t}).mat * (σ^{-t}).mat) * (σ^t).mat * ρ.mat * (σ^t).mat] (split σ^{-2t})
+
+Actually simpler: use mat_rpow_add to get
+  (σ^t).mat * (σ^{-2t}).mat = (σ^{t + (-2t)}).mat = (σ^{-t}).mat
+  (need t + (-2t) = -t and t + (-2t) ≠ 0 when t ≠ 0).
+
+Then Tr[(σ^t).mat * ρ.mat * (σ^{-t}).mat]
+  = Tr[(σ^{-t}).mat * (σ^t).mat * ρ.mat] (cyclicity)
+  = Tr[σ.supportProj.mat * ρ.mat] (by rpow_neg_mul_rpow_eq_supportProj)
+  = ⟪σ.supportProj, ρ.M⟫ (by inner_eq_trace_rc)
+  = 1 (by supportProj_inner_density with kernel condition).
+
+If t = 0: ⟪ρ.M.conj I, σ^0⟫ = ⟪ρ.M, 1⟫ = Tr[ρ] = 1 (by inner_one and MState.tr).
+-/
+private lemma sandwiched_inner_eq_one (h : σ.M.ker ≤ ρ.M.ker) (t : ℝ) :
+    ⟪ρ.M.conj (σ.M ^ t).mat, σ.M ^ (-2 * t)⟫_ℝ = 1 := by
+  sorry
+
+/-
+PROBLEM
+Show that for density matrices ρ, σ (PSD with trace 1) and α > 1,
+Tr[(σ^t ρ σ^t)^α] ≥ 1, where t = (1-α)/(2α).
+
+PROVIDED SOLUTION
+Set A = ρ.M.conj (σ^t).mat, B = σ^{-2t} = σ^{(α-1)/α}.
+Both are PSD. By sandwiched_inner_eq_one: ⟪A, B⟫ = 1.
+
+By inner_le_trace_rpow_mul with exponents p = α > 1, q = α/(α-1):
+  1 = ⟪A, B⟫ ≤ Tr[A^α]^{1/α} * Tr[B^q]^{1/q}
+
+Compute -2t * q:
+  -2t = -(1-α)/α = (α-1)/α
+  q = α/(α-1)
+  -2t * q = (α-1)/α * α/(α-1) = 1
+  So Tr[B^q] = Tr[σ^{(α-1)/α * α/(α-1)}] = Tr[σ^1] = Tr[σ] = 1.
+  Tr[B^q]^{1/q} = 1.
+
+So 1 ≤ Tr[A^α]^{1/α} * 1 = Tr[A^α]^{1/α}.
+Since 1/α > 0: Tr[A^α] ≥ 1.
+
+Note: need 1/p + 1/q = 1/α + (α-1)/α = 1 ✓.
+Also need σ^{-2t} = σ^{(α-1)/α} PSD: true since σ PSD.
+
+Use rpow_mul to simplify B^q = σ^{(α-1)/α * α/(α-1)} = σ^1.
+Use MState.tr for Tr[σ] = 1.
 -/
 private theorem sandwiched_trace_of_gt_1 (h : σ.M.ker ≤ ρ.M.ker) (hα : α > 1) :
     1 ≤ ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).mat) ^ α).trace := by
