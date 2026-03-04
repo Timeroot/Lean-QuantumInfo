@@ -319,7 +319,7 @@ end CPTPMap
 section hermDual
 
 --PULLOUT to Bundled.lean. Also use this to improve the definitions in POVM.lean.
-def HPMap.ofHermitianMat (f : HermitianMat dIn ℂ →ₗ[ℝ] HermitianMat dOut ℂ) : HPMap dIn dOut where
+def HPMap.ofHermitianMat {dOut : Type*} (f : HermitianMat dIn ℂ →ₗ[ℝ] HermitianMat dOut ℂ) : HPMap dIn dOut where
   toFun x := f (realPart x) + Complex.I • f (imaginaryPart x)
   map_add' x y := by
     simp only [map_add, HermitianMat.mat_add, smul_add]
@@ -354,7 +354,6 @@ def HPMap.ofHermitianMat (f : HermitianMat dIn ℂ →ₗ[ℝ] HermitianMat dOut
     · simp [IsSelfAdjoint.imaginaryPart h]
 
 --PULLOUT
-omit [Fintype dOut] in
 @[simp]
 theorem HPMap.linearMap_ofHermitianMat (f : HermitianMat dIn ℂ →ₗ[ℝ] HermitianMat dOut ℂ) :
     LinearMapClass.linearMap (HPMap.ofHermitianMat f) = f := by

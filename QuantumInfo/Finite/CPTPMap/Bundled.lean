@@ -22,7 +22,6 @@ thoroughly in their file CPTP.lean.
 
 
 variable (dIn dOut R : Type*) (𝕜 : Type := ℂ)
-variable [Fintype dIn] [Fintype dOut]
 variable [Semiring R] [RCLike 𝕜]
 
 /-- Hermitian-preserving linear maps. -/
@@ -30,11 +29,12 @@ structure HPMap extends MatrixMap dIn dOut 𝕜 where
   HP : MatrixMap.IsHermitianPreserving toLinearMap
 
 /-- Unital linear maps. -/
-structure UnitalMap [DecidableEq dIn] [DecidableEq dOut] extends MatrixMap dIn dOut R where
+structure UnitalMap [DecidableEq dIn] [DecidableEq dOut]
+    extends MatrixMap dIn dOut R where
   unital : MatrixMap.Unital toLinearMap
 
 /-- Trace-preserving linear maps. -/
-structure TPMap extends MatrixMap dIn dOut R where
+structure TPMap [Fintype dIn] [Fintype dOut] extends MatrixMap dIn dOut R where
   TP : MatrixMap.IsTracePreserving toLinearMap
 
 --Mark this as [simp] so that simp lemmas requiring `IsTracePreserving` can pick it up.
@@ -43,39 +43,44 @@ structure TPMap extends MatrixMap dIn dOut R where
 attribute [simp] TPMap.TP
 
 /-- Positive linear maps. -/
-structure PMap extends HPMap dIn dOut 𝕜 where
+structure PMap [Fintype dIn] [Fintype dOut]
+    extends HPMap dIn dOut 𝕜 where
   pos : MatrixMap.IsPositive toLinearMap
   HP := pos.IsHermitianPreserving
 
 /-- Completely positive linear maps. -/
-structure CPMap [DecidableEq dIn] extends PMap dIn dOut 𝕜 where
+structure CPMap [Fintype dIn] [Fintype dOut] [DecidableEq dIn]
+    extends PMap dIn dOut 𝕜 where
   cp : MatrixMap.IsCompletelyPositive toLinearMap
   pos := cp.IsPositive
 
 /-- Positive trace-preserving linear maps. These includes all channels, but aren't
   necessarily *completely* positive, see `CPTPMap`. -/
-structure PTPMap extends PMap dIn dOut 𝕜, TPMap dIn dOut 𝕜
+structure PTPMap [Fintype dIn] [Fintype dOut]
+  extends PMap dIn dOut 𝕜, TPMap dIn dOut 𝕜
 
 /-- Positive unital maps. These are important because they are the
   dual to `PTPMap`: they are the most general way to map *observables*. -/
-structure PUMap [DecidableEq dIn] [DecidableEq dOut] extends PMap dIn dOut 𝕜, UnitalMap dIn dOut 𝕜
+structure PUMap [Fintype dIn] [Fintype dOut] [DecidableEq dIn] [DecidableEq dOut]
+  extends PMap dIn dOut 𝕜, UnitalMap dIn dOut 𝕜
 
 attribute [simp] PTPMap.TP
 
 /-- Completely positive trace-preserving linear maps. This is the most common
   meaning of "channel", often described as "the most general physically realizable
   quantum operation". -/
-structure CPTPMap [DecidableEq dIn] extends PTPMap dIn dOut (𝕜 := 𝕜), CPMap dIn dOut 𝕜 where
+structure CPTPMap [Fintype dIn] [Fintype dOut] [DecidableEq dIn]
+  extends PTPMap dIn dOut (𝕜 := 𝕜), CPMap dIn dOut 𝕜 where
 
 /-- Completely positive unital maps. These are important because they are the
   dual to `CPTPMap`: they are the physically realizable ways to map *observables*. -/
-structure CPUMap [DecidableEq dIn] [DecidableEq dOut] extends CPMap dIn dOut 𝕜, PUMap dIn dOut 𝕜
+structure CPUMap [Fintype dIn] [Fintype dOut] [DecidableEq dIn] [DecidableEq dOut]
+  extends CPMap dIn dOut 𝕜, PUMap dIn dOut 𝕜
 
 variable {dIn dOut R} {𝕜 : Type} [RCLike 𝕜]
 
 --Hermitian-presering maps: continuous linear maps on HermitianMats.
 namespace HPMap
-omit [Fintype dIn] [Fintype dOut]
 variable {Λ₁ Λ₂ : HPMap dIn dOut 𝕜}
 variable {CΛ₁ CΛ₂ : HPMap dIn dOut ℂ}
 
@@ -138,13 +143,15 @@ instance instFunLike : FunLike (HPMap dIn dOut ℂ) (HermitianMat dIn ℂ) (Herm
   coe_injective' x y h := funext_hermitian fun M ↦
     by simpa using congrFun h M
 
-instance : ContinuousLinearMapClass
+instance [Fintype dIn] : ContinuousLinearMapClass
     (HPMap dIn dOut ℂ) ℝ (HermitianMat dIn ℂ) (HermitianMat dOut ℂ) where
   map_add f x y := HermitianMat.ext <| LinearMap.map_add f.toLinearMap x y
   map_smulₛₗ f c x := HermitianMat.ext <| by simp [instFunLike]
   map_continuous f := .subtype_mk (by fun_prop) _
 
 end HPMap
+
+variable [Fintype dIn] [Fintype dOut]
 
 --Positive-preserving maps: continuous linear order-preserving maps on HermitianMats.
 namespace PMap
@@ -391,8 +398,7 @@ theorem pos_Hermitian (M : CPUMap dIn dOut ℂ) {x : HermitianMat dIn ℂ} (h : 
 
 end CPUMap
 
-
---Tests to make sure that our `simp`s and classe are all working like we want them too
+--Tests to make sure that our `simp`s and classes are all working like we want them too
 
 section test
 variable [DecidableEq dIn] [DecidableEq dOut]
