@@ -111,39 +111,55 @@ theorem average_of_pure_ensemble {T : Type _} {U : Type*} [AddCommGroup U] [Modu
 
 variable {ψ : Ket d}
 
-/-- A pure-state ensemble mixes into a pure state if and only if
-the only states in the ensemble with nonzero probability are equal to `ψ`  -/
-theorem mix_pEnsemble_pure_iff_pure {e : PEnsemble d α} :
-  mix (toMEnsemble e) = MState.pure ψ ↔ ∀ i : α, e.distr i ≠ 0 → e.states i = ψ := by
-  sorry
+@[simp]
+theorem distr_toMEnsemble (e : PEnsemble d α) : (toMEnsemble e).distr = e.distr := by
+  rfl
 
+/-
+A pure-state ensemble mixes into a pure state if and only if
+the only states in the ensemble with nonzero probability are equal
+to the same Ket `ψ` up to a global phase.
+-/
+theorem mix_pEnsemble_pure_iff_pure {e : PEnsemble d α} :
+    mix (toMEnsemble e) = MState.pure ψ ↔
+    ∀ i : α, e.distr i ≠ 0 → MState.pure (e.states i) = MState.pure ψ := by
+  refine ⟨fun h i hi ↦ ?_, fun h ↦ ?_⟩
+  · apply MState.eq_of_sum_eq_pure ?_ ?_ ?_ e.distr.normalized i (Finset.mem_univ i)
+    · exact_mod_cast lt_of_le_of_ne (e.distr i).zero_le hi.symm
+    · exact (MState.pure_iff_purity_one _).mp ⟨ψ, rfl⟩
+    · exact congr_arg MState.M h.symm
+    · grind
+  · have h_sum : mix (toMEnsemble e) = ∑ i, (e.distr i).val • (MState.pure ψ).M := by
+      refine Finset.sum_congr rfl fun i _ => ?_
+      by_cases hi : e.distr i = 0
+      · simp [hi]
+      · rw [← h i hi]
+        rfl
+    simp [MState.ext_iff, h_sum, ← Finset.sum_smul]
+
+/- The theorem below is also false for the same reason as the original `mix_pEnsemble_pure_iff_pure`:
+   knowing `MState.pure (e.states i) = MState.pure ψ` does not imply `e.states i = ψ` as Kets,
+   so `f (e.var i) ≠ f ψ` in general for a non-phase-invariant `f : Ket d → T`. -/
 /-- The average of `f : Ket d → T` on an ensemble that mixes to a pure state `ψ` is `f ψ` -/
 theorem mix_pEnsemble_pure_average {e : PEnsemble d α} {T : Type _} {U : Type*} [AddCommGroup U] [Module ℝ U]
-    [inst : Mixable U T] (f : Ket d → T) (hmix : mix (toMEnsemble e) = MState.pure ψ) :
+    [inst : Mixable U T] (f : Ket d → T) (hf : ∀ ψ φ, Ket.PhaseEquiv.r ψ φ → f ψ = f φ)
+    (hmix : mix (toMEnsemble e) = MState.pure ψ) :
   pure_average f e = f ψ := by
   have hpure := mix_pEnsemble_pure_iff_pure.mp hmix
+  -- Each state with nonzero probability is phase-equivalent to ψ
+  have hfeq : ∀ i, e.distr i ≠ 0 → f (e.var i) = f ψ := fun i hdi =>
+    hf _ _ ((MState.PhaseEquiv_iff_pure_eq _ _).mpr (hpure i hdi))
   simp only [pure_average, Functor.map, Distribution.expect_val]
   apply Mixable.to_U_inj
-  rw [PEnsemble.states] at hpure
   simp only [Mixable.to_U_of_mkT, Function.comp_apply]
-  have h1 : ∀ i ∈ Finset.univ, (e.distr i : ℝ) • (Mixable.to_U (f (e.var i))) ≠ 0 → e.var i = ψ := fun i hi ↦ by
-    have h2 : e.distr i = 0 → (e.distr i : ℝ) • (Mixable.to_U (f (e.var i))) = 0 := fun h0 ↦ by
-      simp only [h0, Prob.coe_zero, zero_smul]
-    exact (hpure i) ∘ h2.mt
-  classical rw [←Finset.sum_filter_of_ne h1, Finset.sum_filter]
-  classical conv =>
-    enter [1, 2, a]
-    rw [←dite_eq_ite]
-    enter [2, hvar]
-    rw [hvar]
-  classical conv =>
-    enter [1, 2, a]
-    rw [dite_eq_ite]
-    rw [←ite_zero_smul]
-  have hpure' : ∀ i ∈ Finset.univ, (↑(e.distr i) : ℝ) ≠ 0 → e.var i = ψ := fun i hi hne0 ↦ by
-    apply hpure i
-    simpa using hne0
-  classical rw [←Finset.sum_smul, ←Finset.sum_filter, Finset.sum_filter_of_ne hpure', Distribution.normalized, one_smul]
+  have h1 : ∀ i ∈ Finset.univ, (e.distr i : ℝ) • (Mixable.to_U (f (e.var i))) ≠ 0 → e.var i = e.var i := fun _ _ _ => rfl
+  -- For nonzero summands, distr i ≠ 0 so f (e.var i) = f ψ
+  have h2 : ∀ i ∈ Finset.univ, (e.distr i : ℝ) • Mixable.to_U (f (e.var i)) = (e.distr i : ℝ) • Mixable.to_U (f ψ) := by
+    intro i _
+    by_cases hdi : e.distr i = 0
+    · simp [hdi]
+    · rw [hfeq i hdi]
+  rw [Finset.sum_congr rfl h2, ← Finset.sum_smul, Distribution.normalized, one_smul]
 
 theorem sum_prob_mul_eq_one_iff {ι : Type*} [Fintype ι] (p : ι → ℝ) (x : ι → ℝ)
     (hp : ∀ i, 0 ≤ p i) (hsum : ∑ i, p i = 1) (hx : ∀ i, x i ≤ 1) :
