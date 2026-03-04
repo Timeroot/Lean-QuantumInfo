@@ -462,18 +462,19 @@ since `Λ.map = of_kraus K K`, we substitute and simplify.
 -/
 private lemma kraus_sum_eq_one_of_TP
     {κ : Type*} [Fintype κ]
-    {K : κ → Matrix dOut dIn ℂ}
-    (hTP : (MatrixMap.of_kraus K K).IsTracePreserving) :
-    ∑ k, (K k).conjTranspose * (K k) = 1 := by
-  refine' Matrix.ext fun i j => _;
-  have := hTP ( Matrix.of fun x y => if x = j then if y = i then 1 else 0 else 0 )
-  simp_all +decide [ Matrix.trace, Matrix.mul_apply, Finset.mul_sum _ _ _ ] ;
+    {K₁ K₂ : κ → Matrix dOut dIn ℂ}
+    (hTP : (MatrixMap.of_kraus K₁ K₂).IsTracePreserving) :
+    ∑ k, (K₂ k).conjTranspose * (K₁ k) = 1 := by
+  ext1 i j
+  have := hTP (Matrix.of fun x y ↦ if x = j then if y = i then 1 else 0 else 0)
+  simp only [Matrix.trace, Matrix.diag_apply, Matrix.of_apply, Finset.sum_ite_eq',
+    Finset.mem_univ, ↓reduceIte] at this
   convert this using 1
-  · simp +decide [ MatrixMap.of_kraus, Matrix.transpose_apply ]
-    ring!
-    simp +decide [ Matrix.sum_apply, Matrix.mul_apply, Matrix.conjTranspose_apply, Finset.mul_sum _ _ _, Finset.sum_mul _ _ _ ];
-    exact Finset.sum_comm.trans ( Finset.sum_congr rfl fun _ _ => Finset.sum_congr rfl fun _ _ => by ring )
-  · simp +decide [ Matrix.one_apply, eq_comm ]
+  · simp [MatrixMap.of_kraus, Matrix.sum_apply, Matrix.mul_apply]
+    rw [Finset.sum_comm]
+    congr! 2
+    ring
+  · simp [Matrix.one_apply, eq_comm]
 
 /-
 PROBLEM
@@ -509,40 +510,37 @@ private lemma exists_unitary_extending_isometry
   obtain ⟨b, hb⟩ : ∃ b : OrthonormalBasis m ℂ (EuclideanSpace ℂ m), ∀ j, b (emb j) = u j := by
     have h_orthonormal : Orthonormal ℂ (fun j => u j) := by
       rw [ orthonormal_iff_ite ];
-      intro i j; replace hV := congr_fun ( congr_fun hV i ) j; simp_all +decide [ Matrix.mul_apply, inner_sum ] ;
-      simpa only [ mul_comm ] using hV;
-    have := @Orthonormal.exists_orthonormalBasis_extension_of_card_eq;
-    contrapose! this;
-    refine' ⟨ ℂ, inferInstance, EuclideanSpace ℂ m, inferInstance, inferInstance, _, _ ⟩;
-    exact inferInstance;
-    refine' ⟨ m, inferInstance, _, _ ⟩;
-    · simp +decide [ Module.finrank_pi ];
-    · refine' ⟨ fun i => if hi : i ∈ Set.range emb then u ( Classical.choose hi ) else 0, Set.range emb, _, _ ⟩ <;> simp_all +decide [ Orthonormal ];
-      intro i j hij; split_ifs <;> simp_all +decide [ Pairwise ] ;
-      exact h_orthonormal.2 ( by intro h; have := Classical.choose_spec ‹∃ y, emb y = ↑i›; have := Classical.choose_spec ‹∃ y, emb y = ↑j›; aesop );
-  refine' ⟨ _, _ ⟩;
-  refine' ⟨ _, _ ⟩;
-  exact Matrix.of ( fun i j => b j i );
-  all_goals simp_all +decide [ Matrix.mem_unitaryGroup_iff ];
-  · ext i j; simp +decide [ Matrix.mul_apply, Matrix.one_apply ] ;
-    have := b.sum_inner_mul_inner ( EuclideanSpace.single i 1 ) ( EuclideanSpace.single j 1 ) ; simp_all +decide [ inner, Finset.sum_ite, Finset.filter_eq, Finset.filter_ne ] ;
-  · exact fun i j => rfl
+      intro i j
+      replace hV := congr_fun (congr_fun hV i) j
+      simpa only [ mul_comm, Matrix.mul_apply ] using hV
+    have := Orthonormal.exists_orthonormalBasis_extension_of_card_eq (𝕜 := ℂ) (E := EuclideanSpace ℂ m) (ι := m)
+    simp only [finrank_euclideanSpace, forall_const] at this
+    contrapose! this
+    · refine ⟨fun i => if hi : i ∈ Set.range emb then u (Classical.choose hi) else 0, Set.range emb, ?_, ?_ ⟩
+      · simp +contextual only [Orthonormal, h_orthonormal.1, implies_true, true_and,
+          Set.mem_range, Set.restrict_apply, Subtype.forall, ↓reduceDIte]
+        intro i j hij
+        split_ifs with h₁ h₂
+        · apply h_orthonormal.2
+          have := Classical.choose_spec ‹∃ y, emb y = ↑i›
+          have := Classical.choose_spec ‹∃ y, emb y = ↑j›
+          grind
+        · simp
+        · simp
+        · simp
+      · simp_all only [Orthonormal, ne_eq, Set.mem_range, exists_exists_eq_and,
+          EmbeddingLike.apply_eq_iff_eq, exists_eq, ↓reduceDIte, Classical.choose_eq, implies_true];
+  refine ⟨⟨Matrix.of (fun i j ↦ b j i), ?_⟩, ?_⟩
+  · simp only [Matrix.mem_unitaryGroup_iff]
+    ext1 i j
+    simpa [inner] using b.sum_inner_mul_inner (EuclideanSpace.single i 1) (EuclideanSpace.single j 1)
+  · simp [hb, u]
 
 omit [DecidableEq dOut] [Inhabited dOut] in
-/-
-PROBLEM
+/--
 Given Kraus operators K indexed by (dOut × dIn), define the isometry matrix
-V : Matrix (dIn × dOut × dOut) dIn ℂ by V_{(a, b, d), a'} = (K (b, a))_{d, a'},
-and show that V†V = 1 given that Σ_k K_k† K_k = 1.
-
-PROVIDED SOLUTION
-(V†V)_{a₁, a₂} = Σ_{(a,b,d)} conj(V_{(a,b,d), a₁}) * V_{(a,b,d), a₂}
-= Σ_{(a,b,d)} conj((K(b,a))_{d,a₁}) * (K(b,a))_{d,a₂}
-= Σ_{k=(b,a)} ((K k)† * (K k))_{a₁,a₂}
-= (Σ_k (K k)† * (K k))_{a₁,a₂}
-= 1_{a₁,a₂}.
-Use ext, simp on conjTranspose and mul, reindex the sum over (b,a) as a sum over k,
-and apply hTP.
+V : Matrix (dIn × dOut × dOut) dIn ℂ by V_{(a, b, d), a'} = (K (b, a))_{d, a'}.
+Then V†V = 1.
 -/
 private lemma purify_isometry_condition
     {K : (dOut × dIn) → Matrix dOut dIn ℂ}
@@ -550,11 +548,11 @@ private lemma purify_isometry_condition
     let V : Matrix (dIn × dOut × dOut) dIn ℂ :=
       fun ⟨a, b, d⟩ a' => (K (b, a)) d a'
     V.conjTranspose * V = 1 := by
-  convert hTP using 1;
-  ext i j;
-  simp +decide [ Matrix.mul_apply, Fintype.sum_prod_type ];
-  rw [ Finset.sum_comm ];
-  simp +decide [ Matrix.sum_apply, Matrix.mul_apply ]
+  rw [← hTP]
+  ext1 i j
+  simp only [Matrix.mul_apply, Fintype.sum_prod_type];
+  rw [Finset.sum_comm]
+  simp [Matrix.sum_apply, Matrix.mul_apply]
 
 /-
 PROBLEM
@@ -598,13 +596,9 @@ with the appropriate lemmas. Key simp lemmas to use:
 - Fintype.sum_prod_type for reindexing sums over product types
 The crucial simplification is that the sum over Unit (from step 1) collapses,
 and the sum over (b,a) in dOut × dIn matches the Kraus sum.
--/
 
-/-
-PROBLEM
-Show that the composed CPTP map equals Λ.
+alternate suggestion:
 
-PROVIDED SOLUTION
 Use CPTPMap.ext to reduce to MatrixMap equality, then LinearMap.ext and funext to get
 entry-level equality. On the LHS, use hK to get of_kraus K K entries. On the RHS, unfold
 the composition step by step:
@@ -669,27 +663,17 @@ theorem exists_purify (Λ : CPTPMap dIn dOut) :
       let append : CPTPMap dIn (dIn × Unit) := CPTPMap.ofEquiv (Equiv.prodPUnit dIn).symm
       CPTPMap.traceLeft ∘ₘ CPTPMap.traceLeft ∘ₘ Λ' ∘ₘ prep ∘ₘ append
     ) := by
-  obtain ⟨K, hK⟩ := MatrixMap.IsCompletelyPositive.exists_kraus Λ.map Λ.cp
-  -- K : (dOut × dIn) → Matrix dOut dIn ℂ
-  -- hK : Λ.map = MatrixMap.of_kraus K K
-  -- Step 1: Extract Kraus sum condition from trace-preserving
+  obtain ⟨K, hK⟩ := Λ.cp.exists_kraus _
   have hTP_kraus : ∑ k, (K k).conjTranspose * (K k) = 1 :=
     kraus_sum_eq_one_of_TP (hK ▸ Λ.TP)
-  -- Step 2: Define the isometry
   let V : Matrix (dIn × dOut × dOut) dIn ℂ :=
     fun ⟨a, b, d⟩ a' => (K (b, a)) d a'
-  -- Step 3: Show V†V = 1
   have hV : V.conjTranspose * V = 1 :=
     purify_isometry_condition hTP_kraus
-  -- Step 4: Extend V to a unitary using the embedding a ↦ (a, default, default)
   let emb : dIn ↪ (dIn × dOut × dOut) :=
     ⟨fun a => (a, default, default), fun a₁ a₂ h => by simpa using h⟩
   obtain ⟨U, hU⟩ := exists_unitary_extending_isometry V hV emb
-  -- Step 5: Construct the purifying channel
-  refine ⟨ofUnitary U, ⟨U, rfl⟩, ?_⟩
-  -- Step 6: Show the trace property.
-  -- We need: Λ = traceLeft ∘ₘ traceLeft ∘ₘ ofUnitary U ∘ₘ prep ∘ₘ append
-  exact purify_trace_eq hK hU
+  refine ⟨ofUnitary U, ⟨U, rfl⟩, purify_trace_eq hK hU⟩
 
 /-- Every channel can be written as a unitary channel on a larger system. In general, if
  the original channel was A→B, we may need to go as big as dilating the output system (the
@@ -703,8 +687,6 @@ theorem exists_purify (Λ : CPTPMap dIn dOut) :
  we require a typeclass instance [Inhabited dOut]. -/
 def purify (Λ : CPTPMap dIn dOut) : CPTPMap (dIn × dOut × dOut) (dIn × dOut × dOut) :=
   exists_purify Λ |>.choose
-
---TODO: Constructing this will probably need Kraus operators first.
 
 theorem purify_IsUnitary (Λ : CPTPMap dIn dOut) : Λ.purify.IsUnitary :=
   exists_purify Λ |>.choose_spec.1
