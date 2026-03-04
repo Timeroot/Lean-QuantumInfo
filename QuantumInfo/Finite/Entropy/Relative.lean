@@ -1120,7 +1120,83 @@ theorem qRelEntropy_le_add_of_le_smul (ρ : MState d) {σ₁ σ₂ : MState d} (
   sorry
 
 /-- "Formula for conversion from operator inequality to quantum relative entropy",
--- Proposition S17 of https://arxiv.org/pdf/2401.01926v2 -/
+Proposition S17 of https://arxiv.org/pdf/2401.01926v2
+
+Relevant snippet:
+
+\begin{proposition}[Formula for conversion from operator inequality to quantum relative entropy]
+    \label{prp:conversion}
+    For any states $\rho,\sigma\in\mathcal{D}\qty(\mathcal{H})$ of any $d$-dimensional system $\mathcal{H}$ and any $\alpha>0$, if it holds that
+    \begin{equation}
+    \label{eq:rho_alpha_sigma}
+        \rho\leq\alpha\sigma,
+    \end{equation}
+    then we have
+    \begin{equation}
+        D\left(\rho\middle|\middle|\sigma\right) \leq \log_2\qty(\alpha).
+    \end{equation}
+    \end{proposition}
+
+    \begin{proof}
+    The issue here is that if the supports of $\rho$ and $\sigma$ are different, it is not possible to take $\log_2$ of the operators $\rho$ and $\sigma$ directly at the same time.
+    To address this issue, we fix an arbitrarily small parameter $\delta$ satisfying $0 < \delta\leq \frac{1}{4}$ and, in place of $\rho$, consider an operator
+    \begin{equation}
+        \frac{\rho+\delta\sigma}{1+\delta},
+    \end{equation}
+    which has the same support as $\sigma$ since the support of $\sigma$ satisfying~\eqref{eq:rho_alpha_sigma} always includes the support of $\rho$.
+
+    From~\eqref{eq:rho_alpha_sigma}, it follows that
+    \begin{equation}
+        \frac{\rho+\delta\sigma}{1+\delta}\leq
+        \frac{\alpha+\delta}{1+\delta}\sigma.
+    \end{equation}
+    Then, due to the operator monotonicity of the logarithm,
+    within the support of $\sigma$, it holds that
+    \begin{equation}
+    \label{eq:operator2}
+        \log_2\qty(\frac{\rho+\delta\sigma}{1+\delta})\leq
+        \log_2\qty(\frac{\alpha+\delta}{1+\delta}\sigma).
+    \end{equation}
+    Thus, we have
+    \begin{align}
+       \label{eq:limit_delta}
+        &\Tr\qty[\frac{\rho+\delta\sigma}{1+\delta}\log_2\qty(\frac{\rho+\delta\sigma}{1+\delta})]
+        \leq\Tr\qty[\frac{\rho+\delta\sigma}{1+\delta}
+        \log_2\qty(\frac{\alpha+\delta}{1+\delta}\sigma)].
+    \end{align}
+    We will take the limit of $\delta\to 0$ to obtain the desired bound of the quantum relative entropy.
+    On the one hand, due to
+    \begin{equation}
+       \label{eq:limit_delta_1}
+       \left\|\frac{\rho+\delta\sigma}{1+\delta}-\rho\right\|_1 \leq\left\|\frac{\delta}{1+\delta}\rho\right\|_1 + \left\|\frac{\delta}{1+\delta}\sigma\right\|_1 \leq 2\delta,
+    \end{equation}
+    using Lemma~\ref{lem:asymptotic_continuity_quantum_entorpy},
+    we can evaluate the left-hand side of~\eqref{eq:limit_delta} by
+    \begin{align}
+    \left|\Tr\qty[\frac{\rho+\delta\sigma}{1+\delta}\log_2\qty(\frac{\rho+\delta\sigma}{1+\delta})]-\Tr\qty[\rho\log_2\qty(\rho)]\right|\leq4\delta\log_2(d)+h(4\delta)
+    \to 0\quad\text{as $\delta\to 0$},
+    \end{align}
+    where $h$ is the binary entropy function in~\eqref{eq:binary_entropy}.
+    On the other hand,
+    we can evaluate the right-hand side of~\eqref{eq:limit_delta} by
+    \begin{align}
+        &\Tr\qty[\frac{\rho + \delta\sigma}{1+\delta}\log_2\qty(\frac{\alpha+\delta}{1+\delta}\sigma)] \nonumber \\
+        &=\frac{\Tr\qty[\rho\log_2\qty(\sigma)]+\log_2\qty(\alpha+\delta)-\log_2\qty(1+\delta)}{1+\delta}+\frac{\delta\qty(\Tr\qty[\sigma\log_2\qty(\sigma)]+\log_2\qty(\alpha+\delta)-\log_2\qty(1+\delta))}{1+\delta}\\
+        \label{eq:limit_delta_2}
+        &\to\Tr\qty[\rho\log_2\qty(\sigma)]+\log_2\qty(\alpha)\quad\text{as $\delta\to 0$}.
+    \end{align}
+    As a whole, since the choice of $\delta>0$ can be arbitrarily small, we obtain from~\eqref{eq:limit_delta},~\eqref{eq:limit_delta_1} and~\eqref{eq:limit_delta_2}
+    \begin{align}
+        &\Tr\qty[\rho\log_2\qty(\rho)]\leq \Tr\qty[\rho\log_2\qty(\sigma)]+\log_2\qty(\alpha).
+    \end{align}
+    Thus, by definition of the quantum relative entropy in~\eqref{eq:relative_entropy}, we have
+    \begin{align}
+        &D\left(\rho\middle|\middle|\sigma\right)\leq\log_2\qty(\alpha).
+    \end{align}
+
+    \end{proof}
+
+-/
 theorem qRelativeEnt_op_le {ρ σ : MState d} (hpos : 0 < α) (h : ρ.M ≤ α • σ.M) :
     𝐃(ρ‖σ) ≤ ENNReal.ofReal (Real.log α) := by
   sorry
