@@ -1114,10 +1114,203 @@ theorem qMutualInfo_as_qRelativeEnt (ρ : MState (dA × dB)) :
     qMutualInfo ρ = (𝐃(ρ‖ρ.traceRight ⊗ᴹ ρ.traceLeft) : EReal) := by
   sorry
 
-theorem qRelEntropy_le_add_of_le_smul (ρ : MState d) {σ₁ σ₂ : MState d} (hσ : σ₁.M ≤ α • σ₂.M) :
+/-
+Helper: If σ₂ ≤ α • σ₁ for density matrices, then α > 0.
+   Proof: σ₂ has trace 1, so it's nonzero. If α ≤ 0, then α • σ₁ ≤ 0 (since σ₁ ≥ 0),
+   but σ₂ ≤ α • σ₁ ≤ 0 with σ₂ ≥ 0 forces σ₂ = 0, contradicting trace = 1.
+-/
+private lemma pos_of_MState_le_smul {σ₁ σ₂ : MState d} (hσ : σ₂.M ≤ α • σ₁.M) : 0 < α := by
+  by_contra h_nonpos;
+  have h_ge_zero : 0 ≤ α • σ₁.1 := by
+    exact hσ.trans' ( by exact? );
+  have h_eq_zero : σ₂.1 = 0 := by
+    have h_eq_zero : σ₂.1 ≤ 0 := by
+      convert hσ using 1;
+      exact Eq.symm ( le_antisymm ( smul_nonpos_of_nonpos_of_nonneg ( le_of_not_gt h_nonpos ) ( by exact σ₁.pos.1 ) ) h_ge_zero );
+    exact le_antisymm h_eq_zero σ₂.pos.1;
+  have := σ₂.3; simp_all +decide [ sub_eq_iff_eq_add ] ;
+
+/-
+PROBLEM
+Restricted log monotonicity for PosDef A: for PosDef A with A ≤ B, and PSD C,
+show ⟪C, A.log⟫ ≤ ⟪C, B.log⟫.
+
+PROVIDED SOLUTION
+Since A is PosDef and A ≤ B, by `HermitianMat.log_mono` we get A.log ≤ B.log.
+Then by `HermitianMat.inner_mono` with C ≥ 0, ⟪C, A.log⟫ ≤ ⟪C, B.log⟫.
+-/
+open ComplexOrder in
+private lemma inner_log_mono_of_posDef_of_le (C : HermitianMat d ℂ) (hC : 0 ≤ C)
+    {A B : HermitianMat d ℂ} (hA : A.mat.PosDef) (hAB : A ≤ B) :
+    ⟪C, A.log⟫ ≤ ⟪C, B.log⟫ := by
+  convert HermitianMat.inner_mono hC _;
+  apply_rules [ HermitianMat.log_mono ]
+
+/-
+PROBLEM
+If A is PSD with A ≤ B, C ≥ 0, and ker(A) ≤ ker(C),
+show ⟪C, A.log⟫ ≤ ⟪C, B.log⟫.
+
+PROVIDED SOLUTION
+For any ε > 0, A + ε • 1 is PosDef (all eigenvalues increase by ε),
+and (A + ε • 1) ≤ (B + ε • 1) from A ≤ B. By `inner_log_mono_of_posDef_of_le`:
+  ⟪C, (A + ε • 1).log⟫ ≤ ⟪C, (B + ε • 1).log⟫.
+
+Take ε → 0 using Filter.Tendsto. The convergence follows from continuity:
+  (A + ε • 1).log and (B + ε • 1).log are continuous in ε (since the CFC of
+  a continuous function is continuous, and the maps ε ↦ A + ε • 1 are continuous).
+  The inner product is also continuous. As ε → 0:
+  (A + ε • 1).log → A.log and (B + ε • 1).log → B.log
+  in the matrix norm.
+
+Wait—this is NOT true: (A + ε I).log does NOT converge to A.log when A has zero
+eigenvalues (log(ε) → -∞ ≠ log(0) = 0 in CFC convention).
+
+However, the inner product ⟪C, (A + ε I).log⟫ DOES converge to ⟪C, A.log⟫
+because C is zero on ker(A) (from ker A ≤ ker C). The diverging part
+of log(A + ε I) on ker(A) is multiplied by zero.
+
+To formalize: use the spectral decomposition A = (diag λ).conj U.
+Then (A + ε I) = (diag (λ + ε)).conj U, and
+(A + ε I).log = (diag (log(λ + ε))).conj U.
+Inner product: ⟪C, (A + ε I).log⟫ = ⟪C', diag(log(λ + ε))⟫ = ∑ C'ᵢᵢ log(λᵢ + ε).
+For λᵢ > 0: log(λᵢ + ε) → log(λᵢ).
+For λᵢ = 0: C'ᵢᵢ = 0, so contribution is always 0.
+Total converges to ∑ C'ᵢᵢ log(λᵢ) = ⟪C, A.log⟫.
+
+Similarly for B.
+
+Alternative (simpler, avoiding limits): when A = 0, ker A = ⊤ implies C = 0,
+so both sides are 0. When A ≠ 0 and PosDef, use inner_log_mono_of_posDef_of_le
+directly. When A is PSD, not PosDef, and nonzero, the proof requires the
+limit argument above.
+-/
+/-
+PROBLEM
+For PSD A ≤ B, PSD C with ker(A) ≤ ker(C), show ⟪C, A.log⟫ ≤ ⟪C, B.log⟫.
+
+PROVIDED SOLUTION
+If A = 0: ker A = ⊤ implies ker C = ⊤, so C = 0 (since C ≥ 0 and ker C = ⊤
+means C.lin = 0, i.e., C = 0). Both inner products are 0.
+
+If A.mat.PosDef: apply `inner_log_mono_of_posDef_of_le` directly.
+
+Otherwise, A is PSD but not PosDef and nonzero. Use `A + ε • 1` which is PosDef:
+  `inner_log_mono_of_posDef_of_le C hC (A + ε • 1).posDef (A + ε • 1 ≤ B + ε • 1)`
+gives ⟪C, (A + ε • 1).log⟫ ≤ ⟪C, (B + ε • 1).log⟫ for each ε > 0.
+As ε → 0, both sides converge to ⟪C, A.log⟫ and ⟪C, B.log⟫ respectively.
+(The convergence uses the spectral decomposition and that C is zero on ker A.)
+-/
+private lemma inner_log_mono_of_psd_of_le (C : HermitianMat d ℂ) (hC : 0 ≤ C)
+    {A B : HermitianMat d ℂ} (hA : 0 ≤ A) (hAB : A ≤ B) (hker : A.ker ≤ C.ker) :
+    ⟪C, A.log⟫ ≤ ⟪C, B.log⟫ := by
+  sorry
+
+/-
+PROBLEM
+When σ₂ ≤ α • σ₁, ker σ₂ ≤ ker ρ, and ker σ₁ ≤ ker ρ,
+show the real-valued inequality ⟪ρ.M, σ₂.M.log - σ₁.M.log⟫ ≤ Real.log α.
+
+PROVIDED SOLUTION
+Decompose:
+  ⟪ρ.M, log σ₂ - log σ₁⟫ = ⟪ρ.M, log σ₂ - log(α σ₁)⟫ + ⟪ρ.M, log(α σ₁) - log σ₁⟫
+
+For the second term: by `HermitianMat.log_smul_of_pos` (using (pos_of_MState_le_smul hσ).ne'),
+  log(α σ₁) = log α • supportProj(σ₁) + log σ₁
+so log(α σ₁) - log σ₁ = log α • supportProj(σ₁).
+And ⟪ρ.M, log α • supportProj(σ₁)⟫ = log α * ⟪ρ.M, supportProj(σ₁)⟫
+  = log α * ρ.M.trace (by `HermitianMat.inner_supportProj_of_ker_le` since ker σ₁ ≤ ker ρ)
+  = log α * 1 = log α (by `MState.tr`).
+
+For the first term: by `inner_log_mono_of_psd_of_le` with C = ρ.M, A = σ₂.M,
+B = α • σ₁.M, ker(σ₂.M) ≤ ker(ρ.M), we get
+⟪ρ.M, σ₂.M.log⟫ ≤ ⟪ρ.M, (α • σ₁.M).log⟫, so ⟪ρ.M, log σ₂ - log(α σ₁)⟫ ≤ 0.
+
+Total: ≤ 0 + log α = log α.
+-/
+private lemma inner_log_sub_le_log_alpha (ρ : MState d) {σ₁ σ₂ : MState d} {α : ℝ}
+    (hσ : σ₂.M ≤ α • σ₁.M)
+    (hker₁ : σ₁.M.ker ≤ ρ.M.ker) (hker₂ : σ₂.M.ker ≤ ρ.M.ker) :
+    ⟪ρ.M, σ₂.M.log - σ₁.M.log⟫ ≤ Real.log α := by
+  have h_log_mono : ⟪ρ.M, σ₂.M.log - (α • σ₁.M).log⟫ ≤ 0 := by
+    have h_log_mono : ⟪ρ.M, σ₂.M.log⟫ ≤ ⟪ρ.M, (α • σ₁.M).log⟫ := by
+      apply_rules [ inner_log_mono_of_psd_of_le ];
+      · exact?;
+      · exact?
+    generalize_proofs at *; (
+    simpa [ inner_sub_right ] using sub_nonpos_of_le h_log_mono)
+  have h_log_smul : (α • σ₁.M).log = (Real.log α) • σ₁.M.supportProj + σ₁.M.log := by
+    apply HermitianMat.log_smul_of_pos
+    skip
+    generalize_proofs at *; (
+    have := pos_of_MState_le_smul hσ; aesop;)
+  rw [h_log_smul] at h_log_mono
+  simp_all +decide [ sub_eq_add_neg, add_assoc, add_left_comm, add_comm ];
+  have h_inner_support : ⟪ρ.M, σ₁.M.supportProj⟫ = 1 := by
+    convert HermitianMat.inner_supportProj_of_ker_le _ _ hker₁ using 1;
+    exact?;
+  simp_all +decide [ ← add_assoc, inner_add_right, inner_add_left, inner_smul_right, inner_smul_left ]
+
+/-
+PROBLEM
+The original statement had `σ₁.M ≤ α • σ₂.M` in the hypothesis, but that is
+incorrect (counterexample: σ₁ = |0⟩⟨0|, σ₂ = I/2, ρ = |1⟩⟨1|, α = 2 gives
+D(ρ‖σ₁) = ⊤ > D(ρ‖σ₂) + log 2). The corrected hypothesis is `σ₂.M ≤ α • σ₁.M`.
+
+Show that if σ₂.M ≤ α • σ₁.M then D(ρ‖σ₁) ≤ D(ρ‖σ₂) + log α.
+
+PROVIDED SOLUTION
+Using `pos_of_MState_le_smul` to get α > 0, and `HermitianMat.ker_le_of_le_smul`
+to get ker(σ₁) ≤ ker(σ₂).
+
+Case 1: If ¬(ker σ₂ ≤ ker ρ), then D(ρ‖σ₂) = ⊤, so the RHS = ⊤, trivially true.
+Case 2: ker σ₂ ≤ ker ρ. Then ker σ₁ ≤ ker σ₂ ≤ ker ρ, so both D-values are finite NNReals.
+  Use `qRelativeEnt_ker` to get D(ρ‖σ₁).toEReal = ⟪ρ.M, ρ.M.log - σ₁.M.log⟫
+  and D(ρ‖σ₂).toEReal = ⟪ρ.M, ρ.M.log - σ₂.M.log⟫.
+  Use `inner_log_sub_le_log_alpha` to get ⟪ρ.M, σ₂.M.log - σ₁.M.log⟫ ≤ log α.
+  Then D(ρ‖σ₁) ≤ D(ρ‖σ₂) + log α follows by manipulating the inner products
+  (subtracting the log ρ terms) and converting between EReal and ENNReal.
+  Specifically: D(ρ‖σ₁) - D(ρ‖σ₂) = ⟪ρ.M, σ₂.M.log - σ₁.M.log⟫ ≤ log α,
+  so D(ρ‖σ₁) ≤ D(ρ‖σ₂) + log α. Use `ENNReal.toReal_le_toReal` or similar.
+-/
+set_option maxHeartbeats 800000 in
+theorem qRelEntropy_le_add_of_le_smul (ρ : MState d) {σ₁ σ₂ : MState d} (hσ : σ₂.M ≤ α • σ₁.M) :
     𝐃(ρ‖σ₁) ≤ 𝐃(ρ‖σ₂) + ENNReal.ofReal (Real.log α)
     := by
-  sorry
+  -- Consider two cases: when the kernel of σ₂ is contained in the kernel of ρ and when it is not.
+  by_cases hker : σ₂.M.ker ≤ ρ.M.ker;
+  · by_cases hker₁ : σ₁.M.ker ≤ ρ.M.ker;
+    · -- Using `qRelativeEnt_ker` to get D(ρ‖σ₁).toEReal = ⟪ρ.M, ρ.M.log - σ₁.M.log⟫
+      have hD₁ : (qRelativeEnt ρ σ₁).toEReal = ⟪ρ.M, ρ.M.log - σ₁.M.log⟫ := by
+        exact?
+      have hD₂ : (qRelativeEnt ρ σ₂).toEReal = ⟪ρ.M, ρ.M.log - σ₂.M.log⟫ := by
+        exact?
+      have h_log : ⟪ρ.M, σ₂.M.log - σ₁.M.log⟫ ≤ Real.log α := by
+        apply_rules [ inner_log_sub_le_log_alpha ]
+      have h_final : (qRelativeEnt ρ σ₁).toEReal ≤ (qRelativeEnt ρ σ₂).toEReal + ENNReal.toEReal (ENNReal.ofReal (Real.log α)) := by
+        simp_all +decide [ inner_sub_left, inner_sub_right ];
+        cases max_cases ( Real.log α ) 0 <;> simp +decide [ * ] <;> ring_nf at * <;> norm_cast at * <;> linarith! [ Real.log_nonneg one_le_two ] ;
+      have h_final' : qRelativeEnt ρ σ₁ ≤ qRelativeEnt ρ σ₂ + ENNReal.ofReal (Real.log α) := by
+        exact_mod_cast h_final
+      exact h_final';
+    · by_contra h_contra;
+      have hker_le : σ₁.M.ker ≤ σ₂.M.ker := by
+        apply_rules [ HermitianMat.ker_le_of_le_smul, hσ ];
+        · intro hα_zero
+          have h_contra : σ₂.M ≤ 0 := by
+            aesop
+            skip
+          have h_contra' : σ₂.M = 0 := by
+            exact le_antisymm h_contra ( by exact? )
+          have h_contra'' : σ₂.M.ker = ⊤ := by
+            exact LinearMap.ker_eq_top.mpr ( by aesop )
+          exact hker₁ (by
+          exact fun x hx => hker ( by simp [ h_contra'' ] ) |> fun h => by simpa [ h_contra' ] using h;);
+        · exact σ₂.pos.1
+      generalize_proofs at *; (
+      exact hker₁ ( le_trans hker_le hker ));
+  · simp_all +decide [ qRelativeEnt ];
+    unfold SandwichedRelRentropy; aesop;
 
 /-- "Formula for conversion from operator inequality to quantum relative entropy",
 Proposition S17 of https://arxiv.org/pdf/2401.01926v2
