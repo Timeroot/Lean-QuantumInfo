@@ -936,22 +936,269 @@ lemma inner_log_bounded_near (ρ x : MState d) (hx : x.M.ker ≤ ρ.M.ker)
 
 end lowerSemicontinuous_1
 
+section lowerSemicontinuous_2
+
+variable {d : Type*} [Fintype d] [DecidableEq d]
+
+open scoped InnerProductSpace RealInnerProductSpace HermitianMat
+
+/-
+PROBLEM
+Show that eigenWeight ρ x i = 0 iff the i-th eigenvector of x is in ker(ρ).
+
+PROVIDED SOLUTION
+eigenWeight ρ x i = Re(e_i^* ρ e_i). Since ρ ≥ 0, this is 0 iff e_i ∈ ker(ρ).
+Use `HermitianMat.mem_ker_of_inner_mulVec_zero` for the → direction and
+`HermitianMat.mem_ker_iff_mulVec_zero` for the ← direction.
+For the forward direction: eigenWeight = 0 means star e_i ⋅ ρ e_i = 0 (since it's ≥ 0
+by eigenWeight_nonneg, and Re(z) = 0 with z ≥ 0 implies z = 0).
+Then by `mem_ker_of_inner_mulVec_zero`, e_i ∈ ker(ρ).
+For the backward direction: if ρ e_i = 0, then eigenWeight = Re(e_i^* · 0) = 0.
+-/
+private lemma eigenWeight_eq_zero_iff (ρ x : MState d) (i : d) :
+    eigenWeight ρ x i = 0 ↔ (x.M.H.eigenvectorBasis i : EuclideanSpace ℂ d) ∈ ρ.M.ker := by
+  have h_forward : eigenWeight ρ x i = 0 → (x.M.H.eigenvectorBasis i : d → ℂ) ∈ ρ.M.ker := by
+    unfold eigenWeight
+    generalize_proofs at *;
+    intro h_zero
+    have h_inner : star (x.M.H.eigenvectorBasis i : d → ℂ) ⬝ᵥ (ρ.M.mat.mulVec (x.M.H.eigenvectorBasis i : d → ℂ)) = 0 := by
+      convert h_zero using 1
+      generalize_proofs at *;
+      have h_real : ∀ (v : d → ℂ), star v ⬝ᵥ (ρ.M.mat.mulVec v) = star (star v ⬝ᵥ (ρ.M.mat.mulVec v)) := by
+        intro v
+        have h_real : star v ⬝ᵥ (ρ.M.mat.mulVec v) = star (star v ⬝ᵥ (ρ.M.mat.mulVec v)) := by
+          have h_inner : ∀ (v w : d → ℂ), star v ⬝ᵥ (ρ.M.mat.mulVec w) = star (star w ⬝ᵥ (ρ.M.mat.mulVec v)) := by
+            intro v w
+            have h_inner : star v ⬝ᵥ (ρ.M.mat.mulVec w) = star (star w ⬝ᵥ (ρ.M.mat.mulVec v)) := by
+              have h_inner : star v ⬝ᵥ (ρ.M.mat.mulVec w) = star (star w ⬝ᵥ (ρ.M.mat.mulVec v)) := by
+                have h_inner : ρ.M.mat = star ρ.M.mat := by
+                  exact ρ.M.2.symm ▸ rfl
+                  skip
+                conv_rhs => rw [ h_inner ] ; simp +decide [ Matrix.mulVec, dotProduct ] ; ring;
+                simp +decide [ Matrix.mulVec, dotProduct, Finset.mul_sum _ _ _, mul_assoc, mul_comm, mul_left_comm ];
+                rw [ Finset.sum_comm ] ; congr ; ext ; congr ; ext ; ring!;
+              exact h_inner
+            generalize_proofs at *; (
+            exact h_inner)
+          exact h_inner v v ▸ by simp +decide [ Matrix.mulVec, dotProduct ] ;
+        generalize_proofs at *;
+        exact h_real.trans ( by simp +decide [ Complex.ext_iff ] )
+      generalize_proofs at *; (
+      have h_real : ∀ (v : d → ℂ), star v ⬝ᵥ (ρ.M.mat.mulVec v) = RCLike.re (star v ⬝ᵥ (ρ.M.mat.mulVec v)) := by
+        intro v; specialize h_real v; rw [ eq_comm ] at h_real; simp_all +decide [ Complex.ext_iff ] ;
+        linarith! [ h_real ] ;
+      generalize_proofs at *; (
+      rw [ h_real ] ; norm_cast; simp +decide [ Matrix.vecMul_mulVec, Matrix.dotProduct_mulVec ] ;))
+    generalize_proofs at *;
+    exact (by
+    exact HermitianMat.mem_ker_of_inner_mulVec_zero ρ.2 _ h_inner
+    skip)
+    skip
+  generalize_proofs at *;
+  refine' ⟨ h_forward, fun h => _ ⟩
+  generalize_proofs at *;
+  -- Since ρ e_i = 0, we have e_i^* ρ e_i = 0.
+  have h_zero : (Matrix.vecMul (star (x.M.H.eigenvectorBasis i : d → ℂ)) ρ.M.mat) ⬝ᵥ (x.M.H.eigenvectorBasis i : d → ℂ) = 0 := by
+    have h_zero : ρ.M.mat.mulVec (x.M.H.eigenvectorBasis i : d → ℂ) = 0 := by
+      exact?
+    generalize_proofs at *; (
+    convert congr_arg ( fun v => star ( x.M.H.eigenvectorBasis i : d → ℂ ) ⬝ᵥ v ) h_zero using 1 ; simp +decide [ Matrix.dotProduct_mulVec, Matrix.vecMul_mulVec ] ; ring!;
+    simp +decide [ dotProduct ])
+  generalize_proofs at *; (
+  exact congr_arg Complex.re h_zero)
+
+/-
+PROBLEM
+Show that x.M.ker ≤ ρ.M.ker ↔ ∀ i, eigenvalue_i = 0 → eigenWeight = 0.
+
+PROVIDED SOLUTION
+(→) This is `eigenWeight_zero_of_eigenvalue_zero`.
+(←) x.M.ker = eigenspace 0 (by `ker_eq_eigenspace_zero`). The eigenvectors with eigenvalue 0
+form a basis for ker(x.M). By assumption, each such eigenvector has eigenWeight = 0,
+so by `eigenWeight_eq_zero_iff`, each eigenvector is in ker(ρ). Since ker(ρ) is a submodule
+and contains a spanning set of ker(x.M), it contains all of ker(x.M).
+
+More precisely: take v ∈ x.M.ker. By `ker_eq_eigenspace_zero`, v ∈ eigenspace 0.
+The eigenspace 0 is spanned by {e_i : eigenvalue_i = 0}. Each e_i ∈ ker(ρ) by assumption
+and `eigenWeight_eq_zero_iff`. Since ker(ρ) is a submodule, v ∈ ker(ρ).
+-/
+private lemma ker_le_iff_eigenWeight_zero (ρ x : MState d) :
+    x.M.ker ≤ ρ.M.ker ↔ ∀ i, x.M.H.eigenvalues i = 0 → eigenWeight ρ x i = 0 := by
+  constructor;
+  · exact fun h i hi => eigenWeight_zero_of_eigenvalue_zero ρ x i h hi;
+  · intro h v hv
+    obtain ⟨w, hw⟩ : ∃ w : d → ℂ, v = ∑ i, w i • x.M.H.eigenvectorBasis i := by
+      exact ⟨ _, Eq.symm ( x.M.H.eigenvectorBasis.sum_repr v ) ⟩;
+    -- Since $v \in \ker(x.M)$, we have $x.M(v) = 0$. Using the eigenvector basis, this implies that for each $i$, if the eigenvalue is non-zero, then $w i = 0$.
+    have h_w_zero : ∀ i, x.M.H.eigenvalues i ≠ 0 → w i = 0 := by
+      intro i hi
+      have h_eigenvalue : x.M.val.mulVec v = ∑ i, (x.M.H.eigenvalues i) • w i • x.M.H.eigenvectorBasis i := by
+        have h_eigenvalue : ∀ i, x.M.val.mulVec (x.M.H.eigenvectorBasis i) = x.M.H.eigenvalues i • x.M.H.eigenvectorBasis i := by
+          exact fun i => x.M.H.mulVec_eigenvectorBasis i |> fun h => by simpa [ mul_comm ] using h;
+        generalize_proofs at *; (
+        rw [ hw, Matrix.mulVec_sum ];
+        exact Finset.sum_congr rfl fun i _ => by rw [ Matrix.mulVec_smul, h_eigenvalue i, SMulCommClass.smul_comm ] ;)
+      generalize_proofs at *;
+      have h_eigenvalue_zero : ∑ i, (x.M.H.eigenvalues i) • w i • x.M.H.eigenvectorBasis i = 0 := by
+        exact h_eigenvalue ▸ hv ▸ rfl
+        skip
+      generalize_proofs at *; (
+      have h_eigenvalue_zero : ∀ i, (x.M.H.eigenvalues i) • w i = 0 := by
+        intro i
+        have h_eigenvalue_zero : (x.M.H.eigenvalues i) • w i = inner ℂ (x.M.H.eigenvectorBasis i) (∑ j, (x.M.H.eigenvalues j) • w j • x.M.H.eigenvectorBasis j) := by
+          simp +decide [ inner_sum, inner_smul_right, inner_smul_left, orthonormal_iff_ite.mp ( show Orthonormal ℂ ( fun i => x.M.H.eigenvectorBasis i ) from ?_ ) ]
+        generalize_proofs at *; (
+        aesop
+        skip)
+      generalize_proofs at *; (
+      simpa [ hi ] using h_eigenvalue_zero i |> fun h => by simpa [ hi ] using h;))
+    generalize_proofs at *;
+    simp_all +decide [ eigenWeight_eq_zero_iff ];
+    exact Submodule.sum_mem _ fun i _ => if hi : x.M.H.eigenvalues i = 0 then by simpa [ hi, h_w_zero i ] using Submodule.smul_mem _ ( w i ) ( h i hi ) else by simp +decide [ h_w_zero i hi ] ;
+
+/-
+PROBLEM
+When ¬(x.M.ker ≤ ρ.M.ker), show there exists i with eigenvalue 0 and eigenWeight > 0.
+
+PROVIDED SOLUTION
+By `ker_le_iff_eigenWeight_zero`, ¬(x.M.ker ≤ ρ.M.ker) iff ∃ i, eigenvalue_i = 0 ∧ eigenWeight ≠ 0.
+Since eigenWeight ≥ 0 (by `eigenWeight_nonneg`), eigenWeight ≠ 0 implies eigenWeight > 0.
+-/
+private lemma neg_ker_exists_eigenWeight_pos (ρ x : MState d) (hx : ¬(x.M.ker ≤ ρ.M.ker)) :
+    ∃ i, x.M.H.eigenvalues i = 0 ∧ 0 < eigenWeight ρ x i := by
+  -- By `ker_le_iff_eigenWeight_zero`, ¬(x.M.ker ≤ ρ.M.ker) iff ∃ i, eigenvalue_i = 0 ∧ eigenWeight ≠ 0. Use this fact.
+  have h_eigenWeight_ne_zero : ∃ i, x.M.H.eigenvalues i = 0 ∧ eigenWeight ρ x i ≠ 0 := by
+    exact Classical.not_forall_not.1 fun h => hx <| by simpa using ker_le_iff_eigenWeight_zero ρ x |>.2 fun i hi => Classical.not_not.1 fun hi' => h i ⟨ hi, hi' ⟩ ;
+  exact h_eigenWeight_ne_zero.imp fun i hi => ⟨ hi.1, lt_of_le_of_ne ( eigenWeight_nonneg ρ x i ) hi.2.symm ⟩
+
+private lemma approxLog_at_zero (N : ℕ) : approxLog N 0 = -(N : ℝ) := by
+  -- By definition of `approxLog`, we have `approxLog N 0 = Real.log (max 0 (Real.exp (-N)))`.
+  simp [approxLog];
+  -- Since $\exp(-N)$ is always positive, we have $\max(0, \exp(-N)) = \exp(-N)$.
+  simp [max_eq_right (Real.exp_pos (-N)).le]
+
+/-
+PROBLEM
+Show that when the kernel condition fails, ⟪ρ.M, x.M.cfc (approxLog N)⟫ → -∞ as N → ∞.
+
+PROVIDED SOLUTION
+By `inner_cfc_eq_sum`, ⟪ρ.M, x.M.cfc (approxLog N)⟫ = Σ_i (approxLog N)(λ_i(x)) · eigenWeight(ρ, x, i).
+
+Split the sum into i with λ_i = 0 and λ_i > 0.
+- For λ_i > 0: approxLog N(λ_i) is eventually constant (= log λ_i) for large N, so bounded.
+- For λ_i = 0: approxLog N(0) = -N (by `approxLog_at_zero`). By `neg_ker_exists_eigenWeight_pos`,
+  at least one such term has eigenWeight > 0, contributing -N · w_i where w_i > 0.
+  This drives the sum to -∞.
+
+More precisely, the sum = (Σ_{i: λ_i=0} (-N) · w_i) + (Σ_{i: λ_i>0} (approxLog N)(λ_i) · w_i).
+The second sum is eventually constant. The first sum = -N · (Σ_{i: λ_i=0} w_i) with Σ w_i > 0.
+So the whole thing → -∞.
+-/
+private lemma inner_cfc_approxLog_tendsto_bot (ρ x : MState d) (hx : ¬(x.M.ker ≤ ρ.M.ker)) :
+    Filter.Tendsto (fun N : ℕ => ⟪ρ.M, x.M.cfc (approxLog N)⟫) Filter.atTop Filter.atBot := by
+  have h_split_sum : Filter.Tendsto (fun N : ℕ => ∑ i ∈ Finset.univ.filter (fun i => x.M.H.eigenvalues i = 0), approxLog N (x.M.H.eigenvalues i) * eigenWeight ρ x i) Filter.atTop Filter.atBot := by
+    have h_split_sum : Filter.Tendsto (fun N : ℕ => ∑ i ∈ Finset.univ.filter (fun i => x.M.H.eigenvalues i = 0), (-↑N) * eigenWeight ρ x i) Filter.atTop Filter.atBot := by
+      have h_split_sum : ∑ i ∈ Finset.univ.filter (fun i => x.M.H.eigenvalues i = 0), eigenWeight ρ x i > 0 := by
+        obtain ⟨ i, hi, hi' ⟩ := neg_ker_exists_eigenWeight_pos ρ x hx; exact lt_of_lt_of_le hi' ( Finset.single_le_sum ( fun i _ => eigenWeight_nonneg ρ x i ) ( by aesop ) ) ;
+      simp +decide only [neg_mul];
+      simpa only [ Finset.sum_neg_distrib, Finset.mul_sum _ _ _ ] using Filter.tendsto_neg_atTop_atBot.comp ( tendsto_natCast_atTop_atTop.atTop_mul_const h_split_sum );
+    refine' h_split_sum.congr' _;
+    filter_upwards [ Filter.eventually_gt_atTop 0 ] with N hN using Finset.sum_congr rfl fun i hi => by rw [ show approxLog N ( x.M.H.eigenvalues i ) = -↑N from by rw [ show x.M.H.eigenvalues i = 0 from Finset.mem_filter.mp hi |>.2 ] ; exact approxLog_at_zero N ] ;
+  convert h_split_sum.atBot_add ( show Filter.Tendsto ( fun N : ℕ => ∑ i ∈ Finset.univ.filter ( fun i => x.M.H.eigenvalues i ≠ 0 ), approxLog N ( x.M.H.eigenvalues i ) * eigenWeight ρ x i ) Filter.atTop ( nhds ( ∑ i ∈ Finset.univ.filter ( fun i => x.M.H.eigenvalues i ≠ 0 ), Real.log ( x.M.H.eigenvalues i ) * eigenWeight ρ x i ) ) from ?_ ) using 2;
+  · rw [ inner_cfc_eq_sum, Finset.sum_filter_add_sum_filter_not ];
+  · refine' tendsto_finset_sum _ _;
+    intro i hi; exact Filter.Tendsto.mul ( by exact ( approxLog_tendsto_at_pos ( show 0 < x.M.H.eigenvalues i from lt_of_le_of_ne ( by
+                                                                                  exact? ) ( Ne.symm ( by aesop ) ) ) ) ) tendsto_const_nhds;
+
+/-
+PROBLEM
+Show that when the kernel condition fails at x (¬(x.M.ker ≤ ρ.M.ker)),
+for any y < ⊤, eventually y < (if x'.M.ker ≤ ρ.M.ker then ⟪ρ.M, ρ.M.log - x'.M.log⟫ else ⊤).
+
+PROVIDED SOLUTION
+Use `inner_cfc_approxLog_tendsto_bot` to find N with ⟪ρ.M, x.M.cfc (approxLog N)⟫ < ⟪ρ.M, ρ.M.log⟫ - y.toReal.
+By `continuous_inner_cfc_approxLog`, there's a neighborhood U of x where
+⟪ρ.M, x'.M.cfc (approxLog N)⟫ < ⟪ρ.M, ρ.M.log⟫ - y.toReal for all x' ∈ U.
+
+For x' ∈ U:
+- If ¬(x'.M.ker ≤ ρ.M.ker): the if-else gives ⊤, and y < ⊤ since hy : y < ⊤.
+- If x'.M.ker ≤ ρ.M.ker: by `inner_cfc_approxLog_ge`,
+  ⟪ρ.M, x'.M.log⟫ ≤ ⟪ρ.M, x'.M.cfc (approxLog N)⟫ < ⟪ρ.M, ρ.M.log⟫ - y.toReal.
+  So ⟪ρ.M, ρ.M.log - x'.M.log⟫ = ⟪ρ.M, ρ.M.log⟫ - ⟪ρ.M, x'.M.log⟫ > y.toReal.
+  Since the value is nonneg (by `inner_log_sub_log_nonneg`) and > y.toReal,
+  casting to ENNReal and then to EReal gives the result.
+-/
+end lowerSemicontinuous_2
+
 open Classical in
 theorem qRelativeEnt_lowerSemicontinuous_2 (ρ x : MState d) (hx : ¬(x.M.ker ≤ ρ.M.ker)) (y : ENNReal) (hy : y < ⊤) :
     ∀ᶠ (x' : MState d) in nhds x,
       y < (if x'.M.ker ≤ ρ.M.ker then ⟪ρ.M, ρ.M.log - x'.M.log⟫ else ⊤ : EReal) := by
-  sorry
+  -- Since $y < \top$, we can choose a neighborhood around $x$ where the inner product is less than $y$.
+  have h_inner_lt_y : ∀ᶠ x' in nhds x, x'.M.ker ≤ ρ.M.ker → ⟪ρ.M, ρ.M.log - x'.M.log⟫ > y.toReal := by
+    have h_inner_lt_y : Filter.Tendsto (fun N : ℕ => ⟪ρ.M, ρ.M.log - x.M.cfc (approxLog N)⟫) Filter.atTop Filter.atTop := by
+      have h_inner_lt_y : Filter.Tendsto (fun N : ℕ => ⟪ρ.M, ρ.M.log⟫ - ⟪ρ.M, x.M.cfc (approxLog N)⟫) Filter.atTop Filter.atTop := by
+        exact Filter.Tendsto.add_atTop tendsto_const_nhds ( Filter.tendsto_neg_atBot_atTop.comp ( inner_cfc_approxLog_tendsto_bot ρ x hx ) ) |> Filter.Tendsto.congr ( by aesop ) ;
+      generalize_proofs at *; (
+      convert h_inner_lt_y using 1
+      generalize_proofs at *; (
+      ext; simp +decide [ inner_sub_right ] ;))
+    generalize_proofs at *; (
+    obtain ⟨N, hN⟩ : ∃ N : ℕ, ⟪ρ.M, ρ.M.log - x.M.cfc (approxLog N)⟫ > y.toReal := by
+      exact ( h_inner_lt_y.eventually_gt_atTop _ ) |> fun h => h.exists
+      skip
+    generalize_proofs at *; (
+    have h_cont : Continuous (fun σ : MState d => ⟪ρ.M, ρ.M.log - σ.M.cfc (approxLog N)⟫) := by
+      have h_cont : Continuous (fun σ : MState d => ⟪ρ.M, σ.M.cfc (approxLog N)⟫) := by
+        apply_rules [ continuous_inner_cfc_approxLog ]
+      generalize_proofs at *; (
+      convert h_cont.neg.add continuous_const using 2 ; simp +decide [ inner_sub_right ] ; ring!;)
+    generalize_proofs at *; (
+    have h_cont : ∀ᶠ x' in nhds x, ⟪ρ.M, ρ.M.log - x'.M.cfc (approxLog N)⟫ > y.toReal := by
+      exact h_cont.continuousAt.eventually ( lt_mem_nhds hN ) |> fun h => h.mono fun x' hx' => hx' |> fun hx'' => by simpa using hx'';
+    generalize_proofs at *; (
+    filter_upwards [ h_cont ] with x' hx' hx'' using lt_of_lt_of_le hx' ( by
+      have h_inner_le : ⟪ρ.M, x'.M.log⟫ ≤ ⟪ρ.M, x'.M.cfc (approxLog N)⟫ := by
+        -- Apply the hypothesis `h_inner_le` with the given `N` and the fact that `x'.M.ker ≤ ρ.M.ker`.
+        apply inner_cfc_approxLog_ge ρ x' N hx''
+      generalize_proofs at *; (
+      convert sub_le_sub_left h_inner_le _ using 1 ; ring!;
+      rw [ inner_sub_right ];
+      rw [ inner_sub_right ]) )))));
+  filter_upwards [ h_inner_lt_y ] with x' hx';
+  split_ifs <;> simp_all +decide [ ENNReal.ofReal, ENNReal.toReal ];
+  · -- Since $y.toNNReal$ is the real part of $y$, and we have $y.toNNReal < ⟪ρ, ρ.log - x'.log⟫_ℝ$, it follows that $y < ⟪ρ, ρ.log - x'.log⟫_ℝ$.
+    have h_y_lt_inner : y.toNNReal < ⟪ρ.M, ρ.M.log - x'.M.log⟫ := by
+      convert hx' using 1;
+    convert ENNReal.ofReal_lt_ofReal_iff ( show 0 < ⟪ρ.M, ρ.M.log - x'.M.log⟫ from lt_of_le_of_lt ( by positivity ) h_y_lt_inner ) |>.2 h_y_lt_inner using 1;
+    cases y <;> simp +decide [ ENNReal.ofReal ] at *;
+    rw [ ← NNReal.coe_lt_coe, Real.toNNReal_of_nonneg ( le_of_lt ( lt_of_le_of_lt ( by positivity ) h_y_lt_inner ) ) ];
+    norm_num [ ← ENNReal.ofReal_coe_nnreal ];
+  · exact lt_top_iff_ne_top.mpr ( by aesop )
 
-/-- Relative entropy is lower semicontinuous (in each argument, actually, but we only need in the
+/-
+Relative entropy is lower semicontinuous (in each argument, actually, but we only need in the
 latter here). Will need the fact that all the cfc / eigenvalue stuff is continuous, plus
-carefully handling what happens with the kernel subspace, which will make this a pain. -/
+carefully handling what happens with the kernel subspace, which will make this a pain.
+-/
 @[fun_prop]
 theorem qRelativeEnt.lowerSemicontinuous (ρ : MState d) : LowerSemicontinuous fun σ => 𝐃(ρ‖σ) := by
   simp_rw [qRelativeEnt, SandwichedRelRentropy, if_true, lowerSemicontinuous_iff]
   intro x
   by_cases hx : x.M.ker ≤ ρ.M.ker
-  · -- Use inner_log_bounded_near
-    sorry
+  ·
+    intro y hy;
+    have := @inner_log_bounded_near d _ _ ρ x hx;
+    obtain ⟨y', hy'⟩ : ∃ y' : ℝ, y < ENNReal.ofReal y' ∧ y' < ⟪ρ.M, ρ.M.log - x.M.log⟫ := by
+      rcases ENNReal.lt_iff_exists_real_btwn.mp hy with ⟨ y', hy₁, hy₂ ⟩;
+      rw [ ENNReal.ofReal_lt_iff_lt_toReal ] at hy₂ <;> aesop;
+    have := this ( ⟪ρ.M, ρ.M.log⟫ - y' ) ?_ <;> simp_all +decide [ inner_sub_right ];
+    · filter_upwards [ this ] with σ hσ;
+      split_ifs <;> simp_all +decide [ ENNReal.ofReal ];
+      · refine' lt_of_lt_of_le hy'.1 _;
+        exact_mod_cast le_trans ( max_le ( show y' ≤ ⟪ρ.M, ρ.M.log⟫ - ⟪ρ.M, σ.M.log⟫ from by linarith ) ( show 0 ≤ ⟪ρ.M, ρ.M.log⟫ - ⟪ρ.M, σ.M.log⟫ from by linarith [ show 0 ≤ y' from le_of_not_gt fun h => by norm_num [ Real.toNNReal_of_nonpos h.le ] at hy' ] ) ) le_rfl;
+      · exact hy'.1.trans_le ( by simp +decide );
+    · linarith
   · intro y hy
     simp only [hx, ↓reduceDIte] at hy ⊢
     have h₂ := qRelativeEnt_lowerSemicontinuous_2 ρ x hx y hy
