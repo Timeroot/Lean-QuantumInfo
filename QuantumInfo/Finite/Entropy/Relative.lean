@@ -718,7 +718,7 @@ lemma HermitianMat.mul_supportProj_of_ker_le (A B : HermitianMat d ℂ)
   apply_fun Matrix.conjTranspose at *; aesop;
   exact fun M N hMN => by simpa using congr_arg Matrix.conjTranspose hMN;
 
-lemma HermitianMat.inner_supportProj_of_ker_le (A B : HermitianMat d ℂ)
+lemma HermitianMat.inner_supportProj_of_ker_le {A B : HermitianMat d ℂ}
   (h : LinearMap.ker B.lin ≤ LinearMap.ker A.lin) :
     ⟪A, B.supportProj⟫ = A.trace := by
   rw [inner_def, mul_supportProj_of_ker_le A B h, trace]
@@ -1120,15 +1120,14 @@ Helper: If σ₂ ≤ α • σ₁ for density matrices, then α > 0.
    but σ₂ ≤ α • σ₁ ≤ 0 with σ₂ ≥ 0 forces σ₂ = 0, contradicting trace = 1.
 -/
 private lemma pos_of_MState_le_smul {σ₁ σ₂ : MState d} (hσ : σ₂.M ≤ α • σ₁.M) : 0 < α := by
-  by_contra h_nonpos;
-  have h_ge_zero : 0 ≤ α • σ₁.1 := by
-    exact hσ.trans' ( by exact? );
-  have h_eq_zero : σ₂.1 = 0 := by
-    have h_eq_zero : σ₂.1 ≤ 0 := by
-      convert hσ using 1;
-      exact Eq.symm ( le_antisymm ( smul_nonpos_of_nonpos_of_nonneg ( le_of_not_gt h_nonpos ) ( by exact σ₁.pos.1 ) ) h_ge_zero );
-    exact le_antisymm h_eq_zero σ₂.pos.1;
-  have := σ₂.3; simp_all +decide [ sub_eq_iff_eq_add ] ;
+  by_contra! h_nonpos
+  apply σ₂.pos.ne'
+  apply le_antisymm
+  · convert ← hσ using 1
+    apply le_antisymm
+    · exact smul_nonpos_of_nonpos_of_nonneg h_nonpos ( by positivity)
+    · exact hσ.trans' ( by positivity );
+  · positivity
 
 /-
 PROBLEM
@@ -1143,8 +1142,7 @@ open ComplexOrder in
 private lemma inner_log_mono_of_posDef_of_le (C : HermitianMat d ℂ) (hC : 0 ≤ C)
     {A B : HermitianMat d ℂ} (hA : A.mat.PosDef) (hAB : A ≤ B) :
     ⟪C, A.log⟫ ≤ ⟪C, B.log⟫ := by
-  convert HermitianMat.inner_mono hC _;
-  apply_rules [ HermitianMat.log_mono ]
+  exact HermitianMat.inner_mono hC (HermitianMat.log_mono hA hAB)
 
 /-
 PROBLEM
@@ -1184,12 +1182,8 @@ Alternative (simpler, avoiding limits): when A = 0, ker A = ⊤ implies C = 0,
 so both sides are 0. When A ≠ 0 and PosDef, use inner_log_mono_of_posDef_of_le
 directly. When A is PSD, not PosDef, and nonzero, the proof requires the
 limit argument above.
--/
-/-
-PROBLEM
-For PSD A ≤ B, PSD C with ker(A) ≤ ker(C), show ⟪C, A.log⟫ ≤ ⟪C, B.log⟫.
 
-PROVIDED SOLUTION
+ALTERNATE SOLUTION GUIDE
 If A = 0: ker A = ⊤ implies ker C = ⊤, so C = 0 (since C ≥ 0 and ker C = ⊤
 means C.lin = 0, i.e., C = 0). Both inner products are 0.
 
@@ -1234,22 +1228,17 @@ private lemma inner_log_sub_le_log_alpha (ρ : MState d) {σ₁ σ₂ : MState d
     ⟪ρ.M, σ₂.M.log - σ₁.M.log⟫ ≤ Real.log α := by
   have h_log_mono : ⟪ρ.M, σ₂.M.log - (α • σ₁.M).log⟫ ≤ 0 := by
     have h_log_mono : ⟪ρ.M, σ₂.M.log⟫ ≤ ⟪ρ.M, (α • σ₁.M).log⟫ := by
-      apply_rules [ inner_log_mono_of_psd_of_le ];
-      · exact?;
-      · exact?
-    generalize_proofs at *; (
-    simpa [ inner_sub_right ] using sub_nonpos_of_le h_log_mono)
+      exact inner_log_mono_of_psd_of_le _ ρ.nonneg σ₂.nonneg hσ hker₂
+    simpa [inner_sub_right] using sub_nonpos_of_le h_log_mono
   have h_log_smul : (α • σ₁.M).log = (Real.log α) • σ₁.M.supportProj + σ₁.M.log := by
     apply HermitianMat.log_smul_of_pos
-    skip
-    generalize_proofs at *; (
-    have := pos_of_MState_le_smul hσ; aesop;)
+    rintro rfl
+    simpa using pos_of_MState_le_smul hσ
   rw [h_log_smul] at h_log_mono
-  simp_all +decide [ sub_eq_add_neg, add_assoc, add_left_comm, add_comm ];
+  simp only [add_comm, sub_eq_add_neg, neg_add_rev] at h_log_mono h_log_smul ⊢
   have h_inner_support : ⟪ρ.M, σ₁.M.supportProj⟫ = 1 := by
-    convert HermitianMat.inner_supportProj_of_ker_le _ _ hker₁ using 1;
-    exact?;
-  simp_all +decide [ ← add_assoc, inner_add_right, inner_add_left, inner_smul_right, inner_smul_left ]
+    rw [HermitianMat.inner_supportProj_of_ker_le hker₁, ρ.tr]
+  simp_all [← add_assoc, inner_add_right, inner_smul_right]
 
 /-
 PROBLEM
@@ -1273,7 +1262,6 @@ Case 2: ker σ₂ ≤ ker ρ. Then ker σ₁ ≤ ker σ₂ ≤ ker ρ, so both D
   Specifically: D(ρ‖σ₁) - D(ρ‖σ₂) = ⟪ρ.M, σ₂.M.log - σ₁.M.log⟫ ≤ log α,
   so D(ρ‖σ₁) ≤ D(ρ‖σ₂) + log α. Use `ENNReal.toReal_le_toReal` or similar.
 -/
-set_option maxHeartbeats 800000 in
 theorem qRelEntropy_le_add_of_le_smul (ρ : MState d) {σ₁ σ₂ : MState d} (hσ : σ₂.M ≤ α • σ₁.M) :
     𝐃(ρ‖σ₁) ≤ 𝐃(ρ‖σ₂) + ENNReal.ofReal (Real.log α)
     := by
@@ -1281,36 +1269,29 @@ theorem qRelEntropy_le_add_of_le_smul (ρ : MState d) {σ₁ σ₂ : MState d} (
   by_cases hker : σ₂.M.ker ≤ ρ.M.ker;
   · by_cases hker₁ : σ₁.M.ker ≤ ρ.M.ker;
     · -- Using `qRelativeEnt_ker` to get D(ρ‖σ₁).toEReal = ⟪ρ.M, ρ.M.log - σ₁.M.log⟫
-      have hD₁ : (qRelativeEnt ρ σ₁).toEReal = ⟪ρ.M, ρ.M.log - σ₁.M.log⟫ := by
-        exact?
-      have hD₂ : (qRelativeEnt ρ σ₂).toEReal = ⟪ρ.M, ρ.M.log - σ₂.M.log⟫ := by
-        exact?
       have h_log : ⟪ρ.M, σ₂.M.log - σ₁.M.log⟫ ≤ Real.log α := by
-        apply_rules [ inner_log_sub_le_log_alpha ]
+        apply inner_log_sub_le_log_alpha
+        · exact hσ
+        · exact hker₁
+        · exact hker
       have h_final : (qRelativeEnt ρ σ₁).toEReal ≤ (qRelativeEnt ρ σ₂).toEReal + ENNReal.toEReal (ENNReal.ofReal (Real.log α)) := by
-        simp_all +decide [ inner_sub_left, inner_sub_right ];
-        cases max_cases ( Real.log α ) 0 <;> simp +decide [ * ] <;> ring_nf at * <;> norm_cast at * <;> linarith! [ Real.log_nonneg one_le_two ] ;
+        simp_all only [qRelativeEnt_ker, inner_sub_right, tsub_le_iff_right, EReal.coe_sub, EReal.coe_ennreal_ofReal]
+        cases max_cases (Real.log α) 0
+        <;> simp only [sup_of_le_left, *]
+        <;> norm_cast at *
+        <;> linarith [Real.log_nonneg one_le_two]
       have h_final' : qRelativeEnt ρ σ₁ ≤ qRelativeEnt ρ σ₂ + ENNReal.ofReal (Real.log α) := by
         exact_mod_cast h_final
-      exact h_final';
+      exact h_final'
     · by_contra h_contra;
       have hker_le : σ₁.M.ker ≤ σ₂.M.ker := by
         apply_rules [ HermitianMat.ker_le_of_le_smul, hσ ];
-        · intro hα_zero
-          have h_contra : σ₂.M ≤ 0 := by
-            aesop
-            skip
-          have h_contra' : σ₂.M = 0 := by
-            exact le_antisymm h_contra ( by exact? )
-          have h_contra'' : σ₂.M.ker = ⊤ := by
-            exact LinearMap.ker_eq_top.mpr ( by aesop )
-          exact hker₁ (by
-          exact fun x hx => hker ( by simp [ h_contra'' ] ) |> fun h => by simpa [ h_contra' ] using h;);
-        · exact σ₂.pos.1
-      generalize_proofs at *; (
-      exact hker₁ ( le_trans hker_le hker ));
-  · simp_all +decide [ qRelativeEnt ];
-    unfold SandwichedRelRentropy; aesop;
+        · rintro rfl
+          apply σ₂.pos.not_ge
+          simpa using hσ
+        · positivity
+      exact hker₁ (hker_le.trans hker)
+  · simp [hker, SandwichedRelRentropy, qRelativeEnt]
 
 /-- "Formula for conversion from operator inequality to quantum relative entropy",
 Proposition S17 of https://arxiv.org/pdf/2401.01926v2
