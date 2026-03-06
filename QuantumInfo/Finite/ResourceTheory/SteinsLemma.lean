@@ -1372,7 +1372,9 @@ private theorem EquationS62
         have Esum' : (E1 ε2 n).mat + (E2 ε2 n).mat + (E3 ε2 n).mat = 1 :=
           congrArg HermitianMat.mat (congrFun (congrFun Esum ε2) n)
         conv =>
-          enter [1, 1, 1, 1]
+          enter [1]
+          rw [dif_pos zero_lt_one]
+          enter [1, 1, 1]
           rw [HermitianMat.inner_def]
           rw [← hMulOne]
           rw [← Esum']

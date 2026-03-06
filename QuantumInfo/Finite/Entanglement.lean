@@ -13,7 +13,7 @@ Entanglement measures. (Mixed) convex roof extensions. Definition of product / s
 are in `Braket.lean` and/or `MState.lean`
 
 Important definitions:
- * `convex_roof`: Convex roof extension of `g : Ket d → ℝ≥0`
+ * `convex_roof`: Convex roof extension of `g : KetUpToPhase d → ℝ≥0`
  * `mixed_convex_roof`: Mixed convex roof extension of `f : MState d → ℝ≥0`
  * `EoF`: Entanglement of Formation
 
@@ -46,15 +46,15 @@ open NNReal
 open MState
 open Ensemble
 
-/-- Convex roof extension of a function `g : Ket d → ℝ≥0`, defined as the infimum of all pure-state
+/-- Convex roof extension of a function `g : KetUpToPhase d → ℝ≥0`, defined as the infimum of all pure-state
 ensembles of a given `ρ` of the average of `g` in that ensemble.
 
 This is valued in the extended nonnegative real numbers `ℝ≥0∞` to have good properties of the infimum, which
 come from the fact that `ℝ≥0∞` is a complete lattice. For example, it is necessary for `le_iInf` and `iInf_le_of_le`.
 However, it is also proven in `convex_roof_ne_top` that the convex roof is never `∞`, so the definition `convex_roof` should
 be used in most applications. -/
-def convex_roof_ENNReal {d : Type _} [Fintype d] [DecidableEq d] (g : Ket d → ℝ≥0) : MState d → ℝ≥0∞ := fun ρ =>
-  ⨅ (n : ℕ+) (e : PEnsemble d (Fin n)) (_ : mix (toMEnsemble e) = ρ), ↑(pure_average_NNReal g e)
+def convex_roof_ENNReal {d : Type _} [Fintype d] [DecidableEq d] (g : KetUpToPhase d → ℝ≥0) : MState d → ℝ≥0∞ := fun ρ =>
+  ⨅ (n : ℕ+) (e : PEnsemble d (Fin n)) (_ : mix (toMEnsemble e) = ρ), ↑(pure_average_NNReal (g ∘ KetUpToPhase.mk) e)
 
 /-- Mixed convex roof extension of a function `f : MState d → ℝ≥0`, defined as the infimum of all mixed-state
 ensembles of a given `ρ` of the average of `f` on that ensemble.
@@ -69,7 +69,7 @@ def mixed_convex_roof_ENNReal {d : Type _} [Fintype d] [DecidableEq d] (f : MSta
 variable {d d₁ d₂ : Type _} [Fintype d] [Fintype d₁] [Fintype d₂] [Nonempty d] [Nonempty d₁] [Nonempty d₂]
 variable [DecidableEq d] [DecidableEq d₁] [DecidableEq d₂]
 variable (f : MState d → ℝ≥0)
-variable (g : Ket d → ℝ≥0)
+variable (g : KetUpToPhase d → ℝ≥0)
 
 /-- The convex roof extension `convex_roof_ENNReal` is never ∞. -/
 theorem convex_roof_ne_top : ∀ ρ, convex_roof_ENNReal g ρ ≠ ∞ := fun ρ => by
@@ -91,7 +91,7 @@ theorem mixed_convex_roof_ne_top : ∀ ρ, mixed_convex_roof_ENNReal f ρ ≠ �
   push_neg
   exact trivial_mEnsemble_mix ρ 0
 
-/-- Convex roof extension of a function `g : Ket d → ℝ≥0`, defined as the infimum of all pure-state
+/-- Convex roof extension of a function `g : KetUpToPhase d → ℝ≥0`, defined as the infimum of all pure-state
 ensembles of a given `ρ` of the average of `g` in that ensemble.
 
 This is valued in the nonnegative real numbers `ℝ≥0` by applying `ENNReal.toNNReal` to `convex_roof_ENNReal`. Hence,
@@ -105,8 +105,9 @@ This is valued in the nonnegative real numbers `ℝ≥0` by applying `ENNReal.to
 it should be used in proofs alongside `mixed_convex_roof_ne_top`. -/
 def mixed_convex_roof : MState d → ℝ≥0 := fun x ↦ (mixed_convex_roof_ENNReal f x).untop (mixed_convex_roof_ne_top f x)
 
-/-- Auxiliary function. Convex roof of a function `f : MState d → ℝ≥0` defined over mixed states by resctricting `f` to pure states -/
-def convex_roof_of_MState_fun : MState d → ℝ≥0 := convex_roof (f ∘ pure)
+/-- Auxiliary function. Convex roof of a function `f : MState d → ℝ≥0` defined over mixed states by
+restricting `f` to pure states, via `pureQ : KetUpToPhase d → MState d`. -/
+def convex_roof_of_MState_fun : MState d → ℝ≥0 := convex_roof (f ∘ pureQ)
 
 -- TODO: make `le_convex_roof`, `convex_roof_le`, `le_mixed_convex_roof` and `mixed_convex_roof_le` if-and-only-if statements.
 
@@ -120,7 +121,7 @@ theorem le_mixed_convex_roof (ρ : MState d) :
   exact h n hnpos e hmix
 
 theorem le_convex_roof (ρ : MState d) :
-  (∀ n > 0, ∀ e : PEnsemble d (Fin n), mix (toMEnsemble e) = ρ → c ≤ pure_average_NNReal g e) → (c ≤ convex_roof g ρ) := fun h => by
+  (∀ n > 0, ∀ e : PEnsemble d (Fin n), mix (toMEnsemble e) = ρ → c ≤ pure_average_NNReal (g ∘ KetUpToPhase.mk) e) → (c ≤ convex_roof g ρ) := fun h => by
   unfold convex_roof
   rw [WithTop.le_untop_iff]
   apply le_iInf; intro ⟨n, hnpos⟩; apply le_iInf; intro e; apply le_iInf; intro hmix
@@ -128,7 +129,7 @@ theorem le_convex_roof (ρ : MState d) :
   exact h n hnpos e hmix
 
 theorem convex_roof_le (ρ : MState d):
-(∃ n > 0, ∃ e : PEnsemble d (Fin n), mix (toMEnsemble e) = ρ ∧ pure_average_NNReal g e ≤ c) → (convex_roof g ρ ≤ c) := fun h => by
+(∃ n > 0, ∃ e : PEnsemble d (Fin n), mix (toMEnsemble e) = ρ ∧ pure_average_NNReal (g ∘ KetUpToPhase.mk) e ≤ c) → (convex_roof g ρ ≤ c) := fun h => by
   obtain ⟨n, hnpos, e, hmix, h⟩ := h
   unfold convex_roof
   rw [WithTop.untop_le_iff]
@@ -150,7 +151,7 @@ theorem mixed_convex_roof_le (ρ : MState d):
 the former minimizes over a larger set of ensembles. -/
 theorem mixed_convex_roof_le_convex_roof : mixed_convex_roof f ≤ convex_roof_of_MState_fun f := by
   intro ρ
-  apply le_convex_roof (f ∘ pure) ρ
+  apply le_convex_roof (f ∘ pureQ) ρ
   intro n hnpos e hmix
   apply mixed_convex_roof_le
   use n
@@ -159,8 +160,8 @@ theorem mixed_convex_roof_le_convex_roof : mixed_convex_roof f ≤ convex_roof_o
   apply And.intro hmix
   exact le_of_eq <| NNReal.coe_inj.mp <| average_of_pure_ensemble (toReal ∘ f) e
 
-/-- The convex roof extension of `g : Ket d → ℝ≥0` applied to a pure state `ψ` is `g ψ`. -/
-theorem convex_roof_of_pure (ψ : Ket d) : convex_roof g (pure ψ) = g ψ := by
+/-- The convex roof extension of `g : KetUpToPhase d → ℝ≥0` applied to a pure state `ψ` is `g (KetUpToPhase.mk ψ)`. -/
+theorem convex_roof_of_pure (ψ : Ket d) : convex_roof g (pure ψ) = g (KetUpToPhase.mk ψ) := by
   rw [le_antisymm_iff]
   constructor
   · apply convex_roof_le
@@ -172,10 +173,16 @@ theorem convex_roof_of_pure (ψ : Ket d) : convex_roof g (pure ψ) = g ψ := by
       rfl
   · apply le_convex_roof
     intro n hnpos e hmix
-    replace hpure := mix_pEnsemble_pure_iff_pure.mp hmix
     apply le_of_eq
     simp only [pure_average_NNReal, ← NNReal.coe_inj, coe_mk]
-    rw [mix_pEnsemble_pure_average (toReal ∘ g) hmix, Function.comp_apply]
+    have hphase_inv : ∀ a b, Ket.PhaseEquiv.r a b →
+        (NNReal.toReal ∘ g ∘ KetUpToPhase.mk) a = (NNReal.toReal ∘ g ∘ KetUpToPhase.mk) b := by
+      intro a b hab
+      simp only [Function.comp_apply]
+      congr 1
+      exact congrArg g (Quotient.sound hab)
+    rw [mix_pEnsemble_pure_average (NNReal.toReal ∘ g ∘ KetUpToPhase.mk) hphase_inv hmix]
+    rfl
 
 omit [Nonempty d] in
 /-- The mixed convex roof extension of `f : MState d → ℝ≥0` applied to a pure state `ψ` is `f (pure ψ)`. -/
@@ -197,8 +204,18 @@ theorem mixed_convex_roof_of_pure (ψ : Ket d) : mixed_convex_roof f (pure ψ) =
     rw [mix_mEnsemble_pure_average (toReal ∘ f) hmix, Function.comp_apply]
 
 /-- Entanglement of Formation of bipartite systems. It is the convex roof extension of the
-von Neumann entropy of one of the subsystems (here chosen to be the left one, but see `Entropy.Sᵥₙ_of_partial_eq`). -/
-def EoF : MState (d₁ × d₂) → ℝ≥0 := convex_roof (fun ψ ↦ ⟨Sᵥₙ (pure ψ).traceRight, Sᵥₙ_nonneg (pure ψ).traceRight⟩)
+von Neumann entropy of one of the subsystems (here chosen to be the left one, but see `Entropy.Sᵥₙ_of_partial_eq`).
+
+The function `Sᵥₙ ∘ traceRight ∘ pure` is phase-invariant because `pure` maps phase-equivalent kets to the
+same mixed state, so it descends to `KetUpToPhase` via `pureQ`. -/
+def EoF : MState (d₁ × d₂) → ℝ≥0 :=
+  convex_roof (KetUpToPhase.lift
+    (fun ψ ↦ ⟨Sᵥₙ (pure ψ).traceRight, Sᵥₙ_nonneg (pure ψ).traceRight⟩)
+    (fun ψ φ h ↦ by
+      simp only
+      congr 1
+      congr 1
+      exact congrArg MState.traceRight ((MState.PhaseEquiv_iff_pure_eq ψ φ).mp h)))
 
 /-
 The partial trace of the maximally entangled state is the maximally mixed state.
@@ -261,13 +278,11 @@ theorem Sᵥₙ_ofClassical {d : Type*} [Fintype d] [DecidableEq d] (dist : Dist
 
 /-- The entanglement of formation of the maximally entangled state with on-site dimension 𝕕 is log(𝕕). -/
 theorem EoF_of_MES : EoF (pure <| Ket.MES d) = Real.log (Finset.card Finset.univ (α := d)) := by
-  simp only [EoF, convex_roof_of_pure, coe_mk, Finset.card_univ]
-  simp only [traceRight, MState.pure, Ket.MES, one_div]
+  simp only [EoF, convex_roof_of_pure, Finset.card_univ]
+  simp only [KetUpToPhase.lift_mk]
   -- The von Neumann entropy of the maximally mixed state is log(d).
   have h_von_neumann : Sᵥₙ (MState.uniform : MState d) = Real.log (Fintype.card d) := by
     rw [MState.uniform, Sᵥₙ_ofClassical Distribution.uniform, Hₛ_uniform, Finset.card_univ]
-  convert h_von_neumann using 2;
-  convert traceRight_pure_MES d using 1;
-  unfold Ket.MES;
-  simp_all only [one_div]
-  rfl
+  simp only [NNReal.coe_mk]
+  rw [traceRight_pure_MES]
+  exact h_von_neumann

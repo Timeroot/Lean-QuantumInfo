@@ -29,17 +29,10 @@ as a consequence, the quantum relative entropy.
 open scoped Matrix ComplexOrder
 open BigOperators
 
-/-- The Schatten p-norm of a matrix for p \in [1, \infty). -/
-noncomputable def schattenNorm (p : ℝ) (A : Matrix d d ℂ) : ℝ :=
-  let A_dag_A : HermitianMat d ℂ := ⟨A.conjTranspose * A, by
-    have h := Matrix.isHermitian_mul_conjTranspose_self A.conjTranspose
-    rwa [Matrix.conjTranspose_conjTranspose] at h⟩
-  (A_dag_A.cfc (fun x => x ^ (p/2))).trace ^ (1/p)
-
 /-- The weighted norm \|X\|_{p, σ} defined in the paper. -/
 noncomputable def weighted_norm (p : ℝ) (σ : MState d) (X : Matrix d d ℂ) : ℝ :=
   let σ_pow : HermitianMat d ℂ := σ.M.cfc (fun x => x ^ (1 / (2 * p)))
-  schattenNorm p (σ_pow.mat * X * σ_pow.mat)
+  schattenNorm (σ_pow.mat * X * σ_pow.mat) p
 
 /-- The spectral norm (operator norm) of a matrix. -/
 noncomputable def spectralNorm_mat (A : Matrix d d ℂ) : ℝ :=
@@ -179,7 +172,7 @@ lemma T_is_positive (σ : MState d) (Φ : CPTPMap d d₂) :
 The weighted 1-norm of X is the trace norm of Gamma(X).
 -/
 lemma weighted_norm_one_eq_trace_norm_Gamma (σ : MState d) (X : Matrix d d ℂ) :
-    weighted_norm 1 σ X = schattenNorm 1 (Gamma σ X) := by
+    weighted_norm 1 σ X = schattenNorm (Gamma σ X) 1 := by
   unfold weighted_norm Gamma;
   norm_num
 

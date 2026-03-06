@@ -104,6 +104,18 @@ theorem trace_pos (hA : 0 < A) : 0 < A.trace := by
   rw [RCLike.pos_iff] at h_pos
   exact h_pos.left
 
+open Lean Meta Mathlib.Meta.Positivity in
+/-- Positivity extension for `HermitianMat.trace`: nonneg when the matrix is nonneg,
+positive when the matrix is positive. -/
+@[positivity HermitianMat.trace _]
+def evalHermitianMatTrace : PositivityExt where eval {_u _α} _zα _pα e := do
+  let .app _tr (A : Expr) ← whnfR e | throwError "not HermitianMat.trace"
+  let (isStrict, pfA) ← bestResult A
+  if isStrict then
+    pure (.positive (← mkAppM ``HermitianMat.trace_pos #[pfA]))
+  else
+    pure (.nonnegative (← mkAppM ``HermitianMat.trace_nonneg #[pfA]))
+
 --Without these shortcut instances, `gcongr` fails to close certain goals...? Why? TODO
 instance : PosSMulMono ℝ (HermitianMat n 𝕜) := inferInstance
 instance : SMulPosMono ℝ (HermitianMat n 𝕜) := inferInstance
@@ -119,14 +131,65 @@ theorem le_trace_smul_one [DecidableEq n] (hA : 0 ≤ A) : A ≤ A.trace • 1 :
   intro i
   exact Finset.single_le_sum (fun j _ ↦ hA'.eigenvalues_nonneg j) (Finset.mem_univ i)
 
+/-- The Kronecker product of two nonnegative Hermitian matrices is nonnegative. -/
+theorem kronecker_nonneg {A : HermitianMat m 𝕜} (hA : 0 ≤ A) (hB : 0 ≤ B) : 0 ≤ A ⊗ₖ B := by
+  rw [zero_le_iff, kronecker_mat]
+  classical exact (zero_le_iff.mp hA).PosSemidef_kronecker (zero_le_iff.mp hB)
+
+/-- The Kronecker product of two positive Hermitian matrices is positive. -/
+theorem kronecker_pos {A : HermitianMat m 𝕜} (hA : 0 < A) (hB : 0 < B) : 0 < A ⊗ₖ B := by
+  apply lt_of_le_of_ne (kronecker_nonneg hA.le hB.le)
+  intro h
+  replace h := congr(trace $h)
+  simp only [trace_zero, trace_kronecker, zero_eq_mul] at h
+  apply trace_pos at hA
+  apply trace_pos at hB
+  grind only [cases Or]
+
+open Lean Meta Mathlib.Meta.Positivity in
+/-- Positivity extension for `HermitianMat.kronecker`: nonneg when both factors are. -/
+@[positivity HermitianMat.kronecker _ _]
+def evalHermitianMatKronecker : PositivityExt where eval {_u _α} _zα _pα e := do
+  let .app (.app _kron A) B ← whnfR e | throwError "not HermitianMat.kronecker"
+  let (isStrictA, pfA) ← bestResult A
+  let (isStrictB, pfB) ← bestResult B
+  if isStrictA && isStrictB then
+    pure (.positive (← mkAppM ``HermitianMat.kronecker_pos #[pfA, pfB]))
+  else
+    let pfA' ← try mkAppM ``le_of_lt #[pfA] catch _ => pure pfA
+    let pfB' ← try mkAppM ``le_of_lt #[pfB] catch _ => pure pfB
+    let pfAB' ← mkAppM ``HermitianMat.kronecker_nonneg #[pfA', pfB']
+    pure (.nonnegative pfAB')
+
 variable (M) in
+open Lean Meta Mathlib.Meta.Positivity in
+/-- Positivity extension for `HermitianMat.conj`: nonneg when the inner matrix is. -/
 theorem conj_nonneg (hA : 0 ≤ A) : 0 ≤ A.conj M := by
   rw [zero_le_iff] at hA ⊢
   exact Matrix.PosSemidef.mul_mul_conjTranspose_same hA M
 
- theorem conj_pos [DecidableEq n] {A : HermitianMat n 𝕜} {M : Matrix m n 𝕜} (hA : 0 < A)
+theorem conj_pos [DecidableEq n] {A : HermitianMat n 𝕜} {M : Matrix m n 𝕜} (hA : 0 < A)
     (h : LinearMap.ker M.toEuclideanLin ≤ A.ker) : 0 < A.conj M := by
   classical exact (A.conj_nonneg M hA.le).lt_of_ne' (A.conj_ne_zero hA.ne' h)
+
+open Lean Meta Mathlib.Meta.Positivity in
+/-- Positivity extension for `HermitianMat.conj`: nonneg when the inner matrix is. -/
+@[positivity HermitianMat.conj _ _]
+def evalHermitianMatConj : PositivityExt where eval {_u _α} _zα _pα e := do
+  let .app (.app _coe conjM) (A : Expr) ← whnfR e | throwError "not conj application"
+  let M := conjM.appArg!
+  let (_, pfA) ← bestResult A
+  let pfNonneg ← try mkAppM ``le_of_lt #[pfA] catch _ => pure pfA
+  pure (.nonnegative (← mkAppM ``HermitianMat.conj_nonneg #[M, pfNonneg]))
+
+example [DecidableEq n] [DecidableEq m] [Nonempty n] [Nonempty m]
+  (A B : HermitianMat n ℂ) (hA : 0 ≤ A) (hB : 0 ≤ B) (M : Matrix m n ℂ) :
+    0 < (2 : HermitianMat (n × m) ℂ) + (3 • A) ⊗ₖ (Real.pi • B).conj M := by
+  positivity
+
+example (A B : HermitianMat n ℂ) (hA : 0 < A) (hB : 0 < B) :
+    0 < ((37 • A) ⊗ₖ ((38 : ℝ) • B)).trace := by
+  positivity
 
 theorem convex_cone (hA : 0 ≤ A) (hB : 0 ≤ B) {c₁ c₂ : ℝ} (hc₁ : 0 ≤ c₁) (hc₂ : 0 ≤ c₂) :
     0 ≤ (c₁ • A + c₂ • B) := by
@@ -291,3 +354,6 @@ theorem ker_conj [DecidableEq n] (hA : 0 ≤ A) (B : Matrix n n 𝕜) :
 theorem ker_le_of_le_smul {α : ℝ} [DecidableEq n] (hα : α ≠ 0) (hA : 0 ≤ A) (hAB : A ≤ α • B) : B.ker ≤ A.ker := by
   rw [← ker_pos_smul B hα]
   exact ker_antitone hA hAB
+
+--TODO: Positivity extensions for traceLeft, traceRight, rpow, nat powers, inverse function,
+-- the various `proj` function (in Proj.lean), and the inner product.
