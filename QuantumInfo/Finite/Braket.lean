@@ -368,5 +368,26 @@ In particular, `MState`s really only care about a KetUpToPhase, and not Kets the
 def KetUpToPhase :=
   @Quotient (Ket d) Ket.PhaseEquiv
 
+/-- Construct a `KetUpToPhase` from a `Ket`. -/
+def KetUpToPhase.mk (ψ : Ket d) : KetUpToPhase d :=
+  @Quotient.mk _ Ket.PhaseEquiv ψ
+
+/-- Lift a function on `Ket d` to `KetUpToPhase d`, given that it respects phase equivalence. -/
+def KetUpToPhase.lift {α : Sort*} (f : Ket d → α)
+    (hf : ∀ ψ φ, Ket.PhaseEquiv.r ψ φ → f ψ = f φ) : KetUpToPhase d → α :=
+  @Quotient.lift _ _ Ket.PhaseEquiv f hf
+
+@[simp]
+theorem KetUpToPhase.lift_mk {α : Sort*} (f : Ket d → α)
+    (hf : ∀ ψ φ, Ket.PhaseEquiv.r ψ φ → f ψ = f φ) (ψ : Ket d) :
+    KetUpToPhase.lift f hf (KetUpToPhase.mk ψ) = f ψ := rfl
+
+theorem KetUpToPhase.ind {p : KetUpToPhase d → Prop}
+    (h : ∀ ψ : Ket d, p (KetUpToPhase.mk ψ)) : ∀ q, p q :=
+  @Quotient.ind _ Ket.PhaseEquiv p h
+
+theorem KetUpToPhase.surjective_mk : Function.Surjective (KetUpToPhase.mk (d := d)) :=
+  fun q => @Quotient.ind _ Ket.PhaseEquiv (fun q => ∃ a, KetUpToPhase.mk a = q) (fun a => ⟨a, rfl⟩) q
+
 end equiv
 end braket
