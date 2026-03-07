@@ -4,6 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Alex Meiburg
 -/
 import QuantumInfo.ForMathlib.Matrix
+import QuantumInfo.ForMathlib.Isometry
 
 open BigOperators
 open Classical
@@ -92,8 +93,27 @@ theorem traceNorm_unitary_conj {A : Matrix n n R} {U : Matrix n n R}
 --More generally sum of abs of singular values.
 --Proposition 9.1.1 in Wilde
 theorem traceNorm_Hermitian_eq_sum_abs_eigenvalues {A : Matrix n n R} (hA : A.IsHermitian) :
-    A.traceNorm = ∑ i, abs (hA.eigenvalues i) :=
-  sorry --Diagonalize A
+    A.traceNorm = ∑ i, abs (hA.eigenvalues i) := by
+  obtain ⟨U, D, hU, hD⟩ : ∃ U : Matrix n n R, ∃ D : Matrix n n R, U ∈ Matrix.unitaryGroup n R ∧ D.IsDiag ∧ A = U * D * Uᴴ ∧ ∀ i, D i i = hA.eigenvalues i := by
+    have := hA.spectral_theorem
+    refine' ⟨ _, _, _, _, this, _ ⟩ <;> norm_num [ Matrix.IsDiag ] at *;
+    exact fun i j hij => if_neg hij
+  have trace_norm_eq : traceNorm A = traceNorm D := by
+    rw [hD.2.1]; rw [traceNorm_unitary_conj hU]
+  rw [trace_norm_eq]
+  unfold traceNorm
+  rw [← Matrix.IsDiag.diagonal_diag hD.1]
+  simp [Matrix.diagonal_mul_diagonal, hD.2.2]
+  simp_rw [← sq, ← Real.sqrt_sq_eq_abs, ← Matrix.trace_diagonal]
+  set B := ((diagonal fun i => (hA.eigenvalues i : R) ^ 2)) with bD
+  rw [CFC.sqrt_eq_real_sqrt B _, bD]
+  . rw [cfcₙ_eq_cfc]
+    norm_cast
+    simp_rw [cfc_diagonal (g := fun i => (hA.eigenvalues i) ^2)]
+    simp
+  . apply Matrix.PosSemidef.nonneg
+    rw [Matrix.posSemidef_diagonal_iff]
+    exact_mod_cast fun i => sq_nonneg (hA.eigenvalues i)
 
 /-- The trace norm is nonnegative. Property 9.1.1 in Wilde -/
 theorem traceNorm_nonneg (A : Matrix m n R) : 0 ≤ A.traceNorm :=
