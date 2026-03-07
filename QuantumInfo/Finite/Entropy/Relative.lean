@@ -982,7 +982,7 @@ private theorem sandwichedRelRentropy.continuousOn_Ioi_1 (ρ σ : MState d) :
 theorem sandwichedRelRentropy.continuousOn (ρ σ : MState d) :
     ContinuousOn (fun α => D̃_ α(ρ‖σ)) (Set.Ioi 0) := by
   --If this turns out too hard, we just need `ContinousAt f 1`.
-  --If that's still too hard, we really _just_ need that `(𝓝[≠] 1).tendsto (f 1)`.
+  --If that's still too hard, we really _just_ need that `(𝓝[>] 1).Tendsto f (𝓝 (f 1))`.
   sorry
 
 /-- Quantum relative entropy as `Tr[ρ (log ρ - log σ)]` when supports are correct. -/
