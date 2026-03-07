@@ -800,13 +800,13 @@ lemma HermitianMat.conj_kron
 
 lemma HermitianMat.rpow_diagonal (a : d → ℝ) (r : ℝ) :
   (diagonal ℂ a) ^ r = diagonal ℂ (fun i => a i ^ r) := by
-    exact HermitianMat.cfc_diagonal _ _
+    exact cfc_diagonal _ _
 
 private lemma HermitianMat.pow_kron_diagonal
     (a : d₁ → ℝ) (b : d₂ → ℝ) (r : ℝ) (ha : ∀ i, 0 ≤ a i) (hb : ∀ j, 0 ≤ b j) :
-    ((HermitianMat.diagonal ℂ a) ⊗ₖ (HermitianMat.diagonal ℂ b)) ^ r =
-    ((HermitianMat.diagonal ℂ a) ^ r) ⊗ₖ ((HermitianMat.diagonal ℂ b) ^ r) := by
-  simp only [HermitianMat.kronecker_diagonal, HermitianMat.rpow_diagonal]
+    ((diagonal ℂ a) ⊗ₖ (diagonal ℂ b)) ^ r =
+    ((diagonal ℂ a) ^ r) ⊗ₖ ((diagonal ℂ b) ^ r) := by
+  simp only [kronecker_diagonal, rpow_diagonal]
   congr! 2 with x
   apply Real.mul_rpow (ha x.1) (hb x.2)
 
@@ -1091,21 +1091,7 @@ private lemma approxLog_tendsto_at_pos {t : ℝ} (ht : 0 < t) :
 private def eigenWeight (ρ σ : MState d) (i : d) : ℝ :=
   RCLike.re ((Matrix.vecMul (star (σ.M.H.eigenvectorBasis i : d → ℂ)) ρ.M.mat) ⬝ᵥ (σ.M.H.eigenvectorBasis i : d → ℂ))
 
-/-
-PROBLEM
-Show that ⟪ρ.M, σ.M.cfc f⟫ = Σ_i f(σ.M.H.eigenvalues i) · eigenWeight ρ σ i.
-
-PROVIDED SOLUTION
-By `cfc_toMat_eq_sum_smul_proj`, (σ.M.cfc f).mat = Σ_i f(λ_i) · P_i.
-Then ⟪ρ, σ.cfc f⟫ = Re(Tr(ρ · σ.cfc f)) = Re(Tr(ρ · Σ_i f(λ_i) P_i))
-= Σ_i f(λ_i) · Re(Tr(ρ · P_i))
-where Re(Tr(ρ · P_i)) = eigenWeight ρ σ i by definition.
-
-The inner product expands as Re(Σ_j (ρ · σ.cfc f)_{jj})
-= Re(Σ_j Σ_k ρ_{jk} · (σ.cfc f)_{kj}).
-Using the CFC expansion, this equals the desired sum.
--/
-private lemma inner_cfc_eq_sum (ρ σ : MState d) (f : ℝ → ℝ) :
+private lemma inner_cfc_eq_sum_eigenWeight (ρ σ : MState d) (f : ℝ → ℝ) :
     ⟪ρ.M, σ.M.cfc f⟫ = ∑ i, f (σ.M.H.eigenvalues i) * eigenWeight ρ σ i := by
   -- By definition of the inner product in the context of Hermitian matrices, we can expand it using the trace.
   have h_inner : ⟪ρ.M, σ.M.cfc f⟫ = RCLike.re (Matrix.trace (ρ.M.mat * (σ.M.cfc f).mat)) := by
@@ -1124,15 +1110,6 @@ private lemma inner_cfc_eq_sum (ρ σ : MState d) (f : ℝ → ℝ) :
   simp_all [ eigenWeight ];
   simp [ Matrix.dotProduct_mulVec ]
 
-/-
-PROBLEM
-Show that eigenWeight ρ σ i ≥ 0.
-
-PROVIDED SOLUTION
-eigenWeight ρ σ i = Re(v_i^* ρ v_i) where v_i is the i-th eigenvector of σ.
-Since ρ is PSD, v^* ρ v ≥ 0 for any v. So eigenWeight ≥ 0.
-Use `MState.pos` or `σ.M.H.posSemidef` and the definition of PSD.
--/
 private lemma eigenWeight_nonneg (ρ σ : MState d) (i : d) :
     0 ≤ eigenWeight ρ σ i := by
   -- By definition of `eigenWeight`, we have:
@@ -1149,18 +1126,6 @@ private lemma eigenWeight_nonneg (ρ σ : MState d) (i : d) :
   have := h₁.2 v;
   exact this.1.trans (by simp [w])
 
-/-
-PROBLEM
-Show that eigenWeight ρ σ i = 0 when σ.M.H.eigenvalues i = 0 and ker(σ.M) ≤ ker(ρ.M).
-
-PROVIDED SOLUTION
-If λ_i = 0, then v_i ∈ ker(σ.M) (eigenvector for eigenvalue 0).
-By kernel condition, v_i ∈ ker(ρ.M), so ρ.M · v_i = 0.
-Then eigenWeight = Re(v_i^* · 0) = 0.
-
-Use `HermitianMat.mem_ker_iff_mulVec_zero` and `Matrix.IsHermitian.eigenvector_of_eigenvalue_zero`.
-Or use the fact that eigenvalue 0 means A.mat.mulVec v = 0 for the eigenvector.
--/
 private lemma eigenWeight_zero_of_eigenvalue_zero (ρ σ : MState d) (i : d)
     (hσ : σ.M.ker ≤ ρ.M.ker) (hei : σ.M.H.eigenvalues i = 0) :
     eigenWeight ρ σ i = 0 := by
@@ -1177,7 +1142,7 @@ private lemma eigenWeight_zero_of_eigenvalue_zero (ρ σ : MState d) (i : d)
 open ComplexOrder in
 private lemma inner_cfc_approxLog_ge (ρ σ : MState d) (N : ℕ) (hσ : σ.M.ker ≤ ρ.M.ker) :
     ⟪ρ.M, σ.M.log⟫ ≤ ⟪ρ.M, σ.M.cfc (approxLog N)⟫ := by
-  rw [inner_cfc_eq_sum, show σ.M.log = σ.M.cfc Real.log from rfl, inner_cfc_eq_sum]
+  rw [inner_cfc_eq_sum_eigenWeight, show σ.M.log = σ.M.cfc Real.log from rfl, inner_cfc_eq_sum_eigenWeight]
   apply Finset.sum_le_sum
   intro i _
   have hpsd : σ.M.mat.PosSemidef := by
@@ -1193,8 +1158,8 @@ open ComplexOrder in
 private lemma tendsto_inner_cfc_approxLog (ρ x : MState d) (hx : x.M.ker ≤ ρ.M.ker) :
     Filter.Tendsto (fun N : ℕ => ⟪ρ.M, x.M.cfc (approxLog N)⟫)
       Filter.atTop (nhds ⟪ρ.M, x.M.log⟫) := by
-  rw [show x.M.log = x.M.cfc Real.log from rfl, inner_cfc_eq_sum]
-  simp_rw [inner_cfc_eq_sum]
+  rw [show x.M.log = x.M.cfc Real.log from rfl, inner_cfc_eq_sum_eigenWeight]
+  simp_rw [inner_cfc_eq_sum_eigenWeight]
   apply tendsto_finset_sum
   intro i _
   have hpsd : x.M.mat.PosSemidef := by
@@ -1228,19 +1193,6 @@ variable {d : Type*} [Fintype d] [DecidableEq d]
 
 open scoped InnerProductSpace RealInnerProductSpace HermitianMat
 
-/-
-PROBLEM
-Show that eigenWeight ρ x i = 0 iff the i-th eigenvector of x is in ker(ρ).
-
-PROVIDED SOLUTION
-eigenWeight ρ x i = Re(e_i^* ρ e_i). Since ρ ≥ 0, this is 0 iff e_i ∈ ker(ρ).
-Use `HermitianMat.mem_ker_of_inner_mulVec_zero` for the → direction and
-`HermitianMat.mem_ker_iff_mulVec_zero` for the ← direction.
-For the forward direction: eigenWeight = 0 means star e_i ⋅ ρ e_i = 0 (since it's ≥ 0
-by eigenWeight_nonneg, and Re(z) = 0 with z ≥ 0 implies z = 0).
-Then by `mem_ker_of_inner_mulVec_zero`, e_i ∈ ker(ρ).
-For the backward direction: if ρ e_i = 0, then eigenWeight = Re(e_i^* · 0) = 0.
--/
 private lemma eigenWeight_eq_zero_iff (ρ x : MState d) (i : d) :
     eigenWeight ρ x i = 0 ↔ (x.M.H.eigenvectorBasis i : EuclideanSpace ℂ d) ∈ ρ.M.ker := by
   have h_forward : eigenWeight ρ x i = 0 → (x.M.H.eigenvectorBasis i : d → ℂ) ∈ ρ.M.ker := by
@@ -1286,21 +1238,6 @@ private lemma eigenWeight_eq_zero_iff (ρ x : MState d) (i : d) :
     simp [ dotProduct ]
   exact congr_arg Complex.re h_zero
 
-/-
-PROBLEM
-Show that x.M.ker ≤ ρ.M.ker ↔ ∀ i, eigenvalue_i = 0 → eigenWeight = 0.
-
-PROVIDED SOLUTION
-(→) This is `eigenWeight_zero_of_eigenvalue_zero`.
-(←) x.M.ker = eigenspace 0 (by `ker_eq_eigenspace_zero`). The eigenvectors with eigenvalue 0
-form a basis for ker(x.M). By assumption, each such eigenvector has eigenWeight = 0,
-so by `eigenWeight_eq_zero_iff`, each eigenvector is in ker(ρ). Since ker(ρ) is a submodule
-and contains a spanning set of ker(x.M), it contains all of ker(x.M).
-
-More precisely: take v ∈ x.M.ker. By `ker_eq_eigenspace_zero`, v ∈ eigenspace 0.
-The eigenspace 0 is spanned by {e_i : eigenvalue_i = 0}. Each e_i ∈ ker(ρ) by assumption
-and `eigenWeight_eq_zero_iff`. Since ker(ρ) is a submodule, v ∈ ker(ρ).
--/
 private lemma ker_le_iff_eigenWeight_zero (ρ x : MState d) :
     x.M.ker ≤ ρ.M.ker ↔ ∀ i, x.M.H.eigenvalues i = 0 → eigenWeight ρ x i = 0 := by
   constructor;
@@ -1327,14 +1264,6 @@ private lemma ker_le_iff_eigenWeight_zero (ρ x : MState d) :
     simp_all [ eigenWeight_eq_zero_iff ];
     exact Submodule.sum_mem _ fun i _ => if hi : x.M.H.eigenvalues i = 0 then by simpa [ hi, h_w_zero i ] using Submodule.smul_mem _ ( w i ) ( h i hi ) else by simp [ h_w_zero i hi ] ;
 
-/-
-PROBLEM
-When ¬(x.M.ker ≤ ρ.M.ker), show there exists i with eigenvalue 0 and eigenWeight > 0.
-
-PROVIDED SOLUTION
-By `ker_le_iff_eigenWeight_zero`, ¬(x.M.ker ≤ ρ.M.ker) iff ∃ i, eigenvalue_i = 0 ∧ eigenWeight ≠ 0.
-Since eigenWeight ≥ 0 (by `eigenWeight_nonneg`), eigenWeight ≠ 0 implies eigenWeight > 0.
--/
 private lemma neg_ker_exists_eigenWeight_pos (ρ x : MState d) (hx : ¬(x.M.ker ≤ ρ.M.ker)) :
     ∃ i, x.M.H.eigenvalues i = 0 ∧ 0 < eigenWeight ρ x i := by
   -- By `ker_le_iff_eigenWeight_zero`, ¬(x.M.ker ≤ ρ.M.ker) iff ∃ i, eigenvalue_i = 0 ∧ eigenWeight ≠ 0. Use this fact.
@@ -1343,28 +1272,8 @@ private lemma neg_ker_exists_eigenWeight_pos (ρ x : MState d) (hx : ¬(x.M.ker 
   exact h_eigenWeight_ne_zero.imp fun i hi => ⟨ hi.1, lt_of_le_of_ne ( eigenWeight_nonneg ρ x i ) hi.2.symm ⟩
 
 private lemma approxLog_at_zero (N : ℕ) : approxLog N 0 = -(N : ℝ) := by
-  -- By definition of `approxLog`, we have `approxLog N 0 = Real.log (max 0 (Real.exp (-N)))`.
-  simp [approxLog];
-  -- Since $\exp(-N)$ is always positive, we have $\max(0, \exp(-N)) = \exp(-N)$.
-  simp [max_eq_right (Real.exp_pos (-N)).le]
+  simp [approxLog, max_eq_right (Real.exp_pos (-N)).le]
 
-/-
-PROBLEM
-Show that when the kernel condition fails, ⟪ρ.M, x.M.cfc (approxLog N)⟫ → -∞ as N → ∞.
-
-PROVIDED SOLUTION
-By `inner_cfc_eq_sum`, ⟪ρ.M, x.M.cfc (approxLog N)⟫ = Σ_i (approxLog N)(λ_i(x)) · eigenWeight(ρ, x, i).
-
-Split the sum into i with λ_i = 0 and λ_i > 0.
-- For λ_i > 0: approxLog N(λ_i) is eventually constant (= log λ_i) for large N, so bounded.
-- For λ_i = 0: approxLog N(0) = -N (by `approxLog_at_zero`). By `neg_ker_exists_eigenWeight_pos`,
-  at least one such term has eigenWeight > 0, contributing -N · w_i where w_i > 0.
-  This drives the sum to -∞.
-
-More precisely, the sum = (Σ_{i: λ_i=0} (-N) · w_i) + (Σ_{i: λ_i>0} (approxLog N)(λ_i) · w_i).
-The second sum is eventually constant. The first sum = -N · (Σ_{i: λ_i=0} w_i) with Σ w_i > 0.
-So the whole thing → -∞.
--/
 private lemma inner_cfc_approxLog_tendsto_bot (ρ x : MState d) (hx : ¬(x.M.ker ≤ ρ.M.ker)) :
     Filter.Tendsto (fun N : ℕ => ⟪ρ.M, x.M.cfc (approxLog N)⟫) Filter.atTop Filter.atBot := by
   have h_split_sum : Filter.Tendsto (fun N : ℕ => ∑ i ∈ Finset.univ.filter (fun i => x.M.H.eigenvalues i = 0), approxLog N (x.M.H.eigenvalues i) * eigenWeight ρ x i) Filter.atTop Filter.atBot := by
@@ -1378,29 +1287,11 @@ private lemma inner_cfc_approxLog_tendsto_bot (ρ x : MState d) (hx : ¬(x.M.ker
     refine Finset.sum_congr rfl fun i hi => ?_
     rw [ show approxLog N ( x.M.H.eigenvalues i ) = -↑N from by rw [ show x.M.H.eigenvalues i = 0 from Finset.mem_filter.mp hi |>.2 ] ; exact approxLog_at_zero N ] ;
   convert h_split_sum.atBot_add ( show Filter.Tendsto ( fun N : ℕ => ∑ i ∈ Finset.univ.filter ( fun i => x.M.H.eigenvalues i ≠ 0 ), approxLog N ( x.M.H.eigenvalues i ) * eigenWeight ρ x i ) Filter.atTop ( nhds ( ∑ i ∈ Finset.univ.filter ( fun i => x.M.H.eigenvalues i ≠ 0 ), Real.log ( x.M.H.eigenvalues i ) * eigenWeight ρ x i ) ) from ?_ ) using 2;
-  · rw [ inner_cfc_eq_sum, Finset.sum_filter_add_sum_filter_not ];
+  · rw [ inner_cfc_eq_sum_eigenWeight, Finset.sum_filter_add_sum_filter_not ];
   · apply tendsto_finset_sum
     intro i hi
     exact Filter.Tendsto.mul ( by exact ( approxLog_tendsto_at_pos ( show 0 < x.M.H.eigenvalues i from lt_of_le_of_ne (x.eigenvalue_nonneg i) (Ne.symm (by aesop))))) tendsto_const_nhds;
 
-/-
-PROBLEM
-Show that when the kernel condition fails at x (¬(x.M.ker ≤ ρ.M.ker)),
-for any y < ⊤, eventually y < (if x'.M.ker ≤ ρ.M.ker then ⟪ρ.M, ρ.M.log - x'.M.log⟫ else ⊤).
-
-PROVIDED SOLUTION
-Use `inner_cfc_approxLog_tendsto_bot` to find N with ⟪ρ.M, x.M.cfc (approxLog N)⟫ < ⟪ρ.M, ρ.M.log⟫ - y.toReal.
-By `continuous_inner_cfc_approxLog`, there's a neighborhood U of x where
-⟪ρ.M, x'.M.cfc (approxLog N)⟫ < ⟪ρ.M, ρ.M.log⟫ - y.toReal for all x' ∈ U.
-
-For x' ∈ U:
-- If ¬(x'.M.ker ≤ ρ.M.ker): the if-else gives ⊤, and y < ⊤ since hy : y < ⊤.
-- If x'.M.ker ≤ ρ.M.ker: by `inner_cfc_approxLog_ge`,
-  ⟪ρ.M, x'.M.log⟫ ≤ ⟪ρ.M, x'.M.cfc (approxLog N)⟫ < ⟪ρ.M, ρ.M.log⟫ - y.toReal.
-  So ⟪ρ.M, ρ.M.log - x'.M.log⟫ = ⟪ρ.M, ρ.M.log⟫ - ⟪ρ.M, x'.M.log⟫ > y.toReal.
-  Since the value is nonneg (by `inner_log_sub_log_nonneg`) and > y.toReal,
-  casting to ENNReal and then to EReal gives the result.
--/
 end lowerSemicontinuous_2
 
 open Classical in
