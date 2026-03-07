@@ -1869,7 +1869,7 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
   -- Eq. (S60)
   have qRel_ent_bound n : 𝐃(ρ ⊗ᵣ^[n]‖ℰ n (ρ ⊗ᵣ^[n])) ≤ ENNReal.ofReal (Real.log (n + 1)) := calc
     𝐃(ρ ⊗ᵣ^[n]‖ℰ n (ρ ⊗ᵣ^[n])) ≤ ENNReal.ofReal (Real.log (Fintype.card (spectrum ℝ (σ'' ρ ε m σ n).m))) :=
-      qRelativeEnt_op_le (by simp [hdpos n]) (pinching_bound ..)
+      qRelativeEnt_op_le (pinching_bound ..)
     _ ≤ ENNReal.ofReal (Real.log (n + 1)) := by
       grw [hdle n]
       · exact_mod_cast le_rfl
