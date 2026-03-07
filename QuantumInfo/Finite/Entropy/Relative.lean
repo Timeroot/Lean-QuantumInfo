@@ -343,18 +343,6 @@ lemma HermitianMat.trace_rpow_add_le
     ((A + B) ^ p).trace ≤ (A ^ p).trace + (B ^ p).trace := by
   sorry
 
-/-
-PROBLEM
-For a density matrix σ and r > 0, show σ.M ^ r ≤ 1.
-
-PROVIDED SOLUTION
-Since σ is PSD with eigenvalues in [0,1] (from MState.le_one and σ.nonneg),
-we have σ^r has eigenvalues λ_i^r ∈ [0,1] for r > 0.
-Use HermitianMat.le_iff and show (1 - σ^r) is PSD.
-Express 1 - σ^r using CFC: 1 - σ^r = σ.M.cfc(fun x => 1 - x^r) (via cfc_sub_apply, rpow_eq_cfc).
-Then use cfc_nonneg_iff to reduce to showing 1 - λ_i^r ≥ 0 for each eigenvalue.
-Since λ_i ∈ [0,1] (from le_one) and r > 0, this follows from Real.rpow_le_one.
--/
 lemma MState.rpow_le_one' {r : ℝ} (hσ : 0 < r) : σ.M ^ r ≤ 1 := by
   rw [HermitianMat.le_iff]
   have h1 : 1 - σ.M ^ r = σ.M.cfc (fun x => 1 - x ^ r) := by
@@ -368,9 +356,7 @@ lemma MState.rpow_le_one' {r : ℝ} (hσ : 0 < r) : σ.M ^ r ≤ 1 := by
   have hle : σ.M.H.eigenvalues i ≤ 1 := σ.eigenvalue_le_one i
   linarith [Real.rpow_le_one hge hle hσ.le]
 
-/-
-If A ≥ 0 and A ≤ 1, then each eigenvalue of A is in [0, 1].
--/
+/-- If A ≥ 0 and A ≤ 1, then each eigenvalue of A is in [0, 1]. -/
 lemma HermitianMat.eigenvalues_le_one_of_le_one
     (A : HermitianMat d ℂ) (hA1 : A ≤ 1) (i : d) :
     A.H.eigenvalues i ≤ 1 := by
@@ -397,16 +383,7 @@ lemma HermitianMat.eigenvalues_le_one_of_le_one
   norm_cast at this
   linarith
 
-/-
-PROBLEM
-For positive A ≤ 1 and p ≥ 1, show Tr[A^p] ≤ Tr[A].
-
-PROVIDED SOLUTION
-Rewrite both sides using trace_rpow_eq_sum: Tr[A^p] = ∑ λ_i^p and Tr[A] = ∑ λ_i
-(using trace_rpow_eq_sum and rpow_one for the latter).
-Then apply Finset.sum_le_sum pointwise.
-Each λ_i ∈ [0,1] (from eigenvalues_le_one_of_le_one and eigenvalues_nonneg),
-so λ_i^p ≤ λ_i^1 = λ_i by Real.rpow_le_rpow_of_exponent_ge.
+/-- For positive A ≤ 1 and p ≥ 1, `Tr[A^p] ≤ Tr[A]`.
 -/
 lemma HermitianMat.trace_rpow_le_trace_of_le_one
     (A : HermitianMat d ℂ) (hA : 0 ≤ A) (hA1 : A ≤ 1)
@@ -458,62 +435,7 @@ private theorem sandwiched_trace_of_lt_1 (h : σ.M.ker ≤ ρ.M.ker) (hα₀ : 0
     ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).mat) ^ α).trace ≤ 1 := by
   sorry
 
-/-
-PROBLEM
-Show that for density matrices ρ, σ (PSD with trace 1) and α > 1,
-Tr[(σ^t ρ σ^t)^α] ≥ 1, where t = (1-α)/(2α).
-
-Show ⟪σ^t ρ σ^t, σ^{-2t}⟫ = 1 for density matrices ρ, σ with ker(σ) ≤ ker(ρ).
-
-For PSD A and p ≠ 0: A^{-p} * A^p = A.supportProj.
-
-PROVIDED SOLUTION
-Let A = σ^t ρ σ^t (PSD) with t = (1-α)/(2α) < 0 (since α > 1).
-Use inner_le_trace_rpow_mul (Hermitian trace Hölder inequality) with the pair
-(A, σ^{-2t}) and exponents p = α, q = α/(α-1).
-
-Step 1: Compute ⟪A, σ^{-2t}⟫_ℝ = 1.
-  A = σ^t ρ σ^t, so A * σ^{-2t} = σ^t ρ σ^{t-2t} = σ^t ρ σ^{-t}.
-  Tr[σ^t ρ σ^{-t}] = Tr[σ^{-t} σ^t ρ] = Tr[P_σ ρ] = Tr[ρ] = 1
-  (where P_σ is the support projection of σ, and P_σ ρ = ρ by kernel condition).
-
-Step 2: By inner_le_trace_rpow_mul:
-  ⟪A, σ^{-2t}⟫_ℝ ≤ Tr[A^α]^{1/α} * Tr[σ^{-2t*q}]^{1/q}
-
-Step 3: Compute -2t * q = -(1-α)/α * α/(α-1) = 1.
-  So Tr[σ^1] = 1.
-
-Step 4: From 1 = ⟪A, σ^{-2t}⟫_ℝ ≤ Tr[A^α]^{1/α} * 1, get Tr[A^α] ≥ 1.
-Set t = (1-α)/(2α) and A = ρ.M.conj (σ^t).mat = σ^t ρ σ^t.
-We compute ⟪A, σ^{-2t}⟫ = Tr[A · σ^{-2t}].
-
-A.mat = (σ^t).mat * ρ.mat * ((σ^t).mat)^* = (σ^t).mat * ρ.mat * (σ^t).mat
-(since σ^t is Hermitian).
-
-Tr[A · σ^{-2t}] = Tr[σ^t ρ σ^t σ^{-2t}]
-= Tr[σ^t ρ σ^{t-2t}] = Tr[σ^t ρ σ^{-t}]
-= Tr[σ^{-t} σ^t ρ] (cyclicity of trace)
-
-Now σ^{-t} σ^t = supportProj σ (the support projection of σ), by
-HermitianMat.rpow_neg_mul_rpow_self for positive definite σ,
-or more generally by the CFC: σ^{-t} σ^t = σ.cfc(λ x, if x = 0 then 0 else 1)
-which is the support projection.
-
-Tr[supportProj(σ) · ρ] = Tr[ρ] = 1 since ker(σ) ≤ ker(ρ) implies
-ρ is supported on the support of σ.
-
-Key lemmas: mat_rpow_add, rpow_neg_mul_rpow_self,
-supportProj_mul (or the kernel condition),
-HermitianMat.conjTranspose_mat, MState.tr.
-By rpow_eq_cfc: A^{-p} = A.cfc(·^{-p}) and A^p = A.cfc(·^p).
-The product A^{-p}.mat * A^p.mat = (A.cfc(·^{-p}) * A.cfc(·^p)).mat
-= (A.cfc(fun x => x^{-p} * x^p)).mat (by mat_cfc_mul and cfc_mul_apply or cfc_comp).
-Now x^{-p} * x^p = if x = 0 then 0 else 1 for p ≠ 0:
-  - For x > 0: x^{-p} * x^p = x^0 = 1 (by rpow_add or rpow_neg_mul).
-  - For x = 0: 0^{-p} * 0^p = 0 * 0 = 0 (since p ≠ 0, rpow 0 ≠₀ = 0).
-And A.cfc(if · = 0 then 0 else 1) = A.supportProj (by supportProj_eq_cfc).
-Use cfc_congr_of_nonneg with hA to match the functions on the spectrum.
--/
+/-- For PSD A and p ≠ 0, `A^{-p} * A^p = HermitianMat.supportProj A`. -/
 lemma HermitianMat.rpow_neg_mul_rpow_eq_supportProj
     {A : HermitianMat d ℂ} (hA : 0 ≤ A) {p : ℝ} (hp : p ≠ 0) :
     (A ^ (-p)).mat * (A ^ p).mat = A.supportProj.mat := by
@@ -569,26 +491,21 @@ lemma HermitianMat.mul_supportProj_of_ker_le (A B : HermitianMat d ℂ)
     A.mat * B.supportProj.mat = A.mat := by
   -- Since $B.supportProj$ is the projection onto $range B$, we have $B.supportProj * B.mat = B.mat$.
   have h_supportProj_mul_B : B.supportProj.mat * B.mat = B.mat := by
-    exact supportProj_mul_self B;
+    exact supportProj_mul_self B
   have h_range_A_subset_range_B : LinearMap.range A.lin ≤ LinearMap.range B.lin := by
     have h_orthogonal_complement : LinearMap.range (B.lin : EuclideanSpace ℂ d →ₗ[ℂ] EuclideanSpace ℂ d) = (LinearMap.ker (B.lin : EuclideanSpace ℂ d →ₗ[ℂ] EuclideanSpace ℂ d))ᗮ := by
       have h_orthogonal_complement : ∀ (T : EuclideanSpace ℂ d →ₗ[ℂ] EuclideanSpace ℂ d), T = T.adjoint → LinearMap.range T = (LinearMap.ker T)ᗮ := by
         intro T hT;
         refine' Submodule.eq_of_le_of_finrank_eq _ _;
-        · intro x hx
-          obtain ⟨y, hy⟩ := hx
-          have h_orthogonal : ∀ z ∈ LinearMap.ker T, inner ℂ x z = 0 := by
-            intro z hz
-            have h_orthogonal : inner ℂ (T y) z = inner ℂ y (T.adjoint z) := by
-              rw [ LinearMap.adjoint_inner_right ];
-            simp [ ← hT ] at h_orthogonal ⊢
-            aesop ( simp_config := { singlePass := true } );
-          exact (Submodule.mem_orthogonal' (LinearMap.ker T) x).mpr h_orthogonal;
+        · rintro x ⟨y, rfl⟩
+          rw [Submodule.mem_orthogonal' (LinearMap.ker T) (T y)]
+          intro z hz
+          rw [LinearMap.mem_ker] at hz
+          simp [← LinearMap.adjoint_inner_right, ← hT, hz]
         · have := LinearMap.finrank_range_add_finrank_ker T;
-          have := Submodule.finrank_add_finrank_orthogonal ( LinearMap.ker T );
+          have := Submodule.finrank_add_finrank_orthogonal (LinearMap.ker T)
           linarith;
-      apply h_orthogonal_complement;
-      ext
+      apply h_orthogonal_complement
       simp
     have h_orthogonal_complement_A : LinearMap.range (A.lin : EuclideanSpace ℂ d →ₗ[ℂ] EuclideanSpace ℂ d) ≤ (LinearMap.ker (A.lin : EuclideanSpace ℂ d →ₗ[ℂ] EuclideanSpace ℂ d))ᗮ := by
       intro x hx;
@@ -602,47 +519,21 @@ lemma HermitianMat.mul_supportProj_of_ker_le (A B : HermitianMat d ℂ)
   -- Since $B.supportProj$ is the projection onto $range B$, and $range A \subseteq range B$, we have $B.supportProj * A = A$.
   have h_supportProj_mul_A : ∀ (v : EuclideanSpace ℂ d), B.supportProj.mat.mulVec (A.mat.mulVec v) = A.mat.mulVec v := by
     intro v
-    have hv_range_B : A.mat.mulVec v ∈ LinearMap.range B.lin := by
+    obtain ⟨w, hw⟩ : A.mat.mulVec v ∈ LinearMap.range B.lin := by
       exact h_range_A_subset_range_B ( Set.mem_range_self v );
-    obtain ⟨ w, hw ⟩ := hv_range_B;
-    replace h_supportProj_mul_B := congr_arg ( fun m => m.mulVec w ) h_supportProj_mul_B
+    replace h_supportProj_mul_B := congr(Matrix.mulVec $h_supportProj_mul_B w)
     simpa only [← hw, ← Matrix.mulVec_mulVec] using h_supportProj_mul_B
   -- By definition of matrix multiplication, if B.supportProj * A * v = A * v for all vectors v, then B.supportProj * A = A.
   have h_matrix_eq : ∀ (M N : Matrix d d ℂ), (∀ v : EuclideanSpace ℂ d, M.mulVec (N.mulVec v) = N.mulVec v) → M * N = N := by
     intro M N hMN; ext i j; specialize hMN ( Pi.single j 1 ) ; replace hMN := congr_fun hMN i; aesop;
-  apply_fun Matrix.conjTranspose at *; aesop;
-  exact fun M N hMN => by simpa using congr_arg Matrix.conjTranspose hMN;
+  rw [← Matrix.conjTranspose_inj]
+  simp_all only [Matrix.mulVec_mulVec, Matrix.conjTranspose_mul, conjTranspose_mat, implies_true]
 
 lemma HermitianMat.inner_supportProj_of_ker_le (A B : HermitianMat d ℂ)
   (h : LinearMap.ker B.lin ≤ LinearMap.ker A.lin) :
     ⟪A, B.supportProj⟫ = A.trace := by
   rw [inner_def, mul_supportProj_of_ker_le A B h, trace]
-/-
-PROBLEM
-For a density matrix ρ and PSD σ with ker(σ) ≤ ker(ρ):
-⟨σ.supportProj, ρ⟩ = 1.
 
-PROVIDED SOLUTION
-Use inner_comm to swap, then inner_def to get Tr[ρ.mat * σ.supportProj.mat].
-Since ker(σ) ≤ ker(ρ), range ρ ≤ range σ, so σ.supportProj acts as the identity on range ρ.
-Since ρ is Hermitian, all columns of ρ.mat are in range ρ ⊆ range σ.
-So ρ.mat * σ.supportProj.mat = ρ.mat (the support projection absorbs ρ).
-Hence Tr[ρ.mat * σ.supportProj.mat] = Tr[ρ] = 1 by MState.tr.
-
-Alternatively: kerProj_add_supportProj gives σ.kerProj + σ.supportProj = 1.
-So ⟨σ.supportProj, ρ⟩ = ⟨1 - σ.kerProj, ρ⟩ = ⟨1, ρ⟩ - ⟨σ.kerProj, ρ⟩.
-⟨1, ρ⟩ = Tr[ρ] = 1 (by inner_one/one_inner and MState.tr/trace_eq_re_trace).
-For ⟨σ.kerProj, ρ⟩ = 0:
-  σ.kerProj = projector σ.ker.
-  For any v in ker(σ), v is also in ker(ρ) (by h), so ρ.mat * v = 0.
-  So Tr[σ.kerProj * ρ] = Tr[P_ker * ρ] = sum of eigenvalues of ρ restricted to ker(σ) = 0.
-  More directly: σ.kerProj.mat * ρ.mat = 0 (since range of ρ ⊥ ker(σ) under the kernel containment).
-  Actually simpler: use inner_comm to get ⟨ρ, σ.kerProj⟩ = Tr[ρ.mat * σ.kerProj.mat].
-  Since ker(σ) ≤ ker(ρ) and ρ is Hermitian, ρ.mat * σ.kerProj.mat = 0.
-  (kerProj projects onto ker(σ) ⊆ ker(ρ), and ρ vanishes on ker(ρ).)
-  So ⟨σ.kerProj, ρ⟩ = 0.
-Hence ⟨σ.supportProj, ρ⟩ = 1 - 0 = 1.
--/
 lemma supportProj_inner_density (h : σ.M.ker ≤ ρ.M.ker) :
     ⟪σ.M.supportProj, ρ.M⟫_ℝ = 1 := by
   rw [HermitianMat.inner_comm _ _, HermitianMat.inner_supportProj_of_ker_le ρ.M σ.M h,
