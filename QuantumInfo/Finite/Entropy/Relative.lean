@@ -486,7 +486,7 @@ lemma HermitianMat.inner_supportProj_self (A : HermitianMat d ℂ) :
     exact congrArg₂ _ ( Finset.sum_comm ) ( Finset.sum_comm );
   · simp only [Matrix.trace, Matrix.diag_apply, mat_apply, Complex.re_sum]
 
-lemma HermitianMat.mul_supportProj_of_ker_le (A B : HermitianMat d ℂ)
+lemma HermitianMat.mul_supportProj_of_ker_le {A B : HermitianMat d ℂ}
   (h : LinearMap.ker B.lin ≤ LinearMap.ker A.lin) :
     A.mat * B.supportProj.mat = A.mat := by
   -- Since $B.supportProj$ is the projection onto $range B$, we have $B.supportProj * B.mat = B.mat$.
@@ -529,16 +529,15 @@ lemma HermitianMat.mul_supportProj_of_ker_le (A B : HermitianMat d ℂ)
   rw [← Matrix.conjTranspose_inj]
   simp_all only [Matrix.mulVec_mulVec, Matrix.conjTranspose_mul, conjTranspose_mat, implies_true]
 
-lemma HermitianMat.inner_supportProj_of_ker_le (A B : HermitianMat d ℂ)
+lemma HermitianMat.inner_supportProj_of_ker_le {A B : HermitianMat d ℂ}
   (h : LinearMap.ker B.lin ≤ LinearMap.ker A.lin) :
     ⟪A, B.supportProj⟫ = A.trace := by
-  rw [inner_def, mul_supportProj_of_ker_le A B h, trace]
+  rw [inner_def, mul_supportProj_of_ker_le h, trace]
 
 lemma supportProj_inner_density (h : σ.M.ker ≤ ρ.M.ker) :
     ⟪σ.M.supportProj, ρ.M⟫_ℝ = 1 := by
-  rw [HermitianMat.inner_comm _ _, HermitianMat.inner_supportProj_of_ker_le ρ.M σ.M h,
-    HermitianMat.trace_eq_re_trace]
-  simp [MState.tr']
+  rw [HermitianMat.inner_comm, HermitianMat.inner_supportProj_of_ker_le h]
+  simp
 
 --PULLOUT
 @[simp]
