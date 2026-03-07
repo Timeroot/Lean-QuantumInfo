@@ -4,6 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: Alex Meiburg
 -/
 import QuantumInfo.ForMathlib.Matrix
+import QuantumInfo.ForMathlib.Isometry
 
 open BigOperators
 open Classical
@@ -34,11 +35,70 @@ theorem traceNorm_eq_neg_self (A : Matrix m n R) : traceNorm (-A) = traceNorm A 
   rw [Matrix.conjTranspose_neg, Matrix.neg_mul, Matrix.mul_neg]
   exact neg_neg _
 
+open scoped MatrixOrder Isometry
+lemma cfc_sqrt_isometry_conj {A : Matrix n n R} (hA : 0 ≤ A)
+  {u : Matrix m n R} (hu₁ : u.Isometry) :
+    CFC.sqrt (u * A * uᴴ) = u * CFC.sqrt A * uᴴ := by
+    have h_conj (B : Matrix n n R) (hB : 0 ≤ B) : 0 ≤ u * B * uᴴ := by
+      rw [Matrix.nonneg_iff_posSemidef] at hB ⊢
+      exact hB.mul_mul_conjTranspose_same u
+    have hu := h_conj A hA
+    have hu' := h_conj (CFC.sqrt A) (CFC.sqrt_nonneg A)
+    apply (CFC.sqrt_eq_iff _ _ hu hu').mpr
+    . rw [Matrix.mul_assoc, ← Matrix.mul_assoc uᴴ, ← Matrix.mul_assoc uᴴ]
+      simp [show uᴴ * u = 1 from hu₁]
+      rw [← Matrix.mul_assoc, Matrix.mul_assoc u, CFC.sqrt_mul_sqrt_self A hA]
+
+theorem traceNorm_isometry_left [Fintype k] {A : Matrix n m R} {u : Matrix k n R}
+  (hu₁ : u.Isometry) : traceNorm (u * A) = traceNorm A := by
+  unfold traceNorm
+  congr 1
+  simp [Matrix.mul_assoc]
+  nth_rw 2 [← Matrix.mul_assoc]
+  simp [show uᴴ * u = 1 from hu₁]
+
+theorem traceNorm_isometry_right [Fintype k] {A : Matrix n m R} {u : Matrix k m R}
+  (hu₁ : u.Isometry) : traceNorm (A * uᴴ) = traceNorm A := by
+  unfold traceNorm
+  congr 1
+  simp [← Matrix.mul_assoc]
+  nth_rw 2 [Matrix.mul_assoc]
+  have hA := (Matrix.posSemidef_conjTranspose_mul_self A).nonneg
+  rw [cfc_sqrt_isometry_conj hA hu₁, Matrix.trace_mul_comm, ← Matrix.mul_assoc]
+  simp [show uᴴ * u = 1 by exact hu₁]
+
+/-- The trace norm is invariant under isometries u and v, Property 9.1.4 in Wilde -/
+theorem traceNorm_isometry_conj {A : Matrix n n R} {u : Matrix m n R}
+  (hu : u.Isometry) {v : Matrix m n R} (hv : v.Isometry) :
+    traceNorm (u * A * vᴴ) = traceNorm A := by
+    rw [traceNorm_isometry_right hv, traceNorm_isometry_left hu]
+
+@[simp]
+theorem traceNorm_unitary_conj {A : Matrix n n R} {U : Matrix.unitaryGroup n R} :
+  traceNorm (U.val * A * U.valᴴ) = traceNorm A := by
+  have hu:= (Matrix.mem_unitaryGroup_iff_isometry U.val).mp U.2
+  exact traceNorm_isometry_conj hu.1 hu.1
+
 --More generally sum of abs of singular values.
 --Proposition 9.1.1 in Wilde
 theorem traceNorm_Hermitian_eq_sum_abs_eigenvalues {A : Matrix n n R} (hA : A.IsHermitian) :
-    A.traceNorm = ∑ i, abs (hA.eigenvalues i) :=
-  sorry --Diagonalize A
+    A.traceNorm = ∑ i, abs (hA.eigenvalues i) := by
+  obtain ⟨U, D, hD, hA_eq, h_eig⟩ : ∃ U : Matrix.unitaryGroup n R, ∃ D : Matrix n n R, D.IsDiag ∧ A = U.val * D * U.valᴴ ∧ ∀ i, D i i = hA.eigenvalues i := by
+    refine' ⟨hA.eigenvectorUnitary, _, isDiag_diagonal _, hA.spectral_theorem, _⟩
+    simp [diagonal]
+  nth_rw 1 [hA_eq, traceNorm_unitary_conj]
+  unfold traceNorm
+  rw [← Matrix.IsDiag.diagonal_diag hD]
+  simp [Matrix.diagonal_mul_diagonal, h_eig]
+  simp_rw [← sq, ← Real.sqrt_sq_eq_abs, ← Matrix.trace_diagonal]
+  set B := ((diagonal fun i => (hA.eigenvalues i : R) ^ 2)) with bD
+  rw [CFC.sqrt_eq_real_sqrt B _, bD]
+  . rw [cfcₙ_eq_cfc]
+    rw_mod_cast [cfc_diagonal (g := fun i => (hA.eigenvalues i) ^2)]
+    simp
+  . apply Matrix.PosSemidef.nonneg
+    rw [Matrix.posSemidef_diagonal_iff]
+    exact_mod_cast fun i => sq_nonneg (hA.eigenvalues i)
 
 /-- The trace norm is nonnegative. Property 9.1.1 in Wilde -/
 theorem traceNorm_nonneg (A : Matrix m n R) : 0 ≤ A.traceNorm :=
