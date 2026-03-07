@@ -562,34 +562,42 @@ private lemma purify_MState_pure_basis_default_entry (i j : dOut × dOut) :
     Braket.instFunLikeKet, Braket.instFunLikeBra]
   split_ifs <;> simp_all [eq_comm]
 
-private lemma purify_replacement_single_eq (ρ₀ : MState (dOut × dOut)) (b₁c₁ b₂c₂ : dOut × dOut) :
-    ((replacement ρ₀ : CPTPMap Unit (dOut × dOut)).map (Matrix.single () () 1)) b₁c₁ b₂c₂ =
-    ρ₀.m b₁c₁ b₂c₂ := by
-  have h_trace : (Matrix.traceLeft (Matrix.kroneckerMap (fun x1 x2 => x1 * x2) (Matrix.single () () 1) ρ₀.m)) = ρ₀.m := by
-    ext i j; simp +decide [ Matrix.traceLeft, Matrix.kroneckerMap ]
-  exact congr_fun ( congr_fun h_trace b₁c₁ ) b₂c₂
+omit [Inhabited dOut] in
+private lemma purify_replacement_single_eq (ρ₀ : MState (dOut × dOut)) (b₁ b₂ : dOut × dOut) :
+    ((replacement ρ₀).map (Matrix.single () () 1)) b₁ b₂ = ρ₀.m b₁ b₂ := by
+  open Kronecker in
+  suffices h : (Matrix.single () () 1 ⊗ₖ ρ₀.m).traceLeft = ρ₀.m from
+    congr_fun (congr_fun h b₁) b₂
+  ext : 1
+  simp [Matrix.traceLeft, Matrix.kroneckerMap]
 
 private lemma purify_prep_append_entry (X : Matrix dIn dIn ℂ)
-    (a₁ : dIn) (b₁c₁ : dOut × dOut) (a₂ : dIn) (b₂c₂ : dOut × dOut) :
+      (a₁ : dIn) (b₁c₁ : dOut × dOut) (a₂ : dIn) (b₂c₂ : dOut × dOut) :
     let ρ₀ := MState.pure (Ket.basis (default : dOut × dOut))
     let zero_prep : CPTPMap Unit (dOut × dOut) := replacement ρ₀
     let prep := (id ⊗ᶜᵖ zero_prep)
     let append : CPTPMap dIn (dIn × Unit) := CPTPMap.ofEquiv (Equiv.prodPUnit dIn).symm
     (prep ∘ₘ append).map X (a₁, b₁c₁) (a₂, b₂c₂) =
     X a₁ a₂ * ρ₀.m b₁c₁ b₂c₂ := by
-  unfold replacement
-  unfold CPTPMap.traceLeft; (unfold CPTPMap.prod; (unfold CPTPMap.ofEquiv))
-  simp +decide [Matrix.traceLeft, Matrix.kroneckerMap]
-  erw [LinearMap.comp_apply]; simp +decide [MatrixMap.kron_def]; ring!
-  erw [MatrixMap.kron_def]; simp +decide [MatrixMap.of_kraus]; ring!
-  erw [Finset.sum_eq_single a₁] <;> simp +decide [Matrix.single]; ring!
-  · erw [Matrix.of_apply]; simp +decide [Ket.basis]; ring!
-    erw [Matrix.of_apply]; simp +decide [Ket.basis]; ring!
-  · aesop
+  --TODO Cleanup. The proof tactics aren't too long, but the intermediate state is
+  -- distgusting; probably this can be repackaged as several intermediate simp lemmas
+  -- and generally needs better API.
+  unfold replacement CPTPMap.traceLeft CPTPMap.prod CPTPMap.ofEquiv
+  simp only [id_map, Matrix.traceLeft, Finset.univ_unique, PUnit.default_eq_unit,
+    Finset.sum_singleton, Matrix.kroneckerMap, MState.pure_apply, Equiv.symm_symm]
+  erw [LinearMap.comp_apply, MatrixMap.kron_def]
+  erw [Finset.sum_eq_single a₁]
+  · simp only [Matrix.single]
+    erw [Matrix.of_apply]
+    simp only [Matrix.of_apply]
+    erw [Matrix.of_apply]
+    simp [Matrix.of_apply]
+    ring!
+  · simp +contextual
+  · simp
 
-set_option maxHeartbeats 800000 in
 private lemma purify_conj_entry (X : Matrix dIn dIn ℂ) (U : 𝐔[dIn × dOut × dOut])
-    (i j : dIn × dOut × dOut) :
+      (i j : dIn × dOut × dOut) :
     let ρ₀ := MState.pure (Ket.basis (default : dOut × dOut))
     let zero_prep : CPTPMap Unit (dOut × dOut) := replacement ρ₀
     let prep := (id ⊗ᶜᵖ zero_prep)
@@ -598,37 +606,44 @@ private lemma purify_conj_entry (X : Matrix dIn dIn ℂ) (U : 𝐔[dIn × dOut �
     ∑ α₁ : dIn, ∑ α₂ : dIn,
       U.val i (α₁, default, default) * X α₁ α₂ *
       starRingEnd ℂ (U.val j (α₂, default, default)) := by
-  have h_conj : let ρ₀ := MState.pure (Ket.basis (default : dOut × dOut))
-    let zero_prep : CPTPMap Unit (dOut × dOut) := replacement ρ₀
-    let prep := (id ⊗ᶜᵖ zero_prep)
-    let append : CPTPMap dIn (dIn × Unit) := CPTPMap.ofEquiv (Equiv.prodPUnit dIn).symm
-    (prep ∘ₘ append).map X = Matrix.kroneckerMap (fun x1 x2 => x1 * x2) X (MState.pure (Ket.basis (default : dOut × dOut))).m := by
-      ext ⟨a₁, b₁c₁⟩ ⟨a₂, b₂c₂⟩; simp [purify_prep_append_entry, purify_MState_pure_basis_default_entry]
-  have h_conj : let ρ₀ := MState.pure (Ket.basis (default : dOut × dOut))
-    let zero_prep : CPTPMap Unit (dOut × dOut) := replacement ρ₀
-    let prep := (id ⊗ᶜᵖ zero_prep)
-    let append := CPTPMap.ofEquiv (Equiv.prodPUnit dIn).symm
-    (ofUnitary U).map ((prep ∘ₘ append).map X) i j =
-    ∑ k, ∑ l, U.val i k * (Matrix.kroneckerMap (fun x1 x2 => x1 * x2) X (MState.pure (Ket.basis (default : dOut × dOut))).m) k l * starRingEnd ℂ (U.val j l) := by
-      simp [h_conj, Matrix.mul_apply, Matrix.kroneckerMap]
-      convert congr_arg (fun m : Matrix (dIn × dOut × dOut) (dIn × dOut × dOut) ℂ => m i j) (show (U.val * (Matrix.of fun i j => X i.1 j.1 * ((Ket.basis default) i.2 * (starRingEnd ℂ) ((Ket.basis default) j.2))) * U.val.conjTranspose) = _ from rfl) using 1; simp +decide [Matrix.mul_apply, Matrix.conjTranspose_apply]; ring!
-      exact Finset.sum_comm.trans (Finset.sum_congr rfl fun _ _ => by rw [Finset.sum_mul])
+  open Kronecker in
+  have h_conj :
+      let ρ₀ := MState.pure (Ket.basis (default : dOut × dOut))
+      let zero_prep : CPTPMap Unit (dOut × dOut) := replacement ρ₀
+      let prep := (id ⊗ᶜᵖ zero_prep)
+      let append : CPTPMap dIn (dIn × Unit) := CPTPMap.ofEquiv (Equiv.prodPUnit dIn).symm
+      (prep ∘ₘ append).map X = X ⊗ₖ (MState.pure (Ket.basis (default : dOut × dOut))).m := by
+    ext ⟨a₁, b₁c₁⟩ ⟨a₂, b₂c₂⟩
+    simp [purify_prep_append_entry]
+  have h_conj :
+      let ρ₀ := MState.pure (Ket.basis (default : dOut × dOut))
+      let zero_prep : CPTPMap Unit (dOut × dOut) := replacement ρ₀
+      let prep := (id ⊗ᶜᵖ zero_prep)
+      let append := CPTPMap.ofEquiv (Equiv.prodPUnit dIn).symm
+      (ofUnitary U).map ((prep ∘ₘ append).map X) i j =
+      ∑ k, ∑ l, U.val i k * (X ⊗ₖ (MState.pure (Ket.basis (default : dOut × dOut))).m) k l * starRingEnd ℂ (U.val j l) := by
+    simp [h_conj, Matrix.kroneckerMap]
+    convert congr_arg (fun m : Matrix (dIn × dOut × dOut) (dIn × dOut × dOut) ℂ => m i j) (show (U.val * (Matrix.of fun i j => X i.1 j.1 * ((Ket.basis default) i.2 * (starRingEnd ℂ) ((Ket.basis default) j.2))) * U.val.conjTranspose) = _ from rfl) using 1
+    simp [Matrix.mul_apply, Matrix.conjTranspose_apply]
+    ring_nf!
+    exact Finset.sum_comm.trans (Finset.sum_congr rfl fun _ _ => by rw [Finset.sum_mul])
   have h_restrict : ∀ x : dIn × dOut × dOut, (Ket.basis default) x.2 = if x.2 = default then 1 else 0 := by
-    intro x; exact (by
-    simp +decide [Ket.basis]
-    simp +decide [Ket.vec, eq_comm]
-    exact rfl)
-  simp_all +decide [Finset.sum_ite]
+    intro x
+    simp [Ket.basis, eq_comm]
+    exact rfl
+  simp_all [Finset.sum_ite]
   convert h_conj using 1
   · congr! 1
     convert congr_arg (fun f => (U.val * f * U.val.conjTranspose)) ‹_› using 1
-  · rw [← Finset.sum_product']
-    rw [← Finset.sum_product']
-    refine' Finset.sum_bij (fun x _ => ((x.1, default, default), (x.2, default, default))) _ _ _ _ <;> simp +decide
-    · exact fun a b => rfl
-    · exact fun _ _ => rfl
+  · rw [← Finset.sum_product', ← Finset.sum_product']
+    apply Finset.sum_bij (fun x _ => ((x.1, default, default), (x.2, default, default)))
+    · simp
+      exact fun a b => rfl
+    · simp
+    · simp
+      exact fun _ _ => rfl
+    · simp
 
-set_option maxHeartbeats 800000 in
 private lemma purify_rhs_entry (X : Matrix dIn dIn ℂ) (d₁ d₂ : dOut)
     (U : 𝐔[dIn × dOut × dOut]) :
     let ρ₀ := MState.pure (Ket.basis (default : dOut × dOut))
@@ -639,151 +654,23 @@ private lemma purify_rhs_entry (X : Matrix dIn dIn ℂ) (d₁ d₂ : dOut)
     ∑ a : dIn, ∑ b : dOut, ∑ α₁ : dIn, ∑ α₂ : dIn,
       U.val (a, b, d₁) (α₁, default, default) * X α₁ α₂ *
       starRingEnd ℂ (U.val (a, b, d₂) (α₂, default, default)) := by
-  -- Apply the hypothesis `h_trace` to rewrite the left-hand side of the equation.
-  apply Eq.symm; exact (by
-  convert purify_conj_entry X U using 1;
-  constructor <;> intro h <;> simp_all +decide [ Matrix.traceLeft, Fintype.sum_prod_type ];
-  · intro a b c d e f; rw [ purify_conj_entry ] ;
-  · convert Finset.sum_comm using 1;
-    convert Finset.sum_congr rfl fun y _ => Finset.sum_congr rfl fun x _ => h x y d₁ x y d₂ using 1)
+  apply Eq.symm
+  have h := purify_conj_entry X U
+  rw [Finset.sum_comm]
+  exact Finset.sum_congr rfl fun y _ ↦ Finset.sum_congr rfl fun x _ ↦
+    (h (x, y, d₁) (x, y, d₂)).symm
 
+omit [DecidableEq dIn] [DecidableEq dOut] [Inhabited dOut] in
 private lemma purify_of_kraus_entry (K : (dOut × dIn) → Matrix dOut dIn ℂ) (X : Matrix dIn dIn ℂ) (d₁ d₂ : dOut) :
     (MatrixMap.of_kraus K K) X d₁ d₂ =
     ∑ k : dOut × dIn, ∑ α₁ : dIn, ∑ α₂ : dIn,
       (K k) d₁ α₁ * X α₁ α₂ * starRingEnd ℂ ((K k) d₂ α₂) := by
-  -- By definition of MatrixMap.of_kraus, we can expand the left-hand side using the sum over k of the product of the Kraus operators and the conjugate transpose of the Kraus operators.
   have h_lhs : (MatrixMap.of_kraus K K) X = ∑ k, K k * X * (K k).conjTranspose := by
-    -- By definition of MatrixMap.of_kraus, we can expand the left-hand side using the sum over k of the product of the Kraus operators and the conjugate transpose of the Kraus operators. This follows directly from the definition of MatrixMap.of_kraus.
-    simp [MatrixMap.of_kraus] at *
-  generalize_proofs at *; (
-  simp +decide [ h_lhs, Matrix.sum_apply, Matrix.mul_apply, Matrix.conjTranspose_apply ];
-  simp +decide only [Finset.sum_mul];
-  exact Finset.sum_congr rfl fun _ _ => Finset.sum_comm.trans ( Finset.sum_congr rfl fun _ _ => Finset.sum_congr rfl fun _ _ => by ring ))
-
-/-
-PROBLEM
-Show that the composed CPTP map
-  traceLeft ∘ₘ traceLeft ∘ₘ ofUnitary U ∘ₘ (id ⊗ᶜᵖ replacement (ρ₀)) ∘ₘ ofEquiv (prodPUnit).symm
-equals the map defined by of_kraus K K, given that U's columns at (a', default, default)
-match the isometry V defined by the Kraus operators K.
-
-PROVIDED SOLUTION
-Use CPTPMap.ext to reduce to showing the underlying MatrixMaps agree.
-Then use LinearMap.ext to reduce to showing they agree on all matrices X.
-Then use Matrix.ext to show the entries agree at (d₁, d₂).
-
-The RHS composition unfolds as:
-1. ofEquiv maps X to X.submatrix (Equiv.prodPUnit dIn) (Equiv.prodPUnit dIn) on dIn × Unit
-2. (id ⊗ᶜᵖ replacement ρ₀) applies the Kronecker product of maps; by kron_def,
-   the result at ((a₁,(b₁,c₁)), (a₂,(b₂,c₂))) is
-   Σ_{α₁,α₂,u₁,u₂} (single α₁ α₂ 1)_{a₁,a₂} * (replacement.map (single u₁ u₂ 1))_{(b₁,c₁),(b₂,c₂)} * step1_{(α₁,u₁),(α₂,u₂)}
-   Since Unit is a unique type, u₁ = u₂ = ().
-   This simplifies to X_{a₁,a₂} * (ρ₀.m)_{(b₁,c₁),(b₂,c₂)}
-   where ρ₀ = MState.pure (Ket.basis default), so
-   (ρ₀.m)_{p,q} = if p = (default,default) then (if q = (default,default) then 1 else 0) else 0
-3. ofUnitary U conjugates: (U M U†)_{i,j} = Σ_{k,l} U_{i,k} M_{k,l} conj(U_{j,l})
-   The non-zero entries of M from step 2 are only at k = (α₁, default, default),
-   l = (α₂, default, default). So:
-   (U M U†)_{i,j} = Σ_{α₁,α₂} U_{i,(α₁,default,default)} X_{α₁,α₂} conj(U_{j,(α₂,default,default)})
-   By hU: U_{i,(α,default,default)} = V i α = K(i.2.1, i.1) i.2.2 α
-4. First traceLeft sums over dIn: gives a matrix on dOut × dOut
-5. Second traceLeft sums over the first dOut: gives a matrix on dOut
-   The result is Σ_{a,b} Σ_{α₁,α₂} (K(b,a))_{d₁,α₁} X_{α₁,α₂} conj((K(b,a))_{d₂,α₂})
-   = Σ_k (K k * X * (K k)†)_{d₁,d₂} = (of_kraus K K X)_{d₁,d₂}
-
-The proof strategy: use `ext` at the CPTPMap level to get linear map equality,
-then use `ext` to get matrix entry equality, then unfold all definitions
-(compose, traceLeft, ofUnitary, prod, replacement, ofEquiv, of_kraus) using simp
-with the appropriate lemmas. Key simp lemmas to use:
-- MatrixMap.kron_def for unfolding the tensor product of maps
-- Matrix.traceLeft for the partial trace
-- Matrix.mul_apply for matrix multiplication
-- hU for the unitary column condition
-- Fintype.sum_prod_type for reindexing sums over product types
-The crucial simplification is that the sum over Unit (from step 1) collapses,
-and the sum over (b,a) in dOut × dIn matches the Kraus sum.
-
-alternate suggestion:
-
-Use CPTPMap.ext to reduce to MatrixMap equality, then LinearMap.ext and funext to get
-entry-level equality. On the LHS, use hK to get of_kraus K K entries. On the RHS, unfold
-the composition step by step:
-
-Step 1 (append): Maps X to X.submatrix (Equiv.prodPUnit dIn). At entries:
-  (append.map X) (a₁,()) (a₂,()) = X a₁ a₂
-
-Step 2 (prep = id ⊗ₖₘ zero_prep): By MatrixMap.kron_map_of_kron_state, since
-  append.map X = X ⊗ₖ (1 : Matrix Unit Unit ℂ), we get
-  prep.map (append.map X) = id.map X ⊗ₖ zero_prep.map 1 = X ⊗ₖ ρ₀.m
-  where ρ₀ = MState.pure (Ket.basis default).
-
-Step 3 (ofUnitary U): Conjugation gives
-  (U * (X ⊗ₖ ρ₀.m) * U†) with entries at (i,j):
-  Σ_k Σ_l U i k * (X ⊗ₖ ρ₀.m) k l * conj(U j l)
-  Since ρ₀.m is only nonzero at (default,default), this collapses to:
-  Σ_{α₁,α₂} U i (α₁,default,default) * X α₁ α₂ * conj(U j (α₂,default,default))
-
-Step 4-5 (two traceLeft's): First traces over dIn, then over first dOut:
-  result d₁ d₂ = Σ_{a,b} Σ_{α₁,α₂} U (a,b,d₁) (α₁,0,0) * X α₁ α₂ * conj(U (a,b,d₂) (α₂,0,0))
-  = Σ_{a,b} Σ_{α₁,α₂} (K(b,a)) d₁ α₁ * X α₁ α₂ * conj((K(b,a)) d₂ α₂)  [by hU]
-  = Σ_k (K k * X * (K k)†) d₁ d₂ = (of_kraus K K X) d₁ d₂
-
-The proof approach:
-1. Use CPTPMap.ext to reduce to linear map equality.
-2. Use LinearMap.ext (ext X) to reduce to matrix equality.
-3. Use funext (ext d₁ d₂) to reduce to entry equality.
-4. Rewrite LHS with hK to get of_kraus entries.
-5. On the RHS, the key rewrite step is to note that
-   (prep ∘ₘ append).map X = X ⊗ₖ ρ₀.m  by using MatrixMap.kron_map_of_kron_state.
-   This requires showing append.map X = X ⊗ₖ 1 (a submatrix equals a Kronecker product).
-6. Then unfold ofUnitary to get U * (X ⊗ₖ ρ₀.m) * U†.
-7. Unfold traceLeft to get the sums.
-8. Use hU to replace U entries and reindex sums.
-9. Show the result equals (of_kraus K K X) d₁ d₂.
-
-Key lemmas: MatrixMap.kron_map_of_kron_state, Matrix.traceLeft, Matrix.mul_apply,
-  Matrix.conjTranspose_apply, MatrixMap.of_kraus, MatrixMap.conj, Fintype.sum_prod_type.
--/
-set_option maxHeartbeats 1600000 in
-set_option maxRecDepth 1000 in
-private lemma purify_trace_eq
-    {K : (dOut × dIn) → Matrix dOut dIn ℂ}
-    {Λ : CPTPMap dIn dOut ℂ}
-    (hK : Λ.map = MatrixMap.of_kraus K K)
-    {U : 𝐔[dIn × dOut × dOut]}
-    (hU : ∀ (i : dIn × dOut × dOut) (j : dIn),
-      U.val i (j, default, default) =
-      (fun ⟨a, b, d⟩ a' => (K (b, a)) d a') i j) :
-    Λ = (
-      let zero_prep : CPTPMap Unit (dOut × dOut) := replacement (MState.pure (Ket.basis default))
-      let prep := (id ⊗ᶜᵖ zero_prep)
-      let append : CPTPMap dIn (dIn × Unit) := CPTPMap.ofEquiv (Equiv.prodPUnit dIn).symm
-      CPTPMap.traceLeft ∘ₘ CPTPMap.traceLeft ∘ₘ (ofUnitary U) ∘ₘ prep ∘ₘ append) := by
-  apply CPTPMap.ext
-  ext X : 1
-  ext d₁ d₂ : 2
-  -- LHS: rewrite using hK and of_kraus_entry
-  have hLHS : Λ.map X d₁ d₂ = ∑ k : dOut × dIn, ∑ α₁ : dIn, ∑ α₂ : dIn,
-      (K k) d₁ α₁ * X α₁ α₂ * starRingEnd ℂ ((K k) d₂ α₂) := by
-    rw [hK]; exact purify_of_kraus_entry K X d₁ d₂
-  -- RHS: use purify_rhs_entry
-  have hRHS : (traceLeft ∘ₘ traceLeft ∘ₘ ofUnitary U ∘ₘ
-      (id ⊗ᶜᵖ replacement (MState.pure (Ket.basis default))) ∘ₘ
-      ofEquiv (Equiv.prodPUnit dIn).symm).map X d₁ d₂ =
-    ∑ a : dIn, ∑ b : dOut, ∑ α₁ : dIn, ∑ α₂ : dIn,
-      U.val (a, b, d₁) (α₁, default, default) * X α₁ α₂ *
-      starRingEnd ℂ (U.val (a, b, d₂) (α₂, default, default)) :=
-    purify_rhs_entry X d₁ d₂ U
-  rw [hLHS, hRHS]
-  -- Now reindex: K is indexed by (dOut × dIn), split as ∑_dOut ∑_dIn
-  -- RHS has ∑_dIn ∑_dOut, so we need to swap the summation order
-  rw [Fintype.sum_prod_type]
+    simp [MatrixMap.of_kraus]
+  simp only [h_lhs, Matrix.sum_apply, Matrix.mul_apply]
+  simp only [Matrix.conjTranspose_apply, RCLike.star_def, Finset.sum_mul]
+  refine Finset.sum_congr rfl fun _ _ ↦ ?_
   rw [Finset.sum_comm]
-  apply Finset.sum_congr rfl; intro a _
-  apply Finset.sum_congr rfl; intro b _
-  apply Finset.sum_congr rfl; intro α₁ _
-  apply Finset.sum_congr rfl; intro α₂ _
-  rw [hU (a, b, d₁) α₁, hU (a, b, d₂) α₂]
 
 theorem exists_purify (Λ : CPTPMap dIn dOut) :
     ∃ (Λ' : CPTPMap (dIn × dOut × dOut) (dIn × dOut × dOut)),
@@ -802,9 +689,18 @@ theorem exists_purify (Λ : CPTPMap dIn dOut) :
   have hV : V.conjTranspose * V = 1 :=
     purify_isometry_condition hTP_kraus
   let emb : dIn ↪ (dIn × dOut × dOut) :=
-    ⟨fun a => (a, default, default), fun a₁ a₂ h => by simpa using h⟩
+    ⟨fun a ↦ (a, default, default), fun a₁ a₂ h ↦ by simpa using h⟩
   obtain ⟨U, hU⟩ := exists_unitary_extending_isometry V hV emb
-  refine ⟨ofUnitary U, ⟨U, rfl⟩, purify_trace_eq hK hU⟩
+  use ofUnitary U, ⟨U, rfl⟩
+  apply CPTPMap.ext
+  ext X d₁ d₂ : 2
+  -- LHS: rewrite using hK and purify_of_kraus_entry
+  -- RHS: use purify_rhs_entry
+  change Λ.map = _ at hK
+  rw [hK, purify_of_kraus_entry, purify_rhs_entry]
+  rw [Fintype.sum_prod_type, Finset.sum_comm]
+  simp only [Function.Embedding.coeFn_mk, emb, V] at hU
+  simp_rw [hU]
 
 /-- Every channel can be written as a unitary channel on a larger system. In general, if
  the original channel was A→B, we may need to go as big as dilating the output system (the
