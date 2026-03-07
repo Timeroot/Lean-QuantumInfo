@@ -1129,265 +1129,92 @@ private lemma pos_of_MState_le_smul {σ₁ σ₂ : MState d} (hσ : σ₂.M ≤ 
     · exact hσ.trans' ( by positivity );
   · positivity
 
-/-
-PROBLEM
-Restricted log monotonicity for PosDef A: for PosDef A with A ≤ B, and PSD C,
-show ⟪C, A.log⟫ ≤ ⟪C, B.log⟫.
-
-PROVIDED SOLUTION
-Since A is PosDef and A ≤ B, by `HermitianMat.log_mono` we get A.log ≤ B.log.
-Then by `HermitianMat.inner_mono` with C ≥ 0, ⟪C, A.log⟫ ≤ ⟪C, B.log⟫.
--/
 open ComplexOrder in
-private lemma inner_log_mono_of_posDef_of_le (C : HermitianMat d ℂ) (hC : 0 ≤ C)
-    {A B : HermitianMat d ℂ} (hA : A.mat.PosDef) (hAB : A ≤ B) :
+private lemma HermitianMat.inner_log_mono_of_posDef_of_le {A B C : HermitianMat d 𝕜}
+    (hC : 0 ≤ C) (hA : A.mat.PosDef) (hAB : A ≤ B) :
     ⟪C, A.log⟫ ≤ ⟪C, B.log⟫ := by
-  exact HermitianMat.inner_mono hC (HermitianMat.log_mono hA hAB)
+  exact inner_mono hC (log_mono hA hAB)
 
-/-
-PROBLEM
-If A is PSD with A ≤ B, C ≥ 0, and ker(A) ≤ ker(C),
-show ⟪C, A.log⟫ ≤ ⟪C, B.log⟫.
-
-For PSD A and ε > 0, A + ε • 1 is PosDef
-
-PROVIDED SOLUTION
-For any ε > 0, A + ε • 1 is PosDef (all eigenvalues increase by ε),
-and (A + ε • 1) ≤ (B + ε • 1) from A ≤ B. By `inner_log_mono_of_posDef_of_le`:
-  ⟪C, (A + ε • 1).log⟫ ≤ ⟪C, (B + ε • 1).log⟫.
-
-Take ε → 0 using Filter.Tendsto. The convergence follows from continuity:
-  (A + ε • 1).log and (B + ε • 1).log are continuous in ε (since the CFC of
-  a continuous function is continuous, and the maps ε ↦ A + ε • 1 are continuous).
-  The inner product is also continuous. As ε → 0:
-  (A + ε • 1).log → A.log and (B + ε • 1).log → B.log
-  in the matrix norm.
-
-Wait—this is NOT true: (A + ε I).log does NOT converge to A.log when A has zero
-eigenvalues (log(ε) → -∞ ≠ log(0) = 0 in CFC convention).
-
-However, the inner product ⟪C, (A + ε I).log⟫ DOES converge to ⟪C, A.log⟫
-because C is zero on ker(A) (from ker A ≤ ker C). The diverging part
-of log(A + ε I) on ker(A) is multiplied by zero.
-
-To formalize: use the spectral decomposition A = (diag λ).conj U.
-Then (A + ε I) = (diag (λ + ε)).conj U, and
-(A + ε I).log = (diag (log(λ + ε))).conj U.
-Inner product: ⟪C, (A + ε I).log⟫ = ⟪C', diag(log(λ + ε))⟫ = ∑ C'ᵢᵢ log(λᵢ + ε).
-For λᵢ > 0: log(λᵢ + ε) → log(λᵢ).
-For λᵢ = 0: C'ᵢᵢ = 0, so contribution is always 0.
-Total converges to ∑ C'ᵢᵢ log(λᵢ) = ⟪C, A.log⟫.
-
-Similarly for B.
-
-Alternative (simpler, avoiding limits): when A = 0, ker A = ⊤ implies C = 0,
-so both sides are 0. When A ≠ 0 and PosDef, use inner_log_mono_of_posDef_of_le
-directly. When A is PSD, not PosDef, and nonzero, the proof requires the
-limit argument above.
-
-ALTERNATE SOLUTION GUIDE
-If A = 0: ker A = ⊤ implies ker C = ⊤, so C = 0 (since C ≥ 0 and ker C = ⊤
-means C.lin = 0, i.e., C = 0). Both inner products are 0.
-
-If A.mat.PosDef: apply `inner_log_mono_of_posDef_of_le` directly.
-
-Otherwise, A is PSD but not PosDef and nonzero. Use `A + ε • 1` which is PosDef:
-  `inner_log_mono_of_posDef_of_le C hC (A + ε • 1).posDef (A + ε • 1 ≤ B + ε • 1)`
-gives ⟪C, (A + ε • 1).log⟫ ≤ ⟪C, (B + ε • 1).log⟫ for each ε > 0.
-As ε → 0, both sides converge to ⟪C, A.log⟫ and ⟪C, B.log⟫ respectively.
-(The convergence uses the spectral decomposition and that C is zero on ker A.)
--/
 open ComplexOrder in
 private lemma posDef_add_eps {A : HermitianMat d ℂ} (hA : 0 ≤ A) {ε : ℝ} (hε : 0 < ε) :
-    (A + ε • (1 : HermitianMat d ℂ)).mat.PosDef := by
-  constructor;
-  · simp +decide [ Matrix.IsHermitian, add_mul, mul_add ];
+    (A + ε • 1).mat.PosDef := by
+  constructor
+  · exact HermitianMat.H _
   · intro x hx_ne_zero
     have h_inner : star x ⬝ᵥ (A.val.mulVec x) ≥ 0 := by
-      have := hA.2 x; aesop;
+      simpa [*] using hA.2 x
     have h_eps : star x ⬝ᵥ (ε • 1 : Matrix d d ℂ).mulVec x = ε * star x ⬝ᵥ x := by
-      simp +decide [ Matrix.mulVec, dotProduct, Finset.mul_sum _ _ _, mul_assoc, mul_left_comm, Finset.sum_mul ];
-      simp +decide [ Matrix.one_apply, Finset.mul_sum _ _ _ ]
+      simp [Matrix.mulVec, dotProduct, Finset.mul_sum, mul_left_comm, Matrix.one_apply]
     have h_pos : 0 < ε * star x ⬝ᵥ x := by
-      simp_all +decide [ Complex.mul_conj, Complex.normSq_apply, Finset.sum_add_distrib ]
-    exact (by
-    convert add_pos_of_nonneg_of_pos h_inner h_pos using 1 ; simp +decide [ add_mul, Matrix.add_mulVec ] ; ring!;
-    convert h_eps using 1)
+      simp [*]
+    simpa [Matrix.add_mulVec, h_eps] using add_pos_of_nonneg_of_pos h_inner h_pos
 
-/-
-PROBLEM
-Show (A + ε•1).log = A.cfc (fun u => log(u + ε))
-PROVIDED SOLUTION
-Step 1: Show A + ε • 1 = A.cfc (fun u => u + ε).
-  Use: (fun u => u + ε) = (fun u => id u + (fun _ => ε) u)
-  Then apply `cfc_add_apply`, `cfc_id`, `cfc_const` and take `symm`.
-Step 2: Unfold `log` as `cfc Real.log`, substitute step 1, then apply `cfc_comp_apply`:
-  (A.cfc (fun u => u + ε)).cfc Real.log = A.cfc (Real.log ∘ (fun u => u + ε))
-which simplifies to A.cfc (fun u => Real.log (u + ε)).
--/
-private lemma log_add_eps_eq_cfc (A : HermitianMat d ℂ) (ε : ℝ) :
-    (A + ε • (1 : HermitianMat d ℂ)).log = A.cfc (fun u => Real.log (u + ε)) := by
-  -- By definition of cfc, we know that A + ε • 1 = A.cfc (fun u => u + ε).
-  have h_cfc : A + ε • (1 : HermitianMat d ℂ) = A.cfc (fun u => u + ε) := by
+private lemma log_add_eps_eq_cfc (A : HermitianMat d 𝕜) (ε : ℝ) :
+    (A + ε • 1).log = A.cfc (Real.log <| · + ε) := by
+  have h_cfc : A + ε • 1 = A.cfc (· + ε) := by
     have h_add : A.cfc (fun u => u + ε) = A.cfc (fun u => u) + A.cfc (fun _ => ε) := by
-      exact HermitianMat.cfc_add_apply A (fun x => x) fun x => ε;
-    aesop
-  generalize_proofs at *; (
-  rw [ h_cfc, HermitianMat.log ] ; (
-  exact Eq.symm (HermitianMat.cfc_comp_apply A (fun x => x + ε) Real.log))
-  )
+      exact A.cfc_add_apply _ _
+    simp only [HermitianMat.cfc_id', HermitianMat.cfc_const, h_add]
+  rw [h_cfc, HermitianMat.log, A.cfc_comp_apply]
 
-/-
-PROBLEM
-For PSD A, C ≥ 0 with ker A ≤ ker C, show the inner product
-⟪C, (A + ε • 1).log⟫ converges to ⟪C, A.log⟫ as ε → 0⁺.
-The inner product ⟪C, A.cfc f⟫ can be expressed as a sum over eigenvalues:
-⟪C, A.cfc f⟫ = ∑ i, f(λᵢ) * cᵢ where cᵢ = ⟪C, Pᵢ⟫ and Pᵢ is the rank-1 eigenprojection.
-PROVIDED SOLUTION
-Rewrite using `log_add_eps_eq_cfc`: (A + ε•1).log = A.cfc (fun u => log(u + ε)).
-So the goal becomes showing A.cfc (fun u => log(u + ε)) → A.cfc (fun u => log u) in the inner product.
-Using `cfc_toMat_eq_sum_smul_proj`, inner product with the CFC decomposes as a finite sum:
-  ⟪C, A.cfc f⟫ = ∑ i, f(λᵢ) * cᵢ
-where cᵢ = RCLike.re (C.mat * Pᵢ).trace and Pᵢ is the rank-1 eigenprojection.
-For eigenvalue λᵢ = 0: cᵢ = 0 (from ker A ≤ ker C, because the eigenvector for eigenvalue 0 is in ker A ⊆ ker C).
-For eigenvalue λᵢ > 0: log(λᵢ + ε) → log(λᵢ) as ε → 0.
-So the sum converges (finite sum with each term converging).
-The coefficient cᵢ = 0 for zero eigenvalue follows from:
-- Eigenvector vᵢ ∈ ker A (since A vᵢ = λᵢ vᵢ = 0)
-- ker A ≤ ker C, so vᵢ ∈ ker C, meaning C vᵢ = 0
-- So C.mat * Pᵢ = C.mat * |vᵢ⟩⟨vᵢ| has zero trace (since Tr(C Pᵢ) = ⟨vᵢ|C|vᵢ⟩ = 0)
-The rank-1 eigenprojection for the i-th eigenvector is a rank-1 HermitianMat.
-Using `cfc_toMat_eq_sum_smul_proj`, the CFC decomposes the matrix into sum of scaled projections:
-(A.cfc f).mat = ∑ i, f(λᵢ) • Pᵢ
-Then by linearity of inner product (inner_def + trace of sum):
-⟪C, A.cfc f⟫ = Re(Tr(C.mat * ∑ i, f(λᵢ) • Pᵢ)) = Re(∑ i, f(λᵢ) * Tr(C.mat * Pᵢ)) = ∑ i, f(λᵢ) * Re(Tr(C.mat * Pᵢ))
--/
-private lemma inner_cfc_eq_sum (C A : HermitianMat d ℂ) (f : ℝ → ℝ) :
+private lemma inner_cfc_eq_sum (A C : HermitianMat d 𝕜) (f : ℝ → ℝ) :
     ⟪C, A.cfc f⟫ = ∑ i, f (A.H.eigenvalues i) *
       RCLike.re ((C.mat * (A.H.eigenvectorUnitary.val * Matrix.single i i 1 * A.H.eigenvectorUnitary.val.conjTranspose)).trace) := by
-  convert congr_arg _ ( HermitianMat.cfc_toMat_eq_sum_smul_proj A f ) using 1;
-  any_goals exact fun x => RCLike.re ( Matrix.trace ( C.val * x ) );
-  · bound;
-  · simp +decide [ Matrix.mul_sum, Matrix.sum_apply, Matrix.trace_add, Matrix.trace_smul ]
+  apply congr(RCLike.re ((C.val * $(A.cfc_toMat_eq_sum_smul_proj f)).trace)).trans
+  simp only [HermitianMat.val_eq_coe, Matrix.mul_sum, Algebra.mul_smul_comm, Matrix.trace_sum,
+    Matrix.trace_smul, RCLike.real_smul_eq_coe_mul, map_sum, RCLike.mul_re,
+    RCLike.ofReal_re, RCLike.ofReal_im, zero_mul, sub_zero]
 
-/-
-PROBLEM
-When A.H.eigenvalues i = 0 and ker A ≤ ker C, the coefficient
-RCLike.re ((C.mat * Pᵢ).trace) = 0.
-PROVIDED SOLUTION
-Since A.H.eigenvalues i = 0, the i-th eigenvector vᵢ = A.H.eigenvectorBasis i is in ker A
-(because A vᵢ = λᵢ vᵢ = 0).
-Since ker A ≤ ker C, vᵢ ∈ ker C, so C.mat.mulVec vᵢ = 0.
-Then Tr(C.mat * Pᵢ) = Tr(C.mat * |vᵢ⟩⟨vᵢ|) = ⟨vᵢ| C |vᵢ⟩ = (star vᵢ) ⋅ (C.mat.mulVec vᵢ) = (star vᵢ) ⋅ 0 = 0.
--/
-set_option maxHeartbeats 400000 in
-private lemma eigenproj_coeff_zero_of_ker_le (C A : HermitianMat d ℂ) (hC : 0 ≤ C) (hA : 0 ≤ A)
-    (hker : A.ker ≤ C.ker) (i : d) (hi : A.H.eigenvalues i = 0) :
+private lemma eigenproj_coeff_zero_of_ker_le {A C : HermitianMat d 𝕜}
+    (hker : A.ker ≤ C.ker) {i : d} (hi : A.H.eigenvalues i = 0) :
     RCLike.re ((C.mat * (A.H.eigenvectorUnitary.val * Matrix.single i i 1 * A.H.eigenvectorUnitary.val.conjTranspose)).trace) = 0 := by
-  have h_eigenvector_in_ker : (A.H.eigenvectorBasis i) ∈ LinearMap.ker (Matrix.toEuclideanLin A.mat) := by
-    have := Matrix.IsHermitian.mulVec_eigenvectorBasis A.H i; aesop;
   have h_eigenvector_in_ker_C : C.mat.mulVec (A.H.eigenvectorBasis i) = 0 := by
-    exact hker h_eigenvector_in_ker;
+    have h_eigenvector_in_ker : (A.H.eigenvectorBasis i) ∈ LinearMap.ker A.lin := by
+      simpa [hi] using A.H.mulVec_eigenvectorBasis i
+    exact hker h_eigenvector_in_ker
   have h_trace_zero : (C.mat * (A.H.eigenvectorUnitary.val * Matrix.single i i 1 * A.H.eigenvectorUnitary.val.conjTranspose)).trace = (star (A.H.eigenvectorBasis i)) ⬝ᵥ (C.mat.mulVec (A.H.eigenvectorBasis i)) := by
-    simp +decide [ Matrix.trace, Matrix.mulVec, dotProduct ];
-    simp +decide [ Matrix.mul_apply, Matrix.single, Matrix.conjTranspose_apply ];
-    simp +decide [ Finset.sum_ite, Finset.filter_eq, Finset.filter_and, mul_assoc, mul_comm, mul_left_comm, Finset.mul_sum _ _ _ ];
-    exact Finset.sum_congr rfl fun j hj => Finset.sum_congr rfl fun k hk => by rw [ Finset.sum_eq_single i ] <;> aesop;
-  aesop
+    simp [Matrix.trace, Matrix.mulVec, dotProduct]
+    simp [Matrix.mul_apply, Matrix.single, Matrix.conjTranspose_apply]
+    simp [Finset.sum_ite, Finset.filter_eq, Finset.filter_and, mul_comm, mul_left_comm, Finset.mul_sum]
+    refine Finset.sum_congr rfl fun j hj => Finset.sum_congr rfl fun k hk => ?_
+    rw [Finset.sum_eq_single i] <;> aesop
+  simp [h_eigenvector_in_ker_C, h_trace_zero]
 
-/-
-PROBLEM
-For PSD A, C ≥ 0 with ker A ≤ ker C, show the inner product
-⟪C, (A + ε • 1).log⟫ converges to ⟪C, A.log⟫ as ε → 0⁺.
-PROVIDED SOLUTION
-Rewrite using `log_add_eps_eq_cfc`: (A + ε•1).log = A.cfc (fun u => log(u + ε)).
-Using `inner_cfc_eq_sum`, the inner product becomes:
-  ⟪C, (A + ε•1).log⟫ = ∑ i, log(λᵢ + ε) * cᵢ
-  ⟪C, A.log⟫ = ∑ i, log(λᵢ) * cᵢ
-The difference is ∑ i, (log(λᵢ + ε) - log(λᵢ)) * cᵢ.
-For each i:
-  - If λᵢ = 0: cᵢ = 0 by `eigenproj_coeff_zero_of_ker_le`, so the term is 0 for all ε.
-  - If λᵢ > 0: log(λᵢ + ε) → log(λᵢ) as ε → 0, so the term → 0.
-This is a finite sum where each term → 0, so the total → 0.
-Use `tendsto_finset_sum` and case split on whether λᵢ = 0 or > 0.
--/
-private lemma inner_log_shift_tendsto (C A : HermitianMat d ℂ) (hC : 0 ≤ C) (hA : 0 ≤ A)
-    (hker : A.ker ≤ C.ker) :
-    Filter.Tendsto (fun (ε : ℝ) => ⟪C, (A + ε • (1 : HermitianMat d ℂ)).log⟫)
-      (nhdsWithin 0 (Set.Ioi 0)) (nhds ⟪C, A.log⟫) := by
-  -- By definition of $cfc$, we can write
-  have h_cfc : ∀ ε : ℝ, (A + ε • (1 : HermitianMat d ℂ)).log = A.cfc (fun u => Real.log (u + ε)) := by
-    -- By definition of log, we know that (A + εI).log = cfc (fun u => log(u + ε)).
-    intros ε
-    apply log_add_eps_eq_cfc;
-  -- Using the fact that the logarithm function is continuous, we can bring the limit inside the sum.
-  have h_log_cont : Filter.Tendsto (fun ε : ℝ => ∑ i : d, Real.log ((A.H.eigenvalues i) + ε) * RCLike.re ((C.mat * (A.H.eigenvectorUnitary.val * Matrix.single i i 1 * A.H.eigenvectorUnitary.val.conjTranspose)).trace)) (nhdsWithin 0 (Set.Ioi 0)) (nhds (∑ i : d, Real.log ((A.H.eigenvalues i) + 0) * RCLike.re ((C.mat * (A.H.eigenvectorUnitary.val * Matrix.single i i 1 * A.H.eigenvectorUnitary.val.conjTranspose)).trace))) := by
-    refine' tendsto_finset_sum _ fun i _ => _;
-    by_cases hi : A.H.eigenvalues i = 0;
-    · have := eigenproj_coeff_zero_of_ker_le C A hC hA hker i hi; aesop;
-    · exact Filter.Tendsto.mul ( Filter.Tendsto.log ( tendsto_const_nhds.add ( Filter.tendsto_id.mono_left inf_le_left ) ) ( by simpa [ hi ] ) ) tendsto_const_nhds;
-  convert h_log_cont using 2 <;> simp +decide [ h_cfc, inner_cfc_eq_sum ];
-  convert inner_cfc_eq_sum C A ( fun u => Real.log u ) using 1
+open scoped Topology in
+private lemma inner_log_shift_tendsto {A C : HermitianMat d 𝕜} (hker : A.ker ≤ C.ker) :
+    (𝓝[>] 0).Tendsto (fun (ε : ℝ) ↦ ⟪C, (A + ε • 1).log⟫) (𝓝 ⟪C, A.log⟫) := by
+  simp only [log_add_eps_eq_cfc A]
+  simp only [inner_cfc_eq_sum, HermitianMat.log]
+  refine tendsto_finset_sum _ fun i _ ↦ ?_
+  by_cases hi : A.H.eigenvalues i = 0
+  · simp [eigenproj_coeff_zero_of_ker_le hker hi]
+  · have h := log_add_eps_eq_cfc A
+    simp_rw [HermitianMat.log] at h
+    refine Filter.Tendsto.mul ?_ tendsto_const_nhds
+    conv in 𝓝 (Real.log _) => rw [← add_zero (A.H.eigenvalues i)]
+    apply (tendsto_const_nhds.add (Filter.tendsto_id.mono_left inf_le_left)).log
+    rwa [add_zero]
 
-/-
-PROBLEM
-If A is PSD with A ≤ B, C ≥ 0, and ker(A) ≤ ker(C),
-show ⟪C, A.log⟫ ≤ ⟪C, B.log⟫.
-PROVIDED SOLUTION
-Use `le_of_tendsto_of_tendsto` with:
-- f = fun ε => ⟪C, (A + ε • 1).log⟫, which tends to ⟪C, A.log⟫ by `inner_log_shift_tendsto C A hC hA hker`
-- g = fun ε => ⟪C, (B + ε • 1).log⟫, which tends to ⟪C, B.log⟫ by `inner_log_shift_tendsto C B hC hB hkerB`
-  where hB := le_trans hA hAB, hkerB := le_trans (HermitianMat.ker_antitone hA hAB) hker
-- For the eventual inequality: for ε > 0,
-  `inner_log_mono_of_posDef_of_le C hC (posDef_add_eps hA hε) (add_le_add_right hAB _)`
-  gives ⟪C, (A + ε•1).log⟫ ≤ ⟪C, (B + ε•1).log⟫.
-Use `Filter.Eventually.filter_mono nhdsWithin_le_nhds` to get the eventually condition
-from `nhds` to `nhdsWithin`.
--/
-private lemma inner_log_mono_of_psd_of_le (C : HermitianMat d ℂ) (hC : 0 ≤ C)
-    {A B : HermitianMat d ℂ} (hA : 0 ≤ A) (hAB : A ≤ B) (hker : A.ker ≤ C.ker) :
+private lemma HermitianMat.inner_log_mono_of_psd_of_le {A B C : HermitianMat d ℂ}
+    (hA : 0 ≤ A) (hAB : A ≤ B) (hC : 0 ≤ C) (hker : A.ker ≤ C.ker) :
     ⟪C, A.log⟫ ≤ ⟪C, B.log⟫ := by
-  have hB : 0 ≤ B := le_trans hA hAB
-  have hkerB : B.ker ≤ C.ker := le_trans (HermitianMat.ker_antitone hA hAB) hker
-  have hA_tendsto := inner_log_shift_tendsto C A hC hA hker
-  have hB_tendsto := inner_log_shift_tendsto C B hC hB hkerB
-  have h_eventually : ∀ᶠ ε in nhdsWithin (0 : ℝ) (Set.Ioi 0),
-      ⟪C, (A + ε • (1 : HermitianMat d ℂ)).log⟫ ≤ ⟪C, (B + ε • (1 : HermitianMat d ℂ)).log⟫ := by
-    apply eventually_nhdsWithin_of_forall
-    intro ε hε
-    exact inner_log_mono_of_posDef_of_le C hC (posDef_add_eps hA hε) (add_le_add_right hAB _)
-  exact le_of_tendsto_of_tendsto (b := nhdsWithin (0 : ℝ) (Set.Ioi 0))
-    hA_tendsto hB_tendsto h_eventually
+  open scoped Topology in
+  have h_eventually : ∀ᶠ ε in 𝓝[>] (0 : ℝ),
+      ⟪C, (A + ε • 1).log⟫ ≤ ⟪C, (B + ε • 1).log⟫ := by
+    refine eventually_nhdsWithin_of_forall fun ε hε ↦ ?_
+    exact inner_log_mono_of_posDef_of_le hC (posDef_add_eps hA hε) (add_le_add_right hAB _)
+  refine le_of_tendsto_of_tendsto ?_ ?_ h_eventually
+  · exact inner_log_shift_tendsto hker
+  · apply inner_log_shift_tendsto
+    exact (ker_antitone hA hAB).trans hker
 
-/-
-PROBLEM
-When σ₂ ≤ α • σ₁, ker σ₂ ≤ ker ρ, and ker σ₁ ≤ ker ρ,
-show the real-valued inequality ⟪ρ.M, σ₂.M.log - σ₁.M.log⟫ ≤ Real.log α.
-
-PROVIDED SOLUTION
-Decompose:
-  ⟪ρ.M, log σ₂ - log σ₁⟫ = ⟪ρ.M, log σ₂ - log(α σ₁)⟫ + ⟪ρ.M, log(α σ₁) - log σ₁⟫
-
-For the second term: by `HermitianMat.log_smul_of_pos` (using (pos_of_MState_le_smul hσ).ne'),
-  log(α σ₁) = log α • supportProj(σ₁) + log σ₁
-so log(α σ₁) - log σ₁ = log α • supportProj(σ₁).
-And ⟪ρ.M, log α • supportProj(σ₁)⟫ = log α * ⟪ρ.M, supportProj(σ₁)⟫
-  = log α * ρ.M.trace (by `HermitianMat.inner_supportProj_of_ker_le` since ker σ₁ ≤ ker ρ)
-  = log α * 1 = log α (by `MState.tr`).
-
-For the first term: by `inner_log_mono_of_psd_of_le` with C = ρ.M, A = σ₂.M,
-B = α • σ₁.M, ker(σ₂.M) ≤ ker(ρ.M), we get
-⟪ρ.M, σ₂.M.log⟫ ≤ ⟪ρ.M, (α • σ₁.M).log⟫, so ⟪ρ.M, log σ₂ - log(α σ₁)⟫ ≤ 0.
-
-Total: ≤ 0 + log α = log α.
--/
-private lemma inner_log_sub_le_log_alpha (ρ : MState d) {σ₁ σ₂ : MState d} {α : ℝ}
+private lemma HermitianMat.inner_log_sub_le_log_alpha (ρ : MState d) {σ₁ σ₂ : MState d} {α : ℝ}
     (hσ : σ₂.M ≤ α • σ₁.M)
     (hker₁ : σ₁.M.ker ≤ ρ.M.ker) (hker₂ : σ₂.M.ker ≤ ρ.M.ker) :
     ⟪ρ.M, σ₂.M.log - σ₁.M.log⟫ ≤ Real.log α := by
   have h_log_mono : ⟪ρ.M, σ₂.M.log - (α • σ₁.M).log⟫ ≤ 0 := by
     have h_log_mono : ⟪ρ.M, σ₂.M.log⟫ ≤ ⟪ρ.M, (α • σ₁.M).log⟫ := by
-      exact inner_log_mono_of_psd_of_le _ ρ.nonneg σ₂.nonneg hσ hker₂
+      exact inner_log_mono_of_psd_of_le σ₂.nonneg hσ ρ.nonneg hker₂
     simpa [inner_sub_right] using sub_nonpos_of_le h_log_mono
   have h_log_smul : (α • σ₁.M).log = (Real.log α) • σ₁.M.supportProj + σ₁.M.log := by
     apply HermitianMat.log_smul_of_pos
@@ -1399,28 +1226,6 @@ private lemma inner_log_sub_le_log_alpha (ρ : MState d) {σ₁ σ₂ : MState d
     rw [HermitianMat.inner_supportProj_of_ker_le hker₁, ρ.tr]
   simp_all [← add_assoc, inner_add_right, inner_smul_right]
 
-/-
-PROBLEM
-The original statement had `σ₁.M ≤ α • σ₂.M` in the hypothesis, but that is
-incorrect (counterexample: σ₁ = |0⟩⟨0|, σ₂ = I/2, ρ = |1⟩⟨1|, α = 2 gives
-D(ρ‖σ₁) = ⊤ > D(ρ‖σ₂) + log 2). The corrected hypothesis is `σ₂.M ≤ α • σ₁.M`.
-
-Show that if σ₂.M ≤ α • σ₁.M then D(ρ‖σ₁) ≤ D(ρ‖σ₂) + log α.
-
-PROVIDED SOLUTION
-Using `pos_of_MState_le_smul` to get α > 0, and `HermitianMat.ker_le_of_le_smul`
-to get ker(σ₁) ≤ ker(σ₂).
-
-Case 1: If ¬(ker σ₂ ≤ ker ρ), then D(ρ‖σ₂) = ⊤, so the RHS = ⊤, trivially true.
-Case 2: ker σ₂ ≤ ker ρ. Then ker σ₁ ≤ ker σ₂ ≤ ker ρ, so both D-values are finite NNReals.
-  Use `qRelativeEnt_ker` to get D(ρ‖σ₁).toEReal = ⟪ρ.M, ρ.M.log - σ₁.M.log⟫
-  and D(ρ‖σ₂).toEReal = ⟪ρ.M, ρ.M.log - σ₂.M.log⟫.
-  Use `inner_log_sub_le_log_alpha` to get ⟪ρ.M, σ₂.M.log - σ₁.M.log⟫ ≤ log α.
-  Then D(ρ‖σ₁) ≤ D(ρ‖σ₂) + log α follows by manipulating the inner products
-  (subtracting the log ρ terms) and converting between EReal and ENNReal.
-  Specifically: D(ρ‖σ₁) - D(ρ‖σ₂) = ⟪ρ.M, σ₂.M.log - σ₁.M.log⟫ ≤ log α,
-  so D(ρ‖σ₁) ≤ D(ρ‖σ₂) + log α. Use `ENNReal.toReal_le_toReal` or similar.
--/
 theorem qRelEntropy_le_add_of_le_smul (ρ : MState d) {σ₁ σ₂ : MState d} (hσ : σ₂.M ≤ α • σ₁.M) :
     𝐃(ρ‖σ₁) ≤ 𝐃(ρ‖σ₂) + ENNReal.ofReal (Real.log α)
     := by
@@ -1429,7 +1234,7 @@ theorem qRelEntropy_le_add_of_le_smul (ρ : MState d) {σ₁ σ₂ : MState d} (
   · by_cases hker₁ : σ₁.M.ker ≤ ρ.M.ker;
     · -- Using `qRelativeEnt_ker` to get D(ρ‖σ₁).toEReal = ⟪ρ.M, ρ.M.log - σ₁.M.log⟫
       have h_log : ⟪ρ.M, σ₂.M.log - σ₁.M.log⟫ ≤ Real.log α := by
-        apply inner_log_sub_le_log_alpha
+        apply HermitianMat.inner_log_sub_le_log_alpha
         · exact hσ
         · exact hker₁
         · exact hker
@@ -1452,84 +1257,6 @@ theorem qRelEntropy_le_add_of_le_smul (ρ : MState d) {σ₁ σ₂ : MState d} (
       exact hker₁ (hker_le.trans hker)
   · simp [hker, SandwichedRelRentropy, qRelativeEnt]
 
-/-- "Formula for conversion from operator inequality to quantum relative entropy",
-Proposition S17 of https://arxiv.org/pdf/2401.01926v2
-
-Relevant snippet:
-
-\begin{proposition}[Formula for conversion from operator inequality to quantum relative entropy]
-    \label{prp:conversion}
-    For any states $\rho,\sigma\in\mathcal{D}\qty(\mathcal{H})$ of any $d$-dimensional system $\mathcal{H}$ and any $\alpha>0$, if it holds that
-    \begin{equation}
-    \label{eq:rho_alpha_sigma}
-        \rho\leq\alpha\sigma,
-    \end{equation}
-    then we have
-    \begin{equation}
-        D\left(\rho\middle|\middle|\sigma\right) \leq \log_2\qty(\alpha).
-    \end{equation}
-    \end{proposition}
-
-    \begin{proof}
-    The issue here is that if the supports of $\rho$ and $\sigma$ are different, it is not possible to take $\log_2$ of the operators $\rho$ and $\sigma$ directly at the same time.
-    To address this issue, we fix an arbitrarily small parameter $\delta$ satisfying $0 < \delta\leq \frac{1}{4}$ and, in place of $\rho$, consider an operator
-    \begin{equation}
-        \frac{\rho+\delta\sigma}{1+\delta},
-    \end{equation}
-    which has the same support as $\sigma$ since the support of $\sigma$ satisfying~\eqref{eq:rho_alpha_sigma} always includes the support of $\rho$.
-
-    From~\eqref{eq:rho_alpha_sigma}, it follows that
-    \begin{equation}
-        \frac{\rho+\delta\sigma}{1+\delta}\leq
-        \frac{\alpha+\delta}{1+\delta}\sigma.
-    \end{equation}
-    Then, due to the operator monotonicity of the logarithm,
-    within the support of $\sigma$, it holds that
-    \begin{equation}
-    \label{eq:operator2}
-        \log_2\qty(\frac{\rho+\delta\sigma}{1+\delta})\leq
-        \log_2\qty(\frac{\alpha+\delta}{1+\delta}\sigma).
-    \end{equation}
-    Thus, we have
-    \begin{align}
-       \label{eq:limit_delta}
-        &\Tr\qty[\frac{\rho+\delta\sigma}{1+\delta}\log_2\qty(\frac{\rho+\delta\sigma}{1+\delta})]
-        \leq\Tr\qty[\frac{\rho+\delta\sigma}{1+\delta}
-        \log_2\qty(\frac{\alpha+\delta}{1+\delta}\sigma)].
-    \end{align}
-    We will take the limit of $\delta\to 0$ to obtain the desired bound of the quantum relative entropy.
-    On the one hand, due to
-    \begin{equation}
-       \label{eq:limit_delta_1}
-       \left\|\frac{\rho+\delta\sigma}{1+\delta}-\rho\right\|_1 \leq\left\|\frac{\delta}{1+\delta}\rho\right\|_1 + \left\|\frac{\delta}{1+\delta}\sigma\right\|_1 \leq 2\delta,
-    \end{equation}
-    using Lemma~\ref{lem:asymptotic_continuity_quantum_entorpy},
-    we can evaluate the left-hand side of~\eqref{eq:limit_delta} by
-    \begin{align}
-    \left|\Tr\qty[\frac{\rho+\delta\sigma}{1+\delta}\log_2\qty(\frac{\rho+\delta\sigma}{1+\delta})]-\Tr\qty[\rho\log_2\qty(\rho)]\right|\leq4\delta\log_2(d)+h(4\delta)
-    \to 0\quad\text{as $\delta\to 0$},
-    \end{align}
-    where $h$ is the binary entropy function in~\eqref{eq:binary_entropy}.
-    On the other hand,
-    we can evaluate the right-hand side of~\eqref{eq:limit_delta} by
-    \begin{align}
-        &\Tr\qty[\frac{\rho + \delta\sigma}{1+\delta}\log_2\qty(\frac{\alpha+\delta}{1+\delta}\sigma)] \nonumber \\
-        &=\frac{\Tr\qty[\rho\log_2\qty(\sigma)]+\log_2\qty(\alpha+\delta)-\log_2\qty(1+\delta)}{1+\delta}+\frac{\delta\qty(\Tr\qty[\sigma\log_2\qty(\sigma)]+\log_2\qty(\alpha+\delta)-\log_2\qty(1+\delta))}{1+\delta}\\
-        \label{eq:limit_delta_2}
-        &\to\Tr\qty[\rho\log_2\qty(\sigma)]+\log_2\qty(\alpha)\quad\text{as $\delta\to 0$}.
-    \end{align}
-    As a whole, since the choice of $\delta>0$ can be arbitrarily small, we obtain from~\eqref{eq:limit_delta},~\eqref{eq:limit_delta_1} and~\eqref{eq:limit_delta_2}
-    \begin{align}
-        &\Tr\qty[\rho\log_2\qty(\rho)]\leq \Tr\qty[\rho\log_2\qty(\sigma)]+\log_2\qty(\alpha).
-    \end{align}
-    Thus, by definition of the quantum relative entropy in~\eqref{eq:relative_entropy}, we have
-    \begin{align}
-        &D\left(\rho\middle|\middle|\sigma\right)\leq\log_2\qty(\alpha).
-    \end{align}
-
-    \end{proof}
-
--/
-theorem qRelativeEnt_op_le {ρ σ : MState d} (hpos : 0 < α) (h : ρ.M ≤ α • σ.M) :
-    𝐃(ρ‖σ) ≤ ENNReal.ofReal (Real.log α) := by
-  have := @qRelEntropy_le_add_of_le_smul d _ _ α ρ σ ρ; aesop;
+theorem qRelativeEnt_op_le {ρ σ : MState d} (h : ρ.M ≤ α • σ.M) :
+    𝐃(ρ‖σ) ≤ .ofReal (Real.log α) := by
+  simpa using qRelEntropy_le_add_of_le_smul ρ h
