@@ -515,7 +515,7 @@ And A.cfc(if · = 0 then 0 else 1) = A.supportProj (by supportProj_eq_cfc).
 Use cfc_congr_of_nonneg with hA to match the functions on the spectrum.
 -/
 lemma HermitianMat.rpow_neg_mul_rpow_eq_supportProj
-    (A : HermitianMat d ℂ) (hA : 0 ≤ A) (p : ℝ) (hp : p ≠ 0) :
+    {A : HermitianMat d ℂ} (hA : 0 ≤ A) {p : ℝ} (hp : p ≠ 0) :
     (A ^ (-p)).mat * (A ^ p).mat = A.supportProj.mat := by
   unfold HermitianMat.supportProj;
   have h_cfc : (A ^ (-p)).mat * (A ^ p).mat = (A.cfc (fun x => x ^ (-p))) * (A.cfc (fun x => x ^ p)) := by
@@ -649,209 +649,65 @@ lemma supportProj_inner_density (h : σ.M.ker ≤ ρ.M.ker) :
     HermitianMat.trace_eq_re_trace]
   simp [MState.tr']
 
+--PULLOUT
+@[simp]
+theorem HermitianMat.rpow_zero (A : HermitianMat d ℂ) : A ^ (0 : ℝ) = 1 := by
+  simp [rpow_eq_cfc]
+
 /-
-PROBLEM
 ⟪ρ.M.conj (σ.M ^ t).mat, σ.M ^ (-2 * t)⟫_ℝ = 1 for density matrices ρ, σ with ker(σ) ≤ ker(ρ).
-
-PROVIDED SOLUTION
-Case t = 0: σ.M ^ 0 = 1, conj by identity is identity (HermitianMat.conj_one),
-  σ.M ^ (-2 * 0) = σ.M ^ 0 = 1, so ⟪ρ.M, 1⟫ = Tr[ρ] = 1 by HermitianMat.inner_one and MState.tr.
-
-Case t ≠ 0:
-Step 1: Use HermitianMat.inner_eq_trace_rc to convert:
-  ⟪A, B⟫ = (A.mat * B.mat).trace where A = ρ.M.conj (σ.M^t).mat, B = σ.M^{-2t}.
-
-Step 2: Use HermitianMat.conj_apply_mat:
-  A.mat = (σ.M^t).mat * ρ.M.mat * ((σ.M^t).mat).conjTranspose
-  = (σ.M^t).mat * ρ.mat * (σ.M^t).mat  (by HermitianMat.conjTranspose_mat)
-
-So A.mat * B.mat = (σ^t).mat * ρ.mat * (σ^t).mat * (σ^{-2t}).mat
-
-Step 3: Use Matrix.trace_mul_comm to rearrange:
-  Tr[(σ^t * ρ * (σ^t)) * (σ^{-2t})]  -- 4-fold product as 2×2
-  = Tr[(σ^{-2t}) * (σ^t * ρ * (σ^t))]  -- by trace_mul_comm with M = σ^t * ρ * σ^t, N = σ^{-2t}
-  This gives: Tr[(σ^{-2t}).mat * ((σ^t).mat * ρ.mat * (σ^t).mat)]
-
-Step 4: Reassociate:
-  = Tr[((σ^{-2t}).mat * (σ^t).mat) * ρ.mat * (σ^t).mat]
-
-Step 5: Use ← HermitianMat.mat_rpow_add σ.nonneg (show -2*t + t ≠ 0 by linarith-or-ring):
-  (σ^{-2t}).mat * (σ^t).mat = (σ^{-2t + t}).mat = (σ^{-t}).mat
-
-So Tr[(σ^{-t}).mat * ρ.mat * (σ^t).mat]
-
-Step 6: Use Matrix.trace_mul_comm again (with M = (σ^{-t}).mat * ρ.mat, N = (σ^t).mat):
-  = Tr[(σ^t).mat * (σ^{-t}).mat * ρ.mat]
-
-Hmm, that's in the wrong order. We want (σ^{-t}).mat * (σ^t).mat.
-Try instead: Tr[(σ^{-t}).mat * (ρ.mat * (σ^t).mat)]
-  = Tr[(ρ.mat * (σ^t).mat) * (σ^{-t}).mat]  (by trace_mul_comm)
-  = Tr[ρ.mat * ((σ^t).mat * (σ^{-t}).mat)]  (by assoc)
-
-Hmm, we want (σ^{-t}) * (σ^t) = supportProj, but we have (σ^t) * (σ^{-t}).
-
-Let me try: from Tr[(σ^{-t}).mat * ρ.mat * (σ^t).mat]:
-  = Tr[((σ^{-t}).mat * ρ.mat) * (σ^t).mat]
-  = Tr[(σ^t).mat * ((σ^{-t}).mat * ρ.mat)]  (by trace_mul_comm)
-  = Tr[((σ^t).mat * (σ^{-t}).mat) * ρ.mat]  (by assoc... wait no, wrong direction)
-
-Actually: Tr[(σ^{-t}).mat * ρ.mat * (σ^t).mat]
-  by assoc = Tr[((σ^{-t}).mat) * (ρ.mat * (σ^t).mat)]
-  by trace_mul_comm = Tr[(ρ.mat * (σ^t).mat) * (σ^{-t}).mat]
-  by assoc = Tr[ρ.mat * ((σ^t).mat * (σ^{-t}).mat)]
-
-But (σ^t) * (σ^{-t}) = supportProj too (just negate: use rpow_neg_mul_rpow_eq_supportProj with -t instead of t,
-  since (σ^{-(-t)}).mat * (σ^{-t}).mat = (σ^t).mat * (σ^{-t}).mat).
-
-Wait, rpow_neg_mul_rpow_eq_supportProj says (A^{-p}).mat * (A^p).mat = A.supportProj.mat.
-So with p = -t: (A^t).mat * (A^{-t}).mat = A.supportProj.mat. Yes!
-
-So Tr[ρ.mat * ((σ^t).mat * (σ^{-t}).mat)] = Tr[ρ.mat * σ.M.supportProj.mat]
-= ⟪ρ.M, σ.M.supportProj⟫  (by inner_eq_trace_rc, cast back)
-= ⟪σ.M.supportProj, ρ.M⟫  (by inner_comm)
-= 1  (by supportProj_inner_density h)
-
-Key lemmas to use:
-- HermitianMat.inner_eq_trace_rc
-- HermitianMat.conj_apply_mat
-- HermitianMat.conjTranspose_mat
-- Matrix.trace_mul_comm
-- Matrix.mul_assoc
-- HermitianMat.mat_rpow_add σ.nonneg (show -2*t + t ≠ 0 from by linarith [ht])
-- HermitianMat.rpow_neg_mul_rpow_eq_supportProj σ.M σ.nonneg (-t) (neg_ne_zero.mpr ht)
-- supportProj_inner_density h
 -/
 private lemma sandwiched_inner_eq_one (h : σ.M.ker ≤ ρ.M.ker) (t : ℝ) :
     ⟪ρ.M.conj (σ.M ^ t).mat, σ.M ^ (-2 * t)⟫_ℝ = 1 := by
-  by_cases ht : t = 0
-  · -- Case t = 0
-    subst ht
-    simp only [mul_zero, neg_zero, show σ.M ^ (0 : ℝ) = 1 from by simp [HermitianMat.rpow_eq_cfc]]
-    rw [show (1 : HermitianMat d ℂ).mat = (1 : Matrix d d ℂ) from rfl, HermitianMat.conj_one]
-    rw [HermitianMat.inner_one]
-    exact ρ.tr
-  · -- Case t ≠ 0
-    -- Step 1: Convert inner product to trace
-    rw [HermitianMat.inner_def]
-    -- Goal: selfadjMap Tr[(conj ...).mat * (σ^{-2t}).mat] = 1
-    -- Step 2: Expand conj
-    rw [HermitianMat.conj_apply_mat, HermitianMat.conjTranspose_mat]
-    -- Goal: selfadjMap Tr[(σ^t * ρ * σ^t) * σ^{-2t}] = 1
-    -- Step 3: Trace cyclicity: Tr[ABCD] = Tr[DABC]
-    rw [Matrix.trace_mul_comm ((σ.M ^ t).mat * ρ.M.mat * (σ.M ^ t).mat) (σ.M ^ (-2 * t)).mat]
-    -- Goal: selfadjMap Tr[σ^{-2t} * (σ^t * ρ * σ^t)] = 1
-    -- Step 4: Reassociate to extract σ^{-2t} * σ^t
-    have h_combine : (σ.M ^ (-2 * t)).mat * (σ.M ^ t).mat = (σ.M ^ (-t)).mat := by
-      conv_rhs => rw [show (-t : ℝ) = -2 * t + t from by ring]
-      exact (HermitianMat.mat_rpow_add σ.nonneg (by intro h'; apply ht; linarith)).symm
+  rcases eq_or_ne t 0 with rfl | ht
+  · simp
+  · have h_combine : (σ.M ^ (-2 * t)).mat * (σ.M ^ t).mat = (σ.M ^ (-t)).mat := by
+      rw [show (-t : ℝ) = -2 * t + t by ring, HermitianMat.mat_rpow_add σ.nonneg]
+      contrapose! ht
+      linarith
     have h_support : (σ.M ^ t).mat * (σ.M ^ (-t)).mat = σ.M.supportProj.mat := by
-      have := HermitianMat.rpow_neg_mul_rpow_eq_supportProj σ.M σ.nonneg (-t) (neg_ne_zero.mpr ht)
-      simp only [neg_neg] at this
-      exact this
-    -- Rewrite: Tr[σ^{-2t} * (σ^t * ρ * σ^t)]
-    -- = Tr[(σ^{-2t} * (σ^t * ρ)) * σ^t]  (by ← mul_assoc)
-    rw [← Matrix.mul_assoc (σ.M ^ (-2 * t)).mat ((σ.M ^ t).mat * ρ.M.mat) (σ.M ^ t).mat]
-    -- = Tr[((σ^{-2t} * σ^t) * ρ) * σ^t]  (by ← mul_assoc)
-    rw [← Matrix.mul_assoc (σ.M ^ (-2 * t)).mat (σ.M ^ t).mat ρ.M.mat]
-    rw [h_combine]
-    -- = Tr[(σ^{-t} * ρ) * σ^t]
-    -- = Tr[σ^t * (σ^{-t} * ρ)]  (trace_mul_comm)
-    rw [Matrix.trace_mul_comm ((σ.M ^ (-t)).mat * ρ.M.mat) (σ.M ^ t).mat]
-    -- = Tr[(σ^t * σ^{-t}) * ρ]  (← mul_assoc)
-    rw [← Matrix.mul_assoc, h_support]
-    -- = Tr[supportProj * ρ] = ⟪supportProj, ρ⟫ = 1
-    rw [← HermitianMat.inner_def]
+      rw [← neg_ne_zero] at ht
+      simpa only [neg_neg] using σ.M.rpow_neg_mul_rpow_eq_supportProj σ.nonneg ht
+    rw [HermitianMat.inner_def, HermitianMat.conj_apply_mat, HermitianMat.conjTranspose_mat]
+    rw [Matrix.trace_mul_comm, ← mul_assoc, ← mul_assoc, h_combine]
+    rw [Matrix.trace_mul_cycle, h_support, ← HermitianMat.inner_def]
     exact supportProj_inner_density h
 
-/-
-PROBLEM
-Show that for density matrices ρ, σ (PSD with trace 1) and α > 1,
-Tr[(σ^t ρ σ^t)^α] ≥ 1, where t = (1-α)/(2α).
-
-1 ≤ Tr[(conj(σ^t, ρ))^α] for α > 1, with t = (1-α)/(2α).
-
-PROVIDED SOLUTION
-Set A = ρ.M.conj (σ^t).mat, B = σ^{-2t} = σ^{(α-1)/α}.
-Both are PSD. By sandwiched_inner_eq_one: ⟪A, B⟫ = 1.
-
-By inner_le_trace_rpow_mul with exponents p = α > 1, q = α/(α-1):
-  1 = ⟪A, B⟫ ≤ Tr[A^α]^{1/α} * Tr[B^q]^{1/q}
-
-Compute -2t * q:
-  -2t = -(1-α)/α = (α-1)/α
-  q = α/(α-1)
-  -2t * q = (α-1)/α * α/(α-1) = 1
-  So Tr[B^q] = Tr[σ^{(α-1)/α * α/(α-1)}] = Tr[σ^1] = Tr[σ] = 1.
-  Tr[B^q]^{1/q} = 1.
-
-So 1 ≤ Tr[A^α]^{1/α} * 1 = Tr[A^α]^{1/α}.
-Since 1/α > 0: Tr[A^α] ≥ 1.
-
-Note: need 1/p + 1/q = 1/α + (α-1)/α = 1 ✓.
-Also need σ^{-2t} = σ^{(α-1)/α} PSD: true since σ PSD.
-
-Use rpow_mul to simplify B^q = σ^{(α-1)/α * α/(α-1)} = σ^1.
-Use MState.tr for Tr[σ] = 1.
-Let A = ρ.M.conj (σ^t).mat, B = σ^{-2t}. Set q = α/(α-1). Then:
-
-1. ⟪A, B⟫ = 1 by sandwiched_inner_eq_one h t (already proved).
-
-2. Need 1/α + 1/q = 1 (conjugate exponents). Since q = α/(α-1):
-   1/q = (α-1)/α, so 1/α + (α-1)/α = 1. ✔️
-   Prove: have hpq : 1/α + (α - 1)/α = 1 := by ring.
-   Then convert to 1/α + 1/(α/(α-1)) = 1 since (α-1)/α = 1/(α/(α-1)).
-   Actually better: prove the exponent identity as 1/α + (1 - 1/α) = 1.
-
-3. By HermitianMat.inner_le_trace_rpow_mul A B (PSD proofs) α q hα hpq:
-   1 = ⟪A,B⟫ ≤ Tr[A^α]^{1/α} * Tr[B^q]^{1/q}.
-
-4. Compute Tr[B^q]: B^q = (σ^{-2t})^q = σ^{-2t*q} by rpow_mul.
-   -2t*q = -2*(1-α)/(2α) * α/(α-1) = -(1-α)/α * α/(α-1) = 1.
-   So B^q = σ^1 = σ, and Tr[B^q] = 1 by σ.tr.
-
-5. So 1 ≤ Tr[A^α]^{1/α}. Since 1/α > 0 and Tr[A^α] ≥ 0:
-   1 = 1^α ≤ (Tr[A^α]^{1/α})^α = Tr[A^α]^1 = Tr[A^α].
-   Use Real.rpow_le_rpow, Real.one_rpow, Real.rpow_mul.
-
-Key lemmas:
-- sandwiched_inner_eq_one h ((1 - α)/(2 * α))
-- HermitianMat.inner_le_trace_rpow_mul with p = α, q = α/(α-1)
-- HermitianMat.rpow_mul σ.nonneg
-- σ.tr (for Tr[σ] = 1)
-- HermitianMat.conj_nonneg, HermitianMat.rpow_nonneg (for PSD)
-- HermitianMat.trace_nonneg (for nonneg trace of PSD)
-- Real.rpow_le_rpow, Real.one_rpow, Real.rpow_mul
--/
-set_option maxHeartbeats 800000 in
 private theorem sandwiched_trace_of_gt_1 (h : σ.M.ker ≤ ρ.M.ker) (hα : α > 1) :
     1 ≤ ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).mat) ^ α).trace := by
-  -- Let $t = (1 - α) / (2 * α)$.
-  set t : ℝ := (1 - α) / (2 * α);
-  -- Let $A = \rho.M.conj (σ.M ^ t).mat$ and $B = σ.M ^ (-2 * t)$.
-  set A : HermitianMat d ℂ := HermitianMat.conj (σ.M ^ t) ρ.M
-  set B : HermitianMat d ℂ := σ.M ^ (-2 * t);
-  -- By the properties of the trace and the inner product, we have:
-  have h_trace : ⟪A, B⟫ = 1 := by
-    convert sandwiched_inner_eq_one h t using 1
+  -- Let t = (1 - α) / (2 * α), A = ρ.M.conj (σ.M ^ t) and B = σ.M ^ (-2 * t)
+  set t : ℝ := (1 - α) / (2 * α)
+  set A := ρ.M.conj (σ.M ^ t).mat
+  set B := σ.M ^ (-2 * t)
+  have h_trace : ⟪A, B⟫ = 1 := sandwiched_inner_eq_one h t
   have h_inner : ⟪A, B⟫ ≤ (A ^ α).trace ^ (1 / α) * (B ^ (α / (α - 1))).trace ^ (1 / (α / (α - 1))) := by
-    apply_rules [ HermitianMat.inner_le_trace_rpow_mul ];
-    · apply_rules [ HermitianMat.conj_nonneg, ρ.nonneg, σ.nonneg, Real.rpow_nonneg ];
-    · apply_rules [ HermitianMat.rpow_nonneg ];
-      exact σ.nonneg;
-    · rw [ div_div_eq_mul_div, div_add_div, div_eq_iff ] <;> nlinarith [ mul_div_cancel₀ ( α - 1 ) ( by linarith : ( α : ℝ ) ≠ 0 ) ]
+    apply HermitianMat.inner_le_trace_rpow_mul
+    · positivity
+    · exact HermitianMat.rpow_nonneg σ.nonneg --TODO positivity
+    · exact hα
+    · rw [div_div_eq_mul_div, div_add_div, div_eq_iff]
+      · ring
+      · positivity
+      · positivity
+      · positivity
   have h_trace_B : (B ^ (α / (α - 1))).trace = 1 := by
     have hB : B ^ (α / (α - 1)) = σ.M ^ (-2 * t * (α / (α - 1))) := by
-      rw [ ← HermitianMat.rpow_mul ];
-      exact σ.nonneg
-    generalize_proofs at *; (
-    rw [ hB, show -2 * t * ( α / ( α - 1 ) ) = 1 by rw [ mul_div, div_eq_iff ] <;> nlinarith [ mul_div_cancel₀ ( 1 - α ) ( by linarith : ( 2 * α ) ≠ 0 ), mul_div_cancel₀ ( α ) ( by linarith : ( α - 1 ) ≠ 0 ) ] ] ; simp +decide [ Real.rpow_one ] ;)
+      rw [HermitianMat.rpow_mul σ.nonneg]
+    have h : -2 * t * ( α / ( α - 1 ) ) = 1 := by
+      rw [mul_div, div_eq_iff]
+      · linarith [mul_div_cancel₀ (1 - α) (by linarith : (2 * α) ≠ 0)]
+      · linarith only [hα]
+    rw [hB, h]
+    simp
   have h_final : 1 ≤ (A ^ α).trace ^ (1 / α) := by
-    aesop
-  have h_final' : 1 ≤ (A ^ α).trace := by
-    exact le_of_not_gt fun h => h_final.not_lt <| by simpa using Real.rpow_lt_one ( by linarith [ show 0 ≤ ( A ^ α |> HermitianMat.trace ) from by
-                                                                                                    apply_rules [ HermitianMat.trace_nonneg, HermitianMat.rpow_nonneg ];
-                                                                                                    apply_rules [ HermitianMat.conj_nonneg, ρ.nonneg, σ.nonneg, Real.rpow_nonneg, Real.rpow_nonneg ] ] ) h ( by positivity ) ;
-  exact h_final'
+    simpa only [h_trace, one_div, h_trace_B, Real.one_rpow, mul_one] using h_inner
+  have : 0 ≤ (A ^ α).trace := by
+    --TODO: Make this all discharge via just `positivity`.
+    apply HermitianMat.trace_nonneg
+    apply HermitianMat.rpow_nonneg
+    positivity
+  refine le_of_not_gt fun h => h_final.not_gt ?_
+  simpa using Real.rpow_lt_one this h (by positivity)
 
 private theorem sandwichedRelRentropy_nonneg_α_lt_1 (h : σ.M.ker ≤ ρ.M.ker) (hα0 : 0 < α) (hα : α < 1) :
     0 ≤ ((ρ.M.conj (σ.M ^ ((1 - α)/(2 * α)) ).mat) ^ α).trace.log / (α - 1) := by
@@ -1208,10 +1064,6 @@ private theorem sandwichedRelRentropy_additive_alpha_one (ρ₁ σ₁ : MState d
       add_top, dite_eq_right_iff, ENNReal.coe_ne_top, imp_false]
     contrapose! h1
     exact (ker_le_of_ker_kron_le_left ρ₁ σ₁ ρ₂ σ₂) h1
-
-@[simp]
-lemma HermitianMat.rpow_zero (A : HermitianMat d 𝕜) : A ^ (0 : ℝ) = 1 := by
-  simp [rpow_eq_cfc]
 
 open scoped Kronecker in
 omit [DecidableEq d₁] [DecidableEq d₂] in
