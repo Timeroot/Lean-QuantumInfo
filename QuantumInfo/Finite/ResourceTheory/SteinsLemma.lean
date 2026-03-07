@@ -1197,9 +1197,7 @@ private theorem EquationS62
     · intro _ _ hxy; grind
     · exact hEComm ε2 n
     · grw [hR1R2, ← hε₀, add_zero]
-      · apply MState.nonneg
-      · apply MState.nonneg
-      · exact hR2
+      exact hR2
   clear hEComm
 
   have Esum : E1 + E2 + E3 = 1 := by
@@ -1807,13 +1805,13 @@ private theorem Lemma7 (ρ : MState (H i)) {ε : Prob} (hε : 0 < ε ∧ ε < 1)
   have qRel_σ''_le_σ' n : 𝐃(ρ ⊗ᵣ^[n]‖σ'' ρ ε m σ n) ≤ 𝐃(ρ ⊗ᵣ^[n]‖σ' ρ ε m σ n) + ENNReal.ofReal (σ₁_c i n) := by
     rw [← Real.log_exp (σ₁_c i n)]
     apply qRelEntropy_le_add_of_le_smul
-    apply σ''_le_σ'
+    rw [← inv_smul_le_iff_of_pos (by positivity), ← Real.exp_neg]
+    apply σ'_le_σ''
 
   have qRel_σ'_le_σ'' n : 𝐃(ρ ⊗ᵣ^[n]‖σ' ρ ε m σ n) ≤ 𝐃(ρ ⊗ᵣ^[n]‖σ'' ρ ε m σ n) + ENNReal.ofReal (σ₁_c i n) := by
     rw [← Real.log_exp (σ₁_c i n)]
     apply qRelEntropy_le_add_of_le_smul
-    rw [← inv_smul_le_iff_of_pos (by positivity), ← Real.exp_neg]
-    apply σ'_le_σ''
+    apply σ''_le_σ'
 
   -- Definition of the pinching map w.r.t. σ'' in Eq. (S55)
   let ℰ n := pinching_map (σ'' ρ ε m σ n)
