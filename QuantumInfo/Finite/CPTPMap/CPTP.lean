@@ -446,6 +446,232 @@ end unitary
 section purify
 variable [DecidableEq dOut] [Inhabited dOut]
 
+--PULLOUT
+omit [DecidableEq dOut] [Inhabited dOut] in
+/-
+PROBLEM
+If a MatrixMap of_kraus K K is trace-preserving, then Σ_k K_k† K_k = 1.
+
+PROVIDED SOLUTION
+The TP condition says for all X, trace((of_kraus K K) X) = trace(X).
+Unfolding of_kraus: trace(Σ_k K_k X K_k†) = Σ_k trace(K_k† K_k X) (by cycle) = trace((Σ_k K_k† K_k) X).
+So trace(A X) = trace(X) for all X where A = Σ_k K_k† K_k, which means A = 1.
+Use `Matrix.eq_of_trace_mul_eq` or the fact that trace is a faithful pairing on matrices
+to conclude A = 1. The TP condition `Λ.TP` gives us `∀ x, (Λ.map x).trace = x.trace`, and
+since `Λ.map = of_kraus K K`, we substitute and simplify.
+-/
+private lemma kraus_sum_eq_one_of_TP
+    {κ : Type*} [Fintype κ]
+    {K₁ K₂ : κ → Matrix dOut dIn ℂ}
+    (hTP : (MatrixMap.of_kraus K₁ K₂).IsTracePreserving) :
+    ∑ k, (K₂ k).conjTranspose * (K₁ k) = 1 := by
+  ext1 i j
+  have := hTP (Matrix.of fun x y ↦ if x = j then if y = i then 1 else 0 else 0)
+  simp only [Matrix.trace, Matrix.diag_apply, Matrix.of_apply, Finset.sum_ite_eq',
+    Finset.mem_univ, ↓reduceIte] at this
+  convert this using 1
+  · simp [MatrixMap.of_kraus, Matrix.sum_apply, Matrix.mul_apply]
+    rw [Finset.sum_comm]
+    congr! 2
+    ring
+  · simp [Matrix.one_apply, eq_comm]
+
+/-
+PROBLEM
+Given an m × n matrix V over ℂ with V†V = 1, and an injection emb : n ↪ m,
+there exists a unitary matrix U ∈ unitaryGroup m ℂ such that for all i and j,
+U i (emb j) = V i j.
+
+PROVIDED SOLUTION
+The columns of V form an orthonormal set in ℂ^m (this follows from V†V = 1).
+Using the embedding emb, assign each column V_j to position emb(j) in the larger matrix.
+The remaining columns can be filled by extending to an orthonormal basis of ℂ^m.
+This extension exists by `Orthonormal.exists_orthonormalBasis_extension` in Mathlib.
+The resulting matrix has orthonormal columns spanning ℂ^m, hence it is unitary.
+
+Concretely, define the column vectors of V as an orthonormal family in EuclideanSpace ℂ m,
+indexed by the range of emb. Then use `Orthonormal.exists_orthonormalBasis_extension_of_card_eq`
+to extend this to a full OrthonormalBasis. The matrix of this basis is unitary.
+
+Alternatively, use V to define a linear isometry on the subspace spanned by the image
+of emb, then use `LinearIsometry.extend` to extend to the full space. Since in finite
+dimensions a linear isometry from a space to itself is surjective, this gives a
+LinearIsometryEquiv, hence a unitary matrix.
+-/
+set_option maxHeartbeats 1600000 in
+private lemma exists_unitary_extending_isometry
+    {m n : Type*} [Fintype m] [Fintype n] [DecidableEq m] [DecidableEq n]
+    (V : Matrix m n ℂ) (hV : V.conjTranspose * V = 1)
+    (emb : n ↪ m) :
+    ∃ U : 𝐔[m], ∀ i j, U.val i (emb j) = V i j := by
+  -- Let $u_i$ be the $i$-th column of $V$.
+  set u : n → EuclideanSpace ℂ m := fun j => fun i => V i j;
+  -- Since $u$ is an orthonormal set, we can extend it to an orthonormal basis of $\mathbb{C}^m$.
+  obtain ⟨b, hb⟩ : ∃ b : OrthonormalBasis m ℂ (EuclideanSpace ℂ m), ∀ j, b (emb j) = u j := by
+    have h_orthonormal : Orthonormal ℂ (fun j => u j) := by
+      rw [ orthonormal_iff_ite ];
+      intro i j
+      replace hV := congr_fun (congr_fun hV i) j
+      simpa only [ mul_comm, Matrix.mul_apply ] using hV
+    have := Orthonormal.exists_orthonormalBasis_extension_of_card_eq (𝕜 := ℂ) (E := EuclideanSpace ℂ m) (ι := m)
+    simp only [finrank_euclideanSpace, forall_const] at this
+    contrapose! this
+    · refine ⟨fun i => if hi : i ∈ Set.range emb then u (Classical.choose hi) else 0, Set.range emb, ?_, ?_ ⟩
+      · simp +contextual only [Orthonormal, h_orthonormal.1, implies_true, true_and,
+          Set.mem_range, Set.restrict_apply, Subtype.forall, ↓reduceDIte]
+        intro i j hij
+        split_ifs with h₁ h₂
+        · apply h_orthonormal.2
+          have := Classical.choose_spec ‹∃ y, emb y = ↑i›
+          have := Classical.choose_spec ‹∃ y, emb y = ↑j›
+          grind
+        · simp
+        · simp
+        · simp
+      · simp_all only [Orthonormal, ne_eq, Set.mem_range, exists_exists_eq_and,
+          EmbeddingLike.apply_eq_iff_eq, exists_eq, ↓reduceDIte, Classical.choose_eq, implies_true];
+  refine ⟨⟨Matrix.of (fun i j ↦ b j i), ?_⟩, ?_⟩
+  · simp only [Matrix.mem_unitaryGroup_iff]
+    ext1 i j
+    simpa [inner] using b.sum_inner_mul_inner (EuclideanSpace.single i 1) (EuclideanSpace.single j 1)
+  · simp [hb, u]
+
+omit [DecidableEq dOut] [Inhabited dOut] in
+/--
+Given Kraus operators K indexed by (dOut × dIn), define the isometry matrix
+V : Matrix (dIn × dOut × dOut) dIn ℂ by V_{(a, b, d), a'} = (K (b, a))_{d, a'}.
+Then V†V = 1.
+-/
+private lemma purify_isometry_condition
+    {K : (dOut × dIn) → Matrix dOut dIn ℂ}
+    (hTP : ∑ k, (K k).conjTranspose * (K k) = 1) :
+    let V : Matrix (dIn × dOut × dOut) dIn ℂ :=
+      fun ⟨a, b, d⟩ a' => (K (b, a)) d a'
+    V.conjTranspose * V = 1 := by
+  rw [← hTP]
+  ext1 i j
+  simp only [Matrix.mul_apply, Fintype.sum_prod_type];
+  rw [Finset.sum_comm]
+  simp [Matrix.sum_apply, Matrix.mul_apply]
+
+private lemma purify_MState_pure_basis_default_entry (i j : dOut × dOut) :
+    (MState.pure (Ket.basis (default : dOut × dOut))).m i j =
+    if i = default ∧ j = default then 1 else 0 := by
+  change (MState.pure (Ket.basis (default : dOut × dOut))).M.val i j = _
+  simp only [MState.pure, Matrix.vecMulVec_apply, Ket.basis, Ket.to_bra,
+    Braket.instFunLikeKet, Braket.instFunLikeBra]
+  split_ifs <;> simp_all [eq_comm]
+
+omit [Inhabited dOut] in
+private lemma purify_replacement_single_eq (ρ₀ : MState (dOut × dOut)) (b₁ b₂ : dOut × dOut) :
+    ((replacement ρ₀).map (Matrix.single () () 1)) b₁ b₂ = ρ₀.m b₁ b₂ := by
+  open Kronecker in
+  suffices h : (Matrix.single () () 1 ⊗ₖ ρ₀.m).traceLeft = ρ₀.m from
+    congr_fun (congr_fun h b₁) b₂
+  ext : 1
+  simp [Matrix.traceLeft, Matrix.kroneckerMap]
+
+private lemma purify_prep_append_entry (X : Matrix dIn dIn ℂ)
+      (a₁ : dIn) (b₁c₁ : dOut × dOut) (a₂ : dIn) (b₂c₂ : dOut × dOut) :
+    let ρ₀ := MState.pure (Ket.basis (default : dOut × dOut))
+    let zero_prep : CPTPMap Unit (dOut × dOut) := replacement ρ₀
+    let prep := (id ⊗ᶜᵖ zero_prep)
+    let append : CPTPMap dIn (dIn × Unit) := CPTPMap.ofEquiv (Equiv.prodPUnit dIn).symm
+    (prep ∘ₘ append).map X (a₁, b₁c₁) (a₂, b₂c₂) =
+    X a₁ a₂ * ρ₀.m b₁c₁ b₂c₂ := by
+  --TODO Cleanup. The proof tactics aren't too long, but the intermediate state is
+  -- distgusting; probably this can be repackaged as several intermediate simp lemmas
+  -- and generally needs better API.
+  unfold replacement CPTPMap.traceLeft CPTPMap.prod CPTPMap.ofEquiv
+  simp only [id_map, Matrix.traceLeft, Finset.univ_unique, PUnit.default_eq_unit,
+    Finset.sum_singleton, Matrix.kroneckerMap, MState.pure_apply, Equiv.symm_symm]
+  erw [LinearMap.comp_apply, MatrixMap.kron_def]
+  erw [Finset.sum_eq_single a₁]
+  · simp only [Matrix.single]
+    erw [Matrix.of_apply]
+    simp only [Matrix.of_apply]
+    erw [Matrix.of_apply]
+    simp [Matrix.of_apply]
+    ring!
+  · simp +contextual
+  · simp
+
+private lemma purify_conj_entry (X : Matrix dIn dIn ℂ) (U : 𝐔[dIn × dOut × dOut])
+      (i j : dIn × dOut × dOut) :
+    let ρ₀ := MState.pure (Ket.basis (default : dOut × dOut))
+    let zero_prep : CPTPMap Unit (dOut × dOut) := replacement ρ₀
+    let prep := (id ⊗ᶜᵖ zero_prep)
+    let append : CPTPMap dIn (dIn × Unit) := CPTPMap.ofEquiv (Equiv.prodPUnit dIn).symm
+    ((ofUnitary U) ∘ₘ prep ∘ₘ append).map X i j =
+    ∑ α₁ : dIn, ∑ α₂ : dIn,
+      U.val i (α₁, default, default) * X α₁ α₂ *
+      starRingEnd ℂ (U.val j (α₂, default, default)) := by
+  open Kronecker in
+  have h_conj :
+      let ρ₀ := MState.pure (Ket.basis (default : dOut × dOut))
+      let zero_prep : CPTPMap Unit (dOut × dOut) := replacement ρ₀
+      let prep := (id ⊗ᶜᵖ zero_prep)
+      let append : CPTPMap dIn (dIn × Unit) := CPTPMap.ofEquiv (Equiv.prodPUnit dIn).symm
+      (prep ∘ₘ append).map X = X ⊗ₖ (MState.pure (Ket.basis (default : dOut × dOut))).m := by
+    ext ⟨a₁, b₁c₁⟩ ⟨a₂, b₂c₂⟩
+    simp [purify_prep_append_entry]
+  have h_conj :
+      let ρ₀ := MState.pure (Ket.basis (default : dOut × dOut))
+      let zero_prep : CPTPMap Unit (dOut × dOut) := replacement ρ₀
+      let prep := (id ⊗ᶜᵖ zero_prep)
+      let append := CPTPMap.ofEquiv (Equiv.prodPUnit dIn).symm
+      (ofUnitary U).map ((prep ∘ₘ append).map X) i j =
+      ∑ k, ∑ l, U.val i k * (X ⊗ₖ (MState.pure (Ket.basis (default : dOut × dOut))).m) k l * starRingEnd ℂ (U.val j l) := by
+    simp [h_conj, Matrix.kroneckerMap]
+    convert congr_arg (fun m : Matrix (dIn × dOut × dOut) (dIn × dOut × dOut) ℂ => m i j) (show (U.val * (Matrix.of fun i j => X i.1 j.1 * ((Ket.basis default) i.2 * (starRingEnd ℂ) ((Ket.basis default) j.2))) * U.val.conjTranspose) = _ from rfl) using 1
+    simp [Matrix.mul_apply, Matrix.conjTranspose_apply]
+    ring_nf!
+    exact Finset.sum_comm.trans (Finset.sum_congr rfl fun _ _ => by rw [Finset.sum_mul])
+  have h_restrict : ∀ x : dIn × dOut × dOut, (Ket.basis default) x.2 = if x.2 = default then 1 else 0 := by
+    intro x
+    simp [Ket.basis, eq_comm]
+    exact rfl
+  simp_all [Finset.sum_ite]
+  convert h_conj using 1
+  · congr! 1
+    convert congr_arg (fun f => (U.val * f * U.val.conjTranspose)) ‹_› using 1
+  · rw [← Finset.sum_product', ← Finset.sum_product']
+    apply Finset.sum_bij (fun x _ => ((x.1, default, default), (x.2, default, default)))
+    · simp
+      exact fun a b => rfl
+    · simp
+    · simp
+      exact fun _ _ => rfl
+    · simp
+
+private lemma purify_rhs_entry (X : Matrix dIn dIn ℂ) (d₁ d₂ : dOut)
+    (U : 𝐔[dIn × dOut × dOut]) :
+    let ρ₀ := MState.pure (Ket.basis (default : dOut × dOut))
+    let zero_prep : CPTPMap Unit (dOut × dOut) := replacement ρ₀
+    let prep := (id ⊗ᶜᵖ zero_prep)
+    let append : CPTPMap dIn (dIn × Unit) := CPTPMap.ofEquiv (Equiv.prodPUnit dIn).symm
+    (traceLeft ∘ₘ traceLeft ∘ₘ (ofUnitary U) ∘ₘ prep ∘ₘ append).map X d₁ d₂ =
+    ∑ a : dIn, ∑ b : dOut, ∑ α₁ : dIn, ∑ α₂ : dIn,
+      U.val (a, b, d₁) (α₁, default, default) * X α₁ α₂ *
+      starRingEnd ℂ (U.val (a, b, d₂) (α₂, default, default)) := by
+  apply Eq.symm
+  have h := purify_conj_entry X U
+  rw [Finset.sum_comm]
+  exact Finset.sum_congr rfl fun y _ ↦ Finset.sum_congr rfl fun x _ ↦
+    (h (x, y, d₁) (x, y, d₂)).symm
+
+omit [DecidableEq dIn] [DecidableEq dOut] [Inhabited dOut] in
+private lemma purify_of_kraus_entry (K : (dOut × dIn) → Matrix dOut dIn ℂ) (X : Matrix dIn dIn ℂ) (d₁ d₂ : dOut) :
+    (MatrixMap.of_kraus K K) X d₁ d₂ =
+    ∑ k : dOut × dIn, ∑ α₁ : dIn, ∑ α₂ : dIn,
+      (K k) d₁ α₁ * X α₁ α₂ * starRingEnd ℂ ((K k) d₂ α₂) := by
+  have h_lhs : (MatrixMap.of_kraus K K) X = ∑ k, K k * X * (K k).conjTranspose := by
+    simp [MatrixMap.of_kraus]
+  simp only [h_lhs, Matrix.sum_apply, Matrix.mul_apply]
+  simp only [Matrix.conjTranspose_apply, RCLike.star_def, Finset.sum_mul]
+  refine Finset.sum_congr rfl fun _ _ ↦ ?_
+  rw [Finset.sum_comm]
+
 theorem exists_purify (Λ : CPTPMap dIn dOut) :
     ∃ (Λ' : CPTPMap (dIn × dOut × dOut) (dIn × dOut × dOut)),
       Λ'.IsUnitary ∧
@@ -455,8 +681,26 @@ theorem exists_purify (Λ : CPTPMap dIn dOut) :
       let append : CPTPMap dIn (dIn × Unit) := CPTPMap.ofEquiv (Equiv.prodPUnit dIn).symm
       CPTPMap.traceLeft ∘ₘ CPTPMap.traceLeft ∘ₘ Λ' ∘ₘ prep ∘ₘ append
     ) := by
-  obtain ⟨M, hM⟩ := MatrixMap.IsCompletelyPositive.exists_kraus Λ.map Λ.cp
-  sorry
+  obtain ⟨K, hK⟩ := Λ.cp.exists_kraus _
+  have hTP_kraus : ∑ k, (K k).conjTranspose * (K k) = 1 :=
+    kraus_sum_eq_one_of_TP (hK ▸ Λ.TP)
+  let V : Matrix (dIn × dOut × dOut) dIn ℂ :=
+    fun ⟨a, b, d⟩ a' => (K (b, a)) d a'
+  have hV : V.conjTranspose * V = 1 :=
+    purify_isometry_condition hTP_kraus
+  let emb : dIn ↪ (dIn × dOut × dOut) :=
+    ⟨fun a ↦ (a, default, default), fun a₁ a₂ h ↦ by simpa using h⟩
+  obtain ⟨U, hU⟩ := exists_unitary_extending_isometry V hV emb
+  use ofUnitary U, ⟨U, rfl⟩
+  apply CPTPMap.ext
+  ext X d₁ d₂ : 2
+  -- LHS: rewrite using hK and purify_of_kraus_entry
+  -- RHS: use purify_rhs_entry
+  change Λ.map = _ at hK
+  rw [hK, purify_of_kraus_entry, purify_rhs_entry]
+  rw [Fintype.sum_prod_type, Finset.sum_comm]
+  simp only [Function.Embedding.coeFn_mk, emb, V] at hU
+  simp_rw [hU]
 
 /-- Every channel can be written as a unitary channel on a larger system. In general, if
  the original channel was A→B, we may need to go as big as dilating the output system (the
@@ -470,13 +714,6 @@ theorem exists_purify (Λ : CPTPMap dIn dOut) :
  we require a typeclass instance [Inhabited dOut]. -/
 def purify (Λ : CPTPMap dIn dOut) : CPTPMap (dIn × dOut × dOut) (dIn × dOut × dOut) :=
   exists_purify Λ |>.choose
--- where
-  -- toLinearMap := by
-  --   sorry
-  -- cp := sorry
-  -- TP := sorry
-
---TODO: Constructing this will probably need Kraus operators first.
 
 theorem purify_IsUnitary (Λ : CPTPMap dIn dOut) : Λ.purify.IsUnitary :=
   exists_purify Λ |>.choose_spec.1
