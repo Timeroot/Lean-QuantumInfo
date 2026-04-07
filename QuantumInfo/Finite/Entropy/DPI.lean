@@ -343,6 +343,203 @@ theorem trace_function_convex_ici {g : ℝ → ℝ} (hg : ConvexOn ℝ (Set.Ici 
 
 end HermitianMat
 
+/-! ### Variational formula for the trace functional
+Following Frank–Lieb, for `α > 1` we define
+  `f_α(H, ρ, σ) = α · Tr[ρ · H] − (α−1) · Tr[(σ^{−γ} H σ^{−γ})^{α/(α−1)}]`
+where `γ = (1−α)/(2α)` (so `−γ = (α−1)/(2α) > 0`).
+Key facts (each stated as a lemma below):
+1. `Q̃_α(ρ‖σ) = sup_{H ≥ 0} f_α(H, ρ, σ)` for α > 1.
+2. For fixed `H`, `f_α` is linear in `ρ` (hence convex).
+3. For fixed `H`, `f_α` is convex in `σ` (uses Lieb concavity).
+4. Therefore `f_α` is jointly convex in `(ρ, σ)` for fixed `H`.
+5. The supremum of jointly convex functions is jointly convex.
+-/
+
+/-- The variational function `f_α(H, ρ, σ) = α · ⟪ρ, H⟫ − (α−1) · Tr[(σ^{−γ} H σ^{−γ})^{α/(α−1)}]`
+where `γ = (1−α)/(2α)`. For fixed `H ≥ 0`, this is linear in `ρ` and convex in `σ`.
+Frank–Lieb show that `Q̃_α(ρ‖σ) = sup_{H ≥ 0} f_α(H, ρ, σ)` for `α > 1`. -/
+noncomputable def f_alpha (α : ℝ) (H : HermitianMat d ℂ) (ρ σ : MState d) : ℝ :=
+  let γ : ℝ := (1 - α) / (2 * α)
+  α * ⟪ρ.M, H⟫_ℝ - (α - 1) * ((H.conj (σ.M ^ (-γ)).mat) ^ (α / (α - 1))).trace
+
+/-- The optimizer in the variational formula: `H_hat = σ^γ (σ^γ ρ σ^γ)^{α−1} σ^γ`
+where `γ = (1−α)/(2α)`. -/
+noncomputable def H_hat (α : ℝ) (ρ σ : MState d) : HermitianMat d ℂ :=
+  let γ := (1 - α) / (2 * α)
+  ((ρ.M.conj (σ.M ^ γ).mat) ^ (α - 1)).conj (σ.M ^ γ).mat
+
+/-
+**Step 1a**: The optimizer `H_hat` is PSD.
+-/
+theorem H_hat_nonneg (ρ σ : MState d) : 0 ≤ H_hat α ρ σ := by
+  apply HermitianMat.conj_nonneg;
+  apply HermitianMat.rpow_nonneg;
+  apply HermitianMat.conj_nonneg;
+  exact ρ.nonneg
+
+/-- Sub-lemma for Step 1b: the conj of H_hat by σ^{−γ} simplifies to (ρ.M.conj (σ^γ).mat)^{α−1}.
+This uses σ^{−γ} · σ^γ = identity (on support) to cancel the outer σ^γ factors. -/
+theorem H_hat_conj_sigma (hα : 1 < α) (ρ σ : MState d) :
+    let γ := (1 - α) / (2 * α)
+    (H_hat α ρ σ).conj (σ.M ^ (-γ)).mat = (ρ.M.conj (σ.M ^ γ).mat) ^ (α - 1) := by
+  sorry
+
+/-
+Sub-lemma for Step 1b: the inner product ⟪ρ.M, H_hat⟫ equals Tr[(σ^γ ρ σ^γ)^α].
+By cyclicity of trace: Tr[ρ · σ^γ · (σ^γ ρ σ^γ)^{α−1} · σ^γ] = Tr[(σ^γ ρ σ^γ)^α].
+-/
+theorem inner_rho_H_hat (hα : 1 < α) (ρ σ : MState d) :
+    let γ := (1 - α) / (2 * α)
+    ⟪ρ.M, H_hat α ρ σ⟫_ℝ = ((ρ.M.conj (σ.M ^ γ).mat) ^ α).trace := by
+  unfold H_hat; simp [ HermitianMat.inner_def ] ;
+  have h_cyclic : (ρ.m * (σ.M ^ ((1 - α) / (2 * α))).mat * ((ρ.M.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ^ (α - 1)).mat * (σ.M ^ ((1 - α) / (2 * α))).mat).trace = ((ρ.M.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ^ α).trace := by
+    have h_cyclic : (ρ.M.conj (σ.M ^ ((1 - α) / (2 * α))).mat).mat * ((ρ.M.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ^ (α - 1)).mat = ((ρ.M.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ^ α).mat := by
+      have := @HermitianMat.mat_rpow_add;
+      specialize this ( show 0 ≤ HermitianMat.conj ( σ.M ^ ( ( 1 - α ) / ( 2 * α ) ) ).mat ρ.M from ?_ ) ( show ( 1 : ℝ ) + ( α - 1 ) ≠ 0 from by linarith );
+      · finiteness;
+      · aesop;
+    convert congr_arg Matrix.trace h_cyclic using 1;
+    · rw [ ← Matrix.trace_mul_comm ] ; simp [ Matrix.mul_assoc ] ;
+    · simp [ HermitianMat.trace ];
+      norm_num [ Matrix.trace ];
+      refine' Finset.sum_congr rfl fun i _ => _;
+      convert Complex.ofReal_re _;
+      swap;
+      exact ( ( HermitianMat.conj ( σ.M ^ ( ( 1 - α ) / ( 2 * α ) ) ).mat ) ρ.M ^ α ) i i |> Complex.re;
+      simp [ Complex.ext_iff ];
+  simp_all [ ← Matrix.mul_assoc ]
+
+/-
+**Step 1b**: Evaluating `f_α` at the optimizer `H_hat` gives `Q̃_α(ρ‖σ)`.
+This is the key computation that verifies the variational formula at the optimizer.
+Proof: f_α(H_hat, ρ, σ) = α · Tr[(σ^γ ρ σ^γ)^α] - (α-1) · Tr[(σ^γ ρ σ^γ)^α] = Tr[(σ^γ ρ σ^γ)^α] = Q̃.
+-/
+theorem f_alpha_at_optimizer (hα : 1 < α) (ρ σ : MState d) :
+    f_alpha α (H_hat α ρ σ) ρ σ = Q̃_ α(ρ‖σ) := by
+  have h_inner : ⟪ρ.M, H_hat α ρ σ⟫_ℝ = ((ρ.M.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ^ α).trace := by
+    exact inner_rho_H_hat hα ρ σ
+  have h_conj : (H_hat α ρ σ).conj (σ.M ^ ((α - 1) / (2 * α))).mat = (ρ.M.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ^ (α - 1) := by
+    convert H_hat_conj_sigma ( hα := hα ) ( ρ := ρ ) ( σ := σ ) using 1
+    ring_nf!
+  unfold f_alpha sandwichedTraceFunctional
+  simp_all [ sub_div ]
+  rw [ ← HermitianMat.rpow_mul ] ; norm_num [ show α ≠ 0 by positivity, show α - 1 ≠ 0 by linarith ];
+  · rw [ mul_div_cancel₀ _ ( by linarith ) ] ; ring;
+  · apply_rules [ HermitianMat.conj_nonneg ];
+    exact ρ.nonneg
+
+/-- For α > 1, the map H ↦ f_α(H, ρ, σ) is concave (for fixed ρ, σ),
+so the optimal H is a maximizer. -/
+lemma sandwichedAuxFun_concave_in_H (hα : 1 < α) (ρ σ : MState d) :
+    ConcaveOn ℝ {H | 0 ≤ H} (fun H => f_alpha α H ρ σ) := by
+  sorry
+
+/-- **Step 1c**: `H_hat` is a maximizer: for all `H ≥ 0`, `f_α(H) ≤ f_α(H_hat)`.
+This follows because `H ↦ f_α(H, ρ, σ)` is strictly concave in `H` for `α > 1`
+(the first term is linear, the second is strictly convex via trace function convexity),
+and `H_hat` is the unique critical point. -/
+theorem f_alpha_le_at_optimizer (hα : 1 < α) (ρ σ : MState d)
+    (H : HermitianMat d ℂ) (hH : 0 ≤ H) :
+    f_alpha α H ρ σ ≤ f_alpha α (H_hat α ρ σ) ρ σ := by
+  sorry
+
+/--
+**Step 1 (Variational formula)**: For `α > 1`, the trace functional equals the
+supremum of `f_α` over all PSD `H`:
+  `Q̃_α(ρ‖σ) = ⨆ (H : HermitianMat d ℂ) (_ : 0 ≤ H), f_alpha α H ρ σ`.
+The optimizer is `H_hat = σ^γ (σ^γ ρ σ^γ)^{α−1} σ^γ`.
+-/
+theorem traceFunctional_eq_iSup_f_alpha (hα : 1 < α) (ρ σ : MState d) :
+    Q̃_ α(ρ‖σ) = ⨆ (H : {H : HermitianMat d ℂ // 0 ≤ H}), f_alpha α H.1 ρ σ := by
+  rw [ @ciSup_eq_of_forall_le_of_forall_lt_exists_gt ];
+  · exact fun i => f_alpha_le_at_optimizer hα ρ σ i i.2 |> le_trans <| le_of_eq <| f_alpha_at_optimizer hα ρ σ;
+  · intro w hw;
+    exact ⟨ ⟨ H_hat α ρ σ, H_hat_nonneg ρ σ ⟩, hw.trans_le ( f_alpha_at_optimizer hα ρ σ ▸ le_rfl ) ⟩
+
+/-
+**Step 2 (Linearity in ρ)**: For fixed `H` and `σ`, the map `ρ ↦ f_alpha α H ρ σ`
+is affine (in fact linear plus a constant in σ). In particular it is convex.
+-/
+theorem f_alpha_linear_in_rho (α : ℝ) (H : HermitianMat d ℂ) (σ : MState d)
+    {ι : Type*} [Fintype ι]
+    (w : ι → ℝ) (hw_sum : ∑ i, w i = 1)
+    (ρs : ι → MState d) (ρ_mix : MState d)
+    (hρ_mix : ρ_mix.M = ∑ i, w i • (ρs i).M) :
+    f_alpha α H ρ_mix σ = ∑ i, w i * f_alpha α H (ρs i) σ := by
+  unfold f_alpha
+  simp [ *, mul_sub, Finset.mul_sum , sum_inner ]
+  ring_nf
+  simp [ ← Finset.mul_sum, ← Finset.sum_mul, mul_assoc, mul_comm, mul_left_comm, hw_sum ]
+  ring_nf
+
+/-- **Step 3 (Convexity in σ)**: For fixed `H ≥ 0` and `ρ`, and `α > 1`, the map
+`σ ↦ f_alpha α H ρ σ` is convex. The key is that for `p = α/(α−1) > 1`:
+• `A ↦ Tr[A^p]` is convex on PSD matrices (trace function convexity, Theorem 2.10 of Carlen),
+• `σ ↦ σ^{−γ} H σ^{−γ}` is *concave* in `σ` by Lieb concavity (since `−γ = (α−1)/(2α) ∈ (0,½)`),
+• The composition of a convex non-decreasing function with a concave function is convex,
+  but we actually need the sign: the second term has a factor `−(α−1) < 0` which flips concave → convex.
+More precisely: `σ ↦ Tr[(σ^{−γ} H σ^{−γ})^p]` is concave (by Lieb + trace function convexity),
+so `σ ↦ −(α−1) · Tr[(σ^{−γ} H σ^{−γ})^p]` is convex. -/
+theorem f_alpha_convex_in_sigma (hα : 1 < α) (H : HermitianMat d ℂ) (hH : 0 ≤ H)
+    (ρ : MState d) {ι : Type*} [Fintype ι]
+    (w : ι → ℝ) (hw_nonneg : ∀ i, 0 ≤ w i) (hw_sum : ∑ i, w i = 1)
+    (σs : ι → MState d) (σ_mix : MState d)
+    (hσ_mix : σ_mix.M = ∑ i, w i • (σs i).M) :
+    f_alpha α H ρ σ_mix ≤ ∑ i, w i * f_alpha α H ρ (σs i) := by
+  sorry
+
+/-
+**Step 4 (Joint convexity of f_α)**: For fixed `H ≥ 0` and `α > 1`, the map
+`(ρ, σ) ↦ f_alpha α H ρ σ` is jointly convex. This follows from Steps 2 and 3:
+f_α decomposes as a function linear in ρ (independent of σ) plus a function convex
+in σ (independent of ρ).
+-/
+theorem f_alpha_jointly_convex (hα : 1 < α) (H : HermitianMat d ℂ) (hH : 0 ≤ H)
+    {ι : Type*} [Fintype ι]
+    (w : ι → ℝ) (hw_nonneg : ∀ i, 0 ≤ w i) (hw_sum : ∑ i, w i = 1)
+    (ρs σs : ι → MState d) (ρ_mix σ_mix : MState d)
+    (hρ_mix : ρ_mix.M = ∑ i, w i • (ρs i).M)
+    (hσ_mix : σ_mix.M = ∑ i, w i • (σs i).M) :
+    f_alpha α H ρ_mix σ_mix ≤ ∑ i, w i * f_alpha α H (ρs i) (σs i) := by
+  convert f_alpha_convex_in_sigma hα H hH ρ_mix _ _ _ _ using 1;
+  any_goals assumption;
+  constructor <;> intro h;
+  · exact fun σ_mix hσ_mix =>
+    f_alpha_convex_in_sigma hα H hH ρ_mix w hw_nonneg hw_sum σs σ_mix hσ_mix;
+  · refine' le_trans ( h σ_mix hσ_mix ) _;
+    unfold f_alpha;
+    simp [ hρ_mix ];
+    simp [ sum_inner, inner_smul_left, mul_sub, sub_mul, mul_comm, mul_left_comm, Finset.mul_sum]
+    simp [ ← Finset.mul_sum, ← Finset.sum_mul, hw_sum ]
+
+/-
+The range of `H ↦ f_alpha α H ρ σ` over PSD `H` is bounded above.
+This follows from the variational formula: the supremum equals `Q̃_α(ρ‖σ)`,
+which is a finite real number.
+-/
+theorem f_alpha_bddAbove (hα : 1 < α) (ρ σ : MState d) :
+    BddAbove (Set.range (fun H : {H : HermitianMat d ℂ // 0 ≤ H} => f_alpha α H.1 ρ σ)) := by
+  refine' ⟨ _, Set.forall_mem_range.mpr fun H => f_alpha_le_at_optimizer hα ρ σ _ H.2 ⟩
+
+/-
+**Step 5 (Sup preserves convexity)**: The supremum over `H ≥ 0` of the jointly
+convex `f_alpha α H` is jointly convex. This is a standard fact: for each `H`,
+`f_alpha α H (ρ_mix) (σ_mix) ≤ ∑ wᵢ f_alpha α H (ρᵢ) (σᵢ) ≤ ∑ wᵢ sup_H f_alpha ...`,
+so taking sup on the left gives the result.
+-/
+theorem iSup_f_alpha_jointly_convex (hα : 1 < α)
+    {ι : Type*} [Fintype ι]
+    (w : ι → ℝ) (hw_nonneg : ∀ i, 0 ≤ w i) (hw_sum : ∑ i, w i = 1)
+    (ρs σs : ι → MState d) (ρ_mix σ_mix : MState d)
+    (hρ_mix : ρ_mix.M = ∑ i, w i • (ρs i).M)
+    (hσ_mix : σ_mix.M = ∑ i, w i • (σs i).M) :
+    (⨆ (H : {H : HermitianMat d ℂ // 0 ≤ H}), f_alpha α H.1 ρ_mix σ_mix) ≤
+      ∑ i, w i * (⨆ (H : {H : HermitianMat d ℂ // 0 ≤ H}), f_alpha α H.1 (ρs i) (σs i)) := by
+  refine' ciSup_le _;
+  intro H
+  have h_sum : f_alpha α H.1 ρ_mix σ_mix ≤ ∑ i, w i * (f_alpha α H.1 (ρs i) (σs i)) := by
+    apply f_alpha_jointly_convex hα H.1 H.2 w hw_nonneg hw_sum ρs σs ρ_mix σ_mix hρ_mix hσ_mix;
+  exact h_sum.trans ( Finset.sum_le_sum fun i _ => mul_le_mul_of_nonneg_left ( le_ciSup ( f_alpha_bddAbove hα ( ρs i ) ( σs i ) ) H ) ( hw_nonneg i ) )
 
 /-- The trace functional `Q̃_α` is jointly convex for `α > 1`.
 This is Proposition 3 of the paper, originally from Frank–Lieb.
@@ -358,7 +555,15 @@ theorem sandwichedTraceFunctional_jointly_convex (hα : 1 < α) {ι : Type*} [Fi
     (hρ_mix : ρ_mix.M = ∑ i, w i • (ρs i).M)
     (hσ_mix : σ_mix.M = ∑ i, w i • (σs i).M) :
     Q̃_ α(ρ_mix‖σ_mix) ≤ ∑ i, w i * Q̃_ α(ρs i‖σs i) := by
-  sorry
+  -- Rewrite Q̃ using the variational formula (Step 1)
+  rw [traceFunctional_eq_iSup_f_alpha hα ρ_mix σ_mix]
+  -- Apply Step 5 (sup preserves convexity)
+  calc ⨆ H : {H : HermitianMat d ℂ // 0 ≤ H}, f_alpha α H.1 ρ_mix σ_mix
+      ≤ ∑ i, w i * (⨆ H : {H : HermitianMat d ℂ // 0 ≤ H}, f_alpha α H.1 (ρs i) (σs i)) :=
+        iSup_f_alpha_jointly_convex hα w hw_nonneg hw_sum ρs σs ρ_mix σ_mix hρ_mix hσ_mix
+    _ = ∑ i, w i * Q̃_ α(ρs i‖σs i) := by
+        congr 1; ext i
+        rw [traceFunctional_eq_iSup_f_alpha hα (ρs i) (σs i)]
 
 /-! ### Twirling Construction Helpers
 We construct a twirling set using κ = Perm dB × (dB → Bool).
