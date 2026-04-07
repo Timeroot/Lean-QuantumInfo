@@ -1183,10 +1183,29 @@ The proof uses the twirling argument:
 4. By twirling: `= Q̃_α(ρ_A ⊗ π_B ‖ σ_A ⊗ π_B)`.
 5. By tensor invariance: `= Q̃_α(ρ_A ‖ σ_A)`. -/
 
+/-- If `σ.M.ker ≤ ρ.M.ker`, then `(σ.conj B).ker ≤ (ρ.conj B).ker` for any matrix `B`.
+This follows from `ker_conj` (which expresses `(A.conj B).ker` as a `comap`) and
+`Submodule.comap_mono`. -/
+lemma HermitianMat.ker_conj_le_of_ker_le {n : Type*} [Fintype n] [DecidableEq n]
+    {A B : HermitianMat n ℂ} (hA : 0 ≤ A) (hB : 0 ≤ B) (h : A.ker ≤ B.ker)
+    (C : Matrix n n ℂ) : (A.conj C).ker ≤ (B.conj C).ker := by
+  rw [ker_conj hA, ker_conj hB]
+  exact Submodule.comap_mono h
+
+/-- Unitary conjugation preserves the kernel ordering between MStates.
+If `σ.M.ker ≤ ρ.M.ker`, then `(σ.conjTensorUnitary V).M.ker ≤ (ρ.conjTensorUnitary V).M.ker`. -/
+lemma MState.ker_conjTensorUnitary_le {dA dB : Type*} [Fintype dA] [Fintype dB]
+    [DecidableEq dA] [DecidableEq dB]
+    (ρ σ : MState (dA × dB)) (V : Matrix.unitaryGroup dB ℂ)
+    (hker : σ.M.ker ≤ ρ.M.ker) :
+    (σ.conjTensorUnitary V).M.ker ≤ (ρ.conjTensorUnitary V).M.ker := by
+  simp only [MState.conjTensorUnitary_M]
+  exact HermitianMat.ker_conj_le_of_ker_le σ.nonneg ρ.nonneg hker _
+
 /-- Monotonicity of the trace functional under partial trace for `α > 1`.
 Equation (2.8) of the paper (second line). -/
 theorem sandwichedTraceFunctional_mono_traceRight [Nonempty dB]
-    (hα : 1 < α) (ρ σ : MState (dA × dB)) :
+    (hα : 1 < α) (ρ σ : MState (dA × dB)) (hker : σ.M.ker ≤ ρ.M.ker) :
     Q̃_ α(ρ.traceRight‖σ.traceRight) ≤ Q̃_ α(ρ‖σ) := by
   -- Obtain the twirling unitaries
   obtain ⟨κ, hκ_fin, hκ_ne, V, hV⟩ := exists_twirling_unitaries (dB := dB)
@@ -1214,7 +1233,8 @@ theorem sandwichedTraceFunctional_mono_traceRight [Nonempty dB]
   have h_convex := sandwichedTraceFunctional_jointly_convex hα
     (fun (_ : κ) => (Fintype.card κ : ℝ)⁻¹) (by intro; positivity) hw_sum
     (fun i => ρ.conjTensorUnitary (V i)) (fun i => σ.conjTensorUnitary (V i))
-    ρ_mix σ_mix hρ_mix hσ_mix (sorry)
+    ρ_mix σ_mix hρ_mix hσ_mix
+    (fun i => MState.ker_conjTensorUnitary_le ρ σ (V i) hker)
   -- Step 4 + 5: Q̃_α(ρ_A ⊗ π_B‖σ_A ⊗ π_B) = Q̃_α(ρ_A‖σ_A) by tensor invariance
   have h_tensor : Q̃_ α(ρ_mix‖σ_mix) = Q̃_ α(ρ.traceRight‖σ.traceRight) :=
     sandwichedTraceFunctional_tensor_invariant (by linarith) ρ.traceRight σ.traceRight MState.uniform
@@ -1309,7 +1329,7 @@ theorem sandwichedRenyiEntropy_mono_traceRight [Nonempty dB]
   apply ENNReal.ofReal_le_ofReal
   apply div_le_div_of_nonneg_right _ (by linarith : 0 < α - 1).le
   exact Real.log_le_log (sandwichedTraceFunctional_pos ρ.traceRight σ.traceRight hker_tr)
-    (sandwichedTraceFunctional_mono_traceRight hα ρ σ)
+    (sandwichedTraceFunctional_mono_traceRight hα ρ σ hker)
 
 /-! ## DPI via Stinespring Dilation -/
 
