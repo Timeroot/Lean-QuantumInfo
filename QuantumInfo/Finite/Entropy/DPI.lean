@@ -5,6 +5,7 @@ Authors: Alex Meiburg
 -/
 import QuantumInfo.Finite.Entropy.Relative
 import QuantumInfo.ForMathlib.HermitianMat.Sqrt
+import QuantumInfo.ForMathlib.HermitianMat.LiebConcavity
 
 noncomputable section
 
@@ -662,8 +663,8 @@ theorem f_alpha_linear_in_rho (α : ℝ) (H : HermitianMat d ℂ) (σ : MState d
   This follows from Lieb concavity (Epstein's generalization). -/
 lemma trace_conj_rpow_concave (hα : 1 < α) (H : HermitianMat d ℂ) (hH : 0 ≤ H) :
     ConcaveOn ℝ {σ : HermitianMat d ℂ | 0 ≤ σ}
-      (fun σ => ((H.conj (σ ^ ((α - 1) / (2 * α))).mat) ^ (α / (α - 1))).trace) := by
-  sorry
+      (fun σ => ((H.conj (σ ^ ((α - 1) / (2 * α))).mat) ^ (α / (α - 1))).trace) :=
+  HermitianMat.trace_conj_rpow_concave hα H hH
 
 /-- **Step 3 (Convexity in σ)**: For fixed `H ≥ 0` and `ρ`, and `α > 1`, the map
 `σ ↦ f_alpha α H ρ σ` is convex. The key is that for `p = α/(α−1) > 1`:
