@@ -763,6 +763,23 @@ theorem iSup_f_alpha_jointly_convex (hα : 1 < α)
     apply f_alpha_jointly_convex hα H.1 H.2 w hw_nonneg hw_sum ρs σs ρ_mix σ_mix hρ_mix hσ_mix;
   exact h_sum.trans ( Finset.sum_le_sum fun i _ => mul_le_mul_of_nonneg_left ( le_ciSup ( f_alpha_bddAbove hα ( ρs i ) ( σs i ) (hker i)) H ) ( hw_nonneg i ) )
 
+/-- If for all i, ker(σs i) ≤ ker(ρs i), then ker(∑ w i • σs i) ≤ ker(∑ w i • ρs i),
+provided all weights are nonneg and all matrices are PSD. -/
+theorem HermitianMat.ker_weighted_sum_le {ι : Type*} [Fintype ι]
+    (w : ι → ℝ) (hw_nonneg : ∀ i, 0 ≤ w i)
+    (ρs σs : ι → HermitianMat d ℂ)
+    (hρs_nonneg : ∀ i, 0 ≤ ρs i)
+    (hσs_nonneg : ∀ i, 0 ≤ σs i)
+    (hker : ∀ i, (σs i).ker ≤ (ρs i).ker) :
+    (∑ i, w i • σs i).ker ≤ (∑ i, w i • ρs i).ker := by
+  rw [HermitianMat.ker_sum, HermitianMat.ker_sum]
+  · refine iInf_mono fun i ↦ ?_
+    by_cases hi : w i = 0
+    · simp [hi]
+    · simp_all [HermitianMat.ker_pos_smul]
+  · exact fun i => smul_nonneg (hw_nonneg i) (hρs_nonneg i)
+  · exact fun i => smul_nonneg (hw_nonneg i) (hσs_nonneg i)
+
 /-- The trace functional `Q̃_α` is jointly convex for `α > 1`.
 This is Proposition 3 of the paper, originally from Frank–Lieb.
 The proof uses the variational formula:
@@ -780,7 +797,7 @@ theorem sandwichedTraceFunctional_jointly_convex (hα : 1 < α) {ι : Type*} [Fi
     Q̃_ α(ρ_mix‖σ_mix) ≤ ∑ i, w i * Q̃_ α(ρs i‖σs i) := by
   have hker' : σ_mix.M.ker ≤ ρ_mix.M.ker := by
     rw [hρ_mix, hσ_mix]
-    sorry
+    exact HermitianMat.ker_weighted_sum_le w hw_nonneg _ _ (fun i => (ρs i).nonneg) (fun i => (σs i).nonneg) hker
   rw [traceFunctional_eq_iSup_f_alpha hα ρ_mix σ_mix hker']
   calc ⨆ H : {H : HermitianMat d ℂ // 0 ≤ H}, f_alpha α H.1 ρ_mix σ_mix
       ≤ ∑ i, w i * (⨆ H : {H : HermitianMat d ℂ // 0 ≤ H}, f_alpha α H.1 (ρs i) (σs i)) :=
