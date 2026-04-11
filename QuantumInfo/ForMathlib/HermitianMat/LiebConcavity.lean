@@ -841,7 +841,7 @@ lemma lieb_concavity_psd_extension (H : HermitianMat d ℂ) (hH : 0 ≤ H)
       · simp [ Matrix.PosDef];
         simp [ Matrix.IsHermitian, Matrix.one_apply ];
         intro x hx; simp [ Finsupp.sum ] ;
-        rw [ Finset.sum_congr rfl fun i hi => by rw [ if_neg ( by intro H; simp_all [ Finsupp.mem_support_iff ] ) ] ] ; simp [ mul_assoc, mul_comm, mul_left_comm, hε.out ];
+        rw [ Finset.sum_congr rfl fun i hi => by rw [ if_neg ( by intro H; simp_all [ Finsupp.mem_support_iff ] ) ] ] ; simp [ mul_comm, mul_left_comm ];
         simp [ Complex.mul_conj, Complex.normSq_eq_norm_sq ];
         exact Finset.sum_pos ( fun i hi => mul_pos ( mod_cast hε ) ( sq_pos_of_pos ( mod_cast norm_pos_iff.mpr ( show x i ≠ 0 from by aesop ) ) ) ) ( by contrapose! hx; aesop );
       · exact le_add_of_nonneg_left hσ₂;
