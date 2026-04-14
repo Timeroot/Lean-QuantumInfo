@@ -860,7 +860,7 @@ lemma lieb_rank_one_ineq_core (v : d → ℂ) (hv : v ≠ 0) {p : ℝ} (hp : 1 <
     (dotProduct (star v) (((t • σ₁ + (1 - t) • σ₂) ^ (1 / p)).mat.mulVec v)).re ^ p := by
   -- This can be proved via complex interpolation
   -- (Hadamard three-lines theorem).
-  sorry
+  sorry --c2921371-ffb7-4edc-9143-a0f42c7ac227
 
 /-- **Component 4: Core concavity inequality for positive definite matrices.**
   For positive definite `σ₁, σ₂` and `0 ≤ t ≤ 1`, the rank-one Lieb concavity
@@ -1068,7 +1068,7 @@ lemma lieb_concavity_diagonal (D : d → ℝ) (hD : ∀ i, 0 ≤ D i)
     t • (((diagonal ℂ D).conj (τ₁ ^ (1 / (2 * p))).mat) ^ p).trace +
     (1 - t) • (((diagonal ℂ D).conj (τ₂ ^ (1 / (2 * p))).mat) ^ p).trace ≤
     (((diagonal ℂ D).conj ((t • τ₁ + (1 - t) • τ₂) ^ (1 / (2 * p))).mat) ^ p).trace := by
-  sorry
+  sorry --886c9830-7c13-4bb2-8740-a80ec2c2d719
 
 /-- **Step 4: Positive definite core of Lieb's concavity.**
   For `H ≥ 0`, `p > 1`, and *positive definite* `σ₁, σ₂`, the concavity inequality:
