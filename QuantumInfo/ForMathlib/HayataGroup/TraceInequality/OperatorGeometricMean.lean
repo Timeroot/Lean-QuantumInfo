@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors:
 -/
 
-import Quantum.TraceInequality.GeneralizedPerspectiveFunction
+import QuantumInfo.ForMathlib.HayataGroup.TraceInequality.GeneralizedPerspectiveFunction
 
 namespace OperatorGeometricMean
 

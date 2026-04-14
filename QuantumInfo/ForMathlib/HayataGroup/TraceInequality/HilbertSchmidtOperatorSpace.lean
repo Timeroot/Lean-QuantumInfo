@@ -1,11 +1,11 @@
-/- 
+/-
 Copyright (c) 2025 Hayata Yamasaki. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors:
 -/
 
-import Quantum.TraceInequality.LownerHeinzTheorem
-import Quantum.TraceInequality.GeneralizedPerspectiveFunction
+import QuantumInfo.ForMathlib.HayataGroup.TraceInequality.LownerHeinzTheorem
+import QuantumInfo.ForMathlib.HayataGroup.TraceInequality.GeneralizedPerspectiveFunction
 
 import Mathlib.Analysis.InnerProductSpace.PiL2
 import Mathlib.Analysis.InnerProductSpace.Trace
@@ -366,12 +366,14 @@ lemma re_hsInner_eq_traceRe (X Y : L ℋ) :
   rw [hsInner_eq_trace]
   simp [mul_assoc]
 
+omit [CompleteSpace ℋ] in
 @[simp] lemma leftMulHS_real_smul_one (r : ℝ) :
     leftMulHS (ℋ := ℋ) (r • (1 : L ℋ)) = r • (1 : L (HSOp ℋ)) := by
   ext T
   change ofOp ((r • (1 : L ℋ)) * toOp T) = ofOp (r • toOp T)
   simp [Algebra.smul_def]
 
+omit [CompleteSpace ℋ] in
 @[simp] lemma rightMulHS_real_smul_one (r : ℝ) :
     rightMulHS (ℋ := ℋ) (r • (1 : L ℋ)) = r • (1 : L (HSOp ℋ)) := by
   ext T

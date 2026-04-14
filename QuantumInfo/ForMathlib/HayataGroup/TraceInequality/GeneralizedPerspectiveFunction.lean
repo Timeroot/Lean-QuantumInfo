@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors:
 -/
 
-import Quantum.TraceInequality.JensenOperatorInequality
-import Quantum.TraceInequality.LownerHeinzTheorem
+import QuantumInfo.ForMathlib.HayataGroup.TraceInequality.JensenOperatorInequality
+import QuantumInfo.ForMathlib.HayataGroup.TraceInequality.LownerHeinzTheorem
 
 namespace GeneralizedPerspectiveFunction
 
@@ -130,6 +130,7 @@ private lemma spectrum_convexCombo_Ioi {A B : L ℋ} {t : ℝ}
   simpa [C] using
     (CFC.exists_pos_algebraMap_le_iff (A := L ℋ) (a := C) (ha := hC)).1 ⟨rC, hrC, hrC_le⟩ x hx
 
+omit [Nontrivial ℋ] in
 private lemma cfcR_sq_eq {g k : ℝ → ℝ} {A : L ℋ}
     (hA : IsSelfAdjoint A)
     (hg : ContinuousOn g (spectrum ℝ A))
@@ -142,6 +143,7 @@ private lemma cfcR_sq_eq {g k : ℝ → ℝ} {A : L ℋ}
   intro x hx
   simpa using hmul x hx
 
+omit [Nontrivial ℋ] in
 private lemma cfcR_mul_eq {g k m : ℝ → ℝ} {A : L ℋ}
     (hg : ContinuousOn g (spectrum ℝ A))
     (hk : ContinuousOn k (spectrum ℝ A))
@@ -165,16 +167,19 @@ private lemma hpow_continuousOn
     intro y hy
     exact hpos y hy)
 
+omit [Nontrivial ℋ] in
 private lemma hSqrt_selfAdjoint (h : ℝ → ℝ) (B : L ℋ) :
     IsSelfAdjoint (hSqrt (ℋ := ℋ) h B) := by
   dsimp [hSqrt, cfcR]
   exact cfc_predicate _ _
 
+omit [Nontrivial ℋ] in
 private lemma hInvSqrt_selfAdjoint (h : ℝ → ℝ) (B : L ℋ) :
     IsSelfAdjoint (hInvSqrt (ℋ := ℋ) h B) := by
   dsimp [hInvSqrt, cfcR]
   exact cfc_predicate _ _
 
+omit [Nontrivial ℋ] in
 private lemma hSqrt_mul_hInvSqrt_eq_one
     {h : ℝ → ℝ} {B : L ℋ}
     (hB : IsSelfAdjoint B) (Bs : spectrum ℝ B ⊆ Set.Ioi (0 : ℝ))
@@ -196,6 +201,7 @@ private lemma hSqrt_mul_hInvSqrt_eq_one
     norm_num
   simpa [hSqrt, hInvSqrt] using cfcR_sq_eq (ℋ := ℋ) (A := B) hB hsqrt hinv hmul
 
+omit [Nontrivial ℋ] in
 private lemma hInvSqrt_mul_hSqrt_eq_one
     {h : ℝ → ℝ} {B : L ℋ}
     (hB : IsSelfAdjoint B) (Bs : spectrum ℝ B ⊆ Set.Ioi (0 : ℝ))
@@ -217,6 +223,7 @@ private lemma hInvSqrt_mul_hSqrt_eq_one
     norm_num
   simpa [hSqrt, hInvSqrt] using cfcR_sq_eq (ℋ := ℋ) (A := B) hB hinv hsqrt hmul
 
+omit [Nontrivial ℋ] in
 private lemma hSqrt_mul_hSqrt_eq
     {h : ℝ → ℝ} {B : L ℋ}
     (Bs : spectrum ℝ B ⊆ Set.Ioi (0 : ℝ))
@@ -235,6 +242,7 @@ private lemma hSqrt_mul_hSqrt_eq
     norm_num
   simpa [hSqrt] using cfcR_mul_eq (ℋ := ℋ) (A := B) hsqrt hsqrt hmul
 
+omit [Nontrivial ℋ] in
 private lemma conj_le_conj {X Y T : L ℋ} (hXY : X ≤ Y) (hT : IsSelfAdjoint T) :
     T * X * T ≤ T * Y * T := by
   have hnonneg : 0 ≤ Y - X := sub_nonneg.mpr hXY
@@ -463,11 +471,13 @@ theorem theorem_2_5_forward_jointlyConvexOn_psd_pd_Ici
   exact theorem_2_5_forward_jointlyConvexOn_psd_pd_of_condV
     (ℋ := ℋ) (f := f) (h := h) hcoreV hconc hcont hpos
 
+omit [Nontrivial ℋ] in
 private lemma generalizedPerspective_neg
     (f h : ℝ → ℝ) (A B : L ℋ) :
     ((fun x : ℝ ↦ -f x) Δ h) A B = -((f Δ h) A B) := by
   simp [GeneralizedPerspective, cfcR, cfc_neg, mul_assoc]
 
+omit [Nontrivial ℋ] in
 private lemma jointlyConvexOn_neg
     {s : Set (L ℋ)} {t : Set (L ℋ)} {Φ : L ℋ → L ℋ → L ℋ}
     (hΦ : JointlyConvexOn s t (fun A B ↦ -Φ A B)) :

@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors:
 -/
 
-import Quantum.TraceInequality.JensenOperatorInequalityIImpIV
+import QuantumInfo.ForMathlib.HayataGroup.TraceInequality.JensenOperatorInequalityIImpIV
 
 set_option linter.style.longLine false
 
@@ -18,7 +18,6 @@ section Theorem252
 
 variable {ℋ : Type u}
 variable [NormedAddCommGroup ℋ] [InnerProductSpace ℂ ℋ] [CompleteSpace ℋ]
-variable [Nontrivial ℋ]
 
 set_option synthInstance.maxHeartbeats 400000 in
 -- IsStarNormal CFC is only a theorem in Mathlib; CStarAlgebra chain through WithLp is deep.
@@ -35,7 +34,7 @@ set_option synthInstance.maxHeartbeats 400000 in
 -- Module ℝ for L (HSum ℋ) requires deep WithLp / CStarAlgebra chain.
 noncomputable local instance : Module ℝ (L (HSum ℋ)) := inferInstance
 
-omit ℋ [NormedAddCommGroup ℋ] [InnerProductSpace ℂ ℋ] [CompleteSpace ℋ] [Nontrivial ℋ] in
+omit ℋ [NormedAddCommGroup ℋ] [InnerProductSpace ℂ ℋ] [CompleteSpace ℋ] in
 /--
 Uniform version of Condition (iv), with the Hilbert space arbitrary in the same universe.
 This is the theorem-level uniform counterpart to the operator-level `...All` predicates.
@@ -48,7 +47,7 @@ def CondIVAll (f : ℝ → ℝ) : Prop :=
 
 omit [CompleteSpace ℋ] in
 /-- `L (HSum ℋ)` is nontrivial once `L ℋ` is. -/
-private theorem nontrivial_hsumL_wrap : Nontrivial (L (HSum ℋ)) := by
+private theorem nontrivial_hsumL_wrap [Nontrivial ℋ] : Nontrivial (L (HSum ℋ)) := by
   have h_not_sub : ¬ Subsingleton ℋ := by
     intro hsub
     letI : Subsingleton ℋ := hsub
@@ -155,6 +154,9 @@ private lemma spectrum_Ici_of_nonneg_wrap {A : L ℋ} (hA0 : (0 : L ℋ) ≤ A) 
     (StarOrderedRing.nonneg_iff_spectrum_nonneg (R := ℝ) A
       (ha := IsSelfAdjoint.of_nonneg hA0)).1 hA0
 
+variable [Nontrivial ℋ]
+
+omit [CompleteSpace ℋ] in
 private lemma spectrum_zero_subset_Ici_wrap :
     spectrum ℝ (0 : L ℋ) ⊆ Set.Ici (0 : ℝ) := by
   intro x hx
@@ -162,6 +164,7 @@ private lemma spectrum_zero_subset_Ici_wrap :
     simpa using hx
   simp [Set.Ici, hx0]
 
+omit [Nontrivial ℋ] in
 private lemma blockDiagonal_le_left_wrap {A0 A1 B0 B1 : L ℋ}
     (h : blockDiagonal (ℋ := ℋ) A0 A1 ≤ blockDiagonal (ℋ := ℋ) B0 B1) :
     A0 ≤ B0 := by

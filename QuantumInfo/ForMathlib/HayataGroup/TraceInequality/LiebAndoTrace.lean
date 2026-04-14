@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors:
 -/
 
-import Quantum.TraceInequality.OperatorGeometricMean
-import Quantum.TraceInequality.HilbertSchmidtOperatorSpace
+import QuantumInfo.ForMathlib.HayataGroup.TraceInequality.OperatorGeometricMean
+import QuantumInfo.ForMathlib.HayataGroup.TraceInequality.HilbertSchmidtOperatorSpace
 import Mathlib.Analysis.CStarAlgebra.Matrix
 import Mathlib.Analysis.InnerProductSpace.JointEigenspace
 import Mathlib.Analysis.Matrix.HermitianFunctionalCalculus
@@ -33,7 +33,7 @@ set_option synthInstance.maxHeartbeats 80000 in
 noncomputable local instance :
     IsometricContinuousFunctionalCalculus ℂ ((L ℋ)ᵐᵒᵖ) IsStarNormal := inferInstance
 
-set_option backward.isDefEq.respectTransparency false in
+-- set_option backward.isDefEq.respectTransparency false in -- turned out in v4.29 -> v4.28 backport
 set_option synthInstance.maxHeartbeats 80000 in
 noncomputable instance instCFCRealSelfAdjointMop :
     ContinuousFunctionalCalculus ℝ ((L ℋ)ᵐᵒᵖ) IsSelfAdjoint := inferInstance
@@ -58,6 +58,7 @@ noncomputable def liebCorollaryTraceMap (q r : ℝ) (K : L ℋ) (A B : L ℋ) : 
 noncomputable def andoTraceMap (q r : ℝ) (K : L ℋ) (A B : L ℋ) : ℝ :=
   traceRe (ℋ := ℋ) (A ^ q * star K * B ^ (-r) * K)
 
+omit [CompleteSpace ℋ] [Nontrivial ℋ] in
 private lemma rightMulHS_real_smul_one (r : ℝ) :
     rightMulHS (ℋ := ℋ) (r • (1 : L ℋ)) = r • (1 : L (HSOp ℋ)) := by
   ext T
@@ -73,6 +74,7 @@ private lemma rightMulHS_real_smul_one (r : ℝ) :
           rfl
     _ = r • ofOp (toOp T * (1 : L ℋ)) := by simp
 
+omit [CompleteSpace ℋ] [Nontrivial ℋ] in
 private lemma rightMulHS_nonneg {A : L ℋ} (hA0 : 0 ≤ A) :
     0 ≤ rightMulHS (ℋ := ℋ) A := by
   let sqrtA : L ℋ := A ^ ((1 : ℝ) / 2)
@@ -101,6 +103,7 @@ private lemma rightMulHS_nonneg {A : L ℋ} (hA0 : 0 ≤ A) :
       _ = star S * S := by simp [hSstar]
   simp [hSq]
 
+omit [CompleteSpace ℋ] [Nontrivial ℋ] in
 private lemma rightMulHS_le_rightMulHS {A B : L ℋ} (hAB : A ≤ B) :
     rightMulHS (ℋ := ℋ) A ≤ rightMulHS (ℋ := ℋ) B := by
   have hnonneg : 0 ≤ rightMulHS (ℋ := ℋ) (B - A) :=
@@ -134,6 +137,7 @@ private lemma rightMulHS_pdSet {A : L ℋ} (hA : A ∈ pdSet (ℋ := ℋ)) :
 private noncomputable def phiK (K : L ℋ) (T : L (HSOp ℋ)) : ℝ :=
   Complex.re (inner ℂ (ofOp (star K)) (T (ofOp (star K))))
 
+omit [Nontrivial ℋ] in
 private lemma phiK_nonneg (K : L ℋ) {T : L (HSOp ℋ)} (hT : 0 ≤ T) :
     0 ≤ phiK (ℋ := ℋ) K T := by
   dsimp [phiK]
@@ -148,10 +152,12 @@ private lemma phiK_nonneg (K : L ℋ) {T : L (HSOp ℋ)} (hT : 0 ≤ T) :
   rw [hre]
   exact hnonneg
 
+omit [Nontrivial ℋ] in
 private lemma phiK_add (K : L ℋ) (T S : L (HSOp ℋ)) :
     phiK (ℋ := ℋ) K (T + S) = phiK (ℋ := ℋ) K T + phiK (ℋ := ℋ) K S := by
   simp [phiK, inner_add_right, Complex.add_re]
 
+omit [Nontrivial ℋ] in
 private lemma phiK_smul (K : L ℋ) (r : ℝ) (T : L (HSOp ℋ)) :
     phiK (ℋ := ℋ) K (r • T) = r * phiK (ℋ := ℋ) K T := by
   rw [phiK]
@@ -162,6 +168,7 @@ private lemma phiK_smul (K : L ℋ) (r : ℝ) (T : L (HSOp ℋ)) :
         simpa using inner_smul_right (ofOp (star K)) (T (ofOp (star K))) (r : ℂ)]
   simp
 
+omit [Nontrivial ℋ] in
 private lemma phiK_mono (K : L ℋ) {T S : L (HSOp ℋ)} (hTS : T ≤ S) :
     phiK (ℋ := ℋ) K T ≤ phiK (ℋ := ℋ) K S := by
   have hnonneg :
@@ -175,7 +182,7 @@ private lemma phiK_mono (K : L ℋ) {T S : L (HSOp ℋ)} (hTS : T ≤ S) :
     ring
   linarith [hrewrite ▸ hphi_nonneg]
 
-omit [CompleteSpace ℋ] in
+omit [CompleteSpace ℋ] [Nontrivial ℋ] in
 private lemma leftMulHS_rankOne (A : L ℋ) (x y : ℋ) :
     leftMulHS (ℋ := ℋ) A (ofOp (InnerProductSpace.rankOne ℂ x y)) =
       ofOp (InnerProductSpace.rankOne ℂ (A x) y) := by
@@ -183,6 +190,7 @@ private lemma leftMulHS_rankOne (A : L ℋ) (x y : ℋ) :
   simpa [leftMulHS_apply] using
     (InnerProductSpace.comp_rankOne (𝕜 := ℂ) (x := x) (y := y) (f := A))
 
+omit [Nontrivial ℋ] in
 private lemma rightMulHS_rankOne (B : L ℋ) (x y : ℋ) :
     rightMulHS (ℋ := ℋ) B (ofOp (InnerProductSpace.rankOne ℂ x y)) =
       ofOp (InnerProductSpace.rankOne ℂ x ((star B) y)) := by
@@ -286,7 +294,7 @@ private lemma cfcR_apply_of_mem_eigenspace_real
 
 -- This proof is isolated because the joint eigenspace decomposition is heartbeat-heavy.
 set_option maxHeartbeats 800000 in
-set_option backward.isDefEq.respectTransparency false in
+-- set_option backward.isDefEq.respectTransparency false in -- turned out in v4.29 -> v4.28 backport
 private lemma hmiddle_leftMul_rightMul
     {s : ℝ} {A B : L ℋ}
     (hA : A ∈ pdSet (ℋ := ℋ)) (hB : B ∈ pdSet (ℋ := ℋ)) :
@@ -539,7 +547,7 @@ private lemma hmiddle_leftMul_rightMul
 
 -- The bridge lemma expands a large `HSOp`-valued generalized perspective term.
 set_option maxHeartbeats 800000 in
-set_option backward.isDefEq.respectTransparency false in
+-- set_option backward.isDefEq.respectTransparency false in -- turned out in v4.29 -> v4.28 backport
 private lemma phiK_operatorPowerMean_eq_liebTraceMap
     {s : ℝ} (K A B : L ℋ) (hA : A ∈ pdSet (ℋ := ℋ)) (hB : B ∈ pdSet (ℋ := ℋ)) :
     phiK (ℋ := ℋ) K
@@ -742,6 +750,7 @@ private lemma phiK_operatorPowerMean_eq_liebTraceMap
     _ = liebTraceMap (ℋ := ℋ) s K A B := by
           rfl
 
+omit [FiniteDimensional ℂ ℋ] in
 /-- Convex combinations preserve `pdSet` (strict positivity). -/
 lemma pdSet_convexCombo {A B : L ℋ} {t : ℝ}
     (hA : A ∈ pdSet (ℋ := ℋ)) (hB : B ∈ pdSet (ℋ := ℋ))
@@ -787,6 +796,7 @@ lemma pdSet_convexCombo {A B : L ℋ} {t : ℝ}
   simpa [C] using
     (CFC.exists_pos_algebraMap_le_iff (A := L ℋ) (a := C) (ha := hC)).1 ⟨rC, hrC, hrC_le⟩ x hx
 
+omit [Nontrivial ℋ] in
 private lemma phiK_leftMul_rightMul_eq_traceRe (K C D : L ℋ) :
     phiK (ℋ := ℋ) K
         (leftMulHS (ℋ := ℋ) C * rightMulHS (ℋ := ℋ) D) =
@@ -861,6 +871,7 @@ private lemma pdSet_rpow_of_mem_Icc_zero_one
   exact (CFC.exists_pos_algebraMap_le_iff (A := L ℋ) (a := A ^ p) (ha := hApow_sa)).1
     ⟨r ^ p, Real.rpow_pos_of_pos hr p, hbound⟩
 
+omit [Nontrivial ℋ] in
 set_option maxHeartbeats 400000 in
 private lemma liebTraceMap_mono_right
     {s : ℝ} (hs : 1 - s ∈ Set.Icc (0 : ℝ) 1)
@@ -931,6 +942,7 @@ private lemma liebTraceMap_mono_right
     simp [phiK_leftMul_rightMul_eq_traceRe, liebTraceMap, mul_assoc, sub_eq_add_neg]
   linarith [hrewrite ▸ hphi]
 
+omit [Nontrivial ℋ] in
 set_option maxHeartbeats 400000 in
 private lemma liebTraceMap_antitone_right
     {s : ℝ} (hs : 1 - s ∈ Set.Icc (-1 : ℝ) 0)

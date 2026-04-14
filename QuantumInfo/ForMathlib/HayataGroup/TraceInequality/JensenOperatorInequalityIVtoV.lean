@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors:
 -/
 
-import Quantum.TraceInequality.BlockDiagonal
-import Quantum.TraceInequality.LownerHeinzTheorem
+import QuantumInfo.ForMathlib.HayataGroup.TraceInequality.BlockDiagonal
+import QuantumInfo.ForMathlib.HayataGroup.TraceInequality.LownerHeinzTheorem
 import Mathlib.Analysis.CStarAlgebra.Unitary.Span
 
 set_option linter.style.longLine false
@@ -81,19 +81,21 @@ private theorem nontrivial_hsumL : Nontrivial (L (HSum ℋ)) := by
     exact hw hw0
   exact ⟨0, blockDiagonal (ℋ := ℋ) (1 : L ℋ) 0, hdiag_ne_zero.symm⟩
 
+omit [Nontrivial ℋ] in
 private lemma blockDiagonal_selfAdjoint {A B : L ℋ}
     (hA : IsSelfAdjoint A) (hB : IsSelfAdjoint B) :
     IsSelfAdjoint (blockDiagonal (ℋ := ℋ) A B) := by
   change star (blockDiagonal (ℋ := ℋ) A B) = blockDiagonal (ℋ := ℋ) A B
   simp [blockDiagonal_star, hA.star_eq, hB.star_eq]
 
+omit [Nontrivial ℋ] in
 private lemma blockDiagonal_eq_blockOp (A B : L ℋ) :
     blockDiagonal (ℋ := ℋ) A B = blockOp (ℋ := ℋ) A 0 0 B := by
   ext z i
   fin_cases i <;> simp [blockDiagonal, blockOp]
 
 -- Multiplication of generic block operators is elaboration-heavy even in the scratch file.
-omit [CompleteSpace ℋ] in
+omit [CompleteSpace ℋ] [Nontrivial ℋ] in
 set_option maxHeartbeats 400000 in
 -- The generic `blockOp` product expands into large block normal forms.
 private lemma blockOp_mul (A00 A01 A10 A11 B00 B01 B10 B11 : L ℋ) :
@@ -111,6 +113,7 @@ private lemma blockOp_mul (A00 A01 A10 A11 B00 B01 B10 B11 : L ℋ) :
 
 set_option synthInstance.maxHeartbeats 400000 in
 set_option maxHeartbeats 800000 in
+omit [Nontrivial ℋ] in
 private lemma cfcR_blockDiagonal (f : ℝ → ℝ)
     (A B : L ℋ) (hA : IsSelfAdjoint A) (hB : IsSelfAdjoint B)
     (hcont : ContinuousOn f (spectrum ℝ A ∪ spectrum ℝ B)) :
@@ -150,6 +153,7 @@ private lemma cfcR_blockDiagonal (f : ℝ → ℝ)
     _ = blockDiagonal (ℋ := ℋ) (cfcR (ℋ := ℋ) f A) (cfcR (ℋ := ℋ) f B) := by
             simp [φ, blockDiagonalHom]
 
+omit [Nontrivial ℋ] in
 private lemma blockDiagonal_le_left {A0 A1 B0 B1 : L ℋ}
     (h : blockDiagonal (ℋ := ℋ) A0 A1 ≤ blockDiagonal (ℋ := ℋ) B0 B1) :
     A0 ≤ B0 := by

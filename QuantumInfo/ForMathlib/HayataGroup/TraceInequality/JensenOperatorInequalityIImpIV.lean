@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors:
 -/
 
-import Quantum.TraceInequality.BlockDiagonal
-import Quantum.TraceInequality.LownerHeinzTheorem
+import QuantumInfo.ForMathlib.HayataGroup.TraceInequality.BlockDiagonal
+import QuantumInfo.ForMathlib.HayataGroup.TraceInequality.LownerHeinzTheorem
 import Mathlib.Analysis.CStarAlgebra.Unitary.Span
 import Mathlib.Algebra.Star.UnitaryStarAlgAut
 
@@ -21,7 +21,6 @@ section Theorem252
 
 variable {ℋ : Type u}
 variable [NormedAddCommGroup ℋ] [InnerProductSpace ℂ ℋ] [CompleteSpace ℋ]
-variable [Nontrivial ℋ]
 
 set_option synthInstance.maxHeartbeats 400000 in
 -- IsStarNormal CFC is only a theorem in Mathlib; CStarAlgebra chain through WithLp is deep.
@@ -44,7 +43,7 @@ def CondIV (f : ℝ → ℝ) : Prop :=
 def CondI (f : ℝ → ℝ) : Prop :=
   OperatorConvex (ℋ := ℋ) f ∧ f 0 ≤ 0
 
-omit ℋ [NormedAddCommGroup ℋ] [InnerProductSpace ℂ ℋ] [CompleteSpace ℋ] [Nontrivial ℋ] in
+omit ℋ [NormedAddCommGroup ℋ] [InnerProductSpace ℂ ℋ] [CompleteSpace ℋ] in
 /--
 Uniform version of Condition (i), packaged as `OperatorConvexAll` together with `f 0 ≤ 0`.
 -/
@@ -52,7 +51,7 @@ def CondIAll (f : ℝ → ℝ) : Prop :=
   OperatorConvexAll.{u} f ∧
     f 0 ≤ 0
 
-omit ℋ [NormedAddCommGroup ℋ] [InnerProductSpace ℂ ℋ] [CompleteSpace ℋ] [Nontrivial ℋ] in
+omit ℋ [NormedAddCommGroup ℋ] [InnerProductSpace ℂ ℋ] [CompleteSpace ℋ] in
 /--
 Uniform localized version of Condition (i), packaged as
 `OperatorConvexOnAll (Set.Ici 0)` together with continuity and `f 0 ≤ 0`.
@@ -273,7 +272,7 @@ private lemma cfcR_real_sqrt_eq_sqrt {A : L ℋ} (hA : (0 : L ℋ) ≤ A) :
   rw [CFC.sqrt_eq_real_sqrt A hA, cfcₙ_eq_cfc (f := Real.sqrt) (a := A) (hf0 := by simp), cfcR]
 
 omit [CompleteSpace ℋ] in
-private theorem nontrivial_hsumL : Nontrivial (L (HSum ℋ)) := by
+private theorem nontrivial_hsumL [Nontrivial ℋ] : Nontrivial (L (HSum ℋ)) := by
   have h_not_sub : ¬ Subsingleton ℋ := by
     intro hsub
     letI : Subsingleton ℋ := hsub
@@ -301,6 +300,7 @@ set_option synthInstance.maxHeartbeats 100000 in
 set_option linter.unusedSectionVars false in
 set_option maxHeartbeats 400000 in
 private lemma sqrt_blockDiagonal_of_nonneg
+    [Nontrivial ℋ]
     {A B : L ℋ} (hA : IsSelfAdjoint A) (hB : IsSelfAdjoint B)
     (hA_nonneg : (0 : L ℋ) ≤ A) (hB_nonneg : (0 : L ℋ) ≤ B) :
     CFC.sqrt (blockDiagonal (ℋ := ℋ) A B) =
@@ -315,6 +315,7 @@ private lemma sqrt_blockDiagonal_of_nonneg
   · simpa using
       (by cfc_cont_tac : ContinuousOn Real.sqrt (spectrum ℝ A ∪ spectrum ℝ B))
 
+omit [CompleteSpace ℋ] in
 private lemma complex_I_smul_real_I_smul_invTwo (r : ℝ) (T : L ℋ) :
     Complex.I • r • Complex.I • (2⁻¹ : ℝ) • T =
       -((2⁻¹ : ℝ) * r) • T := by
@@ -336,6 +337,7 @@ private lemma complex_I_smul_real_I_smul_invTwo (r : ℝ) (T : L ℋ) :
     _ = -((2⁻¹ : ℝ) * r) • T x := by
             simp [neg_smul, mul_comm]
 
+omit [CompleteSpace ℋ] in
 private lemma real_smul_complex_I_real_smul_complex_I_comm (s r : ℝ) (T : L ℋ) :
     (s : ℝ) • Complex.I • r • Complex.I • T =
       Complex.I • r • Complex.I • (s : ℝ) • T := by
@@ -350,6 +352,7 @@ private lemma real_smul_complex_I_real_smul_complex_I_comm (s r : ℝ) (T : L �
     _ = Complex.I • r • Complex.I • (s : ℝ) • T := by
             rfl
 
+omit [CompleteSpace ℋ] in
 private lemma half_add_half_eq (T : L ℋ) :
     (2⁻¹ : ℝ) • T + (2⁻¹ : ℝ) • T = T := by
   calc
@@ -358,6 +361,7 @@ private lemma half_add_half_eq (T : L ℋ) :
     _ = (1 : ℝ) • T := by norm_num
     _ = T := by simp
 
+omit [CompleteSpace ℋ] in
 private lemma half_mul_real_add_half_mul_real_eq (r : ℝ) (T : L ℋ) :
     ((2⁻¹ : ℝ) * r) • T + ((2⁻¹ : ℝ) * r) • T = r • T := by
   calc
@@ -438,7 +442,7 @@ private lemma rightEval_bottomRight_scalar
     _ = r • (X * star X) + R1 * (T * R1) := by rw [hS, hT]
     _ = (R1 * T * R1) + r • (X * star X) := by simp [mul_assoc, add_comm]
 
-private lemma star_mul_le_one (X : L ℋ) (hX : ‖X‖ ≤ 1) :
+private lemma star_mul_le_one [Nontrivial ℋ] (X : L ℋ) (hX : ‖X‖ ≤ 1) :
     (star X * X : L ℋ) ≤ 1 := by
   have h1 : star X * X ≤ algebraMap ℝ (L ℋ) (‖X‖ ^ 2) := by
     simpa [pow_two] using (CStarAlgebra.star_mul_le_algebraMap_norm_sq (a := X))
@@ -446,7 +450,7 @@ private lemma star_mul_le_one (X : L ℋ) (hX : ‖X‖ ≤ 1) :
     nlinarith [hX, norm_nonneg X]
   exact h1.trans (by simpa [Algebra.algebraMap_eq_smul_one] using hsq)
 
-private lemma mul_star_le_one (X : L ℋ) (hX : ‖X‖ ≤ 1) :
+private lemma mul_star_le_one [Nontrivial ℋ] (X : L ℋ) (hX : ‖X‖ ≤ 1) :
     (X * star X : L ℋ) ≤ 1 := by
   have h1 : X * star X ≤ algebraMap ℝ (L ℋ) (‖X‖ ^ 2) := by
     simpa [pow_two] using (CStarAlgebra.star_mul_le_algebraMap_norm_sq (a := star X))
@@ -455,7 +459,7 @@ private lemma mul_star_le_one (X : L ℋ) (hX : ‖X‖ ≤ 1) :
   exact h1.trans (by simpa [Algebra.algebraMap_eq_smul_one] using hsq)
 
 -- `simp` and normalization over block expressions are expensive here.
-private lemma blockSwap_norm_le_one (X : L ℋ) (hX : ‖X‖ ≤ 1) :
+private lemma blockSwap_norm_le_one [Nontrivial ℋ] (X : L ℋ) (hX : ‖X‖ ≤ 1) :
     ‖blockSwap (ℋ := ℋ) X‖ ≤ 1 := by
   have hSstar : star (blockSwap (ℋ := ℋ) X) = blockSwap (ℋ := ℋ) X :=
     blockSwap_star (ℋ := ℋ) X
@@ -518,6 +522,9 @@ private lemma spectrum_Ici_of_nonneg {A : L ℋ} (hA0 : (0 : L ℋ) ≤ A) :
     (StarOrderedRing.nonneg_iff_spectrum_nonneg (R := ℝ) A
       (ha := IsSelfAdjoint.of_nonneg hA0)).1 hA0
 
+variable [Nontrivial ℋ]
+
+omit [CompleteSpace ℋ] in
 private lemma spectrum_zero_subset_Ici :
     spectrum ℝ (0 : L ℋ) ⊆ Set.Ici (0 : ℝ) := by
   intro x hx
