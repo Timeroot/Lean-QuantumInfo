@@ -1589,14 +1589,8 @@ theorem sandwichedRenyiEntropy_DPI (hα : 1 ≤ α) (ρ σ : MState d₁) (Φ : 
   · exact sandwichedRenyiEntropy_DPI_gt_one hα ρ σ Φ
   · exact sandwichedRenyiEntropy_DPI_eq_one ρ σ Φ
 
---Helps us track the axioms for the GQSL
-axiom sandwichedRenyiEntropy_DPI_ax : type_of% @sandwichedRenyiEntropy_DPI
-
 /--
-info: 'sandwichedRenyiEntropy_DPI_ax' depends on axioms: [propext,
- sandwichedRenyiEntropy_DPI_ax,
- Classical.choice,
- Quot.sound]
+info: 'sandwichedRenyiEntropy_DPI' depends on axioms: [propext, Classical.choice, Quot.sound]
 -/
 #guard_msgs in
-#print axioms sandwichedRenyiEntropy_DPI_ax
+#print axioms sandwichedRenyiEntropy_DPI
