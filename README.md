@@ -22,18 +22,20 @@ The docgen is available on [my website](https://ohaithe.re/Lean-QuantumInfo/Quan
 
 Docmentation of the main definitions can be found at [DOC.md](./DOC.md). A majority of the work will be outlining the major definitions and theorems from Mark Wilde's _Quantum Information Theory_. A correspondence to the definitions and theorems (in the form of a todo-list) are in [TODO](./TODO.md)
 
-# Major Goal: Generalized Quantum Stein's Lemma
+# Major Accomplishment: Generalized Quantum Stein's Lemma
 
-At the moment, the major goal of this repository is completing a proof of the [Generalized Quantum Stein's Lemma](https://arxiv.org/abs/2408.02722v1), following the proof in that link. The first milestone will be to formalize all the arguments _in that paper_ (while relying on standard or "obvious" results), and then the second milestone will be filling in all those other results so that the whole theorem is sorry-free. The first milestone is, at the moment (October 2025), quite close.
+The initial guiding goal of this repository was completing a proof of the [Generalized Quantum Stein's Lemma](https://arxiv.org/abs/2408.02722v1), following the proof in the linked paper. The first milestone was formalizing all the arguments _in that paper_ (while relying on standard or "obvious" results), which was completed in October 2025. The project was completed when all the other standard results were formalized as well, which was completed in April 2026.
+
+The final theorem is stated as `limit_hypotesting_eq_limit_rel_entropy` in `QuantumInfo/Finite/ResourceTheory/SteinsLemma.lean`.
 
 See our report on the project at [this link](https://arxiv.org/abs/2510.08672).
 
 # Stats
 
-As of Sept 29 2025:
- * 1059 Theorems <!-- git grep -E "(^| )(theorem|instance|lemma) " | grep ".lean:" | wc -l -->
- * 248 Definitions <!-- git grep -E "(^| )(def|abbrev|irreducible_def) " | grep ".lean:" | wc -l -->
- * 13992 Lines of Code <!-- git ls-files | grep '\.lean' | xargs wc -l -->
+As of May 5th 2026 (counts approximate):
+ * 2143 Theorems <!-- git grep -E "(^| )(theorem|instance|lemma) " | grep ".lean:" | wc -l -->
+ * 423 Definitions <!-- git grep -E "(^| )(def|abbrev|irreducible_def) " | grep ".lean:" | wc -l -->
+ * 38105 Lines of Code <!-- git ls-files | grep '\.lean' | xargs wc -l -->
 
 This doesn't include various code snippets that have been upstreamed to Mathlib.
 
@@ -51,4 +53,4 @@ This repository is released under the MIT License, as found in the [LICENSE](./L
   howpublished = {\url{https://github.com/Timeroot/Lean-QuantumInfo}},
 }
 ```
-or cite [the report](https://arxiv.org/abs/2510.08672) for the Stein's Lemma work in particular. Thanks to all contributors, especially Leonardo Lessa and Rodolfo Soldati.
+or cite [the report](https://arxiv.org/abs/2510.08672) for the Stein's Lemma work in particular. Thanks to all contributors, especially Leonardo Lessa and Rodolfo Soldati. Also, thanks to Hayata Yamasaki who has contributed substantial code on operator inequalities (ported to this repository from his own).

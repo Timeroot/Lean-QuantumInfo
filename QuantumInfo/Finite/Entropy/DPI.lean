@@ -5,6 +5,7 @@ Authors: Alex Meiburg
 -/
 import QuantumInfo.Finite.Entropy.Relative
 import QuantumInfo.ForMathlib.HermitianMat.Sqrt
+import QuantumInfo.ForMathlib.HermitianMat.LiebConcavity
 
 noncomputable section
 
@@ -24,404 +25,1572 @@ open scoped InnerProductSpace RealInnerProductSpace HermitianMat
 
 The Data Processing Inequality (DPI) for the sandwiched Rényi relative entropy, and
 as a consequence, the quantum relative entropy.
+
+## Proof structure (for α > 1)
+
+Following Leditzky–Rouzé–Datta (arXiv:1306.5920), the proof proceeds as follows:
+
+1. Define the **trace functional** `Q̃_α(ρ‖σ) = Tr[(σ^γ ρ σ^γ)^α]` where `γ = (1 - α) / (2α)`.
+   The sandwiched Rényi divergence satisfies `D̃_α(ρ‖σ) = log(Q̃_α(ρ‖σ)) / (α - 1)`.
+
+2. The DPI for `D̃_α` reduces to **monotonicity of `Q̃_α` under partial trace**:
+   `Q̃_α(ρ_AB‖σ_AB) ≥ Q̃_α(ρ_A‖σ_A)` for `α > 1`.
+
+3. This monotonicity is proved via the **twirling argument**:
+   - `Q̃_α` is invariant under joint unitary conjugation.
+   - `Q̃_α` is jointly convex for `α > 1` (Frank–Lieb).
+   - A twirling set of unitaries `{V_i}` averages any state to a product with the
+     maximally mixed state.
+   - `Q̃_α` is invariant under tensoring with a fixed state.
+
+4. The general DPI for CPTP maps follows via **Stinespring dilation**:
+   any CPTP map can be decomposed as ancilla preparation + unitary + partial trace.
 -/
 
 open scoped Matrix ComplexOrder
 open BigOperators
 
-/-- The weighted norm \|X\|_{p, σ} defined in the paper. -/
-noncomputable def weighted_norm (p : ℝ) (σ : MState d) (X : Matrix d d ℂ) : ℝ :=
-  let σ_pow : HermitianMat d ℂ := σ.M.cfc (fun x => x ^ (1 / (2 * p)))
-  schattenNorm (σ_pow.mat * X * σ_pow.mat) p
+/-! ## The Sandwiched Trace Functional -/
 
-/-- The spectral norm (operator norm) of a matrix. -/
-noncomputable def spectralNorm_mat (A : Matrix d d ℂ) : ℝ :=
-  if h : Finset.univ.Nonempty then
-    let A_dag_A : HermitianMat d ℂ := ⟨A.conjTranspose * A, by
-      have h := Matrix.isHermitian_mul_conjTranspose_self A.conjTranspose
-      rwa [Matrix.conjTranspose_conjTranspose] at h⟩
-    Real.sqrt ((Finset.univ.image A_dag_A.H.eigenvalues).max' (Finset.Nonempty.image h _))
-  else 0
+/-- The sandwiched trace functional `Q̃_α(ρ‖σ) = Tr[(σ^γ ρ σ^γ)^α]` where `γ = (1-α)/(2α)`.
+This is the quantity underlying the sandwiched Rényi divergence:
+`D̃_α(ρ‖σ) = log(Q̃_α(ρ‖σ)) / (α - 1)`.
 
-/-- The weighted norm for p = \infty. -/
-noncomputable def weighted_norm_infty (_ : MState d) (X : Matrix d d ℂ) : ℝ :=
-  spectralNorm_mat X
+Note: the `conj` operation gives `A.conj B = B * A.mat * B†`, and since `σ^γ` is Hermitian
+(self-adjoint), `B† = B`, so `ρ.M.conj (σ.M ^ γ).mat = σ^γ * ρ * σ^γ`. -/
+noncomputable def sandwichedTraceFunctional (α : ℝ) (ρ σ : MState d) : ℝ :=
+  let γ := (1 - α) / (2 * α)
+  ((ρ.M.conj (σ.M ^ γ).mat) ^ α).trace
 
-/-- The map Γ_σ(X) = σ^{1/2} X σ^{1/2}. -/
-noncomputable def Gamma (σ : MState d) (X : Matrix d d ℂ) : Matrix d d ℂ :=
-  let σ_half : HermitianMat d ℂ := σ.M.cfc (fun x => x ^ (1/2 : ℝ))
-  σ_half.mat * X * σ_half.mat
+notation "Q̃_" α "(" ρ "‖" σ ")" => sandwichedTraceFunctional α ρ σ
 
-/-- The inverse map Γ_σ^{-1}(X) = σ^{-1/2} X σ^{-1/2}. -/
-noncomputable def Gamma_inv (σ : MState d) (X : Matrix d d ℂ) : Matrix d d ℂ :=
-  let σ_inv_half : HermitianMat d ℂ := σ.M.cfc (fun x => x ^ (-1/2 : ℝ))
-  σ_inv_half.mat * X * σ_inv_half.mat
-
-/-- The operator T = Γ_{Φ(σ)}^{-1} ∘ Φ ∘ Γ_σ. -/
-noncomputable def T_op (Φ : CPTPMap d d₂) (σ : MState d) (X : Matrix d d ℂ) : Matrix d₂ d₂ ℂ :=
-  Gamma_inv (Φ σ) (Φ.map (Gamma σ X))
-
-/-- The induced norm of a map Ψ: M_d -> M_d2 with respect to weighted norms. -/
-noncomputable def induced_norm (p : ℝ) (σ : MState d) (Φ : CPTPMap d d₂) (Ψ : Matrix d d ℂ → Matrix d₂ d₂ ℂ) : ℝ :=
-  sSup { weighted_norm p (Φ σ) (Ψ X) / weighted_norm p σ X | (X : Matrix d d ℂ) (_ : weighted_norm p σ X ≠ 0) }
+/-! ## Properties of the Trace Functional -/
 
 /-
-The induced norm of a map Ψ with respect to the weighted infinity norm.
+The sandwiched Rényi divergence equals `log(Q̃_α) / (α - 1)` for `α > 0`, `α ≠ 1`,
+when `σ.M.ker ≤ ρ.M.ker`.
 -/
-noncomputable def induced_norm_infty_map (σ : MState d) (Φ : CPTPMap d d₂) (Ψ : Matrix d d ℂ → Matrix d₂ d₂ ℂ) : ℝ :=
-  sSup { weighted_norm_infty (Φ σ) (Ψ X) / weighted_norm_infty σ X | (X : Matrix d d ℂ) (_ : weighted_norm_infty σ X ≠ 0) }
+theorem sandwichedRelRentropy_eq_log_traceFunctional (hα₀ : 0 < α) (hα₁ : α ≠ 1)
+    (hker : σ.M.ker ≤ ρ.M.ker) :
+    D̃_ α(ρ‖σ) = ENNReal.ofReal (Real.log (Q̃_ α(ρ‖σ)) / (α - 1)) := by
+  rw [ ENNReal.ofReal_eq_coe_nnreal ];
+  unfold SandwichedRelRentropy sandwichedTraceFunctional
+  split
+  next h => simp_all only
+  next h => rfl
 
 /-
-The operator T = Γ_{Φ(σ)}^{-1} ∘ Φ ∘ Γ_σ as a linear map.
+`Q̃_α(ρ‖σ)` is nonneg when `α > 0`.
 -/
-noncomputable def T_map (σ : MState d) (Φ : CPTPMap d d₂) : MatrixMap d d₂ ℂ :=
-  { toFun := fun X => T_op Φ σ X,
-    map_add' := fun X Y => by
-      unfold T_op Gamma Gamma_inv
-      simp [Matrix.mul_add, Matrix.add_mul]
-    map_smul' := fun c X => by
-      unfold T_op
-      simp
-      unfold Gamma Gamma_inv
-      simp [mul_assoc]
-  }
+theorem sandwichedTraceFunctional_nonneg (ρ σ : MState d) :
+    0 ≤ Q̃_ α(ρ‖σ) := by
+  rw [sandwichedTraceFunctional]
+  apply HermitianMat.trace_nonneg
+  apply HermitianMat.rpow_nonneg
+  apply HermitianMat.conj_nonneg
+  exact ρ.nonneg
+
+/-- The trace functional is strictly positive when the kernel condition holds. Under
+`σ.M.ker ≤ ρ.M.ker` (i.e. `supp(ρ) ⊆ supp(σ)`), the sandwich `σ^γ ρ σ^γ ≠ 0`
+because ρ has support inside σ's support. -/
+theorem sandwichedTraceFunctional_pos
+    (ρ σ : MState d) (hker : σ.M.ker ≤ ρ.M.ker) :
+    0 < Q̃_ α(ρ‖σ) := by
+  rw [sandwichedTraceFunctional]
+  apply HermitianMat.trace_pos
+  apply HermitianMat.rpow_pos
+  apply HermitianMat.conj_pos ρ.pos
+  grw [← hker]
+  exact HermitianMat.ker_rpow_le_of_nonneg σ.nonneg
+
+/-! ## Unitary Invariance
+
+`Q̃_α(UρU†‖UσU†) = Q̃_α(ρ‖σ)` for any unitary `U`.
+
+Here, `HermitianMat.conj U.val A` denotes `U * A * U†`, so "conjugating ρ and σ by
+the same unitary" means applying `HermitianMat.conj U.val` to both. -/
 
 /-
-Gamma_map is the conjugation by the square root of sigma.
+The trace functional is invariant under joint unitary conjugation:
+`Tr[(U σ U†)^γ (U ρ U†) (U σ U†)^γ)^α] = Tr[(σ^γ ρ σ^γ)^α]`.
+This corresponds to equation (2.3) in the paper.
+Proved using `rpow_conj_unitary` (f(UXU†) = U f(X) U†) and `conj_conj`.
 -/
-noncomputable def Gamma_map (σ : MState d) : MatrixMap d d ℂ :=
-  MatrixMap.conj (σ.M.cfc (fun x => x ^ (1/2 : ℝ))).mat
+theorem sandwichedTraceFunctional_conj_unitary_hermitian
+    (U : Matrix.unitaryGroup d ℂ) (A B : HermitianMat d ℂ) :
+    let γ := (1 - α) / (2 * α)
+    ((A.conj U.val).conj ((B.conj U.val) ^ γ).mat ^ α).trace =
+      ((A.conj (B ^ γ).mat) ^ α).trace := by
+  have h_rpow_conj : ∀ (A : HermitianMat d ℂ) (U : Matrix.unitaryGroup d ℂ) (r : ℝ), (HermitianMat.conj U.val A) ^ r = HermitianMat.conj U.val (A ^ r) := by
+    -- Apply the theorem `HermitianMat.rpow_conj_unitary` to conclude the proof.
+    apply HermitianMat.rpow_conj_unitary;
+  have h_conj_conj : ∀ (A B : HermitianMat d ℂ) (U : Matrix.unitaryGroup d ℂ), (HermitianMat.conj U.val A).conj ((HermitianMat.conj U.val B).mat) = HermitianMat.conj U.val (A.conj B.mat) := by
+    intros A B U
+    simp [HermitianMat.conj];
+    have h_unitary : ∀ (U : Matrix.unitaryGroup d ℂ), U.val * U.val.conjTranspose = 1 := by
+      exact fun U => U.2.2;
+    simp [ ← mul_assoc ];
+    have := h_unitary U; simp_all [ Matrix.mul_assoc, mul_eq_one_comm.mp this ] ;
+  simp_all [ HermitianMat.conj_apply_mat ]
 
-lemma Gamma_map_eq (σ : MState d) (X : Matrix d d ℂ) :
-    Gamma_map σ X = Gamma σ X := by
-  ext; simp [ Gamma_map, Gamma ];
-  apply_rules [ IsSelfAdjoint.cfc ]
+/-- The trace functional is invariant under joint unitary conjugation of MStates. -/
+theorem sandwichedTraceFunctional_conj_unitary_MState
+    (U : Matrix.unitaryGroup d ℂ) (ρ σ : MState d) :
+    Q̃_ α(ρ.U_conj U‖σ.U_conj U) = Q̃_ α(ρ‖σ) := by
+  unfold sandwichedTraceFunctional MState.U_conj
+  exact sandwichedTraceFunctional_conj_unitary_hermitian U ρ.M σ.M
+
+/-! ## Joint Convexity for α > 1
+
+The trace functional `Q̃_α` is jointly convex for `α > 1`. This is proved by
+Frank and Lieb via a variational formula and strict convexity of trace functions.
+
+### Trace functions convexity
+
+The following result is used in the proof: for a convex function `g : ℝ → ℝ`,
+the map `A ↦ Tr[g(A)]` on Hermitian matrices is convex (Carlen, Theorem 2.10).  -/
+
+namespace HermitianMat
 
 /-
-Gamma_map is completely positive.
+The trace of cfc(g, A) is invariant under unitary conjugation of A.
+Follows from `cfc_conj_unitary` and `trace_conj_unitary`.
 -/
-lemma Gamma_map_CP (σ : MState d) : (Gamma_map σ).IsCompletelyPositive := by
-  have := @MatrixMap.conj_isCompletelyPositive;
-  exact this _
+lemma trace_cfc_conj_unitary (A : HermitianMat d ℂ) (g : ℝ → ℝ) (U : Matrix.unitaryGroup d ℂ) :
+    ((A.conj U.val).cfc g).trace = (A.cfc g).trace := by
+  -- By the properties of the unitary group, we can rewrite $(A.conj U.val).cfc g$ as $(A.cfc g).conj U$.
+  have h_unitary : (conj U.val A).cfc g = (A.cfc g).conj U.val := by
+    convert HermitianMat.cfc_conj_unitary _ _ _ using 1;
+  rw [ h_unitary, HermitianMat.trace_conj_unitary ]
 
 /-
-Gamma_inv_map is the conjugation by the inverse square root of sigma.
+Peierls inequality: for a convex function g, the sum of g applied to the
+diagonal entries of a Hermitian matrix is at most the trace of g(A).
+This follows from Jensen's inequality applied to the spectral decomposition.
 -/
-noncomputable def Gamma_inv_map (σ : MState d) : MatrixMap d d ℂ :=
-  MatrixMap.conj (σ.M.cfc (fun x => x ^ (-1/2 : ℝ))).mat
+theorem peierls_inequality (A : HermitianMat d ℂ) (g : ℝ → ℝ) (hg : ConvexOn ℝ Set.univ g) :
+    ∑ i, g ((A.mat i i).re) ≤ (A.cfc g).trace := by
+  -- By the properties of the trace and the convexity of $g$, we have:
+  have h_trace_le : ∑ i, g ((A.mat i i).re) ≤ ∑ j, g (A.H.eigenvalues j) * ∑ i, ‖(A.H.eigenvectorUnitary.val i j)‖^2 := by
+    -- By the spectral theorem, we can write $A$ as $A = \sum_{i} \lambda_i u_i u_i^*$, where $\lambda_i$ are the eigenvalues and $u_i$ are the corresponding eigenvectors.
+    have h_spectral : ∀ i, (A.mat i i).re = ∑ j, A.H.eigenvalues j * ‖(A.H.eigenvectorUnitary.val i j)‖^2 := by
+      intro i
+      have h_sum : (A.mat i i).re = ∑ j, (A.H.eigenvectorBasis j i) * star (A.H.eigenvectorBasis j i) * A.H.eigenvalues j := by
+        have := A.H.spectral_theorem;
+        replace this := congr_fun ( congr_fun this i ) i ; simp_all [ Matrix.mul_apply, Matrix.diagonal ] ;
+        simp [ Complex.ext_iff, mul_comm, mul_left_comm ];
+        exact Finset.sum_congr rfl fun _ _ => by ring;
+      simp_all [ Complex.ext_iff, mul_comm ];
+      simp [ Complex.normSq, Complex.sq_norm ];
+    have h_jensen : ∀ i, g ((A.mat i i).re) ≤ ∑ j, ‖(A.H.eigenvectorUnitary.val i j)‖^2 * g (A.H.eigenvalues j) := by
+      intro i
+      have h_convex_comb : ∑ j, ‖(A.H.eigenvectorUnitary.val i j)‖^2 = 1 := by
+        have := A.H.eigenvectorUnitary.2;
+        have := this.2;
+        replace this := congr_fun ( congr_fun this i ) i; simp_all [ Matrix.mul_apply, Complex.mul_conj, Complex.normSq_eq_norm_sq ] ;
+        exact_mod_cast this;
+      convert hg.map_sum_le _ _ _ <;> simp_all [ mul_comm ];
+    convert Finset.sum_le_sum fun i _ => h_jensen i using 1;
+    rw [ Finset.sum_comm, Finset.sum_congr rfl ] ; intros ; rw [ Finset.mul_sum _ _ _ ] ; ac_rfl;
+  have h_unitary : ∀ (j : d), ∑ i, ‖(A.H.eigenvectorUnitary.val i j)‖^2 = 1 := by
+    exact fun j => Matrix.unitaryGroup_row_norm (H A).eigenvectorUnitary j;
+  simp_all [ HermitianMat.trace_cfc_eq ]
 
-lemma Gamma_inv_map_eq (σ : MState d) (X : Matrix d d ℂ) :
-    Gamma_inv_map σ X = Gamma_inv σ X := by
-  simp [Gamma_inv_map, Gamma_inv];
-  congr;
-  apply IsSelfAdjoint.cfc
+theorem peierls_inequality_ici (A : HermitianMat d ℂ) (g : ℝ → ℝ) (hg : ConvexOn ℝ (Set.Ici 0) g)
+  (hA : 0 ≤ A) :
+    ∑ i, g ((A.mat i i).re) ≤ (A.cfc g).trace := by
+  -- By the properties of the trace and the convexity of $g$, we have:
+  have h_trace_le : ∑ i, g ((A.mat i i).re) ≤ ∑ j, g (A.H.eigenvalues j) * ∑ i, ‖(A.H.eigenvectorUnitary.val i j)‖^2 := by
+    -- By the spectral theorem, we can write $A$ as $A = \sum_{i} \lambda_i u_i u_i^*$, where $\lambda_i$ are the eigenvalues and $u_i$ are the corresponding eigenvectors.
+    have h_spectral : ∀ i, (A.mat i i).re = ∑ j, A.H.eigenvalues j * ‖(A.H.eigenvectorUnitary.val i j)‖^2 := by
+      intro i
+      have h_sum : (A.mat i i).re = ∑ j, (A.H.eigenvectorBasis j i) * star (A.H.eigenvectorBasis j i) * A.H.eigenvalues j := by
+        have := A.H.spectral_theorem;
+        replace this := congr_fun ( congr_fun this i ) i ; simp_all [ Matrix.mul_apply, Matrix.diagonal ] ;
+        simp [ Complex.ext_iff, mul_comm, mul_left_comm ];
+        exact Finset.sum_congr rfl fun _ _ => by ring;
+      simp_all [ Complex.ext_iff, mul_comm ];
+      simp [ Complex.normSq, Complex.sq_norm ];
+    have h_jensen : ∀ i, g ((A.mat i i).re) ≤ ∑ j, ‖(A.H.eigenvectorUnitary.val i j)‖^2 * g (A.H.eigenvalues j) := by
+      intro i
+      have h_convex_comb : ∑ j, ‖(A.H.eigenvectorUnitary.val i j)‖^2 = 1 := by
+        have := A.H.eigenvectorUnitary.2;
+        have := this.2;
+        replace this := congr_fun ( congr_fun this i ) i; simp_all [ Matrix.mul_apply, Complex.mul_conj, Complex.normSq_eq_norm_sq ] ;
+        exact_mod_cast this;
+      convert hg.map_sum_le _ _ _
+      · simp_all [ mul_comm ];
+      · simp
+      · simpa
+      · simp
+        intro i
+        exact A.eigenvalues_nonneg hA i
+    convert Finset.sum_le_sum fun i _ => h_jensen i using 1;
+    rw [ Finset.sum_comm, Finset.sum_congr rfl ] ; intros ; rw [ Finset.mul_sum _ _ _ ] ; ac_rfl;
+  have h_unitary : ∀ (j : d), ∑ i, ‖(A.H.eigenvectorUnitary.val i j)‖^2 = 1 := by
+    exact fun j => Matrix.unitaryGroup_row_norm (H A).eigenvectorUnitary j;
+  simp_all [ HermitianMat.trace_cfc_eq ]
 
 /-
-The inverse square root of sigma.
+Joint convexity of the trace functional: for a convex function g,
+the map A ↦ tr(g(A)) is convex on the space of Hermitian matrices.
 -/
-noncomputable def sigma_inv_sqrt (σ : MState d) : Matrix d d ℂ :=
-  (σ.M.cfc (fun x => x ^ (-1/2 : ℝ))).mat
+theorem trace_function_convex_univ (g : ℝ → ℝ) (hg : ConvexOn ℝ Set.univ g) :
+    ConvexOn ℝ Set.univ (fun A : HermitianMat d ℂ => (A.cfc g).trace) := by
+  refine ⟨convex_univ, ?_⟩
+  intro A _ B _ a b ha hb hab;
+  -- Let $C = aA + bB$.
+  set C : HermitianMat d ℂ := a • A + b • B;
+  -- By the properties of the trace and the convexity of $g$, we have:
+  have h_trace : (C.cfc g).trace = ∑ i, g (C.H.eigenvalues i) := by
+    exact trace_cfc_eq C g;
+  -- By the properties of the trace and the convexity of $g$, we have $\sum_{i} g(C_{ii}) \leq a \sum_{i} g(A_{ii}) + b \sum_{i} g(B_{ii})$.
+  have h_sum : ∑ i, g (C.H.eigenvalues i) ≤ a * ∑ i, g ((A.conj (star C.H.eigenvectorUnitary.val)).mat i i |> Complex.re) + b * ∑ i, g ((B.conj (star C.H.eigenvectorUnitary.val)).mat i i |> Complex.re) := by
+    have h_sum : ∀ i, g (C.H.eigenvalues i) ≤ a * g ((A.conj (star C.H.eigenvectorUnitary.val)).mat i i |> Complex.re) + b * g ((B.conj (star C.H.eigenvectorUnitary.val)).mat i i |> Complex.re) := by
+      intro i
+      have h_eigenvalue : C.H.eigenvalues i = a * ((A.conj (star C.H.eigenvectorUnitary.val)).mat i i |> Complex.re) + b * ((B.conj (star C.H.eigenvectorUnitary.val)).mat i i |> Complex.re) := by
+        have h_eigenvalue : (C.conj (star C.H.eigenvectorUnitary.val)).mat i i = a * (A.conj (star C.H.eigenvectorUnitary.val)).mat i i + b * (B.conj (star C.H.eigenvectorUnitary.val)).mat i i := by
+          simp +zetaDelta at *;
+          simp [conj]
+          exact Complex.ext rfl rfl;
+        have h_eigenvalue : (C.conj (star C.H.eigenvectorUnitary.val)) = (diagonal ℂ C.H.eigenvalues).conj 1 := by
+          have h_eigenvalue : C = (diagonal ℂ C.H.eigenvalues).conj C.H.eigenvectorUnitary := by
+            exact eq_conj_diagonal C;
+          convert congr_arg ( fun x => ( conj ( star C.H.eigenvectorUnitary.val ) ) x ) h_eigenvalue using 1;
+          simp [ HermitianMat.conj_conj ];
+        simp_all [ HermitianMat.conj ];
+        convert congr_arg Complex.re ‹ ( diagonal ℂ _ ) i i = _ › using 1;
+        · exact Eq.symm ( by erw [ show ( diagonal ℂ _ : HermitianMat d ℂ ) i i = ( C.H.eigenvalues i : ℂ ) by exact if_pos rfl ] ; norm_cast );
+        · norm_num [ Complex.ext_iff ];
+      rw [h_eigenvalue]
+      exact hg.2 trivial trivial ha hb hab;
+    simpa only [ Finset.mul_sum _ _ _, Finset.sum_add_distrib ] using Finset.sum_le_sum fun i _ => h_sum i;
+  -- By the properties of the trace and the convexity of $g$, we have $\sum_{i} g(A_{ii}) \leq \text{tr}(g(A))$ and $\sum_{i} g(B_{ii}) \leq \text{tr}(g(B))$.
+  have h_trace_A : ∑ i, g ((A.conj (star C.H.eigenvectorUnitary.val)).mat i i |> Complex.re) ≤ (A.cfc g).trace := by
+    convert HermitianMat.peierls_inequality _ _ hg using 1;
+    convert HermitianMat.trace_cfc_conj_unitary _ _ _ using 1;
+    rotate_right;
+    exact C.H.eigenvectorUnitary;
+    simp [ conj_conj ]
+  have h_trace_B : ∑ i, g ((B.conj (star C.H.eigenvectorUnitary.val)).mat i i |> Complex.re) ≤ (B.cfc g).trace := by
+    convert HermitianMat.peierls_inequality _ _ hg using 1;
+    convert HermitianMat.trace_cfc_conj_unitary _ _ _;
+    rotate_right;
+    exact C.H.eigenvectorUnitary;
+    simp [ conj_conj ];
+  simpa only [ h_trace ] using h_sum.trans ( add_le_add ( mul_le_mul_of_nonneg_left h_trace_A ha ) ( mul_le_mul_of_nonneg_left h_trace_B hb ) )
+
+/-- Convexity of trace functions: if `g` is convex on `ℝ₊`, then `A ↦ Tr[g(A)]`
+is convex on PSD matrices. This is Theorem 2.10 of Carlen. -/
+theorem trace_function_convex_ici {g : ℝ → ℝ} (hg : ConvexOn ℝ (Set.Ici 0) g) :
+    ConvexOn ℝ {A : HermitianMat d ℂ | 0 ≤ A} (fun A => (A.cfc g).trace) := by
+  refine ⟨convex_Ici 0, ?_⟩
+  intro A hA B hB a b ha hb hab;
+  -- Let $C = aA + bB$.
+  set C : HermitianMat d ℂ := a • A + b • B;
+  -- By the properties of the trace and the convexity of $g$, we have:
+  have h_trace : (C.cfc g).trace = ∑ i, g (C.H.eigenvalues i) := by
+    exact trace_cfc_eq C g;
+  -- By the properties of the trace and the convexity of $g$, we have $\sum_{i} g(C_{ii}) \leq a \sum_{i} g(A_{ii}) + b \sum_{i} g(B_{ii})$.
+  have h_sum : ∑ i, g (C.H.eigenvalues i) ≤ a * ∑ i, g ((A.conj (star C.H.eigenvectorUnitary.val)).mat i i |> Complex.re) + b * ∑ i, g ((B.conj (star C.H.eigenvectorUnitary.val)).mat i i |> Complex.re) := by
+    have h_sum : ∀ i, g (C.H.eigenvalues i) ≤ a * g ((A.conj (star C.H.eigenvectorUnitary.val)).mat i i |> Complex.re) + b * g ((B.conj (star C.H.eigenvectorUnitary.val)).mat i i |> Complex.re) := by
+      intro i
+      have h_eigenvalue : C.H.eigenvalues i = a * ((A.conj (star C.H.eigenvectorUnitary.val)).mat i i |> Complex.re) + b * ((B.conj (star C.H.eigenvectorUnitary.val)).mat i i |> Complex.re) := by
+        have h_eigenvalue : (C.conj (star C.H.eigenvectorUnitary.val)).mat i i = a * (A.conj (star C.H.eigenvectorUnitary.val)).mat i i + b * (B.conj (star C.H.eigenvectorUnitary.val)).mat i i := by
+          simp +zetaDelta only [mat_add, mat_smul, map_add, mat_apply]
+          simp only [conj, AddMonoidHom.coe_mk, ZeroHom.coe_mk, mat_smul, Algebra.mul_smul_comm,
+            Algebra.smul_mul_assoc]
+          rfl
+        have h_eigenvalue : (C.conj (star C.H.eigenvectorUnitary.val)) = (diagonal ℂ C.H.eigenvalues).conj 1 := by
+          have h_eigenvalue : C = (diagonal ℂ C.H.eigenvalues).conj C.H.eigenvectorUnitary := by
+            exact eq_conj_diagonal C;
+          convert congr_arg ( fun x => ( conj ( star C.H.eigenvectorUnitary.val ) ) x ) h_eigenvalue using 1;
+          simp [ HermitianMat.conj_conj ];
+        simp_all [ HermitianMat.conj ];
+        convert congr_arg Complex.re ‹ ( diagonal ℂ _ ) i i = _ › using 1;
+        · exact Eq.symm ( by erw [ show ( diagonal ℂ _ : HermitianMat d ℂ ) i i = ( C.H.eigenvalues i : ℂ ) by exact if_pos rfl ] ; norm_cast );
+        · norm_num [ Complex.ext_iff ];
+      rw [h_eigenvalue]
+      refine hg.2 ?_ ?_ ha hb hab
+      · simp
+        exact (Complex.le_def.mp (((zero_le_iff.mp (conj_nonneg _ hA)).diag_nonneg (i := i)))).1
+      · simp
+        exact (Complex.le_def.mp (((zero_le_iff.mp (conj_nonneg _ hB)).diag_nonneg (i := i)))).1
+    simpa only [ Finset.mul_sum _ _ _, Finset.sum_add_distrib ] using Finset.sum_le_sum fun i _ => h_sum i;
+  -- By the properties of the trace and the convexity of $g$, we have $\sum_{i} g(A_{ii}) \leq \text{tr}(g(A))$ and $\sum_{i} g(B_{ii}) \leq \text{tr}(g(B))$.
+  have h_trace_A : ∑ i, g ((A.conj (star C.H.eigenvectorUnitary.val)).mat i i |> Complex.re) ≤ (A.cfc g).trace := by
+    have hA' : 0 ≤ A.conj (star C.H.eigenvectorUnitary.val) := A.conj_nonneg _ hA
+    calc ∑ i, g ((A.conj (star C.H.eigenvectorUnitary.val)).mat i i |> Complex.re)
+        ≤ ((A.conj (star C.H.eigenvectorUnitary.val)).cfc g).trace :=
+          peierls_inequality_ici _ _ hg hA'
+      _ = (A.cfc g).trace :=
+          trace_cfc_conj_unitary A g ⟨star C.H.eigenvectorUnitary.val, by
+            rw [Matrix.mem_unitaryGroup_iff, star_star]; exact C.H.eigenvectorUnitary.prop.1⟩
+  have h_trace_B : ∑ i, g ((B.conj (star C.H.eigenvectorUnitary.val)).mat i i |> Complex.re) ≤ (B.cfc g).trace := by
+    have hB' : 0 ≤ B.conj (star C.H.eigenvectorUnitary.val) := B.conj_nonneg _ hB
+    calc ∑ i, g ((B.conj (star C.H.eigenvectorUnitary.val)).mat i i |> Complex.re)
+        ≤ ((B.conj (star C.H.eigenvectorUnitary.val)).cfc g).trace :=
+          peierls_inequality_ici _ _ hg hB'
+      _ = (B.cfc g).trace :=
+          trace_cfc_conj_unitary B g ⟨star C.H.eigenvectorUnitary.val, by
+            rw [Matrix.mem_unitaryGroup_iff, star_star]; exact C.H.eigenvectorUnitary.prop.1⟩
+  simpa only [ h_trace ] using h_sum.trans ( add_le_add ( mul_le_mul_of_nonneg_left h_trace_A ha ) ( mul_le_mul_of_nonneg_left h_trace_B hb ) )
+
+-- /-- Strict convexity of trace functions: if `g` is strictly convex on `ℝ₊`, then
+-- `A ↦ Tr[g(A)]` is strictly convex on PSD matrices. -/
+-- theorem trace_function_strictConvex {g : ℝ → ℝ} (hg : StrictConvexOn ℝ (Set.Ici 0) g)
+--     (hg_cont : Continuous g) :
+--     StrictConvexOn ℝ {A : HermitianMat d ℂ | 0 ≤ A}
+--       (fun A => (A.cfc g).trace) := by
+--   not needed right now
+
+end HermitianMat
+
+/-! ### Variational formula for the trace functional
+Following Frank–Lieb, for `α > 1` we define
+  `f_α(H, ρ, σ) = α · Tr[ρ · H] − (α−1) · Tr[(σ^{−γ} H σ^{−γ})^{α/(α−1)}]`
+where `γ = (1−α)/(2α)` (so `−γ = (α−1)/(2α) > 0`).
+Key facts (each stated as a lemma below):
+1. `Q̃_α(ρ‖σ) = sup_{H ≥ 0} f_α(H, ρ, σ)` for α > 1.
+2. For fixed `H`, `f_α` is linear in `ρ` (hence convex).
+3. For fixed `H`, `f_α` is convex in `σ` (uses Lieb concavity).
+4. Therefore `f_α` is jointly convex in `(ρ, σ)` for fixed `H`.
+5. The supremum of jointly convex functions is jointly convex.
+-/
+
+/-- The variational function `f_α(H, ρ, σ) = α · ⟪ρ, H⟫ − (α−1) · Tr[(σ^{−γ} H σ^{−γ})^{α/(α−1)}]`
+where `γ = (1−α)/(2α)`. For fixed `H ≥ 0`, this is linear in `ρ` and convex in `σ`.
+Frank–Lieb show that `Q̃_α(ρ‖σ) = sup_{H ≥ 0} f_α(H, ρ, σ)` for `α > 1`. -/
+noncomputable def f_alpha (α : ℝ) (H : HermitianMat d ℂ) (ρ σ : MState d) : ℝ :=
+  let γ : ℝ := (1 - α) / (2 * α)
+  α * ⟪ρ.M, H⟫_ℝ - (α - 1) * ((H.conj (σ.M ^ (-γ)).mat) ^ (α / (α - 1))).trace
+
+/-- The optimizer in the variational formula: `H_hat = σ^γ (σ^γ ρ σ^γ)^{α−1} σ^γ`
+where `γ = (1−α)/(2α)`. -/
+noncomputable def H_hat (α : ℝ) (ρ σ : MState d) : HermitianMat d ℂ :=
+  let γ := (1 - α) / (2 * α)
+  ((ρ.M.conj (σ.M ^ γ).mat) ^ (α - 1)).conj (σ.M ^ γ).mat
 
 /-
-Gamma_inv_map is conjugation by sigma_inv_sqrt.
+**Step 1a**: The optimizer `H_hat` is PSD.
 -/
-lemma Gamma_inv_map_eq_conj (σ : MState d) :
-    Gamma_inv_map σ = MatrixMap.conj (sigma_inv_sqrt σ) := by
-  exact rfl
-
-/-
-Gamma_inv_map is completely positive.
--/
-lemma Gamma_inv_map_CP (σ : MState d) : (Gamma_inv_map σ).IsCompletelyPositive := by
-  convert MatrixMap.conj_isCompletelyPositive _;
-  · infer_instance;
-  · infer_instance
-
-/-
-T_map is the composition of Gamma_inv_map, Phi, and Gamma_map.
--/
-lemma T_map_eq_comp (σ : MState d) (Φ : CPTPMap d d₂) :
-    T_map σ Φ = (Gamma_inv_map (Φ σ)).comp (Φ.map.comp (Gamma_map σ)) := by
-  ext;
-  unfold T_map;
-  simp [T_op]
-  congr! 1;
-  · exact funext fun x => Gamma_inv_map_eq ( Φ σ ) x ▸ rfl;
-  · rw [ Gamma_map_eq ]
-
-/-
-T_map is completely positive.
--/
-lemma T_is_CP (σ : MState d) (Φ : CPTPMap d d₂) :
-    (T_map σ Φ).IsCompletelyPositive := by
-  rw [ T_map_eq_comp ];
-  apply MatrixMap.IsCompletelyPositive.comp;
-  · apply MatrixMap.IsCompletelyPositive.comp;
-    · exact Gamma_map_CP σ;
-    · exact Φ.cp;
-  · exact Gamma_inv_map_CP (Φ σ)
-
-/-
-T_map is positive.
--/
-lemma T_is_positive (σ : MState d) (Φ : CPTPMap d d₂) :
-    (T_map σ Φ).IsPositive := by
-  exact T_is_CP σ Φ |> fun h => h.IsPositive
-
-/-
-The weighted 1-norm of X is the trace norm of Gamma(X).
--/
-lemma weighted_norm_one_eq_trace_norm_Gamma (σ : MState d) (X : Matrix d d ℂ) :
-    weighted_norm 1 σ X = schattenNorm (Gamma σ X) 1 := by
-  unfold weighted_norm Gamma;
-  norm_num
-
-/-
-The induced norm of a super-operator between weighted Schatten spaces.
--/
-noncomputable def general_induced_norm
-    (p q : ℝ) (σ : MState d) (σ' : MState d₂)
-    (Ψ : MatrixMap d d₂ ℂ) : ℝ :=
-  sSup { weighted_norm q σ' (Ψ X) / weighted_norm p σ X | (X : Matrix d d ℂ) (_ : weighted_norm p σ X ≠ 0) }
-
-/-
-Multiplication property for HermitianMat functional calculus.
--/
-lemma HermitianMat.cfc_mul {d : Type*} [Fintype d] [DecidableEq d]
-    (A : HermitianMat d ℂ) (f g : ℝ → ℝ) :
-    (A.cfc f).mat * (A.cfc g).mat = (A.cfc (fun x => f x * g x)).mat := by
-  symm
-  apply mat_cfc_mul
-
-/-
-Gamma of identity is sigma.
--/
-lemma Gamma_one (σ : MState d) : Gamma σ 1 = σ.M.mat := by
-  have h_gamma_one : (σ.M.cfc (fun x => x^(1/2 : ℝ))).mat * (σ.M.cfc (fun x => x^(1/2 : ℝ))).mat = σ.M.cfc (fun x => x^(1/2 : ℝ) * x^(1/2 : ℝ)) := by
-    symm
-    exact HermitianMat.mat_cfc_mul σ.M ( fun x => x ^ ( 1 / 2 : ℝ ) ) ( fun x => x ^ ( 1 / 2 : ℝ ) )
-  convert h_gamma_one using 1;
-  · unfold Gamma; aesop;
-  · norm_num [ ← Real.sqrt_eq_rpow, Real.sqrt_mul_self ( show 0 ≤ _ from _ ) ];
-    have h_gamma_one : ∀ x ∈ spectrum ℝ σ.m, Real.sqrt x * Real.sqrt x = x := by
-      intro x hx; rw [ Real.mul_self_sqrt ] ; exact (by
-      rw [ spectrum.mem_iff ] at hx;
-      exact Matrix.PosSemidef.pos_of_mem_spectrum σ.psd x hx);
-    rw [ cfc ];
-    split_ifs <;> simp_all
-    · convert rfl;
-      convert cfcHom_id _;
-      ext x; aesop;
-    · exact False.elim ( ‹IsSelfAdjoint σ.m → ¬ContinuousOn ( fun x => Real.sqrt x * Real.sqrt x ) ( spectrum ℝ σ.m ) › σ.M.prop <| ContinuousOn.mul ( Real.continuous_sqrt.continuousOn ) ( Real.continuous_sqrt.continuousOn ) )
-
-/-
-Gamma inverse of sigma is identity.
--/
-lemma Gamma_inv_self (σ : MState d) (hσ : σ.m.PosDef) :
-    Gamma_inv σ σ.M.mat = 1 := by
-  -- We use `HermitianMat.cfc_mul` and the fact that $x^{-1/2} * x * x^{-1/2} = 1$ for $x > 0$.
-  have h_gamma_inv_sigma : (σ.M.cfc (fun x => x ^ (-1/2 : ℝ))).mat * (σ.M.mat) * (σ.M.cfc (fun x => x ^ (-1/2 : ℝ))).mat = (σ.M.cfc (fun x => x ^ (-1/2 : ℝ) * x * x ^ (-1/2 : ℝ))).mat := by
-    have h_gamma_inv_sigma : (σ.M.cfc (fun x => x ^ (-1/2 : ℝ))).mat * (σ.M.cfc id).mat * (σ.M.cfc (fun x => x ^ (-1/2 : ℝ))).mat = (σ.M.cfc (fun x => x ^ (-1/2 : ℝ) * x * x ^ (-1/2 : ℝ))).mat := by
-      have h_gamma_inv_sigma : ∀ (f g h : ℝ → ℝ), ContinuousOn f (spectrum ℝ σ.M.mat) → ContinuousOn g (spectrum ℝ σ.M.mat) → ContinuousOn h (spectrum ℝ σ.M.mat) → (σ.M.cfc f).mat * (σ.M.cfc g).mat * (σ.M.cfc h).mat = (σ.M.cfc (fun x => f x * g x * h x)).mat := by
-        intro f g h hf hg hh
-        have h_gamma_inv_sigma : (σ.M.cfc f).mat * (σ.M.cfc g).mat = (σ.M.cfc (fun x => f x * g x)).mat := by
-          symm
-          convert HermitianMat.mat_cfc_mul σ.M f g using 1;
-        rw [ h_gamma_inv_sigma, ← HermitianMat.mat_cfc_mul ];
-        congr! 2
-      have h : ∀ x ∈ spectrum ℝ σ.M.mat, x ≠ 0 := by
-        norm_num
-        intro x hx h_zero
-        have h_eigenvalue : ∃ v : d → ℂ, v ≠ 0 ∧ σ.m.mulVec v = x • v := by
-          simp_all [ spectrum.mem_iff]
-          contrapose! hx;
-          exact Matrix.PosDef.isUnit hσ;
-        obtain ⟨ v, hv_ne_zero, hv_eigenvalue ⟩ := h_eigenvalue
-        rw [Matrix.posDef_iff_dotProduct_mulVec] at hσ
-        have := hσ.2 hv_ne_zero
-        simp [hv_eigenvalue, h_zero] at this
-      apply h_gamma_inv_sigma
-      · fun_prop
-      · fun_prop
-      · fun_prop
-    convert h_gamma_inv_sigma using 1;
-    ext i j ; simp [ Matrix.mul_apply]
-  -- Since $x^{-1/2} * x * x^{-1/2} = 1$ for $x > 0$, we have $(σ.M.cfc (fun x => x ^ (-1/2 : ℝ))).mat * (σ.M.mat) * (σ.M.cfc (fun x => x ^ (-1/2 : ℝ))).mat = (σ.M.cfc (fun x => 1)).mat$.
-  have h_gamma_inv_sigma_simplified : (σ.M.cfc (fun x => x ^ (-1/2 : ℝ))).mat * (σ.M.mat) * (σ.M.cfc (fun x => x ^ (-1/2 : ℝ))).mat = (σ.M.cfc (fun x => 1)).mat := by
-    convert h_gamma_inv_sigma using 1;
-    congr! 1;
-    -- Since $x^{-1/2} * x * x^{-1/2} = 1$ for all $x > 0$, the functions are equal.
-    have h_eq : ∀ x : ℝ, 0 < x → x ^ (-1 / 2 : ℝ) * x * x ^ (-1 / 2 : ℝ) = 1 := by
-      intro x hx
-      ring_nf
-      norm_num [ hx.ne' ];
-      rw [ ← Real.rpow_natCast, ← Real.rpow_mul hx.le ] ; norm_num [ hx.ne' ];
-      rw [ Real.rpow_neg_one, inv_mul_cancel₀ hx.ne' ];
-    exact Eq.symm (HermitianMat.cfc_congr_of_posDef hσ h_eq);
-  convert h_gamma_inv_sigma_simplified using 1;
-  ext i j
-  simp
-
-/-
-The matrix of the output state is the map applied to the input matrix.
--/
-lemma CPTPMap_apply_MState_M (Φ : CPTPMap d d₂) (σ : MState d) :
-    (Φ σ).M.mat = Φ.map σ.M.mat := by
-  exact rfl
-
-/-
-The map T is unital.
--/
-theorem T_map_unital (σ : MState d) (Φ : CPTPMap d d₂) (hΦσ : (Φ σ).m.PosDef) :
-    (T_map σ Φ) 1 = 1 := by
-  dsimp [T_map, T_op]
-  rw [Gamma_one σ]
-  rw [← CPTPMap_apply_MState_M]
-  rw [Gamma_inv_self (Φ σ) hΦσ]
-
-/-
-The map T is completely positive.
--/
-theorem T_map_is_CP_proof (σ : MState d) (Φ : CPTPMap d d₂) :
-    (T_map σ Φ).IsCompletelyPositive := by
-  apply T_is_CP
-
-/-
-Gamma composed with Gamma inverse is identity.
--/
-lemma Gamma_Gamma_inv (σ : MState d) (hσ : σ.m.PosDef) (X : Matrix d d ℂ) :
-    Gamma σ (Gamma_inv σ X) = X := by
-  -- By definition of Gamma and Gamma_inv, we can simplify the expression.
-  have h_simp : (σ.M.cfc (fun x => x ^ (1 / 2 : ℝ))).mat * (σ.M.cfc (fun x => x ^ (-1 / 2 : ℝ))).mat = 1 := by
-    symm
-    convert HermitianMat.mat_cfc_mul _ _ _ using 1;
-    · have h_gamma_gamma_inv : ∀ x ∈ spectrum ℝ σ.M.mat, x ^ (1 / 2 : ℝ) * x ^ (-1 / 2 : ℝ) = 1 := by
-        intro x hx
-        have hx_pos : 0 < x := by
-          have := (Matrix.posDef_iff_dotProduct_mulVec.mp hσ).2;
-          obtain ⟨v, hv⟩ : ∃ v : d → ℂ, v ≠ 0 ∧ σ.m.mulVec v = x • v := by
-            rw [ spectrum.mem_iff ] at hx;
-            simp_all [ Matrix.isUnit_iff_isUnit_det ];
-            obtain ⟨ v, hv ⟩ := Matrix.exists_mulVec_eq_zero_iff.mpr hx;
-            simp_all [ sub_eq_iff_eq_add, Matrix.sub_mulVec ];
-            exact ⟨ v, hv.1, hv.2.symm.trans ( by ext i; erw [ Matrix.mulVec_diagonal ] ; aesop ) ⟩;
-          specialize this hv.1;
-          simp_all [ dotProduct];
-          simp_all [ mul_assoc, mul_comm];
-          simp_all [ mul_left_comm ( v _ ), Complex.mul_conj, Complex.normSq_eq_norm_sq ];
-          norm_cast at this;
-          exact lt_of_not_ge fun hx' => this.not_ge <| Finset.sum_nonpos fun i _ => mul_nonpos_of_nonpos_of_nonneg hx' <| sq_nonneg _;
-        rw [ ← Real.rpow_add hx_pos ] ; norm_num;
-      rw [HermitianMat.cfc_congr (g := fun x ↦ 1)]
-      · rw [ HermitianMat.cfc_const ]
-        norm_num
-      · exact fun x hx => h_gamma_gamma_inv x hx;
-  unfold Gamma Gamma_inv; simp_all [ ← mul_assoc ] ;
-  simp_all [ mul_assoc, mul_eq_one_comm.mp h_simp ]
-
-/-
-If a Hermitian matrix is bounded by M*I, then all its eigenvalues are at most M.
--/
-theorem HermitianMat.le_smul_one_imp_eigenvalues_le (A : HermitianMat d ℂ) (M : ℝ)
-    (h : A ≤ M • (1 : HermitianMat d ℂ)) (i : d) :
-    A.H.eigenvalues i ≤ M := by
-  -- By definition of eigenvalues, for any unit vector $v$, we have $\langle v, A v \rangle \leq M$.
-  have h_eigenvalue_le_M_step : ∀ (v : EuclideanSpace ℂ d), ‖v‖ = 1 → ⟪v, .toLp 2 <| A.mat.mulVec v⟫_ℂ ≤ M := by
-    intro v hv
-    have h_inner : ⟪v, .toLp 2 <| A.mat.mulVec v⟫_ℂ ≤ ⟪v, .toLp 2 <| (M • 1 : Matrix d d ℂ).mulVec v⟫_ℂ := by
-      have h_inner : ⟪v, .toLp 2 <| ((M • 1 : Matrix d d ℂ) - A.mat).mulVec v⟫_ℂ ≥ 0 := by
-        have h_inner_le_M : ∀ (X : HermitianMat d ℂ), X ≥ 0 → ∀ (v : EuclideanSpace ℂ d), ⟪v, .toLp 2 <| X.mat.mulVec v⟫_ℂ ≥ 0 := by
-          intro X hX v
-          rw [ge_iff_le, HermitianMat.zero_le_iff, Matrix.posSemidef_iff_dotProduct_mulVec] at hX
-          have := hX.2 v
-          simp [ Matrix.mulVec, dotProduct ] at *
-          convert this using 1;
-          refine Finset.sum_congr rfl fun _ _ => ?_
-          sorry
-        convert h_inner_le_M ⟨ _, _ ⟩ _ v;
-        all_goals norm_num [ HermitianMat.le_iff ] at *;
-        · convert h.1;
-        · exact h;
-      simp_all [ Matrix.sub_mulVec]
-    simp_all [ EuclideanSpace.norm_eq ];
-    convert h_inner using 1;
-    simp [ Matrix.mulVec, dotProduct, inner ];
-    simp [ Matrix.one_apply,mul_assoc];
-    simp [ ← Finset.mul_sum];
-    simp [ Complex.mul_conj, Complex.normSq_eq_norm_sq ];
-    norm_cast ; aesop;
-  have := A.H.eigenvectorBasis.orthonormal;
-  have := this.1 i;
-  have := h_eigenvalue_le_M_step ( A.H.eigenvectorBasis i ) this;
-  rw [ show A.mat.mulVec _ = ( Matrix.IsHermitian.eigenvalues A.H i : ℂ ) • ( Matrix.IsHermitian.eigenvectorBasis A.H i ) from ?_ ] at this;
-  · simp_all
-  · convert A.H.mulVec_eigenvectorBasis i using 1
-
-set_option maxHeartbeats 400000 in
-open MatrixOrder in
-/-
-If all eigenvalues of a Hermitian matrix are at most M, then the matrix is bounded by M*I.
--/
-theorem HermitianMat.eigenvalues_le_imp_le_smul_one (A : HermitianMat d ℂ) (M : ℝ)
-    (h : ∀ i, A.H.eigenvalues i ≤ M) :
-    A ≤ M • (1 : HermitianMat d ℂ) := by
-  have := A.H.spectral_theorem.symm;
-  -- Since $A$ is Hermitian, we can write it as $A = UDU^*$ where $U$ is unitary and $D$ is diagonal with eigenvalues $\lambda_i$.
-  have h_decomp : ∃ U : Matrix d d ℂ, U * star U = 1 ∧ ∃ D : HermitianMat d ℂ, A = U * D * star U ∧ ∀ i, D i i ≤ M := by
-    use A.H.eigenvectorUnitary
-    constructor; · simp
-    use HermitianMat.diagonal ℂ A.H.eigenvalues
-    constructor
-    · exact this.symm
-    · simpa [HermitianMat.diagonal, ← HermitianMat.mat_apply] using h
-  obtain ⟨U, hU_unitary, D, hA_eq, hD_le⟩ := h_decomp;
-  have hA_le : U * D * star U ≤ U * (M • 1) * star U := by
-    have hD_le : D ≤ M • (1 : HermitianMat d ℂ) := by
-      sorry
-    have := HermitianMat.conj_mono (M := U) hD_le
-    simp only [conj, AddMonoidHom.coe_mk, ZeroHom.coe_mk] at this
-    replace this := Subtype.coe_le_coe.mpr this
-    simp only [mat_smul, mat_one] at this
-    exact this
-  rw [ ← hA_eq ] at hA_le
-  simp only [Algebra.mul_smul_comm, mul_one, Algebra.smul_mul_assoc, hU_unitary] at hA_le
-  exact hA_le
-
-/-- The block matrix [[1, X], [X†, X†X]] is positive semidefinite. -/
-theorem block_matrix_posSemidef {m n k : Type*} [Fintype m] [Fintype n] [Fintype k]
-    (X : Matrix k n ℂ) (Y : Matrix k m ℂ):
-    (Matrix.fromBlocks (Yᴴ * Y) (Yᴴ * X) (Xᴴ * Y) (Xᴴ * X)).PosSemidef := by
-  set Z : Matrix (m ⊕ n) (m ⊕ n) ℂ := Matrix.fromBlocks (Yᴴ * Y) (Yᴴ * X) (Xᴴ * Y) (Xᴴ * X)
-  have hZ : Z = Matrix.fromBlocks (m := k) Yᴴ 0 Xᴴ 0 * Matrix.fromBlocks Y X 0 0 := by
-    simp +zetaDelta [Matrix.fromBlocks_multiply]
-  have hZ : Z = (Matrix.fromBlocks (o := k) Y X 0 0)ᴴ * Matrix.fromBlocks Y X 0 0 := by
-    rw [hZ]
-    ext i j ; simp [ Matrix.mul_apply];
-    cases i <;> cases j <;> simp [ Matrix.fromBlocks ];
-  rw [hZ]
-  exact Matrix.posSemidef_conjTranspose_mul_self _
-
-theorem block_matrix_one_posSemidef {m n : Type*} [Fintype m] [Fintype n] [DecidableEq m]
-    (X : Matrix m n ℂ) :
-    (Matrix.fromBlocks 1 X Xᴴ (Xᴴ * X)).PosSemidef := by
-  simpa using block_matrix_posSemidef X (1 : Matrix m m ℂ)
-
-/-- The Data Processing Inequality for the Sandwiched Renyi relative entropy.
-Proved in `https://arxiv.org/pdf/1306.5920`. Seems kind of involved. -/
-theorem sandwichedRenyiEntropy_DPI (hα : 1 ≤ α) (ρ σ : MState d) (Φ : CPTPMap d d₂) :
-    D̃_ α(Φ ρ‖Φ σ) ≤ D̃_ α(ρ‖σ) := by
-  --If we want, we can prove this just for 1 < α, and then use continuity (above) to take the limit as
-  -- α → 1.
-  sorry
-
---Helps us track this one sorry for the GQSL
-axiom sandwichedRenyiEntropy_DPI_ax : type_of% @sandwichedRenyiEntropy_DPI
+theorem H_hat_nonneg (ρ σ : MState d) : 0 ≤ H_hat α ρ σ := by
+  apply HermitianMat.conj_nonneg;
+  apply HermitianMat.rpow_nonneg;
+  apply HermitianMat.conj_nonneg;
+  exact ρ.nonneg
 
 /--
-info: 'sandwichedRenyiEntropy_DPI_ax' depends on axioms: [propext,
- sandwichedRenyiEntropy_DPI_ax,
- Classical.choice,
- Quot.sound]
+For a PSD Hermitian matrix B whose kernel contains A's kernel, conjugating B by A's
+support projection leaves B unchanged.
+-/
+private lemma conj_supportProj_eq_of_ker_le (A B : HermitianMat d ℂ) (hker : A.ker ≤ B.ker) :
+    B.conj (A.supportProj).mat = B := by
+  ext i j
+  simp [*, HermitianMat.conj]
+  suffices h_conj : A.supportProj.mat * B.mat * A.supportProj.mat = B.mat by
+    exact congr($h_conj i j)
+  have h_unitary := HermitianMat.mul_supportProj_of_ker_le hker
+  apply_fun Matrix.conjTranspose at h_unitary ⊢;
+  · simp_all only [Matrix.conjTranspose_mul, HermitianMat.conjTranspose_mat];
+  · exact Matrix.conjTranspose_injective;
+
+/--
+The kernel of σ is contained in the kernel of (ρ.conj (σ^γ))^{α-1} when γ ≠ 0 and α > 1.
+-/
+private lemma ker_sigma_le_ker_conj_rpow (ρ σ : MState d) {γ : ℝ} (hγ : γ ≠ 0) (hα1 : α - 1 ≠ 0) :
+    σ.M.ker ≤ ((ρ.M.conj (σ.M ^ γ).mat) ^ (α - 1)).ker := by
+  rw [HermitianMat.ker_rpow_eq_of_nonneg (by positivity) hα1]
+  intro x hx;
+  have h_ker_rpow : x ∈ (σ.M ^ γ).ker := by
+    rwa [HermitianMat.ker_rpow_eq_of_nonneg σ.nonneg hγ]
+  simp_all [HermitianMat.ker, HermitianMat.lin]
+
+/-- Sub-lemma for Step 1b: the conj of H_hat by σ^{−γ} simplifies to (ρ.M.conj (σ^γ).mat)^{α−1}.
+This uses σ^{−γ} · σ^γ = identity (on support) to cancel the outer σ^γ factors. -/
+theorem H_hat_conj_sigma (hα : 1 < α) (ρ σ : MState d) :
+    let γ := (1 - α) / (2 * α)
+    (H_hat α ρ σ).conj (σ.M ^ (-γ)).mat = (ρ.M.conj (σ.M ^ γ).mat) ^ (α - 1) := by
+  intro γ
+  have hγ : γ ≠ 0 := by
+    simp only [γ]; rw [div_ne_zero_iff]; exact ⟨by linarith, by linarith⟩
+  have hα1 : α - 1 ≠ 0 := by linarith
+  show (((ρ.M.conj (σ.M ^ γ).mat) ^ (α - 1)).conj (σ.M ^ γ).mat).conj (σ.M ^ (-γ)).mat =
+    (ρ.M.conj (σ.M ^ γ).mat) ^ (α - 1)
+  rw [HermitianMat.conj_conj]
+  rw [HermitianMat.rpow_neg_mul_rpow_eq_supportProj σ.nonneg hγ]
+  exact conj_supportProj_eq_of_ker_le σ.M _ (ker_sigma_le_ker_conj_rpow ρ σ hγ hα1)
+
+
+/-
+Sub-lemma for Step 1b: the inner product ⟪ρ.M, H_hat⟫ equals Tr[(σ^γ ρ σ^γ)^α].
+By cyclicity of trace: Tr[ρ · σ^γ · (σ^γ ρ σ^γ)^{α−1} · σ^γ] = Tr[(σ^γ ρ σ^γ)^α].
+-/
+theorem inner_rho_H_hat (hα : 1 < α) (ρ σ : MState d) :
+    let γ := (1 - α) / (2 * α)
+    ⟪ρ.M, H_hat α ρ σ⟫_ℝ = ((ρ.M.conj (σ.M ^ γ).mat) ^ α).trace := by
+  unfold H_hat; simp [ HermitianMat.inner_def ] ;
+  have h_cyclic : (ρ.m * (σ.M ^ ((1 - α) / (2 * α))).mat * ((ρ.M.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ^ (α - 1)).mat * (σ.M ^ ((1 - α) / (2 * α))).mat).trace = ((ρ.M.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ^ α).trace := by
+    have h_cyclic : (ρ.M.conj (σ.M ^ ((1 - α) / (2 * α))).mat).mat * ((ρ.M.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ^ (α - 1)).mat = ((ρ.M.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ^ α).mat := by
+      have := @HermitianMat.mat_rpow_add;
+      specialize this ( show 0 ≤ HermitianMat.conj ( σ.M ^ ( ( 1 - α ) / ( 2 * α ) ) ).mat ρ.M from ?_ ) ( show ( 1 : ℝ ) + ( α - 1 ) ≠ 0 from by linarith );
+      · positivity
+      · aesop;
+    convert congr_arg Matrix.trace h_cyclic using 1;
+    · rw [ ← Matrix.trace_mul_comm ] ; simp [ Matrix.mul_assoc ] ;
+    · simp [ HermitianMat.trace ];
+      norm_num [ Matrix.trace ];
+      refine Finset.sum_congr rfl fun i _ => ?_
+      convert Complex.ofReal_re (( ( HermitianMat.conj ( σ.M ^ ( ( 1 - α ) / ( 2 * α ) ) ).mat ) ρ.M ^ α ) i i |> Complex.re)
+      simp [ Complex.ext_iff ];
+  simp_all [ ← Matrix.mul_assoc ]
+
+/-
+**Step 1b**: Evaluating `f_α` at the optimizer `H_hat` gives `Q̃_α(ρ‖σ)`.
+This is the key computation that verifies the variational formula at the optimizer.
+Proof: f_α(H_hat, ρ, σ) = α · Tr[(σ^γ ρ σ^γ)^α] - (α-1) · Tr[(σ^γ ρ σ^γ)^α] = Tr[(σ^γ ρ σ^γ)^α] = Q̃.
+-/
+theorem f_alpha_at_optimizer (hα : 1 < α) (ρ σ : MState d) :
+    f_alpha α (H_hat α ρ σ) ρ σ = Q̃_ α(ρ‖σ) := by
+  have h_inner : ⟪ρ.M, H_hat α ρ σ⟫_ℝ = ((ρ.M.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ^ α).trace := by
+    exact inner_rho_H_hat hα ρ σ
+  have h_conj : (H_hat α ρ σ).conj (σ.M ^ ((α - 1) / (2 * α))).mat = (ρ.M.conj (σ.M ^ ((1 - α) / (2 * α))).mat) ^ (α - 1) := by
+    convert H_hat_conj_sigma ( hα := hα ) ( ρ := ρ ) ( σ := σ ) using 1
+    ring_nf!
+  unfold f_alpha sandwichedTraceFunctional
+  simp_all [ sub_div ]
+  rw [ ← HermitianMat.rpow_mul ] ; norm_num [ show α ≠ 0 by positivity, show α - 1 ≠ 0 by linarith ];
+  · rw [ mul_div_cancel₀ _ ( by linarith ) ] ; ring;
+  · apply_rules [ HermitianMat.conj_nonneg ];
+    exact ρ.nonneg
+
+/-- For α > 1, the map H ↦ f_α(H, ρ, σ) is concave (for fixed ρ, σ),
+so the optimal H is a maximizer. -/
+lemma sandwichedAuxFun_concave_in_H (hα : 1 < α) (ρ σ : MState d) :
+    ConcaveOn ℝ {H | 0 ≤ H} (fun H => f_alpha α H ρ σ) := by
+  constructor
+  · rw [convex_iff_forall_pos]
+    exact fun x hx y hy a b ha hb hab => by simpa [ hab ] using add_nonneg ( smul_nonneg ha.le hx ) ( smul_nonneg hb.le hy ) ;
+  · intro x hx y hy a b ha hb hab
+    simp [f_alpha];
+    -- Apply the convexity of the trace function composed with rpow.
+    have h_trace_convex : ConvexOn ℝ {A : HermitianMat d ℂ | 0 ≤ A} (fun A => (A ^ (α / (α - 1))).trace) := by
+      have h_trace_convex : ConvexOn ℝ (Set.Ici 0) (fun x : ℝ => x ^ (α / (α - 1))) := by
+        exact ( convexOn_rpow ( by rw [ le_div_iff₀ ] <;> linarith ) );
+      convert HermitianMat.trace_function_convex_ici h_trace_convex using 1;
+    have := h_trace_convex.2 ( show 0 ≤ ( HermitianMat.conj ( σ.M ^ ( - ( ( 1 - α ) / ( 2 * α ) ) ) ) x ) from ?_ ) ( show 0 ≤ ( HermitianMat.conj ( σ.M ^ ( - ( ( 1 - α ) / ( 2 * α ) ) ) ) y ) from ?_ ) ha hb hab;
+    · simp_all +decide [ inner_add_right, inner_smul_right, HermitianMat.conj ];
+      nlinarith! [ show 0 ≤ α - 1 by linarith ];
+    · apply_rules [ HermitianMat.conj_nonneg ];
+    · apply_rules [ HermitianMat.conj_nonneg ]
+
+/--
+For PSD `A` and `γ ≠ 0`, the product `A^γ * A^{-γ}` equals the support projection
+of `A`. This is because `x^γ * x^{-γ} = if x = 0 then 0 else 1` for `x ≥ 0`.
+-/
+lemma rpow_mul_neg_rpow_eq_supportProj {A : HermitianMat d ℂ}
+    (hA : 0 ≤ A) (γ : ℝ) (hγ : γ ≠ 0) :
+    (A ^ γ).mat * (A ^ (-γ)).mat = A.supportProj.mat := by
+  rw [HermitianMat.supportProj_eq_cfc];
+  rw [HermitianMat.rpow_eq_cfc, HermitianMat.rpow_eq_cfc];
+  rw [ ← HermitianMat.mat_cfc_mul_apply ];
+  refine congr_arg _ ( HermitianMat.cfc_congr_of_nonneg hA ?_)
+  intro x (hx : 0 ≤ x)
+  rcases eq_or_ne x 0 with hx' | hx'
+  · simp [hx', hγ]
+  · simp [hx', Real.rpow_neg hx]
+    exact mul_inv_cancel₀ (by positivity)
+
+/--
+The support projection of `A` acts as identity on `B` when `A.ker ≤ B.ker`.
+Since `A.supportProj` projects onto `ker(A)⊥` and `B` is zero on `ker(A)`,
+the projection preserves `B`.
+-/
+lemma supportProj_mul_of_ker_le {A B : HermitianMat d ℂ}
+    (hker : A.ker ≤ B.ker) :
+    A.supportProj.mat * B.mat = B.mat := by
+  contrapose! hker;
+  simp_all [ SetLike.le_def ];
+  -- Since $B$ is not in the kernel of $A$, there exists some $x \in \ker(A)$ such that $Bx \neq 0$.
+  obtain ⟨x, hx⟩ : ∃ x : EuclideanSpace ℂ d, A.mat.mulVec x = 0 ∧ B.mat.mulVec x ≠ 0 := by
+    contrapose! hker;
+    have h_support : ∀ x : EuclideanSpace ℂ d, B.mat.mulVec x = B.mat.mulVec (A.supportProj.mat.mulVec x) := by
+      intro x
+      have h_support : x.ofLp = A.supportProj.mat.mulVec x.ofLp + A.kerProj.mat.mulVec x.ofLp := by
+        have h_support : A.supportProj.mat + A.kerProj.mat = 1 := by
+          simp [ add_comm];
+          simp [ ← Matrix.ext_iff];
+          intro i j; exact (by
+          have h_support : A.kerProj + A.supportProj = 1 := by
+            exact HermitianMat.kerProj_add_supportProj A;
+          convert congr_arg ( fun f => f i j ) h_support using 1);
+        rw [ ← Matrix.add_mulVec, h_support, Matrix.one_mulVec ];
+      have h_support : B.mat.mulVec (A.kerProj.mat.mulVec x.ofLp) = 0 := by
+        convert hker _ _;
+        have h_support : A.mat * A.kerProj.mat = 0 := by
+          have h_support : A.mat * A.kerProj.mat = A.mat * (1 - A.supportProj.mat) := by
+            congr;
+            have h_support : A.kerProj + A.supportProj = 1 := by
+              exact HermitianMat.kerProj_add_supportProj A;
+            exact eq_sub_of_add_eq <| congr_arg Subtype.val h_support;
+          rw [ h_support, mul_sub, mul_one, sub_eq_zero ];
+          exact Eq.symm (HermitianMat.mul_supportProj_of_ker_le fun ⦃x⦄ a => a);
+        convert congr_arg ( fun m => m.mulVec x.ofLp ) h_support using 1;
+        · simp
+        · simp
+      convert congr_arg ( fun y => B.mat.mulVec y ) ‹x.ofLp = A.supportProj.mat.mulVec x.ofLp + A.kerProj.mat.mulVec x.ofLp› using 1 ; simp [ Matrix.mulVec_add, h_support ];
+    have h_support : B.mat = B.mat * A.supportProj.mat := by
+      ext i j;
+      convert congr_fun ( h_support ( EuclideanSpace.single j 1 ) ) i using 1;
+      · simp [ Matrix.mulVec, dotProduct ];
+      · simp [ Matrix.mulVec, dotProduct ];
+        rfl;
+    have h_support : B.mat = B.mat.conjTranspose := by
+      exact B.2.symm;
+    have h_support : (B.mat * A.supportProj.mat).conjTranspose = A.supportProj.mat * B.mat := by
+      simp [Matrix.conjTranspose_mul ];
+    lia;
+  refine ⟨x, ?_, ?_⟩
+  · simpa [HermitianMat.ker, HermitianMat.lin, funext_iff, Matrix.toLpLin] using hx.1
+  · rw [HermitianMat.mem_ker_iff_mulVec_zero]
+    exact hx.right
+
+/--
+Right-multiplication variant: `B * A.supportProj = B` when `A.ker ≤ B.ker`.
+Follows from the left-multiplication version by taking conjugate transposes.
+-/
+lemma mul_supportProj_of_ker_le {A B : HermitianMat d ℂ}
+    (hker : A.ker ≤ B.ker) :
+    B.mat * A.supportProj.mat = B.mat := by
+  convert congr_arg Matrix.conjTranspose ( supportProj_mul_of_ker_le hker ) using 1;
+  · norm_num +zetaDelta at *;
+  · exact B.2.symm
+
+/--
+Under the support condition `σ.M.ker ≤ ρ.M.ker` (i.e., supp(ρ) ⊆ supp(σ)),
+conjugation by `σ^γ` and `σ^{-γ}` preserves the inner product:
+`⟪ρ.M, H⟫ = ⟪σ^γ ρ σ^γ, σ^{-γ} H σ^{-γ}⟫`. This holds because the kernel condition
+ensures `ρ` is supported on `supp(σ)`, where `σ^γ σ^{-γ}` acts as the identity.
+-/
+lemma inner_eq_inner_conj_of_ker_le (ρ σ : MState d)
+    (H : HermitianMat d ℂ) (hker : σ.M.ker ≤ ρ.M.ker) (γ : ℝ) (hγ : γ ≠ 0) :
+    ⟪ρ.M, H⟫_ℝ = ⟪ρ.M.conj (σ.M ^ γ).mat, H.conj (σ.M ^ (-γ)).mat⟫_ℝ := by
+  -- Since $\sigma^\gamma \sigma^{-\gamma}$ acts as the identity on the support of $\rho$, we can simplify the expression.
+  have h_support : (σ.M ^ γ).mat * (σ.M ^ (-γ)).mat = σ.M.supportProj.mat ∧ (σ.M ^ (-γ)).mat * (σ.M ^ γ).mat = σ.M.supportProj.mat := by
+    exact ⟨ rpow_mul_neg_rpow_eq_supportProj σ.nonneg γ hγ, by simpa using rpow_mul_neg_rpow_eq_supportProj σ.nonneg ( -γ ) ( neg_ne_zero.mpr hγ ) ⟩;
+  simp only [HermitianMat.inner_def, HermitianMat.conj_apply_mat];
+  have h_support : σ.M.supportProj.mat * ρ.M.mat = ρ.M.mat ∧ ρ.M.mat * σ.M.supportProj.mat = ρ.M.mat := by
+    exact ⟨ supportProj_mul_of_ker_le hker, mul_supportProj_of_ker_le hker ⟩;
+  have h_trace_cyclic : Matrix.trace ((σ.M ^ γ).mat * ρ.M.mat * (σ.M ^ γ).mat * (σ.M ^ (-γ)).mat * H.mat * (σ.M ^ (-γ)).mat) = Matrix.trace ((σ.M ^ (-γ)).mat * (σ.M ^ γ).mat * ρ.M.mat * (σ.M ^ γ).mat * (σ.M ^ (-γ)).mat * H.mat) := by
+    rw [ ← Matrix.trace_mul_comm ] ; simp [ Matrix.mul_assoc ] ;
+  simp_all [ mul_assoc, Matrix.trace_mul_comm ( ( σ.M ^ γ ).mat ) ];
+  simp_all [ ← mul_assoc ]
+
+/-- **Step 1c**: `H_hat` is a maximizer: for all `H ≥ 0`, `f_α(H) ≤ f_α(H_hat)`.
+This uses the trace Young inequality: for PSD `A, B` and conjugate exponents `p, q > 1`,
+`⟪A, B⟫ ≤ Tr[A^p]/p + Tr[B^q]/q`.
+Applied with `A = σ^γ ρ σ^γ`, `B = σ^{-γ} H σ^{-γ}`, `p = α`, `q = α/(α-1)`,
+the inner product identity `⟪ρ, H⟫ = ⟪A, B⟫` (under the support condition) yields
+`f_α(H) ≤ Tr[A^α] = Q̃_α(ρ‖σ) = f_α(H_hat)`.
+Note: the support condition `σ.M.ker ≤ ρ.M.ker` (i.e., supp(ρ) ⊆ supp(σ)) is necessary.
+Without it, the theorem is false: taking ρ orthogonal to σ gives Q̃_α = 0 but
+`f_α(H) = α · Tr[ρH] > 0` for appropriate H. -/
+theorem f_alpha_le_at_optimizer (hα : 1 < α) (ρ σ : MState d)
+    (H : HermitianMat d ℂ) (hH : 0 ≤ H) (hker : σ.M.ker ≤ ρ.M.ker) :
+    f_alpha α H ρ σ ≤ f_alpha α (H_hat α ρ σ) ρ σ := by
+  rw [f_alpha_at_optimizer hα]
+  -- Goal: f_alpha α H ρ σ ≤ Q̃_α(ρ‖σ)
+  set γ : ℝ := (1 - α) / (2 * α) with hγ_def
+  have hγ : γ ≠ 0 := by
+    intro h; have h1 : (1 - α) / (2 * α) = 0 := hγ_def ▸ h
+    have h2 : (2 : ℝ) * α ≠ 0 := by positivity
+    rw [div_eq_zero_iff] at h1; rcases h1 with h1 | h1 <;> linarith
+  set A := ρ.M.conj (σ.M ^ γ).mat
+  set B := H.conj (σ.M ^ (-γ)).mat
+  have hA_nn : 0 ≤ A := HermitianMat.conj_nonneg _ ρ.nonneg
+  have hB_nn : 0 ≤ B := HermitianMat.conj_nonneg _ hH
+  have h_inner : ⟪ρ.M, H⟫_ℝ = ⟪A, B⟫_ℝ :=
+    inner_eq_inner_conj_of_ker_le ρ σ H hker γ hγ
+  have hpq : 1 / α + 1 / (α / (α - 1)) = 1 := by field_simp; ring
+  have h_young := HermitianMat.trace_young A B hA_nn hB_nn α (α / (α - 1)) hα hpq
+  have hα_pos : (0 : ℝ) < α := by linarith
+  have hαm1_pos : (0 : ℝ) < α - 1 := by linarith
+  -- Multiply h_young by α and simplify
+  have h_scaled : α * ⟪A, B⟫_ℝ ≤
+      (A ^ α).trace + (α - 1) * (B ^ (α / (α - 1))).trace := by
+    have := mul_le_mul_of_nonneg_left h_young hα_pos.le
+    have h_simp : α * ((A ^ α).trace / α + (B ^ (α / (α - 1))).trace / (α / (α - 1))) =
+        (A ^ α).trace + (α - 1) * (B ^ (α / (α - 1))).trace := by
+      field_simp
+    linarith
+  -- Goal is definitionally: α * ⟪ρ.M, H⟫ - (α-1) * (B ^ (α/(α-1))).trace ≤ (A ^ α).trace
+  -- which follows from h_scaled and h_inner
+  change α * ⟪ρ.M, H⟫_ℝ - (α - 1) * (B ^ (α / (α - 1))).trace ≤ (A ^ α).trace
+  have h_inner_scaled : α * ⟪ρ.M, H⟫_ℝ = α * ⟪A, B⟫_ℝ := by rw [h_inner]
+  linarith [h_scaled, h_inner_scaled]
+
+/--
+**Step 1 (Variational formula)**: For `α > 1`, the trace functional equals the
+supremum of `f_α` over all PSD `H`:
+  `Q̃_α(ρ‖σ) = ⨆ (H : HermitianMat d ℂ) (_ : 0 ≤ H), f_alpha α H ρ σ`.
+The optimizer is `H_hat = σ^γ (σ^γ ρ σ^γ)^{α−1} σ^γ`.
+-/
+theorem traceFunctional_eq_iSup_f_alpha (hα : 1 < α) (ρ σ : MState d) (hker : σ.M.ker ≤ ρ.M.ker) :
+    Q̃_ α(ρ‖σ) = ⨆ (H : {H : HermitianMat d ℂ // 0 ≤ H}), f_alpha α H.1 ρ σ := by
+  rw [ @ciSup_eq_of_forall_le_of_forall_lt_exists_gt ];
+  · exact fun i => f_alpha_le_at_optimizer hα ρ σ i i.2 hker |> le_trans <| le_of_eq <| f_alpha_at_optimizer hα ρ σ;
+  · intro w hw;
+    exact ⟨ ⟨ H_hat α ρ σ, H_hat_nonneg ρ σ ⟩, hw.trans_le ( f_alpha_at_optimizer hα ρ σ ▸ le_rfl ) ⟩
+
+/-
+**Step 2 (Linearity in ρ)**: For fixed `H` and `σ`, the map `ρ ↦ f_alpha α H ρ σ`
+is affine (in fact linear plus a constant in σ). In particular it is convex.
+-/
+theorem f_alpha_linear_in_rho (α : ℝ) (H : HermitianMat d ℂ) (σ : MState d)
+    {ι : Type*} [Fintype ι]
+    (w : ι → ℝ) (hw_sum : ∑ i, w i = 1)
+    (ρs : ι → MState d) (ρ_mix : MState d)
+    (hρ_mix : ρ_mix.M = ∑ i, w i • (ρs i).M) :
+    f_alpha α H ρ_mix σ = ∑ i, w i * f_alpha α H (ρs i) σ := by
+  unfold f_alpha
+  simp [ *, mul_sub, Finset.mul_sum , sum_inner ]
+  ring_nf
+  simp [ ← Finset.mul_sum, ← Finset.sum_mul, mul_assoc, mul_comm, mul_left_comm, hw_sum ]
+  ring_nf
+
+/-- Concavity of the trace expression: for `p = α/(α−1) > 1` and `s = (α−1)/(2α) > 0` with `2sp = 1`,
+  the map `σ ↦ Tr[(σ^s H σ^s)^p]` is concave on density matrices.
+  This follows from Lieb concavity (Epstein's generalization). -/
+lemma trace_conj_rpow_concave (hα : 1 < α) (H : HermitianMat d ℂ) (hH : 0 ≤ H) :
+    ConcaveOn ℝ {σ : HermitianMat d ℂ | 0 ≤ σ}
+      (fun σ => ((H.conj (σ ^ ((α - 1) / (2 * α))).mat) ^ (α / (α - 1))).trace) :=
+  HermitianMat.trace_conj_rpow_concave hα H hH
+
+/-- **Step 3 (Convexity in σ)**: For fixed `H ≥ 0` and `ρ`, and `α > 1`, the map
+`σ ↦ f_alpha α H ρ σ` is convex. The key is that for `p = α/(α−1) > 1`:
+• `A ↦ Tr[A^p]` is convex on PSD matrices (trace function convexity, Theorem 2.10 of Carlen),
+• `σ ↦ σ^{−γ} H σ^{−γ}` is *concave* in `σ` by Lieb concavity (since `−γ = (α−1)/(2α) ∈ (0,½)`),
+• The composition of a convex non-decreasing function with a concave function is convex,
+  but we actually need the sign: the second term has a factor `−(α−1) < 0` which flips concave → convex.
+More precisely: `σ ↦ Tr[(σ^{−γ} H σ^{−γ})^p]` is concave (by Lieb + trace function convexity),
+so `σ ↦ −(α−1) · Tr[(σ^{−γ} H σ^{−γ})^p]` is convex. -/
+theorem f_alpha_convex_in_sigma (hα : 1 < α) (H : HermitianMat d ℂ) (hH : 0 ≤ H)
+    (ρ : MState d) {ι : Type*} [Fintype ι]
+    (w : ι → ℝ) (hw_nonneg : ∀ i, 0 ≤ w i) (hw_sum : ∑ i, w i = 1)
+    (σs : ι → MState d) (σ_mix : MState d)
+    (hσ_mix : σ_mix.M = ∑ i, w i • (σs i).M) :
+    f_alpha α H ρ σ_mix ≤ ∑ i, w i * f_alpha α H ρ (σs i) := by
+  have hα_pos : 0 < α - 1 := by linarith
+  -- Define the σ-dependent trace function on HermitianMat
+  let s := (α - 1) / (2 * α)
+  let p := α / (α - 1)
+  let F : HermitianMat d ℂ → ℝ := fun σ => ((H.conj (σ ^ s).mat) ^ p).trace
+  -- f_alpha relates to F via: f_alpha α H ρ σ = α * ⟪ρ.M, H⟫ - (α-1) * F(σ.M)
+  -- because -γ = -((1-α)/(2α)) = (α-1)/(2α) = s
+  have hf_eq : ∀ σ : MState d, f_alpha α H ρ σ = α * ⟪ρ.M, H⟫_ℝ - (α - 1) * F σ.M := by
+    intro σ
+    show _ = α * ⟪ρ.M, H⟫_ℝ - (α - 1) *
+      ((H.conj (σ.M ^ ((α - 1) / (2 * α))).mat) ^ (α / (α - 1))).trace
+    unfold f_alpha; ring_nf
+  simp_rw [hf_eq]
+  -- Reduce to concavity: ∑ w_i * F(σ_i.M) ≤ F(σ_mix.M)
+  suffices h : ∑ i, w i * F (σs i).M ≤ F σ_mix.M by
+    have h1 : ∑ i, w i * ((α - 1) * F (σs i).M) = (α - 1) * ∑ i, w i * F (σs i).M := by
+      rw [Finset.mul_sum]; congr 1; ext i; ring
+    simp only [mul_sub, Finset.sum_sub_distrib, ← Finset.sum_mul, hw_sum, one_mul, h1]
+    linarith [mul_le_mul_of_nonneg_left h (le_of_lt hα_pos)]
+  -- Apply ConcaveOn.le_map_sum from trace_conj_rpow_concave
+  have hF_concave : ConcaveOn ℝ {σ : HermitianMat d ℂ | 0 ≤ σ} F :=
+    trace_conj_rpow_concave hα H hH
+  have h_jensen := hF_concave.le_map_sum
+    (t := Finset.univ) (w := w) (p := fun i => (σs i).M)
+    (fun i _ => hw_nonneg i)
+    (by simp [hw_sum])
+    (fun i _ => (σs i).nonneg)
+  rw [← hσ_mix] at h_jensen
+  convert h_jensen using 1
+
+/-
+**Step 4 (Joint convexity of f_α)**: For fixed `H ≥ 0` and `α > 1`, the map
+`(ρ, σ) ↦ f_alpha α H ρ σ` is jointly convex. This follows from Steps 2 and 3:
+f_α decomposes as a function linear in ρ (independent of σ) plus a function convex
+in σ (independent of ρ).
+-/
+theorem f_alpha_jointly_convex (hα : 1 < α) (H : HermitianMat d ℂ) (hH : 0 ≤ H)
+    {ι : Type*} [Fintype ι]
+    (w : ι → ℝ) (hw_nonneg : ∀ i, 0 ≤ w i) (hw_sum : ∑ i, w i = 1)
+    (ρs σs : ι → MState d) (ρ_mix σ_mix : MState d)
+    (hρ_mix : ρ_mix.M = ∑ i, w i • (ρs i).M)
+    (hσ_mix : σ_mix.M = ∑ i, w i • (σs i).M) :
+    f_alpha α H ρ_mix σ_mix ≤ ∑ i, w i * f_alpha α H (ρs i) (σs i) := by
+  convert f_alpha_convex_in_sigma hα H hH ρ_mix _ _ _ _ using 1;
+  any_goals assumption;
+  constructor <;> intro h;
+  · exact fun σ_mix hσ_mix =>
+    f_alpha_convex_in_sigma hα H hH ρ_mix w hw_nonneg hw_sum σs σ_mix hσ_mix;
+  · apply (h σ_mix hσ_mix).trans
+    unfold f_alpha;
+    simp [ hρ_mix ];
+    simp [ sum_inner, inner_smul_left, mul_sub, sub_mul, mul_comm, mul_left_comm, Finset.mul_sum]
+    simp [ ← Finset.mul_sum, ← Finset.sum_mul, hw_sum ]
+
+/-
+The range of `H ↦ f_alpha α H ρ σ` over PSD `H` is bounded above.
+This follows from the variational formula: the supremum equals `Q̃_α(ρ‖σ)`,
+which is a finite real number.
+-/
+theorem f_alpha_bddAbove (hα : 1 < α) (ρ σ : MState d) (hker : σ.M.ker ≤ ρ.M.ker) :
+    BddAbove (Set.range (fun H : {H : HermitianMat d ℂ // 0 ≤ H} => f_alpha α H.1 ρ σ)) := by
+  exact ⟨_, Set.forall_mem_range.mpr fun H => f_alpha_le_at_optimizer hα ρ σ _ H.2 hker⟩
+
+/-
+**Step 5 (Sup preserves convexity)**: The supremum over `H ≥ 0` of the jointly
+convex `f_alpha α H` is jointly convex. This is a standard fact: for each `H`,
+`f_alpha α H (ρ_mix) (σ_mix) ≤ ∑ wᵢ f_alpha α H (ρᵢ) (σᵢ) ≤ ∑ wᵢ sup_H f_alpha ...`,
+so taking sup on the left gives the result.
+-/
+theorem iSup_f_alpha_jointly_convex (hα : 1 < α)
+    {ι : Type*} [Fintype ι]
+    (w : ι → ℝ) (hw_nonneg : ∀ i, 0 ≤ w i) (hw_sum : ∑ i, w i = 1)
+    (ρs σs : ι → MState d) (ρ_mix σ_mix : MState d)
+    (hρ_mix : ρ_mix.M = ∑ i, w i • (ρs i).M)
+    (hσ_mix : σ_mix.M = ∑ i, w i • (σs i).M)
+    (hker : ∀ i, (σs i).M.ker ≤ (ρs i).M.ker) :
+    (⨆ (H : {H : HermitianMat d ℂ // 0 ≤ H}), f_alpha α H.1 ρ_mix σ_mix) ≤
+      ∑ i, w i * (⨆ (H : {H : HermitianMat d ℂ // 0 ≤ H}), f_alpha α H.1 (ρs i) (σs i)) := by
+  apply ciSup_le
+  intro H
+  have h_sum : f_alpha α H.1 ρ_mix σ_mix ≤ ∑ i, w i * (f_alpha α H.1 (ρs i) (σs i)) := by
+    apply f_alpha_jointly_convex hα H.1 H.2 w hw_nonneg hw_sum ρs σs ρ_mix σ_mix hρ_mix hσ_mix;
+  exact h_sum.trans ( Finset.sum_le_sum fun i _ => mul_le_mul_of_nonneg_left ( le_ciSup ( f_alpha_bddAbove hα ( ρs i ) ( σs i ) (hker i)) H ) ( hw_nonneg i ) )
+
+/-- If for all i, ker(σs i) ≤ ker(ρs i), then ker(∑ w i • σs i) ≤ ker(∑ w i • ρs i),
+provided all weights are nonneg and all matrices are PSD. -/
+theorem HermitianMat.ker_weighted_sum_le {ι : Type*} [Fintype ι]
+    (w : ι → ℝ) (hw_nonneg : ∀ i, 0 ≤ w i)
+    (ρs σs : ι → HermitianMat d ℂ)
+    (hρs_nonneg : ∀ i, 0 ≤ ρs i)
+    (hσs_nonneg : ∀ i, 0 ≤ σs i)
+    (hker : ∀ i, (σs i).ker ≤ (ρs i).ker) :
+    (∑ i, w i • σs i).ker ≤ (∑ i, w i • ρs i).ker := by
+  rw [HermitianMat.ker_sum, HermitianMat.ker_sum]
+  · refine iInf_mono fun i ↦ ?_
+    by_cases hi : w i = 0
+    · simp [hi]
+    · simp_all [HermitianMat.ker_pos_smul]
+  · exact fun i => smul_nonneg (hw_nonneg i) (hρs_nonneg i)
+  · exact fun i => smul_nonneg (hw_nonneg i) (hσs_nonneg i)
+
+/-- The trace functional `Q̃_α` is jointly convex for `α > 1`.
+This is Proposition 3 of the paper, originally from Frank–Lieb.
+The proof uses the variational formula:
+  `Q̃_α(ρ‖σ) = sup_{H ≥ 0} f_α(H, ρ, σ)`
+where `f_α(H, ρ, σ) = α · Tr[ρ H] - (α-1) · Tr[(σ^{-γ} H σ^{-γ})^{α/(α-1)}]`
+is jointly convex in `(ρ, σ)` for fixed `H` (since the first term is linear and
+the second uses the convexity of trace functions). The supremum of jointly convex
+functions is jointly convex. -/
+theorem sandwichedTraceFunctional_jointly_convex (hα : 1 < α) {ι : Type*} [Fintype ι]
+    (w : ι → ℝ) (hw_nonneg : ∀ i, 0 ≤ w i) (hw_sum : ∑ i, w i = 1)
+    (ρs σs : ι → MState d) (ρ_mix σ_mix : MState d)
+    (hρ_mix : ρ_mix.M = ∑ i, w i • (ρs i).M)
+    (hσ_mix : σ_mix.M = ∑ i, w i • (σs i).M)
+    (hker : ∀ i, (σs i).M.ker ≤ (ρs i).M.ker) :
+    Q̃_ α(ρ_mix‖σ_mix) ≤ ∑ i, w i * Q̃_ α(ρs i‖σs i) := by
+  have hker' : σ_mix.M.ker ≤ ρ_mix.M.ker := by
+    rw [hρ_mix, hσ_mix]
+    exact HermitianMat.ker_weighted_sum_le w hw_nonneg _ _ (fun i => (ρs i).nonneg) (fun i => (σs i).nonneg) hker
+  rw [traceFunctional_eq_iSup_f_alpha hα ρ_mix σ_mix hker']
+  calc ⨆ H : {H : HermitianMat d ℂ // 0 ≤ H}, f_alpha α H.1 ρ_mix σ_mix
+      ≤ ∑ i, w i * (⨆ H : {H : HermitianMat d ℂ // 0 ≤ H}, f_alpha α H.1 (ρs i) (σs i)) :=
+        iSup_f_alpha_jointly_convex hα w hw_nonneg hw_sum ρs σs ρ_mix σ_mix hρ_mix hσ_mix hker
+    _ = ∑ i, w i * Q̃_ α(ρs i‖σs i) := by
+        congr 1; ext i
+        rw [traceFunctional_eq_iSup_f_alpha hα (ρs i) (σs i) (hker i)]
+
+/-! ### Twirling Construction Helpers
+We construct a twirling set using κ = Perm dB × (dB → Bool).
+For each (σ, f), the unitary V(σ,f) is the product of a sign-diagonal matrix
+(with entries ±1 determined by f) and a permutation matrix.
+The averaging property follows from:
+1. Sign averaging: summing over f kills off-diagonal entries
+2. Permutation averaging: summing over σ uniformizes diagonal entries
+-/
+
+/-
+A diagonal matrix with ±1 entries (determined by a Bool function) is unitary.
+-/
+private lemma signDiag_mem_unitaryGroup (f : dB → Bool) :
+    Matrix.diagonal (fun i : dB => (if f i then (-1 : ℂ) else 1)) ∈ Matrix.unitaryGroup dB ℂ := by
+  constructor;
+  · ext i j; by_cases hi : i = j <;> simp [ hi ] ;
+    · split_ifs <;> simp [ *, Matrix.one_apply ];
+    · rw [ Matrix.diagonal_apply_ne _ (.symm hi) ]
+      simp
+  · ext i j ; by_cases hi : i = j <;> simp [ hi ];
+    · split_ifs <;> simp [ *, Matrix.one_apply ];
+    · rw [ Matrix.diagonal_apply_ne _ (.symm hi) ]
+      simp
+
+/-- The product of a ±1 diagonal matrix and a permutation matrix is unitary. -/
+private lemma twirlingU_mem_unitaryGroup (σ : Equiv.Perm dB) (f : dB → Bool) :
+    Matrix.diagonal (fun i : dB => (if f i then (-1 : ℂ) else 1)) * σ.permMatrix ℂ ∈
+      Matrix.unitaryGroup dB ℂ :=
+  mul_mem (signDiag_mem_unitaryGroup f) (σ.permMatrix_mem_unitaryGroup)
+
+/-- The twirling unitary for a given permutation and sign function. -/
+private def twirlingU (σ : Equiv.Perm dB) (f : dB → Bool) : Matrix.unitaryGroup dB ℂ :=
+  ⟨Matrix.diagonal (fun i : dB => (if f i then (-1 : ℂ) else 1)) * σ.permMatrix ℂ,
+   twirlingU_mem_unitaryGroup σ f⟩
+
+/-
+Entry of the conjugation by a twirling unitary:
+  (X.conj (twirlingU σ f))_{pq} = sign(f,p) * sign(f,q) * X_{σp, σq}.
+-/
+private lemma twirlingU_conj_entry (X : HermitianMat dB ℂ) (σ : Equiv.Perm dB) (f : dB → Bool)
+    (p q : dB) :
+    (X.conj (twirlingU σ f : Matrix dB dB ℂ)) p q =
+      (if f p then (-1 : ℂ) else 1) * (if f q then (-1 : ℂ) else 1) * X (σ p) (σ q) := by
+  have h_conj_apply : ∀ u : Matrix.unitaryGroup dB ℂ, (HermitianMat.conj u.val X).mat = u.val * X.mat * u.val.conjTranspose := by
+    intro u
+    simp_all only [HermitianMat.conj_apply_mat]
+  convert congr_fun ( congr_fun ( h_conj_apply ( twirlingU σ f ) ) p ) q using 1;
+  unfold twirlingU;
+  simp [ Matrix.mul_apply, Matrix.diagonal ] ;
+  simp [Finset.sum_ite]
+  rw [ Finset.sum_eq_single ( σ q ) ]
+  · simp_all only [HermitianMat.conj_apply_mat, implies_true, Equiv.symm_apply_apply, ↓reduceIte]
+    split
+    next h =>
+      simp_all only [map_neg, map_one, mul_neg, mul_one, neg_neg]
+      split
+      next h_1 => simp_all only [neg_neg]
+      next h_1 => simp_all only [Bool.not_eq_true]
+    next h => simp_all only [Bool.not_eq_true, map_one, mul_one]
+  · aesop
+  · simp
+
+/-
+Summing the sign product over all Bool functions.
+  For p = q, each term is 1, giving 2^(card dB).
+  For p ≠ q, terms cancel in pairs (flip f at p).
+-/
+private lemma sum_sign_prod (p q : dB) :
+    ∑ f : dB → Bool, ((if f p then (-1 : ℂ) else 1) * (if f q then (-1 : ℂ) else 1)) =
+      if p = q then (2 ^ Fintype.card dB : ℕ) else 0 := by
+  split_ifs with h
+  · simp +contextual [h]
+  simp +contextual
+  -- By pairing each function with its flip at position p, we can see that the sum of each pair is zero.
+  have h_pair : ∑ f : dB → Bool, (if f q then -if f p then -1 else 1 else if f p then -1 else 1 : ℂ) = ∑ f : dB → Bool, - (if f q then -if f p then -1 else 1 else if f p then -1 else 1 : ℂ) := by
+    apply Finset.sum_bij (fun f _ => Function.update f p (¬f p));
+    · simp;
+    · intro a₁ _ a₂ _ h; ext x; by_cases hx : x = p
+      · replace h := congr_fun h x
+        subst hx
+        simp_all only [Finset.mem_univ, Bool.not_eq_true, Bool.decide_eq_false, Function.update_self,
+          Bool.not_eq_eq_eq_not, Bool.not_not]
+      · replace h := congr_fun h x
+        simp_all only [Finset.mem_univ, Bool.not_eq_true, Bool.decide_eq_false, ne_eq, not_false_eq_true,
+          Function.update_of_ne]
+    · exact fun b _ => ⟨ Function.update b p ( decide ¬b p = true ), Finset.mem_univ _, by simp ⟩;
+    · grind;
+  rw [ Finset.sum_neg_distrib ] at h_pair
+  linear_combination h_pair / 2
+
+/-
+Summing X_{σ(p), σ(p)} over all permutations σ.
+  For each target k, exactly (card dB - 1)! permutations send p to k.
+-/
+private lemma sum_perm_diag_entry (X : HermitianMat dB ℂ) (p : dB) :
+    ∑ σ : Equiv.Perm dB, X (σ p) (σ p) =
+      ((Fintype.card dB - 1).factorial : ℂ) * ∑ k : dB, X k k := by
+  -- For each fixed k, the number of permutations σ with σ p = k is (card dB - 1)! by the lemma `Nat.card_perm_eq_factorial`.
+  have h_card (k : dB) : (Finset.univ.filter (fun σ : Equiv.Perm dB => σ p = k)).card = (Nat.factorial (Fintype.card dB - 1) : ℕ) := by
+    have h_fixed_point : Finset.card (Finset.filter (fun σ : Equiv.Perm dB => σ p = k) Finset.univ) = Finset.card (Finset.univ : Finset (Equiv.Perm dB)) / Fintype.card dB := by
+      have h_card : ∀ k : dB, (Finset.univ.filter (fun σ : Equiv.Perm dB => σ p = k)).card = (Finset.univ.filter (fun σ : Equiv.Perm dB => σ p = p)).card := by
+        intro k;
+        apply Finset.card_bij (fun σ _ => Equiv.swap p k * σ)
+        · intro a ha
+          simp_all only [Finset.mem_filter, Finset.mem_univ, true_and, Equiv.Perm.coe_mul, Function.comp_apply,
+            Equiv.swap_apply_right, and_self]
+        · simp;
+        · simp
+          exact fun b hb => ⟨ Equiv.swap p k * b, by simp [ hb ], by simp ⟩;
+      have h_card : (Finset.univ.filter (fun σ : Equiv.Perm dB => σ p = p)).card * Fintype.card dB = Finset.card (Finset.univ : Finset (Equiv.Perm dB)) := by
+        have h_card : ∑ k : dB, (Finset.univ.filter (fun σ : Equiv.Perm dB => σ p = k)).card = Finset.card (Finset.univ : Finset (Equiv.Perm dB)) := by
+          simp only [Finset.card_eq_sum_ones, Finset.sum_fiberwise];
+        simp_all [ mul_comm ];
+      rw [ ← h_card, ‹∀ k : dB, Finset.card { σ : Equiv.Perm dB | σ p = k } = Finset.card { σ : Equiv.Perm dB | σ p = p } › k, Nat.mul_div_cancel _ ( Fintype.card_pos_iff.mpr ⟨ p ⟩ ) ];
+    rcases n : Fintype.card dB with ( _ | _ | n ) <;> simp_all [ Nat.factorial_succ, Fintype.card_perm ];
+    exact absurd n ( Nat.ne_of_gt ( Fintype.card_pos_iff.mpr ⟨ p ⟩ ) );
+  -- By Fubini's theorem, we can interchange the order of summation.
+  have h_fubini : ∑ σ : Equiv.Perm dB, X (σ p) (σ p) = ∑ k : dB, ∑ σ ∈ Finset.univ.filter (fun σ : Equiv.Perm dB => σ p = k), X k k := by
+    simp only [Finset.sum_filter];
+    rw [ Finset.sum_comm, Finset.sum_congr rfl ]
+    intro x a
+    simp_all only [Finset.mem_univ, Finset.sum_ite_eq, ↓reduceIte]
+  simp_all [ Finset.mul_sum _ _ _ ]
+
+/-
+The sum formula for twirling: summing the conjugation entries over all (σ, f) pairs.
+-/
+private lemma twirling_sum_eq [Nonempty dB] (X : HermitianMat dB ℂ) (p q : dB) :
+    ∑ i : Equiv.Perm dB × (dB → Bool), (X.conj (twirlingU i.1 i.2 : Matrix dB dB ℂ)) p q =
+      if p = q then ((Fintype.card dB - 1).factorial * 2 ^ Fintype.card dB : ℕ) * ∑ k, X k k
+      else 0 := by
+  -- Rewrite the sum as a double sum over σ and f using Finset.sum_product'.
+  have h_double_sum : ∑ i : Equiv.Perm dB × (dB → Bool), ((HermitianMat.conj (twirlingU i.1 i.2 : Matrix dB dB ℂ)) X) p q =
+    ∑ σ : Equiv.Perm dB, ∑ f : dB → Bool, ((if f p then (-1 : ℂ) else 1) * (if f q then (-1 : ℂ) else 1) * X (σ p) (σ q)) := by
+      rw [ ← Finset.sum_product' ];
+      refine Finset.sum_bij ( fun i _ => ( i.1, i.2 ) ) ?_ ?_ ?_ ?_
+      · simp
+      · simp
+      · simp
+      · simp [twirlingU_conj_entry]
+  split_ifs with h;
+  · simp_all [ ← Finset.mul_sum ];
+    have := sum_perm_diag_entry X q; simp_all [ mul_assoc, mul_comm ] ;
+  · rw [h_double_sum, Finset.sum_eq_zero]
+    intro σ _
+    rw [ ← Finset.sum_mul, sum_sign_prod p q ]
+    simp_all only [mul_ite, mul_neg, mul_one, ite_mul, neg_mul, one_mul, Finset.mem_univ, ↓reduceIte,
+      CharP.cast_eq_zero, zero_mul]
+
+/-
+The identity for the twirling set, stated for κ = Perm dB × (dB → Bool).
+-/
+private lemma twirling_identity [Nonempty dB] (X : HermitianMat dB ℂ) :
+    (Fintype.card (Equiv.Perm dB × (dB → Bool)) : ℝ)⁻¹ •
+      ∑ i : Equiv.Perm dB × (dB → Bool), X.conj (twirlingU i.1 i.2 : Matrix dB dB ℂ) =
+        (X.trace / Fintype.card dB) • (1 : HermitianMat dB ℂ) := by
+  ext p q
+  simp [ Fintype.card_prod, Fintype.card_perm, Fintype.card_pi ]
+  ring_nf
+  convert congr_arg ( fun x : ℂ => ( 2⁻¹ ^ Fintype.card dB * ( Fintype.card dB |> Nat.factorial : ℂ ) ⁻¹ ) * x ) ( twirling_sum_eq X p q ) using 1
+  · norm_num [ Matrix.one_apply ]
+    convert Or.inl rfl;
+    induction ( Finset.univ : Finset ( Equiv.Perm dB × ( dB → Bool ) ) ) using Finset.induction
+    · simp_all only [Finset.sum_empty, HermitianMat.zero_apply]
+    · rename_i a s a_1 a_2
+      obtain ⟨fst, snd⟩ := a
+      simp only [not_false_eq_true, Finset.sum_insert, *]
+      rfl
+  · norm_num [ Matrix.one_apply ]
+    rw [ show X.trace = ∑ k, X k k from X.trace_eq_trace]
+    rcases n : Fintype.card dB with ( _ | n )
+    · simp_all
+    · simp_all [ Nat.factorial_succ, mul_assoc, mul_comm, mul_left_comm ]
+      simp [ Nat.factorial_ne_zero ]
+
+/-! ## Twirling Set
+
+A twirling set for a finite-dimensional system `dB` is a set of unitary matrices
+`{V_i}` on `dB` (indexed by some finite type `κ`) such that the average
+`(1/|κ|) Σ_i V_i X V_i†` equals `Tr(X) · (1/dim(dB))` for all `X`.
+When applied as `1_A ⊗ V_i` on a bipartite system `dA × dB`, this gives:
+`(1/|κ|) Σ_i (1_A ⊗ V_i) ρ_AB (1_A ⊗ V_i)† = ρ_A ⊗ π_B`
+where `π_B = 1/dim(dB)` is the maximally mixed state.
+
+The standard construction uses the Heisenberg–Weyl (discrete Weyl) operators. -/
+
+/-- A twirling set for the system `dB` exists: there is a finite collection of unitaries
+whose average conjugation action twirls any matrix to a multiple of the identity.
+Specifically, `(1/|κ|) Σ_i V_i X V_i† = (Tr X / dim dB) · I` for all Hermitian X on dB.
+The standard construction uses the discrete Heisenberg-Weyl group of order `|dB|²`. -/
+private lemma exists_twirling_unitaries [Nonempty dB] :
+    ∃ (κ : Type) (_ : Fintype κ) (_ : Nonempty κ) (V : κ → Matrix.unitaryGroup dB ℂ),
+      ∀ (X : HermitianMat dB ℂ),
+        (Fintype.card κ : ℝ)⁻¹ • ∑ i : κ, X.conj (V i : Matrix dB dB ℂ) =
+          (X.trace / Fintype.card dB) • (1 : HermitianMat dB ℂ) := by
+  use Shrink ( Equiv.Perm dB × ( dB → Bool ) ), inferInstance, inferInstance
+  use fun i => twirlingU ( ( equivShrink _ ).symm i ).1 ( ( equivShrink _ ).symm i ).2
+  intro X
+  rw [ Fintype.card_shrink ]
+  convert twirling_identity X using 2
+  refine Finset.sum_bij ( fun i _ => ( equivShrink _ ).symm i ) ?_ ?_ ?_ ?_
+  · simp
+  · simp
+  · simp
+    exact fun a b => ⟨_, Equiv.apply_symm_apply _ _⟩
+  · simp
+
+
+-- /-- Twirling on a bipartite system: applying `1_A ⊗ V_i` and averaging produces the
+-- partial trace tensored with the maximally mixed state. -/
+-- theorem twirling_bipartite [Nonempty dB]
+--     (κ : Type) [Fintype κ] (V : κ → Matrix.unitaryGroup dB ℂ)
+--     (hV : ∀ (X : HermitianMat dB ℂ),
+--       (Fintype.card κ : ℝ)⁻¹ • ∑ i : κ, X.conj (V i : Matrix dB dB ℂ) =
+--         (X.trace / Fintype.card dB) • (1 : HermitianMat dB ℂ))
+--     (A : HermitianMat (dA × dB) ℂ) :
+--     (Fintype.card κ : ℝ)⁻¹ • ∑ i : κ,
+--       A.conj (Matrix.kroneckerMap (· * ·) (1 : Matrix dA dA ℂ) (V i : Matrix dB dB ℂ)) =
+--       A.traceRight ⊗ₖ ((Fintype.card dB : ℝ)⁻¹ • (1 : HermitianMat dB ℂ)) := by
+--   not needed...
+
+/-! ## Tensor Invariance
+
+`Q̃_α(ρ ⊗ τ ‖ σ ⊗ τ) = Q̃_α(ρ ‖ σ)` for any state `τ`.
+This corresponds to equation (2.4) in the paper. -/
+
+/-
+The trace functional is multiplicative over tensor products:
+`Q̃_α(ρ₁ ⊗ ρ₂ ‖ σ₁ ⊗ σ₂) = Q̃_α(ρ₁‖σ₁) · Q̃_α(ρ₂‖σ₂)`.
+-/
+theorem sandwichedTraceFunctional_mul
+    (ρ₁ σ₁ : MState dA) (ρ₂ σ₂ : MState dB) :
+    Q̃_ α(ρ₁ ⊗ᴹ ρ₂‖σ₁ ⊗ᴹ σ₂) = Q̃_ α(ρ₁‖σ₁) * Q̃_ α(ρ₂‖σ₂) := by
+  exact sandwiched_term_product ρ₁ σ₁ ρ₂ σ₂ α ((1 - α) / (2 * α))
+
+/-
+The trace functional of a state with itself equals 1.
+This follows from the calculation: `γ = (1-α)/(2α)` gives `2γ + 1 = 1/α`,
+so `σ^γ · σ · σ^γ = σ^(2γ+1) = σ^(1/α)`, and `(σ^(1/α))^α = σ^1`,
+whose trace equals 1 since σ is a state.
+-/
+theorem sandwichedTraceFunctional_self (hα : 0 < α) (ρ : MState d) :
+    Q̃_ α(ρ‖ρ) = 1 := by
+  by_cases h : α = 1;
+  · subst h; simp [ sandwichedTraceFunctional ] ;
+  · unfold sandwichedTraceFunctional;
+    have := ρ.pos;
+    have h_simp : (ρ.M.conj (ρ.M ^ ((1 - α) / (2 * α))).mat) = ρ.M ^ (1 + 2 * ((1 - α) / (2 * α))) := by
+      rw [ ← HermitianMat.conj_rpow ];
+      · rw [ HermitianMat.rpow_one ];
+      · exact le_of_lt this;
+      · exact div_ne_zero ( sub_ne_zero_of_ne ( Ne.symm h ) ) ( mul_ne_zero two_ne_zero hα.ne' );
+      · cases lt_or_gt_of_ne h <;> nlinarith [ mul_div_cancel₀ ( 1 - α ) ( by positivity : ( 2 * α ) ≠ 0 ) ];
+    have h_simp : (ρ.M ^ (1 + 2 * ((1 - α) / (2 * α)))) ^ α = ρ.M ^ ((1 + 2 * ((1 - α) / (2 * α))) * α) := by
+      rw [ ← HermitianMat.rpow_mul ];
+      exact le_of_lt this;
+    field_simp at *;
+    simp_all only [add_sub_cancel, one_div, HermitianMat.rpow_one, MState.tr]
+
+/-- The trace functional is invariant under tensoring with a fixed state.
+This follows from multiplicativity (`sandwichedTraceFunctional_mul`) and
+the self-trace-functional being 1 (`sandwichedTraceFunctional_self`). -/
+theorem sandwichedTraceFunctional_tensor_invariant (hα : 0 < α)
+    (ρ σ : MState dA) (τ : MState dB) :
+    Q̃_ α(ρ ⊗ᴹ τ‖σ ⊗ᴹ τ) = Q̃_ α(ρ‖σ) := by
+  rw [sandwichedTraceFunctional_mul, sandwichedTraceFunctional_self hα, mul_one]
+
+/-! ## Twirling MState Helpers
+
+Helper lemmas for constructing MStates via the twirling argument. -/
+
+/-- The MState obtained by conjugating a bipartite state by `1_A ⊗ V` where `V` is a unitary
+on the `B` system. This is `(1_A ⊗ V) ρ_AB (1_A ⊗ V)†`. -/
+def MState.conjTensorUnitary (ρ : MState (dA × dB)) (V : Matrix.unitaryGroup dB ℂ) :
+    MState (dA × dB) :=
+  ρ.U_conj ((1 : Matrix.unitaryGroup dA ℂ) ⊗ᵤ V)
+
+/-- The twirled MState: averaging conjugation by `1_A ⊗ V_i` over all elements of
+the twirling set gives `ρ_A ⊗ uniform_B`. We state the HermitianMat-level
+equality needed for the joint convexity argument. -/
+theorem MState.conjTensorUnitary_M (ρ : MState (dA × dB)) (V : Matrix.unitaryGroup dB ℂ) :
+    (ρ.conjTensorUnitary V).M = ρ.M.conj ((1 : Matrix.unitaryGroup dA ℂ) ⊗ᵤ V).val := by
+  rfl
+
+/-- The trace functional is invariant under `1_A ⊗ V` conjugation. -/
+theorem sandwichedTraceFunctional_conj_tensorUnitary
+    (ρ σ : MState (dA × dB)) (V : Matrix.unitaryGroup dB ℂ) :
+    Q̃_ α(ρ.conjTensorUnitary V‖σ.conjTensorUnitary V) = Q̃_ α(ρ‖σ) := by
+  exact sandwichedTraceFunctional_conj_unitary_MState _ ρ σ
+
+section twirling
+
+variable {dA dB : Type*}
+variable [Fintype dA] [Fintype dB]
+variable [DecidableEq dA] [DecidableEq dB]
+open scoped InnerProductSpace RealInnerProductSpace HermitianMat Matrix
+
+omit [DecidableEq dB] in
+-- The ((a₁,b₁),(a₂,b₂)) entry of (1⊗V)*M*(1⊗V)†
+-- equals (V * block_{a₁,a₂} * V†)_{b₁,b₂}.
+lemma conj_kron_one_entry (M : Matrix (dA × dB) (dA × dB) ℂ)
+    (V : Matrix dB dB ℂ) (a₁ a₂ : dA) (b₁ b₂ : dB) :
+    (Matrix.kroneckerMap (· * ·) (1 : Matrix dA dA ℂ) V * M *
+     (Matrix.kroneckerMap (· * ·) (1 : Matrix dA dA ℂ) V).conjTranspose) (a₁, b₁) (a₂, b₂) =
+    (V * (Matrix.of fun b₁' b₂' => M (a₁, b₁') (a₂, b₂')) * V.conjTranspose) b₁ b₂ := by
+  norm_num [ Matrix.mul_apply, Matrix.adjugate_apply, Matrix.det_apply', Matrix.trace ];
+  simp [ Matrix.one_apply, Finset.sum_ite ];
+  apply Finset.sum_bij (fun x _ => x.2)
+  · simp
+  · simp
+  · simp
+  simp
+  intro a b rfl
+  left
+  apply Finset.sum_bij (fun x _ => x.2)
+  · simp
+  · simp
+  · simp
+  simp +contextual
+
+/-
+For a Hermitian matrix, the twirling identity at the entry level.
+Extracts from hV the entry-level equation.
+-/
+lemma twirling_hermitian_entry
+    (κ : Type) [Fintype κ] (V : κ → Matrix.unitaryGroup dB ℂ)
+    (hV : ∀ (X : HermitianMat dB ℂ),
+      (Fintype.card κ : ℝ)⁻¹ • ∑ i : κ, X.conj (V i : Matrix dB dB ℂ) =
+        (X.trace / Fintype.card dB) • (1 : HermitianMat dB ℂ))
+    (X : HermitianMat dB ℂ) (b₁ b₂ : dB) :
+    ∑ i : κ, ((V i).val * X.val * (V i).val.conjTranspose) b₁ b₂ =
+    (X.val.trace / (Fintype.card dB : ℂ)) * (Fintype.card κ : ℂ) *
+      (if b₁ = b₂ then 1 else 0) := by
+  replace hV := congr_arg ( fun s => s.val b₁ b₂ ) ( hV X ) ; simp_all [ div_eq_inv_mul ] ;
+  convert congr_arg ( fun x : ℂ => x * Fintype.card κ ) hV using 1 <;> ring_nf
+  · by_cases h : Fintype.card κ = 0 <;> simp_all [ HermitianMat.conj ];
+    · rw [ Fintype.card_eq_zero_iff ] at h
+      simp_all only [Finset.univ_eq_empty, Finset.sum_empty]
+    · classical induction ( Finset.univ : Finset κ ) using Finset.induction
+      · simp_all [ Matrix.mul_assoc ]
+      · simp_all [ Matrix.mul_assoc ]
+        rfl
+  · simp [ Matrix.one_apply, mul_assoc, mul_comm ];
+    simp [ Matrix.trace, HermitianMat.trace ];
+    congr! 2;
+    exact Finset.sum_congr rfl fun _ _ => by simp [ Complex.ext_iff ] ;
+/-
+Extension of the twirling property from HermitianMat to general matrices.
+-/
+lemma twirling_general_matrix
+    (κ : Type) [Fintype κ] (V : κ → Matrix.unitaryGroup dB ℂ)
+    (hV : ∀ (X : HermitianMat dB ℂ),
+      (Fintype.card κ : ℝ)⁻¹ • ∑ i : κ, X.conj (V i : Matrix dB dB ℂ) =
+        (X.trace / Fintype.card dB) • (1 : HermitianMat dB ℂ))
+    (X : Matrix dB dB ℂ) (b₁ b₂ : dB) :
+    ∑ i : κ, ((V i).val * X * (V i).val.conjTranspose) b₁ b₂ =
+    (X.trace / (Fintype.card dB : ℂ)) * (Fintype.card κ : ℂ) *
+      (if b₁ = b₂ then 1 else 0) := by
+  -- Decompose X into Hermitian and anti-Hermitian parts.
+  set X_herm : Matrix dB dB ℂ := (1 / 2 : ℂ) • (X + X.conjTranspose)
+  set X_anti_herm : Matrix dB dB ℂ := (1 / (2 * Complex.I) : ℂ) • (X - X.conjTranspose);
+  have h_decomp : X = X_herm + Complex.I • X_anti_herm := by
+    ext i j; norm_num [ X_herm, X_anti_herm ] ; ring_nf
+    norm_num ; ring;
+  -- Apply thetwirling property to X_herm and X_anti_herm.
+  have h_twirling_herm : ∑ i : κ, ((V i).val * X_herm * (V i).val.conjTranspose) b₁ b₂ = (X_herm.trace / (Fintype.card dB : ℂ)) * (Fintype.card κ : ℂ) * (if b₁ = b₂ then 1 else 0) := by
+    convert twirling_hermitian_entry κ V hV ⟨ X_herm, _ ⟩ b₁ b₂ using 1;
+    simp +zetaDelta at *;
+    ext i j; simp [ Matrix.conjTranspose_apply ] ; ring;
+  have h_twirling_anti_herm : ∑ i : κ, ((V i).val * X_anti_herm * (V i).val.conjTranspose) b₁ b₂ = (X_anti_herm.trace / (Fintype.card dB : ℂ)) * (Fintype.card κ : ℂ) * (if b₁ = b₂ then 1 else 0) := by
+    convert twirling_hermitian_entry κ V hV ⟨ X_anti_herm, ?_ ⟩ b₁ b₂ using 1;
+    ext i j; simp [ X_anti_herm, Matrix.conjTranspose_apply ] ; ring;
+  rw [ h_decomp ];
+  convert congr_arg₂ ( · + · ) h_twirling_herm ( congr_arg ( fun x : ℂ => Complex.I * x ) h_twirling_anti_herm ) using 1 <;> norm_num [ Matrix.mul_add, Matrix.add_mul, Matrix.mul_assoc, Finset.mul_sum _ _ _, Finset.sum_add_distrib ]
+  ring_nf
+  split_ifs <;> ring
+
+/-- The MState obtained by conjugating a bipartite state by `1_A ⊗ V`. -/
+def MState.conjTensorUnitary' (ρ : MState (dA × dB)) (V : Matrix.unitaryGroup dB ℂ) :
+    MState (dA × dB) :=
+  ρ.U_conj ((1 : Matrix.unitaryGroup dA ℂ) ⊗ᵤ V)
+
+-- Entry-level form of the conjTensorUnitary.
+lemma conjTensorUnitary'_entry (ρ : MState (dA × dB)) (V : Matrix.unitaryGroup dB ℂ)
+    (a₁ a₂ : dA) (b₁ b₂ : dB) :
+    (ρ.conjTensorUnitary' V).M.val (a₁, b₁) (a₂, b₂) =
+    ((V : Matrix dB dB ℂ) * (Matrix.of fun b₁' b₂' => ρ.M.val (a₁, b₁') (a₂, b₂')) *
+     (V : Matrix dB dB ℂ).conjTranspose) b₁ b₂ := by
+  apply conj_kron_one_entry
+
+-- The RHS entry: (ρ.traceRight ⊗ᴹ uniform).M at ((a₁,b₁),(a₂,b₂)).
+lemma prod_traceRight_uniform_entry [Nonempty dB] (ρ : MState (dA × dB))
+    (a₁ a₂ : dA) (b₁ b₂ : dB) :
+    (ρ.traceRight ⊗ᴹ MState.uniform).M.val (a₁, b₁) (a₂, b₂) =
+    ρ.M.val.traceRight a₁ a₂ * ((Fintype.card dB : ℂ)⁻¹ * if b₁ = b₂ then 1 else 0) := by
+  unfold MState.traceRight MState.uniform
+  unfold MState.ofClassical
+  unfold HermitianMat.diagonal
+  unfold MState.prod
+  unfold HermitianMat.kronecker
+  simp [ Matrix.kroneckerMap_apply ]
+  rw [ Matrix.diagonal_apply ]
+  simp only [mul_ite, mul_zero]
+
+theorem twirling_average_eq [Nonempty dB]
+    (κ : Type) [Fintype κ] (V : κ → Matrix.unitaryGroup dB ℂ)
+    (hV : ∀ (X : HermitianMat dB ℂ),
+      (Fintype.card κ : ℝ)⁻¹ • ∑ i : κ, X.conj (V i : Matrix dB dB ℂ) =
+        (X.trace / Fintype.card dB) • (1 : HermitianMat dB ℂ))
+    (ρ : MState (dA × dB)) :
+    ∑ i : κ, ((Fintype.card κ : ℝ)⁻¹ • (ρ.conjTensorUnitary' (V i)).M) =
+      (ρ.traceRight ⊗ᴹ MState.uniform).M := by
+  -- Apply the twirling hypothesis to each term in the sum.
+  have h_sum : ∀ a₁ a₂ : dA, ∀ b₁ b₂ : dB, (∑ i, (1 / (Fintype.card κ : ℂ)) • (ρ.conjTensorUnitary' (V i)).M.val (a₁, b₁) (a₂, b₂)) = (ρ.M.val.traceRight a₁ a₂) * (1 / (Fintype.card dB : ℂ)) * (if b₁ = b₂ then 1 else 0) := by
+    intro a₁ a₂ b₁ b₂
+    have h_sum : ∑ i : κ, ((V i : Matrix dB dB ℂ) * (Matrix.of fun b₁' b₂' => ρ.M.val (a₁, b₁') (a₂, b₂')) * (V i : Matrix dB dB ℂ).conjTranspose) b₁ b₂ = (ρ.M.val.traceRight a₁ a₂) * (Fintype.card κ : ℂ) * (1 / (Fintype.card dB : ℂ)) * (if b₁ = b₂ then 1 else 0) := by
+      convert twirling_general_matrix κ V hV ( Matrix.of fun b₁' b₂' => ρ.M.val ( a₁, b₁' ) ( a₂, b₂' ) ) b₁ b₂ using 1 ; simp [ Matrix.trace ]
+      ring_nf!
+    convert congr_arg ( fun x : ℂ => ( 1 / ( Fintype.card κ : ℂ ) ) * x ) h_sum using 1
+    · norm_num [ conjTensorUnitary'_entry ]
+      ring_nf
+      rw [ Finset.mul_sum _ _ _ ];
+    · norm_num [ conjTensorUnitary'_entry ]
+      by_cases h : Fintype.card κ = 0 <;> simp_all [ mul_assoc, mul_comm, mul_left_comm ];
+      specialize hV 1 ; norm_num at hV;
+  convert h_sum using 1;
+  constructor <;> intro h;
+  · exact h_sum;
+  · ext ⟨a₁, b₁⟩ ⟨a₂, b₂⟩;
+    convert h a₁ a₂ b₁ b₂ using 1;
+    · classical induction ( Finset.univ : Finset κ ) using Finset.induction
+      · simp_all
+      · simp_all
+        convert congr_arg₂ ( · + · ) rfl ‹_› using 1;
+        simp [ Algebra.smul_def ]
+    · convert prod_traceRight_uniform_entry ρ a₁ a₂ b₁ b₂ using 1;
+      ring
+
+end twirling
+
+/-! ## Monotonicity Under Partial Trace (α > 1)
+
+The main intermediate result: for `α > 1`, the trace functional `Q̃_α` is monotone
+under partial trace:
+`Q̃_α(ρ_AB ‖ σ_AB) ≥ Q̃_α(ρ_A ‖ σ_A)`.
+
+The proof uses the twirling argument:
+1. By unitary invariance, `Q̃_α(ρ_AB‖σ_AB) = Q̃_α(V_i ρ_AB V_i†‖V_i σ_AB V_i†)` for each `i`.
+2. Averaging: `Q̃_α(ρ_AB‖σ_AB) = (1/|κ|) Σ_i Q̃_α(V_i ρ_AB V_i†‖V_i σ_AB V_i†)`.
+3. By joint convexity (α > 1): `≥ Q̃_α((1/|κ|) Σ_i V_i ρ_AB V_i†‖(1/|κ|) Σ_i V_i σ_AB V_i†)`.
+4. By twirling: `= Q̃_α(ρ_A ⊗ π_B ‖ σ_A ⊗ π_B)`.
+5. By tensor invariance: `= Q̃_α(ρ_A ‖ σ_A)`. -/
+
+/-- If `σ.M.ker ≤ ρ.M.ker`, then `(σ.conj B).ker ≤ (ρ.conj B).ker` for any matrix `B`.
+This follows from `ker_conj` (which expresses `(A.conj B).ker` as a `comap`) and
+`Submodule.comap_mono`. -/
+lemma HermitianMat.ker_conj_le_of_ker_le {n : Type*} [Fintype n] [DecidableEq n]
+    {A B : HermitianMat n ℂ} (hA : 0 ≤ A) (hB : 0 ≤ B) (h : A.ker ≤ B.ker)
+    (C : Matrix n n ℂ) : (A.conj C).ker ≤ (B.conj C).ker := by
+  rw [ker_conj hA, ker_conj hB]
+  exact Submodule.comap_mono h
+
+/-- Unitary conjugation preserves the kernel ordering between MStates.
+If `σ.M.ker ≤ ρ.M.ker`, then `(σ.conjTensorUnitary V).M.ker ≤ (ρ.conjTensorUnitary V).M.ker`. -/
+lemma MState.ker_conjTensorUnitary_le {dA dB : Type*} [Fintype dA] [Fintype dB]
+    [DecidableEq dA] [DecidableEq dB]
+    (ρ σ : MState (dA × dB)) (V : Matrix.unitaryGroup dB ℂ)
+    (hker : σ.M.ker ≤ ρ.M.ker) :
+    (σ.conjTensorUnitary V).M.ker ≤ (ρ.conjTensorUnitary V).M.ker := by
+  simp only [MState.conjTensorUnitary_M]
+  exact HermitianMat.ker_conj_le_of_ker_le σ.nonneg ρ.nonneg hker _
+
+/-- Monotonicity of the trace functional under partial trace for `α > 1`.
+Equation (2.8) of the paper (second line). -/
+theorem sandwichedTraceFunctional_mono_traceRight [Nonempty dB]
+    (hα : 1 < α) (ρ σ : MState (dA × dB)) (hker : σ.M.ker ≤ ρ.M.ker) :
+    Q̃_ α(ρ.traceRight‖σ.traceRight) ≤ Q̃_ α(ρ‖σ) := by
+  -- Obtain the twirling unitaries
+  obtain ⟨κ, hκ_fin, hκ_ne, V, hV⟩ := exists_twirling_unitaries (dB := dB)
+  letI : Fintype κ := hκ_fin
+  letI : Nonempty κ := hκ_ne
+  -- By unitary invariance, Q̃_α(ρ‖σ) = Q̃_α(V_i ρ V_i†‖V_i σ V_i†) for each i
+  have h_inv (i) : Q̃_ α(ρ.conjTensorUnitary (V i)‖σ.conjTensorUnitary (V i)) = Q̃_ α(ρ‖σ) :=
+    sandwichedTraceFunctional_conj_tensorUnitary ρ σ (V i)
+  -- Step 2: Q̃_α(ρ‖σ) = Σ_i (1/|κ|) * Q̃_α(V_i ρ V_i†‖V_i σ V_i†)
+  have hcard_ne : (Fintype.card κ : ℝ) ≠ 0 :=
+    Nat.cast_ne_zero.mpr Fintype.card_ne_zero
+  have h_avg : Q̃_ α(ρ‖σ) = ∑ i : κ, (Fintype.card κ : ℝ)⁻¹ * Q̃_ α(ρ.conjTensorUnitary (V i)‖σ.conjTensorUnitary (V i)) := by
+    simp only [h_inv, Finset.sum_const, Finset.card_univ, nsmul_eq_mul]
+    field_simp
+  -- Step 3: By joint convexity (α > 1)
+  have hw_sum : ∑ i : κ, (Fintype.card κ : ℝ)⁻¹ = 1 := by
+    rw [Finset.sum_const, Finset.card_univ, nsmul_eq_mul]
+    exact mul_inv_cancel₀ hcard_ne
+  set ρ_mix := ρ.traceRight ⊗ᴹ MState.uniform (d := dB)
+  set σ_mix := σ.traceRight ⊗ᴹ MState.uniform (d := dB)
+  have hρ_mix : ρ_mix.M = ∑ i : κ, (Fintype.card κ : ℝ)⁻¹ • (ρ.conjTensorUnitary (V i)).M :=
+    (twirling_average_eq κ V hV ρ).symm
+  have hσ_mix : σ_mix.M = ∑ i : κ, (Fintype.card κ : ℝ)⁻¹ • (σ.conjTensorUnitary (V i)).M :=
+    (twirling_average_eq κ V hV σ).symm
+  have h_convex := sandwichedTraceFunctional_jointly_convex hα
+    (fun (_ : κ) => (Fintype.card κ : ℝ)⁻¹) (by intro; positivity) hw_sum
+    (fun i => ρ.conjTensorUnitary (V i)) (fun i => σ.conjTensorUnitary (V i))
+    ρ_mix σ_mix hρ_mix hσ_mix
+    (fun i => MState.ker_conjTensorUnitary_le ρ σ (V i) hker)
+  -- Step 4 + 5: Q̃_α(ρ_A ⊗ π_B‖σ_A ⊗ π_B) = Q̃_α(ρ_A‖σ_A) by tensor invariance
+  have h_tensor : Q̃_ α(ρ_mix‖σ_mix) = Q̃_ α(ρ.traceRight‖σ.traceRight) :=
+    sandwichedTraceFunctional_tensor_invariant (by linarith) ρ.traceRight σ.traceRight MState.uniform
+  -- Combine
+  calc Q̃_ α(ρ.traceRight‖σ.traceRight)
+      = Q̃_ α(ρ_mix‖σ_mix) := h_tensor.symm
+    _ ≤ ∑ i : κ, (Fintype.card κ : ℝ)⁻¹ * Q̃_ α(ρ.conjTensorUnitary (V i)‖σ.conjTensorUnitary (V i)) := h_convex
+    _ = Q̃_ α(ρ‖σ) := h_avg.symm
+
+/-! ## DPI for Sandwiched Rényi Divergence Under Partial Trace -/
+
+/-- The "tensor product" of a vector v with basis vector e_b:
+    (v ⊗ e_b)(a, b') = v(a) if b' = b, else 0 -/
+private def vecTensorBasis (v : dA → ℂ) (b : dB) : (dA × dB) → ℂ :=
+  fun ⟨a, b'⟩ => if b' = b then v a else 0
+
+omit [DecidableEq dA] in
+/-- Key identity: ⟨v, (Tr_B A)v⟩ = ∑_b ⟨v⊗e_b, A(v⊗e_b)⟩ -/
+private lemma inner_traceRight_eq_sum_inner_vecTensorBasis
+    (A : Matrix (dA × dB) (dA × dB) ℂ) (v : dA → ℂ) :
+    star v ⬝ᵥ A.traceRight.mulVec v =
+    ∑ b : dB, star (vecTensorBasis v b) ⬝ᵥ A.mulVec (vecTensorBasis v b) := by
+  simp [ Matrix.traceRight, Matrix.mulVec, dotProduct ];
+  simp [ vecTensorBasis, Fintype.sum_prod_type ];
+  rw [ Finset.sum_comm, Finset.sum_congr rfl ];
+  simp [ Finset.mul_sum _ _ _, mul_assoc, mul_comm];
+  intro x; rw [ Finset.sum_comm ] ; congr; ext y; rw [ Finset.sum_comm ] ;
+  rw [ Finset.sum_comm ];
+  rw [ Finset.sum_eq_single y ]
+  · simp
+  · simp +contextual
+  · simp
+
+omit [DecidableEq dA] in
+/-- If A.mulVec(v⊗e_b) = 0 for all b, then (Tr_B A).mulVec v = 0 -/
+private lemma traceRight_mulVec_zero_of_vecTensorBasis_zero
+    (A : Matrix (dA × dB) (dA × dB) ℂ) (v : dA → ℂ)
+    (h : ∀ b : dB, A.mulVec (vecTensorBasis v b) = 0) :
+    A.traceRight.mulVec v = 0 := by
+  ext i;
+  simp_all [ funext_iff, Matrix.mulVec, dotProduct ];
+  convert Finset.sum_congr rfl fun j _ => h j i j using 1;
+  any_goals exact Finset.univ;
+  · unfold Matrix.traceRight vecTensorBasis; simp [ Finset.sum_ite ] ;
+    simp [ Finset.sum_mul _ _ _, Finset.sum_sigma' ];
+    apply Finset.sum_bij ( fun x _ => ⟨ x.2, x.1, x.2 ⟩ )
+    · simp
+    · rintro ⟨fst, snd⟩ ha₁ ⟨fst_1, snd_1⟩  ha₂ ⟨rfl, ⟨rfl, right⟩⟩
+      rfl
+    · intro b a
+      obtain ⟨fst, ⟨fst_1, snd⟩⟩ := b
+      simp_all only [Finset.mem_sigma, Finset.mem_univ, Finset.mem_filter, true_and, Sigma.mk.injEq,
+        heq_eq_eq, Prod.mk.injEq, exists_const, Sigma.exists, exists_eq_left, and_true, exists_eq]
+    · simp
+  · norm_num
+
+/-- The kernel condition `σ.M.ker ≤ ρ.M.ker` is preserved under partial trace.
+This follows because `supp(ρ) ⊆ supp(σ)` implies `supp(Tr_B ρ) ⊆ supp(Tr_B σ)`:
+if `v ∈ supp(Tr_B ρ)`, then `⟨v, (Tr_B ρ) v⟩ > 0`, so for some basis vector `e_b`
+we have `v ⊗ e_b ∈ supp(ρ) ⊆ supp(σ)`, hence `⟨v, (Tr_B σ) v⟩ ≥ ⟨v ⊗ e_b, σ (v ⊗ e_b)⟩ > 0`. -/
+theorem ker_le_traceRight {ρ σ : MState (dA × dB)}
+    (hker : σ.M.ker ≤ ρ.M.ker) :
+    σ.traceRight.M.ker ≤ ρ.traceRight.M.ker := by
+  simp only [MState.traceRight_M]
+  intro v hv
+  rw [HermitianMat.mem_ker_iff_mulVec_zero] at hv ⊢
+  have hv' : σ.M.mat.traceRight.mulVec v.ofLp = 0 := by
+    rwa [HermitianMat.traceRight_mat] at hv
+  have h_inner_zero : star v.ofLp ⬝ᵥ σ.M.mat.traceRight.mulVec v.ofLp = 0 := by
+    rw [hv']; simp [dotProduct]
+  rw [inner_traceRight_eq_sum_inner_vecTensorBasis] at h_inner_zero
+  have hσ_psd := HermitianMat.zero_le_iff.mp σ.nonneg
+  have h_each_zero : ∀ b : dB,
+      star (vecTensorBasis v.ofLp b) ⬝ᵥ σ.M.mat.mulVec (vecTensorBasis v.ofLp b) = 0 := by
+    have h_nonneg : ∀ b, (0 : ℂ) ≤
+        star (vecTensorBasis v.ofLp b) ⬝ᵥ σ.M.mat.mulVec (vecTensorBasis v.ofLp b) :=
+      fun b => hσ_psd.dotProduct_mulVec_nonneg _
+    intro b
+    exact Finset.sum_eq_zero_iff_of_nonneg (fun b _ => h_nonneg b) |>.mp h_inner_zero b (Finset.mem_univ _)
+  have h_σ_zero : ∀ b : dB, σ.M.mat.mulVec (vecTensorBasis v.ofLp b) = 0 :=
+    fun b => (hσ_psd.dotProduct_mulVec_zero_iff _).mp (h_each_zero b)
+  have h_ρ_zero : ∀ b : dB, ρ.M.mat.mulVec (vecTensorBasis v.ofLp b) = 0 := by
+    intro b
+    have hmem_σ : (WithLp.toLp 2 (vecTensorBasis v.ofLp b) : EuclideanSpace ℂ _) ∈ σ.M.ker := by
+      rw [HermitianMat.mem_ker_iff_mulVec_zero]; exact h_σ_zero b
+    have hmem_ρ := hker hmem_σ
+    rwa [HermitianMat.mem_ker_iff_mulVec_zero] at hmem_ρ
+  exact traceRight_mulVec_zero_of_vecTensorBasis_zero ρ.M.mat v.ofLp h_ρ_zero
+
+/-- The sandwiched Rényi divergence is monotone under partial trace for `α > 1`.
+This follows from monotonicity of the trace functional together with the fact that
+`D̃_α = log(Q̃_α) / (α - 1)` and both `log` and `1/(α-1)` are order-preserving for α > 1. -/
+theorem sandwichedRenyiEntropy_mono_traceRight [Nonempty dB]
+    (hα : 1 < α) (ρ σ : MState (dA × dB))
+    (hker : σ.M.ker ≤ ρ.M.ker) :
+    D̃_ α(ρ.traceRight‖σ.traceRight) ≤ D̃_ α(ρ‖σ) := by
+  have hα₀ : 0 < α := by linarith
+  have hα₁ : α ≠ 1 := hα.ne'
+  have hker_tr := ker_le_traceRight hker
+  -- Rewrite both sides as log(Q̃) / (α - 1)
+  rw [sandwichedRelRentropy_eq_log_traceFunctional hα₀ hα₁ hker,
+      sandwichedRelRentropy_eq_log_traceFunctional hα₀ hα₁ hker_tr]
+  apply ENNReal.ofReal_le_ofReal
+  apply div_le_div_of_nonneg_right _ (by linarith : 0 < α - 1).le
+  exact Real.log_le_log (sandwichedTraceFunctional_pos ρ.traceRight σ.traceRight hker_tr)
+    (sandwichedTraceFunctional_mono_traceRight hα ρ σ hker)
+
+/-! ## DPI via Stinespring Dilation -/
+
+/-
+The sandwiched Rényi divergence is invariant under unitary conjugation.
+-/
+set_option maxHeartbeats 400000 in
+theorem sandwichedRenyiEntropy_conj_unitary (hα : 0 < α) (ρ σ : MState d)
+    (U : Matrix.unitaryGroup d ℂ) :
+    D̃_ α(ρ.U_conj U‖σ.U_conj U) = D̃_ α(ρ‖σ) := by
+  -- Since unitary conjugation preserves the kernel, the condition σ.M.ker ≤ ρ.M.ker is equivalent to (σ.U_conj U).M.ker ≤ (ρ.U_conj U).M.ker.
+  have h_kernel : σ.M.ker ≤ ρ.M.ker ↔ (σ.U_conj U).M.ker ≤ (ρ.U_conj U).M.ker := by
+    have h_kernel : ∀ (A : HermitianMat d ℂ), (A.conj U.val).ker = Submodule.map (U.val.toEuclideanLin) A.ker := by
+      intro A
+      ext x
+      simp [HermitianMat.conj];
+      constructor <;> intro hx
+      all_goals generalize_proofs at *;
+      · use (U.val.conjTranspose.toEuclideanLin x);
+        simp_all [ HermitianMat.ker, Matrix.toEuclideanLin ];
+        simp_all [ HermitianMat.lin, Matrix.toLpLin ];
+        have h_unitary : (U.val * U.val.conjTranspose) = 1 := by
+          exact U.2.2
+        generalize_proofs at *; (
+        apply_fun ( U.val.conjTranspose *ᵥ · ) at hx; simp_all [ Matrix.mul_assoc, Matrix.mulVec_mulVec ] ;
+        simp_all [ ← Matrix.mul_assoc, mul_eq_one_comm.mp h_unitary ]);
+      · obtain ⟨ y, hy, rfl ⟩ := hx; simp_all [ Matrix.toEuclideanLin, Matrix.mul_assoc ] ;
+        simp_all [ HermitianMat.ker, Matrix.toLpLin ];
+        simp_all [ HermitianMat.lin];
+        simp_all [ Matrix.toLpLin, Matrix.mulVec, funext_iff ];
+        simp_all [ Matrix.mul_apply, dotProduct ];
+        -- Since $U$ is unitary, we have $\sum_{x_3} \overline{U_{x_3 x}} U_{x_3 x_1} = \delta_{x x_1}$.
+        have h_unitary : ∀ x x_1, ∑ x_3, (starRingEnd ℂ) (U.val x_3 x) * U.val x_3 x_1 = if x = x_1 then 1 else 0 := by
+          have := U.2.1;
+          intro x x_1; replace this := congr_fun ( congr_fun this x ) x_1; simp_all [ Matrix.mul_apply, Matrix.one_apply ] ;
+        simp_all [ mul_assoc, Finset.sum_mul ];
+        intro x; rw [ Finset.sum_comm ] ; simp_all [ ← Finset.mul_sum ] ;
+    simp [ h_kernel, MState.U_conj ];
+    constructor <;> intro h <;> simp_all [ SetLike.le_def ];
+    · exact fun x hx => ⟨ x, h hx, rfl ⟩;
+    · intro x hx
+      obtain ⟨y, hy, hy'⟩ := h x hx
+      obtain ⟨⟩ : y = x := by
+        apply_fun (U.val⁻¹).mulVec at hy' ; simp_all [ Matrix.mulVec_mulVec ];
+        exact PiLp.ext (congrFun hy')
+      exact hy
+  by_cases h : σ.M.ker ≤ ρ.M.ker <;> simp_all [ SandwichedRelRentropy ];
+  split_ifs <;> simp_all [ MState.U_conj ];
+  · congr 1;
+    rw [ inner_sub_right, inner_sub_right ];
+    grind only [HermitianMat.log_conj_unitary, HermitianMat.inner_conj_unitary];
+  · congr! 2;
+    convert congr_arg Real.log ( sandwichedTraceFunctional_conj_unitary_MState U ρ σ ) using 1
+
+/-
+The sandwiched Rényi divergence is invariant under tensoring with a fixed pure state:
+`D̃_α(ρ ⊗ |ψ⟩⟨ψ| ‖ σ ⊗ |ψ⟩⟨ψ|) = D̃_α(ρ ‖ σ)`.
+-/
+theorem sandwichedRenyiEntropy_tensor_pure (hα : 0 < α) (ρ σ : MState d₁) (ψ : Ket d₂) :
+    D̃_ α(ρ ⊗ᴹ MState.pure ψ‖σ ⊗ᴹ MState.pure ψ) = D̃_ α(ρ‖σ) := by
+  simp [hα]
+
+/-- The sandwiched Rényi divergence is invariant under SWAP. -/
+theorem sandwichedRenyiEntropy_SWAP (ρ σ : MState (dA × dB)) :
+    D̃_ α(ρ.SWAP‖σ.SWAP) = D̃_ α(ρ‖σ) := by
+  exact sandwichedRelRentropy_relabel ρ σ _
+
+/-
+Monotonicity of the sandwiched Rényi divergence under traceRight for `α > 1`,
+without the kernel condition. When the kernel condition fails, `D̃_α = ⊤` and
+the inequality is trivial.
+-/
+theorem sandwichedRenyiEntropy_mono_traceRight' [Nonempty dB]
+    (hα : 1 < α) (ρ σ : MState (dA × dB)) :
+    D̃_ α(ρ.traceRight‖σ.traceRight) ≤ D̃_ α(ρ‖σ) := by
+  by_cases hker : σ.M.ker ≤ ρ.M.ker
+  · exact sandwichedRenyiEntropy_mono_traceRight hα ρ σ hker
+  · simp only [SandwichedRelRentropy, MState.traceRight_M]
+    split
+    next h => simp_all only [le_top]
+    next h => simp_all only [not_lt, le_refl]
+
+/-- Monotonicity of the sandwiched Rényi divergence under `traceLeft` for `α > 1`.
+Follows from `sandwichedRenyiEntropy_mono_traceRight'` + SWAP invariance. -/
+theorem sandwichedRenyiEntropy_mono_traceLeft [Nonempty dA]
+    (hα : 1 < α) (ρ σ : MState (dA × dB)) :
+    D̃_ α(ρ.traceLeft‖σ.traceLeft) ≤ D̃_ α(ρ‖σ) := by
+  -- traceLeft = SWAP.traceRight, and SWAP preserves the SRD
+  rw [← MState.traceRight_SWAP, ← MState.traceRight_SWAP]
+  calc D̃_ α(ρ.SWAP.traceRight‖σ.SWAP.traceRight)
+      ≤ D̃_ α(ρ.SWAP‖σ.SWAP) :=
+        sandwichedRenyiEntropy_mono_traceRight' hα ρ.SWAP σ.SWAP
+    _ = D̃_ α(ρ‖σ) := sandwichedRenyiEntropy_SWAP ρ σ
+
+/-- Helper: The Stinespring preparation `prep ∘ append` equals tensoring with a fixed pure state.
+`append = ofEquiv (Equiv.prodPUnit d₁).symm`.
+TODO: PULLOUT to a more reasonable place. -/
+theorem prep_append_eq_tensor_pure [Inhabited d₂] (ρ : MState d₁) :
+    let ψ₀ : Ket (d₂ × d₂) := Ket.basis default
+    let τ := MState.pure ψ₀
+    let zero_prep : CPTPMap Unit (d₂ × d₂) := CPTPMap.replacement τ
+    let prep := (CPTPMap.id ⊗ᶜᵖ zero_prep)
+    let append : CPTPMap d₁ (d₁ × Unit) := CPTPMap.ofEquiv (Equiv.prodPUnit d₁).symm
+    (prep ∘ₘ append) ρ = ρ ⊗ᴹ τ := by
+  apply MState.ext
+  apply HermitianMat.ext
+  funext ⟨a₁, b₁⟩ ⟨a₂, b₂⟩
+  have h := CPTPMap.prep_append_map_entry ρ.m a₁ b₁ a₂ b₂
+  simp only [MState.prod, HermitianMat.kronecker]
+  exact h
+
+/-- The Data Processing Inequality for the Sandwiched Rényi relative entropy (α > 1).
+Every CPTP map `Φ` satisfies `D̃_α(Φρ‖Φσ) ≤ D̃_α(ρ‖σ)`.
+
+The proof uses the Stinespring representation (see `CPTPMap.exists_purify`):
+every CPTP map can be written as ancilla preparation + unitary conjugation + partial trace.
+Since the sandwiched Rényi divergence is invariant under the first two operations
+(by additivity and relabel invariance) and monotone under partial trace
+(by `sandwichedRenyiEntropy_mono_traceRight`), the DPI follows. -/
+theorem sandwichedRenyiEntropy_DPI_gt_one (hα : 1 < α) (ρ σ : MState d₁) (Φ : CPTPMap d₁ d₂) :
+    D̃_ α(Φ ρ‖Φ σ) ≤ D̃_ α(ρ‖σ) := by
+  have _ : Nonempty d₁ := ρ.nonempty
+  have _ : Nonempty d₂ := (Φ ρ).nonempty
+  haveI : Inhabited d₂ := Classical.inhabited_of_nonempty ‹_›
+  let ψ₀ : Ket (d₂ × d₂) := Ket.basis default
+  let τ := MState.pure ψ₀
+  obtain ⟨U, hU⟩ := Φ.purify_IsUnitary
+  -- USe the `zero_prep` / `prep` / `append` from `CPTPMap.purify_trace`
+  let zero_prep : CPTPMap Unit (d₂ × d₂) := CPTPMap.replacement τ
+  let prep := ((CPTPMap.id : CPTPMap d₁ d₁) ⊗ᶜᵖ zero_prep)
+  let append : CPTPMap d₁ (d₁ × Unit) := CPTPMap.ofEquiv (Equiv.prodPUnit d₁).symm
+  calc D̃_ α(Φ ρ‖Φ σ)
+    _ = D̃_ α((Φ.purify ((prep ∘ₘ append) ρ)).traceLeft.traceLeft‖
+            (Φ.purify ((prep ∘ₘ append) σ)).traceLeft.traceLeft) := by
+        have h_trace (ξ) : Φ ξ = (Φ.purify ((prep ∘ₘ append) ξ)).traceLeft.traceLeft := by
+          simpa using congr($Φ.purify_trace ξ)
+        rw [h_trace ρ, h_trace σ]
+    _ = D̃_ α(((ρ ⊗ᴹ τ).U_conj U).traceLeft.traceLeft‖
+             ((σ ⊗ᴹ τ).U_conj U).traceLeft.traceLeft) := by
+        have h_app (ξ) : Φ.purify ξ = ξ.U_conj U := congr($hU ξ)
+        rw [prep_append_eq_tensor_pure ρ, prep_append_eq_tensor_pure σ, h_app, h_app]
+    _ ≤ D̃_ α(((ρ ⊗ᴹ τ).U_conj U).traceLeft‖((σ ⊗ᴹ τ).U_conj U).traceLeft) :=
+        sandwichedRenyiEntropy_mono_traceLeft hα ..
+    _ ≤ D̃_ α((ρ ⊗ᴹ τ).U_conj U‖(σ ⊗ᴹ τ).U_conj U) :=
+        sandwichedRenyiEntropy_mono_traceLeft hα ..
+    _ = D̃_ α(ρ ⊗ᴹ τ‖σ ⊗ᴹ τ) :=
+        sandwichedRenyiEntropy_conj_unitary (by positivity) _ _ _
+    _ = D̃_ α(ρ‖σ) :=
+        sandwichedRenyiEntropy_tensor_pure (by positivity) ρ σ ψ₀
+
+/-
+The DPI for the sandwiched Rényi divergence at α = 1 (the quantum relative entropy).
+This follows from the α > 1 case by taking a limit, using the continuity of
+`α ↦ D̃_α(ρ‖σ)` established in `sandwichedRelRentropy.continuousOn`.
+-/
+theorem sandwichedRenyiEntropy_DPI_eq_one (ρ σ : MState d₁) (Φ : CPTPMap d₁ d₂) :
+    D̃_ 1(Φ ρ‖Φ σ) ≤ D̃_ 1(ρ‖σ) := by
+  by_contra h_contra;
+  -- Since $\alpha \mapsto D_\alpha(\rho \| \sigma)$ is continuous on $(0, \infty)$, we can take the limit as $\alpha \to 1$.
+  have h_cont : Filter.Tendsto (fun α : ℝ => D̃_ α(Φ ρ‖Φ σ)) (nhdsWithin 1 (Set.Ioi 1)) (nhds (D̃_ 1(Φ ρ‖Φ σ))) ∧ Filter.Tendsto (fun α : ℝ => D̃_ α(ρ‖σ)) (nhdsWithin 1 (Set.Ioi 1)) (nhds (D̃_ 1(ρ‖σ))) := by
+    exact ⟨ tendsto_nhdsWithin_of_tendsto_nhds ( by simpa using sandwichedRelRentropy.continuousOn ( Φ ρ ) ( Φ σ ) |> ContinuousOn.continuousAt <| Ioi_mem_nhds zero_lt_one ), tendsto_nhdsWithin_of_tendsto_nhds ( by simpa using sandwichedRelRentropy.continuousOn ρ σ |> ContinuousOn.continuousAt <| Ioi_mem_nhds zero_lt_one ) ⟩;
+  exact h_contra <| le_of_tendsto_of_tendsto h_cont.1 h_cont.2 <| Filter.eventually_of_mem self_mem_nhdsWithin fun x hx => sandwichedRenyiEntropy_DPI_gt_one hx ρ σ Φ
+
+/-- The Data Processing Inequality for the Sandwiched Renyi relative entropy.
+Proved following the approach of Frank–Lieb and Leditzky–Rouzé–Datta. -/
+theorem sandwichedRenyiEntropy_DPI (hα : 1 ≤ α) (ρ σ : MState d₁) (Φ : CPTPMap d₁ d₂) :
+    D̃_ α(Φ ρ‖Φ σ) ≤ D̃_ α(ρ‖σ) := by
+  rcases hα.lt_or_eq with hα | rfl
+  · exact sandwichedRenyiEntropy_DPI_gt_one hα ρ σ Φ
+  · exact sandwichedRenyiEntropy_DPI_eq_one ρ σ Φ
+
+/--
+info: 'sandwichedRenyiEntropy_DPI' depends on axioms: [propext, Classical.choice, Quot.sound]
 -/
 #guard_msgs in
-#print axioms sandwichedRenyiEntropy_DPI_ax
+#print axioms sandwichedRenyiEntropy_DPI
