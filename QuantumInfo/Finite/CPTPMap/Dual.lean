@@ -54,7 +54,8 @@ theorem _root_.Matrix.PosSemidef.trace_mul_nonneg {n : Type*} [Fintype n] [Decid
     0 ≤ (A * B).trace := by
   open scoped Matrix in
   obtain ⟨sqrtB, rfl⟩ : ∃ sqrtB : Matrix n n 𝕜, B = sqrtBᴴ * sqrtB := by
-    exact Matrix.posSemidef_iff_eq_conjTranspose_mul_self.mp hB;
+    open MatrixOrder in
+    exact CStarAlgebra.nonneg_iff_eq_star_mul_self.mp hB.nonneg
   simp only [← Matrix.mul_assoc, ← Matrix.trace_mul_comm sqrtB]
   have h : (sqrtB * A * sqrtBᴴ).PosSemidef := by
     convert hA.conjTranspose_mul_mul_same sqrtBᴴ using 1

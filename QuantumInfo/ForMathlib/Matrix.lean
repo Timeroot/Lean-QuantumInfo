@@ -9,7 +9,9 @@ import Mathlib.Analysis.CStarAlgebra.Matrix
 import Mathlib.Analysis.Matrix.Order
 import Mathlib.Data.Multiset.Functor --Can't believe I'm having to import this
 import Mathlib.LinearAlgebra.Matrix.Kronecker
-import Mathlib.LinearAlgebra.Matrix.HermitianFunctionalCalculus
+import Mathlib.Analysis.SpecialFunctions.Bernstein
+import Mathlib.Analysis.SpecialFunctions.Pow.NNReal
+import Mathlib.Tactic.NormNum.GCD
 import Mathlib.LinearAlgebra.Matrix.PosDef
 import Mathlib.LinearAlgebra.Matrix.IsDiag
 
@@ -1139,18 +1141,7 @@ theorem PosDef.zero_lt {n : Type*} [Nonempty n] [Fintype n] {A : Matrix n n ℂ}
   apply lt_of_le_of_ne
   · replace hA := hA.posSemidef
     rwa [Matrix.nonneg_iff_posSemidef]
-  · rintro rfl
-    --wtf do better. TODO
-    have : ¬(0 < 0) := by trivial
-    classical rw [← Matrix.posDef_natCast_iff (n := n) (R := ℂ)] at this
-    revert hA
-    convert this
-    ext; simp
-    trans ((0 : ℕ) : ℂ)
-    · simp
-    classical
-    change _ = ite _ _ _
-    simp
+  · rintro rfl; exact absurd (hA.diag_pos (i := Classical.arbitrary n)) (by simp)
 
 
 lemma IsHermitian.spectrum_eq_image_eigenvalues [Fintype n] {A : Matrix n n ℂ} (hA : A.IsHermitian) :
@@ -1327,7 +1318,7 @@ theorem IsHermitian.spectrum_subset_Ici_of_sub {d 𝕜 : Type*} [Fintype d] [Dec
             Unitary.conjStarAlgAut_apply]
           simp [ mul_comm, mul_left_comm, Algebra.smul_def ]
           congr! 1
-          simp [Algebra.algebraMap_eq_smul_one, mul_assoc]
+          simp [Algebra.algebraMap_eq_smul_one]
         -- Substitute the decomposition of $A$ into the expression $(star v ⬝ᵥ (A.mulVec v))$.
         have h_subst : (star v ⬝ᵥ (A.mulVec v)) = ∑ i, (hA.eigenvalues i) * (star v ⬝ᵥ (Matrix.mulVec (Matrix.of (fun j k => (hA.eigenvectorBasis i j) * (star (hA.eigenvectorBasis i k)))) v)) := by
           -- Substitute the decomposition of $A$ into the expression $(star v ⬝ᵥ (A.mulVec v))$ and use the linearity of matrix multiplication.
@@ -1550,7 +1541,9 @@ theorem PosSemidef.piProd [RCLike R] (hA : ∀ i, (A i).PosSemidef) :
     have h_decomp : ∀ i, ∃ B : Matrix (d i) (d i) R, A i = B * star B := by
       intro i
       obtain ⟨B, hB⟩ : ∃ B : Matrix (d i) (d i) R, A i = B.conjTranspose * B := by
-        exact Matrix.posSemidef_iff_eq_conjTranspose_mul_self.mp (hA i)
+        classical
+        open MatrixOrder in
+        exact CStarAlgebra.nonneg_iff_eq_star_mul_self.mp (hA i).nonneg
       use B.conjTranspose;
       convert hB using 1;
       simp [ Matrix.star_eq_conjTranspose ];

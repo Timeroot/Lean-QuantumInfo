@@ -94,15 +94,15 @@ theorem projector_eq_sum_rankOne (b : OrthonormalBasis ι 𝕜 S) :
   unfold projector;
   ext i j;
   field_simp;
-  simp +decide [ Matrix.vecMulVec, LinearMap.toMatrix_apply ];
+  simp +decide [ Matrix.vecMulVec ];
   -- By definition of orthogonal projection, we can write the projection of $e_j$ onto $S$ as $\sum_{k} \langle e_j, b_k \rangle b_k$.
   have h_proj : ∀ j : n, S.orthogonalProjection (EuclideanSpace.single j 1) = ∑ k, (star (b k |>.1 j)) • (b k |>.1) := by
     intro j
     have h_proj : S.orthogonalProjection (EuclideanSpace.single j 1) = ∑ k, (inner 𝕜 (b k |>.1) (EuclideanSpace.single j 1)) • (b k |>.1) := by
       convert b.sum_repr ( S.orthogonalProjection ( EuclideanSpace.single j 1 ) ) using 1;
       constructor <;> intro h <;> simp_all +decide [ Subtype.ext_iff, b.repr_apply_apply ];
-    convert h_proj using 3 ; simp +decide [ inner, EuclideanSpace.inner_single_right ];
-  convert congr_arg ( fun x : EuclideanSpace ( _ ) n => x i ) ( h_proj j ) using 1 <;> simp +decide [ LinearMap.toMatrix_apply, Matrix.mulVec, dotProduct ];
+    convert h_proj using 3 ; simp +decide [ inner ];
+  convert congr_arg ( fun x : EuclideanSpace ( _ ) n => x i ) ( h_proj j ) using 1 ; simp +decide;
   simp +decide [ Matrix.sum_apply, mul_comm ]
 
 /--
@@ -116,32 +116,32 @@ lemma projector_support_eq_sum : A.supportProj.mat =
     · intro x hx;
       -- By definition of $A.support$, we know that $x$ is in the orthogonal complement of the kernel of $A$.
       have h_orthogonal_complement : x ∈ (A.ker : Submodule (𝕜) (EuclideanSpace (𝕜) n))ᗮ := by
-        convert hx using 1;
-        exact?;
+        convert hx using 1
+        exact ker_orthogonal_eq_support A
       -- By definition of $A.ker$, we know that $x$ is orthogonal to all eigenvectors with zero eigenvalues.
       have h_orthogonal_zero_eigenvalues : ∀ i, A.H.eigenvalues i = 0 → inner (𝕜) (A.H.eigenvectorBasis i) x = 0 := by
         intro i hi
         have h_eigenvector_zero : A.mat.mulVec (A.H.eigenvectorBasis i) = 0 := by
           have := A.H.mulVec_eigenvectorBasis i; aesop;
-        convert h_orthogonal_complement ( A.H.eigenvectorBasis i ) _ using 1;
-        exact?;
+        convert h_orthogonal_complement ( A.H.eigenvectorBasis i ) _ using 1
+        exact (mem_ker_iff_mulVec_zero A ((H A).eigenvectorBasis i)).mpr h_eigenvector_zero
       -- By definition of $A.ker$, we know that $x$ can be written as a linear combination of eigenvectors with non-zero eigenvalues.
       have h_decomp : x = ∑ i, (inner (𝕜) (A.H.eigenvectorBasis i) x) • A.H.eigenvectorBasis i := by
-        exact?;
+        exact Eq.symm (OrthonormalBasis.sum_repr' (H A).eigenvectorBasis x)
       rw [ h_decomp ];
-      exact Submodule.sum_mem _ fun i _ => if hi : A.H.eigenvalues i = 0 then by simp +decide [ hi, h_orthogonal_zero_eigenvalues i hi ] else Submodule.smul_mem _ _ ( Submodule.subset_span ⟨ i, hi, rfl ⟩ );
+      exact Submodule.sum_mem _ fun i _ => if hi : A.H.eigenvalues i = 0 then by simp +decide [ h_orthogonal_zero_eigenvalues i hi ] else Submodule.smul_mem _ _ ( Submodule.subset_span ⟨ i, hi, rfl ⟩ );
     · rw [ Submodule.span_le, Set.image_subset_iff ];
       intro i hi;
       simp_all +decide [ HermitianMat.support ];
       use (1 / A.H.eigenvalues i) • A.H.eigenvectorBasis i;
-      convert congr_arg ( fun x => ( 1 / A.H.eigenvalues i ) • x ) ( A.H.mulVec_eigenvectorBasis i ) using 1 ; simp +decide [ hi, Matrix.mulVec_smul ];
-      simp +decide [ funext_iff, Matrix.mulVec, dotProduct ];
-      exact?;
+      convert congr_arg ( fun x => ( 1 / A.H.eigenvalues i ) • x ) ( A.H.mulVec_eigenvectorBasis i ) using 1 ; simp +decide [ hi ];
+      simp +decide [ funext_iff, Matrix.mulVec, dotProduct ]
+      exact PiLp.ext_iff
   have h_orthonormal_basis : ∃ b : OrthonormalBasis {i : n | A.H.eigenvalues i ≠ 0} (𝕜) (Submodule.span (𝕜) (Set.image (fun i => A.H.eigenvectorBasis i) {i | A.H.eigenvalues i ≠ 0})), ∀ i, b i = A.H.eigenvectorBasis i := by
     refine' ⟨ _, _ ⟩;
     refine' OrthonormalBasis.mk _ _;
     use fun i => ⟨ A.H.eigenvectorBasis i, Submodule.subset_span ( Set.mem_image_of_mem _ i.2 ) ⟩;
-    all_goals simp +decide [ Orthonormal, Subtype.ext_iff ];
+    all_goals simp +decide [ Orthonormal ];
     · intro i j hij; have := A.H.eigenvectorBasis.orthonormal; simp_all +decide [ orthonormal_iff_ite ] ;
       exact fun h => hij <| Subtype.ext h;
     · rw [ Submodule.eq_top_iff' ];

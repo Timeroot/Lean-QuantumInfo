@@ -287,8 +287,8 @@ theorem Matrix.commute_euclideanLin (hAB : Commute A B) :
   rw [commute_iff_eq] at hAB ⊢
   ext v i
   convert congr(($hAB).mulVec (WithLp.ofLp v) i) using 0
-  simp only [Module.End.mul_apply, ← Matrix.mulVec_mulVec];
-  simp only [← Matrix.ofLp_toEuclideanLin_apply]
+  simp only [Module.End.mul_apply, ← Matrix.mulVec_mulVec, Matrix.toEuclideanLin,
+    Matrix.ofLp_toLpLin, Matrix.toLin'_apply]
 
 section commute_module
 open Module.End
@@ -527,13 +527,13 @@ theorem star_shared_mul_A_mul_IsDiag : IsDiag
   intro i j hij;
   have := @mulVec_sharedEigenbasisA d;
   specialize this hA hB hAB j;
-  replace this := congr_arg ( fun x => star ( ( sharedEigenbasis hA hB hAB i ).ofLp ) ⬝ᵥ x ) this ; simp_all +decide [ Matrix.mulVec, dotProduct, Finset.mul_sum _ _ _, mul_assoc, mul_comm, mul_left_comm ];
+  replace this := congr_arg ( fun x => star ( ( sharedEigenbasis hA hB hAB i ).ofLp ) ⬝ᵥ x ) this ; simp_all +decide [ Matrix.mulVec, dotProduct, Finset.mul_sum _ _ _, mul_assoc, mul_comm ];
   convert this using 1;
-  · simp +decide [ Matrix.mul_apply, mul_assoc, mul_comm, mul_left_comm, Finset.mul_sum _ _ _, Finset.sum_mul ];
+  · simp +decide [ Matrix.mul_apply, mul_assoc, mul_comm, Finset.sum_mul ];
     congr! 3;
   · have := ( sharedEigenbasis hA hB hAB ).orthonormal;
     rw [ orthonormal_iff_ite ] at this;
-    simp_all +decide [ inner, Finset.mul_sum _ _ _, mul_assoc, mul_comm, mul_left_comm ];
+    simp_all +decide [ inner ];
     rw [ ← Finset.smul_sum, this i j, if_neg hij, smul_zero ]
 
 /-- Analogous to `Matrix.IsHermitian.star_mul_self_mul_eq_diagonal` for the shared basis. -/
@@ -544,7 +544,7 @@ theorem star_shared_mul_B_mul_IsDiag : IsDiag
   apply Matrix.toEuclideanLin.injective
   apply (EuclideanSpace.basisFun d 𝕜).toBasis.ext
   intro i
-  simp only [toEuclideanLin_apply, OrthonormalBasis.coe_toBasis, EuclideanSpace.basisFun_apply,
+  simp only [toLpLin_apply, OrthonormalBasis.coe_toBasis, EuclideanSpace.basisFun_apply,
     EuclideanSpace.ofLp_single, ← mulVec_mulVec, sharedEigenvectorUnitary_mulVec, ← mulVec_mulVec,
     Matrix.diagonal_mulVec_single, mul_one]
   apply PiLp.ext
@@ -566,14 +566,14 @@ theorem star_shared_mul_B_mul_IsDiag : IsDiag
     · exact Matrix.mem_unitaryGroup_iff.mp ( Matrix.sharedEigenvectorUnitary hA hB hAB ).2;
   simp_all [ Matrix.mulVec, funext_iff ];
   simp_all [ Matrix.mul_apply, dotProduct ];
-  by_cases hij : i = j <;> simp +decide [ hij, h_simp2 ];
+  by_cases hij : i = j <;> simp +decide [ hij ];
   · simp +decide [ hij, Pi.single_apply, Matrix.mulVec, dotProduct ];
     simp +decide only [Finset.mul_sum _ _ _, mul_left_comm];
-    rw [ Finset.sum_comm ] ; simp +decide [ mul_assoc, mul_comm, mul_left_comm, Finset.mul_sum _ _ _ ] ;
+    rw [ Finset.sum_comm ] ; simp +decide [ mul_comm, mul_left_comm, Finset.mul_sum _ _ _ ] ;
     congr! 3;
   · simp_all +decide [ mul_comm, Matrix.mulVec, dotProduct ];
-    simp_all +decide [ mul_comm, Finset.mul_sum _ _ _, Finset.sum_mul ];
-    rw [ Finset.sum_comm ] ; simp_all +decide [ mul_assoc, mul_comm, mul_left_comm, Finset.mul_sum _ _ _ ] ;
+    simp_all +decide [ mul_comm, Finset.mul_sum _ _ _ ];
+    rw [ Finset.sum_comm ] ; simp_all +decide [ mul_assoc, mul_left_comm ] ;
 
 end Matrix.SharedEigenbasis
 

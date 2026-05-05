@@ -135,8 +135,9 @@ The inverse function is operator antitone for positive definite matrices.
 open ComplexOrder in
 theorem inv_antitone (hA : A.mat.PosDef) (h : A ≤ B) : B⁻¹ ≤ A⁻¹ := by
   -- Since $B - A$ is positive semidefinite, we can write it as $C^*C$ for some matrix $C$.
-  obtain ⟨C, hC⟩ : ∃ C : Matrix d d 𝕜, B.mat - A.mat = C.conjTranspose * C :=
-    Matrix.posSemidef_iff_eq_conjTranspose_mul_self.mp h
+  obtain ⟨C, hC⟩ : ∃ C : Matrix d d 𝕜, B.mat - A.mat = C.conjTranspose * C := by
+    open MatrixOrder in
+    exact CStarAlgebra.nonneg_iff_eq_star_mul_self.mp (le_iff.mp h).nonneg
   -- Using the fact that $B = A + C^*C$, we can write $B^{-1}$ as $(A + C^*C)^{-1}$.
   have h_inv_posDef : (1 + C * A.mat⁻¹ * C.conjTranspose).PosDef := by
     exact Matrix.PosDef.one.add_posSemidef (hA.inv.posSemidef.mul_mul_conjTranspose_same C)

@@ -3,7 +3,7 @@ Copyright (c) 2025 Alex Meiburg. All rights reserved.
 Released under MIT license as described in the file LICENSE.
 Authors: Alex Meiburg
 -/
-import Mathlib.Analysis.Matrix
+import Mathlib.Analysis.Matrix.Normed
 
 /- We want to have `HermitianMat.trace` give 𝕜 when 𝕜 is already a TrivialStar field, but give the "clean" type
 otherwise -- for instance, ℝ when the input field is ℂ. This typeclass lets us do so. -/

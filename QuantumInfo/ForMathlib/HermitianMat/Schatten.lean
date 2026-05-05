@@ -42,12 +42,12 @@ lemma schattenNorm_nonneg (A : Matrix d d ℂ) (p : ℝ) :
     0 ≤ schattenNorm A p := by
   by_cases hp : p = 0 <;> simp +decide [ *, schattenNorm ];
   by_cases h₁ : 0 ≤ RCLike.re ( Matrix.trace ( Matrix.IsHermitian.cfc ( Matrix.isHermitian_mul_conjTranspose_self A.conjTranspose ) fun x => x ^ ( p / 2 ) ) ) <;> simp_all +decide [ Real.rpow_nonneg ];
-  contrapose! h₁; simp_all +decide [ mul_comm, Matrix.trace ] ; ring_nf; norm_num [ Real.exp_nonneg, Real.log_nonneg ] ; (
+  contrapose! h₁; simp_all +decide [ Matrix.trace ] ; ring_nf; norm_num [ Real.exp_nonneg, Real.log_nonneg ] ; (
   refine' Finset.sum_nonneg fun i _ => _ ; norm_num [ Matrix.IsHermitian.cfc ] ; ring_nf ; norm_num [ Real.exp_nonneg, Real.log_nonneg ] ; (
   simp +decide [ Matrix.mul_apply, Matrix.diagonal ] ; ring_nf ; norm_num [ Real.exp_nonneg, Real.log_nonneg ] ; (
-  exact Finset.sum_nonneg fun _ _ => add_nonneg ( mul_nonneg ( sq_nonneg _ ) ( Real.rpow_nonneg ( by
-    exact? ) _ ) ) ( mul_nonneg ( Real.rpow_nonneg ( by
-    exact? ) _ ) ( sq_nonneg _ ) ))));
+  exact Finset.sum_nonneg fun _ _ => add_nonneg ( mul_nonneg ( sq_nonneg _ ) ( Real.rpow_nonneg (
+    Matrix.eigenvalues_conjTranspose_mul_self_nonneg A _) _ ) ) ( mul_nonneg ( Real.rpow_nonneg (
+    Matrix.eigenvalues_conjTranspose_mul_self_nonneg A _) _ ) ( sq_nonneg _ ) ))));
 
 lemma schattenNorm_pow_eq
   (A : HermitianMat d ℂ) (hA : 0 ≤ A) (p k : ℝ) (hp : 0 < p) (hk : 0 < k) :
@@ -97,9 +97,9 @@ For nonneg eigenvalue λ and p > 0, (√λ)^p = λ^{p/2}.
 PROVIDED SOLUTION
 We have √y = y^{1/2} (by Real.sqrt_eq_rpow). So (√y)^p = (y^{1/2})^p = y^{(1/2)·p} = y^{p/2} by Real.rpow_mul (since y ≥ 0). Use rw [Real.sqrt_eq_rpow, ← Real.rpow_mul hy]; ring_nf.
 -/
-lemma sqrt_rpow_eq_rpow_half {y p : ℝ} (hy : 0 ≤ y) (hp : 0 < p) :
+lemma sqrt_rpow_eq_rpow_half {y p : ℝ} (hy : 0 ≤ y) (_hp : 0 < p) :
     Real.sqrt y ^ p = y ^ (p / 2) := by
-  rw [ Real.sqrt_eq_rpow, ← Real.rpow_mul hy ] ; ring
+  rw [ Real.sqrt_eq_rpow, ← Real.rpow_mul hy ] ; ring_nf
 
 /-
 PROBLEM
@@ -129,7 +129,7 @@ lemma schattenNorm_rpow_eq_sum_singularValues (A : Matrix d d ℂ) {p : ℝ} (hp
   · convert schattenNorm_trace_as_eigenvalue_sum A p using 1
     generalize_proofs at *;
     refine' Finset.sum_congr rfl fun i _ => _;
-    unfold singularValues; rw [ Real.sqrt_eq_rpow, ← Real.rpow_mul ( _ ) ] ; ring;
+    unfold singularValues; rw [ Real.sqrt_eq_rpow, ← Real.rpow_mul ( _ ) ] ; ring_nf;
     simp +zetaDelta at *;
     exact Matrix.eigenvalues_conjTranspose_mul_self_nonneg A i;
   · have h_nonneg : ∀ i : d, 0 ≤ ((Matrix.isHermitian_mul_conjTranspose_self A.conjTranspose).eigenvalues i) ^ (p / 2) := by

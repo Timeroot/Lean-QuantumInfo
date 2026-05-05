@@ -100,7 +100,7 @@ theorem nonSingular_iff_ker_bot : NonSingular A ↔ A.ker = ⊥ := by
     have hm : (WithLp.toLp 2 y) ∈ A.ker := (mem_ker_iff_mulVec_zero A _).mpr hy
     rw [h] at hm
     have := (Submodule.mem_bot (R := 𝕜)).mp hm
-    simp [WithLp.toLp] at this
+    simp at this
     exact this
   specialize @h_inj x 0
   simp_all

@@ -352,10 +352,12 @@ theorem kron_kronecker_const {C : Matrix d d R} (h : C.PosSemidef) {h₁ h₂ : 
   intros n x hx
   have h_kronecker_pos : (x ⊗ₖ C).PosSemidef := by
     -- Since $x$ and $C$ are positive semidefinite, there exist matrices $U$ and $V$ such that $x = U^*U$ and $C = V^*V$.
-    obtain ⟨U, hU⟩ : ∃ U : Matrix (A × Fin n) (A × Fin n) R, x = star U * U :=
-      Matrix.posSemidef_iff_eq_conjTranspose_mul_self.mp hx
-    obtain ⟨V, hV⟩ : ∃ V : Matrix d d R, C = star V * V :=
-      Matrix.posSemidef_iff_eq_conjTranspose_mul_self.mp h
+    obtain ⟨U, hU⟩ : ∃ U : Matrix (A × Fin n) (A × Fin n) R, x = star U * U := by
+      classical
+      open MatrixOrder in exact CStarAlgebra.nonneg_iff_eq_star_mul_self.mp hx.nonneg
+    obtain ⟨V, hV⟩ : ∃ V : Matrix d d R, C = star V * V := by
+      classical
+      open MatrixOrder in exact CStarAlgebra.nonneg_iff_eq_star_mul_self.mp h.nonneg
     -- $W = (U \otimes V)^* (U \otimes V)$ is positive semidefinite.
     have hW_pos : (U ⊗ₖ V).conjTranspose * (U ⊗ₖ V) = x ⊗ₖ C := by
       rw [Matrix.kroneckerMap_conjTranspose, ← Matrix.mul_kronecker_mul]
@@ -596,7 +598,9 @@ theorem conj_isCompletelyPositive (M : Matrix B A R) : (conj M).IsCompletelyPosi
       simp +contextual [ eq_comm ];
     simp only [ h_inner ];
     simpa only [ mul_assoc, mul_comm, mul_left_comm ] using h_reindex
-  obtain ⟨m', rfl⟩ := Matrix.posSemidef_iff_eq_conjTranspose_mul_self.mp h
+  obtain ⟨m', rfl⟩ := by
+    classical
+    open MatrixOrder in exact CStarAlgebra.nonneg_iff_eq_star_mul_self.mp h.nonneg
   convert Matrix.posSemidef_conjTranspose_mul_self (m' * (M ⊗ₖ 1 : Matrix (B × Fin n) (A × Fin n) R).conjTranspose) using 1
   simp only [Matrix.conjTranspose_mul, Matrix.conjTranspose_conjTranspose, Matrix.mul_assoc]
   rw [Matrix.mul_assoc, Matrix.mul_assoc]

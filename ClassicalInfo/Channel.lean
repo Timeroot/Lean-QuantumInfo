@@ -49,22 +49,23 @@ def product : Channel (A × C) (B × D) :=
  output distribution `Distribution O`, and this process is applied
  independently on each symbol in the list. -/
 structure DMChannel where
-  symb_dist : I → Distribution O
+  symb_dist : I → ProbDistribution O
 
 namespace DMChannel
 
 /-- Apply a discrete memoryless channel to an n-character string. -/
-def on_fin (C : DMChannel I O) {n : ℕ} (is : Fin n → I) : Distribution (Fin n → O) :=
-  ⟨fun os ↦ ∏ k, C.symb_dist (is k) (os k), by
-    -- change ∑ os in Fintype.piFinset fun x => (Finset.univ : Finset O), ∏ k : Fin n, ((C.symb_dist (is k)) (os k) : ℝ) = 1
-    -- have : ∀i, Finset.sum Finset.univ (C.symb_dist i) = 1 :=
-    --   fun i ↦ Distribution.prop <| C.symb_dist i
-    -- rw [Finset.sum_prod_piFinset]
-    -- simp [this]
-    sorry⟩
+def on_fin (C : DMChannel I O) {n : ℕ} (is : Fin n → I) : ProbDistribution (Fin n → O) :=
+  ProbDistribution.mk' (fun os ↦ ∏ k, (C.symb_dist (is k) (os k) : ℝ))
+    (fun _ ↦ Finset.prod_nonneg fun k _ ↦ Prob.zero_le_coe)
+    (by
+      have h := Finset.sum_prod_piFinset (Finset.univ : Finset O)
+        (fun (k : Fin n) (j : O) ↦ ((C.symb_dist (is k)) j : ℝ))
+      simp only [Fintype.piFinset_univ] at h
+      simp only [h]
+      exact Finset.prod_eq_one fun k _ ↦ ProbDistribution.normalized (C.symb_dist (is k)))
 
 /-- Apply a discrete memoryless channel to a list. -/
-def on_list (C : DMChannel I O) (is : List I) : Distribution (Fin (is.length) → O) :=
-  C.on_fin is.get
+def on_list (C : DMChannel I O) (is : List I) : ProbDistribution (Fin (is.length) → O) :=
+  on_fin I O C is.get
 
 end DMChannel
