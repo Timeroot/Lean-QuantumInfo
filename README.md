@@ -1,3 +1,9 @@
+# NOTE: This project is now part of Physlib
+
+This repository contains much Lean formalization of quantum information theory. In March 2026, it merged with PhysLean (previously known as HEPLean) and
+formed [Physlib](https://github.com/leanprover-community/physlib), which is now under the [/github.com/leanprover-community](https://github.com/leanprover-community)
+umbrella. As such, work on this repository is essentially done, and new development will take place there!
+
 # Quantum Information in Lean
 
 This repository aims to contain definitions and proofs of basic ideas in quantum information theory. Some major goals, in rough order of difficulty, would be:
