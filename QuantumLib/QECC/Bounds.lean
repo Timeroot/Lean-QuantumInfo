@@ -210,9 +210,11 @@ theorem hamming_bound {t : ℕ} (hnd : ¬ S.IsDegenerate) (ht : 2 * t < S.distan
         f = f' := by
     intro f hf f' hf' hq
     have hwf : weight (ofSym (toS f)) ≤ t := by
-      rw [hweight]; exact (Finset.mem_filter.mp hf).2
+      rw [hweight]
+      exact (Finset.mem_filter.mp hf).2
     have hwf' : weight (ofSym (toS f')) ≤ t := by
-      rw [hweight]; exact (Finset.mem_filter.mp hf').2
+      rw [hweight]
+      exact (Finset.mem_filter.mp hf').2
     have hsub : toS f - toS f' ∈ W := (Submodule.Quotient.eq W).mp hq
     have hxz : ∀ i, ((toS f - toS f').1 i = (toS f).1 i + (toS f').1 i)
         ∧ ((toS f - toS f').2 i = (toS f).2 i + (toS f').2 i) := by
@@ -279,7 +281,10 @@ theorem hamming_bound {t : ℕ} (hnd : ¬ S.IsDegenerate) (ht : 2 * t < S.distan
   calc (∑ j ∈ Finset.range (t + 1), Nat.choose n j * 3 ^ j) * 2 ^ S.numLogical
       = B.card * 2 ^ (n - r) := by rw [hBcard, hk]
     _ ≤ 2 ^ r * 2 ^ (n - r) := Nat.mul_le_mul_right _ hcount
-    _ = 2 ^ n := by rw [← pow_add]; congr 1; omega
+    _ = 2 ^ n := by
+      rw [← pow_add]
+      congr 1
+      omega
 
 /-- **Rate form of the Singleton bound:** `k + 2(d−1) ≤ n`. -/
 theorem numLogical_add_two_mul_distance_le :
@@ -289,14 +294,16 @@ theorem numLogical_add_two_mul_distance_le :
   have hrn := S.finrank_symImage_le
   have hnp : S.numPhysical = n := rfl
   rcases Nat.eq_zero_or_pos S.distance with hd | hd
-  · rw [hnp, hd]; omega
+  · rw [hnp, hd]
+    omega
   by_cases hmn : 2 * (S.distance - 1) ≤ n
   · obtain ⟨C, -, hC⟩ := Finset.exists_subset_card_eq
       (s := (Finset.univ : Finset (Fin n))) (n := 2 * (S.distance - 1))
       (by rw [Finset.card_univ, Fintype.card_fin]; exact hmn)
     obtain ⟨A, hAC, hA⟩ := Finset.exists_subset_card_eq (s := C) (n := S.distance - 1) (by omega)
     have hB : (C \ A).card = S.distance - 1 := by
-      rw [Finset.card_sdiff_of_subset hAC, hC, hA]; omega
+      rw [Finset.card_sdiff_of_subset hAC, hC, hA]
+      omega
     have hkey := S.rank_ge_of_disjoint (Finset.disjoint_sdiff : Disjoint A (C \ A))
       (by rw [hA]; omega) (by rw [hB]; omega)
     rw [hA, hB] at hkey
@@ -391,8 +398,12 @@ theorem gilbert_varshamov {k d : ℕ} (hd : 0 < d) (hk : 0 < k)
     have hbad : symOf P ∈ Bad := by
       rw [hBad]
       exact Finset.mem_filter.mpr ⟨Finset.mem_univ _, hne, hlt⟩
-    have hcentV : symOf P ∈ (sympForm n).orthogonal V := by rw [← hT]; exact hcent
-    have hmem : symOf P ∈ T.symImage := by rw [hT]; exact hVavoid _ hbad hcentV
+    have hcentV : symOf P ∈ (sympForm n).orthogonal V := by
+      rw [← hT]
+      exact hcent
+    have hmem : symOf P ∈ T.symImage := by
+      rw [hT]
+      exact hVavoid _ hbad hcentV
     exact hP.2 (T.symOf_mem_symImage_iff.mp hmem)
   -- and logical operators do exist, since the code carries `k ≥ 1` logical qubits
   have hex : ∃ P : PauliOp n, T.IsLogical P := by

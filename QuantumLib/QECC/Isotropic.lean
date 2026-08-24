@@ -39,7 +39,9 @@ theorem add_self_sympSpace (v : SympSpace n) : v + v = 0 := by
     simp [CharTwo.add_self_eq_zero]
 
 theorem zmod_two_ne_zero {c : ZMod 2} (h : c ≠ 0) : c = 1 := by
-  revert h; revert c; decide
+  revert h
+  revert c
+  decide
 
 theorem mem_orthogonal_iff' (W : Submodule (ZMod 2) (SympSpace n)) (v : SympSpace n) :
     v ∈ (sympForm n).orthogonal W ↔ ∀ w ∈ W, sympForm n w v = 0 :=
@@ -152,7 +154,8 @@ theorem isotropic_sup_span {V : Submodule (ZMod 2) (SympSpace n)}
     have hVV : ∀ x ∈ V, ∀ y ∈ V, sympForm n x y = 0 := fun x hx y hy => hV hy x hx
     have hVu : ∀ x ∈ V, sympForm n x u = 0 := fun x hx => hu x hx
     have huV : ∀ x ∈ V, sympForm n u x = 0 := fun x hx => by
-      rw [sympForm_comm]; exact hVu x hx
+      rw [sympForm_comm]
+      exact hVu x hx
     have hcase : ∀ w, (w = 0 ∨ w = u) → ∀ x ∈ V, sympForm n x w = 0 ∧ sympForm n w x = 0 := by
       rintro w (rfl | rfl) x hx
       · exact ⟨by simp, by simp⟩
@@ -385,7 +388,9 @@ theorem exists_stabGroup_symImage_eq {V : Submodule (ZMod 2) (SympSpace n)}
   have hnegI : negI n ∉ Subgroup.closure (Set.range g) := by
     rw [hgen.mem_closure_iff]
     rintro ⟨a, ha⟩
-    have h0 : ∑ i, a i • u i = 0 := by rw [← hsym, ha]; rfl
+    have h0 : ∑ i, a i • u i = 0 := by
+      rw [← hsym, ha]
+      rfl
     rw [hzero a h0, genSpan_zero] at ha
     have hph : (0 : ZMod 4) = 2 := congrArg PauliOp.phase ha
     exact absurd hph (by decide)

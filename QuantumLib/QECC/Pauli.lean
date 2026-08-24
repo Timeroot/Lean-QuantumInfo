@@ -52,12 +52,16 @@ instance : Inv (PauliOp n) :=
 theorem betaPair_mul_left (P Q R : PauliOp n) :
     betaPair (P * Q) R = betaPair P R + betaPair Q R := by
   simp only [betaPair, mul_z, ← Finset.sum_add_distrib]
-  exact Finset.sum_congr rfl fun i _ => by simp only [Pi.add_apply]; ring
+  exact Finset.sum_congr rfl fun i _ => by
+    simp only [Pi.add_apply]
+    ring
 
 theorem betaPair_mul_right (P Q R : PauliOp n) :
     betaPair P (Q * R) = betaPair P Q + betaPair P R := by
   simp only [betaPair, mul_x, ← Finset.sum_add_distrib]
-  exact Finset.sum_congr rfl fun i _ => by simp only [Pi.add_apply]; ring
+  exact Finset.sum_congr rfl fun i _ => by
+    simp only [Pi.add_apply]
+    ring
 
 /-- The Pauli cocycle sign as a collapsed product: `∏ (-1)^(z_P·x_Q) = (-1)^β(P,Q)`. -/
 theorem prod_negOnePow_betaPair (P Q : PauliOp n) :
@@ -67,7 +71,8 @@ theorem prod_negOnePow_betaPair (P Q : PauliOp n) :
 instance : Group (PauliOp n) where
   mul_assoc a b c := by
     refine PauliOp.ext ?_ (add_assoc a.x b.x c.x) (add_assoc a.z b.z c.z)
-    simp only [mul_phase, betaPair_mul_left, betaPair_mul_right, tau_add]; ring
+    simp only [mul_phase, betaPair_mul_left, betaPair_mul_right, tau_add]
+    ring
   one_mul a := PauliOp.ext (by simp [mul_phase]) (zero_add a.x) (zero_add a.z)
   mul_one a := PauliOp.ext (by simp [mul_phase]) (add_zero a.x) (add_zero a.z)
   inv_mul_cancel a := by
@@ -76,8 +81,12 @@ instance : Group (PauliOp n) where
       rw [show betaPair (⟨-a.phase - tau (betaPair a a), a.x, a.z⟩ : PauliOp n) a
         = betaPair a a from rfl]
       ring
-    · show a.x + a.x = (0 : Fin n → ZMod 2); ext i; simp [CharTwo.add_self_eq_zero]
-    · show a.z + a.z = (0 : Fin n → ZMod 2); ext i; simp [CharTwo.add_self_eq_zero]
+    · show a.x + a.x = (0 : Fin n → ZMod 2)
+      ext i
+      simp [CharTwo.add_self_eq_zero]
+    · show a.z + a.z = (0 : Fin n → ZMod 2)
+      ext i
+      simp [CharTwo.add_self_eq_zero]
 
 /-! ### The faithful matrix representation -/
 

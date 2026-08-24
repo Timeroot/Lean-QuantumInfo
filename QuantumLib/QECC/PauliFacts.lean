@@ -26,8 +26,12 @@ theorem pow_four (P : PauliOp n) : P ^ 4 = 1 := by
     -- (P^4).phase = 2 * (P^2).phase = 4 * P.phase + 2 * tau(betaPair P P) = 0
     -- First compute P^2
     let P2 : PauliOp n := P * P
-    have hP2_x : P2.x = 0 := by ext i; simp [P2, mul_x, CharTwo.add_self_eq_zero]
-    have hP2_z : P2.z = 0 := by ext i; simp [P2, mul_z, CharTwo.add_self_eq_zero]
+    have hP2_x : P2.x = 0 := by
+      ext i
+      simp [P2, mul_x, CharTwo.add_self_eq_zero]
+    have hP2_z : P2.z = 0 := by
+      ext i
+      simp [P2, mul_z, CharTwo.add_self_eq_zero]
     -- betaPair (P^2) (P^2) = 0
     have hbeta : betaPair P2 P2 = 0 := by simp [betaPair, hP2_x, hP2_z]
     -- P^4 = P2 * P2
@@ -41,11 +45,15 @@ theorem pow_four (P : PauliOp n) : P ^ 4 = 1 := by
     rw [mul_phase]
     exact (by decide : ∀ (p : ZMod 4) (s : ZMod 2), p + p + tau s + (p + p + tau s) = 0)
       P.phase (betaPair P P)
-  · have h1 : (P ^ 4).x = (4 : ℕ) • P.x := by simp [pow_succ, mul_x]; ring
+  · have h1 : (P ^ 4).x = (4 : ℕ) • P.x := by
+      simp [pow_succ, mul_x]
+      ring
     have h2 : ∀ m : ZMod 2, (4 : ℕ) • m = 0 := by decide
     show (P ^ 4).x _ = (0 : Fin n → ZMod 2) _
     simp [h1, Pi.smul_apply, h2]
-  · have h1 : (P ^ 4).z = (4 : ℕ) • P.z := by simp [pow_succ, mul_z]; ring
+  · have h1 : (P ^ 4).z = (4 : ℕ) • P.z := by
+      simp [pow_succ, mul_z]
+      ring
     have h2 : ∀ m : ZMod 2, (4 : ℕ) • m = 0 := by decide
     show (P ^ 4).z _ = (0 : Fin n → ZMod 2) _
     simp [h1, Pi.smul_apply, h2]

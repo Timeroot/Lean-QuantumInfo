@@ -217,7 +217,10 @@ private theorem toMat_mul_toMat_cnot (P Q : PauliOp n) (u v u' v' : Fin n → ZM
           _ = P.x + (v' + Q.x) := by rw [h1]
           _ = v' + (P.x + Q.x) := by abel
       · intro hh
-        calc u' + P.x + v = u' + v' + Q.x + (P.x + P.x) := by rw [hh]; abel
+        calc u' + P.x + v
+            = u' + v' + Q.x + (P.x + P.x) := by
+              rw [hh]
+              abel
           _ = u' + v' + Q.x := by rw [hself, add_zero]
     by_cases h2 : v = v' + (P.x + Q.x)
     · rw [if_pos (hcond.mpr h2), if_pos h2]

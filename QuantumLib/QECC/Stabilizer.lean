@@ -219,7 +219,9 @@ theorem pauliOp_mul (p q : PauliSpace n) :
     have hpq1 : (p + q).1 = p.1 + q.1 := rfl
     have hpq2 : (p + q).2 = p.2 + q.2 := rfl
     by_cases huc : u = w + (p + q).1
-    · have hcp : u = w + q.1 + p.1 := by rw [huc, hpq1]; abel
+    · have hcp : u = w + q.1 + p.1 := by
+        rw [huc, hpq1]
+        abel
       rw [if_pos rfl, if_pos hcp, if_pos huc]
       have e1 : (∏ i, (-1 : ℂ) ^ (p.2 i * (w + q.1) i).val)
           = (∏ i, (-1 : ℂ) ^ (p.2 i * w i).val) * ∏ i, (-1 : ℂ) ^ (p.2 i * q.1 i).val := by
@@ -238,7 +240,8 @@ theorem pauliOp_mul (p q : PauliSpace n) :
       simp only [if_neg huc, if_neg hcp, zero_mul, mul_zero]
   · intro v _ hv
     rw [if_neg hv, mul_zero]
-  · intro h; exact absurd (Finset.mem_univ _) h
+  · intro h
+    exact absurd (Finset.mem_univ _) h
 
 /-- Pauli operators are unitary. -/
 theorem pauliOp_mem_unitaryGroup (p : PauliSpace n) :
@@ -262,7 +265,8 @@ theorem pauliOp_mem_unitaryGroup (p : PauliSpace n) :
     · rw [if_neg (mt add_right_cancel huw), mul_zero, if_neg huw]
   · intro v _ hv
     rw [if_neg hv, star_zero, zero_mul]
-  · intro h; exact absurd (Finset.mem_univ _) h
+  · intro h
+    exact absurd (Finset.mem_univ _) h
 
 /-- The product `∏ (-1)^(f i)` collapses to `(-1)` raised to the GF(2) sum. -/
 theorem negOnePow_sum {ι : Type*} [DecidableEq ι] (s : Finset ι) (f : ι → ZMod 2) :
@@ -288,7 +292,8 @@ private theorem negOnePow_val_eq_one {z : ZMod 2} : (-1 : ℂ) ^ z.val = 1 ↔ z
     have hz0 : z.val = 0 := by omega
     have : z.val = (0 : ZMod 2).val := by rw [hz0, ZMod.val_zero]
     exact ZMod.val_injective 2 this
-  · rintro rfl; simp
+  · rintro rfl
+    simp
 
 /-- **Key bridge:** two Pauli operators commute (as matrices) iff their symplectic form vanishes,
 i.e. iff they `Commute` in the symplectic sense. -/
@@ -307,7 +312,9 @@ theorem pauliOp_commute_iff (p q : PauliSpace n) :
   have hdd : (-1 : ℂ) ^ (∑ i, q.2 i * p.1 i).val * (-1) ^ (∑ i, q.2 i * p.1 i).val = 1 := by
     rw [← negOnePow_zmod2_add, CharTwo.add_self_eq_zero, ZMod.val_zero, pow_zero]
   constructor
-  · intro h; rw [h]; exact hdd
+  · intro h
+    rw [h]
+    exact hdd
   · intro h
     exact mul_right_cancel₀ (pow_ne_zero _ (by norm_num : (-1 : ℂ) ≠ 0)) (h.trans hdd.symm)
 

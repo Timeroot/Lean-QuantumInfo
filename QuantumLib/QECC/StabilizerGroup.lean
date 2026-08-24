@@ -57,7 +57,8 @@ theorem pauliOp_trace (p : PauliSpace n) :
   by_cases hp1 : p.1 = 0
   · simp only [hp1, add_zero, ↓reduceIte]
     by_cases hp2 : p.2 = 0
-    · rw [if_pos (Prod.ext hp1 hp2)]; simp [hp2]
+    · rw [if_pos (Prod.ext hp1 hp2)]
+      simp [hp2]
     · -- Find j such that p.2 j ≠ 0
       obtain ⟨j, hj⟩ : ∃ j, p.2 j ≠ 0 := Function.ne_iff.mp hp2
       -- The sum factors as a product; one factor is 0
@@ -65,10 +66,16 @@ theorem pauliOp_trace (p : PauliSpace n) :
           = ∏ i, (∑ xi : ZMod 2, (-1 : ℂ) ^ (p.2 i * xi).val) := by
         rw [Finset.prod_sum]
         refine Finset.sum_bij (fun x _ => fun i _ => x i) ?_ ?_ ?_ ?_
-        · intro x _; exact Finset.mem_pi.mpr fun i _ => Finset.mem_univ _
-        · intro x _ y _ hxy; ext i; exact congr_fun (congr_fun hxy i) (Finset.mem_univ i)
-        · intro g _; use fun i => g i (Finset.mem_univ i); simp
-        · intro x _; simp
+        · intro x _
+          exact Finset.mem_pi.mpr fun i _ => Finset.mem_univ _
+        · intro x _ y _ hxy
+          ext i
+          exact congr_fun (congr_fun hxy i) (Finset.mem_univ i)
+        · intro g _
+          use fun i => g i (Finset.mem_univ i)
+          simp
+        · intro x _
+          simp
       have hj1 : p.2 j = 1 := by
         have h01 : ∀ x : ZMod 2, x = 0 ∨ x = 1 := by decide
         rcases h01 (p.2 j) with h0 | h1
@@ -76,8 +83,12 @@ theorem pauliOp_trace (p : PauliSpace n) :
         · exact h1
       have hsum : ∑ xi, (-1 : ℂ) ^ (p.2 j * xi).val = 0 := by
         simp only [hj1, one_mul]
-        have h0 : (-1 : ℂ) ^ (ZMod.val (0 : ZMod 2)) = 1 := by rw [ZMod.val_zero]; norm_num
-        have h1 : (-1 : ℂ) ^ (ZMod.val (1 : ZMod 2)) = -1 := by rw [ZMod.val_one]; norm_num
+        have h0 : (-1 : ℂ) ^ (ZMod.val (0 : ZMod 2)) = 1 := by
+          rw [ZMod.val_zero]
+          norm_num
+        have h1 : (-1 : ℂ) ^ (ZMod.val (1 : ZMod 2)) = -1 := by
+          rw [ZMod.val_one]
+          norm_num
         rw [show (Finset.univ : Finset (ZMod 2)) = {0, 1} by rfl]
         rw [Finset.sum_pair (by decide), h0, h1]
         norm_num
@@ -134,7 +145,8 @@ theorem pauliOp_injective : Function.Injective (pauliOp (n := n)) := by
     fun f => by
       rw [Finset.prod_eq_single j]
       · simp [hej]
-      · intro i _ hij; simp [hej, hij]
+      · intro i _ hij
+        simp [hej, hij]
       · exact fun h => (h (Finset.mem_univ j)).elim
   rw [hprod p.2, hprod q.2] at hentry
   apply ZMod.val_injective (n := 2)
@@ -163,8 +175,12 @@ theorem sq_eq_one {g : PauliOp n} (hg : g ∈ S.carrier) : g * g = 1 := by
   have hsq : g * g ∈ S.carrier := Subgroup.mul_mem _ hg hg
   -- g * g = ⟨2*phase + tau(betaPair g g), 0, 0⟩
   have mul_self : g * g = ⟨g.phase + g.phase + tau (betaPair g g), g.x + g.x, g.z + g.z⟩ := rfl
-  have xx : g.x + g.x = 0 := by ext i; simp [CharTwo.add_self_eq_zero]
-  have zz : g.z + g.z = 0 := by ext i; simp [CharTwo.add_self_eq_zero]
+  have xx : g.x + g.x = 0 := by
+    ext i
+    simp [CharTwo.add_self_eq_zero]
+  have zz : g.z + g.z = 0 := by
+    ext i
+    simp [CharTwo.add_self_eq_zero]
   -- The phase of g * g is 2*phase + tau(betaPair g g), which is 0 or 2 in ZMod 4
   -- So g * g is either 1 or -I. Since -I ∉ S, we have g * g = 1.
   have key : ∀ (p : ZMod 4) (bp : ZMod 2),
@@ -243,10 +259,18 @@ theorem toMat_trace_of_mem {g : PauliOp n} (hg : g ∈ S.carrier) :
       -- g.phase ∈ {0, 2}
       have hcases : g.phase = 0 ∨ g.phase = 2 := by
         match hp : g.phase with
-        | 0 => left; rfl
-        | 1 => simp [hp] at h2phase; trivial
-        | 2 => right; rfl
-        | 3 => simp [hp] at h2phase; trivial
+        | 0 =>
+          left
+          rfl
+        | 1 =>
+          simp [hp] at h2phase
+          trivial
+        | 2 =>
+          right
+          rfl
+        | 3 =>
+          simp [hp] at h2phase
+          trivial
       rcases hcases with hp0 | hp2
       · -- g.phase = 0 means g = 1
         apply hg1
@@ -254,7 +278,9 @@ theorem toMat_trace_of_mem {g : PauliOp n} (hg : g ∈ S.carrier) :
         rfl
       · -- g.phase = 2 means g = negI
         apply S.negI_notMem
-        have : g = negI n := by rw [hc, hp2]; rfl
+        have : g = negI n := by
+          rw [hc, hp2]
+          rfl
         rwa [this] at hg
   · -- case: ¬(g.x = 0 ∧ g.z = 0)
     simp [hg0]
@@ -445,7 +471,8 @@ theorem stabProj_isHermitian : (stabProj S).IsHermitian := by
   unfold stabProj
   refine IsSelfAdjoint.smul ?_
     (isSelfAdjoint_sum _ fun g _ => isHermitian_toMat S g.property)
-  rw [isSelfAdjoint_iff]; simp
+  rw [isSelfAdjoint_iff]
+  simp
 
 /-- Trace of the stabilizer projector: `2ⁿ / |S|`. -/
 theorem stabProj_trace : (stabProj S).trace = (2 ^ n : ℂ) / Fintype.card S.carrier := by
@@ -515,8 +542,10 @@ theorem weight_mul_le (P Q : PauliOp n) : weight (P * Q) ≤ weight P + weight Q
   intro i hi
   simp only [Finset.mem_union, Finset.mem_filter, Finset.mem_univ] at hi ⊢
   rcases hi with ⟨_, hx | hz⟩
-  · have := hpxq _ _ hx; tauto
-  · have := hpxq _ _ hz; tauto
+  · have := hpxq _ _ hx
+    tauto
+  · have := hpxq _ _ hz
+    tauto
 
 namespace StabGroup
 variable (S : StabGroup n)
@@ -528,7 +557,9 @@ def phaseSubgroup (n : ℕ) : Subgroup (PauliOp n) where
     rintro a b ⟨hax, haz⟩ ⟨hbx, hbz⟩
     exact ⟨by simp [mul_x, hax, hbx], by simp [mul_z, haz, hbz]⟩
   one_mem' := ⟨rfl, rfl⟩
-  inv_mem' := by rintro a ⟨hax, haz⟩; exact ⟨hax, haz⟩
+  inv_mem' := by
+    rintro a ⟨hax, haz⟩
+    exact ⟨hax, haz⟩
 
 @[simp] theorem mem_phaseSubgroup {g : PauliOp n} :
     g ∈ phaseSubgroup n ↔ g.x = 0 ∧ g.z = 0 := Iff.rfl
@@ -674,7 +705,8 @@ theorem codeSpace_eq_top_iff : codeSpace S = ⊤ ↔ S.carrier = ⊥ := by
       have htoMat : g.toMat = 1 := by
         have h1 : Matrix.toLin' (1 : Matrix (Fin n → ZMod 2) (Fin n → ZMod 2) ℂ)
             = LinearMap.id := by
-          ext; simp
+          ext
+          simp
         rw [← h1] at heqn
         exact Matrix.toLin'.injective heqn
       -- g.toMat = 1 implies g = 1 (follows from toMat being injective)
@@ -700,9 +732,11 @@ theorem codeSpace_eq_top_iff : codeSpace S = ⊤ ↔ S.carrier = ⊥ := by
         have hphase_zero : P.phase.val = 0 := by
           have : P.phase.val < 4 := ZMod.val_lt P.phase
           interval_cases P.phase.val <;> simp_all
-          · have := Complex.I_re; simp_all [Complex.ext_iff]
+          · have := Complex.I_re
+            simp_all [Complex.ext_iff]
           · norm_num at htrace
-          · have := Complex.I_re; simp_all [Complex.ext_iff]
+          · have := Complex.I_re
+            simp_all [Complex.ext_iff]
         have hphase : P.phase = 0 := by
           exact ZMod.natCast_zmod_val (P.phase) ▸ hphase_zero ▸ rfl
         -- P = 1 follows from P.phase = 0, P.x = 0, P.z = 0
@@ -794,7 +828,8 @@ theorem exists_isometry_stabProj {k : ℕ}
         = V.conjTranspose * stabProj S * (V * V.conjTranspose) * stabProj S * V := by
           simp only [Matrix.mul_assoc]
       _ = V.conjTranspose * (stabProj S * stabProj S) * V := by
-          rw [hVV']; simp only [Matrix.mul_assoc, Matrix.mul_one]
+          rw [hVV']
+          simp only [Matrix.mul_assoc, Matrix.mul_one]
       _ = V.conjTranspose * stabProj S * V := by rw [stabProj_idem]
   have hμ01 : ∀ i, μ i = 0 ∨ μ i = 1 := by
     intro i
@@ -925,7 +960,9 @@ theorem toMat_injective : Function.Injective (toMat (n := n)) := by
           -- Then u = v + Q.x is satisfied (0 + Q.x = Q.x)
           let u : Fin n → ZMod 2 := Q.x
           let v : Fin n → ZMod 2 := 0
-          have huv : u = v + Q.x := by ext i; simp [u, v]
+          have huv : u = v + Q.x := by
+            ext i
+            simp [u, v]
           have hentry := congr_fun (congr_fun h u) v
           simp [pauliOp, huv] at hentry
           have hprod : ∏ x, (-1 : ℂ) ^ (Q.z x * v x).val = 1 := by
@@ -985,7 +1022,9 @@ theorem toMat_injective : Function.Injective (toMat (n := n)) := by
             have hlist : ∀ (l : List ℂ), (∀ x ∈ l, x = 1 ∨ x = -1) → l.prod = 1 ∨ l.prod = -1 := by
               intro l hl
               induction l with
-              | nil => left; rfl
+              | nil =>
+                left
+                rfl
               | cons x xs ih =>
                 have hx := hl x (List.Mem.head _)
                 have hxs := fun y hy => hl y (List.Mem.tail _ hy)
@@ -1001,7 +1040,8 @@ theorem toMat_injective : Function.Injective (toMat (n := n)) := by
           simp only [Matrix.trace_smul, smul_eq_mul] at inner ⊢
           exact inner
         rcases hAA with hAA | hAA
-        · rw [hAA] at hinner; simp at hinner
+        · rw [hAA] at hinner
+          simp at hinner
           by_cases hsum : (Q.x + P.x, Q.z + P.z) = 0
           · exact False.elim (hBA_eq ⟨by simpa using congr_arg Prod.fst hsum,
               by simpa using congr_arg Prod.snd hsum⟩)
@@ -1016,7 +1056,8 @@ theorem toMat_injective : Function.Injective (toMat (n := n)) := by
               have : Complex.I ≠ 0 := by norm_num
               simp [pow_eq_zero_iff', this]
             exact absurd hinner (mul_ne_zero this ‹(2 : ℂ) ^ n ≠ 0›)
-        · rw [hAA] at hinner; simp at hinner
+        · rw [hAA] at hinner
+          simp at hinner
           by_cases hsum : (Q.x + P.x, Q.z + P.z) = 0
           · exact False.elim (hBA_eq ⟨by simpa using congr_arg Prod.fst hsum,
               by simpa using congr_arg Prod.snd hsum⟩)
@@ -1047,7 +1088,9 @@ theorem toMat_mem_unitaryGroup (P : PauliOp n) :
 
 /-- The representation of the inverse is the conjugate-transpose (unitary inverse). -/
 theorem toMat_inv (P : PauliOp n) : toMat P⁻¹ = star (toMat P) := by
-  have hmul : toMat P * toMat P⁻¹ = 1 := by rw [← toMat_mul]; simp
+  have hmul : toMat P * toMat P⁻¹ = 1 := by
+    rw [← toMat_mul]
+    simp
   rw [← Matrix.inv_eq_right_inv hmul,
     Matrix.inv_eq_left_inv (mul_eq_one_comm.mp (toMat_mem_unitaryGroup P).2)]
 
@@ -1110,9 +1153,11 @@ theorem toMat_commute_or_anticommute (P Q : PauliOp m) :
                   (-1 : ℂ) ^ ((betaPair Q P).val) := prod_negOnePow_betaPair Q P
     rw [hprod, hprod2]
     have : (betaPair P Q).val = 0 ∨ (betaPair P Q).val = 1 := by
-      have := ZMod.val_lt (betaPair P Q); omega
+      have := ZMod.val_lt (betaPair P Q)
+      omega
     have : (betaPair Q P).val = 0 ∨ (betaPair Q P).val = 1 := by
-      have := ZMod.val_lt (betaPair Q P); omega
+      have := ZMod.val_lt (betaPair Q P)
+      omega
     rcases this with h | h <;> rcases this with h' | h' <;> simp_all
 
 /-- The center of the Pauli group is the scalars `{iᵏ · I}`. -/
@@ -1266,7 +1311,9 @@ theorem finrank_codeSpace_eq_two_pow (S : StabGroup m) :
   obtain ⟨k, hk⟩ := card_carrier_eq_two_pow S
   rw [hk]
   -- Use that 2^k divides 2^m to get k ≤ m
-  have hdvd : 2 ^ k ∣ 2 ^ m := by rw [← hk]; exact card_carrier_dvd S
+  have hdvd : 2 ^ k ∣ 2 ^ m := by
+    rw [← hk]
+    exact card_carrier_dvd S
   have hkm : k ≤ m :=
     (Nat.pow_le_pow_iff_right (by norm_num)).mp (Nat.le_of_dvd (Nat.two_pow_pos m) hdvd)
   rw [Nat.log_pow (by decide : 1 < 2)]
@@ -1280,7 +1327,9 @@ theorem numLogical_le_numPhysical (S : StabGroup m) : S.numLogical ≤ S.numPhys
 theorem two_pow_numLogical_mul_card_carrier (S : StabGroup m) :
     2 ^ S.numLogical * Fintype.card S.carrier = 2 ^ m := by
   obtain ⟨r, hr⟩ := card_carrier_eq_two_pow S
-  have hdvd : (2 : ℕ) ^ r ∣ 2 ^ m := by rw [← hr]; exact card_carrier_dvd S
+  have hdvd : (2 : ℕ) ^ r ∣ 2 ^ m := by
+    rw [← hr]
+    exact card_carrier_dvd S
   have hrm : r ≤ m :=
     (Nat.pow_le_pow_iff_right (by norm_num)).mp (Nat.le_of_dvd (Nat.two_pow_pos m) hdvd)
   have hk : S.numLogical = m - r := by

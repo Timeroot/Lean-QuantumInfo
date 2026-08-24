@@ -53,7 +53,9 @@ theorem pauliOp_eq_piKron {n : ℕ} (p : PauliSpace n) :
   by_cases h : u = v + p.1
   · rw [if_pos h]
     refine Finset.prod_congr rfl fun q _ => ?_
-    have hq : u q = v q + p.1 q := by rw [h]; rfl
+    have hq : u q = v q + p.1 q := by
+      rw [h]
+      rfl
     rw [if_pos hq]
   · rw [if_neg h]
     obtain ⟨q, hq⟩ := Function.ne_iff.mp h

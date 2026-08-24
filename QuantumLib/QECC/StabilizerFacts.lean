@@ -115,8 +115,10 @@ theorem exists_undetectable_mul_of_distance_le (hlog : ∃ g, S.IsLogical g) {t 
     have hle : T.card - A.card ≤ t := by
       rw [hAcard, hTcard]
       rcases le_total t S.distance with h | h
-      · rw [min_eq_left h]; omega
-      · rw [min_eq_right h]; omega
+      · rw [min_eq_left h]
+        omega
+      · rw [min_eq_right h]
+        omega
     calc weight (restrict L Aᶜ) ≤ (Aᶜ.filter fun i => L.x i ≠ 0 ∨ L.z i ≠ 0).card :=
           weight_restrict_le L Aᶜ
       _ ≤ (T \ A).card := Finset.card_le_card hsub
@@ -270,12 +272,17 @@ theorem knill_laflamme (D : PauliOp n) :
         have step2 : P = stabProj S * (-toMat g * toMat D) * stabProj S := by
           rw [step1, mul_assoc (stabProj S) (toMat D) (toMat g), hmat]
         have step3 : P = -(stabProj S * toMat g * toMat D * stabProj S) := by
-          rw [step2]; simp [mul_assoc, neg_mul, mul_neg]
+          rw [step2]
+          simp [mul_assoc, neg_mul, mul_neg]
         rw [hstab_right, ← hP] at step3
         exact step3
       -- P = -P implies P = 0
-      have h1 : P + P = 0 := by nth_rewrite 2 [hP_neg]; exact add_neg_cancel P
-      have h2P : (2 : ℂ) • P = 0 := by simp [two_smul] at h1 ⊢; convert h1 using 1
+      have h1 : P + P = 0 := by
+        nth_rewrite 2 [hP_neg]
+        exact add_neg_cancel P
+      have h2P : (2 : ℂ) • P = 0 := by
+        simp [two_smul] at h1 ⊢
+        convert h1 using 1
       have h2 : (2 : ℂ) ≠ 0 := by norm_num
       exact smul_eq_zero.mp h2P |>.resolve_left h2
   · -- Reverse: ∃ c, Compression = c • stabProj → (D ∈ sup ∨ D ∉ centralizer)
@@ -328,9 +335,12 @@ theorem knill_laflamme (D : PauliOp n) :
       have h_D_zero : ∀ v ∈ codeSpace S, Matrix.mulVec D.toMat v = 0 := by
         intro v hv
         have h1 : Matrix.mulVec (stabProj S) (Matrix.mulVec D.toMat v) = 0 := by
-          have h2 : (stabProj S * D.toMat * stabProj S).mulVec v = 0 := by rw [hc]; simp
+          have h2 : (stabProj S * D.toMat * stabProj S).mulVec v = 0 := by
+            rw [hc]
+            simp
           have h2' : (stabProj S * (D.toMat * stabProj S)).mulVec v = 0 := by
-            rw [mul_assoc] at h2; exact h2
+            rw [mul_assoc] at h2
+            exact h2
           rw [← Matrix.mulVec_mulVec v (stabProj S) (D.toMat * stabProj S)] at h2'
           rw [← Matrix.mulVec_mulVec v (D.toMat) (stabProj S)] at h2'
           -- Now h2' : stabProj S.mulVec (D.toMat.mulVec (stabProj S.mulVec v)) = 0
@@ -447,7 +457,8 @@ theorem knill_laflamme (D : PauliOp n) :
               (↑(Fintype.card ↥S.carrier) : ℂ)⁻¹ • ∑ g : ↥S.carrier, (D * g.1).toMat := by
           rw [mul_smul_comm]
           simp_rw [Matrix.mul_sum, toMat_mul]
-        conv_lhs => arg 1; rw [hD_mul_smul]
+        conv_lhs => arg 1
+        rw [hD_mul_smul]
         rw [Matrix.trace_smul]
         have hcard_ne : ((Fintype.card S.carrier) : ℂ) ≠ 0 :=
           Nat.cast_ne_zero.mpr Fintype.card_ne_zero
@@ -533,12 +544,17 @@ theorem compress_eq_zero_of_anticommutes {D g : PauliOp n} (hg : g ∈ S.carrier
       rw [step1, mul_assoc (stabProj S) (toMat D) (toMat g), hmat]
     -- Pull out the negative and use hstab_right: stabProj S * toMat g = stabProj S
     have step3 : P = -(stabProj S * toMat g * toMat D * stabProj S) := by
-      rw [step2]; simp [mul_assoc, neg_mul, mul_neg]
+      rw [step2]
+      simp [mul_assoc, neg_mul, mul_neg]
     rw [hstab_right, ← hP] at step3
     exact step3
   -- P = -P implies P = 0
-  have h1 : P + P = 0 := by nth_rewrite 2 [hP_neg]; exact add_neg_cancel P
-  have h2P : (2 : ℂ) • P = 0 := by simp [two_smul] at h1 ⊢; convert h1 using 1
+  have h1 : P + P = 0 := by
+    nth_rewrite 2 [hP_neg]
+    exact add_neg_cancel P
+  have h2P : (2 : ℂ) • P = 0 := by
+    simp [two_smul] at h1 ⊢
+    convert h1 using 1
   have h2 : (2 : ℂ) ≠ 0 := by norm_num
   exact smul_eq_zero.mp h2P |>.resolve_left h2
 

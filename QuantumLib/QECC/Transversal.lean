@@ -133,7 +133,9 @@ theorem isTransversal_toMat_of_weight_le_one [NeZero n] {P : PauliOp n} (hP : we
         have h1 : (starRingEnd ℂ) d * d = Complex.normSq d := by
           simp [Complex.normSq_eq_conj_mul_self]
         rw [h1, Complex.normSq_eq_norm_sq]
-        suffices ‖d‖ = 1 by rw [this]; norm_num
+        suffices ‖d‖ = 1 by
+          rw [this]
+          norm_num
         -- We have c * conj c = 1, so ‖c‖ = 1
         have hc_norm : ‖c‖ = 1 := by
           have h1 : (starRingEnd ℂ) c = star c := by simp
@@ -199,7 +201,9 @@ theorem isTransversal_toMat_of_weight_le_one [NeZero n] {P : PauliOp n} (hP : we
       simp [Finset.mem_filter] at this
       tauto
     -- At j, either P.x j ≠ 0 or P.z j ≠ 0
-    have hj_mem : j ∈ Finset.univ.filter (fun i => P.x i ≠ 0 ∨ P.z i ≠ 0) := by rw [hj]; simp
+    have hj_mem : j ∈ Finset.univ.filter (fun i => P.x i ≠ 0 ∨ P.z i ≠ 0) := by
+      rw [hj]
+      simp
     simp [Finset.mem_filter] at hj_mem
     -- Define the scalar d = c (the full phase is at position j)
     let c := Complex.I ^ P.phase.val
@@ -257,7 +261,9 @@ theorem isTransversal_toMat_of_weight_le_one [NeZero n] {P : PauliOp n} (hP : we
           have h1 : (starRingEnd ℂ) d * d = Complex.normSq d := by
             simp [Complex.normSq_eq_conj_mul_self]
           rw [h1, Complex.normSq_eq_norm_sq]
-          suffices ‖d‖ = 1 by rw [this]; norm_num
+          suffices ‖d‖ = 1 by
+            rw [this]
+            norm_num
           -- d = c, so ‖d‖ = ‖c‖ = 1
           have hc_norm : ‖c‖ = 1 := by
             have h1 : (starRingEnd ℂ) c = star c := by simp
@@ -329,7 +335,8 @@ theorem isTransversal_toMat_of_weight_le_one [NeZero n] {P : PauliOp n} (hP : we
           · intro hj
             ext i
             by_cases hij : i = j
-            · subst hij; simp [hj]
+            · subst hij
+              simp [hj]
             · rw [Pi.add_apply, hx_zero i hij, add_zero]
               exact hall i hij
         simp only [hfeq]
@@ -524,7 +531,9 @@ theorem finite_of_separated {X : Type*} [PseudoMetricSpace X] {K G : Set X}
   -- Use ε/3-balls to cover K (so two points in same ball have dist < ε)
   let ε' : NNReal := ⟨ε / 3, by linarith⟩
   have hε' : ε' ≠ 0 := by
-    have hpos : (0 : ℝ) < (ε' : ℝ) := by show (0 : ℝ) < ε / 3; linarith
+    have hpos : (0 : ℝ) < (ε' : ℝ) := by
+      show (0 : ℝ) < ε / 3
+      linarith
     exact_mod_cast hpos.ne'
   obtain ⟨N, hNád, hNfin, hNcover⟩ := Metric.exists_finite_isCover_of_isCompact hε' hK
   -- Each point of G is covered by some ball centered at a point of N
@@ -965,7 +974,8 @@ theorem preservesCode_of_implementsLogicalWith
     rw [← Matrix.mul_assoc, hW.1, Matrix.one_mul]
   calc stabProj S * U * stabProj S
       = W * (W.conjTranspose * (U * W)) * W.conjTranspose := by
-        rw [← hW.2]; simp only [Matrix.mul_assoc]
+        rw [← hW.2]
+        simp only [Matrix.mul_assoc]
     _ = W * (W.conjTranspose * (W * V)) * W.conjTranspose := by
         rw [show U * W = W * V from h]
     _ = W * V * W.conjTranspose := by rw [h2]
@@ -1075,14 +1085,18 @@ theorem exists_infinite_nonproportional_unitary (hk : 1 ≤ S.numLogical) :
     funext i
     simp only [Pi.star_apply, hd]
     by_cases hi : i = b
-    · simp only [hi, if_true]; exact hstar m
+    · simp only [hi, if_true]
+      exact hstar m
     · simp only [hi, if_false, star_one, mul_one]
   have hDbb : ∀ m, D m b b = z m := by
-    intro m; simp only [hD, Matrix.diagonal_apply_eq, hd, if_pos]
+    intro m
+    simp only [hD, Matrix.diagonal_apply_eq, hd, if_pos]
   have hDaa : ∀ m, D m a a = 1 := by
-    intro m; simp only [hD, Matrix.diagonal_apply_eq, hd, if_neg hab]
+    intro m
+    simp only [hD, Matrix.diagonal_apply_eq, hd, if_neg hab]
   refine ⟨Set.range D, ?_, ?_, ?_⟩
-  · rintro V ⟨m, rfl⟩; exact hUnit m
+  · rintro V ⟨m, rfl⟩
+    exact hUnit m
   · rintro V ⟨m, rfl⟩ V' ⟨m', rfl⟩ hne c hc
     have ha : D m a a = c * D m' a a := by rw [hc, Matrix.smul_apply, smul_eq_mul]
     rw [hDaa, hDaa, mul_one] at ha            -- ha : 1 = c

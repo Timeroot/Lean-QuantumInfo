@@ -156,7 +156,9 @@ theorem isKnillLaflamme_of_recovery [Nonempty K] {W : Matrix H K ℂ} (hW : Wᴴ
           rw [Matrix.mul_sum, Matrix.sum_mul]
           exact Finset.sum_congr rfl fun j _ => by
             simp [hAdef, Matrix.conjTranspose_mul, Matrix.mul_assoc]
-      _ = Wᴴ * (E a)ᴴ * E b * W := by rw [hMTP]; simp [Matrix.mul_assoc]
+      _ = Wᴴ * (E a)ᴴ * E b * W := by
+        rw [hMTP]
+        simp [Matrix.mul_assoc]
   refine ⟨fun a b => ∑ j : K × H2, (starRingEnd ℂ) (lam (j, a)) * lam (j, b), fun a b => ?_⟩
   rw [← hstep a b, Finset.sum_smul]
   refine Finset.sum_congr rfl fun j _ => ?_
@@ -247,7 +249,8 @@ theorem exists_recovery_bilinear [Nonempty K] {W : Matrix H K ℂ}
   classical
   obtain ⟨k₀⟩ := ‹Nonempty K›
   have hEW : ∀ a b, (E a * W)ᴴ * (E b * W) = c a b • (1 : Matrix K K ℂ) := fun a b => by
-    rw [← hc a b]; simp [Matrix.conjTranspose_mul, Matrix.mul_assoc]
+    rw [← hc a b]
+    simp [Matrix.conjTranspose_mul, Matrix.mul_assoc]
   -- the matrix of Knill–Laflamme coefficients is Hermitian, hence unitarily diagonalizable
   have hcstar : ∀ a b, (starRingEnd ℂ) (c a b) = c b a := by
     intro a b
@@ -422,7 +425,9 @@ theorem exists_recovery_bilinear [Nonempty K] {W : Matrix H K ℂ}
       rw [Matrix.mul_sum]
       refine (Finset.sum_congr rfl fun i _ => ?_).trans hPdef.symm
       rw [← Matrix.mul_assoc, hPV i]
-    have h : Q * Q = 1 - P - P + P * P := by rw [hQdef]; noncomm_ring
+    have h : Q * Q = 1 - P - P + P * P := by
+      rw [hQdef]
+      noncomm_ring
     rw [h, hPP, hQdef]
     abel
   set RK : ι ⊕ H2 → Matrix K H2 ℂ :=
@@ -460,7 +465,9 @@ theorem exists_recovery_bilinear [Nonempty K] {W : Matrix H K ℂ}
       calc Matrix.single k₀ x (1 : ℂ) * Q * ((E a * W) * X * (E b * W)ᴴ)
           = (Matrix.single k₀ x (1 : ℂ) * (Q * (E a * W))) * (X * (E b * W)ᴴ) := by
             simp [Matrix.mul_assoc]
-        _ = 0 := by rw [hQE a]; simp
+        _ = 0 := by
+          rw [hQE a]
+          simp
     rw [h0, Matrix.zero_mul]
   have hmain : ∑ i, RK (Sum.inl i) * ((E a * W) * X * (E b * W)ᴴ) * (RK (Sum.inl i))ᴴ
       = (starRingEnd ℂ) (c a b) • X := by
@@ -532,7 +539,9 @@ theorem exists_recovery_span [Nonempty K] {W : Matrix H K ℂ} (hW : Wᴴ * W = 
       _ = Wᴴ * (∑ b, (E' b)ᴴ * E' b) * W := by
           rw [Matrix.mul_sum, Matrix.sum_mul]
           exact Finset.sum_congr rfl fun b _ => by simp [Matrix.mul_assoc]
-      _ = (1 : ℂ) • (1 : Matrix K K ℂ) := by rw [hTP]; simp [hW]
+      _ = (1 : ℂ) • (1 : Matrix K K ℂ) := by
+        rw [hTP]
+        simp [hW]
   have hexpand : ∀ b, E' b * (W * X * Wᴴ) * (E' b)ᴴ
       = ∑ a, ∑ a', (μ b a * (starRingEnd ℂ) (μ b a')) • (E a * (W * X * Wᴴ) * (E a')ᴴ) := by
     intro b

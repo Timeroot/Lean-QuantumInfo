@@ -58,7 +58,9 @@ theorem norm_pow_succ_sub_pow_succ_le (a b : 𝔸) {K : ℝ} (ha : ‖a‖ ≤ K
         _ ≤ ‖a‖ * ‖a ^ (n + 1) - b ^ (n + 1)‖ + ‖a - b‖ * ‖b ^ (n + 1)‖ :=
             add_le_add (norm_mul_le _ _) (norm_mul_le _ _)
         _ ≤ K * ((n + 1) * K ^ n * ‖a - b‖) + ‖a - b‖ * K ^ (n + 1) := by gcongr
-        _ = ((n + 1 : ℕ) + 1) * K ^ (n + 1) * ‖a - b‖ := by push_cast; ring
+        _ = ((n + 1 : ℕ) + 1) * K ^ (n + 1) * ‖a - b‖ := by
+          push_cast
+          ring
 
 end Telescope
 
@@ -131,7 +133,9 @@ theorem tendsto_pow_inv_of_hasDerivAt {f : ℝ → 𝔸} {z : 𝔸} (hf0 : f 0 =
           gcongr
           calc ‖(1 : 𝔸) + t • z‖ ≤ ‖(1 : 𝔸)‖ + ‖t • z‖ := norm_add_le _ _
             _ = 1 + |t| * ‖z‖ := by simp [norm_smul, Real.norm_eq_abs]
-      _ = 1 + s * |t| := by rw [hs_def]; ring
+      _ = 1 + s * |t| := by
+        rw [hs_def]
+        ring
   have hinv : Tendsto (fun n : ℕ => (n : ℝ)⁻¹) atTop (𝓝 0) :=
     tendsto_inv_atTop_zero.comp tendsto_natCast_atTop_atTop
   have hgpow : ∀ n : ℕ, n ≠ 0 → g ((n : ℝ)⁻¹) ^ n = exp z := by
@@ -172,7 +176,9 @@ theorem tendsto_pow_inv_of_hasDerivAt {f : ℝ → 𝔸} {z : 𝔸} (hf0 : f 0 =
       _ ≤ ((m : ℝ) + 1) * K ^ m * ‖f t - g t‖ := by
           exact_mod_cast norm_pow_succ_sub_pow_succ_le (f t) (g t) hfn hgn m
       _ ≤ ((m : ℝ) + 1) * Real.exp s * ‖f t - g t‖ := by gcongr
-      _ = Real.exp s * ((((m + 1 : ℕ) : ℝ)) * ‖f t - g t‖) := by push_cast; ring
+      _ = Real.exp s * ((((m + 1 : ℕ) : ℝ)) * ‖f t - g t‖) := by
+        push_cast
+        ring
   have hzero : Tendsto
       (fun n : ℕ => Real.exp s * ((n : ℝ) * ‖f ((n : ℝ)⁻¹) - g ((n : ℝ)⁻¹)‖)) atTop (𝓝 0) := by
     have h2 : (fun n : ℕ => ‖f ((n : ℝ)⁻¹) - g ((n : ℝ)⁻¹)‖) =o[atTop] fun n : ℕ => ((n : ℝ)⁻¹) :=

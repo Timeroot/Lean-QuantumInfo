@@ -175,13 +175,15 @@ local macro "single_qubit" : tactic =>
 theorem z_eq_ss :
     evalCircuit (qasm% { qreg q[1]; z q[0]; })
       = evalCircuit (qasm% { qreg q[1]; s q[0]; s q[0]; }) := by
-  single_qubit; exact Qubit.S_sq.symm
+  single_qubit
+  exact Qubit.S_sq.symm
 
 /-- `S = T·T`: the `T` gate squared is the phase gate `S`. -/
 theorem s_eq_tt :
     evalCircuit (qasm% { qreg q[1]; s q[0]; })
       = evalCircuit (qasm% { qreg q[1]; t q[0]; t q[0]; }) := by
-  single_qubit; exact Qubit.T_sq.symm
+  single_qubit
+  exact Qubit.T_sq.symm
 
 /-- `Z = T·T·T·T`: since `T` is an eighth root of the identity, four of them make `Z`. -/
 theorem z_eq_tttt :
@@ -216,18 +218,22 @@ discharged by explicit case analysis. -/
 /-- Entry formula for a single-qubit gate lifted to `𝐔[Fin 1 → Fin 2]`. -/
 theorem gate1_apply (h : 𝐔[Fin 2]) (u v : Fin 1 → Fin 2) :
     (gate1 h).val u v = h.val (u 0) (v 0) := by
-  simp only [gate1, reindexUnitary, reindex_apply, Matrix.submatrix_apply, Equiv.symm_symm]; rfl
+  simp only [gate1, reindexUnitary, reindex_apply, Matrix.submatrix_apply, Equiv.symm_symm]
+  rfl
 
 /-- Entry formula for a two-qubit gate lifted to `𝐔[Fin 2 → Fin 2]`. -/
 theorem gate2_apply (g : 𝐔[Fin 2 × Fin 2]) (u v : Fin 2 → Fin 2) :
     (gate2 g).val u v = g.val (u 0, u 1) (v 0, v 1) := by
-  simp only [gate2, reindexUnitary, reindex_apply, Matrix.submatrix_apply, Equiv.symm_symm]; rfl
+  simp only [gate2, reindexUnitary, reindex_apply, Matrix.submatrix_apply, Equiv.symm_symm]
+  rfl
 
 theorem range_cons2 : Set.range ![(0 : Fin 2), 1] = Set.univ := by
-  ext i; fin_cases i <;> simp
+  ext i
+  fin_cases i <;> simp
 
 theorem range_cons_one : Set.range ![(1 : Fin 2)] = {1} := by
-  ext i; fin_cases i <;> simp
+  ext i
+  fin_cases i <;> simp
 
 /-- Transport a two-qubit register unitary to the product index `Fin 2 × Fin 2`. -/
 def toProd (U : 𝐔[Fin 2 → Fin 2]) : 𝐔[Fin 2 × Fin 2] :=
@@ -235,7 +241,8 @@ def toProd (U : 𝐔[Fin 2 → Fin 2]) : 𝐔[Fin 2 × Fin 2] :=
 
 theorem toProd_apply (U : 𝐔[Fin 2 → Fin 2]) (p p' : Fin 2 × Fin 2) :
     (toProd U).val p p' = U.val ![p.1, p.2] ![p'.1, p'.2] := by
-  simp only [toProd, reindexUnitary, reindex_apply, Matrix.submatrix_apply]; rfl
+  simp only [toProd, reindexUnitary, reindex_apply, Matrix.submatrix_apply]
+  rfl
 
 theorem toProd_inj : Function.Injective toProd :=
   reindexUnitary_injective _
@@ -257,23 +264,27 @@ theorem toProd_embed_q1 (h : 𝐔[Fin 2]) (hq : Function.Injective ![(1 : Fin 2)
     toProd (embedGate ![1] hq (gate1 h)) = 1 ⊗ᵤ h := by
   apply Subtype.ext
   ext p p'
-  obtain ⟨p1, p2⟩ := p; obtain ⟨p1', p2'⟩ := p'
+  obtain ⟨p1, p2⟩ := p
+  obtain ⟨p1', p2'⟩ := p'
   rw [toProd_apply, embedGate_apply, gate1_apply]
   simp only [range_cons_one, Set.mem_singleton_iff, Fin.forall_fin_two, Matrix.cons_val_zero,
     Matrix.cons_val_one, Matrix.cons_val_fin_one, Matrix.unitary_kron,
     Matrix.kroneckerMap_apply, Matrix.UnitaryGroup.one_val, Matrix.one_apply]
   have hcond : ((¬(0 : Fin 2) = 1 → p1 = p1') ∧ (¬True → p2 = p2')) ↔ (p1 = p1') := by
     constructor
-    · rintro ⟨h1, _⟩; exact h1 (by decide)
+    · rintro ⟨h1, _⟩
+      exact h1 (by decide)
     · exact fun h1 => ⟨fun _ => h1, fun h => absurd trivial h⟩
-  simp only [hcond]; ring
+  simp only [hcond]
+  ring
 
 /-- Discharge a `4 × 4` product-space identity between Clifford+T operators by case analysis. -/
 local macro "prod_expand" : tactic =>
   `(tactic|
     (apply Subtype.ext
      ext a b
-     obtain ⟨i1, i2⟩ := a; obtain ⟨j1, j2⟩ := b
+     obtain ⟨i1, i2⟩ := a
+     obtain ⟨j1, j2⟩ := b
      fin_cases i1 <;> fin_cases i2 <;> fin_cases j1 <;> fin_cases j2 <;>
        simp only [Matrix.mul_apply, Matrix.unitary_kron, Matrix.kroneckerMap_apply,
          Fintype.sum_prod_type, Fin.sum_univ_two, Qubit.CNOT, Qubit.controllize, Qubit.H,

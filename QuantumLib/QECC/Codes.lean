@@ -83,7 +83,9 @@ theorem repZ_span_eq_zero (b : Fin n → ZMod 2) (h : (∑ j, b j • repZ n j) 
   have key : ∀ (i : ℕ) (hi : i < n), b ⟨i, hi⟩ = b 0 := by
     intro i
     induction i with
-    | zero => intro hi; congr 1
+    | zero =>
+      intro hi
+      congr 1
     | succ i ih =>
         intro hi
         have hi' : i < n := Nat.lt_of_succ_lt hi
@@ -248,7 +250,8 @@ theorem fiveQubitCode_distance : fiveQubitCode.distance = 3 := by
 /-- The five-qubit code is a *perfect* code: it saturates the quantum Hamming bound. -/
 theorem fiveQubitCode_perfect :
     (∑ j ∈ Finset.range 2, Nat.choose 5 j * 3 ^ j) * 2 ^ fiveQubitCode.numLogical = 2 ^ 5 := by
-  simp [fiveQubitCode_numLogical]; native_decide
+  simp [fiveQubitCode_numLogical]
+  native_decide
 
 /-! ### Shor's nine-qubit code `⟦9,1,3⟧` -/
 

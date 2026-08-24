@@ -55,8 +55,11 @@ theorem list_prod_mul_prod (l : List ι) (f₁ f₂ : ι → G)
       calc f₁ a * (l.map f₁).prod * (f₂ a * (l.map f₂).prod)
           = f₁ a * ((l.map f₁).prod * f₂ a * (l.map f₂).prod) := by simp only [mul_assoc]
         _ = f₁ a * (f₂ a * ((l.map f₁).prod * (l.map f₂).prod)) := by
-              rw [hcomm.eq]; simp only [mul_assoc]
-        _ = f₁ a * f₂ a * (l.map fun i => f₁ i * f₂ i).prod := by rw [ih']; simp only [mul_assoc]
+              rw [hcomm.eq]
+              simp only [mul_assoc]
+        _ = f₁ a * f₂ a * (l.map fun i => f₁ i * f₂ i).prod := by
+          rw [ih']
+          simp only [mul_assoc]
 
 /-- A product all of whose factors but one are trivial. -/
 theorem list_prod_single [DecidableEq ι] {l : List ι} {i : ι} (hi : i ∈ l) (hnd : l.Nodup)

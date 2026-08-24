@@ -108,7 +108,9 @@ theorem exists_scalar_piKron_of_correctsErrors [Nonempty d1] {C : QECC d1 i d2} 
     ∃ z : ℂ, Wᴴ * piKron A * W = z • 1 := by
   obtain ⟨S₁, hS₁sub, hS₁card⟩ :=
     Finset.exists_subset_card_eq (s := S) (n := min k S.card) (min_le_right _ _)
-  have hcard₁ : S₁.card ≤ k := by rw [hS₁card]; exact min_le_left _ _
+  have hcard₁ : S₁.card ≤ k := by
+    rw [hS₁card]
+    exact min_le_left _ _
   have hcard₂ : (S \ S₁).card ≤ k := by
     rw [Finset.card_sdiff_of_subset hS₁sub, hS₁card]
     omega

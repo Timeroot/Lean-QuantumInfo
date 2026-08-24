@@ -201,8 +201,10 @@ theorem isMulSubgroup_codePreservingTuples : IsMulSubgroup (S.CodePreservingTupl
   · rintro a b ⟨ha, ha1, ha2⟩ ⟨hb, hb1, hb2⟩
     have hmul : piKron (a * b) = piKron a * piKron b := (piKron_mul a b).symm
     refine ⟨fun i => Submonoid.mul_mem _ (ha i) (hb i), ?_, ?_⟩
-    · rw [hmul]; exact hpres _ _ ha1 hb1
-    · rw [hmul, Matrix.conjTranspose_mul]; exact hpres _ _ hb2 ha2
+    · rw [hmul]
+      exact hpres _ _ ha1 hb1
+    · rw [hmul, Matrix.conjTranspose_mul]
+      exact hpres _ _ hb2 ha2
   · rintro a ⟨ha, ha1, ha2⟩
     refine ⟨fun i => (a i)ᴴ, ⟨fun i => ?_, ?_, ?_⟩, ?_, ?_⟩
     · rw [Matrix.mem_unitaryGroup_iff, Matrix.star_eq_conjTranspose,

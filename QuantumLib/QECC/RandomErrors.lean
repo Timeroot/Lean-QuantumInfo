@@ -307,7 +307,9 @@ theorem le_pow_of_recursion {c : ℝ} (hc : 0 ≤ c) {t : ℕ} (x : ℕ → ℝ)
   have hnn : 0 ≤ (c * x 0 ^ t) ^ (t + 1) ^ L :=
     pow_nonneg (mul_nonneg hc (pow_nonneg (hx0 0) t)) _
   calc x (L + 1) ≤ c * x L ^ (t + 1) := hrec L
-    _ = (c * x L ^ t) * x L := by rw [pow_succ]; ring
+    _ = (c * x L ^ t) * x L := by
+      rw [pow_succ]
+      ring
     _ ≤ (c * x 0 ^ t) ^ (t + 1) ^ L * 1 :=
         mul_le_mul (mul_pow_le_of_recursion hc x hx0 hrec L) (hx1 L) (hx0 L) hnn
     _ = (c * x 0 ^ t) ^ (t + 1) ^ L := mul_one _

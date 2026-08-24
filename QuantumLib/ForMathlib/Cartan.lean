@@ -63,7 +63,9 @@ variable {H : Set 𝔸}
 
 theorem pow_mem (hH : IsMulSubgroup H) {a : 𝔸} (ha : a ∈ H) : ∀ n : ℕ, a ^ n ∈ H
   | 0 => by simpa using hH.one_mem
-  | (n + 1) => by rw [pow_succ]; exact hH.mul_mem (hH.pow_mem ha n) ha
+  | (n + 1) => by
+      rw [pow_succ]
+      exact hH.mul_mem (hH.pow_mem ha n) ha
 
 /-- A right inverse of an element of `H` again lies in `H`, being its inverse in `H`. -/
 theorem mem_of_mul_eq_one (hH : IsMulSubgroup H) {a b : 𝔸} (ha : a ∈ H) (h1 : a * b = 1) :
@@ -129,8 +131,10 @@ theorem add_mem_expTangent (hH : IsMulSubgroup H) (hcl : IsClosed H) {A B : 𝔸
   have hmem : ∀ n : ℕ, (exp ((n : ℝ)⁻¹ • (t • A)) * exp ((n : ℝ)⁻¹ • (t • B))) ^ n ∈ H := by
     intro n
     refine hH.pow_mem (hH.mul_mem ?_ ?_) n
-    · rw [smul_smul]; exact hA _
-    · rw [smul_smul]; exact hB _
+    · rw [smul_smul]
+      exact hA _
+    · rw [smul_smul]
+      exact hB _
   have : exp (t • A + t • B) ∈ H :=
     hcl.mem_of_tendsto hlim (Filter.Eventually.of_forall hmem)
   rwa [← smul_add] at this

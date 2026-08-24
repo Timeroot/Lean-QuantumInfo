@@ -87,7 +87,8 @@ theorem sympForm_comm (u v : SympSpace n) : sympForm n u v = sympForm n v u := b
   exact Finset.sum_congr rfl fun i _ => by ring
 
 theorem sympForm_isRefl : (sympForm n).IsRefl := fun u v h => by
-  rw [sympForm_comm]; exact h
+  rw [sympForm_comm]
+  exact h
 
 @[simp] theorem sympForm_single_x (i : Fin n) (v : SympSpace n) :
     sympForm n ((Pi.single i 1 : Fin n → ZMod 2), 0) v = v.2 i := by
@@ -110,7 +111,8 @@ theorem sympForm_nondegenerate : (sympForm n).Nondegenerate := by
       simpa [sympForm_apply, Finset.sum_ite_eq', Pi.single_apply, eq_comm] using this
     exact Prod.ext (funext hz) (funext hx)
   refine ⟨hsep, fun v hv => hsep v fun u => ?_⟩
-  rw [sympForm_comm]; exact hv u
+  rw [sympForm_comm]
+  exact hv u
 
 /-- The symplectic form on Pauli images is the symmetrised commutation pairing. -/
 theorem sympForm_symOf (P Q : PauliOp n) :
@@ -132,7 +134,9 @@ def supported (A : Finset (Fin n)) : Submodule (ZMod 2) (SympSpace n) where
   add_mem' := by
     intro u v hu hv i hi
     exact ⟨by simp [(hu i hi).1, (hv i hi).1], by simp [(hu i hi).2, (hv i hi).2]⟩
-  zero_mem' := by intro i _; exact ⟨rfl, rfl⟩
+  zero_mem' := by
+    intro i _
+    exact ⟨rfl, rfl⟩
   smul_mem' := by
     intro c v hv i hi
     exact ⟨by simp [(hv i hi).1], by simp [(hv i hi).2]⟩
@@ -157,11 +161,13 @@ def supportedEquiv (A : Finset (Fin n)) :
     · show (if h : i ∈ A then x i else 0) = x i
       by_cases hi : i ∈ A
       · exact dif_pos hi
-      · rw [dif_neg hi]; exact ((hv i hi).1).symm
+      · rw [dif_neg hi]
+        exact ((hv i hi).1).symm
     · show (if h : i ∈ A then z i else 0) = z i
       by_cases hi : i ∈ A
       · exact dif_pos hi
-      · rw [dif_neg hi]; exact ((hv i hi).2).symm
+      · rw [dif_neg hi]
+        exact ((hv i hi).2).symm
   right_inv := by
     rintro ⟨f, g⟩
     refine Prod.ext (funext fun i => ?_) (funext fun i => ?_)
@@ -221,9 +227,11 @@ theorem orthogonal_supported (A : Finset (Fin n)) :
     refine Finset.sum_eq_zero fun j _ => ?_
     by_cases hj : j ∈ A
     · have := hv j (by simpa using hj)
-      rw [this.1, this.2]; ring
+      rw [this.1, this.2]
+      ring
     · have := hu j hj
-      rw [this.1, this.2]; ring
+      rw [this.1, this.2]
+      ring
 
 /-! ### The symplectic image of a stabilizer group -/
 
@@ -255,10 +263,12 @@ theorem symOf_injOn : Set.InjOn symOf (S.carrier : Set (PauliOp n)) := by
   intro P hP Q hQ hPQ
   have hx : (P * Q).x = 0 := by
     have : P.x = Q.x := congrArg Prod.fst hPQ
-    ext i; simp [this, CharTwo.add_self_eq_zero]
+    ext i
+    simp [this, CharTwo.add_self_eq_zero]
   have hz : (P * Q).z = 0 := by
     have : P.z = Q.z := congrArg Prod.snd hPQ
-    ext i; simp [this, CharTwo.add_self_eq_zero]
+    ext i
+    simp [this, CharTwo.add_self_eq_zero]
   have hg : P * Q ∈ S.carrier := Subgroup.mul_mem _ hP hQ
   have hsq : (P * Q) * (P * Q) = 1 := S.sq_eq_one hg
   have hform : P * Q = (⟨(P * Q).phase, 0, 0⟩ : PauliOp n) := PauliOp.ext rfl hx hz
@@ -268,7 +278,8 @@ theorem symOf_injOn : Set.InjOn symOf (S.carrier : Set (PauliOp n)) := by
   have hcase : ∀ p : ZMod 4, p + p = 0 → p = 0 ∨ p = 2 := by decide
   have hone : P * Q = 1 := by
     rcases hcase _ hpp with h0 | h2
-    · rw [hform, h0]; rfl
+    · rw [hform, h0]
+      rfl
     · exact absurd (by rw [hform, h2] at hg; exact hg) S.negI_notMem
   have hQQ : Q⁻¹ = Q := inv_eq_of_mul_eq_one_right (S.sq_eq_one hQ)
   have hPQ' : P = Q⁻¹ := eq_inv_iff_mul_eq_one.mpr hone

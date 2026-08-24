@@ -237,7 +237,8 @@ theorem cssElem_mul (hdual : ∀ i j, ∑ k, hx i k * hz j k = 0)
     (a a' : Fin r → ZMod 2) (b b' : Fin s → ZMod 2) :
     cssElem hx hz a b * cssElem hx hz a' b' = cssElem hx hz (a + a') (b + b') := by
   have hdual' : ∀ j i, ∑ k, hz j k * hx i k = 0 := fun j i => by
-    rw [← hdual i j]; exact Finset.sum_congr rfl fun k _ => mul_comm _ _
+    rw [← hdual i j]
+    exact Finset.sum_congr rfl fun k _ => mul_comm _ _
   have hbeta : betaPair (cssElem hx hz a b) (cssElem hx hz a' b') = 0 :=
     sum_smul_dot hz hx b a' hdual'
   refine PauliOp.ext ?_ ?_ ?_
@@ -312,8 +313,12 @@ theorem mem_cssCode_iff (hdual : ∀ i j, ∑ k, hx i k * hz j k = 0) {P : Pauli
     · rintro _ _ _ _ ⟨a, b, rfl⟩ ⟨a', b', rfl⟩
       exact ⟨a + a', b + b', (cssElem_mul hdual a a' b b').symm⟩
     · rintro _ _ ⟨a, b, rfl⟩
-      have ha : a + a = 0 := by ext i; exact CharTwo.add_self_eq_zero _
-      have hb : b + b = 0 := by ext j; exact CharTwo.add_self_eq_zero _
+      have ha : a + a = 0 := by
+        ext i
+        exact CharTwo.add_self_eq_zero _
+      have hb : b + b = 0 := by
+        ext j
+        exact CharTwo.add_self_eq_zero _
       exact ⟨a, b, (inv_eq_of_mul_eq_one_right
         (by rw [cssElem_mul hdual, ha, hb, cssElem_zero])).symm⟩
   · rintro ⟨a, b, rfl⟩

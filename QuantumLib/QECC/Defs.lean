@@ -115,7 +115,8 @@ theorem unIsometryKraus_tp (W : Matrix b a ℂ) (hW : W.conjTranspose * W = 1) (
   have hQQ : Q * Q = Q := by
     have h : Q * Q = 1 - W * W.conjTranspose - W * W.conjTranspose
         + (W * W.conjTranspose) * (W * W.conjTranspose) := by
-      rw [hQ]; noncomm_ring
+      rw [hQ]
+      noncomm_ring
     rw [h, hP, hQ]
     abel
   have hterm : ∀ x : b,
