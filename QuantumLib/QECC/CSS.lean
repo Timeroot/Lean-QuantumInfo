@@ -18,8 +18,8 @@ namespace QuantumLib
 namespace PauliOp
 variable {n : ℕ}
 
-/-- A **CSS stabilizer group** from `r` `X`-checks and `s` `Z`-checks satisfying the dual-containment
-(orthogonality) condition `∑ₖ (hx i)ₖ (hz j)ₖ = 0`. -/
+/-- A **CSS stabilizer group** from `r` `X`-checks and `s` `Z`-checks satisfying the
+dual-containment (orthogonality) condition `∑ₖ (hx i)ₖ (hz j)ₖ = 0`. -/
 def cssCode {r s : ℕ} (hx : Fin r → (Fin n → ZMod 2)) (hz : Fin s → (Fin n → ZMod 2))
     (hdual : ∀ i j, ∑ k, hx i k * hz j k = 0) : StabGroup n where
   carrier := Subgroup.closure
@@ -37,7 +37,13 @@ def cssCode {r s : ℕ} (hx : Fin r → (Fin n → ZMod 2)) (hz : Fin s → (Fin
         simp only [mul_phase] at h1
         exact tau_inj _ _ (by simpa [add_comm P.phase Q.phase] using h1)
       · intro h
-        exact PauliOp.ext (by simp [mul_phase, h]; ring) (by simp [mul_x]; ring) (by simp [mul_z]; ring)
+        refine PauliOp.ext ?_ ?_ ?_
+        · simp only [mul_phase, h]
+          ring
+        · simp only [mul_x]
+          ring
+        · simp only [mul_z]
+          ring
     -- Now show generators pairwise commute
     have gen_comm : ∀ x ∈ ((Set.range fun i => (⟨0, hx i, 0⟩ : PauliOp n)) ∪
         (Set.range fun j => (⟨0, 0, hz j⟩ : PauliOp n))),
@@ -89,7 +95,8 @@ def cssCode {r s : ℕ} (hx : Fin r → (Fin n → ZMod 2)) (hz : Fin s → (Fin
         (Set.range fun j => (⟨0, 0, hz j⟩ : PauliOp n))),
         ∃ x' z' : Fin n → ZMod 2, g = ⟨0, x', z'⟩ := by
         -- Stronger invariant: all elements have phase 0 and pairwise betaPair = 0
-        let H : Subgroup (PauliOp n) := Subgroup.closure ((Set.range fun i => (⟨0, hx i, 0⟩ : PauliOp n)) ∪
+        let H : Subgroup (PauliOp n) :=
+          Subgroup.closure ((Set.range fun i => (⟨0, hx i, 0⟩ : PauliOp n)) ∪
             (Set.range fun j => (⟨0, 0, hz j⟩ : PauliOp n)))
         have hX_gen : ∀ i, (⟨0, hx i, 0⟩ : PauliOp n) ∈ H := fun i =>
             Subgroup.subset_closure (Or.inl ⟨i, rfl⟩)
@@ -118,7 +125,8 @@ def cssCode {r s : ℕ} (hx : Fin r → (Fin n → ZMod 2)) (hz : Fin s → (Fin
               (p := fun g _ => betaPair (⟨0, hx i, 0⟩ : PauliOp n) g = 0)
             · -- generators
               intro g hg'
-              rcases hg' with ⟨i', rfl⟩ | ⟨j', rfl⟩ <;> [exact betaPair_X_X i i'; exact betaPair_X_Z i j']
+              rcases hg' with ⟨i', rfl⟩ | ⟨j', rfl⟩ <;>
+                [exact betaPair_X_X i i'; exact betaPair_X_Z i j']
             · -- identity
               exact betaPair_one_left _
             · -- mul
@@ -137,7 +145,8 @@ def cssCode {r s : ℕ} (hx : Fin r → (Fin n → ZMod 2)) (hz : Fin s → (Fin
               (p := fun g _ => betaPair (⟨0, 0, hz j⟩ : PauliOp n) g = 0)
             · -- generators
               intro g hg'
-              rcases hg' with ⟨i', rfl⟩ | ⟨j', rfl⟩ <;> [exact betaPair_Z_X j i'; exact betaPair_Z_Z j j']
+              rcases hg' with ⟨i', rfl⟩ | ⟨j', rfl⟩ <;>
+                [exact betaPair_Z_X j i'; exact betaPair_Z_Z j j']
             · -- identity
               exact betaPair_one_right _
             · -- mul

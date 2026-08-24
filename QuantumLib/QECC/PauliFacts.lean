@@ -53,7 +53,8 @@ theorem pow_four (P : PauliOp n) : P ^ 4 = 1 := by
 /-- Consequently the order of any Pauli divides 4. -/
 theorem orderOf_dvd_four (P : PauliOp n) : orderOf P ∣ 4 := by
   have hbetaP2P : (P * P).betaPair P = 0 := by simp [betaPair, mul_z, CharTwo.add_self_eq_zero]
-  have hbetaP2P2 : (P * P).betaPair (P * P) = 0 := by simp [betaPair, mul_z, CharTwo.add_self_eq_zero]
+  have hbetaP2P2 : (P * P).betaPair (P * P) = 0 := by
+    simp [betaPair, mul_z, CharTwo.add_self_eq_zero]
   have hbetaP3P : (P * P * P).betaPair P = P.betaPair P := by
     simp [betaPair, mul_z]
     congr 1
@@ -192,7 +193,8 @@ theorem mul_comm_eq_phase (P Q : PauliOp n) :
     simp only [Inv.inv]
     -- betaPair only depends on x and z, which are the same for inverse
     have hbeta_eq : betaPair (P * Q)
-        { phase := -(Q * P).phase - tau ((Q * P).betaPair (Q * P)), x := (Q * P).x, z := (Q * P).z } =
+        { phase := -(Q * P).phase - tau ((Q * P).betaPair (Q * P)),
+          x := (Q * P).x, z := (Q * P).z } =
         betaPair (P * Q) (Q * P) := rfl
     rw [hbeta_eq]
     simp only [mul_phase]
@@ -203,10 +205,12 @@ theorem mul_comm_eq_phase (P Q : PauliOp n) :
     have h2tau : ∀ s : ZMod 2, 2 * tau s = 0 := by decide
     have hneg_tau : ∀ s : ZMod 2, -tau s = tau s := by decide
     have hsub_add : ∀ a b : ZMod 2, a - b = a + b := by decide+revert
-    rw [show (betaPair P Q : ZMod 2) - betaPair Q P = betaPair P Q + betaPair Q P from hsub_add _ _, tau_add]
+    rw [show (betaPair P Q : ZMod 2) - betaPair Q P = betaPair P Q + betaPair Q P from
+      hsub_add _ _, tau_add]
     rw [sub_eq_add_neg, hneg_tau]
   -- Combine hc and hphase to get the structure
-  have hstructure : P * Q * (Q * P)⁻¹ = ⟨tau (betaPair P Q - betaPair Q P), 0, 0⟩ := by rw [hc, hphase]
+  have hstructure : P * Q * (Q * P)⁻¹ = ⟨tau (betaPair P Q - betaPair Q P), 0, 0⟩ := by
+    rw [hc, hphase]
   -- Case split on betaPair P Q - betaPair Q P (which is 0 or 1 in ZMod 2)
   have hb : betaPair P Q - betaPair Q P = 0 ∨ betaPair P Q - betaPair Q P = 1 :=
     (by decide : ∀ a : ZMod 2, a = 0 ∨ a = 1) _
@@ -236,7 +240,8 @@ theorem mem_center_iff_support_zero (P : PauliOp n) :
     exact ⟨funext hPx, funext hPz⟩
   · intro ⟨hPx, hPz⟩ Q
     apply PauliOp.ext
-    · simp only [mul_phase, betaPair, hPx, hPz, Pi.zero_apply, mul_zero, zero_mul, Finset.sum_const_zero, tau_zero]
+    · simp only [mul_phase, betaPair, hPx, hPz, Pi.zero_apply, mul_zero, zero_mul,
+        Finset.sum_const_zero, tau_zero]
       ring
     all_goals simp [hPx, hPz]
 
@@ -273,14 +278,17 @@ theorem weight_eq_card_support (P : PauliOp n) :
 theorem central_of_weight_zero {P : PauliOp n} (h : weight P = 0) (Q : PauliOp n) :
     P * Q = Q * P := by
   unfold weight at h
-  have hset_empty : (Finset.univ.filter (fun i => P.x i ≠ 0 ∨ P.z i ≠ 0)) = ∅ := Finset.card_eq_zero.mp h
+  have hset_empty : (Finset.univ.filter (fun i => P.x i ≠ 0 ∨ P.z i ≠ 0)) = ∅ :=
+    Finset.card_eq_zero.mp h
   have hx : P.x = 0 := funext fun i => by
     by_contra hxi
-    have mem : i ∈ Finset.univ.filter (fun j => P.x j ≠ 0 ∨ P.z j ≠ 0) := Finset.mem_filter.mpr ⟨Finset.mem_univ _, Or.inl hxi⟩
+    have mem : i ∈ Finset.univ.filter (fun j => P.x j ≠ 0 ∨ P.z j ≠ 0) :=
+      Finset.mem_filter.mpr ⟨Finset.mem_univ _, Or.inl hxi⟩
     simp [hset_empty] at mem
   have hz : P.z = 0 := funext fun i => by
     by_contra hzi
-    have mem : i ∈ Finset.univ.filter (fun j => P.x j ≠ 0 ∨ P.z j ≠ 0) := Finset.mem_filter.mpr ⟨Finset.mem_univ _, Or.inr hzi⟩
+    have mem : i ∈ Finset.univ.filter (fun j => P.x j ≠ 0 ∨ P.z j ≠ 0) :=
+      Finset.mem_filter.mpr ⟨Finset.mem_univ _, Or.inr hzi⟩
     simp [hset_empty] at mem
   exact (mem_center_iff_support_zero P).mpr ⟨hx, hz⟩ Q
 
@@ -321,7 +329,7 @@ def restrict (P : PauliOp n) (A : Finset (Fin n)) : PauliOp n :=
 theorem weight_restrict_le (P : PauliOp n) (A : Finset (Fin n)) :
     weight (restrict P A) ≤ (A.filter fun i => P.x i ≠ 0 ∨ P.z i ≠ 0).card := by
   refine Finset.card_le_card fun i hi => ?_
-  simp only [Finset.mem_filter, Finset.mem_univ, true_and, restrict_x, restrict_z] at hi ⊢
+  simp only [Finset.mem_filter, restrict_x, restrict_z] at hi ⊢
   by_cases hiA : i ∈ A
   · simpa [hiA] using hi
   · simp [hiA] at hi

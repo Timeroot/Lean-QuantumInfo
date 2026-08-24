@@ -261,7 +261,7 @@ theorem span_comm (a b : Fin m → ZMod 2) :
     genSpan g a * genSpan g b = genSpan g b * genSpan g a := by
   rw [← hg.span_add, ← hg.span_add, add_comm]
 
-set_option linter.unusedSectionVars false in
+omit hg in
 theorem span_single (i : Fin m) : genSpan g (Pi.single i 1) = g i := by
   rw [genSpan, list_prod_single (List.mem_finRange i) (List.nodup_finRange m)]
   · simp [show ((1 : ZMod 2)).val = 1 from rfl]
@@ -276,7 +276,7 @@ theorem mem_closure_iff {P : PauliOp n} :
   · intro hP
     refine Subgroup.closure_induction (p := fun x _ => ∃ a, genSpan g a = x) ?_ ?_ ?_ ?_ hP
     · rintro _ ⟨i, rfl⟩
-      exact ⟨Pi.single i 1, hg.span_single i⟩
+      exact ⟨Pi.single i 1, span_single i⟩
     · exact ⟨0, genSpan_zero⟩
     · rintro _ _ _ _ ⟨a, rfl⟩ ⟨b, rfl⟩
       exact ⟨a + b, hg.span_add a b⟩

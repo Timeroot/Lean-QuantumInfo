@@ -300,7 +300,8 @@ theorem finrank_symImage_le : finrank (ZMod 2) S.symImage ≤ n := by
 
 /-- The orthogonal complement of the stabilizer subspace is exactly the centralizer. -/
 theorem mem_orthogonal_symImage {v : SympSpace n} :
-    v ∈ (sympForm n).orthogonal S.symImage ↔ ofSym v ∈ Subgroup.centralizer (S.carrier : Set (PauliOp n)) := by
+    v ∈ (sympForm n).orthogonal S.symImage ↔
+      ofSym v ∈ Subgroup.centralizer (S.carrier : Set (PauliOp n)) := by
   constructor
   · intro hv P hP
     exact (commute_iff_sympForm P (ofSym v)).mpr (hv _ ⟨P, hP, rfl⟩)
@@ -321,9 +322,10 @@ theorem symOf_mem_symImage_iff {P : PauliOp n} :
 theorem weight_ofSym_le {A : Finset (Fin n)} {v : SympSpace n} (hv : v ∈ supported A) :
     weight (ofSym v) ≤ A.card := by
   refine Finset.card_le_card fun i hi => ?_
-  simp only [Finset.mem_filter, Finset.mem_univ, true_and, ofSym_x, ofSym_z] at hi
+  replace hi := (Finset.mem_filter.mp hi).2
+  simp only [ofSym_x, ofSym_z] at hi
   by_contra hiA
-  exact (hi.elim (fun h => h (hv i hiA).1) (fun h => h (hv i hiA).2))
+  exact hi.elim (fun h => h (hv i hiA).1) (fun h => h (hv i hiA).2)
 
 /-- **The cleaning step.** Below the distance, the centralizer and the stabilizer agree on
 vectors supported inside `A`. -/
@@ -395,7 +397,7 @@ theorem distance_eq_zero_of_le_finrank (h : n ≤ finrank (ZMod 2) S.symImage) :
     S.distance = 0 := by
   have hempty : {w | ∃ g, S.IsLogical g ∧ weight g = w} = (∅ : Set ℕ) := by
     ext w
-    simp only [Set.mem_setOf_eq, Set.mem_empty_iff_false, iff_false]
+    simp only [Set.mem_ofPred_eq, Set.mem_empty_iff_false, iff_false]
     rintro ⟨g, hg, rfl⟩
     refine hg.2 ?_
     rw [← S.symOf_mem_symImage_iff, ← S.orthogonal_symImage_eq h]

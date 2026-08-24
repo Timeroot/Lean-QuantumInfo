@@ -122,7 +122,7 @@ theorem exists_unitaryBasis_expansion (M : Matrix d d ℂ) :
         Matrix d d ℂ) = _
     rw [hsingle, single_eq_sub_smul]
     module
-  rw [Finset.sum_congr rfl fun p _ => hterm p, Fintype.sum_prod_type,
-    ← Matrix.matrix_eq_sum_single]
+  rw [Finset.sum_congr rfl fun p _ => hterm p, Fintype.sum_prod_type]
+  exact Matrix.matrix_eq_sum_single M
 
 end QuantumLib

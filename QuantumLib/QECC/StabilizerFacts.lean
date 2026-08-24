@@ -195,7 +195,7 @@ theorem knill_laflamme (D : PauliOp n) :
     S.Detectable D ↔
       ∃ c : ℂ, stabProj S * toMat D * stabProj S = c • stabProj S := by
   rw [S.detectable_iff_not_mem_centralizer]
-  letI : DecidablePred (· ∈ S.carrier) := fun x => Classical.propDecidable (x ∈ S.carrier)
+  let _ : DecidablePred (· ∈ S.carrier) := fun x => Classical.propDecidable (x ∈ S.carrier)
   constructor
   · -- Forward: (D ∈ sup ∨ D ∉ centralizer) → ∃ c, Compression = c • stabProj
     intro h
@@ -296,7 +296,8 @@ theorem knill_laflamme (D : PauliOp n) :
         intro v hv
         rw [codeSpace, Submodule.mem_iInf] at hv ⊢
         intro i
-        simp only [LinearMap.mem_ker, Matrix.toLin'_apply, LinearMap.sub_apply, LinearMap.id_apply] at hv ⊢
+        simp only [LinearMap.mem_ker, Matrix.toLin'_apply, LinearMap.sub_apply,
+          LinearMap.id_apply] at hv ⊢
         -- Need to show: i.val.toMat * (D.toMat * v) = D.toMat * v
         -- Use that i.val and D commute: i.val.toMat * D.toMat = D.toMat * i.val.toMat
         have hDg_comm : D.toMat * i.val.toMat = i.val.toMat * D.toMat := by
@@ -336,7 +337,8 @@ theorem knill_laflamme (D : PauliOp n) :
           have hvstabil : Matrix.mulVec (stabProj S) v = v := h_proj_idem v hv
           simp only [hvstabil] at h2'
           exact h2'
-        -- Since Matrix.mulVec D.toMat v ∈ codeSpace (by hD_preserves), and stabProj.mulVec = id on codeSpace
+        -- Since Matrix.mulVec D.toMat v ∈ codeSpace (by hD_preserves), and stabProj.mulVec is
+        -- the identity on codeSpace
         have hv2 := hD_preserves v hv
         rw [h_proj_idem (Matrix.mulVec D.toMat v) hv2] at h1
         exact h1
@@ -355,7 +357,8 @@ theorem knill_laflamme (D : PauliOp n) :
           have hmul' : star D.toMat * D.toMat = 1 := hunit.1
           calc x
               = (star D.toMat * D.toMat).mulVec x := by rw [hmul', Matrix.one_mulVec]
-            _ = Matrix.mulVec (star D.toMat) (Matrix.mulVec D.toMat x) := by rw [← Matrix.mulVec_mulVec]
+            _ = Matrix.mulVec (star D.toMat) (Matrix.mulVec D.toMat x) := by
+                  rw [← Matrix.mulVec_mulVec]
             _ = Matrix.mulVec (star D.toMat) (Matrix.mulVec D.toMat y) := by rw [hxy]
             _ = (star D.toMat * D.toMat).mulVec y := by rw [Matrix.mulVec_mulVec]
             _ = y := by rw [hmul', Matrix.one_mulVec]
@@ -368,7 +371,8 @@ theorem knill_laflamme (D : PauliOp n) :
         intro v hv
         rw [codeSpace, Submodule.mem_iInf] at hv ⊢
         intro i
-        simp only [LinearMap.mem_ker, Matrix.toLin'_apply, LinearMap.sub_apply, LinearMap.id_apply] at hv ⊢
+        simp only [LinearMap.mem_ker, Matrix.toLin'_apply, LinearMap.sub_apply,
+          LinearMap.id_apply] at hv ⊢
         have hDg_comm : D.toMat * i.val.toMat = i.val.toMat * D.toMat := by
           rw [← toMat_mul, ← toMat_mul]
           exact congrArg toMat (Subgroup.mem_centralizer_iff.mp hncent i.val i.prop).symm
@@ -392,12 +396,14 @@ theorem knill_laflamme (D : PauliOp n) :
       have h_D_scalar : ∀ v ∈ codeSpace S, Matrix.mulVec D.toMat v = c • v := by
         intro v hv
         have h1 : Matrix.mulVec (stabProj S) (Matrix.mulVec D.toMat v) = c • v := by
-          have h2 : Matrix.mulVec (stabProj S * D.toMat * stabProj S) v = c • Matrix.mulVec (stabProj S) v := by
+          have h2 : Matrix.mulVec (stabProj S * D.toMat * stabProj S) v
+              = c • Matrix.mulVec (stabProj S) v := by
             rw [hc]
             rw [Matrix.smul_mulVec]
           -- Rewrite LHS using associativity
           have hlhs : Matrix.mulVec (stabProj S * D.toMat * stabProj S) v =
-                       Matrix.mulVec (stabProj S) (Matrix.mulVec (D.toMat) (Matrix.mulVec (stabProj S) v)) := by
+                       Matrix.mulVec (stabProj S)
+                         (Matrix.mulVec (D.toMat) (Matrix.mulVec (stabProj S) v)) := by
             rw [Matrix.mulVec_mulVec, Matrix.mulVec_mulVec]
           have hvstabil : Matrix.mulVec (stabProj S) v = v := h_proj_idem v hv
           rw [hlhs, hvstabil] at h2
@@ -428,19 +434,23 @@ theorem knill_laflamme (D : PauliOp n) :
       have htr_comm : S.stabProj * D.toMat * S.stabProj = D.toMat * S.stabProj := by
         rw [mul_assoc, hD_comm_stabProj, ← mul_assoc, stabProj_idem]
       -- trace(stabProj * D * stabProj) = trace(D * stabProj)
-      have htr_simplified : Matrix.trace (S.stabProj * D.toMat * S.stabProj) = Matrix.trace (D.toMat * S.stabProj) := by
+      have htr_simplified : Matrix.trace (S.stabProj * D.toMat * S.stabProj)
+          = Matrix.trace (D.toMat * S.stabProj) := by
         rw [htr_comm]
-      -- Final piece: D ∉ sup means for all g ∈ S.carrier, D * g ∉ phaseSubgroup, so trace(D * g) = 0
+      -- Final piece: D ∉ sup means for all g ∈ S.carrier, D * g ∉ phaseSubgroup, so
+      -- trace(D * g) = 0
       have htr_prod_zero : Matrix.trace (D.toMat * S.stabProj) = 0 := by
         simp only [stabProj]
         -- D * stabProj = (1/|S|) * ∑ g, D * g.toMat
-        have hD_mul_smul : D.toMat * (↑(Fintype.card ↥S.carrier) : ℂ)⁻¹ • ∑ g : ↥S.carrier, (g.1).toMat =
-               (↑(Fintype.card ↥S.carrier) : ℂ)⁻¹ • ∑ g : ↥S.carrier, (D * g.1).toMat := by
+        have hD_mul_smul :
+            D.toMat * (↑(Fintype.card ↥S.carrier) : ℂ)⁻¹ • ∑ g : ↥S.carrier, (g.1).toMat =
+              (↑(Fintype.card ↥S.carrier) : ℂ)⁻¹ • ∑ g : ↥S.carrier, (D * g.1).toMat := by
           rw [mul_smul_comm]
           simp_rw [Matrix.mul_sum, toMat_mul]
         conv_lhs => arg 1; rw [hD_mul_smul]
         rw [Matrix.trace_smul]
-        have hcard_ne : ((Fintype.card S.carrier) : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr Fintype.card_ne_zero
+        have hcard_ne : ((Fintype.card S.carrier) : ℂ) ≠ 0 :=
+          Nat.cast_ne_zero.mpr Fintype.card_ne_zero
         have hcard_inv_ne : ((Fintype.card S.carrier) : ℂ)⁻¹ ≠ 0 := inv_ne_zero hcard_ne
         simp [hcard_inv_ne]
         apply Finset.sum_eq_zero
@@ -462,11 +472,13 @@ theorem knill_laflamme (D : PauliOp n) :
       -- Now we have trace(stabProj * D * stabProj) = 0
       -- But also trace(stabProj * D * stabProj) = c * dim(codeSpace) from hc
       -- So c * dim(codeSpace) = 0, and since codeSpace ≠ ⊥, we get c = 0, contradiction
-      have htr_eq : Matrix.trace (S.stabProj * D.toMat * S.stabProj) = c * Module.finrank ℂ (S.codeSpace) := by
+      have htr_eq : Matrix.trace (S.stabProj * D.toMat * S.stabProj)
+          = c * Module.finrank ℂ (S.codeSpace) := by
         rw [hc]
         rw [Matrix.trace_smul, StabGroup.stabProj_trace, finrank_codeSpace]
         have hdiv : Fintype.card S.carrier ∣ 2 ^ n := Dvd.intro _ (card_mul_codeSpace_finrank S)
-        have hdiv_cast : (2 ^ n : ℂ) / (Fintype.card S.carrier : ℂ) = ↑(2 ^ n / Fintype.card S.carrier) := by
+        have hdiv_cast : (2 ^ n : ℂ) / (Fintype.card S.carrier : ℂ)
+            = ↑(2 ^ n / Fintype.card S.carrier) := by
           rw [Nat.cast_div hdiv (Nat.cast_ne_zero.mpr (Fintype.card_ne_zero))]
           simp
         rw [smul_eq_mul, hdiv_cast]
@@ -475,7 +487,8 @@ theorem knill_laflamme (D : PauliOp n) :
       have hfinrank_pos : 0 < Module.finrank ℂ (S.codeSpace) :=
         Nat.zero_lt_of_lt (by exact_mod_cast Submodule.one_le_finrank_iff.mpr (codeSpace_ne_bot S))
       have hc_zero : c = 0 :=
-        (mul_eq_zero.mp htr_eq.symm).resolve_right (Nat.cast_ne_zero.mpr (Nat.ne_of_gt hfinrank_pos))
+        (mul_eq_zero.mp htr_eq.symm).resolve_right
+          (Nat.cast_ne_zero.mpr (Nat.ne_of_gt hfinrank_pos))
       exact hc0 hc_zero
 
 /-- The compression of a *stabilizer* element to the code space is the projector itself. -/

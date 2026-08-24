@@ -18,7 +18,7 @@ products of the Kraus operators of the factors.
 ## Main results
 
 * `piKron_mul`, `piKron_conjTranspose`, `piKron_sum` — the algebra of `piKron`;
-* `MatrixMap.piProd_of_kraus`, `CPTPMap.piProd_map_of_kraus` — Kraus operators of a product channel;
+* `MatrixMap.piProd_of_kraus`, `CPTPOp.piProd_map_of_kraus` — Kraus operators of a product channel;
 * `QECC.unitaryError_map` — a unitary error of weight `S` is the single Kraus operator `errMat S U`;
 * `QECC.errMat_mem_of_mem` — discretisation of errors: a linear condition holding for the errors
   built from a spanning family of single-qudit operators holds for every error on that set;
@@ -95,7 +95,7 @@ theorem MatrixMap.of_kraus_single_apply {A B κ : Type*} [Fintype A] [DecidableE
     [Fintype κ] (M : κ → Matrix B A ℂ) (a a' : A) (b b' : B) :
     MatrixMap.of_kraus M M (Matrix.single a a' (1 : ℂ)) b b'
       = ∑ k, M k b a * (starRingEnd ℂ) (M k b' a') := by
-  rw [CPTPMap.of_kraus_apply, Matrix.sum_apply]
+  rw [CPTPOp.of_kraus_apply, Matrix.sum_apply]
   refine Finset.sum_congr rfl fun k _ => ?_
   simp [Matrix.mul_apply, Matrix.single_apply, Matrix.conjTranspose_apply, ite_and,
     Finset.sum_ite_eq]
@@ -122,14 +122,13 @@ theorem MatrixMap.piProd_of_kraus {κ : ι → Type*} [∀ i, Fintype (κ i)]
   simp [map_prod, Finset.prod_mul_distrib]
 
 /-- **Kraus operators of a tensor product of channels**, in `CPTPMap` form. -/
-theorem CPTPMap.piProd_map_of_kraus {κ : ι → Type*} [∀ i, Fintype (κ i)]
+theorem CPTPOp.piProd_map_of_kraus {κ : ι → Type*} [∀ i, Fintype (κ i)]
     (Λ : ∀ i, CPTPMap (dI i) (dO i)) (M : ∀ i, κ i → Matrix (dO i) (dI i) ℂ)
     (hM : ∀ i, (Λ i).map = MatrixMap.of_kraus (M i) (M i)) :
-    (CPTPMap.piProd Λ).map
+    (CPTPOp.piProd Λ).map
       = MatrixMap.of_kraus (fun f : ∀ i, κ i => piKron fun i => M i (f i))
           (fun f => piKron fun i => M i (f i)) := by
-  show MatrixMap.piProd (fun i => (Λ i).map) = _
-  rw [funext hM, MatrixMap.piProd_of_kraus]
+  rw [CPTPOp.piProd_map, funext hM, MatrixMap.piProd_of_kraus]
 
 /-! ### Channels with a single Kraus operator -/
 
@@ -143,24 +142,23 @@ theorem MatrixMap.of_kraus_unique {κ : Type*} [Fintype κ] [Unique κ] (X : Mat
     MatrixMap.of_kraus (fun _ : κ => X) (fun _ => X)
       = MatrixMap.of_kraus (fun _ : Unit => X) (fun _ => X) := by
   refine LinearMap.ext fun Y => ?_
-  rw [CPTPMap.of_kraus_apply, CPTPMap.of_kraus_apply, Fintype.sum_unique, Fintype.sum_unique]
+  rw [CPTPOp.of_kraus_apply, CPTPOp.of_kraus_apply, Fintype.sum_unique, Fintype.sum_unique]
 
 /-- The identity channel, presented by the single Kraus operator `1`. -/
-theorem CPTPMap.id_map_eq_of_kraus_one :
-    (CPTPMap.id : CPTPMap A A).map
+theorem CPTPOp.id_map_eq_of_kraus_one :
+    (CPTPOp.id : CPTPMap A A).map
       = MatrixMap.of_kraus (fun _ : Unit => (1 : Matrix A A ℂ)) (fun _ => 1) := by
   refine LinearMap.ext fun X => ?_
-  rw [CPTPMap.of_kraus_apply]
+  rw [CPTPOp.of_kraus_apply]
   simp
 
 /-- A unitary channel, presented by its single Kraus operator. -/
-theorem CPTPMap.ofUnitary_map_eq_of_kraus (U : 𝐔[A]) :
-    (CPTPMap.ofUnitary U).map
+theorem CPTPOp.ofUnitary_map_eq_of_kraus (U : 𝐔[A]) :
+    (CPTPOp.ofUnitary U).map
       = MatrixMap.of_kraus (fun _ : Unit => (U : Matrix A A ℂ)) (fun _ => (U : Matrix A A ℂ)) := by
-  have hU : (CPTPMap.ofUnitary U).map = MatrixMap.conj (U : Matrix A A ℂ) := rfl
-  rw [hU]
+  rw [CPTPOp.ofUnitary_map]
   refine LinearMap.ext fun X => ?_
-  rw [CPTPMap.of_kraus_apply]
+  rw [CPTPOp.of_kraus_apply]
   simp
 
 end single
@@ -249,17 +247,17 @@ theorem unitaryError_map (S : Finset i) (U : i → 𝐔[d2]) :
     (unitaryError S U).map
       = MatrixMap.of_kraus (fun _ : Unit => errMat S fun q => (U q : Matrix d2 d2 ℂ))
           (fun _ => errMat S fun q => (U q : Matrix d2 d2 ℂ)) := by
-  have h := CPTPMap.piProd_map_of_kraus
-    (fun q : i => if q ∈ S then CPTPMap.ofUnitary (U q) else CPTPMap.id)
+  have h := CPTPOp.piProd_map_of_kraus
+    (fun q : i => if q ∈ S then CPTPOp.ofUnitary (U q) else CPTPOp.id)
     (fun q : i => fun _ : Unit => if q ∈ S then (U q : Matrix d2 d2 ℂ) else 1) ?_
   · rw [show unitaryError S U
-        = CPTPMap.piProd (fun q : i => if q ∈ S then CPTPMap.ofUnitary (U q) else CPTPMap.id) from
+        = CPTPOp.piProd (fun q : i => if q ∈ S then CPTPOp.ofUnitary (U q) else CPTPOp.id) from
       rfl, h, ← MatrixMap.of_kraus_unique (κ := i → Unit)]
     rfl
   · intro q
     by_cases hq : q ∈ S
-    · simpa [hq] using CPTPMap.ofUnitary_map_eq_of_kraus (U q)
-    · simpa [hq] using CPTPMap.id_map_eq_of_kraus_one (A := d2)
+    · simpa [hq] using CPTPOp.ofUnitary_map_eq_of_kraus (U q)
+    · simpa [hq] using CPTPOp.id_map_eq_of_kraus_one (A := d2)
 
 /-- **The Kraus operators of a channel error are errors supported on `S`.** Padding the Kraus
 family of each site with a zero operator makes the families uniform across sites, so the Kraus
@@ -271,20 +269,20 @@ theorem exists_kraus_channelError (S : Finset i) (Λ : i → CPTPMap d2 d2)
     ∃ E : (i → Option (d2 × d2)) → Matrix (i → d2) (i → d2) ℂ,
       (channelError S Λ).map = MatrixMap.of_kraus E E ∧ ∀ b, E b ∈ M := by
   classical
-  choose N hN using fun q : i => MatrixMap.IsCompletelyPositive.exists_kraus (Λ q).map (Λ q).cp
+  choose N hN using fun q : i => MatrixMap.IsCompletelyPositive.exists_kraus (Λ q).map (Λ q).map_cp
   set K : i → Option (d2 × d2) → Matrix d2 d2 ℂ := fun q k =>
     if q ∈ S then k.elim 0 (N q) else k.elim 1 fun _ => 0 with hK
   have hKmap : ∀ q : i,
-      (if q ∈ S then Λ q else CPTPMap.id).map = MatrixMap.of_kraus (K q) (K q) := by
+      (if q ∈ S then Λ q else CPTPOp.id).map = MatrixMap.of_kraus (K q) (K q) := by
     intro q
     refine LinearMap.ext fun X => ?_
-    rw [CPTPMap.of_kraus_apply, Fintype.sum_option]
+    rw [CPTPOp.of_kraus_apply, Fintype.sum_option]
     by_cases hq : q ∈ S
-    · rw [if_pos hq, hN q, CPTPMap.of_kraus_apply]
+    · rw [if_pos hq, hN q, CPTPOp.of_kraus_apply]
       simp [hK, hq]
     · rw [if_neg hq]
       simp [hK, hq]
-  refine ⟨fun f => piKron fun q => K q (f q), CPTPMap.piProd_map_of_kraus _ K hKmap, fun f => ?_⟩
+  refine ⟨fun f => piKron fun q => K q (f q), CPTPOp.piProd_map_of_kraus _ K hKmap, fun f => ?_⟩
   show (piKron fun q => K q (f q)) ∈ M
   by_cases hf : ∀ q ∉ S, f q = none
   · have hterm : (piKron fun q => K q (f q)) = errMat S fun q => K q (f q) := by
@@ -334,13 +332,15 @@ theorem discard_map (S : Finset i) :
       = MatrixMap.of_kraus (discardKraus S) (discardKraus S) := by
   refine LinearMap.ext fun X => ?_
   ext u u'
-  rw [CPTPMap.of_kraus_apply, Matrix.sum_apply]
+  rw [CPTPOp.of_kraus_apply, Matrix.sum_apply]
   have hrhs : ∀ s : {q : i // q ∈ S} → d2,
       (discardKraus S s * X * (discardKraus S s)ᴴ) u u'
         = X ((splitEquiv S).symm (s, u)) ((splitEquiv S).symm (s, u')) := by
     intro s
     simp [Matrix.mul_apply, discardKraus, Matrix.conjTranspose_apply, Finset.sum_ite_eq']
   rw [Finset.sum_congr rfl fun s _ => hrhs s]
+  simp only [discard, CPTPOp.compose_map, LinearMap.comp_apply, CPTPOp.traceLeft_map,
+    CPTPOp.ofEquiv_map]
   show Matrix.traceLeft (X.submatrix (splitEquiv S).symm (splitEquiv S).symm) u u' = _
   simp [Matrix.traceLeft]
 

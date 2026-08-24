@@ -85,7 +85,7 @@ theorem exists_recovery_span_pauli {k t : ℕ}
         (∀ b, E b ∈ Submodule.span ℂ
           (Set.range fun P : {P : PauliOp n // weight P ≤ t} => toMat P.1)) →
         N.map = MatrixMap.of_kraus E E →
-        R ∘ₘ N ∘ₘ CPTPMap.ofIsometry W hiso = CPTPMap.id :=
+        R ∘ₘ N ∘ₘ CPTPOp.ofIsometry W hiso = CPTPOp.id :=
   exists_recovery_span hiso
     (S.isKnillLaflamme_toMat hiso hWW (fun P : {P : PauliOp n // weight P ≤ t} => P.2) ht)
 
@@ -98,7 +98,7 @@ theorem exists_recovery_of_pauli_kraus {k t : ℕ} {ι : Type*} [Fintype ι]
     (hE : ∀ b, ∃ (P : PauliOp n) (z : ℂ), weight P ≤ t ∧ E b = z • toMat P)
     {N : CPTPMap (Fin n → ZMod 2) (Fin n → ZMod 2)} (hN : N.map = MatrixMap.of_kraus E E) :
     ∃ R : CPTPMap (Fin n → ZMod 2) (Fin k → ZMod 2),
-      R ∘ₘ N ∘ₘ CPTPMap.ofIsometry W hiso = CPTPMap.id := by
+      R ∘ₘ N ∘ₘ CPTPOp.ofIsometry W hiso = CPTPOp.id := by
   obtain ⟨R, hR⟩ := S.exists_recovery_span_pauli hiso hWW ht
   refine ⟨R, hR E N (fun b => ?_) hN⟩
   obtain ⟨P, z, hP, hEb⟩ := hE b
@@ -113,7 +113,7 @@ theorem exists_recovery_correctsChannelErrors {k t : ℕ}
     {W : Matrix (Fin n → ZMod 2) (Fin k → ZMod 2) ℂ} (hiso : Wᴴ * W = 1)
     (hWW : W * Wᴴ = stabProj S) (ht : 2 * t < S.distance) :
     ∃ R : CPTPMap (Fin n → ZMod 2) (Fin k → ZMod 2),
-      (⟨CPTPMap.ofIsometry W hiso, R⟩ :
+      (⟨CPTPOp.ofIsometry W hiso, R⟩ :
         QECC (Fin k → ZMod 2) (Fin n) (ZMod 2)).CorrectsChannelErrors t := by
   obtain ⟨R, hR⟩ := S.exists_recovery_span_pauli.{0} hiso hWW ht
   refine ⟨R, fun T hT Λ => ?_⟩
@@ -156,7 +156,7 @@ theorem exists_recovery_channelError {k : ℕ} {T : Finset (Fin n)}
     (hWW : W * Wᴴ = stabProj S) (hT : T.card < S.distance)
     (Λ : Fin n → CPTPMap (ZMod 2) (ZMod 2)) :
     ∃ R : CPTPMap (Fin n → ZMod 2) (Fin k → ZMod 2),
-      R ∘ₘ QECC.channelError T Λ ∘ₘ CPTPMap.ofIsometry W hiso = CPTPMap.id := by
+      R ∘ₘ QECC.channelError T Λ ∘ₘ CPTPOp.ofIsometry W hiso = CPTPOp.id := by
   obtain ⟨R, hR⟩ := exists_recovery_span.{0} hiso
     (S.isKnillLaflamme_toMat_supported hiso hWW
       (fun P : {P : PauliOp n // ∀ q ∉ T, P.x q = 0 ∧ P.z q = 0} => P.2) hT)
@@ -174,8 +174,8 @@ theorem exists_qecc_correctsLocatedErrors {m : ℕ} (S : StabGroup m) (k t : ℕ
   have hprod : 2 ^ k * Fintype.card S.carrier = 2 ^ m := by
     rw [hk, ← pow_add, Nat.add_sub_cancel' hkm]
   obtain ⟨W, hiso, hWW⟩ := exists_isometry_stabProj S hprod
-  refine ⟨⟨CPTPMap.ofIsometry W hiso, (S.exists_recovery_channelError hiso hWW
-    (T := ∅) (by simpa using ht.trans_le' (Nat.zero_le _)) (fun _ => CPTPMap.id)).choose⟩,
+  refine ⟨⟨CPTPOp.ofIsometry W hiso, (S.exists_recovery_channelError hiso hWW
+    (T := ∅) (by simpa using ht.trans_le' (Nat.zero_le _)) (fun _ => CPTPOp.id)).choose⟩,
     fun T hT Λ => ?_⟩
   exact S.exists_recovery_channelError hiso hWW (lt_of_le_of_lt hT ht) Λ
 
@@ -190,7 +190,7 @@ theorem exists_qecc_corrects_pauli {m : ℕ} (S : StabGroup m) (k t : ℕ) (hkm 
       ∀ {ι : Type} [Fintype ι] (E : ι → Matrix (Fin m → ZMod 2) (Fin m → ZMod 2) ℂ)
         (N : CPTPMap (Fin m → ZMod 2) (Fin m → ZMod 2)),
         (∀ b, ∃ (P : PauliOp m) (z : ℂ), weight P ≤ t ∧ E b = z • toMat P) →
-        N.map = MatrixMap.of_kraus E E → C.decoder ∘ₘ N ∘ₘ C.encoder = CPTPMap.id := by
+        N.map = MatrixMap.of_kraus E E → C.decoder ∘ₘ N ∘ₘ C.encoder = CPTPOp.id := by
   have hprod : 2 ^ k * Fintype.card S.carrier = 2 ^ m := by
     rw [hk, ← pow_add, Nat.add_sub_cancel' hkm]
   obtain ⟨W, hiso, hWW⟩ := exists_isometry_stabProj S hprod
@@ -203,10 +203,10 @@ theorem exists_qecc_corrects_pauli {m : ℕ} (S : StabGroup m) (k t : ℕ) (hkm 
     obtain ⟨P, z, hP, hEb⟩ := hE b
     rw [hEb]
     exact Submodule.smul_mem _ z (Submodule.subset_span ⟨⟨P, hP⟩, rfl⟩)
-  refine ⟨⟨CPTPMap.ofIsometry W hiso, R⟩, ?_, fun E N hE hN => hR E N (hspan E hE) hN⟩
-  have h := hR (fun _ : Unit => (1 : Matrix (Fin m → ZMod 2) (Fin m → ZMod 2) ℂ)) CPTPMap.id
-    (hspan _ fun _ => ⟨1, 1, by simp, by simp⟩) CPTPMap.id_map_eq_of_kraus_one
-  rwa [CPTPMap.compose_id] at h
+  refine ⟨⟨CPTPOp.ofIsometry W hiso, R⟩, ?_, fun E N hE hN => hR E N (hspan E hE) hN⟩
+  have h := hR (fun _ : Unit => (1 : Matrix (Fin m → ZMod 2) (Fin m → ZMod 2) ℂ)) CPTPOp.id
+    (hspan _ fun _ => ⟨1, 1, by simp, by simp⟩) CPTPOp.id_map_eq_of_kraus_one
+  rwa [CPTPOp.compose_id] at h
 
 open Classical in
 /-- **A stabilizer code of distance `d > 2t` corrects `t` errors.** A stabilizer group on `m` qubits

@@ -230,8 +230,11 @@ theorem pauliOp_mul (p q : PauliSpace n) :
         rw [← Finset.prod_mul_distrib]
         exact Finset.prod_congr rfl fun i _ => by
           rw [hpq2, Pi.add_apply, add_mul, negOnePow_zmod2_add]
-      rw [e1, e2]; ring
-    · have hcp : ¬ u = w + q.1 + p.1 := by rw [hpq1] at huc; rwa [show w + q.1 + p.1 = w + (p.1 + q.1) by abel]
+      rw [e1, e2]
+      ring
+    · have hcp : ¬ u = w + q.1 + p.1 := by
+        rw [hpq1] at huc
+        rwa [show w + q.1 + p.1 = w + (p.1 + q.1) by abel]
       simp only [if_neg huc, if_neg hcp, zero_mul, mul_zero]
   · intro v _ hv
     rw [if_neg hv, mul_zero]

@@ -10,8 +10,9 @@ import QuantumLib.QECC.KnillLaflamme
 /-!
 # Correcting `d` errors implies correcting the erasure of `2d` qudits
 
-A code that corrects arbitrary unitary errors on any `d` of its qudits survives the *erasure* of any
-`2d` of them, and hence obeys the quantum Singleton bound in the form `|d1| · |d2| ^ (2d) ≤ |d2| ^ n`.
+A code that corrects arbitrary unitary errors on any `d` of its qudits survives the *erasure* of
+any `2d` of them, and hence obeys the quantum Singleton bound in the form
+`|d1| · |d2| ^ (2d) ≤ |d2| ^ n`.
 
 The bridge between the two error models is the Knill–Laflamme condition. The Kraus operators of the
 erasure channel multiply to operators supported on the erased set (`piKron A` with `A q = 1` off the
@@ -79,7 +80,7 @@ theorem errMat_mem_of_unitary_mem (T : Finset i) {M : Submodule ℂ (Matrix (i �
 /-- The compression of a product of two unitary errors, each of weight at most `k`, is a scalar on
 the code space of a code correcting `k` errors. -/
 theorem exists_scalar_errMat_mul_errMat [Nonempty d1] {C : QECC d1 i d2} {k : ℕ}
-    {W : Matrix (i → d2) d1 ℂ} (hW : Wᴴ * W = 1) (hC : C.encoder = CPTPMap.ofIsometry W hW)
+    {W : Matrix (i → d2) d1 ℂ} (hW : Wᴴ * W = 1) (hC : C.encoder = CPTPOp.ofIsometry W hW)
     (hcorr : C.CorrectsErrors k) {S₁ S₂ : Finset i} (h₁ : S₁.card ≤ k) (h₂ : S₂.card ≤ k)
     (U V : i → 𝐔[d2]) :
     ∃ z : ℂ, Wᴴ * (errMat S₁ fun q => (U q : Matrix d2 d2 ℂ)) *
@@ -101,7 +102,7 @@ theorem exists_scalar_errMat_mul_errMat [Nonempty d1] {C : QECC d1 i d2} {k : �
 correcting `k` errors. The support is split into two halves of at most `k` qudits, and each half is
 discretised into unitary errors. -/
 theorem exists_scalar_piKron_of_correctsErrors [Nonempty d1] {C : QECC d1 i d2} {k : ℕ}
-    {W : Matrix (i → d2) d1 ℂ} (hW : Wᴴ * W = 1) (hC : C.encoder = CPTPMap.ofIsometry W hW)
+    {W : Matrix (i → d2) d1 ℂ} (hW : Wᴴ * W = 1) (hC : C.encoder = CPTPOp.ofIsometry W hW)
     (hcorr : C.CorrectsErrors k) {S : Finset i} (hS : S.card ≤ 2 * k)
     {A : i → Matrix d2 d2 ℂ} (hA : ∀ q ∉ S, A q = 1) :
     ∃ z : ℂ, Wᴴ * piKron A * W = z • 1 := by
@@ -137,7 +138,7 @@ Kraus operators of the erasure channel are supported on the erased set, hence co
 the code space; the Knill–Laflamme theorem then produces a recovery channel acting on the surviving
 qudits alone. -/
 theorem correctsErasure_of_correctsErrors [Nonempty d1] {C : QECC d1 i d2} {k : ℕ}
-    {W : Matrix (i → d2) d1 ℂ} (hW : Wᴴ * W = 1) (hC : C.encoder = CPTPMap.ofIsometry W hW)
+    {W : Matrix (i → d2) d1 ℂ} (hW : Wᴴ * W = 1) (hC : C.encoder = CPTPOp.ofIsometry W hW)
     (hcorr : C.CorrectsErrors k) {S : Finset i} (hS : S.card ≤ 2 * k) :
     C.CorrectsErasure S := by
   have hKL : IsKnillLaflamme W (discardKraus S) := by
@@ -156,7 +157,7 @@ theorem correctsErasure_of_correctsErrors [Nonempty d1] {C : QECC d1 i d2} {k : 
 satisfies `|d1| · |d2| ^ (2k) ≤ |d2| ^ n`; in the qubit case `|d1| = 2 ^ K` and `|d2| = 2`, this is
 `K + 2k ≤ n`. -/
 theorem singleton_bound_of_correctsErrors {C : QECC d1 i d2} {k : ℕ}
-    {W : Matrix (i → d2) d1 ℂ} (hW : Wᴴ * W = 1) (hC : C.encoder = CPTPMap.ofIsometry W hW)
+    {W : Matrix (i → d2) d1 ℂ} (hW : Wᴴ * W = 1) (hC : C.encoder = CPTPOp.ofIsometry W hW)
     (hcorr : C.CorrectsErrors k) (hk : 2 * k ≤ Fintype.card i) :
     Fintype.card d1 * Fintype.card d2 ^ (2 * k) ≤ Fintype.card d2 ^ Fintype.card i := by
   rcases isEmpty_or_nonempty d1 with _ | _
@@ -171,11 +172,11 @@ theorem singleton_bound_of_correctsErrors {C : QECC d1 i d2} {k : ℕ}
 its qudits: correcting `k` errors makes the erasure of any `2k` qudits recoverable, and if `2k`
 reached `n` the recovery would reconstruct the logical state from the empty set of qudits. -/
 theorem two_mul_lt_card_of_correctsErrors [Nonempty d2] {C : QECC d1 i d2} {k : ℕ}
-    {W : Matrix (i → d2) d1 ℂ} (hW : Wᴴ * W = 1) (hC : C.encoder = CPTPMap.ofIsometry W hW)
+    {W : Matrix (i → d2) d1 ℂ} (hW : Wᴴ * W = 1) (hC : C.encoder = CPTPOp.ofIsometry W hW)
     (hcorr : C.CorrectsErrors k) (hd1 : 2 ≤ Fintype.card d1) : 2 * k < Fintype.card i := by
   by_contra hc
   push Not at hc
-  haveI : Nonempty d1 := Fintype.card_pos_iff.mp (by omega)
+  have : Nonempty d1 := Fintype.card_pos_iff.mp (by omega)
   have hS : (Finset.univ : Finset i).card ≤ 2 * k := by rwa [Finset.card_univ]
   have h := singleton_bound_of_erasure (correctsErasure_of_correctsErrors hW hC hcorr hS)
   rw [Finset.card_univ] at h

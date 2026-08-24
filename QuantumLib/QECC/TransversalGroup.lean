@@ -48,7 +48,8 @@ variable {n : ℕ}
 
 theorem errMat_singleton_apply (i : Fin n) (x : Matrix (ZMod 2) (ZMod 2) ℂ) (u v : Fin n → ZMod 2) :
     errMat ({i} : Finset (Fin n)) (fun _ => x) u v
-      = x (u i) (v i) * ∏ q ∈ Finset.univ.erase i, (1 : Matrix (ZMod 2) (ZMod 2) ℂ) (u q) (v q) := by
+      = x (u i) (v i)
+        * ∏ q ∈ Finset.univ.erase i, (1 : Matrix (ZMod 2) (ZMod 2) ℂ) (u q) (v q) := by
   rw [errMat, piKron_apply, ← Finset.mul_prod_erase _ _ (Finset.mem_univ i)]
   simp only [Finset.mem_singleton]
   congr 1
@@ -235,7 +236,7 @@ theorem isCompact_codePreservingTuples : IsCompact S.CodePreservingTuples := by
         ({u | stabProj S * piKron u * stabProj S = piKron u * stabProj S} ∩
           {u | stabProj S * (piKron u)ᴴ * stabProj S = (piKron u)ᴴ * stabProj S}) := by
     ext u
-    simp only [CodePreservingTuples, Set.mem_setOf_eq, Set.mem_inter_iff, Set.mem_univ_pi]
+    simp only [CodePreservingTuples, Set.mem_ofPred_eq, Set.mem_inter_iff, Set.mem_univ_pi]
   rw [heq]
   have hcT : Continuous fun u : Fin n → Matrix (ZMod 2) (ZMod 2) ℂ => (piKron u)ᴴ :=
     continuous_piKron.matrix_conjTranspose
@@ -291,7 +292,8 @@ theorem finitelyManyTransversalComponents (hd : 1 < S.distance) :
         piKron (fun i => NormedSpace.exp (A i)), ?_, ?_⟩
       · refine ⟨QECC.transversalHam A, 1, S.isLowWeightGen_transversalHam hd A, fun t => ?_, ?_⟩
         · rw [QECC.smul_transversalHam, QECC.exp_transversalHam]
-          have hkey : piKron (NormedSpace.exp (t • A)) = piKron fun i => NormedSpace.exp (t • A i) :=
+          have hkey : piKron (NormedSpace.exp (t • A))
+              = piKron fun i => NormedSpace.exp (t • A i) :=
             congrArg piKron (funext fun i => NormedSpace.exp_pi_apply (t • A) i)
           rw [← hkey]
           exact (hA t).2.1

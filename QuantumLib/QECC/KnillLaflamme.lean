@@ -116,8 +116,9 @@ theorem smul_one_inj [Nonempty K] {x y : ℂ} (h : x • (1 : Matrix K K ℂ) = 
 
 /-! ### The Knill–Laflamme conditions -/
 
-/-- The **Knill–Laflamme conditions** for a family of error operators `E` and an encoding isometry
-`W`: the compressions `Wᴴ (E a)ᴴ (E b) W` of all products of errors to the code space are scalars. -/
+/-- The **Knill–Laflamme conditions** for a family of error operators `E` and an encoding
+isometry `W`: the compressions `Wᴴ (E a)ᴴ (E b) W` of all products of errors to the code space
+are scalars. -/
 def IsKnillLaflamme (W : Matrix H K ℂ) (E : ι → Matrix H2 H ℂ) : Prop :=
   ∃ c : ι → ι → ℂ, ∀ a b, Wᴴ * (E a)ᴴ * E b * W = c a b • 1
 
@@ -128,18 +129,19 @@ def IsKnillLaflamme (W : Matrix H K ℂ) (E : ι → Matrix H2 H ℂ) : Prop :=
 Knill–Laflamme conditions. -/
 theorem isKnillLaflamme_of_recovery [Nonempty K] {W : Matrix H K ℂ} (hW : Wᴴ * W = 1)
     {E : ι → Matrix H2 H ℂ} {N : CPTPMap H H2} (hN : N.map = MatrixMap.of_kraus E E)
-    {R : CPTPMap H2 K} (hR : R ∘ₘ N ∘ₘ CPTPMap.ofIsometry W hW = CPTPMap.id) :
+    {R : CPTPMap H2 K} (hR : R ∘ₘ N ∘ₘ CPTPOp.ofIsometry W hW = CPTPOp.id) :
     IsKnillLaflamme W E := by
-  obtain ⟨M, hM⟩ := R.cp.exists_kraus _
+  obtain ⟨M, hM⟩ := R.map_cp.exists_kraus _
   have hM' : R.map = MatrixMap.of_kraus M M := hM
   have hMTP : ∑ j, (M j)ᴴ * M j = 1 :=
-    Kraus.sum_conjTranspose_mul_self M (hM ▸ R.TP)
+    Kraus.sum_conjTranspose_mul_self M (hM ▸ R.map_TP)
   set A : (K × H2) × ι → Matrix K K ℂ := fun p => M p.1 * E p.2 * W with hAdef
   have hkey : ∀ X : Matrix K K ℂ, ∑ p, A p * X * (A p)ᴴ = X := by
     intro X
-    have h1 : R.map (N.map ((CPTPMap.ofIsometry W hW).map X)) = X :=
-      congrArg (fun Λ : CPTPMap K K => Λ.map X) hR
-    rw [CPTPMap.ofIsometry_map, hN, CPTPMap.of_kraus_apply, hM', CPTPMap.of_kraus_apply] at h1
+    have h1 : R.map (N.map ((CPTPOp.ofIsometry W hW).map X)) = X := by
+      simpa only [CPTPOp.compose_map, CPTPOp.id_map, LinearMap.comp_apply, LinearMap.id_apply]
+        using congrArg (fun Λ : CPTPMap K K => Λ.map X) hR
+    rw [CPTPOp.ofIsometry_map, hN, CPTPOp.of_kraus_apply, hM', CPTPOp.of_kraus_apply] at h1
     conv_rhs => rw [← h1]
     rw [Fintype.sum_prod_type]
     refine Finset.sum_congr rfl fun j _ => ?_
@@ -169,8 +171,8 @@ theorem exists_scalar_of_recovery_two_unitaries [Nonempty K] {W : Matrix H K ℂ
     {X Y : Matrix H H ℂ} (hX : Xᴴ * X = 1) (hY : Yᴴ * Y = 1) {D : CPTPMap H K}
     {N₁ N₂ : CPTPMap H H} (hN₁ : N₁.map = MatrixMap.of_kraus (fun _ : Unit => X) fun _ => X)
     (hN₂ : N₂.map = MatrixMap.of_kraus (fun _ : Unit => Y) fun _ => Y)
-    (h₁ : D ∘ₘ N₁ ∘ₘ CPTPMap.ofIsometry W hW = CPTPMap.id)
-    (h₂ : D ∘ₘ N₂ ∘ₘ CPTPMap.ofIsometry W hW = CPTPMap.id) :
+    (h₁ : D ∘ₘ N₁ ∘ₘ CPTPOp.ofIsometry W hW = CPTPOp.id)
+    (h₂ : D ∘ₘ N₂ ∘ₘ CPTPOp.ofIsometry W hW = CPTPOp.id) :
     ∃ z : ℂ, Wᴴ * Xᴴ * Y * W = z • 1 := by
   obtain ⟨r, hrr, hrs⟩ : ∃ r : ℂ, r * r = 2⁻¹ ∧ star r = r := by
     refine ⟨((Real.sqrt 2)⁻¹ : ℝ), ?_, Complex.conj_ofReal _⟩
@@ -189,19 +191,22 @@ theorem exists_scalar_of_recovery_two_unitaries [Nonempty K] {W : Matrix H K ℂ
     · exact hsmul X hX
   have hTP : ∑ b, (E b)ᴴ * E b = 1 := by
     rw [Fintype.sum_bool, hE, hE, ← add_smul, show (2 : ℂ)⁻¹ + 2⁻¹ = 1 from by norm_num, one_smul]
-  set N : CPTPMap H H := CPTPMap.of_kraus_CPTPMap E hTP with hNdef
-  have hNmap : N.map = MatrixMap.of_kraus E E := rfl
-  have hR : D ∘ₘ N ∘ₘ CPTPMap.ofIsometry W hW = CPTPMap.id := by
-    refine CPTPMap.ext (LinearMap.ext fun Z => ?_)
-    show D.map (N.map ((CPTPMap.ofIsometry W hW).map Z)) = Z
-    have e₁ : D.map (N₁.map ((CPTPMap.ofIsometry W hW).map Z)) = Z :=
-      congrArg (fun Λ : CPTPMap K K => Λ.map Z) h₁
-    have e₂ : D.map (N₂.map ((CPTPMap.ofIsometry W hW).map Z)) = Z :=
-      congrArg (fun Λ : CPTPMap K K => Λ.map Z) h₂
+  set N : CPTPMap H H := CPTPOp.of_kraus_CPTPMap E hTP with hNdef
+  have hNmap : N.map = MatrixMap.of_kraus E E := by
+    rw [hNdef, CPTPOp.map_of_kraus_CPTPMap]
+  have hR : D ∘ₘ N ∘ₘ CPTPOp.ofIsometry W hW = CPTPOp.id := by
+    refine CPTPOp.ext_map (ι := K) (κ := K) (LinearMap.ext fun Z => ?_)
+    simp only [CPTPOp.compose_map, CPTPOp.id_map, LinearMap.comp_apply, LinearMap.id_apply]
+    have e₁ : D.map (N₁.map ((CPTPOp.ofIsometry W hW).map Z)) = Z := by
+      simpa only [CPTPOp.compose_map, CPTPOp.id_map, LinearMap.comp_apply, LinearMap.id_apply]
+        using congrArg (fun Λ : CPTPMap K K => Λ.map Z) h₁
+    have e₂ : D.map (N₂.map ((CPTPOp.ofIsometry W hW).map Z)) = Z := by
+      simpa only [CPTPOp.compose_map, CPTPOp.id_map, LinearMap.comp_apply, LinearMap.id_apply]
+        using congrArg (fun Λ : CPTPMap K K => Λ.map Z) h₂
     have hsplit : ∀ M : Matrix H H ℂ, N.map M = (2 : ℂ)⁻¹ • N₁.map M + (2 : ℂ)⁻¹ • N₂.map M := by
       intro M
-      rw [hNmap, CPTPMap.of_kraus_apply, Fintype.sum_bool, hN₁, hN₂, CPTPMap.of_kraus_apply,
-        CPTPMap.of_kraus_apply]
+      rw [hNmap, CPTPOp.of_kraus_apply, Fintype.sum_bool, hN₁, hN₂, CPTPOp.of_kraus_apply,
+        CPTPOp.of_kraus_apply]
       simp only [hEdef, cond_true, cond_false, Fintype.sum_unique, Matrix.smul_mul,
         Matrix.mul_smul, Matrix.conjTranspose_smul, smul_smul, hrs, hrr]
     rw [hsplit, map_add, map_smul, map_smul, e₁, e₂, ← add_smul,
@@ -440,14 +445,14 @@ theorem exists_recovery_bilinear [Nonempty K] {W : Matrix H K ℂ}
           = Q * (∑ x : H2, Matrix.single x x (1 : ℂ)) * Q := by
             rw [Matrix.mul_sum, Matrix.sum_mul]
             exact Finset.sum_congr rfl fun x _ => hterm x
-        _ = Q := by rw [CPTPMap.sum_single_diag, Matrix.mul_one, hQQ]
+        _ = Q := by rw [CPTPOp.sum_single_diag, Matrix.mul_one, hQQ]
     rw [h1, h2, hQdef]
     abel
-  refine ⟨CPTPMap.of_kraus_CPTPMap RK hRKTP, fun a b X => ?_⟩
-  show MatrixMap.of_kraus RK RK (E a * (W * X * Wᴴ) * (E b)ᴴ) = _
+  refine ⟨CPTPOp.of_kraus_CPTPMap RK hRKTP, fun a b X => ?_⟩
+  rw [CPTPOp.map_of_kraus_CPTPMap]
   have hY : E a * (W * X * Wᴴ) * (E b)ᴴ = (E a * W) * X * (E b * W)ᴴ := by
     simp [Matrix.conjTranspose_mul, Matrix.mul_assoc]
-  rw [hY, CPTPMap.of_kraus_apply, Fintype.sum_sum_type]
+  rw [hY, CPTPOp.of_kraus_apply, Fintype.sum_sum_type]
   have hjunk : ∑ x : H2, RK (Sum.inr x) * ((E a * W) * X * (E b * W)ᴴ) * (RK (Sum.inr x))ᴴ = 0 := by
     refine Finset.sum_eq_zero fun x _ => ?_
     have h0 : RK (Sum.inr x) * ((E a * W) * X * (E b * W)ᴴ) = 0 := by
@@ -496,17 +501,17 @@ theorem exists_recovery_span [Nonempty K] {W : Matrix H K ℂ} (hW : Wᴴ * W = 
     ∃ R : CPTPMap H2 K,
       ∀ {ι' : Type v} [Fintype ι'] (E' : ι' → Matrix H2 H ℂ) (N : CPTPMap H H2),
       (∀ b, E' b ∈ Submodule.span ℂ (Set.range E)) → N.map = MatrixMap.of_kraus E' E' →
-      R ∘ₘ N ∘ₘ CPTPMap.ofIsometry W hW = CPTPMap.id := by
+      R ∘ₘ N ∘ₘ CPTPOp.ofIsometry W hW = CPTPOp.id := by
   classical
   obtain ⟨c, hc⟩ := hKL
   obtain ⟨R, hR⟩ := exists_recovery_bilinear (W := W) hc
   refine ⟨R, ?_⟩
   intro ι' _ E' N hspan hN
-  refine CPTPMap.ext (LinearMap.ext fun X => ?_)
-  show R.map (N.map ((CPTPMap.ofIsometry W hW).map X)) = X
-  rw [CPTPMap.ofIsometry_map, hN, CPTPMap.of_kraus_apply]
+  refine CPTPOp.ext_map (ι := K) (κ := K) (LinearMap.ext fun X => ?_)
+  simp only [CPTPOp.compose_map, CPTPOp.id_map, LinearMap.comp_apply, LinearMap.id_apply]
+  rw [CPTPOp.ofIsometry_map, hN, CPTPOp.of_kraus_apply]
   choose μ hμ using fun b => (Submodule.mem_span_range_iff_exists_fun ℂ).mp (hspan b)
-  have hTP : ∑ b, (E' b)ᴴ * E' b = 1 := Kraus.sum_conjTranspose_mul_self E' (hN ▸ N.TP)
+  have hTP : ∑ b, (E' b)ᴴ * E' b = 1 := Kraus.sum_conjTranspose_mul_self E' (hN ▸ N.map_TP)
   -- the total weight of the Knill–Laflamme coefficients is fixed by trace preservation
   have hone : ∑ b, ∑ a, ∑ a', (starRingEnd ℂ) (μ b a) * μ b a' * c a a' = 1 := by
     refine smul_one_inj (K := K) ?_
@@ -556,7 +561,7 @@ channel undoing `N` on the code space. -/
 theorem exists_recovery_of_isKnillLaflamme [Nonempty K] {W : Matrix H K ℂ} (hW : Wᴴ * W = 1)
     {E : ι → Matrix H2 H ℂ} {N : CPTPMap H H2} (hN : N.map = MatrixMap.of_kraus E E)
     (hKL : IsKnillLaflamme W E) :
-    ∃ R : CPTPMap H2 K, R ∘ₘ N ∘ₘ CPTPMap.ofIsometry W hW = CPTPMap.id := by
+    ∃ R : CPTPMap H2 K, R ∘ₘ N ∘ₘ CPTPOp.ofIsometry W hW = CPTPOp.id := by
   obtain ⟨R, hR⟩ := exists_recovery_span hW hKL
   exact ⟨R, hR E N (fun a => Submodule.subset_span ⟨a, rfl⟩) hN⟩
 
@@ -568,7 +573,7 @@ logical state after the noise — exactly when the Knill–Laflamme conditions
 `Wᴴ (E a)ᴴ (E b) W = c a b • 1` hold. -/
 theorem knill_laflamme_iff [Nonempty K] {W : Matrix H K ℂ} (hW : Wᴴ * W = 1)
     {E : ι → Matrix H2 H ℂ} {N : CPTPMap H H2} (hN : N.map = MatrixMap.of_kraus E E) :
-    (∃ R : CPTPMap H2 K, R ∘ₘ N ∘ₘ CPTPMap.ofIsometry W hW = CPTPMap.id) ↔ IsKnillLaflamme W E :=
+    (∃ R : CPTPMap H2 K, R ∘ₘ N ∘ₘ CPTPOp.ofIsometry W hW = CPTPOp.id) ↔ IsKnillLaflamme W E :=
   ⟨fun ⟨_, hR⟩ => isKnillLaflamme_of_recovery hW hN hR, exists_recovery_of_isKnillLaflamme hW hN⟩
 
 /-- The Knill–Laflamme conditions depend only on the channel, not on the Kraus family chosen to
@@ -584,10 +589,10 @@ decoder correcting the noise `N` exactly when the Kraus operators of `N` satisfy
 conditions for the encoding isometry. -/
 theorem QECC.exists_decoder_iff_isKnillLaflamme {d1 i d2 : Type*} [Fintype i] [DecidableEq i]
     [Fintype d1] [DecidableEq d1] [Nonempty d1] [Fintype d2] [DecidableEq d2] {C : QECC d1 i d2}
-    {W : Matrix (i → d2) d1 ℂ} (hW : Wᴴ * W = 1) (hC : C.encoder = CPTPMap.ofIsometry W hW)
+    {W : Matrix (i → d2) d1 ℂ} (hW : Wᴴ * W = 1) (hC : C.encoder = CPTPOp.ofIsometry W hW)
     {E : ι → Matrix (i → d2) (i → d2) ℂ} {N : CPTPMap (i → d2) (i → d2)}
     (hN : N.map = MatrixMap.of_kraus E E) :
-    (∃ D : CPTPMap (i → d2) d1, D ∘ₘ N ∘ₘ C.encoder = CPTPMap.id) ↔ IsKnillLaflamme W E := by
+    (∃ D : CPTPMap (i → d2) d1, D ∘ₘ N ∘ₘ C.encoder = CPTPOp.id) ↔ IsKnillLaflamme W E := by
   rw [hC]
   exact knill_laflamme_iff hW hN
 

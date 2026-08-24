@@ -91,7 +91,7 @@ def paulify (S : Finset (Fin n)) (f : Fin n → ZMod 2 × ZMod 2) : PauliOp n wh
 theorem weight_paulify_le (S : Finset (Fin n)) (f : Fin n → ZMod 2 × ZMod 2) :
     PauliOp.weight (paulify S f) ≤ S.card := by
   refine Finset.card_le_card fun q hq => ?_
-  simp only [Finset.mem_filter, Finset.mem_univ, true_and, paulify] at hq
+  simp only [paulify] at hq
   by_contra hqS
   simp [hqS] at hq
 

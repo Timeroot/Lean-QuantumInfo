@@ -338,7 +338,8 @@ theorem biProj_apply_eq_sum (S : StabGroup n) (p q : Fin n → ZMod 2 × ZMod 2)
     biProj S p q = ((Fintype.card S.carrier : ℂ)⁻¹) ^ 2
       * ∑ gh : S.carrier × S.carrier, biMat gh.1 gh.2 p q := by
   have hproj : ∀ u v : Fin n → ZMod 2,
-      stabProj S u v = (Fintype.card S.carrier : ℂ)⁻¹ * ∑ g : S.carrier, toMat (g : PauliOp n) u v :=
+      stabProj S u v
+        = (Fintype.card S.carrier : ℂ)⁻¹ * ∑ g : S.carrier, toMat (g : PauliOp n) u v :=
     fun u v => by rw [stabProj, Matrix.smul_apply, Matrix.sum_apply, smul_eq_mul]
   have key : ∑ gh : S.carrier × S.carrier, biMat (gh.1 : PauliOp n) (gh.2 : PauliOp n) p q
       = (∑ g : S.carrier, toMat (g : PauliOp n) (fun i => (p i).1) (fun i => (q i).1))

@@ -81,7 +81,8 @@ theorem pauliOp_trace (p : PauliSpace n) :
         rw [show (Finset.univ : Finset (ZMod 2)) = {0, 1} by rfl]
         rw [Finset.sum_pair (by decide), h0, h1]
         norm_num
-      rw [hfactor, Finset.prod_eq_zero (Finset.mem_univ j) hsum, if_neg (fun h => hp2 (by simp [h]))]
+      rw [hfactor, Finset.prod_eq_zero (Finset.mem_univ j) hsum,
+        if_neg (fun h => hp2 (by simp [h]))]
   · have hne : ∀ x : Fin n → ZMod 2, x ≠ x + p.1 := by
       intro x hx
       have : p.1 = 0 := add_eq_left.mp hx.symm
@@ -317,7 +318,8 @@ theorem range_stabProj :
     intro g hg
     simp only [stabProj]
     rw [Matrix.mul_smul]
-    have h1 : g.toMat * ∑ h : S.carrier, (h : PauliOp n).toMat = ∑ h : S.carrier, (h : PauliOp n).toMat := by
+    have h1 : g.toMat * ∑ h : S.carrier, (h : PauliOp n).toMat
+        = ∑ h : S.carrier, (h : PauliOp n).toMat := by
       let equiv : S.carrier ≃ S.carrier := Equiv.mulLeft (Subtype.mk g hg)
       rw [Finset.mul_sum]
       rw [Fintype.sum_equiv equiv]
@@ -369,13 +371,15 @@ has dimension `2ⁿ / |S|`. -/
 theorem card_mul_codeSpace_finrank :
     Fintype.card S.carrier * Module.finrank ℂ (codeSpace S) = 2 ^ n := by
   -- The trace of stabProj equals the dimension of codeSpace
-  have h_idempotent : Matrix.toLin' (stabProj S) * Matrix.toLin' (stabProj S) = Matrix.toLin' (stabProj S) := by
+  have h_idempotent : Matrix.toLin' (stabProj S) * Matrix.toLin' (stabProj S)
+      = Matrix.toLin' (stabProj S) := by
     have := congr_arg Matrix.toLin' (stabProj_idem S)
     simp only [Matrix.toLin'_mul] at this ⊢
     exact this
   --stabProj defines a projection onto codeSpace
   have h_proj : LinearMap.IsProj (codeSpace S) (Matrix.toLin' (stabProj S)) := by
-    have h := LinearMap.isProj_range_iff_isIdempotentElem (Matrix.toLin' (stabProj S)) |>.mpr h_idempotent
+    have h := LinearMap.isProj_range_iff_isIdempotentElem (Matrix.toLin' (stabProj S))
+      |>.mpr h_idempotent
     rwa [range_stabProj] at h
   -- The trace of stabProj equals the finrank of codeSpace
   have h_trace_eq : Matrix.trace (stabProj S) = Module.finrank ℂ (codeSpace S) := by
@@ -383,9 +387,11 @@ theorem card_mul_codeSpace_finrank :
     rw [Matrix.trace_toLin'_eq] at this
     exact this
   -- Compute the trace: only identity contributes
-  have h_trace_computed : Matrix.trace (stabProj S) = (Fintype.card S.carrier : ℂ)⁻¹ * (2 ^ n : ℂ) := by
+  have h_trace_computed :
+      Matrix.trace (stabProj S) = (Fintype.card S.carrier : ℂ)⁻¹ * (2 ^ n : ℂ) := by
     simp [stabProj, Matrix.trace_smul, Matrix.trace_sum]
-    have h_sum : ∑ i : S.carrier, (i : PauliOp n).toMat.trace = ∑ i : S.carrier, if (i : PauliOp n) = 1 then (2 ^ n : ℂ) else 0 := by
+    have h_sum : ∑ i : S.carrier, (i : PauliOp n).toMat.trace
+        = ∑ i : S.carrier, if (i : PauliOp n) = 1 then (2 ^ n : ℂ) else 0 := by
       congr 1
       ext g
       exact toMat_trace_of_mem S g.prop
@@ -398,7 +404,8 @@ theorem card_mul_codeSpace_finrank :
     simp [Finset.mem_univ]
   -- Combine to get the result
   have h_card_pos : Fintype.card S.carrier > 0 := Fintype.card_pos_iff.mpr ⟨1, S.carrier.one_mem⟩
-  have h_card_ne_zero : (Fintype.card S.carrier : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr (Nat.pos_iff_ne_zero.mp h_card_pos)
+  have h_card_ne_zero : (Fintype.card S.carrier : ℂ) ≠ 0 :=
+    Nat.cast_ne_zero.mpr (Nat.pos_iff_ne_zero.mp h_card_pos)
   rw [h_trace_eq] at h_trace_computed
   field_simp [h_card_ne_zero] at h_trace_computed
   rw [mul_comm] at h_trace_computed
@@ -424,10 +431,11 @@ theorem toMat_mem_mul_stabProj {g : PauliOp n} (hg : g ∈ S.carrier) :
     left_inv a := by simp
     right_inv a := by simp
   } with hequiv
-  conv_lhs => rw [show (∑ a : S.carrier, g.toMat * ((Fintype.card S.carrier : ℂ)⁻¹ • (↑a : PauliOp n).toMat)) 
-    = ∑ a : S.carrier, ((Fintype.card S.carrier : ℂ)⁻¹ • (g * ↑a).toMat) by 
-      apply Finset.sum_congr rfl; intro a _
-      rw [Matrix.mul_smul, toMat_mul]]
+  conv_lhs => rw [show
+    (∑ a : S.carrier, g.toMat * ((Fintype.card S.carrier : ℂ)⁻¹ • (↑a : PauliOp n).toMat))
+      = ∑ a : S.carrier, ((Fintype.card S.carrier : ℂ)⁻¹ • (g * ↑a).toMat) by
+    refine Finset.sum_congr rfl fun a _ => ?_
+    rw [Matrix.mul_smul, toMat_mul]]
   rw [Fintype.sum_equiv equiv]
   intro x
   congr 2
@@ -608,7 +616,8 @@ theorem stabProj_apply_of_mem {v : (Fin n → ZMod 2) → ℂ} (hv : v ∈ codeS
   rw [← range_stabProj] at hv
   obtain ⟨w, hw⟩ := LinearMap.mem_range.mp hv
   have hidem := stabProj_idem S
-  have heq : Matrix.toLin' (stabProj S) ∘ₗ Matrix.toLin' (stabProj S) = Matrix.toLin' (stabProj S) := by
+  have heq : Matrix.toLin' (stabProj S) ∘ₗ Matrix.toLin' (stabProj S)
+      = Matrix.toLin' (stabProj S) := by
     rw [← Matrix.toLin'_mul]
     simp [hidem]
   rw [← hw]
@@ -616,7 +625,8 @@ theorem stabProj_apply_of_mem {v : (Fin n → ZMod 2) → ℂ} (hv : v ∈ codeS
 
 /-- The stabilizer projector is a projection onto the code space. -/
 theorem stabProj_isProj : LinearMap.IsProj (codeSpace S) (Matrix.toLin' (stabProj S)) := by
-  have h_idempotent : Matrix.toLin' (stabProj S) * Matrix.toLin' (stabProj S) = Matrix.toLin' (stabProj S) := by
+  have h_idempotent : Matrix.toLin' (stabProj S) * Matrix.toLin' (stabProj S)
+      = Matrix.toLin' (stabProj S) := by
     have := congr_arg Matrix.toLin' (stabProj_idem S)
     simp only [Matrix.toLin'_mul] at this ⊢
     exact this
@@ -628,9 +638,9 @@ theorem card_carrier_eq_two_pow : ∃ k, Fintype.card S.carrier = 2 ^ k := by
   -- Every element of S.carrier squares to 1, so it's an elementary abelian 2-group
   -- Hence its cardinality is a power of 2
   have h_exp_two : ∀ g : S.carrier, g.1 * g.1 = 1 := fun g => S.sq_eq_one g.2
-  haveI : Fact (Nat.Prime 2) := ⟨Nat.prime_two⟩
+  have : Fact (Nat.Prime 2) := ⟨Nat.prime_two⟩
   -- Show that S.carrier is a 2-group
-  haveI : IsPGroup 2 (↥S.carrier) := fun g => ⟨1, by
+  have : IsPGroup 2 (↥S.carrier) := fun g => ⟨1, by
     have h := h_exp_two g
     simp [pow_two] at h ⊢
     exact Subtype.ext h⟩
@@ -662,7 +672,8 @@ theorem codeSpace_eq_top_iff : codeSpace S = ⊤ ↔ S.carrier = ⊥ := by
       have heqn : Matrix.toLin' g.toMat = LinearMap.id := sub_eq_zero.mp heq
       -- toLin' is injective, so g.toMat = 1
       have htoMat : g.toMat = 1 := by
-        have h1 : Matrix.toLin' (1 : Matrix (Fin n → ZMod 2) (Fin n → ZMod 2) ℂ) = LinearMap.id := by
+        have h1 : Matrix.toLin' (1 : Matrix (Fin n → ZMod 2) (Fin n → ZMod 2) ℂ)
+            = LinearMap.id := by
           ext; simp
         rw [← h1] at heqn
         exact Matrix.toLin'.injective heqn
@@ -935,8 +946,16 @@ theorem toMat_injective : Function.Injective (toMat (n := n)) := by
           apply hPadd
           simp only [Prod.mk.injEq]
           refine ⟨funext fun i => ?_, funext fun i => ?_⟩
-          · have := congr_fun hqx i; simp only [Pi.add_apply, Pi.zero_apply] at this; rw [add_eq_zero_iff_eq_neg] at this; simp at this; exact this.symm
-          · have := congr_fun hqz i; simp only [Pi.add_apply, Pi.zero_apply] at this; rw [add_eq_zero_iff_eq_neg] at this; simp at this; exact this.symm
+          · have h := congr_fun hqx i
+            simp only [Pi.add_apply, Pi.zero_apply] at h
+            rw [add_eq_zero_iff_eq_neg] at h
+            simp at h
+            exact h.symm
+          · have h := congr_fun hqz i
+            simp only [Pi.add_apply, Pi.zero_apply] at h
+            rw [add_eq_zero_iff_eq_neg] at h
+            simp at h
+            exact h.symm
         have inner := congrArg Matrix.trace (congrArg (· * A) h)
         simp only [Matrix.smul_mul] at inner
         have hAA : A * A = 1 ∨ A * A = -1 := by
@@ -977,13 +996,15 @@ theorem toMat_injective : Function.Injective (toMat (n := n)) := by
         have hBA : B * A = (∏ i, (-1 : ℂ) ^ ((Q.x, Q.z).2 i * (P.x, P.z).1 i).val) •
             pauliOp (Q.x + P.x, Q.z + P.z) := by
           exact pauliOp_mul (Q.x, Q.z) (P.x, P.z)
-        have hinner : Complex.I ^ P.phase.val • (A * A).trace = Complex.I ^ Q.phase.val • (B * A).trace := by
+        have hinner : Complex.I ^ P.phase.val • (A * A).trace
+            = Complex.I ^ Q.phase.val • (B * A).trace := by
           simp only [Matrix.trace_smul, smul_eq_mul] at inner ⊢
           exact inner
         rcases hAA with hAA | hAA
         · rw [hAA] at hinner; simp at hinner
           by_cases hsum : (Q.x + P.x, Q.z + P.z) = 0
-          · exact False.elim (hBA_eq ⟨by simpa using congr_arg Prod.fst hsum, by simpa using congr_arg Prod.snd hsum⟩)
+          · exact False.elim (hBA_eq ⟨by simpa using congr_arg Prod.fst hsum,
+              by simpa using congr_arg Prod.snd hsum⟩)
           · have htrace_BA : (pauliOp (Q.x + P.x, Q.z + P.z)).trace = 0 := by
               simp [pauliOp_trace, hsum]
             have hBA_trace : (B * A).trace = 0 := by
@@ -997,7 +1018,8 @@ theorem toMat_injective : Function.Injective (toMat (n := n)) := by
             exact absurd hinner (mul_ne_zero this ‹(2 : ℂ) ^ n ≠ 0›)
         · rw [hAA] at hinner; simp at hinner
           by_cases hsum : (Q.x + P.x, Q.z + P.z) = 0
-          · exact False.elim (hBA_eq ⟨by simpa using congr_arg Prod.fst hsum, by simpa using congr_arg Prod.snd hsum⟩)
+          · exact False.elim (hBA_eq ⟨by simpa using congr_arg Prod.fst hsum,
+              by simpa using congr_arg Prod.snd hsum⟩)
           · have htrace_BA : (pauliOp (Q.x + P.x, Q.z + P.z)).trace = 0 := by
               simp [pauliOp_trace, hsum]
             have hBA_trace : (B * A).trace = 0 := by
@@ -1064,7 +1086,8 @@ theorem toMat_commute_or_anticommute (P Q : PauliOp m) :
   simp only [toMat]
   simp only [smul_mul_smul_comm]
   -- The I^phase factors commute
-  have hI : Complex.I ^ P.phase.val * Complex.I ^ Q.phase.val = Complex.I ^ Q.phase.val * Complex.I ^ P.phase.val := by
+  have hI : Complex.I ^ P.phase.val * Complex.I ^ Q.phase.val
+      = Complex.I ^ Q.phase.val * Complex.I ^ P.phase.val := by
     ring
   rw [hI]
   -- ThePauli matrices multiply to ± the same pauliOp due to betaPair
@@ -1211,9 +1234,9 @@ theorem exists_qecc_decodes (S : StabGroup m) (k : ℕ) (hkm : k ≤ m)
   have hprod : 2 ^ k * Fintype.card S.carrier = 2 ^ m := by
     rw [hk, ← pow_add, Nat.add_sub_cancel' hkm]
   obtain ⟨W, hiso, hWW⟩ := exists_isometry_stabProj S hprod
-  exact ⟨⟨CPTPMap.ofIsometry W hiso, CPTPMap.unIsometry W hiso 0⟩,
-    CPTPMap.unIsometry_comp_ofIsometry W hiso 0, W, hiso, hWW,
-    fun ρ => CPTPMap.ofIsometry_map W hiso ρ⟩
+  exact ⟨⟨CPTPOp.ofIsometry W hiso, CPTPOp.unIsometry W hiso 0⟩,
+    CPTPOp.unIsometry_comp_ofIsometry W hiso 0, W, hiso, hWW,
+    fun ρ => CPTPOp.ofIsometry_map W hiso ρ⟩
 
 /-! ### Code parameters `⟦n,k,d⟧` and membership -/
 
@@ -1228,7 +1251,8 @@ theorem mem_codeSpace_iff (S : StabGroup m) (v : (Fin m → ZMod 2) → ℂ) :
     v ∈ codeSpace S ↔ ∀ g ∈ S.carrier, Matrix.toLin' (toMat g) v = v := by
   rw [codeSpace]
   rw [Submodule.mem_iInf]
-  simp only [LinearMap.mem_ker, LinearMap.sub_apply, Matrix.toLin'_apply, sub_eq_zero, LinearMap.id_apply]
+  simp only [LinearMap.mem_ker, LinearMap.sub_apply, Matrix.toLin'_apply, sub_eq_zero,
+    LinearMap.id_apply]
   constructor
   · intro h g hg
     exact h ⟨g, hg⟩

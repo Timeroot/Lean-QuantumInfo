@@ -173,8 +173,8 @@ theorem hamming_bound {t : ℕ} (hnd : ¬ S.IsDegenerate) (ht : 2 * t < S.distan
   have hk : S.numLogical = n - r := S.numLogical_eq
   -- The quotient of phase space by the centralizer subspace is the space of syndromes.
   set W := (sympForm n).orthogonal S.symImage with hWdef
-  haveI : Finite (SympSpace n ⧸ W) := Quotient.finite _
-  haveI : Fintype (SympSpace n ⧸ W) := Fintype.ofFinite _
+  have : Finite (SympSpace n ⧸ W) := Quotient.finite _
+  have : Fintype (SympSpace n ⧸ W) := Fintype.ofFinite _
   have hQrank : Module.finrank (ZMod 2) (SympSpace n ⧸ W) = r := by
     have h1 := Submodule.finrank_quotient_add_finrank W
     have h2 := finrank_orthogonal_add S.symImage
@@ -253,6 +253,7 @@ theorem hamming_bound {t : ℕ} (hnd : ¬ S.IsDegenerate) (ht : 2 * t < S.distan
     have hwE : weight (h * ofSym (toS f')) < S.distance := by
       have hEw : weight (h * ofSym (toS f')) = weight (ofSym (toS f)) := by
         simp only [weight, hEx, hEz, ofSym_x, ofSym_z]
+        congr!
       omega
     have hwF : weight (ofSym (toS f')) < S.distance := by omega
     have hmul : (h * ofSym (toS f')) * (ofSym (toS f'))⁻¹ ∈ S.carrier := by

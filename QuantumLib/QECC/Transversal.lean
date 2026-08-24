@@ -75,7 +75,8 @@ theorem IsTransversal.mem_unitaryGroup {U : Matrix (Fin n → ZMod 2) (Fin n →
   simp_rw [star_prod]
   -- Combine products
   have combine_prod : ∀ x : Fin n → ZMod 2,
-      (∏ i, u i (f i) (x i)) * ∏ i, star (u i (g i) (x i)) = ∏ i, (u i (f i) (x i) * star (u i (g i) (x i))) := by
+      (∏ i, u i (f i) (x i)) * ∏ i, star (u i (g i) (x i))
+        = ∏ i, (u i (f i) (x i) * star (u i (g i) (x i))) := by
     simp [Finset.prod_mul_distrib]
   simp_rw [combine_prod]
   show ∑ x : (Fin n → ZMod 2), ∏ i : Fin n, u i (f i) (x i) * star (u i (g i) (x i)) = _
@@ -83,7 +84,8 @@ theorem IsTransversal.mem_unitaryGroup {U : Matrix (Fin n → ZMod 2) (Fin n →
   show ∑ x : (Fin n → ZMod 2), ∏ i : Fin n, f' i (x i) = _
   rw [← Fintype.prod_sum]
   -- Each factor is a Kronecker delta because u i is unitary
-  have unitary_row_orthogonal : ∀ i : Fin n, ∀ x y : ZMod 2, ∑ j, u i x j * star (u i y j) = if x = y then 1 else 0 := by
+  have unitary_row_orthogonal : ∀ i : Fin n, ∀ x y : ZMod 2,
+      ∑ j, u i x j * star (u i y j) = if x = y then 1 else 0 := by
     intro i x y
     have hui := hu_unitary i
     rw [Matrix.mem_unitaryGroup_iff] at hui
@@ -271,13 +273,15 @@ theorem isTransversal_toMat_of_weight_le_one [NeZero n] {P : PauliOp n} (hP : we
         simp [hd]
       · simp [hij]
     · intro f g
-      -- The RHS simplifies: for i ≠ j we get (1 : Matrix _ _ _) (f i) (g i) = if f i = g i then 1 else 0
+      -- The RHS simplifies: for i ≠ j we get
+      -- (1 : Matrix _ _ _) (f i) (g i) = if f i = g i then 1 else 0
       -- For i = j we get d • upauli (f j) (g j) = d * upauli (f j) (g j)
       have rhs_eq : ∏ i, (if i = j then d • upauli else 1) (f i) (g i) =
           (if ∀ i ≠ j, f i = g i then d * upauli (f j) (g j) else 0) := by
         by_cases hall : ∀ i ≠ j, f i = g i
         · -- All f i = g i for i ≠ j
-          have h1 : (if ∀ i ≠ j, f i = g i then d * upauli (f j) (g j) else 0) = d * upauli (f j) (g j) := by
+          have h1 : (if ∀ i ≠ j, f i = g i then d * upauli (f j) (g j) else 0)
+              = d * upauli (f j) (g j) := by
             simp only [if_pos hall]
           rw [h1]
           -- For i ≠ j, f i = g i, so (1 : Matrix ..) (f i) (g i) = 1
@@ -300,7 +304,8 @@ theorem isTransversal_toMat_of_weight_le_one [NeZero n] {P : PauliOp n} (hP : we
           rw [if_neg hi_nej, Matrix.one_apply]
           simp [hi_fne]
       rw [rhs_eq]
-      -- Now we need to show: (if ∀ i ≠ j, f i = g i then d * upauli (f j) (g j) else 0) = toMat P f g
+      -- Now we need to show:
+      -- (if ∀ i ≠ j, f i = g i then d * upauli (f j) (g j) else 0) = toMat P f g
       -- toMat P = c • pauliOp (P.x, P.z), and upauli is the single-qubit pauliOp at j
       -- We need to relate pauliOp (P.x, P.z) f g to upauli (f j) (g j)
       by_cases hall : ∀ i ≠ j, f i = g i
@@ -541,7 +546,8 @@ theorem finite_of_separated {X : Type*} [PseudoMetricSpace X] {K G : Set X}
     -- But dist g₁ g₂ ≥ ε by separation, and dist ≤ edist, and ε' + ε' = ε
     have hsep' : dist g₁ g₂ ≥ ε := hsep g₁ hg₁ g₂ hg₂ hne
     have hle : ENNReal.ofReal (dist g₁ g₂) = edist g₁ g₂ := (edist_dist g₁ g₂).symm
-    have hcoerce : ENNReal.ofReal (ε / 3) + ENNReal.ofReal (ε / 3) = ENNReal.ofReal (2 * ε / 3) := by
+    have hcoerce :
+        ENNReal.ofReal (ε / 3) + ENNReal.ofReal (ε / 3) = ENNReal.ofReal (2 * ε / 3) := by
       rw [← ENNReal.ofReal_add (by linarith : 0 ≤ ε / 3) (by linarith : 0 ≤ ε / 3)]
       congr 1
       ring
@@ -562,7 +568,7 @@ theorem finite_of_separated {X : Type*} [PseudoMetricSpace X] {K G : Set X}
     have : f g₁ hg₁ = f g₂ hg₂ := Subtype.ext_iff.mp hIeq
     have heq : g₁ = g₂ := hf_inj g₁ hg₁ g₂ hg₂ this
     exact Subtype.ext heq
-  haveI : Finite N := Set.Finite.to_subtype hNfin
+  have : Finite N := Set.Finite.to_subtype hNfin
   have : Finite G := Finite.of_injective I hI_inj
   exact Set.finite_coe_iff.mpr this
 
@@ -574,7 +580,7 @@ theorem _root_.QuantumLib.isCompact_unitaryGroup {m : Type*} [Fintype m] [Decida
   apply Metric.isCompact_of_isClosed_isBounded
   · have h : {V : Matrix m m ℂ | V ∈ Matrix.unitaryGroup m ℂ} = {V | V * star V = 1} := by
       ext V
-      simp only [Set.mem_setOf_eq]
+      simp only [Set.mem_ofPred_eq]
       exact Matrix.mem_unitaryGroup_iff
     rw [h]
     have : {V : Matrix m m ℂ | V * star V = 1} = (fun V : Matrix m m ℂ => V * star V) ⁻¹' {1} := rfl
@@ -603,7 +609,7 @@ theorem transversalLogicals_subset_unitary :
         V ∈ Matrix.unitaryGroup (Fin S.numLogical → ZMod 2) ℂ} := by
   intro V hV
   obtain ⟨U, hU_trans, W, hW_unit, _, hUV⟩ := hV
-  simp only [Set.mem_setOf_eq]
+  simp only [Set.mem_ofPred_eq]
   rw [Matrix.mem_unitaryGroup_iff']
   have hun : U.conjTranspose * U = 1 := by
     have hu := IsTransversal.mem_unitaryGroup hU_trans
@@ -616,14 +622,16 @@ theorem transversalLogicals_subset_unitary :
     simp only [Matrix.star_eq_conjTranspose]
     calc V.conjTranspose = V.conjTranspose * 1 := by rw [mul_one]
       _ = V.conjTranspose * (W.conjTranspose * W) := by rw [hW_unit]
-      _ = (V.conjTranspose * W.conjTranspose) * W := by exact (Matrix.mul_assoc V.conjTranspose W.conjTranspose W).symm
+      _ = (V.conjTranspose * W.conjTranspose) * W :=
+            (Matrix.mul_assoc V.conjTranspose W.conjTranspose W).symm
       _ = W.conjTranspose * U.conjTranspose * W := by rw [eq1]
   have haux : star V * V = W.conjTranspose * W := by
     rw [hstar]
     have h1 : W.conjTranspose * U.conjTranspose * W * V =
               W.conjTranspose * U.conjTranspose * (W * V) := by exact Matrix.mul_assoc _ _ _
     rw [h1, ← hUV]
-    have h2 : W.conjTranspose * U.conjTranspose * (U * W) = W.conjTranspose * (U.conjTranspose * U) * W := by
+    have h2 : W.conjTranspose * U.conjTranspose * (U * W)
+        = W.conjTranspose * (U.conjTranspose * U) * W := by
       rw [← Matrix.mul_assoc, ← Matrix.mul_assoc]
     rw [h2, hun]
     simp
@@ -636,7 +644,7 @@ theorem transversalLogicalsWith_subset_unitary
       {V : Matrix (Fin S.numLogical → ZMod 2) (Fin S.numLogical → ZMod 2) ℂ |
         V ∈ Matrix.unitaryGroup (Fin S.numLogical → ZMod 2) ℂ} := by
   rintro V ⟨U, hU, hUW⟩
-  simp only [Set.mem_setOf_eq]
+  simp only [Set.mem_ofPred_eq]
   rw [Matrix.mem_unitaryGroup_iff', Matrix.star_eq_conjTranspose]
   have hUu : U.conjTranspose * U = 1 :=
     Matrix.UnitaryGroup.star_mul_self ⟨U, hU.mem_unitaryGroup⟩
@@ -990,7 +998,8 @@ def SeparatedTransversalLogicals
 proportional to one another — the generic case, where only global phases act transversally. -/
 theorem separatedTransversalLogicals_of_proportional
     {W : Matrix (Fin n → ZMod 2) (Fin S.numLogical → ZMod 2) ℂ}
-    (h : ∀ V ∈ S.transversalLogicalsWith W, ∀ V' ∈ S.transversalLogicalsWith W, ∃ c : ℂ, V = c • V') :
+    (h : ∀ V ∈ S.transversalLogicalsWith W, ∀ V' ∈ S.transversalLogicalsWith W,
+      ∃ c : ℂ, V = c • V') :
     S.SeparatedTransversalLogicals W := by
   refine ⟨1, one_pos, fun V hV V' hV' hnp => ?_⟩
   obtain ⟨c, hc⟩ := h V hV V' hV'
@@ -1051,7 +1060,8 @@ theorem exists_infinite_nonproportional_unitary (hk : 1 ≤ S.numLogical) :
     simp only [hz] at hre
     rw [div_eq_div_iff (hpos m).ne' (hpos m').ne'] at hre
     have hmm : (m : ℝ) ^ 2 = (m' : ℝ) ^ 2 := by nlinarith [hre]
-    have : (m : ℝ) = (m' : ℝ) := by nlinarith [sq_nonneg ((m : ℝ) - m'), sq_nonneg ((m : ℝ) + m'), hmm]
+    have : (m : ℝ) = (m' : ℝ) := by
+      nlinarith [sq_nonneg ((m : ℝ) - m'), sq_nonneg ((m : ℝ) + m'), hmm]
     exact_mod_cast this
   -- The diagonal family `D m = diag(1,…,z m,…,1)` (entry `z m` at index `b`).
   set d : ℕ → (Fin S.numLogical → ZMod 2) → ℂ := fun m i => if i = b then z m else 1 with hd

@@ -29,15 +29,14 @@ theorem choi_piProd_apply {ι : Type*} [Fintype ι] [DecidableEq ι] {dI dO : ι
 variable {io ii D : Type*} [Fintype io] [DecidableEq io] [Fintype ii] [DecidableEq ii]
   [Fintype D] [DecidableEq D]
 
-set_option maxRecDepth 8000 in
 /-- **Currying a tensor product of channels.** A channel acting independently on each of the
 `io × ii` registers is, after regrouping, `io` blocks each carrying `ii` independent channels. -/
-theorem CPTPMap.piProd_curry (Λ : io × ii → CPTPMap D D) :
-    CPTPMap.ofEquiv (Equiv.curry io ii D) ∘ₘ CPTPMap.piProd Λ
-        ∘ₘ CPTPMap.ofEquiv (Equiv.curry io ii D).symm
-      = CPTPMap.piProd (fun q => CPTPMap.piProd (fun r => Λ (q, r))) := by
+theorem CPTPOp.piProd_curry (Λ : io × ii → CPTPMap D D) :
+    CPTPOp.ofEquiv (Equiv.curry io ii D) ∘ₘ CPTPOp.piProd Λ
+        ∘ₘ CPTPOp.ofEquiv (Equiv.curry io ii D).symm
+      = CPTPOp.piProd (fun q => CPTPOp.piProd (fun r => Λ (q, r))) := by
   set σ := Equiv.curry io ii D with hσ
-  apply CPTPMap.ext
+  apply CPTPOp.ext_map (ι := io → ii → D) (κ := io → ii → D)
   apply MatrixMap.choi_equiv.injective
   ext x y
   obtain ⟨j₁, i₁⟩ := x
@@ -51,21 +50,20 @@ theorem CPTPMap.piProd_curry (Λ : io × ii → CPTPMap D D) :
         eq_comm (a := σ.symm a)] <;>
       grind
   have hlhs : (MatrixMap.choi_equiv
-      ((CPTPMap.ofEquiv σ ∘ₘ CPTPMap.piProd Λ ∘ₘ CPTPMap.ofEquiv σ.symm) : CPTPMap _ _).map)
+      ((CPTPOp.ofEquiv σ ∘ₘ CPTPOp.piProd Λ ∘ₘ CPTPOp.ofEquiv σ.symm) : CPTPMap _ _).map)
         (j₁, i₁) (j₂, i₂)
       = ∏ p : io × ii, (Λ p).map.choi_matrix (j₁ p.1 p.2, i₁ p.1 p.2) (j₂ p.1 p.2, i₂ p.1 p.2) := by
-    show ((CPTPMap.ofEquiv σ ∘ₘ CPTPMap.piProd Λ ∘ₘ CPTPMap.ofEquiv σ.symm) : CPTPMap _ _).map
-      (Matrix.single i₁ i₂ 1) j₁ j₂ = _
+    simp only [MatrixMap.choi_equiv_apply, MatrixMap.choi_matrix, CPTPOp.compose_map,
+      CPTPOp.ofEquiv_map, CPTPOp.piProd_map, Equiv.symm_symm, LinearMap.comp_apply]
     show (MatrixMap.piProd (fun p => (Λ p).map)
       ((Matrix.single i₁ i₂ (1 : ℂ)).submatrix σ σ)) (σ.symm j₁) (σ.symm j₂) = _
     rw [hsub]
     exact choi_piProd_apply (fun p => (Λ p).map) (σ.symm j₁) (σ.symm j₂) (σ.symm i₁) (σ.symm i₂)
   have hrhs : (MatrixMap.choi_equiv
-      ((CPTPMap.piProd (fun q => CPTPMap.piProd (fun r => Λ (q, r)))) : CPTPMap _ _).map)
+      ((CPTPOp.piProd (fun q => CPTPOp.piProd (fun r => Λ (q, r)))) : CPTPMap _ _).map)
         (j₁, i₁) (j₂, i₂)
       = ∏ q, ∏ r, (Λ (q, r)).map.choi_matrix (j₁ q r, i₁ q r) (j₂ q r, i₂ q r) := by
-    show (MatrixMap.piProd (fun q => (CPTPMap.piProd (fun r => Λ (q, r))).map)).choi_matrix
-      (j₁, i₁) (j₂, i₂) = _
+    simp only [CPTPOp.piProd_map, MatrixMap.choi_equiv_apply]
     rw [choi_piProd_apply]
     exact Finset.prod_congr rfl fun q _ =>
       choi_piProd_apply (fun r => (Λ (q, r)).map) (j₁ q) (j₂ q) (i₁ q) (i₂ q)
@@ -85,14 +83,14 @@ theorem concat_card_index (_outer : QECC d1 io d1') (_inner : QECC d1' ii d2) :
 encoder and decoder acts blockwise: block `q` of the outer register sees the channel that the inner
 code's decoder, the errors on that block, and the inner code's encoder produce. -/
 theorem parallel_blockChannel (C : QECC d1' ii d2) (Λ : io × ii → CPTPMap d2 d2) :
-    (parallel (j := io) C).decoder ∘ₘ CPTPMap.piProd Λ ∘ₘ (parallel (j := io) C).encoder
-      = CPTPMap.piProd
-          (fun q => C.decoder ∘ₘ CPTPMap.piProd (fun r => Λ (q, r)) ∘ₘ C.encoder) := by
+    (parallel (j := io) C).decoder ∘ₘ CPTPOp.piProd Λ ∘ₘ (parallel (j := io) C).encoder
+      = CPTPOp.piProd
+          (fun q => C.decoder ∘ₘ CPTPOp.piProd (fun r => Λ (q, r)) ∘ₘ C.encoder) := by
   simp only [parallel]
-  rw [CPTPMap.compose_assoc (CPTPMap.piProd fun _ : io => C.decoder),
-    ← CPTPMap.compose_assoc _ (CPTPMap.ofEquiv (Equiv.curry io ii d2).symm),
-    CPTPMap.compose_assoc (CPTPMap.piProd fun _ : io => C.decoder),
-    CPTPMap.piProd_curry, ← CPTPMap.piProd_comp, ← CPTPMap.piProd_comp]
+  rw [CPTPOp.compose_assoc (CPTPOp.piProd fun _ : io => C.decoder),
+    ← CPTPOp.compose_assoc _ (CPTPOp.ofEquiv (Equiv.curry io ii d2).symm),
+    CPTPOp.compose_assoc (CPTPOp.piProd fun _ : io => C.decoder),
+    CPTPOp.piProd_curry, ← CPTPOp.piProd_comp, ← CPTPOp.piProd_comp]
 
 /-- **Block decomposition with per-block recoveries.** The same computation as
 `parallel_blockChannel`, but with the inner code's decoder replaced on each block by an arbitrary
@@ -100,22 +98,22 @@ recovery channel `R q`; this is what a located error allows, since the recovery 
 the errors are. -/
 theorem parallel_blockChannel_recovery (C : QECC d1' ii d2) (R : io → CPTPMap (ii → d2) d1')
     (Λ : io × ii → CPTPMap d2 d2) :
-    CPTPMap.piProd R ∘ₘ CPTPMap.ofEquiv (Equiv.curry io ii d2) ∘ₘ CPTPMap.piProd Λ
+    CPTPOp.piProd R ∘ₘ CPTPOp.ofEquiv (Equiv.curry io ii d2) ∘ₘ CPTPOp.piProd Λ
         ∘ₘ (parallel (j := io) C).encoder
-      = CPTPMap.piProd (fun q => R q ∘ₘ CPTPMap.piProd (fun r => Λ (q, r)) ∘ₘ C.encoder) := by
+      = CPTPOp.piProd (fun q => R q ∘ₘ CPTPOp.piProd (fun r => Λ (q, r)) ∘ₘ C.encoder) := by
   simp only [parallel]
-  rw [CPTPMap.compose_assoc (CPTPMap.piProd R),
-    ← CPTPMap.compose_assoc _ (CPTPMap.ofEquiv (Equiv.curry io ii d2).symm),
-    CPTPMap.compose_assoc (CPTPMap.piProd R),
-    CPTPMap.piProd_curry, ← CPTPMap.piProd_comp, ← CPTPMap.piProd_comp]
+  rw [CPTPOp.compose_assoc (CPTPOp.piProd R),
+    ← CPTPOp.compose_assoc _ (CPTPOp.ofEquiv (Equiv.curry io ii d2).symm),
+    CPTPOp.compose_assoc (CPTPOp.piProd R),
+    CPTPOp.piProd_curry, ← CPTPOp.piProd_comp, ← CPTPOp.piProd_comp]
 
 /-- Block-by-block correction: if the inner code undoes the channel acting on every block, then the
 parallel construction undoes the whole product channel. -/
 theorem parallel_correctsBlocks (C : QECC d1' ii d2) (Λ : io × ii → CPTPMap d2 d2)
-    (h : ∀ q : io, C.decoder ∘ₘ CPTPMap.piProd (fun r => Λ (q, r)) ∘ₘ C.encoder = CPTPMap.id) :
-    (parallel (j := io) C).decoder ∘ₘ CPTPMap.piProd Λ ∘ₘ (parallel (j := io) C).encoder
-      = CPTPMap.id := by
-  rw [parallel_blockChannel, funext h, CPTPMap.piProd_id]
+    (h : ∀ q : io, C.decoder ∘ₘ CPTPOp.piProd (fun r => Λ (q, r)) ∘ₘ C.encoder = CPTPOp.id) :
+    (parallel (j := io) C).decoder ∘ₘ CPTPOp.piProd Λ ∘ₘ (parallel (j := io) C).encoder
+      = CPTPOp.id := by
+  rw [parallel_blockChannel, funext h, CPTPOp.piProd_id]
 
 /-- **Concatenation composes correction:** if the inner code corrects `b` errors and the outer code
 merely decodes, then `≤ b` total physical errors land within blocks the inner code fixes, so the
@@ -126,9 +124,9 @@ theorem concat_correctsErrors {b : ℕ} (outer : QECC d1 io d1') (inner : QECC d
   classical
   intro S hS U
   -- each block sees at most `b` of the errors, so the inner code cleans it up
-  have hblocks : ∀ q : io, inner.decoder ∘ₘ CPTPMap.piProd (fun r =>
-      if (q, r) ∈ S then CPTPMap.ofUnitary (U (q, r)) else CPTPMap.id) ∘ₘ inner.encoder
-        = CPTPMap.id := by
+  have hblocks : ∀ q : io, inner.decoder ∘ₘ CPTPOp.piProd (fun r =>
+      if (q, r) ∈ S then CPTPOp.ofUnitary (U (q, r)) else CPTPOp.id) ∘ₘ inner.encoder
+        = CPTPOp.id := by
     intro q
     set Sq : Finset ii := (S.filter (fun p => p.1 = q)).image Prod.snd with hSqdef
     have hmem : ∀ r : ii, r ∈ Sq ↔ (q, r) ∈ S := by
@@ -144,8 +142,8 @@ theorem concat_correctsErrors {b : ℕ} (outer : QECC d1 io d1') (inner : QECC d
       le_trans (le_trans Finset.card_image_le (Finset.card_filter_le _ _)) hS
     have hcorr := hin Sq hcard (fun r => U (q, r))
     have herr : unitaryError Sq (fun r => U (q, r))
-        = CPTPMap.piProd (fun r =>
-            if (q, r) ∈ S then CPTPMap.ofUnitary (U (q, r)) else CPTPMap.id) := by
+        = CPTPOp.piProd (fun r =>
+            if (q, r) ∈ S then CPTPOp.ofUnitary (U (q, r)) else CPTPOp.id) := by
       unfold unitaryError
       congr 1
       funext r
@@ -154,12 +152,12 @@ theorem concat_correctsErrors {b : ℕ} (outer : QECC d1 io d1') (inner : QECC d
       · rw [if_neg (fun hc => hr ((hmem r).mp hc)), if_neg hr]
     rwa [herr] at hcorr
   have hpar : (parallel (j := io) inner).decoder ∘ₘ unitaryError S U
-      ∘ₘ (parallel (j := io) inner).encoder = CPTPMap.id :=
-    parallel_correctsBlocks inner (fun p => if p ∈ S then CPTPMap.ofUnitary (U p) else CPTPMap.id)
+      ∘ₘ (parallel (j := io) inner).encoder = CPTPOp.id :=
+    parallel_correctsBlocks inner (fun p => if p ∈ S then CPTPOp.ofUnitary (U p) else CPTPOp.id)
       hblocks
   simp only [concat, comp]
-  rw [CPTPMap.compose_assoc outer.decoder, ← CPTPMap.compose_assoc _ (parallel inner).encoder,
-    CPTPMap.compose_assoc outer.decoder, hpar, CPTPMap.compose_id]
+  rw [CPTPOp.compose_assoc outer.decoder, ← CPTPOp.compose_assoc _ (parallel inner).encoder,
+    CPTPOp.compose_assoc outer.decoder, hpar, CPTPOp.compose_id]
   exact hout
 
 /-! ### Distance multiplication -/
@@ -223,7 +221,7 @@ omit [Fintype io] in
 /-- The channel that block `q` sees, written as a product over the positions inside the block. -/
 theorem channelError_blockErrors (S : Finset (io × ii)) (Λ : io × ii → CPTPMap d2 d2) (q : io) :
     channelError (blockErrors S q) (fun r => Λ (q, r))
-      = CPTPMap.piProd (fun r => if (q, r) ∈ S then Λ (q, r) else CPTPMap.id) := by
+      = CPTPOp.piProd (fun r => if (q, r) ∈ S then Λ (q, r) else CPTPOp.id) := by
   unfold channelError
   congr 1
   funext r
@@ -242,9 +240,9 @@ theorem concat_correctsPattern (outer : QECC d1 io d1') (inner : QECC d1' ii d2)
   classical
   intro Λ
   set Ψ : io → CPTPMap d1' d1' := fun q => inner.decoder ∘ₘ
-    CPTPMap.piProd (fun r => if (q, r) ∈ S then Λ (q, r) else CPTPMap.id) ∘ₘ inner.encoder
+    CPTPOp.piProd (fun r => if (q, r) ∈ S then Λ (q, r) else CPTPOp.id) ∘ₘ inner.encoder
     with hΨ
-  have hgood : ∀ q ∉ Bad, Ψ q = CPTPMap.id := by
+  have hgood : ∀ q ∉ Bad, Ψ q = CPTPOp.id := by
     intro q hq
     have hcorr := hin q hq (fun r => Λ (q, r))
     rw [channelError_blockErrors] at hcorr
@@ -253,7 +251,7 @@ theorem concat_correctsPattern (outer : QECC d1 io d1') (inner : QECC d1' ii d2)
   have hmid : (parallel (j := io) inner).decoder ∘ₘ channelError S Λ
       ∘ₘ (parallel (j := io) inner).encoder = channelError Bad Ψ := by
     show (parallel (j := io) inner).decoder ∘ₘ
-      CPTPMap.piProd (fun p => if p ∈ S then Λ p else CPTPMap.id) ∘ₘ _ = _
+      CPTPOp.piProd (fun p => if p ∈ S then Λ p else CPTPOp.id) ∘ₘ _ = _
     rw [parallel_blockChannel]
     unfold channelError
     congr 1
@@ -263,8 +261,8 @@ theorem concat_correctsPattern (outer : QECC d1 io d1') (inner : QECC d1' ii d2)
     · rw [if_neg hq]
       exact hgood q hq
   simp only [concat, comp]
-  rw [CPTPMap.compose_assoc outer.decoder, ← CPTPMap.compose_assoc _ (parallel inner).encoder,
-    CPTPMap.compose_assoc outer.decoder, hmid]
+  rw [CPTPOp.compose_assoc outer.decoder, ← CPTPOp.compose_assoc _ (parallel inner).encoder,
+    CPTPOp.compose_assoc outer.decoder, hmid]
   exact hout Ψ
 
 /-- **Distance multiplication (lower bound).** Concatenating an `a`-error-correcting outer code with
@@ -308,7 +306,7 @@ theorem concat_correctsLocatedErrors_mul {a b : ℕ} (outer : QECC d1 io d1')
   set Bad : Finset io := badBlocks b S with hBad
   -- a recovery for each block: the inner code's, where it applies, and its decoder elsewhere
   have hRex : ∀ q : io, ∃ Rq : CPTPMap (ii → d2) d1', (blockErrors S q).card ≤ b →
-      Rq ∘ₘ channelError (blockErrors S q) (fun r => Λ (q, r)) ∘ₘ inner.encoder = CPTPMap.id := by
+      Rq ∘ₘ channelError (blockErrors S q) (fun r => Λ (q, r)) ∘ₘ inner.encoder = CPTPOp.id := by
     intro q
     by_cases hq : (blockErrors S q).card ≤ b
     · obtain ⟨Rq, hRq⟩ := hin (blockErrors S q) hq fun r => Λ (q, r)
@@ -316,20 +314,20 @@ theorem concat_correctsLocatedErrors_mul {a b : ℕ} (outer : QECC d1 io d1')
     · exact ⟨inner.decoder, fun h => absurd h hq⟩
   choose R hRgood using hRex
   set Ψ : io → CPTPMap d1' d1' := fun q => R q ∘ₘ
-    CPTPMap.piProd (fun r => if (q, r) ∈ S then Λ (q, r) else CPTPMap.id) ∘ₘ inner.encoder
+    CPTPOp.piProd (fun r => if (q, r) ∈ S then Λ (q, r) else CPTPOp.id) ∘ₘ inner.encoder
     with hΨ
-  have hgood : ∀ q ∉ Bad, Ψ q = CPTPMap.id := by
+  have hgood : ∀ q ∉ Bad, Ψ q = CPTPOp.id := by
     intro q hq
     have hcard : (blockErrors S q).card ≤ b :=
       Nat.le_of_not_lt fun hc => hq (mem_badBlocks.mpr hc)
     have h := hRgood q hcard
     rwa [channelError_blockErrors] at h
   obtain ⟨Rout, hRout⟩ := hout Bad (card_badBlocks_le hS) Ψ
-  refine ⟨Rout ∘ₘ (CPTPMap.piProd R ∘ₘ CPTPMap.ofEquiv (Equiv.curry io ii d2)), ?_⟩
-  have hmid : (CPTPMap.piProd R ∘ₘ CPTPMap.ofEquiv (Equiv.curry io ii d2)) ∘ₘ channelError S Λ
+  refine ⟨Rout ∘ₘ (CPTPOp.piProd R ∘ₘ CPTPOp.ofEquiv (Equiv.curry io ii d2)), ?_⟩
+  have hmid : (CPTPOp.piProd R ∘ₘ CPTPOp.ofEquiv (Equiv.curry io ii d2)) ∘ₘ channelError S Λ
       ∘ₘ (parallel (j := io) inner).encoder = channelError Bad Ψ := by
-    show (CPTPMap.piProd R ∘ₘ CPTPMap.ofEquiv (Equiv.curry io ii d2)) ∘ₘ
-      CPTPMap.piProd (fun p => if p ∈ S then Λ p else CPTPMap.id) ∘ₘ _ = _
+    show (CPTPOp.piProd R ∘ₘ CPTPOp.ofEquiv (Equiv.curry io ii d2)) ∘ₘ
+      CPTPOp.piProd (fun p => if p ∈ S then Λ p else CPTPOp.id) ∘ₘ _ = _
     rw [parallel_blockChannel_recovery]
     unfold channelError
     congr 1
@@ -339,8 +337,8 @@ theorem concat_correctsLocatedErrors_mul {a b : ℕ} (outer : QECC d1 io d1')
     · rw [if_neg hq]
       exact hgood q hq
   simp only [concat, comp]
-  rw [CPTPMap.compose_assoc Rout, ← CPTPMap.compose_assoc _ (parallel inner).encoder,
-    CPTPMap.compose_assoc Rout, hmid]
+  rw [CPTPOp.compose_assoc Rout, ← CPTPOp.compose_assoc _ (parallel inner).encoder,
+    CPTPOp.compose_assoc Rout, hmid]
   exact hRout
 
 /-- Concatenation preserves the logical space: it is the *outer* code's logical register `d1`

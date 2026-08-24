@@ -153,7 +153,7 @@ theorem iterConcat_correctsPattern (C : QECC d1 io d1) {t : ℕ}
   | L + 1, f, hf => by
       refine concat_correctsPattern (iterConcat C L) C (Bad := badBlocks t (errorSet f))
         (fun q hq => h _ (Nat.le_of_not_lt fun hc => hq (mem_badBlocks.mpr hc))) ?_
-      rw [badBlocks_errorSet]
+      rw [badBlocks_errorSet t f]
       exact iterConcat_correctsPattern C h L (badPat t f) hf
 
 /-- **One level renormalises the error rate.** The probability that the `L`-level tower fails on an

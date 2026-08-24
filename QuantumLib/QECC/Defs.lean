@@ -13,8 +13,8 @@ a CPTP `encoder` and a CPTP `decoder`, and develops their basic theory.
 
 ## Main definitions
 
-A `QECC d1 i d2` encodes a logical Hilbert space on `d1` into an `i`-indexed register of qudits, each
-living on the Hilbert space `d2`; that is, the physical space is `i → d2`. It consists of
+A `QECC d1 i d2` encodes a logical Hilbert space on `d1` into an `i`-indexed register of qudits,
+each living on the Hilbert space `d2`; that is, the physical space is `i → d2`. It consists of
 * `encoder : CPTPMap d1 (i → d2)`, and
 * `decoder : CPTPMap (i → d2) d1`.
 
@@ -23,7 +23,7 @@ The constructions on codes are:
 * `QECC.comp` — chaining two codes where the physical space of the first is the logical space of
   the second;
 * `QECC.parallel` — running `j` independent copies of a code side by side, lifting `QECC d1 i d2` to
-  `QECC (j → d1) (j × i) d2` (this uses the Pi-indexed Kronecker product `CPTPMap.piProd`);
+  `QECC (j → d1) (j × i) d2` (this uses the Pi-indexed Kronecker product `CPTPOp.piProd`);
 * `QECC.concat` — code concatenation, where each physical qudit of the outer code is itself encoded
   by the inner code (`d1` of the inner equals `d2` of the outer). This is the outer code composed
   with the parallel construction of the inner code.
@@ -52,22 +52,22 @@ open scoped Matrix
 
 namespace QuantumLib
 
-/-! ### Auxiliary lemmas on `CPTPMap.ofEquiv` -/
+/-! ### Auxiliary lemmas on `CPTPOp.ofEquiv` -/
 
-namespace CPTPMap
+namespace CPTPOp
 variable {a b : Type*} [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
 /-- Relabelling by `e` and then by `e.symm` is the identity channel. -/
 theorem ofEquiv_symm_comp (e : a ≃ b) :
-    CPTPMap.ofEquiv e ∘ₘ CPTPMap.ofEquiv e.symm = CPTPMap.id := by
-  apply CPTPMap.funext
+    CPTPOp.ofEquiv e ∘ₘ CPTPOp.ofEquiv e.symm = CPTPOp.id := by
+  apply CPTPOp.funext
   intro ρ
-  simp only [CPTPMap.compose_eq, CPTPMap.ofEquiv_apply, Equiv.symm_symm,
-    MState.relabel_relabel, Equiv.symm_trans_self, MState.relabel_refl, CPTPMap.id_MState]
+  simp only [CPTPOp.compose_eq, CPTPOp.ofEquiv_apply, Equiv.symm_symm,
+    MState.relabel_relabel, Equiv.symm_trans_self, MState.relabel_refl, CPTPOp.id_MState]
 
 /-- Relabelling by `e.symm` and then by `e` is the identity channel. -/
 theorem ofEquiv_comp_symm (e : a ≃ b) :
-    CPTPMap.ofEquiv e.symm ∘ₘ CPTPMap.ofEquiv e = CPTPMap.id := by
+    CPTPOp.ofEquiv e.symm ∘ₘ CPTPOp.ofEquiv e = CPTPOp.id := by
   have := ofEquiv_symm_comp e.symm
   rwa [Equiv.symm_symm] at this
 
@@ -82,13 +82,11 @@ theorem of_kraus_apply {κ : Type*} [Fintype κ] (M : κ → Matrix b a ℂ) (X 
 /-- The channel `ρ ↦ W ρ Wᴴ` of an isometry `W : Matrix b a ℂ` (`Wᴴ W = 1`). It embeds the space
 `a` into the subspace of `b` spanned by the columns of `W`. -/
 noncomputable def ofIsometry (W : Matrix b a ℂ) (hW : W.conjTranspose * W = 1) : CPTPMap a b :=
-  CPTPMap.of_kraus_CPTPMap (fun _ : Unit => W) (by simpa using hW)
+  CPTPOp.of_kraus_CPTPMap (fun _ : Unit => W) (by simpa using hW)
 
-omit [DecidableEq b] in
 theorem ofIsometry_map (W : Matrix b a ℂ) (hW : W.conjTranspose * W = 1) (X : Matrix a a ℂ) :
     (ofIsometry W hW).map X = W * X * W.conjTranspose := by
-  show MatrixMap.of_kraus (fun _ : Unit => W) (fun _ : Unit => W) X = _
-  rw [of_kraus_apply]
+  rw [ofIsometry, CPTPOp.map_of_kraus_CPTPMap, of_kraus_apply]
   simp
 
 /-- The Kraus operators of `unIsometry`: the adjoint `Wᴴ` of the isometry, together with one
@@ -146,7 +144,7 @@ theorem unIsometryKraus_tp (W : Matrix b a ℂ) (hW : W.conjTranspose * W = 1) (
 the range of `W` onto the fixed state `|a₀⟩`. It is a left inverse of `ofIsometry W`. -/
 noncomputable def unIsometry (W : Matrix b a ℂ) (hW : W.conjTranspose * W = 1) (a₀ : a) :
     CPTPMap b a :=
-  CPTPMap.of_kraus_CPTPMap (unIsometryKraus W a₀) (unIsometryKraus_tp W hW a₀)
+  CPTPOp.of_kraus_CPTPMap (unIsometryKraus W a₀) (unIsometryKraus_tp W hW a₀)
 
 theorem unIsometry_map (W : Matrix b a ℂ) (hW : W.conjTranspose * W = 1) (a₀ : a)
     (Y : Matrix b b ℂ) :
@@ -154,17 +152,16 @@ theorem unIsometry_map (W : Matrix b a ℂ) (hW : W.conjTranspose * W = 1) (a₀
       = W.conjTranspose * Y * W
         + ∑ x : b, (Matrix.single a₀ x (1 : ℂ) * (1 - W * W.conjTranspose)) * Y *
             (Matrix.single a₀ x (1 : ℂ) * (1 - W * W.conjTranspose)).conjTranspose := by
-  show MatrixMap.of_kraus (unIsometryKraus W a₀) (unIsometryKraus W a₀) Y = _
-  rw [of_kraus_apply, Fintype.sum_option]
+  rw [unIsometry, CPTPOp.map_of_kraus_CPTPMap, of_kraus_apply, Fintype.sum_option]
   simp only [unIsometryKraus, Option.elim, Matrix.conjTranspose_conjTranspose]
 
 /-- The retraction really is a left inverse: `unIsometry W ∘ ofIsometry W = id`. -/
 theorem unIsometry_comp_ofIsometry (W : Matrix b a ℂ) (hW : W.conjTranspose * W = 1) (a₀ : a) :
-    unIsometry W hW a₀ ∘ₘ ofIsometry W hW = CPTPMap.id := by
+    unIsometry W hW a₀ ∘ₘ ofIsometry W hW = CPTPOp.id := by
   have hQW : ((1 : Matrix b b ℂ) - W * W.conjTranspose) * W = 0 := by
     rw [Matrix.sub_mul, Matrix.one_mul, Matrix.mul_assoc, hW, Matrix.mul_one, sub_self]
-  apply CPTPMap.ext
-  show (unIsometry W hW a₀).map ∘ₗ (ofIsometry W hW).map = LinearMap.id
+  apply CPTPOp.ext_map (ι := a) (κ := a)
+  rw [CPTPOp.compose_map, CPTPOp.id_map]
   refine LinearMap.ext fun X => ?_
   rw [LinearMap.comp_apply, LinearMap.id_apply, ofIsometry_map, unIsometry_map]
   have hzero : ∀ x : b,
@@ -182,13 +179,7 @@ theorem unIsometry_comp_ofIsometry (W : Matrix b a ℂ) (hW : W.conjTranspose * 
     ← Matrix.mul_assoc, ← Matrix.mul_assoc, hW, Matrix.one_mul, Matrix.mul_assoc, hW,
     Matrix.mul_one]
 
-end CPTPMap
-
-/-- Mixing two points with weight `1` returns the first. (Companion to `Mixable.mix_zero`.) -/
-theorem Mixable.mix_one {U T : Type*} [AddCommMonoid U] [Module ℝ U] [inst : Mixable U T]
-    (x₁ x₂ : T) : Mixable.mix (1 : Prob) x₁ x₂ = x₁ := by
-  apply inst.to_U_inj
-  simp [Mixable.mix, Mixable.mix_ab]
+end CPTPOp
 
 /-! ### The `QECC` structure -/
 
@@ -211,15 +202,15 @@ variable [Fintype i] [DecidableEq i] [Fintype d1] [DecidableEq d1] [Fintype d2] 
 
 /-- The trivial (identity) code on `i → d2`, obtained when the logical space *is* the physical
 register. Both the encoder and decoder are the identity channel. -/
-noncomputable def identity (i d2 : Type*) [Fintype i] [DecidableEq i] [Fintype d2] [DecidableEq d2] :
-    QECC (i → d2) i d2 where
-  encoder := CPTPMap.id
-  decoder := CPTPMap.id
+noncomputable def identity (i d2 : Type*) [Fintype i] [DecidableEq i] [Fintype d2]
+    [DecidableEq d2] : QECC (i → d2) i d2 where
+  encoder := CPTPOp.id
+  decoder := CPTPOp.id
 
 variable {i' d2' : Type*} [Fintype i'] [DecidableEq i'] [Fintype d2'] [DecidableEq d2']
 
-/-- Composition of two codes: the physical register `i → d2` of the first is the logical space of the
-second. The result encodes `d1` all the way into `i' → d2'`. -/
+/-- Composition of two codes: the physical register `i → d2` of the first is the logical space
+of the second. The result encodes `d1` all the way into `i' → d2'`. -/
 noncomputable def comp (C₁ : QECC d1 i d2) (C₂ : QECC (i → d2) i' d2') : QECC d1 i' d2' where
   encoder := C₂.encoder ∘ₘ C₁.encoder
   decoder := C₁.decoder ∘ₘ C₂.decoder
@@ -231,9 +222,9 @@ lifts to a `QECC (j → d1) (j × i) d2`, where the `j × i` physical qudits are
 qudits. Built from the Pi-Kronecker product of the per-copy channels, reindexed by currying. -/
 noncomputable def parallel (C : QECC d1 i d2) : QECC (j → d1) (j × i) d2 where
   encoder :=
-    CPTPMap.ofEquiv (Equiv.curry j i d2).symm ∘ₘ CPTPMap.piProd (fun _ : j => C.encoder)
+    CPTPOp.ofEquiv (Equiv.curry j i d2).symm ∘ₘ CPTPOp.piProd (fun _ : j => C.encoder)
   decoder :=
-    CPTPMap.piProd (fun _ : j => C.decoder) ∘ₘ CPTPMap.ofEquiv (Equiv.curry j i d2)
+    CPTPOp.piProd (fun _ : j => C.decoder) ∘ₘ CPTPOp.ofEquiv (Equiv.curry j i d2)
 
 variable {d1' : Type*} [Fintype d1'] [DecidableEq d1']
 
@@ -249,7 +240,7 @@ noncomputable def concat {io ii : Type*} [Fintype io] [DecidableEq io] [Fintype 
 
 /-- A code `Decodes` if, in the absence of any error, the decoder perfectly inverts the encoder. -/
 def Decodes (C : QECC d1 i d2) : Prop :=
-  C.decoder ∘ₘ C.encoder = CPTPMap.id
+  C.decoder ∘ₘ C.encoder = CPTPOp.id
 
 @[simp]
 theorem identity_decodes : (identity i d2).Decodes := by
@@ -259,15 +250,15 @@ theorem identity_decodes : (identity i d2).Decodes := by
 theorem comp_decodes {C₁ : QECC d1 i d2} {C₂ : QECC (i → d2) i' d2'}
     (h₁ : C₁.Decodes) (h₂ : C₂.Decodes) : (C₁.comp C₂).Decodes := by
   simp only [Decodes, comp] at *
-  rw [CPTPMap.compose_assoc, ← CPTPMap.compose_assoc C₂.decoder, h₂, CPTPMap.id_compose, h₁]
+  rw [CPTPOp.compose_assoc, ← CPTPOp.compose_assoc C₂.decoder, h₂, CPTPOp.id_compose, h₁]
 
 /-- Decoding is preserved under the parallel construction. -/
 theorem parallel_decodes {C : QECC d1 i d2} (h : C.Decodes) :
     (parallel (j := j) C).Decodes := by
   simp only [Decodes, parallel] at *
-  rw [CPTPMap.compose_assoc, ← CPTPMap.compose_assoc (CPTPMap.ofEquiv (Equiv.curry j i d2)),
-    CPTPMap.ofEquiv_symm_comp, CPTPMap.id_compose, ← CPTPMap.piProd_comp]
-  simp only [h, CPTPMap.piProd_id]
+  rw [CPTPOp.compose_assoc, ← CPTPOp.compose_assoc (CPTPOp.ofEquiv (Equiv.curry j i d2)),
+    CPTPOp.ofEquiv_symm_comp, CPTPOp.id_compose, ← CPTPOp.piProd_comp]
+  simp only [h, CPTPOp.piProd_id]
 
 /-- Decoding is preserved under concatenation of codes. -/
 theorem concat_decodes {io ii : Type*} [Fintype io] [DecidableEq io] [Fintype ii] [DecidableEq ii]
@@ -282,10 +273,9 @@ faithfully recovers `d1` needs `card d1 ≤ card d2 ^ card i`. This is the basic
 statements like the quantum Singleton bound. -/
 theorem card_le_of_decodes {C : QECC d1 i d2} (h : C.Decodes) :
     Fintype.card d1 ≤ Fintype.card d2 ^ Fintype.card i := by
-  have h' : C.decoder ∘ₘ C.encoder = CPTPMap.id := h
+  have h' : C.decoder ∘ₘ C.encoder = CPTPOp.id := h
   have hmap : C.decoder.map ∘ₗ C.encoder.map = LinearMap.id := by
-    show (C.decoder ∘ₘ C.encoder).map = LinearMap.id
-    rw [h']; exact CPTPMap.id_map
+    rw [← CPTPOp.compose_map, h', CPTPOp.id_map]
   have hinj : Function.Injective C.encoder.map :=
     Function.LeftInverse.injective (g := C.decoder.map) (fun x => by
       rw [← LinearMap.comp_apply, hmap, LinearMap.id_apply])
@@ -302,11 +292,10 @@ other channel `Φ`: if *any* recovery `R` inverts `Φ ∘ encoder`, then the log
 most the dimension of the register that `Φ` outputs. Taking `Φ = id` recovers
 `card_le_of_decodes`. -/
 theorem card_le_of_recovery {r : Type*} [Fintype r] [DecidableEq r] {C : QECC d1 i d2}
-    (Φ : CPTPMap (i → d2) r) (R : CPTPMap r d1) (h : R ∘ₘ Φ ∘ₘ C.encoder = CPTPMap.id) :
+    (Φ : CPTPMap (i → d2) r) (R : CPTPMap r d1) (h : R ∘ₘ Φ ∘ₘ C.encoder = CPTPOp.id) :
     Fintype.card d1 ≤ Fintype.card r := by
   have hmap : R.map ∘ₗ (Φ ∘ₘ C.encoder).map = LinearMap.id := by
-    show (R ∘ₘ (Φ ∘ₘ C.encoder)).map = LinearMap.id
-    rw [← CPTPMap.compose_assoc, h]; exact CPTPMap.id_map
+    rw [← CPTPOp.compose_map, ← CPTPOp.compose_assoc, h, CPTPOp.id_map]
   have hinj : Function.Injective (Φ ∘ₘ C.encoder).map :=
     Function.LeftInverse.injective (g := R.map) (fun x => by
       rw [← LinearMap.comp_apply, hmap, LinearMap.id_apply])
@@ -323,13 +312,13 @@ those outside it, and the ones inside `S` are traced out; what remains is the re
 the complement of `S`. This is the erasure error with a *known* location `S`: the environment takes
 the qudits in `S` away, and the decoder is left with the rest. -/
 noncomputable def discard (S : Finset i) : CPTPMap (i → d2) ({q : i // q ∉ S} → d2) :=
-  CPTPMap.traceLeft ∘ₘ
-    CPTPMap.ofEquiv (Equiv.piEquivPiSubtypeProd (fun q : i => q ∈ S) (fun _ => d2))
+  CPTPOp.traceLeft ∘ₘ
+    CPTPOp.ofEquiv (Equiv.piEquivPiSubtypeProd (fun q : i => q ∈ S) (fun _ => d2))
 
 /-- A code *corrects the erasure of `S`* if the logical state can still be recovered from the
 qudits outside `S` alone. -/
 def CorrectsErasure (C : QECC d1 i d2) (S : Finset i) : Prop :=
-  ∃ R : CPTPMap ({q : i // q ∉ S} → d2) d1, R ∘ₘ discard S ∘ₘ C.encoder = CPTPMap.id
+  ∃ R : CPTPMap ({q : i // q ∉ S} → d2) d1, R ∘ₘ discard S ∘ₘ C.encoder = CPTPOp.id
 
 /-- **Quantum Singleton bound, erasure form.** If a code can survive the erasure of the `2d` qudits
 in `S`, then `K · q^{2d} ≤ q^n`: in the qubit case `card d1 = 2^k`, `card d2 = 2`, this is
@@ -359,14 +348,14 @@ theorem singleton_bound_of_erasure {C : QECC d1 i d2} {S : Finset i}
 /-- A unitary error: it acts by the arbitrary unitary `U q` on each qudit `q ∈ S`, and as the
 identity on every qudit outside `S`. -/
 noncomputable def unitaryError (S : Finset i) (U : i → 𝐔[d2]) : CPTPMap (i → d2) (i → d2) :=
-  CPTPMap.piProd (fun q => if q ∈ S then CPTPMap.ofUnitary (U q) else CPTPMap.id)
+  CPTPOp.piProd (fun q => if q ∈ S then CPTPOp.ofUnitary (U q) else CPTPOp.id)
 
 /-- An error affecting no qudits is the identity channel. -/
 @[simp]
 theorem unitaryError_empty (U : i → 𝐔[d2]) :
-    unitaryError (∅ : Finset i) U = CPTPMap.id := by
+    unitaryError (∅ : Finset i) U = CPTPOp.id := by
   simp only [unitaryError, Finset.notMem_empty, if_false]
-  exact CPTPMap.piProd_id
+  exact CPTPOp.piProd_id
 
 /-- A general error: it acts by the arbitrary channel `Λ q` on each qudit `q ∈ S`, and as the
 identity on every qudit outside `S`. This is strictly more general than `unitaryError`, and is what
@@ -374,18 +363,18 @@ arises in concatenation: a block whose inner code fails leaks an arbitrary chann
 onto the outer register. -/
 noncomputable def channelError (S : Finset i) (Λ : i → CPTPMap d2 d2) :
     CPTPMap (i → d2) (i → d2) :=
-  CPTPMap.piProd (fun q => if q ∈ S then Λ q else CPTPMap.id)
+  CPTPOp.piProd (fun q => if q ∈ S then Λ q else CPTPOp.id)
 
 /-- A general error affecting no qudits is the identity channel. -/
 @[simp]
 theorem channelError_empty (Λ : i → CPTPMap d2 d2) :
-    channelError (∅ : Finset i) Λ = CPTPMap.id := by
+    channelError (∅ : Finset i) Λ = CPTPOp.id := by
   simp only [channelError, Finset.notMem_empty, if_false]
-  exact CPTPMap.piProd_id
+  exact CPTPOp.piProd_id
 
 /-- A unitary error is a special case of a general error. -/
 theorem unitaryError_eq_channelError (S : Finset i) (U : i → 𝐔[d2]) :
-    unitaryError S U = channelError S (fun q => CPTPMap.ofUnitary (U q)) := rfl
+    unitaryError S U = channelError S (fun q => CPTPOp.ofUnitary (U q)) := rfl
 
 /-! ### Error correction -/
 
@@ -393,7 +382,7 @@ theorem unitaryError_eq_channelError (S : Finset i) (U : i → 𝐔[d2]) :
 unitary error acting on at most `k` of the physical qudits (and the identity on the rest). -/
 def CorrectsErrors (C : QECC d1 i d2) (k : ℕ) : Prop :=
   ∀ S : Finset i, S.card ≤ k → ∀ U : i → 𝐔[d2],
-    C.decoder ∘ₘ unitaryError S U ∘ₘ C.encoder = CPTPMap.id
+    C.decoder ∘ₘ unitaryError S U ∘ₘ C.encoder = CPTPOp.id
 
 /-- Correcting `k` errors is stronger than correcting fewer. -/
 theorem CorrectsErrors.mono {C : QECC d1 i d2} {k k' : ℕ}
@@ -405,12 +394,12 @@ theorem correctsErrors_zero_iff {C : QECC d1 i d2} : C.CorrectsErrors 0 ↔ C.De
   constructor
   · intro h
     have he := h ∅ (by simp) (fun _ => 1)
-    rw [unitaryError_empty, CPTPMap.compose_id] at he
+    rw [unitaryError_empty, CPTPOp.compose_id] at he
     exact he
   · intro h S hS U
     have hS0 : S = ∅ := Finset.card_eq_zero.mp (Nat.le_zero.mp hS)
     subst hS0
-    rw [unitaryError_empty, CPTPMap.compose_id]
+    rw [unitaryError_empty, CPTPOp.compose_id]
     exact h
 
 /-- A code that corrects any errors, in particular, decodes correctly. -/
@@ -427,12 +416,12 @@ theorem identity_correctsErrors_zero : (identity i d2).CorrectsErrors 0 :=
 This is a priori stronger than `CorrectsErrors k`, which quantifies only over unitary errors. -/
 def CorrectsChannelErrors (C : QECC d1 i d2) (k : ℕ) : Prop :=
   ∀ S : Finset i, S.card ≤ k → ∀ Λ : i → CPTPMap d2 d2,
-    C.decoder ∘ₘ channelError S Λ ∘ₘ C.encoder = CPTPMap.id
+    C.decoder ∘ₘ channelError S Λ ∘ₘ C.encoder = CPTPOp.id
 
 /-- Correcting general errors implies correcting unitary ones. -/
 theorem CorrectsChannelErrors.correctsErrors {C : QECC d1 i d2} {k : ℕ}
     (h : C.CorrectsChannelErrors k) : C.CorrectsErrors k :=
-  fun S hS U => h S hS (fun q => CPTPMap.ofUnitary (U q))
+  fun S hS U => h S hS (fun q => CPTPOp.ofUnitary (U q))
 
 /-- Correcting `k` general errors is stronger than correcting fewer. -/
 theorem CorrectsChannelErrors.mono {C : QECC d1 i d2} {k k' : ℕ}
@@ -444,13 +433,13 @@ theorem correctsChannelErrors_zero_iff {C : QECC d1 i d2} :
     C.CorrectsChannelErrors 0 ↔ C.Decodes := by
   constructor
   · intro h
-    have he := h ∅ (by simp) (fun _ => CPTPMap.id)
-    rw [channelError_empty, CPTPMap.compose_id] at he
+    have he := h ∅ (by simp) (fun _ => CPTPOp.id)
+    rw [channelError_empty, CPTPOp.compose_id] at he
     exact he
   · intro h S hS Λ
     have hS0 : S = ∅ := Finset.card_eq_zero.mp (Nat.le_zero.mp hS)
     subst hS0
-    rw [channelError_empty, CPTPMap.compose_id]
+    rw [channelError_empty, CPTPOp.compose_id]
     exact h
 
 /-- A code that corrects any general errors, in particular, decodes correctly. -/
@@ -463,7 +452,7 @@ set `S` of physical qudits. `CorrectsChannelErrors k` is exactly `CorrectsPatter
 size at most `k`; keeping the pattern explicit is what lets a recursive, pattern-by-pattern failure
 analysis be carried through a concatenation. -/
 def CorrectsPattern (C : QECC d1 i d2) (S : Finset i) : Prop :=
-  ∀ Λ : i → CPTPMap d2 d2, C.decoder ∘ₘ channelError S Λ ∘ₘ C.encoder = CPTPMap.id
+  ∀ Λ : i → CPTPMap d2 d2, C.decoder ∘ₘ channelError S Λ ∘ₘ C.encoder = CPTPOp.id
 
 /-- Correcting `k` errors is correcting every pattern of at most `k` qudits. -/
 theorem correctsChannelErrors_iff_correctsPattern {C : QECC d1 i d2} {k : ℕ} :
@@ -473,10 +462,11 @@ theorem correctsChannelErrors_iff_correctsPattern {C : QECC d1 i d2} {k : ℕ} :
 family of channels acting on them, *some* recovery channel restores the logical state exactly. The
 recovery may depend on the location of the errors and on the channels themselves, which is the
 situation of an erasure: the faulty qudits are known. This is the error model whose radius is
-`d - 1` rather than `⌊(d-1)/2⌋`, and it is the one under which concatenation multiplies distances. -/
+`d - 1` rather than `⌊(d-1)/2⌋`, and it is the one under which concatenation multiplies
+distances. -/
 def CorrectsLocatedErrors (C : QECC d1 i d2) (k : ℕ) : Prop :=
   ∀ S : Finset i, S.card ≤ k → ∀ Λ : i → CPTPMap d2 d2,
-    ∃ R : CPTPMap (i → d2) d1, R ∘ₘ channelError S Λ ∘ₘ C.encoder = CPTPMap.id
+    ∃ R : CPTPMap (i → d2) d1, R ∘ₘ channelError S Λ ∘ₘ C.encoder = CPTPOp.id
 
 /-- Correcting located errors is weaker than correcting them with a single fixed decoder. -/
 theorem CorrectsChannelErrors.correctsLocatedErrors {C : QECC d1 i d2} {k : ℕ}
@@ -491,8 +481,8 @@ theorem CorrectsLocatedErrors.mono {C : QECC d1 i d2} {k k' : ℕ}
 /-- Relabelling the logical register of a code along an equivalence of logical spaces. -/
 noncomputable def relabelLogical {e1 : Type*} [Fintype e1] [DecidableEq e1] (C : QECC d1 i d2)
     (e : d1 ≃ e1) : QECC e1 i d2 where
-  encoder := C.encoder ∘ₘ CPTPMap.ofEquiv e.symm
-  decoder := CPTPMap.ofEquiv e ∘ₘ C.decoder
+  encoder := C.encoder ∘ₘ CPTPOp.ofEquiv e.symm
+  decoder := CPTPOp.ofEquiv e ∘ₘ C.decoder
 
 /-- Relabelling the logical register does not change what a code can correct. -/
 theorem CorrectsLocatedErrors.relabelLogical {e1 : Type*} [Fintype e1] [DecidableEq e1]
@@ -500,39 +490,40 @@ theorem CorrectsLocatedErrors.relabelLogical {e1 : Type*} [Fintype e1] [Decidabl
     (C.relabelLogical e).CorrectsLocatedErrors k := by
   intro S hS Λ
   obtain ⟨R, hR⟩ := h S hS Λ
-  refine ⟨CPTPMap.ofEquiv e ∘ₘ R, ?_⟩
-  show CPTPMap.ofEquiv e ∘ₘ R ∘ₘ channelError S Λ ∘ₘ (C.encoder ∘ₘ CPTPMap.ofEquiv e.symm)
-    = CPTPMap.id
-  rw [← CPTPMap.compose_assoc _ C.encoder (CPTPMap.ofEquiv e.symm),
-    CPTPMap.compose_assoc (CPTPMap.ofEquiv e) R,
-    CPTPMap.compose_assoc (CPTPMap.ofEquiv e) (R ∘ₘ channelError S Λ), hR,
-    CPTPMap.compose_id, CPTPMap.ofEquiv_symm_comp]
+  refine ⟨CPTPOp.ofEquiv e ∘ₘ R, ?_⟩
+  show CPTPOp.ofEquiv e ∘ₘ R ∘ₘ channelError S Λ ∘ₘ (C.encoder ∘ₘ CPTPOp.ofEquiv e.symm)
+    = CPTPOp.id
+  rw [← CPTPOp.compose_assoc _ C.encoder (CPTPOp.ofEquiv e.symm),
+    CPTPOp.compose_assoc (CPTPOp.ofEquiv e) R,
+    CPTPOp.compose_assoc (CPTPOp.ofEquiv e) (R ∘ₘ channelError S Λ), hR,
+    CPTPOp.compose_id, CPTPOp.ofEquiv_symm_comp]
 
 /-- A code correcting located errors decodes, up to a relabelling of the decoder. -/
 theorem CorrectsLocatedErrors.exists_decoder {C : QECC d1 i d2} {k : ℕ}
-    (h : C.CorrectsLocatedErrors k) : ∃ R : CPTPMap (i → d2) d1, R ∘ₘ C.encoder = CPTPMap.id := by
-  obtain ⟨R, hR⟩ := h ∅ (by simp) (fun _ => CPTPMap.id)
-  exact ⟨R, by rwa [channelError_empty, CPTPMap.compose_id] at hR⟩
+    (h : C.CorrectsLocatedErrors k) : ∃ R : CPTPMap (i → d2) d1, R ∘ₘ C.encoder = CPTPOp.id := by
+  obtain ⟨R, hR⟩ := h ∅ (by simp) (fun _ => CPTPOp.id)
+  exact ⟨R, by rwa [channelError_empty, CPTPOp.compose_id] at hR⟩
 
 /-! ### Error detection
 
 Detection is modelled with a *flagging decoder* `R : CPTPMap (i → d2) (d1 × Fin 2)` whose second
-factor `Fin 2` is a flag. The map `prep0` embeds a logical state `ρ ↦ ρ ⊗ |0⟩⟨0|` (accept, flag `0`),
-and `flagChannel` is a fixed "rejected" output carrying flag `1`. A code detects errors if, for every
-error, the flagging decoder produces a convex mixture of the *perfectly preserved* logical state
+factor `Fin 2` is a flag. The map `prep0` embeds a logical state `ρ ↦ ρ ⊗ |0⟩⟨0|` (accept,
+flag `0`), and `flagChannel` is a fixed "rejected" output carrying flag `1`. A code detects errors
+if, for every error, the flagging decoder produces a convex mixture of the *perfectly preserved*
+logical state
 (flag `0`) and the flag (flag `1`); in particular, whenever the flag is `0` the logical content is
 untouched. -/
 
 /-- The channel `ρ ↦ ρ ⊗ |0⟩⟨0|`, preparing a fresh flag qubit in state `|0⟩`. -/
 noncomputable def prep0 (d1 : Type*) [Fintype d1] [DecidableEq d1] :
     CPTPMap d1 (d1 × Fin 2) :=
-  (CPTPMap.id ⊗ᶜᵖ CPTPMap.replacement (dIn := Unit) (MState.pure (Ket.basis (0 : Fin 2)))) ∘ₘ
-    CPTPMap.ofEquiv ((Equiv.prodPUnit d1).symm : d1 ≃ d1 × Unit)
+  (CPTPOp.id ⊗ᶜᵖ CPTPOp.replacement (dIn := Unit) (MState.pure (Ket.basis (0 : Fin 2)))) ∘ₘ
+    CPTPOp.ofEquiv ((Equiv.prodPUnit d1).symm : d1 ≃ d1 × Unit)
 
 /-- A fixed "error detected" output state, carrying flag `1`. -/
 noncomputable def flagChannel (d1 : Type*) [Fintype d1] [DecidableEq d1] [Nonempty d1] :
     CPTPMap d1 (d1 × Fin 2) :=
-  CPTPMap.replacement
+  CPTPOp.replacement
     (MState.pure (Ket.basis (Classical.choice (α := d1) inferInstance, (1 : Fin 2))))
 
 /-- A code `DetectsErrors k` if there is a flagging decoder that, for every unitary error of weight
@@ -555,14 +546,14 @@ theorem DetectsErrors.mono {C : QECC d1 i d2} [Nonempty d1] {k k' : ℕ}
 prepares flag `0` after decoding. -/
 theorem CorrectsErrors.detectsErrors {C : QECC d1 i d2} [Nonempty d1] {k : ℕ}
     (h : C.CorrectsErrors k) : C.DetectsErrors k := by
-  have hd : C.decoder ∘ₘ C.encoder = CPTPMap.id := h.decodes
+  have hd : C.decoder ∘ₘ C.encoder = CPTPOp.id := h.decodes
   refine ⟨prep0 d1 ∘ₘ C.decoder, ?_, ?_⟩
-  · rw [CPTPMap.compose_assoc, hd, CPTPMap.compose_id]
+  · rw [CPTPOp.compose_assoc, hd, CPTPOp.compose_id]
   · intro S hS U
     refine ⟨1, ?_⟩
-    have herr : (C.decoder ∘ₘ unitaryError S U) ∘ₘ C.encoder = CPTPMap.id := h S hS U
-    rw [Mixable.mix_one, CPTPMap.compose_assoc, CPTPMap.compose_assoc,
-      ← CPTPMap.compose_assoc C.decoder, herr, CPTPMap.compose_id]
+    have herr : (C.decoder ∘ₘ unitaryError S U) ∘ₘ C.encoder = CPTPOp.id := h S hS U
+    rw [Mixable.mix_one, CPTPOp.compose_assoc, CPTPOp.compose_assoc,
+      ← CPTPOp.compose_assoc C.decoder, herr, CPTPOp.compose_id]
 
 end QECC
 
