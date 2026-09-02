@@ -1,9 +1,10 @@
 /-
-Copyright (c) 2025-2026. All rights reserved.
+Copyright (c) 2025-2026 Hayata Yamasaki. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Kazumi Kasaura, Hayata Yamasaki
 -/
 
-import Quantum.QuantumMechanics.QuantumChannel
+import QuantumLib.States.Qudit
 import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.ExpLog.Basic
 import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Basic
 import Mathlib.Analysis.SpecialFunctions.Exponential
@@ -14,7 +15,7 @@ import Mathlib.Analysis.RCLike.Basic
 # Differentiation of operator powers in the exponent (CFC)
 
 Infrastructure for the `α → 1` limit of the sandwiched Rényi divergence
-(`SandwichedRenyiUmegaki`).
+(`QuantumLib.Entropy.SandwichedRenyi.Umegaki`).
 
 The key obstacle there is differentiating continuous-functional-calculus
 expressions, for which Mathlib has no dedicated API. This file provides the one
@@ -52,7 +53,8 @@ lemma rpow_eq_normedSpace_exp_smul_log {a : L ℋ} (ha : IsStrictlyPositive a) (
     continuousOn_const.mul hclog
   rw [← CFC.real_exp_eq_normedSpace_exp (a := s • CFC.log a)]
   have h1 : s • CFC.log a = cfc (fun x : ℝ => s * Real.log x) a := by
-    rw [CFC.log, ← cfc_smul s Real.log a hclog]; simp only [smul_eq_mul]
+    rw [CFC.log, ← cfc_smul s Real.log a hclog]
+    simp only [smul_eq_mul]
   rw [h1, ← cfc_comp Real.exp (fun x : ℝ => s * Real.log x) a (hf := hcg)]
   rw [show CFC.rpow a s = cfc (fun x : ℝ => x ^ s) a from CFC.rpow_eq_cfc_real]
   apply cfc_congr
@@ -105,7 +107,7 @@ lemma hasDerivAt_reTrace_mul_left {F : ℝ → L ℋ} {F' : L ℋ} {α₀ : ℝ}
     (hF : HasDerivAt F F' α₀) :
     HasDerivAt (fun α => (Tr (ρ * F α)).re) ((Tr (ρ * F')).re) α₀ := by
   have hcomp := (reTraceMulLeft ρ).toContinuousLinearMap.hasFDerivAt.comp_hasDerivAt α₀ hF
-  simpa [reTraceMulLeft, LinearMap.coe_toContinuousLinearMap] using hcomp
+  simpa [reTraceMulLeft, LinearMap.coe_toContinuousLinearMap, Function.comp_def] using hcomp
 
 /-- The Banach-algebra exponential is continuous on `L ℋ` (via the field `ℝ`). -/
 lemma continuous_normedSpace_exp : Continuous (NormedSpace.exp : L ℋ → L ℋ) := by

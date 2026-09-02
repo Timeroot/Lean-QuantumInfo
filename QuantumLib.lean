@@ -34,3 +34,13 @@ import QuantumLib.QECC.TransversalCNOT
 import QuantumLib.QECC.ConcatDistance
 import QuantumLib.QECC.RandomErrors
 import QuantumLib.QECC.Threshold
+import QuantumLib.States.Qudit
+import QuantumLib.Channels.Superoperator
+import QuantumLib.ForMathlib.CFCDeriv
+import QuantumLib.ForMathlib.TensorCFC
+import QuantumLib.Operators.HaarUnitary
+import QuantumLib.Entropy.YoungInequality
+import QuantumLib.Entropy.SandwichedRenyi.Defs
+import QuantumLib.Entropy.SandwichedRenyi.QuasiJensen
+import QuantumLib.Entropy.SandwichedRenyi.NonNeg
+import QuantumLib.Entropy.SandwichedRenyi.Umegaki

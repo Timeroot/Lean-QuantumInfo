@@ -1,9 +1,10 @@
 /-
-Copyright (c) 2025-2026. All rights reserved.
+Copyright (c) 2025-2026 Hayata Yamasaki. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Kazumi Kasaura, Hayata Yamasaki
 -/
 
-import Quantum.QuantumEntropy.SandwichedQuasiJensen
+import QuantumLib.Entropy.SandwichedRenyi.QuasiJensen
 import Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Continuity
 import Mathlib.LinearAlgebra.Lagrange
 
@@ -45,7 +46,6 @@ open scoped ComplexOrder NNReal Topology
 
 universe u
 
-set_option linter.style.longLine false
 
 /-! ### Support condition `suppLE` -/
 
@@ -82,7 +82,7 @@ lemma suppLE_of_pdSetLM_right
     agrees with the standard `sandwichedRenyiDiv α ρ σ` viewed in `EReal`. -/
 noncomputable def sandwichedRenyiDivNN
     {ℋ : Type u} [Qudit ℋ] [Nontrivial ℋ] (α : ℝ) (ρ σ : L ℋ) : EReal :=
-  letI : Decidable ((1 < α ∧ ¬ suppLE ρ σ) ∨
+  let : Decidable ((1 < α ∧ ¬ suppLE ρ σ) ∨
       (α < 1 ∧ ρ ≠ 0 ∧ (sandwichedQuasi α ρ σ).re = 0)) := Classical.propDecidable _
   if (1 < α ∧ ¬ suppLE ρ σ) ∨ (α < 1 ∧ ρ ≠ 0 ∧ (sandwichedQuasi α ρ σ).re = 0)
     then (⊤ : EReal)
@@ -124,7 +124,9 @@ lemma nonneg_le_smul_of_suppLE
     have hker_ρ : LinearMap.ker ρ = ⊤ := eq_top_iff.mpr (hker_σ ▸ h)
     have hρ_zero : ρ = 0 := by
       ext x
-      have : x ∈ LinearMap.ker ρ := by rw [hker_ρ]; trivial
+      have : x ∈ LinearMap.ker ρ := by
+        rw [hker_ρ]
+        trivial
       exact this
     exact ⟨1, one_pos, by rw [hρ_zero, hσ_zero]; simp⟩
   · -- `σ ≠ 0`: spectral argument.
@@ -143,7 +145,7 @@ lemma nonneg_le_smul_of_suppLE
     -- Show ∃ i, 0 < eig i (using σ ≠ 0).
     have h_exists_pos : ∃ i, 0 < eig i := by
       by_contra h_all
-      push_neg at h_all
+      push Not at h_all
       have h_all_zero : ∀ i, eig i = 0 := fun i => le_antisymm (h_all i) (h_eig_nn i)
       apply hσ_zero
       ext v
@@ -170,7 +172,8 @@ lemma nonneg_le_smul_of_suppLE
       intro i
       simp only [S, Finset.mem_filter, Finset.mem_univ, true_and]
       constructor
-      · intro hi; exact ne_of_gt hi
+      · intro hi
+        exact ne_of_gt hi
       · intro hi
         rcases eq_or_lt_of_le (h_eig_nn i) with h_eq | h_lt
         · exact absurd h_eq.symm hi
@@ -182,7 +185,8 @@ lemma nonneg_le_smul_of_suppLE
         by_contra h_ne
         exact hi ((h_mem_S i).mpr h_ne)
       have h_σ_bi : σ (b i) = 0 := by
-        rw [h_eig_apply i, h_eig_i_zero]; simp
+        rw [h_eig_apply i, h_eig_i_zero]
+        simp
       have h_bi_ker : b i ∈ LinearMap.ker σ := h_σ_bi
       exact h h_bi_ker
     -- Set `lam := ‖ρ‖ / s_min + 1`.
@@ -287,8 +291,7 @@ lemma nonneg_le_smul_of_suppLE
         have h1 : RCLike.re (inner ℂ (ρ xS) xS) ≤ ‖inner ℂ (ρ xS) xS‖ := RCLike.re_le_norm _
         have h2 : ‖inner ℂ (ρ xS) xS‖ ≤ ‖ρ xS‖ * ‖xS‖ := norm_inner_le_norm _ _
         have h3 : ‖ρ xS‖ ≤ ‖ρ‖ * ‖xS‖ := by
-          have := ρ.toContinuousLinearMap.le_opNorm xS
-          simpa using this
+          exact ρ.toContinuousLinearMap.le_opNorm xS
         calc RCLike.re (inner ℂ (ρ xS) xS) ≤ ‖inner ℂ (ρ xS) xS‖ := h1
           _ ≤ ‖ρ xS‖ * ‖xS‖ := h2
           _ ≤ (‖ρ‖ * ‖xS‖) * ‖xS‖ := mul_le_mul_of_nonneg_right h3 (norm_nonneg _)
@@ -440,8 +443,10 @@ private lemma outer_product_apply {ℋ₁ ℋ₂ : Type u} [Qudit ℋ₁] [Qudit
 /-- Adjoint of an outer product swaps its factors: `(|v⟩⟨u|)† = |u⟩⟨v|`. -/
 private lemma adjoint_outer_product {ℋ : Type u} [Qudit ℋ] (u v : ℋ) :
     LinearMap.adjoint (outer_product u v) = outer_product v u := by
-  apply LinearMap.ext; intro x
-  apply ext_inner_right ℂ; intro y
+  apply LinearMap.ext
+  intro x
+  apply ext_inner_right ℂ
+  intro y
   rw [LinearMap.adjoint_inner_left, outer_product_apply, outer_product_apply,
       inner_smul_right, inner_smul_left, inner_conj_symm]
   ring
@@ -464,13 +469,16 @@ private lemma depolarizing_kraus_sum
     intro i j
     have hadj : LinearMap.adjoint ((c : ℂ) • outer_product (bq j) (bp i))
         = (c : ℂ) • outer_product (bp i) (bq j) := by
-      apply LinearMap.ext; intro x
-      apply ext_inner_right ℂ; intro y
+      apply LinearMap.ext
+      intro x
+      apply ext_inner_right ℂ
+      intro y
       rw [LinearMap.adjoint_inner_left]
       simp only [LinearMap.smul_apply, outer_product_apply, inner_smul_right,
         inner_smul_left, inner_conj_symm, Complex.conj_ofReal]
       ring
-    apply LinearMap.ext; intro x
+    apply LinearMap.ext
+    intro x
     have hkt : (krausTerm ((c : ℂ) • outer_product (bq j) (bp i)) : T ℋ 𝒦) γ
         = ((c : ℂ) • outer_product (bq j) (bp i)) ∘ₗ γ ∘ₗ
             ((c : ℂ) • outer_product (bp i) (bq j)) := by
@@ -529,7 +537,8 @@ lemma depolLinMap_isCompletelyPositive (ℋ 𝒦 : Type u) [Qudit ℋ] [Qudit �
     rw [← Complex.ofReal_pow, inv_pow, Real.sq_sqrt hm_nn, Complex.ofReal_inv,
         Complex.ofReal_natCast]
   have hmap : depolLinMap ℋ 𝒦 = ∑ p : Fin m × Fin n, krausTerm (V p) := by
-    apply LinearMap.ext; intro γ
+    apply LinearMap.ext
+    intro γ
     rw [LinearMap.sum_apply]
     change (Tr γ / (m : ℂ)) • (1 : L 𝒦) =
         ∑ p : Fin m × Fin n, (krausTerm (V p) : T ℋ 𝒦) γ
@@ -698,7 +707,8 @@ lemma trace_re_pos_of_ne_zero
       linarith [h_eig_nn i, hsum, hle]
     have h_apply : ∀ i, ρ (hρ_sym.eigenvectorBasis hn i) = 0 := by
       intro i
-      rw [hρ_sym.apply_eigenvectorBasis hn i, h_all i]; simp
+      rw [hρ_sym.apply_eigenvectorBasis hn i, h_all i]
+      simp
     refine LinearMap.ext fun x => ?_
     rw [LinearMap.zero_apply]
     conv_lhs => rw [← (hρ_sym.eigenvectorBasis hn).sum_repr x]
@@ -761,7 +771,9 @@ lemma faithfulApprox_pdSetLM
   have hscalar : ((lam : ℝ) : ℂ) * (Tr ρ / (Module.finrank ℂ 𝒦 : ℂ)) =
       ((lam * (Tr ρ).re / Module.finrank ℂ 𝒦 : ℝ) : ℂ) := by
     set t : ℝ := (Tr ρ).re with ht
-    rw [hTr_real]; push_cast; ring
+    rw [hTr_real]
+    push_cast
+    ring
   have h_Fρ : (faithfulApprox E lam hlam0.le hlam1).toFun ρ =
       ((1 - lam : ℝ) : ℂ) • E.toFun ρ +
         ((lam * (Tr ρ).re / Module.finrank ℂ 𝒦 : ℝ) : ℂ) • (1 : L 𝒦) := by
@@ -865,7 +877,8 @@ lemma sandwichedQuasi_re_continuousOn_nonneg
       ({A : L ℋ | 0 ≤ A} ×ˢ {A : L ℋ | 0 ≤ A}) := by
   set β : ℝ := (1 - α) / (2 * α) with hβ_def
   have hβ_nn : 0 ≤ β := by
-    rw [hβ_def]; apply div_nonneg (by linarith) (by positivity)
+    rw [hβ_def]
+    apply div_nonneg (by linarith) (by positivity)
   have h_inner_cont :
       ContinuousOn (fun p : L ℋ × L ℋ => CFC.rpow p.2 β * p.1 * CFC.rpow p.2 β)
         ({A : L ℋ | 0 ≤ A} ×ˢ {A : L ℋ | 0 ≤ A}) :=
@@ -909,7 +922,8 @@ private lemma sandwichedQuasi_tendsto_nonneg_lt
   have hg_tendsto : Filter.Tendsto g (nhdsWithin 0 (Set.Ioi 0)) (nhdsWithin (ρ, σ) S) := by
     rw [tendsto_nhdsWithin_iff]
     refine ⟨?_, ?_⟩
-    · rw [← hg0]; exact (hg_cont.tendsto 0).mono_left nhdsWithin_le_nhds
+    · rw [← hg0]
+      exact (hg_cont.tendsto 0).mono_left nhdsWithin_le_nhds
     · filter_upwards [self_mem_nhdsWithin] with ε hε
       have hεpos : (0 : ℝ) < ε := hε
       exact Set.mk_mem_prod
@@ -1045,14 +1059,18 @@ lemma cfc_real_apply_eigenvector
   have hEvalNode : ∀ x ∈ S, q.eval x = f x := by
     intro x hx
     have := Lagrange.eval_interpolate_at_node (r := f) (v := id) hInj hx
-    simpa using this
+    simpa only [hq, id_eq] using this
   have hEqOn : (spectrum ℝ A).EqOn f (fun x => q.eval x) := by
     intro x hx
-    have hxS : x ∈ S := by rw [hS, Set.Finite.mem_toFinset]; exact hx
+    have hxS : x ∈ S := by
+      rw [hS, Set.Finite.mem_toFinset]
+      exact hx
     exact (hEvalNode x hxS).symm
   have h1 : cfc f A = cfc (fun x => q.eval x) A := cfc_congr hEqOn
   have h2 : cfc (fun x => q.eval x) A = Polynomial.aeval A q := cfc_polynomial q A
-  have hμS : μ ∈ S := by rw [hS, Set.Finite.mem_toFinset]; exact hμ
+  have hμS : μ ∈ S := by
+    rw [hS, Set.Finite.mem_toFinset]
+    exact hμ
   rw [h1, h2, aeval_apply_of_eigenvector_real hv q, hEvalNode μ hμS]
 
 /-- `CFC.rpow A y` on an eigenvector. -/
@@ -1063,7 +1081,8 @@ private lemma rpow_apply_eigenvector
     CFC.rpow A y v = ((μ ^ y : ℝ) : ℂ) • v := by
   have hsa : IsSelfAdjoint A := (LinearMap.nonneg_iff_isPositive A).mp hA |>.isSelfAdjoint
   have heq : CFC.rpow A y = cfc (fun x : ℝ => x ^ y) A := by
-    rw [CFC.rpow_eq_pow]; exact CFC.rpow_eq_cfc_real (ha := hA)
+    rw [CFC.rpow_eq_pow]
+    exact CFC.rpow_eq_cfc_real (ha := hA)
   rw [heq]
   exact cfc_real_apply_eigenvector hsa (fun x => x ^ y) hv hμ
 
@@ -1074,7 +1093,8 @@ lemma mem_spectrum_real_of_eigenvector
     μ ∈ spectrum ℝ A := by
   have hev : Module.End.HasEigenvalue A (μ : ℂ) := by
     refine Module.End.hasEigenvalue_of_hasEigenvector ⟨?_, hv0⟩
-    rw [Module.End.mem_eigenspace_iff]; exact hv
+    rw [Module.End.mem_eigenspace_iff]
+    exact hv
   have hmem : (μ : ℂ) ∈ spectrum ℂ A := hev.mem_spectrum
   rw [← spectrum.preimage_algebraMap ℂ] at *
   simpa using hmem
@@ -1082,7 +1102,9 @@ lemma mem_spectrum_real_of_eigenvector
 /-- `v ↦ outer_product u v` as a bundled (continuous) linear map. -/
 private noncomputable def outerL {ℋ : Type u} [Qudit ℋ] (u : ℋ) : ℋ →ₗ[ℂ] L ℋ where
   toFun v := outer_product u v
-  map_add' v w := by ext x; simp [outer_product_apply, smul_add]
+  map_add' v w := by
+    ext x
+    simp [outer_product_apply, smul_add]
   map_smul' c v := by
     ext x
     simp only [outer_product_apply, LinearMap.smul_apply, RingHom.id_apply]
@@ -1109,8 +1131,12 @@ private lemma rpow_conj_tendsto_of_suppLE
   set β : ℝ := (1-α)/(2*α) with hβ
   have hαpos : 0 < α := by linarith
   have hβneg : β < 0 := by
-    rw [hβ]; apply div_neg_of_neg_of_pos (by linarith) (by positivity)
-  have h2β : (1:ℝ) + 2*β = 1/α := by rw [hβ]; field_simp; ring
+    rw [hβ]
+    apply div_neg_of_neg_of_pos (by linarith) (by positivity)
+  have h2β : (1:ℝ) + 2*β = 1/α := by
+    rw [hβ]
+    field_simp
+    ring
   set n := Module.finrank ℂ ℋ with hn_def
   have hn : Module.finrank ℂ ℋ = n := rfl
   have hσ_pos : σ.IsPositive := (LinearMap.nonneg_iff_isPositive σ).mp hσ
@@ -1123,12 +1149,15 @@ private lemma rpow_conj_tendsto_of_suppLE
   have hb_ne : ∀ i, b i ≠ 0 := fun i => b.orthonormal.ne_zero i
   have h_ker : ∀ k, eig k = 0 → ρ (b k) = 0 := by
     intro k hk
-    have hσbk : σ (b k) = 0 := by rw [h_eig_apply k, hk]; simp
+    have hσbk : σ (b k) = 0 := by
+      rw [h_eig_apply k, hk]
+      simp
     exact hsupp (LinearMap.mem_ker.mpr hσbk)
   have h_supp_zero : ∀ i j, (eig i = 0 ∨ eig j = 0) → inner ℂ (b j) (ρ (b i)) = (0:ℂ) := by
     intro i j hij
     rcases hij with hi | hj
-    · rw [h_ker i hi]; simp
+    · rw [h_ker i hi]
+      simp
     · rw [show inner ℂ (b j) (ρ (b i)) = inner ℂ (ρ (b j)) (b i) from (hρ_sym (b j) (b i)).symm,
           h_ker j hj]; simp
   have hspec0 : ∀ i, eig i ∈ spectrum ℝ σ :=
@@ -1143,7 +1172,8 @@ private lemma rpow_conj_tendsto_of_suppLE
     apply Finset.sum_congr rfl
     intro j _
     rw [map_smul, hS0b j, smul_smul]
-    congr 1; ring
+    congr 1
+    ring
   have hM0 : ∀ i, (CFC.rpow σ β * ρ * CFC.rpow σ β) (b i)
       = ∑ j, ((((eig i)^β * (eig j)^β : ℝ):ℂ) * inner ℂ (b j) (ρ (b i))) • b j := by
     intro i
@@ -1153,7 +1183,8 @@ private lemma rpow_conj_tendsto_of_suppLE
     intro j _
     rw [smul_smul]
     congr 1
-    push_cast; ring
+    push_cast
+    ring
   have hMε : ∀ (ε : ℝ), 0 < ε → ∀ i,
       (CFC.rpow (σ + (ε:ℂ)•(1:L ℋ)) β * (ρ + (ε:ℂ)•(1:L ℋ)) * CFC.rpow (σ + (ε:ℂ)•(1:L ℋ)) β) (b i)
       = (∑ j, ((((eig i+ε)^β * (eig j+ε)^β : ℝ):ℂ) * inner ℂ (b j) (ρ (b i))) • b j)
@@ -1165,7 +1196,9 @@ private lemma rpow_conj_tendsto_of_suppLE
     have hσε_app : ∀ k, (σ + (ε:ℂ)•(1:L ℋ)) (b k) = ((eig k + ε : ℝ):ℂ) • b k := by
       intro k
       rw [LinearMap.add_apply, h_eig_apply k, LinearMap.smul_apply, Module.End.one_apply]
-      rw [← add_smul]; push_cast; ring_nf
+      rw [← add_smul]
+      push_cast
+      ring_nf
     have hσε_spec : ∀ k, (eig k + ε) ∈ spectrum ℝ (σ + (ε:ℂ)•(1:L ℋ)) :=
       fun k => mem_spectrum_real_of_eigenvector (hb_ne k) (hσε_app k)
     have hSb : ∀ k, CFC.rpow (σ + (ε:ℂ)•(1:L ℋ)) β (b k) = (((eig k+ε)^β : ℝ):ℂ) • b k :=
@@ -1177,7 +1210,8 @@ private lemma rpow_conj_tendsto_of_suppLE
       apply Finset.sum_congr rfl
       intro j _
       rw [map_smul, hSb j, smul_smul]
-      congr 1; ring
+      congr 1
+      ring
     rw [Module.End.mul_apply, Module.End.mul_apply, hSb i, map_smul, map_smul,
         LinearMap.add_apply, LinearMap.smul_apply, Module.End.one_apply, map_add, map_smul,
         hSrho, hSb i, smul_add, Finset.smul_sum]
@@ -1186,10 +1220,12 @@ private lemma rpow_conj_tendsto_of_suppLE
       intro j _
       rw [smul_smul]
       congr 1
-      push_cast; ring
+      push_cast
+      ring
     · rw [smul_smul, smul_smul]
       congr 1
-      push_cast; ring
+      push_cast
+      ring
   have hrpow_tendsto : ∀ k, 0 < eig k →
       Filter.Tendsto (fun ε : ℝ => (eig k + ε)^β) (nhdsWithin 0 (Set.Ioi 0)) (nhds ((eig k)^β)) := by
     intro k hk
@@ -1233,7 +1269,8 @@ private lemma rpow_conj_tendsto_of_suppLE
       (nhds ((CFC.rpow σ β * ρ * CFC.rpow σ β) (b i))) := by
     intro i
     rw [hM0 i]
-    have hEq : (fun ε : ℝ => (CFC.rpow (σ + (ε:ℂ)•(1:L ℋ)) β * (ρ + (ε:ℂ)•(1:L ℋ)) * CFC.rpow (σ + (ε:ℂ)•(1:L ℋ)) β) (b i))
+    have hEq : (fun ε : ℝ => (CFC.rpow (σ + (ε:ℂ)•(1:L ℋ)) β * (ρ + (ε:ℂ)•(1:L ℋ))
+          * CFC.rpow (σ + (ε:ℂ)•(1:L ℋ)) β) (b i))
         =ᶠ[nhdsWithin 0 (Set.Ioi 0)]
         (fun ε => (∑ j, ((((eig i+ε)^β * (eig j+ε)^β : ℝ):ℂ) * inner ℂ (b j) (ρ (b i))) • b j)
           + (((ε * ((eig i+ε)^β)^2 : ℝ)):ℂ) • b i) := by
@@ -1244,14 +1281,14 @@ private lemma rpow_conj_tendsto_of_suppLE
         = (∑ j, ((((eig i)^β * (eig j)^β : ℝ):ℂ) * inner ℂ (b j) (ρ (b i))) • b j) + (0:ℋ) from
         (add_zero _).symm]
     apply Filter.Tendsto.add
-    · apply tendsto_finset_sum
+    · apply tendsto_finsetSum
       intro j _
       by_cases hzero : eig i = 0 ∨ eig j = 0
       · have hin0 := h_supp_zero i j hzero
         rw [hin0]
         simp only [mul_zero, zero_smul]
         exact tendsto_const_nhds
-      · push_neg at hzero
+      · push Not at hzero
         obtain ⟨hi, hj⟩ := hzero
         have hi' : 0 < eig i := lt_of_le_of_ne (h_eig_nn i) (Ne.symm hi)
         have hj' : 0 < eig j := lt_of_le_of_ne (h_eig_nn j) (Ne.symm hj)
@@ -1273,7 +1310,7 @@ private lemma rpow_conj_tendsto_of_suppLE
           ((CFC.rpow (σ + (ε:ℂ)•(1:L ℋ)) β * (ρ + (ε:ℂ)•(1:L ℋ)) * CFC.rpow (σ + (ε:ℂ)•(1:L ℋ)) β) (b i))) :=
     funext fun ε => linearMap_eq_sum_outer_product b _
   rw [hrecon0, hfun]
-  apply tendsto_finset_sum
+  apply tendsto_finsetSum
   intro i _
   exact ((continuous_outerL (b i)).tendsto _).comp (key i)
 
@@ -1313,7 +1350,8 @@ private lemma sandwichedQuasi_tendsto_of_suppLE
   have hcomp := Filter.Tendsto.comp hcont hMwithin
   have heqQ : ∀ ρ' σ' : L ℋ,
       sandwichedQuasi α ρ' σ' = Tr (CFC.rpow (CFC.rpow σ' β * ρ' * CFC.rpow σ' β) α) := by
-    intro ρ' σ'; rfl
+    intro ρ' σ'
+    rfl
   simp_rw [heqQ]
   exact hcomp
 
@@ -1331,7 +1369,8 @@ private lemma sandwichedQuasi_re_eq_zero_iff
   have hM_nn : (0 : L ℋ) ≤ M := rpow_conj_nonneg β hρ hσ
   have hMα_nn : (0 : L ℋ) ≤ CFC.rpow M α := CFC.rpow_nonneg
   have hQ_eq : sandwichedQuasi α ρ σ = Tr (CFC.rpow M α) := by
-    unfold sandwichedQuasi; rw [← hβ, ← hM]
+    unfold sandwichedQuasi
+    rw [← hβ, ← hM]
   rw [hQ_eq]
   constructor
   · intro htr
@@ -1378,7 +1417,8 @@ private lemma sandwichedQuasi_re_ne_zero_of_suppLE
   have h_supp_zero : ∀ i j, (eig i = 0 ∨ eig j = 0) → inner ℂ (b j) (ρ (b i)) = (0:ℂ) := by
     intro i j hij
     rcases hij with hi | hj
-    · rw [h_ker i hi]; simp
+    · rw [h_ker i hi]
+      simp
     · rw [show inner ℂ (b j) (ρ (b i)) = inner ℂ (ρ (b j)) (b i) from (hρ_sym (b j) (b i)).symm,
           h_ker j hj]; simp
   have hspec0 : ∀ i, eig i ∈ spectrum ℝ σ :=
@@ -1399,7 +1439,7 @@ private lemma sandwichedQuasi_re_ne_zero_of_suppLE
     intro i k
     by_cases h : eig i = 0 ∨ eig k = 0
     · exact h_supp_zero i k h
-    · push_neg at h
+    · push Not at h
       have hi' : 0 < eig i := lt_of_le_of_ne (h_eig_nn i) (Ne.symm h.1)
       have hk' : 0 < eig k := lt_of_le_of_ne (h_eig_nn k) (Ne.symm h.2)
       have hc := hcoeff i k
@@ -1567,15 +1607,17 @@ private lemma sandwichedRenyiDiv_faithfulApprox_le
     have hsmul := LinearMap.map_smul F.toCompletelyPositiveMap.toLinearMap (ε : ℂ) (1 : L ℋ)
     have eρ : F.toFun (ρ + (ε : ℂ) • (1 : L ℋ)) = F.toFun ρ + (ε : ℂ) • F.toFun (1 : L ℋ) := by
       have h1 := LinearMap.map_add F.toCompletelyPositiveMap.toLinearMap ρ ((ε : ℂ) • (1 : L ℋ))
-      rw [hsmul] at h1; exact h1
+      rw [hsmul] at h1
+      exact h1
     have eσ : F.toFun (σ + (ε : ℂ) • (1 : L ℋ)) = F.toFun σ + (ε : ℂ) • F.toFun (1 : L ℋ) := by
       have h1 := LinearMap.map_add F.toCompletelyPositiveMap.toLinearMap σ ((ε : ℂ) • (1 : L ℋ))
-      rw [hsmul] at h1; exact h1
+      rw [hsmul] at h1
+      exact h1
     rw [eρ, eσ] at hpd
     exact hpd
   have h_RHS := sandwichedRenyiDiv_tendsto_nonneg_lt hα0 hα_lt hρ hσ zero_le_one hQρσ hTrρ
   have h_LHS := sandwichedRenyiDiv_tendsto_nonneg_lt hα0 hα_lt hFρ_nn hFσ_nn hF1_nn hQF hTrFρ
-  haveI : (nhdsWithin (0 : ℝ) (Set.Ioi 0)).NeBot := nhdsWithin_Ioi_neBot (le_refl 0)
+  have : (nhdsWithin (0 : ℝ) (Set.Ioi 0)).NeBot := nhdsWithin_Ioi_neBot (le_refl 0)
   exact le_of_tendsto_of_tendsto h_LHS h_RHS
     (Filter.eventually_of_mem self_mem_nhdsWithin h_pert)
 
@@ -1627,7 +1669,7 @@ private lemma sandwichedQuasi_re_ne_zero_of_CPTP
         Real.log ((sandwichedQuasi α (F.toFun ρ) (F.toFun σ)).re / (Tr ρ).re) := by
       have hinv_neg : 1 / (α - 1) < 0 := one_div_neg.mpr hαm
       by_contra hcon
-      push_neg at hcon
+      push Not at hcon
       exact absurd hD (not_le.mpr (by
         apply mul_lt_mul_of_neg_left hcon hinv_neg))
     rw [Real.log_le_log_iff (by positivity) (by positivity),
@@ -1654,7 +1696,7 @@ private lemma sandwichedQuasi_re_ne_zero_of_CPTP
       (nonneg_of_pdSetLM (faithfulApprox_pdSetLM E l.property.1 l.property.2 hρ hρ0))
       (nonneg_of_pdSetLM (faithfulApprox_pdSetLM E l.property.1 l.property.2 hσ hσ0))
   have hlim := hcwa.tendsto.comp hpair
-  haveI : (Filter.comap (fun l : {l : ℝ // 0 < l ∧ l ≤ 1} => l.val)
+  have : (Filter.comap (fun l : {l : ℝ // 0 < l ∧ l ≤ 1} => l.val)
       (nhdsWithin 0 (Set.Ioi 0))).NeBot := by
     refine Filter.comap_neBot fun t ht => ?_
     obtain ⟨U, hU_open, hU0, hU_sub⟩ := mem_nhdsWithin.mp ht
@@ -1688,12 +1730,15 @@ private lemma sandwichedQuasi_tendsto_pd
   have hg_tendsto : Filter.Tendsto g (nhdsWithin 0 (Set.Ioi 0)) (nhdsWithin (ρ, σ) S) := by
     rw [tendsto_nhdsWithin_iff]
     refine ⟨?_, ?_⟩
-    · rw [← hg0]; exact (hg_cont.tendsto 0).mono_left nhdsWithin_le_nhds
+    · rw [← hg0]
+      exact (hg_cont.tendsto 0).mono_left nhdsWithin_le_nhds
     · filter_upwards [self_mem_nhdsWithin] with ε hε
       have hεP : (ε : ℂ) • P ∈ pdSetLM (ℋ := ℋ) := pdSetLM_pos_smul hP hε
       refine Set.mk_mem_prod ?_ ?_
-      · rw [add_comm]; exact pdSetLM_add_nonneg (nonneg_of_pdSetLM hεP) hρ
-      · rw [add_comm]; exact pdSetLM_add_nonneg (nonneg_of_pdSetLM hεP) hσ
+      · rw [add_comm]
+        exact pdSetLM_add_nonneg (nonneg_of_pdSetLM hεP) hρ
+      · rw [add_comm]
+        exact pdSetLM_add_nonneg (nonneg_of_pdSetLM hεP) hσ
   have hcwa : ContinuousWithinAt
       (Function.uncurry (fun (ρ σ : L ℋ) => (sandwichedQuasi α ρ σ).re)) S (ρ, σ) :=
     hcont (ρ, σ) ⟨hρ, hσ⟩
@@ -1762,15 +1807,17 @@ private lemma sandwichedRenyiDiv_faithfulApprox_le_gt
     have hsmul := LinearMap.map_smul F.toCompletelyPositiveMap.toLinearMap (ε : ℂ) (1 : L ℋ)
     have eρ : F.toFun (ρ + (ε : ℂ) • (1 : L ℋ)) = F.toFun ρ + (ε : ℂ) • F.toFun (1 : L ℋ) := by
       have h1 := LinearMap.map_add F.toCompletelyPositiveMap.toLinearMap ρ ((ε : ℂ) • (1 : L ℋ))
-      rw [hsmul] at h1; exact h1
+      rw [hsmul] at h1
+      exact h1
     have eσ : F.toFun (σ + (ε : ℂ) • (1 : L ℋ)) = F.toFun σ + (ε : ℂ) • F.toFun (1 : L ℋ) := by
       have h1 := LinearMap.map_add F.toCompletelyPositiveMap.toLinearMap σ ((ε : ℂ) • (1 : L ℋ))
-      rw [hsmul] at h1; exact h1
+      rw [hsmul] at h1
+      exact h1
     rw [eρ, eσ] at hpd
     exact hpd
   have h_RHS := sandwichedRenyiDiv_tendsto_of_suppLE hα_gt hρ hσ hsupp hρ0
   have h_LHS := sandwichedRenyiDiv_tendsto_pd hα0 hFρ_pd hFσ_pd hF1
-  haveI : (nhdsWithin (0 : ℝ) (Set.Ioi 0)).NeBot := nhdsWithin_Ioi_neBot (le_refl 0)
+  have : (nhdsWithin (0 : ℝ) (Set.Ioi 0)).NeBot := nhdsWithin_Ioi_neBot (le_refl 0)
   exact le_of_tendsto_of_tendsto h_LHS h_RHS
     (Filter.eventually_of_mem self_mem_nhdsWithin h_pert)
 
@@ -1795,8 +1842,12 @@ private lemma rpow_conj_tendsto_faithful
   set β : ℝ := (1-α)/(2*α) with hβ
   have hαpos : 0 < α := by linarith
   have hβneg : β < 0 := by
-    rw [hβ]; apply div_neg_of_neg_of_pos (by linarith) (by positivity)
-  have h2β : (1:ℝ) + 2*β = 1/α := by rw [hβ]; field_simp; ring
+    rw [hβ]
+    apply div_neg_of_neg_of_pos (by linarith) (by positivity)
+  have h2β : (1:ℝ) + 2*β = 1/α := by
+    rw [hβ]
+    field_simp
+    ring
   have hα_inv_pos : (0:ℝ) < 1/α := one_div_pos.mpr hαpos
   set n := Module.finrank ℂ ℋ with hn_def
   have hn : Module.finrank ℂ ℋ = n := rfl
@@ -1814,7 +1865,8 @@ private lemma rpow_conj_tendsto_faithful
   have h_supp_zero : ∀ i j, (eig i = 0 ∨ eig j = 0) → inner ℂ (b j) (B (b i)) = (0:ℂ) := by
     intro i j hij
     rcases hij with hi | hj
-    · rw [h_ker i hi]; simp
+    · rw [h_ker i hi]
+      simp
     · rw [show inner ℂ (b j) (B (b i)) = inner ℂ (B (b j)) (b i) from (hB_sym (b j) (b i)).symm,
           h_ker j hj]; simp
   -- eigenvalue of the perturbed operator `Pσ λ`.
@@ -1824,16 +1876,19 @@ private lemma rpow_conj_tendsto_faithful
     intro lam k
     rw [LinearMap.add_apply, LinearMap.smul_apply, h_eig_apply k, LinearMap.smul_apply,
         Module.End.one_apply, smul_smul, ← add_smul, hν]
-    push_cast; ring_nf
+    push_cast
+    ring_nf
   have hν_pos : ∀ (lam : ℝ), 0 < lam → lam ≤ 1 → ∀ k, 0 < ν lam k := by
     intro lam hlam0 hlam1 k
     have h1 : 0 ≤ (1-lam)*eig k := mul_nonneg (by linarith) (h_eig_nn k)
     have h2 : 0 < lam*cσ := mul_pos hlam0 hcσ
-    rw [hν]; linarith
+    rw [hν]
+    linarith
   have hν_le : ∀ (lam : ℝ), 0 < lam → lam ≤ 1 → ∀ k, lam*cσ ≤ ν lam k := by
     intro lam hlam0 hlam1 k
     have h1 : 0 ≤ (1-lam)*eig k := mul_nonneg (by linarith) (h_eig_nn k)
-    rw [hν]; linarith
+    rw [hν]
+    linarith
   -- `A^β (b i) = (eig i)^β • b i`.
   have hspec0 : ∀ i, eig i ∈ spectrum ℝ A :=
     fun i => mem_spectrum_real_of_eigenvector (hb_ne i) (h_eig_apply i)
@@ -1847,7 +1902,8 @@ private lemma rpow_conj_tendsto_faithful
     apply Finset.sum_congr rfl
     intro j _
     rw [map_smul, hS0b j, smul_smul]
-    congr 1; ring
+    congr 1
+    ring
   have hM0 : ∀ i, (CFC.rpow A β * B * CFC.rpow A β) (b i)
       = ∑ j, ((((eig i)^β * (eig j)^β : ℝ):ℂ) * inner ℂ (b j) (B (b i))) • b j := by
     intro i
@@ -1857,7 +1913,8 @@ private lemma rpow_conj_tendsto_faithful
     intro j _
     rw [smul_smul]
     congr 1
-    push_cast; ring
+    push_cast
+    ring
   -- per-λ formula for `Pσ^β Pρ Pσ^β (b i)`.
   have hMlam : ∀ (lam : ℝ), 0 < lam → lam ≤ 1 → ∀ i,
       (CFC.rpow (((1-lam:ℝ):ℂ)•A + ((lam*cσ:ℝ):ℂ)•(1:L ℋ)) β
@@ -1888,7 +1945,8 @@ private lemma rpow_conj_tendsto_faithful
       apply Finset.sum_congr rfl
       intro j _
       rw [map_smul, hSb j, smul_smul]
-      congr 1; ring
+      congr 1
+      ring
     rw [Module.End.mul_apply, Module.End.mul_apply, hSb i, map_smul, map_smul, hPρ_app,
         map_add, map_smul, map_smul, hSrho, hSb i, smul_add]
     congr 1
@@ -1897,17 +1955,23 @@ private lemma rpow_conj_tendsto_faithful
       intro j _
       rw [smul_smul]
       congr 1
-      push_cast; ring
+      push_cast
+      ring
     · rw [smul_smul, smul_smul]
       congr 1
-      push_cast; ring
+      push_cast
+      ring
   -- `ν lam k → eig k` as `λ → 0⁺`.
   have hν_tendsto : ∀ k, Filter.Tendsto (fun lam : ℝ => ν lam k)
       (nhdsWithin 0 (Set.Ioi 0)) (nhds (eig k)) := by
     intro k
-    have hcont : Continuous (fun lam : ℝ => ν lam k) := by rw [hν]; fun_prop
+    have hcont : Continuous (fun lam : ℝ => ν lam k) := by
+      rw [hν]
+      fun_prop
     have h0 : Filter.Tendsto (fun lam : ℝ => ν lam k) (nhds 0) (nhds (ν 0 k)) := hcont.tendsto 0
-    have : ν 0 k = eig k := by rw [hν]; ring
+    have : ν 0 k = eig k := by
+      rw [hν]
+      ring
     rw [this] at h0
     exact h0.mono_left nhdsWithin_le_nhds
   have hrpow_tendsto : ∀ k, 0 < eig k →
@@ -1952,7 +2016,8 @@ private lemma rpow_conj_tendsto_faithful
         calc lam*cρ * (ν lam i)^(2*β) ≤ lam*cρ * (lam*cσ)^(2*β) :=
               mul_le_mul_of_nonneg_left hle (mul_nonneg hlam0.le hcρ)
           _ = cρ * cσ^(2*β) * lam ^ (1/α) := by
-                rw [Real.mul_rpow hlam0.le hcσ.le, ← hlampow]; ring
+                rw [Real.mul_rpow hlam0.le hcσ.le, ← hlampow]
+                ring
       · exact hg
     have hcomp := (Complex.continuous_ofReal.tendsto (0:ℝ)).comp hreal
     simpa only [Function.comp_def, Complex.ofReal_zero] using hcomp
@@ -1983,14 +2048,14 @@ private lemma rpow_conj_tendsto_faithful
         = (∑ j, ((((eig i)^β * (eig j)^β : ℝ):ℂ) * inner ℂ (b j) (B (b i))) • b j) + (0:ℋ) from
         (add_zero _).symm]
     apply Filter.Tendsto.add
-    · apply tendsto_finset_sum
+    · apply tendsto_finsetSum
       intro j _
       by_cases hzero : eig i = 0 ∨ eig j = 0
       · have hin0 := h_supp_zero i j hzero
         rw [hin0]
         simp only [mul_zero, zero_smul]
         exact tendsto_const_nhds
-      · push_neg at hzero
+      · push Not at hzero
         obtain ⟨hi, hj⟩ := hzero
         have hi' : 0 < eig i := lt_of_le_of_ne (h_eig_nn i) (Ne.symm hi)
         have hj' : 0 < eig j := lt_of_le_of_ne (h_eig_nn j) (Ne.symm hj)
@@ -2026,7 +2091,7 @@ private lemma rpow_conj_tendsto_faithful
             * CFC.rpow (((1-lam:ℝ):ℂ)•A + ((lam*cσ:ℝ):ℂ)•(1:L ℋ)) β) (b i))) :=
     funext fun lam => linearMap_eq_sum_outer_product b _
   rw [hrecon0, hfun]
-  apply tendsto_finset_sum
+  apply tendsto_finsetSum
   intro i _
   exact ((continuous_outerL (b i)).tendsto _).comp (key i)
 
@@ -2059,7 +2124,9 @@ private lemma sandwichedRenyiDiv_tendsto_faithful
   have hcρ_nn : 0 ≤ cρ := div_nonneg (le_of_lt (trace_re_pos_of_ne_zero hρ hρ0)) hd_pos.le
   have hEρ0 : Eρ ≠ 0 := by
     intro h
-    have hz : (Tr Eρ).re = 0 := by rw [h]; simp
+    have hz : (Tr Eρ).re = 0 := by
+      rw [h]
+      simp
     rw [hEρdef, ← E.trace_map ρ] at hz
     exact (trace_re_pos_of_ne_zero hρ hρ0).ne' hz
   -- Operator convergence along the faithful path (in the target space `𝒦`).
@@ -2139,7 +2206,7 @@ private lemma sandwichedRenyiDiv_tendsto_faithful
     rw [hTrX_re, hcX]
     push_cast
     field_simp
-  haveI : (Filter.comap (fun l : {l : ℝ // 0 < l ∧ l ≤ 1} => l.val)
+  have : (Filter.comap (fun l : {l : ℝ // 0 < l ∧ l ≤ 1} => l.val)
       (nhdsWithin 0 (Set.Ioi 0))).NeBot := by
     refine Filter.comap_neBot fun t ht => ?_
     obtain ⟨U, hU_open, hU0, hU_sub⟩ := mem_nhdsWithin.mp ht
@@ -2192,7 +2259,7 @@ private lemma sandwichedRenyiDivNN_monotone_real_aux
     rintro ⟨lam, hlam0, hlam1⟩
     exact sandwichedRenyiDiv_faithfulApprox_le_gt E hα_gt hρ hσ hρ0 hsupp hlam0 hlam1
   -- **Step 2**: `λ → 0⁺`, boundary continuity along the faithful path.
-  haveI hNeBot : (Filter.comap (fun l : {l : ℝ // 0 < l ∧ l ≤ 1} => l.val)
+  have hNeBot : (Filter.comap (fun l : {l : ℝ // 0 < l ∧ l ≤ 1} => l.val)
       (nhdsWithin 0 (Set.Ioi 0))).NeBot := by
     refine Filter.comap_neBot fun t ht => ?_
     obtain ⟨U, hU_open, hU0, hU_sub⟩ := mem_nhdsWithin.mp ht
@@ -2235,7 +2302,9 @@ private lemma sandwichedRenyiDivNN_monotone_real_aux_lt
   have hTrρ : (Tr ρ).re ≠ 0 := ne_of_gt (trace_re_pos_of_ne_zero hρ hρ0)
   have hEρ0 : E.toFun ρ ≠ 0 := by
     intro h
-    have hz : (Tr (E.toFun ρ)).re = 0 := by rw [h]; simp
+    have hz : (Tr (E.toFun ρ)).re = 0 := by
+      rw [h]
+      simp
     rw [← E.trace_map ρ] at hz
     exact hTrρ hz
   have hTrEρ : (Tr (E.toFun ρ)).re ≠ 0 := ne_of_gt (trace_re_pos_of_ne_zero hEρ hEρ0)
@@ -2270,7 +2339,7 @@ private lemma sandwichedRenyiDivNN_monotone_real_aux_lt
       ({A : L 𝒦 | 0 ≤ A} ×ˢ {A : L 𝒦 | 0 ≤ A}) (E.toFun ρ, E.toFun σ) :=
     sandwichedRenyiDiv_continuousWithinAt_lt hα0 hα_lt hEρ hEσ hQEρσ hTrEρ
   have hlim := hcwa.tendsto.comp hpair
-  haveI : (Filter.comap (fun l : {l : ℝ // 0 < l ∧ l ≤ 1} => l.val)
+  have : (Filter.comap (fun l : {l : ℝ // 0 < l ∧ l ≤ 1} => l.val)
       (nhdsWithin 0 (Set.Ioi 0))).NeBot := by
     refine Filter.comap_neBot fun t ht => ?_
     obtain ⟨U, hU_open, hU0, hU_sub⟩ := mem_nhdsWithin.mp ht
@@ -2311,7 +2380,8 @@ theorem sandwichedRenyiDivNN_monotone
       by_cases hρ0 : ρ = 0
       · -- `ρ = 0`: both divergences are `0`.
         have hEρ0 : E.toFun ρ = 0 := by
-          rw [hρ0]; exact map_zero E.toCompletelyPositiveMap.toLinearMap
+          rw [hρ0]
+          exact map_zero E.toCompletelyPositiveMap.toLinearMap
         have h_LHS0 : sandwichedRenyiDivNN α (E.toFun ρ) (E.toFun σ) = ((0 : ℝ) : EReal) := by
           rw [hEρ0]
           unfold sandwichedRenyiDivNN
@@ -2330,13 +2400,15 @@ theorem sandwichedRenyiDivNN_monotone
       · have h_LHS : sandwichedRenyiDivNN α (E.toFun ρ) (E.toFun σ) =
             ((sandwichedRenyiDiv α (E.toFun ρ) (E.toFun σ) : ℝ) : EReal) := by
           unfold sandwichedRenyiDivNN
-          rw [if_neg]; rintro (⟨_, h⟩ | ⟨h, _⟩)
+          rw [if_neg]
+          rintro (⟨_, h⟩ | ⟨h, _⟩)
           · exact h hEsupp
           · linarith
         have h_RHS : sandwichedRenyiDivNN α ρ σ =
             ((sandwichedRenyiDiv α ρ σ : ℝ) : EReal) := by
           unfold sandwichedRenyiDivNN
-          rw [if_neg]; rintro (⟨_, h⟩ | ⟨h, _⟩)
+          rw [if_neg]
+          rintro (⟨_, h⟩ | ⟨h, _⟩)
           · exact h hsupp
           · linarith
         rw [h_LHS, h_RHS]
@@ -2350,7 +2422,7 @@ theorem sandwichedRenyiDivNN_monotone
       rw [h_RHS_top]
       exact le_top
   · -- `α < 1`.
-    push_neg at hα_gt
+    push Not at hα_gt
     have hα_lt : α < 1 := lt_of_le_of_ne hα_gt hα_ne1
     have hα0 : 0 < α := by linarith
     by_cases hRtop : ρ ≠ 0 ∧ (sandwichedQuasi α ρ σ).re = 0
@@ -2362,7 +2434,9 @@ theorem sandwichedRenyiDivNN_monotone
       exact le_top
     · by_cases hρ0 : ρ = 0
       · -- `ρ = 0`: both divergences are `0`.
-        have hEρ0 : E.toFun ρ = 0 := by rw [hρ0]; exact map_zero E.toCompletelyPositiveMap.toLinearMap
+        have hEρ0 : E.toFun ρ = 0 := by
+          rw [hρ0]
+          exact map_zero E.toCompletelyPositiveMap.toLinearMap
         have h_LHS0 : sandwichedRenyiDivNN α (E.toFun ρ) (E.toFun σ) = ((0 : ℝ) : EReal) := by
           rw [hEρ0]
           unfold sandwichedRenyiDivNN
@@ -2385,13 +2459,15 @@ theorem sandwichedRenyiDivNN_monotone
         have h_LHS : sandwichedRenyiDivNN α (E.toFun ρ) (E.toFun σ) =
             ((sandwichedRenyiDiv α (E.toFun ρ) (E.toFun σ) : ℝ) : EReal) := by
           unfold sandwichedRenyiDivNN
-          rw [if_neg]; rintro (⟨h, _⟩ | ⟨_, _, h⟩)
+          rw [if_neg]
+          rintro (⟨h, _⟩ | ⟨_, _, h⟩)
           · linarith
           · exact hQEρσ h
         have h_RHS : sandwichedRenyiDivNN α ρ σ =
             ((sandwichedRenyiDiv α ρ σ : ℝ) : EReal) := by
           unfold sandwichedRenyiDivNN
-          rw [if_neg]; rintro (⟨h, _⟩ | ⟨_, _, h⟩)
+          rw [if_neg]
+          rintro (⟨h, _⟩ | ⟨_, _, h⟩)
           · linarith
           · exact hQρσ h
         rw [h_LHS, h_RHS]
@@ -2426,7 +2502,8 @@ lemma re_inner_le_of_le_smul {ρ σ : L ℋ} {lam : ℝ} (h : ρ ≤ (lam : ℂ)
   rw [heq, inner_sub_left, inner_smul_left, Complex.conj_ofReal, map_sub] at hx
   have hre : RCLike.re ((lam : ℂ) * inner ℂ (σ x) x) = lam * RCLike.re (inner ℂ (σ x) x) := by
     change (((lam : ℂ) * inner ℂ (σ x) x)).re = _
-    rw [Complex.re_ofReal_mul]; rfl
+    rw [Complex.re_ofReal_mul]
+    rfl
   rw [hre] at hx
   linarith
 
@@ -2434,7 +2511,7 @@ lemma re_inner_le_of_le_smul {ρ σ : L ℋ} {lam : ℝ} (h : ρ ≤ (lam : ℂ)
 lemma exists_re_inner_pos_of_ne_zero {ρ : L ℋ} (hρ : 0 ≤ ρ) (hρ0 : ρ ≠ 0) :
     ∃ x, 0 < RCLike.re (inner ℂ (ρ x) x) := by
   by_contra h
-  push_neg at h
+  push Not at h
   apply hρ0
   have hρ_pos : ρ.IsPositive := (LinearMap.nonneg_iff_isPositive ρ).mp hρ
   ext x
@@ -2442,7 +2519,8 @@ lemma exists_re_inner_pos_of_ne_zero {ρ : L ℋ} (hρ : 0 ≤ ρ) (hρ0 : ρ �
   have hge : 0 ≤ RCLike.re (inner ℂ (ρ x) x) := hρ_pos.2 x
   have heq : RCLike.re (inner ℂ (ρ x) x) = 0 := le_antisymm hle hge
   have hzero := nonneg_apply_eq_zero_of_inner_self_eq_zero hρ heq
-  rw [LinearMap.zero_apply]; exact hzero
+  rw [LinearMap.zero_apply]
+  exact hzero
 
 /-- For nonneg `ρ ≠ 0` with `suppLE ρ σ`, `maxRelSet ρ σ` has a strictly positive lower bound. -/
 lemma maxRelSet_pos_lowerBound {ρ σ : L ℋ} (hρ : 0 ≤ ρ) (hσ : 0 ≤ σ)
@@ -2457,7 +2535,8 @@ lemma maxRelSet_pos_lowerBound {ρ σ : L ℋ} (hρ : 0 ≤ ρ) (hσ : 0 ≤ σ)
       have hσx : σ x = 0 := nonneg_apply_eq_zero_of_inner_self_eq_zero hσ h_eq.symm
       have hxker : x ∈ LinearMap.ker σ := hσx
       have hρx : ρ x = 0 := hsupp hxker
-      rw [hρx] at hx; simp at hx
+      rw [hρx] at hx
+      simp at hx
     · exact h_lt
   refine ⟨RCLike.re (inner ℂ (ρ x) x) / RCLike.re (inner ℂ (σ x) x), div_pos hx hσx_pos, ?_⟩
   intro lam hlam
@@ -2481,7 +2560,7 @@ lemma sInf_maxRelSet_pos {ρ σ : L ℋ} (hρ : 0 ≤ ρ) (hσ : 0 ≤ σ)
     `¬ suppLE ρ σ`. The equivalent order-theoretic form `log inf{λ ≥ 0 : ρ ≤ λ σ}` is
     `maxRelEntropyNN_eq_log_sInf`. -/
 noncomputable def maxRelEntropyNN (ρ σ : L ℋ) : EReal :=
-  letI : Decidable (suppLE ρ σ) := Classical.propDecidable _
+  let : Decidable (suppLE ρ σ) := Classical.propDecidable _
   if suppLE ρ σ then ((Real.log ‖CFC.rpow σ (-(1/2)) * ρ * CFC.rpow σ (-(1/2))‖ : ℝ) : EReal)
   else (⊤ : EReal)
 
@@ -2502,7 +2581,7 @@ lemma maxRelSet_subset_of_CPTP
 lemma maxRelSet_zero_left {ℋ' : Type u} [Qudit ℋ'] [Nontrivial ℋ'] {τ : L ℋ'} (hτ : 0 ≤ τ) :
     maxRelSet (0 : L ℋ') τ = Set.Ici (0 : ℝ) := by
   ext lam
-  simp only [maxRelSet, Set.mem_setOf_eq, Set.mem_Ici]
+  simp only [maxRelSet, Set.mem_ofPred_eq, Set.mem_Ici]
   refine ⟨fun h => h.1, fun hlam => ⟨hlam, ?_⟩⟩
   exact smul_nonneg (Complex.zero_le_real.mpr hlam) hτ
 
@@ -2512,7 +2591,9 @@ lemma CPTP_toFun_ne_zero
     {ρ : L ℋ} (hρ : 0 ≤ ρ) (hρ0 : ρ ≠ 0) :
     E.toFun ρ ≠ 0 := by
   intro h
-  have htr : (Tr ρ).re = 0 := by rw [E.trace_map ρ, h]; simp
+  have htr : (Tr ρ).re = 0 := by
+    rw [E.trace_map ρ, h]
+    simp
   exact absurd htr (ne_of_gt (trace_re_pos_of_ne_zero hρ hρ0))
 
 /-! ### α = ∞ : the order-theoretic characterization and the data-processing inequality
@@ -2526,7 +2607,8 @@ omit [Nontrivial ℋ] in
 /-- `CFC.rpow σ y` as a real continuous-functional-calculus expression. -/
 private lemma rpow_eq_cfc_aux {σ : L ℋ} (hσ : 0 ≤ σ) (y : ℝ) :
     CFC.rpow σ y = cfc (fun x : ℝ => x ^ y) σ := by
-  rw [CFC.rpow_eq_pow]; exact CFC.rpow_eq_cfc_real hσ
+  rw [CFC.rpow_eq_pow]
+  exact CFC.rpow_eq_cfc_real hσ
 
 /-- Product of two real powers of `σ`, merged into a single `cfc`
     (valid even at singular `σ`, since the real spectrum is finite hence discrete). -/
@@ -2653,13 +2735,15 @@ lemma sInf_maxRelSet_eq_norm {ρ σ : L ℋ} (hρ : 0 ≤ ρ) (hσ : 0 ≤ σ) (
         = (‖M‖ : ℝ) • σ := by
       rw [Algebra.algebraMap_eq_smul_one, mul_smul_comm, mul_one, smul_mul_assoc, rpow_half_sq hσ]
     rw [hRHS] at hconj
-    rw [Complex.coe_smul]; exact hconj
+    rw [Complex.coe_smul]
+    exact hconj
   -- `‖M‖` is a lower bound of `maxRelSet ρ σ`.
   have hlb : ∀ lam ∈ maxRelSet ρ σ, ‖M‖ ≤ lam := by
     intro lam hlam
     have hlam0 : 0 ≤ lam := hlam.1
     have hle : ρ ≤ (lam : ℝ) • σ := by
-      have h := hlam.2; rwa [Complex.coe_smul] at h
+      have h := hlam.2
+      rwa [Complex.coe_smul] at h
     have hconj := hsa_t.conjugate_le_conjugate hle
     rw [← hM] at hconj
     have hrhs : CFC.rpow σ (-(1/2)) * ((lam : ℝ) • σ) * CFC.rpow σ (-(1/2))
@@ -2671,7 +2755,8 @@ lemma sInf_maxRelSet_eq_norm {ρ σ : L ℋ} (hρ : 0 ≤ ρ) (hσ : 0 ≤ σ) (
       rw [← sub_nonneg, ← smul_sub]
       exact smul_nonneg hlam0 (sub_nonneg.mpr (rpow_neg_conj_self_le_one hσ))
     have hMle1 : M ≤ algebraMap ℝ (L ℋ) lam := by
-      rw [Algebra.algebraMap_eq_smul_one]; exact le_trans hconj hstep
+      rw [Algebra.algebraMap_eq_smul_one]
+      exact le_trans hconj hstep
     exact (CStarAlgebra.norm_le_iff_le_algebraMap M hlam0 hMnn).mpr hMle1
   exact le_antisymm (csInf_le (maxRelSet_bddBelow ρ σ) hmem) (le_csInf ⟨‖M‖, hmem⟩ hlb)
 
@@ -2728,7 +2813,7 @@ lemma tendsto_rpow_exponent_atTop {σ : L ℋ} (hσ : 0 ≤ σ) :
       = (fun α => ∑ i, outer_product (b i) (CFC.rpow σ ((1 - α) / (2 * α)) (b i))) :=
     funext fun α => linearMap_eq_sum_outer_product b _
   rw [hrecon, hfun]
-  apply tendsto_finset_sum
+  apply tendsto_finsetSum
   intro i _
   exact ((continuous_outerL (b i)).tendsto _).comp (key i)
 
@@ -2737,7 +2822,8 @@ lemma tendsto_rpow_exponent_atTop {σ : L ℋ} (hσ : 0 ≤ σ) :
 lemma maxRelEntropyNN_eq_log_norm {ρ σ : L ℋ} (hsupp : suppLE ρ σ) :
     maxRelEntropyNN ρ σ =
       ((Real.log ‖CFC.rpow σ (-(1/2)) * ρ * CFC.rpow σ (-(1/2))‖ : ℝ) : EReal) := by
-  unfold maxRelEntropyNN; rw [if_pos hsupp]
+  unfold maxRelEntropyNN
+  rw [if_pos hsupp]
 
 /-- **Order-theoretic characterization** of the max-relative entropy on the `suppLE`
     region: `D_∞(ρ‖σ) = log inf{λ ≥ 0 : ρ ≤ λ σ}`. -/
@@ -2763,7 +2849,8 @@ theorem maxRelEntropyNN_monotone
     by_cases hρ0 : ρ = 0
     · -- both infima are `0`, both logs are `0`
       have hEρ0 : E.toFun ρ = 0 := by
-        rw [hρ0]; exact map_zero E.toCompletelyPositiveMap.toLinearMap
+        rw [hρ0]
+        exact map_zero E.toCompletelyPositiveMap.toLinearMap
       rw [hEρ0, hρ0, maxRelSet_zero_left hEσ, maxRelSet_zero_left hσ]
     · -- ρ ≠ 0: both infima positive, use subset + log monotonicity
       have hEρ0 : E.toFun ρ ≠ 0 := CPTP_toFun_ne_zero E hρ hρ0
@@ -2779,8 +2866,10 @@ theorem maxRelEntropyNN_monotone
       exact Real.log_le_log h_pos_E h_inf_le
   · -- support fails: RHS is ⊤
     have h_RHS : maxRelEntropyNN ρ σ = (⊤ : EReal) := by
-      unfold maxRelEntropyNN; rw [if_neg hsupp]
-    rw [h_RHS]; exact le_top
+      unfold maxRelEntropyNN
+      rw [if_neg hsupp]
+    rw [h_RHS]
+    exact le_top
 
 /-- **Theorem 1 (Frank–Lieb), `α = ∞`, paper form.** For a CPTP map `E` and
     non-negative `ρ, σ` with `suppLE ρ σ`,

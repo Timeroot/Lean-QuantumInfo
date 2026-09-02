@@ -1,10 +1,11 @@
 /-
-Copyright (c) 2025-2026. All rights reserved.
+Copyright (c) 2025-2026 Hayata Yamasaki. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Kazumi Kasaura, Hayata Yamasaki
 -/
 
-import Quantum.QuantumEntropy.SandwichedRenyiNonNeg
-import Quantum.QuantumEntropy.CFCDeriv
+import QuantumLib.Entropy.SandwichedRenyi.NonNeg
+import QuantumLib.ForMathlib.CFCDeriv
 import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.ExpLog.Basic
 import Mathlib.Analysis.RCLike.Basic
 import Mathlib.MeasureTheory.Integral.IntervalIntegral.FundThmCalculus
@@ -19,12 +20,11 @@ This file extends the Frank–Lieb data-processing programme to the boundary cas
 relative entropy**.
 
 It is the companion of the `α = ∞` (max-relative entropy) case, proven in
-`Quantum.QuantumEntropy.SandwichedRenyiNonNeg` (`maxRelEntropyNN_monotone`).
+`QuantumLib.Entropy.SandwichedRenyi.NonNeg` (`maxRelEntropyNN_monotone`).
 
-## Status
+## Main results
 
-The whole `α = 1` programme (following Müller-Lennert et al., arXiv:1306.3142) is
-**fully proven, sorry-free**.
+Following Müller-Lennert et al., arXiv:1306.3142.
 
 * `umegakiNorm`, `umegakiRelEntropyNN` — explicit definitions.
 * `hasDerivAt_sandwichedQuasi_re_one` — the derivative of
@@ -62,7 +62,6 @@ open scoped ComplexOrder Topology
 
 universe u
 
-set_option linter.style.longLine false
 
 section Umegaki
 
@@ -82,7 +81,7 @@ noncomputable def umegakiNorm (ρ σ : L ℋ) : ℝ :=
     the Frank–Lieb extension), as an `EReal`: value `⊤` on the support-mismatch
     region `¬ suppLE ρ σ`, and `umegakiNorm ρ σ` otherwise. -/
 noncomputable def umegakiRelEntropyNN (ρ σ : L ℋ) : EReal :=
-  letI : Decidable (suppLE ρ σ) := Classical.propDecidable _
+  let : Decidable (suppLE ρ σ) := Classical.propDecidable _
   if suppLE ρ σ then ((umegakiNorm ρ σ : ℝ) : EReal) else (⊤ : EReal)
 
 omit [Nontrivial ℋ] in
@@ -119,7 +118,7 @@ lemma hasDerivAt_partB {ρ σ : L ℋ} (hσ : σ ∈ pdSetLM (ℋ := ℋ)) :
     have hu : HasDerivAt (fun α : ℝ => 1 - α) (-1) 1 := by
       simpa using (hasDerivAt_id (1 : ℝ)).const_sub 1
     have hv : HasDerivAt (fun α : ℝ => α) (1) 1 := hasDerivAt_id 1
-    simpa using hu.div hv (by norm_num)
+    simpa using hu.fun_div hv (by norm_num)
   have hchain := CFC.hasDerivAt_rpow_exponent_comp hσsp ht
   have htr := hasDerivAt_reTrace_mul_left ρ hchain
   convert htr using 1
@@ -136,7 +135,9 @@ lemma trace_conj_eq_trace_mul_rpow {ρ σ : L ℋ} (hσ : σ ∈ pdSetLM (ℋ :=
       = Tr (CFC.rpow σ ((1 - α) / (2 * α)) * ρ * CFC.rpow σ ((1 - α) / (2 * α))) := by
   set c := (1 - α) / (2 * α) with hc
   have hσu : IsUnit σ := isUnit_of_pdSetLM hσ
-  have hsum : (1 - α) / α = c + c := by rw [hc]; ring
+  have hsum : (1 - α) / α = c + c := by
+    rw [hc]
+    ring
   rw [hsum, show CFC.rpow σ (c + c) = CFC.rpow σ c * CFC.rpow σ c from CFC.rpow_add hσu,
      ← mul_assoc, LinearMap.trace_mul_comm, ← mul_assoc]
 
@@ -165,16 +166,19 @@ lemma tendsto_average_of_continuousAt {g : ℝ → ℝ → ℝ} {a L : ℝ}
   have hαa : α - a ≠ 0 := sub_ne_zero.mpr hα
   have hsplit : ∫ s in a..α, g α s
       = (∫ s in a..α, (g α s - L)) + (α - a) * L := by
-    rw [intervalIntegral.integral_sub (hint α) (intervalIntegral.intervalIntegrable_const),
+    rw [intervalIntegral.integral_sub (hint α) intervalIntegrable_const,
         intervalIntegral.integral_const, smul_eq_mul]; ring
   have hbound : ∀ s ∈ Set.uIoc a α, ‖g α s - L‖ ≤ ε / 2 := by
     intro s hs
     have hs_dist : |s - a| ≤ |α - a| := by
       rcases Set.mem_uIoc.mp hs with ⟨h1, h2⟩ | ⟨h1, h2⟩
-      · rw [abs_of_pos (by linarith), abs_of_pos (by linarith)]; linarith
-      · rw [abs_of_nonpos (by linarith), abs_of_neg (by linarith)]; linarith
+      · rw [abs_of_pos (by linarith), abs_of_pos (by linarith)]
+        linarith
+      · rw [abs_of_nonpos (by linarith), abs_of_neg (by linarith)]
+        linarith
     have hp_dist : dist (α, s) (a, a) < δ := by
-      rw [Prod.dist_eq]; simp only [max_lt_iff, Real.dist_eq]
+      rw [Prod.dist_eq]
+      simp only [max_lt_iff, Real.dist_eq]
       exact ⟨hdist, lt_of_le_of_lt hs_dist (by rwa [Real.dist_eq] at hdist)⟩
     have hb := hball hp_dist
     rw [Real.dist_eq] at hb
@@ -183,7 +187,9 @@ lemma tendsto_average_of_continuousAt {g : ℝ → ℝ → ℝ} {a L : ℝ}
     intervalIntegral.norm_integral_le_of_norm_le_const hbound
   have hval : (α - a)⁻¹ * (∫ s in a..α, g α s) - L
       = (α - a)⁻¹ * (∫ s in a..α, (g α s - L)) := by
-    rw [hsplit]; field_simp; ring
+    rw [hsplit]
+    field_simp
+    ring
   rw [Real.dist_eq, hval, abs_mul, abs_inv]
   have hpos : (0 : ℝ) < |α - a| := abs_pos.mpr hαa
   calc |α - a|⁻¹ * |∫ s in a..α, (g α s - L)|
@@ -204,14 +210,16 @@ lemma trace_rpow_sub_eq_integral {K : L ℋ} (hK : IsStrictlyPositive K) (α : �
   have hop : (∫ s in (1:ℝ)..α, CFC.rpow K s * CFC.log K)
       = CFC.rpow K α - CFC.rpow K 1 := by
     apply intervalIntegral.integral_eq_sub_of_hasDerivAt
-    · intro s _; exact CFC.hasDerivAt_rpow_exponent hK s
+    · intro s _
+      exact CFC.hasDerivAt_rpow_exponent hK s
     · exact hcont.intervalIntegrable _ _
   rw [← hop]
   have hii : IntervalIntegrable (fun s : ℝ => CFC.rpow K s * CFC.log K) volume 1 α :=
     hcont.intervalIntegrable 1 α
   have hcomm := (reTraceMulLeft (1 : L ℋ)).toContinuousLinearMap.intervalIntegral_comp_comm hii
   have key : ∀ X : L ℋ, (reTraceMulLeft (1 : L ℋ)).toContinuousLinearMap X = (Tr X).re := by
-    intro X; simp [reTraceMulLeft]
+    intro X
+    simp [reTraceMulLeft]
   calc (Tr (∫ s in (1:ℝ)..α, CFC.rpow K s * CFC.log K)).re
       = (reTraceMulLeft (1 : L ℋ)).toContinuousLinearMap
           (∫ s in (1:ℝ)..α, CFC.rpow K s * CFC.log K) := (key _).symm
@@ -259,7 +267,8 @@ lemma continuousAt_quasiIntegrand {ρ σ : L ℋ}
   have hfeq : (fun p : ℝ × ℝ => (Tr (CFC.rpow (K p.1) p.2 * CFC.log (K p.1))).re)
       = (fun p : ℝ × ℝ =>
           (Tr (NormedSpace.exp (p.2 • CFC.log (K p.1)) * CFC.log (K p.1))).re) := by
-    funext p; rw [CFC.rpow_eq_normedSpace_exp_smul_log (hKsp p.1)]
+    funext p
+    rw [CFC.rpow_eq_normedSpace_exp_smul_log (hKsp p.1)]
   change ContinuousAt (fun p : ℝ × ℝ => (Tr (CFC.rpow (K p.1) p.2 * CFC.log (K p.1))).re) (1, 1)
   rw [hfeq]
   have h1 : ContinuousAt (fun p : ℝ × ℝ => CFC.log (K p.1)) ((1:ℝ), (1:ℝ)) :=
@@ -327,12 +336,15 @@ lemma hasDerivAt_partA {ρ σ : L ℋ} (hρ : ρ ∈ pdSetLM (ℋ := ℋ)) (hσ 
         = fun α => (α - 1)⁻¹ * ∫ s in (1:ℝ)..α, g α s := by
       funext α
       rw [slope_def_field, intervalIntegral.integral_same, sub_zero, div_eq_inv_mul]
-    rw [hslope]; exact havg
+    rw [hslope]
+    exact havg
   -- the Part A function equals the integral form
   have hfunc : (fun α => (sandwichedQuasi α ρ σ).re - (Tr (ρ * CFC.rpow σ ((1 - α) / α))).re)
       = (fun α => ∫ s in (1:ℝ)..α, g α s) := by
     funext α
-    have hsq : (sandwichedQuasi α ρ σ).re = (Tr (CFC.rpow (K α) α)).re := by rw [hKdef]; rfl
+    have hsq : (sandwichedQuasi α ρ σ).re = (Tr (CFC.rpow (K α) α)).re := by
+      rw [hKdef]
+      rfl
     have hcyc : (Tr (ρ * CFC.rpow σ ((1 - α) / α))).re = (Tr (CFC.rpow (K α) 1)).re := by
       rw [trace_conj_eq_trace_mul_rpow hσ α,
         show CFC.rpow (K α) 1 = K α from CFC.rpow_one (K α) (nonneg_of_pdSetLM (hKpd α)), hKdef]
@@ -357,10 +369,15 @@ lemma hasDerivAt_sandwichedQuasi_re_one
   have heq : (fun α => (sandwichedQuasi α ρ σ).re)
       = (fun α => (sandwichedQuasi α ρ σ).re - (Tr (ρ * CFC.rpow σ ((1 - α) / α))).re)
         + (fun α => (Tr (ρ * CFC.rpow σ ((1 - α) / α))).re) := by
-    funext α; simp only [Pi.add_apply]; ring
-  rw [heq]
-  convert hsum using 1
-  rw [mul_sub, map_sub, Complex.sub_re]; ring
+    funext α
+    simp only [Pi.add_apply]
+    ring
+  have hre : (Tr (ρ * (CFC.log ρ - CFC.log σ))).re
+      = (Tr (ρ * CFC.log ρ)).re + -(Tr (ρ * CFC.log σ)).re := by
+    rw [mul_sub, map_sub, Complex.sub_re]
+    ring
+  rw [heq, hre]
+  exact hsum
 
 /-- **The `α → 1⁺` limit of the sandwiched Rényi divergence is the Umegaki
     relative entropy**, for positive-definite `ρ, σ`.
@@ -379,7 +396,9 @@ lemma sandwichedRenyiDiv_tendsto_umegaki
   have hσ_nn := nonneg_of_pdSetLM hσ
   have hTrρ_pos : 0 < (Tr ρ).re := trace_re_pos_of_pdSetLM hρ
   have hQ1 : (sandwichedQuasi 1 ρ σ).re = (Tr ρ).re := sandwichedQuasi_one_re ρ σ hσ_nn hρ_nn
-  have hQ1_ne : (sandwichedQuasi 1 ρ σ).re ≠ 0 := by rw [hQ1]; exact ne_of_gt hTrρ_pos
+  have hQ1_ne : (sandwichedQuasi 1 ρ σ).re ≠ 0 := by
+    rw [hQ1]
+    exact ne_of_gt hTrρ_pos
   -- chain rule for `log ∘ (Q_α).re` at `α = 1`
   have hderiv_f := hasDerivAt_sandwichedQuasi_re_one hρ hσ
   have hderiv_logf : HasDerivAt (fun α => Real.log ((sandwichedQuasi α ρ σ).re))
@@ -443,13 +462,16 @@ lemma tendsto_tr_perturb_mul_log_perturb {ρ σ : L ℋ}
   set c : Fin n → ℝ := fun i => (inner ℂ (b i) (ρ (b i))).re with hc_def
   have hc0 : ∀ i, eig i = 0 → c i = 0 := by
     intro i hi
-    have hbker : b i ∈ LinearMap.ker σ := by rw [LinearMap.mem_ker, h_eig_apply i, hi]; simp
+    have hbker : b i ∈ LinearMap.ker σ := by
+      rw [LinearMap.mem_ker, h_eig_apply i, hi]
+      simp
     have hρb : ρ (b i) = 0 := LinearMap.mem_ker.mp (hsupp hbker)
     simp only [hc_def, hρb, inner_zero_right, Complex.zero_re]
   have hev : ∀ (ε : ℝ) (i), (σ + (ε : ℂ) • (1 : L ℋ)) (b i) = ((eig i + ε : ℝ) : ℂ) • b i := by
     intro ε i
     simp only [LinearMap.add_apply, LinearMap.smul_apply, Module.End.one_apply, h_eig_apply i]
-    rw [← add_smul]; norm_cast
+    rw [← add_smul]
+    norm_cast
   have hsa : ∀ (ε : ℝ), IsSelfAdjoint (σ + (ε : ℂ) • (1 : L ℋ)) := by
     intro ε
     rw [IsSelfAdjoint, star_add, hσ_sa.star_eq, star_smul, star_one, Complex.star_def,
@@ -479,7 +501,7 @@ lemma tendsto_tr_perturb_mul_log_perturb {ρ σ : L ℋ}
     exact h0
   rw [hlimval, show (fun ε : ℝ => (Tr ((ρ + (ε : ℂ) • 1) * CFC.log (σ + (ε : ℂ) • 1))).re)
         = (fun ε => ∑ i, Real.log (eig i + ε) * (c i + ε)) from funext hexpand]
-  apply tendsto_finset_sum
+  apply tendsto_finsetSum
   intro i _
   have haddci : Filter.Tendsto (fun ε : ℝ => c i + ε) (𝓝[>] (0:ℝ)) (𝓝 (c i)) := by
     have : Filter.Tendsto (fun ε : ℝ => c i + ε) (𝓝 (0:ℝ)) (𝓝 (c i + 0)) :=
@@ -534,14 +556,15 @@ lemma tendsto_umegakiNorm_perturb {ρ σ : L ℋ}
           (CFC.log (ρ + (ε : ℂ) • 1) - CFC.log (σ + (ε : ℂ) • 1)))).re)
         = (fun ε : ℝ => (Tr ((ρ + (ε : ℂ) • 1) * CFC.log (ρ + (ε : ℂ) • 1))).re
             - (Tr ((ρ + (ε : ℂ) • 1) * CFC.log (σ + (ε : ℂ) • 1))).re) := by
-      funext ε; rw [mul_sub, map_sub, Complex.sub_re]
+      funext ε
+      rw [mul_sub, map_sub, Complex.sub_re]
     rw [heqf, show (Tr (ρ * (CFC.log ρ - CFC.log σ))).re
           = (Tr (ρ * CFC.log ρ)).re - (Tr (ρ * CFC.log σ)).re from by
         rw [mul_sub, map_sub, Complex.sub_re]]
     exact hcrossρ.sub hcrossσ
   have hden0 : (Tr ρ).re ≠ 0 := ne_of_gt (trace_re_pos_of_ne_zero hρ hρ0)
-  have hres := hnum.div (tendsto_tr_perturb (ρ := ρ)) hden0
-  simpa only [umegakiNorm] using hres
+  simp only [umegakiNorm]
+  exact hnum.div (tendsto_tr_perturb (ρ := ρ)) hden0
 
 /-- **Continuity of `umegakiNorm` along a path into the strictly-positive operators**
     (no singularity): if `a ε → a₀`, `b ε → b₀` with `a ε, b ε` eventually
@@ -566,7 +589,8 @@ lemma tendsto_umegakiNorm_within {𝒦 : Type u} [Qudit 𝒦] [Nontrivial 𝒦]
     (QuantumState.continuous_re_trace.tendsto _).comp (ha.mul (hloga.sub hlogb))
   have hden : Filter.Tendsto (fun ε => (Tr (a ε)).re) l (𝓝 (Tr a₀).re) :=
     (QuantumState.continuous_re_trace.tendsto _).comp ha
-  simpa only [umegakiNorm] using hnum.div hden hTra0
+  simp only [umegakiNorm]
+  exact hnum.div hden hTra0
 
 /-- **step1**: for each faithful parameter `λ ∈ (0,1]`,
     `umegakiNorm (F_λ ρ) (F_λ σ) ≤ umegakiNorm ρ σ`. Proven by perturbing inputs to
@@ -579,7 +603,8 @@ lemma umegakiNorm_faithfulApprox_le {𝒦 : Type u} [Qudit 𝒦] [Nontrivial �
     umegakiNorm ((faithfulApprox E lam hlam0.le hlam1).toFun ρ)
         ((faithfulApprox E lam hlam0.le hlam1).toFun σ) ≤ umegakiNorm ρ σ := by
   have hσ0 : σ ≠ 0 := by
-    rintro rfl; apply hρ0
+    rintro rfl
+    apply hρ0
     refine LinearMap.ext fun x => ?_
     rw [LinearMap.zero_apply]
     exact LinearMap.mem_ker.mp (hsupp (LinearMap.mem_ker.mpr (by simp)))
@@ -623,7 +648,7 @@ lemma umegakiNorm_faithfulApprox_le {𝒦 : Type u} [Qudit 𝒦] [Nontrivial �
       have hσε : σ + (ε : ℂ) • 1 ∈ pdSetLM (ℋ := ℋ) := pdSetLM_add_nonneg hσ (pos_smul_one_pdSetLM hε)
       exact hpd2sa (faithfulApprox_pdSetLM E hlam0 hlam1 (nonneg_of_pdSetLM hσε)
         (isUnit_of_pdSetLM hσε).ne_zero)
-  haveI : (𝓝[>] (0:ℝ)).NeBot := nhdsWithin_Ioi_neBot (le_refl 0)
+  have : (𝓝[>] (0:ℝ)).NeBot := nhdsWithin_Ioi_neBot (le_refl 0)
   exact le_of_tendsto_of_tendsto h_LHS h_RHS (Filter.eventually_of_mem self_mem_nhdsWithin h_pert)
 
 lemma tendsto_uloglu : Filter.Tendsto (fun u : ℝ => u * Real.log u) (𝓝[>] (0:ℝ)) (𝓝 0) := by
@@ -667,7 +692,9 @@ lemma tendsto_tr_faithful_cross {𝒦 : Type u} [Qudit 𝒦] [Nontrivial 𝒦] {
   set d : Fin n → ℝ := fun i => (inner ℂ (b i) (B (b i))).re with hd_def
   have hd0 : ∀ i, eig i = 0 → d i = 0 := by
     intro i hi
-    have hbker : b i ∈ LinearMap.ker A := by rw [LinearMap.mem_ker, h_eig_apply i, hi]; simp
+    have hbker : b i ∈ LinearMap.ker A := by
+      rw [LinearMap.mem_ker, h_eig_apply i, hi]
+      simp
     have hBb : B (b i) = 0 := LinearMap.mem_ker.mp (hsupp hbker)
     simp only [hd_def, hBb, inner_zero_right, Complex.zero_re]
   have hev : ∀ (lam : ℝ) (i),
@@ -676,7 +703,9 @@ lemma tendsto_tr_faithful_cross {𝒦 : Type u} [Qudit 𝒦] [Nontrivial 𝒦] {
     intro lam i
     simp only [LinearMap.add_apply, LinearMap.smul_apply, Module.End.one_apply, h_eig_apply i,
       smul_smul]
-    rw [← add_smul]; push_cast; ring_nf
+    rw [← add_smul]
+    push_cast
+    ring_nf
   have hsa : ∀ (lam : ℝ), IsSelfAdjoint (((1 - lam : ℝ) : ℂ) • A + ((lam * cA : ℝ) : ℂ) • (1 : L 𝒦)) := by
     intro lam
     rw [IsSelfAdjoint, star_add, star_smul, hA_sa.star_eq, star_smul, star_one,
@@ -716,7 +745,7 @@ lemma tendsto_tr_faithful_cross {𝒦 : Type u} [Qudit 𝒦] [Nontrivial 𝒦] {
           CFC.log (((1 - lam : ℝ) : ℂ) • A + ((lam * cA : ℝ) : ℂ) • 1))).re)
       = (fun lam => ∑ i, Real.log ((1 - lam) * eig i + lam * cA) * ((1 - lam) * d i + lam * cB))
         from funext hexpand]
-  apply tendsto_finset_sum
+  apply tendsto_finsetSum
   intro i _
   by_cases hi : eig i = 0
   · rw [hi, hd0 i hi]
@@ -755,7 +784,8 @@ lemma tr_eq_re {τ : L ℋ} (hτ : 0 ≤ τ) : Tr τ = ((Tr τ).re : ℂ) := by
     hsym.trace_eq_sum_eigenvalues rfl
   apply Complex.ext
   · rw [Complex.ofReal_re]
-  · rw [h]; simp
+  · rw [h]
+    simp
 
 -- faithfulApprox.toFun in explicit form
 lemma faithfulApprox_toFun_eq {𝒦 : Type u} [Qudit 𝒦] [Nontrivial 𝒦] (E : CPTP ℋ 𝒦)
@@ -788,7 +818,8 @@ theorem tendsto_umegakiNorm_faithful_real {𝒦 : Type u} [Qudit 𝒦] [Nontrivi
   have hEsupp : suppLE (E.toFun ρ) (E.toFun σ) := suppLE_of_CPTP E hρ hσ hsupp
   have hEρ0 : E.toFun ρ ≠ 0 := CPTP_toFun_ne_zero E hρ hρ0
   have hσ0 : σ ≠ 0 := by
-    rintro rfl; apply hρ0
+    rintro rfl
+    apply hρ0
     refine LinearMap.ext fun x => ?_
     rw [LinearMap.zero_apply]
     exact LinearMap.mem_ker.mp (hsupp (LinearMap.mem_ker.mpr (by simp)))
@@ -825,13 +856,15 @@ theorem tendsto_umegakiNorm_faithful_real {𝒦 : Type u} [Qudit 𝒦] [Nontrivi
               CFC.log (((1 - lam : ℝ) : ℂ) • E.toFun ρ + ((lam * cρ : ℝ) : ℂ) • 1))).re
             - (Tr ((((1 - lam : ℝ) : ℂ) • E.toFun ρ + ((lam * cρ : ℝ) : ℂ) • 1) *
               CFC.log (((1 - lam : ℝ) : ℂ) • E.toFun σ + ((lam * cσ : ℝ) : ℂ) • 1))).re) := by
-      funext lam; rw [mul_sub, map_sub, Complex.sub_re]
+      funext lam
+      rw [mul_sub, map_sub, Complex.sub_re]
     rw [heqf, show (Tr (E.toFun ρ * (CFC.log (E.toFun ρ) - CFC.log (E.toFun σ)))).re
           = (Tr (E.toFun ρ * CFC.log (E.toFun ρ))).re - (Tr (E.toFun ρ * CFC.log (E.toFun σ))).re
           from by rw [mul_sub, map_sub, Complex.sub_re]]
     exact hxlogx.sub hcross
   have hden0 : (Tr (E.toFun ρ)).re ≠ 0 := ne_of_gt (trace_re_pos_of_ne_zero hEρ hEρ0)
-  simpa only [umegakiNorm] using hnum.div hden hden0
+  simp only [umegakiNorm]
+  exact hnum.div hden hden0
 
 theorem tendsto_umegakiNorm_faithful {𝒦 : Type u} [Qudit 𝒦] [Nontrivial 𝒦] (E : CPTP ℋ 𝒦)
     {ρ σ : L ℋ} (hρ : 0 ≤ ρ) (hσ : 0 ≤ σ) (hρ0 : ρ ≠ 0) (hsupp : suppLE ρ σ) :
@@ -871,7 +904,7 @@ theorem umegakiNorm_monotone_nn
         umegakiNorm ((faithfulApprox E l.val l.2.1.le l.2.2).toFun ρ)
           ((faithfulApprox E l.val l.2.1.le l.2.2).toFun σ) ≤ umegakiNorm ρ σ :=
       fun l => umegakiNorm_faithfulApprox_le E hρ hσ hρ0 hsupp l.2.1 l.2.2
-    haveI hNeBot : (Filter.comap (fun l : {l : ℝ // 0 < l ∧ l ≤ 1} => l.val)
+    have hNeBot : (Filter.comap (fun l : {l : ℝ // 0 < l ∧ l ≤ 1} => l.val)
         (𝓝[>] (0:ℝ))).NeBot := by
       refine Filter.comap_neBot fun t ht => ?_
       obtain ⟨U, hU_open, hU0, hU_sub⟩ := mem_nhdsWithin.mp ht
@@ -906,8 +939,10 @@ theorem umegakiRelEntropyNN_monotone
     exact umegakiNorm_monotone_nn E hρ hσ hsupp
   · -- support fails: the right-hand side is `⊤`
     have h_RHS : umegakiRelEntropyNN ρ σ = (⊤ : EReal) := by
-      unfold umegakiRelEntropyNN; rw [if_neg hsupp]
-    rw [h_RHS]; exact le_top
+      unfold umegakiRelEntropyNN
+      rw [if_neg hsupp]
+    rw [h_RHS]
+    exact le_top
 
 /-! ### α = ∞ as the `α → ∞` limit (Frank–Lieb limiting argument)
 
@@ -936,17 +971,21 @@ lemma norm_le_re_trace {C : L ℋ} (hC : 0 ≤ C) : ‖C‖ ≤ (Tr C).re := by
   -- `‖C‖` is attained as an eigenvalue.
   have hmemℝ : ‖C‖ ∈ spectrum ℝ C := CStarAlgebra.norm_mem_spectrum_of_nonneg hC
   have hmemℂ : (‖C‖ : ℂ) ∈ spectrum ℂ C := by
-    have h := hmemℝ; rw [← spectrum.preimage_algebraMap ℂ] at h; simpa using h
+    have h := hmemℝ
+    rw [← spectrum.preimage_algebraMap ℂ] at h
+    simpa using h
   have hev : Module.End.HasEigenvalue C (‖C‖ : ℂ) :=
     Module.End.hasEigenvalue_iff_mem_spectrum.mpr hmemℂ
   obtain ⟨w, hw⟩ := hev.exists_hasEigenvector
   have hCw : C w = (‖C‖ : ℂ) • w := Module.End.mem_eigenspace_iff.mp hw.1
   have hw_ne : w ≠ 0 := hw.2
   obtain ⟨j, hcj⟩ : ∃ j, inner ℂ (b j) w ≠ (0 : ℂ) := by
-    by_contra h; push_neg at h
+    by_contra h
+    push Not at h
     apply hw_ne
     have hrep : w = ∑ i, inner ℂ (b i) w • b i := (b.sum_repr' w).symm
-    rw [hrep]; simp [h]
+    rw [hrep]
+    simp [h]
   have hkey : (eig j : ℂ) * inner ℂ (b j) w = (‖C‖ : ℂ) * inner ℂ (b j) w := by
     have h1 : inner ℂ (b j) (C w) = (‖C‖ : ℂ) * inner ℂ (b j) w := by rw [hCw, inner_smul_right]
     have h2 : inner ℂ (b j) (C w) = (eig j : ℂ) * inner ℂ (b j) w := by
@@ -967,7 +1006,8 @@ lemma re_trace_le_finrank_norm {C : L ℋ} (hC : 0 ≤ C) :
   have hdiff : (0 : L ℋ) ≤ algebraMap ℝ (L ℋ) ‖C‖ - C := sub_nonneg.mpr hle
   have htr : 0 ≤ (Tr (algebraMap ℝ (L ℋ) ‖C‖ - C)).re := by
     have h := ((LinearMap.nonneg_iff_isPositive _).mp hdiff).trace_nonneg
-    rw [Complex.le_def] at h; exact h.1
+    rw [Complex.le_def] at h
+    exact h.1
   rw [map_sub, Complex.sub_re] at htr
   have htr1 : (Tr (algebraMap ℝ (L ℋ) ‖C‖)).re = (Module.finrank ℂ ℋ : ℝ) * ‖C‖ := by
     rw [show (algebraMap ℝ (L ℋ)) ‖C‖ = ((‖C‖ : ℝ) : ℂ) • (1 : L ℋ) by
@@ -994,7 +1034,9 @@ lemma sandwichedRenyiDiv_tendsto_maxRel
   have hr_pos : 0 < (Tr ρ).re := trace_re_pos_of_pdSetLM hρ
   set r := (Tr ρ).re with hr
   set d := (Module.finrank ℂ ℋ : ℝ) with hd
-  have hd_pos : 0 < d := by rw [hd]; exact_mod_cast Module.finrank_pos
+  have hd_pos : 0 < d := by
+    rw [hd]
+    exact_mod_cast Module.finrank_pos
   set nA := ‖CFC.rpow σ (-(1/2)) * ρ * CFC.rpow σ (-(1/2))‖ with hnA
   have hnA_pos : 0 < nA := by
     rw [hnA, ← sInf_maxRelSet_eq_norm hρ_nn hσ_nn hsupp]
@@ -1018,20 +1060,22 @@ lemma sandwichedRenyiDiv_tendsto_maxRel
       (fun α : ℝ => ‖CFC.rpow σ ((1 - α) / (2 * α)) * ρ * CFC.rpow σ ((1 - α) / (2 * α))‖)
       Filter.atTop (𝓝 nA) := by
     have := (hg_cont.tendsto (-(1/2))).comp hβ
-    simpa [hnA, Function.comp] using this
+    simpa [hnA, Function.comp_def] using this
   have h_logm : Filter.Tendsto
       (fun α : ℝ => Real.log ‖CFC.rpow σ ((1 - α) / (2 * α)) * ρ * CFC.rpow σ ((1 - α) / (2 * α))‖)
       Filter.atTop (𝓝 (Real.log nA)) :=
     (Real.continuousAt_log (ne_of_gt hnA_pos)).tendsto.comp hm_tendsto
   have h_inv : Filter.Tendsto (fun α : ℝ => 1 / (α - 1)) Filter.atTop (𝓝 0) := by
     have hsub : Filter.Tendsto (fun α : ℝ => α - 1) Filter.atTop Filter.atTop := by
-      simpa using Filter.tendsto_atTop_add_const_right Filter.atTop (-1) Filter.tendsto_id
+      simpa [sub_eq_add_neg] using
+        Filter.tendsto_atTop_add_const_right Filter.atTop (-1) Filter.tendsto_id
     exact Filter.Tendsto.div_atTop tendsto_const_nhds hsub
   have h_ratio : Filter.Tendsto (fun α : ℝ => α / (α - 1)) Filter.atTop (𝓝 1) := by
     have heq : (fun α : ℝ => α / (α - 1)) =ᶠ[Filter.atTop] (fun α => 1 + 1 / (α - 1)) := by
       filter_upwards [Filter.eventually_gt_atTop (1:ℝ)] with α hα
       have : α - 1 ≠ 0 := sub_ne_zero.mpr (ne_of_gt hα)
-      field_simp; ring
+      field_simp
+      ring
     rw [Filter.tendsto_congr' heq]
     simpa using tendsto_const_nhds.add h_inv
   set Lf : ℝ → ℝ := fun α =>
@@ -1041,9 +1085,11 @@ lemma sandwichedRenyiDiv_tendsto_maxRel
     α / (α - 1) * Real.log ‖CFC.rpow σ ((1 - α) / (2 * α)) * ρ * CFC.rpow σ ((1 - α) / (2 * α))‖
       + 1 / (α - 1) * (Real.log d - Real.log r) with hUf
   have hL : Filter.Tendsto Lf Filter.atTop (𝓝 (Real.log nA)) := by
-    rw [hLf]; simpa using (h_ratio.mul h_logm).sub (h_inv.mul_const (Real.log r))
+    rw [hLf]
+    simpa using (h_ratio.mul h_logm).sub (h_inv.mul_const (Real.log r))
   have hU : Filter.Tendsto Uf Filter.atTop (𝓝 (Real.log nA)) := by
-    rw [hUf]; simpa using (h_ratio.mul h_logm).add (h_inv.mul_const (Real.log d - Real.log r))
+    rw [hUf]
+    simpa using (h_ratio.mul h_logm).add (h_inv.mul_const (Real.log d - Real.log r))
   have hbounds : ∀ᶠ α : ℝ in Filter.atTop,
       Lf α ≤ sandwichedRenyiDiv α ρ σ ∧ sandwichedRenyiDiv α ρ σ ≤ Uf α := by
     filter_upwards [Filter.eventually_gt_atTop (1:ℝ)] with α hα1
@@ -1062,14 +1108,20 @@ lemma sandwichedRenyiDiv_tendsto_maxRel
     have hCnn : (0 : L ℋ) ≤ CFC.rpow Mα α := CFC.rpow_nonneg
     have hnorm_eq : ‖CFC.rpow Mα α‖ = ‖Mα‖ ^ α := CFC.norm_rpow Mα hα0 hMα_nn
     set q := (sandwichedQuasi α ρ σ).re with hq
-    have hq_eq : q = (Tr (CFC.rpow Mα α)).re := by rw [hq]; rfl
-    have hq_lo : ‖Mα‖ ^ α ≤ q := by rw [hq_eq, ← hnorm_eq]; exact norm_le_re_trace hCnn
+    have hq_eq : q = (Tr (CFC.rpow Mα α)).re := by
+      rw [hq]
+      rfl
+    have hq_lo : ‖Mα‖ ^ α ≤ q := by
+      rw [hq_eq, ← hnorm_eq]
+      exact norm_le_re_trace hCnn
     have hq_hi : q ≤ d * ‖Mα‖ ^ α := by
-      rw [hq_eq, ← hnorm_eq]; exact re_trace_le_finrank_norm hCnn
+      rw [hq_eq, ← hnorm_eq]
+      exact re_trace_le_finrank_norm hCnn
     have hmα_pos : 0 < ‖Mα‖ ^ α := Real.rpow_pos_of_pos hm_pos α
     have hq_pos : 0 < q := lt_of_lt_of_le hmα_pos hq_lo
     have hlogq_lo : α * Real.log ‖Mα‖ ≤ Real.log q := by
-      rw [← Real.log_rpow hm_pos]; exact Real.log_le_log hmα_pos hq_lo
+      rw [← Real.log_rpow hm_pos]
+      exact Real.log_le_log hmα_pos hq_lo
     have hlogq_hi : Real.log q ≤ Real.log d + α * Real.log ‖Mα‖ := by
       have h := Real.log_le_log hq_pos hq_hi
       rwa [Real.log_mul (ne_of_gt hd_pos) (ne_of_gt hmα_pos), Real.log_rpow hm_pos] at h
@@ -1077,13 +1129,15 @@ lemma sandwichedRenyiDiv_tendsto_maxRel
       unfold sandwichedRenyiDiv
       rw [← hq, ← hr, Real.log_div (ne_of_gt hq_pos) (ne_of_gt hr_pos)]
     refine ⟨?_, ?_⟩
-    · simp only [hLf]; rw [← hMαdef, hD]
+    · simp only [hLf]
+      rw [← hMαdef, hD]
       have key : α * Real.log ‖Mα‖ - Real.log r ≤ Real.log q - Real.log r := by linarith
       have hstep := mul_le_mul_of_nonneg_left key hinv_nn
       calc α / (α - 1) * Real.log ‖Mα‖ - 1 / (α - 1) * Real.log r
             = 1 / (α - 1) * (α * Real.log ‖Mα‖ - Real.log r) := by ring
         _ ≤ 1 / (α - 1) * (Real.log q - Real.log r) := hstep
-    · simp only [hUf]; rw [← hMαdef, hD]
+    · simp only [hUf]
+      rw [← hMαdef, hD]
       have key : Real.log q - Real.log r ≤ (Real.log d + α * Real.log ‖Mα‖) - Real.log r := by
         linarith
       have hstep := mul_le_mul_of_nonneg_left key hinv_nn
@@ -1124,7 +1178,9 @@ lemma sandwichedRenyiDiv_tendsto_maxRel_nn
   have hr_pos : 0 < (Tr ρ).re := trace_re_pos_of_ne_zero hρ hρ0
   set r := (Tr ρ).re with hr
   set d := (Module.finrank ℂ ℋ : ℝ) with hd
-  have hd_pos : 0 < d := by rw [hd]; exact_mod_cast Module.finrank_pos
+  have hd_pos : 0 < d := by
+    rw [hd]
+    exact_mod_cast Module.finrank_pos
   set nA := ‖CFC.rpow σ (-(1/2)) * ρ * CFC.rpow σ (-(1/2))‖ with hnA
   have hnA_pos : 0 < nA := by
     rw [hnA, ← sInf_maxRelSet_eq_norm hρ hσ hsupp]
@@ -1135,7 +1191,9 @@ lemma sandwichedRenyiDiv_tendsto_maxRel_nn
     ((tendsto_rpow_exponent_atTop hσ).mul tendsto_const_nhds).mul (tendsto_rpow_exponent_atTop hσ)
   have hm_tendsto : Filter.Tendsto
       (fun α : ℝ => ‖CFC.rpow σ ((1 - α) / (2 * α)) * ρ * CFC.rpow σ ((1 - α) / (2 * α))‖)
-      Filter.atTop (𝓝 nA) := by rw [hnA]; exact hM_tendsto.norm
+      Filter.atTop (𝓝 nA) := by
+        rw [hnA]
+        exact hM_tendsto.norm
   have h_logm : Filter.Tendsto
       (fun α : ℝ => Real.log ‖CFC.rpow σ ((1 - α) / (2 * α)) * ρ * CFC.rpow σ ((1 - α) / (2 * α))‖)
       Filter.atTop (𝓝 (Real.log nA)) :=
@@ -1145,13 +1203,15 @@ lemma sandwichedRenyiDiv_tendsto_maxRel_nn
     hm_tendsto.eventually (eventually_gt_nhds hnA_pos)
   have h_inv : Filter.Tendsto (fun α : ℝ => 1 / (α - 1)) Filter.atTop (𝓝 0) := by
     have hsub : Filter.Tendsto (fun α : ℝ => α - 1) Filter.atTop Filter.atTop := by
-      simpa using Filter.tendsto_atTop_add_const_right Filter.atTop (-1) Filter.tendsto_id
+      simpa [sub_eq_add_neg] using
+        Filter.tendsto_atTop_add_const_right Filter.atTop (-1) Filter.tendsto_id
     exact Filter.Tendsto.div_atTop tendsto_const_nhds hsub
   have h_ratio : Filter.Tendsto (fun α : ℝ => α / (α - 1)) Filter.atTop (𝓝 1) := by
     have heq : (fun α : ℝ => α / (α - 1)) =ᶠ[Filter.atTop] (fun α => 1 + 1 / (α - 1)) := by
       filter_upwards [Filter.eventually_gt_atTop (1:ℝ)] with α hα
       have : α - 1 ≠ 0 := sub_ne_zero.mpr (ne_of_gt hα)
-      field_simp; ring
+      field_simp
+      ring
     rw [Filter.tendsto_congr' heq]
     simpa using tendsto_const_nhds.add h_inv
   set Lf : ℝ → ℝ := fun α =>
@@ -1161,9 +1221,11 @@ lemma sandwichedRenyiDiv_tendsto_maxRel_nn
     α / (α - 1) * Real.log ‖CFC.rpow σ ((1 - α) / (2 * α)) * ρ * CFC.rpow σ ((1 - α) / (2 * α))‖
       + 1 / (α - 1) * (Real.log d - Real.log r) with hUf
   have hL : Filter.Tendsto Lf Filter.atTop (𝓝 (Real.log nA)) := by
-    rw [hLf]; simpa using (h_ratio.mul h_logm).sub (h_inv.mul_const (Real.log r))
+    rw [hLf]
+    simpa using (h_ratio.mul h_logm).sub (h_inv.mul_const (Real.log r))
   have hU : Filter.Tendsto Uf Filter.atTop (𝓝 (Real.log nA)) := by
-    rw [hUf]; simpa using (h_ratio.mul h_logm).add (h_inv.mul_const (Real.log d - Real.log r))
+    rw [hUf]
+    simpa using (h_ratio.mul h_logm).add (h_inv.mul_const (Real.log d - Real.log r))
   have hbounds : ∀ᶠ α : ℝ in Filter.atTop,
       Lf α ≤ sandwichedRenyiDiv α ρ σ ∧ sandwichedRenyiDiv α ρ σ ≤ Uf α := by
     filter_upwards [Filter.eventually_gt_atTop (1:ℝ), hev_pos] with α hα1 hm_pos
@@ -1175,14 +1237,20 @@ lemma sandwichedRenyiDiv_tendsto_maxRel_nn
     have hCnn : (0 : L ℋ) ≤ CFC.rpow Mα α := CFC.rpow_nonneg
     have hnorm_eq : ‖CFC.rpow Mα α‖ = ‖Mα‖ ^ α := CFC.norm_rpow Mα hα0 hMα_nn
     set q := (sandwichedQuasi α ρ σ).re with hq
-    have hq_eq : q = (Tr (CFC.rpow Mα α)).re := by rw [hq]; rfl
-    have hq_lo : ‖Mα‖ ^ α ≤ q := by rw [hq_eq, ← hnorm_eq]; exact norm_le_re_trace hCnn
+    have hq_eq : q = (Tr (CFC.rpow Mα α)).re := by
+      rw [hq]
+      rfl
+    have hq_lo : ‖Mα‖ ^ α ≤ q := by
+      rw [hq_eq, ← hnorm_eq]
+      exact norm_le_re_trace hCnn
     have hq_hi : q ≤ d * ‖Mα‖ ^ α := by
-      rw [hq_eq, ← hnorm_eq]; exact re_trace_le_finrank_norm hCnn
+      rw [hq_eq, ← hnorm_eq]
+      exact re_trace_le_finrank_norm hCnn
     have hmα_pos : 0 < ‖Mα‖ ^ α := Real.rpow_pos_of_pos hm_pos α
     have hq_pos : 0 < q := lt_of_lt_of_le hmα_pos hq_lo
     have hlogq_lo : α * Real.log ‖Mα‖ ≤ Real.log q := by
-      rw [← Real.log_rpow hm_pos]; exact Real.log_le_log hmα_pos hq_lo
+      rw [← Real.log_rpow hm_pos]
+      exact Real.log_le_log hmα_pos hq_lo
     have hlogq_hi : Real.log q ≤ Real.log d + α * Real.log ‖Mα‖ := by
       have h := Real.log_le_log hq_pos hq_hi
       rwa [Real.log_mul (ne_of_gt hd_pos) (ne_of_gt hmα_pos), Real.log_rpow hm_pos] at h
@@ -1190,13 +1258,15 @@ lemma sandwichedRenyiDiv_tendsto_maxRel_nn
       unfold sandwichedRenyiDiv
       rw [← hq, ← hr, Real.log_div (ne_of_gt hq_pos) (ne_of_gt hr_pos)]
     refine ⟨?_, ?_⟩
-    · simp only [hLf]; rw [← hMαdef, hD]
+    · simp only [hLf]
+      rw [← hMαdef, hD]
       have key : α * Real.log ‖Mα‖ - Real.log r ≤ Real.log q - Real.log r := by linarith
       have hstep := mul_le_mul_of_nonneg_left key hinv_nn
       calc α / (α - 1) * Real.log ‖Mα‖ - 1 / (α - 1) * Real.log r
             = 1 / (α - 1) * (α * Real.log ‖Mα‖ - Real.log r) := by ring
         _ ≤ 1 / (α - 1) * (Real.log q - Real.log r) := hstep
-    · simp only [hUf]; rw [← hMαdef, hD]
+    · simp only [hUf]
+      rw [← hMαdef, hD]
       have key : Real.log q - Real.log r ≤ (Real.log d + α * Real.log ‖Mα‖) - Real.log r := by
         linarith
       have hstep := mul_le_mul_of_nonneg_left key hinv_nn
@@ -1222,7 +1292,8 @@ theorem maxRelEntropyNN_monotone_via_limit_nn
     have hEsupp : suppLE (E.toFun (0 : L ℋ)) (E.toFun σ) := suppLE_of_CPTP E hρ hσ hsupp
     rw [maxRelEntropyNN_eq_log_norm hEsupp, maxRelEntropyNN_eq_log_norm hsupp]
     have hE0 : E.toFun (0 : L ℋ) = 0 := map_zero E.toCompletelyPositiveMap.toLinearMap
-    rw [hE0]; simp
+    rw [hE0]
+    simp
   · have hEρ : (0 : L 𝒦) ≤ E.toFun ρ := map_nonneg E.toCompletelyPositiveMap hρ
     have hEσ : (0 : L 𝒦) ≤ E.toFun σ := map_nonneg E.toCompletelyPositiveMap hσ
     have hEsupp : suppLE (E.toFun ρ) (E.toFun σ) := suppLE_of_CPTP E hρ hσ hsupp
