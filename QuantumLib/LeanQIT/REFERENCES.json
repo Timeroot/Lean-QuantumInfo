@@ -1,0 +1,442 @@
+{
+  "entries": [
+    {
+      "key": "Wilde2011Qst",
+      "source_id": "wilde-2011-qst",
+      "title": "From Classical to Quantum Shannon Theory",
+      "authors": [
+        "Mark M. Wilde"
+      ],
+      "year": 2011,
+      "kind": "lecture-notes",
+      "arxiv_id": "1106.1445",
+      "doi": null,
+      "url": "https://arxiv.org/abs/1106.1445"
+    },
+    {
+      "key": "Gour2024Resources",
+      "source_id": "gour-2024-resources",
+      "title": "Resources of the Quantum World",
+      "authors": [
+        "Gilad Gour"
+      ],
+      "year": 2024,
+      "kind": "lecture-notes",
+      "arxiv_id": "2402.05474",
+      "doi": null,
+      "url": "https://arxiv.org/abs/2402.05474"
+    },
+    {
+      "key": "Tomamichel2015FiniteResources",
+      "source_id": "tomamichel-2015-finite-resources",
+      "title": "Quantum Information Processing with Finite Resources -- Mathematical Foundations",
+      "authors": [
+        "Marco Tomamichel"
+      ],
+      "year": 2015,
+      "kind": "lecture-notes",
+      "arxiv_id": "1504.00233",
+      "doi": null,
+      "url": "https://arxiv.org/abs/1504.00233"
+    },
+    {
+      "key": "BertaChristandlRenner2009Qrst",
+      "source_id": "berta-christandl-renner-2009-qrst",
+      "title": "The Quantum Reverse Shannon Theorem based on One-Shot Information Theory",
+      "authors": [
+        "Mario Berta",
+        "Matthias Christandl",
+        "Renato Renner"
+      ],
+      "year": 2009,
+      "kind": "preprint",
+      "arxiv_id": "0912.3805",
+      "doi": null,
+      "url": "https://arxiv.org/abs/0912.3805"
+    },
+    {
+      "key": "Berta2009SingleShotStateMerging",
+      "source_id": "berta-2009-single-shot-state-merging",
+      "title": "Single-shot Quantum State Merging",
+      "authors": [
+        "Mario Berta"
+      ],
+      "year": 2009,
+      "kind": "preprint",
+      "arxiv_id": "0912.4495",
+      "doi": null,
+      "url": "https://arxiv.org/abs/0912.4495"
+    },
+    {
+      "key": "HorodeckiOppenheimWinter2005StateMerging",
+      "source_id": "horodecki-oppenheim-winter-2005-state-merging",
+      "title": "Quantum state merging and negative information",
+      "authors": [
+        "Michal Horodecki",
+        "Jonathan Oppenheim",
+        "Andreas Winter"
+      ],
+      "year": 2005,
+      "kind": "preprint",
+      "arxiv_id": "quant-ph/0512247",
+      "doi": null,
+      "url": "https://arxiv.org/abs/quant-ph/0512247"
+    },
+    {
+      "key": "HolevoGiovannetti2012QuantumChannels",
+      "source_id": "holevo-giovannetti-2012-quantum-channels",
+      "title": "Quantum channels and their entropic characteristics",
+      "authors": [
+        "A. S. Holevo",
+        "V. Giovannetti"
+      ],
+      "year": 2012,
+      "kind": "preprint",
+      "arxiv_id": "1202.6480",
+      "doi": null,
+      "url": "https://arxiv.org/abs/1202.6480"
+    },
+    {
+      "key": "Horodecki2007Entanglement",
+      "source_id": "horodecki-2007-entanglement",
+      "title": "Quantum entanglement",
+      "authors": [
+        "Ryszard Horodecki",
+        "Pawel Horodecki",
+        "Michal Horodecki",
+        "Karol Horodecki"
+      ],
+      "year": 2007,
+      "kind": "preprint",
+      "arxiv_id": "quant-ph/0702225",
+      "doi": null,
+      "url": "https://arxiv.org/abs/quant-ph/0702225"
+    },
+    {
+      "key": "Nielsen1998EntanglementTransform",
+      "source_id": "nielsen-1998-entanglement-transform",
+      "title": "Conditions for a class of entanglement transformations",
+      "authors": [
+        "M. A. Nielsen"
+      ],
+      "year": 1998,
+      "kind": "preprint",
+      "arxiv_id": "quant-ph/9811053",
+      "doi": null,
+      "url": "https://arxiv.org/abs/quant-ph/9811053"
+    },
+    {
+      "key": "Winter1999CodingTheorems",
+      "source_id": "winter-1999-coding-theorems",
+      "title": "Coding Theorems of Quantum Information Theory",
+      "authors": [
+        "Andreas Winter"
+      ],
+      "year": 1999,
+      "kind": "thesis",
+      "arxiv_id": "quant-ph/9907077",
+      "doi": null,
+      "url": "https://arxiv.org/abs/quant-ph/9907077"
+    },
+    {
+      "key": "Audenaert2006QuantumChernoff",
+      "source_id": "audenaert-2006-quantum-chernoff",
+      "title": "The Quantum Chernoff Bound",
+      "authors": [
+        "K. M. R. Audenaert",
+        "J. Calsamiglia",
+        "Ll. Masanes",
+        "R. Munoz-Tapia",
+        "A. Acin",
+        "E. Bagan",
+        "F. Verstraete"
+      ],
+      "year": 2006,
+      "kind": "preprint",
+      "arxiv_id": "quant-ph/0610027",
+      "doi": null,
+      "url": "https://arxiv.org/abs/quant-ph/0610027"
+    },
+    {
+      "key": "Winter2015ContinuityBounds",
+      "source_id": "winter-2015-continuity-bounds",
+      "title": "Tight uniform continuity bounds for quantum entropies: conditional entropy, relative entropy distance and energy constraints",
+      "authors": [
+        "Andreas Winter"
+      ],
+      "year": 2015,
+      "kind": "preprint",
+      "arxiv_id": "1507.07775",
+      "doi": null,
+      "url": "https://arxiv.org/abs/1507.07775"
+    },
+    {
+      "key": "SutterFawziRenner2015Recovery",
+      "source_id": "sutter-fawzi-renner-2015-recovery",
+      "title": "Universal recovery map for approximate Markov chains",
+      "authors": [
+        "David Sutter",
+        "Omar Fawzi",
+        "Renato Renner"
+      ],
+      "year": 2015,
+      "kind": "preprint",
+      "arxiv_id": "1504.07251",
+      "doi": null,
+      "url": "https://arxiv.org/abs/1504.07251"
+    },
+    {
+      "key": "Renner2007SymmetryIndependence",
+      "source_id": "renner-2007-symmetry-independence",
+      "title": "Symmetry implies independence",
+      "authors": [
+        "Renato Renner"
+      ],
+      "year": 2007,
+      "kind": "preprint",
+      "arxiv_id": "quant-ph/0703069",
+      "doi": null,
+      "url": "https://arxiv.org/abs/quant-ph/0703069"
+    },
+    {
+      "key": "ChristandlKoenigRenner2008Postselection",
+      "source_id": "christandl-koenig-renner-2008-postselection",
+      "title": "Post-selection technique for quantum channels with applications to quantum cryptography",
+      "authors": [
+        "Matthias Christandl",
+        "Robert Koenig",
+        "Renato Renner"
+      ],
+      "year": 2008,
+      "kind": "preprint",
+      "arxiv_id": "0809.3019",
+      "doi": null,
+      "url": "https://arxiv.org/abs/0809.3019"
+    },
+    {
+      "key": "TomamichelColbeckRenner2008Fqaep",
+      "source_id": "tomamichel-colbeck-renner-2008-fqaep",
+      "title": "A Fully Quantum Asymptotic Equipartition Property",
+      "authors": [
+        "Marco Tomamichel",
+        "Roger Colbeck",
+        "Renato Renner"
+      ],
+      "year": 2008,
+      "kind": "preprint",
+      "arxiv_id": "0811.1221",
+      "doi": null,
+      "url": "https://arxiv.org/abs/0811.1221"
+    },
+    {
+      "key": "BennettShorSmolinThapliyal1999EaCapacity",
+      "source_id": "bennett-shor-smolin-thapliyal-1999-ea-capacity",
+      "title": "Entanglement-Assisted Classical Capacity of Noisy Quantum Channels",
+      "authors": [
+        "Charles H. Bennett",
+        "Peter W. Shor",
+        "John A. Smolin",
+        "Ashish V. Thapliyal"
+      ],
+      "year": 1999,
+      "kind": "preprint",
+      "arxiv_id": "quant-ph/9904023",
+      "doi": null,
+      "url": "https://arxiv.org/abs/quant-ph/9904023"
+    },
+    {
+      "key": "HaydenHorodeckiWinterYard2007Decoupling",
+      "source_id": "hayden-horodecki-winter-yard-2007-decoupling",
+      "title": "A decoupling approach to the quantum capacity",
+      "authors": [
+        "Patrick Hayden",
+        "Michal Horodecki",
+        "Andreas Winter",
+        "Jon Yard"
+      ],
+      "year": 2007,
+      "kind": "preprint",
+      "arxiv_id": "quant-ph/0702005",
+      "doi": null,
+      "url": "https://arxiv.org/abs/quant-ph/0702005"
+    },
+    {
+      "key": "DevetakHarrowWinter2005ResourceFramework",
+      "source_id": "devetak-harrow-winter-2005-resource-framework",
+      "title": "A Resource Framework for Quantum Shannon Theory",
+      "authors": [
+        "I. Devetak",
+        "A. W. Harrow",
+        "A. Winter"
+      ],
+      "year": 2005,
+      "kind": "preprint",
+      "arxiv_id": "quant-ph/0512015",
+      "doi": null,
+      "url": "https://arxiv.org/abs/quant-ph/0512015"
+    },
+    {
+      "key": "AbeyesingheDevetakHaydenWinter2006Mother",
+      "source_id": "abeyesinghe-devetak-hayden-winter-2006-mother",
+      "title": "The mother of all protocols: Restructuring quantum information's family tree",
+      "authors": [
+        "Anura Abeyesinghe",
+        "Igor Devetak",
+        "Patrick Hayden",
+        "Andreas Winter"
+      ],
+      "year": 2006,
+      "kind": "preprint",
+      "arxiv_id": "quant-ph/0606225",
+      "doi": null,
+      "url": "https://arxiv.org/abs/quant-ph/0606225"
+    },
+    {
+      "key": "Harrow2013SymmetricSubspace",
+      "source_id": "harrow-2013-symmetric-subspace",
+      "title": "The Church of the Symmetric Subspace",
+      "authors": [
+        "Aram W. Harrow"
+      ],
+      "year": 2013,
+      "kind": "lecture-notes",
+      "arxiv_id": "1308.6595",
+      "doi": null,
+      "url": "https://arxiv.org/abs/1308.6595"
+    },
+    {
+      "key": "BennettBernsteinPopescuSchumacher1995Concentration",
+      "source_id": "bennett-bernstein-popescu-schumacher-1995-concentration",
+      "title": "Concentrating Partial Entanglement by Local Operations",
+      "authors": [
+        "Charles H. Bennett",
+        "Herbert J. Bernstein",
+        "Sandu Popescu",
+        "Benjamin Schumacher"
+      ],
+      "year": 1995,
+      "kind": "preprint",
+      "arxiv_id": "quant-ph/9511030",
+      "doi": null,
+      "url": "https://arxiv.org/abs/quant-ph/9511030"
+    },
+    {
+      "key": "Brunner2013BellNonlocality",
+      "source_id": "brunner-2013-bell-nonlocality",
+      "title": "Bell nonlocality",
+      "authors": [
+        "Nicolas Brunner",
+        "Daniel Cavalcanti",
+        "Stefano Pironio",
+        "Valerio Scarani",
+        "Stephanie Wehner"
+      ],
+      "year": 2013,
+      "kind": "preprint",
+      "arxiv_id": "1303.2849",
+      "doi": null,
+      "url": "https://arxiv.org/abs/1303.2849"
+    },
+    {
+      "key": "MayersYao2003SelfTesting",
+      "source_id": "mayers-yao-2003-self-testing",
+      "title": "Self testing quantum apparatus",
+      "authors": [
+        "Dominic Mayers",
+        "Andrew Yao"
+      ],
+      "year": 2003,
+      "kind": "preprint",
+      "arxiv_id": "quant-ph/0307205",
+      "doi": null,
+      "url": "https://arxiv.org/abs/quant-ph/0307205"
+    },
+    {
+      "key": "ColadangeloGohScarani2016SelfTesting",
+      "source_id": "coladangelo-goh-scarani-2016-self-testing",
+      "title": "All Pure Bipartite Entangled States can be Self-Tested",
+      "authors": [
+        "Andrea Coladangelo",
+        "Koon Tong Goh",
+        "Valerio Scarani"
+      ],
+      "year": 2016,
+      "kind": "preprint",
+      "arxiv_id": "1611.08062",
+      "doi": null,
+      "url": "https://arxiv.org/abs/1611.08062"
+    },
+    {
+      "key": "Renner2005QkdSecurity",
+      "source_id": "renner-2005-qkd-security",
+      "title": "Security of Quantum Key Distribution",
+      "authors": [
+        "Renato Renner"
+      ],
+      "year": 2005,
+      "kind": "preprint",
+      "arxiv_id": "quant-ph/0512258",
+      "doi": null,
+      "url": "https://arxiv.org/abs/quant-ph/0512258"
+    },
+    {
+      "key": "KhatriWilde2024Principles",
+      "source_id": "khatri-wilde-2024-principles",
+      "title": "Principles of Quantum Communication Theory: A Modern Approach",
+      "authors": [
+        "Sumeet Khatri",
+        "Mark M. Wilde"
+      ],
+      "year": 2024,
+      "kind": "book",
+      "arxiv_id": "2011.04672",
+      "doi": "10.48550/arXiv.2011.04672",
+      "url": "https://arxiv.org/abs/2011.04672"
+    },
+    {
+      "key": "Chiribella2007Architecture",
+      "source_id": "chiribella-2007-architecture",
+      "title": "Quantum Circuits Architecture",
+      "authors": [
+        "Giulio Chiribella",
+        "Giacomo Mauro D'Ariano",
+        "Paolo Perinotti"
+      ],
+      "year": 2007,
+      "kind": "paper",
+      "arxiv_id": "0712.1325",
+      "doi": "10.1103/PhysRevLett.101.060401",
+      "url": "https://arxiv.org/abs/0712.1325"
+    },
+    {
+      "key": "Chiribella2008Supermaps",
+      "source_id": "chiribella-2008-supermaps",
+      "title": "Transforming quantum operations: quantum supermaps",
+      "authors": [
+        "Giulio Chiribella",
+        "Giacomo Mauro D'Ariano",
+        "Paolo Perinotti"
+      ],
+      "year": 2008,
+      "kind": "preprint",
+      "arxiv_id": "0804.0180",
+      "doi": "10.1209/0295-5075/83/30004",
+      "url": "https://arxiv.org/abs/0804.0180"
+    },
+    {
+      "key": "Chiribella2009Networks",
+      "source_id": "chiribella-2009-networks",
+      "title": "Theoretical framework for quantum networks",
+      "authors": [
+        "Giulio Chiribella",
+        "Giacomo Mauro D'Ariano",
+        "Paolo Perinotti"
+      ],
+      "year": 2009,
+      "kind": "paper",
+      "arxiv_id": "0904.4483",
+      "doi": "10.1103/PhysRevA.80.022339",
+      "url": "https://arxiv.org/abs/0904.4483"
+    }
+  ]
+}
