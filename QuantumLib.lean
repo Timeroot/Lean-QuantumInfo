@@ -34,3 +34,4 @@ import QuantumLib.QECC.TransversalCNOT
 import QuantumLib.QECC.ConcatDistance
 import QuantumLib.QECC.RandomErrors
 import QuantumLib.QECC.Threshold
+import QuantumLib.QIT
