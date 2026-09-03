@@ -320,6 +320,13 @@ theorem exists_mem_orthogonal_not_mem {V : Submodule (ZMod 2) (SympSpace n)}
     Nat.pow_lt_pow_right (by norm_num) (by omega)
   omega
 
+/-- The converse of `StabGroup.distance_eq_zero_of_le_finrank`: a code that has not used up all
+`n` symplectic dimensions still has a logical operator, so its distance is a genuine minimum. -/
+theorem StabGroup.exists_isLogical_of_finrank_lt {S : StabGroup n}
+    (h : finrank (ZMod 2) S.symImage < n) : ∃ P, S.IsLogical P := by
+  obtain ⟨u, hu, hu'⟩ := exists_mem_orthogonal_not_mem h
+  exact ⟨ofSym u, S.isLogical_ofSym_iff.mpr ⟨hu, hu'⟩⟩
+
 /-! ### Lifting an isotropic subspace back to a stabilizer group -/
 
 /-- The Pauli operator with symplectic image `v`, phased so that it squares to the identity. -/

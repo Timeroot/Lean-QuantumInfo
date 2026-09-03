@@ -50,6 +50,8 @@ def ofSym (v : SympSpace n) : PauliOp n := ⟨0, v.1, v.2⟩
 @[simp] theorem ofSym_x (v : SympSpace n) : (ofSym v).x = v.1 := rfl
 @[simp] theorem ofSym_z (v : SympSpace n) : (ofSym v).z = v.2 := rfl
 
+@[simp] theorem weight_ofSym_symOf (P : PauliOp n) : weight (ofSym (symOf P)) = weight P := rfl
+
 /-- The **symplectic form** on `𝔽₂ⁿ × 𝔽₂ⁿ`. Two Paulis commute iff their symplectic images are
 orthogonal for it. -/
 def sympForm (n : ℕ) : LinearMap.BilinForm (ZMod 2) (SympSpace n) :=
@@ -329,6 +331,44 @@ theorem symOf_mem_symImage_iff {P : PauliOp n} :
     exact ⟨h, hh, congrArg Prod.fst hsym, congrArg Prod.snd hsym⟩
   · rintro ⟨h, hh, hx, hz⟩
     exact ⟨h, hh, Prod.ext hx hz⟩
+
+/-- Centralizing the stabilizer is a purely symplectic condition. -/
+theorem mem_centralizer_iff_symOf {P : PauliOp n} :
+    P ∈ Subgroup.centralizer (S.carrier : Set (PauliOp n)) ↔
+      symOf P ∈ (sympForm n).orthogonal S.symImage := by
+  rw [S.mem_orthogonal_symImage, Subgroup.mem_centralizer_iff, Subgroup.mem_centralizer_iff]
+  refine forall₂_congr fun Q _ => ?_
+  rw [commute_iff_sympForm Q P, commute_iff_sympForm Q (ofSym (symOf P)), symOf_ofSym]
+
+/-- **Logical operators are a symplectic notion:** `P` is logical exactly when its symplectic
+image lies in the orthogonal complement of the stabilizer subspace but not in the subspace. In
+particular being logical depends on `P` only through `symOf P`. -/
+theorem isLogical_iff_symOf {P : PauliOp n} :
+    S.IsLogical P ↔ symOf P ∈ (sympForm n).orthogonal S.symImage ∧ symOf P ∉ S.symImage :=
+  and_congr S.mem_centralizer_iff_symOf (not_congr S.symOf_mem_symImage_iff.symm)
+
+theorem isLogical_ofSym_iff {v : SympSpace n} :
+    S.IsLogical (ofSym v) ↔ v ∈ (sympForm n).orthogonal S.symImage ∧ v ∉ S.symImage :=
+  S.isLogical_iff_symOf
+
+@[simp] theorem isLogical_ofSym_symOf {P : PauliOp n} :
+    S.IsLogical (ofSym (symOf P)) ↔ S.IsLogical P :=
+  S.isLogical_ofSym_iff.trans S.isLogical_iff_symOf.symm
+
+/-- The distance, written entirely in terms of the symplectic subspace. -/
+theorem distance_eq_sInf_symImage : S.distance =
+    sInf {w | ∃ v ∈ (sympForm n).orthogonal S.symImage, v ∉ S.symImage ∧ weight (ofSym v) = w} := by
+  refine congrArg sInf (Set.ext fun w => ⟨?_, ?_⟩)
+  · rintro ⟨P, hP, rfl⟩
+    obtain ⟨h₁, h₂⟩ := S.isLogical_iff_symOf.mp hP
+    exact ⟨symOf P, h₁, h₂, rfl⟩
+  · rintro ⟨v, h₁, h₂, rfl⟩
+    exact ⟨ofSym v, S.isLogical_ofSym_iff.mpr ⟨h₁, h₂⟩, rfl⟩
+
+/-- Codes with the same symplectic subspace have the same distance. -/
+theorem distance_eq_of_symImage_eq {S T : StabGroup n} (h : S.symImage = T.symImage) :
+    S.distance = T.distance := by
+  rw [S.distance_eq_sInf_symImage, T.distance_eq_sInf_symImage, h]
 
 theorem weight_ofSym_le {A : Finset (Fin n)} {v : SympSpace n} (hv : v ∈ supported A) :
     weight (ofSym v) ≤ A.card := by

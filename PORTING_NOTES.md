@@ -124,3 +124,31 @@ Everything kept lives under `QuantumLib/QECC/BitVec/`, with the `LeanQEC/LeanQEC
   the hexadecimal `BitVec` literals holding the bivariate-bicycle parity checks, which cannot be
   broken.
 * The root-namespace `x` and `y` of `Stabilizer/BB.lean` are now `BB_x` and `BB_y`.
+
+### The bridge
+
+`QECC/BitVec/Bridge/` connects the imported development to the rest of QuantumLib. It is new work,
+not part of Lean-QEC.
+
+The connection is made at the symplectic layer rather than the operator layer. `BinSympPauli n`
+and `QuantumLib.PauliOp.SympSpace n` are literally the same type, so `Bridge/Symplectic.lean` only
+has to identify the structure the two developments put on it: `symplecticProd` is `sympForm`,
+`BinSympPauli.weight` is the weight of the named Pauli operator, the row space of a commuting
+check matrix and the symplectic image of a `StabCode` are isotropic, and "undetectable" is
+"logical". Going through the symplectic layer avoids the phase conventions, which disagree —
+`Z2Z2_Pauli_equiv (1, 1)` is `Y` where `QuantumLib.PauliOp.pauliOp (1, 1)` is `XZ`.
+
+`QuantumLib.PauliOp.exists_stabGroup_symImage_eq` rebuilds a stabilizer group from an isotropic
+subspace, so the transfer theorems need neither a `-1 ∉ ⟨generators⟩` side condition nor
+independent generators. The latter matters: `BB54_X_mat` has 27 rows of rank 23.
+
+The two developments disagree on the distance of a code with no undetectable errors — `sInf ∅ = 0`
+against the `n + 1` fallback of a `Finset.min` — so the transfer theorems ask for an undetectable
+error, which `undetectable_set_nonempty_of_finrank_lt` and
+`StabCode.undetectable_set_nonempty_of_numGenerators_lt` supply from `k > 0`.
+
+`Bridge/Codes.lean` composes the result with `QECC/StabilizerCorrection.lean` to get, for each
+example code, a `QuantumLib.QECC` with an encoder and a recovery channel. The exact ranks the
+`param_triple`s need come from combining upstream's one-sided rank bounds with
+`Matrix.rank_add_rank_ker`. This gives QuantumLib the bivariate bicycle codes `⟦54, 8, ≥ 6⟧` and
+`⟦72, 12, ≥ 6⟧`, whose distance bounds rest on the SAT pipeline in `QECC/BitVec/SAT/`.

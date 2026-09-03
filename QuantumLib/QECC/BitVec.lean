@@ -4,6 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Mattias Ehatamm, Yi Lee, Runzhou Tao, Xiaodi Wu, Eashan Hatti
 -/
 
+import QuantumLib.QECC.BitVec.Bridge.Codes
+import QuantumLib.QECC.BitVec.Bridge.Symplectic
 import QuantumLib.QECC.BitVec.Examples.BB54
 import QuantumLib.QECC.BitVec.Examples.BB72
 import QuantumLib.QECC.BitVec.Examples.Planar
