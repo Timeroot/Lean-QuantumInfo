@@ -35,3 +35,4 @@ import QuantumLib.QECC.ConcatDistance
 import QuantumLib.QECC.RandomErrors
 import QuantumLib.QECC.Threshold
 import QuantumLib.QIT
+import QuantumLib.QIT.Bridge

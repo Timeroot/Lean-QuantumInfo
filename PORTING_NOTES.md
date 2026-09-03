@@ -101,3 +101,32 @@ relocation, so no duplicated file could be removed up front.
   `Matrix.fromBlocks_congruence_posSemidef`. It is in fact the special case `Y := √D * R`,
   `X := √D` of physlib's, which makes it a candidate for the deduplication pass.
 * Copyright headers and the `REFERENCES.json` citation keys are untouched.
+
+### The bridge
+
+`QuantumLib/QIT/Bridge/` identifies Lean-QIT's tower of objects with physlib's. Nothing in it
+changes Lean-QIT; it is new material, and `QuantumLib/QIT.lean` — the upstream root — does not
+import it. `QuantumLib.lean` imports both.
+
+The two libraries agree exactly at the bottom. `QIT.MatrixMap a b` and `MatrixMap a b ℂ` are the
+same type, `QIT.MatrixMap.IsTracePreserving` and `MatrixMap.IsTracePreserving` are the same
+predicate, and `QIT.partialTraceA` and `QIT.partialTraceB` are `Matrix.traceLeft` and
+`Matrix.traceRight`. The Choi matrices differ only in which factor of the index type comes first:
+Lean-QIT puts the input first and physlib the output, so each is the `Prod.swap` submatrix of the
+other. Complete positivity is stated by Lean-QIT as positive semidefiniteness of that matrix and by
+physlib as positivity of every ampliation, and `MatrixMap.choi_PSD_iff_CP_map` reconciles them.
+
+Above that level the two libraries make different but equivalent packaging choices — physlib keeps
+states and channels as operators and effects as `HermitianMat`s, Lean-QIT keeps all of them as
+matrices with side conditions — so the bridge is a family of equivalences:
+`QIT.State.equivMState`, `QIT.Channel.equivCPTPMap`, `QIT.PureVector.equivKet` and
+`QIT.POVM.equivPOVM`. Each comes with the compatibilities that make it usable: products, partial
+traces, relabelling and the maximally mixed state for `State`; identity, composition and action on
+states for `Channel`; the rank-one state for `PureVector`; and, for `POVM`, the fact that
+Lean-QIT's `QIT.Channel.measure` is physlib's `POVM.measureDiscard`.
+
+Entropies agree up to the choice of logarithm: Lean-QIT counts bits and physlib counts nats, so
+`QIT.State.vonNeumann ρ = Sᵥₙ ρ.toMState / Real.log 2`, and likewise for the conditional entropy
+and the mutual information. Relative entropy is not bridged here — physlib's is `ENNReal`-valued
+and defined for arbitrary states, while Lean-QIT's is real-valued and assumes positive
+definiteness — so it is left to the deduplication pass.
