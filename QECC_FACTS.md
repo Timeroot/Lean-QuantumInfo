@@ -2,8 +2,9 @@
 
 Status legend: ✅ stated & proved · 🟡 proved in a restated or weaker form (each one says how) · ⬜ not stated
 
-The Lean development contains **no `sorry`** and introduces no new axioms: every theorem below
-marked ✅ or 🟡 compiles down to `propext`/`Classical.choice`/`Quot.sound` only.
+The Lean development contains **no `sorry`**, and every theorem below marked ✅ or 🟡 compiles down
+to `propext`/`Classical.choice`/`Quot.sound` only. The three uncounted `QECC/BitVec` families at the
+end of section I are the exception; that entry says what they rest on instead.
 
 Names in `code font` are the Lean identifiers (in `QuantumInfo/QECC/*` = `QuantumLib/QECC/*`).
 
@@ -113,7 +114,9 @@ Names in `code font` are the Lean identifiers (in `QuantumInfo/QECC/*` = `Quantu
 87. ✅ Steane code `⟦7,1,3⟧` (CSS from `[7,4,3]` Hamming). — `steaneCode`, `steaneCode_numLogical`, `steaneCode_distance`
 88. ✅ Five-qubit code `⟦5,1,3⟧`. — `fiveQubitCode`, `fiveQubitCode_numLogical`, `fiveQubitCode_distance`
 89. ✅ Trivial code has `k = n` and full code space. — `trivialStabilizer`, `trivialStabilizer_numLogical`, `StabGroup.trivial`, `codeSpace_trivial`
-90. ⬜ Toric code `⟦2L²,2,L⟧` (statement of parameters). — `toricCode`
+90. 🟡 Toric code `⟦2L²,2,L⟧`: for every `L ≠ 1` the code has exactly `k = 2` logical qubits and distance at least `L`; the matching upper bound `d ≤ L` is not proved. `toric_isCode_one_false` shows that `L = 1` really has to be excluded. — `toricCode`, `toric_isCode`, `exists_toric_stabGroup`, `exists_toric_qecc`
+
+Three more families come with the `QECC/BitVec` development and are not counted among the hundred: the planar surface code `⟦2L², 1, ≥ L⟧`, and the bivariate bicycle codes `⟦54, 8, ≥ 6⟧` and `⟦72, 12, ≥ 6⟧`, whose distance bounds are discharged by a SAT refutation rather than by hand. The translation from a distance bound into the propositional formula is itself proved correct (`bitvec_sat_translation_correct`), but the refutation is not: `bv_decide` and `bv_check` check the solver's LRAT certificate by native evaluation and assert the outcome as an axiom. The two bivariate bicycle codes each rest on four such axioms — two rank lemmas and two distance lemmas — and `QECC/BitVec`'s own Steane code (`steane_isCode`, a second route to fact 87) on one. The planar family uses `decide` and needs none. — `planar_isCode`, `exists_planar_qecc`, `BB54_isCode`, `exists_BB54_qecc`, `BB72_isCode`, `exists_BB72_qecc`
 
 ## J. Concatenation
 91. ✅ Concatenation of codes as a `QECC` composite. — `QECC.concat`, `QECC.parallel`, `concat_decodes`
@@ -131,8 +134,9 @@ Names in `code font` are the Lean identifiers (in `QuantumInfo/QECC/*` = `Quantu
 
 ## Assumptions, restatements, and what is genuinely missing
 
-The development has no `sorry` and no new axioms. One place deviates from the "textbook"
-statement, deliberately and documented at the declaration:
+The development has no `sorry`, and no new axioms outside the `QECC/BitVec` SAT certificates
+described above. One place deviates from the "textbook" statement, deliberately and documented at
+the declaration:
 
 * **`StabGroup.exists_qecc_decodes`** (realization bridge) — produces a `QECC` from a stabilizer
   group whose encoder is the code-space isometry and whose decoder inverts it (`Decodes`), under

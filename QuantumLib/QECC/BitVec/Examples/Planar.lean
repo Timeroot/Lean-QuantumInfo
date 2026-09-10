@@ -16,9 +16,14 @@ establishes the distance lower bound `L` by exhibiting `L` disjoint cuts that ev
 error must cross.
 -/
 
+namespace QuantumLib
+
+/-- The qubits of the `L × L` planar code: one per edge of the lattice, `L * (L - 1)` horizontal
+and `L * (L + 1)` vertical. -/
 def numQubits (L : ℕ) : ℕ :=
   2 * L ^ 2
 
+/-- The horizontal and the vertical edges together make up all the qubits. -/
 lemma numQubits_eq (L : ℕ) : numQubits L = L * (L - 1) + L * (L + 1) := by
   unfold numQubits
   cases L with
@@ -27,18 +32,27 @@ lemma numQubits_eq (L : ℕ) : numQubits L = L * (L - 1) + L * (L + 1) := by
     simp only [Nat.add_sub_cancel]
     ring
 
+/-- The `X` checks (stars), one per vertex of the lattice at which a star fits. -/
 def numXChecks (L : ℕ) : ℕ :=
   (L - 1) * (L + 1)
 
+/-- The `Z` checks (plaquettes), one per face of the lattice. -/
 def numZChecks (L : ℕ) : ℕ :=
   L * L
 
+/-- The qubit on the horizontal edge in column `x < L` and row `y < L - 1`. The horizontal edges
+come first, `L` to a row. -/
 def horizontalEdgeIndex (L : ℕ) (x y : ℕ) : ℕ :=
   y * L + x
 
+/-- The qubit on the vertical edge in column `x < L + 1` and row `y < L`. The vertical edges come
+after all `L * (L - 1)` horizontal ones, `L + 1` to a row. -/
 def verticalEdgeIndex (L : ℕ) (x y : ℕ) : ℕ :=
   L * (L - 1) + y * (L + 1) + x
 
+/-- The `X` checks. The star at `(x, y) = (i % (L + 1), i / (L + 1))` acts on the vertical edges
+`(x, y)` and `(x, y + 1)`, and on whichever of the horizontal edges `(x - 1, y)` and `(x, y)`
+exist. -/
 def xCheckMatrix (L : ℕ) : Matrix (Fin (numXChecks L)) (Fin (numQubits L)) (ZMod 2) :=
   fun i q =>
     let x := i.1 % (L + 1)
@@ -52,6 +66,8 @@ def xCheckMatrix (L : ℕ) : Matrix (Fin (numXChecks L)) (Fin (numQubits L)) (ZM
     else
       0
 
+/-- The `Z` checks. The plaquette at `(x, y) = (i % L, i / L)` acts on the vertical edges `(x, y)`
+and `(x + 1, y)`, and on whichever of the horizontal edges `(x, y - 1)` and `(x, y)` exist. -/
 def zCheckMatrix (L : ℕ) : Matrix (Fin (numZChecks L)) (Fin (numQubits L)) (ZMod 2) :=
   fun i q =>
     let x := i.1 % L
@@ -65,27 +81,32 @@ def zCheckMatrix (L : ℕ) : Matrix (Fin (numZChecks L)) (Fin (numQubits L)) (ZM
     else
       0
 
+/-- There is at least one plaquette. -/
 lemma numZChecks_pos (L : ℕ) (hL : 1 < L) :
     0 < numZChecks L := by
   unfold numZChecks
   exact Nat.mul_pos (by omega) (by omega)
 
-lemma numXChecks_pos (L : ℕ) (hL : 1 < L) :
+/-- There is at least one star. -/
+private lemma numXChecks_pos (L : ℕ) (hL : 1 < L) :
     0 < numXChecks L := by
   unfold numXChecks
   exact Nat.mul_pos (by omega) (by omega)
 
-lemma xRow_y_lt (L : ℕ) (hL : 1 < L)
+/-- A star lies in one of the rows `0, …, L - 2`. -/
+private lemma xRow_y_lt (L : ℕ) (hL : 1 < L)
     (i : Fin (numXChecks L)) : i.1 / (L + 1) < L - 1 := by
   rw [Nat.div_lt_iff_lt_mul (by omega)]
   simpa [numXChecks, Nat.mul_comm] using i.2
 
-lemma zRow_y_lt (L : ℕ) (hL : 1 < L)
+/-- A plaquette lies in one of the rows `0, …, L - 1`. -/
+private lemma zRow_y_lt (L : ℕ) (hL : 1 < L)
     (i : Fin (numZChecks L)) : i.1 / L < L := by
   rw [Nat.div_lt_iff_lt_mul (Nat.lt_of_succ_lt hL)]
   exact i.2
 
-lemma horizontalEdgeIndex_bound (L x y : ℕ) (hx : x < L)
+/-- A horizontal edge of the lattice is a qubit. -/
+private lemma horizontalEdgeIndex_bound (L x y : ℕ) (hx : x < L)
     (hy : y < L - 1) : horizontalEdgeIndex L x y < numQubits L := by
   unfold horizontalEdgeIndex
   rw [numQubits_eq]
@@ -96,6 +117,7 @@ lemma horizontalEdgeIndex_bound (L x y : ℕ) (hx : x < L)
   have hs : y * L + L = (y + 1) * L := by ring
   omega
 
+/-- A vertical edge of the lattice is a qubit. -/
 lemma verticalEdgeIndex_bound (L x y : ℕ) (hx : x < L + 1)
     (hy : y < L) : verticalEdgeIndex L x y < numQubits L := by
   unfold verticalEdgeIndex
@@ -106,7 +128,8 @@ lemma verticalEdgeIndex_bound (L x y : ℕ) (hx : x < L + 1)
   have hs : y * (L + 1) + (L + 1) = (y + 1) * (L + 1) := by ring
   omega
 
-lemma horizontalEdgeIndex_lt_vertical (L x y x' y' : ℕ)
+/-- Every horizontal edge is indexed before every vertical one. -/
+private lemma horizontalEdgeIndex_lt_vertical (L x y x' y' : ℕ)
     (hx : x < L) (hy : y < L - 1) :
     horizontalEdgeIndex L x y < verticalEdgeIndex L x' y' := by
   unfold horizontalEdgeIndex verticalEdgeIndex
@@ -117,7 +140,8 @@ lemma horizontalEdgeIndex_lt_vertical (L x y x' y' : ℕ)
   have hs : y * L + L = (y + 1) * L := by ring
   omega
 
-lemma gridIndex_inj (W x y x' y' : ℕ) (hx : x < W) (hx' : x' < W) :
+/-- Row-major indexing of a grid of width `W` is injective. -/
+private lemma gridIndex_inj (W x y x' y' : ℕ) (hx : x < W) (hx' : x' < W) :
     y * W + x = y' * W + x' ↔ x = x' ∧ y = y' := by
   constructor
   · intro h
@@ -128,11 +152,13 @@ lemma gridIndex_inj (W x y x' y' : ℕ) (hx : x < W) (hx' : x' < W) :
   · rintro ⟨rfl, rfl⟩
     rfl
 
-lemma horizontalEdgeIndex_inj (L x y x' y' : ℕ) (hx : x < L) (hx' : x' < L) :
+/-- Distinct horizontal edges are distinct qubits. -/
+private lemma horizontalEdgeIndex_inj (L x y x' y' : ℕ) (hx : x < L) (hx' : x' < L) :
     horizontalEdgeIndex L x y = horizontalEdgeIndex L x' y' ↔ x = x' ∧ y = y' :=
   gridIndex_inj L x y x' y' hx hx'
 
-lemma verticalEdgeIndex_inj (L x y x' y' : ℕ)
+/-- Distinct vertical edges are distinct qubits. -/
+private lemma verticalEdgeIndex_inj (L x y x' y' : ℕ)
     (hx : x < L + 1) (hx' : x' < L + 1) :
     verticalEdgeIndex L x y = verticalEdgeIndex L x' y' ↔
       x = x' ∧ y = y' := by
@@ -144,16 +170,19 @@ lemma verticalEdgeIndex_inj (L x y x' y' : ℕ)
   · rintro ⟨rfl, rfl⟩
     rfl
 
-lemma horizontalEdgeIndex_ne_vertical (L x y x' y' : ℕ)
+/-- No horizontal edge is a vertical one. -/
+private lemma horizontalEdgeIndex_ne_vertical (L x y x' y' : ℕ)
     (hx : x < L) (hy : y < L - 1) :
     horizontalEdgeIndex L x y ≠ verticalEdgeIndex L x' y' := by
   exact Nat.ne_of_lt (horizontalEdgeIndex_lt_vertical L x y x' y' hx hy)
 
-lemma verticalEdgeIndex_ne_horizontal (L x y x' y' : ℕ)
+/-- No vertical edge is a horizontal one. -/
+private lemma verticalEdgeIndex_ne_horizontal (L x y x' y' : ℕ)
     (hx' : x' < L) (hy' : y' < L - 1) :
     verticalEdgeIndex L x y ≠ horizontalEdgeIndex L x' y' :=
   Ne.symm (horizontalEdgeIndex_ne_vertical L x' y' x y hx' hy')
 
+/-- A star as a sum of indicator vectors, one for each of the at most four edges it acts on. -/
 lemma xCheckMatrix_row (L : ℕ) (hL : 1 < L)
     (i : Fin (numXChecks L)) :
     xCheckMatrix L i =
@@ -203,6 +232,8 @@ lemma xCheckMatrix_row (L : ℕ) (hL : 1 < L)
     · exfalso
       omega
 
+/-- A plaquette as a sum of indicator vectors, one for each of the at most four edges it acts
+on. -/
 lemma zCheckMatrix_row (L : ℕ) (hL : 1 < L)
     (i : Fin (numZChecks L)) :
     zCheckMatrix L i =
@@ -250,32 +281,38 @@ lemma zCheckMatrix_row (L : ℕ) (hL : 1 < L)
     · split_ifs <;> first | decide | (exfalso; omega)
     · split_ifs <;> first | decide | (exfalso; omega)
 
+/-- Pull an `if` out of the left argument of a dot product. -/
 private lemma ite_dotP {N : ℕ} {c : Prop} [Decidable c] (u v : Fin N → ZMod 2) :
     (if c then u else 0) ⬝ᵥ v = if c then u ⬝ᵥ v else 0 := by
   split_ifs <;> simp
 
+/-- Pull an `if` out of the right argument of a dot product. -/
 private lemma dotP_ite {N : ℕ} {c : Prop} [Decidable c] (u v : Fin N → ZMod 2) :
     u ⬝ᵥ (if c then v else 0) = if c then u ⬝ᵥ v else 0 := by
   split_ifs <;> simp
 
+/-- Pull a `dite` out of the left argument of a dot product. -/
 private lemma dite_dotP {N : ℕ} {c : Prop} [Decidable c] (u : c → Fin N → ZMod 2)
     (v : Fin N → ZMod 2) :
     (if h : c then u h else 0) ⬝ᵥ v = if h : c then u h ⬝ᵥ v else 0 := by
   split_ifs <;> simp
 
+/-- Pull a `dite` out of the right argument of a dot product. -/
 private lemma dotP_dite {N : ℕ} {c : Prop} [Decidable c] (u : Fin N → ZMod 2)
     (v : c → Fin N → ZMod 2) :
     u ⬝ᵥ (if h : c then v h else 0) = if h : c then u ⬝ᵥ v h else 0 := by
   split_ifs <;> simp
 
+/-- Two indicator vectors meet exactly when they indicate the same qubit. -/
 private lemma single_dotP_single {N : ℕ} (a b : Fin N) :
     (Pi.single a 1 : Fin N → ZMod 2) ⬝ᵥ Pi.single b 1 = if a = b then 1 else 0 := by
   rw [single_one_dotProduct, Pi.single_apply]
 
-set_option maxHeartbeats 400000 in
-lemma planarCheckOrthogonality (L : ℕ) (hL : 1 < L) :
-    (zCheckMatrix L).mutually_orth_rows (xCheckMatrix L) := by
-  intro z x
+/-- The rows of `zCheckMatrix L` and `xCheckMatrix L` are orthogonal, in the case where the
+`z`-th plaquette sits in the last row of the lattice. -/
+private lemma planarCheckOrthogonality_of_not_lt (L : ℕ) (hL : 1 < L) (z : Fin (numZChecks L))
+    (x : Fin (numXChecks L)) (g2 : ¬(z : ℕ) / L + 1 < L) :
+    zCheckMatrix L z ⬝ᵥ xCheckMatrix L x = 0 := by
   rw [zCheckMatrix_row L hL z,
     xCheckMatrix_row L hL x]
   simp only [add_dotProduct, dotProduct_add, ite_dotP, dotP_ite, dite_dotP, dotP_dite,
@@ -300,107 +337,147 @@ lemma planarCheckOrthogonality (L : ℕ) (hL : 1 < L) :
   have b2 : xz + 1 < L + 1 := by omega
   have b5 : xx - 1 < L := by omega
   have b6 : yz - 1 < L - 1 := by omega
-  by_cases g2 : yz + 1 < L
-  · have b8 : yz < L - 1 := by omega
-    by_cases g4 : xx < L
-    · simp only [verticalEdgeIndex_inj L (xz) (yz) (xx) (yx) b1 hbx,
-        verticalEdgeIndex_inj L (xz) (yz) (xx) (yx + 1) b1 hbx,
-        verticalEdgeIndex_ne_horizontal L (xz) (yz) (xx - 1) (yx) b5 hyx,
-        verticalEdgeIndex_ne_horizontal L (xz) (yz) (xx) (yx) g4 hyx,
-        verticalEdgeIndex_inj L (xz + 1) (yz) (xx) (yx) b2 hbx,
-        verticalEdgeIndex_inj L (xz + 1) (yz) (xx) (yx + 1) b2 hbx,
-        verticalEdgeIndex_ne_horizontal L (xz + 1) (yz) (xx - 1) (yx) b5 hyx,
-        verticalEdgeIndex_ne_horizontal L (xz + 1) (yz) (xx) (yx) g4 hyx,
-        horizontalEdgeIndex_ne_vertical L (xz) (yz - 1) (xx) (yx) hbz b6,
-        horizontalEdgeIndex_ne_vertical L (xz) (yz - 1) (xx) (yx + 1) hbz b6,
-        horizontalEdgeIndex_inj L (xz) (yz - 1) (xx - 1) (yx) hbz b5,
-        horizontalEdgeIndex_inj L (xz) (yz - 1) (xx) (yx) hbz g4,
-        horizontalEdgeIndex_ne_vertical L (xz) (yz) (xx) (yx) hbz b8,
-        horizontalEdgeIndex_ne_vertical L (xz) (yz) (xx) (yx + 1) hbz b8,
-        horizontalEdgeIndex_inj L (xz) (yz) (xx - 1) (yx) hbz b5,
-        horizontalEdgeIndex_inj L (xz) (yz) (xx) (yx) hbz g4,
-        g2,
-        g4,
-        dite_true,
-        if_false]
-      split_ifs <;> first | decide | (exfalso; omega)
-    · simp only [verticalEdgeIndex_inj L (xz) (yz) (xx) (yx) b1 hbx,
-        verticalEdgeIndex_inj L (xz) (yz) (xx) (yx + 1) b1 hbx,
-        verticalEdgeIndex_ne_horizontal L (xz) (yz) (xx - 1) (yx) b5 hyx,
-        verticalEdgeIndex_inj L (xz + 1) (yz) (xx) (yx) b2 hbx,
-        verticalEdgeIndex_inj L (xz + 1) (yz) (xx) (yx + 1) b2 hbx,
-        verticalEdgeIndex_ne_horizontal L (xz + 1) (yz) (xx - 1) (yx) b5 hyx,
-        horizontalEdgeIndex_ne_vertical L (xz) (yz - 1) (xx) (yx) hbz b6,
-        horizontalEdgeIndex_ne_vertical L (xz) (yz - 1) (xx) (yx + 1) hbz b6,
-        horizontalEdgeIndex_inj L (xz) (yz - 1) (xx - 1) (yx) hbz b5,
-        horizontalEdgeIndex_ne_vertical L (xz) (yz) (xx) (yx) hbz b8,
-        horizontalEdgeIndex_ne_vertical L (xz) (yz) (xx) (yx + 1) hbz b8,
-        horizontalEdgeIndex_inj L (xz) (yz) (xx - 1) (yx) hbz b5,
-        g2,
-        g4,
-        dite_true,
-        dite_false,
-        if_false]
-      split_ifs <;> first | decide | (exfalso; omega)
-  · by_cases g4 : xx < L
-    · simp only [verticalEdgeIndex_inj L (xz) (yz) (xx) (yx) b1 hbx,
-        verticalEdgeIndex_inj L (xz) (yz) (xx) (yx + 1) b1 hbx,
-        verticalEdgeIndex_ne_horizontal L (xz) (yz) (xx - 1) (yx) b5 hyx,
-        verticalEdgeIndex_ne_horizontal L (xz) (yz) (xx) (yx) g4 hyx,
-        verticalEdgeIndex_inj L (xz + 1) (yz) (xx) (yx) b2 hbx,
-        verticalEdgeIndex_inj L (xz + 1) (yz) (xx) (yx + 1) b2 hbx,
-        verticalEdgeIndex_ne_horizontal L (xz + 1) (yz) (xx - 1) (yx) b5 hyx,
-        verticalEdgeIndex_ne_horizontal L (xz + 1) (yz) (xx) (yx) g4 hyx,
-        horizontalEdgeIndex_ne_vertical L (xz) (yz - 1) (xx) (yx) hbz b6,
-        horizontalEdgeIndex_ne_vertical L (xz) (yz - 1) (xx) (yx + 1) hbz b6,
-        horizontalEdgeIndex_inj L (xz) (yz - 1) (xx - 1) (yx) hbz b5,
-        horizontalEdgeIndex_inj L (xz) (yz - 1) (xx) (yx) hbz g4,
-        g2,
-        g4,
-        dite_true,
-        dite_false,
-        if_false]
-      split_ifs <;> first | decide | (exfalso; omega)
-    · simp only [verticalEdgeIndex_inj L (xz) (yz) (xx) (yx) b1 hbx,
-        verticalEdgeIndex_inj L (xz) (yz) (xx) (yx + 1) b1 hbx,
-        verticalEdgeIndex_ne_horizontal L (xz) (yz) (xx - 1) (yx) b5 hyx,
-        verticalEdgeIndex_inj L (xz + 1) (yz) (xx) (yx) b2 hbx,
-        verticalEdgeIndex_inj L (xz + 1) (yz) (xx) (yx + 1) b2 hbx,
-        verticalEdgeIndex_ne_horizontal L (xz + 1) (yz) (xx - 1) (yx) b5 hyx,
-        horizontalEdgeIndex_ne_vertical L (xz) (yz - 1) (xx) (yx) hbz b6,
-        horizontalEdgeIndex_ne_vertical L (xz) (yz - 1) (xx) (yx + 1) hbz b6,
-        horizontalEdgeIndex_inj L (xz) (yz - 1) (xx - 1) (yx) hbz b5,
-        g2,
-        g4,
-        dite_false,
-        if_false]
-      split_ifs <;> first | decide | (exfalso; omega)
+  rw [hE2] at g2
+  by_cases g4 : xx < L
+  · simp only [verticalEdgeIndex_inj L (xz) (yz) (xx) (yx) b1 hbx,
+      verticalEdgeIndex_inj L (xz) (yz) (xx) (yx + 1) b1 hbx,
+      verticalEdgeIndex_ne_horizontal L (xz) (yz) (xx - 1) (yx) b5 hyx,
+      verticalEdgeIndex_ne_horizontal L (xz) (yz) (xx) (yx) g4 hyx,
+      verticalEdgeIndex_inj L (xz + 1) (yz) (xx) (yx) b2 hbx,
+      verticalEdgeIndex_inj L (xz + 1) (yz) (xx) (yx + 1) b2 hbx,
+      verticalEdgeIndex_ne_horizontal L (xz + 1) (yz) (xx - 1) (yx) b5 hyx,
+      verticalEdgeIndex_ne_horizontal L (xz + 1) (yz) (xx) (yx) g4 hyx,
+      horizontalEdgeIndex_ne_vertical L (xz) (yz - 1) (xx) (yx) hbz b6,
+      horizontalEdgeIndex_ne_vertical L (xz) (yz - 1) (xx) (yx + 1) hbz b6,
+      horizontalEdgeIndex_inj L (xz) (yz - 1) (xx - 1) (yx) hbz b5,
+      horizontalEdgeIndex_inj L (xz) (yz - 1) (xx) (yx) hbz g4,
+      g2,
+      g4,
+      dite_true,
+      dite_false,
+      if_false]
+    split_ifs <;> first | decide | (exfalso; omega)
+  · simp only [verticalEdgeIndex_inj L (xz) (yz) (xx) (yx) b1 hbx,
+      verticalEdgeIndex_inj L (xz) (yz) (xx) (yx + 1) b1 hbx,
+      verticalEdgeIndex_ne_horizontal L (xz) (yz) (xx - 1) (yx) b5 hyx,
+      verticalEdgeIndex_inj L (xz + 1) (yz) (xx) (yx) b2 hbx,
+      verticalEdgeIndex_inj L (xz + 1) (yz) (xx) (yx + 1) b2 hbx,
+      verticalEdgeIndex_ne_horizontal L (xz + 1) (yz) (xx - 1) (yx) b5 hyx,
+      horizontalEdgeIndex_ne_vertical L (xz) (yz - 1) (xx) (yx) hbz b6,
+      horizontalEdgeIndex_ne_vertical L (xz) (yz - 1) (xx) (yx + 1) hbz b6,
+      horizontalEdgeIndex_inj L (xz) (yz - 1) (xx - 1) (yx) hbz b5,
+      g2,
+      g4,
+      dite_false,
+      if_false]
+    split_ifs <;> first | decide | (exfalso; omega)
 
-def planarCode (L : ℕ) (hL : 1 < L) : CSS_pair (numQubits L) (numZChecks L) (numXChecks L) := by
+/-- Every star commutes with every plaquette: the two act on an even number of common edges. -/
+lemma planarCheckOrthogonality (L : ℕ) (hL : 1 < L) :
+    (zCheckMatrix L).mutuallyOrthRows (xCheckMatrix L) := by
+  intro z x
+  by_cases g2 : (z : ℕ) / L + 1 < L
+  case neg => exact planarCheckOrthogonality_of_not_lt L hL z x g2
+  rw [zCheckMatrix_row L hL z,
+    xCheckMatrix_row L hL x]
+  simp only [add_dotProduct, dotProduct_add, ite_dotP, dotP_ite, dite_dotP, dotP_dite,
+    single_dotP_single, Fin.ext_iff]
+  generalize hE2 : (↑z : ℕ) / L = yz
+  generalize hE4 : (↑x : ℕ) / (L + 1) = yx
+  generalize hE1 : (↑z : ℕ) % L = xz
+  generalize hE3 : (↑x : ℕ) % (L + 1) = xx
+  have hbz : xz < L := by
+    rw [← hE1]
+    exact Nat.mod_lt _ (Nat.lt_of_succ_lt hL)
+  have hbx : xx < L + 1 := by
+    rw [← hE3]
+    exact Nat.mod_lt _ (by omega)
+  have hyz : yz < L := by
+    rw [← hE2]
+    exact zRow_y_lt L hL z
+  have hyx : yx < L - 1 := by
+    rw [← hE4]
+    exact xRow_y_lt L hL x
+  have b1 : xz < L + 1 := by omega
+  have b2 : xz + 1 < L + 1 := by omega
+  have b5 : xx - 1 < L := by omega
+  have b6 : yz - 1 < L - 1 := by omega
+  rw [hE2] at g2
+  have b8 : yz < L - 1 := by omega
+  by_cases g4 : xx < L
+  · simp only [verticalEdgeIndex_inj L (xz) (yz) (xx) (yx) b1 hbx,
+      verticalEdgeIndex_inj L (xz) (yz) (xx) (yx + 1) b1 hbx,
+      verticalEdgeIndex_ne_horizontal L (xz) (yz) (xx - 1) (yx) b5 hyx,
+      verticalEdgeIndex_ne_horizontal L (xz) (yz) (xx) (yx) g4 hyx,
+      verticalEdgeIndex_inj L (xz + 1) (yz) (xx) (yx) b2 hbx,
+      verticalEdgeIndex_inj L (xz + 1) (yz) (xx) (yx + 1) b2 hbx,
+      verticalEdgeIndex_ne_horizontal L (xz + 1) (yz) (xx - 1) (yx) b5 hyx,
+      verticalEdgeIndex_ne_horizontal L (xz + 1) (yz) (xx) (yx) g4 hyx,
+      horizontalEdgeIndex_ne_vertical L (xz) (yz - 1) (xx) (yx) hbz b6,
+      horizontalEdgeIndex_ne_vertical L (xz) (yz - 1) (xx) (yx + 1) hbz b6,
+      horizontalEdgeIndex_inj L (xz) (yz - 1) (xx - 1) (yx) hbz b5,
+      horizontalEdgeIndex_inj L (xz) (yz - 1) (xx) (yx) hbz g4,
+      horizontalEdgeIndex_ne_vertical L (xz) (yz) (xx) (yx) hbz b8,
+      horizontalEdgeIndex_ne_vertical L (xz) (yz) (xx) (yx + 1) hbz b8,
+      horizontalEdgeIndex_inj L (xz) (yz) (xx - 1) (yx) hbz b5,
+      horizontalEdgeIndex_inj L (xz) (yz) (xx) (yx) hbz g4,
+      g2,
+      g4,
+      dite_true,
+      if_false]
+    split_ifs <;> first | decide | (exfalso; omega)
+  · simp only [verticalEdgeIndex_inj L (xz) (yz) (xx) (yx) b1 hbx,
+      verticalEdgeIndex_inj L (xz) (yz) (xx) (yx + 1) b1 hbx,
+      verticalEdgeIndex_ne_horizontal L (xz) (yz) (xx - 1) (yx) b5 hyx,
+      verticalEdgeIndex_inj L (xz + 1) (yz) (xx) (yx) b2 hbx,
+      verticalEdgeIndex_inj L (xz + 1) (yz) (xx) (yx + 1) b2 hbx,
+      verticalEdgeIndex_ne_horizontal L (xz + 1) (yz) (xx - 1) (yx) b5 hyx,
+      horizontalEdgeIndex_ne_vertical L (xz) (yz - 1) (xx) (yx) hbz b6,
+      horizontalEdgeIndex_ne_vertical L (xz) (yz - 1) (xx) (yx + 1) hbz b6,
+      horizontalEdgeIndex_inj L (xz) (yz - 1) (xx - 1) (yx) hbz b5,
+      horizontalEdgeIndex_ne_vertical L (xz) (yz) (xx) (yx) hbz b8,
+      horizontalEdgeIndex_ne_vertical L (xz) (yz) (xx) (yx + 1) hbz b8,
+      horizontalEdgeIndex_inj L (xz) (yz) (xx - 1) (yx) hbz b5,
+      g2,
+      g4,
+      dite_true,
+      dite_false,
+      if_false]
+    split_ifs <;> first | decide | (exfalso; omega)
+
+/-- The planar surface code, as a CSS pair of plaquette and star checks. -/
+def planarCode (L : ℕ) (hL : 1 < L) : CSSPair (numQubits L) (numZChecks L) (numXChecks L) := by
   letI : NeZero (numZChecks L) :=
     ⟨Nat.ne_of_gt (numZChecks_pos L hL)⟩
   letI : NeZero (numXChecks L) :=
     ⟨Nat.ne_of_gt (numXChecks_pos L hL)⟩
-  exact CSS_pair.of_matrices (zCheckMatrix L) (xCheckMatrix L)
+  exact CSSPair.ofMatrices (zCheckMatrix L) (xCheckMatrix L)
     (planarCheckOrthogonality L hL)
 
-noncomputable def vVal {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (a b : ℕ) : ZMod 2 :=
+/-- The value of `x` on the vertical edge in column `a` and row `b`, and `0` when the lattice has
+no such edge. -/
+private noncomputable def vVal {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (a b : ℕ) : ZMod 2 :=
   if hab : a < L + 1 ∧ b < L then
     x ⟨verticalEdgeIndex L a b, verticalEdgeIndex_bound L a b hab.1 hab.2⟩ else 0
 
-noncomputable def hVal {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (a b : ℕ) : ZMod 2 :=
+/-- The value of `x` on the horizontal edge in column `a` and row `b`, and `0` when the lattice
+has no such edge. -/
+private noncomputable def hVal {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (a b : ℕ) : ZMod 2 :=
   if hab : a < L ∧ b < L - 1 then
     x ⟨horizontalEdgeIndex L a b, horizontalEdgeIndex_bound L a b hab.1 hab.2⟩ else 0
 
-lemma vVal_eq {L : ℕ} (x : Fin (numQubits L) → ZMod 2) {a b : ℕ}
+/-- `vVal` is the value of `x` at a vertical edge that does exist. -/
+private lemma vVal_eq {L : ℕ} (x : Fin (numQubits L) → ZMod 2) {a b : ℕ}
     (ha : a < L + 1) (hb : b < L) (p : verticalEdgeIndex L a b < numQubits L) :
     x ⟨verticalEdgeIndex L a b, p⟩ = vVal x a b := by rw [vVal, dif_pos ⟨ha, hb⟩]
 
-lemma hVal_eq {L : ℕ} (x : Fin (numQubits L) → ZMod 2) {a b : ℕ}
+/-- `hVal` is the value of `x` at a horizontal edge that does exist. -/
+private lemma hVal_eq {L : ℕ} (x : Fin (numQubits L) → ZMod 2) {a b : ℕ}
     (ha : a < L) (hb : b < L - 1) (p : horizontalEdgeIndex L a b < numQubits L) :
     x ⟨horizontalEdgeIndex L a b, p⟩ = hVal x a b := by rw [hVal, dif_pos ⟨ha, hb⟩]
 
-lemma edge_cases {L : ℕ} (hL : 1 < L) (q : Fin (numQubits L)) :
+/-- Every qubit is a horizontal or a vertical edge. -/
+private lemma edge_cases {L : ℕ} (hL : 1 < L) (q : Fin (numQubits L)) :
     (∃ a b, a < L ∧ b < L - 1 ∧ q.1 = horizontalEdgeIndex L a b) ∨
     (∃ a b, a < L + 1 ∧ b < L ∧ q.1 = verticalEdgeIndex L a b) := by
   have hq : (q : ℕ) < L * (L - 1) + L * (L + 1) := lt_of_lt_of_eq q.2 (numQubits_eq L)
@@ -420,7 +497,8 @@ lemma edge_cases {L : ℕ} (hL : 1 < L) (q : Fin (numQubits L)) :
     · unfold verticalEdgeIndex
       omega
 
-lemma eq_of_vVal_hVal {L : ℕ} (hL : 1 < L)
+/-- Two errors that agree on every edge are equal. -/
+private lemma eq_of_vVal_hVal {L : ℕ} (hL : 1 < L)
     (x y : Fin (numQubits L) → ZMod 2)
     (hv : ∀ a b, a < L + 1 → b < L → vVal x a b = vVal y a b)
     (hh : ∀ a b, a < L → b < L - 1 → hVal x a b = hVal y a b) : x = y := by
@@ -433,7 +511,9 @@ lemma eq_of_vVal_hVal {L : ℕ} (hL : 1 < L)
     have hqe : q = ⟨verticalEdgeIndex L a b, hp⟩ := Fin.ext hq
     rw [hqe, vVal_eq x ha hb, vVal_eq y ha hb, hv a b ha hb]
 
-lemma star_relation {L : ℕ} (hL : 1 < L)
+/-- The star at `(a, b)`, read on an error it does not detect: the edges around it carry an even
+number of errors. -/
+private lemma star_relation {L : ℕ} (hL : 1 < L)
     (x : Fin (numQubits L) → ZMod 2) (hx : x ∈ LinearMap.ker (xCheckMatrix L).toLin')
     (a b : ℕ) (ha : a < L + 1) (hb : b < L - 1) :
     vVal x a b + vVal x a (b + 1) + (if 0 < a then hVal x (a - 1) b else 0)
@@ -461,7 +541,9 @@ lemma star_relation {L : ℕ} (hL : 1 < L)
     rw [dif_neg hlt] at key
     exact key
 
-lemma plaq_relation {L : ℕ} (hL : 1 < L)
+/-- The plaquette at `(a, b)`, read on an error it does not detect: the edges around it carry an
+even number of errors. -/
+private lemma plaq_relation {L : ℕ} (hL : 1 < L)
     (x : Fin (numQubits L) → ZMod 2) (hx : x ∈ LinearMap.ker (zCheckMatrix L).toLin')
     (a b : ℕ) (ha : a < L) (hb : b < L) :
     vVal x a b + vVal x (a + 1) b + (if 0 < b then hVal x a (b - 1) else 0)
@@ -498,30 +580,35 @@ lemma plaq_relation {L : ℕ} (hL : 1 < L)
       rw [dif_neg hb1] at key
       exact key
 
+/-- The first check matrix of `planarCode` is the plaquettes. -/
 lemma planarCode_H1 (L : ℕ) (hL : 1 < L) :
     (planarCode L hL).H₁ = zCheckMatrix L := rfl
 
+/-- The second check matrix of `planarCode` is the stars. -/
 lemma planarCode_H2 (L : ℕ) (hL : 1 < L) :
     (planarCode L hL).H₂ = xCheckMatrix L := rfl
 
-
-lemma sum_shift_pred {M : Type*} [AddCommMonoid M] (n : ℕ) (hn : 0 < n) (g : ℕ → M) :
+/-- Drop the vanishing first term of a sum and reindex. -/
+private lemma sum_shift_pred {M : Type*} [AddCommMonoid M] (n : ℕ) (hn : 0 < n) (g : ℕ → M) :
     ∑ b ∈ Finset.range n, (if 0 < b then g (b - 1) else 0) = ∑ t ∈ Finset.range (n - 1), g t := by
   obtain ⟨m, rfl⟩ := Nat.exists_eq_succ_of_ne_zero (by omega : n ≠ 0)
   rw [Finset.sum_range_succ']
   simp
 
-lemma sum_upper {M : Type*} [AddCommMonoid M] (n : ℕ) (hn : 0 < n) (g : ℕ → M) :
+/-- Drop the vanishing last term of a sum and reindex. -/
+private lemma sum_upper {M : Type*} [AddCommMonoid M] (n : ℕ) (hn : 0 < n) (g : ℕ → M) :
     ∑ b ∈ Finset.range n, (if b + 1 < n then g b else 0) = ∑ t ∈ Finset.range (n - 1), g t := by
   obtain ⟨m, rfl⟩ := Nat.exists_eq_succ_of_ne_zero (by omega : n ≠ 0)
   rw [Finset.sum_range_succ]
   simp only [Nat.succ_sub_one, lt_self_iff_false, if_false, add_zero]
   exact Finset.sum_congr rfl (fun t ht => if_pos (by have := Finset.mem_range.mp ht; omega))
 
-noncomputable def Pv {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (y : ℕ) : ZMod 2 :=
+/-- The parity of `x` along the `y`-th row of vertical edges. -/
+private noncomputable def Pv {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (y : ℕ) : ZMod 2 :=
   ∑ a ∈ Finset.range (L + 1), vVal x a y
 
-lemma Pv_step {L : ℕ} (hL : 1 < L)
+/-- On an error the stars do not detect, consecutive rows of vertical edges have equal parity. -/
+private lemma Pv_step {L : ℕ} (hL : 1 < L)
     (x : Fin (numQubits L) → ZMod 2) (hx : x ∈ LinearMap.ker (xCheckMatrix L).toLin')
     (y : ℕ) (hy : y < L - 1) : Pv x y = Pv x (y + 1) := by
   have hsum : ∑ a ∈ Finset.range (L + 1),
@@ -547,7 +634,8 @@ lemma Pv_step {L : ℕ} (hL : 1 < L)
     - (by rw [← two_mul]; simp [CharTwo.two_eq_zero] :
         (∑ a ∈ Finset.range (L+1), vVal x a (y+1)) + (∑ a ∈ Finset.range (L+1), vVal x a (y+1)) = 0)
 
-lemma Pv_const {L : ℕ} (hL : 1 < L)
+/-- On an error the stars do not detect, every row of vertical edges has the parity of row `0`. -/
+private lemma Pv_const {L : ℕ} (hL : 1 < L)
     (x : Fin (numQubits L) → ZMod 2) (hx : x ∈ LinearMap.ker (xCheckMatrix L).toLin')
     (y : ℕ) (hy : y < L) : Pv x y = Pv x 0 := by
   induction y with
@@ -556,12 +644,15 @@ lemma Pv_const {L : ℕ} (hL : 1 < L)
     rw [← Pv_step hL x hx n (by omega)]
     exact ih (by omega)
 
-noncomputable def vCut (L : ℕ) (y : Fin L) : Finset (Fin (numQubits L)) :=
+/-- The `y`-th row of vertical edges: one of the `L` disjoint cuts that carry the distance
+bound. -/
+private noncomputable def vCut (L : ℕ) (y : Fin L) : Finset (Fin (numQubits L)) :=
   Finset.image (fun (a : Fin (L + 1)) =>
     (⟨verticalEdgeIndex L a.1 y.1, verticalEdgeIndex_bound L a.1 y.1 a.2 y.2⟩ :
       Fin (numQubits L))) Finset.univ
 
-lemma sum_vCut {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (y : Fin L) :
+/-- The weight of `x` on the cut `vCut L y`, modulo two, is `Pv x y`. -/
+private lemma sum_vCut {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (y : Fin L) :
     ∑ q ∈ vCut L y, x q = Pv x y.1 := by
   unfold vCut
   rw [Finset.sum_image]
@@ -575,7 +666,8 @@ lemma sum_vCut {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (y : Fin L) :
     simp only [Fin.mk.injEq] at hab
     exact Fin.ext ((verticalEdgeIndex_inj L a.1 y.1 b.1 y.1 a.2 b.2).mp hab).1
 
-lemma vCut_disjoint {L : ℕ} (i j : Fin L) (hij : i ≠ j) :
+/-- Distinct rows of vertical edges are disjoint. -/
+private lemma vCut_disjoint {L : ℕ} (i j : Fin L) (hij : i ≠ j) :
     Disjoint (vCut L i) (vCut L j) := by
   rw [Finset.disjoint_left]
   intro q hi hj
@@ -587,42 +679,48 @@ lemma vCut_disjoint {L : ℕ} (i j : Fin L) (hij : i ≠ j) :
   simp only [Fin.mk.injEq] at ha
   exact hij (Fin.ext ((verticalEdgeIndex_inj L a.1 i.1 b.1 j.1 a.2 b.2).mp ha).2)
 
-lemma vVal_sum {L : ℕ} {ι : Type*} (s : Finset ι) (f : ι → Fin (numQubits L) → ZMod 2)
+/-- `vVal` is additive in the error. -/
+private lemma vVal_sum {L : ℕ} {ι : Type*} (s : Finset ι) (f : ι → Fin (numQubits L) → ZMod 2)
     (a b : ℕ) : vVal (∑ p ∈ s, f p) a b = ∑ p ∈ s, vVal (f p) a b := by
   unfold vVal
   split_ifs with hab
   · exact Finset.sum_apply _ s f
   · rw [Finset.sum_const_zero]
 
-lemma hVal_sum {L : ℕ} {ι : Type*} (s : Finset ι) (f : ι → Fin (numQubits L) → ZMod 2)
+/-- `hVal` is additive in the error. -/
+private lemma hVal_sum {L : ℕ} {ι : Type*} (s : Finset ι) (f : ι → Fin (numQubits L) → ZMod 2)
     (a b : ℕ) : hVal (∑ p ∈ s, f p) a b = ∑ p ∈ s, hVal (f p) a b := by
   unfold hVal
   split_ifs with hab
   · exact Finset.sum_apply _ s f
   · rw [Finset.sum_const_zero]
 
-lemma vVal_smul {L : ℕ} (c : ZMod 2) (f : Fin (numQubits L) → ZMod 2) (a b : ℕ) :
+/-- `vVal` commutes with scalars. -/
+private lemma vVal_smul {L : ℕ} (c : ZMod 2) (f : Fin (numQubits L) → ZMod 2) (a b : ℕ) :
     vVal (c • f) a b = c * vVal f a b := by
   unfold vVal
   split_ifs with hab
   · rw [Pi.smul_apply, smul_eq_mul]
   · rw [mul_zero]
 
-lemma hVal_smul {L : ℕ} (c : ZMod 2) (f : Fin (numQubits L) → ZMod 2) (a b : ℕ) :
+/-- `hVal` commutes with scalars. -/
+private lemma hVal_smul {L : ℕ} (c : ZMod 2) (f : Fin (numQubits L) → ZMod 2) (a b : ℕ) :
     hVal (c • f) a b = c * hVal f a b := by
   unfold hVal
   split_ifs with hab
   · rw [Pi.smul_apply, smul_eq_mul]
   · rw [mul_zero]
 
-lemma plaq_idx_bound {L : ℕ} (c d : ℕ) (hc : c < L) (hd : d < L) :
+/-- The lattice has a plaquette in column `c` and row `d`. -/
+private lemma plaq_idx_bound {L : ℕ} (c d : ℕ) (hc : c < L) (hd : d < L) :
     d * L + c < numZChecks L := by
   unfold numZChecks
   have h3 : (d + 1) * L ≤ L * L := Nat.mul_le_mul_right L (by omega)
   have h2 : (d + 1) * L = d * L + L := by ring
   omega
 
-lemma zChk_vVal {L : ℕ} (hL : 1 < L) (p : Fin (numZChecks L)) (a b : ℕ)
+/-- A plaquette acts on exactly the vertical edges `(x, y)` and `(x + 1, y)`. -/
+private lemma zChk_vVal {L : ℕ} (hL : 1 < L) (p : Fin (numZChecks L)) (a b : ℕ)
     (ha : a < L + 1) (hb : b < L) :
     vVal (zCheckMatrix L p) a b
       = (if a = p.1 % L ∧ b = p.1 / L then 1 else 0)
@@ -659,7 +757,8 @@ lemma zChk_vVal {L : ℕ} (hL : 1 < L) (p : Fin (numZChecks L)) (a b : ℕ)
         · exact hd3 e3
         · exact hd4 e4
 
-lemma zChk_hVal {L : ℕ} (hL : 1 < L) (p : Fin (numZChecks L)) (a b : ℕ)
+/-- A plaquette acts on exactly the horizontal edges `(x, y - 1)` and `(x, y)`. -/
+private lemma zChk_hVal {L : ℕ} (hL : 1 < L) (p : Fin (numZChecks L)) (a b : ℕ)
     (ha : a < L) (hb : b < L - 1) :
     hVal (zCheckMatrix L p) a b
       = (if a = p.1 % L ∧ p.1 / L = b + 1 then 1 else 0)
@@ -698,7 +797,9 @@ lemma zChk_hVal {L : ℕ} (hL : 1 < L) (p : Fin (numZChecks L)) (a b : ℕ)
         · exact h1 ⟨(hI3.mp e3.2).1, by have := (hI3.mp e3.2).2; omega⟩
         · exact h2 ⟨(hI4.mp e4.2).1, (hI4.mp e4.2).2.symm⟩
 
-lemma sum_g_ind1 {L : ℕ} (hL : 1 < L) (g : Fin (numZChecks L) → ZMod 2)
+/-- A sum of plaquette coefficients against the indicator of "column `a`, row `b`" picks out that
+one coefficient. -/
+private lemma sum_g_ind1 {L : ℕ} (hL : 1 < L) (g : Fin (numZChecks L) → ZMod 2)
     (a b : ℕ) (hb : b < L) :
     ∑ p, g p * (if a = p.1 % L ∧ b = p.1 / L then (1:ZMod 2) else 0)
       = if h' : a < L then g ⟨b * L + a, plaq_idx_bound a b h' hb⟩ else 0 := by
@@ -729,7 +830,9 @@ lemma sum_g_ind1 {L : ℕ} (hL : 1 < L) (g : Fin (numZChecks L) → ZMod 2)
       omega
     rw [if_neg this, mul_zero]
 
-lemma sum_g_ind2 {L : ℕ} (hL : 1 < L) (g : Fin (numZChecks L) → ZMod 2)
+/-- A sum of plaquette coefficients against the indicator of "column `a - 1`, row `b`" picks out
+that one coefficient. -/
+private lemma sum_g_ind2 {L : ℕ} (hL : 1 < L) (g : Fin (numZChecks L) → ZMod 2)
     (a b : ℕ) (ha : a < L + 1) (hb : b < L) :
     ∑ p, g p * (if a = p.1 % L + 1 ∧ b = p.1 / L then (1:ZMod 2) else 0)
       = if h' : 0 < a then g ⟨b * L + (a - 1), plaq_idx_bound (a-1) b (by omega) hb⟩ else 0 := by
@@ -760,7 +863,9 @@ lemma sum_g_ind2 {L : ℕ} (hL : 1 < L) (g : Fin (numZChecks L) → ZMod 2)
       omega
     rw [if_neg this, mul_zero]
 
-lemma sum_h_ind {L : ℕ} (hL : 1 < L) (g : Fin (numZChecks L) → ZMod 2)
+/-- A sum of plaquette coefficients against the indicator of "column `a`, row `d`" picks out that
+one coefficient. -/
+private lemma sum_h_ind {L : ℕ} (hL : 1 < L) (g : Fin (numZChecks L) → ZMod 2)
     (a d : ℕ) (ha : a < L) (hd : d < L) :
     ∑ p, g p * (if a = p.1 % L ∧ p.1 / L = d then (1:ZMod 2) else 0)
       = g ⟨d * L + a, plaq_idx_bound a d ha hd⟩ := by
@@ -782,15 +887,19 @@ lemma sum_h_ind {L : ℕ} (hL : 1 < L) (g : Fin (numZChecks L) → ZMod 2)
       exact Fin.ext hp
     rw [if_neg this, mul_zero]
 
-noncomputable def zcf {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (p : Fin (numZChecks L)) :
+/-- The coefficient the plaquette `p` gets when an error is rebuilt from the plaquettes: the
+parity of the vertical edges in the row of `p`, up to and including its column. -/
+private noncomputable def zcf {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (p : Fin (numZChecks L)) :
     ZMod 2 :=
   ∑ a' ∈ Finset.range (p.1 % L + 1), vVal x a' (p.1 / L)
 
-noncomputable def zCombo {L : ℕ} (x : Fin (numQubits L) → ZMod 2) :
+/-- The combination of plaquettes that `zcf` prescribes. -/
+private noncomputable def zCombo {L : ℕ} (x : Fin (numQubits L) → ZMod 2) :
     Fin (numQubits L) → ZMod 2 :=
   ∑ p, zcf x p • zCheckMatrix L p
 
-lemma zcf_val {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (c d : ℕ) (hc : c < L) (hd : d < L) :
+/-- `zcf` at the plaquette in column `c` and row `d`. -/
+private lemma zcf_val {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (c d : ℕ) (hc : c < L) (hd : d < L) :
     zcf x ⟨d * L + c, plaq_idx_bound c d hc hd⟩ = ∑ a' ∈ Finset.range (c + 1), vVal x a' d := by
   unfold zcf
   have h1 : (d * L + c) % L = c := by
@@ -800,7 +909,9 @@ lemma zcf_val {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (c d : ℕ) (hc : c <
       Nat.zero_add]
   simp only [h1, h2]
 
-lemma vVal_zCombo {L : ℕ} (hL : 1 < L) (x : Fin (numQubits L) → ZMod 2)
+/-- When every row of vertical edges has even parity, `zCombo x` agrees with `x` on the vertical
+edges. -/
+private lemma vVal_zCombo {L : ℕ} (hL : 1 < L) (x : Fin (numQubits L) → ZMod 2)
     (hP : ∀ y, y < L → Pv x y = 0) (a b : ℕ) (ha : a < L + 1) (hb : b < L) :
     vVal (zCombo x) a b = vVal x a b := by
   unfold zCombo
@@ -828,7 +939,8 @@ lemma vVal_zCombo {L : ℕ} (hL : 1 < L) (x : Fin (numQubits L) → ZMod 2)
     have h2 : (2 : ZMod 2) = 0 := by decide
     linear_combination hPv - vVal x L b * h2
 
-lemma hVal_zCombo {L : ℕ} (hL : 1 < L) (x : Fin (numQubits L) → ZMod 2)
+/-- On an error the stars do not detect, `zCombo x` agrees with `x` on the horizontal edges. -/
+private lemma hVal_zCombo {L : ℕ} (hL : 1 < L) (x : Fin (numQubits L) → ZMod 2)
     (hx : x ∈ LinearMap.ker (xCheckMatrix L).toLin') (a b : ℕ) (ha : a < L) (hb : b < L - 1) :
     hVal (zCombo x) a b = hVal x a b := by
   unfold zCombo
@@ -854,7 +966,9 @@ lemma hVal_zCombo {L : ℕ} (hL : 1 < L) (x : Fin (numQubits L) → ZMod 2)
       Finset.sum_range_succ (fun t => hVal x t b) a]
   linear_combination (∑ t ∈ Finset.range a, hVal x t b) * h2
 
-lemma x_mem_zrow {L : ℕ} (hL : 1 < L)
+/-- An undetected error whose rows of vertical edges all have even parity is a product of
+plaquettes. -/
+private lemma x_mem_zrow {L : ℕ} (hL : 1 < L)
     (x : Fin (numQubits L) → ZMod 2) (hx : x ∈ LinearMap.ker (xCheckMatrix L).toLin')
     (hP : ∀ y, y < L → Pv x y = 0) : x ∈ (zCheckMatrix L).rowSpace := by
   have hcombo : x = zCombo x :=
@@ -866,7 +980,8 @@ lemma x_mem_zrow {L : ℕ} (hL : 1 < L)
   exact Submodule.sum_mem _
     (fun p _ => Submodule.smul_mem _ _ (Submodule.subset_span (Set.mem_range_self p)))
 
-lemma Pv_ne {L : ℕ} (hL : 1 < L)
+/-- An undetectable error has odd parity on the first row of vertical edges. -/
+private lemma Pv_ne {L : ℕ} (hL : 1 < L)
     (x : Fin (numQubits L) → ZMod 2) (hx : x ∈ LinearMap.ker (xCheckMatrix L).toLin')
     (hnr : x ∉ (zCheckMatrix L).rowSpace) : Pv x 0 = 1 := by
   have hdich : ∀ a : ZMod 2, a = 0 ∨ a = 1 := by decide
@@ -874,8 +989,10 @@ lemma Pv_ne {L : ℕ} (hL : 1 < L)
   have h0 : Pv x 0 = 0 := (hdich (Pv x 0)).resolve_right hne
   exact hnr (x_mem_zrow hL x hx (fun y hy => by rw [Pv_const hL x hx y hy, h0]))
 
-lemma dX_ge (L : ℕ) (hL : 1 < L) :
-    L ≤ min_weight_ker_not_mem_rowspace (xCheckMatrix L) (zCheckMatrix L) := by
+/-- An undetectable error in the kernel of the stars has weight at least `L`: it crosses each of
+the `L` disjoint cuts `vCut L y`. -/
+private lemma dX_ge (L : ℕ) (hL : 1 < L) :
+    L ≤ minWeightKerNotMemRowspace (xCheckMatrix L) (zCheckMatrix L) := by
   apply MWK_ge
   · unfold numQubits
     nlinarith
@@ -886,10 +1003,13 @@ lemma dX_ge (L : ℕ) (hL : 1 < L) :
       rw [sum_vCut, Pv_const hL x hker i.1 i.2]
       exact Pv_ne hL x hker hnr
 
-noncomputable def Ph {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (a : ℕ) : ZMod 2 :=
+/-- The parity of `x` along the `a`-th column of vertical edges. -/
+private noncomputable def Ph {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (a : ℕ) : ZMod 2 :=
   ∑ b ∈ Finset.range L, vVal x a b
 
-lemma Ph_step {L : ℕ} (hL : 1 < L)
+/-- On an error the plaquettes do not detect, consecutive columns of vertical edges have equal
+parity. -/
+private lemma Ph_step {L : ℕ} (hL : 1 < L)
     (x : Fin (numQubits L) → ZMod 2) (hx : x ∈ LinearMap.ker (zCheckMatrix L).toLin')
     (a : ℕ) (ha : a < L) : Ph x a = Ph x (a + 1) := by
   have hsum : ∑ b ∈ Finset.range L,
@@ -907,7 +1027,9 @@ lemma Ph_step {L : ℕ} (hL : 1 < L)
     - (by rw [← two_mul]; simp [CharTwo.two_eq_zero] :
         (∑ b ∈ Finset.range L, vVal x (a+1) b) + (∑ b ∈ Finset.range L, vVal x (a+1) b) = 0)
 
-lemma Ph_const {L : ℕ} (hL : 1 < L)
+/-- On an error the plaquettes do not detect, every column of vertical edges has the parity of
+column `0`. -/
+private lemma Ph_const {L : ℕ} (hL : 1 < L)
     (x : Fin (numQubits L) → ZMod 2) (hx : x ∈ LinearMap.ker (zCheckMatrix L).toLin')
     (a : ℕ) (ha : a < L + 1) : Ph x a = Ph x 0 := by
   induction a with
@@ -916,12 +1038,15 @@ lemma Ph_const {L : ℕ} (hL : 1 < L)
     rw [← Ph_step hL x hx n (by omega)]
     exact ih (by omega)
 
-noncomputable def hCut (L : ℕ) (a : Fin (L + 1)) : Finset (Fin (numQubits L)) :=
+/-- The `a`-th column of vertical edges: one of the `L + 1` disjoint cuts that carry the distance
+bound. -/
+private noncomputable def hCut (L : ℕ) (a : Fin (L + 1)) : Finset (Fin (numQubits L)) :=
   Finset.image (fun (b : Fin L) =>
     (⟨verticalEdgeIndex L a.1 b.1, verticalEdgeIndex_bound L a.1 b.1 a.2 b.2⟩ :
       Fin (numQubits L))) Finset.univ
 
-lemma sum_hCut {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (a : Fin (L + 1)) :
+/-- The weight of `x` on the cut `hCut L a`, modulo two, is `Ph x a`. -/
+private lemma sum_hCut {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (a : Fin (L + 1)) :
     ∑ q ∈ hCut L a, x q = Ph x a.1 := by
   unfold hCut
   rw [Finset.sum_image]
@@ -935,7 +1060,8 @@ lemma sum_hCut {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (a : Fin (L + 1)) :
     simp only [Fin.mk.injEq] at hbc
     exact Fin.ext ((verticalEdgeIndex_inj L a.1 b.1 a.1 c.1 a.2 a.2).mp hbc).2
 
-lemma hCut_disjoint {L : ℕ} (i j : Fin (L + 1)) (hij : i ≠ j) :
+/-- Distinct columns of vertical edges are disjoint. -/
+private lemma hCut_disjoint {L : ℕ} (i j : Fin (L + 1)) (hij : i ≠ j) :
     Disjoint (hCut L i) (hCut L j) := by
   rw [Finset.disjoint_left]
   intro q hi hj
@@ -947,7 +1073,8 @@ lemma hCut_disjoint {L : ℕ} (i j : Fin (L + 1)) (hij : i ≠ j) :
   simp only [Fin.mk.injEq] at hb
   exact hij (Fin.ext ((verticalEdgeIndex_inj L i.1 b.1 j.1 c.1 i.2 j.2).mp hb).1)
 
-lemma xChk_vVal {L : ℕ} (hL : 1 < L) (i : Fin (numXChecks L)) (u v : ℕ)
+/-- A star acts on exactly the vertical edges `(x, y)` and `(x, y + 1)`. -/
+private lemma xChk_vVal {L : ℕ} (hL : 1 < L) (i : Fin (numXChecks L)) (u v : ℕ)
     (hu : u < L + 1) (hv : v < L) :
     vVal (xCheckMatrix L i) u v
       = (if u = i.1 % (L+1) ∧ v = i.1 / (L+1) then 1 else 0)
@@ -984,7 +1111,8 @@ lemma xChk_vVal {L : ℕ} (hL : 1 < L) (i : Fin (numXChecks L)) (u v : ℕ)
         · exact hd3 e3
         · exact hd4 e4
 
-lemma xChk_hVal {L : ℕ} (hL : 1 < L) (i : Fin (numXChecks L)) (u v : ℕ)
+/-- A star acts on exactly the horizontal edges `(x - 1, y)` and `(x, y)`. -/
+private lemma xChk_hVal {L : ℕ} (hL : 1 < L) (i : Fin (numXChecks L)) (u v : ℕ)
     (hu : u < L) (hv : v < L - 1) :
     hVal (xCheckMatrix L i) u v
       = (if u + 1 = i.1 % (L+1) ∧ v = i.1 / (L+1) then 1 else 0)
@@ -1023,14 +1151,17 @@ lemma xChk_hVal {L : ℕ} (hL : 1 < L) (i : Fin (numXChecks L)) (u v : ℕ)
         · exact h1 ⟨by have := (hI3.mp e3.2).1; omega, (hI3.mp e3.2).2⟩
         · exact h2 ((horizontalEdgeIndex_inj L u v x y hu e4.1).mp e4.2)
 
-lemma star_idx_bound {L : ℕ} (c d : ℕ) (hc : c < L + 1) (hd : d < L - 1) :
+/-- The lattice has a star in column `c` and row `d`. -/
+private lemma star_idx_bound {L : ℕ} (c d : ℕ) (hc : c < L + 1) (hd : d < L - 1) :
     d * (L + 1) + c < numXChecks L := by
   unfold numXChecks
   have h3 : (d + 1) * (L + 1) ≤ (L - 1) * (L + 1) := Nat.mul_le_mul_right (L+1) (by omega)
   have h2 : (d + 1) * (L + 1) = d * (L + 1) + (L + 1) := by ring
   omega
 
-lemma sum_s_indh {L : ℕ} (hL : 1 < L) (g : Fin (numXChecks L) → ZMod 2)
+/-- A sum of star coefficients against the indicator of "column `c`, row `d`" picks out that one
+coefficient. -/
+private lemma sum_s_indh {L : ℕ} (hL : 1 < L) (g : Fin (numXChecks L) → ZMod 2)
     (c d : ℕ) (hc : c < L + 1) (hd : d < L - 1) :
     ∑ i, g i * (if c = i.1 % (L+1) ∧ d = i.1 / (L+1) then (1:ZMod 2) else 0)
       = g ⟨d * (L+1) + c, star_idx_bound c d hc hd⟩ := by
@@ -1052,7 +1183,9 @@ lemma sum_s_indh {L : ℕ} (hL : 1 < L) (g : Fin (numXChecks L) → ZMod 2)
       exact Fin.ext hp
     rw [if_neg hcond, mul_zero]
 
-lemma sum_s_ind1 {L : ℕ} (hL : 1 < L) (g : Fin (numXChecks L) → ZMod 2)
+/-- A sum of star coefficients against the indicator of "column `u`, row `v`" picks out that one
+coefficient, or nothing when the lattice has no such star. -/
+private lemma sum_s_ind1 {L : ℕ} (hL : 1 < L) (g : Fin (numXChecks L) → ZMod 2)
     (u v : ℕ) (hu : u < L + 1) :
     ∑ i, g i * (if u = i.1 % (L+1) ∧ v = i.1 / (L+1) then (1:ZMod 2) else 0)
       = if h' : v < L - 1 then g ⟨v * (L+1) + u, star_idx_bound u v hu h'⟩ else 0 := by
@@ -1084,7 +1217,9 @@ lemma sum_s_ind1 {L : ℕ} (hL : 1 < L) (g : Fin (numXChecks L) → ZMod 2)
       omega
     rw [if_neg hcond, mul_zero]
 
-lemma sum_s_ind2 {L : ℕ} (hL : 1 < L) (g : Fin (numXChecks L) → ZMod 2)
+/-- A sum of star coefficients against the indicator of "column `u`, row `v - 1`" picks out that
+one coefficient, or nothing when the lattice has no such star. -/
+private lemma sum_s_ind2 {L : ℕ} (hL : 1 < L) (g : Fin (numXChecks L) → ZMod 2)
     (u v : ℕ) (hu : u < L + 1) (hv : v < L) :
     ∑ i, g i * (if u = i.1 % (L+1) ∧ v = i.1 / (L+1) + 1 then (1:ZMod 2) else 0)
       = if h' : 0 < v then g ⟨(v-1) * (L+1) + u, star_idx_bound u (v-1) hu (by omega)⟩ else 0 := by
@@ -1118,15 +1253,19 @@ lemma sum_s_ind2 {L : ℕ} (hL : 1 < L) (g : Fin (numXChecks L) → ZMod 2)
       exact Nat.succ_ne_zero _ q.symm
     rw [if_neg hcond, mul_zero]
 
-noncomputable def xcf {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (i : Fin (numXChecks L)) :
+/-- The coefficient the star `i` gets when an error is rebuilt from the stars: the parity of the
+vertical edges in the column of `i`, up to and including its row. -/
+private noncomputable def xcf {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (i : Fin (numXChecks L)) :
     ZMod 2 :=
   ∑ b' ∈ Finset.range (i.1 / (L+1) + 1), vVal x (i.1 % (L+1)) b'
 
-noncomputable def xCombo {L : ℕ} (x : Fin (numQubits L) → ZMod 2) :
+/-- The combination of stars that `xcf` prescribes. -/
+private noncomputable def xCombo {L : ℕ} (x : Fin (numQubits L) → ZMod 2) :
     Fin (numQubits L) → ZMod 2 :=
   ∑ i, xcf x i • xCheckMatrix L i
 
-lemma xcf_val {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (c d : ℕ) (hc : c < L + 1) (hd : d < L - 1) :
+/-- `xcf` at the star in column `c` and row `d`. -/
+private lemma xcf_val {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (c d : ℕ) (hc : c < L + 1) (hd : d < L - 1) :
     xcf x ⟨d * (L+1) + c, star_idx_bound c d hc hd⟩ = ∑ b' ∈ Finset.range (d + 1), vVal x c b' := by
   unfold xcf
   have h1 : (d * (L+1) + c) % (L+1) = c := by
@@ -1135,7 +1274,9 @@ lemma xcf_val {L : ℕ} (x : Fin (numQubits L) → ZMod 2) (c d : ℕ) (hc : c <
     rw [Nat.add_comm, Nat.add_mul_div_right _ _ (by omega), Nat.div_eq_of_lt hc, Nat.zero_add]
   simp only [h1, h2]
 
-lemma vVal_xCombo {L : ℕ} (hL : 1 < L) (x : Fin (numQubits L) → ZMod 2)
+/-- When every column of vertical edges has even parity, `xCombo x` agrees with `x` on the
+vertical edges. -/
+private lemma vVal_xCombo {L : ℕ} (hL : 1 < L) (x : Fin (numQubits L) → ZMod 2)
     (hP : ∀ a, a < L + 1 → Ph x a = 0) (u v : ℕ) (hu : u < L + 1) (hv : v < L) :
     vVal (xCombo x) u v = vVal x u v := by
   unfold xCombo
@@ -1167,7 +1308,9 @@ lemma vVal_xCombo {L : ℕ} (hL : 1 < L) (x : Fin (numQubits L) → ZMod 2)
     have h2 : (2 : ZMod 2) = 0 := by decide
     linear_combination hPh - vVal x u (L - 1) * h2
 
-lemma hVal_xCombo {L : ℕ} (hL : 1 < L) (x : Fin (numQubits L) → ZMod 2)
+/-- On an error the plaquettes do not detect, `xCombo x` agrees with `x` on the horizontal
+edges. -/
+private lemma hVal_xCombo {L : ℕ} (hL : 1 < L) (x : Fin (numQubits L) → ZMod 2)
     (hx : x ∈ LinearMap.ker (zCheckMatrix L).toLin') (u v : ℕ) (hu : u < L) (hv : v < L - 1) :
     hVal (xCombo x) u v = hVal x u v := by
   unfold xCombo
@@ -1193,7 +1336,9 @@ lemma hVal_xCombo {L : ℕ} (hL : 1 < L) (x : Fin (numQubits L) → ZMod 2)
       Finset.sum_range_succ (fun t => hVal x u t) v]
   linear_combination (∑ t ∈ Finset.range v, hVal x u t) * h2
 
-lemma z_mem_xrow {L : ℕ} (hL : 1 < L)
+/-- An undetected error whose columns of vertical edges all have even parity is a product of
+stars. -/
+private lemma z_mem_xrow {L : ℕ} (hL : 1 < L)
     (x : Fin (numQubits L) → ZMod 2) (hx : x ∈ LinearMap.ker (zCheckMatrix L).toLin')
     (hP : ∀ a, a < L + 1 → Ph x a = 0) : x ∈ (xCheckMatrix L).rowSpace := by
   have hcombo : x = xCombo x :=
@@ -1205,7 +1350,8 @@ lemma z_mem_xrow {L : ℕ} (hL : 1 < L)
   exact Submodule.sum_mem _
     (fun i _ => Submodule.smul_mem _ _ (Submodule.subset_span (Set.mem_range_self i)))
 
-lemma Ph_ne {L : ℕ} (hL : 1 < L)
+/-- An undetectable error has odd parity on the first column of vertical edges. -/
+private lemma Ph_ne {L : ℕ} (hL : 1 < L)
     (x : Fin (numQubits L) → ZMod 2) (hx : x ∈ LinearMap.ker (zCheckMatrix L).toLin')
     (hnr : x ∉ (xCheckMatrix L).rowSpace) : Ph x 0 = 1 := by
   have hdich : ∀ a : ZMod 2, a = 0 ∨ a = 1 := by decide
@@ -1213,8 +1359,10 @@ lemma Ph_ne {L : ℕ} (hL : 1 < L)
   have h0 : Ph x 0 = 0 := (hdich (Ph x 0)).resolve_right hne
   exact hnr (z_mem_xrow hL x hx (fun a ha => by rw [Ph_const hL x hx a ha, h0]))
 
-lemma dZ_ge (L : ℕ) (hL : 1 < L) :
-    L + 1 ≤ min_weight_ker_not_mem_rowspace (zCheckMatrix L) (xCheckMatrix L) := by
+/-- An undetectable error in the kernel of the plaquettes has weight at least `L + 1`: it crosses
+each of the `L + 1` disjoint cuts `hCut L a`. -/
+private lemma dZ_ge (L : ℕ) (hL : 1 < L) :
+    L + 1 ≤ minWeightKerNotMemRowspace (zCheckMatrix L) (xCheckMatrix L) := by
   apply MWK_ge
   · unfold numQubits
     nlinarith
@@ -1225,7 +1373,8 @@ lemma dZ_ge (L : ℕ) (hL : 1 < L) :
       rw [sum_hCut, Ph_const hL x hker i.1 i.2]
       exact Ph_ne hL x hker hnr
 
-lemma zCheckMatrix_coefficient_zero (L : ℕ) (hL : 1 < L)
+/-- In a combination of plaquettes that vanishes, every coefficient vanishes. -/
+private lemma zCheckMatrix_coefficient_zero (L : ℕ) (hL : 1 < L)
     (g : Fin (numZChecks L) → ZMod 2)
     (hg : ∑ p, g p • zCheckMatrix L p = 0)
     (c d : ℕ) (hc : c < L) (hd : d < L) :
@@ -1259,7 +1408,8 @@ lemma zCheckMatrix_coefficient_zero (L : ℕ) (hL : 1 < L)
       have ih' := ih hc'
       simpa [ih'] using hv
 
-lemma zCheckMatrix_rows_independent (L : ℕ) (hL : 1 < L) :
+/-- The plaquettes are linearly independent. -/
+private lemma zCheckMatrix_rows_independent (L : ℕ) (hL : 1 < L) :
     LinearIndependent (ZMod 2) (zCheckMatrix L).row := by
   rw [Fintype.linearIndependent_iff]
   intro g hg p
@@ -1273,7 +1423,8 @@ lemma zCheckMatrix_rows_independent (L : ℕ) (hL : 1 < L) :
   rw [peq]
   exact zCheckMatrix_coefficient_zero L hL g hg (p.1 % L) (p.1 / L) hpmod hpdiv
 
-lemma xCheckMatrix_coefficient_zero (L : ℕ) (hL : 1 < L)
+/-- In a combination of stars that vanishes, every coefficient vanishes. -/
+private lemma xCheckMatrix_coefficient_zero (L : ℕ) (hL : 1 < L)
     (g : Fin (numXChecks L) → ZMod 2)
     (hg : ∑ i, g i • xCheckMatrix L i = 0)
     (c d : ℕ) (hc : c < L + 1) (hd : d < L - 1) :
@@ -1307,7 +1458,8 @@ lemma xCheckMatrix_coefficient_zero (L : ℕ) (hL : 1 < L)
       have ih' := ih hd'
       simpa [ih'] using he
 
-lemma xCheckMatrix_rows_independent (L : ℕ) (hL : 1 < L) :
+/-- The stars are linearly independent. -/
+private lemma xCheckMatrix_rows_independent (L : ℕ) (hL : 1 < L) :
     LinearIndependent (ZMod 2) (xCheckMatrix L).row := by
   rw [Fintype.linearIndependent_iff]
   intro g hg i
@@ -1322,17 +1474,21 @@ lemma xCheckMatrix_rows_independent (L : ℕ) (hL : 1 < L) :
   exact xCheckMatrix_coefficient_zero L hL g hg
     (i.1 % (L + 1)) (i.1 / (L + 1)) hpmod hpdiv
 
+/-- The plaquettes have full rank `L * L`. -/
 lemma zCheckMatrix_rank (L : ℕ) (hL : 1 < L) :
     (zCheckMatrix L).rank = numZChecks L := by
   have hr := (zCheckMatrix_rows_independent L hL).rank_matrix
   exact hr.trans (Fintype.card_fin (numZChecks L))
 
+/-- The stars have full rank `(L - 1) * (L + 1)`. -/
 lemma xCheckMatrix_rank (L : ℕ) (hL : 1 < L) :
     (xCheckMatrix L).rank = numXChecks L := by
   have hr := (xCheckMatrix_rows_independent L hL).rank_matrix
   exact hr.trans (Fintype.card_fin (numXChecks L))
 
 /- k=1 -/
+
+/-- The planar code has one logical qubit. -/
 theorem planar_k_eq_one (L : ℕ) (hL : 1 < L) :
     numQubits L - (xCheckMatrix L).rank - (zCheckMatrix L).rank = 1 := by
   rw [xCheckMatrix_rank L hL, zCheckMatrix_rank L hL]
@@ -1341,18 +1497,20 @@ theorem planar_k_eq_one (L : ℕ) (hL : 1 < L) :
   have hsum : 2 * (m + 1) ^ 2 = m * (m + 1 + 1) + (m + 1) * (m + 1) + 1 := by ring
   omega
 
-/- L <= d -/
-theorem distance_lower_bound (L : ℕ) (hL : 1 < L) :
+/- L ≤ d -/
+
+/-- The planar code has distance at least `L`. -/
+theorem planarCode_dist_lb (L : ℕ) (hL : 1 < L) :
     L ≤ (planarCode L hL).toBSM.distance
       (Nat.add_pos_left (numZChecks_pos L hL) (numXChecks L)) := by
   have hX := dX_ge L hL
   have hZ := dZ_ge L hL
   have eX : (planarCode L hL).dX
-      = min_weight_ker_not_mem_rowspace (xCheckMatrix L) (zCheckMatrix L) := by
-    rw [CSS_pair.dX, planarCode_H1, planarCode_H2]
+      = minWeightKerNotMemRowspace (xCheckMatrix L) (zCheckMatrix L) := by
+    rw [CSSPair.dX, planarCode_H1, planarCode_H2]
   have eZ : (planarCode L hL).dZ
-      = min_weight_ker_not_mem_rowspace (zCheckMatrix L) (xCheckMatrix L) := by
-    rw [CSS_pair.dZ, planarCode_H1, planarCode_H2]
+      = minWeightKerNotMemRowspace (zCheckMatrix L) (xCheckMatrix L) := by
+    rw [CSSPair.dZ, planarCode_H1, planarCode_H2]
   have key : (planarCode L hL).toBSM.distance
       (Nat.add_pos_left (numZChecks_pos L hL) (numXChecks L))
       = min (planarCode L hL).dX (planarCode L hL).dZ :=
@@ -1360,9 +1518,11 @@ theorem distance_lower_bound (L : ℕ) (hL : 1 < L) :
   rw [key, eX, eZ]
   exact le_min hX (Nat.le_of_succ_le hZ)
 
-theorem planar_param_triple (L : ℕ) (hL : 1 < L) :
-    param_triple (planarCode L hL).toStabCode 1 L := by
-  refine CSS_pair.param_triple_of _ 1 L ?_ (distance_lower_bound L hL)
+/-- The planar code on an `L × L` lattice is a `⟦2L², 1, ≥ L⟧` code. -/
+theorem planar_isCode (L : ℕ) (hL : 1 < L) : (planarCode L hL).toBSM.IsCode 1 L := by
+  refine CSSPair.isCode _ 1 L ?_ Nat.one_pos (planarCode_dist_lb L hL)
   rw [planarCode_H1, planarCode_H2]
   have h := planar_k_eq_one L hL
   omega
+
+end QuantumLib

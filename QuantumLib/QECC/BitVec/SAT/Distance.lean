@@ -10,19 +10,23 @@ import QuantumLib.QECC.BitVec.SAT.Correctness
 /-!
 # From the SAT encoding to a distance bound
 
-The soundness direction of the encoding: if `lt_dist_sat` is unsatisfiable, every undetectable
+The soundness direction of the encoding: if `ltDistSat` is unsatisfiable, every undetectable
 error has weight at least `dist`. Combining the `X` and `Z` halves gives
 `bitvec_sat_translation_correct`, which turns two `bv_decide` runs into a lower bound on the
 distance of a CSS code.
 -/
 
-lemma min_weight_ker_not_mem_rowspace_empty
-  {n k₁ k₂ : ℕ} [NeZero n] [NeZero k₁] [NeZero (n - k₂)]
-  (H₁ : Matrix (Fin k₁) (Fin n) (ZMod 2))
-  (H₂ : Matrix (Fin k₂) (Fin n) (ZMod 2))
-  (is_empty : ¬∃x, x ∈ LinearMap.ker H₁.toLin' /\ x ∉ H₂.rowSpace) :
-  min_weight_ker_not_mem_rowspace H₁ H₂ = n + 1 := by
-  unfold min_weight_ker_not_mem_rowspace at *
+namespace QuantumLib
+
+/-- When nothing lies in the kernel of `H₁` but outside the row space of `H₂`, the minimum
+weight takes its fallback value `n + 1`. -/
+lemma minWeightKerNotMemRowspace_empty
+    {n k₁ k₂ : ℕ} [NeZero n] [NeZero k₁] [NeZero (n - k₂)]
+    (H₁ : Matrix (Fin k₁) (Fin n) (ZMod 2))
+    (H₂ : Matrix (Fin k₂) (Fin n) (ZMod 2))
+    (is_empty : ¬∃x, x ∈ LinearMap.ker H₁.toLin' /\ x ∉ H₂.rowSpace) :
+    minWeightKerNotMemRowspace H₁ H₂ = n + 1 := by
+  unfold minWeightKerNotMemRowspace at *
   simp_all +decide
   have hempty : (LinearMap.ker (Matrix.toLin' H₁) : Set (Fin n → ZMod 2)).toFinset \
       (H₂.rowSpace : Set (Fin n → ZMod 2)).toFinset = ∅ := by
@@ -33,16 +37,16 @@ lemma min_weight_ker_not_mem_rowspace_empty
 
 /-- If the minimum weight of an undetectable error is less than `dist`, there is a witness. -/
 lemma dist_index_some
-  {n k₁ k₂ : ℕ} [NeZero n] [NeZero k₁] [NeZero (n - k₂)]
-  (H₁ : Matrix (Fin k₁) (Fin n) (ZMod 2))
-  (H₂ : Matrix (Fin k₂) (Fin n) (ZMod 2))
-  (dist : ℕ)
-  (non_empty : ∃x, x ∈ LinearMap.ker H₁.toLin' /\ x ∉ H₂.rowSpace)
-  (hdist : min_weight_ker_not_mem_rowspace H₁ H₂ < dist) :
-  ∃x, x ∈ LinearMap.ker H₁.toLin' /\
-    x ∉ H₂.rowSpace /\ hammingNorm x < dist := by
+    {n k₁ k₂ : ℕ} [NeZero n] [NeZero k₁] [NeZero (n - k₂)]
+    (H₁ : Matrix (Fin k₁) (Fin n) (ZMod 2))
+    (H₂ : Matrix (Fin k₂) (Fin n) (ZMod 2))
+    (dist : ℕ)
+    (non_empty : ∃x, x ∈ LinearMap.ker H₁.toLin' /\ x ∉ H₂.rowSpace)
+    (hdist : minWeightKerNotMemRowspace H₁ H₂ < dist) :
+    ∃x, x ∈ LinearMap.ker H₁.toLin' /\
+      x ∉ H₂.rowSpace /\ hammingNorm x < dist := by
   contrapose! hdist
-  simp_all +decide [min_weight_ker_not_mem_rowspace]
+  simp_all +decide [minWeightKerNotMemRowspace]
   rcases h : Finset.min (Finset.image hammingNorm
     ((LinearMap.ker H₁.toLin' : Set (Fin n → ZMod 2)).toFinset \
     (H₂.rowSpace : Set (Fin n → ZMod 2)).toFinset)) with (_ | a) <;> simp_all +decide
@@ -56,9 +60,10 @@ lemma dist_index_some
     rw [Finset.mem_sdiff, Set.mem_toFinset, Set.mem_toFinset] at hy
     exact hdist y hy.1 hy.2
 
-lemma index_vec_monotone {n k : ℕ} {x : Fin n → ZMod 2}
+/-- The indices listed by `indexVec` are non-decreasing. -/
+lemma indexVec_monotone {n k : ℕ} {x : Fin n → ZMod 2}
     {hx : hammingNorm x ≤ k} {hx' : hammingNorm x ≠ 0} :
-    ∀ i j : Fin k, i ≤ j → index_vec x hx hx' i ≤ index_vec x hx hx' j := by
+    ∀ i j : Fin k, i ≤ j → indexVec x hx hx' i ≤ indexVec x hx hx' j := by
   intro i j hij
   let S := Finset.univ.filter (fun j : Fin n => x j ≠ 0)
   let I : Fin (hammingNorm x) → Fin n := fun j => S.orderEmbOfFin rfl j
@@ -77,23 +82,24 @@ lemma index_vec_monotone {n k : ℕ} {x : Fin n → ZMod 2}
       exact Fin.mk_le_mk.mpr (Nat.le_sub_one_of_lt hi)
     · simp [hi, hj]
 
-lemma lt_dist_sat_sound_contrapositive
-  {n k₁ k₂ kersize : ℕ} [NeZero n] [NeZero k₁] [NeZero kersize] [NeZero (n - k₂)]
-  (H₁ : Matrix (Fin k₁) (Fin n) (ZMod 2))
-  (H₂ : Matrix (Fin k₂) (Fin n) (ZMod 2))
-  (H₂_ker : Matrix (Fin kersize) (Fin n) (ZMod 2))
-  (H₂_ker_correct : H₂_ker.is_ker_for H₂)
-  (dist : ℕ)
-  (dist_le : dist ≤ n)
-  (hdist : min_weight_ker_not_mem_rowspace H₁ H₂ < dist) :
-  ¬(lt_dist_sat (flatten_matrix H₁) (flatten_matrix (H₂_ker)) (dist - 1) (Nat.clog 2 n))
-     := by
+/-- The contrapositive of `ltDistSat_sound`: an undetectable error of weight below `dist`
+solves the constraints at `dist - 1`, so `ltDistSat` fails there. -/
+lemma ltDistSat_sound_contrapositive
+    {n k₁ k₂ kersize : ℕ} [NeZero n] [NeZero k₁] [NeZero kersize] [NeZero (n - k₂)]
+    (H₁ : Matrix (Fin k₁) (Fin n) (ZMod 2))
+    (H₂ : Matrix (Fin k₂) (Fin n) (ZMod 2))
+    (H₂_ker : Matrix (Fin kersize) (Fin n) (ZMod 2))
+    (H₂_ker_correct : H₂_ker.isKerFor H₂)
+    (dist : ℕ)
+    (dist_le : dist ≤ n)
+    (hdist : minWeightKerNotMemRowspace H₁ H₂ < dist) :
+    ¬(ltDistSat (flattenMatrix H₁) (flattenMatrix (H₂_ker)) (dist - 1) (Nat.clog 2 n)) := by
   let undetectable_errors : Set (Fin n → ZMod 2) :=
     LinearMap.ker H₁.toLin' \ H₂.rowSpace
   intro htest
   by_cases h_empty : undetectable_errors = ∅
-  · have hmin : min_weight_ker_not_mem_rowspace H₁ H₂ = n + 1 := by
-      apply min_weight_ker_not_mem_rowspace_empty H₁ H₂
+  · have hmin : minWeightKerNotMemRowspace H₁ H₂ = n + 1 := by
+      apply minWeightKerNotMemRowspace_empty H₁ H₂
       intro h_nonempty
       rcases h_nonempty with ⟨x, hxker, hxrow⟩
       have : x ∈ undetectable_errors := ⟨hxker, hxrow⟩
@@ -113,54 +119,57 @@ lemma lt_dist_sat_sound_contrapositive
     rw [←Nat.le_sub_one_iff_lt] at hamming_x
     swap
     · apply lt_of_le_of_lt (Nat.zero_le _) hamming_x
-    let I := index_vec x hamming_x (hammingNorm_ne_zero_iff.2 hx_ne_zero)
-    apply (htest (vec_to_BitVec' I) (vec_to_BitVec x))
+    let I := indexVec x hamming_x (hammingNorm_ne_zero_iff.2 hx_ne_zero)
+    apply (htest (vecToBitVec' I) (vecToBitVec x))
     refine ⟨?_, ?_, ?_, ?_⟩
-    · apply loc_constraints_of_index
-    · rw [symmetry_constraints_iff_index]
-      exact index_vec_monotone
-    · rw [parity_constraints_correct]
+    · apply locConstraints_of_index
+    · rw [symmetryConstraints_iff_index]
+      exact indexVec_monotone
+    · rw [parityConstraints_correct]
       exact ker_x
-    apply (rowspace_constraints_correct H₂_ker_correct).2 rowspace_x
+    apply (rowspaceConstraints_correct H₂_ker_correct).2 rowspace_x
 
-
-
-
-lemma lt_dist_sat_sound
-  {n k₁ k₂ kersize : ℕ} [NeZero n] [NeZero k₁] [NeZero kersize] [NeZero (n - k₂)]
-  {H₁ : Matrix (Fin k₁) (Fin n) (ZMod 2)}
-  {H₂ : Matrix (Fin k₂) (Fin n) (ZMod 2)}
-  (H₂_ker : Matrix (Fin kersize) (Fin n) (ZMod 2))
-  (H₂_kergen_correct : H₂_ker.is_ker_for H₂)
-  {dist : ℕ}
-  (dist_le : dist ≤ n)
-  (test_dist : lt_dist_sat (flatten_matrix H₁) (flatten_matrix H₂_ker) (dist - 1) (Nat.clog 2 n)) :
-  dist ≤ min_weight_ker_not_mem_rowspace H₁ H₂ := by
+/-- Soundness of the encoding: if no error of weight at most `dist - 1` solves the constraints,
+then every vector in the kernel of `H₁` outside the row space of `H₂` has weight at least
+`dist`. -/
+lemma ltDistSat_sound
+    {n k₁ k₂ kersize : ℕ} [NeZero n] [NeZero k₁] [NeZero kersize] [NeZero (n - k₂)]
+    {H₁ : Matrix (Fin k₁) (Fin n) (ZMod 2)}
+    {H₂ : Matrix (Fin k₂) (Fin n) (ZMod 2)}
+    (H₂_ker : Matrix (Fin kersize) (Fin n) (ZMod 2))
+    (H₂_kergen_correct : H₂_ker.isKerFor H₂)
+    {dist : ℕ}
+    (dist_le : dist ≤ n)
+    (test_dist : ltDistSat (flattenMatrix H₁) (flattenMatrix H₂_ker) (dist - 1) (Nat.clog 2 n)) :
+    dist ≤ minWeightKerNotMemRowspace H₁ H₂ := by
   by_contra!
-  suffices this : ¬lt_dist_sat (flatten_matrix H₁) (flatten_matrix H₂_ker) (dist - 1) (Nat.clog 2 n) by
+  suffices this : ¬ltDistSat (flattenMatrix H₁) (flattenMatrix H₂_ker) (dist - 1) (Nat.clog 2 n) by
     simp_all only
-  apply lt_dist_sat_sound_contrapositive _ H₂ _ _ _ dist_le
+  apply ltDistSat_sound_contrapositive _ H₂ _ _ _ dist_le
   · assumption
   · assumption
 
-
+/-- The two SAT queries bound the distance of a CSS code: refuting both instances at `dist - 1`,
+one for each type of check, shows the code has distance at least `dist`. -/
 theorem bitvec_sat_translation_correct
-  {n k₁ k₂ xkersize zkersize : ℕ} [NeZero n] [NeZero k₁]
-  [NeZero k₂] [NeZero xkersize] [NeZero zkersize] [NeZero (n - k₁)] [NeZero (n - k₂)]
-  (css : CSS_pair n k₁ k₂)
-  (xker : Matrix (Fin xkersize) (Fin n) (ZMod 2))
-  (xker_correct : xker.is_ker_for css.H₂)
-  (zker : Matrix (Fin zkersize) (Fin n) (ZMod 2))
-  (zker_correct : zker.is_ker_for css.H₁)
-  {dist : ℕ}
-  (dist_le : dist ≤ n)
-   :
-  lt_dist_sat (flatten_matrix css.H₁) (flatten_matrix xker) (dist - 1) (Nat.clog 2 n) →
-  lt_dist_sat (flatten_matrix css.H₂) (flatten_matrix zker) (dist - 1) (Nat.clog 2 n) →
-  dist ≤ css.toBSM.distance (by apply NeZero.pos) := by
+    {n k₁ k₂ xkersize zkersize : ℕ} [NeZero n] [NeZero k₁]
+    [NeZero k₂] [NeZero xkersize] [NeZero zkersize] [NeZero (n - k₁)] [NeZero (n - k₂)]
+    (css : CSSPair n k₁ k₂)
+    (xker : Matrix (Fin xkersize) (Fin n) (ZMod 2))
+    (xker_correct : xker.isKerFor css.H₂)
+    (zker : Matrix (Fin zkersize) (Fin n) (ZMod 2))
+    (zker_correct : zker.isKerFor css.H₁)
+    {dist : ℕ}
+    (dist_le : dist ≤ n)
+     :
+    ltDistSat (flattenMatrix css.H₁) (flattenMatrix xker) (dist - 1) (Nat.clog 2 n) →
+    ltDistSat (flattenMatrix css.H₂) (flattenMatrix zker) (dist - 1) (Nat.clog 2 n) →
+    dist ≤ css.toBSM.distance (by apply NeZero.pos) := by
   rw [CSS.toBSM_dist_eq]
   intro hdist_z hdist_x
-  unfold CSS_pair.dX CSS_pair.dZ
+  unfold CSSPair.dX CSSPair.dZ
   apply le_min
-  · apply lt_dist_sat_sound zker zker_correct dist_le hdist_x
-  apply lt_dist_sat_sound xker xker_correct dist_le hdist_z
+  · apply ltDistSat_sound zker zker_correct dist_le hdist_x
+  apply ltDistSat_sound xker xker_correct dist_le hdist_z
+
+end QuantumLib

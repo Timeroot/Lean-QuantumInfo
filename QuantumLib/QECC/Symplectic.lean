@@ -13,10 +13,11 @@ and two Paulis commute exactly when that pair is orthogonal for the **symplectic
 
 `⟪u, v⟫ = ∑ i, (u.x i * v.z i + u.z i * v.x i)`.
 
-This file sets up that dictionary: `symOf`, the form `sympForm`, the subspace `symImage S`
-attached to a stabilizer group, and the identification of the centralizer with the symplectic
-orthogonal complement. The payoff is `QuantumLib.PauliOp.StabGroup.rank_ge_of_disjoint`, the
-counting inequality behind the quantum Singleton bound.
+This file sets up that dictionary: `symOf`, the form `sympForm`, the weight `symWeight`, the
+subspace `symImage S` attached to a stabilizer group, and the identification of the centralizer
+with the symplectic orthogonal complement. The payoff is
+`QuantumLib.PauliOp.StabGroup.rank_ge_of_disjoint`, the counting inequality behind the quantum
+Singleton bound.
 -/
 
 open scoped BigOperators
@@ -50,7 +51,16 @@ def ofSym (v : SympSpace n) : PauliOp n := ⟨0, v.1, v.2⟩
 @[simp] theorem ofSym_x (v : SympSpace n) : (ofSym v).x = v.1 := rfl
 @[simp] theorem ofSym_z (v : SympSpace n) : (ofSym v).z = v.2 := rfl
 
-@[simp] theorem weight_ofSym_symOf (P : PauliOp n) : weight (ofSym (symOf P)) = weight P := rfl
+/-- The weight of a symplectic vector: the number of qubits on which it acts nontrivially. -/
+def symWeight (v : SympSpace n) : ℕ :=
+  (Finset.univ.filter (fun i => v.1 i ≠ 0 ∨ v.2 i ≠ 0)).card
+
+@[simp] theorem weight_ofSym (v : SympSpace n) : weight (ofSym v) = symWeight v := rfl
+
+@[simp] theorem symWeight_symOf (P : PauliOp n) : symWeight (symOf P) = weight P := rfl
+
+theorem symWeight_le (v : SympSpace n) : symWeight v ≤ n :=
+  weight_le (ofSym v)
 
 /-- The **symplectic form** on `𝔽₂ⁿ × 𝔽₂ⁿ`. Two Paulis commute iff their symplectic images are
 orthogonal for it. -/

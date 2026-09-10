@@ -16,6 +16,10 @@ gives the standard combinatorial lower bound on the minimum weight of an undetec
 
 open Finset
 
+namespace QuantumLib
+
+/-- If `x` has odd weight on each of `m` disjoint sets, at least `m` of its entries are
+nonzero. -/
 lemma weight_ge_of_cuts {n m : ℕ} (x : Fin n → ZMod 2) (S : Fin m → Finset (Fin n))
     (hdisj : ∀ i j, i ≠ j → Disjoint (S i) (S j))
     (hodd : ∀ i, ∑ q ∈ S i, x q = 1) :
@@ -50,11 +54,14 @@ lemma weight_ge_of_cuts {n m : ℕ} (x : Fin n → ZMod 2) (S : Fin m → Finset
   rw [hnorm, ← hcard]
   exact Finset.card_le_card hsub
 
+/-- A bound `d` on the weight of every vector in the kernel of `M₁` but outside the row space
+of `M₂` bounds `minWeightKerNotMemRowspace`. The hypothesis `d ≤ n + 1` covers the case
+where there is no such vector. -/
 lemma MWK_ge {n k₁ k₂ : ℕ} (M₁ : Matrix (Fin k₁) (Fin n) (ZMod 2))
     (M₂ : Matrix (Fin k₂) (Fin n) (ZMod 2)) (d : ℕ) (hd : d ≤ n + 1)
     (H : ∀ x, x ∈ LinearMap.ker M₁.toLin' → x ∉ M₂.rowSpace → d ≤ hammingNorm x) :
-    d ≤ min_weight_ker_not_mem_rowspace M₁ M₂ := by
-  unfold min_weight_ker_not_mem_rowspace
+    d ≤ minWeightKerNotMemRowspace M₁ M₂ := by
+  unfold minWeightKerNotMemRowspace
   extract_lets ue
   rcases hmin : (Finset.image hammingNorm ue.toFinset).min with _ | a
   · simpa using hd
@@ -66,3 +73,5 @@ lemma MWK_ge {n k₁ k₂ : ℕ} (M₁ : Matrix (Fin k₁) (Fin n) (ZMod 2))
     have hy'' : y ∈ (LinearMap.ker M₁.toLin' : Set _) \ (M₂.rowSpace : Set _) := hy'
     rw [Set.mem_sdiff] at hy''
     exact H y hy''.1 hy''.2
+
+end QuantumLib
