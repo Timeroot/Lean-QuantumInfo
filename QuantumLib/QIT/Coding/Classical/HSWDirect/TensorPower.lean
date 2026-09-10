@@ -28,7 +28,7 @@ stated for states.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 
 universe u v
 
@@ -135,7 +135,7 @@ theorem tensorPower_map_single_apply (N : CPTPMap a b) :
             (1 : ℂ)) (u0, us) (v0, vs) = _
       rw [single_prod_eq_kronecker_single x0 y0 xs ys]
       rw [CPTPOp.prod_map_kronecker]
-      simp only [Matrix.kronecker, Matrix.kroneckerMap, Matrix.of_apply]
+      simp only [Matrix.kroneckerMap, Matrix.of_apply]
       rw [ih xs ys us vs]
       rw [Fin.prod_univ_succ]
       simp [tensorPowerEquiv_succ_zero, tensorPowerEquiv_succ_succ]
@@ -194,13 +194,13 @@ theorem tensorPower_append_map_kronecker_apply (N : CPTPMap a b) (m r : ℕ)
     (X : CMatrix (QIT.TensorPower a m)) (Y : CMatrix (QIT.TensorPower a r))
     (x y : QIT.TensorPower b (m + r)) :
     (N.tensorPower (m + r)).map
-        ((Matrix.kronecker X Y).submatrix (TensorPower.appendEquiv a m r).symm
+        ((X ⊗ₖ Y).submatrix (TensorPower.appendEquiv a m r).symm
           (TensorPower.appendEquiv a m r).symm) x y =
-      (Matrix.kronecker ((N.tensorPower m).map X) ((N.tensorPower r).map Y)).submatrix
+      (((N.tensorPower m).map X) ⊗ₖ ((N.tensorPower r).map Y)).submatrix
         (TensorPower.appendEquiv b m r).symm (TensorPower.appendEquiv b m r).symm x y := by
   rw [MatrixMap.map_eq_sum_single]
   simp only [Matrix.sum_apply, Matrix.smul_apply]
-  simp only [Matrix.submatrix_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]
+  simp only [Matrix.submatrix_apply, Matrix.kroneckerMap_apply]
   rw [MatrixMap.map_eq_sum_single (N.tensorPower m).map X]
   rw [MatrixMap.map_eq_sum_single (N.tensorPower r).map Y]
   simp only [Matrix.sum_apply, Matrix.smul_apply]

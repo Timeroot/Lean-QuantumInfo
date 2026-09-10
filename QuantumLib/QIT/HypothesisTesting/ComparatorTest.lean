@@ -25,7 +25,7 @@ and the decoded message register.  The comparator projection has type-II error
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 
 noncomputable section
 universe u
@@ -108,10 +108,10 @@ theorem comparatorEffect_uniform_prod_trace [Nonempty M] (σ : MState M) :
   calc
     (∑ p : M × M,
         (∑ q : M × M,
-          (Matrix.kronecker (uniformMessageState (M := M)).m σ.m) p q *
+          ((uniformMessageState (M := M)).m ⊗ₖ σ.m) p q *
             comparatorEffect (M := M) q p)).re =
         (∑ p : M × M,
-          (Matrix.kronecker (uniformMessageState (M := M)).m σ.m) p p *
+          ((uniformMessageState (M := M)).m ⊗ₖ σ.m) p p *
             comparatorEffect (M := M) p p).re := by
           congr 1
           refine Finset.sum_congr rfl ?_
@@ -130,9 +130,9 @@ theorem comparatorEffect_uniform_prod_trace [Nonempty M] (σ : MState M) :
           refine Finset.sum_congr rfl ?_
           intro p _
           by_cases h : p.1 = p.2
-          · simp [Matrix.kronecker, Matrix.kroneckerMap_apply,
+          · simp [Matrix.kroneckerMap_apply,
               uniformMessageState_matrix, comparatorEffect, h]
-          · simp [Matrix.kronecker, Matrix.kroneckerMap_apply,
+          · simp [Matrix.kroneckerMap_apply,
               uniformMessageState_matrix, comparatorEffect, h]
     _ = (∑ m₁ : M, ∑ m₂ : M,
           (if m₁ = m₂ then

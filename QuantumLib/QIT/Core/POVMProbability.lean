@@ -24,7 +24,7 @@ with the statement that the outcome probabilities are unchanged.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 
 namespace POVM
 
@@ -167,10 +167,10 @@ theorem prob_reindex_state (M : POVM y a) (rho : MState a) (e : a ≃ b) (outcom
 /-- Extend a POVM to a product system by measuring the right factor with the identity effect. -/
 def tensorRightIdentity (M : POVM y a) (tail : Type w) [Fintype tail] [DecidableEq tail] :
     POVM y (a × tail) :=
-  .ofMatrices (fun outcome => Matrix.kronecker (M.effects outcome) (1 : CMatrix tail))
+  .ofMatrices (fun outcome => (M.effects outcome) ⊗ₖ (1 : CMatrix tail))
     (fun outcome => (M.pos outcome).kronecker Matrix.PosSemidef.one) <| by
     ext i j
-    simp only [Matrix.sum_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]
+    simp only [Matrix.sum_apply, Matrix.kroneckerMap_apply]
     rw [← Finset.sum_mul]
     have hsum :
         (∑ outcome, M.effects outcome i.1 j.1) = (1 : CMatrix a) i.1 j.1 := by
@@ -193,20 +193,20 @@ theorem tensorRightIdentity_prob_prod {tail : Type w} [Fintype tail] [DecidableE
       (M.prob rho outcome : ℝ) := by
   rw [prob_eq_trace_re, prob_eq_trace_re, MState.prod_m]
   change Complex.re
-      (((Matrix.kronecker rho.m sigma.m) *
-        Matrix.kronecker (M.effects outcome) (1 : CMatrix tail)).trace) =
+      (((rho.m ⊗ₖ sigma.m) *
+        ((M.effects outcome) ⊗ₖ (1 : CMatrix tail))).trace) =
     Complex.re ((rho.m * M.effects outcome).trace)
   have hmul :
-      Matrix.kronecker rho.m sigma.m *
-          Matrix.kronecker (M.effects outcome) (1 : CMatrix tail) =
-        Matrix.kronecker (rho.m * M.effects outcome) (sigma.m * 1) :=
+      (rho.m ⊗ₖ sigma.m) *
+          ((M.effects outcome) ⊗ₖ (1 : CMatrix tail)) =
+        (rho.m * M.effects outcome) ⊗ₖ (sigma.m * 1) :=
     (Matrix.mul_kronecker_mul rho.m (M.effects outcome) sigma.m
       (1 : CMatrix tail)).symm
   rw [hmul, Matrix.mul_one]
-  change Complex.re ((Matrix.kronecker (rho.m * M.effects outcome) sigma.m).trace) =
+  change Complex.re (((rho.m * M.effects outcome) ⊗ₖ sigma.m).trace) =
     Complex.re ((rho.m * M.effects outcome).trace)
   have htrace :
-      (Matrix.kronecker (rho.m * M.effects outcome) sigma.m).trace =
+      ((rho.m * M.effects outcome) ⊗ₖ sigma.m).trace =
         (rho.m * M.effects outcome).trace * sigma.m.trace :=
     Matrix.trace_kronecker (rho.m * M.effects outcome) sigma.m
   rw [htrace, sigma.tr']

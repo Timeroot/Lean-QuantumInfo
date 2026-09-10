@@ -33,7 +33,7 @@ one `(n, R+δ, ε)` compression code `C : SchumacherCompressionCode ρ n W` with
           ≥ I(Âⁿ;Rⁿ)_ω             (mutual-information DPI, decoder on B)
           ≥ I(Aⁿ;Rⁿ)_φ_{RA}^{⊗n} − M(n,ε)   (AFW continuity of H(Rⁿ|·))
           = n I(A;R)_φ             (tensor additivity of mutual information)
-          = 2n S(ρ),               (mutual information of a pure bipartite state)
+          = 2n S(ρ), (mutual information of a pure bipartite state)
 ```
 
 where `M(n,ε) = afwContinuityModulus |Aⁿ| ε`, yields

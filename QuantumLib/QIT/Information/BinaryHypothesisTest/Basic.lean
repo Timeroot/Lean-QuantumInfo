@@ -27,7 +27,7 @@ infrastructure.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal ENNReal Topology
+open scoped ComplexOrder MatrixOrder Kronecker NNReal ENNReal Topology
 open Filter Matrix Polynomial
 
 noncomputable section
@@ -189,14 +189,12 @@ theorem petzRenyiCoefficient_prod {b : Type v} [Fintype b] [DecidableEq b]
     _ =
         ((CFC.rpow rho₁.m s * CFC.rpow sigma₁.m (1 - s)).trace) *
           ((CFC.rpow rho₂.m s * CFC.rpow sigma₂.m (1 - s)).trace) := by
-      rw [prod_m rho₁ rho₂, prod_m sigma₁ sigma₂, ← Matrix.kronecker]
+      rw [prod_m rho₁ rho₂, prod_m sigma₁ sigma₂]
       rw [cMatrix_rpow_kronecker rho₁.psd rho₂.psd s]
       rw [cMatrix_rpow_kronecker sigma₁.psd sigma₂.psd (1 - s)]
       change
-        (Matrix.kroneckerMap (fun x y => x * y)
-            (CFC.rpow rho₁.m s) (CFC.rpow rho₂.m s) *
-          Matrix.kroneckerMap (fun x y => x * y)
-            (CFC.rpow sigma₁.m (1 - s)) (CFC.rpow sigma₂.m (1 - s))).trace =
+        (((CFC.rpow rho₁.m s) ⊗ₖ (CFC.rpow rho₂.m s)) *
+          ((CFC.rpow sigma₁.m (1 - s)) ⊗ₖ (CFC.rpow sigma₂.m (1 - s)))).trace =
         (CFC.rpow rho₁.m s * CFC.rpow sigma₁.m (1 - s)).trace *
           (CFC.rpow rho₂.m s * CFC.rpow sigma₂.m (1 - s)).trace
       rw [← Matrix.mul_kronecker_mul]

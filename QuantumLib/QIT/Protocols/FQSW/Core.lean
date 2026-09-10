@@ -38,7 +38,7 @@ up to the slack with error below the tolerance.  It is proved in `IIDDirect.lean
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 noncomputable section
 universe u v w x y z p u1 v1 w1
@@ -487,26 +487,22 @@ public theorem fqswSourceToAliceInput_naturality
   rw [show Matrix.single
       (Equiv.prodAssoc alpha beta gamma i)
       (Equiv.prodAssoc alpha beta gamma j) (1 : ℂ) =
-        Matrix.kroneckerMap (· * ·)
-          (Matrix.single i.1.1 j.1.1 (1 : ℂ))
+        (Matrix.single i.1.1 j.1.1 (1 : ℂ)) ⊗ₖ
           (Matrix.single (i.1.2, i.2) (j.1.2, j.2) (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
   rw [MatrixMap.kron_map_of_kron_state]
   rw [show Matrix.single (i.1.2, i.2) (j.1.2, j.2) (1 : ℂ) =
-        Matrix.kroneckerMap (· * ·)
-          (Matrix.single i.1.2 j.1.2 (1 : ℂ))
+        (Matrix.single i.1.2 j.1.2 (1 : ℂ)) ⊗ₖ
           (Matrix.single i.2 j.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
   rw [MatrixMap.kron_map_of_kron_state]
   rw [show Matrix.single i j (1 : ℂ) =
-        Matrix.kroneckerMap (· * ·)
-          (Matrix.single i.1 j.1 (1 : ℂ))
+        (Matrix.single i.1 j.1 (1 : ℂ)) ⊗ₖ
           (Matrix.single i.2 j.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
   rw [MatrixMap.kron_map_of_kron_state]
   rw [show Matrix.single i.1 j.1 (1 : ℂ) =
-        Matrix.kroneckerMap (· * ·)
-          (Matrix.single i.1.1 j.1.1 (1 : ℂ))
+        (Matrix.single i.1.1 j.1.1 (1 : ℂ)) ⊗ₖ
           (Matrix.single i.1.2 j.1.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
   rw [MatrixMap.kron_map_of_kron_state, CPTPOp.reindex_map]
@@ -550,38 +546,32 @@ public theorem fqswAliceOutputToBobInput_naturality
   rw [show Matrix.single
       (fqswAliceOutputToBobInputEquiv q0 e0 b0 r0 i)
       (fqswAliceOutputToBobInputEquiv q0 e0 b0 r0 j) (1 : ℂ) =
-        Matrix.kroneckerMap (· * ·)
-          (Matrix.single (i.1.1, i.2.1) (j.1.1, j.2.1) (1 : ℂ))
+        (Matrix.single (i.1.1, i.2.1) (j.1.1, j.2.1) (1 : ℂ)) ⊗ₖ
           (Matrix.single (i.2.2, i.1.2) (j.2.2, j.1.2) (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
   rw [MatrixMap.kron_map_of_kron_state]
   rw [show Matrix.single (i.1.1, i.2.1) (j.1.1, j.2.1) (1 : ℂ) =
-        Matrix.kroneckerMap (· * ·)
-          (Matrix.single i.1.1 j.1.1 (1 : ℂ))
+        (Matrix.single i.1.1 j.1.1 (1 : ℂ)) ⊗ₖ
           (Matrix.single i.2.1 j.2.1 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
   rw [MatrixMap.kron_map_of_kron_state]
   rw [show Matrix.single (i.2.2, i.1.2) (j.2.2, j.1.2) (1 : ℂ) =
-        Matrix.kroneckerMap (· * ·)
-          (Matrix.single i.2.2 j.2.2 (1 : ℂ))
+        (Matrix.single i.2.2 j.2.2 (1 : ℂ)) ⊗ₖ
           (Matrix.single i.1.2 j.1.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
   rw [MatrixMap.kron_map_of_kron_state]
   rw [show Matrix.single i j (1 : ℂ) =
-        Matrix.kroneckerMap (· * ·)
-          (Matrix.single i.1 j.1 (1 : ℂ))
+        (Matrix.single i.1 j.1 (1 : ℂ)) ⊗ₖ
           (Matrix.single i.2 j.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
   rw [MatrixMap.kron_map_of_kron_state]
   rw [show Matrix.single i.1 j.1 (1 : ℂ) =
-        Matrix.kroneckerMap (· * ·)
-          (Matrix.single i.1.1 j.1.1 (1 : ℂ))
+        (Matrix.single i.1.1 j.1.1 (1 : ℂ)) ⊗ₖ
           (Matrix.single i.1.2 j.1.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
   rw [MatrixMap.kron_map_of_kron_state]
   rw [show Matrix.single i.2 j.2 (1 : ℂ) =
-        Matrix.kroneckerMap (· * ·)
-          (Matrix.single i.2.1 j.2.1 (1 : ℂ))
+        (Matrix.single i.2.1 j.2.1 (1 : ℂ)) ⊗ₖ
           (Matrix.single i.2.2 j.2.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
   rw [MatrixMap.kron_map_of_kron_state, CPTPOp.reindex_map]

@@ -19,7 +19,7 @@ including the source-facing extended-real theorem.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal Topology Matrix.Norms.L2Operator
+open scoped ComplexOrder MatrixOrder Kronecker NNReal Topology Matrix.Norms.L2Operator
 
 noncomputable section
 universe u v w
@@ -73,7 +73,7 @@ theorem sandwichedRenyiQ_traceRight_ge_of_half_lt_lt_one
       (∑ i ∈ (Finset.univ : Finset ι), (w i : ℂ) •
         ((localRightUnitary (a := a) (U i) : CMatrix (a × b)) * ρ *
           star (localRightUnitary (a := a) (U i) : CMatrix (a × b)))) =
-        Matrix.kronecker (Matrix.traceRight ρ) (MState.uniform : MState b).m := by
+        (Matrix.traceRight ρ) ⊗ₖ (MState.uniform : MState b).m := by
     simpa [ι, w, U, hcast] using
       localRightSignPermutationTwirl_eq_traceRight_kronecker_uniform
         (a := a) (b := b) ρ
@@ -81,7 +81,7 @@ theorem sandwichedRenyiQ_traceRight_ge_of_half_lt_lt_one
       (∑ i ∈ (Finset.univ : Finset ι), (w i : ℂ) •
         ((localRightUnitary (a := a) (U i) : CMatrix (a × b)) * σ *
           star (localRightUnitary (a := a) (U i) : CMatrix (a × b)))) =
-        Matrix.kronecker (Matrix.traceRight σ) (MState.uniform : MState b).m := by
+        (Matrix.traceRight σ) ⊗ₖ (MState.uniform : MState b).m := by
     simpa [ι, w, U, hcast] using
       localRightSignPermutationTwirl_eq_traceRight_kronecker_uniform
         (a := a) (b := b) σ

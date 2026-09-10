@@ -1035,15 +1035,14 @@ theorem petz_traceLeft_rightBlockDiagonal
     simp [Matrix.traceLeft, petzUpRightBlockDiagonal,
       conditionalRenyiRightBlockDiagonal, Matrix.sum_apply,
       Matrix.submatrix_apply,
-      Classical.blockDiagonal, Matrix.kronecker,
-      Matrix.kroneckerMap_apply, Matrix.single_apply]
+      Classical.blockDiagonal, Matrix.kroneckerMap_apply, Matrix.single_apply]
   · have hxy : ∀ x : Y, ¬(x = y ∧ x = y') := by
       intro x h
       exact hyy (h.1.symm.trans h.2)
     simp [Matrix.traceLeft, petzUpRightBlockDiagonal,
       conditionalRenyiRightBlockDiagonal, Matrix.sum_apply,
       Matrix.submatrix_apply, hxy,
-      Classical.blockDiagonal, Matrix.kronecker, Matrix.kroneckerMap_apply]
+      Classical.blockDiagonal, Matrix.kroneckerMap_apply]
 
 theorem petz_conditionalUpTraceMatrix_classical_decomposition
     (E : MEnsemble (A × B) Y) (α : ℝ) :

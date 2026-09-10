@@ -20,7 +20,7 @@ orthogonal source summand.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator
+open scoped ComplexOrder MatrixOrder Kronecker Matrix.Norms.L2Operator
 
 namespace QIT
 
@@ -234,10 +234,10 @@ theorem blockExtensionState_scaleFeasible
   · rw [Matrix.le_iff]
     let failure : MState (extra × b) := (MState.uniform : MState extra).prod σ
     let topDiff : CMatrix (extra × b) :=
-      Matrix.kronecker (1 : CMatrix extra) T -
+      (1 : CMatrix extra) ⊗ₖ T -
         (1 - ρ.matrix.trace.re) • failure.m
     let bottomDiff : CMatrix (a × b) :=
-      Matrix.kronecker (1 : CMatrix a) T - ρ.matrix
+      (1 : CMatrix a) ⊗ₖ T - ρ.matrix
     have hfailure :
         MState.identityTensorStateMatrix (a := extra) σ =
           ((Fintype.card extra : ℝ) : ℂ) • failure.m := by
@@ -250,17 +250,16 @@ theorem blockExtensionState_scaleFeasible
               (1 - ρ.matrix.trace.re)) • failure.m := by
       dsimp [topDiff]
       calc
-        Matrix.kronecker (1 : CMatrix extra) T -
+        (1 : CMatrix extra) ⊗ₖ T -
               (1 - ρ.matrix.trace.re) • failure.m =
-            Matrix.kronecker (1 : CMatrix extra)
+            (1 : CMatrix extra) ⊗ₖ
                 ((T.trace.re : ℂ) • σ.m) -
               (1 - ρ.matrix.trace.re) • failure.m := by rw [hnormalize]
         _ = (T.trace.re : ℂ) • MState.identityTensorStateMatrix (a := extra) σ -
               (1 - ρ.matrix.trace.re) • failure.m := by
               congr 1
               ext i j
-              simp [MState.identityTensorStateMatrix, Matrix.kronecker,
-                Matrix.kroneckerMap_apply]
+              simp [MState.identityTensorStateMatrix, Matrix.kroneckerMap_apply]
               ring
         _ = ((Fintype.card extra : ℝ) * T.trace.re -
               (1 - ρ.matrix.trace.re)) • failure.m := by
@@ -276,7 +275,7 @@ theorem blockExtensionState_scaleFeasible
           CMatrix ((extra × b) ⊕ (a × b))).PosSemidef :=
       Matrix.fromBlocks_diagonal_posSemidef htop hbottom
     have hmatrix :
-        Matrix.kronecker (1 : CMatrix (extra ⊕ a)) T -
+        (1 : CMatrix (extra ⊕ a)) ⊗ₖ T -
             (blockExtensionState ρ failure).m =
           (Matrix.fromBlocks topDiff 0 0 bottomDiff).submatrix
             (sourceSumEquiv extra a b).symm (sourceSumEquiv extra a b).symm := by
@@ -285,8 +284,7 @@ theorem blockExtensionState_scaleFeasible
       rcases j with ⟨j, jb⟩
       cases i <;> cases j <;>
         simp [blockExtensionState_matrix, sourceSumEquiv, topDiff, bottomDiff,
-          failure, Matrix.kronecker,
-          Matrix.kroneckerMap_apply, Matrix.one_apply]
+          failure, Matrix.kroneckerMap_apply, Matrix.one_apply]
     rw [hmatrix]
     exact hcoarse.submatrix (sourceSumEquiv extra a b).symm
 
@@ -448,7 +446,7 @@ theorem identityTensorStateMatrix_sourceSumEquiv
   rcases j with ⟨j, jb⟩
   cases i <;> cases j <;>
     simp [sourceSumEquiv, SubnormalizedState.identityTensorStateMatrix,
-      Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply]
+      Matrix.kroneckerMap_apply, Matrix.one_apply]
 
 /-- The raw max-entropy trace-norm factor is invariant under concrete
 right-summand padding of the source register. -/

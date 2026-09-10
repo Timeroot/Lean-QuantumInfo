@@ -29,7 +29,7 @@ positive endpoints needed by that bridge.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 namespace QIT
 
@@ -109,9 +109,9 @@ With the convention `|K>` indexed by `(input, output)` and conjugated to match
 theorem rectangular_kraus_trace_tensor_trace_transpose
     (K : Matrix b a ℂ) (A : CMatrix a) (B : CMatrix b) :
     (((K * A * Matrix.conjTranspose K) * B).trace) =
-      ((rectangularKrausVecWeight K * Matrix.kronecker A B.transpose).trace) := by
+      ((rectangularKrausVecWeight K * (A ⊗ₖ B.transpose)).trace) := by
   classical
-  simp [Matrix.trace, Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  simp [Matrix.trace, Matrix.mul_apply, Matrix.kroneckerMap_apply,
     rectangularKrausVecWeight, rankOneMatrix_apply, Matrix.transpose_apply,
     Matrix.conjTranspose_apply]
   simp only [Finset.sum_mul]
@@ -141,7 +141,7 @@ theorem rectangular_kraus_trace_tensor_trace_transpose_re
     (K : Matrix b a ℂ) (A : CMatrix a) (B : CMatrix b) :
     ((((K * A * Matrix.conjTranspose K) * B).trace).re) =
       (((rectangularKrausVecWeight K *
-        Matrix.kronecker A B.transpose).trace).re) := by
+        (A ⊗ₖ B.transpose)).trace).re) := by
   exact congrArg Complex.re (rectangular_kraus_trace_tensor_trace_transpose K A B)
 
 /-- Single-rectangular-Kraus Lieb trace concavity.
@@ -469,13 +469,13 @@ variable [Fintype r] [DecidableEq r]
 identity on the right/application tensor factor. -/
 def localReferenceUnitary (U : Matrix.unitaryGroup r ℂ) :
     Matrix.unitaryGroup (r × a) ℂ :=
-  ⟨Matrix.kronecker (U : CMatrix r) (1 : CMatrix a), by
+  ⟨(U : CMatrix r) ⊗ₖ (1 : CMatrix a), by
     let I : Matrix.unitaryGroup a ℂ := ⟨1, by simp⟩
     simpa using Matrix.kronecker_mem_unitary U.2 I.2⟩
 
 @[simp] theorem localReferenceUnitary_coe (U : Matrix.unitaryGroup r ℂ) :
     (localReferenceUnitary (a := a) U : CMatrix (r × a)) =
-      Matrix.kronecker (U : CMatrix r) (1 : CMatrix a) := rfl
+      (U : CMatrix r) ⊗ₖ (1 : CMatrix a) := rfl
 
 theorem diagonalSignReferenceUnitary_conj_apply
     (ε : r → Bool) (X : CMatrix (r × a)) (i i' : r) (j j' : a) :
@@ -486,8 +486,8 @@ theorem diagonalSignReferenceUnitary_conj_apply
       boolSignComplex (ε i) * X (i, j) (i', j') * boolSignComplex (ε i') := by
   simp only [localReferenceUnitary_coe, diagonalSignUnitary_coe,
     Matrix.star_eq_conjTranspose, Matrix.conjTranspose_kronecker,
-    Matrix.conjTranspose_one, Matrix.mul_apply, Matrix.kronecker,
-    Matrix.kroneckerMap_apply, Matrix.one_apply, Matrix.diagonal, Matrix.of_apply,
+    Matrix.conjTranspose_one, Matrix.mul_apply, Matrix.kroneckerMap_apply, Matrix.one_apply, Matrix.diagonal,
+    Matrix.of_apply,
     Matrix.conjTranspose_apply]
   have hinner : ∀ x : r × a,
       (∑ y : r × a,
@@ -533,8 +533,7 @@ theorem permutationReferenceUnitary_conj_apply
       X (π i, j) (π i', j') := by
   simp only [localReferenceUnitary_coe, permutationUnitary_coe, Matrix.of_apply,
     Matrix.star_eq_conjTranspose, Matrix.conjTranspose_kronecker,
-    Matrix.conjTranspose_one, Matrix.mul_apply, Matrix.kronecker,
-    Matrix.kroneckerMap_apply, Matrix.one_apply, Matrix.conjTranspose_apply]
+    Matrix.conjTranspose_one, Matrix.mul_apply, Matrix.kroneckerMap_apply, Matrix.one_apply, Matrix.conjTranspose_apply]
   have hinner : ∀ x : r × a,
       (∑ y : r × a,
         (((if π i = y.1 then 1 else 0) * if j = y.2 then 1 else 0) * X y x)) =
@@ -625,14 +624,12 @@ def referenceDepolarizingTwirl [Nonempty r] (X : CMatrix (r × a)) :
     CMatrix (r × a) :=
   ∑ idx : (r → Bool) × Equiv.Perm r,
     ((Fintype.card ((r → Bool) × Equiv.Perm r) : ℂ)⁻¹) •
-      ((Matrix.kronecker
-          ((permutationUnitary idx.2 * diagonalSignUnitary idx.1 :
-            Matrix.unitaryGroup r ℂ) : CMatrix r)
+      ((((permutationUnitary idx.2 * diagonalSignUnitary idx.1 :
+            Matrix.unitaryGroup r ℂ) : CMatrix r) ⊗ₖ
           (1 : CMatrix a)) *
         X *
-        star (Matrix.kronecker
-          ((permutationUnitary idx.2 * diagonalSignUnitary idx.1 :
-            Matrix.unitaryGroup r ℂ) : CMatrix r)
+        star (((permutationUnitary idx.2 * diagonalSignUnitary idx.1 :
+            Matrix.unitaryGroup r ℂ) : CMatrix r) ⊗ₖ
           (1 : CMatrix a)))
 
 /-- The finite local-reference sign-permutation twirl realizes the source
@@ -646,7 +643,7 @@ KhatriWilde2024Principles, Chapters/EA_capacity.tex lines 2254-2265. -/
 theorem localReferenceTwirl_eq_uniform_tensor_partialTrace
     [Nonempty r] (X : CMatrix (r × a)) :
     referenceDepolarizingTwirl (r := r) (a := a) X =
-      Matrix.kronecker (MState.uniform : MState r).m
+      (MState.uniform : MState r).m ⊗ₖ
         (Matrix.traceLeft X) := by
   classical
   ext x y
@@ -708,10 +705,9 @@ theorem localReferenceTwirl_eq_uniform_tensor_partialTrace
         field_simp [hS, hP]
       _ = (Fintype.card r : ℂ)⁻¹ * ∑ k : r, X (k, j) (k, j') := by
         exact perm_orbit_average_eq_uniform (fun k : r => X (k, j) (k, j')) i
-      _ = (Matrix.kronecker (MState.uniform : MState r).m
+      _ = ((MState.uniform : MState r).m ⊗ₖ
             (Matrix.traceLeft X)) (i, j) (i, j') := by
-        simp [Matrix.traceLeft, uniform_matrix, Matrix.kronecker,
-          Matrix.kroneckerMap_apply, hcastR]
+        simp [Matrix.traceLeft, uniform_matrix, Matrix.kroneckerMap_apply, hcastR]
   · have hsum :
         (∑ idx : (r → Bool) × Equiv.Perm r,
           boolSignComplex (idx.1 (idx.2 i)) *
@@ -734,7 +730,7 @@ theorem localReferenceTwirl_eq_uniform_tensor_partialTrace
         _ = 0 := by
           rw [boolSignComplex_sum_mul_eq_zero_of_ne hne, mul_zero]
     rw [hsum, mul_zero]
-    simp [Matrix.traceLeft, uniform_matrix, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    simp [Matrix.traceLeft, uniform_matrix, Matrix.kroneckerMap_apply,
       hii']
 
 end

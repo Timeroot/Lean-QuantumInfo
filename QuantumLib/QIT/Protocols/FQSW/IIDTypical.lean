@@ -32,7 +32,7 @@ for all large enough `n`.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder QIT.MatrixL2
+open scoped ComplexOrder MatrixOrder Kronecker QIT.MatrixL2
 
 namespace QIT
 
@@ -171,8 +171,7 @@ theorem adhwFQSWMutualInformationAB_eq_entropyA_add_entropyB_sub_entropyR
 private def adhwFQSWIidLiftProjectorA
     (n : ℕ) (PA : CMatrix (TensorPower a n)) :
     CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
-  Matrix.kronecker
-    (Matrix.kronecker PA (1 : CMatrix (TensorPower b n)))
+  (PA ⊗ₖ (1 : CMatrix (TensorPower b n))) ⊗ₖ
     (1 : CMatrix (TensorPower r n))
 
 /-- Lift a `B^n` projector to the grouped i.i.d. source register
@@ -180,8 +179,7 @@ private def adhwFQSWIidLiftProjectorA
 private def adhwFQSWIidLiftProjectorB
     (n : ℕ) (PB : CMatrix (TensorPower b n)) :
     CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
-  Matrix.kronecker
-    (Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB)
+  ((1 : CMatrix (TensorPower a n)) ⊗ₖ PB) ⊗ₖ
     (1 : CMatrix (TensorPower r n))
 
 /-- Lift an `R^n` projector to the grouped i.i.d. source register
@@ -189,7 +187,7 @@ private def adhwFQSWIidLiftProjectorB
 private def adhwFQSWIidLiftProjectorR
     (n : ℕ) (PR : CMatrix (TensorPower r n)) :
     CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
-  Matrix.kronecker (1 : CMatrix (TensorPower a n × TensorPower b n)) PR
+  (1 : CMatrix (TensorPower a n × TensorPower b n)) ⊗ₖ PR
 
 /-- The simultaneous lifted `A^nB^nR^n` projector
 `Π_A ⊗ Π_B ⊗ Π_R`. -/
@@ -197,7 +195,7 @@ def adhwFQSWIidLiftProjectorTriple
     (n : ℕ) (PA : CMatrix (TensorPower a n)) (PB : CMatrix (TensorPower b n))
     (PR : CMatrix (TensorPower r n)) :
     CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
-  Matrix.kronecker (Matrix.kronecker PA PB) PR
+  (PA ⊗ₖ PB) ⊗ₖ PR
 
 /-- The simultaneously projected i.i.d. source matrix
 `Π_A Π_B Π_R ρ Π_A Π_B Π_R`. -/
@@ -219,9 +217,9 @@ private theorem adhwFQSWIidLiftProjector_union_decomp
           (1 - adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR)) -
         (1 - adhwFQSWIidLiftProjectorTriple
           (a := a) (b := b) (r := r) n PA PB PR) =
-      Matrix.kronecker (Matrix.kronecker (1 - PA) (1 - PB))
+      ((1 - PA) ⊗ₖ (1 - PB)) ⊗ₖ
           (1 : CMatrix (TensorPower r n)) +
-        Matrix.kronecker (1 - Matrix.kronecker PA PB) (1 - PR) := by
+        (1 - PA ⊗ₖ PB) ⊗ₖ (1 - PR) := by
   ext x y
   rcases x with ⟨⟨xa, xb⟩, xr⟩
   rcases y with ⟨⟨ya, yb⟩, yr⟩
@@ -232,44 +230,44 @@ private theorem adhwFQSWIidLiftProjector_union_decomp
       by_cases hr : xr = yr
       · subst yr
         simp [adhwFQSWIidLiftProjectorTriple, adhwFQSWIidLiftProjectorA,
-          adhwFQSWIidLiftProjectorB, adhwFQSWIidLiftProjectorR, Matrix.kronecker,
-          Matrix.kroneckerMap_apply, Matrix.sub_apply, Matrix.add_apply]
+          adhwFQSWIidLiftProjectorB, adhwFQSWIidLiftProjectorR, Matrix.kroneckerMap_apply, Matrix.sub_apply,
+          Matrix.add_apply]
         try ring
       · simp [adhwFQSWIidLiftProjectorTriple, adhwFQSWIidLiftProjectorA,
-          adhwFQSWIidLiftProjectorB, adhwFQSWIidLiftProjectorR, Matrix.kronecker,
-          Matrix.kroneckerMap_apply, Matrix.sub_apply, Matrix.add_apply, hr]
+          adhwFQSWIidLiftProjectorB, adhwFQSWIidLiftProjectorR, Matrix.kroneckerMap_apply, Matrix.sub_apply,
+          Matrix.add_apply, hr]
         try ring
     · by_cases hr : xr = yr
       · subst yr
         simp [adhwFQSWIidLiftProjectorTriple, adhwFQSWIidLiftProjectorA,
-          adhwFQSWIidLiftProjectorB, adhwFQSWIidLiftProjectorR, Matrix.kronecker,
-          Matrix.kroneckerMap_apply, Matrix.sub_apply, Matrix.add_apply, hb]
+          adhwFQSWIidLiftProjectorB, adhwFQSWIidLiftProjectorR, Matrix.kroneckerMap_apply, Matrix.sub_apply,
+          Matrix.add_apply, hb]
         try ring
       · simp [adhwFQSWIidLiftProjectorTriple, adhwFQSWIidLiftProjectorA,
-          adhwFQSWIidLiftProjectorB, adhwFQSWIidLiftProjectorR, Matrix.kronecker,
-          Matrix.kroneckerMap_apply, Matrix.sub_apply, Matrix.add_apply, hb, hr]
+          adhwFQSWIidLiftProjectorB, adhwFQSWIidLiftProjectorR, Matrix.kroneckerMap_apply, Matrix.sub_apply,
+          Matrix.add_apply, hb, hr]
         try ring
   · by_cases hb : xb = yb
     · subst yb
       by_cases hr : xr = yr
       · subst yr
         simp [adhwFQSWIidLiftProjectorTriple, adhwFQSWIidLiftProjectorA,
-          adhwFQSWIidLiftProjectorB, adhwFQSWIidLiftProjectorR, Matrix.kronecker,
-          Matrix.kroneckerMap_apply, Matrix.sub_apply, Matrix.add_apply, ha]
+          adhwFQSWIidLiftProjectorB, adhwFQSWIidLiftProjectorR, Matrix.kroneckerMap_apply, Matrix.sub_apply,
+          Matrix.add_apply, ha]
         try ring
       · simp [adhwFQSWIidLiftProjectorTriple, adhwFQSWIidLiftProjectorA,
-          adhwFQSWIidLiftProjectorB, adhwFQSWIidLiftProjectorR, Matrix.kronecker,
-          Matrix.kroneckerMap_apply, Matrix.sub_apply, Matrix.add_apply, ha, hr]
+          adhwFQSWIidLiftProjectorB, adhwFQSWIidLiftProjectorR, Matrix.kroneckerMap_apply, Matrix.sub_apply,
+          Matrix.add_apply, ha, hr]
         try ring
     · by_cases hr : xr = yr
       · subst yr
         simp [adhwFQSWIidLiftProjectorTriple, adhwFQSWIidLiftProjectorA,
-          adhwFQSWIidLiftProjectorB, adhwFQSWIidLiftProjectorR, Matrix.kronecker,
-          Matrix.kroneckerMap_apply, Matrix.sub_apply, Matrix.add_apply, ha, hb]
+          adhwFQSWIidLiftProjectorB, adhwFQSWIidLiftProjectorR, Matrix.kroneckerMap_apply, Matrix.sub_apply,
+          Matrix.add_apply, ha, hb]
         try ring
       · simp [adhwFQSWIidLiftProjectorTriple, adhwFQSWIidLiftProjectorA,
-          adhwFQSWIidLiftProjectorB, adhwFQSWIidLiftProjectorR, Matrix.kronecker,
-          Matrix.kroneckerMap_apply, Matrix.sub_apply, Matrix.add_apply, ha, hb, hr]
+          adhwFQSWIidLiftProjectorB, adhwFQSWIidLiftProjectorR, Matrix.kroneckerMap_apply, Matrix.sub_apply,
+          Matrix.add_apply, ha, hb, hr]
         try ring
 
 /-- Simultaneous-projector union bound on the grouped i.i.d. source register. -/
@@ -288,11 +286,11 @@ private theorem adhwFQSWIidLiftProjector_union_bound
   have hAcomp := MatrixMap.posSemidef_one_sub_of_posSemidef_idempotent PA hPA hPAid
   have hBcomp := MatrixMap.posSemidef_one_sub_of_posSemidef_idempotent PB hPB hPBid
   have hRcomp := MatrixMap.posSemidef_one_sub_of_posSemidef_idempotent PR hPR hPRid
-  have hAB : (Matrix.kronecker PA PB).PosSemidef := hPA.kronecker hPB
-  have hABid : Matrix.kronecker PA PB * Matrix.kronecker PA PB =
-      Matrix.kronecker PA PB := by
+  have hAB : (PA ⊗ₖ PB).PosSemidef := hPA.kronecker hPB
+  have hABid : (PA ⊗ₖ PB) * (PA ⊗ₖ PB) =
+      PA ⊗ₖ PB := by
     simpa [hPAid, hPBid] using (Matrix.mul_kronecker_mul PA PA PB PB).symm
-  have hABcomp := MatrixMap.posSemidef_one_sub_of_posSemidef_idempotent (Matrix.kronecker PA PB) hAB hABid
+  have hABcomp := MatrixMap.posSemidef_one_sub_of_posSemidef_idempotent (PA ⊗ₖ PB) hAB hABid
   exact (hAcomp.kronecker hBcomp).kronecker Matrix.PosSemidef.one |>.add
     (hABcomp.kronecker hRcomp)
 
@@ -369,16 +367,16 @@ private theorem adhwFQSWIid_acceptanceA
   have htraceR :
       (((adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA) *
           ρ.m).trace).re =
-        (((Matrix.kronecker PA (1 : CMatrix (TensorPower b n))) *
+        (((PA ⊗ₖ (1 : CMatrix (TensorPower b n))) *
             ρ.traceRight.m).trace).re := by
     have h := trace_kronecker_one_right_mul_eq_trace_mul_traceRight
       (a := TensorPower a n × TensorPower b n) (b := TensorPower r n)
       (M := ρ.m)
-      (T := Matrix.kronecker PA (1 : CMatrix (TensorPower b n)))
+      (T := PA ⊗ₖ (1 : CMatrix (TensorPower b n)))
     simpa [adhwFQSWIidLiftProjectorA, ρ, PA, MState.traceRight_m] using
       congrArg Complex.re h
   have htraceB :
-      (((Matrix.kronecker PA (1 : CMatrix (TensorPower b n))) *
+      (((PA ⊗ₖ (1 : CMatrix (TensorPower b n))) *
             ρ.traceRight.m).trace).re =
         ((PA * ρ.traceRight.traceRight.m).trace).re := by
     have h := trace_kronecker_one_right_mul_eq_trace_mul_traceRight
@@ -416,16 +414,16 @@ private theorem adhwFQSWIid_acceptanceB
   have htraceR :
       (((adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB) *
           ρ.m).trace).re =
-        (((Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB) *
+        ((((1 : CMatrix (TensorPower a n)) ⊗ₖ PB) *
             ρ.traceRight.m).trace).re := by
     have h := trace_kronecker_one_right_mul_eq_trace_mul_traceRight
       (a := TensorPower a n × TensorPower b n) (b := TensorPower r n)
       (M := ρ.m)
-      (T := Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB)
+      (T := (1 : CMatrix (TensorPower a n)) ⊗ₖ PB)
     simpa [adhwFQSWIidLiftProjectorB, ρ, PB, MState.traceRight_m] using
       congrArg Complex.re h
   have htraceA :
-      (((Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB) *
+      ((((1 : CMatrix (TensorPower a n)) ⊗ₖ PB) *
             ρ.traceRight.m).trace).re =
         ((PB * ρ.traceRight.traceLeft.m).trace).re := by
     have h := trace_kronecker_one_mul_eq_trace_mul_traceLeft
@@ -496,20 +494,20 @@ private theorem adhwFQSW_traceRight_selective_projector_le
     (X : CMatrix (α × β)) (hX : X.PosSemidef)
     (Q : CMatrix β) (hQ : Q.PosSemidef) (hQid : Q * Q = Q) :
     Matrix.traceRight
-        (Matrix.kronecker (1 : CMatrix α) Q * X *
-          Matrix.kronecker (1 : CMatrix α) Q) ≤
+        (((1 : CMatrix α) ⊗ₖ Q) * X *
+          ((1 : CMatrix α) ⊗ₖ Q)) ≤
       Matrix.traceRight X := by
   rw [Matrix.le_iff]
   let D : CMatrix α :=
     Matrix.traceRight X -
       Matrix.traceRight
-        (Matrix.kronecker (1 : CMatrix α) Q * X *
-          Matrix.kronecker (1 : CMatrix α) Q)
+        (((1 : CMatrix α) ⊗ₖ Q) * X *
+          ((1 : CMatrix α) ⊗ₖ Q))
   change D.PosSemidef
   have hbranch_psd :
-      (Matrix.kronecker (1 : CMatrix α) Q * X *
-        Matrix.kronecker (1 : CMatrix α) Q).PosSemidef := by
-    let K : CMatrix (α × β) := Matrix.kronecker (1 : CMatrix α) Q
+      (((1 : CMatrix α) ⊗ₖ Q) * X *
+        ((1 : CMatrix α) ⊗ₖ Q)).PosSemidef := by
+    let K : CMatrix (α × β) := (1 : CMatrix α) ⊗ₖ Q
     have hK : K.PosSemidef := Matrix.PosSemidef.one.kronecker hQ
     have h := hX.mul_mul_conjTranspose_same K
     rw [hK.isHermitian.eq] at h
@@ -521,51 +519,51 @@ private theorem adhwFQSW_traceRight_selective_projector_le
   rw [cMatrix_posSemidef_iff_trace_mul_posSemidef_re_nonneg hDherm]
   intro W hW
   have hQcomp := MatrixMap.posSemidef_one_sub_of_posSemidef_idempotent Q hQ hQid
-  have hWQcomp : (Matrix.kronecker W (1 - Q)).PosSemidef :=
+  have hWQcomp : (W ⊗ₖ (1 - Q)).PosSemidef :=
     hW.kronecker hQcomp
   have hnonneg :
-      0 ≤ ((Matrix.kronecker W (1 - Q) * X).trace).re :=
+      0 ≤ (((W ⊗ₖ (1 - Q)) * X).trace).re :=
     cMatrix_trace_mul_posSemidef_re_nonneg hWQcomp hX
   have htrace_full :
       ((W * Matrix.traceRight X).trace).re =
-        ((Matrix.kronecker W (1 : CMatrix β) * X).trace).re := by
+        (((W ⊗ₖ (1 : CMatrix β)) * X).trace).re := by
     exact congrArg Complex.re
       (trace_kronecker_one_right_mul_eq_trace_mul_traceRight
         (a := α) (b := β) X W).symm
   have htrace_branch :
       ((W * Matrix.traceRight
-          (Matrix.kronecker (1 : CMatrix α) Q * X *
-            Matrix.kronecker (1 : CMatrix α) Q)).trace).re =
-        ((Matrix.kronecker W Q * X).trace).re := by
+          (((1 : CMatrix α) ⊗ₖ Q) * X *
+            ((1 : CMatrix α) ⊗ₖ Q))).trace).re =
+        (((W ⊗ₖ Q) * X).trace).re := by
     have hpair := congrArg Complex.re
       (trace_kronecker_one_right_mul_eq_trace_mul_traceRight
         (a := α) (b := β)
-        (Matrix.kronecker (1 : CMatrix α) Q * X *
-          Matrix.kronecker (1 : CMatrix α) Q) W).symm
+        (((1 : CMatrix α) ⊗ₖ Q) * X *
+          ((1 : CMatrix α) ⊗ₖ Q)) W).symm
     rw [hpair]
     congr 1
-    let K : CMatrix (α × β) := Matrix.kronecker (1 : CMatrix α) Q
-    let L : CMatrix (α × β) := Matrix.kronecker W (1 : CMatrix β)
-    have hKLK : K * L * K = Matrix.kronecker W Q := by
-      have hKL : K * L = Matrix.kronecker W Q := by
+    let K : CMatrix (α × β) := (1 : CMatrix α) ⊗ₖ Q
+    let L : CMatrix (α × β) := W ⊗ₖ (1 : CMatrix β)
+    have hKLK : K * L * K = W ⊗ₖ Q := by
+      have hKL : K * L = W ⊗ₖ Q := by
         simpa [K, L, Matrix.one_mul, Matrix.mul_one] using
           (Matrix.mul_kronecker_mul (1 : CMatrix α) W Q (1 : CMatrix β)).symm
       calc
-        K * L * K = (Matrix.kronecker W Q) * Matrix.kronecker (1 : CMatrix α) Q := by
+        K * L * K = (W ⊗ₖ Q) * ((1 : CMatrix α) ⊗ₖ Q) := by
           rw [hKL]
-        _ = Matrix.kronecker W (Q * Q) := by
+        _ = W ⊗ₖ (Q * Q) := by
           simpa [Matrix.mul_one] using
             (Matrix.mul_kronecker_mul W (1 : CMatrix α) Q Q).symm
-        _ = Matrix.kronecker W Q := by rw [hQid]
+        _ = W ⊗ₖ Q := by rw [hQid]
     calc
-      (Matrix.kronecker W (1 : CMatrix β) *
-          (Matrix.kronecker (1 : CMatrix α) Q * X *
-            Matrix.kronecker (1 : CMatrix α) Q)).trace =
+      ((W ⊗ₖ (1 : CMatrix β)) *
+          (((1 : CMatrix α) ⊗ₖ Q) * X *
+            ((1 : CMatrix α) ⊗ₖ Q))).trace =
           ((K * L * K) * X).trace := by
             have hassoc :
-                Matrix.kronecker W (1 : CMatrix β) *
-                    (Matrix.kronecker (1 : CMatrix α) Q * X *
-                      Matrix.kronecker (1 : CMatrix α) Q) =
+                (W ⊗ₖ (1 : CMatrix β)) *
+                    (((1 : CMatrix α) ⊗ₖ Q) * X *
+                      ((1 : CMatrix α) ⊗ₖ Q)) =
                   L * K * X * K := by
               simp [K, L]
               noncomm_ring
@@ -573,27 +571,24 @@ private theorem adhwFQSW_traceRight_selective_projector_le
             rw [Matrix.trace_mul_cycle]
             congr 1
             noncomm_ring
-      _ = (Matrix.kronecker W Q * X).trace := by
+      _ = ((W ⊗ₖ Q) * X).trace := by
             rw [hKLK]
   have htrace_decomp :
       ((W * D).trace).re =
-        ((Matrix.kronecker W (1 - Q) * X).trace).re := by
+        (((W ⊗ₖ (1 - Q)) * X).trace).re := by
     dsimp [D]
     rw [Matrix.mul_sub, Matrix.trace_sub, Complex.sub_re]
     rw [htrace_full]
     have htrace_branch_expanded := htrace_branch
-    simp only [Matrix.kronecker] at htrace_branch_expanded
     rw [htrace_branch_expanded]
     have hsplit :
-        Matrix.kronecker W (1 : CMatrix β) - Matrix.kronecker W Q =
-          Matrix.kronecker W (1 - Q) := by
+        W ⊗ₖ (1 : CMatrix β) - W ⊗ₖ Q =
+          W ⊗ₖ (1 - Q) := by
       ext x y
-      simp [Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.sub_apply]
+      simp [Matrix.kroneckerMap_apply, Matrix.sub_apply]
       ring
     have hsplit_expanded := hsplit
-    simp only [Matrix.kronecker] at hsplit_expanded
     rw [← Complex.sub_re, ← Matrix.trace_sub, ← Matrix.sub_mul]
-    simp only [Matrix.kronecker]
     rw [hsplit_expanded]
   rw [Matrix.trace_mul_comm]
   rw [htrace_decomp]
@@ -607,20 +602,20 @@ private theorem adhwFQSW_traceLeft_selective_projector_le
     (X : CMatrix (α × β)) (hX : X.PosSemidef)
     (Q : CMatrix α) (hQ : Q.PosSemidef) (hQid : Q * Q = Q) :
     Matrix.traceLeft
-        (Matrix.kronecker Q (1 : CMatrix β) * X *
-          Matrix.kronecker Q (1 : CMatrix β)) ≤
+        ((Q ⊗ₖ (1 : CMatrix β)) * X *
+          (Q ⊗ₖ (1 : CMatrix β))) ≤
       Matrix.traceLeft X := by
   rw [Matrix.le_iff]
   let D : CMatrix β :=
     Matrix.traceLeft X -
       Matrix.traceLeft
-        (Matrix.kronecker Q (1 : CMatrix β) * X *
-          Matrix.kronecker Q (1 : CMatrix β))
+        ((Q ⊗ₖ (1 : CMatrix β)) * X *
+          (Q ⊗ₖ (1 : CMatrix β)))
   change D.PosSemidef
   have hbranch_psd :
-      (Matrix.kronecker Q (1 : CMatrix β) * X *
-        Matrix.kronecker Q (1 : CMatrix β)).PosSemidef := by
-    let K : CMatrix (α × β) := Matrix.kronecker Q (1 : CMatrix β)
+      ((Q ⊗ₖ (1 : CMatrix β)) * X *
+        (Q ⊗ₖ (1 : CMatrix β))).PosSemidef := by
+    let K : CMatrix (α × β) := Q ⊗ₖ (1 : CMatrix β)
     have hK : K.PosSemidef := hQ.kronecker Matrix.PosSemidef.one
     have h := hX.mul_mul_conjTranspose_same K
     rw [hK.isHermitian.eq] at h
@@ -632,51 +627,51 @@ private theorem adhwFQSW_traceLeft_selective_projector_le
   rw [cMatrix_posSemidef_iff_trace_mul_posSemidef_re_nonneg hDherm]
   intro W hW
   have hQcomp := MatrixMap.posSemidef_one_sub_of_posSemidef_idempotent Q hQ hQid
-  have hQcompW : (Matrix.kronecker (1 - Q) W).PosSemidef :=
+  have hQcompW : ((1 - Q) ⊗ₖ W).PosSemidef :=
     hQcomp.kronecker hW
   have hnonneg :
-      0 ≤ ((Matrix.kronecker (1 - Q) W * X).trace).re :=
+      0 ≤ ((((1 - Q) ⊗ₖ W) * X).trace).re :=
     cMatrix_trace_mul_posSemidef_re_nonneg hQcompW hX
   have htrace_full :
       ((W * Matrix.traceLeft X).trace).re =
-        ((Matrix.kronecker (1 : CMatrix α) W * X).trace).re := by
+        ((((1 : CMatrix α) ⊗ₖ W) * X).trace).re := by
     exact congrArg Complex.re
       (trace_kronecker_one_mul_eq_trace_mul_traceLeft
         (a := α) (b := β) X W).symm
   have htrace_branch :
       ((W * Matrix.traceLeft
-          (Matrix.kronecker Q (1 : CMatrix β) * X *
-            Matrix.kronecker Q (1 : CMatrix β))).trace).re =
-        ((Matrix.kronecker Q W * X).trace).re := by
+          ((Q ⊗ₖ (1 : CMatrix β)) * X *
+            (Q ⊗ₖ (1 : CMatrix β)))).trace).re =
+        (((Q ⊗ₖ W) * X).trace).re := by
     have hpair := congrArg Complex.re
       (trace_kronecker_one_mul_eq_trace_mul_traceLeft
         (a := α) (b := β)
-        (Matrix.kronecker Q (1 : CMatrix β) * X *
-          Matrix.kronecker Q (1 : CMatrix β)) W).symm
+        ((Q ⊗ₖ (1 : CMatrix β)) * X *
+          (Q ⊗ₖ (1 : CMatrix β))) W).symm
     rw [hpair]
     congr 1
-    let K : CMatrix (α × β) := Matrix.kronecker Q (1 : CMatrix β)
-    let L : CMatrix (α × β) := Matrix.kronecker (1 : CMatrix α) W
-    have hKLK : K * L * K = Matrix.kronecker Q W := by
-      have hKL : K * L = Matrix.kronecker Q W := by
+    let K : CMatrix (α × β) := Q ⊗ₖ (1 : CMatrix β)
+    let L : CMatrix (α × β) := (1 : CMatrix α) ⊗ₖ W
+    have hKLK : K * L * K = Q ⊗ₖ W := by
+      have hKL : K * L = Q ⊗ₖ W := by
         simpa [K, L, Matrix.one_mul, Matrix.mul_one] using
           (Matrix.mul_kronecker_mul Q (1 : CMatrix α) (1 : CMatrix β) W).symm
       calc
-        K * L * K = (Matrix.kronecker Q W) * Matrix.kronecker Q (1 : CMatrix β) := by
+        K * L * K = (Q ⊗ₖ W) * (Q ⊗ₖ (1 : CMatrix β)) := by
           rw [hKL]
-        _ = Matrix.kronecker (Q * Q) W := by
+        _ = (Q * Q) ⊗ₖ W := by
           simpa [Matrix.mul_one] using
             (Matrix.mul_kronecker_mul Q Q W (1 : CMatrix β)).symm
-        _ = Matrix.kronecker Q W := by rw [hQid]
+        _ = Q ⊗ₖ W := by rw [hQid]
     calc
-      (Matrix.kronecker (1 : CMatrix α) W *
-          (Matrix.kronecker Q (1 : CMatrix β) * X *
-            Matrix.kronecker Q (1 : CMatrix β))).trace =
+      (((1 : CMatrix α) ⊗ₖ W) *
+          ((Q ⊗ₖ (1 : CMatrix β)) * X *
+            (Q ⊗ₖ (1 : CMatrix β)))).trace =
           ((K * L * K) * X).trace := by
             have hassoc :
-                Matrix.kronecker (1 : CMatrix α) W *
-                    (Matrix.kronecker Q (1 : CMatrix β) * X *
-                      Matrix.kronecker Q (1 : CMatrix β)) =
+                ((1 : CMatrix α) ⊗ₖ W) *
+                    ((Q ⊗ₖ (1 : CMatrix β)) * X *
+                      (Q ⊗ₖ (1 : CMatrix β))) =
                   L * K * X * K := by
               simp [K, L]
               noncomm_ring
@@ -684,27 +679,24 @@ private theorem adhwFQSW_traceLeft_selective_projector_le
             rw [Matrix.trace_mul_cycle]
             congr 1
             noncomm_ring
-      _ = (Matrix.kronecker Q W * X).trace := by
+      _ = ((Q ⊗ₖ W) * X).trace := by
             rw [hKLK]
   have htrace_decomp :
       ((W * D).trace).re =
-        ((Matrix.kronecker (1 - Q) W * X).trace).re := by
+        ((((1 - Q) ⊗ₖ W) * X).trace).re := by
     dsimp [D]
     rw [Matrix.mul_sub, Matrix.trace_sub, Complex.sub_re]
     rw [htrace_full]
     have htrace_branch_expanded := htrace_branch
-    simp only [Matrix.kronecker] at htrace_branch_expanded
     rw [htrace_branch_expanded]
     have hsplit :
-        Matrix.kronecker (1 : CMatrix α) W - Matrix.kronecker Q W =
-          Matrix.kronecker (1 - Q) W := by
+        (1 : CMatrix α) ⊗ₖ W - Q ⊗ₖ W =
+          (1 - Q) ⊗ₖ W := by
       ext x y
-      simp [Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.sub_apply]
+      simp [Matrix.kroneckerMap_apply, Matrix.sub_apply]
       ring
     have hsplit_expanded := hsplit
-    simp only [Matrix.kronecker] at hsplit_expanded
     rw [← Complex.sub_re, ← Matrix.trace_sub, ← Matrix.sub_mul]
-    simp only [Matrix.kronecker]
     rw [hsplit_expanded]
   rw [Matrix.trace_mul_comm]
   rw [htrace_decomp]
@@ -805,7 +797,7 @@ private theorem adhwFQSWIidLiftProjectorA_traceRight_traceRight
       PA * ρ.traceRight.traceRight.m * PA := by
   ext x y
   simp [adhwFQSWIidLiftProjectorA, Matrix.traceRight,
-    Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
+    Matrix.mul_apply, Matrix.kroneckerMap_apply, Matrix.one_apply,
     Fintype.sum_prod_type, Finset.mul_sum, Finset.sum_mul, mul_assoc]
   simpa using
     (adhwFQSW_sum_four_comm
@@ -823,8 +815,8 @@ private theorem adhwFQSWIidLiftProjectorB_traceRight_traceLeft
       PB * ρ.traceRight.traceLeft.m * PB := by
   ext x y
   simp [adhwFQSWIidLiftProjectorB,
-    Matrix.traceLeft, Matrix.traceRight, Matrix.mul_apply, Matrix.kronecker,
-    Matrix.kroneckerMap_apply, Matrix.one_apply, Fintype.sum_prod_type,
+    Matrix.traceLeft, Matrix.traceRight, Matrix.mul_apply, Matrix.kroneckerMap_apply, Matrix.one_apply,
+    Fintype.sum_prod_type,
     Finset.mul_sum, Finset.sum_mul, mul_assoc]
   simpa using
     (adhwFQSW_sum_four_comm
@@ -841,7 +833,7 @@ private theorem adhwFQSWIidLiftProjectorR_traceLeft
       PR * ρ.traceLeft.m * PR := by
   ext x y
   simp [adhwFQSWIidLiftProjectorR, Matrix.traceLeft,
-    Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
+    Matrix.mul_apply, Matrix.kroneckerMap_apply, Matrix.one_apply,
     Fintype.sum_prod_type, Finset.mul_sum, Finset.sum_mul, mul_assoc]
   simpa using
     (adhwFQSW_sum_four_comm
@@ -881,23 +873,22 @@ private theorem adhwFQSWIidLiftProjectorA_idempotent
       adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA =
         adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA := by
   have hAB :
-      Matrix.kronecker PA (1 : CMatrix (TensorPower b n)) *
-          Matrix.kronecker PA (1 : CMatrix (TensorPower b n)) =
-        Matrix.kronecker PA (1 : CMatrix (TensorPower b n)) := by
+      (PA ⊗ₖ (1 : CMatrix (TensorPower b n))) *
+          (PA ⊗ₖ (1 : CMatrix (TensorPower b n))) =
+        PA ⊗ₖ (1 : CMatrix (TensorPower b n)) := by
     simpa [hPAid] using
       (Matrix.mul_kronecker_mul PA PA (1 : CMatrix (TensorPower b n))
         (1 : CMatrix (TensorPower b n))).symm
   calc
     adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA *
         adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA =
-      Matrix.kronecker
-        (Matrix.kronecker PA (1 : CMatrix (TensorPower b n)) *
-          Matrix.kronecker PA (1 : CMatrix (TensorPower b n)))
+      ((PA ⊗ₖ (1 : CMatrix (TensorPower b n))) *
+          (PA ⊗ₖ (1 : CMatrix (TensorPower b n)))) ⊗ₖ
         ((1 : CMatrix (TensorPower r n)) * (1 : CMatrix (TensorPower r n))) := by
           simpa [adhwFQSWIidLiftProjectorA] using
             (Matrix.mul_kronecker_mul
-              (Matrix.kronecker PA (1 : CMatrix (TensorPower b n)))
-              (Matrix.kronecker PA (1 : CMatrix (TensorPower b n)))
+              (PA ⊗ₖ (1 : CMatrix (TensorPower b n)))
+              (PA ⊗ₖ (1 : CMatrix (TensorPower b n)))
               (1 : CMatrix (TensorPower r n)) (1 : CMatrix (TensorPower r n))).symm
     _ = adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA := by
           rw [hAB]
@@ -912,16 +903,15 @@ theorem adhwFQSWIidLiftProjectorTriple_idempotent
       adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR =
         adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR := by
   have hAB :
-      Matrix.kronecker PA PB * Matrix.kronecker PA PB =
-        Matrix.kronecker PA PB := by
+      (PA ⊗ₖ PB) * (PA ⊗ₖ PB) =
+        PA ⊗ₖ PB := by
     simpa [hPAid, hPBid] using (Matrix.mul_kronecker_mul PA PA PB PB).symm
   calc
     adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR *
         adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR =
-      Matrix.kronecker
-        (Matrix.kronecker PA PB * Matrix.kronecker PA PB) (PR * PR) := by
+      ((PA ⊗ₖ PB) * (PA ⊗ₖ PB)) ⊗ₖ (PR * PR) := by
           simpa [adhwFQSWIidLiftProjectorTriple] using
-            (Matrix.mul_kronecker_mul (Matrix.kronecker PA PB) (Matrix.kronecker PA PB)
+            (Matrix.mul_kronecker_mul (PA ⊗ₖ PB) (PA ⊗ₖ PB)
               PR PR).symm
     _ = adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR := by
           rw [hAB, hPRid]
@@ -992,19 +982,19 @@ private theorem adhwFQSW_partialTraceR_liftAB_sandwich_eq_liftB_sandwich_partial
     (ρ : MState ((TensorPower a n × TensorPower b n) × TensorPower r n))
     (PA : CMatrix (TensorPower a n)) (PB : CMatrix (TensorPower b n)) :
     Matrix.traceRight
-        (Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n)) *
+        (((PA ⊗ₖ PB) ⊗ₖ (1 : CMatrix (TensorPower r n))) *
           ρ.m *
-          Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n))) =
-      Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB *
+          ((PA ⊗ₖ PB) ⊗ₖ (1 : CMatrix (TensorPower r n)))) =
+      ((1 : CMatrix (TensorPower a n)) ⊗ₖ PB) *
         Matrix.traceRight
           (adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA * ρ.m *
             adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA) *
-        Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB := by
+        ((1 : CMatrix (TensorPower a n)) ⊗ₖ PB) := by
   ext x y
   rcases x with ⟨xa, xb⟩
   rcases y with ⟨ya, yb⟩
   simp [adhwFQSWIidLiftProjectorA, Matrix.traceRight, Matrix.mul_apply,
-    Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
+    Matrix.kroneckerMap_apply, Matrix.one_apply,
     Fintype.sum_prod_type, Finset.mul_sum, Finset.sum_mul, mul_assoc]
   simpa [mul_comm, mul_left_comm, mul_assoc] using
     (adhwFQSW_sum_five_comm
@@ -1019,19 +1009,19 @@ private theorem adhwFQSW_partialTraceR_liftAB_sandwich_eq_liftA_sandwich_partial
     (ρ : MState ((TensorPower a n × TensorPower b n) × TensorPower r n))
     (PA : CMatrix (TensorPower a n)) (PB : CMatrix (TensorPower b n)) :
     Matrix.traceRight
-        (Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n)) *
+        (((PA ⊗ₖ PB) ⊗ₖ (1 : CMatrix (TensorPower r n))) *
           ρ.m *
-          Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n))) =
-      Matrix.kronecker PA (1 : CMatrix (TensorPower b n)) *
+          ((PA ⊗ₖ PB) ⊗ₖ (1 : CMatrix (TensorPower r n)))) =
+      (PA ⊗ₖ (1 : CMatrix (TensorPower b n))) *
         Matrix.traceRight
           (adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB * ρ.m *
             adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB) *
-        Matrix.kronecker PA (1 : CMatrix (TensorPower b n)) := by
+        (PA ⊗ₖ (1 : CMatrix (TensorPower b n))) := by
   ext x y
   rcases x with ⟨xa, xb⟩
   rcases y with ⟨ya, yb⟩
   simp [adhwFQSWIidLiftProjectorB, Matrix.traceRight, Matrix.mul_apply,
-    Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
+    Matrix.kroneckerMap_apply, Matrix.one_apply,
     Fintype.sum_prod_type, Finset.mul_sum, Finset.sum_mul, mul_assoc]
   simpa [mul_comm, mul_left_comm, mul_assoc] using
     (adhwFQSW_sum_five_comm_leftPair
@@ -1050,13 +1040,13 @@ private theorem adhwFQSW_triple_sandwich_eq_liftR_select_liftAB_sandwich
         ρ.m *
         adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR =
       adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR *
-        (Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n)) *
+        (((PA ⊗ₖ PB) ⊗ₖ (1 : CMatrix (TensorPower r n))) *
           ρ.m *
-          Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n))) *
+          ((PA ⊗ₖ PB) ⊗ₖ (1 : CMatrix (TensorPower r n)))) *
         adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR := by
-  let K : CMatrix (TensorPower a n × TensorPower b n) := Matrix.kronecker PA PB
+  let K : CMatrix (TensorPower a n × TensorPower b n) := PA ⊗ₖ PB
   let PiAB : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
-    Matrix.kronecker K (1 : CMatrix (TensorPower r n))
+    K ⊗ₖ (1 : CMatrix (TensorPower r n))
   let PiR := adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR
   let Pi := adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR
   have hleft : PiR * PiAB = Pi := by
@@ -1083,13 +1073,13 @@ private theorem adhwFQSW_triple_sandwich_eq_liftAB_select_liftR_sandwich
     adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR *
         ρ.m *
         adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR =
-      Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n)) *
+      ((PA ⊗ₖ PB) ⊗ₖ (1 : CMatrix (TensorPower r n))) *
         (adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR * ρ.m *
           adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR) *
-        Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n)) := by
-  let K : CMatrix (TensorPower a n × TensorPower b n) := Matrix.kronecker PA PB
+        ((PA ⊗ₖ PB) ⊗ₖ (1 : CMatrix (TensorPower r n))) := by
+  let K : CMatrix (TensorPower a n × TensorPower b n) := PA ⊗ₖ PB
   let PiAB : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
-    Matrix.kronecker K (1 : CMatrix (TensorPower r n))
+    K ⊗ₖ (1 : CMatrix (TensorPower r n))
   let PiR := adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR
   let Pi := adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR
   have hleft : PiAB * PiR = Pi := by
@@ -1129,7 +1119,7 @@ private theorem adhwFQSW_normalizedTripleSandwich_traceRight_le_envelope
   let PR := (adhwFQSWSystemRState ψ).typicalSubspaceProjector n δ'
   let Pi := adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR
   let PiAB : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
-    Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n))
+    (PA ⊗ₖ PB) ⊗ₖ (1 : CMatrix (TensorPower r n))
   let PiA := adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA
   let τM : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
     Pi * ρ.m * Pi
@@ -1182,9 +1172,9 @@ private theorem adhwFQSW_normalizedTripleSandwich_traceRight_le_envelope
         hτA_R_psd PB hPBpsd hPBid
     have heq :
         Matrix.traceRight τAB =
-          Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB *
+          ((1 : CMatrix (TensorPower a n)) ⊗ₖ PB) *
             Matrix.traceRight τA *
-            Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB := by
+            ((1 : CMatrix (TensorPower a n)) ⊗ₖ PB) := by
       simpa [τAB, τA, PiAB, PiA] using
         adhwFQSW_partialTraceR_liftAB_sandwich_eq_liftB_sandwich_partialTraceR
           (a := a) (b := b) (r := r) n ρ PA PB
@@ -1273,7 +1263,7 @@ private theorem adhwFQSW_normalizedTripleSandwich_traceLeft_le_envelope
   let PR := (adhwFQSWSystemRState ψ).typicalSubspaceProjector n δ'
   let Pi := adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR
   let PiAB : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
-    Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n))
+    (PA ⊗ₖ PB) ⊗ₖ (1 : CMatrix (TensorPower r n))
   let PiB := adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB
   let τM : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
     Pi * ρ.m * Pi
@@ -1326,9 +1316,9 @@ private theorem adhwFQSW_normalizedTripleSandwich_traceLeft_le_envelope
         hτB_R_psd PA hPApsd hPAid
     have heq :
         Matrix.traceRight τAB =
-          Matrix.kronecker PA (1 : CMatrix (TensorPower b n)) *
+          (PA ⊗ₖ (1 : CMatrix (TensorPower b n))) *
             Matrix.traceRight τB *
-            Matrix.kronecker PA (1 : CMatrix (TensorPower b n)) := by
+            (PA ⊗ₖ (1 : CMatrix (TensorPower b n))) := by
       simpa [τAB, τB, PiAB, PiB] using
         adhwFQSW_partialTraceR_liftAB_sandwich_eq_liftA_sandwich_partialTraceR
           (a := a) (b := b) (r := r) n ρ PA PB
@@ -1417,7 +1407,7 @@ private theorem adhwFQSW_normalizedTripleSandwich_marginalR_le_envelope
   let PR := (adhwFQSWSystemRState ψ).typicalSubspaceProjector n δ'
   let Pi := adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR
   let PiAB : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
-    Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n))
+    (PA ⊗ₖ PB) ⊗ₖ (1 : CMatrix (TensorPower r n))
   let PiR := adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR
   let τM : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
     Pi * ρ.m * Pi
@@ -1432,13 +1422,13 @@ private theorem adhwFQSW_normalizedTripleSandwich_marginalR_le_envelope
   rcases hPA_stmt with ⟨hPApsd, _hPAherm, hPAid, _hPAle⟩
   rcases hPB_stmt with ⟨hPBpsd, _hPBherm, hPBid, _hPBle⟩
   rcases hPR_stmt with ⟨hPRpsd, _hPRherm, _hPRid, hPRle⟩
-  have hQpsd : (Matrix.kronecker PA PB).PosSemidef := hPApsd.kronecker hPBpsd
-  have hQid : Matrix.kronecker PA PB * Matrix.kronecker PA PB = Matrix.kronecker PA PB := by
+  have hQpsd : (PA ⊗ₖ PB).PosSemidef := hPApsd.kronecker hPBpsd
+  have hQid : (PA ⊗ₖ PB) * (PA ⊗ₖ PB) = PA ⊗ₖ PB := by
     calc
-      Matrix.kronecker PA PB * Matrix.kronecker PA PB =
-          Matrix.kronecker (PA * PA) (PB * PB) := by
+      (PA ⊗ₖ PB) * (PA ⊗ₖ PB) =
+          (PA * PA) ⊗ₖ (PB * PB) := by
             exact (Matrix.mul_kronecker_mul PA PA PB PB).symm
-      _ = Matrix.kronecker PA PB := by rw [hPAid, hPBid]
+      _ = PA ⊗ₖ PB := by rw [hPAid, hPBid]
   have hRpsd : τR.PosSemidef := by
     have hPiRpsd := adhwFQSWIidLiftProjectorR_posSemidef (a := a) (b := b) n PR hPRpsd
     simpa [τR, PiR] using projector_sandwich_posSemidef PiR hPiRpsd ρ
@@ -1447,7 +1437,7 @@ private theorem adhwFQSW_normalizedTripleSandwich_marginalR_le_envelope
         Matrix.traceLeft τR := by
     have hsel :=
       adhwFQSW_traceLeft_selective_projector_le
-        (X := τR) hRpsd (Matrix.kronecker PA PB) hQpsd hQid
+        (X := τR) hRpsd (PA ⊗ₖ PB) hQpsd hQid
     have hτeq :
         τM = PiAB * τR * PiAB := by
       simpa [τM, τR, Pi, PiAB, PiR, Matrix.mul_assoc] using

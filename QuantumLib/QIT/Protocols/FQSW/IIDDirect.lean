@@ -31,7 +31,7 @@ against a rate slack `δ`, which is what restores the `2^(-nδ/4)` tail after th
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder QIT.MatrixL2
+open scoped ComplexOrder MatrixOrder Kronecker QIT.MatrixL2
 
 namespace QIT
 
@@ -67,7 +67,7 @@ def adhwFQSWIidCompressedSourceLiftMatrix
     Matrix
       ((TensorPower a n × TensorPower b n) × TensorPower r n)
       (((q × e) × btyp) × rtyp) ℂ :=
-  Matrix.kronecker (Matrix.kronecker P.supportLiftMatrix B.supportIsometry.matrix)
+  (P.supportLiftMatrix ⊗ₖ B.supportIsometry.matrix) ⊗ₖ
     R.supportIsometry.matrix
 
 /-- Lift the true simultaneous typical coordinates
@@ -89,8 +89,7 @@ def adhwFQSWIidTypicalSourceLiftMatrix
     Matrix
       ((TensorPower a n × TensorPower b n) × TensorPower r n)
       ((atyp × btyp) × rtyp) ℂ :=
-  Matrix.kronecker
-    (Matrix.kronecker P.supportIsometry.matrix B.supportIsometry.matrix)
+  (P.supportIsometry.matrix ⊗ₖ B.supportIsometry.matrix) ⊗ₖ
     R.supportIsometry.matrix
 
 /-- The compressed source lift has range equal to the simultaneous
@@ -131,55 +130,50 @@ theorem adhwFQSWIidCompressedSourceLiftMatrix_mul_conjTranspose
         (adhwFQSWSystemRState ψ).typicalSubspaceProjector n T.typicalitySlack := by
     simpa [LR] using R.supportIsometry_range_projector_eq
   have hct_outer :
-      Matrix.conjTranspose (Matrix.kronecker (Matrix.kronecker LA LB) LR) =
-        Matrix.kronecker
-          (Matrix.conjTranspose (Matrix.kronecker LA LB))
+      Matrix.conjTranspose ((LA ⊗ₖ LB) ⊗ₖ LR) =
+        (Matrix.conjTranspose (LA ⊗ₖ LB)) ⊗ₖ
           (Matrix.conjTranspose LR) := by
-    simpa [Matrix.kronecker] using
-      Matrix.conjTranspose_kronecker (Matrix.kronecker LA LB) LR
+    simpa using
+      Matrix.conjTranspose_kronecker (LA ⊗ₖ LB) LR
   have hct_inner :
-      Matrix.conjTranspose (Matrix.kronecker LA LB) =
-        Matrix.kronecker (Matrix.conjTranspose LA) (Matrix.conjTranspose LB) := by
-    simpa [Matrix.kronecker] using Matrix.conjTranspose_kronecker LA LB
+      Matrix.conjTranspose (LA ⊗ₖ LB) =
+        (Matrix.conjTranspose LA) ⊗ₖ (Matrix.conjTranspose LB) := by
+    simpa using Matrix.conjTranspose_kronecker LA LB
   have hinner_mul :
-      Matrix.kronecker LA LB *
-          Matrix.kronecker (Matrix.conjTranspose LA) (Matrix.conjTranspose LB) =
-        Matrix.kronecker (LA * Matrix.conjTranspose LA)
+      (LA ⊗ₖ LB) *
+          ((Matrix.conjTranspose LA) ⊗ₖ (Matrix.conjTranspose LB)) =
+        (LA * Matrix.conjTranspose LA) ⊗ₖ
           (LB * Matrix.conjTranspose LB) := by
     simpa using
       (Matrix.mul_kronecker_mul
         LA (Matrix.conjTranspose LA) LB (Matrix.conjTranspose LB)).symm
   calc
-    Matrix.kronecker (Matrix.kronecker LA LB) LR *
-        Matrix.conjTranspose (Matrix.kronecker (Matrix.kronecker LA LB) LR) =
-      Matrix.kronecker
-        (Matrix.kronecker (LA * Matrix.conjTranspose LA)
-          (LB * Matrix.conjTranspose LB))
+    ((LA ⊗ₖ LB) ⊗ₖ LR) *
+        Matrix.conjTranspose ((LA ⊗ₖ LB) ⊗ₖ LR) =
+      ((LA * Matrix.conjTranspose LA) ⊗ₖ
+          (LB * Matrix.conjTranspose LB)) ⊗ₖ
         (LR * Matrix.conjTranspose LR) := by
         rw [hct_outer, hct_inner]
         calc
-          Matrix.kronecker (Matrix.kronecker LA LB) LR *
-              Matrix.kronecker
-                (Matrix.kronecker (Matrix.conjTranspose LA) (Matrix.conjTranspose LB))
-                (Matrix.conjTranspose LR) =
-            Matrix.kronecker
-              (Matrix.kronecker LA LB *
-                Matrix.kronecker (Matrix.conjTranspose LA) (Matrix.conjTranspose LB))
+          ((LA ⊗ₖ LB) ⊗ₖ LR) *
+              (((Matrix.conjTranspose LA) ⊗ₖ (Matrix.conjTranspose LB)) ⊗ₖ
+                (Matrix.conjTranspose LR)) =
+            ((LA ⊗ₖ LB) *
+                ((Matrix.conjTranspose LA) ⊗ₖ (Matrix.conjTranspose LB))) ⊗ₖ
               (LR * Matrix.conjTranspose LR) := by
               exact
                 (Matrix.mul_kronecker_mul
-                  (Matrix.kronecker LA LB)
-                  (Matrix.kronecker (Matrix.conjTranspose LA) (Matrix.conjTranspose LB))
+                  (LA ⊗ₖ LB)
+                  ((Matrix.conjTranspose LA) ⊗ₖ (Matrix.conjTranspose LB))
                   LR (Matrix.conjTranspose LR)).symm
           _ =
-            Matrix.kronecker
-              (Matrix.kronecker (LA * Matrix.conjTranspose LA)
-                (LB * Matrix.conjTranspose LB))
+            ((LA * Matrix.conjTranspose LA) ⊗ₖ
+                (LB * Matrix.conjTranspose LB)) ⊗ₖ
               (LR * Matrix.conjTranspose LR) := by
               exact congrArg
-                (fun X => Matrix.kronecker X (LR * Matrix.conjTranspose LR))
+                (fun X => X ⊗ₖ (LR * Matrix.conjTranspose LR))
                 hinner_mul
-    _ = Matrix.kronecker (Matrix.kronecker T.projectorA T.projectorB) T.projectorR := by
+    _ = (T.projectorA ⊗ₖ T.projectorB) ⊗ₖ T.projectorR := by
         rw [hA, hB, hR, ← T.projectorA_eq, ← T.projectorB_eq, ← T.projectorR_eq]
 
 /-- The true typical-source lift has range equal to the simultaneous
@@ -219,55 +213,50 @@ theorem adhwFQSWIidTypicalSourceLiftMatrix_mul_conjTranspose
         (adhwFQSWSystemRState ψ).typicalSubspaceProjector n T.typicalitySlack := by
     simpa [LR] using R.supportIsometry_range_projector_eq
   have hct_outer :
-      Matrix.conjTranspose (Matrix.kronecker (Matrix.kronecker LA LB) LR) =
-        Matrix.kronecker
-          (Matrix.conjTranspose (Matrix.kronecker LA LB))
+      Matrix.conjTranspose ((LA ⊗ₖ LB) ⊗ₖ LR) =
+        (Matrix.conjTranspose (LA ⊗ₖ LB)) ⊗ₖ
           (Matrix.conjTranspose LR) := by
-    simpa [Matrix.kronecker] using
-      Matrix.conjTranspose_kronecker (Matrix.kronecker LA LB) LR
+    simpa using
+      Matrix.conjTranspose_kronecker (LA ⊗ₖ LB) LR
   have hct_inner :
-      Matrix.conjTranspose (Matrix.kronecker LA LB) =
-        Matrix.kronecker (Matrix.conjTranspose LA) (Matrix.conjTranspose LB) := by
-    simpa [Matrix.kronecker] using Matrix.conjTranspose_kronecker LA LB
+      Matrix.conjTranspose (LA ⊗ₖ LB) =
+        (Matrix.conjTranspose LA) ⊗ₖ (Matrix.conjTranspose LB) := by
+    simpa using Matrix.conjTranspose_kronecker LA LB
   have hinner_mul :
-      Matrix.kronecker LA LB *
-          Matrix.kronecker (Matrix.conjTranspose LA) (Matrix.conjTranspose LB) =
-        Matrix.kronecker (LA * Matrix.conjTranspose LA)
+      (LA ⊗ₖ LB) *
+          ((Matrix.conjTranspose LA) ⊗ₖ (Matrix.conjTranspose LB)) =
+        (LA * Matrix.conjTranspose LA) ⊗ₖ
           (LB * Matrix.conjTranspose LB) := by
     simpa using
       (Matrix.mul_kronecker_mul
         LA (Matrix.conjTranspose LA) LB (Matrix.conjTranspose LB)).symm
   calc
-    Matrix.kronecker (Matrix.kronecker LA LB) LR *
-        Matrix.conjTranspose (Matrix.kronecker (Matrix.kronecker LA LB) LR) =
-      Matrix.kronecker
-        (Matrix.kronecker (LA * Matrix.conjTranspose LA)
-          (LB * Matrix.conjTranspose LB))
+    ((LA ⊗ₖ LB) ⊗ₖ LR) *
+        Matrix.conjTranspose ((LA ⊗ₖ LB) ⊗ₖ LR) =
+      ((LA * Matrix.conjTranspose LA) ⊗ₖ
+          (LB * Matrix.conjTranspose LB)) ⊗ₖ
         (LR * Matrix.conjTranspose LR) := by
         rw [hct_outer, hct_inner]
         calc
-          Matrix.kronecker (Matrix.kronecker LA LB) LR *
-              Matrix.kronecker
-                (Matrix.kronecker (Matrix.conjTranspose LA) (Matrix.conjTranspose LB))
-                (Matrix.conjTranspose LR) =
-            Matrix.kronecker
-              (Matrix.kronecker LA LB *
-                Matrix.kronecker (Matrix.conjTranspose LA) (Matrix.conjTranspose LB))
+          ((LA ⊗ₖ LB) ⊗ₖ LR) *
+              (((Matrix.conjTranspose LA) ⊗ₖ (Matrix.conjTranspose LB)) ⊗ₖ
+                (Matrix.conjTranspose LR)) =
+            ((LA ⊗ₖ LB) *
+                ((Matrix.conjTranspose LA) ⊗ₖ (Matrix.conjTranspose LB))) ⊗ₖ
               (LR * Matrix.conjTranspose LR) := by
               exact
                 (Matrix.mul_kronecker_mul
-                  (Matrix.kronecker LA LB)
-                  (Matrix.kronecker (Matrix.conjTranspose LA) (Matrix.conjTranspose LB))
+                  (LA ⊗ₖ LB)
+                  ((Matrix.conjTranspose LA) ⊗ₖ (Matrix.conjTranspose LB))
                   LR (Matrix.conjTranspose LR)).symm
           _ =
-            Matrix.kronecker
-              (Matrix.kronecker (LA * Matrix.conjTranspose LA)
-                (LB * Matrix.conjTranspose LB))
+            ((LA * Matrix.conjTranspose LA) ⊗ₖ
+                (LB * Matrix.conjTranspose LB)) ⊗ₖ
               (LR * Matrix.conjTranspose LR) := by
               exact congrArg
-                (fun X => Matrix.kronecker X (LR * Matrix.conjTranspose LR))
+                (fun X => X ⊗ₖ (LR * Matrix.conjTranspose LR))
                 hinner_mul
-    _ = Matrix.kronecker (Matrix.kronecker T.projectorA T.projectorB) T.projectorR := by
+    _ = (T.projectorA ⊗ₖ T.projectorB) ⊗ₖ T.projectorR := by
         rw [hA, hB, hR, ← T.projectorA_eq, ← T.projectorB_eq, ← T.projectorR_eq]
 
 /-- The compressed source lift's initial projection is exactly the padded
@@ -288,10 +277,8 @@ theorem adhwFQSWIidCompressedSourceLiftMatrix_conjTranspose_mul
     (R : ADHWFQSWIidTypicalRefRegister ψ n δ ε T rtyp) :
     let L := adhwFQSWIidCompressedSourceLiftMatrix P B R
     Matrix.conjTranspose L * L =
-      Matrix.kronecker
-        (Matrix.kronecker
-          (P.isometry.matrix * Matrix.conjTranspose P.isometry.matrix)
-          (1 : CMatrix btyp))
+      ((P.isometry.matrix * Matrix.conjTranspose P.isometry.matrix) ⊗ₖ
+          (1 : CMatrix btyp)) ⊗ₖ
         (1 : CMatrix rtyp) := by
   dsimp
   let LA : Matrix (TensorPower a n) (q × e) ℂ := P.supportLiftMatrix
@@ -307,59 +294,52 @@ theorem adhwFQSWIidCompressedSourceLiftMatrix_conjTranspose_mul
   have hR : Matrix.conjTranspose LR * LR = (1 : CMatrix rtyp) := by
     simpa [LR] using R.supportIsometry.isometry
   have hct_outer :
-      Matrix.conjTranspose (Matrix.kronecker (Matrix.kronecker LA LB) LR) =
-        Matrix.kronecker
-          (Matrix.conjTranspose (Matrix.kronecker LA LB))
+      Matrix.conjTranspose ((LA ⊗ₖ LB) ⊗ₖ LR) =
+        (Matrix.conjTranspose (LA ⊗ₖ LB)) ⊗ₖ
           (Matrix.conjTranspose LR) := by
-    simpa [Matrix.kronecker] using
-      Matrix.conjTranspose_kronecker (Matrix.kronecker LA LB) LR
+    simpa using
+      Matrix.conjTranspose_kronecker (LA ⊗ₖ LB) LR
   have hct_inner :
-      Matrix.conjTranspose (Matrix.kronecker LA LB) =
-        Matrix.kronecker (Matrix.conjTranspose LA) (Matrix.conjTranspose LB) := by
-    simpa [Matrix.kronecker] using Matrix.conjTranspose_kronecker LA LB
+      Matrix.conjTranspose (LA ⊗ₖ LB) =
+        (Matrix.conjTranspose LA) ⊗ₖ (Matrix.conjTranspose LB) := by
+    simpa using Matrix.conjTranspose_kronecker LA LB
   have hinner_mul :
-      Matrix.kronecker (Matrix.conjTranspose LA) (Matrix.conjTranspose LB) *
-          Matrix.kronecker LA LB =
-        Matrix.kronecker (Matrix.conjTranspose LA * LA)
+      ((Matrix.conjTranspose LA) ⊗ₖ (Matrix.conjTranspose LB)) *
+          (LA ⊗ₖ LB) =
+        (Matrix.conjTranspose LA * LA) ⊗ₖ
           (Matrix.conjTranspose LB * LB) := by
     simpa using
       (Matrix.mul_kronecker_mul
         (Matrix.conjTranspose LA) LA (Matrix.conjTranspose LB) LB).symm
   calc
-    Matrix.conjTranspose (Matrix.kronecker (Matrix.kronecker LA LB) LR) *
-        Matrix.kronecker (Matrix.kronecker LA LB) LR =
-      Matrix.kronecker
-        (Matrix.kronecker (Matrix.conjTranspose LA * LA)
-          (Matrix.conjTranspose LB * LB))
+    Matrix.conjTranspose ((LA ⊗ₖ LB) ⊗ₖ LR) *
+        ((LA ⊗ₖ LB) ⊗ₖ LR) =
+      ((Matrix.conjTranspose LA * LA) ⊗ₖ
+          (Matrix.conjTranspose LB * LB)) ⊗ₖ
         (Matrix.conjTranspose LR * LR) := by
         rw [hct_outer, hct_inner]
         calc
-          Matrix.kronecker
-              (Matrix.kronecker (Matrix.conjTranspose LA) (Matrix.conjTranspose LB))
-              (Matrix.conjTranspose LR) *
-              Matrix.kronecker (Matrix.kronecker LA LB) LR =
-            Matrix.kronecker
-              (Matrix.kronecker (Matrix.conjTranspose LA) (Matrix.conjTranspose LB) *
-                Matrix.kronecker LA LB)
+          (((Matrix.conjTranspose LA) ⊗ₖ (Matrix.conjTranspose LB)) ⊗ₖ
+              (Matrix.conjTranspose LR)) *
+              ((LA ⊗ₖ LB) ⊗ₖ LR) =
+            (((Matrix.conjTranspose LA) ⊗ₖ (Matrix.conjTranspose LB)) *
+                (LA ⊗ₖ LB)) ⊗ₖ
               (Matrix.conjTranspose LR * LR) := by
               exact
                 (Matrix.mul_kronecker_mul
-                  (Matrix.kronecker (Matrix.conjTranspose LA) (Matrix.conjTranspose LB))
-                  (Matrix.kronecker LA LB)
+                  ((Matrix.conjTranspose LA) ⊗ₖ (Matrix.conjTranspose LB))
+                  (LA ⊗ₖ LB)
                   (Matrix.conjTranspose LR) LR).symm
           _ =
-            Matrix.kronecker
-              (Matrix.kronecker (Matrix.conjTranspose LA * LA)
-                (Matrix.conjTranspose LB * LB))
+            ((Matrix.conjTranspose LA * LA) ⊗ₖ
+                (Matrix.conjTranspose LB * LB)) ⊗ₖ
               (Matrix.conjTranspose LR * LR) := by
               exact congrArg
-                (fun X => Matrix.kronecker X (Matrix.conjTranspose LR * LR))
+                (fun X => X ⊗ₖ (Matrix.conjTranspose LR * LR))
                 hinner_mul
     _ =
-      Matrix.kronecker
-        (Matrix.kronecker
-          (P.isometry.matrix * Matrix.conjTranspose P.isometry.matrix)
-          (1 : CMatrix btyp))
+      ((P.isometry.matrix * Matrix.conjTranspose P.isometry.matrix) ⊗ₖ
+          (1 : CMatrix btyp)) ⊗ₖ
         (1 : CMatrix rtyp) := by
         rw [hA, hB, hR]
 
@@ -378,10 +358,8 @@ theorem adhwFQSWIidCompressedSourceLiftMatrix_mul_initialProjection
     (B : ADHWFQSWIidTypicalBobRegister ψ n δ ε T btyp)
     (R : ADHWFQSWIidTypicalRefRegister ψ n δ ε T rtyp) :
     let L := adhwFQSWIidCompressedSourceLiftMatrix P B R
-    let Q := Matrix.kronecker
-      (Matrix.kronecker
-        (P.isometry.matrix * Matrix.conjTranspose P.isometry.matrix)
-        (1 : CMatrix btyp))
+    let Q := ((P.isometry.matrix * Matrix.conjTranspose P.isometry.matrix) ⊗ₖ
+        (1 : CMatrix btyp)) ⊗ₖ
       (1 : CMatrix rtyp)
     L * Q = L := by
   intro L Q
@@ -394,10 +372,8 @@ theorem adhwFQSWIidCompressedSourceLiftMatrix_mul_initialProjection
       ADHWFQSWPaddedAtypEmbedding.supportLiftMatrix_mul_initialProjection P
   calc
     L * Q =
-        Matrix.kronecker
-          (Matrix.kronecker
-            (LA * (P.isometry.matrix * Matrix.conjTranspose P.isometry.matrix))
-            (LB * (1 : CMatrix btyp)))
+        ((LA * (P.isometry.matrix * Matrix.conjTranspose P.isometry.matrix)) ⊗ₖ
+            (LB * (1 : CMatrix btyp))) ⊗ₖ
           (LR * (1 : CMatrix rtyp)) := by
           dsimp [L, Q, adhwFQSWIidCompressedSourceLiftMatrix, LA, LB, LR]
           rw [← Matrix.mul_kronecker_mul]
@@ -424,28 +400,27 @@ theorem adhwFQSWIidCompressedSourceLiftMatrix_eq_typicalSourceLiftMatrix_mul_pad
     let L0 := adhwFQSWIidTypicalSourceLiftMatrix P B R
     let padAB : ReferenceIsometry (atyp × btyp) ((q × e) × btyp) :=
       P.isometry.prod (ReferenceIsometry.ofEquiv (Equiv.refl btyp))
-    let K := Matrix.kronecker padAB.matrix (1 : CMatrix rtyp)
+    let K := padAB.matrix ⊗ₖ (1 : CMatrix rtyp)
     L = L0 * Matrix.conjTranspose K := by
   intro L L0 padAB K
   have hpad :
       padAB.matrix =
-        Matrix.kronecker P.isometry.matrix (1 : CMatrix btyp) := by
+        P.isometry.matrix ⊗ₖ (1 : CMatrix btyp) := by
     ext i j
     by_cases hij : i.2 = j.2 <;>
       simp [padAB, ReferenceIsometry.prod, ReferenceIsometry.ofEquiv,
-        Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply, hij]
+        Matrix.kroneckerMap_apply, Matrix.one_apply, hij]
   have hpad_ct :
       Matrix.conjTranspose padAB.matrix =
-        Matrix.kronecker (Matrix.conjTranspose P.isometry.matrix)
+        (Matrix.conjTranspose P.isometry.matrix) ⊗ₖ
           (1 : CMatrix btyp) := by
     rw [hpad]
     simpa [Matrix.conjTranspose_one] using
       Matrix.conjTranspose_kronecker P.isometry.matrix (1 : CMatrix btyp)
   have hKct :
       Matrix.conjTranspose K =
-        Matrix.kronecker
-          (Matrix.kronecker (Matrix.conjTranspose P.isometry.matrix)
-            (1 : CMatrix btyp))
+        ((Matrix.conjTranspose P.isometry.matrix) ⊗ₖ
+            (1 : CMatrix btyp)) ⊗ₖ
           (1 : CMatrix rtyp) := by
     dsimp [K]
     rw [Matrix.conjTranspose_kronecker, hpad_ct]
@@ -453,27 +428,24 @@ theorem adhwFQSWIidCompressedSourceLiftMatrix_eq_typicalSourceLiftMatrix_mul_pad
   symm
   calc
     L0 * Matrix.conjTranspose K =
-        Matrix.kronecker
-          (Matrix.kronecker P.supportIsometry.matrix B.supportIsometry.matrix *
-            Matrix.kronecker (Matrix.conjTranspose P.isometry.matrix)
-              (1 : CMatrix btyp))
+        ((P.supportIsometry.matrix ⊗ₖ B.supportIsometry.matrix) *
+            ((Matrix.conjTranspose P.isometry.matrix) ⊗ₖ
+              (1 : CMatrix btyp))) ⊗ₖ
           (R.supportIsometry.matrix * (1 : CMatrix rtyp)) := by
           dsimp [L0, adhwFQSWIidTypicalSourceLiftMatrix]
           rw [hKct]
           exact
             (Matrix.mul_kronecker_mul
-              (Matrix.kronecker P.supportIsometry.matrix B.supportIsometry.matrix)
-              (Matrix.kronecker (Matrix.conjTranspose P.isometry.matrix)
+              (P.supportIsometry.matrix ⊗ₖ B.supportIsometry.matrix)
+              ((Matrix.conjTranspose P.isometry.matrix) ⊗ₖ
                 (1 : CMatrix btyp))
               R.supportIsometry.matrix (1 : CMatrix rtyp)).symm
     _ =
-        Matrix.kronecker
-          (Matrix.kronecker
-            (P.supportIsometry.matrix * Matrix.conjTranspose P.isometry.matrix)
-            (B.supportIsometry.matrix * (1 : CMatrix btyp)))
+        ((P.supportIsometry.matrix * Matrix.conjTranspose P.isometry.matrix) ⊗ₖ
+            (B.supportIsometry.matrix * (1 : CMatrix btyp))) ⊗ₖ
           (R.supportIsometry.matrix * (1 : CMatrix rtyp)) := by
           exact congrArg
-            (fun X => Matrix.kronecker X
+            (fun X => X ⊗ₖ
               (R.supportIsometry.matrix * (1 : CMatrix rtyp)))
             (Matrix.mul_kronecker_mul
               P.supportIsometry.matrix (Matrix.conjTranspose P.isometry.matrix)
@@ -522,10 +494,10 @@ theorem adhwFQSWIidPaddedTypicalSource_a_purity_le
           Matrix.conjTranspose ABtyp.matrix := by
     rw [MState.traceRight_m, ← hsource0_lift]
     change Matrix.traceRight
-        (Matrix.kronecker ABtyp.matrix R.supportIsometry.matrix *
+        ((ABtyp.matrix ⊗ₖ R.supportIsometry.matrix) *
           source0.state.m *
           Matrix.conjTranspose
-            (Matrix.kronecker ABtyp.matrix R.supportIsometry.matrix)) =
+            (ABtyp.matrix ⊗ₖ R.supportIsometry.matrix)) =
       ABtyp.matrix * source0.state.traceRight.m *
         Matrix.conjTranspose ABtyp.matrix
     rw [referenceIsometry_prod_traceRight_conj]
@@ -536,10 +508,10 @@ theorem adhwFQSWIidPaddedTypicalSource_a_purity_le
           Matrix.conjTranspose P.supportIsometry.matrix := by
     rw [MState.traceRight_m, hT_AB]
     change Matrix.traceRight
-        (Matrix.kronecker P.supportIsometry.matrix B.supportIsometry.matrix *
+        ((P.supportIsometry.matrix ⊗ₖ B.supportIsometry.matrix) *
           source0.state.traceRight.m *
           Matrix.conjTranspose
-            (Matrix.kronecker P.supportIsometry.matrix B.supportIsometry.matrix)) =
+            (P.supportIsometry.matrix ⊗ₖ B.supportIsometry.matrix)) =
       P.supportIsometry.matrix * source0.state.traceRight.traceRight.m *
         Matrix.conjTranspose P.supportIsometry.matrix
     rw [referenceIsometry_prod_traceRight_conj]
@@ -555,9 +527,9 @@ theorem adhwFQSWIidPaddedTypicalSource_a_purity_le
           Matrix.conjTranspose P.isometry.matrix := by
     rw [MState.traceRight_m, hsource_AB]
     change Matrix.traceRight
-        (Matrix.kronecker P.isometry.matrix idB.matrix *
+        ((P.isometry.matrix ⊗ₖ idB.matrix) *
           source0.state.traceRight.m *
-          Matrix.conjTranspose (Matrix.kronecker P.isometry.matrix idB.matrix)) =
+          Matrix.conjTranspose (P.isometry.matrix ⊗ₖ idB.matrix)) =
       P.isometry.matrix * source0.state.traceRight.traceRight.m *
         Matrix.conjTranspose P.isometry.matrix
     rw [referenceIsometry_prod_traceRight_conj]
@@ -619,10 +591,10 @@ theorem adhwFQSWIidPaddedTypicalSource_b_purity_le
           Matrix.conjTranspose ABtyp.matrix := by
     rw [MState.traceRight_m, ← hsource0_lift]
     change Matrix.traceRight
-        (Matrix.kronecker ABtyp.matrix R.supportIsometry.matrix *
+        ((ABtyp.matrix ⊗ₖ R.supportIsometry.matrix) *
           source0.state.m *
           Matrix.conjTranspose
-            (Matrix.kronecker ABtyp.matrix R.supportIsometry.matrix)) =
+            (ABtyp.matrix ⊗ₖ R.supportIsometry.matrix)) =
       ABtyp.matrix * source0.state.traceRight.m *
         Matrix.conjTranspose ABtyp.matrix
     rw [referenceIsometry_prod_traceRight_conj]
@@ -633,10 +605,10 @@ theorem adhwFQSWIidPaddedTypicalSource_b_purity_le
           Matrix.conjTranspose B.supportIsometry.matrix := by
     rw [MState.traceLeft_m, hT_AB]
     change Matrix.traceLeft
-        (Matrix.kronecker P.supportIsometry.matrix B.supportIsometry.matrix *
+        ((P.supportIsometry.matrix ⊗ₖ B.supportIsometry.matrix) *
           source0.state.traceRight.m *
           Matrix.conjTranspose
-            (Matrix.kronecker P.supportIsometry.matrix B.supportIsometry.matrix)) =
+            (P.supportIsometry.matrix ⊗ₖ B.supportIsometry.matrix)) =
       B.supportIsometry.matrix * source0.state.traceRight.traceLeft.m *
         Matrix.conjTranspose B.supportIsometry.matrix
     rw [referenceIsometry_prod_traceLeft_conj]
@@ -652,9 +624,9 @@ theorem adhwFQSWIidPaddedTypicalSource_b_purity_le
           Matrix.conjTranspose idB.matrix := by
     rw [MState.traceLeft_m, hsource_AB]
     change Matrix.traceLeft
-        (Matrix.kronecker P.isometry.matrix idB.matrix *
+        ((P.isometry.matrix ⊗ₖ idB.matrix) *
           source0.state.traceRight.m *
-          Matrix.conjTranspose (Matrix.kronecker P.isometry.matrix idB.matrix)) =
+          Matrix.conjTranspose (P.isometry.matrix ⊗ₖ idB.matrix)) =
       idB.matrix * source0.state.traceRight.traceLeft.m *
         Matrix.conjTranspose idB.matrix
     rw [referenceIsometry_prod_traceLeft_conj]
@@ -712,10 +684,10 @@ theorem adhwFQSWIidPaddedTypicalSource_r_purity_le
           Matrix.conjTranspose R.supportIsometry.matrix := by
     rw [MState.traceLeft_m, ← hsource0_lift]
     change Matrix.traceLeft
-        (Matrix.kronecker ABtyp.matrix R.supportIsometry.matrix *
+        ((ABtyp.matrix ⊗ₖ R.supportIsometry.matrix) *
           source0.state.m *
           Matrix.conjTranspose
-            (Matrix.kronecker ABtyp.matrix R.supportIsometry.matrix)) =
+            (ABtyp.matrix ⊗ₖ R.supportIsometry.matrix)) =
       R.supportIsometry.matrix * source0.state.traceLeft.m *
         Matrix.conjTranspose R.supportIsometry.matrix
     rw [referenceIsometry_prod_traceLeft_conj]
@@ -1379,7 +1351,7 @@ theorem exists_adhwFQSWIidCompressedSourceWitness
   let padAB : ReferenceIsometry (atyp × btyp) ((q × e) × btyp) :=
     P.isometry.prod (ReferenceIsometry.ofEquiv (Equiv.refl btyp))
   let K : Matrix (((q × e) × btyp) × rtyp) ((atyp × btyp) × rtyp) ℂ :=
-    Matrix.kronecker padAB.matrix (1 : CMatrix rtyp)
+    padAB.matrix ⊗ₖ (1 : CMatrix rtyp)
   let Pi := adhwFQSWIidLiftProjectorTriple
     (a := a) (b := b) (r := r) n T.projectorA T.projectorB T.projectorR
   let v0 := Matrix.mulVec (Matrix.conjTranspose L0) φ.vec
@@ -1503,7 +1475,7 @@ theorem exists_adhwFQSWIidCompressedSourceWitness
       ext i j
       by_cases hij : i.2 = j.2 <;>
         simp [padR, idR, K, ReferenceIsometry.prod, ReferenceIsometry.ofEquiv,
-          Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply, hij]
+          Matrix.kroneckerMap_apply, Matrix.one_apply, hij]
     simpa [hpadR] using padR.isometry
   have hL_eq :
       L = L0 * Matrix.conjTranspose K := by

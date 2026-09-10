@@ -39,7 +39,7 @@ operator used by the de Finetti proof route.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator QIT.MatrixL2
+open scoped ComplexOrder MatrixOrder Kronecker Matrix.Norms.L2Operator QIT.MatrixL2
 open MeasureTheory
 
 namespace QIT
@@ -202,11 +202,11 @@ theorem unitaryTensorPowerMatrix_mul (U V : Matrix.unitaryGroup a ℂ) (n : ℕ)
       simp [unitaryTensorPowerMatrix]
   | succ n ih =>
       apply Subtype.ext
-      change Matrix.kronecker ((U * V : Matrix.unitaryGroup a ℂ) : CMatrix a)
+      change ((U * V : Matrix.unitaryGroup a ℂ) : CMatrix a) ⊗ₖ
             (unitaryTensorPowerMatrix (U * V) n : CMatrix (TensorPower a n)) =
-        ((Matrix.kronecker (U : CMatrix a)
+        (((U : CMatrix a) ⊗ₖ
               (unitaryTensorPowerMatrix U n : CMatrix (TensorPower a n))) *
-          (Matrix.kronecker (V : CMatrix a)
+          ((V : CMatrix a) ⊗ₖ
               (unitaryTensorPowerMatrix V n : CMatrix (TensorPower a n))))
       rw [ih]
       simpa using
@@ -535,8 +535,7 @@ theorem unitaryTensorPowerMatrix_diagonalPhase_apply (phase : a → ℂ)
       cases y with
       | mk y0 ys =>
       simp only [unitaryTensorPowerMatrix_succ]
-      change (Matrix.kronecker
-          (diagonalPhaseUnitary (a := a) phase hphase : CMatrix a)
+      change ((diagonalPhaseUnitary (a := a) phase hphase : CMatrix a) ⊗ₖ
           (unitaryTensorPowerMatrix (diagonalPhaseUnitary (a := a) phase hphase) n :
             CMatrix (TensorPower a n))) (x0, xs) (y0, ys) =
         if (x0, xs) = (y0, ys) then
@@ -3907,7 +3906,7 @@ private theorem unitaryTensorPowerMatrix_continuous (n : ℕ) :
       exact continuous_const
   | succ n ih =>
       change Continuous fun U : Matrix.unitaryGroup a ℂ =>
-        Matrix.kronecker (U : CMatrix a)
+        (U : CMatrix a) ⊗ₖ
           (unitaryTensorPowerMatrix U n : CMatrix (TensorPower a n))
       refine continuous_pi ?_
       intro i

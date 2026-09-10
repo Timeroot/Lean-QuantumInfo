@@ -381,11 +381,11 @@ omit [DecidableEq β] in
 Here `A` is square on `β` (the right-factor system). -/
 private theorem kron_one_mul_conjTranspose_entry (A : CMatrix β)
     (X : CMatrix (α × β)) (i : α) (d d' : β) (i' : α) :
-    (Matrix.kronecker (1 : CMatrix α) A * X *
-        (Matrix.kronecker (1 : CMatrix α) A).conjTranspose) (i, d) (i', d') =
+    (((1 : CMatrix α) ⊗ₖ A) * X *
+        ((1 : CMatrix α) ⊗ₖ A).conjTranspose) (i, d) (i', d') =
       ∑ p : β, ∑ q : β, A d p * X (i, p) (i', q) * star (A d' q) := by
   simp only [Matrix.mul_apply, Finset.sum_mul, Fintype.sum_prod_type,
-    Matrix.conjTranspose_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    Matrix.conjTranspose_apply, Matrix.kroneckerMap_apply,
     Matrix.one_apply, ite_mul, zero_mul, one_mul]
   -- Collapse the inner `α`-sum controlled by `if i = x_2`.
   have h1 : ∀ (x : α) (x_1 : β),
@@ -446,15 +446,15 @@ Kraus conjugations. -/
 private theorem kron_idChannel_ofKraus_apply
     (M : κ → CMatrix β) (X : CMatrix (α × β)) :
     MatrixMap.kron (CPTPOp.id (dIn := α)).map (MatrixMap.ofKraus M) X =
-      ∑ k, Matrix.kronecker (1 : CMatrix α) (M k) * X *
-        (Matrix.kronecker (1 : CMatrix α) (M k)).conjTranspose := by
+      ∑ k, ((1 : CMatrix α) ⊗ₖ (M k)) * X *
+        ((1 : CMatrix α) ⊗ₖ (M k)).conjTranspose := by
   ext ⟨i, d⟩ ⟨i', d'⟩
   rw [kron_idChannel_ofKraus_apply_entry]
-  rw [show ((∑ k, Matrix.kronecker (1 : CMatrix α) (M k) * X *
-        (Matrix.kronecker (1 : CMatrix α) (M k)).conjTranspose) :
+  rw [show ((∑ k, ((1 : CMatrix α) ⊗ₖ (M k)) * X *
+        ((1 : CMatrix α) ⊗ₖ (M k)).conjTranspose) :
         CMatrix (α × β)) (i, d) (i', d') =
-      ∑ k, (Matrix.kronecker (1 : CMatrix α) (M k) * X *
-        (Matrix.kronecker (1 : CMatrix α) (M k)).conjTranspose) (i, d) (i', d') from
+      ∑ k, (((1 : CMatrix α) ⊗ₖ (M k)) * X *
+        ((1 : CMatrix α) ⊗ₖ (M k)).conjTranspose) (i, d) (i', d') from
     Matrix.sum_apply (i, d) (i', d') Finset.univ _]
   refine Finset.sum_congr rfl ?_
   intro k _
@@ -512,14 +512,14 @@ private theorem typicalCompression_omega_matrix_eq (ρ : MState a) (n : ℕ) (δ
     (φ : CMatrix (TensorPower a n × TensorPower a n)) :
     MatrixMap.kron (CPTPOp.id (dIn := TensorPower a n)).map
       (MatrixMap.ofKraus (typicalCompressionKraus ρ n δ i0)) φ =
-    Matrix.kronecker (1 : CMatrix (TensorPower a n))
-      (ρ.typicalSubspaceProjector n δ) * φ *
-      (Matrix.kronecker (1 : CMatrix _)
+    ((1 : CMatrix (TensorPower a n)) ⊗ₖ
+      (ρ.typicalSubspaceProjector n δ)) * φ *
+      ((1 : CMatrix _) ⊗ₖ
         (ρ.typicalSubspaceProjector n δ)).conjTranspose +
     ∑ l : AtypicalSubspaceIndex ρ n δ,
-      Matrix.kronecker (1 : CMatrix _)
-        (typicalCorrectionKraus ρ n δ i0 l) * φ *
-      (Matrix.kronecker (1 : CMatrix _)
+      ((1 : CMatrix _) ⊗ₖ
+        (typicalCorrectionKraus ρ n δ i0 l)) * φ *
+      ((1 : CMatrix _) ⊗ₖ
         (typicalCorrectionKraus ρ n δ i0 l)).conjTranspose := by
   rw [kron_idChannel_ofKraus_apply, Fintype.sum_prod_type, Fintype.sum_sum_type]
   simp only [Fintype.sum_unique]
@@ -542,7 +542,7 @@ public theorem typicalCompressionCode_jointError_le (ρ : MState a) (n : ℕ) (�
         ρ.atypicalSubspaceSpectralWeight n δ / 2 := by
   let An := QIT.TensorPower a n
   let Pi := ρ.typicalSubspaceProjector n δ
-  let PiMat : CMatrix (An × An) := Matrix.kronecker (1 : CMatrix An) Pi
+  let PiMat : CMatrix (An × An) := (1 : CMatrix An) ⊗ₖ Pi
   let ψ : Ket (a × a) := MState.canonicalPurification ρ
   let φ : MState (An × An) := ψ.state.tensorPowerBipartite n
   let C := typicalCompressionCode ρ n δ i0
@@ -550,9 +550,9 @@ public theorem typicalCompressionCode_jointError_le (ρ : MState a) (n : ℕ) (�
   let ω : MState (An × An) := ((CPTPOp.id (dIn := An)).prod N) φ
   let ω_corr : CMatrix (An × An) :=
     ∑ l : AtypicalSubspaceIndex ρ n δ,
-      Matrix.kronecker (1 : CMatrix An) (typicalCorrectionKraus ρ n δ i0 l) *
+      ((1 : CMatrix An) ⊗ₖ (typicalCorrectionKraus ρ n δ i0 l)) *
         φ.m *
-      (Matrix.kronecker (1 : CMatrix An)
+      ((1 : CMatrix An) ⊗ₖ
         (typicalCorrectionKraus ρ n δ i0 l)).conjTranspose
   -- 0. `C.jointError = ½ · traceNorm (ω.m - φ.m)`.
   have herr_def : C.jointError = (1 / 2 : ℝ) * traceNorm (ω.m - φ.m) := by
@@ -581,7 +581,7 @@ public theorem typicalCompressionCode_jointError_le (ρ : MState a) (n : ℕ) (�
   -- 4. `((PiMat * φ.m).trace).re = typicalSubspaceSpectralWeight ρ n δ`.
   have htrace_PiMat_φ : ((PiMat * φ.m).trace).re =
       ρ.typicalSubspaceSpectralWeight n δ := by
-    have hkey : (Matrix.kronecker (1 : CMatrix An) Pi * φ.m).trace =
+    have hkey : (((1 : CMatrix An) ⊗ₖ Pi) * φ.m).trace =
         (Pi * (ρ.tensorPower n).m).trace := by
       rw [trace_kronecker_one_mul_eq_trace_mul_traceLeft, hφ_pTA]
     rw [hkey, Matrix.trace_mul_comm,
@@ -601,9 +601,9 @@ public theorem typicalCompressionCode_jointError_le (ρ : MState a) (n : ℕ) (�
   -- `mul_mul_conjTranspose_same`; sum of PSD is PSD).
   have hω_corr_psd : ω_corr.PosSemidef := by
     show (∑ l : AtypicalSubspaceIndex ρ n δ,
-        Matrix.kronecker (1 : CMatrix An) (typicalCorrectionKraus ρ n δ i0 l) *
+        ((1 : CMatrix An) ⊗ₖ (typicalCorrectionKraus ρ n δ i0 l)) *
           φ.m *
-        (Matrix.kronecker (1 : CMatrix An)
+        ((1 : CMatrix An) ⊗ₖ
           (typicalCorrectionKraus ρ n δ i0 l)).conjTranspose).PosSemidef
     exact Matrix.posSemidef_sum Finset.univ (fun l _ =>
       φ.psd.mul_mul_conjTranspose_same _)

@@ -20,7 +20,7 @@ the finite-resource Choi characterization and inverse formula
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 namespace QIT
 
@@ -394,11 +394,11 @@ theorem krausAdjoint_eq_stinespring
     (K : κ → Matrix b a ℂ) (E : CMatrix b) :
     krausAdjoint K E =
       Matrix.conjTranspose (krausStinespringMatrix K) *
-        Matrix.kronecker E (1 : CMatrix κ) *
+        (E ⊗ₖ (1 : CMatrix κ)) *
           krausStinespringMatrix K := by
   ext i j
   simp [krausAdjoint, krausStinespringMatrix, Matrix.sum_apply, Matrix.mul_apply,
-    Matrix.conjTranspose_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    Matrix.conjTranspose_apply, Matrix.kroneckerMap_apply,
     Matrix.one_apply, Fintype.sum_prod_type, Finset.mul_sum, mul_comm]
   rw [Finset.sum_comm]
 
@@ -406,9 +406,9 @@ omit [DecidableEq b] in
 /-- Squaring a Stinespring block observable squares the observed operator. -/
 theorem krausStinespring_observable_sq
     (E : CMatrix b) :
-    Matrix.kronecker E (1 : CMatrix κ) *
-        Matrix.kronecker E (1 : CMatrix κ) =
-      Matrix.kronecker (E * E) (1 : CMatrix κ) := by
+    (E ⊗ₖ (1 : CMatrix κ)) *
+        (E ⊗ₖ (1 : CMatrix κ)) =
+      (E * E) ⊗ₖ (1 : CMatrix κ) := by
   simpa using
     (Matrix.mul_kronecker_mul E E (1 : CMatrix κ) (1 : CMatrix κ)).symm
 
@@ -417,14 +417,14 @@ omit [Fintype b] [DecidableEq b] [Fintype κ] in
 Hermitian. -/
 theorem krausStinespring_observable_isHermitian
     {E : CMatrix b} (hE : E.IsHermitian) :
-    (Matrix.kronecker E (1 : CMatrix κ)).IsHermitian := by
+    (E ⊗ₖ (1 : CMatrix κ)).IsHermitian := by
   rw [Matrix.IsHermitian]
   calc
-    Matrix.conjTranspose (Matrix.kronecker E (1 : CMatrix κ)) =
-        Matrix.kronecker (Matrix.conjTranspose E) (Matrix.conjTranspose (1 : CMatrix κ)) := by
-          simpa [Matrix.kronecker] using
+    Matrix.conjTranspose (E ⊗ₖ (1 : CMatrix κ)) =
+        (Matrix.conjTranspose E) ⊗ₖ (Matrix.conjTranspose (1 : CMatrix κ)) := by
+          simpa using
             Matrix.conjTranspose_kronecker E (1 : CMatrix κ)
-    _ = Matrix.kronecker E (1 : CMatrix κ) := by
+    _ = E ⊗ₖ (1 : CMatrix κ) := by
           rw [hE.eq]
           simp
 
@@ -448,24 +448,24 @@ omit [DecidableEq b] in
 observed operators in the same order. -/
 theorem krausStinespring_observable_conjTranspose_mul
     (E : CMatrix b) :
-    Matrix.conjTranspose (Matrix.kronecker E (1 : CMatrix κ)) *
-        Matrix.kronecker E (1 : CMatrix κ) =
-      Matrix.kronecker (Matrix.conjTranspose E * E) (1 : CMatrix κ) := by
+    Matrix.conjTranspose (E ⊗ₖ (1 : CMatrix κ)) *
+        (E ⊗ₖ (1 : CMatrix κ)) =
+      (Matrix.conjTranspose E * E) ⊗ₖ (1 : CMatrix κ) := by
   have hct :
-      Matrix.conjTranspose (Matrix.kronecker E (1 : CMatrix κ)) =
-        Matrix.kronecker (Matrix.conjTranspose E) (Matrix.conjTranspose (1 : CMatrix κ)) := by
-    simpa [Matrix.kronecker] using Matrix.conjTranspose_kronecker E (1 : CMatrix κ)
+      Matrix.conjTranspose (E ⊗ₖ (1 : CMatrix κ)) =
+        (Matrix.conjTranspose E) ⊗ₖ (Matrix.conjTranspose (1 : CMatrix κ)) := by
+    simpa using Matrix.conjTranspose_kronecker E (1 : CMatrix κ)
   calc
-    Matrix.conjTranspose (Matrix.kronecker E (1 : CMatrix κ)) *
-        Matrix.kronecker E (1 : CMatrix κ) =
-        Matrix.kronecker (Matrix.conjTranspose E) (Matrix.conjTranspose (1 : CMatrix κ)) *
-          Matrix.kronecker E (1 : CMatrix κ) := by
+    Matrix.conjTranspose (E ⊗ₖ (1 : CMatrix κ)) *
+        (E ⊗ₖ (1 : CMatrix κ)) =
+        ((Matrix.conjTranspose E) ⊗ₖ (Matrix.conjTranspose (1 : CMatrix κ))) *
+          (E ⊗ₖ (1 : CMatrix κ)) := by
             rw [hct]
-    _ = Matrix.kronecker (Matrix.conjTranspose E * E)
+    _ = (Matrix.conjTranspose E * E) ⊗ₖ
         (Matrix.conjTranspose (1 : CMatrix κ) * (1 : CMatrix κ)) := by
             exact (Matrix.mul_kronecker_mul (Matrix.conjTranspose E) E
               (Matrix.conjTranspose (1 : CMatrix κ)) (1 : CMatrix κ)).symm
-    _ = Matrix.kronecker (Matrix.conjTranspose E * E) (1 : CMatrix κ) := by
+    _ = (Matrix.conjTranspose E * E) ⊗ₖ (1 : CMatrix κ) := by
             simp
 
 /-- Kadison-Schwarz inequality for a unital Kraus Heisenberg adjoint:
@@ -476,10 +476,10 @@ theorem krausAdjoint_conjTranspose_mul_self_le_of_krausAdjoint_one
     Matrix.conjTranspose (krausAdjoint K E) * krausAdjoint K E ≤
       krausAdjoint K (Matrix.conjTranspose E * E) := by
   let S : Matrix (b × κ) a ℂ := krausStinespringMatrix K
-  let T : CMatrix (b × κ) := Matrix.kronecker E (1 : CMatrix κ)
+  let T : CMatrix (b × κ) := E ⊗ₖ (1 : CMatrix κ)
   have hTstarT :
       Matrix.conjTranspose T * T =
-        Matrix.kronecker (Matrix.conjTranspose E * E) (1 : CMatrix κ) := by
+        (Matrix.conjTranspose E * E) ⊗ₖ (1 : CMatrix κ) := by
     simpa [T] using krausStinespring_observable_conjTranspose_mul (κ := κ) E
   have hmain :
       (Matrix.conjTranspose (T * S) * (1 - S * Matrix.conjTranspose S) * (T * S)
@@ -498,7 +498,7 @@ theorem krausAdjoint_conjTranspose_mul_self_le_of_krausAdjoint_one
             rw [krausAdjoint_eq_stinespring K (Matrix.conjTranspose E * E),
               krausAdjoint_eq_stinespring K E]
             change Matrix.conjTranspose S *
-                Matrix.kronecker (Matrix.conjTranspose E * E) (1 : CMatrix κ) * S -
+                ((Matrix.conjTranspose E * E) ⊗ₖ (1 : CMatrix κ)) * S -
                 Matrix.conjTranspose (Matrix.conjTranspose S * T * S) *
                   (Matrix.conjTranspose S * T * S) =
                 Matrix.conjTranspose S * (Matrix.conjTranspose T * T) * S -
@@ -532,10 +532,10 @@ theorem krausAdjoint_mul_self_le_of_krausAdjoint_one
     {E : CMatrix b} (hE : E.IsHermitian) :
     krausAdjoint K E * krausAdjoint K E ≤ krausAdjoint K (E * E) := by
   let S : Matrix (b × κ) a ℂ := krausStinespringMatrix K
-  let T : CMatrix (b × κ) := Matrix.kronecker E (1 : CMatrix κ)
+  let T : CMatrix (b × κ) := E ⊗ₖ (1 : CMatrix κ)
   have hTstar : Matrix.conjTranspose T = T := by
     exact (krausStinespring_observable_isHermitian (κ := κ) hE).eq
-  have hTsq : T * T = Matrix.kronecker (E * E) (1 : CMatrix κ) := by
+  have hTsq : T * T = (E * E) ⊗ₖ (1 : CMatrix κ) := by
     simpa [T] using krausStinespring_observable_sq (κ := κ) E
   have hmain :
       (Matrix.conjTranspose (T * S) * (1 - S * Matrix.conjTranspose S) * (T * S)
@@ -552,7 +552,7 @@ theorem krausAdjoint_mul_self_le_of_krausAdjoint_one
             rw [krausAdjoint_eq_stinespring K (E * E),
               krausAdjoint_eq_stinespring K E]
             change Matrix.conjTranspose S *
-                Matrix.kronecker (E * E) (1 : CMatrix κ) * S -
+                ((E * E) ⊗ₖ (1 : CMatrix κ)) * S -
                 (Matrix.conjTranspose S * T * S) *
                   (Matrix.conjTranspose S * T * S) =
                 Matrix.conjTranspose S * (T * T) * S -
@@ -702,7 +702,6 @@ theorem trace_kron_single (Phi : MatrixMap a b) (Psi : MatrixMap c d)
       (Phi (Matrix.single i i' (1 : ℂ))).trace *
         (Psi (Matrix.single j j' (1 : ℂ))).trace := by
   rw [single_prod_eq_kronecker_single]
-  simp only [Matrix.kronecker]
   rw [MatrixMap.kron_map_of_kron_state]
   exact Matrix.trace_kronecker _ _
 
@@ -710,13 +709,12 @@ theorem trace_kron_single (Phi : MatrixMap a b) (Psi : MatrixMap c d)
 reordering between `((a × c) × (b × d))` and `((a × b) × (c × d))`. -/
 theorem choi_kron (Phi : MatrixMap a b) (Psi : MatrixMap c d) :
     choi (MatrixMap.kron Phi Psi) =
-      (Matrix.kronecker (choi Phi) (choi Psi)).submatrix
+      ((choi Phi) ⊗ₖ (choi Psi)).submatrix
         (fun x : (a × c) × (b × d) => ((x.1.1, x.2.1), (x.1.2, x.2.2)))
         (fun x : (a × c) × (b × d) => ((x.1.1, x.2.1), (x.1.2, x.2.2))) := by
   ext acbd acbd'
-  simp only [choi, Matrix.submatrix_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]
+  simp only [choi, Matrix.submatrix_apply, Matrix.kroneckerMap_apply]
   rw [single_prod_eq_kronecker_single acbd.1.1 acbd'.1.1 acbd.1.2 acbd'.1.2]
-  simp only [Matrix.kronecker]
   rw [MatrixMap.kron_map_of_kron_state]
   rfl
 

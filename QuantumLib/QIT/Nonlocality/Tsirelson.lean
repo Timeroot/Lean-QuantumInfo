@@ -64,7 +64,7 @@ variable [Fintype HA] [DecidableEq HA] [Fintype HB] [DecidableEq HB]
 
 /-- Tensor-product observable `A_x ⊗ B_y` for one CHSH setting pair. -/
 def jointObservable (M : ObservableModel HA HB) (x y : Fin 2) : CMatrix (HA × HB) :=
-  Matrix.kronecker (M.alice x) (M.bob y)
+  (M.alice x) ⊗ₖ (M.bob y)
 
 /-- Observable-level correlator `E_xy = Tr(ρ (A_x ⊗ B_y))`, as a real number. -/
 def correlator (M : ObservableModel HA HB) (x y : Fin 2) : ℝ :=
@@ -82,11 +82,11 @@ theorem value_eq_correlators (M : ObservableModel HA HB) :
 
 /-- Alice's observable lifted to the bipartite product space. -/
 def aliceLift (M : ObservableModel HA HB) (x : Fin 2) : CMatrix (HA × HB) :=
-  Matrix.kronecker (M.alice x) (1 : CMatrix HB)
+  (M.alice x) ⊗ₖ (1 : CMatrix HB)
 
 /-- Bob's observable lifted to the bipartite product space. -/
 def bobLift (M : ObservableModel HA HB) (y : Fin 2) : CMatrix (HA × HB) :=
-  Matrix.kronecker (1 : CMatrix HA) (M.bob y)
+  (1 : CMatrix HA) ⊗ₖ (M.bob y)
 
 /-- The CHSH Bell operator `A₀B₀ + A₀B₁ + A₁B₀ - A₁B₁`. -/
 def chshOperator (M : ObservableModel HA HB) : CMatrix (HA × HB) :=
@@ -336,8 +336,8 @@ theorem singletObservableModel_correlator_zero_zero :
     singletAlice, singletBob,
     TwoQubit.singletState, TwoQubit.singletKet, TwoQubit.singletMatrix,
     rankOneMatrix, TwoQubit.singletAmp,
-    TwoQubit.sigmaX, TwoQubit.sigmaZ, Matrix.vecMulVec_apply, Matrix.kronecker,
-    Matrix.mul_apply, Matrix.trace, TwoQubit.invSqrtTwo, TwoQubit.star_invSqrtTwo]
+    TwoQubit.sigmaX, TwoQubit.sigmaZ, Matrix.vecMulVec_apply, Matrix.mul_apply, Matrix.trace, TwoQubit.invSqrtTwo,
+    TwoQubit.star_invSqrtTwo]
   ring_nf
   exact sqrt_two_cube_mul_quarter
 
@@ -347,8 +347,8 @@ theorem singletObservableModel_correlator_zero_one :
     singletAlice, singletBob,
     TwoQubit.singletState, TwoQubit.singletKet, TwoQubit.singletMatrix,
     rankOneMatrix, TwoQubit.singletAmp,
-    TwoQubit.sigmaX, TwoQubit.sigmaZ, Matrix.vecMulVec_apply, Matrix.kronecker,
-    Matrix.mul_apply, Matrix.trace, TwoQubit.invSqrtTwo, TwoQubit.star_invSqrtTwo]
+    TwoQubit.sigmaX, TwoQubit.sigmaZ, Matrix.vecMulVec_apply, Matrix.mul_apply, Matrix.trace, TwoQubit.invSqrtTwo,
+    TwoQubit.star_invSqrtTwo]
   ring_nf
   exact sqrt_two_cube_mul_quarter
 
@@ -358,8 +358,8 @@ theorem singletObservableModel_correlator_one_zero :
     singletAlice, singletBob,
     TwoQubit.singletState, TwoQubit.singletKet, TwoQubit.singletMatrix,
     rankOneMatrix, TwoQubit.singletAmp,
-    TwoQubit.sigmaX, TwoQubit.sigmaZ, Matrix.vecMulVec_apply, Matrix.kronecker,
-    Matrix.mul_apply, Matrix.trace, TwoQubit.invSqrtTwo, TwoQubit.star_invSqrtTwo]
+    TwoQubit.sigmaX, TwoQubit.sigmaZ, Matrix.vecMulVec_apply, Matrix.mul_apply, Matrix.trace, TwoQubit.invSqrtTwo,
+    TwoQubit.star_invSqrtTwo]
   ring_nf
   exact sqrt_two_cube_mul_quarter
 
@@ -369,8 +369,8 @@ theorem singletObservableModel_correlator_one_one :
     singletAlice, singletBob,
     TwoQubit.singletState, TwoQubit.singletKet, TwoQubit.singletMatrix,
     rankOneMatrix, TwoQubit.singletAmp,
-    TwoQubit.sigmaX, TwoQubit.sigmaZ, Matrix.vecMulVec_apply, Matrix.kronecker,
-    Matrix.mul_apply, Matrix.trace, TwoQubit.invSqrtTwo, TwoQubit.star_invSqrtTwo]
+    TwoQubit.sigmaX, TwoQubit.sigmaZ, Matrix.vecMulVec_apply, Matrix.mul_apply, Matrix.trace, TwoQubit.invSqrtTwo,
+    TwoQubit.star_invSqrtTwo]
   ring_nf
   exact sqrt_two_cube_mul_neg_quarter
 
@@ -413,7 +413,7 @@ variable [Fintype HA] [DecidableEq HA] [Fintype HB] [DecidableEq HB]
 
 /-- Tensor-product observable `A_x ⊗ B_y` for one CHSH setting pair. -/
 def jointObservable (M : ContractionModel HA HB) (x y : Fin 2) : CMatrix (HA × HB) :=
-  Matrix.kronecker (M.alice x) (M.bob y)
+  (M.alice x) ⊗ₖ (M.bob y)
 
 /-- Contraction-level correlator `E_xy = Tr(ρ (A_x ⊗ B_y))`. -/
 def correlator (M : ContractionModel HA HB) (x y : Fin 2) : ℝ :=
@@ -431,11 +431,11 @@ theorem value_eq_correlators (M : ContractionModel HA HB) :
 
 /-- Alice's contraction observable lifted to the bipartite product space. -/
 def aliceLift (M : ContractionModel HA HB) (x : Fin 2) : CMatrix (HA × HB) :=
-  Matrix.kronecker (M.alice x) (1 : CMatrix HB)
+  (M.alice x) ⊗ₖ (1 : CMatrix HB)
 
 /-- Bob's contraction observable lifted to the bipartite product space. -/
 def bobLift (M : ContractionModel HA HB) (y : Fin 2) : CMatrix (HA × HB) :=
-  Matrix.kronecker (1 : CMatrix HA) (M.bob y)
+  (1 : CMatrix HA) ⊗ₖ (M.bob y)
 
 /-- The CHSH Bell operator for a contraction model. -/
 def chshOperator (M : ContractionModel HA HB) : CMatrix (HA × HB) :=
@@ -498,17 +498,17 @@ theorem aliceLift_contracts (M : ContractionModel HA HB) (x : Fin 2) :
     (1 - M.aliceLift x * M.aliceLift x).PosSemidef := by
   have h :
       1 - M.aliceLift x * M.aliceLift x =
-        Matrix.kronecker (1 - M.alice x * M.alice x) (1 : CMatrix HB) := by
+        (1 - M.alice x * M.alice x) ⊗ₖ (1 : CMatrix HB) := by
     have hmul :
         M.aliceLift x * M.aliceLift x =
-          Matrix.kronecker (M.alice x * M.alice x) ((1 : CMatrix HB) * 1) := by
+          (M.alice x * M.alice x) ⊗ₖ ((1 : CMatrix HB) * 1) := by
       change (M.alice x ⊗ₖ (1 : CMatrix HB)) * (M.alice x ⊗ₖ (1 : CMatrix HB)) =
         (M.alice x * M.alice x) ⊗ₖ ((1 : CMatrix HB) * 1)
       rw [← Matrix.mul_kronecker_mul]
     rw [hmul]
     ext i j
     by_cases hHA : i.1 = j.1 <;> by_cases hHB : i.2 = j.2 <;>
-      simp [Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply, Prod.ext_iff,
+      simp [Matrix.kroneckerMap_apply, Matrix.one_apply, Prod.ext_iff,
         hHA, hHB]
   rw [h]
   exact (M.alice_contracts x).kronecker Matrix.PosSemidef.one
@@ -517,17 +517,17 @@ theorem bobLift_contracts (M : ContractionModel HA HB) (y : Fin 2) :
     (1 - M.bobLift y * M.bobLift y).PosSemidef := by
   have h :
       1 - M.bobLift y * M.bobLift y =
-        Matrix.kronecker (1 : CMatrix HA) (1 - M.bob y * M.bob y) := by
+        (1 : CMatrix HA) ⊗ₖ (1 - M.bob y * M.bob y) := by
     have hmul :
         M.bobLift y * M.bobLift y =
-          Matrix.kronecker ((1 : CMatrix HA) * 1) (M.bob y * M.bob y) := by
+          ((1 : CMatrix HA) * 1) ⊗ₖ (M.bob y * M.bob y) := by
       change ((1 : CMatrix HA) ⊗ₖ M.bob y) * ((1 : CMatrix HA) ⊗ₖ M.bob y) =
         ((1 : CMatrix HA) * 1) ⊗ₖ (M.bob y * M.bob y)
       rw [← Matrix.mul_kronecker_mul]
     rw [hmul]
     ext i j
     by_cases hHA : i.1 = j.1 <;> by_cases hHB : i.2 = j.2 <;>
-      simp [Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply, Prod.ext_iff,
+      simp [Matrix.kroneckerMap_apply, Matrix.one_apply, Prod.ext_iff,
         hHA, hHB]
   rw [h]
   exact Matrix.PosSemidef.one.kronecker (M.bob_contracts y)
@@ -747,38 +747,36 @@ theorem _root_.QIT.Bell.QuantumRealization.chshCorrelator_eq_toContractionModel_
   let : DecidableEq R.HB := R.decidableEqHB
   have htrace :
       ((R.rho.m *
-            Matrix.kronecker ((R.alice x).effects false - (R.alice x).effects true)
-              ((R.bob y).effects false - (R.bob y).effects true)).trace).re =
+            (((R.alice x).effects false - (R.alice x).effects true) ⊗ₖ
+              ((R.bob y).effects false - (R.bob y).effects true))).trace).re =
         ((R.rho.m *
-            Matrix.kronecker ((R.alice x).effects false) ((R.bob y).effects false)).trace).re -
+            (((R.alice x).effects false) ⊗ₖ ((R.bob y).effects false))).trace).re -
           ((R.rho.m *
-            Matrix.kronecker ((R.alice x).effects false) ((R.bob y).effects true)).trace).re -
+            (((R.alice x).effects false) ⊗ₖ ((R.bob y).effects true))).trace).re -
           ((R.rho.m *
-            Matrix.kronecker ((R.alice x).effects true) ((R.bob y).effects false)).trace).re +
+            (((R.alice x).effects true) ⊗ₖ ((R.bob y).effects false))).trace).re +
           ((R.rho.m *
-            Matrix.kronecker ((R.alice x).effects true) ((R.bob y).effects true)).trace).re := by
+            (((R.alice x).effects true) ⊗ₖ ((R.bob y).effects true))).trace).re := by
     have hkr :
-        Matrix.kronecker ((R.alice x).effects false - (R.alice x).effects true)
+        ((R.alice x).effects false - (R.alice x).effects true) ⊗ₖ
             ((R.bob y).effects false - (R.bob y).effects true) =
-          Matrix.kronecker ((R.alice x).effects false) ((R.bob y).effects false) -
-            Matrix.kronecker ((R.alice x).effects false) ((R.bob y).effects true) -
-            Matrix.kronecker ((R.alice x).effects true) ((R.bob y).effects false) +
-            Matrix.kronecker ((R.alice x).effects true) ((R.bob y).effects true) := by
+          ((R.alice x).effects false) ⊗ₖ ((R.bob y).effects false) -
+            ((R.alice x).effects false) ⊗ₖ ((R.bob y).effects true) -
+            ((R.alice x).effects true) ⊗ₖ ((R.bob y).effects false) +
+            ((R.alice x).effects true) ⊗ₖ ((R.bob y).effects true) := by
       ext i j
-      simp [Matrix.kronecker, Matrix.kroneckerMap_apply]
+      simp [Matrix.kroneckerMap_apply]
       ring
     rw [hkr]
     simp [Matrix.mul_add, Matrix.mul_sub, Matrix.trace_add, Matrix.trace_sub]
-  simp only [Matrix.kronecker] at htrace
   unfold QuantumRealization.chshCorrelator CHSH.ContractionModel.correlator
     CHSH.ContractionModel.jointObservable QuantumRealization.toContractionModel
   simp [QuantumRealization.prob, POVM.prob_eq_trace_re, R.joint_effects,
     POVM.binaryObservable, CHSH.outcomeSign, Fintype.sum_prod_type]
   change _ =
     ((R.rho.m *
-      Matrix.kronecker ((R.alice x).effects false - (R.alice x).effects true)
-        ((R.bob y).effects false - (R.bob y).effects true)).trace).re
-  simp only [Matrix.kronecker]
+      (((R.alice x).effects false - (R.alice x).effects true) ⊗ₖ
+        ((R.bob y).effects false - (R.bob y).effects true))).trace).re
   rw [htrace]
   ring_nf
 

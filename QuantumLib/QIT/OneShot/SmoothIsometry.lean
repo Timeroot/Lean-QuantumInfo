@@ -20,7 +20,7 @@ also transport purified-distance balls in the reverse direction.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator NNReal Pointwise
+open scoped ComplexOrder MatrixOrder Kronecker Matrix.Norms.L2Operator NNReal Pointwise
 open Matrix
 open Set
 
@@ -72,23 +72,23 @@ private theorem traceNorm_applyMatrixRight
 theorem applyMatrixRight_eq_kron_conj
     (V : ReferenceIsometry r₁ r₂) (X : CMatrix (a × r₁)) :
     V.applyMatrixRight X =
-      Matrix.kronecker (1 : CMatrix a) V.matrix * X *
-        Matrix.conjTranspose (Matrix.kronecker (1 : CMatrix a) V.matrix) := by
+      ((1 : CMatrix a) ⊗ₖ V.matrix) * X *
+        Matrix.conjTranspose ((1 : CMatrix a) ⊗ₖ V.matrix) := by
   ext i j
   simp [ReferenceIsometry.applyMatrixRight, ReferenceIsometry.rightBlock,
-    Matrix.kronecker, Matrix.mul_apply, Finset.mul_sum, Finset.sum_mul,
+    Matrix.mul_apply, Finset.mul_sum, Finset.sum_mul,
     Matrix.conjTranspose_kronecker, Matrix.conjTranspose_apply,
     Matrix.one_apply, Fintype.sum_prod_type, mul_assoc, mul_comm
     ]
 
 theorem conditioningK_isometry
     (V : ReferenceIsometry r₁ r₂) :
-    Matrix.conjTranspose (Matrix.kronecker (1 : CMatrix a) V.matrix) *
-        Matrix.kronecker (1 : CMatrix a) V.matrix =
+    Matrix.conjTranspose ((1 : CMatrix a) ⊗ₖ V.matrix) *
+        ((1 : CMatrix a) ⊗ₖ V.matrix) =
       (1 : CMatrix (a × r₁)) := by
-  have hconj : Matrix.conjTranspose (Matrix.kronecker (1 : CMatrix a) V.matrix) =
-      Matrix.kronecker (1 : CMatrix a) (Matrix.conjTranspose V.matrix) := by
-    simpa [Matrix.kronecker] using
+  have hconj : Matrix.conjTranspose ((1 : CMatrix a) ⊗ₖ V.matrix) =
+      (1 : CMatrix a) ⊗ₖ (Matrix.conjTranspose V.matrix) := by
+    simpa using
       (Matrix.conjTranspose_kronecker (1 : CMatrix a) V.matrix)
   rw [hconj]
   simpa [V.isometry] using
@@ -109,12 +109,12 @@ private theorem applyMatrix_mul
     (X Y : CMatrix (r₁ × a)) :
     V.applyMatrix X * V.applyMatrix Y = V.applyMatrix (X * Y) := by
   let K : Matrix (r₂ × a) (r₁ × a) ℂ :=
-    Matrix.kronecker V.matrix (1 : CMatrix a)
+    V.matrix ⊗ₖ (1 : CMatrix a)
   have hK : Matrix.conjTranspose K * K = (1 : CMatrix (r₁ × a)) := by
     have hconj : Matrix.conjTranspose K =
-        Matrix.kronecker (Matrix.conjTranspose V.matrix) (1 : CMatrix a) := by
+        (Matrix.conjTranspose V.matrix) ⊗ₖ (1 : CMatrix a) := by
       dsimp [K]
-      simpa [Matrix.kronecker] using
+      simpa using
         (Matrix.conjTranspose_kronecker V.matrix (1 : CMatrix a))
     rw [hconj]
     simpa [K, V.isometry] using
@@ -207,7 +207,7 @@ private theorem conditionalMaxEntropyTraceNorm_conditioningIsometryApply_eq
         psdSqrt (identityTensorStateMatrix (a := a)
           (referenceIsometryCompressed σPlus V))) := by
   let K : Matrix (a × bPlus) (a × b) ℂ :=
-    Matrix.kronecker (1 : CMatrix a) V.matrix
+    (1 : CMatrix a) ⊗ₖ V.matrix
   let E : CMatrix (a × bPlus) := K * Matrix.conjTranspose K
   let ρPlus : SubnormalizedState (a × bPlus) :=
     ρ.conditioningIsometryApply V
@@ -232,7 +232,6 @@ private theorem conditionalMaxEntropyTraceNorm_conditioningIsometryApply_eq
     dsimp [ρPlus, K]
     rw [conditioningIsometryApply_matrix,
       ReferenceIsometry.applyMatrixRight_eq_kron_conj]
-    simp [Matrix.kronecker]
   have hAfix : E * ρPlus.matrix * E = ρPlus.matrix := by
     calc
       E * ρPlus.matrix * E = E * (K * ρ.matrix * Matrix.conjTranspose K) * E := by
@@ -267,33 +266,33 @@ private theorem conditionalMaxEntropyTraceNorm_conditioningIsometryApply_eq
     exact h
   have hER : E * RPlus * E = V.applyMatrixRight R := by
     have hconj : Matrix.conjTranspose K =
-        Matrix.kronecker (1 : CMatrix a) (Matrix.conjTranspose V.matrix) := by
+        (1 : CMatrix a) ⊗ₖ (Matrix.conjTranspose V.matrix) := by
       dsimp [K]
-      simpa [Matrix.kronecker] using
+      simpa using
         (Matrix.conjTranspose_kronecker (1 : CMatrix a) V.matrix)
     have hcompress : Matrix.conjTranspose K * RPlus * K =
-        Matrix.kronecker (1 : CMatrix a)
+        (1 : CMatrix a) ⊗ₖ
           (Matrix.conjTranspose V.matrix * σPlus.matrix * V.matrix) := by
       dsimp [RPlus]
       rw [hconj]
-      change Matrix.kronecker (1 : CMatrix a) (Matrix.conjTranspose V.matrix) *
-          Matrix.kronecker (1 : CMatrix a) σPlus.matrix *
-          Matrix.kronecker (1 : CMatrix a) V.matrix = _
+      change ((1 : CMatrix a) ⊗ₖ (Matrix.conjTranspose V.matrix)) *
+          ((1 : CMatrix a) ⊗ₖ σPlus.matrix) *
+          ((1 : CMatrix a) ⊗ₖ V.matrix) = _
       have h1 :
-          Matrix.kronecker (1 : CMatrix a) (Matrix.conjTranspose V.matrix) *
-              Matrix.kronecker (1 : CMatrix a) σPlus.matrix =
-            Matrix.kronecker (1 * 1 : CMatrix a)
+          ((1 : CMatrix a) ⊗ₖ (Matrix.conjTranspose V.matrix)) *
+              ((1 : CMatrix a) ⊗ₖ σPlus.matrix) =
+            (1 * 1 : CMatrix a) ⊗ₖ
               (Matrix.conjTranspose V.matrix * σPlus.matrix) := by
-        simpa [Matrix.kronecker] using
+        simpa using
           (Matrix.mul_kronecker_mul (1 : CMatrix a) (1 : CMatrix a)
             (Matrix.conjTranspose V.matrix) σPlus.matrix).symm
       have h2 :
-          Matrix.kronecker (1 * 1 : CMatrix a)
-              (Matrix.conjTranspose V.matrix * σPlus.matrix) *
-              Matrix.kronecker (1 : CMatrix a) V.matrix =
-            Matrix.kronecker (1 * 1 * 1 : CMatrix a)
+          ((1 * 1 : CMatrix a) ⊗ₖ
+              (Matrix.conjTranspose V.matrix * σPlus.matrix)) *
+              ((1 : CMatrix a) ⊗ₖ V.matrix) =
+            (1 * 1 * 1 : CMatrix a) ⊗ₖ
               (Matrix.conjTranspose V.matrix * σPlus.matrix * V.matrix) := by
-        simpa [Matrix.kronecker] using
+        simpa using
           (Matrix.mul_kronecker_mul (1 * 1 : CMatrix a) (1 : CMatrix a)
             (Matrix.conjTranspose V.matrix * σPlus.matrix) V.matrix).symm
       rw [h1, h2]
@@ -303,13 +302,12 @@ private theorem conditionalMaxEntropyTraceNorm_conditioningIsometryApply_eq
           Matrix.conjTranspose K := by simp [E, Matrix.mul_assoc]
       _ = K * R * Matrix.conjTranspose K := by
         have hRmatrix : R =
-            Matrix.kronecker (1 : CMatrix a)
+            (1 : CMatrix a) ⊗ₖ
               (Matrix.conjTranspose V.matrix * σPlus.matrix * V.matrix) := by
           dsimp [R, σ]
-          change Matrix.kronecker (1 : CMatrix a)
+          change (1 : CMatrix a) ⊗ₖ
               (referenceIsometryCompressed σPlus V).matrix = _
           rw [referenceIsometryCompressed_matrix]
-          rfl
         rw [hcompress, hRmatrix]
       _ = V.applyMatrixRight R := by
         rw [ReferenceIsometry.applyMatrixRight_eq_kron_conj]
@@ -340,7 +338,7 @@ private theorem conditionalMaxEntropyTraceNorm_sourceIsometryApply_eq
       traceNorm (psdSqrt ρ.matrix *
         psdSqrt (identityTensorStateMatrix (a := a) σ)) := by
   let K : Matrix (aPlus × b) (a × b) ℂ :=
-    Matrix.kronecker U.matrix (1 : CMatrix b)
+    U.matrix ⊗ₖ (1 : CMatrix b)
   let E : CMatrix (aPlus × b) := K * Matrix.conjTranspose K
   let ρPlus : SubnormalizedState (aPlus × b) := ρ.sourceIsometryApply U
   let RPlus : CMatrix (aPlus × b) :=
@@ -348,9 +346,9 @@ private theorem conditionalMaxEntropyTraceNorm_sourceIsometryApply_eq
   let R : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   have hK : Matrix.conjTranspose K * K = (1 : CMatrix (a × b)) := by
     have hconj : Matrix.conjTranspose K =
-        Matrix.kronecker (Matrix.conjTranspose U.matrix) (1 : CMatrix b) := by
+        (Matrix.conjTranspose U.matrix) ⊗ₖ (1 : CMatrix b) := by
       dsimp [K]
-      simpa [Matrix.kronecker] using
+      simpa using
         (Matrix.conjTranspose_kronecker U.matrix (1 : CMatrix b))
     rw [hconj]
     simpa [K, U.isometry] using
@@ -371,7 +369,6 @@ private theorem conditionalMaxEntropyTraceNorm_sourceIsometryApply_eq
     dsimp [ρPlus, K]
     rw [sourceIsometryApply_matrix,
       ReferenceIsometry.applyMatrix_eq_kron_conj]
-    simp [Matrix.kronecker]
   have hAfix : E * ρPlus.matrix * E = ρPlus.matrix := by
     calc
       E * ρPlus.matrix * E = E * (K * ρ.matrix * Matrix.conjTranspose K) * E := by
@@ -405,30 +402,30 @@ private theorem conditionalMaxEntropyTraceNorm_sourceIsometryApply_eq
     exact h
   have hER : E * RPlus * E = U.applyMatrix R := by
     have hconj : Matrix.conjTranspose K =
-        Matrix.kronecker (Matrix.conjTranspose U.matrix) (1 : CMatrix b) := by
+        (Matrix.conjTranspose U.matrix) ⊗ₖ (1 : CMatrix b) := by
       dsimp [K]
-      simpa [Matrix.kronecker] using
+      simpa using
         (Matrix.conjTranspose_kronecker U.matrix (1 : CMatrix b))
     have hcompress : Matrix.conjTranspose K * RPlus * K = R := by
       dsimp [RPlus, R]
       rw [hconj]
-      change Matrix.kronecker (Matrix.conjTranspose U.matrix) (1 : CMatrix b) *
-          Matrix.kronecker (1 : CMatrix aPlus) σ.matrix *
-          Matrix.kronecker U.matrix (1 : CMatrix b) = _
+      change ((Matrix.conjTranspose U.matrix) ⊗ₖ (1 : CMatrix b)) *
+          ((1 : CMatrix aPlus) ⊗ₖ σ.matrix) *
+          (U.matrix ⊗ₖ (1 : CMatrix b)) = _
       have h1 :
-          Matrix.kronecker (Matrix.conjTranspose U.matrix) (1 : CMatrix b) *
-              Matrix.kronecker (1 : CMatrix aPlus) σ.matrix =
-            Matrix.kronecker (Matrix.conjTranspose U.matrix *
-              (1 : CMatrix aPlus)) ((1 : CMatrix b) * σ.matrix) := by
-        simpa [Matrix.kronecker] using
+          ((Matrix.conjTranspose U.matrix) ⊗ₖ (1 : CMatrix b)) *
+              ((1 : CMatrix aPlus) ⊗ₖ σ.matrix) =
+            (Matrix.conjTranspose U.matrix *
+              (1 : CMatrix aPlus)) ⊗ₖ ((1 : CMatrix b) * σ.matrix) := by
+        simpa using
           (Matrix.mul_kronecker_mul (Matrix.conjTranspose U.matrix)
             (1 : CMatrix aPlus) (1 : CMatrix b) σ.matrix).symm
       rw [h1]
       have h2 := Matrix.mul_kronecker_mul
         (Matrix.conjTranspose U.matrix * (1 : CMatrix aPlus))
         U.matrix ((1 : CMatrix b) * σ.matrix) (1 : CMatrix b)
-      show _ = Matrix.kronecker (1 : CMatrix a) σ.matrix
-      simpa [Matrix.kronecker, Matrix.mul_one, Matrix.one_mul, U.isometry] using h2.symm
+      show _ = (1 : CMatrix a) ⊗ₖ σ.matrix
+      simpa [Matrix.mul_one, Matrix.one_mul, U.isometry] using h2.symm
     calc
       E * RPlus * E = K * (Matrix.conjTranspose K * RPlus * K) *
           Matrix.conjTranspose K := by simp [E, Matrix.mul_assoc]
@@ -497,13 +494,13 @@ theorem conditioningIsometryCompressed_apply_matrix
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
     (τPlus : SubnormalizedState (a × bPlus)) (V : ReferenceIsometry b bPlus) :
     ((τPlus.conditioningIsometryCompressed V).conditioningIsometryApply V).matrix =
-      Matrix.kronecker (1 : CMatrix a) (V.matrix * Matrix.conjTranspose V.matrix) *
+      ((1 : CMatrix a) ⊗ₖ (V.matrix * Matrix.conjTranspose V.matrix)) *
           τPlus.matrix *
-        Matrix.conjTranspose (Matrix.kronecker (1 : CMatrix a)
+        Matrix.conjTranspose ((1 : CMatrix a) ⊗ₖ
           (V.matrix * Matrix.conjTranspose V.matrix)) := by
   rw [conditioningIsometryApply_matrix, conditioningIsometryCompressed_matrix]
   let K : Matrix (a × bPlus) (a × b) ℂ :=
-    Matrix.kronecker (1 : CMatrix a) V.matrix
+    (1 : CMatrix a) ⊗ₖ V.matrix
   have hcompress :
       MatrixMap.kron (CPTPOp.id (dIn := a)).map
           (MatrixMap.ofKraus (fun _ : Unit => Matrix.conjTranspose V.matrix))
@@ -514,7 +511,7 @@ theorem conditioningIsometryCompressed_apply_matrix
         (fun _ : Unit => Matrix.conjTranspose V.matrix)
         (ReferenceIsometry.rightBlock τPlus.matrix i.1 j.1) i.2 j.2 =
           (Matrix.conjTranspose K * τPlus.matrix * K) i j
-    simp [MatrixMap.ofKraus, K, Matrix.kronecker, Matrix.mul_apply,
+    simp [MatrixMap.ofKraus, K, Matrix.mul_apply,
       Finset.mul_sum, Matrix.conjTranspose_apply,
       Matrix.one_apply, Fintype.sum_prod_type, mul_comm,
       mul_left_comm, Finset.sum_ite_eq',
@@ -539,22 +536,22 @@ theorem conditioningIsometryCompressed_apply_matrix
   change K * (Matrix.conjTranspose K * τPlus.matrix * K) *
       Matrix.conjTranspose K = _
   have hE : K * Matrix.conjTranspose K =
-      Matrix.kronecker (1 : CMatrix a) (V.matrix * Matrix.conjTranspose V.matrix) := by
+      (1 : CMatrix a) ⊗ₖ (V.matrix * Matrix.conjTranspose V.matrix) := by
     dsimp [K]
-    have hconj : Matrix.conjTranspose (Matrix.kronecker (1 : CMatrix a) V.matrix) =
-        Matrix.kronecker (1 : CMatrix a) (Matrix.conjTranspose V.matrix) := by
-      simpa [Matrix.kronecker] using
+    have hconj : Matrix.conjTranspose ((1 : CMatrix a) ⊗ₖ V.matrix) =
+        (1 : CMatrix a) ⊗ₖ (Matrix.conjTranspose V.matrix) := by
+      simpa using
         (Matrix.conjTranspose_kronecker (1 : CMatrix a) V.matrix)
-    change Matrix.kronecker (1 : CMatrix a) V.matrix *
-        Matrix.conjTranspose (Matrix.kronecker (1 : CMatrix a) V.matrix) = _
+    change ((1 : CMatrix a) ⊗ₖ V.matrix) *
+        Matrix.conjTranspose ((1 : CMatrix a) ⊗ₖ V.matrix) = _
     rw [hconj]
-    simpa [Matrix.kronecker] using
+    simpa using
       (Matrix.mul_kronecker_mul (1 : CMatrix a) (1 : CMatrix a)
         V.matrix (Matrix.conjTranspose V.matrix)).symm
   have hEherm : Matrix.conjTranspose
-      (Matrix.kronecker (1 : CMatrix a)
+      ((1 : CMatrix a) ⊗ₖ
         (V.matrix * Matrix.conjTranspose V.matrix)) =
-      Matrix.kronecker (1 : CMatrix a)
+      (1 : CMatrix a) ⊗ₖ
         (V.matrix * Matrix.conjTranspose V.matrix) := by
     simp [Matrix.conjTranspose_kronecker, Matrix.conjTranspose_mul]
   calc
@@ -562,9 +559,9 @@ theorem conditioningIsometryCompressed_apply_matrix
           Matrix.conjTranspose K =
       (K * Matrix.conjTranspose K) * τPlus.matrix *
         (K * Matrix.conjTranspose K) := by simp [Matrix.mul_assoc]
-      _ = Matrix.kronecker (1 : CMatrix a) (V.matrix * Matrix.conjTranspose V.matrix) *
+      _ = ((1 : CMatrix a) ⊗ₖ (V.matrix * Matrix.conjTranspose V.matrix)) *
         τPlus.matrix *
-        Matrix.conjTranspose (Matrix.kronecker (1 : CMatrix a)
+        Matrix.conjTranspose ((1 : CMatrix a) ⊗ₖ
           (V.matrix * Matrix.conjTranspose V.matrix)) := by
         rw [hE, hEherm]
 
@@ -572,13 +569,13 @@ private theorem sourceIsometryCompressed_apply_matrix
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
     (τPlus : SubnormalizedState (aPlus × b)) (U : ReferenceIsometry a aPlus) :
     ((τPlus.sourceIsometryCompressed U).sourceIsometryApply U).matrix =
-      Matrix.kronecker (U.matrix * Matrix.conjTranspose U.matrix)
-          (1 : CMatrix b) * τPlus.matrix *
-        Matrix.conjTranspose (Matrix.kronecker (U.matrix *
-          Matrix.conjTranspose U.matrix) (1 : CMatrix b)) := by
+      ((U.matrix * Matrix.conjTranspose U.matrix) ⊗ₖ
+          (1 : CMatrix b)) * τPlus.matrix *
+        Matrix.conjTranspose ((U.matrix *
+          Matrix.conjTranspose U.matrix) ⊗ₖ (1 : CMatrix b)) := by
   rw [sourceIsometryApply_matrix, sourceIsometryCompressed_matrix]
   let K : Matrix (aPlus × b) (a × b) ℂ :=
-    Matrix.kronecker U.matrix (1 : CMatrix b)
+    U.matrix ⊗ₖ (1 : CMatrix b)
   have hcompress :
       MatrixMap.kron
           (MatrixMap.ofKraus (fun _ : Unit => Matrix.conjTranspose U.matrix))
@@ -590,7 +587,7 @@ private theorem sourceIsometryCompressed_apply_matrix
         (fun _ : Unit => Matrix.conjTranspose U.matrix)
         (ReferenceIsometry.targetBlock τPlus.matrix i.2 j.2) i.1 j.1 =
       (Matrix.conjTranspose K * τPlus.matrix * K) i j
-    simp [MatrixMap.ofKraus, K, Matrix.kronecker, Matrix.mul_apply,
+    simp [MatrixMap.ofKraus, K, Matrix.mul_apply,
       Finset.mul_sum, Matrix.conjTranspose_apply,
       Matrix.one_apply, Fintype.sum_prod_type, mul_comm,
       mul_left_comm, Finset.sum_ite_eq',
@@ -612,23 +609,23 @@ private theorem sourceIsometryCompressed_apply_matrix
   change K * (Matrix.conjTranspose K * τPlus.matrix * K) *
       Matrix.conjTranspose K = _
   have hE : K * Matrix.conjTranspose K =
-      Matrix.kronecker (U.matrix * Matrix.conjTranspose U.matrix)
+      (U.matrix * Matrix.conjTranspose U.matrix) ⊗ₖ
         (1 : CMatrix b) := by
     dsimp [K]
-    have hconj : Matrix.conjTranspose (Matrix.kronecker U.matrix (1 : CMatrix b)) =
-        Matrix.kronecker (Matrix.conjTranspose U.matrix) (1 : CMatrix b) := by
-      simpa [Matrix.kronecker] using
+    have hconj : Matrix.conjTranspose (U.matrix ⊗ₖ (1 : CMatrix b)) =
+        (Matrix.conjTranspose U.matrix) ⊗ₖ (1 : CMatrix b) := by
+      simpa using
         (Matrix.conjTranspose_kronecker U.matrix (1 : CMatrix b))
-    change Matrix.kronecker U.matrix (1 : CMatrix b) *
-        Matrix.conjTranspose (Matrix.kronecker U.matrix (1 : CMatrix b)) = _
+    change (U.matrix ⊗ₖ (1 : CMatrix b)) *
+        Matrix.conjTranspose (U.matrix ⊗ₖ (1 : CMatrix b)) = _
     rw [hconj]
-    simpa [Matrix.kronecker] using
+    simpa using
       (Matrix.mul_kronecker_mul U.matrix (Matrix.conjTranspose U.matrix)
         (1 : CMatrix b) (1 : CMatrix b)).symm
   have hEherm : Matrix.conjTranspose
-      (Matrix.kronecker (U.matrix * Matrix.conjTranspose U.matrix)
+      ((U.matrix * Matrix.conjTranspose U.matrix) ⊗ₖ
         (1 : CMatrix b)) =
-      Matrix.kronecker (U.matrix * Matrix.conjTranspose U.matrix)
+      (U.matrix * Matrix.conjTranspose U.matrix) ⊗ₖ
         (1 : CMatrix b) := by
     simp [Matrix.conjTranspose_kronecker, Matrix.conjTranspose_mul]
   calc
@@ -636,10 +633,10 @@ private theorem sourceIsometryCompressed_apply_matrix
           Matrix.conjTranspose K =
       (K * Matrix.conjTranspose K) * τPlus.matrix *
         (K * Matrix.conjTranspose K) := by simp [Matrix.mul_assoc]
-    _ = Matrix.kronecker (U.matrix * Matrix.conjTranspose U.matrix)
-          (1 : CMatrix b) * τPlus.matrix *
-        Matrix.conjTranspose (Matrix.kronecker (U.matrix *
-          Matrix.conjTranspose U.matrix) (1 : CMatrix b)) := by
+    _ = ((U.matrix * Matrix.conjTranspose U.matrix) ⊗ₖ
+          (1 : CMatrix b)) * τPlus.matrix *
+        Matrix.conjTranspose ((U.matrix *
+          Matrix.conjTranspose U.matrix) ⊗ₖ (1 : CMatrix b)) := by
         rw [hE, hEherm]
 
 /-- The bipartite support projector of an isometrically conditioned state is supported by
@@ -649,7 +646,7 @@ theorem conditioning_support_projector_supports_image
     (ρ : SubnormalizedState (a × b)) (V : ReferenceIsometry b bPlus) :
     Matrix.Supports
       (bipartiteSupportProjector (ρ.conditioningIsometryApply V))
-      (Matrix.kronecker (1 : CMatrix a)
+      ((1 : CMatrix a) ⊗ₖ
         (V.matrix * Matrix.conjTranspose V.matrix)) := by
   let ρPlus := ρ.conditioningIsometryApply V
   let Q : CMatrix bPlus := V.matrix * Matrix.conjTranspose V.matrix
@@ -685,27 +682,22 @@ theorem conditioning_support_projector_supports_image
         _ = Q := by rw [V.isometry]; simp [Q]
     exact Matrix.Supports.projector_fixes
       (psdInvSqrt_support_posSemidef ρPlus.traceLeft.pos) hQpos hQid hPBQ
-  have hPE : Matrix.Supports P (Matrix.kronecker (1 : CMatrix a) Q) := by
+  have hPE : Matrix.Supports P ((1 : CMatrix a) ⊗ₖ Q) := by
     apply Matrix.Supports.of_mul_right_eq_self
     dsimp [P]
-    change Matrix.kronecker
-        (supportProjector ρPlus.traceRight.matrix ρPlus.traceRight.pos) PB *
-        Matrix.kronecker (1 : CMatrix a) Q =
-      Matrix.kronecker
-        (supportProjector ρPlus.traceRight.matrix ρPlus.traceRight.pos) PB
+    change ((supportProjector ρPlus.traceRight.matrix ρPlus.traceRight.pos) ⊗ₖ PB) *
+        ((1 : CMatrix a) ⊗ₖ Q) =
+      (supportProjector ρPlus.traceRight.matrix ρPlus.traceRight.pos) ⊗ₖ PB
     calc
-      Matrix.kronecker
-          (supportProjector ρPlus.traceRight.matrix ρPlus.traceRight.pos) PB *
-          Matrix.kronecker (1 : CMatrix a) Q =
-        Matrix.kronecker
-          (supportProjector ρPlus.traceRight.matrix ρPlus.traceRight.pos * 1)
+      ((supportProjector ρPlus.traceRight.matrix ρPlus.traceRight.pos) ⊗ₖ PB) *
+          ((1 : CMatrix a) ⊗ₖ Q) =
+        (supportProjector ρPlus.traceRight.matrix ρPlus.traceRight.pos * 1) ⊗ₖ
           (PB * Q) := by
-            simpa [Matrix.kronecker] using
+            simpa using
               (Matrix.mul_kronecker_mul
                 (supportProjector ρPlus.traceRight.matrix ρPlus.traceRight.pos)
                 (1 : CMatrix a) PB Q).symm
-      _ = Matrix.kronecker
-          (supportProjector ρPlus.traceRight.matrix ρPlus.traceRight.pos) PB := by
+      _ = (supportProjector ρPlus.traceRight.matrix ρPlus.traceRight.pos) ⊗ₖ PB := by
             rw [mul_one, hPBfix.2]
   simpa [P, Q] using hPE
 
@@ -714,8 +706,7 @@ private theorem source_support_projector_supports_image
     (ρ : SubnormalizedState (a × b)) (U : ReferenceIsometry a aPlus) :
     Matrix.Supports
       (bipartiteSupportProjector (ρ.sourceIsometryApply U))
-      (Matrix.kronecker
-        (U.matrix * Matrix.conjTranspose U.matrix) (1 : CMatrix b)) := by
+      ((U.matrix * Matrix.conjTranspose U.matrix) ⊗ₖ (1 : CMatrix b)) := by
   let ρPlus := ρ.sourceIsometryApply U
   let Q : CMatrix aPlus := U.matrix * Matrix.conjTranspose U.matrix
   let P : CMatrix (aPlus × b) := bipartiteSupportProjector ρPlus
@@ -750,25 +741,25 @@ private theorem source_support_projector_supports_image
         _ = Q := by rw [U.isometry]; simp [Q]
     exact Matrix.Supports.projector_fixes
       (psdInvSqrt_support_posSemidef ρPlus.traceRight.pos) hQpos hQid hPAQ
-  have hPE : Matrix.Supports P (Matrix.kronecker Q (1 : CMatrix b)) := by
+  have hPE : Matrix.Supports P (Q ⊗ₖ (1 : CMatrix b)) := by
     apply Matrix.Supports.of_mul_right_eq_self
     dsimp [P]
-    change Matrix.kronecker PA
-        (supportProjector ρPlus.traceLeft.matrix ρPlus.traceLeft.pos) *
-        Matrix.kronecker Q (1 : CMatrix b) =
-      Matrix.kronecker PA
+    change (PA ⊗ₖ
+        (supportProjector ρPlus.traceLeft.matrix ρPlus.traceLeft.pos)) *
+        (Q ⊗ₖ (1 : CMatrix b)) =
+      PA ⊗ₖ
         (supportProjector ρPlus.traceLeft.matrix ρPlus.traceLeft.pos)
     calc
-      Matrix.kronecker PA
-          (supportProjector ρPlus.traceLeft.matrix ρPlus.traceLeft.pos) *
-          Matrix.kronecker Q (1 : CMatrix b) =
-        Matrix.kronecker (PA * Q)
+      (PA ⊗ₖ
+          (supportProjector ρPlus.traceLeft.matrix ρPlus.traceLeft.pos)) *
+          (Q ⊗ₖ (1 : CMatrix b)) =
+        (PA * Q) ⊗ₖ
           (supportProjector ρPlus.traceLeft.matrix ρPlus.traceLeft.pos * 1) := by
-            simpa [Matrix.kronecker] using
+            simpa using
               (Matrix.mul_kronecker_mul PA Q
                 (supportProjector ρPlus.traceLeft.matrix ρPlus.traceLeft.pos)
                 (1 : CMatrix b)).symm
-      _ = Matrix.kronecker PA
+      _ = PA ⊗ₖ
           (supportProjector ρPlus.traceLeft.matrix ρPlus.traceLeft.pos) := by
             rw [hPAfix.2, mul_one]
   simpa [P, Q] using hPE
@@ -779,11 +770,9 @@ private theorem source_support_reconstruct
     {P : CMatrix (aPlus × b)}
     (hSupport : Matrix.Supports τPlus.matrix P)
     (hImage : Matrix.Supports P
-      (Matrix.kronecker
-        (U.matrix * Matrix.conjTranspose U.matrix) (1 : CMatrix b))) :
+      ((U.matrix * Matrix.conjTranspose U.matrix) ⊗ₖ (1 : CMatrix b))) :
     (τPlus.sourceIsometryCompressed U).sourceIsometryApply U = τPlus := by
-  let E : CMatrix (aPlus × b) := Matrix.kronecker
-      (U.matrix * Matrix.conjTranspose U.matrix) (1 : CMatrix b)
+  let E : CMatrix (aPlus × b) := (U.matrix * Matrix.conjTranspose U.matrix) ⊗ₖ (1 : CMatrix b)
   have hEpos : E.PosSemidef := by
     dsimp [E]
     exact (Matrix.posSemidef_self_mul_conjTranspose U.matrix).kronecker
@@ -823,10 +812,10 @@ theorem conditioning_support_reconstruct
     {P : CMatrix (a × bPlus)}
     (hSupport : Matrix.Supports τPlus.matrix P)
     (hImage : Matrix.Supports P
-      (Matrix.kronecker (1 : CMatrix a)
+      ((1 : CMatrix a) ⊗ₖ
         (V.matrix * Matrix.conjTranspose V.matrix))) :
     (τPlus.conditioningIsometryCompressed V).conditioningIsometryApply V = τPlus := by
-  let E : CMatrix (a × bPlus) := Matrix.kronecker (1 : CMatrix a)
+  let E : CMatrix (a × bPlus) := (1 : CMatrix a) ⊗ₖ
       (V.matrix * Matrix.conjTranspose V.matrix)
   have hEpos : E.PosSemidef := by
     dsimp [E]

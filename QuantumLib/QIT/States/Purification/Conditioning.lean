@@ -33,7 +33,7 @@ L3 bridge.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 open Matrix
 
@@ -80,12 +80,12 @@ theorem conditioningIsometryApply_matrix (ρ : MState (a × b))
 theorem conditioningIsometryApply_matrix_eq_kronecker_conj
     (ρ : MState (a × b)) (V : ReferenceIsometry b bPlus) :
     (ρ.conditioningIsometryApply V).m =
-      Matrix.kronecker (1 : CMatrix a) V.matrix * ρ.m *
-        Matrix.conjTranspose (Matrix.kronecker (1 : CMatrix a) V.matrix) := by
+      ((1 : CMatrix a) ⊗ₖ V.matrix) * ρ.m *
+        Matrix.conjTranspose ((1 : CMatrix a) ⊗ₖ V.matrix) := by
   ext x y
   simp [conditioningIsometryApply_matrix, ReferenceIsometry.applyMatrixRight,
-    ReferenceIsometry.rightBlock, Matrix.mul_apply, Matrix.kronecker,
-    Matrix.kroneckerMap_apply, Matrix.one_apply, Matrix.conjTranspose_kronecker,
+    ReferenceIsometry.rightBlock, Matrix.mul_apply, Matrix.kroneckerMap_apply, Matrix.one_apply,
+    Matrix.conjTranspose_kronecker,
     Fintype.sum_prod_type, Finset.mul_sum,
     Finset.sum_ite_eq', apply_ite, mul_comm]
 
@@ -128,12 +128,12 @@ theorem psdSupportCompressRight_eq_conj
     (X : CMatrix (a × b)) :
     psdSupportCompressRight (a := a) N hN X =
       Matrix.conjTranspose
-        (Matrix.kronecker (1 : CMatrix a) (psdSupportIsometry N hN)) *
-        X * Matrix.kronecker (1 : CMatrix a) (psdSupportIsometry N hN) := by
+        ((1 : CMatrix a) ⊗ₖ (psdSupportIsometry N hN)) *
+        X * ((1 : CMatrix a) ⊗ₖ (psdSupportIsometry N hN)) := by
   classical
   ext x y
   simp [psdSupportCompressRight, ReferenceIsometry.rightBlock, Matrix.mul_apply,
-    Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
+    Matrix.kroneckerMap_apply, Matrix.one_apply,
     Fintype.sum_prod_type, Finset.sum_mul, Finset.sum_ite_eq',
     apply_ite]
 
@@ -183,18 +183,18 @@ theorem traceLeft_psdSupportCompressRight
 /-- A bipartite state is supported by the identity tensor its right marginal. -/
 theorem matrix_supports_identityTensor_traceLeft (ρ : MState (a × b)) :
     Matrix.Supports ρ.m
-      (Matrix.kronecker (1 : CMatrix a) ρ.traceLeft.m) := by
+      ((1 : CMatrix a) ⊗ₖ ρ.traceLeft.m) := by
   classical
   have hρ : Matrix.Supports ρ.m (ρ.traceRight.prod ρ.traceLeft).m :=
     ρ.matrix_supports_prod_marginals
   have hprod :
       Matrix.Supports (ρ.traceRight.prod ρ.traceLeft).m
-        (Matrix.kronecker (1 : CMatrix a) ρ.traceLeft.m) := by
+        ((1 : CMatrix a) ⊗ₖ ρ.traceLeft.m) := by
     intro v hv
     let L : CMatrix (a × b) :=
-      Matrix.kronecker (1 : CMatrix a) ρ.traceLeft.m
+      (1 : CMatrix a) ⊗ₖ ρ.traceLeft.m
     let K : CMatrix (a × b) :=
-      Matrix.kronecker ρ.traceRight.m (1 : CMatrix b)
+      ρ.traceRight.m ⊗ₖ (1 : CMatrix b)
     have hfactor : (ρ.traceRight.prod ρ.traceLeft).m = K * L := by
       rw [MState.prod_m]
       simpa [K, L] using
@@ -220,15 +220,13 @@ theorem rightBlock_supports_traceLeft
   intro v hv
   let w : a × b → ℂ := fun z => if z.1 = y then v z.2 else 0
   have hNw :
-      Matrix.mulVec (Matrix.kronecker (1 : CMatrix a) ρ.traceLeft.m) w = 0 := by
+      Matrix.mulVec ((1 : CMatrix a) ⊗ₖ ρ.traceLeft.m) w = 0 := by
     ext z
     by_cases hzy : z.1 = y
     ·
-      simpa [w, Matrix.mulVec, dotProduct, Matrix.kronecker,
-        Matrix.kroneckerMap_apply, Matrix.one_apply, Fintype.sum_prod_type,
+      simpa [w, Matrix.mulVec, dotProduct, Matrix.kroneckerMap_apply, Matrix.one_apply, Fintype.sum_prod_type,
         Finset.sum_ite_eq', hzy] using congrFun hv z.2
-    · simp [w, Matrix.mulVec, dotProduct, Matrix.kronecker,
-        Matrix.kroneckerMap_apply, Matrix.one_apply, Fintype.sum_prod_type,
+    · simp [w, Matrix.mulVec, dotProduct, Matrix.kroneckerMap_apply, Matrix.one_apply, Fintype.sum_prod_type,
         Finset.sum_ite_eq', hzy]
   have hSupport := matrix_supports_identityTensor_traceLeft (a := a) (b := b) ρ
   have hMw := hSupport w hNw
@@ -255,7 +253,7 @@ noncomputable def conditioningSupportCompressedState
   (pos := by
     rw [psdSupportCompressRight_eq_conj]
     exact Matrix.PosSemidef.conjTranspose_mul_mul_same ρ.psd
-      (Matrix.kronecker (1 : CMatrix a)
+      ((1 : CMatrix a) ⊗ₖ
         (psdSupportIsometry ρ.traceLeft.m ρ.traceLeft.psd)))
   (trace_eq_one := by
     let X : CMatrix (a × psdSupportIndex ρ.traceLeft.m ρ.traceLeft.psd) :=
@@ -405,7 +403,7 @@ Here `σ_B` is subnormalized, matching
 [Tomamichel2015FiniteResources, calculus.tex:81-89] and
 [Tomamichel2015FiniteResources, calculus.tex:191-198]. -/
 def identityTensorStateMatrix (σ : SubnormalizedState b) : CMatrix (a × b) :=
-  Matrix.kronecker (1 : CMatrix a) σ.matrix
+  (1 : CMatrix a) ⊗ₖ σ.matrix
 
 /-- Feasibility predicate for subnormalized conditional min-entropy in the
 local bits convention: `ρ_AB ≤ 2^{-λ} • (I_A ⊗ σ_B)` with

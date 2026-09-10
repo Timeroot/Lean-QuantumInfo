@@ -21,7 +21,7 @@ extraction wrappers.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 
 namespace QIT.Security
 
@@ -292,7 +292,7 @@ def rennerIdealKeyPairStateFor
 theorem rennerIdealKeyPairStateFor_matrix
     (ρ : SubnormalizedState ((κ × κ) × e)) :
     (rennerIdealKeyPairStateFor ρ).matrix =
-      Matrix.kronecker (uniformRetainedSameKeyPairState (κ := κ)).m
+      (uniformRetainedSameKeyPairState (κ := κ)).m ⊗ₖ
         ρ.traceLeft.matrix :=
   rfl
 
@@ -446,7 +446,7 @@ def conditionedIdealKeyPairStateFor
 theorem conditionedIdealKeyPairStateFor_matrix
     (ρ : MState ((KeyOutput κ × KeyOutput κ) × e)) :
     (conditionedIdealKeyPairStateFor ρ).m =
-      Matrix.kronecker (conditionedUniformSameKeyPairState (κ := κ)).m
+      (conditionedUniformSameKeyPairState (κ := κ)).m ⊗ₖ
         ρ.traceLeft.m :=
   MState.prod_m _ _
 

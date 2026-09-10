@@ -17,7 +17,7 @@ spine for entanglement-assisted classical communication.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Pointwise
+open scoped ComplexOrder MatrixOrder Kronecker Pointwise
 
 namespace QIT
 
@@ -112,11 +112,9 @@ theorem sandwichedMutualInformationSionBracketRe_eq_source
     (rhoA : MState a) (ψ : Ket ((a × b) × c))
     (σB : MState b) (τC : MState c) (alpha : ℝ) :
     sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha =
-      ((Matrix.kronecker
-          (Matrix.kronecker
-            (CFC.rpow rhoA.m ((1 - alpha) / alpha))
-            (CFC.rpow σB.m ((1 - alpha) / alpha)))
-          (CFC.rpow τC.m ((alpha - 1) / alpha)) *
+      (((((CFC.rpow rhoA.m ((1 - alpha) / alpha)) ⊗ₖ
+            (CFC.rpow σB.m ((1 - alpha) / alpha))) ⊗ₖ
+          (CFC.rpow τC.m ((alpha - 1) / alpha))) *
         ψ.state.m).trace).re := by
   unfold sandwichedMutualInformationSionBracketRe MState.abcWeightedSidePowerTraceRe
   have hsigma_exp : -((alpha - 1) / alpha) = (1 - alpha) / alpha := by
@@ -134,11 +132,9 @@ def sandwichedMutualInformationACTraceMatrix
     (τC : MState c) (alpha : ℝ) : CMatrix b :=
   fun j j' =>
     ∑ i : a, ∑ k : c,
-      ((Matrix.kronecker
-          (Matrix.kronecker
-            (CFC.rpow rhoA.m ((1 - alpha) / alpha))
-            (1 : CMatrix b))
-          (CFC.rpow τC.m ((alpha - 1) / alpha)) *
+      (((((CFC.rpow rhoA.m ((1 - alpha) / alpha)) ⊗ₖ
+            (1 : CMatrix b)) ⊗ₖ
+          (CFC.rpow τC.m ((alpha - 1) / alpha))) *
         ψ.state.m) ((i, j), k) ((i, j'), k))
 
 /-- The `AC`-side weight from KW `EA_capacity.tex:2028-2035`, after
@@ -147,8 +143,7 @@ def sandwichedMutualInformationACWeight
     {a : Type u1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype c] [DecidableEq c]
     (rhoA : MState a) (τC : MState c) (alpha : ℝ) : CMatrix (a × c) :=
-  Matrix.kronecker
-    (CFC.rpow rhoA.m ((1 - alpha) / alpha))
+  (CFC.rpow rhoA.m ((1 - alpha) / alpha)) ⊗ₖ
     (CFC.rpow τC.m ((alpha - 1) / alpha))
 
 /-- Coordinate form of the KW trace-out-`AC` matrix. -/
@@ -163,7 +158,7 @@ theorem sandwichedMutualInformationACTraceMatrix_apply
         sandwichedMutualInformationACWeight rhoA τC alpha (i, k) (i', k') *
           ψ.vec ((i', j), k') * star (ψ.vec ((i, j'), k)) := by
   simp [sandwichedMutualInformationACTraceMatrix, sandwichedMutualInformationACWeight,
-    Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
+    Matrix.mul_apply, Matrix.kroneckerMap_apply, Matrix.one_apply,
     Ket.state_matrix, rankOneMatrix_apply, Fintype.sum_prod_type, mul_assoc]
 
 /-- The `AC`-grouped amplitude obtained by applying the square-root of the
@@ -177,8 +172,7 @@ def sandwichedMutualInformationACWeightedAmp
     (rhoA : MState a) (ψ : Ket ((a × b) × c))
     (τC : MState c) (alpha : ℝ) : (a × c) × b → ℂ :=
   Matrix.mulVec
-    (Matrix.kronecker
-      (CFC.sqrt (sandwichedMutualInformationACWeight rhoA τC alpha))
+    ((CFC.sqrt (sandwichedMutualInformationACWeight rhoA τC alpha)) ⊗ₖ
       (1 : CMatrix b))
     (fun p : (a × c) × b => ψ.vec ((p.1.1, p.2), p.1.2))
 
@@ -304,15 +298,15 @@ theorem sandwichedMutualInformationACWeightedAmp_ne_zero_posDef
   have hS : IsUnit S := by
     simpa [S] using
       sandwichedMutualInformationACWeight_sqrt_isUnit_posDef rhoA τC hrhoA hτC alpha
-  have hK : IsUnit (Matrix.kronecker S (1 : CMatrix b)) := by
+  have hK : IsUnit (S ⊗ₖ (1 : CMatrix b)) := by
     exact Matrix.IsUnit.kronecker hS isUnit_one
   intro hzero
   have hmul :
-      Matrix.mulVec (Matrix.kronecker S (1 : CMatrix b)) psiACB = 0 := by
+      Matrix.mulVec (S ⊗ₖ (1 : CMatrix b)) psiACB = 0 := by
     simpa [sandwichedMutualInformationACWeightedAmp, S, psiACB] using hzero
   have hmul' :
-      Matrix.mulVec (Matrix.kronecker S (1 : CMatrix b)) psiACB =
-        Matrix.mulVec (Matrix.kronecker S (1 : CMatrix b)) 0 := by
+      Matrix.mulVec (S ⊗ₖ (1 : CMatrix b)) psiACB =
+        Matrix.mulVec (S ⊗ₖ (1 : CMatrix b)) 0 := by
     simpa using hmul
   exact hpsi ((Matrix.mulVec_injective_of_isUnit hK) hmul')
 
@@ -328,7 +322,7 @@ theorem sandwichedMutualInformationACWeightedAmp_apply
         (CFC.sqrt (sandwichedMutualInformationACWeight rhoA τC alpha)) (i, k) (i', k') *
           ψ.vec ((i', j), k') := by
   unfold sandwichedMutualInformationACWeightedAmp
-  simp only [Matrix.mulVec, dotProduct, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  simp only [Matrix.mulVec, dotProduct, Matrix.kroneckerMap_apply,
     Matrix.one_apply]
   simp [Fintype.sum_prod_type]
 
@@ -350,9 +344,9 @@ theorem traceLeft_rankOne_ACWeightedAmp_eq_ACTraceMatrix
   let psiACB : (a × c) × b → ℂ := fun p => ψ.vec ((p.1.1, p.2), p.1.2)
   have hmove :
       Matrix.traceLeft
-          (rankOneMatrix (Matrix.mulVec (Matrix.kronecker S (1 : CMatrix b)) psiACB)) =
+          (rankOneMatrix (Matrix.mulVec (S ⊗ₖ (1 : CMatrix b)) psiACB)) =
         Matrix.traceLeft
-          (Matrix.kronecker (S * S) (1 : CMatrix b) * rankOneMatrix psiACB) := by
+          (((S * S) ⊗ₖ (1 : CMatrix b)) * rankOneMatrix psiACB) := by
     exact traceLeft_rankOne_kron_left_mulVec_eq_weight_mul S
       (by
         simpa [S] using
@@ -368,21 +362,21 @@ theorem traceLeft_rankOne_ACWeightedAmp_eq_ACTraceMatrix
           (sandwichedMutualInformationACWeightedAmp rhoA ψ τC alpha))
         =
       Matrix.traceLeft
-          (rankOneMatrix (Matrix.mulVec (Matrix.kronecker S (1 : CMatrix b)) psiACB)) := by
+          (rankOneMatrix (Matrix.mulVec (S ⊗ₖ (1 : CMatrix b)) psiACB)) := by
         simp [sandwichedMutualInformationACWeightedAmp, S, psiACB]
     _ =
       Matrix.traceLeft
-        (Matrix.kronecker (S * S) (1 : CMatrix b) * rankOneMatrix psiACB) := hmove
+        (((S * S) ⊗ₖ (1 : CMatrix b)) * rankOneMatrix psiACB) := hmove
     _ =
       Matrix.traceLeft
-        (Matrix.kronecker (sandwichedMutualInformationACWeight rhoA τC alpha)
-          (1 : CMatrix b) * rankOneMatrix psiACB) := by
+        (((sandwichedMutualInformationACWeight rhoA τC alpha) ⊗ₖ
+          (1 : CMatrix b)) * rankOneMatrix psiACB) := by
         rw [hsqrt]
     _ = sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha := by
         ext j j'
         rw [sandwichedMutualInformationACTraceMatrix_apply]
-        simp [Matrix.traceLeft, rankOneMatrix_apply, Matrix.mul_apply, Matrix.kronecker,
-          Matrix.kroneckerMap_apply, Matrix.one_apply, Fintype.sum_prod_type,
+        simp [Matrix.traceLeft, rankOneMatrix_apply, Matrix.mul_apply, Matrix.kroneckerMap_apply, Matrix.one_apply,
+          Fintype.sum_prod_type,
           mul_assoc, psiACB]
 
 /-- The KW trace-out-`AC` matrix is positive semidefinite, as required by the
@@ -521,7 +515,7 @@ theorem sandwichedMutualInformationSionBracketRe_eq_trace_sigma_mul_ACTraceMatri
         sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha).trace).re := by
   rw [sandwichedMutualInformationSionBracketRe_eq_source]
   simp only [sandwichedMutualInformationACTraceMatrix, Matrix.trace, Matrix.diag,
-    Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply]
+    Matrix.mul_apply, Matrix.kroneckerMap_apply, Matrix.one_apply]
   rw [Fintype.sum_prod_type]
   rw [Finset.sum_comm]
   congr 1
@@ -581,8 +575,7 @@ def sandwichedMutualInformationABWeight
     {a : Type u1} {b : Type v1}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     (rhoA : MState a) (σB : MState b) (alpha : ℝ) : CMatrix (a × b) :=
-  Matrix.kronecker
-    (CFC.rpow rhoA.m ((1 - alpha) / (2 * alpha)))
+  (CFC.rpow rhoA.m ((1 - alpha) / (2 * alpha))) ⊗ₖ
     (CFC.rpow σB.m ((1 - alpha) / (2 * alpha)))
 
 /-- The weighted purification vector used in the proof of KW
@@ -599,8 +592,7 @@ def sandwichedMutualInformationWeightedPurificationAmp
     (ψ : Ket ((a × b) × c)) (alpha : ℝ) :
     (a × b) × c → ℂ :=
   Matrix.mulVec
-    (Matrix.kronecker
-      (sandwichedMutualInformationABWeight rhoA σB alpha)
+    ((sandwichedMutualInformationABWeight rhoA σB alpha) ⊗ₖ
       (1 : CMatrix c))
     ψ.vec
 
@@ -644,8 +636,8 @@ theorem sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_t
   let s : ℝ := (1 - alpha) / (2 * alpha)
   let T : CMatrix c := CFC.rpow τC.m ((alpha - 1) / alpha)
   let Wab : CMatrix (a × b) := sandwichedMutualInformationABWeight rhoA σB alpha
-  let W : CMatrix ((a × b) × c) := Matrix.kronecker Wab (1 : CMatrix c)
-  let K : CMatrix ((a × b) × c) := Matrix.kronecker (1 : CMatrix (a × b)) T
+  let W : CMatrix ((a × b) × c) := Wab ⊗ₖ (1 : CMatrix c)
+  let K : CMatrix ((a × b) × c) := (1 : CMatrix (a × b)) ⊗ₖ T
   have hρpow :
       CFC.rpow rhoA.m s * CFC.rpow rhoA.m s =
         CFC.rpow rhoA.m ((1 - alpha) / alpha) := by
@@ -680,19 +672,16 @@ theorem sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_t
     exact (kronecker_isHermitian Wab (1 : CMatrix c) hWab (by simp)).eq
   have hWKW :
       W * K * W =
-        Matrix.kronecker
-          (Matrix.kronecker
-            (CFC.rpow rhoA.m ((1 - alpha) / alpha))
-            (CFC.rpow σB.m ((1 - alpha) / alpha)))
+        ((CFC.rpow rhoA.m ((1 - alpha) / alpha)) ⊗ₖ
+            (CFC.rpow σB.m ((1 - alpha) / alpha))) ⊗ₖ
           T := by
-    have hWK : W * K = Matrix.kronecker Wab T := by
+    have hWK : W * K = Wab ⊗ₖ T := by
       unfold W K
       simpa using
         (Matrix.mul_kronecker_mul Wab (1 : CMatrix (a × b)) (1 : CMatrix c) T).symm
     have hWab2 :
         Wab * Wab =
-          Matrix.kronecker
-            (CFC.rpow rhoA.m ((1 - alpha) / alpha))
+          (CFC.rpow rhoA.m ((1 - alpha) / alpha)) ⊗ₖ
             (CFC.rpow σB.m ((1 - alpha) / alpha)) := by
       unfold Wab sandwichedMutualInformationABWeight
       let R : CMatrix a := CFC.rpow rhoA.m ((1 - alpha) / (2 * alpha))
@@ -704,23 +693,20 @@ theorem sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_t
           S * S = CFC.rpow σB.m ((1 - alpha) / alpha) := by
         simpa [S, s, mul_comm] using hσpow
       calc
-        Matrix.kronecker R S * Matrix.kronecker R S =
-            Matrix.kronecker (R * R) (S * S) := by
+        (R ⊗ₖ S) * (R ⊗ₖ S) =
+            (R * R) ⊗ₖ (S * S) := by
               exact (Matrix.mul_kronecker_mul R R S S).symm
-        _ = Matrix.kronecker
-              (CFC.rpow rhoA.m ((1 - alpha) / alpha))
+        _ = (CFC.rpow rhoA.m ((1 - alpha) / alpha)) ⊗ₖ
               (CFC.rpow σB.m ((1 - alpha) / alpha)) := by
               rw [hR, hS]
     calc
-      W * K * W = Matrix.kronecker Wab T * W := by rw [hWK]
-      _ = Matrix.kronecker Wab T * Matrix.kronecker Wab (1 : CMatrix c) := by
+      W * K * W = (Wab ⊗ₖ T) * W := by rw [hWK]
+      _ = (Wab ⊗ₖ T) * (Wab ⊗ₖ (1 : CMatrix c)) := by
             rfl
-      _ = Matrix.kronecker (Wab * Wab) (T * (1 : CMatrix c)) := by
+      _ = (Wab * Wab) ⊗ₖ (T * (1 : CMatrix c)) := by
             exact (Matrix.mul_kronecker_mul Wab Wab T (1 : CMatrix c)).symm
-      _ = Matrix.kronecker
-            (Matrix.kronecker
-              (CFC.rpow rhoA.m ((1 - alpha) / alpha))
-              (CFC.rpow σB.m ((1 - alpha) / alpha)))
+      _ = ((CFC.rpow rhoA.m ((1 - alpha) / alpha)) ⊗ₖ
+              (CFC.rpow σB.m ((1 - alpha) / alpha))) ⊗ₖ
             T := by
             rw [hWab2]
             simp
@@ -735,22 +721,18 @@ theorem sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_t
   rw [traceLeft_mul_trace_eq_trace_mul_kronecker_one_right,
     Ket.state_matrix]
   change
-    ((Matrix.kronecker
-          (Matrix.kronecker
-            (CFC.rpow rhoA.m ((1 - alpha) / alpha))
-            (CFC.rpow σB.m ((1 - alpha) / alpha)))
-          T *
+    (((((CFC.rpow rhoA.m ((1 - alpha) / alpha)) ⊗ₖ
+            (CFC.rpow σB.m ((1 - alpha) / alpha))) ⊗ₖ
+          T) *
         rankOneMatrix ψ.vec).trace).re =
       ((rankOneMatrix
           (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha) *
         K).trace).re
   rw [hrank]
   calc
-    ((Matrix.kronecker
-          (Matrix.kronecker
-            (CFC.rpow rhoA.m ((1 - alpha) / alpha))
-            (CFC.rpow σB.m ((1 - alpha) / alpha)))
-          T *
+    (((((CFC.rpow rhoA.m ((1 - alpha) / alpha)) ⊗ₖ
+            (CFC.rpow σB.m ((1 - alpha) / alpha))) ⊗ₖ
+          T) *
         rankOneMatrix ψ.vec).trace).re =
         ((W * K * W * rankOneMatrix ψ.vec).trace).re := by rw [hWKW]
     _ = (((W * rankOneMatrix ψ.vec * W) * K).trace).re := by
@@ -784,8 +766,8 @@ theorem sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_t
   let s : ℝ := (1 - alpha) / (2 * alpha)
   let T : CMatrix c := CFC.rpow τC.m ((alpha - 1) / alpha)
   let Wab : CMatrix (a × b) := sandwichedMutualInformationABWeight rhoA σB alpha
-  let W : CMatrix ((a × b) × c) := Matrix.kronecker Wab (1 : CMatrix c)
-  let K : CMatrix ((a × b) × c) := Matrix.kronecker (1 : CMatrix (a × b)) T
+  let W : CMatrix ((a × b) × c) := Wab ⊗ₖ (1 : CMatrix c)
+  let K : CMatrix ((a × b) × c) := (1 : CMatrix (a × b)) ⊗ₖ T
   have hρpow :
       CFC.rpow rhoA.m s * CFC.rpow rhoA.m s =
         CFC.rpow rhoA.m ((1 - alpha) / alpha) := by
@@ -830,19 +812,16 @@ theorem sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_t
     exact (kronecker_isHermitian Wab (1 : CMatrix c) hWab (by simp)).eq
   have hWKW :
       W * K * W =
-        Matrix.kronecker
-          (Matrix.kronecker
-            (CFC.rpow rhoA.m ((1 - alpha) / alpha))
-            (CFC.rpow σB.m ((1 - alpha) / alpha)))
+        ((CFC.rpow rhoA.m ((1 - alpha) / alpha)) ⊗ₖ
+            (CFC.rpow σB.m ((1 - alpha) / alpha))) ⊗ₖ
           T := by
-    have hWK : W * K = Matrix.kronecker Wab T := by
+    have hWK : W * K = Wab ⊗ₖ T := by
       unfold W K
       simpa using
         (Matrix.mul_kronecker_mul Wab (1 : CMatrix (a × b)) (1 : CMatrix c) T).symm
     have hWab2 :
         Wab * Wab =
-          Matrix.kronecker
-            (CFC.rpow rhoA.m ((1 - alpha) / alpha))
+          (CFC.rpow rhoA.m ((1 - alpha) / alpha)) ⊗ₖ
             (CFC.rpow σB.m ((1 - alpha) / alpha)) := by
       unfold Wab sandwichedMutualInformationABWeight
       let R : CMatrix a := CFC.rpow rhoA.m ((1 - alpha) / (2 * alpha))
@@ -854,23 +833,20 @@ theorem sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_t
           S * S = CFC.rpow σB.m ((1 - alpha) / alpha) := by
         simpa [S, s, mul_comm] using hσpow
       calc
-        Matrix.kronecker R S * Matrix.kronecker R S =
-            Matrix.kronecker (R * R) (S * S) := by
+        (R ⊗ₖ S) * (R ⊗ₖ S) =
+            (R * R) ⊗ₖ (S * S) := by
               exact (Matrix.mul_kronecker_mul R R S S).symm
-        _ = Matrix.kronecker
-              (CFC.rpow rhoA.m ((1 - alpha) / alpha))
+        _ = (CFC.rpow rhoA.m ((1 - alpha) / alpha)) ⊗ₖ
               (CFC.rpow σB.m ((1 - alpha) / alpha)) := by
               rw [hR, hS]
     calc
-      W * K * W = Matrix.kronecker Wab T * W := by rw [hWK]
-      _ = Matrix.kronecker Wab T * Matrix.kronecker Wab (1 : CMatrix c) := by
+      W * K * W = (Wab ⊗ₖ T) * W := by rw [hWK]
+      _ = (Wab ⊗ₖ T) * (Wab ⊗ₖ (1 : CMatrix c)) := by
             rfl
-      _ = Matrix.kronecker (Wab * Wab) (T * (1 : CMatrix c)) := by
+      _ = (Wab * Wab) ⊗ₖ (T * (1 : CMatrix c)) := by
             exact (Matrix.mul_kronecker_mul Wab Wab T (1 : CMatrix c)).symm
-      _ = Matrix.kronecker
-            (Matrix.kronecker
-              (CFC.rpow rhoA.m ((1 - alpha) / alpha))
-              (CFC.rpow σB.m ((1 - alpha) / alpha)))
+      _ = ((CFC.rpow rhoA.m ((1 - alpha) / alpha)) ⊗ₖ
+              (CFC.rpow σB.m ((1 - alpha) / alpha))) ⊗ₖ
             T := by
             rw [hWab2]
             simp
@@ -885,22 +861,18 @@ theorem sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_t
   rw [traceLeft_mul_trace_eq_trace_mul_kronecker_one_right,
     Ket.state_matrix]
   change
-    ((Matrix.kronecker
-          (Matrix.kronecker
-            (CFC.rpow rhoA.m ((1 - alpha) / alpha))
-            (CFC.rpow σB.m ((1 - alpha) / alpha)))
-          T *
+    (((((CFC.rpow rhoA.m ((1 - alpha) / alpha)) ⊗ₖ
+            (CFC.rpow σB.m ((1 - alpha) / alpha))) ⊗ₖ
+          T) *
         rankOneMatrix ψ.vec).trace).re =
       ((rankOneMatrix
           (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha) *
         K).trace).re
   rw [hrank]
   calc
-    ((Matrix.kronecker
-          (Matrix.kronecker
-            (CFC.rpow rhoA.m ((1 - alpha) / alpha))
-            (CFC.rpow σB.m ((1 - alpha) / alpha)))
-          T *
+    (((((CFC.rpow rhoA.m ((1 - alpha) / alpha)) ⊗ₖ
+            (CFC.rpow σB.m ((1 - alpha) / alpha))) ⊗ₖ
+          T) *
         rankOneMatrix ψ.vec).trace).re =
         ((W * K * W * rankOneMatrix ψ.vec).trace).re := by rw [hWKW]
     _ = (((W * rankOneMatrix ψ.vec * W) * K).trace).re := by
@@ -1342,10 +1314,10 @@ theorem traceRight_rankOne_weightedPurificationAmp_eq_referenceInner
       Matrix.traceRight (rankOneMatrix ψ.vec) *
         Matrix.conjTranspose
           (sandwichedMutualInformationABWeight ψ.state.marginalAB.traceRight σB alpha) =
-    CFC.rpow (Matrix.kronecker ψ.state.marginalAB.traceRight.m σB.m)
+    CFC.rpow (ψ.state.marginalAB.traceRight.m ⊗ₖ σB.m)
         ((1 - alpha) / (2 * alpha)) *
       ψ.state.marginalAB.m *
-      CFC.rpow (Matrix.kronecker ψ.state.marginalAB.traceRight.m σB.m)
+      CFC.rpow (ψ.state.marginalAB.traceRight.m ⊗ₖ σB.m)
         ((1 - alpha) / (2 * alpha))
   rw [cMatrix_rpow_kronecker hA.posSemidef hσ.posSemidef ((1 - alpha) / (2 * alpha))]
   change W * Matrix.traceRight (rankOneMatrix ψ.vec) *

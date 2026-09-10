@@ -29,7 +29,7 @@ characterization from [Tomamichel2015FiniteResources, calculus.tex:81-89] and
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 open scoped Topology
 open scoped Matrix.Norms.L2Operator QIT.MatrixL2
 open Set
@@ -52,23 +52,23 @@ def conditionalMinEntropyScaleFeasiblePairSet
     Set (MState (a × b) × CMatrix b) :=
   ({ρ' : MState (a × b) | ρ.purifiedBall ε ρ'} ×ˢ
       SubnormalizedState.psdTraceBoundedMatrixSet b B) ∩
-    {p | p.1.m ≤ Matrix.kronecker (1 : CMatrix a) p.2}
+    {p | p.1.m ≤ (1 : CMatrix a) ⊗ₖ p.2}
 
 /-- The matrix-order constraint in the normalized feasible-pair domain is
 closed. -/
 theorem conditionalMinEntropyScaleFeasiblePair_order_isClosed :
     IsClosed
       ({p : MState (a × b) × CMatrix b |
-        p.1.m ≤ Matrix.kronecker (1 : CMatrix a) p.2}) := by
+        p.1.m ≤ (1 : CMatrix a) ⊗ₖ p.2}) := by
   let f : MState (a × b) × CMatrix b → CMatrix (a × b) :=
-    fun p => Matrix.kronecker (1 : CMatrix a) p.2 - p.1.m
+    fun p => (1 : CMatrix a) ⊗ₖ p.2 - p.1.m
   have hf : Continuous f := by
     exact ((SubnormalizedState.continuous_kronecker_one_matrix (a := a) (b := b)).comp
         continuous_snd).sub
       (MState.continuous_matrix.comp continuous_fst)
   have hset :
       {p : MState (a × b) × CMatrix b |
-        p.1.m ≤ Matrix.kronecker (1 : CMatrix a) p.2} =
+        p.1.m ≤ (1 : CMatrix a) ⊗ₖ p.2} =
       {p | f p ∈ ({M : CMatrix (a × b) | M.PosSemidef} : Set (CMatrix (a × b)))} := by
     ext p
     simp [f, Matrix.le_iff]
@@ -461,9 +461,9 @@ theorem cqState_toSubnormalized_sourceCoordinatePinch
   refine Finset.sum_congr rfl fun z _ => ?_
   change (SubnormalizedState.sourceCoordinatePinchChannel (a := ι) (b := b)).map
       ((E.probs z : ℂ) •
-        Matrix.kronecker (Matrix.single z z (1 : ℂ)) (E.states z).m) =
+        ((Matrix.single z z (1 : ℂ)) ⊗ₖ (E.states z).m)) =
     (E.probs z : ℂ) •
-      Matrix.kronecker (Matrix.single z z (1 : ℂ)) (E.states z).m
+      (Matrix.single z z (1 : ℂ)) ⊗ₖ (E.states z).m
   rw [map_smul]
   rw [SubnormalizedState.sourceCoordinatePinchChannel_map_singleTensor]
 
@@ -1007,10 +1007,9 @@ private theorem identityTensorStateMatrix_eq_blockDiagonal (σ : MState b) :
       congrFun (congrFun (Classical.blockDiagonal_block_self
         (fun _ : ι => σ.m) x) i) j
     simp only [Classical.block] at hblock
-    simpa [MState.identityTensorStateMatrix, Matrix.kronecker, Matrix.kroneckerMap_apply]
+    simpa [MState.identityTensorStateMatrix, Matrix.kroneckerMap_apply]
       using hblock.symm
-  · simp [Classical.blockDiagonal, MState.identityTensorStateMatrix, Matrix.kronecker,
-      Matrix.kroneckerMap_apply, hxx']
+  · simp [Classical.blockDiagonal, MState.identityTensorStateMatrix, Matrix.kroneckerMap_apply, hxx']
     have hblock :=
       congrFun (congrFun (Classical.blockDiagonal_block_ne
         (fun _ : ι => σ.m) hxx') i) j
@@ -1320,8 +1319,7 @@ omit [Fintype ι] in
 private theorem identityTensorStateMatrix_block_self (σ : MState b) (x : ι) :
     Classical.block (MState.identityTensorStateMatrix (a := ι) σ) x x = σ.m := by
   ext i j
-  simp [Classical.block, MState.identityTensorStateMatrix, Matrix.kronecker,
-    Matrix.kroneckerMap_apply]
+  simp [Classical.block, MState.identityTensorStateMatrix, Matrix.kroneckerMap_apply]
 
 /-- Every conditional-min-entropy feasible pair gives a feasible matrix for the
 cq guessing dual program. -/
@@ -1430,7 +1428,7 @@ theorem cqDualFeasible_iff_conditionalMinEntropyScaleFeasible
       intro x
       simpa [Matrix.le_iff] using hT.2 x
     have hmatrix :
-        Matrix.kronecker (1 : CMatrix ι) T - E.cqState.m =
+        (1 : CMatrix ι) ⊗ₖ T - E.cqState.m =
           Classical.blockDiagonal fun x => T - E.cqBlock x := by
       rw [Classical.identityTensor_eq_blockDiagonal, cqState_eq_blockDiagonal_cqBlock,
         ← Classical.blockDiagonal_sub]
@@ -1441,13 +1439,13 @@ theorem cqDualFeasible_iff_conditionalMinEntropyScaleFeasible
     rw [Matrix.le_iff]
     have hsub := hT.2.submatrix (fun i : b => (x, i))
     have hmatrix :
-        Matrix.kronecker (1 : CMatrix ι) T - E.cqState.m =
+        (1 : CMatrix ι) ⊗ₖ T - E.cqState.m =
           Classical.blockDiagonal fun y => T - E.cqBlock y := by
       rw [Classical.identityTensor_eq_blockDiagonal, cqState_eq_blockDiagonal_cqBlock,
         ← Classical.blockDiagonal_sub]
     change
       (Classical.block
-        (Matrix.kronecker (1 : CMatrix ι) T - E.cqState.m) x x).PosSemidef at hsub
+        ((1 : CMatrix ι) ⊗ₖ T - E.cqState.m) x x).PosSemidef at hsub
     rw [hmatrix, Classical.blockDiagonal_block_self] at hsub
     exact hsub
 

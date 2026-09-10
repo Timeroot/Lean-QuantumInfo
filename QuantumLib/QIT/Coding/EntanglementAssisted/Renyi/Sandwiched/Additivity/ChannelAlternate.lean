@@ -19,7 +19,7 @@ spine for entanglement-assisted classical communication.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Pointwise
+open scoped ComplexOrder MatrixOrder Kronecker Pointwise
 
 universe u1 v1 u2 v2
 
@@ -120,10 +120,10 @@ theorem sandwichedSideWeightMap_apply_ne_zero_of_posDef
 theorem referenceKron_sandwichedSideWeightMap_apply
     (sigma : MState b1) (alpha : ℝ) (X : CMatrix (a1 × b1)) :
     MatrixMap.kron (CPTPOp.id (dIn := a1)).map (sandwichedSideWeightMap sigma alpha) X =
-      Matrix.kronecker (1 : CMatrix a1)
-          (CFC.rpow sigma.m ((1 - alpha) / (2 * alpha))) *
+      ((1 : CMatrix a1) ⊗ₖ
+          (CFC.rpow sigma.m ((1 - alpha) / (2 * alpha)))) *
         X *
-        (Matrix.kronecker (1 : CMatrix a1)
+        ((1 : CMatrix a1) ⊗ₖ
           (CFC.rpow sigma.m ((1 - alpha) / (2 * alpha)))).conjTranspose := by
   have hid : (CPTPOp.id (dIn := a1)).map =
       MatrixMap.ofKraus (fun _ : Unit => (1 : CMatrix a1)) := by
@@ -141,7 +141,7 @@ theorem referenceKron_sandwichedSideWeightMap_apply_ne_zero_of_posDef
         (sandwichedSideWeightMap sigma alpha) X ≠ 0 := by
   let s : ℝ := (1 - alpha) / (2 * alpha)
   let C : CMatrix b1 := CFC.rpow sigma.m s
-  let D : CMatrix (a1 × b1) := Matrix.kronecker (1 : CMatrix a1) C
+  let D : CMatrix (a1 × b1) := (1 : CMatrix a1) ⊗ₖ C
   have hC : C.PosDef := by
     simpa [C, s] using cMatrix_rpow_posDef_of_posDef hsigma s
   have hD : D.PosDef := by
@@ -335,7 +335,7 @@ theorem cbOneToAlphaOriginalInput_eq_zero_of_trace_zero
     one_div_ne_zero (mul_ne_zero two_ne_zero (ne_of_gt halpha))
   unfold cbOneToAlphaOriginalInput cbOneToAlphaReferenceWeight
   rw [hYzero, CFC.zero_rpow (A := CMatrix a1) hexp_ne]
-  simp [Matrix.kronecker]
+  simp
 
 /-- Zero-trace source-side inputs contribute zero to the source Choi/Gamma
 CB-norm value.
@@ -409,7 +409,7 @@ theorem cbOneToAlphaReferenceWeight_pos_real_smul
   unfold cbOneToAlphaReferenceWeight
   rw [cMatrix_rpow_real_smul_posSemidef_schatten hY (le_of_lt ht)]
   ext p q
-  simp [Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.smul_apply, mul_assoc]
+  simp [Matrix.kroneckerMap_apply, Matrix.smul_apply, mul_assoc]
 
 /-- Positive real scaling of the source-side CB original input.
 
@@ -831,18 +831,16 @@ theorem sandwichedSideWeightMap_prod_posDef
   ext X bd bd'
   simp [MatrixMap.ofKraus, MatrixMap.krausProduct]
   change
-    (CFC.rpow (Matrix.kronecker sigma1.m sigma2.m)
+    (CFC.rpow (sigma1.m ⊗ₖ sigma2.m)
           ((1 - alpha) / (2 * alpha)) *
         X *
-        (CFC.rpow (Matrix.kronecker sigma1.m sigma2.m)
+        (CFC.rpow (sigma1.m ⊗ₖ sigma2.m)
           ((1 - alpha) / (2 * alpha))).conjTranspose)
         bd bd' =
-      (Matrix.kronecker
-          (CFC.rpow sigma1.m ((1 - alpha) / (2 * alpha)))
-          (CFC.rpow sigma2.m ((1 - alpha) / (2 * alpha))) *
+      (((CFC.rpow sigma1.m ((1 - alpha) / (2 * alpha))) ⊗ₖ
+          (CFC.rpow sigma2.m ((1 - alpha) / (2 * alpha)))) *
         X *
-        (Matrix.kronecker
-          (CFC.rpow sigma1.m ((1 - alpha) / (2 * alpha)))
+        ((CFC.rpow sigma1.m ((1 - alpha) / (2 * alpha))) ⊗ₖ
           (CFC.rpow sigma2.m ((1 - alpha) / (2 * alpha)))).conjTranspose)
         bd bd'
   rw [cMatrix_rpow_kronecker hsigma1.posSemidef hsigma2.posSemidef ((1 - alpha) / (2 * alpha))]
@@ -876,18 +874,18 @@ channel acts on the second tensor factor. -/
 theorem referenceLift_referenceSandwich
     (Phi : MatrixMap a1 b1) (W : CMatrix a1) (X : CMatrix (a1 × a1)) :
     MatrixMap.referenceLift Phi
-        (Matrix.kronecker W (1 : CMatrix a1) *
+        ((W ⊗ₖ (1 : CMatrix a1)) *
           X *
-          Matrix.kronecker W (1 : CMatrix a1)) =
-      Matrix.kronecker W (1 : CMatrix b1) *
+          (W ⊗ₖ (1 : CMatrix a1))) =
+      (W ⊗ₖ (1 : CMatrix b1)) *
         MatrixMap.referenceLift Phi X *
-        Matrix.kronecker W (1 : CMatrix b1) := by
+        (W ⊗ₖ (1 : CMatrix b1)) := by
   classical
   ext rb rb'
   rcases rb with ⟨r, b⟩
   rcases rb' with ⟨r', b'⟩
   simp only [MatrixMap.referenceLift, MatrixMap.kron_idChannel_left_apply_slice,
-    Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
+    Matrix.mul_apply, Matrix.kroneckerMap_apply, Matrix.one_apply,
     Fintype.sum_prod_type]
   simp only [eq_comm]
   have hleft :
@@ -1011,11 +1009,9 @@ theorem referenceLift_referenceSandwich
 
 theorem canonicalPurification_referenceSandwich_state_eq_cbOneToAlphaOriginalInput
     (tau : MState a1) {alpha : ℝ} (halpha : 1 < alpha) :
-    Matrix.kronecker
-        (CFC.rpow tau.m ((1 - alpha) / (2 * alpha))) (1 : CMatrix a1) *
+    ((CFC.rpow tau.m ((1 - alpha) / (2 * alpha))) ⊗ₖ (1 : CMatrix a1)) *
           (tau.canonicalPurification.reindex (Equiv.prodComm a1 a1)).state.m *
-        Matrix.kronecker
-          (CFC.rpow tau.m ((1 - alpha) / (2 * alpha))) (1 : CMatrix a1) =
+        ((CFC.rpow tau.m ((1 - alpha) / (2 * alpha))) ⊗ₖ (1 : CMatrix a1)) =
       MatrixMap.cbOneToAlphaOriginalInput tau.m alpha := by
   let s : ℝ := (1 - alpha) / (2 * alpha)
   let R : CMatrix a1 := CFC.rpow tau.m (1 / (2 * alpha))
@@ -1071,7 +1067,7 @@ theorem canonicalPurification_referenceSandwich_state_eq_cbOneToAlphaOriginalInp
   ext ra ra'
   rcases ra with ⟨r, x⟩
   rcases ra' with ⟨r', x'⟩
-  simp only [Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  simp only [Matrix.mul_apply, Matrix.kroneckerMap_apply,
     Matrix.one_apply, rankOneMatrix_apply]
   calc
     (∑ y : a1 × a1,
@@ -1337,101 +1333,101 @@ theorem swappedCanonical_referenceInner_eq_referenceLift_cbOneToAlphaOriginalInp
       _ = tau := by
         simpa [psi] using MState.canonicalPurification_reindex_prodComm_traceRight tau
   have hstateSandwich :
-      Matrix.kronecker Wtau (1 : CMatrix a1) * psi.state.m *
-          Matrix.kronecker Wtau (1 : CMatrix a1) =
+      (Wtau ⊗ₖ (1 : CMatrix a1)) * psi.state.m *
+          (Wtau ⊗ₖ (1 : CMatrix a1)) =
         MatrixMap.cbOneToAlphaOriginalInput tau.m alpha := by
     simpa [psi, Wtau, s] using
       MatrixMap.canonicalPurification_referenceSandwich_state_eq_cbOneToAlphaOriginalInput
         tau halpha
   have hreferenceSandwich :
       MatrixMap.referenceLift N.map
-          (Matrix.kronecker Wtau (1 : CMatrix a1) * psi.state.m *
-            Matrix.kronecker Wtau (1 : CMatrix a1)) =
-        Matrix.kronecker Wtau (1 : CMatrix b1) *
+          ((Wtau ⊗ₖ (1 : CMatrix a1)) * psi.state.m *
+            (Wtau ⊗ₖ (1 : CMatrix a1))) =
+        (Wtau ⊗ₖ (1 : CMatrix b1)) *
           MatrixMap.referenceLift N.map psi.state.m *
-          Matrix.kronecker Wtau (1 : CMatrix b1) := by
+          (Wtau ⊗ₖ (1 : CMatrix b1)) := by
     exact MatrixMap.referenceLift_referenceSandwich N.map Wtau psi.state.m
   have hBA :
-      Matrix.kronecker (1 : CMatrix a1) Wsigma *
-          Matrix.kronecker Wtau (1 : CMatrix b1) =
-        Matrix.kronecker Wtau Wsigma := by
+      ((1 : CMatrix a1) ⊗ₖ Wsigma) *
+          (Wtau ⊗ₖ (1 : CMatrix b1)) =
+        Wtau ⊗ₖ Wsigma := by
     calc
-      Matrix.kronecker (1 : CMatrix a1) Wsigma *
-          Matrix.kronecker Wtau (1 : CMatrix b1) =
-        Matrix.kronecker ((1 : CMatrix a1) * Wtau)
+      ((1 : CMatrix a1) ⊗ₖ Wsigma) *
+          (Wtau ⊗ₖ (1 : CMatrix b1)) =
+        ((1 : CMatrix a1) * Wtau) ⊗ₖ
           (Wsigma * (1 : CMatrix b1)) := by
             exact (Matrix.mul_kronecker_mul
               (1 : CMatrix a1) Wtau Wsigma (1 : CMatrix b1)).symm
-      _ = Matrix.kronecker Wtau Wsigma := by simp
+      _ = Wtau ⊗ₖ Wsigma := by simp
   have hAB :
-      Matrix.kronecker Wtau (1 : CMatrix b1) *
-          Matrix.kronecker (1 : CMatrix a1) Wsigma =
-        Matrix.kronecker Wtau Wsigma := by
+      (Wtau ⊗ₖ (1 : CMatrix b1)) *
+          ((1 : CMatrix a1) ⊗ₖ Wsigma) =
+        Wtau ⊗ₖ Wsigma := by
     calc
-      Matrix.kronecker Wtau (1 : CMatrix b1) *
-          Matrix.kronecker (1 : CMatrix a1) Wsigma =
-        Matrix.kronecker (Wtau * (1 : CMatrix a1))
+      (Wtau ⊗ₖ (1 : CMatrix b1)) *
+          ((1 : CMatrix a1) ⊗ₖ Wsigma) =
+        (Wtau * (1 : CMatrix a1)) ⊗ₖ
           ((1 : CMatrix b1) * Wsigma) := by
             exact (Matrix.mul_kronecker_mul
               Wtau (1 : CMatrix a1) (1 : CMatrix b1) Wsigma).symm
-      _ = Matrix.kronecker Wtau Wsigma := by simp
+      _ = Wtau ⊗ₖ Wsigma := by simp
   have hpow :
-      CFC.rpow (Matrix.kronecker tau.m sigma.m) s =
-        Matrix.kronecker Wtau Wsigma := by
+      CFC.rpow (tau.m ⊗ₖ sigma.m) s =
+        Wtau ⊗ₖ Wsigma := by
     simpa [Wtau, Wsigma] using
       cMatrix_rpow_kronecker tau.psd sigma.psd s
   calc
     MState.sandwichedRenyiReferenceInner (N.hypothesisTestingOutputState psi)
         ((N.hypothesisTestingOutputState psi).traceRight.prod sigma).m alpha
         =
-      Matrix.kronecker Wtau Wsigma *
+      (Wtau ⊗ₖ Wsigma) *
         MatrixMap.referenceLift N.map psi.state.m *
-        Matrix.kronecker Wtau Wsigma := by
+        (Wtau ⊗ₖ Wsigma) := by
           unfold MState.sandwichedRenyiReferenceInner
           change
             CFC.rpow ((N.hypothesisTestingOutputState psi).traceRight.prod sigma).m s *
                 (N.hypothesisTestingOutputState psi).m *
               CFC.rpow ((N.hypothesisTestingOutputState psi).traceRight.prod sigma).m s =
-            Matrix.kronecker Wtau Wsigma *
+            (Wtau ⊗ₖ Wsigma) *
                 MatrixMap.referenceLift N.map psi.state.m *
-              Matrix.kronecker Wtau Wsigma
-          rw [hmarg, MState.prod_m, ← Matrix.kronecker, hpow]
+              Wtau ⊗ₖ Wsigma
+          rw [hmarg, MState.prod_m, hpow]
           rw [CPTPOp.hypothesisTestingOutputState_matrix_referenceLift]
     _ =
-      Matrix.kronecker (1 : CMatrix a1) Wsigma *
-        (Matrix.kronecker Wtau (1 : CMatrix b1) *
+      ((1 : CMatrix a1) ⊗ₖ Wsigma) *
+        ((Wtau ⊗ₖ (1 : CMatrix b1)) *
           MatrixMap.referenceLift N.map psi.state.m *
-          Matrix.kronecker Wtau (1 : CMatrix b1)) *
-        Matrix.kronecker (1 : CMatrix a1) Wsigma := by
+          (Wtau ⊗ₖ (1 : CMatrix b1))) *
+        ((1 : CMatrix a1) ⊗ₖ Wsigma) := by
           calc
-            Matrix.kronecker Wtau Wsigma *
+            (Wtau ⊗ₖ Wsigma) *
                 MatrixMap.referenceLift N.map psi.state.m *
-              Matrix.kronecker Wtau Wsigma =
-              (Matrix.kronecker (1 : CMatrix a1) Wsigma *
-                  Matrix.kronecker Wtau (1 : CMatrix b1)) *
+              (Wtau ⊗ₖ Wsigma) =
+              (((1 : CMatrix a1) ⊗ₖ Wsigma) *
+                  (Wtau ⊗ₖ (1 : CMatrix b1))) *
                 MatrixMap.referenceLift N.map psi.state.m *
-                (Matrix.kronecker Wtau (1 : CMatrix b1) *
-                  Matrix.kronecker (1 : CMatrix a1) Wsigma) := by
+                ((Wtau ⊗ₖ (1 : CMatrix b1)) *
+                  ((1 : CMatrix a1) ⊗ₖ Wsigma)) := by
                   rw [hBA, hAB]
             _ =
-              Matrix.kronecker (1 : CMatrix a1) Wsigma *
-                (Matrix.kronecker Wtau (1 : CMatrix b1) *
+              ((1 : CMatrix a1) ⊗ₖ Wsigma) *
+                ((Wtau ⊗ₖ (1 : CMatrix b1)) *
                   MatrixMap.referenceLift N.map psi.state.m *
-                  Matrix.kronecker Wtau (1 : CMatrix b1)) *
-                Matrix.kronecker (1 : CMatrix a1) Wsigma := by
+                  (Wtau ⊗ₖ (1 : CMatrix b1))) *
+                ((1 : CMatrix a1) ⊗ₖ Wsigma) := by
                   noncomm_ring
     _ =
-      Matrix.kronecker (1 : CMatrix a1) Wsigma *
+      ((1 : CMatrix a1) ⊗ₖ Wsigma) *
         MatrixMap.referenceLift N.map
-          (Matrix.kronecker Wtau (1 : CMatrix a1) * psi.state.m *
-            Matrix.kronecker Wtau (1 : CMatrix a1)) *
-        Matrix.kronecker (1 : CMatrix a1) Wsigma := by
+          ((Wtau ⊗ₖ (1 : CMatrix a1)) * psi.state.m *
+            (Wtau ⊗ₖ (1 : CMatrix a1))) *
+        ((1 : CMatrix a1) ⊗ₖ Wsigma) := by
           rw [hreferenceSandwich]
     _ =
-      Matrix.kronecker (1 : CMatrix a1) Wsigma *
+      ((1 : CMatrix a1) ⊗ₖ Wsigma) *
         MatrixMap.referenceLift N.map
           (MatrixMap.cbOneToAlphaOriginalInput tau.m alpha) *
-        Matrix.kronecker (1 : CMatrix a1) Wsigma := by
+        ((1 : CMatrix a1) ⊗ₖ Wsigma) := by
           rw [hstateSandwich]
     _ =
       MatrixMap.referenceLift (sandwichedSideWeightedMap N sigma alpha)
@@ -1442,8 +1438,8 @@ theorem swappedCanonical_referenceInner_eq_referenceLift_cbOneToAlphaOriginalInp
           have hWherm : Wsigma.conjTranspose = Wsigma := by
             exact (cMatrix_rpow_posSemidef (A := sigma.m) (s := s) sigma.psd).isHermitian.eq
           have hDherm :
-              (Matrix.kronecker (1 : CMatrix a1) Wsigma).conjTranspose =
-                Matrix.kronecker (1 : CMatrix a1) Wsigma := by
+              ((1 : CMatrix a1) ⊗ₖ Wsigma).conjTranspose =
+                (1 : CMatrix a1) ⊗ₖ Wsigma := by
             exact (Matrix.PosSemidef.one.kronecker
               (cMatrix_rpow_posSemidef (A := sigma.m) (s := s) sigma.psd)).isHermitian.eq
           rw [hDherm]
@@ -1462,7 +1458,7 @@ theorem referenceInner_eq_referenceLift_weightedRankOne
     let s : ℝ := (1 - alpha) / (2 * alpha)
     let weighted : a1 × a1 → ℂ :=
       Matrix.mulVec
-        (Matrix.kronecker (CFC.rpow psi.state.traceRight.m s) (1 : CMatrix a1))
+        ((CFC.rpow psi.state.traceRight.m s) ⊗ₖ (1 : CMatrix a1))
         psi.vec
     MState.sandwichedRenyiReferenceInner (N.hypothesisTestingOutputState psi)
         ((N.hypothesisTestingOutputState psi).traceRight.prod sigma).m alpha =
@@ -1471,7 +1467,7 @@ theorem referenceInner_eq_referenceLift_weightedRankOne
   intro s weighted
   let Wtau : CMatrix a1 := CFC.rpow psi.state.traceRight.m s
   let Wsigma : CMatrix b1 := CFC.rpow sigma.m s
-  let M : CMatrix (a1 × a1) := Matrix.kronecker Wtau (1 : CMatrix a1)
+  let M : CMatrix (a1 × a1) := Wtau ⊗ₖ (1 : CMatrix a1)
   have hmarg :
       (N.hypothesisTestingOutputState psi).traceRight = psi.state.traceRight :=
     CPTPOp.hypothesisTestingOutputState_traceRight N psi
@@ -1490,12 +1486,12 @@ theorem referenceInner_eq_referenceLift_weightedRankOne
     ext i
     simp [Matrix.mulVec, Matrix.vecMul, dotProduct, Matrix.conjTranspose, mul_comm]
   have hstateSandwich :
-      Matrix.kronecker Wtau (1 : CMatrix a1) * psi.state.m *
-          Matrix.kronecker Wtau (1 : CMatrix a1) =
+      (Wtau ⊗ₖ (1 : CMatrix a1)) * psi.state.m *
+          (Wtau ⊗ₖ (1 : CMatrix a1)) =
         rankOneMatrix weighted := by
     calc
-      Matrix.kronecker Wtau (1 : CMatrix a1) * psi.state.m *
-          Matrix.kronecker Wtau (1 : CMatrix a1) =
+      (Wtau ⊗ₖ (1 : CMatrix a1)) * psi.state.m *
+          (Wtau ⊗ₖ (1 : CMatrix a1)) =
         M * rankOneMatrix psi.vec * Matrix.conjTranspose M := by
           rw [Ket.state_matrix]
           change M * rankOneMatrix psi.vec * M =
@@ -1506,92 +1502,92 @@ theorem referenceInner_eq_referenceLift_weightedRankOne
           rfl
   have hreferenceSandwich :
       MatrixMap.referenceLift N.map
-          (Matrix.kronecker Wtau (1 : CMatrix a1) * psi.state.m *
-            Matrix.kronecker Wtau (1 : CMatrix a1)) =
-        Matrix.kronecker Wtau (1 : CMatrix b1) *
+          ((Wtau ⊗ₖ (1 : CMatrix a1)) * psi.state.m *
+            (Wtau ⊗ₖ (1 : CMatrix a1))) =
+        (Wtau ⊗ₖ (1 : CMatrix b1)) *
           MatrixMap.referenceLift N.map psi.state.m *
-          Matrix.kronecker Wtau (1 : CMatrix b1) := by
+          (Wtau ⊗ₖ (1 : CMatrix b1)) := by
     exact MatrixMap.referenceLift_referenceSandwich N.map Wtau psi.state.m
   have hBA :
-      Matrix.kronecker (1 : CMatrix a1) Wsigma *
-          Matrix.kronecker Wtau (1 : CMatrix b1) =
-        Matrix.kronecker Wtau Wsigma := by
+      ((1 : CMatrix a1) ⊗ₖ Wsigma) *
+          (Wtau ⊗ₖ (1 : CMatrix b1)) =
+        Wtau ⊗ₖ Wsigma := by
     calc
-      Matrix.kronecker (1 : CMatrix a1) Wsigma *
-          Matrix.kronecker Wtau (1 : CMatrix b1) =
-        Matrix.kronecker ((1 : CMatrix a1) * Wtau)
+      ((1 : CMatrix a1) ⊗ₖ Wsigma) *
+          (Wtau ⊗ₖ (1 : CMatrix b1)) =
+        ((1 : CMatrix a1) * Wtau) ⊗ₖ
           (Wsigma * (1 : CMatrix b1)) := by
             exact (Matrix.mul_kronecker_mul
               (1 : CMatrix a1) Wtau Wsigma (1 : CMatrix b1)).symm
-      _ = Matrix.kronecker Wtau Wsigma := by simp
+      _ = Wtau ⊗ₖ Wsigma := by simp
   have hAB :
-      Matrix.kronecker Wtau (1 : CMatrix b1) *
-          Matrix.kronecker (1 : CMatrix a1) Wsigma =
-        Matrix.kronecker Wtau Wsigma := by
+      (Wtau ⊗ₖ (1 : CMatrix b1)) *
+          ((1 : CMatrix a1) ⊗ₖ Wsigma) =
+        Wtau ⊗ₖ Wsigma := by
     calc
-      Matrix.kronecker Wtau (1 : CMatrix b1) *
-          Matrix.kronecker (1 : CMatrix a1) Wsigma =
-        Matrix.kronecker (Wtau * (1 : CMatrix a1))
+      (Wtau ⊗ₖ (1 : CMatrix b1)) *
+          ((1 : CMatrix a1) ⊗ₖ Wsigma) =
+        (Wtau * (1 : CMatrix a1)) ⊗ₖ
           ((1 : CMatrix b1) * Wsigma) := by
             exact (Matrix.mul_kronecker_mul
               Wtau (1 : CMatrix a1) (1 : CMatrix b1) Wsigma).symm
-      _ = Matrix.kronecker Wtau Wsigma := by simp
+      _ = Wtau ⊗ₖ Wsigma := by simp
   have hpow :
-      CFC.rpow (Matrix.kronecker psi.state.traceRight.m sigma.m) s =
-        Matrix.kronecker Wtau Wsigma := by
+      CFC.rpow (psi.state.traceRight.m ⊗ₖ sigma.m) s =
+        Wtau ⊗ₖ Wsigma := by
     simpa [Wtau, Wsigma] using
       cMatrix_rpow_kronecker psi.state.traceRight.psd hsigma.posSemidef s
   calc
     MState.sandwichedRenyiReferenceInner (N.hypothesisTestingOutputState psi)
         ((N.hypothesisTestingOutputState psi).traceRight.prod sigma).m alpha
         =
-      Matrix.kronecker Wtau Wsigma *
+      (Wtau ⊗ₖ Wsigma) *
         MatrixMap.referenceLift N.map psi.state.m *
-        Matrix.kronecker Wtau Wsigma := by
+        (Wtau ⊗ₖ Wsigma) := by
           unfold MState.sandwichedRenyiReferenceInner
           change
             CFC.rpow ((N.hypothesisTestingOutputState psi).traceRight.prod sigma).m s *
                 (N.hypothesisTestingOutputState psi).m *
               CFC.rpow ((N.hypothesisTestingOutputState psi).traceRight.prod sigma).m s =
-            Matrix.kronecker Wtau Wsigma *
+            (Wtau ⊗ₖ Wsigma) *
                 MatrixMap.referenceLift N.map psi.state.m *
-              Matrix.kronecker Wtau Wsigma
-          rw [hmarg, MState.prod_m, ← Matrix.kronecker, hpow]
+              Wtau ⊗ₖ Wsigma
+          rw [hmarg, MState.prod_m, hpow]
           rw [CPTPOp.hypothesisTestingOutputState_matrix_referenceLift]
     _ =
-      Matrix.kronecker (1 : CMatrix a1) Wsigma *
-        (Matrix.kronecker Wtau (1 : CMatrix b1) *
+      ((1 : CMatrix a1) ⊗ₖ Wsigma) *
+        ((Wtau ⊗ₖ (1 : CMatrix b1)) *
           MatrixMap.referenceLift N.map psi.state.m *
-          Matrix.kronecker Wtau (1 : CMatrix b1)) *
-        Matrix.kronecker (1 : CMatrix a1) Wsigma := by
+          (Wtau ⊗ₖ (1 : CMatrix b1))) *
+        ((1 : CMatrix a1) ⊗ₖ Wsigma) := by
           calc
-            Matrix.kronecker Wtau Wsigma *
+            (Wtau ⊗ₖ Wsigma) *
                 MatrixMap.referenceLift N.map psi.state.m *
-              Matrix.kronecker Wtau Wsigma =
-              (Matrix.kronecker (1 : CMatrix a1) Wsigma *
-                  Matrix.kronecker Wtau (1 : CMatrix b1)) *
+              (Wtau ⊗ₖ Wsigma) =
+              (((1 : CMatrix a1) ⊗ₖ Wsigma) *
+                  (Wtau ⊗ₖ (1 : CMatrix b1))) *
                 MatrixMap.referenceLift N.map psi.state.m *
-                (Matrix.kronecker Wtau (1 : CMatrix b1) *
-                  Matrix.kronecker (1 : CMatrix a1) Wsigma) := by
+                ((Wtau ⊗ₖ (1 : CMatrix b1)) *
+                  ((1 : CMatrix a1) ⊗ₖ Wsigma)) := by
                   rw [hBA, hAB]
             _ =
-              Matrix.kronecker (1 : CMatrix a1) Wsigma *
-                (Matrix.kronecker Wtau (1 : CMatrix b1) *
+              ((1 : CMatrix a1) ⊗ₖ Wsigma) *
+                ((Wtau ⊗ₖ (1 : CMatrix b1)) *
                   MatrixMap.referenceLift N.map psi.state.m *
-                  Matrix.kronecker Wtau (1 : CMatrix b1)) *
-                Matrix.kronecker (1 : CMatrix a1) Wsigma := by
+                  (Wtau ⊗ₖ (1 : CMatrix b1))) *
+                ((1 : CMatrix a1) ⊗ₖ Wsigma) := by
                   noncomm_ring
     _ =
-      Matrix.kronecker (1 : CMatrix a1) Wsigma *
+      ((1 : CMatrix a1) ⊗ₖ Wsigma) *
         MatrixMap.referenceLift N.map
-          (Matrix.kronecker Wtau (1 : CMatrix a1) * psi.state.m *
-            Matrix.kronecker Wtau (1 : CMatrix a1)) *
-        Matrix.kronecker (1 : CMatrix a1) Wsigma := by
+          ((Wtau ⊗ₖ (1 : CMatrix a1)) * psi.state.m *
+            (Wtau ⊗ₖ (1 : CMatrix a1))) *
+        ((1 : CMatrix a1) ⊗ₖ Wsigma) := by
           rw [hreferenceSandwich]
     _ =
-      Matrix.kronecker (1 : CMatrix a1) Wsigma *
+      ((1 : CMatrix a1) ⊗ₖ Wsigma) *
         MatrixMap.referenceLift N.map (rankOneMatrix weighted) *
-        Matrix.kronecker (1 : CMatrix a1) Wsigma := by
+        ((1 : CMatrix a1) ⊗ₖ Wsigma) := by
           rw [hstateSandwich]
     _ =
       MatrixMap.referenceLift (sandwichedSideWeightedMap N sigma alpha)
@@ -1600,8 +1596,8 @@ theorem referenceInner_eq_referenceLift_weightedRankOne
           rw [MatrixMap.referenceLift_comp_apply]
           rw [MatrixMap.referenceKron_sandwichedSideWeightMap_apply]
           have hDherm :
-              (Matrix.kronecker (1 : CMatrix a1) Wsigma).conjTranspose =
-                Matrix.kronecker (1 : CMatrix a1) Wsigma := by
+              ((1 : CMatrix a1) ⊗ₖ Wsigma).conjTranspose =
+                (1 : CMatrix a1) ⊗ₖ Wsigma := by
             exact (Matrix.PosSemidef.one.kronecker
               (cMatrix_rpow_posSemidef (A := sigma.m) (s := s) sigma.psd)).isHermitian.eq
           rw [hDherm]
@@ -1619,7 +1615,7 @@ theorem weightedRankOne_denominator_eq_one
     let s : ℝ := (1 - alpha) / (2 * alpha)
     let weighted : a1 × a1 → ℂ :=
       Matrix.mulVec
-        (Matrix.kronecker (CFC.rpow psi.state.traceRight.m s) (1 : CMatrix a1))
+        ((CFC.rpow psi.state.traceRight.m s) ⊗ₖ (1 : CMatrix a1))
         psi.vec
     psdSchattenPNorm
         (Matrix.traceRight (rankOneMatrix weighted))
@@ -1700,7 +1696,7 @@ theorem weightedRankOne_denominator_eq_one_psd
     let s : ℝ := (1 - alpha) / (2 * alpha)
     let weighted : a1 × a1 → ℂ :=
       Matrix.mulVec
-        (Matrix.kronecker (CFC.rpow psi.state.traceRight.m s) (1 : CMatrix a1))
+        ((CFC.rpow psi.state.traceRight.m s) ⊗ₖ (1 : CMatrix a1))
         psi.vec
     psdSchattenPNorm
         (Matrix.traceRight (rankOneMatrix weighted))
@@ -2164,8 +2160,7 @@ private theorem cbOneToAlphaReferenceWeight_continuousOn_posSemidef
     positivity
   have hpow := MState.cMatrix_rpow_continuousOn_posSemidef_of_pos (a := a1) hexp
   have hkr :
-      Continuous fun T : CMatrix a1 => Matrix.kronecker T (1 : CMatrix a1) := by
-    unfold Matrix.kronecker
+      Continuous fun T : CMatrix a1 => T ⊗ₖ (1 : CMatrix a1) := by
     exact _root_.continuous_matrix fun x y => by
       simpa [Matrix.kroneckerMap_apply, Pi.mul_def] using
         (continuous_id.matrix_elem x.1 y.1).mul continuous_const
@@ -2386,7 +2381,7 @@ private def sandwichedChannelReferenceKWMatrix
     CMatrix (a1 × b1) :=
   let base : CMatrix (a1 × b1) := sandwichedChannelReferenceBase N tau alpha
   CFC.sqrt base *
-    Matrix.kronecker (1 : CMatrix a1) (CFC.rpow M ((1 - alpha) / alpha)) *
+    ((1 : CMatrix a1) ⊗ₖ (CFC.rpow M ((1 - alpha) / alpha))) *
       CFC.sqrt base
 
 private theorem sandwichedChannelReferenceKWMatrix_posSemidef
@@ -2395,7 +2390,7 @@ private theorem sandwichedChannelReferenceKWMatrix_posSemidef
     (sandwichedChannelReferenceKWMatrix N tau alpha M).PosSemidef := by
   let base : CMatrix (a1 × b1) := sandwichedChannelReferenceBase N tau alpha
   let W : CMatrix (a1 × b1) :=
-    Matrix.kronecker (1 : CMatrix a1) (CFC.rpow M ((1 - alpha) / alpha))
+    (1 : CMatrix a1) ⊗ₖ (CFC.rpow M ((1 - alpha) / alpha))
   have hbase : base.PosSemidef := sandwichedChannelReferenceBase_posSemidef N tau alpha
   have hW : W.PosSemidef :=
     Matrix.PosSemidef.one.kronecker
@@ -2437,20 +2432,20 @@ private theorem cMatrix_reference_half_rpow_mul_self
 private theorem referenceWeight_mul_self_eq_referencePower
     {M : CMatrix b1} (hM : M.PosSemidef) {alpha : ℝ} (halpha : 1 < alpha) :
     let D : CMatrix (a1 × b1) :=
-      Matrix.kronecker (1 : CMatrix a1) (CFC.rpow M ((1 - alpha) / (2 * alpha)))
+      (1 : CMatrix a1) ⊗ₖ (CFC.rpow M ((1 - alpha) / (2 * alpha)))
     D * D =
-      Matrix.kronecker (1 : CMatrix a1) (CFC.rpow M ((1 - alpha) / alpha)) := by
+      (1 : CMatrix a1) ⊗ₖ (CFC.rpow M ((1 - alpha) / alpha)) := by
   intro D
   calc
     D * D =
-        Matrix.kronecker ((1 : CMatrix a1) * (1 : CMatrix a1))
+        ((1 : CMatrix a1) * (1 : CMatrix a1)) ⊗ₖ
           (CFC.rpow M ((1 - alpha) / (2 * alpha)) *
             CFC.rpow M ((1 - alpha) / (2 * alpha))) := by
           simpa [D] using
             (Matrix.mul_kronecker_mul (1 : CMatrix a1) (1 : CMatrix a1)
               (CFC.rpow M ((1 - alpha) / (2 * alpha)))
               (CFC.rpow M ((1 - alpha) / (2 * alpha)))).symm
-    _ = Matrix.kronecker (1 : CMatrix a1) (CFC.rpow M ((1 - alpha) / alpha)) := by
+    _ = (1 : CMatrix a1) ⊗ₖ (CFC.rpow M ((1 - alpha) / alpha)) := by
           rw [cMatrix_reference_half_rpow_mul_self hM halpha]
           simp
 
@@ -2487,7 +2482,7 @@ private theorem sandwichedChannelOriginalValueReferenceDensity_eq_kwMatrix_norm
     sandwichedSideWeightedMap_completelyPositive N sigma alpha
   let base : CMatrix (a1 × b1) := sandwichedChannelReferenceBase N tau alpha
   let D : CMatrix (a1 × b1) :=
-    Matrix.kronecker (1 : CMatrix a1) (CFC.rpow M ((1 - alpha) / (2 * alpha)))
+    (1 : CMatrix a1) ⊗ₖ (CFC.rpow M ((1 - alpha) / (2 * alpha)))
   let S : CMatrix (a1 × b1) := CFC.sqrt base
   let A : CMatrix (a1 × b1) := D * S
   let B : CMatrix (a1 × b1) := S * D
@@ -2503,7 +2498,7 @@ private theorem sandwichedChannelOriginalValueReferenceDensity_eq_kwMatrix_norm
     simpa [S] using CFC.sqrt_mul_sqrt_self base hbase.nonneg
   have hDsq :
       D * D =
-        Matrix.kronecker (1 : CMatrix a1) (CFC.rpow M ((1 - alpha) / alpha)) := by
+        (1 : CMatrix a1) ⊗ₖ (CFC.rpow M ((1 - alpha) / alpha)) := by
     simpa [D] using referenceWeight_mul_self_eq_referencePower (a1 := a1)
       hM.1.posSemidef halpha
   have hYeq :
@@ -2527,8 +2522,8 @@ private theorem sandwichedChannelOriginalValueReferenceDensity_eq_kwMatrix_norm
     calc
       B * A = S * D * (D * S) := by simp [A, B, Matrix.mul_assoc]
       _ = S * (D * D) * S := by noncomm_ring
-      _ = S * Matrix.kronecker (1 : CMatrix a1)
-            (CFC.rpow M ((1 - alpha) / alpha)) * S := by rw [hDsq]
+      _ = S * ((1 : CMatrix a1) ⊗ₖ
+            (CFC.rpow M ((1 - alpha) / alpha))) * S := by rw [hDsq]
       _ = sandwichedChannelReferenceKWMatrix N tau alpha M := by
             simp [S, base, sandwichedChannelReferenceKWMatrix, Matrix.mul_assoc]
   have hABpsd :
@@ -2579,21 +2574,21 @@ private theorem cMatrix_conj_le_conj
 omit [DecidableEq b1] in
 private theorem kronecker_one_left_le_of_le
     {A B : CMatrix b1} (hAB : A ≤ B) :
-    Matrix.kronecker (1 : CMatrix a1) A ≤ Matrix.kronecker (1 : CMatrix a1) B := by
+    (1 : CMatrix a1) ⊗ₖ A ≤ (1 : CMatrix a1) ⊗ₖ B := by
   rw [Matrix.le_iff]
   have hdiff : (B - A).PosSemidef := Matrix.le_iff.mp hAB
   have hdiffK :
-      (Matrix.kronecker (1 : CMatrix a1) (B - A)).PosSemidef :=
+      ((1 : CMatrix a1) ⊗ₖ (B - A)).PosSemidef :=
     Matrix.PosSemidef.one.kronecker hdiff
   have heq :
-      Matrix.kronecker (1 : CMatrix a1) B -
-          Matrix.kronecker (1 : CMatrix a1) A =
-        Matrix.kronecker (1 : CMatrix a1) (B - A) := by
+      (1 : CMatrix a1) ⊗ₖ B -
+          (1 : CMatrix a1) ⊗ₖ A =
+        (1 : CMatrix a1) ⊗ₖ (B - A) := by
     ext i j
     by_cases hij : i.1 = j.1
-    · simp [Matrix.kronecker, Matrix.kroneckerMap_apply,
+    · simp [Matrix.kroneckerMap_apply,
         sub_eq_add_neg, mul_add]
-    · simp [Matrix.kronecker, Matrix.kroneckerMap_apply, hij,
+    · simp [Matrix.kroneckerMap_apply, hij,
         sub_eq_add_neg]
   rw [heq]
   exact hdiffK
@@ -2613,9 +2608,9 @@ private theorem sandwichedChannelReferenceKWMatrix_le_convex_combo
   let PX : CMatrix b1 := CFC.rpow X p
   let PY : CMatrix b1 := CFC.rpow Y p
   let Pmix : CMatrix b1 := CFC.rpow (s • X + t • Y) p
-  let WX : CMatrix (a1 × b1) := Matrix.kronecker (1 : CMatrix a1) PX
-  let WY : CMatrix (a1 × b1) := Matrix.kronecker (1 : CMatrix a1) PY
-  let Wmix : CMatrix (a1 × b1) := Matrix.kronecker (1 : CMatrix a1) Pmix
+  let WX : CMatrix (a1 × b1) := (1 : CMatrix a1) ⊗ₖ PX
+  let WY : CMatrix (a1 × b1) := (1 : CMatrix a1) ⊗ₖ PY
+  let Wmix : CMatrix (a1 × b1) := (1 : CMatrix a1) ⊗ₖ Pmix
   have hp : p ∈ Set.Icc (-1 : ℝ) 0 := by
     constructor
     · dsimp [p]
@@ -2634,7 +2629,7 @@ private theorem sandwichedChannelReferenceKWMatrix_le_convex_combo
       Wmix ≤ s • WX + t • WY := by
     have hK := kronecker_one_left_le_of_le (a1 := a1) hpow
     have hlin :
-        Matrix.kronecker (1 : CMatrix a1) (s • PX + t • PY) =
+        (1 : CMatrix a1) ⊗ₖ (s • PX + t • PY) =
       s • WX + t • WY := by
       dsimp [WX, WY]
       rw [Matrix.kroneckerMap_add_right (fun x y : ℂ => x * y)
@@ -2871,8 +2866,8 @@ private theorem sandwichedChannelOriginalValueLogReferenceDensity_continuousOn_f
           (MState.fullRankDensityMatrixSet_subset_densityMatrixSet M.2))
         alpha) X
   let Yexplicit : S → CMatrix (a1 × b1) := fun M =>
-    Matrix.kronecker (1 : CMatrix a1) (W M) * base *
-      Matrix.kronecker (1 : CMatrix a1) (W M)
+    ((1 : CMatrix a1) ⊗ₖ (W M)) * base *
+      (1 : CMatrix a1) ⊗ₖ (W M)
   have hY_eq : Y = Yexplicit := by
     funext M
     dsimp [Y, Yexplicit, base, W]
@@ -2880,12 +2875,12 @@ private theorem sandwichedChannelOriginalValueLogReferenceDensity_continuousOn_f
     rw [MatrixMap.referenceLift_comp_apply]
     rw [MatrixMap.referenceKron_sandwichedSideWeightMap_apply]
     have hDherm :
-        (Matrix.kronecker (1 : CMatrix a1)
+        ((1 : CMatrix a1) ⊗ₖ
             (CFC.rpow
               (MState.densityMatrixSetState M.1
                 (MState.fullRankDensityMatrixSet_subset_densityMatrixSet M.2)).m
               ((1 - alpha) / (2 * alpha)))).conjTranspose =
-          Matrix.kronecker (1 : CMatrix a1)
+          (1 : CMatrix a1) ⊗ₖ
             (CFC.rpow
               (MState.densityMatrixSetState M.1
                 (MState.fullRankDensityMatrixSet_subset_densityMatrixSet M.2)).m
@@ -2901,8 +2896,7 @@ private theorem sandwichedChannelOriginalValueLogReferenceDensity_continuousOn_f
     simp [MState.densityMatrixSetState_matrix]
   have hYexplicit_cont : Continuous Yexplicit := by
     have hkr :
-        Continuous fun M : S => Matrix.kronecker (1 : CMatrix a1) (W M) := by
-      unfold Matrix.kronecker
+        Continuous fun M : S => (1 : CMatrix a1) ⊗ₖ (W M) := by
       exact _root_.continuous_matrix fun x y => by
         simpa [Matrix.kroneckerMap_apply, Pi.mul_def] using
           continuous_const.mul ((hWcont.matrix_elem x.2 y.2))
@@ -3422,7 +3416,7 @@ theorem inputSandwichedRenyiMutualInformationE_le_CBNormExpression
   let s : ℝ := (1 - alpha) / (2 * alpha)
   let weighted : a1 × a1 → ℂ :=
     Matrix.mulVec
-      (Matrix.kronecker (CFC.rpow psi.state.traceRight.m s) (1 : CMatrix a1))
+      ((CFC.rpow psi.state.traceRight.m s) ⊗ₖ (1 : CMatrix a1))
       psi.vec
   have halpha_pos : 0 < alpha := lt_trans zero_lt_one halpha
   have hmarg : rho.traceRight = psi.state.traceRight := by

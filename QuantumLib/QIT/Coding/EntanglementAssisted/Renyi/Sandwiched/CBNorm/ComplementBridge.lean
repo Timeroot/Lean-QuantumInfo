@@ -201,7 +201,7 @@ theorem cbOneToAlphaOriginalInput_eq_rankOne_rpow
         if x2 = x ∧ x1 = x' then R r x2 else 0 := by
           simp [cbOneToAlphaOriginalInput, cbOneToAlphaReferenceWeight,
             unnormalizedMaximallyEntangledProjector, MatrixMap.choi,
-            Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.mul_apply,
+            Matrix.kroneckerMap_apply, Matrix.mul_apply,
             Matrix.one_apply, Matrix.single, Fintype.sum_prod_type, R,
             mul_comm]
     _ = ∑ x1 : a, if x1 = x' then R x1 r' * R r x else 0 := by

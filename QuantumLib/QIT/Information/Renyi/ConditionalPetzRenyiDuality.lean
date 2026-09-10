@@ -33,7 +33,7 @@ here.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 open Matrix
 
@@ -238,17 +238,17 @@ This is the trace bookkeeping used in Tomamichel2015FiniteResources,
 purifying `ABC` system with an identity on `C`. -/
 theorem trace_left_right_kronecker_one_eq_traceRight
     (R : CMatrix (a × b)) (L M : CMatrix a) :
-    ((Matrix.kronecker L (1 : CMatrix b) * R *
-      Matrix.kronecker M (1 : CMatrix b)).trace).re =
+    (((L ⊗ₖ (1 : CMatrix b)) * R *
+      (M ⊗ₖ (1 : CMatrix b))).trace).re =
       ((L * Matrix.traceRight R * M).trace).re := by
   calc
-    ((Matrix.kronecker L (1 : CMatrix b) * R *
-        Matrix.kronecker M (1 : CMatrix b)).trace).re =
-        (((R * Matrix.kronecker M (1 : CMatrix b)) *
-          Matrix.kronecker L (1 : CMatrix b)).trace).re := by
+    (((L ⊗ₖ (1 : CMatrix b)) * R *
+        (M ⊗ₖ (1 : CMatrix b))).trace).re =
+        (((R * (M ⊗ₖ (1 : CMatrix b))) *
+          (L ⊗ₖ (1 : CMatrix b))).trace).re := by
           rw [Matrix.trace_mul_cycle, Matrix.trace_mul_cycle]
     _ = ((Matrix.traceRight
-          (R * Matrix.kronecker M (1 : CMatrix b)) * L).trace).re := by
+          (R * (M ⊗ₖ (1 : CMatrix b))) * L).trace).re := by
           rw [trace_mul_kronecker_one_right_eq_traceRight]
     _ = (((Matrix.traceRight R * M) * L).trace).re := by
           rw [traceRight_mul_kronecker_one_left]
@@ -434,10 +434,10 @@ omit [Fintype a] [Fintype b] [Fintype c] [DecidableEq c] in
 from `I_AB \otimes T_C` to `I_A \otimes T_C \otimes I_B`. -/
 theorem prodABCToACB_submatrix_refC
     (T : CMatrix c) :
-    (Matrix.kronecker (1 : CMatrix (a × b)) T).submatrix
+    ((1 : CMatrix (a × b)) ⊗ₖ T).submatrix
         (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c)).symm
         (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c)).symm =
-      Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) T) (1 : CMatrix b) := by
+      ((1 : CMatrix a) ⊗ₖ T) ⊗ₖ (1 : CMatrix b) := by
   ext x y
   rcases x with ⟨⟨i, k⟩, j⟩
   rcases y with ⟨⟨i', k'⟩, j'⟩
@@ -445,17 +445,17 @@ theorem prodABCToACB_submatrix_refC
   · subst i'
     by_cases hj : j = j'
     · subst j'
-      simp [Matrix.kronecker, QIT.prodABCToACBEquiv]
-    · simp [Matrix.kronecker, QIT.prodABCToACBEquiv, hj]
-  · simp [Matrix.kronecker, QIT.prodABCToACBEquiv, hi]
+      simp [QIT.prodABCToACBEquiv]
+    · simp [QIT.prodABCToACBEquiv, hj]
+  · simp [QIT.prodABCToACBEquiv, hi]
 
 omit [Fintype a] [Fintype b] [DecidableEq b] [Fintype c] in
 private theorem prodABCToACB_submatrix_refB
     (T : CMatrix b) :
-    (Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) T) (1 : CMatrix c)).submatrix
+    (((1 : CMatrix a) ⊗ₖ T) ⊗ₖ (1 : CMatrix c)).submatrix
         (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c)).symm
         (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c)).symm =
-      Matrix.kronecker (1 : CMatrix (a × c)) T := by
+      (1 : CMatrix (a × c)) ⊗ₖ T := by
   ext x y
   rcases x with ⟨⟨i, k⟩, j⟩
   rcases y with ⟨⟨i', k'⟩, j'⟩
@@ -463,41 +463,41 @@ private theorem prodABCToACB_submatrix_refB
   · subst i'
     by_cases hk : k = k'
     · subst k'
-      simp [Matrix.kronecker, QIT.prodABCToACBEquiv]
-    · simp [Matrix.kronecker, QIT.prodABCToACBEquiv, hk]
-  · simp [Matrix.kronecker, QIT.prodABCToACBEquiv, hi]
+      simp [QIT.prodABCToACBEquiv]
+    · simp [QIT.prodABCToACBEquiv, hk]
+  · simp [QIT.prodABCToACBEquiv, hi]
 
 private theorem prodABCToACB_projectorTrace_reindex
     (psi : Ket ((a × b) × c)) (TC : CMatrix c) (SB : CMatrix b) :
-    ((Matrix.kronecker (1 : CMatrix (a × b)) TC *
+    ((((1 : CMatrix (a × b)) ⊗ₖ TC) *
       psi.state.m *
-      Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) SB) (1 : CMatrix c)).trace).re =
-      ((Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) TC) (1 : CMatrix b) *
+      (((1 : CMatrix a) ⊗ₖ SB) ⊗ₖ (1 : CMatrix c))).trace).re =
+      (((((1 : CMatrix a) ⊗ₖ TC) ⊗ₖ (1 : CMatrix b)) *
         (psi.reindex
           (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c))).state.m *
-        Matrix.kronecker (1 : CMatrix (a × c)) SB).trace).re := by
+        ((1 : CMatrix (a × c)) ⊗ₖ SB)).trace).re := by
   let e := QIT.prodABCToACBEquiv (a := a) (b := b) (c := c)
-  let A : CMatrix ((a × b) × c) := Matrix.kronecker (1 : CMatrix (a × b)) TC
+  let A : CMatrix ((a × b) × c) := (1 : CMatrix (a × b)) ⊗ₖ TC
   let B : CMatrix ((a × b) × c) := psi.state.m
   let C : CMatrix ((a × b) × c) :=
-    Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) SB) (1 : CMatrix c)
+    ((1 : CMatrix a) ⊗ₖ SB) ⊗ₖ (1 : CMatrix c)
   let phi : Ket ((a × c) × b) := psi.reindex e
   have hA :
       A.submatrix e.symm e.symm =
-        Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) TC) (1 : CMatrix b) := by
+        ((1 : CMatrix a) ⊗ₖ TC) ⊗ₖ (1 : CMatrix b) := by
     simpa [A, e] using prodABCToACB_submatrix_refC
       (a := a) (b := b) (c := c) TC
   have hB : B.submatrix e.symm e.symm = phi.state.m := by
     simp [B, phi, Ket.reindex_state]
   have hC :
       C.submatrix e.symm e.symm =
-        Matrix.kronecker (1 : CMatrix (a × c)) SB := by
+        (1 : CMatrix (a × c)) ⊗ₖ SB := by
     simpa [C, e] using prodABCToACB_submatrix_refB
       (a := a) (b := b) (c := c) SB
   change ((A * B * C).trace).re =
-    ((Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) TC) (1 : CMatrix b) *
+    (((((1 : CMatrix a) ⊗ₖ TC) ⊗ₖ (1 : CMatrix b)) *
       phi.state.m *
-      Matrix.kronecker (1 : CMatrix (a × c)) SB).trace).re
+      ((1 : CMatrix (a × c)) ⊗ₖ SB)).trace).re
   calc
     ((A * B * C).trace).re =
         (((A * B * C).submatrix e.symm e.symm).trace).re := by
@@ -509,9 +509,9 @@ private theorem prodABCToACB_projectorTrace_reindex
           congr 1
           rw [Matrix.submatrix_mul_equiv, Matrix.submatrix_mul_equiv]
     _ =
-        ((Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) TC) (1 : CMatrix b) *
+        (((((1 : CMatrix a) ⊗ₖ TC) ⊗ₖ (1 : CMatrix b)) *
           phi.state.m *
-          Matrix.kronecker (1 : CMatrix (a × c)) SB).trace).re := by
+          ((1 : CMatrix (a × c)) ⊗ₖ SB)).trace).re := by
           rw [hA, hB, hC]
 
 private theorem sum_r_s_s_reorder
@@ -645,9 +645,9 @@ when source proofs move a marginal power through a pure rank-one projector. -/
 theorem ket_rpow_traceRight_tensor_one_mulVec_eq_one_tensor_traceLeft_rpow_mulVec
     {r s : Type*} [Fintype r] [DecidableEq r] [Fintype s] [DecidableEq s]
     (psi : Ket (r × s)) (p : ℝ) :
-    (Matrix.kronecker (CFC.rpow psi.state.traceRight.m p) (1 : CMatrix s)).mulVec
+    ((CFC.rpow psi.state.traceRight.m p) ⊗ₖ (1 : CMatrix s)).mulVec
         psi.vec =
-      (Matrix.kronecker (1 : CMatrix r) (CFC.rpow psi.state.traceLeft.m p)).mulVec
+      ((1 : CMatrix r) ⊗ₖ (CFC.rpow psi.state.traceLeft.m p)).mulVec
         psi.vec := by
   let U : Matrix.unitaryGroup s ℂ :=
     psi.state.traceLeft.psd.isHermitian.eigenvectorUnitary
@@ -655,7 +655,7 @@ theorem ket_rpow_traceRight_tensor_one_mulVec_eq_one_tensor_traceLeft_rpow_mulVe
   ext z
   rcases z with ⟨i, x⟩
   have hleft :
-      (Matrix.kronecker (CFC.rpow psi.state.traceRight.m p) (1 : CMatrix s)).mulVec
+      ((CFC.rpow psi.state.traceRight.m p) ⊗ₖ (1 : CMatrix s)).mulVec
           psi.vec (i, x) =
         ∑ k : s, ((lambda k ^ p : ℝ) : ℂ) *
           rightSchmidtSlice psi k i * (U : CMatrix s) x k := by
@@ -682,7 +682,7 @@ theorem ket_rpow_traceRight_tensor_one_mulVec_eq_one_tensor_traceLeft_rpow_mulVe
             simpa [U, lambda, Pi.smul_apply, mul_assoc] using
               congrArg (fun z => z * (U : CMatrix s) x k) hk
   have hright :
-      (Matrix.kronecker (1 : CMatrix r) (CFC.rpow psi.state.traceLeft.m p)).mulVec
+      ((1 : CMatrix r) ⊗ₖ (CFC.rpow psi.state.traceLeft.m p)).mulVec
           psi.vec (i, x) =
         ∑ k : s, ((lambda k ^ p : ℝ) : ℂ) *
           rightSchmidtSlice psi k i * (U : CMatrix s) x k := by
@@ -720,15 +720,15 @@ theorem ket_rpow_traceRight_tensor_one_mulVec_eq_one_tensor_traceLeft_rpow_mulVe
 private theorem ket_projectorTrace_move_left_rpow
     {r s : Type*} [Fintype r] [DecidableEq r] [Fintype s] [DecidableEq s]
     (psi : Ket (r × s)) (K : CMatrix (r × s)) (p : ℝ) :
-    ((Matrix.kronecker (CFC.rpow psi.state.traceRight.m p) (1 : CMatrix s) *
+    ((((CFC.rpow psi.state.traceRight.m p) ⊗ₖ (1 : CMatrix s)) *
       psi.state.m * K).trace).re =
-      ((Matrix.kronecker (1 : CMatrix r) (CFC.rpow psi.state.traceLeft.m p) *
+      ((((1 : CMatrix r) ⊗ₖ (CFC.rpow psi.state.traceLeft.m p)) *
         psi.state.m * K).trace).re := by
   simpa [Ket.state_matrix] using
     trace_mul_rankOneMatrix_mul_re_eq_of_mulVec_eq
-      (L := Matrix.kronecker (CFC.rpow psi.state.traceRight.m p) (1 : CMatrix s))
+      (L := (CFC.rpow psi.state.traceRight.m p) ⊗ₖ (1 : CMatrix s))
       (R := K)
-      (L' := Matrix.kronecker (1 : CMatrix r) (CFC.rpow psi.state.traceLeft.m p))
+      (L' := (1 : CMatrix r) ⊗ₖ (CFC.rpow psi.state.traceLeft.m p))
       (R' := K)
       (v := psi.vec)
       (ket_rpow_traceRight_tensor_one_mulVec_eq_one_tensor_traceLeft_rpow_mulVec
@@ -739,13 +739,13 @@ private theorem ket_projectorTrace_move_right_rpow
     {r s : Type*} [Fintype r] [DecidableEq r] [Fintype s] [DecidableEq s]
     (psi : Ket (r × s)) (K : CMatrix (r × s)) (p : ℝ) :
     ((K * psi.state.m *
-      Matrix.kronecker (1 : CMatrix r) (CFC.rpow psi.state.traceLeft.m p)).trace).re =
+      ((1 : CMatrix r) ⊗ₖ (CFC.rpow psi.state.traceLeft.m p))).trace).re =
       ((K * psi.state.m *
-        Matrix.kronecker (CFC.rpow psi.state.traceRight.m p) (1 : CMatrix s)).trace).re := by
+        ((CFC.rpow psi.state.traceRight.m p) ⊗ₖ (1 : CMatrix s))).trace).re := by
   let R : CMatrix (r × s) :=
-    Matrix.kronecker (1 : CMatrix r) (CFC.rpow psi.state.traceLeft.m p)
+    (1 : CMatrix r) ⊗ₖ (CFC.rpow psi.state.traceLeft.m p)
   let R' : CMatrix (r × s) :=
-    Matrix.kronecker (CFC.rpow psi.state.traceRight.m p) (1 : CMatrix s)
+    (CFC.rpow psi.state.traceRight.m p) ⊗ₖ (1 : CMatrix s)
   have hR : R.mulVec psi.vec = R'.mulVec psi.vec :=
     (ket_rpow_traceRight_tensor_one_mulVec_eq_one_tensor_traceLeft_rpow_mulVec
       psi p).symm
@@ -782,64 +782,55 @@ movement on the `AC|B` split, and a Hermitian trace swap to align with the
 existing AC-side projector trace convention. -/
 theorem conditionalPetzRenyi_projectorTrace_marginalAB_eq_acbProjectorTrace_dualParam
     (psi : Ket ((a × b) × c)) {alpha : ℝ} :
-    ((Matrix.kronecker
-        (CFC.rpow psi.state.marginalAB.m (alpha - 1))
-        (1 : CMatrix c) *
+    ((((CFC.rpow psi.state.marginalAB.m (alpha - 1)) ⊗ₖ
+        (1 : CMatrix c)) *
       psi.state.m *
-      Matrix.kronecker
-        (Matrix.kronecker (1 : CMatrix a)
-          (CFC.rpow psi.state.marginalBOfABC.m (1 - alpha)))
-        (1 : CMatrix c)).trace).re =
-      ((Matrix.kronecker
-          (CFC.rpow psi.state.marginalAC.m (1 - alpha))
-          (1 : CMatrix b) *
+      (((1 : CMatrix a) ⊗ₖ
+          (CFC.rpow psi.state.marginalBOfABC.m (1 - alpha))) ⊗ₖ
+        (1 : CMatrix c))).trace).re =
+      ((((CFC.rpow psi.state.marginalAC.m (1 - alpha)) ⊗ₖ
+          (1 : CMatrix b)) *
         (psi.reindex
           (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c))).state.m *
-        Matrix.kronecker
-          (Matrix.kronecker (1 : CMatrix a)
-            (CFC.rpow psi.state.marginalAC.traceLeft.m (alpha - 1)))
-          (1 : CMatrix b)).trace).re := by
+        (((1 : CMatrix a) ⊗ₖ
+            (CFC.rpow psi.state.marginalAC.traceLeft.m (alpha - 1))) ⊗ₖ
+          (1 : CMatrix b))).trace).re := by
   let e := QIT.prodABCToACBEquiv (a := a) (b := b) (c := c)
   let phi : Ket ((a × c) × b) := psi.reindex e
   let p : ℝ := alpha - 1
   let q : ℝ := 1 - alpha
   let KBABC : CMatrix ((a × b) × c) :=
-    Matrix.kronecker
-      (Matrix.kronecker (1 : CMatrix a)
-        (CFC.rpow psi.state.marginalBOfABC.m q))
+    ((1 : CMatrix a) ⊗ₖ
+        (CFC.rpow psi.state.marginalBOfABC.m q)) ⊗ₖ
       (1 : CMatrix c)
   let KCABC₀ : CMatrix ((a × b) × c) :=
-    Matrix.kronecker (1 : CMatrix (a × b))
+    (1 : CMatrix (a × b)) ⊗ₖ
       (CFC.rpow psi.state.traceLeft.m p)
   let KACB₀ : CMatrix ((a × c) × b) :=
-    Matrix.kronecker
-      (Matrix.kronecker (1 : CMatrix a)
-        (CFC.rpow psi.state.traceLeft.m p))
+    ((1 : CMatrix a) ⊗ₖ
+        (CFC.rpow psi.state.traceLeft.m p)) ⊗ₖ
       (1 : CMatrix b)
   let KACB : CMatrix ((a × c) × b) :=
-    Matrix.kronecker
-      (Matrix.kronecker (1 : CMatrix a)
-        (CFC.rpow psi.state.marginalAC.traceLeft.m p))
+    ((1 : CMatrix a) ⊗ₖ
+        (CFC.rpow psi.state.marginalAC.traceLeft.m p)) ⊗ₖ
       (1 : CMatrix b)
   let RBACB : CMatrix ((a × c) × b) :=
-    Matrix.kronecker (1 : CMatrix (a × c))
+    (1 : CMatrix (a × c)) ⊗ₖ
       (CFC.rpow psi.state.marginalBOfABC.m q)
   let RACACB : CMatrix ((a × c) × b) :=
-    Matrix.kronecker (CFC.rpow psi.state.marginalAC.m q) (1 : CMatrix b)
+    (CFC.rpow psi.state.marginalAC.m q) ⊗ₖ (1 : CMatrix b)
   have hC : psi.state.marginalAC.traceLeft = psi.state.traceLeft :=
     MState.marginalAC_traceLeft_eq_traceLeft psi.state
   have hKACB : KACB₀ = KACB := by
     simpa [KACB₀, KACB] using
       congrArg
         (fun τ : MState c =>
-          Matrix.kronecker
-            (Matrix.kronecker (1 : CMatrix a) (CFC.rpow τ.m p))
+          ((1 : CMatrix a) ⊗ₖ (CFC.rpow τ.m p)) ⊗ₖ
             (1 : CMatrix b))
         hC.symm
   have hleft :
-      ((Matrix.kronecker
-          (CFC.rpow psi.state.marginalAB.m p)
-          (1 : CMatrix c) *
+      ((((CFC.rpow psi.state.marginalAB.m p) ⊗ₖ
+          (1 : CMatrix c)) *
         psi.state.m * KBABC).trace).re =
         ((KCABC₀ * psi.state.m * KBABC).trace).re := by
     have h :=
@@ -892,14 +883,12 @@ theorem conditionalPetzRenyi_projectorTrace_marginalAB_eq_acbProjectorTrace_dual
     simpa [Ket.state_matrix] using
       trace_rankOneMatrix_hermitian_swap_re KACB RACACB phi.vec hKherm hRherm
   calc
-    ((Matrix.kronecker
-        (CFC.rpow psi.state.marginalAB.m (alpha - 1))
-        (1 : CMatrix c) *
+    ((((CFC.rpow psi.state.marginalAB.m (alpha - 1)) ⊗ₖ
+        (1 : CMatrix c)) *
       psi.state.m *
-      Matrix.kronecker
-        (Matrix.kronecker (1 : CMatrix a)
-          (CFC.rpow psi.state.marginalBOfABC.m (1 - alpha)))
-        (1 : CMatrix c)).trace).re =
+      (((1 : CMatrix a) ⊗ₖ
+          (CFC.rpow psi.state.marginalBOfABC.m (1 - alpha))) ⊗ₖ
+        (1 : CMatrix c))).trace).re =
         ((KCABC₀ * psi.state.m * KBABC).trace).re := by
           simpa [p, q, KBABC] using hleft
     _ = ((KACB₀ * phi.state.m * RBACB).trace).re := hreindex
@@ -907,15 +896,13 @@ theorem conditionalPetzRenyi_projectorTrace_marginalAB_eq_acbProjectorTrace_dual
     _ = ((KACB * phi.state.m * RACACB).trace).re := by rw [hKACB]
     _ = ((RACACB * phi.state.m * KACB).trace).re := hswap
     _ =
-        ((Matrix.kronecker
-          (CFC.rpow psi.state.marginalAC.m (1 - alpha))
-          (1 : CMatrix b) *
+        ((((CFC.rpow psi.state.marginalAC.m (1 - alpha)) ⊗ₖ
+          (1 : CMatrix b)) *
         (psi.reindex
           (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c))).state.m *
-        Matrix.kronecker
-          (Matrix.kronecker (1 : CMatrix a)
-            (CFC.rpow psi.state.marginalAC.traceLeft.m (alpha - 1)))
-          (1 : CMatrix b)).trace).re := by
+        (((1 : CMatrix a) ⊗ₖ
+            (CFC.rpow psi.state.marginalAC.traceLeft.m (alpha - 1))) ⊗ₖ
+          (1 : CMatrix b))).trace).re := by
           simp [phi, e, p, q, KACB, RACACB]
 
 /-- First source trace rewrite for downward Petz duality.
@@ -933,19 +920,17 @@ theorem conditionalPetzRenyiTraceTerm_marginalAB_eq_projectorTrace
     (halpha_ne_zero : alpha ≠ 0) :
     psi.state.marginalAB.conditionalPetzRenyiTraceTerm
         psi.state.marginalBOfABC alpha =
-      ((Matrix.kronecker
-          (CFC.rpow psi.state.marginalAB.m (alpha - 1))
-          (1 : CMatrix c) *
+      ((((CFC.rpow psi.state.marginalAB.m (alpha - 1)) ⊗ₖ
+          (1 : CMatrix c)) *
         psi.state.m *
-        Matrix.kronecker
-          (Matrix.kronecker (1 : CMatrix a)
-            (CFC.rpow psi.state.marginalBOfABC.m (1 - alpha)))
-          (1 : CMatrix c)).trace).re := by
+        (((1 : CMatrix a) ⊗ₖ
+            (CFC.rpow psi.state.marginalBOfABC.m (1 - alpha))) ⊗ₖ
+          (1 : CMatrix c))).trace).re := by
   let rhoAB : MState (a × b) := psi.state.marginalAB
   let rhoB : MState b := psi.state.marginalBOfABC
   let L : CMatrix (a × b) := CFC.rpow rhoAB.m (alpha - 1)
   let M : CMatrix (a × b) :=
-    Matrix.kronecker (1 : CMatrix a) (CFC.rpow rhoB.m (1 - alpha))
+    (1 : CMatrix a) ⊗ₖ (CFC.rpow rhoB.m (1 - alpha))
   have hpow_one : CFC.rpow rhoAB.m (1 : ℝ) = rhoAB.m :=
     CFC.rpow_one rhoAB.m (ha := Matrix.nonneg_iff_posSemidef.mpr rhoAB.psd)
   have hpq : (alpha - 1) + 1 ≠ 0 := by
@@ -970,16 +955,16 @@ theorem conditionalPetzRenyiTraceTerm_marginalAB_eq_projectorTrace
   change
     ((CFC.rpow rhoAB.m alpha *
       CFC.rpow (MState.identityTensorStateMatrix (a := a) rhoB) (1 - alpha)).trace).re =
-      ((Matrix.kronecker L (1 : CMatrix c) * psi.state.m *
-        Matrix.kronecker M (1 : CMatrix c)).trace).re
+      (((L ⊗ₖ (1 : CMatrix c)) * psi.state.m *
+        (M ⊗ₖ (1 : CMatrix c))).trace).re
   rw [hside]
   calc
     ((CFC.rpow rhoAB.m alpha * M).trace).re =
         ((L * rhoAB.m * M).trace).re := by
           rw [← hpow]
     _ =
-        ((Matrix.kronecker L (1 : CMatrix c) * psi.state.m *
-          Matrix.kronecker M (1 : CMatrix c)).trace).re := by
+        (((L ⊗ₖ (1 : CMatrix c)) * psi.state.m *
+          (M ⊗ₖ (1 : CMatrix c))).trace).re := by
           have htrace :=
             trace_left_right_kronecker_one_eq_traceRight
               (a := a × b) (b := c) psi.state.m L M
@@ -999,14 +984,12 @@ theorem conditionalPetzRenyiTraceTermZero_marginalAB_eq_projectorTrace
     (psi : Ket ((a × b) × c)) :
     ((Matrix.rangeProjection psi.state.marginalAB.m *
       MState.identityTensorStateMatrix (a := a) psi.state.marginalBOfABC).trace).re =
-      ((Matrix.kronecker
-          (CFC.rpow psi.state.marginalAB.m (0 - 1))
-          (1 : CMatrix c) *
+      ((((CFC.rpow psi.state.marginalAB.m (0 - 1)) ⊗ₖ
+          (1 : CMatrix c)) *
         psi.state.m *
-        Matrix.kronecker
-          (Matrix.kronecker (1 : CMatrix a)
-            (CFC.rpow psi.state.marginalBOfABC.m (1 - 0)))
-          (1 : CMatrix c)).trace).re := by
+        (((1 : CMatrix a) ⊗ₖ
+            (CFC.rpow psi.state.marginalBOfABC.m (1 - 0))) ⊗ₖ
+          (1 : CMatrix c))).trace).re := by
   have hbook : Matrix.rangeProjection psi.state.marginalAB.m =
       CFC.rpow psi.state.marginalAB.m (0 - 1) * psi.state.marginalAB.m := by
     have h :=
@@ -1023,7 +1006,7 @@ theorem conditionalPetzRenyiTraceTermZero_marginalAB_eq_projectorTrace
   have hside :
       CFC.rpow (MState.identityTensorStateMatrix (a := a) psi.state.marginalBOfABC)
           (1 - 0) =
-        Matrix.kronecker (1 : CMatrix a)
+        (1 : CMatrix a) ⊗ₖ
           (CFC.rpow psi.state.marginalBOfABC.m (1 - 0)) := by
     simpa [MState.identityTensorStateMatrix] using
       MState.cMatrix_rpow_identity_kronecker (a := a)
@@ -1034,7 +1017,7 @@ theorem conditionalPetzRenyiTraceTermZero_marginalAB_eq_projectorTrace
     trace_left_right_kronecker_one_eq_traceRight
       (a := a × b) (b := c) psi.state.m
       (CFC.rpow psi.state.marginalAB.m (0 - 1))
-      (Matrix.kronecker (1 : CMatrix a)
+      ((1 : CMatrix a) ⊗ₖ
         (CFC.rpow psi.state.marginalBOfABC.m (1 - 0)))
   simpa [MState.marginalAB] using htrace.symm
 
@@ -1056,15 +1039,13 @@ theorem conditionalPetzRenyiTraceTerm_marginalAC_eq_acbProjectorTrace
     (hbeta_ne_zero : beta ≠ 0) :
     psi.state.marginalAC.conditionalPetzRenyiTraceTerm
         psi.state.marginalAC.traceLeft beta =
-      ((Matrix.kronecker
-          (CFC.rpow psi.state.marginalAC.m (beta - 1))
-          (1 : CMatrix b) *
+      ((((CFC.rpow psi.state.marginalAC.m (beta - 1)) ⊗ₖ
+          (1 : CMatrix b)) *
         (psi.reindex
           (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c))).state.m *
-        Matrix.kronecker
-          (Matrix.kronecker (1 : CMatrix a)
-            (CFC.rpow psi.state.marginalAC.traceLeft.m (1 - beta)))
-          (1 : CMatrix b)).trace).re := by
+        (((1 : CMatrix a) ⊗ₖ
+            (CFC.rpow psi.state.marginalAC.traceLeft.m (1 - beta))) ⊗ₖ
+          (1 : CMatrix b))).trace).re := by
   let e := QIT.prodABCToACBEquiv (a := a) (b := b) (c := c)
   let phi : Ket ((a × c) × b) := psi.reindex e
   have hsource :=
@@ -1091,15 +1072,13 @@ theorem conditionalPetzRenyiTraceTerm_marginalAC_eq_acbProjectorTrace_dualParam
     (hbeta_ne_zero : beta ≠ 0) (hdual : alpha + beta = 2) :
     psi.state.marginalAC.conditionalPetzRenyiTraceTerm
         psi.state.marginalAC.traceLeft beta =
-      ((Matrix.kronecker
-          (CFC.rpow psi.state.marginalAC.m (1 - alpha))
-          (1 : CMatrix b) *
+      ((((CFC.rpow psi.state.marginalAC.m (1 - alpha)) ⊗ₖ
+          (1 : CMatrix b)) *
         (psi.reindex
           (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c))).state.m *
-        Matrix.kronecker
-          (Matrix.kronecker (1 : CMatrix a)
-            (CFC.rpow psi.state.marginalAC.traceLeft.m (alpha - 1)))
-          (1 : CMatrix b)).trace).re := by
+        (((1 : CMatrix a) ⊗ₖ
+            (CFC.rpow psi.state.marginalAC.traceLeft.m (alpha - 1))) ⊗ₖ
+          (1 : CMatrix b))).trace).re := by
   have hbase :=
     conditionalPetzRenyiTraceTerm_marginalAC_eq_acbProjectorTrace
       (a := a) (b := b) (c := c) psi hbeta_ne_zero
@@ -1134,24 +1113,20 @@ theorem conditionalPetzRenyiTraceTerm_marginalAB_eq_marginalAC_dualParam
   calc
     psi.state.marginalAB.conditionalPetzRenyiTraceTerm
         psi.state.marginalBOfABC alpha =
-        ((Matrix.kronecker
-          (CFC.rpow psi.state.marginalAB.m (alpha - 1))
-          (1 : CMatrix c) *
+        ((((CFC.rpow psi.state.marginalAB.m (alpha - 1)) ⊗ₖ
+          (1 : CMatrix c)) *
         psi.state.m *
-        Matrix.kronecker
-          (Matrix.kronecker (1 : CMatrix a)
-            (CFC.rpow psi.state.marginalBOfABC.m (1 - alpha)))
-          (1 : CMatrix c)).trace).re := hAB
+        (((1 : CMatrix a) ⊗ₖ
+            (CFC.rpow psi.state.marginalBOfABC.m (1 - alpha))) ⊗ₖ
+          (1 : CMatrix c))).trace).re := hAB
     _ =
-        ((Matrix.kronecker
-          (CFC.rpow psi.state.marginalAC.m (1 - alpha))
-          (1 : CMatrix b) *
+        ((((CFC.rpow psi.state.marginalAC.m (1 - alpha)) ⊗ₖ
+          (1 : CMatrix b)) *
         (psi.reindex
           (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c))).state.m *
-        Matrix.kronecker
-          (Matrix.kronecker (1 : CMatrix a)
-            (CFC.rpow psi.state.marginalAC.traceLeft.m (alpha - 1)))
-          (1 : CMatrix b)).trace).re := hbridge
+        (((1 : CMatrix a) ⊗ₖ
+            (CFC.rpow psi.state.marginalAC.traceLeft.m (alpha - 1))) ⊗ₖ
+          (1 : CMatrix b))).trace).re := hbridge
     _ =
         psi.state.marginalAC.conditionalPetzRenyiTraceTerm
           psi.state.marginalAC.traceLeft beta := hAC.symm

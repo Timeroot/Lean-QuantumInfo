@@ -30,7 +30,7 @@ PPT convention [Horodecki2007Entanglement, ent-review-last.tex:2234-2290].
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 namespace QIT
 
@@ -99,9 +99,9 @@ theorem cMatrix_trace_re_le_of_le {ι : Type*} [Fintype ι] {X Y : CMatrix ι}
 left subsystem. -/
 theorem traceLeft_mul_kronecker_one_right [Fintype a] [Fintype b] [DecidableEq a]
     (X : CMatrix (a × b)) (U : CMatrix b) :
-    Matrix.traceLeft (X * Matrix.kronecker (1 : CMatrix a) U) = Matrix.traceLeft X * U := by
+    Matrix.traceLeft (X * ((1 : CMatrix a) ⊗ₖ U)) = Matrix.traceLeft X * U := by
   ext j j'
-  simp [Matrix.traceLeft, Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  simp [Matrix.traceLeft, Matrix.mul_apply, Matrix.kroneckerMap_apply,
     Matrix.one_apply, Fintype.sum_prod_type, Finset.sum_mul]
   rw [Finset.sum_comm]
 
@@ -109,9 +109,9 @@ theorem traceLeft_mul_kronecker_one_right [Fintype a] [Fintype b] [DecidableEq a
 out the left subsystem. -/
 theorem traceLeft_kronecker_one_right_mul [Fintype a] [Fintype b] [DecidableEq a]
     (X : CMatrix (a × b)) (V : CMatrix b) :
-    Matrix.traceLeft (Matrix.kronecker (1 : CMatrix a) V * X) = V * Matrix.traceLeft X := by
+    Matrix.traceLeft (((1 : CMatrix a) ⊗ₖ V) * X) = V * Matrix.traceLeft X := by
   ext j j'
-  simp [Matrix.traceLeft, Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  simp [Matrix.traceLeft, Matrix.mul_apply, Matrix.kroneckerMap_apply,
     Matrix.one_apply, Fintype.sum_prod_type, Finset.mul_sum]
   rw [Finset.sum_comm]
 
@@ -119,7 +119,7 @@ theorem traceLeft_kronecker_one_right_mul [Fintype a] [Fintype b] [DecidableEq a
 theorem traceLeft_mul_trace_eq_trace_mul_kronecker_one_right
     [Fintype a] [Fintype b] [DecidableEq a]
     (X : CMatrix (a × b)) (U : CMatrix b) :
-    (Matrix.traceLeft X * U).trace = (X * Matrix.kronecker (1 : CMatrix a) U).trace :=
+    (Matrix.traceLeft X * U).trace = (X * ((1 : CMatrix a) ⊗ₖ U)).trace :=
   (Matrix.trace_mul_one_kron_right X U).symm
 
 /-- Trace pairing against a left identity Kronecker factor reduces to the
@@ -127,10 +127,10 @@ partial trace over the left subsystem. -/
 theorem trace_kronecker_one_mul_eq_trace_mul_traceLeft
     [Fintype a] [Fintype b] [DecidableEq a]
     (M : CMatrix (a × b)) (T : CMatrix b) :
-    (Matrix.kronecker (1 : CMatrix a) T * M).trace = (T * Matrix.traceLeft M).trace := by
+    (((1 : CMatrix a) ⊗ₖ T) * M).trace = (T * Matrix.traceLeft M).trace := by
   calc
-    (Matrix.kronecker (1 : CMatrix a) T * M).trace =
-        (M * Matrix.kronecker (1 : CMatrix a) T).trace := by
+    (((1 : CMatrix a) ⊗ₖ T) * M).trace =
+        (M * ((1 : CMatrix a) ⊗ₖ T)).trace := by
       rw [Matrix.trace_mul_comm]
     _ = (Matrix.traceLeft M * T).trace := by
       exact (traceLeft_mul_trace_eq_trace_mul_kronecker_one_right M T).symm
@@ -378,15 +378,14 @@ theorem _root_.Matrix.PosSemidef.zero_diag_zero_row_col [Fintype a] [DecidableEq
 /-- Taking `Tr_A` of a Kronecker product leaves the second factor scaled by
 the trace of the first factor [Wilde2011Qst, qit-notes.tex:7754-7762]. -/
 theorem traceLeft_kronecker [Fintype a] (M : CMatrix a) (N : CMatrix b) :
-    Matrix.traceLeft (Matrix.kronecker M N) = matrixScale M.trace N := by
+    Matrix.traceLeft (M ⊗ₖ N) = matrixScale M.trace N := by
   ext j j'
-  simp [Matrix.traceLeft, matrixScale, Matrix.trace, Matrix.kronecker,
-    Matrix.kroneckerMap_apply, Finset.sum_mul]
+  simp [Matrix.traceLeft, matrixScale, Matrix.trace, Matrix.kroneckerMap_apply, Finset.sum_mul]
 
 /-- Taking `Tr_B` of a Kronecker product leaves the first factor scaled by the
 trace of the second factor [Wilde2011Qst, qit-notes.tex:7754-7762]. -/
 theorem traceRight_kronecker [Fintype b] (M : CMatrix a) (N : CMatrix b) :
-    Matrix.traceRight (Matrix.kronecker M N) = matrixScale N.trace M := by
+    Matrix.traceRight (M ⊗ₖ N) = matrixScale N.trace M := by
   ext i i'
   change (Finset.univ.sum fun j : b => M i i' * N j j) =
     (Finset.univ.sum fun j : b => N j j) * M i i'
@@ -399,8 +398,8 @@ theorem traceRight_kronecker [Fintype b] (M : CMatrix a) (N : CMatrix b) :
 
 /-- Partial transpose on the first subsystem transposes the first Kronecker factor. -/
 theorem partialTransposeA_kronecker (M : CMatrix a) (N : CMatrix b) :
-    partialTransposeA (a := a) (b := b) (Matrix.kronecker M N) =
-      Matrix.kronecker (Matrix.transpose M) N := by
+    partialTransposeA (a := a) (b := b) (M ⊗ₖ N) =
+      (Matrix.transpose M) ⊗ₖ N := by
   ext x y
   cases x
   cases y
@@ -408,8 +407,8 @@ theorem partialTransposeA_kronecker (M : CMatrix a) (N : CMatrix b) :
 
 /-- Partial transpose on the second subsystem transposes the second Kronecker factor. -/
 theorem partialTransposeB_kronecker (M : CMatrix a) (N : CMatrix b) :
-    partialTransposeB (a := a) (b := b) (Matrix.kronecker M N) =
-      Matrix.kronecker M (Matrix.transpose N) := by
+    partialTransposeB (a := a) (b := b) (M ⊗ₖ N) =
+      M ⊗ₖ (Matrix.transpose N) := by
   ext x y
   cases x
   cases y
@@ -419,17 +418,9 @@ theorem partialTransposeB_kronecker (M : CMatrix a) (N : CMatrix b) :
 theorem single_prod_eq_kronecker_single [DecidableEq a] [DecidableEq b]
     (i i' : a) (j j' : b) :
     Matrix.single (i, j) (i', j') (1 : ℂ) =
-      Matrix.kronecker (Matrix.single i i' (1 : ℂ))
+      (Matrix.single i i' (1 : ℂ)) ⊗ₖ
         (Matrix.single j j' (1 : ℂ)) := by
-  ext x y
-  cases x with
-  | mk x1 x2 =>
-    cases y with
-    | mk y1 y2 =>
-      by_cases hi : i = x1 <;> by_cases hj : j = x2 <;>
-        by_cases hi' : i' = y1 <;> by_cases hj' : j' = y2 <;>
-        simp [Matrix.single, Matrix.kronecker, Matrix.kroneckerMap_apply,
-          Prod.ext_iff, hi, hj, hi', hj']
+  rw [Matrix.single_kronecker_single, one_mul]
 
 /-- Trace of a diagonal matrix unit. -/
 theorem trace_single_one [Fintype a] [DecidableEq a] (i i' : a) :
@@ -475,10 +466,10 @@ theorem cMatrix_trace_reindex {ι κ : Type*} [Fintype ι] [Fintype κ]
 `Tr_B[X (U ⊗ 1)] = Tr_B[X] U`. -/
 theorem traceRight_mul_kronecker_one_left [Fintype a] [Fintype b] [DecidableEq b]
     (X : CMatrix (a × b)) (U : CMatrix a) :
-    Matrix.traceRight (X * Matrix.kronecker U (1 : CMatrix b)) =
+    Matrix.traceRight (X * (U ⊗ₖ (1 : CMatrix b))) =
       Matrix.traceRight X * U := by
   ext i i'
-  simp [Matrix.traceRight, Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  simp [Matrix.traceRight, Matrix.mul_apply, Matrix.kroneckerMap_apply,
     Matrix.one_apply, Fintype.sum_prod_type, Finset.sum_mul]
   rw [Finset.sum_comm]
 
@@ -487,7 +478,7 @@ partial trace over the right subsystem. -/
 theorem trace_mul_kronecker_one_right_eq_traceRight
     [Fintype a] [Fintype b] [DecidableEq b]
     (X : CMatrix (a × b)) (U : CMatrix a) :
-    (X * Matrix.kronecker U (1 : CMatrix b)).trace =
+    (X * (U ⊗ₖ (1 : CMatrix b))).trace =
       (Matrix.traceRight X * U).trace := by
   rw [← traceRight_mul_kronecker_one_left X U, Matrix.traceRight_trace]
 
@@ -496,10 +487,10 @@ reduces to the partial trace over the right subsystem. -/
 theorem trace_kronecker_one_right_mul_eq_trace_mul_traceRight
     [Fintype a] [Fintype b] [DecidableEq b]
     (M : CMatrix (a × b)) (T : CMatrix a) :
-    (Matrix.kronecker T (1 : CMatrix b) * M).trace = (T * Matrix.traceRight M).trace := by
+    ((T ⊗ₖ (1 : CMatrix b)) * M).trace = (T * Matrix.traceRight M).trace := by
   calc
-    (Matrix.kronecker T (1 : CMatrix b) * M).trace =
-        (M * Matrix.kronecker T (1 : CMatrix b)).trace := by
+    ((T ⊗ₖ (1 : CMatrix b)) * M).trace =
+        (M * (T ⊗ₖ (1 : CMatrix b))).trace := by
       rw [Matrix.trace_mul_comm]
     _ = (Matrix.traceRight M * T).trace :=
       trace_mul_kronecker_one_right_eq_traceRight M T

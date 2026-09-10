@@ -22,7 +22,7 @@ arxive.tex:965-974,1986-1993].
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 attribute [simp] CPTPOp.mat_coe_eq_apply_mat
 
@@ -88,7 +88,7 @@ theorem prepareMap_single {x : Type w} [Fintype x] [DecidableEq x]
 theorem prepareMap_choi {x : Type w} [Fintype x] [DecidableEq x]
     (rho : x → MState b) :
     QIT.MatrixMap.choi (prepareMap rho) =
-      ∑ x, Matrix.kronecker (Matrix.single x x (1 : ℂ)) (rho x).m := by
+      ∑ x, (Matrix.single x x (1 : ℂ)) ⊗ₖ (rho x).m := by
   ext xb xb'
   rcases xb with ⟨x, b1⟩
   rcases xb' with ⟨x', b2⟩
@@ -97,13 +97,13 @@ theorem prepareMap_choi {x : Type w} [Fintype x] [DecidableEq x]
     rw [QIT.MatrixMap.choi, prepareMap_single rho x x, if_pos rfl]
     simp only [Matrix.sum_apply]
     rw [Finset.sum_eq_single x]
-    · simp [Matrix.kronecker, Matrix.single]
+    · simp [Matrix.single]
     · intro z _ hz
-      simp [Matrix.kronecker, Matrix.single, hz]
+      simp [Matrix.single, hz]
     · intro hx
       simp at hx
   · rw [QIT.MatrixMap.choi, prepareMap_single rho x x', if_neg h]
-    simp only [Matrix.sum_apply, Matrix.kronecker, Matrix.single]
+    simp only [Matrix.sum_apply, Matrix.single]
     symm
     refine Finset.sum_eq_zero fun z _ => ?_
     have hneq : ¬ (z = x ∧ z = x') := by
@@ -150,16 +150,16 @@ theorem measureMap_apply {y : Type x} [Fintype y] [DecidableEq y]
 theorem measureMap_choi {y : Type x} [Fintype y] [DecidableEq y]
     (M : POVM y a) :
     QIT.MatrixMap.choi (measureMap M) =
-      ∑ y, Matrix.kronecker (Matrix.transpose (M.effects y)) (Matrix.single y y (1 : ℂ)) := by
+      ∑ y, (Matrix.transpose (M.effects y)) ⊗ₖ (Matrix.single y y (1 : ℂ)) := by
   ext ay ay'
   rcases ay with ⟨a1, y1⟩
   rcases ay' with ⟨a2, y2⟩
   change
     ((∑ x, (Matrix.single a1 a2 (1 : ℂ) * M.effects x).trace • Matrix.single x x (1 : ℂ))
       y1 y2) =
-      (∑ x, Matrix.kronecker (Matrix.transpose (M.effects x)) (Matrix.single x x (1 : ℂ)))
+      (∑ x, (Matrix.transpose (M.effects x)) ⊗ₖ (Matrix.single x x (1 : ℂ)))
         (a1, y1) (a2, y2)
-  simp only [Matrix.sum_apply, Matrix.smul_apply, Matrix.kronecker]
+  simp only [Matrix.sum_apply, Matrix.smul_apply]
   change
     (∑ x,
       (Matrix.single a1 a2 (1 : ℂ) * M.effects x).trace *
@@ -233,15 +233,15 @@ variable [Fintype c] [DecidableEq c] [Fintype d] [DecidableEq d]
 /-- The product channel acts componentwise on Kronecker products of matrices. -/
 theorem prod_map_kronecker (Phi : CPTPMap a b) (Psi : CPTPMap c d)
     (X : CMatrix a) (Y : CMatrix c) :
-    (prod Phi Psi).map (Matrix.kronecker X Y) =
-      Matrix.kronecker (Phi.map X) (Psi.map Y) := by
+    (prod Phi Psi).map (X ⊗ₖ Y) =
+      (Phi.map X) ⊗ₖ (Psi.map Y) := by
   rw [prod_map]
   exact MatrixMap.kron_map_of_kron_state Phi.map Psi.map X Y
 
 /-- Entrywise form of `prod_map_kronecker`. -/
 theorem prod_map_kronecker_apply (Phi : CPTPMap a b) (Psi : CPTPMap c d)
     (X : CMatrix a) (Y : CMatrix c) (xb yb : b) (xd yd : d) :
-    (prod Phi Psi).map (Matrix.kronecker X Y) (xb, xd) (yb, yd) =
+    (prod Phi Psi).map (X ⊗ₖ Y) (xb, xd) (yb, yd) =
       Phi.map X xb yb * Psi.map Y xd yd := by
   rw [prod_map_kronecker]
   rfl

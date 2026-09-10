@@ -43,7 +43,7 @@ bounds can enter the chain partway along.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder QIT.MatrixL2
+open scoped ComplexOrder MatrixOrder Kronecker QIT.MatrixL2
 
 noncomputable section
 universe u v w x y z p u1 v1 w1
@@ -393,7 +393,7 @@ def adhwFQSWARSplitMatrix
 def adhwFQSWARProductSplitMatrix
     (ψ : Ket ((a × b) × r)) (split : a ≃ (q × e)) :
     CMatrix ((q × e) × r) :=
-  Matrix.kronecker (adhwFQSWASplitMatrix ψ split) (adhwFQSWSigmaRState ψ).m
+  (adhwFQSWASplitMatrix ψ split) ⊗ₖ (adhwFQSWSigmaRState ψ).m
 
 /-- Applying a reference isometry to the left/reference side conjugates the
 left marginal by that isometry. -/
@@ -419,13 +419,13 @@ theorem referenceIsometry_prod_conj_eq_applyMatrix_applyMatrixRight
     [Fintype γ] [DecidableEq γ] [Fintype δ] [DecidableEq δ]
     (V : ReferenceIsometry α β) (W : ReferenceIsometry γ δ)
     (X : CMatrix (α × γ)) :
-    Matrix.kronecker V.matrix W.matrix * X *
-        Matrix.conjTranspose (Matrix.kronecker V.matrix W.matrix) =
+    (V.matrix ⊗ₖ W.matrix) * X *
+        Matrix.conjTranspose (V.matrix ⊗ₖ W.matrix) =
       V.applyMatrix (W.applyMatrixRight X) := by
   ext x y
   simp [ReferenceIsometry.applyMatrix, ReferenceIsometry.applyMatrixRight,
     ReferenceIsometry.targetBlock, ReferenceIsometry.rightBlock,
-    Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    Matrix.mul_apply, Matrix.kroneckerMap_apply,
     Matrix.conjTranspose_kronecker, Finset.sum_mul, Finset.mul_sum,
     Fintype.sum_prod_type, mul_assoc, mul_left_comm, mul_comm]
   apply Finset.sum_congr rfl
@@ -441,8 +441,8 @@ theorem referenceIsometry_prod_traceRight_conj
     (V : ReferenceIsometry α β) (W : ReferenceIsometry γ δ)
     (X : CMatrix (α × γ)) :
     Matrix.traceRight
-        (Matrix.kronecker V.matrix W.matrix * X *
-          Matrix.conjTranspose (Matrix.kronecker V.matrix W.matrix)) =
+        ((V.matrix ⊗ₖ W.matrix) * X *
+          Matrix.conjTranspose (V.matrix ⊗ₖ W.matrix)) =
       V.matrix * Matrix.traceRight X *
         Matrix.conjTranspose V.matrix := by
   rw [referenceIsometry_prod_conj_eq_applyMatrix_applyMatrixRight]
@@ -458,8 +458,8 @@ theorem referenceIsometry_prod_traceLeft_conj
     (V : ReferenceIsometry α β) (W : ReferenceIsometry γ δ)
     (X : CMatrix (α × γ)) :
     Matrix.traceLeft
-        (Matrix.kronecker V.matrix W.matrix * X *
-          Matrix.conjTranspose (Matrix.kronecker V.matrix W.matrix)) =
+        ((V.matrix ⊗ₖ W.matrix) * X *
+          Matrix.conjTranspose (V.matrix ⊗ₖ W.matrix)) =
       W.matrix * Matrix.traceLeft X *
         Matrix.conjTranspose W.matrix := by
   rw [referenceIsometry_prod_conj_eq_applyMatrix_applyMatrixRight]
@@ -598,11 +598,11 @@ theorem referenceIsometry_applyMatrix_eq_kronecker_one_conj
     [Fintype γ] [DecidableEq γ]
     (V : ReferenceIsometry α β) (X : CMatrix (α × γ)) :
     V.applyMatrix X =
-      (Matrix.kronecker V.matrix (1 : CMatrix γ)) * X *
-        Matrix.conjTranspose (Matrix.kronecker V.matrix (1 : CMatrix γ)) := by
+      (V.matrix ⊗ₖ (1 : CMatrix γ)) * X *
+        Matrix.conjTranspose (V.matrix ⊗ₖ (1 : CMatrix γ)) := by
   ext x y
   simp [ReferenceIsometry.applyMatrix, ReferenceIsometry.targetBlock,
-    Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    Matrix.mul_apply, Matrix.kroneckerMap_apply,
     Matrix.conjTranspose_kronecker, Matrix.conjTranspose_one, Matrix.one_apply,
     Finset.sum_mul, mul_assoc]
   rw [fqsw_sum_prod_right_eq_pair' (b0 := y.2)]
@@ -632,43 +632,42 @@ theorem fqsw_traceLeft_qer_kronecker
     [Fintype q] [Fintype e] [Fintype r]
     (A : CMatrix (q × e)) (R : CMatrix r) :
     Matrix.traceLeft
-      ((Matrix.kronecker A R).submatrix
+      ((A ⊗ₖ R).submatrix
         (Equiv.prodAssoc q e r).symm
         (Equiv.prodAssoc q e r).symm) =
-      Matrix.kronecker (Matrix.traceLeft A) R := by
+      (Matrix.traceLeft A) ⊗ₖ R := by
   ext i j
-  simp [Matrix.traceLeft, Equiv.prodAssoc, Matrix.kronecker,
-    Matrix.kroneckerMap_apply, Finset.sum_mul]
+  simp [Matrix.traceLeft, Equiv.prodAssoc, Matrix.kroneckerMap_apply, Finset.sum_mul]
 
 /-- Hilbert--Schmidt square of a Kronecker product factors. -/
 theorem fqsw_hilbertSchmidtSq_kronecker
     {α : Type u} {β : Type v} [Fintype α] [DecidableEq α]
     [Fintype β] [DecidableEq β] (M : CMatrix α) (N : CMatrix β) :
-    hilbertSchmidtSq (Matrix.kronecker M N) =
+    hilbertSchmidtSq (M ⊗ₖ N) =
       hilbertSchmidtSq M * hilbertSchmidtSq N := by
   unfold hilbertSchmidtSq
-  change ((Matrix.conjTranspose (Matrix.kronecker M N) *
-        Matrix.kronecker M N).trace).re =
+  change ((Matrix.conjTranspose (M ⊗ₖ N) *
+        (M ⊗ₖ N)).trace).re =
       ((Matrix.conjTranspose M * M).trace).re *
         ((Matrix.conjTranspose N * N).trace).re
   have hct :
-      Matrix.conjTranspose (Matrix.kronecker M N) =
-        Matrix.kronecker (Matrix.conjTranspose M) (Matrix.conjTranspose N) := by
-    simpa [Matrix.kronecker] using Matrix.conjTranspose_kronecker M N
+      Matrix.conjTranspose (M ⊗ₖ N) =
+        (Matrix.conjTranspose M) ⊗ₖ (Matrix.conjTranspose N) := by
+    simpa using Matrix.conjTranspose_kronecker M N
   have hmul :
-      Matrix.kronecker (Matrix.conjTranspose M) (Matrix.conjTranspose N) *
-          Matrix.kronecker M N =
-        Matrix.kronecker (Matrix.conjTranspose M * M) (Matrix.conjTranspose N * N) := by
-    simpa [Matrix.kronecker] using
+      ((Matrix.conjTranspose M) ⊗ₖ (Matrix.conjTranspose N)) *
+          (M ⊗ₖ N) =
+        (Matrix.conjTranspose M * M) ⊗ₖ (Matrix.conjTranspose N * N) := by
+    simpa using
       (Matrix.mul_kronecker_mul (Matrix.conjTranspose M) M
         (Matrix.conjTranspose N) N).symm
   rw [hct, hmul]
   have htrace :
-      (Matrix.kronecker (Matrix.conjTranspose M * M)
+      ((Matrix.conjTranspose M * M) ⊗ₖ
           (Matrix.conjTranspose N * N)).trace =
         (Matrix.conjTranspose M * M).trace *
           (Matrix.conjTranspose N * N).trace := by
-    simpa [Matrix.kronecker] using
+    simpa using
       Matrix.trace_kronecker (Matrix.conjTranspose M * M)
         (Matrix.conjTranspose N * N)
   rw [htrace]
@@ -792,9 +791,9 @@ theorem adhwFQSWAliceIsometryOfSplitUnitary_applyMatrix_AR_eq
     (U : Matrix.unitaryGroup (q × e) ℂ) :
     (adhwFQSWAliceIsometryOfSplitUnitary split U).applyMatrix
         (adhwFQSWARState ψ).m =
-      (Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)) *
+      ((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)) *
         adhwFQSWARSplitMatrix ψ split *
-        star (Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)) := by
+        star ((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)) := by
   unfold adhwFQSWAliceIsometryOfSplitUnitary adhwFQSWAliceIsometryOfSplit
   rw [referenceIsometry_comp_applyMatrix]
   have hsplit :
@@ -818,9 +817,9 @@ theorem adhwFQSWSigmaA2RStateOfSplitUnitary_matrix_eq_traceLeft_applyMatrix_AR_s
     (adhwFQSWSigmaA2RStateOfIsometry (q := q) (e := e) ψ
       (adhwFQSWAliceIsometryOfSplitUnitary split U)).m =
       Matrix.traceLeft
-        (((Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)) *
+        ((((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)) *
             adhwFQSWARSplitMatrix ψ split *
-            star (Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r))).submatrix
+            star ((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r))).submatrix
           (Equiv.prodAssoc q e r).symm
           (Equiv.prodAssoc q e r).symm) := by
   rw [adhwFQSWSigmaA2RStateOfIsometry_matrix_eq_traceLeft_applyMatrix_AR]
@@ -837,55 +836,50 @@ theorem adhwFQSWProductA2RStateOfSplitUnitary_matrix_eq_traceLeft_applyMatrix_AR
         (adhwFQSWAliceIsometryOfSplitUnitary split U))
       (adhwFQSWSigmaRState ψ)).m =
       Matrix.traceLeft
-        (((Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)) *
+        ((((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)) *
             adhwFQSWARProductSplitMatrix ψ split *
-            star (Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r))).submatrix
+            star ((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r))).submatrix
           (Equiv.prodAssoc q e r).symm
           (Equiv.prodAssoc q e r).symm) := by
   let ρA : CMatrix (q × e) := adhwFQSWASplitMatrix ψ split
   let ρR : CMatrix r := (adhwFQSWSigmaRState ψ).m
   have hconj :
-      (Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)) *
+      ((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)) *
           adhwFQSWARProductSplitMatrix ψ split *
-          star (Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)) =
-        Matrix.kronecker
-          ((U : CMatrix (q × e)) * ρA * star (U : CMatrix (q × e)))
+          star ((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)) =
+        ((U : CMatrix (q × e)) * ρA * star (U : CMatrix (q × e))) ⊗ₖ
           ρR := by
     unfold adhwFQSWARProductSplitMatrix ρA ρR
     rw [Matrix.star_eq_conjTranspose]
     have hct :
         Matrix.conjTranspose
-            (Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)) =
-          Matrix.kronecker
-            (Matrix.conjTranspose (U : CMatrix (q × e)))
+            ((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)) =
+          (Matrix.conjTranspose (U : CMatrix (q × e))) ⊗ₖ
             (Matrix.conjTranspose (1 : CMatrix r)) := by
-      simpa [Matrix.kronecker] using
+      simpa using
         Matrix.conjTranspose_kronecker (U : CMatrix (q × e)) (1 : CMatrix r)
     rw [hct, Matrix.conjTranspose_one]
     have hmul_left :
-        Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r) *
-            Matrix.kronecker (adhwFQSWASplitMatrix ψ split)
-              (adhwFQSWSigmaRState ψ).m =
-          Matrix.kronecker
-            ((U : CMatrix (q × e)) * adhwFQSWASplitMatrix ψ split)
+        ((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)) *
+            ((adhwFQSWASplitMatrix ψ split) ⊗ₖ
+              (adhwFQSWSigmaRState ψ).m) =
+          ((U : CMatrix (q × e)) * adhwFQSWASplitMatrix ψ split) ⊗ₖ
             ((1 : CMatrix r) * (adhwFQSWSigmaRState ψ).m) := by
-      simpa [Matrix.kronecker] using
+      simpa using
         (Matrix.mul_kronecker_mul (U : CMatrix (q × e))
           (adhwFQSWASplitMatrix ψ split) (1 : CMatrix r)
           (adhwFQSWSigmaRState ψ).m).symm
     rw [hmul_left]
     have hmul_right :
-        Matrix.kronecker
-            ((U : CMatrix (q × e)) * adhwFQSWASplitMatrix ψ split)
-            ((1 : CMatrix r) * (adhwFQSWSigmaRState ψ).m) *
-          Matrix.kronecker (Matrix.conjTranspose (U : CMatrix (q × e)))
-            (1 : CMatrix r) =
-        Matrix.kronecker
-          (((U : CMatrix (q × e)) * adhwFQSWASplitMatrix ψ split) *
-            Matrix.conjTranspose (U : CMatrix (q × e)))
+        (((U : CMatrix (q × e)) * adhwFQSWASplitMatrix ψ split) ⊗ₖ
+            ((1 : CMatrix r) * (adhwFQSWSigmaRState ψ).m)) *
+          ((Matrix.conjTranspose (U : CMatrix (q × e))) ⊗ₖ
+            (1 : CMatrix r)) =
+        (((U : CMatrix (q × e)) * adhwFQSWASplitMatrix ψ split) *
+            Matrix.conjTranspose (U : CMatrix (q × e))) ⊗ₖ
           (((1 : CMatrix r) * (adhwFQSWSigmaRState ψ).m) *
             (1 : CMatrix r)) := by
-      simpa [Matrix.kronecker] using
+      simpa using
         (Matrix.mul_kronecker_mul
           ((U : CMatrix (q × e)) * adhwFQSWASplitMatrix ψ split)
           (Matrix.conjTranspose (U : CMatrix (q × e)))
@@ -898,16 +892,15 @@ theorem adhwFQSWProductA2RStateOfSplitUnitary_matrix_eq_traceLeft_applyMatrix_AR
       (adhwFQSWSigmaA2StateOfIsometry (q := q) (e := e) ψ
         (adhwFQSWAliceIsometryOfSplitUnitary split U))
       (adhwFQSWSigmaRState ψ)).m =
-        Matrix.kronecker
-          (Matrix.traceLeft
-            ((U : CMatrix (q × e)) * ρA * star (U : CMatrix (q × e))))
+        (Matrix.traceLeft
+            ((U : CMatrix (q × e)) * ρA * star (U : CMatrix (q × e)))) ⊗ₖ
           ρR := by
           simp [ρA, ρR,
             adhwFQSWSigmaA2StateOfSplitUnitary_matrix_eq_traceLeft_applyMatrix_A]
     _ = Matrix.traceLeft
-        (((Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)) *
+        ((((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)) *
             adhwFQSWARProductSplitMatrix ψ split *
-            star (Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r))).submatrix
+            star ((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r))).submatrix
           (Equiv.prodAssoc q e r).symm
           (Equiv.prodAssoc q e r).symm) := by
           rw [hconj]
@@ -1763,8 +1756,7 @@ theorem adhwFQSWARProductSplitMatrix_eq_source_product_submatrix
         (fqswARSplitEquiv split).symm (fqswARSplitEquiv split).symm := by
   ext x y
   simp [adhwFQSWARProductSplitMatrix, adhwFQSWASplitMatrix,
-    adhwFQSWSigmaRState, fqswARSplitEquiv, Matrix.kronecker,
-    Matrix.kroneckerMap_apply]
+    adhwFQSWSigmaRState, fqswARSplitEquiv, Matrix.kroneckerMap_apply]
 
 omit [Nonempty e] in
 /-- The split product matrix has Hilbert--Schmidt square
@@ -1872,7 +1864,7 @@ theorem adhwFQSWARCorrelationSplitMatrix_eq_zero_of_subsingleton
     _ = (ρsplit.traceRight.prod ρsplit.traceLeft).m := hprod
     _ = adhwFQSWARProductSplitMatrix ψ split := by
       ext x y
-      simp [Matrix.kronecker, Matrix.kroneckerMap_apply,
+      simp [Matrix.kroneckerMap_apply,
         adhwFQSWARProductSplitMatrix]
       rw [← MState.traceRight_m ρsplit, hAmatrix]
       rw [← MState.traceLeft_m ρsplit, hBmatrix]
@@ -2609,13 +2601,13 @@ theorem fqsw_A2R_square_trace_eq_twirl_inv_integrand
     [Fintype r] [DecidableEq r]
     (ρ : CMatrix ((q × e) × r)) (U : Matrix.unitaryGroup (q × e) ℂ) :
     (Matrix.traceLeft
-        (((Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)) *
-            ρ * star (Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r))).submatrix
+        ((((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)) *
+            ρ * star ((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r))).submatrix
           (Equiv.prodAssoc q e r).symm
           (Equiv.prodAssoc q e r).symm) *
       Matrix.traceLeft
-        (((Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)) *
-            ρ * star (Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r))).submatrix
+        ((((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)) *
+            ρ * star ((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r))).submatrix
           (Equiv.prodAssoc q e r).symm
           (Equiv.prodAssoc q e r).symm)).trace =
       (tensorPowerKroneckerTwo (a := (q × e) × r) ρ *
@@ -2631,7 +2623,7 @@ theorem fqsw_A2R_square_trace_eq_twirl_inv_integrand
       (tensorPowerSwapMatrixTwo (a := e))
   let H : CMatrix (TensorPower r 2) := tensorPowerSwapMatrixTwo (a := r)
   let K : CMatrix ((q × e) × r) :=
-    Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)
+    (U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)
   let U₂ : CMatrix (TensorPower (q × e) 2) :=
     tensorPowerKroneckerTwo (a := q × e) (U : CMatrix (q × e))
   let K₂ : CMatrix (TensorPower ((q × e) × r) 2) :=
@@ -2684,8 +2676,8 @@ theorem fqsw_A2R_square_trace_eq_twirl_inv_integrand
       rw [if_neg hxy, if_neg hyx]
       simp
   rw [show
-      (Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)) *
-          ρ * star (Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)) =
+      ((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)) *
+          ρ * star ((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)) =
         K * ρ * star K by rfl]
   rw [fqsw_A2R_square_trace_eq_split_observable
     (q := q) (e := e) (r := r) (ρ := K * ρ * star K)]
@@ -2725,13 +2717,13 @@ theorem fqsw_A2R_square_trace_average_eq
     (ρ : CMatrix ((q × e) × r)) :
     (∫ U : Matrix.unitaryGroup (q × e) ℂ,
       (Matrix.traceLeft
-          (((Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)) *
-              ρ * star (Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r))).submatrix
+          ((((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)) *
+              ρ * star ((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r))).submatrix
             (Equiv.prodAssoc q e r).symm
             (Equiv.prodAssoc q e r).symm) *
         Matrix.traceLeft
-          (((Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)) *
-              ρ * star (Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r))).submatrix
+          ((((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)) *
+              ρ * star ((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r))).submatrix
             (Equiv.prodAssoc q e r).symm
             (Equiv.prodAssoc q e r).symm)).trace
       ∂unitaryHaarMeasure (a := q × e)) =
@@ -2756,13 +2748,13 @@ theorem fqsw_A2R_square_trace_average_eq
   calc
     (∫ U : Matrix.unitaryGroup (q × e) ℂ,
       (Matrix.traceLeft
-          (((Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)) *
-              ρ * star (Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r))).submatrix
+          ((((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)) *
+              ρ * star ((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r))).submatrix
             (Equiv.prodAssoc q e r).symm
             (Equiv.prodAssoc q e r).symm) *
         Matrix.traceLeft
-          (((Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)) *
-              ρ * star (Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r))).submatrix
+          ((((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)) *
+              ρ * star ((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r))).submatrix
             (Equiv.prodAssoc q e r).symm
             (Equiv.prodAssoc q e r).symm)).trace
       ∂unitaryHaarMeasure (a := q × e)) =
@@ -3076,14 +3068,14 @@ theorem adhwFQSWProductDecouplingHilbertSchmidtIntegrandOfSplitUnitary_eq_correl
     adhwFQSWProductDecouplingHilbertSchmidtIntegrandOfSplitUnitary ψ split U =
       hilbertSchmidtSq
         (Matrix.traceLeft
-          (((Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)) *
+          ((((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)) *
               (adhwFQSWARSplitMatrix ψ split -
                 adhwFQSWARProductSplitMatrix ψ split) *
-              star (Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r))).submatrix
+              star ((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r))).submatrix
             (Equiv.prodAssoc q e r).symm
             (Equiv.prodAssoc q e r).symm)) := by
   let K : CMatrix ((q × e) × r) :=
-    Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)
+    (U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)
   let Rm : CMatrix ((q × e) × r) := adhwFQSWARSplitMatrix ψ split
   let Pm : CMatrix ((q × e) × r) := adhwFQSWARProductSplitMatrix ψ split
   rw [adhwFQSWProductDecouplingHilbertSchmidtIntegrandOfSplitUnitary]
@@ -3133,15 +3125,15 @@ theorem adhwFQSWProductDecouplingHilbertSchmidtAverage_eq_of_nontrivial
       adhwFQSWARProductSplitMatrix ψ split
   let g : Matrix.unitaryGroup (q × e) ℂ → ℂ := fun U =>
     (Matrix.traceLeft
-        (((Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)) *
+        ((((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)) *
             Δ *
-            star (Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r))).submatrix
+            star ((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r))).submatrix
           (Equiv.prodAssoc q e r).symm
           (Equiv.prodAssoc q e r).symm) *
       Matrix.traceLeft
-        (((Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)) *
+        ((((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)) *
             Δ *
-            star (Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r))).submatrix
+            star ((U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r))).submatrix
           (Equiv.prodAssoc q e r).symm
           (Equiv.prodAssoc q e r).symm)).trace
   have hg_cont : Continuous g := by
@@ -3187,7 +3179,7 @@ theorem adhwFQSWProductDecouplingHilbertSchmidtAverage_eq_of_nontrivial
         (g U).re := by
     intro U
     let K : CMatrix ((q × e) × r) :=
-      Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)
+      (U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)
     let M : CMatrix (e × r) :=
       Matrix.traceLeft
         ((K * Δ * star K).submatrix
@@ -3272,7 +3264,7 @@ theorem adhwFQSWProductDecouplingHilbertSchmidtAverage_le
       rw [adhwFQSWProductDecouplingHilbertSchmidtIntegrandOfSplitUnitary_eq_correlation]
       rw [hΔzero]
       let K : CMatrix ((q × e) × r) :=
-        Matrix.kronecker (U : CMatrix (q × e)) (1 : CMatrix r)
+        (U : CMatrix (q × e)) ⊗ₖ (1 : CMatrix r)
       let M : CMatrix (e × r) :=
         Matrix.traceLeft
           ((K * (0 : CMatrix ((q × e) × r)) * star K).submatrix

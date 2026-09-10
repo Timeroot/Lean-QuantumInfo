@@ -24,7 +24,7 @@ by the Uhlmann leaf.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 open Matrix
 
@@ -476,7 +476,7 @@ theorem traceNorm_eq_max_unitary_abs_trace (M : CMatrix a) :
 
 private theorem kronecker_one_right_mem_unitaryGroup
     {b : Type v} [Fintype b] [DecidableEq b] (U : Matrix.unitaryGroup b ℂ) :
-    Matrix.kronecker (1 : CMatrix a) (U : CMatrix b) ∈
+    (1 : CMatrix a) ⊗ₖ (U : CMatrix b) ∈
       Matrix.unitaryGroup (a × b) ℂ := by
   let I : Matrix.unitaryGroup a ℂ := ⟨1, by simp⟩
   simpa using Matrix.kronecker_mem_unitary I.2 U.2
@@ -496,11 +496,11 @@ private theorem applyMatrixRight_eq_kronecker_conj
     {b : Type v} [Fintype b] [DecidableEq b]
     (V : ReferenceIsometry b b) (X : CMatrix (a × b)) :
     V.applyMatrixRight X =
-      Matrix.kronecker (1 : CMatrix a) V.matrix * X *
-        Matrix.conjTranspose (Matrix.kronecker (1 : CMatrix a) V.matrix) := by
+      ((1 : CMatrix a) ⊗ₖ V.matrix) * X *
+        Matrix.conjTranspose ((1 : CMatrix a) ⊗ₖ V.matrix) := by
   ext x y
   simp only [ReferenceIsometry.applyMatrixRight, ReferenceIsometry.rightBlock,
-    Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    Matrix.mul_apply, Matrix.kroneckerMap_apply,
     Matrix.one_apply, Matrix.conjTranspose_apply, Fintype.sum_prod_type]
   simp only [ite_mul, zero_mul, one_mul]
   have hinner : ∀ z : a, ∀ t : b,
@@ -534,7 +534,7 @@ private theorem applyMatrixRight_eq_kronecker_conj
 
 private theorem kronecker_one_referenceIsometry_mem_unitary
     {b : Type v} [Fintype b] [DecidableEq b] (V : ReferenceIsometry b b) :
-    Matrix.kronecker (1 : CMatrix a) V.matrix ∈ Matrix.unitaryGroup (a × b) ℂ := by
+    (1 : CMatrix a) ⊗ₖ V.matrix ∈ Matrix.unitaryGroup (a × b) ℂ := by
   let I : Matrix.unitaryGroup a ℂ := ⟨1, by simp⟩
   exact Matrix.kronecker_mem_unitary I.2 (referenceIsometry_matrix_mem_unitary V)
 
@@ -548,7 +548,7 @@ theorem traceNorm_traceLeft_le_matrix
   obtain ⟨U, hU⟩ := traceNorm_variational_exists_unitary_abs_trace
     (Matrix.traceLeft X)
   let Ubig : Matrix.unitaryGroup (a × b) ℂ :=
-    ⟨Matrix.kronecker (1 : CMatrix a) (U : CMatrix b),
+    ⟨(1 : CMatrix a) ⊗ₖ (U : CMatrix b),
       kronecker_one_right_mem_unitaryGroup U⟩
   calc
     traceNorm (Matrix.traceLeft X)
@@ -563,7 +563,7 @@ theorem traceNorm_traceLeft_le_matrix
 
 private theorem kronecker_one_left_mem_unitaryGroup
     {b : Type v} [Fintype b] [DecidableEq b] (U : Matrix.unitaryGroup a ℂ) :
-    Matrix.kronecker (U : CMatrix a) (1 : CMatrix b) ∈
+    (U : CMatrix a) ⊗ₖ (1 : CMatrix b) ∈
       Matrix.unitaryGroup (a × b) ℂ := by
   let I : Matrix.unitaryGroup b ℂ := ⟨1, by simp⟩
   simpa using Matrix.kronecker_mem_unitary U.2 I.2
@@ -576,7 +576,7 @@ theorem traceNorm_traceRight_le_matrix
   obtain ⟨U, hU⟩ := traceNorm_variational_exists_unitary_abs_trace
     (Matrix.traceRight X)
   let Ubig : Matrix.unitaryGroup (a × b) ℂ :=
-    ⟨Matrix.kronecker (U : CMatrix a) (1 : CMatrix b),
+    ⟨(U : CMatrix a) ⊗ₖ (1 : CMatrix b),
       kronecker_one_left_mem_unitaryGroup U⟩
   calc
     traceNorm (Matrix.traceRight X)
@@ -618,7 +618,7 @@ theorem traceNorm_applyMatrixRight_le
   classical
   obtain ⟨U, hU⟩ := traceNorm_variational_exists_unitary_abs_trace (V.applyMatrixRight X)
   let K : Matrix.unitaryGroup (a × b) ℂ :=
-    ⟨Matrix.kronecker (1 : CMatrix a) V.matrix,
+    ⟨(1 : CMatrix a) ⊗ₖ V.matrix,
       kronecker_one_referenceIsometry_mem_unitary (a := a) V⟩
   let Uin : Matrix.unitaryGroup (a × b) ℂ := K⁻¹ * U * K
   have htrace : ((V.applyMatrixRight X) * (U : CMatrix (a × b))).trace =

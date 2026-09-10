@@ -20,7 +20,7 @@ It realizes the tensor-product candidate step inside the source proof
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 noncomputable section
 universe u v
@@ -275,21 +275,19 @@ theorem applyState_hypothesisTensor_succ_reindex
   rw [MatrixMap.kron_idChannel_left_apply_slice]
   have hslice :
       (Matrix.of fun j j' =>
-          (Matrix.kronecker rho.m sigma.m).submatrix
+          (rho.m ⊗ₖ sigma.m).submatrix
             (MState.tensorPowerBipartiteSuccEquiv a a n).symm
             (MState.tensorPowerBipartiteSuccEquiv a a n).symm
             (((xR0, xRs), (xB0, xBs)).1, j)
             (((yR0, yRs), (yB0, yBs)).1, j')) =
-        Matrix.kronecker
-          (Matrix.of fun i i' => rho.m (xR0, i) (yR0, i'))
+        (Matrix.of fun i i' => rho.m (xR0, i) (yR0, i')) ⊗ₖ
           (Matrix.of fun is is' => sigma.m (xRs, is) (yRs, is')) := by
     ext z z'
     rcases z with ⟨z0, zs⟩
     rcases z' with ⟨z0', zs'⟩
-    simp [MState.tensorPowerBipartiteSuccEquiv, Matrix.kronecker,
-      Matrix.kroneckerMap_apply, Matrix.of_apply]
+    simp [MState.tensorPowerBipartiteSuccEquiv, Matrix.kroneckerMap_apply, Matrix.of_apply]
     rfl
-  rw [← Matrix.kronecker, hslice]
+  rw [hslice]
   rw [CPTPOp.tensorPower_succ]
   refine Eq.trans (CPTPOp.prod_map_kronecker_apply N (N.tensorPower n) _ _ _ _ _ _) ?_
   simp [-CPTPOp.id_map, Matrix.kroneckerMap_apply,

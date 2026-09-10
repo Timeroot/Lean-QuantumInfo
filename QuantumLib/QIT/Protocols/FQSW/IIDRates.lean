@@ -33,7 +33,7 @@ choice for all large enough `n`.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder QIT.MatrixL2
+open scoped ComplexOrder MatrixOrder Kronecker QIT.MatrixL2
 
 namespace QIT
 
@@ -558,31 +558,29 @@ theorem fqswChannelOfReferenceIsometry_prod
   rcases ef with ⟨a, c⟩
   rcases ef' with ⟨a', c'⟩
   rw [single_prod_eq_kronecker_single]
-  simp only [Matrix.kronecker]
   rw [MatrixMap.kron_map_of_kron_state]
   simp only [MatrixMap.ofReferenceIsometry_apply, ReferenceIsometry.prod]
   change
-    (Matrix.kronecker V.matrix W.matrix *
-        Matrix.kronecker (Matrix.single a a' (1 : ℂ)) (Matrix.single c c' (1 : ℂ)) *
-      Matrix.conjTranspose (Matrix.kronecker V.matrix W.matrix)) i j =
+    ((V.matrix ⊗ₖ W.matrix) *
+        ((Matrix.single a a' (1 : ℂ)) ⊗ₖ (Matrix.single c c' (1 : ℂ))) *
+      Matrix.conjTranspose (V.matrix ⊗ₖ W.matrix)) i j =
       (V.matrix * Matrix.single a a' (1 : ℂ) * Matrix.conjTranspose V.matrix) i.1 j.1 *
         (W.matrix * Matrix.single c c' (1 : ℂ) * Matrix.conjTranspose W.matrix) i.2 j.2
   have hconj :
-      Matrix.conjTranspose (Matrix.kronecker V.matrix W.matrix) =
-        Matrix.kronecker (Matrix.conjTranspose V.matrix) (Matrix.conjTranspose W.matrix) := by
-    simpa [Matrix.kronecker] using Matrix.conjTranspose_kronecker V.matrix W.matrix
+      Matrix.conjTranspose (V.matrix ⊗ₖ W.matrix) =
+        (Matrix.conjTranspose V.matrix) ⊗ₖ (Matrix.conjTranspose W.matrix) := by
+    simpa using Matrix.conjTranspose_kronecker V.matrix W.matrix
   rw [hconj]
-  rw [show Matrix.kronecker V.matrix W.matrix *
-      Matrix.kronecker (Matrix.single a a' (1 : ℂ)) (Matrix.single c c' (1 : ℂ)) =
-        Matrix.kronecker (V.matrix * Matrix.single a a' (1 : ℂ))
+  rw [show (V.matrix ⊗ₖ W.matrix) *
+      ((Matrix.single a a' (1 : ℂ)) ⊗ₖ (Matrix.single c c' (1 : ℂ))) =
+        (V.matrix * Matrix.single a a' (1 : ℂ)) ⊗ₖ
           (W.matrix * Matrix.single c c' (1 : ℂ)) from
       (Matrix.mul_kronecker_mul V.matrix (Matrix.single a a' (1 : ℂ))
         W.matrix (Matrix.single c c' (1 : ℂ))).symm]
-  rw [show Matrix.kronecker (V.matrix * Matrix.single a a' (1 : ℂ))
-      (W.matrix * Matrix.single c c' (1 : ℂ)) *
-      Matrix.kronecker (Matrix.conjTranspose V.matrix) (Matrix.conjTranspose W.matrix) =
-        Matrix.kronecker
-          (V.matrix * Matrix.single a a' (1 : ℂ) * Matrix.conjTranspose V.matrix)
+  rw [show ((V.matrix * Matrix.single a a' (1 : ℂ)) ⊗ₖ
+      (W.matrix * Matrix.single c c' (1 : ℂ))) *
+      ((Matrix.conjTranspose V.matrix) ⊗ₖ (Matrix.conjTranspose W.matrix)) =
+        (V.matrix * Matrix.single a a' (1 : ℂ) * Matrix.conjTranspose V.matrix) ⊗ₖ
           (W.matrix * Matrix.single c c' (1 : ℂ) * Matrix.conjTranspose W.matrix) from
       (Matrix.mul_kronecker_mul (V.matrix * Matrix.single a a' (1 : ℂ))
         (Matrix.conjTranspose V.matrix) (W.matrix * Matrix.single c c' (1 : ℂ))

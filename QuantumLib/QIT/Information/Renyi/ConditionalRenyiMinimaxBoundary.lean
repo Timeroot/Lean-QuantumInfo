@@ -30,7 +30,7 @@ the full-rank boundary inside each fixed-`tau` infimum.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 open Matrix
 
@@ -309,7 +309,7 @@ variable [Fintype c] [DecidableEq c]
 
 /-- The positive `AC` weight `I_A tensor tau_C^p` in the common bracket. -/
 def upwardRenyiDualityACWeight (tau : CMatrix c) (p : ℝ) : CMatrix (a × c) :=
-  Matrix.kronecker (1 : CMatrix a) (CFC.rpow tau p)
+  (1 : CMatrix a) ⊗ₖ (CFC.rpow tau p)
 
 /-- Reorder the `ABC` amplitude as an `AC:B` amplitude. -/
 def upwardRenyiDualityACBAmplitude
@@ -370,7 +370,7 @@ def upwardRenyiDualityACWeightedAmplitude
     (psi : Ket ((a × b) × c)) (tau : CMatrix c) (p : ℝ) :
     (a × c) × b → ℂ :=
   Matrix.mulVec
-    (Matrix.kronecker (CFC.sqrt (upwardRenyiDualityACWeight (a := a) tau p))
+    ((CFC.sqrt (upwardRenyiDualityACWeight (a := a) tau p)) ⊗ₖ
       (1 : CMatrix b))
     psi.upwardRenyiDualityACBAmplitude
 
@@ -388,7 +388,7 @@ theorem upwardRenyiDualityEffectiveBMatrix_eq_partialTrace_weight_mul
     (htau : tau.PosSemidef) :
     psi.upwardRenyiDualityEffectiveBMatrix tau p =
       Matrix.traceLeft
-        (Matrix.kronecker (upwardRenyiDualityACWeight (a := a) tau p) (1 : CMatrix b) *
+        (((upwardRenyiDualityACWeight (a := a) tau p) ⊗ₖ (1 : CMatrix b)) *
           rankOneMatrix psi.upwardRenyiDualityACBAmplitude) := by
   let W : CMatrix (a × c) := upwardRenyiDualityACWeight (a := a) tau p
   let S : CMatrix (a × c) := CFC.sqrt W
@@ -404,17 +404,17 @@ theorem upwardRenyiDualityEffectiveBMatrix_eq_partialTrace_weight_mul
     psi.upwardRenyiDualityEffectiveBMatrix tau p =
         Matrix.traceLeft
           (rankOneMatrix
-            (Matrix.mulVec (Matrix.kronecker S (1 : CMatrix b))
+            (Matrix.mulVec (S ⊗ₖ (1 : CMatrix b))
               psi.upwardRenyiDualityACBAmplitude)) := by
           simp [upwardRenyiDualityEffectiveBMatrix,
             upwardRenyiDualityACWeightedAmplitude, S, W]
     _ = Matrix.traceLeft
-          (Matrix.kronecker (S * S) (1 : CMatrix b) *
+          (((S * S) ⊗ₖ (1 : CMatrix b)) *
             rankOneMatrix psi.upwardRenyiDualityACBAmplitude) :=
       traceLeft_rankOne_kron_left_mulVec_eq_weight_mul
         S hS psi.upwardRenyiDualityACBAmplitude
     _ = Matrix.traceLeft
-          (Matrix.kronecker W (1 : CMatrix b) *
+          ((W ⊗ₖ (1 : CMatrix b)) *
             rankOneMatrix psi.upwardRenyiDualityACBAmplitude) := by rw [hSS]
 
 /-- Coordinate form of the effective `B`-side matrix. -/
@@ -426,8 +426,8 @@ theorem upwardRenyiDualityEffectiveBMatrix_apply
         CFC.rpow tau p k k' * psi.vec ((i, j), k') * star (psi.vec ((i, j'), k)) := by
   rw [upwardRenyiDualityEffectiveBMatrix_eq_partialTrace_weight_mul psi tau p htau]
   simp [upwardRenyiDualityACWeight, upwardRenyiDualityACBAmplitude,
-    Matrix.traceLeft, rankOneMatrix_apply, Matrix.mul_apply, Matrix.kronecker,
-    Matrix.kroneckerMap_apply, Matrix.one_apply, Fintype.sum_prod_type, mul_assoc]
+    Matrix.traceLeft, rankOneMatrix_apply, Matrix.mul_apply, Matrix.kroneckerMap_apply, Matrix.one_apply,
+    Fintype.sum_prod_type, mul_assoc]
 
 private theorem sum_a_b_c_b_c_reorder
     {aa bb cc : Type*} [Fintype aa] [Fintype bb] [Fintype cc]
@@ -460,7 +460,7 @@ theorem abcSidePowerTraceRe_eq_effectiveBMatrix_pairing
   congr 1
   simpa [Matrix.trace, Matrix.mul_apply,
       upwardRenyiDualityEffectiveBMatrix_apply psi tau p htau,
-      Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply, rankOneMatrix_apply,
+      Matrix.kroneckerMap_apply, Matrix.one_apply, rankOneMatrix_apply,
       Fintype.sum_prod_type, Finset.mul_sum, mul_assoc] using
     (sum_a_b_c_b_c_reorder
       (f := fun i j k j' k' =>

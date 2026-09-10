@@ -19,7 +19,7 @@ specializations live in `QIT.States.TraceNorm.BlockMatrix`.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 namespace Matrix
 
@@ -364,26 +364,26 @@ variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 `A ⊗ I * (A ⊗ I + r • (I ⊗ B))⁻¹ * (I ⊗ B)`. -/
 def andoResolventIntegrand
     (r : ℝ) (A : QIT.CMatrix a) (B : QIT.CMatrix b) : QIT.CMatrix (a × b) :=
-  Matrix.kronecker A (1 : QIT.CMatrix b) *
-    (Matrix.kronecker A (1 : QIT.CMatrix b) +
-      r • Matrix.kronecker (1 : QIT.CMatrix a) B)⁻¹ *
-    Matrix.kronecker (1 : QIT.CMatrix a) B
+  (A ⊗ₖ (1 : QIT.CMatrix b)) *
+    (A ⊗ₖ (1 : QIT.CMatrix b) +
+      r • ((1 : QIT.CMatrix a) ⊗ₖ B))⁻¹ *
+    ((1 : QIT.CMatrix a) ⊗ₖ B)
 
 /-- The Ando resolvent denominator is positive definite when `A ≥ 0`, `B > 0`,
 and `r > 0`. -/
 theorem andoDenom_posDef
     {r : ℝ} {A : QIT.CMatrix a} {B : QIT.CMatrix b}
     (hA : A.PosSemidef) (hB : B.PosDef) (hr : 0 < r) :
-    (Matrix.kronecker A (1 : QIT.CMatrix b) +
-      r • Matrix.kronecker (1 : QIT.CMatrix a) B).PosDef := by
+    (A ⊗ₖ (1 : QIT.CMatrix b) +
+      r • ((1 : QIT.CMatrix a) ⊗ₖ B)).PosDef := by
   have hleft :
-      (Matrix.kronecker A (1 : QIT.CMatrix b)).PosSemidef :=
+      (A ⊗ₖ (1 : QIT.CMatrix b)).PosSemidef :=
     hA.kronecker Matrix.PosSemidef.one
   have hright₀ :
-      (Matrix.kronecker (1 : QIT.CMatrix a) B).PosDef :=
+      ((1 : QIT.CMatrix a) ⊗ₖ B).PosDef :=
     Matrix.PosDef.one.kronecker hB
   have hright :
-      (r • Matrix.kronecker (1 : QIT.CMatrix a) B).PosDef :=
+      (r • ((1 : QIT.CMatrix a) ⊗ₖ B)).PosDef :=
     Matrix.PosDef.smul hright₀ hr
   exact Matrix.PosDef.posSemidef_add hleft hright
 
@@ -394,13 +394,13 @@ theorem andoResolventIntegrand_smul_eq_resolventComplement
     {r : ℝ} {A : QIT.CMatrix a} {B : QIT.CMatrix b}
     (hA : A.PosSemidef) (hB : B.PosDef) (hr : 0 < r) :
     r • andoResolventIntegrand (a := a) (b := b) r A B =
-      Matrix.kronecker A (1 : QIT.CMatrix b) -
-        Matrix.kronecker A (1 : QIT.CMatrix b) *
-          (Matrix.kronecker A (1 : QIT.CMatrix b) +
-            r • Matrix.kronecker (1 : QIT.CMatrix a) B)⁻¹ *
-          Matrix.kronecker A (1 : QIT.CMatrix b) := by
-  let X : QIT.CMatrix (a × b) := Matrix.kronecker A (1 : QIT.CMatrix b)
-  let Z : QIT.CMatrix (a × b) := Matrix.kronecker (1 : QIT.CMatrix a) B
+      A ⊗ₖ (1 : QIT.CMatrix b) -
+        (A ⊗ₖ (1 : QIT.CMatrix b)) *
+          (A ⊗ₖ (1 : QIT.CMatrix b) +
+            r • ((1 : QIT.CMatrix a) ⊗ₖ B))⁻¹ *
+          (A ⊗ₖ (1 : QIT.CMatrix b)) := by
+  let X : QIT.CMatrix (a × b) := A ⊗ₖ (1 : QIT.CMatrix b)
+  let Z : QIT.CMatrix (a × b) := (1 : QIT.CMatrix a) ⊗ₖ B
   let D : QIT.CMatrix (a × b) := X + r • Z
   have hD : D.PosDef := by
     simpa [X, Z, D] using andoDenom_posDef (a := a) (b := b) hA hB hr
@@ -417,11 +417,11 @@ theorem andoResolventIntegrand_smul_eq_resolventComplement
           simp [D, sub_eq_add_neg, add_assoc, add_comm]
     _ = X - X * D⁻¹ * X := by
           rw [mul_sub, hXD]
-    _ = Matrix.kronecker A (1 : QIT.CMatrix b) -
-        Matrix.kronecker A (1 : QIT.CMatrix b) *
-          (Matrix.kronecker A (1 : QIT.CMatrix b) +
-            r • Matrix.kronecker (1 : QIT.CMatrix a) B)⁻¹ *
-          Matrix.kronecker A (1 : QIT.CMatrix b) := by
+    _ = A ⊗ₖ (1 : QIT.CMatrix b) -
+        (A ⊗ₖ (1 : QIT.CMatrix b)) *
+          (A ⊗ₖ (1 : QIT.CMatrix b) +
+            r • ((1 : QIT.CMatrix a) ⊗ₖ B))⁻¹ *
+          (A ⊗ₖ (1 : QIT.CMatrix b)) := by
           simp [X, Z, D]
 
 /-- Pointwise concavity of Ando's resolvent integrand in the positive
@@ -439,10 +439,10 @@ theorem andoResolventIntegrand_concave_posDef
       andoResolventIntegrand (a := a) (b := b) r
         (t • A₁ + (1 - t) • A₂)
         (t • B₁ + (1 - t) • B₂) := by
-  let X₁ : QIT.CMatrix (a × b) := Matrix.kronecker A₁ (1 : QIT.CMatrix b)
-  let X₂ : QIT.CMatrix (a × b) := Matrix.kronecker A₂ (1 : QIT.CMatrix b)
-  let Z₁ : QIT.CMatrix (a × b) := Matrix.kronecker (1 : QIT.CMatrix a) B₁
-  let Z₂ : QIT.CMatrix (a × b) := Matrix.kronecker (1 : QIT.CMatrix a) B₂
+  let X₁ : QIT.CMatrix (a × b) := A₁ ⊗ₖ (1 : QIT.CMatrix b)
+  let X₂ : QIT.CMatrix (a × b) := A₂ ⊗ₖ (1 : QIT.CMatrix b)
+  let Z₁ : QIT.CMatrix (a × b) := (1 : QIT.CMatrix a) ⊗ₖ B₁
+  let Z₂ : QIT.CMatrix (a × b) := (1 : QIT.CMatrix a) ⊗ₖ B₂
   have hX₁ : X₁.PosSemidef := by
     simpa [X₁] using hA₁.kronecker Matrix.PosSemidef.one
   have hX₂ : X₂.PosSemidef := by
@@ -481,16 +481,16 @@ theorem andoResolventIntegrand_concave_posDef
     have hBbar : (t • B₁ + (1 - t) • B₂).PosDef :=
       Matrix.PosDef.convexCombination hB₁ hB₂ ht0 ht1
     have hXbar :
-        Matrix.kronecker (t • A₁ + (1 - t) • A₂) (1 : QIT.CMatrix b) =
+        (t • A₁ + (1 - t) • A₂) ⊗ₖ (1 : QIT.CMatrix b) =
           t • X₁ + (1 - t) • X₂ := by
       ext i j
-      simp [X₁, X₂, Matrix.kronecker, Matrix.kroneckerMap_apply, add_mul,
+      simp [X₁, X₂, Matrix.kroneckerMap_apply, add_mul,
         mul_comm, mul_left_comm, mul_assoc]
     have hZbar :
-        Matrix.kronecker (1 : QIT.CMatrix a) (t • B₁ + (1 - t) • B₂) =
+        (1 : QIT.CMatrix a) ⊗ₖ (t • B₁ + (1 - t) • B₂) =
           t • Z₁ + (1 - t) • Z₂ := by
       ext i j
-      simp [Z₁, Z₂, Matrix.kronecker, Matrix.kroneckerMap_apply, add_mul,
+      simp [Z₁, Z₂, Matrix.kroneckerMap_apply, add_mul,
         mul_comm, mul_left_comm, mul_assoc]
     have hleft₁ :
         r • andoResolventIntegrand (a := a) (b := b) r A₁ B₁ =

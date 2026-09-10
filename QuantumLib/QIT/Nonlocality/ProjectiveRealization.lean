@@ -38,7 +38,7 @@ variable [Fintype HA] [Fintype HB] [DecidableEq HA] [DecidableEq HB]
 /-- Tensor product of two finite projective measurements. -/
 def kronecker (PA : ProjectiveMeasurement A HA) (PB : ProjectiveMeasurement B HB) :
     ProjectiveMeasurement (A × B) (HA × HB) where
-  effects outcome := Matrix.kronecker (PA.effects outcome.1) (PB.effects outcome.2)
+  effects outcome := (PA.effects outcome.1) ⊗ₖ (PB.effects outcome.2)
   isHermitian outcome := by
     change Matrix.conjTranspose (PA.effects outcome.1 ⊗ₖ PB.effects outcome.2) =
       PA.effects outcome.1 ⊗ₖ PB.effects outcome.2
@@ -85,7 +85,7 @@ def kronecker (PA : ProjectiveMeasurement A HA) (PB : ProjectiveMeasurement B HB
 theorem kronecker_effects (PA : ProjectiveMeasurement A HA)
     (PB : ProjectiveMeasurement B HB) (outcome : A × B) :
     (kronecker PA PB).effects outcome =
-      Matrix.kronecker (PA.effects outcome.1) (PB.effects outcome.2) :=
+      (PA.effects outcome.1) ⊗ₖ (PB.effects outcome.2) :=
   rfl
 
 end ProjectiveMeasurement
@@ -146,7 +146,7 @@ structure ProjectiveQuantumRealization
   /-- The joint projective measurement has tensor-product effects. -/
   joint_effects : ∀ x y outcome,
     (joint x y).effects outcome =
-      Matrix.kronecker ((alice x).effects outcome.1) ((bob y).effects outcome.2)
+      ((alice x).effects outcome.1) ⊗ₖ ((bob y).effects outcome.2)
 
 namespace ProjectiveQuantumRealization
 
@@ -190,7 +190,7 @@ def bobFamilyEmbedding :
 def jointFamilyEmbedding :
     Matrix (POVM.FamilyNaimarkSpace R.alice × POVM.FamilyNaimarkSpace R.bob)
       (R.HA × R.HB) ℂ :=
-  Matrix.kronecker R.aliceFamilyEmbedding R.bobFamilyEmbedding
+  R.aliceFamilyEmbedding ⊗ₖ R.bobFamilyEmbedding
 
 theorem jointFamilyEmbedding_isometry :
     Matrix.conjTranspose R.jointFamilyEmbedding * R.jointFamilyEmbedding = 1 := by
@@ -226,8 +226,7 @@ def projectiveJoint (x : X) (y : Y) :
 @[simp]
 theorem projectiveJoint_effects (x : X) (y : Y) (outcome : A × B) :
     (R.projectiveJoint x y).effects outcome =
-      Matrix.kronecker
-        ((POVM.familyNaimarkProjectiveMeasurement R.alice x).effects outcome.1)
+      ((POVM.familyNaimarkProjectiveMeasurement R.alice x).effects outcome.1) ⊗ₖ
         ((POVM.familyNaimarkProjectiveMeasurement R.bob y).effects outcome.2) :=
   rfl
 
@@ -245,7 +244,7 @@ theorem jointFamily_compression_projector (x : X) (y : Y) (outcome : A × B) :
     Matrix.conjTranspose R.jointFamilyEmbedding *
         (R.projectiveJoint x y).effects outcome *
         R.jointFamilyEmbedding =
-      Matrix.kronecker ((R.alice x).effects outcome.1) ((R.bob y).effects outcome.2) := by
+      ((R.alice x).effects outcome.1) ⊗ₖ ((R.bob y).effects outcome.2) := by
   change Matrix.conjTranspose (R.aliceFamilyEmbedding ⊗ₖ R.bobFamilyEmbedding) *
         (((POVM.familyNaimarkProjectiveMeasurement R.alice x).effects outcome.1) ⊗ₖ
           ((POVM.familyNaimarkProjectiveMeasurement R.bob y).effects outcome.2)) *
@@ -292,7 +291,7 @@ theorem projective_trace_joint_eq (x : X) (y : Y) (outcome : A × B) :
                     rw [Matrix.mul_assoc]
     _ =
         (R.rho.m *
-          Matrix.kronecker ((R.alice x).effects outcome.1) ((R.bob y).effects outcome.2)).trace := by
+          (((R.alice x).effects outcome.1) ⊗ₖ ((R.bob y).effects outcome.2))).trace := by
           rw [R.jointFamily_compression_projector x y outcome]
     _ = (R.rho.m * (R.joint x y).effects outcome).trace := by
           rw [R.joint_effects x y outcome]

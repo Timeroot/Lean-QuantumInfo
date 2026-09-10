@@ -561,3 +561,42 @@ same `n = 0` convention. The single `QIT.messageRate` sits below both, and the t
 bounds proved on the HSW side — a rate lower bound from message-set cardinality, the one-bit cost
 of halving the message set, and the `1/n` per-use cost of expurgating to a survivor set — are now
 available to the entanglement-assisted branch, which had none of them.
+
+### Kronecker notation
+
+Mathlib defines `Matrix.kronecker` as a `@[simp] def` whose own doc-comment asks callers to write
+`⊗ₖ` instead, and that notation abbreviates `Matrix.kroneckerMap (· * ·)`. The two spellings are
+definitionally but not syntactically equal, and everything physlib knows about Kronecker products
+is stated in the `kroneckerMap` form: `kroneckerMap_conjTranspose`, `kroneckerMap_IsHermitian`,
+`PosSemidef_kronecker`, `PosDef.kron`, `kronecker_conj_eq`, and the typed products built over them.
+Lean-QIT wrote `Matrix.kronecker` 2788 times across 116 files and applied `kroneckerMap` by hand
+another eighty, so lemmas from the two sides did not fire on each other's goals; the bridge commit
+had to insert fourteen `← Matrix.kronecker` rewrites whose only purpose was to put a goal back into
+the shape the next tactic recognized.
+
+Everything is now written `⊗ₖ`, and `Kronecker` joins the `open scoped` line of 98 files. Where a
+Kronecker product is an operand of a `*` or a `•` the grouping is written out. `⊗ₖ` binds at 100
+against 70 for `*`, so `X * A ⊗ₖ B` already parsed as `X * (A ⊗ₖ B)`, but it does not read that way
+in a proof that has `(X * A) ⊗ₖ B` two lines above.
+
+Three hundred and ten of the old mentions were not terms at all. Twenty were `unfold
+Matrix.kronecker`; the rest sat in the lemma list of a `simp`, `simp only`, `simpa` or `rw`,
+present only to make two head symbols agree. They are gone, and six proof steps went with them,
+having become redundant once the rewrite before them closed the goal on its own: two branches in
+`Nonlocality/YangNavascues/Extraction.lean` and three in `OneShot/SmoothIsometry.lean`.
+`Security/ExtractorTraceBridge.lean` had restated its own trace hypothesis in the other spelling in
+order to apply `Matrix.trace_kronecker` to it, eleven lines to reach a lemma that now applies
+directly. `ReferenceIsometry.prod` discharges its isometry condition in two lines where it took
+thirteen, and `Util/Matrix.lean`'s `single_prod_eq_kronecker_single`, which its callers want in
+that orientation, follows from Mathlib's `single_kronecker_single` in one line rather than a
+four-way case split.
+
+The products themselves stay on `Matrix`, which is the honest answer to the question this pass
+started from. Where a Kronecker product of two channels or two states is what is meant the port
+already says so, and says so often: `MatrixMap.kron` appears 437 times, alongside `CPTPOp.prod` and
+`MState.prod`. The remaining `⊗ₖ` are operator-level for a reason. Roughly eleven hundred tensor an
+identity onto one factor, which is a `⊗ₖ` and nothing else; most of the rest multiply, conjugate,
+take a real power of, index into or trace a product of two operators that are not states —
+measurement effects, projectors, isometries, cutoff functions of a marginal. Even the eighty sites
+that do read `ρ.m ⊗ₖ σ.m` sit under `CFC.rpow`, `.submatrix`, `Matrix.Supports` or an entry lookup,
+where `(ρ ⊗ᴹ σ).m` would only add a `prod_m` for the next tactic to undo.

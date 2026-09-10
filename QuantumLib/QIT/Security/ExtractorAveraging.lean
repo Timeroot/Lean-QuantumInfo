@@ -17,7 +17,7 @@ randomness-extraction proof route.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 
 namespace QIT.Security
 
@@ -277,8 +277,7 @@ variable (H : HashFamily F Z S)
 /-- Per-seed extractor output matrix on `S × E`, without the public seed register. -/
 def extractorSeedOutputMatrix (E : MEnsemble e Z) (f : F) : CMatrix (S × e) :=
   ∑ z, (E.probs z) •
-    Matrix.kronecker
-      (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
+    (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ)) ⊗ₖ
       (E.states z).m
 
 omit [DecidableEq F] [DecidableEq Z] [Fintype S] [Nonempty F] in
@@ -286,9 +285,8 @@ omit [DecidableEq F] [DecidableEq Z] [Fintype S] [Nonempty F] in
 theorem extractorSeedOutputMatrix_eq_sum (E : MEnsemble e Z) (f : F) :
     extractorSeedOutputMatrix H E f =
       ∑ z, (E.probs z) •
-        Matrix.kronecker
-          (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
-          (E.states z).m :=
+        ((Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ)) ⊗ₖ
+          (E.states z).m) :=
   rfl
 
 /-- The `f`-seed block of the full extractor output matrix, retaining `S × E`. -/
@@ -300,12 +298,11 @@ omit [DecidableEq Z] [Fintype S] [Nonempty F] in
 theorem extractorOutputSeedBlock_eq_sum (E : MEnsemble e Z) (f : F) :
     extractorOutputSeedBlock H E f =
       ∑ z, (E.probs z * H.prob f) •
-        Matrix.kronecker
-          (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
-          (E.states z).m := by
+        ((Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ)) ⊗ₖ
+          (E.states z).m) := by
   ext se se'
   simp only [extractorOutputSeedBlock, extractorOutputMatrix,
-    Matrix.sum_apply, Matrix.smul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]
+    Matrix.sum_apply, Matrix.smul_apply, Matrix.kroneckerMap_apply]
   refine Finset.sum_congr rfl fun z _ => ?_
   rw [Finset.sum_eq_single_of_mem f (Finset.mem_univ _)]
   · simp

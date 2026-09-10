@@ -203,7 +203,7 @@ private theorem classical_blockDiagonal_trace {ι : Type w} {β : Type x}
   unfold Classical.blockDiagonal
   simp only [Matrix.trace_sum]
   refine Finset.sum_congr rfl fun i _ => ?_
-  simp only [Matrix.trace, Matrix.kronecker, Matrix.single]
+  simp only [Matrix.trace, Matrix.single]
   rw [Fintype.sum_prod_type]
   rw [Fintype.sum_eq_single i]
   · simp
@@ -470,7 +470,7 @@ private theorem inputPermutationLabelExtension_slice_same
           (i, j) (i', j')) := by
   rw [MState.inputPermutationLabelExtension_matrix]
   simp only [MState.inputPermutationLabelEquiv, Classical.blockDiagonal, Matrix.submatrix_apply,
-    Matrix.sum_apply, Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.single,
+    Matrix.sum_apply, Matrix.kroneckerMap_apply, Matrix.single,
     Matrix.smul_apply, Equiv.coe_fn_symm_mk]
   rw [Finset.sum_eq_single π]
   · simp
@@ -489,7 +489,7 @@ private theorem inputPermutationLabelExtension_slice_ne
       (i, (j, π)) (i', (j', σ)) = 0 := by
   rw [MState.inputPermutationLabelExtension_matrix]
   simp only [MState.inputPermutationLabelEquiv, Classical.blockDiagonal, Matrix.submatrix_apply,
-    Matrix.sum_apply, Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.single,
+    Matrix.sum_apply, Matrix.kroneckerMap_apply, Matrix.single,
     Matrix.smul_apply, Equiv.coe_fn_symm_mk]
   refine Finset.sum_eq_zero fun τ _ => ?_
   by_cases hτπ : τ = π

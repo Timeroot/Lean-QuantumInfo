@@ -57,7 +57,7 @@ This module develops the combinatorics of such joint configuration spaces.
 
 @[expose] public section
 
-open scoped BigOperators
+open scoped BigOperators Kronecker
 
 namespace QIT
 
@@ -588,8 +588,8 @@ theorem matReindex_conjTranspose (e : ι ≃ κ) (M : CMatrix ι) :
 Kronecker product of the reindexed factors. -/
 theorem matReindex_kronecker_prodCongr {ι₁ κ₁ ι₂ κ₂ : Type*}
     (e₁ : ι₁ ≃ κ₁) (e₂ : ι₂ ≃ κ₂) (M : CMatrix ι₁) (N : CMatrix ι₂) :
-    matReindex (Equiv.prodCongr e₁ e₂) (Matrix.kronecker M N) =
-      Matrix.kronecker (matReindex e₁ M) (matReindex e₂ N) := by
+    matReindex (Equiv.prodCongr e₁ e₂) (M ⊗ₖ N) =
+      (matReindex e₁ M) ⊗ₖ (matReindex e₂ N) := by
   ext ⟨k₁, k₂⟩ ⟨k₁', k₂'⟩
   rfl
 

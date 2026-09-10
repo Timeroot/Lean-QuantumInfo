@@ -20,7 +20,7 @@ sandwiched Renyi mutual information.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Topology
+open scoped ComplexOrder MatrixOrder Kronecker Topology
 open Filter
 
 noncomputable section
@@ -141,7 +141,7 @@ bound for the sandwiched Rényi inner operator at a singular product reference. 
 theorem posSemidef_trace_mul_kronecker_le_partialTrace
     {ρ : CMatrix (a × b)} (hρ : ρ.PosSemidef)
     {A : CMatrix a} (hA : A.PosSemidef) {B : CMatrix b} (hB : B.PosSemidef) :
-    ((Matrix.kronecker A B * ρ).trace).re ≤
+    (((A ⊗ₖ B) * ρ).trace).re ≤
       B.trace.re * (A * Matrix.traceRight ρ).trace.re := by
   -- `c • 1 - B` is PSD where `c = B.trace.re`.
   have hC_psd : (((B.trace.re : ℝ) : ℂ) • (1 : CMatrix b) - B).PosSemidef := by
@@ -150,32 +150,32 @@ theorem posSemidef_trace_mul_kronecker_le_partialTrace
     exact Matrix.le_iff.mp hle
   -- `A ⊗ (c • 1 - B)` is PSD (Kronecker of PSD).
   have hAC_psd :
-      (Matrix.kronecker A (((B.trace.re : ℝ) : ℂ) • (1 : CMatrix b) - B)).PosSemidef :=
+      (A ⊗ₖ (((B.trace.re : ℝ) : ℂ) • (1 : CMatrix b) - B)).PosSemidef :=
     hA.kronecker hC_psd
   -- Non-negativity: `0 ≤ Tr[(A ⊗ (c • 1 - B)) ρ].re`.
   have hnn : 0 ≤
-      ((Matrix.kronecker A (((B.trace.re : ℝ) : ℂ) • (1 : CMatrix b) - B) * ρ).trace).re :=
+      (((A ⊗ₖ (((B.trace.re : ℝ) : ℂ) • (1 : CMatrix b) - B)) * ρ).trace).re :=
     cMatrix_trace_mul_posSemidef_re_nonneg hAC_psd hρ
   -- Distribute the Kronecker over the subtraction and scalar (entry-wise).
-  rw [show Matrix.kronecker A (((B.trace.re : ℝ) : ℂ) • (1 : CMatrix b) - B) =
-        ((B.trace.re : ℝ) : ℂ) • Matrix.kronecker A (1 : CMatrix b) -
-          Matrix.kronecker A B by
+  rw [show A ⊗ₖ (((B.trace.re : ℝ) : ℂ) • (1 : CMatrix b) - B) =
+        ((B.trace.re : ℝ) : ℂ) • (A ⊗ₖ (1 : CMatrix b)) -
+          A ⊗ₖ B by
       ext ⟨i1, i2⟩ ⟨j1, j2⟩
-      simp only [Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.sub_apply,
+      simp only [Matrix.kroneckerMap_apply, Matrix.sub_apply,
                  Matrix.smul_apply]
       ring] at hnn
   rw [Matrix.sub_mul, Matrix.smul_mul, Matrix.trace_sub, Matrix.trace_smul,
       Complex.sub_re] at hnn
   -- `(c • z).re = c.re * z.re` for real `c`; here `c = B.trace.re`.
   have h_smul_re : (((B.trace.re : ℝ) : ℂ) •
-        ((Matrix.kronecker A (1 : CMatrix b) * ρ).trace)).re =
-      B.trace.re * ((Matrix.kronecker A (1 : CMatrix b) * ρ).trace).re := by
+        (((A ⊗ₖ (1 : CMatrix b)) * ρ).trace)).re =
+      B.trace.re * (((A ⊗ₖ (1 : CMatrix b)) * ρ).trace).re := by
     simp [Complex.ofReal_im]
   rw [h_smul_re] at hnn
   -- Partial-trace pairing: `Tr[(A ⊗ 1) ρ] = Tr[A · Matrix.traceRight ρ]`.
-  have hpair : ((Matrix.kronecker A (1 : CMatrix b) * ρ).trace).re =
+  have hpair : (((A ⊗ₖ (1 : CMatrix b)) * ρ).trace).re =
       (A * Matrix.traceRight ρ).trace.re := by
-    rw [Matrix.trace_mul_comm (Matrix.kronecker A (1 : CMatrix b)) ρ,
+    rw [Matrix.trace_mul_comm (A ⊗ₖ (1 : CMatrix b)) ρ,
         trace_mul_kronecker_one_right_eq_traceRight ρ A,
         Matrix.trace_mul_comm (Matrix.traceRight ρ) A]
   rw [hpair] at hnn
@@ -355,8 +355,7 @@ theorem prod_tendsto
         (nhds (rho.m, sigma.m)) :=
     hleft.prodMk_nhds hright
   have hkr :
-      Continuous fun M : CMatrix a × CMatrix b => Matrix.kronecker M.1 M.2 := by
-    unfold Matrix.kronecker
+      Continuous fun M : CMatrix a × CMatrix b => M.1 ⊗ₖ M.2 := by
     exact _root_.continuous_matrix fun x y => by
       simp only [Matrix.kroneckerMap_apply]
       exact (continuous_fst.matrix_elem x.1 y.1).mul
@@ -1035,7 +1034,7 @@ def fullRankApproxProductReferencePath
 while keeping the left state fixed. -/
 def fixedLeftReferenceRegularization
     (rhoA : MState a) (sigma : MState b) (epsilon : ℝ) : CMatrix (a × b) :=
-  Matrix.kronecker rhoA.m
+  rhoA.m ⊗ₖ
     (sandwichedRenyiReferenceRegularization sigma.m epsilon)
 
 /-- Product eigenbasis for a tensor-product reference. -/
@@ -1045,7 +1044,7 @@ def productReferenceEigenvectorUnitary
     rhoA.psd.isHermitian.eigenvectorUnitary
   let UB : Matrix.unitaryGroup b ℂ :=
     sigmaB.psd.isHermitian.eigenvectorUnitary
-  ⟨Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b),
+  ⟨(UA : CMatrix a) ⊗ₖ (UB : CMatrix b),
     Matrix.kronecker_mem_unitary UA.2 UB.2⟩
 
 /-- A tensor-product reference is diagonal in the product of the single-system
@@ -1083,13 +1082,13 @@ theorem productReference_matrix_eq_productEigenbasis_diagonal
     simpa [UB, Function.comp_def,
       Unitary.conjStarAlgAut_apply] using sigmaB.psd.isHermitian.spectral_theorem
   rw [MState.prod_m]
-  change Matrix.kronecker rhoA.m sigmaB.m =
-    Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b) *
+  change rhoA.m ⊗ₖ sigmaB.m =
+    ((UA : CMatrix a) ⊗ₖ (UB : CMatrix b)) *
       Matrix.diagonal
         (fun y : a × b =>
           ((rhoA.psd.isHermitian.eigenvalues y.1 *
               sigmaB.psd.isHermitian.eigenvalues y.2 : ℝ) : ℂ)) *
-      star (Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b))
+      star ((UA : CMatrix a) ⊗ₖ (UB : CMatrix b))
   conv_lhs =>
     rw [hA, hB]
   simp [Matrix.star_eq_conjTranspose, Matrix.conjTranspose_kronecker,
@@ -1197,14 +1196,14 @@ theorem fixedLeftReferenceRegularization_matrix_eq_productEigenbasis_diagonal
               ((sigma.psd.isHermitian.eigenvalues y + epsilon : ℝ) : ℂ)) *
           star (UB : CMatrix b) := by
     simpa [UB] using referenceRegularization_matrix_eq_eigenbasis_diagonal sigma epsilon
-  change Matrix.kronecker rhoA.m
+  change rhoA.m ⊗ₖ
       (sandwichedRenyiReferenceRegularization sigma.m epsilon) =
-    Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b) *
+    ((UA : CMatrix a) ⊗ₖ (UB : CMatrix b)) *
       Matrix.diagonal
         (fun y : a × b =>
           ((rhoA.psd.isHermitian.eigenvalues y.1 *
               (sigma.psd.isHermitian.eigenvalues y.2 + epsilon) : ℝ) : ℂ)) *
-      star (Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b))
+      star ((UA : CMatrix a) ⊗ₖ (UB : CMatrix b))
   conv_lhs =>
     rw [hA, hB]
   simp [Matrix.star_eq_conjTranspose, Matrix.conjTranspose_kronecker,
@@ -1981,8 +1980,7 @@ theorem fixedLeftReferenceRegularization_tendsto_zero
         (nhdsWithin (0 : ℝ) (Set.Ioi 0)) (nhds sigma.m) :=
     sandwichedRenyiReferenceRegularization_tendsto sigma.m
   have hkr :
-      Continuous fun M : CMatrix b => Matrix.kronecker rhoA.m M := by
-    unfold Matrix.kronecker
+      Continuous fun M : CMatrix b => rhoA.m ⊗ₖ M := by
     exact _root_.continuous_matrix fun x y => by
       simp only [Matrix.kroneckerMap_apply]
       exact continuous_const.mul (continuous_id.matrix_elem x.2 y.2)
@@ -2000,12 +1998,12 @@ theorem supports_fixedLeftReferenceRegularization_of_supports
   classical
   let M : CMatrix (a × b) := (rhoA.prod sigma).m
   let N : CMatrix (a × b) :=
-    Matrix.kronecker rhoA.m (((epsilon : ℝ) : ℂ) • (1 : CMatrix b))
+    rhoA.m ⊗ₖ (((epsilon : ℝ) : ℂ) • (1 : CMatrix b))
   have hfixed_eq :
       fixedLeftReferenceRegularization rhoA sigma epsilon = N + (1 : ℝ) • M := by
     ext i j
     simp [fixedLeftReferenceRegularization, sandwichedRenyiReferenceRegularization,
-      M, N, Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.add_apply,
+      M, N, Matrix.kroneckerMap_apply, Matrix.add_apply,
       Matrix.smul_apply]
     ring
   have hM : M.PosSemidef := by
@@ -2049,8 +2047,7 @@ theorem fullRankApproxMaximallyMixedProductReference_matrix_eq_smul_fixedLeftRef
   rw [fullRankApproxMaximallyMixedStatePath_matrix_eq_smul_referenceRegularization
     sigma hdelta]
   ext i j
-  simp [fixedLeftReferenceRegularization, Matrix.kronecker,
-    Matrix.kroneckerMap_apply, Matrix.smul_apply, smul_eq_mul]
+  simp [fixedLeftReferenceRegularization, Matrix.kroneckerMap_apply, Matrix.smul_apply, smul_eq_mul]
   ring
 
 /-- Filter form of the canonical side-state full-rank approximation as a
@@ -2076,11 +2073,11 @@ theorem fullRankApproxProductReferencePath_matrix_sub_smul_left
     (hdelta : delta ∈ Set.Ioo (0 : ℝ) 1) :
     (fullRankApproxProductReferencePath rhoA sigma mu delta).m -
         (((1 - delta : ℝ) : ℂ) • (rhoA.prod sigma).m) =
-      Matrix.kronecker rhoA.m (((delta : ℝ) : ℂ) • mu.m) := by
+      rhoA.m ⊗ₖ (((delta : ℝ) : ℂ) • mu.m) := by
   ext i j
   simp [fullRankApproxProductReferencePath, fullRankApproxStatePath,
     fullRankApproxState, regularizedStateMatrix,
-    Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.sub_apply, Matrix.add_apply,
+    Matrix.kroneckerMap_apply, Matrix.sub_apply, Matrix.add_apply,
     Matrix.smul_apply, smul_eq_mul, hdelta]
   ring
 
@@ -2121,14 +2118,14 @@ theorem supports_fullRankApproxMaximallyMixedProductReference_of_supports
   let : Nonempty b := sigma.nonempty
   let M : CMatrix (a × b) := (rhoA.prod sigma).m
   let N : CMatrix (a × b) :=
-    Matrix.kronecker rhoA.m (((delta : ℝ) : ℂ) • (MState.uniform : MState b).m)
+    rhoA.m ⊗ₖ (((delta : ℝ) : ℂ) • (MState.uniform : MState b).m)
   have hpath_eq :
       (rhoA.prod (fullRankApproxMaximallyMixedStatePath sigma delta)).m =
         N + ((1 - delta : ℝ) • M) := by
     ext i j
     simp [fullRankApproxMaximallyMixedStatePath, fullRankApproxStatePath,
       fullRankApproxState, regularizedStateMatrix, M, N,
-      Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.add_apply,
+      Matrix.kroneckerMap_apply, Matrix.add_apply,
       Matrix.smul_apply, uniform_matrix, smul_eq_mul, hdelta]
     ring
   have hM : M.PosSemidef := by
@@ -2453,8 +2450,7 @@ theorem fullRankApproxProductReferencePath_matrix_tendsto_zero
     MState.continuous_matrix.tendsto sigma |>.comp
       (fullRankApproxStatePath_tendsto_zero sigma mu)
   have hkr :
-      Continuous fun M : CMatrix b => Matrix.kronecker rhoA.m M := by
-    unfold Matrix.kronecker
+      Continuous fun M : CMatrix b => rhoA.m ⊗ₖ M := by
     exact _root_.continuous_matrix fun x y => by
       simp only [Matrix.kroneckerMap_apply]
       exact continuous_const.mul (continuous_id.matrix_elem x.2 y.2)
@@ -2529,8 +2525,7 @@ theorem fullRankApproxProductReferenceBothPath_matrix_tendsto_zero
         (nhds (rhoA.m, sigma.m)) :=
     hleft.prodMk_nhds hright
   have hkr :
-      Continuous fun M : CMatrix a × CMatrix b => Matrix.kronecker M.1 M.2 := by
-    unfold Matrix.kronecker
+      Continuous fun M : CMatrix a × CMatrix b => M.1 ⊗ₖ M.2 := by
     exact _root_.continuous_matrix fun x y => by
       simp only [Matrix.kroneckerMap_apply]
       exact (continuous_fst.matrix_elem x.1 y.1).mul
@@ -3135,28 +3130,28 @@ The sandwiched product is PSD (a congruence of the PSD Kronecker `A ⊗ B` by
 bound core of the singular-marginal USC proof (Step 4b). -/
 lemma norm_sqrtMatrix_kronecker_mul_sqrtMatrix_le
     (ρ : MState (a × b)) {A : CMatrix a} (hA : A.PosSemidef) {B : CMatrix b} (hB : B.PosSemidef) :
-    ‖ρ.sqrtMatrix * Matrix.kronecker A B * ρ.sqrtMatrix‖ ≤
+    ‖ρ.sqrtMatrix * (A ⊗ₖ B) * ρ.sqrtMatrix‖ ≤
       B.trace.re * (A * ρ.traceRight.m).trace.re := by
-  have hK_psd : (Matrix.kronecker A B).PosSemidef := hA.kronecker hB
-  have hpsd : (ρ.sqrtMatrix * Matrix.kronecker A B * ρ.sqrtMatrix).PosSemidef := by
+  have hK_psd : (A ⊗ₖ B).PosSemidef := hA.kronecker hB
+  have hpsd : (ρ.sqrtMatrix * (A ⊗ₖ B) * ρ.sqrtMatrix).PosSemidef := by
     have h := hK_psd.mul_mul_conjTranspose_same ρ.sqrtMatrix
     rwa [ρ.sqrtMatrix_isHermitian.eq] at h
-  have htr : (ρ.sqrtMatrix * Matrix.kronecker A B * ρ.sqrtMatrix).trace =
-      (Matrix.kronecker A B * ρ.m).trace := by
+  have htr : (ρ.sqrtMatrix * (A ⊗ₖ B) * ρ.sqrtMatrix).trace =
+      ((A ⊗ₖ B) * ρ.m).trace := by
     rw [Matrix.trace_mul_cycle, ρ.sqrtMatrix_mul_self, Matrix.trace_mul_comm]
   have hone : ‖(1 : CMatrix (a × b))‖ ≤ 1 := by
     rw [Matrix.cstar_norm_def]
     simpa [ContinuousLinearMap.one_def] using
       ContinuousLinearMap.norm_id_le (𝕜 := ℂ) (E := EuclideanSpace ℂ (a × b))
-  have htrnn : 0 ≤ (ρ.sqrtMatrix * Matrix.kronecker A B * ρ.sqrtMatrix).trace.re :=
+  have htrnn : 0 ≤ (ρ.sqrtMatrix * (A ⊗ₖ B) * ρ.sqrtMatrix).trace.re :=
     (Matrix.PosSemidef.trace_nonneg hpsd).1
-  calc ‖ρ.sqrtMatrix * Matrix.kronecker A B * ρ.sqrtMatrix‖
-      ≤ (ρ.sqrtMatrix * Matrix.kronecker A B * ρ.sqrtMatrix).trace.re *
+  calc ‖ρ.sqrtMatrix * (A ⊗ₖ B) * ρ.sqrtMatrix‖
+      ≤ (ρ.sqrtMatrix * (A ⊗ₖ B) * ρ.sqrtMatrix).trace.re *
           ‖(1 : CMatrix (a × b))‖ :=
         norm_le_trace_re_mul_norm_one_of_posSemidef hpsd
-    _ ≤ (ρ.sqrtMatrix * Matrix.kronecker A B * ρ.sqrtMatrix).trace.re * 1 :=
+    _ ≤ (ρ.sqrtMatrix * (A ⊗ₖ B) * ρ.sqrtMatrix).trace.re * 1 :=
         mul_le_mul_of_nonneg_left hone htrnn
-    _ = (Matrix.kronecker A B * ρ.m).trace.re := by rw [mul_one, htr]
+    _ = ((A ⊗ₖ B) * ρ.m).trace.re := by rw [mul_one, htr]
     _ ≤ B.trace.re * (A * ρ.traceRight.m).trace.re := by
         rw [MState.traceRight_m]
         exact posSemidef_trace_mul_kronecker_le_partialTrace ρ.psd hA hB
@@ -3200,9 +3195,9 @@ theorem sandwichedRenyiReferenceInner_rpow_trace_re_tendsto_of_tendsto_state
     (sigmaB : MState b) (hsigmaB : sigmaB.m.PosDef) :
     Filter.Tendsto (fun x =>
       (CFC.rpow (sandwichedRenyiReferenceInner (rhoF x)
-        (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) α) α).trace.re) l
+        ((rhoF x).traceRight.m ⊗ₖ sigmaB.m) α) α).trace.re) l
       (nhds (CFC.rpow (sandwichedRenyiReferenceInner rho
-        (Matrix.kronecker rho.traceRight.m sigmaB.m) α) α).trace.re) := by
+        (rho.traceRight.m ⊗ₖ sigmaB.m) α) α).trace.re) := by
   -- (1) Scalar bookkeeping: s = (1-alpha)/(2 alpha) is negative, nonzero, ≤ 1,
   -- and 2*s + 1 = 1/alpha > 0.
   have hα_pos : 0 < α := lt_trans zero_lt_one halpha
@@ -3250,8 +3245,7 @@ theorem sandwichedRenyiReferenceInner_rpow_trace_re_tendsto_of_tendsto_state
     rw [cfc_rpowCutoffErr_eq_zero_of_spectralGap hA0_psd hγ hgap] at hstep
     simpa using hstep
   -- (6) Kronecker continuity in the left factor (right factor `Bs` fixed).
-  have hKronCont : Continuous fun M : CMatrix a => Matrix.kronecker M Bs := by
-    unfold Matrix.kronecker
+  have hKronCont : Continuous fun M : CMatrix a => M ⊗ₖ Bs := by
     exact _root_.continuous_matrix fun x y => by
       simp only [Matrix.kroneckerMap_apply]
       exact (continuous_id.matrix_elem x.1 y.1).mul continuous_const
@@ -3261,13 +3255,13 @@ theorem sandwichedRenyiReferenceInner_rpow_trace_re_tendsto_of_tendsto_state
   -- The bound is `‖M_x‖^2 ≤ (Bs*Bs).trace.re * (cfc (rpowCutoffErr gamma s) A_x).trace.re`,
   -- and the RHS tends to `(Bs*Bs).trace.re * 0 = 0`.
   have herrNorm : Filter.Tendsto (fun x =>
-      Matrix.kronecker (CFC.rpow (rhoF x).traceRight.m s -
-        cfc (rpowCutoff γ s) (rhoF x).traceRight.m) Bs * (rhoF x).sqrtMatrix) l
+      ((CFC.rpow (rhoF x).traceRight.m s -
+        cfc (rpowCutoff γ s) (rhoF x).traceRight.m) ⊗ₖ Bs) * (rhoF x).sqrtMatrix) l
       (nhds 0) := by
     -- Per-element squared-norm bound.
     have hSq_bound : ∀ x : X,
-        ‖Matrix.kronecker (CFC.rpow (rhoF x).traceRight.m s -
-          cfc (rpowCutoff γ s) (rhoF x).traceRight.m) Bs * (rhoF x).sqrtMatrix‖^2 ≤
+        ‖((CFC.rpow (rhoF x).traceRight.m s -
+          cfc (rpowCutoff γ s) (rhoF x).traceRight.m) ⊗ₖ Bs) * (rhoF x).sqrtMatrix‖^2 ≤
           (Bs * Bs).trace.re * (cfc (rpowCutoffErr γ s) (rhoF x).traceRight.m).trace.re := by
       intro x
       set Ax : CMatrix a := (rhoF x).traceRight.m with hAx_def
@@ -3291,27 +3285,26 @@ theorem sandwichedRenyiReferenceInner_rpow_trace_re_tendsto_of_tendsto_state
         rw [← hCut_def, ← hE_def, pow_two] at hlin
         exact hlin
       -- `star M = sqrtMatrix * kronecker E Bs` (Hermitian factors).
-      have hstarM : star (Matrix.kronecker E Bs * (rhoF x).sqrtMatrix) =
-          (rhoF x).sqrtMatrix * Matrix.kronecker E Bs := by
+      have hstarM : star ((E ⊗ₖ Bs) * (rhoF x).sqrtMatrix) =
+          (rhoF x).sqrtMatrix * (E ⊗ₖ Bs) := by
         rw [Matrix.star_eq_conjTranspose, Matrix.conjTranspose_mul]
-        unfold Matrix.kronecker
         simp only [Matrix.conjTranspose_kronecker, (rhoF x).sqrtMatrix_isHermitian.eq,
           hE_herm.eq, hBs_herm.eq]
-      have hKron_mul : Matrix.kronecker E Bs * Matrix.kronecker E Bs =
-          Matrix.kronecker (E * E) (Bs * Bs) :=
+      have hKron_mul : (E ⊗ₖ Bs) * (E ⊗ₖ Bs) =
+          (E * E) ⊗ₖ (Bs * Bs) :=
         (Matrix.mul_kronecker_mul E E Bs Bs).symm
       -- `star M * M = sqrtMatrix * kronecker (E*E) (Bs*Bs) * sqrtMatrix`.
-      have hstarMstarM : star (Matrix.kronecker E Bs * (rhoF x).sqrtMatrix) *
-          (Matrix.kronecker E Bs * (rhoF x).sqrtMatrix) =
-          (rhoF x).sqrtMatrix * Matrix.kronecker (E * E) (Bs * Bs) * (rhoF x).sqrtMatrix := by
+      have hstarMstarM : star ((E ⊗ₖ Bs) * (rhoF x).sqrtMatrix) *
+          ((E ⊗ₖ Bs) * (rhoF x).sqrtMatrix) =
+          (rhoF x).sqrtMatrix * ((E * E) ⊗ₖ (Bs * Bs)) * (rhoF x).sqrtMatrix := by
         rw [hstarM, ← hKron_mul]
         noncomm_ring
       -- Assemble the squared-norm bound.
-      calc ‖Matrix.kronecker E Bs * (rhoF x).sqrtMatrix‖^2
-          = ‖star (Matrix.kronecker E Bs * (rhoF x).sqrtMatrix) *
-               (Matrix.kronecker E Bs * (rhoF x).sqrtMatrix)‖ := by
+      calc ‖(E ⊗ₖ Bs) * (rhoF x).sqrtMatrix‖^2
+          = ‖star ((E ⊗ₖ Bs) * (rhoF x).sqrtMatrix) *
+               ((E ⊗ₖ Bs) * (rhoF x).sqrtMatrix)‖ := by
             rw [pow_two, ← CStarRing.norm_star_mul_self]
-        _ = ‖(rhoF x).sqrtMatrix * Matrix.kronecker (E * E) (Bs * Bs) *
+        _ = ‖(rhoF x).sqrtMatrix * ((E * E) ⊗ₖ (Bs * Bs)) *
                (rhoF x).sqrtMatrix‖ := by rw [hstarMstarM]
         _ ≤ (Bs * Bs).trace.re * ((E * E) * Ax).trace.re := by
             exact norm_sqrtMatrix_kronecker_mul_sqrtMatrix_le (rhoF x) hEE_psd hBsBs_psd
@@ -3325,18 +3318,18 @@ theorem sandwichedRenyiReferenceInner_rpow_trace_re_tendsto_of_tendsto_state
       have h := Tendsto.mul (tendsto_const_nhds (x := (Bs * Bs).trace.re)) herrTrace
       rwa [mul_zero] at h
     have hSq_tendsto : Filter.Tendsto (fun x =>
-        ‖Matrix.kronecker (CFC.rpow (rhoF x).traceRight.m s -
-          cfc (rpowCutoff γ s) (rhoF x).traceRight.m) Bs * (rhoF x).sqrtMatrix‖^2) l
+        ‖((CFC.rpow (rhoF x).traceRight.m s -
+          cfc (rpowCutoff γ s) (rhoF x).traceRight.m) ⊗ₖ Bs) * (rhoF x).sqrtMatrix‖^2) l
         (nhds 0) := by
       refine tendsto_of_tendsto_of_tendsto_of_le_of_le tendsto_const_nhds hbound_tendsto
         (fun _ => pow_nonneg (norm_nonneg _) 2) (fun x => hSq_bound x)
     have hnorm : Filter.Tendsto (fun x =>
-        ‖Matrix.kronecker (CFC.rpow (rhoF x).traceRight.m s -
-          cfc (rpowCutoff γ s) (rhoF x).traceRight.m) Bs * (rhoF x).sqrtMatrix‖) l
+        ‖((CFC.rpow (rhoF x).traceRight.m s -
+          cfc (rpowCutoff γ s) (rhoF x).traceRight.m) ⊗ₖ Bs) * (rhoF x).sqrtMatrix‖) l
         (nhds 0) := by
       have h2 : Filter.Tendsto (fun x =>
-          Real.sqrt (‖Matrix.kronecker (CFC.rpow (rhoF x).traceRight.m s -
-            cfc (rpowCutoff γ s) (rhoF x).traceRight.m) Bs * (rhoF x).sqrtMatrix‖ ^ 2)) l
+          Real.sqrt (‖((CFC.rpow (rhoF x).traceRight.m s -
+            cfc (rpowCutoff γ s) (rhoF x).traceRight.m) ⊗ₖ Bs) * (rhoF x).sqrtMatrix‖ ^ 2)) l
           (nhds 0) := by
         have h := (Real.continuous_sqrt.tendsto 0).comp hSq_tendsto
         rwa [show (nhds (Real.sqrt 0) : Filter ℝ) = nhds 0 from by rw [Real.sqrt_zero]] at h
@@ -3346,42 +3339,42 @@ theorem sandwichedRenyiReferenceInner_rpow_trace_re_tendsto_of_tendsto_state
     exact tendsto_iff_norm_sub_tendsto_zero.mpr (by simpa only [sub_zero] using hnorm)
   -- (8) On-support matrix tendsto: `(Cut_x ⊗ Bs) * sqrtMatrix_x → (A^s ⊗ Bs) * sqrtMatrix`.
   have hOn : Filter.Tendsto (fun x =>
-      Matrix.kronecker (cfc (rpowCutoff γ s) (rhoF x).traceRight.m) Bs *
+      ((cfc (rpowCutoff γ s) (rhoF x).traceRight.m) ⊗ₖ Bs) *
         (rhoF x).sqrtMatrix) l
-    (nhds (Matrix.kronecker (CFC.rpow rho.traceRight.m s) Bs * rho.sqrtMatrix)) :=
+    (nhds (((CFC.rpow rho.traceRight.m s) ⊗ₖ Bs) * rho.sqrtMatrix)) :=
     (hKronCont.tendsto _).comp hCut |>.mul hsqrt
   -- (9) T_x → T: full matrix T_x = CFC.rpow (kronecker A_x sigmaB.m) s * sqrtMatrix_x
   -- tends to T = CFC.rpow (kronecker A sigmaB.m) s * rho.sqrtMatrix, via
   -- the kron-rpow identity, decomposing `CFC.rpow A_x s = Cut_x + E_x`, and
   -- `Tendsto.add hOn herrNorm`.
   have hTx : Filter.Tendsto (fun x =>
-      CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s *
+      CFC.rpow ((rhoF x).traceRight.m ⊗ₖ sigmaB.m) s *
         (rhoF x).sqrtMatrix) l
-    (nhds (CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s *
+    (nhds (CFC.rpow (rho.traceRight.m ⊗ₖ sigmaB.m) s *
       rho.sqrtMatrix)) := by
     have hkron_x : ∀ x,
-        CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s =
-          Matrix.kronecker (CFC.rpow (rhoF x).traceRight.m s) Bs := fun x =>
+        CFC.rpow ((rhoF x).traceRight.m ⊗ₖ sigmaB.m) s =
+          (CFC.rpow (rhoF x).traceRight.m s) ⊗ₖ Bs := fun x =>
       cMatrix_rpow_kronecker ((rhoF x).traceRight.psd) hsigmaB.posSemidef s
     have hkron_lim :
-        CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s =
-          Matrix.kronecker (CFC.rpow rho.traceRight.m s) Bs :=
+        CFC.rpow (rho.traceRight.m ⊗ₖ sigmaB.m) s =
+          (CFC.rpow rho.traceRight.m s) ⊗ₖ Bs :=
       cMatrix_rpow_kronecker rho.traceRight.psd hsigmaB.posSemidef s
     rw [hkron_lim]
     have hTx_kron : Filter.Tendsto (fun x =>
-        Matrix.kronecker (CFC.rpow (rhoF x).traceRight.m s) Bs *
+        ((CFC.rpow (rhoF x).traceRight.m s) ⊗ₖ Bs) *
           (rhoF x).sqrtMatrix) l
-      (nhds (Matrix.kronecker (CFC.rpow rho.traceRight.m s) Bs * rho.sqrtMatrix)) := by
+      (nhds (((CFC.rpow rho.traceRight.m s) ⊗ₖ Bs) * rho.sqrtMatrix)) := by
       have hsum := hOn.add herrNorm
       rw [add_zero] at hsum
       refine hsum.congr' ?_
       filter_upwards with x
       have hK : (cfc (rpowCutoff γ s) (rhoF x).traceRight.m +
           (CFC.rpow (rhoF x).traceRight.m s -
-            cfc (rpowCutoff γ s) (rhoF x).traceRight.m)).kronecker Bs =
-          (cfc (rpowCutoff γ s) (rhoF x).traceRight.m).kronecker Bs +
-          Matrix.kronecker (CFC.rpow (rhoF x).traceRight.m s -
-            cfc (rpowCutoff γ s) (rhoF x).traceRight.m) Bs :=
+            cfc (rpowCutoff γ s) (rhoF x).traceRight.m)) ⊗ₖ Bs =
+          (cfc (rpowCutoff γ s) (rhoF x).traceRight.m) ⊗ₖ Bs +
+          (CFC.rpow (rhoF x).traceRight.m s -
+            cfc (rpowCutoff γ s) (rhoF x).traceRight.m) ⊗ₖ Bs :=
         Matrix.add_kronecker _ _ _
       have hA : cfc (rpowCutoff γ s) (rhoF x).traceRight.m +
           (CFC.rpow (rhoF x).traceRight.m s -
@@ -3395,65 +3388,65 @@ theorem sandwichedRenyiReferenceInner_rpow_trace_re_tendsto_of_tendsto_state
   -- (10) inner_x → inner: `inner_x = T_x * star T_x` (Hermitian factors, sqrt square).
   have hinner : Filter.Tendsto (fun x =>
       sandwichedRenyiReferenceInner (rhoF x)
-        (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) α) l
+        ((rhoF x).traceRight.m ⊗ₖ sigmaB.m) α) l
     (nhds (sandwichedRenyiReferenceInner rho
-      (Matrix.kronecker rho.traceRight.m sigmaB.m) α)) := by
+      (rho.traceRight.m ⊗ₖ sigmaB.m) α)) := by
     have hCx_herm : ∀ x,
-        (CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s).IsHermitian :=
+        (CFC.rpow ((rhoF x).traceRight.m ⊗ₖ sigmaB.m) s).IsHermitian :=
       fun x =>
         (cMatrix_rpow_posSemidef
           (Matrix.PosSemidef.kronecker (rhoF x).traceRight.psd hsigmaB.posSemidef)).isHermitian
     have hC0_herm :
-        (CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s).IsHermitian :=
+        (CFC.rpow (rho.traceRight.m ⊗ₖ sigmaB.m) s).IsHermitian :=
       (cMatrix_rpow_posSemidef
         (Matrix.PosSemidef.kronecker rho.traceRight.psd hsigmaB.posSemidef)).isHermitian
     have hinner_eq : ∀ x,
         sandwichedRenyiReferenceInner (rhoF x)
-          (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) α =
-        (CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s *
+          ((rhoF x).traceRight.m ⊗ₖ sigmaB.m) α =
+        (CFC.rpow ((rhoF x).traceRight.m ⊗ₖ sigmaB.m) s *
           (rhoF x).sqrtMatrix) *
-        star (CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s *
+        star (CFC.rpow ((rhoF x).traceRight.m ⊗ₖ sigmaB.m) s *
           (rhoF x).sqrtMatrix) := by
       intro x
-      show CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s *
+      show CFC.rpow ((rhoF x).traceRight.m ⊗ₖ sigmaB.m) s *
             (rhoF x).m *
-          CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s =
-        (CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s *
+          CFC.rpow ((rhoF x).traceRight.m ⊗ₖ sigmaB.m) s =
+        (CFC.rpow ((rhoF x).traceRight.m ⊗ₖ sigmaB.m) s *
           (rhoF x).sqrtMatrix) *
-        star (CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s *
+        star (CFC.rpow ((rhoF x).traceRight.m ⊗ₖ sigmaB.m) s *
           (rhoF x).sqrtMatrix)
       rw [show (rhoF x).m = (rhoF x).sqrtMatrix * (rhoF x).sqrtMatrix from
         (rhoF x).sqrtMatrix_mul_self.symm]
       have hstar_eq : star
-          (CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s *
+          (CFC.rpow ((rhoF x).traceRight.m ⊗ₖ sigmaB.m) s *
             (rhoF x).sqrtMatrix) =
           (rhoF x).sqrtMatrix *
-            CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s := by
+            CFC.rpow ((rhoF x).traceRight.m ⊗ₖ sigmaB.m) s := by
         rw [Matrix.star_eq_conjTranspose, Matrix.conjTranspose_mul]
         simp only [(rhoF x).sqrtMatrix_isHermitian.eq, (hCx_herm x).eq]
       rw [hstar_eq]
       noncomm_ring
     have hinner_eq_lim :
         sandwichedRenyiReferenceInner rho
-          (Matrix.kronecker rho.traceRight.m sigmaB.m) α =
-        (CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s *
+          (rho.traceRight.m ⊗ₖ sigmaB.m) α =
+        (CFC.rpow (rho.traceRight.m ⊗ₖ sigmaB.m) s *
           rho.sqrtMatrix) *
-        star (CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s *
+        star (CFC.rpow (rho.traceRight.m ⊗ₖ sigmaB.m) s *
           rho.sqrtMatrix) := by
-      show CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s *
+      show CFC.rpow (rho.traceRight.m ⊗ₖ sigmaB.m) s *
             rho.m *
-          CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s =
-        (CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s *
+          CFC.rpow (rho.traceRight.m ⊗ₖ sigmaB.m) s =
+        (CFC.rpow (rho.traceRight.m ⊗ₖ sigmaB.m) s *
           rho.sqrtMatrix) *
-        star (CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s *
+        star (CFC.rpow (rho.traceRight.m ⊗ₖ sigmaB.m) s *
           rho.sqrtMatrix)
       rw [show rho.m = rho.sqrtMatrix * rho.sqrtMatrix from
         rho.sqrtMatrix_mul_self.symm]
       have hstar_eq : star
-          (CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s *
+          (CFC.rpow (rho.traceRight.m ⊗ₖ sigmaB.m) s *
             rho.sqrtMatrix) =
           rho.sqrtMatrix *
-            CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s := by
+            CFC.rpow (rho.traceRight.m ⊗ₖ sigmaB.m) s := by
         rw [Matrix.star_eq_conjTranspose, Matrix.conjTranspose_mul]
         simp only [rho.sqrtMatrix_isHermitian.eq, hC0_herm.eq]
       rw [hstar_eq]
@@ -3466,13 +3459,13 @@ theorem sandwichedRenyiReferenceInner_rpow_trace_re_tendsto_of_tendsto_state
   -- Schatten PSD trace-power continuity at positive `alpha`.
   have hinner_psd : ∀ᶠ x in l,
       (sandwichedRenyiReferenceInner (rhoF x)
-        (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) α).PosSemidef :=
+        ((rhoF x).traceRight.m ⊗ₖ sigmaB.m) α).PosSemidef :=
     Filter.Eventually.of_forall fun x =>
       sandwichedRenyiReferenceInner_posSemidef (rhoF x)
         (Matrix.PosSemidef.kronecker (rhoF x).traceRight.psd hsigmaB.posSemidef) α
   have hinner_lim_psd :
       (sandwichedRenyiReferenceInner rho
-        (Matrix.kronecker rho.traceRight.m sigmaB.m) α).PosSemidef :=
+        (rho.traceRight.m ⊗ₖ sigmaB.m) α).PosSemidef :=
     sandwichedRenyiReferenceInner_posSemidef rho
       (Matrix.PosSemidef.kronecker rho.traceRight.psd hsigmaB.posSemidef) α
   exact cMatrix_rpow_trace_re_tendsto_of_tendsto_posSemidef
@@ -3553,19 +3546,19 @@ theorem sandwichedRenyiMutualInformationCandidateE_upperSemicontinuousOn
   have htpow :
       Filter.Tendsto (fun rho' =>
         (CFC.rpow (sandwichedRenyiReferenceInner rho'
-          (Matrix.kronecker rho'.traceRight.m sigmaB.m) alpha) alpha).trace.re)
+          (rho'.traceRight.m ⊗ₖ sigmaB.m) alpha) alpha).trace.re)
         (nhds rho)
         (nhds (CFC.rpow (sandwichedRenyiReferenceInner rho
-          (Matrix.kronecker rho.traceRight.m sigmaB.m) alpha) alpha).trace.re) :=
+          (rho.traceRight.m ⊗ₖ sigmaB.m) alpha) alpha).trace.re) :=
     sandwichedRenyiReferenceInner_rpow_trace_re_tendsto_of_tendsto_state
       (rhoF := fun rho' : MState (a × b) => rho') tendsto_id halpha hγ_pos hgap
       sigmaB hsigmaB
   -- (4) Limit trace positivity (supports holds at `rho`).
-  have hkr_psd : (Matrix.kronecker rho.traceRight.m sigmaB.m).PosSemidef :=
+  have hkr_psd : (rho.traceRight.m ⊗ₖ sigmaB.m).PosSemidef :=
     Matrix.PosSemidef.kronecker rho.traceRight.psd hsigmaB.posSemidef
   have htpow_pos :
       0 < (CFC.rpow (sandwichedRenyiReferenceInner rho
-        (Matrix.kronecker rho.traceRight.m sigmaB.m) alpha) alpha).trace.re := by
+        (rho.traceRight.m ⊗ₖ sigmaB.m) alpha) alpha).trace.re := by
     have hsup := hsupports rho
     rw [MState.prod_m] at hsup
     exact sandwichedRenyiReferenceInner_psdTracePower_pos_of_supports rho
@@ -3573,7 +3566,7 @@ theorem sandwichedRenyiMutualInformationCandidateE_upperSemicontinuousOn
   -- (5) Compose with `log2` (continuous at the strictly positive limit trace).
   have hlog2_cont : ContinuousAt (fun y : ℝ => log2 y)
       (CFC.rpow (sandwichedRenyiReferenceInner rho
-        (Matrix.kronecker rho.traceRight.m sigmaB.m) alpha) alpha).trace.re := by
+        (rho.traceRight.m ⊗ₖ sigmaB.m) alpha) alpha).trace.re := by
     unfold log2
     refine ContinuousAt.div ?_ continuousAt_const ?_
     · exact Real.continuousAt_log htpow_pos.ne'
@@ -3581,21 +3574,21 @@ theorem sandwichedRenyiMutualInformationCandidateE_upperSemicontinuousOn
   have hlog2_tendsto :
       Filter.Tendsto (fun rho' =>
         log2 ((CFC.rpow (sandwichedRenyiReferenceInner rho'
-          (Matrix.kronecker rho'.traceRight.m sigmaB.m) alpha) alpha).trace.re))
+          (rho'.traceRight.m ⊗ₖ sigmaB.m) alpha) alpha).trace.re))
         (nhds rho)
         (nhds (log2 ((CFC.rpow (sandwichedRenyiReferenceInner rho
-          (Matrix.kronecker rho.traceRight.m sigmaB.m) alpha) alpha).trace.re))) :=
+          (rho.traceRight.m ⊗ₖ sigmaB.m) alpha) alpha).trace.re))) :=
     hlog2_cont.tendsto.comp htpow
   -- (6) Scalar multiplication by `1/(alpha-1)` is continuous.
   have hmul_tendsto :
       Filter.Tendsto (fun rho' =>
         (1 / (alpha - 1)) *
           log2 ((CFC.rpow (sandwichedRenyiReferenceInner rho'
-            (Matrix.kronecker rho'.traceRight.m sigmaB.m) alpha) alpha).trace.re))
+            (rho'.traceRight.m ⊗ₖ sigmaB.m) alpha) alpha).trace.re))
         (nhds rho)
         (nhds ((1 / (alpha - 1)) *
           log2 ((CFC.rpow (sandwichedRenyiReferenceInner rho
-            (Matrix.kronecker rho.traceRight.m sigmaB.m) alpha) alpha).trace.re))) :=
+            (rho.traceRight.m ⊗ₖ sigmaB.m) alpha) alpha).trace.re))) :=
     (continuous_const_mul _).tendsto _ |>.comp hlog2_tendsto
   -- (7) Real-valued finite-branch tendsto: unfold the finite definition to the
   -- scalar-`log2` form and discharge with `hmul_tendsto`.

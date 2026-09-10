@@ -19,7 +19,7 @@ form used in Tomamichel2015FiniteResources, `apps.tex:195-212`.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 
 namespace QIT
 
@@ -189,8 +189,8 @@ theorem coherentSideIsometry_matrix (hP : P.IsRankOne)
     hP.coherentSideIsometry.matrix out input =
       if out.1.1 = out.1.2 ∧ out.2 = input.2 then
         star ((hP.vector out.1.1).vec input.1) else 0 := by
-  simp only [coherentSideIsometry, ReferenceIsometry.prod, Matrix.kronecker,
-    Matrix.kroneckerMap_apply, ReferenceIsometry.ofInjective, coherentIsometry_matrix]
+  simp only [coherentSideIsometry, ReferenceIsometry.prod, Matrix.kroneckerMap_apply, ReferenceIsometry.ofInjective,
+  coherentIsometry_matrix]
   by_cases hdiag : out.1.1 = out.1.2 <;>
     by_cases hside : out.2 = input.2 <;> simp [hdiag, hside]
 
@@ -307,7 +307,7 @@ theorem coherentYCMarginal_eq_measure (hP : P.IsRankOne)
 `(Y tensor Y') tensor B`. -/
 def copiedIdentityTensor (σ : CMatrix (y × b)) : CMatrix ((y × y) × b) :=
   Matrix.reindex (Equiv.prodAssoc y y b).symm (Equiv.prodAssoc y y b).symm
-    (Matrix.kronecker (1 : CMatrix y) σ)
+    ((1 : CMatrix y) ⊗ₖ σ)
 
 omit [Fintype y] [Fintype b] [DecidableEq b] in
 @[simp]
@@ -316,7 +316,7 @@ theorem copiedIdentityTensor_apply (σ : CMatrix (y × b))
     copiedIdentityTensor σ i j =
       if i.1.1 = j.1.1 then σ (i.1.2, i.2) (j.1.2, j.2) else 0 := by
   simp [copiedIdentityTensor, Matrix.reindex_apply, Matrix.submatrix_apply,
-    Matrix.kronecker, Matrix.one_apply]
+    Matrix.one_apply]
 
 omit [DecidableEq b] in
 theorem copiedIdentityTensor_posSemidef {σ : CMatrix (y × b)}
@@ -522,12 +522,11 @@ theorem measureCoherentPullback_rankOne (hP : P.IsRankOne)
         (hP.coherentPullback σ) =
       ∑ measured, ∑ outcome,
         (hR.vector measured).overlapSq (hP.vector outcome) •
-          Matrix.kronecker (Matrix.single measured measured (1 : ℂ))
-            (copiedOutcomeBlock σ outcome) := by
+          ((Matrix.single measured measured (1 : ℂ)) ⊗ₖ
+            (copiedOutcomeBlock σ outcome)) := by
   ext ⟨i, k⟩ ⟨j, l⟩
   rw [hP.measureCoherentPullback_rankOne_apply hR]
-  simp only [Matrix.sum_apply, Matrix.smul_apply, Matrix.kronecker,
-    Matrix.kroneckerMap_apply]
+  simp only [Matrix.sum_apply, Matrix.smul_apply, Matrix.kroneckerMap_apply]
   by_cases hij : i = j
   · subst j
     rw [if_pos rfl, Finset.sum_eq_single i]

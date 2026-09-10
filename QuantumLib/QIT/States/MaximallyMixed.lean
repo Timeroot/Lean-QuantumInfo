@@ -18,7 +18,7 @@ reproving them.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator
+open scoped ComplexOrder MatrixOrder Kronecker Matrix.Norms.L2Operator
 open Matrix
 
 noncomputable section
@@ -54,8 +54,7 @@ omit [Fintype a] in theorem identityTensorStateMatrix_uniform [Nonempty b] :
       ((((Fintype.card b : ℝ)⁻¹ : ℝ) : ℂ) • (1 : CMatrix (a × b))) := by
   ext x y
   by_cases h1 : x.1 = y.1 <;> by_cases h2 : x.2 = y.2 <;>
-    simp [identityTensorStateMatrix, Matrix.kronecker,
-      Matrix.kroneckerMap_apply, Matrix.one_apply, Prod.ext_iff, h1, h2]
+    simp [identityTensorStateMatrix, Matrix.kroneckerMap_apply, Matrix.one_apply, Prod.ext_iff, h1, h2]
 
 theorem uniform_traceRight [Nonempty a] [Nonempty b] :
     (MState.uniform : MState (a × b)).traceRight = (MState.uniform : MState a) := by
@@ -117,19 +116,19 @@ theorem uniform_sqrtMatrix [Nonempty a] :
 theorem uniform_prod_sqrtMatrix [Nonempty a] (σ : MState b) :
     ((MState.uniform : MState a).prod σ).sqrtMatrix =
       ((Real.sqrt ((Fintype.card a : ℝ)⁻¹) : ℝ) : ℂ) •
-        Matrix.kronecker (1 : CMatrix a) σ.sqrtMatrix := by
-  rw [MState.sqrtMatrix, MState.prod_m, ← Matrix.kronecker]
+        ((1 : CMatrix a) ⊗ₖ σ.sqrtMatrix) := by
+  rw [MState.sqrtMatrix, MState.prod_m]
   rw [psdSqrt_kronecker (MState.uniform : MState a).psd σ.psd]
-  change Matrix.kronecker ((MState.uniform : MState a).sqrtMatrix) (σ.sqrtMatrix) =
+  change ((MState.uniform : MState a).sqrtMatrix) ⊗ₖ (σ.sqrtMatrix) =
     ((Real.sqrt ((Fintype.card a : ℝ)⁻¹) : ℝ) : ℂ) •
-      Matrix.kronecker (1 : CMatrix a) σ.sqrtMatrix
+      (1 : CMatrix a) ⊗ₖ σ.sqrtMatrix
   rw [uniform_sqrtMatrix (a := a)]
   ext x y
   simp [Matrix.kroneckerMap_apply, mul_assoc]
 
 theorem sqrt_identityTensorStateMatrix_eq_sqrt_card_smul_uniform_prod_sqrtMatrix
     [Nonempty a] (σ : MState b) :
-    Matrix.kronecker (1 : CMatrix a) σ.sqrtMatrix =
+    (1 : CMatrix a) ⊗ₖ σ.sqrtMatrix =
       ((Real.sqrt (Fintype.card a : ℝ) : ℂ) •
         ((MState.uniform : MState a).prod σ).sqrtMatrix) := by
   have hcard_pos : 0 < (Fintype.card a : ℝ) := by

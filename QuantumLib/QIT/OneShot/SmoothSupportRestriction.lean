@@ -21,7 +21,7 @@ matrix support statement remains independent of compression index types.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal Pointwise
+open scoped ComplexOrder MatrixOrder Kronecker NNReal Pointwise
 
 open Matrix
 
@@ -49,8 +49,7 @@ theorem supportProjector_apply (M : CMatrix a) (hM : M.PosSemidef) :
 /-- The product support projector associated with a bipartite state. -/
 def bipartiteSupportProjector (ρ : SubnormalizedState (a × b)) :
     CMatrix (a × b) :=
-  Matrix.kronecker
-    (supportProjector ρ.traceRight.matrix ρ.traceRight.pos)
+  (supportProjector ρ.traceRight.matrix ρ.traceRight.pos) ⊗ₖ
     (supportProjector ρ.traceLeft.matrix ρ.traceLeft.pos)
 
 /-- The one-Kraus support filter on a bipartite matrix. -/
@@ -100,25 +99,25 @@ theorem supportFilter_traceNonincreasing
     have hleft : ((1 : CMatrix a) - PA).PosSemidef := Matrix.le_iff.mp hPAle
     have hright : ((1 : CMatrix b) - PB).PosSemidef := Matrix.le_iff.mp hPBle
     have hdecomp :
-        (1 : CMatrix (a × b)) - Matrix.kronecker PA PB =
-          Matrix.kronecker ((1 : CMatrix a) - PA) PB +
-            Matrix.kronecker (1 : CMatrix a) ((1 : CMatrix b) - PB) := by
+        (1 : CMatrix (a × b)) - PA ⊗ₖ PB =
+          ((1 : CMatrix a) - PA) ⊗ₖ PB +
+            (1 : CMatrix a) ⊗ₖ ((1 : CMatrix b) - PB) := by
       ext i j
       by_cases hij : i = j
       · subst j
-        simp [Matrix.kronecker, Matrix.kroneckerMap_apply, sub_eq_add_neg]
+        simp [Matrix.kroneckerMap_apply, sub_eq_add_neg]
         ring
       · by_cases h1 : i.1 = j.1
         · have h2 : i.2 ≠ j.2 := by
             intro h2
             exact hij (Prod.ext h1 h2)
-          simp [Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
+          simp [Matrix.kroneckerMap_apply, Matrix.one_apply,
             h1, h2, hij]
           ring
         · have hp : i ≠ j := hij
-          simp [Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
+          simp [Matrix.kroneckerMap_apply, Matrix.one_apply,
             h1, hp]
-    rw [show bipartiteSupportProjector ρ = Matrix.kronecker PA PB by rfl]
+    rw [show bipartiteSupportProjector ρ = PA ⊗ₖ PB by rfl]
     rw [Matrix.le_iff]
     rw [hdecomp]
     exact (hleft.kronecker hPB).add (Matrix.PosSemidef.one.kronecker hright)
@@ -142,13 +141,13 @@ theorem supportFilter_traceNonincreasing
       exact psdInvSqrt_support_idempotent ρ.traceRight.pos
     have hPBid : PB * PB = PB := by
       exact psdInvSqrt_support_idempotent ρ.traceLeft.pos
-    change Matrix.kronecker PA PB * Matrix.kronecker PA PB =
-      Matrix.kronecker PA PB
+    change (PA ⊗ₖ PB) * (PA ⊗ₖ PB) =
+      PA ⊗ₖ PB
     calc
-      Matrix.kronecker PA PB * Matrix.kronecker PA PB =
-          Matrix.kronecker (PA * PA) (PB * PB) := by
+      (PA ⊗ₖ PB) * (PA ⊗ₖ PB) =
+          (PA * PA) ⊗ₖ (PB * PB) := by
             exact (Matrix.mul_kronecker_mul PA PA PB PB).symm
-      _ = Matrix.kronecker PA PB := by rw [hPAid, hPBid]
+      _ = PA ⊗ₖ PB := by rw [hPAid, hPBid]
   have hout :
       (supportFilter ρ X).trace.re =
         (X * bipartiteSupportProjector ρ).trace.re := by
@@ -222,7 +221,7 @@ theorem bipartiteSupport_center_support
           (ρ.traceRight.prod ρ.traceLeft).matrix := by
       rw [MState.prod_m, hA, hB]
       ext x y
-      simp [SubnormalizedState.prod, Matrix.kronecker, Matrix.kroneckerMap_apply,
+      simp [SubnormalizedState.prod, Matrix.kroneckerMap_apply,
         Matrix.smul_apply]
       ring
     have hvn : (ρn.traceRight.prod ρn.traceLeft).m.mulVec v = 0 := by
@@ -247,38 +246,38 @@ theorem supportFilterState_center (ρ : SubnormalizedState (a × b)) :
   have hNB : NB * PB = NB := by
     exact (supportProjector_fixes_of_supports (M := NB) (N := NB)
       ρ.traceLeft.pos ρ.traceLeft.pos (Matrix.Supports.refl NB)).2
-  have hNP : Matrix.kronecker NA NB * Matrix.kronecker PA PB =
-      Matrix.kronecker NA NB := by
+  have hNP : (NA ⊗ₖ NB) * (PA ⊗ₖ PB) =
+      NA ⊗ₖ NB := by
     calc
-      Matrix.kronecker NA NB * Matrix.kronecker PA PB =
-          Matrix.kronecker (NA * PA) (NB * PB) := by
+      (NA ⊗ₖ NB) * (PA ⊗ₖ PB) =
+          (NA * PA) ⊗ₖ (NB * PB) := by
             exact (Matrix.mul_kronecker_mul NA PA NB PB).symm
-      _ = Matrix.kronecker NA NB := by rw [hNA, hNB]
-  have hNPsupport : Matrix.Supports (Matrix.kronecker NA NB)
-      (Matrix.kronecker PA PB) :=
+      _ = NA ⊗ₖ NB := by rw [hNA, hNB]
+  have hNPsupport : Matrix.Supports (NA ⊗ₖ NB)
+      (PA ⊗ₖ PB) :=
     Matrix.Supports.of_mul_right_eq_self hNP
-  have hρP : Matrix.Supports ρ.matrix (Matrix.kronecker PA PB) := by
+  have hρP : Matrix.Supports ρ.matrix (PA ⊗ₖ PB) := by
     exact hcenter.trans hNPsupport
-  have hP : (Matrix.kronecker PA PB).PosSemidef :=
+  have hP : (PA ⊗ₖ PB).PosSemidef :=
     (ρ.traceRight.pos |> psdInvSqrt_support_posSemidef).kronecker
       (ρ.traceLeft.pos |> psdInvSqrt_support_posSemidef)
-  have hPid : Matrix.kronecker PA PB * Matrix.kronecker PA PB =
-      Matrix.kronecker PA PB := by
+  have hPid : (PA ⊗ₖ PB) * (PA ⊗ₖ PB) =
+      PA ⊗ₖ PB := by
     have hPAid : PA * PA = PA := by
       exact psdInvSqrt_support_idempotent ρ.traceRight.pos
     have hPBid : PB * PB = PB := by
       exact psdInvSqrt_support_idempotent ρ.traceLeft.pos
     calc
-      Matrix.kronecker PA PB * Matrix.kronecker PA PB =
-          Matrix.kronecker (PA * PA) (PB * PB) := by
+      (PA ⊗ₖ PB) * (PA ⊗ₖ PB) =
+          (PA * PA) ⊗ₖ (PB * PB) := by
             exact (Matrix.mul_kronecker_mul PA PA PB PB).symm
-      _ = Matrix.kronecker PA PB := by
+      _ = PA ⊗ₖ PB := by
         rw [hPAid, hPBid]
   have hfix := Matrix.Supports.projector_fixes ρ.pos hP hPid hρP
   rw [supportFilterState_matrix]
   change bipartiteSupportProjector ρ * ρ.matrix *
       Matrix.conjTranspose (bipartiteSupportProjector ρ) = ρ.matrix
-  rw [show bipartiteSupportProjector ρ = Matrix.kronecker PA PB by rfl,
+  rw [show bipartiteSupportProjector ρ = PA ⊗ₖ PB by rfl,
     (hP.isHermitian).eq, hfix.1, hfix.2]
 
 theorem supportFilterState_supports_projector
@@ -294,12 +293,12 @@ theorem supportFilterState_supports_projector
     let PB : CMatrix b := supportProjector ρ.traceLeft.matrix ρ.traceLeft.pos
     have hPA : PA * PA = PA := psdInvSqrt_support_idempotent ρ.traceRight.pos
     have hPB : PB * PB = PB := psdInvSqrt_support_idempotent ρ.traceLeft.pos
-    change Matrix.kronecker PA PB * Matrix.kronecker PA PB = _
+    change (PA ⊗ₖ PB) * (PA ⊗ₖ PB) = _
     calc
-      Matrix.kronecker PA PB * Matrix.kronecker PA PB =
-          Matrix.kronecker (PA * PA) (PB * PB) := by
+      (PA ⊗ₖ PB) * (PA ⊗ₖ PB) =
+          (PA * PA) ⊗ₖ (PB * PB) := by
             exact (Matrix.mul_kronecker_mul PA PA PB PB).symm
-      _ = Matrix.kronecker PA PB := by rw [hPA, hPB]
+      _ = PA ⊗ₖ PB := by rw [hPA, hPB]
   have hPherm := hP.isHermitian
   rw [Matrix.mul_assoc, hPherm.eq, hPid]
 
@@ -459,8 +458,7 @@ private theorem supportFilter_conditionalMaxEntropyExponentCandidate_le
   have hPid : P * P = P := by
     have hPAid : PA * PA = PA := psdInvSqrt_support_idempotent ρ.traceRight.pos
     have hPBid : PB * PB = PB := psdInvSqrt_support_idempotent ρ.traceLeft.pos
-    change Matrix.kronecker PA PB * Matrix.kronecker PA PB = Matrix.kronecker PA PB
-    simp only [Matrix.kronecker]
+    change (PA ⊗ₖ PB) * (PA ⊗ₖ PB) = PA ⊗ₖ PB
     rw [← Matrix.mul_kronecker_mul, hPAid, hPBid]
   have hPle : Matrix.conjTranspose P * P ≤ (1 : CMatrix (a × b)) := by
     have hPone : P ≤ (1 : CMatrix (a × b)) :=
@@ -490,9 +488,9 @@ private theorem supportFilter_conditionalMaxEntropyExponentCandidate_le
   have hR : R.PosSemidef := by
     exact identityTensorStateMatrix_posSemidef (a := a) (sideSupportState ρ σ)
   have hsqrtR : psdSqrt R =
-      Matrix.kronecker (1 : CMatrix a)
+      (1 : CMatrix a) ⊗ₖ
         (psdSqrt (sideSupportState ρ σ).matrix) := by
-    change psdSqrt (Matrix.kronecker (1 : CMatrix a)
+    change psdSqrt ((1 : CMatrix a) ⊗ₖ
         (sideSupportState ρ σ).matrix) = _
     rw [psdSqrt_kronecker Matrix.PosSemidef.one
       (sideSupportState ρ σ).pos]
@@ -502,32 +500,30 @@ private theorem supportFilter_conditionalMaxEntropyExponentCandidate_le
   have hcomm : P * psdSqrt R = psdSqrt R * P := by
     dsimp [P]
     calc
-      Matrix.kronecker PA PB * psdSqrt R =
-          Matrix.kronecker PA PB *
-            Matrix.kronecker (1 : CMatrix a)
-              (psdSqrt (sideSupportState ρ σ).matrix) := by rw [hsqrtR]
-      _ = Matrix.kronecker (PA * (1 : CMatrix a))
+      (PA ⊗ₖ PB) * psdSqrt R =
+          (PA ⊗ₖ PB) *
+            ((1 : CMatrix a) ⊗ₖ
+              (psdSqrt (sideSupportState ρ σ).matrix)) := by rw [hsqrtR]
+      _ = (PA * (1 : CMatrix a)) ⊗ₖ
           (PB * psdSqrt (sideSupportState ρ σ).matrix) := by
-            simp only [Matrix.kronecker]
             rw [← Matrix.mul_kronecker_mul]
-      _ = Matrix.kronecker PA (psdSqrt (sideSupportState ρ σ).matrix) := by
+      _ = PA ⊗ₖ (psdSqrt (sideSupportState ρ σ).matrix) := by
             rw [Matrix.mul_one, hσsqrt_left]
-      _ = Matrix.kronecker ((1 : CMatrix a) * PA)
+      _ = ((1 : CMatrix a) * PA) ⊗ₖ
           (psdSqrt (sideSupportState ρ σ).matrix * PB) := by
             rw [one_mul, hσsqrt_right]
-      _ = Matrix.kronecker (1 : CMatrix a)
-          (psdSqrt (sideSupportState ρ σ).matrix) *
-            Matrix.kronecker PA PB := by
-            simp only [Matrix.kronecker]
+      _ = ((1 : CMatrix a) ⊗ₖ
+          (psdSqrt (sideSupportState ρ σ).matrix)) *
+            (PA ⊗ₖ PB) := by
             rw [← Matrix.mul_kronecker_mul]
       _ = psdSqrt R * P := by
-        change Matrix.kronecker (1 : CMatrix a)
-            (psdSqrt (sideSupportState ρ σ).matrix) *
-              Matrix.kronecker PA PB =
-          psdSqrt R * Matrix.kronecker PA PB
+        change ((1 : CMatrix a) ⊗ₖ
+            (psdSqrt (sideSupportState ρ σ).matrix)) *
+              (PA ⊗ₖ PB) =
+          psdSqrt R * PA ⊗ₖ PB
         rw [hsqrtR]
   let A0 : SubnormalizedState (a × b) := supportFilterState ρ τ
-  let E : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) PB
+  let E : CMatrix (a × b) := (1 : CMatrix a) ⊗ₖ PB
   let R0 : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   have hER : E * R0 * E = R := by
     dsimp [E, R0, R, identityTensorStateMatrix]
@@ -535,15 +531,13 @@ private theorem supportFilter_conditionalMaxEntropyExponentCandidate_le
     rw [hσp]
     simp only [mul_one]
   have hEP : E * P = P := by
-    change Matrix.kronecker (1 : CMatrix a) PB * Matrix.kronecker PA PB =
-      Matrix.kronecker PA PB
-    simp only [Matrix.kronecker]
+    change ((1 : CMatrix a) ⊗ₖ PB) * (PA ⊗ₖ PB) =
+      PA ⊗ₖ PB
     rw [← Matrix.mul_kronecker_mul]
     rw [one_mul, hPBid]
   have hPE : P * E = P := by
-    change Matrix.kronecker PA PB * Matrix.kronecker (1 : CMatrix a) PB =
-      Matrix.kronecker PA PB
-    simp only [Matrix.kronecker]
+    change (PA ⊗ₖ PB) * ((1 : CMatrix a) ⊗ₖ PB) =
+      PA ⊗ₖ PB
     rw [← Matrix.mul_kronecker_mul]
     rw [Matrix.mul_one, hPBid]
   have hAstate : A0.matrix = P * τ.matrix * P := by
@@ -640,14 +634,13 @@ theorem conditionalMinEntropyScaleFeasible_supportFilter
     have hPAid : PA * PA = PA := psdInvSqrt_support_idempotent ρ.traceRight.pos
     have hPBid : PB * PB = PB := psdInvSqrt_support_idempotent ρ.traceLeft.pos
     have hPITP :
-        P * Matrix.kronecker (1 : CMatrix a) T * P =
-          Matrix.kronecker PA T' := by
-      rw [show P = Matrix.kronecker PA PB by rfl]
-      simp only [Matrix.kronecker]
+        P * ((1 : CMatrix a) ⊗ₖ T) * P =
+          PA ⊗ₖ T' := by
+      rw [show P = PA ⊗ₖ PB by rfl]
       rw [← Matrix.mul_kronecker_mul, ← Matrix.mul_kronecker_mul]
       simp [T', hPAid]
     have hdiff :
-        (Matrix.kronecker (1 : CMatrix a) T' -
+        ((1 : CMatrix a) ⊗ₖ T' -
           (supportFilterState ρ τ).matrix).PosSemidef := by
       have hstate :
           (supportFilterState ρ τ).matrix =
@@ -655,39 +648,39 @@ theorem conditionalMinEntropyScaleFeasible_supportFilter
         rw [supportFilterState_matrix]
       rw [hstate]
       rw [hPherm.eq]
-      rw [show P = Matrix.kronecker PA PB by rfl] at hsand
+      rw [show P = PA ⊗ₖ PB by rfl] at hsand
       have hdecomp :
-          Matrix.kronecker (1 : CMatrix a) T' -
+          (1 : CMatrix a) ⊗ₖ T' -
               P * τ.matrix * P =
-            (P * (Matrix.kronecker (1 : CMatrix a) T - τ.matrix) *
+            (P * ((1 : CMatrix a) ⊗ₖ T - τ.matrix) *
                 P) +
-              Matrix.kronecker ((1 : CMatrix a) - PA) T' := by
-        have hsplit : Matrix.kronecker (1 : CMatrix a) T' =
-            Matrix.kronecker PA T' +
-              Matrix.kronecker ((1 : CMatrix a) - PA) T' := by
+              ((1 : CMatrix a) - PA) ⊗ₖ T' := by
+        have hsplit : (1 : CMatrix a) ⊗ₖ T' =
+            PA ⊗ₖ T' +
+              ((1 : CMatrix a) - PA) ⊗ₖ T' := by
           ext x y
-          simp [Matrix.kronecker, Matrix.kroneckerMap_apply]
+          simp [Matrix.kroneckerMap_apply]
           ring
         calc
-          Matrix.kronecker (1 : CMatrix a) T' - P * τ.matrix * P =
-              (Matrix.kronecker PA T' +
-                Matrix.kronecker ((1 : CMatrix a) - PA) T') -
+          (1 : CMatrix a) ⊗ₖ T' - P * τ.matrix * P =
+              (PA ⊗ₖ T' +
+                ((1 : CMatrix a) - PA) ⊗ₖ T') -
                   P * τ.matrix * P := by rw [← hsplit]
-          _ = (P * Matrix.kronecker (1 : CMatrix a) T * P -
+          _ = (P * ((1 : CMatrix a) ⊗ₖ T) * P -
                 P * τ.matrix * P) +
-                  Matrix.kronecker ((1 : CMatrix a) - PA) T' := by
+                  ((1 : CMatrix a) - PA) ⊗ₖ T' := by
                 rw [hPITP]
                 abel
-          _ = P * (Matrix.kronecker (1 : CMatrix a) T - τ.matrix) * P +
-                Matrix.kronecker ((1 : CMatrix a) - PA) T' := by
+          _ = P * ((1 : CMatrix a) ⊗ₖ T - τ.matrix) * P +
+                ((1 : CMatrix a) - PA) ⊗ₖ T' := by
                 rw [mul_sub, sub_mul]
       rw [hdecomp]
       have hrest :
-          (Matrix.kronecker ((1 : CMatrix a) - PA) T').PosSemidef :=
+          (((1 : CMatrix a) - PA) ⊗ₖ T').PosSemidef :=
         (Matrix.le_iff.mp hPAle).kronecker hQ
       have hadd :
-          (P * (Matrix.kronecker (1 : CMatrix a) T - τ.matrix) * P +
-            Matrix.kronecker ((1 : CMatrix a) - PA) T').PosSemidef :=
+          (P * ((1 : CMatrix a) ⊗ₖ T - τ.matrix) * P +
+            ((1 : CMatrix a) - PA) ⊗ₖ T').PosSemidef :=
         Matrix.PosSemidef.add hsand hrest
       exact hadd
     exact (Matrix.le_iff).mpr hdiff

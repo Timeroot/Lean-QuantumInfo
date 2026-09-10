@@ -23,7 +23,7 @@ Source alignment:
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 namespace QIT
 
@@ -335,21 +335,20 @@ private theorem id_kron_traceValue_uniform_tensor
         (MatrixMap.kron (CPTPOp.id (dIn := r)).map Phi)
         (MatrixMap.IsCompletelyPositive.kron (CPTPOp.id (dIn := r)).map_cp hPhi)
         alpha
-        (Matrix.kronecker (MState.uniform : MState r).m Y.matrix) =
+        ((MState.uniform : MState r).m ⊗ₖ Y.matrix) =
       alphaToAlphaTraceValue Phi hPhi Y := by
   let K : MatrixMap (r × a) (r × b) :=
     MatrixMap.kron (CPTPOp.id (dIn := r)).map Phi
   let hK : MatrixMap.IsCompletelyPositive K :=
     MatrixMap.IsCompletelyPositive.kron (CPTPOp.id (dIn := r)).map_cp hPhi
-  have hprod : (Matrix.kronecker (MState.uniform : MState r).m Y.matrix).PosSemidef :=
+  have hprod : ((MState.uniform : MState r).m ⊗ₖ Y.matrix).PosSemidef :=
     (MState.uniform : MState r).psd.kronecker Y.pos
   rw [cpValueOnPSD_of_pos K hK alpha hprod]
   unfold cpPsdSchattenRpowValue alphaToAlphaTraceValue
   have hpow :
-      CFC.rpow (Matrix.kronecker (MState.uniform : MState r).m Y.matrix)
+      CFC.rpow ((MState.uniform : MState r).m ⊗ₖ Y.matrix)
           (1 / (alpha : ℝ)) =
-        Matrix.kronecker
-          (CFC.rpow (MState.uniform : MState r).m (1 / (alpha : ℝ)))
+        (CFC.rpow (MState.uniform : MState r).m (1 / (alpha : ℝ))) ⊗ₖ
           (CFC.rpow Y.matrix (1 / (alpha : ℝ))) :=
     cMatrix_rpow_kronecker (MState.uniform : MState r).psd Y.pos (1 / (alpha : ℝ))
   let Rpow : CMatrix r :=
@@ -364,28 +363,27 @@ private theorem id_kron_traceValue_uniform_tensor
   have hPhiYpow : (Phi Ypow).PosSemidef :=
     MatrixMap.isCompletelyPositive_mapsPositive Phi hPhi Ypow hYpow
   have hmap :
-      K (CFC.rpow (Matrix.kronecker (MState.uniform : MState r).m Y.matrix)
+      K (CFC.rpow ((MState.uniform : MState r).m ⊗ₖ Y.matrix)
           (1 / (alpha : ℝ))) =
-        Matrix.kronecker Rpow (Phi Ypow) := by
+        Rpow ⊗ₖ (Phi Ypow) := by
     rw [hpow]
     change MatrixMap.kron (CPTPOp.id (dIn := r)).map Phi
-        (Matrix.kronecker Rpow Ypow) =
-      Matrix.kronecker Rpow (Phi Ypow)
-    simp only [Matrix.kronecker]
+        (Rpow ⊗ₖ Ypow) =
+      Rpow ⊗ₖ (Phi Ypow)
     rw [MatrixMap.kron_map_of_kron_state, CPTPOp.idChannel_map]
-  have hKpow : (K (CFC.rpow (Matrix.kronecker (MState.uniform : MState r).m Y.matrix)
+  have hKpow : (K (CFC.rpow ((MState.uniform : MState r).m ⊗ₖ Y.matrix)
           (1 / (alpha : ℝ)))).PosSemidef :=
     MatrixMap.isCompletelyPositive_mapsPositive K hK
-      (CFC.rpow (Matrix.kronecker (MState.uniform : MState r).m Y.matrix)
+      (CFC.rpow ((MState.uniform : MState r).m ⊗ₖ Y.matrix)
           (1 / (alpha : ℝ)))
       (cMatrix_rpow_posSemidef
-        (A := Matrix.kronecker (MState.uniform : MState r).m Y.matrix)
+        (A := (MState.uniform : MState r).m ⊗ₖ Y.matrix)
         (s := 1 / (alpha : ℝ)) hprod)
   calc
     psdSchattenPNorm
-        (K (CFC.rpow (Matrix.kronecker (MState.uniform : MState r).m Y.matrix)
+        (K (CFC.rpow ((MState.uniform : MState r).m ⊗ₖ Y.matrix)
           (1 / (alpha : ℝ)))) _ alpha =
-      psdSchattenPNorm (Matrix.kronecker Rpow (Phi Ypow))
+      psdSchattenPNorm (Rpow ⊗ₖ (Phi Ypow))
         (hRpow.kronecker hPhiYpow) alpha := by
           exact psdSchattenPNorm_congr hmap hKpow
             (hRpow.kronecker hPhiYpow) alpha
@@ -416,10 +414,10 @@ private theorem id_kron_traceValue_le_partialTrace_traceValue
   let U : ι → Matrix.unitaryGroup r ℂ :=
     fun idx => permutationUnitary idx.2 * diagonalSignUnitary idx.1
   let X : ι → CMatrix (r × a) := fun idx =>
-    (Matrix.kronecker ((U idx : Matrix.unitaryGroup r ℂ) : CMatrix r)
+    (((U idx : Matrix.unitaryGroup r ℂ) : CMatrix r) ⊗ₖ
         (1 : CMatrix a)) *
       Y.matrix *
-      star (Matrix.kronecker ((U idx : Matrix.unitaryGroup r ℂ) : CMatrix r)
+      star (((U idx : Matrix.unitaryGroup r ℂ) : CMatrix r) ⊗ₖ
         (1 : CMatrix a))
   have hX : ∀ idx : ι, (X idx).PosSemidef := by
     intro idx
@@ -483,13 +481,13 @@ private theorem id_kron_traceValue_le_partialTrace_traceValue
     dsimp [referenceDepolarizingTwirl, X, U, ι]
   have htwirl :
       referenceDepolarizingTwirl (r := r) (a := a) Y.matrix =
-        Matrix.kronecker (MState.uniform : MState r).m
+        (MState.uniform : MState r).m ⊗ₖ
           (Matrix.traceLeft Y.matrix) :=
     localReferenceTwirl_eq_uniform_tensor_partialTrace (r := r) (a := a)
       Y.matrix
   have hproduct :
       cpValueOnPSD K hK alpha
-        (Matrix.kronecker (MState.uniform : MState r).m
+        ((MState.uniform : MState r).m ⊗ₖ
           (Matrix.traceLeft Y.matrix)) =
       alphaToAlphaTraceValue Phi hPhi (Y.partialTraceReference (r := r)) :=
     id_kron_traceValue_uniform_tensor
@@ -505,7 +503,7 @@ private theorem id_kron_traceValue_le_partialTrace_traceValue
           (referenceDepolarizingTwirl (r := r) (a := a) Y.matrix) := by
           rw [htwirl_sum]
     _ = cpValueOnPSD K hK alpha
-          (Matrix.kronecker (MState.uniform : MState r).m
+          ((MState.uniform : MState r).m ⊗ₖ
             (Matrix.traceLeft Y.matrix)) := by
           rw [htwirl]
     _ = alphaToAlphaTraceValue Phi hPhi (Y.partialTraceReference (r := r)) := hproduct
@@ -586,7 +584,7 @@ private theorem alphaToAlphaPositiveValueSet_subset_id_kron
   have hRnorm_pos : 0 < psdSchattenPNorm R hR alpha := by
     simpa [R, hR] using uniform_schatten_norm_pos (r := r) alpha
   let X : AlphaToAlphaPositiveDomain (r × a) alpha :=
-    { matrix := Matrix.kronecker R Z.matrix,
+    { matrix := R ⊗ₖ Z.matrix,
       pos := hR.kronecker Z.pos,
       norm_pos := by
         rw [psdSchattenPNorm_kronecker hR Z.pos alpha]
@@ -595,25 +593,24 @@ private theorem alphaToAlphaPositiveValueSet_subset_id_kron
   have hPhiZ : (Phi Z.matrix).PosSemidef :=
     MatrixMap.isCompletelyPositive_mapsPositive Phi hPhi Z.matrix Z.pos
   have hKprod :
-      K (Matrix.kronecker R Z.matrix) = Matrix.kronecker R (Phi Z.matrix) := by
+      K (R ⊗ₖ Z.matrix) = R ⊗ₖ (Phi Z.matrix) := by
     dsimp [K]
     change MatrixMap.kron (CPTPOp.id (dIn := r)).map Phi
-        (Matrix.kronecker R Z.matrix) =
-      Matrix.kronecker R (Phi Z.matrix)
-    simp only [Matrix.kronecker]
+        (R ⊗ₖ Z.matrix) =
+      R ⊗ₖ (Phi Z.matrix)
     rw [MatrixMap.kron_map_of_kron_state, CPTPOp.idChannel_map]
-  have hKpos : (K (Matrix.kronecker R Z.matrix)).PosSemidef :=
+  have hKpos : (K (R ⊗ₖ Z.matrix)).PosSemidef :=
     MatrixMap.isCompletelyPositive_mapsPositive K hK
-      (Matrix.kronecker R Z.matrix) (hR.kronecker Z.pos)
+      (R ⊗ₖ Z.matrix) (hR.kronecker Z.pos)
   have hnum :
-      psdSchattenPNorm (K (Matrix.kronecker R Z.matrix)) hKpos alpha =
-        psdSchattenPNorm (Matrix.kronecker R (Phi Z.matrix))
+      psdSchattenPNorm (K (R ⊗ₖ Z.matrix)) hKpos alpha =
+        psdSchattenPNorm (R ⊗ₖ (Phi Z.matrix))
           (hR.kronecker hPhiZ) alpha :=
     psdSchattenPNorm_congr hKprod hKpos (hR.kronecker hPhiZ) alpha
   unfold alphaToAlphaPositiveValue
   change
-    psdSchattenPNorm (K (Matrix.kronecker R Z.matrix)) _ alpha /
-      psdSchattenPNorm (Matrix.kronecker R Z.matrix) _ alpha =
+    psdSchattenPNorm (K (R ⊗ₖ Z.matrix)) _ alpha /
+      psdSchattenPNorm (R ⊗ₖ Z.matrix) _ alpha =
     psdSchattenPNorm (Phi Z.matrix)
         (MatrixMap.isCompletelyPositive_mapsPositive Phi hPhi Z.matrix Z.pos)
         alpha /

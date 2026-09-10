@@ -317,15 +317,13 @@ private theorem aliceProjectionOp_mul_bobLocalComplement_mulVec
 
 private theorem aliceProjection_kronecker_bobMatrix_eq
     (R : CMatrix HB) (i : ι) :
-    Matrix.kroneckerMap (fun x1 x2 : ℂ => x1 * x2)
-        (data.aliceProjection.effects i) R =
+    (data.aliceProjection.effects i) ⊗ₖ R =
       data.aliceProjectionOp i * data.bobLocalOp R := by
   simp [YNData.aliceProjectionOp, YNData.bobLocalOp, ← Matrix.mul_kronecker_mul]
 
 private theorem aliceProjection_kronecker_bobLocalBranch_mulVec
     (h : YNPhaseAlignedConditions data ψ) (i j : ι) :
-    (Matrix.kroneckerMap (fun x1 x2 : ℂ => x1 * x2)
-        (data.aliceProjection.effects i)
+    ((data.aliceProjection.effects i) ⊗ₖ
         ((h.toBobLocalOrthogonalization.bobLocal j).matrix)).mulVec ψ.vec =
       if i = j then (data.aliceProjectionOp i).mulVec ψ.vec else 0 := by
   rw [aliceProjection_kronecker_bobMatrix_eq (data := data)]
@@ -334,8 +332,7 @@ private theorem aliceProjection_kronecker_bobLocalBranch_mulVec
 private theorem aliceProjection_kronecker_bobLocalComplement_mulVec
     (h : YNPhaseAlignedConditions data ψ)
     (B : SchmidtTarget.BaseReindexToFin data.target) (i : ι) :
-    (Matrix.kroneckerMap (fun x1 x2 : ℂ => x1 * x2)
-        (data.aliceProjection.effects i)
+    ((data.aliceProjection.effects i) ⊗ₖ
         (1 - ∑ l : Fin (Fintype.card ι),
           (h.toBobLocalOrthogonalization.bobLocal (B.toEquiv.symm l)).matrix)).mulVec
         ψ.vec = 0 := by
@@ -354,9 +351,9 @@ private theorem aliceProjection_kronecker_bobLocalComplement_mulVec
     · subst ha'
       by_cases hhb : hb = hb'
       · subst hb'
-        simp [YNData.bobLocalOp, Matrix.kronecker, Matrix.sub_apply, Matrix.sum_apply]
-      · simp [YNData.bobLocalOp, Matrix.kronecker, Matrix.sub_apply, Matrix.sum_apply, hhb]
-    · simp [YNData.bobLocalOp, Matrix.kronecker, Matrix.sub_apply, Matrix.sum_apply, hha]
+        simp [YNData.bobLocalOp, Matrix.sub_apply, Matrix.sum_apply]
+      · simp [YNData.bobLocalOp, Matrix.sub_apply, Matrix.sum_apply, hhb]
+    · simp [YNData.bobLocalOp, Matrix.sub_apply, Matrix.sum_apply, hha]
   rw [hBob]
   exact aliceProjectionOp_mul_bobLocalComplement_mulVec (h := h) B i
 
@@ -379,8 +376,7 @@ private theorem aliceBobBranchOperator_mulVec_eq_transformedBobProjectionOp
     simp only [YNData.transformedBobProjectionOp_eq, YNData.unitaryOp]
     rw [← Matrix.mulVec_mulVec]
     have hinner :
-        (Matrix.kroneckerMap (fun x1 x2 : ℂ => x1 * x2)
-            (data.aliceProjection.effects data.target.base)
+        ((data.aliceProjection.effects data.target.base) ⊗ₖ
             ((h.toBobLocalOrthogonalization.bobLocal data.target.base).matrix +
               (1 - ∑ l : Fin (Fintype.card ι),
                 (h.toBobLocalOrthogonalization.bobLocal (B.toEquiv.symm l)).matrix))).mulVec
@@ -394,15 +390,13 @@ private theorem aliceBobBranchOperator_mulVec_eq_transformedBobProjectionOp
         h.projectionAligned data.target.base
     rw [hinner]
     rw [Matrix.mulVec_mulVec]
-    simp [Matrix.kronecker]
   · rw [h.toBobLocalOrthogonalization.bobBranchOperator_ne_base B k hkbase]
     simp only [YNData.aliceBranchOperator]
     rw [Matrix.mul_kronecker_mul]
     simp only [YNData.transformedBobProjectionOp_eq, YNData.unitaryOp]
     rw [← Matrix.mulVec_mulVec]
     have hinner :
-        (Matrix.kroneckerMap (fun x1 x2 : ℂ => x1 * x2)
-            (data.aliceProjection.effects (B.toEquiv.symm k))
+        ((data.aliceProjection.effects (B.toEquiv.symm k)) ⊗ₖ
             (h.toBobLocalOrthogonalization.bobLocal (B.toEquiv.symm k)).matrix).mulVec
             ψ.vec =
           (data.bobProjectionOp (B.toEquiv.symm k)).mulVec ψ.vec := by
@@ -412,7 +406,6 @@ private theorem aliceBobBranchOperator_mulVec_eq_transformedBobProjectionOp
         h.projectionAligned (B.toEquiv.symm k)
     rw [hinner]
     rw [Matrix.mulVec_mulVec]
-    simp [Matrix.kronecker]
 
 private theorem aliceBobBranchOperator_mulVec_eq_zero_of_ne
     (h : YNPhaseAlignedConditions data ψ)
@@ -436,8 +429,7 @@ private theorem aliceBobBranchOperator_mulVec_eq_zero_of_ne
       apply B.toEquiv.symm.injective
       simpa [hbase_symm] using hEq
     have hinner :
-        (Matrix.kroneckerMap (fun x1 x2 : ℂ => x1 * x2)
-            (data.aliceProjection.effects (B.toEquiv.symm ka))
+        ((data.aliceProjection.effects (B.toEquiv.symm ka)) ⊗ₖ
             ((h.toBobLocalOrthogonalization.bobLocal data.target.base).matrix +
               (1 - ∑ l : Fin (Fintype.card ι),
                 (h.toBobLocalOrthogonalization.bobLocal (B.toEquiv.symm l)).matrix))).mulVec
@@ -457,8 +449,7 @@ private theorem aliceBobBranchOperator_mulVec_eq_zero_of_ne
       intro hEq
       exact hneq (B.toEquiv.symm.injective hEq)
     have hinner :
-        (Matrix.kroneckerMap (fun x1 x2 : ℂ => x1 * x2)
-            (data.aliceProjection.effects (B.toEquiv.symm ka))
+        ((data.aliceProjection.effects (B.toEquiv.symm ka)) ⊗ₖ
             (h.toBobLocalOrthogonalization.bobLocal (B.toEquiv.symm kb)).matrix).mulVec
             ψ.vec = 0 := by
       rw [aliceProjection_kronecker_bobLocalBranch_mulVec (h := h)

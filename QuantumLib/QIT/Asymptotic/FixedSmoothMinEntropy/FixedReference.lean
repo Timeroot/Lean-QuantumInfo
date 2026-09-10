@@ -277,7 +277,7 @@ private theorem ConditionalMinEntropyFeasible.exists_posDef_reference_below
         ((1 - p : ℝ) : ℂ) • Tσ + ((p : ℝ) : ℂ) • Tm := by
     ext x y
     simp [σ', MState.regularizedWithState_matrix, MState.regularizedStateMatrix,
-      Tσ, Tm, identityTensorStateMatrix, Matrix.kronecker, Matrix.kroneckerMap_apply,
+      Tσ, Tm, identityTensorStateMatrix, Matrix.kroneckerMap_apply,
       Complex.real_smul]
     ring
   have hside :
@@ -444,7 +444,7 @@ namespace SubnormalizedState
 private theorem identityTensorStateMatrix_trace_re_le_card
     (σ : SubnormalizedState b) :
     (identityTensorStateMatrix (a := a) σ).trace.re ≤ (Fintype.card a : ℝ) := by
-  change (Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix a) σ.matrix).trace.re ≤
+  change ((1 : CMatrix a) ⊗ₖ σ.matrix).trace.re ≤
     (Fintype.card a : ℝ)
   rw [Matrix.trace_kronecker, Matrix.trace_one]
   rw [Complex.mul_re, σ.trace_im_zero]
@@ -489,7 +489,7 @@ private theorem one_le_inv_smul_identityTensorStateMatrix_toSubnormalized_of_pos
       ((c⁻¹ : ℝ) : ℂ) • identityTensorStateMatrix (a := a) σ.toSubnormalized -
           (1 : CMatrix (a × b)) =
         ((c⁻¹ : ℝ) : ℂ) •
-          Matrix.kronecker (1 : CMatrix a) (σ.m - c • (1 : CMatrix b)) := by
+          ((1 : CMatrix a) ⊗ₖ (σ.m - c • (1 : CMatrix b))) := by
     ext x y
     rcases x with ⟨xa, xb⟩
     rcases y with ⟨ya, yb⟩
@@ -498,12 +498,12 @@ private theorem one_le_inv_smul_identityTensorStateMatrix_toSubnormalized_of_pos
       by_cases hB : xb = yb
       · subst yb
         simp [SubnormalizedState.identityTensorStateMatrix, identityTensorStateMatrix,
-          Matrix.kronecker, Matrix.kroneckerMap_apply]
+          Matrix.kroneckerMap_apply]
         field_simp [ne_of_gt hc_pos]
       · simp [SubnormalizedState.identityTensorStateMatrix, identityTensorStateMatrix,
-          Matrix.kronecker, Matrix.kroneckerMap_apply, hB]
+          Matrix.kroneckerMap_apply, hB]
     · simp [SubnormalizedState.identityTensorStateMatrix, identityTensorStateMatrix,
-        Matrix.kronecker, Matrix.kroneckerMap_apply, hA]
+        Matrix.kroneckerMap_apply, hA]
   rw [hdiff]
   exact Matrix.PosSemidef.smul
     (Matrix.PosSemidef.one.kronecker hdiffB)

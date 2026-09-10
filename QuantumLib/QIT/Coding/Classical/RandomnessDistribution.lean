@@ -768,9 +768,9 @@ theorem uniformDecodedMessageState_eq_measure_cqChannelOutputState
       rw [Finset.sum_eq_single m]
       · simp [uniformDecodedMessageState, Classical.diagonalState,
           uniformDecodedMessageProb, uniformEnsemble, uniformProbs, uniformMessageProb,
-          Matrix.kronecker, -POVM.measureDiscard_map, hmeas]
+          -POVM.measureDiscard_map, hmeas]
       · intro x _ hx
-        simp [Matrix.kronecker, hx]
+        simp [hx]
       · simp
     · have hmeas :
           ((POVM.measureDiscard C.decoder) (C.outputState m)).m mhat mhat' = 0 := by
@@ -780,9 +780,9 @@ theorem uniformDecodedMessageState_eq_measure_cqChannelOutputState
       rw [Finset.sum_eq_single m]
       · simp [uniformDecodedMessageState, Classical.diagonalState,
           uniformDecodedMessageProb, uniformEnsemble, uniformProbs, uniformMessageProb,
-          Matrix.kronecker, -POVM.measureDiscard_map, hhat, hmeas]
+          -POVM.measureDiscard_map, hhat, hmeas]
       · intro x _ hx
-        simp [Matrix.kronecker, hx]
+        simp [hx]
       · simp
   · rw [Finset.sum_eq_zero]
     · simp [uniformDecodedMessageState, Classical.diagonalState,
@@ -790,8 +790,8 @@ theorem uniformDecodedMessageState_eq_measure_cqChannelOutputState
     · intro x _
       by_cases hx : x = m
       · subst x
-        simp [Matrix.kronecker, hm]
-      · simp [Matrix.kronecker, hx]
+        simp [hm]
+      · simp [hx]
 
 /-- Decoding is a right-local channel, so it cannot increase mutual
 information. -/

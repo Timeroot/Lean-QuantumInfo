@@ -25,7 +25,7 @@ spine for entanglement-assisted classical communication.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Pointwise
+open scoped ComplexOrder MatrixOrder Kronecker Pointwise
 
 namespace QIT
 
@@ -98,12 +98,12 @@ theorem Matrix.Supports.kronecker_of_posSemidef
     (hRhoA : rhoA.PosSemidef) (hRefA : refA.PosSemidef)
     (hRhoB : rhoB.PosSemidef) (hRefB : refB.PosSemidef)
     (h1 : Matrix.Supports rhoA refA) (h2 : Matrix.Supports rhoB refB) :
-    Matrix.Supports (Matrix.kronecker rhoA rhoB) (Matrix.kronecker refA refB) := by
+    Matrix.Supports (rhoA ⊗ₖ rhoB) (refA ⊗ₖ refB) := by
   classical
   let U1 : Matrix.unitaryGroup a ℂ := star hRefA.isHermitian.eigenvectorUnitary
   let U2 : Matrix.unitaryGroup b ℂ := star hRefB.isHermitian.eigenvectorUnitary
   let U : Matrix.unitaryGroup (a × b) ℂ :=
-    ⟨Matrix.kronecker (U1 : CMatrix a) (U2 : CMatrix b),
+    ⟨(U1 : CMatrix a) ⊗ₖ (U2 : CMatrix b),
       kronecker_mem_unitaryGroup U1 U2⟩
   let d1 : a → ℝ := fun i => hRefA.isHermitian.eigenvalues i
   let d2 : b → ℝ := fun j => hRefB.isHermitian.eigenvalues j
@@ -180,7 +180,7 @@ theorem Matrix.Supports.kronecker_of_posSemidef
     intro j hj
     exact Matrix.Supports.diagonal_zero_of_posSemidef hRhoB' hd2_nonneg h2diag hj
   have hprodDiag :
-      Matrix.Supports (Matrix.kronecker rhoA' rhoB')
+      Matrix.Supports (rhoA' ⊗ₖ rhoB')
         (Matrix.diagonal fun x : a × b => ((d x : ℝ) : ℂ) : CMatrix (a × b)) := by
     refine Matrix.Supports.of_posSemidef_diagonal (hRhoA'.kronecker hRhoB') hd_nonneg ?_
     intro x hx
@@ -191,23 +191,23 @@ theorem Matrix.Supports.kronecker_of_posSemidef
     · simp [Matrix.kroneckerMap_apply, hdiagZero2 j hj]
   have hprodDiag' :
       Matrix.Supports
-        ((U : CMatrix (a × b)) * Matrix.kronecker rhoA rhoB * star (U : CMatrix (a × b)))
-        ((U : CMatrix (a × b)) * Matrix.kronecker refA refB * star (U : CMatrix (a × b))) := by
+        ((U : CMatrix (a × b)) * (rhoA ⊗ₖ rhoB) * star (U : CMatrix (a × b)))
+        ((U : CMatrix (a × b)) * (refA ⊗ₖ refB) * star (U : CMatrix (a × b))) := by
     have hleft :
-        (U : CMatrix (a × b)) * Matrix.kronecker rhoA rhoB * star (U : CMatrix (a × b)) =
-          Matrix.kronecker rhoA' rhoB' := by
+        (U : CMatrix (a × b)) * (rhoA ⊗ₖ rhoB) * star (U : CMatrix (a × b)) =
+          rhoA' ⊗ₖ rhoB' := by
       simp [U, rhoA', rhoB', Matrix.conjTranspose_kronecker, Matrix.star_eq_conjTranspose,
         Matrix.mul_kronecker_mul, Matrix.mul_assoc]
     have hright :
-        (U : CMatrix (a × b)) * Matrix.kronecker refA refB * star (U : CMatrix (a × b)) =
+        (U : CMatrix (a × b)) * (refA ⊗ₖ refB) * star (U : CMatrix (a × b)) =
           Matrix.diagonal fun x : a × b => ((d x : ℝ) : ℂ) := by
       calc
-        (U : CMatrix (a × b)) * Matrix.kronecker refA refB * star (U : CMatrix (a × b)) =
-            Matrix.kronecker ((U1 : CMatrix a) * refA * star (U1 : CMatrix a))
+        (U : CMatrix (a × b)) * (refA ⊗ₖ refB) * star (U : CMatrix (a × b)) =
+            ((U1 : CMatrix a) * refA * star (U1 : CMatrix a)) ⊗ₖ
               ((U2 : CMatrix b) * refB * star (U2 : CMatrix b)) := by
               simp [U, Matrix.conjTranspose_kronecker, Matrix.star_eq_conjTranspose,
                 Matrix.mul_kronecker_mul, Matrix.mul_assoc]
-        _ = Matrix.kronecker D1 D2 := by
+        _ = D1 ⊗ₖ D2 := by
               rw [hRefA_diag, hRefB_diag]
         _ = Matrix.diagonal fun x : a × b => ((d x : ℝ) : ℂ) := by
               simpa [D1, D2, d] using
@@ -218,8 +218,8 @@ theorem Matrix.Supports.kronecker_of_posSemidef
     exact hprodDiag
   intro v hv
   let Umat : CMatrix (a × b) := (U : CMatrix (a × b))
-  let rhoProd : CMatrix (a × b) := Matrix.kronecker rhoA rhoB
-  let refProd : CMatrix (a × b) := Matrix.kronecker refA refB
+  let rhoProd : CMatrix (a × b) := rhoA ⊗ₖ rhoB
+  let refProd : CMatrix (a × b) := refA ⊗ₖ refB
   have hstarU_U : star Umat * Umat = 1 := by
     change star (U : CMatrix (a × b)) * (U : CMatrix (a × b)) = 1
     exact Unitary.coe_star_mul_self U

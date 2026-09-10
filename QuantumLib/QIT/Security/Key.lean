@@ -21,7 +21,7 @@ Definition-level API for finite normalized key-security predicates, following
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 
 namespace QIT.Security
 
@@ -94,7 +94,7 @@ def rennerIdealKeyStateFor (ρ : SubnormalizedState (κ × e)) :
 @[simp]
 theorem rennerIdealKeyStateFor_matrix (ρ : SubnormalizedState (κ × e)) :
     (rennerIdealKeyStateFor ρ).matrix =
-      Matrix.kronecker (uniformKeyState (κ := κ)).m ρ.traceLeft.matrix :=
+      (uniformKeyState (κ := κ)).m ⊗ₖ ρ.traceLeft.matrix :=
   rfl
 
 /-- Renner trace-distance secrecy distance on the subnormalized successful
@@ -220,7 +220,7 @@ def conditionedIdealKeySideInfoState (σE : MState e) : MState (KeyOutput κ × 
 @[simp]
 theorem conditionedIdealKeySideInfoState_matrix (σE : MState e) :
     (conditionedIdealKeySideInfoState (κ := κ) σE).m =
-      Matrix.kronecker (conditionedUniformKeyOutputState (κ := κ)).m σE.m :=
+      (conditionedUniformKeyOutputState (κ := κ)).m ⊗ₖ σE.m :=
   MState.prod_m _ _
 
 /-- Conditioned/no-abort ideal state associated to a real key-side-information
@@ -232,7 +232,7 @@ def conditionedIdealKeyStateFor
 @[simp]
 theorem conditionedIdealKeyStateFor_matrix (ρ : MState (KeyOutput κ × e)) :
     (conditionedIdealKeyStateFor ρ).m =
-      Matrix.kronecker (conditionedUniformKeyOutputState (κ := κ)).m
+      (conditionedUniformKeyOutputState (κ := κ)).m ⊗ₖ
         ρ.traceLeft.m :=
   MState.prod_m _ _
 

@@ -17,7 +17,7 @@ low-alpha sandwiched Renyi route.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal Topology Matrix.Norms.L2Operator
+open scoped ComplexOrder MatrixOrder Kronecker NNReal Topology Matrix.Norms.L2Operator
 
 namespace QIT
 
@@ -48,9 +48,9 @@ vectorization convention:
 `Tr((K† A K) B) = Tr(|K⟩⟨K| (A ⊗ Bᵀ))`. -/
 theorem epstein_traceTerm_tensor_trace_transpose (K A B : CMatrix a) :
     (((star K * A * K) * B).trace) =
-      ((cMatrixVecWeight K * Matrix.kronecker A B.transpose).trace) := by
+      ((cMatrixVecWeight K * (A ⊗ₖ B.transpose)).trace) := by
   classical
-  simp [Matrix.trace, Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  simp [Matrix.trace, Matrix.mul_apply, Matrix.kroneckerMap_apply,
     cMatrixVecWeight, rankOneMatrix_apply, Matrix.transpose_apply]
   simp only [Finset.sum_mul]
   rw [← Fintype.sum_prod_type']
@@ -77,7 +77,7 @@ omit [DecidableEq a] in
 /-- Real-part version of `epstein_traceTerm_tensor_trace_transpose`. -/
 theorem epstein_traceTerm_tensor_trace_transpose_re (K A B : CMatrix a) :
     ((((star K * A * K) * B).trace).re) =
-      (((cMatrixVecWeight K * Matrix.kronecker A B.transpose).trace).re) := by
+      (((cMatrixVecWeight K * (A ⊗ₖ B.transpose)).trace).re) := by
   exact congrArg Complex.re (epstein_traceTerm_tensor_trace_transpose K A B)
 
 /-- Entrywise complex conjugation as a real star-algebra equivalence on

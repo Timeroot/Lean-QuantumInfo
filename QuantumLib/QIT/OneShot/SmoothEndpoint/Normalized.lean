@@ -40,7 +40,7 @@ needs, and `conditionalMinEntropyDualEffectProgram` packages the dual as an
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator NNReal Pointwise QIT.MatrixL2
+open scoped ComplexOrder MatrixOrder Kronecker Matrix.Norms.L2Operator NNReal Pointwise QIT.MatrixL2
 open scoped Topology
 open Matrix hiding traceNorm traceNorm_conjTranspose traceNorm_nonneg
 open Set Filter
@@ -86,7 +86,7 @@ theorem sqrtMatrix_trace_re_pos [Nonempty a] (ρ : MState a) :
 /-- The maximally mixed state on a nonempty finite system. -/
 theorem identityTensorStateMatrix_trace_re (σ : MState b) :
     (identityTensorStateMatrix (a := a) σ).trace.re = (Fintype.card a : ℝ) := by
-  change (Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix a) σ.m).trace.re =
+  change ((1 : CMatrix a) ⊗ₖ σ.m).trace.re =
     (Fintype.card a : ℝ)
   rw [Matrix.trace_kronecker, σ.tr', Matrix.trace_one]
   norm_num
@@ -194,9 +194,9 @@ theorem conditionalMaxEntropyExponentCandidate_uniform_pos
 
 theorem psdSqrt_identityTensorStateMatrix (σ : MState b) :
     psdSqrt (identityTensorStateMatrix (a := a) σ) =
-      Matrix.kronecker (1 : CMatrix a) σ.sqrtMatrix := by
-  change psdSqrt (Matrix.kronecker (1 : CMatrix a) σ.m) =
-    Matrix.kronecker (1 : CMatrix a) σ.sqrtMatrix
+      (1 : CMatrix a) ⊗ₖ σ.sqrtMatrix := by
+  change psdSqrt ((1 : CMatrix a) ⊗ₖ σ.m) =
+    (1 : CMatrix a) ⊗ₖ σ.sqrtMatrix
   rw [psdSqrt_kronecker Matrix.PosSemidef.one σ.psd]
   have hone : psdSqrt (1 : CMatrix a) = (1 : CMatrix a) := by
     simpa using (psdSqrt_real_smul_one (a := a) (r := 1) (by norm_num))
@@ -207,7 +207,7 @@ theorem conditionalMaxEntropyExponentCandidate_eq_sqrt_identity
     (ρ : MState (a × b)) (σ : MState b) :
     ρ.conditionalMaxEntropyExponentCandidate (a := a) σ =
       (traceNorm (ρ.sqrtMatrix *
-        Matrix.kronecker (1 : CMatrix a) σ.sqrtMatrix)) ^ 2 := by
+        ((1 : CMatrix a) ⊗ₖ σ.sqrtMatrix))) ^ 2 := by
   rw [conditionalMaxEntropyExponentCandidate_eq,
     psdSqrt_identityTensorStateMatrix (a := a) σ]
 
@@ -223,16 +223,16 @@ theorem conditionalMaxEntropyExponentCandidate_eq_card_mul_squaredFidelity
   have hsqrt_nonneg : 0 ≤ Real.sqrt d := Real.sqrt_nonneg d
   have hsqrt_sq : (Real.sqrt d) ^ 2 = d := Real.sq_sqrt hd_nonneg
   have hrewrite :
-      ρ.sqrtMatrix * Matrix.kronecker (1 : CMatrix a) σ.sqrtMatrix =
+      ρ.sqrtMatrix * ((1 : CMatrix a) ⊗ₖ σ.sqrtMatrix) =
         (((Real.sqrt d : ℝ) : ℂ) • M) := by
     have hsqrt :
-        Matrix.kronecker (1 : CMatrix a) σ.sqrtMatrix =
+        (1 : CMatrix a) ⊗ₖ σ.sqrtMatrix =
           (((Real.sqrt d : ℝ) : ℂ) • ((MState.uniform : MState a).prod σ).sqrtMatrix) := by
       dsimp [d]
       exact sqrt_identityTensorStateMatrix_eq_sqrt_card_smul_uniform_prod_sqrtMatrix
         (a := a) σ
     calc
-      ρ.sqrtMatrix * Matrix.kronecker (1 : CMatrix a) σ.sqrtMatrix =
+      ρ.sqrtMatrix * ((1 : CMatrix a) ⊗ₖ σ.sqrtMatrix) =
           ρ.sqrtMatrix *
             (((Real.sqrt d : ℝ) : ℂ) • ((MState.uniform : MState a).prod σ).sqrtMatrix) := by
             rw [hsqrt]
@@ -1328,13 +1328,13 @@ min-entropy:
 `ρ_AB ≤ I_A ⊗ T_B`, with `T_B ≥ 0`. -/
 def ConditionalMinEntropyScaleFeasible (ρ : MState (a × b)) (T : CMatrix b) :
     Prop :=
-  T.PosSemidef ∧ ρ.m ≤ Matrix.kronecker (1 : CMatrix a) T
+  T.PosSemidef ∧ ρ.m ≤ (1 : CMatrix a) ⊗ₖ T
 
 @[simp]
 theorem ConditionalMinEntropyScaleFeasible_eq
     (ρ : MState (a × b)) (T : CMatrix b) :
     ConditionalMinEntropyScaleFeasible (a := a) ρ T ↔
-      T.PosSemidef ∧ ρ.m ≤ Matrix.kronecker (1 : CMatrix a) T :=
+      T.PosSemidef ∧ ρ.m ≤ (1 : CMatrix a) ⊗ₖ T :=
   Iff.rfl
 
 /-- Conditioning-register isometries transport unnormalized conditional-min
@@ -1357,15 +1357,15 @@ theorem ConditionalMinEntropyScaleFeasible.apply_conditioningIsometry
     have hCP : MatrixMap.IsCompletelyPositive Φ :=
       MatrixMap.IsCompletelyPositive.kron (CPTPOp.id (dIn := a)).map_cp
         (MatrixMap.ofReferenceIsometry_isCompletelyPositive V)
-    have hdiff : (Matrix.kronecker (1 : CMatrix a) T - ρ.m).PosSemidef := hT.2
+    have hdiff : ((1 : CMatrix a) ⊗ₖ T - ρ.m).PosSemidef := hT.2
     have hmap := MatrixMap.isCompletelyPositive_mapsPositive Φ hCP
-      (Matrix.kronecker (1 : CMatrix a) T - ρ.m) hdiff
-    change ((Matrix.kronecker (1 : CMatrix a)
+      ((1 : CMatrix a) ⊗ₖ T - ρ.m) hdiff
+    change (((1 : CMatrix a) ⊗ₖ
         (MatrixMap.ofReferenceIsometry V T)) -
         (ρ.conditioningIsometryApply V).m).PosSemidef
     rw [conditioningIsometryApply_matrix]
     convert hmap using 1
-    simp only [Φ, map_sub, Matrix.kronecker]
+    simp only [Φ, map_sub]
     rw [MatrixMap.kron_map_of_kron_state]
     rw [MatrixMap.kron_id_ofReferenceIsometry_apply_eq_applyMatrixRight]
     simp [CPTPOp.id_map]
@@ -1407,17 +1407,17 @@ theorem ConditionalMinEntropyScaleFeasible.compress_sumInr
   · exact Matrix.sumBlock22_posSemidef hT.1
   · have hsub := hT.2.submatrix (fun x : a × b => (x.1, Sum.inr x.2))
     have heq :
-        (Matrix.kronecker (1 : CMatrix a) TPlus -
+        ((1 : CMatrix a) ⊗ₖ TPlus -
               (ρ.conditioningIsometryApply
                 (ReferenceIsometry.sumInr extra b)).m).submatrix
             (fun x : a × b => (x.1, Sum.inr x.2))
             (fun x : a × b => (x.1, Sum.inr x.2)) =
-          Matrix.kronecker (1 : CMatrix a) (Matrix.sumBlock22 TPlus) - ρ.m := by
+          (1 : CMatrix a) ⊗ₖ (Matrix.sumBlock22 TPlus) - ρ.m := by
       ext x y
-      simp [Matrix.kronecker, Matrix.sumBlock22, conditioningIsometryApply_matrix,
+      simp [Matrix.sumBlock22, conditioningIsometryApply_matrix,
         ReferenceIsometry.applyMatrixRight, ReferenceIsometry.rightBlock,
         ReferenceIsometry.sumInr, Matrix.mul_apply]
-    change (Matrix.kronecker (1 : CMatrix a) (Matrix.sumBlock22 TPlus) -
+    change ((1 : CMatrix a) ⊗ₖ (Matrix.sumBlock22 TPlus) -
       ρ.m).PosSemidef
     rw [← heq]
     exact hsub
@@ -1746,14 +1746,14 @@ theorem conditionalMinEntropyDualEffectValue_le_scaleValue
     (hM : ConditionalMinEntropyDualEffectFeasible (a := a) M)
     (hT : ConditionalMinEntropyScaleFeasible (a := a) ρ T) :
     ((ρ.m * M).trace).re ≤ T.trace.re := by
-  have hdiff : (Matrix.kronecker (1 : CMatrix a) T - ρ.m).PosSemidef := hT.2
+  have hdiff : ((1 : CMatrix a) ⊗ₖ T - ρ.m).PosSemidef := hT.2
   have hnonneg₁ := cMatrix_trace_mul_posSemidef_re_nonneg hdiff hM.1
   have hle₁ :
       ((ρ.m * M).trace).re ≤
-        ((Matrix.kronecker (1 : CMatrix a) T * M).trace).re := by
+        ((((1 : CMatrix a) ⊗ₖ T) * M).trace).re := by
     have htrace :
-        (((Matrix.kronecker (1 : CMatrix a) T - ρ.m) * M).trace).re =
-          ((Matrix.kronecker (1 : CMatrix a) T * M).trace).re -
+        ((((1 : CMatrix a) ⊗ₖ T - ρ.m) * M).trace).re =
+          ((((1 : CMatrix a) ⊗ₖ T) * M).trace).re -
             ((ρ.m * M).trace).re := by
       simp [Matrix.sub_mul, Matrix.trace_sub]
     linarith
@@ -1772,7 +1772,7 @@ theorem conditionalMinEntropyDualEffectValue_le_scaleValue
     linarith
   calc
     ((ρ.m * M).trace).re ≤
-        ((Matrix.kronecker (1 : CMatrix a) T * M).trace).re := hle₁
+        ((((1 : CMatrix a) ⊗ₖ T) * M).trace).re := hle₁
     _ = ((T * Matrix.traceLeft M).trace).re :=
         congrArg Complex.re (trace_kronecker_one_mul_eq_trace_mul_traceLeft M T)
     _ ≤ T.trace.re := hle₂
@@ -2029,18 +2029,18 @@ theorem conditionalMinEntropyDualEffectProgram_dualFeasible_of_scaleFeasible
     simpa [conditionalMinEntropyDualEffectProgram, psdCone_mem] using hZ
   have hM : M.PosSemidef := Matrix.sumBlock11_posSemidef hZpsd
   have hS : S.PosSemidef := Matrix.sumBlock22_posSemidef hZpsd
-  have hdiff : (Matrix.kronecker (1 : CMatrix a) T - ρ.m).PosSemidef := hT.2
+  have hdiff : ((1 : CMatrix a) ⊗ₖ T - ρ.m).PosSemidef := hT.2
   have hmain_nonneg := cMatrix_trace_mul_posSemidef_re_nonneg hdiff hM
   have hmain_trace :
-      (((Matrix.kronecker (1 : CMatrix a) T - ρ.m) * M).trace).re =
+      ((((1 : CMatrix a) ⊗ₖ T - ρ.m) * M).trace).re =
         ((T * Matrix.traceLeft M).trace).re -
           ((ρ.m * M).trace).re := by
     calc
-      (((Matrix.kronecker (1 : CMatrix a) T - ρ.m) * M).trace).re =
-          (((Matrix.kronecker (1 : CMatrix a) T * M -
+      ((((1 : CMatrix a) ⊗ₖ T - ρ.m) * M).trace).re =
+          (((((1 : CMatrix a) ⊗ₖ T) * M -
               ρ.m * M)).trace).re := by
         simp [Matrix.sub_mul]
-      _ = ((Matrix.kronecker (1 : CMatrix a) T * M).trace).re -
+      _ = ((((1 : CMatrix a) ⊗ₖ T) * M).trace).re -
             ((ρ.m * M).trace).re := by
         simp [Matrix.trace_sub]
       _ = ((T * Matrix.traceLeft M).trace).re -
@@ -2176,16 +2176,16 @@ theorem conditionalMinEntropyDualEffectProgram_dualValueSet_subset_scaleValueSet
         0 ≤ y A := hyA
         _ = ((T.val * A).trace).re := hrep
     · rw [Matrix.le_iff]
-      have hK : (Matrix.kronecker (1 : CMatrix a) T.val).IsHermitian := by
+      have hK : ((1 : CMatrix a) ⊗ₖ T.val).IsHermitian := by
         rw [Matrix.IsHermitian]
         calc
-          (Matrix.kronecker (1 : CMatrix a) T.val)ᴴ =
-              Matrix.kronecker ((1 : CMatrix a)ᴴ) (T.valᴴ) := by
-            simpa [Matrix.kronecker] using
+          ((1 : CMatrix a) ⊗ₖ T.val)ᴴ =
+              ((1 : CMatrix a)ᴴ) ⊗ₖ (T.valᴴ) := by
+            simpa using
               (Matrix.conjTranspose_kronecker (1 : CMatrix a) T.val)
-          _ = Matrix.kronecker (1 : CMatrix a) T.val := by
+          _ = (1 : CMatrix a) ⊗ₖ T.val := by
             rw [Matrix.conjTranspose_one, T.isHermitian.eq]
-      have hHerm : (Matrix.kronecker (1 : CMatrix a) T.val - ρ.m).IsHermitian :=
+      have hHerm : ((1 : CMatrix a) ⊗ₖ T.val - ρ.m).IsHermitian :=
         hK.sub ρ.psd.1
       refine (cMatrix_posSemidef_iff_trace_mul_posSemidef_re_nonneg hHerm).2 ?_
       intro A hA
@@ -2194,15 +2194,15 @@ theorem conditionalMinEntropyDualEffectProgram_dualValueSet_subset_scaleValueSet
       have hrep := hrep_psd (Matrix.traceLeft A)
         (traceLeft_posSemidef hA)
       have htrace :
-          (((Matrix.kronecker (1 : CMatrix a) T.val - ρ.m) * A).trace).re =
+          ((((1 : CMatrix a) ⊗ₖ T.val - ρ.m) * A).trace).re =
             ((T.val * Matrix.traceLeft A).trace).re -
               ((ρ.m * A).trace).re := by
         calc
-          (((Matrix.kronecker (1 : CMatrix a) T.val - ρ.m) * A).trace).re =
-              (((Matrix.kronecker (1 : CMatrix a) T.val * A -
+          ((((1 : CMatrix a) ⊗ₖ T.val - ρ.m) * A).trace).re =
+              (((((1 : CMatrix a) ⊗ₖ T.val) * A -
                   ρ.m * A)).trace).re := by
             simp [Matrix.sub_mul]
-          _ = ((Matrix.kronecker (1 : CMatrix a) T.val * A).trace).re -
+          _ = ((((1 : CMatrix a) ⊗ₖ T.val) * A).trace).re -
                 ((ρ.m * A).trace).re := by
             simp [Matrix.trace_sub]
           _ = ((T.val * Matrix.traceLeft A).trace).re -
@@ -2467,8 +2467,7 @@ theorem block_le_of_conditionalMinEntropyFeasible
           (fun i : b => (x, i)) (fun i : b => (x, i)) =
         c • σ.m - Classical.block ρ.m x x := by
     ext i j
-    simp [Classical.block, MState.identityTensorStateMatrix, Matrix.kronecker,
-      Matrix.kroneckerMap_apply, c]
+    simp [Classical.block, MState.identityTensorStateMatrix, Matrix.kroneckerMap_apply, c]
   rwa [hblock_eq] at hblock
 
 theorem conditionalMinEntropyScaleFeasible_trace_lower_bound [Nonempty a]
@@ -2480,10 +2479,10 @@ theorem conditionalMinEntropyScaleFeasible_trace_lower_bound [Nonempty a]
     rw [ρ.tr']
     norm_num
   have hright :
-      (Matrix.kronecker (1 : CMatrix a) T).trace.re =
+      ((1 : CMatrix a) ⊗ₖ T).trace.re =
         (Fintype.card a : ℝ) * T.trace.re := by
-    rw [show Matrix.kronecker (1 : CMatrix a) T =
-        Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix a) T by rfl]
+    rw [show (1 : CMatrix a) ⊗ₖ T =
+        (1 : CMatrix a) ⊗ₖ T by rfl]
     rw [Matrix.trace_kronecker, Matrix.trace_one]
     simp [Complex.mul_re]
   rw [hleft, hright] at htrace
@@ -2561,13 +2560,13 @@ theorem conditionalMinEntropyScaleValueSet_eq_normalizedScaleValueSet
         exact rpow_two_log2_pos htr_pos
       have hside :
           ((T.trace.re : ℂ) • identityTensorStateMatrix (a := a) σ) =
-            Matrix.kronecker (1 : CMatrix a) T := by
+            (1 : CMatrix a) ⊗ₖ T := by
         rw [identityTensorStateMatrix]
-        rw [show Matrix.kronecker (1 : CMatrix a) T =
-            Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix a) T by rfl]
+        rw [show (1 : CMatrix a) ⊗ₖ T =
+            (1 : CMatrix a) ⊗ₖ T by rfl]
         change ((T.trace.re : ℂ) •
-            Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix a) σ.m) =
-          Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix a) T
+            ((1 : CMatrix a) ⊗ₖ σ.m)) =
+          (1 : CMatrix a) ⊗ₖ T
         rw [← Matrix.kronecker_smul]
         rw [show ((T.trace.re : ℂ) • σ.m) = T by
           exact smul_ofPosSemidefTracePos_matrix T hTfeas.1 htr_pos]

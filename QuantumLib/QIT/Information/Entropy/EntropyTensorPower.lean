@@ -42,7 +42,7 @@ unitary similarity.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 open Matrix Polynomial
 
@@ -89,9 +89,9 @@ omit [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] in
 /-- The Kronecker product of two Hermitian matrices is Hermitian. -/
 theorem kronecker_isHermitian (A : CMatrix a) (B : CMatrix b)
     (hA : A.IsHermitian) (hB : B.IsHermitian) :
-    (Matrix.kronecker A B).IsHermitian := by
-  show (Matrix.kronecker A B)ᴴ = Matrix.kronecker A B
-  simp only [Matrix.kronecker, Matrix.conjTranspose_kronecker,
+    (A ⊗ₖ B).IsHermitian := by
+  show (A ⊗ₖ B)ᴴ = A ⊗ₖ B
+  simp only [Matrix.conjTranspose_kronecker,
     show Aᴴ = A from hA.eq, show Bᴴ = B from hB.eq]
 
 /-- The `n`-fold pairwise-product multiset `s^{⊗ n}`: each element is a product
@@ -156,7 +156,7 @@ theorem eigenvalueMultiset_kronecker (A : CMatrix a) (B : CMatrix b)
   let UA : Matrix.unitaryGroup a ℂ := hA.eigenvectorUnitary
   let UB : Matrix.unitaryGroup b ℂ := hB.eigenvectorUnitary
   let U : Matrix.unitaryGroup (a × b) ℂ :=
-    ⟨Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b),
+    ⟨(UA : CMatrix a) ⊗ₖ (UB : CMatrix b),
       Matrix.kronecker_mem_unitary UA.2 UB.2⟩
   let α : a → ℝ := hA.eigenvalues
   let β : b → ℝ := hB.eigenvalues
@@ -168,11 +168,11 @@ theorem eigenvalueMultiset_kronecker (A : CMatrix a) (B : CMatrix b)
       (Matrix.diagonal fun i => (β i : ℂ)) := by
     simpa [UB, β, Function.comp_def] using hB.spectral_theorem
   -- `A ⊗ B = (Uₐ ⊗ U_B) · diag(α·β) · (Uₐ ⊗ U_B)†`.
-  have hAB_spec : Matrix.kronecker A B = Unitary.conjStarAlgAut ℂ _ U
+  have hAB_spec : A ⊗ₖ B = Unitary.conjStarAlgAut ℂ _ U
       (Matrix.diagonal fun i => (dprod i : ℂ)) := by
     rw [hA_spec, hB_spec]
     simp only [Unitary.conjStarAlgAut_apply, dprod, star_eq_conjTranspose,
-      U, Matrix.kronecker, ← Matrix.conjTranspose_kronecker,
+      U, ← Matrix.conjTranspose_kronecker,
       Matrix.mul_kronecker_mul, Matrix.diagonal_kronecker_diagonal,
       Complex.ofReal_mul]
   have hDprod_self : IsSelfAdjoint fun i : a × b => (dprod i : ℂ) := by
@@ -184,7 +184,7 @@ theorem eigenvalueMultiset_kronecker (A : CMatrix a) (B : CMatrix b)
     isHermitian_diagonal_of_self_adjoint _ hDprod_self
   -- Characteristic polynomials agree by similarity invariance.
   have hCharpoly :
-      (Matrix.kronecker A B).charpoly =
+      (A ⊗ₖ B).charpoly =
         (Matrix.diagonal fun i => (dprod i : ℂ)).charpoly := by
     rw [hAB_spec, charpoly_conjStarAlgAut]
   -- Equal characteristic polynomials give equal eigenvalue functions.
@@ -379,7 +379,7 @@ theorem eigenvalueMultiset_tensorPower (ρ : MState a) :
       -- `(ρ.prod (ρ.tensorPower n)).m` is the Kronecker product, so the
       -- eigenvalue multiset transports across that matrix equation.
       have hprod : (ρ.prod (ρ.tensorPower n)).m =
-          Matrix.kronecker ρ.m (ρ.tensorPower n).m :=
+          ρ.m ⊗ₖ (ρ.tensorPower n).m :=
         MState.prod_m ρ (ρ.tensorPower n)
       refine Eq.trans (eigenvalueMultiset_eq_of_eq hprod _
         (kronecker_isHermitian ρ.m (ρ.tensorPower n).m

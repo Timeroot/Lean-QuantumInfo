@@ -1240,7 +1240,7 @@ theorem conditioningIsometryApply_prod_reindex_grouped
   simp [MState.conditioningIsometryApply_matrix,
     ReferenceIsometry.applyMatrixRight, ReferenceIsometry.rightBlock,
     ReferenceIsometry.prod, Equiv.prodProdProdComm,
-    Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.mul_apply,
+    Matrix.kroneckerMap_apply, Matrix.mul_apply,
     Matrix.conjTranspose, Fintype.sum_prod_type, Finset.sum_mul,
     Finset.mul_sum]
   conv_lhs =>

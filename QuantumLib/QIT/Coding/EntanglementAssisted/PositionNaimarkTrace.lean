@@ -64,7 +64,7 @@ def tensorPowerAt (P : ProjectionMatrix a) :
     {n : ℕ} → Fin n → ProjectionMatrix (TensorPower a n)
   | 0, i => i.elim0
   | n + 1, ⟨0, _⟩ =>
-      { matrix := Matrix.kronecker P.matrix (1 : CMatrix (TensorPower a n))
+      { matrix := P.matrix ⊗ₖ (1 : CMatrix (TensorPower a n))
         isHermitian := by
           change Matrix.conjTranspose
               (P.matrix ⊗ₖ (1 : CMatrix (TensorPower a n))) =
@@ -78,7 +78,7 @@ def tensorPowerAt (P : ProjectionMatrix a) :
   | n + 1, ⟨Nat.succ k, hk⟩ =>
       let Q : ProjectionMatrix (TensorPower a n) :=
         P.tensorPowerAt ⟨k, Nat.lt_of_succ_lt_succ hk⟩
-      { matrix := Matrix.kronecker (1 : CMatrix a) Q.matrix
+      { matrix := (1 : CMatrix a) ⊗ₖ Q.matrix
         isHermitian := by
           change Matrix.conjTranspose ((1 : CMatrix a) ⊗ₖ Q.matrix) =
             (1 : CMatrix a) ⊗ₖ Q.matrix
@@ -94,7 +94,7 @@ decreasing_by omega
 /-- Insert a local projector in the head position of a tensor power. -/
 def tensorPowerHead (P : ProjectionMatrix a) (n : ℕ) :
     ProjectionMatrix (TensorPower a (n + 1)) where
-  matrix := Matrix.kronecker P.matrix (1 : CMatrix (TensorPower a n))
+  matrix := P.matrix ⊗ₖ (1 : CMatrix (TensorPower a n))
   isHermitian := by
     change Matrix.conjTranspose
         (P.matrix ⊗ₖ (1 : CMatrix (TensorPower a n))) =
@@ -109,13 +109,13 @@ def tensorPowerHead (P : ProjectionMatrix a) (n : ℕ) :
 @[simp]
 theorem tensorPowerHead_matrix (P : ProjectionMatrix a) (n : ℕ) :
     (P.tensorPowerHead n).matrix =
-      Matrix.kronecker P.matrix (1 : CMatrix (TensorPower a n)) :=
+      P.matrix ⊗ₖ (1 : CMatrix (TensorPower a n)) :=
   rfl
 
 @[simp]
 theorem tensorPowerAt_tail (P : ProjectionMatrix a) {n : ℕ} (i : Fin n) :
     (P.tensorPowerAt (n := n + 1) i.succ).matrix =
-      Matrix.kronecker (1 : CMatrix a) (P.tensorPowerAt i).matrix :=
+      (1 : CMatrix a) ⊗ₖ (P.tensorPowerAt i).matrix :=
   by
     cases i with
     | mk k hk =>
@@ -966,7 +966,7 @@ acting as identity on all remaining reference coordinates. -/
 def commonOutputReferenceEffectAt (E : CMatrix (a × b))
     (k : ℕ) (m : Fin k) :
     CMatrix (TensorPower b 1 × TensorPower a k) :=
-  (Matrix.kronecker E
+  (E ⊗ₖ
       (1 : CMatrix (TensorPower.CoordComplement (a := a) k m))).submatrix
     (TensorPower.outputReferenceCoordEquiv (a := a) (b := b) k m)
     (TensorPower.outputReferenceCoordEquiv (a := a) (b := b) k m)
@@ -977,7 +977,7 @@ theorem commonOutputReferenceEffectAt_eq
     (E : CMatrix (a × b))
     (k : ℕ) (m : Fin k) :
     commonOutputReferenceEffectAt (a := a) (b := b) E k m =
-      (Matrix.kronecker E
+      (E ⊗ₖ
           (1 : CMatrix (TensorPower.CoordComplement (a := a) k m))).submatrix
         (TensorPower.outputReferenceCoordEquiv (a := a) (b := b) k m)
         (TensorPower.outputReferenceCoordEquiv (a := a) (b := b) k m) :=
@@ -1006,17 +1006,17 @@ theorem one_sub_commonOutputReferenceEffectAt
   · by_cases hf : (e x).1 = (e y).1
     · have hxy : x = y := by
         exact e.injective (Prod.ext hf ht)
-      simp [commonOutputReferenceEffectAt, Matrix.kronecker, Matrix.kroneckerMap_apply,
+      simp [commonOutputReferenceEffectAt, Matrix.kroneckerMap_apply,
         hxy]
     · have hxy : x ≠ y := by
         intro h
         exact hf (by rw [h])
-      simp [commonOutputReferenceEffectAt, e, Matrix.kronecker, Matrix.kroneckerMap_apply,
+      simp [commonOutputReferenceEffectAt, e, Matrix.kroneckerMap_apply,
         Matrix.one_apply, ht, hf, hxy]
   · have hxy : x ≠ y := by
       intro h
       exact ht (by rw [h])
-    simp [commonOutputReferenceEffectAt, e, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    simp [commonOutputReferenceEffectAt, e, Matrix.kroneckerMap_apply,
       Matrix.one_apply, ht, hxy]
 
 /-- The lifted common-output/reference effect is bounded by the identity
@@ -1037,7 +1037,7 @@ def commonOutputReferenceAt (P : ProjectionMatrix (a × b))
     ProjectionMatrix (TensorPower b 1 × TensorPower a k) :=
   let localProj : ProjectionMatrix
       ((a × b) × TensorPower.CoordComplement (a := a) k m) :=
-    { matrix := Matrix.kronecker P.matrix
+    { matrix := P.matrix ⊗ₖ
         (1 : CMatrix (TensorPower.CoordComplement (a := a) k m))
       isHermitian := by
         change Matrix.conjTranspose
@@ -1081,7 +1081,7 @@ to testing its first marginal. -/
 theorem effectTrace_traceRight
     {b : Type v} [Fintype b] [DecidableEq b]
     (ρ : MState (a × b)) (E : CMatrix a) :
-    effectTrace ρ (Matrix.kronecker E (1 : CMatrix b)) =
+    effectTrace ρ (E ⊗ₖ (1 : CMatrix b)) =
       effectTrace ρ.traceRight E := by
   unfold effectTrace effectAcceptProbability
   rw [MState.traceRight_m]
@@ -1101,7 +1101,7 @@ theorem effectTrace_commonOutputReferenceEffectAt
         E := by
   rw [ProjectionMatrix.commonOutputReferenceEffectAt_eq]
   rw [effectTrace_reindex ρ
-    (Matrix.kronecker E
+    (E ⊗ₖ
       (1 : CMatrix (TensorPower.CoordComplement (a := a) k m)))
     (TensorPower.outputReferenceCoordEquiv (a := a) (b := b) k m)]
   exact effectTrace_traceRight
@@ -1127,7 +1127,7 @@ independent tail preserves its trace against a product state. -/
 theorem effectTrace_prod_left
     {b : Type u} [Fintype b] [DecidableEq b]
     (ρ : MState a) (σ : MState b) (E : CMatrix a) :
-    effectTrace (ρ.prod σ) (Matrix.kronecker E (1 : CMatrix b)) =
+    effectTrace (ρ.prod σ) (E ⊗ₖ (1 : CMatrix b)) =
       effectTrace ρ E := by
   unfold effectTrace effectAcceptProbability
   rw [MState.prod_m]
@@ -1143,7 +1143,7 @@ preserves the effect trace against the tail product factor. -/
 theorem effectTrace_prod_right
     {b : Type u} [Fintype b] [DecidableEq b]
     (ρ : MState a) (σ : MState b) (E : CMatrix b) :
-    effectTrace (ρ.prod σ) (Matrix.kronecker (1 : CMatrix a) E) =
+    effectTrace (ρ.prod σ) ((1 : CMatrix a) ⊗ₖ E) =
       effectTrace σ E := by
   unfold effectTrace effectAcceptProbability
   rw [MState.prod_m]
@@ -1195,7 +1195,7 @@ theorem effectTrace_tensorPowerAt
               rw [hzero]
               have hmat :
                   (P.tensorPowerAt (n := n + 1) ⟨0, Nat.succ_pos n⟩).matrix =
-                    Matrix.kronecker P.matrix (1 : CMatrix (TensorPower a n)) := by
+                    P.matrix ⊗ₖ (1 : CMatrix (TensorPower a n)) := by
                 unfold ProjectionMatrix.tensorPowerAt
                 rfl
               rw [hmat]
@@ -1215,17 +1215,17 @@ complement tensored with the identity on the tail. -/
 theorem tensorPowerHead_compl_matrix
     (P : ProjectionMatrix a) (n : ℕ) :
     (P.tensorPowerHead n).compl.matrix =
-      Matrix.kronecker P.compl.matrix (1 : CMatrix (TensorPower a n)) := by
+      P.compl.matrix ⊗ₖ (1 : CMatrix (TensorPower a n)) := by
   have hone :
       (1 : CMatrix (TensorPower a (n + 1))) =
-        Matrix.kronecker (1 : CMatrix a) (1 : CMatrix (TensorPower a n)) :=
+        (1 : CMatrix a) ⊗ₖ (1 : CMatrix (TensorPower a n)) :=
     Matrix.one_kronecker_one.symm
   have hsub :
-      Matrix.kronecker ((1 : CMatrix a) - P.matrix) (1 : CMatrix (TensorPower a n)) =
-        Matrix.kronecker (1 : CMatrix a) (1 : CMatrix (TensorPower a n)) -
-          Matrix.kronecker P.matrix (1 : CMatrix (TensorPower a n)) := by
+      ((1 : CMatrix a) - P.matrix) ⊗ₖ (1 : CMatrix (TensorPower a n)) =
+        (1 : CMatrix a) ⊗ₖ (1 : CMatrix (TensorPower a n)) -
+          P.matrix ⊗ₖ (1 : CMatrix (TensorPower a n)) := by
     ext x y
-    simp only [Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.sub_apply, sub_mul]
+    simp only [Matrix.kroneckerMap_apply, Matrix.sub_apply, sub_mul]
   simp only [ProjectionMatrix.compl_matrix, ProjectionMatrix.tensorPowerHead_matrix]
   rw [hsub, hone]
   rfl
@@ -1236,7 +1236,7 @@ theorem effectTrace_prod_left_compl_head
     {b : Type u} [Fintype b] [DecidableEq b]
     (P : ProjectionMatrix a) (ρ : MState a) (σ : MState b) :
     effectTrace (ρ.prod σ)
-        (Matrix.kronecker P.compl.matrix (1 : CMatrix b)) =
+        (P.compl.matrix ⊗ₖ (1 : CMatrix b)) =
       effectTrace ρ P.compl.matrix :=
   effectTrace_prod_left ρ σ P.compl.matrix
 
@@ -1286,7 +1286,7 @@ theorem positionTrace_falseAlarm_identity
   unfold positionTraceState
   rw [ProjectionMatrix.tensorPowerAt_tail]
   change effectTrace (ρ.prod (σ.tensorPower n))
-      (Matrix.kronecker (1 : CMatrix a) (P.tensorPowerAt i).matrix) =
+      ((1 : CMatrix a) ⊗ₖ (P.tensorPowerAt i).matrix) =
     effectTrace σ P.matrix
   rw [effectTrace_prod_right ρ (σ.tensorPower n) (P.tensorPowerAt i).matrix]
   exact effectTrace_tensorPowerAt P σ i

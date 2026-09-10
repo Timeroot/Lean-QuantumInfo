@@ -22,7 +22,7 @@ file never defines a zero weight multiplied by `+infinity`.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 open Matrix
 
 noncomputable section
@@ -63,7 +63,7 @@ theorem blockDiagonal_rpow
       simp only [star_eq_conjTranspose]
       rw [blockDiagonal_conjTranspose, blockDiagonal_mul]
       rw [show (1 : CMatrix (ι × a)) =
-          Matrix.kronecker (1 : CMatrix ι) (1 : CMatrix a) by simp]
+          (1 : CMatrix ι) ⊗ₖ (1 : CMatrix a) by simp]
       rw [identityTensor_eq_blockDiagonal (ι := ι) (a := a)
         (1 : CMatrix a)]
       apply congrArg blockDiagonal
@@ -189,7 +189,7 @@ theorem blockDiagonal_rpow_posDef
       simp only [star_eq_conjTranspose]
       rw [blockDiagonal_conjTranspose, blockDiagonal_mul]
       rw [show (1 : CMatrix (ι × a)) =
-          Matrix.kronecker (1 : CMatrix ι) (1 : CMatrix a) by simp]
+          (1 : CMatrix ι) ⊗ₖ (1 : CMatrix a) by simp]
       rw [identityTensor_eq_blockDiagonal (ι := ι) (a := a)
         (1 : CMatrix a)]
       apply congrArg blockDiagonal
@@ -650,8 +650,7 @@ theorem conditionalRenyiState_traceLeft_eq_conditionalMarginalBYState
     MEnsemble.cqState_matrix]
   by_cases hyy : y = y'
   · subst y'
-    simp [MEnsemble.conditionalMarginalB, Matrix.kronecker,
-      Matrix.kroneckerMap_apply, prodABCToBCAEquiv_symm_apply,
+    simp [MEnsemble.conditionalMarginalB, Matrix.kroneckerMap_apply, prodABCToBCAEquiv_symm_apply,
       Matrix.sum_apply]
     conv_lhs => rw [Finset.sum_comm]
     rw [Finset.sum_eq_single_of_mem y (Finset.mem_univ y)]
@@ -665,8 +664,7 @@ theorem conditionalRenyiState_traceLeft_eq_conditionalMarginalBYState
   · have hxy : ∀ x : Y, ¬(x = y ∧ x = y') := by
       intro x h
       exact hyy (h.1.symm.trans h.2)
-    simp [MEnsemble.conditionalMarginalB, Matrix.kronecker,
-      Matrix.kroneckerMap_apply, prodABCToBCAEquiv_symm_apply,
+    simp [MEnsemble.conditionalMarginalB, Matrix.kroneckerMap_apply, prodABCToBCAEquiv_symm_apply,
       Matrix.sum_apply, hxy]
 
 /-- The classical labels of positive probability.  Restricting sums to it keeps the extended-real
@@ -728,7 +726,7 @@ theorem traceLeft_supports_of_identityTensor_support
     {a : Type u} {b : Type v} [Fintype a] [DecidableEq a]
     [Fintype b] [DecidableEq b]
     {X : CMatrix (a × b)} {N : CMatrix b}
-    (hX : Matrix.Supports X (Matrix.kronecker (1 : CMatrix a) N)) :
+    (hX : Matrix.Supports X ((1 : CMatrix a) ⊗ₖ N)) :
     Matrix.Supports (Matrix.traceLeft X) N := by
   intro v hv
   ext j
@@ -745,17 +743,15 @@ theorem traceLeft_supports_of_identityTensor_support
       apply Finset.sum_eq_zero
       intro i hi
       let w : a × b → ℂ := fun z => if z.1 = i then v z.2 else 0
-      have hw : (Matrix.kronecker (1 : CMatrix a) N).mulVec w = 0 := by
+      have hw : ((1 : CMatrix a) ⊗ₖ N).mulVec w = 0 := by
         ext z
         rcases z with ⟨k, x⟩
         by_cases hki : k = i
         · subst k
-          simp [w, Matrix.mulVec, dotProduct, Matrix.kronecker,
-            Matrix.kroneckerMap_apply, Matrix.one_apply,
+          simp [w, Matrix.mulVec, dotProduct, Matrix.kroneckerMap_apply, Matrix.one_apply,
             Fintype.sum_prod_type]
           simpa [Matrix.mulVec, dotProduct] using congrFun hv x
-        · simp [w, Matrix.mulVec, dotProduct, Matrix.kronecker,
-            Matrix.kroneckerMap_apply, Matrix.one_apply,
+        · simp [w, Matrix.mulVec, dotProduct, Matrix.kroneckerMap_apply, Matrix.one_apply,
             Fintype.sum_prod_type, hki]
       have hXw : X.mulVec w = 0 := hX w hw
       simpa [w, Matrix.mulVec, dotProduct, Fintype.sum_prod_type] using
@@ -775,8 +771,7 @@ theorem conditionalReference_blockDiagonal
   · subst y'
     simp [conditionalRenyiRightBlockDiagonal, identityTensorStateMatrix,
       MEnsemble.conditionalMarginalBYState, MEnsemble.conditionalMarginalB,
-      MEnsemble.cqState_matrix, MState.reindex_matrix, Matrix.kronecker,
-      Matrix.kroneckerMap_apply, prodABCToBCAEquiv_symm_apply,
+      MEnsemble.cqState_matrix, MState.reindex_matrix, Matrix.kroneckerMap_apply, prodABCToBCAEquiv_symm_apply,
       Matrix.traceLeft, Matrix.sum_apply]
     simp only [Matrix.one_apply]
     rw [Finset.sum_eq_single_of_mem y (Finset.mem_univ y)]
@@ -786,7 +781,7 @@ theorem conditionalReference_blockDiagonal
         rw [Finset.sum_eq_single_of_mem y (Finset.mem_univ y) (by
           intro z _ hzy
           simp [hzy])]
-      simp [Matrix.kronecker, Matrix.kroneckerMap_apply]
+      simp [Matrix.kroneckerMap_apply]
       by_cases haa : a = a'
       · subst a'
         rw [NNReal.smul_def]
@@ -799,8 +794,7 @@ theorem conditionalReference_blockDiagonal
       exact hyy (h.1.symm.trans h.2)
     simp [conditionalRenyiRightBlockDiagonal, identityTensorStateMatrix,
       MEnsemble.conditionalMarginalBYState, MEnsemble.conditionalMarginalB,
-      MEnsemble.cqState_matrix, MState.reindex_matrix, Matrix.kronecker,
-      Matrix.kroneckerMap_apply, prodABCToBCAEquiv_symm_apply,
+      MEnsemble.cqState_matrix, MState.reindex_matrix, Matrix.kroneckerMap_apply, prodABCToBCAEquiv_symm_apply,
       Matrix.traceLeft, Matrix.sum_apply,
       Classical.blockDiagonal, hxy]
 

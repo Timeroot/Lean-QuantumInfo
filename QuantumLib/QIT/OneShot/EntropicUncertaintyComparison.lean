@@ -26,7 +26,7 @@ measurement comparison then uses the source Stinespring bridge from
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 open Matrix
 
 noncomputable section
@@ -364,12 +364,12 @@ theorem measureCoherentPullback_le_overlap_identityTensorMarginal
   calc
     (Finset.univ.sum fun measured => Finset.univ.sum fun outcome =>
         (hX.vector measured).overlapSq (hY.vector outcome) •
-          Matrix.kronecker (Matrix.single measured measured (1 : ℂ))
-            (copiedOutcomeBlock sigma.m outcome)) ≤
+          ((Matrix.single measured measured (1 : ℂ)) ⊗ₖ
+            (copiedOutcomeBlock sigma.m outcome))) ≤
         (X.rankOneTraceOverlap Y : ℝ) •
-          Matrix.kronecker (1 : CMatrix x)
+          ((1 : CMatrix x) ⊗ₖ
             (Finset.univ.sum fun outcome =>
-              copiedOutcomeBlock sigma.m outcome) :=
+              copiedOutcomeBlock sigma.m outcome)) :=
       X.overlap_domination_le_rankOne Y hX hY _ hblock
     _ = (X.rankOneTraceOverlap Y : ℝ) •
         MState.identityTensorStateMatrix (a := x) sigma.traceLeft := by

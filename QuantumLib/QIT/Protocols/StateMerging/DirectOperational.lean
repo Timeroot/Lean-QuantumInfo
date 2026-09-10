@@ -274,16 +274,14 @@ private theorem fqswTeleportation_liftedResource_preserves
                 (MatrixMap.traceEffectToUnit
                   ((generalizedBellPOVM q).effects result))
                 (teleportationCorrection q result).map)
-              ((Matrix.kroneckerMap (fun x1 x2 => x1 * x2)
-                (Matrix.single m m' (1 : ℂ))
+              (((Matrix.single m m' (1 : ℂ)) ⊗ₖ
                 (rankOneMatrix
                   (teleportationEntanglementResource q).ket.vec)).submatrix
                     (fun x => (x.1.1, x.1.2, x.2))
                     (fun x => (x.1.1, x.1.2, x.2)))
               (PUnit.unit, qi) (PUnit.unit, qj) =
             ∑ full : (q × q) × q, ∑ full' : (q × q) × q,
-              (Matrix.kroneckerMap (fun x1 x2 => x1 * x2)
-                (Matrix.single m m' (1 : ℂ))
+              ((Matrix.single m m' (1 : ℂ)) ⊗ₖ
                 (rankOneMatrix
                   (teleportationEntanglementResource q).ket.vec)).submatrix
                     (fun x => (x.1.1, x.1.2, x.2))
@@ -299,8 +297,7 @@ private theorem fqswTeleportation_liftedResource_preserves
         simp only [Matrix.sum_apply, Matrix.smul_apply, smul_eq_mul]
         rfl
       have hInput (m m' : q) (full full' : (q × q) × q) :
-          (Matrix.kroneckerMap (fun x1 x2 => x1 * x2)
-            (Matrix.single m m' (1 : ℂ))
+          ((Matrix.single m m' (1 : ℂ)) ⊗ₖ
             (rankOneMatrix
               (teleportationEntanglementResource q).ket.vec)).submatrix
                 (fun x => (x.1.1, x.1.2, x.2))
@@ -318,8 +315,7 @@ private theorem fqswTeleportation_liftedResource_preserves
         _ = ∑ m : q, ∑ m' : q, rho.m (ri, m) (rj, m') *
               (∑ full : (q × q) × q,
                 ∑ full' : (q × q) × q,
-                  (Matrix.kroneckerMap (fun x1 x2 => x1 * x2)
-                    (Matrix.single m m' (1 : ℂ))
+                  ((Matrix.single m m' (1 : ℂ)) ⊗ₖ
                     (rankOneMatrix
                       (teleportationEntanglementResource q).ket.vec)).submatrix
                         (fun x => (x.1.1, x.1.2, x.2))

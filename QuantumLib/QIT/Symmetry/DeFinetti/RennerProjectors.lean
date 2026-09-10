@@ -55,7 +55,7 @@ argument hands to a channel.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator NNReal QIT.MatrixL2
+open scoped ComplexOrder MatrixOrder Kronecker Matrix.Norms.L2Operator NNReal QIT.MatrixL2
 open MeasureTheory
 
 noncomputable section
@@ -720,18 +720,15 @@ private theorem unitaryTwirlIntegrand_takeDrop_submatrix
           (tensorPowerTakeDropEquiv a n k)) U).submatrix
         (tensorPowerTakeDropEquiv a n k).symm
         (tensorPowerTakeDropEquiv a n k).symm =
-      Matrix.kronecker
-          (unitaryTensorPowerMatrix U n : CMatrix (TensorPower a n))
-          (unitaryTensorPowerMatrix U k : CMatrix (TensorPower a k)) *
+      ((unitaryTensorPowerMatrix U n : CMatrix (TensorPower a n)) ⊗ₖ
+          (unitaryTensorPowerMatrix U k : CMatrix (TensorPower a k))) *
         A *
-        star (Matrix.kronecker
-          (unitaryTensorPowerMatrix U n : CMatrix (TensorPower a n))
+        star ((unitaryTensorPowerMatrix U n : CMatrix (TensorPower a n)) ⊗ₖ
           (unitaryTensorPowerMatrix U k : CMatrix (TensorPower a k))) := by
   let e := tensorPowerTakeDropEquiv a n k
   let Un : CMatrix (TensorPower a (n + k)) := unitaryTensorPowerMatrix U (n + k)
   let Us : CMatrix (TensorPower a n × TensorPower a k) :=
-    Matrix.kronecker
-      (unitaryTensorPowerMatrix U n : CMatrix (TensorPower a n))
+    (unitaryTensorPowerMatrix U n : CMatrix (TensorPower a n)) ⊗ₖ
       (unitaryTensorPowerMatrix U k : CMatrix (TensorPower a k))
   have hU : Un.submatrix e.symm e.symm = Us := by
     simpa [Un, Us, e] using
@@ -765,17 +762,15 @@ theorem rennerMIIDProjectorZero_eq_unitaryTwirlIntegrand
 private theorem rennerGammaIntegrand_takeDrop_submatrix [Nonempty a]
     (ν : Ket a) (n k r : ℕ) (U : Matrix.unitaryGroup a ℂ) :
     (unitaryTwirlIntegrand (a := a) ((n + r) + k)
-        (((Matrix.kronecker
-            ((1 : CMatrix (TensorPower a (n + r))) -
-              rennerMIIDProjectorId (a := a) n r ν)
+        (((((1 : CMatrix (TensorPower a (n + r))) -
+              rennerMIIDProjectorId (a := a) n r ν) ⊗ₖ
             (rennerMIIDProjectorIdZero (a := a) k ν)).submatrix
               (tensorPowerTakeDropEquiv a (n + r) k)
               (tensorPowerTakeDropEquiv a (n + r) k))) U).submatrix
         (tensorPowerTakeDropEquiv a (n + r) k).symm
         (tensorPowerTakeDropEquiv a (n + r) k).symm =
-      Matrix.kronecker
-        ((1 : CMatrix (TensorPower a (n + r))) -
-          rennerMIIDProjector (a := a) n r ν U)
+      ((1 : CMatrix (TensorPower a (n + r))) -
+          rennerMIIDProjector (a := a) n r ν U) ⊗ₖ
         (rennerMIIDProjectorZero (a := a) k ν U) := by
   let UL : CMatrix (TensorPower a (n + r)) := unitaryTensorPowerMatrix U (n + r)
   let UR : CMatrix (TensorPower a k) := unitaryTensorPowerMatrix U k
@@ -783,7 +778,7 @@ private theorem rennerGammaIntegrand_takeDrop_submatrix [Nonempty a]
   let P0id : CMatrix (TensorPower a k) := rennerMIIDProjectorIdZero (a := a) k ν
   have hsplit :=
     unitaryTwirlIntegrand_takeDrop_submatrix (a := a) (n + r) k
-      (Matrix.kronecker ((1 : CMatrix (TensorPower a (n + r))) - Pid) P0id) U
+      (((1 : CMatrix (TensorPower a (n + r))) - Pid) ⊗ₖ P0id) U
   rw [hsplit]
   have hleft :
       UL * ((1 : CMatrix (TensorPower a (n + r))) - Pid) * star UL =
@@ -812,40 +807,38 @@ private theorem rennerGammaIntegrand_takeDrop_submatrix [Nonempty a]
     dsimp [UR, P0id]
     rw [rennerMIIDProjectorIdZero_eq_rankOneTensorPower]
   have hstarK :
-      star (Matrix.kronecker UL UR) =
-        Matrix.kronecker (star UL) (star UR) := by
+      star (UL ⊗ₖ UR) =
+        (star UL) ⊗ₖ (star UR) := by
     simpa [Matrix.star_eq_conjTranspose] using Matrix.conjTranspose_kronecker UL UR
   rw [hstarK]
   change
-    Matrix.kronecker UL UR * Matrix.kronecker (1 - Pid) P0id *
-        Matrix.kronecker (star UL) (star UR) =
-      Matrix.kronecker
-        ((1 : CMatrix (TensorPower a (n + r))) -
-          rennerMIIDProjector (a := a) n r ν U)
+    (UL ⊗ₖ UR) * ((1 - Pid) ⊗ₖ P0id) *
+        ((star UL) ⊗ₖ (star UR)) =
+      ((1 : CMatrix (TensorPower a (n + r))) -
+          rennerMIIDProjector (a := a) n r ν U) ⊗ₖ
         (rennerMIIDProjectorZero (a := a) k ν U)
   have hmul1 :
-      Matrix.kronecker UL UR * Matrix.kronecker (1 - Pid) P0id =
-        Matrix.kronecker (UL * (1 - Pid)) (UR * P0id) :=
+      (UL ⊗ₖ UR) * ((1 - Pid) ⊗ₖ P0id) =
+        (UL * (1 - Pid)) ⊗ₖ (UR * P0id) :=
     (Matrix.mul_kronecker_mul UL (1 - Pid) UR P0id).symm
   have hmul2 :
-      Matrix.kronecker (UL * (1 - Pid)) (UR * P0id) *
-          Matrix.kronecker (star UL) (star UR) =
-        Matrix.kronecker ((UL * (1 - Pid)) * star UL)
+      ((UL * (1 - Pid)) ⊗ₖ (UR * P0id)) *
+          ((star UL) ⊗ₖ (star UR)) =
+        ((UL * (1 - Pid)) * star UL) ⊗ₖ
           ((UR * P0id) * star UR) :=
     (Matrix.mul_kronecker_mul (UL * (1 - Pid)) (star UL)
       (UR * P0id) (star UR)).symm
   calc
-    Matrix.kronecker UL UR * Matrix.kronecker (1 - Pid) P0id *
-        Matrix.kronecker (star UL) (star UR) =
-        Matrix.kronecker (UL * (1 - Pid)) (UR * P0id) *
-          Matrix.kronecker (star UL) (star UR) := by
+    (UL ⊗ₖ UR) * ((1 - Pid) ⊗ₖ P0id) *
+        ((star UL) ⊗ₖ (star UR)) =
+        ((UL * (1 - Pid)) ⊗ₖ (UR * P0id)) *
+          ((star UL) ⊗ₖ (star UR)) := by
           rw [hmul1]
-    _ = Matrix.kronecker ((UL * (1 - Pid)) * star UL)
+    _ = ((UL * (1 - Pid)) * star UL) ⊗ₖ
           ((UR * P0id) * star UR) := by
           rw [hmul2]
-    _ = Matrix.kronecker
-          ((1 : CMatrix (TensorPower a (n + r))) -
-            rennerMIIDProjector (a := a) n r ν U)
+    _ = ((1 : CMatrix (TensorPower a (n + r))) -
+            rennerMIIDProjector (a := a) n r ν U) ⊗ₖ
           (rennerMIIDProjectorZero (a := a) k ν U) := by
           simp [hleft, hright]
 
@@ -1044,8 +1037,8 @@ right `k` block onto its symmetric subspace. -/
 theorem splitRightSymmetricProjection_mul_of_supported {n k : ℕ}
     {ρ : MState (TensorPower a (n + k))}
     (hρ : ρ.SupportedOnSymmetricSubspace (a := a)) :
-    Matrix.kronecker (1 : CMatrix (TensorPower a n))
-        (symmetricProjectionMatrix (a := a) k) *
+    ((1 : CMatrix (TensorPower a n)) ⊗ₖ
+        (symmetricProjectionMatrix (a := a) k)) *
       (ρ.reindex (tensorPowerTakeDropEquiv a n k)).m =
       (ρ.reindex (tensorPowerTakeDropEquiv a n k)).m := by
   let e := tensorPowerTakeDropEquiv a n k
@@ -1054,7 +1047,7 @@ theorem splitRightSymmetricProjection_mul_of_supported {n k : ℕ}
   let Psplit : CMatrix (TensorPower a n × TensorPower a k) :=
     Pfull.submatrix e.symm e.symm
   let Q : CMatrix (TensorPower a n × TensorPower a k) :=
-    Matrix.kronecker (1 : CMatrix (TensorPower a n))
+    (1 : CMatrix (TensorPower a n)) ⊗ₖ
       (symmetricProjectionMatrix (a := a) k)
   let ρsplit : CMatrix (TensorPower a n × TensorPower a k) :=
     (ρ.reindex e).m
@@ -1088,10 +1081,10 @@ private theorem traceRight_kronecker_one_left_mul {ι κ : Type v}
     [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq κ]
     (L : CMatrix ι) (X : CMatrix (ι × κ)) :
     Matrix.traceRight
-      (Matrix.kronecker L (1 : CMatrix κ) * X) =
+      ((L ⊗ₖ (1 : CMatrix κ)) * X) =
       L * Matrix.traceRight X := by
   ext i i'
-  simp [Matrix.traceRight, Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  simp [Matrix.traceRight, Matrix.mul_apply, Matrix.kroneckerMap_apply,
     Matrix.one_apply, Fintype.sum_prod_type, Finset.mul_sum]
   rw [Finset.sum_comm]
 
@@ -1099,11 +1092,11 @@ private noncomputable def kroneckerOneMulConstCLM {ι κ : Type v}
     [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq κ]
     (X : CMatrix (ι × κ)) : CMatrix κ →L[ℝ] CMatrix (ι × κ) :=
   LinearMap.toContinuousLinearMap
-    ({ toFun := fun P => Matrix.kronecker (1 : CMatrix ι) P * X
+    ({ toFun := fun P => ((1 : CMatrix ι) ⊗ₖ P) * X
        map_add' := by
         intro P Q
         ext i j
-        simp only [Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+        simp only [Matrix.mul_apply, Matrix.kroneckerMap_apply,
           Matrix.add_apply]
         rw [← Finset.sum_add_distrib]
         refine Finset.sum_congr rfl ?_
@@ -1112,7 +1105,7 @@ private noncomputable def kroneckerOneMulConstCLM {ι κ : Type v}
        map_smul' := by
         intro c P
         ext i j
-        simp only [Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+        simp only [Matrix.mul_apply, Matrix.kroneckerMap_apply,
           Matrix.smul_apply, RingHom.id_apply]
         change ∑ x, (1 : CMatrix ι) i.1 x.1 * ((c : ℂ) * P i.2 x.2) *
             X x j =
@@ -1127,8 +1120,8 @@ private theorem integral_kronecker_one_mul_const {α : Type*} [MeasurableSpace �
     {μ : Measure α} {ι κ : Type v} [Fintype ι] [DecidableEq ι]
     [Fintype κ] [DecidableEq κ]
     {f : α → CMatrix κ} (hf : Integrable f μ) (X : CMatrix (ι × κ)) :
-    (∫ x, Matrix.kronecker (1 : CMatrix ι) (f x) * X ∂μ) =
-      Matrix.kronecker (1 : CMatrix ι) (∫ x, f x ∂μ) * X := by
+    (∫ x, ((1 : CMatrix ι) ⊗ₖ (f x)) * X ∂μ) =
+      ((1 : CMatrix ι) ⊗ₖ (∫ x, f x ∂μ)) * X := by
   simpa [kroneckerOneMulConstCLM] using
     (kroneckerOneMulConstCLM (ι := ι) (κ := κ) X).integral_comp_comm hf
 
@@ -1300,11 +1293,11 @@ private theorem traceRight_kronecker_rankOne_left_mul_rankOne
     {α β : Type*} [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
     (η : β → ℂ) (ψ : α × β → ℂ) :
     Matrix.traceRight
-      (Matrix.kronecker (1 : CMatrix α) (rankOneMatrix η) * rankOneMatrix ψ) =
+      (((1 : CMatrix α) ⊗ₖ (rankOneMatrix η)) * rankOneMatrix ψ) =
       rankOneMatrix (contractedAmp η ψ) := by
   ext x x'
-  simp only [Matrix.traceRight, Matrix.of_apply, Matrix.mul_apply, Matrix.kroneckerMap_apply, Matrix.kronecker,
-    rankOneMatrix_apply, contractedAmp, Matrix.one_apply]
+  simp only [Matrix.traceRight, Matrix.of_apply, Matrix.mul_apply, Matrix.kroneckerMap_apply, rankOneMatrix_apply,
+  contractedAmp, Matrix.one_apply]
   calc
     (∑ x_1 : β, ∑ x_2 : α × β,
       (if x = x_2.1 then (1 : ℂ) else 0) * (η x_1 * star (η x_2.2)) *
@@ -1330,9 +1323,8 @@ the later exponential-bound assembly.  It is the Haar twirl of
 def rennerGammaMatrix [Nonempty a] (ν : Ket a) (n k r : ℕ) :
     CMatrix (TensorPower a ((n + r) + k)) :=
   unitaryTwirl ((n + r) + k)
-    (((Matrix.kronecker
-        ((1 : CMatrix (TensorPower a (n + r))) -
-          rennerMIIDProjectorId (a := a) n r ν)
+    (((((1 : CMatrix (TensorPower a (n + r))) -
+          rennerMIIDProjectorId (a := a) n r ν) ⊗ₖ
         (rennerMIIDProjectorIdZero (a := a) k ν)).submatrix
           (tensorPowerTakeDropEquiv a (n + r) k)
           (tensorPowerTakeDropEquiv a (n + r) k)))
@@ -1351,7 +1343,7 @@ def rennerRhoUMatrix [Nonempty a] {n k : ℕ}
     (U : Matrix.unitaryGroup a ℂ) : CMatrix (TensorPower a n) :=
   ((Fintype.card (TensorPowerProfile a k) : ℝ) : ℂ) •
     Matrix.traceRight
-      ((Matrix.kronecker (1 : CMatrix (TensorPower a n))
+      (((1 : CMatrix (TensorPower a n)) ⊗ₖ
           (rennerMIIDProjectorZero (a := a) k ν U)) *
         (ρ.reindex (tensorPowerTakeDropEquiv a n k)).m)
 
@@ -1360,7 +1352,7 @@ theorem rennerRhoUMatrix_trace [Nonempty a] {n k : ℕ}
     (U : Matrix.unitaryGroup a ℂ) :
     (ρ.rennerRhoUMatrix (a := a) (n := n) (k := k) ν U).trace =
       ((Fintype.card (TensorPowerProfile a k) : ℝ) : ℂ) *
-        (((Matrix.kronecker (1 : CMatrix (TensorPower a n))
+        ((((1 : CMatrix (TensorPower a n)) ⊗ₖ
             (rennerMIIDProjectorZero (a := a) k ν U)) *
           (ρ.reindex (tensorPowerTakeDropEquiv a n k)).m).trace) := by
   rw [rennerRhoUMatrix, Matrix.trace_smul, Matrix.traceRight_trace]
@@ -1382,8 +1374,8 @@ theorem rennerRhoUMatrix_posSemidef_of_pure [Nonempty a] {n k : ℕ}
       (ν.tensorPower k).vec
   have hpt :
       Matrix.traceRight
-        (Matrix.kronecker (1 : CMatrix (TensorPower a n))
-            (rennerMIIDProjectorZero (a := a) k ν U) *
+        (((1 : CMatrix (TensorPower a n)) ⊗ₖ
+            (rennerMIIDProjectorZero (a := a) k ν U)) *
           (ψ.state.reindex e).m) =
         rankOneMatrix
           (contractedAmp (α := TensorPower a n) (β := TensorPower a k) η
@@ -1408,22 +1400,22 @@ private theorem rennerRhoUMatrix_continuous [Nonempty a] {n k : ℕ}
   have hP := rennerMIIDProjectorZero_continuous (a := a) k ν
   have hK :
       Continuous fun U : Matrix.unitaryGroup a ℂ =>
-        Matrix.kronecker (1 : CMatrix (TensorPower a n))
-            (rennerMIIDProjectorZero (a := a) k ν U) * X :=
+        ((1 : CMatrix (TensorPower a n)) ⊗ₖ
+            (rennerMIIDProjectorZero (a := a) k ν U)) * X :=
     (kroneckerOneMulConstCLM (ι := TensorPower a n) (κ := TensorPower a k) X).continuous.comp hP
   have hPT :
       Continuous fun U : Matrix.unitaryGroup a ℂ =>
         Matrix.traceRight
-          (Matrix.kronecker (1 : CMatrix (TensorPower a n))
-              (rennerMIIDProjectorZero (a := a) k ν U) * X) :=
+          (((1 : CMatrix (TensorPower a n)) ⊗ₖ
+              (rennerMIIDProjectorZero (a := a) k ν U)) * X) :=
     (cMatrixTraceRightCLM (ι := TensorPower a n) (κ := TensorPower a k)).continuous.comp hK
   have hEq : (fun U : Matrix.unitaryGroup a ℂ =>
       ρ.rennerRhoUMatrix (a := a) (n := n) (k := k) ν U) =
       fun U : Matrix.unitaryGroup a ℂ =>
         ((Fintype.card (TensorPowerProfile a k) : ℝ) : ℂ) •
           Matrix.traceRight
-            (Matrix.kronecker (1 : CMatrix (TensorPower a n))
-                (rennerMIIDProjectorZero (a := a) k ν U) * X) := rfl
+            (((1 : CMatrix (TensorPower a n)) ⊗ₖ
+                (rennerMIIDProjectorZero (a := a) k ν U)) * X) := rfl
   rw [hEq]
   exact hPT.const_smul (((Fintype.card (TensorPowerProfile a k) : ℝ) : ℂ))
 
@@ -1548,9 +1540,8 @@ theorem rennerDefectRhoUMatrix_eq_gammaIntegrand_partialTrace
       ((Fintype.card (TensorPowerProfile a k) : ℝ) : ℂ) •
         Matrix.traceRight
           ((unitaryTwirlIntegrand (a := a) ((m + r) + k)
-              (((Matrix.kronecker
-                  ((1 : CMatrix (TensorPower a (m + r))) -
-                    rennerMIIDProjectorId (a := a) m r ν)
+              (((((1 : CMatrix (TensorPower a (m + r))) -
+                    rennerMIIDProjectorId (a := a) m r ν) ⊗ₖ
                   (rennerMIIDProjectorIdZero (a := a) k ν)).submatrix
                     (tensorPowerTakeDropEquiv a (m + r) k)
                     (tensorPowerTakeDropEquiv a (m + r) k))) U).submatrix
@@ -1566,43 +1557,42 @@ theorem rennerDefectRhoUMatrix_eq_gammaIntegrand_partialTrace
   let c : ℂ := ((Fintype.card (TensorPowerProfile a k) : ℝ) : ℂ)
   have hsplit :
       (unitaryTwirlIntegrand (a := a) ((m + r) + k)
-          (((Matrix.kronecker
-              ((1 : CMatrix (TensorPower a (m + r))) -
-                rennerMIIDProjectorId (a := a) m r ν)
+          (((((1 : CMatrix (TensorPower a (m + r))) -
+                rennerMIIDProjectorId (a := a) m r ν) ⊗ₖ
               (rennerMIIDProjectorIdZero (a := a) k ν)).submatrix
                 (tensorPowerTakeDropEquiv a (m + r) k)
                 (tensorPowerTakeDropEquiv a (m + r) k))) U).submatrix
             (tensorPowerTakeDropEquiv a (m + r) k).symm
             (tensorPowerTakeDropEquiv a (m + r) k).symm =
-        Matrix.kronecker L R := by
+        L ⊗ₖ R := by
     simpa [L, R] using
       rennerGammaIntegrand_takeDrop_submatrix (a := a) ν m k r U
   have hkr :
-      Matrix.kronecker L R * X =
-        Matrix.kronecker L (1 : CMatrix (TensorPower a k)) *
-          (Matrix.kronecker (1 : CMatrix (TensorPower a (m + r))) R * X) := by
+      (L ⊗ₖ R) * X =
+        (L ⊗ₖ (1 : CMatrix (TensorPower a k))) *
+          (((1 : CMatrix (TensorPower a (m + r))) ⊗ₖ R) * X) := by
     have hmul :
-        Matrix.kronecker L (1 : CMatrix (TensorPower a k)) *
-            Matrix.kronecker (1 : CMatrix (TensorPower a (m + r))) R =
-          Matrix.kronecker L R := by
+        (L ⊗ₖ (1 : CMatrix (TensorPower a k))) *
+            ((1 : CMatrix (TensorPower a (m + r))) ⊗ₖ R) =
+          L ⊗ₖ R := by
       simpa using
         (Matrix.mul_kronecker_mul L (1 : CMatrix (TensorPower a (m + r)))
           (1 : CMatrix (TensorPower a k)) R).symm
     calc
-      Matrix.kronecker L R * X =
-          (Matrix.kronecker L (1 : CMatrix (TensorPower a k)) *
-              Matrix.kronecker (1 : CMatrix (TensorPower a (m + r))) R) * X := by
+      (L ⊗ₖ R) * X =
+          ((L ⊗ₖ (1 : CMatrix (TensorPower a k))) *
+              ((1 : CMatrix (TensorPower a (m + r))) ⊗ₖ R)) * X := by
             rw [hmul]
-      _ = Matrix.kronecker L (1 : CMatrix (TensorPower a k)) *
-            (Matrix.kronecker (1 : CMatrix (TensorPower a (m + r))) R * X) := by
+      _ = (L ⊗ₖ (1 : CMatrix (TensorPower a k))) *
+            (((1 : CMatrix (TensorPower a (m + r))) ⊗ₖ R) * X) := by
             rw [Matrix.mul_assoc]
   calc
     L * ρ.rennerRhoUMatrix (a := a) (n := m + r) (k := k) ν U =
         L * (c • Matrix.traceRight
-          (Matrix.kronecker (1 : CMatrix (TensorPower a (m + r))) R * X)) := by
+          (((1 : CMatrix (TensorPower a (m + r))) ⊗ₖ R) * X)) := by
           rfl
     _ = c • (L * Matrix.traceRight
-          (Matrix.kronecker (1 : CMatrix (TensorPower a (m + r))) R * X)) := by
+          (((1 : CMatrix (TensorPower a (m + r))) ⊗ₖ R) * X)) := by
           ext i j
           simp only [Matrix.mul_apply, Matrix.smul_apply, smul_eq_mul]
           rw [Finset.mul_sum]
@@ -1610,17 +1600,16 @@ theorem rennerDefectRhoUMatrix_eq_gammaIntegrand_partialTrace
           intro x hx
           ring
     _ = c • Matrix.traceRight
-          (Matrix.kronecker L (1 : CMatrix (TensorPower a k)) *
-            (Matrix.kronecker (1 : CMatrix (TensorPower a (m + r))) R * X)) := by
+          ((L ⊗ₖ (1 : CMatrix (TensorPower a k))) *
+            (((1 : CMatrix (TensorPower a (m + r))) ⊗ₖ R) * X)) := by
           rw [traceRight_kronecker_one_left_mul]
     _ = c • Matrix.traceRight
-          (Matrix.kronecker L R * X) := by
+          ((L ⊗ₖ R) * X) := by
           rw [hkr]
     _ = c • Matrix.traceRight
           ((unitaryTwirlIntegrand (a := a) ((m + r) + k)
-              (((Matrix.kronecker
-                  ((1 : CMatrix (TensorPower a (m + r))) -
-                    rennerMIIDProjectorId (a := a) m r ν)
+              (((((1 : CMatrix (TensorPower a (m + r))) -
+                    rennerMIIDProjectorId (a := a) m r ν) ⊗ₖ
                   (rennerMIIDProjectorIdZero (a := a) k ν)).submatrix
                     (tensorPowerTakeDropEquiv a (m + r) k)
                     (tensorPowerTakeDropEquiv a (m + r) k))) U).submatrix
@@ -1647,9 +1636,8 @@ theorem rennerProjectedFamily_gamma_rewrite
   let X : CMatrix (TensorPower a (m + r) × TensorPower a k) :=
     (ρ.reindex e).m
   let A : CMatrix (TensorPower a ((m + r) + k)) :=
-    ((Matrix.kronecker
-      ((1 : CMatrix (TensorPower a (m + r))) -
-        rennerMIIDProjectorId (a := a) m r ν)
+    ((((1 : CMatrix (TensorPower a (m + r))) -
+        rennerMIIDProjectorId (a := a) m r ν) ⊗ₖ
       (rennerMIIDProjectorIdZero (a := a) k ν)).submatrix e e)
   let c : ℂ := ((Fintype.card (TensorPowerProfile a k) : ℝ) : ℂ)
   have hAint :
@@ -1717,22 +1705,22 @@ theorem rennerTraceOutLastK_eq_haarAverage_rhoU [Nonempty a] {n k : ℕ}
       ∂unitaryHaarMeasure (a := a)
   let P : CMatrix (TensorPower a k) := symmetricProjectionMatrix (a := a) k
   let Q : CMatrix (TensorPower a n × TensorPower a k) :=
-    Matrix.kronecker (1 : CMatrix (TensorPower a n)) P
+    (1 : CMatrix (TensorPower a n)) ⊗ₖ P
   let c : ℂ := ((Fintype.card (TensorPowerProfile a k) : ℝ) : ℂ)
   have hPint := rennerMIIDProjectorZero_integrable (a := a) k ν
   have hKint :
       Integrable
         (fun U : Matrix.unitaryGroup a ℂ =>
-          Matrix.kronecker (1 : CMatrix (TensorPower a n))
-              (rennerMIIDProjectorZero (a := a) k ν U) * X)
+          ((1 : CMatrix (TensorPower a n)) ⊗ₖ
+              (rennerMIIDProjectorZero (a := a) k ν U)) * X)
         (unitaryHaarMeasure (a := a)) :=
     (kroneckerOneMulConstCLM (ι := TensorPower a n) (κ := TensorPower a k) X).integrable_comp hPint
   have hPTint :
       Integrable
         (fun U : Matrix.unitaryGroup a ℂ =>
           Matrix.traceRight
-            (Matrix.kronecker (1 : CMatrix (TensorPower a n))
-              (rennerMIIDProjectorZero (a := a) k ν U) * X))
+            (((1 : CMatrix (TensorPower a n)) ⊗ₖ
+              (rennerMIIDProjectorZero (a := a) k ν U)) * X))
         (unitaryHaarMeasure (a := a)) :=
     (cMatrixTraceRightCLM (ι := TensorPower a n) (κ := TensorPower a k)).integrable_comp hKint
   have hQX : Q * X = X := by
@@ -1743,18 +1731,18 @@ theorem rennerTraceOutLastK_eq_haarAverage_rhoU [Nonempty a] {n k : ℕ}
     simpa [Pavg, P, c] using
       rennerMIIDProjectorZero_average_mul_symmetricProjectionMatrix (a := a) k ν
   have hKavgX :
-      Matrix.kronecker (1 : CMatrix (TensorPower a n)) Pavg * X = c⁻¹ • X := by
+      ((1 : CMatrix (TensorPower a n)) ⊗ₖ Pavg) * X = c⁻¹ • X := by
     calc
-      Matrix.kronecker (1 : CMatrix (TensorPower a n)) Pavg * X =
-          Matrix.kronecker (1 : CMatrix (TensorPower a n)) Pavg * (Q * X) := by
+      ((1 : CMatrix (TensorPower a n)) ⊗ₖ Pavg) * X =
+          ((1 : CMatrix (TensorPower a n)) ⊗ₖ Pavg) * (Q * X) := by
             rw [hQX]
-      _ = (Matrix.kronecker (1 : CMatrix (TensorPower a n)) Pavg * Q) * X := by
+      _ = (((1 : CMatrix (TensorPower a n)) ⊗ₖ Pavg) * Q) * X := by
             rw [Matrix.mul_assoc]
-      _ = Matrix.kronecker (1 : CMatrix (TensorPower a n)) (Pavg * P) * X := by
+      _ = ((1 : CMatrix (TensorPower a n)) ⊗ₖ (Pavg * P)) * X := by
             dsimp [Q, P]
             rw [← Matrix.mul_kronecker_mul]
             simp
-      _ = Matrix.kronecker (1 : CMatrix (TensorPower a n)) (c⁻¹ • P) * X := by
+      _ = ((1 : CMatrix (TensorPower a n)) ⊗ₖ (c⁻¹ • P)) * X := by
             rw [hPavgP]
       _ = c⁻¹ • (Q * X) := by
             simp [Q, P, Matrix.kronecker_smul]
@@ -1765,15 +1753,15 @@ theorem rennerTraceOutLastK_eq_haarAverage_rhoU [Nonempty a] {n k : ℕ}
   have haverage :
       ρ.rennerRhoUAverageMatrix (a := a) (n := n) (k := k) ν =
         c • Matrix.traceRight
-          (Matrix.kronecker (1 : CMatrix (TensorPower a n)) Pavg * X) := by
+          (((1 : CMatrix (TensorPower a n)) ⊗ₖ Pavg) * X) := by
     rw [rennerRhoUAverageMatrix]
     change (∫ U : Matrix.unitaryGroup a ℂ,
         c • Matrix.traceRight
-          (Matrix.kronecker (1 : CMatrix (TensorPower a n))
-            (rennerMIIDProjectorZero (a := a) k ν U) * X)
+          (((1 : CMatrix (TensorPower a n)) ⊗ₖ
+            (rennerMIIDProjectorZero (a := a) k ν U)) * X)
         ∂unitaryHaarMeasure (a := a)) =
       c • Matrix.traceRight
-        (Matrix.kronecker (1 : CMatrix (TensorPower a n)) Pavg * X)
+        (((1 : CMatrix (TensorPower a n)) ⊗ₖ Pavg) * X)
     rw [integral_smul]
     rw [← cMatrix_integral_traceRight (hf := hKint)]
     rw [integral_kronecker_one_mul_const (hf := hPint)]

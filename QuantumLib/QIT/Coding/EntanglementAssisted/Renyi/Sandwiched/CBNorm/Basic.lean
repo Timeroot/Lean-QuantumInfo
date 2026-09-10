@@ -33,7 +33,7 @@ left to the downstream proof layer.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 universe u v
 
@@ -55,9 +55,8 @@ def referenceLift (Phi : MatrixMap a b) : MatrixMap (a × a) (a × b) :=
 /-- Reference-lifted maps act componentwise on product matrices. -/
 theorem referenceLift_apply_kronecker
     (Phi : MatrixMap a b) (X Y : CMatrix a) :
-    Phi.referenceLift (Matrix.kronecker X Y) = Matrix.kronecker X (Phi Y) := by
+    Phi.referenceLift (X ⊗ₖ Y) = X ⊗ₖ (Phi Y) := by
   rw [referenceLift]
-  simp only [Matrix.kronecker]
   rw [MatrixMap.kron_map_of_kron_state, CPTPOp.idChannel_map]
 
 /-- Complete positivity is preserved by reference lifting. -/
@@ -118,7 +117,7 @@ theorem unnormalizedMaximallyEntangledProjector_eq_card_smul_state [Nonempty a] 
 /-- The reference-side weight `Y_R^(1/(2 alpha)) tensor I_A` from the source CB
 norm definition. -/
 def cbOneToAlphaReferenceWeight (Y : CMatrix a) (alpha : ℝ) : CMatrix (a × a) :=
-  Matrix.kronecker (CFC.rpow Y (1 / (2 * alpha))) (1 : CMatrix a)
+  (CFC.rpow Y (1 / (2 * alpha))) ⊗ₖ (1 : CMatrix a)
 
 /-- The reference-side weight is Hermitian for positive semidefinite `Y`. -/
 theorem cbOneToAlphaReferenceWeight_isHermitian

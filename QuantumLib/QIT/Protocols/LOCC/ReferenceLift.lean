@@ -54,6 +54,7 @@ noncomputable section
 namespace QIT
 
 open QIT
+open scoped Kronecker
 
 private theorem regroup_kron_id_apply_single
     {A : Type u} {A' : Type v} {B : Type w} {B' : Type x} {R : Type y}
@@ -72,28 +73,24 @@ private theorem regroup_kron_id_apply_single
   rw [show Matrix.single
       ((prodABCToACBEquiv A B R).symm i)
       ((prodABCToACBEquiv A B R).symm j) (1 : ℂ) =
-        Matrix.kroneckerMap (· * ·)
-          (Matrix.single (i.1.1, i.2) (j.1.1, j.2) (1 : ℂ))
+        (Matrix.single (i.1.1, i.2) (j.1.1, j.2) (1 : ℂ)) ⊗ₖ
           (Matrix.single i.1.2 j.1.2 (1 : ℂ)) by
       simpa [prodABCToACBEquiv] using
         (single_prod_eq_kronecker_single
           (i.1.1, i.2) (j.1.1, j.2) i.1.2 j.1.2)]
   rw [MatrixMap.kron_map_of_kron_state]
   rw [show Matrix.single (i.1.1, i.2) (j.1.1, j.2) (1 : ℂ) =
-        Matrix.kroneckerMap (· * ·)
-          (Matrix.single i.1.1 j.1.1 (1 : ℂ))
+        (Matrix.single i.1.1 j.1.1 (1 : ℂ)) ⊗ₖ
           (Matrix.single i.2 j.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
   rw [MatrixMap.kron_map_of_kron_state]
   rw [show Matrix.single i j (1 : ℂ) =
-        Matrix.kroneckerMap (· * ·)
-          (Matrix.single i.1 j.1 (1 : ℂ))
+        (Matrix.single i.1 j.1 (1 : ℂ)) ⊗ₖ
           (Matrix.single i.2 j.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
   rw [MatrixMap.kron_map_of_kron_state]
   rw [show Matrix.single i.1 j.1 (1 : ℂ) =
-        Matrix.kroneckerMap (· * ·)
-          (Matrix.single i.1.1 j.1.1 (1 : ℂ))
+        (Matrix.single i.1.1 j.1.1 (1 : ℂ)) ⊗ₖ
           (Matrix.single i.1.2 j.1.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
   rw [MatrixMap.kron_map_of_kron_state, CPTPOp.reindex_map]

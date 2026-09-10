@@ -25,7 +25,7 @@ directions are `QIT.trace_rankOneMatrix_eq_one_iff`, `Ket.ofRankOne` and
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 open Matrix
 
 namespace QIT
@@ -106,14 +106,14 @@ theorem dotProduct_star_eq_zero_of_rankOne_mulVec_eq_zero (ψ φ : a → ℂ)
 left-hand weight before tracing out the weighted system. -/
 theorem traceLeft_rankOne_kron_left_mulVec_eq_weight_mul {b : Type v} [DecidableEq a]
     [Fintype b] [DecidableEq b] (S : CMatrix a) (hS : S.IsHermitian) (ψ : a × b → ℂ) :
-    Matrix.traceLeft (rankOneMatrix (Matrix.mulVec (Matrix.kronecker S (1 : CMatrix b)) ψ)) =
-      Matrix.traceLeft (Matrix.kronecker (S * S) (1 : CMatrix b) * rankOneMatrix ψ) := by
+    Matrix.traceLeft (rankOneMatrix (Matrix.mulVec (S ⊗ₖ (1 : CMatrix b)) ψ)) =
+      Matrix.traceLeft (((S * S) ⊗ₖ (1 : CMatrix b)) * rankOneMatrix ψ) := by
   ext j j'
   have hstar : ∀ x y : a, (starRingEnd ℂ) (S x y) = S y x := by
     intro x y
     simpa [Matrix.conjTranspose_apply] using congrFun (congrFun hS.eq y) x
   simp [Matrix.traceLeft, rankOneMatrix_apply, Matrix.mulVec, dotProduct, Matrix.mul_apply,
-    Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply, Fintype.sum_prod_type,
+    Matrix.kroneckerMap_apply, Matrix.one_apply, Fintype.sum_prod_type,
     Finset.mul_sum, Finset.sum_mul, mul_assoc]
   simp_rw [hstar]
   conv_lhs =>
@@ -139,18 +139,18 @@ theorem rankOneMatrix_mulVec_eq_mul_rankOneMatrix_mul_conjTranspose
 /-- Coordinate form of a left tensor factor acting on a bipartite vector. -/
 theorem kronecker_left_one_mulVec_apply {c : Type v} [Fintype c] [DecidableEq c]
     (W : CMatrix a) (ψ : a × c → ℂ) (i : a) (k : c) :
-    (Matrix.kronecker W (1 : CMatrix c)).mulVec ψ (i, k) =
+    (W ⊗ₖ (1 : CMatrix c)).mulVec ψ (i, k) =
       W.mulVec (fun j => ψ (j, k)) i := by
-  simp only [Matrix.mulVec, dotProduct, Matrix.kronecker]
+  simp only [Matrix.mulVec, dotProduct]
   rw [← Finset.univ_product_univ, Finset.sum_product]
   simp [Matrix.one_apply]
 
 /-- Coordinate form of a right tensor factor acting on a bipartite vector. -/
 theorem kronecker_right_one_mulVec_apply [DecidableEq a] {c : Type v} [Fintype c]
     (W : CMatrix c) (ψ : a × c → ℂ) (i : a) (k : c) :
-    (Matrix.kronecker (1 : CMatrix a) W).mulVec ψ (i, k) =
+    ((1 : CMatrix a) ⊗ₖ W).mulVec ψ (i, k) =
       W.mulVec (fun l => ψ (i, l)) k := by
-  simp only [Matrix.mulVec, dotProduct, Matrix.kronecker]
+  simp only [Matrix.mulVec, dotProduct]
   rw [← Finset.univ_product_univ, Finset.sum_product]
   simp [Matrix.one_apply]
 
@@ -158,11 +158,11 @@ theorem kronecker_right_one_mulVec_apply [DecidableEq a] {c : Type v} [Fintype c
 sandwiches the original first-system marginal by `W`. -/
 theorem traceRight_rankOne_kron_left_mulVec_eq {c : Type v} [Fintype c] [DecidableEq c]
     (W : CMatrix a) (ψ : a × c → ℂ) :
-    Matrix.traceRight (rankOneMatrix ((Matrix.kronecker W (1 : CMatrix c)).mulVec ψ)) =
+    Matrix.traceRight (rankOneMatrix ((W ⊗ₖ (1 : CMatrix c)).mulVec ψ)) =
       W * Matrix.traceRight (rankOneMatrix ψ) * Matrix.conjTranspose W := by
   ext x y
   have hmulVec :
-      (Matrix.kronecker W (1 : CMatrix c)).mulVec ψ =
+      (W ⊗ₖ (1 : CMatrix c)).mulVec ψ =
         fun p : a × c => W.mulVec (fun i => ψ (i, p.2)) p.1 := by
     ext p
     exact kronecker_left_one_mulVec_apply W ψ p.1 p.2

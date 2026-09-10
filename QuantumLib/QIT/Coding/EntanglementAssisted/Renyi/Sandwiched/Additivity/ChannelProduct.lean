@@ -243,7 +243,7 @@ theorem applyState_prod_reindex_prodProdProdComm
   rw [MatrixMap.kron_idChannel_left_apply_slice]
   have hslice :
       (Matrix.of fun j j' =>
-          (Matrix.kronecker rho.m sigma.m).submatrix
+          (rho.m ⊗ₖ sigma.m).submatrix
             (Equiv.prodProdProdComm a1 a1 a2 a2).symm
             (Equiv.prodProdProdComm a1 a1 a2 a2).symm
             (((xR1, xR2), (xB1, xB2)).1, j)
@@ -253,9 +253,8 @@ theorem applyState_prod_reindex_prodProdProdComm
     ext z z'
     rcases z with ⟨z1, z2⟩
     rcases z' with ⟨z1', z2'⟩
-    simp [Equiv.prodProdProdComm, Matrix.kronecker,
-      Matrix.kroneckerMap_apply, Matrix.of_apply]
-  rw [← Matrix.kronecker, hslice, MatrixMap.kron_map_of_kron_state]
+    simp [Equiv.prodProdProdComm, Matrix.kroneckerMap_apply, Matrix.of_apply]
+  rw [hslice, MatrixMap.kron_map_of_kron_state]
   simp [Equiv.prodProdProdComm, Matrix.kroneckerMap_apply, -CPTPOp.id_map]
   rw [MatrixMap.kron_idChannel_left_apply_slice]
   rw [MatrixMap.kron_idChannel_left_apply_slice]

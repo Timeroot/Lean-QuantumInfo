@@ -23,7 +23,7 @@ Frank--Lieb sandwiched Renyi route.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal Topology Matrix.Norms.L2Operator
+open scoped ComplexOrder MatrixOrder Kronecker NNReal Topology Matrix.Norms.L2Operator
 
 universe u v w
 
@@ -37,23 +37,23 @@ variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 /-- Tensoring on opposite sides commutes: `(A ⊗ I) (I ⊗ B) = (I ⊗ B) (A ⊗ I)`. -/
 theorem kronecker_left_right_commute
     (A : QIT.CMatrix a) (B : QIT.CMatrix b) :
-    Matrix.kronecker A (1 : QIT.CMatrix b) *
-        Matrix.kronecker (1 : QIT.CMatrix a) B =
-      Matrix.kronecker (1 : QIT.CMatrix a) B *
-        Matrix.kronecker A (1 : QIT.CMatrix b) := by
+    (A ⊗ₖ (1 : QIT.CMatrix b)) *
+        ((1 : QIT.CMatrix a) ⊗ₖ B) =
+      ((1 : QIT.CMatrix a) ⊗ₖ B) *
+        (A ⊗ₖ (1 : QIT.CMatrix b)) := by
   calc
-    Matrix.kronecker A (1 : QIT.CMatrix b) *
-        Matrix.kronecker (1 : QIT.CMatrix a) B =
-      Matrix.kronecker (A * (1 : QIT.CMatrix a)) ((1 : QIT.CMatrix b) * B) := by
-        simpa [Matrix.kronecker] using
+    (A ⊗ₖ (1 : QIT.CMatrix b)) *
+        ((1 : QIT.CMatrix a) ⊗ₖ B) =
+      (A * (1 : QIT.CMatrix a)) ⊗ₖ ((1 : QIT.CMatrix b) * B) := by
+        simpa using
           (Matrix.mul_kronecker_mul A (1 : QIT.CMatrix a)
             (1 : QIT.CMatrix b) B).symm
-    _ = Matrix.kronecker ((1 : QIT.CMatrix a) * A) (B * (1 : QIT.CMatrix b)) := by
+    _ = ((1 : QIT.CMatrix a) * A) ⊗ₖ (B * (1 : QIT.CMatrix b)) := by
         simp
     _ =
-      Matrix.kronecker (1 : QIT.CMatrix a) B *
-        Matrix.kronecker A (1 : QIT.CMatrix b) := by
-        simpa [Matrix.kronecker] using
+      ((1 : QIT.CMatrix a) ⊗ₖ B) *
+        (A ⊗ₖ (1 : QIT.CMatrix b)) := by
+        simpa using
           (Matrix.mul_kronecker_mul (1 : QIT.CMatrix a) A
             B (1 : QIT.CMatrix b))
 
@@ -132,13 +132,13 @@ public theorem cMatrix_rpow_kronecker_inv_mul_right_eq_tensor_one_sub
     {A : CMatrix a} {B : CMatrix b}
     (hA : A.PosSemidef) (hB : B.PosDef)
     (p : ℝ) :
-    CFC.rpow (Matrix.kronecker A B⁻¹) p *
-        Matrix.kronecker (1 : CMatrix a) B =
-      Matrix.kronecker (CFC.rpow A p) (CFC.rpow B (1 - p)) := by
+    CFC.rpow (A ⊗ₖ B⁻¹) p *
+        ((1 : CMatrix a) ⊗ₖ B) =
+      (CFC.rpow A p) ⊗ₖ (CFC.rpow B (1 - p)) := by
   have hBinv_psd : B⁻¹.PosSemidef := hB.inv.posSemidef
   have hpowK :
-      CFC.rpow (Matrix.kronecker A B⁻¹) p =
-        Matrix.kronecker (CFC.rpow A p) (CFC.rpow B⁻¹ p) := by
+      CFC.rpow (A ⊗ₖ B⁻¹) p =
+        (CFC.rpow A p) ⊗ₖ (CFC.rpow B⁻¹ p) := by
     simpa using
       cMatrix_rpow_kronecker
         (A := A) (B := B⁻¹) hA hBinv_psd p
@@ -155,18 +155,18 @@ public theorem cMatrix_rpow_kronecker_inv_mul_right_eq_tensor_one_sub
       _ = CFC.rpow B (1 - p) := by
         ring_nf
   calc
-    CFC.rpow (Matrix.kronecker A B⁻¹) p *
-        Matrix.kronecker (1 : CMatrix a) B =
-      Matrix.kronecker (CFC.rpow A p) (CFC.rpow B⁻¹ p) *
-        Matrix.kronecker (1 : CMatrix a) B := by
+    CFC.rpow (A ⊗ₖ B⁻¹) p *
+        ((1 : CMatrix a) ⊗ₖ B) =
+      ((CFC.rpow A p) ⊗ₖ (CFC.rpow B⁻¹ p)) *
+        ((1 : CMatrix a) ⊗ₖ B) := by
         rw [hpowK]
     _ =
-      Matrix.kronecker (CFC.rpow A p * (1 : CMatrix a))
+      (CFC.rpow A p * (1 : CMatrix a)) ⊗ₖ
         (CFC.rpow B⁻¹ p * B) := by
-        simpa [Matrix.kronecker] using
+        simpa using
           (Matrix.mul_kronecker_mul
             (CFC.rpow A p) (1 : CMatrix a) (CFC.rpow B⁻¹ p) B).symm
-    _ = Matrix.kronecker (CFC.rpow A p) (CFC.rpow B (1 - p)) := by
+    _ = (CFC.rpow A p) ⊗ₖ (CFC.rpow B (1 - p)) := by
         rw [hBpow]
         simp
 
@@ -197,15 +197,15 @@ public theorem cMatrix_setIntegral_mul_right
 public theorem cMatrix_kronecker_inv_ref_mul_right
     {b : Type v} [Fintype b] [DecidableEq b]
     {A : CMatrix a} {B : CMatrix b} (hB : B.PosDef) :
-    Matrix.kronecker A B⁻¹ * Matrix.kronecker (1 : CMatrix a) B =
-      Matrix.kronecker A (1 : CMatrix b) := by
+    (A ⊗ₖ B⁻¹) * ((1 : CMatrix a) ⊗ₖ B) =
+      A ⊗ₖ (1 : CMatrix b) := by
   have hdet : IsUnit B.det := (Matrix.isUnit_iff_isUnit_det B).mp hB.isUnit
   calc
-    Matrix.kronecker A B⁻¹ * Matrix.kronecker (1 : CMatrix a) B =
-      Matrix.kronecker (A * (1 : CMatrix a)) (B⁻¹ * B) := by
-        simpa [Matrix.kronecker] using
+    (A ⊗ₖ B⁻¹) * ((1 : CMatrix a) ⊗ₖ B) =
+      (A * (1 : CMatrix a)) ⊗ₖ (B⁻¹ * B) := by
+        simpa using
           (Matrix.mul_kronecker_mul A (1 : CMatrix a) B⁻¹ B).symm
-    _ = Matrix.kronecker A (1 : CMatrix b) := by
+    _ = A ⊗ₖ (1 : CMatrix b) := by
         rw [Matrix.nonsing_inv_mul B hdet]
         simp
 
@@ -214,57 +214,56 @@ right-multiplication by `(I ⊗ B)⁻¹`. -/
 public theorem cMatrix_andoDenom_mul_ref_inv_eq_shift
     {b : Type v} [Fintype b] [DecidableEq b]
     {A : CMatrix a} {B : CMatrix b} (hB : B.PosDef) {r : ℝ} :
-    (Matrix.kronecker A (1 : CMatrix b) +
-        r • Matrix.kronecker (1 : CMatrix a) B) *
-      Matrix.kronecker (1 : CMatrix a) B⁻¹ =
-    Matrix.kronecker A B⁻¹ + r • (1 : CMatrix (a × b)) := by
+    (A ⊗ₖ (1 : CMatrix b) +
+        r • ((1 : CMatrix a) ⊗ₖ B)) *
+      ((1 : CMatrix a) ⊗ₖ B⁻¹) =
+    A ⊗ₖ B⁻¹ + r • (1 : CMatrix (a × b)) := by
   have hdet : IsUnit B.det := (Matrix.isUnit_iff_isUnit_det B).mp hB.isUnit
   calc
-    (Matrix.kronecker A (1 : CMatrix b) +
-        r • Matrix.kronecker (1 : CMatrix a) B) *
-      Matrix.kronecker (1 : CMatrix a) B⁻¹ =
-      Matrix.kronecker A (1 : CMatrix b) *
-          Matrix.kronecker (1 : CMatrix a) B⁻¹ +
-        (r • Matrix.kronecker (1 : CMatrix a) B) *
-          Matrix.kronecker (1 : CMatrix a) B⁻¹ := by
+    (A ⊗ₖ (1 : CMatrix b) +
+        r • ((1 : CMatrix a) ⊗ₖ B)) *
+      ((1 : CMatrix a) ⊗ₖ B⁻¹) =
+      (A ⊗ₖ (1 : CMatrix b)) *
+          ((1 : CMatrix a) ⊗ₖ B⁻¹) +
+        (r • ((1 : CMatrix a) ⊗ₖ B)) *
+          ((1 : CMatrix a) ⊗ₖ B⁻¹) := by
         rw [add_mul]
-    _ = Matrix.kronecker A B⁻¹ + r • (1 : CMatrix (a × b)) := by
+    _ = A ⊗ₖ B⁻¹ + r • (1 : CMatrix (a × b)) := by
         have h₁ :
-            Matrix.kronecker A (1 : CMatrix b) *
-                Matrix.kronecker (1 : CMatrix a) B⁻¹ =
-              Matrix.kronecker A B⁻¹ := by
+            (A ⊗ₖ (1 : CMatrix b)) *
+                ((1 : CMatrix a) ⊗ₖ B⁻¹) =
+              A ⊗ₖ B⁻¹ := by
           calc
-            Matrix.kronecker A (1 : CMatrix b) *
-                Matrix.kronecker (1 : CMatrix a) B⁻¹ =
-              Matrix.kronecker (A * (1 : CMatrix a))
+            (A ⊗ₖ (1 : CMatrix b)) *
+                ((1 : CMatrix a) ⊗ₖ B⁻¹) =
+              (A * (1 : CMatrix a)) ⊗ₖ
                 ((1 : CMatrix b) * B⁻¹) := by
-                simpa [Matrix.kronecker] using
+                simpa using
                   (Matrix.mul_kronecker_mul
                     A (1 : CMatrix a) (1 : CMatrix b) B⁻¹).symm
-            _ = Matrix.kronecker A B⁻¹ := by
+            _ = A ⊗ₖ B⁻¹ := by
                 simp
         have h₂ :
-            (r • Matrix.kronecker (1 : CMatrix a) B) *
-                Matrix.kronecker (1 : CMatrix a) B⁻¹ =
+            (r • ((1 : CMatrix a) ⊗ₖ B)) *
+                ((1 : CMatrix a) ⊗ₖ B⁻¹) =
               r • (1 : CMatrix (a × b)) := by
           calc
-            (r • Matrix.kronecker (1 : CMatrix a) B) *
-                Matrix.kronecker (1 : CMatrix a) B⁻¹ =
+            (r • ((1 : CMatrix a) ⊗ₖ B)) *
+                ((1 : CMatrix a) ⊗ₖ B⁻¹) =
               r •
-                (Matrix.kronecker (1 : CMatrix a) B *
-                  Matrix.kronecker (1 : CMatrix a) B⁻¹) := by
+                (((1 : CMatrix a) ⊗ₖ B) *
+                  ((1 : CMatrix a) ⊗ₖ B⁻¹)) := by
                 simp
             _ = r • (1 : CMatrix (a × b)) := by
                 have hmul :
-                    Matrix.kronecker (1 : CMatrix a) B *
-                        Matrix.kronecker (1 : CMatrix a) B⁻¹ =
+                    ((1 : CMatrix a) ⊗ₖ B) *
+                        ((1 : CMatrix a) ⊗ₖ B⁻¹) =
                       1 := by
                   calc
-                    Matrix.kronecker (1 : CMatrix a) B *
-                        Matrix.kronecker (1 : CMatrix a) B⁻¹ =
-                      Matrix.kronecker
-                        ((1 : CMatrix a) * (1 : CMatrix a)) (B * B⁻¹) := by
-                        simpa [Matrix.kronecker] using
+                    ((1 : CMatrix a) ⊗ₖ B) *
+                        ((1 : CMatrix a) ⊗ₖ B⁻¹) =
+                      ((1 : CMatrix a) * (1 : CMatrix a)) ⊗ₖ (B * B⁻¹) := by
+                        simpa using
                           (Matrix.mul_kronecker_mul
                             (1 : CMatrix a) (1 : CMatrix a) B B⁻¹).symm
                     _ = 1 := by
@@ -279,13 +278,13 @@ public theorem cMatrix_shiftedKroneckerInv_inv_eq_ref_mul_andoDenom_inv
     {b : Type v} [Fintype b] [DecidableEq b]
     {r : ℝ} {A : CMatrix a} {B : CMatrix b}
     (hA : A.PosSemidef) (hB : B.PosDef) (hr : 0 < r) :
-    (Matrix.kronecker A B⁻¹ + r • (1 : CMatrix (a × b)))⁻¹ =
-      Matrix.kronecker (1 : CMatrix a) B *
-        (Matrix.kronecker A (1 : CMatrix b) +
-          r • Matrix.kronecker (1 : CMatrix a) B)⁻¹ := by
-  let X : CMatrix (a × b) := Matrix.kronecker A (1 : CMatrix b)
-  let Y : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) B
-  let C : CMatrix (a × b) := Matrix.kronecker A B⁻¹
+    (A ⊗ₖ B⁻¹ + r • (1 : CMatrix (a × b)))⁻¹ =
+      ((1 : CMatrix a) ⊗ₖ B) *
+        (A ⊗ₖ (1 : CMatrix b) +
+          r • ((1 : CMatrix a) ⊗ₖ B))⁻¹ := by
+  let X : CMatrix (a × b) := A ⊗ₖ (1 : CMatrix b)
+  let Y : CMatrix (a × b) := (1 : CMatrix a) ⊗ₖ B
+  let C : CMatrix (a × b) := A ⊗ₖ B⁻¹
   let D : CMatrix (a × b) := X + r • Y
   have hYpd : Y.PosDef := by
     simpa [Y] using Matrix.PosDef.one.kronecker hB
@@ -293,7 +292,7 @@ public theorem cMatrix_shiftedKroneckerInv_inv_eq_ref_mul_andoDenom_inv
   have hDpd : D.PosDef := by
     simpa [X, Y, D] using Matrix.andoDenom_posDef (a := a) (b := b) hA hB hr
   have hDdet : IsUnit D.det := (Matrix.isUnit_iff_isUnit_det D).mp hDpd.isUnit
-  have hYinv : Y⁻¹ = Matrix.kronecker (1 : CMatrix a) B⁻¹ := by
+  have hYinv : Y⁻¹ = (1 : CMatrix a) ⊗ₖ B⁻¹ := by
     simpa [Y] using (Matrix.inv_kronecker (1 : CMatrix a) B)
   have hDYinv : D * Y⁻¹ = C + r • (1 : CMatrix (a × b)) := by
     rw [hYinv]
@@ -326,12 +325,12 @@ public theorem audenaertRpowIntegrand_kronecker_inv_mul_right_eq_ando
     {p r : ℝ} {A : CMatrix a} {B : CMatrix b}
     (hp : p ∈ Set.Ioo (0 : ℝ) 1) (hr : 0 < r)
     (hA : A.PosSemidef) (hB : B.PosDef) :
-    audenaertRpowIntegrand p r (Matrix.kronecker A B⁻¹) *
-        Matrix.kronecker (1 : CMatrix a) B =
+    audenaertRpowIntegrand p r (A ⊗ₖ B⁻¹) *
+        ((1 : CMatrix a) ⊗ₖ B) =
       (r ^ (p - 1)) • Matrix.andoResolventIntegrand (a := a) (b := b) r A B := by
-  let C : CMatrix (a × b) := Matrix.kronecker A B⁻¹
-  let X : CMatrix (a × b) := Matrix.kronecker A (1 : CMatrix b)
-  let Y : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) B
+  let C : CMatrix (a × b) := A ⊗ₖ B⁻¹
+  let X : CMatrix (a × b) := A ⊗ₖ (1 : CMatrix b)
+  let Y : CMatrix (a × b) := (1 : CMatrix a) ⊗ₖ B
   let D : CMatrix (a × b) := X + r • Y
   have hCpsd : C.PosSemidef := by
     simpa [C] using hA.kronecker hB.inv.posSemidef
@@ -344,8 +343,8 @@ public theorem audenaertRpowIntegrand_kronecker_inv_mul_right_eq_ando
       cMatrix_shiftedKroneckerInv_inv_eq_ref_mul_andoDenom_inv
         (a := a) (b := b) (A := A) (B := B) (r := r) hA hB hr
   calc
-    audenaertRpowIntegrand p r (Matrix.kronecker A B⁻¹) *
-        Matrix.kronecker (1 : CMatrix a) B =
+    audenaertRpowIntegrand p r (A ⊗ₖ B⁻¹) *
+        ((1 : CMatrix a) ⊗ₖ B) =
       (r ^ (p - 1) • (C * (C + r • (1 : CMatrix (a × b)))⁻¹)) * Y := by
         rw [audenaertRpowIntegrand_eq_resolvent hp hr hCpsd]
         simp [audenaertResolventIntegrand, C, Y]
@@ -380,14 +379,14 @@ public theorem andoIntegralRepresentation_posDef
           (Set.Ioi 0) μ) ∧
       (∀ ⦃A : CMatrix a⦄ ⦃B : CMatrix b⦄,
         A.PosSemidef → B.PosDef →
-        Matrix.kronecker (CFC.rpow A (p : ℝ)) (CFC.rpow B (1 - (p : ℝ))) =
+        (CFC.rpow A (p : ℝ)) ⊗ₖ (CFC.rpow B (1 - (p : ℝ))) =
           ∫ r in Set.Ioi 0, (r ^ ((p : ℝ) - 1)) •
             Matrix.andoResolventIntegrand (a := a) (b := b) r A B ∂μ) := by
   obtain ⟨μ, hint, hpow⟩ := audenaertRpowIntegralRepresentation (a := a × b) hp
   refine ⟨μ, ?_, ?_⟩
   · intro A B hA hB
-    let C : CMatrix (a × b) := Matrix.kronecker A B⁻¹
-    let Y : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) B
+    let C : CMatrix (a × b) := A ⊗ₖ B⁻¹
+    let Y : CMatrix (a × b) := (1 : CMatrix a) ⊗ₖ B
     have hpReal : (p : ℝ) ∈ Set.Ioo (0 : ℝ) 1 := by
       exact ⟨by exact_mod_cast hp.1, by exact_mod_cast hp.2⟩
     have hCpsd : C.PosSemidef := by
@@ -415,8 +414,8 @@ public theorem andoIntegralRepresentation_posDef
       hAudRightInt.congr_fun hEqOn measurableSet_Ioi
     simpa [G] using hGInt
   · intro A B hA hB
-    let C : CMatrix (a × b) := Matrix.kronecker A B⁻¹
-    let Y : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) B
+    let C : CMatrix (a × b) := A ⊗ₖ B⁻¹
+    let Y : CMatrix (a × b) := (1 : CMatrix a) ⊗ₖ B
     have hpReal : (p : ℝ) ∈ Set.Ioo (0 : ℝ) 1 := by
       exact ⟨by exact_mod_cast hp.1, by exact_mod_cast hp.2⟩
     have hCpsd : C.PosSemidef := by
@@ -451,12 +450,12 @@ public theorem andoIntegralRepresentation_posDef
       exact ae_restrict_of_forall_mem measurableSet_Ioi hEqOn
     have hTensor :
         CFC.rpow C (p : ℝ) * Y =
-          Matrix.kronecker (CFC.rpow A (p : ℝ)) (CFC.rpow B (1 - (p : ℝ))) := by
+          (CFC.rpow A (p : ℝ)) ⊗ₖ (CFC.rpow B (1 - (p : ℝ))) := by
       simpa [C, Y] using
         cMatrix_rpow_kronecker_inv_mul_right_eq_tensor_one_sub
           (a := a) (b := b) (A := A) (B := B) hA hB (p : ℝ)
     calc
-      Matrix.kronecker (CFC.rpow A (p : ℝ)) (CFC.rpow B (1 - (p : ℝ))) =
+      (CFC.rpow A (p : ℝ)) ⊗ₖ (CFC.rpow B (1 - (p : ℝ))) =
           CFC.rpow C (p : ℝ) * Y := by
         exact hTensor.symm
       _ = ∫ r in Set.Ioi 0, F r ∂μ := hLeft
@@ -832,27 +831,25 @@ theorem liebAndo_tensorTraceConcavity_of_andoIntegralRepresentation_posDef
           (t • A₁ + (1 - t) • A₂)
           (t • B₁ + (1 - t) • B₂)) s μ)
     (hRep₁ :
-      Matrix.kronecker (CFC.rpow A₁ p) (CFC.rpow B₁ (1 - p)) =
+      (CFC.rpow A₁ p) ⊗ₖ (CFC.rpow B₁ (1 - p)) =
         ∫ r in s, (r ^ (p - 1)) •
           Matrix.andoResolventIntegrand (a := a) (b := b) r A₁ B₁ ∂μ)
     (hRep₂ :
-      Matrix.kronecker (CFC.rpow A₂ p) (CFC.rpow B₂ (1 - p)) =
+      (CFC.rpow A₂ p) ⊗ₖ (CFC.rpow B₂ (1 - p)) =
         ∫ r in s, (r ^ (p - 1)) •
           Matrix.andoResolventIntegrand (a := a) (b := b) r A₂ B₂ ∂μ)
     (hRept :
-      Matrix.kronecker
-          (CFC.rpow (t • A₁ + (1 - t) • A₂) p)
+      (CFC.rpow (t • A₁ + (1 - t) • A₂) p) ⊗ₖ
           (CFC.rpow (t • B₁ + (1 - t) • B₂) (1 - p)) =
         ∫ r in s, (r ^ (p - 1)) •
           Matrix.andoResolventIntegrand (a := a) (b := b) r
             (t • A₁ + (1 - t) • A₂)
             (t • B₁ + (1 - t) • B₂) ∂μ) :
-    t * ((Matrix.kronecker (CFC.rpow A₁ p) (CFC.rpow B₁ (1 - p))).trace).re +
+    t * (((CFC.rpow A₁ p) ⊗ₖ (CFC.rpow B₁ (1 - p))).trace).re +
         (1 - t) *
-          ((Matrix.kronecker (CFC.rpow A₂ p) (CFC.rpow B₂ (1 - p))).trace).re
+          (((CFC.rpow A₂ p) ⊗ₖ (CFC.rpow B₂ (1 - p))).trace).re
       ≤
-    ((Matrix.kronecker
-      (CFC.rpow (t • A₁ + (1 - t) • A₂) p)
+    (((CFC.rpow (t • A₁ + (1 - t) • A₂) p) ⊗ₖ
       (CFC.rpow (t • B₁ + (1 - t) • B₂) (1 - p))).trace).re := by
   have hconc :=
     andoResolventIntegrand_rpow_weighted_setIntegral_trace_concave_posDef'
@@ -885,27 +882,25 @@ theorem liebAndo_tensorConcavity_of_andoIntegralRepresentation_posDef
           (t • A₁ + (1 - t) • A₂)
           (t • B₁ + (1 - t) • B₂)) s μ)
     (hRep₁ :
-      Matrix.kronecker (CFC.rpow A₁ p) (CFC.rpow B₁ (1 - p)) =
+      (CFC.rpow A₁ p) ⊗ₖ (CFC.rpow B₁ (1 - p)) =
         ∫ r in s, (r ^ (p - 1)) •
           Matrix.andoResolventIntegrand (a := a) (b := b) r A₁ B₁ ∂μ)
     (hRep₂ :
-      Matrix.kronecker (CFC.rpow A₂ p) (CFC.rpow B₂ (1 - p)) =
+      (CFC.rpow A₂ p) ⊗ₖ (CFC.rpow B₂ (1 - p)) =
         ∫ r in s, (r ^ (p - 1)) •
           Matrix.andoResolventIntegrand (a := a) (b := b) r A₂ B₂ ∂μ)
     (hRept :
-      Matrix.kronecker
-          (CFC.rpow (t • A₁ + (1 - t) • A₂) p)
+      (CFC.rpow (t • A₁ + (1 - t) • A₂) p) ⊗ₖ
           (CFC.rpow (t • B₁ + (1 - t) • B₂) (1 - p)) =
         ∫ r in s, (r ^ (p - 1)) •
           Matrix.andoResolventIntegrand (a := a) (b := b) r
             (t • A₁ + (1 - t) • A₂)
             (t • B₁ + (1 - t) • B₂) ∂μ) :
-    t • Matrix.kronecker (CFC.rpow A₁ p) (CFC.rpow B₁ (1 - p)) +
+    t • ((CFC.rpow A₁ p) ⊗ₖ (CFC.rpow B₁ (1 - p))) +
         (1 - t) •
-          Matrix.kronecker (CFC.rpow A₂ p) (CFC.rpow B₂ (1 - p))
+          ((CFC.rpow A₂ p) ⊗ₖ (CFC.rpow B₂ (1 - p)))
       ≤
-    Matrix.kronecker
-      (CFC.rpow (t • A₁ + (1 - t) • A₂) p)
+    (CFC.rpow (t • A₁ + (1 - t) • A₂) p) ⊗ₖ
       (CFC.rpow (t • B₁ + (1 - t) • B₂) (1 - p)) := by
   have hconc :=
     andoResolventIntegrand_rpow_weighted_setIntegral_concave_posDef'
@@ -926,14 +921,11 @@ public theorem liebAndo_tensorTraceConcavity_posDef
     (hA₁ : A₁.PosSemidef) (hA₂ : A₂.PosSemidef)
     (hB₁ : B₁.PosDef) (hB₂ : B₂.PosDef)
     {t : ℝ} (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
-    t * ((Matrix.kronecker
-          (CFC.rpow A₁ (p : ℝ)) (CFC.rpow B₁ (1 - (p : ℝ)))).trace).re +
+    t * (((CFC.rpow A₁ (p : ℝ)) ⊗ₖ (CFC.rpow B₁ (1 - (p : ℝ)))).trace).re +
         (1 - t) *
-          ((Matrix.kronecker
-            (CFC.rpow A₂ (p : ℝ)) (CFC.rpow B₂ (1 - (p : ℝ)))).trace).re
+          (((CFC.rpow A₂ (p : ℝ)) ⊗ₖ (CFC.rpow B₂ (1 - (p : ℝ)))).trace).re
       ≤
-    ((Matrix.kronecker
-      (CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ))
+    (((CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ)) ⊗ₖ
       (CFC.rpow (t • B₁ + (1 - t) • B₂) (1 - (p : ℝ)))).trace).re := by
   obtain ⟨μ, hint, hrep⟩ := andoIntegralRepresentation_posDef (a := a) (b := b) hp
   have hAbar : (t • A₁ + (1 - t) • A₂).PosSemidef :=
@@ -966,14 +958,11 @@ public theorem liebAndo_tensorConcavity_posDef
     (hA₁ : A₁.PosSemidef) (hA₂ : A₂.PosSemidef)
     (hB₁ : B₁.PosDef) (hB₂ : B₂.PosDef)
     {t : ℝ} (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
-    t • Matrix.kronecker
-          (CFC.rpow A₁ (p : ℝ)) (CFC.rpow B₁ (1 - (p : ℝ))) +
+    t • ((CFC.rpow A₁ (p : ℝ)) ⊗ₖ (CFC.rpow B₁ (1 - (p : ℝ)))) +
         (1 - t) •
-          Matrix.kronecker
-            (CFC.rpow A₂ (p : ℝ)) (CFC.rpow B₂ (1 - (p : ℝ)))
+          ((CFC.rpow A₂ (p : ℝ)) ⊗ₖ (CFC.rpow B₂ (1 - (p : ℝ))))
       ≤
-    Matrix.kronecker
-      (CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ))
+    (CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ)) ⊗ₖ
       (CFC.rpow (t • B₁ + (1 - t) • B₂) (1 - (p : ℝ))) := by
   obtain ⟨μ, hint, hrep⟩ := andoIntegralRepresentation_posDef (a := a) (b := b) hp
   have hAbar : (t • A₁ + (1 - t) • A₂).PosSemidef :=
@@ -1001,19 +990,19 @@ public theorem cMatrix_kronecker_trace_re_tendsto_right
     {X : Type*} {l : Filter X} {F : X → CMatrix b} {B : CMatrix b}
     (K : CMatrix a) (hF : Filter.Tendsto F l (nhds B)) :
     Filter.Tendsto
-      (fun x : X => ((Matrix.kronecker K (F x)).trace).re)
+      (fun x : X => ((K ⊗ₖ (F x)).trace).re)
       l
-      (nhds ((Matrix.kronecker K B).trace.re)) := by
+      (nhds ((K ⊗ₖ B).trace.re)) := by
   have hcont :
       Continuous fun M : CMatrix b =>
-        ((Matrix.kronecker K M).trace).re := by
+        ((K ⊗ₖ M).trace).re := by
     rw [continuous_iff_continuousAt]
     intro M
-    have hfun : (fun M : CMatrix b => (Matrix.kronecker K M).trace) =
+    have hfun : (fun M : CMatrix b => (K ⊗ₖ M).trace) =
         fun M : CMatrix b => K.trace * M.trace :=
       funext fun M => Matrix.trace_kronecker K M
     have htrace : ContinuousAt (fun M : CMatrix b =>
-        (Matrix.kronecker K M).trace) M := by
+        (K ⊗ₖ M).trace) M := by
       rw [hfun]
       exact ((continuous_const.mul
         (Continuous.matrix_trace continuous_id)).continuousAt : ContinuousAt
@@ -1032,9 +1021,9 @@ public theorem cMatrix_tensorTrace_rpow_tendsto_right_of_tendsto_posSemidef
     (hB : B.PosSemidef) {q : ℝ} (hq : 0 < q) :
     Filter.Tendsto
       (fun x : X =>
-        ((Matrix.kronecker (CFC.rpow A p) (CFC.rpow (F x) q)).trace).re)
+        (((CFC.rpow A p) ⊗ₖ (CFC.rpow (F x) q)).trace).re)
       l
-      (nhds ((Matrix.kronecker (CFC.rpow A p) (CFC.rpow B q)).trace.re)) := by
+      (nhds (((CFC.rpow A p) ⊗ₖ (CFC.rpow B q)).trace.re)) := by
   have hpow :
       Filter.Tendsto (fun x : X => CFC.rpow (F x) q) l
         (nhds (CFC.rpow B q)) :=
@@ -1049,9 +1038,9 @@ public theorem cMatrix_kronecker_tendsto_right
     {b : Type v} [Fintype b] [DecidableEq b]
     {X : Type*} {l : Filter X} {F : X → CMatrix b} {B : CMatrix b}
     (K : CMatrix a) (hF : Filter.Tendsto F l (nhds B)) :
-    Filter.Tendsto (fun x : X => Matrix.kronecker K (F x)) l
-      (nhds (Matrix.kronecker K B)) := by
-  have hcont : Continuous fun M : CMatrix b => Matrix.kronecker K M := by
+    Filter.Tendsto (fun x : X => K ⊗ₖ (F x)) l
+      (nhds (K ⊗ₖ B)) := by
+  have hcont : Continuous fun M : CMatrix b => K ⊗ₖ M := by
     apply continuous_matrix
     intro i j
     rcases i with ⟨ia, ib⟩
@@ -1071,9 +1060,9 @@ public theorem cMatrix_tensor_rpow_tendsto_right_of_tendsto_posSemidef
     (hB : B.PosSemidef) {q : ℝ} (hq : 0 < q) :
     Filter.Tendsto
       (fun x : X =>
-        Matrix.kronecker (CFC.rpow A p) (CFC.rpow (F x) q))
+        (CFC.rpow A p) ⊗ₖ (CFC.rpow (F x) q))
       l
-      (nhds (Matrix.kronecker (CFC.rpow A p) (CFC.rpow B q))) := by
+      (nhds ((CFC.rpow A p) ⊗ₖ (CFC.rpow B q))) := by
   have hpow :
       Filter.Tendsto (fun x : X => CFC.rpow (F x) q) l
         (nhds (CFC.rpow B q)) :=
@@ -1094,14 +1083,11 @@ public theorem liebAndo_tensorTraceConcavity_posSemidef
     (hA₁ : A₁.PosSemidef) (hA₂ : A₂.PosSemidef)
     (hB₁ : B₁.PosSemidef) (hB₂ : B₂.PosSemidef)
     {t : ℝ} (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
-    t * ((Matrix.kronecker
-          (CFC.rpow A₁ (p : ℝ)) (CFC.rpow B₁ (1 - (p : ℝ)))).trace).re +
+    t * (((CFC.rpow A₁ (p : ℝ)) ⊗ₖ (CFC.rpow B₁ (1 - (p : ℝ)))).trace).re +
         (1 - t) *
-          ((Matrix.kronecker
-            (CFC.rpow A₂ (p : ℝ)) (CFC.rpow B₂ (1 - (p : ℝ)))).trace).re
+          (((CFC.rpow A₂ (p : ℝ)) ⊗ₖ (CFC.rpow B₂ (1 - (p : ℝ)))).trace).re
       ≤
-    ((Matrix.kronecker
-      (CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ))
+    (((CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ)) ⊗ₖ
       (CFC.rpow (t • B₁ + (1 - t) • B₂) (1 - (p : ℝ)))).trace).re := by
   let q : ℝ := 1 - (p : ℝ)
   let l : Filter ℝ := nhdsWithin (0 : ℝ) (Set.Ioi 0)
@@ -1142,34 +1128,28 @@ public theorem liebAndo_tensorTraceConcavity_posSemidef
   have hleft₁ :
       Filter.Tendsto
         (fun ε : ℝ =>
-          ((Matrix.kronecker
-            (CFC.rpow A₁ (p : ℝ)) (CFC.rpow (B₁ε ε) q)).trace).re)
+          (((CFC.rpow A₁ (p : ℝ)) ⊗ₖ (CFC.rpow (B₁ε ε) q)).trace).re)
         l
-        (nhds ((Matrix.kronecker
-          (CFC.rpow A₁ (p : ℝ)) (CFC.rpow B₁ q)).trace.re)) :=
+        (nhds (((CFC.rpow A₁ (p : ℝ)) ⊗ₖ (CFC.rpow B₁ q)).trace.re)) :=
     cMatrix_tensorTrace_rpow_tendsto_right_of_tendsto_posSemidef
       (a := a) (b := b) (A := A₁) (p := (p : ℝ))
       hB₁ε_tend hB₁ε_psd hB₁ hq_pos
   have hleft₂ :
       Filter.Tendsto
         (fun ε : ℝ =>
-          ((Matrix.kronecker
-            (CFC.rpow A₂ (p : ℝ)) (CFC.rpow (B₂ε ε) q)).trace).re)
+          (((CFC.rpow A₂ (p : ℝ)) ⊗ₖ (CFC.rpow (B₂ε ε) q)).trace).re)
         l
-        (nhds ((Matrix.kronecker
-          (CFC.rpow A₂ (p : ℝ)) (CFC.rpow B₂ q)).trace.re)) :=
+        (nhds (((CFC.rpow A₂ (p : ℝ)) ⊗ₖ (CFC.rpow B₂ q)).trace.re)) :=
     cMatrix_tensorTrace_rpow_tendsto_right_of_tendsto_posSemidef
       (a := a) (b := b) (A := A₂) (p := (p : ℝ))
       hB₂ε_tend hB₂ε_psd hB₂ hq_pos
   have hright :
       Filter.Tendsto
         (fun ε : ℝ =>
-          ((Matrix.kronecker
-            (CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ))
+          (((CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ)) ⊗ₖ
             (CFC.rpow (Bbarε ε) q)).trace).re)
         l
-        (nhds ((Matrix.kronecker
-          (CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ))
+        (nhds (((CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ)) ⊗ₖ
           (CFC.rpow Bbar q)).trace.re)) :=
     cMatrix_tensorTrace_rpow_tendsto_right_of_tendsto_posSemidef
       (a := a) (b := b) (A := t • A₁ + (1 - t) • A₂) (p := (p : ℝ))
@@ -1177,27 +1157,20 @@ public theorem liebAndo_tensorTraceConcavity_posSemidef
   have hleft :
       Filter.Tendsto
         (fun ε : ℝ =>
-          t * ((Matrix.kronecker
-            (CFC.rpow A₁ (p : ℝ)) (CFC.rpow (B₁ε ε) q)).trace).re +
-            (1 - t) * ((Matrix.kronecker
-              (CFC.rpow A₂ (p : ℝ)) (CFC.rpow (B₂ε ε) q)).trace).re)
+          t * (((CFC.rpow A₁ (p : ℝ)) ⊗ₖ (CFC.rpow (B₁ε ε) q)).trace).re +
+            (1 - t) * (((CFC.rpow A₂ (p : ℝ)) ⊗ₖ (CFC.rpow (B₂ε ε) q)).trace).re)
         l
         (nhds
-          (t * ((Matrix.kronecker
-            (CFC.rpow A₁ (p : ℝ)) (CFC.rpow B₁ q)).trace).re +
-            (1 - t) * ((Matrix.kronecker
-              (CFC.rpow A₂ (p : ℝ)) (CFC.rpow B₂ q)).trace).re)) :=
+          (t * (((CFC.rpow A₁ (p : ℝ)) ⊗ₖ (CFC.rpow B₁ q)).trace).re +
+            (1 - t) * (((CFC.rpow A₂ (p : ℝ)) ⊗ₖ (CFC.rpow B₂ q)).trace).re)) :=
     (hleft₁.const_mul t).add (hleft₂.const_mul (1 - t))
   have hineq_eventual :
       (fun ε : ℝ =>
-        t * ((Matrix.kronecker
-          (CFC.rpow A₁ (p : ℝ)) (CFC.rpow (B₁ε ε) q)).trace).re +
-          (1 - t) * ((Matrix.kronecker
-            (CFC.rpow A₂ (p : ℝ)) (CFC.rpow (B₂ε ε) q)).trace).re)
+        t * (((CFC.rpow A₁ (p : ℝ)) ⊗ₖ (CFC.rpow (B₁ε ε) q)).trace).re +
+          (1 - t) * (((CFC.rpow A₂ (p : ℝ)) ⊗ₖ (CFC.rpow (B₂ε ε) q)).trace).re)
         ≤ᶠ[l]
       (fun ε : ℝ =>
-        ((Matrix.kronecker
-          (CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ))
+        (((CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ)) ⊗ₖ
           (CFC.rpow (Bbarε ε) q)).trace).re) := by
     filter_upwards [self_mem_nhdsWithin] with ε hε
     have hε : 0 < ε := hε
@@ -1231,14 +1204,11 @@ public theorem liebAndo_tensorConcavity_posSemidef
     (hA₁ : A₁.PosSemidef) (hA₂ : A₂.PosSemidef)
     (hB₁ : B₁.PosSemidef) (hB₂ : B₂.PosSemidef)
     {t : ℝ} (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
-    t • Matrix.kronecker
-          (CFC.rpow A₁ (p : ℝ)) (CFC.rpow B₁ (1 - (p : ℝ))) +
+    t • ((CFC.rpow A₁ (p : ℝ)) ⊗ₖ (CFC.rpow B₁ (1 - (p : ℝ)))) +
         (1 - t) •
-          Matrix.kronecker
-            (CFC.rpow A₂ (p : ℝ)) (CFC.rpow B₂ (1 - (p : ℝ)))
+          ((CFC.rpow A₂ (p : ℝ)) ⊗ₖ (CFC.rpow B₂ (1 - (p : ℝ))))
       ≤
-    Matrix.kronecker
-      (CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ))
+    (CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ)) ⊗ₖ
       (CFC.rpow (t • B₁ + (1 - t) • B₂) (1 - (p : ℝ))) := by
   let q : ℝ := 1 - (p : ℝ)
   let l : Filter ℝ := nhdsWithin (0 : ℝ) (Set.Ioi 0)
@@ -1279,34 +1249,28 @@ public theorem liebAndo_tensorConcavity_posSemidef
   have hleft₁ :
       Filter.Tendsto
         (fun ε : ℝ =>
-          Matrix.kronecker
-            (CFC.rpow A₁ (p : ℝ)) (CFC.rpow (B₁ε ε) q))
+          (CFC.rpow A₁ (p : ℝ)) ⊗ₖ (CFC.rpow (B₁ε ε) q))
         l
-        (nhds (Matrix.kronecker
-          (CFC.rpow A₁ (p : ℝ)) (CFC.rpow B₁ q))) :=
+        (nhds ((CFC.rpow A₁ (p : ℝ)) ⊗ₖ (CFC.rpow B₁ q))) :=
     cMatrix_tensor_rpow_tendsto_right_of_tendsto_posSemidef
       (a := a) (b := b) (A := A₁) (p := (p : ℝ))
       hB₁ε_tend hB₁ε_psd hB₁ hq_pos
   have hleft₂ :
       Filter.Tendsto
         (fun ε : ℝ =>
-          Matrix.kronecker
-            (CFC.rpow A₂ (p : ℝ)) (CFC.rpow (B₂ε ε) q))
+          (CFC.rpow A₂ (p : ℝ)) ⊗ₖ (CFC.rpow (B₂ε ε) q))
         l
-        (nhds (Matrix.kronecker
-          (CFC.rpow A₂ (p : ℝ)) (CFC.rpow B₂ q))) :=
+        (nhds ((CFC.rpow A₂ (p : ℝ)) ⊗ₖ (CFC.rpow B₂ q))) :=
     cMatrix_tensor_rpow_tendsto_right_of_tendsto_posSemidef
       (a := a) (b := b) (A := A₂) (p := (p : ℝ))
       hB₂ε_tend hB₂ε_psd hB₂ hq_pos
   have hright :
       Filter.Tendsto
         (fun ε : ℝ =>
-          Matrix.kronecker
-            (CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ))
+          (CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ)) ⊗ₖ
             (CFC.rpow (Bbarε ε) q))
         l
-        (nhds (Matrix.kronecker
-          (CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ))
+        (nhds ((CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ)) ⊗ₖ
           (CFC.rpow Bbar q))) :=
     cMatrix_tensor_rpow_tendsto_right_of_tendsto_posSemidef
       (a := a) (b := b) (A := t • A₁ + (1 - t) • A₂) (p := (p : ℝ))
@@ -1314,27 +1278,20 @@ public theorem liebAndo_tensorConcavity_posSemidef
   have hleft :
       Filter.Tendsto
         (fun ε : ℝ =>
-          t • Matrix.kronecker
-            (CFC.rpow A₁ (p : ℝ)) (CFC.rpow (B₁ε ε) q) +
-          (1 - t) • Matrix.kronecker
-            (CFC.rpow A₂ (p : ℝ)) (CFC.rpow (B₂ε ε) q))
+          t • ((CFC.rpow A₁ (p : ℝ)) ⊗ₖ (CFC.rpow (B₁ε ε) q)) +
+          (1 - t) • ((CFC.rpow A₂ (p : ℝ)) ⊗ₖ (CFC.rpow (B₂ε ε) q)))
         l
         (nhds
-          (t • Matrix.kronecker
-            (CFC.rpow A₁ (p : ℝ)) (CFC.rpow B₁ q) +
-          (1 - t) • Matrix.kronecker
-            (CFC.rpow A₂ (p : ℝ)) (CFC.rpow B₂ q))) :=
+          (t • ((CFC.rpow A₁ (p : ℝ)) ⊗ₖ (CFC.rpow B₁ q)) +
+          (1 - t) • ((CFC.rpow A₂ (p : ℝ)) ⊗ₖ (CFC.rpow B₂ q)))) :=
     (hleft₁.const_smul t).add (hleft₂.const_smul (1 - t))
   have hineq_eventual :
       (fun ε : ℝ =>
-        t • Matrix.kronecker
-          (CFC.rpow A₁ (p : ℝ)) (CFC.rpow (B₁ε ε) q) +
-        (1 - t) • Matrix.kronecker
-          (CFC.rpow A₂ (p : ℝ)) (CFC.rpow (B₂ε ε) q))
+        t • ((CFC.rpow A₁ (p : ℝ)) ⊗ₖ (CFC.rpow (B₁ε ε) q)) +
+        (1 - t) • ((CFC.rpow A₂ (p : ℝ)) ⊗ₖ (CFC.rpow (B₂ε ε) q)))
         ≤ᶠ[l]
       (fun ε : ℝ =>
-        Matrix.kronecker
-          (CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ))
+        (CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ)) ⊗ₖ
           (CFC.rpow (Bbarε ε) q)) := by
     filter_upwards [self_mem_nhdsWithin] with ε hε
     have hε : 0 < ε := hε
@@ -1369,22 +1326,18 @@ public theorem liebAndo_tensorWeightedTraceConcavity_posSemidef
     (hB₁ : B₁.PosSemidef) (hB₂ : B₂.PosSemidef)
     (hW : W.PosSemidef)
     {t : ℝ} (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
-    t * ((W * Matrix.kronecker
-          (CFC.rpow A₁ (p : ℝ)) (CFC.rpow B₁ (1 - (p : ℝ)))).trace).re +
+    t * ((W * ((CFC.rpow A₁ (p : ℝ)) ⊗ₖ (CFC.rpow B₁ (1 - (p : ℝ))))).trace).re +
         (1 - t) *
-          ((W * Matrix.kronecker
-            (CFC.rpow A₂ (p : ℝ)) (CFC.rpow B₂ (1 - (p : ℝ)))).trace).re
+          ((W * ((CFC.rpow A₂ (p : ℝ)) ⊗ₖ (CFC.rpow B₂ (1 - (p : ℝ))))).trace).re
       ≤
-    ((W * Matrix.kronecker
-      (CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ))
-      (CFC.rpow (t • B₁ + (1 - t) • B₂) (1 - (p : ℝ)))).trace).re := by
+    ((W * ((CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ)) ⊗ₖ
+      (CFC.rpow (t • B₁ + (1 - t) • B₂) (1 - (p : ℝ))))).trace).re := by
   let M₁ : CMatrix (a × b) :=
-    Matrix.kronecker (CFC.rpow A₁ (p : ℝ)) (CFC.rpow B₁ (1 - (p : ℝ)))
+    (CFC.rpow A₁ (p : ℝ)) ⊗ₖ (CFC.rpow B₁ (1 - (p : ℝ)))
   let M₂ : CMatrix (a × b) :=
-    Matrix.kronecker (CFC.rpow A₂ (p : ℝ)) (CFC.rpow B₂ (1 - (p : ℝ)))
+    (CFC.rpow A₂ (p : ℝ)) ⊗ₖ (CFC.rpow B₂ (1 - (p : ℝ)))
   let Mt : CMatrix (a × b) :=
-    Matrix.kronecker
-      (CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ))
+    (CFC.rpow (t • A₁ + (1 - t) • A₂) (p : ℝ)) ⊗ₖ
       (CFC.rpow (t • B₁ + (1 - t) • B₂) (1 - (p : ℝ)))
   have hmat : t • M₁ + (1 - t) • M₂ ≤ Mt := by
     simpa [M₁, M₂, Mt] using

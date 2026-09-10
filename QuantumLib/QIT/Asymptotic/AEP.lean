@@ -30,7 +30,7 @@ yet available.
 
 noncomputable section
 universe u v
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 open Filter
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
@@ -753,7 +753,7 @@ private theorem _root_.MState.tensorPowerTripartiteGrouped_marginalAC
         (MState.tensorPowerTripartiteGrouped_marginalAC ρ n)
       simp [tensorPowerProdProdEquiv, MState.tensorPowerBipartite_matrix,
         MState.tensorPower_succ_matrix, MState.reindex_matrix,
-        MState.marginalAC_matrix, Matrix.kronecker] at hih ⊢
+        MState.marginalAC_matrix] at hih ⊢
       have hih_grouped :
           (∑ rest : TensorPower b n,
             (ρ.tensorPower n).m
@@ -790,9 +790,8 @@ private theorem _root_.MState.tensorPowerTripartiteGrouped_marginalAC
           simpa using (Finset.sum_mul Finset.univ
             (fun j : b => ρ.m ((xA0, j), xC0) ((yA0, j), yC0))
             ((ρ.marginalAC.tensorPowerBipartite n).m (xAs, xCs) (yAs, yCs))).symm
-        _ = (Matrix.kroneckerMap (fun x1 x2 : ℂ => x1 * x2)
-                (Matrix.of fun ac ac' : a × c =>
-                  ∑ j : b, ρ.m ((ac.1, j), ac.2) ((ac'.1, j), ac'.2))
+        _ = ((Matrix.of fun ac ac' : a × c =>
+                  ∑ j : b, ρ.m ((ac.1, j), ac.2) ((ac'.1, j), ac'.2)) ⊗ₖ
                 (ρ.marginalAC.tensorPower n).m).submatrix
               (tensorPowerProdEquiv a c (n + 1)).symm
               (tensorPowerProdEquiv a c (n + 1)).symm

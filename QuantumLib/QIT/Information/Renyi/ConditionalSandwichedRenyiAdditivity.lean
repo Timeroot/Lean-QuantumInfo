@@ -24,7 +24,7 @@ The finite-order endpoint cases are handled separately at `alpha = 1/2` and
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 open Matrix
 
@@ -106,10 +106,10 @@ def conditionalRenyiGroupedProduct
 theorem conditionalRenyiGroupedProduct_matrix
     (rho : MState (a × b)) (tau : MState (c × d)) :
     (rho.conditionalRenyiGroupedProduct tau).m =
-      (Matrix.kronecker rho.m tau.m).submatrix
+      (rho.m ⊗ₖ tau.m).submatrix
         (Equiv.prodProdProdComm a b c d).symm
         (Equiv.prodProdProdComm a b c d).symm := by
-  rw [conditionalRenyiGroupedProduct, MState.reindex_matrix, MState.prod_m, ← Matrix.kronecker]
+  rw [conditionalRenyiGroupedProduct, MState.reindex_matrix, MState.prod_m]
 
 /-- The conditioning marginal of a grouped product is the product of the two
 conditioning marginals. -/
@@ -123,7 +123,7 @@ theorem conditionalRenyiGroupedProduct_traceLeft
   ext x y
   rcases x with ⟨j, l⟩
   rcases y with ⟨j', l'⟩
-  simp only [Matrix.traceLeft, Matrix.of_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  simp only [Matrix.traceLeft, Matrix.of_apply, Matrix.kroneckerMap_apply,
     Equiv.prodProdProdComm, Fintype.sum_prod_type,
     Matrix.submatrix_apply]
   change (∑ i : a, ∑ k : c,
@@ -236,9 +236,8 @@ theorem sandwichedRenyiReferenceInner_conditionalRenyiGroupedProduct
     sandwichedRenyiReferenceInner
         (rho.conditionalRenyiGroupedProduct tau)
         (identityTensorStateMatrix (a := a × c) (sigma.prod omega)) alpha =
-      (Matrix.kronecker
-        (sandwichedRenyiReferenceInner rho
-          (identityTensorStateMatrix (a := a) sigma) alpha)
+      ((sandwichedRenyiReferenceInner rho
+          (identityTensorStateMatrix (a := a) sigma) alpha) ⊗ₖ
         (sandwichedRenyiReferenceInner tau
           (identityTensorStateMatrix (a := c) omega) alpha)).submatrix
         (Equiv.prodProdProdComm a b c d).symm
@@ -253,32 +252,32 @@ theorem sandwichedRenyiReferenceInner_conditionalRenyiGroupedProduct
   have hR2 : R2.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := c) omega homega
   have hpow :
       CFC.rpow (identityTensorStateMatrix (a := a × c) (sigma.prod omega)) s =
-        (Matrix.kronecker C1 C2).submatrix e.symm e.symm := by
+        (C1 ⊗ₖ C2).submatrix e.symm e.symm := by
     rw [identityTensorStateMatrix_prod_grouping]
     rw [cMatrix_rpow_submatrix_equiv_posDef
-      (Matrix.kronecker R1 R2) (hR1.kronecker hR2) e.symm s]
+      (R1 ⊗ₖ R2) (hR1.kronecker hR2) e.symm s]
     rw [cMatrix_rpow_kronecker hR1.posSemidef hR2.posSemidef s]
   unfold sandwichedRenyiReferenceInner
   simp only [conditionalRenyiGroupedProduct_matrix]
   change
     CFC.rpow (identityTensorStateMatrix (a := a × c) (sigma.prod omega)) s *
-          (Matrix.kronecker rho.m tau.m).submatrix e.symm e.symm *
+          (rho.m ⊗ₖ tau.m).submatrix e.symm e.symm *
           CFC.rpow (identityTensorStateMatrix (a := a × c) (sigma.prod omega)) s =
-      (Matrix.kronecker (C1 * rho.m * C1) (C2 * tau.m * C2)).submatrix
+      ((C1 * rho.m * C1) ⊗ₖ (C2 * tau.m * C2)).submatrix
         e.symm e.symm
   rw [hpow]
   rw [Matrix.submatrix_mul_equiv, Matrix.submatrix_mul_equiv]
   apply congrArg (fun M : CMatrix ((a × b) × (c × d)) =>
     M.submatrix e.symm e.symm)
   calc
-    Matrix.kronecker C1 C2 * Matrix.kronecker rho.m tau.m *
-          Matrix.kronecker C1 C2 =
-        Matrix.kronecker (C1 * rho.m) (C2 * tau.m) *
-          Matrix.kronecker C1 C2 := by
+    (C1 ⊗ₖ C2) * (rho.m ⊗ₖ tau.m) *
+          (C1 ⊗ₖ C2) =
+        ((C1 * rho.m) ⊗ₖ (C2 * tau.m)) *
+          (C1 ⊗ₖ C2) := by
       exact congrArg (fun M : CMatrix ((a × b) × (c × d)) =>
-        M * Matrix.kronecker C1 C2)
+        M * (C1 ⊗ₖ C2))
         (Matrix.mul_kronecker_mul C1 rho.m C2 tau.m).symm
-    _ = Matrix.kronecker (C1 * rho.m * C1) (C2 * tau.m * C2) :=
+    _ = (C1 * rho.m * C1) ⊗ₖ (C2 * tau.m * C2) :=
       (Matrix.mul_kronecker_mul (C1 * rho.m) C1
         (C2 * tau.m) C2).symm
 
@@ -310,14 +309,14 @@ theorem conditionalSandwichedRenyiUpSourceTraceTerm_prod_grouped
       sandwichedRenyiReferenceInner
           (rho.conditionalRenyiGroupedProduct tau)
           (identityTensorStateMatrix (a := a × c) (sigma.prod omega)) alpha =
-        (Matrix.kronecker inner1 inner2).submatrix e.symm e.symm := by
+        (inner1 ⊗ₖ inner2).submatrix e.symm e.symm := by
     simpa [e, inner1, inner2] using
       sandwichedRenyiReferenceInner_conditionalRenyiGroupedProduct
         rho sigma tau omega hsigma homega alpha
   unfold conditionalSandwichedRenyiUpSourceTraceTerm psdTracePower
   rw [hinner]
   rw [cMatrix_rpow_submatrix_equiv_nonneg
-    (Matrix.kronecker inner1 inner2) (hinner1.kronecker hinner2) e.symm halpha]
+    (inner1 ⊗ₖ inner2) (hinner1.kronecker hinner2) e.symm halpha]
   rw [Matrix.trace_submatrix _ e.symm]
   exact psdTracePower_kronecker hinner1 hinner2
 
@@ -776,43 +775,42 @@ theorem ConditionalMinEntropyScaleFeasible.prod_grouped
     (hT : ConditionalMinEntropyScaleFeasible (a := a) rho T)
     (hU : ConditionalMinEntropyScaleFeasible (a := c) tau U) :
     ConditionalMinEntropyScaleFeasible (a := a × c)
-      (rho.conditionalRenyiGroupedProduct tau) (Matrix.kronecker T U) := by
+      (rho.conditionalRenyiGroupedProduct tau) (T ⊗ₖ U) := by
   constructor
   · exact hT.1.kronecker hU.1
   · let e := Equiv.prodProdProdComm a b c d
-    let A : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) T
-    let B : CMatrix (c × d) := Matrix.kronecker (1 : CMatrix c) U
+    let A : CMatrix (a × b) := (1 : CMatrix a) ⊗ₖ T
+    let B : CMatrix (c × d) := (1 : CMatrix c) ⊗ₖ U
     have hA : A.PosSemidef := Matrix.PosSemidef.one.kronecker hT.1
     have hB : B.PosSemidef := Matrix.PosSemidef.one.kronecker hU.1
     have hdiffA : (A - rho.m).PosSemidef := hT.2
     have hdiffB : (B - tau.m).PosSemidef := hU.2
     have hraw :
-        (Matrix.kronecker A B - Matrix.kronecker rho.m tau.m).PosSemidef := by
+        (A ⊗ₖ B - rho.m ⊗ₖ tau.m).PosSemidef := by
       have hsum := (hdiffA.kronecker hB).add (rho.psd.kronecker hdiffB)
-      have heq : Matrix.kronecker A B - Matrix.kronecker rho.m tau.m =
-          Matrix.kronecker (A - rho.m) B +
-            Matrix.kronecker rho.m (B - tau.m) := by
+      have heq : A ⊗ₖ B - rho.m ⊗ₖ tau.m =
+          (A - rho.m) ⊗ₖ B +
+            rho.m ⊗ₖ (B - tau.m) := by
         ext x y
-        simp [A, B, Matrix.kronecker, Matrix.kroneckerMap_apply]
+        simp [A, B, Matrix.kroneckerMap_apply]
         ring
       rw [heq]
       exact hsum
-    change (Matrix.kronecker (1 : CMatrix (a × c)) (Matrix.kronecker T U) -
+    change ((1 : CMatrix (a × c)) ⊗ₖ (T ⊗ₖ U) -
       (rho.conditionalRenyiGroupedProduct tau).m).PosSemidef
     convert hraw.submatrix e.symm using 1
     ext x y
     rcases x with ⟨⟨i, k⟩, ⟨j, l⟩⟩
     rcases y with ⟨⟨i', k'⟩, ⟨j', l'⟩⟩
     simp [e, A, B, Equiv.prodProdProdComm,
-      conditionalRenyiGroupedProduct_matrix, Matrix.kronecker,
-      Matrix.kroneckerMap_apply]
+      conditionalRenyiGroupedProduct_matrix, Matrix.kroneckerMap_apply]
     by_cases hi : i = i' <;> by_cases hk : k = k' <;>
       simp [Matrix.one_apply, hi, hk]
 
 omit [DecidableEq b] [DecidableEq d] in
 private theorem trace_kronecker_re_of_posSemidef
     {T : CMatrix b} {U : CMatrix d} (hT : T.PosSemidef) (hU : U.PosSemidef) :
-    (Matrix.kronecker T U).trace.re = T.trace.re * U.trace.re := by
+    (T ⊗ₖ U).trace.re = T.trace.re * U.trace.re := by
   have htrace := congrArg Complex.re (Matrix.trace_kronecker T U)
   have hTim : T.trace.im = 0 := (Matrix.PosSemidef.trace_nonneg hT).2.symm
   have hUim : U.trace.im = 0 := (Matrix.PosSemidef.trace_nonneg hU).2.symm
@@ -838,7 +836,7 @@ private theorem conditionalMinEntropyScale_eq_iInf_feasible
 def conditionalMinEntropyDualEffectGroupedProduct
     (M : CMatrix (a × b)) (N : CMatrix (c × d)) :
     CMatrix ((a × c) × (b × d)) :=
-  (Matrix.kronecker M N).submatrix
+  (M ⊗ₖ N).submatrix
     (Equiv.prodProdProdComm a b c d).symm
     (Equiv.prodProdProdComm a b c d).symm
 
@@ -848,14 +846,13 @@ private theorem traceLeft_conditionalMinEntropyDualEffectGroupedProduct
     (M : CMatrix (a × b)) (N : CMatrix (c × d)) :
     Matrix.traceLeft
         (conditionalMinEntropyDualEffectGroupedProduct M N) =
-      Matrix.kronecker (Matrix.traceLeft M)
+      (Matrix.traceLeft M) ⊗ₖ
         (Matrix.traceLeft N) := by
   ext x y
   rcases x with ⟨j, l⟩
   rcases y with ⟨j', l'⟩
   simp [conditionalMinEntropyDualEffectGroupedProduct, Matrix.traceLeft,
-    Equiv.prodProdProdComm, Matrix.kronecker,
-    Matrix.kroneckerMap_apply, Fintype.sum_prod_type]
+    Equiv.prodProdProdComm, Matrix.kroneckerMap_apply, Fintype.sum_prod_type]
   rw [Finset.sum_mul_sum]
 
 omit [DecidableEq a] [DecidableEq c] in
@@ -877,7 +874,7 @@ theorem ConditionalMinEntropyDualEffectFeasible.prod_grouped
     have hQ : Q.PosSemidef := traceLeft_posSemidef hN.1
     have hdiffP : ((1 : CMatrix b) - P).PosSemidef := hM.2
     have hdiffQ : ((1 : CMatrix d) - Q).PosSemidef := hN.2
-    change (Matrix.kronecker P Q ≤ (1 : CMatrix (b × d)))
+    change (P ⊗ₖ Q ≤ (1 : CMatrix (b × d)))
     rw [Matrix.le_iff]
     have hsum := (hdiffP.kronecker Matrix.PosSemidef.one).add (hP.kronecker hdiffQ)
     convert hsum using 1
@@ -885,7 +882,7 @@ theorem ConditionalMinEntropyDualEffectFeasible.prod_grouped
     rcases x with ⟨j, l⟩
     rcases y with ⟨j', l'⟩
     by_cases hj : j = j' <;> by_cases hl : l = l' <;>
-      simp [P, Q, Matrix.kronecker, Matrix.kroneckerMap_apply, hj, hl] <;> ring
+      simp [P, Q, Matrix.kroneckerMap_apply, hj, hl] <;> ring
 
 private theorem conditionalMinEntropyDualEffectGroupedProduct_value
     (rho : MState (a × b)) (tau : MState (c × d))
@@ -904,8 +901,8 @@ private theorem conditionalMinEntropyDualEffectGroupedProduct_value
     rw [Matrix.submatrix_mul_equiv]
     rw [Matrix.trace_submatrix _ e.symm]
     calc
-      (Matrix.kronecker rho.m tau.m * Matrix.kronecker M N).trace =
-          (Matrix.kronecker (rho.m * M) (tau.m * N)).trace :=
+      ((rho.m ⊗ₖ tau.m) * (M ⊗ₖ N)).trace =
+          ((rho.m * M) ⊗ₖ (tau.m * N)).trace :=
         congrArg Matrix.trace
           (Matrix.mul_kronecker_mul rho.m M tau.m N).symm
       _ = (rho.m * M).trace * (tau.m * N).trace :=
@@ -1051,7 +1048,7 @@ theorem conditionalMinEntropyScale_prod_grouped
     rw [Real.mul_iInf_of_nonneg hTnonneg]
     refine le_ciInf fun U : Ptau => ?_
     have hle := ciInf_le hPprodBdd
-      (⟨Matrix.kronecker T.1 U.1, T.2.prod_grouped U.2⟩ : Pprod)
+      (⟨T.1 ⊗ₖ U.1, T.2.prod_grouped U.2⟩ : Pprod)
     rw [trace_kronecker_re_of_posSemidef T.2.1 U.2.1] at hle
     exact hle
   · rw [conditionalMinEntropyScale_eq_iSup_dualEffect rhoTau,

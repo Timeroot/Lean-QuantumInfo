@@ -20,7 +20,7 @@ Tomamichel, `calculus.tex:525-554,653-694`.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator
+open scoped ComplexOrder MatrixOrder Kronecker Matrix.Norms.L2Operator
 
 noncomputable section
 universe u v
@@ -142,19 +142,19 @@ private theorem smoothConditionalMinEntropy_le_smoothConditionalMaxEntropy_add_d
         ((Tmin.trace.re : ℂ) • MState.identityTensorStateMatrix
           (a := extra ⊕ a) σB) := by
     calc
-      ρhat.m ≤ Matrix.kronecker (1 : CMatrix (extra ⊕ a)) Tmin :=
+      ρhat.m ≤ (1 : CMatrix (extra ⊕ a)) ⊗ₖ Tmin :=
         hρhat_feas.2
       _ = (Tmin.trace.re : ℂ) •
           MState.identityTensorStateMatrix (a := extra ⊕ a) σB := by
         have hkron := congrArg
-          (fun T : CMatrix b => Matrix.kronecker (1 : CMatrix (extra ⊕ a)) T)
+          (fun T : CMatrix b => (1 : CMatrix (extra ⊕ a)) ⊗ₖ T)
           hTnorm
         calc
-          Matrix.kronecker (1 : CMatrix (extra ⊕ a)) Tmin =
-              Matrix.kronecker (1 : CMatrix (extra ⊕ a))
+          (1 : CMatrix (extra ⊕ a)) ⊗ₖ Tmin =
+              (1 : CMatrix (extra ⊕ a)) ⊗ₖ
                 ((Tmin.trace.re : ℂ) • σB.m) := hkron.symm
           _ = (Tmin.trace.re : ℂ) •
-              Matrix.kronecker (1 : CMatrix (extra ⊕ a)) σB.m :=
+              ((1 : CMatrix (extra ⊕ a)) ⊗ₖ σB.m) :=
             Matrix.kronecker_smul _ _ _
   have hsdp := MState.neg_log2_add_log2_fidelity_sq_le_conditionalMaxEntropy
     ω ρhat σB hTmin hfid_pos hρhat_bound

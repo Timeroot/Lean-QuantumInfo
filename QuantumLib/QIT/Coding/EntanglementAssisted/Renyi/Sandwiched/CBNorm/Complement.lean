@@ -27,7 +27,7 @@ complementary completely positive map.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 namespace QIT
 
@@ -75,7 +75,7 @@ def krausProduct
     {a₂ : Type x} {b₂ : Type y} {κ₂ : Type z}
     (K₁ : κ₁ → Matrix b₁ a₁ ℂ) (K₂ : κ₂ → Matrix b₂ a₂ ℂ) :
     (κ₁ × κ₂) → Matrix (b₁ × b₂) (a₁ × a₂) ℂ :=
-  fun kk => Matrix.kronecker (K₁ kk.1) (K₂ kk.2)
+  fun kk => (K₁ kk.1) ⊗ₖ (K₂ kk.2)
 
 private theorem ofKraus_kronecker_apply
     {a₁ : Type u} {b₁ : Type v} {κ₁ : Type w}
@@ -86,13 +86,12 @@ private theorem ofKraus_kronecker_apply
     [Fintype κ₂] [DecidableEq κ₂]
     (K₁ : κ₁ → Matrix b₁ a₁ ℂ) (K₂ : κ₂ → Matrix b₂ a₂ ℂ)
     (X : CMatrix a₁) (Y : CMatrix a₂) :
-    MatrixMap.ofKraus (krausProduct K₁ K₂) (Matrix.kronecker X Y) =
-      Matrix.kronecker (MatrixMap.ofKraus K₁ X) (MatrixMap.ofKraus K₂ Y) := by
+    MatrixMap.ofKraus (krausProduct K₁ K₂) (X ⊗ₖ Y) =
+      (MatrixMap.ofKraus K₁ X) ⊗ₖ (MatrixMap.ofKraus K₂ Y) := by
   calc
-    MatrixMap.ofKraus (krausProduct K₁ K₂) (Matrix.kronecker X Y) =
+    MatrixMap.ofKraus (krausProduct K₁ K₂) (X ⊗ₖ Y) =
       ∑ kk : κ₁ × κ₂,
-        Matrix.kronecker
-          (K₁ kk.1 * X * (K₁ kk.1).conjTranspose)
+        (K₁ kk.1 * X * (K₁ kk.1).conjTranspose) ⊗ₖ
           (K₂ kk.2 * Y * (K₂ kk.2).conjTranspose) := by
         unfold MatrixMap.ofKraus krausProduct
         simp only [LinearMap.coe_mk, AddHom.coe_mk]
@@ -101,39 +100,38 @@ private theorem ofKraus_kronecker_apply
         let A : Matrix b₁ a₁ ℂ := K₁ kk.1
         let B : Matrix b₂ a₂ ℂ := K₂ kk.2
         calc
-          Matrix.kronecker A B * Matrix.kronecker X Y *
-              (Matrix.kronecker A B).conjTranspose =
-            Matrix.kronecker A B * Matrix.kronecker X Y *
-              Matrix.kronecker A.conjTranspose B.conjTranspose := by
-              rw [show (Matrix.kronecker A B).conjTranspose =
-                  Matrix.kronecker A.conjTranspose B.conjTranspose by
+          (A ⊗ₖ B) * (X ⊗ₖ Y) *
+              (A ⊗ₖ B).conjTranspose =
+            (A ⊗ₖ B) * (X ⊗ₖ Y) *
+              (A.conjTranspose ⊗ₖ B.conjTranspose) := by
+              rw [show (A ⊗ₖ B).conjTranspose =
+                  A.conjTranspose ⊗ₖ B.conjTranspose by
                 simpa using Matrix.conjTranspose_kronecker A B]
-          _ = Matrix.kronecker (A * X) (B * Y) *
-              Matrix.kronecker A.conjTranspose B.conjTranspose := by
-              rw [show Matrix.kronecker A B * Matrix.kronecker X Y =
-                  Matrix.kronecker (A * X) (B * Y) by
+          _ = ((A * X) ⊗ₖ (B * Y)) *
+              (A.conjTranspose ⊗ₖ B.conjTranspose) := by
+              rw [show (A ⊗ₖ B) * (X ⊗ₖ Y) =
+                  (A * X) ⊗ₖ (B * Y) by
                 exact (Matrix.mul_kronecker_mul A X B Y).symm]
-          _ = Matrix.kronecker ((A * X) * A.conjTranspose)
+          _ = ((A * X) * A.conjTranspose) ⊗ₖ
               ((B * Y) * B.conjTranspose) := by
-              rw [show Matrix.kronecker (A * X) (B * Y) *
-                    Matrix.kronecker A.conjTranspose B.conjTranspose =
-                  Matrix.kronecker ((A * X) * A.conjTranspose)
+              rw [show ((A * X) ⊗ₖ (B * Y)) *
+                    (A.conjTranspose ⊗ₖ B.conjTranspose) =
+                  ((A * X) * A.conjTranspose) ⊗ₖ
                     ((B * Y) * B.conjTranspose) by
                 exact (Matrix.mul_kronecker_mul (A * X) A.conjTranspose
                   (B * Y) B.conjTranspose).symm]
-          _ = Matrix.kronecker (A * X * A.conjTranspose)
+          _ = (A * X * A.conjTranspose) ⊗ₖ
               (B * Y * B.conjTranspose) := by
               simp [Matrix.mul_assoc]
     _ =
       ∑ k₁ : κ₁, ∑ k₂ : κ₂,
-        Matrix.kronecker
-          (K₁ k₁ * X * (K₁ k₁).conjTranspose)
+        (K₁ k₁ * X * (K₁ k₁).conjTranspose) ⊗ₖ
           (K₂ k₂ * Y * (K₂ k₂).conjTranspose) := by
         rw [← Finset.univ_product_univ, Finset.sum_product]
-    _ = Matrix.kronecker (MatrixMap.ofKraus K₁ X) (MatrixMap.ofKraus K₂ Y) := by
+    _ = (MatrixMap.ofKraus K₁ X) ⊗ₖ (MatrixMap.ofKraus K₂ Y) := by
         ext bd bd'
         simp only [MatrixMap.ofKraus, LinearMap.coe_mk, AddHom.coe_mk,
-          Matrix.sum_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]
+          Matrix.sum_apply, Matrix.kroneckerMap_apply]
         rw [Finset.sum_mul]
         simp_rw [Finset.mul_sum]
 
@@ -160,10 +158,10 @@ theorem kron_ofKraus_eq_ofKraus_krausProduct
   intro ac' _
   have hkron_ac :
       MatrixMap.kron (MatrixMap.ofKraus K₁) (MatrixMap.ofKraus K₂)
-          (Matrix.kronecker (Matrix.single ac.1 ac'.1 (1 : ℂ))
+          ((Matrix.single ac.1 ac'.1 (1 : ℂ)) ⊗ₖ
             (Matrix.single ac.2 ac'.2 (1 : ℂ))) bd bd' =
-        Matrix.kronecker (MatrixMap.ofKraus K₁ (Matrix.single ac.1 ac'.1 (1 : ℂ)))
-          (MatrixMap.ofKraus K₂ (Matrix.single ac.2 ac'.2 (1 : ℂ))) bd bd' :=
+        ((MatrixMap.ofKraus K₁ (Matrix.single ac.1 ac'.1 (1 : ℂ))) ⊗ₖ
+          (MatrixMap.ofKraus K₂ (Matrix.single ac.2 ac'.2 (1 : ℂ)))) bd bd' :=
     congrFun
     (congrFun
       (MatrixMap.kron_map_of_kron_state

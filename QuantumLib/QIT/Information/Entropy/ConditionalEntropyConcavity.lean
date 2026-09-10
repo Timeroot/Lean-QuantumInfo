@@ -80,7 +80,7 @@ private theorem cqAXBState_marginalAC (E : MEnsemble (a × b) ι) :
   ext ab ab'
   simp [cqAXBState, prodABCToBACEquiv, MState.marginalAC,
     MEnsemble.cqState_matrix, MEnsemble.averageState_matrix, Matrix.sum_apply,
-    Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.single_apply]
+    Matrix.kroneckerMap_apply, Matrix.single_apply]
 
 private theorem cqAXBState_traceLeft (E : MEnsemble (a × b) ι) :
     (cqAXBState E).traceLeft = E.averageState.traceLeft := by
@@ -88,7 +88,7 @@ private theorem cqAXBState_traceLeft (E : MEnsemble (a × b) ι) :
   ext b₁ b₂
   simp [cqAXBState, prodABCToBACEquiv,
     MEnsemble.cqState_matrix, MEnsemble.averageState_matrix, Matrix.sum_apply,
-    Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.single_apply,
+    Matrix.kroneckerMap_apply, Matrix.single_apply,
     Matrix.traceLeft, Fintype.sum_prod_type]
 
 private theorem cqAXBState_marginalBC_reindex (E : MEnsemble (a × b) ι) :
@@ -100,7 +100,7 @@ private theorem cqAXBState_marginalBC_reindex (E : MEnsemble (a × b) ι) :
   rcases bx' with ⟨x', b₂⟩
   simp [cqAXBState, prodABCToBACEquiv, MState.marginalBC_matrix, MState.reindex_matrix,
     MEnsemble.cqState_matrix, MEnsemble.marginalBipartiteB,
-    Matrix.sum_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    Matrix.sum_apply, Matrix.kroneckerMap_apply,
     Matrix.single_apply, Matrix.traceLeft]
   by_cases h : x = x'
   · subst h
@@ -178,7 +178,7 @@ private theorem cqProductEnsemble_averageState (E : MEnsemble a ι) :
   rcases xi with ⟨x, i⟩
   rcases xj with ⟨y, j⟩
   simp [cqProductEnsemble, classicalBasisState, MEnsemble.averageState_matrix,
-    MEnsemble.cqState_matrix, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    MEnsemble.cqState_matrix, Matrix.kroneckerMap_apply,
     Matrix.sum_apply]
 
 private theorem cqProductEnsemble_state_conditionalEntropy_nonneg

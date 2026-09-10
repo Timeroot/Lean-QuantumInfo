@@ -58,7 +58,7 @@ def classicalCopyProjector (I : Type u) [Fintype I] [DecidableEq I] :
 
 namespace ProjectiveMeasurementLift
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 open _root_.QIT.Matrix
 
 local postfix:1024 "†" => Matrix.conjTranspose
@@ -159,11 +159,11 @@ the block-diagonal reference into the full amplitude. -/
 theorem sum_blockAmplitude_sandwich
     (X : Matrix (I × B) E ℂ) (Q : CMatrix B) :
     (∑ i : I, (blockAmplitude X i)† * Q * blockAmplitude X i) =
-      X† * Matrix.kronecker (1 : CMatrix I) Q * X := by
+      X† * ((1 : CMatrix I) ⊗ₖ Q) * X := by
   classical
   ext e e'
   simp [Matrix.sum_apply, Matrix.mul_apply, Matrix.conjTranspose_apply,
-    blockAmplitude, Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
+    blockAmplitude, Matrix.kroneckerMap_apply, Matrix.one_apply,
     Fintype.sum_prod_type, Finset.sum_mul, Finset.sum_ite_eq']
 
 /-- A positive matrix whose diagonal record blocks have a common weighted
@@ -175,7 +175,7 @@ theorem matrix_le_identity_kronecker_of_diagonal_blocks_le_posDef
     (hweights_nonneg : ∀ i, 0 ≤ weights i)
     (hweights_sum : ∑ i, weights i = 1)
     (hblock : ∀ i, Classical.block T i i ≤ (weights i : ℂ) • Q) :
-    T ≤ Matrix.kronecker (1 : CMatrix I) Q := by
+    T ≤ (1 : CMatrix I) ⊗ₖ Q := by
   classical
   let X : CMatrix (I × B) := psdSqrt T
   let Xi : I → Matrix B (I × B) ℂ := fun i ↦ blockAmplitude X i
@@ -210,25 +210,25 @@ theorem matrix_le_identity_kronecker_of_diagonal_blocks_le_posDef
         (1 : CMatrix (I × B)) := by
     rw [← Finset.sum_smul, hweightsComplex, one_smul]
   have hcomplement :
-      X† * (Matrix.kronecker (1 : CMatrix I) Q)⁻¹ * X ≤
+      X† * ((1 : CMatrix I) ⊗ₖ Q)⁻¹ * X ≤
         (1 : CMatrix (I × B)) := by
     have hinv :
-        (Matrix.kronecker (1 : CMatrix I) Q)⁻¹ =
-          Matrix.kronecker (1 : CMatrix I) Q⁻¹ := by
-      simpa only [Matrix.kronecker, inv_one] using
+        ((1 : CMatrix I) ⊗ₖ Q)⁻¹ =
+          (1 : CMatrix I) ⊗ₖ Q⁻¹ := by
+      simpa only [inv_one] using
         (Matrix.inv_kronecker (1 : CMatrix I) Q)
     rw [hinv]
     simpa only [inv_one, sum_blockAmplitude_sandwich, hsumWeights, Xi] using hsum
-  have hQglobal : (Matrix.kronecker (1 : CMatrix I) Q).PosDef :=
+  have hQglobal : ((1 : CMatrix I) ⊗ₖ Q).PosDef :=
     Matrix.PosDef.one.kronecker hQ
   have hcomplement' :
-      X† * (Matrix.kronecker (1 : CMatrix I) Q)⁻¹ * X ≤
+      X† * ((1 : CMatrix I) ⊗ₖ Q)⁻¹ * X ≤
         (((1 : ℝ) : ℂ) • (1 : CMatrix (I × B))) := by
     norm_num
     exact hcomplement
   have hresult :=
     (Matrix.conjTranspose_mul_inv_mul_self_le_smul_one_iff_self_mul_conjTranspose_le_smul
-      X (Matrix.kronecker (1 : CMatrix I) Q) hQglobal
+      X ((1 : CMatrix I) ⊗ₖ Q) hQglobal
       (c := 1) zero_lt_one).1 hcomplement'
   norm_num at hresult
   rw [hXGram] at hresult
@@ -243,9 +243,9 @@ theorem matrix_le_identity_kronecker_of_diagonal_blocks_le
     (hweights_nonneg : ∀ i, 0 ≤ weights i)
     (hweights_sum : ∑ i, weights i = 1)
     (hblock : ∀ i, Classical.block T i i ≤ (weights i : ℂ) • Q) :
-    T ≤ Matrix.kronecker (1 : CMatrix I) Q := by
+    T ≤ (1 : CMatrix I) ⊗ₖ Q := by
   classical
-  let D : CMatrix (I × B) := Matrix.kronecker (1 : CMatrix I) Q - T
+  let D : CMatrix (I × B) := (1 : CMatrix I) ⊗ₖ Q - T
   have hDherm : D.IsHermitian :=
     ((Matrix.PosSemidef.one.kronecker hQ).isHermitian).sub hT.isHermitian
   have hreg : ∀ epsilon : ℝ, 0 < epsilon →
@@ -856,7 +856,7 @@ theorem exists_projectiveMeasurementPreimage_of_purifiedBall
 
 end SubnormalizedState
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 /-- Fixed-reference feasibility survives the coherent projective lift.  The
 diagonal record blocks may carry different probabilities, but they all use the
@@ -888,26 +888,25 @@ theorem projectiveRecorded_conditionalMinEntropyFeasible
       (MState.identityTensorStateMatrix_posSemidef (a := A') sigmaR)
       (by exact_mod_cast hcpos.le)
   have hglobal :
-      tau.m ≤ Matrix.kronecker (1 : CMatrix I) Q :=
+      tau.m ≤ (1 : CMatrix I) ⊗ₖ Q :=
     ProjectiveMeasurementLift.matrix_le_identity_kronecker_of_diagonal_blocks_le
       tau.m tau.psd Q hQ weights hweights_nonneg hweights_sum
       (by simpa only [Q] using hblocks)
   let e := prodABCToBACEquiv I A' R
   have hreference :
-      (Matrix.kronecker (1 : CMatrix I) Q).submatrix e.symm e.symm =
+      ((1 : CMatrix I) ⊗ₖ Q).submatrix e.symm e.symm =
         (Real.rpow 2 (-lam) : ℂ) •
           MState.identityTensorStateMatrix (a := A' × I) sigmaR := by
     ext x y
     rcases x with ⟨⟨a, i⟩, r⟩
     rcases y with ⟨⟨a', i'⟩, r'⟩
     simp [e, Q, prodABCToBACEquiv,
-      MState.identityTensorStateMatrix, Matrix.kronecker,
-      Matrix.kroneckerMap_apply, Matrix.one_apply]
+      MState.identityTensorStateMatrix, Matrix.kroneckerMap_apply, Matrix.one_apply]
     by_cases ha : a = a' <;> by_cases hi : i = i' <;> simp [ha, hi]
   rw [MState.ConditionalMinEntropyFeasible, Matrix.le_iff]
   have hsub := (Matrix.le_iff.mp hglobal).submatrix e.symm
   change
-    ((Matrix.kronecker (1 : CMatrix I) Q).submatrix e.symm e.symm -
+    (((1 : CMatrix I) ⊗ₖ Q).submatrix e.symm e.symm -
       tau.m.submatrix e.symm e.symm).PosSemidef at hsub
   rw [hreference] at hsub
   simpa only [MState.reindex_matrix] using hsub
@@ -1064,8 +1063,8 @@ theorem fullRecordedSourceReferenceEnsemble_cqState_matrix_eq_positiveSupport_su
     (M.fullRecordedSourceReferenceEnsemble psi).cqState.m =
       ∑ i : M.positiveSupport psi,
         M.branchWeight psi i.1 •
-          Matrix.kronecker (Matrix.single i.1 i.1 (1 : ℂ))
-            (M.positiveBranchSourceReferenceState psi i).m := by
+          ((Matrix.single i.1 i.1 (1 : ℂ)) ⊗ₖ
+            (M.positiveBranchSourceReferenceState psi i).m) := by
   classical
   rw [MEnsemble.cqState_matrix]
   conv_lhs =>
@@ -1073,13 +1072,13 @@ theorem fullRecordedSourceReferenceEnsemble_cqState_matrix_eq_positiveSupport_su
       (fun i : M.refinedBranchIndex => 0 < M.branchWeight psi i)
       (fun i =>
         (M.fullRecordedSourceReferenceEnsemble psi).probs i •
-          Matrix.kronecker (Matrix.single i i (1 : ℂ))
-            ((M.fullRecordedSourceReferenceEnsemble psi).states i).m)]
+          ((Matrix.single i i (1 : ℂ)) ⊗ₖ
+            ((M.fullRecordedSourceReferenceEnsemble psi).states i).m))]
   have hzero :
       (∑ i : {i : M.refinedBranchIndex // ¬ 0 < M.branchWeight psi i},
         (M.fullRecordedSourceReferenceEnsemble psi).probs i.1 •
-          Matrix.kronecker (Matrix.single i.1 i.1 (1 : ℂ))
-            ((M.fullRecordedSourceReferenceEnsemble psi).states i.1).m) = 0 := by
+          ((Matrix.single i.1 i.1 (1 : ℂ)) ⊗ₖ
+            ((M.fullRecordedSourceReferenceEnsemble psi).states i.1).m)) = 0 := by
     apply Finset.sum_eq_zero
     intro i _hi
     have hweight : M.branchWeight psi i.1 = 0 :=
@@ -1098,8 +1097,8 @@ theorem fullRecordedIdealReferenceEnsemble_cqState_matrix_eq_positiveSupport_sum
     (M.fullRecordedIdealReferenceEnsemble psi sigmaR).cqState.m =
       ∑ i : M.positiveSupport psi,
         M.branchWeight psi i.1 •
-          Matrix.kronecker (Matrix.single i.1 i.1 (1 : ℂ))
-            ((MState.uniform : MState A').prod sigmaR).m := by
+          ((Matrix.single i.1 i.1 (1 : ℂ)) ⊗ₖ
+            ((MState.uniform : MState A').prod sigmaR).m) := by
   classical
   rw [MEnsemble.cqState_matrix]
   conv_lhs =>
@@ -1107,13 +1106,13 @@ theorem fullRecordedIdealReferenceEnsemble_cqState_matrix_eq_positiveSupport_sum
       (fun i : M.refinedBranchIndex => 0 < M.branchWeight psi i)
       (fun i =>
         (M.fullRecordedIdealReferenceEnsemble psi sigmaR).probs i •
-          Matrix.kronecker (Matrix.single i i (1 : ℂ))
-            ((M.fullRecordedIdealReferenceEnsemble psi sigmaR).states i).m)]
+          ((Matrix.single i i (1 : ℂ)) ⊗ₖ
+            ((M.fullRecordedIdealReferenceEnsemble psi sigmaR).states i).m))]
   have hzero :
       (∑ i : {i : M.refinedBranchIndex // ¬ 0 < M.branchWeight psi i},
         (M.fullRecordedIdealReferenceEnsemble psi sigmaR).probs i.1 •
-          Matrix.kronecker (Matrix.single i.1 i.1 (1 : ℂ))
-            ((M.fullRecordedIdealReferenceEnsemble psi sigmaR).states i.1).m) = 0 := by
+          ((Matrix.single i.1 i.1 (1 : ℂ)) ⊗ₖ
+            ((M.fullRecordedIdealReferenceEnsemble psi sigmaR).states i.1).m)) = 0 := by
     apply Finset.sum_eq_zero
     intro i _hi
     have hweight : M.branchWeight psi i.1 = 0 :=
@@ -1150,7 +1149,6 @@ theorem recordedSourceReferenceEnsemble_sourceIsometryApply
   apply Finset.sum_congr rfl
   intro i _hi
   rw [LinearMap.map_smul_of_tower]
-  simp only [Matrix.kronecker]
   rw [MatrixMap.kron_map_of_kron_state]
   congr 1
   rw [positiveRecordSourceIsometry,
@@ -1185,7 +1183,6 @@ theorem recordedIdealReferenceEnsemble_sourceIsometryApply
   apply Finset.sum_congr rfl
   intro i _hi
   rw [LinearMap.map_smul_of_tower]
-  simp only [Matrix.kronecker]
   rw [MatrixMap.kron_map_of_kron_state]
   congr 1
   rw [positiveRecordSourceIsometry,
@@ -1209,8 +1206,7 @@ theorem recordedMaximallyMixedFixedReferenceState_eq_recordedIdealReferenceEnsem
   simp [recordedMaximallyMixedFixedReferenceState, recordedFixedReferenceState,
     recordedFixedReferenceEnsemble, recordedIdealReferenceEnsemble,
     prodABCToBCAEquiv, MEnsemble.cqState,
-    Matrix.kronecker,
-    Matrix.kroneckerMap_apply]
+        Matrix.kroneckerMap_apply]
   simp only [Matrix.sum_apply, Matrix.smul_apply, Matrix.kroneckerMap_apply]
   rw [Finset.mul_sum]
   apply Finset.sum_congr rfl
@@ -1314,11 +1310,11 @@ theorem coherentProjectiveSourceReferenceState_block
             Matrix.conjTranspose (sourceReferenceAmplitude psi)) r r' *
         Matrix.conjTranspose M.refinedStinespringIsometry.matrix)
           (a', i) (a'', i) =
-      ((Matrix.kronecker (M.refinedKraus i) (1 : CMatrix R) *
+      ((((M.refinedKraus i) ⊗ₖ (1 : CMatrix R)) *
           sourceReferenceAmplitude psi) *
         (Matrix.conjTranspose (sourceReferenceAmplitude psi) *
           Matrix.conjTranspose
-            (Matrix.kronecker (M.refinedKraus i) (1 : CMatrix R))))
+            ((M.refinedKraus i) ⊗ₖ (1 : CMatrix R))))
           (a', r) (a'', r')
   have hstarIf (x : A) (s : R) :
       star (if r' = s then M.refinedKraus i a'' x else 0) =
@@ -1328,8 +1324,7 @@ theorem coherentProjectiveSourceReferenceState_block
     · rw [if_neg h, if_neg h]
       exact map_zero (starRingEnd ℂ)
   simp only [ReferenceIsometry.targetBlock, refinedStinespringIsometry_matrix_apply,
-    Matrix.mul_apply, Matrix.conjTranspose_apply, Matrix.kronecker,
-    Matrix.kroneckerMap_apply, Matrix.one_apply, Fintype.sum_prod_type,
+    Matrix.mul_apply, Matrix.conjTranspose_apply, Matrix.kroneckerMap_apply, Matrix.one_apply, Fintype.sum_prod_type,
     Finset.mul_sum, Finset.sum_mul]
   simp only [mul_ite, mul_one, mul_zero]
   simp_rw [hstarIf]

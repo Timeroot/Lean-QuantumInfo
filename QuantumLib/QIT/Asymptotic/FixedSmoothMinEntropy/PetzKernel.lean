@@ -69,12 +69,12 @@ theorem cMatrixPetzTrace_trace_eq_vec_one_kronecker
     (CFC.rpow A alpha * CFC.rpow B (1 - alpha)).trace =
       dotProduct (star (Matrix.vec (1 : CMatrix ι)))
         (Matrix.mulVec
-          (Matrix.kronecker (Matrix.transpose (CFC.rpow B (1 - alpha)))
+          ((Matrix.transpose (CFC.rpow B (1 - alpha))) ⊗ₖ
             (CFC.rpow A alpha))
           (Matrix.vec (1 : CMatrix ι))) := by
   have hmulvec :
       Matrix.mulVec
-          (Matrix.kronecker (Matrix.transpose (CFC.rpow B (1 - alpha)))
+          ((Matrix.transpose (CFC.rpow B (1 - alpha))) ⊗ₖ
             (CFC.rpow A alpha))
           (Matrix.vec (1 : CMatrix ι)) =
         Matrix.vec (CFC.rpow A alpha * (1 : CMatrix ι) *
@@ -97,7 +97,7 @@ theorem cMatrixPetzTrace_eq_vec_one_kronecker_re
     cMatrixPetzTrace A B alpha =
       (dotProduct (star (Matrix.vec (1 : CMatrix ι)))
         (Matrix.mulVec
-          (Matrix.kronecker (Matrix.transpose (CFC.rpow B (1 - alpha)))
+          ((Matrix.transpose (CFC.rpow B (1 - alpha))) ⊗ₖ
             (CFC.rpow A alpha))
           (Matrix.vec (1 : CMatrix ι)))).re := by
   rw [cMatrixPetzTrace]
@@ -765,7 +765,7 @@ positive scalar depending on the integration variable. -/
 def cMatrixPetzPerspectiveResolventIntegrand
     {a b : Type*} [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     (r coeff : ℝ) (A : CMatrix a) (B : CMatrix b) : CMatrix (a × b) :=
-  Matrix.kronecker A (1 : CMatrix b) -
+  A ⊗ₖ (1 : CMatrix b) -
     coeff • Matrix.andoResolventIntegrand (a := a) (b := b) r A B
 
 private theorem cMatrix_rpowIntegrand₁₂_eq_resolvent_affine
@@ -852,13 +852,13 @@ theorem cMatrix_rpowIntegrand₁₂_kronecker_inv_mul_right_eq_petzPerspective
     {p r : ℝ} {A : CMatrix a} {B : CMatrix b}
     (hp : p ∈ Set.Ioo (1 : ℝ) 2) (hr : 0 < r)
     (hA : A.PosSemidef) (hB : B.PosDef) :
-    cfcₙ (Real.rpowIntegrand₁₂ p r) (Matrix.kronecker A B⁻¹) *
-        Matrix.kronecker (1 : CMatrix a) B =
+    cfcₙ (Real.rpowIntegrand₁₂ p r) (A ⊗ₖ B⁻¹) *
+        ((1 : CMatrix a) ⊗ₖ B) =
       (r ^ (p - 2)) •
         cMatrixPetzPerspectiveResolventIntegrand (a := a) (b := b) r r A B := by
-  let C : CMatrix (a × b) := Matrix.kronecker A B⁻¹
-  let X : CMatrix (a × b) := Matrix.kronecker A (1 : CMatrix b)
-  let Y : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) B
+  let C : CMatrix (a × b) := A ⊗ₖ B⁻¹
+  let X : CMatrix (a × b) := A ⊗ₖ (1 : CMatrix b)
+  let Y : CMatrix (a × b) := (1 : CMatrix a) ⊗ₖ B
   let D : CMatrix (a × b) := X + r • Y
   have hCpsd : C.PosSemidef := by
     simpa [C] using hA.kronecker hB.inv.posSemidef
@@ -909,8 +909,8 @@ theorem cMatrix_rpowIntegrand₁₂_kronecker_inv_mul_right_eq_petzPerspective
         ((r ^ (p - 1) : ℝ) : ℂ) := by
     simpa using congrArg (fun x : ℝ => (x : ℂ)) hpow_mul
   calc
-    cfcₙ (Real.rpowIntegrand₁₂ p r) (Matrix.kronecker A B⁻¹) *
-        Matrix.kronecker (1 : CMatrix a) B =
+    cfcₙ (Real.rpowIntegrand₁₂ p r) (A ⊗ₖ B⁻¹) *
+        ((1 : CMatrix a) ⊗ₖ B) =
       ((r ^ (p - 1)) •
         (r⁻¹ • C + r • (C + r • (1 : CMatrix (a × b)))⁻¹ -
           (1 : CMatrix (a × b)))) * Y := by
@@ -994,7 +994,7 @@ theorem cMatrixPetzPerspectiveIntegralRepresentation_Ioo_one_two
           (Set.Ioi 0) μ) ∧
       (∀ ⦃A : CMatrix a⦄ ⦃B : CMatrix b⦄,
         A.PosSemidef → B.PosDef →
-        Matrix.kronecker (CFC.rpow A p) (CFC.rpow B (1 - p)) =
+        (CFC.rpow A p) ⊗ₖ (CFC.rpow B (1 - p)) =
           ∫ r in Set.Ioi 0, (r ^ (p - 2)) •
             cMatrixPetzPerspectiveResolventIntegrand (a := a) (b := b) r r A B ∂μ) := by
   let pNN : ℝ≥0 := ⟨p, le_trans zero_le_one hp.1.le⟩
@@ -1007,8 +1007,8 @@ theorem cMatrixPetzPerspectiveIntegralRepresentation_Ioo_one_two
       (CMatrix (a × b)) hpNN
   refine ⟨μ, ?_, ?_⟩
   · intro A B hA hB
-    let C : CMatrix (a × b) := Matrix.kronecker A B⁻¹
-    let Y : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) B
+    let C : CMatrix (a × b) := A ⊗ₖ B⁻¹
+    let Y : CMatrix (a × b) := (1 : CMatrix a) ⊗ₖ B
     have hCpsd : C.PosSemidef := by
       simpa [C] using hA.kronecker hB.inv.posSemidef
     have hCnonneg : C ∈ Set.Ici (0 : CMatrix (a × b)) :=
@@ -1038,8 +1038,8 @@ theorem cMatrixPetzPerspectiveIntegralRepresentation_Ioo_one_two
       hRightInt.congr_fun hEqOn measurableSet_Ioi
     simpa [G] using hGInt
   · intro A B hA hB
-    let C : CMatrix (a × b) := Matrix.kronecker A B⁻¹
-    let Y : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) B
+    let C : CMatrix (a × b) := A ⊗ₖ B⁻¹
+    let Y : CMatrix (a × b) := (1 : CMatrix a) ⊗ₖ B
     have hpNN_pos : 0 < pNN := by
       exact lt_trans zero_lt_one hpNN.1
     have hCpsd : C.PosSemidef := by
@@ -1083,12 +1083,12 @@ theorem cMatrixPetzPerspectiveIntegralRepresentation_Ioo_one_two
       exact MeasureTheory.ae_restrict_of_forall_mem measurableSet_Ioi hEqOn
     have hTensor :
         CFC.rpow C p * Y =
-          Matrix.kronecker (CFC.rpow A p) (CFC.rpow B (1 - p)) := by
+          (CFC.rpow A p) ⊗ₖ (CFC.rpow B (1 - p)) := by
       simpa [C, Y] using
         cMatrix_rpow_kronecker_inv_mul_right_eq_tensor_one_sub
           (a := a) (b := b) (A := A) (B := B) hA hB p
     calc
-      Matrix.kronecker (CFC.rpow A p) (CFC.rpow B (1 - p)) =
+      (CFC.rpow A p) ⊗ₖ (CFC.rpow B (1 - p)) =
           CFC.rpow C p * Y := by
         exact hTensor.symm
       _ = ∫ r in Set.Ioi 0, F r ∂μ := hLeft
@@ -1114,7 +1114,7 @@ theorem cMatrixPetzPerspectiveResolventIntegrand_convex_posDef
   let Ibar := Matrix.andoResolventIntegrand (a := a) (b := b) r
     (t • A₁ + (1 - t) • A₂) (t • B₁ + (1 - t) • B₂)
   let Xbar : CMatrix (a × b) :=
-    Matrix.kronecker (t • A₁ + (1 - t) • A₂) (1 : CMatrix b)
+    (t • A₁ + (1 - t) • A₂) ⊗ₖ (1 : CMatrix b)
   have hconc : t • I₁ + (1 - t) • I₂ ≤ Ibar := by
     simpa [I₁, I₂, Ibar] using
       Matrix.andoResolventIntegrand_concave_posDef
@@ -1133,7 +1133,7 @@ theorem cMatrixPetzPerspectiveResolventIntegrand_convex_posDef
           r coeff A₂ B₂ := by
       ext i j
       simp [cMatrixPetzPerspectiveResolventIntegrand, Xbar, I₁, I₂,
-        Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.smul_apply,
+        Matrix.kroneckerMap_apply, Matrix.smul_apply,
         Matrix.sub_apply, add_mul]
       ring
 
@@ -1560,20 +1560,20 @@ entry point for the Petz quasi-entropy route. -/
 def cMatrixPetzTraceKernel
     {ι : Type*} [Fintype ι] [DecidableEq ι]
     (A B : CMatrix ι) (alpha : ℝ) : Matrix (ι × ι) (ι × ι) ℂ :=
-  Matrix.kronecker (Matrix.transpose (CFC.rpow B (1 - alpha)))
+  (Matrix.transpose (CFC.rpow B (1 - alpha))) ⊗ₖ
     (CFC.rpow A alpha)
 
 /-- Hilbert-Schmidt kernel for left multiplication by `A` under `Matrix.vec`. -/
 def cMatrixLeftMulKernel
     {ι : Type*} [Fintype ι] [DecidableEq ι]
     (A : CMatrix ι) : Matrix (ι × ι) (ι × ι) ℂ :=
-  Matrix.kronecker (1 : CMatrix ι) A
+  (1 : CMatrix ι) ⊗ₖ A
 
 /-- Hilbert-Schmidt kernel for right multiplication by `B` under `Matrix.vec`. -/
 def cMatrixRightMulKernel
     {ι : Type*} [Fintype ι] [DecidableEq ι]
     (B : CMatrix ι) : Matrix (ι × ι) (ι × ι) ℂ :=
-  Matrix.kronecker (Matrix.transpose B) (1 : CMatrix ι)
+  (Matrix.transpose B) ⊗ₖ (1 : CMatrix ι)
 
 theorem cMatrixLeftMulKernel_posSemidef
     {ι : Type*} [Fintype ι] [DecidableEq ι]
@@ -1606,17 +1606,17 @@ theorem cMatrixLeftRightMulKernel_commute
       cMatrixRightMulKernel B * cMatrixLeftMulKernel A := by
   calc
     cMatrixLeftMulKernel A * cMatrixRightMulKernel B =
-        Matrix.kronecker ((1 : CMatrix ι) * Matrix.transpose B)
+        ((1 : CMatrix ι) * Matrix.transpose B) ⊗ₖ
           (A * (1 : CMatrix ι)) := by
-          simpa [cMatrixLeftMulKernel, cMatrixRightMulKernel, Matrix.kronecker]
+          simpa [cMatrixLeftMulKernel, cMatrixRightMulKernel]
             using
               (Matrix.mul_kronecker_mul (1 : CMatrix ι) (Matrix.transpose B)
                 A (1 : CMatrix ι)).symm
-    _ = Matrix.kronecker (Matrix.transpose B * (1 : CMatrix ι))
+    _ = (Matrix.transpose B * (1 : CMatrix ι)) ⊗ₖ
           ((1 : CMatrix ι) * A) := by
           rw [Matrix.one_mul, Matrix.mul_one, Matrix.one_mul, Matrix.mul_one]
     _ = cMatrixRightMulKernel B * cMatrixLeftMulKernel A := by
-          simpa [cMatrixLeftMulKernel, cMatrixRightMulKernel, Matrix.kronecker]
+          simpa [cMatrixLeftMulKernel, cMatrixRightMulKernel]
             using
               (Matrix.mul_kronecker_mul (Matrix.transpose B) (1 : CMatrix ι)
                 (1 : CMatrix ι) A)
@@ -1627,16 +1627,16 @@ theorem cMatrixRightInvMulLeftKernel_eq_kronecker
     {ι : Type*} [Fintype ι] [DecidableEq ι]
     (A B : CMatrix ι) :
     cMatrixRightMulKernel B⁻¹ * cMatrixLeftMulKernel A =
-      Matrix.kronecker (Matrix.transpose B⁻¹) A := by
+      (Matrix.transpose B⁻¹) ⊗ₖ A := by
   calc
     cMatrixRightMulKernel B⁻¹ * cMatrixLeftMulKernel A =
-        Matrix.kronecker (Matrix.transpose B⁻¹ * (1 : CMatrix ι))
+        (Matrix.transpose B⁻¹ * (1 : CMatrix ι)) ⊗ₖ
           ((1 : CMatrix ι) * A) := by
-          simpa [cMatrixLeftMulKernel, cMatrixRightMulKernel, Matrix.kronecker]
+          simpa [cMatrixLeftMulKernel, cMatrixRightMulKernel]
             using
               (Matrix.mul_kronecker_mul (Matrix.transpose B⁻¹) (1 : CMatrix ι)
                 (1 : CMatrix ι) A).symm
-    _ = Matrix.kronecker (Matrix.transpose B⁻¹) A := by
+    _ = (Matrix.transpose B⁻¹) ⊗ₖ A := by
           simp
 
 /-- The Kronecker-shaped Petz kernel is the product of right- and
@@ -1655,16 +1655,15 @@ theorem cMatrixPetzTraceKernel_eq_rightLeftPowerKernel
         cMatrixLeftMulKernel (CFC.rpow A alpha) := by
   calc
     cMatrixPetzTraceKernel A B alpha =
-        Matrix.kronecker (Matrix.transpose (CFC.rpow B (1 - alpha)))
+        (Matrix.transpose (CFC.rpow B (1 - alpha))) ⊗ₖ
           (CFC.rpow A alpha) := by
           rfl
-    _ = Matrix.kronecker
-          (Matrix.transpose (CFC.rpow B (1 - alpha)) * (1 : CMatrix ι))
+    _ = (Matrix.transpose (CFC.rpow B (1 - alpha)) * (1 : CMatrix ι)) ⊗ₖ
           ((1 : CMatrix ι) * CFC.rpow A alpha) := by
           simp
     _ = cMatrixRightMulKernel (CFC.rpow B (1 - alpha)) *
         cMatrixLeftMulKernel (CFC.rpow A alpha) := by
-          simpa [cMatrixLeftMulKernel, cMatrixRightMulKernel, Matrix.kronecker]
+          simpa [cMatrixLeftMulKernel, cMatrixRightMulKernel]
             using
               (Matrix.mul_kronecker_mul
                 (Matrix.transpose (CFC.rpow B (1 - alpha))) (1 : CMatrix ι)
@@ -1758,12 +1757,12 @@ private theorem cMatrixPetz_reindex_prodComm_kronecker
     {a b : Type*} [Fintype a] [Fintype b]
     (M : CMatrix a) (N : CMatrix b) :
     Matrix.reindex (Equiv.prodComm a b) (Equiv.prodComm a b)
-        (Matrix.kronecker M N) =
-      Matrix.kronecker N M := by
+        (M ⊗ₖ N) =
+      N ⊗ₖ M := by
   ext x y
   cases x
   cases y
-  simp [Matrix.reindex_apply, Matrix.kronecker, Matrix.kroneckerMap_apply, mul_comm]
+  simp [Matrix.reindex_apply, Matrix.kroneckerMap_apply, mul_comm]
 
 private theorem cMatrixPetz_reindex_finset_sum_smul
     {κ α β : Type*} [Fintype κ] [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
@@ -1776,19 +1775,19 @@ private theorem cMatrixPetz_reindex_finset_sum_smul
 private theorem cMatrixPetz_submatrix_prodSwap_kronecker
     {a b : Type*} [Fintype a] [Fintype b]
     (M : CMatrix a) (N : CMatrix b) :
-    (Matrix.kronecker M N).submatrix (Prod.swap : b × a → a × b) Prod.swap =
-      Matrix.kronecker N M := by
+    (M ⊗ₖ N).submatrix (Prod.swap : b × a → a × b) Prod.swap =
+      N ⊗ₖ M := by
   ext x y
   cases x
   cases y
-  simp [Matrix.kronecker, Matrix.kroneckerMap_apply, mul_comm]
+  simp [Matrix.kroneckerMap_apply, mul_comm]
 
 private theorem cMatrixPetz_submatrix_prodSwap_kroneckerMap_mul
     {a b : Type*} [Fintype a] [Fintype b]
     (M : CMatrix a) (N : CMatrix b) :
-    (Matrix.kroneckerMap (fun x y : ℂ => x * y) M N).submatrix
+    (M ⊗ₖ N).submatrix
         (Prod.swap : b × a → a × b) Prod.swap =
-      Matrix.kroneckerMap (fun x y : ℂ => x * y) N M := by
+      N ⊗ₖ M := by
   ext x y
   cases x
   cases y
@@ -1824,11 +1823,10 @@ private theorem cMatrixPetz_rawTensorUniformJointConvex_Ioo_one_two
     (A : κ → CMatrix a) (B : κ → CMatrix b) {alpha : ℝ}
     (halpha : alpha ∈ Set.Ioo (1 : ℝ) 2)
     (hA : ∀ k, (A k).PosSemidef) (hB : ∀ k, (B k).PosDef) :
-    Matrix.kronecker
-        (CFC.rpow (∑ k, ((Fintype.card κ : ℝ)⁻¹) • A k) alpha)
+    (CFC.rpow (∑ k, ((Fintype.card κ : ℝ)⁻¹) • A k) alpha) ⊗ₖ
         (CFC.rpow (∑ k, ((Fintype.card κ : ℝ)⁻¹) • B k) (1 - alpha)) ≤
       ∑ k, ((Fintype.card κ : ℝ)⁻¹) •
-        Matrix.kronecker (CFC.rpow (A k) alpha) (CFC.rpow (B k) (1 - alpha)) := by
+        ((CFC.rpow (A k) alpha) ⊗ₖ (CFC.rpow (B k) (1 - alpha))) := by
   classical
   let w : ℝ := (Fintype.card κ : ℝ)⁻¹
   let Abar : CMatrix a := ∑ k, w • A k
@@ -1906,11 +1904,11 @@ private theorem cMatrixPetz_rawTensorUniformJointConvex_Ioo_one_two
         ∫ r in Set.Ioi 0, (∑ k, w • Fk k r) ∂μ :=
     cMatrix_setIntegral_mono measurableSet_Ioi hFbarInt hsumInt hmono
   have hrepbar :
-      Matrix.kronecker (CFC.rpow Abar alpha) (CFC.rpow Bbar (1 - alpha)) =
+      (CFC.rpow Abar alpha) ⊗ₖ (CFC.rpow Bbar (1 - alpha)) =
         ∫ r in Set.Ioi 0, Fbar r ∂μ := by
     simpa [Fbar, Abar, Bbar] using hrep hAbar hBbar
   have hrepks :
-      ∀ k, Matrix.kronecker (CFC.rpow (A k) alpha) (CFC.rpow (B k) (1 - alpha)) =
+      ∀ k, (CFC.rpow (A k) alpha) ⊗ₖ (CFC.rpow (B k) (1 - alpha)) =
         ∫ r in Set.Ioi 0, Fk k r ∂μ := by
     intro k
     simpa [Fk] using hrep (hA k) (hB k)
@@ -1920,15 +1918,14 @@ private theorem cMatrixPetz_rawTensorUniformJointConvex_Ioo_one_two
     cMatrixPetz_setIntegral_finset_sum_smul (κ := κ) (ι := a × b)
       (μ := μ) (s := Set.Ioi 0) (f := Fk) w hFkInt
   calc
-    Matrix.kronecker
-        (CFC.rpow (∑ k, ((Fintype.card κ : ℝ)⁻¹) • A k) alpha)
+    (CFC.rpow (∑ k, ((Fintype.card κ : ℝ)⁻¹) • A k) alpha) ⊗ₖ
         (CFC.rpow (∑ k, ((Fintype.card κ : ℝ)⁻¹) • B k) (1 - alpha)) =
         ∫ r in Set.Ioi 0, Fbar r ∂μ := by
           simpa [Abar, Bbar, w] using hrepbar
     _ ≤ ∫ r in Set.Ioi 0, (∑ k, w • Fk k r) ∂μ := hintegral_le
     _ = ∑ k, w • ∫ r in Set.Ioi 0, Fk k r ∂μ := hsumIntegral
     _ = ∑ k, ((Fintype.card κ : ℝ)⁻¹) •
-        Matrix.kronecker (CFC.rpow (A k) alpha) (CFC.rpow (B k) (1 - alpha)) := by
+        ((CFC.rpow (A k) alpha) ⊗ₖ (CFC.rpow (B k) (1 - alpha))) := by
           apply Finset.sum_congr rfl
           intro k _
           rw [← hrepks k]
@@ -2076,8 +2073,8 @@ private theorem cMatrixLeftMulKernel_mul
       cMatrixLeftMulKernel (A * C) := by
   calc
     cMatrixLeftMulKernel A * cMatrixLeftMulKernel C =
-        Matrix.kronecker ((1 : CMatrix ι) * (1 : CMatrix ι)) (A * C) := by
-          simpa [cMatrixLeftMulKernel, Matrix.kronecker] using
+        ((1 : CMatrix ι) * (1 : CMatrix ι)) ⊗ₖ (A * C) := by
+          simpa [cMatrixLeftMulKernel] using
             (Matrix.mul_kronecker_mul (1 : CMatrix ι) (1 : CMatrix ι) A C).symm
     _ = cMatrixLeftMulKernel (A * C) := by
           simp [cMatrixLeftMulKernel]
@@ -2094,9 +2091,9 @@ private theorem cMatrixRightMulKernel_inv
     simp [Matrix.one_apply, eq_comm]
   calc
     cMatrixRightMulKernel B * cMatrixRightMulKernel B⁻¹ =
-        Matrix.kronecker (B.transpose * B⁻¹.transpose)
+        (B.transpose * B⁻¹.transpose) ⊗ₖ
           ((1 : CMatrix ι) * (1 : CMatrix ι)) := by
-          simpa [cMatrixRightMulKernel, Matrix.kronecker] using
+          simpa [cMatrixRightMulKernel] using
             (Matrix.mul_kronecker_mul B.transpose B⁻¹.transpose
               (1 : CMatrix ι) (1 : CMatrix ι)).symm
     _ = 1 := by
@@ -2105,7 +2102,7 @@ private theorem cMatrixRightMulKernel_inv
           rcases x with ⟨x₁, x₂⟩
           rcases y with ⟨y₁, y₂⟩
           by_cases h₁ : x₁ = y₁ <;> by_cases h₂ : x₂ = y₂ <;>
-          simp [Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
+          simp [Matrix.kroneckerMap_apply, Matrix.one_apply,
             Prod.ext_iff, h₁, h₂]
 
 private theorem cMatrixLeftMulKernel_uniform_average
@@ -2119,9 +2116,9 @@ private theorem cMatrixLeftMulKernel_uniform_average
   rcases y with ⟨y₁, y₂⟩
   by_cases hxy : x₁ = y₁
   · subst y₁
-    simp [cMatrixLeftMulKernel, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    simp [cMatrixLeftMulKernel, Matrix.kroneckerMap_apply,
       Matrix.sum_apply, Matrix.smul_apply, Finset.mul_sum]
-  · simp [cMatrixLeftMulKernel, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  · simp [cMatrixLeftMulKernel, Matrix.kroneckerMap_apply,
       Matrix.sum_apply, Matrix.smul_apply, hxy]
 
 private theorem cMatrixRightMulKernel_uniform_average
@@ -2135,9 +2132,9 @@ private theorem cMatrixRightMulKernel_uniform_average
   rcases y with ⟨y₁, y₂⟩
   by_cases hxy : x₂ = y₂
   · subst y₂
-    simp [cMatrixRightMulKernel, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    simp [cMatrixRightMulKernel, Matrix.kroneckerMap_apply,
       Matrix.sum_apply, Matrix.smul_apply]
-  · simp [cMatrixRightMulKernel, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  · simp [cMatrixRightMulKernel, Matrix.kroneckerMap_apply,
       Matrix.sum_apply, Matrix.smul_apply, hxy]
 
 private theorem cMatrixPetzTraceKernel_two_eq_squarePerspective

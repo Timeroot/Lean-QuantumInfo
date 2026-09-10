@@ -62,10 +62,10 @@ omit [DecidableEq HB] in
 Bob-by-Alice amplitude matrix. -/
 theorem bobAmplitudeMatrix_kronecker_mulVec
     (P : CMatrix HB) (φ : HA × HB → ℂ) :
-    bobAmplitudeMatrix ((Matrix.kronecker (1 : CMatrix HA) P).mulVec φ) =
+    bobAmplitudeMatrix (((1 : CMatrix HA) ⊗ₖ P).mulVec φ) =
       P * bobAmplitudeMatrix φ := by
   ext b a
-  simp [bobAmplitudeMatrix, Matrix.mul_apply, Matrix.mulVec, dotProduct, Matrix.kronecker]
+  simp [bobAmplitudeMatrix, Matrix.mul_apply, Matrix.mulVec, dotProduct]
   rw [← Finset.univ_product_univ, Finset.sum_product]
   simp [Matrix.one_apply]
 
@@ -73,9 +73,9 @@ omit [DecidableEq HB] in
 /-- Coordinate form of a Bob-local operator acting on a bipartite vector. -/
 theorem kronecker_one_mulVec_apply
     (P : CMatrix HB) (φ : HA × HB → ℂ) (a : HA) (b : HB) :
-    (Matrix.kronecker (1 : CMatrix HA) P).mulVec φ (a, b) =
+    ((1 : CMatrix HA) ⊗ₖ P).mulVec φ (a, b) =
       P.mulVec (fun b' => φ (a, b')) b := by
-  simp only [Matrix.mulVec, dotProduct, Matrix.kronecker]
+  simp only [Matrix.mulVec, dotProduct]
   rw [← Finset.univ_product_univ, Finset.sum_product]
   simp [Matrix.one_apply]
 
@@ -140,7 +140,7 @@ theorem rangeProjection_amplitudeGram_mulVec
 rank-one bipartite vector fixes that vector. -/
 theorem kronecker_rangeProjection_traceLeft_rankOne_mulVec
     (φ : HA × HB → ℂ) :
-    (Matrix.kronecker (1 : CMatrix HA)
+    ((1 : CMatrix HA) ⊗ₖ
       (Matrix.rangeProjection (Matrix.traceLeft (rankOneMatrix φ)))).mulVec φ =
         φ := by
   let A := bobAmplitudeMatrix φ
@@ -149,7 +149,7 @@ theorem kronecker_rangeProjection_traceLeft_rankOne_mulVec
         A * Matrix.conjTranspose A := by
     rw [traceLeft_rankOneMatrix_eq_bobAmplitudeMatrix_mul_conjTranspose]
   change
-    (Matrix.kronecker (1 : CMatrix HA)
+    ((1 : CMatrix HA) ⊗ₖ
       (Matrix.rangeProjection (Matrix.traceLeft (rankOneMatrix φ)))).mulVec φ =
         φ
   rw [hM]
@@ -158,7 +158,7 @@ theorem kronecker_rangeProjection_traceLeft_rankOne_mulVec
   have hslice := rangeProjection_amplitudeGram_mulVec (HA := HA) (HB := HB) A a
   have hslice_b := congrFun hslice b
   calc
-    (Matrix.kronecker (1 : CMatrix HA)
+    ((1 : CMatrix HA) ⊗ₖ
         (Matrix.rangeProjection (A * Matrix.conjTranspose A))).mulVec φ (a, b)
         =
           (Matrix.rangeProjection (A * Matrix.conjTranspose A)).mulVec
@@ -223,26 +223,26 @@ exactly as `(1 ⊗ P)` does. -/
 theorem kronecker_rangeProjection_traceLeft_rankOne_projection_mulVec
     (P : CMatrix HB) (hPherm : P.IsHermitian) (hPid : P * P = P)
     (φ : HA × HB → ℂ) :
-    (Matrix.kronecker (1 : CMatrix HA)
+    ((1 : CMatrix HA) ⊗ₖ
       (Matrix.rangeProjection
         (Matrix.traceLeft
-          (rankOneMatrix ((Matrix.kronecker (1 : CMatrix HA) P).mulVec φ))))).mulVec φ =
-      (Matrix.kronecker (1 : CMatrix HA) P).mulVec φ := by
+          (rankOneMatrix (((1 : CMatrix HA) ⊗ₖ P).mulVec φ))))).mulVec φ =
+      ((1 : CMatrix HA) ⊗ₖ P).mulVec φ := by
   let A := bobAmplitudeMatrix φ
   have hAmp :=
     bobAmplitudeMatrix_kronecker_mulVec (HA := HA) (HB := HB) P φ
   have hM :
       Matrix.traceLeft
-          (rankOneMatrix ((Matrix.kronecker (1 : CMatrix HA) P).mulVec φ)) =
+          (rankOneMatrix (((1 : CMatrix HA) ⊗ₖ P).mulVec φ)) =
         (P * A) * Matrix.conjTranspose (P * A) := by
     rw [traceLeft_rankOneMatrix_eq_bobAmplitudeMatrix_mul_conjTranspose]
     rw [hAmp]
   change
-    (Matrix.kronecker (1 : CMatrix HA)
+    ((1 : CMatrix HA) ⊗ₖ
       (Matrix.rangeProjection
         (Matrix.traceLeft
-          (rankOneMatrix ((Matrix.kronecker (1 : CMatrix HA) P).mulVec φ))))).mulVec φ =
-      (Matrix.kronecker (1 : CMatrix HA) P).mulVec φ
+          (rankOneMatrix (((1 : CMatrix HA) ⊗ₖ P).mulVec φ))))).mulVec φ =
+      ((1 : CMatrix HA) ⊗ₖ P).mulVec φ
   rw [hM]
   funext x
   rcases x with ⟨a, b⟩
@@ -251,7 +251,7 @@ theorem kronecker_rangeProjection_traceLeft_rankOne_projection_mulVec
       (HA := HA) (HB := HB) P hPherm hPid A a
   have hslice_b := congrFun hslice b
   calc
-    (Matrix.kronecker (1 : CMatrix HA)
+    ((1 : CMatrix HA) ⊗ₖ
         (Matrix.rangeProjection (P * A * Matrix.conjTranspose (P * A)))).mulVec φ (a, b)
         =
           (Matrix.rangeProjection (P * A * Matrix.conjTranspose (P * A))).mulVec
@@ -259,7 +259,7 @@ theorem kronecker_rangeProjection_traceLeft_rankOne_projection_mulVec
             rw [kronecker_one_mulVec_apply]
     _ = P.mulVec (fun b' => φ (a, b')) b := by
             simpa [A, bobAmplitudeMatrix] using hslice_b
-    _ = (Matrix.kronecker (1 : CMatrix HA) P).mulVec φ (a, b) := by
+    _ = ((1 : CMatrix HA) ⊗ₖ P).mulVec φ (a, b) := by
             rw [kronecker_one_mulVec_apply]
 
 /-- A vector equality gives same left action on the corresponding rank-one
@@ -329,12 +329,12 @@ theorem bobProjectedReducedSupport_sameOnStateSupport
         (data.bobProjectionOp k).mulVec ψ.vec := by
     rw [bobLocalOp_eq, bobProjectionOp_eq]
     change
-      (Matrix.kronecker (1 : CMatrix HA)
+      ((1 : CMatrix HA) ⊗ₖ
         (Matrix.rangeProjection
           (Matrix.traceLeft
-            (rankOneMatrix ((Matrix.kronecker (1 : CMatrix HA)
+            (rankOneMatrix (((1 : CMatrix HA) ⊗ₖ
               ((data.bobProjection k).matrix)).mulVec ψ.vec))))).mulVec ψ.vec =
-        (Matrix.kronecker (1 : CMatrix HA) ((data.bobProjection k).matrix)).mulVec ψ.vec
+        ((1 : CMatrix HA) ⊗ₖ ((data.bobProjection k).matrix)).mulVec ψ.vec
     exact Matrix.kronecker_rangeProjection_traceLeft_rankOne_projection_mulVec
       ((data.bobProjection k).matrix)
       (data.bobProjection k).isHermitian

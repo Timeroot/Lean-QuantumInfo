@@ -24,7 +24,7 @@ classical-conditioning route rests on.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal Pointwise
+open scoped ComplexOrder MatrixOrder Kronecker NNReal Pointwise
 open Matrix
 
 noncomputable section
@@ -368,7 +368,7 @@ theorem identityTensorStateMatrix_coordinateYPinching
         (coordinateYPinchedState σ) := by
   rw [ProjectiveMeasurement.pinchingChannel_map]
   rw [coordinateYPinchedState]
-  change _ = Matrix.kronecker (1 : CMatrix A)
+  change _ = (1 : CMatrix A) ⊗ₖ
     (((coordinateYProjectiveMeasurementRight (B := B) (Y := Y)).pinchingChannel) σ).m
   rw [ProjectiveMeasurement.pinchingChannel_applyState_matrix]
   ext ⟨a, b, y⟩ ⟨a', b', y'⟩
@@ -378,15 +378,15 @@ theorem identityTensorStateMatrix_coordinateYPinching
     · subst y'
       simp [coordinateYProjectiveMeasurement,
         coordinateYProjectiveMeasurementRight, identityTensorStateMatrix,
-        Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.mul_apply,
+        Matrix.kroneckerMap_apply, Matrix.mul_apply,
         Matrix.diagonal, Matrix.sum_apply]
     · simp [coordinateYProjectiveMeasurement,
         coordinateYProjectiveMeasurementRight, identityTensorStateMatrix,
-        Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.mul_apply,
+        Matrix.kroneckerMap_apply, Matrix.mul_apply,
         Matrix.diagonal, Matrix.sum_apply, hyy]
   · simp [coordinateYProjectiveMeasurement,
       coordinateYProjectiveMeasurementRight, identityTensorStateMatrix,
-      Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.mul_apply,
+      Matrix.kroneckerMap_apply, Matrix.mul_apply,
       Matrix.diagonal, Matrix.sum_apply, haa]
 
 theorem conditionalSandwichedRenyiUp_candidate_le_of_coordinateYPinching
@@ -448,21 +448,18 @@ theorem sandwiched_reference_cq_blockDiagonal
     by_cases hyy : y = y'
     · subst y'
       simp [conditionalRenyiRightBlockDiagonal, identityTensorStateMatrix,
-        MEnsemble.cqState_matrix, MState.reindex_matrix, Matrix.kronecker,
-        Matrix.kroneckerMap_apply, Matrix.sum_apply,
+        MEnsemble.cqState_matrix, MState.reindex_matrix, Matrix.kroneckerMap_apply, Matrix.sum_apply,
         Classical.blockDiagonal, Matrix.single_apply]
       rw [NNReal.smul_def]
       simp
     · simp [conditionalRenyiRightBlockDiagonal, identityTensorStateMatrix,
-        MEnsemble.cqState_matrix, MState.reindex_matrix, Matrix.kronecker,
-        Matrix.kroneckerMap_apply, Matrix.sum_apply,
+        MEnsemble.cqState_matrix, MState.reindex_matrix, Matrix.kroneckerMap_apply, Matrix.sum_apply,
         Classical.blockDiagonal, Matrix.single_apply]
       apply Finset.sum_congr rfl
       intro x hx
       simp [NNReal.smul_def]
   · simp [conditionalRenyiRightBlockDiagonal, identityTensorStateMatrix,
-      MEnsemble.cqState_matrix, MState.reindex_matrix, Matrix.kronecker,
-      Matrix.kroneckerMap_apply, Matrix.sum_apply,
+      MEnsemble.cqState_matrix, MState.reindex_matrix, Matrix.kroneckerMap_apply, Matrix.sum_apply,
       Classical.blockDiagonal, Matrix.single_apply, haa]
 
 /-- A block diagonal matrix with positive definite blocks is positive definite. -/
@@ -481,7 +478,7 @@ theorem classical_blockDiagonal_posDef
       rw [Classical.blockDiagonal_conjTranspose,
         Classical.blockDiagonal_mul]
       rw [show (1 : CMatrix (ι × D)) =
-          Matrix.kronecker (1 : CMatrix ι) (1 : CMatrix D) by simp]
+          (1 : CMatrix ι) ⊗ₖ (1 : CMatrix D) by simp]
       rw [Classical.identityTensor_eq_blockDiagonal (ι := ι) (a := D)
         (1 : CMatrix D)]
       apply congrArg Classical.blockDiagonal
@@ -550,8 +547,7 @@ theorem sandwiched_reference_cq_block_posDef
           (fun b : B => (b, y)) (fun b : B => (b, y)) =
         (F.probs y : ℂ) • (F.states y).m := by
     ext b b'
-    simp [MEnsemble.cqState_matrix, Matrix.kronecker,
-      Matrix.kroneckerMap_apply, Matrix.submatrix, Matrix.sum_apply,
+    simp [MEnsemble.cqState_matrix, Matrix.kroneckerMap_apply, Matrix.submatrix, Matrix.sum_apply,
       Matrix.single_apply, smul_eq_mul, NNReal.smul_def, Complex.real_smul]
   rw [← heq]
   exact hsub

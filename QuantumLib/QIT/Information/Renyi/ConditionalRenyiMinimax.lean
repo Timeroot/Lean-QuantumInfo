@@ -32,7 +32,7 @@ Source alignment:
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator NNReal QIT.MatrixL2
+open scoped ComplexOrder MatrixOrder Kronecker Matrix.Norms.L2Operator NNReal QIT.MatrixL2
 
 noncomputable section
 universe u v w
@@ -331,9 +331,8 @@ with `upwardRenyiDualityBracketRe`. -/
 def abcSidePowerTraceRe
     (R : CMatrix ((a × b) × c))
     (σ : CMatrix b) (τ : CMatrix c) (p : ℝ) : ℝ :=
-  ((Matrix.kronecker
-      (Matrix.kronecker (1 : CMatrix a) (CFC.rpow σ (-p)))
-      (CFC.rpow τ p) * R).trace).re
+  (((((1 : CMatrix a) ⊗ₖ (CFC.rpow σ (-p))) ⊗ₖ
+      (CFC.rpow τ p)) * R).trace).re
 
 theorem upwardRenyiDualityBracketRe_eq_abcSidePowerTraceRe
     (ψ : Ket ((a × b) × c))
@@ -351,11 +350,10 @@ omit [DecidableEq a] [DecidableEq b] [DecidableEq c] in
 private theorem trace_kronecker_right_add_smul_add_smul_re
     (K : CMatrix (a × b)) (R : CMatrix ((a × b) × c))
     (T U V : CMatrix c) (s t : ℝ) :
-    ((Matrix.kronecker K (T + (s • U + t • V)) * R).trace).re =
-      ((Matrix.kronecker K T * R).trace).re +
-        (s * ((Matrix.kronecker K U * R).trace).re +
-          t * ((Matrix.kronecker K V * R).trace).re) := by
-  unfold Matrix.kronecker
+    (((K ⊗ₖ (T + (s • U + t • V))) * R).trace).re =
+      (((K ⊗ₖ T) * R).trace).re +
+        (s * (((K ⊗ₖ U) * R).trace).re +
+          t * (((K ⊗ₖ V) * R).trace).re) := by
   rw [Matrix.kronecker_add K T (s • U + t • V)]
   rw [Matrix.kronecker_add K (s • U) (t • V)]
   rw [Matrix.kronecker_smul s K U, Matrix.kronecker_smul t K V]
@@ -366,25 +364,24 @@ omit [DecidableEq b] [DecidableEq c] in
 private theorem trace_kronecker_middle_add_smul_add_smul_re
     (R : CMatrix ((a × b) × c)) (K : CMatrix c)
     (T U V : CMatrix b) (s t : ℝ) :
-    ((Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) (T + (s • U + t • V))) K *
+    (((((1 : CMatrix a) ⊗ₖ (T + (s • U + t • V))) ⊗ₖ K) *
           R).trace).re =
-      ((Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) T) K * R).trace).re +
-        (s * ((Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) U) K * R).trace).re +
-          t * ((Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) V) K * R).trace).re) := by
-  unfold Matrix.kronecker
+      (((((1 : CMatrix a) ⊗ₖ T) ⊗ₖ K) * R).trace).re +
+        (s * (((((1 : CMatrix a) ⊗ₖ U) ⊗ₖ K) * R).trace).re +
+          t * (((((1 : CMatrix a) ⊗ₖ V) ⊗ₖ K) * R).trace).re) := by
   rw [Matrix.kroneckerMap_add_right (fun x y : ℂ => x * y)
     (by intro x y z; exact mul_add x y z) (1 : CMatrix a) T (s • U + t • V)]
   rw [Matrix.kroneckerMap_add_left (fun x y : ℂ => x * y)
     (by intro x y z; exact add_mul x y z)
-    (Matrix.kroneckerMap (fun x y : ℂ => x * y) (1 : CMatrix a) T)
-    (Matrix.kroneckerMap (fun x y : ℂ => x * y) (1 : CMatrix a) (s • U + t • V))
+    ((1 : CMatrix a) ⊗ₖ T)
+    ((1 : CMatrix a) ⊗ₖ (s • U + t • V))
     K]
   rw [Matrix.kroneckerMap_add_right (fun x y : ℂ => x * y)
     (by intro x y z; exact mul_add x y z) (1 : CMatrix a) (s • U) (t • V)]
   rw [Matrix.kroneckerMap_add_left (fun x y : ℂ => x * y)
     (by intro x y z; exact add_mul x y z)
-    (Matrix.kroneckerMap (fun x y : ℂ => x * y) (1 : CMatrix a) (s • U))
-    (Matrix.kroneckerMap (fun x y : ℂ => x * y) (1 : CMatrix a) (t • V))
+    ((1 : CMatrix a) ⊗ₖ (s • U))
+    ((1 : CMatrix a) ⊗ₖ (t • V))
     K]
   rw [Matrix.kroneckerMap_smul_right (fun x y : ℂ => x * y) s
     (by intro x y; exact mul_smul_comm s x y) (1 : CMatrix a) U]
@@ -392,20 +389,19 @@ private theorem trace_kronecker_middle_add_smul_add_smul_re
     (by intro x y; exact mul_smul_comm t x y) (1 : CMatrix a) V]
   rw [Matrix.kroneckerMap_smul_left (fun x y : ℂ => x * y) s
     (by intro x y; exact smul_mul_assoc s x y)
-    (Matrix.kroneckerMap (fun x y : ℂ => x * y) (1 : CMatrix a) U) K]
+    ((1 : CMatrix a) ⊗ₖ U) K]
   rw [Matrix.kroneckerMap_smul_left (fun x y : ℂ => x * y) t
     (by intro x y; exact smul_mul_assoc t x y)
-    (Matrix.kroneckerMap (fun x y : ℂ => x * y) (1 : CMatrix a) V) K]
+    ((1 : CMatrix a) ⊗ₖ V) K]
   simp only [Matrix.add_mul, Matrix.smul_mul, Matrix.trace_add, Matrix.trace_smul,
     Complex.add_re, Complex.smul_re, smul_eq_mul]
 
 omit [DecidableEq a] [DecidableEq b] [DecidableEq c] in
 private theorem trace_kronecker_right_continuous
     (K : CMatrix (a × b)) (R : CMatrix ((a × b) × c)) :
-    Continuous fun T : CMatrix c => ((Matrix.kronecker K T * R).trace).re := by
+    Continuous fun T : CMatrix c => (((K ⊗ₖ T) * R).trace).re := by
   have hkr :
-      Continuous fun T : CMatrix c => Matrix.kronecker K T := by
-    unfold Matrix.kronecker
+      Continuous fun T : CMatrix c => K ⊗ₖ T := by
     exact _root_.continuous_matrix fun x y =>
       continuous_const.mul (continuous_id.matrix_elem x.2 y.2)
   exact Complex.continuous_re.comp
@@ -415,15 +411,13 @@ omit [DecidableEq b] [DecidableEq c] in
 private theorem trace_kronecker_middle_continuous
     (R : CMatrix ((a × b) × c)) (K : CMatrix c) :
     Continuous fun T : CMatrix b =>
-      ((Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) T) K * R).trace).re := by
+      (((((1 : CMatrix a) ⊗ₖ T) ⊗ₖ K) * R).trace).re := by
   have hinner :
-      Continuous fun T : CMatrix b => Matrix.kronecker (1 : CMatrix a) T := by
-    unfold Matrix.kronecker
+      Continuous fun T : CMatrix b => (1 : CMatrix a) ⊗ₖ T := by
     exact _root_.continuous_matrix fun x y =>
       continuous_const.mul (continuous_id.matrix_elem x.2 y.2)
   have hkr :
-      Continuous fun T : CMatrix b => Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) T) K := by
-    unfold Matrix.kronecker
+      Continuous fun T : CMatrix b => ((1 : CMatrix a) ⊗ₖ T) ⊗ₖ K := by
     exact _root_.continuous_matrix fun x y =>
       (hinner.matrix_elem x.1 y.1).mul continuous_const
   exact Complex.continuous_re.comp
@@ -810,7 +804,7 @@ theorem abcSidePowerTraceRe_concaveOn_tau
       (Matrix.PosSemidef.smul hy ht)
   · intro x hx y hy s t hs ht hst
     let S : CMatrix b := CFC.rpow σ (-p)
-    let K : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) S
+    let K : CMatrix (a × b) := (1 : CMatrix a) ⊗ₖ S
     let T : CMatrix c := CFC.rpow (s • x + t • y) p
     let U : CMatrix c := CFC.rpow x p
     let V : CMatrix c := CFC.rpow y p
@@ -830,25 +824,25 @@ theorem abcSidePowerTraceRe_concaveOn_tau
       cMatrix_rpow_posSemidef (A := σ) (s := -p) hσ
     have hleft : K.PosSemidef :=
       Matrix.PosSemidef.one.kronecker hS
-    have hfull : (Matrix.kronecker K D).PosSemidef :=
+    have hfull : (K ⊗ₖ D).PosSemidef :=
       hleft.kronecker hD
     have htrace := cMatrix_trace_mul_posSemidef_re_nonneg hfull hR
-    change 0 ≤ ((Matrix.kronecker K D * R).trace).re at htrace
+    change 0 ≤ (((K ⊗ₖ D) * R).trace).re at htrace
     have htrace' :
         0 ≤ abcSidePowerTraceRe (a := a) R σ (s • x + t • y) p +
           (-s * abcSidePowerTraceRe (a := a) R σ x p +
             -t * abcSidePowerTraceRe (a := a) R σ y p) := by
       rw [trace_kronecker_right_add_smul_add_smul_re K R T U V (-s) (-t)] at htrace
       have hT :
-          ((Matrix.kronecker K T * R).trace).re =
+          (((K ⊗ₖ T) * R).trace).re =
             abcSidePowerTraceRe (a := a) R σ (s • x + t • y) p := by
         simp [abcSidePowerTraceRe, K, S, T]
       have hU :
-          ((Matrix.kronecker K U * R).trace).re =
+          (((K ⊗ₖ U) * R).trace).re =
             abcSidePowerTraceRe (a := a) R σ x p := by
         simp [abcSidePowerTraceRe, K, S, U]
       have hV :
-          ((Matrix.kronecker K V * R).trace).re =
+          (((K ⊗ₖ V) * R).trace).re =
             abcSidePowerTraceRe (a := a) R σ y p := by
         simp [abcSidePowerTraceRe, K, S, V]
       rw [hT, hU, hV] at htrace
@@ -877,7 +871,7 @@ theorem abcSidePowerTraceRe_continuousOn_tau_posSemidef
     ContinuousOn
       (fun τ : CMatrix c => abcSidePowerTraceRe (a := a) R σ τ p)
       ({τ : CMatrix c | τ.PosSemidef} : Set (CMatrix c)) := by
-  let K : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) (CFC.rpow σ (-p))
+  let K : CMatrix (a × b) := (1 : CMatrix a) ⊗ₖ (CFC.rpow σ (-p))
   have htrace := trace_kronecker_right_continuous (a := a) (b := b) (c := c) K R
   have hpow := cMatrix_rpow_continuousOn_posSemidef_of_pos (a := c) hp0
   simpa [abcSidePowerTraceRe, K, Function.comp_def] using htrace.comp_continuousOn hpow
@@ -933,13 +927,13 @@ theorem abcSidePowerTraceRe_convexOn_sigma_posDef
     have hD : D.PosSemidef := Matrix.nonneg_iff_posSemidef.mp hD_nonneg
     have hT : T.PosSemidef :=
       cMatrix_rpow_posSemidef (A := τ) (s := p) hτ
-    have hleft : (Matrix.kronecker (1 : CMatrix a) D).PosSemidef :=
+    have hleft : ((1 : CMatrix a) ⊗ₖ D).PosSemidef :=
       Matrix.PosSemidef.one.kronecker hD
-    have hfull : (Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) D) T).PosSemidef :=
+    have hfull : (((1 : CMatrix a) ⊗ₖ D) ⊗ₖ T).PosSemidef :=
       hleft.kronecker hT
     have htrace := cMatrix_trace_mul_posSemidef_re_nonneg hfull hR
     change 0 ≤
-      ((Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) D) T * R).trace).re at htrace
+      (((((1 : CMatrix a) ⊗ₖ D) ⊗ₖ T) * R).trace).re at htrace
     have htrace' :
         0 ≤ -abcSidePowerTraceRe (a := a) R (s • x + t • y) τ p +
           (s * abcSidePowerTraceRe (a := a) R x τ p +
@@ -947,27 +941,26 @@ theorem abcSidePowerTraceRe_convexOn_sigma_posDef
       rw [trace_kronecker_middle_add_smul_add_smul_re R T ((-1 : ℝ) • S) U V s t]
         at htrace
       have hS :
-          ((Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) ((-1 : ℝ) • S)) T *
+          (((((1 : CMatrix a) ⊗ₖ ((-1 : ℝ) • S)) ⊗ₖ T) *
             R).trace).re =
             -abcSidePowerTraceRe (a := a) R (s • x + t • y) τ p := by
         simp only [abcSidePowerTraceRe, S, T]
-        unfold Matrix.kronecker
         rw [Matrix.kroneckerMap_smul_right (fun x y : ℂ => x * y) (-1 : ℝ)
           (by intro x y; exact mul_smul_comm (-1 : ℝ) x y) (1 : CMatrix a)
           (CFC.rpow (s • x + t • y) (-p))]
         rw [Matrix.kroneckerMap_smul_left (fun x y : ℂ => x * y) (-1 : ℝ)
           (by intro x y; exact smul_mul_assoc (-1 : ℝ) x y)
-          (Matrix.kroneckerMap (fun x y : ℂ => x * y) (1 : CMatrix a)
+          ((1 : CMatrix a) ⊗ₖ
             (CFC.rpow (s • x + t • y) (-p)))
           (CFC.rpow τ p)]
         rw [Matrix.smul_mul, Matrix.trace_smul]
         simp
       have hU :
-          ((Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) U) T * R).trace).re =
+          (((((1 : CMatrix a) ⊗ₖ U) ⊗ₖ T) * R).trace).re =
             abcSidePowerTraceRe (a := a) R x τ p := by
         simp [abcSidePowerTraceRe, U, T]
       have hV :
-          ((Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) V) T * R).trace).re =
+          (((((1 : CMatrix a) ⊗ₖ V) ⊗ₖ T) * R).trace).re =
             abcSidePowerTraceRe (a := a) R y τ p := by
         simp [abcSidePowerTraceRe, V, T]
       rw [hS, hU, hV] at htrace

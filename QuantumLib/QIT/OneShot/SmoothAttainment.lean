@@ -21,7 +21,7 @@ purified-distance ball into source-style attained extrema.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator Topology
+open scoped ComplexOrder MatrixOrder Kronecker Matrix.Norms.L2Operator Topology
 
 namespace QIT
 
@@ -43,7 +43,7 @@ theorem continuous_identityTensorStateMatrix :
   intro i
   refine continuous_pi ?_
   intro j
-  simp [identityTensorStateMatrix, Matrix.kronecker]
+  simp [identityTensorStateMatrix]
   exact continuous_const.mul
     ((continuous_apply j.2).comp ((continuous_apply i.2).comp continuous_matrix))
 
@@ -69,21 +69,21 @@ def conditionalMinEntropyScaleFeasiblePairSet
     Set (SubnormalizedState (a × b) × CMatrix b) :=
   ({ρ' : SubnormalizedState (a × b) | ρ.purifiedBall ε ρ'} ×ˢ
       psdTraceBoundedMatrixSet b B) ∩
-    {p | p.1.matrix ≤ Matrix.kronecker (1 : CMatrix a) p.2}
+    {p | p.1.matrix ≤ (1 : CMatrix a) ⊗ₖ p.2}
 
 /-- The matrix-order constraint in the feasible-pair domain is closed. -/
 theorem conditionalMinEntropyScaleFeasiblePair_order_isClosed :
     IsClosed
       ({p : SubnormalizedState (a × b) × CMatrix b |
-        p.1.matrix ≤ Matrix.kronecker (1 : CMatrix a) p.2}) := by
+        p.1.matrix ≤ (1 : CMatrix a) ⊗ₖ p.2}) := by
   let f : SubnormalizedState (a × b) × CMatrix b → CMatrix (a × b) :=
-    fun p => Matrix.kronecker (1 : CMatrix a) p.2 - p.1.matrix
+    fun p => (1 : CMatrix a) ⊗ₖ p.2 - p.1.matrix
   have hf : Continuous f := by
     exact ((continuous_kronecker_one_matrix (a := a) (b := b)).comp continuous_snd).sub
       (continuous_matrix.comp continuous_fst)
   have hset :
       {p : SubnormalizedState (a × b) × CMatrix b |
-        p.1.matrix ≤ Matrix.kronecker (1 : CMatrix a) p.2} =
+        p.1.matrix ≤ (1 : CMatrix a) ⊗ₖ p.2} =
       {p | f p ∈ ({M : CMatrix (a × b) | M.PosSemidef} : Set (CMatrix (a × b)))} := by
     ext p
     simp [f, Matrix.le_iff]

@@ -28,7 +28,7 @@ statements aligned with the mathematical domain.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 
 open Matrix Polynomial
 
@@ -968,8 +968,8 @@ theorem sandwichedRenyiQ_kronecker
     (hρ₂ : ρ₂.PosSemidef) (hσ₂ : σ₂.PosSemidef)
     (α : ℝ) :
     sandwichedRenyiQ
-        (Matrix.kronecker ρ₁ ρ₂)
-        (Matrix.kronecker σ₁ σ₂)
+        (ρ₁ ⊗ₖ ρ₂)
+        (σ₁ ⊗ₖ σ₂)
         (hρ₁.kronecker hρ₂) (hσ₁.kronecker hσ₂) α =
       sandwichedRenyiQ ρ₁ σ₁ hρ₁ hσ₁ α *
         sandwichedRenyiQ ρ₂ σ₂ hρ₂ hσ₂ α := by
@@ -979,14 +979,14 @@ theorem sandwichedRenyiQ_kronecker
   let inner₁ : CMatrix a := C₁ * ρ₁ * C₁
   let inner₂ : CMatrix b := C₂ * ρ₂ * C₂
   have hC :
-      CFC.rpow (Matrix.kronecker σ₁ σ₂) s =
-        Matrix.kronecker C₁ C₂ := by
+      CFC.rpow (σ₁ ⊗ₖ σ₂) s =
+        C₁ ⊗ₖ C₂ := by
     simpa [C₁, C₂, s] using cMatrix_rpow_kronecker hσ₁ hσ₂ s
   have hinner :
-      CFC.rpow (Matrix.kronecker σ₁ σ₂) s *
-          Matrix.kronecker ρ₁ ρ₂ *
-          CFC.rpow (Matrix.kronecker σ₁ σ₂) s =
-        Matrix.kronecker inner₁ inner₂ := by
+      CFC.rpow (σ₁ ⊗ₖ σ₂) s *
+          (ρ₁ ⊗ₖ ρ₂) *
+          CFC.rpow (σ₁ ⊗ₖ σ₂) s =
+        inner₁ ⊗ₖ inner₂ := by
     rw [hC]
     simp [inner₁, inner₂, Matrix.mul_kronecker_mul, Matrix.mul_assoc]
   have hC₁_hm : C₁.IsHermitian :=
@@ -1001,14 +1001,13 @@ theorem sandwichedRenyiQ_kronecker
     rwa [hC₂_hm.eq] at h
   have htraceC :
       (CFC.rpow
-        (CFC.rpow (Matrix.kronecker σ₁ σ₂) s * Matrix.kronecker ρ₁ ρ₂ *
-          CFC.rpow (Matrix.kronecker σ₁ σ₂) s) α).trace =
+        (CFC.rpow (σ₁ ⊗ₖ σ₂) s * (ρ₁ ⊗ₖ ρ₂) *
+          CFC.rpow (σ₁ ⊗ₖ σ₂) s) α).trace =
         (CFC.rpow inner₁ α).trace * (CFC.rpow inner₂ α).trace := by
     rw [hinner]
     rw [cMatrix_rpow_kronecker hinner₁_psd hinner₂_psd α]
     change
-      (Matrix.kroneckerMap (fun x y => x * y)
-        (CFC.rpow inner₁ α) (CFC.rpow inner₂ α)).trace =
+      ((CFC.rpow inner₁ α) ⊗ₖ (CFC.rpow inner₂ α)).trace =
         (CFC.rpow inner₁ α).trace * (CFC.rpow inner₂ α).trace
     rw [Matrix.trace_kronecker]
   have h_im1 : ((CFC.rpow inner₁ α).trace).im = 0 := by
@@ -1024,8 +1023,8 @@ theorem sandwichedRenyiQ_kronecker
   unfold sandwichedRenyiQ
   change
     (CFC.rpow
-      (CFC.rpow (Matrix.kronecker σ₁ σ₂) s * Matrix.kronecker ρ₁ ρ₂ *
-        CFC.rpow (Matrix.kronecker σ₁ σ₂) s) α).trace.re =
+      (CFC.rpow (σ₁ ⊗ₖ σ₂) s * (ρ₁ ⊗ₖ ρ₂) *
+        CFC.rpow (σ₁ ⊗ₖ σ₂) s) α).trace.re =
       (CFC.rpow inner₁ α).trace.re * (CFC.rpow inner₂ α).trace.re
   rw [htraceC, Complex.mul_re, h_im1, h_im2]
   ring
@@ -1370,14 +1369,12 @@ theorem petzRenyi_prod {b : Type v} [Fintype b] [DecidableEq b]
             CFC.rpow (σ₁.prod σ₂).m (1 - α)).trace =
           (CFC.rpow ρ₁.m α * CFC.rpow σ₁.m (1 - α)).trace *
             (CFC.rpow ρ₂.m α * CFC.rpow σ₂.m (1 - α)).trace := by
-      rw [prod_m ρ₁ ρ₂, prod_m σ₁ σ₂, ← Matrix.kronecker]
+      rw [prod_m ρ₁ ρ₂, prod_m σ₁ σ₂]
       rw [cMatrix_rpow_kronecker hρ₁.posSemidef hρ₂.posSemidef α]
       rw [cMatrix_rpow_kronecker hσ₁.posSemidef hσ₂.posSemidef (1 - α)]
       change
-        (Matrix.kroneckerMap (fun x y => x * y)
-          (CFC.rpow ρ₁.m α) (CFC.rpow ρ₂.m α) *
-        Matrix.kroneckerMap (fun x y => x * y)
-          (CFC.rpow σ₁.m (1 - α)) (CFC.rpow σ₂.m (1 - α))).trace =
+        (((CFC.rpow ρ₁.m α) ⊗ₖ (CFC.rpow ρ₂.m α)) *
+        ((CFC.rpow σ₁.m (1 - α)) ⊗ₖ (CFC.rpow σ₂.m (1 - α)))).trace =
         (CFC.rpow ρ₁.m α * CFC.rpow σ₁.m (1 - α)).trace *
           (CFC.rpow ρ₂.m α * CFC.rpow σ₂.m (1 - α)).trace
       rw [← Matrix.mul_kronecker_mul]
@@ -1455,14 +1452,13 @@ theorem sandwichedRenyi_prod {b : Type v} [Fintype b] [DecidableEq b]
   let s := (1 - α) / (2 * α)
   have hC :
       CFC.rpow (σ₁.prod σ₂).m s =
-        Matrix.kronecker (CFC.rpow σ₁.m s) (CFC.rpow σ₂.m s) := by
+        (CFC.rpow σ₁.m s) ⊗ₖ (CFC.rpow σ₂.m s) := by
     rw [prod_m σ₁ σ₂]
     exact cMatrix_rpow_kronecker hσ₁.posSemidef hσ₂.posSemidef s
   have hinner :
       CFC.rpow (σ₁.prod σ₂).m s * (ρ₁.prod ρ₂).m *
           CFC.rpow (σ₁.prod σ₂).m s =
-        Matrix.kronecker
-          (CFC.rpow σ₁.m s * ρ₁.m * CFC.rpow σ₁.m s)
+        (CFC.rpow σ₁.m s * ρ₁.m * CFC.rpow σ₁.m s) ⊗ₖ
           (CFC.rpow σ₂.m s * ρ₂.m * CFC.rpow σ₂.m s) := by
     rw [hC, prod_m ρ₁ ρ₂]
     simp [Matrix.mul_kronecker_mul, Matrix.mul_assoc]
@@ -1503,9 +1499,8 @@ theorem sandwichedRenyi_prod {b : Type v} [Fintype b] [DecidableEq b]
       rw [hinner]
       rw [cMatrix_rpow_kronecker hinner₁_pos.posSemidef hinner₂_pos.posSemidef α]
       change
-        (Matrix.kroneckerMap (fun x y => x * y)
-          (CFC.rpow
-            (CFC.rpow σ₁.m s * ρ₁.m * CFC.rpow σ₁.m s) α)
+        ((CFC.rpow
+            (CFC.rpow σ₁.m s * ρ₁.m * CFC.rpow σ₁.m s) α) ⊗ₖ
           (CFC.rpow
             (CFC.rpow σ₂.m s * ρ₂.m * CFC.rpow σ₂.m s) α)).trace =
           (CFC.rpow

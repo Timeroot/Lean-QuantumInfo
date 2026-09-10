@@ -37,7 +37,7 @@ the functional calculus of `sqrt X + X^{-1/2} + I`.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator QIT.MatrixL2
+open scoped ComplexOrder MatrixOrder Kronecker Matrix.Norms.L2Operator QIT.MatrixL2
 
 open Matrix Polynomial
 
@@ -91,8 +91,8 @@ theorem vonNeumann_eq_of_matrix_eq_isometry_conj
 private theorem kronecker_one_isometry
     {bPlus : Type w} [Fintype bPlus] [DecidableEq bPlus]
     (V : ReferenceIsometry b bPlus) :
-    Matrix.conjTranspose (Matrix.kronecker (1 : CMatrix a) V.matrix) *
-        Matrix.kronecker (1 : CMatrix a) V.matrix =
+    Matrix.conjTranspose ((1 : CMatrix a) ⊗ₖ V.matrix) *
+        ((1 : CMatrix a) ⊗ₖ V.matrix) =
       (1 : CMatrix (a × b)) := by
   ext x y
   rcases x with ⟨xA, xB⟩
@@ -100,10 +100,10 @@ private theorem kronecker_one_isometry
   have hV := congrFun (congrFun V.isometry xB) yB
   by_cases hxy : xA = yA
   · subst yA
-    simpa [Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    simpa [Matrix.mul_apply, Matrix.kroneckerMap_apply,
       Matrix.one_apply, Matrix.conjTranspose_apply, Fintype.sum_prod_type,
       Finset.sum_ite_eq', apply_ite] using hV
-  · simp [Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  · simp [Matrix.mul_apply, Matrix.kroneckerMap_apply,
       Matrix.one_apply, Matrix.conjTranspose_apply, Fintype.sum_prod_type,
       apply_ite, hxy, eq_comm]
 
@@ -118,7 +118,7 @@ theorem conditionalEntropy_conditioningIsometryApply
       (ρ.conditioningIsometryApply V).vonNeumann = ρ.vonNeumann :=
     vonNeumann_eq_of_matrix_eq_isometry_conj
       (ρ := ρ) (σ := ρ.conditioningIsometryApply V)
-      (V := Matrix.kronecker (1 : CMatrix a) V.matrix)
+      (V := (1 : CMatrix a) ⊗ₖ V.matrix)
       (kronecker_one_isometry (a := a) V)
       (ρ.conditioningIsometryApply_matrix_eq_kronecker_conj V)
   have hmarg :
@@ -586,19 +586,19 @@ private theorem cfc_conjStarAlgAut_posDef
 omit [DecidableEq b] in
 private theorem kronecker_one_mul_mul
     (A B C : CMatrix b) :
-    Matrix.kronecker (1 : CMatrix a) (A * (B * C)) =
-      Matrix.kronecker (1 : CMatrix a) A *
-        (Matrix.kronecker (1 : CMatrix a) B *
-          Matrix.kronecker (1 : CMatrix a) C) := by
+    (1 : CMatrix a) ⊗ₖ (A * (B * C)) =
+      ((1 : CMatrix a) ⊗ₖ A) *
+        (((1 : CMatrix a) ⊗ₖ B) *
+          ((1 : CMatrix a) ⊗ₖ C)) := by
   have hBC :
-      Matrix.kronecker (1 : CMatrix a) B * Matrix.kronecker (1 : CMatrix a) C =
-        Matrix.kronecker (1 : CMatrix a) (B * C) := by
+      ((1 : CMatrix a) ⊗ₖ B) * ((1 : CMatrix a) ⊗ₖ C) =
+        (1 : CMatrix a) ⊗ₖ (B * C) := by
     simpa using
       (Matrix.mul_kronecker_mul (1 : CMatrix a) (1 : CMatrix a) B C).symm
   rw [hBC]
-  rw [show Matrix.kronecker (1 : CMatrix a) A *
-      Matrix.kronecker (1 : CMatrix a) (B * C) =
-        Matrix.kronecker ((1 : CMatrix a) * 1) (A * (B * C)) by
+  rw [show ((1 : CMatrix a) ⊗ₖ A) *
+      ((1 : CMatrix a) ⊗ₖ (B * C)) =
+        ((1 : CMatrix a) * 1) ⊗ₖ (A * (B * C)) by
     simpa using
       (Matrix.mul_kronecker_mul (1 : CMatrix a) (1 : CMatrix a) A (B * C)).symm]
   simp
@@ -606,10 +606,10 @@ private theorem kronecker_one_mul_mul
 omit [DecidableEq b] in
 private theorem kronecker_one_mul_mul_assoc
     (A B C : CMatrix b) :
-    Matrix.kronecker (1 : CMatrix a) ((A * B) * C) =
-      Matrix.kronecker (1 : CMatrix a) A *
-        Matrix.kronecker (1 : CMatrix a) B *
-          Matrix.kronecker (1 : CMatrix a) C := by
+    (1 : CMatrix a) ⊗ₖ ((A * B) * C) =
+      ((1 : CMatrix a) ⊗ₖ A) *
+        ((1 : CMatrix a) ⊗ₖ B) *
+          ((1 : CMatrix a) ⊗ₖ C) := by
   rw [show (A * B) * C = A * (B * C) by rw [Matrix.mul_assoc]]
   rw [kronecker_one_mul_mul]
   rw [Matrix.mul_assoc]
@@ -622,12 +622,12 @@ theorem psdLog_identityTensorStateMatrix
     (σ : MState b) (hσ : σ.m.PosDef) :
     psdLog (identityTensorStateMatrix (a := a) σ)
         (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ) =
-      Matrix.kronecker (1 : CMatrix a) (psdLog σ.m hσ) := by
+      (1 : CMatrix a) ⊗ₖ (psdLog σ.m hσ) := by
   classical
   let Uσ : Matrix.unitaryGroup b ℂ := hσ.1.eigenvectorUnitary
   let UI : Matrix.unitaryGroup a ℂ := ⟨1, by simp⟩
   let U : Matrix.unitaryGroup (a × b) ℂ :=
-    ⟨Matrix.kronecker (1 : CMatrix a) (Uσ : CMatrix b),
+    ⟨(1 : CMatrix a) ⊗ₖ (Uσ : CMatrix b),
       Matrix.kronecker_mem_unitary UI.2 Uσ.2⟩
   let d : b → ℝ := hσ.1.eigenvalues
   let dside : a × b → ℝ := fun i => d i.2
@@ -653,16 +653,16 @@ theorem psdLog_identityTensorStateMatrix
           (Matrix.diagonal (fun i => (dside i : ℂ))) := by
     have hDside_kr :
         (Matrix.diagonal (fun i => (dside i : ℂ)) : CMatrix (a × b)) =
-          Matrix.kronecker (1 : CMatrix a)
+          (1 : CMatrix a) ⊗ₖ
             (Matrix.diagonal (fun i => (d i : ℂ)) : CMatrix b) := by
       ext x y
       by_cases h₁ : x.1 = y.1
       · by_cases h₂ : x.2 = y.2
-        · simp [dside, Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
+        · simp [dside, Matrix.kroneckerMap_apply, Matrix.one_apply,
             Matrix.diagonal, Prod.ext_iff, h₁, h₂]
-        · simp [dside, Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
+        · simp [dside, Matrix.kroneckerMap_apply, Matrix.one_apply,
             Matrix.diagonal, Prod.ext_iff, h₁, h₂]
-      · simp [dside, Matrix.kronecker, Matrix.kroneckerMap_apply,
+      · simp [dside, Matrix.kroneckerMap_apply,
           Matrix.diagonal, Prod.ext_iff, h₁]
     rw [identityTensorStateMatrix, hσ_spec]
     rw [hDside_kr]
@@ -696,16 +696,16 @@ theorem psdLog_identityTensorStateMatrix
   rw [hlogside, hlogσ]
   have hDside_kr :
       (Matrix.diagonal (fun i => ((Real.log (dside i) : ℝ) : ℂ)) : CMatrix (a × b)) =
-        Matrix.kronecker (1 : CMatrix a)
+        (1 : CMatrix a) ⊗ₖ
           (Matrix.diagonal (fun i => ((Real.log (d i) : ℝ) : ℂ)) : CMatrix b) := by
     ext x y
     by_cases h₁ : x.1 = y.1
     · by_cases h₂ : x.2 = y.2
-      · simp [dside, Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
+      · simp [dside, Matrix.kroneckerMap_apply, Matrix.one_apply,
           Matrix.diagonal, Prod.ext_iff, h₁, h₂]
-      · simp [dside, Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
+      · simp [dside, Matrix.kroneckerMap_apply, Matrix.one_apply,
           Matrix.diagonal, Prod.ext_iff, h₁, h₂]
-    · simp [dside, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    · simp [dside, Matrix.kroneckerMap_apply,
         Matrix.diagonal, Prod.ext_iff, h₁]
   rw [hDside_kr]
   simpa [U, Unitary.conjStarAlgAut_apply, star_eq_conjTranspose,
@@ -1026,8 +1026,8 @@ theorem conditionalEntropyRelative_to_conditionalEntropy
   rw [psdLog_identityTensorStateMatrix (a := a) ρ.traceLeft hρB]
   calc
     ((ρ.m *
-      Matrix.kronecker (1 : CMatrix a) (psdLog ρ.traceLeft.m hρB)).trace).re =
-        ((Matrix.kronecker (1 : CMatrix a) (psdLog ρ.traceLeft.m hρB) *
+      ((1 : CMatrix a) ⊗ₖ (psdLog ρ.traceLeft.m hρB))).trace).re =
+        ((((1 : CMatrix a) ⊗ₖ (psdLog ρ.traceLeft.m hρB)) *
           ρ.m).trace).re := by
       rw [Matrix.trace_mul_comm]
     _ = ((psdLog ρ.traceLeft.m hρB *
@@ -1077,8 +1077,8 @@ theorem conditionalEntropyRelative_le_conditionalEntropy
         ((ρ.traceLeft.m * psdLog σ.m hσ).trace).re := by
     rw [psdLog_identityTensorStateMatrix (a := a) σ hσ]
     calc
-      ((ρ.m * Matrix.kronecker (1 : CMatrix a) (psdLog σ.m hσ)).trace).re =
-          ((Matrix.kronecker (1 : CMatrix a) (psdLog σ.m hσ) *
+      ((ρ.m * ((1 : CMatrix a) ⊗ₖ (psdLog σ.m hσ))).trace).re =
+          ((((1 : CMatrix a) ⊗ₖ (psdLog σ.m hσ)) *
             ρ.m).trace).re := by
         rw [Matrix.trace_mul_comm]
       _ = ((psdLog σ.m hσ *
@@ -1119,8 +1119,8 @@ theorem conditionalEntropyRelativeFullReference_le_conditionalEntropy
         ((ρ.traceLeft.m * psdLog σ.m hσ).trace).re := by
     rw [psdLog_identityTensorStateMatrix (a := a) σ hσ]
     calc
-      ((ρ.m * Matrix.kronecker (1 : CMatrix a) (psdLog σ.m hσ)).trace).re =
-          ((Matrix.kronecker (1 : CMatrix a) (psdLog σ.m hσ) *
+      ((ρ.m * ((1 : CMatrix a) ⊗ₖ (psdLog σ.m hσ))).trace).re =
+          ((((1 : CMatrix a) ⊗ₖ (psdLog σ.m hσ)) *
             ρ.m).trace).re := by
         rw [Matrix.trace_mul_comm]
       _ = ((psdLog σ.m hσ *
@@ -1188,8 +1188,8 @@ theorem conditionalEntropyRelativeFullReference_to_conditionalEntropy
     rw [psdLog_identityTensorStateMatrix (a := a) ρ.traceLeft hρB]
     calc
       ((ρ.m *
-        Matrix.kronecker (1 : CMatrix a) (psdLog ρ.traceLeft.m hρB)).trace).re =
-          ((Matrix.kronecker (1 : CMatrix a) (psdLog ρ.traceLeft.m hρB) *
+        ((1 : CMatrix a) ⊗ₖ (psdLog ρ.traceLeft.m hρB))).trace).re =
+          ((((1 : CMatrix a) ⊗ₖ (psdLog ρ.traceLeft.m hρB)) *
             ρ.m).trace).re := by
         rw [Matrix.trace_mul_comm]
       _ = ((psdLog ρ.traceLeft.m hρB *
@@ -3302,19 +3302,18 @@ theorem tensorPowerBipartite_succ_grouped_forAlphaContinuity
         (Equiv.prodProdProdComm
           a b (TensorPower a n) (TensorPower b n)) := by
   have hL : (ρ.tensorPowerBipartite (n + 1)).m =
-      (Matrix.kronecker ρ.m (ρ.tensorPower n).m).submatrix
+      (ρ.m ⊗ₖ (ρ.tensorPower n).m).submatrix
         (tensorPowerProdEquiv a b (n + 1)).symm (tensorPowerProdEquiv a b (n + 1)).symm := by
     rw [MState.tensorPowerBipartite_matrix, MState.tensorPower_succ_matrix]
     rfl
   have hR : ((ρ.prod (ρ.tensorPowerBipartite n)).reindex
         (Equiv.prodProdProdComm a b (TensorPower a n) (TensorPower b n))).m =
-      (Matrix.kronecker ρ.m
+      (ρ.m ⊗ₖ
           ((ρ.tensorPower n).m.submatrix (tensorPowerProdEquiv a b n).symm
             (tensorPowerProdEquiv a b n).symm)).submatrix
         (Equiv.prodProdProdComm a b (TensorPower a n) (TensorPower b n)).symm
         (Equiv.prodProdProdComm a b (TensorPower a n) (TensorPower b n)).symm := by
-    rw [MState.reindex_matrix, MState.prod_m, MState.tensorPowerBipartite_matrix,
-      ← Matrix.kronecker]
+    rw [MState.reindex_matrix, MState.prod_m, MState.tensorPowerBipartite_matrix]
   refine MState.ext (hL.trans (Eq.trans ?_ hR.symm))
   ext x y
   rfl
@@ -3374,13 +3373,13 @@ theorem tensorPowerBipartite_conditionalPetzRenyiTraceTerm_zero
     cases yA
     cases yB
     change
-      (Matrix.kronecker (1 : CMatrix (TensorPower a 0))
+      ((1 : CMatrix (TensorPower a 0)) ⊗ₖ
           (ρ.tensorPowerBipartite 0).traceLeft.m)
         (PUnit.unit, PUnit.unit) (PUnit.unit, PUnit.unit) =
         (1 : CMatrix (TensorPower a 0 × TensorPower b 0))
           (PUnit.unit, PUnit.unit) (PUnit.unit, PUnit.unit)
     rw [hBmat]
-    simp [QIT.TensorPower, Matrix.kronecker]
+    simp [QIT.TensorPower]
     change (1 : ℂ) * 1 = 1
     norm_num
   unfold conditionalPetzRenyiTraceTerm

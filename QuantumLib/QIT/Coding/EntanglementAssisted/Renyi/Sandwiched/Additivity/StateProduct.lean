@@ -18,7 +18,7 @@ spine for entanglement-assisted classical communication.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Pointwise
+open scoped ComplexOrder MatrixOrder Kronecker Pointwise
 
 noncomputable section
 universe u1 v1 u2 v2
@@ -202,8 +202,8 @@ theorem sandwichedRenyiQ_kronecker_posSemidef_support
     (hrho2 : rho2.PosSemidef) (hsigma2 : sigma2.PosSemidef)
     (alpha : ℝ) :
     MState.sandwichedRenyiQ
-        (Matrix.kronecker rho1 rho2)
-        (Matrix.kronecker sigma1 sigma2)
+        (rho1 ⊗ₖ rho2)
+        (sigma1 ⊗ₖ sigma2)
         (hrho1.kronecker hrho2) (hsigma1.kronecker hsigma2) alpha =
       MState.sandwichedRenyiQ rho1 sigma1 hrho1 hsigma1 alpha *
         MState.sandwichedRenyiQ rho2 sigma2 hrho2 hsigma2 alpha := by
@@ -213,15 +213,15 @@ theorem sandwichedRenyiQ_kronecker_posSemidef_support
   let inner1 : CMatrix x := C1 * rho1 * C1
   let inner2 : CMatrix y := C2 * rho2 * C2
   have hC :
-      CFC.rpow (Matrix.kronecker sigma1 sigma2) s =
-        Matrix.kronecker C1 C2 := by
+      CFC.rpow (sigma1 ⊗ₖ sigma2) s =
+        C1 ⊗ₖ C2 := by
     simpa [C1, C2, s] using
       cMatrix_rpow_kronecker hsigma1 hsigma2 s
   have hinner :
-      CFC.rpow (Matrix.kronecker sigma1 sigma2) s *
-          Matrix.kronecker rho1 rho2 *
-          CFC.rpow (Matrix.kronecker sigma1 sigma2) s =
-        Matrix.kronecker inner1 inner2 := by
+      CFC.rpow (sigma1 ⊗ₖ sigma2) s *
+          (rho1 ⊗ₖ rho2) *
+          CFC.rpow (sigma1 ⊗ₖ sigma2) s =
+        inner1 ⊗ₖ inner2 := by
     rw [hC]
     simp [inner1, inner2, Matrix.mul_kronecker_mul, Matrix.mul_assoc]
   have hC1_hm : C1.IsHermitian :=
@@ -236,14 +236,13 @@ theorem sandwichedRenyiQ_kronecker_posSemidef_support
     rwa [hC2_hm.eq] at h
   have htraceC :
       (CFC.rpow
-        (CFC.rpow (Matrix.kronecker sigma1 sigma2) s * Matrix.kronecker rho1 rho2 *
-          CFC.rpow (Matrix.kronecker sigma1 sigma2) s) alpha).trace =
+        (CFC.rpow (sigma1 ⊗ₖ sigma2) s * (rho1 ⊗ₖ rho2) *
+          CFC.rpow (sigma1 ⊗ₖ sigma2) s) alpha).trace =
         (CFC.rpow inner1 alpha).trace * (CFC.rpow inner2 alpha).trace := by
     rw [hinner]
     rw [cMatrix_rpow_kronecker hinner1_psd hinner2_psd]
     change
-      (Matrix.kroneckerMap (fun x y => x * y)
-        (CFC.rpow inner1 alpha) (CFC.rpow inner2 alpha)).trace =
+      ((CFC.rpow inner1 alpha) ⊗ₖ (CFC.rpow inner2 alpha)).trace =
         (CFC.rpow inner1 alpha).trace * (CFC.rpow inner2 alpha).trace
     rw [Matrix.trace_kronecker]
   have him1 : ((CFC.rpow inner1 alpha).trace).im = 0 := by
@@ -259,8 +258,8 @@ theorem sandwichedRenyiQ_kronecker_posSemidef_support
   unfold MState.sandwichedRenyiQ
   change
     (CFC.rpow
-      (CFC.rpow (Matrix.kronecker sigma1 sigma2) s * Matrix.kronecker rho1 rho2 *
-        CFC.rpow (Matrix.kronecker sigma1 sigma2) s) alpha).trace.re =
+      (CFC.rpow (sigma1 ⊗ₖ sigma2) s * (rho1 ⊗ₖ rho2) *
+        CFC.rpow (sigma1 ⊗ₖ sigma2) s) alpha).trace.re =
       (CFC.rpow inner1 alpha).trace.re * (CFC.rpow inner2 alpha).trace.re
   rw [htraceC, Complex.mul_re, him1, him2]
   ring
@@ -281,7 +280,7 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_prod_of_supports
     (hsupport2 : Matrix.Supports rho2.m sigma2)
     (alpha : ℝ) :
     MState.sandwichedRenyiPSDReferenceHighAlphaFinite (rho1.prod rho2)
-        (Matrix.kronecker sigma1 sigma2) (hsigma1.kronecker hsigma2) alpha =
+        (sigma1 ⊗ₖ sigma2) (hsigma1.kronecker hsigma2) alpha =
       MState.sandwichedRenyiPSDReferenceHighAlphaFinite rho1 sigma1 hsigma1 alpha +
         MState.sandwichedRenyiPSDReferenceHighAlphaFinite rho2 sigma2 hsigma2 alpha := by
   have hq :=
@@ -292,7 +291,7 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_prod_of_supports
   have htrace :
       psdTracePower
           (MState.sandwichedRenyiReferenceInner (rho1.prod rho2)
-            (Matrix.kronecker sigma1 sigma2) alpha)
+            (sigma1 ⊗ₖ sigma2) alpha)
           (MState.sandwichedRenyiReferenceInner_posSemidef (rho1.prod rho2)
             (hsigma1.kronecker hsigma2) alpha)
           alpha =
@@ -320,7 +319,7 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_prod_of_supports
       0 <
         psdTracePower
           (MState.sandwichedRenyiReferenceInner (rho1.prod rho2)
-            (Matrix.kronecker sigma1 sigma2) alpha)
+            (sigma1 ⊗ₖ sigma2) alpha)
           (MState.sandwichedRenyiReferenceInner_posSemidef (rho1.prod rho2)
             (hsigma1.kronecker hsigma2) alpha)
           alpha := by
@@ -558,8 +557,8 @@ theorem bipartiteProduct_candidateReference_supports_of_supports
   let ref2 : MState (a2 × b2) := omega.traceRight.prod sigma2
   let e := Equiv.prodProdProdComm a1 b1 a2 b2
   have hraw :
-      Matrix.Supports (Matrix.kronecker xi.m omega.m)
-        (Matrix.kronecker ref1.m ref2.m) := by
+      Matrix.Supports (xi.m ⊗ₖ omega.m)
+        (ref1.m ⊗ₖ ref2.m) := by
     simpa [ref1, ref2, MState.prod_m] using
       Matrix.Supports.kronecker_of_posSemidef xi.psd ref1.psd omega.psd ref2.psd
         hsupport1 hsupport2
@@ -571,11 +570,11 @@ theorem bipartiteProduct_candidateReference_supports_of_supports
       MState.bipartiteProduct_candidateReference xi omega sigma1 sigma2
   have hleftMatrix :
       (xi.bipartiteProduct omega).m =
-        (Matrix.kronecker xi.m omega.m).submatrix e.symm e.symm := by
+        (xi.m ⊗ₖ omega.m).submatrix e.symm e.symm := by
     simp [e, MState.bipartiteProduct, MState.reindex_matrix]
   have hrightMatrix :
       ((xi.bipartiteProduct omega).traceRight.prod (sigma1.prod sigma2)).m =
-        (Matrix.kronecker ref1.m ref2.m).submatrix e.symm e.symm := by
+        (ref1.m ⊗ₖ ref2.m).submatrix e.symm e.symm := by
     rw [hrefState]
     simp [e, MState.reindex_matrix]
   rw [hleftMatrix, hrightMatrix]
@@ -650,10 +649,9 @@ theorem sandwichedMutualInformationACWeight_prod
   simp only [sandwichedMutualInformationACWeight]
   rw [MState.prod_m rhoA1 rhoA2]
   rw [MState.prod_m tauC1 tauC2]
-  rw [← Matrix.kronecker, ← Matrix.kronecker]
   rw [cMatrix_rpow_kronecker rhoA1.psd rhoA2.psd ((1 - alpha) / alpha)]
   rw [cMatrix_rpow_kronecker tauC1.psd tauC2.psd ((alpha - 1) / alpha)]
-  simp [Matrix.kronecker, Matrix.kroneckerMap_apply, mul_assoc, mul_left_comm]
+  simp [Matrix.kroneckerMap_apply, mul_assoc, mul_left_comm]
 
 /-- Finite-sum factorization used after the KW product `AC` trace entries have
 been reduced to componentwise products. -/
@@ -697,8 +695,7 @@ theorem sandwichedMutualInformationACTraceMatrix_bipartiteProductPurification_pr
     (alpha : ℝ) :
     sandwichedMutualInformationACTraceMatrix (rhoA1.prod rhoA2)
         (bipartiteProductPurification psi phi) (tauC1.prod tauC2) alpha =
-      Matrix.kronecker
-        (sandwichedMutualInformationACTraceMatrix rhoA1 psi tauC1 alpha)
+      (sandwichedMutualInformationACTraceMatrix rhoA1 psi tauC1 alpha) ⊗ₖ
         (sandwichedMutualInformationACTraceMatrix rhoA2 phi tauC2 alpha) := by
   ext j j'
   rcases j with ⟨j1, j2⟩
@@ -785,13 +782,13 @@ theorem psdSchattenPNorm_ACTraceMatrix_bipartiteProductPurification_prod
     sandwichedMutualInformationACTraceMatrix_posSemidef rhoA1 psi tauC1 alpha
   let hmatrixRight : matrixRight.PosSemidef :=
     sandwichedMutualInformationACTraceMatrix_posSemidef rhoA2 phi tauC2 alpha
-  have hmat : matrixProd = Matrix.kronecker matrixLeft matrixRight := by
+  have hmat : matrixProd = matrixLeft ⊗ₖ matrixRight := by
     simpa [matrixProd, matrixLeft, matrixRight] using
       sandwichedMutualInformationACTraceMatrix_bipartiteProductPurification_prod
         rhoA1 rhoA2 psi phi tauC1 tauC2 alpha
   calc
     psdSchattenPNorm matrixProd hmatrixProd (sandwichedAlternateSchattenOrder halpha)
-        = psdSchattenPNorm (Matrix.kronecker matrixLeft matrixRight)
+        = psdSchattenPNorm (matrixLeft ⊗ₖ matrixRight)
             (hmatrixLeft.kronecker hmatrixRight)
             (sandwichedAlternateSchattenOrder halpha) := by
           exact psdSchattenPNorm_congr hmat hmatrixProd
@@ -1662,10 +1659,10 @@ theorem traceRight_rankOne_weightedPurificationAmp_eq_referenceInner_support
       Matrix.traceRight (rankOneMatrix ψ.vec) *
         Matrix.conjTranspose
           (sandwichedMutualInformationABWeight ψ.state.marginalAB.traceRight σB alpha) =
-    CFC.rpow (Matrix.kronecker ψ.state.marginalAB.traceRight.m σB.m)
+    CFC.rpow (ψ.state.marginalAB.traceRight.m ⊗ₖ σB.m)
         ((1 - alpha) / (2 * alpha)) *
       ψ.state.marginalAB.m *
-      CFC.rpow (Matrix.kronecker ψ.state.marginalAB.traceRight.m σB.m)
+      CFC.rpow (ψ.state.marginalAB.traceRight.m ⊗ₖ σB.m)
         ((1 - alpha) / (2 * alpha))
   rw [cMatrix_rpow_kronecker
     ψ.state.marginalAB.traceRight.psd σB.psd ((1 - alpha) / (2 * alpha))]

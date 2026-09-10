@@ -19,7 +19,7 @@ position-dependent sequence. Used by conditional typicality (HSW).
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 namespace QIT
 
@@ -53,7 +53,7 @@ theorem productState_zero_matrix (states : Fin 0 → MState a) :
 @[simp]
 theorem productState_succ_matrix (n : ℕ) (states : Fin (n + 1) → MState a) :
     (productState states).m =
-      Matrix.kronecker (states 0).m (productState (states ·.succ)).m :=
+      (states 0).m ⊗ₖ (productState (states ·.succ)).m :=
   MState.prod_m _ _
 
 end

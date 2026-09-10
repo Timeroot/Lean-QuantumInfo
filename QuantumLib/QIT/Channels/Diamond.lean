@@ -479,7 +479,6 @@ theorem kron_comp_apply {c : Type w} {d : Type x} {e : Type u} {f : Type v}
   cases ef' with
   | mk e1 f1 =>
   rw [single_prod_eq_kronecker_single]
-  simp only [Matrix.kronecker]
   rw [MatrixMap.kron_map_of_kron_state]
   rw [MatrixMap.kron_map_of_kron_state]
   rw [MatrixMap.kron_map_of_kron_state]
@@ -539,7 +538,6 @@ theorem kron_idChannel_left_apply_slice {c : Type w} {d : Type x}
         refine Finset.sum_congr rfl fun ac' _ => ?_
         simp only [Matrix.smul_apply, smul_eq_mul]
         rw [single_prod_eq_kronecker_single]
-        simp only [Matrix.kronecker]
         rw [MatrixMap.kron_map_of_kron_state]
         simp [CPTPOp.id_map, Matrix.kroneckerMap_apply, Matrix.single]
     _ = ∑ j : c, ∑ j' : c,

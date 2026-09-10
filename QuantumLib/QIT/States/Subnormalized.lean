@@ -28,7 +28,7 @@ inequalities live in downstream information-theoretic modules.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 open Matrix
 
@@ -102,10 +102,10 @@ theorem normalize_matrix (ρ : SubnormalizedState a) (htr : ρ.matrix.trace.re �
 /-- Product of subnormalized states as a Kronecker product. -/
 def prod (ρ : SubnormalizedState a) (σ : SubnormalizedState b) :
     SubnormalizedState (a × b) where
-  matrix := Matrix.kronecker ρ.matrix σ.matrix
+  matrix := ρ.matrix ⊗ₖ σ.matrix
   pos := ρ.pos.kronecker σ.pos
   trace_le_one := by
-    change ((Matrix.kroneckerMap (fun x y => x * y) ρ.matrix σ.matrix).trace).re ≤ 1
+    change ((ρ.matrix ⊗ₖ σ.matrix).trace).re ≤ 1
     rw [Matrix.trace_kronecker]
     rw [Complex.mul_re, ρ.trace_im_zero, σ.trace_im_zero]
     nlinarith [ρ.trace_nonneg, σ.trace_nonneg, ρ.trace_le_one, σ.trace_le_one]

@@ -51,7 +51,7 @@ mixture are in `DeFinetti.Domination` and `DeFinetti.Postselection`.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator NNReal QIT.MatrixL2
+open scoped ComplexOrder MatrixOrder Kronecker Matrix.Norms.L2Operator NNReal QIT.MatrixL2
 open MeasureTheory
 
 noncomputable section
@@ -187,9 +187,9 @@ theorem rightBlock_mem_symmetric_of_global_mem_symmetric (n k : ℕ)
 private theorem kronecker_one_mulVec_apply {α β : Type*}
     [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
     (P : CMatrix β) (φ : α × β → ℂ) (x : α × β) :
-    (Matrix.kronecker (1 : CMatrix α) P).mulVec φ x =
+    ((1 : CMatrix α) ⊗ₖ P).mulVec φ x =
       P.mulVec (fun y : β => φ (x.1, y)) x.2 := by
-  simp only [Matrix.mulVec, dotProduct, Matrix.kronecker, Matrix.kroneckerMap_apply]
+  simp only [Matrix.mulVec, dotProduct, Matrix.kroneckerMap_apply]
   rw [Fintype.sum_prod_type]
   simp [Matrix.one_apply]
 
@@ -199,7 +199,7 @@ symmetric subspace of the right block fixes any globally symmetric vector. -/
 theorem kronecker_one_symmetricProjection_mulVec_split_of_global_mem_symmetric
     (n k : ℕ) {f : TensorPower a (n + k) → ℂ}
     (hf : f ∈ symmetricSubspace (a := a) (n + k)) :
-    (Matrix.kronecker (1 : CMatrix (TensorPower a n))
+    ((1 : CMatrix (TensorPower a n)) ⊗ₖ
         (symmetricProjectionMatrix (a := a) k)).mulVec
       (fun x : TensorPower a n × TensorPower a k =>
         f ((tensorPowerTakeDropEquiv a n k).symm x)) =
@@ -220,8 +220,8 @@ theorem kronecker_one_symmetricProjection_mulVec_split_of_global_mem_symmetric
 projector after the `n|k` reindexing. -/
 theorem kronecker_one_symmetricProjection_mul_reindexed_symmetricProjection
     (n k : ℕ) :
-    Matrix.kronecker (1 : CMatrix (TensorPower a n))
-        (symmetricProjectionMatrix (a := a) k) *
+    ((1 : CMatrix (TensorPower a n)) ⊗ₖ
+        (symmetricProjectionMatrix (a := a) k)) *
       (symmetricProjectionMatrix (a := a) (n + k)).submatrix
         (tensorPowerTakeDropEquiv a n k).symm
         (tensorPowerTakeDropEquiv a n k).symm =
@@ -264,11 +264,10 @@ theorem unitaryTensorPowerMatrix_takeDrop_submatrix
     (unitaryTensorPowerMatrix U (n + k) : CMatrix (TensorPower a (n + k))).submatrix
         (tensorPowerTakeDropEquiv a n k).symm
         (tensorPowerTakeDropEquiv a n k).symm =
-      Matrix.kronecker
-        (unitaryTensorPowerMatrix U n : CMatrix (TensorPower a n))
+      (unitaryTensorPowerMatrix U n : CMatrix (TensorPower a n)) ⊗ₖ
         (unitaryTensorPowerMatrix U k : CMatrix (TensorPower a k)) := by
   ext x y
-  rw [Matrix.submatrix_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]
+  rw [Matrix.submatrix_apply, Matrix.kroneckerMap_apply]
   rw [unitaryTensorPowerMatrix_apply_eq_fin_prod,
     unitaryTensorPowerMatrix_apply_eq_fin_prod,
     unitaryTensorPowerMatrix_apply_eq_fin_prod]

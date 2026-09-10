@@ -27,7 +27,7 @@ formulas to singular references.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal Pointwise
+open scoped ComplexOrder MatrixOrder Kronecker NNReal Pointwise
 open Matrix
 
 noncomputable section
@@ -996,10 +996,9 @@ theorem conditionalSandwichedRenyiUp_lowAlpha_regularization_input_tendsto
 omit [Fintype A] [Fintype B] [DecidableEq B] [Fintype Y] [DecidableEq Y] in
 theorem kroneckerMap_one_real_smul
     (c : ℝ) (M : CMatrix (B × Y)) :
-    Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix A)
+    (1 : CMatrix A) ⊗ₖ
         ((c : ℂ) • M) =
-      (c : ℂ) • Matrix.kroneckerMap (fun x y => x * y)
-        (1 : CMatrix A) M := by
+      (c : ℂ) • ((1 : CMatrix A) ⊗ₖ M) := by
   ext i j
   simp [Matrix.kroneckerMap_apply, Matrix.smul_apply]
   ring
@@ -1007,10 +1006,9 @@ theorem kroneckerMap_one_real_smul
 omit [Fintype A] [Fintype B] [DecidableEq B] [Fintype Y] [DecidableEq Y] in
 theorem kroneckerMap_one_smul_real
     (c : ℝ) (M : CMatrix (B × Y)) :
-    Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix A)
+    (1 : CMatrix A) ⊗ₖ
         (c • M) =
-      c • Matrix.kroneckerMap (fun x y => x * y)
-        (1 : CMatrix A) M := by
+      c • ((1 : CMatrix A) ⊗ₖ M) := by
   ext i j
   simp [Matrix.kroneckerMap_apply, Matrix.smul_apply]
   ring
@@ -1018,16 +1016,16 @@ theorem kroneckerMap_one_smul_real
 omit [Fintype A] [Fintype B] [DecidableEq B] [Fintype Y] [DecidableEq Y] in
 theorem kroneckerMap_one_add
     (M N : CMatrix (B × Y)) :
-    Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix A) (M + N) =
-      Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix A) M +
-        Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix A) N := by
+    (1 : CMatrix A) ⊗ₖ (M + N) =
+      (1 : CMatrix A) ⊗ₖ M +
+        (1 : CMatrix A) ⊗ₖ N := by
   ext i j
   simp [Matrix.kroneckerMap_apply, Matrix.add_apply]
   ring
 
 omit [Fintype A] [Fintype B] [Fintype Y] in
 theorem kroneckerMap_one_one :
-    Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix A)
+    (1 : CMatrix A) ⊗ₖ
         (1 : CMatrix (B × Y)) = (1 : CMatrix (A × (B × Y))) := by
   ext i j
   simp [Matrix.kroneckerMap_apply, Matrix.one_apply]
@@ -1124,25 +1122,23 @@ theorem conditionalSandwichedRenyiUp_candidateE_fullRankApprox_tendsto_of_lowAlp
           (fullRankApproxMaximallyMixedStatePath σ δ)) =
           scale δ •
             sandwichedRenyiReferenceRegularization τ (ε δ) := by
-      change Matrix.kroneckerMap (fun x y => x * y)
-        (1 : CMatrix A)
+      change (1 : CMatrix A) ⊗ₖ
           (fullRankApproxMaximallyMixedStatePath σ δ).m = _
       rw [hpath_matrix]
       calc
-        Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix A)
+        (1 : CMatrix A) ⊗ₖ
               (((1 - δ : ℝ) : ℂ) •
                 sandwichedRenyiReferenceRegularization σ.m
                   (δ / ((1 - δ) * (Fintype.card (B × Y) : ℝ)))) =
-            Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix A)
+            (1 : CMatrix A) ⊗ₖ
               ((1 - δ) •
                 sandwichedRenyiReferenceRegularization σ.m
                   (δ / ((1 - δ) * (Fintype.card (B × Y) : ℝ)))) := by
                 ext i j
                 simp [Matrix.smul_apply]
-        _ = (1 - δ) • Matrix.kroneckerMap (fun x y => x * y)
-              (1 : CMatrix A)
+        _ = (1 - δ) • ((1 : CMatrix A) ⊗ₖ
                 (sandwichedRenyiReferenceRegularization σ.m
-                  (δ / ((1 - δ) * (Fintype.card (B × Y) : ℝ)))) := by
+                  (δ / ((1 - δ) * (Fintype.card (B × Y) : ℝ))))) := by
                 exact kroneckerMap_one_real_smul (A := A) (B := B) (Y := Y)
                   (1 - δ) _
         _ = scale δ • sandwichedRenyiReferenceRegularization τ (ε δ) := by

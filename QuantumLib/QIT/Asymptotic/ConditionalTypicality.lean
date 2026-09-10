@@ -25,7 +25,7 @@ per-sequence entropy sum `Σ_i S(ρ_i)`.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 
 universe u v
 
@@ -150,7 +150,7 @@ theorem eigenvalueMultiset_productState :
           (states 0).psd.isHermitian
           (productState fun i : Fin n => states i.succ).psd.isHermitian
       have hprod : ((states 0).prod (productState fun i : Fin n => states i.succ)).m =
-          Matrix.kronecker (states 0).m (productState fun i : Fin n => states i.succ).m :=
+          (states 0).m ⊗ₖ (productState fun i : Fin n => states i.succ).m :=
         MState.prod_m (states 0) (productState fun i : Fin n => states i.succ)
       refine Eq.trans (eigenvalueMultiset_eq_of_eq hprod _
         (kronecker_isHermitian (states 0).m
@@ -1757,15 +1757,15 @@ theorem unitaryTensorPowerMatrix_conj_productState_diag
   | n + 1, states, (z0, zs) => by
       let Un := unitaryTensorPowerMatrix U n
       have hstar :
-          star (Matrix.kronecker (U : CMatrix a) (Un : CMatrix (TensorPower a n))) =
-            Matrix.kronecker (star (U : CMatrix a)) (star (Un : CMatrix (TensorPower a n))) := by
+          star ((U : CMatrix a) ⊗ₖ (Un : CMatrix (TensorPower a n))) =
+            (star (U : CMatrix a)) ⊗ₖ (star (Un : CMatrix (TensorPower a n))) := by
         simpa [Matrix.star_eq_conjTranspose] using
           Matrix.conjTranspose_kronecker (U : CMatrix a) (Un : CMatrix (TensorPower a n))
       rw [productState_succ_matrix]
       change
-        (star (Matrix.kronecker (U : CMatrix a) (Un : CMatrix (TensorPower a n))) *
-              Matrix.kronecker (states 0).m (productState (states ·.succ)).m *
-              Matrix.kronecker (U : CMatrix a) (Un : CMatrix (TensorPower a n)))
+        (star ((U : CMatrix a) ⊗ₖ (Un : CMatrix (TensorPower a n))) *
+              ((states 0).m ⊗ₖ (productState (states ·.succ)).m) *
+              ((U : CMatrix a) ⊗ₖ (Un : CMatrix (TensorPower a n))))
             (z0, zs) (z0, zs) =
           ∏ i : Fin (n + 1),
             (star (U : CMatrix a) * (states i).m * (U : CMatrix a))
@@ -1778,26 +1778,26 @@ theorem unitaryTensorPowerMatrix_conj_productState_diag
           (productState (states ·.succ)).m *
           (Un : CMatrix (TensorPower a n))
       have hkr :
-          Matrix.kronecker (star (U : CMatrix a)) (star (Un : CMatrix (TensorPower a n))) *
-                Matrix.kronecker (states 0).m (productState (states ·.succ)).m *
-                Matrix.kronecker (U : CMatrix a) (Un : CMatrix (TensorPower a n)) =
-            Matrix.kronecker A B := by
+          ((star (U : CMatrix a)) ⊗ₖ (star (Un : CMatrix (TensorPower a n)))) *
+                ((states 0).m ⊗ₖ (productState (states ·.succ)).m) *
+                ((U : CMatrix a) ⊗ₖ (Un : CMatrix (TensorPower a n))) =
+            A ⊗ₖ B := by
         calc
-          Matrix.kronecker (star (U : CMatrix a)) (star (Un : CMatrix (TensorPower a n))) *
-                Matrix.kronecker (states 0).m (productState (states ·.succ)).m *
-                Matrix.kronecker (U : CMatrix a) (Un : CMatrix (TensorPower a n)) =
-            Matrix.kronecker (star (U : CMatrix a) * (states 0).m)
+          ((star (U : CMatrix a)) ⊗ₖ (star (Un : CMatrix (TensorPower a n)))) *
+                ((states 0).m ⊗ₖ (productState (states ·.succ)).m) *
+                ((U : CMatrix a) ⊗ₖ (Un : CMatrix (TensorPower a n))) =
+            ((star (U : CMatrix a) * (states 0).m) ⊗ₖ
                 (star (Un : CMatrix (TensorPower a n)) *
-                  (productState (states ·.succ)).m) *
-                Matrix.kronecker (U : CMatrix a) (Un : CMatrix (TensorPower a n)) := by
+                  (productState (states ·.succ)).m)) *
+                ((U : CMatrix a) ⊗ₖ (Un : CMatrix (TensorPower a n))) := by
               exact congrArg
                 (fun M : CMatrix (a × TensorPower a n) =>
-                  M * Matrix.kronecker (U : CMatrix a) (Un : CMatrix (TensorPower a n)))
+                  M * ((U : CMatrix a) ⊗ₖ (Un : CMatrix (TensorPower a n))))
                 (Matrix.mul_kronecker_mul
                   (star (U : CMatrix a)) (states 0).m
                   (star (Un : CMatrix (TensorPower a n)))
                   (productState (states ·.succ)).m).symm
-          _ = Matrix.kronecker ((star (U : CMatrix a) * (states 0).m) * (U : CMatrix a))
+          _ = ((star (U : CMatrix a) * (states 0).m) * (U : CMatrix a)) ⊗ₖ
                 ((star (Un : CMatrix (TensorPower a n)) *
                     (productState (states ·.succ)).m) *
                   (Un : CMatrix (TensorPower a n))) := by
@@ -1806,10 +1806,10 @@ theorem unitaryTensorPowerMatrix_conj_productState_diag
                 (star (Un : CMatrix (TensorPower a n)) *
                   (productState (states ·.succ)).m)
                 (Un : CMatrix (TensorPower a n))).symm
-          _ = Matrix.kronecker A B := by
+          _ = A ⊗ₖ B := by
               rfl
       rw [hkr]
-      simp only [Matrix.kronecker, Matrix.kroneckerMap_apply]
+      simp only [Matrix.kroneckerMap_apply]
       have hBdiag :
           B zs zs =
             ∏ i : Fin n,
@@ -1913,15 +1913,15 @@ theorem unitaryTensorPowerMatrix_conj_tensorPower_eq_marginalProductDiagonalStat
       let U := ρ.psd.isHermitian.eigenvectorUnitary
       let Un := unitaryTensorPowerMatrix U n
       have hstar :
-          star (Matrix.kronecker (U : CMatrix a) (Un : CMatrix (TensorPower a n))) =
-            Matrix.kronecker (star (U : CMatrix a)) (star (Un : CMatrix (TensorPower a n))) := by
+          star ((U : CMatrix a) ⊗ₖ (Un : CMatrix (TensorPower a n))) =
+            (star (U : CMatrix a)) ⊗ₖ (star (Un : CMatrix (TensorPower a n))) := by
         simpa [Matrix.star_eq_conjTranspose] using
           Matrix.conjTranspose_kronecker (U : CMatrix a) (Un : CMatrix (TensorPower a n))
       rw [MState.tensorPower_succ_matrix]
       change
-        star (Matrix.kronecker (U : CMatrix a) (Un : CMatrix (TensorPower a n))) *
-              Matrix.kronecker ρ.m (ρ.tensorPower n).m *
-              Matrix.kronecker (U : CMatrix a) (Un : CMatrix (TensorPower a n)) =
+        star ((U : CMatrix a) ⊗ₖ (Un : CMatrix (TensorPower a n))) *
+              (ρ.m ⊗ₖ (ρ.tensorPower n).m) *
+              ((U : CMatrix a) ⊗ₖ (Un : CMatrix (TensorPower a n))) =
           (marginalProductDiagonalState (stateEigenvalueDistribution ρ) (n + 1)).m
       rw [hstar]
       let A : CMatrix a := star (U : CMatrix a) * ρ.m * (U : CMatrix a)
@@ -1930,32 +1930,32 @@ theorem unitaryTensorPowerMatrix_conj_tensorPower_eq_marginalProductDiagonalStat
           (ρ.tensorPower n).m *
           (Un : CMatrix (TensorPower a n))
       have hkr :
-          Matrix.kronecker (star (U : CMatrix a)) (star (Un : CMatrix (TensorPower a n))) *
-                Matrix.kronecker ρ.m (ρ.tensorPower n).m *
-                Matrix.kronecker (U : CMatrix a) (Un : CMatrix (TensorPower a n)) =
-            Matrix.kronecker A B := by
+          ((star (U : CMatrix a)) ⊗ₖ (star (Un : CMatrix (TensorPower a n)))) *
+                (ρ.m ⊗ₖ (ρ.tensorPower n).m) *
+                ((U : CMatrix a) ⊗ₖ (Un : CMatrix (TensorPower a n))) =
+            A ⊗ₖ B := by
         calc
-          Matrix.kronecker (star (U : CMatrix a)) (star (Un : CMatrix (TensorPower a n))) *
-                Matrix.kronecker ρ.m (ρ.tensorPower n).m *
-                Matrix.kronecker (U : CMatrix a) (Un : CMatrix (TensorPower a n)) =
-            Matrix.kronecker (star (U : CMatrix a) * ρ.m)
-                (star (Un : CMatrix (TensorPower a n)) * (ρ.tensorPower n).m) *
-                Matrix.kronecker (U : CMatrix a) (Un : CMatrix (TensorPower a n)) := by
+          ((star (U : CMatrix a)) ⊗ₖ (star (Un : CMatrix (TensorPower a n)))) *
+                (ρ.m ⊗ₖ (ρ.tensorPower n).m) *
+                ((U : CMatrix a) ⊗ₖ (Un : CMatrix (TensorPower a n))) =
+            ((star (U : CMatrix a) * ρ.m) ⊗ₖ
+                (star (Un : CMatrix (TensorPower a n)) * (ρ.tensorPower n).m)) *
+                ((U : CMatrix a) ⊗ₖ (Un : CMatrix (TensorPower a n))) := by
               exact congrArg
                 (fun M : CMatrix (a × TensorPower a n) =>
-                  M * Matrix.kronecker (U : CMatrix a) (Un : CMatrix (TensorPower a n)))
+                  M * ((U : CMatrix a) ⊗ₖ (Un : CMatrix (TensorPower a n))))
                 (Matrix.mul_kronecker_mul
                   (star (U : CMatrix a)) ρ.m
                   (star (Un : CMatrix (TensorPower a n)))
                   (ρ.tensorPower n).m).symm
-          _ = Matrix.kronecker ((star (U : CMatrix a) * ρ.m) * (U : CMatrix a))
+          _ = ((star (U : CMatrix a) * ρ.m) * (U : CMatrix a)) ⊗ₖ
                 ((star (Un : CMatrix (TensorPower a n)) * (ρ.tensorPower n).m) *
                   (Un : CMatrix (TensorPower a n))) := by
               exact (Matrix.mul_kronecker_mul
                 (star (U : CMatrix a) * ρ.m) (U : CMatrix a)
                 (star (Un : CMatrix (TensorPower a n)) * (ρ.tensorPower n).m)
                 (Un : CMatrix (TensorPower a n))).symm
-          _ = Matrix.kronecker A B := by rfl
+          _ = A ⊗ₖ B := by rfl
       rw [hkr]
       have hA : A =
           Matrix.diagonal
@@ -1980,7 +1980,7 @@ theorem unitaryTensorPowerMatrix_conj_tensorPower_eq_marginalProductDiagonalStat
       | mk x0 xs =>
       cases y with
       | mk y0 ys =>
-      simp only [Matrix.kronecker, Matrix.kroneckerMap_apply]
+      simp only [Matrix.kroneckerMap_apply]
       rw [marginalProductDiagonalState_matrix_apply (stateEigenvalueDistribution ρ) n xs ys,
         marginalProductDiagonalState_matrix_apply (stateEigenvalueDistribution ρ) (n + 1)
           ((x0, xs) : TensorPower a (n + 1)) ((y0, ys) : TensorPower a (n + 1))]
@@ -3456,7 +3456,7 @@ theorem averageState_eq_tensorPower_of_iid {a ι : Type*} [Fintype a] [Decidable
           simp only [Fin.cons_succ]
         have hmat :
             (productState fun i => symStates ((Fin.cons x0 xs : Fin (n + 1) → ι) i)).m =
-              Matrix.kronecker (symStates x0).m
+              (symStates x0).m ⊗ₖ
                 (productState fun i => symStates (xs i)).m := by
           rw [productState_succ_matrix, htail_eq]
           simp only [Fin.cons_zero]

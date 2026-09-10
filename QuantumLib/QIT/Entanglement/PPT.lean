@@ -70,7 +70,7 @@ def IsPPT (rho : MState (a × b)) : Prop :=
 /-- Product states are PPT. -/
 theorem isPPT_prod (rho : MState a) (sigma : MState b) :
     IsPPT (rho.prod sigma) := by
-  rw [IsPPT, MState.prod_m, ← Matrix.kronecker, partialTransposeB_kronecker]
+  rw [IsPPT, MState.prod_m, partialTransposeB_kronecker]
   exact rho.psd.kronecker sigma.psd.transpose
 
 /-- PPT states are closed under finite convex mixing. -/

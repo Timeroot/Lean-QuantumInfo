@@ -23,7 +23,7 @@ distance.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 open Matrix
 
@@ -129,13 +129,13 @@ omit [Fintype a] [Fintype b] [DecidableEq b] in
 private theorem traceLeft_assoc_identityTensor
     (T : CMatrix b) :
     Matrix.traceLeft
-        ((Matrix.kronecker (1 : CMatrix (k × a)) T).submatrix
+        (((1 : CMatrix (k × a)) ⊗ₖ T).submatrix
           (Equiv.prodAssoc k a b).symm (Equiv.prodAssoc k a b).symm) =
-      (Fintype.card k : ℝ) • Matrix.kronecker (1 : CMatrix a) T := by
+      (Fintype.card k : ℝ) • ((1 : CMatrix a) ⊗ₖ T) := by
   ext i j
   rcases i with ⟨iA, iB⟩
   rcases j with ⟨jA, jB⟩
-  simp [Matrix.traceLeft, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  simp [Matrix.traceLeft, Matrix.kroneckerMap_apply,
     Equiv.prodAssoc, Matrix.one_apply]
 
 /-- A feasible side operator for `(K x A)|B` remains feasible after discarding
@@ -149,13 +149,13 @@ theorem ConditionalMinEntropyScaleFeasible.sourceDiscard
   · exact Matrix.PosSemidef.smul hT.1 (Nat.cast_nonneg (Fintype.card k))
   · have hAssoc :
         rho.sourceAssocReindex.matrix ≤
-          (Matrix.kronecker (1 : CMatrix (k × a)) T).submatrix
+          ((1 : CMatrix (k × a)) ⊗ₖ T).submatrix
             (Equiv.prodAssoc k a b).symm (Equiv.prodAssoc k a b).symm := by
       rw [sourceAssocReindex_matrix, Matrix.le_iff] at ⊢
       exact hT.2.submatrix (Equiv.prodAssoc k a b).symm
     have hPartial := traceLeft_mono (a := k) (b := a × b) hAssoc
     change Matrix.traceLeft rho.sourceAssocReindex.matrix ≤
-      Matrix.kronecker (1 : CMatrix a) ((Fintype.card k : ℝ) • T)
+      (1 : CMatrix a) ⊗ₖ ((Fintype.card k : ℝ) • T)
     rw [traceLeft_assoc_identityTensor (k := k) (a := a) (b := b)] at hPartial
     simpa [Matrix.kronecker_smul] using hPartial
 

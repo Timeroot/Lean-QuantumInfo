@@ -18,7 +18,7 @@ classical-quantum state obtained by publishing the seed and output.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 
 namespace QIT.Security
 
@@ -186,9 +186,8 @@ The register order is output key, public seed, then side information. -/
 def extractorOutputMatrix (E : MEnsemble e Z) : CMatrix (S × (F × e)) :=
   ∑ z, ∑ f,
     (E.probs z * H.prob f) •
-      Matrix.kronecker
-        (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
-        (Matrix.kronecker (Matrix.single f f (1 : ℂ)) (E.states z).m)
+      (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ)) ⊗ₖ
+        ((Matrix.single f f (1 : ℂ)) ⊗ₖ (E.states z).m)
 
 omit [DecidableEq Z] [Fintype S] [Nonempty F] in
 @[simp]
@@ -196,9 +195,8 @@ theorem extractorOutputMatrix_eq_sum (E : MEnsemble e Z) :
     extractorOutputMatrix H E =
       ∑ z, ∑ f,
         (E.probs z * H.prob f) •
-          Matrix.kronecker
-            (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
-            (Matrix.kronecker (Matrix.single f f (1 : ℂ)) (E.states z).m) :=
+          ((Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ)) ⊗ₖ
+            ((Matrix.single f f (1 : ℂ)) ⊗ₖ (E.states z).m)) :=
   rfl
 
 /-- The extractor output cq-state with registers `S × (F × E)`. -/
@@ -217,27 +215,24 @@ def extractorOutputState (E : MEnsemble e Z) : MState (S × (F × e)) := .ofMatr
     calc
       (∑ z : Z, ∑ f : F,
           (E.probs z * H.prob f) •
-            (Matrix.kronecker
-              (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
-              (Matrix.kronecker (Matrix.single f f (1 : ℂ)) (E.states z).m)).trace) =
+            ((Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ)) ⊗ₖ
+              ((Matrix.single f f (1 : ℂ)) ⊗ₖ (E.states z).m)).trace) =
           ∑ z : Z, ∑ f : F, ((E.probs z * H.prob f : ℝ≥0) : ℂ) := by
         refine Finset.sum_congr rfl fun z _ => ?_
         refine Finset.sum_congr rfl fun f _ => ?_
         have htrace :
-            (Matrix.kronecker
-              (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
-              (Matrix.kronecker (Matrix.single f f (1 : ℂ)) (E.states z).m)).trace =
+            ((Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ)) ⊗ₖ
+              ((Matrix.single f f (1 : ℂ)) ⊗ₖ (E.states z).m)).trace =
                 1 := by
           have houter :
-              (Matrix.kronecker
-                (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
-                (Matrix.kronecker (Matrix.single f f (1 : ℂ)) (E.states z).m)).trace =
+              ((Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ)) ⊗ₖ
+                ((Matrix.single f f (1 : ℂ)) ⊗ₖ (E.states z).m)).trace =
                 (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ)).trace *
-                  (Matrix.kronecker (Matrix.single f f (1 : ℂ))
+                  ((Matrix.single f f (1 : ℂ)) ⊗ₖ
                     (E.states z).m).trace :=
             Matrix.trace_kronecker _ _
           have hinner :
-              (Matrix.kronecker (Matrix.single f f (1 : ℂ))
+              ((Matrix.single f f (1 : ℂ)) ⊗ₖ
                 (E.states z).m).trace =
                 (Matrix.single f f (1 : ℂ)).trace * (E.states z).m.trace :=
             Matrix.trace_kronecker _ _

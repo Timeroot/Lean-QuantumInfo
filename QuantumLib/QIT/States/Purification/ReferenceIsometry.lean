@@ -21,7 +21,7 @@ reference system.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 namespace QIT
 
@@ -173,11 +173,11 @@ theorem trace_apply_block (B : CMatrix r₁) :
 /-- Applying a reference isometry is conjugation by `V ⊗ 1`. -/
 theorem applyMatrix_eq_kron_conj [Fintype a] [DecidableEq a] (X : CMatrix (r₁ × a)) :
     V.applyMatrix X =
-      Matrix.kronecker V.matrix (1 : CMatrix a) * X *
-        Matrix.conjTranspose (Matrix.kronecker V.matrix (1 : CMatrix a)) := by
+      (V.matrix ⊗ₖ (1 : CMatrix a)) * X *
+        Matrix.conjTranspose (V.matrix ⊗ₖ (1 : CMatrix a)) := by
   ext i j
   simp [applyMatrix, targetBlock,
-    Matrix.kronecker, Matrix.mul_apply, Finset.mul_sum, Finset.sum_mul,
+    Matrix.mul_apply, Finset.mul_sum, Finset.sum_mul,
     Matrix.conjTranspose_kronecker, Matrix.conjTranspose_apply,
     Matrix.one_apply, Fintype.sum_prod_type,
     mul_assoc, mul_comm]
@@ -187,7 +187,7 @@ theorem applyMatrix_posSemidef [Fintype a] [DecidableEq a] {X : CMatrix (r₁ ×
     (hX : X.PosSemidef) :
     (V.applyMatrix X).PosSemidef := by
   have h := hX.conjTranspose_mul_mul_same
-    (Matrix.conjTranspose (Matrix.kronecker V.matrix (1 : CMatrix a)))
+    (Matrix.conjTranspose (V.matrix ⊗ₖ (1 : CMatrix a)))
   rw [V.applyMatrix_eq_kron_conj X]
   simpa [Matrix.conjTranspose_conjTranspose] using h
 
@@ -326,20 +326,9 @@ variable [Fintype r₃] [DecidableEq r₃] [Fintype r₄] [DecidableEq r₄]
 recursive `TensorPower` convention. -/
 def prod (V : ReferenceIsometry r₁ r₂) (W : ReferenceIsometry r₃ r₄) :
     ReferenceIsometry (r₁ × r₃) (r₂ × r₄) where
-  matrix := Matrix.kronecker V.matrix W.matrix
+  matrix := V.matrix ⊗ₖ W.matrix
   isometry := by
-    change (V.matrix.kronecker W.matrix).conjTranspose *
-        V.matrix.kronecker W.matrix = 1
-    rw [show (V.matrix.kronecker W.matrix).conjTranspose =
-        Matrix.kronecker V.matrix.conjTranspose W.matrix.conjTranspose from
-      Matrix.conjTranspose_kronecker V.matrix W.matrix]
-    rw [show Matrix.kronecker V.matrix.conjTranspose W.matrix.conjTranspose *
-          Matrix.kronecker V.matrix W.matrix =
-        Matrix.kronecker (V.matrix.conjTranspose * V.matrix)
-          (W.matrix.conjTranspose * W.matrix) from by
-      exact (Matrix.mul_kronecker_mul V.matrix.conjTranspose V.matrix
-        W.matrix.conjTranspose W.matrix).symm]
-    rw [V.isometry, W.isometry]
+    rw [Matrix.conjTranspose_kronecker, ← Matrix.mul_kronecker_mul, V.isometry, W.isometry]
     exact Matrix.one_kronecker_one
 
 /-- Tensor power of a reference isometry on recursive tensor-power labels. -/

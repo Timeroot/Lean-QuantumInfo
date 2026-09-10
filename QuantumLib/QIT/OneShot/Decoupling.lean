@@ -54,7 +54,7 @@ coefficients then collapse the variance to `haydenProjectedAE_hilbertSchmidt_var
 
 namespace QIT
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator NNReal QIT.MatrixL2
+open scoped ComplexOrder MatrixOrder Kronecker Matrix.Norms.L2Operator NNReal QIT.MatrixL2
 open MeasureTheory
 
 universe u v w x
@@ -96,13 +96,13 @@ def haydenProjectedAE [Fintype a] [Fintype e] [DecidableEq a] [DecidableEq e]
     (P : CMatrix a) (d : ℝ) (ρ : CMatrix (a × e))
     (U : Matrix.unitaryGroup a ℂ) : CMatrix (a × e) :=
   (((Fintype.card a : ℝ) / d : ℝ) : ℂ) •
-    (Matrix.kronecker (P * (U : CMatrix a)) (1 : CMatrix e) * ρ *
-      Matrix.kronecker (star (U : CMatrix a) * P) (1 : CMatrix e))
+    (((P * (U : CMatrix a)) ⊗ₖ (1 : CMatrix e)) * ρ *
+      ((star (U : CMatrix a) * P) ⊗ₖ (1 : CMatrix e)))
 
 /-- The source mean target `d⁻¹ • (P ⊗ φ^E)` for the projected state. -/
 def haydenProjectedAEMeanTarget [Fintype a] [Fintype e]
     (P : CMatrix a) (d : ℝ) (ρ : CMatrix (a × e)) : CMatrix (a × e) :=
-  (((1 : ℝ) / d : ℝ) : ℂ) • Matrix.kronecker P (Matrix.traceLeft ρ)
+  (((1 : ℝ) / d : ℝ) : ℂ) • (P ⊗ₖ (Matrix.traceLeft ρ))
 
 /-! ## Source setup bridge -/
 
@@ -186,16 +186,16 @@ private theorem kronecker_projection_one_finrank_range_toEuclideanLin_eq
     [Fintype a] [Fintype e] [DecidableEq a] [DecidableEq e]
     (P : CMatrix a) (d : ℝ) (hPid : P * P = P) (hPtr : P.trace = (d : ℂ)) :
     (Module.finrank ℂ
-        (LinearMap.range (Matrix.kronecker P (1 : CMatrix e)).toEuclideanLin) : ℝ) =
+        (LinearMap.range (P ⊗ₖ (1 : CMatrix e)).toEuclideanLin) : ℝ) =
       d * (Fintype.card e : ℝ) := by
-  let K : CMatrix (a × e) := Matrix.kronecker P (1 : CMatrix e)
+  let K : CMatrix (a × e) := P ⊗ₖ (1 : CMatrix e)
   have hKidem : K * K = K := by
     dsimp [K]
     calc
-      Matrix.kronecker P (1 : CMatrix e) * Matrix.kronecker P (1 : CMatrix e) =
-          Matrix.kronecker (P * P) ((1 : CMatrix e) * 1) := by
+      (P ⊗ₖ (1 : CMatrix e)) * (P ⊗ₖ (1 : CMatrix e)) =
+          (P * P) ⊗ₖ ((1 : CMatrix e) * 1) := by
             exact (Matrix.mul_kronecker_mul P P (1 : CMatrix e) (1 : CMatrix e)).symm
-      _ = Matrix.kronecker P (1 : CMatrix e) := by
+      _ = P ⊗ₖ (1 : CMatrix e) := by
           rw [hPid, Matrix.mul_one]
   have hKrankC := finrank_range_toEuclideanLin_eq_trace_of_idempotent K hKidem
   have hKtrace : K.trace = ((d * (Fintype.card e : ℝ) : ℝ) : ℂ) := by
@@ -211,7 +211,7 @@ private theorem haydenProjectedAE_diff_left_supported [Fintype a] [Fintype e]
     [DecidableEq a] [DecidableEq e]
     (P : CMatrix a) (d : ℝ) (rho : CMatrix (a × e))
     (U : Matrix.unitaryGroup a ℂ) (hPid : P * P = P) :
-    Matrix.kronecker P (1 : CMatrix e) *
+    (P ⊗ₖ (1 : CMatrix e)) *
       (haydenProjectedAE (a := a) (e := e) P d rho U -
         haydenProjectedAEMeanTarget (a := a) (e := e) P d rho) =
       haydenProjectedAE (a := a) (e := e) P d rho U -
@@ -221,41 +221,41 @@ private theorem haydenProjectedAE_diff_left_supported [Fintype a] [Fintype e]
   · unfold haydenProjectedAE
     rw [Matrix.mul_smul]
     congr 1
-    have hleft : Matrix.kronecker P (1 : CMatrix e) *
-        Matrix.kronecker (P * (U : CMatrix a)) (1 : CMatrix e) =
-        Matrix.kronecker (P * (U : CMatrix a)) (1 : CMatrix e) := by
+    have hleft : (P ⊗ₖ (1 : CMatrix e)) *
+        ((P * (U : CMatrix a)) ⊗ₖ (1 : CMatrix e)) =
+        (P * (U : CMatrix a)) ⊗ₖ (1 : CMatrix e) := by
       calc
-        Matrix.kronecker P (1 : CMatrix e) *
-            Matrix.kronecker (P * (U : CMatrix a)) (1 : CMatrix e) =
-          Matrix.kronecker (P * (P * (U : CMatrix a))) ((1 : CMatrix e) * 1) := by
+        (P ⊗ₖ (1 : CMatrix e)) *
+            ((P * (U : CMatrix a)) ⊗ₖ (1 : CMatrix e)) =
+          (P * (P * (U : CMatrix a))) ⊗ₖ ((1 : CMatrix e) * 1) := by
             exact (Matrix.mul_kronecker_mul P (P * (U : CMatrix a))
               (1 : CMatrix e) (1 : CMatrix e)).symm
-        _ = Matrix.kronecker (P * (U : CMatrix a)) (1 : CMatrix e) := by
+        _ = (P * (U : CMatrix a)) ⊗ₖ (1 : CMatrix e) := by
             rw [Matrix.mul_one]
             congr 1
             rw [← Matrix.mul_assoc, hPid]
     calc
-      Matrix.kronecker P (1 : CMatrix e) *
-          (Matrix.kronecker (P * (U : CMatrix a)) (1 : CMatrix e) * rho *
-            Matrix.kronecker (star (U : CMatrix a) * P) (1 : CMatrix e)) =
-        (Matrix.kronecker P (1 : CMatrix e) *
-          Matrix.kronecker (P * (U : CMatrix a)) (1 : CMatrix e)) * rho *
-            Matrix.kronecker (star (U : CMatrix a) * P) (1 : CMatrix e) := by
+      (P ⊗ₖ (1 : CMatrix e)) *
+          (((P * (U : CMatrix a)) ⊗ₖ (1 : CMatrix e)) * rho *
+            ((star (U : CMatrix a) * P) ⊗ₖ (1 : CMatrix e))) =
+        ((P ⊗ₖ (1 : CMatrix e)) *
+          ((P * (U : CMatrix a)) ⊗ₖ (1 : CMatrix e))) * rho *
+            ((star (U : CMatrix a) * P) ⊗ₖ (1 : CMatrix e)) := by
           noncomm_ring
-      _ = Matrix.kronecker (P * (U : CMatrix a)) (1 : CMatrix e) * rho *
-            Matrix.kronecker (star (U : CMatrix a) * P) (1 : CMatrix e) := by
+      _ = ((P * (U : CMatrix a)) ⊗ₖ (1 : CMatrix e)) * rho *
+            ((star (U : CMatrix a) * P) ⊗ₖ (1 : CMatrix e)) := by
           rw [hleft]
   · unfold haydenProjectedAEMeanTarget
     rw [Matrix.mul_smul]
     congr 1
     calc
-      Matrix.kronecker P (1 : CMatrix e) *
-          Matrix.kronecker P (Matrix.traceLeft rho) =
-        Matrix.kronecker (P * P) ((1 : CMatrix e) *
+      (P ⊗ₖ (1 : CMatrix e)) *
+          (P ⊗ₖ (Matrix.traceLeft rho)) =
+        (P * P) ⊗ₖ ((1 : CMatrix e) *
           Matrix.traceLeft rho) := by
           exact (Matrix.mul_kronecker_mul P P (1 : CMatrix e)
             (Matrix.traceLeft rho)).symm
-      _ = Matrix.kronecker P (Matrix.traceLeft rho) := by
+      _ = P ⊗ₖ (Matrix.traceLeft rho) := by
           rw [hPid, Matrix.one_mul]
 
 private theorem haydenProjectedAE_diff_finrank_range_le_projected_dim
@@ -270,7 +270,7 @@ private theorem haydenProjectedAE_diff_finrank_range_le_projected_dim
   let Delta : CMatrix (a × e) :=
     haydenProjectedAE (a := a) (e := e) P d rho U -
       haydenProjectedAEMeanTarget (a := a) (e := e) P d rho
-  let K : CMatrix (a × e) := Matrix.kronecker P (1 : CMatrix e)
+  let K : CMatrix (a × e) := P ⊗ₖ (1 : CMatrix e)
   have hsupport : K * Delta = Delta := by
     simpa [K, Delta] using
       haydenProjectedAE_diff_left_supported (a := a) (e := e) P d rho U hPid
@@ -533,12 +533,12 @@ private theorem tensorPowerKroneckerTwo_smul [Fintype a] [DecidableEq a]
 private theorem decoupling_continuous_kronecker_one {α : Type*} [TopologicalSpace α]
     {ι : Type u} {κ : Type v} [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq κ]
     {f : α → CMatrix ι} (hf : Continuous f) :
-    Continuous fun x => Matrix.kronecker (f x) (1 : CMatrix κ) := by
+    Continuous fun x => (f x) ⊗ₖ (1 : CMatrix κ) := by
   refine continuous_pi ?_
   intro i
   refine continuous_pi ?_
   intro j
-  simp [Matrix.kronecker]
+  simp
   exact ((continuous_apply j.1).comp ((continuous_apply i.1).comp hf)).mul continuous_const
 
 private theorem sum_tensorPower_one [Fintype a] {β : Type*} [AddCommMonoid β]
@@ -553,8 +553,8 @@ private theorem sum_tensorPower_one [Fintype a] {β : Type*} [AddCommMonoid β]
 /-- Ambient one-copy Haar twirl on the `A` register. -/
 private def ambientSideTwirlIntegrand [Fintype a] [Fintype e] [DecidableEq a] [DecidableEq e]
     (M : CMatrix (a × e)) (U : Matrix.unitaryGroup a ℂ) : CMatrix (a × e) :=
-  Matrix.kronecker (U : CMatrix a) (1 : CMatrix e) * M *
-    Matrix.kronecker (star (U : CMatrix a)) (1 : CMatrix e)
+  ((U : CMatrix a) ⊗ₖ (1 : CMatrix e)) * M *
+    (star (U : CMatrix a)) ⊗ₖ (1 : CMatrix e)
 
 private theorem haydenProjectedAE_eq_projected_ambientSideTwirl [Fintype a] [Fintype e]
     [DecidableEq a] [DecidableEq e]
@@ -562,46 +562,46 @@ private theorem haydenProjectedAE_eq_projected_ambientSideTwirl [Fintype a] [Fin
     (U : Matrix.unitaryGroup a ℂ) :
     haydenProjectedAE (a := a) (e := e) P d rho U =
       (((Fintype.card a : ℝ) / d : ℝ) : ℂ) •
-        (Matrix.kronecker P (1 : CMatrix e) *
+        ((P ⊗ₖ (1 : CMatrix e)) *
           ambientSideTwirlIntegrand (a := a) (e := e) rho U *
-          Matrix.kronecker P (1 : CMatrix e)) := by
+          (P ⊗ₖ (1 : CMatrix e))) := by
   unfold haydenProjectedAE ambientSideTwirlIntegrand
   congr 1
   have hKU :
-      Matrix.kronecker (P * (U : CMatrix a)) (1 : CMatrix e) =
-        Matrix.kronecker P (1 : CMatrix e) *
-          Matrix.kronecker (U : CMatrix a) (1 : CMatrix e) := by
+      (P * (U : CMatrix a)) ⊗ₖ (1 : CMatrix e) =
+        (P ⊗ₖ (1 : CMatrix e)) *
+          ((U : CMatrix a) ⊗ₖ (1 : CMatrix e)) := by
     calc
-      Matrix.kronecker (P * (U : CMatrix a)) (1 : CMatrix e) =
-          Matrix.kronecker (P * (U : CMatrix a)) ((1 : CMatrix e) * 1) := by rw [Matrix.mul_one]
-      _ = Matrix.kronecker P (1 : CMatrix e) *
-            Matrix.kronecker (U : CMatrix a) (1 : CMatrix e) := by
+      (P * (U : CMatrix a)) ⊗ₖ (1 : CMatrix e) =
+          (P * (U : CMatrix a)) ⊗ₖ ((1 : CMatrix e) * 1) := by rw [Matrix.mul_one]
+      _ = (P ⊗ₖ (1 : CMatrix e)) *
+            ((U : CMatrix a) ⊗ₖ (1 : CMatrix e)) := by
           exact Matrix.mul_kronecker_mul P (U : CMatrix a) (1 : CMatrix e) (1 : CMatrix e)
   have hKSU :
-      Matrix.kronecker (star (U : CMatrix a) * P) (1 : CMatrix e) =
-        Matrix.kronecker (star (U : CMatrix a)) (1 : CMatrix e) *
-          Matrix.kronecker P (1 : CMatrix e) := by
+      (star (U : CMatrix a) * P) ⊗ₖ (1 : CMatrix e) =
+        ((star (U : CMatrix a)) ⊗ₖ (1 : CMatrix e)) *
+          (P ⊗ₖ (1 : CMatrix e)) := by
     calc
-      Matrix.kronecker (star (U : CMatrix a) * P) (1 : CMatrix e) =
-          Matrix.kronecker (star (U : CMatrix a) * P) ((1 : CMatrix e) * 1) := by
+      (star (U : CMatrix a) * P) ⊗ₖ (1 : CMatrix e) =
+          (star (U : CMatrix a) * P) ⊗ₖ ((1 : CMatrix e) * 1) := by
             rw [Matrix.mul_one]
-      _ = Matrix.kronecker (star (U : CMatrix a)) (1 : CMatrix e) *
-            Matrix.kronecker P (1 : CMatrix e) := by
+      _ = ((star (U : CMatrix a)) ⊗ₖ (1 : CMatrix e)) *
+            (P ⊗ₖ (1 : CMatrix e)) := by
           exact Matrix.mul_kronecker_mul (star (U : CMatrix a)) P
             (1 : CMatrix e) (1 : CMatrix e)
   calc
-    Matrix.kronecker (P * (U : CMatrix a)) (1 : CMatrix e) * rho *
-        Matrix.kronecker (star (U : CMatrix a) * P) (1 : CMatrix e) =
-      (Matrix.kronecker P (1 : CMatrix e) * Matrix.kronecker (U : CMatrix a) (1 : CMatrix e)) *
+    ((P * (U : CMatrix a)) ⊗ₖ (1 : CMatrix e)) * rho *
+        ((star (U : CMatrix a) * P) ⊗ₖ (1 : CMatrix e)) =
+      ((P ⊗ₖ (1 : CMatrix e)) * ((U : CMatrix a) ⊗ₖ (1 : CMatrix e))) *
           rho *
-        (Matrix.kronecker (star (U : CMatrix a)) (1 : CMatrix e) *
-          Matrix.kronecker P (1 : CMatrix e)) := by
+        (((star (U : CMatrix a)) ⊗ₖ (1 : CMatrix e)) *
+          (P ⊗ₖ (1 : CMatrix e))) := by
         rw [hKU, hKSU]
     _ =
-      Matrix.kronecker P (1 : CMatrix e) *
-        (Matrix.kronecker (U : CMatrix a) (1 : CMatrix e) * rho *
-          Matrix.kronecker (star (U : CMatrix a)) (1 : CMatrix e)) *
-        Matrix.kronecker P (1 : CMatrix e) := by
+      (P ⊗ₖ (1 : CMatrix e)) *
+        (((U : CMatrix a) ⊗ₖ (1 : CMatrix e)) * rho *
+          ((star (U : CMatrix a)) ⊗ₖ (1 : CMatrix e))) *
+        (P ⊗ₖ (1 : CMatrix e)) := by
         noncomm_ring
 
 /-- Reindex an operator on `A² × E²` to the recursive `(A × E)²` convention. -/
@@ -614,7 +614,7 @@ def twoCopyProdReindex [Fintype a] [Fintype e]
 def twoCopySideOperator [Fintype a] [Fintype e]
     (G : CMatrix (TensorPower a 2)) (H : CMatrix (TensorPower e 2)) :
     CMatrix (TensorPower (a × e) 2) :=
-  twoCopyProdReindex (a := a) (e := e) (Matrix.kronecker G H)
+  twoCopyProdReindex (a := a) (e := e) (G ⊗ₖ H)
 
 @[simp]
 theorem twoCopySideOperator_apply [Fintype a] [Fintype e]
@@ -631,7 +631,7 @@ theorem twoCopySideOperator_add_left [Fintype a] [Fintype e]
       twoCopySideOperator (a := a) (e := e) G H +
         twoCopySideOperator (a := a) (e := e) G' H := by
   ext x y
-  simp [twoCopySideOperator, twoCopyProdReindex, Matrix.kronecker]
+  simp [twoCopySideOperator, twoCopyProdReindex]
   ring
 
 theorem twoCopySideOperator_smul_left [Fintype a] [Fintype e]
@@ -639,19 +639,18 @@ theorem twoCopySideOperator_smul_left [Fintype a] [Fintype e]
     twoCopySideOperator (a := a) (e := e) (c • G) H =
       c • twoCopySideOperator (a := a) (e := e) G H := by
   ext x y
-  simp [twoCopySideOperator, twoCopyProdReindex, Matrix.kronecker]
+  simp [twoCopySideOperator, twoCopyProdReindex]
   ring
 
 /-- Two-copy Kronecker for an operator acting only on the left side of a product register,
 with the right side still written as a two-copy Kronecker power. -/
 theorem tensorPowerKroneckerTwo_kronecker_one_tensorPower [Fintype a] [Fintype e]
     [DecidableEq a] [DecidableEq e] (A : CMatrix a) :
-    tensorPowerKroneckerTwo (a := a × e) (Matrix.kronecker A (1 : CMatrix e)) =
+    tensorPowerKroneckerTwo (a := a × e) (A ⊗ₖ (1 : CMatrix e)) =
       twoCopySideOperator (a := a) (e := e) (tensorPowerKroneckerTwo (a := a) A)
         (tensorPowerKroneckerTwo (a := e) (1 : CMatrix e)) := by
   ext x y
-  simp [twoCopySideOperator, twoCopyProdReindex, Matrix.kronecker,
-    tensorPowerKroneckerTwo, tensorPowerProdEquiv_fst_apply]
+  simp [twoCopySideOperator, twoCopyProdReindex, tensorPowerKroneckerTwo, tensorPowerProdEquiv_fst_apply]
   rw [tensorPowerProdEquiv_snd_apply (a := a) (b := e) 2 x 0,
     tensorPowerProdEquiv_snd_apply (a := a) (b := e) 2 y 0,
     tensorPowerProdEquiv_snd_apply (a := a) (b := e) 2 x 1,
@@ -661,7 +660,7 @@ theorem tensorPowerKroneckerTwo_kronecker_one_tensorPower [Fintype a] [Fintype e
 /-- Two-copy Kronecker for an operator acting only on the left side of a product register. -/
 theorem tensorPowerKroneckerTwo_kronecker_one [Fintype a] [Fintype e]
     [DecidableEq a] [DecidableEq e] (A : CMatrix a) :
-    tensorPowerKroneckerTwo (a := a × e) (Matrix.kronecker A (1 : CMatrix e)) =
+    tensorPowerKroneckerTwo (a := a × e) (A ⊗ₖ (1 : CMatrix e)) =
       twoCopySideOperator (a := a) (e := e) (tensorPowerKroneckerTwo (a := a) A)
         (1 : CMatrix (TensorPower e 2)) := by
   rw [tensorPowerKroneckerTwo_kronecker_one_tensorPower,
@@ -694,8 +693,7 @@ theorem twoCopySideOperator_mul [Fintype a] [Fintype e]
   ext x y
   rw [← twoCopyTensorWord_coords (a := a × e) x,
     ← twoCopyTensorWord_coords (a := a × e) y]
-  simp [twoCopySideOperator, twoCopyProdReindex, Matrix.mul_apply, Matrix.kronecker,
-    Finset.mul_sum, Finset.sum_mul]
+  simp [twoCopySideOperator, twoCopyProdReindex, Matrix.mul_apply, Finset.mul_sum, Finset.sum_mul]
   let X := tensorPowerProdEquiv a e 2 x
   let Y := tensorPowerProdEquiv a e 2 y
   calc
@@ -1097,8 +1095,8 @@ private theorem haydenProjectedAE_square_trace_eq_restrictedFlip_inv_integrand [
             (tensorPowerSwapMatrixTwo (a := e))).trace := by
   rw [haydenProjectedAE_square_trace_eq_twoCopy_side_swaps]
   let c : ℂ := (((Fintype.card a : ℝ) / d : ℝ) : ℂ)
-  let L : CMatrix (a × e) := Matrix.kronecker (P * (U : CMatrix a)) (1 : CMatrix e)
-  let R : CMatrix (a × e) := Matrix.kronecker (star (U : CMatrix a) * P) (1 : CMatrix e)
+  let L : CMatrix (a × e) := (P * (U : CMatrix a)) ⊗ₖ (1 : CMatrix e)
+  let R : CMatrix (a × e) := (star (U : CMatrix a) * P) ⊗ₖ (1 : CMatrix e)
   let LA : CMatrix (TensorPower a 2) := tensorPowerKroneckerTwo (a := a) (P * (U : CMatrix a))
   let RA : CMatrix (TensorPower a 2) := tensorPowerKroneckerTwo (a := a) (star (U : CMatrix a) * P)
   let FAE : CMatrix (TensorPower (a × e) 2) :=
@@ -1384,12 +1382,12 @@ private theorem unitaryTwirlIntegrand_oneCopyMatrixLift_apply [Fintype a] [Decid
   intro x _
   rw [sum_tensorPower_one]
   have hstar :
-      star (Matrix.kronecker (U : CMatrix a) (1 : CMatrix PUnit))
+      star ((U : CMatrix a) ⊗ₖ (1 : CMatrix PUnit))
           (x, PUnit.unit) (j, PUnit.unit) = star ((U : CMatrix a) j x) := by
-    simp [Matrix.star_apply, Matrix.kronecker]
+    simp [Matrix.star_apply]
   change (∑ x_1 : a,
         (U : CMatrix a) i x_1 * (1 : CMatrix PUnit) PUnit.unit PUnit.unit * M x_1 x) *
-      star (Matrix.kronecker (U : CMatrix a) (1 : CMatrix PUnit)) (x, PUnit.unit)
+      star ((U : CMatrix a) ⊗ₖ (1 : CMatrix PUnit)) (x, PUnit.unit)
         (j, PUnit.unit) =
     (∑ j_1 : a, (U : CMatrix a) i j_1 * M j_1 x) * star ((U : CMatrix a) j x)
   rw [hstar]
@@ -1462,7 +1460,7 @@ private theorem ambientSideTwirlIntegrand_apply_block [Fintype a] [Fintype e]
       ambientUnitaryTwirlIntegrand (a := a)
         (ambientSideBlock (a := a) (e := e) M r s) U i j := by
   simp [ambientSideTwirlIntegrand, ambientUnitaryTwirlIntegrand, ambientSideBlock,
-    Matrix.mul_apply, Matrix.kronecker, Matrix.one_apply, Fintype.sum_prod_type]
+    Matrix.mul_apply, Matrix.one_apply, Fintype.sum_prod_type]
 
 private theorem ambientSideTwirl_integrand_continuous [Fintype a] [Fintype e]
     [DecidableEq a] [DecidableEq e] (M : CMatrix (a × e)) :
@@ -1486,7 +1484,7 @@ private theorem haydenProjectedAE_continuous [Fintype a] [Fintype e]
     (P : CMatrix a) (d : ℝ) (rho : CMatrix (a × e)) :
     Continuous fun U : Matrix.unitaryGroup a ℂ =>
       haydenProjectedAE (a := a) (e := e) P d rho U := by
-  let K : CMatrix (a × e) := Matrix.kronecker P (1 : CMatrix e)
+  let K : CMatrix (a × e) := P ⊗ₖ (1 : CMatrix e)
   let c : ℂ := (((Fintype.card a : ℝ) / d : ℝ) : ℂ)
   have hambient := ambientSideTwirl_integrand_continuous (a := a) (e := e) rho
   have hcont : Continuous fun U : Matrix.unitaryGroup a ℂ =>
@@ -1542,7 +1540,7 @@ private theorem ambientSideTwirl_integral_eq_kronecker_partialTrace [Fintype a] 
     (∫ U : Matrix.unitaryGroup a ℂ,
         ambientSideTwirlIntegrand (a := a) (e := e) M U ∂unitaryHaarMeasure (a := a)) =
       (((1 : ℝ) / (Fintype.card a : ℝ) : ℝ) : ℂ) •
-        Matrix.kronecker (1 : CMatrix a) (Matrix.traceLeft M) := by
+        ((1 : CMatrix a) ⊗ₖ (Matrix.traceLeft M)) := by
   ext x y
   rw [cMatrix_integral_apply
     (hf := ambientSideTwirl_integrand_integrable (a := a) (e := e) M) x y]
@@ -1566,7 +1564,7 @@ private theorem ambientSideTwirl_integral_eq_kronecker_partialTrace [Fintype a] 
     exact (ambientSideTwirlIntegrand_apply_block (a := a) (e := e) M U x.1 y.1 x.2 y.2).symm
   rw [hscalar] at hentry
   rw [hentry]
-  simp [ambientSideBlock_trace, Matrix.smul_apply, Matrix.kronecker]
+  simp [ambientSideBlock_trace, Matrix.smul_apply]
   ring
 
 /-- Algebraic assembly of the first-moment target after the Haar twirl has
@@ -1576,22 +1574,22 @@ theorem haydenProjectedAE_meanTarget_sandwich_assembly [Fintype a] [Fintype e]
     (P : CMatrix a) (d : ℝ) (rho : CMatrix (a × e))
     (hP : P * P = P) (hd : d ≠ 0) :
     (((Fintype.card a : ℝ) / d : ℝ) : ℂ) •
-        (Matrix.kronecker P (1 : CMatrix e) *
+        ((P ⊗ₖ (1 : CMatrix e)) *
           ((((1 : ℝ) / (Fintype.card a : ℝ) : ℝ) : ℂ) •
-            Matrix.kronecker (1 : CMatrix a) (Matrix.traceLeft rho)) *
-          Matrix.kronecker P (1 : CMatrix e)) =
+            ((1 : CMatrix a) ⊗ₖ (Matrix.traceLeft rho))) *
+          (P ⊗ₖ (1 : CMatrix e))) =
       haydenProjectedAEMeanTarget (a := a) (e := e) P d rho := by
   unfold haydenProjectedAEMeanTarget
   rw [Matrix.mul_smul]
   rw [Matrix.smul_mul]
   let R := Matrix.traceLeft rho
-  have hmul₁ : Matrix.kronecker P (1 : CMatrix e) * Matrix.kronecker (1 : CMatrix a) R =
-      Matrix.kronecker (P * 1) ((1 : CMatrix e) * R) := by
+  have hmul₁ : (P ⊗ₖ (1 : CMatrix e)) * ((1 : CMatrix a) ⊗ₖ R) =
+      (P * 1) ⊗ₖ ((1 : CMatrix e) * R) := by
     exact (Matrix.mul_kronecker_mul P (1 : CMatrix a) (1 : CMatrix e) R).symm
   rw [hmul₁]
-  have hmul₂ : Matrix.kronecker (P * 1) ((1 : CMatrix e) * R) *
-      Matrix.kronecker P (1 : CMatrix e) =
-        Matrix.kronecker ((P * 1) * P) (((1 : CMatrix e) * R) * 1) := by
+  have hmul₂ : ((P * 1) ⊗ₖ ((1 : CMatrix e) * R)) *
+      (P ⊗ₖ (1 : CMatrix e)) =
+        ((P * 1) * P) ⊗ₖ (((1 : CMatrix e) * R) * 1) := by
     exact (Matrix.mul_kronecker_mul (P * 1) P ((1 : CMatrix e) * R)
       (1 : CMatrix e)).symm
   rw [hmul₂]
@@ -1613,7 +1611,7 @@ theorem haydenProjectedAE_firstMoment_eq_meanTarget [Fintype a] [Fintype e]
     (∫ U : Matrix.unitaryGroup a ℂ,
         haydenProjectedAE (a := a) (e := e) P d rho U ∂unitaryHaarMeasure (a := a)) =
       haydenProjectedAEMeanTarget (a := a) (e := e) P d rho := by
-  let K : CMatrix (a × e) := Matrix.kronecker P (1 : CMatrix e)
+  let K : CMatrix (a × e) := P ⊗ₖ (1 : CMatrix e)
   let c : ℂ := (((Fintype.card a : ℝ) / d : ℝ) : ℂ)
   have hf :=
     ambientSideTwirl_integrand_integrable (a := a) (e := e) rho
@@ -1658,7 +1656,7 @@ theorem haydenProjectedAE_firstMoment_eq_meanTarget [Fintype a] [Fintype e]
     _ = c •
         (K *
           ((((1 : ℝ) / (Fintype.card a : ℝ) : ℝ) : ℂ) •
-            Matrix.kronecker (1 : CMatrix a) (Matrix.traceLeft rho)) * K) := by
+            ((1 : CMatrix a) ⊗ₖ (Matrix.traceLeft rho))) * K) := by
         rw [ambientSideTwirl_integral_eq_kronecker_partialTrace (a := a) (e := e) rho]
     _ = haydenProjectedAEMeanTarget (a := a) (e := e) P d rho := by
         simpa [K, c] using

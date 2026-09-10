@@ -35,7 +35,7 @@ Source: [Tomamichel2015FiniteResources, cond.tex:268-291].
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 open Matrix
 
 noncomputable section
@@ -60,8 +60,8 @@ theorem measurementMap_identityTensorStateMatrix_le
         (identityTensorStateMatrix (a := a) sigma) ≤
       identityTensorStateMatrix (a := c) sigma := by
   change (CPTPOp.prod (POVM.measureDiscard M) (CPTPOp.id (dIn := b))).map
-      (Matrix.kronecker (1 : CMatrix a) sigma.m) ≤
-    Matrix.kronecker (1 : CMatrix c) sigma.m
+      ((1 : CMatrix a) ⊗ₖ sigma.m) ≤
+    (1 : CMatrix c) ⊗ₖ sigma.m
   rw [CPTPOp.prod_map_kronecker]
   have hid : (CPTPOp.id (dIn := b)).map sigma.m = sigma.m := by
     simp [CPTPOp.id_map]
@@ -69,12 +69,11 @@ theorem measurementMap_identityTensorStateMatrix_le
   have hkron := (Matrix.le_iff.mp hMUnit).kronecker sigma.psd
   apply Matrix.le_iff.mpr
   have heq :
-      Matrix.kronecker (1 : CMatrix c) sigma.m -
-          Matrix.kronecker ((POVM.measureDiscard M).map (1 : CMatrix a)) sigma.m =
-        Matrix.kronecker
-          ((1 : CMatrix c) - (POVM.measureDiscard M).map (1 : CMatrix a)) sigma.m := by
+      (1 : CMatrix c) ⊗ₖ sigma.m -
+          ((POVM.measureDiscard M).map (1 : CMatrix a)) ⊗ₖ sigma.m =
+        ((1 : CMatrix c) - (POVM.measureDiscard M).map (1 : CMatrix a)) ⊗ₖ sigma.m := by
     ext i j
-    simp [Matrix.kronecker, Matrix.kroneckerMap_apply, sub_mul]
+    simp [Matrix.kroneckerMap_apply, sub_mul]
   rw [heq]
   exact hkron
 
@@ -406,7 +405,7 @@ theorem relativeEntropyPSDReferenceTraceLogE_real_smul_identityTensor_traceLeft_
     sigma.psd.isHermitian.eigenvectorUnitary
   let UA : Matrix.unitaryGroup a ℂ := 1
   let U : Matrix.unitaryGroup (a × b) ℂ :=
-    ⟨Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b),
+    ⟨(UA : CMatrix a) ⊗ₖ (UB : CMatrix b),
       Matrix.kronecker_mem_unitary UA.2 UB.2⟩
   let mu : b → ℝ := fun j => sigma.psd.isHermitian.eigenvalues j
   let d : a × b → ℝ := fun ij => scale * mu ij.2
@@ -421,7 +420,7 @@ theorem relativeEntropyPSDReferenceTraceLogE_real_smul_identityTensor_traceLeft_
     simpa [UB, mu, Function.comp_def, Unitary.conjStarAlgAut_apply] using
       sigma.psd.isHermitian.spectral_theorem
   have hdiagKron :
-      Matrix.kronecker (1 : CMatrix a)
+      (1 : CMatrix a) ⊗ₖ
           (Matrix.diagonal (fun j : b => ((mu j : ℝ) : ℂ))) =
         Matrix.diagonal
           (fun ij : a × b => ((mu ij.2 : ℝ) : ℂ)) := by
@@ -429,37 +428,37 @@ theorem relativeEntropyPSDReferenceTraceLogE_real_smul_identityTensor_traceLeft_
     rcases ij with ⟨i, j⟩
     rcases kl with ⟨k, l⟩
     by_cases hik : i = k <;> by_cases hjl : j = l <;>
-      simp [Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.diagonal,
+      simp [Matrix.kroneckerMap_apply, Matrix.diagonal,
         hik, hjl]
   have hrefSpec :
       ref = (U : CMatrix (a × b)) *
           Matrix.diagonal
             (fun ij : a × b => ((mu ij.2 : ℝ) : ℂ)) *
           star (U : CMatrix (a × b)) := by
-    change Matrix.kronecker (1 : CMatrix a) sigma.m = _
+    change (1 : CMatrix a) ⊗ₖ sigma.m = _
     rw [hsigmaSpec]
     rw [← hdiagKron]
     calc
-      Matrix.kronecker (1 : CMatrix a)
+      (1 : CMatrix a) ⊗ₖ
           (((UB : CMatrix b) *
             Matrix.diagonal (fun j : b => ((mu j : ℝ) : ℂ))) *
               star (UB : CMatrix b)) =
-          Matrix.kronecker ((1 : CMatrix a) * 1)
+          (((1 : CMatrix a) * 1) ⊗ₖ
             ((UB : CMatrix b) *
-              Matrix.diagonal (fun j : b => ((mu j : ℝ) : ℂ))) *
-          Matrix.kronecker (1 : CMatrix a) (star (UB : CMatrix b)) := by
+              Matrix.diagonal (fun j : b => ((mu j : ℝ) : ℂ)))) *
+          ((1 : CMatrix a) ⊗ₖ (star (UB : CMatrix b))) := by
         simpa using
           (Matrix.mul_kronecker_mul (1 : CMatrix a) (1 : CMatrix a)
             ((UB : CMatrix b) *
               Matrix.diagonal (fun j : b => ((mu j : ℝ) : ℂ)))
             (star (UB : CMatrix b)))
-      _ = (Matrix.kronecker (1 : CMatrix a) (UB : CMatrix b) *
-          Matrix.kronecker (1 : CMatrix a)
-            (Matrix.diagonal (fun j : b => ((mu j : ℝ) : ℂ)))) *
-          Matrix.kronecker (1 : CMatrix a) (star (UB : CMatrix b)) := by
+      _ = (((1 : CMatrix a) ⊗ₖ (UB : CMatrix b)) *
+          ((1 : CMatrix a) ⊗ₖ
+            (Matrix.diagonal (fun j : b => ((mu j : ℝ) : ℂ))))) *
+          ((1 : CMatrix a) ⊗ₖ (star (UB : CMatrix b))) := by
         exact congrArg
           (fun M : CMatrix (a × b) =>
-            M * Matrix.kronecker (1 : CMatrix a) (star (UB : CMatrix b)))
+            M * ((1 : CMatrix a) ⊗ₖ (star (UB : CMatrix b))))
           (Matrix.mul_kronecker_mul (1 : CMatrix a) (1 : CMatrix a)
             (UB : CMatrix b)
             (Matrix.diagonal (fun j : b => ((mu j : ℝ) : ℂ))))

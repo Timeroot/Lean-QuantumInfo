@@ -23,7 +23,7 @@ proof lines 366-400.  The Sion minimax step this feeds into is in
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 open Matrix
 
@@ -51,8 +51,7 @@ def liftACToABC (MAC : CMatrix (a × c)) : CMatrix ((a × b) × c) :=
 common bracket expression in `cond.tex`, Proposition `pr:dual-new`. -/
 def abcSideStatePowerMatrix (σB : MState b) (τC : MState c) (alphaPrime : ℝ) :
     CMatrix ((a × b) × c) :=
-  Matrix.kronecker
-    (Matrix.kronecker (1 : CMatrix a) (CFC.rpow σB.m (-alphaPrime)))
+  ((1 : CMatrix a) ⊗ₖ (CFC.rpow σB.m (-alphaPrime))) ⊗ₖ
     (CFC.rpow τC.m alphaPrime)
 
 end MState

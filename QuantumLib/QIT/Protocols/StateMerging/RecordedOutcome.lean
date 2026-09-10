@@ -26,7 +26,7 @@ part of the classical record.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 
 universe u v w x y z p q
 
@@ -202,32 +202,24 @@ private theorem prodAssoc_kron_naturality
   rw [CPTPOp.reindex_map_single]
   rw [show Matrix.single (Equiv.prodAssoc A R B i)
       (Equiv.prodAssoc A R B j) (1 : ℂ) =
-        Matrix.kronecker
-          (Matrix.single i.1.1 j.1.1 (1 : ℂ))
+        (Matrix.single i.1.1 j.1.1 (1 : ℂ)) ⊗ₖ
           (Matrix.single (i.1.2, i.2) (j.1.2, j.2) (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
-  simp only [Matrix.kronecker]
   rw [MatrixMap.kron_map_of_kron_state]
   rw [show Matrix.single (i.1.2, i.2) (j.1.2, j.2) (1 : ℂ) =
-        Matrix.kronecker
-          (Matrix.single i.1.2 j.1.2 (1 : ℂ))
+        (Matrix.single i.1.2 j.1.2 (1 : ℂ)) ⊗ₖ
           (Matrix.single i.2 j.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
-  simp only [Matrix.kronecker]
   rw [MatrixMap.kron_map_of_kron_state]
   rw [show Matrix.single i j (1 : ℂ) =
-        Matrix.kronecker
-          (Matrix.single i.1 j.1 (1 : ℂ))
+        (Matrix.single i.1 j.1 (1 : ℂ)) ⊗ₖ
           (Matrix.single i.2 j.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
-  simp only [Matrix.kronecker]
   rw [MatrixMap.kron_map_of_kron_state]
   rw [show Matrix.single i.1 j.1 (1 : ℂ) =
-        Matrix.kronecker
-          (Matrix.single i.1.1 j.1.1 (1 : ℂ))
+        (Matrix.single i.1.1 j.1.1 (1 : ℂ)) ⊗ₖ
           (Matrix.single i.1.2 j.1.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
-  simp only [Matrix.kronecker]
   rw [MatrixMap.kron_map_of_kron_state, CPTPOp.reindex_map]
   ext k l
   simp [mul_assoc]
@@ -812,8 +804,7 @@ theorem idealRecordedOutcomeState_eq_uniform_prod :
   simp [idealRecordedOutcomeState, idealRecordedConditioningState,
     idealRecordedOutcomeEnsemble, idealRecordedConditioningEnsemble,
     prodABCToBCAEquiv, Equiv.prodComm,
-    MEnsemble.cqState, Matrix.kronecker,
-    Matrix.kroneckerMap_apply]
+    MEnsemble.cqState, Matrix.kroneckerMap_apply]
   simp only [Matrix.sum_apply, Matrix.smul_apply, Matrix.kroneckerMap_apply]
   rw [Finset.mul_sum]
   apply Finset.sum_congr rfl

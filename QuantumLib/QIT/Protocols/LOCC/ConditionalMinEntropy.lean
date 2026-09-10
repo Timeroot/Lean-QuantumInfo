@@ -22,7 +22,7 @@ the complete family of Kraus Gram matrices before returning to the input.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 namespace QIT
 
@@ -314,7 +314,7 @@ theorem branchSourceReferenceAmplitude_eq_kronecker_mul
     (M : FiniteInstrument A A' X) (psi : Ket (A × (R × E)))
     (i : M.refinedBranchIndex) :
     M.branchSourceReferenceAmplitude psi i =
-      Matrix.kronecker (M.refinedKraus i) (1 : CMatrix R) *
+      ((M.refinedKraus i) ⊗ₖ (1 : CMatrix R)) *
         sourceReferenceAmplitude psi := by
   classical
   ext ar e
@@ -359,77 +359,72 @@ theorem sum_branchSourceReferenceAmplitude_referenceSandwich
     (S : CMatrix R) :
     (∑ i : M.refinedBranchIndex,
         Matrix.conjTranspose (M.branchSourceReferenceAmplitude psi i) *
-          Matrix.kronecker (1 : CMatrix A') S *
+          ((1 : CMatrix A') ⊗ₖ S) *
           M.branchSourceReferenceAmplitude psi i) =
       Matrix.conjTranspose (sourceReferenceAmplitude psi) *
-        Matrix.kronecker (1 : CMatrix A) S *
+        ((1 : CMatrix A) ⊗ₖ S) *
         sourceReferenceAmplitude psi := by
   classical
   have hbranch (i : M.refinedBranchIndex) :
       Matrix.conjTranspose (M.branchSourceReferenceAmplitude psi i) *
-          Matrix.kronecker (1 : CMatrix A') S *
+          ((1 : CMatrix A') ⊗ₖ S) *
           M.branchSourceReferenceAmplitude psi i =
         Matrix.conjTranspose (sourceReferenceAmplitude psi) *
-          Matrix.kronecker
-            (Matrix.conjTranspose (M.refinedKraus i) * M.refinedKraus i) S *
+          ((Matrix.conjTranspose (M.refinedKraus i) * M.refinedKraus i) ⊗ₖ S) *
           sourceReferenceAmplitude psi := by
     have hct :
         Matrix.conjTranspose
-            (Matrix.kronecker (M.refinedKraus i) (1 : CMatrix R)) =
-          Matrix.kronecker (Matrix.conjTranspose (M.refinedKraus i))
+            ((M.refinedKraus i) ⊗ₖ (1 : CMatrix R)) =
+          (Matrix.conjTranspose (M.refinedKraus i)) ⊗ₖ
             (1 : CMatrix R) := by
-      simpa [Matrix.kronecker] using
+      simpa using
         (Matrix.conjTranspose_kronecker
           (M.refinedKraus i) (1 : CMatrix R))
     have hleft :
-        Matrix.kronecker (Matrix.conjTranspose (M.refinedKraus i))
-            (1 : CMatrix R) * Matrix.kronecker (1 : CMatrix A') S =
-          Matrix.kronecker (Matrix.conjTranspose (M.refinedKraus i)) S := by
-      simpa [Matrix.kronecker] using
+        ((Matrix.conjTranspose (M.refinedKraus i)) ⊗ₖ
+            (1 : CMatrix R)) * ((1 : CMatrix A') ⊗ₖ S) =
+          (Matrix.conjTranspose (M.refinedKraus i)) ⊗ₖ S := by
+      simpa using
         (Matrix.mul_kronecker_mul (Matrix.conjTranspose (M.refinedKraus i))
           (1 : CMatrix A') (1 : CMatrix R) S).symm
     have hright :
-        Matrix.kronecker (Matrix.conjTranspose (M.refinedKraus i)) S *
-            Matrix.kronecker (M.refinedKraus i) (1 : CMatrix R) =
-          Matrix.kronecker
-            (Matrix.conjTranspose (M.refinedKraus i) * M.refinedKraus i) S := by
-      simpa [Matrix.kronecker] using
+        ((Matrix.conjTranspose (M.refinedKraus i)) ⊗ₖ S) *
+            ((M.refinedKraus i) ⊗ₖ (1 : CMatrix R)) =
+          (Matrix.conjTranspose (M.refinedKraus i) * M.refinedKraus i) ⊗ₖ S := by
+      simpa using
         (Matrix.mul_kronecker_mul (Matrix.conjTranspose (M.refinedKraus i))
           (M.refinedKraus i) S (1 : CMatrix R)).symm
     rw [M.branchSourceReferenceAmplitude_eq_kronecker_mul psi i,
       Matrix.conjTranspose_mul, hct]
     calc
       Matrix.conjTranspose (sourceReferenceAmplitude psi) *
-            Matrix.kronecker (Matrix.conjTranspose (M.refinedKraus i))
-              (1 : CMatrix R) * Matrix.kronecker (1 : CMatrix A') S *
-            (Matrix.kronecker (M.refinedKraus i) (1 : CMatrix R) *
+            ((Matrix.conjTranspose (M.refinedKraus i)) ⊗ₖ
+              (1 : CMatrix R)) * ((1 : CMatrix A') ⊗ₖ S) *
+            (((M.refinedKraus i) ⊗ₖ (1 : CMatrix R)) *
               sourceReferenceAmplitude psi) =
           Matrix.conjTranspose (sourceReferenceAmplitude psi) *
-            ((Matrix.kronecker (Matrix.conjTranspose (M.refinedKraus i))
-                (1 : CMatrix R) * Matrix.kronecker (1 : CMatrix A') S) *
-              Matrix.kronecker (M.refinedKraus i) (1 : CMatrix R)) *
+            ((((Matrix.conjTranspose (M.refinedKraus i)) ⊗ₖ
+                (1 : CMatrix R)) * ((1 : CMatrix A') ⊗ₖ S)) *
+              ((M.refinedKraus i) ⊗ₖ (1 : CMatrix R))) *
             sourceReferenceAmplitude psi := by simp only [Matrix.mul_assoc]
       _ = Matrix.conjTranspose (sourceReferenceAmplitude psi) *
-          Matrix.kronecker
-            (Matrix.conjTranspose (M.refinedKraus i) * M.refinedKraus i) S *
+          ((Matrix.conjTranspose (M.refinedKraus i) * M.refinedKraus i) ⊗ₖ S) *
           sourceReferenceAmplitude psi := by rw [hleft, hright]
   calc
     (∑ i : M.refinedBranchIndex,
         Matrix.conjTranspose (M.branchSourceReferenceAmplitude psi i) *
-          Matrix.kronecker (1 : CMatrix A') S *
+          ((1 : CMatrix A') ⊗ₖ S) *
           M.branchSourceReferenceAmplitude psi i) =
         ∑ i : M.refinedBranchIndex,
           Matrix.conjTranspose (sourceReferenceAmplitude psi) *
-            Matrix.kronecker
-              (Matrix.conjTranspose (M.refinedKraus i) * M.refinedKraus i) S *
+            ((Matrix.conjTranspose (M.refinedKraus i) * M.refinedKraus i) ⊗ₖ S) *
             sourceReferenceAmplitude psi := by
       apply Finset.sum_congr rfl
       intro i _
       exact hbranch i
     _ = Matrix.conjTranspose (sourceReferenceAmplitude psi) *
         (∑ i : M.refinedBranchIndex,
-          Matrix.kronecker
-            (Matrix.conjTranspose (M.refinedKraus i) * M.refinedKraus i) S) *
+          (Matrix.conjTranspose (M.refinedKraus i) * M.refinedKraus i) ⊗ₖ S) *
         sourceReferenceAmplitude psi := by
       symm
       ext e e'
@@ -440,17 +435,15 @@ theorem sum_branchSourceReferenceAmplitude_referenceSandwich
         rw [Finset.sum_comm]
       rw [Finset.sum_comm]
     _ = Matrix.conjTranspose (sourceReferenceAmplitude psi) *
-        Matrix.kronecker
-          (∑ i : M.refinedBranchIndex,
-            Matrix.conjTranspose (M.refinedKraus i) * M.refinedKraus i) S *
+        ((∑ i : M.refinedBranchIndex,
+            Matrix.conjTranspose (M.refinedKraus i) * M.refinedKraus i) ⊗ₖ S) *
         sourceReferenceAmplitude psi := by
       congr 2
       ext ar ar'
-      simp only [Matrix.sum_apply, Matrix.kronecker,
-        Matrix.kroneckerMap_apply]
+      simp only [Matrix.sum_apply, Matrix.kroneckerMap_apply]
       rw [Finset.sum_mul]
     _ = Matrix.conjTranspose (sourceReferenceAmplitude psi) *
-        Matrix.kronecker (1 : CMatrix A) S *
+        ((1 : CMatrix A) ⊗ₖ S) *
         sourceReferenceAmplitude psi := by
       rw [M.sum_conjTranspose_refinedKraus_mul_refinedKraus]
 
@@ -480,15 +473,15 @@ theorem conditionalMinEntropyScaleFeasible_of_positiveBranches_posDef
     MState.ConditionalMinEntropyScaleFeasible (a := A)
       (sourceReferenceState psi) T := by
   classical
-  let QA : CMatrix (A × R) := Matrix.kronecker (1 : CMatrix A) T
-  let QA' : CMatrix (A' × R) := Matrix.kronecker (1 : CMatrix A') T
+  let QA : CMatrix (A × R) := (1 : CMatrix A) ⊗ₖ T
+  let QA' : CMatrix (A' × R) := (1 : CMatrix A') ⊗ₖ T
   have hQA : QA.PosDef := by
     simpa [QA] using (Matrix.PosDef.one.kronecker hT)
   have hQA' : QA'.PosDef := by
     simpa [QA'] using (Matrix.PosDef.one.kronecker hT)
-  have hQAinv : QA⁻¹ = Matrix.kronecker (1 : CMatrix A) T⁻¹ := by
+  have hQAinv : QA⁻¹ = (1 : CMatrix A) ⊗ₖ T⁻¹ := by
     simpa [QA] using (Matrix.inv_kronecker (1 : CMatrix A) T)
-  have hQA'inv : QA'⁻¹ = Matrix.kronecker (1 : CMatrix A') T⁻¹ := by
+  have hQA'inv : QA'⁻¹ = (1 : CMatrix A') ⊗ₖ T⁻¹ := by
     simpa [QA'] using (Matrix.inv_kronecker (1 : CMatrix A') T)
   have hcomponent : ∀ i : M.refinedBranchIndex,
       Matrix.conjTranspose (M.branchSourceReferenceAmplitude psi i) * QA'⁻¹ *
@@ -572,7 +565,7 @@ theorem conditionalMinEntropyScaleFeasible_of_positiveBranches
       (sourceReferenceState psi) T := by
   classical
   let D : CMatrix (A × R) :=
-    Matrix.kronecker (1 : CMatrix A) T - (sourceReferenceState psi).m
+    (1 : CMatrix A) ⊗ₖ T - (sourceReferenceState psi).m
   have hDherm : D.IsHermitian := by
     exact ((Matrix.PosSemidef.one.kronecker hT).isHermitian).sub
       (sourceReferenceState psi).psd.isHermitian
@@ -591,8 +584,8 @@ theorem conditionalMinEntropyScaleFeasible_of_positiveBranches
       rw [Matrix.le_iff]
       simpa [Tepsilon, sub_eq_add_neg, add_assoc] using hperturbR
     have hQle :
-        Matrix.kronecker (1 : CMatrix A') T ≤
-          Matrix.kronecker (1 : CMatrix A') Tepsilon := by
+        (1 : CMatrix A') ⊗ₖ T ≤
+          (1 : CMatrix A') ⊗ₖ Tepsilon := by
       rw [Matrix.le_iff]
       have hkron :=
         (Matrix.PosSemidef.one : (1 : CMatrix A').PosSemidef).kronecker

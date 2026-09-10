@@ -21,7 +21,7 @@ material [Tomamichel2015FiniteResources, prelim.tex:617-624].
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 
 universe u v
 
@@ -37,12 +37,12 @@ variable [DecidableEq ι] [DecidableEq a]
 
 /-- The classical-quantum state rho_XQ = Sum_x p_x |x><x|_X (x) rho_x. -/
 def cqState (E : MEnsemble a ι) : MState (ι × a) := .ofMatrix
-  (matrix := ∑ x, (E.probs x) • Matrix.kronecker (Matrix.single x x (1 : ℂ)) (E.states x).m)
+  (matrix := ∑ x, (E.probs x) • ((Matrix.single x x (1 : ℂ)) ⊗ₖ (E.states x).m))
   (pos := by
     exact Matrix.posSemidef_sum Finset.univ fun x _ =>
       ((posSemidef_single x).kronecker (E.states x).psd).smul (NNReal.coe_nonneg (E.probs x)))
   (trace_eq_one := by
-    have hkr : ∀ x, (Matrix.kronecker (Matrix.single x x (1 : ℂ)) (E.states x).m).trace =
+    have hkr : ∀ x, ((Matrix.single x x (1 : ℂ)) ⊗ₖ (E.states x).m).trace =
         (Matrix.single x x (1 : ℂ)).trace * (E.states x).m.trace := fun x =>
       Matrix.trace_kronecker _ _
     simp only [Matrix.trace_sum, Matrix.trace_smul]
@@ -55,7 +55,7 @@ def cqState (E : MEnsemble a ι) : MState (ι × a) := .ofMatrix
 @[simp]
 theorem cqState_matrix (E : MEnsemble a ι) :
     E.cqState.m =
-      ∑ x, (E.probs x) • Matrix.kronecker (Matrix.single x x (1 : ℂ)) (E.states x).m :=
+      ∑ x, (E.probs x) • ((Matrix.single x x (1 : ℂ)) ⊗ₖ (E.states x).m) :=
   MState.matrix_ofMatrix _ _ _
 
 /-- Tracing out the classical register gives the ensemble's average state. -/
@@ -63,7 +63,7 @@ theorem traceLeft_cqState (E : MEnsemble a ι) :
     Matrix.traceLeft (E.cqState.m) = E.averageState.m := by
   ext j j'
   simp only [cqState_matrix, averageState_matrix, Matrix.traceLeft, Matrix.of_apply, Matrix.sum_apply,
-    Matrix.smul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]
+    Matrix.smul_apply, Matrix.kroneckerMap_apply]
   refine Finset.sum_congr rfl fun i _ => ?_
   rw [Finset.sum_eq_single_of_mem i (Finset.mem_univ _)
       fun x _ hx => by
@@ -83,7 +83,7 @@ theorem traceRight_cqState (E : MEnsemble a ι) :
     Matrix.traceRight (E.cqState.m) = Matrix.diagonal (fun x => ((E.probs x : ℂ))) := by
   ext x x'
   simp only [cqState_matrix, Matrix.traceRight, Matrix.of_apply, Matrix.sum_apply, Matrix.diagonal_apply,
-    Matrix.smul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]
+    Matrix.smul_apply, Matrix.kroneckerMap_apply]
   by_cases h : x = x'
   · subst h
     rw [if_pos rfl]
@@ -127,15 +127,14 @@ def block (X : CMatrix (ι × a)) (x x' : ι) : CMatrix a := fun i j => X (x, i)
 
 /-- Reconstruct a block-diagonal classical-quantum matrix from quantum blocks. -/
 def blockDiagonal (blocks : ι → CMatrix a) : CMatrix (ι × a) :=
-  ∑ x, Matrix.kronecker (Matrix.single x x (1 : ℂ)) (blocks x)
+  ∑ x, (Matrix.single x x (1 : ℂ)) ⊗ₖ (blocks x)
 
 /-- Extracting a diagonal block from a block-diagonal matrix recovers that block. -/
 @[simp]
 theorem blockDiagonal_block_self (blocks : ι → CMatrix a) (x : ι) :
     block (blockDiagonal blocks) x x = blocks x := by
   ext i j
-  simp only [block, blockDiagonal, Matrix.sum_apply, Matrix.kronecker,
-    Matrix.kroneckerMap_apply]
+  simp only [block, blockDiagonal, Matrix.sum_apply, Matrix.kroneckerMap_apply]
   rw [Finset.sum_eq_single_of_mem x (Finset.mem_univ _)
       fun y _ hy => by
         have hz : Matrix.single y y (1 : ℂ) x x = 0 := by
@@ -148,8 +147,7 @@ theorem blockDiagonal_block_self (blocks : ι → CMatrix a) (x : ι) :
 theorem blockDiagonal_block_ne (blocks : ι → CMatrix a) {x x' : ι} (h : x ≠ x') :
     block (blockDiagonal blocks) x x' = 0 := by
   ext i j
-  simp only [block, blockDiagonal, Matrix.sum_apply, Matrix.kronecker,
-    Matrix.kroneckerMap_apply]
+  simp only [block, blockDiagonal, Matrix.sum_apply, Matrix.kroneckerMap_apply]
   refine Finset.sum_eq_zero fun y _ => ?_
   have hz : Matrix.single y y (1 : ℂ) x x' = 0 := by
     rw [Matrix.single_apply, if_neg fun hyy => h (hyy.1.symm.trans hyy.2)]
@@ -164,7 +162,7 @@ theorem blockDiagonal_sub (blocks blocks' : ι → CMatrix a) :
   rw [← Finset.sum_sub_distrib]
   refine Finset.sum_congr rfl fun x _ => ?_
   ext xi xj
-  simp [Matrix.kronecker, Matrix.kroneckerMap_apply]
+  simp [Matrix.kroneckerMap_apply]
   ring
 
 /-- Block-diagonal reconstruction commutes with scalar multiplication. -/
@@ -176,13 +174,13 @@ theorem blockDiagonal_smul (c : ℂ) (blocks : ι → CMatrix a) :
   rw [Finset.smul_sum]
   refine Finset.sum_congr rfl fun x _ => ?_
   ext xi xj
-  simp [Matrix.kronecker, Matrix.kroneckerMap_apply]
+  simp [Matrix.kroneckerMap_apply]
   ring
 
 /-- A side operator tensored with the classical identity is the constant
 block-diagonal matrix with that side operator in each diagonal block. -/
 theorem identityTensor_eq_blockDiagonal (T : CMatrix a) :
-    Matrix.kronecker (1 : CMatrix ι) T =
+    (1 : CMatrix ι) ⊗ₖ T =
       blockDiagonal (fun _ : ι => T) := by
   classical
   ext xi xj
@@ -193,11 +191,11 @@ theorem identityTensor_eq_blockDiagonal (T : CMatrix a) :
     have hblock :=
       congrFun (congrFun
         (blockDiagonal_block_self (fun _ : ι => T) x) i) j
-    simpa [block, Matrix.kronecker, Matrix.kroneckerMap_apply] using hblock.symm
+    simpa [block, Matrix.kroneckerMap_apply] using hblock.symm
   · have hblock :=
       congrFun (congrFun
         (blockDiagonal_block_ne (fun _ : ι => T) hxx') i) j
-    simpa [block, Matrix.kronecker, Matrix.kroneckerMap_apply, hxx'] using hblock.symm
+    simpa [block, Matrix.kroneckerMap_apply, hxx'] using hblock.symm
 
 variable [Fintype a] [DecidableEq a]
 
@@ -223,7 +221,7 @@ theorem blockDiagonal_trace (blocks : ι → CMatrix a) :
   rw [Matrix.trace_sum]
   refine Finset.sum_congr rfl fun x _ => ?_
   have hkr :
-      ((Matrix.kronecker (Matrix.single x x (1 : ℂ)) (blocks x)).trace) =
+      (((Matrix.single x x (1 : ℂ)) ⊗ₖ (blocks x)).trace) =
         (Matrix.single x x (1 : ℂ)).trace * (blocks x).trace :=
     Matrix.trace_kronecker _ _
   rw [hkr, trace_single_one, if_pos rfl]
@@ -406,7 +404,7 @@ theorem cqState_eq_blockDiagonal (E : MEnsemble a ι) :
     E.cqState.m = blockDiagonal fun x => (E.probs x : ℂ) • (E.states x).m := by
   ext xi xj
   simp only [MEnsemble.cqState_matrix, blockDiagonal, Matrix.sum_apply, Matrix.smul_apply,
-    Matrix.kronecker, Matrix.kroneckerMap_apply, smul_eq_mul]
+    Matrix.kroneckerMap_apply, smul_eq_mul]
   refine Finset.sum_congr rfl fun x _ => ?_
   rw [Algebra.smul_def]
   rw [show (algebraMap ℝ≥0 ℂ) (E.probs x) = (E.probs x : ℂ) by rfl]

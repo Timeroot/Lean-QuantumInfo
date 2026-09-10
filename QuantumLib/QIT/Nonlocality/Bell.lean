@@ -21,7 +21,7 @@ Finite Bell scenarios are represented by a nonnegative real probability table
 
 @[expose] public section
 
-open scoped NNReal
+open scoped NNReal Kronecker
 
 namespace QIT
 namespace Bell
@@ -224,7 +224,7 @@ structure QuantumRealization
   /-- The joint POVM has tensor-product effects. -/
   joint_effects : ∀ x y outcome,
     (joint x y).effects outcome =
-      Matrix.kronecker ((alice x).effects outcome.1) ((bob y).effects outcome.2)
+      ((alice x).effects outcome.1) ⊗ₖ ((bob y).effects outcome.2)
 
 namespace QuantumRealization
 

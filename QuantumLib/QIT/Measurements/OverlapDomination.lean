@@ -79,20 +79,20 @@ The domination is the matrix inequality underpinning the measurement-overlap
 bound of `apps.tex:208-213`. -/
 theorem overlap_domination_le (M : y → CMatrix b) (hM : ∀ j, (M j).PosSemidef) :
     (∑ i, ∑ j, ((P.effects i * Q.effects j).trace).re •
-        Matrix.kronecker (Matrix.single i i (1 : ℂ)) (M j)) ≤
-      (P.rankOneTraceOverlap Q : ℝ) • Matrix.kronecker (1 : CMatrix x) (∑ j, M j) := by
+        ((Matrix.single i i (1 : ℂ)) ⊗ₖ (M j))) ≤
+      (P.rankOneTraceOverlap Q : ℝ) • ((1 : CMatrix x) ⊗ₖ (∑ j, M j)) := by
   set c : ℝ := (P.rankOneTraceOverlap Q : ℝ)
   -- The outcome-basis identity matrix is the resolution `Σ_i |i><i|`.
   have hone : (1 : CMatrix x) = ∑ i, Matrix.single i i (1 : ℂ) :=
     (Matrix.sum_single_one).symm
   -- Kronecker is bilinear, hence distributes over both outcome-register sums.
   have hkron (A : x → CMatrix x) (B : y → CMatrix b) :
-      Matrix.kronecker (∑ i, A i) (∑ j, B j) = ∑ i, ∑ j, Matrix.kronecker (A i) (B j) := by
+      (∑ i, A i) ⊗ₖ (∑ j, B j) = ∑ i, ∑ j, (A i) ⊗ₖ (B j) := by
     ext ⟨ia, ba⟩ ⟨ib, bb⟩
-    simp only [Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.sum_apply]
+    simp only [Matrix.kroneckerMap_apply, Matrix.sum_apply]
     exact Fintype.sum_mul_sum _ _
   have hpsd : (∑ i, ∑ j, (c - ((P.effects i * Q.effects j).trace).re) •
-      Matrix.kronecker (Matrix.single i i (1 : ℂ)) (M j)).PosSemidef := by
+      ((Matrix.single i i (1 : ℂ)) ⊗ₖ (M j))).PosSemidef := by
     apply Matrix.posSemidef_sum
     intro i _
     apply Matrix.posSemidef_sum
@@ -102,11 +102,11 @@ theorem overlap_domination_le (M : y → CMatrix b) (hM : ∀ j, (M j).PosSemide
     · exact sub_nonneg.mpr (mod_cast P.trace_re_le_rankOneTraceOverlap Q i j)
   rw [Matrix.le_iff]
   have heq :
-      ((P.rankOneTraceOverlap Q : ℝ) • Matrix.kronecker (1 : CMatrix x) (∑ j, M j)) -
+      ((P.rankOneTraceOverlap Q : ℝ) • ((1 : CMatrix x) ⊗ₖ (∑ j, M j))) -
           (∑ i, ∑ j, ((P.effects i * Q.effects j).trace).re •
-            Matrix.kronecker (Matrix.single i i (1 : ℂ)) (M j)) =
+            ((Matrix.single i i (1 : ℂ)) ⊗ₖ (M j))) =
         ∑ i, ∑ j, (c - ((P.effects i * Q.effects j).trace).re) •
-          Matrix.kronecker (Matrix.single i i (1 : ℂ)) (M j) := by
+          ((Matrix.single i i (1 : ℂ)) ⊗ₖ (M j)) := by
     rw [show c = (P.rankOneTraceOverlap Q : ℝ) from rfl, hone, hkron]
     simp only [Finset.smul_sum, ← Finset.sum_sub_distrib, ← sub_smul]
   rw [heq]
@@ -122,8 +122,8 @@ source-facing domination through `c = max_{i,j} |⟨φ_i|ϑ_j⟩|²`. -/
 theorem overlap_domination_le_rankOne (hP : P.IsRankOne) (hQ : Q.IsRankOne)
     (M : y → CMatrix b) (hM : ∀ j, (M j).PosSemidef) :
     (∑ i, ∑ j, (hP.vector i).overlapSq (hQ.vector j) •
-        Matrix.kronecker (Matrix.single i i (1 : ℂ)) (M j)) ≤
-      (P.rankOneTraceOverlap Q : ℝ) • Matrix.kronecker (1 : CMatrix x) (∑ j, M j) := by
+        ((Matrix.single i i (1 : ℂ)) ⊗ₖ (M j))) ≤
+      (P.rankOneTraceOverlap Q : ℝ) • ((1 : CMatrix x) ⊗ₖ (∑ j, M j)) := by
   classical
   have hkey : ∀ i j,
       ((P.effects i * Q.effects j).trace).re = (hP.vector i).overlapSq (hQ.vector j) := by

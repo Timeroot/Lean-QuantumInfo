@@ -29,7 +29,7 @@ smooth one-shot optimization arguments.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator QIT.MatrixL2
+open scoped ComplexOrder MatrixOrder Kronecker Matrix.Norms.L2Operator QIT.MatrixL2
 
 open Matrix
 
@@ -191,12 +191,12 @@ variable {b : Type v} [Fintype b] [DecidableEq b]
 omit [Fintype a] [Fintype b] [DecidableEq b] in
 /-- The map `T_B ↦ I_A ⊗ T_B` is continuous on side-information matrices. -/
 theorem continuous_kronecker_one_matrix :
-    Continuous fun T : CMatrix b => Matrix.kronecker (1 : CMatrix a) T := by
+    Continuous fun T : CMatrix b => (1 : CMatrix a) ⊗ₖ T := by
   refine continuous_pi ?_
   intro i
   refine continuous_pi ?_
   intro j
-  simp [Matrix.kronecker, Matrix.kroneckerMap_apply]
+  simp [Matrix.kroneckerMap_apply]
   exact continuous_const.mul
     ((continuous_apply j.2).comp ((continuous_apply i.2).comp continuous_id))
 

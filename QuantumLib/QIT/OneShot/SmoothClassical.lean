@@ -25,7 +25,7 @@ states on `((a × x) × (y × b))`.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal Pointwise
+open scoped ComplexOrder MatrixOrder Kronecker NNReal Pointwise
 open Matrix
 
 namespace QIT
@@ -278,11 +278,11 @@ private theorem classicalPinching_map_apply
 
 private theorem classicalPinching_map_identityTensor (T : CMatrix (y × b)) :
     classicalXYMeasurement.pinchingChannel.map
-        (Matrix.kronecker (1 : CMatrix (a × x)) T) =
-      Matrix.kronecker (1 : CMatrix (a × x)) (classicalConditioningPinch T) := by
+        ((1 : CMatrix (a × x)) ⊗ₖ T) =
+      (1 : CMatrix (a × x)) ⊗ₖ (classicalConditioningPinch T) := by
   ext i j
   simp only [classicalConditioningPinch]
-  simp only [Matrix.kronecker, Matrix.kroneckerMap_apply]
+  simp only [Matrix.kroneckerMap_apply]
   rw [classicalPinching_map_apply, sourceCoordinatePinchChannel_map_apply]
   by_cases hsource : i.1 = j.1
   · by_cases hy : i.2.1 = j.2.1
@@ -300,13 +300,13 @@ private theorem ConditionalMinEntropyScaleFeasible.classicalPinch
       (sourceCoordinatePinchChannel (a := y) (b := b)).map
       (sourceCoordinatePinchChannel (a := y) (b := b)).map_cp T hT.1
   · have hdiff :
-        (Matrix.kronecker (1 : CMatrix (a × x)) T - rho.matrix).PosSemidef :=
+        ((1 : CMatrix (a × x)) ⊗ₖ T - rho.matrix).PosSemidef :=
       hT.2
     have hmap := MatrixMap.isCompletelyPositive_mapsPositive
       classicalXYMeasurement.pinchingChannel.map
       classicalXYMeasurement.pinchingChannel.map_cp
-      (Matrix.kronecker (1 : CMatrix (a × x)) T - rho.matrix) hdiff
-    change (Matrix.kronecker (1 : CMatrix (a × x))
+      ((1 : CMatrix (a × x)) ⊗ₖ T - rho.matrix) hdiff
+    change ((1 : CMatrix (a × x)) ⊗ₖ
         (classicalConditioningPinch T) -
         classicalXYMeasurement.pinchingChannel.map rho.matrix).PosSemidef
     convert hmap using 1
@@ -1459,9 +1459,9 @@ private theorem classicalCoherentBlockProjector_sandwich_posSemidef
     {y' : Type*} [Fintype y'] [DecidableEq y']
     (T : CMatrix (c × x × y')) (hT : T.PosSemidef) (p q : x) (k : y') :
     (classicalCoherentBlockProjector (a := a) (x := x) (c := c) p q k *
-        Matrix.kronecker (1 : CMatrix (a × x)) T *
+        ((1 : CMatrix (a × x)) ⊗ₖ T) *
           classicalCoherentBlockProjector (a := a) (x := x) (c := c) p q k).PosSemidef := by
-  have hM : (Matrix.kronecker (1 : CMatrix (a × x)) T).PosSemidef :=
+  have hM : ((1 : CMatrix (a × x)) ⊗ₖ T).PosSemidef :=
     Matrix.PosSemidef.one.kronecker hT
   simpa only [classicalCoherentBlockProjector_conjTranspose] using
     hM.conjTranspose_mul_mul_same
@@ -1471,16 +1471,16 @@ private theorem classicalCoherentMap_reference_residual
     {c : Type*} [Fintype c] [DecidableEq c]
     {y' : Type*} [Fintype y'] [DecidableEq y']
     (T : CMatrix (c × x × y')) (i j) :
-    ((Matrix.kronecker (1 : CMatrix (a × x))
+    (((1 : CMatrix (a × x)) ⊗ₖ
         (classicalCoherentConditioningPinch (x := x) T) -
         classicalCoherentMap (a := a) (x := x) (c := c) (y' := y')
-          (Matrix.kronecker (1 : CMatrix (a × x)) T)) i j) =
+          ((1 : CMatrix (a × x)) ⊗ₖ T)) i j) =
       (∑ p : x, ∑ q ∈ Finset.univ.erase p, ∑ k : y',
         classicalCoherentBlockProjector (a := a) (x := x) (c := c) p q k *
-          Matrix.kronecker (1 : CMatrix (a × x)) T *
+          ((1 : CMatrix (a × x)) ⊗ₖ T) *
           classicalCoherentBlockProjector (a := a) (x := x) (c := c) p q k) i j := by
   classical
-  simp only [Matrix.sub_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  simp only [Matrix.sub_apply, Matrix.kroneckerMap_apply,
     classicalCoherentConditioningPinch_apply, classicalCoherentMap_apply,
     Matrix.sum_apply]
   simp_rw [classicalCoherentBlockProjector_sandwich_apply]
@@ -1591,18 +1591,18 @@ private theorem classicalCoherentMap_reference_le
     {y' : Type*} [Fintype y'] [DecidableEq y']
     (T : CMatrix (c × x × y')) (hT : T.PosSemidef) :
     classicalCoherentMap (a := a) (x := x) (c := c) (y' := y')
-        (Matrix.kronecker (1 : CMatrix (a × x)) T) ≤
-      Matrix.kronecker (1 : CMatrix (a × x))
+        ((1 : CMatrix (a × x)) ⊗ₖ T) ≤
+      (1 : CMatrix (a × x)) ⊗ₖ
         (classicalCoherentConditioningPinch (x := x) T) := by
   rw [Matrix.le_iff]
   have hres :
-      Matrix.kronecker (1 : CMatrix (a × x))
+      (1 : CMatrix (a × x)) ⊗ₖ
           (classicalCoherentConditioningPinch (x := x) T) -
         classicalCoherentMap (a := a) (x := x) (c := c) (y' := y')
-          (Matrix.kronecker (1 : CMatrix (a × x)) T) =
+          ((1 : CMatrix (a × x)) ⊗ₖ T) =
       ∑ p : x, ∑ q ∈ Finset.univ.erase p, ∑ k : y',
         classicalCoherentBlockProjector (a := a) (x := x) (c := c) p q k *
-          Matrix.kronecker (1 : CMatrix (a × x)) T *
+          ((1 : CMatrix (a × x)) ⊗ₖ T) *
           classicalCoherentBlockProjector (a := a) (x := x) (c := c) p q k := by
     ext i j
     exact classicalCoherentMap_reference_residual T i j
@@ -1631,33 +1631,33 @@ private theorem ConditionalMinEntropyScaleFeasible.classicalCoherentPinch
       (classicalCoherentConditioningMeasurement
         (c := c) (x := x) (y' := y')).pinchingChannel.map_cp T hT.1
   · have hdiff :
-        (Matrix.kronecker (1 : CMatrix (a × x)) T - rho.matrix).PosSemidef :=
+        ((1 : CMatrix (a × x)) ⊗ₖ T - rho.matrix).PosSemidef :=
       hT.2
     have hmap := MatrixMap.isCompletelyPositive_mapsPositive
       (classicalCoherentMap (a := a) (x := x) (c := c) (y' := y'))
       (classicalCoherentMap_completelyPositive
         (a := a) (x := x) (c := c) (y' := y'))
-      (Matrix.kronecker (1 : CMatrix (a × x)) T - rho.matrix) hdiff
+      ((1 : CMatrix (a × x)) ⊗ₖ T - rho.matrix) hdiff
     have href := classicalCoherentMap_reference_le (a := a) (x := x)
       (c := c) (y' := y') T hT.1
     have hrefPsd :
-        (Matrix.kronecker (1 : CMatrix (a × x))
+        ((1 : CMatrix (a × x)) ⊗ₖ
             (classicalCoherentConditioningPinch (x := x) T) -
           classicalCoherentMap (a := a) (x := x) (c := c) (y' := y')
-            (Matrix.kronecker (1 : CMatrix (a × x)) T)).PosSemidef :=
+            ((1 : CMatrix (a × x)) ⊗ₖ T)).PosSemidef :=
       Matrix.le_iff.mp href
     have hsum :
-        (Matrix.kronecker (1 : CMatrix (a × x))
+        ((1 : CMatrix (a × x)) ⊗ₖ
             (classicalCoherentConditioningPinch (x := x) T) -
           classicalCoherentMap (a := a) (x := x) (c := c) (y' := y') rho.matrix).PosSemidef := by
       have hmap' :
           (classicalCoherentMap (a := a) (x := x) (c := c) (y' := y')
-              (Matrix.kronecker (1 : CMatrix (a × x)) T) -
+              ((1 : CMatrix (a × x)) ⊗ₖ T) -
             classicalCoherentMap (a := a) (x := x) (c := c) (y' := y') rho.matrix).PosSemidef := by
         simpa only [map_sub] using hmap
       simpa [sub_eq_add_neg, add_assoc, add_left_comm, add_comm] using
         hrefPsd.add hmap'
-    change (Matrix.kronecker (1 : CMatrix (a × x))
+    change ((1 : CMatrix (a × x)) ⊗ₖ
         (classicalCoherentConditioningPinch (x := x) T) -
       (rho.applyTraceNonincreasingCP
         (classicalCoherentMap (a := a) (x := x) (c := c) (y' := y'))
@@ -3183,8 +3183,8 @@ private theorem classicalBlockDiagonal_apply_ne
   · subst q
     by_cases h : i.1 = j.1
     · exact False.elim (hij h)
-    · simp [Matrix.kronecker, Matrix.kroneckerMap_apply, h]
-  · simp [Matrix.kronecker, Matrix.kroneckerMap_apply, hqi]
+    · simp [Matrix.kroneckerMap_apply, h]
+  · simp [Matrix.kroneckerMap_apply, hqi]
 
 private theorem classicalBlockDiagonal_apply_eq
     {ι d : Type*} [Fintype ι] [DecidableEq ι]
@@ -3193,9 +3193,9 @@ private theorem classicalBlockDiagonal_apply_eq
   unfold Classical.blockDiagonal
   rw [Matrix.sum_apply]
   rw [Finset.sum_eq_single q]
-  · simp [Matrix.kronecker, Matrix.kroneckerMap_apply]
+  · simp [Matrix.kroneckerMap_apply]
   · intro q' _ hq'
-    simp [Matrix.kronecker, Matrix.kroneckerMap_apply, hq']
+    simp [Matrix.kroneckerMap_apply, hq']
   · simp
 
 private theorem classicalBlockDiagonal_mulVec_apply

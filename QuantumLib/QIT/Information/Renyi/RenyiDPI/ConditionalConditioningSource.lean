@@ -21,7 +21,7 @@ Tomamichel2015FiniteResources, `cond.tex:268-284`.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 open Matrix
 
 noncomputable section
@@ -109,7 +109,7 @@ private theorem smul_identityTensorStateMatrix_le_fullRankApprox
   have hone : (1 : CMatrix a).PosSemidef := Matrix.PosSemidef.one
   have hkron := hone.kronecker hside
   have heq :
-      Matrix.kronecker (1 : CMatrix a)
+      (1 : CMatrix a) ⊗ₖ
           ((fullRankApproxStatePath sigma (MState.uniform : MState b) delta).m -
             (1 - delta) • sigma.m) =
         identityTensorStateMatrix (a := a)
@@ -117,7 +117,7 @@ private theorem smul_identityTensorStateMatrix_le_fullRankApprox
           (1 - delta) • identityTensorStateMatrix (a := a) sigma := by
     ext i j
     simp [identityTensorStateMatrix, fullRankApproxMaximallyMixedStatePath,
-      Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.smul_apply]
+      Matrix.kroneckerMap_apply, Matrix.smul_apply]
     ring
   rw [← heq]
   exact hkron

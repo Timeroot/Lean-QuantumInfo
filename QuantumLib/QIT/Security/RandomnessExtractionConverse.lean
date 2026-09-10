@@ -21,7 +21,7 @@ min-entropy feasibility constraint.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 
 universe uF uZ uS ue
 
@@ -611,7 +611,7 @@ variable [Fintype e] [DecidableEq e]
 label of an ensemble. -/
 def deterministicPostprocessCqState (E : MEnsemble e Z) (g : Z → S) : MState (S × e) := .ofMatrix
   (matrix := ∑ z, (E.probs z) •
-    Matrix.kronecker (Matrix.single (g z) (g z) (1 : ℂ)) (E.states z).m)
+    ((Matrix.single (g z) (g z) (1 : ℂ)) ⊗ₖ (E.states z).m))
   (pos := by
     exact Matrix.posSemidef_sum Finset.univ fun z _ =>
       (((posSemidef_single (g z)).kronecker (E.states z).psd).smul
@@ -620,14 +620,14 @@ def deterministicPostprocessCqState (E : MEnsemble e Z) (g : Z → S) : MState (
     simp only [Matrix.trace_sum, Matrix.trace_smul]
     calc
       (∑ z : Z, (E.probs z) •
-          (Matrix.kronecker (Matrix.single (g z) (g z) (1 : ℂ))
+          ((Matrix.single (g z) (g z) (1 : ℂ)) ⊗ₖ
             (E.states z).m).trace) =
           ∑ z : Z, ((E.probs z : ℝ≥0) : ℂ) := by
         refine Finset.sum_congr rfl fun z _ => ?_
         have htrace :
-            (Matrix.kronecker (Matrix.single (g z) (g z) (1 : ℂ))
+            ((Matrix.single (g z) (g z) (1 : ℂ)) ⊗ₖ
               (E.states z).m).trace = 1 := by
-          simpa [Matrix.kronecker] using
+          simpa using
             (Matrix.trace_kronecker
               (Matrix.single (g z) (g z) (1 : ℂ))
               (E.states z).m).trans
@@ -642,7 +642,7 @@ omit [DecidableEq Z] in
 theorem deterministicPostprocessCqState_matrix (E : MEnsemble e Z) (g : Z → S) :
     (E.deterministicPostprocessCqState g).m =
       ∑ z, (E.probs z) •
-        Matrix.kronecker (Matrix.single (g z) (g z) (1 : ℂ)) (E.states z).m :=
+        ((Matrix.single (g z) (g z) (1 : ℂ)) ⊗ₖ (E.states z).m) :=
   MState.matrix_ofMatrix _ _ _
 
 omit [DecidableEq Z] in
@@ -662,9 +662,9 @@ theorem deterministicPostprocessCqState_toSubnormalized_sourceCoordinatePinch
   refine Finset.sum_congr rfl fun z _ => ?_
   change (SubnormalizedState.sourceCoordinatePinchChannel (a := S) (b := e)).map
       ((E.probs z : ℂ) •
-        Matrix.kronecker (Matrix.single (g z) (g z) (1 : ℂ)) (E.states z).m) =
+        ((Matrix.single (g z) (g z) (1 : ℂ)) ⊗ₖ (E.states z).m)) =
     (E.probs z : ℂ) •
-      Matrix.kronecker (Matrix.single (g z) (g z) (1 : ℂ)) (E.states z).m
+      (Matrix.single (g z) (g z) (1 : ℂ)) ⊗ₖ (E.states z).m
   rw [map_smul]
   rw [SubnormalizedState.sourceCoordinatePinchChannel_map_singleTensor]
 
@@ -677,7 +677,7 @@ def deterministicGraphCqState (E : MEnsemble e Z) (g : Z → S) : MState ((Z × 
 theorem deterministicGraphCqState_matrix (E : MEnsemble e Z) (g : Z → S) :
     (E.deterministicGraphCqState g).m =
       ∑ z, (E.probs z) •
-        Matrix.kronecker (Matrix.single (z, g z) (z, g z) (1 : ℂ)) (E.states z).m :=
+        ((Matrix.single (z, g z) (z, g z) (1 : ℂ)) ⊗ₖ (E.states z).m) :=
   deterministicPostprocessCqState_matrix E fun z => (z, g z)
 
 /-- The deterministic graph cq center is the original cq center with the
@@ -700,12 +700,11 @@ theorem deterministicGraphCqState_toSubnormalized_eq_sourceIsometryApply
   change MatrixMap.kron (QIT.MatrixMap.ofReferenceIsometry (deterministicGraphSourceIsometry g))
       (CPTPOp.id (dIn := e)).map
         ((E.probs z : ℂ) •
-          Matrix.kronecker (Matrix.single z z (1 : ℂ)) (E.states z).m) =
+          ((Matrix.single z z (1 : ℂ)) ⊗ₖ (E.states z).m)) =
     (E.probs z : ℂ) •
-      Matrix.kronecker (Matrix.single (z, g z) (z, g z) (1 : ℂ)) (E.states z).m
+      (Matrix.single (z, g z) (z, g z) (1 : ℂ)) ⊗ₖ (E.states z).m
   rw [map_smul]
   congr 1
-  simp only [Matrix.kronecker]
   rw [MatrixMap.kron_map_of_kron_state]
   rw [deterministicGraphSourceIsometry]
   rw [MatrixMap.ofReferenceIsometry_ofInjective_single
@@ -761,7 +760,7 @@ theorem deterministicGraphEnsemble_cqState (E : MEnsemble e Z) (g : Z → S) :
   rcases x with ⟨⟨zx, sx⟩, i⟩
   rcases y with ⟨⟨zy, sy⟩, j⟩
   simp only [MEnsemble.cqState_matrix, deterministicGraphCqState_matrix, Matrix.sum_apply,
-    Matrix.smul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    Matrix.smul_apply, Matrix.kroneckerMap_apply,
     deterministicGraphEnsemble_probs, deterministicGraphEnsemble_states]
   rw [Fintype.sum_prod_type]
   refine Finset.sum_congr rfl fun z _ => ?_
@@ -783,7 +782,7 @@ theorem deterministicGraphEnsemble_postprocess_snd
   rcases x with ⟨s, i⟩
   rcases y with ⟨s', j⟩
   simp only [deterministicPostprocessCqState_matrix, Matrix.sum_apply,
-    Matrix.smul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    Matrix.smul_apply, Matrix.kroneckerMap_apply,
     deterministicGraphEnsemble_probs, deterministicGraphEnsemble_states]
   rw [Fintype.sum_prod_type]
   refine Finset.sum_congr rfl fun z _ => ?_
@@ -804,7 +803,7 @@ theorem deterministicGraphEnsemble_postprocess_fst
   rcases x with ⟨z, i⟩
   rcases y with ⟨z', j⟩
   simp only [deterministicPostprocessCqState_matrix, MEnsemble.cqState_matrix,
-    Matrix.sum_apply, Matrix.smul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    Matrix.sum_apply, Matrix.smul_apply, Matrix.kroneckerMap_apply,
     deterministicGraphEnsemble_probs, deterministicGraphEnsemble_states]
   rw [Fintype.sum_prod_type]
   refine Finset.sum_congr rfl fun z0 _ => ?_
@@ -825,7 +824,7 @@ theorem deterministicGraphCqState_marginalSE (E : MEnsemble e Z) (g : Z → S) :
   rcases y with ⟨s', j⟩
   simp only [MState.traceLeft_m, MState.reindex_matrix, deterministicGraphCqState_matrix,
     deterministicPostprocessCqState_matrix, Matrix.traceLeft, Matrix.of_apply, Matrix.submatrix_apply,
-    Matrix.sum_apply, Matrix.smul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]
+    Matrix.sum_apply, Matrix.smul_apply, Matrix.kroneckerMap_apply]
   rw [Finset.sum_comm]
   refine Finset.sum_congr rfl fun z _ => ?_
   simp [Equiv.prodAssoc, Matrix.single_apply, NNReal.smul_def]
@@ -869,7 +868,7 @@ theorem deterministicGraphCqState_marginalZE (E : MEnsemble e Z) (g : Z → S) :
   rcases y with ⟨z', j⟩
   simp only [MState.traceLeft_m, MState.reindex_matrix, deterministicGraphCqState_matrix,
     MEnsemble.cqState_matrix, Matrix.traceLeft, Matrix.of_apply, Matrix.submatrix_apply, Matrix.sum_apply,
-    Matrix.smul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]
+    Matrix.smul_apply, Matrix.kroneckerMap_apply]
   rw [Finset.sum_comm]
   refine Finset.sum_congr rfl fun z0 _ => ?_
   simp [deterministicGraphSourceMarginalEquiv, Matrix.single_apply, NNReal.smul_def]
@@ -963,7 +962,7 @@ theorem deterministicPostprocessCqState_block (E : MEnsemble e Z) (g : Z → S) 
       ∑ z, if g z = s then E.cqBlock z else 0 := by
   ext i j
   simp only [deterministicPostprocessCqState_matrix, Classical.block, Matrix.sum_apply,
-    Matrix.smul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]
+    Matrix.smul_apply, Matrix.kroneckerMap_apply]
   refine Finset.sum_congr rfl fun z _ => ?_
   by_cases hz : g z = s
   · subst hz
@@ -1419,14 +1418,13 @@ theorem subnormalizedBlock_le_of_conditionalMinEntropyFeasible
           (fun i : b => (x, i)) (fun i : b => (x, i)) =
         c • σ.matrix - Classical.block ρ.matrix x x := by
     ext i j
-    simp [Classical.block, SubnormalizedState.identityTensorStateMatrix, Matrix.kronecker,
-      Matrix.kroneckerMap_apply, c]
+    simp [Classical.block, SubnormalizedState.identityTensorStateMatrix, Matrix.kroneckerMap_apply, c]
   rwa [hblock_eq] at hblock
 
 private theorem subnormalizedIdentityTensorStateMatrix_trace (σ : SubnormalizedState b) :
     (SubnormalizedState.identityTensorStateMatrix (a := a) σ).trace =
       (Fintype.card a : ℂ) * σ.matrix.trace := by
-  change (Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix a) σ.matrix).trace =
+  change ((1 : CMatrix a) ⊗ₖ σ.matrix).trace =
     (Fintype.card a : ℂ) * σ.matrix.trace
   rw [Matrix.trace_kronecker, Matrix.trace_one]
 
@@ -3141,12 +3139,12 @@ private theorem matchedSeedSourceState_ConditionalMinEntropyScaleFeasible
       exact hsum_le.trans_eq
         (Classical.traceLeft_eq_sum_blocks (ι := F) (a := e) T).symm
     have hmatrix :
-        Matrix.kronecker (1 : CMatrix Z) (Matrix.traceLeft T) -
+        (1 : CMatrix Z) ⊗ₖ (Matrix.traceLeft T) -
             (matchedSeedSourceState (Z := Z) (F := F) (e := e) τ).matrix =
           Classical.blockDiagonal
             (fun z : Z => Matrix.traceLeft T - blocks z) := by
       calc
-        Matrix.kronecker (1 : CMatrix Z) (Matrix.traceLeft T) -
+        (1 : CMatrix Z) ⊗ₖ (Matrix.traceLeft T) -
             (matchedSeedSourceState (Z := Z) (F := F) (e := e) τ).matrix =
             Classical.blockDiagonal
                 (fun _ : Z => Matrix.traceLeft T) -
@@ -3462,7 +3460,7 @@ theorem extractorOutputState_eq_seededSourceEnsemble_deterministicPostprocessCqS
   simp only [QIT.Security.extractorOutputState_matrix,
     QIT.Security.extractorOutputMatrix_eq_sum,
     MEnsemble.deterministicPostprocessCqState_matrix, Matrix.sum_apply,
-    Matrix.smul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]
+    Matrix.smul_apply, Matrix.kroneckerMap_apply]
   rw [Fintype.sum_prod_type]
   simp [mul_left_comm]
 

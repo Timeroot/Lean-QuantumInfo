@@ -167,19 +167,19 @@ variable (data : YNData ι HA HB)
 
 /-- Alice's projection lifted to the bipartite system. -/
 def aliceProjectionOp (k : ι) : CMatrix (HA × HB) :=
-  Matrix.kronecker ((data.aliceProjection).effects k) (1 : CMatrix HB)
+  ((data.aliceProjection).effects k) ⊗ₖ (1 : CMatrix HB)
 
 /-- Bob's projection lifted to the bipartite system. -/
 def bobProjectionOp (k : ι) : CMatrix (HA × HB) :=
-  Matrix.kronecker (1 : CMatrix HA) ((data.bobProjection k).matrix)
+  (1 : CMatrix HA) ⊗ₖ ((data.bobProjection k).matrix)
 
 /-- Lift a Bob-local operator to the bipartite system. -/
 def bobLocalOp (_data : YNData ι HA HB) (Q : CMatrix HB) : CMatrix (HA × HB) :=
-  Matrix.kronecker (1 : CMatrix HA) Q
+  (1 : CMatrix HA) ⊗ₖ Q
 
 /-- The local unitary `X_A^(k) tensor X_B^(k)` lifted to the bipartite system. -/
 def unitaryOp (k : ι) : CMatrix (HA × HB) :=
-  Matrix.kronecker (data.aliceUnitary k : CMatrix HA) (data.bobUnitary k : CMatrix HB)
+  (data.aliceUnitary k : CMatrix HA) ⊗ₖ (data.bobUnitary k : CMatrix HB)
 
 /-- The source-side product `X_A^(k) X_B^(k) P_B^(k)` as a bipartite operator. -/
 def transformedBobProjectionOp (k : ι) : CMatrix (HA × HB) :=
@@ -224,18 +224,18 @@ def baseProjectionMatrix (rho : MState (HA × HB)) : CMatrix (HA × HB) :=
 @[simp]
 theorem aliceProjectionOp_eq (k : ι) :
     data.aliceProjectionOp k =
-      Matrix.kronecker ((data.aliceProjection).effects k) (1 : CMatrix HB) :=
+      ((data.aliceProjection).effects k) ⊗ₖ (1 : CMatrix HB) :=
   rfl
 
 @[simp]
 theorem bobProjectionOp_eq (k : ι) :
     data.bobProjectionOp k =
-      Matrix.kronecker (1 : CMatrix HA) ((data.bobProjection k).matrix) :=
+      (1 : CMatrix HA) ⊗ₖ ((data.bobProjection k).matrix) :=
   rfl
 
 @[simp]
 theorem bobLocalOp_eq (Q : CMatrix HB) :
-    data.bobLocalOp Q = Matrix.kronecker (1 : CMatrix HA) Q :=
+    data.bobLocalOp Q = (1 : CMatrix HA) ⊗ₖ Q :=
   rfl
 
 @[simp]
@@ -347,9 +347,8 @@ theorem aliceProjectionOp_sum_eq_one :
   · subst hb'
     have hAlice := congrArg (fun M : CMatrix HA => M ha ha')
       data.aliceProjection.sum_eq_one
-    simpa [aliceProjectionOp, Matrix.sum_apply, Matrix.kronecker,
-      Matrix.one_apply] using hAlice
-  · simp [aliceProjectionOp, Matrix.sum_apply, Matrix.kronecker, hhb]
+    simpa [aliceProjectionOp, Matrix.sum_apply, Matrix.one_apply] using hAlice
+  · simp [aliceProjectionOp, Matrix.sum_apply, hhb]
 
 /-- Alice's lifted projection fixes its own post-selected density matrix. -/
 theorem projectionAgreementMatrix_fixed_by_aliceProjectionOp

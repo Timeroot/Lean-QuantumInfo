@@ -24,7 +24,7 @@ from cq conditional min-entropy feasibility.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 
 namespace QIT.Security
 
@@ -741,7 +741,7 @@ private theorem extractorSeedOutputMatrix_output_offdiag
     · subst s
       simp [hss]
     · simp [hs]
-  simp [Matrix.kronecker, Matrix.kroneckerMap_apply, hsingle]
+  simp [Matrix.kroneckerMap_apply, hsingle]
 
 omit [DecidableEq Z] [DecidableEq F] [Nonempty F] [Nonempty S] in
 private theorem extractorSeedSideInfoMatrix_eq_totalBlock
@@ -753,17 +753,16 @@ private theorem extractorSeedSideInfoMatrix_eq_totalBlock
   calc
     (∑ s : S, ∑ z : Z,
         (E.probs z) •
-          (Matrix.kronecker
-            (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
+          ((Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ)) ⊗ₖ
             (E.states z).m) (s, i) (s, j)) =
       ∑ z : Z, (E.probs z) • (E.states z).m i j := by
         rw [Finset.sum_comm]
         refine Finset.sum_congr rfl fun z _ => ?_
         rw [Finset.sum_eq_single_of_mem (H.hash f z) (Finset.mem_univ _)]
-        · simp [Matrix.kronecker, Matrix.kroneckerMap_apply]
+        · simp [Matrix.kroneckerMap_apply]
         · intro s _ hs
           have hne : H.hash f z ≠ s := fun h => hs h.symm
-          simp [Matrix.kronecker, Matrix.kroneckerMap_apply, hne]
+          simp [Matrix.kroneckerMap_apply, hne]
     _ = (∑ z : Z, E.cqBlock z) i j := by
         rw [Matrix.sum_apply]
         refine Finset.sum_congr rfl fun z _ => ?_
@@ -778,7 +777,7 @@ private theorem extractorSeedIdealMatrix_output_offdiag
     {s s' : S} {i j : e} (hss : s ≠ s') :
     extractorSeedIdealMatrix H E f (s, i) (s', j) = 0 := by
   unfold extractorSeedIdealMatrix
-  simp [Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.diagonal, hss]
+  simp [Matrix.kroneckerMap_apply, Matrix.diagonal, hss]
 
 omit [DecidableEq Z] [DecidableEq F] [Nonempty F] in
 private theorem extractorSeedDiff_output_offdiag
@@ -804,8 +803,7 @@ private theorem outputBlock_seedDiff_eq_centeredResidual
       extractorSeedOutputMatrix H E f (s, i) (s, j) =
         (H.extractorSeedOutputBucket E f s) i j := by
     unfold extractorSeedOutputMatrix extractorSeedOutputBucket
-    simp only [Matrix.sum_apply, Matrix.smul_apply, Matrix.kronecker,
-      Matrix.kroneckerMap_apply]
+    simp only [Matrix.sum_apply, Matrix.smul_apply, Matrix.kroneckerMap_apply]
     refine Finset.sum_congr rfl fun z _ => ?_
     rw [MEnsemble.cqBlock_eq]
     by_cases hz : H.hash f z = s
@@ -815,7 +813,7 @@ private theorem outputBlock_seedDiff_eq_centeredResidual
       extractorSeedIdealMatrix H E f (s, i) (s, j) =
         (((Fintype.card S : ℂ)⁻¹) • H.extractorCqTotalBlock E) i j := by
     unfold extractorSeedIdealMatrix
-    simp only [Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.smul_apply]
+    simp only [Matrix.kroneckerMap_apply, Matrix.smul_apply]
     rw [hside]
     simp [uniformExtractorOutputState_matrix, uniformExtractorOutputProb, Matrix.diagonal]
   rw [hout, hideal]

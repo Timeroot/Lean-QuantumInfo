@@ -23,7 +23,7 @@ reverse-Holder Schatten variational formulas from `metric.tex:87-138`.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 
 open Matrix
 
@@ -81,13 +81,13 @@ theorem conditionalPetzRenyiTraceTerm_eq_traceLeft
       ((Matrix.traceLeft (CFC.rpow ρ.m α) *
         CFC.rpow σ.m (1 - α)).trace).re
   rw [show CFC.rpow (identityTensorStateMatrix (a := a) σ) (1 - α) =
-      Matrix.kronecker (1 : CMatrix a) (CFC.rpow σ.m (1 - α)) from by
+      (1 : CMatrix a) ⊗ₖ (CFC.rpow σ.m (1 - α)) from by
         simpa [identityTensorStateMatrix] using
           cMatrix_rpow_identity_kronecker (a := a) σ.m σ.psd (1 - α)]
   calc
     ((CFC.rpow ρ.m α *
-        Matrix.kronecker (1 : CMatrix a) (CFC.rpow σ.m (1 - α))).trace).re =
-        ((Matrix.kronecker (1 : CMatrix a) (CFC.rpow σ.m (1 - α)) *
+        ((1 : CMatrix a) ⊗ₖ (CFC.rpow σ.m (1 - α)))).trace).re =
+        ((((1 : CMatrix a) ⊗ₖ (CFC.rpow σ.m (1 - α))) *
           CFC.rpow ρ.m α).trace).re := by
           rw [Matrix.trace_mul_comm]
     _ = ((CFC.rpow σ.m (1 - α) *

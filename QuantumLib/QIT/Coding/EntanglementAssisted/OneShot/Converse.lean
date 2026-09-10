@@ -27,7 +27,7 @@ by `QIT.HypothesisTesting.DPI`.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 
 universe u v w x y
 
@@ -90,11 +90,11 @@ theorem preDecodedMessageOutputState_eq_channel_preDecodedMessageInputState
   intro m _
   change
     ((uniformMessageProb (M := M) m : ℂ) •
-      Matrix.kronecker (Matrix.single m m (1 : ℂ)) (C.outputState m).m) =
+      ((Matrix.single m m (1 : ℂ)) ⊗ₖ (C.outputState m).m)) =
     ((uniformMessageProb (M := M) m : ℂ) •
-      Matrix.kronecker (Matrix.single m m (1 : ℂ))
+      ((Matrix.single m m (1 : ℂ)) ⊗ₖ
         (((N.tensorPower n).prod (CPTPOp.id (dIn := EB)))
-          (C.channelInputState m)).m)
+          (C.channelInputState m)).m))
   rfl
 
 /-- For one channel use, repartition `M × (A¹ × E_B)` as `(M × E_B) × A`,
@@ -228,9 +228,9 @@ theorem oneUseReferenceInputState_traceRight
       simp only [uniformInputEnsemble, MEnsemble.cqState_matrix, Matrix.sum_apply,
         Matrix.smul_apply]
       rw [Finset.sum_eq_single xm]
-      · simp [Matrix.kronecker]
+      · simp
       · intro m _ hm
-        simp [Matrix.kronecker, hm]
+        simp [hm]
       · simp
     simp_rw [hblock]
     rw [← Finset.smul_sum]
@@ -293,8 +293,8 @@ theorem oneUseReferenceInputState_traceRight
       intro m _
       by_cases hmx : m = xm
       · subst m
-        simp [Matrix.kronecker, hm]
-      · simp [Matrix.kronecker, hmx]
+        simp [hm]
+      · simp [hmx]
     simp [hblock, uniformMessageState, Classical.diagonalState_matrix, hm]
 
 /-- For one use, the output reference marginal is the same product
@@ -449,25 +449,24 @@ theorem uniformDecodedMessageState_eq_measure_preDecoded
         simp
       rw [Finset.sum_eq_single m]
       · simp [uniformDecodedMessageState, Matrix.sum_apply, Matrix.single_apply,
-          uniformDecodedMessageProb, uniformOutputEnsemble, Matrix.kronecker,
-          hmeas]
+          uniformDecodedMessageProb, uniformOutputEnsemble, hmeas]
       · intro x _ hx
-        simp [Matrix.kronecker, hx]
+        simp [hx]
       · simp
     · rw [Finset.sum_eq_single m]
       · have hne : ∀ c : M, ¬(c = mhat ∧ c = mhat') := fun c hc => hhat (hc.1 ▸ hc.2)
         simp [uniformDecodedMessageState, Matrix.sum_apply,
-          uniformOutputEnsemble, Matrix.kronecker, hne, hhat]
+          uniformOutputEnsemble, hne, hhat]
       · intro x _ hx
-        simp [Matrix.kronecker, hx]
+        simp [hx]
       · simp
   · rw [Finset.sum_eq_zero]
     · simp [uniformDecodedMessageState, hm]
     · intro x _
       by_cases hx : x = m
       · subst x
-        simp [Matrix.kronecker, hm]
-      · simp [Matrix.kronecker, hx]
+        simp [hm]
+      · simp [hx]
 
 /-- Measuring Bob's pre-decoding register cannot increase optimized
 extended-real hypothesis-testing mutual information. -/

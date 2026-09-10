@@ -18,7 +18,7 @@ Frank--Lieb concavity and low-alpha sandwiched Renyi `Q` concavity tools.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal Topology Matrix.Norms.L2Operator
+open scoped ComplexOrder MatrixOrder Kronecker NNReal Topology Matrix.Norms.L2Operator
 
 noncomputable section
 universe u v w
@@ -4224,12 +4224,12 @@ theorem sandwichedRenyiQ_traceRight_ge_of_localRightUnitary_twirling
       (∑ i ∈ s, (w i : ℂ) •
         ((localRightUnitary (a := a) (U i) : CMatrix (a × b)) * ρ *
           star (localRightUnitary (a := a) (U i) : CMatrix (a × b)))) =
-        Matrix.kronecker (Matrix.traceRight ρ) (MState.uniform : MState b).m)
+        (Matrix.traceRight ρ) ⊗ₖ (MState.uniform : MState b).m)
     (hTwirlσ :
       (∑ i ∈ s, (w i : ℂ) •
         ((localRightUnitary (a := a) (U i) : CMatrix (a × b)) * σ *
           star (localRightUnitary (a := a) (U i) : CMatrix (a × b)))) =
-        Matrix.kronecker (Matrix.traceRight σ) (MState.uniform : MState b).m) :
+        (Matrix.traceRight σ) ⊗ₖ (MState.uniform : MState b).m) :
     sandwichedRenyiQ ρ σ hρ hσ α ≤
       sandwichedRenyiQ
         (Matrix.traceRight ρ) (Matrix.traceRight σ)
@@ -4269,8 +4269,8 @@ theorem sandwichedRenyiQ_traceRight_ge_of_localRightUnitary_twirling
           hw_nonneg)
         α =
       sandwichedRenyiQ
-        (Matrix.kronecker (Matrix.traceRight ρ) (MState.uniform : MState b).m)
-        (Matrix.kronecker (Matrix.traceRight σ) (MState.uniform : MState b).m)
+        ((Matrix.traceRight ρ) ⊗ₖ (MState.uniform : MState b).m)
+        ((Matrix.traceRight σ) ⊗ₖ (MState.uniform : MState b).m)
         ((traceRight_posSemidef hρ).kronecker (MState.uniform : MState b).psd)
         ((traceRight_posSemidef hσ).kronecker (MState.uniform : MState b).psd)
         α :=
@@ -4298,8 +4298,8 @@ theorem sandwichedRenyiQ_traceRight_ge_of_localRightUnitary_twirling
       hTwirlρ hTwirlσ α
   have htensor :
       sandwichedRenyiQ
-        (Matrix.kronecker (Matrix.traceRight ρ) (MState.uniform : MState b).m)
-        (Matrix.kronecker (Matrix.traceRight σ) (MState.uniform : MState b).m)
+        ((Matrix.traceRight ρ) ⊗ₖ (MState.uniform : MState b).m)
+        ((Matrix.traceRight σ) ⊗ₖ (MState.uniform : MState b).m)
         ((traceRight_posSemidef hρ).kronecker (MState.uniform : MState b).psd)
         ((traceRight_posSemidef hσ).kronecker (MState.uniform : MState b).psd)
         α =
@@ -4367,7 +4367,7 @@ theorem diagonalSignUnitary_conj_apply
       boolSignComplex (ε j) * X (i, j) (i', j') * boolSignComplex (ε j') := by
   simp only [localRightUnitary_coe, diagonalSignUnitary_coe, Matrix.star_eq_conjTranspose,
     Matrix.conjTranspose_kronecker, Matrix.conjTranspose_one, Matrix.mul_apply,
-    Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply, Matrix.diagonal,
+    Matrix.kroneckerMap_apply, Matrix.one_apply, Matrix.diagonal,
     Matrix.of_apply, Matrix.conjTranspose_apply]
   have hinner : ∀ x : a × b,
       (∑ y : a × b,
@@ -4598,7 +4598,7 @@ theorem permutationUnitary_conj_apply
       X (i, π j) (i', π j') := by
   simp only [localRightUnitary_coe, permutationUnitary_coe, Matrix.star_eq_conjTranspose,
     Matrix.conjTranspose_kronecker, Matrix.conjTranspose_one, Matrix.mul_apply,
-    Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
+    Matrix.kroneckerMap_apply, Matrix.one_apply,
     Matrix.of_apply, Matrix.conjTranspose_apply]
   have hinner : ∀ x : a × b,
       (∑ y : a × b,
@@ -4770,7 +4770,7 @@ theorem localRightPermutationTwirl_signTwirl_eq_traceRight_kronecker_uniform
     {b : Type v} [Fintype b] [DecidableEq b] [Nonempty b]
     (X : CMatrix (a × b)) :
     localRightPermutationTwirl (localRightSignTwirl X) =
-      Matrix.kronecker (Matrix.traceRight X) (MState.uniform : MState b).m := by
+      (Matrix.traceRight X) ⊗ₖ (MState.uniform : MState b).m := by
   classical
   ext x y
   rcases x with ⟨i, j⟩
@@ -4784,9 +4784,9 @@ theorem localRightPermutationTwirl_signTwirl_eq_traceRight_kronecker_uniform
     norm_num [hcardR]
   by_cases hjj' : j = j'
   · subst j'
-    simp [Matrix.traceRight, uniform_matrix, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    simp [Matrix.traceRight, uniform_matrix, Matrix.kroneckerMap_apply,
       hcast, mul_comm]
-  · simp [Matrix.traceRight, uniform_matrix, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  · simp [Matrix.traceRight, uniform_matrix, Matrix.kroneckerMap_apply,
       hjj']
 
 /-- Local-right unitaries respect multiplication. -/
@@ -4796,9 +4796,9 @@ theorem localRightUnitary_mul {b : Type v} [Fintype b] [DecidableEq b]
       (localRightUnitary (a := a) U : CMatrix (a × b)) *
         (localRightUnitary (a := a) V : CMatrix (a × b)) := by
   rw [localRightUnitary_coe, localRightUnitary_coe, localRightUnitary_coe]
-  change Matrix.kronecker (1 : CMatrix a) ((U * V : Matrix.unitaryGroup b ℂ) : CMatrix b) =
-    Matrix.kronecker (1 : CMatrix a) (U : CMatrix b) *
-      Matrix.kronecker (1 : CMatrix a) (V : CMatrix b)
+  change (1 : CMatrix a) ⊗ₖ ((U * V : Matrix.unitaryGroup b ℂ) : CMatrix b) =
+    ((1 : CMatrix a) ⊗ₖ (U : CMatrix b)) *
+      (1 : CMatrix a) ⊗ₖ (V : CMatrix b)
   simpa using
     (Matrix.mul_kronecker_mul (1 : CMatrix a) (1 : CMatrix a)
       (U : CMatrix b) (V : CMatrix b))
@@ -4858,7 +4858,7 @@ theorem localRightSignPermutationTwirl_eq_traceRight_kronecker_uniform
           star (localRightUnitary (a := a)
             (permutationUnitary idx.2 * diagonalSignUnitary idx.1) :
               CMatrix (a × b)))) =
-      Matrix.kronecker (Matrix.traceRight X) (MState.uniform : MState b).m := by
+      (Matrix.traceRight X) ⊗ₖ (MState.uniform : MState b).m := by
   classical
   ext x y
   rcases x with ⟨i, j⟩
@@ -4917,10 +4917,9 @@ theorem localRightSignPermutationTwirl_eq_traceRight_kronecker_uniform
         field_simp [hS, hP]
       _ = (Fintype.card b : ℂ)⁻¹ * ∑ k : b, X (i, k) (i', k) := by
         exact perm_orbit_average_eq_uniform (fun k : b => X (i, k) (i', k)) j
-      _ = (Matrix.kronecker (Matrix.traceRight X) (MState.uniform : MState b).m)
+      _ = ((Matrix.traceRight X) ⊗ₖ (MState.uniform : MState b).m)
           (i, j) (i', j) := by
-        simp [Matrix.traceRight, uniform_matrix, Matrix.kronecker,
-          Matrix.kroneckerMap_apply, hcastB, mul_comm]
+        simp [Matrix.traceRight, uniform_matrix, Matrix.kroneckerMap_apply, hcastB, mul_comm]
   · have hsum :
         (∑ idx : (b → Bool) × Equiv.Perm b,
           boolSignComplex (idx.1 (idx.2 j)) *
@@ -4943,7 +4942,7 @@ theorem localRightSignPermutationTwirl_eq_traceRight_kronecker_uniform
         _ = 0 := by
           rw [boolSignComplex_sum_mul_eq_zero_of_ne hne, mul_zero]
     rw [hsum, mul_zero]
-    simp [Matrix.traceRight, uniform_matrix, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    simp [Matrix.traceRight, uniform_matrix, Matrix.kroneckerMap_apply,
       hjj']
 
 end MState

@@ -21,7 +21,7 @@ entangled resource adjoined.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 namespace QIT
 
@@ -78,18 +78,18 @@ theorem teleportationAppendResourceChannel_map
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
     (X : CMatrix d) :
     (teleportationAppendResourceChannel d).map X =
-      Matrix.kronecker X
+      X ⊗ₖ
         (teleportationEntanglementResource d).state.m := by
   have hunit :
       (CPTPOp.reindex (Equiv.prodPUnit d).symm).map X =
-        Matrix.kronecker X (1 : CMatrix PUnit.{u + 1}) := by
+        X ⊗ₖ (1 : CMatrix PUnit.{u + 1}) := by
     ext i j
     cases i.2
     cases j.2
     simp only [CPTPOp.reindex, CPTPOp.map_ofMat,
       MatrixMap.ofReferenceIsometry_apply,
       ReferenceIsometry.ofEquiv, Equiv.prodPUnit_symm_apply,
-      Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+      Matrix.mul_apply, Matrix.kroneckerMap_apply,
       Matrix.one_apply]
     rw [Finset.sum_eq_single j.1]
     · rw [Finset.sum_eq_single i.1]
@@ -109,7 +109,6 @@ theorem teleportationAppendResourceChannel_map
   simp only [teleportationAppendResourceChannel, CPTPOp.compose_map,
     LinearMap.comp_apply, CPTPOp.prod_map]
   rw [hunit]
-  simp only [Matrix.kronecker]
   rw [MatrixMap.kron_map_of_kron_state]
   have hid : (CPTPOp.id (dIn := d)).map X = X := by
     simp
@@ -234,7 +233,7 @@ theorem teleportationLOCCResourceChannel_eq_teleportationChannel
   simp only [Equiv.symm_symm,
     teleportationChannel, CPTPOp.map_ofMat, MatrixMap.ofKraus, LinearMap.coe_mk,
     AddHom.coe_mk, Matrix.sum_apply]
-  simp [Matrix.kronecker]
+  simp
   refine Finset.sum_congr rfl fun result _ => ?_
   simp_rw [teleportationBellRankOneEffect_single d result,
     teleportationCorrection_map_single d result]

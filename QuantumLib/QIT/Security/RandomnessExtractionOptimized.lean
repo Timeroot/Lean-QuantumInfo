@@ -115,12 +115,10 @@ theorem ConditionalMinEntropyFeasible.exists_posDef_of_sub_slack
             identityTensorStateMatrix (a := a) (MState.uniform : MState b) := by
     ext x y
     by_cases hxy : x.1 = y.1
-    · simp [τ, fullRankPerturb, identityTensorStateMatrix, Matrix.kronecker,
-        Matrix.kroneckerMap_apply, Matrix.one_apply, hxy, mul_add,
+    · simp [τ, fullRankPerturb, identityTensorStateMatrix, Matrix.kroneckerMap_apply, Matrix.one_apply, hxy, mul_add,
         mul_assoc, mul_left_comm, mul_comm]
       rw [← mul_assoc, hmulC]
-    · simp [τ, fullRankPerturb, identityTensorStateMatrix, Matrix.kronecker,
-        Matrix.kroneckerMap_apply, Matrix.one_apply, hxy]
+    · simp [τ, fullRankPerturb, identityTensorStateMatrix, Matrix.kroneckerMap_apply, Matrix.one_apply, hxy]
   have hterm_psd :
       (((cMu * (1 - t) : ℝ) : ℂ) •
           identityTensorStateMatrix (a := a) (MState.uniform : MState b)).PosSemidef := by

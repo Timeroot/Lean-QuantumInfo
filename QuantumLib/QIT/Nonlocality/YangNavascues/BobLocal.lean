@@ -66,7 +66,7 @@ def bobLocalOp (HA : Type v) [Fintype HA] [DecidableEq HA]
     {ι : Type u} {HB : Type w} [Fintype ι] [DecidableEq ι]
     [Fintype HB] [DecidableEq HB]
     (Q : ι → Projection HB) (k : ι) : CMatrix (HA × HB) :=
-  Matrix.kronecker (1 : CMatrix HA) (Q k).matrix
+  (1 : CMatrix HA) ⊗ₖ (Q k).matrix
 
 @[simp]
 theorem bobLocalOp_eq (Q : ι → Projection HB) (k : ι) :
@@ -91,12 +91,12 @@ theorem bobProjectedReducedSupportProjection_mulVec_eq_bobProjectionOp
       (data.bobProjectionOp k).mulVec ψ.vec := by
   rw [YangNavascues.bobLocalOp_eq, bobProjectionOp_eq]
   change
-    (Matrix.kronecker (1 : CMatrix HA)
+    ((1 : CMatrix HA) ⊗ₖ
       (Matrix.rangeProjection
         (Matrix.traceLeft
-          (rankOneMatrix ((Matrix.kronecker (1 : CMatrix HA)
+          (rankOneMatrix (((1 : CMatrix HA) ⊗ₖ
             ((data.bobProjection k).matrix)).mulVec ψ.vec))))).mulVec ψ.vec =
-      (Matrix.kronecker (1 : CMatrix HA) ((data.bobProjection k).matrix)).mulVec ψ.vec
+      ((1 : CMatrix HA) ⊗ₖ ((data.bobProjection k).matrix)).mulVec ψ.vec
   exact Matrix.kronecker_rangeProjection_traceLeft_rankOne_projection_mulVec
     ((data.bobProjection k).matrix)
     (data.bobProjection k).isHermitian

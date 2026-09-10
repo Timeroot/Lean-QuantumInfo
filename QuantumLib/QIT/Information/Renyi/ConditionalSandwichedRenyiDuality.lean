@@ -29,7 +29,7 @@ states are normalized; singular support is handled by the extended bracket in
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal ENNReal Pointwise
+open scoped ComplexOrder MatrixOrder Kronecker NNReal ENNReal Pointwise
 
 open Matrix
 
@@ -47,9 +47,9 @@ namespace QIT
 private theorem continuous_kronecker_right_one
     {d : Type*} {e : Type*} [Fintype d] [DecidableEq d]
     [Fintype e] [DecidableEq e] :
-    Continuous (fun X : CMatrix d => Matrix.kronecker X (1 : CMatrix e)) := by
+    Continuous (fun X : CMatrix d => X ⊗ₖ (1 : CMatrix e)) := by
   refine continuous_pi fun i => continuous_pi fun j => ?_
-  simp [Matrix.kronecker, Matrix.kroneckerMap_apply]
+  simp [Matrix.kroneckerMap_apply]
   exact (continuous_apply_apply i.1 j.1).mul continuous_const
 
 private theorem continuous_traceLeft
@@ -246,8 +246,7 @@ def upwardRenyiDualityABWeightedAmplitude
     (psi : Ket ((a × b) × c)) (sigma : CMatrix b) (p : ℝ) :
     (a × b) × c → ℂ :=
   Matrix.mulVec
-    (Matrix.kronecker
-      (Matrix.kronecker (1 : CMatrix a) (CFC.rpow sigma (-p / 2)))
+    (((1 : CMatrix a) ⊗ₖ (CFC.rpow sigma (-p / 2))) ⊗ₖ
       (1 : CMatrix c))
     psi.vec
 
@@ -300,7 +299,7 @@ theorem traceRight_rankOne_upwardRenyiDualityABWeightedAmplitude_eq_referenceInn
   let p := upwardRenyiDualityParameter alpha
   let s : ℝ := (1 - alpha) / (2 * alpha)
   let Wab : CMatrix (a × b) :=
-    Matrix.kronecker (1 : CMatrix a) (CFC.rpow sigma.m (-p / 2))
+    (1 : CMatrix a) ⊗ₖ (CFC.rpow sigma.m (-p / 2))
   have hp : p = (alpha - 1) / alpha := rfl
   have hsp : -p / 2 = s := by
     simp [p, upwardRenyiDualityParameter, s]
@@ -313,7 +312,7 @@ theorem traceRight_rankOne_upwardRenyiDualityABWeightedAmplitude_eq_referenceInn
   rw [show upwardRenyiDualityParameter alpha = p by rfl]
   change Matrix.traceRight
       (rankOneMatrix
-        (Matrix.mulVec (Matrix.kronecker Wab (1 : CMatrix c)) psi.vec)) = _
+        (Matrix.mulVec (Wab ⊗ₖ (1 : CMatrix c)) psi.vec)) = _
   rw [traceRight_rankOne_kron_left_mulVec_eq]
   have hWabHerm : Matrix.conjTranspose Wab = Wab := by
     rw [hWab]
@@ -335,12 +334,12 @@ theorem abcSidePowerTraceRe_eq_highCMatrix_pairing
       ((psi.upwardRenyiDualityHighCMatrix sigma p *
         CFC.rpow tau p).trace).re := by
   let S : CMatrix b := CFC.rpow sigma (-p / 2)
-  let Wab : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) S
+  let Wab : CMatrix (a × b) := (1 : CMatrix a) ⊗ₖ S
   let W : CMatrix ((a × b) × c) :=
-    Matrix.kronecker Wab (1 : CMatrix c)
+    Wab ⊗ₖ (1 : CMatrix c)
   let T : CMatrix c := CFC.rpow tau p
   let K : CMatrix ((a × b) × c) :=
-    Matrix.kronecker (1 : CMatrix (a × b)) T
+    (1 : CMatrix (a × b)) ⊗ₖ T
   have hSpow : S * S = CFC.rpow sigma (-p) := by
     calc
       S * S = CFC.rpow sigma ((-p / 2) + (-p / 2)) := by
@@ -357,34 +356,32 @@ theorem abcSidePowerTraceRe_eq_highCMatrix_pairing
     exact hW.isHermitian.eq
   have hWKW :
       W * K * W =
-        Matrix.kronecker
-          (Matrix.kronecker (1 : CMatrix a) (CFC.rpow sigma (-p))) T := by
-    have hWK : W * K = Matrix.kronecker Wab T := by
+        ((1 : CMatrix a) ⊗ₖ (CFC.rpow sigma (-p))) ⊗ₖ T := by
+    have hWK : W * K = Wab ⊗ₖ T := by
       unfold W K
       simpa using
         (Matrix.mul_kronecker_mul Wab (1 : CMatrix (a × b))
           (1 : CMatrix c) T).symm
     have hWab2 :
         Wab * Wab =
-          Matrix.kronecker (1 : CMatrix a) (CFC.rpow sigma (-p)) := by
+          (1 : CMatrix a) ⊗ₖ (CFC.rpow sigma (-p)) := by
       unfold Wab
       calc
-        Matrix.kronecker (1 : CMatrix a) S *
-            Matrix.kronecker (1 : CMatrix a) S =
-            Matrix.kronecker ((1 : CMatrix a) * 1) (S * S) := by
+        ((1 : CMatrix a) ⊗ₖ S) *
+            ((1 : CMatrix a) ⊗ₖ S) =
+            ((1 : CMatrix a) * 1) ⊗ₖ (S * S) := by
               exact (Matrix.mul_kronecker_mul
                 (1 : CMatrix a) (1 : CMatrix a) S S).symm
-        _ = Matrix.kronecker (1 : CMatrix a) (CFC.rpow sigma (-p)) := by
+        _ = (1 : CMatrix a) ⊗ₖ (CFC.rpow sigma (-p)) := by
               rw [hSpow]
               simp
     calc
-      W * K * W = Matrix.kronecker Wab T * W := by rw [hWK]
-      _ = Matrix.kronecker Wab T *
-          Matrix.kronecker Wab (1 : CMatrix c) := by rfl
-      _ = Matrix.kronecker (Wab * Wab) (T * (1 : CMatrix c)) := by
+      W * K * W = (Wab ⊗ₖ T) * W := by rw [hWK]
+      _ = (Wab ⊗ₖ T) *
+          (Wab ⊗ₖ (1 : CMatrix c)) := by rfl
+      _ = (Wab * Wab) ⊗ₖ (T * (1 : CMatrix c)) := by
             exact (Matrix.mul_kronecker_mul Wab Wab T (1 : CMatrix c)).symm
-      _ = Matrix.kronecker
-          (Matrix.kronecker (1 : CMatrix a) (CFC.rpow sigma (-p))) T := by
+      _ = ((1 : CMatrix a) ⊗ₖ (CFC.rpow sigma (-p))) ⊗ₖ T := by
             rw [hWab2]
             simp
   have hrank :
@@ -397,15 +394,13 @@ theorem abcSidePowerTraceRe_eq_highCMatrix_pairing
   rw [Ket.state_matrix]
   rw [traceLeft_mul_trace_eq_trace_mul_kronecker_one_right]
   change
-    ((Matrix.kronecker
-        (Matrix.kronecker (1 : CMatrix a) (CFC.rpow sigma (-p))) T *
+    (((((1 : CMatrix a) ⊗ₖ (CFC.rpow sigma (-p))) ⊗ₖ T) *
       rankOneMatrix psi.vec).trace).re =
       ((rankOneMatrix (psi.upwardRenyiDualityABWeightedAmplitude sigma p) *
         K).trace).re
   rw [hrank]
   calc
-    ((Matrix.kronecker
-        (Matrix.kronecker (1 : CMatrix a) (CFC.rpow sigma (-p))) T *
+    (((((1 : CMatrix a) ⊗ₖ (CFC.rpow sigma (-p))) ⊗ₖ T) *
       rankOneMatrix psi.vec).trace).re =
         ((W * K * W * rankOneMatrix psi.vec).trace).re := by rw [hWKW]
     _ = (((W * rankOneMatrix psi.vec * W) * K).trace).re := by
@@ -571,7 +566,7 @@ theorem traceRight_rankOne_upwardRenyiDualityACWeightedAmplitude_eq_referenceInn
   unfold upwardRenyiDualityACWeightedAmplitude
   change Matrix.traceRight
       (rankOneMatrix
-        (Matrix.mulVec (Matrix.kronecker S (1 : CMatrix b))
+        (Matrix.mulVec (S ⊗ₖ (1 : CMatrix b))
           psi.upwardRenyiDualityACBAmplitude)) = _
   rw [traceRight_rankOne_kron_left_mulVec_eq]
   rw [hmarg]
@@ -1007,19 +1002,19 @@ theorem upwardRenyiDualityEffectiveBMatrix_densityIdentityRegularization_tendsto
     rankOneMatrix psi.upwardRenyiDualityACBAmplitude
   let G : CMatrix c → CMatrix b := fun T =>
     Matrix.traceLeft
-      (Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) T)
-        (1 : CMatrix b) * K)
+      ((((1 : CMatrix a) ⊗ₖ T) ⊗ₖ
+        (1 : CMatrix b)) * K)
   have hG : Continuous G := by
     have hinner : Continuous (fun T : CMatrix c =>
-        Matrix.kronecker (1 : CMatrix a) T) :=
+        (1 : CMatrix a) ⊗ₖ T) :=
       SubnormalizedState.continuous_kronecker_one_matrix
     have houter : Continuous (fun T : CMatrix c =>
-        Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) T)
+        ((1 : CMatrix a) ⊗ₖ T) ⊗ₖ
           (1 : CMatrix b)) :=
       continuous_kronecker_right_one.comp hinner
     have harg : Continuous (fun T : CMatrix c =>
-        Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) T)
-          (1 : CMatrix b) * K) :=
+        (((1 : CMatrix a) ⊗ₖ T) ⊗ₖ
+          (1 : CMatrix b)) * K) :=
       Continuous.matrix_mul houter continuous_const
     simpa [G, Function.comp_def] using continuous_traceLeft.comp harg
   have htau := MState.densityIdentityRegularization_matrix_tendsto tau

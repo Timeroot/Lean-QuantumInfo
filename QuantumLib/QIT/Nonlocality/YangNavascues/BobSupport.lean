@@ -115,10 +115,10 @@ corresponding Bob-side amplitude ranges are orthogonal.
 -/
 theorem bobAmplitudeMatrix_projection_conjTranspose_mul_eq_zero
     (P Q : CMatrix HB) (hPherm : P.IsHermitian) (φ : HA × HB → ℂ)
-    (hPQ : (Matrix.kronecker (1 : CMatrix HA) (P * Q)).mulVec φ = 0) :
+    (hPQ : ((1 : CMatrix HA) ⊗ₖ (P * Q)).mulVec φ = 0) :
     Matrix.conjTranspose
-        (Matrix.bobAmplitudeMatrix ((Matrix.kronecker (1 : CMatrix HA) P).mulVec φ)) *
-      Matrix.bobAmplitudeMatrix ((Matrix.kronecker (1 : CMatrix HA) Q).mulVec φ) = 0 := by
+        (Matrix.bobAmplitudeMatrix (((1 : CMatrix HA) ⊗ₖ P).mulVec φ)) *
+      Matrix.bobAmplitudeMatrix (((1 : CMatrix HA) ⊗ₖ Q).mulVec φ) = 0 := by
   let A := Matrix.bobAmplitudeMatrix φ
   have hPQA : (P * Q) * A = 0 := by
     rw [← Matrix.bobAmplitudeMatrix_kronecker_mulVec]
@@ -333,7 +333,7 @@ theorem bobProjectedReducedSupportProjection_orthogonal
   have hvec :=
     data.bobProjectionOp_mul_bobProjectionOp_mulVec_eq_zero ψ h i j hij
   have hvecLocal :
-      (Matrix.kronecker (1 : CMatrix HA)
+      ((1 : CMatrix HA) ⊗ₖ
         ((data.bobProjection i).matrix * (data.bobProjection j).matrix)).mulVec ψ.vec = 0 := by
     simpa [bobProjectionOp_eq, ← Matrix.mul_kronecker_mul, Matrix.one_mul] using hvec
   have hAmp :

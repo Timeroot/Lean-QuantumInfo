@@ -22,7 +22,7 @@ entropy and the tensor-power AEP limits are built on top of it elsewhere.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 open Matrix
 
@@ -40,7 +40,7 @@ namespace MState
 theorem identityTensorStateMatrix_posDef_of_posDef
     (σ : MState b) (hσ : σ.m.PosDef) :
     (identityTensorStateMatrix (a := a) σ).PosDef := by
-  change (Matrix.kronecker (1 : CMatrix a) σ.m).PosDef
+  change ((1 : CMatrix a) ⊗ₖ σ.m).PosDef
   exact Matrix.PosDef.one.kronecker hσ
 
 /-- The fixed-side conditional Petz Renyi entropy candidate.
@@ -145,11 +145,11 @@ private theorem referenceIsometry_applyMatrixRight_eq_kronecker_conj
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
     (V : ReferenceIsometry b bPlus) (X : CMatrix (a × b)) :
     V.applyMatrixRight X =
-      Matrix.kronecker (1 : CMatrix a) V.matrix * X *
-        Matrix.conjTranspose (Matrix.kronecker (1 : CMatrix a) V.matrix) := by
+      ((1 : CMatrix a) ⊗ₖ V.matrix) * X *
+        Matrix.conjTranspose ((1 : CMatrix a) ⊗ₖ V.matrix) := by
   ext x y
   simp [ReferenceIsometry.applyMatrixRight, ReferenceIsometry.rightBlock,
-    Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    Matrix.mul_apply, Matrix.kroneckerMap_apply,
     Matrix.one_apply, Matrix.conjTranspose_kronecker, Fintype.sum_prod_type,
     Finset.sum_mul, Finset.mul_sum, Finset.sum_ite_eq', apply_ite,
     mul_assoc, mul_comm]
@@ -175,13 +175,13 @@ real powers.  The identity factor contributes eigenvalue `1`, so no full-rank
 assumption is needed on the right reference. -/
 theorem cMatrix_rpow_identity_kronecker
     (N : CMatrix b) (hN : N.PosSemidef) (s : ℝ) :
-    CFC.rpow (Matrix.kronecker (1 : CMatrix a) N) s =
-      Matrix.kronecker (1 : CMatrix a) (CFC.rpow N s) := by
+    CFC.rpow ((1 : CMatrix a) ⊗ₖ N) s =
+      (1 : CMatrix a) ⊗ₖ (CFC.rpow N s) := by
   classical
   let U₁ : Matrix.unitaryGroup a ℂ := 1
   let U₂ : Matrix.unitaryGroup b ℂ := hN.isHermitian.eigenvectorUnitary
   let U : Matrix.unitaryGroup (a × b) ℂ :=
-    ⟨Matrix.kronecker (U₁ : CMatrix a) (U₂ : CMatrix b),
+    ⟨(U₁ : CMatrix a) ⊗ₖ (U₂ : CMatrix b),
       Matrix.kronecker_mem_unitary U₁.2 U₂.2⟩
   let d : b → ℝ := hN.isHermitian.eigenvalues
   have hd : ∀ i, 0 ≤ d i := by
@@ -194,23 +194,23 @@ theorem cMatrix_rpow_identity_kronecker
     simpa [U₂, d, Matrix.IsHermitian.spectral_theorem, Unitary.conjStarAlgAut_apply,
       Function.comp_def] using hN.isHermitian.spectral_theorem
   have hleft_arg :
-      Matrix.kronecker (1 : CMatrix a) N =
+      (1 : CMatrix a) ⊗ₖ N =
         (U : CMatrix (a × b)) *
           (Matrix.diagonal fun i : a × b => ((d i.2 : ℝ) : ℂ)) *
             star (U : CMatrix (a × b)) := by
     rw [hN_spec]
     ext x y
     by_cases hxy : x.1 = y.1
-    · simp [U, U₁, Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    · simp [U, U₁, Matrix.mul_apply, Matrix.kroneckerMap_apply,
         Matrix.one_apply, Matrix.diagonal, Fintype.sum_prod_type,
         Finset.mul_sum, Finset.sum_ite_eq', apply_ite,
         hxy, mul_assoc, mul_left_comm, mul_comm]
-    · simp [U, U₁, Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    · simp [U, U₁, Matrix.mul_apply, Matrix.kroneckerMap_apply,
         Matrix.one_apply, Matrix.diagonal, Fintype.sum_prod_type,
         Finset.mul_sum, Finset.sum_ite_eq', apply_ite,
         hxy, mul_assoc, mul_left_comm, mul_comm]
   have hleft_pow :
-      CFC.rpow (Matrix.kronecker (1 : CMatrix a) N) s =
+      CFC.rpow ((1 : CMatrix a) ⊗ₖ N) s =
         (U : CMatrix (a × b)) *
           (Matrix.diagonal fun i : a × b => ((d i.2 ^ s : ℝ) : ℂ)) *
             star (U : CMatrix (a × b)) := by
@@ -227,11 +227,11 @@ theorem cMatrix_rpow_identity_kronecker
   rw [hleft_pow, hN_pow]
   ext x y
   by_cases hxy : x.1 = y.1
-  · simp [U, U₁, Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  · simp [U, U₁, Matrix.mul_apply, Matrix.kroneckerMap_apply,
       Matrix.one_apply, Matrix.diagonal, Fintype.sum_prod_type,
       Finset.mul_sum, Finset.sum_ite_eq', apply_ite,
       hxy, mul_assoc, mul_left_comm, mul_comm]
-  · simp [U, U₁, Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  · simp [U, U₁, Matrix.mul_apply, Matrix.kroneckerMap_apply,
       Matrix.one_apply, Matrix.diagonal, Fintype.sum_prod_type,
       Finset.mul_sum, Finset.sum_ite_eq', apply_ite,
       hxy, mul_assoc, mul_left_comm, mul_comm]
@@ -257,7 +257,7 @@ theorem conditionalPetzRenyiTraceTerm_conditioningSupportCompressedState
   let Vref : ReferenceIsometry (psdSupportIndex N hN) b :=
     psdSupportReferenceIsometry N hN
   let W : Matrix (a × b) (a × psdSupportIndex N hN) ℂ :=
-    Matrix.kronecker (1 : CMatrix a) Vb
+    (1 : CMatrix a) ⊗ₖ Vb
   let τc : CMatrix (a × psdSupportIndex N hN) :=
     identityTensorStateMatrix (a := a) ρc.traceLeft
   let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) ρ.traceLeft
@@ -267,13 +267,13 @@ theorem conditionalPetzRenyiTraceTerm_conditioningSupportCompressedState
   have hW : Matrix.conjTranspose W * W =
       (1 : CMatrix (a × psdSupportIndex N hN)) := by
     rw [show Matrix.conjTranspose W =
-        Matrix.kronecker (1 : CMatrix a) (Matrix.conjTranspose Vb) by
+        (1 : CMatrix a) ⊗ₖ (Matrix.conjTranspose Vb) by
           simp [W, Matrix.conjTranspose_kronecker]]
-    rw [show W = Matrix.kronecker (1 : CMatrix a) Vb by rfl]
+    rw [show W = (1 : CMatrix a) ⊗ₖ Vb by rfl]
     calc
-      Matrix.kronecker (1 : CMatrix a) (Matrix.conjTranspose Vb) *
-          Matrix.kronecker (1 : CMatrix a) Vb =
-          Matrix.kronecker ((1 : CMatrix a) * (1 : CMatrix a))
+      ((1 : CMatrix a) ⊗ₖ (Matrix.conjTranspose Vb)) *
+          ((1 : CMatrix a) ⊗ₖ Vb) =
+          ((1 : CMatrix a) * (1 : CMatrix a)) ⊗ₖ
             (Matrix.conjTranspose Vb * Vb) := by
             simpa using
               (Matrix.mul_kronecker_mul (1 : CMatrix a) (1 : CMatrix a)
@@ -307,7 +307,7 @@ theorem conditionalPetzRenyiTraceTerm_conditioningSupportCompressedState
     exact cMatrix_rpow_psdSupportCompress_reconstruct_self N hN h_one_sub_ne
   have hτc_pow :
       CFC.rpow τc (1 - α) =
-        Matrix.kronecker (1 : CMatrix a)
+        (1 : CMatrix a) ⊗ₖ
           (CFC.rpow ρc.traceLeft.m (1 - α)) := by
     exact cMatrix_rpow_identity_kronecker
       (a := a) ρc.traceLeft.m ρc.traceLeft.psd (1 - α)
@@ -317,42 +317,42 @@ theorem conditionalPetzRenyiTraceTerm_conditioningSupportCompressedState
     rw [hτc_pow]
     have hτ_orig :
         CFC.rpow τ (1 - α) =
-          Matrix.kronecker (1 : CMatrix a) (CFC.rpow N (1 - α)) := by
+          (1 : CMatrix a) ⊗ₖ (CFC.rpow N (1 - α)) := by
       simpa [τ, N, identityTensorStateMatrix] using
         cMatrix_rpow_identity_kronecker
           (a := a) N hN (1 - α)
     rw [hτ_orig, ← hB_pow]
     rw [show Matrix.conjTranspose W =
-        Matrix.kronecker (1 : CMatrix a) (Matrix.conjTranspose Vb) by
+        (1 : CMatrix a) ⊗ₖ (Matrix.conjTranspose Vb) by
           simp [W, Matrix.conjTranspose_kronecker]]
-    rw [show W = Matrix.kronecker (1 : CMatrix a) Vb by rfl]
+    rw [show W = (1 : CMatrix a) ⊗ₖ Vb by rfl]
     let R : CMatrix (psdSupportIndex N hN) :=
       CFC.rpow ρc.traceLeft.m (1 - α)
     calc
-      Matrix.kronecker (1 : CMatrix a) (Vb * R * Matrix.conjTranspose Vb) =
-          Matrix.kronecker ((1 : CMatrix a) * (1 : CMatrix a))
+      (1 : CMatrix a) ⊗ₖ (Vb * R * Matrix.conjTranspose Vb) =
+          ((1 : CMatrix a) * (1 : CMatrix a)) ⊗ₖ
             (Vb * (R * Matrix.conjTranspose Vb)) := by
             simp [R, Matrix.mul_assoc]
-      _ = Matrix.kronecker (1 : CMatrix a) Vb *
-          Matrix.kronecker (1 : CMatrix a) (R * Matrix.conjTranspose Vb) := by
+      _ = ((1 : CMatrix a) ⊗ₖ Vb) *
+          ((1 : CMatrix a) ⊗ₖ (R * Matrix.conjTranspose Vb)) := by
             simpa using
               Matrix.mul_kronecker_mul (1 : CMatrix a) (1 : CMatrix a)
                 Vb (R * Matrix.conjTranspose Vb)
-      _ = Matrix.kronecker (1 : CMatrix a) Vb *
-          (Matrix.kronecker (1 : CMatrix a) R *
-            Matrix.kronecker (1 : CMatrix a) (Matrix.conjTranspose Vb)) := by
+      _ = ((1 : CMatrix a) ⊗ₖ Vb) *
+          (((1 : CMatrix a) ⊗ₖ R) *
+            ((1 : CMatrix a) ⊗ₖ (Matrix.conjTranspose Vb))) := by
             congr 1
             simpa using
               Matrix.mul_kronecker_mul (1 : CMatrix a) (1 : CMatrix a)
                 R (Matrix.conjTranspose Vb)
-      _ = Matrix.kronecker (1 : CMatrix a) Vb *
-          Matrix.kronecker (1 : CMatrix a)
-            (CFC.rpow ρc.traceLeft.m (1 - α)) *
-          Matrix.kronecker (1 : CMatrix a) (Matrix.conjTranspose Vb) := by
+      _ = ((1 : CMatrix a) ⊗ₖ Vb) *
+          ((1 : CMatrix a) ⊗ₖ
+            (CFC.rpow ρc.traceLeft.m (1 - α))) *
+          ((1 : CMatrix a) ⊗ₖ (Matrix.conjTranspose Vb)) := by
             exact (Matrix.mul_assoc
-              (Matrix.kronecker (1 : CMatrix a) Vb)
-              (Matrix.kronecker (1 : CMatrix a) R)
-              (Matrix.kronecker (1 : CMatrix a) (Matrix.conjTranspose Vb))).symm
+              ((1 : CMatrix a) ⊗ₖ Vb)
+              ((1 : CMatrix a) ⊗ₖ R)
+              ((1 : CMatrix a) ⊗ₖ (Matrix.conjTranspose Vb))).symm
   dsimp [conditionalPetzRenyiTraceTerm]
   change
     ((CFC.rpow ρc.m α * CFC.rpow τc (1 - α)).trace).re =
@@ -398,7 +398,7 @@ reference `(I_A ⊗ σ_B) ⊗ (I_C ⊗ σ_D)` is exactly the grouped reference
 theorem identityTensorStateMatrix_prod_grouping
     (σ₁ : MState b) (σ₂ : MState d) :
     identityTensorStateMatrix (a := a × c) (σ₁.prod σ₂) =
-      (Matrix.kronecker (identityTensorStateMatrix (a := a) σ₁)
+      ((identityTensorStateMatrix (a := a) σ₁) ⊗ₖ
         (identityTensorStateMatrix (a := c) σ₂)).submatrix
           (Equiv.prodProdProdComm a b c d).symm
           (Equiv.prodProdProdComm a b c d).symm := by
@@ -409,13 +409,10 @@ theorem identityTensorStateMatrix_prod_grouping
   · subst i'
     by_cases hk : k = k'
     · subst k'
-      simp [identityTensorStateMatrix, Matrix.kronecker,
-        Matrix.kroneckerMap_apply, Equiv.prodProdProdComm]
-    · simp [identityTensorStateMatrix, Matrix.kronecker,
-        Matrix.kroneckerMap_apply, Equiv.prodProdProdComm,
+      simp [identityTensorStateMatrix, Matrix.kroneckerMap_apply, Equiv.prodProdProdComm]
+    · simp [identityTensorStateMatrix, Matrix.kroneckerMap_apply, Equiv.prodProdProdComm,
         hk]
-  · simp [identityTensorStateMatrix, Matrix.kronecker,
-      Matrix.kroneckerMap_apply, Equiv.prodProdProdComm,
+  · simp [identityTensorStateMatrix, Matrix.kroneckerMap_apply, Equiv.prodProdProdComm,
       hi]
 
 /-- Multiplicativity of the fixed-side Petz trace kernel under unshuffled
@@ -433,30 +430,28 @@ theorem conditionalPetzRenyiTraceTerm_prod_kroneckerReference
     (α : ℝ) :
     ((CFC.rpow (ρ₁.prod ρ₂).m α *
       CFC.rpow
-        (Matrix.kronecker (identityTensorStateMatrix (a := a) σ₁)
+        ((identityTensorStateMatrix (a := a) σ₁) ⊗ₖ
           (identityTensorStateMatrix (a := c) σ₂)) (1 - α)).trace).re =
       conditionalPetzRenyiTraceTerm ρ₁ σ₁ α *
         conditionalPetzRenyiTraceTerm ρ₂ σ₂ α := by
   have htraceC :
       (CFC.rpow (ρ₁.prod ρ₂).m α *
         CFC.rpow
-          (Matrix.kronecker (identityTensorStateMatrix (a := a) σ₁)
+          ((identityTensorStateMatrix (a := a) σ₁) ⊗ₖ
             (identityTensorStateMatrix (a := c) σ₂)) (1 - α)).trace =
         (CFC.rpow ρ₁.m α *
           CFC.rpow (identityTensorStateMatrix (a := a) σ₁) (1 - α)).trace *
         (CFC.rpow ρ₂.m α *
           CFC.rpow (identityTensorStateMatrix (a := c) σ₂) (1 - α)).trace := by
-    rw [MState.prod_m ρ₁ ρ₂, ← Matrix.kronecker]
+    rw [MState.prod_m ρ₁ ρ₂]
     rw [cMatrix_rpow_kronecker hρ₁.posSemidef hρ₂.posSemidef α]
     rw [cMatrix_rpow_kronecker
       (identityTensorStateMatrix_posDef_of_posDef (a := a) σ₁ hσ₁).posSemidef
       (identityTensorStateMatrix_posDef_of_posDef (a := c) σ₂ hσ₂).posSemidef (1 - α)]
     change
-      (Matrix.kroneckerMap (fun x y => x * y)
-          (CFC.rpow ρ₁.m α) (CFC.rpow ρ₂.m α) *
-        Matrix.kroneckerMap (fun x y => x * y)
-          (CFC.rpow (identityTensorStateMatrix (a := a) σ₁) (1 - α))
-          (CFC.rpow (identityTensorStateMatrix (a := c) σ₂) (1 - α))).trace =
+      (((CFC.rpow ρ₁.m α) ⊗ₖ (CFC.rpow ρ₂.m α)) *
+        ((CFC.rpow (identityTensorStateMatrix (a := a) σ₁) (1 - α)) ⊗ₖ
+          (CFC.rpow (identityTensorStateMatrix (a := c) σ₂) (1 - α)))).trace =
         (CFC.rpow ρ₁.m α *
           CFC.rpow (identityTensorStateMatrix (a := a) σ₁) (1 - α)).trace *
         (CFC.rpow ρ₂.m α *
@@ -494,30 +489,28 @@ theorem conditionalPetzRenyiTraceTerm_prod_kroneckerReference_fullReference
     (α : ℝ) :
     ((CFC.rpow (ρ₁.prod ρ₂).m α *
       CFC.rpow
-        (Matrix.kronecker (identityTensorStateMatrix (a := a) σ₁)
+        ((identityTensorStateMatrix (a := a) σ₁) ⊗ₖ
           (identityTensorStateMatrix (a := c) σ₂)) (1 - α)).trace).re =
       conditionalPetzRenyiTraceTerm ρ₁ σ₁ α *
         conditionalPetzRenyiTraceTerm ρ₂ σ₂ α := by
   have htraceC :
       (CFC.rpow (ρ₁.prod ρ₂).m α *
         CFC.rpow
-          (Matrix.kronecker (identityTensorStateMatrix (a := a) σ₁)
+          ((identityTensorStateMatrix (a := a) σ₁) ⊗ₖ
             (identityTensorStateMatrix (a := c) σ₂)) (1 - α)).trace =
         (CFC.rpow ρ₁.m α *
           CFC.rpow (identityTensorStateMatrix (a := a) σ₁) (1 - α)).trace *
         (CFC.rpow ρ₂.m α *
           CFC.rpow (identityTensorStateMatrix (a := c) σ₂) (1 - α)).trace := by
-    rw [MState.prod_m ρ₁ ρ₂, ← Matrix.kronecker]
+    rw [MState.prod_m ρ₁ ρ₂]
     rw [cMatrix_rpow_kronecker ρ₁.psd ρ₂.psd α]
     rw [cMatrix_rpow_kronecker
       (identityTensorStateMatrix_posDef_of_posDef (a := a) σ₁ hσ₁).posSemidef
       (identityTensorStateMatrix_posDef_of_posDef (a := c) σ₂ hσ₂).posSemidef (1 - α)]
     change
-      (Matrix.kroneckerMap (fun x y => x * y)
-          (CFC.rpow ρ₁.m α) (CFC.rpow ρ₂.m α) *
-        Matrix.kroneckerMap (fun x y => x * y)
-          (CFC.rpow (identityTensorStateMatrix (a := a) σ₁) (1 - α))
-          (CFC.rpow (identityTensorStateMatrix (a := c) σ₂) (1 - α))).trace =
+      (((CFC.rpow ρ₁.m α) ⊗ₖ (CFC.rpow ρ₂.m α)) *
+        ((CFC.rpow (identityTensorStateMatrix (a := a) σ₁) (1 - α)) ⊗ₖ
+          (CFC.rpow (identityTensorStateMatrix (a := c) σ₂) (1 - α)))).trace =
         (CFC.rpow ρ₁.m α *
           CFC.rpow (identityTensorStateMatrix (a := a) σ₁) (1 - α)).trace *
         (CFC.rpow ρ₂.m α *
@@ -559,7 +552,7 @@ theorem conditionalPetzRenyiEntropyCandidate_prod_kroneckerReference
         log2
           ((CFC.rpow (ρ₁.prod ρ₂).m α *
             CFC.rpow
-              (Matrix.kronecker (identityTensorStateMatrix (a := a) σ₁)
+              ((identityTensorStateMatrix (a := a) σ₁) ⊗ₖ
                 (identityTensorStateMatrix (a := c) σ₂)) (1 - α)).trace).re =
       ρ₁.conditionalPetzRenyiEntropyCandidate hρ₁ σ₁ hσ₁ α hα_pos hα_ne_one +
         ρ₂.conditionalPetzRenyiEntropyCandidate hρ₂ σ₂ hσ₂ α hα_pos hα_ne_one := by
@@ -610,7 +603,7 @@ theorem conditionalPetzRenyiTraceTerm_prod_grouped_of_rpow_reindex
     (hrefpow :
       CFC.rpow (identityTensorStateMatrix (a := a × c) (σ₁.prod σ₂)) (1 - α) =
         (CFC.rpow
-          (Matrix.kronecker (identityTensorStateMatrix (a := a) σ₁)
+          ((identityTensorStateMatrix (a := a) σ₁) ⊗ₖ
             (identityTensorStateMatrix (a := c) σ₂)) (1 - α)).submatrix
           (Equiv.prodProdProdComm a b c d).symm
           (Equiv.prodProdProdComm a b c d).symm) :
@@ -662,11 +655,11 @@ theorem conditionalPetzRenyiTraceTerm_prod_grouped_posDef
   have hrefpow :
       CFC.rpow (identityTensorStateMatrix (a := a × c) (σ₁.prod σ₂)) (1 - α) =
         (CFC.rpow
-          (Matrix.kronecker (identityTensorStateMatrix (a := a) σ₁)
+          ((identityTensorStateMatrix (a := a) σ₁) ⊗ₖ
             (identityTensorStateMatrix (a := c) σ₂)) (1 - α)).submatrix e.symm e.symm := by
     rw [identityTensorStateMatrix_prod_grouping]
     exact cMatrix_rpow_submatrix_equiv_posDef
-      (Matrix.kronecker (identityTensorStateMatrix (a := a) σ₁)
+      ((identityTensorStateMatrix (a := a) σ₁) ⊗ₖ
         (identityTensorStateMatrix (a := c) σ₂))
       ((identityTensorStateMatrix_posDef_of_posDef (a := a) σ₁ hσ₁).kronecker
         (identityTensorStateMatrix_posDef_of_posDef (a := c) σ₂ hσ₂))
@@ -702,11 +695,11 @@ theorem conditionalPetzRenyiTraceTerm_prod_grouped_fullReference
   have hrefpow :
       CFC.rpow (identityTensorStateMatrix (a := a × c) (σ₁.prod σ₂)) (1 - α) =
         (CFC.rpow
-          (Matrix.kronecker (identityTensorStateMatrix (a := a) σ₁)
+          ((identityTensorStateMatrix (a := a) σ₁) ⊗ₖ
             (identityTensorStateMatrix (a := c) σ₂)) (1 - α)).submatrix e.symm e.symm := by
     rw [identityTensorStateMatrix_prod_grouping]
     exact cMatrix_rpow_submatrix_equiv_posDef
-      (Matrix.kronecker (identityTensorStateMatrix (a := a) σ₁)
+      ((identityTensorStateMatrix (a := a) σ₁) ⊗ₖ
         (identityTensorStateMatrix (a := c) σ₂))
       ((identityTensorStateMatrix_posDef_of_posDef (a := a) σ₁ hσ₁).kronecker
         (identityTensorStateMatrix_posDef_of_posDef (a := c) σ₂ hσ₂))
@@ -750,7 +743,7 @@ theorem conditionalPetzRenyiEntropyCandidate_prod_grouped_of_rpow_reindex
     (hrefpow :
       CFC.rpow (identityTensorStateMatrix (a := a × c) (σ₁.prod σ₂)) (1 - α) =
         (CFC.rpow
-          (Matrix.kronecker (identityTensorStateMatrix (a := a) σ₁)
+          ((identityTensorStateMatrix (a := a) σ₁) ⊗ₖ
             (identityTensorStateMatrix (a := c) σ₂)) (1 - α)).submatrix
           (Equiv.prodProdProdComm a b c d).symm
           (Equiv.prodProdProdComm a b c d).symm) :
@@ -831,11 +824,11 @@ theorem conditionalPetzRenyiEntropyCandidate_prod_grouped_posDef
   have hrefpow :
       CFC.rpow (identityTensorStateMatrix (a := a × c) (σ₁.prod σ₂)) (1 - α) =
         (CFC.rpow
-          (Matrix.kronecker (identityTensorStateMatrix (a := a) σ₁)
+          ((identityTensorStateMatrix (a := a) σ₁) ⊗ₖ
             (identityTensorStateMatrix (a := c) σ₂)) (1 - α)).submatrix e.symm e.symm := by
     rw [identityTensorStateMatrix_prod_grouping]
     exact cMatrix_rpow_submatrix_equiv_posDef
-      (Matrix.kronecker (identityTensorStateMatrix (a := a) σ₁)
+      ((identityTensorStateMatrix (a := a) σ₁) ⊗ₖ
         (identityTensorStateMatrix (a := c) σ₂))
       ((identityTensorStateMatrix_posDef_of_posDef (a := a) σ₁ hσ₁).kronecker
         (identityTensorStateMatrix_posDef_of_posDef (a := c) σ₂ hσ₂))

@@ -31,7 +31,7 @@ separate negative-power infrastructure.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 
 open Matrix Polynomial
 
@@ -47,10 +47,10 @@ omit [DecidableEq a] in
 theorem traceRight_leftKroneckerOne_mul
     {b : Type v} [Fintype b] [DecidableEq b]
     (X : CMatrix (a × b)) (U : CMatrix a) :
-    Matrix.traceRight (Matrix.kronecker U (1 : CMatrix b) * X) =
+    Matrix.traceRight ((U ⊗ₖ (1 : CMatrix b)) * X) =
       U * Matrix.traceRight X := by
   ext i i'
-  simp [Matrix.traceRight, Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  simp [Matrix.traceRight, Matrix.mul_apply, Matrix.kroneckerMap_apply,
     Matrix.one_apply, Fintype.sum_prod_type, Finset.mul_sum]
   rw [Finset.sum_comm]
 
@@ -58,23 +58,23 @@ theorem traceRight_left_unitary_conj
     {b : Type v} [Fintype b] [DecidableEq b]
     (X : CMatrix (a × b)) (U : Matrix.unitaryGroup a ℂ) :
     Matrix.traceRight
-        (star (Matrix.kronecker (U : CMatrix a) (1 : CMatrix b)) * X *
-          Matrix.kronecker (U : CMatrix a) (1 : CMatrix b)) =
+        (star ((U : CMatrix a) ⊗ₖ (1 : CMatrix b)) * X *
+          ((U : CMatrix a) ⊗ₖ (1 : CMatrix b))) =
       star (U : CMatrix a) * Matrix.traceRight X *
         (U : CMatrix a) := by
   have hstar :
-      star (Matrix.kronecker (U : CMatrix a) (1 : CMatrix b)) =
-        Matrix.kronecker (star (U : CMatrix a)) (1 : CMatrix b) := by
+      star ((U : CMatrix a) ⊗ₖ (1 : CMatrix b)) =
+        (star (U : CMatrix a)) ⊗ₖ (1 : CMatrix b) := by
     simpa [Matrix.star_eq_conjTranspose] using
       Matrix.conjTranspose_kronecker (U : CMatrix a) (1 : CMatrix b)
   rw [hstar]
   calc
     Matrix.traceRight
-        ((Matrix.kronecker (star (U : CMatrix a)) (1 : CMatrix b) * X) *
-          Matrix.kronecker (U : CMatrix a) (1 : CMatrix b))
+        ((((star (U : CMatrix a)) ⊗ₖ (1 : CMatrix b)) * X) *
+          ((U : CMatrix a) ⊗ₖ (1 : CMatrix b)))
         =
           Matrix.traceRight
-            (Matrix.kronecker (star (U : CMatrix a)) (1 : CMatrix b) * X) *
+            (((star (U : CMatrix a)) ⊗ₖ (1 : CMatrix b)) * X) *
             (U : CMatrix a) := by
             rw [traceRight_mul_kronecker_one_left]
     _ = (star (U : CMatrix a) * Matrix.traceRight X) *
@@ -88,18 +88,18 @@ theorem traceRight_right_unitary_conj
     {b : Type v} [Fintype b] [DecidableEq b]
     (X : CMatrix (a × b)) (V : Matrix.unitaryGroup b ℂ) :
     Matrix.traceRight
-        (star (Matrix.kronecker (1 : CMatrix a) (V : CMatrix b)) * X *
-          Matrix.kronecker (1 : CMatrix a) (V : CMatrix b)) =
+        (star ((1 : CMatrix a) ⊗ₖ (V : CMatrix b)) * X *
+          ((1 : CMatrix a) ⊗ₖ (V : CMatrix b))) =
       Matrix.traceRight X := by
   classical
   ext i i'
   have hstar :
-      star (Matrix.kronecker (1 : CMatrix a) (V : CMatrix b)) =
-        Matrix.kronecker (1 : CMatrix a) (star (V : CMatrix b)) := by
+      star ((1 : CMatrix a) ⊗ₖ (V : CMatrix b)) =
+        (1 : CMatrix a) ⊗ₖ (star (V : CMatrix b)) := by
     simpa [Matrix.star_eq_conjTranspose] using
       Matrix.conjTranspose_kronecker (1 : CMatrix a) (V : CMatrix b)
   rw [hstar]
-  simp [Matrix.traceRight, Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  simp [Matrix.traceRight, Matrix.mul_apply, Matrix.kroneckerMap_apply,
     Matrix.one_apply, Fintype.sum_prod_type, Finset.mul_sum, mul_left_comm, mul_comm]
   have hunit : (V : CMatrix b) * star (V : CMatrix b) = 1 :=
     Unitary.coe_mul_star_self V
@@ -135,23 +135,23 @@ theorem traceLeft_right_unitary_conj
     {b : Type v} [Fintype b] [DecidableEq b]
     (X : CMatrix (a × b)) (V : Matrix.unitaryGroup b ℂ) :
     Matrix.traceLeft
-        (star (Matrix.kronecker (1 : CMatrix a) (V : CMatrix b)) * X *
-          Matrix.kronecker (1 : CMatrix a) (V : CMatrix b)) =
+        (star ((1 : CMatrix a) ⊗ₖ (V : CMatrix b)) * X *
+          ((1 : CMatrix a) ⊗ₖ (V : CMatrix b))) =
       star (V : CMatrix b) * Matrix.traceLeft X *
         (V : CMatrix b) := by
   have hstar :
-      star (Matrix.kronecker (1 : CMatrix a) (V : CMatrix b)) =
-        Matrix.kronecker (1 : CMatrix a) (star (V : CMatrix b)) := by
+      star ((1 : CMatrix a) ⊗ₖ (V : CMatrix b)) =
+        (1 : CMatrix a) ⊗ₖ (star (V : CMatrix b)) := by
     simpa [Matrix.star_eq_conjTranspose] using
       Matrix.conjTranspose_kronecker (1 : CMatrix a) (V : CMatrix b)
   rw [hstar]
   calc
     Matrix.traceLeft
-        ((Matrix.kronecker (1 : CMatrix a) (star (V : CMatrix b)) * X) *
-          Matrix.kronecker (1 : CMatrix a) (V : CMatrix b))
+        ((((1 : CMatrix a) ⊗ₖ (star (V : CMatrix b))) * X) *
+          ((1 : CMatrix a) ⊗ₖ (V : CMatrix b)))
         =
           Matrix.traceLeft
-            (Matrix.kronecker (1 : CMatrix a) (star (V : CMatrix b)) * X) *
+            (((1 : CMatrix a) ⊗ₖ (star (V : CMatrix b))) * X) *
             (V : CMatrix b) := by
             rw [traceLeft_mul_kronecker_one_right]
     _ = (star (V : CMatrix b) * Matrix.traceLeft X) *
@@ -165,18 +165,18 @@ theorem traceLeft_left_unitary_conj
     {b : Type v} [Fintype b] [DecidableEq b]
     (X : CMatrix (a × b)) (U : Matrix.unitaryGroup a ℂ) :
     Matrix.traceLeft
-        (star (Matrix.kronecker (U : CMatrix a) (1 : CMatrix b)) * X *
-          Matrix.kronecker (U : CMatrix a) (1 : CMatrix b)) =
+        (star ((U : CMatrix a) ⊗ₖ (1 : CMatrix b)) * X *
+          ((U : CMatrix a) ⊗ₖ (1 : CMatrix b))) =
       Matrix.traceLeft X := by
   classical
   ext j j'
   have hstar :
-      star (Matrix.kronecker (U : CMatrix a) (1 : CMatrix b)) =
-        Matrix.kronecker (star (U : CMatrix a)) (1 : CMatrix b) := by
+      star ((U : CMatrix a) ⊗ₖ (1 : CMatrix b)) =
+        (star (U : CMatrix a)) ⊗ₖ (1 : CMatrix b) := by
     simpa [Matrix.star_eq_conjTranspose] using
       Matrix.conjTranspose_kronecker (U : CMatrix a) (1 : CMatrix b)
   rw [hstar]
-  simp [Matrix.traceLeft, Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  simp [Matrix.traceLeft, Matrix.mul_apply, Matrix.kroneckerMap_apply,
     Matrix.one_apply, Fintype.sum_prod_type, Finset.mul_sum, mul_left_comm, mul_comm]
   have hunit : (U : CMatrix a) * star (U : CMatrix a) = 1 :=
     Unitary.coe_mul_star_self U
@@ -213,14 +213,14 @@ theorem traceRight_local_unitary_conj
     (X : CMatrix (a × b)) (U : Matrix.unitaryGroup a ℂ)
     (V : Matrix.unitaryGroup b ℂ) :
     Matrix.traceRight
-        (star (Matrix.kronecker (U : CMatrix a) (V : CMatrix b)) * X *
-          Matrix.kronecker (U : CMatrix a) (V : CMatrix b)) =
+        (star ((U : CMatrix a) ⊗ₖ (V : CMatrix b)) * X *
+          ((U : CMatrix a) ⊗ₖ (V : CMatrix b))) =
       star (U : CMatrix a) * Matrix.traceRight X *
         (U : CMatrix a) := by
-  let K : CMatrix (a × b) := Matrix.kronecker (U : CMatrix a) (1 : CMatrix b)
-  let L : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) (V : CMatrix b)
+  let K : CMatrix (a × b) := (U : CMatrix a) ⊗ₖ (1 : CMatrix b)
+  let L : CMatrix (a × b) := (1 : CMatrix a) ⊗ₖ (V : CMatrix b)
   have hfactor :
-      Matrix.kronecker (U : CMatrix a) (V : CMatrix b) = K * L := by
+      (U : CMatrix a) ⊗ₖ (V : CMatrix b) = K * L := by
     simpa [K, L] using
       (Matrix.mul_kronecker_mul (U : CMatrix a) (1 : CMatrix a)
         (1 : CMatrix b) (V : CMatrix b))
@@ -239,14 +239,14 @@ theorem traceLeft_local_unitary_conj
     (X : CMatrix (a × b)) (U : Matrix.unitaryGroup a ℂ)
     (V : Matrix.unitaryGroup b ℂ) :
     Matrix.traceLeft
-        (star (Matrix.kronecker (U : CMatrix a) (V : CMatrix b)) * X *
-          Matrix.kronecker (U : CMatrix a) (V : CMatrix b)) =
+        (star ((U : CMatrix a) ⊗ₖ (V : CMatrix b)) * X *
+          ((U : CMatrix a) ⊗ₖ (V : CMatrix b))) =
       star (V : CMatrix b) * Matrix.traceLeft X *
         (V : CMatrix b) := by
-  let K : CMatrix (a × b) := Matrix.kronecker (U : CMatrix a) (1 : CMatrix b)
-  let L : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) (V : CMatrix b)
+  let K : CMatrix (a × b) := (U : CMatrix a) ⊗ₖ (1 : CMatrix b)
+  let L : CMatrix (a × b) := (1 : CMatrix a) ⊗ₖ (V : CMatrix b)
   have hfactor :
-      Matrix.kronecker (U : CMatrix a) (V : CMatrix b) = K * L := by
+      (U : CMatrix a) ⊗ₖ (V : CMatrix b) = K * L := by
     simpa [K, L] using
       (Matrix.mul_kronecker_mul (U : CMatrix a) (1 : CMatrix a)
         (1 : CMatrix b) (V : CMatrix b))
@@ -265,7 +265,7 @@ theorem traceLeft_local_unitary_conj
 theorem kronecker_mem_unitaryGroup
     {b : Type v} [Fintype b] [DecidableEq b]
     (U : Matrix.unitaryGroup a ℂ) (V : Matrix.unitaryGroup b ℂ) :
-    Matrix.kronecker (U : CMatrix a) (V : CMatrix b) ∈
+    (U : CMatrix a) ⊗ₖ (V : CMatrix b) ∈
       Matrix.unitaryGroup (a × b) ℂ := by
   exact kronecker_mem_unitary U.2 V.2
 
@@ -1870,25 +1870,25 @@ This is the finite-dimensional kernel-inclusion form used to pass from
 theorem Matrix.Supports.kronecker_right_of_posDef
     {b : Type v} [Fintype b] [DecidableEq b]
     (A : CMatrix a) (B C : CMatrix b) (hC : C.PosDef) :
-    Matrix.Supports (Matrix.kronecker A B) (Matrix.kronecker A C) := by
-  let L : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) (B * C⁻¹)
+    Matrix.Supports (A ⊗ₖ B) (A ⊗ₖ C) := by
+  let L : CMatrix (a × b) := (1 : CMatrix a) ⊗ₖ (B * C⁻¹)
   have hCdet : IsUnit C.det := (Matrix.isUnit_iff_isUnit_det C).mp hC.isUnit
   have hleft : C⁻¹ * C = (1 : CMatrix b) := Matrix.nonsing_inv_mul C hCdet
-  have hfactor : Matrix.kronecker A B = L * Matrix.kronecker A C := by
+  have hfactor : A ⊗ₖ B = L * (A ⊗ₖ C) := by
     calc
-      Matrix.kronecker A B =
-          Matrix.kronecker (A * (1 : CMatrix a)) (B * (1 : CMatrix b)) := by simp
-      _ = Matrix.kronecker (A * (1 : CMatrix a)) (B * (C⁻¹ * C)) := by rw [hleft]
-      _ = Matrix.kronecker ((1 : CMatrix a) * A) ((B * C⁻¹) * C) := by
+      A ⊗ₖ B =
+          (A * (1 : CMatrix a)) ⊗ₖ (B * (1 : CMatrix b)) := by simp
+      _ = (A * (1 : CMatrix a)) ⊗ₖ (B * (C⁻¹ * C)) := by rw [hleft]
+      _ = ((1 : CMatrix a) * A) ⊗ₖ ((B * C⁻¹) * C) := by
             simp [Matrix.mul_assoc]
-      _ = L * Matrix.kronecker A C := by
-            simpa [L, Matrix.kronecker] using
+      _ = L * (A ⊗ₖ C) := by
+            simpa [L] using
               (Matrix.mul_kronecker_mul (1 : CMatrix a) A (B * C⁻¹) C)
   intro v hv
   calc
-    Matrix.mulVec (Matrix.kronecker A B) v =
-        Matrix.mulVec (L * Matrix.kronecker A C) v := by rw [hfactor]
-    _ = Matrix.mulVec L (Matrix.mulVec (Matrix.kronecker A C) v) := by
+    Matrix.mulVec (A ⊗ₖ B) v =
+        Matrix.mulVec (L * (A ⊗ₖ C)) v := by rw [hfactor]
+    _ = Matrix.mulVec L (Matrix.mulVec (A ⊗ₖ C) v) := by
         rw [Matrix.mulVec_mulVec]
     _ = 0 := by
         rw [hv]
@@ -1912,7 +1912,7 @@ theorem matrix_supports_prod_marginals (ρ : MState (a × b)) :
   let UA : Matrix.unitaryGroup a ℂ := ρA.psd.isHermitian.eigenvectorUnitary
   let UB : Matrix.unitaryGroup b ℂ := ρB.psd.isHermitian.eigenvectorUnitary
   let UAB : Matrix.unitaryGroup (a × b) ℂ :=
-    ⟨Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b),
+    ⟨(UA : CMatrix a) ⊗ₖ (UB : CMatrix b),
       kronecker_mem_unitaryGroup UA UB⟩
   let M' : CMatrix (a × b) := star (UAB : CMatrix (a × b)) * ρ.m * UAB
   let dA : a → ℝ := fun i => ρA.psd.isHermitian.eigenvalues i
@@ -2070,11 +2070,11 @@ theorem matrix_supports_prod_marginals (ρ : MState (a × b)) :
     let DB : CMatrix b := Matrix.diagonal fun j => ((dB j : ℝ) : ℂ)
     have hD :
         (Matrix.diagonal fun x : a × b => ((d x : ℝ) : ℂ) : CMatrix (a × b)) =
-          Matrix.kronecker DA DB := by
+          DA ⊗ₖ DB := by
       ext x y
       by_cases hxy : x = y
       · subst y
-        simp [DA, DB, d, Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.diagonal]
+        simp [DA, DB, d, Matrix.kroneckerMap_apply, Matrix.diagonal]
       · have hneq : x.1 ≠ y.1 ∨ x.2 ≠ y.2 := by
           by_cases h1 : x.1 = y.1
           · right
@@ -2083,28 +2083,28 @@ theorem matrix_supports_prod_marginals (ρ : MState (a × b)) :
           · left
             exact h1
         rcases hneq with hneqA | hneqB
-        · simp [DA, DB, d, Matrix.kronecker, Matrix.kroneckerMap_apply,
+        · simp [DA, DB, d, Matrix.kroneckerMap_apply,
             Matrix.diagonal, hxy, hneqA]
-        · simp [DA, DB, d, Matrix.kronecker, Matrix.kroneckerMap_apply,
+        · simp [DA, DB, d, Matrix.kroneckerMap_apply,
             Matrix.diagonal, hxy, hneqB]
     have hUAB :
         (UAB : CMatrix (a × b)) =
-          Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b) := rfl
+          (UA : CMatrix a) ⊗ₖ (UB : CMatrix b) := rfl
     have hstarUAB :
         star (UAB : CMatrix (a × b)) =
-          Matrix.kronecker (star (UA : CMatrix a)) (star (UB : CMatrix b)) := by
+          (star (UA : CMatrix a)) ⊗ₖ (star (UB : CMatrix b)) := by
       simpa [UAB, Matrix.star_eq_conjTranspose] using
         Matrix.conjTranspose_kronecker (UA : CMatrix a) (UB : CMatrix b)
     rw [MState.prod_m]
     change (UAB : CMatrix (a × b)) *
           (Matrix.diagonal fun x : a × b => ((d x : ℝ) : ℂ)) *
           star (UAB : CMatrix (a × b)) =
-        Matrix.kronecker ρA.m ρB.m
+        ρA.m ⊗ₖ ρB.m
     rw [hD, hUAB, hstarUAB]
-    change (Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b) *
-          Matrix.kronecker DA DB) *
-          Matrix.kronecker (star (UA : CMatrix a)) (star (UB : CMatrix b)) =
-        Matrix.kronecker ρA.m ρB.m
+    change (((UA : CMatrix a) ⊗ₖ (UB : CMatrix b)) *
+          (DA ⊗ₖ DB)) *
+          ((star (UA : CMatrix a)) ⊗ₖ (star (UB : CMatrix b))) =
+        ρA.m ⊗ₖ ρB.m
     rw [hA, hB]
     simp [DA, DB, Matrix.mul_kronecker_mul, Matrix.mul_assoc]
   simpa [hMback, hNback, ρA, ρB] using hconj
@@ -2270,12 +2270,12 @@ theorem cMatrix_rpow_kronecker
     {a : Type u} {b : Type v} [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     {A : CMatrix a} {B : CMatrix b} (hA : A.PosSemidef) (hB : B.PosSemidef)
     (s : ℝ) :
-    CFC.rpow (Matrix.kronecker A B) s =
-      Matrix.kronecker (CFC.rpow A s) (CFC.rpow B s) := by
+    CFC.rpow (A ⊗ₖ B) s =
+      (CFC.rpow A s) ⊗ₖ (CFC.rpow B s) := by
   let UA : Matrix.unitaryGroup a ℂ := hA.isHermitian.eigenvectorUnitary
   let UB : Matrix.unitaryGroup b ℂ := hB.isHermitian.eigenvectorUnitary
   let U : Matrix.unitaryGroup (a × b) ℂ :=
-    ⟨Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b),
+    ⟨(UA : CMatrix a) ⊗ₖ (UB : CMatrix b),
       Matrix.kronecker_mem_unitary UA.2 UB.2⟩
   let da : a → ℝ := hA.isHermitian.eigenvalues
   let db : b → ℝ := hB.isHermitian.eigenvalues
@@ -2292,7 +2292,7 @@ theorem cMatrix_rpow_kronecker
         star (UB : CMatrix b) := by
     simpa [UB, db, Function.comp_def] using hB.isHermitian.spectral_theorem
   have hAB_spec :
-      Matrix.kronecker A B =
+      A ⊗ₖ B =
         (U : CMatrix (a × b)) *
           Matrix.diagonal (fun i => (dprod i : ℂ)) *
           star (U : CMatrix (a × b)) := by
@@ -2301,7 +2301,7 @@ theorem cMatrix_rpow_kronecker
       Matrix.mul_kronecker_mul, Matrix.diagonal_kronecker_diagonal,
       Matrix.mul_assoc]
   have hleft :
-      CFC.rpow (Matrix.kronecker A B) s =
+      CFC.rpow (A ⊗ₖ B) s =
         (U : CMatrix (a × b)) *
           Matrix.diagonal (fun i => ((dprod i ^ s : ℝ) : ℂ)) *
           star (U : CMatrix (a × b)) := by
@@ -2331,7 +2331,7 @@ theorem cMatrix_rpow_kronecker
     rw [hB_spec]
     exact cMatrix_rpow_unitary_conj_diagonal_ofReal UB db hdb s
   have hright :
-      Matrix.kronecker (CFC.rpow A s) (CFC.rpow B s) =
+      (CFC.rpow A s) ⊗ₖ (CFC.rpow B s) =
         (U : CMatrix (a × b)) *
           (Matrix.diagonal fun i : a × b =>
             (((da i.1 ^ s) * (db i.2 ^ s) : ℝ) : ℂ)) *
@@ -3814,12 +3814,12 @@ theorem psdTracePower_kronecker
     {b : Type v} [Fintype b] [DecidableEq b]
     {A : CMatrix a} {B : CMatrix b} (hA : A.PosSemidef) (hB : B.PosSemidef)
     {p : ℝ} :
-    psdTracePower (Matrix.kronecker A B) (hA.kronecker hB) p =
+    psdTracePower (A ⊗ₖ B) (hA.kronecker hB) p =
       psdTracePower A hA p * psdTracePower B hB p := by
-  show (CFC.rpow (Matrix.kronecker A B) p).trace.re =
+  show (CFC.rpow (A ⊗ₖ B) p).trace.re =
     psdTracePower A hA p * psdTracePower B hB p
   rw [cMatrix_rpow_kronecker hA hB]
-  change (Matrix.kroneckerMap (fun x y => x * y) (CFC.rpow A p)
+  change ((CFC.rpow A p) ⊗ₖ
       (CFC.rpow B p)).trace.re =
     psdTracePower A hA p * psdTracePower B hB p
   rw [Matrix.trace_kronecker]
@@ -3840,8 +3840,8 @@ theorem psdTracePower_kronecker
 theorem psdSqrt_kronecker
     {b : Type v} [Fintype b] [DecidableEq b]
     {A : CMatrix a} {B : CMatrix b} (hA : A.PosSemidef) (hB : B.PosSemidef) :
-    psdSqrt (Matrix.kronecker A B) =
-      Matrix.kronecker (psdSqrt A) (psdSqrt B) := by
+    psdSqrt (A ⊗ₖ B) =
+      (psdSqrt A) ⊗ₖ (psdSqrt B) := by
   simp only [psdSqrt, CFC.sqrt_eq_rpow]
   exact cMatrix_rpow_kronecker hA hB (1 / 2)
 
@@ -4247,9 +4247,9 @@ theorem psdSchattenPNorm_kronecker
     {b : Type v} [Fintype b] [DecidableEq b]
     {A : CMatrix a} {B : CMatrix b} (hA : A.PosSemidef) (hB : B.PosSemidef)
     (p : SchattenOrder) :
-    psdSchattenPNorm (Matrix.kronecker A B) (hA.kronecker hB) p =
+    psdSchattenPNorm (A ⊗ₖ B) (hA.kronecker hB) p =
       psdSchattenPNorm A hA p * psdSchattenPNorm B hB p := by
-  show Real.rpow (psdTracePower (Matrix.kronecker A B) (hA.kronecker hB) (p : ℝ))
+  show Real.rpow (psdTracePower (A ⊗ₖ B) (hA.kronecker hB) (p : ℝ))
       (1 / (p : ℝ)) = _
   rw [psdTracePower_kronecker hA hB]
   exact Real.mul_rpow (psdTracePower_nonneg A hA p)

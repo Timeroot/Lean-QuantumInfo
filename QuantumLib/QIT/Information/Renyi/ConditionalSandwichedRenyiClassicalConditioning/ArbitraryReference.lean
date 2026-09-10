@@ -26,7 +26,7 @@ obtained from the fixed full-rank reference results by coordinate-`Y` pinching.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal Pointwise
+open scoped ComplexOrder MatrixOrder Kronecker NNReal Pointwise
 open Matrix
 
 noncomputable section
@@ -117,23 +117,22 @@ theorem conditionalSandwichedRenyiUp_candidateE_fullRankApprox_tendsto_of_highAl
         identityTensorStateMatrix (a := A)
           (fullRankApproxMaximallyMixedStatePath σ δ) =
           scale δ • sandwichedRenyiReferenceRegularization τ (ε δ) := by
-      change Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix A)
+      change (1 : CMatrix A) ⊗ₖ
         (fullRankApproxMaximallyMixedStatePath σ δ).m = _
       rw [hpath_matrix]
       calc
-        Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix A)
+        (1 : CMatrix A) ⊗ₖ
               (((1 - δ : ℝ) : ℂ) •
                 sandwichedRenyiReferenceRegularization σ.m
                   (δ / ((1 - δ) * (Fintype.card (B × Y) : ℝ)))) =
-            Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix A)
+            (1 : CMatrix A) ⊗ₖ
               ((1 - δ) • sandwichedRenyiReferenceRegularization σ.m
                 (δ / ((1 - δ) * (Fintype.card (B × Y) : ℝ)))) := by
           ext i j
           simp [Matrix.smul_apply]
-        _ = (1 - δ) • Matrix.kroneckerMap (fun x y => x * y)
-              (1 : CMatrix A)
+        _ = (1 - δ) • ((1 : CMatrix A) ⊗ₖ
               (sandwichedRenyiReferenceRegularization σ.m
-                (δ / ((1 - δ) * (Fintype.card (B × Y) : ℝ)))) := by
+                (δ / ((1 - δ) * (Fintype.card (B × Y) : ℝ))))) := by
           exact kroneckerMap_one_real_smul (A := A) (B := B) (Y := Y)
             (1 - δ) _
         _ = scale δ • sandwichedRenyiReferenceRegularization τ (ε δ) := by

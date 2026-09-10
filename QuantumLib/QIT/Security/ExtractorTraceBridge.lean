@@ -22,7 +22,7 @@ the full extractor output with the seed-averaged per-seed extractor outputs.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 
 namespace QIT.Security
 
@@ -64,7 +64,7 @@ def idealExtractorOutputState (ρ : MState (S × (F × e))) : MState (S × (F ×
 @[simp]
 theorem idealExtractorOutputState_matrix (ρ : MState (S × (F × e))) :
     (idealExtractorOutputState ρ).m =
-      Matrix.kronecker (uniformExtractorOutputState (S := S)).m ρ.traceLeft.m :=
+      (uniformExtractorOutputState (S := S)).m ⊗ₖ ρ.traceLeft.m :=
   MState.prod_m _ _
 
 /-- Normalized secrecy distance of an extractor output from its ideal uniform-output state. -/
@@ -95,8 +95,7 @@ theorem idealExtractorOutputChannel_applyState (ρ : MState (S × (F × e))) :
   rw [CPTPOp.mat_coe_eq_apply_mat, idealExtractorOutputState_matrix]
   simp only [idealExtractorOutputChannel, CPTPOp.prod_map]
   rw [MatrixMap.kron_idChannel_apply_slice]
-  simp [Matrix.traceLeft, Matrix.trace, Matrix.kronecker,
-    Matrix.kroneckerMap_apply, mul_comm]
+  simp [Matrix.traceLeft, Matrix.trace, Matrix.kroneckerMap_apply, mul_comm]
 
 /-- Idealizing the extractor output register is a CPTP contraction. -/
 theorem idealExtractorOutputState_normalizedTraceDistance_le
@@ -181,9 +180,8 @@ namespace HashFamily
 def hashSeedOutputState (H : HashFamily F Z S) (z : Z) : MState (S × F) := .ofMatrix
   (matrix :=
     ∑ f, H.prob f •
-      Matrix.kronecker
-        (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
-        (Matrix.single f f (1 : ℂ)))
+      ((Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ)) ⊗ₖ
+        (Matrix.single f f (1 : ℂ))))
   (pos := by
     exact Matrix.posSemidef_sum Finset.univ fun f _ =>
       ((posSemidef_single (H.hash f z)).kronecker (posSemidef_single f)).smul
@@ -193,22 +191,11 @@ def hashSeedOutputState (H : HashFamily F Z S) (z : Z) : MState (S × F) := .ofM
     calc
       (∑ f : F,
           (H.prob f : ℂ) *
-            (Matrix.kronecker
-              (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
+            ((Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ)) ⊗ₖ
               (Matrix.single f f (1 : ℂ))).trace) =
           ∑ f : F, (H.prob f : ℂ) := by
             refine Finset.sum_congr rfl fun f _ => ?_
-            have htrace :=
-              Matrix.trace_kronecker
-                (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
-                (Matrix.single f f (1 : ℂ))
-            have htrace' :
-                ((Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ)).kronecker
-                  (Matrix.single f f (1 : ℂ))).trace =
-                    (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ)).trace *
-                      (Matrix.single f f (1 : ℂ)).trace := by
-              simpa [Matrix.kronecker] using htrace
-            rw [htrace', trace_single_one, if_pos rfl,
+            rw [Matrix.trace_kronecker, trace_single_one, if_pos rfl,
               trace_single_one, if_pos rfl]
             norm_num
       _ = ↑(∑ f : F, H.prob f) := by simp
@@ -221,9 +208,8 @@ omit [Fintype Z] [DecidableEq Z] [Nonempty S] [Nonempty F] in
 theorem hashSeedOutputState_matrix (H : HashFamily F Z S) (z : Z) :
     (hashSeedOutputState H z).m =
       ∑ f, H.prob f •
-        Matrix.kronecker
-          (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
-          (Matrix.single f f (1 : ℂ)) :=
+        ((Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ)) ⊗ₖ
+          (Matrix.single f f (1 : ℂ))) :=
   MState.matrix_ofMatrix _ _ _
 
 /-- The classical channel that reads `z`, samples a public seed, and outputs
@@ -255,7 +241,7 @@ theorem extractorOutputChannel_applyState_cqState
     CPTPOp.reindex_applyState, applyState_prepare_prod_id_cqState_matrix,
     MState.reindex_matrix, extractorOutputState_matrix, extractorOutputMatrix,
     hashSeedOutputState_matrix, Matrix.sum_apply, Matrix.smul_apply,
-    Matrix.submatrix_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]
+    Matrix.submatrix_apply, Matrix.kroneckerMap_apply]
   simp [Equiv.prodAssoc, Finset.sum_mul, Finset.mul_sum]
   refine Finset.sum_congr rfl fun z _ => ?_
   refine Finset.sum_congr rfl fun f0 _ => ?_
@@ -290,14 +276,14 @@ theorem extractorSeedSideInfoMatrix_eq_traceLeft (E : MEnsemble e Z) (f : F) :
 
 /-- The per-seed ideal matrix: uniform extractor output tensor the seed's side information. -/
 def extractorSeedIdealMatrix (E : MEnsemble e Z) (f : F) : CMatrix (S × e) :=
-  Matrix.kronecker (uniformExtractorOutputState (S := S)).m
+  (uniformExtractorOutputState (S := S)).m ⊗ₖ
     (extractorSeedSideInfoMatrix H E f)
 
 omit [DecidableEq F] [DecidableEq Z] [Nonempty F] in
 @[simp]
 theorem extractorSeedIdealMatrix_eq_kronecker (E : MEnsemble e Z) (f : F) :
     extractorSeedIdealMatrix H E f =
-      Matrix.kronecker (uniformExtractorOutputState (S := S)).m
+      (uniformExtractorOutputState (S := S)).m ⊗ₖ
         (extractorSeedSideInfoMatrix H E f) :=
   rfl
 
@@ -399,14 +385,14 @@ theorem extractorSeedOutputMatrix_trace (H : HashFamily F Z S)
   simp only [Matrix.trace_sum, Matrix.trace_smul]
   calc
     (∑ z : Z, (E.probs z) •
-        (Matrix.kronecker (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
+        ((Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ)) ⊗ₖ
           (E.states z).m).trace) =
       ∑ z : Z, ((E.probs z : ℝ≥0) : ℂ) := by
         refine Finset.sum_congr rfl fun z _ => ?_
         have htrace :
-            (Matrix.kronecker (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
+            ((Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ)) ⊗ₖ
               (E.states z).m).trace = 1 := by
-          simpa [Matrix.kronecker] using
+          simpa using
             (Matrix.trace_kronecker
               (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
               (E.states z).m).trans
@@ -432,11 +418,11 @@ theorem extractorSeedIdealMatrix_trace (H : HashFamily F Z S)
     (E : MEnsemble e Z) (f : F) :
     (extractorSeedIdealMatrix H E f).trace = 1 := by
   unfold extractorSeedIdealMatrix extractorSeedSideInfoMatrix
-  rw [show (Matrix.kronecker (uniformExtractorOutputState (S := S)).m
+  rw [show ((uniformExtractorOutputState (S := S)).m ⊗ₖ
       (Matrix.traceLeft (extractorSeedOutputMatrix H E f))).trace =
         (uniformExtractorOutputState (S := S)).m.trace *
           (Matrix.traceLeft (extractorSeedOutputMatrix H E f)).trace by
-    simpa [Matrix.kronecker] using
+    simpa using
       Matrix.trace_kronecker (uniformExtractorOutputState (S := S)).m
         (Matrix.traceLeft (extractorSeedOutputMatrix H E f))]
   rw [uniformExtractorOutputState_matrix]
@@ -484,7 +470,7 @@ private theorem extractorOutputMatrix_seed_offdiag (H : HashFamily F Z S)
     · subst hgf
       simp [hff]
     · simp [hgf]
-  simp [Matrix.kronecker, Matrix.kroneckerMap_apply, hsingle]
+  simp [Matrix.kroneckerMap_apply, hsingle]
 
 omit [DecidableEq Z] [Nonempty S] [Nonempty F] in
 private theorem extractorOutputMarginalB_seed_offdiag (H : HashFamily F Z S)
@@ -506,7 +492,7 @@ private theorem seedBlock_extractorOutputMatrix (H : HashFamily F Z S)
   simp only [extractorSeedOutputMatrix, Matrix.sum_apply, Matrix.smul_apply]
   rw [Finset.smul_sum]
   refine Finset.sum_congr rfl fun z _ => ?_
-  simp only [Matrix.kronecker, Matrix.kroneckerMap_apply]
+  simp only [Matrix.kroneckerMap_apply]
   let A : ℂ :=
     Matrix.single (H.hash f z) (H.hash f z) 1 se.1 se'.1 *
       (E.states z).m se.2 se'.2
@@ -542,7 +528,7 @@ private theorem seedBlock_idealExtractorOutputMatrix (H : HashFamily F Z S)
   have hmarg :=
     congrFun (congrFun (extractorOutputMarginalB_seedBlock H E f) i) j
   simp only [Matrix.smul_apply] at hmarg
-  simp only [Matrix.kronecker, Matrix.kroneckerMap_apply]
+  simp only [Matrix.kroneckerMap_apply]
   rw [hmarg]
   let A : ℂ := (uniformExtractorOutputState (S := S)).m s s'
   let B : ℂ := extractorSeedSideInfoMatrix H E f i j

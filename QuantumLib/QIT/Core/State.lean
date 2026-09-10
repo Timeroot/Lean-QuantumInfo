@@ -27,7 +27,7 @@ qit-notes.tex:1888-1920].
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 noncomputable section
 universe u v w
@@ -208,12 +208,12 @@ theorem reindex_symm_reindex {α : Type u} {β : Type v}
 /-- The matrix `I_A ⊗ σ_B`, the state-level building block used by the conditional entropy
 definitions. -/
 def identityTensorStateMatrix (sigma : MState b) : CMatrix (a × b) :=
-  Matrix.kronecker (1 : CMatrix a) sigma.m
+  (1 : CMatrix a) ⊗ₖ sigma.m
 
 /-- The matrix `I_A ⊗ σ_B` is positive semidefinite. -/
 theorem identityTensorStateMatrix_posSemidef (sigma : MState b) :
     (identityTensorStateMatrix (a := a) sigma).PosSemidef := by
-  change (Matrix.kronecker (1 : CMatrix a) sigma.m).PosSemidef
+  change ((1 : CMatrix a) ⊗ₖ sigma.m).PosSemidef
   exact Matrix.PosSemidef.one.kronecker sigma.psd
 
 /-- `Tr_A (rho_A tensor sigma_B) = sigma_B`. -/
@@ -440,7 +440,7 @@ theorem tensorPower_zero_matrix (rho : MState a) :
 @[simp]
 theorem tensorPower_succ_matrix (rho : MState a) (n : ℕ) :
     (rho.tensorPower (n + 1)).m =
-      Matrix.kronecker rho.m (rho.tensorPower n).m :=
+      rho.m ⊗ₖ (rho.tensorPower n).m :=
   MState.prod_m rho (rho.tensorPower n)
 
 /-- IID tensor powers of a positive-definite state are positive-definite. -/
@@ -507,8 +507,7 @@ theorem tensorPowerBipartite_traceRight (rho : MState (a × b)) :
               have hih := congrArg (fun σ : MState (TensorPower a n) => σ.m xs ys)
                 (tensorPowerBipartite_traceRight rho n)
               simp [Matrix.traceRight] at hih
-              simp [tensorPowerProdEquiv, Matrix.traceRight, Matrix.kronecker,
-                Matrix.kroneckerMap_apply]
+              simp [tensorPowerProdEquiv, Matrix.traceRight, Matrix.kroneckerMap_apply]
               calc
                 (∑ x : b × TensorPower b n,
                     rho.m (x0, x.1) (y0, x.1) *
@@ -558,8 +557,7 @@ theorem tensorPowerBipartite_traceLeft (rho : MState (a × b)) :
               have hih := congrArg (fun σ : MState (TensorPower b n) => σ.m xs ys)
                 (tensorPowerBipartite_traceLeft rho n)
               simp [Matrix.traceLeft] at hih
-              simp [tensorPowerProdEquiv, Matrix.traceLeft, Matrix.kronecker,
-                Matrix.kroneckerMap_apply]
+              simp [tensorPowerProdEquiv, Matrix.traceLeft, Matrix.kroneckerMap_apply]
               calc
                 (∑ x : a × TensorPower a n,
                     rho.m (x.1, x0) (x.1, y0) *
@@ -626,7 +624,7 @@ def unitaryTensorPowerMatrix (U : Matrix.unitaryGroup a ℂ) :
   | 0 => 1
   | n + 1 =>
       let Un := unitaryTensorPowerMatrix U n
-      ⟨Matrix.kronecker (U : CMatrix a) (Un : CMatrix (TensorPower a n)),
+      ⟨(U : CMatrix a) ⊗ₖ (Un : CMatrix (TensorPower a n)),
         Matrix.kronecker_mem_unitary U.2 Un.2⟩
 
 @[simp]
@@ -635,7 +633,7 @@ theorem unitaryTensorPowerMatrix_zero (U : Matrix.unitaryGroup a ℂ) :
 
 theorem unitaryTensorPowerMatrix_succ (U : Matrix.unitaryGroup a ℂ) (n : ℕ) :
     unitaryTensorPowerMatrix U (n + 1) =
-      ⟨Matrix.kronecker (U : CMatrix a)
+      ⟨(U : CMatrix a) ⊗ₖ
           (unitaryTensorPowerMatrix U n : CMatrix (TensorPower a n)),
         Matrix.kronecker_mem_unitary U.2 (unitaryTensorPowerMatrix U n).2⟩ := rfl
 

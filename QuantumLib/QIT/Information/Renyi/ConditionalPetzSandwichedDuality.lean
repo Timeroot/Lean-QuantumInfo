@@ -31,7 +31,7 @@ positive-definite API hypotheses.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 
 open Matrix
 
@@ -125,9 +125,9 @@ def mixedPetzSandwichedACBWeightedAmplitude
     (a × c) × b → ℂ :=
   let phi := psi.reindex (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c))
   let W : CMatrix (a × c) :=
-    Matrix.kronecker (1 : CMatrix a)
+    (1 : CMatrix a) ⊗ₖ
       (CFC.rpow psi.state.marginalAC.traceLeft.m ((alpha - 1) / 2))
-  Matrix.mulVec (Matrix.kronecker W (1 : CMatrix b)) phi.vec
+  Matrix.mulVec (W ⊗ₖ (1 : CMatrix b)) phi.vec
 
 /-- The purifying vector weighted by `ρ_AB^((α-1)/2)` on the `a × b` registers, carrying the
 `A|B` side of the duality. -/
@@ -135,8 +135,7 @@ def mixedPetzSandwichedABWeightedAmplitude
     (psi : Ket ((a × b) × c)) (alpha : ℝ) :
     (a × b) × c → ℂ :=
   Matrix.mulVec
-    (Matrix.kronecker
-      (CFC.rpow psi.state.marginalAB.m ((alpha - 1) / 2))
+    ((CFC.rpow psi.state.marginalAB.m ((alpha - 1) / 2)) ⊗ₖ
       (1 : CMatrix c))
     psi.vec
 
@@ -167,14 +166,13 @@ theorem mixedPetzSandwichedACBWeightedAmplitude_eq_reindex_ABWeightedAmplitude
     congrArg DensityOp.m hC
   let T : CMatrix c := CFC.rpow psi.state.traceLeft.m p
   let KC : CMatrix ((a × b) × c) :=
-    Matrix.kronecker (1 : CMatrix (a × b)) T
+    (1 : CMatrix (a × b)) ⊗ₖ T
   let KACB : CMatrix ((a × c) × b) :=
-    Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) T) (1 : CMatrix b)
+    ((1 : CMatrix a) ⊗ₖ T) ⊗ₖ (1 : CMatrix b)
   let phi : Ket ((a × c) × b) := psi.reindex e
   have hACB_matrix :
-      Matrix.kronecker
-          (Matrix.kronecker (1 : CMatrix a)
-            (CFC.rpow psi.state.marginalAC.traceLeft.m p))
+      ((1 : CMatrix a) ⊗ₖ
+            (CFC.rpow psi.state.marginalAC.traceLeft.m p)) ⊗ₖ
           (1 : CMatrix b) = KACB := by
     dsimp [KACB, T]
     rw [hCmat]
@@ -184,9 +182,8 @@ theorem mixedPetzSandwichedACBWeightedAmplitude_eq_reindex_ABWeightedAmplitude
     ext y
     change
       (Matrix.mulVec
-        (Matrix.kronecker
-          (Matrix.kronecker (1 : CMatrix a)
-            (CFC.rpow psi.state.marginalAC.traceLeft.m p))
+        (((1 : CMatrix a) ⊗ₖ
+            (CFC.rpow psi.state.marginalAC.traceLeft.m p)) ⊗ₖ
           (1 : CMatrix b))
         (psi.reindex e).vec) y =
       (Matrix.mulVec KACB phi.vec) y
@@ -201,22 +198,20 @@ theorem mixedPetzSandwichedACBWeightedAmplitude_eq_reindex_ABWeightedAmplitude
   have hx := congrFun hmove ((i, j), k)
   have hleft :
       psi.mixedPetzSandwichedACBWeightedAmplitude alpha ((i, k), j) =
-        (Matrix.kronecker (1 : CMatrix (a × b))
+        ((1 : CMatrix (a × b)) ⊗ₖ
             (CFC.rpow psi.state.traceLeft.m p)).mulVec psi.vec ((i, j), k) := by
     rw [hACB_def]
     change Matrix.mulVec KACB phi.vec ((i, k), j) =
       Matrix.mulVec KC psi.vec ((i, j), k)
     rw [← hKC_submatrix]
     simp [KC, T, phi, e, Ket.reindex_vec,
-      QIT.prodABCToACBEquiv, Matrix.mulVec, dotProduct, Matrix.kronecker,
-      Fintype.sum_prod_type]
+      QIT.prodABCToACBEquiv, Matrix.mulVec, dotProduct, Fintype.sum_prod_type]
     apply Finset.sum_congr rfl
     intro _ _
     rw [Finset.sum_comm]
   have hab :
       psi.mixedPetzSandwichedABWeightedAmplitude alpha ((i, j), k) =
-        (Matrix.kronecker
-          (CFC.rpow psi.state.marginalAB.m p) (1 : CMatrix c)).mulVec
+        ((CFC.rpow psi.state.marginalAB.m p) ⊗ₖ (1 : CMatrix c)).mulVec
           psi.vec ((i, j), k) := by
     rfl
   rw [hleft, hab]
@@ -238,7 +233,7 @@ theorem traceRight_rankOne_mixedPetzSandwichedACBWeightedAmplitude_eq_referenceI
   let tau := psi.state.marginalAC.traceLeft
   let p : ℝ := (alpha - 1) / 2
   let W : CMatrix (a × c) :=
-    Matrix.kronecker (1 : CMatrix a) (CFC.rpow tau.m p)
+    (1 : CMatrix a) ⊗ₖ (CFC.rpow tau.m p)
   have hp :
       (1 - beta) / (2 * beta) = p := by
     simpa [p] using
@@ -260,7 +255,7 @@ theorem traceRight_rankOne_mixedPetzSandwichedACBWeightedAmplitude_eq_referenceI
           (s := (alpha - 1) / 2) psi.state.marginalAC.traceLeft.psd)
     exact hWpsd.isHermitian.eq
   change Matrix.traceRight
-      (rankOneMatrix (Matrix.mulVec (Matrix.kronecker W (1 : CMatrix b)) phi.vec)) =
+      (rankOneMatrix (Matrix.mulVec (W ⊗ₖ (1 : CMatrix b)) phi.vec)) =
     MState.sandwichedRenyiReferenceInner psi.state.marginalAC
       (MState.identityTensorStateMatrix (a := a) tau) beta
   rw [traceRight_rankOne_kron_left_mulVec_eq, hmarg, hWherm]
@@ -296,7 +291,7 @@ theorem traceLeft_rankOne_mixedPetzSandwichedACBWeightedAmplitude_eq_petzTraceMa
   change Matrix.traceLeft
       (Matrix.traceRight
         (rankOneMatrix
-          (Matrix.mulVec (Matrix.kronecker Wab (1 : CMatrix c)) psi.vec))) =
+          (Matrix.mulVec (Wab ⊗ₖ (1 : CMatrix c)) psi.vec))) =
     psi.state.marginalAB.conditionalPetzRenyiUpTraceMatrix alpha
   rw [traceRight_rankOne_kron_left_mulVec_eq]
   have hmargAB :

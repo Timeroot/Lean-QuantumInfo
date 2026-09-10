@@ -29,7 +29,7 @@ reserved for classical-state infrastructure.
 
 noncomputable section
 universe u v
-open scoped ComplexOrder MatrixOrder NNReal ENNReal Topology
+open scoped ComplexOrder MatrixOrder Kronecker NNReal ENNReal Topology
 open Filter Polynomial
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
@@ -132,13 +132,13 @@ theorem tensorPower_matrix_eq_unitaryTensorPowerMatrix_diagonal
         simpa [U, D, coe_stateSpectralWeight, Function.comp_def, Unitary.conjStarAlgAut_apply]
           using rho.psd.isHermitian.spectral_theorem
       rw [MState.tensorPower_succ_matrix]
-      change Matrix.kronecker rho.m (rho.tensorPower n).m =
-        (Matrix.kronecker (U : CMatrix a) (Un : CMatrix (TensorPower a n))) *
+      change rho.m ⊗ₖ (rho.tensorPower n).m =
+        ((U : CMatrix a) ⊗ₖ (Un : CMatrix (TensorPower a n))) *
           Matrix.diagonal
             (fun x : a × TensorPower a n =>
               ((((stateSpectralWeight rho x.1 *
                 tensorPowerSpectralWeight rho n x.2 : ℝ≥0) : ℝ)) : ℂ)) *
-            star (Matrix.kronecker (U : CMatrix a) (Un : CMatrix (TensorPower a n)))
+            star ((U : CMatrix a) ⊗ₖ (Un : CMatrix (TensorPower a n)))
       rw [hrho, ih]
       simp [U, Un, D,
         Matrix.star_eq_conjTranspose, Matrix.conjTranspose_kronecker, Matrix.mul_kronecker_mul,
@@ -169,29 +169,29 @@ theorem tensorPowerNussbaumSzkolaOverlap_eq_normSq
       let UrhoN : Matrix.unitaryGroup (TensorPower a n) ℂ := unitaryTensorPowerMatrix Urho n
       let UsigmaN : Matrix.unitaryGroup (TensorPower a n) ℂ := unitaryTensorPowerMatrix Usigma n
       have hentry :
-          ((star (Matrix.kronecker (Urho : CMatrix a) (UrhoN : CMatrix (TensorPower a n))) *
-              Matrix.kronecker (Usigma : CMatrix a) (UsigmaN : CMatrix (TensorPower a n)))
+          ((star ((Urho : CMatrix a) ⊗ₖ (UrhoN : CMatrix (TensorPower a n))) *
+              ((Usigma : CMatrix a) ⊗ₖ (UsigmaN : CMatrix (TensorPower a n))))
               (x0, xs) (y0, ys)) =
             ((star (Urho : CMatrix a) * (Usigma : CMatrix a)) x0 y0) *
               ((star (UrhoN : CMatrix (TensorPower a n)) *
                 (UsigmaN : CMatrix (TensorPower a n))) xs ys) := by
         have hstar :
-            star (Matrix.kronecker (Urho : CMatrix a)
+            star ((Urho : CMatrix a) ⊗ₖ
                 (UrhoN : CMatrix (TensorPower a n))) =
-              Matrix.kronecker (star (Urho : CMatrix a))
+              (star (Urho : CMatrix a)) ⊗ₖ
                 (star (UrhoN : CMatrix (TensorPower a n))) := by
           ext i j
           simp [Matrix.star_apply]
         rw [hstar]
         have hmul :
-            Matrix.kronecker (star (Urho : CMatrix a))
-                (star (UrhoN : CMatrix (TensorPower a n))) *
-              Matrix.kronecker (Usigma : CMatrix a)
-                (UsigmaN : CMatrix (TensorPower a n)) =
-            Matrix.kronecker (star (Urho : CMatrix a) * (Usigma : CMatrix a))
+            ((star (Urho : CMatrix a)) ⊗ₖ
+                (star (UrhoN : CMatrix (TensorPower a n)))) *
+              ((Usigma : CMatrix a) ⊗ₖ
+                (UsigmaN : CMatrix (TensorPower a n))) =
+            (star (Urho : CMatrix a) * (Usigma : CMatrix a)) ⊗ₖ
               (star (UrhoN : CMatrix (TensorPower a n)) *
                 (UsigmaN : CMatrix (TensorPower a n))) := by
-          simpa [Matrix.kronecker] using
+          simpa using
             (Matrix.mul_kronecker_mul
               (star (Urho : CMatrix a)) (Usigma : CMatrix a)
               (star (UrhoN : CMatrix (TensorPower a n)))
@@ -202,10 +202,10 @@ theorem tensorPowerNussbaumSzkolaOverlap_eq_normSq
         ((nussbaumSzkolaOverlap rho sigma x0 y0 *
             tensorPowerNussbaumSzkolaOverlap rho sigma n xs ys : ℝ≥0) : ℝ) =
           Complex.normSq
-            ((star (Matrix.kronecker (Urho : CMatrix a)
+            ((star ((Urho : CMatrix a) ⊗ₖ
                 (UrhoN : CMatrix (TensorPower a n))) *
-              Matrix.kronecker (Usigma : CMatrix a)
-                (UsigmaN : CMatrix (TensorPower a n))) (x0, xs) (y0, ys))
+              ((Usigma : CMatrix a) ⊗ₖ
+                (UsigmaN : CMatrix (TensorPower a n)))) (x0, xs) (y0, ys))
       rw [hentry, Complex.normSq_mul]
       have hoverlap :
           (nussbaumSzkolaOverlap rho sigma x0 y0 : ℝ) =
@@ -462,7 +462,7 @@ def productMarginalEigenvectorUnitary
     rhoAB.traceRight.psd.isHermitian.eigenvectorUnitary
   let UB : Matrix.unitaryGroup b ℂ :=
     rhoAB.traceLeft.psd.isHermitian.eigenvectorUnitary
-  ⟨Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b),
+  ⟨(UA : CMatrix a) ⊗ₖ (UB : CMatrix b),
     Matrix.kronecker_mem_unitary UA.2 UB.2⟩
 
 /-- Transition from the eigenbasis of `rhoAB` to the product eigenbasis of its
@@ -560,7 +560,7 @@ theorem productMarginal_matrix_eq_productEigenbasis_diagonal
       Unitary.conjStarAlgAut_apply]
       using rhoAB.traceLeft.psd.isHermitian.spectral_theorem
   rw [MState.prod_m]
-  change Matrix.kronecker rhoAB.traceRight.m rhoAB.traceLeft.m =
+  change rhoAB.traceRight.m ⊗ₖ rhoAB.traceLeft.m =
     (productMarginalEigenvectorUnitary rhoAB : CMatrix (a × b)) *
       Matrix.diagonal
         (fun y : a × b =>
@@ -856,7 +856,7 @@ theorem productMarginalNussbaumSzkolaOverlap_weighted_fst_sum
         rhoAB.m UA UB
     have hUprod :
         (Uprod : CMatrix (a × b)) =
-          Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b) := by
+          (UA : CMatrix a) ⊗ₖ (UB : CMatrix b) := by
       rfl
     have hptM :
         Matrix.traceRight M =
@@ -946,7 +946,7 @@ theorem productMarginalNussbaumSzkolaOverlap_weighted_snd_sum
         rhoAB.m UA UB
     have hUprod :
         (Uprod : CMatrix (a × b)) =
-          Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b) := by
+          (UA : CMatrix a) ⊗ₖ (UB : CMatrix b) := by
       rfl
     have hptM :
         Matrix.traceLeft M =

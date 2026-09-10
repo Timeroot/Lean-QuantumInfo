@@ -36,7 +36,7 @@ as hypotheses.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Topology
+open scoped ComplexOrder MatrixOrder Kronecker Topology
 open Filter
 
 noncomputable section
@@ -726,7 +726,7 @@ private def productLeftReferenceEigenvectorUnitary
     rhoA.psd.isHermitian.eigenvectorUnitary
   let UB : Matrix.unitaryGroup b ℂ :=
     sigmaB.psd.isHermitian.eigenvectorUnitary
-  ⟨Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b),
+  ⟨(UA : CMatrix a) ⊗ₖ (UB : CMatrix b),
     Matrix.kronecker_mem_unitary UA.2 UB.2⟩
 
 /-- The product reference `rho_A tensor sigma_B` is diagonal in the tensor
@@ -831,7 +831,7 @@ private theorem productLeftReference_diag_fst_sum
   let UB : Matrix.unitaryGroup b ℂ :=
     sigmaB.psd.isHermitian.eigenvectorUnitary
   have hU :
-      (U : CMatrix (a × b)) = Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b) := by
+      (U : CMatrix (a × b)) = (UA : CMatrix a) ⊗ₖ (UB : CMatrix b) := by
     rfl
   have hptM :
       Matrix.traceRight M =
@@ -905,7 +905,7 @@ private theorem productLeftReference_diag_snd_sum
   let UA : Matrix.unitaryGroup a ℂ :=
     rhoAB.traceRight.psd.isHermitian.eigenvectorUnitary
   have hU :
-      (U : CMatrix (a × b)) = Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b) := by
+      (U : CMatrix (a × b)) = (UA : CMatrix a) ⊗ₖ (UB : CMatrix b) := by
     rfl
   have hptM :
       Matrix.traceLeft M =

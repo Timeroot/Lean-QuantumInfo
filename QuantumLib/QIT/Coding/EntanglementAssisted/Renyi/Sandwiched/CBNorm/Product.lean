@@ -21,7 +21,7 @@ final CB `1 → alpha` multiplicativity conclusion at source line 2240.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder Kronecker
 
 namespace QIT
 
@@ -557,7 +557,7 @@ private theorem alphaToAlphaPositiveValue_kron_product_eq_mul
     (Y : AlphaToAlphaPositiveDomain c (SchattenOrder.ofOneLt halpha)) :
     alphaToAlphaPositiveValue (MatrixMap.kron Phi Psi)
         (MatrixMap.IsCompletelyPositive.kron hPhi hPsi)
-        { matrix := Matrix.kronecker X.matrix Y.matrix,
+        { matrix := X.matrix ⊗ₖ Y.matrix,
           pos := X.pos.kronecker Y.pos,
           norm_pos := by
             rw [psdSchattenPNorm_kronecker X.pos Y.pos
@@ -574,19 +574,19 @@ private theorem alphaToAlphaPositiveValue_kron_product_eq_mul
   have halpha_pos : 0 < alpha := lt_trans zero_lt_one halpha
   have hnum :
       psdSchattenPNorm
-          (MatrixMap.kron Phi Psi (Matrix.kronecker X.matrix Y.matrix))
+          (MatrixMap.kron Phi Psi (X.matrix ⊗ₖ Y.matrix))
           (MatrixMap.isCompletelyPositive_mapsPositive (MatrixMap.kron Phi Psi)
-            hKron (Matrix.kronecker X.matrix Y.matrix)
+            hKron (X.matrix ⊗ₖ Y.matrix)
             (X.pos.kronecker Y.pos))
           (SchattenOrder.ofOneLt halpha) =
         psdSchattenPNorm
-          (Matrix.kronecker (Phi X.matrix) (Psi Y.matrix))
+          ((Phi X.matrix) ⊗ₖ (Psi Y.matrix))
           (hPhiX.kronecker hPsiY)
           (SchattenOrder.ofOneLt halpha) := by
     exact psdSchattenPNorm_congr
       (MatrixMap.kron_map_of_kron_state Phi Psi X.matrix Y.matrix)
       (MatrixMap.isCompletelyPositive_mapsPositive (MatrixMap.kron Phi Psi)
-        hKron (Matrix.kronecker X.matrix Y.matrix) (X.pos.kronecker Y.pos))
+        hKron (X.matrix ⊗ₖ Y.matrix) (X.pos.kronecker Y.pos))
       (hPhiX.kronecker hPsiY)
       (SchattenOrder.ofOneLt halpha)
   unfold alphaToAlphaPositiveValue
@@ -643,7 +643,7 @@ private theorem alphaToAlphaNorm_mul_le_kron
   intro Y
   let Z : AlphaToAlphaPositiveDomain (a × c)
       (SchattenOrder.ofOneLt halpha) :=
-    { matrix := Matrix.kronecker X.matrix Y.matrix,
+    { matrix := X.matrix ⊗ₖ Y.matrix,
       pos := X.pos.kronecker Y.pos,
       norm_pos := by
         rw [psdSchattenPNorm_kronecker X.pos Y.pos

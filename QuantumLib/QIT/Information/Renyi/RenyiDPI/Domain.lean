@@ -29,7 +29,7 @@ finite-channel power inequalities, and dual-parameter algebra.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal
 
 open Matrix
 
@@ -1317,8 +1317,8 @@ theorem sandwichedRenyiQ_kronecker_uniform_right [Nonempty b]
     {ρ σ : CMatrix a} (hρ : ρ.PosSemidef) (hσ : σ.PosSemidef)
     (α : ℝ) (hα_half : 1 / 2 < α) (hα_lt_one : α < 1) :
     sandwichedRenyiQ
-        (Matrix.kronecker ρ (MState.uniform : MState b).m)
-        (Matrix.kronecker σ (MState.uniform : MState b).m)
+        (ρ ⊗ₖ (MState.uniform : MState b).m)
+        (σ ⊗ₖ (MState.uniform : MState b).m)
         (hρ.kronecker (MState.uniform : MState b).psd)
         (hσ.kronecker (MState.uniform : MState b).psd) α =
       sandwichedRenyiQ ρ σ hρ hσ α := by
@@ -1332,13 +1332,13 @@ theorem sandwichedRenyiQ_kronecker_uniform_right [Nonempty b]
 right tensor factor. -/
 def localRightUnitary (U : Matrix.unitaryGroup b ℂ) :
     Matrix.unitaryGroup (a × b) ℂ :=
-  ⟨Matrix.kronecker (1 : CMatrix a) (U : CMatrix b), by
+  ⟨(1 : CMatrix a) ⊗ₖ (U : CMatrix b), by
     let I : Matrix.unitaryGroup a ℂ := ⟨1, by simp⟩
     simpa using Matrix.kronecker_mem_unitary I.2 U.2⟩
 
 @[simp] theorem localRightUnitary_coe (U : Matrix.unitaryGroup b ℂ) :
     (localRightUnitary (a := a) U : CMatrix (a × b)) =
-      Matrix.kronecker (1 : CMatrix a) (U : CMatrix b) := rfl
+      (1 : CMatrix a) ⊗ₖ (U : CMatrix b) := rfl
 
 /-- The low-`α` `Q` functional is invariant under unitary conjugation on the
 right tensor factor. -/

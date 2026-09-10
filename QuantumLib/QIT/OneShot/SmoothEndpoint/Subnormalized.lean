@@ -34,7 +34,7 @@ with the induced monotonicity of the endpoint values.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator NNReal Pointwise
+open scoped ComplexOrder MatrixOrder Kronecker Matrix.Norms.L2Operator NNReal Pointwise
 open scoped Topology
 open Matrix
 open Set Filter
@@ -129,13 +129,13 @@ min-entropy:
 `ρ_AB ≤ I_A ⊗ T_B`, with `T_B ≥ 0`. -/
 def ConditionalMinEntropyScaleFeasible
     (ρ : SubnormalizedState (a × b)) (T : CMatrix b) : Prop :=
-  T.PosSemidef ∧ ρ.matrix ≤ Matrix.kronecker (1 : CMatrix a) T
+  T.PosSemidef ∧ ρ.matrix ≤ (1 : CMatrix a) ⊗ₖ T
 
 @[simp]
 theorem ConditionalMinEntropyScaleFeasible_eq
     (ρ : SubnormalizedState (a × b)) (T : CMatrix b) :
     ConditionalMinEntropyScaleFeasible (a := a) ρ T ↔
-      T.PosSemidef ∧ ρ.matrix ≤ Matrix.kronecker (1 : CMatrix a) T :=
+      T.PosSemidef ∧ ρ.matrix ≤ (1 : CMatrix a) ⊗ₖ T :=
   Iff.rfl
 
 /-- Conditioning-register isometries transport raw subnormalized
@@ -156,15 +156,15 @@ theorem ConditionalMinEntropyScaleFeasible.apply_conditioningIsometry
     have hCP : MatrixMap.IsCompletelyPositive Φ :=
       MatrixMap.IsCompletelyPositive.kron (CPTPOp.id (dIn := a)).map_cp
         (MatrixMap.ofReferenceIsometry_isCompletelyPositive V)
-    have hdiff : (Matrix.kronecker (1 : CMatrix a) T - ρ.matrix).PosSemidef := hT.2
+    have hdiff : ((1 : CMatrix a) ⊗ₖ T - ρ.matrix).PosSemidef := hT.2
     have hmap := MatrixMap.isCompletelyPositive_mapsPositive Φ hCP
-      (Matrix.kronecker (1 : CMatrix a) T - ρ.matrix) hdiff
-    change ((Matrix.kronecker (1 : CMatrix a)
+      ((1 : CMatrix a) ⊗ₖ T - ρ.matrix) hdiff
+    change (((1 : CMatrix a) ⊗ₖ
         (MatrixMap.ofReferenceIsometry V T)) -
         (ρ.conditioningIsometryApply V).matrix).PosSemidef
     rw [conditioningIsometryApply_matrix]
     convert hmap using 1
-    simp only [Φ, map_sub, Matrix.kronecker]
+    simp only [Φ, map_sub]
     rw [MatrixMap.kron_map_of_kron_state]
     rw [MatrixMap.kron_id_ofReferenceIsometry_apply_eq_applyMatrixRight]
     simp [CPTPOp.id_map]
@@ -192,11 +192,11 @@ omit [Fintype b] [DecidableEq b] in
 private theorem referenceIsometry_applyMatrix_kronecker_one_right_eq
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
     (V : ReferenceIsometry a aPlus) (T : CMatrix b) :
-    V.applyMatrix (Matrix.kronecker (1 : CMatrix a) T) =
-      Matrix.kronecker (V.matrix * Matrix.conjTranspose V.matrix) T := by
+    V.applyMatrix ((1 : CMatrix a) ⊗ₖ T) =
+      (V.matrix * Matrix.conjTranspose V.matrix) ⊗ₖ T := by
   ext x y
   simp [ReferenceIsometry.applyMatrix, ReferenceIsometry.targetBlock,
-    Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.mul_apply,
+    Matrix.kroneckerMap_apply, Matrix.mul_apply,
     Matrix.one_apply, mul_assoc, mul_comm]
   rw [Finset.mul_sum]
 
@@ -204,23 +204,21 @@ omit [DecidableEq b] in
 private theorem referenceIsometry_applyMatrix_kronecker_one_right_le
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
     (V : ReferenceIsometry a aPlus) {T : CMatrix b} (hT : T.PosSemidef) :
-    V.applyMatrix (Matrix.kronecker (1 : CMatrix a) T) ≤
-      Matrix.kronecker (1 : CMatrix aPlus) T := by
+    V.applyMatrix ((1 : CMatrix a) ⊗ₖ T) ≤
+      (1 : CMatrix aPlus) ⊗ₖ T := by
   rw [Matrix.le_iff]
   have hproj :
       ((1 : CMatrix aPlus) - V.matrix * Matrix.conjTranspose V.matrix).PosSemidef := by
     simpa [Matrix.le_iff] using
       (referenceIsometry_rangeProjection_le_one (b := a) V)
-  have hkr : (Matrix.kronecker
-      ((1 : CMatrix aPlus) - V.matrix * Matrix.conjTranspose V.matrix) T).PosSemidef :=
+  have hkr : (((1 : CMatrix aPlus) - V.matrix * Matrix.conjTranspose V.matrix) ⊗ₖ T).PosSemidef :=
     hproj.kronecker hT
   have heq :
-      Matrix.kronecker (1 : CMatrix aPlus) T -
-          Matrix.kronecker (V.matrix * Matrix.conjTranspose V.matrix) T =
-        Matrix.kronecker
-          ((1 : CMatrix aPlus) - V.matrix * Matrix.conjTranspose V.matrix) T := by
+      (1 : CMatrix aPlus) ⊗ₖ T -
+          (V.matrix * Matrix.conjTranspose V.matrix) ⊗ₖ T =
+        ((1 : CMatrix aPlus) - V.matrix * Matrix.conjTranspose V.matrix) ⊗ₖ T := by
     ext x y
-    simp only [Matrix.sub_apply, Matrix.kronecker, Matrix.kroneckerMap_apply, sub_mul]
+    simp only [Matrix.sub_apply, Matrix.kroneckerMap_apply, sub_mul]
   rw [referenceIsometry_applyMatrix_kronecker_one_right_eq, heq]
   exact hkr
 
@@ -267,11 +265,11 @@ theorem ConditionalMinEntropyScaleFeasible.apply_sourceIsometry
     have hCP : MatrixMap.IsCompletelyPositive Φ :=
       MatrixMap.IsCompletelyPositive.kron (MatrixMap.ofReferenceIsometry_isCompletelyPositive V)
         (CPTPOp.id (dIn := b)).map_cp
-    have hdiff : (Matrix.kronecker (1 : CMatrix a) T - ρ.matrix).PosSemidef := hT.2
+    have hdiff : ((1 : CMatrix a) ⊗ₖ T - ρ.matrix).PosSemidef := hT.2
     have hmap := MatrixMap.isCompletelyPositive_mapsPositive Φ hCP
-      (Matrix.kronecker (1 : CMatrix a) T - ρ.matrix) hdiff
+      ((1 : CMatrix a) ⊗ₖ T - ρ.matrix) hdiff
     have himage :
-        (V.applyMatrix (Matrix.kronecker (1 : CMatrix a) T) -
+        (V.applyMatrix ((1 : CMatrix a) ⊗ₖ T) -
           (ρ.sourceIsometryApply V).matrix).PosSemidef := by
       convert hmap using 1
       simp only [Φ, map_sub]
@@ -280,7 +278,7 @@ theorem ConditionalMinEntropyScaleFeasible.apply_sourceIsometry
       rw [sourceIsometryApply_matrix]
     have hsource_le :
         (ρ.sourceIsometryApply V).matrix ≤
-          V.applyMatrix (Matrix.kronecker (1 : CMatrix a) T) := by
+          V.applyMatrix ((1 : CMatrix a) ⊗ₖ T) := by
       simpa [Matrix.le_iff] using himage
     exact hsource_le.trans
       (referenceIsometry_applyMatrix_kronecker_one_right_le (a := a) V hT.1)
@@ -471,17 +469,17 @@ theorem ConditionalMinEntropyScaleFeasible.compress_conditioningIsometry
       MatrixMap.IsCompletelyPositive.kron (CPTPOp.id (dIn := a)).map_cp
         (MatrixMap.ofKraus_completelyPositive (fun _ : Unit => Matrix.conjTranspose V.matrix))
     have hdiff :
-        (Matrix.kronecker (1 : CMatrix a) TPlus -
+        ((1 : CMatrix a) ⊗ₖ TPlus -
           (ρ.conditioningIsometryApply V).matrix).PosSemidef := hT.2
     have hmap := MatrixMap.isCompletelyPositive_mapsPositive Φ hCP
-      (Matrix.kronecker (1 : CMatrix a) TPlus -
+      ((1 : CMatrix a) ⊗ₖ TPlus -
         (ρ.conditioningIsometryApply V).matrix) hdiff
-    change (Matrix.kronecker (1 : CMatrix a)
+    change ((1 : CMatrix a) ⊗ₖ
         (Matrix.conjTranspose V.matrix * TPlus * V.matrix) -
         ρ.matrix).PosSemidef
     convert hmap using 1
     rw [conditioningIsometryApply_matrix]
-    simp only [Φ, Γ, map_sub, Matrix.kronecker]
+    simp only [Φ, Γ, map_sub]
     rw [MatrixMap.kron_map_of_kron_state]
     rw [referenceIsometry_rightCompression_applyMatrixRight]
     simp [CPTPOp.id_map, MatrixMap.ofKraus]
@@ -512,14 +510,14 @@ theorem ConditionalMinEntropyScaleFeasible.sourceIsometryCompressed
         (MatrixMap.ofKraus_completelyPositive (fun _ : Unit => Matrix.conjTranspose V.matrix))
         (CPTPOp.id (dIn := b)).map_cp
     have hdiff :
-        (Matrix.kronecker (1 : CMatrix aPlus) T - ρPlus.matrix).PosSemidef := hT.2
+        ((1 : CMatrix aPlus) ⊗ₖ T - ρPlus.matrix).PosSemidef := hT.2
     have hmap := MatrixMap.isCompletelyPositive_mapsPositive Φ hCP
-      (Matrix.kronecker (1 : CMatrix aPlus) T - ρPlus.matrix) hdiff
-    change (Matrix.kronecker (1 : CMatrix a) T -
+      ((1 : CMatrix aPlus) ⊗ₖ T - ρPlus.matrix) hdiff
+    change ((1 : CMatrix a) ⊗ₖ T -
         (ρPlus.sourceIsometryCompressed V).matrix).PosSemidef
     convert hmap using 1
     rw [sourceIsometryCompressed_matrix]
-    simp only [Φ, Γ, map_sub, Matrix.kronecker]
+    simp only [Φ, Γ, map_sub]
     rw [MatrixMap.kron_map_of_kron_state]
     rw [referenceIsometry_leftCompression_one]
     simp [CPTPOp.id_map, MatrixMap.ofKraus]
@@ -536,17 +534,17 @@ theorem ConditionalMinEntropyScaleFeasible.compress_sumInr
   · exact Matrix.sumBlock22_posSemidef hT.1
   · have hsub := hT.2.submatrix (fun x : a × b => (x.1, Sum.inr x.2))
     have heq :
-        (Matrix.kronecker (1 : CMatrix a) TPlus -
+        ((1 : CMatrix a) ⊗ₖ TPlus -
               (ρ.conditioningIsometryApply
                 (ReferenceIsometry.sumInr extra b)).matrix).submatrix
             (fun x : a × b => (x.1, Sum.inr x.2))
             (fun x : a × b => (x.1, Sum.inr x.2)) =
-          Matrix.kronecker (1 : CMatrix a) (Matrix.sumBlock22 TPlus) - ρ.matrix := by
+          (1 : CMatrix a) ⊗ₖ (Matrix.sumBlock22 TPlus) - ρ.matrix := by
       ext x y
-      simp [Matrix.kronecker, Matrix.sumBlock22, conditioningIsometryApply_matrix,
+      simp [Matrix.sumBlock22, conditioningIsometryApply_matrix,
         ReferenceIsometry.applyMatrixRight, ReferenceIsometry.rightBlock,
         ReferenceIsometry.sumInr, Matrix.mul_apply]
-    change (Matrix.kronecker (1 : CMatrix a) (Matrix.sumBlock22 TPlus) -
+    change ((1 : CMatrix a) ⊗ₖ (Matrix.sumBlock22 TPlus) -
       ρ.matrix).PosSemidef
     rw [← heq]
     exact hsub
@@ -570,15 +568,15 @@ theorem ConditionalMinEntropyScaleFeasible.conditioningSumInrCompressed
       MatrixMap.IsCompletelyPositive.kron (CPTPOp.id (dIn := a)).map_cp
         (MatrixMap.sumInrBlockCompression_traceNonincreasingCP
           (extra := extra) (α := b)).completelyPositive
-    have hdiff : (Matrix.kronecker (1 : CMatrix a) TPlus - ρPlus.matrix).PosSemidef := hT.2
+    have hdiff : ((1 : CMatrix a) ⊗ₖ TPlus - ρPlus.matrix).PosSemidef := hT.2
     have hmap := MatrixMap.isCompletelyPositive_mapsPositive Φ hCP
-      (Matrix.kronecker (1 : CMatrix a) TPlus - ρPlus.matrix) hdiff
-    change (Matrix.kronecker (1 : CMatrix a)
+      ((1 : CMatrix a) ⊗ₖ TPlus - ρPlus.matrix) hdiff
+    change ((1 : CMatrix a) ⊗ₖ
         (MatrixMap.sumInrBlockCompression (extra := extra) (α := b) TPlus) -
         ρPlus.conditioningSumInrCompressed.matrix).PosSemidef
     rw [conditioningSumInrCompressed_matrix]
     convert hmap using 1
-    simp only [Φ, map_sub, Matrix.kronecker]
+    simp only [Φ, map_sub]
     rw [MatrixMap.kron_map_of_kron_state]
     simp [CPTPOp.id_map]
 
@@ -791,10 +789,10 @@ theorem conditionalMinEntropyScaleFeasible_trace_lower_bound [Nonempty a]
     ρ.matrix.trace.re / (Fintype.card a : ℝ) ≤ T.trace.re := by
   have htrace := cMatrix_trace_re_le_of_le hT.2
   have hright :
-      (Matrix.kronecker (1 : CMatrix a) T).trace.re =
+      ((1 : CMatrix a) ⊗ₖ T).trace.re =
         (Fintype.card a : ℝ) * T.trace.re := by
-    rw [show Matrix.kronecker (1 : CMatrix a) T =
-        Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix a) T by rfl]
+    rw [show (1 : CMatrix a) ⊗ₖ T =
+        (1 : CMatrix a) ⊗ₖ T by rfl]
     rw [Matrix.trace_kronecker, Matrix.trace_one]
     simp [Complex.mul_re]
   rw [hright] at htrace
@@ -868,7 +866,7 @@ theorem conditionalMinEntropyScaleValue_le_exponentScale_of_conditionalMinEntrop
 
 theorem identityTensorStateMatrix_posSemidef (σ : SubnormalizedState b) :
     (identityTensorStateMatrix (a := a) σ).PosSemidef := by
-  change (Matrix.kronecker (1 : CMatrix a) σ.matrix).PosSemidef
+  change ((1 : CMatrix a) ⊗ₖ σ.matrix).PosSemidef
   exact Matrix.PosSemidef.one.kronecker σ.pos
 
 /-- A positive-trace raw scale feasible side operator gives a subnormalized
@@ -887,12 +885,12 @@ theorem ConditionalMinEntropyFeasible.of_scaleFeasible_trace_pos
       ((T.trace.re : ℂ) •
           identityTensorStateMatrix (a := a)
             (MState.ofPosSemidefTracePos T hT.1 htr).toSubnormalized) =
-        Matrix.kronecker (1 : CMatrix a) T := by
+        (1 : CMatrix a) ⊗ₖ T := by
     ext x y
     have htrC : ((T.trace.re : ℂ) ≠ 0) := by
       exact_mod_cast htr.ne'
     simp [identityTensorStateMatrix, MState.toSubnormalized,
-      MState.ofPosSemidefTracePos, Matrix.kronecker, Matrix.kroneckerMap_apply]
+      MState.ofPosSemidefTracePos, Matrix.kroneckerMap_apply]
     field_simp [htrC]
   rw [hrpow, hside]
   exact hT.2
@@ -938,15 +936,15 @@ theorem negLog2_image_conditionalMinEntropyScaleValueSet_eq_of_trace_pos
       exact Matrix.PosSemidef.smul
         (identityTensorStateMatrix_posSemidef (a := a) m.toSubnormalized) hpadC
     have hkr :
-        Matrix.kronecker (1 : CMatrix a) T =
+        (1 : CMatrix a) ⊗ₖ T =
           (c : ℂ) • identityTensorStateMatrix (a := a) σ +
             (pad : ℂ) • identityTensorStateMatrix (a := a) m.toSubnormalized := by
       ext x y
-      simp [T, identityTensorStateMatrix, Matrix.kronecker, Matrix.kroneckerMap_apply,
+      simp [T, identityTensorStateMatrix, Matrix.kroneckerMap_apply,
         MState.toSubnormalized, mul_add]
       ring
     have hle :
-        ρ.matrix ≤ Matrix.kronecker (1 : CMatrix a) T := by
+        ρ.matrix ≤ (1 : CMatrix a) ⊗ₖ T := by
       refine le_trans hfeas ?_
       rw [hkr]
       exact le_add_of_nonneg_right (by simpa [Matrix.le_iff] using hpad_id_pos)
@@ -1084,16 +1082,16 @@ theorem block_le_of_conditionalMinEntropyScaleFeasible
     Classical.block ρ.matrix x x ≤ T := by
   rw [Matrix.le_iff]
   have hdiff :
-      (Matrix.kronecker (1 : CMatrix a) T - ρ.matrix).PosSemidef := by
+      ((1 : CMatrix a) ⊗ₖ T - ρ.matrix).PosSemidef := by
     simpa [Matrix.le_iff] using hT.2
   have hblock := hdiff.submatrix (fun i : b => (x, i))
   have hblock_eq :
       Matrix.submatrix
-          (Matrix.kronecker (1 : CMatrix a) T - ρ.matrix)
+          ((1 : CMatrix a) ⊗ₖ T - ρ.matrix)
           (fun i : b => (x, i)) (fun i : b => (x, i)) =
         T - Classical.block ρ.matrix x x := by
     ext i j
-    simp [Classical.block, Matrix.kronecker, Matrix.kroneckerMap_apply]
+    simp [Classical.block, Matrix.kroneckerMap_apply]
   rwa [hblock_eq] at hblock
 
 /-- Build a subnormalized classical-quantum state from positive semidefinite
@@ -1661,11 +1659,11 @@ theorem ConditionalMinEntropyScaleFeasible.sourceBlockFilter
           block_le_of_conditionalMinEntropyScaleFeasible ρ T x hT
       · simpa [hp] using hT.1
     have hmatrix :
-        Matrix.kronecker (1 : CMatrix a) T - (ρ.sourceBlockFilter p).matrix =
+        (1 : CMatrix a) ⊗ₖ T - (ρ.sourceBlockFilter p).matrix =
           Classical.blockDiagonal
             (fun x : a => if p x then T - Classical.block ρ.matrix x x else T) := by
       calc
-        Matrix.kronecker (1 : CMatrix a) T - (ρ.sourceBlockFilter p).matrix =
+        (1 : CMatrix a) ⊗ₖ T - (ρ.sourceBlockFilter p).matrix =
             Classical.blockDiagonal (fun _ : a => T) -
               Classical.blockDiagonal
                 (fun x : a => if p x then Classical.block ρ.matrix x x else 0) := by
@@ -1795,12 +1793,12 @@ private theorem coordinateMeasure_map_apply (X : CMatrix a) (x x' : a) :
 /-- Source-coordinate pinching fixes every side-operator tensor `I_A ⊗ T_B`. -/
 theorem sourceCoordinatePinchChannel_map_identityTensor (T : CMatrix b) :
     (sourceCoordinatePinchChannel (a := a) (b := b)).map
-        (Matrix.kronecker (1 : CMatrix a) T) =
-      Matrix.kronecker (1 : CMatrix a) T := by
+        ((1 : CMatrix a) ⊗ₖ T) =
+      (1 : CMatrix a) ⊗ₖ T := by
   dsimp [sourceCoordinatePinchChannel]
   change (((POVM.measureDiscard (POVM.coordinate a)).prod (CPTPOp.id (dIn := b))).map
-      (Matrix.kronecker (1 : CMatrix a) T)) =
-    Matrix.kronecker (1 : CMatrix a) T
+      ((1 : CMatrix a) ⊗ₖ T)) =
+    (1 : CMatrix a) ⊗ₖ T
   rw [CPTPOp.prod_map_kronecker]
   rw [coordinateMeasure_map_one]
   rw [CPTPOp.idChannel_map]
@@ -1808,12 +1806,12 @@ theorem sourceCoordinatePinchChannel_map_identityTensor (T : CMatrix b) :
 /-- Source-coordinate pinching fixes a diagonal source block tensor. -/
 theorem sourceCoordinatePinchChannel_map_singleTensor (x : a) (T : CMatrix b) :
     (sourceCoordinatePinchChannel (a := a) (b := b)).map
-        (Matrix.kronecker (Matrix.single x x (1 : ℂ)) T) =
-      Matrix.kronecker (Matrix.single x x (1 : ℂ)) T := by
+        ((Matrix.single x x (1 : ℂ)) ⊗ₖ T) =
+      (Matrix.single x x (1 : ℂ)) ⊗ₖ T := by
   dsimp [sourceCoordinatePinchChannel]
   change (((POVM.measureDiscard (POVM.coordinate a)).prod (CPTPOp.id (dIn := b))).map
-      (Matrix.kronecker (Matrix.single x x (1 : ℂ)) T)) =
-    Matrix.kronecker (Matrix.single x x (1 : ℂ)) T
+      ((Matrix.single x x (1 : ℂ)) ⊗ₖ T)) =
+    (Matrix.single x x (1 : ℂ)) ⊗ₖ T
   rw [CPTPOp.prod_map_kronecker]
   rw [coordinateMeasure_map_single]
   rw [CPTPOp.idChannel_map]
@@ -1921,10 +1919,10 @@ theorem ConditionalMinEntropyScaleFeasible.sourceCoordinatePinch_of_sourceDeterm
         (block_le_of_conditionalMinEntropyScaleFeasible
           (ρ.sourceDeterministicPostprocess g) T (g x) hT)
     have hmatrix :
-        Matrix.kronecker (1 : CMatrix a) T - ρ.sourceCoordinatePinch.matrix =
+        (1 : CMatrix a) ⊗ₖ T - ρ.sourceCoordinatePinch.matrix =
           Classical.blockDiagonal (fun x => T - Classical.block ρ.matrix x x) := by
       calc
-        Matrix.kronecker (1 : CMatrix a) T - ρ.sourceCoordinatePinch.matrix =
+        (1 : CMatrix a) ⊗ₖ T - ρ.sourceCoordinatePinch.matrix =
             Classical.blockDiagonal (fun _ : a => T) -
               Classical.blockDiagonal (fun x => Classical.block ρ.matrix x x) := by
               rw [Classical.identityTensor_eq_blockDiagonal,
@@ -1974,12 +1972,12 @@ theorem ConditionalMinEntropyScaleFeasible.sourceCoordinatePinch
   · exact hT.1
   · let Φ : MatrixMap (a × b) (a × b) :=
       (sourceCoordinatePinchChannel (a := a) (b := b)).map
-    have hdiff : (Matrix.kronecker (1 : CMatrix a) T - ρ.matrix).PosSemidef :=
+    have hdiff : ((1 : CMatrix a) ⊗ₖ T - ρ.matrix).PosSemidef :=
       hT.2
     have hmap := MatrixMap.isCompletelyPositive_mapsPositive Φ
       (sourceCoordinatePinchChannel (a := a) (b := b)).map_cp
-      (Matrix.kronecker (1 : CMatrix a) T - ρ.matrix) hdiff
-    change (Matrix.kronecker (1 : CMatrix a) T - ρ.sourceCoordinatePinch.matrix).PosSemidef
+      ((1 : CMatrix a) ⊗ₖ T - ρ.matrix) hdiff
+    change ((1 : CMatrix a) ⊗ₖ T - ρ.sourceCoordinatePinch.matrix).PosSemidef
     rw [sourceCoordinatePinch_matrix]
     convert hmap using 1
     simp only [Φ, map_sub]
@@ -2138,16 +2136,16 @@ theorem ConditionalMinEntropyScaleFeasible.conditioningIsometryCompressed
     have hCP : MatrixMap.IsCompletelyPositive Φ :=
       MatrixMap.IsCompletelyPositive.kron (CPTPOp.id (dIn := a)).map_cp
         (MatrixMap.ofKraus_completelyPositive (fun _ : Unit => Matrix.conjTranspose V.matrix))
-    have hdiff : (Matrix.kronecker (1 : CMatrix a) TPlus - ρPlus.matrix).PosSemidef :=
+    have hdiff : ((1 : CMatrix a) ⊗ₖ TPlus - ρPlus.matrix).PosSemidef :=
       hT.2
     have hmap := MatrixMap.isCompletelyPositive_mapsPositive Φ hCP
-      (Matrix.kronecker (1 : CMatrix a) TPlus - ρPlus.matrix) hdiff
-    change (Matrix.kronecker (1 : CMatrix a)
+      ((1 : CMatrix a) ⊗ₖ TPlus - ρPlus.matrix) hdiff
+    change ((1 : CMatrix a) ⊗ₖ
         (Matrix.conjTranspose V.matrix * TPlus * V.matrix) -
         (ρPlus.conditioningIsometryCompressed V).matrix).PosSemidef
     rw [conditioningIsometryCompressed_matrix]
     convert hmap using 1
-    simp only [Φ, Γ, map_sub, Matrix.kronecker]
+    simp only [Φ, Γ, map_sub]
     rw [MatrixMap.kron_map_of_kron_state]
     simp [CPTPOp.id_map, MatrixMap.ofKraus]
 
@@ -2443,7 +2441,7 @@ private theorem rightBlock_identityTensorStateMatrix
       (((1 : CMatrix a) i j) • σ.matrix) := by
   ext x y
   simp [identityTensorStateMatrix, ReferenceIsometry.rightBlock,
-    Matrix.kronecker, Matrix.kroneckerMap_apply]
+    Matrix.kroneckerMap_apply]
 
 omit [Fintype a] in
 @[simp]
@@ -2456,7 +2454,7 @@ theorem identityTensorStateMatrix_referenceIsometryApply
   rw [ReferenceIsometry.applyMatrixRight]
   rw [rightBlock_identityTensorStateMatrix]
   simp [identityTensorStateMatrix, MatrixMap.ofReferenceIsometry_apply,
-    Matrix.kronecker, Matrix.kroneckerMap_apply]
+    Matrix.kroneckerMap_apply]
 
 @[simp]
 theorem identityTensorStateMatrix_sumInrCompressedSide
@@ -2469,7 +2467,7 @@ theorem identityTensorStateMatrix_sumInrCompressedSide
   ext x y
   rw [MatrixMap.kron_idChannel_left_apply_slice]
   simp [identityTensorStateMatrix, sumInrCompressedSide, MatrixMap.sumInrBlockCompression,
-    Matrix.kronecker, Matrix.kroneckerMap_apply]
+    Matrix.kroneckerMap_apply]
 
 omit [Fintype a] in
 private theorem sumBlock22_identityTensorStateMatrix_submatrix_prodSumRightEquiv
@@ -2482,7 +2480,7 @@ private theorem sumBlock22_identityTensorStateMatrix_submatrix_prodSumRightEquiv
   ext x y
   simp [Matrix.sumBlock22, ReferenceIsometry.prodSumRightEquiv,
     identityTensorStateMatrix, sumInrCompressedSide, MatrixMap.sumInrBlockCompression,
-    Matrix.kronecker, Matrix.kroneckerMap_apply]
+    Matrix.kroneckerMap_apply]
 
 private theorem sumBlock22_conditioning_matrix_submatrix_prodSumRightEquiv
     {extra : Type*} [Fintype extra] [DecidableEq extra]
@@ -3131,7 +3129,7 @@ theorem identityTensorStateMatrix_normalize_smul
   have hσC : ((σ.matrix.trace.re : ℂ) ≠ 0) := by
     exact_mod_cast hσ
   simp [identityTensorStateMatrix, MState.identityTensorStateMatrix,
-    SubnormalizedState.normalize_matrix, Matrix.kronecker, Matrix.kroneckerMap_apply]
+    SubnormalizedState.normalize_matrix, Matrix.kroneckerMap_apply]
   field_simp [hσC]
 
 theorem conditionalMaxEntropyExponentCandidate_eq_zero_of_side_trace_zero
@@ -3146,7 +3144,7 @@ theorem conditionalMaxEntropyExponentCandidate_eq_zero_of_side_trace_zero
     (Matrix.PosSemidef.trace_eq_zero_iff σ.pos).mp htrace
   have hside : identityTensorStateMatrix (a := a) σ = 0 := by
     ext x y
-    simp [identityTensorStateMatrix, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    simp [identityTensorStateMatrix, Matrix.kroneckerMap_apply,
       hσ_zero]
   unfold conditionalMaxEntropyExponentCandidate
   rw [hside]
@@ -3244,8 +3242,7 @@ theorem conditionalMaxEntropyExponentCandidate_uniform_pos_of_trace_pos
             (1 : CMatrix (a × b))) := by
       ext x y
       by_cases h1 : x.1 = y.1 <;> by_cases h2 : x.2 = y.2 <;>
-        simp [identityTensorStateMatrix, Matrix.kronecker,
-          Matrix.kroneckerMap_apply, Matrix.one_apply, Prod.ext_iff, h1, h2]
+        simp [identityTensorStateMatrix, Matrix.kroneckerMap_apply, Matrix.one_apply, Prod.ext_iff, h1, h2]
     rw [hid]
     exact psdSqrt_real_smul_one (a := a × b) hc_nonneg
   have htrace_eq :
@@ -3631,12 +3628,12 @@ theorem ConditionalMinEntropyScaleFeasible.ofStateScale
   constructor
   · exact Matrix.PosSemidef.smul hT.1 ht0
   · have hscaled := cMatrix_real_smul_le_smul (A := ρ.m)
-      (B := Matrix.kronecker (1 : CMatrix a) T) ht0 hT.2
+      (B := (1 : CMatrix a) ⊗ₖ T) ht0 hT.2
     have hkr :
-        Matrix.kronecker (1 : CMatrix a) (t • T) =
-          t • Matrix.kronecker (1 : CMatrix a) T := by
+        (1 : CMatrix a) ⊗ₖ (t • T) =
+          t • ((1 : CMatrix a) ⊗ₖ T) := by
       ext i j
-      simp [Matrix.kronecker, Matrix.kroneckerMap_apply, Complex.real_smul]
+      simp [Matrix.kroneckerMap_apply, Complex.real_smul]
       ring
     rw [SubnormalizedState.ofStateScale_matrix, hkr]
     exact hscaled
@@ -3651,12 +3648,12 @@ theorem ConditionalMinEntropyScaleFeasible.toStateScale
   · exact Matrix.PosSemidef.smul hT.1 (inv_nonneg.mpr ht.le)
   · have hscaled := cMatrix_real_smul_le_smul
       (A := (SubnormalizedState.ofStateScale ρ t ht.le ht1).matrix)
-      (B := Matrix.kronecker (1 : CMatrix a) T)
+      (B := (1 : CMatrix a) ⊗ₖ T)
       (inv_nonneg.mpr ht.le) hT.2
     convert hscaled using 1
     · simp [smul_smul, ht.ne']
     · ext i j
-      simp [Matrix.kronecker, Matrix.kroneckerMap_apply, Complex.real_smul]
+      simp [Matrix.kroneckerMap_apply, Complex.real_smul]
       ring
 
 theorem conditionalMinEntropyScaleValueSet_ofStateScale

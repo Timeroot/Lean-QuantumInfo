@@ -20,7 +20,7 @@ sandwiched Renyi divergence and mutual information.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Topology
+open scoped ComplexOrder MatrixOrder Kronecker Topology
 open Filter
 
 noncomputable section
@@ -1045,9 +1045,9 @@ theorem kwPurificationStateMatrix_trace_eq_one (ρ : MState a) :
     (1 : CMatrix a) (1 : CMatrix a)
   simp only [Matrix.mul_one,
     show (1 : CMatrix a).transpose = 1 from Matrix.transpose_one] at hep
-  have hK1K1 : Matrix.kronecker (1 : CMatrix a) (1 : CMatrix a) =
+  have hK1K1 : (1 : CMatrix a) ⊗ₖ (1 : CMatrix a) =
       (1 : CMatrix (a × a)) := by
-    simp [Matrix.kronecker]
+    simp
   rw [hK1K1, Matrix.mul_one, hstarK, hK_sq, ρ.tr'] at hep
   exact hep.symm
 
@@ -1077,13 +1077,13 @@ theorem kw_vectorization_eq
     ((ρ.sqrtMatrix * CFC.rpow σ γ * ρ.sqrtMatrix *
         CFC.rpow τ (-γ)).trace).re =
       ((kwPurificationStateMatrix ρ *
-        CFC.rpow (Matrix.kronecker τ⁻¹ σ.transpose) γ).trace).re := by
+        CFC.rpow (τ⁻¹ ⊗ₖ σ.transpose) γ).trace).re := by
   have hτ_inv : (τ⁻¹ : CMatrix a).PosDef := hτ.inv
   have hσT : σ.transpose.PosDef := hσ.transpose
   -- Expand `(τ⁻¹ ⊗ σᵀ)^γ = τ^{-γ} ⊗ (σ^γ)ᵀ` via PosDef Kronecker + transpose.
   have hKron_rpow :
-      CFC.rpow (Matrix.kronecker τ⁻¹ σ.transpose) γ =
-        Matrix.kronecker (CFC.rpow τ (-γ)) (CFC.rpow σ γ).transpose := by
+      CFC.rpow (τ⁻¹ ⊗ₖ σ.transpose) γ =
+        (CFC.rpow τ (-γ)) ⊗ₖ (CFC.rpow σ γ).transpose := by
     rw [cMatrix_rpow_kronecker hτ_inv.posSemidef hσT.posSemidef γ]
     rw [cMatrix_rpow_nonsing_inv_eq_rpow_neg hτ γ]
     rw [cMatrix_rpow_transpose_posDef hσ γ]
@@ -1110,7 +1110,7 @@ theorem kw_vectorization_eq_highAlpha
     ((ρ.sqrtMatrix * CFC.rpow σ ((1 - α) / α) * ρ.sqrtMatrix *
         CFC.rpow τ ((α - 1) / α)).trace).re =
       ((kwPurificationStateMatrix ρ *
-        CFC.rpow (Matrix.kronecker τ⁻¹ σ.transpose) ((1 - α) / α)).trace).re := by
+        CFC.rpow (τ⁻¹ ⊗ₖ σ.transpose) ((1 - α) / α)).trace).re := by
   have hγ : -((1 - α) / α) = (α - 1) / α := by ring
   rw [← hγ]
   exact kw_vectorization_eq ρ hσ hτ (γ := (1 - α) / α)
@@ -1351,7 +1351,7 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_mono_posDef_reference_posDef_
       sandwichedRenyiPSDReferenceHighAlphaFinite ρ σ hσ.posSemidef γ.1 =
         ⨆ τ : ι, (γ.1 / (γ.1 - 1)) *
           log2 ((kwPurificationStateMatrix ρ *
-            CFC.rpow (Matrix.kronecker τ.1⁻¹ σ.transpose) ((1 - γ.1) / γ.1)).trace).re := by
+            CFC.rpow (τ.1⁻¹ ⊗ₖ σ.transpose) ((1 - γ.1) / γ.1)).trace).re := by
     intro γ
     have hγ : 1 < γ.1 := γ.2
     have hγ_pos : 0 < γ.1 := lt_trans zero_lt_one hγ
@@ -1414,17 +1414,17 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_mono_posDef_reference_posDef_
           CFC.rpow τ.1 ((γ.1 - 1) / γ.1)).trace).re =
       (γ.1 / (γ.1 - 1)) *
         log2 ((kwPurificationStateMatrix ρ *
-          CFC.rpow (Matrix.kronecker τ.1⁻¹ σ.transpose) ((1 - γ.1) / γ.1)).trace).re
+          CFC.rpow (τ.1⁻¹ ⊗ₖ σ.transpose) ((1 - γ.1) / γ.1)).trace).re
     rw [kw_vectorization_eq_highAlpha (α := γ.1) ρ hσ τ.2.1]
   have hper_tau : ∀ τ : ι,
       (α / (α - 1)) *
         log2 ((kwPurificationStateMatrix ρ *
-          CFC.rpow (Matrix.kronecker τ.1⁻¹ σ.transpose) ((1 - α) / α)).trace).re ≤
+          CFC.rpow (τ.1⁻¹ ⊗ₖ σ.transpose) ((1 - α) / α)).trace).re ≤
       (β / (β - 1)) *
         log2 ((kwPurificationStateMatrix ρ *
-          CFC.rpow (Matrix.kronecker τ.1⁻¹ σ.transpose) ((1 - β) / β)).trace).re := by
+          CFC.rpow (τ.1⁻¹ ⊗ₖ σ.transpose) ((1 - β) / β)).trace).re := by
     intro τ
-    have hXpd : (Matrix.kronecker τ.1⁻¹ σ.transpose).PosDef :=
+    have hXpd : (τ.1⁻¹ ⊗ₖ σ.transpose).PosDef :=
       (τ.2.1.inv).kronecker hσ.transpose
     have hkw := kw_state_rpowTrace_alphaObjective_mono
       (kwPurificationState ρ) hXpd ⟨α, hα⟩ ⟨β, hβ⟩ hab
@@ -1432,11 +1432,11 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_mono_posDef_reference_posDef_
     have halg : ∀ γ : {γ : ℝ // 1 < γ},
         (γ.1 / (γ.1 - 1)) *
             log2 ((kwPurificationStateMatrix ρ *
-                CFC.rpow (Matrix.kronecker τ.1⁻¹ σ.transpose)
+                CFC.rpow (τ.1⁻¹ ⊗ₖ σ.transpose)
                   ((1 - γ.1) / γ.1)).trace).re =
           -((Real.log
                 ((kwPurificationStateMatrix ρ *
-                    CFC.rpow (Matrix.kronecker τ.1⁻¹ σ.transpose)
+                    CFC.rpow (τ.1⁻¹ ⊗ₖ σ.transpose)
                       ((1 - γ.1) / γ.1)).trace).re /
               ((1 - γ.1) / γ.1)) / Real.log 2) := by
       intro γ
@@ -1459,7 +1459,7 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_mono_posDef_reference_posDef_
         (hM'pd β).posSemidef ⟨β, lt_trans zero_lt_one hβ⟩), ?_⟩
   rintro _ ⟨τ, rfl⟩
   have hpos : 0 < ((kwPurificationStateMatrix ρ *
-      CFC.rpow (Matrix.kronecker τ.1⁻¹ σ.transpose) ((1 - β) / β)).trace).re := by
+      CFC.rpow (τ.1⁻¹ ⊗ₖ σ.transpose) ((1 - β) / β)).trace).re := by
     rw [← kw_vectorization_eq_highAlpha (α := β) ρ hσ τ.2.1]
     have hτpd : (CFC.rpow τ.1 ((β - 1) / β)).PosDef :=
       cMatrix_rpow_posDef_of_posDef τ.2.1 ((β - 1) / β)
@@ -1467,7 +1467,7 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_mono_posDef_reference_posDef_
   have hupper := psd_trace_rpow_holder_variational_upper
     (hM'pd β).posSemidef τ.2.1.posSemidef τ.2.2 (hhc β hβ) rfl
   have hCJ : ((kwPurificationStateMatrix ρ *
-      CFC.rpow (Matrix.kronecker τ.1⁻¹ σ.transpose) ((1 - β) / β)).trace).re =
+      CFC.rpow (τ.1⁻¹ ⊗ₖ σ.transpose) ((1 - β) / β)).trace).re =
       ((ρ.sqrtMatrix * CFC.rpow σ ((1 - β) / β) * ρ.sqrtMatrix *
         CFC.rpow τ.1 (1 / (β / (β - 1)))).trace).re := by
     rw [← kw_vectorization_eq_highAlpha (α := β) ρ hσ τ.2.1,

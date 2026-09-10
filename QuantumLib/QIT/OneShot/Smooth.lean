@@ -1567,8 +1567,7 @@ theorem identityTensorStateMatrix_ofStateScale
     identityTensorStateMatrix (a := a) (ofStateScale σ t ht0 ht1) =
       t • MState.identityTensorStateMatrix (a := a) σ := by
   ext i j
-  simp [identityTensorStateMatrix, MState.identityTensorStateMatrix, Matrix.kronecker,
-    Matrix.kroneckerMap_apply, Complex.real_smul]
+  simp [identityTensorStateMatrix, MState.identityTensorStateMatrix, Matrix.kroneckerMap_apply, Complex.real_smul]
   ring
 
 /-- Two subnormalized bipartite states are complementary pure marginals when
