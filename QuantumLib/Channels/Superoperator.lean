@@ -5,2463 +5,525 @@ Authors: Kazumi Kasaura, Hayata Yamasaki
 -/
 
 import QuantumLib.States.Qudit
+import QuantumInfo.Channels.Bundled
+import QuantumInfo.ForMathlib.PartialTrace
+import Mathlib.Analysis.Complex.Order
 import Mathlib.Analysis.InnerProductSpace.TensorProduct
-import Mathlib.Analysis.InnerProductSpace.PiL2
 import Mathlib.Analysis.InnerProductSpace.Trace
 import Mathlib.LinearAlgebra.Matrix.ToLin
-import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.PiProd
+
+/-!
+# Superoperators between qudits
+
+A linear map between the operator algebras of two qudits is an `OpMap ℋ₁ ℋ₂`, and a quantum
+channel is a `CPTPOp ℋ₁ ℋ₂`. This file collects the qudit-specific tools built on top of those.
+
+* `Qudit` instances for tensor products and for `EuclideanSpace ℂ κ`.
+* `outerProduct u v`, the rank-one operator `|v⟩⟨u|`.
+* `matEquiv bE bF`, the matrix of an operator `ℋ₁ →L[ℂ] ℋ₂` in orthonormal bases of the source
+  and the target. This is the rectangular counterpart of `StdBasis.toMatOf`, and it is what
+  transports the Kraus theory of `MatrixMap` to operator maps: `krausTerm V` is conjugation
+  `A ↦ V A V†`, `toMatOf_krausTerm` identifies its matrix with `MatrixMap.conj`, and
+  `exists_kraus` is the Kraus decomposition of a completely positive `OpMap`.
+* `isCompletelyPositive_add` and `isCompletelyPositive_smul`, closure of complete positivity under
+  sums and nonnegative scalings, and `CPTPOp.convexComb`, the convex combination of two channels.
+* `TrLeft` and `TrRight`, the partial traces, as bundled operator maps over
+  `ContinuousLinearMap.traceLeft` and `ContinuousLinearMap.traceRight`.
+* `opTensorEquiv : L (ℋ₁ ⊗[ℂ] ℋ₂) ≃ₗ[ℂ] L ℋ₁ ⊗[ℂ] L ℋ₂`, and `conjugateEnd` for transporting
+  operators along an isomorphism of the underlying spaces.
+* `krausToStinespringOperator`, the Stinespring operator of a Kraus family, and `trRight_kraus`,
+  which recovers the channel from it.
+-/
 
 namespace QuantumChannel
 
-open QuantumState
-open TensorProduct
+open QuantumState TensorProduct
+open scoped Matrix ComplexOrder
 
 universe u v w
 
-section Definition
-
--- The set of linear maps
-abbrev T (ℋ₁ : Type u) (ℋ₂ : Type v)
-  [AddCommGroup ℋ₁] [Module ℂ ℋ₁] [AddCommGroup ℋ₂] [Module ℂ ℋ₂] : Type (max u v) :=
-  (L ℋ₁) →ₗ[ℂ] (L ℋ₂)
-
-
--- The structure of quantum channels
-structure CPTP (ℋ₁ : Type u) (ℋ₂ : Type v) [Qudit ℋ₁] [Qudit ℋ₂]
-  extends CompletelyPositiveMap (L ℋ₁) (L ℋ₂) where
-  trace_map (ρ : L ℋ₁) : Tr ρ = Tr (toFun ρ)
-
-variable {ℋ₁ : Type u} {ℋ₂ : Type v} [Qudit ℋ₁] [Qudit ℋ₂]
-variable {ι : Type*} [DecidableEq ι] [Fintype ι]
-
--- def: Partial trace (1.121) https://cs.uwaterloo.ca/~watrous/TQI/TQI.1.pdf
--- Tr₂(X) for X ∈ L(ℋ₁⊗ℋ₂)
-
-noncomputable instance : Qudit (ℋ₁ ⊗[ℂ] ℋ₂) := by
-  letI : Module.Finite ℂ (ℋ₁ ⊗[ℂ] ℋ₂) := inferInstance
-  exact
-    { toNormedAddCommGroup := inferInstance
-      toInnerProductSpace := inferInstance
-      toCompleteSpace := inferInstance
-      fg_top := Module.Finite.fg_top }
-
-noncomputable instance {κ : Type u} [Fintype κ] [DecidableEq κ] :
-    Qudit (EuclideanSpace ℂ κ) := by
-  letI : Module.Finite ℂ (EuclideanSpace ℂ κ) :=
-    Module.Finite.of_basis (EuclideanSpace.basisFun κ ℂ).toBasis
-  exact
-    { toNormedAddCommGroup := inferInstance
-      toInnerProductSpace := inferInstance
-      toCompleteSpace := inferInstance
-      fg_top := Module.Finite.fg_top }
-
-noncomputable def l_tensor_equiv {ℋ₁ : Type u} {ℋ₂ : Type v} [Qudit ℋ₁] [Qudit ℋ₂] :
-  (L (ℋ₁ ⊗[ℂ] ℋ₂)) ≃ₗ[ℂ] (L ℋ₁ ⊗[ℂ] L ℋ₂) :=
-  ((dualTensorHomEquiv ℂ (ℋ₁ ⊗[ℂ] ℋ₂) (ℋ₁ ⊗[ℂ] ℋ₂)).symm : LinearEquiv (RingHom.id ℂ) _ _).trans <|
-  ((dualDistribEquiv ℂ ℋ₁ ℋ₂).symm.rTensor (ℋ₁ ⊗[ℂ] ℋ₂)).trans <|
-  (TensorProduct.assoc ℂ (Module.Dual ℂ ℋ₁ ⊗[ℂ] Module.Dual ℂ ℋ₂) ℋ₁ ℋ₂).symm.trans <|
-  ((TensorProduct.assoc ℂ (Module.Dual ℂ ℋ₁) (Module.Dual ℂ ℋ₂) ℋ₁).rTensor ℋ₂).trans <|
-  (((TensorProduct.comm ℂ (Module.Dual ℂ ℋ₂) ℋ₁).lTensor (Module.Dual ℂ ℋ₁)).rTensor ℋ₂).trans <|
-  ((TensorProduct.assoc ℂ (Module.Dual ℂ ℋ₁) ℋ₁ (Module.Dual ℂ ℋ₂)).symm.rTensor ℋ₂).trans <|
-  (TensorProduct.assoc ℂ (Module.Dual ℂ ℋ₁ ⊗[ℂ] ℋ₁) (Module.Dual ℂ ℋ₂) ℋ₂).trans <|
-  (TensorProduct.congr (dualTensorHomEquiv ℂ ℋ₁ ℋ₁) (dualTensorHomEquiv ℂ ℋ₂ ℋ₂))
-
--- It may be neccesary to add some lemmas to use l_tensor_equiv effectively
-
-noncomputable def Tr₂ : T (ℋ₁ ⊗[ℂ] ℋ₂) ℋ₂ :=
-  (TensorProduct.lid ℂ (L ℋ₂)).toLinearMap
-  ∘ₗ (TensorProduct.map Tr LinearMap.id)
-  ∘ₗ l_tensor_equiv.toLinearMap
-
-lemma Tr₂_l_tensor_equiv_symm_tmul
-    (X : L ℋ₁) (Y : L ℋ₂) :
-    Tr₂ ((l_tensor_equiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂)).symm (X ⊗ₜ[ℂ] Y)) = (Tr X) • Y := by
-  simp [Tr₂]
-
-lemma l_tensor_equiv_symm_tmul_aux
-    {E : Type u} {F : Type v} [Qudit E] [Qudit F]
-    (u : Module.Dual ℂ E ⊗[ℂ] E)
-    (v : Module.Dual ℂ F ⊗[ℂ] F) :
-    (l_tensor_equiv (ℋ₁ := E) (ℋ₂ := F)).symm
-        ((dualTensorHom ℂ E E u) ⊗ₜ[ℂ] (dualTensorHom ℂ F F v)) =
-      TensorProduct.map (dualTensorHom ℂ E E u) (dualTensorHom ℂ F F v) := by
-  induction u using TensorProduct.induction_on with
-  | zero =>
-      simp [TensorProduct.map_zero_left]
-  | tmul f p =>
-      induction v using TensorProduct.induction_on with
-      | zero =>
-          simp [TensorProduct.map_zero_right]
-      | tmul g q =>
-          ext x y
-          simp [l_tensor_equiv, TensorProduct.map, smul_smul]
-      | add v₁ v₂ hv₁ hv₂ =>
-          simp [TensorProduct.tmul_add, map_add, TensorProduct.map_add_right, hv₁, hv₂]
-  | add u₁ u₂ hu₁ hu₂ =>
-      simp [TensorProduct.add_tmul, map_add, TensorProduct.map_add_left, hu₁, hu₂]
-
-lemma l_tensor_equiv_symm_tmul
-    {E : Type u} {F : Type v} [Qudit E] [Qudit F]
-    (B : L E) (C : L F) :
-    (l_tensor_equiv (ℋ₁ := E) (ℋ₂ := F)).symm (B ⊗ₜ[ℂ] C) =
-      TensorProduct.map B C := by
-  let bE := Module.Free.chooseBasis ℂ E
-  let bF := Module.Free.chooseBasis ℂ F
-  let u : Module.Dual ℂ E ⊗[ℂ] E := (dualTensorHomEquivOfBasis bE).symm B
-  let v : Module.Dual ℂ F ⊗[ℂ] F := (dualTensorHomEquivOfBasis bF).symm C
-  have hu : dualTensorHom ℂ E E u = B := by
-    simp [u]
-  have hv : dualTensorHom ℂ F F v = C := by
-    simp [v]
-  rw [← hu, ← hv]
-  exact l_tensor_equiv_symm_tmul_aux (E := E) (F := F) u v
-
-lemma l_tensor_equiv_map_tmul
-    {E : Type u} {F : Type v} [Qudit E] [Qudit F]
-    (B : L E) (C : L F) :
-    (l_tensor_equiv (ℋ₁ := E) (ℋ₂ := F)) (TensorProduct.map B C) =
-      B ⊗ₜ[ℂ] C := by
-  apply (l_tensor_equiv (ℋ₁ := E) (ℋ₂ := F)).symm.injective
-  rw [LinearEquiv.symm_apply_apply]
-  exact (l_tensor_equiv_symm_tmul (E := E) (F := F) B C).symm
-
-lemma Tr₂_l_tensor_equiv_symm_tmul_nonneg
-    (X : L ℋ₁) (Y : L ℋ₂) (hX : 0 ≤ X) (hY : 0 ≤ Y) :
-    0 ≤ Tr₂ ((l_tensor_equiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂)).symm (X ⊗ₜ[ℂ] Y)) := by
-  rw [Tr₂_l_tensor_equiv_symm_tmul]
-  exact (LinearMap.nonneg_iff_isPositive _).mpr <|
-    ((LinearMap.nonneg_iff_isPositive Y).mp hY).smul_of_nonneg
-      ((LinearMap.nonneg_iff_isPositive X).mp hX).trace_nonneg
-
-lemma Tr₂_sum_l_tensor_equiv_symm_tmul_nonneg
-    {κ : Type u} [Fintype κ]
-    (X : κ → L ℋ₁) (Y : κ → L ℋ₂)
-    (hX : ∀ a, 0 ≤ X a) (hY : ∀ a, 0 ≤ Y a) :
-    0 ≤ Tr₂
-      (∑ a : κ,
-        (l_tensor_equiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂)).symm ((X a) ⊗ₜ[ℂ] (Y a))) := by
-  rw [map_sum]
-  exact Finset.sum_nonneg fun a _ =>
-    Tr₂_l_tensor_equiv_symm_tmul_nonneg (X a) (Y a) (hX a) (hY a)
-
--- def: vec(A) (1.127) https://cs.uwaterloo.ca/~watrous/TQI/TQI.1.pdf
--- vec[|u⟩⟨v|] := |u⟩⊗|v⟩ : (ℋ₁ →L[ℂ] ℋ₂) → ℋ₂⊗ℋ₁
-noncomputable def vec (b : Module.Basis ι ℂ ℋ₂) :
-  (ℋ₂ →ₗ[ℂ] ℋ₁) →ₗ[ℂ] (ℋ₁ ⊗[ℂ] ℋ₂) :=
-  (TensorProduct.comm ℂ ℋ₂ ℋ₁)
-  ∘ₗ (TensorProduct.map b.toDualEquiv.symm.toLinearMap LinearMap.id)
-  ∘ₗ (dualTensorHomEquiv ℂ ℋ₂ ℋ₁).symm.toLinearMap
-
-noncomputable def vecLinearEquiv (b : Module.Basis ι ℂ ℋ₂) :
-    (ℋ₂ →ₗ[ℂ] ℋ₁) ≃ₗ[ℂ] (ℋ₁ ⊗[ℂ] ℋ₂) :=
-  (dualTensorHomEquiv ℂ ℋ₂ ℋ₁).symm.trans <|
-    (TensorProduct.congr b.toDualEquiv.symm (LinearEquiv.refl ℂ ℋ₁)).trans <|
-      TensorProduct.comm ℂ ℋ₂ ℋ₁
-
-lemma vecLinearEquiv_toLinearMap (b : Module.Basis ι ℂ ℋ₂) :
-    (vecLinearEquiv (ℋ₁ := ℋ₁) b).toLinearMap = vec b := by
-  ext A
-  simp [vecLinearEquiv, vec, TensorProduct.congr]
-
--- (1.131) (1.132) https://cs.uwaterloo.ca/~watrous/TQI/TQI.1.pdf
--- Lemma 5.12 http://www.ueltschi.org/AZschool/notes/EricCarlen.pdf
--- For any qudit ℋ, any A,B ∈ L(ℋ), and any K ∈ L(ℋ),
--- ⟨ vec[K] ∣ (A ⊗ B) vec[K] ⟩ = Tr[K† A K B.transpose]
-noncomputable def l_transpose (b : Module.Basis ι ℂ ℋ₁)
-  (A : L ℋ₁) : L ℋ₁ :=
-  b.toDualEquiv.symm.toLinearMap ∘ₗ A.dualMap ∘ₗ b.toDualEquiv.toLinearMap
-
-lemma dualTensorHom_map
-    {R : Type*} [CommSemiring R]
-    {M M' N N' : Type*}
-    [AddCommMonoid M] [AddCommMonoid M'] [AddCommMonoid N] [AddCommMonoid N']
-    [Module R M] [Module R M'] [Module R N] [Module R N']
-    (f : M' →ₗ[R] M) (g : N →ₗ[R] N')
-    (x : (Module.Dual R M) ⊗[R] N) :
-    (dualTensorHom R M' N') (TensorProduct.map f.dualMap g x)
-      = g ∘ₗ (dualTensorHom R M N x) ∘ₗ f := by
-  refine TensorProduct.induction_on x ?h0 ?htmul ?hadd
-  · simp
-  · intro φ n
-    -- 両辺とも線形写像なので ext で点ごとに見る
-    ext m'
-    -- `map_tmul`, `dualTensorHom_apply`, `dualMap_apply` を simp で畳む
-    simp [dualTensorHom_apply]
-  · intro x y hx hy
-    simp only [map_add, hx, hy]
-    ext _
-    simp
-
-lemma dualTensorHomEquiv_symm_map
-    {R : Type*} [CommSemiring R]
-    {M M' N N' : Type*}
-    [AddCommMonoid M] [AddCommMonoid M'] [AddCommMonoid N] [AddCommMonoid N']
-    [Module R M] [Module R M'] [Module R N] [Module R N']
-    [Module.Free R M] [Module.Finite R M]
-    [Module.Free R M'] [Module.Finite R M']
-    (f : M' →ₗ[R] M) (g : N →ₗ[R] N')
-    (K : M →ₗ[R] N) :
-    TensorProduct.map f.dualMap g ((dualTensorHomEquiv R M N).symm K)
-      = (dualTensorHomEquiv R M' N').symm (g ∘ₗ K ∘ₗ f) := by
-  -- `dualTensorHomEquiv` は線形同型なので injective で Hom 側に落とす
-  apply (dualTensorHomEquiv R M' N').injective
-  -- `dualTensorHomEquiv` の forward は `dualTensorHom` なので、上の lemma で終わる
-  simpa [dualTensorHomEquiv] using
-    (dualTensorHom_map (R := R) (M := M) (M' := M') (N := N) (N' := N') f g
-      ((dualTensorHomEquiv R M N).symm K))
-
-lemma dual_comm {R : Type*} [CommSemiring R]
-    {M : Type*} [AddCommMonoid M] [Module R M] [Module.Free R M]
-    (b : Module.Basis ι R M) (x y : M) :
-  (b.toDual x) y = (b.toDual y) x := by
-  rw [←(Module.Basis.sum_equivFun b x)]
-  rw [map_sum, map_sum, LinearMap.sum_apply]
-  congr
-  ext i
-  rw [map_smul, map_smul, LinearMap.smul_apply]
-  congr 1
-  rw [←(Module.Basis.sum_equivFun b y)]
-  rw [map_sum, map_sum, LinearMap.sum_apply]
-  congr
-  ext j
-  rw [map_smul, map_smul, LinearMap.smul_apply]
-  congr 1
-  rw [b.toDual_apply, b.toDual_apply]
-  congr 1
-  exact Eq.propIntro (fun a ↦ id (Eq.symm a)) fun a ↦ id (Eq.symm a)
-
-lemma dual_symm_comm {R : Type*} [CommSemiring R]
-    {M : Type*} [AddCommMonoid M] [Module R M] [Module.Free R M]
-    (b : Module.Basis ι R M) (x y : Module.Dual R M) :
-  x (b.toDualEquiv.symm y) = y (b.toDualEquiv.symm x) := by
-  nth_rw 1 [(by simp : x = b.toDualEquiv (b.toDualEquiv.symm x))]
-  nth_rw 2 [(by simp : y = b.toDualEquiv (b.toDualEquiv.symm y))]
-  rw [b.toDualEquiv_apply]
-  apply dual_comm
-
-lemma comp_dual_equiv_symm_eq (b : Module.Basis ι ℂ ℋ₂)
-  (B : L ℋ₂) : B ∘ₗ b.toDualEquiv.symm.toLinearMap
-    = ((Module.evalEquiv ℂ ℋ₂).symm.toLinearMap ∘ₗ
-      ((l_transpose b B) ∘ₗ b.toDualEquiv.symm.toLinearMap).dualMap) := by
-  ext x
-  dsimp only [l_transpose]
-  apply (Module.evalEquiv ℂ ℋ₂).injective
-  simp only [LinearMap.coe_comp, LinearEquiv.coe_coe, Function.comp_apply, Module.evalEquiv_apply,
-    LinearEquiv.apply_symm_apply]
-  ext y
-  simp only [Module.Dual.eval_apply, LinearMap.dualMap_apply',
-    LinearMap.coe_comp, LinearEquiv.coe_coe,
-    Function.comp_apply, LinearEquiv.apply_symm_apply]
-  have hxy := dual_symm_comm b (y ∘ₗ B) x
-  simpa using hxy
-
-lemma dual_equiv_symm_eq (b : Module.Basis ι ℂ ℋ₂)
-  : b.toDualEquiv.symm.toLinearMap
-    = ((Module.evalEquiv ℂ ℋ₂).symm.toLinearMap ∘ₗ (b.toDualEquiv.symm.toLinearMap).dualMap) := by
-  let := comp_dual_equiv_symm_eq b (I ℋ₂)
-  simp only [LinearMap.id_comp, l_transpose, LinearMap.dualMap_id, LinearEquiv.comp_coe,
-    LinearEquiv.self_trans_symm,
-    LinearEquiv.refl_toLinearMap] at this
-  exact this
-
-lemma map_vec_eq_vec (b : Module.Basis ι ℂ ℋ₂)
-  (A : L ℋ₁) (B : L ℋ₂) (K : ℋ₂ →ₗ[ℂ] ℋ₁) :
-  (TensorProduct.map A B) (vec b K) = vec b (A ∘ₗ K ∘ₗ (l_transpose b B)) := by
-  simp only [vec, LinearMap.coe_comp, LinearEquiv.coe_coe, Function.comp_apply]
-  rw [map_comm]
-  congr 1
-  rw [map_map]
-  simp only [LinearMap.comp_id]
-  nth_rw 2 [dual_equiv_symm_eq]
-  rw [(by simp : LinearMap.id = LinearMap.id ∘ₗ LinearMap.id), map_comp]
-  rw [comp_dual_equiv_symm_eq]
-  rw [(by simp : A = LinearMap.id ∘ₗ A), map_comp]
-  simp only [LinearMap.coe_comp, Function.comp_apply]
-  congr 1
-  rw [dualTensorHomEquiv_symm_map, dualTensorHomEquiv_symm_map]
-  rfl
-
-lemma vec_apply (b : Module.Basis ι ℂ ℋ₂)
-  (C : ℋ₂ →ₗ[ℂ] ℋ₁) :
-  vec b C = ∑ i : ι, (C (b i)) ⊗ₜ[ℂ] (b i) := by
-  obtain ⟨u, rfl⟩ := (dualTensorHomEquiv ℂ ℋ₂ ℋ₁).surjective C
-  induction u with
-  | zero => simp
-  | add u v hu hv =>
-    simp only [map_add, hu, hv, LinearMap.add_apply, TensorProduct.add_tmul,
-      Finset.sum_add_distrib]
-  | tmul f y =>
-    have hf : b.toDualEquiv.symm f = ∑ i : ι, f (b i) • b i := by
-      apply b.toDualEquiv.injective
-      simp [map_sum, Module.Basis.coe_toDual_self]
-    have hvec : vec b (dualTensorHomEquiv ℂ ℋ₂ ℋ₁ (f ⊗ₜ[ℂ] y))
-        = y ⊗ₜ[ℂ] (b.toDualEquiv.symm f) := by
-      simp [vec]
-    rw [hvec, hf]
-    simp [TensorProduct.tmul_sum, TensorProduct.smul_tmul']
-
-lemma inner_vec_eq_trace
-  (b : OrthonormalBasis ι ℂ ℋ₂)
-  (A B : ℋ₂ →ₗ[ℂ] ℋ₁) :
-  inner ℂ (vec b.toBasis A) (vec b.toBasis B) = Tr (A† ∘ₗ B) := by
-  calc
-    inner ℂ (vec b.toBasis A) (vec b.toBasis B)
-        = ∑ i : ι, inner ℂ (A (b i)) (B (b i)) := by
-      simp [vec_apply, inner_sum, sum_inner, b.inner_eq_ite]
-    _ = ∑ i : ι, inner ℂ (b i) ((A† ∘ₗ B) (b i)) := by
-      simp [LinearMap.comp_apply, LinearMap.adjoint_inner_right]
-    _ = ∑ i : ι, b.toBasis.coord i ((A† ∘ₗ B) (b i)) := by
-      refine Finset.sum_congr rfl ?_
-      intro i hi
-      have hcoord : b.toBasis.coord i = (innerSL ℂ (b i)).toLinearMap := by
-        ext j
-        simp [b.repr_apply_apply]
-      simp [hcoord]
-    _ = Tr (A† ∘ₗ B) := by
-      simp [Tr, LinearMap.trace_eq_matrix_trace (b := b.toBasis) (f := A† ∘ₗ B),
-        Matrix.trace, LinearMap.toMatrix_apply]
-
-lemma ando_identity (b : OrthonormalBasis ι ℂ ℋ₂)
-  (A : L ℋ₁) (B : L ℋ₂) (K : ℋ₂ →ₗ[ℂ] ℋ₁) :
-  inner ℂ (vec b.toBasis K) ((TensorProduct.map A B) (vec b.toBasis K))
-    = Tr (K† ∘ₗ A ∘ₗ K ∘ₗ (l_transpose b.toBasis B)) := by
-  rw [map_vec_eq_vec]
-  apply inner_vec_eq_trace
-
--- def: Choi operator (2.64) https://cs.uwaterloo.ca/~watrous/TQI/TQI.2.pdf
--- J(Φ) := (Φ⊗id)(vec[I(ℋ₂⊗ℋ₁)] vec[I(ℋ₂⊗ℋ₁)]†) for Φ ∈ T(ℋ₁,ℋ₂)
-
--- (1.57) in https://cs.uwaterloo.ca/~watrous/TQI/TQI.1.pdf
-noncomputable def outer_product
-  (u : ℋ₁) (v : ℋ₂) : ℋ₁ →ₗ[ℂ] ℋ₂ :=
-  (dualTensorHomEquiv ℂ ℋ₁ ℋ₂).toLinearMap <|
-    ((InnerProductSpace.toDualMap ℂ ℋ₁ u) ⊗ₜ[ℂ] v)
-
-lemma outer_product_eq_rankOne
-    (u : ℋ₁) (v : ℋ₂) :
-    outer_product u v = (InnerProductSpace.rankOne ℂ v u).toLinearMap := by
-  ext x
-  simp [outer_product, dualTensorHom_apply]
-
-lemma outer_product_self_nonneg
-    (u : ℋ₁) :
-    0 ≤ outer_product u u := by
-  rw [outer_product_eq_rankOne]
-  have hcont : (InnerProductSpace.rankOne ℂ u u).IsPositive :=
-    InnerProductSpace.isPositive_rankOne_self (𝕜 := ℂ) u
-  exact (LinearMap.nonneg_iff_isPositive _).mpr <|
-    (LinearMap.isPositive_toContinuousLinearMap_iff _).mp hcont
-
-lemma outer_product_sum
-    {κ : Type*} [Fintype κ]
-    (x y : κ → ℋ₁) :
-    outer_product (∑ a : κ, x a) (∑ a : κ, y a) =
-      ∑ a : κ, ∑ b : κ, outer_product (x a) (y b) := by
-  ext z
-  simp [outer_product_eq_rankOne]
-
-lemma Tr₂_simple_outer_product_sum_nonneg
-    {κ : Type u} [Fintype κ]
-    (x : κ → ℋ₁) (y : κ → ℋ₂) :
-    0 ≤ Tr₂
-      (∑ a : κ,
-        (l_tensor_equiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂)).symm
-          ((outer_product (x a) (x a)) ⊗ₜ[ℂ] (outer_product (y a) (y a)))) := by
-  exact Tr₂_sum_l_tensor_equiv_symm_tmul_nonneg
-    (fun a => outer_product (x a) (x a))
-    (fun a => outer_product (y a) (y a))
-    (fun a => outer_product_self_nonneg (x a))
-    (fun a => outer_product_self_nonneg (y a))
-
-noncomputable def choi (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) : L (ℋ₂ ⊗[ℂ] ℋ₁) :=
-  (l_tensor_equiv.symm.toLinearMap
-  ∘ₗ (TensorProduct.map Φ LinearMap.id)
-  ∘ₗ l_tensor_equiv.toLinearMap) (outer_product (vec b (I ℋ₁)) (vec b (I ℋ₁)))
-
-end Definition
-
-section RepresentationsOfChannels
+section Instances
 
 variable {ℋ₁ : Type u} {ℋ₂ : Type v} [Qudit ℋ₁] [Qudit ℋ₂]
 
--- Proposition 2.17 https://cs.uwaterloo.ca/~watrous/TQI/TQI.2.pdf
--- For any qudit ℋ, and any P ∈ Pos(ℋ),
--- the map Φ(α):=αP ∈ T(ℂ,ℋ) is a completely positive ContinuourLinearMap.
-
--- Proposition 2.18 and its remark https://cs.uwaterloo.ca/~watrous/TQI/TQI.2.pdf
--- For any qudits ℋ₁, ℋ₂, and any Φ ∈ T(ℋ₁,ℋ₂),
--- if Φ is a completely positive ContinuourLinearMap,
--- the adjoint map of Φ is a completely positive ContinuourLinearMap.
-
--- Corollary 2.19 https://cs.uwaterloo.ca/~watrous/TQI/TQI.2.pdf
--- For any qudit ℋ, Tr ∈ T(ℋ,ℂ) is a completely positive ContinuourLinearMap.
-
--- Proposition 2.20 https://cs.uwaterloo.ca/~watrous/TQI/TQI.2.pdf
--- For any qudits ℋ₁, ℋ₂, and any Φ ∈ T(ℋ₁,ℋ₂),
--- J(Φ)=∑_{a∈Σ} vec(Aₐ) vec(Bₐ)†
--- if and only if
--- for ℋ₃=ℂ^Σ, A,B∈(ℋ₁→L[ℂ]ℋ₂⊗ℋ₃) defined as
--- A=∑_{a∈Σ}Aₐ⊗eₐ,
--- B=∑_{a∈Σ}Aₐ⊗eₐ,
--- it holds for all X∈L(X) that
--- Φ(X)=Tr₃[Aₐ X Bₐ†]
-
--- Theorem 2.22 https://cs.uwaterloo.ca/~watrous/TQI/TQI.2.pdf
--- For any qudits ℋ₁, ℋ₂, and any Φ ∈ T(ℋ₁,ℋ₂), the following statements are equivalent:
--- 1: Φ is a completely positive ContinuosLinearMap;
--- 2: J(Φ) ∈ Pos(ℋ₂⊗ℋ₁);
--- 3: ∃qudit ℋ₃, ∃A∈(ℋ₁→L[ℂ]ℋ₂⊗ℋ₃), Φ(X)=Tr₃[A X A†]
-
-theorem isCompletelyPositive_iff_cstarMatrix_nonneg
-    (Φ : T ℋ₁ ℋ₂) :
-    (∃ Ψ : CompletelyPositiveMap (L ℋ₁) (L ℋ₂), Ψ.toLinearMap = Φ) ↔
-      ∀ (k : ℕ) (M : CStarMatrix (Fin k) (Fin k) (L ℋ₁)),
-        0 ≤ M → 0 ≤ M.map Φ := by
-  constructor
-  · rintro ⟨Ψ, rfl⟩ k M hM
-    exact Ψ.map_cstarMatrix_nonneg' k M hM
-  · intro hΦ
-    exact ⟨{ Φ with map_cstarMatrix_nonneg' := hΦ }, rfl⟩
-
-theorem card_nonzero_eigenvalues_eq_finrank_range
-    {E : Type u} [Qudit E] (T : L E) (hT : 0 ≤ T) :
-    let n := Module.finrank ℂ E
-    let hSym : T.IsSymmetric := (LinearMap.nonneg_iff_isPositive T).mp hT |>.isSymmetric
-    Fintype.card { i : Fin n // hSym.eigenvalues rfl i ≠ 0 } =
-      Module.finrank ℂ (LinearMap.range T) := by
-  classical
-  dsimp
-  let n := Module.finrank ℂ E
-  let hSym : T.IsSymmetric := (LinearMap.nonneg_iff_isPositive T).mp hT |>.isSymmetric
-  have hzero :
-      Fintype.card { i : Fin n // hSym.eigenvalues rfl i = 0 } =
-        Module.finrank ℂ (LinearMap.ker T) := by
-    have hzero' := hSym.card_filter_eigenvalues_eq (hn := rfl) (μ := (0 : ℝ))
-    have hker :
-        Module.finrank ℂ (Module.End.eigenspace T 0) = Module.finrank ℂ (LinearMap.ker T) := by
-      simpa using congrArg (fun S : Submodule ℂ E => Module.finrank ℂ S)
-        (Module.End.eigenspace_zero (R := ℂ) T)
-    simpa [Fintype.card_subtype] using hzero'.trans hker
-  have hcard :
-      Fintype.card { i : Fin n // hSym.eigenvalues rfl i ≠ 0 } =
-        n - Module.finrank ℂ (LinearMap.ker T) := by
-    rw [Fintype.card_subtype_compl]
-    simp [n, hzero]
-  rw [hcard]
-  exact by
-    simp [n, (Nat.eq_sub_of_add_eq (LinearMap.finrank_range_add_finrank_ker T)).symm]
-
-variable {ι : Type*} [DecidableEq ι] [Fintype ι]
-
-def IsPositiveMap (Φ : T ℋ₁ ℋ₂) : Prop :=
-  ∀ X : L ℋ₁, 0 ≤ X → 0 ≤ Φ X
-
-def IsKPositive (k : ℕ) (Φ : T ℋ₁ ℋ₂) : Prop :=
-  ∀ M : CStarMatrix (Fin k) (Fin k) (L ℋ₁), 0 ≤ M → 0 ≤ M.map Φ
-
-noncomputable def amplifyWithId (Φ : T ℋ₁ ℋ₂) : T (ℋ₁ ⊗[ℂ] ℋ₁) (ℋ₂ ⊗[ℂ] ℋ₁) :=
-  l_tensor_equiv.symm.toLinearMap
-    ∘ₗ (TensorProduct.map Φ LinearMap.id)
-    ∘ₗ l_tensor_equiv.toLinearMap
-
-def IsCompletelyPositive (Φ : T ℋ₁ ℋ₂) : Prop :=
-  ∃ Ψ : CompletelyPositiveMap (L ℋ₁) (L ℋ₂), Ψ.toLinearMap = Φ
-
-abbrev DS (k : ℕ) (ℋ : Type u) := PiLp 2 (fun _ : Fin k => ℋ)
-
-noncomputable instance dsFiniteDimensional (k : ℕ) (ℋ : Type u) [Qudit ℋ] :
-    FiniteDimensional ℂ (DS k ℋ) :=
-  ((PiLp.continuousLinearEquiv 2 ℂ (fun _ : Fin k => ℋ)).symm.toLinearEquiv).finiteDimensional
-
-noncomputable instance dsQudit (k : ℕ) (ℋ : Type u) [Qudit ℋ] : Qudit (DS k ℋ) where
+/-- A tensor product of qudits is a qudit. -/
+noncomputable instance : Qudit (ℋ₁ ⊗[ℂ] ℋ₂) where
   toNormedAddCommGroup := inferInstance
   toInnerProductSpace := inferInstance
-  toCompleteSpace := inferInstance
-  fg_top := by
-    let : Module.Finite ℂ (DS k ℋ) := dsFiniteDimensional k ℋ
-    simpa using (Module.Finite.fg_top (R := ℂ) (M := DS k ℋ))
+  fg_top := Module.Finite.fg_top
 
-noncomputable def ampPlainEquiv (k : ℕ) (ℋ : Type u) [Qudit ℋ] :
-    L (DS k ℋ) ≃ₐ[ℂ] Matrix (Fin k) (Fin k) (L ℋ) :=
-  ((PiLp.continuousLinearEquiv 2 ℂ (fun _ : Fin k => ℋ)).toLinearEquiv.conjAlgEquiv ℂ).trans
-    (endVecAlgEquivMatrixEnd (ι := Fin k) (R := ℂ) (A := ℂ) (M := ℋ))
+/-- `EuclideanSpace ℂ κ` is a qudit for finite `κ`; this is the concrete qudit the Kraus and
+Stinespring constructions use for the environment. -/
+noncomputable instance {κ : Type u} [Fintype κ] : Qudit (EuclideanSpace ℂ κ) where
+  toNormedAddCommGroup := inferInstance
+  toInnerProductSpace := inferInstance
+  fg_top := Module.Finite.fg_top
 
-lemma ampPlainEquiv_apply_apply
-    (k : ℕ) (ℋ : Type u) [Qudit ℋ]
-    (f : L (DS k ℋ)) (i j : Fin k) (x : ℋ) :
-    ampPlainEquiv k ℋ f i j x =
-      (PiLp.continuousLinearEquiv 2 ℂ (fun _ : Fin k => ℋ))
-        (f (((PiLp.continuousLinearEquiv 2 ℂ (fun _ : Fin k => ℋ)).symm) (Pi.single j x))) i := by
+end Instances
+
+section OuterProduct
+
+variable {ℋ₁ : Type u} {ℋ₂ : Type v} [Qudit ℋ₁] [Qudit ℋ₂]
+
+/-- The rank-one operator `|v⟩⟨u| : x ↦ ⟪u, x⟫ • v`. See (1.57) of
+<https://cs.uwaterloo.ca/~watrous/TQI/TQI.1.pdf>. -/
+noncomputable abbrev outerProduct (u : ℋ₁) (v : ℋ₂) : ℋ₁ →L[ℂ] ℋ₂ :=
+  InnerProductSpace.rankOne ℂ v u
+
+/-- `|v⟩⟨u|` sends `x` to `⟪u, x⟫ • v`. -/
+@[simp]
+theorem outerProduct_apply (u : ℋ₁) (v : ℋ₂) (x : ℋ₁) :
+    outerProduct u v x = (inner ℂ u x : ℂ) • v :=
   rfl
 
-lemma inner_symm_single
-    (k : ℕ) (ℋ : Type u) [Qudit ℋ]
-    (v : DS k ℋ) (i : Fin k) (x : ℋ) :
-    inner ℂ v (((PiLp.continuousLinearEquiv 2 ℂ (fun _ : Fin k => ℋ)).symm) (Pi.single i x)) =
-      inner ℂ (v i) x := by
-  rw [PiLp.inner_apply]
-  classical
-  rw [Finset.sum_eq_single i]
-  · simp
-  · intro j _ hji
-    simp [hji]
-  · intro hi
-    simp at hi
+/-- The adjoint of `|v⟩⟨u|` is `|u⟩⟨v|`. -/
+theorem adjoint_outerProduct (u : ℋ₁) (v : ℋ₂) : (outerProduct u v)† = outerProduct v u :=
+  InnerProductSpace.adjoint_rankOne v u
 
-lemma inner_single_symm
-    (k : ℕ) (ℋ : Type u) [Qudit ℋ]
-    (i : Fin k) (x : ℋ) (v : DS k ℋ) :
-    inner ℂ (((PiLp.continuousLinearEquiv 2 ℂ (fun _ : Fin k => ℋ)).symm) (Pi.single i x)) v =
-      inner ℂ x (v i) := by
-  rw [PiLp.inner_apply]
-  classical
-  rw [Finset.sum_eq_single i]
-  · simp
-  · intro j _ hji
-    simp [hji]
-  · intro hi
-    simp at hi
+/-- `|u⟩⟨u|` is positive. -/
+theorem outerProduct_self_nonneg (u : ℋ₁) : 0 ≤ outerProduct u u :=
+  (ContinuousLinearMap.nonneg_iff_isPositive _).mpr (InnerProductSpace.isPositive_rankOne_self u)
 
-lemma inner_coord_right
-    (k : ℕ) (ℋ : Type u) [Qudit ℋ]
-    (z : DS k ℋ) (i : Fin k) (y : ℋ) :
-    inner ℂ ((PiLp.continuousLinearEquiv 2 ℂ (fun _ : Fin k => ℋ)) z i) y =
-      inner ℂ z (((PiLp.continuousLinearEquiv 2 ℂ (fun _ : Fin k => ℋ)).symm) (Pi.single i y)) := by
-  simpa using (inner_symm_single (k := k) (ℋ := ℋ) (v := z) (i := i) (x := y)).symm
+/-- The outer product is bilinear, so it expands over sums in both arguments. -/
+theorem outerProduct_sum {κ : Type*} [Fintype κ] (x y : κ → ℋ₁) :
+    outerProduct (∑ a : κ, x a) (∑ a : κ, y a) =
+      ∑ a : κ, ∑ b : κ, outerProduct (x a) (y b) := by
+  refine ContinuousLinearMap.ext fun z ↦ ?_
+  simp
 
-lemma inner_coord_left
-    (k : ℕ) (ℋ : Type u) [Qudit ℋ]
-    (i : Fin k) (x : ℋ) (z : DS k ℋ) :
-    inner ℂ x ((PiLp.continuousLinearEquiv 2 ℂ (fun _ : Fin k => ℋ)) z i) =
-      inner ℂ (((PiLp.continuousLinearEquiv 2 ℂ (fun _ : Fin k => ℋ)).symm) (Pi.single i x)) z := by
-  simpa using (inner_single_symm (k := k) (ℋ := ℋ) (i := i) (x := x) (v := z)).symm
+/-- `|v⟩⟨u|` has trace `⟪u, v⟫`. -/
+@[simp]
+theorem trace_outerProduct {E : Type u} [Qudit E] (u v : E) : Tr (outerProduct u v) = inner ℂ u v :=
+  InnerProductSpace.trace_rankOne v u
 
-lemma ampPlainEquiv_map_star
-    (k : ℕ) (ℋ : Type u) [Qudit ℋ]
-    (f : L (DS k ℋ)) :
-    ampPlainEquiv k ℋ (star f) = star (ampPlainEquiv k ℋ f) := by
-  ext i j x
-  apply ext_inner_right ℂ
-  intro y
-  rw [ampPlainEquiv_apply_apply, Matrix.star_apply]
-  have hstar :
-      inner ℂ ((star ((ampPlainEquiv k ℋ) f j i)) x) y =
-        inner ℂ x ((ampPlainEquiv k ℋ f j i) y) := by
-    change inner ℂ (((ampPlainEquiv k ℋ f j i)†) x) y =
-      inner ℂ x ((ampPlainEquiv k ℋ f j i) y)
-    simpa using
-      (LinearMap.adjoint_inner_left (A := ampPlainEquiv k ℋ f j i) (x := y) (y := x))
-  rw [hstar, ampPlainEquiv_apply_apply, inner_coord_right, inner_coord_left]
-  simpa [LinearMap.star_eq_adjoint] using
-    (LinearMap.adjoint_inner_left
-      (A := f)
-      (x := ((PiLp.continuousLinearEquiv 2 ℂ (fun _ : Fin k => ℋ)).symm (Pi.single i y)))
-      (y := ((PiLp.continuousLinearEquiv 2 ℂ (fun _ : Fin k => ℋ)).symm (Pi.single j x))))
+/-- Every operator is the sum of the rank-one operators `|T bᵢ⟩⟨bᵢ|` over an orthonormal basis. -/
+theorem linearMap_eq_sum_outerProduct {E : Type u} [Qudit E] {ι : Type*} [Fintype ι]
+    (b : OrthonormalBasis ι ℂ E) (T : L E) : T = ∑ i : ι, outerProduct (b i) (T (b i)) := by
+  refine ContinuousLinearMap.ext fun x ↦ ?_
+  rw [sum_apply]
+  conv_lhs => rw [← b.sum_repr' x]
+  simp
 
-noncomputable def ampMatrixStarAlgEquiv (k : ℕ) (ℋ : Type u) [Qudit ℋ] :
-    L (DS k ℋ) ≃⋆ₐ[ℂ] Matrix (Fin k) (Fin k) (L ℋ) :=
-  StarAlgEquiv.ofAlgEquiv (ampPlainEquiv k ℋ) (ampPlainEquiv_map_star (k := k) (ℋ := ℋ))
+/-- An operator with the same trace pairing as the identity *is* the identity. -/
+theorem eq_one_of_Tr_mul {E : Type u} [Qudit E] {S : L E} (h : ∀ X : L E, Tr (S * X) = Tr X) :
+    S = 1 := by
+  refine ContinuousLinearMap.ext fun v ↦ ext_inner_left ℂ fun w ↦ ?_
+  have hmul : S * outerProduct w v = outerProduct w (S v) :=
+    ContinuousLinearMap.ext fun x ↦ by simp
+  have hv := h (outerProduct w v)
+  rw [hmul, trace_outerProduct, trace_outerProduct] at hv
+  exact hv
 
-noncomputable def ampCStarEquiv (k : ℕ) (ℋ : Type u) [Qudit ℋ] :
-    L (DS k ℋ) ≃⋆ₐ[ℂ] CStarMatrix (Fin k) (Fin k) (L ℋ) :=
-  (ampMatrixStarAlgEquiv k ℋ).trans CStarMatrix.ofMatrixStarAlgEquiv
+end OuterProduct
 
-noncomputable def ampSuper
-    (k : ℕ) (Φ : T ℋ₁ ℋ₂) : T (DS k ℋ₁) (DS k ℋ₂) :=
-  (ampCStarEquiv k ℋ₂).symm.toAlgEquiv.toLinearMap ∘ₗ
-    (CStarMatrix.mapₗ Φ) ∘ₗ
-      (ampCStarEquiv k ℋ₁).toAlgEquiv.toLinearMap
+section Matrices
 
-lemma ampCStarEquiv_ampSuper_apply
-    (k : ℕ) (Φ : T ℋ₁ ℋ₂) (A : L (DS k ℋ₁)) :
-    ampCStarEquiv k ℋ₂ (ampSuper k Φ A) = (ampCStarEquiv k ℋ₁ A).map Φ := by
-  change
-    ampCStarEquiv k ℋ₂
-      ((ampCStarEquiv k ℋ₂).symm (((ampCStarEquiv k ℋ₁) A).map Φ)) =
-        ((ampCStarEquiv k ℋ₁) A).map Φ
-  exact (ampCStarEquiv k ℋ₂).apply_symm_apply _
+variable {ℋ₁ : Type u} {ℋ₂ : Type v} [Qudit ℋ₁] [Qudit ℋ₂]
+variable {ι : Type*} [Fintype ι] [DecidableEq ι] {κ : Type*} [Fintype κ] [DecidableEq κ]
 
-lemma starAlgEquiv_mem_nonnegClosure
-    {A B : Type*}
-    [Semiring A] [StarRing A] [Algebra ℂ A] [PartialOrder A] [StarOrderedRing A]
-    [Semiring B] [StarRing B] [Algebra ℂ B] [PartialOrder B] [StarOrderedRing B]
-    (e : A ≃⋆ₐ[ℂ] B) {x : A}
-    (hx : x ∈ AddSubmonoid.closure (Set.range fun s : A => star s * s)) :
-    e x ∈ AddSubmonoid.closure (Set.range fun t : B => star t * t) := by
-  induction hx using AddSubmonoid.closure_induction with
-  | mem y hy =>
-      obtain ⟨s, rfl⟩ := hy
-      refine AddSubmonoid.subset_closure ⟨e s, ?_⟩
-      simpa using congrArg (fun z => z * e s) (map_star e s).symm
-  | zero =>
-      rw [map_zero]
-      exact AddSubmonoid.zero_mem (AddSubmonoid.closure (Set.range fun t : B => star t * t))
-  | add y z _ _ ihy ihz =>
-      rw [map_add]
-      exact AddSubmonoid.add_mem (AddSubmonoid.closure (Set.range fun t : B => star t * t)) ihy ihz
+/-- The matrix of an operator in given orthonormal bases of the source and the target. This is the
+rectangular counterpart of `StdBasis.toMatOf`. -/
+noncomputable def matEquiv (bE : OrthonormalBasis ι ℂ ℋ₁) (bF : OrthonormalBasis κ ℂ ℋ₂) :
+    (ℋ₁ →L[ℂ] ℋ₂) ≃ₗ[ℂ] Matrix κ ι ℂ :=
+  LinearMap.toContinuousLinearMap.symm ≪≫ₗ LinearMap.toMatrix bE.toBasis bF.toBasis
 
-lemma starAlgEquiv_nonneg
-    {A B : Type*}
-    [Semiring A] [StarRing A] [Algebra ℂ A] [PartialOrder A] [StarOrderedRing A]
-    [Semiring B] [StarRing B] [Algebra ℂ B] [PartialOrder B] [StarOrderedRing B]
-    (e : A ≃⋆ₐ[ℂ] B) {x : A} (hx : 0 ≤ x) :
-    0 ≤ e x := by
-  refine StarOrderedRing.nonneg_iff.mpr ?_
-  exact starAlgEquiv_mem_nonnegClosure e (StarOrderedRing.nonneg_iff.mp hx)
+omit [DecidableEq κ] in
+/-- The `(i, j)` entry of the matrix of `V` is `⟪bF i, V (bE j)⟫`. -/
+@[simp]
+theorem matEquiv_apply (bE : OrthonormalBasis ι ℂ ℋ₁) (bF : OrthonormalBasis κ ℂ ℋ₂)
+    (V : ℋ₁ →L[ℂ] ℋ₂) (i : κ) (j : ι) : matEquiv bE bF V i j = inner ℂ (bF i) (V (bE j)) := by
+  simp [matEquiv, LinearMap.toMatrix_apply, OrthonormalBasis.coe_toBasis_repr_apply,
+    OrthonormalBasis.repr_apply_apply]
 
-lemma starAlgEquiv_nonneg_iff
-    {A B : Type*}
-    [Semiring A] [StarRing A] [Algebra ℂ A] [PartialOrder A] [StarOrderedRing A]
-    [Semiring B] [StarRing B] [Algebra ℂ B] [PartialOrder B] [StarOrderedRing B]
-    (e : A ≃⋆ₐ[ℂ] B) {x : A} :
-    0 ≤ e x ↔ 0 ≤ x := by
-  constructor
-  · intro hx
-    simpa using starAlgEquiv_nonneg e.symm hx
-  · intro hx
-    exact starAlgEquiv_nonneg e hx
+/-- Taking the adjoint of an operator conjugate-transposes its matrix. -/
+theorem matEquiv_conjTranspose (bE : OrthonormalBasis ι ℂ ℋ₁) (bF : OrthonormalBasis κ ℂ ℋ₂)
+    (V : ℋ₁ →L[ℂ] ℋ₂) : (matEquiv bE bF V)ᴴ = matEquiv bF bE (V†) := by
+  ext i j
+  rw [Matrix.conjTranspose_apply, matEquiv_apply, matEquiv_apply, RCLike.star_def, inner_conj_symm,
+    ContinuousLinearMap.adjoint_inner_right]
 
-lemma isKPositive_iff_isPositiveMap_ampSuper
-    (k : ℕ) (Φ : T ℋ₁ ℋ₂) :
-    IsKPositive k Φ ↔ IsPositiveMap (ampSuper k Φ) := by
-  constructor
-  · intro hΦ A hA
-    have hAmap :
-        0 ≤ ampCStarEquiv k ℋ₁ A := starAlgEquiv_nonneg (ampCStarEquiv k ℋ₁) hA
-    have hMap :
-        0 ≤ ampCStarEquiv k ℋ₂ (ampSuper k Φ A) := by
-      rw [ampCStarEquiv_ampSuper_apply]
-      exact hΦ _ hAmap
-    exact (starAlgEquiv_nonneg_iff (ampCStarEquiv k ℋ₂)).1 hMap
-  · intro hΦ M hM
-    let A : L (DS k ℋ₁) := (ampCStarEquiv k ℋ₁).symm M
-    have hMA : ampCStarEquiv k ℋ₁ A = M := by
-      simp [A]
-    have hA : 0 ≤ A := by
-      have hM' : 0 ≤ ampCStarEquiv k ℋ₁ A := by simpa [hMA] using hM
-      exact (starAlgEquiv_nonneg_iff (ampCStarEquiv k ℋ₁)).1 hM'
-    have hAmp : 0 ≤ ampSuper k Φ A := hΦ A hA
-    have hMap : 0 ≤ ampCStarEquiv k ℋ₂ (ampSuper k Φ A) :=
-      starAlgEquiv_nonneg (ampCStarEquiv k ℋ₂) hAmp
-    have hEq :
-        ampCStarEquiv k ℋ₂ (ampSuper k Φ A) = (ampCStarEquiv k ℋ₁ A).map Φ :=
-      ampCStarEquiv_ampSuper_apply (k := k) (Φ := Φ) (A := A)
-    simpa [hEq, hMA] using hMap
+/-- On a single space, read in one basis, `matEquiv` is `StdBasis.toMatOf`. -/
+theorem matEquiv_self (b : OrthonormalBasis ι ℂ ℋ₁) (A : L ℋ₁) :
+    matEquiv b b A = StdBasis.toMatOf b A := by
+  ext i j
+  rw [matEquiv_apply, StdBasis.toMatOf_apply]
 
-theorem completelyPositive_to_positiveMap
-    (Φ : T ℋ₁ ℋ₂) :
-    IsCompletelyPositive Φ → IsPositiveMap Φ := by
-  rintro ⟨Ψ, rfl⟩ X hX
-  exact map_nonneg Ψ hX
+end Matrices
 
-lemma conjugate_positive
-    {ℋ₃ : Type w} [Qudit ℋ₃]
-    (A : ℋ₁ →ₗ[ℂ] ℋ₃) :
-    IsPositiveMap
-      { toFun := fun X => A.comp (X.comp (LinearMap.adjoint A))
-        map_add' := by
-          intro X Y
-          ext x
-          simp
-        map_smul' := by
-          intro c X
-          ext x
-          simp } := by
-  intro X hX
-  exact (LinearMap.nonneg_iff_isPositive _).mpr <|
-    (LinearMap.nonneg_iff_isPositive X).mp hX |>.conj_adjoint A
+section Kraus
 
-lemma comp_outer_product_adjoint
-    {ℋ₃ : Type w} [Qudit ℋ₃]
-    (A : ℋ₁ →ₗ[ℂ] ℋ₃) (u v : ℋ₁) :
-    A.comp ((outer_product u v).comp (LinearMap.adjoint A)) =
-      outer_product (A u) (A v) := by
-  ext y
-  simp [outer_product_eq_rankOne, LinearMap.adjoint_inner_right]
+variable {ℋ₁ : Type u} {ℋ₂ : Type v} [Qudit ℋ₁] [Qudit ℋ₂]
+variable {ι : Type*} [Fintype ι] [DecidableEq ι] {κ : Type*} [Fintype κ] [DecidableEq κ]
 
-noncomputable def krausTerm
-    (V : ℋ₁ →ₗ[ℂ] ℋ₂) : T ℋ₁ ℋ₂ where
-  toFun := fun A => V ∘ₗ A ∘ₗ V†
-  map_add' := by
-    intro A B
-    ext x
-    simp [LinearMap.add_comp, LinearMap.comp_add]
-  map_smul' := by
-    intro c A
-    ext x
-    simp [LinearMap.smul_comp, LinearMap.comp_smul]
+/-- Conjugation by a single operator, `A ↦ V A V†`. Every completely positive map is a finite sum
+of these; see `QuantumChannel.exists_kraus`. -/
+noncomputable def krausTerm (V : ℋ₁ →L[ℂ] ℋ₂) : OpMap ℋ₁ ℋ₂ where
+  toFun A := V ∘L A ∘L V†
+  map_add' A B := by
+    simp [ContinuousLinearMap.comp_add, ContinuousLinearMap.add_comp]
+  map_smul' c A := by
+    simp [ContinuousLinearMap.smul_comp]
 
-lemma krausTerm_isPositiveMap
-    (V : ℋ₁ →ₗ[ℂ] ℋ₂) :
-    IsPositiveMap (krausTerm V) := by
-  intro A hA
-  have hAclm : A.toContinuousLinearMap.IsPositive :=
-    A.isPositive_toContinuousLinearMap_iff.mpr ((LinearMap.nonneg_iff_isPositive A).1 hA)
-  exact (ContinuousLinearMap.nonneg_iff_isPositive _).2 <| by
-    simpa [krausTerm, LinearMap.comp_assoc, LinearMap.star_eq_adjoint,
-      ContinuousLinearMap.coe_comp] using hAclm.conj_adjoint V.toContinuousLinearMap
-
-noncomputable def dsEquiv (k : ℕ) (ℋ : Type*) [Qudit ℋ] :
-    DS k ℋ ≃L[ℂ] (Fin k → ℋ) :=
-  PiLp.continuousLinearEquiv (p := (2 : ENNReal)) (𝕜 := ℂ) (β := fun _ : Fin k => ℋ)
-
-noncomputable def dsProj (k : ℕ) (ℋ : Type*) [Qudit ℋ] (i : Fin k) :
-    DS k ℋ →L[ℂ] ℋ :=
-  (ContinuousLinearMap.proj (R := ℂ) (φ := fun _ : Fin k => ℋ) i) ∘L
-    (dsEquiv k ℋ).toContinuousLinearMap
-
-noncomputable def dsIncl (k : ℕ) (ℋ : Type*) [Qudit ℋ] (i : Fin k) :
-    ℋ →L[ℂ] DS k ℋ :=
-  (dsEquiv k ℋ).symm.toContinuousLinearMap ∘L
-    (ContinuousLinearMap.single ℂ (fun _ : Fin k => ℋ) i)
-
-lemma dsProj_dsIncl_apply
-    (k : ℕ) (ℋ : Type*) [Qudit ℋ] (i j : Fin k) (x : ℋ) :
-    dsProj k ℋ i (dsIncl k ℋ j x) = if i = j then x else 0 := by
-  by_cases h : i = j
-  · subst h
-    simp [dsProj, dsIncl, dsEquiv]
-  · simp [dsProj, dsIncl, dsEquiv, h]
-
-lemma dsIncl_adjoint
-    (k : ℕ) (ℋ : Type*) [Qudit ℋ] (i : Fin k) :
-    (dsIncl k ℋ i).adjoint = dsProj k ℋ i := by
-  apply ContinuousLinearMap.ext
-  intro x
-  refine ext_inner_right ℂ fun y => ?_
-  rw [ContinuousLinearMap.adjoint_inner_left]
-  simpa [dsProj, dsIncl, dsEquiv] using
-    (inner_symm_single (k := k) (ℋ := ℋ) (v := x) (i := i) (x := y))
-
-lemma dsProj_adjoint
-    (k : ℕ) (ℋ : Type*) [Qudit ℋ] (i : Fin k) :
-    (dsProj k ℋ i).adjoint = dsIncl k ℋ i := by
-  calc
-    (dsProj k ℋ i).adjoint = ((dsIncl k ℋ i).adjoint).adjoint := by rw [dsIncl_adjoint]
-    _ = dsIncl k ℋ i := ContinuousLinearMap.adjoint_adjoint _
-
-noncomputable def ampKrausFactorCLM
-    (k : ℕ) (V : ℋ₁ →ₗ[ℂ] ℋ₂) : DS k ℋ₁ →L[ℂ] DS k ℋ₂ :=
-  ∑ i : Fin k, ((dsIncl k ℋ₂ i).comp V.toContinuousLinearMap).comp (dsProj k ℋ₁ i)
-
-noncomputable def ampKrausFactor
-    (k : ℕ) (V : ℋ₁ →ₗ[ℂ] ℋ₂) : DS k ℋ₁ →ₗ[ℂ] DS k ℋ₂ :=
-  (ampKrausFactorCLM k V).toLinearMap
-
-lemma dsProj_ampKrausFactorCLM
-    (k : ℕ) (V : ℋ₁ →ₗ[ℂ] ℋ₂) (i : Fin k) (x : DS k ℋ₁) :
-    dsProj k ℋ₂ i (ampKrausFactorCLM k V x) = V (dsProj k ℋ₁ i x) := by
-  classical
-  simp [ampKrausFactorCLM, dsProj_dsIncl_apply]
-
-lemma ampKrausFactorCLM_dsIncl
-    (k : ℕ) (V : ℋ₁ →ₗ[ℂ] ℋ₂) (i : Fin k) (x : ℋ₁) :
-    ampKrausFactorCLM k V (dsIncl k ℋ₁ i x) = dsIncl k ℋ₂ i (V x) := by
-  apply (dsEquiv k ℋ₂).injective
-  ext j
-  have h :=
-    dsProj_ampKrausFactorCLM (k := k) (V := V) (i := j) (x := dsIncl k ℋ₁ i x)
-  by_cases hji : j = i
-  · subst hji
-    simpa [dsProj, dsIncl, dsEquiv] using h
-  · simpa [dsProj, dsIncl, dsEquiv, hji] using h
-
-lemma ampKrausFactorCLM_adjoint_dsIncl
-    (k : ℕ) (V : ℋ₁ →ₗ[ℂ] ℋ₂) (i : Fin k) (x : ℋ₂) :
-    (ampKrausFactorCLM k V).adjoint (dsIncl k ℋ₂ i x) = dsIncl k ℋ₁ i (V.adjoint x) := by
-  classical
-  apply (dsEquiv k ℋ₁).injective
-  ext j
-  apply ext_inner_right ℂ
-  intro y
-  rw [show
-      inner ℂ
-          ((dsEquiv k ℋ₁) ((ampKrausFactorCLM k V).adjoint (dsIncl k ℋ₂ i x)) j) y =
-        inner ℂ
-          (dsProj k ℋ₁ j ((ampKrausFactorCLM k V).adjoint (dsIncl k ℋ₂ i x))) y by
-      rfl]
-  rw [show
-      inner ℂ ((dsEquiv k ℋ₁) (dsIncl k ℋ₁ i (V.adjoint x)) j) y =
-        inner ℂ (dsProj k ℋ₁ j (dsIncl k ℋ₁ i (V.adjoint x))) y by
-      rfl]
-  by_cases hji : j = i
-  · subst j
-    calc
-      inner ℂ
-          (dsProj k ℋ₁ i ((ampKrausFactorCLM k V).adjoint (dsIncl k ℋ₂ i x))) y =
-        inner ℂ ((ampKrausFactorCLM k V).adjoint (dsIncl k ℋ₂ i x))
-          (dsIncl k ℋ₁ i y) := by
-          simpa [dsIncl_adjoint] using
-            (ContinuousLinearMap.adjoint_inner_left
-              (A := dsIncl k ℋ₁ i)
-              (x := y)
-              (y := (ampKrausFactorCLM k V).adjoint (dsIncl k ℋ₂ i x)))
-      _ = inner ℂ (dsIncl k ℋ₂ i x)
-          (ampKrausFactorCLM k V (dsIncl k ℋ₁ i y)) := by
-          exact ContinuousLinearMap.adjoint_inner_left
-            (A := ampKrausFactorCLM k V)
-            (x := dsIncl k ℋ₁ i y)
-            (y := dsIncl k ℋ₂ i x)
-      _ = inner ℂ (dsIncl k ℋ₂ i x) (dsIncl k ℋ₂ i (V y)) := by
-          rw [ampKrausFactorCLM_dsIncl]
-      _ = inner ℂ (V.adjoint x) y := by
-          rw [← ContinuousLinearMap.adjoint_inner_right
-            (A := dsIncl k ℋ₂ i)
-            (x := x)
-            (y := dsIncl k ℋ₂ i (V y))]
-          simp [dsIncl_adjoint, dsProj_dsIncl_apply,
-            LinearMap.adjoint_inner_left]
-      _ = inner ℂ (dsProj k ℋ₁ i (dsIncl k ℋ₁ i (V.adjoint x))) y := by
-          simp [dsProj_dsIncl_apply]
-  · calc
-      inner ℂ
-          (dsProj k ℋ₁ j ((ampKrausFactorCLM k V).adjoint (dsIncl k ℋ₂ i x))) y =
-        inner ℂ ((ampKrausFactorCLM k V).adjoint (dsIncl k ℋ₂ i x))
-          (dsIncl k ℋ₁ j y) := by
-          simpa [dsIncl_adjoint] using
-            (ContinuousLinearMap.adjoint_inner_left
-              (A := dsIncl k ℋ₁ j)
-              (x := y)
-              (y := (ampKrausFactorCLM k V).adjoint (dsIncl k ℋ₂ i x)))
-      _ = inner ℂ (dsIncl k ℋ₂ i x)
-          (ampKrausFactorCLM k V (dsIncl k ℋ₁ j y)) := by
-          exact ContinuousLinearMap.adjoint_inner_left
-            (A := ampKrausFactorCLM k V)
-            (x := dsIncl k ℋ₁ j y)
-            (y := dsIncl k ℋ₂ i x)
-      _ = inner ℂ (dsIncl k ℋ₂ i x) (dsIncl k ℋ₂ j (V y)) := by
-          rw [ampKrausFactorCLM_dsIncl]
-      _ = 0 := by
-          rw [← ContinuousLinearMap.adjoint_inner_right
-            (A := dsIncl k ℋ₂ i)
-            (x := x)
-            (y := dsIncl k ℋ₂ j (V y))]
-          have hij : i ≠ j := fun hij => hji hij.symm
-          simp [dsIncl_adjoint, dsProj_dsIncl_apply, hij]
-      _ = inner ℂ (dsProj k ℋ₁ j (dsIncl k ℋ₁ i (V.adjoint x))) y := by
-          simp [dsProj_dsIncl_apply, hji]
-
-lemma ampKrausFactor_adjoint_dsIncl
-    (k : ℕ) (V : ℋ₁ →ₗ[ℂ] ℋ₂) (i : Fin k) (x : ℋ₂) :
-    ((ampKrausFactor k V)†) (dsIncl k ℋ₂ i x) = dsIncl k ℋ₁ i (V.adjoint x) := by
-  change (ampKrausFactorCLM k V).adjoint (dsIncl k ℋ₂ i x) = dsIncl k ℋ₁ i (V.adjoint x)
-  exact ampKrausFactorCLM_adjoint_dsIncl (k := k) (V := V) (i := i) (x := x)
-
-lemma dsProj_ampKrausFactor
-    (k : ℕ) (V : ℋ₁ →ₗ[ℂ] ℋ₂) (i : Fin k) (x : DS k ℋ₁) :
-    dsProj k ℋ₂ i (ampKrausFactor k V x) = V (dsProj k ℋ₁ i x) := by
-  exact dsProj_ampKrausFactorCLM (k := k) (V := V) (i := i) (x := x)
-
-lemma ampKrausFactor_dsIncl
-    (k : ℕ) (V : ℋ₁ →ₗ[ℂ] ℋ₂) (i : Fin k) (x : ℋ₁) :
-    ampKrausFactor k V (dsIncl k ℋ₁ i x) = dsIncl k ℋ₂ i (V x) := by
-  exact ampKrausFactorCLM_dsIncl (k := k) (V := V) (i := i) (x := x)
-
-lemma ampPlainEquiv_apply_apply_ds
-    (k : ℕ) (ℋ : Type*) [Qudit ℋ]
-    (f : L (DS k ℋ)) (i j : Fin k) (x : ℋ) :
-    ampPlainEquiv k ℋ f i j x = dsProj k ℋ i (f (dsIncl k ℋ j x)) := by
-  simpa [dsProj, dsIncl, dsEquiv] using
-    (ampPlainEquiv_apply_apply (k := k) (ℋ := ℋ) (f := f) (i := i) (j := j) (x := x))
-
-lemma ampPlainEquiv_symm_apply_apply
-    (k : ℕ) (ℋ : Type*) [Qudit ℋ]
-    (N : CStarMatrix (Fin k) (Fin k) (L ℋ))
-    (i j : Fin k) (x : ℋ) :
-    ampPlainEquiv k ℋ ((ampCStarEquiv k ℋ).symm N) i j x = N i j x := by
-  have hcoe : ∀ f : L (DS k ℋ), ampMatrixStarAlgEquiv k ℋ f = ampPlainEquiv k ℋ f :=
-    fun _ => rfl
-  have h : (ampCStarEquiv k ℋ).symm N
-      = (ampMatrixStarAlgEquiv k ℋ).symm (CStarMatrix.ofMatrixStarAlgEquiv.symm N) := rfl
-  rw [h, ← hcoe, StarAlgEquiv.apply_symm_apply]
+/-- `krausTerm V` acts by `A ↦ V A V†`. -/
+@[simp]
+theorem krausTerm_apply (V : ℋ₁ →L[ℂ] ℋ₂) (A : L ℋ₁) : krausTerm V A = V ∘L A ∘L V† :=
   rfl
 
-noncomputable def linearToContinuousEndStarAlgEquiv
-    (ℋ : Type*) [Qudit ℋ] :
-    L ℋ ≃⋆ₐ[ℂ] (ℋ →L[ℂ] ℋ) where
-  toFun := LinearMap.toContinuousLinearMap
-  invFun := ContinuousLinearMap.toLinearMap
-  left_inv := by
-    intro A
-    rfl
-  right_inv := by
-    intro A
-    ext x
-    rfl
-  map_mul' := by
-    intro A B
-    rfl
-  map_add' := by
-    intro A B
-    rfl
-  map_smul' := by
-    intro c A
-    rfl
-  map_star' := by
-    intro A
-    simpa [LinearMap.star_eq_adjoint, ContinuousLinearMap.star_eq_adjoint] using
-      (LinearMap.adjoint_toContinuousLinearMap (A := A))
+/-- The matrix representation of `krausTerm V` is conjugation by the matrix of `V`. -/
+theorem toMatOf_krausTerm (bE : OrthonormalBasis ι ℂ ℋ₁) (bF : OrthonormalBasis κ ℂ ℋ₂)
+    (V : ℋ₁ →L[ℂ] ℋ₂) :
+    OpMap.toMatOf bE bF (krausTerm V) = MatrixMap.conj (matEquiv bE bF V) := by
+  refine LinearMap.ext fun M ↦ ?_
+  rw [OpMap.toMatOf_apply, MatrixMap.conj_apply]
+  ext i j
+  set A : L ℋ₁ := (StdBasis.toMatOf bE).symm M with hA
+  have hM (k l : ι) : (inner ℂ (bE k) (A (bE l)) : ℂ) = M k l := by
+    rw [hA, ← StdBasis.toMatOf_apply, StarAlgEquiv.apply_symm_apply]
+  have hadj (l : ι) : (matEquiv bE bF V)ᴴ l j = inner ℂ (bE l) ((V†) (bF j)) := by
+    rw [matEquiv_conjTranspose, matEquiv_apply]
+  have hcol (l : ι) : (inner ℂ (bF i) (V (A (bE l))) : ℂ) = ∑ k, matEquiv bE bF V i k * M k l := by
+    conv_lhs => rw [← bE.sum_repr' (A (bE l))]
+    simp [hM, mul_comm]
+  rw [StdBasis.toMatOf_apply, krausTerm_apply, ContinuousLinearMap.comp_apply,
+    ContinuousLinearMap.comp_apply]
+  conv_lhs => rw [← bE.sum_repr' ((V†) (bF j))]
+  simp only [map_sum, map_smul, inner_sum, inner_smul_right, hcol]
+  refine Finset.sum_congr rfl fun l _ ↦ ?_
+  simp only [Matrix.mul_apply, hadj]
+  rw [mul_comm]
 
-noncomputable def basisPiTensorLinearEquiv
-    (n : ℕ) (b : OrthonormalBasis (Fin n) ℂ ℋ₁) :
-    DS n ℋ₂ ≃ₗ[ℂ] ℋ₂ ⊗[ℂ] ℋ₁ :=
-  (dsEquiv n ℋ₂).toLinearEquiv.trans <|
-    ((Finsupp.linearEquivFunOnFinite ℂ ℋ₂ (Fin n)).symm.trans
-      (TensorProduct.equivFinsuppOfBasisRight b.toBasis).symm)
+/-- Passing to matrices commutes with finite sums of operator maps. -/
+theorem toMatOf_sum {σ : Type*} (s : Finset σ) (Φ : σ → OpMap ℋ₁ ℋ₂)
+    (bE : OrthonormalBasis ι ℂ ℋ₁) (bF : OrthonormalBasis κ ℂ ℋ₂) :
+    OpMap.toMatOf bE bF (∑ r ∈ s, Φ r) = ∑ r ∈ s, OpMap.toMatOf bE bF (Φ r) :=
+  map_sum (OpMap.matEquivOf bE bF) Φ s
 
-lemma basisPiTensorLinearEquiv_apply
-    (n : ℕ) (b : OrthonormalBasis (Fin n) ℂ ℋ₁) (x : DS n ℋ₂) :
-    basisPiTensorLinearEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b x =
-      ∑ i, dsProj n ℋ₂ i x ⊗ₜ[ℂ] b i := by
-  rw [basisPiTensorLinearEquiv]
-  change
-    (TensorProduct.equivFinsuppOfBasisRight b.toBasis).symm
-        ((Finsupp.linearEquivFunOnFinite ℂ ℋ₂ (Fin n)).symm ((dsEquiv n ℋ₂) x)) =
-      ∑ i, dsProj n ℋ₂ i x ⊗ₜ[ℂ] b i
-  rw [TensorProduct.equivFinsuppOfBasisRight_symm_apply]
-  simp [Finsupp.sum_fintype, dsProj, dsEquiv]
+/-- Passing to matrices commutes with addition of operator maps. -/
+theorem toMatOf_add (Φ Ψ : OpMap ℋ₁ ℋ₂) (bE : OrthonormalBasis ι ℂ ℋ₁)
+    (bF : OrthonormalBasis κ ℂ ℋ₂) :
+    OpMap.toMatOf bE bF (Φ + Ψ) = OpMap.toMatOf bE bF Φ + OpMap.toMatOf bE bF Ψ :=
+  map_add (OpMap.matEquivOf bE bF) Φ Ψ
 
-lemma basisPiTensorLinearEquiv_dsIncl
-    (n : ℕ) (b : OrthonormalBasis (Fin n) ℂ ℋ₁) (i : Fin n) (x : ℋ₂) :
-    basisPiTensorLinearEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b (dsIncl n ℋ₂ i x) =
-      x ⊗ₜ[ℂ] b i := by
-  rw [basisPiTensorLinearEquiv_apply]
+/-- Passing to matrices commutes with scaling an operator map. -/
+theorem toMatOf_smul (c : ℂ) (Φ : OpMap ℋ₁ ℋ₂) (bE : OrthonormalBasis ι ℂ ℋ₁)
+    (bF : OrthonormalBasis κ ℂ ℋ₂) :
+    OpMap.toMatOf bE bF (c • Φ) = c • OpMap.toMatOf bE bF Φ :=
+  map_smul (OpMap.matEquivOf bE bF) c Φ
+
+/-- A sum of completely positive operator maps is completely positive. -/
+theorem isCompletelyPositive_add {Φ Ψ : OpMap ℋ₁ ℋ₂} (hΦ : OpMap.IsCompletelyPositive Φ)
+    (hΨ : OpMap.IsCompletelyPositive Ψ) : OpMap.IsCompletelyPositive (Φ + Ψ) := by
+  rw [OpMap.isCompletelyPositive_iff_of (stdOrthonormalBasis ℂ ℋ₁) (stdOrthonormalBasis ℂ ℋ₂),
+    OpMap.IsCompletelyPositiveOf, toMatOf_add]
+  exact MatrixMap.IsCompletelyPositive.add ((OpMap.isCompletelyPositive_iff_of _ _ Φ).mp hΦ)
+    ((OpMap.isCompletelyPositive_iff_of _ _ Ψ).mp hΨ)
+
+/-- A nonnegative multiple of a completely positive operator map is completely positive. -/
+theorem isCompletelyPositive_smul {Φ : OpMap ℋ₁ ℋ₂} (hΦ : OpMap.IsCompletelyPositive Φ) {c : ℂ}
+    (hc : 0 ≤ c) : OpMap.IsCompletelyPositive (c • Φ) := by
+  rw [OpMap.isCompletelyPositive_iff_of (stdOrthonormalBasis ℂ ℋ₁) (stdOrthonormalBasis ℂ ℋ₂),
+    OpMap.IsCompletelyPositiveOf, toMatOf_smul]
+  exact MatrixMap.IsCompletelyPositive.smul ((OpMap.isCompletelyPositive_iff_of _ _ Φ).mp hΦ) hc
+
+/-- Conjugation by a single operator is completely positive. -/
+theorem krausTerm_isCompletelyPositive (V : ℋ₁ →L[ℂ] ℋ₂) :
+    OpMap.IsCompletelyPositive (krausTerm V) := by
+  rw [OpMap.isCompletelyPositive_iff_of (stdOrthonormalBasis ℂ ℋ₁) (stdOrthonormalBasis ℂ ℋ₂),
+    OpMap.IsCompletelyPositiveOf, toMatOf_krausTerm]
+  exact MatrixMap.congruence_CP _
+
+/-- A finite sum of conjugations is completely positive. -/
+theorem sum_krausTerm_isCompletelyPositive {σ : Type*} [Fintype σ] (V : σ → (ℋ₁ →L[ℂ] ℋ₂)) :
+    OpMap.IsCompletelyPositive (∑ r, krausTerm (V r)) := by
+  rw [OpMap.isCompletelyPositive_iff_of (stdOrthonormalBasis ℂ ℋ₁) (stdOrthonormalBasis ℂ ℋ₂),
+    OpMap.IsCompletelyPositiveOf, toMatOf_sum]
+  refine MatrixMap.IsCompletelyPositive.finset_sum fun r ↦ ?_
+  rw [toMatOf_krausTerm]
+  exact MatrixMap.congruence_CP _
+
+/-- **Kraus decomposition.** Every completely positive operator map is a finite sum of
+conjugations `A ↦ Vᵣ A Vᵣ†`. -/
+theorem exists_kraus {Φ : OpMap ℋ₁ ℋ₂} (hΦ : OpMap.IsCompletelyPositive Φ) :
+    ∃ (σ : Type w) (_ : Fintype σ) (_ : DecidableEq σ) (V : σ → (ℋ₁ →L[ℂ] ℋ₂)),
+      Φ = ∑ r, krausTerm (V r) := by
   classical
-  rw [Finset.sum_eq_single i]
-  · simp [dsProj_dsIncl_apply]
-  · intro j _ hji
-    simp [dsProj_dsIncl_apply, hji]
-  · simp
-
-lemma basisPiTensorLinearEquiv_inner
-    (n : ℕ) (b : OrthonormalBasis (Fin n) ℂ ℋ₁) (x y : DS n ℋ₂) :
-    inner ℂ
-        (basisPiTensorLinearEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b x)
-        (basisPiTensorLinearEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b y) =
-      inner ℂ x y := by
-  rw [basisPiTensorLinearEquiv_apply, basisPiTensorLinearEquiv_apply]
-  classical
-  simp only [inner_sum, sum_inner, TensorProduct.inner_tmul]
-  simpa [PiLp.inner_apply, dsProj, dsEquiv] using
-    (b.orthonormal.inner_left_right_finset
-      (s := Finset.univ)
-      (a := fun i j => inner ℂ (dsProj n ℋ₂ j x) (dsProj n ℋ₂ i y)))
-
-noncomputable def basisPiTensorLinearIsometryEquiv
-    (n : ℕ) (b : OrthonormalBasis (Fin n) ℂ ℋ₁) :
-    DS n ℋ₂ ≃ₗᵢ[ℂ] ℋ₂ ⊗[ℂ] ℋ₁ :=
-  (basisPiTensorLinearEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b).isometryOfInner
-    (basisPiTensorLinearEquiv_inner (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b)
-
-noncomputable def basisPiTensorEndAlgEquiv
-    (n : ℕ) (b : OrthonormalBasis (Fin n) ℂ ℋ₁) :
-    L (DS n ℋ₂) ≃⋆ₐ[ℂ] L (ℋ₂ ⊗[ℂ] ℋ₁) :=
-  (linearToContinuousEndStarAlgEquiv (ℋ := DS n ℋ₂)).trans <|
-    ((basisPiTensorLinearIsometryEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b).conjStarAlgEquiv.trans
-      (linearToContinuousEndStarAlgEquiv (ℋ := ℋ₂ ⊗[ℂ] ℋ₁)).symm)
-
-lemma basisPiTensorLinearIsometryEquiv_apply
-    (n : ℕ) (b : OrthonormalBasis (Fin n) ℂ ℋ₁) (x : DS n ℋ₂) :
-    basisPiTensorLinearIsometryEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b x =
-      ∑ i, dsProj n ℋ₂ i x ⊗ₜ[ℂ] b i := by
-  exact basisPiTensorLinearEquiv_apply (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b x
-
-lemma basisPiTensorLinearIsometryEquiv_dsIncl
-    (n : ℕ) (b : OrthonormalBasis (Fin n) ℂ ℋ₁) (i : Fin n) (x : ℋ₂) :
-    basisPiTensorLinearIsometryEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b (dsIncl n ℋ₂ i x) =
-      x ⊗ₜ[ℂ] b i := by
-  exact basisPiTensorLinearEquiv_dsIncl (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b i x
-
-lemma basisPiTensorLinearIsometryEquiv_symm_tmul
-    (n : ℕ) (b : OrthonormalBasis (Fin n) ℂ ℋ₁) (i : Fin n) (x : ℋ₂) :
-    (basisPiTensorLinearIsometryEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b).symm (x ⊗ₜ[ℂ] b i) =
-      dsIncl n ℋ₂ i x := by
-  apply (basisPiTensorLinearIsometryEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b).injective
-  simpa using
-    (basisPiTensorLinearIsometryEquiv_dsIncl (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b i x).symm
-
-lemma basisPiTensorEndAlgEquiv_apply_apply
-    (n : ℕ) (b : OrthonormalBasis (Fin n) ℂ ℋ₁)
-    (A : L (DS n ℋ₂)) (z : ℋ₂ ⊗[ℂ] ℋ₁) :
-    basisPiTensorEndAlgEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b A z =
-      basisPiTensorLinearIsometryEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b
-        (A ((basisPiTensorLinearIsometryEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b).symm z)) := by
+  set bE := stdOrthonormalBasis ℂ ℋ₁
+  set bF := stdOrthonormalBasis ℂ ℋ₂
+  obtain ⟨M, hM⟩ := MatrixMap.IsCompletelyPositive.exists_kraus _ hΦ
+  refine ⟨ULift.{w} _, inferInstance, inferInstance,
+    fun r ↦ (matEquiv bE bF).symm (M r.down), ?_⟩
+  refine OpMap.toMatOf_injective bE bF ?_
+  rw [toMatOf_sum, hM, MatrixMap.of_kraus_eq_sum_conj,
+    ← Equiv.ulift.{w}.sum_comp fun k ↦ MatrixMap.conj (M k)]
+  refine Finset.sum_congr rfl fun r _ ↦ ?_
+  rw [toMatOf_krausTerm, LinearEquiv.apply_symm_apply]
   rfl
 
-lemma basisPiTensorEndAlgEquiv_apply_tmul_basis
-    (n : ℕ) (b : OrthonormalBasis (Fin n) ℂ ℋ₁)
-    (A : L (DS n ℋ₂)) (x : ℋ₂) (j : Fin n) :
-    basisPiTensorEndAlgEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b A (x ⊗ₜ[ℂ] b j) =
-      ∑ i : Fin n, ((ampCStarEquiv n ℋ₂ A) i j) x ⊗ₜ[ℂ] b i := by
-  rw [basisPiTensorEndAlgEquiv_apply_apply]
-  rw [basisPiTensorLinearIsometryEquiv_symm_tmul]
-  rw [basisPiTensorLinearIsometryEquiv_apply]
-  refine Finset.sum_congr rfl ?_
-  intro i _
-  have hcoord :
-      dsProj n ℋ₂ i (A (dsIncl n ℋ₂ j x)) =
-        ampPlainEquiv n ℋ₂ A i j x := by
-    symm
-    exact ampPlainEquiv_apply_apply_ds
-      (k := n) (ℋ := ℋ₂) (f := A) (i := i) (j := j) (x := x)
-  rw [hcoord]
+end Kraus
+
+section PartialTrace
+
+variable {ℋ₁ : Type u} {ℋ₂ : Type v} [Qudit ℋ₁] [Qudit ℋ₂]
+
+/-- The partial trace over the *first* factor, as an operator map. See (1.121) of
+<https://cs.uwaterloo.ca/~watrous/TQI/TQI.1.pdf>. -/
+noncomputable def TrLeft : OpMap (ℋ₁ ⊗[ℂ] ℋ₂) ℋ₂ where
+  toFun := ContinuousLinearMap.traceLeft
+  map_add' := ContinuousLinearMap.traceLeft_add
+  map_smul' c A := ContinuousLinearMap.traceLeft_smul A c
+
+/-- `TrLeft` acts by `ContinuousLinearMap.traceLeft`. -/
+@[simp]
+theorem TrLeft_apply (A : L (ℋ₁ ⊗[ℂ] ℋ₂)) : TrLeft A = A.traceLeft :=
   rfl
 
-lemma matrixUnit_apply_basis
-    (n : ℕ) (b : OrthonormalBasis (Fin n) ℂ ℋ₁)
-    (i j k : Fin n) :
-    outer_product (b j) (b i) (b k) = if j = k then b i else 0 := by
-  by_cases h : j = k
-  · subst h
-    simp [outer_product, dualTensorHom_apply]
-  · simp [outer_product, dualTensorHom_apply, h]
+/-- The partial trace over the *second* factor, as an operator map. -/
+noncomputable def TrRight {ℋ₃ : Type w} [Qudit ℋ₃] : OpMap (ℋ₂ ⊗[ℂ] ℋ₃) ℋ₂ where
+  toFun := ContinuousLinearMap.traceRight
+  map_add' := ContinuousLinearMap.traceRight_add
+  map_smul' c A := ContinuousLinearMap.traceRight_smul A c
 
-lemma basisPiTensorEndAlgEquiv_expansion
-    (n : ℕ) (b : OrthonormalBasis (Fin n) ℂ ℋ₁)
-    (A : L (DS n ℋ₂)) :
-    basisPiTensorEndAlgEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b A =
-      ∑ i : Fin n, ∑ j : Fin n,
-        (l_tensor_equiv (ℋ₁ := ℋ₂) (ℋ₂ := ℋ₁)).symm
-          (((ampCStarEquiv n ℋ₂ A) i j) ⊗ₜ[ℂ] outer_product (b j) (b i)) := by
-  apply LinearMap.ext
-  intro z
-  refine TensorProduct.induction_on z ?_ ?_ ?_
-  · simp
-  · intro x v
-    calc
-      basisPiTensorEndAlgEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b A (x ⊗ₜ[ℂ] v) =
-          ∑ j : Fin n,
-            (b.repr v j) •
-              basisPiTensorEndAlgEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b A (x ⊗ₜ[ℂ] b j) := by
-          conv_lhs => rw [← b.sum_repr v]
-          simp [TensorProduct.tmul_sum, TensorProduct.tmul_smul, map_sum]
-      _ =
-          ∑ j : Fin n,
-            (b.repr v j) •
-              ∑ i : Fin n, ((ampCStarEquiv n ℋ₂ A) i j) x ⊗ₜ[ℂ] b i := by
-          refine Finset.sum_congr rfl ?_
-          intro j _
-          rw [basisPiTensorEndAlgEquiv_apply_tmul_basis]
-      _ =
-          ∑ i : Fin n, ∑ j : Fin n,
-            (b.repr v j) • (((ampCStarEquiv n ℋ₂ A) i j) x ⊗ₜ[ℂ] b i) := by
-          rw [Finset.sum_comm]
-          refine Finset.sum_congr rfl ?_
-          intro i _
-          simp [Finset.smul_sum]
-      _ =
-          (∑ i : Fin n, ∑ j : Fin n,
-            (l_tensor_equiv (ℋ₁ := ℋ₂) (ℋ₂ := ℋ₁)).symm
-              (((ampCStarEquiv n ℋ₂ A) i j) ⊗ₜ[ℂ] outer_product (b j) (b i))) (x ⊗ₜ[ℂ] v) := by
-          simp only [LinearMap.sum_apply]
-          refine Finset.sum_congr rfl ?_
-          intro i _
-          refine Finset.sum_congr rfl ?_
-          intro j _
-          rw [l_tensor_equiv_symm_tmul]
-          simp [outer_product, dualTensorHom_apply, TensorProduct.tmul_smul,
-            OrthonormalBasis.repr_apply_apply]
-  · intro z w hz hw
-    simp only [hz, hw, map_add]
-
-lemma basisPiTensorEndAlgEquiv_ampSuper
-    (n : ℕ) (b : OrthonormalBasis (Fin n) ℂ ℋ₁)
-    (Φ : T ℋ₁ ℋ₂) (A : L (DS n ℋ₁)) :
-    basisPiTensorEndAlgEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b (ampSuper n Φ A) =
-      amplifyWithId Φ (basisPiTensorEndAlgEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₁) n b A) := by
-  rw [basisPiTensorEndAlgEquiv_expansion (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b (ampSuper n Φ A)]
-  rw [basisPiTensorEndAlgEquiv_expansion (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₁) n b A]
-  simp only [amplifyWithId, LinearMap.comp_apply, map_sum]
-  refine Finset.sum_congr rfl ?_
-  intro i _
-  refine Finset.sum_congr rfl ?_
-  intro j _
-  have hentry :
-      (ampCStarEquiv n ℋ₂ (ampSuper n Φ A)) i j =
-        Φ ((ampCStarEquiv n ℋ₁ A) i j) := by
-    have h := congrFun (congrFun (ampCStarEquiv_ampSuper_apply (k := n) (Φ := Φ) (A := A)) i) j
-    simpa [CStarMatrix.map_apply] using h
-  have hterm :
-      ((ampCStarEquiv n ℋ₂ (ampSuper n Φ A)) i j) ⊗ₜ[ℂ] outer_product (b j) (b i) =
-        Φ ((ampCStarEquiv n ℋ₁ A) i j) ⊗ₜ[ℂ] outer_product (b j) (b i) := by
-    exact congrArg (fun B : L ℋ₂ => B ⊗ₜ[ℂ] outer_product (b j) (b i)) hentry
-  have hcancel :
-      (l_tensor_equiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₁))
-          ((l_tensor_equiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₁)).symm
-            (((ampCStarEquiv n ℋ₁ A) i j) ⊗ₜ[ℂ] outer_product (b j) (b i))) =
-        ((ampCStarEquiv n ℋ₁ A) i j) ⊗ₜ[ℂ] outer_product (b j) (b i) := by
-    exact LinearEquiv.apply_symm_apply (l_tensor_equiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₁))
-      (((ampCStarEquiv n ℋ₁ A) i j) ⊗ₜ[ℂ] outer_product (b j) (b i))
-  apply (l_tensor_equiv (ℋ₁ := ℋ₂) (ℋ₂ := ℋ₁)).injective
-  rw [LinearEquiv.apply_symm_apply]
-  have houter :
-      (l_tensor_equiv (ℋ₁ := ℋ₂) (ℋ₂ := ℋ₁))
-          ((l_tensor_equiv (ℋ₁ := ℋ₂) (ℋ₂ := ℋ₁)).symm
-            ((TensorProduct.map Φ LinearMap.id)
-              ((l_tensor_equiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₁))
-                ((l_tensor_equiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₁)).symm
-                  (((ampCStarEquiv n ℋ₁ A) i j) ⊗ₜ[ℂ] outer_product (b j) (b i)))))) =
-        (TensorProduct.map Φ LinearMap.id)
-          ((l_tensor_equiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₁))
-            ((l_tensor_equiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₁)).symm
-              (((ampCStarEquiv n ℋ₁ A) i j) ⊗ₜ[ℂ] outer_product (b j) (b i)))) := by
-    exact LinearEquiv.apply_symm_apply (l_tensor_equiv (ℋ₁ := ℋ₂) (ℋ₂ := ℋ₁))
-      ((TensorProduct.map Φ LinearMap.id)
-        ((l_tensor_equiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₁))
-          ((l_tensor_equiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₁)).symm
-            (((ampCStarEquiv n ℋ₁ A) i j) ⊗ₜ[ℂ] outer_product (b j) (b i)))))
-  change
-      ((ampCStarEquiv n ℋ₂ (ampSuper n Φ A)) i j) ⊗ₜ[ℂ] outer_product (b j) (b i) =
-        (l_tensor_equiv (ℋ₁ := ℋ₂) (ℋ₂ := ℋ₁))
-          ((l_tensor_equiv (ℋ₁ := ℋ₂) (ℋ₂ := ℋ₁)).symm
-            ((TensorProduct.map Φ LinearMap.id)
-              ((l_tensor_equiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₁))
-                ((l_tensor_equiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₁)).symm
-                  (((ampCStarEquiv n ℋ₁ A) i j) ⊗ₜ[ℂ] outer_product (b j) (b i))))))
-  rw [houter]
-  rw [hcancel]
-  rw [TensorProduct.map_tmul]
-  exact hterm
-
-lemma ampSuper_krausTerm_eq
-    (k : ℕ) (V : ℋ₁ →ₗ[ℂ] ℋ₂) :
-    ampSuper k (krausTerm V) = krausTerm (ampKrausFactor k V) := by
-  apply LinearMap.ext
-  intro A
-  apply (ampCStarEquiv k ℋ₂).injective
-  trans (ampCStarEquiv k ℋ₁ A).map (krausTerm V)
-  · exact ampCStarEquiv_ampSuper_apply (k := k) (Φ := krausTerm V) (A := A)
-  ext i j x
-  change (((ampCStarEquiv k ℋ₁ A).map (krausTerm V)) i j) x =
-    ampPlainEquiv k ℋ₂ ((krausTerm (ampKrausFactor k V)) A) i j x
-  rw [ampPlainEquiv_apply_apply_ds]
-  have hentry :
-      (ampCStarEquiv k ℋ₁ A i j) (V.adjoint x) =
-        dsProj k ℋ₁ i (A (dsIncl k ℋ₁ j (V.adjoint x))) :=
-    ampPlainEquiv_apply_apply_ds (k := k) (ℋ := ℋ₁) (f := A) (i := i) (j := j)
-      (x := V.adjoint x)
-  simp [CStarMatrix.map_apply, krausTerm, dsProj_ampKrausFactor,
-    ampKrausFactor_adjoint_dsIncl, hentry]
-
-lemma krausTerm_isCompletelyPositive
-    (V : ℋ₁ →ₗ[ℂ] ℋ₂) :
-    IsCompletelyPositive (krausTerm V) := by
-  refine (isCompletelyPositive_iff_cstarMatrix_nonneg (krausTerm V)).mpr ?_
-  intro k M hM
-  have hK : IsKPositive k (krausTerm V) := by
-    exact (isKPositive_iff_isPositiveMap_ampSuper (k := k) (Φ := krausTerm V)).mpr <| by
-      simpa [ampSuper_krausTerm_eq] using
-        krausTerm_isPositiveMap (V := ampKrausFactor k V)
-  exact hK M hM
-
-lemma sum_krausTerm_isCompletelyPositive
-    {σ : Type*} [Fintype σ]
-    (V : σ → (ℋ₁ →ₗ[ℂ] ℋ₂)) :
-    IsCompletelyPositive (∑ r, krausTerm (V r)) := by
-  classical
-  refine (isCompletelyPositive_iff_cstarMatrix_nonneg (∑ r, krausTerm (V r))).mpr ?_
-  intro k M hM
-  have hmap : M.map (∑ r, (krausTerm (V r) : T ℋ₁ ℋ₂)) = ∑ r, M.map (krausTerm (V r)) := by
-    have hmapFin (s : Finset σ) :
-        M.map (Finset.sum s fun r => (krausTerm (V r) : T ℋ₁ ℋ₂)) =
-          Finset.sum s fun r => M.map (krausTerm (V r)) := by
-      ext i j x
-      induction s using Finset.induction_on with
-      | empty =>
-          simp [CStarMatrix.map_apply]
-      | @insert a s ha ih =>
-          simp [Finset.sum_insert, ha, CStarMatrix.map_apply, LinearMap.sum_apply]
-          simpa [CStarMatrix.map_apply, LinearMap.sum_apply] using ih
-    simpa using hmapFin Finset.univ
-  simpa [hmap] using
-    (Finset.sum_nonneg fun r _ =>
-      (isCompletelyPositive_iff_cstarMatrix_nonneg (krausTerm (V r))).mp
-        (krausTerm_isCompletelyPositive (V r)) k M hM)
-
-def AmplificationPositive (Φ : T ℋ₁ ℋ₂) : Prop :=
-  IsPositiveMap (amplifyWithId Φ)
-
-lemma cp_amplify
-    (Φ : T ℋ₁ ℋ₂) :
-    IsCompletelyPositive Φ → AmplificationPositive Φ := by
-  intro hΦ X hX
-  let n := Module.finrank ℂ ℋ₁
-  let b : OrthonormalBasis (Fin n) ℂ ℋ₁ := stdOrthonormalBasis ℂ ℋ₁
-  let e₁ := basisPiTensorEndAlgEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₁) n b
-  let e₂ := basisPiTensorEndAlgEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b
-  let A : L (DS n ℋ₁) := e₁.symm X
-  have hA : 0 ≤ A := by
-    have hX' : 0 ≤ e₁ A := by
-      simpa [A, e₁] using hX
-    exact (starAlgEquiv_nonneg_iff e₁).1 hX'
-  have hK : IsKPositive n Φ :=
-    (isCompletelyPositive_iff_cstarMatrix_nonneg Φ).mp hΦ n
-  have hAmp : 0 ≤ ampSuper n Φ A :=
-    (isKPositive_iff_isPositiveMap_ampSuper (k := n) (Φ := Φ)).mp hK A hA
-  have hTensor : 0 ≤ e₂ (ampSuper n Φ A) :=
-    starAlgEquiv_nonneg e₂ hAmp
-  have hEq : e₂ (ampSuper n Φ A) = amplifyWithId Φ X := by
-    simpa [A, e₁, e₂] using
-      (basisPiTensorEndAlgEquiv_ampSuper (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) n b Φ A)
-  simpa [hEq] using hTensor
-
-def ChoiPositive (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) : Prop :=
-  0 ≤ choi b Φ
-
-def KrausRep (Φ : T ℋ₁ ℋ₂) (κ : Type*) [DecidableEq κ] [Fintype κ] : Prop :=
-  ∃ A : κ → (ℋ₁ →ₗ[ℂ] ℋ₂),
-    ∀ X : L ℋ₁, Φ X = ∑ a : κ, (A a).comp (X.comp (LinearMap.adjoint (A a)))
-
-theorem fixed_kraus_to_cp
-    {κ : Type*} [DecidableEq κ] [Fintype κ]
-    (Φ : T ℋ₁ ℋ₂) :
-    KrausRep Φ κ → IsCompletelyPositive Φ := by
-  rintro ⟨A, hA⟩
-  have hΦ : Φ = ∑ a : κ, krausTerm (A a) := by
-    apply LinearMap.ext
-    intro X
-    simpa [krausTerm] using hA X
-  rw [hΦ]
-  exact sum_krausTerm_isCompletelyPositive A
-
-noncomputable def choiRank (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) : ℕ :=
-  Module.finrank ℂ (LinearMap.range (choi b Φ))
-
-def HasKraus (Φ : T ℋ₁ ℋ₂) : Prop :=
-  ∃ (κ : Type u) (_ : DecidableEq κ) (_ : Fintype κ),
-    @KrausRep ℋ₁ ℋ₂ _ _ Φ κ _ _
-
-def HasRankKraus (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) : Prop :=
-  ∃ (κ : Type u) (dec : DecidableEq κ) (inst : Fintype κ),
-    Fintype.card κ = choiRank b Φ ∧
-      @KrausRep ℋ₁ ℋ₂ _ _ Φ κ dec inst
-
-lemma positive_full_spectral_outer_product
-    {E : Type*} [Qudit E] (T : L E) (hT : 0 ≤ T) :
-    let n := Module.finrank ℂ E
-    let hTpos : T.IsPositive := (LinearMap.nonneg_iff_isPositive T).mp hT
-    let hSym : T.IsSymmetric := hTpos.isSymmetric
-    ∃ u : Fin n → E,
-      T = ∑ i : Fin n, outer_product (u i) (u i) ∧
-        ∀ i : Fin n, hSym.eigenvalues rfl i = 0 → u i = 0 := by
-  classical
-  dsimp
-  let n := Module.finrank ℂ E
-  let hTpos : T.IsPositive := (LinearMap.nonneg_iff_isPositive T).mp hT
-  let hSym : T.IsSymmetric := hTpos.isSymmetric
-  let u : Fin n → E :=
-    fun i => ((hSym.eigenvalues rfl i).sqrt : ℂ) • hSym.eigenvectorBasis rfl i
-  refine ⟨u, ?_, ?_⟩
-  · ext x
-    rw [show (∑ i : Fin n, outer_product (u i) (u i)) x =
-        ∑ i : Fin n, inner ℂ (u i) x • u i by
-      simp [outer_product_eq_rankOne]]
-    simp_rw [u]
-    simp_rw [inner_smul_left]
-    simp_rw [smul_smul]
-    simp_rw [mul_assoc]
-    simp_rw [Complex.conj_ofReal]
-    simp_rw [mul_comm (inner ℂ _ _)]
-    simp_rw [← mul_assoc]
-    simp_rw [← Complex.ofReal_mul]
-    simp_rw [← Real.sqrt_mul (hTpos.nonneg_eigenvalues rfl _)]
-    simp_rw [Real.sqrt_mul_self (hTpos.nonneg_eigenvalues rfl _)]
-    simp_rw [mul_comm _ (inner ℂ _ _)]
-    simp_rw [← smul_eq_mul]
-    simp_rw [smul_assoc]
-    have happly :
-        ∀ i : Fin n,
-          (hSym.eigenvalues rfl i : ℂ) • hSym.eigenvectorBasis rfl i =
-            T (hSym.eigenvectorBasis rfl i) := by
-      intro i
-      exact (hSym.apply_eigenvectorBasis rfl i).symm
-    simp_rw [happly]
-    simp_rw [← map_smul]
-    simp_rw [← map_sum]
-    simp_rw [← OrthonormalBasis.repr_apply_apply]
-    simp_rw [OrthonormalBasis.sum_repr]
-  · intro i hi
-    change ((hSym.eigenvalues rfl i).sqrt : ℂ) • hSym.eigenvectorBasis rfl i = 0
-    simp [hi]
-
-lemma positive_spectral_outer_product
-    {E : Type*} [Qudit E] (T : L E) (hT : 0 ≤ T) :
-    let n := Module.finrank ℂ E
-    let hTpos : T.IsPositive := (LinearMap.nonneg_iff_isPositive T).mp hT
-    let hSym : T.IsSymmetric := hTpos.isSymmetric
-    ∃ u : { i : Fin n // hSym.eigenvalues rfl i ≠ 0 } → E,
-      T = ∑ a, outer_product (u a) (u a) := by
-  dsimp
-  let n := Module.finrank ℂ E
-  let hTpos : T.IsPositive := (LinearMap.nonneg_iff_isPositive T).mp hT
-  let hSym : T.IsSymmetric := hTpos.isSymmetric
-  let p : Fin n → Prop := fun i => hSym.eigenvalues rfl i ≠ 0
-  obtain ⟨u, hsum, hzero⟩ :=
-    positive_full_spectral_outer_product (T := T) (hT := hT)
-  refine ⟨fun a => u a, ?_⟩
-  have hzero_sum :
-      (∑ a : { i : Fin n // ¬ p i }, outer_product (u a) (u a)) = 0 := by
-    apply Fintype.sum_eq_zero
-    intro a
-    have ha : hSym.eigenvalues rfl a = 0 := not_not.mp a.property
-    simp [hzero a ha, outer_product]
-  have hsplit :=
-    Fintype.sum_subtype_add_sum_subtype p
-      (fun i : Fin n => outer_product (u i) (u i))
-  calc
-    T = ∑ i : Fin n, outer_product (u i) (u i) := hsum
-    _ = ∑ a : { i : Fin n // p i }, outer_product (u a) (u a) := by
-      rw [← hsplit, hzero_sum, add_zero]
-
-lemma positive_to_rank_outer_product
-    {E : Type*} [Qudit E] (T : L E) (hT : 0 ≤ T) :
-    ∃ (κ : Type u) (_ : DecidableEq κ) (_ : Fintype κ),
-      Fintype.card κ = Module.finrank ℂ (LinearMap.range T) ∧
-        ∃ u : κ → E, T = ∑ a : κ, outer_product (u a) (u a) := by
-  let n := Module.finrank ℂ E
-  let hTpos : T.IsPositive := (LinearMap.nonneg_iff_isPositive T).mp hT
-  let hSym : T.IsSymmetric := hTpos.isSymmetric
-  let κ₀ := { i : Fin n // hSym.eigenvalues rfl i ≠ 0 }
-  let κ := ULift κ₀
-  have hcard₀ : Fintype.card κ₀ = Module.finrank ℂ (LinearMap.range T) := by
-    exact card_nonzero_eigenvalues_eq_finrank_range T hT
-  have hcard : Fintype.card κ = Module.finrank ℂ (LinearMap.range T) := by
-    simpa [κ, Fintype.card_ulift] using hcard₀
-  obtain ⟨u₀, hu₀⟩ :=
-    positive_spectral_outer_product (T := T) (hT := hT)
-  refine ⟨κ, inferInstance, inferInstance, hcard, ?_⟩
-  refine ⟨fun a : κ => u₀ a.down, ?_⟩
-  have hsum :
-      (∑ a : κ, outer_product (u₀ a.down) (u₀ a.down)) =
-        ∑ a : κ₀, outer_product (u₀ a) (u₀ a) := by
-    symm
-    refine Fintype.sum_equiv (Equiv.ulift.symm : κ₀ ≃ κ) _ _ ?_
-    intro a
-    rfl
-  exact hu₀.trans hsum.symm
-
-theorem hasRankKraus_to_hasKraus
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    HasRankKraus b Φ → HasKraus Φ := by
-  rintro ⟨κ, dec, inst, _, hkraus⟩
-  exact ⟨κ, dec, inst, hkraus⟩
-
-theorem rankKraus_to_kraus
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    HasRankKraus b Φ → HasKraus Φ :=
-  hasRankKraus_to_hasKraus b Φ
-
-theorem kraus_to_positiveMap
-    (Φ : T ℋ₁ ℋ₂) :
-    HasKraus Φ → IsPositiveMap Φ := by
-  rintro ⟨κ, hκ, hκ', A, hA⟩ X hX
-  let : DecidableEq κ := hκ
-  let : Fintype κ := hκ'
-  rw [hA X]
-  exact Finset.sum_nonneg fun a _ =>
-    conjugate_positive (ℋ₁ := ℋ₁) (ℋ₃ := ℋ₂) (A a) X hX
-
-theorem rankKraus_to_positiveMap
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    HasRankKraus b Φ → IsPositiveMap Φ :=
-  kraus_to_positiveMap Φ ∘
-    rankKraus_to_kraus b Φ
-
-noncomputable def conjugateEnd {E F : Type*} [AddCommGroup E] [Module ℂ E]
-    [AddCommGroup F] [Module ℂ F] (e : E ≃ₗ[ℂ] F) :
-    (E →ₗ[ℂ] E) →ₗ[ℂ] (F →ₗ[ℂ] F) where
-  toFun X := e.toLinearMap.comp (X.comp e.symm.toLinearMap)
-  map_add' X Y := by
-    ext x
-    simp
-  map_smul' c X := by
-    ext x
-    simp
-
-lemma conjugateEnd_comm_positive
-    {E : Type u} {F : Type v} [Qudit E] [Qudit F] :
-    IsPositiveMap (conjugateEnd (TensorProduct.comm ℂ E F)) := by
-  intro X hX
-  have hXpos : X.IsPositive := (LinearMap.nonneg_iff_isPositive X).mp hX
-  have hcomm :
-      LinearMap.adjoint (TensorProduct.comm ℂ E F).toLinearMap =
-        (TensorProduct.comm ℂ E F).symm.toLinearMap := by
-    simpa [TensorProduct.toLinearEquiv_commIsometry] using
-      (LinearIsometryEquiv.adjoint_toLinearMap_eq_symm
-        (TensorProduct.commIsometry ℂ E F))
-  exact (LinearMap.nonneg_iff_isPositive _).mpr <| by
-    simpa [conjugateEnd, hcomm] using
-      hXpos.conj_adjoint (TensorProduct.comm ℂ E F).toLinearMap
-
-noncomputable def TrRight {ℋ₃ : Type u} [Qudit ℋ₃] : T (ℋ₂ ⊗[ℂ] ℋ₃) ℋ₂ :=
-  (Tr₂ (ℋ₁ := ℋ₃) (ℋ₂ := ℋ₂)).comp
-    (conjugateEnd (TensorProduct.comm ℂ ℋ₂ ℋ₃))
-
-noncomputable def krausToStinespringOperator
-    {κ : Type u} [DecidableEq κ] [Fintype κ]
-    (A : κ → (ℋ₁ →ₗ[ℂ] ℋ₂)) :
-    ℋ₁ →ₗ[ℂ] (ℋ₂ ⊗[ℂ] EuclideanSpace ℂ κ) where
-  toFun x := ∑ a : κ, (A a x) ⊗ₜ[ℂ] (EuclideanSpace.basisFun κ ℂ a)
-  map_add' x y := by
-    simp [TensorProduct.add_tmul, Finset.sum_add_distrib]
-  map_smul' c x := by
-    simp [TensorProduct.smul_tmul', Finset.smul_sum]
-
-lemma krausToStinespringOperator_apply
-    {κ : Type u} [DecidableEq κ] [Fintype κ]
-    (A : κ → (ℋ₁ →ₗ[ℂ] ℋ₂)) (x : ℋ₁) :
-    krausToStinespringOperator (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A x
-      = ∑ a : κ, (A a x) ⊗ₜ[ℂ] (EuclideanSpace.basisFun κ ℂ a) :=
+/-- `TrRight` acts by `ContinuousLinearMap.traceRight`. -/
+@[simp]
+theorem TrRight_apply {ℋ₃ : Type w} [Qudit ℋ₃] (A : L (ℋ₂ ⊗[ℂ] ℋ₃)) : TrRight A = A.traceRight :=
   rfl
 
-lemma adjoint_krausToStinespringOperator_tmul_basisFun
-    {κ : Type u} [DecidableEq κ] [Fintype κ]
-    (A : κ → (ℋ₁ →ₗ[ℂ] ℋ₂)) (y : ℋ₂) (b : κ) :
-    (LinearMap.adjoint (krausToStinespringOperator (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A))
-        (y ⊗ₜ[ℂ] EuclideanSpace.basisFun κ ℂ b) =
-      (LinearMap.adjoint (A b)) y := by
-  apply ext_inner_right ℂ
-  intro x
-  rw [LinearMap.adjoint_inner_left, LinearMap.adjoint_inner_left]
-  simp [krausToStinespringOperator_apply, inner_sum, TensorProduct.inner_tmul,
-    EuclideanSpace.basisFun_apply, EuclideanSpace.inner_single_left]
+/-- The partial trace over the first factor is positive. -/
+theorem TrLeft_isPositive : OpMap.IsPositive (TrLeft (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂)) := fun A hA ↦
+  (ContinuousLinearMap.nonneg_iff_isPositive _).mpr
+    (ContinuousLinearMap.IsPositive.traceLeft A ((ContinuousLinearMap.nonneg_iff_isPositive A).mp hA))
 
-lemma conjugateEnd_krausToStinespringOperator_apply_basisFun_tmul
-    {κ : Type u} [DecidableEq κ] [Fintype κ]
-    (A : κ → (ℋ₁ →ₗ[ℂ] ℋ₂)) (X : L ℋ₁) (b : κ) (y : ℋ₂) :
-    (conjugateEnd (TensorProduct.comm ℂ ℋ₂ (EuclideanSpace ℂ κ))
-        (((krausToStinespringOperator (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A).comp X).comp
-          (LinearMap.adjoint (krausToStinespringOperator (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A))))
-      ((EuclideanSpace.basisFun κ ℂ b) ⊗ₜ[ℂ] y) =
-        ∑ a : κ, (EuclideanSpace.basisFun κ ℂ a) ⊗ₜ[ℂ]
-          ((A a).comp (X.comp (LinearMap.adjoint (A b))) y) := by
-  have hadj :
-      (LinearMap.adjoint (krausToStinespringOperator (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A))
-          (y ⊗ₜ[ℂ] EuclideanSpace.single b (1 : ℂ)) =
-        (LinearMap.adjoint (A b)) y := by
-    simpa [EuclideanSpace.basisFun_apply] using
-      (adjoint_krausToStinespringOperator_tmul_basisFun
-        (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) (κ := κ) A y b)
-  simp [conjugateEnd, krausToStinespringOperator_apply, LinearMap.comp_apply,
-    EuclideanSpace.basisFun_apply, hadj]
+/-- The partial trace over the second factor is positive. -/
+theorem TrRight_isPositive {ℋ₃ : Type w} [Qudit ℋ₃] :
+    OpMap.IsPositive (TrRight (ℋ₂ := ℋ₂) (ℋ₃ := ℋ₃)) := fun A hA ↦
+  (ContinuousLinearMap.nonneg_iff_isPositive _).mpr
+    (ContinuousLinearMap.IsPositive.traceRight A
+      ((ContinuousLinearMap.nonneg_iff_isPositive A).mp hA))
 
-lemma conjugateEnd_krausToStinespringOperator_apply_single_tmul
-    {κ : Type u} [DecidableEq κ] [Fintype κ]
-    (A : κ → (ℋ₁ →ₗ[ℂ] ℋ₂)) (X : L ℋ₁) (b : κ) (y : ℋ₂) :
-    (conjugateEnd (TensorProduct.comm ℂ ℋ₂ (EuclideanSpace ℂ κ))
-        (((krausToStinespringOperator (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A).comp X).comp
-          (LinearMap.adjoint (krausToStinespringOperator (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A))))
-      ((EuclideanSpace.single b (1 : ℂ)) ⊗ₜ[ℂ] y) =
-        ∑ a : κ, (EuclideanSpace.single a (1 : ℂ)) ⊗ₜ[ℂ]
-          ((A a).comp (X.comp (LinearMap.adjoint (A b))) y) := by
-  simpa [EuclideanSpace.basisFun_apply] using
-    (conjugateEnd_krausToStinespringOperator_apply_basisFun_tmul
-      (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A X b y)
+end PartialTrace
 
-lemma finrank_kraus_environment
-    {κ : Type u} [DecidableEq κ] [Fintype κ] :
-    Module.finrank ℂ (EuclideanSpace ℂ κ) = Fintype.card κ := by
-  simp [finrank_euclideanSpace (𝕜 := ℂ) (ι := κ)]
+section TensorEquiv
 
-lemma linearMap_eq_sum_outer_product
-    {E : Type u} [Qudit E] {ι : Type*} [Fintype ι]
-    (b : OrthonormalBasis ι ℂ E) (T : L E) :
-    T = ∑ i : ι, outer_product (b i) (T (b i)) := by
-  ext x
-  have hsum : T x = ∑ i : ι, inner ℂ (b i) x • T (b i) := by
-    simpa using congrArg T (b.sum_repr' x).symm
-  calc
-    T x = ∑ i : ι, inner ℂ (b i) x • T (b i) := hsum
-    _ = (∑ i : ι, outer_product (b i) (T (b i))) x := by
-      simp [LinearMap.sum_apply, outer_product_eq_rankOne]
+variable {ℋ₁ : Type u} {ℋ₂ : Type v} [Qudit ℋ₁] [Qudit ℋ₂]
 
-lemma basis_dual_inner
-    {E : Type u} [Qudit E] {ι : Type*} [DecidableEq ι] [Fintype ι]
-    (b : Module.Basis ι ℂ E) (i j : ι) :
-    inner ℂ (b i)
-      ((InnerProductSpace.toDual ℂ E).symm ((b.coord j).toContinuousLinearMap)) =
-        if i = j then 1 else 0 := by
-  rw [← inner_conj_symm]
-  have h :
-      inner ℂ
-        ((InnerProductSpace.toDual ℂ E).symm ((b.coord j).toContinuousLinearMap))
-        (b i) = if i = j then 1 else 0 := by
-    simpa using (Module.Basis.dualBasis_apply_self b j i)
-  rw [h]
-  by_cases hij : i = j <;> simp [hij]
+/-- Operators on `ℋ₁ ⊗ ℋ₂` are the tensor product of the operators on the two factors. -/
+noncomputable def opTensorEquiv : L (ℋ₁ ⊗[ℂ] ℋ₂) ≃ₗ[ℂ] L ℋ₁ ⊗[ℂ] L ℋ₂ :=
+  LinearMap.toContinuousLinearMap.symm ≪≫ₗ (homTensorHomEquiv ℂ ℋ₁ ℋ₂ ℋ₁ ℋ₂).symm ≪≫ₗ
+    TensorProduct.congr LinearMap.toContinuousLinearMap LinearMap.toContinuousLinearMap
 
-lemma basis_sum_dual
-    {E : Type u} [Qudit E] {ι : Type*} [DecidableEq ι] [Fintype ι]
-    (b : Module.Basis ι ℂ E) (x : E) :
-    x =
-      ∑ i : ι, inner ℂ (b i) x •
-        ((InnerProductSpace.toDual ℂ E).symm ((b.coord i).toContinuousLinearMap)) := by
-  apply InnerProductSpace.ext_inner_left_basis b
-  intro j
-  rw [inner_sum]
-  simp [inner_smul_right, basis_dual_inner]
+/-- `opTensorEquiv` sends `TensorProduct.mapL B C` back and forth to `B ⊗ₜ C`. -/
+@[simp]
+theorem opTensorEquiv_symm_tmul (B : L ℋ₁) (C : L ℋ₂) :
+    opTensorEquiv.symm (B ⊗ₜ[ℂ] C) = TensorProduct.mapL B C := by
+  refine ContinuousLinearMap.coe_injective (TensorProduct.ext' fun x y ↦ ?_)
+  simp [opTensorEquiv, homTensorHomEquiv_apply]
 
-lemma linearMap_eq_sum_basis_outer_product
-    {E : Type u} [Qudit E] {ι : Type*} [DecidableEq ι] [Fintype ι]
-    (b : Module.Basis ι ℂ E) (T : L E) :
-    T =
-      ∑ i : ι, ∑ j : ι,
-        (b.coord j
-          (T ((InnerProductSpace.toDual ℂ E).symm ((b.coord i).toContinuousLinearMap)))) •
-          outer_product (b i) (b j) := by
-  ext x
-  have hx := basis_sum_dual b x
-  calc
-    T x =
-        T (∑ i : ι, inner ℂ (b i) x •
-          ((InnerProductSpace.toDual ℂ E).symm ((b.coord i).toContinuousLinearMap))) := by
-          rw [← hx]
-    _ = ∑ i : ι, inner ℂ (b i) x •
-          T ((InnerProductSpace.toDual ℂ E).symm ((b.coord i).toContinuousLinearMap)) := by
-          simp [map_sum]
-    _ = ∑ i : ι, inner ℂ (b i) x •
-          (∑ j : ι,
-            (b.coord j
-              (T ((InnerProductSpace.toDual ℂ E).symm ((b.coord i).toContinuousLinearMap)))) •
-              b j) := by
-          simp [b.sum_repr]
-    _ = (∑ i : ι, ∑ j : ι,
-        (b.coord j
-          (T ((InnerProductSpace.toDual ℂ E).symm ((b.coord i).toContinuousLinearMap)))) •
-          outer_product (b i) (b j)) x := by
-          simp only [LinearMap.sum_apply]
-          refine Finset.sum_congr rfl ?_
-          intro i _
-          rw [Finset.smul_sum]
-          refine Finset.sum_congr rfl ?_
-          intro j _
-          simp [outer_product, dualTensorHom_apply, smul_smul, mul_comm]
+/-- The forward direction of `opTensorEquiv_symm_tmul`. -/
+theorem opTensorEquiv_mapL (B : L ℋ₁) (C : L ℋ₂) :
+    opTensorEquiv (TensorProduct.mapL B C) = B ⊗ₜ[ℂ] C := by
+  rw [← opTensorEquiv_symm_tmul, LinearEquiv.apply_symm_apply]
 
-lemma basis_outer_coeff
-    {E : Type u} [Qudit E] {ι : Type*} [DecidableEq ι] [Fintype ι]
-    (b : Module.Basis ι ℂ E) (p q i j : ι) :
-    b.coord q ((outer_product (b i) (b j))
-      ((InnerProductSpace.toDual ℂ E).symm ((b.coord p).toContinuousLinearMap))) =
-        if i = p then if j = q then 1 else 0 else 0 := by
-  have hinner := basis_dual_inner b i p
-  by_cases hip : i = p
-  · subst hip
-    by_cases hjq : j = q <;> simp [outer_product, dualTensorHom_apply, hinner, hjq]
-  · simp [outer_product, dualTensorHom_apply, hinner, hip]
+/-- The trace of `X ⊗ Y` is the product of the traces. -/
+@[simp]
+theorem Tr_mapL (X : L ℋ₁) (Y : L ℋ₂) : Tr (TensorProduct.mapL X Y) = Tr X * Tr Y := by
+  simp only [Tr_apply, TensorProduct.toLinearMap_mapL]
+  exact LinearMap.trace_tensorProduct' _ _
 
-lemma l_tensor_equiv_symm_outer_product
-    {E : Type u} {F : Type v} [Qudit E] [Qudit F]
-    (u v : E) (x y : F) :
-    (l_tensor_equiv (ℋ₁ := E) (ℋ₂ := F)).symm
-      ((outer_product u v) ⊗ₜ[ℂ] (outer_product x y)) =
-        outer_product (u ⊗ₜ[ℂ] x) (v ⊗ₜ[ℂ] y) := by
-  apply LinearMap.ext
-  intro z
-  refine TensorProduct.induction_on z ?_ ?_ ?_
-  · simp
-  · intro a b
-    simp [l_tensor_equiv, outer_product, TensorProduct.inner_tmul, smul_tmul']
-  · intro z₁ z₂ hz₁ hz₂
-    simp [hz₁, hz₂]
+/-- Tracing out the first factor of `X ⊗ Y` leaves `Tr X • Y`. -/
+theorem TrLeft_opTensorEquiv_symm_tmul (X : L ℋ₁) (Y : L ℋ₂) :
+    TrLeft (opTensorEquiv.symm (X ⊗ₜ[ℂ] Y)) = Tr X • Y := by
+  refine ContinuousLinearMap.ext fun y' ↦ ext_inner_left ℂ fun y ↦ ?_
+  rw [TrLeft_apply, ContinuousLinearMap.inner_traceLeft _ (stdOrthonormalBasis ℂ ℋ₁)]
+  simp only [opTensorEquiv_symm_tmul, TensorProduct.mapL_tmul, TensorProduct.inner_tmul,
+    smul_apply, inner_smul_right, Tr_apply]
+  rw [← Finset.sum_mul, LinearMap.trace_eq_sum_inner _ (stdOrthonormalBasis ℂ ℋ₁)]
+  rfl
 
-lemma l_tensor_equiv_outer_product_tmul
-    {E : Type u} {F : Type v} [Qudit E] [Qudit F]
-    (u v : E) (x y : F) :
-    (l_tensor_equiv (ℋ₁ := E) (ℋ₂ := F))
-      (outer_product (u ⊗ₜ[ℂ] x) (v ⊗ₜ[ℂ] y)) =
-        (outer_product u v) ⊗ₜ[ℂ] (outer_product x y) := by
-  apply (l_tensor_equiv (ℋ₁ := E) (ℋ₂ := F)).symm.injective
-  rw [LinearEquiv.symm_apply_apply]
-  exact (l_tensor_equiv_symm_outer_product (E := E) (F := F) u v x y).symm
+/-- Tracing out the second factor of `X ⊗ Y` leaves `Tr Y • X`. -/
+theorem TrRight_opTensorEquiv_symm_tmul (X : L ℋ₁) (Y : L ℋ₂) :
+    TrRight (opTensorEquiv.symm (X ⊗ₜ[ℂ] Y)) = Tr Y • X := by
+  refine ContinuousLinearMap.ext fun x' ↦ ext_inner_left ℂ fun x ↦ ?_
+  rw [TrRight_apply, ContinuousLinearMap.inner_traceRight _ (stdOrthonormalBasis ℂ ℋ₂)]
+  simp only [opTensorEquiv_symm_tmul, TensorProduct.mapL_tmul, TensorProduct.inner_tmul,
+    smul_apply, inner_smul_right, Tr_apply]
+  rw [← Finset.mul_sum, LinearMap.trace_eq_sum_inner _ (stdOrthonormalBasis ℂ ℋ₂), mul_comm]
+  rfl
 
-lemma choi_basis_expansion
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    choi b Φ =
-      ∑ i : ι, ∑ j : ι,
-        (l_tensor_equiv (ℋ₁ := ℋ₂) (ℋ₂ := ℋ₁)).symm
-          ((Φ (outer_product (b i) (b j))) ⊗ₜ[ℂ] outer_product (b i) (b j)) := by
-  rw [choi, vec_apply]
-  simp only [I, LinearMap.id_coe, id_eq]
-  change (l_tensor_equiv (ℋ₁ := ℋ₂) (ℋ₂ := ℋ₁)).symm
-      ((TensorProduct.map Φ LinearMap.id)
-        ((l_tensor_equiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₁))
-          (outer_product (∑ i : ι, b i ⊗ₜ[ℂ] b i) (∑ i : ι, b i ⊗ₜ[ℂ] b i)))) =
-    ∑ i : ι, ∑ j : ι,
-      (l_tensor_equiv (ℋ₁ := ℋ₂) (ℋ₂ := ℋ₁)).symm
-        ((Φ (outer_product (b i) (b j))) ⊗ₜ[ℂ] outer_product (b i) (b j))
-  rw [show outer_product (∑ i : ι, b i ⊗ₜ[ℂ] b i) (∑ i : ι, b i ⊗ₜ[ℂ] b i) =
-      ∑ i : ι, ∑ j : ι, outer_product (b i ⊗ₜ[ℂ] b i) (b j ⊗ₜ[ℂ] b j) by
-    exact outer_product_sum (fun i : ι => b i ⊗ₜ[ℂ] b i) (fun i : ι => b i ⊗ₜ[ℂ] b i)]
-  simp only [map_sum]
-  simp_rw [l_tensor_equiv_outer_product_tmul]
-  simp only [TensorProduct.map_tmul, LinearMap.id_coe, id_eq]
+/-- Tracing out the first factor of a product of positive operators leaves a positive operator. -/
+theorem TrLeft_opTensorEquiv_symm_tmul_nonneg (X : L ℋ₁) (Y : L ℋ₂) (hX : 0 ≤ X) (hY : 0 ≤ Y) :
+    0 ≤ TrLeft (opTensorEquiv.symm (X ⊗ₜ[ℂ] Y)) := by
+  rw [TrLeft_opTensorEquiv_symm_tmul]
+  exact (ContinuousLinearMap.nonneg_iff_isPositive _).mpr <|
+    ((ContinuousLinearMap.nonneg_iff_isPositive Y).mp hY).smul_of_nonneg
+      ((ContinuousLinearMap.nonneg_iff_isPositive X).mp hX).toLinearMap.trace_nonneg
 
-lemma tensor_basis_sum_coeff
-    {E : Type u} {F : Type v} [Qudit E] [Qudit F]
-    {ι : Type*} [DecidableEq ι] [Fintype ι]
-    (b : Module.Basis ι ℂ E) (p q : ι) (S : ι → ι → L F) :
-    (TensorProduct.rid ℂ (L F)).toLinearMap
-      ((TensorProduct.map LinearMap.id
-        { toFun := fun X : L E =>
-            b.coord q (X ((InnerProductSpace.toDual ℂ E).symm ((b.coord p).toContinuousLinearMap)))
-          map_add' := by intro X Y; simp
-          map_smul' := by intro c X; simp })
-        (∑ i : ι, ∑ j : ι, S i j ⊗ₜ[ℂ] outer_product (b i) (b j))) =
-      S p q := by
-  classical
-  simp only [map_sum, TensorProduct.map_tmul, LinearMap.id_coe, id_eq]
-  rw [Finset.sum_eq_single p]
-  · rw [Finset.sum_eq_single q]
-    · have hcoeff :
-          (b.repr ((outer_product (b p) (b q))
-            ((InnerProductSpace.toDual ℂ E).symm
-              (LinearMap.toContinuousLinearMap (b.coord p))))) q = 1 := by
-          simpa using (basis_outer_coeff b p q p q)
-      simp [Module.Basis.coord_apply, hcoeff]
-    · intro j _ hjq
-      have hcoeff :
-          (b.repr ((outer_product (b p) (b j))
-            ((InnerProductSpace.toDual ℂ E).symm
-              (LinearMap.toContinuousLinearMap (b.coord p))))) q = 0 := by
-          simpa [hjq] using (basis_outer_coeff b p q p j)
-      simp [Module.Basis.coord_apply, hcoeff]
-    · intro hq
-      simp at hq
-  · intro i _ hip
-    apply Finset.sum_eq_zero
-    intro j _
-    have hcoeff :
-        (b.repr ((outer_product (b i) (b j))
-          ((InnerProductSpace.toDual ℂ E).symm
-            (LinearMap.toContinuousLinearMap (b.coord p))))) q = 0 := by
-        simpa [hip] using (basis_outer_coeff b p q i j)
-    simp [Module.Basis.coord_apply, hcoeff]
-  · intro hp
-    simp at hp
-
-lemma choi_basis_apply_eq_of_choi_eq
-    (b : Module.Basis ι ℂ ℋ₁) {Φ Ψ : T ℋ₁ ℋ₂}
-    (h : choi b Φ = choi b Ψ) (i j : ι) :
-    Φ (outer_product (b i) (b j)) = Ψ (outer_product (b i) (b j)) := by
-  have htensor :
-      (∑ p : ι, ∑ q : ι,
-        Φ (outer_product (b p) (b q)) ⊗ₜ[ℂ] outer_product (b p) (b q)) =
-      (∑ p : ι, ∑ q : ι,
-        Ψ (outer_product (b p) (b q)) ⊗ₜ[ℂ] outer_product (b p) (b q)) := by
-    have h' := congrArg (l_tensor_equiv (ℋ₁ := ℋ₂) (ℋ₂ := ℋ₁)) h
-    simpa [choi_basis_expansion] using h'
-  calc
-    Φ (outer_product (b i) (b j)) =
-        (TensorProduct.rid ℂ (L ℋ₂)).toLinearMap
-          ((TensorProduct.map LinearMap.id
-            { toFun := fun X : L ℋ₁ =>
-                b.coord j
-                  (X ((InnerProductSpace.toDual ℂ ℋ₁).symm ((b.coord i).toContinuousLinearMap)))
-              map_add' := by intro X Y; simp
-              map_smul' := by intro c X; simp })
-            (∑ p : ι, ∑ q : ι,
-              Φ (outer_product (b p) (b q)) ⊗ₜ[ℂ] outer_product (b p) (b q))) := by
-          exact (tensor_basis_sum_coeff b i j
-            (fun p q => Φ (outer_product (b p) (b q)))).symm
-    _ =
-        (TensorProduct.rid ℂ (L ℋ₂)).toLinearMap
-          ((TensorProduct.map LinearMap.id
-            { toFun := fun X : L ℋ₁ =>
-                b.coord j
-                  (X ((InnerProductSpace.toDual ℂ ℋ₁).symm ((b.coord i).toContinuousLinearMap)))
-              map_add' := by intro X Y; simp
-              map_smul' := by intro c X; simp })
-            (∑ p : ι, ∑ q : ι,
-              Ψ (outer_product (b p) (b q)) ⊗ₜ[ℂ] outer_product (b p) (b q))) := by
-          rw [htensor]
-    _ = Ψ (outer_product (b i) (b j)) := by
-          exact tensor_basis_sum_coeff b i j
-            (fun p q => Ψ (outer_product (b p) (b q)))
-
-lemma choi_injective
-    (b : Module.Basis ι ℂ ℋ₁) :
-    Function.Injective (choi b : T ℋ₁ ℋ₂ → L (ℋ₂ ⊗[ℂ] ℋ₁)) := by
-  intro Φ Ψ h
-  apply LinearMap.ext
-  intro X
-  conv_lhs => rw [linearMap_eq_sum_basis_outer_product b X]
-  conv_rhs => rw [linearMap_eq_sum_basis_outer_product b X]
-  simp only [map_sum, map_smul]
-  refine Finset.sum_congr rfl ?_
-  intro i _
-  refine Finset.sum_congr rfl ?_
-  intro j _
-  rw [choi_basis_apply_eq_of_choi_eq b h i j]
-
-lemma outer_product_vec_expansion
-    (b : Module.Basis ι ℂ ℋ₁) (A : ℋ₁ →ₗ[ℂ] ℋ₂) :
-    outer_product (vec b A) (vec b A) =
-      ∑ i : ι, ∑ j : ι,
-        (l_tensor_equiv (ℋ₁ := ℋ₂) (ℋ₂ := ℋ₁)).symm
-          ((outer_product (A (b i)) (A (b j))) ⊗ₜ[ℂ] outer_product (b i) (b j)) := by
-  rw [vec_apply]
-  rw [show outer_product (∑ i : ι, A (b i) ⊗ₜ[ℂ] b i)
-      (∑ i : ι, A (b i) ⊗ₜ[ℂ] b i) =
-      ∑ i : ι, ∑ j : ι,
-        outer_product (A (b i) ⊗ₜ[ℂ] b i) (A (b j) ⊗ₜ[ℂ] b j) by
-    exact outer_product_sum
-      (fun i : ι => A (b i) ⊗ₜ[ℂ] b i)
-      (fun i : ι => A (b i) ⊗ₜ[ℂ] b i)]
-  simp_rw [← l_tensor_equiv_symm_outer_product]
-
-lemma choi_kraus_expansion
-    {κ : Type u} [DecidableEq κ] [Fintype κ]
-    (b : Module.Basis ι ℂ ℋ₁) (A : κ → (ℋ₁ →ₗ[ℂ] ℋ₂)) :
-    choi b
-      { toFun := fun X => ∑ a : κ, (A a).comp (X.comp (LinearMap.adjoint (A a)))
-        map_add' := by
-          intro X Y
-          simp [LinearMap.comp_add, LinearMap.add_comp, Finset.sum_add_distrib]
-        map_smul' := by
-          intro c X
-          simp [LinearMap.comp_smul, LinearMap.smul_comp, Finset.smul_sum] } =
-      ∑ a : κ, outer_product (vec b (A a)) (vec b (A a)) := by
-  classical
-  rw [choi_basis_expansion]
-  change
-    ∑ i : ι, ∑ j : ι,
-      (l_tensor_equiv (ℋ₁ := ℋ₂) (ℋ₂ := ℋ₁)).symm
-        (((∑ a : κ, (A a).comp ((outer_product (b i) (b j)).comp
-          (LinearMap.adjoint (A a)))) ⊗ₜ[ℂ] outer_product (b i) (b j))) =
-      ∑ a : κ, outer_product (vec b (A a)) (vec b (A a))
-  simp_rw [comp_outer_product_adjoint]
-  simp_rw [TensorProduct.sum_tmul]
-  simp only [map_sum]
-  simp_rw [outer_product_vec_expansion]
-  let F : ι → ι → κ → L (ℋ₂ ⊗[ℂ] ℋ₁) :=
-    fun i j a =>
-      (l_tensor_equiv (ℋ₁ := ℋ₂) (ℋ₂ := ℋ₁)).symm
-        ((outer_product (A a (b i)) (A a (b j))) ⊗ₜ[ℂ] outer_product (b i) (b j))
-  change ∑ i : ι, ∑ j : ι, ∑ a : κ, F i j a =
-    ∑ a : κ, ∑ i : ι, ∑ j : ι, F i j a
-  calc
-    ∑ i : ι, ∑ j : ι, ∑ a : κ, F i j a
-        = ∑ i : ι, ∑ a : κ, ∑ j : ι, F i j a := by
-          refine Finset.sum_congr rfl ?_
-          intro i _
-          exact Finset.sum_comm
-    _ = ∑ a : κ, ∑ i : ι, ∑ j : ι, F i j a := by
-          exact Finset.sum_comm
-
-lemma choi_outer_product_kraus_apply
-    {κ : Type u} [DecidableEq κ] [Fintype κ]
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂)
-    (u : κ → ℋ₂ ⊗[ℂ] ℋ₁)
-    (hΦ : choi b Φ = ∑ a : κ, outer_product (u a) (u a))
-    (X : L ℋ₁) :
-    let A : κ → (ℋ₁ →ₗ[ℂ] ℋ₂) :=
-      fun a => (vecLinearEquiv (ℋ₁ := ℋ₂) b).symm (u a)
-    Φ X = ∑ a : κ, (A a).comp (X.comp (LinearMap.adjoint (A a))) := by
-  classical
-  let A : κ → (ℋ₁ →ₗ[ℂ] ℋ₂) :=
-    fun a => (vecLinearEquiv (ℋ₁ := ℋ₂) b).symm (u a)
-  let Ψ : T ℋ₁ ℋ₂ :=
-    { toFun := fun X => ∑ a : κ, (A a).comp (X.comp (LinearMap.adjoint (A a)))
-      map_add' := by
-        intro X Y
-        simp [LinearMap.comp_add, LinearMap.add_comp, Finset.sum_add_distrib]
-      map_smul' := by
-        intro c X
-        simp [LinearMap.comp_smul, LinearMap.smul_comp, Finset.smul_sum] }
-  have hvec : ∀ a : κ, vec b (A a) = u a := by
-    intro a
-    rw [← vecLinearEquiv_toLinearMap (ℋ₁ := ℋ₂) b]
-    exact LinearEquiv.apply_symm_apply (vecLinearEquiv (ℋ₁ := ℋ₂) b) (u a)
-  have hΨ : choi b Ψ = choi b Φ := by
-    rw [choi_kraus_expansion]
-    simp_rw [hvec]
-    exact hΦ.symm
-  have hmap : Ψ = Φ := choi_injective b hΨ
-  change Φ X = Ψ X
-  exact (LinearMap.congr_fun hmap X).symm
-
-lemma choi_outer_product_to_kraus
-    {κ : Type u} [DecidableEq κ] [Fintype κ]
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂)
-    (u : κ → ℋ₂ ⊗[ℂ] ℋ₁)
-    (hΦ : choi b Φ = ∑ a : κ, outer_product (u a) (u a)) :
-    KrausRep Φ κ := by
-  refine ⟨fun a => (vecLinearEquiv (ℋ₁ := ℋ₂) b).symm (u a), ?_⟩
-  intro X
-  exact choi_outer_product_kraus_apply b Φ u hΦ X
-
-theorem fixed_kraus_to_choi
-    {κ : Type u} [DecidableEq κ] [Fintype κ]
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    KrausRep Φ κ → ChoiPositive b Φ := by
-  rintro ⟨A, hA⟩
-  have hΦ :
-      Φ =
-        { toFun := fun X => ∑ a : κ, (A a).comp (X.comp (LinearMap.adjoint (A a)))
-          map_add' := by
-            intro X Y
-            simp [LinearMap.comp_add, LinearMap.add_comp, Finset.sum_add_distrib]
-          map_smul' := by
-            intro c X
-            simp [LinearMap.comp_smul, LinearMap.smul_comp, Finset.smul_sum] } := by
-    apply LinearMap.ext
-    intro X
-    exact hA X
-  rw [hΦ]
-  rw [ChoiPositive, choi_kraus_expansion]
-  exact Finset.sum_nonneg fun a _ =>
-    outer_product_self_nonneg (vec b (A a))
-
-theorem kraus_to_choi
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    HasKraus Φ → ChoiPositive b Φ := by
-  rintro ⟨κ, hκ, hκ', hΦ⟩
-  let : DecidableEq κ := hκ
-  let : Fintype κ := hκ'
-  exact fixed_kraus_to_choi b Φ hΦ
-
-theorem rank_kraus_to_choi
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    HasRankKraus b Φ → ChoiPositive b Φ :=
-  kraus_to_choi b Φ ∘
-    rankKraus_to_kraus b Φ
-
-lemma l_tensor_equiv_symm_outer_product_apply
-    {E : Type u} {F : Type v} [Qudit E] [Qudit F]
-    (u v x : E) (T : L F) (y : F) :
-    ((l_tensor_equiv (ℋ₁ := E) (ℋ₂ := F)).symm
-      ((outer_product u v) ⊗ₜ[ℂ] T)) (x ⊗ₜ[ℂ] y) =
-        (outer_product u v x) ⊗ₜ[ℂ] T y := by
-  let b := stdOrthonormalBasis ℂ F
-  rw [linearMap_eq_sum_outer_product b T]
-  rw [TensorProduct.tmul_sum]
+/-- The same for a sum of products of positive operators, a separable operator. -/
+theorem TrLeft_sum_opTensorEquiv_symm_tmul_nonneg {σ : Type*} [Fintype σ]
+    (X : σ → L ℋ₁) (Y : σ → L ℋ₂) (hX : ∀ a, 0 ≤ X a) (hY : ∀ a, 0 ≤ Y a) :
+    0 ≤ TrLeft (∑ a : σ, opTensorEquiv.symm ((X a) ⊗ₜ[ℂ] (Y a))) := by
   rw [map_sum]
-  simp only [LinearMap.sum_apply, l_tensor_equiv_symm_outer_product]
-  simp [outer_product_eq_rankOne, TensorProduct.inner_tmul]
-  rw [TensorProduct.tmul_sum]
-  simp [smul_tmul', smul_smul, mul_comm]
+  exact Finset.sum_nonneg fun a _ ↦ TrLeft_opTensorEquiv_symm_tmul_nonneg (X a) (Y a) (hX a) (hY a)
 
-lemma ite_tmul_zero_left
-    {E : Type u} {F : Type v}
-    [AddCommGroup E] [Module ℂ E] [AddCommGroup F] [Module ℂ F]
-    (p : Prop) [Decidable p] (x : E) (y : F) :
-    (if p then x else 0) ⊗ₜ[ℂ] y = if p then x ⊗ₜ[ℂ] y else 0 := by
-  by_cases hp : p <;> simp [hp]
+end TensorEquiv
 
-lemma trace_outer_product_basisFun
-    {κ : Type u} [DecidableEq κ] [Fintype κ]
-    (a b : κ) :
-    Tr (outer_product (EuclideanSpace.basisFun κ ℂ a) (EuclideanSpace.basisFun κ ℂ b)) =
-      if a = b then 1 else 0 := by
-  rw [outer_product_eq_rankOne, InnerProductSpace.trace_rankOne]
-  by_cases hab : a = b
-  · subst hab
-    simp [EuclideanSpace.basisFun_apply]
-  · simpa [hab] using (EuclideanSpace.basisFun κ ℂ).inner_eq_ite a b
+section Conjugate
 
-lemma trace_outer_product_single
-    {κ : Type u} [DecidableEq κ] [Fintype κ]
-    (a b : κ) :
-    Tr (outer_product (EuclideanSpace.single a (1 : ℂ)) (EuclideanSpace.single b (1 : ℂ))) =
-      if a = b then 1 else 0 := by
-  simpa [EuclideanSpace.basisFun_apply] using
-    (trace_outer_product_basisFun (κ := κ) a b)
+variable {E : Type u} {F : Type v} [Qudit E] [Qudit F]
 
-lemma trace_outer_product
-    {E : Type u} [Qudit E] (u v : E) :
-    Tr (outer_product u v) = inner ℂ u v := by
-  rw [outer_product_eq_rankOne]
-  simpa using InnerProductSpace.trace_rankOne (𝕜 := ℂ) (E := E) v u
+/-- Transporting an operator along an isomorphism of the underlying spaces, `X ↦ e X e⁻¹`. -/
+noncomputable def conjugateEnd (e : E ≃L[ℂ] F) : OpMap E F where
+  toFun X := (e : E →L[ℂ] F) ∘L X ∘L (e.symm : F →L[ℂ] E)
+  map_add' X Y := by
+    simp [ContinuousLinearMap.comp_add, ContinuousLinearMap.add_comp]
+  map_smul' c X := by
+    simp [ContinuousLinearMap.smul_comp]
 
-noncomputable def tensorRightSlice
-    {κ : Type*} [Fintype κ]
-    {E : Type u} {F : Type v} [Qudit E] [Qudit F]
-    (b : OrthonormalBasis κ ℂ F) (i : κ) :
-    E ⊗[ℂ] F →ₗ[ℂ] E :=
-  (TensorProduct.rid ℂ E).toLinearMap ∘ₗ
-    TensorProduct.map LinearMap.id (b.toBasis.coord i)
+/-- `conjugateEnd e` acts by `X ↦ e X e⁻¹`. -/
+@[simp]
+theorem conjugateEnd_apply (e : E ≃L[ℂ] F) (X : L E) :
+    conjugateEnd e X = (e : E →L[ℂ] F) ∘L X ∘L (e.symm : F →L[ℂ] E) :=
+  rfl
 
-lemma tensorRightSlice_tmul
-    {κ : Type*} [Fintype κ]
-    {E : Type u} {F : Type v} [Qudit E] [Qudit F]
-    (b : OrthonormalBasis κ ℂ F) (i : κ) (x : E) (y : F) :
-    tensorRightSlice (E := E) (F := F) b i (x ⊗ₜ[ℂ] y) =
-      b.toBasis.coord i y • x := by
-  simp [tensorRightSlice]
+end Conjugate
 
-lemma tensorRightSlice_expand
-    {κ : Type*} [Fintype κ]
-    {E : Type u} {F : Type v} [Qudit E] [Qudit F]
-    (b : OrthonormalBasis κ ℂ F) (z : E ⊗[ℂ] F) :
-    z = ∑ i : κ, tensorRightSlice (E := E) (F := F) b i z ⊗ₜ[ℂ] b i := by
-  refine TensorProduct.induction_on z ?_ ?_ ?_
+section Stinespring
+
+variable {ℋ₁ : Type u} {ℋ₂ : Type v} [Qudit ℋ₁] [Qudit ℋ₂]
+variable {κ : Type u} [Fintype κ] [DecidableEq κ]
+
+/-- The Stinespring operator `x ↦ ∑ₐ (Aₐ x) ⊗ eₐ` of a Kraus family `A`. -/
+noncomputable def krausToStinespringOperator (A : κ → (ℋ₁ →L[ℂ] ℋ₂)) :
+    ℋ₁ →L[ℂ] (ℋ₂ ⊗[ℂ] EuclideanSpace ℂ κ) :=
+  ∑ a : κ, TensorProduct.tmulRightL ℂ (EuclideanSpace.basisFun κ ℂ a) ∘L A a
+
+/-- The Stinespring operator sends `x` to `∑ₐ (Aₐ x) ⊗ eₐ`. -/
+@[simp]
+theorem krausToStinespringOperator_apply (A : κ → (ℋ₁ →L[ℂ] ℋ₂)) (x : ℋ₁) :
+    krausToStinespringOperator A x = ∑ a : κ, (A a x) ⊗ₜ[ℂ] (EuclideanSpace.basisFun κ ℂ a) := by
+  simp [krausToStinespringOperator]
+
+/-- Its adjoint reads off one Kraus operator at a time: `y ⊗ e_b` goes to `A_b† y`. -/
+@[simp]
+theorem adjoint_krausToStinespringOperator_tmul_single (A : κ → (ℋ₁ →L[ℂ] ℋ₂)) (y : ℋ₂) (b : κ) :
+    ((krausToStinespringOperator A)†) (y ⊗ₜ[ℂ] EuclideanSpace.single b 1) = ((A b)†) y := by
+  refine ext_inner_right ℂ fun x ↦ ?_
+  rw [ContinuousLinearMap.adjoint_inner_left, ContinuousLinearMap.adjoint_inner_left,
+    krausToStinespringOperator_apply]
+  simp [inner_sum, TensorProduct.inner_tmul, EuclideanSpace.basisFun_apply,
+    EuclideanSpace.inner_single_left]
+
+/-- Tracing out the environment of the Stinespring operator recovers the Kraus sum. -/
+theorem trRight_kraus (A : κ → (ℋ₁ →L[ℂ] ℋ₂)) (X : L ℋ₁) :
+    TrRight (krausToStinespringOperator A ∘L X ∘L (krausToStinespringOperator A)†) =
+      ∑ a : κ, A a ∘L X ∘L (A a)† := by
+  refine ContinuousLinearMap.ext fun x' ↦ ext_inner_left ℂ fun x ↦ ?_
+  rw [TrRight_apply, ContinuousLinearMap.inner_traceRight _ (EuclideanSpace.basisFun κ ℂ)]
+  simp only [ContinuousLinearMap.comp_apply, EuclideanSpace.basisFun_apply,
+    adjoint_krausToStinespringOperator_tmul_single]
+  simp only [krausToStinespringOperator_apply, inner_sum, TensorProduct.inner_tmul,
+    EuclideanSpace.basisFun_apply, EuclideanSpace.inner_single_left, map_one, one_mul, sum_apply]
+  refine Finset.sum_congr rfl fun i _ ↦ ?_
+  rw [Finset.sum_eq_single i]
   · simp
-  · intro x y
-    calc
-      x ⊗ₜ[ℂ] y = x ⊗ₜ[ℂ] (∑ i : κ, b.repr y i • b i) := by
-        rw [b.sum_repr]
-      _ = ∑ i : κ, x ⊗ₜ[ℂ] (b.repr y i • b i) := by
-        rw [TensorProduct.tmul_sum]
-      _ = ∑ i : κ, (b.toBasis.coord i y • x) ⊗ₜ[ℂ] b i := by
-        refine Finset.sum_congr rfl ?_
-        intro i _
-        rw [TensorProduct.tmul_smul, TensorProduct.smul_tmul']
-        simp [OrthonormalBasis.repr_apply_apply]
-  · intro x y hx hy
-    calc
-      x + y =
-          ∑ i, (tensorRightSlice (E := E) (F := F) b i) x ⊗ₜ[ℂ] b i +
-            ∑ i, (tensorRightSlice (E := E) (F := F) b i) y ⊗ₜ[ℂ] b i := by
-            exact congrArg₂ (fun a b => a + b) hx hy
-      _ =
-          ∑ i,
-            ((tensorRightSlice (E := E) (F := F) b i) x ⊗ₜ[ℂ] b i +
-              (tensorRightSlice (E := E) (F := F) b i) y ⊗ₜ[ℂ] b i) := by
-            rw [Finset.sum_add_distrib]
-      _ =
-          ∑ i,
-            ((tensorRightSlice (E := E) (F := F) b i) x +
-              (tensorRightSlice (E := E) (F := F) b i) y) ⊗ₜ[ℂ] b i := by
-            simp [TensorProduct.add_tmul]
-      _ =
-          ∑ i, (tensorRightSlice (E := E) (F := F) b i) (x + y) ⊗ₜ[ℂ] b i := by
-            simp [map_add]
+  · intro b _ hb
+    simp [hb]
+  · simp
 
-lemma TrRight_outer_product_tmul_basis
-    {κ : Type*} [DecidableEq κ] [Fintype κ]
-    {E : Type u} {F : Type v} [Qudit E] [Qudit F]
-    (b : OrthonormalBasis κ ℂ F) (i j : κ) (x y : E) :
-    TrRight (ℋ₂ := E) (ℋ₃ := F)
-      (outer_product (x ⊗ₜ[ℂ] b i) (y ⊗ₜ[ℂ] b j)) =
-        if i = j then outer_product x y else 0 := by
-  dsimp [TrRight]
-  have hconj :
-      conjugateEnd (TensorProduct.comm ℂ E F)
-        (outer_product (x ⊗ₜ[ℂ] b i) (y ⊗ₜ[ℂ] b j)) =
-        outer_product (b i ⊗ₜ[ℂ] x) (b j ⊗ₜ[ℂ] y) := by
-    apply LinearMap.ext
-    intro z
-    refine TensorProduct.induction_on z ?_ ?_ ?_
-    · simp [conjugateEnd, outer_product]
-    · intro a c
-      simp [conjugateEnd, outer_product_eq_rankOne, TensorProduct.inner_tmul, mul_comm]
-    · intro z w hz hw
-      simp [hz, hw]
-  rw [hconj]
-  rw [← l_tensor_equiv_symm_outer_product (E := F) (F := E) (b i) (b j) x y]
-  rw [Tr₂_l_tensor_equiv_symm_tmul]
-  rw [trace_outer_product]
-  by_cases hij : i = j
-  · subst j
-    simp
-  · simp [b.inner_eq_ite, hij]
+/-- The Gram operator of the Stinespring operator is the Kraus completeness sum. -/
+theorem adjoint_comp_krausToStinespringOperator (A : κ → (ℋ₁ →L[ℂ] ℋ₂)) :
+    (krausToStinespringOperator A)† ∘L krausToStinespringOperator A =
+      ∑ a : κ, (A a)† ∘L A a := by
+  refine ContinuousLinearMap.ext fun x ↦ ?_
+  rw [ContinuousLinearMap.comp_apply, krausToStinespringOperator_apply, map_sum, sum_apply]
+  simp only [EuclideanSpace.basisFun_apply]
+  exact Finset.sum_congr rfl fun a _ ↦
+    adjoint_krausToStinespringOperator_tmul_single A (A a x) a
 
-lemma TrRight_outer_product
-    {κ : Type*} [DecidableEq κ] [Fintype κ]
-    {E : Type u} {F : Type v} [Qudit E] [Qudit F]
-    (b : OrthonormalBasis κ ℂ F) (u v : E ⊗[ℂ] F) :
-    TrRight (ℋ₂ := E) (ℋ₃ := F) (outer_product u v) =
-      ∑ i : κ,
-        outer_product
-          (tensorRightSlice (E := E) (F := F) b i u)
-          (tensorRightSlice (E := E) (F := F) b i v) := by
-  conv_lhs =>
-    rw [tensorRightSlice_expand (E := E) (F := F) b u,
-      tensorRightSlice_expand (E := E) (F := F) b v]
-    rw [outer_product_sum]
-  simp only [map_sum]
-  classical
-  calc
-    ∑ a : κ, ∑ b' : κ,
-        TrRight (ℋ₂ := E) (ℋ₃ := F)
-          (outer_product
-            (tensorRightSlice (E := E) (F := F) b a u ⊗ₜ[ℂ] b a)
-            (tensorRightSlice (E := E) (F := F) b b' v ⊗ₜ[ℂ] b b')) =
-      ∑ a : κ, ∑ b' : κ,
-        (if a = b' then
-          outer_product
-            (tensorRightSlice (E := E) (F := F) b a u)
-            (tensorRightSlice (E := E) (F := F) b b' v)
-        else 0) := by
-        refine Finset.sum_congr rfl ?_
-        intro a _
-        refine Finset.sum_congr rfl ?_
-        intro b' _
-        exact TrRight_outer_product_tmul_basis (E := E) (F := F) b a b'
-          (tensorRightSlice (E := E) (F := F) b a u)
-          (tensorRightSlice (E := E) (F := F) b b' v)
-    _ =
-      ∑ i : κ,
-        outer_product
-          (tensorRightSlice (E := E) (F := F) b i u)
-          (tensorRightSlice (E := E) (F := F) b i v) := by
-        refine Finset.sum_congr rfl ?_
-        intro a _
-        rw [Finset.sum_eq_single a]
-        · simp
-        · intro b' _ hb'
-          have hab : a ≠ b' := fun h => hb' h.symm
-          simp [hab]
-        · simp
+end Stinespring
 
-lemma tensorRightSlice_comp_outer_product
-    {κ : Type*} [Fintype κ]
-    {E : Type u} {F : Type v} [Qudit E] [Qudit F]
-    (b : OrthonormalBasis κ ℂ F) (i : κ) (u v : E ⊗[ℂ] F) :
-    (tensorRightSlice (E := E) (F := F) b i).comp
-        ((outer_product u v).comp
-          (LinearMap.adjoint (tensorRightSlice (E := E) (F := F) b i))) =
-      outer_product
-        (tensorRightSlice (E := E) (F := F) b i u)
-        (tensorRightSlice (E := E) (F := F) b i v) := by
-  exact @comp_outer_product_adjoint (E ⊗[ℂ] F) inferInstance E inferInstance
-    (tensorRightSlice (E := E) (F := F) b i) u v
+section Channel
 
-lemma TrRight_eq_kraus_sum
-    {κ : Type*} [DecidableEq κ] [Fintype κ]
-    {E : Type u} {F : Type v} [Qudit E] [Qudit F]
-    (b : OrthonormalBasis κ ℂ F) (X : L (E ⊗[ℂ] F)) :
-    TrRight (ℋ₂ := E) (ℋ₃ := F) X =
-      (∑ i : κ,
-        (tensorRightSlice (E := E) (F := F) b i).comp
-          (X.comp (LinearMap.adjoint (tensorRightSlice (E := E) (F := F) b i))) : L E) := by
-  let c : OrthonormalBasis (Fin (Module.finrank ℂ (E ⊗[ℂ] F))) ℂ (E ⊗[ℂ] F) :=
-    stdOrthonormalBasis ℂ (E ⊗[ℂ] F)
-  rw [linearMap_eq_sum_outer_product c X]
-  calc
-    TrRight (ℋ₂ := E) (ℋ₃ := F) (∑ a, outer_product (c a) (X (c a))) =
-        ∑ a, TrRight (ℋ₂ := E) (ℋ₃ := F) (outer_product (c a) (X (c a))) := by
-          simp
-    _ =
-        ∑ a, ∑ i : κ,
-          (outer_product
-            (tensorRightSlice (E := E) (F := F) b i (c a))
-            (tensorRightSlice (E := E) (F := F) b i (X (c a))) : L E) := by
-          refine Finset.sum_congr rfl ?_
-          intro a _
-          exact TrRight_outer_product (E := E) (F := F) b (c a) (X (c a))
-    _ =
-        ∑ i : κ, ∑ a,
-          (outer_product
-            (tensorRightSlice (E := E) (F := F) b i (c a))
-            (tensorRightSlice (E := E) (F := F) b i (X (c a))) : L E) := by
-          rw [Finset.sum_comm]
-    _ =
-        (∑ i : κ,
-          (tensorRightSlice (E := E) (F := F) b i).comp
-            ((∑ a, outer_product (c a) (X (c a))).comp
-              (LinearMap.adjoint (tensorRightSlice (E := E) (F := F) b i))) : L E) := by
-          refine Finset.sum_congr rfl ?_
-          intro i _
-          calc
-            (∑ a,
-              (outer_product
-                (tensorRightSlice (E := E) (F := F) b i (c a))
-                (tensorRightSlice (E := E) (F := F) b i (X (c a))) : L E)) =
-                ∑ a,
-                  (tensorRightSlice (E := E) (F := F) b i).comp
-                    ((outer_product (c a) (X (c a))).comp
-                      (LinearMap.adjoint (tensorRightSlice (E := E) (F := F) b i))) := by
-                refine Finset.sum_congr rfl ?_
-                intro a _
-                exact (tensorRightSlice_comp_outer_product
-                  (E := E) (F := F) b i (c a) (X (c a))).symm
-            _ =
-                (tensorRightSlice (E := E) (F := F) b i).comp
-                  ((∑ a, outer_product (c a) (X (c a))).comp
-                    (LinearMap.adjoint (tensorRightSlice (E := E) (F := F) b i))) := by
-                ext z
-                simp [LinearMap.comp_apply]
+variable {ℋ₁ : Type u} {ℋ₂ : Type v} [Qudit ℋ₁] [Qudit ℋ₂]
 
-theorem TrRight_krausRep
-    {κ : Type*} [DecidableEq κ] [Fintype κ]
-    {E : Type u} {F : Type v} [Qudit E] [Qudit F]
-    (b : OrthonormalBasis κ ℂ F) :
-    KrausRep (ℋ₁ := E ⊗[ℂ] F) (ℋ₂ := E)
-      (TrRight (ℋ₂ := E) (ℋ₃ := F)) κ := by
-  refine ⟨fun i => tensorRightSlice (E := E) (F := F) b i, ?_⟩
-  intro X
-  exact TrRight_eq_kraus_sum b X
+/-- A channel built from a Kraus family, given that the family is trace preserving. -/
+noncomputable def ofKraus {σ : Type*} [Fintype σ] (V : σ → (ℋ₁ →L[ℂ] ℋ₂))
+    (hV : ∑ r, (V r)† ∘L V r = 1) : CPTPOp ℋ₁ ℋ₂ where
+  toLinearMap := ∑ r, krausTerm (V r)
+  cp := sum_krausTerm_isCompletelyPositive V
+  TP A := by
+    have h (r : σ) : LinearMap.trace ℂ ℋ₂ ((V r ∘L A ∘L (V r)†) : ℋ₂ →ₗ[ℂ] ℋ₂) =
+        LinearMap.trace ℂ ℋ₁ ((A ∘L (V r)† ∘L V r : ℋ₁ →L[ℂ] ℋ₁) : ℋ₁ →ₗ[ℂ] ℋ₁) :=
+      (LinearMap.trace_comp_comm' (V r : ℋ₁ →ₗ[ℂ] ℋ₂) ((A ∘L (V r)† : ℋ₂ →L[ℂ] ℋ₁) :
+        ℋ₂ →ₗ[ℂ] ℋ₁)).symm
+    have key : ∑ r, (A ∘L (V r)† ∘L V r) = A := by
+      refine ContinuousLinearMap.ext fun x ↦ ?_
+      have happ (r : σ) : (A ∘L (V r)† ∘L V r) x = A (((V r)† ∘L V r) x) := rfl
+      rw [sum_apply]
+      simp only [happ, ← map_sum, ← sum_apply, hV]
+      simp
+    rw [LinearMap.sum_apply, ContinuousLinearMap.toLinearMap_sum, map_sum]
+    simp only [krausTerm_apply, h, ← map_sum, ← ContinuousLinearMap.toLinearMap_sum, key]
 
-theorem TrRight_isCompletelyPositive
-    {κ : Type*} [DecidableEq κ] [Fintype κ]
-    {E : Type u} {F : Type v} [Qudit E] [Qudit F]
-    (b : OrthonormalBasis κ ℂ F) :
-    IsCompletelyPositive (TrRight (ℋ₂ := E) (ℋ₃ := F)) := by
-  exact fixed_kraus_to_cp
-    (ℋ₁ := E ⊗[ℂ] F) (ℋ₂ := E)
-    (TrRight (ℋ₂ := E) (ℋ₃ := F))
-    (TrRight_krausRep b)
+/-- `ofKraus V hV` acts by the Kraus sum it was built from. -/
+@[simp]
+theorem ofKraus_toLinearMap {σ : Type*} [Fintype σ] (V : σ → (ℋ₁ →L[ℂ] ℋ₂))
+    (hV : ∑ r, (V r)† ∘L V r = 1) : (ofKraus V hV).toLinearMap = ∑ r, krausTerm (V r) :=
+  rfl
 
-theorem comp_isCompletelyPositive
-    {ℋ₃ : Type w} [Qudit ℋ₃]
-    (Φ : T ℋ₁ ℋ₂) (Ψ : T ℋ₂ ℋ₃)
-    (hΦ : IsCompletelyPositive Φ) (hΨ : IsCompletelyPositive Ψ) :
-    IsCompletelyPositive (Ψ.comp Φ) := by
-  refine (isCompletelyPositive_iff_cstarMatrix_nonneg (Ψ.comp Φ)).mpr ?_
-  intro k M hM
-  have hΦM :
-      0 ≤ M.map Φ :=
-    (isCompletelyPositive_iff_cstarMatrix_nonneg Φ).mp hΦ k M hM
-  have hΨM :
-      0 ≤ (M.map Φ).map Ψ :=
-    (isCompletelyPositive_iff_cstarMatrix_nonneg Ψ).mp hΨ k (M.map Φ) hΦM
-  have hmap : (M.map Φ).map Ψ = M.map (Ψ.comp Φ) := by
-    ext i j X
-    simp [CStarMatrix.map_apply]
-  simpa [hmap] using hΨM
+/-- Converse of the trace-preservation computation in `ofKraus`: a Kraus family whose sum is
+trace preserving satisfies the completeness relation `∑ᵣ Vᵣ† Vᵣ = 1`. -/
+theorem sum_adjoint_comp_self_eq_one {σ : Type*} [Fintype σ] (V : σ → (ℋ₁ →L[ℂ] ℋ₂))
+    (hTP : OpMap.IsTracePreserving (∑ r, krausTerm (V r))) :
+    ∑ r, (V r)† ∘L V r = 1 := by
+  refine eq_one_of_Tr_mul fun X ↦ ?_
+  have hcyc (r : σ) : Tr (((V r)† ∘L V r) * X) = Tr (V r ∘L X ∘L (V r)†) :=
+    LinearMap.trace_comp_comm' ((V r ∘L X : ℋ₁ →L[ℂ] ℋ₂) : ℋ₁ →ₗ[ℂ] ℋ₂)
+      (((V r)† : ℋ₂ →L[ℂ] ℋ₁) : ℋ₂ →ₗ[ℂ] ℋ₁)
+  have hT := hTP X
+  rw [LinearMap.sum_apply, ContinuousLinearMap.toLinearMap_sum, map_sum] at hT
+  rw [Finset.sum_mul, map_sum]
+  simp only [hcyc]
+  simpa only [krausTerm_apply, Tr_apply] using hT
 
-def StinespringRep (Φ : T ℋ₁ ℋ₂) (ℋ₃ : Type u) [Qudit ℋ₃] : Prop :=
-  ∃ A : ℋ₁ →ₗ[ℂ] (ℋ₂ ⊗[ℂ] ℋ₃),
-    ∀ X : L ℋ₁,
-      Φ X =
-        (@TrRight ℋ₂ inferInstance ℋ₃ inferInstance
-          (((A.comp X).comp
-            (LinearMap.adjoint A : (ℋ₂ ⊗[ℂ] ℋ₃) →ₗ[ℂ] ℋ₁)) : L (ℋ₂ ⊗[ℂ] ℋ₃)) : L ℋ₂)
-
-def HasStinespring (Φ : T ℋ₁ ℋ₂) : Prop :=
-  ∃ (ℋ₃ : Type u) (_ : Qudit ℋ₃), @StinespringRep ℋ₁ ℋ₂ _ _ Φ ℋ₃ _
-
-def HasRankStinespring (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) : Prop :=
-  ∃ (ℋ₃ : Type u) (inst : Qudit ℋ₃),
-    Module.finrank ℂ ℋ₃ = choiRank b Φ ∧
-      @StinespringRep ℋ₁ ℋ₂ _ _ Φ ℋ₃ inst
-
-lemma stinespring_cstarMatrix_nonneg
-    {ℋ₃ : Type u} [Qudit ℋ₃]
-    (Φ : T ℋ₁ ℋ₂) (hΦ : StinespringRep Φ ℋ₃) :
-    ∀ (k : ℕ) (M : CStarMatrix (Fin k) (Fin k) (L ℋ₁)),
-      0 ≤ M → 0 ≤ M.map Φ := by
-  obtain ⟨A, hA⟩ := hΦ
-  let K : T ℋ₁ (ℋ₂ ⊗[ℂ] ℋ₃) := krausTerm A
-  have hK : IsCompletelyPositive K := krausTerm_isCompletelyPositive A
-  have hTr : IsCompletelyPositive (TrRight (ℋ₂ := ℋ₂) (ℋ₃ := ℋ₃)) := by
-    exact TrRight_isCompletelyPositive (stdOrthonormalBasis ℂ ℋ₃)
-  have hΦeq : Φ = (TrRight (ℋ₂ := ℋ₂) (ℋ₃ := ℋ₃)).comp K := by
-    apply LinearMap.ext
-    intro X
-    rw [hA X]
-    simp [K, krausTerm, LinearMap.comp_assoc]
-  have hCP : IsCompletelyPositive Φ := by
-    rw [hΦeq]
-    exact comp_isCompletelyPositive K (TrRight (ℋ₂ := ℋ₂) (ℋ₃ := ℋ₃)) hK hTr
-  exact (isCompletelyPositive_iff_cstarMatrix_nonneg Φ).mp hCP
-
-theorem hasRankStinespring_to_hasStinespring
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    HasRankStinespring b Φ → HasStinespring Φ := by
-  rintro ⟨ℋ₃, inst, _, hstinespring⟩
-  exact ⟨ℋ₃, inst, hstinespring⟩
-
-theorem rankStinespring_to_stinespring
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    HasRankStinespring b Φ → HasStinespring Φ :=
-  hasRankStinespring_to_hasStinespring b Φ
-
-theorem tensor_to_choi
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    AmplificationPositive Φ → ChoiPositive b Φ := by
-  intro hΦ
-  exact hΦ (outer_product (vec b (I ℋ₁)) (vec b (I ℋ₁)))
-    (outer_product_self_nonneg (vec b (I ℋ₁)))
-
--- (1) → (2)
-theorem cp_to_tensor
-    (Φ : T ℋ₁ ℋ₂) :
-    IsCompletelyPositive Φ → AmplificationPositive Φ := by
-  exact cp_amplify Φ
-
--- (3) → (5)
-theorem choi_to_rank_kraus
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    ChoiPositive b Φ → HasRankKraus b Φ := by
-  intro hΦ
-  obtain ⟨κ, hκ, hκ', hcard, u, hu⟩ :=
-    positive_to_rank_outer_product (choi b Φ) hΦ
-  let : DecidableEq κ := hκ
-  let : Fintype κ := hκ'
-  refine ⟨κ, hκ, hκ', ?_, ?_⟩
-  · exact hcard
-  · exact choi_outer_product_to_kraus b Φ u hu
-
-theorem choi_iff_rank_kraus
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    ChoiPositive b Φ ↔ HasRankKraus b Φ := by
-  exact ⟨choi_to_rank_kraus b Φ, rank_kraus_to_choi b Φ⟩
-
-theorem choi_to_positiveMap
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    ChoiPositive b Φ → IsPositiveMap Φ :=
-  rankKraus_to_positiveMap b Φ ∘
-    choi_to_rank_kraus b Φ
-
-theorem choi_to_kraus
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    ChoiPositive b Φ → HasKraus Φ :=
-  rankKraus_to_kraus b Φ ∘
-    choi_to_rank_kraus b Φ
-
-theorem choi_iff_kraus
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    ChoiPositive b Φ ↔ HasKraus Φ := by
-  exact ⟨choi_to_kraus b Φ, kraus_to_choi b Φ⟩
-
-
-theorem conjugate_kraus_expansion
-    {κ : Type u} [DecidableEq κ] [Fintype κ]
-    (A : κ → (ℋ₁ →ₗ[ℂ] ℋ₂)) (X : L ℋ₁) :
-    conjugateEnd (TensorProduct.comm ℂ ℋ₂ (EuclideanSpace ℂ κ))
-      (((krausToStinespringOperator (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A).comp X).comp
-        (LinearMap.adjoint (krausToStinespringOperator (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A))) =
-      ∑ a : κ, ∑ b : κ,
-        (l_tensor_equiv (ℋ₁ := EuclideanSpace ℂ κ) (ℋ₂ := ℋ₂)).symm
-          ((outer_product (EuclideanSpace.basisFun κ ℂ b) (EuclideanSpace.basisFun κ ℂ a)) ⊗ₜ[ℂ]
-            ((A a).comp (X.comp (LinearMap.adjoint (A b))))) := by
-  classical
-  apply TensorProduct.ext'
-  intro z y
-  rw [← (EuclideanSpace.basisFun κ ℂ).sum_repr' z]
-  simp_rw [TensorProduct.sum_tmul]
-  simp_rw [← TensorProduct.smul_tmul']
-  simp [map_sum, map_smul,
-    conjugateEnd_krausToStinespringOperator_apply_single_tmul,
-    l_tensor_equiv_symm_outer_product_apply, EuclideanSpace.basisFun_apply]
-  simp [outer_product_eq_rankOne, EuclideanSpace.inner_single_left, ite_tmul_zero_left]
-
-theorem trRight_kraus
-    {κ : Type u} [DecidableEq κ] [Fintype κ]
-    (A : κ → (ℋ₁ →ₗ[ℂ] ℋ₂)) (X : L ℋ₁) :
-    TrRight ((((krausToStinespringOperator (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A).comp X).comp
-      (LinearMap.adjoint (krausToStinespringOperator (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A)))) =
-      ∑ a : κ, (A a).comp (X.comp (LinearMap.adjoint (A a))) := by
-  classical
-  dsimp [TrRight]
-  rw [conjugate_kraus_expansion (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A X]
-  simp [Tr₂_l_tensor_equiv_symm_tmul, trace_outer_product_single, EuclideanSpace.basisFun_apply]
-
-lemma trRight_kraus_positive
-    {κ : Type u} [DecidableEq κ] [Fintype κ]
-    (A : κ → (ℋ₁ →ₗ[ℂ] ℋ₂)) :
-    IsPositiveMap
-      { toFun := fun X =>
-          TrRight ((((krausToStinespringOperator (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A).comp X).comp
-            (LinearMap.adjoint (krausToStinespringOperator (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A))))
-        map_add' := by
-          intro X Y
-          ext y
-          simp [LinearMap.comp_add, LinearMap.add_comp]
-        map_smul' := by
-          intro c X
-          ext y
-          simp [LinearMap.comp_smul, LinearMap.smul_comp] } := by
-  intro X hX
-  change 0 ≤ TrRight ((((krausToStinespringOperator (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A).comp X).comp
-    (LinearMap.adjoint (krausToStinespringOperator (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A))))
-  rw [trRight_kraus (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A X]
-  exact Finset.sum_nonneg fun a _ =>
-    conjugate_positive (ℋ₁ := ℋ₁) (ℋ₃ := ℋ₂) (A a) X hX
-theorem fixed_kraus_to_stinespring
-    {κ : Type u} [DecidableEq κ] [Fintype κ]
-    (Φ : T ℋ₁ ℋ₂) :
-    KrausRep Φ κ → StinespringRep Φ (EuclideanSpace ℂ κ) := by
-  rintro ⟨A, hA⟩
-  refine ⟨krausToStinespringOperator (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A, ?_⟩
-  intro X
-  rw [hA X]
-  simpa using (trRight_kraus (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A X).symm
-
--- (4) → (6)
-theorem kraus_to_stinespring
-    (Φ : T ℋ₁ ℋ₂) :
-    HasKraus Φ → HasStinespring Φ := by
-  rintro ⟨κ, hκ, hκ', hΦ⟩
-  let : DecidableEq κ := hκ
-  let : Fintype κ := hκ'
-  exact ⟨EuclideanSpace ℂ κ, inferInstance,
-    fixed_kraus_to_stinespring (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) Φ hΦ⟩
-
--- (5) → (7)
-theorem rank_kraus_to_rank_stinespring
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    HasRankKraus b Φ → HasRankStinespring b Φ := by
-  rintro ⟨κ, hκ, hκ', hcard, hΦ⟩
-  let : DecidableEq κ := hκ
-  let : Fintype κ := hκ'
-  refine ⟨EuclideanSpace ℂ κ, inferInstance, ?_, ?_⟩
-  · rw [finrank_kraus_environment]
-    exact hcard
-  · exact fixed_kraus_to_stinespring (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) Φ hΦ
-
-theorem choi_to_stinespring
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    ChoiPositive b Φ → HasStinespring Φ :=
-  kraus_to_stinespring Φ ∘
-    choi_to_kraus b Φ
-
-theorem choi_to_rank_stinespring
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    ChoiPositive b Φ → HasRankStinespring b Φ :=
-  rank_kraus_to_rank_stinespring b Φ ∘
-    choi_to_rank_kraus b Φ
-
-theorem tensor_to_rank_kraus
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    AmplificationPositive Φ → HasRankKraus b Φ :=
-  choi_to_rank_kraus b Φ ∘
-    tensor_to_choi b Φ
-
-theorem tensor_to_kraus
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    AmplificationPositive Φ → HasKraus Φ :=
-  choi_to_kraus b Φ ∘
-    tensor_to_choi b Φ
-
-theorem tensor_to_stinespring
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    AmplificationPositive Φ → HasStinespring Φ :=
-  choi_to_stinespring b Φ ∘
-    tensor_to_choi b Φ
-
-theorem tensor_to_rank_stinespring
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    AmplificationPositive Φ → HasRankStinespring b Φ :=
-  choi_to_rank_stinespring b Φ ∘
-    tensor_to_choi b Φ
-
-theorem tensor_to_positiveMap
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    AmplificationPositive Φ → IsPositiveMap Φ :=
-  choi_to_positiveMap b Φ ∘
-    tensor_to_choi b Φ
-
--- (6) → (1)
-theorem stinespring_to_cp
-    (Φ : T ℋ₁ ℋ₂) :
-    HasStinespring Φ → IsCompletelyPositive Φ := by
-  rintro ⟨ℋ₃, inst, hΦ⟩
-  let : Qudit ℋ₃ := inst
-  exact (isCompletelyPositive_iff_cstarMatrix_nonneg Φ).mpr
-    (stinespring_cstarMatrix_nonneg Φ hΦ)
-
-theorem tensor_to_cp
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    AmplificationPositive Φ → IsCompletelyPositive Φ :=
-  stinespring_to_cp Φ ∘
-    tensor_to_stinespring b Φ
-
-theorem cp_to_choi
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    IsCompletelyPositive Φ → ChoiPositive b Φ :=
-  tensor_to_choi b Φ ∘
-    cp_to_tensor Φ
-
-theorem cp_to_rank_kraus
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    IsCompletelyPositive Φ → HasRankKraus b Φ :=
-  choi_to_rank_kraus b Φ ∘
-    cp_to_choi b Φ
-
-theorem cp_to_kraus
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    IsCompletelyPositive Φ → HasKraus Φ :=
-  rankKraus_to_kraus b Φ ∘
-    cp_to_rank_kraus b Φ
-
-theorem cp_to_stinespring
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    IsCompletelyPositive Φ → HasStinespring Φ :=
-  kraus_to_stinespring Φ ∘
-    cp_to_kraus b Φ
-
-theorem cp_to_rank_stinespring
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    IsCompletelyPositive Φ → HasRankStinespring b Φ :=
-  rank_kraus_to_rank_stinespring b Φ ∘
-    cp_to_rank_kraus b Φ
-
-theorem choi_to_cp
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    ChoiPositive b Φ → IsCompletelyPositive Φ :=
-  stinespring_to_cp Φ ∘
-    rankStinespring_to_stinespring b Φ ∘
-    rank_kraus_to_rank_stinespring b Φ ∘
-    choi_to_rank_kraus b Φ
-
-theorem kraus_to_cp
-    (Φ : T ℋ₁ ℋ₂) :
-    HasKraus Φ → IsCompletelyPositive Φ := by
-  rintro ⟨κ, hκ, hκ', hΦ⟩
-  let : DecidableEq κ := hκ
-  let : Fintype κ := hκ'
-  exact fixed_kraus_to_cp Φ hΦ
-
-theorem rank_kraus_to_cp
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    HasRankKraus b Φ → IsCompletelyPositive Φ := by
-  intro hΦ
-  exact kraus_to_cp Φ (rankKraus_to_kraus b Φ hΦ)
-
-theorem rank_stinespring_to_cp
-    (b : Module.Basis ι ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    HasRankStinespring b Φ → IsCompletelyPositive Φ :=
-  stinespring_to_cp Φ ∘
-    rankStinespring_to_stinespring b Φ
-
-theorem cp_iff_tensor
-    {κ : Type*} [DecidableEq κ] [Fintype κ]
-    (b : Module.Basis κ ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    IsCompletelyPositive Φ ↔ AmplificationPositive Φ := by
-  refine ⟨cp_to_tensor Φ, ?_⟩
-  intro hTensor
-  exact choi_to_cp b Φ
-    (tensor_to_choi b Φ hTensor)
-
-theorem cp_iff_choi
-    {κ : Type*} [DecidableEq κ] [Fintype κ]
-    (b : Module.Basis κ ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    IsCompletelyPositive Φ ↔ ChoiPositive b Φ := by
-  exact ⟨cp_to_choi b Φ, choi_to_cp b Φ⟩
-
-theorem cp_iff_kraus
-    {κ : Type*} [DecidableEq κ] [Fintype κ]
-    (b : Module.Basis κ ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    IsCompletelyPositive Φ ↔ HasKraus Φ := by
-  exact ⟨cp_to_kraus b Φ, kraus_to_cp Φ⟩
-
-theorem cp_iff_rank_kraus
-    {κ : Type*} [DecidableEq κ] [Fintype κ]
-    (b : Module.Basis κ ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    IsCompletelyPositive Φ ↔ HasRankKraus b Φ := by
-  exact ⟨cp_to_rank_kraus b Φ,
-    rank_kraus_to_cp b Φ⟩
-
-theorem cp_iff_stinespring
-    {κ : Type*} [DecidableEq κ] [Fintype κ]
-    (b : Module.Basis κ ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    IsCompletelyPositive Φ ↔ HasStinespring Φ := by
-  exact ⟨cp_to_stinespring b Φ,
-    stinespring_to_cp Φ⟩
-
-theorem cp_iff_rank_stinespring
-    {κ : Type*} [DecidableEq κ] [Fintype κ]
-    (b : Module.Basis κ ℂ ℋ₁) (Φ : T ℋ₁ ℋ₂) :
-    IsCompletelyPositive Φ ↔ HasRankStinespring b Φ := by
-  exact ⟨cp_to_rank_stinespring b Φ,
-    rank_stinespring_to_cp b Φ⟩
-
-
--- Theorem 2.26 https://cs.uwaterloo.ca/~watrous/TQI/TQI.2.pdf
--- For any qudits ℋ₁, ℋ₂, and any Φ ∈ T(ℋ₁,ℋ₂), the following statements are equivalent:
--- 1: Φ is a trace-preserving ContinuosLinearMap;
--- 2: Tr₂[J(Φ)] = I(ℋ₁);
--- 3: ∃qudit ℋ₃, ∃A,B∈(ℋ₁→L[ℂ]ℋ₂⊗ℋ₃), Φ(X)=Tr₃[A X B†] ∧ A† B = I(ℋ₁)
-
--- Corollary 2.27 https://cs.uwaterloo.ca/~watrous/TQI/TQI.2.pdf
--- For any qudits ℋ₁, ℋ₂, and any Φ ∈ T(ℋ₁,ℋ₂), the following statements are equivalent:
--- 1: Φ ∈ C(ℋ₁,ℋ₂);
--- 2: J(Φ)∈ Pos(ℋ₂⊗ℋ₁) ∧ Tr₂[J(Φ)] = I(ℋ₁);
--- 3: ∃qudit ℋ₃, ∃A∈(ℋ₁→L[ℂ]ℋ₂⊗ℋ₃), Φ(X)=Tr₃[A X A†] ∧ A† A = I(ℋ₁)
-
-end RepresentationsOfChannels
+end Channel
 
 end QuantumChannel
+
+namespace CPTPOp
+
+open QuantumState QuantumChannel
+
+open scoped ComplexOrder
+
+universe u v
+
+variable {ℋ₁ : Type u} {ℋ₂ : Type v} [Qudit ℋ₁] [Qudit ℋ₂]
+
+/-- Trace preservation, stated with `QuantumState.Tr`. -/
+@[simp]
+theorem Tr_map (Λ : CPTPOp ℋ₁ ℋ₂) (A : L ℋ₁) : Tr (Λ.toLinearMap A) = Tr A :=
+  Λ.TP A
+
+/-- The convex combination `(1 - t) • Λ₁ + t • Λ₂` of two channels, for `t ∈ [0,1]`. -/
+noncomputable def convexComb (Λ₁ Λ₂ : CPTPOp ℋ₁ ℋ₂) {t : ℝ} (ht₀ : 0 ≤ t) (ht₁ : t ≤ 1) :
+    CPTPOp ℋ₁ ℋ₂ where
+  toLinearMap := ((1 - t : ℝ) : ℂ) • Λ₁.toLinearMap + ((t : ℝ) : ℂ) • Λ₂.toLinearMap
+  cp := isCompletelyPositive_add
+    (isCompletelyPositive_smul Λ₁.cp (Complex.zero_le_real.mpr (by linarith)))
+    (isCompletelyPositive_smul Λ₂.cp (Complex.zero_le_real.mpr ht₀))
+  TP A := by
+    rw [LinearMap.add_apply, LinearMap.smul_apply, LinearMap.smul_apply,
+      ContinuousLinearMap.toLinearMap_add, ContinuousLinearMap.toLinearMap_smul,
+      ContinuousLinearMap.toLinearMap_smul, map_add, map_smul, map_smul, Λ₁.TP A, Λ₂.TP A,
+      smul_eq_mul, smul_eq_mul, ← add_mul]
+    push_cast
+    ring
+
+/-- `convexComb` acts by the convex combination it was built from. -/
+@[simp]
+theorem convexComb_toLinearMap (Λ₁ Λ₂ : CPTPOp ℋ₁ ℋ₂) {t : ℝ} (ht₀ : 0 ≤ t) (ht₁ : t ≤ 1) :
+    (Λ₁.convexComb Λ₂ ht₀ ht₁).toLinearMap =
+      ((1 - t : ℝ) : ℂ) • Λ₁.toLinearMap + ((t : ℝ) : ℂ) • Λ₂.toLinearMap :=
+  rfl
+
+end CPTPOp

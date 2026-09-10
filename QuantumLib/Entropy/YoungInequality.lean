@@ -6,23 +6,82 @@ Authors: Kazumi Kasaura, Hayata Yamasaki
 
 import QuantumLib.States.Qudit
 import QuantumLib.Channels.Superoperator
+import QuantumInfo.ForMathlib.StdBasis
 import Mathlib.Analysis.Complex.Order
 import Mathlib.Analysis.CStarAlgebra.Matrix
 import Mathlib.Analysis.Matrix.Order
 import Mathlib.Analysis.MeanInequalities
 import Mathlib.Analysis.InnerProductSpace.Trace
 
-open QuantumState
+/-!
+# The trace Young inequality
+
+For Hölder conjugate exponents `p` and `q` and positive operators `X` and `Y`,
+`Tr (X Y) ≤ Tr (X ^ p) / p + Tr (Y ^ q) / q`. The reverse inequality
+`Tr (M ^ r) / r + Tr (N ^ s) / s ≤ Tr (M N)` holds for the conjugate pair `r < 0`, `0 < s < 1`,
+provided `M` is positive definite.
+
+Both come from the scalar Young inequality, applied eigenvalue by eigenvalue. Diagonalising `X` and
+`Y` separately, `Tr (X Y)` is the double sum of `xᵢ * yⱼ` against the overlaps `‖⟪bᵢ, b'ⱼ⟫‖ ^ 2`
+between the two eigenbases, and those overlaps are doubly stochastic;
+`weighted_young_finset` is the scalar inequality summed against such weights, and
+`trace_rpow_eq_sum_eigenvalues` identifies the two right-hand sides with sums of powers of
+eigenvalues.
+-/
+
 open scoped ComplexOrder
 open scoped MatrixOrder
 open scoped Matrix.Norms.L2Operator
 
 universe u
 
-noncomputable instance matrixCStarAlgebra {ℋ : Type u} [Qudit ℋ] :
-    CStarAlgebra (Matrix (Fin (Module.finrank ℂ ℋ)) (Fin (Module.finrank ℂ ℋ)) ℂ) where
+namespace Matrix
 
-lemma weighted_young_finset {ι κ : Type*} [Fintype ι] [Fintype κ]
+/-- `trace (A ^ p)` is the sum of the `p`-th powers of the eigenvalues, for `A` positive
+semidefinite. -/
+lemma trace_rpow_eq_sum_eigenvalues {n : Type*} [Fintype n] [DecidableEq n]
+    (A : Matrix n n ℂ) (hA : A.IsHermitian) (hA0 : 0 ≤ A) (p : ℝ) :
+    Matrix.trace (CFC.rpow A p)
+      = ∑ i, (((hA.eigenvalues i) ^ p : ℝ) : ℂ) := by
+  rw [CFC.rpow_eq_pow]
+  rw [CFC.rpow_eq_cfc_real (a := A) (y := p) (ha := hA0)]
+  have htrace :
+      Matrix.trace (cfc (fun x : ℝ => x ^ p) A)
+        = ((Matrix.charpoly (cfc (fun x : ℝ => x ^ p) A)).roots.sum) := by
+    simpa using (Matrix.trace_eq_sum_roots_charpoly (A := cfc (fun x : ℝ => x ^ p) A))
+  rw [htrace]
+  rw [hA.charpoly_cfc_eq (f := fun x : ℝ => x ^ p)]
+  have hroots :
+      (Polynomial.roots
+        (∏ i, (Polynomial.X - Polynomial.C ((((hA.eigenvalues i) ^ p : ℝ)) : ℂ))))
+        = (Finset.univ.val.bind fun i =>
+            Polynomial.roots
+              (Polynomial.X - Polynomial.C ((((hA.eigenvalues i) ^ p : ℝ)) : ℂ))) := by
+    exact Polynomial.roots_prod
+      (f := fun i => (Polynomial.X - Polynomial.C ((((hA.eigenvalues i) ^ p : ℝ)) : ℂ)))
+      (s := Finset.univ)
+      (Finset.prod_ne_zero_iff.mpr (by
+        intro i hi
+        exact Polynomial.X_sub_C_ne_zero _))
+  have hsum := congrArg Multiset.sum hroots
+  simpa using hsum
+
+end Matrix
+
+namespace QuantumState
+
+/-- `LinearMap.IsSymmetric.apply_eigenvectorBasis`, phrased for the operator itself rather than
+for its underlying linear map. -/
+private lemma eigen_apply {ℋ : Type u} [Qudit ℋ] {X : L ℋ} (hX : X.IsPositive)
+    {n : ℕ} (hn : Module.finrank ℂ ℋ = n) (i : Fin n) :
+    X (hX.isSymmetric.eigenvectorBasis hn i)
+      = ((hX.isSymmetric.eigenvalues hn i : ℝ) : ℂ) • hX.isSymmetric.eigenvectorBasis hn i :=
+  hX.isSymmetric.apply_eigenvectorBasis hn i
+
+/-- The scalar Young inequality summed against doubly stochastic weights: if the `c i j` are
+nonnegative and every row and every column of `c` sums to `1`, then
+`∑ i, ∑ j, x i * y j * c i j ≤ (∑ i, x i ^ p) / p + (∑ j, y j ^ q) / q`. -/
+private lemma weighted_young_finset {ι κ : Type*} [Fintype ι] [Fintype κ]
     (p q : ℝ) (hpq : p.HolderConjugate q)
     (x : ι → ℝ) (y : κ → ℝ) (c : ι → κ → ℝ)
     (hx : ∀ i, 0 ≤ x i) (hy : ∀ j, 0 ≤ y j) (hc : ∀ i j, 0 ≤ c i j)
@@ -58,8 +117,9 @@ lemma weighted_young_finset {ι κ : Type*} [Fintype ι] [Fintype κ]
     _ = (∑ i, x i ^ p) / p + (∑ j, y j ^ q) / q := by
       simp [div_eq_mul_inv, Finset.sum_mul]
 
-lemma trace_comp_eq_sum_eigen_right {ℋ : Type u} [Qudit ℋ] (X Y : L ℋ) (hY : Y.IsPositive) :
-    Tr (X ∘ₗ Y)
+/-- Expanding `Tr (X Y)` in an eigenbasis `b` of `Y`: it is `∑ i, yᵢ * ⟪b i, X (b i)⟫`. -/
+private lemma trace_comp_eq_sum_eigen_right {ℋ : Type u} [Qudit ℋ] (X Y : L ℋ) (hY : Y.IsPositive) :
+    Tr (X ∘L Y)
       = ∑ i : Fin (Module.finrank ℂ ℋ),
           ((hY.isSymmetric.eigenvalues (n := Module.finrank ℂ ℋ) rfl i : ℝ) : ℂ)
             * inner ℂ
@@ -67,50 +127,45 @@ lemma trace_comp_eq_sum_eigen_right {ℋ : Type u} [Qudit ℋ] (X Y : L ℋ) (hY
                 (X (hY.isSymmetric.eigenvectorBasis (n := Module.finrank ℂ ℋ) rfl i)) := by
   let b := hY.isSymmetric.eigenvectorBasis (n := Module.finrank ℂ ℋ) rfl
   calc
-    Tr (X ∘ₗ Y) = ∑ i : Fin (Module.finrank ℂ ℋ), inner ℂ (b i) ((X ∘ₗ Y) (b i)) := by
-      simpa [QuantumState.Tr] using LinearMap.trace_eq_sum_inner (T := X ∘ₗ Y) b
+    Tr (X ∘L Y) = ∑ i : Fin (Module.finrank ℂ ℋ), inner ℂ (b i) ((X ∘L Y) (b i)) := by
+      simpa [QuantumState.Tr] using LinearMap.trace_eq_sum_inner (T := ((X ∘L Y : L ℋ) : ℋ →ₗ[ℂ] ℋ)) b
     _ = ∑ i : Fin (Module.finrank ℂ ℋ), inner ℂ (b i) (X (Y (b i))) := by
       simp
-    _ = ∑ i : Fin (Module.finrank ℂ ℋ),
-          inner ℂ (b i)
-            (X (((hY.isSymmetric.eigenvalues (n := Module.finrank ℂ ℋ) rfl i : ℝ) : ℂ) • b i)) := by
-      refine Finset.sum_congr rfl ?_
-      intro i hi
-      simp [b] at *
     _ = ∑ i : Fin (Module.finrank ℂ ℋ),
           ((hY.isSymmetric.eigenvalues (n := Module.finrank ℂ ℋ) rfl i : ℝ) : ℂ)
             * inner ℂ (b i) (X (b i)) := by
       refine Finset.sum_congr rfl fun i _ => ?_
-      rw [map_smul, inner_smul_right]
+      rw [eigen_apply hY rfl i, map_smul, inner_smul_right]
 
+/-- The trace of an operator is the trace of its matrix in an orthonormal basis. -/
 lemma tr_eq_matrix_trace_orthonormal {ℋ : Type u} [Qudit ℋ]
     (b : OrthonormalBasis (Fin (Module.finrank ℂ ℋ)) ℂ ℋ) (T : L ℋ) :
-    Tr T = Matrix.trace (LinearMap.toMatrixOrthonormal b T) := by
-  simpa [QuantumState.Tr, LinearMap.toMatrixOrthonormal] using
-    (LinearMap.trace_eq_matrix_trace (R := ℂ) (b := b.toBasis) (f := T))
+    Tr T = Matrix.trace (StdBasis.toMatOf b T) :=
+  (StdBasis.trace_toMatOf b T).symm
 
-lemma toMatrixOrthonormal_rpow {ℋ : Type u} [Qudit ℋ]
+/-- Passing to matrices commutes with nonnegative real powers of a positive operator. -/
+private lemma toMatOf_rpow {ℋ : Type u} [Qudit ℋ]
     (b : OrthonormalBasis (Fin (Module.finrank ℂ ℋ)) ℂ ℋ) (X : L ℋ)
     (hX : X.IsPositive) (p : ℝ) (hp : 0 ≤ p) :
-    LinearMap.toMatrixOrthonormal b (CFC.rpow X p)
-      = CFC.rpow (LinearMap.toMatrixOrthonormal b X) p := by
-  have hXnonneg : 0 ≤ X := (LinearMap.nonneg_iff_isPositive X).2 hX
+    StdBasis.toMatOf b (CFC.rpow X p)
+      = CFC.rpow (StdBasis.toMatOf b X) p := by
+  have hXnonneg : 0 ≤ X := (ContinuousLinearMap.nonneg_iff_isPositive X).2 hX
   have hXselfAdjoint : IsSelfAdjoint X := hX.isSelfAdjoint
-  have hφ : Continuous (LinearMap.toMatrixOrthonormal b) :=
-    (StarAlgEquiv.isometry (LinearMap.toMatrixOrthonormal b)).continuous
-  have hφnonneg : 0 ≤ LinearMap.toMatrixOrthonormal b X :=
-    map_nonneg (LinearMap.toMatrixOrthonormal b) hXnonneg
-  have hφselfAdjoint : IsSelfAdjoint (LinearMap.toMatrixOrthonormal b X) :=
-    IsSelfAdjoint.map hXselfAdjoint (LinearMap.toMatrixOrthonormal b)
+  have hφ : Continuous (StdBasis.toMatOf b) :=
+    (StarAlgEquiv.isometry (StdBasis.toMatOf b)).continuous
+  have hφnonneg : 0 ≤ StdBasis.toMatOf b X :=
+    map_nonneg (StdBasis.toMatOf b) hXnonneg
+  have hφselfAdjoint : IsSelfAdjoint (StdBasis.toMatOf b X) :=
+    IsSelfAdjoint.map hXselfAdjoint (StdBasis.toMatOf b)
   have hf : ContinuousOn (fun x : ℝ => x ^ p) (spectrum ℝ X) :=
     (Real.continuous_rpow_const hp).continuousOn
   rw [CFC.rpow_eq_pow, CFC.rpow_eq_pow]
   rw [CFC.rpow_eq_cfc_real (a := X) (y := p) (ha := hXnonneg)]
-  rw [CFC.rpow_eq_cfc_real (a := LinearMap.toMatrixOrthonormal b X) (y := p) (ha := hφnonneg)]
+  rw [CFC.rpow_eq_cfc_real (a := StdBasis.toMatOf b X) (y := p) (ha := hφnonneg)]
   simpa using
     (StarAlgHomClass.map_cfc
       (R := ℝ)
-      (φ := LinearMap.toMatrixOrthonormal b)
+      (φ := StdBasis.toMatOf b)
       (f := fun x : ℝ => x ^ p)
       (a := X)
       (hf := hf)
@@ -118,52 +173,28 @@ lemma toMatrixOrthonormal_rpow {ℋ : Type u} [Qudit ℋ]
       (ha := hXselfAdjoint)
       (hφa := hφselfAdjoint))
 
-lemma matrix_trace_rpow_eq_sum_eigenvalues {n : Type*} [Fintype n] [DecidableEq n]
-    (A : Matrix n n ℂ) (hA : A.IsHermitian) (hA0 : 0 ≤ A) (p : ℝ) :
-    Matrix.trace (CFC.rpow A p)
-      = ∑ i, (((hA.eigenvalues i) ^ p : ℝ) : ℂ) := by
-  rw [CFC.rpow_eq_pow]
-  rw [CFC.rpow_eq_cfc_real (a := A) (y := p) (ha := hA0)]
-  have htrace :
-      Matrix.trace (cfc (fun x : ℝ => x ^ p) A)
-        = ((Matrix.charpoly (cfc (fun x : ℝ => x ^ p) A)).roots.sum) := by
-    simpa using (Matrix.trace_eq_sum_roots_charpoly (A := cfc (fun x : ℝ => x ^ p) A))
-  rw [htrace]
-  rw [hA.charpoly_cfc_eq (f := fun x : ℝ => x ^ p)]
-  have hroots :
-      (Polynomial.roots
-        (∏ i, (Polynomial.X - Polynomial.C ((((hA.eigenvalues i) ^ p : ℝ)) : ℂ))))
-        = (Finset.univ.val.bind fun i =>
-            Polynomial.roots
-              (Polynomial.X - Polynomial.C ((((hA.eigenvalues i) ^ p : ℝ)) : ℂ))) := by
-    exact Polynomial.roots_prod
-      (f := fun i => (Polynomial.X - Polynomial.C ((((hA.eigenvalues i) ^ p : ℝ)) : ℂ)))
-      (s := Finset.univ)
-      (Finset.prod_ne_zero_iff.mpr (by
-        intro i hi
-        exact Polynomial.X_sub_C_ne_zero _))
-  have hsum := congrArg Multiset.sum hroots
-  simpa using hsum
-
-lemma toMatrixOrthonormal_eq_diagonal_eigenvalues {ℋ : Type u} [Qudit ℋ]
+/-- In its own eigenbasis, a positive operator is the diagonal matrix of its eigenvalues. -/
+private lemma toMatOf_eq_diagonal_eigenvalues {ℋ : Type u} [Qudit ℋ]
     (X : L ℋ) (hX : X.IsPositive) :
-    LinearMap.toMatrixOrthonormal (hX.isSymmetric.eigenvectorBasis (n := Module.finrank ℂ ℋ) rfl) X
+    StdBasis.toMatOf (hX.isSymmetric.eigenvectorBasis (n := Module.finrank ℂ ℋ) rfl) X
       = Matrix.diagonal (fun i =>
           (((hX.isSymmetric.eigenvalues (n := Module.finrank ℂ ℋ) rfl i) : ℝ) : ℂ)) := by
   let bx := hX.isSymmetric.eigenvectorBasis (n := Module.finrank ℂ ℋ) rfl
   ext i j
   by_cases hij : i = j
   · subst hij
-    simp only [LinearMap.toMatrixOrthonormal_apply_apply,
-      hX.isSymmetric.apply_eigenvectorBasis, Matrix.diagonal_apply_eq]
+    simp only [StdBasis.toMatOf_apply,
+      eigen_apply hX rfl, Matrix.diagonal_apply_eq]
     have : IsScalarTower ℝ ℂ ℋ := RestrictScalars.isScalarTower ℝ ℂ ℋ
     rw [inner_smul_right_eq_smul, inner_self_eq_one_of_norm_eq_one (bx.norm_eq_one i),
       Algebra.smul_def, mul_one]
     exact Algebra.algebraMap_self_apply _
-  · simp [LinearMap.toMatrixOrthonormal_apply_apply, hij,
-      hX.isSymmetric.apply_eigenvectorBasis]
+  · simp [StdBasis.toMatOf_apply, hij, eigen_apply hX rfl]
 
-lemma sum_rpow_eq_of_multiset_map_eq {ι : Type*} [Fintype ι]
+/-- Two families taking the same multiset of values have the same sum of `p`-th powers. This is
+how the eigenvalues of an operator are matched with those of its matrix, which are only known
+to agree up to order. -/
+private lemma sum_rpow_eq_of_multiset_map_eq {ι : Type*} [Fintype ι]
     (f g : ι → ℝ) (p : ℝ)
     (h : Multiset.map f Finset.univ.val = Multiset.map g Finset.univ.val) :
     (∑ i, (f i) ^ p) = ∑ i, (g i) ^ p := by
@@ -171,7 +202,9 @@ lemma sum_rpow_eq_of_multiset_map_eq {ι : Type*} [Fintype ι]
   have hsum := congrArg Multiset.sum hpow
   simpa using hsum
 
-lemma trace_rpow_eq_sum_eigenvalues {ℋ : Type u} [Qudit ℋ]
+/-- `Tr (X ^ p)` is the sum of the `p`-th powers of the eigenvalues of a positive operator, for
+`p` nonnegative. -/
+private lemma trace_rpow_eq_sum_eigenvalues {ℋ : Type u} [Qudit ℋ]
     (X : L ℋ) (hX : X.IsPositive) (p : ℝ) (hp : 0 ≤ p) :
     Tr (CFC.rpow X p)
       = ((((∑ i : Fin (Module.finrank ℂ ℋ),
@@ -180,10 +213,10 @@ lemma trace_rpow_eq_sum_eigenvalues {ℋ : Type u} [Qudit ℋ]
   let eVals : Fin (Module.finrank ℂ ℋ) → ℝ :=
     fun i => hX.isSymmetric.eigenvalues (n := Module.finrank ℂ ℋ) rfl i
   let M : Matrix (Fin (Module.finrank ℂ ℋ)) (Fin (Module.finrank ℂ ℋ)) ℂ :=
-    LinearMap.toMatrixOrthonormal bx X
-  have hXnonneg : 0 ≤ X := (LinearMap.nonneg_iff_isPositive X).2 hX
+    StdBasis.toMatOf bx X
+  have hXnonneg : 0 ≤ X := (ContinuousLinearMap.nonneg_iff_isPositive X).2 hX
   have hMnonneg : 0 ≤ M := by
-    simpa [M] using map_nonneg (LinearMap.toMatrixOrthonormal bx) hXnonneg
+    simpa [M] using map_nonneg (StdBasis.toMatOf bx) hXnonneg
   have hMpsd : M.PosSemidef := (Matrix.nonneg_iff_posSemidef).1 hMnonneg
   have hMherm : M.IsHermitian := hMpsd.1
   have hrootsM :
@@ -193,7 +226,7 @@ lemma trace_rpow_eq_sum_eigenvalues {ℋ : Type u} [Qudit ℋ]
       M.charpoly.roots = Multiset.map (RCLike.ofReal ∘ eVals) Finset.univ.val := by
     have hdiagM : M = Matrix.diagonal (fun i =>
       (((hX.isSymmetric.eigenvalues (n := Module.finrank ℂ ℋ) rfl i) : ℝ) : ℂ)) := by
-      simpa [M, eVals] using toMatrixOrthonormal_eq_diagonal_eigenvalues X hX
+      simpa [M, eVals] using toMatOf_eq_diagonal_eigenvalues X hX
     rw [hdiagM, Matrix.charpoly_diagonal]
     have hroots :
         (Polynomial.roots
@@ -227,14 +260,14 @@ lemma trace_rpow_eq_sum_eigenvalues {ℋ : Type u} [Qudit ℋ]
         = (((∑ i : Fin (Module.finrank ℂ ℋ), (eVals i) ^ p) : ℝ) : ℂ) := by
     exact congrArg (fun r : ℝ => (r : ℂ)) hsumPow
   calc
-    Tr (CFC.rpow X p) = Matrix.trace (LinearMap.toMatrixOrthonormal bx (CFC.rpow X p)) :=
+    Tr (CFC.rpow X p) = Matrix.trace (StdBasis.toMatOf bx (CFC.rpow X p)) :=
       tr_eq_matrix_trace_orthonormal bx (CFC.rpow X p)
     _ = Matrix.trace (CFC.rpow M p) := by
       exact (by
-        have hmap := toMatrixOrthonormal_rpow bx X hX p hp
+        have hmap := toMatOf_rpow bx X hX p hp
         simpa [M] using congrArg Matrix.trace hmap)
     _ = ∑ i : Fin (Module.finrank ℂ ℋ), (((hMherm.eigenvalues i) ^ p : ℝ) : ℂ) := by
-      exact matrix_trace_rpow_eq_sum_eigenvalues M hMherm hMnonneg p
+      exact Matrix.trace_rpow_eq_sum_eigenvalues M hMherm hMnonneg p
     _ = (((∑ i : Fin (Module.finrank ℂ ℋ), (hMherm.eigenvalues i) ^ p) : ℝ) : ℂ) := by
       simp
     _ = (((∑ i : Fin (Module.finrank ℂ ℋ), (eVals i) ^ p) : ℝ) : ℂ) := hsumPowC
@@ -242,25 +275,29 @@ lemma trace_rpow_eq_sum_eigenvalues {ℋ : Type u} [Qudit ℋ]
               (hX.isSymmetric.eigenvalues (n := Module.finrank ℂ ℋ) rfl i) ^ p) : ℝ)) : ℂ) := by
       simp [eVals]
 
-lemma overlap_coeff_nonneg {ℋ : Type u} [Qudit ℋ]
+/-- The overlaps `‖⟪bx i, bY j⟫‖ ^ 2` between two orthonormal bases are nonnegative. -/
+private lemma overlap_coeff_nonneg {ℋ : Type u} [Qudit ℋ]
     (bx bY : OrthonormalBasis (Fin (Module.finrank ℂ ℋ)) ℂ ℋ) :
     ∀ i j, 0 ≤ ‖inner ℂ (bx i) (bY j)‖ ^ 2 := by
   intro i j
   positivity
 
-lemma overlap_coeff_row_sum {ℋ : Type u} [Qudit ℋ]
+/-- Every row of the overlaps sums to `1`. -/
+private lemma overlap_coeff_row_sum {ℋ : Type u} [Qudit ℋ]
     (bx bY : OrthonormalBasis (Fin (Module.finrank ℂ ℋ)) ℂ ℋ) :
     ∀ i, (∑ j, ‖inner ℂ (bx i) (bY j)‖ ^ 2) = 1 := by
   intro i
   simpa [bx.norm_eq_one i] using bY.sum_sq_norm_inner_left (x := bx i)
 
-lemma overlap_coeff_col_sum {ℋ : Type u} [Qudit ℋ]
+/-- Every column of the overlaps sums to `1`, so the overlaps are doubly stochastic. -/
+private lemma overlap_coeff_col_sum {ℋ : Type u} [Qudit ℋ]
     (bx bY : OrthonormalBasis (Fin (Module.finrank ℂ ℋ)) ℂ ℋ) :
     ∀ j, (∑ i, ‖inner ℂ (bx i) (bY j)‖ ^ 2) = 1 := by
   intro j
   simpa [bY.norm_eq_one j] using bx.sum_sq_norm_inner_right (x := bY j)
 
-lemma weighted_young_overlap {ℋ : Type u} [Qudit ℋ] {p q : ℝ} (hpq : p.HolderConjugate q)
+/-- `weighted_young_finset` with the overlaps between two orthonormal bases as the weights. -/
+private lemma weighted_young_overlap {ℋ : Type u} [Qudit ℋ] {p q : ℝ} (hpq : p.HolderConjugate q)
     (bx bY : OrthonormalBasis (Fin (Module.finrank ℂ ℋ)) ℂ ℋ)
     (x y : Fin (Module.finrank ℂ ℋ) → ℝ)
     (hx : ∀ i, 0 ≤ x i) (hy : ∀ j, 0 ≤ y j) :
@@ -272,7 +309,9 @@ lemma weighted_young_overlap {ℋ : Type u} [Qudit ℋ] {p q : ℝ} (hpq : p.Hol
       hx hy (overlap_coeff_nonneg bx bY)
       (overlap_coeff_row_sum bx bY) (overlap_coeff_col_sum bx bY)
 
-lemma inner_apply_eq_sum_eigen_overlap {ℋ : Type u} [Qudit ℋ]
+/-- A diagonal entry `⟪bY j, X (bY j)⟫` of a positive operator, in any orthonormal basis, is
+`∑ i, xᵢ * ‖⟪bx i, bY j⟫‖ ^ 2` against its own eigenbasis `bx`. -/
+private lemma inner_apply_eq_sum_eigen_overlap {ℋ : Type u} [Qudit ℋ]
     (X : L ℋ) (hX : X.IsPositive)
     (bY : OrthonormalBasis (Fin (Module.finrank ℂ ℋ)) ℂ ℋ)
     (j : Fin (Module.finrank ℂ ℋ)) :
@@ -296,7 +335,7 @@ lemma inner_apply_eq_sum_eigen_overlap {ℋ : Type u} [Qudit ℋ]
               * inner ℂ (bY j) (bx i)) := by
       refine Finset.sum_congr rfl ?_
       intro i hi
-      rw [hX.isSymmetric.apply_eigenvectorBasis (n := Module.finrank ℂ ℋ) rfl i]
+      rw [eigen_apply hX (n := Module.finrank ℂ ℋ) rfl i]
       have : IsScalarTower ℝ ℂ ℋ := RestrictScalars.isScalarTower ℝ ℂ ℋ
       rw [inner_smul_right, inner_smul_right_eq_smul]
       congr 1
@@ -310,9 +349,10 @@ lemma inner_apply_eq_sum_eigen_overlap {ℋ : Type u} [Qudit ℋ]
       rw [hconj, Complex.normSq_eq_conj_mul_self]
       ring
 
-lemma trace_comp_eq_double_sum_eigen_overlap {ℋ : Type u} [Qudit ℋ]
+/-- `Tr (X Y)` as the double sum of `xᵢ * yⱼ` against the overlaps between the two eigenbases. -/
+private lemma trace_comp_eq_double_sum_eigen_overlap {ℋ : Type u} [Qudit ℋ]
     (X Y : L ℋ) (hX : X.IsPositive) (hY : Y.IsPositive) :
-    Tr (X ∘ₗ Y)
+    Tr (X ∘L Y)
       = ∑ j : Fin (Module.finrank ℂ ℋ),
           ((hY.isSymmetric.eigenvalues (n := Module.finrank ℂ ℋ) rfl j : ℝ) : ℂ)
             * (∑ i : Fin (Module.finrank ℂ ℋ),
@@ -321,7 +361,7 @@ lemma trace_comp_eq_double_sum_eigen_overlap {ℋ : Type u} [Qudit ℋ]
                       (hX.isSymmetric.eigenvectorBasis (n := Module.finrank ℂ ℋ) rfl i)
                       (hY.isSymmetric.eigenvectorBasis (n := Module.finrank ℂ ℋ) rfl j))) := by
   calc
-    Tr (X ∘ₗ Y)
+    Tr (X ∘L Y)
         = ∑ j : Fin (Module.finrank ℂ ℋ),
             ((hY.isSymmetric.eigenvalues (n := Module.finrank ℂ ℋ) rfl j : ℝ) : ℂ)
               * inner ℂ
@@ -340,9 +380,11 @@ lemma trace_comp_eq_double_sum_eigen_overlap {ℋ : Type u} [Qudit ℋ]
       rw [inner_apply_eq_sum_eigen_overlap X hX
         (hY.isSymmetric.eigenvectorBasis (n := Module.finrank ℂ ℋ) rfl) j]
 
+/-- **The trace Young inequality.** For Hölder conjugates `p` and `q` and positive operators
+`X` and `Y`, `Tr (X Y) ≤ Tr (X ^ p) / p + Tr (Y ^ q) / q`. -/
 theorem trace_young_inequality {ℋ : Type u} [Qudit ℋ] {p q : ℝ} (hpq : p.HolderConjugate q)
-  (X Y : L ℋ) (hX : X.IsPositive) (hY : Y.IsPositive) :
-  Tr (X ∘ₗ Y) ≤ Tr (CFC.rpow X p) / p + Tr (CFC.rpow Y q) / q := by
+    (X Y : L ℋ) (hX : X.IsPositive) (hY : Y.IsPositive) :
+    Tr (X ∘L Y) ≤ Tr (CFC.rpow X p) / p + Tr (CFC.rpow Y q) / q := by
   let bx := hX.isSymmetric.eigenvectorBasis (n := Module.finrank ℂ ℋ) rfl
   let bY := hY.isSymmetric.eigenvectorBasis (n := Module.finrank ℂ ℋ) rfl
   have hdouble := trace_comp_eq_double_sum_eigen_overlap X Y hX hY
@@ -350,12 +392,12 @@ theorem trace_young_inequality {ℋ : Type u} [Qudit ℋ] {p q : ℝ} (hpq : p.H
       ∀ i : Fin (Module.finrank ℂ ℋ),
         0 ≤ hX.isSymmetric.eigenvalues (n := Module.finrank ℂ ℋ) rfl i := by
     intro i
-    exact hX.nonneg_eigenvalues (hn := (rfl : Module.finrank ℂ ℋ = Module.finrank ℂ ℋ)) i
+    exact hX.toLinearMap.nonneg_eigenvalues (hn := (rfl : Module.finrank ℂ ℋ = Module.finrank ℂ ℋ)) i
   have hYnonneg :
       ∀ j : Fin (Module.finrank ℂ ℋ),
         0 ≤ hY.isSymmetric.eigenvalues (n := Module.finrank ℂ ℋ) rfl j := by
     intro j
-    exact hY.nonneg_eigenvalues (hn := (rfl : Module.finrank ℂ ℋ = Module.finrank ℂ ℋ)) j
+    exact hY.toLinearMap.nonneg_eigenvalues (hn := (rfl : Module.finrank ℂ ℋ = Module.finrank ℂ ℋ)) j
   have hYoung :=
     weighted_young_overlap hpq bx bY
       (fun i => hX.isSymmetric.eigenvalues (n := Module.finrank ℂ ℋ) rfl i)
@@ -411,7 +453,7 @@ theorem trace_young_inequality {ℋ : Type u} [Qudit ℋ] {p q : ℝ} (hpq : p.H
             + ((∑ j : Fin (Module.finrank ℂ ℋ),
               (hY.isSymmetric.eigenvalues (n := Module.finrank ℂ ℋ) rfl j) ^ q) / q : ℝ) := hYoung
   have hbound_double_complex :
-      Tr (X ∘ₗ Y)
+      Tr (X ∘L Y)
         ≤ ((((∑ i : Fin (Module.finrank ℂ ℋ),
                 (hX.isSymmetric.eigenvalues (n := Module.finrank ℂ ℋ) rfl i) ^ p) / p : ℝ)
               + ((∑ j : Fin (Module.finrank ℂ ℋ),
@@ -424,7 +466,7 @@ theorem trace_young_inequality {ℋ : Type u} [Qudit ℋ] {p q : ℝ} (hpq : p.H
   have htraceX := trace_rpow_eq_sum_eigenvalues X hX p hp_nonneg
   have htraceY := trace_rpow_eq_sum_eigenvalues Y hY q hq_nonneg
   calc
-    Tr (X ∘ₗ Y)
+    Tr (X ∘L Y)
       ≤ ((((∑ i : Fin (Module.finrank ℂ ℋ),
               (hX.isSymmetric.eigenvalues (n := Module.finrank ℂ ℋ) rfl i) ^ p) / p : ℝ)
             + ((∑ j : Fin (Module.finrank ℂ ℋ),
@@ -454,7 +496,7 @@ private lemma rpow_ge_one_add_mul {t : ℝ} (ht : 0 < t) {r : ℝ} (hr : r ≤ 0
 
 /-- Scalar reverse Young inequality for strictly positive reals:
     a^r/r + b^s/s ≤ a*b when r < 0, 0 < s < 1, 1/r + 1/s = 1. -/
-lemma reverse_young_of_pos {a b : ℝ} (ha : 0 < a) (hb : 0 < b)
+private lemma reverse_young_of_pos {a b : ℝ} (ha : 0 < a) (hb : 0 < b)
     {r s : ℝ} (hr : r < 0) (hs0 : 0 < s) (hs1 : s < 1)
     (hrs : 1 / r + 1 / s = 1) :
     a ^ r / r + b ^ s / s ≤ a * b := by
@@ -496,7 +538,7 @@ lemma reverse_young_of_pos {a b : ℝ} (ha : 0 < a) (hb : 0 < b)
   nlinarith [h_1mr_s, h_expanded]
 
 /-- Scalar reverse Young inequality for a > 0, b ≥ 0. -/
-lemma reverse_young_of_nonneg {a b : ℝ} (ha : 0 < a) (hb : 0 ≤ b)
+private lemma reverse_young_of_nonneg {a b : ℝ} (ha : 0 < a) (hb : 0 ≤ b)
     {r s : ℝ} (hr : r < 0) (hs0 : 0 < s) (hs1 : s < 1)
     (hrs : 1 / r + 1 / s = 1) :
     a ^ r / r + b ^ s / s ≤ a * b := by
@@ -506,7 +548,7 @@ lemma reverse_young_of_nonneg {a b : ℝ} (ha : 0 < a) (hb : 0 ≤ b)
   · exact reverse_young_of_pos ha hb_pos hr hs0 hs1 hrs
 
 /-- Weighted reverse Young inequality with doubly stochastic coefficients. -/
-lemma weighted_reverse_young_finset {ι κ : Type*} [Fintype ι] [Fintype κ]
+private lemma weighted_reverse_young_finset {ι κ : Type*} [Fintype ι] [Fintype κ]
     (r s : ℝ) (hr : r < 0) (hs0 : 0 < s) (hs1 : s < 1) (hrs : 1 / r + 1 / s = 1)
     (x : ι → ℝ) (y : κ → ℝ) (c : ι → κ → ℝ)
     (hx : ∀ i, 0 < x i) (hy : ∀ j, 0 ≤ y j) (hc : ∀ i j, 0 ≤ c i j)
@@ -532,7 +574,9 @@ lemma weighted_reverse_young_finset {ι κ : Type*} [Fintype ι] [Fintype κ]
       exact mul_le_mul_of_nonneg_right
         (reverse_young_of_nonneg (hx i) (hy j) hr hs0 hs1 hrs) (hc i j)
 
-lemma weighted_reverse_young_overlap {ℋ : Type u} [Qudit ℋ] {r s : ℝ}
+/-- `weighted_reverse_young_finset` with the overlaps between two orthonormal bases as the
+weights. -/
+private lemma weighted_reverse_young_overlap {ℋ : Type u} [Qudit ℋ] {r s : ℝ}
     (hr : r < 0) (hs0 : 0 < s) (hs1 : s < 1) (hrs : 1 / r + 1 / s = 1)
     (bx bY : OrthonormalBasis (Fin (Module.finrank ℂ ℋ)) ℂ ℋ)
     (x y : Fin (Module.finrank ℂ ℋ) → ℝ)
@@ -546,22 +590,22 @@ lemma weighted_reverse_young_overlap {ℋ : Type u} [Qudit ℋ] {r s : ℝ}
       (overlap_coeff_row_sum bx bY) (overlap_coeff_col_sum bx bY)
 
 /-- Matrix representation of rpow for positive definite operators (any exponent). -/
-lemma toMatrixOrthonormal_rpow_pd {ℋ : Type u} [Qudit ℋ]
+lemma toMatOf_rpow_pd {ℋ : Type u} [Qudit ℋ]
     (b : OrthonormalBasis (Fin (Module.finrank ℂ ℋ)) ℂ ℋ) (X : L ℋ)
     (hX : X.IsPositive) (hX_unit : IsUnit X) (p : ℝ) :
-    LinearMap.toMatrixOrthonormal b (CFC.rpow X p)
-      = CFC.rpow (LinearMap.toMatrixOrthonormal b X) p := by
+    StdBasis.toMatOf b (CFC.rpow X p)
+      = CFC.rpow (StdBasis.toMatOf b X) p := by
   by_cases hp : 0 ≤ p
-  · exact toMatrixOrthonormal_rpow b X hX p hp
+  · exact toMatOf_rpow b X hX p hp
   · push Not at hp
-    have hXnonneg : 0 ≤ X := (LinearMap.nonneg_iff_isPositive X).2 hX
+    have hXnonneg : 0 ≤ X := (ContinuousLinearMap.nonneg_iff_isPositive X).2 hX
     have hXselfAdjoint : IsSelfAdjoint X := hX.isSelfAdjoint
-    have hφ : Continuous (LinearMap.toMatrixOrthonormal b) :=
-      (StarAlgEquiv.isometry (LinearMap.toMatrixOrthonormal b)).continuous
-    have hφnonneg : 0 ≤ LinearMap.toMatrixOrthonormal b X :=
-      map_nonneg (LinearMap.toMatrixOrthonormal b) hXnonneg
-    have hφselfAdjoint : IsSelfAdjoint (LinearMap.toMatrixOrthonormal b X) :=
-      IsSelfAdjoint.map hXselfAdjoint (LinearMap.toMatrixOrthonormal b)
+    have hφ : Continuous (StdBasis.toMatOf b) :=
+      (StarAlgEquiv.isometry (StdBasis.toMatOf b)).continuous
+    have hφnonneg : 0 ≤ StdBasis.toMatOf b X :=
+      map_nonneg (StdBasis.toMatOf b) hXnonneg
+    have hφselfAdjoint : IsSelfAdjoint (StdBasis.toMatOf b X) :=
+      IsSelfAdjoint.map hXselfAdjoint (StdBasis.toMatOf b)
     have h_spec_nn : spectrum ℝ X ⊆ Set.Ici 0 :=
       (StarOrderedRing.nonneg_iff_spectrum_nonneg (R := ℝ) _ (ha := hXselfAdjoint)).1 hXnonneg
     have h0_not_mem : (0 : ℝ) ∉ spectrum ℝ X :=
@@ -573,27 +617,27 @@ lemma toMatrixOrthonormal_rpow_pd {ℋ : Type u} [Qudit ℋ]
           (fun h => h0_not_mem (h ▸ hx))))
     rw [CFC.rpow_eq_pow, CFC.rpow_eq_pow]
     rw [CFC.rpow_eq_cfc_real (a := X) (y := p) (ha := hXnonneg)]
-    rw [CFC.rpow_eq_cfc_real (a := LinearMap.toMatrixOrthonormal b X)
+    rw [CFC.rpow_eq_cfc_real (a := StdBasis.toMatOf b X)
         (y := p) (ha := hφnonneg)]
     simpa using
       (StarAlgHomClass.map_cfc (R := ℝ)
-        (φ := LinearMap.toMatrixOrthonormal b)
+        (φ := StdBasis.toMatOf b)
         (f := fun x : ℝ => x ^ p)
         (a := X) (hf := hf) (hφ := hφ)
         (ha := hXselfAdjoint) (hφa := hφselfAdjoint))
 
 /-- Strictly positive eigenvalues for positive definite operators. -/
-lemma pos_eigenvalues_of_isPositive_isUnit {ℋ : Type u} [Qudit ℋ]
+private lemma pos_eigenvalues_of_isPositive_isUnit {ℋ : Type u} [Qudit ℋ]
     (X : L ℋ) (hX : X.IsPositive) (hX_unit : IsUnit X) :
     ∀ i, 0 < hX.isSymmetric.eigenvalues (n := Module.finrank ℂ ℋ) rfl i := by
   intro i
-  have h_nn := hX.nonneg_eigenvalues (hn := rfl) i
+  have h_nn := hX.toLinearMap.nonneg_eigenvalues (hn := rfl) i
   refine lt_of_le_of_ne h_nn (fun h => ?_)
-  have h_eigvec := hX.isSymmetric.apply_eigenvectorBasis (n := Module.finrank ℂ ℋ) rfl i
+  have h_eigvec := eigen_apply hX (n := Module.finrank ℂ ℋ) rfl i
   have h_ker : X (hX.isSymmetric.eigenvectorBasis rfl i) = 0 := by
     rw [h_eigvec]
     have : IsScalarTower ℝ ℂ ℋ := RestrictScalars.isScalarTower ℝ ℂ ℋ
-    simp [← h, Algebra.algebraMap_eq_smul_one]
+    simp [← h]
   have h_ne : hX.isSymmetric.eigenvectorBasis rfl i ≠ 0 :=
     (hX.isSymmetric.eigenvectorBasis rfl).toBasis.ne_zero i
   obtain ⟨u, hu⟩ := hX_unit
@@ -609,7 +653,7 @@ lemma pos_eigenvalues_of_isPositive_isUnit {ℋ : Type u} [Qudit ℋ]
   exact absurd (h_inj h_ker') h_ne
 
 /-- Trace of rpow for pd operators as sum of eigenvalue powers (all exponents). -/
-lemma trace_rpow_eq_sum_eigenvalues_pd {ℋ : Type u} [Qudit ℋ]
+private lemma trace_rpow_eq_sum_eigenvalues_pd {ℋ : Type u} [Qudit ℋ]
     (X : L ℋ) (hX : X.IsPositive) (hX_unit : IsUnit X) (p : ℝ) :
     Tr (CFC.rpow X p)
       = ((((∑ i : Fin (Module.finrank ℂ ℋ),
@@ -621,10 +665,10 @@ lemma trace_rpow_eq_sum_eigenvalues_pd {ℋ : Type u} [Qudit ℋ]
     let eVals : Fin (Module.finrank ℂ ℋ) → ℝ :=
       fun i => hX.isSymmetric.eigenvalues (n := Module.finrank ℂ ℋ) rfl i
     let M : Matrix (Fin (Module.finrank ℂ ℋ)) (Fin (Module.finrank ℂ ℋ)) ℂ :=
-      LinearMap.toMatrixOrthonormal bx X
-    have hXnonneg : 0 ≤ X := (LinearMap.nonneg_iff_isPositive X).2 hX
+      StdBasis.toMatOf bx X
+    have hXnonneg : 0 ≤ X := (ContinuousLinearMap.nonneg_iff_isPositive X).2 hX
     have hMnonneg : 0 ≤ M := by
-      simpa [M] using map_nonneg (LinearMap.toMatrixOrthonormal bx) hXnonneg
+      simpa [M] using map_nonneg (StdBasis.toMatOf bx) hXnonneg
     have hMpsd : M.PosSemidef := (Matrix.nonneg_iff_posSemidef).1 hMnonneg
     have hMherm : M.IsHermitian := hMpsd.1
     have hrootsM :
@@ -634,7 +678,7 @@ lemma trace_rpow_eq_sum_eigenvalues_pd {ℋ : Type u} [Qudit ℋ]
         M.charpoly.roots = Multiset.map (RCLike.ofReal ∘ eVals) Finset.univ.val := by
       have hdiagM : M = Matrix.diagonal (fun i =>
         (((hX.isSymmetric.eigenvalues (n := Module.finrank ℂ ℋ) rfl i) : ℝ) : ℂ)) := by
-        simpa [M, eVals] using toMatrixOrthonormal_eq_diagonal_eigenvalues X hX
+        simpa [M, eVals] using toMatOf_eq_diagonal_eigenvalues X hX
       rw [hdiagM, Matrix.charpoly_diagonal]
       have hroots :
           (Polynomial.roots
@@ -668,14 +712,14 @@ lemma trace_rpow_eq_sum_eigenvalues_pd {ℋ : Type u} [Qudit ℋ]
           = (((∑ i : Fin (Module.finrank ℂ ℋ), (eVals i) ^ p) : ℝ) : ℂ) := by
       exact congrArg (fun r : ℝ => (r : ℂ)) hsumPow
     calc
-      Tr (CFC.rpow X p) = Matrix.trace (LinearMap.toMatrixOrthonormal bx (CFC.rpow X p)) :=
+      Tr (CFC.rpow X p) = Matrix.trace (StdBasis.toMatOf bx (CFC.rpow X p)) :=
         tr_eq_matrix_trace_orthonormal bx (CFC.rpow X p)
       _ = Matrix.trace (CFC.rpow M p) := by
         exact (by
-          have hmap := toMatrixOrthonormal_rpow_pd bx X hX hX_unit p
+          have hmap := toMatOf_rpow_pd bx X hX hX_unit p
           simpa [M] using congrArg Matrix.trace hmap)
       _ = ∑ i : Fin (Module.finrank ℂ ℋ), (((hMherm.eigenvalues i) ^ p : ℝ) : ℂ) := by
-        exact matrix_trace_rpow_eq_sum_eigenvalues M hMherm hMnonneg p
+        exact Matrix.trace_rpow_eq_sum_eigenvalues M hMherm hMnonneg p
       _ = (((∑ i : Fin (Module.finrank ℂ ℋ), (hMherm.eigenvalues i) ^ p) : ℝ) : ℂ) := by
         simp
       _ = (((∑ i : Fin (Module.finrank ℂ ℋ), (eVals i) ^ p) : ℝ) : ℂ) := hsumPowC
@@ -685,11 +729,11 @@ lemma trace_rpow_eq_sum_eigenvalues_pd {ℋ : Type u} [Qudit ℋ]
 
 /-- Reverse trace Young inequality: for r < 0, s ∈ (0, 1), 1/r + 1/s = 1,
     M positive definite, N positive semidefinite:
-    Tr(M^r)/r + Tr(N^s)/s ≤ Tr(M ∘ₗ N). -/
+    Tr(M^r)/r + Tr(N^s)/s ≤ Tr(M ∘L N). -/
 theorem trace_reverse_young_inequality {ℋ : Type u} [Qudit ℋ] {r s : ℝ}
     (hr : r < 0) (hs0 : 0 < s) (hs1 : s < 1) (hrs : 1 / r + 1 / s = 1)
     (M N : L ℋ) (hM : M.IsPositive) (hM_unit : IsUnit M) (hN : N.IsPositive) :
-    Tr (CFC.rpow M r) / r + Tr (CFC.rpow N s) / s ≤ Tr (M ∘ₗ N) := by
+    Tr (CFC.rpow M r) / r + Tr (CFC.rpow N s) / s ≤ Tr (M ∘L N) := by
   let bM := hM.isSymmetric.eigenvectorBasis (n := Module.finrank ℂ ℋ) rfl
   let bN := hN.isSymmetric.eigenvectorBasis (n := Module.finrank ℂ ℋ) rfl
   have hdouble := trace_comp_eq_double_sum_eigen_overlap M N hM hN
@@ -701,7 +745,7 @@ theorem trace_reverse_young_inequality {ℋ : Type u} [Qudit ℋ] {r s : ℝ}
       ∀ j : Fin (Module.finrank ℂ ℋ),
         0 ≤ hN.isSymmetric.eigenvalues (n := Module.finrank ℂ ℋ) rfl j := by
     intro j
-    exact hN.nonneg_eigenvalues (hn := rfl) j
+    exact hN.toLinearMap.nonneg_eigenvalues (hn := rfl) j
   have hRevYoung :=
     weighted_reverse_young_overlap hr hs0 hs1 hrs bM bN
       (fun i => hM.isSymmetric.eigenvalues (n := Module.finrank ℂ ℋ) rfl i)
@@ -743,7 +787,7 @@ theorem trace_reverse_young_inequality {ℋ : Type u} [Qudit ℋ] {r s : ℝ}
         simp [Complex.normSq_eq_norm_sq, mul_assoc, mul_left_comm]
   have hbound_double_complex :
       Tr (CFC.rpow M r) / r + Tr (CFC.rpow N s) / s
-        ≤ Tr (M ∘ₗ N) := by
+        ≤ Tr (M ∘L N) := by
     rw [hdouble]
     have htraceM := trace_rpow_eq_sum_eigenvalues_pd M hM hM_unit r
     have hs_nonneg : 0 ≤ s := hs0.le
@@ -753,3 +797,5 @@ theorem trace_reverse_young_inequality {ℋ : Type u} [Qudit ℋ] {r s : ℝ}
   exact hbound_double_complex
 
 end ReverseYoung
+
+end QuantumState

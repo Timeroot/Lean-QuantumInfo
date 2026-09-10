@@ -6,41 +6,32 @@ Authors: Kazumi Kasaura, Hayata Yamasaki
 
 import QuantumLib.Channels.Superoperator
 import QuantumInfo.ForMathlib.HayataGroup.TraceInequality.LiebAndoTrace
--- Haar measure on locally compact groups
-import Mathlib.MeasureTheory.Measure.Haar.Basic
--- IsTopologicalGroup instance for unitary groups
-import Mathlib.Topology.Algebra.Star.Unitary
--- Jensen's inequality for convex/concave functions under probability measures
-import Mathlib.Analysis.Convex.Integral
--- Haar-invariant integrals (integral_mul_left_eq_self)
-import Mathlib.MeasureTheory.Group.Integral
--- Trace of rank-one operators and inner product
-import Mathlib.Analysis.InnerProductSpace.Trace
--- finrank_eq_card_basis
-import Mathlib.LinearAlgebra.Dimension.StrongRankCondition
--- IsCentral for End, center of endomorphism algebras
-import Mathlib.Algebra.Central.End
--- rTensorStarAlgHom, lTensorStarAlgHom, map_eq_rTensor_mul_lTensor
 import QuantumLib.ForMathlib.TensorCFC
+import Mathlib.Analysis.Convex.Integral
+import Mathlib.Analysis.InnerProductSpace.Trace
+import Mathlib.LinearAlgebra.Dimension.StrongRankCondition
+import Mathlib.MeasureTheory.Group.Integral
+import Mathlib.MeasureTheory.Measure.Haar.Basic
+import Mathlib.Topology.Algebra.Star.Unitary
 
 /-!
-# Haar measure on the unitary group and tools for Theorem 1
+# Haar measure on the unitary group, and the twirl
 
-Infrastructure for the normalized (probability) Haar measure on the finite-dimensional
-unitary group, the twirl identity, and Jensen-type inequalities for jointly convex /
+The normalized (probability) Haar measure on the unitary group of a finite-dimensional Hilbert
+space, the twirl identity it satisfies, and Jensen-type inequalities for jointly convex and
 concave operator functions under Haar integration.
 
-These are the measure-theoretic ingredients needed to derive monotonicity of the
-sandwiched Rényi relative entropy (Theorem 1 of Frank–Lieb, arXiv:1306.5358) from
-Proposition 3 (joint convexity / concavity of the sandwiched quasi-relative entropy).
+These are the measure-theoretic ingredients that carry monotonicity of the sandwiched Rényi
+relative entropy (Theorem 1 of Frank–Lieb, arXiv:1306.5358) back to the joint convexity and
+concavity of the sandwiched quasi-relative entropy (Proposition 3 of the same paper).
 
 ## Convention
 
-We write `Tr₂` for `QuantumChannel.Tr₂`, which traces out the **first** tensor factor:
-  `Tr₂ : L(ℋ₁ ⊗ ℋ₂) → L ℋ₂`.
+We write `TrLeft` for `QuantumChannel.TrLeft`, which traces out the **first** tensor factor:
+  `TrLeft : L(ℋ₁ ⊗ ℋ₂) → L ℋ₂`.
 When the first factor is the "environment" ℋ_env and the second is the main system ℋ,
-`Tr₂` computes the partial trace over the environment. This matches the Stinespring
-convention `E(γ) = Tr₂(U (τ ⊗ γ) U*)` where τ is the environment state on ℋ₁ and
+`TrLeft` computes the partial trace over the environment. This matches the Stinespring
+convention `E(γ) = TrLeft(U (τ ⊗ γ) U*)` where τ is the environment state on ℋ₁ and
 γ is the input state on ℋ₂.
 -/
 
@@ -59,44 +50,12 @@ section CompactHaar
 
 variable {ℋ : Type u} [Qudit ℋ]
 
+/-- Operators carry the Borel σ-algebra of their norm topology, so that operator-valued
+functions on the unitary group can be integrated. -/
 noncomputable instance instMeasurableSpaceLM : MeasurableSpace (L ℋ) := borel (L ℋ)
+
+/-- That σ-algebra is the Borel one by definition. -/
 instance instBorelSpaceLM : BorelSpace (L ℋ) := ⟨rfl⟩
-
--- Topology on `L ℋ` induced from CLM is compatible with multiplication and star
-private noncomputable abbrev iso (ℋ : Type u) [Qudit ℋ] := linear_isometry_equiv (ℋ := ℋ)
-
-private lemma iso_eq_toCLM (a : L ℋ) :
-    iso ℋ a = LinearMap.toContinuousLinearMap a := rfl
-
-private lemma iso_mul (a b : L ℋ) : iso ℋ (a * b) = iso ℋ a * iso ℋ b := by
-  change LinearMap.toContinuousLinearMap (a * b) =
-    LinearMap.toContinuousLinearMap a * LinearMap.toContinuousLinearMap b
-  exact (Module.End.toContinuousLinearMap ℋ).map_mul a b
-
-private lemma iso_star (a : L ℋ) : iso ℋ (star a) = star (iso ℋ a) := by
-  change LinearMap.toContinuousLinearMap (star a) = star (LinearMap.toContinuousLinearMap a)
-  ext x
-  rfl
-
-noncomputable instance instContinuousMulLM : ContinuousMul (L ℋ) where
-  continuous_mul := by
-    suffices h : ∀ a b : L ℋ, a * b = (iso ℋ).symm ((iso ℋ) a * (iso ℋ) b) by
-      simp_rw [h]
-      exact (iso ℋ).symm.continuous.comp
-        (continuous_mul.comp ((iso ℋ).continuous.prodMap (iso ℋ).continuous))
-    intro a b
-    conv_rhs => rw [show (iso ℋ) a * (iso ℋ) b = (iso ℋ) (a * b) from (iso_mul a b).symm]
-    exact ((iso ℋ).symm_apply_apply (a * b)).symm
-
-noncomputable instance instContinuousStarLM : ContinuousStar (L ℋ) where
-  continuous_star := by
-    suffices h : (star : L ℋ → L ℋ) = (iso ℋ).symm ∘ star ∘ (iso ℋ) by
-      rw [h]
-      exact (iso ℋ).symm.continuous.comp (continuous_star.comp (iso ℋ).continuous)
-    funext a
-    change star a = (iso ℋ).symm (star ((iso ℋ) a))
-    conv_rhs => rw [show star ((iso ℋ) a) = (iso ℋ) (star a) from (iso_star a).symm]
-    exact ((iso ℋ).symm_apply_apply (star a)).symm
 
 /-- Every unitary operator on a finite-dimensional Hilbert space has operator norm ≤ 1. -/
 lemma unitaryNormBound [Nontrivial ℋ] (U : unitary (L ℋ)) : ‖(U : L ℋ)‖ ≤ 1 := by
@@ -116,10 +75,12 @@ instance compactSpace_unitary [Nontrivial ℋ] : CompactSpace (unitary (L ℋ)) 
   exact isCompact_iff_compactSpace.mp
     (Metric.isCompact_of_isClosed_isBounded isClosed_unitary unitary_isBounded)
 
+/-- The unitary group is locally compact, being compact; this is what `haarMeasure` asks for. -/
 instance locallyCompactSpace_unitary [Nontrivial ℋ] : LocallyCompactSpace (unitary (L ℋ)) := by
   have : ProperSpace (unitary (L ℋ)) := proper_of_compact
   exact locallyCompact_of_proper
 
+/-- The whole unitary group, as the positive compact set that `haarMeasure` normalises against. -/
 private noncomputable def unitaryPC (ℋ : Type u) [Qudit ℋ] [Nontrivial ℋ] :
     TopologicalSpace.PositiveCompacts (unitary (L ℋ)) :=
   ⟨⟨Set.univ, isCompact_univ⟩, by rw [interior_univ]; exact Set.univ_nonempty⟩
@@ -130,6 +91,7 @@ noncomputable def haarUnitary (ℋ : Type u) [Qudit ℋ] [Nontrivial ℋ] :
     Measure (unitary (L ℋ)) :=
   haarMeasure (unitaryPC ℋ)
 
+/-- `haarUnitary` is a Haar measure, hence left invariant. -/
 instance haarUnitary_isHaarMeasure [Nontrivial ℋ] :
     IsHaarMeasure (haarUnitary ℋ) := by
   unfold haarUnitary
@@ -150,7 +112,7 @@ section Measurability
 
 variable {ℋ : Type u} [Qudit ℋ]
 
-/-- Conjugation u ↦ (↑u) * X * (star ↑u) is continuous on the unitary group. -/
+/-- Conjugation `u ↦ u X u†` is continuous on the unitary group. -/
 lemma continuous_unitaryConj (X : L ℋ) :
     Continuous (fun u : unitary (L ℋ) => (u : L ℋ) * X * (star (u : L ℋ))) := by
   have hval : Continuous (fun u : unitary (L ℋ) => (u : L ℋ)) := continuous_subtype_val
@@ -169,46 +131,46 @@ end Measurability
 
 /-! ## Section 3: Twirl (Schur averaging) identity
 
-The core result is `twirl_eq_smul_one`: averaging unitary conjugation over the
-Haar measure produces a scalar multiple of the identity. This follows from two facts:
-1. The averaged operator commutes with all unitaries (by Haar left-invariance).
-2. An element of `L ℋ` commuting with all elements is a scalar (`IsCentral ℂ (L ℋ)`).
-3. To bridge (1) → (2), one shows that unitaries ℂ-linearly span `L ℋ`.
-The scalar is then determined by the trace.
+The core result is `twirl_eq_smul_one`: averaging unitary conjugation over the Haar measure
+produces a scalar multiple of the identity. The averaged operator commutes with every unitary, by
+left invariance of the Haar measure, and `scalar_of_commutes_unitaries` turns that into being a
+scalar: reflections in unit vectors are unitary, and commuting with all of them makes every unit
+vector an eigenvector, with one eigenvalue shared between them. The scalar is then read off from
+the trace.
 
-The Schur orthogonality relation and the tensor-product twirl identity are
-consequences of `twirl_eq_smul_one`.
+The Schur orthogonality relation and the tensor-product twirl identities are consequences.
 -/
 
 section Twirl
 
 variable {ℋ : Type u} [Qudit ℋ] [Nontrivial ℋ]
 
-/-- The rank-one projection P_v = |v⟩⟨v| as a linear map. -/
+/-- The rank-one projection P_v = |v⟩⟨v|. -/
 private noncomputable def proj (v : ℋ) : L ℋ :=
-  (InnerProductSpace.rankOne ℂ v v : ℋ →L[ℂ] ℋ).toLinearMap
+  outerProduct v v
 
 omit [Nontrivial ℋ] in
+/-- `proj v` sends `w` to `⟪v, w⟫ • v`. -/
 private lemma proj_apply (v w : ℋ) : proj v w = @inner ℂ ℋ _ v w • v := by
-  simp [proj, InnerProductSpace.rankOne_apply]
+  simp [proj]
 
-/-- The reflection R_v = 1 - 2|v⟩⟨v| as a linear map. -/
+/-- The reflection R_v = 1 - 2|v⟩⟨v|. -/
 private noncomputable def refl' (v : ℋ) : L ℋ :=
   (1 : L ℋ) - (2 : ℂ) • proj v
 
 omit [Nontrivial ℋ] in
+/-- `refl' v` sends `w` to `w - 2⟪v, w⟫ • v`. -/
 private lemma refl'_apply (v w : ℋ) :
     refl' v w = w - (2 : ℂ) • @inner ℂ ℋ _ v w • v := by
   simp [refl', proj_apply, smul_smul]
 
 omit [Nontrivial ℋ] in
+/-- A rank-one projection is self-adjoint. -/
 private lemma star_proj (v : ℋ) : star (proj v) = proj v := by
-  apply (iso ℋ).injective
-  simp only [iso_star, proj]
-  change star (InnerProductSpace.rankOne ℂ v v) = InnerProductSpace.rankOne ℂ v v
-  rw [ContinuousLinearMap.star_eq_adjoint, InnerProductSpace.adjoint_rankOne]
+  rw [proj, ContinuousLinearMap.star_eq_adjoint, adjoint_outerProduct]
 
 omit [Nontrivial ℋ] in
+/-- A reflection in a unit vector is an involution. -/
 private lemma refl'_sq (v : ℋ) (hv : ‖v‖ = 1) : refl' v * refl' v = 1 := by
   have hiv : @inner ℂ ℋ _ v v = (1 : ℂ) := by
     rw [inner_self_eq_norm_sq_to_K, hv]
@@ -224,10 +186,12 @@ private lemma refl'_sq (v : ℋ) (hv : ‖v‖ = 1) : refl' v * refl' v = 1 := b
   simp only [mul_neg, neg_smul, sub_neg_eq_add, sub_add_cancel]
 
 omit [Nontrivial ℋ] in
+/-- A reflection is self-adjoint. -/
 private lemma refl'_star (v : ℋ) : star (refl' v) = refl' v := by
   simp [refl', star_sub, star_one, star_smul, star_proj]
 
 omit [Nontrivial ℋ] in
+/-- A reflection in a unit vector is unitary, being a self-adjoint involution. -/
 private lemma refl'_unitary (v : ℋ) (hv : ‖v‖ = 1) : refl' v ∈ unitary (L ℋ) := by
   rw [Unitary.mem_iff]
   exact ⟨by rw [refl'_star, refl'_sq v hv], by rw [refl'_star, refl'_sq v hv]⟩
@@ -338,9 +302,11 @@ lemma scalar_of_commutes_unitaries (M : L ℋ)
     rw [hu_def, map_smul, smul_comm] at hMu
     exact smul_right_injective ℋ hcinv hMu
 
+/-- **The twirl of an operator is a scalar.** Averaging `u X u†` over the Haar measure on the
+unitary group gives `((dim ℋ)⁻¹ * Tr X) • 1`. -/
 theorem twirl_eq_smul_one (X : L ℋ) :
     ∫ u : unitary (L ℋ), (u : L ℋ) * X * star (u : L ℋ) ∂(haarUnitary ℋ) =
-    ((Module.finrank ℂ ℋ : ℂ)⁻¹ * LinearMap.trace ℂ ℋ X) • (1 : L ℋ) := by
+    ((Module.finrank ℂ ℋ : ℂ)⁻¹ * Tr X) • (1 : L ℋ) := by
   set Φ := ∫ u : unitary (L ℋ), (u : L ℋ) * X * star (u : L ℋ) ∂(haarUnitary ℋ)
   -- Step 1: Φ commutes with all unitaries V (by Haar left-invariance)
   have hΦ_comm : ∀ V : unitary (L ℋ), (V : L ℋ) * Φ = Φ * (V : L ℋ) := by
@@ -371,19 +337,19 @@ theorem twirl_eq_smul_one (X : L ℋ) :
   -- Step 2: Φ is scalar (from scalar_of_commutes_unitaries)
   obtain ⟨c, hc⟩ := scalar_of_commutes_unitaries Φ hΦ_comm
   -- Step 3: determine c from trace (Tr(Φ) = Tr(X) since trace is cyclic and Haar is prob.)
-  have hc_val : c = (Module.finrank ℂ ℋ : ℂ)⁻¹ * LinearMap.trace ℂ ℋ X := by
+  have hc_val : c = (Module.finrank ℂ ℋ : ℂ)⁻¹ * Tr X := by
     have hd : (Module.finrank ℂ ℋ : ℂ) ≠ 0 :=
       Nat.cast_ne_zero.mpr (Module.finrank_pos (R := ℂ) (M := ℋ)).ne'
-    have h1 : LinearMap.trace ℂ ℋ Φ = c * (Module.finrank ℂ ℋ : ℂ) := by
-      rw [hc, map_smul, LinearMap.trace_one, smul_eq_mul]
-    have h2 : LinearMap.trace ℂ ℋ Φ = LinearMap.trace ℂ ℋ X := by
-      let trCLM : L ℋ →L[ℂ] ℂ := { LinearMap.trace ℂ ℋ with }
+    have h1 : Tr Φ = c * (Module.finrank ℂ ℋ : ℂ) := by
+      rw [hc, map_smul, Tr_one, smul_eq_mul]
+    have h2 : Tr Φ = Tr X := by
+      let trCLM : L ℋ →L[ℂ] ℂ := LinearMap.toContinuousLinearMap Tr
       have h_tr := trCLM.integral_comp_comm (integrable_unitaryConj X)
       have h_cycl : ∀ u : unitary (L ℋ),
-          trCLM ((u : L ℋ) * X * star (u : L ℋ)) = LinearMap.trace ℂ ℋ X := by
+          trCLM ((u : L ℋ) * X * star (u : L ℋ)) = Tr X := by
         intro u
-        change LinearMap.trace ℂ ℋ ((u : L ℋ) * X * star (u : L ℋ)) = _
-        rw [LinearMap.trace_mul_cycle,
+        change Tr ((u : L ℋ) * X * star (u : L ℋ)) = _
+        rw [Tr_mul_cycle,
             show star (↑u : L ℋ) * (↑u : L ℋ) = 1 from (Unitary.mem_iff.mp u.property).1,
             one_mul]
       simp_rw [h_cycl] at h_tr
@@ -395,19 +361,17 @@ theorem twirl_eq_smul_one (X : L ℋ) :
 
 variable {ι : Type*} [DecidableEq ι] [Fintype ι]
 
-/-- Schur orthogonality for the fundamental representation of the unitary group:
-    ∫ u_{ij} * conj(u_{kl}) du = δ_{ik} δ_{jl} / dim ℋ
-    where u_{ij} = ⟨b i, U (b j)⟩ for an orthonormal basis b.
-
-    This follows from `twirl_eq_smul_one` applied to the rank-1 operator |b j⟩⟨b l|,
-    then taking the (i,k) matrix element. -/
+/-- **Schur orthogonality** for the fundamental representation of the unitary group. Writing
+`u i j` for the matrix entry `⟪b i, u (b j)⟫` in an orthonormal basis `b`, the average of
+`u i j * conj (u k l)` is `(dim ℋ)⁻¹` when `i = k` and `j = l`, and `0` otherwise. It comes from
+`twirl_eq_smul_one` applied to `|b j⟩⟨b l|`, read off at the `(i, k)` entry. -/
 theorem schur_orthogonality (b : OrthonormalBasis ι ℂ ℋ) (i j k l : ι) :
     ∫ u : unitary (L ℋ),
       @inner ℂ ℋ _ (b i) ((u : L ℋ) (b j)) *
       starRingEnd ℂ (@inner ℂ ℋ _ (b k) ((u : L ℋ) (b l)))
     ∂(haarUnitary ℋ) =
     if i = k ∧ j = l then (Fintype.card ι : ℂ)⁻¹ else 0 := by
-  set X : L ℋ := (InnerProductSpace.rankOne ℂ (b j) (b l) : ℋ →L[ℂ] ℋ).toLinearMap with hX
+  set X : L ℋ := outerProduct (b l) (b j) with hX
   have h_int : ∀ u : unitary (L ℋ),
       @inner ℂ ℋ _ (b i) ((u : L ℋ) (b j)) *
       starRingEnd ℂ (@inner ℂ ℋ _ (b k) ((u : L ℋ) (b l))) =
@@ -416,8 +380,7 @@ theorem schur_orthogonality (b : OrthonormalBasis ι ℂ ℋ) (i j k l : ι) :
     change _ = @inner ℂ ℋ _ (b i) ((↑u : L ℋ) (X ((star (↑u : L ℋ)) (b k))))
     have hXapp : X ((star (↑u : L ℋ)) (b k)) =
         @inner ℂ ℋ _ (b l) ((star (↑u : L ℋ)) (b k)) • b j := by
-      change (InnerProductSpace.rankOne ℂ (b j) (b l) : ℋ →L[ℂ] ℋ).toLinearMap _ = _
-      simp [InnerProductSpace.rankOne_apply]
+      rw [hX, outerProduct_apply]
     rw [hXapp, map_smul, inner_smul_right]
     suffices h : @inner ℂ ℋ _ (b l) ((star (↑u : L ℋ)) (b k)) =
         starRingEnd ℂ (@inner ℂ ℋ _ (b k) ((↑u : L ℋ) (b l))) by
@@ -425,7 +388,8 @@ theorem schur_orthogonality (b : OrthonormalBasis ι ℂ ℋ) (i j k l : ι) :
           ring
     rw [← inner_conj_symm]
     congr 1
-    exact LinearMap.adjoint_inner_left (↑u : L ℋ) (b l) (b k)
+    rw [ContinuousLinearMap.star_eq_adjoint]
+    exact ContinuousLinearMap.adjoint_inner_left (↑u : L ℋ) (b l) (b k)
   simp_rw [h_int]
   let lm : L ℋ →ₗ[ℂ] ℂ := ⟨⟨fun A => @inner ℂ ℋ _ (b i) (A (b k)),
     fun A B => by simp⟩, fun c A => by simp⟩
@@ -435,12 +399,11 @@ theorem schur_orthogonality (b : OrthonormalBasis ι ℂ ℋ) (i j k l : ι) :
       elem ((u : L ℋ) * X * star (u : L ℋ)) := fun _ => rfl
   simp_rw [h_eq]
   rw [elem.integral_comp_comm (integrable_unitaryConj X), twirl_eq_smul_one X]
-  change @inner ℂ ℋ _ (b i) (((Module.finrank ℂ ℋ : ℂ)⁻¹ * LinearMap.trace ℂ ℋ X) • b k) =
+  change @inner ℂ ℋ _ (b i) (((Module.finrank ℂ ℋ : ℂ)⁻¹ * Tr X) • b k) =
     if i = k ∧ j = l then (Fintype.card ι : ℂ)⁻¹ else 0
   rw [inner_smul_right]
-  have hTr : LinearMap.trace ℂ ℋ X = @inner ℂ ℋ _ (b l) (b j) := by
-    rw [hX]
-    exact InnerProductSpace.trace_rankOne (b j) (b l)
+  have hTr : Tr X = @inner ℂ ℋ _ (b l) (b j) := by
+    rw [hX, trace_outerProduct]
   rw [hTr, Module.finrank_eq_card_basis b.toBasis]
   have horth := orthonormal_iff_ite.mp b.orthonormal
   rw [horth l j, horth i k]
@@ -451,239 +414,115 @@ variable {ℋ₁ : Type u} {ℋ₂ : Type u} [Qudit ℋ₁] [Qudit ℋ₂]
 variable [Nontrivial ℋ₁] [Nontrivial ℋ₂]
 
 omit [Nontrivial ℋ₁] [Nontrivial ℋ₂] in
-private lemma map_id_eq_rTensorStarAlgHom (f : L ℋ₁) :
-    TensorProduct.map f (LinearMap.id (M := ℋ₂)) =
-    (rTensorStarAlgHom (ℋ₂ := ℋ₂)) f := by
-  rw [show (LinearMap.id : L ℋ₂) = 1 from rfl,
-    map_eq_rTensor_mul_lTensor, map_one (lTensorStarAlgHom (ℋ₁ := ℋ₁)), mul_one]
+/-- `f ⊗ 1` is the amplification `rTensorStarAlgHom f`. -/
+private lemma mapL_one_eq_rTensorStarAlgHom (f : L ℋ₁) :
+    TensorProduct.mapL f (1 : L ℋ₂) = (rTensorStarAlgHom (ℋ₂ := ℋ₂)) f := by
+  rw [map_eq_rTensor_mul_lTensor, map_one (lTensorStarAlgHom (ℋ₁ := ℋ₁)), mul_one]
 
 omit [Nontrivial ℋ₁] [Nontrivial ℋ₂] in
-/-- Tensor-product conjugation u ↦ map u id * X * map (star u) id is continuous. -/
+/-- `1 ⊗ g` is the amplification `lTensorStarAlgHom g`. -/
+private lemma one_mapL_eq_lTensorStarAlgHom (g : L ℋ₂) :
+    TensorProduct.mapL (1 : L ℋ₁) g = (lTensorStarAlgHom (ℋ₁ := ℋ₁)) g := by
+  rw [map_eq_rTensor_mul_lTensor, map_one (rTensorStarAlgHom (ℋ₂ := ℋ₂)), one_mul]
+
+omit [Nontrivial ℋ₁] [Nontrivial ℋ₂] in
+/-- Tensor-product conjugation `u ↦ (u ⊗ 1) X (u† ⊗ 1)` is continuous. -/
 lemma continuous_unitaryConj_tensor (X : L (ℋ₁ ⊗[ℂ] ℋ₂)) :
     Continuous (fun u : unitary (L ℋ₁) =>
-      TensorProduct.map ((u : L ℋ₁)) (LinearMap.id (M := ℋ₂)) * X *
-      TensorProduct.map (star (u : L ℋ₁)) (LinearMap.id (M := ℋ₂))) := by
-  simp_rw [map_id_eq_rTensorStarAlgHom]
+      TensorProduct.mapL ((u : L ℋ₁)) (1 : L ℋ₂) * X *
+      TensorProduct.mapL (star (u : L ℋ₁)) (1 : L ℋ₂)) := by
+  simp_rw [mapL_one_eq_rTensorStarAlgHom]
   exact (((continuous_rTensorStarAlgHom (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂)).comp
     continuous_subtype_val).mul continuous_const).mul
     ((continuous_rTensorStarAlgHom (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂)).comp
       (continuous_star.comp continuous_subtype_val))
 
 omit [Nontrivial ℋ₂] in
-/-- Tensor-product conjugation is integrable w.r.t. Haar on the first factor. -/
+/-- Tensor-product conjugation is integrable against the Haar measure on the first factor. -/
 lemma integrable_unitaryConj_tensor (X : L (ℋ₁ ⊗[ℂ] ℋ₂)) :
     Integrable (fun u : unitary (L ℋ₁) =>
-      TensorProduct.map ((u : L ℋ₁)) (LinearMap.id (M := ℋ₂)) * X *
-      TensorProduct.map (star (u : L ℋ₁)) (LinearMap.id (M := ℋ₂)))
+      TensorProduct.mapL ((u : L ℋ₁)) (1 : L ℋ₂) * X *
+      TensorProduct.mapL (star (u : L ℋ₁)) (1 : L ℋ₂))
       (haarUnitary ℋ₁) :=
   (continuous_unitaryConj_tensor X).integrable_of_hasCompactSupport
     (IsCompact.of_isClosed_subset isCompact_univ (isClosed_tsupport _) (Set.subset_univ _))
 
--- Forward direction on rank-one operators (dualTensorHom ⊗ dualTensorHom):
--- trace through the chain of 8 linear equivalences in l_tensor_equiv.
-omit [Nontrivial ℋ₁] [Nontrivial ℋ₂] in
-private lemma l_tensor_forward_rankone (f₁ : Module.Dual ℂ ℋ₁) (u₁ : ℋ₁)
-    (f₂ : Module.Dual ℂ ℋ₂) (u₂ : ℋ₂) :
-    l_tensor_equiv (dualTensorHomEquiv ℂ (ℋ₁ ⊗[ℂ] ℋ₂) (ℋ₁ ⊗[ℂ] ℋ₂)
-      (TensorProduct.dualDistribEquiv ℂ ℋ₁ ℋ₂ (f₁ ⊗ₜ[ℂ] f₂) ⊗ₜ[ℂ] (u₁ ⊗ₜ[ℂ] u₂))) =
-    dualTensorHomEquiv ℂ ℋ₁ ℋ₁ (f₁ ⊗ₜ[ℂ] u₁) ⊗ₜ[ℂ] dualTensorHomEquiv ℂ ℋ₂ ℋ₂ (f₂ ⊗ₜ[ℂ] u₂) := by
-  unfold l_tensor_equiv
-  simp only [LinearEquiv.trans_apply, LinearEquiv.symm_apply_apply,
-    LinearEquiv.rTensor_tmul, LinearEquiv.lTensor_tmul,
-    TensorProduct.assoc_tmul, TensorProduct.assoc_symm_tmul,
-    TensorProduct.comm_tmul, TensorProduct.congr_tmul]
-
--- Extend to all operators by surjectivity of dualTensorHomEquiv and bilinearity.
-omit [Nontrivial ℋ₁] [Nontrivial ℋ₂] in
-private lemma l_tensor_equiv_forward_tmul (A : L ℋ₁) (B : L ℋ₂) :
-    l_tensor_equiv (TensorProduct.map A B) = A ⊗ₜ[ℂ] B := by
-  obtain ⟨a, rfl⟩ := (dualTensorHomEquiv ℂ ℋ₁ ℋ₁).surjective A
-  obtain ⟨b, rfl⟩ := (dualTensorHomEquiv ℂ ℋ₂ ℋ₂).surjective B
-  induction a using TensorProduct.induction_on with
-  | zero =>
-    simp only [map_zero, TensorProduct.map_zero_left, map_zero, TensorProduct.zero_tmul]
-  | add a₁ a₂ ha₁ ha₂ =>
-    simp only [map_add, TensorProduct.map_add_left, map_add, TensorProduct.add_tmul]
-    exact congr_arg₂ (· + ·) ha₁ ha₂
-  | tmul f₁ u₁ =>
-    induction b using TensorProduct.induction_on with
-    | zero =>
-      simp only [map_zero, TensorProduct.map_zero_right, map_zero, TensorProduct.tmul_zero]
-    | add b₁ b₂ hb₁ hb₂ =>
-      simp only [map_add, TensorProduct.map_add_right, map_add, TensorProduct.tmul_add]
-      exact congr_arg₂ (· + ·) hb₁ hb₂
-    | tmul f₂ u₂ =>
-      change l_tensor_equiv
-        (TensorProduct.map ((dualTensorHom ℂ ℋ₁ ℋ₁) (f₁ ⊗ₜ[ℂ] u₁))
-          ((dualTensorHom ℂ ℋ₂ ℋ₂) (f₂ ⊗ₜ[ℂ] u₂))) =
-        (dualTensorHom ℂ ℋ₁ ℋ₁) (f₁ ⊗ₜ[ℂ] u₁) ⊗ₜ[ℂ] (dualTensorHom ℂ ℋ₂ ℋ₂) (f₂ ⊗ₜ[ℂ] u₂)
-      rw [map_dualTensorHom]
-      exact l_tensor_forward_rankone f₁ u₁ f₂ u₂
-
-omit [Nontrivial ℋ₁] [Nontrivial ℋ₂] in
-private lemma l_tensor_equiv_symm_tmul (A : L ℋ₁) (B : L ℋ₂) :
-    l_tensor_equiv.symm (A ⊗ₜ[ℂ] B) = TensorProduct.map A B := by
-  apply l_tensor_equiv.injective
-  rw [LinearEquiv.apply_symm_apply, l_tensor_equiv_forward_tmul]
-
-omit [Nontrivial ℋ₁] [Nontrivial ℋ₂] in
-private lemma Tr₂_map (A : L ℋ₁) (B : L ℋ₂) :
-    QuantumChannel.Tr₂ (TensorProduct.map A B : L (ℋ₁ ⊗[ℂ] ℋ₂)) =
-    LinearMap.trace ℂ ℋ₁ A • B := by
-  unfold QuantumChannel.Tr₂
-  simp only [LinearMap.comp_apply]
-  rw [show l_tensor_equiv.toLinearMap (TensorProduct.map A B) =
-      l_tensor_equiv (TensorProduct.map A B) from rfl,
-    ← l_tensor_equiv_symm_tmul (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂) A B,
-    LinearEquiv.apply_symm_apply,
-    TensorProduct.map_tmul, LinearMap.id_apply]
-  change (TensorProduct.lid ℂ (L ℋ₂)) (LinearMap.trace ℂ ℋ₁ A ⊗ₜ[ℂ] B) =
-    LinearMap.trace ℂ ℋ₁ A • B
-  exact TensorProduct.lid_tmul B (LinearMap.trace ℂ ℋ₁ A)
-
-omit [Nontrivial ℋ₁] [Nontrivial ℋ₂] in
-private lemma map_add_right (f : L ℋ₁) (g₁ g₂ : L ℋ₂) :
-    TensorProduct.map f (g₁ + g₂) =
-    TensorProduct.map f g₁ + TensorProduct.map f g₂ := by
-  simp only [map_eq_rTensor_mul_lTensor, map_add (lTensorStarAlgHom (ℋ₁ := ℋ₁)), mul_add]
-
 omit [Nontrivial ℋ₂] in
-/-- **Twirl identity**: averaging unitary conjugation in the first tensor factor
-    over the Haar measure produces the partial trace tensored with the maximally
-    mixed state on the first factor.
-
-    ∫ (u⊗1) X (u*⊗1) du = dim(ℋ₁)⁻¹ · I_{ℋ₁} ⊗ Tr₁(X)
-
-    This follows from `twirl_eq_smul_one` applied to the first tensor factor,
-    using the linearity of the integral and properties of the partial trace.
-
-    Here `Tr₂` in `QuantumChannel` traces out the first factor ℋ₁,
-    giving an operator on ℋ₂. -/
+/-- **Twirl over the first factor.** Averaging `(u ⊗ 1) X (u† ⊗ 1)` over the Haar measure on
+`unitary (L ℋ₁)` leaves the first factor maximally mixed and the second factor traced out:
+`∫ (u ⊗ 1) X (u† ⊗ 1) = ((dim ℋ₁)⁻¹ • 1) ⊗ TrLeft X`. It reduces, by linearity of the integral, to
+`twirl_eq_smul_one` on the first factor. -/
 theorem twirl_eq_partialTrace_smul_id (X : L (ℋ₁ ⊗[ℂ] ℋ₂)) :
     ∫ u : unitary (L ℋ₁),
-      TensorProduct.map ((u : L ℋ₁)) (LinearMap.id (M := ℋ₂)) * X *
-      TensorProduct.map (star (u : L ℋ₁)) (LinearMap.id (M := ℋ₂))
+      TensorProduct.mapL ((u : L ℋ₁)) (1 : L ℋ₂) * X *
+      TensorProduct.mapL (star (u : L ℋ₁)) (1 : L ℋ₂)
     ∂(haarUnitary ℋ₁) =
-    TensorProduct.map
-      ((Module.finrank ℂ ℋ₁ : ℂ)⁻¹ • LinearMap.id (M := ℋ₁))
-      (QuantumChannel.Tr₂ X) := by
+    TensorProduct.mapL ((Module.finrank ℂ ℋ₁ : ℂ)⁻¹ • (1 : L ℋ₁)) (TrLeft X) := by
   suffices h : ∀ Y : L ℋ₁ ⊗[ℂ] L ℋ₂,
       ∫ u : unitary (L ℋ₁),
-        TensorProduct.map ((u : L ℋ₁)) (LinearMap.id (M := ℋ₂)) *
-        l_tensor_equiv.symm Y *
-        TensorProduct.map (star (u : L ℋ₁)) (LinearMap.id (M := ℋ₂))
+        TensorProduct.mapL ((u : L ℋ₁)) (1 : L ℋ₂) *
+        opTensorEquiv.symm Y *
+        TensorProduct.mapL (star (u : L ℋ₁)) (1 : L ℋ₂)
       ∂(haarUnitary ℋ₁) =
-      TensorProduct.map
-        ((Module.finrank ℂ ℋ₁ : ℂ)⁻¹ • LinearMap.id (M := ℋ₁))
-        (QuantumChannel.Tr₂ (l_tensor_equiv.symm Y)) by
-    have := h (l_tensor_equiv X)
+      TensorProduct.mapL ((Module.finrank ℂ ℋ₁ : ℂ)⁻¹ • (1 : L ℋ₁))
+        (TrLeft (opTensorEquiv.symm Y)) by
+    have := h (opTensorEquiv X)
     simp only [LinearEquiv.symm_apply_apply] at this
     exact this
   intro Y
   induction Y using TensorProduct.induction_on with
   | zero =>
-    simp only [map_zero, mul_zero, zero_mul, integral_zero]
-    symm
-    exact TensorProduct.ext' fun v₁ v₂ => by simp
+    simp only [map_zero, mul_zero, zero_mul, integral_zero, TensorProduct.mapL_zero_right]
   | tmul A B =>
-    rw [l_tensor_equiv_symm_tmul, Tr₂_map]
+    rw [TrLeft_opTensorEquiv_symm_tmul, opTensorEquiv_symm_tmul]
     have h_simp : ∀ u : unitary (L ℋ₁),
-        TensorProduct.map ((u : L ℋ₁)) (LinearMap.id (M := ℋ₂)) *
-        TensorProduct.map A B *
-        TensorProduct.map (star (u : L ℋ₁)) (LinearMap.id (M := ℋ₂)) =
-        TensorProduct.map ((u : L ℋ₁) * A * star (u : L ℋ₁)) B := fun u =>
-      TensorProduct.ext' fun v₁ v₂ => by simp [TensorProduct.map_tmul]
+        TensorProduct.mapL ((u : L ℋ₁)) (1 : L ℋ₂) *
+        TensorProduct.mapL A B *
+        TensorProduct.mapL (star (u : L ℋ₁)) (1 : L ℋ₂) =
+        TensorProduct.mapL ((u : L ℋ₁) * A * star (u : L ℋ₁)) B := fun u => by
+      rw [← TensorProduct.mapL_mul, ← TensorProduct.mapL_mul, one_mul, mul_one]
     simp_rw [h_simp]
-    -- Goal: ∫ map (u*A*star u) B du = map (dim⁻¹ • id) (Tr A • B)
+    -- Goal: ∫ mapL (u*A*star u) B du = mapL (dim⁻¹ • 1) (Tr A • B)
     let mapB_lm : L ℋ₁ →ₗ[ℂ] L (ℋ₁ ⊗[ℂ] ℋ₂) :=
-      { toFun := fun f => TensorProduct.map f B
-        map_add' := fun f g => by
-          simp only [map_eq_rTensor_mul_lTensor, map_add
-            (rTensorStarAlgHom (ℋ₂ := ℋ₂)), add_mul]
+      { toFun := fun f => TensorProduct.mapL f B
+        map_add' := fun f g => TensorProduct.mapL_add_left f g B
         map_smul' := fun c f => by
-          simp only [RingHom.id_apply, map_eq_rTensor_mul_lTensor,
-            map_smul (rTensorStarAlgHom (ℋ₂ := ℋ₂)), smul_mul_assoc] }
+          simp only [RingHom.id_apply]
+          exact TensorProduct.mapL_smul_left c f B }
     let mapB : L ℋ₁ →L[ℂ] L (ℋ₁ ⊗[ℂ] ℋ₂) := ⟨mapB_lm, map_continuous mapB_lm⟩
     calc ∫ u : unitary (L ℋ₁),
-            TensorProduct.map ((u : L ℋ₁) * A * star (u : L ℋ₁)) B
+            TensorProduct.mapL ((u : L ℋ₁) * A * star (u : L ℋ₁)) B
             ∂(haarUnitary ℋ₁)
         = mapB (∫ u : unitary (L ℋ₁),
             (u : L ℋ₁) * A * star (u : L ℋ₁) ∂(haarUnitary ℋ₁)) :=
           mapB.integral_comp_comm (integrable_unitaryConj A)
-      _ = TensorProduct.map
-            ((Module.finrank ℂ ℋ₁ : ℂ)⁻¹ • LinearMap.id (M := ℋ₁))
-            (LinearMap.trace ℂ ℋ₁ A • B) := by
+      _ = TensorProduct.mapL ((Module.finrank ℂ ℋ₁ : ℂ)⁻¹ • (1 : L ℋ₁)) (Tr A • B) := by
           rw [twirl_eq_smul_one A]
-          change TensorProduct.map
-            (((Module.finrank ℂ ℋ₁ : ℂ)⁻¹ * LinearMap.trace ℂ ℋ₁ A) • (1 : L ℋ₁)) B =
-            TensorProduct.map ((Module.finrank ℂ ℋ₁ : ℂ)⁻¹ • (1 : L ℋ₁))
-              (LinearMap.trace ℂ ℋ₁ A • B)
-          rw [map_eq_rTensor_mul_lTensor
-                (((Module.finrank ℂ ℋ₁ : ℂ)⁻¹ * LinearMap.trace ℂ ℋ₁ A) • (1 : L ℋ₁)) B,
-              map_eq_rTensor_mul_lTensor
-                ((Module.finrank ℂ ℋ₁ : ℂ)⁻¹ • (1 : L ℋ₁))
-                (LinearMap.trace ℂ ℋ₁ A • B)]
-          simp only [map_smul, map_one, smul_mul_assoc, one_mul, smul_smul]
+          change TensorProduct.mapL
+            (((Module.finrank ℂ ℋ₁ : ℂ)⁻¹ * Tr A) • (1 : L ℋ₁)) B = _
+          rw [TensorProduct.mapL_smul_left, TensorProduct.mapL_smul_left,
+            TensorProduct.mapL_smul_right, smul_smul]
   | add Y₁ Y₂ hY₁ hY₂ =>
-    rw [show (l_tensor_equiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂)).symm (Y₁ + Y₂) =
-        l_tensor_equiv.symm Y₁ + l_tensor_equiv.symm Y₂ from map_add _ _ _]
+    rw [show (opTensorEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂)).symm (Y₁ + Y₂) =
+        opTensorEquiv.symm Y₁ + opTensorEquiv.symm Y₂ from map_add _ _ _]
     simp only [mul_add, add_mul]
     rw [integral_add
-      (integrable_unitaryConj_tensor (l_tensor_equiv.symm Y₁))
-      (integrable_unitaryConj_tensor (l_tensor_equiv.symm Y₂)),
-      show QuantumChannel.Tr₂ (l_tensor_equiv.symm Y₁ + l_tensor_equiv.symm Y₂) =
-        QuantumChannel.Tr₂ (l_tensor_equiv.symm Y₁) +
-        QuantumChannel.Tr₂ (l_tensor_equiv.symm Y₂) from map_add _ _ _,
-      map_add_right]
+      (integrable_unitaryConj_tensor (opTensorEquiv.symm Y₁))
+      (integrable_unitaryConj_tensor (opTensorEquiv.symm Y₂)),
+      show TrLeft (opTensorEquiv.symm Y₁ + opTensorEquiv.symm Y₂) =
+        TrLeft (opTensorEquiv.symm Y₁) + TrLeft (opTensorEquiv.symm Y₂) from map_add _ _ _,
+      TensorProduct.mapL_add_right]
     exact congr_arg₂ (· + ·) hY₁ hY₂
 
 /-! ### Right-factor twirl (mirror of `twirl_eq_partialTrace_smul_id`) -/
 
 omit [Nontrivial ℋ₁] [Nontrivial ℋ₂] in
-/-- `conjugateEnd` by the tensor swap turns `T A B` into `T B A`. -/
-private lemma conjugateEnd_comm_map (A : L ℋ₁) (B : L ℋ₂) :
-    (conjugateEnd (TensorProduct.comm ℂ ℋ₁ ℋ₂))
-        (TensorProduct.map A B : L (ℋ₁ ⊗[ℂ] ℋ₂)) =
-      (TensorProduct.map B A : L (ℋ₂ ⊗[ℂ] ℋ₁)) := by
-  apply TensorProduct.ext'
-  intro y x
-  change (TensorProduct.comm ℂ ℋ₁ ℋ₂).toLinearMap
-        ((TensorProduct.map A B) ((TensorProduct.comm ℂ ℋ₁ ℋ₂).symm.toLinearMap (y ⊗ₜ[ℂ] x))) =
-       (TensorProduct.map B A) (y ⊗ₜ[ℂ] x)
-  simp [TensorProduct.map_tmul]
-
-omit [Nontrivial ℋ₁] [Nontrivial ℋ₂] in
-/-- Partial trace formula for `TrRight` applied to a tensor product:
-    `TrRight (T A B) = (Tr B) • A`. -/
-private lemma TrRight_map (A : L ℋ₁) (B : L ℋ₂) :
-    QuantumChannel.TrRight (TensorProduct.map A B : L (ℋ₁ ⊗[ℂ] ℋ₂)) =
-    LinearMap.trace ℂ ℋ₂ B • A := by
-  -- TrRight = Tr₂ ∘ conjugateEnd (TensorProduct.comm ℂ ℋ₁ ℋ₂)
-  unfold QuantumChannel.TrRight
-  simp only [LinearMap.comp_apply]
-  rw [conjugateEnd_comm_map A B]
-  exact Tr₂_map B A
-
-omit [Nontrivial ℋ₁] [Nontrivial ℋ₂] in
-/-- Right-additivity for `TensorProduct.map` in the second argument (already exists
-    as `map_add_right`). This is the analog for the first argument. -/
-private lemma map_add_left (f₁ f₂ : L ℋ₁) (g : L ℋ₂) :
-    TensorProduct.map (f₁ + f₂) g =
-    TensorProduct.map f₁ g + TensorProduct.map f₂ g := by
-  simp only [map_eq_rTensor_mul_lTensor, map_add (rTensorStarAlgHom (ℋ₂ := ℋ₂)), add_mul]
-
-omit [Nontrivial ℋ₁] [Nontrivial ℋ₂] in
 /-- Tensor-product conjugation on the right factor is continuous. -/
 lemma continuous_unitaryConj_tensor_right (X : L (ℋ₁ ⊗[ℂ] ℋ₂)) :
     Continuous (fun u : unitary (L ℋ₂) =>
-      TensorProduct.map (LinearMap.id (M := ℋ₁)) ((u : L ℋ₂)) * X *
-      TensorProduct.map (LinearMap.id (M := ℋ₁)) (star (u : L ℋ₂))) := by
-  have h_id_eq : ∀ g : L ℋ₂,
-      TensorProduct.map (LinearMap.id (M := ℋ₁)) g = (lTensorStarAlgHom (ℋ₁ := ℋ₁)) g := by
-    intro g
-    rw [show (LinearMap.id : L ℋ₁) = 1 from rfl,
-        map_eq_rTensor_mul_lTensor, map_one (rTensorStarAlgHom (ℋ₂ := ℋ₂)), one_mul]
-  simp_rw [h_id_eq]
+      TensorProduct.mapL (1 : L ℋ₁) ((u : L ℋ₂)) * X *
+      TensorProduct.mapL (1 : L ℋ₁) (star (u : L ℋ₂))) := by
+  simp_rw [one_mapL_eq_lTensorStarAlgHom]
   exact (((continuous_lTensorStarAlgHom (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂)).comp
     continuous_subtype_val).mul continuous_const).mul
     ((continuous_lTensorStarAlgHom (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂)).comp
@@ -693,91 +532,76 @@ omit [Nontrivial ℋ₁] in
 /-- Tensor-product conjugation on the right factor is integrable. -/
 lemma integrable_unitaryConj_tensor_right (X : L (ℋ₁ ⊗[ℂ] ℋ₂)) :
     Integrable (fun u : unitary (L ℋ₂) =>
-      TensorProduct.map (LinearMap.id (M := ℋ₁)) ((u : L ℋ₂)) * X *
-      TensorProduct.map (LinearMap.id (M := ℋ₁)) (star (u : L ℋ₂)))
+      TensorProduct.mapL (1 : L ℋ₁) ((u : L ℋ₂)) * X *
+      TensorProduct.mapL (1 : L ℋ₁) (star (u : L ℋ₂)))
       (haarUnitary ℋ₂) :=
   (continuous_unitaryConj_tensor_right X).integrable_of_hasCompactSupport
     (IsCompact.of_isClosed_subset isCompact_univ (isClosed_tsupport _) (Set.subset_univ _))
 
 omit [Nontrivial ℋ₁] in
-/-- **Right-factor twirl identity** (mirror of `twirl_eq_partialTrace_smul_id`).
-
-    ∫ (1⊗u) X (1⊗u*) du = TrRight(X) ⊗ dim(ℋ₂)⁻¹ • id_{ℋ₂}
-
-    where the integral is over normalized Haar measure on `unitary (L ℋ₂)`. -/
+/-- **Twirl over the second factor**, the mirror of `twirl_eq_partialTrace_smul_id`:
+`∫ (1 ⊗ u) X (1 ⊗ u†) = TrRight X ⊗ ((dim ℋ₂)⁻¹ • 1)`, over the Haar measure on
+`unitary (L ℋ₂)`. -/
 theorem twirl_eq_partialTrace_right_smul_id (X : L (ℋ₁ ⊗[ℂ] ℋ₂)) :
     ∫ u : unitary (L ℋ₂),
-      TensorProduct.map (LinearMap.id (M := ℋ₁)) ((u : L ℋ₂)) * X *
-      TensorProduct.map (LinearMap.id (M := ℋ₁)) (star (u : L ℋ₂))
+      TensorProduct.mapL (1 : L ℋ₁) ((u : L ℋ₂)) * X *
+      TensorProduct.mapL (1 : L ℋ₁) (star (u : L ℋ₂))
     ∂(haarUnitary ℋ₂) =
-    TensorProduct.map (QuantumChannel.TrRight X)
-      ((Module.finrank ℂ ℋ₂ : ℂ)⁻¹ • LinearMap.id (M := ℋ₂)) := by
+    TensorProduct.mapL (TrRight X) ((Module.finrank ℂ ℋ₂ : ℂ)⁻¹ • (1 : L ℋ₂)) := by
   suffices h : ∀ Y : L ℋ₁ ⊗[ℂ] L ℋ₂,
       ∫ u : unitary (L ℋ₂),
-        TensorProduct.map (LinearMap.id (M := ℋ₁)) ((u : L ℋ₂)) *
-        l_tensor_equiv.symm Y *
-        TensorProduct.map (LinearMap.id (M := ℋ₁)) (star (u : L ℋ₂))
+        TensorProduct.mapL (1 : L ℋ₁) ((u : L ℋ₂)) *
+        opTensorEquiv.symm Y *
+        TensorProduct.mapL (1 : L ℋ₁) (star (u : L ℋ₂))
       ∂(haarUnitary ℋ₂) =
-      TensorProduct.map
-        (QuantumChannel.TrRight (l_tensor_equiv.symm Y))
-        ((Module.finrank ℂ ℋ₂ : ℂ)⁻¹ • LinearMap.id (M := ℋ₂)) by
-    have := h (l_tensor_equiv X)
+      TensorProduct.mapL (TrRight (opTensorEquiv.symm Y))
+        ((Module.finrank ℂ ℋ₂ : ℂ)⁻¹ • (1 : L ℋ₂)) by
+    have := h (opTensorEquiv X)
     simp only [LinearEquiv.symm_apply_apply] at this
     exact this
   intro Y
   induction Y using TensorProduct.induction_on with
   | zero =>
-    simp only [map_zero, mul_zero, zero_mul, integral_zero]
-    symm
-    exact TensorProduct.ext' fun v₁ v₂ => by simp
+    simp only [map_zero, mul_zero, zero_mul, integral_zero, TensorProduct.mapL_zero_left]
   | tmul A B =>
-    rw [l_tensor_equiv_symm_tmul, TrRight_map]
+    rw [TrRight_opTensorEquiv_symm_tmul, opTensorEquiv_symm_tmul]
     have h_simp : ∀ u : unitary (L ℋ₂),
-        TensorProduct.map (LinearMap.id (M := ℋ₁)) ((u : L ℋ₂)) *
-        TensorProduct.map A B *
-        TensorProduct.map (LinearMap.id (M := ℋ₁)) (star (u : L ℋ₂)) =
-        TensorProduct.map A ((u : L ℋ₂) * B * star (u : L ℋ₂)) := fun u =>
-      TensorProduct.ext' fun v₁ v₂ => by simp [TensorProduct.map_tmul]
+        TensorProduct.mapL (1 : L ℋ₁) ((u : L ℋ₂)) *
+        TensorProduct.mapL A B *
+        TensorProduct.mapL (1 : L ℋ₁) (star (u : L ℋ₂)) =
+        TensorProduct.mapL A ((u : L ℋ₂) * B * star (u : L ℋ₂)) := fun u => by
+      rw [← TensorProduct.mapL_mul, ← TensorProduct.mapL_mul, one_mul, mul_one]
     simp_rw [h_simp]
-    -- Goal: ∫ map A (u*B*star u) du = map (Tr B • A) (dim⁻¹ • id)
+    -- Goal: ∫ mapL A (u*B*star u) du = mapL (Tr B • A) (dim⁻¹ • 1)
     let mapA_lm : L ℋ₂ →ₗ[ℂ] L (ℋ₁ ⊗[ℂ] ℋ₂) :=
-      { toFun := fun g => TensorProduct.map A g
-        map_add' := fun g h => map_add_right A g h
+      { toFun := fun g => TensorProduct.mapL A g
+        map_add' := fun g h => TensorProduct.mapL_add_right A g h
         map_smul' := fun c g => by
-          simp only [RingHom.id_apply, map_eq_rTensor_mul_lTensor,
-            map_smul (lTensorStarAlgHom (ℋ₁ := ℋ₁)), mul_smul_comm] }
+          simp only [RingHom.id_apply]
+          exact TensorProduct.mapL_smul_right c A g }
     let mapA : L ℋ₂ →L[ℂ] L (ℋ₁ ⊗[ℂ] ℋ₂) := ⟨mapA_lm, map_continuous mapA_lm⟩
     calc ∫ u : unitary (L ℋ₂),
-            TensorProduct.map A ((u : L ℋ₂) * B * star (u : L ℋ₂))
+            TensorProduct.mapL A ((u : L ℋ₂) * B * star (u : L ℋ₂))
             ∂(haarUnitary ℋ₂)
         = mapA (∫ u : unitary (L ℋ₂),
             (u : L ℋ₂) * B * star (u : L ℋ₂) ∂(haarUnitary ℋ₂)) :=
           mapA.integral_comp_comm (integrable_unitaryConj B)
-      _ = TensorProduct.map
-            (LinearMap.trace ℂ ℋ₂ B • A)
-            ((Module.finrank ℂ ℋ₂ : ℂ)⁻¹ • LinearMap.id (M := ℋ₂)) := by
+      _ = TensorProduct.mapL (Tr B • A) ((Module.finrank ℂ ℋ₂ : ℂ)⁻¹ • (1 : L ℋ₂)) := by
           rw [twirl_eq_smul_one B]
-          change TensorProduct.map A
-            (((Module.finrank ℂ ℋ₂ : ℂ)⁻¹ * LinearMap.trace ℂ ℋ₂ B) • (1 : L ℋ₂)) =
-            TensorProduct.map (LinearMap.trace ℂ ℋ₂ B • A)
-              ((Module.finrank ℂ ℋ₂ : ℂ)⁻¹ • (1 : L ℋ₂))
-          rw [map_eq_rTensor_mul_lTensor
-                A (((Module.finrank ℂ ℋ₂ : ℂ)⁻¹ * LinearMap.trace ℂ ℋ₂ B) • (1 : L ℋ₂)),
-              map_eq_rTensor_mul_lTensor
-                (LinearMap.trace ℂ ℋ₂ B • A)
-                ((Module.finrank ℂ ℋ₂ : ℂ)⁻¹ • (1 : L ℋ₂))]
-          simp only [map_smul, map_one, mul_smul_comm, mul_one, smul_smul]
+          change TensorProduct.mapL A
+            (((Module.finrank ℂ ℋ₂ : ℂ)⁻¹ * Tr B) • (1 : L ℋ₂)) = _
+          rw [TensorProduct.mapL_smul_right, TensorProduct.mapL_smul_right,
+            TensorProduct.mapL_smul_left, smul_smul]
   | add Y₁ Y₂ hY₁ hY₂ =>
-    rw [show (l_tensor_equiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂)).symm (Y₁ + Y₂) =
-        l_tensor_equiv.symm Y₁ + l_tensor_equiv.symm Y₂ from map_add _ _ _]
+    rw [show (opTensorEquiv (ℋ₁ := ℋ₁) (ℋ₂ := ℋ₂)).symm (Y₁ + Y₂) =
+        opTensorEquiv.symm Y₁ + opTensorEquiv.symm Y₂ from map_add _ _ _]
     simp only [mul_add, add_mul]
     rw [integral_add
-      (integrable_unitaryConj_tensor_right (l_tensor_equiv.symm Y₁))
-      (integrable_unitaryConj_tensor_right (l_tensor_equiv.symm Y₂)),
-      show QuantumChannel.TrRight (l_tensor_equiv.symm Y₁ + l_tensor_equiv.symm Y₂) =
-        QuantumChannel.TrRight (l_tensor_equiv.symm Y₁) +
-        QuantumChannel.TrRight (l_tensor_equiv.symm Y₂) from map_add _ _ _,
-      map_add_left]
+      (integrable_unitaryConj_tensor_right (opTensorEquiv.symm Y₁))
+      (integrable_unitaryConj_tensor_right (opTensorEquiv.symm Y₂)),
+      show TrRight (opTensorEquiv.symm Y₁ + opTensorEquiv.symm Y₂) =
+        TrRight (opTensorEquiv.symm Y₁) + TrRight (opTensorEquiv.symm Y₂) from map_add _ _ _,
+      TensorProduct.mapL_add_left]
     exact congr_arg₂ (· + ·) hY₁ hY₂
 
 end Twirl
@@ -862,31 +686,26 @@ section StinespringHaar
 variable {ℋ₁ : Type u} {ℋ₂ : Type u} [Qudit ℋ₁] [Qudit ℋ₂]
 variable [Nontrivial ℋ₁]
 
-/-- **Stinespring–Haar identity** (Equation (1) of arXiv:1306.5358):
-    If E is a CPTP map with Stinespring dilation `E(γ) = Tr₂(U (τ ⊗ γ) U*)`,
-    where ℋ₁ is the environment and ℋ₂ is the main system, then
-
-      dim(ℋ₁)⁻¹·I_{ℋ₁} ⊗ E(γ) = ∫ (u⊗1) U(τ⊗γ) U*(u*⊗1) du
-
-    where the integral is over the normalized Haar measure on unitaries of
-    the environment system ℋ₁. -/
+/-- **Stinespring–Haar identity**, equation (1) of arXiv:1306.5358. For a channel given by the
+Stinespring dilation `E γ = TrLeft (U (τ ⊗ γ) U†)`, with `ℋ₁` the environment and `ℋ₂` the system,
+`((dim ℋ₁)⁻¹ • 1) ⊗ E γ = ∫ (u ⊗ 1) U (τ ⊗ γ) U† (u† ⊗ 1)`, the integral being over the Haar
+measure on the unitaries of the environment. -/
 theorem stinespring_haar_eq
     (U : unitary (L (ℋ₁ ⊗[ℂ] ℋ₂))) (τ : L ℋ₁) (γ : L ℋ₂) :
-    TensorProduct.map
-      ((Module.finrank ℂ ℋ₁ : ℂ)⁻¹ • LinearMap.id (M := ℋ₁))
-      (QuantumChannel.Tr₂
+    TensorProduct.mapL ((Module.finrank ℂ ℋ₁ : ℂ)⁻¹ • (1 : L ℋ₁))
+      (TrLeft
         ((U : L (ℋ₁ ⊗[ℂ] ℋ₂)) *
-         TensorProduct.map τ γ *
+         TensorProduct.mapL τ γ *
          star (U : L (ℋ₁ ⊗[ℂ] ℋ₂)))) =
     ∫ u : unitary (L ℋ₁),
-      TensorProduct.map ((u : L ℋ₁)) (LinearMap.id (M := ℋ₂)) *
+      TensorProduct.mapL ((u : L ℋ₁)) (1 : L ℋ₂) *
         ((U : L (ℋ₁ ⊗[ℂ] ℋ₂)) *
-         TensorProduct.map τ γ *
+         TensorProduct.mapL τ γ *
          star (U : L (ℋ₁ ⊗[ℂ] ℋ₂))) *
-      TensorProduct.map (star (u : L ℋ₁)) (LinearMap.id (M := ℋ₂))
-    ∂(haarUnitary ℋ₁) := by
-  exact (twirl_eq_partialTrace_smul_id
-    ((U : L (ℋ₁ ⊗[ℂ] ℋ₂)) * TensorProduct.map τ γ *
+      TensorProduct.mapL (star (u : L ℋ₁)) (1 : L ℋ₂)
+    ∂(haarUnitary ℋ₁) :=
+  (twirl_eq_partialTrace_smul_id
+    ((U : L (ℋ₁ ⊗[ℂ] ℋ₂)) * TensorProduct.mapL τ γ *
      star (U : L (ℋ₁ ⊗[ℂ] ℋ₂)))).symm
 
 end StinespringHaar
