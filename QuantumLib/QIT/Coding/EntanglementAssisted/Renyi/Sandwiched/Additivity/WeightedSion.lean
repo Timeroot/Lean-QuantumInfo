@@ -19,13 +19,12 @@ spine for entanglement-assisted classical communication.
 
 open scoped ComplexOrder MatrixOrder Pointwise
 
-namespace QIT
-
+noncomputable section
 universe u1 v1 u2 v2
 
-noncomputable section
+open QIT
 
-namespace State
+namespace MState
 
 /-- Raw weighted matrix form of the KW Sion trace bracket
 `Tr[(A_A ⊗ σ_B^{-p} ⊗ τ_C^p) R]`.
@@ -40,7 +39,7 @@ def abcWeightedSidePowerTraceRe
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (A : CMatrix a) (R : CMatrix (Prod (Prod a b) c))
+    (A : CMatrix a) (R : CMatrix ((a × b) × c))
     (σ : CMatrix b) (τ : CMatrix c) (p : ℝ) : ℝ :=
   ((Matrix.kronecker (Matrix.kronecker A (CFC.rpow σ (-p)))
       (CFC.rpow τ p) * R).trace).re
@@ -51,7 +50,7 @@ theorem abcWeightedSidePowerTraceRe_nonneg
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
     {A : CMatrix a} (hA : A.PosSemidef)
-    {R : CMatrix (Prod (Prod a b) c)} (hR : R.PosSemidef)
+    {R : CMatrix ((a × b) × c)} (hR : R.PosSemidef)
     {σ : CMatrix b} (hσ : σ.PosSemidef)
     {τ : CMatrix c} (hτ : τ.PosSemidef) (p : ℝ) :
     0 ≤ abcWeightedSidePowerTraceRe (a := a) A R σ τ p := by
@@ -71,7 +70,7 @@ theorem abcWeightedSidePowerTraceRe_one
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (R : CMatrix (Prod (Prod a b) c)) (σ : CMatrix b) (τ : CMatrix c) (p : ℝ) :
+    (R : CMatrix ((a × b) × c)) (σ : CMatrix b) (τ : CMatrix c) (p : ℝ) :
     abcWeightedSidePowerTraceRe (a := a) (b := b) (c := c)
         (1 : CMatrix a) R σ τ p =
       abcSidePowerTraceRe (a := a) R σ τ p := by
@@ -80,7 +79,7 @@ theorem abcWeightedSidePowerTraceRe_one
 private theorem trace_weighted_kronecker_right_add_smul_add_smul_re
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [Fintype b] [Fintype c]
-    (K : CMatrix (Prod a b)) (R : CMatrix (Prod (Prod a b) c))
+    (K : CMatrix (a × b)) (R : CMatrix ((a × b) × c))
     (T U V : CMatrix c) (s t : ℝ) :
     ((Matrix.kronecker K (T + (s • U + t • V)) * R).trace).re =
       ((Matrix.kronecker K T * R).trace).re +
@@ -96,7 +95,7 @@ private theorem trace_weighted_kronecker_right_add_smul_add_smul_re
 private theorem trace_weighted_kronecker_middle_add_smul_add_smul_re
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [Fintype b] [Fintype c]
-    (A : CMatrix a) (R : CMatrix (Prod (Prod a b) c)) (K : CMatrix c)
+    (A : CMatrix a) (R : CMatrix ((a × b) × c)) (K : CMatrix c)
     (T U V : CMatrix b) (s t : ℝ) :
     ((Matrix.kronecker (Matrix.kronecker A (T + (s • U + t • V))) K *
           R).trace).re =
@@ -134,7 +133,7 @@ private theorem trace_weighted_kronecker_middle_add_smul_add_smul_re
 private theorem trace_weighted_kronecker_right_continuous
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [Fintype b] [Fintype c]
-    (K : CMatrix (Prod a b)) (R : CMatrix (Prod (Prod a b) c)) :
+    (K : CMatrix (a × b)) (R : CMatrix ((a × b) × c)) :
     Continuous fun T : CMatrix c => ((Matrix.kronecker K T * R).trace).re := by
   have hkr :
       Continuous fun T : CMatrix c => Matrix.kronecker K T := by
@@ -148,7 +147,7 @@ private theorem trace_weighted_kronecker_right_continuous
 private theorem trace_weighted_kronecker_middle_continuous
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [Fintype b] [Fintype c]
-    (A : CMatrix a) (R : CMatrix (Prod (Prod a b) c)) (K : CMatrix c) :
+    (A : CMatrix a) (R : CMatrix ((a × b) × c)) (K : CMatrix c) :
     Continuous fun T : CMatrix b =>
       ((Matrix.kronecker (Matrix.kronecker A T) K * R).trace).re := by
   have hinner :
@@ -172,7 +171,7 @@ theorem abcWeightedSidePowerTraceRe_concaveOn_tau
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
     {A : CMatrix a} (hA : A.PosSemidef)
-    {R : CMatrix (Prod (Prod a b) c)} (hR : R.PosSemidef)
+    {R : CMatrix ((a × b) × c)} (hR : R.PosSemidef)
     {σ : CMatrix b} (hσ : σ.PosSemidef)
     {p : ℝ} (hp0 : 0 < p) (hp1 : p ≤ 1) :
     ConcaveOn ℝ ({τ : CMatrix c | τ.PosSemidef} : Set (CMatrix c))
@@ -184,7 +183,7 @@ theorem abcWeightedSidePowerTraceRe_concaveOn_tau
       (Matrix.PosSemidef.smul hy ht)
   · intro x hx y hy s t hs ht hst
     let S : CMatrix b := CFC.rpow σ (-p)
-    let K : CMatrix (Prod a b) := Matrix.kronecker A S
+    let K : CMatrix (a × b) := Matrix.kronecker A S
     let T : CMatrix c := CFC.rpow (s • x + t • y) p
     let U : CMatrix c := CFC.rpow x p
     let V : CMatrix c := CFC.rpow y p
@@ -241,7 +240,7 @@ theorem abcWeightedSidePowerTraceRe_quasiconcaveOn_tau
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
     {A : CMatrix a} (hA : A.PosSemidef)
-    {R : CMatrix (Prod (Prod a b) c)} (hR : R.PosSemidef)
+    {R : CMatrix ((a × b) × c)} (hR : R.PosSemidef)
     {σ : CMatrix b} (hσ : σ.PosSemidef)
     {p : ℝ} (hp0 : 0 < p) (hp1 : p ≤ 1) :
     QuasiconcaveOn ℝ ({τ : CMatrix c | τ.PosSemidef} : Set (CMatrix c))
@@ -253,12 +252,12 @@ theorem abcWeightedSidePowerTraceRe_continuousOn_tau_posSemidef
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (A : CMatrix a) (R : CMatrix (Prod (Prod a b) c)) (σ : CMatrix b)
+    (A : CMatrix a) (R : CMatrix ((a × b) × c)) (σ : CMatrix b)
     {p : ℝ} (hp0 : 0 < p) :
     ContinuousOn
       (fun τ : CMatrix c => abcWeightedSidePowerTraceRe (a := a) A R σ τ p)
       ({τ : CMatrix c | τ.PosSemidef} : Set (CMatrix c)) := by
-  let K : CMatrix (Prod a b) := Matrix.kronecker A (CFC.rpow σ (-p))
+  let K : CMatrix (a × b) := Matrix.kronecker A (CFC.rpow σ (-p))
   have htrace := trace_weighted_kronecker_right_continuous (a := a) (b := b) K R
   have hpow := cMatrix_rpow_continuousOn_posSemidef_of_pos (a := c) hp0
   simpa [abcWeightedSidePowerTraceRe, K, Function.comp_def] using
@@ -270,7 +269,7 @@ theorem abcWeightedSidePowerTraceRe_lowerSemicontinuousOn_tau_posSemidef
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (A : CMatrix a) (R : CMatrix (Prod (Prod a b) c)) (σ : CMatrix b)
+    (A : CMatrix a) (R : CMatrix ((a × b) × c)) (σ : CMatrix b)
     {p : ℝ} (hp0 : 0 < p) :
     LowerSemicontinuousOn
       (fun τ : CMatrix c => abcWeightedSidePowerTraceRe (a := a) A R σ τ p)
@@ -284,7 +283,7 @@ theorem abcWeightedSidePowerTraceRe_upperSemicontinuousOn_tau_posSemidef
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (A : CMatrix a) (R : CMatrix (Prod (Prod a b) c)) (σ : CMatrix b)
+    (A : CMatrix a) (R : CMatrix ((a × b) × c)) (σ : CMatrix b)
     {p : ℝ} (hp0 : 0 < p) :
     UpperSemicontinuousOn
       (fun τ : CMatrix c => abcWeightedSidePowerTraceRe (a := a) A R σ τ p)
@@ -299,7 +298,7 @@ theorem abcWeightedSidePowerTraceRe_convexOn_sigma_posDef
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
     {A : CMatrix a} (hA : A.PosSemidef)
-    {R : CMatrix (Prod (Prod a b) c)} (hR : R.PosSemidef)
+    {R : CMatrix ((a × b) × c)} (hR : R.PosSemidef)
     {τ : CMatrix c} (hτ : τ.PosSemidef)
     {p : ℝ} (hp0 : 0 < p) (hp1 : p ≤ 1) :
     ConvexOn ℝ ({σ : CMatrix b | σ.PosDef} : Set (CMatrix b))
@@ -379,7 +378,7 @@ theorem abcWeightedSidePowerTraceRe_quasiconvexOn_sigma_posDef
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
     {A : CMatrix a} (hA : A.PosSemidef)
-    {R : CMatrix (Prod (Prod a b) c)} (hR : R.PosSemidef)
+    {R : CMatrix ((a × b) × c)} (hR : R.PosSemidef)
     {τ : CMatrix c} (hτ : τ.PosSemidef)
     {p : ℝ} (hp0 : 0 < p) (hp1 : p ≤ 1) :
     QuasiconvexOn ℝ ({σ : CMatrix b | σ.PosDef} : Set (CMatrix b))
@@ -393,7 +392,7 @@ theorem abcWeightedSidePowerTraceRe_continuousOn_sigma_posDef
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (A : CMatrix a) (R : CMatrix (Prod (Prod a b) c)) (τ : CMatrix c) (p : ℝ) :
+    (A : CMatrix a) (R : CMatrix ((a × b) × c)) (τ : CMatrix c) (p : ℝ) :
     ContinuousOn
       (fun σ : CMatrix b => abcWeightedSidePowerTraceRe (a := a) A R σ τ p)
       ({σ : CMatrix b | σ.PosDef} : Set (CMatrix b)) := by
@@ -409,7 +408,7 @@ theorem abcWeightedSidePowerTraceRe_lowerSemicontinuousOn_sigma_posDef
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (A : CMatrix a) (R : CMatrix (Prod (Prod a b) c)) (τ : CMatrix c) (p : ℝ) :
+    (A : CMatrix a) (R : CMatrix ((a × b) × c)) (τ : CMatrix c) (p : ℝ) :
     LowerSemicontinuousOn
       (fun σ : CMatrix b => abcWeightedSidePowerTraceRe (a := a) A R σ τ p)
       ({σ : CMatrix b | σ.PosDef} : Set (CMatrix b)) :=
@@ -422,7 +421,7 @@ theorem abcWeightedSidePowerTraceRe_upperSemicontinuousOn_sigma_posDef
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (A : CMatrix a) (R : CMatrix (Prod (Prod a b) c)) (τ : CMatrix c) (p : ℝ) :
+    (A : CMatrix a) (R : CMatrix ((a × b) × c)) (τ : CMatrix c) (p : ℝ) :
     UpperSemicontinuousOn
       (fun σ : CMatrix b => abcWeightedSidePowerTraceRe (a := a) A R σ τ p)
       ({σ : CMatrix b | σ.PosDef} : Set (CMatrix b)) :=
@@ -441,7 +440,7 @@ theorem uniformlyPositiveDensityMatrixSet_sion_abcWeightedSidePowerTraceRe_EReal
     {delta p : ℝ} (hdelta : 0 < delta)
     (hneB : (uniformlyPositiveDensityMatrixSet delta b).Nonempty)
     {A : CMatrix a} (hA : A.PosSemidef)
-    {R : CMatrix (Prod (Prod a b) c)} (hR : R.PosSemidef)
+    {R : CMatrix ((a × b) × c)} (hR : R.PosSemidef)
     (hp0 : 0 < p) (hp1 : p ≤ 1) :
     (⨅ σ ∈ uniformlyPositiveDensityMatrixSet delta b, ⨆ τ ∈ densityMatrixSet c,
         (abcWeightedSidePowerTraceRe (a := a) A R σ τ p : EReal)) =
@@ -494,7 +493,7 @@ theorem fullRankDensityMatrixSet_sion_abcWeightedSidePowerTraceRe_EReal
     [Fintype c] [DecidableEq c] [Nonempty c]
     {p : ℝ}
     {A : CMatrix a} (hA : A.PosSemidef)
-    {R : CMatrix (Prod (Prod a b) c)} (hR : R.PosSemidef)
+    {R : CMatrix ((a × b) × c)} (hR : R.PosSemidef)
     (hp0 : 0 < p) (hp1 : p ≤ 1) :
     (⨅ sigma : CMatrix b,
       ⨅ _hSigma : (fullRankDensityMatrixSet b) sigma,
@@ -521,7 +520,7 @@ theorem fullRankDensityMatrixSet_sion_abcWeightedSidePowerTraceRe_EReal
             ⨅ tau : CMatrix c,
               ⨅ _hTau : (densityMatrixSet c) tau,
                 -((abcWeightedSidePowerTraceRe (a := a) A R sigma tau p : EReal)) := by
-    exact State.sion_iInf_iSup_eq_iSup_iInf
+    exact MState.sion_iInf_iSup_eq_iSup_iInf
       (densityMatrixSet_nonempty (a := c))
       (densityMatrixSet_convex (a := c))
       (densityMatrixSet_isCompact (a := c))
@@ -583,7 +582,9 @@ theorem fullRankDensityMatrixSet_sion_abcWeightedSidePowerTraceRe_EReal
   have hsub := ereal_sion_from_neg F hnegSub
   simpa [F, iInf_subtype, iSup_subtype] using hsub
 
-end State
+end MState
+
+namespace QIT
 
 /-- KW high-`alpha` specialization of the fixed-`A` Sion exchange for the raw
 alternate-expression trace bracket.
@@ -597,22 +598,21 @@ theorem sandwichedAlpha_sion_abcWeightedSidePowerTraceRe_EReal
     {delta alpha : ℝ} (hdelta_pos : 0 < delta)
     (hdelta_le : delta ≤ (Fintype.card b : ℝ)⁻¹)
     {A : CMatrix a} (hA : A.PosSemidef)
-    {R : CMatrix (Prod (Prod a b) c)} (hR : R.PosSemidef)
+    {R : CMatrix ((a × b) × c)} (hR : R.PosSemidef)
     (halpha : 1 < alpha) :
-    (⨅ σ ∈ State.uniformlyPositiveDensityMatrixSet delta b,
-        ⨆ τ ∈ State.densityMatrixSet c,
-          (State.abcWeightedSidePowerTraceRe (a := a) A R σ τ
+    (⨅ σ ∈ MState.uniformlyPositiveDensityMatrixSet delta b,
+        ⨆ τ ∈ MState.densityMatrixSet c,
+          (MState.abcWeightedSidePowerTraceRe (a := a) A R σ τ
             ((alpha - 1) / alpha) : EReal)) =
-      ⨆ τ ∈ State.densityMatrixSet c,
-        ⨅ σ ∈ State.uniformlyPositiveDensityMatrixSet delta b,
-          (State.abcWeightedSidePowerTraceRe (a := a) A R σ τ
+      ⨆ τ ∈ MState.densityMatrixSet c,
+        ⨅ σ ∈ MState.uniformlyPositiveDensityMatrixSet delta b,
+          (MState.abcWeightedSidePowerTraceRe (a := a) A R σ τ
             ((alpha - 1) / alpha) : EReal) := by
   have hp := sandwichedAlphaPrime_pos_lt_one halpha
-  exact State.uniformlyPositiveDensityMatrixSet_sion_abcWeightedSidePowerTraceRe_EReal
+  exact MState.uniformlyPositiveDensityMatrixSet_sion_abcWeightedSidePowerTraceRe_EReal
     (a := a) (b := b) (c := c)
     hdelta_pos
-    (State.uniformlyPositiveDensityMatrixSet_nonempty (a := b) hdelta_le)
+    (MState.uniformlyPositiveDensityMatrixSet_nonempty (a := b) hdelta_le)
     hA hR hp.1 (le_of_lt hp.2)
-end
 
 end QIT

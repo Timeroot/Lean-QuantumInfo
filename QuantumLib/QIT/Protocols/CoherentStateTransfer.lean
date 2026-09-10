@@ -38,35 +38,58 @@ variable [Fintype r] [DecidableEq r]
 protocol, including Alice/Bob isometries, computed output, and canonical
 transferred-source target. -/
 abbrev CoherentStateTransferBlockProtocol
-    (psi : PureVector (Prod (Prod a b) r)) (n : ℕ)
+    (psi : Ket ((a × b) × r)) (n : ℕ)
     (communication : Type x) (ebitAlice : Type y) (ebitBob : Type z)
     [Fintype communication] [DecidableEq communication]
     [Fintype ebitAlice] [DecidableEq ebitAlice] [Nonempty ebitAlice]
     [Fintype ebitBob] [DecidableEq ebitBob] :=
   FQSWBlockProtocol psi n communication ebitAlice ebitBob
 
-namespace PureVector
+end
+end QIT
+
+namespace Ket
+
+noncomputable section
+
+open QIT
+universe u v w x y z
+variable {a : Type u} {b : Type v} {r : Type w}
+variable [Fintype a] [DecidableEq a]
+variable [Fintype b] [DecidableEq b]
+variable [Fintype r] [DecidableEq r]
 
 /-- Achievability of coherent state transfer, reusing the canonical concrete
 FQSW protocol contract. -/
 def IsAchievableCoherentStateTransfer
-    (psi : PureVector (Prod (Prod a b) r)) : Prop :=
-  PureVector.IsAchievableFQSW.{u, v, w, x, y, z} psi
+    (psi : Ket ((a × b) × r)) : Prop :=
+  Ket.IsAchievableFQSW.{u, v, w, x, y, z} psi
 
 theorem isAchievableCoherentStateTransfer_iff_isAchievableFQSW
-    (psi : PureVector (Prod (Prod a b) r)) :
-    PureVector.IsAchievableCoherentStateTransfer.{u, v, w, x, y, z} psi ↔
-      PureVector.IsAchievableFQSW.{u, v, w, x, y, z} psi :=
+    (psi : Ket ((a × b) × r)) :
+    Ket.IsAchievableCoherentStateTransfer.{u, v, w, x, y, z} psi ↔
+      Ket.IsAchievableFQSW.{u, v, w, x, y, z} psi :=
   by
     unfold IsAchievableCoherentStateTransfer
     rfl
 
 theorem fqswCommunicationRate_eq_coherentTransferRate
-    (psi : PureVector (Prod (Prod a b) r)) :
+    (psi : Ket ((a × b) × r)) :
     psi.fqswCommunicationRate = psi.state.coherentTransferRate :=
   rfl
 
-end PureVector
+end
+
+end Ket
+
+namespace QIT
+noncomputable section
+
+universe u v w x y z
+variable {a : Type u} {b : Type v} {r : Type w}
+variable [Fintype a] [DecidableEq a]
+variable [Fintype b] [DecidableEq b]
+variable [Fintype r] [DecidableEq r]
 
 end
 

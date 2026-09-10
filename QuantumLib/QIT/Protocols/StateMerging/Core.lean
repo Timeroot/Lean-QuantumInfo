@@ -39,8 +39,8 @@ noncomputable section
 and inaccessible reference registers. -/
 def stateMergingInputEquiv
     (A : Type u) (B : Type v) (R : Type w) (KA : Type x) (KB : Type y) :
-    Prod (Prod (Prod A B) R) (Prod KA KB) ≃
-      Prod (Prod (Prod A KA) (Prod B KB)) R where
+    (((A × B) × R) × (KA × KB)) ≃
+      (((A × KA) × (B × KB)) × R) where
   toFun t := (((t.1.1.1, t.2.1), (t.1.1.2, t.2.2)), t.1.2)
   invFun t := (((t.1.1.1, t.1.2.1), t.2), (t.1.1.2, t.1.2.2))
   left_inv := by intro t; rfl
@@ -50,8 +50,8 @@ def stateMergingInputEquiv
 of the one-way LOCC channel, followed by the untouched reference. -/
 def stateMergingTargetEquiv
     (A : Type u) (B : Type v) (R : Type w) (LA : Type x) (LB : Type y) :
-    Prod (Prod (Prod A B) R) (Prod LA LB) ≃
-      Prod (Prod LA (Prod (Prod A B) LB)) R where
+    (((A × B) × R) × (LA × LB)) ≃
+      ((LA × ((A × B) × LB)) × R) where
   toFun t := ((t.2.1, (t.1.1, t.2.2)), t.1.2)
   invFun t := ((t.1.2.1, t.2), (t.1.1, t.1.2.2))
   left_inv := by intro t; rfl
@@ -64,10 +64,10 @@ variable [Fintype r] [DecidableEq r]
 
 /-- The grouped IID pure source `(A^n B^n) R^n`. -/
 def stateMergingBlockSource
-    (psi : PureVector (Prod (Prod a b) r)) (n : ℕ) :
-    PureVector
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
-  (psi.tensorPower n).reindex (fqswTensorPowerTripartiteEquiv a b r n)
+    (psi : Ket ((a × b) × r)) (n : ℕ) :
+    Ket
+      ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
+  (psi.tensorPower n).reindex (tensorPowerProdProdEquiv a b r n)
 
 /-- A source-shaped finite block state-merging protocol.
 
@@ -76,7 +76,7 @@ rank `K = |K_A|`.  The one-way LOCC operation leaves Alice with `L_A` and
 gives Bob `B' B^n L_B`, where `B'` has the same basis as `A^n`; the output pair
 has rank `L = |L_A|`. -/
 structure StateMergingBlockProtocol
-    (psi : PureVector (Prod (Prod a b) r)) (n : ℕ)
+    (psi : Ket ((a × b) × r)) (n : ℕ)
     (kA : Type x) (kB : Type y) (lA : Type z) (lB : Type p)
     (outcome : Type q)
     [Fintype kA] [DecidableEq kA] [Nonempty kA]
@@ -84,19 +84,22 @@ structure StateMergingBlockProtocol
     [Fintype lA] [DecidableEq lA] [Nonempty lA]
     [Fintype lB] [DecidableEq lB]
     [Fintype outcome] [DecidableEq outcome] [Nonempty outcome] where
+  /-- The identification of the two halves of the input ebits. -/
   inputEbitPairing : kA ≃ kB
+  /-- The identification of the two halves of the output ebits. -/
   outputEbitPairing : lA ≃ lB
+  /-- The one-way LOCC operation the protocol performs. -/
   locc :
     OneWayLOCC
-      (Prod (TensorPower a n) kA)
+      (TensorPower a n × kA)
       lA
-      (Prod (TensorPower b n) kB)
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) lB)
+      (TensorPower b n × kB)
+      ((TensorPower a n × TensorPower b n) × lB)
       outcome
 
 namespace StateMergingBlockProtocol
 
-variable {psi : PureVector (Prod (Prod a b) r)} {n : ℕ}
+variable {psi : Ket ((a × b) × r)} {n : ℕ}
 variable {kA : Type x} {kB : Type y} {lA : Type z} {lB : Type p}
 variable {outcome : Type q}
 variable [Fintype kA] [DecidableEq kA] [Nonempty kA]
@@ -105,11 +108,12 @@ variable [Fintype lA] [DecidableEq lA] [Nonempty lA]
 variable [Fintype lB] [DecidableEq lB]
 variable [Fintype outcome] [DecidableEq outcome] [Nonempty outcome]
 
+/-- Decidable equality on the protocol's output register, assembled from the
+factor instances so that it is definitionally the product instance. -/
 local instance stateMergingOutputDecidableEq :
     DecidableEq
-      (Prod
-        (Prod lA (Prod (Prod (TensorPower a n) (TensorPower b n)) lB))
-        (TensorPower r n)) :=
+      ((lA × ((TensorPower a n × TensorPower b n) × lB)) ×
+        TensorPower r n) :=
   @instDecidableEqProd _ _
     (@instDecidableEqProd _ _ inferInstance
       (@instDecidableEqProd _ _
@@ -123,33 +127,30 @@ variable (C : StateMergingBlockProtocol psi n kA kB lA lB outcome)
 /-- The physical input `psi^n tensor Phi_K`, regrouped as local Alice, local
 Bob, and reference systems. -/
 def initialState :
-    State
-      (Prod
-        (Prod (Prod (TensorPower a n) kA) (Prod (TensorPower b n) kB))
-        (TensorPower r n)) :=
+    MState
+      (((TensorPower a n × kA) × (TensorPower b n × kB)) ×
+        TensorPower r n) :=
   ((stateMergingBlockSource psi n).state.prod
-      (State.maximallyEntangled C.inputEbitPairing)).reindex
+      (MState.maximallyEntangled C.inputEbitPairing)).reindex
     (stateMergingInputEquiv
       (TensorPower a n) (TensorPower b n) (TensorPower r n) kA kB)
 
 /-- The output computed by the one-way LOCC operation, tensored with the
 identity channel on the inaccessible reference. -/
 def outputState :
-    State
-      (Prod
-        (Prod lA (Prod (Prod (TensorPower a n) (TensorPower b n)) lB))
-        (TensorPower r n)) :=
-  (C.locc.toChannel.prod (Channel.idChannel (TensorPower r n))).applyState C.initialState
+    MState
+      ((lA × ((TensorPower a n × TensorPower b n) × lB)) ×
+        TensorPower r n) :=
+  (C.locc.toChannel.prod (CPTPOp.id (dIn := TensorPower r n))) C.initialState
 
 /-- The ideal target `Phi_L tensor psi_{B'BR}^n`, expressed in the same output
 register order as `outputState`. -/
 def targetState :
-    State
-      (Prod
-        (Prod lA (Prod (Prod (TensorPower a n) (TensorPower b n)) lB))
-        (TensorPower r n)) :=
+    MState
+      ((lA × ((TensorPower a n × TensorPower b n) × lB)) ×
+        TensorPower r n) :=
   ((stateMergingBlockSource psi n).state.prod
-      (State.maximallyEntangled C.outputEbitPairing)).reindex
+      (MState.maximallyEntangled C.outputEbitPairing)).reindex
     (stateMergingTargetEquiv
       (TensorPower a n) (TensorPower b n) (TensorPower r n) lA lB)
 
@@ -159,7 +160,7 @@ def fidelityError : ℝ :=
   1 - C.outputState.squaredFidelity C.targetState
 
 theorem fidelityError_nonneg : 0 ≤ C.fidelityError :=
-  sub_nonneg.mpr (State.squaredFidelity_le_one _ _)
+  sub_nonneg.mpr (MState.squaredFidelity_le_one _ _)
 
 theorem fidelityError_le_iff (epsilon : ℝ) :
     C.fidelityError ≤ epsilon ↔
@@ -181,14 +182,26 @@ def classicalCommunicationRate
 
 end StateMergingBlockProtocol
 
-namespace PureVector
+end
+end QIT
+
+namespace Ket
+
+noncomputable section
+
+open QIT
+universe u v w x y z p q u' v'
+variable {a : Type u} {b : Type v} {r : Type w}
+variable [Fintype a] [DecidableEq a]
+variable [Fintype b] [DecidableEq b]
+variable [Fintype r] [DecidableEq r]
 
 /-- Achievable net entanglement rate for standard state merging in the sense
 of HOW. Every positive rate slack and fidelity-error tolerance is met by
 concrete one-way LOCC block protocols at all sufficiently large blocklengths.
 No output-ebit-rank growth condition is imposed. -/
 def IsAchievableStateMergingRate
-    (psi : PureVector (Prod (Prod a b) r)) (R : ℝ) : Prop :=
+    (psi : Ket ((a × b) × r)) (R : ℝ) : Prop :=
   ∀ delta : ℝ, 0 < delta → ∀ epsilon : ℝ, 0 < epsilon →
     ∃ N : ℕ, ∀ n : ℕ, n ≥ N →
       ∃ (kA : Type x), ∃ (_ : Fintype kA), ∃ (_ : DecidableEq kA),
@@ -207,7 +220,7 @@ def IsAchievableStateMergingRate
 converse. One nonnegative exponent uniformly bounds the output ebit rank over
 all tolerances and all sufficiently large selected protocols. -/
 def IsAchievableStateMergingRateWithOutputEbitExponent
-    (psi : PureVector (Prod (Prod a b) r)) (R : ℝ) : Prop :=
+    (psi : Ket ((a × b) × r)) (R : ℝ) : Prop :=
   ∃ outputEbitExponent : ℝ, 0 ≤ outputEbitExponent ∧
   ∀ delta : ℝ, 0 < delta → ∀ epsilon : ℝ, 0 < epsilon →
     ∃ N : ℕ, 1 ≤ N ∧ ∀ n : ℕ, n ≥ N →
@@ -226,7 +239,7 @@ def IsAchievableStateMergingRateWithOutputEbitExponent
 
 /-- Exponent-restricted achievability implies canonical HOW achievability. -/
 theorem IsAchievableStateMergingRateWithOutputEbitExponent.toIsAchievableStateMergingRate
-    {psi : PureVector (Prod (Prod a b) r)} {R : ℝ}
+    {psi : Ket ((a × b) × r)} {R : ℝ}
     (hR :
       IsAchievableStateMergingRateWithOutputEbitExponent.{u, v, w, x, y, z, p, q} psi R) :
     IsAchievableStateMergingRate.{u, v, w, x, y, z, p, q} psi R := by
@@ -247,11 +260,22 @@ theorem IsAchievableStateMergingRateWithOutputEbitExponent.toIsAchievableStateMe
 /-- Standard state-merging cost: the infimum of achievable net entanglement
 rates.  No sign restriction is imposed, so negative conditional-entropy
 sources can be represented as net entanglement generation. -/
-def stateMergingCost (psi : PureVector (Prod (Prod a b) r)) : ℝ :=
+def stateMergingCost (psi : Ket ((a × b) × r)) : ℝ :=
   sInf {R : ℝ |
-    PureVector.IsAchievableStateMergingRate.{u, v, w, x, y, z, p, q} psi R}
+    Ket.IsAchievableStateMergingRate.{u, v, w, x, y, z, p, q} psi R}
 
-end PureVector
+end
+
+end Ket
+
+namespace QIT
+noncomputable section
+
+universe u v w x y z p q u' v'
+variable {a : Type u} {b : Type v} {r : Type w}
+variable [Fintype a] [DecidableEq a]
+variable [Fintype b] [DecidableEq b]
+variable [Fintype r] [DecidableEq r]
 
 end
 

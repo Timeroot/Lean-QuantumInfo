@@ -47,11 +47,11 @@ variable (data : YNData ι HA HB)
 The Bob-local replacement family obtained by projecting onto the reduced
 supports of `(1_A ⊗ P_B^(k)) ψ`.
 -/
-def bobReducedSupportFamily (ψ : PureVector (HA × HB)) : ι → Projection HB :=
+def bobReducedSupportFamily (ψ : Ket (HA × HB)) : ι → Projection HB :=
   fun k => data.bobProjectedReducedSupportProjection ψ k
 
 @[simp]
-theorem bobReducedSupportFamily_apply (ψ : PureVector (HA × HB)) (k : ι) :
+theorem bobReducedSupportFamily_apply (ψ : Ket (HA × HB)) (k : ι) :
     data.bobReducedSupportFamily ψ k =
       data.bobProjectedReducedSupportProjection ψ k :=
   rfl
@@ -83,25 +83,25 @@ projection.
 
 This is stronger than the post-matrix preservation field used by
 `BobLocalOrthogonalization`, and is intentionally specialized to the concrete
-reduced-support family built from a pure vector.
+reduced-support family built from a ket.
 -/
 theorem bobProjectedReducedSupportProjection_mulVec_eq_bobProjectionOp
-    (ψ : PureVector (HA × HB)) (k : ι) :
-    (YangNavascues.bobLocalOp HA (data.bobProjectedReducedSupportProjection ψ) k).mulVec ψ.amp =
-      (data.bobProjectionOp k).mulVec ψ.amp := by
+    (ψ : Ket (HA × HB)) (k : ι) :
+    (YangNavascues.bobLocalOp HA (data.bobProjectedReducedSupportProjection ψ) k).mulVec ψ.vec =
+      (data.bobProjectionOp k).mulVec ψ.vec := by
   rw [YangNavascues.bobLocalOp_eq, bobProjectionOp_eq]
   change
     (Matrix.kronecker (1 : CMatrix HA)
       (Matrix.rangeProjection
-        (partialTraceA (a := HA) (b := HB)
+        (Matrix.traceLeft
           (rankOneMatrix ((Matrix.kronecker (1 : CMatrix HA)
-            ((data.bobProjection k).matrix)).mulVec ψ.amp))))).mulVec ψ.amp =
-      (Matrix.kronecker (1 : CMatrix HA) ((data.bobProjection k).matrix)).mulVec ψ.amp
-  exact Matrix.kronecker_rangeProjection_partialTraceA_rankOne_projection_mulVec
+            ((data.bobProjection k).matrix)).mulVec ψ.vec))))).mulVec ψ.vec =
+      (Matrix.kronecker (1 : CMatrix HA) ((data.bobProjection k).matrix)).mulVec ψ.vec
+  exact Matrix.kronecker_rangeProjection_traceLeft_rankOne_projection_mulVec
     ((data.bobProjection k).matrix)
     (data.bobProjection k).isHermitian
     (data.bobProjection k).idempotent
-    ψ.amp
+    ψ.vec
 
 end YNData
 
@@ -116,7 +116,7 @@ post-selected density action on `rho` as Bob's original `(1_A ⊗ P_B^(k))`.
 structure BobLocalOrthogonalization {ι : Type u} {HA : Type v} {HB : Type w}
     [Fintype ι] [DecidableEq ι]
     [Fintype HA] [DecidableEq HA] [Fintype HB] [DecidableEq HB]
-    (data : YNData ι HA HB) (rho : State (HA × HB)) where
+    (data : YNData ι HA HB) (rho : MState (HA × HB)) where
   /-- The Bob-local orthogonal projection family `Q_k`. -/
   bobLocal : ι → Projection HB
   /-- Distinct Bob-local projections are mutually orthogonal. -/
@@ -127,7 +127,7 @@ structure BobLocalOrthogonalization {ι : Type u} {HA : Type v} {HB : Type w}
 
 namespace BobLocalOrthogonalization
 
-variable {data : YNData ι HA HB} {rho : State (HA × HB)}
+variable {data : YNData ι HA HB} {rho : MState (HA × HB)}
 variable (W : BobLocalOrthogonalization data rho)
 
 /-- The lifted `(1_A ⊗ Q_k)` is Hermitian. -/
@@ -165,7 +165,7 @@ end BobLocalOrthogonalization
 namespace YNConditions
 
 variable {data : YNData ι HA HB}
-variable {ψ : PureVector (HA × HB)}
+variable {ψ : Ket (HA × HB)}
 
 /--
 The reduced-support projections form the exact Bob-local replacement family
@@ -191,8 +191,8 @@ concrete vector-level action needed by the CGS branch-vector calculation.
 -/
 theorem bobReducedSupportOrthogonalization_mulVec_eq_bobProjectionOp
     (h : YNConditions data ψ.state) (k : ι) :
-    (bobLocalOp HA (h.bobReducedSupportOrthogonalization.bobLocal) k).mulVec ψ.amp =
-      (data.bobProjectionOp k).mulVec ψ.amp := by
+    (bobLocalOp HA (h.bobReducedSupportOrthogonalization.bobLocal) k).mulVec ψ.vec =
+      (data.bobProjectionOp k).mulVec ψ.vec := by
   exact data.bobProjectedReducedSupportProjection_mulVec_eq_bobProjectionOp ψ k
 
 end YNConditions

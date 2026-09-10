@@ -33,7 +33,6 @@ universe u1 v1 u2 v2
 
 noncomputable section
 
-
 /-- If a positive-definite matrix is supported by a positive-semidefinite
 reference, the reference is positive definite.  This local closure lemma is
 used to rule out singular side references in the high-`alpha` KW support
@@ -44,7 +43,7 @@ theorem Matrix.Supports.posDef_right_of_left_posDef
     (hSupport : Matrix.Supports M N) : N.PosDef := by
   refine Matrix.PosDef.of_dotProduct_mulVec_pos hN.isHermitian ?_
   intro x hx
-  have hnonneg : 0 <= star x ⬝ᵥ N.mulVec x :=
+  have hnonneg : 0 ≤ star x ⬝ᵥ N.mulVec x :=
     hN.dotProduct_mulVec_nonneg x
   have hne : star x ⬝ᵥ N.mulVec x ≠ 0 := by
     intro hzero
@@ -55,44 +54,8 @@ theorem Matrix.Supports.posDef_right_of_left_posDef
     have hpos : 0 < star x ⬝ᵥ M.mulVec x :=
       hM.dotProduct_mulVec_pos hx
     rw [hMquad_zero] at hpos
-    exact (lt_irrefl (0 : Complex)) hpos
+    exact (lt_irrefl (0 : ℂ)) hpos
   exact lt_of_le_of_ne hnonneg (Ne.symm hne)
-
-/-- If the right tensor factor is full rank, replacing it by any matrix on the
-left-hand side preserves support domination.
-
-This is the finite-dimensional kernel-inclusion form used below to pass from
-`rho_A \otimes rho_B` to `rho_A \otimes sigma_B` when `sigma_B` is full rank. -/
-theorem Matrix.Supports.kronecker_right_of_posDef
-    {a : Type u1} {b : Type v1} [Fintype a] [DecidableEq a]
-    [Fintype b] [DecidableEq b]
-    (A : CMatrix a) (B C : CMatrix b) (hC : C.PosDef) :
-    Matrix.Supports (Matrix.kronecker A B) (Matrix.kronecker A C) := by
-  let L : CMatrix (Prod a b) := Matrix.kronecker (1 : CMatrix a) (B * C⁻¹)
-  have hCdet : IsUnit C.det := (Matrix.isUnit_iff_isUnit_det C).mp hC.isUnit
-  have hleft : C⁻¹ * C = (1 : CMatrix b) := Matrix.nonsing_inv_mul C hCdet
-  have hfactor :
-      Matrix.kronecker A B = L * Matrix.kronecker A C := by
-    calc
-      Matrix.kronecker A B =
-          Matrix.kronecker (A * (1 : CMatrix a)) (B * (1 : CMatrix b)) := by
-            simp
-      _ = Matrix.kronecker (A * (1 : CMatrix a)) (B * (C⁻¹ * C)) := by
-            rw [hleft]
-      _ = Matrix.kronecker ((1 : CMatrix a) * A) ((B * C⁻¹) * C) := by
-            simp [Matrix.mul_assoc]
-      _ = L * Matrix.kronecker A C := by
-            simpa [L, Matrix.kronecker] using
-              (Matrix.mul_kronecker_mul (1 : CMatrix a) A (B * C⁻¹) C)
-  intro v hv
-  calc
-    Matrix.mulVec (Matrix.kronecker A B) v =
-        Matrix.mulVec (L * Matrix.kronecker A C) v := by rw [hfactor]
-    _ = Matrix.mulVec L (Matrix.mulVec (Matrix.kronecker A C) v) := by
-        rw [Matrix.mulVec_mulVec]
-    _ = 0 := by
-        rw [hv]
-        simp
 
 /-- If a PSD matrix is supported by a nonnegative diagonal reference, then its
 diagonal entries vanish wherever the reference diagonal vanishes. -/
@@ -139,12 +102,12 @@ theorem Matrix.Supports.kronecker_of_posSemidef
   classical
   let U1 : Matrix.unitaryGroup a ℂ := star hRefA.isHermitian.eigenvectorUnitary
   let U2 : Matrix.unitaryGroup b ℂ := star hRefB.isHermitian.eigenvectorUnitary
-  let U : Matrix.unitaryGroup (Prod a b) ℂ :=
+  let U : Matrix.unitaryGroup (a × b) ℂ :=
     ⟨Matrix.kronecker (U1 : CMatrix a) (U2 : CMatrix b),
       kronecker_mem_unitaryGroup U1 U2⟩
   let d1 : a → ℝ := fun i => hRefA.isHermitian.eigenvalues i
   let d2 : b → ℝ := fun j => hRefB.isHermitian.eigenvalues j
-  let d : Prod a b → ℝ := fun x => d1 x.1 * d2 x.2
+  let d : a × b → ℝ := fun x => d1 x.1 * d2 x.2
   let rhoA' : CMatrix a := (U1 : CMatrix a) * rhoA * star (U1 : CMatrix a)
   let rhoB' : CMatrix b := (U2 : CMatrix b) * rhoB * star (U2 : CMatrix b)
   let D1 : CMatrix a := Matrix.diagonal fun i => ((d1 i : ℝ) : ℂ)
@@ -218,7 +181,7 @@ theorem Matrix.Supports.kronecker_of_posSemidef
     exact Matrix.Supports.diagonal_zero_of_posSemidef hRhoB' hd2_nonneg h2diag hj
   have hprodDiag :
       Matrix.Supports (Matrix.kronecker rhoA' rhoB')
-        (Matrix.diagonal fun x : Prod a b => ((d x : ℝ) : ℂ) : CMatrix (Prod a b)) := by
+        (Matrix.diagonal fun x : a × b => ((d x : ℝ) : ℂ) : CMatrix (a × b)) := by
     refine Matrix.Supports.of_posSemidef_diagonal (hRhoA'.kronecker hRhoB') hd_nonneg ?_
     intro x hx
     rcases x with ⟨i, j⟩
@@ -228,25 +191,25 @@ theorem Matrix.Supports.kronecker_of_posSemidef
     · simp [Matrix.kroneckerMap_apply, hdiagZero2 j hj]
   have hprodDiag' :
       Matrix.Supports
-        ((U : CMatrix (Prod a b)) * Matrix.kronecker rhoA rhoB * star (U : CMatrix (Prod a b)))
-        ((U : CMatrix (Prod a b)) * Matrix.kronecker refA refB * star (U : CMatrix (Prod a b))) := by
+        ((U : CMatrix (a × b)) * Matrix.kronecker rhoA rhoB * star (U : CMatrix (a × b)))
+        ((U : CMatrix (a × b)) * Matrix.kronecker refA refB * star (U : CMatrix (a × b))) := by
     have hleft :
-        (U : CMatrix (Prod a b)) * Matrix.kronecker rhoA rhoB * star (U : CMatrix (Prod a b)) =
+        (U : CMatrix (a × b)) * Matrix.kronecker rhoA rhoB * star (U : CMatrix (a × b)) =
           Matrix.kronecker rhoA' rhoB' := by
       simp [U, rhoA', rhoB', Matrix.conjTranspose_kronecker, Matrix.star_eq_conjTranspose,
         Matrix.mul_kronecker_mul, Matrix.mul_assoc]
     have hright :
-        (U : CMatrix (Prod a b)) * Matrix.kronecker refA refB * star (U : CMatrix (Prod a b)) =
-          Matrix.diagonal fun x : Prod a b => ((d x : ℝ) : ℂ) := by
+        (U : CMatrix (a × b)) * Matrix.kronecker refA refB * star (U : CMatrix (a × b)) =
+          Matrix.diagonal fun x : a × b => ((d x : ℝ) : ℂ) := by
       calc
-        (U : CMatrix (Prod a b)) * Matrix.kronecker refA refB * star (U : CMatrix (Prod a b)) =
+        (U : CMatrix (a × b)) * Matrix.kronecker refA refB * star (U : CMatrix (a × b)) =
             Matrix.kronecker ((U1 : CMatrix a) * refA * star (U1 : CMatrix a))
               ((U2 : CMatrix b) * refB * star (U2 : CMatrix b)) := by
               simp [U, Matrix.conjTranspose_kronecker, Matrix.star_eq_conjTranspose,
                 Matrix.mul_kronecker_mul, Matrix.mul_assoc]
         _ = Matrix.kronecker D1 D2 := by
               rw [hRefA_diag, hRefB_diag]
-        _ = Matrix.diagonal fun x : Prod a b => ((d x : ℝ) : ℂ) := by
+        _ = Matrix.diagonal fun x : a × b => ((d x : ℝ) : ℂ) := by
               simpa [D1, D2, d] using
                 (Matrix.diagonal_kronecker_diagonal
                   (fun i : a => ((d1 i : ℝ) : ℂ))
@@ -254,11 +217,11 @@ theorem Matrix.Supports.kronecker_of_posSemidef
     rw [hleft, hright]
     exact hprodDiag
   intro v hv
-  let Umat : CMatrix (Prod a b) := (U : CMatrix (Prod a b))
-  let rhoProd : CMatrix (Prod a b) := Matrix.kronecker rhoA rhoB
-  let refProd : CMatrix (Prod a b) := Matrix.kronecker refA refB
+  let Umat : CMatrix (a × b) := (U : CMatrix (a × b))
+  let rhoProd : CMatrix (a × b) := Matrix.kronecker rhoA rhoB
+  let refProd : CMatrix (a × b) := Matrix.kronecker refA refB
   have hstarU_U : star Umat * Umat = 1 := by
-    change star (U : CMatrix (Prod a b)) * (U : CMatrix (Prod a b)) = 1
+    change star (U : CMatrix (a × b)) * (U : CMatrix (a × b)) = 1
     exact Unitary.coe_star_mul_self U
   have hmatRef : (Umat * refProd * star Umat) * Umat = Umat * refProd := by
     calc
@@ -350,30 +313,6 @@ theorem Matrix.Supports.reindex
       (by intro x; simp)
   rw [hsum]
   exact hj
-
-private theorem cMatrix_reindex_mem_unitary
-    {a : Type u1} {b : Type v1} [Fintype a] [DecidableEq a]
-    [Fintype b] [DecidableEq b]
-    (e : a ≃ b) (U : Matrix.unitaryGroup a ℂ) :
-    Matrix.reindex e e (U : CMatrix a) ∈ Matrix.unitaryGroup b ℂ := by
-  rw [Matrix.mem_unitaryGroup_iff]
-  ext i j
-  have hU := Matrix.mem_unitaryGroup_iff.mp U.2
-  have happ := congrFun (congrFun hU (e.symm i)) (e.symm j)
-  simp [Matrix.mul_apply, Matrix.star_apply] at happ ⊢
-  have hsum :
-      (∑ x : b, (U : CMatrix a) (e.symm i) (e.symm x) *
-          starRingEnd ℂ ((U : CMatrix a) (e.symm j) (e.symm x))) =
-        ∑ y : a, (U : CMatrix a) (e.symm i) y *
-          starRingEnd ℂ ((U : CMatrix a) (e.symm j) y) := by
-    exact Fintype.sum_equiv e.symm
-      (fun x : b => (U : CMatrix a) (e.symm i) (e.symm x) *
-        starRingEnd ℂ ((U : CMatrix a) (e.symm j) (e.symm x)))
-      (fun y : a => (U : CMatrix a) (e.symm i) y *
-        starRingEnd ℂ ((U : CMatrix a) (e.symm j) y))
-      (by intro x; rfl)
-  rw [hsum]
-  simpa [Matrix.one_apply] using happ
 
 /-- Spectral multiplication rule for PSD matrix powers under the repository's
 support convention.
@@ -482,145 +421,18 @@ theorem cMatrix_sqrt_mul_sandwiched_left_rpow
   rw [mul_comm]
   exact real_sandwiched_left_rpow_mul_sqrt hx halpha
 
-/-- Support-convention real powers commute with finite reindexing.
-
-The nonnegative-exponent version follows directly from continuous functional
-calculus.  KW's high-`alpha` sandwiched expressions also use the negative
-exponent `(1 - alpha) / (2 * alpha)` on possibly singular PSD references; this
-finite-dimensional spectral proof records the repository support convention
-`0^s = 0` and therefore avoids adding a full-rank hypothesis merely to
-repartition product systems. -/
-theorem cMatrix_rpow_reindex_posSemidef_support
-    {a : Type u1} {b : Type v1} [Fintype a] [DecidableEq a]
-    [Fintype b] [DecidableEq b]
-    (e : a ≃ b) {A : CMatrix a} (hA : A.PosSemidef) (s : ℝ) :
-    CFC.rpow (Matrix.reindex e e A) s =
-      Matrix.reindex e e (CFC.rpow A s) := by
-  let U : Matrix.unitaryGroup a ℂ := hA.isHermitian.eigenvectorUnitary
-  let Ue : Matrix.unitaryGroup b ℂ :=
-    ⟨Matrix.reindex e e (U : CMatrix a), cMatrix_reindex_mem_unitary e U⟩
-  let d : a → ℝ := hA.isHermitian.eigenvalues
-  let de : b → ℝ := fun i => d (e.symm i)
-  have hd : ∀ i, 0 ≤ d i := by
-    intro i
-    exact hA.eigenvalues_nonneg i
-  have hde : ∀ i, 0 ≤ de i := by
-    intro i
-    exact hd (e.symm i)
-  have hA_spec :
-      A = Unitary.conjStarAlgAut ℂ _ U
-        (Matrix.diagonal (fun i => (d i : ℂ))) := by
-    simpa [U, d, Function.comp_def] using hA.isHermitian.spectral_theorem
-  have hdiag :
-      Matrix.reindex e e (Matrix.diagonal (fun i => (d i : ℂ)) : CMatrix a) =
-        Matrix.diagonal (fun i => (de i : ℂ)) := by
-    ext i j
-    by_cases hij : i = j
-    · subst j
-      simp [de]
-    · simp [Matrix.diagonal, hij]
-  have hstarU :
-      Matrix.reindex e e (star (U : CMatrix a)) =
-        star (Matrix.reindex e e (U : CMatrix a)) := by
-    ext i j
-    simp [Matrix.star_apply]
-  have hdiagAlg :
-      (Matrix.reindexAlgEquiv ℂ ℂ e)
-          (Matrix.diagonal (fun i => (d i : ℂ)) : CMatrix a) =
-        Matrix.diagonal (fun i => (de i : ℂ)) := by
-    simpa [Matrix.coe_reindexAlgEquiv] using hdiag
-  have hstarUAlg :
-      (Matrix.reindexAlgEquiv ℂ ℂ e) (star (U : CMatrix a)) =
-        star ((Matrix.reindexAlgEquiv ℂ ℂ e) (U : CMatrix a)) := by
-    simpa [Matrix.coe_reindexAlgEquiv] using hstarU
-  have hre_spec :
-      Matrix.reindex e e A =
-        Unitary.conjStarAlgAut ℂ _ Ue
-          (Matrix.diagonal (fun i => (de i : ℂ))) := by
-    rw [hA_spec]
-    change (Matrix.reindexAlgEquiv ℂ ℂ e)
-        (((U : CMatrix a) * Matrix.diagonal (fun i => (d i : ℂ))) * star (U : CMatrix a)) =
-      ((Ue : CMatrix b) * Matrix.diagonal (fun i => (de i : ℂ))) * star (Ue : CMatrix b)
-    rw [map_mul, map_mul]
-    rw [hdiagAlg, hstarUAlg]
-    rfl
-  have hA_rpow :
-      CFC.rpow A s =
-        Unitary.conjStarAlgAut ℂ _ U
-          (Matrix.diagonal (fun i => ((d i ^ s : ℝ) : ℂ))) := by
-    rw [hA_spec]
-    simpa [Unitary.conjStarAlgAut_apply] using
-      cMatrix_rpow_unitary_conj_diagonal_ofReal U d hd s
-  have hre_rpow :
-      CFC.rpow (Matrix.reindex e e A) s =
-        Unitary.conjStarAlgAut ℂ _ Ue
-          (Matrix.diagonal (fun i => ((de i ^ s : ℝ) : ℂ))) := by
-    rw [hre_spec]
-    simpa [Unitary.conjStarAlgAut_apply] using
-      cMatrix_rpow_unitary_conj_diagonal_ofReal Ue de hde s
-  rw [hre_rpow, hA_rpow]
-  have hdiag_pow :
-      Matrix.reindex e e (Matrix.diagonal (fun i => ((d i ^ s : ℝ) : ℂ)) : CMatrix a) =
-        Matrix.diagonal (fun i => ((de i ^ s : ℝ) : ℂ)) := by
-    ext i j
-    by_cases hij : i = j
-    · subst j
-      simp [de]
-    · simp [Matrix.diagonal, hij]
-  change ((Ue : CMatrix b) *
-        Matrix.diagonal (fun i => ((de i ^ s : ℝ) : ℂ))) *
-        star (Ue : CMatrix b) =
-      (Matrix.reindexAlgEquiv ℂ ℂ e)
-        (((U : CMatrix a) * Matrix.diagonal (fun i => ((d i ^ s : ℝ) : ℂ))) *
-          star (U : CMatrix a))
-  rw [map_mul, map_mul]
-  have hdiagPowAlg :
-      (Matrix.reindexAlgEquiv ℂ ℂ e)
-          (Matrix.diagonal (fun i => ((d i ^ s : ℝ) : ℂ)) : CMatrix a) =
-        Matrix.diagonal (fun i => ((de i ^ s : ℝ) : ℂ)) := by
-    simpa [Matrix.coe_reindexAlgEquiv] using hdiag_pow
-  rw [hdiagPowAlg, hstarUAlg]
-  rfl
-
-private theorem State.marginalB_posDef_of_posDef
-    {a : Type u1} {b : Type v1} [Fintype a] [DecidableEq a]
-    [Fintype b] [DecidableEq b]
-    (rhoAB : State (Prod a b)) (hrho : rhoAB.matrix.PosDef) :
-    rhoAB.marginalB.matrix.PosDef := by
-  let : Nonempty a := by
-    rcases rhoAB.nonempty with ⟨x⟩
-    exact ⟨x.1⟩
-  simpa [State.marginalB_matrix] using
-    (partialTraceA_posDef_of_posDef
-      (a := a) (b := b) (M := rhoAB.matrix) hrho)
-
-theorem State.marginalA_posDef_of_posDef
-    {a : Type u1} {b : Type v1} [Fintype a] [DecidableEq a]
-    [Fintype b] [DecidableEq b]
-    (rhoAB : State (Prod a b)) (hrho : rhoAB.matrix.PosDef) :
-    rhoAB.marginalA.matrix.PosDef := by
-  let rhoBA : State (Prod b a) := rhoAB.reindex (Equiv.prodComm a b)
-  have hrhoBA : rhoBA.matrix.PosDef := by
-    simpa [rhoBA] using State.reindex_posDef rhoAB (Equiv.prodComm a b) hrho
-  have hmarg : rhoAB.marginalA = rhoBA.marginalB := by
-    apply State.ext
-    ext i j
-    simp [rhoBA, State.marginalA, State.marginalB, State.reindex,
-      partialTraceA, partialTraceB]
-  rw [hmarg]
-  exact State.marginalB_posDef_of_posDef rhoBA hrhoBA
-
-theorem State.prod_right_posDef_of_posDef
+theorem _root_.MState.prod_right_posDef_of_posDef
     {a : Type u1} {b : Type v1} [Fintype a] [DecidableEq a]
     [Fintype b] [DecidableEq b] [Nonempty a]
-    (rhoA : State a) (sigmaB : State b)
-    (hprod : (rhoA.prod sigmaB).matrix.PosDef) :
-    sigmaB.matrix.PosDef := by
+    (rhoA : MState a) (sigmaB : MState b)
+    (hprod : (rhoA.prod sigmaB).m.PosDef) :
+    sigmaB.m.PosDef := by
   have hpt :
-      (partialTraceA (a := a) (b := b) (rhoA.prod sigmaB).matrix).PosDef :=
-    partialTraceA_posDef_of_posDef
-      (a := a) (b := b) (M := (rhoA.prod sigmaB).matrix) hprod
-  simpa [State.partialTraceA_prod rhoA sigmaB] using hpt
+      (Matrix.traceLeft (rhoA.prod sigmaB).m).PosDef :=
+    _root_.QIT.traceLeft_posDef_of_posDef
+      (a := a) (b := b) (M := (rhoA.prod sigmaB).m) hprod
+  rw [MState.traceLeft_prod rhoA sigmaB] at hpt
+  exact hpt
 
 /-- Infimum of independently optimized real-valued objectives over a product
 domain.  This is the order-theoretic scalar step used in the KW source when an
@@ -650,47 +462,6 @@ theorem real_sInf_range_prod_add_eq_add_sInf_range
   · refine le_csInf (Set.range_nonempty _) ?_
     rintro x ⟨p, rfl⟩
     exact add_le_add (csInf_le hf ⟨p.1, rfl⟩) (csInf_le hg ⟨p.2, rfl⟩)
-
-/-- Coercion from real-valued bounded-below objectives to `EReal` preserves
-the infimum.  This is the scalar bridge between the real KW full-rank branch
-and the repository's extended-real optimized definitions. -/
-theorem ereal_sInf_range_coe_eq_coe_real_sInf
-    {ι : Type*} [Nonempty ι] (f : ι → ℝ)
-    (hf : BddBelow (Set.range f)) :
-    sInf (Set.range fun i : ι => (f i : EReal)) =
-      ((sInf (Set.range f) : ℝ) : EReal) := by
-  let S : Set (WithTop ℝ) := Set.range fun i : ι => ((f i : ℝ) : WithTop ℝ)
-  have hS_bdd : BddBelow S := by
-    rcases hf with ⟨lb, hlb⟩
-    refine ⟨(lb : WithTop ℝ), ?_⟩
-    rintro y ⟨i, rfl⟩
-    exact WithTop.coe_le_coe.mpr (hlb ⟨i, rfl⟩)
-  have htop : sInf S = ((sInf (Set.range f) : ℝ) : WithTop ℝ) := by
-    have h := WithTop.coe_sInf' (s := Set.range f) (Set.range_nonempty f) hf
-    have himage : ((fun a : ℝ => (a : WithTop ℝ)) '' Set.range f) = S := by
-      ext y
-      constructor
-      · rintro ⟨x, ⟨i, rfl⟩, rfl⟩
-        exact ⟨i, rfl⟩
-      · rintro ⟨i, rfl⟩
-        exact ⟨f i, ⟨i, rfl⟩, rfl⟩
-    rw [himage] at h
-    exact h.symm
-  have hbot := WithBot.coe_sInf' (s := S) hS_bdd
-  have hrange : (Set.range fun i : ι => (f i : EReal)) =
-      ((fun a : WithTop ℝ => (a : WithBot (WithTop ℝ))) '' S) := by
-    ext y
-    constructor
-    · rintro ⟨i, rfl⟩
-      exact ⟨(f i : WithTop ℝ), ⟨i, rfl⟩, rfl⟩
-    · rintro ⟨x, ⟨i, rfl⟩, rfl⟩
-      exact ⟨i, rfl⟩
-  rw [hrange]
-  calc
-    sInf ((fun a : WithTop ℝ => (a : WithBot (WithTop ℝ))) '' S) =
-        ((sInf S : WithTop ℝ) : WithBot (WithTop ℝ)) := hbot.symm
-    _ = (((sInf (Set.range f) : ℝ) : WithTop ℝ) : WithBot (WithTop ℝ)) := by
-      rw [htop]
 
 /-- Infimum of a nonnegative extended-real family, computed in `ENNReal`.
 
@@ -787,26 +558,6 @@ theorem real_sSup_range_prod_add_eq_add_sSup_range
     refine ⟨f i + g j, ⟨(i, j), rfl⟩, ?_⟩
     linarith
 
-/-- On a nonempty positive bounded-above real set, `log2` sends the supremum
-to the supremum of the image.  This is the local logarithm-transport step used
-before splitting a product-state optimization into independent optimizations. -/
-theorem real_log2_sSup_image_eq {s : Set ℝ}
-    (hne : s.Nonempty) (hbdd : BddAbove s) (hpos : ∀ x ∈ s, 0 < x) :
-    sSup (log2 '' s) = log2 (sSup s) := by
-  unfold log2
-  have hsup_pos : 0 < sSup s := by
-    rcases hne with ⟨x, hx⟩
-    exact lt_of_lt_of_le (hpos x hx) (le_csSup hbdd hx)
-  have hcont : ContinuousWithinAt (fun x : ℝ => Real.log x / Real.log 2) s (sSup s) :=
-    (Real.continuousAt_log hsup_pos.ne').div_const _ |>.continuousWithinAt
-  have hmono : MonotoneOn (fun x : ℝ => Real.log x / Real.log 2) s := by
-    intro x hx y hy hxy
-    exact div_le_div_of_nonneg_right (Real.log_le_log (hpos x hx) hxy)
-      (le_of_lt (Real.log_pos one_lt_two))
-  have hmap := MonotoneOn.map_csSup_of_continuousWithinAt
-    (f := fun x : ℝ => Real.log x / Real.log 2) (A := s) hcont hmono hne hbdd
-  simpa using hmap.symm
-
 /-- On a nonempty bounded-below set with strictly positive infimum, `log2`
 sends the infimum to the infimum of the image. -/
 theorem real_log2_sInf_image_eq {s : Set ℝ}
@@ -844,7 +595,7 @@ theorem real_log2_sSup_range_prod_mul_eq_add
     exact mul_pos (hfpos p.1) (hgpos p.2)
   have hlogsup :
       sSup (log2 '' prodSet) = log2 (sSup prodSet) :=
-    real_log2_sSup_image_eq hprod_nonempty hprod hprod_pos
+    log2_sSup_image_eq hprod_nonempty hprod hprod_pos
   have himage :
       log2 '' prodSet =
         Set.range fun p : ι × κ => log2 (f p.1 * g p.2) := by
@@ -953,21 +704,21 @@ theorem sandwichedAlpha_sion_abcSidePowerTraceRe_EReal
     [Fintype c] [DecidableEq c]
     {delta alpha : ℝ} (hdelta_pos : 0 < delta)
     (hdelta_le : delta ≤ (Fintype.card b : ℝ)⁻¹)
-    {R : CMatrix (Prod (Prod a b) c)} (hR : R.PosSemidef)
+    {R : CMatrix ((a × b) × c)} (hR : R.PosSemidef)
     (halpha : 1 < alpha) :
-    (⨅ σ ∈ State.uniformlyPositiveDensityMatrixSet delta b,
-        ⨆ τ ∈ State.densityMatrixSet c,
-          (State.abcSidePowerTraceRe (a := a) R σ τ ((alpha - 1) / alpha) :
+    (⨅ σ ∈ MState.uniformlyPositiveDensityMatrixSet delta b,
+        ⨆ τ ∈ MState.densityMatrixSet c,
+          (MState.abcSidePowerTraceRe (a := a) R σ τ ((alpha - 1) / alpha) :
             EReal)) =
-      ⨆ τ ∈ State.densityMatrixSet c,
-        ⨅ σ ∈ State.uniformlyPositiveDensityMatrixSet delta b,
-          (State.abcSidePowerTraceRe (a := a) R σ τ ((alpha - 1) / alpha) :
+      ⨆ τ ∈ MState.densityMatrixSet c,
+        ⨅ σ ∈ MState.uniformlyPositiveDensityMatrixSet delta b,
+          (MState.abcSidePowerTraceRe (a := a) R σ τ ((alpha - 1) / alpha) :
             EReal) := by
   have hp := sandwichedAlphaPrime_pos_lt_one halpha
-  exact State.uniformlyPositiveDensityMatrixSet_sion_abcSidePowerTraceRe_EReal
+  exact MState.uniformlyPositiveDensityMatrixSet_sion_abcSidePowerTraceRe_EReal
     (a := a) (b := b) (c := c)
     hdelta_pos
-    (State.uniformlyPositiveDensityMatrixSet_nonempty (a := b) hdelta_le)
+    (MState.uniformlyPositiveDensityMatrixSet_nonempty (a := b) hdelta_le)
     hR hp.1 (le_of_lt hp.2)
 
 /-- On normalized side states, the matrix-domain Sion function used above is
@@ -979,259 +730,104 @@ theorem upwardRenyiDualityBracketRe_state_matrices
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (ψ : PureVector (Prod (Prod a b) c)) (σB : State b) (τC : State c)
+    (ψ : Ket ((a × b) × c)) (σB : MState b) (τC : MState c)
     (alphaPrime : ℝ) :
-    State.upwardRenyiDualityBracketRe (a := a)
-        ψ σB.matrix τC.matrix alphaPrime =
+    MState.upwardRenyiDualityBracketRe (a := a)
+        ψ σB.m τC.m alphaPrime =
       (ψ.upwardRenyiDualityCommonBracket σB τC alphaPrime).re := by
   have hσ :
-      State.densityMatrixSetState σB.matrix
-          (State.state_matrix_mem_densityMatrixSet σB) = σB := by
-    apply State.ext
-    exact State.densityMatrixSetState_matrix σB.matrix
-      (State.state_matrix_mem_densityMatrixSet σB)
+      MState.densityMatrixSetState σB.m
+          (MState.state_matrix_mem_densityMatrixSet σB) = σB := by
+    apply MState.ext
+    exact MState.densityMatrixSetState_matrix σB.m
+      (MState.state_matrix_mem_densityMatrixSet σB)
   have hτ :
-      State.densityMatrixSetState τC.matrix
-          (State.state_matrix_mem_densityMatrixSet τC) = τC := by
-    apply State.ext
-    exact State.densityMatrixSetState_matrix τC.matrix
-      (State.state_matrix_mem_densityMatrixSet τC)
-  rw [State.upwardRenyiDualityBracketRe_of_mem (a := a) ψ
-    (State.state_matrix_mem_densityMatrixSet σB)
-    (State.state_matrix_mem_densityMatrixSet τC)
+      MState.densityMatrixSetState τC.m
+          (MState.state_matrix_mem_densityMatrixSet τC) = τC := by
+    apply MState.ext
+    exact MState.densityMatrixSetState_matrix τC.m
+      (MState.state_matrix_mem_densityMatrixSet τC)
+  rw [MState.upwardRenyiDualityBracketRe_of_mem (a := a) ψ
+    (MState.state_matrix_mem_densityMatrixSet σB)
+    (MState.state_matrix_mem_densityMatrixSet τC)
     alphaPrime]
   rw [hσ, hτ]
-
-/-- Negation changes an extended-real infimum into the corresponding supremum.
-
-This order-theoretic bridge is used when applying Sion to the negative of the
-KW trace bracket and then returning to the original bracket. -/
-theorem ereal_neg_iInf_eq_iSup_neg {ι : Sort _} (f : ι → EReal) :
-    -(⨅ i, f i) = ⨆ i, -f i := by
-  have h := OrderIso.map_iInf EReal.negOrderIso f
-  change OrderDual.ofDual (EReal.negOrderIso (⨅ i, f i)) = _
-  rw [h]
-  rfl
-
-/-- Negation changes an extended-real supremum into the corresponding
-infimum. -/
-theorem ereal_neg_iSup_eq_iInf_neg {ι : Sort _} (f : ι → EReal) :
-    -(⨆ i, f i) = ⨅ i, -f i := by
-  have h := OrderIso.map_iSup EReal.negOrderIso f
-  change OrderDual.ofDual (EReal.negOrderIso (⨆ i, f i)) = _
-  rw [h]
-  rfl
-
-/-- Convert a Sion equality proved for the negative saddle function back to
-the source `inf sup = sup inf` equality for the original function. -/
-theorem ereal_sion_from_neg
-    {ι κ : Sort _} (F : ι → κ → EReal)
-    (h :
-      (⨅ k : κ, ⨆ i : ι, -F i k) =
-        ⨆ i : ι, ⨅ k : κ, -F i k) :
-    (⨅ i : ι, ⨆ k : κ, F i k) =
-      ⨆ k : κ, ⨅ i : ι, F i k := by
-  have hneg := congrArg Neg.neg h
-  rw [ereal_neg_iInf_eq_iSup_neg, ereal_neg_iSup_eq_iInf_neg] at hneg
-  simp_rw [ereal_neg_iSup_eq_iInf_neg, ereal_neg_iInf_eq_iSup_neg, neg_neg] at hneg
-  exact hneg.symm
-
-/-- The scalar map `x ↦ -(x : EReal)` is antitone. -/
-theorem antitone_ereal_neg_coe : Antitone (fun x : ℝ => -((x : EReal))) := by
-  intro x y hxy
-  exact EReal.neg_le_neg_iff.mpr (EReal.coe_le_coe_iff.mpr hxy)
-
-/-- Optimizing a matrix functional over normalized `State`s is the same as
-optimizing it over the matrix-level density set used by the Sion API. -/
-theorem state_iInf_matrix_eq_densityMatrixSet_iInf
-    {b : Type v1} [Fintype b] [DecidableEq b] (f : CMatrix b → EReal) :
-    (⨅ σ : State b, f σ.matrix) =
-      ⨅ M : CMatrix b, ⨅ _hM : M ∈ State.densityMatrixSet b, f M := by
-  apply le_antisymm
-  · refine le_iInf ?_
-    intro M
-    refine le_iInf ?_
-    intro hM
-    calc
-      (⨅ σ : State b, f σ.matrix) ≤
-          f (State.densityMatrixSetState M hM).matrix := iInf_le _ _
-      _ = f M := by rw [State.densityMatrixSetState_matrix]
-  · refine le_iInf ?_
-    intro σ
-    exact le_trans
-      (iInf_le (fun M : CMatrix b => ⨅ hM : M ∈ State.densityMatrixSet b, f M)
-        σ.matrix)
-      (iInf_le (fun hM : σ.matrix ∈ State.densityMatrixSet b => f σ.matrix)
-        (State.state_matrix_mem_densityMatrixSet σ))
-
-/-- Supremum version of `state_iInf_matrix_eq_densityMatrixSet_iInf`. -/
-theorem state_iSup_matrix_eq_densityMatrixSet_iSup
-    {b : Type v1} [Fintype b] [DecidableEq b] (f : CMatrix b → EReal) :
-    (⨆ σ : State b, f σ.matrix) =
-      ⨆ M : CMatrix b, ⨆ _hM : M ∈ State.densityMatrixSet b, f M := by
-  apply le_antisymm
-  · refine iSup_le ?_
-    intro σ
-    calc
-      f σ.matrix ≤
-          (⨆ hM : σ.matrix ∈ State.densityMatrixSet b, f σ.matrix) :=
-        le_iSup
-          (fun hM : σ.matrix ∈ State.densityMatrixSet b => f σ.matrix)
-          (State.state_matrix_mem_densityMatrixSet σ)
-      _ ≤ ⨆ M : CMatrix b, ⨆ hM : M ∈ State.densityMatrixSet b, f M :=
-        le_iSup
-          (fun M : CMatrix b => ⨆ hM : M ∈ State.densityMatrixSet b, f M)
-          σ.matrix
-  · refine iSup_le ?_
-    intro M
-    refine iSup_le ?_
-    intro hM
-    calc
-      f M = f (State.densityMatrixSetState M hM).matrix := by
-        rw [State.densityMatrixSetState_matrix]
-      _ ≤ (⨆ σ : State b, f σ.matrix) :=
-        le_iSup (fun σ : State b => f σ.matrix) (State.densityMatrixSetState M hM)
-
-/-- The full-rank matrix domain is equivalent to optimizing over states whose
-density matrix is positive definite. -/
-theorem fullRankState_iInf_matrix_eq_fullRankDensityMatrixSet_iInf
-    {b : Type v1} [Fintype b] [DecidableEq b] (f : CMatrix b → EReal) :
-    (⨅ sigma : {sigma : State b // sigma.matrix.PosDef}, f sigma.val.matrix) =
-      ⨅ M : CMatrix b, ⨅ _hM : M ∈ State.fullRankDensityMatrixSet b, f M := by
-  apply le_antisymm
-  · refine le_iInf ?_
-    intro M
-    refine le_iInf ?_
-    intro hM
-    let sigma : {sigma : State b // sigma.matrix.PosDef} :=
-      ⟨{ matrix := M, pos := hM.1.posSemidef, trace_eq_one := hM.2 }, hM.1⟩
-    calc
-      (⨅ sigma : {sigma : State b // sigma.matrix.PosDef}, f sigma.val.matrix) ≤
-          f sigma.val.matrix := iInf_le _ _
-      _ = f M := rfl
-  · refine le_iInf ?_
-    intro sigma
-    exact le_trans
-      (iInf_le
-        (fun M : CMatrix b =>
-          ⨅ hM : M ∈ State.fullRankDensityMatrixSet b, f M)
-        sigma.val.matrix)
-      (iInf_le
-        (fun hM : sigma.val.matrix ∈ State.fullRankDensityMatrixSet b =>
-          f sigma.val.matrix)
-        ⟨sigma.property, sigma.val.trace_eq_one⟩)
-
-/-- Supremum version of
-`fullRankState_iInf_matrix_eq_fullRankDensityMatrixSet_iInf`. -/
-theorem fullRankState_iSup_matrix_eq_fullRankDensityMatrixSet_iSup
-    {b : Type v1} [Fintype b] [DecidableEq b] (f : CMatrix b → EReal) :
-    (⨆ sigma : {sigma : State b // sigma.matrix.PosDef}, f sigma.val.matrix) =
-      ⨆ M : CMatrix b, ⨆ _hM : M ∈ State.fullRankDensityMatrixSet b, f M := by
-  apply le_antisymm
-  · refine iSup_le ?_
-    intro sigma
-    calc
-      f sigma.val.matrix ≤
-          (⨆ hM : sigma.val.matrix ∈ State.fullRankDensityMatrixSet b,
-            f sigma.val.matrix) :=
-        le_iSup
-          (fun hM : sigma.val.matrix ∈ State.fullRankDensityMatrixSet b =>
-            f sigma.val.matrix)
-          ⟨sigma.property, sigma.val.trace_eq_one⟩
-      _ ≤ ⨆ M : CMatrix b, ⨆ hM : M ∈ State.fullRankDensityMatrixSet b, f M :=
-        le_iSup
-          (fun M : CMatrix b =>
-            ⨆ hM : M ∈ State.fullRankDensityMatrixSet b, f M)
-          sigma.val.matrix
-  · refine iSup_le ?_
-    intro M
-    refine iSup_le ?_
-    intro hM
-    let sigma : {sigma : State b // sigma.matrix.PosDef} :=
-      ⟨{ matrix := M, pos := hM.1.posSemidef, trace_eq_one := hM.2 }, hM.1⟩
-    calc
-      f M = f sigma.val.matrix := rfl
-      _ ≤ (⨆ sigma : {sigma : State b // sigma.matrix.PosDef}, f sigma.val.matrix) :=
-        le_iSup
-          (fun sigma : {sigma : State b // sigma.matrix.PosDef} =>
-            f sigma.val.matrix)
-          sigma
 
 /-- The compact full-support matrix domain used by Sion is equivalent to
 optimizing over states whose density matrix has the same lower spectral bound. -/
 theorem uniformlyPositiveState_iInf_matrix_eq_uniformlyPositiveDensityMatrixSet_iInf
     {b : Type v1} [Fintype b] [DecidableEq b] {delta : ℝ}
     (f : CMatrix b → EReal) :
-    (⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
-        f σ.val.matrix) =
+    (⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
+        f σ.val.m) =
       ⨅ M : CMatrix b,
-        ⨅ _hM : M ∈ State.uniformlyPositiveDensityMatrixSet delta b, f M := by
+        ⨅ _hM : M ∈ MState.uniformlyPositiveDensityMatrixSet delta b, f M := by
   apply le_antisymm
   · refine le_iInf ?_
     intro M
     refine le_iInf ?_
     intro hM
-    let σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix} :=
-      ⟨State.densityMatrixSetState M hM.1, by
-        rw [State.densityMatrixSetState_matrix]
+    let σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m} :=
+      ⟨MState.densityMatrixSetState M hM.1, by
+        rw [MState.densityMatrixSetState_matrix]
         exact hM.2⟩
     calc
-      (⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
-          f σ.val.matrix) ≤ f σ.val.matrix := iInf_le _ _
-      _ = f M := by rw [State.densityMatrixSetState_matrix]
+      (⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
+          f σ.val.m) ≤ f σ.val.m := iInf_le _ _
+      _ = f M := by rw [MState.densityMatrixSetState_matrix]
   · refine le_iInf ?_
     intro σ
     exact le_trans
       (iInf_le
         (fun M : CMatrix b =>
-          ⨅ hM : M ∈ State.uniformlyPositiveDensityMatrixSet delta b, f M)
-        σ.val.matrix)
+          ⨅ hM : M ∈ MState.uniformlyPositiveDensityMatrixSet delta b, f M)
+        σ.val.m)
       (iInf_le
-        (fun hM : σ.val.matrix ∈ State.uniformlyPositiveDensityMatrixSet delta b =>
-          f σ.val.matrix)
-        ⟨State.state_matrix_mem_densityMatrixSet σ.val, σ.property⟩)
+        (fun hM : σ.val.m ∈ MState.uniformlyPositiveDensityMatrixSet delta b =>
+          f σ.val.m)
+        ⟨MState.state_matrix_mem_densityMatrixSet σ.val, σ.property⟩)
 
 /-- Supremum version of
 `uniformlyPositiveState_iInf_matrix_eq_uniformlyPositiveDensityMatrixSet_iInf`. -/
 theorem uniformlyPositiveState_iSup_matrix_eq_uniformlyPositiveDensityMatrixSet_iSup
     {b : Type v1} [Fintype b] [DecidableEq b] {delta : ℝ}
     (f : CMatrix b → EReal) :
-    (⨆ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
-        f σ.val.matrix) =
+    (⨆ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
+        f σ.val.m) =
       ⨆ M : CMatrix b,
-        ⨆ _hM : M ∈ State.uniformlyPositiveDensityMatrixSet delta b, f M := by
+        ⨆ _hM : M ∈ MState.uniformlyPositiveDensityMatrixSet delta b, f M := by
   apply le_antisymm
   · refine iSup_le ?_
     intro σ
     calc
-      f σ.val.matrix ≤
-          (⨆ hM : σ.val.matrix ∈ State.uniformlyPositiveDensityMatrixSet delta b,
-            f σ.val.matrix) :=
+      f σ.val.m ≤
+          (⨆ hM : σ.val.m ∈ MState.uniformlyPositiveDensityMatrixSet delta b,
+            f σ.val.m) :=
         le_iSup
-          (fun hM : σ.val.matrix ∈ State.uniformlyPositiveDensityMatrixSet delta b =>
-            f σ.val.matrix)
-          ⟨State.state_matrix_mem_densityMatrixSet σ.val, σ.property⟩
+          (fun hM : σ.val.m ∈ MState.uniformlyPositiveDensityMatrixSet delta b =>
+            f σ.val.m)
+          ⟨MState.state_matrix_mem_densityMatrixSet σ.val, σ.property⟩
       _ ≤ ⨆ M : CMatrix b,
-          ⨆ hM : M ∈ State.uniformlyPositiveDensityMatrixSet delta b, f M :=
+          ⨆ hM : M ∈ MState.uniformlyPositiveDensityMatrixSet delta b, f M :=
         le_iSup
           (fun M : CMatrix b =>
-            ⨆ hM : M ∈ State.uniformlyPositiveDensityMatrixSet delta b, f M)
-          σ.val.matrix
+            ⨆ hM : M ∈ MState.uniformlyPositiveDensityMatrixSet delta b, f M)
+          σ.val.m
   · refine iSup_le ?_
     intro M
     refine iSup_le ?_
     intro hM
-    let σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix} :=
-      ⟨State.densityMatrixSetState M hM.1, by
-        rw [State.densityMatrixSetState_matrix]
+    let σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m} :=
+      ⟨MState.densityMatrixSetState M hM.1, by
+        rw [MState.densityMatrixSetState_matrix]
         exact hM.2⟩
     calc
-      f M = f σ.val.matrix := by rw [State.densityMatrixSetState_matrix]
-      _ ≤ (⨆ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
-          f σ.val.matrix) :=
+      f M = f σ.val.m := by rw [MState.densityMatrixSetState_matrix]
+      _ ≤ (⨆ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
+          f σ.val.m) :=
         le_iSup
-          (fun σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix} =>
-            f σ.val.matrix)
+          (fun σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m} =>
+            f σ.val.m)
           σ
 
 /-- The uniformly-positive state domain used by the compact Sion step is a
@@ -1242,15 +838,15 @@ This is the EReal order bridge used when passing from the compact
 alternate-expression proof. -/
 theorem fullRankState_iInf_le_uniformlyPositiveState_iInf_EReal
     {b : Type v1} [Fintype b] [DecidableEq b] {delta : ℝ}
-    (hdelta : 0 < delta) (f : State b → EReal) :
-    (⨅ σ : {σ : State b // σ.matrix.PosDef}, f σ.val) ≤
-      ⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix}, f σ.val := by
+    (hdelta : 0 < delta) (f : MState b → EReal) :
+    (⨅ σ : {σ : MState b // σ.m.PosDef}, f σ.val) ≤
+      ⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m}, f σ.val := by
   refine le_iInf ?_
   intro σ
-  have hσpos : σ.val.matrix.PosDef :=
-    State.uniformlyPositiveDensityMatrixSet_subset_posDef (a := b) hdelta
-      ⟨State.state_matrix_mem_densityMatrixSet σ.val, σ.property⟩
-  exact iInf_le (fun τ : {σ : State b // σ.matrix.PosDef} => f τ.val)
+  have hσpos : σ.val.m.PosDef :=
+    MState.uniformlyPositiveDensityMatrixSet_subset_posDef (a := b) hdelta
+      ⟨MState.state_matrix_mem_densityMatrixSet σ.val, σ.property⟩
+  exact iInf_le (fun τ : {σ : MState b // σ.m.PosDef} => f τ.val)
     ⟨σ.val, hσpos⟩
 end
 

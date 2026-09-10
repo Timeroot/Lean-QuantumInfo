@@ -30,7 +30,7 @@ namespace TensorPower
 /-- Split functions on `Fin (m+r)` into the first `m` and last `r`
 coordinates. -/
 def finTakeDropEquiv (a : Type u) (m r : ℕ) :
-    (Fin (m + r) → a) ≃ Prod (Fin m → a) (Fin r → a) where
+    (Fin (m + r) → a) ≃ ((Fin m → a) × (Fin r → a)) where
   toFun f := (fun i => f (Fin.castAdd r i), fun j => f (Fin.natAdd m j))
   invFun g := fun i => Fin.addCases (fun j : Fin m => g.1 j) (fun j : Fin r => g.2 j) i
   left_inv := by
@@ -49,7 +49,7 @@ def finTakeDropEquiv (a : Type u) (m r : ℕ) :
 
 /-- Split a recursive tensor power into a left prefix and right suffix. -/
 def takeDropEquiv (a : Type u) [Fintype a] [DecidableEq a] (m r : ℕ) :
-    TensorPower a (m + r) ≃ Prod (TensorPower a m) (TensorPower a r) :=
+    TensorPower a (m + r) ≃ (TensorPower a m × TensorPower a r) :=
   (tensorPowerEquiv (a := a) (m + r)).trans
     ((finTakeDropEquiv a m r).trans
       (Equiv.prodCongr (tensorPowerEquiv (a := a) m).symm
@@ -58,7 +58,7 @@ def takeDropEquiv (a : Type u) [Fintype a] [DecidableEq a] (m r : ℕ) :
 /-- Append a left tensor word and right tensor word into one recursive tensor
 power. -/
 def appendEquiv (a : Type u) [Fintype a] [DecidableEq a] (m r : ℕ) :
-    Prod (TensorPower a m) (TensorPower a r) ≃ TensorPower a (m + r) :=
+    (TensorPower a m × TensorPower a r) ≃ TensorPower a (m + r) :=
   (takeDropEquiv a m r).symm
 
 /-- Flatten `t` blocks of length `k` into one tensor word of length `t * k`.

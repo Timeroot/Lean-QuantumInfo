@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2026 Alex Meiburg. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Alex Meiburg
+-/
 import QuantumLib.QECC.Stabilizer
 
 /-!
@@ -14,8 +19,11 @@ variable {n : ℕ}
 /-- An element of the `n`-qubit Pauli group: `iᵏ XˣZᶻ`. -/
 @[ext]
 structure PauliOp (n : ℕ) where
+  /-- The exponent `k` of the leading `iᵏ`. -/
   phase : ZMod 4
+  /-- The qubits carrying an `X`. -/
   x : Fin n → ZMod 2
+  /-- The qubits carrying a `Z`. -/
   z : Fin n → ZMod 2
 
 namespace PauliOp

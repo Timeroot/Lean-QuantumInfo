@@ -201,14 +201,20 @@ and a joint POVM whose effects are `M_{a|x} ⊗ M_{b|y}`
 structure QuantumRealization
     (X : Type uX) (Y : Type uY) (A : Type uA) (B : Type uB)
     [Fintype X] [Fintype Y] [Fintype A] [Fintype B] [DecidableEq A] [DecidableEq B] where
+  /-- Alice's Hilbert space. -/
   HA : Type (max uX uY uA uB)
+  /-- Bob's Hilbert space. -/
   HB : Type (max uX uY uA uB)
+  /-- Alice's Hilbert space is finite dimensional. -/
   [fintypeHA : Fintype HA]
+  /-- Alice's Hilbert space has decidable equality of basis labels. -/
   [decidableEqHA : DecidableEq HA]
+  /-- Bob's Hilbert space is finite dimensional. -/
   [fintypeHB : Fintype HB]
+  /-- Bob's Hilbert space has decidable equality of basis labels. -/
   [decidableEqHB : DecidableEq HB]
   /-- Bipartite state shared by Alice and Bob. -/
-  rho : State (HA × HB)
+  rho : MState (HA × HB)
   /-- Alice's POVM for each setting. -/
   alice : X → POVM A HA
   /-- Bob's POVM for each setting. -/

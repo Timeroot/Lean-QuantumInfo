@@ -14,12 +14,11 @@ public import QuantumLib.QIT.Core.Map.ChoiCharacterization
 public import QuantumLib.QIT.Core.Channel
 public import QuantumLib.QIT.Core.Measurement
 public import QuantumLib.QIT.Core.POVMProbability
-public import QuantumLib.QIT.Core.Components
 
 /-!
 # QIT core
 
-Finite-dimensional cross-domain proof-kernel objects for local QIT development.
+Finite-dimensional cross-domain proof-kernel objects for the rest of Lean-QIT.
 
 Topic-heavy theorem surfaces are available through public facades such as
 `QIT.States`, `QIT.Information`, `QIT.Entanglement`, and `QIT.Nonlocality`.

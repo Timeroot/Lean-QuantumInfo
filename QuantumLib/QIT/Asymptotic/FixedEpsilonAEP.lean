@@ -23,19 +23,17 @@ the blocklength.
 
 open Filter
 
-namespace QIT
-
-universe u v
-
 noncomputable section
-
+universe u v
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-namespace State
+open QIT
+
+namespace MState
 
 private theorem fixedEpsilon_min_rate_lower_eventually
-    (ρ : State (Prod a b)) {ε : ℝ} (hε_pos : 0 < ε) (hε_lt_one : ε < 1) :
+    (ρ : MState (a × b)) {ε : ℝ} (hε_pos : 0 < ε) (hε_lt_one : ε < 1) :
     ∀ᶠ n : ℕ in atTop,
       ρ.conditionalEntropy -
           finiteAEPDelta ε ρ.finiteAEPEtaTrace / Real.sqrt (n : ℝ) ≤
@@ -55,7 +53,7 @@ private theorem fixedEpsilon_min_rate_lower_eventually
 
 private theorem fixedEpsilon_min_rate_le_max_rate_add_correction
     [Nonempty a] [Nonempty b]
-    (ρ : State (Prod a b)) {ε ε' : ℝ}
+    (ρ : MState (a × b)) {ε ε' : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1)
     (hε'0 : 0 ≤ ε') (hε'1 : ε' < 1)
     (hsum : ε + ε' < 1) (n : ℕ) :
@@ -65,7 +63,7 @@ private theorem fixedEpsilon_min_rate_le_max_rate_add_correction
           ε' n hε'0 hε'1 +
         log2 (1 / (1 - (ε + ε') ^ 2)) / (n : ℝ) := by
   have hcomparison :=
-    State.smoothConditionalMinEntropy_le_smoothConditionalMaxEntropy_add_epsilonPenalty
+    MState.smoothConditionalMinEntropy_le_smoothConditionalMaxEntropy_add_epsilonPenalty
       (ρ.tensorPowerBipartite n) hε0 hε1 hε'0 hε'1 hsum
   have hinv : 0 ≤ (1 / (n : ℝ)) := by positivity
   calc
@@ -91,19 +89,21 @@ private theorem fixedEpsilon_min_rate_le_max_rate_add_correction
 
 private theorem canonicalAEPpurification_marginalAB
     [Nonempty a] [Nonempty b]
-    (ρ : State (Prod a b)) :
-    let Ω : PureVector (Prod (Prod a b) (Prod a b)) :=
-      ρ.canonicalPurification.reindex (Equiv.prodComm (Prod a b) (Prod a b))
+    (ρ : MState (a × b)) :
+    let Ω : Ket ((a × b) × (a × b)) :=
+      ρ.canonicalPurification.reindex (Equiv.prodComm (a × b) (a × b))
     Ω.state.marginalAB = ρ := by
   dsimp
-  apply State.ext
+  apply MState.ext
   have hpur :
-      partialTraceB ((rankOneMatrix ρ.canonicalPurification.amp).submatrix
-        Prod.swap Prod.swap) = ρ.matrix :=
-    ρ.canonicalPurification_purifies
-  simpa [State.marginalAB_eq_marginalA, PureVector.reindex_state, State.reindex,
-    State.marginalA, State.marginalB, partialTraceA, partialTraceB,
-    PureVector.state_matrix, rankOneMatrix_apply] using hpur
+      Matrix.traceRight ((rankOneMatrix ρ.canonicalPurification.vec).submatrix
+        Prod.swap Prod.swap) = ρ.m := by
+    have h := ρ.canonicalPurification_purifies
+    simp only [Ket.purifies_iff, Ket.state_matrix] at h
+    exact h
+  simpa [MState.marginalAB_eq_traceRight, Ket.reindex_state, MState.reindex_matrix,
+    MState.traceRight_m, MState.traceLeft_m, Matrix.traceLeft, Matrix.traceRight,
+    Ket.state_matrix, rankOneMatrix_apply] using hpur
 
 /-- At every fixed `0 < ε < 1`, the normalized smooth conditional min-entropy
 of the IID tensor power converges to the conditional von Neumann entropy.
@@ -113,7 +113,7 @@ min/max comparison at `ε' = (1-ε)/2`, smooth duality on a purification, and th
 finite-N lower bound on the complementary marginal. -/
 theorem tensorPowerSubnormalizedSmoothConditionalMinEntropyRate_tendsto
     [Nonempty a] [Nonempty b]
-    (ρ : State (Prod a b)) (ε : ℝ) (hε_pos : 0 < ε) (hε_lt_one : ε < 1) :
+    (ρ : MState (a × b)) (ε : ℝ) (hε_pos : 0 < ε) (hε_lt_one : ε < 1) :
     Tendsto
       (fun n : ℕ =>
         ρ.tensorPowerSubnormalizedSmoothConditionalMinEntropyRate
@@ -124,13 +124,13 @@ theorem tensorPowerSubnormalizedSmoothConditionalMinEntropyRate_tendsto
   have hε'0 : 0 ≤ ε' := le_of_lt hε'pos
   have hε'1 : ε' < 1 := by dsimp [ε']; linarith
   have hsum : ε + ε' < 1 := by dsimp [ε']; linarith
-  let Ω : PureVector (Prod (Prod a b) (Prod a b)) :=
-    ρ.canonicalPurification.reindex (Equiv.prodComm (Prod a b) (Prod a b))
-  let σ : State (Prod a (Prod a b)) := Ω.state.marginalAC
+  let Ω : Ket ((a × b) × (a × b)) :=
+    ρ.canonicalPurification.reindex (Equiv.prodComm (a × b) (a × b))
+  let σ : MState (a × (a × b)) := Ω.state.marginalAC
   have hAB : Ω.state.marginalAB = ρ :=
     canonicalAEPpurification_marginalAB ρ
   have hentropyDual : ρ.conditionalEntropy = -σ.conditionalEntropy := by
-    have h := State.PureVector.conditionalEntropy_marginalAB_eq_neg_marginalAC Ω
+    have h := Ket.conditionalEntropy_marginalAB_eq_neg_marginalAC Ω
     rw [hAB] at h
     simpa only [σ] using h
   have hlower := fixedEpsilon_min_rate_lower_eventually ρ hε_pos hε_lt_one
@@ -149,7 +149,7 @@ theorem tensorPowerSubnormalizedSmoothConditionalMinEntropyRate_tendsto
       fixedEpsilon_min_rate_le_max_rate_add_correction
         ρ (le_of_lt hε_pos) hε_lt_one hε'0 hε'1 hsum n
     have hduality :=
-      PureVector.tensorPowerSubnormalizedSmoothConditionalMaxEntropyRate_marginalAB_eq_neg_min_marginalAC
+      Ket.tensorPowerSubnormalizedSmoothConditionalMaxEntropyRate_marginalAB_eq_neg_min_marginalAC
         Ω hε'0 hε'1 n
     rw [hAB] at hduality
     change
@@ -199,15 +199,15 @@ theorem tensorPowerSubnormalizedSmoothConditionalMinEntropyRate_tendsto
 of the IID tensor power converges to the conditional von Neumann entropy. -/
 theorem tensorPowerSubnormalizedSmoothConditionalMaxEntropyRate_tendsto
     [Nonempty a] [Nonempty b]
-    (ρ : State (Prod a b)) (ε : ℝ) (hε_pos : 0 < ε) (hε_lt_one : ε < 1) :
+    (ρ : MState (a × b)) (ε : ℝ) (hε_pos : 0 < ε) (hε_lt_one : ε < 1) :
     Tendsto
       (fun n : ℕ =>
         ρ.tensorPowerSubnormalizedSmoothConditionalMaxEntropyRate
           ε n (le_of_lt hε_pos) hε_lt_one)
       atTop (nhds ρ.conditionalEntropy) := by
-  let Ω : PureVector (Prod (Prod a b) (Prod a b)) :=
-    ρ.canonicalPurification.reindex (Equiv.prodComm (Prod a b) (Prod a b))
-  let σ : State (Prod a (Prod a b)) := Ω.state.marginalAC
+  let Ω : Ket ((a × b) × (a × b)) :=
+    ρ.canonicalPurification.reindex (Equiv.prodComm (a × b) (a × b))
+  let σ : MState (a × (a × b)) := Ω.state.marginalAC
   have hAB : Ω.state.marginalAB = ρ :=
     canonicalAEPpurification_marginalAB ρ
   have hrate :
@@ -219,12 +219,12 @@ theorem tensorPowerSubnormalizedSmoothConditionalMaxEntropyRate_tendsto
             ε n (le_of_lt hε_pos) hε_lt_one) := by
     funext n
     have hduality :=
-      PureVector.tensorPowerSubnormalizedSmoothConditionalMaxEntropyRate_marginalAB_eq_neg_min_marginalAC
+      Ket.tensorPowerSubnormalizedSmoothConditionalMaxEntropyRate_marginalAB_eq_neg_min_marginalAC
         Ω (le_of_lt hε_pos) hε_lt_one n
     rw [hAB] at hduality
     simpa [σ] using hduality
   have hentropy : ρ.conditionalEntropy = -σ.conditionalEntropy := by
-    have h := State.PureVector.conditionalEntropy_marginalAB_eq_neg_marginalAC Ω
+    have h := Ket.conditionalEntropy_marginalAB_eq_neg_marginalAC Ω
     rw [hAB] at h
     simpa only [σ] using h
   rw [hrate, hentropy]
@@ -234,7 +234,7 @@ theorem tensorPowerSubnormalizedSmoothConditionalMaxEntropyRate_tendsto
 /-- Fully quantum asymptotic equipartition property in the literal iterated
 limit form stated by TCR 2008, `thm:qaep`. -/
 theorem fullyQuantumAsymptoticEquipartitionProperty
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     QIT.asymptoticAEP_statement ρ := by
   let : Nonempty a := by
     rcases ρ.nonempty with ⟨x⟩
@@ -246,9 +246,4 @@ theorem fullyQuantumAsymptoticEquipartitionProperty
     ρ.tensorPowerSubnormalizedSmoothConditionalMinEntropyRate_tendsto
     ρ.tensorPowerSubnormalizedSmoothConditionalMaxEntropyRate_tendsto
 
-end State
-
-end
-
-
-end QIT
+end MState

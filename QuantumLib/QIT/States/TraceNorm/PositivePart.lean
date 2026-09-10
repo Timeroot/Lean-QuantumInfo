@@ -50,11 +50,6 @@ private def eigenbasisConjugate {a : Type u} [Fintype a] [DecidableEq a]
     {H : CMatrix a} (hH : H.IsHermitian) (E : CMatrix a) : CMatrix a :=
   star (hH.eigenvectorUnitary : CMatrix a) * E * (hH.eigenvectorUnitary : CMatrix a)
 
-private theorem trace_diagonal_mul_eq_sum {a : Type u} [Fintype a] [DecidableEq a]
-    (d : a → ℂ) (E : CMatrix a) :
-    (Matrix.diagonal d * E).trace = ∑ i, d i * E i i := by
-  simp [Matrix.trace, Matrix.diagonal_mul]
-
 theorem real_posPart_eq_if (x : ℝ) : x⁺ = if 0 < x then x else 0 := by
   rw [_root_.posPart_def]
   split_ifs with hx
@@ -364,124 +359,117 @@ theorem positiveSpectralProjector_trace_max_effect {a : Type u}
 
 /-- Difference of density matrices has trace zero. -/
 theorem state_sub_trace_zero {a : Type u} [Fintype a] [DecidableEq a]
-    (rho sigma : State a) :
-    (rho.matrix - sigma.matrix).trace = 0 := by
-  rw [Matrix.trace_sub, rho.trace_eq_one, sigma.trace_eq_one]
+    (rho sigma : MState a) :
+    (rho.m - sigma.m).trace = 0 := by
+  rw [Matrix.trace_sub, rho.tr', sigma.tr']
   norm_num
 
 /-- Normalized trace distance between states is the trace of the positive part
 of their Hermitian difference. -/
-theorem State.normalizedTraceDistance_eq_posPart_trace {a : Type u}
-    [Fintype a] [DecidableEq a] (rho sigma : State a) :
-    rho.normalizedTraceDistance sigma = ((rho.matrix - sigma.matrix)⁺).trace.re := by
-  let H : CMatrix a := rho.matrix - sigma.matrix
-  have hH : H.IsHermitian := rho.pos.isHermitian.sub sigma.pos.isHermitian
+theorem _root_.MState.normalizedTraceDistance_eq_posPart_trace {a : Type u}
+    [Fintype a] [DecidableEq a] (rho sigma : MState a) :
+    rho.normalizedTraceDistance sigma = ((rho.m - sigma.m)⁺).trace.re := by
+  let H : CMatrix a := rho.m - sigma.m
+  have hH : H.IsHermitian := rho.psd.isHermitian.sub sigma.psd.isHermitian
   have htr : H.trace = 0 := by
-    simpa [H] using state_sub_trace_zero rho sigma
+    simp [H]
   have hnorm := traceNorm_eq_two_posPart_trace_re_of_trace_zero H hH htr
   calc
     rho.normalizedTraceDistance sigma = (1 / 2 : ℝ) * traceNorm H := by rfl
     _ = (1 / 2 : ℝ) * (2 * (H⁺).trace.re) := by rw [hnorm]
     _ = (H⁺).trace.re := by ring
 
-/-- Backward-compatible unqualified spelling of the state positive-part trace
-formula. -/
-theorem normalizedTraceDistance_eq_posPart_trace {a : Type u}
-    [Fintype a] [DecidableEq a] (rho sigma : State a) :
-    rho.normalizedTraceDistance sigma = ((rho.matrix - sigma.matrix)⁺).trace.re :=
-  State.normalizedTraceDistance_eq_posPart_trace rho sigma
-
 /-- The positive-part trace of a state difference as a complex trace. -/
-theorem State.posPart_trace_eq_normalizedTraceDistance {a : Type u}
-    [Fintype a] [DecidableEq a] (rho sigma : State a) :
-    ((rho.matrix - sigma.matrix)⁺).trace =
+theorem _root_.MState.posPart_trace_eq_normalizedTraceDistance {a : Type u}
+    [Fintype a] [DecidableEq a] (rho sigma : MState a) :
+    ((rho.m - sigma.m)⁺).trace =
       (rho.normalizedTraceDistance sigma : ℂ) := by
   rw [posPart_trace_eq_re_coe]
-  rw [← State.normalizedTraceDistance_eq_posPart_trace]
+  rw [← MState.normalizedTraceDistance_eq_posPart_trace]
 
 /-- The negative-part trace of a state difference as a real trace. -/
-theorem State.negPart_trace_re_eq_normalizedTraceDistance {a : Type u}
-    [Fintype a] [DecidableEq a] (rho sigma : State a) :
-    ((rho.matrix - sigma.matrix)⁻).trace.re =
+theorem _root_.MState.negPart_trace_re_eq_normalizedTraceDistance {a : Type u}
+    [Fintype a] [DecidableEq a] (rho sigma : MState a) :
+    ((rho.m - sigma.m)⁻).trace.re =
       rho.normalizedTraceDistance sigma := by
-  let H : CMatrix a := rho.matrix - sigma.matrix
-  have hH : H.IsHermitian := rho.pos.isHermitian.sub sigma.pos.isHermitian
+  let H : CMatrix a := rho.m - sigma.m
+  have hH : H.IsHermitian := rho.psd.isHermitian.sub sigma.psd.isHermitian
   have htr : H.trace = 0 := by
-    simpa [H] using state_sub_trace_zero rho sigma
+    simp [H]
   calc
-    ((rho.matrix - sigma.matrix)⁻).trace.re = ((rho.matrix - sigma.matrix)⁺).trace.re := by
+    ((rho.m - sigma.m)⁻).trace.re = ((rho.m - sigma.m)⁺).trace.re := by
       simpa [H] using negPart_trace_re_eq_posPart_trace_re_of_trace_zero H hH htr
     _ = rho.normalizedTraceDistance sigma := by
-      rw [← State.normalizedTraceDistance_eq_posPart_trace rho sigma]
+      rw [← MState.normalizedTraceDistance_eq_posPart_trace rho sigma]
 
 /-- The negative-part trace of a state difference as a complex trace. -/
-theorem State.negPart_trace_eq_normalizedTraceDistance {a : Type u}
-    [Fintype a] [DecidableEq a] (rho sigma : State a) :
-    ((rho.matrix - sigma.matrix)⁻).trace =
+theorem _root_.MState.negPart_trace_eq_normalizedTraceDistance {a : Type u}
+    [Fintype a] [DecidableEq a] (rho sigma : MState a) :
+    ((rho.m - sigma.m)⁻).trace =
       (rho.normalizedTraceDistance sigma : ℂ) := by
   rw [negPart_trace_eq_re_coe]
-  rw [State.negPart_trace_re_eq_normalizedTraceDistance]
+  rw [MState.negPart_trace_re_eq_normalizedTraceDistance]
 
 /-- Positive part of the trace-distance decomposition, normalized to a state. -/
-def State.traceDistancePosPartState {a : Type u} [Fintype a] [DecidableEq a]
-    (rho sigma : State a) (hδ : 0 < rho.normalizedTraceDistance sigma) : State a where
-  matrix := (((rho.normalizedTraceDistance sigma)⁻¹ : ℝ) : ℂ) •
-    ((rho.matrix - sigma.matrix)⁺)
-  pos := Matrix.PosSemidef.smul (posPart_posSemidef (rho.matrix - sigma.matrix))
+def _root_.MState.traceDistancePosPartState {a : Type u} [Fintype a] [DecidableEq a]
+    (rho sigma : MState a) (hδ : 0 < rho.normalizedTraceDistance sigma) : MState a := .ofMatrix
+  (matrix := (((rho.normalizedTraceDistance sigma)⁻¹ : ℝ) : ℂ) •
+    ((rho.m - sigma.m)⁺))
+  (pos := Matrix.PosSemidef.smul (posPart_posSemidef (rho.m - sigma.m))
     (by
-      exact_mod_cast (inv_nonneg.mpr hδ.le))
-  trace_eq_one := by
-    rw [Matrix.trace_smul, State.posPart_trace_eq_normalizedTraceDistance]
+      exact_mod_cast (inv_nonneg.mpr hδ.le)))
+  (trace_eq_one := by
+    rw [Matrix.trace_smul, MState.posPart_trace_eq_normalizedTraceDistance]
     let δ : ℝ := rho.normalizedTraceDistance sigma
     change (((δ⁻¹ : ℝ) : ℂ) * (δ : ℂ)) = 1
     have hδ_ne : δ ≠ 0 := hδ.ne'
     rw [← Complex.ofReal_mul]
-    simp [hδ_ne]
+    simp [hδ_ne])
 
 /-- Negative part of the trace-distance decomposition, normalized to a state. -/
-def State.traceDistanceNegPartState {a : Type u} [Fintype a] [DecidableEq a]
-    (rho sigma : State a) (hδ : 0 < rho.normalizedTraceDistance sigma) : State a where
-  matrix := (((rho.normalizedTraceDistance sigma)⁻¹ : ℝ) : ℂ) •
-    ((rho.matrix - sigma.matrix)⁻)
-  pos := Matrix.PosSemidef.smul (negPart_posSemidef (rho.matrix - sigma.matrix))
+def _root_.MState.traceDistanceNegPartState {a : Type u} [Fintype a] [DecidableEq a]
+    (rho sigma : MState a) (hδ : 0 < rho.normalizedTraceDistance sigma) : MState a := .ofMatrix
+  (matrix := (((rho.normalizedTraceDistance sigma)⁻¹ : ℝ) : ℂ) •
+    ((rho.m - sigma.m)⁻))
+  (pos := Matrix.PosSemidef.smul (negPart_posSemidef (rho.m - sigma.m))
     (by
-      exact_mod_cast (inv_nonneg.mpr hδ.le))
-  trace_eq_one := by
-    rw [Matrix.trace_smul, State.negPart_trace_eq_normalizedTraceDistance]
+      exact_mod_cast (inv_nonneg.mpr hδ.le)))
+  (trace_eq_one := by
+    rw [Matrix.trace_smul, MState.negPart_trace_eq_normalizedTraceDistance]
     let δ : ℝ := rho.normalizedTraceDistance sigma
     change (((δ⁻¹ : ℝ) : ℂ) * (δ : ℂ)) = 1
     have hδ_ne : δ ≠ 0 := hδ.ne'
     rw [← Complex.ofReal_mul]
-    simp [hδ_ne]
+    simp [hδ_ne])
 
 @[simp]
-theorem State.traceDistancePosPartState_matrix {a : Type u} [Fintype a] [DecidableEq a]
-    (rho sigma : State a) (hδ : 0 < rho.normalizedTraceDistance sigma) :
-    (rho.traceDistancePosPartState sigma hδ).matrix =
+theorem _root_.MState.traceDistancePosPartState_matrix {a : Type u} [Fintype a] [DecidableEq a]
+    (rho sigma : MState a) (hδ : 0 < rho.normalizedTraceDistance sigma) :
+    (rho.traceDistancePosPartState sigma hδ).m =
       (((rho.normalizedTraceDistance sigma)⁻¹ : ℝ) : ℂ) •
-        ((rho.matrix - sigma.matrix)⁺) :=
-  rfl
+        ((rho.m - sigma.m)⁺) :=
+  MState.matrix_ofMatrix _ _ _
 
 @[simp]
-theorem State.traceDistanceNegPartState_matrix {a : Type u} [Fintype a] [DecidableEq a]
-    (rho sigma : State a) (hδ : 0 < rho.normalizedTraceDistance sigma) :
-    (rho.traceDistanceNegPartState sigma hδ).matrix =
+theorem _root_.MState.traceDistanceNegPartState_matrix {a : Type u} [Fintype a] [DecidableEq a]
+    (rho sigma : MState a) (hδ : 0 < rho.normalizedTraceDistance sigma) :
+    (rho.traceDistanceNegPartState sigma hδ).m =
       (((rho.normalizedTraceDistance sigma)⁻¹ : ℝ) : ℂ) •
-        ((rho.matrix - sigma.matrix)⁻) :=
-  rfl
+        ((rho.m - sigma.m)⁻) :=
+  MState.matrix_ofMatrix _ _ _
 
 /-- Scaling the normalized positive part by the trace distance recovers `H⁺`. -/
-theorem State.normalizedTraceDistance_smul_traceDistancePosPartState_matrix {a : Type u}
+theorem _root_.MState.normalizedTraceDistance_smul_traceDistancePosPartState_matrix {a : Type u}
     [Fintype a] [DecidableEq a]
-    (rho sigma : State a) (hδ : 0 < rho.normalizedTraceDistance sigma) :
+    (rho sigma : MState a) (hδ : 0 < rho.normalizedTraceDistance sigma) :
     ((rho.normalizedTraceDistance sigma : ℝ) : ℂ) •
-        (rho.traceDistancePosPartState sigma hδ).matrix =
-      ((rho.matrix - sigma.matrix)⁺) := by
-  rw [State.traceDistancePosPartState_matrix]
+        (rho.traceDistancePosPartState sigma hδ).m =
+      ((rho.m - sigma.m)⁺) := by
+  rw [MState.traceDistancePosPartState_matrix]
   rw [smul_smul]
   let δ : ℝ := rho.normalizedTraceDistance sigma
-  change ((δ : ℂ) * ((δ⁻¹ : ℝ) : ℂ)) • ((rho.matrix - sigma.matrix)⁺) =
-    ((rho.matrix - sigma.matrix)⁺)
+  change ((δ : ℂ) * ((δ⁻¹ : ℝ) : ℂ)) • ((rho.m - sigma.m)⁺) =
+    ((rho.m - sigma.m)⁺)
   have hscalar : ((δ : ℂ) * ((δ⁻¹ : ℝ) : ℂ)) = 1 := by
     have hδ_ne : δ ≠ 0 := hδ.ne'
     rw [← Complex.ofReal_mul]
@@ -489,45 +477,45 @@ theorem State.normalizedTraceDistance_smul_traceDistancePosPartState_matrix {a :
   rw [hscalar, one_smul]
 
 /-- Scaling the normalized negative part by the trace distance recovers `H⁻`. -/
-theorem State.normalizedTraceDistance_smul_traceDistanceNegPartState_matrix {a : Type u}
+theorem _root_.MState.normalizedTraceDistance_smul_traceDistanceNegPartState_matrix {a : Type u}
     [Fintype a] [DecidableEq a]
-    (rho sigma : State a) (hδ : 0 < rho.normalizedTraceDistance sigma) :
+    (rho sigma : MState a) (hδ : 0 < rho.normalizedTraceDistance sigma) :
     ((rho.normalizedTraceDistance sigma : ℝ) : ℂ) •
-        (rho.traceDistanceNegPartState sigma hδ).matrix =
-      ((rho.matrix - sigma.matrix)⁻) := by
-  rw [State.traceDistanceNegPartState_matrix]
+        (rho.traceDistanceNegPartState sigma hδ).m =
+      ((rho.m - sigma.m)⁻) := by
+  rw [MState.traceDistanceNegPartState_matrix]
   rw [smul_smul]
   let δ : ℝ := rho.normalizedTraceDistance sigma
-  change ((δ : ℂ) * ((δ⁻¹ : ℝ) : ℂ)) • ((rho.matrix - sigma.matrix)⁻) =
-    ((rho.matrix - sigma.matrix)⁻)
+  change ((δ : ℂ) * ((δ⁻¹ : ℝ) : ℂ)) • ((rho.m - sigma.m)⁻) =
+    ((rho.m - sigma.m)⁻)
   have hscalar : ((δ : ℂ) * ((δ⁻¹ : ℝ) : ℂ)) = 1 := by
     have hδ_ne : δ ≠ 0 := hδ.ne'
     rw [← Complex.ofReal_mul]
     simp [hδ_ne]
   rw [hscalar, one_smul]
 
-/-- State-difference decomposition into positive and negative parts. -/
-theorem State.sub_eq_posPart_sub_negPart {a : Type u} [Fintype a] [DecidableEq a]
-    (rho sigma : State a) :
-    rho.matrix - sigma.matrix =
-      ((rho.matrix - sigma.matrix)⁺) - ((rho.matrix - sigma.matrix)⁻) := by
-  let H : CMatrix a := rho.matrix - sigma.matrix
-  have hH : H.IsHermitian := rho.pos.isHermitian.sub sigma.pos.isHermitian
+/-- MState-difference decomposition into positive and negative parts. -/
+theorem _root_.MState.sub_eq_posPart_sub_negPart {a : Type u} [Fintype a] [DecidableEq a]
+    (rho sigma : MState a) :
+    rho.m - sigma.m =
+      ((rho.m - sigma.m)⁺) - ((rho.m - sigma.m)⁻) := by
+  let H : CMatrix a := rho.m - sigma.m
+  have hH : H.IsHermitian := rho.psd.isHermitian.sub sigma.psd.isHermitian
   simpa [H] using (CFC.posPart_sub_negPart H hH.isSelfAdjoint).symm
 
 /-- Zero normalized trace distance forces equality of the underlying density
 matrices. -/
-theorem State.matrix_eq_of_normalizedTraceDistance_eq_zero {a : Type u}
-    [Fintype a] [DecidableEq a] {rho sigma : State a}
+theorem _root_.MState.matrix_eq_of_normalizedTraceDistance_eq_zero {a : Type u}
+    [Fintype a] [DecidableEq a] {rho sigma : MState a}
     (hδ : rho.normalizedTraceDistance sigma = 0) :
-    rho.matrix = sigma.matrix := by
-  let H : CMatrix a := rho.matrix - sigma.matrix
+    rho.m = sigma.m := by
+  let H : CMatrix a := rho.m - sigma.m
   have hpos_re : (H⁺).trace.re = 0 := by
-    have hdist := State.normalizedTraceDistance_eq_posPart_trace rho sigma
+    have hdist := MState.normalizedTraceDistance_eq_posPart_trace rho sigma
     rw [hδ] at hdist
     simpa [H] using hdist.symm
   have hneg_re : (H⁻).trace.re = 0 := by
-    have hdist := State.negPart_trace_re_eq_normalizedTraceDistance rho sigma
+    have hdist := MState.negPart_trace_re_eq_normalizedTraceDistance rho sigma
     rw [hδ] at hdist
     simpa [H] using hdist
   have hpos_trace : (H⁺).trace = 0 := by
@@ -540,58 +528,58 @@ theorem State.matrix_eq_of_normalizedTraceDistance_eq_zero {a : Type u}
     (Matrix.PosSemidef.trace_eq_zero_iff (posPart_posSemidef H)).mp hpos_trace
   have hneg_zero : H⁻ = 0 :=
     (Matrix.PosSemidef.trace_eq_zero_iff (negPart_posSemidef H)).mp hneg_trace
-  have hsub : rho.matrix - sigma.matrix = 0 := by
-    have hdecomp := State.sub_eq_posPart_sub_negPart rho sigma
+  have hsub : rho.m - sigma.m = 0 := by
+    have hdecomp := MState.sub_eq_posPart_sub_negPart rho sigma
     simpa [H, hpos_zero, hneg_zero] using hdecomp
   exact sub_eq_zero.mp hsub
 
 /-- Zero normalized trace distance forces equality of states. -/
-theorem State.eq_of_normalizedTraceDistance_eq_zero {a : Type u}
-    [Fintype a] [DecidableEq a] {rho sigma : State a}
+theorem _root_.MState.eq_of_normalizedTraceDistance_eq_zero {a : Type u}
+    [Fintype a] [DecidableEq a] {rho sigma : MState a}
     (hδ : rho.normalizedTraceDistance sigma = 0) :
     rho = sigma :=
-  State.ext (State.matrix_eq_of_normalizedTraceDistance_eq_zero hδ)
+  MState.ext (MState.matrix_eq_of_normalizedTraceDistance_eq_zero hδ)
 
 /-- Rearranged state-difference decomposition used by the AFW convex split. -/
-theorem State.sigma_add_posPart_eq_rho_add_negPart {a : Type u}
-    [Fintype a] [DecidableEq a] (rho sigma : State a) :
-    sigma.matrix + ((rho.matrix - sigma.matrix)⁺) =
-      rho.matrix + ((rho.matrix - sigma.matrix)⁻) := by
-  let H : CMatrix a := rho.matrix - sigma.matrix
+theorem _root_.MState.sigma_add_posPart_eq_rho_add_negPart {a : Type u}
+    [Fintype a] [DecidableEq a] (rho sigma : MState a) :
+    sigma.m + ((rho.m - sigma.m)⁺) =
+      rho.m + ((rho.m - sigma.m)⁻) := by
+  let H : CMatrix a := rho.m - sigma.m
   let Hp : CMatrix a := H⁺
   let Hn : CMatrix a := H⁻
-  have h : rho.matrix - sigma.matrix = Hp - Hn := by
-    simpa [H, Hp, Hn] using State.sub_eq_posPart_sub_negPart rho sigma
-  change sigma.matrix + Hp = rho.matrix + Hn
+  have h : rho.m - sigma.m = Hp - Hn := by
+    simpa [H, Hp, Hn] using MState.sub_eq_posPart_sub_negPart rho sigma
+  change sigma.m + Hp = rho.m + Hn
   have hpos :
-      Hp = rho.matrix - sigma.matrix + Hn := by
+      Hp = rho.m - sigma.m + Hn := by
     calc
       Hp = (Hp - Hn) + Hn := by
         abel
-      _ = rho.matrix - sigma.matrix + Hn := by
+      _ = rho.m - sigma.m + Hn := by
         rw [← h]
   calc
-    sigma.matrix + Hp = sigma.matrix + (rho.matrix - sigma.matrix + Hn) := by
+    sigma.m + Hp = sigma.m + (rho.m - sigma.m + Hn) := by
       rw [hpos]
-    _ = rho.matrix + Hn := by
+    _ = rho.m + Hn := by
       ext i j
       simp
       ring
 
 /-- AFW matrix split after normalizing the positive and negative parts to
 states and scaling them back by the trace distance. -/
-theorem State.sigma_add_normalizedTraceDistance_smul_traceDistancePosPartState_eq
+theorem _root_.MState.sigma_add_normalizedTraceDistance_smul_traceDistancePosPartState_eq
     {a : Type u} [Fintype a] [DecidableEq a]
-    (rho sigma : State a) (hδ : 0 < rho.normalizedTraceDistance sigma) :
-    sigma.matrix +
+    (rho sigma : MState a) (hδ : 0 < rho.normalizedTraceDistance sigma) :
+    sigma.m +
         ((rho.normalizedTraceDistance sigma : ℝ) : ℂ) •
-          (rho.traceDistancePosPartState sigma hδ).matrix =
-      rho.matrix +
+          (rho.traceDistancePosPartState sigma hδ).m =
+      rho.m +
         ((rho.normalizedTraceDistance sigma : ℝ) : ℂ) •
-          (rho.traceDistanceNegPartState sigma hδ).matrix := by
-  rw [State.normalizedTraceDistance_smul_traceDistancePosPartState_matrix,
-    State.normalizedTraceDistance_smul_traceDistanceNegPartState_matrix]
-  exact State.sigma_add_posPart_eq_rho_add_negPart rho sigma
+          (rho.traceDistanceNegPartState sigma hδ).m := by
+  rw [MState.normalizedTraceDistance_smul_traceDistancePosPartState_matrix,
+    MState.normalizedTraceDistance_smul_traceDistanceNegPartState_matrix]
+  exact MState.sigma_add_posPart_eq_rho_add_negPart rho sigma
 
 end
 

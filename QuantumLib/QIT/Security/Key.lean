@@ -52,11 +52,9 @@ theorem abort_eq_none : (abort : KeyOutput κ) = none :=
 theorem key_eq_some (k : κ) : key k = some k :=
   rfl
 
-@[simp]
 theorem abort_ne_key (k : κ) : (abort : KeyOutput κ) ≠ key k := by
   simp [abort, key]
 
-@[simp]
 theorem key_ne_abort (k : κ) : key k ≠ (abort : KeyOutput κ) := by
   simp [abort, key]
 
@@ -77,26 +75,26 @@ theorem uniformKeyProb_sum :
 
 /-- The ideal uniform state on the actual retained key space, with no abort
 coordinate. -/
-def uniformKeyState : State κ :=
+def uniformKeyState : MState κ :=
   Classical.diagonalState (uniformKeyProb (κ := κ)) uniformKeyProb_sum
 
 @[simp]
 theorem uniformKeyState_matrix :
-    (uniformKeyState (κ := κ)).matrix =
+    (uniformKeyState (κ := κ)).m =
       Matrix.diagonal fun k => (uniformKeyProb (κ := κ) k : ℂ) :=
-  rfl
+  Classical.diagonalState_matrix _ _
 
 /-- Source-facing Renner ideal state for a successful key branch: the key is
 uniform and independent, while the side-information marginal keeps the same
 subnormalized trace/mass as the real successful branch. -/
 def rennerIdealKeyStateFor (ρ : SubnormalizedState (κ × e)) :
     SubnormalizedState (κ × e) :=
-  (uniformKeyState (κ := κ)).toSubnormalized.prod ρ.marginalB
+  (uniformKeyState (κ := κ)).toSubnormalized.prod ρ.traceLeft
 
 @[simp]
 theorem rennerIdealKeyStateFor_matrix (ρ : SubnormalizedState (κ × e)) :
     (rennerIdealKeyStateFor ρ).matrix =
-      Matrix.kronecker (uniformKeyState (κ := κ)).matrix ρ.marginalB.matrix :=
+      Matrix.kronecker (uniformKeyState (κ := κ)).m ρ.traceLeft.matrix :=
   rfl
 
 /-- Renner trace-distance secrecy distance on the subnormalized successful
@@ -125,14 +123,14 @@ theorem isRennerEpsilonSecretKey_iff (ε : ℝ) (ρ : SubnormalizedState (κ × 
 /-- Extract the successful key/side-information branch from an explicit-abort
 normalized output state. The result is subnormalized; its trace is the success
 probability. -/
-def successfulKeySideInfoState (ρ : State (KeyOutput κ × e)) :
+def successfulKeySideInfoState (ρ : MState (KeyOutput κ × e)) :
     SubnormalizedState (κ × e) where
-  matrix := fun x y => ρ.matrix (KeyOutput.key x.1, x.2) (KeyOutput.key y.1, y.2)
-  pos := ρ.pos.submatrix fun x : κ × e => (KeyOutput.key x.1, x.2)
+  matrix := fun x y => ρ.m (KeyOutput.key x.1, x.2) (KeyOutput.key y.1, y.2)
+  pos := ρ.psd.submatrix fun x : κ × e => (KeyOutput.key x.1, x.2)
   trace_le_one := by
     classical
     let f : κ × e → KeyOutput κ × e := fun x => (KeyOutput.key x.1, x.2)
-    let g : KeyOutput κ × e → ℝ := fun y => (ρ.matrix y y).re
+    let g : KeyOutput κ × e → ℝ := fun y => (ρ.m y y).re
     have hf : Function.Injective f := by
       intro x y hxy
       cases x
@@ -149,28 +147,28 @@ def successfulKeySideInfoState (ρ : State (KeyOutput κ × e)) :
         (by intro y _; exact Finset.mem_univ y)
         (by
           intro y _ _hy
-          exact (Complex.nonneg_iff.mp (ρ.pos.diag_nonneg (i := y))).1)
+          exact (Complex.nonneg_iff.mp (ρ.psd.diag_nonneg (i := y))).1)
     calc
       (∑ x : κ × e,
-          ρ.matrix (KeyOutput.key x.1, x.2) (KeyOutput.key x.1, x.2)).re =
+          ρ.m (KeyOutput.key x.1, x.2) (KeyOutput.key x.1, x.2)).re =
           ∑ x : κ × e, g (f x) := by
         simp [f, g]
       _ ≤ ∑ y : KeyOutput κ × e, g y := by
         rw [hsuccess_eq_image]
         exact himage_le_univ
-      _ = (∑ y : KeyOutput κ × e, ρ.matrix y y).re := by
+      _ = (∑ y : KeyOutput κ × e, ρ.m y y).re := by
         simp [g]
-      _ = ρ.matrix.trace.re := by
+      _ = ρ.m.trace.re := by
         rfl
       _ = 1 := by
-        rw [ρ.trace_eq_one]
+        rw [ρ.tr']
         norm_num
 
 omit [Nonempty κ] in
 @[simp]
-theorem successfulKeySideInfoState_matrix (ρ : State (KeyOutput κ × e)) :
+theorem successfulKeySideInfoState_matrix (ρ : MState (KeyOutput κ × e)) :
     (successfulKeySideInfoState ρ).matrix =
-      fun x y => ρ.matrix (KeyOutput.key x.1, x.2) (KeyOutput.key y.1, y.2) :=
+      fun x y => ρ.m (KeyOutput.key x.1, x.2) (KeyOutput.key y.1, y.2) :=
   rfl
 
 /-! ## Conditioned/no-abort helpers
@@ -181,18 +179,16 @@ not the source-facing Renner secrecy definitions. -/
 
 /-- Conditioned/no-abort ideal key-output distribution: abort has weight zero,
 keys are uniform. -/
-def conditionedUniformKeyOutputProb : KeyOutput κ -> ℝ≥0
+def conditionedUniformKeyOutputProb : KeyOutput κ → ℝ≥0
   | none => 0
   | some _ => (Fintype.card κ : ℝ≥0)⁻¹
 
 omit [DecidableEq κ] [Nonempty κ] in
-@[simp]
 theorem conditionedUniformKeyOutputProb_abort :
     conditionedUniformKeyOutputProb (κ := κ) KeyOutput.abort = 0 :=
   rfl
 
 omit [DecidableEq κ] [Nonempty κ] in
-@[simp]
 theorem conditionedUniformKeyOutputProb_key (k : κ) :
     conditionedUniformKeyOutputProb (κ := κ) (KeyOutput.key k) =
       (Fintype.card κ : ℝ≥0)⁻¹ :=
@@ -206,108 +202,107 @@ theorem conditionedUniformKeyOutputProb_sum :
 
 /-- Conditioned/no-abort uniform key-output state with explicit abort
 probability zero. -/
-def conditionedUniformKeyOutputState : State (KeyOutput κ) :=
+def conditionedUniformKeyOutputState : MState (KeyOutput κ) :=
   Classical.diagonalState (conditionedUniformKeyOutputProb (κ := κ))
     conditionedUniformKeyOutputProb_sum
 
 @[simp]
 theorem conditionedUniformKeyOutputState_matrix :
-    (conditionedUniformKeyOutputState (κ := κ)).matrix =
+    (conditionedUniformKeyOutputState (κ := κ)).m =
       Matrix.diagonal fun out => (conditionedUniformKeyOutputProb (κ := κ) out : ℂ) :=
-  rfl
+  Classical.diagonalState_matrix _ _
 
 /-- Conditioned/no-abort product of a uniform key output and adversarial side
 information. -/
-def conditionedIdealKeySideInfoState (σE : State e) : State (KeyOutput κ × e) :=
+def conditionedIdealKeySideInfoState (σE : MState e) : MState (KeyOutput κ × e) :=
   (conditionedUniformKeyOutputState (κ := κ)).prod σE
 
 @[simp]
-theorem conditionedIdealKeySideInfoState_matrix (σE : State e) :
-    (conditionedIdealKeySideInfoState (κ := κ) σE).matrix =
-      Matrix.kronecker (conditionedUniformKeyOutputState (κ := κ)).matrix σE.matrix :=
-  rfl
+theorem conditionedIdealKeySideInfoState_matrix (σE : MState e) :
+    (conditionedIdealKeySideInfoState (κ := κ) σE).m =
+      Matrix.kronecker (conditionedUniformKeyOutputState (κ := κ)).m σE.m :=
+  MState.prod_m _ _
 
 /-- Conditioned/no-abort ideal state associated to a real key-side-information
 state. -/
 def conditionedIdealKeyStateFor
-    (ρ : State (KeyOutput κ × e)) : State (KeyOutput κ × e) :=
-  conditionedIdealKeySideInfoState (κ := κ) ρ.marginalB
+    (ρ : MState (KeyOutput κ × e)) : MState (KeyOutput κ × e) :=
+  conditionedIdealKeySideInfoState (κ := κ) ρ.traceLeft
 
 @[simp]
-theorem conditionedIdealKeyStateFor_matrix (ρ : State (KeyOutput κ × e)) :
-    (conditionedIdealKeyStateFor ρ).matrix =
-      Matrix.kronecker (conditionedUniformKeyOutputState (κ := κ)).matrix
-        ρ.marginalB.matrix :=
-  rfl
+theorem conditionedIdealKeyStateFor_matrix (ρ : MState (KeyOutput κ × e)) :
+    (conditionedIdealKeyStateFor ρ).m =
+      Matrix.kronecker (conditionedUniformKeyOutputState (κ := κ)).m
+        ρ.traceLeft.m :=
+  MState.prod_m _ _
 
-theorem conditionedIdealKeyStateFor_conditionedIdealKeySideInfoState (σE : State e) :
+theorem conditionedIdealKeyStateFor_conditionedIdealKeySideInfoState (σE : MState e) :
     conditionedIdealKeyStateFor (κ := κ)
         (conditionedIdealKeySideInfoState (κ := κ) σE) =
       conditionedIdealKeySideInfoState (κ := κ) σE := by
   have hm :
-      (conditionedIdealKeySideInfoState (κ := κ) σE).marginalB = σE := by
-    apply State.ext
-    exact State.partialTraceA_prod (conditionedUniformKeyOutputState (κ := κ)) σE
+      (conditionedIdealKeySideInfoState (κ := κ) σE).traceLeft = σE :=
+    MState.traceLeft_prod_eq (conditionedUniformKeyOutputState (κ := κ)) σE
   unfold conditionedIdealKeyStateFor
   rw [hm]
 
 /-- Conditioned/no-abort distance from uniform `d(ρ_AB | B)`, without the
 factor `1 / 2`. -/
-def conditionedDistanceFromUniformGiven (ρ : State (KeyOutput κ × e)) : ℝ :=
+def conditionedDistanceFromUniformGiven (ρ : MState (KeyOutput κ × e)) : ℝ :=
   ρ.traceNormDistance (conditionedIdealKeyStateFor ρ)
 
 @[simp]
 theorem conditionedDistanceFromUniformGiven_eq_traceNormDistance
-    (ρ : State (KeyOutput κ × e)) :
+    (ρ : MState (KeyOutput κ × e)) :
     conditionedDistanceFromUniformGiven ρ =
       ρ.traceNormDistance (conditionedIdealKeyStateFor ρ) :=
   rfl
 
 /-- Conditioned/no-abort secrecy distance, using the
 `1 / 2 * ‖real - ideal‖₁` convention. -/
-def conditionedSecrecyDistance (ρ : State (KeyOutput κ × e)) : ℝ :=
+def conditionedSecrecyDistance (ρ : MState (KeyOutput κ × e)) : ℝ :=
   ρ.normalizedTraceDistance (conditionedIdealKeyStateFor ρ)
 
 @[simp]
 theorem conditionedSecrecyDistance_eq_normalizedTraceDistance
-    (ρ : State (KeyOutput κ × e)) :
+    (ρ : MState (KeyOutput κ × e)) :
     conditionedSecrecyDistance ρ =
       ρ.normalizedTraceDistance (conditionedIdealKeyStateFor ρ) :=
   rfl
 
 /-- A conditioned/no-abort perfect key is exactly the uniform key product with
 its side information. -/
-def IsConditionedPerfectKey (ρ : State (KeyOutput κ × e)) : Prop :=
+def IsConditionedPerfectKey (ρ : MState (KeyOutput κ × e)) : Prop :=
   ρ = conditionedIdealKeyStateFor ρ
 
 /-- Conditioned/no-abort `ε`-secret key helper. Source-facing secrecy uses
 `IsRennerEpsilonSecretKey` instead. -/
-def IsConditionedEpsilonSecretKey (ε : ℝ) (ρ : State (KeyOutput κ × e)) : Prop :=
+def IsConditionedEpsilonSecretKey (ε : ℝ) (ρ : MState (KeyOutput κ × e)) : Prop :=
   conditionedSecrecyDistance ρ ≤ ε
 
 @[simp]
-theorem isConditionedPerfectKey_iff (ρ : State (KeyOutput κ × e)) :
+theorem isConditionedPerfectKey_iff (ρ : MState (KeyOutput κ × e)) :
     IsConditionedPerfectKey ρ ↔ ρ = conditionedIdealKeyStateFor ρ :=
   Iff.rfl
 
 @[simp]
-theorem isConditionedEpsilonSecretKey_iff (ε : ℝ) (ρ : State (KeyOutput κ × e)) :
+theorem isConditionedEpsilonSecretKey_iff (ε : ℝ) (ρ : MState (KeyOutput κ × e)) :
     IsConditionedEpsilonSecretKey ε ρ ↔ conditionedSecrecyDistance ρ ≤ ε :=
   Iff.rfl
 
-theorem conditionedSecrecyDistance_ideal (ρ : State (KeyOutput κ × e)) :
+theorem conditionedSecrecyDistance_ideal (ρ : MState (KeyOutput κ × e)) :
     conditionedSecrecyDistance (conditionedIdealKeyStateFor ρ) = 0 := by
   rw [show conditionedIdealKeyStateFor ρ =
-      conditionedIdealKeySideInfoState (κ := κ) ρ.marginalB from rfl]
+      conditionedIdealKeySideInfoState (κ := κ) ρ.traceLeft from rfl]
   simp [conditionedSecrecyDistance,
     conditionedIdealKeyStateFor_conditionedIdealKeySideInfoState]
 
-theorem isConditionedEpsilonSecretKey_zero_ideal (ρ : State (KeyOutput κ × e)) :
+theorem isConditionedEpsilonSecretKey_zero_ideal (ρ : MState (KeyOutput κ × e)) :
     IsConditionedEpsilonSecretKey 0 (conditionedIdealKeyStateFor ρ) := by
   rw [IsConditionedEpsilonSecretKey, conditionedSecrecyDistance_ideal]
 
 theorem IsConditionedPerfectKey.isConditionedEpsilonSecretKey_zero
-    {ρ : State (KeyOutput κ × e)}
+    {ρ : MState (KeyOutput κ × e)}
     (hρ : IsConditionedPerfectKey ρ) : IsConditionedEpsilonSecretKey 0 ρ := by
   rw [isConditionedPerfectKey_iff] at hρ
   rw [hρ]

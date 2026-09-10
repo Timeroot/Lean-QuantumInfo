@@ -138,8 +138,7 @@ theorem mem_visible {Bad : Finset (SympSpace n)} {V : Submodule (ZMod 2) (SympSp
 
 theorem isotropic_sup_span {V : Submodule (ZMod 2) (SympSpace n)}
     (hV : V ≤ (sympForm n).orthogonal V) {u : SympSpace n} (hu : u ∈ (sympForm n).orthogonal V) :
-    (V ⊔ Submodule.span (ZMod 2) {u}) ≤ (sympForm n).orthogonal (V ⊔ Submodule.span (ZMod 2) {u})
-    := by
+    (V ⊔ Submodule.span (ZMod 2) {u}) ≤ (sympForm n).orthogonal (V ⊔ Submodule.span (ZMod 2) {u}) := by
   have hspan : ∀ w ∈ Submodule.span (ZMod 2) {u}, w = 0 ∨ w = u := by
     intro w hw
     obtain ⟨c, rfl⟩ := Submodule.mem_span_singleton.mp hw

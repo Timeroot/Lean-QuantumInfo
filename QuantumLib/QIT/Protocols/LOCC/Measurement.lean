@@ -19,13 +19,13 @@ records its classical outcome and discards the measured quantum system.
 
 open scoped ComplexOrder MatrixOrder
 
-namespace QIT
+namespace POVM
+
+open QIT
 
 universe u v
 
 noncomputable section
-
-namespace POVM
 
 variable {outcome : Type u} {input : Type v}
 variable [Fintype outcome]
@@ -52,10 +52,9 @@ def discardInstrument (M : POVM outcome input) :
   branchTraceNonincreasingCP result :=
     MatrixMap.traceEffectToUnit_traceNonincreasingCP
       (M.pos result) (M.effect_le_one result)
-  total := Channel.traceToUnit input
+  total := CPTPOp.traceToUnit input
   sum_branch_eq_total := by
-    change (∑ result, MatrixMap.traceEffectToUnit (M.effects result)) =
-      MatrixMap.traceEffectToUnit (1 : CMatrix input)
+    rw [CPTPOp.traceToUnit_map]
     apply LinearMap.ext
     intro X
     rw [LinearMap.sum_apply]
@@ -75,12 +74,9 @@ theorem discardInstrument_branch (M : POVM outcome input) (result : outcome) :
   rfl
 
 theorem discardInstrument_totalChannel (M : POVM outcome input) :
-    M.discardInstrument.totalChannel = Channel.traceToUnit input :=
+    M.discardInstrument.totalChannel = CPTPOp.traceToUnit input :=
   rfl
-
-end POVM
 
 end
 
-
-end QIT
+end POVM

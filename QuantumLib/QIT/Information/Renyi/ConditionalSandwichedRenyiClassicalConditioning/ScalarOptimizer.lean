@@ -15,10 +15,11 @@ public import QuantumLib.QIT.Information.Renyi.ConditionalSandwichedRenyiClassic
 public import QuantumLib.QIT.Information.Renyi.ConditionalSandwichedRenyiClassicalConditioning.LowAlphaQDecomposition
 
 /-!
-# scalar optimizer / component bridge
+# Scalar optimizer and component bridge
 
-Responsibility layer of the sandwiched conditional Renyi classical-conditioning
-source route.
+The scalar optimization behind the branch formula: the supremum of a weighted
+`rpow` sum over probability weights, the distribution attaining it, and the
+bridge from the per-branch entropies to that scalar power.
 -/
 
 @[expose] public section
@@ -26,18 +27,16 @@ source route.
 open scoped ComplexOrder MatrixOrder NNReal Pointwise
 open Matrix
 
-namespace QIT
-
-universe u v w
-
 noncomputable section
-
+universe u v w
 variable {A : Type u} {B : Type v} {Y : Type w}
 variable [Fintype A] [DecidableEq A]
 variable [Fintype B] [DecidableEq B]
 variable [Fintype Y] [DecidableEq Y]
 
-namespace State
+open QIT
+
+namespace MState
 
 /-! ### Finite-support logarithmic form and scalar optimization -/
 
@@ -45,11 +44,10 @@ namespace State
 def sandwichedFiniteBranchEntropy (Q : Y → ℝ) (α : ℝ) (y : Y) : ℝ :=
   (1 / (α - 1)) * log2 (Q y)
 
-/- The source uses this identity after the block `Q` decomposition.  The
-  hypothesis `hQ` is deliberately pointwise: it excludes only the
-  undefined logarithm branch, while a zero classical weight still contributes
-  exactly zero to the finite sum. -/
 omit [DecidableEq Y] in
+/-- A weighted average of positive `Q` values, read logarithmically, is the weighted average of
+`2 ^ ((α - 1) H)` over the branch entropies.  The hypothesis `hQ` is pointwise, excluding only the
+undefined logarithm branch; a zero classical weight still contributes exactly zero. -/
 theorem sandwichedFiniteSupport_log_formula
     (p Q : Y → ℝ) (α : ℝ) (hα_ne_one : α ≠ 1)
     (_hp : ∀ y, 0 ≤ p y) (hQ : ∀ y, 0 < Q y) :
@@ -70,23 +68,23 @@ omit [DecidableEq Y] in
 /-- The source finite-support logarithmic identity, rewritten in terms of the
 normalized component conditional entropies. -/
 theorem sandwichedDownComponentLogFormula
-    (E : Ensemble Y (A × B)) (α : ℝ) (hα_ne_one : α ≠ 1) :
+    (E : MEnsemble (A × B) Y) (α : ℝ) (hα_ne_one : α ≠ 1) :
     (1 / (1 - α)) * log2
         (∑ y, (E.probs y : ℝ) *
-          sandwichedRenyiQ (E.states y).matrix
-            (identityTensorStateMatrix (a := A) (E.states y).marginalB)
-            (E.states y).pos
-            (identityTensorStateMatrix_posSemidef_of_state
-              (a := A) (E.states y).marginalB) α) =
+          sandwichedRenyiQ (E.states y).m
+            (identityTensorStateMatrix (a := A) (E.states y).traceLeft)
+            (E.states y).psd
+            (identityTensorStateMatrix_posSemidef
+              (a := A) (E.states y).traceLeft) α) =
       (1 / (1 - α)) * log2
         (∑ y, (E.probs y : ℝ) * Real.rpow 2
           ((1 - α) * sandwichedDownComponentEntropy E y α)) := by
   let Q : Y → ℝ := fun y =>
-    sandwichedRenyiQ (E.states y).matrix
-      (identityTensorStateMatrix (a := A) (E.states y).marginalB)
-      (E.states y).pos
-      (identityTensorStateMatrix_posSemidef_of_state
-        (a := A) (E.states y).marginalB) α
+    sandwichedRenyiQ (E.states y).m
+      (identityTensorStateMatrix (a := A) (E.states y).traceLeft)
+      (E.states y).psd
+      (identityTensorStateMatrix_posSemidef
+        (a := A) (E.states y).traceLeft) α
   have hp : ∀ y, 0 ≤ (E.probs y : ℝ) := by
     intro y
     exact_mod_cast NNReal.coe_nonneg (E.probs y)
@@ -128,11 +126,11 @@ theorem sandwichedDownComponentLogFormula
           ((1 - α) * sandwichedDownComponentEntropy E y α)) := by
       rw [← neg_mul, hcoeff]
 
-/-! The optimizer below is the scalar part of the source up-arrow proof. -/
+/-! The optimizer below is the scalar part of the up-arrow proof.  It rests on the following
+abstract Minkowski-sum calculation. -/
 
-/-! The finite-support optimizer is an instance of the following abstract
-finite Minkowski-sum calculation. -/
-
+/-- The supremum of a Minkowski sum of two nonempty bounded sets of reals is the sum of their
+suprema. -/
 private theorem real_csSup_add {s t : Set ℝ}
     (hs₀ : s.Nonempty) (hs₁ : BddAbove s)
     (ht₀ : t.Nonempty) (ht₁ : BddAbove t) :
@@ -167,6 +165,8 @@ private theorem real_csSup_add {s t : Set ℝ}
       linarith [ht_bound x hx]
     linarith
 
+/-- Sums `∑ i ∈ s, f i` obtained by selecting one element `f i` from each `S i`.  Its supremum
+splits as the sum of the suprema, which is how the branchwise optimizations are combined. -/
 def finiteSelectionSumSet {ι : Type*} (s : Finset ι) (S : ι → Set ℝ) : Set ℝ :=
   {x | ∃ f : ι → ℝ, (∀ i ∈ s, f i ∈ S i) ∧ x = ∑ i ∈ s, f i}
 
@@ -250,12 +250,14 @@ theorem finiteSelectionSumSet_sSup {ι : Type*} [DecidableEq ι]
 def sandwichedScalarOptimizerWeight (p h α : ℝ) : ℝ :=
   p * Real.rpow 2 (((1 - α) / α) * h)
 
+/-- The classical `α`-power sum `∑_y r(y)^α q(y)^(1-α)`, the scalar quantity the upward
+optimization reduces to. -/
 def sandwichedScalarPower (r q : Y → ℝ) (α : ℝ) : ℝ :=
   ∑ y, (r y) ^ α * (q y) ^ (1 - α)
 
 theorem sandwichedUpFixedReferenceBranchFormulaReal_eq_scalarPower
-    (E : Ensemble Y (A × B)) (F : Ensemble Y B)
-    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).matrix.PosDef)
+    (E : MEnsemble (A × B) Y) (F : MEnsemble B Y)
+    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     sandwichedScalarPower
         (fun y => (E.probs y : ℝ) *
@@ -301,8 +303,8 @@ theorem sandwichedUpFixedReferenceBranchFormulaReal_eq_scalarPower
   ring
 
 theorem sandwichedUpFixedReferenceBranchFormulaReal_eq_log_scalarPower
-    (E : Ensemble Y (A × B)) (F : Ensemble Y B)
-    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).matrix.PosDef)
+    (E : MEnsemble (A × B) Y) (F : MEnsemble B Y)
+    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     sandwichedUpFixedReferenceBranchFormulaReal E F α hF hα_pos hα_ne_one =
       (1 / (1 - α)) * log2
@@ -353,12 +355,10 @@ theorem sandwichedScalarPower_optimizer
       congr 1
       ring
 
-/-! The same optimizer remains exact when some weights vanish.  This is the
-source convention needed for a classical register with zero-probability
-branches: the normalized optimizer is zero on precisely those branches, and
-no division by that probability is used. -/
-
 omit [DecidableEq Y] in
+/-- The normalized weights `r y / ∑ z, r z` are exact optimizers of `sandwichedScalarPower`, with
+optimal value `(∑ z, r z) ^ α`.  Vanishing weights are allowed: the optimizer is zero on precisely
+those branches and no division by a zero probability occurs. -/
 theorem sandwichedScalarPower_optimizer_of_nonneg
     (r : Y → ℝ) (α : ℝ) (hr : ∀ y, 0 ≤ r y)
     (hR : 0 < ∑ y, r y) (hα_pos : 0 < α) :
@@ -392,12 +392,9 @@ theorem sandwichedScalarPower_optimizer_of_nonneg
       congr 1
       ring
 
-/-! The two inequalities below are the finite Holder/Jensen step in the
-source optimizer.  They are stated with ordinary real `rpow`; consequently
-the zero-probability branches are handled explicitly rather than by dividing
-by a probability. -/
-
 omit [DecidableEq Y] in
+/-- The Hölder bound `sandwichedScalarPower r q α ≤ (∑ y, r y) ^ α` for `0 < α < 1`, against any
+strictly positive probability weights `q`. -/
 theorem sandwichedScalarPower_le_sum_rpow_of_nonneg
     (r q : Y → ℝ) (α : ℝ)
     (hr : ∀ y, 0 ≤ r y) (hq_pos : ∀ y, 0 < q y)
@@ -597,9 +594,4 @@ theorem sandwichedScalarPower_uniformMix_tendsto
   simpa using tendsto_finsetSum (Finset.univ : Finset Y)
     (fun y _ => hterm y)
 
-
-end State
-
-end
-
-end QIT
+end MState

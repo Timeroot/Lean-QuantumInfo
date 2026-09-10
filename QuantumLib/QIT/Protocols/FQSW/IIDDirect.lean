@@ -7,28 +7,37 @@ Authors: QuAIR Team
 module
 
 public import QuantumLib.QIT.Protocols.FQSW.IIDRates
+public import QuantumLib.QIT.Util.MatrixInstances
 
 /-!
-# FQSW IID direct theorem
+# The i.i.d. FQSW direct theorem
 
-This file is a dependency-ordered leaf of `QIT.Protocols.FQSW`.  Declaration
-names, namespaces, statements, and proof terms are preserved from the original
-monolithic module.
+`fqsw_direct_achievable` proves `Ket.IsAchievableFQSW ψ` for every finite-dimensional pure
+tripartite source: concrete physical block protocols exist whose quantum communication rate
+approaches `I(A;R)/2`, whose ebit-yield rate approaches `I(A;B)/2`, and whose computed normalized
+trace-distance error vanishes.  This is the i.i.d. half of
+[AbeyesingheDevetakHaydenWinter2006Mother, fqsw.tex:1093-1180].
+
+The assembly runs one-shot FQSW on the typical-subspace compression of `ψ^{⊗n}` and then transports
+the resulting protocol back to the full registers: Alice compresses and pads `A^n` before applying
+the selected one-shot isometry, and Bob compresses `B^n`, applies the one-shot Uhlmann decoder and
+decodes both transferred typical systems back.  Compression contributes its own error, so the block
+error is `2ε` on top of the one-shot tail; `ADHWFQSWIidMixedBlockConstruction` carries the
+typicality, padding, rate and one-shot records that produce it.  The typicality window is `δ / 8`
+against a rate slack `δ`, which is what restores the `2^(-nδ/4)` tail after the register rounding of
+`IIDRates.lean`.  `ADHWFQSWIidConstruction` bundles the resulting block protocols over all `n`, and
+`fqsw_direct_achievable_of_iidConstruction` reads that bundle as the operational statement.
 -/
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder QIT.MatrixL2
 
 namespace QIT
 
 universe u v w x y z p u1 v1 w1
 
 noncomputable section
-
-local instance fqswIIDDirectCMatrixContinuousENorm {ι : Type*} [Fintype ι] [DecidableEq ι] :
-    ContinuousENorm (CMatrix ι) :=
-  SeminormedAddGroup.toContinuousENorm
 
 variable {a : Type u} {b : Type v} {r : Type w}
 variable {q : Type x} {e : Type y} {et : Type z}
@@ -43,7 +52,7 @@ variable [Fintype et] [DecidableEq et]
 `A^n × B^n × R^n` using Alice's padded support lift and the Bob/reference
 typical support inclusions. -/
 def adhwFQSWIidCompressedSourceLiftMatrix
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ ε : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δ ε : ℝ}
     {T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε}
     {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
     {q : Type x} {e : Type y}
@@ -56,8 +65,8 @@ def adhwFQSWIidCompressedSourceLiftMatrix
     (B : ADHWFQSWIidTypicalBobRegister ψ n δ ε T btyp)
     (R : ADHWFQSWIidTypicalRefRegister ψ n δ ε T rtyp) :
     Matrix
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n))
-      (Prod (Prod (Prod q e) btyp) rtyp) ℂ :=
+      ((TensorPower a n × TensorPower b n) × TensorPower r n)
+      (((q × e) × btyp) × rtyp) ℂ :=
   Matrix.kronecker (Matrix.kronecker P.supportLiftMatrix B.supportIsometry.matrix)
     R.supportIsometry.matrix
 
@@ -65,7 +74,7 @@ def adhwFQSWIidCompressedSourceLiftMatrix
 `A^typ × B^typ × R^typ` into the full i.i.d. source coordinates
 `A^n × B^n × R^n`. -/
 def adhwFQSWIidTypicalSourceLiftMatrix
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ ε : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δ ε : ℝ}
     {T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε}
     {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
     {q : Type x} {e : Type y}
@@ -78,8 +87,8 @@ def adhwFQSWIidTypicalSourceLiftMatrix
     (B : ADHWFQSWIidTypicalBobRegister ψ n δ ε T btyp)
     (R : ADHWFQSWIidTypicalRefRegister ψ n δ ε T rtyp) :
     Matrix
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n))
-      (Prod (Prod atyp btyp) rtyp) ℂ :=
+      ((TensorPower a n × TensorPower b n) × TensorPower r n)
+      ((atyp × btyp) × rtyp) ℂ :=
   Matrix.kronecker
     (Matrix.kronecker P.supportIsometry.matrix B.supportIsometry.matrix)
     R.supportIsometry.matrix
@@ -87,7 +96,7 @@ def adhwFQSWIidTypicalSourceLiftMatrix
 /-- The compressed source lift has range equal to the simultaneous
 `A^nB^nR^n` typical projector. -/
 theorem adhwFQSWIidCompressedSourceLiftMatrix_mul_conjTranspose
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ ε : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δ ε : ℝ}
     {T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε}
     {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
     {q : Type x} {e : Type y}
@@ -105,7 +114,7 @@ theorem adhwFQSWIidCompressedSourceLiftMatrix_mul_conjTranspose
         (a := a) (b := b) (r := r) n
         T.projectorA T.projectorB T.projectorR := by
   dsimp
-  let LA : Matrix (TensorPower a n) (Prod q e) ℂ := P.supportLiftMatrix
+  let LA : Matrix (TensorPower a n) (q × e) ℂ := P.supportLiftMatrix
   let LB : Matrix (TensorPower b n) btyp ℂ := B.supportIsometry.matrix
   let LR : Matrix (TensorPower r n) rtyp ℂ := R.supportIsometry.matrix
   have hA :
@@ -176,7 +185,7 @@ theorem adhwFQSWIidCompressedSourceLiftMatrix_mul_conjTranspose
 /-- The true typical-source lift has range equal to the simultaneous
 `A^nB^nR^n` typical projector. -/
 theorem adhwFQSWIidTypicalSourceLiftMatrix_mul_conjTranspose
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ ε : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δ ε : ℝ}
     {T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε}
     {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
     {q : Type x} {e : Type y}
@@ -265,7 +274,7 @@ theorem adhwFQSWIidTypicalSourceLiftMatrix_mul_conjTranspose
 Alice typical-support projection, tensor the full Bob and reference typical
 registers. -/
 theorem adhwFQSWIidCompressedSourceLiftMatrix_conjTranspose_mul
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ ε : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δ ε : ℝ}
     {T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε}
     {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
     {q : Type x} {e : Type y}
@@ -285,7 +294,7 @@ theorem adhwFQSWIidCompressedSourceLiftMatrix_conjTranspose_mul
           (1 : CMatrix btyp))
         (1 : CMatrix rtyp) := by
   dsimp
-  let LA : Matrix (TensorPower a n) (Prod q e) ℂ := P.supportLiftMatrix
+  let LA : Matrix (TensorPower a n) (q × e) ℂ := P.supportLiftMatrix
   let LB : Matrix (TensorPower b n) btyp ℂ := B.supportIsometry.matrix
   let LR : Matrix (TensorPower r n) rtyp ℂ := R.supportIsometry.matrix
   have hA :
@@ -356,7 +365,7 @@ theorem adhwFQSWIidCompressedSourceLiftMatrix_conjTranspose_mul
 
 /-- The compressed source lift is supported on its initial projection. -/
 theorem adhwFQSWIidCompressedSourceLiftMatrix_mul_initialProjection
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ ε : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δ ε : ℝ}
     {T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε}
     {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
     {q : Type x} {e : Type y}
@@ -376,7 +385,7 @@ theorem adhwFQSWIidCompressedSourceLiftMatrix_mul_initialProjection
       (1 : CMatrix rtyp)
     L * Q = L := by
   intro L Q
-  let LA : Matrix (TensorPower a n) (Prod q e) ℂ := P.supportLiftMatrix
+  let LA : Matrix (TensorPower a n) (q × e) ℂ := P.supportLiftMatrix
   let LB : Matrix (TensorPower b n) btyp ℂ := B.supportIsometry.matrix
   let LR : Matrix (TensorPower r n) rtyp ℂ := R.supportIsometry.matrix
   have hA :
@@ -399,7 +408,7 @@ theorem adhwFQSWIidCompressedSourceLiftMatrix_mul_initialProjection
 /-- The padded compressed lift factors through the true typical-source lift
 followed by the adjoint of Alice's padded `A^typ ↪ A₁ × A₂` embedding. -/
 theorem adhwFQSWIidCompressedSourceLiftMatrix_eq_typicalSourceLiftMatrix_mul_paddingAdjoint
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ ε : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δ ε : ℝ}
     {T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε}
     {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
     {q : Type x} {e : Type y}
@@ -413,7 +422,7 @@ theorem adhwFQSWIidCompressedSourceLiftMatrix_eq_typicalSourceLiftMatrix_mul_pad
     (R : ADHWFQSWIidTypicalRefRegister ψ n δ ε T rtyp) :
     let L := adhwFQSWIidCompressedSourceLiftMatrix P B R
     let L0 := adhwFQSWIidTypicalSourceLiftMatrix P B R
-    let padAB : ReferenceIsometry (Prod atyp btyp) (Prod (Prod q e) btyp) :=
+    let padAB : ReferenceIsometry (atyp × btyp) ((q × e) × btyp) :=
       P.isometry.prod (ReferenceIsometry.ofEquiv (Equiv.refl btyp))
     let K := Matrix.kronecker padAB.matrix (1 : CMatrix rtyp)
     L = L0 * Matrix.conjTranspose K := by
@@ -477,7 +486,7 @@ theorem adhwFQSWIidCompressedSourceLiftMatrix_eq_typicalSourceLiftMatrix_mul_pad
 purity, and the typical lift identifies that purity with the normalized
 simultaneous-typical source's `A` purity. -/
 theorem adhwFQSWIidPaddedTypicalSource_a_purity_le
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ ε : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δ ε : ℝ}
     {T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε}
     {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
     {q : Type x} {e : Type y}
@@ -489,84 +498,83 @@ theorem adhwFQSWIidPaddedTypicalSource_a_purity_le
     (P : ADHWFQSWPaddedAtypEmbedding ψ n T.typicalitySlack atyp q e)
     (B : ADHWFQSWIidTypicalBobRegister ψ n δ ε T btyp)
     (R : ADHWFQSWIidTypicalRefRegister ψ n δ ε T rtyp)
-    (source0 : PureVector (Prod (Prod atyp btyp) rtyp))
+    (source0 : Ket ((atyp × btyp) × rtyp))
     (hsource0_lift :
       (adhwFQSWIidTypicalSourceLiftMatrix P B R) *
-          source0.state.matrix *
+          source0.state.m *
           Matrix.conjTranspose (adhwFQSWIidTypicalSourceLiftMatrix P B R) =
-        T.normalizedTypicalSource.matrix) :
-    let padAB : ReferenceIsometry (Prod atyp btyp) (Prod (Prod q e) btyp) :=
+        T.normalizedTypicalSource.m) :
+    let padAB : ReferenceIsometry (atyp × btyp) ((q × e) × btyp) :=
       P.isometry.prod (ReferenceIsometry.ofEquiv (Equiv.refl btyp))
-    let source : PureVector (Prod (Prod (Prod q e) btyp) rtyp) :=
-      padAB.applyPureVector source0
+    let source : Ket (((q × e) × btyp) × rtyp) :=
+      padAB.applyKet source0
     adhwFQSWAPurity source ≤
       (2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyA ψ - δ))) := by
   intro padAB source
   let idB : ReferenceIsometry btyp btyp :=
     ReferenceIsometry.ofEquiv (Equiv.refl btyp)
-  let ABtyp : ReferenceIsometry (Prod atyp btyp)
-      (Prod (TensorPower a n) (TensorPower b n)) :=
+  let ABtyp : ReferenceIsometry (atyp × btyp)
+      (TensorPower a n × TensorPower b n) :=
     P.supportIsometry.prod B.supportIsometry
   have hT_AB :
-      T.normalizedTypicalSource.marginalA.matrix =
-        ABtyp.matrix * source0.state.marginalA.matrix *
+      T.normalizedTypicalSource.traceRight.m =
+        ABtyp.matrix * source0.state.traceRight.m *
           Matrix.conjTranspose ABtyp.matrix := by
-    rw [State.marginalA_matrix, ← hsource0_lift]
-    change partialTraceB (a := Prod (TensorPower a n) (TensorPower b n))
-        (b := TensorPower r n)
+    rw [MState.traceRight_m, ← hsource0_lift]
+    change Matrix.traceRight
         (Matrix.kronecker ABtyp.matrix R.supportIsometry.matrix *
-          source0.state.matrix *
+          source0.state.m *
           Matrix.conjTranspose
             (Matrix.kronecker ABtyp.matrix R.supportIsometry.matrix)) =
-      ABtyp.matrix * source0.state.marginalA.matrix *
+      ABtyp.matrix * source0.state.traceRight.m *
         Matrix.conjTranspose ABtyp.matrix
-    rw [referenceIsometry_prod_partialTraceB_conj]
-    rfl
+    rw [referenceIsometry_prod_traceRight_conj]
+    simp only [MState.traceRight_m]
   have hT_A :
-      T.normalizedTypicalSource.marginalA.marginalA.matrix =
-        P.supportIsometry.matrix * source0.state.marginalA.marginalA.matrix *
+      T.normalizedTypicalSource.traceRight.traceRight.m =
+        P.supportIsometry.matrix * source0.state.traceRight.traceRight.m *
           Matrix.conjTranspose P.supportIsometry.matrix := by
-    rw [State.marginalA_matrix, hT_AB]
-    change partialTraceB (a := TensorPower a n) (b := TensorPower b n)
+    rw [MState.traceRight_m, hT_AB]
+    change Matrix.traceRight
         (Matrix.kronecker P.supportIsometry.matrix B.supportIsometry.matrix *
-          source0.state.marginalA.matrix *
+          source0.state.traceRight.m *
           Matrix.conjTranspose
             (Matrix.kronecker P.supportIsometry.matrix B.supportIsometry.matrix)) =
-      P.supportIsometry.matrix * source0.state.marginalA.marginalA.matrix *
+      P.supportIsometry.matrix * source0.state.traceRight.traceRight.m *
         Matrix.conjTranspose P.supportIsometry.matrix
-    rw [referenceIsometry_prod_partialTraceB_conj]
-    rfl
+    rw [referenceIsometry_prod_traceRight_conj]
+    simp only [MState.traceRight_m]
   have hsource_AB :
-      source.state.marginalA.matrix =
-        padAB.matrix * source0.state.marginalA.matrix *
+      source.state.traceRight.m =
+        padAB.matrix * source0.state.traceRight.m *
           Matrix.conjTranspose padAB.matrix := by
-    simpa [source] using referenceIsometry_marginalA_applyPureVector padAB source0
+    simpa [source] using referenceIsometry_traceRight_applyKet padAB source0
   have hsource_A :
-      source.state.marginalA.marginalA.matrix =
-        P.isometry.matrix * source0.state.marginalA.marginalA.matrix *
+      source.state.traceRight.traceRight.m =
+        P.isometry.matrix * source0.state.traceRight.traceRight.m *
           Matrix.conjTranspose P.isometry.matrix := by
-    rw [State.marginalA_matrix, hsource_AB]
-    change partialTraceB (a := Prod q e) (b := btyp)
+    rw [MState.traceRight_m, hsource_AB]
+    change Matrix.traceRight
         (Matrix.kronecker P.isometry.matrix idB.matrix *
-          source0.state.marginalA.matrix *
+          source0.state.traceRight.m *
           Matrix.conjTranspose (Matrix.kronecker P.isometry.matrix idB.matrix)) =
-      P.isometry.matrix * source0.state.marginalA.marginalA.matrix *
+      P.isometry.matrix * source0.state.traceRight.traceRight.m *
         Matrix.conjTranspose P.isometry.matrix
-    rw [referenceIsometry_prod_partialTraceB_conj]
-    rfl
+    rw [referenceIsometry_prod_traceRight_conj]
+    simp only [MState.traceRight_m]
   have hsource_hs :
-      hilbertSchmidtSq source.state.marginalA.marginalA.matrix =
-        hilbertSchmidtSq source0.state.marginalA.marginalA.matrix := by
+      hilbertSchmidtSq source.state.traceRight.traceRight.m =
+        hilbertSchmidtSq source0.state.traceRight.traceRight.m := by
     rw [hsource_A]
     exact referenceIsometry_hilbertSchmidtSq_conj
-      P.isometry source0.state.marginalA.marginalA
+      P.isometry source0.state.traceRight.traceRight
   have hT_hs :
-      hilbertSchmidtSq T.normalizedTypicalSource.marginalA.marginalA.matrix =
-        hilbertSchmidtSq source0.state.marginalA.marginalA.matrix := by
+      hilbertSchmidtSq T.normalizedTypicalSource.traceRight.traceRight.m =
+        hilbertSchmidtSq source0.state.traceRight.traceRight.m := by
     rw [hT_A]
     exact referenceIsometry_hilbertSchmidtSq_conj
-      P.supportIsometry source0.state.marginalA.marginalA
-  rw [adhwFQSWAPurity, adhwFQSWARState_marginalA_eq_systemA,
+      P.supportIsometry source0.state.traceRight.traceRight
+  rw [adhwFQSWAPurity, adhwFQSWARState_traceRight_eq_systemA,
     adhwFQSWSystemAState]
   rw [hsource_hs, ← hT_hs]
   exact T.purityA_le
@@ -575,7 +583,7 @@ theorem adhwFQSWIidPaddedTypicalSource_a_purity_le
 purity, and the typical lift identifies that purity with the normalized
 simultaneous-typical source's `B` purity. -/
 theorem adhwFQSWIidPaddedTypicalSource_b_purity_le
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ ε : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δ ε : ℝ}
     {T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε}
     {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
     {q : Type x} {e : Type y}
@@ -587,83 +595,82 @@ theorem adhwFQSWIidPaddedTypicalSource_b_purity_le
     (P : ADHWFQSWPaddedAtypEmbedding ψ n T.typicalitySlack atyp q e)
     (B : ADHWFQSWIidTypicalBobRegister ψ n δ ε T btyp)
     (R : ADHWFQSWIidTypicalRefRegister ψ n δ ε T rtyp)
-    (source0 : PureVector (Prod (Prod atyp btyp) rtyp))
+    (source0 : Ket ((atyp × btyp) × rtyp))
     (hsource0_lift :
       (adhwFQSWIidTypicalSourceLiftMatrix P B R) *
-          source0.state.matrix *
+          source0.state.m *
           Matrix.conjTranspose (adhwFQSWIidTypicalSourceLiftMatrix P B R) =
-        T.normalizedTypicalSource.matrix) :
-    let padAB : ReferenceIsometry (Prod atyp btyp) (Prod (Prod q e) btyp) :=
+        T.normalizedTypicalSource.m) :
+    let padAB : ReferenceIsometry (atyp × btyp) ((q × e) × btyp) :=
       P.isometry.prod (ReferenceIsometry.ofEquiv (Equiv.refl btyp))
-    let source : PureVector (Prod (Prod (Prod q e) btyp) rtyp) :=
-      padAB.applyPureVector source0
-    hilbertSchmidtSq source.state.marginalA.marginalB.matrix ≤
+    let source : Ket (((q × e) × btyp) × rtyp) :=
+      padAB.applyKet source0
+    hilbertSchmidtSq source.state.traceRight.traceLeft.m ≤
       (2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyB ψ - δ))) := by
   intro padAB source
   let idB : ReferenceIsometry btyp btyp :=
     ReferenceIsometry.ofEquiv (Equiv.refl btyp)
-  let ABtyp : ReferenceIsometry (Prod atyp btyp)
-      (Prod (TensorPower a n) (TensorPower b n)) :=
+  let ABtyp : ReferenceIsometry (atyp × btyp)
+      (TensorPower a n × TensorPower b n) :=
     P.supportIsometry.prod B.supportIsometry
   have hT_AB :
-      T.normalizedTypicalSource.marginalA.matrix =
-        ABtyp.matrix * source0.state.marginalA.matrix *
+      T.normalizedTypicalSource.traceRight.m =
+        ABtyp.matrix * source0.state.traceRight.m *
           Matrix.conjTranspose ABtyp.matrix := by
-    rw [State.marginalA_matrix, ← hsource0_lift]
-    change partialTraceB (a := Prod (TensorPower a n) (TensorPower b n))
-        (b := TensorPower r n)
+    rw [MState.traceRight_m, ← hsource0_lift]
+    change Matrix.traceRight
         (Matrix.kronecker ABtyp.matrix R.supportIsometry.matrix *
-          source0.state.matrix *
+          source0.state.m *
           Matrix.conjTranspose
             (Matrix.kronecker ABtyp.matrix R.supportIsometry.matrix)) =
-      ABtyp.matrix * source0.state.marginalA.matrix *
+      ABtyp.matrix * source0.state.traceRight.m *
         Matrix.conjTranspose ABtyp.matrix
-    rw [referenceIsometry_prod_partialTraceB_conj]
-    rfl
+    rw [referenceIsometry_prod_traceRight_conj]
+    simp only [MState.traceRight_m]
   have hT_B :
-      T.normalizedTypicalSource.marginalA.marginalB.matrix =
-        B.supportIsometry.matrix * source0.state.marginalA.marginalB.matrix *
+      T.normalizedTypicalSource.traceRight.traceLeft.m =
+        B.supportIsometry.matrix * source0.state.traceRight.traceLeft.m *
           Matrix.conjTranspose B.supportIsometry.matrix := by
-    rw [State.marginalB_matrix, hT_AB]
-    change partialTraceA (a := TensorPower a n) (b := TensorPower b n)
+    rw [MState.traceLeft_m, hT_AB]
+    change Matrix.traceLeft
         (Matrix.kronecker P.supportIsometry.matrix B.supportIsometry.matrix *
-          source0.state.marginalA.matrix *
+          source0.state.traceRight.m *
           Matrix.conjTranspose
             (Matrix.kronecker P.supportIsometry.matrix B.supportIsometry.matrix)) =
-      B.supportIsometry.matrix * source0.state.marginalA.marginalB.matrix *
+      B.supportIsometry.matrix * source0.state.traceRight.traceLeft.m *
         Matrix.conjTranspose B.supportIsometry.matrix
-    rw [referenceIsometry_prod_partialTraceA_conj]
-    rfl
+    rw [referenceIsometry_prod_traceLeft_conj]
+    simp only [MState.traceLeft_m]
   have hsource_AB :
-      source.state.marginalA.matrix =
-        padAB.matrix * source0.state.marginalA.matrix *
+      source.state.traceRight.m =
+        padAB.matrix * source0.state.traceRight.m *
           Matrix.conjTranspose padAB.matrix := by
-    simpa [source] using referenceIsometry_marginalA_applyPureVector padAB source0
+    simpa [source] using referenceIsometry_traceRight_applyKet padAB source0
   have hsource_B :
-      source.state.marginalA.marginalB.matrix =
-        idB.matrix * source0.state.marginalA.marginalB.matrix *
+      source.state.traceRight.traceLeft.m =
+        idB.matrix * source0.state.traceRight.traceLeft.m *
           Matrix.conjTranspose idB.matrix := by
-    rw [State.marginalB_matrix, hsource_AB]
-    change partialTraceA (a := Prod q e) (b := btyp)
+    rw [MState.traceLeft_m, hsource_AB]
+    change Matrix.traceLeft
         (Matrix.kronecker P.isometry.matrix idB.matrix *
-          source0.state.marginalA.matrix *
+          source0.state.traceRight.m *
           Matrix.conjTranspose (Matrix.kronecker P.isometry.matrix idB.matrix)) =
-      idB.matrix * source0.state.marginalA.marginalB.matrix *
+      idB.matrix * source0.state.traceRight.traceLeft.m *
         Matrix.conjTranspose idB.matrix
-    rw [referenceIsometry_prod_partialTraceA_conj]
-    rfl
+    rw [referenceIsometry_prod_traceLeft_conj]
+    simp only [MState.traceLeft_m]
   have hsource_hs :
-      hilbertSchmidtSq source.state.marginalA.marginalB.matrix =
-        hilbertSchmidtSq source0.state.marginalA.marginalB.matrix := by
+      hilbertSchmidtSq source.state.traceRight.traceLeft.m =
+        hilbertSchmidtSq source0.state.traceRight.traceLeft.m := by
     rw [hsource_B]
     exact referenceIsometry_hilbertSchmidtSq_conj
-      idB source0.state.marginalA.marginalB
+      idB source0.state.traceRight.traceLeft
   have hT_hs :
-      hilbertSchmidtSq T.normalizedTypicalSource.marginalA.marginalB.matrix =
-        hilbertSchmidtSq source0.state.marginalA.marginalB.matrix := by
+      hilbertSchmidtSq T.normalizedTypicalSource.traceRight.traceLeft.m =
+        hilbertSchmidtSq source0.state.traceRight.traceLeft.m := by
     rw [hT_B]
     exact referenceIsometry_hilbertSchmidtSq_conj
-      B.supportIsometry source0.state.marginalA.marginalB
+      B.supportIsometry source0.state.traceRight.traceLeft
   rw [hsource_hs, ← hT_hs]
   exact T.purityB_le
 
@@ -671,7 +678,7 @@ theorem adhwFQSWIidPaddedTypicalSource_b_purity_le
 purity, and the typical lift identifies that purity with the normalized
 simultaneous-typical source's `R` purity. -/
 theorem adhwFQSWIidPaddedTypicalSource_r_purity_le
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ ε : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δ ε : ℝ}
     {T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε}
     {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
     {q : Type x} {e : Type y}
@@ -683,54 +690,53 @@ theorem adhwFQSWIidPaddedTypicalSource_r_purity_le
     (P : ADHWFQSWPaddedAtypEmbedding ψ n T.typicalitySlack atyp q e)
     (B : ADHWFQSWIidTypicalBobRegister ψ n δ ε T btyp)
     (R : ADHWFQSWIidTypicalRefRegister ψ n δ ε T rtyp)
-    (source0 : PureVector (Prod (Prod atyp btyp) rtyp))
+    (source0 : Ket ((atyp × btyp) × rtyp))
     (hsource0_lift :
       (adhwFQSWIidTypicalSourceLiftMatrix P B R) *
-          source0.state.matrix *
+          source0.state.m *
           Matrix.conjTranspose (adhwFQSWIidTypicalSourceLiftMatrix P B R) =
-        T.normalizedTypicalSource.matrix) :
-    let padAB : ReferenceIsometry (Prod atyp btyp) (Prod (Prod q e) btyp) :=
+        T.normalizedTypicalSource.m) :
+    let padAB : ReferenceIsometry (atyp × btyp) ((q × e) × btyp) :=
       P.isometry.prod (ReferenceIsometry.ofEquiv (Equiv.refl btyp))
-    let source : PureVector (Prod (Prod (Prod q e) btyp) rtyp) :=
-      padAB.applyPureVector source0
+    let source : Ket (((q × e) × btyp) × rtyp) :=
+      padAB.applyKet source0
     adhwFQSWRPurity source ≤
       (2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyR ψ - δ))) := by
   intro padAB source
-  let ABtyp : ReferenceIsometry (Prod atyp btyp)
-      (Prod (TensorPower a n) (TensorPower b n)) :=
+  let ABtyp : ReferenceIsometry (atyp × btyp)
+      (TensorPower a n × TensorPower b n) :=
     P.supportIsometry.prod B.supportIsometry
   have hT_R :
-      T.normalizedTypicalSource.marginalB.matrix =
-        R.supportIsometry.matrix * source0.state.marginalB.matrix *
+      T.normalizedTypicalSource.traceLeft.m =
+        R.supportIsometry.matrix * source0.state.traceLeft.m *
           Matrix.conjTranspose R.supportIsometry.matrix := by
-    rw [State.marginalB_matrix, ← hsource0_lift]
-    change partialTraceA (a := Prod (TensorPower a n) (TensorPower b n))
-        (b := TensorPower r n)
+    rw [MState.traceLeft_m, ← hsource0_lift]
+    change Matrix.traceLeft
         (Matrix.kronecker ABtyp.matrix R.supportIsometry.matrix *
-          source0.state.matrix *
+          source0.state.m *
           Matrix.conjTranspose
             (Matrix.kronecker ABtyp.matrix R.supportIsometry.matrix)) =
-      R.supportIsometry.matrix * source0.state.marginalB.matrix *
+      R.supportIsometry.matrix * source0.state.traceLeft.m *
         Matrix.conjTranspose R.supportIsometry.matrix
-    rw [referenceIsometry_prod_partialTraceA_conj]
-    rfl
+    rw [referenceIsometry_prod_traceLeft_conj]
+    simp only [MState.traceLeft_m]
   have hsource_R :
-      source.state.marginalB.matrix = source0.state.marginalB.matrix := by
-    have hpur : source.Purifies source0.state.marginalB := by
+      source.state.traceLeft.m = source0.state.traceLeft.m := by
+    have hpur : source.Purifies source0.state.traceLeft := by
       simpa [source] using
-        padAB.applyPureVector_purifies (PureVector.purifies_marginalB source0)
-    simpa [PureVector.purifies_iff, State.marginalB_matrix] using hpur
+        padAB.applyKet_purifies (Ket.purifies_traceLeft source0)
+    simpa [Ket.purifies_iff, MState.traceLeft_m] using hpur
   have hsource_hs :
-      hilbertSchmidtSq source.state.marginalB.matrix =
-        hilbertSchmidtSq source0.state.marginalB.matrix := by
+      hilbertSchmidtSq source.state.traceLeft.m =
+        hilbertSchmidtSq source0.state.traceLeft.m := by
     rw [hsource_R]
   have hT_hs :
-      hilbertSchmidtSq T.normalizedTypicalSource.marginalB.matrix =
-        hilbertSchmidtSq source0.state.marginalB.matrix := by
+      hilbertSchmidtSq T.normalizedTypicalSource.traceLeft.m =
+        hilbertSchmidtSq source0.state.traceLeft.m := by
     rw [hT_R]
     exact referenceIsometry_hilbertSchmidtSq_conj
-      R.supportIsometry source0.state.marginalB
-  rw [adhwFQSWRPurity, adhwFQSWARState_marginalB_eq_systemR,
+      R.supportIsometry source0.state.traceLeft
+  rw [adhwFQSWRPurity, adhwFQSWARState_traceLeft_eq_systemR,
     adhwFQSWSystemRState]
   rw [hsource_hs, ← hT_hs]
   exact T.purityR_le
@@ -740,7 +746,7 @@ simultaneous typical source.  This records the concrete `A`/`B`/`R` typical
 support isometries used by the next source-route slice without claiming the
 final no-witness i.i.d. FQSW theorem. -/
 structure ADHWFQSWIidCompressedSourceWitness
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ ε : ℝ)
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ ε : ℝ)
     (T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε)
     (atyp : Type p) (btyp : Type u1) (rtyp : Type v1)
     (q : Type x) (e : Type y)
@@ -749,23 +755,29 @@ structure ADHWFQSWIidCompressedSourceWitness
     [Fintype rtyp] [DecidableEq rtyp]
     [Fintype q] [DecidableEq q]
     [Fintype e] [DecidableEq e] where
+  /-- Alice's typical support isometry, padded up to the one-shot register `q × e`. -/
   paddedAtypEmbedding :
     ADHWFQSWPaddedAtypEmbedding ψ n T.typicalitySlack atyp q e
+  /-- Bob's typical support isometry. -/
   typicalBobRegister :
     ADHWFQSWIidTypicalBobRegister ψ n δ ε T btyp
+  /-- The reference typical support isometry. -/
   typicalRefRegister :
     ADHWFQSWIidTypicalRefRegister ψ n δ ε T rtyp
-  unpaddedSource : PureVector (Prod (Prod atyp btyp) rtyp)
-  source : PureVector (Prod (Prod (Prod q e) btyp) rtyp)
+  /-- The typical source in unpadded typical coordinates. -/
+  unpaddedSource : Ket ((atyp × btyp) × rtyp)
+  /-- The typical source in the padded one-shot coordinates. -/
+  source : Ket (((q × e) × btyp) × rtyp)
+  /-- The padded source is the image of the unpadded one under the padding isometry. -/
   source_eq_padded :
     source =
       (paddedAtypEmbedding.isometry.prod
-        (ReferenceIsometry.ofEquiv (Equiv.refl btyp))).applyPureVector unpaddedSource
+        (ReferenceIsometry.ofEquiv (Equiv.refl btyp))).applyKet unpaddedSource
   unpadded_lifted_state_eq_normalizedTypicalSource :
     (let L := adhwFQSWIidTypicalSourceLiftMatrix
        paddedAtypEmbedding typicalBobRegister typicalRefRegister
-     L * unpaddedSource.state.matrix * Matrix.conjTranspose L =
-       T.normalizedTypicalSource.matrix)
+     L * unpaddedSource.state.m * Matrix.conjTranspose L =
+       T.normalizedTypicalSource.m)
   source_a_purity_le :
     adhwFQSWAPurity source ≤
       (2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyA ψ - δ)))
@@ -773,7 +785,7 @@ structure ADHWFQSWIidCompressedSourceWitness
     adhwFQSWRPurity source ≤
       (2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyR ψ - δ)))
   source_b_purity_le :
-    hilbertSchmidtSq source.state.marginalA.marginalB.matrix ≤
+    hilbertSchmidtSq source.state.traceRight.traceLeft.m ≤
       (2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyB ψ - δ)))
   source_ar_purity_le :
     adhwFQSWARPurity source ≤
@@ -781,14 +793,14 @@ structure ADHWFQSWIidCompressedSourceWitness
   lifted_state_eq_normalizedTypicalSource :
     (let L := adhwFQSWIidCompressedSourceLiftMatrix
        paddedAtypEmbedding typicalBobRegister typicalRefRegister
-     L * source.state.matrix * Matrix.conjTranspose L =
-       T.normalizedTypicalSource.matrix)
+     L * source.state.m * Matrix.conjTranspose L =
+       T.normalizedTypicalSource.m)
   source_traceNorm_le_original :
-    traceNormDistance T.normalizedTypicalSource.matrix (adhwFQSWIidSourceState ψ n).matrix ≤ ε
+    traceNormDistance T.normalizedTypicalSource.m (adhwFQSWIidSourceState ψ n).m ≤ ε
 
 namespace ADHWFQSWIidCompressedSourceWitness
 
-variable {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ ε : ℝ}
+variable {ψ : Ket ((a × b) × r)} {n : ℕ} {δ ε : ℝ}
 variable {T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε}
 variable {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
 variable {q : Type x} {e : Type y}
@@ -802,8 +814,8 @@ variable [Fintype e] [DecidableEq e] [Nonempty e]
 block registers. -/
 def sourceLiftIsometry
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e) :
-    ReferenceIsometry (Prod (Prod atyp btyp) rtyp)
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
+    ReferenceIsometry ((atyp × btyp) × rtyp)
+      ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
   (W.paddedAtypEmbedding.supportIsometry.prod
     W.typicalBobRegister.supportIsometry).prod
       W.typicalRefRegister.supportIsometry
@@ -811,8 +823,8 @@ def sourceLiftIsometry
 /-- The finite-coordinate source decoded into the original IID systems. -/
 def decodedSourceState
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e) :
-    State (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
-  (fqswChannelOfReferenceIsometry W.sourceLiftIsometry).applyState
+    MState ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
+  (fqswChannelOfReferenceIsometry W.sourceLiftIsometry)
     W.unpaddedSource.state
 
 omit [Nonempty atyp] [Nonempty btyp] [Nonempty q] [Nonempty e] in
@@ -821,10 +833,10 @@ normalized simultaneous-typical source. -/
 theorem decodedSourceState_eq_normalizedTypicalSource
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e) :
     W.decodedSourceState = T.normalizedTypicalSource := by
-  apply State.ext
+  apply MState.ext
   simpa [decodedSourceState, sourceLiftIsometry,
-    fqswChannelOfReferenceIsometry, Channel.applyState,
-    MatrixMap.ofReferenceIsometry_apply, PureVector.state,
+    fqswChannelOfReferenceIsometry, CPTPOp.mat_coe_eq_apply_mat,
+    MatrixMap.ofReferenceIsometry_apply, Ket.state,
     ReferenceIsometry.prod, adhwFQSWIidTypicalSourceLiftMatrix] using
       W.unpadded_lifted_state_eq_normalizedTypicalSource
 
@@ -832,8 +844,8 @@ theorem decodedSourceState_eq_normalizedTypicalSource
 block registers using the physical Schumacher decoders. -/
 def sourceDecoder
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e) :
-    Channel (Prod (Prod (Prod q e) btyp) rtyp)
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
+    CPTPMap (((q × e) × btyp) × rtyp)
+      ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
   (W.paddedAtypEmbedding.physicalDecoder.prod
     W.typicalBobRegister.physicalDecoder).prod
       W.typicalRefRegister.physicalDecoder
@@ -842,36 +854,36 @@ def sourceDecoder
 registers, leaving the finite reference register unchanged. -/
 def sourceEmbedding
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e) :
-    Channel (Prod (Prod atyp btyp) rtyp)
-      (Prod (Prod (Prod q e) btyp) rtyp) :=
+    CPTPMap ((atyp × btyp) × rtyp)
+      (((q × e) × btyp) × rtyp) :=
   (fqswChannelOfReferenceIsometry
     (W.paddedAtypEmbedding.isometry.prod
       (ReferenceIsometry.ofEquiv (Equiv.refl btyp)))).prod
-        (Channel.idChannel rtyp)
+        (CPTPOp.id (dIn := rtyp))
 
 omit [Nonempty atyp] [Nonempty btyp] [Nonempty q] [Nonempty e] in
 /-- The source embedding channel computes exactly the padded pure source stored
 by the IID witness. -/
 theorem sourceEmbedding_applyState_unpaddedSource
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e) :
-    W.sourceEmbedding.applyState W.unpaddedSource.state = W.source.state := by
+    W.sourceEmbedding W.unpaddedSource.state = W.source.state := by
   unfold sourceEmbedding
   rw [fqswChannelOfReferenceIsometry_prod_id_applyState_pure]
-  exact (congrArg PureVector.state W.source_eq_padded).symm
+  exact (congrArg Ket.state W.source_eq_padded).symm
 
 omit [Nonempty btyp] [Nonempty q] [Nonempty e] in
 /-- Decoding immediately after the concrete padded source embedding is the
 three-register typical-support lift. -/
 theorem sourceDecoder_comp_sourceEmbedding
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e) :
-    W.sourceDecoder.comp W.sourceEmbedding =
+    W.sourceDecoder ∘ₘ W.sourceEmbedding =
       fqswChannelOfReferenceIsometry W.sourceLiftIsometry := by
   unfold sourceDecoder sourceEmbedding sourceLiftIsometry
   rw [fqswChannelOfReferenceIsometry_prod,
     fqswChannelOfReferenceIsometry_ofEquiv_refl]
-  rw [Channel.prod_comp_prod, Channel.prod_comp_prod]
+  rw [CPTPOp.prod_comp_prod, CPTPOp.prod_comp_prod]
   rw [W.paddedAtypEmbedding.physicalDecoder_comp_isometry_eq_supportIsometryChannel]
-  rw [Channel.comp_idChannel, Channel.comp_idChannel]
+  rw [CPTPOp.compose_id, CPTPOp.compose_id]
   rw [W.typicalBobRegister.physicalDecoder_eq_supportIsometryChannel,
     W.typicalRefRegister.physicalDecoder_eq_supportIsometryChannel]
   rw [← fqswChannelOfReferenceIsometry_prod,
@@ -882,71 +894,68 @@ omit [Nonempty btyp] [Nonempty q] [Nonempty e] in
 same decoded source state used by the normalized-typical bridge. -/
 theorem sourceDecoder_applyState_source_eq_decodedSourceState
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e) :
-    W.sourceDecoder.applyState W.source.state = W.decodedSourceState := by
+    W.sourceDecoder W.source.state = W.decodedSourceState := by
   calc
-    W.sourceDecoder.applyState W.source.state =
-        W.sourceDecoder.applyState
-          (W.sourceEmbedding.applyState W.unpaddedSource.state) := by
+    W.sourceDecoder W.source.state =
+        W.sourceDecoder
+          (W.sourceEmbedding W.unpaddedSource.state) := by
             rw [W.sourceEmbedding_applyState_unpaddedSource]
-    _ = (W.sourceDecoder.comp W.sourceEmbedding).applyState W.unpaddedSource.state := by
-          rw [Channel.applyState_comp]
+    _ = (W.sourceDecoder ∘ₘ W.sourceEmbedding) W.unpaddedSource.state := by
+          rw [CPTPOp.compose_eq]
     _ = W.decodedSourceState := by
           rw [W.sourceDecoder_comp_sourceEmbedding]
           rfl
 
+set_option synthInstance.maxSize 512 in
 /-- Decode the computed one-shot FQSW output back into the original IID source
 registers while leaving the distilled ebit registers unchanged. -/
 def decodedOneShotOutputState
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e)
-    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (Prod q e))) :
-    State (Prod
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n))
-      (Prod e e)) :=
+    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (q × e))) :
+    MState (((TensorPower a n × TensorPower b n) × TensorPower r n) ×
+      (e × e)) :=
   (W.sourceDecoder.prod
-    (Channel.idChannel (Prod e e))).applyState
+    (CPTPOp.id (dIn := e × e)))
       H.toOneShotProtocol.outputState
 
+set_option synthInstance.maxSize 512 in
 /-- Decode the source factor of the computed one-shot target while leaving its
 maximally entangled pair unchanged. -/
 def decodedOneShotTargetState
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e)
-    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (Prod q e))) :
-    State (Prod
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n))
-      (Prod e e)) :=
+    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (q × e))) :
+    MState (((TensorPower a n × TensorPower b n) × TensorPower r n) ×
+      (e × e)) :=
   (W.sourceDecoder.prod
-    (Channel.idChannel (Prod e e))).applyState
+    (CPTPOp.id (dIn := e × e)))
       H.toOneShotProtocol.targetState
 
 /-- The source-shaped ideal target for the normalized simultaneous-typical
 state and the ebit pairing selected by the one-shot theorem. -/
 def normalizedTypicalTargetState
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e)
-    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (Prod q e))) :
-    State (Prod
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n))
-      (Prod e e)) :=
+    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (q × e))) :
+    MState (((TensorPower a n × TensorPower b n) × TensorPower r n) ×
+      (e × e)) :=
   T.normalizedTypicalSource.prod
-    (State.maximallyEntangled H.toOneShotProtocol.ebitPairing)
+    (MState.maximallyEntangled H.toOneShotProtocol.ebitPairing)
 
 omit [Nonempty btyp] in
 /-- Decoding the one-shot ideal target produces the normalized simultaneous-
 typical source tensor the same canonical maximally entangled pair. -/
 theorem decodedOneShotTargetState_eq_normalizedTypicalTargetState
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e)
-    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (Prod q e))) :
+    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (q × e))) :
     W.decodedOneShotTargetState H = W.normalizedTypicalTargetState H := by
   have hid :
-      (Channel.idChannel (Prod e e)).applyState
-          (State.maximallyEntangled H.toOneShotProtocol.ebitPairing) =
-        State.maximallyEntangled H.toOneShotProtocol.ebitPairing := by
-    apply State.ext
-    change (Channel.idChannel (Prod e e)).map
-      (State.maximallyEntangled H.toOneShotProtocol.ebitPairing).matrix =
-        (State.maximallyEntangled H.toOneShotProtocol.ebitPairing).matrix
-    simp [Channel.idChannel, MatrixMap.ofKraus]
+      (CPTPOp.id (dIn := e × e))
+          (MState.maximallyEntangled H.toOneShotProtocol.ebitPairing) =
+        MState.maximallyEntangled H.toOneShotProtocol.ebitPairing := by
+    apply MState.ext
+    rw [CPTPOp.mat_coe_eq_apply_mat]
+    simp [CPTPOp.id_map]
   unfold decodedOneShotTargetState normalizedTypicalTargetState
-  rw [FQSWOneShotProtocol.targetState, Channel.applyState_prod]
+  rw [FQSWOneShotProtocol.targetState, CPTPOp.prod_apply_prod]
   rw [hid]
   rw [W.sourceDecoder_applyState_source_eq_decodedSourceState,
     W.decodedSourceState_eq_normalizedTypicalSource]
@@ -955,9 +964,9 @@ theorem decodedOneShotTargetState_eq_normalizedTypicalTargetState
 followed by the concrete one-shot decoupling isometry selected by ADHW. -/
 def physicalAliceOperation
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e)
-    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (Prod q e))) :
-    Channel (TensorPower a n) (Prod q e) :=
-  (fqswChannelOfReferenceIsometry H.toOneShotProtocol.aliceIsometry).comp
+    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (q × e))) :
+    CPTPMap (TensorPower a n) (q × e) :=
+  (fqswChannelOfReferenceIsometry H.toOneShotProtocol.aliceIsometry) ∘ₘ
     W.paddedAtypEmbedding.physicalEncoder
 
 /-- Bob's physical IID operation: compress `B^n`, apply the concrete one-shot
@@ -965,120 +974,117 @@ Uhlmann decoder, and decode both transferred typical systems back into the
 original `A^n B^n` registers. -/
 def physicalBobOperation
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e)
-    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (Prod q e))) :
-    Channel (Prod q (TensorPower b n))
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) e) :=
-  let pre : Channel (Prod q (TensorPower b n)) (Prod q btyp) :=
-    (Channel.idChannel q).prod W.typicalBobRegister.physicalEncoder
-  let oneShot : Channel (Prod q btyp) (Prod (Prod (Prod q e) btyp) e) :=
+    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (q × e))) :
+    CPTPMap (q × TensorPower b n)
+      ((TensorPower a n × TensorPower b n) × e) :=
+  let pre : CPTPMap (q × TensorPower b n) (q × btyp) :=
+    (CPTPOp.id (dIn := q)).prod W.typicalBobRegister.physicalEncoder
+  let oneShot : CPTPMap (q × btyp) (((q × e) × btyp) × e) :=
     fqswChannelOfReferenceIsometry H.toOneShotProtocol.bobIsometry
-  let post : Channel (Prod (Prod (Prod q e) btyp) e)
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) e) :=
+  let post : CPTPMap (((q × e) × btyp) × e)
+      ((TensorPower a n × TensorPower b n) × e) :=
     (W.paddedAtypEmbedding.physicalDecoder.prod
-      W.typicalBobRegister.physicalDecoder).prod (Channel.idChannel e)
-  post.comp (oneShot.comp pre)
+      W.typicalBobRegister.physicalDecoder).prod (CPTPOp.id (dIn := e))
+  post ∘ₘ (oneShot ∘ₘ pre)
 
 /-- The source-route data determines an actual block protocol on the original
 IID registers; no preprocessing channel or semantic output field is supplied. -/
 def toFQSWBlockProtocol
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e)
-    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (Prod q e))) :
+    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (q × e))) :
     FQSWBlockProtocol ψ n q e e where
   aliceOperation := W.physicalAliceOperation H
   bobOperation := W.physicalBobOperation H
   ebitPairing := H.toOneShotProtocol.ebitPairing
 
-
 private theorem idChannel_prod
     {alpha : Type u} {beta : Type v}
     [Fintype alpha] [DecidableEq alpha] [Fintype beta] [DecidableEq beta] :
-    (Channel.idChannel alpha).prod (Channel.idChannel beta) =
-      Channel.idChannel (Prod alpha beta) := by
-  rw [Channel.mk.injEq]
+    (CPTPOp.id (dIn := alpha)).prod (CPTPOp.id (dIn := beta)) =
+      CPTPOp.id (dIn := alpha × beta) := by
+  refine CPTPOp.ext_map ?_
   apply LinearMap.ext
   intro X
   ext i j
-  change MatrixMap.kron (Channel.idChannel alpha).map
-      (Channel.idChannel beta).map X i j =
-    (Channel.idChannel (Prod alpha beta)).map X i j
+  simp only [CPTPOp.prod_map]
   rw [MatrixMap.kron_idChannel_apply_slice]
-  simp [Channel.idChannel, MatrixMap.ofKraus]
+  simp [CPTPOp.id_map]
 
 /-- The channel pipeline computed by the finite-coordinate one-shot protocol. -/
 private def oneShotOutputChannel
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e)
-    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (Prod q e))) :
-    Channel (Prod (Prod (Prod q e) btyp) rtyp)
-      (Prod (Prod (Prod (Prod q e) btyp) rtyp) (Prod e e)) :=
+    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (q × e))) :
+    CPTPMap (((q × e) × btyp) × rtyp)
+      ((((q × e) × btyp) × rtyp) × (e × e)) :=
   let sourceRegroup :=
-    Channel.reindex (fqswSourceToAliceInputEquiv (Prod q e) btyp rtyp)
+    CPTPOp.reindex (Equiv.prodAssoc (q × e) btyp rtyp)
   let alice :=
     (fqswChannelOfReferenceIsometry H.toOneShotProtocol.aliceIsometry).prod
-      (Channel.idChannel (Prod btyp rtyp))
+      (CPTPOp.id (dIn := btyp × rtyp))
   let bobRegroup :=
-    Channel.reindex (fqswAliceOutputToBobInputEquiv q e btyp rtyp)
+    CPTPOp.reindex (fqswAliceOutputToBobInputEquiv q e btyp rtyp)
   let bob :=
     (fqswChannelOfReferenceIsometry H.toOneShotProtocol.bobIsometry).prod
-      (Channel.idChannel (Prod rtyp e))
+      (CPTPOp.id (dIn := rtyp × e))
   let finalRegroup :=
-    Channel.reindex (fqswBobOutputToFinalEquiv (Prod q e) btyp e rtyp e)
-  finalRegroup.comp (bob.comp (bobRegroup.comp (alice.comp sourceRegroup)))
+    CPTPOp.reindex (fqswAliceOutputToBobInputEquiv ((q × e) × btyp) e rtyp e)
+  finalRegroup ∘ₘ (bob ∘ₘ (bobRegroup ∘ₘ (alice ∘ₘ sourceRegroup)))
 
 /-- The channel pipeline computed by the concrete physical IID block. -/
 private def physicalOutputChannel
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e)
-    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (Prod q e))) :
-    Channel (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n))
-      (Prod (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n))
-        (Prod e e)) :=
-  let sourceRegroup := Channel.reindex
-    (fqswSourceToAliceInputEquiv (TensorPower a n) (TensorPower b n) (TensorPower r n))
+    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (q × e))) :
+    CPTPMap ((TensorPower a n × TensorPower b n) × TensorPower r n)
+      (((TensorPower a n × TensorPower b n) × TensorPower r n) ×
+        (e × e)) :=
+  let sourceRegroup := CPTPOp.reindex
+    (Equiv.prodAssoc (TensorPower a n) (TensorPower b n) (TensorPower r n))
   let alice := (W.physicalAliceOperation H).prod
-    (Channel.idChannel (Prod (TensorPower b n) (TensorPower r n)))
-  let bobRegroup := Channel.reindex
+    (CPTPOp.id (dIn := TensorPower b n × TensorPower r n))
+  let bobRegroup := CPTPOp.reindex
     (fqswAliceOutputToBobInputEquiv q e (TensorPower b n) (TensorPower r n))
   let bob := (W.physicalBobOperation H).prod
-    (Channel.idChannel (Prod (TensorPower r n) e))
-  let finalRegroup := Channel.reindex
-    (fqswBobOutputToFinalEquiv
-      (TensorPower a n) (TensorPower b n) e (TensorPower r n) e)
-  finalRegroup.comp (bob.comp (bobRegroup.comp (alice.comp sourceRegroup)))
+    (CPTPOp.id (dIn := TensorPower r n × e))
+  let finalRegroup := CPTPOp.reindex
+    (fqswAliceOutputToBobInputEquiv
+      (TensorPower a n × TensorPower b n) e (TensorPower r n) e)
+  finalRegroup ∘ₘ (bob ∘ₘ (bobRegroup ∘ₘ (alice ∘ₘ sourceRegroup)))
 
 private theorem physicalOutputChannel_comp_sourceLift
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e)
-    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (Prod q e))) :
-    (W.physicalOutputChannel H).comp
+    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (q × e))) :
+    (W.physicalOutputChannel H) ∘ₘ
         (fqswChannelOfReferenceIsometry W.sourceLiftIsometry) =
-      (W.sourceDecoder.prod (Channel.idChannel (Prod e e))).comp
-        ((W.oneShotOutputChannel H).comp W.sourceEmbedding) := by
+      (W.sourceDecoder.prod (CPTPOp.id (dIn := e × e))) ∘ₘ
+        ((W.oneShotOutputChannel H) ∘ₘ W.sourceEmbedding) := by
   let LA := fqswChannelOfReferenceIsometry W.paddedAtypEmbedding.supportIsometry
   let LB := fqswChannelOfReferenceIsometry W.typicalBobRegister.supportIsometry
   let LR := fqswChannelOfReferenceIsometry W.typicalRefRegister.supportIsometry
   let P := fqswChannelOfReferenceIsometry W.paddedAtypEmbedding.isometry
   let UA := fqswChannelOfReferenceIsometry H.toOneShotProtocol.aliceIsometry
   let VB := fqswChannelOfReferenceIsometry H.toOneShotProtocol.bobIsometry
-  let IQ := Channel.idChannel q
-  let IE := Channel.idChannel e
-  let IB := Channel.idChannel btyp
-  let IR := Channel.idChannel rtyp
-  let Rsource0 := Channel.reindex (fqswSourceToAliceInputEquiv atyp btyp rtyp)
-  let Rsource1 := Channel.reindex (fqswSourceToAliceInputEquiv (Prod q e) btyp rtyp)
-  let RsourceN := Channel.reindex
-    (fqswSourceToAliceInputEquiv (TensorPower a n) (TensorPower b n) (TensorPower r n))
-  let Ralice0 := Channel.reindex (fqswAliceOutputToBobInputEquiv q e btyp rtyp)
-  let RaliceN := Channel.reindex
+  let IQ := CPTPOp.id (dIn := q)
+  let IE := CPTPOp.id (dIn := e)
+  let IB := CPTPOp.id (dIn := btyp)
+  let IR := CPTPOp.id (dIn := rtyp)
+  let Rsource0 := CPTPOp.reindex (Equiv.prodAssoc atyp btyp rtyp)
+  let Rsource1 := CPTPOp.reindex (Equiv.prodAssoc (q × e) btyp rtyp)
+  let RsourceN := CPTPOp.reindex
+    (Equiv.prodAssoc (TensorPower a n) (TensorPower b n) (TensorPower r n))
+  let Ralice0 := CPTPOp.reindex (fqswAliceOutputToBobInputEquiv q e btyp rtyp)
+  let RaliceN := CPTPOp.reindex
     (fqswAliceOutputToBobInputEquiv q e (TensorPower b n) (TensorPower r n))
-  let Rfinal0 := Channel.reindex
-    (fqswBobOutputToFinalEquiv (Prod q e) btyp e rtyp e)
-  let RfinalN := Channel.reindex
-    (fqswBobOutputToFinalEquiv
-      (TensorPower a n) (TensorPower b n) e (TensorPower r n) e)
+  let Rfinal0 := CPTPOp.reindex
+    (fqswAliceOutputToBobInputEquiv ((q × e) × btyp) e rtyp e)
+  let RfinalN := CPTPOp.reindex
+    (fqswAliceOutputToBobInputEquiv
+      (TensorPower a n × TensorPower b n) e (TensorPower r n) e)
   let DA := W.paddedAtypEmbedding.physicalDecoder
   let DB := W.typicalBobRegister.physicalDecoder
   let DR := W.typicalRefRegister.physicalDecoder
   let sourceLift := (LA.prod LB).prod LR
   let sourceEmbed := (P.prod IB).prod IR
-  let afterAlice := (Channel.idChannel (Prod q e)).prod (LB.prod LR)
+  let afterAlice := (CPTPOp.id (dIn := q × e)).prod (LB.prod LR)
   let beforeBob := (IQ.prod LB).prod (LR.prod IE)
   let afterBob := ((DA.prod DB).prod IE).prod (LR.prod IE)
   have hSourceLiftChannel :
@@ -1092,195 +1098,193 @@ private theorem physicalOutputChannel_comp_sourceLift
     unfold sourceEmbedding
     rw [fqswChannelOfReferenceIsometry_prod,
       fqswChannelOfReferenceIsometry_ofEquiv_refl]
-  have hSource : RsourceN.comp sourceLift = (LA.prod (LB.prod LR)).comp Rsource0 := by
+  have hSource : RsourceN ∘ₘ sourceLift = (LA.prod (LB.prod LR)) ∘ₘ Rsource0 := by
     exact (FQSWBlockProtocol.fqswSourceToAliceInput_naturality LA LB LR).symm
-  have hEmbed : Rsource1.comp sourceEmbed =
-      (P.prod (IB.prod IR)).comp Rsource0 := by
+  have hEmbed : Rsource1 ∘ₘ sourceEmbed =
+      (P.prod (IB.prod IR)) ∘ₘ Rsource0 := by
     exact (FQSWBlockProtocol.fqswSourceToAliceInput_naturality P IB IR).symm
   have hAliceLocal :
       ((W.physicalAliceOperation H).prod
-          (Channel.idChannel (Prod (TensorPower b n) (TensorPower r n)))).comp
+          (CPTPOp.id (dIn := TensorPower b n × TensorPower r n))) ∘ₘ
           (LA.prod (LB.prod LR)) =
-        afterAlice.comp ((UA.prod (Channel.idChannel (Prod btyp rtyp))).comp
+        afterAlice ∘ₘ ((UA.prod (CPTPOp.id (dIn := btyp × rtyp))) ∘ₘ
           (P.prod (IB.prod IR))) := by
     unfold physicalAliceOperation
-    rw [Channel.prod_comp_prod, fqswChannel_comp_assoc,
+    rw [CPTPOp.prod_comp_prod, CPTPOp.compose_assoc,
       W.paddedAtypEmbedding.physicalEncoder_comp_supportIsometry]
-    rw [Channel.idChannel_comp]
-    rw [Channel.prod_comp_prod, Channel.idChannel_comp]
-    rw [Channel.prod_comp_prod, Channel.idChannel_comp]
-    rw [Channel.prod_comp_prod, Channel.comp_idChannel, Channel.comp_idChannel]
-  have hAliceRegroup : RaliceN.comp afterAlice = beforeBob.comp Ralice0 := by
+    rw [CPTPOp.id_compose]
+    rw [CPTPOp.prod_comp_prod, CPTPOp.id_compose]
+    rw [CPTPOp.prod_comp_prod, CPTPOp.id_compose]
+    rw [CPTPOp.prod_comp_prod, CPTPOp.compose_id, CPTPOp.compose_id]
+  have hAliceRegroup : RaliceN ∘ₘ afterAlice = beforeBob ∘ₘ Ralice0 := by
     dsimp only [RaliceN, afterAlice, beforeBob, Ralice0, IQ, IE]
-    rw [show Channel.idChannel (Prod q e) = IQ.prod IE by
+    rw [show CPTPOp.id (dIn := q × e) = IQ.prod IE by
       exact idChannel_prod.symm]
     exact (FQSWBlockProtocol.fqswAliceOutputToBobInput_naturality IQ IE LB LR).symm
   have hBobLocal :
       ((W.physicalBobOperation H).prod
-          (Channel.idChannel (Prod (TensorPower r n) e))).comp beforeBob =
-        afterBob.comp (VB.prod (Channel.idChannel (Prod rtyp e))) := by
+          (CPTPOp.id (dIn := TensorPower r n × e))) ∘ₘ beforeBob =
+        afterBob ∘ₘ (VB.prod (CPTPOp.id (dIn := rtyp × e))) := by
     unfold physicalBobOperation
     dsimp only
-    rw [Channel.prod_comp_prod, Channel.idChannel_comp]
-    rw [fqswChannel_comp_assoc, fqswChannel_comp_assoc]
-    rw [Channel.prod_comp_prod, Channel.comp_idChannel,
+    rw [CPTPOp.prod_comp_prod, CPTPOp.id_compose]
+    rw [CPTPOp.compose_assoc, CPTPOp.compose_assoc]
+    rw [CPTPOp.prod_comp_prod, CPTPOp.compose_id,
       W.typicalBobRegister.physicalEncoder_comp_supportIsometry]
-    rw [idChannel_prod, Channel.comp_idChannel]
-    rw [Channel.prod_comp_prod, Channel.comp_idChannel]
+    rw [idChannel_prod, CPTPOp.compose_id]
+    rw [CPTPOp.prod_comp_prod, CPTPOp.compose_id]
   have hReferenceDecoder : DR = LR := by
     dsimp only [DR, LR]
     exact W.typicalRefRegister.physicalDecoder_eq_supportIsometryChannel
-  have hFinal : RfinalN.comp afterBob =
-      (((DA.prod DB).prod DR).prod (Channel.idChannel (Prod e e))).comp Rfinal0 := by
+  have hFinal : RfinalN ∘ₘ afterBob =
+      (((DA.prod DB).prod DR).prod (CPTPOp.id (dIn := e × e))) ∘ₘ Rfinal0 := by
     rw [hReferenceDecoder]
     dsimp only [RfinalN, afterBob, DA, DB, LR, IE, Rfinal0]
-    rw [show Channel.idChannel (Prod e e) = IE.prod IE by
+    rw [show CPTPOp.id (dIn := e × e) = IE.prod IE by
       exact idChannel_prod.symm]
     exact (FQSWBlockProtocol.fqswAliceOutputToBobInput_naturality
-      (q0 := Prod (Prod q e) btyp) (e0 := e) (b0 := rtyp) (r0 := e)
-      (q1 := Prod (TensorPower a n) (TensorPower b n))
+      (q0 := (q × e) × btyp) (e0 := e) (b0 := rtyp) (r0 := e)
+      (q1 := TensorPower a n × TensorPower b n)
       (e1 := e) (b1 := TensorPower r n) (r1 := e)
       (DA.prod DB) IE LR IE).symm
   rw [hSourceLiftChannel, hSourceDecoderChannel, hSourceEmbeddingChannel]
   unfold physicalOutputChannel oneShotOutputChannel
   dsimp only
-  simp only [fqswChannel_comp_assoc]
+  simp only [CPTPOp.compose_assoc]
   rw [hSource]
-  rw [← fqswChannel_comp_assoc _ _ Rsource0, hAliceLocal]
-  simp only [fqswChannel_comp_assoc]
+  rw [← CPTPOp.compose_assoc _ _ Rsource0, hAliceLocal]
+  simp only [CPTPOp.compose_assoc]
   rw [← hEmbed]
-  rw [← fqswChannel_comp_assoc RaliceN afterAlice, hAliceRegroup]
-  simp only [fqswChannel_comp_assoc]
-  rw [← fqswChannel_comp_assoc
+  rw [← CPTPOp.compose_assoc RaliceN afterAlice, hAliceRegroup]
+  simp only [CPTPOp.compose_assoc]
+  rw [← CPTPOp.compose_assoc
       ((W.physicalBobOperation H).prod
-        (Channel.idChannel (Prod (TensorPower r n) e))) beforeBob,
+        (CPTPOp.id (dIn := TensorPower r n × e))) beforeBob,
     hBobLocal]
-  simp only [fqswChannel_comp_assoc]
-  rw [← fqswChannel_comp_assoc RfinalN afterBob, hFinal]
-  simp only [fqswChannel_comp_assoc]
+  simp only [CPTPOp.compose_assoc]
+  rw [← CPTPOp.compose_assoc RfinalN afterBob, hFinal]
+  simp only [CPTPOp.compose_assoc]
   rfl
 
+set_option synthInstance.maxSize 512 in
+set_option maxRecDepth 4000 in
 /-- On the normalized simultaneous-typical source, the concrete physical IID
 pipeline is exactly the decoded finite-coordinate one-shot output. -/
 theorem physicalOutput_on_normalizedTypicalSource
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e)
-    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (Prod q e))) :
+    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (q × e))) :
     (W.toFQSWBlockProtocol H).outputStateOfBlockState T.normalizedTypicalSource =
       W.decodedOneShotOutputState H := by
   rw [← W.decodedSourceState_eq_normalizedTypicalSource]
   unfold FQSWBlockProtocol.outputStateOfBlockState decodedSourceState
   dsimp only
-  rw [← Channel.reindex_applyState, ← Channel.reindex_applyState,
-    ← Channel.reindex_applyState]
-  rw [← Channel.applyState_comp, ← Channel.applyState_comp,
-    ← Channel.applyState_comp, ← Channel.applyState_comp]
-  change (W.physicalOutputChannel H).applyState
-      ((fqswChannelOfReferenceIsometry W.sourceLiftIsometry).applyState
+  rw [← CPTPOp.reindex_applyState, ← CPTPOp.reindex_applyState,
+    ← CPTPOp.reindex_applyState]
+  rw [← CPTPOp.compose_eq, ← CPTPOp.compose_eq,
+    ← CPTPOp.compose_eq, ← CPTPOp.compose_eq]
+  change (W.physicalOutputChannel H)
+      ((fqswChannelOfReferenceIsometry W.sourceLiftIsometry)
         W.unpaddedSource.state) = W.decodedOneShotOutputState H
-  rw [← Channel.applyState_comp, W.physicalOutputChannel_comp_sourceLift]
+  rw [← CPTPOp.compose_eq, W.physicalOutputChannel_comp_sourceLift]
   unfold decodedOneShotOutputState
-  rw [Channel.applyState_comp, Channel.applyState_comp]
+  rw [CPTPOp.compose_eq, CPTPOp.compose_eq]
   rw [W.sourceEmbedding_applyState_unpaddedSource]
-  change (W.sourceDecoder.prod (Channel.idChannel (Prod e e))).applyState
-      ((W.oneShotOutputChannel H).applyState W.source.state) =
-    (W.sourceDecoder.prod (Channel.idChannel (Prod e e))).applyState
+  have harg :
+      (W.oneShotOutputChannel H) W.source.state =
+        H.toOneShotProtocol.outputState := by
+    rw [← H.toOneShotProtocol.outputStateOfState_source_eq_outputState]
+    unfold oneShotOutputChannel FQSWOneShotProtocol.outputStateOfState
+    dsimp only
+    rw [CPTPOp.compose_eq, CPTPOp.compose_eq, CPTPOp.compose_eq,
+      CPTPOp.compose_eq]
+    rw [CPTPOp.reindex_applyState, CPTPOp.reindex_applyState,
+      CPTPOp.reindex_applyState]
+  change (W.sourceDecoder.prod (CPTPOp.id (dIn := e × e)))
+      ((W.oneShotOutputChannel H) W.source.state) =
+    (W.sourceDecoder.prod (CPTPOp.id (dIn := e × e)))
       H.toOneShotProtocol.outputState
-  congr 1
-  rw [← H.toOneShotProtocol.outputStateOfState_source_eq_outputState]
-  unfold oneShotOutputChannel FQSWOneShotProtocol.outputStateOfState
-  dsimp only
-  rw [Channel.applyState_comp, Channel.applyState_comp, Channel.applyState_comp,
-    Channel.applyState_comp]
-  rw [Channel.reindex_applyState, Channel.reindex_applyState,
-    Channel.reindex_applyState]
+  rw [harg]
 
+set_option maxRecDepth 4000 in
 /-- The concrete physical IID pipeline is a channel, so it contracts the
 trace distance between arbitrary block-source states. -/
 private theorem physicalOutputChannel_applyState
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e)
-    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (Prod q e)))
-    (ρ : State
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n))) :
-    (W.physicalOutputChannel H).applyState ρ =
+    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (q × e)))
+    (ρ : MState
+      ((TensorPower a n × TensorPower b n) × TensorPower r n)) :
+    (W.physicalOutputChannel H) ρ =
       (W.toFQSWBlockProtocol H).outputStateOfBlockState ρ := by
   unfold physicalOutputChannel FQSWBlockProtocol.outputStateOfBlockState
   dsimp only
-  rw [Channel.applyState_comp, Channel.applyState_comp,
-    Channel.applyState_comp, Channel.applyState_comp]
-  rw [Channel.reindex_applyState, Channel.reindex_applyState,
-    Channel.reindex_applyState]
+  rw [CPTPOp.compose_eq, CPTPOp.compose_eq,
+    CPTPOp.compose_eq, CPTPOp.compose_eq]
+  rw [CPTPOp.reindex_applyState, CPTPOp.reindex_applyState,
+    CPTPOp.reindex_applyState]
   rfl
 
+set_option maxRecDepth 4000 in
 theorem physicalOutput_traceNormDistance_le
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e)
-    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (Prod q e)))
-    (ρ σ : State
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n))) :
+    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (q × e)))
+    (ρ σ : MState
+      ((TensorPower a n × TensorPower b n) × TensorPower r n)) :
     traceNormDistance
-        ((W.toFQSWBlockProtocol H).outputStateOfBlockState ρ).matrix
-        ((W.toFQSWBlockProtocol H).outputStateOfBlockState σ).matrix ≤
-      traceNormDistance ρ.matrix σ.matrix := by
+        ((W.toFQSWBlockProtocol H).outputStateOfBlockState ρ).m
+        ((W.toFQSWBlockProtocol H).outputStateOfBlockState σ).m ≤
+      traceNormDistance ρ.m σ.m := by
   have hρ :
-      (W.physicalOutputChannel H).applyState ρ =
+      (W.physicalOutputChannel H) ρ =
         (W.toFQSWBlockProtocol H).outputStateOfBlockState ρ := by
     exact W.physicalOutputChannel_applyState H ρ
   have hσ :
-      (W.physicalOutputChannel H).applyState σ =
+      (W.physicalOutputChannel H) σ =
         (W.toFQSWBlockProtocol H).outputStateOfBlockState σ := by
     exact W.physicalOutputChannel_applyState H σ
-  have h := Channel.normalizedTraceDistance_applyState_le
+  have h := CPTPOp.normalizedTraceDistance_applyState_le
     (W.physicalOutputChannel H) ρ σ
   rw [hρ, hσ] at h
-  unfold State.normalizedTraceDistance normalizedTraceDistance at h
+  unfold MState.normalizedTraceDistance normalizedTraceDistance at h
   nlinarith
 
+set_option synthInstance.maxSize 512 in
+set_option maxRecDepth 4000 in
 omit [Nonempty btyp] in
 /-- Decoding the one-shot output and target back into the original IID
 registers cannot increase their trace-norm error. -/
 theorem decodedOneShot_traceNormError_le
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e)
-    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (Prod q e))) :
-    traceNormDistance (W.decodedOneShotOutputState H).matrix
-        (W.normalizedTypicalTargetState H).matrix ≤
+    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (q × e))) :
+    traceNormDistance (W.decodedOneShotOutputState H).m
+        (W.normalizedTypicalTargetState H).m ≤
       H.toOneShotProtocol.traceNormError := by
-  let Φ := W.sourceDecoder.prod (Channel.idChannel (Prod e e))
-  have h := Channel.normalizedTraceDistance_applyState_le Φ
+  let Φ := W.sourceDecoder.prod (CPTPOp.id (dIn := e × e))
+  have h := CPTPOp.normalizedTraceDistance_applyState_le Φ
     H.toOneShotProtocol.outputState H.toOneShotProtocol.targetState
   have hraw :
-      traceNormDistance (W.decodedOneShotOutputState H).matrix
-          (W.decodedOneShotTargetState H).matrix ≤
+      traceNormDistance (W.decodedOneShotOutputState H).m
+          (W.decodedOneShotTargetState H).m ≤
         H.toOneShotProtocol.traceNormError := by
     unfold decodedOneShotOutputState decodedOneShotTargetState
     change traceNormDistance
-        (Φ.applyState H.toOneShotProtocol.outputState).matrix
-        (Φ.applyState H.toOneShotProtocol.targetState).matrix ≤
-      traceNormDistance H.toOneShotProtocol.outputState.matrix
-        H.toOneShotProtocol.targetState.matrix
-    unfold State.normalizedTraceDistance normalizedTraceDistance at h
+        (Φ H.toOneShotProtocol.outputState).m
+        (Φ H.toOneShotProtocol.targetState).m ≤
+      traceNormDistance H.toOneShotProtocol.outputState.m
+        H.toOneShotProtocol.targetState.m
+    unfold MState.normalizedTraceDistance normalizedTraceDistance at h
     nlinarith
   rw [← W.decodedOneShotTargetState_eq_normalizedTypicalTargetState H]
   exact hraw
-
-private theorem adhwFQSW_traceNormDistance_triangle
-    {α : Type*} [Fintype α] [DecidableEq α]
-    (ρ σ τ : State α) :
-    traceNormDistance ρ.matrix τ.matrix ≤
-      traceNormDistance ρ.matrix σ.matrix + traceNormDistance σ.matrix τ.matrix := by
-  have h := State.normalizedTraceDistance_triangle ρ σ τ
-  unfold State.normalizedTraceDistance normalizedTraceDistance at h
-  nlinarith
 
 omit [Nonempty q] in
 private theorem fqswBlock_outputState_eq_adhwIidSource
     (C : FQSWBlockProtocol ψ n q e et) :
     C.outputState = C.outputStateOfBlockState (adhwFQSWIidSourceState ψ n) := by
   unfold FQSWBlockProtocol.outputState FQSWBlockProtocol.outputStateOfState
-    adhwFQSWIidSourceState adhwFQSWIidPureVector
-  rw [PureVector.reindex_state, PureVector.tensorPower_state]
+    adhwFQSWIidSourceState adhwFQSWIidKet
+  rw [Ket.reindex_state, Ket.tensorPower_state]
 
 section
-
-set_option maxHeartbeats 800000
 
 /-- The actual physical block output obeys the ADHW double-triangle bound.
 Both perturbation terms are distances between the original IID source and the
@@ -1288,49 +1292,49 @@ normalized simultaneous-typical source; the middle term is the computed
 one-shot protocol error transported through the physical decoders. -/
 theorem toFQSWBlockProtocol_output_traceNormDistance_le_sourceRoute
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e)
-    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (Prod q e))) :
+    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (q × e))) :
     traceNormDistance
         ((W.toFQSWBlockProtocol H).outputStateOfBlockState
-          (adhwFQSWIidSourceState ψ n)).matrix
-        (W.toFQSWBlockProtocol H).targetState.matrix ≤
+          (adhwFQSWIidSourceState ψ n)).m
+        (W.toFQSWBlockProtocol H).targetState.m ≤
       2 * ε + H.toOneShotProtocol.traceNormError := by
   let C := W.toFQSWBlockProtocol H
   let source := adhwFQSWIidSourceState ψ n
   let typical := T.normalizedTypicalSource
-  let ebit := State.maximallyEntangled H.toOneShotProtocol.ebitPairing
-  have hsource : traceNormDistance source.matrix typical.matrix ≤ ε := by
+  let ebit := MState.maximallyEntangled H.toOneShotProtocol.ebitPairing
+  have hsource : traceNormDistance source.m typical.m ≤ ε := by
     rw [traceNormDistance_comm]
     exact W.source_traceNorm_le_original
   have htransport :
-      traceNormDistance (C.outputStateOfBlockState source).matrix
-          (C.outputStateOfBlockState typical).matrix ≤
-        traceNormDistance source.matrix typical.matrix := by
+      traceNormDistance (C.outputStateOfBlockState source).m
+          (C.outputStateOfBlockState typical).m ≤
+        traceNormDistance source.m typical.m := by
     exact W.physicalOutput_traceNormDistance_le H source typical
   have hmiddle :
-      traceNormDistance (C.outputStateOfBlockState typical).matrix
-          (typical.prod ebit).matrix ≤
+      traceNormDistance (C.outputStateOfBlockState typical).m
+          (typical.prod ebit).m ≤
         H.toOneShotProtocol.traceNormError := by
     rw [show C.outputStateOfBlockState typical = W.decodedOneShotOutputState H by
       exact W.physicalOutput_on_normalizedTypicalSource H]
     simpa [typical, ebit, normalizedTypicalTargetState] using
       W.decodedOneShot_traceNormError_le H
   have htarget :
-      traceNormDistance (typical.prod ebit).matrix C.targetState.matrix ≤ ε := by
-    change traceNormDistance (typical.prod ebit).matrix (source.prod ebit).matrix ≤ ε
+      traceNormDistance (typical.prod ebit).m C.targetState.m ≤ ε := by
+    change traceNormDistance (typical.prod ebit).m (source.prod ebit).m ≤ ε
     exact (fqswProdRight_traceNormDistance_le typical source ebit).trans
       W.source_traceNorm_le_original
   calc
-    traceNormDistance (C.outputStateOfBlockState source).matrix C.targetState.matrix ≤
-        traceNormDistance (C.outputStateOfBlockState source).matrix
-            (C.outputStateOfBlockState typical).matrix +
-          traceNormDistance (C.outputStateOfBlockState typical).matrix
-            C.targetState.matrix :=
-      adhwFQSW_traceNormDistance_triangle _ _ _
-    _ ≤ traceNormDistance source.matrix typical.matrix +
-          (traceNormDistance (C.outputStateOfBlockState typical).matrix
-              (typical.prod ebit).matrix +
-            traceNormDistance (typical.prod ebit).matrix C.targetState.matrix) :=
-      add_le_add htransport (adhwFQSW_traceNormDistance_triangle _ _ _)
+    traceNormDistance (C.outputStateOfBlockState source).m C.targetState.m ≤
+        traceNormDistance (C.outputStateOfBlockState source).m
+            (C.outputStateOfBlockState typical).m +
+          traceNormDistance (C.outputStateOfBlockState typical).m
+            C.targetState.m :=
+      traceNormDistance_triangle _ _ _
+    _ ≤ traceNormDistance source.m typical.m +
+          (traceNormDistance (C.outputStateOfBlockState typical).m
+              (typical.prod ebit).m +
+            traceNormDistance (typical.prod ebit).m C.targetState.m) :=
+      add_le_add htransport (traceNormDistance_triangle _ _ _)
     _ ≤ ε + (H.toOneShotProtocol.traceNormError + ε) :=
       add_le_add hsource (add_le_add hmiddle htarget)
     _ = 2 * ε + H.toOneShotProtocol.traceNormError := by ring
@@ -1338,7 +1342,7 @@ theorem toFQSWBlockProtocol_output_traceNormDistance_le_sourceRoute
 /-- Computed-error form of the physical ADHW source-route estimate. -/
 theorem toFQSWBlockProtocol_traceNormError_le_sourceRoute
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e)
-    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (Prod q e))) :
+    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (q × e))) :
     (W.toFQSWBlockProtocol H).traceNormError ≤
       2 * ε + H.toOneShotProtocol.traceNormError := by
   unfold FQSWBlockProtocol.traceNormError
@@ -1352,7 +1356,7 @@ end ADHWFQSWIidCompressedSourceWitness
 /-- Construct the compressed pure source whose lift is the normalized
 simultaneously typical i.i.d. source. -/
 theorem exists_adhwFQSWIidCompressedSourceWitness
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ ε : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δ ε : ℝ}
     {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
     {q : Type x} {e : Type y}
     [Fintype atyp] [DecidableEq atyp]
@@ -1368,17 +1372,17 @@ theorem exists_adhwFQSWIidCompressedSourceWitness
       (ADHWFQSWIidCompressedSourceWitness
         ψ n δ ε T atyp btyp rtyp q e) := by
   classical
-  let φ := adhwFQSWIidPureVector ψ n
+  let φ := adhwFQSWIidKet ψ n
   let ρ := adhwFQSWIidSourceState ψ n
   let L := adhwFQSWIidCompressedSourceLiftMatrix P B R
   let L0 := adhwFQSWIidTypicalSourceLiftMatrix P B R
-  let padAB : ReferenceIsometry (Prod atyp btyp) (Prod (Prod q e) btyp) :=
+  let padAB : ReferenceIsometry (atyp × btyp) ((q × e) × btyp) :=
     P.isometry.prod (ReferenceIsometry.ofEquiv (Equiv.refl btyp))
-  let K : Matrix (Prod (Prod (Prod q e) btyp) rtyp) (Prod (Prod atyp btyp) rtyp) ℂ :=
+  let K : Matrix (((q × e) × btyp) × rtyp) ((atyp × btyp) × rtyp) ℂ :=
     Matrix.kronecker padAB.matrix (1 : CMatrix rtyp)
   let Pi := adhwFQSWIidLiftProjectorTriple
     (a := a) (b := b) (r := r) n T.projectorA T.projectorB T.projectorR
-  let v0 := Matrix.mulVec (Matrix.conjTranspose L0) φ.amp
+  let v0 := Matrix.mulVec (Matrix.conjTranspose L0) φ.vec
   have hL0range : L0 * Matrix.conjTranspose L0 = Pi := by
     simpa [L0, Pi] using
       adhwFQSWIidTypicalSourceLiftMatrix_mul_conjTranspose P B R
@@ -1397,103 +1401,103 @@ theorem exists_adhwFQSWIidCompressedSourceWitness
         (a := a) (b := b) (r := r) n
         T.projectorA T.projectorB T.projectorR hPAidT hPBidT hPRidT
   have hrank :
-      rankOneMatrix v0 = Matrix.conjTranspose L0 * ρ.matrix * L0 := by
+      rankOneMatrix v0 = Matrix.conjTranspose L0 * ρ.m * L0 := by
     calc
       rankOneMatrix v0 =
-          Matrix.conjTranspose L0 * rankOneMatrix φ.amp *
+          Matrix.conjTranspose L0 * rankOneMatrix φ.vec *
             Matrix.conjTranspose (Matrix.conjTranspose L0) := by
             simpa [v0] using
               rankOneMatrix_mulVec_eq_mul_rankOneMatrix_mul_conjTranspose
-                (Matrix.conjTranspose L0) φ.amp
-      _ = Matrix.conjTranspose L0 * ρ.matrix * L0 := by
-            simp [ρ, φ, adhwFQSWIidSourceState, PureVector.state_matrix,
+                (Matrix.conjTranspose L0) φ.vec
+      _ = Matrix.conjTranspose L0 * ρ.m * L0 := by
+            simp [ρ, φ, adhwFQSWIidSourceState, Ket.state_matrix,
               Matrix.mul_assoc]
   have hvtrace_to_range :
-      (rankOneMatrix v0).trace = (ρ.matrix * Pi).trace := by
+      (rankOneMatrix v0).trace = (ρ.m * Pi).trace := by
     calc
       (rankOneMatrix v0).trace =
-          (Matrix.conjTranspose L0 * ρ.matrix * L0).trace := by rw [hrank]
-      _ = (Matrix.conjTranspose L0 * (ρ.matrix * L0)).trace := by
+          (Matrix.conjTranspose L0 * ρ.m * L0).trace := by rw [hrank]
+      _ = (Matrix.conjTranspose L0 * (ρ.m * L0)).trace := by
             exact congrArg Matrix.trace
-              (Matrix.mul_assoc (Matrix.conjTranspose L0) ρ.matrix L0)
-      _ = ((ρ.matrix * L0) * Matrix.conjTranspose L0).trace := by
-            exact Matrix.trace_mul_comm (Matrix.conjTranspose L0) (ρ.matrix * L0)
-      _ = (ρ.matrix * (L0 * Matrix.conjTranspose L0)).trace := by
+              (Matrix.mul_assoc (Matrix.conjTranspose L0) ρ.m L0)
+      _ = ((ρ.m * L0) * Matrix.conjTranspose L0).trace := by
+            exact Matrix.trace_mul_comm (Matrix.conjTranspose L0) (ρ.m * L0)
+      _ = (ρ.m * (L0 * Matrix.conjTranspose L0)).trace := by
             exact congrArg Matrix.trace
-              (Matrix.mul_assoc ρ.matrix L0 (Matrix.conjTranspose L0))
-      _ = (ρ.matrix * Pi).trace := by rw [hL0range]
+              (Matrix.mul_assoc ρ.m L0 (Matrix.conjTranspose L0))
+      _ = (ρ.m * Pi).trace := by rw [hL0range]
   have hprojected_trace :
-      (Pi * ρ.matrix * Pi).trace = (ρ.matrix * Pi).trace := by
+      (Pi * ρ.m * Pi).trace = (ρ.m * Pi).trace := by
     calc
-      (Pi * ρ.matrix * Pi).trace =
-          (Pi * (ρ.matrix * Pi)).trace := by
-            exact congrArg Matrix.trace (Matrix.mul_assoc Pi ρ.matrix Pi)
-      _ = ((ρ.matrix * Pi) * Pi).trace := by
-            exact Matrix.trace_mul_comm Pi (ρ.matrix * Pi)
-      _ = (ρ.matrix * (Pi * Pi)).trace := by
-            exact congrArg Matrix.trace (Matrix.mul_assoc ρ.matrix Pi Pi)
-      _ = (ρ.matrix * Pi).trace := by rw [hPiid]
+      (Pi * ρ.m * Pi).trace =
+          (Pi * (ρ.m * Pi)).trace := by
+            exact congrArg Matrix.trace (Matrix.mul_assoc Pi ρ.m Pi)
+      _ = ((ρ.m * Pi) * Pi).trace := by
+            exact Matrix.trace_mul_comm Pi (ρ.m * Pi)
+      _ = (ρ.m * (Pi * Pi)).trace := by
+            exact congrArg Matrix.trace (Matrix.mul_assoc ρ.m Pi Pi)
+      _ = (ρ.m * Pi).trace := by rw [hPiid]
   have hvtrace_eq :
-      (rankOneMatrix v0).trace = (Pi * ρ.matrix * Pi).trace := by
+      (rankOneMatrix v0).trace = (Pi * ρ.m * Pi).trace := by
     rw [hvtrace_to_range, hprojected_trace]
   have hpos : 0 < (rankOneMatrix v0).trace.re := by
-    have hproj : 0 < (Pi * ρ.matrix * Pi).trace.re := by
+    have hproj : 0 < (Pi * ρ.m * Pi).trace.re := by
       simpa [Pi, ρ, adhwFQSWIidProjectedSourceMatrix] using
         T.normalizedTypicalSource_projected_trace_pos
     rw [hvtrace_eq]
     exact hproj
-  let source0 : PureVector (Prod (Prod atyp btyp) rtyp) :=
-    PureVector.normalize v0 hpos
-  let source : PureVector (Prod (Prod (Prod q e) btyp) rtyp) :=
-    padAB.applyPureVector source0
+  let source0 : Ket ((atyp × btyp) × rtyp) :=
+    Ket.normalizeRankOne v0 hpos
+  let source : Ket (((q × e) × btyp) × rtyp) :=
+    padAB.applyKet source0
   have hlift_rank :
-      L0 * rankOneMatrix v0 * Matrix.conjTranspose L0 = Pi * ρ.matrix * Pi := by
+      L0 * rankOneMatrix v0 * Matrix.conjTranspose L0 = Pi * ρ.m * Pi := by
     calc
       L0 * rankOneMatrix v0 * Matrix.conjTranspose L0 =
-          L0 * (Matrix.conjTranspose L0 * ρ.matrix * L0) *
+          L0 * (Matrix.conjTranspose L0 * ρ.m * L0) *
             Matrix.conjTranspose L0 := by
             rw [hrank]
-      _ = (L0 * Matrix.conjTranspose L0) * ρ.matrix *
+      _ = (L0 * Matrix.conjTranspose L0) * ρ.m *
             (L0 * Matrix.conjTranspose L0) := by
             simp [Matrix.mul_assoc]
-      _ = Pi * ρ.matrix * Pi := by rw [hL0range]
+      _ = Pi * ρ.m * Pi := by rw [hL0range]
   have hsource0_lift :
-      L0 * source0.state.matrix * Matrix.conjTranspose L0 =
-        T.normalizedTypicalSource.matrix := by
+      L0 * source0.state.m * Matrix.conjTranspose L0 =
+        T.normalizedTypicalSource.m := by
     dsimp [source0]
     calc
-      L0 * (PureVector.normalize v0 hpos).state.matrix * Matrix.conjTranspose L0 =
+      L0 * (Ket.normalizeRankOne v0 hpos).state.m * Matrix.conjTranspose L0 =
           L0 * (((((rankOneMatrix v0).trace.re)⁻¹ : ℝ) : ℂ) • rankOneMatrix v0) *
             Matrix.conjTranspose L0 := by
-            rw [PureVector.normalize_state_matrix]
+            rw [Ket.normalizeRankOne_state_matrix]
       _ = (((((rankOneMatrix v0).trace.re)⁻¹ : ℝ) : ℂ) •
             (L0 * rankOneMatrix v0 * Matrix.conjTranspose L0)) := by
             simp [Matrix.mul_smul, Matrix.smul_mul, Matrix.mul_assoc]
-      _ = (((((Pi * ρ.matrix * Pi).trace.re)⁻¹ : ℝ) : ℂ) •
-            (Pi * ρ.matrix * Pi)) := by
+      _ = (((((Pi * ρ.m * Pi).trace.re)⁻¹ : ℝ) : ℂ) •
+            (Pi * ρ.m * Pi)) := by
             rw [hlift_rank]
             have htrace_re :
-                (rankOneMatrix v0).trace.re = (Pi * ρ.matrix * Pi).trace.re :=
+                (rankOneMatrix v0).trace.re = (Pi * ρ.m * Pi).trace.re :=
               congrArg Complex.re hvtrace_eq
             rw [htrace_re]
-      _ = T.normalizedTypicalSource.matrix := by
+      _ = T.normalizedTypicalSource.m := by
             simpa [Pi, ρ, adhwFQSWIidProjectedSourceMatrix] using
               (T.normalizedTypicalSource_matrix_eq).symm
   have hsource_state :
-      source.state.matrix =
-        K * source0.state.matrix * Matrix.conjTranspose K := by
-    simpa [source, K, PureVector.state_matrix,
-      ReferenceIsometry.applyPureVector_amp] using
-      (padAB.rankOne_applyAmp source0.amp).trans
+      source.state.m =
+        K * source0.state.m * Matrix.conjTranspose K := by
+    simpa [source, K, Ket.state_matrix,
+      ReferenceIsometry.applyKet_vec] using
+      (padAB.rankOne_applyAmp source0.vec).trans
         (referenceIsometry_applyMatrix_eq_kronecker_one_conj
-          padAB (rankOneMatrix source0.amp))
+          padAB (rankOneMatrix source0.vec))
   have hKiso :
       Matrix.conjTranspose K * K =
-        (1 : CMatrix (Prod (Prod atyp btyp) rtyp)) := by
+        (1 : CMatrix ((atyp × btyp) × rtyp)) := by
     let idR : ReferenceIsometry rtyp rtyp :=
       ReferenceIsometry.ofEquiv (Equiv.refl rtyp)
-    let padR : ReferenceIsometry (Prod (Prod atyp btyp) rtyp)
-        (Prod (Prod (Prod q e) btyp) rtyp) :=
+    let padR : ReferenceIsometry ((atyp × btyp) × rtyp)
+        (((q × e) × btyp) × rtyp) :=
       padAB.prod idR
     have hpadR : padR.matrix = K := by
       ext i j
@@ -1517,7 +1521,7 @@ theorem exists_adhwFQSWIidCompressedSourceWitness
     simpa [padAB, source] using
       adhwFQSWIidPaddedTypicalSource_r_purity_le P B R source0 hsource0_lift
   have hsource_b_purity_le :
-      hilbertSchmidtSq source.state.marginalA.marginalB.matrix ≤
+      hilbertSchmidtSq source.state.traceRight.traceLeft.m ≤
         (2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyB ψ - δ))) := by
     simpa [padAB, source] using
       adhwFQSWIidPaddedTypicalSource_b_purity_le P B R source0 hsource0_lift
@@ -1541,25 +1545,25 @@ theorem exists_adhwFQSWIidCompressedSourceWitness
        lifted_state_eq_normalizedTypicalSource := ?_
        source_traceNorm_le_original := T.normalized_traceNorm_le }⟩
   calc
-    L * source.state.matrix * Matrix.conjTranspose L =
+    L * source.state.m * Matrix.conjTranspose L =
         (L0 * Matrix.conjTranspose K) *
-          (K * source0.state.matrix * Matrix.conjTranspose K) *
+          (K * source0.state.m * Matrix.conjTranspose K) *
           Matrix.conjTranspose (L0 * Matrix.conjTranspose K) := by
           rw [hL_eq, hsource_state]
-    _ = L0 * source0.state.matrix * Matrix.conjTranspose L0 := by
+    _ = L0 * source0.state.m * Matrix.conjTranspose L0 := by
           rw [Matrix.conjTranspose_mul, Matrix.conjTranspose_conjTranspose]
           calc
             (L0 * Matrix.conjTranspose K) *
-                (K * source0.state.matrix * Matrix.conjTranspose K) *
+                (K * source0.state.m * Matrix.conjTranspose K) *
                 (K * Matrix.conjTranspose L0) =
               L0 * ((Matrix.conjTranspose K * K) *
-                  source0.state.matrix * (Matrix.conjTranspose K * K)) *
+                  source0.state.m * (Matrix.conjTranspose K * K)) *
                   Matrix.conjTranspose L0 := by
                 simp [Matrix.mul_assoc]
-            _ = L0 * source0.state.matrix * Matrix.conjTranspose L0 := by
+            _ = L0 * source0.state.m * Matrix.conjTranspose L0 := by
                   rw [hKiso]
                   simp [Matrix.mul_assoc]
-    _ = T.normalizedTypicalSource.matrix := hsource0_lift
+    _ = T.normalizedTypicalSource.m := hsource0_lift
 
 /-- Constant absorption used by the strengthened mixed source-route `skoro`
 estimate.  The `4 ≤ nδ` tail condition and nonnegative mutual information
@@ -1823,7 +1827,7 @@ private theorem fqsw_mixed_source_fourthRootArgument_scalar_le_skoro
 `skoro` fourth-root argument bound when the typicality slack is at most one
 eighth of the rate slack. -/
 theorem ADHWFQSWIidCompressedSourceWitness.fourthRootArgument_le_iid_skoro_mixed
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δtyp δrate ε : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δtyp δrate ε : ℝ}
     {T : ADHWFQSWSimultaneousTypicalProjectors ψ n δtyp ε}
     {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
     {q : Type x} {e : Type y}
@@ -1848,32 +1852,32 @@ theorem ADHWFQSWIidCompressedSourceWitness.fourthRootArgument_le_iid_skoro_mixed
   let HR : ℝ := adhwFQSWEntropyR ψ
   have hbaseAR : (1 / 2 : ℝ) * I + EB + HR - HB = I := by
     dsimp [I, EB, HA, HB, HR]
-    unfold PureVector.fqswEbitYieldRate
+    unfold Ket.fqswEbitYieldRate
     rw [adhwFQSWMutualInformationAR_eq_entropyA_add_entropyR_sub_entropyB,
       adhwFQSWMutualInformationAB_eq_entropyA_add_entropyB_sub_entropyR]
     ring
   have hbaseProd : (1 / 2 : ℝ) * I + EB - HA = 0 := by
     dsimp [I, EB, HA, HB, HR]
-    unfold PureVector.fqswEbitYieldRate
+    unfold Ket.fqswEbitYieldRate
     rw [adhwFQSWMutualInformationAR_eq_entropyA_add_entropyR_sub_entropyB,
       adhwFQSWMutualInformationAB_eq_entropyA_add_entropyB_sub_entropyR]
     ring
   have hI_nonneg : 0 ≤ I := by
     dsimp [I]
-    exact State.mutualInformation_nonneg ψ.state.coherentTransferReferenceState
+    exact MState.mutualInformation_nonneg ψ.state.coherentTransferReferenceState
   have hq_pos_nat : 0 < Fintype.card q := Fintype.card_pos_iff.mpr inferInstance
   have hq_pos : 0 < (Fintype.card q : ℝ) := by exact_mod_cast hq_pos_nat
   have he_nonneg : 0 ≤ (Fintype.card e : ℝ) := Nat.cast_nonneg _
   have hrtyp_nonneg : 0 ≤ (Fintype.card rtyp : ℝ) := Nat.cast_nonneg _
   have hApu_nonneg : 0 ≤ adhwFQSWAPurity W.source := by
     simpa [adhwFQSWAPurity] using
-      hilbertSchmidtSq_nonneg ((adhwFQSWARState W.source).marginalA.matrix)
+      hilbertSchmidtSq_nonneg ((adhwFQSWARState W.source).traceRight.m)
   have hRpu_nonneg : 0 ≤ adhwFQSWRPurity W.source := by
     simpa [adhwFQSWRPurity] using
-      hilbertSchmidtSq_nonneg ((adhwFQSWARState W.source).marginalB.matrix)
+      hilbertSchmidtSq_nonneg ((adhwFQSWARState W.source).traceLeft.m)
   have hARpu_nonneg : 0 ≤ adhwFQSWARPurity W.source := by
     simpa [adhwFQSWARPurity] using
-      hilbertSchmidtSq_nonneg (adhwFQSWARState W.source).matrix
+      hilbertSchmidtSq_nonneg (adhwFQSWARState W.source).m
   have hQ_upper :
       (Fintype.card q : ℝ) ≤
         (2 : ℝ) ^ ((n : ℝ) * ((1 / 2 : ℝ) * I + (9 / 4 : ℝ) * δrate)) := by
@@ -1881,7 +1885,7 @@ theorem ADHWFQSWIidCompressedSourceWitness.fourthRootArgument_le_iid_skoro_mixed
       le_two_rpow_of_log2_le hq_pos
         balancedRateChoice.rateChoice.communication_log_le
     simpa [I, adhwFQSWIidRoundedCommunicationLogUpperTarget,
-      PureVector.fqswCommunicationRate] using hlog
+      Ket.fqswCommunicationRate] using hlog
   have hE_upper :
       (Fintype.card e : ℝ) ≤ (2 : ℝ) ^ ((n : ℝ) * EB) := by
     simpa [EB] using balancedRateChoice.ebit_card_upper_for_target
@@ -1912,7 +1916,7 @@ theorem ADHWFQSWIidCompressedSourceWitness.fourthRootArgument_le_iid_skoro_mixed
 This closes the ADHW `skoro` step internally from the compressed source purity
 fields and the balanced finite-register choice. -/
 theorem ADHWFQSWIidCompressedSourceWitness.oneShotTail_le_mixed
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δtyp δrate ε : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δtyp δrate ε : ℝ}
     {T : ADHWFQSWSimultaneousTypicalProjectors ψ n δtyp ε}
     {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
     {q : Type x} {e : Type y}
@@ -1946,7 +1950,7 @@ theorem ADHWFQSWIidCompressedSourceWitness.oneShotTail_le_mixed
 compressed source witness, one-shot bound, and proved one-shot tail used in the
 physical double-triangle argument. -/
 structure ADHWFQSWIidSourceRouteBlock
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ ε : ℝ)
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ ε : ℝ)
     (T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε)
     (atyp : Type p) (btyp : Type u1) (rtyp : Type v1)
     (q : Type x) (e : Type y)
@@ -1956,18 +1960,21 @@ structure ADHWFQSWIidSourceRouteBlock
     [Fintype q] [DecidableEq q] [Nonempty q]
     [Fintype e] [DecidableEq e] [Nonempty e]
     where
+  /-- The compressed source in one-shot coordinates. -/
   compressedSourceWitness :
     ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e
+  /-- The one-shot decoupling bound applied to that compressed source. -/
   oneShotBound :
     ADHWFQSWOneShotBound compressedSourceWitness.source q e
-      (Equiv.refl (Prod q e))
+      (Equiv.refl (q × e))
+  /-- The one-shot error decays exponentially in the blocklength. -/
   oneShotTail_le :
     adhwFQSWOneShotErrorBound compressedSourceWitness.source q ≤
       Real.sqrt 8 * (2 : ℝ) ^ (-((n : ℝ) * δ / 8))
 
 namespace ADHWFQSWIidSourceRouteBlock
 
-variable {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ ε : ℝ}
+variable {ψ : Ket ((a × b) × r)} {n : ℕ} {δ ε : ℝ}
 variable {T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε}
 variable {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
 variable {q : Type x} {e : Type y}
@@ -2019,7 +2026,7 @@ end ADHWFQSWIidSourceRouteBlock
 typical projectors and compressed source use `δtyp`, while the finite
 communication/ebit registers and one-shot exponential tail use `δrate`. -/
 structure ADHWFQSWIidMixedSourceRouteBlock
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δtyp δrate ε : ℝ)
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δtyp δrate ε : ℝ)
     (T : ADHWFQSWSimultaneousTypicalProjectors ψ n δtyp ε)
     (atyp : Type p) (btyp : Type u1) (rtyp : Type v1)
     (q : Type x) (e : Type y)
@@ -2029,18 +2036,21 @@ structure ADHWFQSWIidMixedSourceRouteBlock
     [Fintype q] [DecidableEq q] [Nonempty q]
     [Fintype e] [DecidableEq e] [Nonempty e]
     where
+  /-- The compressed source in one-shot coordinates, at typicality slack `δtyp`. -/
   compressedSourceWitness :
     ADHWFQSWIidCompressedSourceWitness ψ n δtyp ε T atyp btyp rtyp q e
+  /-- The one-shot decoupling bound applied to that compressed source. -/
   oneShotBound :
     ADHWFQSWOneShotBound compressedSourceWitness.source q e
-      (Equiv.refl (Prod q e))
+      (Equiv.refl (q × e))
+  /-- The one-shot error decays exponentially at the rate slack `δrate`. -/
   oneShotTail_le_mixed :
     adhwFQSWOneShotErrorBound compressedSourceWitness.source q ≤
       Real.sqrt 8 * (2 : ℝ) ^ (-((n : ℝ) * δrate / 4))
 
 namespace ADHWFQSWIidMixedSourceRouteBlock
 
-variable {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δtyp δrate ε : ℝ}
+variable {ψ : Ket ((a × b) × r)} {n : ℕ} {δtyp δrate ε : ℝ}
 variable {T : ADHWFQSWSimultaneousTypicalProjectors ψ n δtyp ε}
 variable {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
 variable {q : Type x} {e : Type y}
@@ -2091,7 +2101,7 @@ end ADHWFQSWIidMixedSourceRouteBlock
 /-- Assemble a source-route block from its fixed compressed source witness,
 one-shot bound, and proved one-shot tail estimate. -/
 theorem exists_adhwFQSWIidSourceRouteBlock
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ ε : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δ ε : ℝ}
     {T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε}
     {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
     {q : Type x} {e : Type y}
@@ -2101,7 +2111,7 @@ theorem exists_adhwFQSWIidSourceRouteBlock
     [Fintype q] [DecidableEq q] [Nonempty q]
     [Fintype e] [DecidableEq e] [Nonempty e]
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δ ε T atyp btyp rtyp q e)
-    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (Prod q e)))
+    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (q × e)))
     (honeShotBound :
       adhwFQSWOneShotErrorBound W.source q ≤
         Real.sqrt 8 * (2 : ℝ) ^ (-((n : ℝ) * δ / 8))) :
@@ -2113,7 +2123,7 @@ theorem exists_adhwFQSWIidSourceRouteBlock
 /-- Assemble a mixed-slack source-route block from the fixed compressed source
 witness, one-shot bound, and proved rate-slack tail estimate. -/
 theorem exists_adhwFQSWIidMixedSourceRouteBlock
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δtyp δrate ε : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δtyp δrate ε : ℝ}
     {T : ADHWFQSWSimultaneousTypicalProjectors ψ n δtyp ε}
     {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
     {q : Type x} {e : Type y}
@@ -2123,7 +2133,7 @@ theorem exists_adhwFQSWIidMixedSourceRouteBlock
     [Fintype q] [DecidableEq q] [Nonempty q]
     [Fintype e] [DecidableEq e] [Nonempty e]
     (W : ADHWFQSWIidCompressedSourceWitness ψ n δtyp ε T atyp btyp rtyp q e)
-    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (Prod q e)))
+    (H : ADHWFQSWOneShotBound W.source q e (Equiv.refl (q × e)))
     (honeShotBound :
       adhwFQSWOneShotErrorBound W.source q ≤
         Real.sqrt 8 * (2 : ℝ) ^ (-((n : ℝ) * δrate / 4))) :
@@ -2138,7 +2148,7 @@ theorem exists_adhwFQSWIidMixedSourceRouteBlock
 padded-embedding, one-shot, and rounded-rate route of fqsw.tex lines
 1093-1180. -/
 structure ADHWFQSWIidBlockConstruction
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ ε : ℝ)
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ ε : ℝ)
     (atyp : Type p) (btyp : Type u1) (rtyp : Type v1)
     (q : Type x) (e : Type y)
     [Fintype atyp] [DecidableEq atyp]
@@ -2146,16 +2156,23 @@ structure ADHWFQSWIidBlockConstruction
     [Fintype rtyp] [DecidableEq rtyp]
     [Fintype q] [DecidableEq q] [Nonempty q]
     [Fintype e] [DecidableEq e] [Nonempty e] where
+  /-- The simultaneous typical projectors for the three registers. -/
   typicalProjectors : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε
+  /-- Alice's typical support isometry, padded up to the one-shot register `q × e`. -/
   paddedAtypEmbedding :
     ADHWFQSWPaddedAtypEmbedding ψ n typicalProjectors.typicalitySlack atyp q e
+  /-- Bob's typical support isometry. -/
   typicalBobRegister :
     ADHWFQSWIidTypicalBobRegister ψ n δ ε typicalProjectors btyp
+  /-- The reference typical support isometry. -/
   typicalRefRegister :
     ADHWFQSWIidTypicalRefRegister ψ n δ ε typicalProjectors rtyp
+  /-- The rounded communication and ebit rates. -/
   rateChoice : ADHWFQSWIidRateChoice ψ n δ q e
+  /-- The cardinality inequalities the one-shot bound needs. -/
   oneShotCardinalitySideConditions :
     ADHWFQSWIidOneShotCardinalitySideConditions atyp btyp rtyp q e
+  /-- The compressed source together with its one-shot bound. -/
   sourceRouteBlock :
     ADHWFQSWIidSourceRouteBlock ψ n δ ε typicalProjectors atyp btyp rtyp q e
 
@@ -2163,7 +2180,7 @@ structure ADHWFQSWIidBlockConstruction
 typicality, padding, rounded-rate, one-shot, compression, and post-compression
 error records. -/
 theorem exists_adhwFQSWIidBlockConstruction
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ ε : ℝ)
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ ε : ℝ)
     (atyp : Type p) (btyp : Type u1) (rtyp : Type v1)
     (q : Type x) (e : Type y)
     [Fintype atyp] [DecidableEq atyp]
@@ -2192,39 +2209,9 @@ theorem exists_adhwFQSWIidBlockConstruction
      oneShotCardinalitySideConditions := oneShotCardinalitySideConditions
      sourceRouteBlock := sourceRouteBlock }⟩
 
-/-- Assemble one finite ADHW i.i.d. block through the source-route
-post-compression bridge instead of supplying the final post-compression trace
-bound as a free hypothesis. -/
-theorem exists_adhwFQSWIidBlockConstruction_of_sourceRoutePostCompression
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ ε : ℝ)
-    (atyp : Type p) (btyp : Type u1) (rtyp : Type v1)
-    (q : Type x) (e : Type y)
-    [Fintype atyp] [DecidableEq atyp]
-    [Fintype btyp] [DecidableEq btyp]
-    [Fintype rtyp] [DecidableEq rtyp]
-    [Fintype q] [DecidableEq q] [Nonempty q]
-    [Fintype e] [DecidableEq e] [Nonempty e]
-    (typicalProjectors : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε)
-    (paddedAtypEmbedding :
-      ADHWFQSWPaddedAtypEmbedding ψ n typicalProjectors.typicalitySlack atyp q e)
-    (typicalBobRegister :
-      ADHWFQSWIidTypicalBobRegister ψ n δ ε typicalProjectors btyp)
-    (typicalRefRegister :
-      ADHWFQSWIidTypicalRefRegister ψ n δ ε typicalProjectors rtyp)
-    (rateChoice : ADHWFQSWIidRateChoice ψ n δ q e)
-    (oneShotCardinalitySideConditions :
-      ADHWFQSWIidOneShotCardinalitySideConditions atyp btyp rtyp q e)
-    (sourceRouteBlock :
-      ADHWFQSWIidSourceRouteBlock ψ n δ ε typicalProjectors atyp btyp rtyp q e) :
-    Nonempty (ADHWFQSWIidBlockConstruction ψ n δ ε atyp btyp rtyp q e) :=
-  exists_adhwFQSWIidBlockConstruction
-    ψ n δ ε atyp btyp rtyp q e
-    typicalProjectors paddedAtypEmbedding typicalBobRegister typicalRefRegister
-    rateChoice oneShotCardinalitySideConditions sourceRouteBlock
-
 namespace ADHWFQSWIidBlockConstruction
 
-variable {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ ε : ℝ}
+variable {ψ : Ket ((a × b) × r)} {n : ℕ} {δ ε : ℝ}
 variable {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
 variable {q : Type x} {e : Type y}
 variable [Fintype atyp] [DecidableEq atyp]
@@ -2307,7 +2294,7 @@ support and compressed source use `δtyp`; the rounded communication and ebit
 registers use `δrate`, which is the slack exposed to the public rate and error
 estimates. -/
 structure ADHWFQSWIidMixedBlockConstruction
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δtyp δrate ε : ℝ)
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δtyp δrate ε : ℝ)
     (atyp : Type p) (btyp : Type u1) (rtyp : Type v1)
     (q : Type x) (e : Type y)
     [Fintype atyp] [DecidableEq atyp]
@@ -2315,16 +2302,23 @@ structure ADHWFQSWIidMixedBlockConstruction
     [Fintype rtyp] [DecidableEq rtyp]
     [Fintype q] [DecidableEq q] [Nonempty q]
     [Fintype e] [DecidableEq e] [Nonempty e] where
+  /-- The simultaneous typical projectors for the three registers. -/
   typicalProjectors : ADHWFQSWSimultaneousTypicalProjectors ψ n δtyp ε
+  /-- Alice's typical support isometry, padded up to the one-shot register `q × e`. -/
   paddedAtypEmbedding :
     ADHWFQSWPaddedAtypEmbedding ψ n typicalProjectors.typicalitySlack atyp q e
+  /-- Bob's typical support isometry. -/
   typicalBobRegister :
     ADHWFQSWIidTypicalBobRegister ψ n δtyp ε typicalProjectors btyp
+  /-- The reference typical support isometry. -/
   typicalRefRegister :
     ADHWFQSWIidTypicalRefRegister ψ n δtyp ε typicalProjectors rtyp
+  /-- The rounded communication and ebit rates, at slack `δrate`. -/
   balancedRateChoice : ADHWFQSWIidBalancedRateChoice ψ n δrate q e
+  /-- The cardinality inequalities the one-shot bound needs. -/
   oneShotCardinalitySideConditions :
     ADHWFQSWIidOneShotCardinalitySideConditions atyp btyp rtyp q e
+  /-- The compressed source together with its mixed-slack one-shot bound. -/
   sourceRouteBlock :
     ADHWFQSWIidMixedSourceRouteBlock
       ψ n δtyp δrate ε typicalProjectors atyp btyp rtyp q e
@@ -2333,7 +2327,7 @@ structure ADHWFQSWIidMixedBlockConstruction
 typicality, padding, rounded-rate, one-shot, compression, and source-route
 records. -/
 theorem exists_adhwFQSWIidMixedBlockConstruction
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δtyp δrate ε : ℝ)
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δtyp δrate ε : ℝ)
     (atyp : Type p) (btyp : Type u1) (rtyp : Type v1)
     (q : Type x) (e : Type y)
     [Fintype atyp] [DecidableEq atyp]
@@ -2366,7 +2360,7 @@ theorem exists_adhwFQSWIidMixedBlockConstruction
      sourceRouteBlock := sourceRouteBlock }⟩
 
 theorem ADHWFQSWIidMixedBlockConstruction.rateChoice
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δtyp δrate ε : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δtyp δrate ε : ℝ}
     {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
     {q : Type x} {e : Type y}
     [Fintype atyp] [DecidableEq atyp]
@@ -2380,7 +2374,7 @@ theorem ADHWFQSWIidMixedBlockConstruction.rateChoice
 
 namespace ADHWFQSWIidMixedBlockConstruction
 
-variable {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δtyp δrate ε : ℝ}
+variable {ψ : Ket ((a × b) × r)} {n : ℕ} {δtyp δrate ε : ℝ}
 variable {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
 variable {q : Type x} {e : Type y}
 variable [Fintype atyp] [DecidableEq atyp]
@@ -2464,7 +2458,7 @@ the existing simultaneous-typicality, balanced-cardinality, compressed-source,
 and one-shot APIs, then closes the tail with the source-route mixed `skoro`
 estimate. -/
 theorem exists_adhwFQSWIidMixedBlockConstruction_eventually
-    (ψ : PureVector (Prod (Prod a b) r)) {δtyp δrate ε : ℝ}
+    (ψ : Ket ((a × b) × r)) {δtyp δrate ε : ℝ}
     (hδtyp : 0 < δtyp) (hδrate : 0 < δrate) (hε : 0 < ε)
     (hδtyp_le_eighth : δtyp ≤ δrate / 8) :
     ∃ N : ℕ, ∀ n : ℕ, n ≥ N →
@@ -2536,7 +2530,7 @@ theorem exists_adhwFQSWIidMixedBlockConstruction_eventually
 /-- ADHW i.i.d. FQSW construction record: the typical-subspace and Schumacher
 compression route of fqsw.tex lines 1093-1180 supplies the block protocols
 used by the asymptotic direct theorem. -/
-structure ADHWFQSWIidConstruction (ψ : PureVector (Prod (Prod a b) r)) where
+structure ADHWFQSWIidConstruction (ψ : Ket ((a × b) × r)) where
   typical_rate_blocks :
     ∀ δ : ℝ, 0 < δ → ∀ εerr : ℝ, 0 < εerr →
       ∃ N : ℕ, ∀ n : ℕ, n ≥ N →
@@ -2554,7 +2548,7 @@ structure ADHWFQSWIidConstruction (ψ : PureVector (Prod (Prod a b) r)) where
 `δtyp = δrate / 8`, which restores the exact ADHW `2^(-nδrate/4)` tail after
 the finite-register rounding estimates. -/
 theorem exists_adhwFQSWIidConstruction
-    (ψ : PureVector (Prod (Prod a b) r)) :
+    (ψ : Ket ((a × b) × r)) :
     Nonempty (ADHWFQSWIidConstruction.{u, v, w, x, y} ψ) := by
   refine ⟨{ typical_rate_blocks := ?_ }⟩
   intro δ hδ εerr hεerr
@@ -2563,16 +2557,31 @@ theorem exists_adhwFQSWIidConstruction
       (ψ := ψ) (δtyp := δ / 8) (δrate := δ) (ε := εerr)
       (by positivity) hδ hεerr le_rfl
 
-namespace PureVector
+end
+end QIT
 
-variable (ψ : PureVector (Prod (Prod a b) r))
+namespace Ket
+
+noncomputable section
+
+open QIT
+universe u v w x y z p u1 v1 w1
+variable {a : Type u} {b : Type v} {r : Type w}
+variable {q : Type x} {e : Type y} {et : Type z}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+variable [Fintype r] [DecidableEq r]
+variable [Fintype q] [DecidableEq q]
+variable [Fintype e] [DecidableEq e] [Nonempty e]
+variable [Fintype et] [DecidableEq et]
+
+variable (ψ : Ket ((a × b) × r))
 
 /-- The ADHW i.i.d. construction supplies concrete physical block protocols
 with the source communication rate, ebit-yield rate, and vanishing computed
 trace-distance error; see fqsw.tex lines 1093-1180. -/
 theorem fqsw_direct_achievable_of_iidConstruction
     (h : ADHWFQSWIidConstruction.{u, v, w, x, y} ψ) :
-    PureVector.IsAchievableFQSW.{u, v, w, x, y, y} ψ := by
+    Ket.IsAchievableFQSW.{u, v, w, x, y, y} ψ := by
   intro δ hδ εerr hεerr
   have hδ3_pos : 0 < δ / 3 := by positivity
   have hε4_pos : 0 < εerr / 4 := by positivity
@@ -2612,11 +2621,25 @@ communication rate approaching `I(A;R)/2`, ebit-yield rate approaching
 `I(A;B)/2`, and vanishing computed trace-distance error, following fqsw.tex
 lines 1093-1180. -/
 theorem fqsw_direct_achievable :
-    PureVector.IsAchievableFQSW.{u, v, w, x, y, y} ψ :=
+    Ket.IsAchievableFQSW.{u, v, w, x, y, y} ψ :=
   Nonempty.elim (exists_adhwFQSWIidConstruction ψ)
     (fqsw_direct_achievable_of_iidConstruction ψ)
 
-end PureVector
+end
+
+end Ket
+
+namespace QIT
+noncomputable section
+
+universe u v w x y z p u1 v1 w1
+variable {a : Type u} {b : Type v} {r : Type w}
+variable {q : Type x} {e : Type y} {et : Type z}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+variable [Fintype r] [DecidableEq r]
+variable [Fintype q] [DecidableEq q]
+variable [Fintype e] [DecidableEq e] [Nonempty e]
+variable [Fintype et] [DecidableEq et]
 
 end
 

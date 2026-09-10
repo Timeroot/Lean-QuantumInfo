@@ -12,10 +12,10 @@ public import QuantumLib.QIT.States.Geometry.PurifiedDistance
 public import Mathlib.Topology.MetricSpace.ProperSpace
 
 /-!
-# Topology for finite-dimensional states and pure vectors
+# Topology for finite-dimensional states and kets
 
 This module contains the canonical finite-dimensional topology attached to
-density states and normalized pure vectors.  High-level information-theoretic
+density states and normalized kets.  High-level information-theoretic
 modules should import this surface rather than introduce these global
 instances themselves.
 -/
@@ -25,13 +25,12 @@ instances themselves.
 open scoped ComplexOrder MatrixOrder
 open Matrix
 
-namespace QIT
-
+noncomputable section
 universe u v
 
-noncomputable section
+open QIT
 
-namespace State
+namespace MState
 
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
@@ -44,23 +43,46 @@ theorem mem_stateMatrixSet_iff {M : CMatrix a} :
     M ∈ stateMatrixSet a ↔ M.PosSemidef ∧ M.trace = 1 :=
   Iff.rfl
 
-/-- States carry the topology induced by their density matrices. -/
-instance instTopologicalSpace : TopologicalSpace (State a) :=
-  TopologicalSpace.induced State.matrix inferInstance
-
 /-- The matrix projection from states is continuous. -/
 @[fun_prop]
-theorem continuous_matrix : Continuous (fun ρ : State a => ρ.matrix) :=
-  continuous_induced_dom
+theorem continuous_matrix : Continuous (fun ρ : MState a => ρ.m) :=
+  HermitianMat.continuous_mat.comp continuous_induced_dom
 
 private theorem matrix_injective :
-    Function.Injective (fun ρ : State a => ρ.matrix) := by
+    Function.Injective (fun ρ : MState a => ρ.m) := by
   intro ρ σ hρσ
   exact ext hρσ
 
 theorem isEmbedding_matrix :
-    Topology.IsEmbedding (fun ρ : State a => ρ.matrix) :=
-  Function.Injective.isEmbedding_induced matrix_injective
+    Topology.IsEmbedding (fun ρ : MState a => ρ.m) where
+  eq_induced := by
+    rw [show (fun ρ : MState a => ρ.m) = HermitianMat.mat ∘ DensityOp.M from rfl,
+      ← induced_compose]
+    rfl
+  injective := matrix_injective
+
+/-- A map into states is continuous as soon as the density matrices vary continuously. -/
+theorem continuous_of_continuous_m {X : Type*} [TopologicalSpace X] {f : X → MState a}
+    (hf : Continuous fun x => (f x).m) : Continuous f :=
+  isEmbedding_matrix.continuous_iff.mpr hf
+
+/-- A family of states converges as soon as its density matrices converge. -/
+theorem tendsto_of_tendsto_m {X : Type*} {l : Filter X} {f : X → MState a} {ρ : MState a}
+    (hf : Filter.Tendsto (fun x => (f x).m) l (nhds ρ.m)) : Filter.Tendsto f l (nhds ρ) :=
+  isEmbedding_matrix.tendsto_nhds_iff.mpr hf
+
+/-- Square-root matrices vary continuously along state paths. -/
+theorem sqrtMatrix_tendsto_of_tendsto {X : Type*} {l : Filter X}
+    {ρF : X → MState a} {ρ : MState a} (hρF : Filter.Tendsto ρF l (nhds ρ)) :
+    Filter.Tendsto (fun x : X => (ρF x).sqrtMatrix) l (nhds ρ.sqrtMatrix) := by
+  have hmatrix : Filter.Tendsto (fun x : X => (ρF x).m) l (nhds ρ.m) :=
+    continuous_matrix.tendsto ρ |>.comp hρF
+  have hpsd : ∀ᶠ x in l, (ρF x).m.PosSemidef :=
+    Filter.Eventually.of_forall fun x => (ρF x).psd
+  have hpow :=
+    _root_.QIT.cMatrix_rpow_tendsto_of_tendsto_posSemidef
+      (a := a) (p := (1 / 2 : ℝ)) (by norm_num) hmatrix hpsd ρ.psd
+  simpa [MState.sqrtMatrix, psdSqrt, CFC.sqrt_eq_rpow] using hpow
 
 /-- The matrix-level normalized-state domain is compact. -/
 theorem stateMatrixSet_isCompact :
@@ -85,107 +107,102 @@ theorem stateMatrixSet_isCompact :
   exact hsubcompact.inter_right htrace_closed
 
 private theorem matrix_image_univ :
-    (fun ρ : State a => ρ.matrix) '' Set.univ =
+    (fun ρ : MState a => ρ.m) '' Set.univ =
       stateMatrixSet a := by
   ext M
   constructor
   · rintro ⟨ρ, -, rfl⟩
-    exact ⟨ρ.pos, ρ.trace_eq_one⟩
+    exact ⟨ρ.psd, ρ.tr'⟩
   · intro hM
-    refine ⟨⟨M, hM.1, hM.2⟩, Set.mem_univ _, rfl⟩
+    exact ⟨MState.ofMatrix M hM.1 hM.2, Set.mem_univ _, MState.matrix_ofMatrix _ _ _⟩
 
 /-- The full type of finite-dimensional normalized states is compact. -/
 theorem isCompact_univ :
-    IsCompact (Set.univ : Set (State a)) := by
+    IsCompact (Set.univ : Set (MState a)) := by
   rw [isEmbedding_matrix.isCompact_iff]
   rw [matrix_image_univ]
   exact stateMatrixSet_isCompact (a := a)
 
-/-- Normalized states form a compact space in the density-matrix topology. -/
-instance instCompactSpace : CompactSpace (State a) :=
-  isCompact_univ_iff.mp isCompact_univ
-
 /-- The embedding of a normalized state as a subnormalized state is continuous. -/
 theorem continuous_toSubnormalized :
-    Continuous (fun ρ : State a => ρ.toSubnormalized) := by
+    Continuous (fun ρ : MState a => ρ.toSubnormalized) := by
   rw [continuous_induced_rng]
-  change Continuous fun ρ : State a => ρ.toSubnormalized.matrix
-  simpa [State.toSubnormalized_matrix] using continuous_matrix
+  change Continuous fun ρ : MState a => ρ.toSubnormalized.matrix
+  simpa [MState.toSubnormalized_matrix] using continuous_matrix
 
 /-- A closed purified-distance ball in the normalized-state topology. -/
-theorem purifiedBall_isClosed (ρ : State a) (ε : ℝ) :
-    IsClosed ({σ : State a | ρ.purifiedBall ε σ}) := by
+theorem purifiedBall_isClosed (ρ : MState a) (ε : ℝ) :
+    IsClosed ({σ : MState a | ρ.purifiedBall ε σ}) := by
   have hclosed :
       IsClosed
-        ({σ : State a |
+        ({σ : MState a |
           ρ.toSubnormalized.purifiedBall ε σ.toSubnormalized}) :=
     (SubnormalizedState.purifiedBall_isClosed (a := a) ρ.toSubnormalized ε).preimage
-      State.continuous_toSubnormalized
+      MState.continuous_toSubnormalized
   have hset :
-      {σ : State a | ρ.purifiedBall ε σ} =
-        {σ : State a | ρ.toSubnormalized.purifiedBall ε σ.toSubnormalized} := by
+      {σ : MState a | ρ.purifiedBall ε σ} =
+        {σ : MState a | ρ.toSubnormalized.purifiedBall ε σ.toSubnormalized} := by
     ext σ
     show ρ.purifiedBall ε σ ↔
       ρ.toSubnormalized.purifiedBall ε σ.toSubnormalized
-    rw [State.purifiedBall_eq, SubnormalizedState.purifiedBall_eq,
-      State.toSubnormalized_purifiedDistance_eq]
+    rw [MState.purifiedBall_eq, SubnormalizedState.purifiedBall_eq,
+      MState.toSubnormalized_purifiedDistance_eq]
   rwa [hset]
 
 /-- A purified-distance ball is compact as a closed subset of the compact
 normalized-state space. -/
-theorem purifiedBall_isCompact (ρ : State a) (ε : ℝ) :
-    IsCompact ({σ : State a | ρ.purifiedBall ε σ}) := by
+theorem purifiedBall_isCompact (ρ : MState a) (ε : ℝ) :
+    IsCompact ({σ : MState a | ρ.purifiedBall ε σ}) := by
   have hcompact :=
-    (State.isCompact_univ (a := a)).inter_right (purifiedBall_isClosed (a := a) ρ ε)
+    (MState.isCompact_univ (a := a)).inter_right (purifiedBall_isClosed (a := a) ρ ε)
   simpa [Set.univ_inter] using hcompact
 
 variable {b : Type v} [Fintype b] [DecidableEq b]
 
 /-- The first marginal is continuous in the density-matrix topology. -/
-theorem marginalA_continuous :
-    Continuous (fun ρ : State (Prod a b) => ρ.marginalA) := by
-  rw [continuous_induced_rng]
-  change Continuous fun ρ : State (Prod a b) =>
-    partialTraceB (a := a) (b := b) ρ.matrix
+theorem traceRight_continuous :
+    Continuous (fun ρ : MState (a × b) => ρ.traceRight) := by
+  refine continuous_of_continuous_m ?_
+  simp only [MState.traceRight_m]
   refine continuous_pi ?_
   intro i
   refine continuous_pi ?_
   intro i'
-  simp only [partialTraceB]
+  simp only [Matrix.traceRight, Matrix.of_apply]
   refine continuous_finsetSum Finset.univ ?_
   intro j _
   exact (continuous_apply (i', j)).comp
-    ((continuous_apply (i, j)).comp State.continuous_matrix)
+    ((continuous_apply (i, j)).comp MState.continuous_matrix)
 
 /-- The second marginal is continuous in the density-matrix topology. -/
-theorem marginalB_continuous :
-    Continuous (fun ρ : State (Prod a b) => ρ.marginalB) := by
-  rw [continuous_induced_rng]
-  change Continuous fun ρ : State (Prod a b) =>
-    partialTraceA (a := a) (b := b) ρ.matrix
+theorem traceLeft_continuous :
+    Continuous (fun ρ : MState (a × b) => ρ.traceLeft) := by
+  refine continuous_of_continuous_m ?_
+  simp only [MState.traceLeft_m]
   refine continuous_pi ?_
   intro j
   refine continuous_pi ?_
   intro j'
-  simp only [partialTraceA]
+  simp only [Matrix.traceLeft, Matrix.of_apply]
   refine continuous_finsetSum Finset.univ ?_
   intro i _
   exact (continuous_apply (i, j')).comp
-    ((continuous_apply (i, j)).comp State.continuous_matrix)
+    ((continuous_apply (i, j)).comp MState.continuous_matrix)
 
-end State
+end MState
 
-namespace PureVector
+namespace Ket
 
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
-/-- Pure vectors carry the topology induced by their amplitudes. -/
-instance instTopologicalSpace : TopologicalSpace (PureVector a) :=
-  TopologicalSpace.induced PureVector.amp inferInstance
+/-- Kets carry the topology induced by their amplitudes. -/
+instance instTopologicalSpace : TopologicalSpace (Ket a) :=
+  TopologicalSpace.induced Ket.vec inferInstance
 
-/-- The amplitude projection from normalized pure vectors is continuous. -/
+omit [DecidableEq a] in
+/-- The amplitude projection from normalized kets is continuous. -/
 @[fun_prop]
-theorem continuous_amp : Continuous (fun ψ : PureVector a => ψ.amp) :=
+theorem continuous_vec : Continuous (fun ψ : Ket a => ψ.vec) :=
   continuous_induced_dom
 
 omit [Fintype a] [DecidableEq a] in
@@ -198,13 +215,13 @@ theorem rankOneMatrix_continuous : Continuous (fun ψ : a → ℂ => rankOneMatr
   simp only [rankOneMatrix_apply]
   exact (continuous_apply i).mul (continuous_star.comp (continuous_apply j))
 
-/-- The state associated to a normalized pure vector is continuous. -/
-theorem state_continuous : Continuous (fun ψ : PureVector a => ψ.state) := by
-  rw [continuous_induced_rng]
-  change Continuous fun ψ : PureVector a => rankOneMatrix ψ.amp
-  exact rankOneMatrix_continuous.comp PureVector.continuous_amp
+/-- The state associated to a normalized ket is continuous. -/
+theorem state_continuous : Continuous (fun ψ : Ket a => ψ.state) := by
+  refine MState.continuous_of_continuous_m ?_
+  simp only [Ket.state_matrix]
+  exact rankOneMatrix_continuous.comp Ket.continuous_vec
 
-/-- The amplitude vectors underlying normalized pure vectors. -/
+/-- The amplitude vectors underlying normalized kets. -/
 private def normalizedAmplitudeSet (a : Type u) [Fintype a] : Set (a → ℂ) :=
   {ψ | (rankOneMatrix ψ).trace = 1}
 
@@ -258,9 +275,9 @@ private theorem normalizedAmplitudeSet_isCompact :
     ⟨normalizedAmplitudeSet_isClosed, normalizedAmplitudeSet_isBounded⟩
 
 private def ampSubtypeEquiv :
-    PureVector a ≃ {ψ : a → ℂ // ψ ∈ normalizedAmplitudeSet a} where
-  toFun ψ := ⟨ψ.amp, ψ.trace_rankOne_eq_one⟩
-  invFun ψ := ⟨ψ.1, ψ.2⟩
+    Ket a ≃ {ψ : a → ℂ // ψ ∈ normalizedAmplitudeSet a} where
+  toFun ψ := ⟨ψ.vec, ψ.trace_rankOne_eq_one⟩
+  invFun ψ := Ket.ofRankOne ψ.1 ψ.2
   left_inv ψ := by
     cases ψ
     rfl
@@ -269,22 +286,18 @@ private def ampSubtypeEquiv :
     rfl
 
 private noncomputable def ampSubtypeHomeomorph :
-    PureVector a ≃ₜ {ψ : a → ℂ // ψ ∈ normalizedAmplitudeSet a} where
+    Ket a ≃ₜ {ψ : a → ℂ // ψ ∈ normalizedAmplitudeSet a} where
   toEquiv := ampSubtypeEquiv
-  continuous_toFun := PureVector.continuous_amp.subtype_mk fun ψ => ψ.trace_rankOne_eq_one
+  continuous_toFun := Ket.continuous_vec.subtype_mk fun ψ => ψ.trace_rankOne_eq_one
   continuous_invFun := by
     rw [continuous_induced_rng]
     change Continuous fun ψ : {ψ : a → ℂ // ψ ∈ normalizedAmplitudeSet a} => ψ.1
     exact continuous_subtype_val
 
-/-- Finite-dimensional normalized pure vectors form a compact space. -/
-instance instCompactSpace : CompactSpace (PureVector a) := by
+/-- Finite-dimensional normalized kets form a compact space. -/
+instance instCompactSpace : CompactSpace (Ket a) := by
   have : CompactSpace {ψ : a → ℂ // ψ ∈ normalizedAmplitudeSet a} :=
     isCompact_iff_compactSpace.mp normalizedAmplitudeSet_isCompact
   exact ampSubtypeHomeomorph.symm.compactSpace
 
-end PureVector
-
-end
-
-end QIT
+end Ket

@@ -6,6 +6,7 @@ Authors: QuAIR Team
 
 module
 
+public import QuantumLib.QIT.Coding.Rate
 public import QuantumLib.QIT.Information.Entropy.Entropy
 public import QuantumLib.QIT.HypothesisTesting.MutualInformation
 public import QuantumLib.QIT.Core.Channel
@@ -53,56 +54,53 @@ open scoped ComplexOrder MatrixOrder
 open Matrix
 open Filter
 
-namespace QIT
-
 universe u v w x y
+
+namespace QIT
 
 noncomputable section
 
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-namespace PureVector
-
-variable {a : Type u} [Fintype a] [DecidableEq a]
-
-/-- A canonical basis pure vector on a nonempty finite system. -/
-def basisPureVector [Nonempty a] : PureVector a where
-  amp := fun i => if i = Classical.choice (inferInstance : Nonempty a) then 1 else 0
-  trace_rankOne_eq_one := by
-    rw [rankOneMatrix_trace, dotProduct]
-    simp
-
-end PureVector
-
 theorem mutualInformation_continuous :
-    Continuous (fun ρ : State (Prod a b) => mutualInformation ρ) := by
+    Continuous (fun ρ : MState (a × b) => mutualInformation ρ) := by
   unfold mutualInformation
-  exact ((State.vonNeumann_continuous.comp State.marginalA_continuous).add
-    (State.vonNeumann_continuous.comp State.marginalB_continuous)).sub
-    State.vonNeumann_continuous
+  exact ((MState.vonNeumann_continuous.comp MState.traceRight_continuous).add
+    (MState.vonNeumann_continuous.comp MState.traceLeft_continuous)).sub
+    MState.vonNeumann_continuous
 
-namespace Channel
+end
+end QIT
 
-variable (N : Channel a b)
+noncomputable section
+
+namespace CPTPOp
+
+open QIT
+
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+
+variable (N : CPTPMap a b)
 
 /-- Output state `(id_R ⊗ N)(|ψ⟩⟨ψ|)` for a pure input-reference state. -/
 def entanglementAssistedOutputState {r : Type w} [Fintype r] [DecidableEq r]
-    (ψ : PureVector (Prod r a)) : State (Prod r b) :=
-  ((Channel.idChannel r).prod N).applyState ψ.state
+    (ψ : Ket (r × a)) : MState (r × b) :=
+  ((CPTPOp.id (dIn := r)).prod N) ψ.state
 
 theorem entanglementAssistedOutputState_continuous {r : Type w} [Fintype r] [DecidableEq r] :
-    Continuous (fun ψ : PureVector (Prod r a) => N.entanglementAssistedOutputState ψ) :=
-  (((Channel.idChannel r).prod N).applyState_continuous).comp PureVector.state_continuous
+    Continuous (fun ψ : Ket (r × a) => N.entanglementAssistedOutputState ψ) :=
+  (((CPTPOp.id (dIn := r)).prod N).applyState_continuous).comp Ket.state_continuous
 
 /-- Mutual information of the entanglement-assisted channel output state. -/
 def entanglementAssistedMutualInformation {r : Type w} [Fintype r] [DecidableEq r]
-    (ψ : PureVector (Prod r a)) : ℝ :=
+    (ψ : Ket (r × a)) : ℝ :=
   mutualInformation (N.entanglementAssistedOutputState ψ)
 
 theorem entanglementAssistedMutualInformation_continuous
     {r : Type w} [Fintype r] [DecidableEq r] :
-    Continuous (fun ψ : PureVector (Prod r a) =>
+    Continuous (fun ψ : Ket (r × a) =>
       N.entanglementAssistedMutualInformation ψ) :=
   mutualInformation_continuous.comp N.entanglementAssistedOutputState_continuous
 
@@ -113,20 +111,20 @@ uses `sSup` over pure states on a reference copy of the input system; the
 separate compactness/maximizer proof for the attained `max` is tracked
 downstream. -/
 def entanglementAssistedInformation : ℝ :=
-  sSup (Set.range fun ψ : PureVector (Prod a a) =>
+  sSup (Set.range fun ψ : Ket (a × a) =>
     N.entanglementAssistedMutualInformation ψ)
 
-/-- The supremum in `Channel.entanglementAssistedInformation` is attained on a
+/-- The supremum in `CPTPOp.entanglementAssistedInformation` is attained on a
 pure input-reference state for nonempty finite input systems. -/
 theorem exists_entanglementAssistedInformation_maximizer [Nonempty a] :
-    ∃ ψ : PureVector (Prod a a),
+    ∃ ψ : Ket (a × a),
       N.entanglementAssistedInformation =
         N.entanglementAssistedMutualInformation ψ := by
-  let f : PureVector (Prod a a) → ℝ :=
+  let f : Ket (a × a) → ℝ :=
     fun ψ => N.entanglementAssistedMutualInformation ψ
-  have : Nonempty (PureVector (Prod a a)) :=
-    ⟨PureVector.basisPureVector⟩
-  have hne : (Set.univ : Set (PureVector (Prod a a))).Nonempty :=
+  have : Nonempty (Ket (a × a)) :=
+    ⟨default⟩
+  have hne : (Set.univ : Set (Ket (a × a))).Nonempty :=
     Set.univ_nonempty
   obtain ⟨ψ, _hψmem, hψmax⟩ :=
     isCompact_univ.exists_isMaxOn hne
@@ -146,14 +144,14 @@ theorem exists_entanglementAssistedInformation_maximizer [Nonempty a] :
 /-- Every input-reference mutual information value is bounded by the channel
 supremum `I(N)`. -/
 theorem entanglementAssistedMutualInformation_le_information [Nonempty a]
-    (ψ : PureVector (Prod a a)) :
+    (ψ : Ket (a × a)) :
     N.entanglementAssistedMutualInformation ψ ≤
       N.entanglementAssistedInformation := by
-  let f : PureVector (Prod a a) → ℝ :=
+  let f : Ket (a × a) → ℝ :=
     fun ψ => N.entanglementAssistedMutualInformation ψ
-  have : Nonempty (PureVector (Prod a a)) :=
-    ⟨PureVector.basisPureVector⟩
-  have hne : (Set.univ : Set (PureVector (Prod a a))).Nonempty :=
+  have : Nonempty (Ket (a × a)) :=
+    ⟨default⟩
+  have hne : (Set.univ : Set (Ket (a × a))).Nonempty :=
     Set.univ_nonempty
   obtain ⟨ψmax, _hψmem, hψmax⟩ :=
     isCompact_univ.exists_isMaxOn hne
@@ -165,11 +163,16 @@ theorem entanglementAssistedMutualInformation_le_information [Nonempty a]
   rcases hy with ⟨φ, rfl⟩
   exact hψmax trivial
 
-end Channel
+end CPTPOp
 
-/-- Register rate for an entanglement-assisted classical message code. -/
-def entanglementAssistedMessageRate (M : Type w) [Fintype M] (n : ℕ) : ℝ :=
-  if n = 0 then 0 else log2 (Fintype.card M : ℝ) / (n : ℝ)
+end
+
+namespace QIT
+
+noncomputable section
+
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
 /-- A finite entanglement-assisted classical communication code for `n` uses
 of channel `N`.
@@ -178,30 +181,33 @@ Alice and Bob share a finite state on `EA × EB`.  For each message, Alice
 applies an encoder channel to her share `EA` to prepare the channel input
 `A^n`; Bob decodes from the channel output `B^n` together with his retained
 share `EB`. -/
-structure EntanglementAssistedClassicalCode (N : Channel a b) (n : ℕ)
+structure EntanglementAssistedClassicalCode (N : CPTPMap a b) (n : ℕ)
     (M : Type w) [Fintype M] [DecidableEq M] [Nonempty M]
     (EA : Type x) [Fintype EA] [DecidableEq EA]
     (EB : Type y) [Fintype EB] [DecidableEq EB] where
-  sharedState : State (Prod EA EB)
-  encoder : M → Channel EA (TensorPower a n)
-  decoder : POVM M (Prod (TensorPower b n) EB)
+  /-- The entanglement Alice and Bob share before the protocol starts. -/
+  sharedState : MState (EA × EB)
+  /-- Alice's message-dependent encoding of her share into the channel input. -/
+  encoder : M → CPTPMap EA (TensorPower a n)
+  /-- Bob's decoding POVM on the channel output together with his share. -/
+  decoder : POVM M (TensorPower b n × EB)
 
 namespace EntanglementAssistedClassicalCode
 
-variable {N : Channel a b} {n : ℕ}
+variable {N : CPTPMap a b} {n : ℕ}
 variable {M : Type w} [Fintype M] [DecidableEq M] [Nonempty M]
 variable {EA : Type x} [Fintype EA] [DecidableEq EA]
 variable {EB : Type y} [Fintype EB] [DecidableEq EB]
 
 /-- Joint channel-input and Bob-side state after Alice encodes a message. -/
 def channelInputState (C : EntanglementAssistedClassicalCode N n M EA EB)
-    (m : M) : State (Prod (TensorPower a n) EB) :=
-  ((C.encoder m).prod (Channel.idChannel EB)).applyState C.sharedState
+    (m : M) : MState (TensorPower a n × EB) :=
+  ((C.encoder m).prod (CPTPOp.id (dIn := EB))) C.sharedState
 
 /-- Bob's received state after the `n` channel uses and before decoding. -/
 def outputState (C : EntanglementAssistedClassicalCode N n M EA EB)
-    (m : M) : State (Prod (TensorPower b n) EB) :=
-  ((N.tensorPower n).prod (Channel.idChannel EB)).applyState
+    (m : M) : MState (TensorPower b n × EB) :=
+  ((N.tensorPower n).prod (CPTPOp.id (dIn := EB)))
     (C.channelInputState m)
 
 /-- Born-rule probability that Bob decodes the transmitted message. -/
@@ -220,19 +226,30 @@ def maxErrorAtMost (C : EntanglementAssistedClassicalCode N n M EA EB)
 
 /-- Classical communication rate of the message set. -/
 def rate (_C : EntanglementAssistedClassicalCode N n M EA EB) : ℝ :=
-  entanglementAssistedMessageRate M n
+  messageRate M n
 
+omit [DecidableEq a] in
 @[simp]
 theorem rate_one (C : EntanglementAssistedClassicalCode N 1 M EA EB) :
     C.rate = log2 (Fintype.card M : ℝ) := by
-  unfold rate entanglementAssistedMessageRate
+  unfold rate messageRate
   norm_num
 
 end EntanglementAssistedClassicalCode
 
-namespace Channel
+end
+end QIT
 
-variable (N : Channel a b)
+noncomputable section
+
+namespace CPTPOp
+
+open QIT
+
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+
+variable (N : CPTPMap a b)
 
 /-- Operational achievability of an entanglement-assisted classical rate. -/
 def IsAchievableEntanglementAssistedClassicalRate (R : ℝ) : Prop :=
@@ -342,17 +359,17 @@ namespace OneShotEndpoint
 /-- Deterministic decoder POVM that always reports one fixed message. -/
 def deterministicPOVM
     (M : Type u) [Fintype M] [DecidableEq M] [Nonempty M]
-    (q : Type v) [Fintype q] [DecidableEq q] : POVM M q where
-  effects m :=
-    if m = Classical.choice (inferInstance : Nonempty M) then
-      (1 : CMatrix q)
-    else
-      0
-  pos m := by
-    by_cases hm : m = Classical.choice (inferInstance : Nonempty M)
-    · simp [hm, Matrix.PosSemidef.one]
-    · simp [hm, Matrix.PosSemidef.zero]
-  sum_eq_one := by
+    (q : Type v) [Fintype q] [DecidableEq q] : POVM M q :=
+  .ofMatrices
+    (fun m =>
+      if m = Classical.choice (inferInstance : Nonempty M) then
+        (1 : CMatrix q)
+      else
+        0)
+    (fun m => by
+      by_cases hm : m = Classical.choice (inferInstance : Nonempty M)
+      · simp [hm, Matrix.PosSemidef.one]
+      · simp [hm, Matrix.PosSemidef.zero]) <| by
     ext i j
     rw [Matrix.sum_apply]
     rw [Finset.sum_eq_single (Classical.choice (inferInstance : Nonempty M))]
@@ -374,14 +391,14 @@ def arbitraryMessageOneShotEntanglementAssistedCode
     [Nonempty a]
     (M : Type u) [Fintype M] [DecidableEq M] [Nonempty M] :
     EntanglementAssistedClassicalCode N 1 M PUnit PUnit where
-  sharedState := State.unit.prod State.unit
+  sharedState := MState.unit.prod MState.unit
   encoder _ := by
     letI : Nonempty (QIT.TensorPower a 1) :=
       ⟨(Classical.choice (inferInstance : Nonempty a), PUnit.unit)⟩
     exact
-    Channel.prepare (fun _ : PUnit =>
-      (PureVector.basisPureVector : PureVector (QIT.TensorPower a 1)).state)
-  decoder := OneShotEndpoint.deterministicPOVM M (Prod (QIT.TensorPower b 1) PUnit)
+    CPTPOp.prepare (fun _ : PUnit =>
+      (default : Ket (QIT.TensorPower a 1)).state)
+  decoder := OneShotEndpoint.deterministicPOVM M (QIT.TensorPower b 1 × PUnit)
 
 /-- Every arbitrary-message endpoint code has maximal error at most one. -/
 theorem arbitraryMessageOneShotEntanglementAssistedCode_maxErrorAtMost_one
@@ -457,23 +474,35 @@ theorem oneShotEntanglementAssistedClassicalCapacityE_one_eq_top
     exact EReal.coe_lt_coe_iff.mpr hyn
   exact hyC.trans_le hle
 
-end Channel
+end CPTPOp
+
+end
+
+namespace QIT
+
+noncomputable section
+
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
 /-- Source-shaped witness for one block of the entanglement-assisted direct
 coding route for a fixed pure input-reference state.
 
 The witness packages an already-constructed code and the estimates expected
 from the BSST direct proof: rate at least the output mutual information minus
-`δ`, and maximal decoding error at most `ε`.  This structure is an API for
-later proof leaves; this module does not prove the direct coding theorem. -/
+`δ`, and maximal decoding error at most `ε`.  This module consumes such
+witnesses; it does not construct them. -/
 structure EntanglementAssistedDirectCodingWitness {r : Type u}
-    [Fintype r] [DecidableEq r] (N : Channel a b)
-    (ψ : PureVector (Prod r a)) (n : ℕ) (δ ε : ℝ)
+    [Fintype r] [DecidableEq r] (N : CPTPMap a b)
+    (ψ : Ket (r × a)) (n : ℕ) (δ ε : ℝ)
     (M : Type u) [Fintype M] [DecidableEq M] [Nonempty M]
     (EA : Type u) [Fintype EA] [DecidableEq EA]
     (EB : Type u) [Fintype EB] [DecidableEq EB] where
+  /-- The underlying entanglement-assisted code. -/
   code : EntanglementAssistedClassicalCode N n M EA EB
+  /-- The code's rate is within `δ` of the mutual information of `ψ` through `N`. -/
   rate_ge : code.rate ≥ N.entanglementAssistedMutualInformation ψ - δ
+  /-- Every message is decoded with error at most `ε`. -/
   maxError_le : code.maxErrorAtMost ε
 
 /-- Source-shaped one-shot achievability witness.
@@ -482,13 +511,16 @@ The Khatri--Wilde one-shot lower bound constructs such a witness using
 position-based coding and sequential decoding.  This structure records only the
 resulting code and numerical lower-bound estimate; it does not prove the
 one-shot theorem. -/
-structure EntanglementAssistedOneShotAchievabilityWitness (N : Channel a b)
+structure EntanglementAssistedOneShotAchievabilityWitness (N : CPTPMap a b)
     (ε lowerBound : ℝ)
     (M : Type u) [Fintype M] [DecidableEq M] [Nonempty M]
     (EA : Type u) [Fintype EA] [DecidableEq EA]
     (EB : Type u) [Fintype EB] [DecidableEq EB] where
+  /-- The underlying single-use entanglement-assisted code. -/
   code : EntanglementAssistedClassicalCode N 1 M EA EB
+  /-- Every message is decoded with error at most `ε`. -/
   maxError_le : code.maxErrorAtMost ε
+  /-- The code attains at least the claimed rate. -/
   lowerBound_le_rate : lowerBound ≤ code.rate
 
 /-- Source-consistent converse estimates for entanglement-assisted classical
@@ -502,7 +534,7 @@ rate strictly below `N.entanglementAssistedInformation + η`.
 
 This source-shaped interface is the one used by the sandwiched-Renyi
 asymptotic upper-bound route. -/
-structure EntanglementAssistedSourceConverseWitnessFamily (N : Channel a b) where
+structure EntanglementAssistedSourceConverseWitnessFamily (N : CPTPMap a b) where
   rate_lt :
     ∀ η : ℝ, 0 < η → ∀ ε : ℝ, 0 ≤ ε → ε < 1 →
       ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
@@ -513,21 +545,31 @@ structure EntanglementAssistedSourceConverseWitnessFamily (N : Channel a b) wher
                 C.maxErrorAtMost ε →
                   C.rate < N.entanglementAssistedInformation + η
 
-namespace Channel
+end
+end QIT
 
-variable (N : Channel a b)
+noncomputable section
+
+namespace CPTPOp
+
+open QIT
+
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+
+variable (N : CPTPMap a b)
 
 /-- Entanglement-assisted direct achievability from a family of BSST
 direct-coding witnesses.
 
-This is the direct-coding side of the BSST route currently formalized in
-Lean.  In the modern source route, the concrete witnesses come from
-Khatri--Wilde one-shot position-based coding and the asymptotic passage from
-their one-shot lower bound.  The one-shot theorem itself, converse,
-compactness/maximizer theorem, and final capacity equality are separate proof
-obligations. -/
+This is the direct-coding side of the BSST route.  Concrete witnesses come from
+Khatri--Wilde one-shot position-based coding and the asymptotic passage from its
+one-shot lower bound, in
+`QuantumLib.QIT.Coding.EntanglementAssisted.PositionBasedCoding` and
+`QuantumLib.QIT.Coding.EntanglementAssisted.OneShot.Lower`; the matching upper
+bound is in `QuantumLib.QIT.Coding.EntanglementAssisted.OneShot.Converse`. -/
 theorem entanglementAssisted_direct_achievable_of_directCodingWitness
-    {r : Type u} [Fintype r] [DecidableEq r] (ψ : PureVector (Prod r a))
+    {r : Type u} [Fintype r] [DecidableEq r] (ψ : Ket (r × a))
     (h :
       ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
         ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
@@ -746,9 +788,6 @@ theorem entanglementAssisted_capacity_and_strongConverseCapacity_eq_information_
     N.strongConverseEntanglementAssistedClassicalCapacity_eq_information_of_achievable_of_sourceConverseWitness
       hach hconv⟩
 
-
-end Channel
+end CPTPOp
 
 end
-
-end QIT

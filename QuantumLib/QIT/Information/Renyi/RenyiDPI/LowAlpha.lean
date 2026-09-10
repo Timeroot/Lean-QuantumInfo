@@ -22,17 +22,15 @@ open scoped ComplexOrder MatrixOrder NNReal
 
 open Matrix
 
-namespace QIT
-
-universe u v w
-
 noncomputable section
-
+universe u v w
 variable {a : Type u} {b : Type v} {c : Type w}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 variable [Fintype c] [DecidableEq c]
 
-namespace State
+open QIT
+
+namespace MState
 
 open RenyiDPI.Statement
 
@@ -43,22 +41,22 @@ operator implies the full-rank channel DPI inequality.
 This packages the precise operator inequality needed for the subunit Renyi
 range without assuming DPI as a hypothesis. -/
 theorem sandwichedRenyi_dataProcessing_le_of_inner_tracePower_ge_of_lt_one
-    (ρ σ : State a) (Φ : Channel a b)
-    (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef)
-    (hρΦ : (Φ.applyState ρ).matrix.PosDef) (hσΦ : (Φ.applyState σ).matrix.PosDef)
+    (ρ σ : MState a) (Φ : CPTPMap a b)
+    (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
+    (hρΦ : (Φ ρ).m.PosDef) (hσΦ : (Φ σ).m.PosDef)
     (α : ℝ) (hα_half : 1 / 2 ≤ α) (hα_lt_one : α < 1)
     (hpower :
       psdTracePower (sandwichedRenyiInner ρ σ α)
           (sandwichedRenyiInner_posSemidef ρ σ α) α ≤
-        psdTracePower (sandwichedRenyiInner (Φ.applyState ρ) (Φ.applyState σ) α)
-          (sandwichedRenyiInner_posSemidef (Φ.applyState ρ) (Φ.applyState σ) α) α) :
-    sandwichedRenyi (Φ.applyState ρ) (Φ.applyState σ) hρΦ hσΦ
+        psdTracePower (sandwichedRenyiInner (Φ ρ) (Φ σ) α)
+          (sandwichedRenyiInner_posSemidef (Φ ρ) (Φ σ) α) α) :
+    sandwichedRenyi (Φ ρ) (Φ σ) hρΦ hσΦ
         α (by linarith) (ne_of_lt hα_lt_one) ≤
       sandwichedRenyi ρ σ hρ hσ α (by linarith) (ne_of_lt hα_lt_one) := by
   have hα_pos : 0 < α := by linarith
   have hα_ne_one : α ≠ 1 := ne_of_lt hα_lt_one
   rw [sandwichedRenyi_eq_log2_psdTracePower_inner
-      (Φ.applyState ρ) (Φ.applyState σ) hρΦ hσΦ α hα_pos hα_ne_one,
+      (Φ ρ) (Φ σ) hρΦ hσΦ α hα_pos hα_ne_one,
     sandwichedRenyi_eq_log2_psdTracePower_inner
       ρ σ hρ hσ α hα_pos hα_ne_one]
   have hin_pos :
@@ -78,37 +76,37 @@ theorem sandwichedRenyi_dataProcessing_le_of_inner_tracePower_ge_of_lt_one
 For `α < 1`, the logarithmic prefactor in `D̃_α` is negative, so the data
 processing inequality is obtained from the reverse `Q`-functional inequality
 `Q_α(ρ, σ) ≤ Q_α(Φρ, Φσ)`.  This is the bridge from the PSD-friendly
-matrix-level route back to the current `State + PosDef` public theorem
+matrix-level route back to the current `MState + PosDef` public theorem
 surface. -/
 theorem sandwichedRenyi_dataProcessing_le_of_lowAlphaQ_ge
-    (ρ σ : State a) (Φ : Channel a b)
-    (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef)
-    (hρΦ : (Φ.applyState ρ).matrix.PosDef) (hσΦ : (Φ.applyState σ).matrix.PosDef)
+    (ρ σ : MState a) (Φ : CPTPMap a b)
+    (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
+    (hρΦ : (Φ ρ).m.PosDef) (hσΦ : (Φ σ).m.PosDef)
     (α : ℝ) (hα_half : 1 / 2 ≤ α) (hα_lt_one : α < 1)
     (hQ :
-      sandwichedRenyiQ ρ.matrix σ.matrix ρ.pos σ.pos α ≤
-        sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.applyState σ).matrix
-          (Φ.applyState ρ).pos (Φ.applyState σ).pos α) :
-    sandwichedRenyi (Φ.applyState ρ) (Φ.applyState σ) hρΦ hσΦ
+      sandwichedRenyiQ ρ.m σ.m ρ.psd σ.psd α ≤
+        sandwichedRenyiQ (Φ ρ).m (Φ σ).m
+          (Φ ρ).psd (Φ σ).psd α) :
+    sandwichedRenyi (Φ ρ) (Φ σ) hρΦ hσΦ
         α (by linarith) (ne_of_lt hα_lt_one) ≤
       sandwichedRenyi ρ σ hρ hσ α (by linarith) (ne_of_lt hα_lt_one) := by
   exact
     sandwichedRenyi_dataProcessing_le_of_inner_tracePower_ge_of_lt_one
       ρ σ Φ hρ hσ hρΦ hσΦ α hα_half hα_lt_one
       (by
-        simpa [sandwichedRenyiQ_eq_psdTracePower_inner] using hQ)
+        simpa only [sandwichedRenyiQ_eq_psdTracePower_inner, psdTracePower] using hQ)
 
 /-- The reference-spectral pinching channel satisfies the full-rank sandwiched
 Renyi DPI in the `1 / 2 ≤ α < 1` range. -/
 theorem sandwichedRenyi_dataProcessing_referenceSpectralPinching_channel_statement_lt_one
-    (ρ σ : State a)
-    (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef)
+    (ρ σ : MState a)
+    (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
     (hρP :
-      (((ProjectiveMeasurement.ofHermitianEigenbasis σ.matrix σ.pos.isHermitian
-        ).pinchingChannel).applyState ρ).matrix.PosDef)
+      (((ProjectiveMeasurement.ofHermitianEigenbasis σ.m σ.psd.isHermitian
+        ).pinchingChannel) ρ).m.PosDef)
     (α : ℝ) (hα_half : 1 / 2 ≤ α) (hα_lt_one : α < 1) :
     sandwichedRenyi_dataProcessing_channel_statement ρ σ
-      ((ProjectiveMeasurement.ofHermitianEigenbasis σ.matrix σ.pos.isHermitian
+      ((ProjectiveMeasurement.ofHermitianEigenbasis σ.m σ.psd.isHermitian
         ).pinchingChannel)
       hρ hσ hρP
       (by
@@ -117,21 +115,21 @@ theorem sandwichedRenyi_dataProcessing_referenceSpectralPinching_channel_stateme
       α hα_half (ne_of_lt hα_lt_one) := by
   classical
   let P : ProjectiveMeasurement a a :=
-    ProjectiveMeasurement.ofHermitianEigenbasis σ.matrix σ.pos.isHermitian
-  have hσP_eq : P.pinchingChannel.applyState σ = σ := by
+    ProjectiveMeasurement.ofHermitianEigenbasis σ.m σ.psd.isHermitian
+  have hσP_eq : P.pinchingChannel σ = σ := by
     simpa [P] using
       ProjectiveMeasurement.ofHermitianEigenbasis_pinchingChannel_applyState_self σ
-  have hσP : (P.pinchingChannel.applyState σ).matrix.PosDef := by
+  have hσP : (P.pinchingChannel σ).m.PosDef := by
     rw [hσP_eq]
     exact hσ
   have hpower :
       psdTracePower (sandwichedRenyiInner ρ σ α)
           (sandwichedRenyiInner_posSemidef ρ σ α) α ≤
         psdTracePower
-          (sandwichedRenyiInner (P.pinchingChannel.applyState ρ)
-            (P.pinchingChannel.applyState σ) α)
+          (sandwichedRenyiInner (P.pinchingChannel ρ)
+            (P.pinchingChannel σ) α)
           (sandwichedRenyiInner_posSemidef
-            (P.pinchingChannel.applyState ρ) (P.pinchingChannel.applyState σ) α)
+            (P.pinchingChannel ρ) (P.pinchingChannel σ) α)
           α := by
     simpa [hσP_eq, P] using
       sandwichedRenyiInner_referenceSpectralPinching_tracePower_ge_of_le_one
@@ -145,14 +143,14 @@ theorem sandwichedRenyi_dataProcessing_referenceSpectralPinching_channel_stateme
 sandwiched Renyi DPI statement throughout the source range
 `1 / 2 ≤ α < 1` or `1 < α`. -/
 theorem sandwichedRenyi_dataProcessing_referenceSpectralPinching_channel_statement
-    (ρ σ : State a)
-    (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef)
+    (ρ σ : MState a)
+    (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
     (hρP :
-      (((ProjectiveMeasurement.ofHermitianEigenbasis σ.matrix σ.pos.isHermitian
-        ).pinchingChannel).applyState ρ).matrix.PosDef)
+      (((ProjectiveMeasurement.ofHermitianEigenbasis σ.m σ.psd.isHermitian
+        ).pinchingChannel) ρ).m.PosDef)
     (α : ℝ) (hα_range : (1 / 2 ≤ α ∧ α < 1) ∨ 1 < α) :
     sandwichedRenyi_dataProcessing_channel_statement ρ σ
-      ((ProjectiveMeasurement.ofHermitianEigenbasis σ.matrix σ.pos.isHermitian
+      ((ProjectiveMeasurement.ofHermitianEigenbasis σ.m σ.psd.isHermitian
         ).pinchingChannel)
       hρ hσ hρP
       (by
@@ -181,33 +179,33 @@ the proof route establishes that the input inner operator's PSD Schatten
 expression is bounded by the output inner operator's expression, the negative
 Renyi prefactor converts it to DPI. -/
 theorem sandwichedRenyi_dataProcessing_le_of_inner_schattenPNorm_ge_of_lt_one
-    (ρ σ : State a) (Φ : Channel a b)
-    (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef)
-    (hρΦ : (Φ.applyState ρ).matrix.PosDef) (hσΦ : (Φ.applyState σ).matrix.PosDef)
+    (ρ σ : MState a) (Φ : CPTPMap a b)
+    (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
+    (hρΦ : (Φ ρ).m.PosDef) (hσΦ : (Φ σ).m.PosDef)
     (α : ℝ) (hα_half : 1 / 2 ≤ α) (hα_lt_one : α < 1)
     (hnorm :
       psdSchattenPNorm (sandwichedRenyiInner ρ σ α)
           (sandwichedRenyiInner_posSemidef ρ σ α) ⟨α, by linarith⟩ ≤
         psdSchattenPNorm
-          (sandwichedRenyiInner (Φ.applyState ρ) (Φ.applyState σ) α)
-          (sandwichedRenyiInner_posSemidef (Φ.applyState ρ) (Φ.applyState σ) α)
+          (sandwichedRenyiInner (Φ ρ) (Φ σ) α)
+          (sandwichedRenyiInner_posSemidef (Φ ρ) (Φ σ) α)
           ⟨α, by linarith⟩) :
-    sandwichedRenyi (Φ.applyState ρ) (Φ.applyState σ) hρΦ hσΦ
+    sandwichedRenyi (Φ ρ) (Φ σ) hρΦ hσΦ
         α (by linarith) (ne_of_lt hα_lt_one) ≤
       sandwichedRenyi ρ σ hρ hσ α (by linarith) (ne_of_lt hα_lt_one) := by
   have hα_pos : 0 < α := by linarith
   have hpower :
       psdTracePower (sandwichedRenyiInner ρ σ α)
           (sandwichedRenyiInner_posSemidef ρ σ α) α ≤
-        psdTracePower (sandwichedRenyiInner (Φ.applyState ρ) (Φ.applyState σ) α)
-          (sandwichedRenyiInner_posSemidef (Φ.applyState ρ) (Φ.applyState σ) α) α :=
+        psdTracePower (sandwichedRenyiInner (Φ ρ) (Φ σ) α)
+          (sandwichedRenyiInner_posSemidef (Φ ρ) (Φ σ) α) α :=
     psdTracePower_le_of_psdSchattenPNorm_le
       (sandwichedRenyiInner_posSemidef ρ σ α)
-      (sandwichedRenyiInner_posSemidef (Φ.applyState ρ) (Φ.applyState σ) α)
+      (sandwichedRenyiInner_posSemidef (Φ ρ) (Φ σ) α)
       hα_pos
       (sandwichedRenyiInner_psdTracePower_pos ρ σ hρ hσ α)
       (sandwichedRenyiInner_psdTracePower_pos
-        (Φ.applyState ρ) (Φ.applyState σ) hρΦ hσΦ α)
+        (Φ ρ) (Φ σ) hρΦ hσΦ α)
       hnorm
   exact sandwichedRenyi_dataProcessing_le_of_inner_tracePower_ge_of_lt_one
     ρ σ Φ hρ hσ hρΦ hσΦ α hα_half hα_lt_one hpower
@@ -220,19 +218,19 @@ displayed trace objective is controlled by the output PSD Schatten expression.
 This theorem then converts that source-shaped reverse-Holder bound into the
 full-rank logarithmic DPI inequality. -/
 theorem sandwichedRenyi_dataProcessing_le_of_reverseHolder_trace_le_of_lt_one
-    (ρ σ : State a) (Φ : Channel a b)
-    (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef)
-    (hρΦ : (Φ.applyState ρ).matrix.PosDef) (hσΦ : (Φ.applyState σ).matrix.PosDef)
+    (ρ σ : MState a) (Φ : CPTPMap a b)
+    (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
+    (hρΦ : (Φ ρ).m.PosDef) (hσΦ : (Φ σ).m.PosDef)
     (α : ℝ) (hα_half : 1 / 2 ≤ α) (hα_lt_one : α < 1)
     {N : CMatrix a} (hN : N.PosSemidef) (hNtr : N.trace.re = 1)
     (hSupport : Matrix.Supports (sandwichedRenyiInner ρ σ α) N)
     (htrace_le :
       ((sandwichedRenyiInner ρ σ α * CFC.rpow N (1 - 1 / α)).trace).re ≤
         psdSchattenPNorm
-          (sandwichedRenyiInner (Φ.applyState ρ) (Φ.applyState σ) α)
-          (sandwichedRenyiInner_posSemidef (Φ.applyState ρ) (Φ.applyState σ) α)
+          (sandwichedRenyiInner (Φ ρ) (Φ σ) α)
+          (sandwichedRenyiInner_posSemidef (Φ ρ) (Φ σ) α)
           ⟨α, by linarith⟩) :
-    sandwichedRenyi (Φ.applyState ρ) (Φ.applyState σ) hρΦ hσΦ
+    sandwichedRenyi (Φ ρ) (Φ σ) hρΦ hσΦ
         α (by linarith) (ne_of_lt hα_lt_one) ≤
       sandwichedRenyi ρ σ hρ hσ α (by linarith) (ne_of_lt hα_lt_one) := by
   have hα_pos : 0 < α := by linarith
@@ -240,8 +238,8 @@ theorem sandwichedRenyi_dataProcessing_le_of_reverseHolder_trace_le_of_lt_one
       psdSchattenPNorm (sandwichedRenyiInner ρ σ α)
           (sandwichedRenyiInner_posSemidef ρ σ α) ⟨α, hα_pos⟩ ≤
         psdSchattenPNorm
-          (sandwichedRenyiInner (Φ.applyState ρ) (Φ.applyState σ) α)
-          (sandwichedRenyiInner_posSemidef (Φ.applyState ρ) (Φ.applyState σ) α)
+          (sandwichedRenyiInner (Φ ρ) (Φ σ) α)
+          (sandwichedRenyiInner_posSemidef (Φ ρ) (Φ σ) α)
           ⟨α, hα_pos⟩ :=
     psdSchattenPNorm_le_of_reverseHolder_trace_le
       (sandwichedRenyiInner_posSemidef ρ σ α) hN hNtr hSupport
@@ -258,9 +256,9 @@ Because the full-rank input sandwiched inner operator has positive
 side-state. Thus it is enough to prove the displayed trace bound for every
 normalized PSD side-state supporting the input inner operator. -/
 theorem sandwichedRenyi_dataProcessing_le_of_all_reverseHolder_sideStates_trace_le_of_lt_one
-    (ρ σ : State a) (Φ : Channel a b)
-    (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef)
-    (hρΦ : (Φ.applyState ρ).matrix.PosDef) (hσΦ : (Φ.applyState σ).matrix.PosDef)
+    (ρ σ : MState a) (Φ : CPTPMap a b)
+    (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
+    (hρΦ : (Φ ρ).m.PosDef) (hσΦ : (Φ σ).m.PosDef)
     (α : ℝ) (hα_half : 1 / 2 ≤ α) (hα_lt_one : α < 1)
     (htrace_all :
       ∀ {N : CMatrix a}, N.PosSemidef → N.trace.re = 1 →
@@ -268,11 +266,11 @@ theorem sandwichedRenyi_dataProcessing_le_of_all_reverseHolder_sideStates_trace_
           ((sandwichedRenyiInner ρ σ α *
               CFC.rpow N (1 - 1 / α)).trace).re ≤
             psdSchattenPNorm
-              (sandwichedRenyiInner (Φ.applyState ρ) (Φ.applyState σ) α)
+              (sandwichedRenyiInner (Φ ρ) (Φ σ) α)
               (sandwichedRenyiInner_posSemidef
-                (Φ.applyState ρ) (Φ.applyState σ) α)
+                (Φ ρ) (Φ σ) α)
               ⟨α, by linarith⟩) :
-    sandwichedRenyi (Φ.applyState ρ) (Φ.applyState σ) hρΦ hσΦ
+    sandwichedRenyi (Φ ρ) (Φ σ) hρΦ hσΦ
         α (by linarith) (ne_of_lt hα_lt_one) ≤
       sandwichedRenyi ρ σ hρ hσ α (by linarith) (ne_of_lt hα_lt_one) := by
   have hα_pos : 0 < α := by linarith
@@ -287,26 +285,26 @@ theorem sandwichedRenyi_dataProcessing_le_of_all_reverseHolder_sideStates_trace_
 
 /-- Full-rank side-state handoff for the `1 / 2 ≤ α < 1` channel DPI route.
 
-The input sandwiched inner operator is full-rank in the local `State + PosDef`
+The input sandwiched inner operator is full-rank in the local `MState + PosDef`
 domain. Its explicit reverse-Holder optimizer is therefore also full-rank, so
 the remaining channel-specific low-`α` task can be stated using only
 normalized positive-definite side-states. This is the form needed before using
 negative powers of the side-state in a source-faithful duality argument. -/
 theorem sandwichedRenyi_dataProcessing_le_of_all_reverseHolder_fullRank_sideStates_trace_le_of_lt_one
-    (ρ σ : State a) (Φ : Channel a b)
-    (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef)
-    (hρΦ : (Φ.applyState ρ).matrix.PosDef) (hσΦ : (Φ.applyState σ).matrix.PosDef)
+    (ρ σ : MState a) (Φ : CPTPMap a b)
+    (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
+    (hρΦ : (Φ ρ).m.PosDef) (hσΦ : (Φ σ).m.PosDef)
     (α : ℝ) (hα_half : 1 / 2 ≤ α) (hα_lt_one : α < 1)
     (htrace_all :
       ∀ {N : CMatrix a}, N.PosDef → N.trace.re = 1 →
           ((sandwichedRenyiInner ρ σ α *
               CFC.rpow N (1 - 1 / α)).trace).re ≤
             psdSchattenPNorm
-              (sandwichedRenyiInner (Φ.applyState ρ) (Φ.applyState σ) α)
+              (sandwichedRenyiInner (Φ ρ) (Φ σ) α)
               (sandwichedRenyiInner_posSemidef
-                (Φ.applyState ρ) (Φ.applyState σ) α)
+                (Φ ρ) (Φ σ) α)
               ⟨α, by linarith⟩) :
-    sandwichedRenyi (Φ.applyState ρ) (Φ.applyState σ) hρΦ hσΦ
+    sandwichedRenyi (Φ ρ) (Φ σ) hρΦ hσΦ
         α (by linarith) (ne_of_lt hα_lt_one) ≤
       sandwichedRenyi ρ σ hρ hσ α (by linarith) (ne_of_lt hα_lt_one) := by
   have hα_pos : 0 < α := by linarith
@@ -339,7 +337,7 @@ inputs and full-rank side-states.
 This isolates the finite-dimensional positivity fact needed by the low-`α`
 route before applying negative side-state powers or logarithmic conversions. -/
 theorem sandwichedRenyi_reverseHolder_fullRank_sideState_trace_pos
-    (ρ σ : State a) (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef)
+    (ρ σ : MState a) (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
     (α : ℝ) {N : CMatrix a} (hN : N.PosDef) :
     0 <
       ((sandwichedRenyiInner ρ σ α *
@@ -356,7 +354,7 @@ This is the concrete equality behind the low-`α` optimizer handoff: after this
 point, the only missing channel-specific inequality is to compare this exact
 input-side optimizer value with the output-side PSD Schatten expression. -/
 theorem sandwichedRenyi_reverseHolder_optimizer_trace_eq_schatten
-    (ρ σ : State a) (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef)
+    (ρ σ : MState a) (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) :
     let M : CMatrix a := sandwichedRenyiInner ρ σ α
     let hM : M.PosSemidef := by
@@ -380,7 +378,7 @@ inner operator.
 This is the concrete power-state form needed by the conditional-duality/minimax
 route for the strict subunit interval. -/
 theorem sandwichedRenyi_reverseHolder_optimizer_eq_normalized_inner_power
-    (ρ σ : State a) (α : ℝ) :
+    (ρ σ : MState a) (α : ℝ) :
     let M : CMatrix a := sandwichedRenyiInner ρ σ α
     let hM : M.PosSemidef := by
       simpa [M] using sandwichedRenyiInner_posSemidef ρ σ α
@@ -401,29 +399,29 @@ obligation: it combines the already-proved pinching trace-power expansion with
 the explicit reverse-Holder optimizer equality. The general-channel case still
 requires the conditional-duality/minimax route. -/
 theorem sandwichedRenyi_referenceSpectralPinching_reverseHolder_optimizer_trace_le_of_lt_one
-    (ρ σ : State a) (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef)
+    (ρ σ : MState a) (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
     (α : ℝ) (hα_half : 1 / 2 ≤ α) (hα_lt_one : α < 1) :
     let P : ProjectiveMeasurement a a :=
-      ProjectiveMeasurement.ofHermitianEigenbasis σ.matrix σ.pos.isHermitian
+      ProjectiveMeasurement.ofHermitianEigenbasis σ.m σ.psd.isHermitian
     let M : CMatrix a := sandwichedRenyiInner ρ σ α
     let hM : M.PosSemidef := by
       simpa [M] using sandwichedRenyiInner_posSemidef ρ σ α
     ((M * CFC.rpow (psdTraceReverseHolderOptimizer M hM α)
         (1 - 1 / α)).trace).re ≤
       psdSchattenPNorm
-        (sandwichedRenyiInner (P.pinchingChannel.applyState ρ)
-          (P.pinchingChannel.applyState σ) α)
+        (sandwichedRenyiInner (P.pinchingChannel ρ)
+          (P.pinchingChannel σ) α)
         (sandwichedRenyiInner_posSemidef
-          (P.pinchingChannel.applyState ρ) (P.pinchingChannel.applyState σ) α)
+          (P.pinchingChannel ρ) (P.pinchingChannel σ) α)
         ⟨α, by linarith⟩ := by
   classical
   let P : ProjectiveMeasurement a a :=
-    ProjectiveMeasurement.ofHermitianEigenbasis σ.matrix σ.pos.isHermitian
+    ProjectiveMeasurement.ofHermitianEigenbasis σ.m σ.psd.isHermitian
   let M : CMatrix a := sandwichedRenyiInner ρ σ α
   let hM : M.PosSemidef := by
     simpa [M] using sandwichedRenyiInner_posSemidef ρ σ α
   have hα_pos : 0 < α := by linarith
-  have hσP_eq : P.pinchingChannel.applyState σ = σ := by
+  have hσP_eq : P.pinchingChannel σ = σ := by
     simpa [P] using
       ProjectiveMeasurement.ofHermitianEigenbasis_pinchingChannel_applyState_self σ
   have htrace_eq :
@@ -436,9 +434,9 @@ theorem sandwichedRenyi_referenceSpectralPinching_reverseHolder_optimizer_trace_
   have hpower :
       psdTracePower M hM α ≤
         psdTracePower
-          (sandwichedRenyiInner (P.pinchingChannel.applyState ρ) σ α)
+          (sandwichedRenyiInner (P.pinchingChannel ρ) σ α)
           (sandwichedRenyiInner_posSemidef
-            (P.pinchingChannel.applyState ρ) σ α)
+            (P.pinchingChannel ρ) σ α)
           α := by
     simpa [M, hM, P] using
       sandwichedRenyiInner_referenceSpectralPinching_tracePower_ge_of_le_one
@@ -446,44 +444,44 @@ theorem sandwichedRenyi_referenceSpectralPinching_reverseHolder_optimizer_trace_
   have hnorm :
       psdSchattenPNorm M hM ⟨α, hα_pos⟩ ≤
         psdSchattenPNorm
-          (sandwichedRenyiInner (P.pinchingChannel.applyState ρ) σ α)
+          (sandwichedRenyiInner (P.pinchingChannel ρ) σ α)
           (sandwichedRenyiInner_posSemidef
-            (P.pinchingChannel.applyState ρ) σ α)
+            (P.pinchingChannel ρ) σ α)
           ⟨α, hα_pos⟩ :=
     _root_.QIT.psdSchattenPNorm_le_of_psdTracePower_le
       hM
       (sandwichedRenyiInner_posSemidef
-        (P.pinchingChannel.applyState ρ) σ α)
+        (P.pinchingChannel ρ) σ α)
       hα_pos hpower
   calc
     ((M * CFC.rpow (psdTraceReverseHolderOptimizer M hM α)
         (1 - 1 / α)).trace).re =
         psdSchattenPNorm M hM ⟨α, hα_pos⟩ := htrace_eq
     _ ≤ psdSchattenPNorm
-          (sandwichedRenyiInner (P.pinchingChannel.applyState ρ) σ α)
+          (sandwichedRenyiInner (P.pinchingChannel ρ) σ α)
           (sandwichedRenyiInner_posSemidef
-            (P.pinchingChannel.applyState ρ) σ α)
+            (P.pinchingChannel ρ) σ α)
           ⟨α, hα_pos⟩ := hnorm
     _ = psdSchattenPNorm
-          (sandwichedRenyiInner (P.pinchingChannel.applyState ρ)
-            (P.pinchingChannel.applyState σ) α)
+          (sandwichedRenyiInner (P.pinchingChannel ρ)
+            (P.pinchingChannel σ) α)
           (sandwichedRenyiInner_posSemidef
-            (P.pinchingChannel.applyState ρ) (P.pinchingChannel.applyState σ) α)
+            (P.pinchingChannel ρ) (P.pinchingChannel σ) α)
           ⟨α, hα_pos⟩ := by
           rw [hσP_eq]
 
 /-- Single-obligation optimizer handoff for the `1 / 2 ≤ α < 1` channel DPI
 route.
 
-The previous all-side-state form is equivalent to a source-shaped variational
-argument, but the actual remaining proof obligation can be concentrated on the
-explicit full-rank reverse-Holder optimizer for the input sandwiched inner
-operator. Proving the displayed trace bound for that optimizer is now enough
-to obtain the full-rank logarithmic DPI inequality in the subunit range. -/
+The all-side-state form is equivalent to a source-shaped variational argument,
+but the hypothesis can be concentrated on the explicit full-rank reverse-Holder
+optimizer for the input sandwiched inner operator: the displayed trace bound
+for that optimizer already gives the full-rank logarithmic DPI inequality in
+the subunit range. -/
 theorem sandwichedRenyi_dataProcessing_le_of_reverseHolder_optimizer_trace_le_of_lt_one
-    (ρ σ : State a) (Φ : Channel a b)
-    (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef)
-    (hρΦ : (Φ.applyState ρ).matrix.PosDef) (hσΦ : (Φ.applyState σ).matrix.PosDef)
+    (ρ σ : MState a) (Φ : CPTPMap a b)
+    (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
+    (hρΦ : (Φ ρ).m.PosDef) (hσΦ : (Φ σ).m.PosDef)
     (α : ℝ) (hα_half : 1 / 2 ≤ α) (hα_lt_one : α < 1)
     (htrace_le :
       let M : CMatrix a := sandwichedRenyiInner ρ σ α
@@ -492,11 +490,11 @@ theorem sandwichedRenyi_dataProcessing_le_of_reverseHolder_optimizer_trace_le_of
       ((M * CFC.rpow (psdTraceReverseHolderOptimizer M hM α)
           (1 - 1 / α)).trace).re ≤
         psdSchattenPNorm
-          (sandwichedRenyiInner (Φ.applyState ρ) (Φ.applyState σ) α)
+          (sandwichedRenyiInner (Φ ρ) (Φ σ) α)
           (sandwichedRenyiInner_posSemidef
-            (Φ.applyState ρ) (Φ.applyState σ) α)
+            (Φ ρ) (Φ σ) α)
           ⟨α, by linarith⟩) :
-    sandwichedRenyi (Φ.applyState ρ) (Φ.applyState σ) hρΦ hσΦ
+    sandwichedRenyi (Φ ρ) (Φ σ) hρΦ hσΦ
         α (by linarith) (ne_of_lt hα_lt_one) ≤
       sandwichedRenyi ρ σ hρ hσ α (by linarith) (ne_of_lt hα_lt_one) := by
   have hα_pos : 0 < α := by linarith
@@ -515,16 +513,14 @@ theorem sandwichedRenyi_dataProcessing_le_of_reverseHolder_optimizer_trace_le_of
       (by simpa [M, hM] using hSupport)
       (by simpa [M, hM] using htrace_le)
 
-/-- Statement-form strict-subunit handoff for the remaining low-`α` proof
-obligation.
-
-This theorem does not prove the missing reverse-Holder optimizer inequality.
-It records the exact final shape needed to turn that future inequality into the
-general-channel full-rank DPI statement for `1 / 2 ≤ α < 1`. -/
+/-- Statement form of
+`sandwichedRenyi_dataProcessing_le_of_reverseHolder_optimizer_trace_le_of_lt_one`: the same
+reverse-Holder optimizer trace bound yields the packaged channel predicate
+`sandwichedRenyi_dataProcessing_channel_statement` for `1 / 2 ≤ α < 1`. -/
 theorem sandwichedRenyi_dataProcessing_channel_statement_of_reverseHolder_optimizer_trace_le_of_lt_one
-    (ρ σ : State a) (Φ : Channel a b)
-    (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef)
-    (hρΦ : (Φ.applyState ρ).matrix.PosDef) (hσΦ : (Φ.applyState σ).matrix.PosDef)
+    (ρ σ : MState a) (Φ : CPTPMap a b)
+    (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
+    (hρΦ : (Φ ρ).m.PosDef) (hσΦ : (Φ σ).m.PosDef)
     (α : ℝ) (hα_half : 1 / 2 ≤ α) (hα_lt_one : α < 1)
     (htrace_le :
       let M : CMatrix a := sandwichedRenyiInner ρ σ α
@@ -533,9 +529,9 @@ theorem sandwichedRenyi_dataProcessing_channel_statement_of_reverseHolder_optimi
       ((M * CFC.rpow (psdTraceReverseHolderOptimizer M hM α)
           (1 - 1 / α)).trace).re ≤
         psdSchattenPNorm
-          (sandwichedRenyiInner (Φ.applyState ρ) (Φ.applyState σ) α)
+          (sandwichedRenyiInner (Φ ρ) (Φ σ) α)
           (sandwichedRenyiInner_posSemidef
-            (Φ.applyState ρ) (Φ.applyState σ) α)
+            (Φ ρ) (Φ σ) α)
           ⟨α, by linarith⟩) :
     sandwichedRenyi_dataProcessing_channel_statement ρ σ Φ hρ hσ hρΦ hσΦ
       α hα_half (ne_of_lt hα_lt_one) := by
@@ -544,139 +540,81 @@ theorem sandwichedRenyi_dataProcessing_channel_statement_of_reverseHolder_optimi
     sandwichedRenyi_dataProcessing_le_of_reverseHolder_optimizer_trace_le_of_lt_one
       ρ σ Φ hρ hσ hρΦ hσΦ α hα_half hα_lt_one htrace_le
 
-/-- The reference-spectral pinching channel satisfies the strict-subunit
-full-rank DPI through the reverse-Holder optimizer route.
-
-This is a proof-route check rather than a new public endpoint: it shows that
-the optimizer trace bound above is strong enough to feed the general
-`reverseHolder_optimizer_trace_le` handoff. -/
-theorem sandwichedRenyi_dataProcessing_referenceSpectralPinching_channel_statement_lt_one_via_optimizer
-    (ρ σ : State a)
-    (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef)
-    (hρP :
-      (((ProjectiveMeasurement.ofHermitianEigenbasis σ.matrix σ.pos.isHermitian
-        ).pinchingChannel).applyState ρ).matrix.PosDef)
-    (α : ℝ) (hα_half : 1 / 2 ≤ α) (hα_lt_one : α < 1) :
-    sandwichedRenyi_dataProcessing_channel_statement ρ σ
-      ((ProjectiveMeasurement.ofHermitianEigenbasis σ.matrix σ.pos.isHermitian
-        ).pinchingChannel)
-      hρ hσ hρP
-      (by
-        rw [ProjectiveMeasurement.ofHermitianEigenbasis_pinchingChannel_applyState_self]
-        exact hσ)
-      α hα_half (ne_of_lt hα_lt_one) := by
-  classical
-  let P : ProjectiveMeasurement a a :=
-    ProjectiveMeasurement.ofHermitianEigenbasis σ.matrix σ.pos.isHermitian
-  have hσP_eq : P.pinchingChannel.applyState σ = σ := by
-    simpa [P] using
-      ProjectiveMeasurement.ofHermitianEigenbasis_pinchingChannel_applyState_self σ
-  have hσP : (P.pinchingChannel.applyState σ).matrix.PosDef := by
-    rw [hσP_eq]
-    exact hσ
-  have htrace_le :
-      let M : CMatrix a := sandwichedRenyiInner ρ σ α
-      let hM : M.PosSemidef := by
-        simpa [M] using sandwichedRenyiInner_posSemidef ρ σ α
-      ((M * CFC.rpow (psdTraceReverseHolderOptimizer M hM α)
-          (1 - 1 / α)).trace).re ≤
-        psdSchattenPNorm
-          (sandwichedRenyiInner (P.pinchingChannel.applyState ρ)
-            (P.pinchingChannel.applyState σ) α)
-          (sandwichedRenyiInner_posSemidef
-            (P.pinchingChannel.applyState ρ) (P.pinchingChannel.applyState σ) α)
-          ⟨α, by linarith⟩ := by
-    simpa [P] using
-      sandwichedRenyi_referenceSpectralPinching_reverseHolder_optimizer_trace_le_of_lt_one
-        ρ σ hρ hσ α hα_half hα_lt_one
-  have hDPI :=
-    sandwichedRenyi_dataProcessing_channel_statement_of_reverseHolder_optimizer_trace_le_of_lt_one
-      ρ σ P.pinchingChannel hρ hσ hρP hσP α hα_half hα_lt_one htrace_le
-  simpa [sandwichedRenyi_dataProcessing_channel_statement, P, hσP_eq] using hDPI
-
 /-- Applying the identity channel does not change the sandwiched Renyi
-divergence. This small API lemma keeps later DPI sanity checks independent from
-the concrete Kraus implementation of `Channel.idChannel`. -/
-@[simp]
+divergence. -/
 theorem sandwichedRenyi_idChannel_applyState
-    (ρ σ : State a) (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef)
-    (hρid : ((Channel.idChannel a).applyState ρ).matrix.PosDef)
-    (hσid : ((Channel.idChannel a).applyState σ).matrix.PosDef)
+    (ρ σ : MState a) (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
+    (hρid : ((CPTPOp.id (dIn := a)) ρ).m.PosDef)
+    (hσid : ((CPTPOp.id (dIn := a)) σ).m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
-    sandwichedRenyi ((Channel.idChannel a).applyState ρ)
-        ((Channel.idChannel a).applyState σ) hρid hσid α hα_pos hα_ne_one =
+    sandwichedRenyi ((CPTPOp.id (dIn := a)) ρ)
+        ((CPTPOp.id (dIn := a)) σ) hρid hσid α hα_pos hα_ne_one =
       sandwichedRenyi ρ σ hρ hσ α hα_pos hα_ne_one := by
   unfold sandwichedRenyi
-  simp [Channel.applyState, Channel.idChannel, MatrixMap.ofKraus]
+  simp
 
-/-- Identity-channel sanity check for the generalized statement surface.
-
-This is a genuine proved specialization and an API check for the `Channel a b`
-statement shape; it is not the sandwiched Renyi DPI proof required to close
-`sandwiched-renyi-dpi`. -/
+/-- The identity channel satisfies the `CPTPMap a b` data-processing
+statement. -/
 theorem sandwichedRenyi_dataProcessing_channel_statement_idChannel
-    (ρ σ : State a) (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef)
+    (ρ σ : MState a) (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
     (α : ℝ) (hα : 1 / 2 ≤ α) (hα_ne_one : α ≠ 1) :
-    sandwichedRenyi_dataProcessing_channel_statement ρ σ (Channel.idChannel a) hρ hσ
-      (by simpa [Channel.applyState, Channel.idChannel, MatrixMap.ofKraus] using hρ)
-      (by simpa [Channel.applyState, Channel.idChannel, MatrixMap.ofKraus] using hσ)
+    sandwichedRenyi_dataProcessing_channel_statement ρ σ (CPTPOp.id (dIn := a)) hρ hσ
+      (by simpa [CPTPOp.mat_coe_eq_apply_mat, CPTPOp.id_map, MatrixMap.ofKraus] using hρ)
+      (by simpa [CPTPOp.mat_coe_eq_apply_mat, CPTPOp.id_map, MatrixMap.ofKraus] using hσ)
       α hα hα_ne_one := by
   unfold sandwichedRenyi_dataProcessing_channel_statement
   exact le_of_eq (sandwichedRenyi_idChannel_applyState ρ σ hρ hσ _ _ α (by linarith) hα_ne_one)
 
-/-- A proved state-level DPI instance remains true after tensoring both inputs
-with the same untouched full-rank side-information pair.
-
-This is a reusable lifting step for later tensor-power/asymptotic DPI work: it
-uses the already-proved product additivity of `sandwichedRenyi`, not the deep DPI
-theorem itself. -/
+/-- A state-level DPI instance remains true after tensoring both inputs with the
+same untouched full-rank side-information pair.  The proof is product additivity
+of `sandwichedRenyi`, not data processing itself. -/
 theorem sandwichedRenyi_dataProcessing_channel_statement_prod_idChannel
-    (ρ₁ σ₁ : State a) (ρ₂ σ₂ : State c) (Φ : Channel a b)
-    (hρ₁ : ρ₁.matrix.PosDef) (hσ₁ : σ₁.matrix.PosDef)
-    (hρ₂ : ρ₂.matrix.PosDef) (hσ₂ : σ₂.matrix.PosDef)
-    (hρΦ : (Φ.applyState ρ₁).matrix.PosDef) (hσΦ : (Φ.applyState σ₁).matrix.PosDef)
+    (ρ₁ σ₁ : MState a) (ρ₂ σ₂ : MState c) (Φ : CPTPMap a b)
+    (hρ₁ : ρ₁.m.PosDef) (hσ₁ : σ₁.m.PosDef)
+    (hρ₂ : ρ₂.m.PosDef) (hσ₂ : σ₂.m.PosDef)
+    (hρΦ : (Φ ρ₁).m.PosDef) (hσΦ : (Φ σ₁).m.PosDef)
     (α : ℝ) (hα : 1 / 2 ≤ α) (hα_ne_one : α ≠ 1)
     (hΦ : sandwichedRenyi_dataProcessing_channel_statement ρ₁ σ₁ Φ
       hρ₁ hσ₁ hρΦ hσΦ α hα hα_ne_one) :
     sandwichedRenyi_dataProcessing_channel_statement (ρ₁.prod ρ₂) (σ₁.prod σ₂)
-      (Φ.prod (Channel.idChannel c))
-      (State.prod_posDef hρ₁ hρ₂) (State.prod_posDef hσ₁ hσ₂)
+      (Φ.prod (CPTPOp.id (dIn := c)))
+      (MState.PosDef.kron hρ₁ hρ₂) (MState.PosDef.kron hσ₁ hσ₂)
       (by
-        rw [Channel.applyState_prod]
-        exact State.prod_posDef hρΦ
-          (by simpa [Channel.applyState, Channel.idChannel, MatrixMap.ofKraus] using hρ₂))
+        rw [CPTPOp.prod_apply_prod]
+        exact MState.PosDef.kron hρΦ
+          (by simpa [CPTPOp.mat_coe_eq_apply_mat, CPTPOp.id_map, MatrixMap.ofKraus] using hρ₂))
       (by
-        rw [Channel.applyState_prod]
-        exact State.prod_posDef hσΦ
-          (by simpa [Channel.applyState, Channel.idChannel, MatrixMap.ofKraus] using hσ₂))
+        rw [CPTPOp.prod_apply_prod]
+        exact MState.PosDef.kron hσΦ
+          (by simpa [CPTPOp.mat_coe_eq_apply_mat, CPTPOp.id_map, MatrixMap.ofKraus] using hσ₂))
       α hα hα_ne_one := by
   have hα_pos : 0 < α := by linarith
   unfold sandwichedRenyi_dataProcessing_channel_statement at hΦ ⊢
   calc
-    sandwichedRenyi ((Φ.prod (Channel.idChannel c)).applyState (ρ₁.prod ρ₂))
-        ((Φ.prod (Channel.idChannel c)).applyState (σ₁.prod σ₂)) _ _
+    sandwichedRenyi ((Φ.prod (CPTPOp.id (dIn := c))) (ρ₁.prod ρ₂))
+        ((Φ.prod (CPTPOp.id (dIn := c))) (σ₁.prod σ₂)) _ _
         α _ hα_ne_one =
-      sandwichedRenyi ((Φ.applyState ρ₁).prod ((Channel.idChannel c).applyState ρ₂))
-        ((Φ.applyState σ₁).prod ((Channel.idChannel c).applyState σ₂)) _ _
+      sandwichedRenyi (MState.prod (Φ ρ₁) ((CPTPOp.id (dIn := c)) ρ₂))
+        (MState.prod (Φ σ₁) ((CPTPOp.id (dIn := c)) σ₂)) _ _
         α hα_pos hα_ne_one := by
           unfold sandwichedRenyi
-          simp [Channel.applyState_prod]
+          simp [CPTPOp.prod_apply_prod]
     _ =
-      sandwichedRenyi (Φ.applyState ρ₁) (Φ.applyState σ₁) hρΦ hσΦ
+      sandwichedRenyi (Φ ρ₁) (Φ σ₁) hρΦ hσΦ
           α hα_pos hα_ne_one +
-        sandwichedRenyi ((Channel.idChannel c).applyState ρ₂)
-          ((Channel.idChannel c).applyState σ₂)
-          (by simpa [Channel.applyState, Channel.idChannel, MatrixMap.ofKraus] using hρ₂)
-          (by simpa [Channel.applyState, Channel.idChannel, MatrixMap.ofKraus] using hσ₂)
+        sandwichedRenyi ((CPTPOp.id (dIn := c)) ρ₂)
+          ((CPTPOp.id (dIn := c)) σ₂)
+          (by simpa [CPTPOp.mat_coe_eq_apply_mat, CPTPOp.id_map, MatrixMap.ofKraus] using hρ₂)
+          (by simpa [CPTPOp.mat_coe_eq_apply_mat, CPTPOp.id_map, MatrixMap.ofKraus] using hσ₂)
           α hα_pos hα_ne_one := by
-          rw [State.sandwichedRenyi_prod (Φ.applyState ρ₁) (Φ.applyState σ₁)
-            ((Channel.idChannel c).applyState ρ₂) ((Channel.idChannel c).applyState σ₂)
+          rw [MState.sandwichedRenyi_prod (Φ ρ₁) (Φ σ₁)
+            ((CPTPOp.id (dIn := c)) ρ₂) ((CPTPOp.id (dIn := c)) σ₂)
             hρΦ hσΦ
-            (by simpa [Channel.applyState, Channel.idChannel, MatrixMap.ofKraus] using hρ₂)
-            (by simpa [Channel.applyState, Channel.idChannel, MatrixMap.ofKraus] using hσ₂)
+            (by simpa [CPTPOp.mat_coe_eq_apply_mat, CPTPOp.id_map, MatrixMap.ofKraus] using hρ₂)
+            (by simpa [CPTPOp.mat_coe_eq_apply_mat, CPTPOp.id_map, MatrixMap.ofKraus] using hσ₂)
             α hα_pos hα_ne_one]
     _ =
-      sandwichedRenyi (Φ.applyState ρ₁) (Φ.applyState σ₁) hρΦ hσΦ
+      sandwichedRenyi (Φ ρ₁) (Φ σ₁) hρΦ hσΦ
           α hα_pos hα_ne_one +
         sandwichedRenyi ρ₂ σ₂ hρ₂ hσ₂ α hα_pos hα_ne_one := by
           rw [sandwichedRenyi_idChannel_applyState ρ₂ σ₂ hρ₂ hσ₂ _ _
@@ -685,9 +623,9 @@ theorem sandwichedRenyi_dataProcessing_channel_statement_prod_idChannel
         sandwichedRenyi ρ₂ σ₂ hρ₂ hσ₂ α hα_pos hα_ne_one := by
           exact add_le_add hΦ (le_refl _)
     _ = sandwichedRenyi (ρ₁.prod ρ₂) (σ₁.prod σ₂)
-        (State.prod_posDef hρ₁ hρ₂) (State.prod_posDef hσ₁ hσ₂)
+        (MState.PosDef.kron hρ₁ hρ₂) (MState.PosDef.kron hσ₁ hσ₂)
         α hα_pos hα_ne_one := by
-          rw [State.sandwichedRenyi_prod ρ₁ σ₁ ρ₂ σ₂
+          rw [MState.sandwichedRenyi_prod ρ₁ σ₁ ρ₂ σ₂
             hρ₁ hσ₁ hρ₂ hσ₂ α hα_pos hα_ne_one]
 
 /-- The class of channels satisfying the local full-rank sandwiched Renyi DPI
@@ -697,31 +635,31 @@ This does not prove DPI for every channel by itself. It is the composition step
 needed by reduction routes that prove DPI for primitive maps and then assemble
 larger channels from them. -/
 theorem sandwichedRenyi_dataProcessing_channel_statement_comp
-    (ρ σ : State a) (Φ : Channel a b) (Ψ : Channel b c)
-    (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef)
-    (hρΦ : (Φ.applyState ρ).matrix.PosDef)
-    (hσΦ : (Φ.applyState σ).matrix.PosDef)
-    (hρΨΦ : (Ψ.applyState (Φ.applyState ρ)).matrix.PosDef)
-    (hσΨΦ : (Ψ.applyState (Φ.applyState σ)).matrix.PosDef)
+    (ρ σ : MState a) (Φ : CPTPMap a b) (Ψ : CPTPMap b c)
+    (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
+    (hρΦ : (Φ ρ).m.PosDef)
+    (hσΦ : (Φ σ).m.PosDef)
+    (hρΨΦ : (Ψ (Φ ρ)).m.PosDef)
+    (hσΨΦ : (Ψ (Φ σ)).m.PosDef)
     (α : ℝ) (hα : 1 / 2 ≤ α) (hα_ne_one : α ≠ 1)
     (hΦ : sandwichedRenyi_dataProcessing_channel_statement ρ σ Φ
       hρ hσ hρΦ hσΦ α hα hα_ne_one)
-    (hΨ : sandwichedRenyi_dataProcessing_channel_statement (Φ.applyState ρ)
-      (Φ.applyState σ) Ψ hρΦ hσΦ hρΨΦ hσΨΦ α hα hα_ne_one) :
-    sandwichedRenyi_dataProcessing_channel_statement ρ σ (Ψ.comp Φ) hρ hσ
-      (by rw [Channel.applyState_comp]; exact hρΨΦ)
-      (by rw [Channel.applyState_comp]; exact hσΨΦ)
+    (hΨ : sandwichedRenyi_dataProcessing_channel_statement (Φ ρ)
+      (Φ σ) Ψ hρΦ hσΦ hρΨΦ hσΨΦ α hα hα_ne_one) :
+    sandwichedRenyi_dataProcessing_channel_statement ρ σ (Ψ ∘ₘ Φ) hρ hσ
+      (by rw [CPTPOp.compose_eq]; exact hρΨΦ)
+      (by rw [CPTPOp.compose_eq]; exact hσΨΦ)
       α hα hα_ne_one := by
   have hα_pos : 0 < α := by linarith
   unfold sandwichedRenyi_dataProcessing_channel_statement at hΦ hΨ ⊢
   calc
-    sandwichedRenyi ((Ψ.comp Φ).applyState ρ) ((Ψ.comp Φ).applyState σ) _ _
+    sandwichedRenyi ((Ψ ∘ₘ Φ) ρ) ((Ψ ∘ₘ Φ) σ) _ _
         α _ hα_ne_one =
-      sandwichedRenyi (Ψ.applyState (Φ.applyState ρ))
-        (Ψ.applyState (Φ.applyState σ)) hρΨΦ hσΨΦ α hα_pos hα_ne_one := by
+      sandwichedRenyi (Ψ (Φ ρ))
+        (Ψ (Φ σ)) hρΨΦ hσΨΦ α hα_pos hα_ne_one := by
           unfold sandwichedRenyi
-          simp [Channel.applyState_comp]
-    _ ≤ sandwichedRenyi (Φ.applyState ρ) (Φ.applyState σ)
+          simp [CPTPOp.compose_eq]
+    _ ≤ sandwichedRenyi (Φ ρ) (Φ σ)
         hρΦ hσΦ α hα_pos hα_ne_one := hΨ
     _ ≤ sandwichedRenyi ρ σ hρ hσ α hα_pos hα_ne_one := hΦ
 
@@ -733,60 +671,60 @@ pinched state is known to be full-rank in the reference eigenbasis, its
 sandwiched Renyi divergence against the reference state is exactly the
 classical Renyi power-sum expression for the two eigenbasis distributions. -/
 theorem sandwichedRenyi_referenceSpectralPinching_eq_classicalPowerSum
-    (ρ σ : State a)
+    (ρ σ : MState a)
     (hρP :
-      (((ProjectiveMeasurement.ofHermitianEigenbasis σ.matrix σ.pos.isHermitian).pinchingChannel
-        ).applyState ρ).matrix.PosDef)
-    (hσ : σ.matrix.PosDef)
+      (((ProjectiveMeasurement.ofHermitianEigenbasis σ.m σ.psd.isHermitian).pinchingChannel
+        ) ρ).m.PosDef)
+    (hσ : σ.m.PosDef)
     (hp_pos : ∀ i, 0 < (ProjectiveMeasurement.eigenbasisDiagonalProb ρ σ i : ℝ))
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     sandwichedRenyi
-        (((ProjectiveMeasurement.ofHermitianEigenbasis σ.matrix σ.pos.isHermitian).pinchingChannel
-          ).applyState ρ)
+        (((ProjectiveMeasurement.ofHermitianEigenbasis σ.m σ.psd.isHermitian).pinchingChannel
+          ) ρ)
         σ hρP hσ α hα_pos hα_ne_one =
       (1 / (α - 1)) *
         log2
           (∑ i,
             ((ProjectiveMeasurement.eigenbasisDiagonalProb ρ σ i : ℝ) ^ α) *
               ((ProjectiveMeasurement.stateEigenvalueProb σ i : ℝ) ^ (1 - α))) := by
-  let U : Matrix.unitaryGroup a ℂ := σ.pos.isHermitian.eigenvectorUnitary
-  let Pρ : State a :=
-    ((ProjectiveMeasurement.ofHermitianEigenbasis σ.matrix σ.pos.isHermitian).pinchingChannel
-      ).applyState ρ
+  let U : Matrix.unitaryGroup a ℂ := σ.psd.isHermitian.eigenvectorUnitary
+  let Pρ : MState a :=
+    ((ProjectiveMeasurement.ofHermitianEigenbasis σ.m σ.psd.isHermitian).pinchingChannel
+      ) ρ
   let p : a → ℝ≥0 := ProjectiveMeasurement.eigenbasisDiagonalProb ρ σ
   let q : a → ℝ≥0 := ProjectiveMeasurement.stateEigenvalueProb σ
   let hp_sum : ∑ i, p i = 1 := ProjectiveMeasurement.eigenbasisDiagonalProb_sum ρ σ
   let hq_sum : ∑ i, q i = 1 := ProjectiveMeasurement.stateEigenvalueProb_sum σ
-  let ρdiag : State a := Classical.diagonalState p hp_sum
-  let σdiag : State a := Classical.diagonalState q hq_sum
-  have hρdiag_pos : ρdiag.matrix.PosDef :=
+  let ρdiag : MState a := Classical.diagonalState p hp_sum
+  let σdiag : MState a := Classical.diagonalState q hq_sum
+  have hρdiag_pos : ρdiag.m.PosDef :=
     Classical.diagonalState_posDef p hp_sum hp_pos
-  have hσdiag_pos : σdiag.matrix.PosDef :=
+  have hσdiag_pos : σdiag.m.PosDef :=
     Classical.diagonalState_posDef q hq_sum
       (ProjectiveMeasurement.stateEigenvalueProb_pos_of_posDef σ hσ)
   have hPρ_eq : Pρ = ρdiag.unitaryConj U := by
-    apply State.ext
+    apply MState.ext
     calc
-      Pρ.matrix =
+      Pρ.m =
           (U : CMatrix a) *
             Matrix.diagonal (fun i => ((p i : ℝ≥0) : ℂ)) *
             star (U : CMatrix a) := by
             simpa [Pρ, p, U] using
               ProjectiveMeasurement.ofHermitianEigenbasis_pinchingChannel_applyState_matrix_eq_unitary_diagonalProb
                 ρ σ
-      _ = (ρdiag.unitaryConj U).matrix := by
-            simp [ρdiag, State.unitaryConj, Classical.diagonalState_matrix]
+      _ = (ρdiag.unitaryConj U).m := by
+            simp [ρdiag, MState.unitaryConj, Classical.diagonalState_matrix]
   have hσ_eq : σ = σdiag.unitaryConj U := by
-    apply State.ext
+    apply MState.ext
     calc
-      σ.matrix =
+      σ.m =
           (U : CMatrix a) *
             Matrix.diagonal (fun i => ((q i : ℝ≥0) : ℂ)) *
             star (U : CMatrix a) := by
             simpa [q, U] using
               ProjectiveMeasurement.state_matrix_eq_unitary_diagonalEigenvalueProb σ
-      _ = (σdiag.unitaryConj U).matrix := by
-            simp [σdiag, State.unitaryConj, Classical.diagonalState_matrix]
+      _ = (σdiag.unitaryConj U).m := by
+            simp [σdiag, MState.unitaryConj, Classical.diagonalState_matrix]
   calc
     sandwichedRenyi Pρ σ hρP hσ α hα_pos hα_ne_one =
         sandwichedRenyi (ρdiag.unitaryConj U) (σdiag.unitaryConj U)
@@ -811,60 +749,60 @@ theorem sandwichedRenyi_referenceSpectralPinching_eq_classicalPowerSum
 /-- Reference-spectral pinching reduces the Petz Renyi expression to the same
 finite classical power sum in the reference eigenbasis. -/
 theorem petzRenyi_referenceSpectralPinching_eq_classicalPowerSum
-    (ρ σ : State a)
+    (ρ σ : MState a)
     (hρP :
-      (((ProjectiveMeasurement.ofHermitianEigenbasis σ.matrix σ.pos.isHermitian).pinchingChannel
-        ).applyState ρ).matrix.PosDef)
-    (hσ : σ.matrix.PosDef)
+      (((ProjectiveMeasurement.ofHermitianEigenbasis σ.m σ.psd.isHermitian).pinchingChannel
+        ) ρ).m.PosDef)
+    (hσ : σ.m.PosDef)
     (hp_pos : ∀ i, 0 < (ProjectiveMeasurement.eigenbasisDiagonalProb ρ σ i : ℝ))
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     petzRenyi
-        (((ProjectiveMeasurement.ofHermitianEigenbasis σ.matrix σ.pos.isHermitian).pinchingChannel
-          ).applyState ρ)
+        (((ProjectiveMeasurement.ofHermitianEigenbasis σ.m σ.psd.isHermitian).pinchingChannel
+          ) ρ)
         σ hρP hσ α hα_pos hα_ne_one =
       (1 / (α - 1)) *
         log2
           (∑ i,
             ((ProjectiveMeasurement.eigenbasisDiagonalProb ρ σ i : ℝ) ^ α) *
               ((ProjectiveMeasurement.stateEigenvalueProb σ i : ℝ) ^ (1 - α))) := by
-  let U : Matrix.unitaryGroup a ℂ := σ.pos.isHermitian.eigenvectorUnitary
-  let Pρ : State a :=
-    ((ProjectiveMeasurement.ofHermitianEigenbasis σ.matrix σ.pos.isHermitian).pinchingChannel
-      ).applyState ρ
+  let U : Matrix.unitaryGroup a ℂ := σ.psd.isHermitian.eigenvectorUnitary
+  let Pρ : MState a :=
+    ((ProjectiveMeasurement.ofHermitianEigenbasis σ.m σ.psd.isHermitian).pinchingChannel
+      ) ρ
   let p : a → ℝ≥0 := ProjectiveMeasurement.eigenbasisDiagonalProb ρ σ
   let q : a → ℝ≥0 := ProjectiveMeasurement.stateEigenvalueProb σ
   let hp_sum : ∑ i, p i = 1 := ProjectiveMeasurement.eigenbasisDiagonalProb_sum ρ σ
   let hq_sum : ∑ i, q i = 1 := ProjectiveMeasurement.stateEigenvalueProb_sum σ
-  let ρdiag : State a := Classical.diagonalState p hp_sum
-  let σdiag : State a := Classical.diagonalState q hq_sum
-  have hρdiag_pos : ρdiag.matrix.PosDef :=
+  let ρdiag : MState a := Classical.diagonalState p hp_sum
+  let σdiag : MState a := Classical.diagonalState q hq_sum
+  have hρdiag_pos : ρdiag.m.PosDef :=
     Classical.diagonalState_posDef p hp_sum hp_pos
-  have hσdiag_pos : σdiag.matrix.PosDef :=
+  have hσdiag_pos : σdiag.m.PosDef :=
     Classical.diagonalState_posDef q hq_sum
       (ProjectiveMeasurement.stateEigenvalueProb_pos_of_posDef σ hσ)
   have hPρ_eq : Pρ = ρdiag.unitaryConj U := by
-    apply State.ext
+    apply MState.ext
     calc
-      Pρ.matrix =
+      Pρ.m =
           (U : CMatrix a) *
             Matrix.diagonal (fun i => ((p i : ℝ≥0) : ℂ)) *
             star (U : CMatrix a) := by
             simpa [Pρ, p, U] using
               ProjectiveMeasurement.ofHermitianEigenbasis_pinchingChannel_applyState_matrix_eq_unitary_diagonalProb
                 ρ σ
-      _ = (ρdiag.unitaryConj U).matrix := by
-            simp [ρdiag, State.unitaryConj, Classical.diagonalState_matrix]
+      _ = (ρdiag.unitaryConj U).m := by
+            simp [ρdiag, MState.unitaryConj, Classical.diagonalState_matrix]
   have hσ_eq : σ = σdiag.unitaryConj U := by
-    apply State.ext
+    apply MState.ext
     calc
-      σ.matrix =
+      σ.m =
           (U : CMatrix a) *
             Matrix.diagonal (fun i => ((q i : ℝ≥0) : ℂ)) *
             star (U : CMatrix a) := by
             simpa [q, U] using
               ProjectiveMeasurement.state_matrix_eq_unitary_diagonalEigenvalueProb σ
-      _ = (σdiag.unitaryConj U).matrix := by
-            simp [σdiag, State.unitaryConj, Classical.diagonalState_matrix]
+      _ = (σdiag.unitaryConj U).m := by
+            simp [σdiag, MState.unitaryConj, Classical.diagonalState_matrix]
   calc
     petzRenyi Pρ σ hρP hσ α hα_pos hα_ne_one =
         petzRenyi (ρdiag.unitaryConj U) (σdiag.unitaryConj U)
@@ -890,20 +828,20 @@ theorem petzRenyi_referenceSpectralPinching_eq_classicalPowerSum
 reference state, sandwiched Renyi and Petz Renyi coincide. This is the
 commuting-state bridge used by the pinching proof route. -/
 theorem sandwichedRenyi_referenceSpectralPinching_eq_petzRenyi
-    (ρ σ : State a)
+    (ρ σ : MState a)
     (hρP :
-      (((ProjectiveMeasurement.ofHermitianEigenbasis σ.matrix σ.pos.isHermitian).pinchingChannel
-        ).applyState ρ).matrix.PosDef)
-    (hσ : σ.matrix.PosDef)
+      (((ProjectiveMeasurement.ofHermitianEigenbasis σ.m σ.psd.isHermitian).pinchingChannel
+        ) ρ).m.PosDef)
+    (hσ : σ.m.PosDef)
     (hp_pos : ∀ i, 0 < (ProjectiveMeasurement.eigenbasisDiagonalProb ρ σ i : ℝ))
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     sandwichedRenyi
-        (((ProjectiveMeasurement.ofHermitianEigenbasis σ.matrix σ.pos.isHermitian).pinchingChannel
-          ).applyState ρ)
+        (((ProjectiveMeasurement.ofHermitianEigenbasis σ.m σ.psd.isHermitian).pinchingChannel
+          ) ρ)
         σ hρP hσ α hα_pos hα_ne_one =
       petzRenyi
-        (((ProjectiveMeasurement.ofHermitianEigenbasis σ.matrix σ.pos.isHermitian).pinchingChannel
-          ).applyState ρ)
+        (((ProjectiveMeasurement.ofHermitianEigenbasis σ.m σ.psd.isHermitian).pinchingChannel
+          ) ρ)
         σ hρP hσ α hα_pos hα_ne_one := by
   rw [sandwichedRenyi_referenceSpectralPinching_eq_classicalPowerSum ρ σ hρP hσ
       hp_pos α hα_pos hα_ne_one,
@@ -914,16 +852,16 @@ theorem sandwichedRenyi_referenceSpectralPinching_eq_petzRenyi
 measured-subsystem sandwiched Renyi inequality.
 
 This bridges the source route's measurement-map language with the local channel
-statement surface: proving DPI for `Channel.measure M ⊗ id` is enough to obtain
+statement surface: proving DPI for `POVM.measureDiscard M ⊗ id` is enough to obtain
 the inequality phrased using `measureSubsystemState`. -/
 theorem sandwichedRenyi_measureSubsystem_le_of_dataProcessing_channel_statement
-    (ρ σ : State (Prod a b)) (M : POVM c a)
-    (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef)
-    (hρM : (measureSubsystemState M ρ).matrix.PosDef)
-    (hσM : (measureSubsystemState M σ).matrix.PosDef)
+    (ρ σ : MState (a × b)) (M : POVM c a)
+    (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
+    (hρM : (measureSubsystemState M ρ).m.PosDef)
+    (hσM : (measureSubsystemState M σ).m.PosDef)
     (α : ℝ) (hα : 1 / 2 ≤ α) (hα_ne_one : α ≠ 1)
     (hDPI : sandwichedRenyi_dataProcessing_channel_statement ρ σ
-      ((Channel.measure M).prod (Channel.idChannel b)) hρ hσ
+      ((POVM.measureDiscard M).prod (CPTPOp.id (dIn := b))) hρ hσ
       (by simpa [measureSubsystemState] using hρM)
       (by simpa [measureSubsystemState] using hσM)
       α hα hα_ne_one) :
@@ -932,8 +870,4 @@ theorem sandwichedRenyi_measureSubsystem_le_of_dataProcessing_channel_statement
       sandwichedRenyi ρ σ hρ hσ α (by linarith) hα_ne_one := by
   simpa [sandwichedRenyi_dataProcessing_channel_statement, measureSubsystemState] using hDPI
 
-end State
-
-end
-
-end QIT
+end MState

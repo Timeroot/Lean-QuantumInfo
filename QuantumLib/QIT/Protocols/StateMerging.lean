@@ -18,18 +18,8 @@ public import QuantumLib.QIT.Protocols.StateMerging.Direct
 public import QuantumLib.QIT.Protocols.StateMerging.Optimality
 
 /-!
-# State merging
+# MState merging
 
 Facade for the source-shaped one-way-LOCC operational semantics of standard
 quantum state merging.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace Protocols
-namespace StateMerging
-
-end StateMerging
-end Protocols
-end QIT

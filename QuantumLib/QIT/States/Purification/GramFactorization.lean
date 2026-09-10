@@ -18,7 +18,7 @@ equivalence route registered from [Wilde2011Qst, qit-notes.tex:10320-10338]
 and [Gour2024Resources, BookQRT.tex:2051-2069].
 
 The abstract theorem factors maps with equal target-side Gram operators.  The
-matrix theorem uses the `PureVector.amplitudeMatrix` convention from
+matrix theorem uses the `Ket.amplitudeMatrix` convention from
 `QIT.States.Purification.Gram`, where amplitudes are target rows and reference
 columns, so the target Gram matrix is `A * Aᴴ`.
 -/

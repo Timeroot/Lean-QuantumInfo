@@ -8,6 +8,7 @@ module
 
 public import QuantumLib.QIT.Information.Entropy.Entropy
 public import QuantumLib.QIT.States.Schatten
+public import QuantumLib.QIT.Util.MatrixInstances
 public import Mathlib.Data.EReal.Basic
 import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.ExpLog.Order
 
@@ -25,26 +26,28 @@ proofs live in `QIT.Information.Entropy.RelativeEntropyDPI`.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator
+open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator QIT.MatrixL2
+
+noncomputable section
+universe u
+
+open QIT
 
 namespace QIT
 
-universe u
-
-noncomputable section
-
-noncomputable local instance cMatrixCStarAlgebraForRelativeEntropyTraceLog
-    {n : Type*} [Fintype n] [DecidableEq n] : CStarAlgebra (CMatrix n) := {}
-
 namespace Matrix
 
-private theorem relativeEntropyTraceLog_roots_X_pow_map_re_xlog2_sum_zero (n : ℕ) :
+/-- The zero roots contributed by powers of `X` do not affect `xlog2` spectral
+sums. -/
+theorem roots_X_pow_map_re_xlog2_sum_zero (n : ℕ) :
     ((Polynomial.X ^ n : Polynomial ℂ).roots.map (fun z : ℂ => xlog2 z.re)).sum = 0 := by
   rw [Polynomial.roots_X_pow, Multiset.map_nsmul, Multiset.sum_nsmul,
     Multiset.map_singleton, Multiset.sum_singleton]
   simp [xlog2]
 
-private theorem relativeEntropyTraceLog_roots_re_xlog2_sum_eq_of_X_pow_mul_eq
+/-- If two characteristic-polynomial identities differ only by powers of `X`,
+then the `xlog2` spectral sums over their nonzero roots agree. -/
+theorem roots_re_xlog2_sum_eq_of_X_pow_mul_eq
     {P Q : Polynomial ℂ} {m n : ℕ} (hP : P ≠ 0) (hQ : Q ≠ 0)
     (h : Polynomial.X ^ m * P = Polynomial.X ^ n * Q) :
     (P.roots.map (fun z : ℂ => xlog2 z.re)).sum =
@@ -58,53 +61,55 @@ private theorem relativeEntropyTraceLog_roots_re_xlog2_sum_eq_of_X_pow_mul_eq
   have hsum :=
     congrArg (fun s : Multiset ℂ => (s.map (fun z : ℂ => xlog2 z.re)).sum) hroots
   simp only [Multiset.map_add, Multiset.sum_add] at hsum
-  rw [relativeEntropyTraceLog_roots_X_pow_map_re_xlog2_sum_zero m,
-    relativeEntropyTraceLog_roots_X_pow_map_re_xlog2_sum_zero n] at hsum
+  rw [roots_X_pow_map_re_xlog2_sum_zero m,
+    roots_X_pow_map_re_xlog2_sum_zero n] at hsum
   simpa using hsum
 
 end Matrix
 
-namespace State
+end QIT
+
+namespace MState
 
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
-theorem relativeEntropyTraceLog_vonNeumann_psdSupportCompressedState_eq
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (hSupport : Matrix.Supports rho.matrix sigma) :
+theorem vonNeumann_psdSupportCompressedState_eq
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (hSupport : Matrix.Supports rho.m sigma) :
     (_root_.QIT.psdSupportCompressedState rho hSigma hSupport).vonNeumann =
       rho.vonNeumann := by
   classical
-  let rhoC : State (psdSupportIndex sigma hSigma) :=
+  let rhoC : MState (psdSupportIndex sigma hSigma) :=
     _root_.QIT.psdSupportCompressedState rho hSigma hSupport
   let V : Matrix a (psdSupportIndex sigma hSigma) ℂ := psdSupportIsometry sigma hSigma
   have hV : Matrix.conjTranspose V * V = (1 : CMatrix (psdSupportIndex sigma hSigma)) := by
     simpa [V] using psdSupportIsometry_isometry sigma hSigma
-  have hrec : V * rhoC.matrix * Matrix.conjTranspose V = rho.matrix := by
+  have hrec : V * rhoC.m * Matrix.conjTranspose V = rho.m := by
     simpa [V, rhoC] using
       psdSupportCompress_reconstruct_of_supports
-        (M := rho.matrix) (N := sigma) rho.pos hSigma hSupport
-  rw [State.vonNeumann_eq_neg_sum_eigenvalueMultiset,
-    State.vonNeumann_eq_neg_sum_eigenvalueMultiset]
-  have hpoly := Matrix.charpoly_isometry_conj (V := V) rhoC.matrix hV
+        (M := rho.m) (N := sigma) rho.psd hSigma hSupport
+  rw [MState.vonNeumann_eq_neg_sum_eigenvalueMultiset,
+    MState.vonNeumann_eq_neg_sum_eigenvalueMultiset]
+  have hpoly := Matrix.charpoly_isometry_conj (V := V) rhoC.m hV
   rw [hrec] at hpoly
-  have hP : rho.matrix.charpoly ≠ 0 := (Matrix.charpoly_monic _).ne_zero
-  have hQ : rhoC.matrix.charpoly ≠ 0 := (Matrix.charpoly_monic _).ne_zero
+  have hP : rho.m.charpoly ≠ 0 := (Matrix.charpoly_monic _).ne_zero
+  have hQ : rhoC.m.charpoly ≠ 0 := (Matrix.charpoly_monic _).ne_zero
   have hroot :=
-    Matrix.relativeEntropyTraceLog_roots_re_xlog2_sum_eq_of_X_pow_mul_eq
-      (P := rho.matrix.charpoly) (Q := rhoC.matrix.charpoly) hP hQ hpoly
-  have hrootsRho := rho.pos.isHermitian.roots_charpoly_eq_eigenvalues
-  have hrootsRhoC := rhoC.pos.isHermitian.roots_charpoly_eq_eigenvalues
+    Matrix.roots_re_xlog2_sum_eq_of_X_pow_mul_eq
+      (P := rho.m.charpoly) (Q := rhoC.m.charpoly) hP hQ hpoly
+  have hrootsRho := rho.psd.isHermitian.roots_charpoly_eq_eigenvalues
+  have hrootsRhoC := rhoC.psd.isHermitian.roots_charpoly_eq_eigenvalues
   rw [hrootsRho, hrootsRhoC] at hroot
   have hsum :
-      ((eigenvalueMultiset rhoC.pos.isHermitian).map xlog2).sum =
-        ((eigenvalueMultiset rho.pos.isHermitian).map xlog2).sum := by
+      ((eigenvalueMultiset rhoC.psd.isHermitian).map xlog2).sum =
+        ((eigenvalueMultiset rho.psd.isHermitian).map xlog2).sum := by
     simpa [eigenvalueMultiset, Multiset.map_map, Function.comp_def] using hroot.symm
   rw [hsum]
 
 private theorem relativeEntropyTraceLog_psdSupportLog_embedding_eq_cfc_logZero
     (sigma : CMatrix a) (hSigma : sigma.PosSemidef) :
     let V : Matrix a (psdSupportIndex sigma hSigma) ℂ := psdSupportIsometry sigma hSigma
-    V * State.psdLog (psdSupportCompress sigma hSigma sigma)
+    V * MState.psdLog (psdSupportCompress sigma hSigma sigma)
         (psdSupportCompress_self_posDef sigma hSigma) *
         Matrix.conjTranspose V =
       cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) sigma := by
@@ -130,11 +135,11 @@ private theorem relativeEntropyTraceLog_psdSupportLog_embedding_eq_cfc_logZero
         (Matrix.diagonal fun i : psdSupportIndex sigma hSigma => ((d i.1 : ℝ) : ℂ)) := by
     simpa [d] using psdSupportCompress_self_eq_diagonal sigma hSigma
   have hlogC :
-      State.psdLog (psdSupportCompress sigma hSigma sigma)
+      MState.psdLog (psdSupportCompress sigma hSigma sigma)
           (psdSupportCompress_self_posDef sigma hSigma) =
         (Matrix.diagonal fun i : psdSupportIndex sigma hSigma =>
           ((Real.log (d i.1) : ℝ) : ℂ)) := by
-    rw [State.psdLog, hSigmaC]
+    rw [MState.psdLog, hSigmaC]
     exact cfc_diagonal_ofReal (fun i : psdSupportIndex sigma hSigma => d i.1) Real.log
   rw [hlogSigma, hlogC]
   ext r s
@@ -169,28 +174,28 @@ private theorem relativeEntropyTraceLog_psdSupportLog_embedding_eq_cfc_logZero
       exact le_antisymm (not_lt.mp hxpos) (hSigma.eigenvalues_nonneg x)
     simp [g, hzero]
 
-theorem relativeEntropyTraceLog_trace_mul_psdSupportLog_eq_trace_mul_cfc_logZero
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (hSupport : Matrix.Supports rho.matrix sigma) :
-    ((psdSupportCompress sigma hSigma rho.matrix *
-      State.psdLog (psdSupportCompress sigma hSigma sigma)
+theorem trace_mul_psdSupportLog_eq_trace_mul_cfc_logZero
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (hSupport : Matrix.Supports rho.m sigma) :
+    ((psdSupportCompress sigma hSigma rho.m *
+      MState.psdLog (psdSupportCompress sigma hSigma sigma)
         (psdSupportCompress_self_posDef sigma hSigma)).trace).re =
-      ((rho.matrix * cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) sigma).trace).re := by
+      ((rho.m * cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) sigma).trace).re := by
   classical
   let V : Matrix a (psdSupportIndex sigma hSigma) ℂ := psdSupportIsometry sigma hSigma
-  let rhoC : CMatrix (psdSupportIndex sigma hSigma) := psdSupportCompress sigma hSigma rho.matrix
+  let rhoC : CMatrix (psdSupportIndex sigma hSigma) := psdSupportCompress sigma hSigma rho.m
   let L : CMatrix (psdSupportIndex sigma hSigma) :=
-    State.psdLog (psdSupportCompress sigma hSigma sigma)
+    MState.psdLog (psdSupportCompress sigma hSigma sigma)
       (psdSupportCompress_self_posDef sigma hSigma)
   let f : ℝ → ℝ := fun x => if x = 0 then 0 else Real.log x
   have htrace : ((rhoC * L).trace).re =
       ((V * (rhoC * L) * Matrix.conjTranspose V).trace).re := by
     simpa [V] using
       (congrArg Complex.re (psdSupportIsometry_conj_trace sigma hSigma (rhoC * L))).symm
-  have hrec : V * rhoC * Matrix.conjTranspose V = rho.matrix := by
+  have hrec : V * rhoC * Matrix.conjTranspose V = rho.m := by
     simpa [V, rhoC] using
       psdSupportCompress_reconstruct_of_supports
-        (M := rho.matrix) (N := sigma) rho.pos hSigma hSupport
+        (M := rho.m) (N := sigma) rho.psd hSigma hSupport
   have hlog : V * L * Matrix.conjTranspose V = cfc f sigma := by
     simpa [V, L, f] using
       relativeEntropyTraceLog_psdSupportLog_embedding_eq_cfc_logZero sigma hSigma
@@ -207,22 +212,22 @@ theorem relativeEntropyTraceLog_trace_mul_psdSupportLog_eq_trace_mul_cfc_logZero
       _ = V * (rhoC * L) * Matrix.conjTranspose V := by
             simp [Matrix.mul_assoc]
   calc
-    ((psdSupportCompress sigma hSigma rho.matrix *
-      State.psdLog (psdSupportCompress sigma hSigma sigma)
+    ((psdSupportCompress sigma hSigma rho.m *
+      MState.psdLog (psdSupportCompress sigma hSigma sigma)
         (psdSupportCompress_self_posDef sigma hSigma)).trace).re =
         ((rhoC * L).trace).re := by rfl
     _ = ((V * (rhoC * L) * Matrix.conjTranspose V).trace).re := htrace
     _ = (((V * rhoC * Matrix.conjTranspose V) *
           (V * L * Matrix.conjTranspose V)).trace).re := by rw [hmul]
-    _ = ((rho.matrix * cfc f sigma).trace).re := by rw [hrec, hlog]
-    _ = ((rho.matrix * cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) sigma).trace).re := by
+    _ = ((rho.m * cfc f sigma).trace).re := by rw [hrec, hlog]
+    _ = ((rho.m * cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) sigma).trace).re := by
           rfl
 
 theorem relativeEntropyTraceLog_cfc_logZero_eq_psdLog_of_posDef
     (sigma : CMatrix a) (hSigma : sigma.PosDef) :
     cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) sigma =
-      State.psdLog sigma hSigma := by
-  rw [State.psdLog]
+      MState.psdLog sigma hSigma := by
+  rw [MState.psdLog]
   apply cfc_congr
   intro x hx
   have hxpos : 0 < x := (Matrix.PosDef.isStrictlyPositive hSigma).spectrum_pos hx
@@ -234,18 +239,18 @@ The branch is written on the positive spectral support of the PSD reference.
 The compressed reference is positive definite there, so `psdLog` is the usual
 functional-calculus logarithm on the source-supported domain. -/
 noncomputable def relativeEntropyPSDReferenceTraceLogFinite
-    (rho : State a) (sigma : CMatrix a) (hSigma : sigma.PosSemidef)
-    (hSupport : Matrix.Supports rho.matrix sigma) : Real := by
+    (rho : MState a) (sigma : CMatrix a) (hSigma : sigma.PosSemidef)
+    (hSupport : Matrix.Supports rho.m sigma) : ℝ := by
   classical
-  let rhoC : State (psdSupportIndex sigma hSigma) :=
+  let rhoC : MState (psdSupportIndex sigma hSigma) :=
     psdSupportCompressedState rho hSigma hSupport
   let sigmaC : CMatrix (psdSupportIndex sigma hSigma) :=
     psdSupportCompress sigma hSigma sigma
   have hSigmaC : sigmaC.PosDef := by
-    simpa [sigmaC] using psdSupportCompressedState_reference_posDef hSigma
+    simpa [sigmaC] using psdSupportCompress_self_posDef _ hSigma
   exact
     -rhoC.vonNeumann -
-      ((rhoC.matrix * psdLog sigmaC hSigmaC).trace.re / Real.log 2)
+      ((rhoC.m * psdLog sigmaC hSigmaC).trace.re / Real.log 2)
 
 /-- Source-facing extended-real trace-log PSD-reference relative entropy.
 
@@ -253,65 +258,65 @@ This is the Khatri--Wilde/Tomamichel support convention: the trace-log finite
 branch is used when `rho` is supported by `sigma`; otherwise the value is
 `+infty`. -/
 noncomputable def relativeEntropyPSDReferenceTraceLogE
-    (rho : State a) (sigma : CMatrix a) (hSigma : sigma.PosSemidef) : EReal := by
+    (rho : MState a) (sigma : CMatrix a) (hSigma : sigma.PosSemidef) : EReal := by
   classical
   exact
-    if hSupport : Matrix.Supports rho.matrix sigma then
+    if hSupport : Matrix.Supports rho.m sigma then
       (relativeEntropyPSDReferenceTraceLogFinite rho sigma hSigma hSupport : EReal)
     else
       (⊤ : EReal)
 
 /-- Canonical state-state quantum relative entropy as an extended real, using
 the trace-log support convention. -/
-noncomputable def relativeEntropy (rho sigma : State a) : EReal :=
-  relativeEntropyPSDReferenceTraceLogE rho sigma.matrix sigma.pos
+noncomputable def relativeEntropy (rho sigma : MState a) : EReal :=
+  relativeEntropyPSDReferenceTraceLogE rho sigma.m sigma.psd
 
 @[simp]
 theorem relativeEntropyPSDReferenceTraceLogE_eq_top_of_not_supports
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (hSupport : ¬ Matrix.Supports rho.matrix sigma) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (hSupport : ¬ Matrix.Supports rho.m sigma) :
     relativeEntropyPSDReferenceTraceLogE rho sigma hSigma = (⊤ : EReal) := by
   simp [relativeEntropyPSDReferenceTraceLogE, hSupport]
 
 @[simp]
 theorem relativeEntropyPSDReferenceTraceLogE_eq_coe_of_supports
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (hSupport : Matrix.Supports rho.matrix sigma) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (hSupport : Matrix.Supports rho.m sigma) :
     relativeEntropyPSDReferenceTraceLogE rho sigma hSigma =
       (relativeEntropyPSDReferenceTraceLogFinite rho sigma hSigma hSupport : EReal) := by
   simp [relativeEntropyPSDReferenceTraceLogE, hSupport]
 
 /-- The finite trace-log branch against a positive-definite matrix reference
 can be evaluated without assuming that the input state is full rank. -/
-theorem relativeEntropyPSDReferenceTraceLogFinite_eq_posDef_formula
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosDef)
-    (hSupport : Matrix.Supports rho.matrix sigma) :
+theorem relativeEntropyPSDReferenceTraceLogFinite_eq_of_posDef
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosDef)
+    (hSupport : Matrix.Supports rho.m sigma) :
     relativeEntropyPSDReferenceTraceLogFinite rho sigma hSigma.posSemidef hSupport =
       -rho.vonNeumann -
-        ((rho.matrix * State.psdLog sigma hSigma).trace.re / Real.log 2) := by
+        ((rho.m * MState.psdLog sigma hSigma).trace.re / Real.log 2) := by
   have hEntropy :
       (_root_.QIT.psdSupportCompressedState rho hSigma.posSemidef hSupport).vonNeumann =
         rho.vonNeumann :=
-    relativeEntropyTraceLog_vonNeumann_psdSupportCompressedState_eq
+    vonNeumann_psdSupportCompressedState_eq
       rho hSigma.posSemidef hSupport
   have hTrace :
-      ((psdSupportCompress sigma hSigma.posSemidef rho.matrix *
-        State.psdLog (psdSupportCompress sigma hSigma.posSemidef sigma)
+      ((psdSupportCompress sigma hSigma.posSemidef rho.m *
+        MState.psdLog (psdSupportCompress sigma hSigma.posSemidef sigma)
           (psdSupportCompress_self_posDef sigma hSigma.posSemidef)).trace).re =
-        ((rho.matrix *
-          cfc (fun x : Real => if x = 0 then 0 else Real.log x) sigma).trace).re :=
-    relativeEntropyTraceLog_trace_mul_psdSupportLog_eq_trace_mul_cfc_logZero
+        ((rho.m *
+          cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) sigma).trace).re :=
+    trace_mul_psdSupportLog_eq_trace_mul_cfc_logZero
       rho hSigma.posSemidef hSupport
   have hLog :
-      cfc (fun x : Real => if x = 0 then 0 else Real.log x) sigma =
-        State.psdLog sigma hSigma :=
+      cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) sigma =
+        MState.psdLog sigma hSigma :=
     relativeEntropyTraceLog_cfc_logZero_eq_psdLog_of_posDef sigma hSigma
   have hTrace' :
-      (((_root_.QIT.psdSupportCompressedState rho hSigma.posSemidef hSupport).matrix *
-        State.psdLog (psdSupportCompress sigma hSigma.posSemidef sigma)
+      (((_root_.QIT.psdSupportCompressedState rho hSigma.posSemidef hSupport).m *
+        MState.psdLog (psdSupportCompress sigma hSigma.posSemidef sigma)
           (psdSupportCompress_self_posDef sigma hSigma.posSemidef)).trace).re =
-        ((rho.matrix *
-          cfc (fun x : Real => if x = 0 then 0 else Real.log x) sigma).trace).re := by
+        ((rho.m *
+          cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) sigma).trace).re := by
     simpa [_root_.QIT.psdSupportCompressedState] using hTrace
   rw [relativeEntropyPSDReferenceTraceLogFinite]
   rw [hEntropy, hTrace', hLog]
@@ -319,101 +324,103 @@ theorem relativeEntropyPSDReferenceTraceLogFinite_eq_posDef_formula
 /-- Multiplying a positive-definite reference by a positive scalar shifts
 support-aware Umegaki relative entropy by `-log2 scale`. -/
 theorem relativeEntropyPSDReferenceTraceLogE_real_smul_reference
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosDef)
-    {scale : Real} (hScale : 0 < scale) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosDef)
+    {scale : ℝ} (hScale : 0 < scale) :
     relativeEntropyPSDReferenceTraceLogE rho (scale • sigma)
         (Matrix.PosDef.smul hSigma hScale).posSemidef =
       relativeEntropyPSDReferenceTraceLogE rho sigma hSigma.posSemidef -
         (log2 scale : EReal) := by
-  let hSupport : Matrix.Supports rho.matrix sigma :=
-    Matrix.Supports.of_right_posDef rho.matrix sigma hSigma
-  let hSupportScaled : Matrix.Supports rho.matrix (scale • sigma) :=
-    Matrix.Supports.of_right_posDef rho.matrix (scale • sigma)
+  let hSupport : Matrix.Supports rho.m sigma :=
+    Matrix.Supports.of_right_posDef rho.m sigma hSigma
+  let hSupportScaled : Matrix.Supports rho.m (scale • sigma) :=
+    Matrix.Supports.of_right_posDef rho.m (scale • sigma)
       (Matrix.PosDef.smul hSigma hScale)
   rw [relativeEntropyPSDReferenceTraceLogE_eq_coe_of_supports
       rho (Matrix.PosDef.smul hSigma hScale).posSemidef hSupportScaled,
     relativeEntropyPSDReferenceTraceLogE_eq_coe_of_supports
       rho hSigma.posSemidef hSupport]
-  rw [relativeEntropyPSDReferenceTraceLogFinite_eq_posDef_formula
+  rw [relativeEntropyPSDReferenceTraceLogFinite_eq_of_posDef
       rho (Matrix.PosDef.smul hSigma hScale) hSupportScaled,
-    relativeEntropyPSDReferenceTraceLogFinite_eq_posDef_formula
+    relativeEntropyPSDReferenceTraceLogFinite_eq_of_posDef
       rho hSigma hSupport]
   have hLog :
-      State.psdLog (scale • sigma) (Matrix.PosDef.smul hSigma hScale) =
-        algebraMap Real (CMatrix a) (Real.log scale) + State.psdLog sigma hSigma := by
+      MState.psdLog (scale • sigma) (Matrix.PosDef.smul hSigma hScale) =
+        algebraMap ℝ (CMatrix a) (Real.log scale) + MState.psdLog sigma hSigma := by
     exact CFC.log_smul' sigma hScale
       (ha := by exact Matrix.PosDef.isStrictlyPositive hSigma)
   rw [hLog]
   simp [Matrix.mul_add, Matrix.trace_add, Algebra.algebraMap_eq_smul_one,
-    Matrix.trace_smul, rho.trace_eq_one, log2]
+    Matrix.trace_smul, rho.tr', log2]
   norm_cast
   ring
 
 @[simp]
 theorem relativeEntropy_eq_top_of_not_supports
-    (rho sigma : State a) (hSupport : ¬ Matrix.Supports rho.matrix sigma.matrix) :
+    (rho sigma : MState a) (hSupport : ¬ Matrix.Supports rho.m sigma.m) :
     rho.relativeEntropy sigma = (⊤ : EReal) := by
   simp [relativeEntropy, hSupport]
 
 @[simp]
 theorem relativeEntropy_eq_coe_of_supports
-    (rho sigma : State a) (hSupport : Matrix.Supports rho.matrix sigma.matrix) :
+    (rho sigma : MState a) (hSupport : Matrix.Supports rho.m sigma.m) :
     rho.relativeEntropy sigma =
-      (relativeEntropyPSDReferenceTraceLogFinite rho sigma.matrix sigma.pos hSupport : EReal) := by
+      (relativeEntropyPSDReferenceTraceLogFinite rho sigma.m sigma.psd hSupport : EReal) := by
   simp [relativeEntropy, hSupport]
 
 theorem relativeEntropy_eq_coe_posDefFinite_of_posDef
-    (rho sigma : State a) (hRho : rho.matrix.PosDef) (hSigma : sigma.matrix.PosDef) :
+    (rho sigma : MState a) (hRho : rho.m.PosDef) (hSigma : sigma.m.PosDef) :
     rho.relativeEntropy sigma =
       (rho.relativeEntropyPosDefFinite sigma hRho hSigma : EReal) := by
   classical
-  let hSupport : Matrix.Supports rho.matrix sigma.matrix :=
-    Matrix.Supports.of_right_posDef rho.matrix sigma.matrix hSigma
+  let hSupport : Matrix.Supports rho.m sigma.m :=
+    Matrix.Supports.of_right_posDef rho.m sigma.m hSigma
   rw [relativeEntropy_eq_coe_of_supports rho sigma hSupport]
   congr 1
   have hEntropy :
-      (_root_.QIT.psdSupportCompressedState rho sigma.pos hSupport).vonNeumann =
+      (_root_.QIT.psdSupportCompressedState rho sigma.psd hSupport).vonNeumann =
         rho.vonNeumann :=
-    relativeEntropyTraceLog_vonNeumann_psdSupportCompressedState_eq rho sigma.pos hSupport
+    vonNeumann_psdSupportCompressedState_eq rho sigma.psd hSupport
   have hTrace :
-      ((psdSupportCompress sigma.matrix sigma.pos rho.matrix *
-        State.psdLog (psdSupportCompress sigma.matrix sigma.pos sigma.matrix)
-          (psdSupportCompress_self_posDef sigma.matrix sigma.pos)).trace).re =
-        ((rho.matrix *
-          cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) sigma.matrix).trace).re :=
-    relativeEntropyTraceLog_trace_mul_psdSupportLog_eq_trace_mul_cfc_logZero
-      rho sigma.pos hSupport
+      ((psdSupportCompress sigma.m sigma.psd rho.m *
+        MState.psdLog (psdSupportCompress sigma.m sigma.psd sigma.m)
+          (psdSupportCompress_self_posDef sigma.m sigma.psd)).trace).re =
+        ((rho.m *
+          cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) sigma.m).trace).re :=
+    trace_mul_psdSupportLog_eq_trace_mul_cfc_logZero
+      rho sigma.psd hSupport
   have hLogZero :
-      cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) sigma.matrix =
-        State.psdLog sigma.matrix hSigma :=
-    relativeEntropyTraceLog_cfc_logZero_eq_psdLog_of_posDef sigma.matrix hSigma
+      cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) sigma.m =
+        MState.psdLog sigma.m hSigma :=
+    relativeEntropyTraceLog_cfc_logZero_eq_psdLog_of_posDef sigma.m hSigma
   have hVon :
       rho.vonNeumann =
-        -((rho.matrix * State.psdLog rho.matrix hRho).trace.re) / Real.log 2 :=
-    State.vonNeumann_eq_neg_trace_mul_psdLog_div_log_two rho hRho
+        -((rho.m * MState.psdLog rho.m hRho).trace.re) / Real.log 2 :=
+    MState.vonNeumann_eq_neg_trace_mul_psdLog_div_log_two rho hRho
   calc
-    relativeEntropyPSDReferenceTraceLogFinite rho sigma.matrix sigma.pos hSupport =
-        -(_root_.QIT.psdSupportCompressedState rho sigma.pos hSupport).vonNeumann -
-          ((psdSupportCompress sigma.matrix sigma.pos rho.matrix *
-            State.psdLog (psdSupportCompress sigma.matrix sigma.pos sigma.matrix)
-              (psdSupportCompress_self_posDef sigma.matrix sigma.pos)).trace).re /
+    relativeEntropyPSDReferenceTraceLogFinite rho sigma.m sigma.psd hSupport =
+        -(_root_.QIT.psdSupportCompressedState rho sigma.psd hSupport).vonNeumann -
+          (((_root_.QIT.psdSupportCompressedState rho sigma.psd hSupport).m *
+            MState.psdLog (psdSupportCompress sigma.m sigma.psd sigma.m)
+              (psdSupportCompress_self_posDef sigma.m sigma.psd)).trace).re /
             Real.log 2 := by
           rfl
     _ = -rho.vonNeumann -
-          ((rho.matrix *
-            cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) sigma.matrix).trace).re /
+          ((rho.m *
+            cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) sigma.m).trace).re /
             Real.log 2 := by
-          rw [hEntropy, hTrace]
+          rw [psdSupportCompressedState_matrix, hEntropy, hTrace]
     _ = -rho.vonNeumann -
-          ((rho.matrix * State.psdLog sigma.matrix hSigma).trace).re /
+          ((rho.m * MState.psdLog sigma.m hSigma).trace).re /
             Real.log 2 := by
           rw [hLogZero]
     _ = rho.relativeEntropyPosDefFinite sigma hRho hSigma := by
           rw [hVon]
-          simp [State.relativeEntropyPosDefFinite]
+          simp [MState.relativeEntropyPosDefFinite]
           ring
 
-end State
+end MState
+
+namespace QIT
 
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
@@ -435,14 +442,14 @@ def relativeEntropyPSDTraceLogFinite
     (hSigma : sigma.PosSemidef) (hSupport : Matrix.Supports rho sigma) : ℝ := by
   classical
   let hRhoTr : 0 < rho.trace.re :=
-    State.posSemidef_trace_pos_of_ne_zero hRho hRho_ne
-  let rhoNorm : State a := State.normalizePSD rho hRho hRhoTr.ne'
-  have hSupportNorm : Matrix.Supports rhoNorm.matrix sigma := by
-    simpa [rhoNorm, State.normalizePSD] using
+    MState.posSemidef_trace_pos_of_ne_zero hRho hRho_ne
+  let rhoNorm : MState a := MState.normalizePSD rho hRho hRhoTr.ne'
+  have hSupportNorm : Matrix.Supports rhoNorm.m sigma := by
+    simpa [rhoNorm, MState.normalizePSD] using
       supports_real_smul_left ((rho.trace.re)⁻¹ : ℝ) hSupport
   exact
     log2 rho.trace.re +
-      State.relativeEntropyPSDReferenceTraceLogFinite
+      MState.relativeEntropyPSDReferenceTraceLogFinite
         rhoNorm sigma hSigma hSupportNorm
 
 /-- Source-exact extended-real quantum divergence for nonzero PSD operators.
@@ -475,29 +482,27 @@ theorem relativeEntropyPSDTraceLogE_eq_coe_of_supports
   simp [relativeEntropyPSDTraceLogE, hSupport]
 
 theorem relativeEntropyPSDTraceLogFinite_state_eq
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (hSupport : Matrix.Supports rho.matrix sigma) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (hSupport : Matrix.Supports rho.m sigma) :
     relativeEntropyPSDTraceLogFinite
-        rho.matrix sigma rho.pos rho.density_matrix_ne_zero hSigma hSupport =
-      State.relativeEntropyPSDReferenceTraceLogFinite rho sigma hSigma hSupport := by
-  simp [relativeEntropyPSDTraceLogFinite, State.normalizePSD_self, rho.trace_re_eq_one, log2]
+        rho.m sigma rho.psd rho.matrix_ne_zero hSigma hSupport =
+      MState.relativeEntropyPSDReferenceTraceLogFinite rho sigma hSigma hSupport := by
+  simp [relativeEntropyPSDTraceLogFinite, MState.normalizePSD_self, log2]
 
 /-- The source-exact PSD-operator definition specializes to the existing
 normalized-state PSD-reference API used by the DPI theorems. -/
 theorem relativeEntropyPSDTraceLogE_state_eq
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef) :
-    relativeEntropyPSDTraceLogE rho.matrix sigma rho.pos rho.density_matrix_ne_zero hSigma =
-      State.relativeEntropyPSDReferenceTraceLogE rho sigma hSigma := by
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef) :
+    relativeEntropyPSDTraceLogE rho.m sigma rho.psd rho.matrix_ne_zero hSigma =
+      MState.relativeEntropyPSDReferenceTraceLogE rho sigma hSigma := by
   classical
-  by_cases hSupport : Matrix.Supports rho.matrix sigma
+  by_cases hSupport : Matrix.Supports rho.m sigma
   · rw [relativeEntropyPSDTraceLogE_eq_coe_of_supports
-        rho.matrix sigma rho.pos rho.density_matrix_ne_zero hSigma hSupport,
-      State.relativeEntropyPSDReferenceTraceLogE_eq_coe_of_supports rho hSigma hSupport,
+        rho.m sigma rho.psd rho.matrix_ne_zero hSigma hSupport,
+      MState.relativeEntropyPSDReferenceTraceLogE_eq_coe_of_supports rho hSigma hSupport,
       relativeEntropyPSDTraceLogFinite_state_eq rho hSigma hSupport]
   · rw [relativeEntropyPSDTraceLogE_eq_top_of_not_supports
-        rho.matrix sigma rho.pos rho.density_matrix_ne_zero hSigma hSupport,
-      State.relativeEntropyPSDReferenceTraceLogE_eq_top_of_not_supports rho hSigma hSupport]
-
-end
+        rho.m sigma rho.psd rho.matrix_ne_zero hSigma hSupport,
+      MState.relativeEntropyPSDReferenceTraceLogE_eq_top_of_not_supports rho hSigma hSupport]
 
 end QIT

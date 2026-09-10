@@ -22,7 +22,7 @@ The carrier comes with:
 * a region dispatch (`RenyiOrder.Region`, `RenyiOrder.region`) that partitions
   the closed interval into its five source-meaningful pieces;
 * the reciprocal `RenyiOrder.recip` (with the convention `recip infinity = 0`);
-* the source conjugate order map `alpha |-> beta = alpha / (2*alpha - 1)`,
+* the source conjugate order map `alpha ↦ beta = alpha / (2*alpha - 1)`,
   extended to the closed interval by the boundary pairs `(1/2, infinity)`,
   `(1, 1)`, `(infinity, 1/2)`; and
 * the headline closure `recip_add_recip_conjugateOrder`, the identity
@@ -32,7 +32,7 @@ The boundary values of the upward sandwiched conditional Renyi entropy are the
 source-named entropies (conditional von Neumann entropy at `alpha = 1`,
 conditional max-entropy at `alpha = 1/2`, conditional min-entropy at
 `alpha = infinity`); the unified total surface
-`State.conditionalSandwichedRenyiUpExtendedOrder` adds the `alpha = infinity`
+`MState.conditionalSandwichedRenyiUpExtendedOrder` adds the `alpha = infinity`
 boundary arm to the existing finite-order surface
 `conditionalSandwichedRenyiUpFiniteOrder`, and is compatible with the existing
 finite-real positive-definite-gated surface `conditionalSandwichedRenyi` on the
@@ -44,11 +44,10 @@ boundary matching the source-named limit value is source-faithful), and
 `cond.tex` (the boundary values of the upward conditional entropy and the
 conjugate order map).
 
-The real `alpha -> 1` and `alpha -> infinity` limit theorems for the upward
+The real `alpha → 1` and `alpha → infinity` limit theorems for the upward
 conditional entropy are out of scope here: the `alpha = infinity` limit has no
 boxed source proof, and the `alpha = 1` conditional lift needs a
-supremum-versus-limit exchange that is not yet available. Both are recorded as
-named follow-up blockers; every theorem in this module is completely proved.
+supremum-versus-limit exchange.
 -/
 
 @[expose] public section
@@ -57,14 +56,14 @@ open scoped ComplexOrder MatrixOrder Topology
 
 open Matrix Filter
 
-namespace QIT
-
-universe u v
-
 noncomputable section
-
+universe u v
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+
+open QIT
+
+namespace QIT
 
 /-- The closed sandwiched-Renyi order interval `[1/2, infinity]`.
 
@@ -76,7 +75,7 @@ def RenyiOrder : Type := {α : WithTop ℝ // ((1/2 : ℝ) : WithTop ℝ) ≤ α
 
 namespace RenyiOrder
 
-/-- Construct a finite Renyi order from a real `r >= 1/2`. -/
+/-- Construct a finite Renyi order from a real `r ≥ 1/2`. -/
 def ofReal (r : ℝ) (h : ((1/2 : ℝ) : WithTop ℝ) ≤ ↑r) : RenyiOrder := ⟨↑r, h⟩
 
 /-- The boundary order `alpha = infinity`. -/
@@ -116,7 +115,7 @@ theorem coe_ofReal (r : ℝ) (h : ((1/2 : ℝ) : WithTop ℝ) ≤ ↑r) :
 theorem coe_infinity :
     ((infinity : RenyiOrder) : WithTop ℝ) = ⊤ := rfl
 
-/-- A finite order coerced to `↑r` carries the real lower bound `1/2 <= r`. -/
+/-- A finite order coerced to `↑r` carries the real lower bound `1/2 ≤ r`. -/
 theorem le_of_coe {r : ℝ} (α : RenyiOrder) (h : α.val = ↑r) : 1/2 ≤ r := by
   have hp := α.prop
   rw [h] at hp
@@ -167,7 +166,7 @@ theorem region_infinity : (infinity : RenyiOrder).region = .infinity := rfl
 
 The convention is `recip infinity = 0`, matching the closed-interval identity
 `1/alpha + 1/beta = 2` at the boundary pair `(infinity, 1/2)`. For finite
-`alpha >= 1/2 > 0` the reciprocal is the ordinary real reciprocal. -/
+`alpha ≥ 1/2 > 0` the reciprocal is the ordinary real reciprocal. -/
 def recip (α : RenyiOrder) : WithTop ℝ :=
   match α.val with
   | ⊤ => 0
@@ -251,25 +250,27 @@ the `alpha = infinity` boundary arm (conditional min-entropy). The three
 boundary values are the source-named entropies; the source defines the
 boundary orders as limits of the sandwiched kernel, so a definitional
 boundary matching the source-named limit value is source-faithful. The
-state-scoped wrapper is `State.conditionalSandwichedRenyiUpExtendedOrder`. -/
-def extendedSurfaceCore (ρ : State (Prod a b)) (α : RenyiOrder) : ℝ :=
+state-scoped wrapper is `MState.conditionalSandwichedRenyiUpExtendedOrder`. -/
+def extendedSurfaceCore (ρ : MState (a × b)) (α : RenyiOrder) : ℝ :=
   match α.val with
   | ⊤ => ρ.conditionalMinEntropy
   | some r => ρ.conditionalSandwichedRenyiUpFiniteOrder r
 
 @[simp]
-theorem extendedSurfaceCore_infinity (ρ : State (Prod a b)) :
+theorem extendedSurfaceCore_infinity (ρ : MState (a × b)) :
     extendedSurfaceCore ρ infinity = ρ.conditionalMinEntropy := rfl
 
 @[simp]
-theorem extendedSurfaceCore_ofReal (ρ : State (Prod a b)) (r : ℝ)
+theorem extendedSurfaceCore_ofReal (ρ : MState (a × b)) (r : ℝ)
     (h : ((1/2 : ℝ) : WithTop ℝ) ≤ ↑r) :
     extendedSurfaceCore ρ (ofReal r h) =
       ρ.conditionalSandwichedRenyiUpFiniteOrder r := rfl
 
 end RenyiOrder
 
-namespace State
+end QIT
+
+namespace MState
 
 /-- The total upward sandwiched conditional Renyi entropy over the full closed
 order interval `[1/2, infinity]`, dispatched on `RenyiOrder`.
@@ -290,18 +291,18 @@ entropies; the source defines the boundary orders as limits of the sandwiched
 kernel, so a definitional boundary matching the source-named limit value is
 source-faithful. -/
 def conditionalSandwichedRenyiUpExtendedOrder
-    (ρ : State (Prod a b)) (α : RenyiOrder) : ℝ :=
+    (ρ : MState (a × b)) (α : RenyiOrder) : ℝ :=
   RenyiOrder.extendedSurfaceCore ρ α
 
 @[simp]
 theorem conditionalSandwichedRenyiUpExtendedOrder_infinity
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     ρ.conditionalSandwichedRenyiUpExtendedOrder RenyiOrder.infinity =
       ρ.conditionalMinEntropy :=
   RenyiOrder.extendedSurfaceCore_infinity ρ
 
 @[simp]
-theorem conditionalSandwichedRenyiUpExtendedOrder_half (ρ : State (Prod a b)) :
+theorem conditionalSandwichedRenyiUpExtendedOrder_half (ρ : MState (a × b)) :
     ρ.conditionalSandwichedRenyiUpExtendedOrder
       (RenyiOrder.ofReal (2 : ℝ)⁻¹ (by norm_num)) = ρ.conditionalMaxEntropy := by
   show RenyiOrder.extendedSurfaceCore ρ
@@ -310,7 +311,7 @@ theorem conditionalSandwichedRenyiUpExtendedOrder_half (ρ : State (Prod a b)) :
     conditionalSandwichedRenyiUpFiniteOrder_half]
 
 @[simp]
-theorem conditionalSandwichedRenyiUpExtendedOrder_one (ρ : State (Prod a b)) :
+theorem conditionalSandwichedRenyiUpExtendedOrder_one (ρ : MState (a × b)) :
     ρ.conditionalSandwichedRenyiUpExtendedOrder
       (RenyiOrder.ofReal 1 (by norm_num)) = ρ.conditionalEntropy := by
   show RenyiOrder.extendedSurfaceCore ρ (RenyiOrder.ofReal 1 (by norm_num)) =
@@ -319,7 +320,7 @@ theorem conditionalSandwichedRenyiUpExtendedOrder_one (ρ : State (Prod a b)) :
     conditionalSandwichedRenyiUpFiniteOrder_one]
 
 theorem conditionalSandwichedRenyiUpExtendedOrder_ltOne
-    (ρ : State (Prod a b)) {r : ℝ} (h1 : 1/2 < r) (h2 : r < 1) :
+    (ρ : MState (a × b)) {r : ℝ} (h1 : 1/2 < r) (h2 : r < 1) :
     ρ.conditionalSandwichedRenyiUpExtendedOrder
       (RenyiOrder.ofReal r (by exact_mod_cast (le_of_lt h1))) =
       ρ.conditionalSandwichedRenyiUpSource r (lt_trans (by norm_num) h1)
@@ -335,7 +336,7 @@ theorem conditionalSandwichedRenyiUpExtendedOrder_ltOne
     conditionalSandwichedRenyiUpFiniteOrder_of_pos_ne_one_ne_half ρ hpos hne hne_half]
 
 theorem conditionalSandwichedRenyiUpExtendedOrder_gtOne
-    (ρ : State (Prod a b)) {r : ℝ} (h : 1 < r) :
+    (ρ : MState (a × b)) {r : ℝ} (h : 1 < r) :
     ρ.conditionalSandwichedRenyiUpExtendedOrder
       (RenyiOrder.ofReal r
         (by exact_mod_cast (le_of_lt (lt_trans (by norm_num) h)))) =
@@ -356,11 +357,11 @@ theorem conditionalSandwichedRenyiUpExtendedOrder_gtOne
 existing finite-real positive-definite-gated `conditionalSandwichedRenyi`.
 
 This is the strict-acceptance compatibility hinge: on the interior
-`1/2 < alpha`, `alpha != 1`, the extended surface does not weaken the existing
+`1/2 < alpha`, `alpha ≠ 1`, the extended surface does not weaken the existing
 finite-real surface. The boundary orders (`alpha = 1/2`, `1`, `infinity`) are
 the source-named entropies and are handled by the corresponding simp lemmas. -/
 theorem conditionalSandwichedRenyiUpExtendedOrder_ofReal
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
     {r : ℝ} (hhalf : 1/2 < r) (hne : r ≠ 1) :
     ρ.conditionalSandwichedRenyiUpExtendedOrder
       (RenyiOrder.ofReal r (by exact_mod_cast (le_of_lt hhalf))) =
@@ -378,13 +379,9 @@ theorem conditionalSandwichedRenyiUpExtendedOrder_ofReal
 
 /-- In-module smoke: the extended surface has the expected boundary at
 `alpha = infinity`. -/
-example (ρ : State (Prod a b)) :
+example (ρ : MState (a × b)) :
     ρ.conditionalSandwichedRenyiUpExtendedOrder RenyiOrder.infinity =
       ρ.conditionalMinEntropy :=
   conditionalSandwichedRenyiUpExtendedOrder_infinity ρ
 
-end State
-
-end
-
-end QIT
+end MState

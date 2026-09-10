@@ -12,7 +12,7 @@ public import QuantumLib.QIT.States.MaximallyMixed
 /-!
 # Canonical maximally entangled states
 
-The canonical bipartite pure vector and its normalized state are defined from
+The canonical bipartite ket and its normalized state are defined from
 a finite basis equivalence.  Their marginal identities are foundation-level
 facts, independent of any communication protocol.
 -/
@@ -22,34 +22,29 @@ facts, independent of any communication protocol.
 open scoped ComplexOrder MatrixOrder
 open Matrix
 
-namespace QIT
-
+noncomputable section
 universe u v
 
-noncomputable section
+open QIT
 
-namespace PureVector
+namespace Ket
 
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Nonempty a] [Fintype b] [DecidableEq b]
 
 /-- The normalized vector with equal amplitudes on the graph of `pairing`. -/
-def maximallyEntangled (pairing : a ≃ b) : PureVector (Prod a b) where
-  amp := fun x =>
-    if pairing x.1 = x.2 then
-      ((Real.sqrt (Fintype.card a : ℝ) : ℂ)⁻¹)
-    else
-      0
-  trace_rankOne_eq_one := by
+def maximallyEntangled (pairing : a ≃ b) : Ket (a × b) :=
+  Ket.ofRankOne
+    (fun x => if pairing x.1 = x.2 then ((Real.sqrt (Fintype.card a : ℝ) : ℂ)⁻¹) else 0) <| by
     rw [rankOneMatrix_trace]
     have hcard_pos : 0 < (Fintype.card a : ℝ) := by
       exact_mod_cast Fintype.card_pos_iff.mpr inferInstance
     have hsqrt_ne : Real.sqrt (Fintype.card a : ℝ) ≠ 0 := by
       exact ne_of_gt (Real.sqrt_pos.2 hcard_pos)
     calc
-      (fun x : Prod a b =>
+      (fun x : a × b =>
           (if pairing x.1 = x.2 then ((Real.sqrt (Fintype.card a : ℝ))⁻¹ : ℂ) else 0)) ⬝ᵥ
-          (fun x : Prod a b =>
+          (fun x : a × b =>
             star (if pairing x.1 = x.2 then
               ((Real.sqrt (Fintype.card a : ℝ))⁻¹ : ℂ) else 0)) =
           ∑ i : a, ∑ j : b,
@@ -79,49 +74,50 @@ def maximallyEntangled (pairing : a ≃ b) : PureVector (Prod a b) where
         rw [← Complex.ofReal_natCast, ← Complex.ofReal_pow]
         exact congrArg Complex.ofReal (Real.sq_sqrt hcard_pos.le).symm
 
-theorem maximallyEntangled_amp (pairing : a ≃ b) (x : Prod a b) :
-    (maximallyEntangled pairing).amp x =
+omit [DecidableEq a] in
+theorem maximallyEntangled_vec (pairing : a ≃ b) (x : a × b) :
+    (maximallyEntangled pairing).vec x =
       if pairing x.1 = x.2 then
         ((Real.sqrt (Fintype.card a : ℝ) : ℂ)⁻¹)
       else 0 :=
   rfl
 
 theorem maximallyEntangled_matrix (pairing : a ≃ b) :
-    (maximallyEntangled pairing).state.matrix =
-      rankOneMatrix (maximallyEntangled pairing).amp := by
+    (maximallyEntangled pairing).state.m =
+      rankOneMatrix (maximallyEntangled pairing).vec := by
   rw [state_matrix]
 
-end PureVector
+end Ket
 
-namespace State
+namespace MState
 
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Nonempty a] [Fintype b] [DecidableEq b]
 
 /-- The normalized state associated with the canonical maximally entangled
-pure vector. -/
-def maximallyEntangled (pairing : a ≃ b) : State (Prod a b) :=
-  (PureVector.maximallyEntangled pairing).state
+ket. -/
+def maximallyEntangled (pairing : a ≃ b) : MState (a × b) :=
+  (Ket.maximallyEntangled pairing).state
 
 @[simp]
 theorem maximallyEntangled_matrix (pairing : a ≃ b) :
-    (maximallyEntangled pairing).matrix =
-      (PureVector.maximallyEntangled pairing).state.matrix :=
+    (maximallyEntangled pairing).m =
+      (Ket.maximallyEntangled pairing).state.m :=
   rfl
 
-end State
+end MState
 
-namespace PureVector
+namespace Ket
 
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Nonempty a] [Fintype b] [DecidableEq b]
 
 /-- The first marginal of the canonical maximally entangled vector is
 maximally mixed. -/
-theorem maximallyEntangled_marginalA (pairing : a ≃ b) :
-    (maximallyEntangled pairing).state.marginalA =
-      State.maximallyMixed a := by
-  apply State.ext
+theorem maximallyEntangled_traceRight (pairing : a ≃ b) :
+    (maximallyEntangled pairing).state.traceRight =
+      (MState.uniform : MState a) := by
+  apply MState.ext
   ext x y
   have hcard_pos : 0 < (Fintype.card a : ℝ) := by
     exact_mod_cast Fintype.card_pos_iff.mpr inferInstance
@@ -143,18 +139,18 @@ theorem maximallyEntangled_marginalA (pairing : a ≃ b) :
     simpa using hcoef
   by_cases hxy : x = y
   · subst y
-    simp [State.marginalA, partialTraceB, PureVector.state,
-      maximallyEntangled, State.maximallyMixed, hcoef']
+    simp [Matrix.traceRight, Ket.state,
+      maximallyEntangled, hcoef']
   · have hyx : ¬ y = x := fun h => hxy h.symm
-    simp [State.marginalA, partialTraceB, PureVector.state,
-      maximallyEntangled, State.maximallyMixed, hxy, hyx]
+    simp [Matrix.traceRight, Ket.state,
+      maximallyEntangled, hxy, hyx]
 
 /-- The second marginal of the canonical maximally entangled vector is
 maximally mixed. -/
-theorem maximallyEntangled_marginalB (pairing : a ≃ b) [Nonempty b] :
-    (maximallyEntangled pairing).state.marginalB =
-      State.maximallyMixed b := by
-  apply State.ext
+theorem maximallyEntangled_traceLeft (pairing : a ≃ b) [Nonempty b] :
+    (maximallyEntangled pairing).state.traceLeft =
+      (MState.uniform : MState b) := by
+  apply MState.ext
   ext x y
   have hcard_pos : 0 < (Fintype.card a : ℝ) := by
     exact_mod_cast Fintype.card_pos_iff.mpr inferInstance
@@ -176,8 +172,8 @@ theorem maximallyEntangled_marginalB (pairing : a ≃ b) [Nonempty b] :
     simpa using hcoef
   by_cases hxy : x = y
   · subst y
-    simp [State.marginalB, partialTraceA, PureVector.state,
-      maximallyEntangled, State.maximallyMixed]
+    simp [Matrix.traceLeft, Ket.state,
+      maximallyEntangled]
     rw [Finset.sum_eq_single (pairing.symm x)]
     · simp [pairing.apply_symm_apply]
       rw [hcoef']
@@ -189,7 +185,7 @@ theorem maximallyEntangled_marginalB (pairing : a ≃ b) [Nonempty b] :
       simp [hne]
     · simp
   · have hyx : ¬ y = x := fun h => hxy h.symm
-    simp [State.marginalB, partialTraceA, PureVector.state,
+    simp [Matrix.traceLeft, Ket.state,
       maximallyEntangled]
     rw [Finset.sum_eq_single (pairing.symm x)]
     · simp [hxy]
@@ -199,6 +195,4 @@ theorem maximallyEntangled_marginalB (pairing : a ≃ b) [Nonempty b] :
       simp [hne]
     · simp
 
-end PureVector
-end
-end QIT
+end Ket

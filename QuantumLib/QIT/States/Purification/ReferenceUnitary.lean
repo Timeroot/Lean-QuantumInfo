@@ -10,7 +10,7 @@ public import QuantumLib.QIT.States.Purification.ReferenceIsometry
 public import Mathlib.LinearAlgebra.UnitaryGroup
 
 /-!
-# Reference-system unitaries and pure-vector overlaps
+# Reference-system unitaries and ket overlaps
 
 This module supplies the local reference-unitary and overlap API needed for the
 Uhlmann route registered from [Wilde2011Qst, qit-notes.tex:15060-15093] and the
@@ -31,7 +31,8 @@ noncomputable section
 
 /-- A unitary acting on a finite purifying reference register. -/
 structure ReferenceUnitary (r : Type u) [Fintype r] [DecidableEq r] where
-  matrix : Matrix.unitaryGroup r Complex
+  /-- The underlying element of the unitary group. -/
+  matrix : Matrix.unitaryGroup r ℂ
 
 namespace ReferenceUnitary
 
@@ -41,7 +42,7 @@ variable [Fintype r] [DecidableEq r]
 variable (U : ReferenceUnitary r)
 
 /-- The underlying matrix of a reference unitary. -/
-def matrixCoe : Matrix r r Complex :=
+def matrixCoe : Matrix r r ℂ :=
   U.matrix
 
 /-- A reference unitary is, in particular, a reference isometry on the same register. -/
@@ -52,51 +53,69 @@ def toReferenceIsometry : ReferenceIsometry r r where
 
 variable [Fintype a] [DecidableEq a]
 
-/-- Apply a reference unitary to the reference side of a bipartite pure vector. -/
-def applyPureVector (Ψ : PureVector (Prod r a)) : PureVector (Prod r a) :=
-  U.toReferenceIsometry.applyPureVector Ψ
+/-- Apply a reference unitary to the reference side of a bipartite ket. -/
+def applyKet (Ψ : Ket (r × a)) : Ket (r × a) :=
+  U.toReferenceIsometry.applyKet Ψ
 
-/-- The unitary pure-vector action unfolds to the underlying reference-isometry action. -/
-theorem applyPureVector_eq_referenceIsometry (Ψ : PureVector (Prod r a)) :
-    U.applyPureVector Ψ = U.toReferenceIsometry.applyPureVector Ψ :=
+/-- The unitary ket action unfolds to the underlying reference-isometry action. -/
+theorem applyKet_eq_referenceIsometry (Ψ : Ket (r × a)) :
+    U.applyKet Ψ = U.toReferenceIsometry.applyKet Ψ :=
   rfl
 
 /-- The amplitude formula for applying a reference unitary. -/
-theorem applyPureVector_amp (Ψ : PureVector (Prod r a)) :
-    (U.applyPureVector Ψ).amp = U.toReferenceIsometry.applyAmp Ψ.amp :=
+theorem applyKet_vec (Ψ : Ket (r × a)) :
+    (U.applyKet Ψ).vec = U.toReferenceIsometry.applyAmp Ψ.vec :=
   rfl
 
 end ReferenceUnitary
 
-namespace PureVector
+end
+end QIT
+
+namespace Ket
+
+noncomputable section
+
+open QIT
+universe u v
 
 variable {a : Type u}
 variable [Fintype a] [DecidableEq a]
 
-/-- Bra-ket overlap of two pure vectors, using the convention `⟨Ψ|Φ⟩`. -/
-def overlap (Ψ Φ : PureVector a) : ℂ :=
-  ∑ i, star (Ψ.amp i) * Φ.amp i
+/-- Bra-ket overlap of two kets, using the convention `⟨Ψ|Φ⟩`. -/
+def overlap (Ψ Φ : Ket a) : ℂ :=
+  ∑ i, star (Ψ.vec i) * Φ.vec i
 
-/-- Squared magnitude of the pure-vector overlap. -/
-def overlapSq (Ψ Φ : PureVector a) : ℝ :=
+/-- Squared magnitude of the ket overlap. -/
+def overlapSq (Ψ Φ : Ket a) : ℝ :=
   Complex.normSq (Ψ.overlap Φ)
 
+omit [DecidableEq a] in
 /-- The overlap definition as a finite coordinate sum. -/
-theorem overlap_eq_sum (Ψ Φ : PureVector a) :
-    Ψ.overlap Φ = ∑ i, star (Ψ.amp i) * Φ.amp i :=
+theorem overlap_eq_sum (Ψ Φ : Ket a) :
+    Ψ.overlap Φ = ∑ i, star (Ψ.vec i) * Φ.vec i :=
   rfl
 
+omit [DecidableEq a] in
 /-- The squared overlap definition unfolds to `Complex.normSq`. -/
-theorem overlapSq_eq_normSq (Ψ Φ : PureVector a) :
+theorem overlapSq_eq_normSq (Ψ Φ : Ket a) :
     Ψ.overlapSq Φ = Complex.normSq (Ψ.overlap Φ) :=
   rfl
 
+omit [DecidableEq a] in
 /-- Squared overlaps are nonnegative. -/
-theorem overlapSq_nonneg (Ψ Φ : PureVector a) :
+theorem overlapSq_nonneg (Ψ Φ : Ket a) :
     0 ≤ Ψ.overlapSq Φ :=
   Complex.normSq_nonneg _
 
-end PureVector
+end
+
+end Ket
+
+namespace QIT
+noncomputable section
+
+universe u v
 
 end
 

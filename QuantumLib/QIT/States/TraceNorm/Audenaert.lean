@@ -9,6 +9,7 @@ module
 public import QuantumLib.QIT.Util.Matrix
 public import QuantumLib.QIT.Util.SDP.HermitianPSDTraceDuality
 public import QuantumLib.QIT.States.TraceNorm.PositivePartBlock
+public import QuantumLib.QIT.Util.MatrixInstances
 public import Mathlib.Analysis.CStarAlgebra.Basic
 public import Mathlib.Analysis.CStarAlgebra.Matrix
 public import Mathlib.Analysis.Calculus.Deriv.Mul
@@ -36,7 +37,7 @@ block-decomposition positivity argument
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder NNReal Topology Matrix.Norms.L2Operator
+open scoped ComplexOrder MatrixOrder NNReal Topology Matrix.Norms.L2Operator QIT.MatrixL2
 open Matrix MeasureTheory Set intervalIntegral
 
 namespace QIT
@@ -44,17 +45,6 @@ namespace QIT
 universe u v
 
 noncomputable section
-
-noncomputable local instance cMatrixCStarAlgebra
-    {a : Type u} [Fintype a] [DecidableEq a] : CStarAlgebra (CMatrix a) := {}
-
-noncomputable instance cMatrixContinuousENorm
-    {a : Type u} [Fintype a] [DecidableEq a] : ContinuousENorm (CMatrix a) :=
-  SeminormedAddGroup.toContinuousENorm
-
-noncomputable instance cMatrixENormedAddMonoid
-    {a : Type u} [Fintype a] [DecidableEq a] : ENormedAddMonoid (CMatrix a) :=
-  NormedAddGroup.toENormedAddMonoid
 
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
@@ -65,19 +55,6 @@ def audenaertRpowIntegrand (p r : ℝ) (A : CMatrix a) : CMatrix a :=
 /-- The finite-dimensional resolvent form of the CFC integrand. -/
 def audenaertResolventIntegrand (p r : ℝ) (A : CMatrix a) : CMatrix a :=
   r ^ (p - 1) • (A * (A + r • (1 : CMatrix a))⁻¹)
-
-omit [Fintype a] in
-private theorem cMatrix_real_smul_one_posDef {r : ℝ} (hr : 0 < r) :
-    (r • (1 : CMatrix a)).PosDef := by
-  rw [show r • (1 : CMatrix a) = Matrix.diagonal (fun _ : a => (r : ℂ)) by
-    ext i j
-    by_cases hij : i = j
-    · subst j
-      simp
-    · simp [hij]]
-  rw [Matrix.posDef_diagonal_iff]
-  intro i
-  exact_mod_cast hr
 
 omit [Fintype a] in
 /-- For PSD `A` and `0 < r`, `A + r • 1` is positive definite. -/
@@ -301,7 +278,7 @@ omit [DecidableEq a] in
 private theorem sumBlock11_fromBlocks_left_mul
     {p : Type u} {n : Type v} [Fintype p] [Fintype n]
     (A : Matrix p p ℂ) (D : Matrix n n ℂ)
-    (M : Matrix (Sum p n) (Sum p n) ℂ) :
+    (M : Matrix (p ⊕ n) (p ⊕ n) ℂ) :
     Matrix.sumBlock11 (Matrix.fromBlocks A 0 0 D * M) =
       A * Matrix.sumBlock11 M := by
   ext i j
@@ -309,7 +286,7 @@ private theorem sumBlock11_fromBlocks_left_mul
 
 private theorem trace_fromBlocks_projector_mul
     {p : Type u} {n : Type v} [Fintype p] [DecidableEq p] [Fintype n]
-    (M : Matrix (Sum p n) (Sum p n) ℂ) :
+    (M : Matrix (p ⊕ n) (p ⊕ n) ℂ) :
     (Matrix.fromBlocks (1 : Matrix p p ℂ) 0 0 (0 : Matrix n n ℂ) * M).trace =
       (Matrix.sumBlock11 M).trace := by
   rw [← Matrix.fromBlocks_sumBlocks M]
@@ -324,22 +301,6 @@ private theorem positiveSpectralProjector_trace_mul
     (positiveSpectralProjector H hH * X)]
   rw [spectralSignBlockMatrix_mul, spectralSignBlockMatrix_projector]
   exact trace_fromBlocks_projector_mul _
-
-private theorem trace_mul_le_of_le {D X Y : CMatrix a}
-    (hD : D.PosSemidef) (hXY : X ≤ Y) :
-    ((D * X).trace).re ≤ ((D * Y).trace).re := by
-  rw [Matrix.le_iff] at hXY
-  have hnonneg := cMatrix_trace_mul_posSemidef_re_nonneg hD hXY
-  have hcalc : ((D * (Y - X)).trace).re =
-      ((D * Y).trace).re - ((D * X).trace).re := by
-    simp [Matrix.mul_sub, Matrix.trace_sub]
-  linarith
-
-/-- Real powers of positive semidefinite matrices are positive semidefinite. -/
-public theorem cMatrix_rpow_posSemidef {s : ℝ} {A : CMatrix a}
-    (_hA : A.PosSemidef) :
-    (CFC.rpow A s).PosSemidef :=
-  Matrix.nonneg_iff_posSemidef.mp (CFC.rpow_nonneg (a := A) (y := s))
 
 /-- The left-half substitution used in Audenaert's proof of Theorem 1. -/
 public theorem audenaertLeftHalfParams {s : ℝ}
@@ -357,15 +318,6 @@ public theorem audenaertLeftHalfParams {s : ℝ}
   have hmul : (1 - s) * (s / (1 - s)) = s := by
     field_simp [ne_of_gt hr]
   exact ⟨hr, ht_nonneg, ht_le, hmul⟩
-
-/-- Power-of-power reduction for possibly singular PSD matrices and nonnegative exponents. -/
-public theorem cMatrix_rpow_rpow_of_nonneg {A : CMatrix a} (hA : A.PosSemidef)
-    {r t s : ℝ} (hr : 0 ≤ r) (ht : 0 ≤ t) (hrt : r * t = s) :
-    CFC.rpow (CFC.rpow A r) t = CFC.rpow A s := by
-  rw [show CFC.rpow (CFC.rpow A r) t = CFC.rpow A (r * t) by
-    exact CFC.rpow_rpow_of_exponent_nonneg A r t hr ht
-      (Matrix.nonneg_iff_posSemidef.mpr hA)]
-  rw [hrt]
 
 /-- Positive real powers with exponents adding to one multiply back to a PSD matrix.
 
@@ -517,10 +469,6 @@ private noncomputable def traceLeftRightCLM (P B : CMatrix a) :
       simp [Matrix.trace_smul]
   } : CMatrix a →ₗ[ℝ] ℂ))
 
-private theorem traceLeftRightCLM_apply (P B X : CMatrix a) :
-    traceLeftRightCLM P B X = ((P * B * X).trace).re :=
-  rfl
-
 /-- Left/right multiplication and trace commute with interval Bochner integrals. -/
 public theorem audenaertTraceLeftRight_intervalIntegral
     {f : ℝ → CMatrix a} (hf : IntervalIntegrable f volume (0 : ℝ) 1)
@@ -553,7 +501,7 @@ public theorem audenaertTraceLeftRight_sub_integrableOn
 omit [DecidableEq a] in
 private theorem sumBlock11_mul_self
     {p : Type u} {n : Type v} [Fintype p] [Fintype n]
-    (S : Matrix (Sum p n) (Sum p n) ℂ) :
+    (S : Matrix (p ⊕ n) (p ⊕ n) ℂ) :
     Matrix.sumBlock11 (S * S) =
       Matrix.sumBlock11 S * Matrix.sumBlock11 S +
         Matrix.sumBlock12 S * Matrix.sumBlock21 S := by
@@ -565,7 +513,7 @@ omit [DecidableEq a] in
 private theorem sumBlock11_mul_diag_mul
     {p : Type u} {n : Type v} [Fintype p] [Fintype n]
     (Dp : Matrix p p ℂ) (Dn : Matrix n n ℂ)
-    (S : Matrix (Sum p n) (Sum p n) ℂ) :
+    (S : Matrix (p ⊕ n) (p ⊕ n) ℂ) :
     Matrix.sumBlock11 (S * Matrix.fromBlocks Dp 0 0 (-Dn) * S) =
       Matrix.sumBlock11 S * Dp * Matrix.sumBlock11 S -
         Matrix.sumBlock12 S * Dn * Matrix.sumBlock21 S := by
@@ -577,7 +525,7 @@ omit [DecidableEq a] in
 private theorem terminal_block_algebra
     {p : Type u} {n : Type v} [Fintype p] [Fintype n]
     (Dp : Matrix p p ℂ) (Dn : Matrix n n ℂ)
-    (S : Matrix (Sum p n) (Sum p n) ℂ) :
+    (S : Matrix (p ⊕ n) (p ⊕ n) ℂ) :
     (Dp * Matrix.sumBlock11 (S * S) -
         Matrix.sumBlock11 (S * Matrix.fromBlocks Dp 0 0 (-Dn) * S)).trace =
       (Dp * Matrix.sumBlock12 S * Matrix.sumBlock21 S +
@@ -738,7 +686,7 @@ public theorem audenaertResolventPath_trace_ge_terminal {A B : CMatrix a}
   let S := spectralSignBlockMatrix H hH V
   let Dp := positiveEigenvalueBlock H hH
   let Dn := negativeEigenvalueBlock H hH
-  let D : CMatrix (Sum (positiveSpectralIndex H hH) (nonpositiveSpectralIndex H hH)) :=
+  let D : CMatrix (positiveSpectralIndex H hH ⊕ nonpositiveSpectralIndex H hH) :=
     Matrix.fromBlocks Dp 0 0 (-Dn)
   let Y := Matrix.sumBlock11 (S - u • (S * D * S))
   let W := Matrix.sumBlock11 (S * S)
@@ -761,7 +709,7 @@ public theorem audenaertResolventPath_trace_ge_terminal {A B : CMatrix a}
       spectralSignBlockMatrix_sub, spectralSignBlockMatrix_smul,
       spectralSignBlockMatrix_self] using hraw
   have horderTrace : r * ((Dp * W).trace).re ≤ ((Dp * Y).trace).re := by
-    have h := trace_mul_le_of_le (positiveEigenvalueBlock_posSemidef H hH) horder
+    have h := cMatrix_trace_mul_le_of_le_posSemidef_left (positiveEigenvalueBlock_posSemidef H hH) horder
     simpa [Matrix.trace_smul] using h
   have hblockTrace :
       ((Matrix.sumBlock11

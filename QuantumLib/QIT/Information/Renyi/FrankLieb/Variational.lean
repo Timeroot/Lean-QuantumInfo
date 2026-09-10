@@ -133,6 +133,56 @@ theorem cMatrix_rpow_transpose_nonneg
     cMatrix_map_star_eq_transpose_of_posSemidef hpowPSD
   rw [← hmapA, hpowmap, hpowmapTranspose]
 
+/-- Entrywise conjugation commutes with real powers on positive-definite
+matrices for arbitrary real exponents.
+
+This is the `PosDef` analog of `cMatrix_rpow_map_star_nonneg`; positive
+definiteness keeps the spectrum away from `0`, so `x ^ s` stays continuous
+there even for the negative exponents that a high-`α` objective produces. -/
+theorem cMatrix_rpow_map_star_posDef
+    {A : CMatrix a} (hA : A.PosDef) (s : ℝ) :
+    CFC.rpow (A.map star) s = (CFC.rpow A s).map star := by
+  have hA_nonneg : 0 ≤ A := Matrix.nonneg_iff_posSemidef.mpr hA.posSemidef
+  have hmap_eq : A.map star = A.transpose :=
+    cMatrix_map_star_eq_transpose_of_posSemidef hA.posSemidef
+  have hmap_nonneg : 0 ≤ A.map star := by
+    rw [hmap_eq]
+    exact Matrix.nonneg_iff_posSemidef.mpr hA.posSemidef.transpose
+  change (A.map star) ^ s = (A ^ s).map star
+  rw [CFC.rpow_eq_cfc_real (a := A.map star) (y := s) hmap_nonneg]
+  rw [CFC.rpow_eq_cfc_real (a := A) (y := s) hA_nonneg]
+  simpa [cMatrixConjStarAlgEquiv] using
+    (StarAlgHomClass.map_cfc
+      (cMatrixConjStarAlgEquiv (a := a))
+      (fun x : ℝ => x ^ s) A
+      (hf := by
+        intro x hx
+        exact (Real.continuousAt_rpow_const x s
+          (.inl (ne_of_gt
+            ((Matrix.PosDef.isStrictlyPositive hA).spectrum_pos hx)))).continuousWithinAt)
+      (hφ := by
+        change Continuous fun A : CMatrix a => A.map star
+        fun_prop)
+      (hφa := by
+        change IsSelfAdjoint (A.map star)
+        rw [hmap_eq]
+        exact hA.posSemidef.transpose.isHermitian)).symm
+
+/-- Real powers commute with transpose on positive-definite matrices for any
+real exponent. This is the `PosDef` analog of `cMatrix_rpow_transpose_nonneg`. -/
+theorem cMatrix_rpow_transpose_posDef
+    {A : CMatrix a} (hA : A.PosDef) (s : ℝ) :
+    CFC.rpow A.transpose s = (CFC.rpow A s).transpose := by
+  have hmapA : A.map star = A.transpose :=
+    cMatrix_map_star_eq_transpose_of_posSemidef hA.posSemidef
+  have hpowmap : CFC.rpow (A.map star) s = (CFC.rpow A s).map star :=
+    cMatrix_rpow_map_star_posDef hA s
+  have hpowPSD : (CFC.rpow A s).PosSemidef :=
+    cMatrix_rpow_posSemidef (A := A) (s := s) hA.posSemidef
+  have hpowmapTranspose :
+      (CFC.rpow A s).map star = (CFC.rpow A s).transpose :=
+    cMatrix_map_star_eq_transpose_of_posSemidef hpowPSD
+  rw [← hmapA, hpowmap, hpowmapTranspose]
 
 /-- Binary convex combination of complex matrices, with real weights coerced
 to complex scalars. -/
@@ -179,7 +229,8 @@ theorem cMatrixConvexCombination_posSemidef
     (posSemidef_complex_smul_of_real_nonneg hB (sub_nonneg.mpr ht1))
 
 omit [DecidableEq a] in
-/-- Positive definite matrices are closed under binary convex combinations. -/
+/-- Positive definite matrices are closed under binary convex combinations written with
+complex scalar multiplication by real weights. -/
 theorem cMatrixConvexCombination_posDef
     {A B : CMatrix a} (hA : A.PosDef) (hB : B.PosDef)
     {t : ℝ} (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
@@ -207,7 +258,7 @@ theorem cMatrixPSDRegularization_posDef_of_pos
     (cMatrixPSDRegularization A ε).PosDef := by
   have hmax : max ε 0 = ε := max_eq_left hε.le
   simpa [cMatrixPSDRegularization, hmax] using
-    State.cMatrix_posSemidef_add_pos_smul_one_posDef hA hε
+    MState.cMatrix_posSemidef_add_pos_smul_one_posDef hA hε
 
 omit [Fintype a] in
 /-- PSD identity regularization tends back to the original matrix as
@@ -263,40 +314,22 @@ theorem cMatrix_rpow_rpow_of_posDef
       rw [hrt]
 
 /-- Nonnegative real powers of the same PSD matrix multiply by adding
-exponents. -/
+exponents.
+
+The zero-exponent corner that `cMatrix_rpow_add_psd` excludes is reachable only
+when both exponents vanish, where both sides are the identity. -/
 theorem cMatrix_rpow_mul_rpow_of_nonneg
     {A : CMatrix a} (hA : A.PosSemidef) {r s : ℝ}
     (hr : 0 ≤ r) (hs : 0 ≤ s) :
     CFC.rpow A r * CFC.rpow A s = CFC.rpow A (r + s) := by
-  let rNN : ℝ≥0 := ⟨r, hr⟩
-  let sNN : ℝ≥0 := ⟨s, hs⟩
-  by_cases hr_zero : rNN = 0
-  · have hr' : r = 0 := by
-      have hcoe := congrArg (fun x : ℝ≥0 => x.val) hr_zero
-      simpa [rNN] using hcoe
+  by_cases hrs : r + s = 0
+  · have hr' : r = 0 := le_antisymm (by linarith) hr
+    have hs' : s = 0 := le_antisymm (by linarith) hs
     have hzero : CFC.rpow A (0 : ℝ) = 1 := by
       simp only [CFC.rpow]
       simpa using cfc_const_one (R := ℝ≥0) A
-    rw [hr', zero_add, hzero, Matrix.one_mul]
-  · by_cases hs_zero : sNN = 0
-    · have hs' : s = 0 := by
-        have hcoe := congrArg (fun x : ℝ≥0 => x.val) hs_zero
-        simpa [sNN] using hcoe
-      have hzero : CFC.rpow A (0 : ℝ) = 1 := by
-        simp only [CFC.rpow]
-        simpa using cfc_const_one (R := ℝ≥0) A
-      rw [hs', add_zero, hzero, Matrix.mul_one]
-    · have hsum : ((rNN + sNN : ℝ≥0) : ℝ) = r + s := by rfl
-      have hrNN_pos : 0 < rNN := pos_iff_ne_zero.mpr hr_zero
-      have hsNN_pos : 0 < sNN := pos_iff_ne_zero.mpr hs_zero
-      have hadd : A ^ (rNN + sNN) = A ^ rNN * A ^ sNN :=
-        CFC.nnrpow_add (a := A) hrNN_pos hsNN_pos
-      have hrpow : A ^ rNN = CFC.rpow A r := CFC.nnrpow_eq_rpow (a := A) hrNN_pos
-      have hspow : A ^ sNN = CFC.rpow A s := CFC.nnrpow_eq_rpow (a := A) hsNN_pos
-      have hsumpow : A ^ (rNN + sNN) = CFC.rpow A (r + s) := by
-        simpa [rNN, sNN, hsum] using (CFC.nnrpow_eq_rpow (a := A)
-          (add_pos hrNN_pos hsNN_pos))
-      rw [← hrpow, ← hspow, ← hsumpow, hadd]
+    rw [hr', hs', add_zero, hzero, Matrix.one_mul]
+  · exact cMatrix_rpow_add_psd hA hrs
 
 /-- Epstein's trace functional primitive
 `Tr[(K† σ^c K)^(1/c)]`, written as a real trace.

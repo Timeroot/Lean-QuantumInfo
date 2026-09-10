@@ -18,11 +18,3 @@ public import QuantumLib.QIT.Asymptotic.FixedEpsilonAEP
 
 Top-level import facade for typicality, AEP, and fixed smooth min-entropy tools.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace Asymptotic
-
-end Asymptotic
-end QIT

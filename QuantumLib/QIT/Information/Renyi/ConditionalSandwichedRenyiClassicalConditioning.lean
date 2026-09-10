@@ -24,18 +24,5 @@ public import QuantumLib.QIT.Information.Renyi.ConditionalSandwichedRenyiClassic
 
 Facade for the dependency-ordered responsibility-layer modules (cq/block
 algebra, low-alpha Q decomposition, high-alpha support route, scalar
-optimizer / component bridge, and the public source-shaped wrappers, split
-in two for the 2500-line budget).  The public surface is unchanged from the
-original monolithic module; this file re-exports it for downstream
-compatibility.
+optimizer / component bridge, and the public source-shaped wrappers).
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace Information
-namespace Renyi
-
-end Renyi
-end Information
-end QIT

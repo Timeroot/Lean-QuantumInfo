@@ -19,7 +19,7 @@ public import QuantumLib.QIT.Information.Renyi.RenyiOrderParameter
 This module formalizes Tomamichel's proof route in `cond.tex:268-291`. For the channel
 `Phi = measure M x id`, sub-unitality gives
 
-`Phi (I_A x sigma_B) <= I_X x sigma_B`.
+`Phi (I_A x sigma_B) ≤ I_X x sigma_B`.
 
 Sandwiched Renyi data processing and antitonicity in the reference then
 compare every input conditional-entropy candidate with the corresponding
@@ -38,17 +38,15 @@ Source: [Tomamichel2015FiniteResources, cond.tex:268-291].
 open scoped ComplexOrder MatrixOrder NNReal
 open Matrix
 
-namespace QIT
-
-universe u v w
-
 noncomputable section
-
+universe u v w
 variable {a : Type u} {b : Type v} {c : Type w}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 variable [Fintype c] [DecidableEq c]
 
-namespace State
+open QIT
+
+namespace MState
 
 /-- A sub-unital measurement channel sends `I_A x sigma_B` below
 `I_X x sigma_B`.
@@ -57,55 +55,55 @@ This is the reference-dominance step in Tomamichel's conditional Renyi DPI
 proof (`cond.tex:286-289`). -/
 theorem measurementMap_identityTensorStateMatrix_le
     (M : POVM c a) (hMUnit : measurementMapDoesNotEnlargeUnit M)
-    (sigma : State b) :
-    (Channel.prod (Channel.measure M) (Channel.idChannel b)).map
-        (identityTensorStateMatrix (a := a) sigma) <=
+    (sigma : MState b) :
+    (CPTPOp.prod (POVM.measureDiscard M) (CPTPOp.id (dIn := b))).map
+        (identityTensorStateMatrix (a := a) sigma) ≤
       identityTensorStateMatrix (a := c) sigma := by
-  change (Channel.prod (Channel.measure M) (Channel.idChannel b)).map
-      (Matrix.kronecker (1 : CMatrix a) sigma.matrix) <=
-    Matrix.kronecker (1 : CMatrix c) sigma.matrix
-  rw [Channel.prod_map_kronecker]
-  have hid : (Channel.idChannel b).map sigma.matrix = sigma.matrix := by
-    simp [Channel.idChannel, MatrixMap.ofKraus]
+  change (CPTPOp.prod (POVM.measureDiscard M) (CPTPOp.id (dIn := b))).map
+      (Matrix.kronecker (1 : CMatrix a) sigma.m) ≤
+    Matrix.kronecker (1 : CMatrix c) sigma.m
+  rw [CPTPOp.prod_map_kronecker]
+  have hid : (CPTPOp.id (dIn := b)).map sigma.m = sigma.m := by
+    simp [CPTPOp.id_map]
   rw [hid]
-  have hkron := (Matrix.le_iff.mp hMUnit).kronecker sigma.pos
+  have hkron := (Matrix.le_iff.mp hMUnit).kronecker sigma.psd
   apply Matrix.le_iff.mpr
   have heq :
-      Matrix.kronecker (1 : CMatrix c) sigma.matrix -
-          Matrix.kronecker ((Channel.measure M).map (1 : CMatrix a)) sigma.matrix =
+      Matrix.kronecker (1 : CMatrix c) sigma.m -
+          Matrix.kronecker ((POVM.measureDiscard M).map (1 : CMatrix a)) sigma.m =
         Matrix.kronecker
-          ((1 : CMatrix c) - (Channel.measure M).map (1 : CMatrix a)) sigma.matrix := by
+          ((1 : CMatrix c) - (POVM.measureDiscard M).map (1 : CMatrix a)) sigma.m := by
     ext i j
     simp [Matrix.kronecker, Matrix.kroneckerMap_apply, sub_mul]
   rw [heq]
   exact hkron
 
 /-- Full-rank sandwiched Renyi divergence is nonnegative throughout the
-source DPI range `alpha >= 1/2`, `alpha != 1`.
+source DPI range `alpha ≥ 1/2`, `alpha ≠ 1`.
 
 The proof applies the established channel DPI to the terminal one-outcome
 measurement channel.  This supplies the finite upper bound needed by the
 real-valued conditional-entropy supremum. -/
 theorem sandwichedRenyi_nonneg_of_half_le_ne_one
-    (rho sigma : State a) (hrho : rho.matrix.PosDef) (hsigma : sigma.matrix.PosDef)
-    (alpha : Real) (halpha : 1 / 2 <= alpha) (halpha1 : alpha ≠ 1) :
-    0 <= sandwichedRenyi rho sigma hrho hsigma alpha
+    (rho sigma : MState a) (hrho : rho.m.PosDef) (hsigma : sigma.m.PosDef)
+    (alpha : ℝ) (halpha : 1 / 2 ≤ alpha) (halpha1 : alpha ≠ 1) :
+    0 ≤ sandwichedRenyi rho sigma hrho hsigma alpha
       (lt_of_lt_of_le (by norm_num) halpha) halpha1 := by
-  let Phi : Channel a PUnit.{1} := terminalMeasureChannel a
-  have hrhoPhi_eq : Phi.applyState rho = State.unit := by
+  let Phi : CPTPMap a PUnit.{1} := terminalMeasureChannel a
+  have hrhoPhi_eq : Phi rho = MState.unit := by
     simpa [Phi] using terminalMeasureChannel_applyState rho
-  have hsigmaPhi_eq : Phi.applyState sigma = State.unit := by
+  have hsigmaPhi_eq : Phi sigma = MState.unit := by
     simpa [Phi] using terminalMeasureChannel_applyState sigma
-  have hunit_pos : (State.unit.matrix : CMatrix PUnit.{1}).PosDef := by
-    change (1 : CMatrix PUnit.{1}).PosDef
+  have hunit_pos : (MState.unit.m : CMatrix PUnit.{1}).PosDef := by
+    rw [MState.unit_matrix]
     exact Matrix.PosDef.one
-  have hrhoPhi : (Phi.applyState rho).matrix.PosDef := by
+  have hrhoPhi : (Phi rho).m.PosDef := by
     rw [hrhoPhi_eq]
     exact hunit_pos
-  have hsigmaPhi : (Phi.applyState sigma).matrix.PosDef := by
+  have hsigmaPhi : (Phi sigma).m.PosDef := by
     rw [hsigmaPhi_eq]
     exact hunit_pos
-  have hrange : (1 / 2 <= alpha ∧ alpha < 1) ∨ 1 < alpha := by
+  have hrange : (1 / 2 ≤ alpha ∧ alpha < 1) ∨ 1 < alpha := by
     rcases lt_or_gt_of_ne halpha1 with hlt | hgt
     · exact Or.inl ⟨halpha, hlt⟩
     · exact Or.inr hgt
@@ -114,10 +112,10 @@ theorem sandwichedRenyi_nonneg_of_half_le_ne_one
       rho sigma Phi hrho hsigma hrhoPhi hsigmaPhi alpha hrange
   unfold RenyiDPI.Statement.sandwichedRenyi_dataProcessing_channel_statement at hDPI
   have hleft :
-      sandwichedRenyi (Phi.applyState rho) (Phi.applyState sigma)
+      sandwichedRenyi (Phi rho) (Phi sigma)
           hrhoPhi hsigmaPhi alpha (lt_of_lt_of_le (by norm_num) halpha) halpha1 = 0 := by
     simpa [hrhoPhi_eq, hsigmaPhi_eq] using
-      sandwichedRenyi_self_eq_zero State.unit hunit_pos alpha
+      sandwichedRenyi_self_eq_zero MState.unit hunit_pos alpha
         (lt_of_lt_of_le (by norm_num) halpha) halpha1
   rw [hleft] at hDPI
   exact hDPI
@@ -128,20 +126,20 @@ candidates under a sub-unital measurement map.
 The proof is exactly the source chain: PSD-reference channel DPI, reference
 dominance, and negation to pass from divergence to conditional entropy. -/
 theorem conditionalSandwichedRenyiUpSourceCandidate_le_measureSubsystemState
-    (rho : State (Prod a b))
+    (rho : MState (a × b))
     (M : POVM c a) (hMUnit : measurementMapDoesNotEnlargeUnit M)
-    (alpha : Real) (halpha : 1 / 2 <= alpha) (halpha1 : alpha ≠ 1)
-    (sigma : State b) (hsigma : sigma.matrix.PosDef) :
+    (alpha : ℝ) (halpha : 1 / 2 ≤ alpha) (halpha1 : alpha ≠ 1)
+    (sigma : MState b) (hsigma : sigma.m.PosDef) :
     rho.conditionalSandwichedRenyiUpSourceCandidate
-        sigma hsigma alpha (by linarith) halpha1 <=
+        sigma hsigma alpha (by linarith) halpha1 ≤
       (measureSubsystemState M rho).conditionalSandwichedRenyiUpSourceCandidate
         sigma hsigma alpha (by linarith) halpha1 := by
-  let Phi : Channel (Prod a b) (Prod c b) :=
-    Channel.prod (Channel.measure M) (Channel.idChannel b)
-  let rin : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) sigma
-  let rout : CMatrix (Prod c b) := identityTensorStateMatrix (a := c) sigma
+  let Phi : CPTPMap (a × b) (c × b) :=
+    CPTPOp.prod (POVM.measureDiscard M) (CPTPOp.id (dIn := b))
+  let rin : CMatrix (a × b) := identityTensorStateMatrix (a := a) sigma
+  let rout : CMatrix (c × b) := identityTensorStateMatrix (a := c) sigma
   have halpha_pos : 0 < alpha := lt_of_lt_of_le (by norm_num) halpha
-  have hrange : (1 / 2 <= alpha ∧ alpha < 1) ∨ 1 < alpha := by
+  have hrange : (1 / 2 ≤ alpha ∧ alpha < 1) ∨ 1 < alpha := by
     rcases lt_or_gt_of_ne halpha1 with hlt | hgt
     · exact Or.inl ⟨halpha, hlt⟩
     · exact Or.inr hgt
@@ -149,33 +147,33 @@ theorem conditionalSandwichedRenyiUpSourceCandidate_le_measureSubsystemState
     exact (identityTensorStateMatrix_posDef_of_posDef (a := a) sigma hsigma).posSemidef
   have hrout : rout.PosSemidef := by
     exact (identityTensorStateMatrix_posDef_of_posDef (a := c) sigma hsigma).posSemidef
-  have hmap : Phi.map rin <= rout := by
+  have hmap : Phi.map rin ≤ rout := by
     simpa [Phi, rin, rout] using measurementMap_identityTensorStateMatrix_le M hMUnit sigma
   have hDPI :=
     sandwichedRenyiPSDReferenceE_dataProcessing_channel_of_half_le_lt_one_or_one_lt
       rho hrin Phi alpha hrange
   have hreference :=
-    sandwichedRenyiPSDReferenceE_antitone_reference (Phi.applyState rho)
+    sandwichedRenyiPSDReferenceE_antitone_reference (Phi rho)
       (Phi.mapsPositive rin hrin) hrout hmap halpha
   have hdiv :
-      (Phi.applyState rho).sandwichedRenyiPSDReferenceE rout hrout alpha <=
+      MState.sandwichedRenyiPSDReferenceE (Phi rho) rout hrout alpha ≤
         rho.sandwichedRenyiPSDReferenceE rin hrin alpha :=
     le_trans hreference hDPI
   have hdiv' :
       (measureSubsystemState M rho).sandwichedRenyiPSDReferenceE
           (identityTensorStateMatrix (a := c) sigma)
-          (identityTensorStateMatrix_posSemidef_of_state (a := c) sigma) alpha <=
+          (identityTensorStateMatrix_posSemidef (a := c) sigma) alpha ≤
         rho.sandwichedRenyiPSDReferenceE
           (identityTensorStateMatrix (a := a) sigma)
-          (identityTensorStateMatrix_posSemidef_of_state (a := a) sigma) alpha := by
+          (identityTensorStateMatrix_posSemidef (a := a) sigma) alpha := by
     simpa [Phi, rin, rout, measureSubsystemState] using hdiv
-  have hinBridge := sandwichedUpSourceCandidate_eq_neg_referenceE
+  have hinBridge := conditionalSandwichedRenyiUpSourceCandidate_eq_neg_referenceE
     rho sigma hsigma alpha halpha_pos halpha1
-  have houtBridge := sandwichedUpSourceCandidate_eq_neg_referenceE
+  have houtBridge := conditionalSandwichedRenyiUpSourceCandidate_eq_neg_referenceE
     (measureSubsystemState M rho) sigma hsigma alpha halpha_pos halpha1
   have hsource :
       (rho.conditionalSandwichedRenyiUpSourceCandidate
-          sigma hsigma alpha halpha_pos halpha1 : EReal) <=
+          sigma hsigma alpha halpha_pos halpha1 : EReal) ≤
         ((measureSubsystemState M rho).conditionalSandwichedRenyiUpSourceCandidate
           sigma hsigma alpha halpha_pos halpha1 : EReal) := by
     rw [hinBridge, houtBridge]
@@ -185,14 +183,14 @@ theorem conditionalSandwichedRenyiUpSourceCandidate_le_measureSubsystemState
 /-! ## Source-shaped arbitrary-state finite orders -/
 
 /-- The source-shaped upward candidate set is bounded above throughout the
-closed finite DPI range `alpha >= 1/2`, `alpha != 1`.
+closed finite DPI range `alpha ≥ 1/2`, `alpha ≠ 1`.
 
 At the half-order endpoint every candidate is bounded by conditional
 max-entropy. On the strict interior this reuses the established source
 boundedness theorem. -/
 theorem conditionalSandwichedRenyiUpSourceValueSet_bddAbove_of_half_le_ne_one
-    (rho : State (Prod a b)) (alpha : Real)
-    (halpha : 1 / 2 <= alpha) (halpha1 : alpha ≠ 1) :
+    (rho : MState (a × b)) (alpha : ℝ)
+    (halpha : 1 / 2 ≤ alpha) (halpha1 : alpha ≠ 1) :
     BddAbove (rho.conditionalSandwichedRenyiUpSourceValueSet alpha
       (lt_of_lt_of_le (by norm_num) halpha) halpha1) := by
   by_cases hhalf : alpha = 1 / 2
@@ -207,16 +205,16 @@ theorem conditionalSandwichedRenyiUpSourceValueSet_bddAbove_of_half_le_ne_one
 
 /-- Measuring the first subsystem by a sub-unital measurement cannot decrease
 the source-shaped upward sandwiched conditional Renyi entropy at any finite
-order `alpha >= 1/2`, `alpha != 1`.
+order `alpha ≥ 1/2`, `alpha ≠ 1`.
 
 No full-rank condition is imposed on the input or measured state. The proof
 maps each full-rank side-reference candidate by divergence DPI and reference
 dominance, then takes the source optimizer supremum. -/
 theorem measurementMap_conditionalSandwichedRenyiUpSource_monotonicity
-    (rho : State (Prod a b))
+    (rho : MState (a × b))
     (M : POVM c a) (hMUnit : measurementMapDoesNotEnlargeUnit M)
-    (alpha : Real) (halpha : 1 / 2 <= alpha) (halpha1 : alpha ≠ 1) :
-    rho.conditionalSandwichedRenyiUpSource alpha (by linarith) halpha1 <=
+    (alpha : ℝ) (halpha : 1 / 2 ≤ alpha) (halpha1 : alpha ≠ 1) :
+    rho.conditionalSandwichedRenyiUpSource alpha (by linarith) halpha1 ≤
       (measureSubsystemState M rho).conditionalSandwichedRenyiUpSource
         alpha (by linarith) halpha1 := by
   let : Nonempty b := by
@@ -238,34 +236,34 @@ theorem measurementMap_conditionalSandwichedRenyiUpSource_monotonicity
 
 /-! ## Boundary order `alpha = infinity` -/
 
-
 /-- A conditional-min feasible exponent remains feasible after a sub-unital
 measurement of the first subsystem. -/
 theorem ConditionalMinEntropyFeasible.measureSubsystemState
-    (rho : State (Prod a b)) (sigma : State b) (lam : Real)
+    (rho : MState (a × b)) (sigma : MState b) (lam : ℝ)
     (M : POVM c a) (hMUnit : measurementMapDoesNotEnlargeUnit M)
     (h : ConditionalMinEntropyFeasible (a := a) rho sigma lam) :
     ConditionalMinEntropyFeasible (a := c) (measureSubsystemState M rho) sigma lam := by
-  let Phi : Channel (Prod a b) (Prod c b) :=
-    Channel.prod (Channel.measure M) (Channel.idChannel b)
-  let rin : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) sigma
-  let rout : CMatrix (Prod c b) := identityTensorStateMatrix (a := c) sigma
-  let t : Real := Real.rpow 2 (-lam)
-  have ht : 0 <= t := Real.rpow_nonneg (by norm_num) _
-  have hmapRef : Phi.map rin <= rout := by
+  let Phi : CPTPMap (a × b) (c × b) :=
+    CPTPOp.prod (POVM.measureDiscard M) (CPTPOp.id (dIn := b))
+  let rin : CMatrix (a × b) := identityTensorStateMatrix (a := a) sigma
+  let rout : CMatrix (c × b) := identityTensorStateMatrix (a := c) sigma
+  let t : ℝ := Real.rpow 2 (-lam)
+  have ht : 0 ≤ t := Real.rpow_nonneg (by norm_num) _
+  have hmapRef : Phi.map rin ≤ rout := by
     simpa [Phi, rin, rout] using
       measurementMap_identityTensorStateMatrix_le M hMUnit sigma
-  have hmapFeas : Phi.map rho.matrix <= Phi.map ((t : Complex) • rin) := by
+  have hmapFeas : Phi.map rho.m ≤ Phi.map ((t : ℂ) • rin) := by
     apply Matrix.le_iff.mpr
-    have hpos : (((t : Complex) • rin) - rho.matrix).PosSemidef := by
+    have hpos : (((t : ℂ) • rin) - rho.m).PosSemidef := by
       simpa [t, rin, ConditionalMinEntropyFeasible, Matrix.le_iff] using h
     simpa [map_sub, map_smul] using Phi.mapsPositive _ hpos
-  have hscaleRef : (t : Complex) • Phi.map rin <= (t : Complex) • rout :=
+  have hscaleRef : (t : ℂ) • Phi.map rin ≤ (t : ℂ) • rout :=
     cMatrix_ofReal_smul_le_smul ht hmapRef
   rw [ConditionalMinEntropyFeasible]
-  have hfinal : Phi.map rho.matrix <= (t : Complex) • rout :=
+  have hfinal : Phi.map rho.m ≤ (t : ℂ) • rout :=
     hmapFeas.trans (by simpa [map_smul] using hscaleRef)
-  have hlhs : (_root_.QIT.measureSubsystemState M rho).matrix = Phi.map rho.matrix := rfl
+  have hlhs : (_root_.QIT.measureSubsystemState M rho).m = Phi.map rho.m :=
+    CPTPOp.mat_coe_eq_apply_mat Phi rho
   rw [hlhs]
   simpa [Phi, rin, rout, t] using hfinal
 
@@ -273,15 +271,15 @@ theorem ConditionalMinEntropyFeasible.measureSubsystemState
 the first subsystem. This is the `alpha = infinity` endpoint of the total
 conditional sandwiched Renyi theorem. -/
 theorem measurementMap_conditionalMinEntropy_monotonicity
-    (rho : State (Prod a b))
+    (rho : MState (a × b))
     (M : POVM c a) (hMUnit : measurementMapDoesNotEnlargeUnit M) :
-    rho.conditionalMinEntropy <=
+    rho.conditionalMinEntropy ≤
       (measureSubsystemState M rho).conditionalMinEntropy := by
   let : Nonempty b := by
     rcases rho.nonempty with ⟨z⟩
     exact ⟨z.2⟩
   rw [conditionalMinEntropy_eq, conditionalMinEntropy_eq]
-  change sSup (rho.conditionalMinEntropyFeasibleExponentValueSet (a := a)) <=
+  change sSup (rho.conditionalMinEntropyFeasibleExponentValueSet (a := a)) ≤
     sSup ((measureSubsystemState M rho).conditionalMinEntropyFeasibleExponentValueSet
       (a := c))
   refine csSup_le
@@ -299,35 +297,35 @@ theorem measurementMap_conditionalMinEntropy_monotonicity
 /-- Against a full-rank side reference, the support-aware trace-log relative
 entropy is the negative fixed-reference conditional entropy. -/
 theorem relativeEntropyPSDReferenceTraceLogFinite_identityTensor_eq_neg_conditionalEntropy
-    (rho : State (Prod a b)) (sigma : State b) (hsigma : sigma.matrix.PosDef) :
+    (rho : MState (a × b)) (sigma : MState b) (hsigma : sigma.m.PosDef) :
     relativeEntropyPSDReferenceTraceLogFinite rho
         (identityTensorStateMatrix (a := a) sigma)
-        (identityTensorStateMatrix_posSemidef_of_state (a := a) sigma)
-        (Matrix.Supports.of_right_posDef rho.matrix
+        (identityTensorStateMatrix_posSemidef (a := a) sigma)
+        (Matrix.Supports.of_right_posDef rho.m
           (identityTensorStateMatrix (a := a) sigma)
           (identityTensorStateMatrix_posDef_of_posDef (a := a) sigma hsigma)) =
       -rho.conditionalEntropyRelativeFullReference sigma hsigma := by
-  let ref : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) sigma
+  let ref : CMatrix (a × b) := identityTensorStateMatrix (a := a) sigma
   let href : ref.PosDef :=
     identityTensorStateMatrix_posDef_of_posDef (a := a) sigma hsigma
-  let hsupp : Matrix.Supports rho.matrix ref :=
-    Matrix.Supports.of_right_posDef rho.matrix ref href
+  let hsupp : Matrix.Supports rho.m ref :=
+    Matrix.Supports.of_right_posDef rho.m ref href
   have hEntropy :
       (_root_.QIT.psdSupportCompressedState rho href.posSemidef hsupp).vonNeumann =
         rho.vonNeumann :=
-    relativeEntropyTraceLog_vonNeumann_psdSupportCompressedState_eq
+    vonNeumann_psdSupportCompressedState_eq
       rho href.posSemidef hsupp
   have hTrace :
-      ((psdSupportCompress ref href.posSemidef rho.matrix *
-        State.psdLog (psdSupportCompress ref href.posSemidef ref)
+      ((psdSupportCompress ref href.posSemidef rho.m *
+        MState.psdLog (psdSupportCompress ref href.posSemidef ref)
           (psdSupportCompress_self_posDef ref href.posSemidef)).trace).re =
-        ((rho.matrix *
-          cfc (fun x : Real => if x = 0 then 0 else Real.log x) ref).trace).re :=
-    relativeEntropyTraceLog_trace_mul_psdSupportLog_eq_trace_mul_cfc_logZero
+        ((rho.m *
+          cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) ref).trace).re :=
+    trace_mul_psdSupportLog_eq_trace_mul_cfc_logZero
       rho href.posSemidef hsupp
   have hLogZero :
-      cfc (fun x : Real => if x = 0 then 0 else Real.log x) ref =
-        State.psdLog ref href :=
+      cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) ref =
+        MState.psdLog ref href :=
     relativeEntropyTraceLog_cfc_logZero_eq_psdLog_of_posDef ref href
   have hSupportEntropy :
       rho.supportEntropyTraceTerm = -rho.vonNeumann * Real.log 2 :=
@@ -337,12 +335,14 @@ theorem relativeEntropyPSDReferenceTraceLogFinite_identityTensor_eq_neg_conditio
   calc
     relativeEntropyPSDReferenceTraceLogFinite rho ref href.posSemidef hsupp =
         -(_root_.QIT.psdSupportCompressedState rho href.posSemidef hsupp).vonNeumann -
-          ((psdSupportCompress ref href.posSemidef rho.matrix *
-            State.psdLog (psdSupportCompress ref href.posSemidef ref)
+          ((psdSupportCompress ref href.posSemidef rho.m *
+            MState.psdLog (psdSupportCompress ref href.posSemidef ref)
               (psdSupportCompress_self_posDef ref href.posSemidef)).trace).re /
-            Real.log 2 := by rfl
+            Real.log 2 := by
+      rw [← psdSupportCompressedState_matrix rho href.posSemidef hsupp]
+      rfl
     _ = -rho.vonNeumann -
-          ((rho.matrix * State.psdLog ref href).trace).re / Real.log 2 := by
+          ((rho.m * MState.psdLog ref href).trace).re / Real.log 2 := by
       rw [hEntropy, hTrace, hLogZero]
     _ = -rho.conditionalEntropyRelativeFullReference sigma hsigma := by
       rw [conditionalEntropyRelativeFullReference, hSupportEntropy]
@@ -351,18 +351,18 @@ theorem relativeEntropyPSDReferenceTraceLogFinite_identityTensor_eq_neg_conditio
 
 /-- Extended-real form of the full-reference trace-log bridge. -/
 theorem relativeEntropyPSDReferenceTraceLogE_identityTensor_eq_neg_conditionalEntropy
-    (rho : State (Prod a b)) (sigma : State b) (hsigma : sigma.matrix.PosDef) :
+    (rho : MState (a × b)) (sigma : MState b) (hsigma : sigma.m.PosDef) :
     relativeEntropyPSDReferenceTraceLogE rho
         (identityTensorStateMatrix (a := a) sigma)
-        (identityTensorStateMatrix_posSemidef_of_state (a := a) sigma) =
+        (identityTensorStateMatrix_posSemidef (a := a) sigma) =
       (-rho.conditionalEntropyRelativeFullReference sigma hsigma : EReal) := by
-  let hsupp : Matrix.Supports rho.matrix
+  let hsupp : Matrix.Supports rho.m
       (identityTensorStateMatrix (a := a) sigma) :=
-    Matrix.Supports.of_right_posDef rho.matrix
+    Matrix.Supports.of_right_posDef rho.m
       (identityTensorStateMatrix (a := a) sigma)
       (identityTensorStateMatrix_posDef_of_posDef (a := a) sigma hsigma)
   rw [relativeEntropyPSDReferenceTraceLogE_eq_coe_of_supports rho
-    (identityTensorStateMatrix_posSemidef_of_state (a := a) sigma) hsupp]
+    (identityTensorStateMatrix_posSemidef (a := a) sigma) hsupp]
   rw [relativeEntropyPSDReferenceTraceLogFinite_identityTensor_eq_neg_conditionalEntropy
     rho sigma hsigma]
   simp
@@ -377,54 +377,54 @@ diagonal coefficients of `rho_AB` sum over `A` to the spectral weights of
 `rho_B`; hence the trace-log term is `log scale - H(B)`.  The support theorem
 for `rho_AB` against `I_A tensor rho_B` supplies the finite branch of the
 extended-real divergence. -/
-theorem relativeEntropyPSDReferenceTraceLogE_real_smul_identityTensor_marginalB_eq
-    (rho : State (Prod a b)) {scale : Real} (hscale : 0 < scale) :
+theorem relativeEntropyPSDReferenceTraceLogE_real_smul_identityTensor_traceLeft_eq
+    (rho : MState (a × b)) {scale : ℝ} (hscale : 0 < scale) :
     relativeEntropyPSDReferenceTraceLogE rho
-        (scale • identityTensorStateMatrix (a := a) rho.marginalB)
+        (scale • identityTensorStateMatrix (a := a) rho.traceLeft)
         (Matrix.PosSemidef.smul
-          (identityTensorStateMatrix_posSemidef_of_state
-            (a := a) rho.marginalB) hscale.le) =
+          (identityTensorStateMatrix_posSemidef
+            (a := a) rho.traceLeft) hscale.le) =
       (-rho.conditionalEntropy - log2 scale : EReal) := by
   classical
-  let sigma := rho.marginalB
-  let ref : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) sigma
-  let scaledRef : CMatrix (Prod a b) := scale • ref
+  let sigma := rho.traceLeft
+  let ref : CMatrix (a × b) := identityTensorStateMatrix (a := a) sigma
+  let scaledRef : CMatrix (a × b) := scale • ref
   let href : ref.PosSemidef :=
-    identityTensorStateMatrix_posSemidef_of_state (a := a) sigma
+    identityTensorStateMatrix_posSemidef (a := a) sigma
   let hscaledRef : scaledRef.PosSemidef := Matrix.PosSemidef.smul href hscale.le
-  have hsupport : Matrix.Supports rho.matrix ref := by
+  have hsupport : Matrix.Supports rho.m ref := by
     simpa [ref, sigma, identityTensorStateMatrix] using
-      matrix_supports_identityTensor_marginalB (a := a) (b := b) rho
-  have hsupportScaled : Matrix.Supports rho.matrix scaledRef := by
+      matrix_supports_identityTensor_traceLeft (a := a) (b := b) rho
+  have hsupportScaled : Matrix.Supports rho.m scaledRef := by
     intro v hv
     have hscaledZero : scale • Matrix.mulVec ref v = 0 := by
       simpa [scaledRef, Matrix.smul_mulVec] using hv
     have hrefZero : Matrix.mulVec ref v = 0 := by
       exact (smul_eq_zero.mp hscaledZero).resolve_left hscale.ne'
     exact hsupport v hrefZero
-  let UB : Matrix.unitaryGroup b Complex :=
-    sigma.pos.isHermitian.eigenvectorUnitary
-  let UA : Matrix.unitaryGroup a Complex := 1
-  let U : Matrix.unitaryGroup (Prod a b) Complex :=
+  let UB : Matrix.unitaryGroup b ℂ :=
+    sigma.psd.isHermitian.eigenvectorUnitary
+  let UA : Matrix.unitaryGroup a ℂ := 1
+  let U : Matrix.unitaryGroup (a × b) ℂ :=
     ⟨Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b),
       Matrix.kronecker_mem_unitary UA.2 UB.2⟩
-  let mu : b -> Real := fun j => sigma.pos.isHermitian.eigenvalues j
-  let d : Prod a b -> Real := fun ij => scale * mu ij.2
-  let coeff : Prod a b -> Real := fun ij =>
-    ((star (U : CMatrix (Prod a b)) * rho.matrix *
-      (U : CMatrix (Prod a b))) ij ij).re
-  let f : Real -> Real := fun x => if x = 0 then 0 else Real.log x
+  let mu : b → ℝ := fun j => sigma.psd.isHermitian.eigenvalues j
+  let d : a × b → ℝ := fun ij => scale * mu ij.2
+  let coeff : a × b → ℝ := fun ij =>
+    ((star (U : CMatrix (a × b)) * rho.m *
+      (U : CMatrix (a × b))) ij ij).re
+  let f : ℝ → ℝ := fun x => if x = 0 then 0 else Real.log x
   have hsigmaSpec :
-      sigma.matrix = (UB : CMatrix b) *
-          Matrix.diagonal (fun j : b => ((mu j : Real) : Complex)) *
+      sigma.m = (UB : CMatrix b) *
+          Matrix.diagonal (fun j : b => ((mu j : ℝ) : ℂ)) *
           star (UB : CMatrix b) := by
     simpa [UB, mu, Function.comp_def, Unitary.conjStarAlgAut_apply] using
-      sigma.pos.isHermitian.spectral_theorem
+      sigma.psd.isHermitian.spectral_theorem
   have hdiagKron :
       Matrix.kronecker (1 : CMatrix a)
-          (Matrix.diagonal (fun j : b => ((mu j : Real) : Complex))) =
+          (Matrix.diagonal (fun j : b => ((mu j : ℝ) : ℂ))) =
         Matrix.diagonal
-          (fun ij : Prod a b => ((mu ij.2 : Real) : Complex)) := by
+          (fun ij : a × b => ((mu ij.2 : ℝ) : ℂ)) := by
     ext ij kl
     rcases ij with ⟨i, j⟩
     rcases kl with ⟨k, l⟩
@@ -432,125 +432,125 @@ theorem relativeEntropyPSDReferenceTraceLogE_real_smul_identityTensor_marginalB_
       simp [Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.diagonal,
         hik, hjl]
   have hrefSpec :
-      ref = (U : CMatrix (Prod a b)) *
+      ref = (U : CMatrix (a × b)) *
           Matrix.diagonal
-            (fun ij : Prod a b => ((mu ij.2 : Real) : Complex)) *
-          star (U : CMatrix (Prod a b)) := by
-    change Matrix.kronecker (1 : CMatrix a) sigma.matrix = _
+            (fun ij : a × b => ((mu ij.2 : ℝ) : ℂ)) *
+          star (U : CMatrix (a × b)) := by
+    change Matrix.kronecker (1 : CMatrix a) sigma.m = _
     rw [hsigmaSpec]
     rw [← hdiagKron]
     calc
       Matrix.kronecker (1 : CMatrix a)
           (((UB : CMatrix b) *
-            Matrix.diagonal (fun j : b => ((mu j : Real) : Complex))) *
+            Matrix.diagonal (fun j : b => ((mu j : ℝ) : ℂ))) *
               star (UB : CMatrix b)) =
           Matrix.kronecker ((1 : CMatrix a) * 1)
             ((UB : CMatrix b) *
-              Matrix.diagonal (fun j : b => ((mu j : Real) : Complex))) *
+              Matrix.diagonal (fun j : b => ((mu j : ℝ) : ℂ))) *
           Matrix.kronecker (1 : CMatrix a) (star (UB : CMatrix b)) := by
         simpa using
           (Matrix.mul_kronecker_mul (1 : CMatrix a) (1 : CMatrix a)
             ((UB : CMatrix b) *
-              Matrix.diagonal (fun j : b => ((mu j : Real) : Complex)))
+              Matrix.diagonal (fun j : b => ((mu j : ℝ) : ℂ)))
             (star (UB : CMatrix b)))
       _ = (Matrix.kronecker (1 : CMatrix a) (UB : CMatrix b) *
           Matrix.kronecker (1 : CMatrix a)
-            (Matrix.diagonal (fun j : b => ((mu j : Real) : Complex)))) *
+            (Matrix.diagonal (fun j : b => ((mu j : ℝ) : ℂ)))) *
           Matrix.kronecker (1 : CMatrix a) (star (UB : CMatrix b)) := by
         exact congrArg
-          (fun M : CMatrix (Prod a b) =>
+          (fun M : CMatrix (a × b) =>
             M * Matrix.kronecker (1 : CMatrix a) (star (UB : CMatrix b)))
           (Matrix.mul_kronecker_mul (1 : CMatrix a) (1 : CMatrix a)
             (UB : CMatrix b)
-            (Matrix.diagonal (fun j : b => ((mu j : Real) : Complex))))
+            (Matrix.diagonal (fun j : b => ((mu j : ℝ) : ℂ))))
       _ = _ := by
         simp [U, UA, Matrix.star_eq_conjTranspose,
           Matrix.conjTranspose_kronecker, Matrix.mul_assoc]
   have hdiagScale :
-      ((scale : Complex) • Matrix.diagonal
-          (fun ij : Prod a b => ((mu ij.2 : Real) : Complex))) =
-        Matrix.diagonal (fun ij : Prod a b => ((d ij : Real) : Complex)) := by
+      ((scale : ℂ) • Matrix.diagonal
+          (fun ij : a × b => ((mu ij.2 : ℝ) : ℂ))) =
+        Matrix.diagonal (fun ij : a × b => ((d ij : ℝ) : ℂ)) := by
     ext ij kl
     simp [d, Matrix.diagonal]
   have hscaledSpec :
-      scaledRef = (U : CMatrix (Prod a b)) *
-          Matrix.diagonal (fun ij : Prod a b => ((d ij : Real) : Complex)) *
-          star (U : CMatrix (Prod a b)) := by
-    rw [show scaledRef = (scale : Complex) • ref by rfl, hrefSpec]
+      scaledRef = (U : CMatrix (a × b)) *
+          Matrix.diagonal (fun ij : a × b => ((d ij : ℝ) : ℂ)) *
+          star (U : CMatrix (a × b)) := by
+    rw [show scaledRef = (scale : ℂ) • ref by rfl, hrefSpec]
     calc
-      (scale : Complex) •
-          ((U : CMatrix (Prod a b)) *
+      (scale : ℂ) •
+          ((U : CMatrix (a × b)) *
             Matrix.diagonal
-              (fun ij : Prod a b => ((mu ij.2 : Real) : Complex)) *
-            star (U : CMatrix (Prod a b))) =
-        ((scale : Complex) •
-          ((U : CMatrix (Prod a b)) *
+              (fun ij : a × b => ((mu ij.2 : ℝ) : ℂ)) *
+            star (U : CMatrix (a × b))) =
+        ((scale : ℂ) •
+          ((U : CMatrix (a × b)) *
             Matrix.diagonal
-              (fun ij : Prod a b => ((mu ij.2 : Real) : Complex)))) *
-            star (U : CMatrix (Prod a b)) := by
+              (fun ij : a × b => ((mu ij.2 : ℝ) : ℂ)))) *
+            star (U : CMatrix (a × b)) := by
               rw [Matrix.smul_mul]
-      _ = ((U : CMatrix (Prod a b)) *
-          ((scale : Complex) • Matrix.diagonal
-            (fun ij : Prod a b => ((mu ij.2 : Real) : Complex)))) *
-            star (U : CMatrix (Prod a b)) := by
+      _ = ((U : CMatrix (a × b)) *
+          ((scale : ℂ) • Matrix.diagonal
+            (fun ij : a × b => ((mu ij.2 : ℝ) : ℂ)))) *
+            star (U : CMatrix (a × b)) := by
               rw [Matrix.mul_smul]
-      _ = (U : CMatrix (Prod a b)) *
-          Matrix.diagonal (fun ij : Prod a b => ((d ij : Real) : Complex)) *
-            star (U : CMatrix (Prod a b)) := by rw [hdiagScale]
+      _ = (U : CMatrix (a × b)) *
+          Matrix.diagonal (fun ij : a × b => ((d ij : ℝ) : ℂ)) *
+            star (U : CMatrix (a × b)) := by rw [hdiagScale]
   have hlogScaled :
-      cfc f scaledRef = (U : CMatrix (Prod a b)) *
-          Matrix.diagonal (fun ij : Prod a b => ((f (d ij) : Real) : Complex)) *
-          star (U : CMatrix (Prod a b)) := by
+      cfc f scaledRef = (U : CMatrix (a × b)) *
+          Matrix.diagonal (fun ij : a × b => ((f (d ij) : ℝ) : ℂ)) *
+          star (U : CMatrix (a × b)) := by
     rw [hscaledSpec]
     exact cfc_unitary_conj_diagonal_ofReal U d f
   have hpartial :
-      partialTraceA (a := a) (b := b)
-          (star (U : CMatrix (Prod a b)) * rho.matrix *
-            (U : CMatrix (Prod a b))) =
-        star (UB : CMatrix b) * sigma.matrix * (UB : CMatrix b) := by
-    have h := partialTraceA_local_unitary_conj
-      (a := a) (b := b) rho.matrix UA UB
-    simpa [U, sigma, State.marginalB_matrix] using h
+      Matrix.traceLeft
+          (star (U : CMatrix (a × b)) * rho.m *
+            (U : CMatrix (a × b))) =
+        star (UB : CMatrix b) * sigma.m * (UB : CMatrix b) := by
+    have h := traceLeft_local_unitary_conj
+      (a := a) (b := b) rho.m UA UB
+    simpa [U, sigma, MState.traceLeft_m] using h
   have hdiagB :
-      star (UB : CMatrix b) * sigma.matrix * (UB : CMatrix b) =
-        Matrix.diagonal (fun j : b => ((mu j : Real) : Complex)) := by
+      star (UB : CMatrix b) * sigma.m * (UB : CMatrix b) =
+        Matrix.diagonal (fun j : b => ((mu j : ℝ) : ℂ)) := by
     calc
-      star (UB : CMatrix b) * sigma.matrix * (UB : CMatrix b) =
+      star (UB : CMatrix b) * sigma.m * (UB : CMatrix b) =
           (star (UB : CMatrix b) * (UB : CMatrix b)) *
-            Matrix.diagonal (fun j : b => ((mu j : Real) : Complex)) *
+            Matrix.diagonal (fun j : b => ((mu j : ℝ) : ℂ)) *
               (star (UB : CMatrix b) * (UB : CMatrix b)) := by
         rw [hsigmaSpec]
         noncomm_ring
-      _ = Matrix.diagonal (fun j : b => ((mu j : Real) : Complex)) := by
+      _ = Matrix.diagonal (fun j : b => ((mu j : ℝ) : ℂ)) := by
         rw [Unitary.coe_star_mul_self]
         simp
   have hcoeffSum (j : b) : (∑ i : a, coeff (i, j)) = mu j := by
     have hentry := congrFun (congrFun hpartial j) j
     rw [hdiagB] at hentry
     have hre := congrArg Complex.re hentry
-    simpa [partialTraceA, coeff, Matrix.diagonal] using hre
+    simpa [Matrix.traceLeft, coeff, Matrix.diagonal] using hre
   have htrace :
-      ((rho.matrix * cfc f scaledRef).trace).re =
-        ∑ ij : Prod a b, coeff ij * f (d ij) := by
+      ((rho.m * cfc f scaledRef).trace).re =
+        ∑ ij : a × b, coeff ij * f (d ij) := by
     rw [hlogScaled]
-    let D : CMatrix (Prod a b) :=
-      Matrix.diagonal fun ij => ((f (d ij) : Real) : Complex)
+    let D : CMatrix (a × b) :=
+      Matrix.diagonal fun ij => ((f (d ij) : ℝ) : ℂ)
     have htraceCycle :
-        (rho.matrix * ((U : CMatrix (Prod a b)) * D *
-          star (U : CMatrix (Prod a b)))).trace =
-          ((star (U : CMatrix (Prod a b)) * rho.matrix *
-            (U : CMatrix (Prod a b))) * D).trace := by
+        (rho.m * ((U : CMatrix (a × b)) * D *
+          star (U : CMatrix (a × b)))).trace =
+          ((star (U : CMatrix (a × b)) * rho.m *
+            (U : CMatrix (a × b))) * D).trace := by
       calc
-        (rho.matrix * ((U : CMatrix (Prod a b)) * D *
-            star (U : CMatrix (Prod a b)))).trace =
-            (((rho.matrix * (U : CMatrix (Prod a b))) * D) *
-              star (U : CMatrix (Prod a b))).trace := by
+        (rho.m * ((U : CMatrix (a × b)) * D *
+            star (U : CMatrix (a × b)))).trace =
+            (((rho.m * (U : CMatrix (a × b))) * D) *
+              star (U : CMatrix (a × b))).trace := by
                 simp [Matrix.mul_assoc]
-        _ = (star (U : CMatrix (Prod a b)) *
-            ((rho.matrix * (U : CMatrix (Prod a b))) * D)).trace := by
+        _ = (star (U : CMatrix (a × b)) *
+            ((rho.m * (U : CMatrix (a × b))) * D)).trace := by
               rw [Matrix.trace_mul_comm]
-        _ = ((star (U : CMatrix (Prod a b)) * rho.matrix *
-            (U : CMatrix (Prod a b))) * D).trace := by
+        _ = ((star (U : CMatrix (a × b)) * rho.m *
+            (U : CMatrix (a × b))) * D).trace := by
               simp [Matrix.mul_assoc]
     rw [htraceCycle]
     simp [D, coeff, Matrix.trace, Matrix.diagonal, Matrix.mul_apply,
@@ -561,13 +561,13 @@ theorem relativeEntropyPSDReferenceTraceLogE_real_smul_identityTensor_marginalB_
     by_cases hj : mu j = 0
     · simp [hj]
     · have hjpos : 0 < mu j :=
-        lt_of_le_of_ne (sigma.pos.eigenvalues_nonneg j) (Ne.symm hj)
+        lt_of_le_of_ne (sigma.psd.eigenvalues_nonneg j) (Ne.symm hj)
       simp [f, hj, hscale.ne', Real.log_mul hscale.ne' hjpos.ne', mul_add]
   have hsum :
-      (∑ ij : Prod a b, coeff ij * f (d ij)) =
+      (∑ ij : a × b, coeff ij * f (d ij)) =
         Real.log scale + ∑ j : b, mu j * Real.log (mu j) := by
     calc
-      (∑ ij : Prod a b, coeff ij * f (d ij)) =
+      (∑ ij : a × b, coeff ij * f (d ij)) =
           ∑ j : b, (∑ i : a, coeff (i, j)) * f (scale * mu j) := by
         rw [Fintype.sum_prod_type, Finset.sum_comm]
         refine Finset.sum_congr rfl fun j _ => ?_
@@ -581,30 +581,30 @@ theorem relativeEntropyPSDReferenceTraceLogE_real_smul_identityTensor_marginalB_
         rw [Finset.sum_add_distrib]
         have hmu : ∑ j : b, mu j = 1 := by
           have hmuComplex :
-              (∑ j : b, ((mu j : Real) : Complex)) = 1 := by
+              (∑ j : b, ((mu j : ℝ) : ℂ)) = 1 := by
             simpa [mu] using
-              sigma.pos.isHermitian.trace_eq_sum_eigenvalues.symm.trans
-                sigma.trace_eq_one
+              sigma.psd.isHermitian.trace_eq_sum_eigenvalues.symm.trans
+                sigma.tr'
           exact Complex.ofReal_injective (by simpa using hmuComplex)
         rw [← Finset.sum_mul, hmu]
         ring
   have hEntropy :
       (_root_.QIT.psdSupportCompressedState rho hscaledRef hsupportScaled).vonNeumann =
         rho.vonNeumann :=
-    relativeEntropyTraceLog_vonNeumann_psdSupportCompressedState_eq
+    vonNeumann_psdSupportCompressedState_eq
       rho hscaledRef hsupportScaled
   have hTraceCompress :
-      (((_root_.QIT.psdSupportCompressedState rho hscaledRef hsupportScaled).matrix *
-        State.psdLog (psdSupportCompress scaledRef hscaledRef scaledRef)
+      (((_root_.QIT.psdSupportCompressedState rho hscaledRef hsupportScaled).m *
+        MState.psdLog (psdSupportCompress scaledRef hscaledRef scaledRef)
           (psdSupportCompress_self_posDef scaledRef hscaledRef)).trace).re =
-        ((rho.matrix * cfc f scaledRef).trace).re := by
+        ((rho.m * cfc f scaledRef).trace).re := by
     simpa [f, _root_.QIT.psdSupportCompressedState] using
-      relativeEntropyTraceLog_trace_mul_psdSupportLog_eq_trace_mul_cfc_logZero
+      trace_mul_psdSupportLog_eq_trace_mul_cfc_logZero
         rho hscaledRef hsupportScaled
   have hMarginalEntropy :
       (∑ j : b, mu j * Real.log (mu j)) / Real.log 2 =
         -sigma.vonNeumann := by
-    unfold State.vonNeumann xlog2 log2
+    unfold MState.vonNeumann xlog2 log2
     have hpointLog (j : b) :
         mu j * Real.log (mu j) / Real.log 2 =
           if mu j = 0 then 0 else mu j * (Real.log (mu j) / Real.log 2) := by
@@ -631,54 +631,54 @@ theorem relativeEntropyPSDReferenceTraceLogE_real_smul_identityTensor_marginalB_
 /-- Conditional von Neumann entropy cannot decrease under the sub-unital
 measurement when the side marginal is full-rank. The proof is exactly
 reference dominance followed by trace-log relative-entropy DPI. -/
-theorem measurementMap_conditionalEntropy_monotonicity_of_marginalB_posDef
-    (rho : State (Prod a b)) (hrhoB : rho.marginalB.matrix.PosDef)
+theorem measurementMap_conditionalEntropy_monotonicity_of_traceLeft_posDef
+    (rho : MState (a × b)) (hrhoB : rho.traceLeft.m.PosDef)
     (M : POVM c a) (hMUnit : measurementMapDoesNotEnlargeUnit M) :
-    rho.conditionalEntropy <= (measureSubsystemState M rho).conditionalEntropy := by
-  let out : State (Prod c b) := measureSubsystemState M rho
-  have hmarg : out.marginalB = rho.marginalB := by
+    rho.conditionalEntropy ≤ (measureSubsystemState M rho).conditionalEntropy := by
+  let out : MState (c × b) := measureSubsystemState M rho
+  have hmarg : out.traceLeft = rho.traceLeft := by
     simpa [out, measureSubsystemState] using
-      marginalB_applyState_prod_id rho (Channel.measure M)
-  have houtB : out.marginalB.matrix.PosDef := by
+      traceLeft_applyState_prod_id rho (POVM.measureDiscard M)
+  have houtB : out.traceLeft.m.PosDef := by
     rw [hmarg]
     exact hrhoB
-  let Phi : Channel (Prod a b) (Prod c b) :=
-    Channel.prod (Channel.measure M) (Channel.idChannel b)
-  let rin : CMatrix (Prod a b) :=
-    identityTensorStateMatrix (a := a) rho.marginalB
-  let rout : CMatrix (Prod c b) :=
-    identityTensorStateMatrix (a := c) out.marginalB
+  let Phi : CPTPMap (a × b) (c × b) :=
+    CPTPOp.prod (POVM.measureDiscard M) (CPTPOp.id (dIn := b))
+  let rin : CMatrix (a × b) :=
+    identityTensorStateMatrix (a := a) rho.traceLeft
+  let rout : CMatrix (c × b) :=
+    identityTensorStateMatrix (a := c) out.traceLeft
   have hrin : rin.PosSemidef :=
-    identityTensorStateMatrix_posSemidef_of_state (a := a) rho.marginalB
+    identityTensorStateMatrix_posSemidef (a := a) rho.traceLeft
   have hrout : rout.PosSemidef :=
-    identityTensorStateMatrix_posSemidef_of_state (a := c) out.marginalB
-  have hmap : Phi.map rin <= rout := by
+    identityTensorStateMatrix_posSemidef (a := c) out.traceLeft
+  have hmap : Phi.map rin ≤ rout := by
     simpa [Phi, rin, rout, hmarg] using
-      measurementMap_identityTensorStateMatrix_le M hMUnit rho.marginalB
+      measurementMap_identityTensorStateMatrix_le M hMUnit rho.traceLeft
   have hDPI :=
     relativeEntropyPSDReferenceTraceLogE_dataProcessing_channel_ge rho hrin Phi
   have hreference :=
-    relativeEntropyPSDReferenceTraceLogE_antitone_reference (Phi.applyState rho)
+    relativeEntropyPSDReferenceTraceLogE_antitone_reference (Phi rho)
       (Phi.mapsPositive rin hrin) hrout hmap
   have hdiv :
-      relativeEntropyPSDReferenceTraceLogE (Phi.applyState rho) rout hrout <=
+      relativeEntropyPSDReferenceTraceLogE (Phi rho) rout hrout ≤
         relativeEntropyPSDReferenceTraceLogE rho rin hrin :=
     hreference.trans hDPI
   have hdiv' :
       relativeEntropyPSDReferenceTraceLogE out
-          (identityTensorStateMatrix (a := c) out.marginalB)
-          (identityTensorStateMatrix_posSemidef_of_state (a := c) out.marginalB) <=
+          (identityTensorStateMatrix (a := c) out.traceLeft)
+          (identityTensorStateMatrix_posSemidef (a := c) out.traceLeft) ≤
         relativeEntropyPSDReferenceTraceLogE rho
-          (identityTensorStateMatrix (a := a) rho.marginalB)
-          (identityTensorStateMatrix_posSemidef_of_state (a := a) rho.marginalB) := by
+          (identityTensorStateMatrix (a := a) rho.traceLeft)
+          (identityTensorStateMatrix_posSemidef (a := a) rho.traceLeft) := by
     simpa [Phi, rin, rout, out, measureSubsystemState] using hdiv
   rw [relativeEntropyPSDReferenceTraceLogE_identityTensor_eq_neg_conditionalEntropy
-      out out.marginalB houtB,
+      out out.traceLeft houtB,
     relativeEntropyPSDReferenceTraceLogE_identityTensor_eq_neg_conditionalEntropy
-      rho rho.marginalB hrhoB,
+      rho rho.traceLeft hrhoB,
     conditionalEntropyRelativeFullReference_to_conditionalEntropy out houtB,
     conditionalEntropyRelativeFullReference_to_conditionalEntropy rho hrhoB] at hdiv'
-  have hreal : -out.conditionalEntropy <= -rho.conditionalEntropy :=
+  have hreal : -out.conditionalEntropy ≤ -rho.conditionalEntropy :=
     EReal.coe_le_coe_iff.mp hdiv'
   simpa [out] using (neg_le_neg_iff.mp hreal)
 
@@ -690,42 +690,38 @@ where the canonical side reference is full-rank. Measurement commutes with the
 conditioning isometry, so the source trace-log DPI proof transports back to
 the original register. -/
 theorem measurementMap_conditionalEntropy_monotonicity
-    (rho : State (Prod a b))
+    (rho : MState (a × b))
     (M : POVM c a) (hMUnit : measurementMapDoesNotEnlargeUnit M) :
-    rho.conditionalEntropy <= (measureSubsystemState M rho).conditionalEntropy := by
+    rho.conditionalEntropy ≤ (measureSubsystemState M rho).conditionalEntropy := by
   let rhoC := rho.conditioningSupportCompressedState
   let V : ReferenceIsometry
-      (psdSupportIndex rho.marginalB.matrix rho.marginalB.pos) b :=
-    psdSupportReferenceIsometry rho.marginalB.matrix rho.marginalB.pos
+      (psdSupportIndex rho.traceLeft.m rho.traceLeft.psd) b :=
+    psdSupportReferenceIsometry rho.traceLeft.m rho.traceLeft.psd
   let outC := measureSubsystemState M rhoC
   let out := measureSubsystemState M rho
-  have hrhoMatrix : V.applyMatrixRight rhoC.matrix = rho.matrix := by
-    have hrec := congrArg State.matrix
+  have hrhoMatrix : V.applyMatrixRight rhoC.m = rho.m := by
+    have hrec := congrArg DensityOp.m
       (rho.conditioningSupportCompressedState_conditioningIsometryApply)
-    rw [State.conditioningIsometryApply_matrix] at hrec
+    rw [MState.conditioningIsometryApply_matrix] at hrec
     simpa [rhoC, V] using hrec
   have houtRec : outC.conditioningIsometryApply V = out := by
-    apply State.ext
-    rw [State.conditioningIsometryApply_matrix]
-    change V.applyMatrixRight
-        (MatrixMap.kron (Channel.measure M).map
-          (Channel.idChannel
-            (psdSupportIndex rho.marginalB.matrix rho.marginalB.pos)).map
-          rhoC.matrix) =
-      MatrixMap.kron (Channel.measure M).map (Channel.idChannel b).map rho.matrix
+    apply MState.ext
+    rw [MState.conditioningIsometryApply_matrix]
+    simp only [outC, out, measureSubsystemState, CPTPOp.mat_coe_eq_apply_mat,
+      CPTPOp.prod_map]
     rw [← hrhoMatrix]
     exact (MatrixMap.kron_idChannel_apply_applyMatrixRight
-      (Channel.measure M).map V rhoC.matrix).symm
-  have hmono : rhoC.conditionalEntropy <= outC.conditionalEntropy :=
-    measurementMap_conditionalEntropy_monotonicity_of_marginalB_posDef rhoC
-      (State.conditioningSupportCompressedState_marginalB_posDef rho) M hMUnit
+      (POVM.measureDiscard M).map V rhoC.m).symm
+  have hmono : rhoC.conditionalEntropy ≤ outC.conditionalEntropy :=
+    measurementMap_conditionalEntropy_monotonicity_of_traceLeft_posDef rhoC
+      (MState.conditioningSupportCompressedState_traceLeft_posDef rho) M hMUnit
   calc
     rho.conditionalEntropy = rhoC.conditionalEntropy := by
       symm
-      exact State.conditionalEntropy_conditioningSupportCompressedState rho
-    _ <= outC.conditionalEntropy := hmono
+      exact MState.conditionalEntropy_conditioningSupportCompressedState rho
+    _ ≤ outC.conditionalEntropy := hmono
     _ = out.conditionalEntropy := by
-      have h := State.conditionalEntropy_conditioningIsometryApply outC V
+      have h := MState.conditionalEntropy_conditioningIsometryApply outC V
       rw [houtRec] at h
       exact h.symm
     _ = (measureSubsystemState M rho).conditionalEntropy := rfl
@@ -743,33 +739,33 @@ trace-log and operator-order routes. No full-rank state assumption, conditional
 duality, or reverse-channel hypothesis remains; the pointwise comparison is
 the direct source DPI route. -/
 theorem measurementMap_conditionalSandwichedRenyiUpExtendedOrder_monotonicity
-    (rho : State (Prod a b))
+    (rho : MState (a × b))
     (M : POVM c a) (hMUnit : measurementMapDoesNotEnlargeUnit M)
     (alpha : RenyiOrder) :
-    rho.conditionalSandwichedRenyiUpExtendedOrder alpha <=
+    rho.conditionalSandwichedRenyiUpExtendedOrder alpha ≤
       (measureSubsystemState M rho).conditionalSandwichedRenyiUpExtendedOrder alpha := by
   obtain ⟨val, hval⟩ := alpha
   cases val with
   | top =>
-      change rho.conditionalMinEntropy <=
+      change rho.conditionalMinEntropy ≤
         (measureSubsystemState M rho).conditionalMinEntropy
       exact measurementMap_conditionalMinEntropy_monotonicity rho M hMUnit
   | coe r =>
-      have hr : 1 / 2 <= r := by exact_mod_cast hval
-      change rho.conditionalSandwichedRenyiUpFiniteOrder r <=
+      have hr : 1 / 2 ≤ r := by exact_mod_cast hval
+      change rho.conditionalSandwichedRenyiUpFiniteOrder r ≤
         (measureSubsystemState M rho).conditionalSandwichedRenyiUpFiniteOrder r
       by_cases hone : r = 1
       · subst r
         rw [conditionalSandwichedRenyiUpFiniteOrder_one,
           conditionalSandwichedRenyiUpFiniteOrder_one]
         exact measurementMap_conditionalEntropy_monotonicity rho M hMUnit
-      by_cases hhalf : r = (2 : Real)⁻¹
+      by_cases hhalf : r = (2 : ℝ)⁻¹
       · subst r
         rw [conditionalSandwichedRenyiUpFiniteOrder_half,
           conditionalSandwichedRenyiUpFiniteOrder_half]
         have hsource :=
           measurementMap_conditionalSandwichedRenyiUpSource_monotonicity
-            rho M hMUnit (1 / 2 : Real) (by norm_num) (by norm_num)
+            rho M hMUnit (1 / 2 : ℝ) (by norm_num) (by norm_num)
         simpa only [conditionalSandwichedRenyiUpSource_half_eq_conditionalMaxEntropy]
           using hsource
       · have hpos : 0 < r := lt_of_lt_of_le (by norm_num) hr
@@ -780,8 +776,4 @@ theorem measurementMap_conditionalSandwichedRenyiUpExtendedOrder_monotonicity
         exact measurementMap_conditionalSandwichedRenyiUpSource_monotonicity
           rho M hMUnit r hr hone
 
-end State
-
-end
-
-end QIT
+end MState

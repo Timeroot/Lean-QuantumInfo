@@ -9,28 +9,36 @@ module
 public import QuantumLib.QIT.Protocols.FQSW.OneShot
 public import QuantumLib.QIT.Asymptotic.AEP
 public import QuantumLib.QIT.Coding.Source.SchumacherDirect
+public import QuantumLib.QIT.Util.MatrixInstances
 
 /-!
-# FQSW IID typicality infrastructure
+# Typical subspaces for the i.i.d. FQSW source
 
-This file is a dependency-ordered leaf of `QIT.Protocols.FQSW`.  Declaration
-names, namespaces, statements, and proof terms are preserved from the original
-monolithic module.
+The asymptotic FQSW theorem applies the one-shot bound to `ψ^{⊗n}`, and the one-shot error is
+governed by dimensions and purities, which for `n` copies are controlled by typical subspaces.
+This module builds that layer: `adhwFQSWIidKet` regroups `ψ^{⊗n}` as `(A^n × B^n) × R^n`, the three
+one-copy marginals `adhwFQSWSystemAState`, `adhwFQSWSystemBState`, `adhwFQSWSystemRState` give the
+entropies, and purity of the source turns `I(A;R)` and `I(A;B)` into sums and differences of
+`H(A)`, `H(B)` and `H(R)`.
+
+`ADHWFQSWSimultaneousTypicalProjectors` collects projectors `Π_A`, `Π_B`, `Π_R` that are typical at
+once, together with the compressed source they cut out and the rank, weight, and marginal-purity
+bounds it satisfies.  The projectors are taken at the internal window `δ / 2` while the bounds are
+advertised at `δ`; the slack is what
+`MState.eventually_two_pow_sub_le_typicalSubspaceDimension` needs in order to give a dimension
+bound at the advertised window.  `exists_adhwFQSWSimultaneousTypicalProjectors` produces the record
+for all large enough `n`.
 -/
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder QIT.MatrixL2
 
 namespace QIT
 
 universe u v w x y z p u1 v1 w1
 
 noncomputable section
-
-local instance fqswIIDTypicalCMatrixContinuousENorm {ι : Type*} [Fintype ι] [DecidableEq ι] :
-    ContinuousENorm (CMatrix ι) :=
-  SeminormedAddGroup.toContinuousENorm
 
 variable {a : Type u} {b : Type v} {r : Type w}
 variable {q : Type x} {e : Type y} {et : Type z}
@@ -42,187 +50,127 @@ variable [Fintype et] [DecidableEq et]
 
 /-- The `n`-fold i.i.d. source regrouped as `(A^n × B^n) × R^n`, matching
 the source notation `ψ' = (φ^{ABR})^{⊗ n}` in ADHW fqsw.tex lines 1093-1101. -/
-def adhwFQSWIidPureVector (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) :
-    PureVector (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
-  (ψ.tensorPower n).reindex (fqswTensorPowerTripartiteEquiv a b r n)
+def adhwFQSWIidKet (ψ : Ket ((a × b) × r)) (n : ℕ) :
+    Ket ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
+  (ψ.tensorPower n).reindex (tensorPowerProdProdEquiv a b r n)
 
 /-- The density state of the regrouped i.i.d. source `ψ'` from ADHW fqsw.tex
 lines 1093-1101. -/
-def adhwFQSWIidSourceState (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) :
-    State (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
-  (adhwFQSWIidPureVector ψ n).state
+def adhwFQSWIidSourceState (ψ : Ket ((a × b) × r)) (n : ℕ) :
+    MState ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
+  (adhwFQSWIidKet ψ n).state
 
 /-- Alice's one-copy marginal used for the `Π_A` typical projector in ADHW
 fqsw.tex lines 1110-1120. -/
-def adhwFQSWSystemAState (ψ : PureVector (Prod (Prod a b) r)) : State a :=
-  ψ.state.marginalA.marginalA
+def adhwFQSWSystemAState (ψ : Ket ((a × b) × r)) : MState a :=
+  ψ.state.traceRight.traceRight
 
 /-- Bob's one-copy marginal used for the `Π_B` typical projector in ADHW
 fqsw.tex lines 1110-1120. -/
-def adhwFQSWSystemBState (ψ : PureVector (Prod (Prod a b) r)) : State b :=
-  ψ.state.marginalA.marginalB
+def adhwFQSWSystemBState (ψ : Ket ((a × b) × r)) : MState b :=
+  ψ.state.traceRight.traceLeft
 
 /-- Reference one-copy marginal used for the `Π_R` typical projector in ADHW
 fqsw.tex lines 1110-1120. -/
-def adhwFQSWSystemRState (ψ : PureVector (Prod (Prod a b) r)) : State r :=
-  ψ.state.marginalB
+def adhwFQSWSystemRState (ψ : Ket ((a × b) × r)) : MState r :=
+  ψ.state.traceLeft
 
 /-- Entropy `H(A)` in the i.i.d. FQSW source route of ADHW fqsw.tex
 lines 1110-1120. -/
-def adhwFQSWEntropyA (ψ : PureVector (Prod (Prod a b) r)) : ℝ :=
+def adhwFQSWEntropyA (ψ : Ket ((a × b) × r)) : ℝ :=
   (adhwFQSWSystemAState ψ).vonNeumann
 
 /-- Entropy `H(B)` in the i.i.d. FQSW source route of ADHW fqsw.tex
 lines 1110-1120. -/
-def adhwFQSWEntropyB (ψ : PureVector (Prod (Prod a b) r)) : ℝ :=
+def adhwFQSWEntropyB (ψ : Ket ((a × b) × r)) : ℝ :=
   (adhwFQSWSystemBState ψ).vonNeumann
 
 /-- Entropy `H(R)` in the i.i.d. FQSW source route of ADHW fqsw.tex
 lines 1110-1120. -/
-def adhwFQSWEntropyR (ψ : PureVector (Prod (Prod a b) r)) : ℝ :=
+def adhwFQSWEntropyR (ψ : Ket ((a × b) × r)) : ℝ :=
   (adhwFQSWSystemRState ψ).vonNeumann
 
 /-- The `A` marginal of the source-route `AR` state is the original source
 `A` marginal. -/
-theorem adhwFQSWARState_marginalA_eq_systemA
-    (ψ : PureVector (Prod (Prod a b) r)) :
-    (adhwFQSWARState ψ).marginalA = adhwFQSWSystemAState ψ := by
-  apply State.ext
+theorem adhwFQSWARState_traceRight_eq_systemA
+    (ψ : Ket ((a × b) × r)) :
+    (adhwFQSWARState ψ).traceRight = adhwFQSWSystemAState ψ := by
+  apply MState.ext
   ext i j
-  simp [adhwFQSWARState, adhwFQSWSystemAState, State.coherentTransferReferenceState,
-    State.marginalA, partialTraceB]
+  simp [adhwFQSWARState, adhwFQSWSystemAState, MState.coherentTransferReferenceState,
+    Matrix.traceRight]
   rw [Finset.sum_comm]
 
 /-- The `R` marginal of the source-route `AR` state is the original reference
 marginal. -/
-theorem adhwFQSWARState_marginalB_eq_systemR
-    (ψ : PureVector (Prod (Prod a b) r)) :
-    (adhwFQSWARState ψ).marginalB = adhwFQSWSystemRState ψ := by
-  apply State.ext
+theorem adhwFQSWARState_traceLeft_eq_systemR
+    (ψ : Ket ((a × b) × r)) :
+    (adhwFQSWARState ψ).traceLeft = adhwFQSWSystemRState ψ := by
+  apply MState.ext
   ext i j
-  simp [adhwFQSWARState, adhwFQSWSystemRState, State.coherentTransferReferenceState,
-    State.marginalB, partialTraceA, Fintype.sum_prod_type]
+  simp [adhwFQSWARState, adhwFQSWSystemRState, MState.coherentTransferReferenceState,
+    Matrix.traceLeft, Fintype.sum_prod_type]
 
 /-- The `AR` marginal in the ADHW FQSW source route has the same entropy as
 the complementary source `B` system. -/
 theorem adhwFQSWARState_vonNeumann_eq_entropyB
-    (ψ : PureVector (Prod (Prod a b) r)) :
+    (ψ : Ket ((a × b) × r)) :
     (adhwFQSWARState ψ).vonNeumann = adhwFQSWEntropyB ψ := by
-  let Ω : PureVector (Prod (Prod a r) b) :=
-    ψ.reindex (fqswSourceToARBEquiv a b r)
-  have hΩA : Ω.state.marginalA = adhwFQSWARState ψ := by
-    apply State.ext
+  let Ω : Ket ((a × r) × b) :=
+    ψ.reindex (prodABCToACBEquiv a b r)
+  have hΩA : Ω.state.traceRight = adhwFQSWARState ψ := by
+    apply MState.ext
     ext i j
-    simp [Ω, adhwFQSWARState, State.coherentTransferReferenceState,
-      fqswSourceToARBEquiv, PureVector.reindex_state, State.reindex,
-      State.marginalA, partialTraceB, PureVector.state_matrix, rankOneMatrix_apply]
-  have hΩB : Ω.state.marginalB = adhwFQSWSystemBState ψ := by
-    apply State.ext
+    simp [Ω, adhwFQSWARState, MState.coherentTransferReferenceState,
+      prodABCToACBEquiv, Ket.reindex_state,
+      Matrix.traceRight, Ket.state_matrix, rankOneMatrix_apply]
+  have hΩB : Ω.state.traceLeft = adhwFQSWSystemBState ψ := by
+    apply MState.ext
     ext i j
-    simp [Ω, adhwFQSWSystemBState, fqswSourceToARBEquiv,
-      PureVector.reindex_state, State.reindex, State.marginalB,
-      State.marginalA, partialTraceA, partialTraceB, PureVector.state_matrix,
+    simp [Ω, adhwFQSWSystemBState, prodABCToACBEquiv,
+      Ket.reindex_state,
+      Matrix.traceLeft, Matrix.traceRight, Ket.state_matrix,
       rankOneMatrix_apply, Fintype.sum_prod_type]
-  have hdual := State.pureVector_marginalA_vonNeumann_eq_marginalB Ω
+  have hdual := MState.ket_traceRight_vonNeumann_eq_traceLeft Ω
   rw [hΩA, hΩB] at hdual
   simpa [adhwFQSWEntropyB] using hdual
 
 /-- The source `AB` marginal has the same entropy as the complementary
 reference system `R`. -/
 theorem adhwFQSWSourceAB_vonNeumann_eq_entropyR
-    (ψ : PureVector (Prod (Prod a b) r)) :
-    ψ.state.marginalA.vonNeumann = adhwFQSWEntropyR ψ := by
+    (ψ : Ket ((a × b) × r)) :
+    ψ.state.traceRight.vonNeumann = adhwFQSWEntropyR ψ := by
   simpa [adhwFQSWEntropyR, adhwFQSWSystemRState] using
-    State.pureVector_marginalA_vonNeumann_eq_marginalB ψ
+    MState.ket_traceRight_vonNeumann_eq_traceLeft ψ
 
 /-- Source-route mutual information identity
 `I(A;R) = H(A) + H(R) - H(B)`. -/
 theorem adhwFQSWMutualInformationAR_eq_entropyA_add_entropyR_sub_entropyB
-    (ψ : PureVector (Prod (Prod a b) r)) :
+    (ψ : Ket ((a × b) × r)) :
     mutualInformation ψ.state.coherentTransferReferenceState =
       adhwFQSWEntropyA ψ + adhwFQSWEntropyR ψ - adhwFQSWEntropyB ψ := by
   rw [← adhwFQSWARState]
   rw [mutualInformation]
-  rw [adhwFQSWARState_marginalA_eq_systemA,
-    adhwFQSWARState_marginalB_eq_systemR,
+  rw [adhwFQSWARState_traceRight_eq_systemA,
+    adhwFQSWARState_traceLeft_eq_systemR,
     adhwFQSWARState_vonNeumann_eq_entropyB]
   rfl
 
 /-- Source-route mutual information identity
 `I(A;B) = H(A) + H(B) - H(R)`. -/
 theorem adhwFQSWMutualInformationAB_eq_entropyA_add_entropyB_sub_entropyR
-    (ψ : PureVector (Prod (Prod a b) r)) :
-    mutualInformation ψ.state.marginalA =
+    (ψ : Ket ((a × b) × r)) :
+    mutualInformation ψ.state.traceRight =
       adhwFQSWEntropyA ψ + adhwFQSWEntropyB ψ - adhwFQSWEntropyR ψ := by
   rw [mutualInformation]
   rw [adhwFQSWSourceAB_vonNeumann_eq_entropyR]
   rfl
 
-/-- Local partial-trace pairing for a right identity factor:
-`Tr_B[X (T ⊗ I)] = Tr_B[X] T`. -/
-private theorem adhwFQSW_partialTraceB_mul_kronecker_one_left
-    {α : Type u} {β : Type v} [Fintype α] [Fintype β] [DecidableEq β]
-    (X : CMatrix (Prod α β)) (T : CMatrix α) :
-    partialTraceB (a := α) (b := β) (X * Matrix.kronecker T (1 : CMatrix β)) =
-      partialTraceB (a := α) (b := β) X * T := by
-  ext i i'
-  simp [partialTraceB, Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
-    Matrix.one_apply, Fintype.sum_prod_type, Finset.sum_mul]
-  rw [Finset.sum_comm]
-
-/-- Trace pairing for an observable acting only on the left tensor factor. -/
-private theorem adhwFQSW_trace_kronecker_one_left_mul_eq_trace_mul_partialTraceB
-    {α : Type u} {β : Type v} [Fintype α] [Fintype β] [DecidableEq β]
-    (M : CMatrix (Prod α β)) (T : CMatrix α) :
-    (Matrix.kronecker T (1 : CMatrix β) * M).trace =
-      (T * partialTraceB (a := α) (b := β) M).trace := by
-  calc
-    (Matrix.kronecker T (1 : CMatrix β) * M).trace =
-        (M * Matrix.kronecker T (1 : CMatrix β)).trace := by
-      rw [Matrix.trace_mul_comm]
-    _ = ((partialTraceB (a := α) (b := β) M) * T).trace := by
-      rw [← adhwFQSW_partialTraceB_mul_kronecker_one_left
-        (α := α) (β := β) M T]
-      exact (partialTraceB_trace (a := α) (b := β)
-        (M * Matrix.kronecker T (1 : CMatrix β))).symm
-    _ = (T * partialTraceB (a := α) (b := β) M).trace := by
-      rw [Matrix.trace_mul_comm]
-
-/-- Local partial-trace pairing for a left identity factor:
-`Tr_A[X (I ⊗ T)] = Tr_A[X] T`. -/
-private theorem adhwFQSW_partialTraceA_mul_kronecker_one_right
-    {α : Type u} {β : Type v} [Fintype α] [Fintype β] [DecidableEq α]
-    (X : CMatrix (Prod α β)) (T : CMatrix β) :
-    partialTraceA (a := α) (b := β) (X * Matrix.kronecker (1 : CMatrix α) T) =
-      partialTraceA (a := α) (b := β) X * T := by
-  ext j j'
-  simp [partialTraceA, Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
-    Matrix.one_apply, Fintype.sum_prod_type, Finset.sum_mul]
-  rw [Finset.sum_comm]
-
-/-- Trace pairing for an observable acting only on the right tensor factor. -/
-private theorem adhwFQSW_trace_kronecker_one_right_mul_eq_trace_mul_partialTraceA
-    {α : Type u} {β : Type v} [Fintype α] [Fintype β] [DecidableEq α]
-    (M : CMatrix (Prod α β)) (T : CMatrix β) :
-    (Matrix.kronecker (1 : CMatrix α) T * M).trace =
-      (T * partialTraceA (a := α) (b := β) M).trace := by
-  calc
-    (Matrix.kronecker (1 : CMatrix α) T * M).trace =
-        (M * Matrix.kronecker (1 : CMatrix α) T).trace := by
-      rw [Matrix.trace_mul_comm]
-    _ = ((partialTraceA (a := α) (b := β) M) * T).trace := by
-      rw [← adhwFQSW_partialTraceA_mul_kronecker_one_right
-        (α := α) (β := β) M T]
-      exact (partialTraceA_trace (a := α) (b := β)
-        (M * Matrix.kronecker (1 : CMatrix α) T)).symm
-    _ = (T * partialTraceA (a := α) (b := β) M).trace := by
-      rw [Matrix.trace_mul_comm]
-
 /-- Lift an `A^n` projector to the grouped i.i.d. source register
 `A^nB^nR^n`. -/
 private def adhwFQSWIidLiftProjectorA
     (n : ℕ) (PA : CMatrix (TensorPower a n)) :
-    CMatrix (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
+    CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
   Matrix.kronecker
     (Matrix.kronecker PA (1 : CMatrix (TensorPower b n)))
     (1 : CMatrix (TensorPower r n))
@@ -231,7 +179,7 @@ private def adhwFQSWIidLiftProjectorA
 `A^nB^nR^n`. -/
 private def adhwFQSWIidLiftProjectorB
     (n : ℕ) (PB : CMatrix (TensorPower b n)) :
-    CMatrix (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
+    CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
   Matrix.kronecker
     (Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB)
     (1 : CMatrix (TensorPower r n))
@@ -240,41 +188,26 @@ private def adhwFQSWIidLiftProjectorB
 `A^nB^nR^n`. -/
 private def adhwFQSWIidLiftProjectorR
     (n : ℕ) (PR : CMatrix (TensorPower r n)) :
-    CMatrix (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
-  Matrix.kronecker (1 : CMatrix (Prod (TensorPower a n) (TensorPower b n))) PR
+    CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
+  Matrix.kronecker (1 : CMatrix (TensorPower a n × TensorPower b n)) PR
 
 /-- The simultaneous lifted `A^nB^nR^n` projector
 `Π_A ⊗ Π_B ⊗ Π_R`. -/
 def adhwFQSWIidLiftProjectorTriple
     (n : ℕ) (PA : CMatrix (TensorPower a n)) (PB : CMatrix (TensorPower b n))
     (PR : CMatrix (TensorPower r n)) :
-    CMatrix (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
+    CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
   Matrix.kronecker (Matrix.kronecker PA PB) PR
 
 /-- The simultaneously projected i.i.d. source matrix
 `Π_A Π_B Π_R ρ Π_A Π_B Π_R`. -/
 def adhwFQSWIidProjectedSourceMatrix
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ)
+    (ψ : Ket ((a × b) × r)) (n : ℕ)
     (PA : CMatrix (TensorPower a n)) (PB : CMatrix (TensorPower b n))
     (PR : CMatrix (TensorPower r n)) :
-    CMatrix (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
+    CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
   let Pi := adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR
-  Pi * (adhwFQSWIidSourceState ψ n).matrix * Pi
-
-/-- The lifted triple projector factors as the product of the three
-single-register lifted projectors. -/
-private theorem adhwFQSWIidLiftProjectorTriple_eq_mul
-    (n : ℕ) (PA : CMatrix (TensorPower a n)) (PB : CMatrix (TensorPower b n))
-    (PR : CMatrix (TensorPower r n)) :
-    adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR =
-      adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA *
-        adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB *
-          adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR := by
-  ext x y
-  simp [adhwFQSWIidLiftProjectorTriple, adhwFQSWIidLiftProjectorA,
-    adhwFQSWIidLiftProjectorB, adhwFQSWIidLiftProjectorR, Matrix.mul_apply,
-    Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
-    Fintype.sum_prod_type]
+  Pi * (adhwFQSWIidSourceState ψ n).m * Pi
 
 -- Algebraic decomposition behind the simultaneous-projector union bound.
 omit [Fintype a] [Fintype b] [Fintype r] in
@@ -352,131 +285,119 @@ private theorem adhwFQSWIidLiftProjector_union_bound
           (1 - adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR) := by
   rw [Matrix.le_iff]
   rw [adhwFQSWIidLiftProjector_union_decomp]
-  have hAcomp := projector_one_sub_posSemidef PA hPA hPAid
-  have hBcomp := projector_one_sub_posSemidef PB hPB hPBid
-  have hRcomp := projector_one_sub_posSemidef PR hPR hPRid
+  have hAcomp := MatrixMap.posSemidef_one_sub_of_posSemidef_idempotent PA hPA hPAid
+  have hBcomp := MatrixMap.posSemidef_one_sub_of_posSemidef_idempotent PB hPB hPBid
+  have hRcomp := MatrixMap.posSemidef_one_sub_of_posSemidef_idempotent PR hPR hPRid
   have hAB : (Matrix.kronecker PA PB).PosSemidef := hPA.kronecker hPB
   have hABid : Matrix.kronecker PA PB * Matrix.kronecker PA PB =
       Matrix.kronecker PA PB := by
     simpa [hPAid, hPBid] using (Matrix.mul_kronecker_mul PA PA PB PB).symm
-  have hABcomp := projector_one_sub_posSemidef (Matrix.kronecker PA PB) hAB hABid
+  have hABcomp := MatrixMap.posSemidef_one_sub_of_posSemidef_idempotent (Matrix.kronecker PA PB) hAB hABid
   exact (hAcomp.kronecker hBcomp).kronecker Matrix.PosSemidef.one |>.add
     (hABcomp.kronecker hRcomp)
 
 /-- The `A^n` marginal of the grouped FQSW i.i.d. source is the tensor power
 of the one-copy `A` marginal. -/
-private theorem adhwFQSWIidSourceState_marginalA_eq_tensorPower
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) :
-    (adhwFQSWIidSourceState ψ n).marginalA.marginalA =
+private theorem adhwFQSWIidSourceState_traceRight_eq_tensorPower
+    (ψ : Ket ((a × b) × r)) (n : ℕ) :
+    (adhwFQSWIidSourceState ψ n).traceRight.traceRight =
       (adhwFQSWSystemAState ψ).tensorPower n := by
   have hAB :
-      (adhwFQSWIidSourceState ψ n).marginalA =
-        ψ.state.marginalA.tensorPowerBipartite n := by
-    simpa [adhwFQSWIidSourceState, adhwFQSWIidPureVector,
-      fqswTensorPowerTripartiteEquiv, PureVector.tensorPowerTripartiteGrouped,
-      PureVector.tensorPowerTripartiteGroupedEquiv, PureVector.reindex_state,
-      PureVector.tensorPower_state] using
-      PureVector.tensorPowerTripartiteGrouped_marginalAB (a := a) (b := b) (c := r) ψ n
+      (adhwFQSWIidSourceState ψ n).traceRight =
+        ψ.state.traceRight.tensorPowerBipartite n := by
+    simpa [adhwFQSWIidSourceState, adhwFQSWIidKet,
+      tensorPowerProdProdEquiv, Ket.tensorPowerTripartiteGrouped,
+      Ket.reindex_state,
+      Ket.tensorPower_state] using
+      Ket.tensorPowerTripartiteGrouped_marginalAB (a := a) (b := b) (c := r) ψ n
   rw [hAB]
   simpa [adhwFQSWSystemAState] using
-    State.tensorPowerBipartite_marginalA (rho := ψ.state.marginalA) n
+    MState.tensorPowerBipartite_traceRight (rho := ψ.state.traceRight) n
 
 /-- The `B^n` marginal of the grouped FQSW i.i.d. source is the tensor power
 of the one-copy `B` marginal. -/
-private theorem adhwFQSWIidSourceState_marginalB_eq_tensorPower
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) :
-    (adhwFQSWIidSourceState ψ n).marginalA.marginalB =
+private theorem adhwFQSWIidSourceState_traceLeft_eq_tensorPower
+    (ψ : Ket ((a × b) × r)) (n : ℕ) :
+    (adhwFQSWIidSourceState ψ n).traceRight.traceLeft =
       (adhwFQSWSystemBState ψ).tensorPower n := by
   have hAB :
-      (adhwFQSWIidSourceState ψ n).marginalA =
-        ψ.state.marginalA.tensorPowerBipartite n := by
-    simpa [adhwFQSWIidSourceState, adhwFQSWIidPureVector,
-      fqswTensorPowerTripartiteEquiv, PureVector.tensorPowerTripartiteGrouped,
-      PureVector.tensorPowerTripartiteGroupedEquiv, PureVector.reindex_state,
-      PureVector.tensorPower_state] using
-      PureVector.tensorPowerTripartiteGrouped_marginalAB (a := a) (b := b) (c := r) ψ n
+      (adhwFQSWIidSourceState ψ n).traceRight =
+        ψ.state.traceRight.tensorPowerBipartite n := by
+    simpa [adhwFQSWIidSourceState, adhwFQSWIidKet,
+      tensorPowerProdProdEquiv, Ket.tensorPowerTripartiteGrouped,
+      Ket.reindex_state,
+      Ket.tensorPower_state] using
+      Ket.tensorPowerTripartiteGrouped_marginalAB (a := a) (b := b) (c := r) ψ n
   rw [hAB]
   simpa [adhwFQSWSystemBState] using
-    State.tensorPowerBipartite_marginalB (rho := ψ.state.marginalA) n
-
-/-- Tracing the `AC` marginal down to `C` agrees with the direct `C`
-marginal for a left-associated tripartite state. -/
-private theorem adhwFQSW_marginalAC_marginalB_eq_marginalB
-    {α : Type u} {β : Type v} {γ : Type w}
-    [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
-    [Fintype γ] [DecidableEq γ]
-    (ρ : State (Prod (Prod α β) γ)) :
-    ρ.marginalAC.marginalB = ρ.marginalB := by
-  apply State.ext
-  ext x y
-  simp [State.marginalAC, State.marginalB, partialTraceA, Fintype.sum_prod_type]
+    MState.tensorPowerBipartite_traceLeft (rho := ψ.state.traceRight) n
 
 /-- The `R^n` marginal of the grouped FQSW i.i.d. source is the tensor power
 of the one-copy reference marginal. -/
 private theorem adhwFQSWIidSourceState_marginalR_eq_tensorPower
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) :
-    (adhwFQSWIidSourceState ψ n).marginalB =
+    (ψ : Ket ((a × b) × r)) (n : ℕ) :
+    (adhwFQSWIidSourceState ψ n).traceLeft =
       (adhwFQSWSystemRState ψ).tensorPower n := by
   let ρ := adhwFQSWIidSourceState ψ n
   have hAC :
       ρ.marginalAC = ψ.state.marginalAC.tensorPowerBipartite n := by
-    simpa [ρ, adhwFQSWIidSourceState, adhwFQSWIidPureVector,
-      fqswTensorPowerTripartiteEquiv, PureVector.tensorPowerTripartiteGrouped,
-      PureVector.tensorPowerTripartiteGroupedEquiv, PureVector.reindex_state,
-      PureVector.tensorPower_state] using
-      PureVector.tensorPowerTripartiteGrouped_marginalAC (a := a) (b := b) (c := r) ψ n
+    simpa [ρ, adhwFQSWIidSourceState, adhwFQSWIidKet,
+      tensorPowerProdProdEquiv, Ket.tensorPowerTripartiteGrouped,
+      Ket.reindex_state,
+      Ket.tensorPower_state] using
+      Ket.tensorPowerTripartiteGrouped_marginalAC (a := a) (b := b) (c := r) ψ n
   calc
-    ρ.marginalB = ρ.marginalAC.marginalB := by
-      exact (adhwFQSW_marginalAC_marginalB_eq_marginalB ρ).symm
-    _ = (ψ.state.marginalAC.tensorPowerBipartite n).marginalB := by
+    ρ.traceLeft = ρ.marginalAC.traceLeft := by
+      exact (MState.marginalAC_traceLeft_eq_traceLeft ρ).symm
+    _ = (ψ.state.marginalAC.tensorPowerBipartite n).traceLeft := by
       rw [hAC]
-    _ = (ψ.state.marginalAC.marginalB).tensorPower n := by
-      exact State.tensorPowerBipartite_marginalB (rho := ψ.state.marginalAC) n
+    _ = (ψ.state.marginalAC.traceLeft).tensorPower n := by
+      exact MState.tensorPowerBipartite_traceLeft (rho := ψ.state.marginalAC) n
     _ = (adhwFQSWSystemRState ψ).tensorPower n := by
-      have hR := adhwFQSW_marginalAC_marginalB_eq_marginalB ψ.state
-      simpa [adhwFQSWSystemRState] using congrArg (fun σ : State r => σ.tensorPower n) hR
+      have hR := MState.marginalAC_traceLeft_eq_traceLeft ψ.state
+      simpa [adhwFQSWSystemRState] using congrArg (fun σ : MState r => σ.tensorPower n) hR
 
 /-- Acceptance identity for the lifted `A^n` typical projector. -/
 private theorem adhwFQSWIid_acceptanceA
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ : ℝ) :
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ : ℝ) :
     (((adhwFQSWIidLiftProjectorA (b := b) (r := r) n
         ((adhwFQSWSystemAState ψ).typicalSubspaceProjector n δ)) *
-        (adhwFQSWIidSourceState ψ n).matrix).trace).re =
+        (adhwFQSWIidSourceState ψ n).m).trace).re =
       (adhwFQSWSystemAState ψ).typicalSubspaceSpectralWeight n δ := by
   let ρ := adhwFQSWIidSourceState ψ n
   let PA := (adhwFQSWSystemAState ψ).typicalSubspaceProjector n δ
   have htraceR :
       (((adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA) *
-          ρ.matrix).trace).re =
+          ρ.m).trace).re =
         (((Matrix.kronecker PA (1 : CMatrix (TensorPower b n))) *
-            ρ.marginalA.matrix).trace).re := by
-    have h := adhwFQSW_trace_kronecker_one_left_mul_eq_trace_mul_partialTraceB
-      (α := Prod (TensorPower a n) (TensorPower b n)) (β := TensorPower r n)
-      (M := ρ.matrix)
+            ρ.traceRight.m).trace).re := by
+    have h := trace_kronecker_one_right_mul_eq_trace_mul_traceRight
+      (a := TensorPower a n × TensorPower b n) (b := TensorPower r n)
+      (M := ρ.m)
       (T := Matrix.kronecker PA (1 : CMatrix (TensorPower b n)))
-    simpa [adhwFQSWIidLiftProjectorA, ρ, PA, State.marginalA_matrix] using
+    simpa [adhwFQSWIidLiftProjectorA, ρ, PA, MState.traceRight_m] using
       congrArg Complex.re h
   have htraceB :
       (((Matrix.kronecker PA (1 : CMatrix (TensorPower b n))) *
-            ρ.marginalA.matrix).trace).re =
-        ((PA * ρ.marginalA.marginalA.matrix).trace).re := by
-    have h := adhwFQSW_trace_kronecker_one_left_mul_eq_trace_mul_partialTraceB
-      (α := TensorPower a n) (β := TensorPower b n)
-      (M := ρ.marginalA.matrix) (T := PA)
-    simpa [State.marginalA_matrix] using congrArg Complex.re h
-  have hmarg := congrArg (fun σ : State (TensorPower a n) => σ.matrix)
-    (adhwFQSWIidSourceState_marginalA_eq_tensorPower ψ n)
+            ρ.traceRight.m).trace).re =
+        ((PA * ρ.traceRight.traceRight.m).trace).re := by
+    have h := trace_kronecker_one_right_mul_eq_trace_mul_traceRight
+      (a := TensorPower a n) (b := TensorPower b n)
+      (M := ρ.traceRight.m) (T := PA)
+    simpa [MState.traceRight_m] using congrArg Complex.re h
+  have hmarg := congrArg (fun σ : MState (TensorPower a n) => σ.m)
+    (adhwFQSWIidSourceState_traceRight_eq_tensorPower ψ n)
   have hmarg' :
-      ρ.marginalA.marginalA.matrix =
-        ((adhwFQSWSystemAState ψ).tensorPower n).matrix := by
+      ρ.traceRight.traceRight.m =
+        ((adhwFQSWSystemAState ψ).tensorPower n).m := by
     simpa [ρ] using hmarg
   calc
     (((adhwFQSWIidLiftProjectorA (b := b) (r := r) n
         ((adhwFQSWSystemAState ψ).typicalSubspaceProjector n δ)) *
-        (adhwFQSWIidSourceState ψ n).matrix).trace).re =
-        ((PA * ρ.marginalA.marginalA.matrix).trace).re := by
+        (adhwFQSWIidSourceState ψ n).m).trace).re =
+        ((PA * ρ.traceRight.traceRight.m).trace).re := by
           rw [htraceR, htraceB]
-    _ = (((adhwFQSWSystemAState ψ).tensorPower n).matrix * PA).trace.re := by
+    _ = (((adhwFQSWSystemAState ψ).tensorPower n).m * PA).trace.re := by
           rw [hmarg']
           rw [Matrix.trace_mul_comm]
     _ = (adhwFQSWSystemAState ψ).typicalSubspaceSpectralWeight n δ := by
@@ -485,45 +406,45 @@ private theorem adhwFQSWIid_acceptanceA
 
 /-- Acceptance identity for the lifted `B^n` typical projector. -/
 private theorem adhwFQSWIid_acceptanceB
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ : ℝ) :
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ : ℝ) :
     (((adhwFQSWIidLiftProjectorB (a := a) (r := r) n
         ((adhwFQSWSystemBState ψ).typicalSubspaceProjector n δ)) *
-        (adhwFQSWIidSourceState ψ n).matrix).trace).re =
+        (adhwFQSWIidSourceState ψ n).m).trace).re =
       (adhwFQSWSystemBState ψ).typicalSubspaceSpectralWeight n δ := by
   let ρ := adhwFQSWIidSourceState ψ n
   let PB := (adhwFQSWSystemBState ψ).typicalSubspaceProjector n δ
   have htraceR :
       (((adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB) *
-          ρ.matrix).trace).re =
+          ρ.m).trace).re =
         (((Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB) *
-            ρ.marginalA.matrix).trace).re := by
-    have h := adhwFQSW_trace_kronecker_one_left_mul_eq_trace_mul_partialTraceB
-      (α := Prod (TensorPower a n) (TensorPower b n)) (β := TensorPower r n)
-      (M := ρ.matrix)
+            ρ.traceRight.m).trace).re := by
+    have h := trace_kronecker_one_right_mul_eq_trace_mul_traceRight
+      (a := TensorPower a n × TensorPower b n) (b := TensorPower r n)
+      (M := ρ.m)
       (T := Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB)
-    simpa [adhwFQSWIidLiftProjectorB, ρ, PB, State.marginalA_matrix] using
+    simpa [adhwFQSWIidLiftProjectorB, ρ, PB, MState.traceRight_m] using
       congrArg Complex.re h
   have htraceA :
       (((Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB) *
-            ρ.marginalA.matrix).trace).re =
-        ((PB * ρ.marginalA.marginalB.matrix).trace).re := by
-    have h := adhwFQSW_trace_kronecker_one_right_mul_eq_trace_mul_partialTraceA
-      (α := TensorPower a n) (β := TensorPower b n)
-      (M := ρ.marginalA.matrix) (T := PB)
-    simpa [State.marginalB_matrix] using congrArg Complex.re h
-  have hmarg := congrArg (fun σ : State (TensorPower b n) => σ.matrix)
-    (adhwFQSWIidSourceState_marginalB_eq_tensorPower ψ n)
+            ρ.traceRight.m).trace).re =
+        ((PB * ρ.traceRight.traceLeft.m).trace).re := by
+    have h := trace_kronecker_one_mul_eq_trace_mul_traceLeft
+      (a := TensorPower a n) (b := TensorPower b n)
+      (M := ρ.traceRight.m) (T := PB)
+    simpa [MState.traceLeft_m] using congrArg Complex.re h
+  have hmarg := congrArg (fun σ : MState (TensorPower b n) => σ.m)
+    (adhwFQSWIidSourceState_traceLeft_eq_tensorPower ψ n)
   have hmarg' :
-      ρ.marginalA.marginalB.matrix =
-        ((adhwFQSWSystemBState ψ).tensorPower n).matrix := by
+      ρ.traceRight.traceLeft.m =
+        ((adhwFQSWSystemBState ψ).tensorPower n).m := by
     simpa [ρ] using hmarg
   calc
     (((adhwFQSWIidLiftProjectorB (a := a) (r := r) n
         ((adhwFQSWSystemBState ψ).typicalSubspaceProjector n δ)) *
-        (adhwFQSWIidSourceState ψ n).matrix).trace).re =
-        ((PB * ρ.marginalA.marginalB.matrix).trace).re := by
+        (adhwFQSWIidSourceState ψ n).m).trace).re =
+        ((PB * ρ.traceRight.traceLeft.m).trace).re := by
           rw [htraceR, htraceA]
-    _ = (((adhwFQSWSystemBState ψ).tensorPower n).matrix * PB).trace.re := by
+    _ = (((adhwFQSWSystemBState ψ).tensorPower n).m * PB).trace.re := by
           rw [hmarg']
           rw [Matrix.trace_mul_comm]
     _ = (adhwFQSWSystemBState ψ).typicalSubspaceSpectralWeight n δ := by
@@ -532,35 +453,35 @@ private theorem adhwFQSWIid_acceptanceB
 
 /-- Acceptance identity for the lifted `R^n` typical projector. -/
 private theorem adhwFQSWIid_acceptanceR
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ : ℝ) :
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ : ℝ) :
     (((adhwFQSWIidLiftProjectorR (a := a) (b := b) n
         ((adhwFQSWSystemRState ψ).typicalSubspaceProjector n δ)) *
-        (adhwFQSWIidSourceState ψ n).matrix).trace).re =
+        (adhwFQSWIidSourceState ψ n).m).trace).re =
       (adhwFQSWSystemRState ψ).typicalSubspaceSpectralWeight n δ := by
   let ρ := adhwFQSWIidSourceState ψ n
   let PR := (adhwFQSWSystemRState ψ).typicalSubspaceProjector n δ
   have htraceAB :
       (((adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR) *
-          ρ.matrix).trace).re =
-        ((PR * ρ.marginalB.matrix).trace).re := by
-    have h := adhwFQSW_trace_kronecker_one_right_mul_eq_trace_mul_partialTraceA
-      (α := Prod (TensorPower a n) (TensorPower b n)) (β := TensorPower r n)
-      (M := ρ.matrix) (T := PR)
-    simpa [adhwFQSWIidLiftProjectorR, ρ, PR, State.marginalB_matrix] using
+          ρ.m).trace).re =
+        ((PR * ρ.traceLeft.m).trace).re := by
+    have h := trace_kronecker_one_mul_eq_trace_mul_traceLeft
+      (a := TensorPower a n × TensorPower b n) (b := TensorPower r n)
+      (M := ρ.m) (T := PR)
+    simpa [adhwFQSWIidLiftProjectorR, ρ, PR, MState.traceLeft_m] using
       congrArg Complex.re h
-  have hmarg := congrArg (fun σ : State (TensorPower r n) => σ.matrix)
+  have hmarg := congrArg (fun σ : MState (TensorPower r n) => σ.m)
     (adhwFQSWIidSourceState_marginalR_eq_tensorPower ψ n)
   have hmarg' :
-      ρ.marginalB.matrix =
-        ((adhwFQSWSystemRState ψ).tensorPower n).matrix := by
+      ρ.traceLeft.m =
+        ((adhwFQSWSystemRState ψ).tensorPower n).m := by
     simpa [ρ] using hmarg
   calc
     (((adhwFQSWIidLiftProjectorR (a := a) (b := b) n
         ((adhwFQSWSystemRState ψ).typicalSubspaceProjector n δ)) *
-        (adhwFQSWIidSourceState ψ n).matrix).trace).re =
-        ((PR * ρ.marginalB.matrix).trace).re := by
+        (adhwFQSWIidSourceState ψ n).m).trace).re =
+        ((PR * ρ.traceLeft.m).trace).re := by
           rw [htraceAB]
-    _ = (((adhwFQSWSystemRState ψ).tensorPower n).matrix * PR).trace.re := by
+    _ = (((adhwFQSWSystemRState ψ).tensorPower n).m * PR).trace.re := by
           rw [hmarg']
           rw [Matrix.trace_mul_comm]
     _ = (adhwFQSWSystemRState ψ).typicalSubspaceSpectralWeight n δ := by
@@ -569,62 +490,62 @@ private theorem adhwFQSWIid_acceptanceR
 
 /-- Selectively projecting the right register cannot increase the left
 marginal in Loewner order. -/
-private theorem adhwFQSW_partialTraceB_selective_projector_le
+private theorem adhwFQSW_traceRight_selective_projector_le
     {α : Type u} {β : Type v} [Fintype α] [DecidableEq α]
     [Fintype β] [DecidableEq β]
-    (X : CMatrix (Prod α β)) (hX : X.PosSemidef)
+    (X : CMatrix (α × β)) (hX : X.PosSemidef)
     (Q : CMatrix β) (hQ : Q.PosSemidef) (hQid : Q * Q = Q) :
-    partialTraceB (a := α) (b := β)
+    Matrix.traceRight
         (Matrix.kronecker (1 : CMatrix α) Q * X *
           Matrix.kronecker (1 : CMatrix α) Q) ≤
-      partialTraceB (a := α) (b := β) X := by
+      Matrix.traceRight X := by
   rw [Matrix.le_iff]
   let D : CMatrix α :=
-    partialTraceB (a := α) (b := β) X -
-      partialTraceB (a := α) (b := β)
+    Matrix.traceRight X -
+      Matrix.traceRight
         (Matrix.kronecker (1 : CMatrix α) Q * X *
           Matrix.kronecker (1 : CMatrix α) Q)
   change D.PosSemidef
   have hbranch_psd :
       (Matrix.kronecker (1 : CMatrix α) Q * X *
         Matrix.kronecker (1 : CMatrix α) Q).PosSemidef := by
-    let K : CMatrix (Prod α β) := Matrix.kronecker (1 : CMatrix α) Q
+    let K : CMatrix (α × β) := Matrix.kronecker (1 : CMatrix α) Q
     have hK : K.PosSemidef := Matrix.PosSemidef.one.kronecker hQ
     have h := hX.mul_mul_conjTranspose_same K
     rw [hK.isHermitian.eq] at h
     simpa [K, Matrix.mul_assoc] using h
   have hDherm : D.IsHermitian := by
     dsimp [D]
-    exact (partialTraceB_isHermitian hX.isHermitian).sub
-      (partialTraceB_isHermitian hbranch_psd.isHermitian)
+    exact (Matrix.IsHermitian.traceRight hX.isHermitian).sub
+      (Matrix.IsHermitian.traceRight hbranch_psd.isHermitian)
   rw [cMatrix_posSemidef_iff_trace_mul_posSemidef_re_nonneg hDherm]
   intro W hW
-  have hQcomp := projector_one_sub_posSemidef Q hQ hQid
+  have hQcomp := MatrixMap.posSemidef_one_sub_of_posSemidef_idempotent Q hQ hQid
   have hWQcomp : (Matrix.kronecker W (1 - Q)).PosSemidef :=
     hW.kronecker hQcomp
   have hnonneg :
       0 ≤ ((Matrix.kronecker W (1 - Q) * X).trace).re :=
     cMatrix_trace_mul_posSemidef_re_nonneg hWQcomp hX
   have htrace_full :
-      ((W * partialTraceB (a := α) (b := β) X).trace).re =
+      ((W * Matrix.traceRight X).trace).re =
         ((Matrix.kronecker W (1 : CMatrix β) * X).trace).re := by
     exact congrArg Complex.re
-      (adhwFQSW_trace_kronecker_one_left_mul_eq_trace_mul_partialTraceB
-        (α := α) (β := β) X W).symm
+      (trace_kronecker_one_right_mul_eq_trace_mul_traceRight
+        (a := α) (b := β) X W).symm
   have htrace_branch :
-      ((W * partialTraceB (a := α) (b := β)
+      ((W * Matrix.traceRight
           (Matrix.kronecker (1 : CMatrix α) Q * X *
             Matrix.kronecker (1 : CMatrix α) Q)).trace).re =
         ((Matrix.kronecker W Q * X).trace).re := by
     have hpair := congrArg Complex.re
-      (adhwFQSW_trace_kronecker_one_left_mul_eq_trace_mul_partialTraceB
-        (α := α) (β := β)
+      (trace_kronecker_one_right_mul_eq_trace_mul_traceRight
+        (a := α) (b := β)
         (Matrix.kronecker (1 : CMatrix α) Q * X *
           Matrix.kronecker (1 : CMatrix α) Q) W).symm
     rw [hpair]
     congr 1
-    let K : CMatrix (Prod α β) := Matrix.kronecker (1 : CMatrix α) Q
-    let L : CMatrix (Prod α β) := Matrix.kronecker W (1 : CMatrix β)
+    let K : CMatrix (α × β) := Matrix.kronecker (1 : CMatrix α) Q
+    let L : CMatrix (α × β) := Matrix.kronecker W (1 : CMatrix β)
     have hKLK : K * L * K = Matrix.kronecker W Q := by
       have hKL : K * L = Matrix.kronecker W Q := by
         simpa [K, L, Matrix.one_mul, Matrix.mul_one] using
@@ -680,62 +601,62 @@ private theorem adhwFQSW_partialTraceB_selective_projector_le
 
 /-- Selectively projecting the left register cannot increase the right
 marginal in Loewner order. -/
-private theorem adhwFQSW_partialTraceA_selective_projector_le
+private theorem adhwFQSW_traceLeft_selective_projector_le
     {α : Type u} {β : Type v} [Fintype α] [DecidableEq α]
     [Fintype β] [DecidableEq β]
-    (X : CMatrix (Prod α β)) (hX : X.PosSemidef)
+    (X : CMatrix (α × β)) (hX : X.PosSemidef)
     (Q : CMatrix α) (hQ : Q.PosSemidef) (hQid : Q * Q = Q) :
-    partialTraceA (a := α) (b := β)
+    Matrix.traceLeft
         (Matrix.kronecker Q (1 : CMatrix β) * X *
           Matrix.kronecker Q (1 : CMatrix β)) ≤
-      partialTraceA (a := α) (b := β) X := by
+      Matrix.traceLeft X := by
   rw [Matrix.le_iff]
   let D : CMatrix β :=
-    partialTraceA (a := α) (b := β) X -
-      partialTraceA (a := α) (b := β)
+    Matrix.traceLeft X -
+      Matrix.traceLeft
         (Matrix.kronecker Q (1 : CMatrix β) * X *
           Matrix.kronecker Q (1 : CMatrix β))
   change D.PosSemidef
   have hbranch_psd :
       (Matrix.kronecker Q (1 : CMatrix β) * X *
         Matrix.kronecker Q (1 : CMatrix β)).PosSemidef := by
-    let K : CMatrix (Prod α β) := Matrix.kronecker Q (1 : CMatrix β)
+    let K : CMatrix (α × β) := Matrix.kronecker Q (1 : CMatrix β)
     have hK : K.PosSemidef := hQ.kronecker Matrix.PosSemidef.one
     have h := hX.mul_mul_conjTranspose_same K
     rw [hK.isHermitian.eq] at h
     simpa [K, Matrix.mul_assoc] using h
   have hDherm : D.IsHermitian := by
     dsimp [D]
-    exact (partialTraceA_isHermitian hX.isHermitian).sub
-      (partialTraceA_isHermitian hbranch_psd.isHermitian)
+    exact (Matrix.IsHermitian.traceLeft hX.isHermitian).sub
+      (Matrix.IsHermitian.traceLeft hbranch_psd.isHermitian)
   rw [cMatrix_posSemidef_iff_trace_mul_posSemidef_re_nonneg hDherm]
   intro W hW
-  have hQcomp := projector_one_sub_posSemidef Q hQ hQid
+  have hQcomp := MatrixMap.posSemidef_one_sub_of_posSemidef_idempotent Q hQ hQid
   have hQcompW : (Matrix.kronecker (1 - Q) W).PosSemidef :=
     hQcomp.kronecker hW
   have hnonneg :
       0 ≤ ((Matrix.kronecker (1 - Q) W * X).trace).re :=
     cMatrix_trace_mul_posSemidef_re_nonneg hQcompW hX
   have htrace_full :
-      ((W * partialTraceA (a := α) (b := β) X).trace).re =
+      ((W * Matrix.traceLeft X).trace).re =
         ((Matrix.kronecker (1 : CMatrix α) W * X).trace).re := by
     exact congrArg Complex.re
-      (adhwFQSW_trace_kronecker_one_right_mul_eq_trace_mul_partialTraceA
-        (α := α) (β := β) X W).symm
+      (trace_kronecker_one_mul_eq_trace_mul_traceLeft
+        (a := α) (b := β) X W).symm
   have htrace_branch :
-      ((W * partialTraceA (a := α) (b := β)
+      ((W * Matrix.traceLeft
           (Matrix.kronecker Q (1 : CMatrix β) * X *
             Matrix.kronecker Q (1 : CMatrix β))).trace).re =
         ((Matrix.kronecker Q W * X).trace).re := by
     have hpair := congrArg Complex.re
-      (adhwFQSW_trace_kronecker_one_right_mul_eq_trace_mul_partialTraceA
-        (α := α) (β := β)
+      (trace_kronecker_one_mul_eq_trace_mul_traceLeft
+        (a := α) (b := β)
         (Matrix.kronecker Q (1 : CMatrix β) * X *
           Matrix.kronecker Q (1 : CMatrix β)) W).symm
     rw [hpair]
     congr 1
-    let K : CMatrix (Prod α β) := Matrix.kronecker Q (1 : CMatrix β)
-    let L : CMatrix (Prod α β) := Matrix.kronecker (1 : CMatrix α) W
+    let K : CMatrix (α × β) := Matrix.kronecker Q (1 : CMatrix β)
+    let L : CMatrix (α × β) := Matrix.kronecker (1 : CMatrix α) W
     have hKLK : K * L * K = Matrix.kronecker Q W := by
       have hKL : K * L = Matrix.kronecker Q W := by
         simpa [K, L, Matrix.one_mul, Matrix.mul_one] using
@@ -789,60 +710,6 @@ private theorem adhwFQSW_partialTraceA_selective_projector_le
   rw [htrace_decomp]
   exact hnonneg
 
-private theorem adhwFQSW_partialTraceB_sub
-    {α : Type u} {β : Type v} [Fintype β]
-    (X Y : CMatrix (Prod α β)) :
-    partialTraceB (a := α) (b := β) (X - Y) =
-      partialTraceB (a := α) (b := β) X -
-        partialTraceB (a := α) (b := β) Y := by
-  ext i j
-  simp [partialTraceB, Finset.sum_sub_distrib]
-
-private theorem adhwFQSW_partialTraceA_sub
-    {α : Type u} {β : Type v} [Fintype α]
-    (X Y : CMatrix (Prod α β)) :
-    partialTraceA (a := α) (b := β) (X - Y) =
-      partialTraceA (a := α) (b := β) X -
-        partialTraceA (a := α) (b := β) Y := by
-  ext i j
-  simp [partialTraceA, Finset.sum_sub_distrib]
-
-private theorem adhwFQSW_partialTraceB_mono
-    {α : Type u} {β : Type v} [Fintype α] [Fintype β]
-    {X Y : CMatrix (Prod α β)} (hXY : X ≤ Y) :
-    partialTraceB (a := α) (b := β) X ≤
-      partialTraceB (a := α) (b := β) Y := by
-  rw [Matrix.le_iff]
-  have hdiff : (Y - X).PosSemidef := Matrix.le_iff.mp hXY
-  have hpt := partialTraceB_posSemidef (a := α) (b := β) hdiff
-  simpa [adhwFQSW_partialTraceB_sub] using hpt
-
-private theorem adhwFQSW_partialTraceA_mono
-    {α : Type u} {β : Type v} [Fintype α] [Fintype β]
-    {X Y : CMatrix (Prod α β)} (hXY : X ≤ Y) :
-    partialTraceA (a := α) (b := β) X ≤
-      partialTraceA (a := α) (b := β) Y := by
-  rw [Matrix.le_iff]
-  have hdiff : (Y - X).PosSemidef := Matrix.le_iff.mp hXY
-  have hpt := partialTraceA_posSemidef (a := α) (b := β) hdiff
-  simpa [adhwFQSW_partialTraceA_sub] using hpt
-
-private theorem adhwFQSW_smul_le_smul_of_nonneg
-    {α : Type u} [Fintype α] [DecidableEq α]
-    {A B : CMatrix α} {c : ℝ} (hc : 0 ≤ c) (hAB : A ≤ B) :
-    (((c : ℝ) : ℂ) • A) ≤ (((c : ℝ) : ℂ) • B) := by
-  rw [Matrix.le_iff] at hAB ⊢
-  have hscaled : (((c : ℝ) : ℂ) • (B - A)).PosSemidef :=
-    Matrix.PosSemidef.smul hAB (by exact_mod_cast hc)
-  simpa [smul_sub] using hscaled
-
-private theorem adhwFQSW_real_smul_smul
-    {α : Type u} (c d : ℝ) (M : CMatrix α) :
-    (((c : ℝ) : ℂ) • (((d : ℝ) : ℂ) • M)) =
-      ((((c * d : ℝ) : ℂ) • M)) := by
-  ext i j
-  simp [Matrix.smul_apply, smul_eq_mul, Complex.ofReal_mul, mul_assoc]
-
 private theorem adhwFQSW_complex_smul_smul
     {α : Type u} (c d : ℂ) (M : CMatrix α) :
     c • (d • M) = (c * d) • M := by
@@ -878,7 +745,7 @@ private theorem adhwFQSW_sum_five_comm
     [Fintype δ] [Fintype ε] [AddCommMonoid M]
     (f : α → β → γ → δ → ε → M) :
     (∑ a, ∑ b, ∑ c, ∑ d, ∑ e, f a b c d e) =
-      ∑ c, ∑ e, ∑ a, ∑ d, ∑ b, f a b c d e := by
+      ∑ c, ∑ e, ∑ a, ∑ b, ∑ d, f a b c d e := by
   calc
     (∑ a, ∑ b, ∑ c, ∑ d, ∑ e, f a b c d e)
         = ∑ a, ∑ c, ∑ b, ∑ d, ∑ e, f a b c d e := by
@@ -905,21 +772,13 @@ private theorem adhwFQSW_sum_five_comm
           apply Finset.sum_congr rfl
           intro c _
           rw [Finset.sum_comm]
-    _ = ∑ c, ∑ e, ∑ a, ∑ d, ∑ b, f a b c d e := by
-          apply Finset.sum_congr rfl
-          intro c _
-          apply Finset.sum_congr rfl
-          intro e _
-          apply Finset.sum_congr rfl
-          intro a _
-          rw [Finset.sum_comm]
 
 private theorem adhwFQSW_sum_five_comm_leftPair
     {α β γ δ ε M : Type*} [Fintype α] [Fintype β] [Fintype γ]
     [Fintype δ] [Fintype ε] [AddCommMonoid M]
     (f : α → β → γ → δ → ε → M) :
     (∑ a, ∑ b, ∑ c, ∑ d, ∑ e, f a b c d e) =
-      ∑ b, ∑ d, ∑ a, ∑ e, ∑ c, f a b c d e := by
+      ∑ b, ∑ d, ∑ a, ∑ c, ∑ e, f a b c d e := by
   calc
     (∑ a, ∑ b, ∑ c, ∑ d, ∑ e, f a b c d e)
         = ∑ b, ∑ a, ∑ c, ∑ d, ∑ e, f a b c d e := by
@@ -934,71 +793,60 @@ private theorem adhwFQSW_sum_five_comm_leftPair
           apply Finset.sum_congr rfl
           intro b _
           rw [Finset.sum_comm]
-    _ = ∑ b, ∑ d, ∑ a, ∑ e, ∑ c, f a b c d e := by
-          apply Finset.sum_congr rfl
-          intro b _
-          apply Finset.sum_congr rfl
-          intro d _
-          apply Finset.sum_congr rfl
-          intro a _
-          rw [Finset.sum_comm]
 
-private theorem adhwFQSWIidLiftProjectorA_marginalA_marginalA
+private theorem adhwFQSWIidLiftProjectorA_traceRight_traceRight
     (n : ℕ)
-    (ρ : State (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)))
+    (ρ : MState ((TensorPower a n × TensorPower b n) × TensorPower r n))
     (PA : CMatrix (TensorPower a n)) :
-    partialTraceB (a := TensorPower a n) (b := TensorPower b n)
-      (partialTraceB (a := Prod (TensorPower a n) (TensorPower b n))
-        (b := TensorPower r n)
-        (adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA * ρ.matrix *
+    Matrix.traceRight
+      (Matrix.traceRight
+        (adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA * ρ.m *
           adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA)) =
-      PA * ρ.marginalA.marginalA.matrix * PA := by
+      PA * ρ.traceRight.traceRight.m * PA := by
   ext x y
-  simp [adhwFQSWIidLiftProjectorA, State.marginalA_matrix, partialTraceB,
+  simp [adhwFQSWIidLiftProjectorA, Matrix.traceRight,
     Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
     Fintype.sum_prod_type, Finset.mul_sum, Finset.sum_mul, mul_assoc]
   simpa using
     (adhwFQSW_sum_four_comm
       (fun b0 r0 v0 u0 =>
-        PA x u0 * (ρ.matrix ((u0, b0), r0) ((v0, b0), r0) * PA v0 y)))
+        PA x u0 * (ρ.m ((u0, b0), r0) ((v0, b0), r0) * PA v0 y)))
 
-private theorem adhwFQSWIidLiftProjectorB_marginalA_marginalB
+private theorem adhwFQSWIidLiftProjectorB_traceRight_traceLeft
     (n : ℕ)
-    (ρ : State (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)))
+    (ρ : MState ((TensorPower a n × TensorPower b n) × TensorPower r n))
     (PB : CMatrix (TensorPower b n)) :
-    partialTraceA (a := TensorPower a n) (b := TensorPower b n)
-      (partialTraceB (a := Prod (TensorPower a n) (TensorPower b n))
-        (b := TensorPower r n)
-        (adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB * ρ.matrix *
+    Matrix.traceLeft
+      (Matrix.traceRight
+        (adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB * ρ.m *
           adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB)) =
-      PB * ρ.marginalA.marginalB.matrix * PB := by
+      PB * ρ.traceRight.traceLeft.m * PB := by
   ext x y
-  simp [adhwFQSWIidLiftProjectorB, State.marginalA_matrix, State.marginalB_matrix,
-    partialTraceA, partialTraceB, Matrix.mul_apply, Matrix.kronecker,
+  simp [adhwFQSWIidLiftProjectorB,
+    Matrix.traceLeft, Matrix.traceRight, Matrix.mul_apply, Matrix.kronecker,
     Matrix.kroneckerMap_apply, Matrix.one_apply, Fintype.sum_prod_type,
     Finset.mul_sum, Finset.sum_mul, mul_assoc]
   simpa using
     (adhwFQSW_sum_four_comm
       (fun a0 r0 v0 u0 =>
-        PB x u0 * (ρ.matrix ((a0, u0), r0) ((a0, v0), r0) * PB v0 y)))
+        PB x u0 * (ρ.m ((a0, u0), r0) ((a0, v0), r0) * PB v0 y)))
 
-private theorem adhwFQSWIidLiftProjectorR_marginalB
+private theorem adhwFQSWIidLiftProjectorR_traceLeft
     (n : ℕ)
-    (ρ : State (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)))
+    (ρ : MState ((TensorPower a n × TensorPower b n) × TensorPower r n))
     (PR : CMatrix (TensorPower r n)) :
-    partialTraceA (a := Prod (TensorPower a n) (TensorPower b n))
-        (b := TensorPower r n)
-        (adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR * ρ.matrix *
+    Matrix.traceLeft
+        (adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR * ρ.m *
           adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR) =
-      PR * ρ.marginalB.matrix * PR := by
+      PR * ρ.traceLeft.m * PR := by
   ext x y
-  simp [adhwFQSWIidLiftProjectorR, State.marginalB_matrix, partialTraceA,
+  simp [adhwFQSWIidLiftProjectorR, Matrix.traceLeft,
     Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
     Fintype.sum_prod_type, Finset.mul_sum, Finset.sum_mul, mul_assoc]
   simpa using
     (adhwFQSW_sum_four_comm
       (fun a0 b0 v0 u0 =>
-        PR x u0 * (ρ.matrix ((a0, b0), u0) ((a0, b0), v0) * PR v0 y)))
+        PR x u0 * (ρ.m ((a0, b0), u0) ((a0, b0), v0) * PR v0 y)))
 
 omit [DecidableEq a] in
 private theorem adhwFQSWIidLiftProjectorA_posSemidef
@@ -1055,46 +903,6 @@ private theorem adhwFQSWIidLiftProjectorA_idempotent
           rw [hAB]
           simp [adhwFQSWIidLiftProjectorA]
 
-omit [DecidableEq b] in
-private theorem adhwFQSWIidLiftProjectorB_idempotent
-    (n : ℕ) (PB : CMatrix (TensorPower b n)) (hPBid : PB * PB = PB) :
-    adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB *
-      adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB =
-        adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB := by
-  have hAB :
-      Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB *
-          Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB =
-        Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB := by
-    simpa [hPBid] using
-      (Matrix.mul_kronecker_mul (1 : CMatrix (TensorPower a n))
-        (1 : CMatrix (TensorPower a n)) PB PB).symm
-  calc
-    adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB *
-        adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB =
-      Matrix.kronecker
-        (Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB *
-          Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB)
-        ((1 : CMatrix (TensorPower r n)) * (1 : CMatrix (TensorPower r n))) := by
-          simpa [adhwFQSWIidLiftProjectorB] using
-            (Matrix.mul_kronecker_mul
-              (Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB)
-              (Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB)
-              (1 : CMatrix (TensorPower r n)) (1 : CMatrix (TensorPower r n))).symm
-    _ = adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB := by
-          rw [hAB]
-          simp [adhwFQSWIidLiftProjectorB]
-
-omit [DecidableEq r] in
-private theorem adhwFQSWIidLiftProjectorR_idempotent
-    (n : ℕ) (PR : CMatrix (TensorPower r n)) (hPRid : PR * PR = PR) :
-    adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR *
-      adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR =
-        adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR := by
-  simpa [adhwFQSWIidLiftProjectorR, hPRid] using
-    (Matrix.mul_kronecker_mul
-      (1 : CMatrix (Prod (TensorPower a n) (TensorPower b n)))
-      (1 : CMatrix (Prod (TensorPower a n) (TensorPower b n))) PR PR).symm
-
 omit [DecidableEq a] [DecidableEq b] [DecidableEq r] in
 theorem adhwFQSWIidLiftProjectorTriple_idempotent
     (n : ℕ) (PA : CMatrix (TensorPower a n)) (PB : CMatrix (TensorPower b n))
@@ -1120,16 +928,16 @@ theorem adhwFQSWIidLiftProjectorTriple_idempotent
           simp [adhwFQSWIidLiftProjectorTriple]
 
 private theorem adhwFQSW_rejection_trace_eq_one_sub_acceptance
-    (ρ : State a) (P : CMatrix a) :
-    ((ρ.matrix * (1 - P)).trace).re = 1 - ((P * ρ.matrix).trace).re := by
-  have hmul : ρ.matrix * (1 - P) = ρ.matrix - ρ.matrix * P := by
+    (ρ : MState a) (P : CMatrix a) :
+    ((ρ.m * (1 - P)).trace).re = 1 - ((P * ρ.m).trace).re := by
+  have hmul : ρ.m * (1 - P) = ρ.m - ρ.m * P := by
     noncomm_ring
-  rw [hmul, Matrix.trace_sub, Complex.sub_re, ρ.trace_eq_one, Complex.one_re]
+  rw [hmul, Matrix.trace_sub, Complex.sub_re, ρ.tr', Complex.one_re]
   rw [Matrix.trace_mul_comm]
 
 private theorem adhwFQSWIidLiftProjectorTriple_acceptance_of_single
     (n : ℕ)
-    (ρ : State (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)))
+    (ρ : MState ((TensorPower a n × TensorPower b n) × TensorPower r n))
     (η : ℝ)
     (PA : CMatrix (TensorPower a n)) (PB : CMatrix (TensorPower b n))
     (PR : CMatrix (TensorPower r n))
@@ -1137,16 +945,16 @@ private theorem adhwFQSWIidLiftProjectorTriple_acceptance_of_single
     (hPAid : PA * PA = PA) (hPBid : PB * PB = PB) (hPRid : PR * PR = PR)
     (haccA :
       1 - η / 3 ≤
-        ((adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA * ρ.matrix).trace).re)
+        ((adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA * ρ.m).trace).re)
     (haccB :
       1 - η / 3 ≤
-        ((adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB * ρ.matrix).trace).re)
+        ((adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB * ρ.m).trace).re)
     (haccR :
       1 - η / 3 ≤
-        ((adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR * ρ.matrix).trace).re) :
+        ((adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR * ρ.m).trace).re) :
     1 - η ≤
       ((adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR *
-        ρ.matrix).trace).re := by
+        ρ.m).trace).re := by
   let PiA := adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA
   let PiB := adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB
   let PiR := adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR
@@ -1156,48 +964,46 @@ private theorem adhwFQSWIidLiftProjectorTriple_acceptance_of_single
       adhwFQSWIidLiftProjector_union_bound (a := a) (b := b) (r := r) n PA PB PR
         hPA hPB hPR hPAid hPBid hPRid
   have htrace_le :=
-    cMatrix_trace_mul_le_of_le_posSemidef_left (W := ρ.matrix) ρ.pos hunion
+    cMatrix_trace_mul_le_of_le_posSemidef_left (W := ρ.m) ρ.psd hunion
   have hsum :
-      ((ρ.matrix * ((1 - PiA) + (1 - PiB) + (1 - PiR))).trace).re =
-        (1 - ((PiA * ρ.matrix).trace).re) +
-          (1 - ((PiB * ρ.matrix).trace).re) +
-            (1 - ((PiR * ρ.matrix).trace).re) := by
+      ((ρ.m * ((1 - PiA) + (1 - PiB) + (1 - PiR))).trace).re =
+        (1 - ((PiA * ρ.m).trace).re) +
+          (1 - ((PiB * ρ.m).trace).re) +
+            (1 - ((PiR * ρ.m).trace).re) := by
     rw [Matrix.mul_add, Matrix.mul_add, Matrix.trace_add, Matrix.trace_add,
       Complex.add_re, Complex.add_re]
     rw [adhwFQSW_rejection_trace_eq_one_sub_acceptance ρ PiA]
     rw [adhwFQSW_rejection_trace_eq_one_sub_acceptance ρ PiB]
     rw [adhwFQSW_rejection_trace_eq_one_sub_acceptance ρ PiR]
   have hrejection :
-      ((ρ.matrix * (1 - Pi)).trace).re ≤ η := by
+      ((ρ.m * (1 - Pi)).trace).re ≤ η := by
     calc
-      ((ρ.matrix * (1 - Pi)).trace).re
-          ≤ ((ρ.matrix * ((1 - PiA) + (1 - PiB) + (1 - PiR))).trace).re := htrace_le
-      _ = (1 - ((PiA * ρ.matrix).trace).re) +
-            (1 - ((PiB * ρ.matrix).trace).re) +
-              (1 - ((PiR * ρ.matrix).trace).re) := hsum
+      ((ρ.m * (1 - Pi)).trace).re
+          ≤ ((ρ.m * ((1 - PiA) + (1 - PiB) + (1 - PiR))).trace).re := htrace_le
+      _ = (1 - ((PiA * ρ.m).trace).re) +
+            (1 - ((PiB * ρ.m).trace).re) +
+              (1 - ((PiR * ρ.m).trace).re) := hsum
       _ ≤ η := by linarith
   have hrej_eq := adhwFQSW_rejection_trace_eq_one_sub_acceptance ρ Pi
   linarith
 
 private theorem adhwFQSW_partialTraceR_liftAB_sandwich_eq_liftB_sandwich_partialTraceR
     (n : ℕ)
-    (ρ : State (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)))
+    (ρ : MState ((TensorPower a n × TensorPower b n) × TensorPower r n))
     (PA : CMatrix (TensorPower a n)) (PB : CMatrix (TensorPower b n)) :
-    partialTraceB
-        (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n)
+    Matrix.traceRight
         (Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n)) *
-          ρ.matrix *
+          ρ.m *
           Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n))) =
       Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB *
-        partialTraceB
-          (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n)
-          (adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA * ρ.matrix *
+        Matrix.traceRight
+          (adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA * ρ.m *
             adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA) *
         Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB := by
   ext x y
   rcases x with ⟨xa, xb⟩
   rcases y with ⟨ya, yb⟩
-  simp [adhwFQSWIidLiftProjectorA, partialTraceB, Matrix.mul_apply,
+  simp [adhwFQSWIidLiftProjectorA, Matrix.traceRight, Matrix.mul_apply,
     Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
     Fintype.sum_prod_type, Finset.mul_sum, Finset.sum_mul, mul_assoc]
   simpa [mul_comm, mul_left_comm, mul_assoc] using
@@ -1206,27 +1012,25 @@ private theorem adhwFQSW_partialTraceR_liftAB_sandwich_eq_liftB_sandwich_partial
         PA xa aL *
           (PA aR ya *
             (PB xb bL *
-              (PB bR yb * ρ.matrix ((aL, bL), r0) ((aR, bR), r0))))))
+              (PB bR yb * ρ.m ((aL, bL), r0) ((aR, bR), r0))))))
 
 private theorem adhwFQSW_partialTraceR_liftAB_sandwich_eq_liftA_sandwich_partialTraceR
     (n : ℕ)
-    (ρ : State (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)))
+    (ρ : MState ((TensorPower a n × TensorPower b n) × TensorPower r n))
     (PA : CMatrix (TensorPower a n)) (PB : CMatrix (TensorPower b n)) :
-    partialTraceB
-        (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n)
+    Matrix.traceRight
         (Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n)) *
-          ρ.matrix *
+          ρ.m *
           Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n))) =
       Matrix.kronecker PA (1 : CMatrix (TensorPower b n)) *
-        partialTraceB
-          (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n)
-          (adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB * ρ.matrix *
+        Matrix.traceRight
+          (adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB * ρ.m *
             adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB) *
         Matrix.kronecker PA (1 : CMatrix (TensorPower b n)) := by
   ext x y
   rcases x with ⟨xa, xb⟩
   rcases y with ⟨ya, yb⟩
-  simp [adhwFQSWIidLiftProjectorB, partialTraceB, Matrix.mul_apply,
+  simp [adhwFQSWIidLiftProjectorB, Matrix.traceRight, Matrix.mul_apply,
     Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
     Fintype.sum_prod_type, Finset.mul_sum, Finset.sum_mul, mul_assoc]
   simpa [mul_comm, mul_left_comm, mul_assoc] using
@@ -1235,87 +1039,85 @@ private theorem adhwFQSW_partialTraceR_liftAB_sandwich_eq_liftA_sandwich_partial
         PA xa aL *
           (PA aR ya *
             (PB xb bL *
-              (PB bR yb * ρ.matrix ((aL, bL), r0) ((aR, bR), r0))))))
+              (PB bR yb * ρ.m ((aL, bL), r0) ((aR, bR), r0))))))
 
 private theorem adhwFQSW_triple_sandwich_eq_liftR_select_liftAB_sandwich
     (n : ℕ)
-    (ρ : State (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)))
+    (ρ : MState ((TensorPower a n × TensorPower b n) × TensorPower r n))
     (PA : CMatrix (TensorPower a n)) (PB : CMatrix (TensorPower b n))
     (PR : CMatrix (TensorPower r n)) :
     adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR *
-        ρ.matrix *
+        ρ.m *
         adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR =
       adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR *
         (Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n)) *
-          ρ.matrix *
+          ρ.m *
           Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n))) *
         adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR := by
-  let K : CMatrix (Prod (TensorPower a n) (TensorPower b n)) := Matrix.kronecker PA PB
-  let PiAB : CMatrix (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
+  let K : CMatrix (TensorPower a n × TensorPower b n) := Matrix.kronecker PA PB
+  let PiAB : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
     Matrix.kronecker K (1 : CMatrix (TensorPower r n))
   let PiR := adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR
   let Pi := adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR
   have hleft : PiR * PiAB = Pi := by
     simpa [PiR, PiAB, Pi, K, adhwFQSWIidLiftProjectorR,
       adhwFQSWIidLiftProjectorTriple] using
-      (Matrix.mul_kronecker_mul (1 : CMatrix (Prod (TensorPower a n) (TensorPower b n)))
+      (Matrix.mul_kronecker_mul (1 : CMatrix (TensorPower a n × TensorPower b n))
         K PR (1 : CMatrix (TensorPower r n))).symm
   have hright : PiAB * PiR = Pi := by
     simpa [PiR, PiAB, Pi, K, adhwFQSWIidLiftProjectorR,
       adhwFQSWIidLiftProjectorTriple] using
-      (Matrix.mul_kronecker_mul K (1 : CMatrix (Prod (TensorPower a n) (TensorPower b n)))
+      (Matrix.mul_kronecker_mul K (1 : CMatrix (TensorPower a n × TensorPower b n))
         (1 : CMatrix (TensorPower r n)) PR).symm
   calc
-    Pi * ρ.matrix * Pi = PiR * PiAB * ρ.matrix * (PiAB * PiR) := by
+    Pi * ρ.m * Pi = PiR * PiAB * ρ.m * (PiAB * PiR) := by
       rw [hleft, hright]
-    _ = PiR * (PiAB * ρ.matrix * PiAB) * PiR := by
+    _ = PiR * (PiAB * ρ.m * PiAB) * PiR := by
       noncomm_ring
 
 private theorem adhwFQSW_triple_sandwich_eq_liftAB_select_liftR_sandwich
     (n : ℕ)
-    (ρ : State (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)))
+    (ρ : MState ((TensorPower a n × TensorPower b n) × TensorPower r n))
     (PA : CMatrix (TensorPower a n)) (PB : CMatrix (TensorPower b n))
     (PR : CMatrix (TensorPower r n)) :
     adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR *
-        ρ.matrix *
+        ρ.m *
         adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR =
       Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n)) *
-        (adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR * ρ.matrix *
+        (adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR * ρ.m *
           adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR) *
         Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n)) := by
-  let K : CMatrix (Prod (TensorPower a n) (TensorPower b n)) := Matrix.kronecker PA PB
-  let PiAB : CMatrix (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
+  let K : CMatrix (TensorPower a n × TensorPower b n) := Matrix.kronecker PA PB
+  let PiAB : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
     Matrix.kronecker K (1 : CMatrix (TensorPower r n))
   let PiR := adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR
   let Pi := adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR
   have hleft : PiAB * PiR = Pi := by
     simpa [PiR, PiAB, Pi, K, adhwFQSWIidLiftProjectorR,
       adhwFQSWIidLiftProjectorTriple] using
-      (Matrix.mul_kronecker_mul K (1 : CMatrix (Prod (TensorPower a n) (TensorPower b n)))
+      (Matrix.mul_kronecker_mul K (1 : CMatrix (TensorPower a n × TensorPower b n))
         (1 : CMatrix (TensorPower r n)) PR).symm
   have hright : PiR * PiAB = Pi := by
     simpa [PiR, PiAB, Pi, K, adhwFQSWIidLiftProjectorR,
       adhwFQSWIidLiftProjectorTriple] using
-      (Matrix.mul_kronecker_mul (1 : CMatrix (Prod (TensorPower a n) (TensorPower b n)))
+      (Matrix.mul_kronecker_mul (1 : CMatrix (TensorPower a n × TensorPower b n))
         K PR (1 : CMatrix (TensorPower r n))).symm
   calc
-    Pi * ρ.matrix * Pi = PiAB * PiR * ρ.matrix * (PiR * PiAB) := by
+    Pi * ρ.m * Pi = PiAB * PiR * ρ.m * (PiR * PiAB) := by
       rw [hleft, hright]
-    _ = PiAB * (PiR * ρ.matrix * PiR) * PiAB := by
+    _ = PiAB * (PiR * ρ.m * PiR) * PiAB := by
       noncomm_ring
 
-private theorem adhwFQSW_normalizedTripleSandwich_marginalA_le_envelope
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ' : ℝ) :
+private theorem adhwFQSW_normalizedTripleSandwich_traceRight_le_envelope
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ' : ℝ) :
     let PA := (adhwFQSWSystemAState ψ).typicalSubspaceProjector n δ'
     let PB := (adhwFQSWSystemBState ψ).typicalSubspaceProjector n δ'
     let PR := (adhwFQSWSystemRState ψ).typicalSubspaceProjector n δ'
     let Pi := adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR
-    let τM := Pi * (adhwFQSWIidSourceState ψ n).matrix * Pi
+    let τM := Pi * (adhwFQSWIidSourceState ψ n).m * Pi
     0 < τM.trace.re →
-      partialTraceB (a := TensorPower a n) (b := TensorPower b n)
-        (partialTraceB
-          (a := Prod (TensorPower a n) (TensorPower b n))
-          (b := TensorPower r n)
+      Matrix.traceRight
+        (Matrix.traceRight
           ((((τM.trace.re)⁻¹ : ℝ) : ℂ) • τM)) ≤
         (((((τM.trace.re)⁻¹ : ℝ) : ℂ) *
           (((2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyA ψ - δ'))) : ℝ) : ℂ)) • PA) := by
@@ -1326,15 +1128,15 @@ private theorem adhwFQSW_normalizedTripleSandwich_marginalA_le_envelope
   let PB := (adhwFQSWSystemBState ψ).typicalSubspaceProjector n δ'
   let PR := (adhwFQSWSystemRState ψ).typicalSubspaceProjector n δ'
   let Pi := adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR
-  let PiAB : CMatrix (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
+  let PiAB : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
     Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n))
   let PiA := adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA
-  let τM : CMatrix (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
-    Pi * ρ.matrix * Pi
-  let τAB : CMatrix (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
-    PiAB * ρ.matrix * PiAB
-  let τA : CMatrix (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
-    PiA * ρ.matrix * PiA
+  let τM : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
+    Pi * ρ.m * Pi
+  let τAB : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
+    PiAB * ρ.m * PiAB
+  let τA : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
+    PiA * ρ.m * PiA
   have hPA_stmt :=
     (adhwFQSWSystemAState ψ).typicalSubspaceProjector_statement_proved n δ'
   have hPB_stmt :=
@@ -1349,12 +1151,10 @@ private theorem adhwFQSW_normalizedTripleSandwich_marginalA_le_envelope
   have hτABpsd : τAB.PosSemidef := by
     simpa [τAB, PiAB] using projector_sandwich_posSemidef PiAB hPiABpsd ρ
   have hR :
-      partialTraceB
-          (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τM ≤
-        partialTraceB
-          (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τAB := by
+      Matrix.traceRight τM ≤
+        Matrix.traceRight τAB := by
     have hsel :=
-      adhwFQSW_partialTraceB_selective_projector_le
+      adhwFQSW_traceRight_selective_projector_le
         (X := τAB) hτABpsd PR hPRpsd hPRid
     have hτeq :
         τM =
@@ -1368,64 +1168,54 @@ private theorem adhwFQSW_normalizedTripleSandwich_marginalA_le_envelope
     have hPiApsd := adhwFQSWIidLiftProjectorA_posSemidef (b := b) (r := r) n PA hPApsd
     simpa [τA, PiA] using projector_sandwich_posSemidef PiA hPiApsd ρ
   have hB :
-      partialTraceB (a := TensorPower a n) (b := TensorPower b n)
-          (partialTraceB
-            (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τAB) ≤
-        partialTraceB (a := TensorPower a n) (b := TensorPower b n)
-          (partialTraceB
-            (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τA) := by
+      Matrix.traceRight
+          (Matrix.traceRight τAB) ≤
+        Matrix.traceRight
+          (Matrix.traceRight τA) := by
     have hτA_R_psd :
-        (partialTraceB
-          (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τA).PosSemidef :=
-      partialTraceB_posSemidef (a := Prod (TensorPower a n) (TensorPower b n))
+        (Matrix.traceRight τA).PosSemidef :=
+      traceRight_posSemidef (a := TensorPower a n × TensorPower b n)
         (b := TensorPower r n) hApsd
     have hsel :=
-      adhwFQSW_partialTraceB_selective_projector_le
-        (X := partialTraceB
-          (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τA)
+      adhwFQSW_traceRight_selective_projector_le
+        (X := Matrix.traceRight τA)
         hτA_R_psd PB hPBpsd hPBid
     have heq :
-        partialTraceB
-            (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τAB =
+        Matrix.traceRight τAB =
           Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB *
-            partialTraceB
-              (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τA *
+            Matrix.traceRight τA *
             Matrix.kronecker (1 : CMatrix (TensorPower a n)) PB := by
       simpa [τAB, τA, PiAB, PiA] using
         adhwFQSW_partialTraceR_liftAB_sandwich_eq_liftB_sandwich_partialTraceR
           (a := a) (b := b) (r := r) n ρ PA PB
     simpa [heq] using hsel
   have hcore₀ :
-      partialTraceB (a := TensorPower a n) (b := TensorPower b n)
-          (partialTraceB
-            (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τM) ≤
-        PA * ρ.marginalA.marginalA.matrix * PA := by
+      Matrix.traceRight
+          (Matrix.traceRight τM) ≤
+        PA * ρ.traceRight.traceRight.m * PA := by
     calc
-      partialTraceB (a := TensorPower a n) (b := TensorPower b n)
-          (partialTraceB
-            (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τM)
-          ≤ partialTraceB (a := TensorPower a n) (b := TensorPower b n)
-              (partialTraceB
-                (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τAB) :=
-              adhwFQSW_partialTraceB_mono
-                (α := TensorPower a n) (β := TensorPower b n) hR
-      _ ≤ partialTraceB (a := TensorPower a n) (b := TensorPower b n)
-              (partialTraceB
-                (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τA) := hB
-      _ = PA * ρ.marginalA.marginalA.matrix * PA := by
+      Matrix.traceRight
+          (Matrix.traceRight τM)
+          ≤ Matrix.traceRight
+              (Matrix.traceRight τAB) :=
+              traceRight_mono
+                (a := TensorPower a n) (b := TensorPower b n) hR
+      _ ≤ Matrix.traceRight
+              (Matrix.traceRight τA) := hB
+      _ = PA * ρ.traceRight.traceRight.m * PA := by
             simpa [τA, PiA] using
-              adhwFQSWIidLiftProjectorA_marginalA_marginalA
+              adhwFQSWIidLiftProjectorA_traceRight_traceRight
                 (a := a) (b := b) (r := r) n ρ PA
   have hmarg :
-      ρ.marginalA.marginalA.matrix =
-        ((adhwFQSWSystemAState ψ).tensorPower n).matrix := by
-    simpa [ρ] using congrArg (fun σ : State (TensorPower a n) => σ.matrix)
-      (adhwFQSWIidSourceState_marginalA_eq_tensorPower ψ n)
+      ρ.traceRight.traceRight.m =
+        ((adhwFQSWSystemAState ψ).tensorPower n).m := by
+    simpa [ρ] using congrArg (fun σ : MState (TensorPower a n) => σ.m)
+      (adhwFQSWIidSourceState_traceRight_eq_tensorPower ψ n)
   have hcompress :
-      PA * ρ.marginalA.marginalA.matrix * PA ≤
+      PA * ρ.traceRight.traceRight.m * PA ≤
         (((((2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyA ψ - δ')))) : ℝ) : ℂ) • PA) := by
     have htyp :=
-      State.typicalSubspaceProjector_tensorPower_compress_le
+      MState.typicalSubspaceProjector_tensorPower_compress_le
         (adhwFQSWSystemAState ψ) n δ'
     have hexp :
         -((n : ℝ) * (adhwFQSWEntropyA ψ - δ')) =
@@ -1441,45 +1231,37 @@ private theorem adhwFQSW_normalizedTripleSandwich_marginalA_le_envelope
     dsimp [c]
     exact inv_nonneg.mpr htrace_pos.le
   have hscaled :=
-    adhwFQSW_smul_le_smul_of_nonneg
-      (α := TensorPower a n)
-      (A := partialTraceB (a := TensorPower a n) (b := TensorPower b n)
-        (partialTraceB
-          (a := Prod (TensorPower a n) (TensorPower b n))
-          (b := TensorPower r n) τM))
+    cMatrix_ofReal_smul_le_smul
+      (a := TensorPower a n)
+      (A := Matrix.traceRight
+        (Matrix.traceRight τM))
       (B := (((d : ℝ) : ℂ) • PA))
       hinv_nonneg hcore
   have hscaled_prod :
       (((c : ℝ) : ℂ) •
-          partialTraceB (a := TensorPower a n) (b := TensorPower b n)
-            (partialTraceB
-              (a := Prod (TensorPower a n) (TensorPower b n))
-              (b := TensorPower r n) τM)) ≤
+          Matrix.traceRight
+            (Matrix.traceRight τM)) ≤
         (((((c : ℝ) : ℂ) * (((d : ℝ) : ℂ)) : ℂ) • PA)) := by
     have hnested :
         (((c : ℝ) : ℂ) •
-            partialTraceB (a := TensorPower a n) (b := TensorPower b n)
-              (partialTraceB
-                (a := Prod (TensorPower a n) (TensorPower b n))
-                (b := TensorPower r n) τM)) ≤
+            Matrix.traceRight
+              (Matrix.traceRight τM)) ≤
           (((c : ℝ) : ℂ) • (((d : ℝ) : ℂ) • PA)) := by
       simpa using hscaled
     rw [adhwFQSW_complex_smul_smul (((c : ℝ) : ℂ)) (((d : ℝ) : ℂ)) PA] at hnested
     exact hnested
-  simpa [c, d, τM, Pi, ρ, PA, PB, PR, partialTraceB_smul, Matrix.mul_assoc] using hscaled_prod
+  simpa [c, d, τM, Pi, ρ, PA, PB, PR, Matrix.traceRight_smul, Matrix.mul_assoc] using hscaled_prod
 
-private theorem adhwFQSW_normalizedTripleSandwich_marginalB_le_envelope
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ' : ℝ) :
+private theorem adhwFQSW_normalizedTripleSandwich_traceLeft_le_envelope
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ' : ℝ) :
     let PA := (adhwFQSWSystemAState ψ).typicalSubspaceProjector n δ'
     let PB := (adhwFQSWSystemBState ψ).typicalSubspaceProjector n δ'
     let PR := (adhwFQSWSystemRState ψ).typicalSubspaceProjector n δ'
     let Pi := adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR
-    let τM := Pi * (adhwFQSWIidSourceState ψ n).matrix * Pi
+    let τM := Pi * (adhwFQSWIidSourceState ψ n).m * Pi
     0 < τM.trace.re →
-      partialTraceA (a := TensorPower a n) (b := TensorPower b n)
-        (partialTraceB
-          (a := Prod (TensorPower a n) (TensorPower b n))
-          (b := TensorPower r n)
+      Matrix.traceLeft
+        (Matrix.traceRight
           ((((τM.trace.re)⁻¹ : ℝ) : ℂ) • τM)) ≤
         (((((τM.trace.re)⁻¹ : ℝ) : ℂ) *
           (((2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyB ψ - δ'))) : ℝ) : ℂ)) • PB) := by
@@ -1490,15 +1272,15 @@ private theorem adhwFQSW_normalizedTripleSandwich_marginalB_le_envelope
   let PB := (adhwFQSWSystemBState ψ).typicalSubspaceProjector n δ'
   let PR := (adhwFQSWSystemRState ψ).typicalSubspaceProjector n δ'
   let Pi := adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR
-  let PiAB : CMatrix (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
+  let PiAB : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
     Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n))
   let PiB := adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB
-  let τM : CMatrix (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
-    Pi * ρ.matrix * Pi
-  let τAB : CMatrix (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
-    PiAB * ρ.matrix * PiAB
-  let τB : CMatrix (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
-    PiB * ρ.matrix * PiB
+  let τM : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
+    Pi * ρ.m * Pi
+  let τAB : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
+    PiAB * ρ.m * PiAB
+  let τB : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
+    PiB * ρ.m * PiB
   have hPA_stmt :=
     (adhwFQSWSystemAState ψ).typicalSubspaceProjector_statement_proved n δ'
   have hPB_stmt :=
@@ -1513,12 +1295,10 @@ private theorem adhwFQSW_normalizedTripleSandwich_marginalB_le_envelope
   have hτABpsd : τAB.PosSemidef := by
     simpa [τAB, PiAB] using projector_sandwich_posSemidef PiAB hPiABpsd ρ
   have hR :
-      partialTraceB
-          (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τM ≤
-        partialTraceB
-          (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τAB := by
+      Matrix.traceRight τM ≤
+        Matrix.traceRight τAB := by
     have hsel :=
-      adhwFQSW_partialTraceB_selective_projector_le
+      adhwFQSW_traceRight_selective_projector_le
         (X := τAB) hτABpsd PR hPRpsd hPRid
     have hτeq :
         τM =
@@ -1532,64 +1312,54 @@ private theorem adhwFQSW_normalizedTripleSandwich_marginalB_le_envelope
     have hPiBpsd := adhwFQSWIidLiftProjectorB_posSemidef (a := a) (r := r) n PB hPBpsd
     simpa [τB, PiB] using projector_sandwich_posSemidef PiB hPiBpsd ρ
   have hA :
-      partialTraceA (a := TensorPower a n) (b := TensorPower b n)
-          (partialTraceB
-            (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τAB) ≤
-        partialTraceA (a := TensorPower a n) (b := TensorPower b n)
-          (partialTraceB
-            (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τB) := by
+      Matrix.traceLeft
+          (Matrix.traceRight τAB) ≤
+        Matrix.traceLeft
+          (Matrix.traceRight τB) := by
     have hτB_R_psd :
-        (partialTraceB
-          (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τB).PosSemidef :=
-      partialTraceB_posSemidef (a := Prod (TensorPower a n) (TensorPower b n))
+        (Matrix.traceRight τB).PosSemidef :=
+      traceRight_posSemidef (a := TensorPower a n × TensorPower b n)
         (b := TensorPower r n) hBpsd
     have hsel :=
-      adhwFQSW_partialTraceA_selective_projector_le
-        (X := partialTraceB
-          (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τB)
+      adhwFQSW_traceLeft_selective_projector_le
+        (X := Matrix.traceRight τB)
         hτB_R_psd PA hPApsd hPAid
     have heq :
-        partialTraceB
-            (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τAB =
+        Matrix.traceRight τAB =
           Matrix.kronecker PA (1 : CMatrix (TensorPower b n)) *
-            partialTraceB
-              (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τB *
+            Matrix.traceRight τB *
             Matrix.kronecker PA (1 : CMatrix (TensorPower b n)) := by
       simpa [τAB, τB, PiAB, PiB] using
         adhwFQSW_partialTraceR_liftAB_sandwich_eq_liftA_sandwich_partialTraceR
           (a := a) (b := b) (r := r) n ρ PA PB
     simpa [heq] using hsel
   have hcore₀ :
-      partialTraceA (a := TensorPower a n) (b := TensorPower b n)
-          (partialTraceB
-            (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τM) ≤
-        PB * ρ.marginalA.marginalB.matrix * PB := by
+      Matrix.traceLeft
+          (Matrix.traceRight τM) ≤
+        PB * ρ.traceRight.traceLeft.m * PB := by
     calc
-      partialTraceA (a := TensorPower a n) (b := TensorPower b n)
-          (partialTraceB
-            (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τM)
-          ≤ partialTraceA (a := TensorPower a n) (b := TensorPower b n)
-              (partialTraceB
-                (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τAB) :=
-              adhwFQSW_partialTraceA_mono
-                (α := TensorPower a n) (β := TensorPower b n) hR
-      _ ≤ partialTraceA (a := TensorPower a n) (b := TensorPower b n)
-              (partialTraceB
-                (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τB) := hA
-      _ = PB * ρ.marginalA.marginalB.matrix * PB := by
+      Matrix.traceLeft
+          (Matrix.traceRight τM)
+          ≤ Matrix.traceLeft
+              (Matrix.traceRight τAB) :=
+              traceLeft_mono
+                (a := TensorPower a n) (b := TensorPower b n) hR
+      _ ≤ Matrix.traceLeft
+              (Matrix.traceRight τB) := hA
+      _ = PB * ρ.traceRight.traceLeft.m * PB := by
             simpa [τB, PiB] using
-              adhwFQSWIidLiftProjectorB_marginalA_marginalB
+              adhwFQSWIidLiftProjectorB_traceRight_traceLeft
                 (a := a) (b := b) (r := r) n ρ PB
   have hmarg :
-      ρ.marginalA.marginalB.matrix =
-        ((adhwFQSWSystemBState ψ).tensorPower n).matrix := by
-    simpa [ρ] using congrArg (fun σ : State (TensorPower b n) => σ.matrix)
-      (adhwFQSWIidSourceState_marginalB_eq_tensorPower ψ n)
+      ρ.traceRight.traceLeft.m =
+        ((adhwFQSWSystemBState ψ).tensorPower n).m := by
+    simpa [ρ] using congrArg (fun σ : MState (TensorPower b n) => σ.m)
+      (adhwFQSWIidSourceState_traceLeft_eq_tensorPower ψ n)
   have hcompress :
-      PB * ρ.marginalA.marginalB.matrix * PB ≤
+      PB * ρ.traceRight.traceLeft.m * PB ≤
         (((((2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyB ψ - δ')))) : ℝ) : ℂ) • PB) := by
     have htyp :=
-      State.typicalSubspaceProjector_tensorPower_compress_le
+      MState.typicalSubspaceProjector_tensorPower_compress_le
         (adhwFQSWSystemBState ψ) n δ'
     have hexp :
         -((n : ℝ) * (adhwFQSWEntropyB ψ - δ')) =
@@ -1605,45 +1375,37 @@ private theorem adhwFQSW_normalizedTripleSandwich_marginalB_le_envelope
     dsimp [c]
     exact inv_nonneg.mpr htrace_pos.le
   have hscaled :=
-    adhwFQSW_smul_le_smul_of_nonneg
-      (α := TensorPower b n)
-      (A := partialTraceA (a := TensorPower a n) (b := TensorPower b n)
-        (partialTraceB
-          (a := Prod (TensorPower a n) (TensorPower b n))
-          (b := TensorPower r n) τM))
+    cMatrix_ofReal_smul_le_smul
+      (a := TensorPower b n)
+      (A := Matrix.traceLeft
+        (Matrix.traceRight τM))
       (B := (((d : ℝ) : ℂ) • PB))
       hinv_nonneg hcore
   have hscaled_prod :
       (((c : ℝ) : ℂ) •
-          partialTraceA (a := TensorPower a n) (b := TensorPower b n)
-            (partialTraceB
-              (a := Prod (TensorPower a n) (TensorPower b n))
-              (b := TensorPower r n) τM)) ≤
+          Matrix.traceLeft
+            (Matrix.traceRight τM)) ≤
         (((((c : ℝ) : ℂ) * (((d : ℝ) : ℂ)) : ℂ) • PB)) := by
     have hnested :
         (((c : ℝ) : ℂ) •
-            partialTraceA (a := TensorPower a n) (b := TensorPower b n)
-              (partialTraceB
-                (a := Prod (TensorPower a n) (TensorPower b n))
-                (b := TensorPower r n) τM)) ≤
+            Matrix.traceLeft
+              (Matrix.traceRight τM)) ≤
           (((c : ℝ) : ℂ) • (((d : ℝ) : ℂ) • PB)) := by
       simpa using hscaled
     rw [adhwFQSW_complex_smul_smul (((c : ℝ) : ℂ)) (((d : ℝ) : ℂ)) PB] at hnested
     exact hnested
-  simpa [c, d, τM, Pi, ρ, PA, PB, PR, partialTraceA_smul, partialTraceB_smul,
+  simpa [c, d, τM, Pi, ρ, PA, PB, PR, Matrix.traceLeft_smul, Matrix.traceRight_smul,
     Matrix.mul_assoc] using hscaled_prod
 
 private theorem adhwFQSW_normalizedTripleSandwich_marginalR_le_envelope
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ' : ℝ) :
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ' : ℝ) :
     let PA := (adhwFQSWSystemAState ψ).typicalSubspaceProjector n δ'
     let PB := (adhwFQSWSystemBState ψ).typicalSubspaceProjector n δ'
     let PR := (adhwFQSWSystemRState ψ).typicalSubspaceProjector n δ'
     let Pi := adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR
-    let τM := Pi * (adhwFQSWIidSourceState ψ n).matrix * Pi
+    let τM := Pi * (adhwFQSWIidSourceState ψ n).m * Pi
     0 < τM.trace.re →
-      partialTraceA
-          (a := Prod (TensorPower a n) (TensorPower b n))
-          (b := TensorPower r n)
+      Matrix.traceLeft
           ((((τM.trace.re)⁻¹ : ℝ) : ℂ) • τM) ≤
         (((((τM.trace.re)⁻¹ : ℝ) : ℂ) *
           (((2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyR ψ - δ'))) : ℝ) : ℂ)) • PR) := by
@@ -1654,13 +1416,13 @@ private theorem adhwFQSW_normalizedTripleSandwich_marginalR_le_envelope
   let PB := (adhwFQSWSystemBState ψ).typicalSubspaceProjector n δ'
   let PR := (adhwFQSWSystemRState ψ).typicalSubspaceProjector n δ'
   let Pi := adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR
-  let PiAB : CMatrix (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
+  let PiAB : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
     Matrix.kronecker (Matrix.kronecker PA PB) (1 : CMatrix (TensorPower r n))
   let PiR := adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR
-  let τM : CMatrix (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
-    Pi * ρ.matrix * Pi
-  let τR : CMatrix (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
-    PiR * ρ.matrix * PiR
+  let τM : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
+    Pi * ρ.m * Pi
+  let τR : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
+    PiR * ρ.m * PiR
   have hPA_stmt :=
     (adhwFQSWSystemAState ψ).typicalSubspaceProjector_statement_proved n δ'
   have hPB_stmt :=
@@ -1681,12 +1443,10 @@ private theorem adhwFQSW_normalizedTripleSandwich_marginalR_le_envelope
     have hPiRpsd := adhwFQSWIidLiftProjectorR_posSemidef (a := a) (b := b) n PR hPRpsd
     simpa [τR, PiR] using projector_sandwich_posSemidef PiR hPiRpsd ρ
   have hAB :
-      partialTraceA
-          (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τM ≤
-        partialTraceA
-          (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τR := by
+      Matrix.traceLeft τM ≤
+        Matrix.traceLeft τR := by
     have hsel :=
-      adhwFQSW_partialTraceA_selective_projector_le
+      adhwFQSW_traceLeft_selective_projector_le
         (X := τR) hRpsd (Matrix.kronecker PA PB) hQpsd hQid
     have hτeq :
         τM = PiAB * τR * PiAB := by
@@ -1695,28 +1455,25 @@ private theorem adhwFQSW_normalizedTripleSandwich_marginalR_le_envelope
           (a := a) (b := b) (r := r) n ρ PA PB PR
     simpa [τR, hτeq, PiAB] using hsel
   have hcore₀ :
-      partialTraceA
-          (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τM ≤
-        PR * ρ.marginalB.matrix * PR := by
+      Matrix.traceLeft τM ≤
+        PR * ρ.traceLeft.m * PR := by
     calc
-      partialTraceA
-          (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τM
-          ≤ partialTraceA
-              (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τR := hAB
-      _ = PR * ρ.marginalB.matrix * PR := by
+      Matrix.traceLeft τM
+          ≤ Matrix.traceLeft τR := hAB
+      _ = PR * ρ.traceLeft.m * PR := by
             simpa [τR, PiR] using
-              adhwFQSWIidLiftProjectorR_marginalB
+              adhwFQSWIidLiftProjectorR_traceLeft
                 (a := a) (b := b) (r := r) n ρ PR
   have hmarg :
-      ρ.marginalB.matrix =
-        ((adhwFQSWSystemRState ψ).tensorPower n).matrix := by
-    simpa [ρ] using congrArg (fun σ : State (TensorPower r n) => σ.matrix)
+      ρ.traceLeft.m =
+        ((adhwFQSWSystemRState ψ).tensorPower n).m := by
+    simpa [ρ] using congrArg (fun σ : MState (TensorPower r n) => σ.m)
       (adhwFQSWIidSourceState_marginalR_eq_tensorPower ψ n)
   have hcompress :
-      PR * ρ.marginalB.matrix * PR ≤
+      PR * ρ.traceLeft.m * PR ≤
         (((((2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyR ψ - δ')))) : ℝ) : ℂ) • PR) := by
     have htyp :=
-      State.typicalSubspaceProjector_tensorPower_compress_le
+      MState.typicalSubspaceProjector_tensorPower_compress_le
         (adhwFQSWSystemRState ψ) n δ'
     have hexp :
         -((n : ℝ) * (adhwFQSWEntropyR ψ - δ')) =
@@ -1732,31 +1489,28 @@ private theorem adhwFQSW_normalizedTripleSandwich_marginalR_le_envelope
     dsimp [c]
     exact inv_nonneg.mpr htrace_pos.le
   have hscaled :=
-    adhwFQSW_smul_le_smul_of_nonneg
-      (α := TensorPower r n)
-      (A := partialTraceA
-        (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τM)
+    cMatrix_ofReal_smul_le_smul
+      (a := TensorPower r n)
+      (A := Matrix.traceLeft τM)
       (B := (((d : ℝ) : ℂ) • PR))
       hinv_nonneg hcore
   have hscaled_prod :
       (((c : ℝ) : ℂ) •
-          partialTraceA
-            (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τM) ≤
+          Matrix.traceLeft τM) ≤
         (((((c : ℝ) : ℂ) * (((d : ℝ) : ℂ)) : ℂ) • PR)) := by
     have hnested :
         (((c : ℝ) : ℂ) •
-            partialTraceA
-              (a := Prod (TensorPower a n) (TensorPower b n)) (b := TensorPower r n) τM) ≤
+            Matrix.traceLeft τM) ≤
           (((c : ℝ) : ℂ) • (((d : ℝ) : ℂ) • PR)) := by
       simpa using hscaled
     rw [adhwFQSW_complex_smul_smul (((c : ℝ) : ℂ)) (((d : ℝ) : ℂ)) PR] at hnested
     exact hnested
-  simpa [c, d, τM, Pi, ρ, PA, PB, PR, partialTraceA_smul, Matrix.mul_assoc] using
+  simpa [c, d, τM, Pi, ρ, PA, PB, PR, Matrix.traceLeft_smul, Matrix.mul_assoc] using
     hscaled_prod
 
 /-- AEP high-weight form for one typical projector spectral weight. -/
 private theorem adhwFQSW_eventually_one_sub_le_typicalSubspaceSpectralWeight
-    (ρ : State a) {δ η : ℝ} (hδ : 0 < δ) (hη : 0 < η) :
+    (ρ : MState a) {δ η : ℝ} (hδ : 0 < δ) (hη : 0 < η) :
     ∃ N : ℕ, ∀ n : ℕ, n ≥ N →
       1 - η ≤ ρ.typicalSubspaceSpectralWeight n δ := by
   have hlim := ρ.tendsto_typicalSubspaceSpectralWeight hδ
@@ -1843,45 +1597,29 @@ private theorem adhwFQSW_real_smul_one_le_smul_one
 
 private theorem adhwFQSW_hilbertSchmidtSq_le_of_projector_envelope
     {α : Type u} [Fintype α] [DecidableEq α]
-    (ρ : State α) {P : CMatrix α} {c d : ℝ}
+    (ρ : MState α) {P : CMatrix α} {c d : ℝ}
     (hc : 0 ≤ c) (hd : 0 ≤ d) (hP_le : P ≤ (1 : CMatrix α))
-    (hcd : c ≤ d) (henv : ρ.matrix ≤ (((c : ℝ) : ℂ) • P)) :
-    hilbertSchmidtSq ρ.matrix ≤ d := by
+    (hcd : c ≤ d) (henv : ρ.m ≤ (((c : ℝ) : ℂ) • P)) :
+    hilbertSchmidtSq ρ.m ≤ d := by
   have hPenv : (((c : ℝ) : ℂ) • P) ≤ (((c : ℝ) : ℂ) • (1 : CMatrix α)) :=
-    adhwFQSW_smul_le_smul_of_nonneg hc hP_le
+    cMatrix_ofReal_smul_le_smul hc hP_le
   have hdenv : (((c : ℝ) : ℂ) • (1 : CMatrix α)) ≤
       (((d : ℝ) : ℂ) • (1 : CMatrix α)) :=
     adhwFQSW_real_smul_one_le_smul_one hcd
-  exact State.hilbertSchmidtSq_matrix_le_of_le_smul_one ρ hd
+  exact MState.hilbertSchmidtSq_matrix_le_of_le_smul_one ρ hd
     (henv.trans (hPenv.trans hdenv))
 
 private theorem adhwFQSW_traceNormDistance_le_of_normalizedTraceDistance_le
     {α : Type u} [Fintype α] [DecidableEq α]
-    (ρ σ : State α) {η ε : ℝ}
+    (ρ σ : MState α) {η ε : ℝ}
     (hdist : ρ.normalizedTraceDistance σ ≤ Real.sqrt η + η)
     (hsplit : 2 * (Real.sqrt η + η) ≤ ε) :
-    traceNormDistance ρ.matrix σ.matrix ≤ ε := by
-  have hnorm : (1 / 2 : ℝ) * traceNormDistance ρ.matrix σ.matrix ≤
+    traceNormDistance ρ.m σ.m ≤ ε := by
+  have hnorm : (1 / 2 : ℝ) * traceNormDistance ρ.m σ.m ≤
       Real.sqrt η + η := by
-    simpa [State.normalizedTraceDistance, normalizedTraceDistance] using hdist
-  have hnonneg : 0 ≤ traceNormDistance ρ.matrix σ.matrix :=
-    traceNormDistance_nonneg ρ.matrix σ.matrix
-  nlinarith
-
-private theorem adhwFQSW_traceNormDistance_triangle_state
-    {α : Type u} [Fintype α] [DecidableEq α]
-    (ρ σ τ : State α) :
-    traceNormDistance ρ.matrix τ.matrix ≤
-      traceNormDistance ρ.matrix σ.matrix + traceNormDistance σ.matrix τ.matrix := by
-  have htri := State.normalizedTraceDistance_triangle ρ σ τ
-  have hscaled :
-      (1 / 2 : ℝ) * traceNormDistance ρ.matrix τ.matrix ≤
-        (1 / 2 : ℝ) * traceNormDistance ρ.matrix σ.matrix +
-          (1 / 2 : ℝ) * traceNormDistance σ.matrix τ.matrix := by
-    simpa [State.normalizedTraceDistance, normalizedTraceDistance,
-      mul_add] using htri
-  have hnonneg : 0 ≤ traceNormDistance ρ.matrix τ.matrix :=
-    traceNormDistance_nonneg ρ.matrix τ.matrix
+    simpa [MState.normalizedTraceDistance, normalizedTraceDistance] using hdist
+  have hnonneg : 0 ≤ traceNormDistance ρ.m σ.m :=
+    traceNormDistance_nonneg ρ.m σ.m
   nlinarith
 
 /-- Simultaneous ADHW i.i.d. typical projectors `Π_A`, `Π_B`, and `Π_R`,
@@ -1889,74 +1627,103 @@ with the no-witness spectral construction, source estimates, marginal purity
 bounds, and item iii rank bounds from fqsw.tex lines 1110-1129.
 
 The projectors use the internal typicality window `δ / 2`.  This is the
-standard slack split needed by `State.eventually_two_pow_sub_le_typicalSubspaceDimension`:
+standard slack split needed by `MState.eventually_two_pow_sub_le_typicalSubspaceDimension`:
 the constructed projectors are typical at the smaller window while the public
 ADHW rank and purity bounds are stated with the advertised `±δ` slack. -/
 structure ADHWFQSWSimultaneousTypicalProjectors
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ ε : ℝ) where
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ ε : ℝ) where
+  /-- The internal typicality window, smaller than the advertised slack `δ`. -/
   typicalitySlack : ℝ
+  /-- The internal window is half the advertised slack. -/
   typicalitySlack_eq : typicalitySlack = δ / 2
+  /-- The internal window is positive. -/
   typicalitySlack_pos : 0 < typicalitySlack
+  /-- The internal window is strictly smaller than the advertised slack. -/
   typicalitySlack_lt_delta : typicalitySlack < δ
+  /-- Alice's typical projector. -/
   projectorA : CMatrix (TensorPower a n)
+  /-- Bob's typical projector. -/
   projectorB : CMatrix (TensorPower b n)
+  /-- The reference typical projector. -/
   projectorR : CMatrix (TensorPower r n)
+  /-- Alice's projector is the typical-subspace projector at the internal window. -/
   projectorA_eq :
     projectorA = (adhwFQSWSystemAState ψ).typicalSubspaceProjector n typicalitySlack
+  /-- Bob's projector is the typical-subspace projector at the internal window. -/
   projectorB_eq :
     projectorB = (adhwFQSWSystemBState ψ).typicalSubspaceProjector n typicalitySlack
+  /-- The reference projector is the typical-subspace projector at the internal window. -/
   projectorR_eq :
     projectorR = (adhwFQSWSystemRState ψ).typicalSubspaceProjector n typicalitySlack
+  /-- The defining typicality properties of Alice's projector. -/
   projectorA_statement :
     (adhwFQSWSystemAState ψ).typicalSubspaceProjector_statement n typicalitySlack
+  /-- The defining typicality properties of Bob's projector. -/
   projectorB_statement :
     (adhwFQSWSystemBState ψ).typicalSubspaceProjector_statement n typicalitySlack
+  /-- The defining typicality properties of the reference projector. -/
   projectorR_statement :
     (adhwFQSWSystemRState ψ).typicalSubspaceProjector_statement n typicalitySlack
+  /-- The Schumacher-compressed source. -/
   compressedSource :
-    State (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n))
+    MState ((TensorPower a n × TensorPower b n) × TensorPower r n)
+  /-- The source projected onto all three typical subspaces and renormalized. -/
   normalizedTypicalSource :
-    State (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n))
+    MState ((TensorPower a n × TensorPower b n) × TensorPower r n)
+  /-- The projected source has nonzero trace, so it can be renormalized. -/
   normalizedTypicalSource_projected_trace_pos :
     0 < (adhwFQSWIidProjectedSourceMatrix
       (a := a) (b := b) (r := r) ψ n projectorA projectorB projectorR).trace.re
+  /-- The normalized typical source is the renormalized projected source. -/
   normalizedTypicalSource_matrix_eq :
-    normalizedTypicalSource.matrix =
+    normalizedTypicalSource.m =
       ((((adhwFQSWIidProjectedSourceMatrix
         (a := a) (b := b) (r := r) ψ n projectorA projectorB projectorR).trace.re)⁻¹ :
           ℝ) : ℂ) •
         adhwFQSWIidProjectedSourceMatrix
           (a := a) (b := b) (r := r) ψ n projectorA projectorB projectorR
+  /-- Compression moves the source by at most `ε` in trace distance. -/
   schumacher_traceNorm_le :
-    traceNormDistance compressedSource.matrix (adhwFQSWIidSourceState ψ n).matrix ≤ ε
+    traceNormDistance compressedSource.m (adhwFQSWIidSourceState ψ n).m ≤ ε
+  /-- The compressed and normalized typical sources are within `ε`. -/
   schumacher_traceNorm_le_normalizedTypical :
-    traceNormDistance compressedSource.matrix normalizedTypicalSource.matrix ≤ ε
+    traceNormDistance compressedSource.m normalizedTypicalSource.m ≤ ε
+  /-- Typical projection moves the source by at most `ε` in trace distance. -/
   normalized_traceNorm_le :
-    traceNormDistance normalizedTypicalSource.matrix (adhwFQSWIidSourceState ψ n).matrix ≤ ε
+    traceNormDistance normalizedTypicalSource.m (adhwFQSWIidSourceState ψ n).m ≤ ε
+  /-- Alice's marginal purity is exponentially small in her entropy. -/
   purityA_le :
-    hilbertSchmidtSq normalizedTypicalSource.marginalA.marginalA.matrix ≤
+    hilbertSchmidtSq normalizedTypicalSource.traceRight.traceRight.m ≤
       (2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyA ψ - δ)))
+  /-- Bob's marginal purity is exponentially small in his entropy. -/
   purityB_le :
-    hilbertSchmidtSq normalizedTypicalSource.marginalA.marginalB.matrix ≤
+    hilbertSchmidtSq normalizedTypicalSource.traceRight.traceLeft.m ≤
       (2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyB ψ - δ)))
+  /-- The reference marginal purity is exponentially small in its entropy. -/
   purityR_le :
-    hilbertSchmidtSq normalizedTypicalSource.marginalB.matrix ≤
+    hilbertSchmidtSq normalizedTypicalSource.traceLeft.m ≤
       (2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyR ψ - δ)))
+  /-- Alice's typical subspace has rank at least `2 ^ (n (S(A) - δ))`. -/
   rankA_lower :
     (2 : ℝ) ^ ((n : ℝ) * (adhwFQSWEntropyA ψ - δ)) ≤
       (adhwFQSWSystemAState ψ).typicalSubspaceDimension n typicalitySlack
+  /-- Alice's typical subspace has rank at most `2 ^ (n (S(A) + δ))`. -/
   rankA_upper :
     (adhwFQSWSystemAState ψ).typicalSubspaceDimension n typicalitySlack ≤
       (2 : ℝ) ^ ((n : ℝ) * (adhwFQSWEntropyA ψ + δ))
+  /-- Bob's typical subspace has rank at least `2 ^ (n (S(B) - δ))`. -/
   rankB_lower :
     (2 : ℝ) ^ ((n : ℝ) * (adhwFQSWEntropyB ψ - δ)) ≤
       (adhwFQSWSystemBState ψ).typicalSubspaceDimension n typicalitySlack
+  /-- Bob's typical subspace has rank at most `2 ^ (n (S(B) + δ))`. -/
   rankB_upper :
     (adhwFQSWSystemBState ψ).typicalSubspaceDimension n typicalitySlack ≤
       (2 : ℝ) ^ ((n : ℝ) * (adhwFQSWEntropyB ψ + δ))
+  /-- The reference typical subspace has rank at least `2 ^ (n (S(R) - δ))`. -/
   rankR_lower :
     (2 : ℝ) ^ ((n : ℝ) * (adhwFQSWEntropyR ψ - δ)) ≤
       (adhwFQSWSystemRState ψ).typicalSubspaceDimension n typicalitySlack
+  /-- The reference typical subspace has rank at most `2 ^ (n (S(R) + δ))`. -/
   rankR_upper :
     (adhwFQSWSystemRState ψ).typicalSubspaceDimension n typicalitySlack ≤
       (2 : ℝ) ^ ((n : ℝ) * (adhwFQSWEntropyR ψ + δ))
@@ -1964,7 +1731,7 @@ structure ADHWFQSWSimultaneousTypicalProjectors
 /-- Upper rank bound after splitting the advertised ADHW slack `δ` into an
 internal typicality window `δ / 2`. -/
 private theorem adhwFQSW_typicalSubspaceDimension_le_two_pow_halfSlack
-    (ρ : State a) (n : ℕ) {δ : ℝ} (hδ : 0 < δ) :
+    (ρ : MState a) (n : ℕ) {δ : ℝ} (hδ : 0 < δ) :
     ρ.typicalSubspaceDimension n (δ / 2) ≤
       (2 : ℝ) ^ ((n : ℝ) * (ρ.vonNeumann + δ)) := by
   have hbase : (1 : ℝ) ≤ 2 := by norm_num
@@ -1984,7 +1751,7 @@ large `n` have the three internal-window projectors, the normalized source
 estimates, the three marginal purity estimates, and the ADHW item iii rank
 bounds. -/
 theorem exists_adhwFQSWSimultaneousTypicalProjectors
-    (ψ : PureVector (Prod (Prod a b) r)) (δ ε : ℝ)
+    (ψ : Ket ((a × b) × r)) (δ ε : ℝ)
     (hδ : 0 < δ) (hε : 0 < ε) :
     ∃ N : ℕ, ∀ n : ℕ, n ≥ N →
       Nonempty (ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε) := by
@@ -2046,10 +1813,10 @@ theorem exists_adhwFQSWSimultaneousTypicalProjectors
   let PR := (adhwFQSWSystemRState ψ).typicalSubspaceProjector n δtyp
   let PiA := adhwFQSWIidLiftProjectorA (b := b) (r := r) n PA
   let Pi := adhwFQSWIidLiftProjectorTriple (a := a) (b := b) (r := r) n PA PB PR
-  let τA : CMatrix (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
-    PiA * ρ.matrix * PiA
-  let τM : CMatrix (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
-    Pi * ρ.matrix * Pi
+  let τA : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
+    PiA * ρ.m * PiA
+  let τM : CMatrix ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
+    Pi * ρ.m * Pi
   have hPAstmt :
       (adhwFQSWSystemAState ψ).typicalSubspaceProjector_statement n δtyp :=
     (adhwFQSWSystemAState ψ).typicalSubspaceProjector_statement_proved n δtyp
@@ -2084,37 +1851,37 @@ theorem exists_adhwFQSWSimultaneousTypicalProjectors
   have hτMpsd : τM.PosSemidef := by
     simpa [τM] using projector_sandwich_posSemidef Pi hPipsd ρ
   have haccA3 :
-      1 - η / 3 ≤ ((PiA * ρ.matrix).trace).re := by
+      1 - η / 3 ≤ ((PiA * ρ.m).trace).re := by
     calc
       1 - η / 3 ≤
           (adhwFQSWSystemAState ψ).typicalSubspaceSpectralWeight n δtyp :=
             hW_A n hnWA
-      _ = ((PiA * ρ.matrix).trace).re := by
+      _ = ((PiA * ρ.m).trace).re := by
             simpa [PiA, PA, ρ, δtyp] using
               (adhwFQSWIid_acceptanceA (a := a) (b := b) (r := r) ψ n δtyp).symm
   let PiB := adhwFQSWIidLiftProjectorB (a := a) (r := r) n PB
   let PiR := adhwFQSWIidLiftProjectorR (a := a) (b := b) n PR
   have haccB3 :
-      1 - η / 3 ≤ ((PiB * ρ.matrix).trace).re := by
+      1 - η / 3 ≤ ((PiB * ρ.m).trace).re := by
     calc
       1 - η / 3 ≤
           (adhwFQSWSystemBState ψ).typicalSubspaceSpectralWeight n δtyp :=
             hW_B n hnWB
-      _ = ((PiB * ρ.matrix).trace).re := by
+      _ = ((PiB * ρ.m).trace).re := by
             simpa [PiB, PB, ρ, δtyp] using
               (adhwFQSWIid_acceptanceB (a := a) (b := b) (r := r) ψ n δtyp).symm
   have haccR3 :
-      1 - η / 3 ≤ ((PiR * ρ.matrix).trace).re := by
+      1 - η / 3 ≤ ((PiR * ρ.m).trace).re := by
     calc
       1 - η / 3 ≤
           (adhwFQSWSystemRState ψ).typicalSubspaceSpectralWeight n δtyp :=
             hW_R n hnWR
-      _ = ((PiR * ρ.matrix).trace).re := by
+      _ = ((PiR * ρ.m).trace).re := by
             simpa [PiR, PR, ρ, δtyp] using
               (adhwFQSWIid_acceptanceR (a := a) (b := b) (r := r) ψ n δtyp).symm
-  have haccA : 1 - η ≤ ((PiA * ρ.matrix).trace).re := by
+  have haccA : 1 - η ≤ ((PiA * ρ.m).trace).re := by
     linarith
-  have haccTriple : 1 - η ≤ ((Pi * ρ.matrix).trace).re := by
+  have haccTriple : 1 - η ≤ ((Pi * ρ.m).trace).re := by
     simpa [Pi, PiA, PiB, PiR, PA, PB, PR] using
       adhwFQSWIidLiftProjectorTriple_acceptance_of_single
         (a := a) (b := b) (r := r) n ρ η PA PB PR
@@ -2127,55 +1894,55 @@ theorem exists_adhwFQSWSimultaneousTypicalProjectors
       projector_sandwich_trace_re_ne_zero_of_acceptance Pi hPiid ρ hη_lt_one haccTriple
   have htraceM_lower : 1 - η ≤ τM.trace.re := by
     calc
-      1 - η ≤ ((Pi * ρ.matrix).trace).re := haccTriple
+      1 - η ≤ ((Pi * ρ.m).trace).re := haccTriple
       _ = τM.trace.re := by
             simpa [τM] using
               (projector_sandwich_trace_re_eq_acceptance Pi hPiid ρ).symm
   have htraceM_pos : 0 < τM.trace.re :=
     lt_of_lt_of_le (by linarith : 0 < 1 - η) htraceM_lower
   let compressedSource :
-      State (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
-    State.normalizePSD τA hτApsd htrA
+      MState ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
+    MState.normalizePSD τA hτApsd htrA
   let normalizedTypicalSource :
-      State (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n)) :=
-    State.normalizePSD τM hτMpsd htrM
+      MState ((TensorPower a n × TensorPower b n) × TensorPower r n) :=
+    MState.normalizePSD τM hτMpsd htrM
   have hdistCompressed_norm :
       compressedSource.normalizedTraceDistance ρ ≤ Real.sqrt η + η := by
-    simpa [compressedSource, τA, State.normalizedTraceDistance, normalizedTraceDistance,
-      State.normalizePSD_matrix] using
+    simpa [compressedSource, τA, MState.normalizedTraceDistance, normalizedTraceDistance,
+      MState.normalizePSD_matrix] using
       normalizedTraceDistance_normalize_projector_sandwich_le
         (P := PiA) hPiApsd hPiAid ρ hη_nonneg hη_lt_one haccA
   have hdistNormalized_norm :
       normalizedTypicalSource.normalizedTraceDistance ρ ≤ Real.sqrt η + η := by
-    simpa [normalizedTypicalSource, τM, State.normalizedTraceDistance, normalizedTraceDistance,
-      State.normalizePSD_matrix] using
+    simpa [normalizedTypicalSource, τM, MState.normalizedTraceDistance, normalizedTraceDistance,
+      MState.normalizePSD_matrix] using
       normalizedTraceDistance_normalize_projector_sandwich_le
         (P := Pi) hPipsd hPiid ρ hη_nonneg hη_lt_one haccTriple
   have hdistCompressed_half :
-      traceNormDistance compressedSource.matrix ρ.matrix ≤ ε / 2 :=
+      traceNormDistance compressedSource.m ρ.m ≤ ε / 2 :=
     adhwFQSW_traceNormDistance_le_of_normalizedTraceDistance_le
       compressedSource ρ hdistCompressed_norm (by simpa [η] using hη_error)
   have hdistNormalized_half :
-      traceNormDistance normalizedTypicalSource.matrix ρ.matrix ≤ ε / 2 :=
+      traceNormDistance normalizedTypicalSource.m ρ.m ≤ ε / 2 :=
     adhwFQSW_traceNormDistance_le_of_normalizedTraceDistance_le
       normalizedTypicalSource ρ hdistNormalized_norm (by simpa [η] using hη_error)
   have hdistCompressed :
-      traceNormDistance compressedSource.matrix ρ.matrix ≤ ε :=
+      traceNormDistance compressedSource.m ρ.m ≤ ε :=
     hdistCompressed_half.trans hε_half_le
   have hdistNormalized :
-      traceNormDistance normalizedTypicalSource.matrix ρ.matrix ≤ ε :=
+      traceNormDistance normalizedTypicalSource.m ρ.m ≤ ε :=
     hdistNormalized_half.trans hε_half_le
   have hdistCompressedNormalized :
-      traceNormDistance compressedSource.matrix normalizedTypicalSource.matrix ≤ ε := by
+      traceNormDistance compressedSource.m normalizedTypicalSource.m ≤ ε := by
     have hdistNormalized_half_comm :
-        traceNormDistance ρ.matrix normalizedTypicalSource.matrix ≤ ε / 2 := by
+        traceNormDistance ρ.m normalizedTypicalSource.m ≤ ε / 2 := by
       rw [traceNormDistance_comm]
       exact hdistNormalized_half
     calc
-      traceNormDistance compressedSource.matrix normalizedTypicalSource.matrix
-          ≤ traceNormDistance compressedSource.matrix ρ.matrix +
-              traceNormDistance ρ.matrix normalizedTypicalSource.matrix :=
-            adhwFQSW_traceNormDistance_triangle_state compressedSource ρ normalizedTypicalSource
+      traceNormDistance compressedSource.m normalizedTypicalSource.m
+          ≤ traceNormDistance compressedSource.m ρ.m +
+              traceNormDistance ρ.m normalizedTypicalSource.m :=
+            traceNormDistance_triangle compressedSource.m ρ.m normalizedTypicalSource.m
       _ ≤ ε / 2 + ε / 2 := by
             exact add_le_add hdistCompressed_half hdistNormalized_half_comm
       _ = ε := by ring
@@ -2237,72 +2004,70 @@ theorem exists_adhwFQSWSimultaneousTypicalProjectors
         (H := adhwFQSWEntropyR ψ) (δ := δ) (δtyp := δtyp)
         htraceM_lower hη_le_half rfl hn_absorb
   have henvA :
-      normalizedTypicalSource.marginalA.marginalA.matrix ≤ (((cA : ℝ) : ℂ) • PA) := by
+      normalizedTypicalSource.traceRight.traceRight.m ≤ (((cA : ℝ) : ℂ) • PA) := by
     have henv :=
-      adhwFQSW_normalizedTripleSandwich_marginalA_le_envelope
+      adhwFQSW_normalizedTripleSandwich_traceRight_le_envelope
         (a := a) (b := b) (r := r) ψ n δtyp htraceM_pos
+    simp only [normalizedTypicalSource, MState.traceRight_m, MState.normalizePSD_matrix]
     change
-      partialTraceB (a := TensorPower a n) (b := TensorPower b n)
-        (partialTraceB
-          (a := Prod (TensorPower a n) (TensorPower b n))
-          (b := TensorPower r n)
+      Matrix.traceRight
+        (Matrix.traceRight
           ((((τM.trace.re)⁻¹ : ℝ) : ℂ) • τM)) ≤ (((cA : ℝ) : ℂ) • PA)
-    rw [partialTraceB_smul, partialTraceB_smul]
+    rw [Matrix.traceRight_smul, Matrix.traceRight_smul]
     have henv' := henv
-    rw [partialTraceB_smul, partialTraceB_smul] at henv'
+    rw [Matrix.traceRight_smul, Matrix.traceRight_smul] at henv'
     simpa only [τM, Pi, ρ, PA, PB, PR, cA, Matrix.mul_assoc, Complex.ofReal_mul] using henv'
   have henvB :
-      normalizedTypicalSource.marginalA.marginalB.matrix ≤ (((cB : ℝ) : ℂ) • PB) := by
+      normalizedTypicalSource.traceRight.traceLeft.m ≤ (((cB : ℝ) : ℂ) • PB) := by
     have henv :=
-      adhwFQSW_normalizedTripleSandwich_marginalB_le_envelope
+      adhwFQSW_normalizedTripleSandwich_traceLeft_le_envelope
         (a := a) (b := b) (r := r) ψ n δtyp htraceM_pos
+    simp only [normalizedTypicalSource, MState.traceRight_m, MState.traceLeft_m,
+      MState.normalizePSD_matrix]
     change
-      partialTraceA (a := TensorPower a n) (b := TensorPower b n)
-        (partialTraceB
-          (a := Prod (TensorPower a n) (TensorPower b n))
-          (b := TensorPower r n)
+      Matrix.traceLeft
+        (Matrix.traceRight
           ((((τM.trace.re)⁻¹ : ℝ) : ℂ) • τM)) ≤ (((cB : ℝ) : ℂ) • PB)
-    rw [partialTraceB_smul, partialTraceA_smul]
+    rw [Matrix.traceRight_smul, Matrix.traceLeft_smul]
     have henv' := henv
-    rw [partialTraceB_smul, partialTraceA_smul] at henv'
+    rw [Matrix.traceRight_smul, Matrix.traceLeft_smul] at henv'
     simpa only [τM, Pi, ρ, PA, PB, PR, cB, Matrix.mul_assoc, Complex.ofReal_mul] using henv'
   have henvR :
-      normalizedTypicalSource.marginalB.matrix ≤ (((cR : ℝ) : ℂ) • PR) := by
+      normalizedTypicalSource.traceLeft.m ≤ (((cR : ℝ) : ℂ) • PR) := by
     have henv :=
       adhwFQSW_normalizedTripleSandwich_marginalR_le_envelope
         (a := a) (b := b) (r := r) ψ n δtyp htraceM_pos
+    simp only [normalizedTypicalSource, MState.traceLeft_m, MState.normalizePSD_matrix]
     change
-      partialTraceA
-          (a := Prod (TensorPower a n) (TensorPower b n))
-          (b := TensorPower r n)
+      Matrix.traceLeft
           ((((τM.trace.re)⁻¹ : ℝ) : ℂ) • τM) ≤
         (((((τM.trace.re)⁻¹ *
             (2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyR ψ - δtyp)))) : ℝ) : ℂ) • PR)
     rw [Complex.ofReal_mul]
     simpa only [τM, Pi, ρ, PA, PB, PR, Matrix.mul_assoc] using henv
   have hpurityA :
-      hilbertSchmidtSq normalizedTypicalSource.marginalA.marginalA.matrix ≤
+      hilbertSchmidtSq normalizedTypicalSource.traceRight.traceRight.m ≤
         (2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyA ψ - δ))) :=
     adhwFQSW_hilbertSchmidtSq_le_of_projector_envelope
       (c := cA)
       (d := (2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyA ψ - δ))))
-      normalizedTypicalSource.marginalA.marginalA
+      normalizedTypicalSource.traceRight.traceRight
       hcA_nonneg htargetA_nonneg hPAle hcA_le henvA
   have hpurityB :
-      hilbertSchmidtSq normalizedTypicalSource.marginalA.marginalB.matrix ≤
+      hilbertSchmidtSq normalizedTypicalSource.traceRight.traceLeft.m ≤
         (2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyB ψ - δ))) :=
     adhwFQSW_hilbertSchmidtSq_le_of_projector_envelope
       (c := cB)
       (d := (2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyB ψ - δ))))
-      normalizedTypicalSource.marginalA.marginalB
+      normalizedTypicalSource.traceRight.traceLeft
       hcB_nonneg htargetB_nonneg hPBle hcB_le henvB
   have hpurityR :
-      hilbertSchmidtSq normalizedTypicalSource.marginalB.matrix ≤
+      hilbertSchmidtSq normalizedTypicalSource.traceLeft.m ≤
         (2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyR ψ - δ))) :=
     adhwFQSW_hilbertSchmidtSq_le_of_projector_envelope
       (c := cR)
       (d := (2 : ℝ) ^ (-((n : ℝ) * (adhwFQSWEntropyR ψ - δ))))
-      normalizedTypicalSource.marginalB
+      normalizedTypicalSource.traceLeft
       hcR_nonneg htargetR_nonneg hPRle hcR_le henvR
   exact
     ⟨{ typicalitySlack := δtyp
@@ -2324,9 +2089,9 @@ theorem exists_adhwFQSWSimultaneousTypicalProjectors
         change 0 < τM.trace.re
         exact htraceM_pos
        normalizedTypicalSource_matrix_eq := by
-        change normalizedTypicalSource.matrix =
+        change normalizedTypicalSource.m =
           (((τM.trace.re)⁻¹ : ℝ) : ℂ) • τM
-        exact State.normalizePSD_matrix τM hτMpsd htrM
+        exact MState.normalizePSD_matrix τM hτMpsd htrM
        schumacher_traceNorm_le := by
         simpa [ρ] using hdistCompressed
        schumacher_traceNorm_le_normalizedTypical := by

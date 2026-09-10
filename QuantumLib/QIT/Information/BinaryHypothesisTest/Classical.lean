@@ -7,6 +7,7 @@ Authors: QuAIR Team
 module
 
 public import QuantumLib.QIT.Core
+public import QuantumLib.QIT.Classical.Distribution
 public import Mathlib.Analysis.SpecialFunctions.Log.ENNRealLogExp
 public import Mathlib.Analysis.SpecialFunctions.Pow.Deriv
 public import Mathlib.LinearAlgebra.Lagrange
@@ -15,13 +16,10 @@ public import Mathlib.Topology.Instances.EReal.Lemmas
 /-!
 # Binary hypothesis test spectral API: classical layer
 
-This module contains the finite classical-distribution infrastructure, the
-relative-entropy family, the classical binary model, and the common-support
-variational proof for the classical Chernoff bound.  The API lives at
-information layer L2 because its consumers (RenyiLimit and MutualInformationDPI)
-are L2, while QIT/Classical is reserved for classical-state infrastructure.
-These declarations were relocated from QIT/HypothesisTesting/ChernoffSupport.lean
-as part of the L3-to-L2 layering cleanup.
+This module contains the relative-entropy family for finite classical
+distributions, the classical binary model, and the common-support variational
+proof for the classical Chernoff bound.  The API lives at information layer L2
+because its consumers, `RenyiLimit` and `MutualInformationDPI`, are L2.
 -/
 
 @[expose] public section
@@ -37,185 +35,119 @@ open Filter Matrix Polynomial
 
 namespace BinaryHypothesisTest
 
-/-- A finite classical probability distribution. -/
-structure ClassicalDistribution (α : Type u) [Fintype α] where
-  prob : α → ℝ≥0
-  sum_eq_one : ∑ x, prob x = 1
-
-namespace ClassicalDistribution
-
-variable {α : Type u} [Fintype α]
-
-/-- Support containment for finite classical distributions. -/
-def SupportedBy (r : ClassicalDistribution α) (p : α → ℝ≥0) : Prop :=
-  ∀ x, r.prob x ≠ 0 → p x ≠ 0
-
-@[simp]
-theorem supportedBy_self (r : ClassicalDistribution α) :
-    r.SupportedBy r.prob := by
-  intro x hx
-  exact hx
-
-/-- Support containment is transitive. -/
-theorem SupportedBy.trans {r p : ClassicalDistribution α} {q : α → ℝ≥0}
-    (hrp : r.SupportedBy p.prob) (hpq : p.SupportedBy q) :
-    r.SupportedBy q := by
-  intro x hx
-  exact hpq x (hrp x hx)
-
-/-- A finite probability distribution has at least one nonzero mass point. -/
-theorem exists_prob_ne_zero (r : ClassicalDistribution α) :
-    ∃ x : α, r.prob x ≠ 0 := by
-  by_contra h
-  have hall : ∀ x : α, r.prob x = 0 := by
-    intro x
-    by_contra hx
-    exact h ⟨x, hx⟩
-  have hsum0 : ∑ x : α, r.prob x = 0 := by
-    simp [hall]
-  have : (0 : ℝ≥0) = 1 := by
-    simpa [hsum0] using r.sum_eq_one
-  norm_num at this
-
-/-- A chosen nonzero support point of a finite distribution. -/
-noncomputable def supportPoint (r : ClassicalDistribution α) : α :=
-  Classical.choose (exists_prob_ne_zero r)
-
-theorem supportPoint_prob_ne_zero (r : ClassicalDistribution α) :
-    r.prob r.supportPoint ≠ 0 :=
-  Classical.choose_spec (exists_prob_ne_zero r)
-
-/-- The floors of scaled probabilities have total mass at most the scale. -/
-theorem floor_scaled_sum_le (r : ClassicalDistribution α) (N : Nat) :
-    ∑ x : α, Nat.floor ((N : ℝ) * (r.prob x : ℝ)) ≤ N := by
-  exact_mod_cast (show
-    (∑ x : α, (Nat.floor ((N : ℝ) * (r.prob x : ℝ)) : ℝ)) ≤ (N : ℝ) from by
-      have hterm : ∀ x : α,
-          (Nat.floor ((N : ℝ) * (r.prob x : ℝ)) : ℝ) ≤
-            (N : ℝ) * (r.prob x : ℝ) := by
-        intro x
-        exact Nat.floor_le (mul_nonneg (by positivity) (by positivity))
-      calc
-        (∑ x : α, (Nat.floor ((N : ℝ) * (r.prob x : ℝ)) : ℝ))
-            ≤ ∑ x : α, (N : ℝ) * (r.prob x : ℝ) :=
-              Finset.sum_le_sum fun x _ => hterm x
-        _ = (N : ℝ) := by
-          rw [← Finset.mul_sum]
-          have hsum : ∑ x : α, (r.prob x : ℝ) = 1 := by
-            exact_mod_cast r.sum_eq_one
-          rw [hsum]
-          ring)
-end ClassicalDistribution
 /-- One real KL summand, with the standard `0 log 0 = 0` convention on the
 first argument.  Unsupported positive mass is handled by the EReal wrapper
 below, not by this real-valued expression. -/
 def relativeEntropySummandReal {α : Type u} [Fintype α]
-    (r p : ClassicalDistribution α) (x : α) : ℝ :=
-  if r.prob x = 0 then
+    (r p : ProbDistribution α) (x : α) : ℝ :=
+  if r.nnprob x = 0 then
     0
   else
-    (r.prob x : ℝ) * Real.log ((r.prob x : ℝ) / (p.prob x : ℝ))
+    (r.nnprob x : ℝ) * Real.log ((r.nnprob x : ℝ) / (p.nnprob x : ℝ))
 
 /-- Finite real-valued classical relative entropy on a fixed support. -/
 def relativeEntropyReal {α : Type u} [Fintype α]
-    (r p : ClassicalDistribution α) : ℝ :=
+    (r p : ProbDistribution α) : ℝ :=
   ∑ x, relativeEntropySummandReal r p x
 
 /-- Support-aware extended-real classical relative entropy.  It is `⊤` when
 `r` assigns positive mass outside the support of `p`. -/
 def relativeEntropy {α : Type u} [Fintype α]
-    (r p : ClassicalDistribution α) : EReal := by
+    (r p : ProbDistribution α) : EReal := by
   classical
   exact
-    if r.SupportedBy p.prob then
+    if r.SupportedBy p.nnprob then
       (relativeEntropyReal r p : EReal)
     else
       ⊤
 
 @[simp]
 theorem relativeEntropySummandReal_zero_mass {α : Type u} [Fintype α]
-    (r p : ClassicalDistribution α) {x : α} (hx : r.prob x = 0) :
+    (r p : ProbDistribution α) {x : α} (hx : r.nnprob x = 0) :
     relativeEntropySummandReal r p x = 0 := by
   simp [relativeEntropySummandReal, hx]
 
 theorem relativeEntropy_eq_top_of_not_supported {α : Type u} [Fintype α]
-    (r p : ClassicalDistribution α) (h : ¬ r.SupportedBy p.prob) :
+    (r p : ProbDistribution α) (h : ¬ r.SupportedBy p.nnprob) :
     relativeEntropy r p = ⊤ := by
   classical
   simp [relativeEntropy, h]
 
 theorem relativeEntropy_eq_coe_of_supported {α : Type u} [Fintype α]
-    (r p : ClassicalDistribution α) (h : r.SupportedBy p.prob) :
+    (r p : ProbDistribution α) (h : r.SupportedBy p.nnprob) :
     relativeEntropy r p = (relativeEntropyReal r p : EReal) := by
   classical
   simp [relativeEntropy, h]
 
 /-- Pointwise Gibbs inequality with the `0 log 0 = 0` convention. -/
 theorem relativeEntropySummandReal_ge_sub {α : Type u} [Fintype α]
-    (r p : ClassicalDistribution α) (h : r.SupportedBy p.prob) (x : α) :
-    (r.prob x : ℝ) - (p.prob x : ℝ) ≤
+    (r p : ProbDistribution α) (h : r.SupportedBy p.nnprob) (x : α) :
+    (r.nnprob x : ℝ) - (p.nnprob x : ℝ) ≤
       relativeEntropySummandReal r p x := by
-  by_cases hr0 : r.prob x = 0
-  · have hp_nonneg : 0 ≤ (p.prob x : ℝ) := by positivity
+  by_cases hr0 : r.nnprob x = 0
+  · have hp_nonneg : 0 ≤ (p.nnprob x : ℝ) := by positivity
     simp [relativeEntropySummandReal, hr0]
-  · have hp0 : p.prob x ≠ 0 := h x hr0
-    have hrr : 0 < (r.prob x : ℝ) := by
-      have hrr_nn : (0 : ℝ≥0) < r.prob x :=
+  · have hp0 : p.nnprob x ≠ 0 := h x hr0
+    have hrr : 0 < (r.nnprob x : ℝ) := by
+      have hrr_nn : (0 : ℝ≥0) < r.nnprob x :=
         lt_of_le_of_ne (by positivity) (Ne.symm hr0)
       exact_mod_cast hrr_nn
-    have hpp : 0 < (p.prob x : ℝ) := by
-      have hpp_nn : (0 : ℝ≥0) < p.prob x :=
+    have hpp : 0 < (p.nnprob x : ℝ) := by
+      have hpp_nn : (0 : ℝ≥0) < p.nnprob x :=
         lt_of_le_of_ne (by positivity) (Ne.symm hp0)
       exact_mod_cast hpp_nn
-    have hratio : 0 < (r.prob x : ℝ) / (p.prob x : ℝ) :=
+    have hratio : 0 < (r.nnprob x : ℝ) / (p.nnprob x : ℝ) :=
       div_pos hrr hpp
     have hlog := Real.one_sub_inv_le_log_of_pos hratio
     have hmul :
-        (r.prob x : ℝ) * (1 - (((r.prob x : ℝ) / (p.prob x : ℝ))⁻¹)) ≤
-          (r.prob x : ℝ) *
-            Real.log ((r.prob x : ℝ) / (p.prob x : ℝ)) :=
+        (r.nnprob x : ℝ) * (1 - (((r.nnprob x : ℝ) / (p.nnprob x : ℝ))⁻¹)) ≤
+          (r.nnprob x : ℝ) *
+            Real.log ((r.nnprob x : ℝ) / (p.nnprob x : ℝ)) :=
       mul_le_mul_of_nonneg_left hlog (le_of_lt hrr)
     calc
-      (r.prob x : ℝ) - (p.prob x : ℝ)
-          = (r.prob x : ℝ) *
-              (1 - (((r.prob x : ℝ) / (p.prob x : ℝ))⁻¹)) := by
+      (r.nnprob x : ℝ) - (p.nnprob x : ℝ)
+          = (r.nnprob x : ℝ) *
+              (1 - (((r.nnprob x : ℝ) / (p.nnprob x : ℝ))⁻¹)) := by
             field_simp [hrr.ne', hpp.ne']
-      _ ≤ (r.prob x : ℝ) *
-            Real.log ((r.prob x : ℝ) / (p.prob x : ℝ)) := hmul
+      _ ≤ (r.nnprob x : ℝ) *
+            Real.log ((r.nnprob x : ℝ) / (p.nnprob x : ℝ)) := hmul
       _ = relativeEntropySummandReal r p x := by
             simp [relativeEntropySummandReal, hr0]
 
 /-- Classical relative entropy is nonnegative on a fixed support. -/
 theorem relativeEntropyReal_nonneg {α : Type u} [Fintype α]
-    (r p : ClassicalDistribution α) (h : r.SupportedBy p.prob) :
+    (r p : ProbDistribution α) (h : r.SupportedBy p.nnprob) :
     0 ≤ relativeEntropyReal r p := by
   have hterm :
       ∀ x : α,
-        (r.prob x : ℝ) - (p.prob x : ℝ) ≤
+        (r.nnprob x : ℝ) - (p.nnprob x : ℝ) ≤
           relativeEntropySummandReal r p x :=
     relativeEntropySummandReal_ge_sub r p h
   have hsum_lower :
-      (∑ x : α, ((r.prob x : ℝ) - (p.prob x : ℝ))) ≤
+      (∑ x : α, ((r.nnprob x : ℝ) - (p.nnprob x : ℝ))) ≤
         ∑ x : α, relativeEntropySummandReal r p x :=
     Finset.sum_le_sum fun x _ => hterm x
-  have hsumr : ∑ x : α, (r.prob x : ℝ) = 1 := by
-    exact_mod_cast r.sum_eq_one
-  have hsump : ∑ x : α, (p.prob x : ℝ) = 1 := by
-    exact_mod_cast p.sum_eq_one
+  have hsumr : ∑ x : α, (r.nnprob x : ℝ) = 1 := by
+    exact_mod_cast r.sum_nnprob
+  have hsump : ∑ x : α, (p.nnprob x : ℝ) = 1 := by
+    exact_mod_cast p.sum_nnprob
   have hzero :
-      (∑ x : α, ((r.prob x : ℝ) - (p.prob x : ℝ))) = 0 := by
+      (∑ x : α, ((r.nnprob x : ℝ) - (p.nnprob x : ℝ))) = 0 := by
     rw [Finset.sum_sub_distrib, hsumr, hsump]
     ring
   unfold relativeEntropyReal
   linarith
 
-
 /-- A finite classical binary discrimination model with two probability vectors
 on the same finite alphabet. -/
 structure ClassicalBinaryModel (α : Type u) [Fintype α] where
+  /-- The distribution under the first hypothesis. -/
   p : α → ℝ≥0
+  /-- The distribution under the second hypothesis. -/
   q : α → ℝ≥0
+  /-- The first distribution is normalized. -/
   p_sum : ∑ x, p x = 1
+  /-- The second distribution is normalized. -/
   q_sum : ∑ x, q x = 1
 
 namespace ClassicalBinaryModel
@@ -223,22 +155,20 @@ namespace ClassicalBinaryModel
 variable {α : Type u} [Fintype α]
 
 /-- The `p` side as a finite classical distribution. -/
-def pDistribution (M : ClassicalBinaryModel α) : ClassicalDistribution α :=
-  { prob := M.p
-    sum_eq_one := M.p_sum }
+def pDistribution (M : ClassicalBinaryModel α) : ProbDistribution α :=
+  .ofNNReal M.p M.p_sum
 
 /-- The `q` side as a finite classical distribution. -/
-def qDistribution (M : ClassicalBinaryModel α) : ClassicalDistribution α :=
-  { prob := M.q
-    sum_eq_one := M.q_sum }
+def qDistribution (M : ClassicalBinaryModel α) : ProbDistribution α :=
+  .ofNNReal M.q M.q_sum
 
 @[simp]
-theorem pDistribution_prob (M : ClassicalBinaryModel α) :
-    M.pDistribution.prob = M.p := rfl
+theorem pDistribution_nnprob (M : ClassicalBinaryModel α) :
+    M.pDistribution.nnprob = M.p := rfl
 
 @[simp]
-theorem qDistribution_prob (M : ClassicalBinaryModel α) :
-    M.qDistribution.prob = M.q := rfl
+theorem qDistribution_nnprob (M : ClassicalBinaryModel α) :
+    M.qDistribution.nnprob = M.q := rfl
 
 /-- Equal-prior classical error `sum_x min{p_x/2, q_x/2}`. -/
 def equalPriorError (M : ClassicalBinaryModel α) : ℝ≥0 :=
@@ -249,7 +179,7 @@ def equalPriorErrorENNReal (M : ClassicalBinaryModel α) : ℝ≥0∞ :=
   (M.equalPriorError : ℝ≥0∞)
 
 /-- IID tensor power of a finite classical binary model. -/
-def tensorPower (M : ClassicalBinaryModel α) : (n : Nat) → ClassicalBinaryModel (TensorPower α n)
+def tensorPower (M : ClassicalBinaryModel α) : (n : ℕ) → ClassicalBinaryModel (TensorPower α n)
   | 0 =>
       { p := fun _ => 1
         q := fun _ => 1
@@ -264,7 +194,7 @@ def tensorPower (M : ClassicalBinaryModel α) : (n : Nat) → ClassicalBinaryMod
       { p := fun x => M.p x.1 * Mn.p x.2
         q := fun x => M.q x.1 * Mn.q x.2
         p_sum := by
-          change (∑ x : Prod α (TensorPower α n), M.p x.1 * Mn.p x.2) = 1
+          change (∑ x : α × TensorPower α n, M.p x.1 * Mn.p x.2) = 1
           rw [Fintype.sum_prod_type]
           calc
             (∑ x : α, ∑ xs : TensorPower α n, M.p x * Mn.p xs)
@@ -273,7 +203,7 @@ def tensorPower (M : ClassicalBinaryModel α) : (n : Nat) → ClassicalBinaryMod
             _ = ∑ x : α, M.p x := by simp [Mn.p_sum]
             _ = 1 := M.p_sum
         q_sum := by
-          change (∑ x : Prod α (TensorPower α n), M.q x.1 * Mn.q x.2) = 1
+          change (∑ x : α × TensorPower α n, M.q x.1 * Mn.q x.2) = 1
           rw [Fintype.sum_prod_type]
           calc
             (∑ x : α, ∑ xs : TensorPower α n, M.q x * Mn.q xs)
@@ -282,26 +212,24 @@ def tensorPower (M : ClassicalBinaryModel α) : (n : Nat) → ClassicalBinaryMod
             _ = ∑ x : α, M.q x := by simp [Mn.q_sum]
             _ = 1 := M.q_sum }
 
-@[simp]
 theorem tensorPower_zero_p (M : ClassicalBinaryModel α) (x : TensorPower α 0) :
     (M.tensorPower 0).p x = 1 := by
   cases x
   simp [tensorPower]
 
-@[simp]
 theorem tensorPower_zero_q (M : ClassicalBinaryModel α) (x : TensorPower α 0) :
     (M.tensorPower 0).q x = 1 := by
   cases x
   simp [tensorPower]
 
 @[simp]
-theorem tensorPower_succ_p (M : ClassicalBinaryModel α) (n : Nat)
+theorem tensorPower_succ_p (M : ClassicalBinaryModel α) (n : ℕ)
     (x : α) (xs : TensorPower α n) :
     (M.tensorPower (n + 1)).p (x, xs) = M.p x * (M.tensorPower n).p xs := by
   simp [tensorPower]
 
 @[simp]
-theorem tensorPower_succ_q (M : ClassicalBinaryModel α) (n : Nat)
+theorem tensorPower_succ_q (M : ClassicalBinaryModel α) (n : ℕ)
     (x : α) (xs : TensorPower α n) :
     (M.tensorPower (n + 1)).q (x, xs) = M.q x * (M.tensorPower n).q xs := by
   simp [tensorPower]
@@ -331,16 +259,15 @@ theorem tiltedWeight_sum (M : ClassicalBinaryModel α) (s : ℝ) :
 /-- The normalized tilted distribution associated with a nonzero Chernoff
 coefficient. -/
 noncomputable def tiltedDistribution (M : ClassicalBinaryModel α) (s : ℝ)
-    (hZ : M.petzChernoffCoefficient s ≠ 0) : ClassicalDistribution α :=
-  { prob := fun x => M.tiltedWeight s x / M.petzChernoffCoefficient s
-    sum_eq_one := by
-      rw [← Finset.sum_div]
-      exact div_self hZ }
+    (hZ : M.petzChernoffCoefficient s ≠ 0) : ProbDistribution α :=
+  .ofNNReal (fun x => M.tiltedWeight s x / M.petzChernoffCoefficient s) <| by
+    rw [← Finset.sum_div]
+    exact div_self hZ
 
 @[simp]
-theorem tiltedDistribution_prob (M : ClassicalBinaryModel α) (s : ℝ)
+theorem tiltedDistribution_nnprob (M : ClassicalBinaryModel α) (s : ℝ)
     (hZ : M.petzChernoffCoefficient s ≠ 0) (x : α) :
-    (M.tiltedDistribution s hZ).prob x =
+    (M.tiltedDistribution s hZ).nnprob x =
       M.tiltedWeight s x / M.petzChernoffCoefficient s := rfl
 
 /-- Away from the endpoint `s = 0`, the tilted distribution is supported on
@@ -350,7 +277,7 @@ theorem tiltedDistribution_supportedBy_p
     (hZ : M.petzChernoffCoefficient s ≠ 0) :
     (M.tiltedDistribution s hZ).SupportedBy M.p := by
   intro x hx
-  rw [tiltedDistribution_prob] at hx
+  rw [tiltedDistribution_nnprob] at hx
   have hweight : M.tiltedWeight s x ≠ 0 := by
     intro hzero
     simp [hzero] at hx
@@ -367,7 +294,7 @@ theorem tiltedDistribution_supportedBy_q
     (hZ : M.petzChernoffCoefficient s ≠ 0) :
     (M.tiltedDistribution s hZ).SupportedBy M.q := by
   intro x hx
-  rw [tiltedDistribution_prob] at hx
+  rw [tiltedDistribution_nnprob] at hx
   have hweight : M.tiltedWeight s x ≠ 0 := by
     intro hzero
     simp [hzero] at hx
@@ -558,12 +485,12 @@ noncomputable def chernoffPartitionDeriv (M : ClassicalBinaryModel α) (s : ℝ)
 common-support partition. -/
 noncomputable def commonSupportTiltedDistribution
     (M : ClassicalBinaryModel α) (s : ℝ)
-    (hZ : M.chernoffPartitionNNReal s ≠ 0) : ClassicalDistribution α :=
-  { prob := fun x =>
+    (hZ : M.chernoffPartitionNNReal s ≠ 0) : ProbDistribution α :=
+  .ofNNReal
+    (fun x =>
       if M.p x ≠ 0 ∧ M.q x ≠ 0 then
         M.p x ^ s * M.q x ^ (1 - s) / M.chernoffPartitionNNReal s
-      else 0
-    sum_eq_one := by
+      else 0) <| by
       classical
       rw [← Finset.sum_filter
         (s := Finset.univ)
@@ -584,34 +511,34 @@ noncomputable def commonSupportTiltedDistribution
             simp [y.2])
           (by intro x hx; rfl)
       rw [hsum]
-      exact div_self hZ }
+      exact div_self hZ
 
 @[simp]
-theorem commonSupportTiltedDistribution_prob
+theorem commonSupportTiltedDistribution_nnprob
     (M : ClassicalBinaryModel α) (s : ℝ)
     (hZ : M.chernoffPartitionNNReal s ≠ 0) (x : α) :
-    (M.commonSupportTiltedDistribution s hZ).prob x =
+    (M.commonSupportTiltedDistribution s hZ).nnprob x =
       if M.p x ≠ 0 ∧ M.q x ≠ 0 then
         M.p x ^ s * M.q x ^ (1 - s) / M.chernoffPartitionNNReal s
       else 0 := rfl
 
-theorem commonSupportTiltedDistribution_prob_toReal_of_mem
+theorem commonSupportTiltedDistribution_nnprob_toReal_of_mem
     (M : ClassicalBinaryModel α) (s : ℝ)
     (hZ : M.chernoffPartitionNNReal s ≠ 0) {x : α}
     (hx : M.p x ≠ 0 ∧ M.q x ≠ 0) :
-    ((M.commonSupportTiltedDistribution s hZ).prob x : ℝ) =
+    ((M.commonSupportTiltedDistribution s hZ).nnprob x : ℝ) =
       ((M.p x : ℝ) ^ s) * ((M.q x : ℝ) ^ (1 - s)) /
         M.chernoffPartition s := by
   have hZr : (M.chernoffPartitionNNReal s : ℝ) = M.chernoffPartition s := by
     simp
-  simp [commonSupportTiltedDistribution_prob, hx, hZr]
+  simp [commonSupportTiltedDistribution_nnprob, hx, hZr]
 
-theorem commonSupportTiltedDistribution_prob_toReal_of_not_mem
+theorem commonSupportTiltedDistribution_nnprob_toReal_of_not_mem
     (M : ClassicalBinaryModel α) (s : ℝ)
     (hZ : M.chernoffPartitionNNReal s ≠ 0) {x : α}
     (hx : ¬(M.p x ≠ 0 ∧ M.q x ≠ 0)) :
-    ((M.commonSupportTiltedDistribution s hZ).prob x : ℝ) = 0 := by
-  simp [commonSupportTiltedDistribution_prob, hx]
+    ((M.commonSupportTiltedDistribution s hZ).nnprob x : ℝ) = 0 := by
+  simp [commonSupportTiltedDistribution_nnprob, hx]
 
 private theorem sum_div_mul_sub_const_eq {ι : Type u} [Fintype ι]
     (W A : ι → ℝ) {Z c : ℝ} (hZ : Z ≠ 0) (hW : (∑ x, W x) = Z) :
@@ -662,15 +589,15 @@ theorem relativeEntropySummandReal_commonSupportTilted_p_of_mem
     rw [← chernoffPartitionNNReal_coe]
     exact_mod_cast hZpos_nn
   have hr :
-      ((M.commonSupportTiltedDistribution s hZ).prob x : ℝ) =
+      ((M.commonSupportTiltedDistribution s hZ).nnprob x : ℝ) =
       ((M.p x : ℝ) ^ s) * ((M.q x : ℝ) ^ (1 - s)) /
         M.chernoffPartition s :=
-    commonSupportTiltedDistribution_prob_toReal_of_mem (M := M) (s := s) hZ hx
+    commonSupportTiltedDistribution_nnprob_toReal_of_mem (M := M) (s := s) hZ hx
   have hrpos :
-      0 < ((M.commonSupportTiltedDistribution s hZ).prob x : ℝ) := by
+      0 < ((M.commonSupportTiltedDistribution s hZ).nnprob x : ℝ) := by
     rw [hr]
     positivity
-  have hrne_nn : (M.commonSupportTiltedDistribution s hZ).prob x ≠ 0 := by
+  have hrne_nn : (M.commonSupportTiltedDistribution s hZ).nnprob x ≠ 0 := by
     exact_mod_cast hrpos.ne'
   rw [relativeEntropySummandReal, if_neg hrne_nn]
   rw [hr]
@@ -712,15 +639,15 @@ theorem relativeEntropySummandReal_commonSupportTilted_q_of_mem
     rw [← chernoffPartitionNNReal_coe]
     exact_mod_cast hZpos_nn
   have hr :
-      ((M.commonSupportTiltedDistribution s hZ).prob x : ℝ) =
+      ((M.commonSupportTiltedDistribution s hZ).nnprob x : ℝ) =
       ((M.p x : ℝ) ^ s) * ((M.q x : ℝ) ^ (1 - s)) /
         M.chernoffPartition s :=
-    commonSupportTiltedDistribution_prob_toReal_of_mem (M := M) (s := s) hZ hx
+    commonSupportTiltedDistribution_nnprob_toReal_of_mem (M := M) (s := s) hZ hx
   have hrpos :
-      0 < ((M.commonSupportTiltedDistribution s hZ).prob x : ℝ) := by
+      0 < ((M.commonSupportTiltedDistribution s hZ).nnprob x : ℝ) := by
     rw [hr]
     positivity
-  have hrne_nn : (M.commonSupportTiltedDistribution s hZ).prob x ≠ 0 := by
+  have hrne_nn : (M.commonSupportTiltedDistribution s hZ).nnprob x ≠ 0 := by
     exact_mod_cast hrpos.ne'
   rw [relativeEntropySummandReal, if_neg hrne_nn]
   rw [hr]
@@ -748,9 +675,9 @@ theorem relativeEntropySummandReal_commonSupportTilted_p_of_not_mem
     relativeEntropySummandReal
         (M.commonSupportTiltedDistribution s hZ) M.pDistribution x = 0 := by
   have hr :
-      ((M.commonSupportTiltedDistribution s hZ).prob x : ℝ) = 0 :=
-    commonSupportTiltedDistribution_prob_toReal_of_not_mem (M := M) (s := s) hZ hx
-  have hrnn : (M.commonSupportTiltedDistribution s hZ).prob x = 0 := by
+      ((M.commonSupportTiltedDistribution s hZ).nnprob x : ℝ) = 0 :=
+    commonSupportTiltedDistribution_nnprob_toReal_of_not_mem (M := M) (s := s) hZ hx
+  have hrnn : (M.commonSupportTiltedDistribution s hZ).nnprob x = 0 := by
     exact_mod_cast hr
   rw [relativeEntropySummandReal, if_pos hrnn]
 
@@ -763,9 +690,9 @@ theorem relativeEntropySummandReal_commonSupportTilted_q_of_not_mem
     relativeEntropySummandReal
         (M.commonSupportTiltedDistribution s hZ) M.qDistribution x = 0 := by
   have hr :
-      ((M.commonSupportTiltedDistribution s hZ).prob x : ℝ) = 0 :=
-    commonSupportTiltedDistribution_prob_toReal_of_not_mem (M := M) (s := s) hZ hx
-  have hrnn : (M.commonSupportTiltedDistribution s hZ).prob x = 0 := by
+      ((M.commonSupportTiltedDistribution s hZ).nnprob x : ℝ) = 0 :=
+    commonSupportTiltedDistribution_nnprob_toReal_of_not_mem (M := M) (s := s) hZ hx
+  have hrnn : (M.commonSupportTiltedDistribution s hZ).nnprob x = 0 := by
     exact_mod_cast hr
   rw [relativeEntropySummandReal, if_pos hrnn]
 
@@ -970,7 +897,7 @@ theorem commonSupportTiltedDistribution_supportedBy_p
     (hZ : M.chernoffPartitionNNReal s ≠ 0) :
     (M.commonSupportTiltedDistribution s hZ).SupportedBy M.p := by
   intro x hx
-  rw [commonSupportTiltedDistribution_prob] at hx
+  rw [commonSupportTiltedDistribution_nnprob] at hx
   by_contra hp0
   simp [hp0] at hx
 
@@ -980,7 +907,7 @@ theorem commonSupportTiltedDistribution_supportedBy_q
     (hZ : M.chernoffPartitionNNReal s ≠ 0) :
     (M.commonSupportTiltedDistribution s hZ).SupportedBy M.q := by
   intro x hx
-  rw [commonSupportTiltedDistribution_prob] at hx
+  rw [commonSupportTiltedDistribution_nnprob] at hx
   by_contra hq0
   simp [hq0] at hx
 
@@ -1119,7 +1046,7 @@ theorem neg_log_commonPartition_left_le_chernoffDistance
     ((-Real.log (M.chernoffPartition 0) : ℝ) : EReal) ≤
       M.chernoffDistance := by
   classical
-  let sseq : Nat → ℝ := fun n => (((n + 2 : Nat) : ℝ)⁻¹)
+  let sseq : ℕ → ℝ := fun n => (((n + 2 : ℕ) : ℝ)⁻¹)
   have hZpos_nn : 0 < M.chernoffPartitionNNReal 0 := by
     exact lt_of_le_of_ne (by positivity) (Ne.symm hZ)
   have hZpos : 0 < M.chernoffPartition 0 := by
@@ -1131,7 +1058,7 @@ theorem neg_log_commonPartition_left_le_chernoffDistance
       (tendsto_one_div_atTop_nhds_zero_nat (𝕜 := ℝ)).comp
         (tendsto_add_atTop_nat 2)
   have hpart_tend :
-      Tendsto (fun n : Nat => M.chernoffPartition (sseq n))
+      Tendsto (fun n : ℕ => M.chernoffPartition (sseq n))
         atTop (𝓝 (M.chernoffPartition 0)) :=
     (continuous_chernoffPartition M).continuousAt.tendsto.comp hsseq_tend
   have hpart_pos_eventual :
@@ -1143,11 +1070,11 @@ theorem neg_log_commonPartition_left_le_chernoffDistance
           M.chernoffDistance := by
     filter_upwards [hpart_pos_eventual] with n hpos
     have hs0 : 0 < sseq n := by
-      have hpos_nat : (0 : ℝ) < (n + 2 : Nat) := by
+      have hpos_nat : (0 : ℝ) < (n + 2 : ℕ) := by
         exact_mod_cast Nat.succ_pos (n + 1)
       exact inv_pos.mpr hpos_nat
     have hs1 : sseq n < 1 := by
-      have hlt : (1 : ℝ) < (n + 2 : Nat) := by
+      have hlt : (1 : ℝ) < (n + 2 : ℕ) := by
         have hn : (0 : ℝ) ≤ n := by exact_mod_cast Nat.zero_le n
         norm_num
         linarith
@@ -1160,7 +1087,7 @@ theorem neg_log_commonPartition_left_le_chernoffDistance
     exact neg_log_commonPartition_le_chernoffDistance_of_mem_Ioo
       (M := M) hs0 hs1 hZseq
   have hlog_tend :
-      Tendsto (fun n : Nat => -Real.log (M.chernoffPartition (sseq n)))
+      Tendsto (fun n : ℕ => -Real.log (M.chernoffPartition (sseq n)))
         atTop (𝓝 (-Real.log (M.chernoffPartition 0))) := by
     have hcont :
         ContinuousAt (fun x : ℝ => -Real.log x) (M.chernoffPartition 0) :=
@@ -1176,14 +1103,14 @@ theorem neg_log_commonPartition_right_le_chernoffDistance
     ((-Real.log (M.chernoffPartition 1) : ℝ) : EReal) ≤
       M.chernoffDistance := by
   classical
-  let sseq : Nat → ℝ := fun n => (1 : ℝ) - (((n + 2 : Nat) : ℝ)⁻¹)
+  let sseq : ℕ → ℝ := fun n => (1 : ℝ) - (((n + 2 : ℕ) : ℝ)⁻¹)
   have hZpos_nn : 0 < M.chernoffPartitionNNReal 1 := by
     exact lt_of_le_of_ne (by positivity) (Ne.symm hZ)
   have hZpos : 0 < M.chernoffPartition 1 := by
     rw [← chernoffPartitionNNReal_coe]
     exact_mod_cast hZpos_nn
   have hinv_tend :
-      Tendsto (fun n : Nat => (((n + 2 : Nat) : ℝ)⁻¹))
+      Tendsto (fun n : ℕ => (((n + 2 : ℕ) : ℝ)⁻¹))
         atTop (𝓝 (0 : ℝ)) := by
     simpa [Function.comp_def, one_div, Nat.cast_add,
       add_comm, add_left_comm, add_assoc] using
@@ -1192,7 +1119,7 @@ theorem neg_log_commonPartition_right_le_chernoffDistance
   have hsseq_tend : Tendsto sseq atTop (𝓝 (1 : ℝ)) := by
     simpa [sseq] using tendsto_const_nhds.sub hinv_tend
   have hpart_tend :
-      Tendsto (fun n : Nat => M.chernoffPartition (sseq n))
+      Tendsto (fun n : ℕ => M.chernoffPartition (sseq n))
         atTop (𝓝 (M.chernoffPartition 1)) :=
     (continuous_chernoffPartition M).continuousAt.tendsto.comp hsseq_tend
   have hpart_pos_eventual :
@@ -1203,12 +1130,12 @@ theorem neg_log_commonPartition_right_le_chernoffDistance
         ((-Real.log (M.chernoffPartition (sseq n)) : ℝ) : EReal) ≤
           M.chernoffDistance := by
     filter_upwards [hpart_pos_eventual] with n hpos
-    have hinv_pos : 0 < (((n + 2 : Nat) : ℝ)⁻¹) := by
-      have hpos_nat : (0 : ℝ) < (n + 2 : Nat) := by
+    have hinv_pos : 0 < (((n + 2 : ℕ) : ℝ)⁻¹) := by
+      have hpos_nat : (0 : ℝ) < (n + 2 : ℕ) := by
         exact_mod_cast Nat.succ_pos (n + 1)
       exact inv_pos.mpr hpos_nat
-    have hinv_lt_one : (((n + 2 : Nat) : ℝ)⁻¹) < 1 := by
-      have hlt : (1 : ℝ) < (n + 2 : Nat) := by
+    have hinv_lt_one : (((n + 2 : ℕ) : ℝ)⁻¹) < 1 := by
+      have hlt : (1 : ℝ) < (n + 2 : ℕ) := by
         have hn : (0 : ℝ) ≤ n := by exact_mod_cast Nat.zero_le n
         norm_num
         linarith
@@ -1227,7 +1154,7 @@ theorem neg_log_commonPartition_right_le_chernoffDistance
     exact neg_log_commonPartition_le_chernoffDistance_of_mem_Ioo
       (M := M) hs0 hs1 hZseq
   have hlog_tend :
-      Tendsto (fun n : Nat => -Real.log (M.chernoffPartition (sseq n)))
+      Tendsto (fun n : ℕ => -Real.log (M.chernoffPartition (sseq n)))
         atTop (𝓝 (-Real.log (M.chernoffPartition 1))) := by
     have hcont :
         ContinuousAt (fun x : ℝ => -Real.log x) (M.chernoffPartition 1) :=
@@ -1256,7 +1183,7 @@ theorem neg_log_commonPartition_le_chernoffDistance
 
 /-- IID tensor powers multiply classical Petz/Chernoff coefficients. -/
 theorem tensorPower_petzChernoffCoefficient
-    (M : ClassicalBinaryModel α) (s : ℝ) (n : Nat) :
+    (M : ClassicalBinaryModel α) (s : ℝ) (n : ℕ) :
     (M.tensorPower n).petzChernoffCoefficient s =
       M.petzChernoffCoefficient s ^ n := by
   induction n with
@@ -1267,7 +1194,7 @@ theorem tensorPower_petzChernoffCoefficient
       simp
   | succ n ih =>
       change
-        (∑ x : Prod α (TensorPower α n),
+        (∑ x : α × TensorPower α n,
             ((M.p x.1 * (M.tensorPower n).p x.2) ^ s) *
               ((M.q x.1 * (M.tensorPower n).q x.2) ^ (1 - s))) =
           M.petzChernoffCoefficient s ^ (n + 1)
@@ -1303,23 +1230,26 @@ theorem tensorPower_petzChernoffCoefficient
 
 variable [DecidableEq α]
 
+/-- The larger of the two relative entropies of `r` against the null and alternative hypotheses,
+as an extended real.  It is the objective of the variational form of the Chernoff distance; see
+`exists_distribution_klMax_le_chernoffDistance`. -/
 def distributionKLMax
-    (M : ClassicalBinaryModel α) (r : ClassicalDistribution α) : EReal :=
+    (M : ClassicalBinaryModel α) (r : ProbDistribution α) : EReal :=
   max (relativeEntropy r M.pDistribution) (relativeEntropy r M.qDistribution)
 
 omit [DecidableEq α] in
 /-- On common support, the support-aware KL maximum is the real KL maximum
 embedded into `EReal`. -/
 theorem distributionKLMax_eq_coe_real_of_supported
-    (M : ClassicalBinaryModel α) (r : ClassicalDistribution α)
+    (M : ClassicalBinaryModel α) (r : ProbDistribution α)
     (hp : r.SupportedBy M.p) (hq : r.SupportedBy M.q) :
     M.distributionKLMax r =
       ((max (relativeEntropyReal r M.pDistribution)
           (relativeEntropyReal r M.qDistribution) : ℝ) : EReal) := by
   classical
-  have hp' : r.SupportedBy M.pDistribution.prob := by
+  have hp' : r.SupportedBy M.pDistribution.nnprob := by
     simpa [pDistribution] using hp
-  have hq' : r.SupportedBy M.qDistribution.prob := by
+  have hq' : r.SupportedBy M.qDistribution.nnprob := by
     simpa [qDistribution] using hq
   unfold distributionKLMax
   rw [relativeEntropy_eq_coe_of_supported _ _ hp',
@@ -1434,7 +1364,7 @@ has KL maximum at most the public Chernoff distance. -/
 theorem exists_distribution_klMax_le_chernoffDistance
     (M : ClassicalBinaryModel α) [DecidableEq α]
     (hfinite : M.chernoffDistance ≠ ⊤) :
-    ∃ r : ClassicalDistribution α,
+    ∃ r : ProbDistribution α,
       r.SupportedBy M.p ∧
       r.SupportedBy M.q ∧
       M.distributionKLMax r ≤ M.chernoffDistance := by
@@ -1450,7 +1380,6 @@ theorem exists_distribution_klMax_le_chernoffDistance
     (commonSupportTilted_distributionKLMax_le_neg_log_partition_at_min
       (M := M) hs hmin hZ).trans
       (neg_log_commonPartition_le_chernoffDistance (M := M) hs hZ)
-
 
 end ClassicalBinaryModel
 

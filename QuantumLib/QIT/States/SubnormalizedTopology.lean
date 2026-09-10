@@ -9,6 +9,7 @@ module
 public import QuantumLib.QIT.States.Subnormalized
 public import QuantumLib.QIT.States.TraceNorm.Spectral
 public import QuantumLib.QIT.Util.SDP.PSDCone
+public import QuantumLib.QIT.Util.MatrixInstances
 public import Mathlib.Topology.MetricSpace.ProperSpace
 import Mathlib.Analysis.CStarAlgebra.Classes
 import Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Basic
@@ -28,7 +29,7 @@ smooth one-shot optimization arguments.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator
+open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator QIT.MatrixL2
 
 open Matrix
 
@@ -37,9 +38,6 @@ namespace QIT
 universe u v
 
 noncomputable section
-
-noncomputable local instance instCMatrixCStarAlgebraForSubnormalizedTopology
-    (n : Type u) [Fintype n] [DecidableEq n] : CStarAlgebra (CMatrix n) := {}
 
 namespace SubnormalizedState
 
@@ -99,7 +97,7 @@ theorem subnormalizedMatrixSet_isBounded :
   refine ⟨‖(1 : CMatrix a)‖, ?_⟩
   intro M hM
   rcases hM with ⟨hMpsd, hMtr⟩
-  have hnorm := State.norm_le_trace_re_mul_norm_one_of_posSemidef (a := a) hMpsd
+  have hnorm := MState.norm_le_trace_re_mul_norm_one_of_posSemidef (a := a) hMpsd
   have htrace_bound :
       M.trace.re * ‖(1 : CMatrix a)‖ ≤ 1 * ‖(1 : CMatrix a)‖ :=
     mul_le_mul_of_nonneg_right hMtr (norm_nonneg _)
@@ -128,25 +126,6 @@ theorem isCompact_univ :
   rw [matrix_image_univ]
   exact subnormalizedMatrixSet_isCompact (a := a)
 
-theorem traceNorm_continuous_forTopology :
-    Continuous (traceNorm : CMatrix a → ℝ) := by
-  have hgram : Continuous (fun M : CMatrix a => star M * M) := by
-    exact (Continuous.star continuous_id).matrix_mul continuous_id
-  have hnonneg : ∀ M : CMatrix a, (star M * M) ∈ {A : CMatrix a | 0 ≤ A} := by
-    intro M
-    exact Matrix.nonneg_iff_posSemidef.mpr
-      (Matrix.posSemidef_conjTranspose_mul_self M)
-  have hsqrtOn :
-      ContinuousOn (CFC.sqrt : CMatrix a → CMatrix a) {A : CMatrix a | 0 ≤ A} := by
-    exact CFC.continuousOn_sqrt
-  have hsqrt : Continuous (fun M : CMatrix a => CFC.sqrt (star M * M)) := by
-    exact hsqrtOn.comp_continuous hgram hnonneg
-  have htrace : Continuous (fun M : CMatrix a => (CFC.sqrt (star M * M)).trace) :=
-    Continuous.matrix_trace hsqrt
-  have hre : Continuous fun M : CMatrix a => ((CFC.sqrt (star M * M)).trace).re :=
-    Complex.continuous_re.comp htrace
-  exact hre
-
 theorem continuous_psdSqrt_matrix :
     Continuous fun ρ : SubnormalizedState a => psdSqrt ρ.matrix := by
   have hsqrtOn :
@@ -167,7 +146,7 @@ theorem continuous_generalizedFidelity_right (ρ : SubnormalizedState a) :
     continuous_const.matrix_mul continuous_psdSqrt_matrix
   have hnorm : Continuous fun σ : SubnormalizedState a =>
       traceNorm (psdSqrt ρ.matrix * psdSqrt σ.matrix) :=
-    traceNorm_continuous_forTopology.comp hmul
+    QIT.traceNorm_continuous.comp hmul
   have htrace : Continuous fun σ : SubnormalizedState a => σ.matrix.trace.re :=
     Complex.continuous_re.comp (Continuous.matrix_trace continuous_matrix)
   have hslack : Continuous fun σ : SubnormalizedState a =>
@@ -258,7 +237,7 @@ theorem psdTraceBoundedMatrixSet_isBounded {R : ℝ} :
   refine ⟨R * ‖(1 : CMatrix b)‖, ?_⟩
   intro T hT
   rcases hT with ⟨hTpsd, hTtrace⟩
-  have hnorm := State.norm_le_trace_re_mul_norm_one_of_posSemidef (a := b) hTpsd
+  have hnorm := MState.norm_le_trace_re_mul_norm_one_of_posSemidef (a := b) hTpsd
   have htrace_bound :
       T.trace.re * ‖(1 : CMatrix b)‖ ≤ R * ‖(1 : CMatrix b)‖ :=
     mul_le_mul_of_nonneg_right hTtrace (norm_nonneg _)

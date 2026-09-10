@@ -22,11 +22,3 @@ public import QuantumLib.QIT.Information.Basic
 
 Information-quantity import surface for entropy, Renyi, coding, one-shot, and comparison APIs.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace Information
-
-end Information
-end QIT

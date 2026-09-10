@@ -26,7 +26,7 @@ the `AB|C` side to the `AC|B` side before closing the scalar entropy identity.
 The boundary points `alpha = 0` and `alpha = 2` are closed by the
 support-projection bookend `cMatrix_rpow_neg_one_mul_self_eq_rangeProjection`
 (the `alpha = 0` replacement for the singular-PSD exponent law), yielding the
-closed-interval duality `PureVector.conditionalPetzRenyiDown_duality` on
+closed-interval duality `Ket.conditionalPetzRenyiDown_duality` on
 `Set.Icc 0 2`.  Subnormalized-state variants are intentionally not claimed
 here.
 -/
@@ -37,123 +37,59 @@ open scoped ComplexOrder MatrixOrder
 
 open Matrix
 
-namespace QIT
-
-universe u v w
-
 noncomputable section
-
+universe u v w
 variable {a : Type u} {b : Type v} {c : Type w}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 variable [Fintype c] [DecidableEq c]
 
-omit [DecidableEq a] in
-private theorem trace_mul_kronecker_one_right_eq_partialTraceB_forPetz
-    (X : CMatrix (Prod a b)) (U : CMatrix a) :
-    (X * Matrix.kronecker U (1 : CMatrix b)).trace =
-      (partialTraceB (a := a) (b := b) X * U).trace := by
-  have hpartial :
-      partialTraceB (a := a) (b := b) (X * Matrix.kronecker U (1 : CMatrix b)) =
-        partialTraceB (a := a) (b := b) X * U :=
-    partialTraceB_mul_leftKroneckerOne X U
-  rw [← hpartial, partialTraceB_trace]
+open QIT
 
-/-- Product rule for real powers of a positive semidefinite matrix away from the
-zero-exponent sum convention.
-
-This is used by source trace rewrites that combine adjacent marginal powers,
-for example `rho^s * rho^t = rho^(s+t)`. -/
-theorem cMatrix_rpow_add_psd_forPetz
-    {d : Type*} [Fintype d] [DecidableEq d] {A : CMatrix d}
-    (hA : A.PosSemidef) {p q : Real} (hpq : p + q ≠ 0) :
-    CFC.rpow A p * CFC.rpow A q = CFC.rpow A (p + q) := by
-  let U : Matrix.unitaryGroup d Complex := hA.isHermitian.eigenvectorUnitary
-  let eigen : d → Real := hA.isHermitian.eigenvalues
-  have heigen_nonneg : ∀ i, 0 ≤ eigen i := fun i => hA.eigenvalues_nonneg i
-  have hA_spec :
-      A = (U : CMatrix d) *
-        (Matrix.diagonal fun i => (eigen i : Complex)) *
-        star (U : CMatrix d) := by
-    simpa [U, eigen, Function.comp_def] using hA.isHermitian.spectral_theorem
-  have hp :
-      CFC.rpow A p =
-        (U : CMatrix d) *
-          (Matrix.diagonal fun i => ((eigen i ^ p : Real) : Complex)) *
-          star (U : CMatrix d) := by
-    rw [hA_spec]
-    exact cMatrix_rpow_unitary_conj_diagonal_ofReal U eigen heigen_nonneg p
-  have hq :
-      CFC.rpow A q =
-        (U : CMatrix d) *
-          (Matrix.diagonal fun i => ((eigen i ^ q : Real) : Complex)) *
-          star (U : CMatrix d) := by
-    rw [hA_spec]
-    exact cMatrix_rpow_unitary_conj_diagonal_ofReal U eigen heigen_nonneg q
-  have hpq_pow :
-      CFC.rpow A (p + q) =
-        (U : CMatrix d) *
-          (Matrix.diagonal fun i => ((eigen i ^ (p + q) : Real) : Complex)) *
-          star (U : CMatrix d) := by
-    rw [hA_spec]
-    exact cMatrix_rpow_unitary_conj_diagonal_ofReal U eigen heigen_nonneg (p + q)
-  have hconj (M : CMatrix d) :
-      (U : CMatrix d) * M * star (U : CMatrix d) =
-        (Unitary.conjStarAlgAut Complex (CMatrix d) U) M := by
-    simp [Unitary.conjStarAlgAut_apply]
-  have hdiag :
-      (Matrix.diagonal fun i => ((eigen i ^ p : Real) : Complex) : CMatrix d) *
-        (Matrix.diagonal fun i => ((eigen i ^ q : Real) : Complex)) =
-        Matrix.diagonal (fun i => ((eigen i ^ (p + q) : Real) : Complex)) := by
-    ext i j
-    by_cases hij : i = j
-    · subst j
-      simp [Real.rpow_add' (heigen_nonneg i) hpq]
-    · simp [hij]
-  rw [hp, hq, hpq_pow, hconj, hconj, hconj, ← map_mul, hdiag]
+namespace QIT
 
 /-- Inverse square law for a positive semidefinite matrix with the CFC
 zero-on-kernel convention: `A^(-1) * A * A = A`.
 
-The exponent law `cMatrix_rpow_add_psd_forPetz` excludes the zero exponent
-sum, so the `(-1) + 1 + 1 = 1` combination needed at the `alpha = 0` Petz
-boundary is proved separately here by diagonalization: on each eigenvalue the
+The exponent law `cMatrix_rpow_add_psd` excludes the zero exponent sum, so the
+`(-1) + 1 + 1 = 1` combination needed at the `alpha = 0` Petz boundary is
+proved separately here by diagonalization: on each eigenvalue the
 identity is `λ⁻¹ * λ * λ = λ` for `λ > 0`, and the junk value `0^(-1) = 0`
 absorbs the kernel.  No full-rank hypothesis is needed. -/
 theorem cMatrix_rpow_neg_one_mul_self_mul_self
     {d : Type*} [Fintype d] [DecidableEq d] {A : CMatrix d}
     (hA : A.PosSemidef) :
     CFC.rpow A (-1) * A * A = A := by
-  let U : Matrix.unitaryGroup d Complex := hA.isHermitian.eigenvectorUnitary
-  let eigen : d → Real := hA.isHermitian.eigenvalues
+  let U : Matrix.unitaryGroup d ℂ := hA.isHermitian.eigenvectorUnitary
+  let eigen : d → ℝ := hA.isHermitian.eigenvalues
   have heigen_nonneg : ∀ i, 0 ≤ eigen i := fun i => hA.eigenvalues_nonneg i
   have hA_spec :
       A = (U : CMatrix d) *
-        (Matrix.diagonal fun i => (eigen i : Complex)) *
+        (Matrix.diagonal fun i => (eigen i : ℂ)) *
         star (U : CMatrix d) := by
     simpa [U, eigen, Function.comp_def] using hA.isHermitian.spectral_theorem
   have hinv :
       CFC.rpow A (-1) =
         (U : CMatrix d) *
-          (Matrix.diagonal fun i => ((eigen i ^ (-1 : Real) : Real) : Complex)) *
+          (Matrix.diagonal fun i => ((eigen i ^ (-1 : ℝ) : ℝ) : ℂ)) *
           star (U : CMatrix d) := by
     rw [hA_spec]
     exact cMatrix_rpow_unitary_conj_diagonal_ofReal U eigen heigen_nonneg (-1)
   have hconj (M : CMatrix d) :
       (U : CMatrix d) * M * star (U : CMatrix d) =
-        (Unitary.conjStarAlgAut Complex (CMatrix d) U) M := by
+        (Unitary.conjStarAlgAut ℂ (CMatrix d) U) M := by
     simp [Unitary.conjStarAlgAut_apply]
   have hdiag :
-      (Matrix.diagonal fun i => ((eigen i ^ (-1 : Real) : Real) : Complex) :
+      (Matrix.diagonal fun i => ((eigen i ^ (-1 : ℝ) : ℝ) : ℂ) :
           CMatrix d) *
-        (Matrix.diagonal fun i => (eigen i : Complex)) *
-        (Matrix.diagonal fun i => (eigen i : Complex)) =
-        Matrix.diagonal (fun i => (eigen i : Complex)) := by
+        (Matrix.diagonal fun i => (eigen i : ℂ)) *
+        (Matrix.diagonal fun i => (eigen i : ℂ)) =
+        Matrix.diagonal (fun i => (eigen i : ℂ)) := by
     ext i j
     by_cases hij : i = j
     · subst j
       by_cases h0 : eigen i = 0
       · simp [h0]
-      · have hreal : eigen i ^ (-1 : Real) * eigen i * eigen i = eigen i := by
+      · have hreal : eigen i ^ (-1 : ℝ) * eigen i * eigen i = eigen i := by
           rw [Real.rpow_neg_one, inv_mul_cancel₀ h0, one_mul]
         simp only [Matrix.diagonal_mul_diagonal, Matrix.diagonal_apply, ↓reduceIte,
           ← Complex.ofReal_mul, hreal]
@@ -169,13 +105,13 @@ Both sides act as the identity on the range of `A` (by
 `cMatrix_rpow_neg_one_mul_self_mul_self`) and vanish on its orthogonal
 complement (the kernel of the Hermitian matrix `A`, where the CFC junk value
 `0^(-1) = 0` absorbs the inverse power).  This replaces the exponent law
-`cMatrix_rpow_add_psd_forPetz`, whose `p + q ≠ 0` side condition fails exactly
+`cMatrix_rpow_add_psd`, whose `p + q ≠ 0` side condition fails exactly
 at the `alpha = 0` boundary; no full-rank hypothesis is needed. -/
 theorem cMatrix_rpow_neg_one_mul_self_eq_rangeProjection
     {d : Type*} [Fintype d] [DecidableEq d] {A : CMatrix d}
     (hA : A.PosSemidef) :
     CFC.rpow A (-1) * A = Matrix.rangeProjection A := by
-  have hTAA : ∀ x : EuclideanSpace Complex d,
+  have hTAA : ∀ x : EuclideanSpace ℂ d,
       (CFC.rpow A (-1)).toEuclideanLin (A.toEuclideanLin (A.toEuclideanLin x)) =
         A.toEuclideanLin x := by
     intro x
@@ -187,7 +123,7 @@ theorem cMatrix_rpow_neg_one_mul_self_eq_rangeProjection
     simpa [LinearMap.comp_apply] using hx
   apply Matrix.toEuclideanLin.injective
   rw [Matrix.toLpLin_mul_same, Matrix.rangeProjection_toEuclideanLin]
-  set K : Submodule Complex (EuclideanSpace Complex d) :=
+  set K : Submodule ℂ (EuclideanSpace ℂ d) :=
     LinearMap.range A.toEuclideanLin with hK
   refine LinearMap.ext fun v => ?_
   simp only [LinearMap.comp_apply]
@@ -213,15 +149,15 @@ theorem cMatrix_rpow_neg_one_mul_self_eq_rangeProjection
 
 private theorem cMatrix_rpow_mulVec_of_posSemidef_eigen_forPetz
     {d : Type*} [Fintype d] [DecidableEq d] {A : CMatrix d}
-    (hA : A.PosSemidef) {v : d -> Complex} {lambda : Real}
-    (_hlambda : 0 <= lambda)
-    (hev : A.mulVec v = (lambda : Complex) • v) (p : Real) :
-    (CFC.rpow A p).mulVec v = ((lambda ^ p : Real) : Complex) • v := by
-  let U : Matrix.unitaryGroup d Complex := hA.isHermitian.eigenvectorUnitary
-  let eigen : d -> Real := hA.isHermitian.eigenvalues
-  let D : CMatrix d := Matrix.diagonal fun i => ((eigen i : Real) : Complex)
-  let Dp : CMatrix d := Matrix.diagonal fun i => ((eigen i ^ p : Real) : Complex)
-  let w : d -> Complex := (star (U : CMatrix d)).mulVec v
+    (hA : A.PosSemidef) {v : d → ℂ} {lambda : ℝ}
+    (_hlambda : 0 ≤ lambda)
+    (hev : A.mulVec v = (lambda : ℂ) • v) (p : ℝ) :
+    (CFC.rpow A p).mulVec v = ((lambda ^ p : ℝ) : ℂ) • v := by
+  let U : Matrix.unitaryGroup d ℂ := hA.isHermitian.eigenvectorUnitary
+  let eigen : d → ℝ := hA.isHermitian.eigenvalues
+  let D : CMatrix d := Matrix.diagonal fun i => ((eigen i : ℝ) : ℂ)
+  let Dp : CMatrix d := Matrix.diagonal fun i => ((eigen i ^ p : ℝ) : ℂ)
+  let w : d → ℂ := (star (U : CMatrix d)).mulVec v
   have hA_spec :
       A = (U : CMatrix d) * D * star (U : CMatrix d) := by
     simpa [U, eigen, D, Function.comp_def] using hA.isHermitian.spectral_theorem
@@ -244,19 +180,19 @@ private theorem cMatrix_rpow_mulVec_of_posSemidef_eigen_forPetz
         _ = D * star (U : CMatrix d) := by simp
     simpa [w, Matrix.mulVec_mulVec, Matrix.mul_assoc] using
       congrArg (fun M : CMatrix d => M.mulVec v) hmat
-  have hcoord : D.mulVec w = (lambda : Complex) • w := by
+  have hcoord : D.mulVec w = (lambda : ℂ) • w := by
     calc
       D.mulVec w = (star (U : CMatrix d)).mulVec (A.mulVec v) := hcoord_left.symm
-      _ = (star (U : CMatrix d)).mulVec ((lambda : Complex) • v) := by rw [hev]
-      _ = (lambda : Complex) • w := by
+      _ = (star (U : CMatrix d)).mulVec ((lambda : ℂ) • v) := by rw [hev]
+      _ = (lambda : ℂ) • w := by
             rw [Matrix.mulVec_smul]
-  have hDp_coord : Dp.mulVec w = ((lambda ^ p : Real) : Complex) • w := by
+  have hDp_coord : Dp.mulVec w = ((lambda ^ p : ℝ) : ℂ) • w := by
     ext i
     have hi := congrFun hcoord i
     by_cases hwi : w i = 0
     · simp [Dp, Matrix.mulVec, dotProduct, Matrix.diagonal, hwi]
-    · have heq_complex : (eigen i : Complex) = (lambda : Complex) := by
-        have hi' : (eigen i : Complex) * w i = (lambda : Complex) * w i := by
+    · have heq_complex : (eigen i : ℂ) = (lambda : ℂ) := by
+        have hi' : (eigen i : ℂ) * w i = (lambda : ℂ) * w i := by
           simpa [D, Matrix.mulVec, dotProduct, Matrix.diagonal] using hi
         exact mul_right_cancel₀ hwi hi'
       have heq : eigen i = lambda := Complex.ofReal_injective heq_complex
@@ -276,18 +212,18 @@ private theorem cMatrix_rpow_mulVec_of_posSemidef_eigen_forPetz
         ((U : CMatrix d) * Dp * star (U : CMatrix d)).mulVec v := by rw [hpow]
     _ = (U : CMatrix d).mulVec (Dp.mulVec w) := by
           simp [w, Matrix.mulVec_mulVec, Matrix.mul_assoc]
-    _ = (U : CMatrix d).mulVec (((lambda ^ p : Real) : Complex) • w) := by
+    _ = (U : CMatrix d).mulVec (((lambda ^ p : ℝ) : ℂ) • w) := by
           rw [hDp_coord]
-    _ = ((lambda ^ p : Real) : Complex) • (U : CMatrix d).mulVec w := by
+    _ = ((lambda ^ p : ℝ) : ℂ) • (U : CMatrix d).mulVec w := by
           rw [Matrix.mulVec_smul]
-    _ = ((lambda ^ p : Real) : Complex) • v := by rw [hv]
+    _ = ((lambda ^ p : ℝ) : ℂ) • v := by rw [hv]
 
 private theorem cMatrix_rpow_mulVec_eigenvectorUnitary_forPetz
     {d : Type*} [Fintype d] [DecidableEq d] {A : CMatrix d}
-    (hA : A.PosSemidef) (k : d) (p : Real) :
+    (hA : A.PosSemidef) (k : d) (p : ℝ) :
     (CFC.rpow A p).mulVec
         (fun x => (hA.isHermitian.eigenvectorUnitary : CMatrix d) x k) =
-      ((hA.isHermitian.eigenvalues k ^ p : Real) : Complex) •
+      ((hA.isHermitian.eigenvalues k ^ p : ℝ) : ℂ) •
         fun x => (hA.isHermitian.eigenvectorUnitary : CMatrix d) x k := by
   apply cMatrix_rpow_mulVec_of_posSemidef_eigen_forPetz
     hA (hA.eigenvalues_nonneg k) ?_ p
@@ -300,29 +236,29 @@ omit [DecidableEq a] in
 This is the trace bookkeeping used in Tomamichel2015FiniteResources,
 `cond.tex:329-331`, when a trace over `AB` is rewritten as a trace over a
 purifying `ABC` system with an identity on `C`. -/
-theorem trace_left_right_kronecker_one_eq_partialTraceB
-    (R : CMatrix (Prod a b)) (L M : CMatrix a) :
+theorem trace_left_right_kronecker_one_eq_traceRight
+    (R : CMatrix (a × b)) (L M : CMatrix a) :
     ((Matrix.kronecker L (1 : CMatrix b) * R *
       Matrix.kronecker M (1 : CMatrix b)).trace).re =
-      ((L * partialTraceB (a := a) (b := b) R * M).trace).re := by
+      ((L * Matrix.traceRight R * M).trace).re := by
   calc
     ((Matrix.kronecker L (1 : CMatrix b) * R *
         Matrix.kronecker M (1 : CMatrix b)).trace).re =
         (((R * Matrix.kronecker M (1 : CMatrix b)) *
           Matrix.kronecker L (1 : CMatrix b)).trace).re := by
           rw [Matrix.trace_mul_cycle, Matrix.trace_mul_cycle]
-    _ = ((partialTraceB (a := a) (b := b)
+    _ = ((Matrix.traceRight
           (R * Matrix.kronecker M (1 : CMatrix b)) * L).trace).re := by
-          rw [trace_mul_kronecker_one_right_eq_partialTraceB_forPetz]
-    _ = (((partialTraceB (a := a) (b := b) R * M) * L).trace).re := by
-          rw [partialTraceB_mul_leftKroneckerOne]
-    _ = ((L * partialTraceB (a := a) (b := b) R * M).trace).re := by
+          rw [trace_mul_kronecker_one_right_eq_traceRight]
+    _ = (((Matrix.traceRight R * M) * L).trace).re := by
+          rw [traceRight_mul_kronecker_one_left]
+    _ = ((L * Matrix.traceRight R * M).trace).re := by
           exact congrArg Complex.re
-            (Matrix.trace_mul_cycle (partialTraceB (a := a) (b := b) R) M L)
+            (Matrix.trace_mul_cycle (Matrix.traceRight R) M L)
 
 private theorem trace_mul_rankOneMatrix_mul_eq_dotProduct
     {d : Type*} [Fintype d] [DecidableEq d]
-    (L R : CMatrix d) (v : d -> Complex) :
+    (L R : CMatrix d) (v : d → ℂ) :
     (L * rankOneMatrix v * R).trace =
       dotProduct (star ((Matrix.conjTranspose R).mulVec v)) (L.mulVec v) := by
   simp [Matrix.trace, Matrix.mul_apply, rankOneMatrix_apply, Matrix.mulVec, dotProduct,
@@ -334,7 +270,7 @@ private theorem trace_mul_rankOneMatrix_mul_eq_dotProduct
 
 private theorem trace_mul_rankOneMatrix_mul_re_eq_of_mulVec_eq
     {d : Type*} [Fintype d] [DecidableEq d]
-    {L R L' R' : CMatrix d} {v : d -> Complex}
+    {L R L' R' : CMatrix d} {v : d → ℂ}
     (hL : L.mulVec v = L'.mulVec v)
     (hR : (Matrix.conjTranspose R).mulVec v = (Matrix.conjTranspose R').mulVec v) :
     ((L * rankOneMatrix v * R).trace).re =
@@ -345,7 +281,7 @@ private theorem trace_mul_rankOneMatrix_mul_re_eq_of_mulVec_eq
 
 private theorem trace_mul_rankOneMatrix_mul_re_eq_of_hermitian_mulVec_eq
     {d : Type*} [Fintype d] [DecidableEq d]
-    {L R L' R' : CMatrix d} {v : d -> Complex}
+    {L R L' R' : CMatrix d} {v : d → ℂ}
     (hL : L.mulVec v = L'.mulVec v)
     (hR : R.mulVec v = R'.mulVec v)
     (hRherm : Matrix.conjTranspose R = R)
@@ -358,7 +294,7 @@ private theorem trace_mul_rankOneMatrix_mul_re_eq_of_hermitian_mulVec_eq
 
 private theorem trace_rankOneMatrix_hermitian_swap_re
     {d : Type*} [Fintype d] [DecidableEq d]
-    (L R : CMatrix d) (v : d -> Complex)
+    (L R : CMatrix d) (v : d → ℂ)
     (hL : Matrix.conjTranspose L = L) (hR : Matrix.conjTranspose R = R) :
     ((L * rankOneMatrix v * R).trace).re =
       ((R * rankOneMatrix v * L).trace).re := by
@@ -374,46 +310,23 @@ private theorem trace_rankOneMatrix_hermitian_swap_re
           rw [Matrix.trace_conjTranspose]
     _ = ((R * rankOneMatrix v * L).trace).re := by rw [hct]
 
-private theorem kronecker_left_mulVec_apply_forPetz
-    {d e : Type*} [Fintype d] [DecidableEq d] [Fintype e] [DecidableEq e]
-    (W : CMatrix d) (v : Prod d e -> Complex) (i : d) (k : e) :
-    (Matrix.kronecker W (1 : CMatrix e)).mulVec v (i, k) =
-      W.mulVec (fun j => v (j, k)) i := by
-  simp only [Matrix.mulVec, dotProduct, Matrix.kronecker]
-  rw [← Finset.univ_product_univ, Finset.sum_product]
-  simp [Matrix.one_apply]
-
-private theorem kronecker_right_mulVec_apply_forPetz
-    {d e : Type*} [Fintype d] [DecidableEq d] [Fintype e] [DecidableEq e]
-    (W : CMatrix e) (v : Prod d e -> Complex) (i : d) (k : e) :
-    (Matrix.kronecker (1 : CMatrix d) W).mulVec v (i, k) =
-      W.mulVec (fun l => v (i, l)) k := by
-  simp only [Matrix.mulVec, dotProduct, Matrix.kronecker]
-  rw [← Finset.univ_product_univ, Finset.sum_product]
-  simp [Matrix.one_apply]
-
-/-- Parameter bookkeeping for the old Petz downward-duality conjugacy
-`alpha + beta = 2`. -/
-private theorem petzRenyiDualParam_beta_eq_two_sub
-    {alpha beta : Real} (hdual : alpha + beta = 2) :
-    beta = 2 - alpha := by
-  linarith
-
 /-- Under `alpha + beta = 2`, the state exponent on the `AC` side is
 `beta - 1 = 1 - alpha`. -/
 private theorem petzRenyiDualParam_beta_sub_one_eq_one_sub
-    {alpha beta : Real} (hdual : alpha + beta = 2) :
+    {alpha beta : ℝ} (hdual : alpha + beta = 2) :
     beta - 1 = 1 - alpha := by
   linarith
 
 /-- Under `alpha + beta = 2`, the reference exponent on the `C` side is
 `1 - beta = alpha - 1`. -/
 private theorem petzRenyiDualParam_one_sub_beta_eq_sub_one
-    {alpha beta : Real} (hdual : alpha + beta = 2) :
+    {alpha beta : ℝ} (hdual : alpha + beta = 2) :
     1 - beta = alpha - 1 := by
   linarith
 
-namespace State
+end QIT
+
+namespace MState
 
 /-- Entropy-level Petz duality algebra from equality of the two trace terms.
 
@@ -423,9 +336,9 @@ needed upstream is the source trace bridge equating the two Petz trace terms;
 once that equality is available, `alpha + beta = 2` makes the two prefactors
 `1/(1-alpha)` and `1/(1-beta)` cancel. -/
 theorem conditionalPetzRenyiEntropyCandidateFullReference_add_eq_zero_of_traceTerm_eq
-    (rhoAB : State (Prod a b)) (sigmaB : State b) (hsigmaB : sigmaB.matrix.PosDef)
-    (rhoAC : State (Prod a c)) (tauC : State c) (htauC : tauC.matrix.PosDef)
-    {alpha beta : Real} (halpha_pos : 0 < alpha) (hbeta_pos : 0 < beta)
+    (rhoAB : MState (a × b)) (sigmaB : MState b) (hsigmaB : sigmaB.m.PosDef)
+    (rhoAC : MState (a × c)) (tauC : MState c) (htauC : tauC.m.PosDef)
+    {alpha beta : ℝ} (halpha_pos : 0 < alpha) (hbeta_pos : 0 < beta)
     (halpha_ne_one : alpha ≠ 1) (hbeta_ne_one : beta ≠ 1)
     (hdual : alpha + beta = 2)
     (htrace :
@@ -436,7 +349,7 @@ theorem conditionalPetzRenyiEntropyCandidateFullReference_add_eq_zero_of_traceTe
       rhoAC.conditionalPetzRenyiEntropyCandidateFullReference tauC htauC
         beta hbeta_pos hbeta_ne_one =
       0 := by
-  let L : Real := log2 (rhoAC.conditionalPetzRenyiTraceTerm tauC beta)
+  let L : ℝ := log2 (rhoAC.conditionalPetzRenyiTraceTerm tauC beta)
   have halpha_den : 1 - alpha ≠ 0 := by
     intro h
     apply halpha_ne_one
@@ -470,19 +383,19 @@ with a `PosSemidef` identity-tensor reference.  The strict positivity of the
 trace term is assumed so the result plugs into the EReal duality; the algebra
 itself only uses `α + β = 2`. -/
 theorem conditionalPetzRenyiReferenceFinite_add_eq_zero_of_traceTerm_eq
-    (rhoAB : State (Prod a b)) (sigmaB : State b)
-    (rhoAC : State (Prod a c)) (tauC : State c)
-    {alpha beta : Real} (halpha_pos : 0 < alpha) (hbeta_pos : 0 < beta)
+    (rhoAB : MState (a × b)) (sigmaB : MState b)
+    (rhoAC : MState (a × c)) (tauC : MState c)
+    {alpha beta : ℝ} (halpha_pos : 0 < alpha) (hbeta_pos : 0 < beta)
     (halpha_ne_one : alpha ≠ 1) (hbeta_ne_one : beta ≠ 1)
     (hdual : alpha + beta = 2)
     (htrace : rhoAB.conditionalPetzRenyiTraceTerm sigmaB alpha =
       rhoAC.conditionalPetzRenyiTraceTerm tauC beta)
     (_htrace_pos : 0 < rhoAB.conditionalPetzRenyiTraceTerm sigmaB alpha) :
     rhoAB.petzRenyiReferenceFinite (identityTensorStateMatrix (a := a) sigmaB)
-        (identityTensorStateMatrix_posSemidef_of_state (a := a) sigmaB)
+        (identityTensorStateMatrix_posSemidef (a := a) sigmaB)
         alpha halpha_pos halpha_ne_one +
       rhoAC.petzRenyiReferenceFinite (identityTensorStateMatrix (a := a) tauC)
-        (identityTensorStateMatrix_posSemidef_of_state (a := a) tauC)
+        (identityTensorStateMatrix_posSemidef (a := a) tauC)
         beta hbeta_pos hbeta_ne_one =
       0 := by
   have halpha_den : alpha - 1 ≠ 0 := by
@@ -497,13 +410,13 @@ theorem conditionalPetzRenyiReferenceFinite_add_eq_zero_of_traceTerm_eq
     field_simp [halpha_den, hbeta_den]
     linarith
   have htrace_raw :
-      ((CFC.rpow rhoAB.matrix alpha *
+      ((CFC.rpow rhoAB.m alpha *
           CFC.rpow (identityTensorStateMatrix (a := a) sigmaB) (1 - alpha)).trace).re =
-        ((CFC.rpow rhoAC.matrix beta *
+        ((CFC.rpow rhoAC.m beta *
           CFC.rpow (identityTensorStateMatrix (a := a) tauC) (1 - beta)).trace).re := by
     simpa [conditionalPetzRenyiTraceTerm] using htrace
-  let L : Real := log2
-    ((CFC.rpow rhoAC.matrix beta *
+  let L : ℝ := log2
+    ((CFC.rpow rhoAC.m beta *
         CFC.rpow (identityTensorStateMatrix (a := a) tauC) (1 - beta)).trace).re
   unfold petzRenyiReferenceFinite
   rw [htrace_raw]
@@ -512,76 +425,18 @@ theorem conditionalPetzRenyiReferenceFinite_add_eq_zero_of_traceTerm_eq
       (1 / (alpha - 1) + 1 / (beta - 1)) * L := by ring
     _ = 0 := by rw [hcoeff]; ring
 
-end State
+end MState
 
-namespace PureVector
-
-def conditionalPetzRenyiABCToACBEquiv :
-    Prod (Prod a b) c ≃ Prod (Prod a c) b where
-  toFun x := ((x.1.1, x.2), x.1.2)
-  invFun x := ((x.1.1, x.2), x.1.2)
-  left_inv x := by rcases x with ⟨⟨_, _⟩, _⟩; rfl
-  right_inv x := by rcases x with ⟨⟨_, _⟩, _⟩; rfl
-
-private theorem conditionalPetzRenyiABCToACB_marginalAB
-    (psi : PureVector (Prod (Prod a b) c)) :
-    ((psi.reindex (conditionalPetzRenyiABCToACBEquiv (a := a) (b := b) (c := c))).state).marginalAB =
-      psi.state.marginalAC := by
-  apply State.ext
-  ext x y
-  rcases x with ⟨i, k⟩
-  rcases y with ⟨i', k'⟩
-  simp [State.marginalAC_matrix, State.marginalAB, State.marginalA,
-    partialTraceB, PureVector.reindex_state, State.reindex,
-    conditionalPetzRenyiABCToACBEquiv]
-
-private theorem conditionalPetzRenyiABCToACB_marginalBOfABC
-    (psi : PureVector (Prod (Prod a b) c)) :
-    ((psi.reindex (conditionalPetzRenyiABCToACBEquiv (a := a) (b := b) (c := c))).state).marginalBOfABC =
-      psi.state.marginalAC.marginalB := by
-  apply State.ext
-  ext k k'
-  simp [State.marginalBOfABC, State.marginalAB, State.marginalA,
-    State.marginalB, State.marginalAC_matrix, partialTraceA, partialTraceB,
-    PureVector.reindex_state, State.reindex, conditionalPetzRenyiABCToACBEquiv]
-
-private theorem conditionalPetzRenyiABCToACB_marginalB
-    (psi : PureVector (Prod (Prod a b) c)) :
-    ((psi.reindex (conditionalPetzRenyiABCToACBEquiv (a := a) (b := b) (c := c))).state).marginalB =
-      psi.state.marginalBOfABC := by
-  apply State.ext
-  ext k k'
-  simp [State.marginalBOfABC, State.marginalAB, State.marginalA, State.marginalB,
-    partialTraceA, partialTraceB, PureVector.reindex_state, State.reindex,
-    conditionalPetzRenyiABCToACBEquiv, Fintype.sum_prod_type]
-
-private theorem conditionalPetzRenyiABCToACB_marginalAC
-    (psi : PureVector (Prod (Prod a b) c)) :
-    ((psi.reindex (conditionalPetzRenyiABCToACBEquiv (a := a) (b := b) (c := c))).state).marginalAC =
-      psi.state.marginalAB := by
-  apply State.ext
-  ext x y
-  rcases x with ⟨i, k⟩
-  rcases y with ⟨i', k'⟩
-  simp [State.marginalAC_matrix, State.marginalAB, State.marginalA,
-    partialTraceB, PureVector.reindex_state, State.reindex,
-    conditionalPetzRenyiABCToACBEquiv]
-
-private theorem marginalAC_marginalB_eq_marginalB
-    (psi : PureVector (Prod (Prod a b) c)) :
-    psi.state.marginalAC.marginalB = psi.state.marginalB := by
-  apply State.ext
-  ext k k'
-  simp [State.marginalAC, State.marginalB, partialTraceA, Fintype.sum_prod_type]
+namespace Ket
 
 omit [Fintype a] [Fintype b] [Fintype c] [DecidableEq c] in
 /-- Reindexing the `ABC` tensor order to `ACB` moves a C-reference operator
 from `I_AB \otimes T_C` to `I_A \otimes T_C \otimes I_B`. -/
-theorem conditionalPetzRenyiABCToACB_submatrix_refC
+theorem prodABCToACB_submatrix_refC
     (T : CMatrix c) :
-    (Matrix.kronecker (1 : CMatrix (Prod a b)) T).submatrix
-        (conditionalPetzRenyiABCToACBEquiv (a := a) (b := b) (c := c)).symm
-        (conditionalPetzRenyiABCToACBEquiv (a := a) (b := b) (c := c)).symm =
+    (Matrix.kronecker (1 : CMatrix (a × b)) T).submatrix
+        (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c)).symm
+        (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c)).symm =
       Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) T) (1 : CMatrix b) := by
   ext x y
   rcases x with ⟨⟨i, k⟩, j⟩
@@ -590,17 +445,17 @@ theorem conditionalPetzRenyiABCToACB_submatrix_refC
   · subst i'
     by_cases hj : j = j'
     · subst j'
-      simp [Matrix.kronecker, conditionalPetzRenyiABCToACBEquiv]
-    · simp [Matrix.kronecker, conditionalPetzRenyiABCToACBEquiv, hj]
-  · simp [Matrix.kronecker, conditionalPetzRenyiABCToACBEquiv, hi]
+      simp [Matrix.kronecker, QIT.prodABCToACBEquiv]
+    · simp [Matrix.kronecker, QIT.prodABCToACBEquiv, hj]
+  · simp [Matrix.kronecker, QIT.prodABCToACBEquiv, hi]
 
 omit [Fintype a] [Fintype b] [DecidableEq b] [Fintype c] in
-private theorem conditionalPetzRenyiABCToACB_submatrix_refB
+private theorem prodABCToACB_submatrix_refB
     (T : CMatrix b) :
     (Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) T) (1 : CMatrix c)).submatrix
-        (conditionalPetzRenyiABCToACBEquiv (a := a) (b := b) (c := c)).symm
-        (conditionalPetzRenyiABCToACBEquiv (a := a) (b := b) (c := c)).symm =
-      Matrix.kronecker (1 : CMatrix (Prod a c)) T := by
+        (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c)).symm
+        (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c)).symm =
+      Matrix.kronecker (1 : CMatrix (a × c)) T := by
   ext x y
   rcases x with ⟨⟨i, k⟩, j⟩
   rcases y with ⟨⟨i', k'⟩, j'⟩
@@ -608,46 +463,46 @@ private theorem conditionalPetzRenyiABCToACB_submatrix_refB
   · subst i'
     by_cases hk : k = k'
     · subst k'
-      simp [Matrix.kronecker, conditionalPetzRenyiABCToACBEquiv]
-    · simp [Matrix.kronecker, conditionalPetzRenyiABCToACBEquiv, hk]
-  · simp [Matrix.kronecker, conditionalPetzRenyiABCToACBEquiv, hi]
+      simp [Matrix.kronecker, QIT.prodABCToACBEquiv]
+    · simp [Matrix.kronecker, QIT.prodABCToACBEquiv, hk]
+  · simp [Matrix.kronecker, QIT.prodABCToACBEquiv, hi]
 
-private theorem conditionalPetzRenyiABCToACB_projectorTrace_reindex
-    (psi : PureVector (Prod (Prod a b) c)) (TC : CMatrix c) (SB : CMatrix b) :
-    ((Matrix.kronecker (1 : CMatrix (Prod a b)) TC *
-      psi.state.matrix *
+private theorem prodABCToACB_projectorTrace_reindex
+    (psi : Ket ((a × b) × c)) (TC : CMatrix c) (SB : CMatrix b) :
+    ((Matrix.kronecker (1 : CMatrix (a × b)) TC *
+      psi.state.m *
       Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) SB) (1 : CMatrix c)).trace).re =
       ((Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) TC) (1 : CMatrix b) *
         (psi.reindex
-          (conditionalPetzRenyiABCToACBEquiv (a := a) (b := b) (c := c))).state.matrix *
-        Matrix.kronecker (1 : CMatrix (Prod a c)) SB).trace).re := by
-  let e := conditionalPetzRenyiABCToACBEquiv (a := a) (b := b) (c := c)
-  let A : CMatrix (Prod (Prod a b) c) := Matrix.kronecker (1 : CMatrix (Prod a b)) TC
-  let B : CMatrix (Prod (Prod a b) c) := psi.state.matrix
-  let C : CMatrix (Prod (Prod a b) c) :=
+          (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c))).state.m *
+        Matrix.kronecker (1 : CMatrix (a × c)) SB).trace).re := by
+  let e := QIT.prodABCToACBEquiv (a := a) (b := b) (c := c)
+  let A : CMatrix ((a × b) × c) := Matrix.kronecker (1 : CMatrix (a × b)) TC
+  let B : CMatrix ((a × b) × c) := psi.state.m
+  let C : CMatrix ((a × b) × c) :=
     Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) SB) (1 : CMatrix c)
-  let phi : PureVector (Prod (Prod a c) b) := psi.reindex e
+  let phi : Ket ((a × c) × b) := psi.reindex e
   have hA :
       A.submatrix e.symm e.symm =
         Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) TC) (1 : CMatrix b) := by
-    simpa [A, e] using conditionalPetzRenyiABCToACB_submatrix_refC
+    simpa [A, e] using prodABCToACB_submatrix_refC
       (a := a) (b := b) (c := c) TC
-  have hB : B.submatrix e.symm e.symm = phi.state.matrix := by
-    simp [B, phi, PureVector.reindex_state, State.reindex]
+  have hB : B.submatrix e.symm e.symm = phi.state.m := by
+    simp [B, phi, Ket.reindex_state]
   have hC :
       C.submatrix e.symm e.symm =
-        Matrix.kronecker (1 : CMatrix (Prod a c)) SB := by
-    simpa [C, e] using conditionalPetzRenyiABCToACB_submatrix_refB
+        Matrix.kronecker (1 : CMatrix (a × c)) SB := by
+    simpa [C, e] using prodABCToACB_submatrix_refB
       (a := a) (b := b) (c := c) SB
   change ((A * B * C).trace).re =
     ((Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) TC) (1 : CMatrix b) *
-      phi.state.matrix *
-      Matrix.kronecker (1 : CMatrix (Prod a c)) SB).trace).re
+      phi.state.m *
+      Matrix.kronecker (1 : CMatrix (a × c)) SB).trace).re
   calc
     ((A * B * C).trace).re =
         (((A * B * C).submatrix e.symm e.symm).trace).re := by
           exact congrArg Complex.re
-            (State.trace_submatrix_equiv e.symm (A * B * C)).symm
+            (Matrix.trace_submatrix (A * B * C) e.symm).symm
     _ =
         ((A.submatrix e.symm e.symm * B.submatrix e.symm e.symm *
           C.submatrix e.symm e.symm).trace).re := by
@@ -655,13 +510,13 @@ private theorem conditionalPetzRenyiABCToACB_projectorTrace_reindex
           rw [Matrix.submatrix_mul_equiv, Matrix.submatrix_mul_equiv]
     _ =
         ((Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) TC) (1 : CMatrix b) *
-          phi.state.matrix *
-          Matrix.kronecker (1 : CMatrix (Prod a c)) SB).trace).re := by
+          phi.state.m *
+          Matrix.kronecker (1 : CMatrix (a × c)) SB).trace).re := by
           rw [hA, hB, hC]
 
 private theorem sum_r_s_s_reorder
     {r s : Type*} [Fintype r] [Fintype s]
-    (f : r -> s -> s -> Complex) :
+    (f : r → s → s → ℂ) :
     (∑ x : r, ∑ y : s, ∑ z : s, f x y z) =
       ∑ z : s, ∑ y : s, ∑ x : r, f x y z := by
   calc
@@ -679,238 +534,238 @@ private theorem sum_r_s_s_reorder
 
 private def rightSchmidtSlice
     {r s : Type*} [Fintype r] [DecidableEq r] [Fintype s] [DecidableEq s]
-    (psi : PureVector (Prod r s)) (k : s) : r -> Complex :=
+    (psi : Ket (r × s)) (k : s) : r → ℂ :=
   fun i => ∑ x : s,
-    star ((psi.state.marginalB.pos.isHermitian.eigenvectorUnitary : CMatrix s) x k) *
-      psi.amp (i, x)
+    star ((psi.state.traceLeft.psd.isHermitian.eigenvectorUnitary : CMatrix s) x k) *
+      psi.vec (i, x)
 
-private theorem rightSchmidtSlice_marginalB_left_eigen_sum
+private theorem rightSchmidtSlice_traceLeft_left_eigen_sum
     {r s : Type*} [Fintype r] [DecidableEq r] [Fintype s] [DecidableEq s]
-    (psi : PureVector (Prod r s)) (k x : s) :
+    (psi : Ket (r × s)) (k x : s) :
     (∑ y : s,
-      star ((psi.state.marginalB.pos.isHermitian.eigenvectorUnitary : CMatrix s) y k) *
-        psi.state.marginalB.matrix y x) =
-      (psi.state.marginalB.pos.isHermitian.eigenvalues k : Complex) *
-        star ((psi.state.marginalB.pos.isHermitian.eigenvectorUnitary : CMatrix s) x k) := by
-  let U : Matrix.unitaryGroup s Complex :=
-    psi.state.marginalB.pos.isHermitian.eigenvectorUnitary
-  let lambda : Real := psi.state.marginalB.pos.isHermitian.eigenvalues k
+      star ((psi.state.traceLeft.psd.isHermitian.eigenvectorUnitary : CMatrix s) y k) *
+        psi.state.traceLeft.m y x) =
+      (psi.state.traceLeft.psd.isHermitian.eigenvalues k : ℂ) *
+        star ((psi.state.traceLeft.psd.isHermitian.eigenvectorUnitary : CMatrix s) x k) := by
+  let U : Matrix.unitaryGroup s ℂ :=
+    psi.state.traceLeft.psd.isHermitian.eigenvectorUnitary
+  let lambda : ℝ := psi.state.traceLeft.psd.isHermitian.eigenvalues k
   have hentry : ∀ i j : s,
-      star (psi.state.marginalB.matrix i j) = psi.state.marginalB.matrix j i := by
+      star (psi.state.traceLeft.m i j) = psi.state.traceLeft.m j i := by
     intro i j
     simpa [Matrix.conjTranspose_apply] using
-      congrFun (congrFun psi.state.marginalB.pos.isHermitian.eq j) i
+      congrFun (congrFun psi.state.traceLeft.psd.isHermitian.eq j) i
   have hentry_partial : ∀ i j : s,
-      star (partialTraceA (a := r) (b := s) (rankOneMatrix psi.amp) i j) =
-        partialTraceA (a := r) (b := s) (rankOneMatrix psi.amp) j i := by
+      star (Matrix.traceLeft (rankOneMatrix psi.vec) i j) =
+        Matrix.traceLeft (rankOneMatrix psi.vec) j i := by
     intro i j
-    simpa [State.marginalB] using hentry i j
-  have hright := psi.state.marginalB.pos.isHermitian.mulVec_eigenvectorBasis k
+    simpa using hentry i j
+  have hright := psi.state.traceLeft.psd.isHermitian.mulVec_eigenvectorBasis k
   have hcomp :
-      (∑ y : s, psi.state.marginalB.matrix x y * (U : CMatrix s) y k) =
-        (lambda : Complex) * (U : CMatrix s) x k := by
+      (∑ y : s, psi.state.traceLeft.m x y * (U : CMatrix s) y k) =
+        (lambda : ℂ) * (U : CMatrix s) x k := by
     have h := congrFun hright x
     simpa [U, lambda, Matrix.mulVec, dotProduct,
       Matrix.IsHermitian.eigenvectorUnitary_apply] using h
   have hstar := congrArg star hcomp
-  simpa [U, lambda, State.marginalB, hentry_partial, Finset.mul_sum, mul_assoc,
+  simpa [U, lambda, hentry_partial, Finset.mul_sum, mul_assoc,
     mul_left_comm, mul_comm] using hstar
 
-private theorem rightSchmidtSlice_marginalA_eigen
+private theorem rightSchmidtSlice_traceRight_eigen
     {r s : Type*} [Fintype r] [DecidableEq r] [Fintype s] [DecidableEq s]
-    (psi : PureVector (Prod r s)) (k : s) :
-    psi.state.marginalA.matrix.mulVec (rightSchmidtSlice psi k) =
-      (psi.state.marginalB.pos.isHermitian.eigenvalues k : Complex) •
+    (psi : Ket (r × s)) (k : s) :
+    psi.state.traceRight.m.mulVec (rightSchmidtSlice psi k) =
+      (psi.state.traceLeft.psd.isHermitian.eigenvalues k : ℂ) •
         rightSchmidtSlice psi k := by
-  let U : Matrix.unitaryGroup s Complex :=
-    psi.state.marginalB.pos.isHermitian.eigenvectorUnitary
-  let lambda : Real := psi.state.marginalB.pos.isHermitian.eigenvalues k
+  let U : Matrix.unitaryGroup s ℂ :=
+    psi.state.traceLeft.psd.isHermitian.eigenvectorUnitary
+  let lambda : ℝ := psi.state.traceLeft.psd.isHermitian.eigenvalues k
   ext i
   have hrewrite :
-      (psi.state.marginalA.matrix.mulVec (rightSchmidtSlice psi k)) i =
-        ∑ x : s, psi.amp (i, x) *
-          (∑ y : s, star ((U : CMatrix s) y k) * psi.state.marginalB.matrix y x) := by
-    simpa [U, rightSchmidtSlice, State.marginalA, State.marginalB, partialTraceA,
-      partialTraceB, Matrix.mulVec, dotProduct, rankOneMatrix_apply, Finset.mul_sum,
+      (psi.state.traceRight.m.mulVec (rightSchmidtSlice psi k)) i =
+        ∑ x : s, psi.vec (i, x) *
+          (∑ y : s, star ((U : CMatrix s) y k) * psi.state.traceLeft.m y x) := by
+    simpa [U, rightSchmidtSlice, Matrix.traceLeft,
+      Matrix.traceRight, Matrix.mulVec, dotProduct, rankOneMatrix_apply, Finset.mul_sum,
       mul_assoc, mul_left_comm, mul_comm] using
       (sum_r_s_s_reorder
         (f := fun x y z =>
-          psi.amp (i, z) *
-            (psi.amp (x, y) *
-              (star (psi.amp (x, z)) * star ((U : CMatrix s) y k)))))
+          psi.vec (i, z) *
+            (psi.vec (x, y) *
+              (star (psi.vec (x, z)) * star ((U : CMatrix s) y k)))))
   calc
-    (psi.state.marginalA.matrix.mulVec (rightSchmidtSlice psi k)) i =
-        ∑ x : s, psi.amp (i, x) *
-          (∑ y : s, star ((U : CMatrix s) y k) * psi.state.marginalB.matrix y x) := hrewrite
-    _ = ∑ x : s, psi.amp (i, x) *
-          ((lambda : Complex) * star ((U : CMatrix s) x k)) := by
+    (psi.state.traceRight.m.mulVec (rightSchmidtSlice psi k)) i =
+        ∑ x : s, psi.vec (i, x) *
+          (∑ y : s, star ((U : CMatrix s) y k) * psi.state.traceLeft.m y x) := hrewrite
+    _ = ∑ x : s, psi.vec (i, x) *
+          ((lambda : ℂ) * star ((U : CMatrix s) x k)) := by
           apply Finset.sum_congr rfl
           intro x _
-          rw [rightSchmidtSlice_marginalB_left_eigen_sum (psi := psi) k x]
-    _ = ((lambda : Complex) • rightSchmidtSlice psi k) i := by
+          rw [rightSchmidtSlice_traceLeft_left_eigen_sum (psi := psi) k x]
+    _ = ((lambda : ℂ) • rightSchmidtSlice psi k) i := by
           simp [U, lambda, rightSchmidtSlice, Finset.mul_sum, mul_assoc, mul_comm]
 
-private theorem rightSchmidtSlice_marginalA_rpow
+private theorem rightSchmidtSlice_traceRight_rpow
     {r s : Type*} [Fintype r] [DecidableEq r] [Fintype s] [DecidableEq s]
-    (psi : PureVector (Prod r s)) (k : s) (p : Real) :
-    (CFC.rpow psi.state.marginalA.matrix p).mulVec (rightSchmidtSlice psi k) =
-      ((psi.state.marginalB.pos.isHermitian.eigenvalues k ^ p : Real) : Complex) •
+    (psi : Ket (r × s)) (k : s) (p : ℝ) :
+    (CFC.rpow psi.state.traceRight.m p).mulVec (rightSchmidtSlice psi k) =
+      ((psi.state.traceLeft.psd.isHermitian.eigenvalues k ^ p : ℝ) : ℂ) •
         rightSchmidtSlice psi k := by
   exact cMatrix_rpow_mulVec_of_posSemidef_eigen_forPetz
-    psi.state.marginalA.pos (psi.state.marginalB.pos.eigenvalues_nonneg k)
-    (rightSchmidtSlice_marginalA_eigen psi k) p
+    psi.state.traceRight.psd (psi.state.traceLeft.psd.eigenvalues_nonneg k)
+    (rightSchmidtSlice_traceRight_eigen psi k) p
 
 private theorem rightSchmidtSlice_reconstruct
     {r s : Type*} [Fintype r] [DecidableEq r] [Fintype s] [DecidableEq s]
-    (psi : PureVector (Prod r s)) (i : r) (x : s) :
+    (psi : Ket (r × s)) (i : r) (x : s) :
     (∑ k : s,
       rightSchmidtSlice psi k i *
-        (psi.state.marginalB.pos.isHermitian.eigenvectorUnitary : CMatrix s) x k) =
-      psi.amp (i, x) := by
-  let U : Matrix.unitaryGroup s Complex :=
-    psi.state.marginalB.pos.isHermitian.eigenvectorUnitary
+        (psi.state.traceLeft.psd.isHermitian.eigenvectorUnitary : CMatrix s) x k) =
+      psi.vec (i, x) := by
+  let U : Matrix.unitaryGroup s ℂ :=
+    psi.state.traceLeft.psd.isHermitian.eigenvectorUnitary
   have hunit : (U : CMatrix s) * star (U : CMatrix s) = 1 :=
     Unitary.coe_mul_star_self U
   calc
     (∑ k : s, rightSchmidtSlice psi k i * (U : CMatrix s) x k) =
-        ∑ y : s, psi.amp (i, y) * ((U : CMatrix s) * star (U : CMatrix s)) x y := by
+        ∑ y : s, psi.vec (i, y) * ((U : CMatrix s) * star (U : CMatrix s)) x y := by
           simp [U, rightSchmidtSlice, Matrix.mul_apply, Finset.mul_sum, mul_left_comm,
             mul_comm]
           rw [Finset.sum_comm]
-    _ = psi.amp (i, x) := by
+    _ = psi.vec (i, x) := by
           rw [hunit]
           simp [Matrix.one_apply]
 
 /-- Schmidt/intertwiner movement for powers of complementary pure-state marginals.
 
-For a pure vector on `r ⊗ s`, applying `ρ_r^p` on the left tensor factor gives
+For a ket on `r ⊗ s`, applying `ρ_r^p` on the left tensor factor gives
 the same vector as applying `ρ_s^p` on the right tensor factor.  This is the
 finite-dimensional bridge used in Tomamichel2015FiniteResources, `cond.tex`,
 when source proofs move a marginal power through a pure rank-one projector. -/
-theorem pureVector_rpow_marginalA_tensor_one_mulVec_eq_one_tensor_marginalB_rpow_mulVec
+theorem ket_rpow_traceRight_tensor_one_mulVec_eq_one_tensor_traceLeft_rpow_mulVec
     {r s : Type*} [Fintype r] [DecidableEq r] [Fintype s] [DecidableEq s]
-    (psi : PureVector (Prod r s)) (p : Real) :
-    (Matrix.kronecker (CFC.rpow psi.state.marginalA.matrix p) (1 : CMatrix s)).mulVec
-        psi.amp =
-      (Matrix.kronecker (1 : CMatrix r) (CFC.rpow psi.state.marginalB.matrix p)).mulVec
-        psi.amp := by
-  let U : Matrix.unitaryGroup s Complex :=
-    psi.state.marginalB.pos.isHermitian.eigenvectorUnitary
-  let lambda : s -> Real := psi.state.marginalB.pos.isHermitian.eigenvalues
+    (psi : Ket (r × s)) (p : ℝ) :
+    (Matrix.kronecker (CFC.rpow psi.state.traceRight.m p) (1 : CMatrix s)).mulVec
+        psi.vec =
+      (Matrix.kronecker (1 : CMatrix r) (CFC.rpow psi.state.traceLeft.m p)).mulVec
+        psi.vec := by
+  let U : Matrix.unitaryGroup s ℂ :=
+    psi.state.traceLeft.psd.isHermitian.eigenvectorUnitary
+  let lambda : s → ℝ := psi.state.traceLeft.psd.isHermitian.eigenvalues
   ext z
   rcases z with ⟨i, x⟩
   have hleft :
-      (Matrix.kronecker (CFC.rpow psi.state.marginalA.matrix p) (1 : CMatrix s)).mulVec
-          psi.amp (i, x) =
-        ∑ k : s, ((lambda k ^ p : Real) : Complex) *
+      (Matrix.kronecker (CFC.rpow psi.state.traceRight.m p) (1 : CMatrix s)).mulVec
+          psi.vec (i, x) =
+        ∑ k : s, ((lambda k ^ p : ℝ) : ℂ) *
           rightSchmidtSlice psi k i * (U : CMatrix s) x k := by
-    rw [kronecker_left_mulVec_apply_forPetz]
+    rw [kronecker_left_one_mulVec_apply]
     have hvec :
-        (fun j : r => psi.amp (j, x)) =
+        (fun j : r => psi.vec (j, x)) =
           fun j : r => ∑ k : s, rightSchmidtSlice psi k j * (U : CMatrix s) x k := by
       ext j
       exact (rightSchmidtSlice_reconstruct psi j x).symm
     rw [hvec]
     calc
-      (CFC.rpow psi.state.marginalA.matrix p).mulVec
+      (CFC.rpow psi.state.traceRight.m p).mulVec
           (fun j : r => ∑ k : s, rightSchmidtSlice psi k j * (U : CMatrix s) x k) i =
           ∑ k : s,
-            (CFC.rpow psi.state.marginalA.matrix p).mulVec
+            (CFC.rpow psi.state.traceRight.m p).mulVec
               (rightSchmidtSlice psi k) i * (U : CMatrix s) x k := by
             simp [Matrix.mulVec, dotProduct, Finset.mul_sum, mul_assoc, mul_comm]
             rw [Finset.sum_comm]
-      _ = ∑ k : s, ((lambda k ^ p : Real) : Complex) *
+      _ = ∑ k : s, ((lambda k ^ p : ℝ) : ℂ) *
             rightSchmidtSlice psi k i * (U : CMatrix s) x k := by
             apply Finset.sum_congr rfl
             intro k _
-            have hk := congrFun (rightSchmidtSlice_marginalA_rpow psi k p) i
+            have hk := congrFun (rightSchmidtSlice_traceRight_rpow psi k p) i
             simpa [U, lambda, Pi.smul_apply, mul_assoc] using
               congrArg (fun z => z * (U : CMatrix s) x k) hk
   have hright :
-      (Matrix.kronecker (1 : CMatrix r) (CFC.rpow psi.state.marginalB.matrix p)).mulVec
-          psi.amp (i, x) =
-        ∑ k : s, ((lambda k ^ p : Real) : Complex) *
+      (Matrix.kronecker (1 : CMatrix r) (CFC.rpow psi.state.traceLeft.m p)).mulVec
+          psi.vec (i, x) =
+        ∑ k : s, ((lambda k ^ p : ℝ) : ℂ) *
           rightSchmidtSlice psi k i * (U : CMatrix s) x k := by
-    rw [kronecker_right_mulVec_apply_forPetz]
+    rw [kronecker_right_one_mulVec_apply]
     have hvec :
-        (fun y : s => psi.amp (i, y)) =
+        (fun y : s => psi.vec (i, y)) =
           fun y : s => ∑ k : s, rightSchmidtSlice psi k i * (U : CMatrix s) y k := by
       ext y
       exact (rightSchmidtSlice_reconstruct psi i y).symm
     rw [hvec]
     calc
-      (CFC.rpow psi.state.marginalB.matrix p).mulVec
+      (CFC.rpow psi.state.traceLeft.m p).mulVec
           (fun y : s => ∑ k : s, rightSchmidtSlice psi k i * (U : CMatrix s) y k) x =
           ∑ k : s, rightSchmidtSlice psi k i *
-            (CFC.rpow psi.state.marginalB.matrix p).mulVec
+            (CFC.rpow psi.state.traceLeft.m p).mulVec
               (fun y : s => (U : CMatrix s) y k) x := by
             simp [Matrix.mulVec, dotProduct, Finset.mul_sum, mul_left_comm]
             rw [Finset.sum_comm]
       _ = ∑ k : s, rightSchmidtSlice psi k i *
-            (((lambda k ^ p : Real) : Complex) * (U : CMatrix s) x k) := by
+            (((lambda k ^ p : ℝ) : ℂ) * (U : CMatrix s) x k) := by
             apply Finset.sum_congr rfl
             intro k _
             have hk := congrFun
               (cMatrix_rpow_mulVec_eigenvectorUnitary_forPetz
-                psi.state.marginalB.pos k p) x
+                psi.state.traceLeft.psd k p) x
             simpa [U, lambda, Pi.smul_apply] using
               congrArg (fun z => rightSchmidtSlice psi k i * z) hk
-      _ = ∑ k : s, ((lambda k ^ p : Real) : Complex) *
+      _ = ∑ k : s, ((lambda k ^ p : ℝ) : ℂ) *
             rightSchmidtSlice psi k i * (U : CMatrix s) x k := by
             apply Finset.sum_congr rfl
             intro k _
             ring
   rw [hleft, hright]
 
-private theorem pureVector_projectorTrace_move_left_rpow
+private theorem ket_projectorTrace_move_left_rpow
     {r s : Type*} [Fintype r] [DecidableEq r] [Fintype s] [DecidableEq s]
-    (psi : PureVector (Prod r s)) (K : CMatrix (Prod r s)) (p : Real) :
-    ((Matrix.kronecker (CFC.rpow psi.state.marginalA.matrix p) (1 : CMatrix s) *
-      psi.state.matrix * K).trace).re =
-      ((Matrix.kronecker (1 : CMatrix r) (CFC.rpow psi.state.marginalB.matrix p) *
-        psi.state.matrix * K).trace).re := by
-  simpa [PureVector.state_matrix] using
+    (psi : Ket (r × s)) (K : CMatrix (r × s)) (p : ℝ) :
+    ((Matrix.kronecker (CFC.rpow psi.state.traceRight.m p) (1 : CMatrix s) *
+      psi.state.m * K).trace).re =
+      ((Matrix.kronecker (1 : CMatrix r) (CFC.rpow psi.state.traceLeft.m p) *
+        psi.state.m * K).trace).re := by
+  simpa [Ket.state_matrix] using
     trace_mul_rankOneMatrix_mul_re_eq_of_mulVec_eq
-      (L := Matrix.kronecker (CFC.rpow psi.state.marginalA.matrix p) (1 : CMatrix s))
+      (L := Matrix.kronecker (CFC.rpow psi.state.traceRight.m p) (1 : CMatrix s))
       (R := K)
-      (L' := Matrix.kronecker (1 : CMatrix r) (CFC.rpow psi.state.marginalB.matrix p))
+      (L' := Matrix.kronecker (1 : CMatrix r) (CFC.rpow psi.state.traceLeft.m p))
       (R' := K)
-      (v := psi.amp)
-      (pureVector_rpow_marginalA_tensor_one_mulVec_eq_one_tensor_marginalB_rpow_mulVec
+      (v := psi.vec)
+      (ket_rpow_traceRight_tensor_one_mulVec_eq_one_tensor_traceLeft_rpow_mulVec
         psi p)
       rfl
 
-private theorem pureVector_projectorTrace_move_right_rpow
+private theorem ket_projectorTrace_move_right_rpow
     {r s : Type*} [Fintype r] [DecidableEq r] [Fintype s] [DecidableEq s]
-    (psi : PureVector (Prod r s)) (K : CMatrix (Prod r s)) (p : Real) :
-    ((K * psi.state.matrix *
-      Matrix.kronecker (1 : CMatrix r) (CFC.rpow psi.state.marginalB.matrix p)).trace).re =
-      ((K * psi.state.matrix *
-        Matrix.kronecker (CFC.rpow psi.state.marginalA.matrix p) (1 : CMatrix s)).trace).re := by
-  let R : CMatrix (Prod r s) :=
-    Matrix.kronecker (1 : CMatrix r) (CFC.rpow psi.state.marginalB.matrix p)
-  let R' : CMatrix (Prod r s) :=
-    Matrix.kronecker (CFC.rpow psi.state.marginalA.matrix p) (1 : CMatrix s)
-  have hR : R.mulVec psi.amp = R'.mulVec psi.amp :=
-    (pureVector_rpow_marginalA_tensor_one_mulVec_eq_one_tensor_marginalB_rpow_mulVec
+    (psi : Ket (r × s)) (K : CMatrix (r × s)) (p : ℝ) :
+    ((K * psi.state.m *
+      Matrix.kronecker (1 : CMatrix r) (CFC.rpow psi.state.traceLeft.m p)).trace).re =
+      ((K * psi.state.m *
+        Matrix.kronecker (CFC.rpow psi.state.traceRight.m p) (1 : CMatrix s)).trace).re := by
+  let R : CMatrix (r × s) :=
+    Matrix.kronecker (1 : CMatrix r) (CFC.rpow psi.state.traceLeft.m p)
+  let R' : CMatrix (r × s) :=
+    Matrix.kronecker (CFC.rpow psi.state.traceRight.m p) (1 : CMatrix s)
+  have hR : R.mulVec psi.vec = R'.mulVec psi.vec :=
+    (ket_rpow_traceRight_tensor_one_mulVec_eq_one_tensor_traceLeft_rpow_mulVec
       psi p).symm
   have hRherm : Matrix.conjTranspose R = R := by
     have hpsd : R.PosSemidef := by
       dsimp [R]
       exact Matrix.PosSemidef.one.kronecker
-        (cMatrix_rpow_posSemidef (A := psi.state.marginalB.matrix) (s := p)
-          psi.state.marginalB.pos)
+        (cMatrix_rpow_posSemidef (A := psi.state.traceLeft.m) (s := p)
+          psi.state.traceLeft.psd)
     exact hpsd.isHermitian.eq
   have hR'herm : Matrix.conjTranspose R' = R' := by
     have hpsd : R'.PosSemidef := by
       dsimp [R']
       exact
-        (cMatrix_rpow_posSemidef (A := psi.state.marginalA.matrix) (s := p)
-          psi.state.marginalA.pos).kronecker Matrix.PosSemidef.one
+        (cMatrix_rpow_posSemidef (A := psi.state.traceRight.m) (s := p)
+          psi.state.traceRight.psd).kronecker Matrix.PosSemidef.one
     exact hpsd.isHermitian.eq
-  simpa [PureVector.state_matrix, R, R'] using
+  simpa [Ket.state_matrix, R, R'] using
     trace_mul_rankOneMatrix_mul_re_eq_of_hermitian_mulVec_eq
-      (L := K) (R := R) (L' := K) (R' := R') (v := psi.amp)
+      (L := K) (R := R) (L' := K) (R' := R') (v := psi.vec)
       rfl hR hRherm hR'herm
 
 /-- Middle source trace bridge for downward Petz duality.
@@ -926,92 +781,92 @@ pure projector, finite basis relabeling from `ABC` to `ACB`, the corresponding
 movement on the `AC|B` split, and a Hermitian trace swap to align with the
 existing AC-side projector trace convention. -/
 theorem conditionalPetzRenyi_projectorTrace_marginalAB_eq_acbProjectorTrace_dualParam
-    (psi : PureVector (Prod (Prod a b) c)) {alpha : Real} :
+    (psi : Ket ((a × b) × c)) {alpha : ℝ} :
     ((Matrix.kronecker
-        (CFC.rpow psi.state.marginalAB.matrix (alpha - 1))
+        (CFC.rpow psi.state.marginalAB.m (alpha - 1))
         (1 : CMatrix c) *
-      psi.state.matrix *
+      psi.state.m *
       Matrix.kronecker
         (Matrix.kronecker (1 : CMatrix a)
-          (CFC.rpow psi.state.marginalBOfABC.matrix (1 - alpha)))
+          (CFC.rpow psi.state.marginalBOfABC.m (1 - alpha)))
         (1 : CMatrix c)).trace).re =
       ((Matrix.kronecker
-          (CFC.rpow psi.state.marginalAC.matrix (1 - alpha))
+          (CFC.rpow psi.state.marginalAC.m (1 - alpha))
           (1 : CMatrix b) *
         (psi.reindex
-          (conditionalPetzRenyiABCToACBEquiv (a := a) (b := b) (c := c))).state.matrix *
+          (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c))).state.m *
         Matrix.kronecker
           (Matrix.kronecker (1 : CMatrix a)
-            (CFC.rpow psi.state.marginalAC.marginalB.matrix (alpha - 1)))
+            (CFC.rpow psi.state.marginalAC.traceLeft.m (alpha - 1)))
           (1 : CMatrix b)).trace).re := by
-  let e := conditionalPetzRenyiABCToACBEquiv (a := a) (b := b) (c := c)
-  let phi : PureVector (Prod (Prod a c) b) := psi.reindex e
-  let p : Real := alpha - 1
-  let q : Real := 1 - alpha
-  let KBABC : CMatrix (Prod (Prod a b) c) :=
+  let e := QIT.prodABCToACBEquiv (a := a) (b := b) (c := c)
+  let phi : Ket ((a × c) × b) := psi.reindex e
+  let p : ℝ := alpha - 1
+  let q : ℝ := 1 - alpha
+  let KBABC : CMatrix ((a × b) × c) :=
     Matrix.kronecker
       (Matrix.kronecker (1 : CMatrix a)
-        (CFC.rpow psi.state.marginalBOfABC.matrix q))
+        (CFC.rpow psi.state.marginalBOfABC.m q))
       (1 : CMatrix c)
-  let KCABC₀ : CMatrix (Prod (Prod a b) c) :=
-    Matrix.kronecker (1 : CMatrix (Prod a b))
-      (CFC.rpow psi.state.marginalB.matrix p)
-  let KACB₀ : CMatrix (Prod (Prod a c) b) :=
+  let KCABC₀ : CMatrix ((a × b) × c) :=
+    Matrix.kronecker (1 : CMatrix (a × b))
+      (CFC.rpow psi.state.traceLeft.m p)
+  let KACB₀ : CMatrix ((a × c) × b) :=
     Matrix.kronecker
       (Matrix.kronecker (1 : CMatrix a)
-        (CFC.rpow psi.state.marginalB.matrix p))
+        (CFC.rpow psi.state.traceLeft.m p))
       (1 : CMatrix b)
-  let KACB : CMatrix (Prod (Prod a c) b) :=
+  let KACB : CMatrix ((a × c) × b) :=
     Matrix.kronecker
       (Matrix.kronecker (1 : CMatrix a)
-        (CFC.rpow psi.state.marginalAC.marginalB.matrix p))
+        (CFC.rpow psi.state.marginalAC.traceLeft.m p))
       (1 : CMatrix b)
-  let RBACB : CMatrix (Prod (Prod a c) b) :=
-    Matrix.kronecker (1 : CMatrix (Prod a c))
-      (CFC.rpow psi.state.marginalBOfABC.matrix q)
-  let RACACB : CMatrix (Prod (Prod a c) b) :=
-    Matrix.kronecker (CFC.rpow psi.state.marginalAC.matrix q) (1 : CMatrix b)
-  have hC : psi.state.marginalAC.marginalB = psi.state.marginalB :=
-    marginalAC_marginalB_eq_marginalB psi
+  let RBACB : CMatrix ((a × c) × b) :=
+    Matrix.kronecker (1 : CMatrix (a × c))
+      (CFC.rpow psi.state.marginalBOfABC.m q)
+  let RACACB : CMatrix ((a × c) × b) :=
+    Matrix.kronecker (CFC.rpow psi.state.marginalAC.m q) (1 : CMatrix b)
+  have hC : psi.state.marginalAC.traceLeft = psi.state.traceLeft :=
+    MState.marginalAC_traceLeft_eq_traceLeft psi.state
   have hKACB : KACB₀ = KACB := by
     simpa [KACB₀, KACB] using
       congrArg
-        (fun τ : State c =>
+        (fun τ : MState c =>
           Matrix.kronecker
-            (Matrix.kronecker (1 : CMatrix a) (CFC.rpow τ.matrix p))
+            (Matrix.kronecker (1 : CMatrix a) (CFC.rpow τ.m p))
             (1 : CMatrix b))
         hC.symm
   have hleft :
       ((Matrix.kronecker
-          (CFC.rpow psi.state.marginalAB.matrix p)
+          (CFC.rpow psi.state.marginalAB.m p)
           (1 : CMatrix c) *
-        psi.state.matrix * KBABC).trace).re =
-        ((KCABC₀ * psi.state.matrix * KBABC).trace).re := by
+        psi.state.m * KBABC).trace).re =
+        ((KCABC₀ * psi.state.m * KBABC).trace).re := by
     have h :=
-      pureVector_projectorTrace_move_left_rpow
-        (r := Prod a b) (s := c) psi KBABC p
-    simpa [KCABC₀, State.marginalAB, State.marginalA] using h
+      ket_projectorTrace_move_left_rpow
+        (r := a × b) (s := c) psi KBABC p
+    simpa [KCABC₀, MState.marginalAB] using h
   have hreindex :
-      ((KCABC₀ * psi.state.matrix * KBABC).trace).re =
-        ((KACB₀ * phi.state.matrix * RBACB).trace).re := by
+      ((KCABC₀ * psi.state.m * KBABC).trace).re =
+        ((KACB₀ * phi.state.m * RBACB).trace).re := by
     have h :=
-      conditionalPetzRenyiABCToACB_projectorTrace_reindex
+      prodABCToACB_projectorTrace_reindex
         (a := a) (b := b) (c := c) psi
-        (CFC.rpow psi.state.marginalB.matrix p)
-        (CFC.rpow psi.state.marginalBOfABC.matrix q)
+        (CFC.rpow psi.state.traceLeft.m p)
+        (CFC.rpow psi.state.marginalBOfABC.m q)
     simpa [KCABC₀, KBABC, KACB₀, RBACB, phi, e] using h
-  have hphiA : phi.state.marginalA = psi.state.marginalAC := by
-    simpa [phi, e, State.marginalAB, State.marginalA] using
-      conditionalPetzRenyiABCToACB_marginalAB (a := a) (b := b) (c := c) psi
-  have hphiB : phi.state.marginalB = psi.state.marginalBOfABC := by
+  have hphiA : phi.state.traceRight = psi.state.marginalAC := by
+    simpa [phi, e, MState.marginalAB] using
+      prodABCToACB_marginalAB (a := a) (b := b) (c := c) psi
+  have hphiB : phi.state.traceLeft = psi.state.marginalBOfABC := by
     simpa [phi, e] using
-      conditionalPetzRenyiABCToACB_marginalB (a := a) (b := b) (c := c) psi
+      prodABCToACB_traceLeft (a := a) (b := b) (c := c) psi
   have hright :
-      ((KACB₀ * phi.state.matrix * RBACB).trace).re =
-        ((KACB₀ * phi.state.matrix * RACACB).trace).re := by
+      ((KACB₀ * phi.state.m * RBACB).trace).re =
+        ((KACB₀ * phi.state.m * RACACB).trace).re := by
     have h :=
-      pureVector_projectorTrace_move_right_rpow
-        (r := Prod a c) (s := b) phi KACB₀ q
+      ket_projectorTrace_move_right_rpow
+        (r := a × c) (s := b) phi KACB₀ q
     simpa [RBACB, RACACB, hphiA, hphiB] using h
   have hKherm : Matrix.conjTranspose KACB = KACB := by
     have hpsd : KACB.PosSemidef := by
@@ -1019,8 +874,8 @@ theorem conditionalPetzRenyi_projectorTrace_marginalAB_eq_acbProjectorTrace_dual
       exact
         (Matrix.PosSemidef.one.kronecker
           (cMatrix_rpow_posSemidef
-            (A := psi.state.marginalAC.marginalB.matrix) (s := p)
-            psi.state.marginalAC.marginalB.pos)).kronecker
+            (A := psi.state.marginalAC.traceLeft.m) (s := p)
+            psi.state.marginalAC.traceLeft.psd)).kronecker
           Matrix.PosSemidef.one
     exact hpsd.isHermitian.eq
   have hRherm : Matrix.conjTranspose RACACB = RACACB := by
@@ -1028,38 +883,38 @@ theorem conditionalPetzRenyi_projectorTrace_marginalAB_eq_acbProjectorTrace_dual
       dsimp [RACACB]
       exact
         (cMatrix_rpow_posSemidef
-          (A := psi.state.marginalAC.matrix) (s := q)
-          psi.state.marginalAC.pos).kronecker Matrix.PosSemidef.one
+          (A := psi.state.marginalAC.m) (s := q)
+          psi.state.marginalAC.psd).kronecker Matrix.PosSemidef.one
     exact hpsd.isHermitian.eq
   have hswap :
-      ((KACB * phi.state.matrix * RACACB).trace).re =
-        ((RACACB * phi.state.matrix * KACB).trace).re := by
-    simpa [PureVector.state_matrix] using
-      trace_rankOneMatrix_hermitian_swap_re KACB RACACB phi.amp hKherm hRherm
+      ((KACB * phi.state.m * RACACB).trace).re =
+        ((RACACB * phi.state.m * KACB).trace).re := by
+    simpa [Ket.state_matrix] using
+      trace_rankOneMatrix_hermitian_swap_re KACB RACACB phi.vec hKherm hRherm
   calc
     ((Matrix.kronecker
-        (CFC.rpow psi.state.marginalAB.matrix (alpha - 1))
+        (CFC.rpow psi.state.marginalAB.m (alpha - 1))
         (1 : CMatrix c) *
-      psi.state.matrix *
+      psi.state.m *
       Matrix.kronecker
         (Matrix.kronecker (1 : CMatrix a)
-          (CFC.rpow psi.state.marginalBOfABC.matrix (1 - alpha)))
+          (CFC.rpow psi.state.marginalBOfABC.m (1 - alpha)))
         (1 : CMatrix c)).trace).re =
-        ((KCABC₀ * psi.state.matrix * KBABC).trace).re := by
+        ((KCABC₀ * psi.state.m * KBABC).trace).re := by
           simpa [p, q, KBABC] using hleft
-    _ = ((KACB₀ * phi.state.matrix * RBACB).trace).re := hreindex
-    _ = ((KACB₀ * phi.state.matrix * RACACB).trace).re := hright
-    _ = ((KACB * phi.state.matrix * RACACB).trace).re := by rw [hKACB]
-    _ = ((RACACB * phi.state.matrix * KACB).trace).re := hswap
+    _ = ((KACB₀ * phi.state.m * RBACB).trace).re := hreindex
+    _ = ((KACB₀ * phi.state.m * RACACB).trace).re := hright
+    _ = ((KACB * phi.state.m * RACACB).trace).re := by rw [hKACB]
+    _ = ((RACACB * phi.state.m * KACB).trace).re := hswap
     _ =
         ((Matrix.kronecker
-          (CFC.rpow psi.state.marginalAC.matrix (1 - alpha))
+          (CFC.rpow psi.state.marginalAC.m (1 - alpha))
           (1 : CMatrix b) *
         (psi.reindex
-          (conditionalPetzRenyiABCToACBEquiv (a := a) (b := b) (c := c))).state.matrix *
+          (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c))).state.m *
         Matrix.kronecker
           (Matrix.kronecker (1 : CMatrix a)
-            (CFC.rpow psi.state.marginalAC.marginalB.matrix (alpha - 1)))
+            (CFC.rpow psi.state.marginalAC.traceLeft.m (alpha - 1)))
           (1 : CMatrix b)).trace).re := by
           simp [phi, e, p, q, KACB, RACACB]
 
@@ -1074,61 +929,61 @@ The assumption `α ≠ 0` is exactly the nonzero-exponent side condition needed
 by the current singular-PSD exponent law when combining
 `ρ_AB^(α-1) ρ_AB = ρ_AB^α`. -/
 theorem conditionalPetzRenyiTraceTerm_marginalAB_eq_projectorTrace
-    (psi : PureVector (Prod (Prod a b) c)) {alpha : Real}
+    (psi : Ket ((a × b) × c)) {alpha : ℝ}
     (halpha_ne_zero : alpha ≠ 0) :
     psi.state.marginalAB.conditionalPetzRenyiTraceTerm
         psi.state.marginalBOfABC alpha =
       ((Matrix.kronecker
-          (CFC.rpow psi.state.marginalAB.matrix (alpha - 1))
+          (CFC.rpow psi.state.marginalAB.m (alpha - 1))
           (1 : CMatrix c) *
-        psi.state.matrix *
+        psi.state.m *
         Matrix.kronecker
           (Matrix.kronecker (1 : CMatrix a)
-            (CFC.rpow psi.state.marginalBOfABC.matrix (1 - alpha)))
+            (CFC.rpow psi.state.marginalBOfABC.m (1 - alpha)))
           (1 : CMatrix c)).trace).re := by
-  let rhoAB : State (Prod a b) := psi.state.marginalAB
-  let rhoB : State b := psi.state.marginalBOfABC
-  let L : CMatrix (Prod a b) := CFC.rpow rhoAB.matrix (alpha - 1)
-  let M : CMatrix (Prod a b) :=
-    Matrix.kronecker (1 : CMatrix a) (CFC.rpow rhoB.matrix (1 - alpha))
-  have hpow_one : CFC.rpow rhoAB.matrix (1 : Real) = rhoAB.matrix :=
-    CFC.rpow_one rhoAB.matrix (ha := Matrix.nonneg_iff_posSemidef.mpr rhoAB.pos)
+  let rhoAB : MState (a × b) := psi.state.marginalAB
+  let rhoB : MState b := psi.state.marginalBOfABC
+  let L : CMatrix (a × b) := CFC.rpow rhoAB.m (alpha - 1)
+  let M : CMatrix (a × b) :=
+    Matrix.kronecker (1 : CMatrix a) (CFC.rpow rhoB.m (1 - alpha))
+  have hpow_one : CFC.rpow rhoAB.m (1 : ℝ) = rhoAB.m :=
+    CFC.rpow_one rhoAB.m (ha := Matrix.nonneg_iff_posSemidef.mpr rhoAB.psd)
   have hpq : (alpha - 1) + 1 ≠ 0 := by
     intro hzero
     apply halpha_ne_zero
     linarith
-  have hpow : L * rhoAB.matrix = CFC.rpow rhoAB.matrix alpha := by
+  have hpow : L * rhoAB.m = CFC.rpow rhoAB.m alpha := by
     calc
-      L * rhoAB.matrix =
-          CFC.rpow rhoAB.matrix (alpha - 1) * CFC.rpow rhoAB.matrix (1 : Real) := by
+      L * rhoAB.m =
+          CFC.rpow rhoAB.m (alpha - 1) * CFC.rpow rhoAB.m (1 : ℝ) := by
             rw [hpow_one]
-      _ = CFC.rpow rhoAB.matrix ((alpha - 1) + 1) := by
-            exact cMatrix_rpow_add_psd_forPetz rhoAB.pos hpq
-      _ = CFC.rpow rhoAB.matrix alpha := by
+      _ = CFC.rpow rhoAB.m ((alpha - 1) + 1) := by
+            exact cMatrix_rpow_add_psd rhoAB.psd hpq
+      _ = CFC.rpow rhoAB.m alpha := by
             congr 1
             ring
   have hside :
-      CFC.rpow (State.identityTensorStateMatrix (a := a) rhoB) (1 - alpha) = M := by
-    simpa [M, State.identityTensorStateMatrix] using
-      State.cMatrix_rpow_identity_kronecker (a := a) rhoB.matrix rhoB.pos (1 - alpha)
-  dsimp [State.conditionalPetzRenyiTraceTerm]
+      CFC.rpow (MState.identityTensorStateMatrix (a := a) rhoB) (1 - alpha) = M := by
+    simpa [M, MState.identityTensorStateMatrix] using
+      MState.cMatrix_rpow_identity_kronecker (a := a) rhoB.m rhoB.psd (1 - alpha)
+  dsimp [MState.conditionalPetzRenyiTraceTerm]
   change
-    ((CFC.rpow rhoAB.matrix alpha *
-      CFC.rpow (State.identityTensorStateMatrix (a := a) rhoB) (1 - alpha)).trace).re =
-      ((Matrix.kronecker L (1 : CMatrix c) * psi.state.matrix *
+    ((CFC.rpow rhoAB.m alpha *
+      CFC.rpow (MState.identityTensorStateMatrix (a := a) rhoB) (1 - alpha)).trace).re =
+      ((Matrix.kronecker L (1 : CMatrix c) * psi.state.m *
         Matrix.kronecker M (1 : CMatrix c)).trace).re
   rw [hside]
   calc
-    ((CFC.rpow rhoAB.matrix alpha * M).trace).re =
-        ((L * rhoAB.matrix * M).trace).re := by
+    ((CFC.rpow rhoAB.m alpha * M).trace).re =
+        ((L * rhoAB.m * M).trace).re := by
           rw [← hpow]
     _ =
-        ((Matrix.kronecker L (1 : CMatrix c) * psi.state.matrix *
+        ((Matrix.kronecker L (1 : CMatrix c) * psi.state.m *
           Matrix.kronecker M (1 : CMatrix c)).trace).re := by
           have htrace :=
-            trace_left_right_kronecker_one_eq_partialTraceB
-              (a := Prod a b) (b := c) psi.state.matrix L M
-          simpa [rhoAB, State.marginalAB, State.marginalA] using htrace.symm
+            trace_left_right_kronecker_one_eq_traceRight
+              (a := a × b) (b := c) psi.state.m L M
+          simpa [rhoAB, MState.marginalAB] using htrace.symm
 
 /-- Boundary trace rewrite at `alpha = 0` for downward Petz duality.
 
@@ -1141,51 +996,51 @@ rho_AB^alpha`, which needs `alpha ≠ 0`) is replaced by the range-projection
 bookend `cMatrix_rpow_neg_one_mul_self_eq_rangeProjection`.  The remaining
 trace-lifting step is `alpha`-independent and is reused verbatim. -/
 theorem conditionalPetzRenyiTraceTermZero_marginalAB_eq_projectorTrace
-    (psi : PureVector (Prod (Prod a b) c)) :
-    ((Matrix.rangeProjection psi.state.marginalAB.matrix *
-      State.identityTensorStateMatrix (a := a) psi.state.marginalBOfABC).trace).re =
+    (psi : Ket ((a × b) × c)) :
+    ((Matrix.rangeProjection psi.state.marginalAB.m *
+      MState.identityTensorStateMatrix (a := a) psi.state.marginalBOfABC).trace).re =
       ((Matrix.kronecker
-          (CFC.rpow psi.state.marginalAB.matrix (0 - 1))
+          (CFC.rpow psi.state.marginalAB.m (0 - 1))
           (1 : CMatrix c) *
-        psi.state.matrix *
+        psi.state.m *
         Matrix.kronecker
           (Matrix.kronecker (1 : CMatrix a)
-            (CFC.rpow psi.state.marginalBOfABC.matrix (1 - 0)))
+            (CFC.rpow psi.state.marginalBOfABC.m (1 - 0)))
           (1 : CMatrix c)).trace).re := by
-  have hbook : Matrix.rangeProjection psi.state.marginalAB.matrix =
-      CFC.rpow psi.state.marginalAB.matrix (0 - 1) * psi.state.marginalAB.matrix := by
+  have hbook : Matrix.rangeProjection psi.state.marginalAB.m =
+      CFC.rpow psi.state.marginalAB.m (0 - 1) * psi.state.marginalAB.m := by
     have h :=
-      cMatrix_rpow_neg_one_mul_self_eq_rangeProjection psi.state.marginalAB.pos
+      cMatrix_rpow_neg_one_mul_self_eq_rangeProjection psi.state.marginalAB.psd
     rw [zero_sub]
     exact h.symm
-  have hT : State.identityTensorStateMatrix (a := a) psi.state.marginalBOfABC =
-      CFC.rpow (State.identityTensorStateMatrix (a := a) psi.state.marginalBOfABC)
+  have hT : MState.identityTensorStateMatrix (a := a) psi.state.marginalBOfABC =
+      CFC.rpow (MState.identityTensorStateMatrix (a := a) psi.state.marginalBOfABC)
         (1 - 0) := by
     rw [sub_zero]
     exact (CFC.rpow_one _ (ha := Matrix.nonneg_iff_posSemidef.mpr
-      (State.identityTensorStateMatrix_posSemidef_of_state (a := a)
+      (MState.identityTensorStateMatrix_posSemidef (a := a)
         psi.state.marginalBOfABC))).symm
   have hside :
-      CFC.rpow (State.identityTensorStateMatrix (a := a) psi.state.marginalBOfABC)
+      CFC.rpow (MState.identityTensorStateMatrix (a := a) psi.state.marginalBOfABC)
           (1 - 0) =
         Matrix.kronecker (1 : CMatrix a)
-          (CFC.rpow psi.state.marginalBOfABC.matrix (1 - 0)) := by
-    simpa [State.identityTensorStateMatrix] using
-      State.cMatrix_rpow_identity_kronecker (a := a)
-        psi.state.marginalBOfABC.matrix psi.state.marginalBOfABC.pos (1 - 0)
+          (CFC.rpow psi.state.marginalBOfABC.m (1 - 0)) := by
+    simpa [MState.identityTensorStateMatrix] using
+      MState.cMatrix_rpow_identity_kronecker (a := a)
+        psi.state.marginalBOfABC.m psi.state.marginalBOfABC.psd (1 - 0)
   rw [hbook]
   conv_lhs => rw [hT, hside]
   have htrace :=
-    trace_left_right_kronecker_one_eq_partialTraceB
-      (a := Prod a b) (b := c) psi.state.matrix
-      (CFC.rpow psi.state.marginalAB.matrix (0 - 1))
+    trace_left_right_kronecker_one_eq_traceRight
+      (a := a × b) (b := c) psi.state.m
+      (CFC.rpow psi.state.marginalAB.m (0 - 1))
       (Matrix.kronecker (1 : CMatrix a)
-        (CFC.rpow psi.state.marginalBOfABC.matrix (1 - 0)))
-  simpa [State.marginalAB, State.marginalA] using htrace.symm
+        (CFC.rpow psi.state.marginalBOfABC.m (1 - 0)))
+  simpa [MState.marginalAB] using htrace.symm
 
 /-- AC-side source trace rewrite for downward Petz duality.
 
-For the reindexed `AC:B` presentation of the same pure vector, this is the
+For the reindexed `AC:B` presentation of the same ket, this is the
 formal version of the final source trace contraction in
 Tomamichel2015FiniteResources, `cond.tex:334-335`, read from the Petz trace
 term side:
@@ -1197,30 +1052,30 @@ used directly when closing the `H_β(A|C)` half of Proposition `pr:dual-old`.
 The ACB ordering is only a basis relabeling of the original `ABC` pure state;
 the declaration names keep the original namespaces unchanged. -/
 theorem conditionalPetzRenyiTraceTerm_marginalAC_eq_acbProjectorTrace
-    (psi : PureVector (Prod (Prod a b) c)) {beta : Real}
+    (psi : Ket ((a × b) × c)) {beta : ℝ}
     (hbeta_ne_zero : beta ≠ 0) :
     psi.state.marginalAC.conditionalPetzRenyiTraceTerm
-        psi.state.marginalAC.marginalB beta =
+        psi.state.marginalAC.traceLeft beta =
       ((Matrix.kronecker
-          (CFC.rpow psi.state.marginalAC.matrix (beta - 1))
+          (CFC.rpow psi.state.marginalAC.m (beta - 1))
           (1 : CMatrix b) *
         (psi.reindex
-          (conditionalPetzRenyiABCToACBEquiv (a := a) (b := b) (c := c))).state.matrix *
+          (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c))).state.m *
         Matrix.kronecker
           (Matrix.kronecker (1 : CMatrix a)
-            (CFC.rpow psi.state.marginalAC.marginalB.matrix (1 - beta)))
+            (CFC.rpow psi.state.marginalAC.traceLeft.m (1 - beta)))
           (1 : CMatrix b)).trace).re := by
-  let e := conditionalPetzRenyiABCToACBEquiv (a := a) (b := b) (c := c)
-  let phi : PureVector (Prod (Prod a c) b) := psi.reindex e
+  let e := QIT.prodABCToACBEquiv (a := a) (b := b) (c := c)
+  let phi : Ket ((a × c) × b) := psi.reindex e
   have hsource :=
     conditionalPetzRenyiTraceTerm_marginalAB_eq_projectorTrace
       (a := a) (b := c) (c := b) phi hbeta_ne_zero
   have hAB : phi.state.marginalAB = psi.state.marginalAC := by
-    simpa [phi, e] using conditionalPetzRenyiABCToACB_marginalAB (a := a) (b := b)
+    simpa [phi, e] using prodABCToACB_marginalAB (a := a) (b := b)
       (c := c) psi
-  have hB : phi.state.marginalBOfABC = psi.state.marginalAC.marginalB := by
+  have hB : phi.state.marginalBOfABC = psi.state.marginalAC.traceLeft := by
     simpa [phi, e] using
-      conditionalPetzRenyiABCToACB_marginalBOfABC (a := a) (b := b) (c := c) psi
+      prodABCToACB_marginalBOfABC (a := a) (b := b) (c := c) psi
   rw [hAB, hB] at hsource
   simpa only [phi, e] using hsource
 
@@ -1232,18 +1087,18 @@ This is the same trace contraction as
 exponents are displayed in the form used in Tomamichel2015FiniteResources,
 `cond.tex:332-335`: `rho_AC^(1-alpha)` and `rho_C^(alpha-1)`. -/
 theorem conditionalPetzRenyiTraceTerm_marginalAC_eq_acbProjectorTrace_dualParam
-    (psi : PureVector (Prod (Prod a b) c)) {alpha beta : Real}
+    (psi : Ket ((a × b) × c)) {alpha beta : ℝ}
     (hbeta_ne_zero : beta ≠ 0) (hdual : alpha + beta = 2) :
     psi.state.marginalAC.conditionalPetzRenyiTraceTerm
-        psi.state.marginalAC.marginalB beta =
+        psi.state.marginalAC.traceLeft beta =
       ((Matrix.kronecker
-          (CFC.rpow psi.state.marginalAC.matrix (1 - alpha))
+          (CFC.rpow psi.state.marginalAC.m (1 - alpha))
           (1 : CMatrix b) *
         (psi.reindex
-          (conditionalPetzRenyiABCToACBEquiv (a := a) (b := b) (c := c))).state.matrix *
+          (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c))).state.m *
         Matrix.kronecker
           (Matrix.kronecker (1 : CMatrix a)
-            (CFC.rpow psi.state.marginalAC.marginalB.matrix (alpha - 1)))
+            (CFC.rpow psi.state.marginalAC.traceLeft.m (alpha - 1)))
           (1 : CMatrix b)).trace).re := by
   have hbase :=
     conditionalPetzRenyiTraceTerm_marginalAC_eq_acbProjectorTrace
@@ -1260,13 +1115,13 @@ and `beta ≠ 0` are the singular-PSD exponent side conditions required by the
 current finite-dimensional CFC power API when contracting a projector trace
 back to `Tr(rho^alpha sigma^(1-alpha))`. -/
 theorem conditionalPetzRenyiTraceTerm_marginalAB_eq_marginalAC_dualParam
-    (psi : PureVector (Prod (Prod a b) c)) {alpha beta : Real}
+    (psi : Ket ((a × b) × c)) {alpha beta : ℝ}
     (halpha_ne_zero : alpha ≠ 0) (hbeta_ne_zero : beta ≠ 0)
     (hdual : alpha + beta = 2) :
     psi.state.marginalAB.conditionalPetzRenyiTraceTerm
         psi.state.marginalBOfABC alpha =
       psi.state.marginalAC.conditionalPetzRenyiTraceTerm
-        psi.state.marginalAC.marginalB beta := by
+        psi.state.marginalAC.traceLeft beta := by
   have hAB :=
     conditionalPetzRenyiTraceTerm_marginalAB_eq_projectorTrace
       (a := a) (b := b) (c := c) psi halpha_ne_zero
@@ -1280,26 +1135,26 @@ theorem conditionalPetzRenyiTraceTerm_marginalAB_eq_marginalAC_dualParam
     psi.state.marginalAB.conditionalPetzRenyiTraceTerm
         psi.state.marginalBOfABC alpha =
         ((Matrix.kronecker
-          (CFC.rpow psi.state.marginalAB.matrix (alpha - 1))
+          (CFC.rpow psi.state.marginalAB.m (alpha - 1))
           (1 : CMatrix c) *
-        psi.state.matrix *
+        psi.state.m *
         Matrix.kronecker
           (Matrix.kronecker (1 : CMatrix a)
-            (CFC.rpow psi.state.marginalBOfABC.matrix (1 - alpha)))
+            (CFC.rpow psi.state.marginalBOfABC.m (1 - alpha)))
           (1 : CMatrix c)).trace).re := hAB
     _ =
         ((Matrix.kronecker
-          (CFC.rpow psi.state.marginalAC.matrix (1 - alpha))
+          (CFC.rpow psi.state.marginalAC.m (1 - alpha))
           (1 : CMatrix b) *
         (psi.reindex
-          (conditionalPetzRenyiABCToACBEquiv (a := a) (b := b) (c := c))).state.matrix *
+          (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c))).state.m *
         Matrix.kronecker
           (Matrix.kronecker (1 : CMatrix a)
-            (CFC.rpow psi.state.marginalAC.marginalB.matrix (alpha - 1)))
+            (CFC.rpow psi.state.marginalAC.traceLeft.m (alpha - 1)))
           (1 : CMatrix b)).trace).re := hbridge
     _ =
         psi.state.marginalAC.conditionalPetzRenyiTraceTerm
-          psi.state.marginalAC.marginalB beta := hAC.symm
+          psi.state.marginalAC.traceLeft beta := hAC.symm
 
 /-- Normalized non-endpoint old-Petz downward duality.
 
@@ -1310,10 +1165,10 @@ non-endpoint hypotheses.  The theorem assumes full-rank side marginals because
 candidate.  It does not claim endpoint conventions at `alpha = 0` or
 `alpha = 1`, nor any subnormalized-state extension. -/
 theorem conditionalPetzRenyiDown_duality_source
-    (psi : PureVector (Prod (Prod a b) c))
-    (hB : psi.state.marginalBOfABC.matrix.PosDef)
-    (hC : psi.state.marginalAC.marginalB.matrix.PosDef)
-    {alpha beta : Real}
+    (psi : Ket ((a × b) × c))
+    (hB : psi.state.marginalBOfABC.m.PosDef)
+    (hC : psi.state.marginalAC.traceLeft.m.PosDef)
+    {alpha beta : ℝ}
     (halpha_pos : 0 < alpha) (hbeta_pos : 0 < beta)
     (_halpha_le_two : alpha ≤ 2) (_hbeta_le_two : beta ≤ 2)
     (halpha_ne_one : alpha ≠ 1) (hbeta_ne_one : beta ≠ 1)
@@ -1328,12 +1183,12 @@ theorem conditionalPetzRenyiDown_duality_source
       (a := a) (b := b) (c := c) psi
       (ne_of_gt halpha_pos) (ne_of_gt hbeta_pos) hdual
   have hscalar :=
-    State.conditionalPetzRenyiEntropyCandidateFullReference_add_eq_zero_of_traceTerm_eq
+    MState.conditionalPetzRenyiEntropyCandidateFullReference_add_eq_zero_of_traceTerm_eq
       (a := a) (b := b) (c := c)
       psi.state.marginalAB psi.state.marginalBOfABC hB
-      psi.state.marginalAC psi.state.marginalAC.marginalB hC
+      psi.state.marginalAC psi.state.marginalAC.traceLeft hC
       halpha_pos hbeta_pos halpha_ne_one hbeta_ne_one hdual htrace
-  simpa [State.conditionalPetzRenyiDown] using hscalar
+  simpa [MState.conditionalPetzRenyiDown] using hscalar
 
 /-- Interior singular-marginal downward Petz Renyi duality.
 
@@ -1342,12 +1197,12 @@ For a pure tripartite state `psi` and interior dual parameters
 conditional Renyi entropies sum to zero in `EReal`, with NO `PosDef` marginal
 hypotheses.  This is the interior part of Tomamichel2015FiniteResources,
 `cond.tex`, Proposition `pr:dual-old`; singular marginals are handled by the
-support-aware kernel `State.conditionalPetzRenyiDownGeneralE` rather than by a
+support-aware kernel `MState.conditionalPetzRenyiDownGeneralE` rather than by a
 full-rank assumption.  Endpoint conventions at `alpha = 0` and `alpha = 1` are
 not claimed here. -/
 theorem conditionalPetzRenyiDownGeneralE_duality_interior
-    (psi : PureVector (Prod (Prod a b) c))
-    {alpha beta : Real}
+    (psi : Ket ((a × b) × c))
+    {alpha beta : ℝ}
     (halpha_pos : 0 < alpha) (hbeta_pos : 0 < beta)
     (halpha_ne_one : alpha ≠ 1) (hbeta_ne_one : beta ≠ 1)
     (hdual : alpha + beta = 2) :
@@ -1355,72 +1210,72 @@ theorem conditionalPetzRenyiDownGeneralE_duality_interior
       psi.state.marginalAC.conditionalPetzRenyiDownGeneralE beta hbeta_pos hbeta_ne_one =
       0 := by
   -- The AB side's canonical reference marginal is the B marginal of `psi`.
-  -- The bridge is phrased with `marginalBOfABC`; rewrite it to `marginalAB.marginalB`.
+  -- The bridge is phrased with `marginalBOfABC`; rewrite it to `marginalAB.traceLeft`.
   have hbridge :=
     conditionalPetzRenyiTraceTerm_marginalAB_eq_marginalAC_dualParam
       (a := a) (b := b) (c := c) psi
       (ne_of_gt halpha_pos) (ne_of_gt hbeta_pos) hdual
-  rw [State.marginalBOfABC_eq] at hbridge
+  rw [MState.marginalBOfABC_eq] at hbridge
   -- The AB trace term `Tr(rho_AB^alpha (I ⊗ rho_B)^(1-alpha))` is strictly
   -- positive for every interior `alpha`, since `rho_AB` is supported on
   -- `I_A ⊗ rho_B`.  This supplies the `≠ 0` side condition of the EReal coe.
-  have hMne : CFC.rpow psi.state.marginalAB.matrix alpha ≠ 0 := by
+  have hMne : CFC.rpow psi.state.marginalAB.m alpha ≠ 0 := by
     have hpow_pos :
-        0 < psdTracePower psi.state.marginalAB.matrix psi.state.marginalAB.pos
+        0 < psdTracePower psi.state.marginalAB.m psi.state.marginalAB.psd
           (p := alpha) :=
-      psdTracePower_pos_of_ne_zero psi.state.marginalAB.matrix
-        psi.state.marginalAB.pos psi.state.marginalAB.matrix_ne_zero
+      psdTracePower_pos_of_ne_zero psi.state.marginalAB.m
+        psi.state.marginalAB.psd psi.state.marginalAB.matrix_ne_zero
     intro hzero
     have htrace_zero :
-        psdTracePower psi.state.marginalAB.matrix psi.state.marginalAB.pos
+        psdTracePower psi.state.marginalAB.m psi.state.marginalAB.psd
           (p := alpha) = 0 := by
       simpa [psdTracePower] using
         congrArg (fun X : CMatrix (a × b) => X.trace.re) hzero
     linarith
   have hposAB :
       0 < psi.state.marginalAB.conditionalPetzRenyiTraceTerm
-        psi.state.marginalAB.marginalB alpha := by
+        psi.state.marginalAB.traceLeft alpha := by
     exact
       trace_mul_cMatrix_rpow_pos_of_support
-        (cMatrix_rpow_posSemidef (A := psi.state.marginalAB.matrix) (s := alpha)
-          psi.state.marginalAB.pos)
-        (State.identityTensorStateMatrix_posSemidef_of_state (a := a)
-          psi.state.marginalAB.marginalB)
+        (cMatrix_rpow_posSemidef (A := psi.state.marginalAB.m) (s := alpha)
+          psi.state.marginalAB.psd)
+        (MState.identityTensorStateMatrix_posSemidef (a := a)
+          psi.state.marginalAB.traceLeft)
         hMne
-        ((cMatrix_rpow_supports_self psi.state.marginalAB.pos halpha_pos).trans
-          (State.matrix_supports_identityTensor_marginalB psi.state.marginalAB))
+        ((cMatrix_rpow_supports_self psi.state.marginalAB.psd halpha_pos).trans
+          (MState.matrix_supports_identityTensor_traceLeft psi.state.marginalAB))
         (1 - alpha)
   -- Real-valued scalar cancellation across the two finite references.
   have hcancel :=
-    State.conditionalPetzRenyiReferenceFinite_add_eq_zero_of_traceTerm_eq
+    MState.conditionalPetzRenyiReferenceFinite_add_eq_zero_of_traceTerm_eq
       (a := a) (b := b) (c := c)
-      psi.state.marginalAB psi.state.marginalAB.marginalB
-      psi.state.marginalAC psi.state.marginalAC.marginalB
+      psi.state.marginalAB psi.state.marginalAB.traceLeft
+      psi.state.marginalAC psi.state.marginalAC.traceLeft
       halpha_pos hbeta_pos halpha_ne_one hbeta_ne_one hdual hbridge hposAB
   -- Reduce both support-aware wrappers to coes of the finite reference.
-  rw [State.conditionalPetzRenyiDownGeneralE_eq_coe
+  rw [MState.conditionalPetzRenyiDownGeneralE_eq_coe
         psi.state.marginalAB alpha halpha_pos halpha_ne_one,
-    State.conditionalPetzRenyiDownGeneralE_eq_coe
+    MState.conditionalPetzRenyiDownGeneralE_eq_coe
         psi.state.marginalAC beta hbeta_pos hbeta_ne_one]
   -- Close in `EReal`: both sides are coes of finite reals, so the negations
   -- fold into a single coe and the real cancellation `hcancel` finishes.
   have hkey :
       (- psi.state.marginalAB.petzRenyiReferenceFinite
-          (State.identityTensorStateMatrix (a := a) psi.state.marginalAB.marginalB)
-          (State.identityTensorStateMatrix_posSemidef_of_state (a := a)
-            psi.state.marginalAB.marginalB)
+          (MState.identityTensorStateMatrix (a := a) psi.state.marginalAB.traceLeft)
+          (MState.identityTensorStateMatrix_posSemidef (a := a)
+            psi.state.marginalAB.traceLeft)
           alpha halpha_pos halpha_ne_one +
         - psi.state.marginalAC.petzRenyiReferenceFinite
-          (State.identityTensorStateMatrix (a := a) psi.state.marginalAC.marginalB)
-          (State.identityTensorStateMatrix_posSemidef_of_state (a := a)
-            psi.state.marginalAC.marginalB)
-          beta hbeta_pos hbeta_ne_one : Real) = 0 := by linarith
+          (MState.identityTensorStateMatrix (a := a) psi.state.marginalAC.traceLeft)
+          (MState.identityTensorStateMatrix_posSemidef (a := a)
+            psi.state.marginalAC.traceLeft)
+          beta hbeta_pos hbeta_ne_one : ℝ) = 0 := by linarith
   simp only [← EReal.coe_neg, ← EReal.coe_add]
   exact_mod_cast hkey
 
-end PureVector
+end Ket
 
-namespace State
+namespace MState
 
 /-- Open-interval downward Petz Renyi entropy, extending the support-aware
 interior wrapper to the Umegaki point `alpha = 1`.
@@ -1429,11 +1284,11 @@ At `alpha = 1` the value is the ordinary conditional von Neumann entropy
 `rho.conditionalEntropy` embedded into `EReal`; for `alpha ≠ 1` it coincides
 with the support-aware `conditionalPetzRenyiDownGeneralE`.  The parameter is
 restricted to the open interval `(0, 2)`; the boundary points `alpha = 0` and
-`alpha = 2` are intentionally NOT covered here, since they require the
-`H^down_0` / support-projection endpoint layer and are deferred to a later PR.
+`alpha = 2` are not covered here, since they require the `H^down_0` /
+support-projection endpoint layer.
 No `PosDef` hypothesis is required on the reference marginal. -/
 noncomputable def conditionalPetzRenyiDownExtended
-    (rho : State (Prod a b)) (alpha : Real)
+    (rho : MState (a × b)) (alpha : ℝ)
     (halpha_pos : 0 < alpha) (_halpha_lt_two : alpha < 2) : EReal := by
   classical
   exact
@@ -1442,9 +1297,9 @@ noncomputable def conditionalPetzRenyiDownExtended
 
 /-- Reduction of the extended wrapper to the support-aware interior wrapper
 away from `alpha = 1` (so the `alpha ≠ 1` arm of the open-interval duality can
-dispatch to the PR1 interior theorem). -/
+dispatch to the interior theorem). -/
 theorem conditionalPetzRenyiDownExtended_of_ne_one
-    (rho : State (Prod a b)) (alpha : Real)
+    (rho : MState (a × b)) (alpha : ℝ)
     (halpha_pos : 0 < alpha) (halpha_lt_two : alpha < 2)
     (halpha_ne_one : alpha ≠ 1) :
     rho.conditionalPetzRenyiDownExtended alpha halpha_pos halpha_lt_two =
@@ -1453,26 +1308,26 @@ theorem conditionalPetzRenyiDownExtended_of_ne_one
   unfold conditionalPetzRenyiDownExtended
   rw [dif_neg halpha_ne_one]
 
-end State
+end MState
 
-namespace PureVector
+namespace Ket
 
 /-- Open-interval downward Petz Renyi duality for a pure tripartite state.
 
 For `alpha, beta` in the open interval `(0, 2)` with `alpha + beta = 2`, the two
 downward Petz conditional Renyi entropies sum to zero in `EReal`, with NO
 `PosDef` marginal hypotheses.  This closes the open interval `(0, 2)`:
-  * the interior `(0, 2) \ {1}` is PR1's
+  * the interior `(0, 2) \ {1}` is
     `conditionalPetzRenyiDownGeneralE_duality_interior`;
   * the Umegaki point `(alpha, beta) = (1, 1)` reduces to the pure-state
     conditional-entropy duality
-    `State.PureVector.conditionalEntropy_marginalAB_eq_neg_marginalAC`.
+    `Ket.conditionalEntropy_marginalAB_eq_neg_marginalAC`.
 
 The boundary points `alpha = 0` / `alpha = 2` (i.e. `(0, 2)` and `(2, 0)`) are
-intentionally deferred to PR3, pending the `H^down_0` plus support-projection
-endpoint layer; they are NOT claimed here. -/
+not covered: they need the `H^down_0` plus support-projection endpoint
+layer. -/
 theorem conditionalPetzRenyiDownExtended_duality
-    (psi : PureVector (Prod (Prod a b) c)) {alpha beta : Real}
+    (psi : Ket ((a × b) × c)) {alpha beta : ℝ}
     (halpha_pos : 0 < alpha) (halpha_lt_two : alpha < 2)
     (hbeta_pos : 0 < beta) (hbeta_lt_two : beta < 2)
     (hdual : alpha + beta = 2) :
@@ -1487,18 +1342,19 @@ theorem conditionalPetzRenyiDownExtended_duality
     -- conditional von Neumann entropy, whose pure-state duality
     -- `H(A|B) = -H(A|C)` is already `conditionalEntropy_marginalAB_eq_neg_marginalAC`.
     have hbeta_eq_one : beta = 1 := by linarith
-    unfold State.conditionalPetzRenyiDownExtended
+    unfold MState.conditionalPetzRenyiDownExtended
     rw [dif_pos ha, dif_pos hbeta_eq_one]
     have hdual_ent : psi.state.marginalAB.conditionalEntropy =
         -psi.state.marginalAC.conditionalEntropy :=
-      State.PureVector.conditionalEntropy_marginalAB_eq_neg_marginalAC psi
+      Ket.conditionalEntropy_marginalAB_eq_neg_marginalAC psi
     have hkey : psi.state.marginalAB.conditionalEntropy +
         psi.state.marginalAC.conditionalEntropy = 0 := by linarith
     simp only [← EReal.coe_add]
     exact_mod_cast hkey
   · -- Interior point `alpha ≠ 1` (hence `beta ≠ 1`): reduce both extended
-    -- wrappers to `conditionalPetzRenyiDownGeneralE` and dispatch to PR1's
-    -- interior duality, which needs no `PosDef` hypothesis.
+    -- wrappers to `conditionalPetzRenyiDownGeneralE` and dispatch to
+    -- `conditionalPetzRenyiDownGeneralE_duality_interior`, which needs no
+    -- `PosDef` hypothesis.
     have hbeta_ne_one : beta ≠ 1 := by
       intro hbe
       apply ha
@@ -1510,9 +1366,9 @@ theorem conditionalPetzRenyiDownExtended_duality
     exact conditionalPetzRenyiDownGeneralE_duality_interior psi
       halpha_pos hbeta_pos ha hbeta_ne_one hdual
 
-end PureVector
+end Ket
 
-namespace State
+namespace MState
 
 /-- Boundary value of the downward Petz conditional Renyi entropy at
 `alpha = 0`, in the source-faithful support-projection form
@@ -1524,9 +1380,9 @@ of the interior trace term is replaced by the projection onto the support of
 `rho_AB` (equivalently, by `rho_AB^(-1) rho_AB`, via
 `cMatrix_rpow_neg_one_mul_self_eq_rangeProjection`).  No `PosDef` hypothesis
 on the marginal is required. -/
-noncomputable def conditionalPetzRenyiDownZero (rho : State (Prod a b)) : Real :=
-  log2 ((Matrix.rangeProjection rho.matrix *
-    identityTensorStateMatrix (a := a) rho.marginalB).trace.re)
+noncomputable def conditionalPetzRenyiDownZero (rho : MState (a × b)) : ℝ :=
+  log2 ((Matrix.rangeProjection rho.m *
+    identityTensorStateMatrix (a := a) rho.traceLeft).trace.re)
 
 /-- Closed-interval downward Petz Renyi entropy for `alpha ∈ [0, 2]`.
 
@@ -1536,7 +1392,7 @@ At the boundary points this is the support-projection value
 `(0, 2)` it agrees with `conditionalPetzRenyiDownExtended` (Umegaki point
 included).  No `PosDef` hypothesis is required anywhere. -/
 noncomputable def conditionalPetzRenyiDownClosed
-    (rho : State (Prod a b)) (alpha : Real) (h0 : 0 ≤ alpha) (h2 : alpha ≤ 2) :
+    (rho : MState (a × b)) (alpha : ℝ) (h0 : 0 ≤ alpha) (h2 : alpha ≤ 2) :
     EReal := by
   classical
   exact
@@ -1548,7 +1404,7 @@ noncomputable def conditionalPetzRenyiDownClosed
 
 /-- Reduction of the closed-interval wrapper at the boundary `alpha = 0`. -/
 theorem conditionalPetzRenyiDownClosed_of_zero
-    (rho : State (Prod a b)) (h0 : 0 ≤ (0 : Real)) (h2 : (0 : Real) ≤ 2) :
+    (rho : MState (a × b)) (h0 : 0 ≤ (0 : ℝ)) (h2 : (0 : ℝ) ≤ 2) :
     rho.conditionalPetzRenyiDownClosed 0 h0 h2 =
       (rho.conditionalPetzRenyiDownZero : EReal) := by
   classical
@@ -1557,17 +1413,17 @@ theorem conditionalPetzRenyiDownClosed_of_zero
 
 /-- Reduction of the closed-interval wrapper at the boundary `alpha = 2`. -/
 theorem conditionalPetzRenyiDownClosed_of_two
-    (rho : State (Prod a b)) (h0 : 0 ≤ (2 : Real)) (h2 : (2 : Real) ≤ 2) :
+    (rho : MState (a × b)) (h0 : 0 ≤ (2 : ℝ)) (h2 : (2 : ℝ) ≤ 2) :
     rho.conditionalPetzRenyiDownClosed 2 h0 h2 =
       rho.conditionalPetzRenyiDownGeneralE 2 (by norm_num) (by norm_num) := by
   classical
   unfold conditionalPetzRenyiDownClosed
-  rw [dif_neg (by norm_num : (2 : Real) ≠ 0), dif_pos rfl]
+  rw [dif_neg (by norm_num : (2 : ℝ) ≠ 0), dif_pos rfl]
 
 /-- Reduction of the closed-interval wrapper to the open-interval wrapper
 away from the two boundary points. -/
 theorem conditionalPetzRenyiDownClosed_of_ne_zero_ne_two
-    (rho : State (Prod a b)) (alpha : Real) (h0 : 0 ≤ alpha) (h2 : alpha ≤ 2)
+    (rho : MState (a × b)) (alpha : ℝ) (h0 : 0 ≤ alpha) (h2 : alpha ≤ 2)
     (h00 : alpha ≠ 0) (h02 : alpha ≠ 2) :
     rho.conditionalPetzRenyiDownClosed alpha h0 h2 =
       rho.conditionalPetzRenyiDownExtended alpha
@@ -1576,9 +1432,9 @@ theorem conditionalPetzRenyiDownClosed_of_ne_zero_ne_two
   unfold conditionalPetzRenyiDownClosed
   rw [dif_neg h00, dif_neg h02]
 
-end State
+end MState
 
-namespace PureVector
+namespace Ket
 
 /-- Boundary downward Petz duality at `(alpha, beta) = (0, 2)`: the
 support-projection value on the `AB` side plus the `alpha = 2` Petz value on
@@ -1591,12 +1447,12 @@ verbatim at `alpha = 0`, and the AC-side contraction at `beta = 2`; the scalar
 entropy identity then closes because the two trace terms are equal as reals,
 so no positivity side condition is needed for the `log2` cancellation. -/
 theorem conditionalPetzRenyiDownZero_add_generalE_two_eq_zero
-    (psi : PureVector (Prod (Prod a b) c)) :
+    (psi : Ket ((a × b) × c)) :
     (psi.state.marginalAB.conditionalPetzRenyiDownZero : EReal) +
       psi.state.marginalAC.conditionalPetzRenyiDownGeneralE 2
         (by norm_num) (by norm_num) = 0 := by
-  have h2pos : (0 : Real) < 2 := by norm_num
-  have h2ne1 : (2 : Real) ≠ 1 := by norm_num
+  have h2pos : (0 : ℝ) < 2 := by norm_num
+  have h2ne1 : (2 : ℝ) ≠ 1 := by norm_num
   -- Chain the three trace steps at `(alpha, beta) = (0, 2)`: boundary
   -- rewrite, middle bridge, AC-side contraction.
   have hQ0 :=
@@ -1608,42 +1464,42 @@ theorem conditionalPetzRenyiDownZero_add_generalE_two_eq_zero
   have hAC :=
     conditionalPetzRenyiTraceTerm_marginalAC_eq_acbProjectorTrace_dualParam
       (a := a) (b := b) (c := c) psi
-      (show (2 : Real) ≠ 0 by norm_num) (show (0 : Real) + 2 = 2 by norm_num)
+      (show (2 : ℝ) ≠ 0 by norm_num) (show (0 : ℝ) + 2 = 2 by norm_num)
   have hQ := hQ0.trans (hbridge.trans hAC.symm)
-  rw [State.marginalBOfABC_eq] at hQ
+  rw [MState.marginalBOfABC_eq] at hQ
   -- The boundary value is `log2` of the shared trace term.
   have hzero : psi.state.marginalAB.conditionalPetzRenyiDownZero =
       log2 (psi.state.marginalAC.conditionalPetzRenyiTraceTerm
-        psi.state.marginalAC.marginalB 2) := by
-    unfold State.conditionalPetzRenyiDownZero
+        psi.state.marginalAC.traceLeft 2) := by
+    unfold MState.conditionalPetzRenyiDownZero
     rw [hQ]
   -- The `alpha = 2` Petz value is `-log2` of the same trace term.
   have hfin : psi.state.marginalAC.petzRenyiReferenceFinite
-      (State.identityTensorStateMatrix (a := a) psi.state.marginalAC.marginalB)
-      (State.identityTensorStateMatrix_posSemidef_of_state (a := a)
-        psi.state.marginalAC.marginalB) 2 h2pos h2ne1 =
+      (MState.identityTensorStateMatrix (a := a) psi.state.marginalAC.traceLeft)
+      (MState.identityTensorStateMatrix_posSemidef (a := a)
+        psi.state.marginalAC.traceLeft) 2 h2pos h2ne1 =
       log2 (psi.state.marginalAC.conditionalPetzRenyiTraceTerm
-        psi.state.marginalAC.marginalB 2) := by
-    show (1 / (2 - 1 : Real)) *
+        psi.state.marginalAC.traceLeft 2) := by
+    show (1 / (2 - 1 : ℝ)) *
         log2 (psi.state.marginalAC.conditionalPetzRenyiTraceTerm
-          psi.state.marginalAC.marginalB 2) =
+          psi.state.marginalAC.traceLeft 2) =
       log2 (psi.state.marginalAC.conditionalPetzRenyiTraceTerm
-        psi.state.marginalAC.marginalB 2)
-    have hone : (1 : Real) / (2 - 1) = 1 := by norm_num
+        psi.state.marginalAC.traceLeft 2)
+    have hone : (1 : ℝ) / (2 - 1) = 1 := by norm_num
     rw [hone, one_mul]
   have hgen : psi.state.marginalAC.conditionalPetzRenyiDownGeneralE 2 h2pos h2ne1 =
       (-(log2 (psi.state.marginalAC.conditionalPetzRenyiTraceTerm
-        psi.state.marginalAC.marginalB 2)) : EReal) := by
-    rw [State.conditionalPetzRenyiDownGeneralE_eq_coe
+        psi.state.marginalAC.traceLeft 2)) : EReal) := by
+    rw [MState.conditionalPetzRenyiDownGeneralE_eq_coe
       psi.state.marginalAC 2 h2pos h2ne1, hfin]
   -- Close in `EReal`: both sides are coes of finite reals.
   change (psi.state.marginalAB.conditionalPetzRenyiDownZero : EReal) +
     psi.state.marginalAC.conditionalPetzRenyiDownGeneralE 2 h2pos h2ne1 = 0
   rw [hgen, hzero]
   have hkey : (log2 (psi.state.marginalAC.conditionalPetzRenyiTraceTerm
-        psi.state.marginalAC.marginalB 2) +
+        psi.state.marginalAC.traceLeft 2) +
       -(log2 (psi.state.marginalAC.conditionalPetzRenyiTraceTerm
-        psi.state.marginalAC.marginalB 2)) : Real) = 0 :=
+        psi.state.marginalAC.traceLeft 2)) : ℝ) = 0 :=
     add_neg_cancel _
   simp only [← EReal.coe_neg, ← EReal.coe_add]
   exact_mod_cast hkey
@@ -1652,14 +1508,14 @@ theorem conditionalPetzRenyiDownZero_add_generalE_two_eq_zero
 the `(0, 2)` boundary by reindexing the purifying system from `ABC` to `ACB`.
 No `PosDef` hypotheses. -/
 theorem conditionalPetzRenyiDownGeneralETwo_add_zero_eq_zero
-    (psi : PureVector (Prod (Prod a b) c)) :
+    (psi : Ket ((a × b) × c)) :
     psi.state.marginalAB.conditionalPetzRenyiDownGeneralE 2
         (by norm_num) (by norm_num) +
       (psi.state.marginalAC.conditionalPetzRenyiDownZero : EReal) = 0 := by
   have h := conditionalPetzRenyiDownZero_add_generalE_two_eq_zero
-    (psi.reindex (conditionalPetzRenyiABCToACBEquiv (a := a) (b := b) (c := c)))
-  rw [conditionalPetzRenyiABCToACB_marginalAB psi,
-    conditionalPetzRenyiABCToACB_marginalAC psi] at h
+    (psi.reindex (QIT.prodABCToACBEquiv (a := a) (b := b) (c := c)))
+  rw [prodABCToACB_marginalAB psi,
+    prodABCToACB_marginalAC psi] at h
   rw [add_comm]
   exact h
 
@@ -1669,15 +1525,15 @@ For `alpha, beta ∈ Set.Icc 0 2` with `alpha + beta = 2`, the two downward
 Petz conditional Renyi entropies of the complementary marginals sum to zero
 in `EReal`, with NO `PosDef` marginal hypotheses.  This is the closed-interval
 form of Tomamichel2015FiniteResources, `cond.tex`, Proposition `pr:dual-old`:
-the interior `(0, 2)` is PR2's `conditionalPetzRenyiDownExtended_duality`
-(with the Umegaki point `alpha = 1` included), and the boundary points
+the interior `(0, 2)` is `conditionalPetzRenyiDownExtended_duality` (with the
+Umegaki point `alpha = 1` included), and the boundary points
 `(0, 2)` and `(2, 0)` are closed by the support-projection bookend
 `cMatrix_rpow_neg_one_mul_self_eq_rangeProjection` via
 `conditionalPetzRenyiDownZero_add_generalE_two_eq_zero` and its reindexed
 sibling. -/
 theorem conditionalPetzRenyiDown_duality
-    (psi : PureVector (Prod (Prod a b) c)) {alpha beta : Real}
-    (halpha : alpha ∈ Set.Icc (0 : Real) 2) (hbeta : beta ∈ Set.Icc (0 : Real) 2)
+    (psi : Ket ((a × b) × c)) {alpha beta : ℝ}
+    (halpha : alpha ∈ Set.Icc (0 : ℝ) 2) (hbeta : beta ∈ Set.Icc (0 : ℝ) 2)
     (hdual : alpha + beta = 2) :
     psi.state.marginalAB.conditionalPetzRenyiDownClosed alpha halpha.1 halpha.2 +
       psi.state.marginalAC.conditionalPetzRenyiDownClosed beta hbeta.1 hbeta.2 = 0 := by
@@ -1687,9 +1543,9 @@ theorem conditionalPetzRenyiDown_duality
     have hbeta2 : beta = 2 := by linarith
     subst h00
     subst hbeta2
-    rw [State.conditionalPetzRenyiDownClosed_of_zero
+    rw [MState.conditionalPetzRenyiDownClosed_of_zero
           psi.state.marginalAB halpha.1 halpha.2,
-        State.conditionalPetzRenyiDownClosed_of_two
+        MState.conditionalPetzRenyiDownClosed_of_two
           psi.state.marginalAC hbeta.1 hbeta.2]
     exact conditionalPetzRenyiDownZero_add_generalE_two_eq_zero psi
   · by_cases h02 : alpha = 2
@@ -1697,13 +1553,14 @@ theorem conditionalPetzRenyiDown_duality
       have hbeta0 : beta = 0 := by linarith
       subst h02
       subst hbeta0
-      rw [State.conditionalPetzRenyiDownClosed_of_two
+      rw [MState.conditionalPetzRenyiDownClosed_of_two
             psi.state.marginalAB halpha.1 halpha.2,
-          State.conditionalPetzRenyiDownClosed_of_zero
+          MState.conditionalPetzRenyiDownClosed_of_zero
             psi.state.marginalAC hbeta.1 hbeta.2]
       exact conditionalPetzRenyiDownGeneralETwo_add_zero_eq_zero psi
     · -- Interior `alpha ∈ (0, 2)`: reduce both closed wrappers to the
-      -- open-interval wrapper and dispatch to PR2.
+      -- open-interval wrapper and dispatch to
+      -- `conditionalPetzRenyiDownExtended_duality`.
       have halpha_pos : 0 < alpha := lt_of_le_of_ne halpha.1 (Ne.symm h00)
       have halpha_lt_two : alpha < 2 := lt_of_le_of_ne halpha.2 h02
       have hb0 : beta ≠ 0 := by
@@ -1716,15 +1573,11 @@ theorem conditionalPetzRenyiDown_duality
         linarith
       have hbeta_pos : 0 < beta := lt_of_le_of_ne hbeta.1 (Ne.symm hb0)
       have hbeta_lt_two : beta < 2 := lt_of_le_of_ne hbeta.2 hb2
-      rw [State.conditionalPetzRenyiDownClosed_of_ne_zero_ne_two
+      rw [MState.conditionalPetzRenyiDownClosed_of_ne_zero_ne_two
             psi.state.marginalAB alpha halpha.1 halpha.2 h00 h02,
-          State.conditionalPetzRenyiDownClosed_of_ne_zero_ne_two
+          MState.conditionalPetzRenyiDownClosed_of_ne_zero_ne_two
             psi.state.marginalAC beta hbeta.1 hbeta.2 hb0 hb2]
       exact conditionalPetzRenyiDownExtended_duality psi
         halpha_pos halpha_lt_two hbeta_pos hbeta_lt_two hdual
 
-end PureVector
-
-end
-
-end QIT
+end Ket

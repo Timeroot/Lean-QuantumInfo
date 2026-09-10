@@ -13,9 +13,7 @@ public import QuantumLib.QIT.Coding.EntanglementAssisted.Asymptotic.ConverseWitn
 # Asymptotic entanglement-assisted classical communication facade
 
 This module is part of the entanglement-assisted classical communication
-asymptotic proof spine.  It was split out mechanically from the historical
-`EntanglementAssistedAsymptotic` files; theorem statements and proof routes are
-unchanged.
+asymptotic proof spine.
 -/
 
 @[expose] public section
@@ -23,25 +21,25 @@ unchanged.
 open scoped ComplexOrder MatrixOrder NNReal Topology
 open Filter
 
-namespace QIT
-
 universe u v w x y
 
 noncomputable section
 
+namespace CPTPOp
+
+open QIT
+
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-namespace Channel
-
-variable (N : Channel a b)
+variable (N : CPTPMap a b)
 
 /-- Khatri--Wilde asymptotic lower bound: the channel mutual information
 `I(N)` is an operationally achievable entanglement-assisted classical rate.
 
 This theorem is the source-shaped independent lower-bound route: it combines
 the one-shot PSD Petz--Renyi lower bound, tensor-power superadditivity of the
-barred PSD Petz channel quantity, the `alpha -> 1^-` limit to `I(N)`, and the
+barred PSD Petz channel quantity, the `alpha → 1^-` limit to `I(N)`, and the
 block-channel lifting lemma above.  It does not use the sandwiched-Renyi DPI
 or strong-converse route. -/
 theorem entanglementAssistedInformation_isAchievable_of_oneShotPetzLowerBound
@@ -92,7 +90,7 @@ theorem entanglementAssistedInformation_isAchievable_of_oneShotPetzLowerBound
   have hpen_lt : penalty < (n : ℝ) * (δ / 2) := by
     have := (div_lt_iff₀ hnR_pos).mp hpen_div
     simpa [mul_comm, mul_left_comm] using this
-  let blockN : Channel (QIT.TensorPower a n) (QIT.TensorPower b n) := N.tensorPower n
+  let blockN : CPTPMap (QIT.TensorPower a n) (QIT.TensorPower b n) := N.tensorPower n
   let blockPetz : ℝ :=
     blockN.barPetzRenyiMutualInformationPSDFinite
       alpha.1 alpha.2.1 (ne_of_lt alpha.2.2)
@@ -131,14 +129,14 @@ theorem entanglementAssistedInformation_isAchievable_of_oneShotPetzLowerBound
           alpha.1 / (1 - alpha.1) * log2 (1 / (ε - η)) -
           log2 (4 * ε / η ^ 2) : ℝ) : EReal) ≤
         blockN.oneShotEntanglementAssistedClassicalCapacityE ε
-    exact @Channel.oneShotEntanglementAssistedClassicalCapacityE_petzPSDFiniteLowerBound
+    exact @CPTPOp.oneShotEntanglementAssistedClassicalCapacityE_petzPSDFiniteLowerBound
       (QIT.TensorPower a n)
       (QIT.tensorPowerFintype (a := a) n)
       (QIT.tensorPowerDecidableEq (a := a) n)
       (QIT.TensorPower b n)
       (QIT.tensorPowerFintype (a := b) n)
       (QIT.tensorPowerDecidableEq (a := b) n)
-      blockN (TensorPower.nonempty (a := a) n)
+      blockN (tensorPower_nonempty_of_nonempty (α := a) n)
       ε η alpha.1 hε hη_pos hη_lt alpha.2.1 alpha.2.2
   have hlower_lt_capacity :
       (lowerReal : EReal) <
@@ -168,10 +166,6 @@ theorem entanglementAssistedInformation_isAchievable_of_oneShotPetzLowerBound
   exact N.nUseLowerBoundWitness_of_blockOneShotCode
     hn_pos C' hCerr' (le_of_lt (by simpa [lowerReal] using hCrate_gt'))
 
-set_option maxHeartbeats 200000
-
-end Channel
+end CPTPOp
 
 end
-
-end QIT

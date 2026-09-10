@@ -27,11 +27,8 @@ public import QuantumLib.QIT.Nonlocality
 /-!
 # QIT
 
-Local incubator namespace for quantum information theory work.
+QuAIR's Lean-QIT: entropies and divergences, one-shot and asymptotic rates, coding theorems,
+hypothesis testing, symmetry, nonlocality and protocols, built on the finite-dimensional matrix
+model of `QIT.CMatrix`. `QuantumLib.QIT.Bridge` records how it lines up with the rest of
+QuantumLib.
 -/
-
-@[expose] public section
-
-namespace QIT
-
-end QIT

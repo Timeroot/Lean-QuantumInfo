@@ -8,27 +8,55 @@ module
 
 public import QuantumLib.QIT.Asymptotic.FixedSmoothMinEntropy.FixedReference
 
+/-!
+# The Petz witness for the fixed-reference smooth min-entropy
+
+The Tomamichel-Colbeck-Renner lower bound on the smooth min-entropy
+[TomamichelColbeckRenner2008Fqaep, thm:entropy-ineq] is a threshold argument: pick the exponent
+
+`λ = H↑_α(A|B)_ρ - log₂(2/ε²)/(α-1)`,
+
+cut the state at `2^(-λ) (I_A ⊗ σ_B)`, and argue that the part above the cut is small enough that
+the cut state still lies in the ε-ball.  This module carries out both halves for a *fixed* `σ_B`.
+
+The threshold exponent and its scale `2^(-λ)` come in two flavours, one demanding positive
+definiteness of both `ρ_AB` and `σ_B` and one -- the flavour the assembly actually uses -- asking
+it only of the reference.  The Petz Rényi input enters through the identity
+`petzSmoothMinThresholdScale_rpow_one_sub_alpha_mul_traceTerm_eq`, which converts the entropy into
+the trace expression the threshold estimate needs.
+
+Cutting is done by an explicit filter rather than by an abstract projector: writing `s = 2^(-λ)`
+for the scale, `Λ = s(I_A ⊗ σ_B)` for the threshold matrix and `Δ = {ρ_AB - Λ}₊` for the positive
+part above it, the operator `G = √Λ (Λ + Δ)^(-1/2)` satisfies `G ρ G† ≤ Λ`, so `ρ~ = G ρ G†` is a
+subnormalized state feasible for the fixed reference at exponent `λ`.  What must be checked is
+that `G` is contractive and that the trace lost by applying it is at most `Tr Δ`; those are
+`fixedPetzSmoothMinWitnessMatrix_trace_re_le_one_of_contract` and
+`fixedPetzSmoothMinG_trace_loss_le_positivePart_trace`.  The module ends with the four lower bounds
+on `smoothConditionalMinEntropyFixedSubnormalized` that the assembly consumes, differing in whether
+the caller supplies an operator inequality or a ball membership and whether the exponent is given
+directly or as a scale.
+-/
+
 @[expose] public section
 
 open scoped ComplexOrder MatrixOrder Kronecker NNReal
 open Filter
 
-namespace QIT
-
-universe u v w
-
 noncomputable section
-
+universe u v w
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
-namespace State
+
+open QIT
+
+namespace MState
 /-! ## Fixed-reference feasible witnesses -/
 
 /-- Fixed-reference Petz threshold exponent used in the TCR smooth-min lower
 bound. -/
 def petzSmoothMinThresholdExponent
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef)
     (ε α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) : ℝ :=
   ρ.conditionalPetzRenyiEntropyCandidate hρ σ hσ α hα_pos hα_ne_one -
     (1 / (α - 1)) * log2 (2 / ε ^ 2)
@@ -36,8 +64,8 @@ def petzSmoothMinThresholdExponent
 /-- Fixed-reference Petz threshold scale, i.e. the right-hand scalar
 `2^{-λ}` for `petzSmoothMinThresholdExponent`. -/
 def petzSmoothMinThresholdScale
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef)
     (ε α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) : ℝ :=
   Real.rpow 2
     (-(ρ.petzSmoothMinThresholdExponent hρ σ hσ ε α hα_pos hα_ne_one))
@@ -47,39 +75,39 @@ full-rank reference side. This is the source-domain version of
 `petzSmoothMinThresholdExponent`: only the reference matrix carries a
 positive-definiteness witness. -/
 def petzSmoothMinThresholdExponentFullReference
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef)
     (ε α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) : ℝ :=
   ρ.conditionalPetzRenyiEntropyCandidateFullReference σ hσ α hα_pos hα_ne_one -
     (1 / (α - 1)) * log2 (2 / ε ^ 2)
 
 /-- Full-reference Petz threshold scale for arbitrary left states. -/
 def petzSmoothMinThresholdScaleFullReference
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef)
     (ε α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) : ℝ :=
   Real.rpow 2
     (-(ρ.petzSmoothMinThresholdExponentFullReference σ hσ ε α hα_pos hα_ne_one))
 
 theorem petzSmoothMinThresholdScale_pos
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef)
     (ε α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     0 < ρ.petzSmoothMinThresholdScale hρ σ hσ ε α hα_pos hα_ne_one := by
   unfold petzSmoothMinThresholdScale
   exact Real.rpow_pos_of_pos (by norm_num : (0 : ℝ) < 2) _
 
 theorem petzSmoothMinThresholdScaleFullReference_pos
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef)
     (ε α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     0 < ρ.petzSmoothMinThresholdScaleFullReference σ hσ ε α hα_pos hα_ne_one := by
   unfold petzSmoothMinThresholdScaleFullReference
   exact Real.rpow_pos_of_pos (by norm_num : (0 : ℝ) < 2) _
 
 theorem petzSmoothMinThresholdExponentFullReference_eq_neg_log2_scale
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef)
     (ε α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     ρ.petzSmoothMinThresholdExponentFullReference σ hσ ε α hα_pos hα_ne_one =
       -log2 (ρ.petzSmoothMinThresholdScaleFullReference σ hσ ε α
@@ -89,8 +117,8 @@ theorem petzSmoothMinThresholdExponentFullReference_eq_neg_log2_scale
       (ρ.petzSmoothMinThresholdExponentFullReference σ hσ ε α hα_pos hα_ne_one)).symm
 
 theorem petzSmoothMinThresholdScale_eq_entropyPenalty
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef)
     {ε α : ℝ} (hε_pos : 0 < ε)
     (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     ρ.petzSmoothMinThresholdScale hρ σ hσ ε α hα_pos hα_ne_one =
@@ -106,8 +134,8 @@ theorem petzSmoothMinThresholdScale_eq_entropyPenalty
       (gamma := 1 / (α - 1)) (x := 2 / ε ^ 2) hx)
 
 theorem petzSmoothMinThresholdScale_rpow_one_sub_alpha_mul_traceTerm_eq
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef)
     {ε α : ℝ} (hε_pos : 0 < ε) (hα_gt : 1 < α) :
     ρ.petzSmoothMinThresholdScale hρ σ hσ ε α
         (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm) ^ (1 - α) *
@@ -179,8 +207,8 @@ theorem petzSmoothMinThresholdScale_rpow_one_sub_alpha_mul_traceTerm_eq
   simpa [lam, T, hα_pos, hα_ne_one] using hmain.trans hx_inv_eq
 
 theorem petzSmoothMinThresholdScaleFullReference_rpow_one_sub_alpha_mul_traceTerm_eq
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef)
     {ε α : ℝ} (hε_pos : 0 < ε) (hα_gt : 1 < α) :
     ρ.petzSmoothMinThresholdScaleFullReference σ hσ ε α
         (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm) ^ (1 - α) *
@@ -255,9 +283,9 @@ theorem petzSmoothMinThresholdScaleFullReference_rpow_one_sub_alpha_mul_traceTer
   simpa [lam, T, hα_pos, hα_ne_one] using hmain.trans hx_inv_eq
 
 theorem SubnormalizedState.ConditionalMinEntropyFeasible.of_le_petzSmoothMinThresholdScale
-    {ρ' : SubnormalizedState (Prod a b)}
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    {ρ' : SubnormalizedState (a × b)}
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef)
     (ε α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1)
     (hbound :
       ρ'.matrix ≤
@@ -266,11 +294,11 @@ theorem SubnormalizedState.ConditionalMinEntropyFeasible.of_le_petzSmoothMinThre
     SubnormalizedState.ConditionalMinEntropyFeasible (a := a) ρ' σ.toSubnormalized
       (ρ.petzSmoothMinThresholdExponent hρ σ hσ ε α hα_pos hα_ne_one) := by
   simpa [SubnormalizedState.ConditionalMinEntropyFeasible,
-    petzSmoothMinThresholdScale, State.toSubnormalized_identityTensorStateMatrix_eq] using hbound
+    petzSmoothMinThresholdScale, MState.toSubnormalized_identityTensorStateMatrix_eq] using hbound
 
 theorem SubnormalizedState.ConditionalMinEntropyFeasible.of_le_positive_scale
-    {ρ' : SubnormalizedState (Prod a b)}
-    (σ : State b) {lambda : ℝ} (hlambda : 0 < lambda)
+    {ρ' : SubnormalizedState (a × b)}
+    (σ : MState b) {lambda : ℝ} (hlambda : 0 < lambda)
     (hbound :
       ρ'.matrix ≤
         ((lambda : ℝ) : ℂ) • identityTensorStateMatrix (a := a) σ) :
@@ -279,7 +307,7 @@ theorem SubnormalizedState.ConditionalMinEntropyFeasible.of_le_positive_scale
   have hscale : Real.rpow 2 (-(-log2 lambda)) = lambda := by
     simpa using rpow_two_log2_pos hlambda
   rw [SubnormalizedState.ConditionalMinEntropyFeasible,
-    State.toSubnormalized_identityTensorStateMatrix_eq]
+    MState.toSubnormalized_identityTensorStateMatrix_eq]
   rw [hscale]
   exact hbound
 
@@ -289,12 +317,12 @@ smoothed witness and a direct fixed-reference operator bound.
 This is the narrow bridge needed by threshold-compressed substates: the witness
 is not normalized, and the smoothing ball is centered at `ρ.toSubnormalized`. -/
 theorem smoothConditionalMinEntropyFixedSubnormalized_lower_bound_of_petz_operator_bound
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef)
     (ε α : ℝ)
     (hε_pos : 0 < ε) (hε_lt : ε < 1)
     (hα_gt : 1 < α) (_hα_le_two : α ≤ 2)
-    (ρ' : SubnormalizedState (Prod a b))
+    (ρ' : SubnormalizedState (a × b))
     (hball : ρ.toSubnormalized.purifiedBall ε ρ')
     (hbound :
       ρ'.matrix ≤
@@ -316,10 +344,10 @@ theorem smoothConditionalMinEntropyFixedSubnormalized_lower_bound_of_petz_operat
 /-- Fixed-reference smooth-min lower bound from an explicit positive threshold
 scale, with no full-rank assumption on the left state. -/
 theorem smoothConditionalMinEntropyFixedSubnormalized_lower_bound_of_positive_operator_bound
-    (ρ : State (Prod a b)) (σ : State b)
+    (ρ : MState (a × b)) (σ : MState b)
     (ε lambda : ℝ)
     (hε_pos : 0 < ε) (hε_lt : ε < 1) (hlambda : 0 < lambda)
-    (ρ' : SubnormalizedState (Prod a b))
+    (ρ' : SubnormalizedState (a × b))
     (hball : ρ.toSubnormalized.purifiedBall ε ρ')
     (hbound :
       ρ'.matrix ≤
@@ -338,35 +366,35 @@ theorem smoothConditionalMinEntropyFixedSubnormalized_lower_bound_of_positive_op
 /-- The positive part `Δ = {ρ_AB - λ(I_A ⊗ σ_B)}_+` used in the
 source-shaped TCR smooth-min witness. -/
 def fixedPetzThresholdPositivePart
-    (ρ : State (Prod a b)) (σ : State b) (lambda : ℝ) : CMatrix (Prod a b) :=
-  (ρ.matrix - lambda • identityTensorStateMatrix (a := a) σ)⁺
+    (ρ : MState (a × b)) (σ : MState b) (lambda : ℝ) : CMatrix (a × b) :=
+  (ρ.m - lambda • identityTensorStateMatrix (a := a) σ)⁺
 
 theorem fixedPetzThresholdPositivePart_posSemidef
-    (ρ : State (Prod a b)) (σ : State b) (lambda : ℝ) :
+    (ρ : MState (a × b)) (σ : MState b) (lambda : ℝ) :
     (ρ.fixedPetzThresholdPositivePart σ lambda).PosSemidef := by
   unfold fixedPetzThresholdPositivePart
   exact Matrix.nonneg_iff_posSemidef.mp
-    (CFC.posPart_nonneg (ρ.matrix - lambda • identityTensorStateMatrix (a := a) σ))
+    (CFC.posPart_nonneg (ρ.m - lambda • identityTensorStateMatrix (a := a) σ))
 
 /-- The source-shaped threshold matrix
 `Λ = λ(I_A ⊗ σ_B)` for the fixed-reference smooth-min witness. -/
 def fixedPetzSmoothMinLambdaMatrix
-    (_ρ : State (Prod a b)) (σ : State b) (lambda : ℝ) : CMatrix (Prod a b) :=
+    (_ρ : MState (a × b)) (σ : MState b) (lambda : ℝ) : CMatrix (a × b) :=
   lambda • identityTensorStateMatrix (a := a) σ
 
 /-- Positive-part decomposition gives the source majorization
 `ρ_AB ≤ Λ + Δ`. -/
 theorem fixedPetzSmoothMin_state_le_lambda_add_delta
-    (ρ : State (Prod a b)) (σ : State b) (lambda : ℝ) :
-    ρ.matrix ≤
+    (ρ : MState (a × b)) (σ : MState b) (lambda : ℝ) :
+    ρ.m ≤
       ρ.fixedPetzSmoothMinLambdaMatrix σ lambda +
         ρ.fixedPetzThresholdPositivePart σ lambda := by
-  let Λ : CMatrix (Prod a b) := ρ.fixedPetzSmoothMinLambdaMatrix σ lambda
-  let H : CMatrix (Prod a b) := ρ.matrix - Λ
+  let Λ : CMatrix (a × b) := ρ.fixedPetzSmoothMinLambdaMatrix σ lambda
+  let H : CMatrix (a × b) := ρ.m - Λ
   have hH : H.IsHermitian := by
     dsimp [H, Λ, fixedPetzSmoothMinLambdaMatrix, identityTensorStateMatrix]
-    exact ρ.pos.isHermitian.sub
-      ((identityTensorStateMatrix_posSemidef_of_state (a := a) σ).isHermitian.smul
+    exact ρ.psd.isHermitian.sub
+      ((identityTensorStateMatrix_posSemidef (a := a) σ).isHermitian.smul
         (IsSelfAdjoint.all lambda))
   rw [Matrix.le_iff]
   have hsub : H⁺ - H = H⁻ := by
@@ -376,7 +404,7 @@ theorem fixedPetzSmoothMin_state_le_lambda_add_delta
       _ = H⁻ := by abel
   have hdiff :
       ρ.fixedPetzSmoothMinLambdaMatrix σ lambda +
-          ρ.fixedPetzThresholdPositivePart σ lambda - ρ.matrix =
+          ρ.fixedPetzThresholdPositivePart σ lambda - ρ.m =
         H⁺ - H := by
     simp [H, Λ, fixedPetzSmoothMinLambdaMatrix, fixedPetzThresholdPositivePart]
     abel
@@ -460,12 +488,12 @@ theorem cMatrix_rpow_neg_half_mul_self_eq_psdSqrt_of_posDef
 /-- The source-shaped positive-definite/core filter
 `G = Λ^{1/2}(Λ + Δ)^{-1/2}`.
 
-For now this is the ordinary CFC `rpow (-1/2)` version.  Downstream lemmas
+This uses the ordinary CFC `rpow (-1/2)`.  Downstream lemmas
 keep the inverse/square-root order fact as an explicit hypothesis, so the
 support-inverse generalization can replace this definition without changing the
 smooth-min handoff. -/
 def fixedPetzSmoothMinG
-    (ρ : State (Prod a b)) (σ : State b) (lambda : ℝ) : CMatrix (Prod a b) :=
+    (ρ : MState (a × b)) (σ : MState b) (lambda : ℝ) : CMatrix (a × b) :=
   psdSqrt (ρ.fixedPetzSmoothMinLambdaMatrix σ lambda) *
     CFC.rpow
       (ρ.fixedPetzSmoothMinLambdaMatrix σ lambda +
@@ -474,20 +502,20 @@ def fixedPetzSmoothMinG
 
 /-- Matrix of the source-shaped witness `ρ~ = GρG†`. -/
 def fixedPetzSmoothMinWitnessMatrix
-    (ρ : State (Prod a b)) (σ : State b) (lambda : ℝ) : CMatrix (Prod a b) :=
-  ρ.fixedPetzSmoothMinG σ lambda * ρ.matrix *
+    (ρ : MState (a × b)) (σ : MState b) (lambda : ℝ) : CMatrix (a × b) :=
+  ρ.fixedPetzSmoothMinG σ lambda * ρ.m *
     Matrix.conjTranspose (ρ.fixedPetzSmoothMinG σ lambda)
 
 theorem fixedPetzSmoothMinLambdaMatrix_posDef
-    (ρ : State (Prod a b)) (σ : State b) (lambda : ℝ)
-    (hlambda : 0 < lambda) (hσ : σ.matrix.PosDef) :
+    (ρ : MState (a × b)) (σ : MState b) (lambda : ℝ)
+    (hlambda : 0 < lambda) (hσ : σ.m.PosDef) :
     (ρ.fixedPetzSmoothMinLambdaMatrix σ lambda).PosDef := by
   unfold fixedPetzSmoothMinLambdaMatrix
   exact (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ).smul hlambda
 
 theorem fixedPetzSmoothMinLambda_add_delta_posDef
-    (ρ : State (Prod a b)) (σ : State b) (lambda : ℝ)
-    (hlambda : 0 < lambda) (hσ : σ.matrix.PosDef) :
+    (ρ : MState (a × b)) (σ : MState b) (lambda : ℝ)
+    (hlambda : 0 < lambda) (hσ : σ.m.PosDef) :
     (ρ.fixedPetzSmoothMinLambdaMatrix σ lambda +
       ρ.fixedPetzThresholdPositivePart σ lambda).PosDef :=
   by
@@ -497,18 +525,18 @@ theorem fixedPetzSmoothMinLambda_add_delta_posDef
       (ρ.fixedPetzSmoothMinLambdaMatrix_posDef σ lambda hlambda hσ)
 
 theorem fixedPetzSmoothMinG_filter_conj_eq_lambda_posDef
-    (ρ : State (Prod a b)) (σ : State b) (lambda : ℝ)
-    (hlambda : 0 < lambda) (hσ : σ.matrix.PosDef) :
+    (ρ : MState (a × b)) (σ : MState b) (lambda : ℝ)
+    (hlambda : 0 < lambda) (hσ : σ.m.PosDef) :
     ρ.fixedPetzSmoothMinG σ lambda *
         (ρ.fixedPetzSmoothMinLambdaMatrix σ lambda +
           ρ.fixedPetzThresholdPositivePart σ lambda) *
           Matrix.conjTranspose (ρ.fixedPetzSmoothMinG σ lambda) =
       ρ.fixedPetzSmoothMinLambdaMatrix σ lambda := by
-  let Λ : CMatrix (Prod a b) := ρ.fixedPetzSmoothMinLambdaMatrix σ lambda
-  let Δ : CMatrix (Prod a b) := ρ.fixedPetzThresholdPositivePart σ lambda
-  let A : CMatrix (Prod a b) := Λ + Δ
-  let R : CMatrix (Prod a b) := CFC.rpow A (-(1 / 2 : ℝ))
-  let S : CMatrix (Prod a b) := psdSqrt Λ
+  let Λ : CMatrix (a × b) := ρ.fixedPetzSmoothMinLambdaMatrix σ lambda
+  let Δ : CMatrix (a × b) := ρ.fixedPetzThresholdPositivePart σ lambda
+  let A : CMatrix (a × b) := Λ + Δ
+  let R : CMatrix (a × b) := CFC.rpow A (-(1 / 2 : ℝ))
+  let S : CMatrix (a × b) := psdSqrt Λ
   have hΛpsd : Λ.PosSemidef := by
     simpa [Λ] using
       (ρ.fixedPetzSmoothMinLambdaMatrix_posDef σ lambda hlambda hσ).posSemidef
@@ -541,8 +569,8 @@ theorem fixedPetzSmoothMinG_filter_conj_eq_lambda_posDef
       simp [hS2]
 
 theorem fixedPetzSmoothMinG_filter_conj_le_lambda_posDef
-    (ρ : State (Prod a b)) (σ : State b) (lambda : ℝ)
-    (hlambda : 0 < lambda) (hσ : σ.matrix.PosDef) :
+    (ρ : MState (a × b)) (σ : MState b) (lambda : ℝ)
+    (hlambda : 0 < lambda) (hσ : σ.m.PosDef) :
     ρ.fixedPetzSmoothMinG σ lambda *
         (ρ.fixedPetzSmoothMinLambdaMatrix σ lambda +
           ρ.fixedPetzThresholdPositivePart σ lambda) *
@@ -551,52 +579,52 @@ theorem fixedPetzSmoothMinG_filter_conj_le_lambda_posDef
   rw [ρ.fixedPetzSmoothMinG_filter_conj_eq_lambda_posDef σ lambda hlambda hσ]
 
 theorem fixedPetzSmoothMinWitnessMatrix_posSemidef
-    (ρ : State (Prod a b)) (σ : State b) (lambda : ℝ) :
+    (ρ : MState (a × b)) (σ : MState b) (lambda : ℝ) :
     (ρ.fixedPetzSmoothMinWitnessMatrix σ lambda).PosSemidef := by
   unfold fixedPetzSmoothMinWitnessMatrix
-  exact ρ.pos.mul_mul_conjTranspose_same (ρ.fixedPetzSmoothMinG σ lambda)
+  exact ρ.psd.mul_mul_conjTranspose_same (ρ.fixedPetzSmoothMinG σ lambda)
 
 theorem fixedPetzSmoothMinWitnessMatrix_trace_re_le_one_of_contract
-    (ρ : State (Prod a b)) (σ : State b) (lambda : ℝ)
+    (ρ : MState (a × b)) (σ : MState b) (lambda : ℝ)
     (hcontract :
       Matrix.conjTranspose (ρ.fixedPetzSmoothMinG σ lambda) *
           ρ.fixedPetzSmoothMinG σ lambda ≤ 1) :
     (ρ.fixedPetzSmoothMinWitnessMatrix σ lambda).trace.re ≤ 1 := by
-  let G : CMatrix (Prod a b) := ρ.fixedPetzSmoothMinG σ lambda
+  let G : CMatrix (a × b) := ρ.fixedPetzSmoothMinG σ lambda
   have htrace_le :
-      ((ρ.matrix * (Matrix.conjTranspose G * G)).trace).re ≤
-        ((ρ.matrix * 1).trace).re :=
-    cMatrix_trace_mul_le_of_le_posSemidef_left ρ.pos hcontract
+      ((ρ.m * (Matrix.conjTranspose G * G)).trace).re ≤
+        ((ρ.m * 1).trace).re :=
+    cMatrix_trace_mul_le_of_le_posSemidef_left ρ.psd hcontract
   have hcyc :
       (ρ.fixedPetzSmoothMinWitnessMatrix σ lambda).trace =
-        (ρ.matrix * (Matrix.conjTranspose G * G)).trace := by
+        (ρ.m * (Matrix.conjTranspose G * G)).trace := by
     calc
       (ρ.fixedPetzSmoothMinWitnessMatrix σ lambda).trace =
-          (G * ρ.matrix * Matrix.conjTranspose G).trace := rfl
-      _ = (ρ.matrix * (Matrix.conjTranspose G * G)).trace := by
+          (G * ρ.m * Matrix.conjTranspose G).trace := rfl
+      _ = (ρ.m * (Matrix.conjTranspose G * G)).trace := by
           calc
-            (G * ρ.matrix * Matrix.conjTranspose G).trace =
-                ((G * ρ.matrix) * Matrix.conjTranspose G).trace := by
+            (G * ρ.m * Matrix.conjTranspose G).trace =
+                ((G * ρ.m) * Matrix.conjTranspose G).trace := by
               rw [Matrix.mul_assoc]
-            _ = (Matrix.conjTranspose G * (G * ρ.matrix)).trace := by
+            _ = (Matrix.conjTranspose G * (G * ρ.m)).trace := by
               rw [Matrix.trace_mul_comm]
-            _ = ((Matrix.conjTranspose G * G) * ρ.matrix).trace := by
+            _ = ((Matrix.conjTranspose G * G) * ρ.m).trace := by
               rw [← Matrix.mul_assoc]
-            _ = (ρ.matrix * (Matrix.conjTranspose G * G)).trace := by
+            _ = (ρ.m * (Matrix.conjTranspose G * G)).trace := by
               rw [Matrix.trace_mul_comm]
   rw [hcyc]
-  rw [Matrix.mul_one, ρ.trace_eq_one] at htrace_le
+  rw [Matrix.mul_one, ρ.tr'] at htrace_le
   norm_num at htrace_le
   exact htrace_le
 
 /-- The source-shaped witness as a subnormalized state, assuming the filter is
 contractive in the `G†G ≤ I` sense. -/
 def fixedPetzSmoothMinWitnessSubstate
-    (ρ : State (Prod a b)) (σ : State b) (lambda : ℝ)
+    (ρ : MState (a × b)) (σ : MState b) (lambda : ℝ)
     (hcontract :
       Matrix.conjTranspose (ρ.fixedPetzSmoothMinG σ lambda) *
           ρ.fixedPetzSmoothMinG σ lambda ≤ 1) :
-    SubnormalizedState (Prod a b) where
+    SubnormalizedState (a × b) where
   matrix := ρ.fixedPetzSmoothMinWitnessMatrix σ lambda
   pos := ρ.fixedPetzSmoothMinWitnessMatrix_posSemidef σ lambda
   trace_le_one :=
@@ -604,7 +632,7 @@ def fixedPetzSmoothMinWitnessSubstate
 
 @[simp]
 theorem fixedPetzSmoothMinWitnessSubstate_matrix
-    (ρ : State (Prod a b)) (σ : State b) (lambda : ℝ)
+    (ρ : MState (a × b)) (σ : MState b) (lambda : ℝ)
     (hcontract :
       Matrix.conjTranspose (ρ.fixedPetzSmoothMinG σ lambda) *
           ρ.fixedPetzSmoothMinG σ lambda ≤ 1) :
@@ -625,15 +653,15 @@ theorem cMatrix_conj_le_conj_of_le {ι : Type*} [Fintype ι] [DecidableEq ι]
   rwa [hdiff]
 
 theorem fixedPetzSmoothMinG_contract_posDef
-    (ρ : State (Prod a b)) (σ : State b) (lambda : ℝ)
-    (hlambda : 0 < lambda) (hσ : σ.matrix.PosDef) :
+    (ρ : MState (a × b)) (σ : MState b) (lambda : ℝ)
+    (hlambda : 0 < lambda) (hσ : σ.m.PosDef) :
     Matrix.conjTranspose (ρ.fixedPetzSmoothMinG σ lambda) *
         ρ.fixedPetzSmoothMinG σ lambda ≤ 1 := by
-  let Λ : CMatrix (Prod a b) := ρ.fixedPetzSmoothMinLambdaMatrix σ lambda
-  let Δ : CMatrix (Prod a b) := ρ.fixedPetzThresholdPositivePart σ lambda
-  let A : CMatrix (Prod a b) := Λ + Δ
-  let R : CMatrix (Prod a b) := CFC.rpow A (-(1 / 2 : ℝ))
-  let S : CMatrix (Prod a b) := psdSqrt Λ
+  let Λ : CMatrix (a × b) := ρ.fixedPetzSmoothMinLambdaMatrix σ lambda
+  let Δ : CMatrix (a × b) := ρ.fixedPetzThresholdPositivePart σ lambda
+  let A : CMatrix (a × b) := Λ + Δ
+  let R : CMatrix (a × b) := CFC.rpow A (-(1 / 2 : ℝ))
+  let S : CMatrix (a × b) := psdSqrt Λ
   have hΛpsd : Λ.PosSemidef := by
     simpa [Λ] using
       (ρ.fixedPetzSmoothMinLambdaMatrix_posDef σ lambda hlambda hσ).posSemidef
@@ -690,36 +718,36 @@ private theorem contract_doubled_effect_posSemidef_of_contract
 the trace loss of the source filter is controlled by the threshold positive
 part `Δ = {ρ_AB - λ(I_A ⊗ σ_B)}_+`. -/
 theorem fixedPetzSmoothMinG_trace_loss_le_positivePart_trace
-    (ρ : State (Prod a b)) (σ : State b) (lambda : ℝ)
-    (hlambda : 0 < lambda) (hσ : σ.matrix.PosDef) :
-    1 - (((ρ.fixedPetzSmoothMinG σ lambda * ρ.matrix).trace).re) ≤
+    (ρ : MState (a × b)) (σ : MState b) (lambda : ℝ)
+    (hlambda : 0 < lambda) (hσ : σ.m.PosDef) :
+    1 - (((ρ.fixedPetzSmoothMinG σ lambda * ρ.m).trace).re) ≤
       (ρ.fixedPetzThresholdPositivePart σ lambda).trace.re := by
-  let Λ : CMatrix (Prod a b) := ρ.fixedPetzSmoothMinLambdaMatrix σ lambda
-  let Δ : CMatrix (Prod a b) := ρ.fixedPetzThresholdPositivePart σ lambda
-  let A : CMatrix (Prod a b) := Λ + Δ
-  let G : CMatrix (Prod a b) := ρ.fixedPetzSmoothMinG σ lambda
-  let E : CMatrix (Prod a b) := (1 : CMatrix (Prod a b)) + 1 -
+  let Λ : CMatrix (a × b) := ρ.fixedPetzSmoothMinLambdaMatrix σ lambda
+  let Δ : CMatrix (a × b) := ρ.fixedPetzThresholdPositivePart σ lambda
+  let A : CMatrix (a × b) := Λ + Δ
+  let G : CMatrix (a × b) := ρ.fixedPetzSmoothMinG σ lambda
+  let E : CMatrix (a × b) := (1 : CMatrix (a × b)) + 1 -
     (G + Matrix.conjTranspose G)
-  let S : CMatrix (Prod a b) := psdSqrt Λ
-  let R : CMatrix (Prod a b) := CFC.rpow A (-(1 / 2 : ℝ))
+  let S : CMatrix (a × b) := psdSqrt Λ
+  let R : CMatrix (a × b) := CFC.rpow A (-(1 / 2 : ℝ))
   have hcontract : Matrix.conjTranspose G * G ≤ 1 := by
     simpa [G] using ρ.fixedPetzSmoothMinG_contract_posDef σ lambda hlambda hσ
   have hEpos : E.PosSemidef := by
     simpa [E, G] using
       contract_doubled_effect_posSemidef_of_contract (G := G) hcontract
-  have hρ_le_A : ρ.matrix ≤ A := by
+  have hρ_le_A : ρ.m ≤ A := by
     simpa [A, Λ, Δ] using ρ.fixedPetzSmoothMin_state_le_lambda_add_delta σ lambda
-  have htrace_le : ((E * ρ.matrix).trace).re ≤ ((E * A).trace).re :=
+  have htrace_le : ((E * ρ.m).trace).re ≤ ((E * A).trace).re :=
     cMatrix_trace_mul_le_of_le_posSemidef_left hEpos hρ_le_A
   have hGρ_conj :
-      ((Matrix.conjTranspose G * ρ.matrix).trace).re =
-        ((G * ρ.matrix).trace).re :=
-    trace_conjTranspose_mul_hermitian_re_eq ρ.pos.isHermitian
+      ((Matrix.conjTranspose G * ρ.m).trace).re =
+        ((G * ρ.m).trace).re :=
+    trace_conjTranspose_mul_hermitian_re_eq ρ.psd.isHermitian
   have hEρ :
-      ((E * ρ.matrix).trace).re =
-        2 * (1 - ((G * ρ.matrix).trace).re) := by
+      ((E * ρ.m).trace).re =
+        2 * (1 - ((G * ρ.m).trace).re) := by
     simp [E, Matrix.add_mul, Matrix.sub_mul, Matrix.trace_add, Matrix.trace_sub,
-      hGρ_conj, ρ.trace_eq_one]
+      hGρ_conj, ρ.tr']
     ring
   have hΛpsd : Λ.PosSemidef := by
     simpa [Λ] using
@@ -770,19 +798,19 @@ theorem fixedPetzSmoothMinG_trace_loss_le_positivePart_trace
     rw [hEAeq, hGA_conj, hAtr]
     linarith
   have htwice :
-      2 * (1 - ((G * ρ.matrix).trace).re) ≤ 2 * Δ.trace.re := by
+      2 * (1 - ((G * ρ.m).trace).re) ≤ 2 * Δ.trace.re := by
     rw [← hEρ]
     exact le_trans htrace_le hEA
-  have hloss : 1 - ((G * ρ.matrix).trace).re ≤ Δ.trace.re := by
+  have hloss : 1 - ((G * ρ.m).trace).re ≤ Δ.trace.re := by
     linarith
   simpa [G, Δ] using hloss
 
 /-- If `ρ ≤ Λ + Δ`, then the source filter reduces the witness bound to the
 single CFC inverse/square-root inequality `G(Λ+Δ)G† ≤ Λ`. -/
 theorem fixedPetzSmoothMinWitnessMatrix_le_lambda_of_le_add_delta
-    (ρ : State (Prod a b)) (σ : State b) (lambda : ℝ)
+    (ρ : MState (a × b)) (σ : MState b) (lambda : ℝ)
     (hρ_le :
-      ρ.matrix ≤
+      ρ.m ≤
         ρ.fixedPetzSmoothMinLambdaMatrix σ lambda +
           ρ.fixedPetzThresholdPositivePart σ lambda)
     (hconj :
@@ -799,7 +827,7 @@ theorem fixedPetzSmoothMinWitnessMatrix_le_lambda_of_le_add_delta
 /-- Source-shaped witness bound reduced only to the CFC filter inequality
 `G(Λ+Δ)G† ≤ Λ`; the positive-part majorization is discharged here. -/
 theorem fixedPetzSmoothMinWitnessMatrix_le_lambda_of_filter_conj
-    (ρ : State (Prod a b)) (σ : State b) (lambda : ℝ)
+    (ρ : MState (a × b)) (σ : MState b) (lambda : ℝ)
     (hconj :
       ρ.fixedPetzSmoothMinG σ lambda *
           (ρ.fixedPetzSmoothMinLambdaMatrix σ lambda +
@@ -816,7 +844,7 @@ This is the PSD-left version of the threshold bridge: the center state is an
 arbitrary finite state, while full-rankness is only required for the fixed
 reference when the concrete TCR filter is used. -/
 theorem smoothConditionalMinEntropyFixedSubnormalized_lower_bound_of_fixedPetzSmoothMinG_bound_scale
-    (ρ : State (Prod a b)) (σ : State b)
+    (ρ : MState (a × b)) (σ : MState b)
     (ε lambda : ℝ)
     (hε_pos : 0 < ε) (hε_lt : ε < 1) (hlambda : 0 < lambda)
     (hcontract :
@@ -837,8 +865,8 @@ theorem smoothConditionalMinEntropyFixedSubnormalized_lower_bound_of_fixedPetzSm
 /-- Source-shaped `GρG†` handoff at an explicit positive threshold scale, with
 the CFC filter order inequality discharged from a full-rank reference. -/
 theorem smoothConditionalMinEntropyFixedSubnormalized_lower_bound_of_fixedPetzSmoothMinG_ball_scale
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef)
     (ε lambda : ℝ)
     (hε_pos : 0 < ε) (hε_lt : ε < 1) (hlambda : 0 < lambda)
     (hball :
@@ -871,8 +899,8 @@ lower-bound theorem.  The two remaining source obligations are explicit:
 the witness must lie in the purified ball, and the CFC filter must satisfy the
 direct threshold operator bound. -/
 theorem smoothConditionalMinEntropyFixedSubnormalized_lower_bound_of_fixedPetzSmoothMinG_bound
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef)
     (ε α : ℝ)
     (hε_pos : 0 < ε) (hε_lt : ε < 1)
     (hα_gt : 1 < α) (hα_le_two : α ≤ 2)
@@ -914,8 +942,8 @@ theorem smoothConditionalMinEntropyFixedSubnormalized_lower_bound_of_fixedPetzSm
 operator-order parts discharged in the positive-definite core.  The only
 remaining source obligation is the purified-ball estimate for the TCR witness. -/
 theorem smoothConditionalMinEntropyFixedSubnormalized_lower_bound_of_fixedPetzSmoothMinG_ball
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef)
     (ε α : ℝ)
     (hε_pos : 0 < ε) (hε_lt : ε < 1)
     (hα_gt : 1 < α) (hα_le_two : α ≤ 2)
@@ -958,8 +986,4 @@ theorem smoothConditionalMinEntropyFixedSubnormalized_lower_bound_of_fixedPetzSm
     (ρ := ρ) hρ (σ := σ) hσ ε α hε_pos hε_lt hα_gt hα_le_two
     hcontract (by simpa [lam, hcontract] using hball) hbound
 
-end State
-
-end
-
-end QIT
+end MState

@@ -11,6 +11,7 @@ public import QuantumLib.QIT.Information.Renyi.RenyiDPI.Domain
 public import QuantumLib.QIT.States.TraceNorm.Audenaert
 public import QuantumLib.QIT.Util.BlockMatrix
 import QuantumLib.QIT.Util.CMatrixCLM
+import QuantumLib.QIT.Util.CMatrixIntegral
 public import Mathlib.Data.EReal.Basic
 
 /-!
@@ -130,7 +131,7 @@ public theorem cMatrix_rpow_kronecker_inv_mul_right_eq_tensor_one_sub
     {b : Type v} [Fintype b] [DecidableEq b]
     {A : CMatrix a} {B : CMatrix b}
     (hA : A.PosSemidef) (hB : B.PosDef)
-    {p : ℝ} (hp0 : 0 ≤ p) :
+    (p : ℝ) :
     CFC.rpow (Matrix.kronecker A B⁻¹) p *
         Matrix.kronecker (1 : CMatrix a) B =
       Matrix.kronecker (CFC.rpow A p) (CFC.rpow B (1 - p)) := by
@@ -139,8 +140,8 @@ public theorem cMatrix_rpow_kronecker_inv_mul_right_eq_tensor_one_sub
       CFC.rpow (Matrix.kronecker A B⁻¹) p =
         Matrix.kronecker (CFC.rpow A p) (CFC.rpow B⁻¹ p) := by
     simpa using
-      cMatrix_rpow_kronecker_nonneg
-        (A := A) (B := B⁻¹) hA hBinv_psd hp0
+      cMatrix_rpow_kronecker
+        (A := A) (B := B⁻¹) hA hBinv_psd p
   have hBpow : CFC.rpow B⁻¹ p * B = CFC.rpow B (1 - p) := by
     rw [cMatrix_rpow_nonsing_inv_eq_rpow_neg hB p]
     have hBpowone : CFC.rpow B (1 : ℝ) = B :=
@@ -418,8 +419,6 @@ public theorem andoIntegralRepresentation_posDef
     let Y : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) B
     have hpReal : (p : ℝ) ∈ Set.Ioo (0 : ℝ) 1 := by
       exact ⟨by exact_mod_cast hp.1, by exact_mod_cast hp.2⟩
-    have hp0 : 0 ≤ (p : ℝ) := by
-      exact_mod_cast (show (0 : ℝ≥0) ≤ p from zero_le)
     have hCpsd : C.PosSemidef := by
       simpa [C] using hA.kronecker hB.inv.posSemidef
     have hAudInt :
@@ -455,7 +454,7 @@ public theorem andoIntegralRepresentation_posDef
           Matrix.kronecker (CFC.rpow A (p : ℝ)) (CFC.rpow B (1 - (p : ℝ))) := by
       simpa [C, Y] using
         cMatrix_rpow_kronecker_inv_mul_right_eq_tensor_one_sub
-          (a := a) (b := b) (A := A) (B := B) hA hB hp0
+          (a := a) (b := b) (A := A) (B := B) hA hB (p : ℝ)
     calc
       Matrix.kronecker (CFC.rpow A (p : ℝ)) (CFC.rpow B (1 - (p : ℝ))) =
           CFC.rpow C (p : ℝ) * Y := by
@@ -466,39 +465,6 @@ public theorem andoIntegralRepresentation_posDef
           Matrix.andoResolventIntegrand (a := a) (b := b) r A B ∂μ := by
         rfl
 
-private theorem cMatrix_integral_conjTranspose {α : Type*} [MeasurableSpace α]
-    {μ : Measure α} {ι : Type v} [Fintype ι] [DecidableEq ι]
-    {f : α → CMatrix ι} (hf : Integrable f μ) :
-    Matrix.conjTranspose (∫ x, f x ∂μ) =
-      ∫ x, Matrix.conjTranspose (f x) ∂μ := by
-  simpa [cMatrixConjTransposeCLM] using
-    ((cMatrixConjTransposeCLM (ι := ι)).integral_comp_comm hf).symm
-
-private theorem cMatrix_integral_dotProduct_mulVec {α : Type*} [MeasurableSpace α]
-    {μ : Measure α} {ι : Type v} [Fintype ι] [DecidableEq ι]
-    {f : α → CMatrix ι} (hf : Integrable f μ) (x : ι → ℂ) :
-    dotProduct (star x) (Matrix.mulVec (∫ t, f t ∂μ) x) =
-      ∫ t, dotProduct (star x) (Matrix.mulVec (f t) x) ∂μ := by
-  simp_rw [← cMatrixQuadraticCLM_apply x]
-  exact
-    ((cMatrixQuadraticCLM x).integral_comp_comm hf).symm
-
-private theorem isClosed_setOf_zero_le_complex_frankLieb :
-    IsClosed ({z : ℂ | 0 ≤ z} : Set ℂ) := by
-  have h : ({z : ℂ | 0 ≤ z} : Set ℂ) = {z | 0 ≤ z.re} ∩ {z | z.im = 0} := by
-    ext z
-    simp only [Set.mem_inter_iff, Set.mem_ofPred_eq]
-    constructor
-    · intro hz
-      simp [Complex.le_def] at hz ⊢
-      tauto
-    · rintro ⟨hre, him⟩
-      simp [Complex.le_def]
-      exact ⟨hre, him.symm⟩
-  rw [h]
-  exact (isClosed_Ici.preimage Complex.continuous_re).inter
-    (isClosed_singleton.preimage Complex.continuous_im)
-
 private theorem continuous_cMatrix_quadraticForm {ι : Type v}
     [Fintype ι] [DecidableEq ι] (x : ι →₀ ℂ) :
     Continuous (fun A : CMatrix ι =>
@@ -508,7 +474,7 @@ private theorem continuous_cMatrix_quadraticForm {ι : Type v}
   exact continuous_finsetSum x.support fun i _ =>
     continuous_finsetSum x.support fun j _ =>
       Continuous.mul (Continuous.mul continuous_const
-        (cMatrixEntryCLM_complex (ι := ι) i j).continuous) continuous_const
+        (cMatrixEntryCLMComplex (ι := ι) i j).continuous) continuous_const
 
 /-- The finite-dimensional cone of positive semidefinite complex matrices is
 closed in the norm topology. -/
@@ -531,7 +497,7 @@ public theorem isClosed_cMatrix_posSemidef {ι : Type v}
     rw [hH]
     exact isClosed_eq (cMatrixConjTransposeCLM (ι := ι)).continuous continuous_id
   · exact isClosed_iInter fun x =>
-      isClosed_setOf_zero_le_complex_frankLieb.preimage
+      isClosed_Ici.preimage
         (continuous_cMatrix_quadraticForm (ι := ι) x)
 
 /-- Positive semidefiniteness is preserved under limits of eventually PSD
@@ -559,52 +525,6 @@ public theorem cMatrix_le_of_tendsto {ι : Type v}
     cMatrix_posSemidef_of_tendsto hdiff
       (hle.mono fun _ hx => Matrix.le_iff.mp hx)
   exact Matrix.le_iff.mpr hpsd
-
-/-- Bochner integration preserves positive semidefiniteness for matrix-valued
-functions, up to almost-everywhere equality. -/
-public theorem cMatrix_integral_posSemidef_of_ae {α : Type*} [MeasurableSpace α]
-    {μ : Measure α} {ι : Type v} [Fintype ι] [DecidableEq ι]
-    {f : α → CMatrix ι} (hf : Integrable f μ)
-    (hpos : ∀ᵐ t ∂μ, (f t).PosSemidef) :
-    (∫ t, f t ∂μ).PosSemidef := by
-  refine Matrix.PosSemidef.of_dotProduct_mulVec_nonneg ?_ ?_
-  · rw [Matrix.IsHermitian, cMatrix_integral_conjTranspose (hf := hf)]
-    apply integral_congr_ae
-    exact hpos.mono fun _ ht => ht.isHermitian.eq
-  · intro x
-    rw [cMatrix_integral_dotProduct_mulVec (hf := hf) x]
-    exact integral_nonneg_of_ae (hpos.mono fun _ ht => ht.dotProduct_mulVec_nonneg x)
-
-/-- Monotonicity of Bochner set integration for matrix-valued functions in
-Loewner order.
-
-Mathlib's scalar/order lemma needs a closed-order-topology instance which is
-not available for `CMatrix`; this version proves the PSD difference directly
-from quadratic forms. -/
-public theorem cMatrix_setIntegral_mono
-    {μ : Measure ℝ} {s : Set ℝ} (hs : MeasurableSet s)
-    {f g : ℝ → CMatrix a}
-    (hf : IntegrableOn f s μ) (hg : IntegrableOn g s μ)
-    (hle : ∀ r ∈ s, f r ≤ g r) :
-    ∫ r in s, f r ∂μ ≤ ∫ r in s, g r ∂μ := by
-  have hdiffInt : IntegrableOn (fun r : ℝ => g r - f r) s μ := hg.sub hf
-  have hdiffPSD :
-      (∫ r in s, (g r - f r) ∂μ).PosSemidef := by
-    have hdiffInt' : Integrable (fun r : ℝ => g r - f r) (μ.restrict s) := by
-      simpa [IntegrableOn] using hdiffInt
-    exact
-      cMatrix_integral_posSemidef_of_ae (μ := μ.restrict s) hdiffInt'
-        ((ae_restrict_iff' hs).mpr
-          (ae_of_all μ fun r hr => Matrix.le_iff.mp (hle r hr)))
-  have hsub :
-      ∫ r in s, (g r - f r) ∂μ =
-        (∫ r in s, g r ∂μ) - (∫ r in s, f r ∂μ) := by
-    simpa [IntegrableOn] using
-      integral_sub (μ := μ.restrict s)
-        (by simpa [IntegrableOn] using hg)
-        (by simpa [IntegrableOn] using hf)
-  rw [hsub] at hdiffPSD
-  exact Matrix.le_iff.mpr hdiffPSD
 
 /-- Monotonicity of the real trace after Bochner integration of matrix-valued
 functions.
@@ -753,7 +673,7 @@ theorem andoResolventIntegrand_rpow_weighted_setIntegral_concave_posDef
       Matrix.andoResolventIntegrand_rpow_weighted_concave_posDef
         hA₁ hA₂ hB₁ hB₂ (hr_pos r hrs) ht0 ht1 (p := p)
   simpa [F₁, F₂, Ft] using
-    cMatrix_setIntegral_mono (a := a × b) hs hLeftInt hIt hmono
+    cMatrix_setIntegral_mono (ι := a × b) hs hLeftInt hIt hmono
 
 /-- Standard separated-left form of the integrated Ando trace concavity. -/
 theorem andoResolventIntegrand_rpow_weighted_setIntegral_trace_concave_posDef'
@@ -1283,10 +1203,10 @@ public theorem liebAndo_tensorTraceConcavity_posSemidef
     have hε : 0 < ε := hε
     have hB₁ε_pos : (B₁ε ε).PosDef := by
       simpa [B₁ε] using
-        State.cMatrix_posSemidef_add_pos_smul_one_posDef hB₁ hε
+        MState.cMatrix_posSemidef_add_pos_smul_one_posDef hB₁ hε
     have hB₂ε_pos : (B₂ε ε).PosDef := by
       simpa [B₂ε] using
-        State.cMatrix_posSemidef_add_pos_smul_one_posDef hB₂ hε
+        MState.cMatrix_posSemidef_add_pos_smul_one_posDef hB₂ hε
     have hpos :=
       liebAndo_tensorTraceConcavity_posDef
         (a := a) (b := b) (p := p) hp
@@ -1420,10 +1340,10 @@ public theorem liebAndo_tensorConcavity_posSemidef
     have hε : 0 < ε := hε
     have hB₁ε_pos : (B₁ε ε).PosDef := by
       simpa [B₁ε] using
-        State.cMatrix_posSemidef_add_pos_smul_one_posDef hB₁ hε
+        MState.cMatrix_posSemidef_add_pos_smul_one_posDef hB₁ hε
     have hB₂ε_pos : (B₂ε ε).PosDef := by
       simpa [B₂ε] using
-        State.cMatrix_posSemidef_add_pos_smul_one_posDef hB₂ hε
+        MState.cMatrix_posSemidef_add_pos_smul_one_posDef hB₂ hε
     have hpos :=
       liebAndo_tensorConcavity_posDef
         (a := a) (b := b) (p := p) hp

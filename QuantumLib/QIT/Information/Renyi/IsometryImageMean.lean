@@ -24,11 +24,12 @@ a zero failure block; the direct-sum mean property then removes that block.
 
 open scoped ComplexOrder MatrixOrder
 
-namespace QIT
-
+noncomputable section
 universe u v
 
-noncomputable section
+open QIT
+
+namespace QIT
 
 namespace ReferenceIsometry
 
@@ -45,12 +46,6 @@ private theorem compressionMap_apply (V : ReferenceIsometry a b) (X : CMatrix b)
     V.compressionMap X =
       Matrix.conjTranspose V.matrix * X * V.matrix := by
   simp [compressionMap, MatrixMap.ofKraus]
-
-private theorem matrix_mulVec_injective (V : ReferenceIsometry a b) :
-    Function.Injective V.matrix.mulVec := by
-  intro x y hxy
-  have h := congrArg (Matrix.mulVec (Matrix.conjTranspose V.matrix)) hxy
-  simpa [Matrix.mulVec_mulVec, V.isometry] using h
 
 private theorem imageProjection_complement_posSemidef (V : ReferenceIsometry a b) :
     (1 - V.matrix * Matrix.conjTranspose V.matrix).PosSemidef := by
@@ -69,7 +64,7 @@ private theorem imageProjection_complement_posSemidef (V : ReferenceIsometry a b
 
 private theorem compressionMap_traceNonincreasingCP (V : ReferenceIsometry a b) :
     MatrixMap.TraceNonincreasingCP V.compressionMap where
-  completelyPositive := MatrixMap.ofKraus_isCompletelyPositive _
+  completelyPositive := MatrixMap.ofKraus_completelyPositive _
   traceNonincreasing := by
     intro X hX
     have hcomp := V.imageProjection_complement_posSemidef
@@ -112,35 +107,37 @@ theorem compression_posDef (V : ReferenceIsometry a b)
 
 end ReferenceIsometry
 
-namespace State
+end QIT
+
+namespace MState
 
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
 /-- Put a normalized state in the right block of a binary direct sum. -/
-private def rightZeroExtension (rho : State a) : State (Sum PUnit.{1} a) where
-  matrix := Matrix.fromBlocks 0 0 0 rho.matrix
-  pos := Matrix.fromBlocks_diagonal_posSemidef Matrix.PosSemidef.zero rho.pos
-  trace_eq_one := by
-    rw [Matrix.trace_fromBlocks_diagonal, rho.trace_eq_one]
-    simp
+private def rightZeroExtension (rho : MState a) : MState (PUnit.{1} ⊕ a) := .ofMatrix
+  (matrix := Matrix.fromBlocks 0 0 0 rho.m)
+  (pos := Matrix.fromBlocks_diagonal_posSemidef Matrix.PosSemidef.zero rho.psd)
+  (trace_eq_one := by
+    rw [Matrix.trace_fromBlocks_diagonal, rho.tr']
+    simp)
 
 @[simp]
-private theorem rightZeroExtension_matrix (rho : State a) :
-    rho.rightZeroExtension.matrix = Matrix.fromBlocks 0 0 0 rho.matrix :=
-  rfl
+private theorem rightZeroExtension_matrix (rho : MState a) :
+    rho.rightZeroExtension.m = Matrix.fromBlocks 0 0 0 rho.m :=
+  matrix_ofMatrix _ _ _
 
-private theorem rightZeroExtension_eq_reindex_directSumZero (rho : State a) :
+private theorem rightZeroExtension_eq_reindex_directSumZero (rho : MState a) :
     rho.rightZeroExtension =
       (rho.directSumZero PUnit.{1}).reindex (Equiv.sumComm a PUnit.{1}) := by
-  apply State.ext
+  apply MState.ext
   ext i j
   cases i <;> cases j <;>
-    simp [rightZeroExtension, State.reindex_matrix]
+    simp [rightZeroExtension, MState.reindex_matrix]
 
 private theorem rightZeroExtension_supports_fromBlocks
-    (rho : State a) {failure : CMatrix PUnit.{1}} {sigma : CMatrix a}
-    (hSupport : Matrix.Supports rho.matrix sigma) :
-    Matrix.Supports rho.rightZeroExtension.matrix
+    (rho : MState a) {failure : CMatrix PUnit.{1}} {sigma : CMatrix a}
+    (hSupport : Matrix.Supports rho.m sigma) :
+    Matrix.Supports rho.rightZeroExtension.m
       (Matrix.fromBlocks failure 0 0 sigma) := by
   intro v hv
   rw [Matrix.fromBlocks_mulVec] at hv
@@ -159,12 +156,12 @@ private theorem rightZeroExtension_supports_fromBlocks
       simpa [Function.comp_def] using hi
 
 private theorem supports_of_rightZeroExtension_supports_fromBlocks
-    (rho : State a) {failure : CMatrix PUnit.{1}} {sigma : CMatrix a}
-    (hSupport : Matrix.Supports rho.rightZeroExtension.matrix
+    (rho : MState a) {failure : CMatrix PUnit.{1}} {sigma : CMatrix a}
+    (hSupport : Matrix.Supports rho.rightZeroExtension.m
       (Matrix.fromBlocks failure 0 0 sigma)) :
-    Matrix.Supports rho.matrix sigma := by
+    Matrix.Supports rho.m sigma := by
   intro v hv
-  let w : Sum PUnit.{1} a -> Complex := Sum.elim (fun _ => 0) v
+  let w : PUnit.{1} ⊕ a → ℂ := Sum.elim (fun _ => 0) v
   have href :
       (Matrix.fromBlocks failure 0 0 sigma).mulVec w = 0 := by
     rw [Matrix.fromBlocks_mulVec]
@@ -181,55 +178,55 @@ private theorem supports_of_rightZeroExtension_supports_fromBlocks
   simpa [rightZeroExtension, Matrix.fromBlocks_mulVec, w] using hi
 
 private theorem relativeEntropyPSDReferenceTraceLogE_rightZeroExtension_of_supports
-    (rho : State a) {failure : CMatrix PUnit.{1}} {sigma : CMatrix a}
+    (rho : MState a) {failure : CMatrix PUnit.{1}} {sigma : CMatrix a}
     (hFailure : failure.PosSemidef) (hSigma : sigma.PosSemidef)
-    (hSupport : Matrix.Supports rho.matrix sigma) :
+    (hSupport : Matrix.Supports rho.m sigma) :
     relativeEntropyPSDReferenceTraceLogE rho.rightZeroExtension
         (Matrix.fromBlocks failure 0 0 sigma)
         (Matrix.fromBlocks_diagonal_posSemidef hFailure hSigma) =
       relativeEntropyPSDReferenceTraceLogE rho sigma hSigma := by
-  let ref : CMatrix (Sum PUnit.{1} a) := Matrix.fromBlocks failure 0 0 sigma
+  let ref : CMatrix (PUnit.{1} ⊕ a) := Matrix.fromBlocks failure 0 0 sigma
   let hRef : ref.PosSemidef :=
     Matrix.fromBlocks_diagonal_posSemidef hFailure hSigma
-  let hSupportBlock : Matrix.Supports rho.rightZeroExtension.matrix ref :=
+  let hSupportBlock : Matrix.Supports rho.rightZeroExtension.m ref :=
     rho.rightZeroExtension_supports_fromBlocks hSupport
-  let f : Real -> Real := fun x => if x = 0 then 0 else Real.log x
+  let f : ℝ → ℝ := fun x => if x = 0 then 0 else Real.log x
   have hEntropyBlock :
       (_root_.QIT.psdSupportCompressedState rho.rightZeroExtension hRef
         hSupportBlock).vonNeumann = rho.vonNeumann := by
     calc
       (_root_.QIT.psdSupportCompressedState rho.rightZeroExtension hRef
           hSupportBlock).vonNeumann = rho.rightZeroExtension.vonNeumann :=
-        relativeEntropyTraceLog_vonNeumann_psdSupportCompressedState_eq
+        vonNeumann_psdSupportCompressedState_eq
           rho.rightZeroExtension hRef hSupportBlock
       _ = rho.vonNeumann := by
         rw [rho.rightZeroExtension_eq_reindex_directSumZero,
-          State.vonNeumann_reindex, directSumZero_vonNeumann]
+          MState.vonNeumann_reindex, directSumZero_vonNeumann]
   have hEntropy :
       (_root_.QIT.psdSupportCompressedState rho hSigma hSupport).vonNeumann =
         rho.vonNeumann :=
-    relativeEntropyTraceLog_vonNeumann_psdSupportCompressedState_eq
+    vonNeumann_psdSupportCompressedState_eq
       rho hSigma hSupport
   have hTraceBlock :
       (((_root_.QIT.psdSupportCompressedState rho.rightZeroExtension hRef
-          hSupportBlock).matrix *
-        State.psdLog (psdSupportCompress ref hRef ref)
+          hSupportBlock).m *
+        MState.psdLog (psdSupportCompress ref hRef ref)
           (psdSupportCompress_self_posDef ref hRef)).trace).re =
-        ((rho.rightZeroExtension.matrix * cfc f ref).trace).re := by
+        ((rho.rightZeroExtension.m * cfc f ref).trace).re := by
     simpa [ref, hRef, f, _root_.QIT.psdSupportCompressedState] using
-      relativeEntropyTraceLog_trace_mul_psdSupportLog_eq_trace_mul_cfc_logZero
+      trace_mul_psdSupportLog_eq_trace_mul_cfc_logZero
         rho.rightZeroExtension hRef hSupportBlock
   have hTrace :
-      (((_root_.QIT.psdSupportCompressedState rho hSigma hSupport).matrix *
-        State.psdLog (psdSupportCompress sigma hSigma sigma)
+      (((_root_.QIT.psdSupportCompressedState rho hSigma hSupport).m *
+        MState.psdLog (psdSupportCompress sigma hSigma sigma)
           (psdSupportCompress_self_posDef sigma hSigma)).trace).re =
-        ((rho.matrix * cfc f sigma).trace).re := by
+        ((rho.m * cfc f sigma).trace).re := by
     simpa [f, _root_.QIT.psdSupportCompressedState] using
-      relativeEntropyTraceLog_trace_mul_psdSupportLog_eq_trace_mul_cfc_logZero
+      trace_mul_psdSupportLog_eq_trace_mul_cfc_logZero
         rho hSigma hSupport
   have hBlockTraceEq :
-      ((rho.rightZeroExtension.matrix * cfc f ref).trace).re =
-        ((rho.matrix * cfc f sigma).trace).re := by
+      ((rho.rightZeroExtension.m * cfc f ref).trace).re =
+        ((rho.m * cfc f sigma).trace).re := by
     rw [show cfc f ref =
         Matrix.fromBlocks (cfc f failure) 0 0 (cfc f sigma) by
       exact cMatrix_cfc_fromBlocks_diagonal hFailure hSigma f]
@@ -242,7 +239,9 @@ private theorem relativeEntropyPSDReferenceTraceLogE_rightZeroExtension_of_suppo
   simp only [relativeEntropyPSDReferenceTraceLogFinite]
   rw [hEntropyBlock, hEntropy, hTraceBlock, hTrace, hBlockTraceEq]
 
-end State
+end MState
+
+namespace QIT
 
 namespace MatrixMap.TraceNonincreasingCP
 
@@ -272,31 +271,34 @@ variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
 /-- Universe-pinned completion channel used by the image/complement proof. -/
 private def compressionCompletion (V : ReferenceIsometry a b) :
-    Channel (Sum PUnit.{1} b) (Sum PUnit.{1} a) :=
+    CPTPMap (PUnit.{1} ⊕ b) (PUnit.{1} ⊕ a) :=
   V.compressionMap_traceNonincreasingCP.hatCompletion
 
 private theorem compressionCompletion_apply_imageState (V : ReferenceIsometry a b)
-    (rho : State a) :
-    V.compressionCompletion.applyState
-        ((Channel.ofReferenceIsometry V).applyState rho).rightZeroExtension =
+    (rho : MState a) :
+    V.compressionCompletion
+        (MState.rightZeroExtension ((CPTPOp.ofReferenceIsometry V) rho)) =
       rho.rightZeroExtension := by
   let hComp := V.compressionMap_traceNonincreasingCP
-  let image := (Channel.ofReferenceIsometry V).applyState rho
-  have hcompression : V.compressionMap image.matrix = rho.matrix := by
-    simpa [image, Channel.applyState, Channel.ofReferenceIsometry_map,
-      MatrixMap.ofReferenceIsometry_apply] using V.compressionMap_image rho.matrix
-  have hloss : (image.matrix * hComp.lossEffect).trace = 0 := by
-    rw [hComp.trace_mul_lossEffect, hcompression, image.trace_eq_one,
-      rho.trace_eq_one]
+  let image : MState b := (CPTPOp.ofReferenceIsometry V) rho
+  have hcompression : V.compressionMap image.m = rho.m := by
+    simpa [image, CPTPOp.mat_coe_eq_apply_mat, CPTPOp.ofReferenceIsometry_map,
+      MatrixMap.ofReferenceIsometry_apply] using V.compressionMap_image rho.m
+  have hloss : (image.m * hComp.lossEffect).trace = 0 := by
+    rw [hComp.trace_mul_lossEffect, hcompression, image.tr',
+      rho.tr']
     simp
-  apply State.ext
-  change V.compressionCompletion.map (Matrix.fromBlocks 0 0 0 image.matrix) =
-    Matrix.fromBlocks 0 0 0 rho.matrix
-  change hComp.hatCompletion.map (Matrix.fromBlocks 0 0 0 image.matrix) =
-    Matrix.fromBlocks 0 0 0 rho.matrix
-  rw [hComp.hatCompletion_apply_fromBlocks (0 : CMatrix PUnit.{1}) image.matrix]
-  ext i j
-  cases i <;> cases j <;> simp [hcompression, hloss]
+  have hmap : V.compressionCompletion.map (Matrix.fromBlocks 0 0 0 image.m) =
+      Matrix.fromBlocks 0 0 0 rho.m := by
+    change hComp.hatCompletion.map (Matrix.fromBlocks 0 0 0 image.m) =
+      Matrix.fromBlocks 0 0 0 rho.m
+    rw [hComp.hatCompletion_apply_fromBlocks (0 : CMatrix PUnit.{1}) image.m]
+    ext i j
+    cases i <;> cases j <;> simp [hcompression, hloss]
+  apply MState.ext
+  rw [CPTPOp.mat_coe_eq_apply_mat]
+  simp only [MState.rightZeroExtension_matrix]
+  exact hmap
 
 /-- The positive failure-reference block produced by compression completion. -/
 private def compressionFailureReference (V : ReferenceIsometry a b)
@@ -309,8 +311,8 @@ private theorem compressionFailureReference_posDef_of_posSemidef
     {sigma : CMatrix b} (hSigma : sigma.PosSemidef) :
     (V.compressionFailureReference sigma).PosDef := by
   let hComp := V.compressionMap_traceNonincreasingCP
-  let z : Complex := (sigma * hComp.lossEffect).trace
-  have hzRe : 0 <= z.re := by
+  let z : ℂ := (sigma * hComp.lossEffect).trace
+  have hzRe : 0 ≤ z.re := by
     exact cMatrix_trace_mul_posSemidef_re_nonneg hSigma
       hComp.lossEffect_posSemidef
   have hzIm : z.im = 0 := by
@@ -318,7 +320,7 @@ private theorem compressionFailureReference_posDef_of_posSemidef
       hComp.lossEffect_posSemidef
   have hone : 0 < 1 + z.re := by linarith
   have heq : V.compressionFailureReference sigma =
-      ((1 + z.re : Real) : Complex) • (1 : CMatrix PUnit) := by
+      ((1 + z.re : ℝ) : ℂ) • (1 : CMatrix PUnit) := by
     ext i j
     cases i
     cases j
@@ -347,7 +349,9 @@ private theorem compressionCompletion_map_reference (V : ReferenceIsometry a b)
 
 end ReferenceIsometry
 
-namespace State
+end QIT
+
+namespace MState
 
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
@@ -357,30 +361,30 @@ reference.  This is the order-one boundary of Tomamichel's pinching-and-mean
 argument: channel completion supplies a failure flag, trace-log DPI performs
 the compression, and the zero-state direct-sum identity removes the flag. -/
 theorem relativeEntropyPSDReferenceTraceLogE_isometryImage_ge_compression
-    (rho : State a) (V : ReferenceIsometry a b)
+    (rho : MState a) (V : ReferenceIsometry a b)
     {sigma : CMatrix b} (hSigma : sigma.PosSemidef)
     (hSupport : Matrix.Supports
-      ((Channel.ofReferenceIsometry V).applyState rho).matrix sigma) :
+      ((CPTPOp.ofReferenceIsometry V) rho).m sigma) :
     relativeEntropyPSDReferenceTraceLogE
-        ((Channel.ofReferenceIsometry V).applyState rho) sigma hSigma >=
+        ((CPTPOp.ofReferenceIsometry V) rho) sigma hSigma ≥
       relativeEntropyPSDReferenceTraceLogE rho
         (Matrix.conjTranspose V.matrix * sigma * V.matrix)
         (Matrix.PosSemidef.conjTranspose_mul_mul_same hSigma V.matrix) := by
-  let image := (Channel.ofReferenceIsometry V).applyState rho
+  let image : MState b := (CPTPOp.ofReferenceIsometry V) rho
   let completion := V.compressionCompletion
   let inputState := image.rightZeroExtension
-  let inputRef : CMatrix (Sum PUnit.{1} b) :=
+  let inputRef : CMatrix (PUnit.{1} ⊕ b) :=
     Matrix.fromBlocks (1 : CMatrix PUnit.{1}) 0 0 sigma
   let compressed : CMatrix a :=
     Matrix.conjTranspose V.matrix * sigma * V.matrix
   let failure : CMatrix PUnit.{1} := V.compressionFailureReference sigma
   have hInputRef : inputRef.PosSemidef :=
     Matrix.fromBlocks_diagonal_posSemidef Matrix.PosSemidef.one hSigma
-  have hInputSupport : Matrix.Supports inputState.matrix inputRef := by
+  have hInputSupport : Matrix.Supports inputState.m inputRef := by
     exact image.rightZeroExtension_supports_fromBlocks hSupport
   have hDPI :
-      relativeEntropyPSDReferenceTraceLogE inputState inputRef hInputRef >=
-        relativeEntropyPSDReferenceTraceLogE (completion.applyState inputState)
+      relativeEntropyPSDReferenceTraceLogE inputState inputRef hInputRef ≥
+        relativeEntropyPSDReferenceTraceLogE (completion inputState)
           (completion.map inputRef) (completion.mapsPositive inputRef hInputRef) :=
     relativeEntropyPSDReferenceTraceLogE_dataProcessing_channel_ge
       inputState hInputRef completion
@@ -389,26 +393,26 @@ theorem relativeEntropyPSDReferenceTraceLogE_isometryImage_ge_compression
   have hCompressed : compressed.PosSemidef := by
     exact Matrix.PosSemidef.conjTranspose_mul_mul_same hSigma V.matrix
   have hOutputSupport :
-      Matrix.Supports (completion.applyState inputState).matrix
+      Matrix.Supports (completion inputState).m
         (completion.map inputRef) :=
     channel_applyState_supports_of_supports inputState hInputRef completion
       hInputSupport
   have hOutputSupport' :
-      Matrix.Supports rho.rightZeroExtension.matrix
+      Matrix.Supports rho.rightZeroExtension.m
         (Matrix.fromBlocks failure 0 0 compressed) := by
     simpa only [completion, inputState, inputRef, image, failure, compressed,
       V.compressionCompletion_apply_imageState rho,
       V.compressionCompletion_map_reference sigma] using hOutputSupport
-  have hCompressedSupport : Matrix.Supports rho.matrix compressed :=
+  have hCompressedSupport : Matrix.Supports rho.m compressed :=
     rho.supports_of_rightZeroExtension_supports_fromBlocks hOutputSupport'
   calc
     relativeEntropyPSDReferenceTraceLogE
-        ((Channel.ofReferenceIsometry V).applyState rho) sigma hSigma =
+        ((CPTPOp.ofReferenceIsometry V) rho) sigma hSigma =
       relativeEntropyPSDReferenceTraceLogE inputState inputRef hInputRef := by
         symm
         exact image.relativeEntropyPSDReferenceTraceLogE_rightZeroExtension_of_supports
           Matrix.PosSemidef.one hSigma hSupport
-    _ >= relativeEntropyPSDReferenceTraceLogE (completion.applyState inputState)
+    _ ≥ relativeEntropyPSDReferenceTraceLogE (completion inputState)
         (completion.map inputRef) (completion.mapsPositive inputRef hInputRef) := hDPI
     _ = relativeEntropyPSDReferenceTraceLogE rho compressed hCompressed := by
       have hmean :=
@@ -419,17 +423,17 @@ theorem relativeEntropyPSDReferenceTraceLogE_isometryImage_ge_compression
         V.compressionCompletion_map_reference sigma] using hmean
 
 private theorem sandwichedRenyiPSDReferenceE_rightZeroExtension
-    (rho : State a) {failure : CMatrix PUnit.{1}} {sigma : CMatrix a}
+    (rho : MState a) {failure : CMatrix PUnit.{1}} {sigma : CMatrix a}
     (hFailure : failure.PosDef) (hSigma : sigma.PosDef)
-    (alpha : Real) (hAlpha : 1 / 2 <= alpha) :
+    (alpha : ℝ) (hAlpha : 1 / 2 ≤ alpha) :
     sandwichedRenyiPSDReferenceE rho.rightZeroExtension
         (Matrix.fromBlocks failure 0 0 sigma)
         (Matrix.fromBlocks_diagonal_posDef hFailure hSigma).posSemidef alpha =
       sandwichedRenyiPSDReferenceE rho sigma hSigma.posSemidef alpha := by
-  let e : Sum a PUnit.{1} ≃ Sum PUnit.{1} a := Equiv.sumComm a PUnit.{1}
+  let e : (a ⊕ PUnit.{1}) ≃ (PUnit.{1} ⊕ a) := Equiv.sumComm a PUnit.{1}
   have href :
       Matrix.reindex e e (Matrix.fromBlocks sigma 0 0 failure) =
-        (Matrix.fromBlocks failure 0 0 sigma : CMatrix (Sum PUnit.{1} a)) := by
+        (Matrix.fromBlocks failure 0 0 sigma : CMatrix (PUnit.{1} ⊕ a)) := by
     ext i j
     cases i <;> cases j <;> simp [e, Matrix.reindex_apply]
   have hmean := sandwichedRenyiPSDReferenceE_directSumZero_reindex
@@ -440,34 +444,34 @@ private theorem sandwichedRenyiPSDReferenceE_rightZeroExtension
 /-- Tomamichel's image/complement pinching and mean step for a finite
 isometry.
 
-For every finite sandwiched-Renyi order `alpha >= 1/2`, including the
+For every finite sandwiched-Renyi order `alpha ≥ 1/2`, including the
 support-aware Umegaki branch at `alpha = 1`, embedding a state by an isometry
 cannot reduce its divergence below the divergence against the compressed
-reference.  The proof completes `X |-> V^* X V` by a failure flag, applies
+reference.  The proof completes `X ↦ V^* X V` by a failure flag, applies
 data processing, and removes the zero state block with the direct-sum mean
 property [Tomamichel2015FiniteResources, apps.tex:193-215]. -/
 theorem sandwichedRenyiPSDReferenceE_isometryImage_ge_compression
-    (rho : State a) (V : ReferenceIsometry a b)
+    (rho : MState a) (V : ReferenceIsometry a b)
     {sigma : CMatrix b} (hSigma : sigma.PosDef)
-    (alpha : Real) (hAlpha : 1 / 2 <= alpha) :
+    (alpha : ℝ) (hAlpha : 1 / 2 ≤ alpha) :
     sandwichedRenyiPSDReferenceE
-        ((Channel.ofReferenceIsometry V).applyState rho) sigma
-        hSigma.posSemidef alpha >=
+        ((CPTPOp.ofReferenceIsometry V) rho) sigma
+        hSigma.posSemidef alpha ≥
       sandwichedRenyiPSDReferenceE rho
         (Matrix.conjTranspose V.matrix * sigma * V.matrix)
         (V.compression_posDef hSigma).posSemidef alpha := by
-  let image := (Channel.ofReferenceIsometry V).applyState rho
+  let image : MState b := (CPTPOp.ofReferenceIsometry V) rho
   let hComp := V.compressionMap_traceNonincreasingCP
   let completion := V.compressionCompletion
   let inputState := image.rightZeroExtension
-  let inputRef : CMatrix (Sum PUnit.{1} b) :=
+  let inputRef : CMatrix (PUnit.{1} ⊕ b) :=
     Matrix.fromBlocks (1 : CMatrix PUnit.{1}) 0 0 sigma
   have hInputRef : inputRef.PosDef := by
     exact Matrix.fromBlocks_diagonal_posDef Matrix.PosDef.one hSigma
   have hDPI :
       sandwichedRenyiPSDReferenceE inputState inputRef
-          hInputRef.posSemidef alpha >=
-        sandwichedRenyiPSDReferenceE (completion.applyState inputState)
+          hInputRef.posSemidef alpha ≥
+        sandwichedRenyiPSDReferenceE (completion inputState)
           (completion.map inputRef)
           (completion.mapsPositive inputRef hInputRef.posSemidef) alpha := by
     by_cases hOne : alpha = 1
@@ -476,7 +480,7 @@ theorem sandwichedRenyiPSDReferenceE_isometryImage_ge_compression
         sandwichedRenyiPSDReferenceE_eq_traceLogE_of_eq_one _ _ rfl]
       exact relativeEntropyPSDReferenceTraceLogE_dataProcessing_channel_ge
         inputState hInputRef.posSemidef completion
-    · have hRange : (1 / 2 <= alpha ∧ alpha < 1) ∨ 1 < alpha := by
+    · have hRange : (1 / 2 ≤ alpha ∧ alpha < 1) ∨ 1 < alpha := by
         rcases lt_or_gt_of_ne hOne with hLow | hHigh
         · exact Or.inl ⟨hAlpha, hLow⟩
         · exact Or.inr hHigh
@@ -490,14 +494,14 @@ theorem sandwichedRenyiPSDReferenceE_isometryImage_ge_compression
     V.compression_posDef hSigma
   calc
     sandwichedRenyiPSDReferenceE
-        ((Channel.ofReferenceIsometry V).applyState rho) sigma
+        ((CPTPOp.ofReferenceIsometry V) rho) sigma
         hSigma.posSemidef alpha =
       sandwichedRenyiPSDReferenceE inputState inputRef
         hInputRef.posSemidef alpha := by
           symm
           exact sandwichedRenyiPSDReferenceE_rightZeroExtension
             image Matrix.PosDef.one hSigma alpha hAlpha
-    _ >= sandwichedRenyiPSDReferenceE (completion.applyState inputState)
+    _ ≥ sandwichedRenyiPSDReferenceE (completion inputState)
         (completion.map inputRef)
         (completion.mapsPositive inputRef hInputRef.posSemidef) alpha := hDPI
     _ = sandwichedRenyiPSDReferenceE rho
@@ -509,8 +513,4 @@ theorem sandwichedRenyiPSDReferenceE_isometryImage_ge_compression
             V.compressionCompletion_apply_imageState rho,
             V.compressionCompletion_map_reference sigma] using hmean
 
-end State
-
-end
-
-end QIT
+end MState

@@ -12,9 +12,8 @@ import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.RingI
 /-!
 # Operator convexity of `x ↦ x^p` on `[1, 2]`
 
-This module adds the local Lean-QIT API for the mathlib TODO proving that
-`a ↦ a ^ p` is operator convex for `p ∈ [1, 2]`. The proof follows the
-existing integral representation in mathlib for `Real.rpowIntegrand₁₂`.
+This module proves that `a ↦ a ^ p` is operator convex for `p ∈ [1, 2]`, a mathlib TODO.
+The proof follows the existing integral representation in mathlib for `Real.rpowIntegrand₁₂`.
 -/
 
 @[expose] public section

@@ -5,7 +5,7 @@ Status legend: ✅ stated & proved · 🟡 proved in a restated or weaker form (
 The Lean development contains **no `sorry`** and introduces no new axioms: every theorem below
 marked ✅ or 🟡 compiles down to `propext`/`Classical.choice`/`Quot.sound` only.
 
-Names in `code font` are the Lean identifiers (in `QuantumInfo/QECC/*` = `QuantumLib/QECC/*`).
+Names in `code font` are the Lean identifiers, in `QuantumLib/QECC/*`.
 
 ## A. Pauli group structure
 1. ✅ The `n`-qubit Paulis form a group. — `PauliOp`, `instGroup`
@@ -20,7 +20,7 @@ Names in `code font` are the Lean identifiers (in `QuantumInfo/QECC/*` = `Quantu
 10. ✅ Every commutator of Paulis is `±I`. — `mul_comm_eq_phase`
 11. ✅ A Hermitian Pauli squares to `I`. — `sq_eq_one_of_isHermitian`; stabilizer case `StabGroup.sq_eq_one`
 12. ✅ Every Pauli has order dividing 4. — `pow_four`, `orderOf_dvd_four`
-13. ✅ Pauli group modulo its center is elementary abelian `(ZMod 2)^{2n}`. — `pauliModCenter_equiv`, `toSymHom`, `ker_toSymHom`
+13. ✅ Pauli group modulo its center is elementary abelian `(ZMod 2)^{2n}`. — `pauliModCenterEquiv`, `toSymHom`, `ker_toSymHom`
 14. ✅ `betaPair` is bilinear; the induced symplectic form is alternating and nondegenerate. — `betaPair_mul_left`, `betaPair_mul_right`, `sympForm_self`, `sympForm_nondegenerate`
 15. ✅ Conjugation by a Pauli preserves the `x,z` support (only the phase moves). — `weight_conj`, `mem_center_iff_support_zero`
 
@@ -78,7 +78,7 @@ Names in `code font` are the Lean identifiers (in `QuantumInfo/QECC/*` = `Quantu
 58. ✅ `E` detectable or `E` centralizes `S`. — `detectable_or_mem_centralizer`
 59. ✅ no logical of weight `< d ⟹ distance ≥ d`. — `lt_distance_of_no_logical`
 60. ✅ distance = min weight over logicals, and the min is attained. — `distance`, `distance_le_weight_of_logical`, `exists_logical_weight_eq_distance`, `distance_eq`
-61. ✅ `2t < distance ⟹` the code corrects `t` errors: pairwise detectability of `E⁻¹F`, and — through Knill–Laflamme — an explicit recovery channel, realized as a `QECC` whose single decoder undoes *every* channel error acting on at most `t` qubits (`CorrectsChannelErrors t`, hence also `CorrectsErrors t` and `Decodes`). Arbitrary errors are reduced to Paulis by the discretisation step, `QECC.errMat_mem_span_pauli`. The converse, `corrects t ⟹ 2t < distance`, is not stated. — `corrects_of_two_mul_lt_distance`, `detectable_of_le_half_distance`, `StabGroup.exists_recovery_of_pauli_kraus`, `StabGroup.exists_qecc_corrects_pauli`, `StabGroup.exists_recovery_correctsChannelErrors`, `StabGroup.exists_qecc_correctsChannelErrors`
+61. ✅ `2t < distance ⟹` the code corrects `t` errors: pairwise detectability of `E⁻¹F`, and — through Knill–Laflamme — an explicit recovery channel, realized as a `QECC` whose single decoder undoes *every* channel error acting on at most `t` qubits (`CorrectsChannelErrors t`, hence also `CorrectsErrors t` and `Decodes`). Arbitrary errors are reduced to Paulis by the discretisation step, `QECC.errMat_mem_span_pauli`. The converse, `corrects t ⟹ 2t < distance`, is not stated. — `detectable_mul_of_weight_lt`, `detectable_of_le_half_distance`, `StabGroup.exists_recovery_of_pauli_kraus`, `StabGroup.exists_qecc_corrects_pauli`, `StabGroup.exists_recovery_correctsChannelErrors`, `StabGroup.exists_qecc_correctsChannelErrors`
 62. ✅ `weight E < distance ⟹ E` detectable, and no logical below weight `d` forces `distance ≥ d`. — `detectable_of_weight_lt_distance`, `lt_distance_of_no_logical`
 63. ✅ Knill–Laflamme (stabilizer form): `E` detectable ⟺ `Π E Π = c Π`. — `knill_laflamme`
 64. ✅ `2·weight E < d ⟹ E⁻¹F` detectable, and conversely: for a code with a logical operator, every pair of errors of weight `≤ t` has detectable difference **iff** `2t < d`, so `⌊(d−1)/2⌋` is exactly the correction radius. — `detectable_mul_of_weight_lt`, `exists_undetectable_mul_of_distance_le`, `forall_detectable_mul_iff`
@@ -104,11 +104,11 @@ Names in `code font` are the Lean identifiers (in `QuantumInfo/QECC/*` = `Quantu
 80. ✅ CSS is a genuine stabilizer group (`-I ∉ S`) — discharged inside `cssCode`. — `cssCode`
 81. ✅ Self-dual CSS from a single self-orthogonal code. — `cssCode_selfDual_isComm` (used for `steaneCode`)
 82. ✅ Transversal CNOT is logical CNOT for CSS: it fixes the projector onto the two-block code space, and conjugation acts on two-block Paulis by the four Heisenberg relations of CNOT. — `transversalCNOT`, `transversalCNOT_mem_unitaryGroup`, `transversalCNOT_conj_biMat`, `transversalCNOT_conj_x_control`, `transversalCNOT_conj_x_target`, `transversalCNOT_conj_z_control`, `transversalCNOT_conj_z_target`, `cnotPair_mem_cssCode`, `css_transversal_cnot`
-83. ⬜ CSS code space = intersection of two classical code spaces (X/Z). — `css_codeSpace`
+83. ⬜ CSS code space = intersection of two classical code spaces (X/Z).
 
 ## I. Specific codes
 84. ✅ Bit-flip repetition code `⟦n,1,1⟧`: a single `Z` is logical, so the quantum distance is `1`. — `repetitionCode`, `repetitionCode_numLogical`, `repetitionCode_card_carrier`, `repetitionCode_isLogical`, `repetitionCode_distance`
-85. ⬜ Phase-flip repetition code (X-stabilizers). — `phaseRepetitionCode`
+85. ⬜ Phase-flip repetition code (X-stabilizers).
 86. ✅ Shor code `⟦9,1,3⟧`. — `shorCode`, `shorCode_numLogical`, `shorCode_distance`
 87. ✅ Steane code `⟦7,1,3⟧` (CSS from `[7,4,3]` Hamming). — `steaneCode`, `steaneCode_numLogical`, `steaneCode_distance`
 88. ✅ Five-qubit code `⟦5,1,3⟧`. — `fiveQubitCode`, `fiveQubitCode_numLogical`, `fiveQubitCode_distance`

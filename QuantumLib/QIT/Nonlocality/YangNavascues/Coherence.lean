@@ -50,18 +50,18 @@ theorem rankOneCoherence_apply {α : Type*} (φ χ : α → ℂ) (i j : α) :
   simp [rankOneCoherence, Matrix.vecMulVec_apply]
 
 /-- The CGS base branch vector `P_A^(0) ψ`. -/
-def baseBranchVector (ψ : PureVector (HA × HB)) : HA × HB → ℂ :=
-  (data.aliceProjectionOp data.target.base).mulVec ψ.amp
+def baseBranchVector (ψ : Ket (HA × HB)) : HA × HB → ℂ :=
+  (data.aliceProjectionOp data.target.base).mulVec ψ.vec
 
 @[simp]
-theorem baseBranchVector_eq (ψ : PureVector (HA × HB)) :
+theorem baseBranchVector_eq (ψ : Ket (HA × HB)) :
     data.baseBranchVector ψ =
-      (data.aliceProjectionOp data.target.base).mulVec ψ.amp :=
+      (data.aliceProjectionOp data.target.base).mulVec ψ.vec :=
   rfl
 
 /-- The pure-state base projection density is the rank-one matrix of the base branch vector. -/
 theorem baseProjectionMatrix_pure_eq_rankOneMatrix_baseBranchVector
-    (ψ : PureVector (HA × HB)) :
+    (ψ : Ket (HA × HB)) :
     data.baseProjectionMatrix ψ.state =
       rankOneMatrix (data.baseBranchVector ψ) := by
   exact data.postMatrix_pure_eq_rankOneMatrix_mulVec ψ
@@ -76,19 +76,19 @@ The first field is the existing density-level YN condition.  The second field
 is the source vector equality with the unsquared coefficient ratio, needed for
 off-diagonal target coherence terms in the CGS Fourier calculation.
 -/
-def YNPhaseAlignedConditions (data : YNData ι HA HB) (ψ : PureVector (HA × HB)) : Prop :=
+def YNPhaseAlignedConditions (data : YNData ι HA HB) (ψ : Ket (HA × HB)) : Prop :=
   YNConditions data ψ.state ∧
     (∀ k : ι,
-      (data.aliceProjectionOp k).mulVec ψ.amp =
-        (data.bobProjectionOp k).mulVec ψ.amp) ∧
+      (data.aliceProjectionOp k).mulVec ψ.vec =
+        (data.bobProjectionOp k).mulVec ψ.vec) ∧
     (∀ k : ι,
-      (data.transformedBobProjectionOp k).mulVec ψ.amp =
+      (data.transformedBobProjectionOp k).mulVec ψ.vec =
         (((data.target.coeff k / data.target.coeff data.target.base : ℝ) : ℂ)) •
           data.baseBranchVector ψ)
 
 namespace YNPhaseAlignedConditions
 
-variable {data : YNData ι HA HB} {ψ : PureVector (HA × HB)}
+variable {data : YNData ι HA HB} {ψ : Ket (HA × HB)}
 
 /-- Forget the explicit phase alignment to the density-level YN conditions. -/
 theorem ynConditions (h : YNPhaseAlignedConditions data ψ) :
@@ -105,15 +105,15 @@ theorem baseBranchVector_trace_rankOne
 
 /-- Extract the source vector-level coefficient-ratio condition. -/
 theorem phaseAligned (h : YNPhaseAlignedConditions data ψ) (k : ι) :
-    (data.transformedBobProjectionOp k).mulVec ψ.amp =
+    (data.transformedBobProjectionOp k).mulVec ψ.vec =
       (((data.target.coeff k / data.target.coeff data.target.base : ℝ) : ℂ)) •
         data.baseBranchVector ψ :=
   h.2.2 k
 
 /-- Extract the source vector-level projection-agreement condition. -/
 theorem projectionAligned (h : YNPhaseAlignedConditions data ψ) (k : ι) :
-    (data.aliceProjectionOp k).mulVec ψ.amp =
-      (data.bobProjectionOp k).mulVec ψ.amp :=
+    (data.aliceProjectionOp k).mulVec ψ.vec =
+      (data.bobProjectionOp k).mulVec ψ.vec :=
   h.2.1 k
 
 private theorem rankOneCoherence_smul_smul {α : Type*} (a b : ℝ) (φ χ : α → ℂ) :
@@ -129,8 +129,8 @@ by the CGS Fourier sum.
 theorem transformedBobProjection_rankOneCoherence
     (h : YNPhaseAlignedConditions data ψ) (i j : ι) :
     YNData.rankOneCoherence
-        ((data.transformedBobProjectionOp i).mulVec ψ.amp)
-        ((data.transformedBobProjectionOp j).mulVec ψ.amp) =
+        ((data.transformedBobProjectionOp i).mulVec ψ.vec)
+        ((data.transformedBobProjectionOp j).mulVec ψ.vec) =
       (((data.target.coeff i / data.target.coeff data.target.base) *
           (data.target.coeff j / data.target.coeff data.target.base) : ℝ) : ℂ) •
         YNData.rankOneCoherence (data.baseBranchVector ψ) (data.baseBranchVector ψ) := by
@@ -157,8 +157,8 @@ consume it without unfolding the reduced-support construction.
 -/
 theorem bobLocalOrthogonalization_mulVec_eq_bobProjectionOp
     (h : YNPhaseAlignedConditions data ψ) (k : ι) :
-    (bobLocalOp HA (h.toBobLocalOrthogonalization.bobLocal) k).mulVec ψ.amp =
-      (data.bobProjectionOp k).mulVec ψ.amp :=
+    (bobLocalOp HA (h.toBobLocalOrthogonalization.bobLocal) k).mulVec ψ.vec =
+      (data.bobProjectionOp k).mulVec ψ.vec :=
   YNConditions.bobReducedSupportOrthogonalization_mulVec_eq_bobProjectionOp h.ynConditions k
 
 end YNPhaseAlignedConditions

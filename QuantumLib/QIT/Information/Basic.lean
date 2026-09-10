@@ -22,16 +22,6 @@ public import QuantumLib.QIT.OneShot.CQGuessing
 /-!
 # Basic information quantities
 
-Compatibility import surface for entropy, divergences, trace distance,
-fidelity, smooth quantities, and cq guessing APIs.
+Import surface for entropy, divergences, trace distance, fidelity, smooth
+quantities, and cq guessing APIs.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace Information
-namespace Basic
-
-end Basic
-end Information
-end QIT

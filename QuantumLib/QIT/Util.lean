@@ -7,6 +7,7 @@ Authors: QuAIR Team
 module
 
 public import QuantumLib.QIT.Util.Matrix
+public import QuantumLib.QIT.Util.MatrixInstances
 public import QuantumLib.QIT.Util.Matrix.PosSqrt
 public import QuantumLib.QIT.Util.BlockMatrix
 public import QuantumLib.QIT.Util.RpowOperatorConvex

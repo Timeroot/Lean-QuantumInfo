@@ -25,22 +25,23 @@ public import QuantumLib.QIT.Util.TensorPower
 The symmetric subspace of `(TensorPower a n) → ℂ`, defined as the
 fixed-point/invariant subspace of the natural `Equiv.Perm (Fin n)` action on
 `TensorPower a n` (recursive factor-swap). Permutation invariance follows the
-symmetric-subspace convention registered from [Harrow2013Symmetric,
-arxiv-symmetric.tex:272-294] and [Renner2007Symmetry, sub.tex:800-825].
-Schur's lemma is cited from mathlib. No asymptotics, no smooth entropy.
+symmetric-subspace convention registered from [Harrow2013SymmetricSubspace,
+arxiv-symmetric.tex:272-294] and [Renner2007SymmetryIndependence,
+sub.tex:800-825]. Schur's lemma is cited from mathlib. No asymptotics, no smooth
+entropy.
 -/
 
 @[expose] public section
 
 open scoped ComplexOrder Matrix MatrixOrder
 
-namespace QIT
-
-universe u
-
 noncomputable section
-
+universe u
 variable {a : Type u} [DecidableEq a]
+
+open QIT
+
+namespace QIT
 
 /-- Precompose a `Fin n → a` function by permutation inverse (left action via `⁻¹`). -/
 def precompPerm (n : ℕ) (σ : Equiv.Perm (Fin n)) : Equiv (Fin n → a) (Fin n → a) where
@@ -358,7 +359,7 @@ theorem tensorPowerProfile_card_eq_multichoose (n : ℕ) :
 
 /-- The exact binomial profile-count formula for tensor powers over a nonempty
 finite alphabet, matching the stars-and-bars dimension factor in Renner's
-`lem:symbasis` [Renner2007Symmetry, sub.tex:800-825]. -/
+`lem:symbasis` [Renner2007SymmetryIndependence, sub.tex:800-825]. -/
 theorem tensorPowerProfile_card_eq_choose [Nonempty a] (n : ℕ) :
     Fintype.card (TensorPowerProfile a n) =
       Nat.choose (n + Fintype.card a - 1) n := by
@@ -850,28 +851,38 @@ theorem tensorPowerBasisDelta_sum {n : ℕ} (y : TensorPower a n) :
     ∑ x : TensorPower a n, tensorPowerBasisDelta (a := a) y x = 1 := by
   simp [tensorPowerBasisDelta]
 
-namespace State
+end QIT
+
+namespace MState
+
+variable [Fintype a]
 
 /-- Matrix entries of an i.i.d. tensor-power state factor coordinatewise under
 the `TensorPower a n ≃ (Fin n → a)` convention. -/
-theorem tensorPower_matrix_apply (ρ : State a) :
+theorem tensorPower_matrix_apply (ρ : MState a) :
     ∀ (n : ℕ) (x y : TensorPower a n),
-      (ρ.tensorPower n).matrix x y =
-        ∏ i : Fin n, ρ.matrix ((tensorPowerEquiv n x) i) ((tensorPowerEquiv n y) i)
+      (ρ.tensorPower n).m x y =
+        ∏ i : Fin n, ρ.m ((tensorPowerEquiv n x) i) ((tensorPowerEquiv n y) i)
   | 0, x, y => by
-      cases x
-      cases y
-      simp [State.tensorPower, State.unit]
-  | n + 1, (x0, xs), (y0, ys) => by
-      rw [State.tensorPower_succ, State.prod]
-      change ρ.matrix x0 y0 * (ρ.tensorPower n).matrix xs ys =
+      have : Subsingleton (TensorPower a 0) := inferInstanceAs (Subsingleton PUnit)
+      rw [MState.tensorPower_zero_matrix, Subsingleton.elim x y, Matrix.one_apply_eq,
+        Fin.prod_univ_zero]
+  | n + 1, x, y => by
+      rw [MState.tensorPower_succ_matrix]
+      obtain ⟨x0, xs⟩ := x
+      obtain ⟨y0, ys⟩ := y
+      change ρ.m x0 y0 * (ρ.tensorPower n).m xs ys =
         ∏ i : Fin (n + 1),
-          ρ.matrix ((tensorPowerEquiv (n + 1) (x0, xs)) i)
+          ρ.m ((tensorPowerEquiv (n + 1) (x0, xs)) i)
             ((tensorPowerEquiv (n + 1) (y0, ys)) i)
       rw [tensorPower_matrix_apply ρ n xs ys, Fin.prod_univ_succ]
       simp
 
-end State
+end MState
+
+namespace QIT
+
+variable [Fintype a]
 
 /-- Permutation matrix implementing the `Fin n` permutation action on tensor powers. -/
 abbrev permutationMatrix (n : ℕ) (σ : Equiv.Perm (Fin n)) : CMatrix (TensorPower a n) :=
@@ -884,7 +895,6 @@ theorem permutationMatrix_one (n : ℕ) :
   simp [permutationMatrix]
 
 omit [Fintype a] in
-@[simp]
 theorem permutationMatrix_conjTranspose (n : ℕ) (σ : Equiv.Perm (Fin n)) :
     (permutationMatrix (a := a) n σ).conjTranspose =
       permutationMatrix (a := a) n σ⁻¹ := by
@@ -1928,7 +1938,7 @@ theorem symmetricSubmodule_finrank_eq_profile_card (n : ℕ) :
 
 /-- The symmetric tensor-power submodule has the exact stars-and-bars
 dimension `choose (n + |a| - 1) n` over a nonempty finite alphabet, matching
-Renner's symmetric-basis dimension formula [Renner2007Symmetry,
+Renner's symmetric-basis dimension formula [Renner2007SymmetryIndependence,
 sub.tex:800-825]. -/
 theorem symmetricSubmodule_finrank_eq_choose [Nonempty a] (n : ℕ) :
     Module.finrank ℂ (symmetricSubmodule (a := a) n) =
@@ -2038,20 +2048,20 @@ def twoCopySwapPerm : Equiv.Perm (Fin 2) :=
   Equiv.swap 0 1
 
 /-- The flip matrix on two tensor copies. -/
-abbrev tensorPowerSwapMatrix_two : CMatrix (TensorPower a 2) :=
+abbrev tensorPowerSwapMatrixTwo : CMatrix (TensorPower a 2) :=
   permutationMatrix (a := a) 2 twoCopySwapPerm
 
 /-- The two-copy flip matrix squares to the identity. -/
 theorem tensorPowerSwapMatrix_two_sq :
-    tensorPowerSwapMatrix_two (a := a) * tensorPowerSwapMatrix_two (a := a) = 1 := by
-  rw [tensorPowerSwapMatrix_two, permutationMatrix_mul]
+    tensorPowerSwapMatrixTwo (a := a) * tensorPowerSwapMatrixTwo (a := a) = 1 := by
+  rw [tensorPowerSwapMatrixTwo, permutationMatrix_mul]
   ext x y
   simp [Matrix.one_apply, twoCopySwapPerm]
 
 omit [Fintype a] in
 private theorem permutationMatrix_sum_fin_two :
     (∑ σ : Equiv.Perm (Fin 2), permutationMatrix (a := a) 2 σ) =
-      1 + tensorPowerSwapMatrix_two (a := a) := by
+      1 + tensorPowerSwapMatrixTwo (a := a) := by
   rw [Finset.sum_eq_add_sum_sdiff_singleton_of_mem
     (s := Finset.univ)
     (i := (1 : Equiv.Perm (Fin 2)))
@@ -2076,12 +2086,12 @@ omit [Fintype a] in
 /-- On two tensor copies, the Reynolds projection is `1/2 * (1 + F)`. -/
 theorem symmetricProjectionMatrix_two_eq_half_one_add_swap :
     symmetricProjectionMatrix (a := a) 2 =
-      ((2 : ℂ)⁻¹) • (1 + tensorPowerSwapMatrix_two (a := a)) := by
+      ((2 : ℂ)⁻¹) • (1 + tensorPowerSwapMatrixTwo (a := a)) := by
   rw [symmetricProjectionMatrix_eq_perm_average, permutationMatrix_sum_fin_two]
   norm_num [Fintype.card_perm, Nat.factorial]
 
 /-- The two-copy antisymmetric projection `1 - P₊`. -/
-def antisymmetricProjectionMatrix_two : CMatrix (TensorPower a 2) :=
+def antisymmetricProjectionMatrixTwo : CMatrix (TensorPower a 2) :=
   1 - symmetricProjectionMatrix (a := a) 2
 
 /-- The tensor word with first coordinate `i` and second coordinate `j`. -/
@@ -2193,13 +2203,13 @@ theorem antisymmetricPairVector_comp_permEquiv_twoCopySwapPerm (i j : a) :
   simp [antisymmetricPairVector, tensorPowerBasisDelta, hij, hji, sub_eq_add_neg]
 
 theorem tensorPowerSwapMatrix_two_mulVec_antisymmetricPairVector (i j : a) :
-    (tensorPowerSwapMatrix_two (a := a)).mulVec (antisymmetricPairVector (a := a) i j) =
+    (tensorPowerSwapMatrixTwo (a := a)).mulVec (antisymmetricPairVector (a := a) i j) =
       -antisymmetricPairVector (a := a) i j := by
   calc
-    (tensorPowerSwapMatrix_two (a := a)).mulVec (antisymmetricPairVector (a := a) i j)
+    (tensorPowerSwapMatrixTwo (a := a)).mulVec (antisymmetricPairVector (a := a) i j)
         = (fun x => antisymmetricPairVector (a := a) i j
             (permEquiv (a := a) 2 twoCopySwapPerm x)) := by
-          rw [tensorPowerSwapMatrix_two, permutationMatrix_mulVec]
+          rw [tensorPowerSwapMatrixTwo, permutationMatrix_mulVec]
     _ = antisymmetricPairVector (a := a) j i :=
           antisymmetricPairVector_comp_permEquiv_twoCopySwapPerm (a := a) i j
     _ = -antisymmetricPairVector (a := a) i j :=
@@ -2208,9 +2218,9 @@ theorem tensorPowerSwapMatrix_two_mulVec_antisymmetricPairVector (i j : a) :
 omit [Fintype a] in
 /-- On two tensor copies, the antisymmetric projection is `1/2 * (1 - F)`. -/
 theorem antisymmetricProjectionMatrix_two_eq_half_one_sub_swap :
-    antisymmetricProjectionMatrix_two (a := a) =
-      ((2 : ℂ)⁻¹) • (1 - tensorPowerSwapMatrix_two (a := a)) := by
-  rw [antisymmetricProjectionMatrix_two, symmetricProjectionMatrix_two_eq_half_one_add_swap]
+    antisymmetricProjectionMatrixTwo (a := a) =
+      ((2 : ℂ)⁻¹) • (1 - tensorPowerSwapMatrixTwo (a := a)) := by
+  rw [antisymmetricProjectionMatrixTwo, symmetricProjectionMatrix_two_eq_half_one_add_swap]
   ext x y
   simp [Matrix.one_apply, Matrix.sub_apply, Matrix.add_apply, Matrix.smul_apply]
   by_cases hxy : x = y
@@ -2221,7 +2231,7 @@ theorem antisymmetricProjectionMatrix_two_eq_half_one_sub_swap :
       simp [hxy, hswap]
 
 theorem antisymmetricProjectionMatrix_two_mulVec_antisymmetricPairVector (i j : a) :
-    (antisymmetricProjectionMatrix_two (a := a)).mulVec (antisymmetricPairVector (a := a) i j) =
+    (antisymmetricProjectionMatrixTwo (a := a)).mulVec (antisymmetricPairVector (a := a) i j) =
       antisymmetricPairVector (a := a) i j := by
   rw [antisymmetricProjectionMatrix_two_eq_half_one_sub_swap]
   rw [Matrix.smul_mulVec, Matrix.sub_mulVec, Matrix.one_mulVec,
@@ -2361,28 +2371,6 @@ private theorem twoCopyTensorWord_delta_swap_delta_nested_sum (x y : TensorPower
               simp [hx, hy]
     _ = if x = permEquiv (a := a) 2 twoCopySwapPerm y then 1 else 0 :=
         twoCopyTensorWord_delta_swap_delta_sum (a := a) x y
-
-private theorem twoCopyTensorWord_delta_delta_swap_nested_sum (x y : TensorPower a 2) :
-    (∑ i : a, ∑ j : a,
-      if y = twoCopyTensorWord (a := a) j i then
-        if x = twoCopyTensorWord (a := a) i j then (1 : ℂ) else 0
-      else 0) =
-      if x = permEquiv (a := a) 2 twoCopySwapPerm y then 1 else 0 := by
-  calc
-    (∑ i : a, ∑ j : a,
-      if y = twoCopyTensorWord (a := a) j i then
-        if x = twoCopyTensorWord (a := a) i j then (1 : ℂ) else 0
-      else 0)
-        = ∑ i : a, ∑ j : a,
-            (if x = twoCopyTensorWord (a := a) i j then (1 : ℂ) else 0) *
-            (if y = twoCopyTensorWord (a := a) j i then (1 : ℂ) else 0) := by
-            refine Finset.sum_congr rfl fun i _ => ?_
-            refine Finset.sum_congr rfl fun j _ => ?_
-            by_cases hx : x = twoCopyTensorWord (a := a) i j <;>
-              by_cases hy : y = twoCopyTensorWord (a := a) j i <;>
-              simp [hx, hy]
-    _ = if x = permEquiv (a := a) 2 twoCopySwapPerm y then 1 else 0 :=
-        twoCopyTensorWord_delta_delta_swap_sum (a := a) x y
 
 private theorem twoCopyTensorWord_delta_delta_swap_nested_sum' (x y : TensorPower a 2) :
     (∑ i : a, ∑ j : a,
@@ -2529,14 +2517,14 @@ rank-one matrices generated by `|i,j⟩ - |j,i⟩`.  Ordered pairs are used to
 avoid choosing representatives of unordered pairs; the factor `1/4` accounts
 for both orientations and for the unnormalized pair vectors. -/
 theorem antisymmetricProjectionMatrix_two_eq_quarter_sum_rankOne_antisymmetricPairVector :
-    antisymmetricProjectionMatrix_two (a := a) =
+    antisymmetricProjectionMatrixTwo (a := a) =
       ((4 : ℂ)⁻¹) •
         (∑ i : a, ∑ j : a, rankOneMatrix (antisymmetricPairVector (a := a) i j)) := by
   classical
   rw [antisymmetricProjectionMatrix_two_eq_half_one_sub_swap]
   ext x y
   simp [Matrix.smul_apply, Matrix.sub_apply, Matrix.one_apply,
-    tensorPowerSwapMatrix_two, rankOne_antisymmetricPairVector_ordered_sum_apply]
+    tensorPowerSwapMatrixTwo, rankOne_antisymmetricPairVector_ordered_sum_apply]
   have hswap_iff :
       (permEquiv (a := a) 2 twoCopySwapPerm x = y) ↔
         x = permEquiv (a := a) 2 twoCopySwapPerm y := by
@@ -2579,22 +2567,22 @@ theorem antisymmetricProjectionMatrix_two_eq_quarter_sum_rankOne_antisymmetricPa
 
 /-- The two-copy flip fixes the symmetric projection on the left. -/
 theorem tensorPowerSwapMatrix_two_mul_symmetricProjectionMatrix_two :
-    tensorPowerSwapMatrix_two (a := a) * symmetricProjectionMatrix (a := a) 2 =
+    tensorPowerSwapMatrixTwo (a := a) * symmetricProjectionMatrix (a := a) 2 =
       symmetricProjectionMatrix (a := a) 2 := by
-  simpa [tensorPowerSwapMatrix_two, twoCopySwapPerm] using
+  simpa [tensorPowerSwapMatrixTwo, twoCopySwapPerm] using
     permutationMatrix_mul_symmetricProjectionMatrix (a := a) 2 twoCopySwapPerm
 
 /-- The two-copy flip fixes the symmetric projection on the right. -/
 theorem symmetricProjectionMatrix_two_mul_tensorPowerSwapMatrix_two :
-    symmetricProjectionMatrix (a := a) 2 * tensorPowerSwapMatrix_two (a := a) =
+    symmetricProjectionMatrix (a := a) 2 * tensorPowerSwapMatrixTwo (a := a) =
       symmetricProjectionMatrix (a := a) 2 := by
-  simpa [tensorPowerSwapMatrix_two, twoCopySwapPerm] using
+  simpa [tensorPowerSwapMatrixTwo, twoCopySwapPerm] using
     symmetricProjectionMatrix_mul_permutationMatrix (a := a) 2 twoCopySwapPerm
 
 /-- The two-copy flip acts by `-1` on the antisymmetric projection on the left. -/
 theorem tensorPowerSwapMatrix_two_mul_antisymmetricProjectionMatrix_two :
-    tensorPowerSwapMatrix_two (a := a) * antisymmetricProjectionMatrix_two (a := a) =
-      -antisymmetricProjectionMatrix_two (a := a) := by
+    tensorPowerSwapMatrixTwo (a := a) * antisymmetricProjectionMatrixTwo (a := a) =
+      -antisymmetricProjectionMatrixTwo (a := a) := by
   rw [antisymmetricProjectionMatrix_two_eq_half_one_sub_swap]
   rw [Matrix.mul_smul, Matrix.mul_sub, Matrix.mul_one, tensorPowerSwapMatrix_two_sq]
   ext x y
@@ -2603,8 +2591,8 @@ theorem tensorPowerSwapMatrix_two_mul_antisymmetricProjectionMatrix_two :
 
 /-- The two-copy flip acts by `-1` on the antisymmetric projection on the right. -/
 theorem antisymmetricProjectionMatrix_two_mul_tensorPowerSwapMatrix_two :
-    antisymmetricProjectionMatrix_two (a := a) * tensorPowerSwapMatrix_two (a := a) =
-      -antisymmetricProjectionMatrix_two (a := a) := by
+    antisymmetricProjectionMatrixTwo (a := a) * tensorPowerSwapMatrixTwo (a := a) =
+      -antisymmetricProjectionMatrixTwo (a := a) := by
   rw [antisymmetricProjectionMatrix_two_eq_half_one_sub_swap]
   rw [Matrix.smul_mul, Matrix.sub_mul, Matrix.one_mul, tensorPowerSwapMatrix_two_sq]
   ext x y
@@ -2614,14 +2602,14 @@ theorem antisymmetricProjectionMatrix_two_mul_tensorPowerSwapMatrix_two :
 omit [Fintype a] in
 /-- The symmetric and antisymmetric two-copy projections sum to the identity. -/
 theorem symmetricProjectionMatrix_two_add_antisymmetricProjectionMatrix_two :
-    symmetricProjectionMatrix (a := a) 2 + antisymmetricProjectionMatrix_two (a := a) = 1 := by
-  rw [antisymmetricProjectionMatrix_two]
+    symmetricProjectionMatrix (a := a) 2 + antisymmetricProjectionMatrixTwo (a := a) = 1 := by
+  rw [antisymmetricProjectionMatrixTwo]
   abel
 
 /-- The symmetric and antisymmetric two-copy projections are orthogonal. -/
 theorem symmetricProjectionMatrix_two_mul_antisymmetricProjectionMatrix_two :
-    symmetricProjectionMatrix (a := a) 2 * antisymmetricProjectionMatrix_two (a := a) = 0 := by
-  rw [antisymmetricProjectionMatrix_two]
+    symmetricProjectionMatrix (a := a) 2 * antisymmetricProjectionMatrixTwo (a := a) = 0 := by
+  rw [antisymmetricProjectionMatrixTwo]
   rw [Matrix.mul_sub, Matrix.mul_one, symmetricProjectionMatrix_idempotent]
   abel
 
@@ -2645,9 +2633,9 @@ theorem symmetricProjectionMatrix_two_trace :
 
 /-- The trace of the antisymmetric two-copy projection is `D(D-1)/2`. -/
 theorem antisymmetricProjectionMatrix_two_trace :
-    (antisymmetricProjectionMatrix_two (a := a)).trace =
+    (antisymmetricProjectionMatrixTwo (a := a)).trace =
       ((Fintype.card a : ℂ) * ((Fintype.card a : ℂ) - 1)) / 2 := by
-  rw [antisymmetricProjectionMatrix_two, Matrix.trace_sub, Matrix.trace_one,
+  rw [antisymmetricProjectionMatrixTwo, Matrix.trace_sub, Matrix.trace_one,
     symmetricProjectionMatrix_two_trace]
   rw [tensorPower_card]
   norm_num
@@ -2656,7 +2644,7 @@ theorem antisymmetricProjectionMatrix_two_trace :
 /-- The two-copy antisymmetric projection has nonzero trace on a nontrivial
 alphabet. -/
 theorem antisymmetricProjectionMatrix_two_trace_ne_zero [Nontrivial a] :
-    (antisymmetricProjectionMatrix_two (a := a)).trace ≠ 0 := by
+    (antisymmetricProjectionMatrixTwo (a := a)).trace ≠ 0 := by
   rw [antisymmetricProjectionMatrix_two_trace]
   have hcard_pos : (Fintype.card a : ℂ) ≠ 0 := by
     exact_mod_cast (Nat.ne_of_gt (Nat.zero_lt_of_lt Fintype.one_lt_card))
@@ -2691,23 +2679,22 @@ private theorem trace_conj_permutationMatrix (n : ℕ) (σ : Equiv.Perm (Fin n))
 
 /-- The channel that permutes the tensor factors of `TensorPower a n`. -/
 def permutationChannel (n : ℕ) (σ : Equiv.Perm (Fin n)) :
-    Channel (TensorPower a n) (TensorPower a n) where
-  map := MatrixMap.ofKraus (fun (_ : Unit) => permutationMatrix (a := a) n σ)
-  completelyPositive := by
-    rw [MatrixMap.IsCompletelyPositive, MatrixMap.choi_ofKraus]
-    exact Matrix.posSemidef_sum Finset.univ (fun _ _ =>
-      Matrix.posSemidef_vecMulVec_self_star
-        (fun x : TensorPower a n × TensorPower a n =>
-          permutationMatrix (a := a) n σ x.2 x.1))
-  tracePreserving := by
-    intro X
-    show (MatrixMap.ofKraus (fun (_ : Unit) => permutationMatrix (a := a) n σ) X).trace =
-      X.trace
-    simp only [MatrixMap.ofKraus, LinearMap.coe_mk, AddHom.coe_mk, Finset.univ_unique,
-      PUnit.default_eq_unit, Finset.sum_singleton]
-    exact trace_conj_permutationMatrix (a := a) n σ X
-  mapsPositive := MatrixMap.ofKraus_mapsPositive
-    (fun (_ : Unit) => permutationMatrix (a := a) n σ)
+    CPTPMap (TensorPower a n) (TensorPower a n) :=
+  CPTPOp.ofMat
+    (MatrixMap.ofKraus (fun (_ : Unit) => permutationMatrix (a := a) n σ))
+    (by
+      rw [MatrixMap.isCompletelyPositive_iff_choi, MatrixMap.choi_ofKraus]
+      exact Matrix.posSemidef_sum Finset.univ (fun _ _ =>
+        Matrix.posSemidef_vecMulVec_self_star
+          (fun x : TensorPower a n × TensorPower a n =>
+            permutationMatrix (a := a) n σ x.2 x.1)))
+    (by
+      intro X
+      show (MatrixMap.ofKraus (fun (_ : Unit) => permutationMatrix (a := a) n σ) X).trace =
+        X.trace
+      simp only [MatrixMap.ofKraus, LinearMap.coe_mk, AddHom.coe_mk, Finset.univ_unique,
+        PUnit.default_eq_unit, Finset.sum_singleton]
+      exact trace_conj_permutationMatrix (a := a) n σ X)
 
 theorem permutationChannel_map (n : ℕ) (σ : Equiv.Perm (Fin n))
     (X : CMatrix (TensorPower a n)) :
@@ -2724,28 +2711,31 @@ theorem permutationChannel_map_apply (n : ℕ) (σ : Equiv.Perm (Fin n))
   simp [permutationMatrix, Equiv.Perm.permMatrix, PEquiv.toMatrix_toPEquiv_mul,
     PEquiv.mul_toMatrix_toPEquiv, permEquiv_symm, Equiv.Perm.inv_def]
 
-namespace State
+end QIT
+
+namespace MState
+
+variable [Fintype a]
 
 /-- A state on a tensor-power system is permutation invariant when every tensor-factor
 permutation channel fixes it. -/
-def IsPermutationInvariant {n : ℕ} (ρ : State (TensorPower a n)) : Prop :=
-  ∀ σ : Equiv.Perm (Fin n), (permutationChannel (a := a) n σ).applyState ρ = ρ
+def IsPermutationInvariant {n : ℕ} (ρ : MState (TensorPower a n)) : Prop :=
+  ∀ σ : Equiv.Perm (Fin n), (permutationChannel (a := a) n σ) ρ = ρ
 
-theorem permutationChannel_apply_tensorPower (ρ : State a) (n : ℕ)
+theorem permutationChannel_apply_tensorPower (ρ : MState a) (n : ℕ)
     (σ : Equiv.Perm (Fin n)) :
-    (permutationChannel (a := a) n σ).applyState (ρ.tensorPower n) =
+    (permutationChannel (a := a) n σ) (ρ.tensorPower n) =
       ρ.tensorPower n := by
-  apply State.ext
+  apply MState.ext
+  rw [CPTPOp.mat_coe_eq_apply_mat]
   ext x y
-  change ((permutationChannel (a := a) n σ).map (ρ.tensorPower n).matrix) x y =
-    (ρ.tensorPower n).matrix x y
-  rw [permutationChannel_map_apply, State.tensorPower_matrix_apply,
-    State.tensorPower_matrix_apply]
+  rw [permutationChannel_map_apply, MState.tensorPower_matrix_apply,
+    MState.tensorPower_matrix_apply]
   simp [tensorPowerEquiv_permEquiv]
   exact Equiv.prod_comp σ.symm
-    (fun i => ρ.matrix ((tensorPowerEquiv n x) i) ((tensorPowerEquiv n y) i))
+    (fun i => ρ.m ((tensorPowerEquiv n x) i) ((tensorPowerEquiv n y) i))
 
-theorem tensorPower_isPermutationInvariant (ρ : State a) (n : ℕ) :
+theorem tensorPower_isPermutationInvariant (ρ : MState a) (n : ℕ) :
     (ρ.tensorPower n).IsPermutationInvariant (a := a) := by
   intro σ
   exact permutationChannel_apply_tensorPower ρ n σ
@@ -2753,52 +2743,53 @@ theorem tensorPower_isPermutationInvariant (ρ : State a) (n : ℕ) :
 /-- Finite permutation twirling: average a tensor-power state over all tensor-factor
 permutation channels. This is the state-level Reynolds projection onto permutation
 invariant states. -/
-def permutationTwirling {n : ℕ} (ρ : State (TensorPower a n)) : State (TensorPower a n) where
-  matrix := ((Fintype.card (Equiv.Perm (Fin n)) : ℝ)⁻¹) •
-    ∑ σ : Equiv.Perm (Fin n), ((permutationChannel (a := a) n σ).applyState ρ).matrix
-  pos := by
+def permutationTwirling {n : ℕ} (ρ : MState (TensorPower a n)) : MState (TensorPower a n) := .ofMatrix
+  (matrix := ((Fintype.card (Equiv.Perm (Fin n)) : ℝ)⁻¹) •
+    ∑ σ : Equiv.Perm (Fin n), ((permutationChannel (a := a) n σ) ρ).m)
+  (pos := by
     exact (Matrix.posSemidef_sum Finset.univ fun σ _ =>
-      ((permutationChannel (a := a) n σ).applyState ρ).pos).smul (inv_nonneg.mpr
-        (Nat.cast_nonneg (Fintype.card (Equiv.Perm (Fin n)))))
-  trace_eq_one := by
+      ((permutationChannel (a := a) n σ) ρ).psd).smul (inv_nonneg.mpr
+        (Nat.cast_nonneg (Fintype.card (Equiv.Perm (Fin n))))))
+  (trace_eq_one := by
     simp only [Matrix.trace_smul, Matrix.trace_sum]
     calc
       (((Fintype.card (Equiv.Perm (Fin n)) : ℝ)⁻¹) •
-          ∑ σ : Equiv.Perm (Fin n), (((permutationChannel (a := a) n σ).applyState ρ).matrix).trace)
+          ∑ σ : Equiv.Perm (Fin n), (((permutationChannel (a := a) n σ) ρ).m).trace)
           = (((Fintype.card (Equiv.Perm (Fin n)) : ℝ)⁻¹ : ℝ) : ℂ) *
               (Fintype.card (Equiv.Perm (Fin n)) : ℂ) := by
-            simp [State.trace_eq_one, Finset.sum_const, nsmul_eq_mul]
+            rw [Finset.sum_congr rfl fun σ _ =>
+              ((permutationChannel (a := a) n σ) ρ).tr']
+            simp
       _ = 1 := by
             norm_num [Nat.cast_ne_zero.mpr (Fintype.card_ne_zero :
-              Fintype.card (Equiv.Perm (Fin n)) ≠ 0)]
+              Fintype.card (Equiv.Perm (Fin n)) ≠ 0)])
 
-theorem permutationTwirling_matrix_apply {n : ℕ} (ρ : State (TensorPower a n))
+@[simp]
+theorem permutationTwirling_matrix {n : ℕ} (ρ : MState (TensorPower a n)) :
+    (ρ.permutationTwirling (a := a)).m =
+      ((Fintype.card (Equiv.Perm (Fin n)) : ℝ)⁻¹) •
+        ∑ σ : Equiv.Perm (Fin n), ((permutationChannel (a := a) n σ) ρ).m :=
+  MState.matrix_ofMatrix _ _ _
+
+theorem permutationTwirling_matrix_apply {n : ℕ} (ρ : MState (TensorPower a n))
     (x y : TensorPower a n) :
-    (ρ.permutationTwirling (a := a)).matrix x y =
+    (ρ.permutationTwirling (a := a)).m x y =
       ((Fintype.card (Equiv.Perm (Fin n)) : ℝ)⁻¹) •
         ∑ σ : Equiv.Perm (Fin n),
-          ρ.matrix (permEquiv (a := a) n σ x) (permEquiv (a := a) n σ y) := by
-  change (((Fintype.card (Equiv.Perm (Fin n)) : ℝ)⁻¹) •
-      (∑ σ : Equiv.Perm (Fin n), ((permutationChannel (a := a) n σ).map ρ.matrix))) x y =
-    ((Fintype.card (Equiv.Perm (Fin n)) : ℝ)⁻¹) •
-      ∑ σ : Equiv.Perm (Fin n),
-        ρ.matrix (permEquiv (a := a) n σ x) (permEquiv (a := a) n σ y)
-  simp only [Matrix.smul_apply, Matrix.sum_apply]
+          ρ.m (permEquiv (a := a) n σ x) (permEquiv (a := a) n σ y) := by
+  rw [permutationTwirling_matrix]
+  simp only [CPTPOp.mat_coe_eq_apply_mat, Matrix.smul_apply, Matrix.sum_apply]
   congr 1
-  show (∑ σ : Equiv.Perm (Fin n), ((permutationChannel (a := a) n σ).map ρ.matrix) x y) =
-    ∑ σ : Equiv.Perm (Fin n),
-      ρ.matrix (permEquiv (a := a) n σ x) (permEquiv (a := a) n σ y)
   refine Finset.sum_congr rfl fun σ _ => ?_
-  exact permutationChannel_map_apply (a := a) n σ ρ.matrix x y
+  exact permutationChannel_map_apply (a := a) n σ ρ.m x y
 
 theorem permutationTwirling_isPermutationInvariant {n : ℕ}
-    (ρ : State (TensorPower a n)) :
+    (ρ : MState (TensorPower a n)) :
     ρ.permutationTwirling.IsPermutationInvariant (a := a) := by
   intro τ
-  apply State.ext
+  apply MState.ext
+  rw [CPTPOp.mat_coe_eq_apply_mat]
   ext x y
-  change ((permutationChannel (a := a) n τ).map ρ.permutationTwirling.matrix) x y =
-    ρ.permutationTwirling.matrix x y
   rw [permutationChannel_map_apply, permutationTwirling_matrix_apply,
     permutationTwirling_matrix_apply]
   congr 1
@@ -2807,41 +2798,41 @@ theorem permutationTwirling_isPermutationInvariant {n : ℕ}
       invFun := fun σ => σ * τ⁻¹,
       left_inv := by intro σ; simp [mul_assoc],
       right_inv := by intro σ; simp [mul_assoc] }
-    (fun σ => ρ.matrix (permEquiv (a := a) n σ (permEquiv (a := a) n τ x))
+    (fun σ => ρ.m (permEquiv (a := a) n σ (permEquiv (a := a) n τ x))
       (permEquiv (a := a) n σ (permEquiv (a := a) n τ y)))
-    (fun σ => ρ.matrix (permEquiv (a := a) n σ x) (permEquiv (a := a) n σ y)) ?_
+    (fun σ => ρ.m (permEquiv (a := a) n σ x) (permEquiv (a := a) n σ y)) ?_
   intro σ
   simp
-  change ρ.matrix (σ • (τ • x)) (σ • (τ • y)) =
-    ρ.matrix ((σ * τ) • x) ((σ * τ) • y)
+  change ρ.m (σ • (τ • x)) (σ • (τ • y)) =
+    ρ.m ((σ * τ) • x) ((σ * τ) • y)
   rw [← mul_smul σ τ x, ← mul_smul σ τ y]
 
 /-- Applying a tensor-factor permutation to a twirled state leaves it unchanged. -/
 theorem permutationChannel_apply_permutationTwirling {n : ℕ}
-    (ρ : State (TensorPower a n)) (τ : Equiv.Perm (Fin n)) :
-    (permutationChannel (a := a) n τ).applyState ρ.permutationTwirling =
+    (ρ : MState (TensorPower a n)) (τ : Equiv.Perm (Fin n)) :
+    (permutationChannel (a := a) n τ) ρ.permutationTwirling =
       ρ.permutationTwirling :=
   permutationTwirling_isPermutationInvariant (a := a) ρ τ
 
 theorem permutationTwirling_apply_of_isPermutationInvariant {n : ℕ}
-    {ρ : State (TensorPower a n)} (hρ : ρ.IsPermutationInvariant (a := a)) :
+    {ρ : MState (TensorPower a n)} (hρ : ρ.IsPermutationInvariant (a := a)) :
     ρ.permutationTwirling = ρ := by
-  apply State.ext
+  apply MState.ext
   ext x y
   rw [permutationTwirling_matrix_apply]
   have hconst :
       (∑ σ : Equiv.Perm (Fin n),
-          ρ.matrix (permEquiv (a := a) n σ x) (permEquiv (a := a) n σ y)) =
-        (Fintype.card (Equiv.Perm (Fin n)) : ℂ) * ρ.matrix x y := by
+          ρ.m (permEquiv (a := a) n σ x) (permEquiv (a := a) n σ y)) =
+        (Fintype.card (Equiv.Perm (Fin n)) : ℂ) * ρ.m x y := by
     calc
       (∑ σ : Equiv.Perm (Fin n),
-          ρ.matrix (permEquiv (a := a) n σ x) (permEquiv (a := a) n σ y))
-          = ∑ _σ : Equiv.Perm (Fin n), ρ.matrix x y := by
+          ρ.m (permEquiv (a := a) n σ x) (permEquiv (a := a) n σ y))
+          = ∑ _σ : Equiv.Perm (Fin n), ρ.m x y := by
               refine Finset.sum_congr rfl fun σ _ => ?_
-              have hσ := congrArg State.matrix (hρ σ)
+              have hσ := congrArg DensityOp.m (hρ σ)
               have happly := congrFun (congrFun hσ x) y
-              simpa [Channel.applyState, permutationChannel_map_apply] using happly
-      _ = (Fintype.card (Equiv.Perm (Fin n)) : ℂ) * ρ.matrix x y := by
+              simpa [CPTPOp.mat_coe_eq_apply_mat, permutationChannel_map_apply] using happly
+      _ = (Fintype.card (Equiv.Perm (Fin n)) : ℂ) * ρ.m x y := by
               rw [Finset.sum_const, Finset.card_univ, nsmul_eq_mul]
   rw [hconst]
   norm_num [Nat.cast_ne_zero.mpr (Fintype.card_ne_zero :
@@ -2849,13 +2840,13 @@ theorem permutationTwirling_apply_of_isPermutationInvariant {n : ℕ}
 
 /-- A state is fixed by finite permutation twirling iff it is permutation invariant. -/
 theorem permutationTwirling_eq_self_iff_isPermutationInvariant {n : ℕ}
-    (ρ : State (TensorPower a n)) :
+    (ρ : MState (TensorPower a n)) :
     ρ.permutationTwirling = ρ ↔ ρ.IsPermutationInvariant (a := a) := by
   constructor
   · intro hρ σ
     calc
-      (permutationChannel (a := a) n σ).applyState ρ =
-          (permutationChannel (a := a) n σ).applyState ρ.permutationTwirling := by
+      (permutationChannel (a := a) n σ) ρ =
+          (permutationChannel (a := a) n σ) ρ.permutationTwirling := by
             rw [hρ]
       _ = ρ.permutationTwirling := permutationChannel_apply_permutationTwirling
             (a := a) ρ σ
@@ -2864,10 +2855,10 @@ theorem permutationTwirling_eq_self_iff_isPermutationInvariant {n : ℕ}
 
 /-- Twirling is unchanged if the input state is first permuted. -/
 theorem permutationTwirling_apply_permutationChannel {n : ℕ}
-    (ρ : State (TensorPower a n)) (τ : Equiv.Perm (Fin n)) :
-    ((permutationChannel (a := a) n τ).applyState ρ).permutationTwirling =
+    (ρ : MState (TensorPower a n)) (τ : Equiv.Perm (Fin n)) :
+    MState.permutationTwirling ((permutationChannel (a := a) n τ) ρ) =
       ρ.permutationTwirling := by
-  apply State.ext
+  apply MState.ext
   ext x y
   rw [permutationTwirling_matrix_apply, permutationTwirling_matrix_apply]
   congr 1
@@ -2877,29 +2868,31 @@ theorem permutationTwirling_apply_permutationChannel {n : ℕ}
       left_inv := by intro σ; simp,
       right_inv := by intro σ; simp }
     (fun σ =>
-      ((permutationChannel (a := a) n τ).applyState ρ).matrix
+      ((permutationChannel (a := a) n τ) ρ).m
         (permEquiv (a := a) n σ x) (permEquiv (a := a) n σ y))
-    (fun σ => ρ.matrix (permEquiv (a := a) n σ x)
+    (fun σ => ρ.m (permEquiv (a := a) n σ x)
       (permEquiv (a := a) n σ y)) ?_
   intro σ
-  simp [Channel.applyState, permutationChannel_map_apply]
-  change ρ.matrix (τ • (σ • x)) (τ • (σ • y)) =
-    ρ.matrix ((τ * σ) • x) ((τ * σ) • y)
+  simp [CPTPOp.mat_coe_eq_apply_mat, permutationChannel_map_apply]
+  change ρ.m (τ • (σ • x)) (τ • (σ • y)) =
+    ρ.m ((τ * σ) • x) ((τ * σ) • y)
   rw [← mul_smul τ σ x, ← mul_smul τ σ y]
 
 /-- Tensor-power states are fixed by finite permutation twirling. -/
-theorem tensorPower_permutationTwirling (ρ : State a) (n : ℕ) :
+theorem tensorPower_permutationTwirling (ρ : MState a) (n : ℕ) :
     (ρ.tensorPower n).permutationTwirling = ρ.tensorPower n :=
   permutationTwirling_apply_of_isPermutationInvariant
     (tensorPower_isPermutationInvariant (a := a) ρ n)
 
-theorem permutationTwirling_idempotent {n : ℕ} (ρ : State (TensorPower a n)) :
+theorem permutationTwirling_idempotent {n : ℕ} (ρ : MState (TensorPower a n)) :
     ρ.permutationTwirling.permutationTwirling = ρ.permutationTwirling :=
   permutationTwirling_apply_of_isPermutationInvariant
     (permutationTwirling_isPermutationInvariant (a := a) ρ)
 
-end State
+end MState
 
-end
+namespace QIT
+
+variable [Fintype a]
 
 end QIT

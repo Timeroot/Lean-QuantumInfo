@@ -19,13 +19,3 @@ public import QuantumLib.QIT.Coding.Classical.HSWLimit
 
 Import surface for HSW and classical coding auxiliaries.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace Coding
-namespace Classical
-
-end Classical
-end Coding
-end QIT

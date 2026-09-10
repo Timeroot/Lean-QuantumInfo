@@ -22,11 +22,3 @@ public import QuantumLib.QIT.Core.POVMProbability
 
 Thin measurement-facing import surface for POVM and decoder work.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace Measurements
-
-end Measurements
-end QIT

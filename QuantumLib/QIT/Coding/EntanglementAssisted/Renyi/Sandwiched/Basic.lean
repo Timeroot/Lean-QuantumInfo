@@ -22,40 +22,38 @@ Source alignment:
   sandwiched-Renyi state and channel mutual information objectives.
 * [KhatriWilde2024Principles, Chapters/EA_capacity.tex:1128-1165] gives the
   alternate-expression route that later connects the channel objective to the
-  completely bounded `1 -> alpha` norm.
+  completely bounded `1 → alpha` norm.
 * [KhatriWilde2024Principles, Chapters/EA_capacity.tex:1169-1217] proves
   additivity for the bipartite-state sandwiched-Renyi mutual information.
 * [KhatriWilde2024Principles, Chapters/EA_capacity.tex:1220-1277] proves
   channel additivity from the bipartite-state additivity, CB alternate
   expression, and CB multiplicativity.
 * [KhatriWilde2024Principles, Chapters/EA_capacity.tex:1869-1907] proves the
-  `alpha -> 1+` limit through monotonicity, pointwise sandwiched-Renyi
+  `alpha → 1+` limit through monotonicity, pointwise sandwiched-Renyi
   convergence, and the Mosonyi minimax exchange.
 * [KhatriWilde2024Principles, Chapters/EA_capacity.tex:2102-2140] and
   [KhatriWilde2024Principles, Chapters/EA_capacity.tex:2152-2240] provide the
   CB norm alternate expression and multiplicativity proof used by channel
   additivity.
 
-The channel additivity theorem and the `alpha -> 1+` channel limit require the
-CB `1 -> alpha` alternate expression, CB multiplicativity, and the Mosonyi
-minimax/limit exchange.  Those proof layers are intentionally not represented by
-placeholder declarations here.
+The channel additivity theorem and the `alpha → 1+` channel limit require the
+CB `1 → alpha` alternate expression, CB multiplicativity, and the Mosonyi
+minimax/limit exchange.  Those proof layers live in `Sandwiched.CBNorm`,
+`Sandwiched.Additivity` and `Sandwiched.Limit`, not here.
 -/
 
 @[expose] public section
 
 open scoped ComplexOrder MatrixOrder NNReal
 
-namespace QIT
-
-universe u v
-
 noncomputable section
-
+universe u v
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-namespace State
+open QIT
+
+namespace MState
 
 /-- Optimized state hypothesis-testing mutual information is bounded above by
 the optimized sandwiched-Renyi mutual information plus the Khatri--Wilde
@@ -64,7 +62,7 @@ comparison penalty.
 This lifts `prop:sandwich-to-htre` from relative entropy candidates to the
 state mutual-information infimum over side-information states. -/
 theorem hypothesisTestingMutualInformation_le_sandwichedRenyiMutualInformationE_add
-    (rhoAB : State (Prod a b)) {epsilon alpha : ℝ}
+    (rhoAB : MState (a × b)) {epsilon alpha : ℝ}
     (hepsilon_nonneg : 0 ≤ epsilon) (hepsilon_lt_one : epsilon < 1)
     (halpha : 1 < alpha) :
     rhoAB.hypothesisTestingMutualInformation epsilon ≤
@@ -79,36 +77,36 @@ theorem hypothesisTestingMutualInformation_le_sandwichedRenyiMutualInformationE_
   have hsub :
       rhoAB.hypothesisTestingMutualInformation epsilon - penaltyE ≤
         rhoAB.sandwichedRenyiMutualInformationE alpha := by
-    rw [State.sandwichedRenyiMutualInformationE_eq_sInf]
+    rw [MState.sandwichedRenyiMutualInformationE_eq_sInf]
     refine le_csInf (rhoAB.sandwichedRenyiMutualInformationEValueSet_nonempty alpha) ?_
     intro y hy
     rcases hy with ⟨sigmaB, rfl⟩
     have hHTcand :
         rhoAB.hypothesisTestingMutualInformation epsilon ≤
-          rhoAB.hypothesisTestingRelativeEntropy (rhoAB.marginalA.prod sigmaB) epsilon := by
-      rw [State.hypothesisTestingMutualInformation_eq_sInf]
+          rhoAB.hypothesisTestingRelativeEntropy (rhoAB.traceRight.prod sigmaB) epsilon := by
+      rw [MState.hypothesisTestingMutualInformation_eq_sInf]
       exact sInf_le ⟨sigmaB, rfl⟩
     have hcmpPSD :
         rhoAB.hypothesisTestingRelativeEntropyPSDE
-            (rhoAB.marginalA.prod sigmaB).matrix epsilon ≤
+            (rhoAB.traceRight.prod sigmaB).m epsilon ≤
           rhoAB.sandwichedRenyiPSDReferenceE
-              (rhoAB.marginalA.prod sigmaB).matrix
-              (rhoAB.marginalA.prod sigmaB).pos alpha +
+              (rhoAB.traceRight.prod sigmaB).m
+              (rhoAB.traceRight.prod sigmaB).psd alpha +
             penaltyE := by
       simpa [penalty, penaltyE] using
-        (State.hypothesisTestingRelativeEntropyPSDE_le_sandwichedRenyiPSDReferenceE_add
+        (MState.hypothesisTestingRelativeEntropyPSDE_le_sandwichedRenyiPSDReferenceE_add
           (rho := rhoAB)
-          (sigma := (rhoAB.marginalA.prod sigmaB).matrix)
-          (hsigma := (rhoAB.marginalA.prod sigmaB).pos)
+          (sigma := (rhoAB.traceRight.prod sigmaB).m)
+          (hsigma := (rhoAB.traceRight.prod sigmaB).psd)
           (epsilon := epsilon) (alpha := alpha)
           hepsilon_nonneg hepsilon_lt_one halpha)
     have hcmp :
-        rhoAB.hypothesisTestingRelativeEntropy (rhoAB.marginalA.prod sigmaB) epsilon ≤
+        rhoAB.hypothesisTestingRelativeEntropy (rhoAB.traceRight.prod sigmaB) epsilon ≤
           rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB alpha + penaltyE := by
-      rw [← State.hypothesisTestingRelativeEntropyPSDE_eq_state
+      rw [← MState.hypothesisTestingRelativeEntropyPSDE_eq_state
         (rho := rhoAB) (epsilon := epsilon)
-        (sigma := rhoAB.marginalA.prod sigmaB)]
-      simpa [State.sandwichedRenyiMutualInformationCandidateE_eq] using hcmpPSD
+        (sigma := rhoAB.traceRight.prod sigmaB)]
+      simpa [MState.sandwichedRenyiMutualInformationCandidateE_eq] using hcmpPSD
     exact EReal.sub_le_of_le_add (hHTcand.trans hcmp)
   have hmain :
       rhoAB.hypothesisTestingMutualInformation epsilon ≤
@@ -118,22 +116,31 @@ theorem hypothesisTestingMutualInformation_le_sandwichedRenyiMutualInformationE_
       (.inl (EReal.coe_ne_top penalty))).mp hsub
   simpa [penalty, penaltyE] using hmain
 
-end State
+end MState
 
-namespace Channel
+end
 
-variable (N : Channel a b)
+noncomputable section
+
+namespace CPTPOp
+
+open QIT
+
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+
+variable (N : CPTPMap a b)
 
 /-- Fixed-input channel sandwiched-Renyi mutual information for the
 input-reference pure state `psi`. -/
 def inputSandwichedRenyiMutualInformationE
-    (psi : PureVector (Prod a a)) (alpha : ℝ) : EReal :=
+    (psi : Ket (a × a)) (alpha : ℝ) : EReal :=
   (N.hypothesisTestingOutputState psi).sandwichedRenyiMutualInformationE alpha
 
 /-- Channel sandwiched-Renyi mutual information value set over pure
 input-reference states. -/
 def sandwichedRenyiMutualInformationEValueSet (alpha : ℝ) : Set EReal :=
-  Set.range fun psi : PureVector (Prod a a) =>
+  Set.range fun psi : Ket (a × a) =>
     N.inputSandwichedRenyiMutualInformationE psi alpha
 
 /-- Extended-real sandwiched-Renyi mutual information of a channel:
@@ -145,7 +152,7 @@ def sandwichedRenyiMutualInformationE (alpha : ℝ) : EReal :=
   sSup (N.sandwichedRenyiMutualInformationEValueSet alpha)
 
 theorem inputSandwichedRenyiMutualInformationE_eq
-    (psi : PureVector (Prod a a)) (alpha : ℝ) :
+    (psi : Ket (a × a)) (alpha : ℝ) :
     N.inputSandwichedRenyiMutualInformationE psi alpha =
       (N.hypothesisTestingOutputState psi).sandwichedRenyiMutualInformationE alpha := by
   rfl
@@ -156,13 +163,13 @@ theorem sandwichedRenyiMutualInformationE_eq_sSup (alpha : ℝ) :
   rfl
 
 theorem inputSandwichedRenyiMutualInformationE_mem_valueSet
-    (psi : PureVector (Prod a a)) (alpha : ℝ) :
+    (psi : Ket (a × a)) (alpha : ℝ) :
     N.inputSandwichedRenyiMutualInformationE psi alpha ∈
       N.sandwichedRenyiMutualInformationEValueSet alpha := by
   exact ⟨psi, rfl⟩
 
 theorem inputSandwichedRenyiMutualInformationE_le_channel
-    (psi : PureVector (Prod a a)) (alpha : ℝ) :
+    (psi : Ket (a × a)) (alpha : ℝ) :
     N.inputSandwichedRenyiMutualInformationE psi alpha ≤
       N.sandwichedRenyiMutualInformationE alpha := by
   rw [sandwichedRenyiMutualInformationE_eq_sSup]
@@ -171,7 +178,7 @@ theorem inputSandwichedRenyiMutualInformationE_le_channel
 /-- The pure-input value set is nonempty whenever the input system is inhabited. -/
 theorem sandwichedRenyiMutualInformationEValueSet_nonempty [Nonempty a] (alpha : ℝ) :
     (N.sandwichedRenyiMutualInformationEValueSet alpha).Nonempty := by
-  let psi0 : PureVector (Prod a a) := PureVector.basisPureVector
+  let psi0 : Ket (a × a) := default
   exact ⟨N.inputSandwichedRenyiMutualInformationE psi0 alpha,
     N.inputSandwichedRenyiMutualInformationE_mem_valueSet psi0 alpha⟩
 
@@ -191,35 +198,33 @@ theorem hypothesisTestingMutualInformation_le_sandwichedRenyiMutualInformationE_
   classical
   let penalty : ℝ := alpha / (alpha - 1) * log2 (1 / (1 - epsilon))
   let penaltyE : EReal := (penalty : EReal)
-  have : Nonempty (PureVector (Prod a a)) :=
-    ⟨PureVector.basisPureVector⟩
+  have : Nonempty (Ket (a × a)) :=
+    ⟨default⟩
   rw [← EReal.ge_of_forall_gt_iff_ge]
   intro z hz
   rw [N.hypothesisTestingMutualInformation_eq_sSup] at hz
   obtain ⟨value, hvalue, hzvalue⟩ :=
     exists_lt_of_lt_csSup
       (Set.range_nonempty
-        (fun psi : PureVector (Prod a a) =>
+        (fun psi : Ket (a × a) =>
           N.inputHypothesisTestingMutualInformation psi epsilon))
       hz
   rcases hvalue with ⟨psi, rfl⟩
   have hstate :=
-    State.hypothesisTestingMutualInformation_le_sandwichedRenyiMutualInformationE_add
+    MState.hypothesisTestingMutualInformation_le_sandwichedRenyiMutualInformationE_add
       (rhoAB := N.hypothesisTestingOutputState psi)
       hepsilon_nonneg hepsilon_lt_one halpha
   have hinput :
       N.inputHypothesisTestingMutualInformation psi epsilon ≤
         N.inputSandwichedRenyiMutualInformationE psi alpha + penaltyE := by
-    simpa [Channel.inputHypothesisTestingMutualInformation,
-      Channel.inputSandwichedRenyiMutualInformationE, penalty, penaltyE] using hstate
+    simpa [CPTPOp.inputHypothesisTestingMutualInformation,
+      CPTPOp.inputSandwichedRenyiMutualInformationE, penalty, penaltyE] using hstate
   have hchannel :
       N.inputSandwichedRenyiMutualInformationE psi alpha + penaltyE ≤
         N.sandwichedRenyiMutualInformationE alpha + penaltyE :=
     add_le_add (N.inputSandwichedRenyiMutualInformationE_le_channel psi alpha) le_rfl
   exact hzvalue.le.trans (hinput.trans hchannel)
 
-end Channel
+end CPTPOp
 
 end
-
-end QIT

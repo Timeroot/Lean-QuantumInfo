@@ -36,63 +36,66 @@ metric.tex:512-513], conditional min/max entropy follow
 Lean-QIT records entropy values in bits. Thus the min-entropy order constraint
 uses `2^{-λ}` rather than the natural-exponential notation used in the source.
 The cq guessing-probability interface follows [Tomamichel2015FiniteResources,
-calculus.tex:348-357], but the SDP/duality proof of optimality remains a
-downstream proof dependency.
+calculus.tex:348-357].
 -/
 
 @[expose] public section
 
 open scoped ComplexOrder MatrixOrder NNReal Pointwise
 
-open Matrix
-
-namespace QIT
-
-universe u v w
+open Matrix hiding traceNorm
 
 noncomputable section
-
+universe u v w
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
-namespace State
+open QIT
+
+namespace MState
 
 variable {b : Type v} [Fintype b] [DecidableEq b]
 
 variable {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
 
 /-- Purified distance cannot increase after tracing out the second subsystem. -/
-theorem purifiedDistance_marginalA_le [Nonempty b]
-    (ρ σ : State (Prod a b)) :
-    ρ.marginalA.purifiedDistance σ.marginalA ≤ ρ.purifiedDistance σ :=
+theorem purifiedDistance_traceRight_le [Nonempty b]
+    (ρ σ : MState (a × b)) :
+    ρ.traceRight.purifiedDistance σ.traceRight ≤ ρ.purifiedDistance σ :=
   purifiedDistance_le_of_squaredFidelity_le
-    (State.squaredFidelity_le_marginalA_squaredFidelity ρ σ)
+    (MState.squaredFidelity_le_traceRight_squaredFidelity ρ σ)
 
 /-- Purified distance cannot increase after tracing out the first subsystem. -/
-theorem purifiedDistance_marginalB_le [Nonempty a]
-    (ρ σ : State (Prod a b)) :
-    ρ.marginalB.purifiedDistance σ.marginalB ≤ ρ.purifiedDistance σ :=
+theorem purifiedDistance_traceLeft_le [Nonempty a]
+    (ρ σ : MState (a × b)) :
+    ρ.traceLeft.purifiedDistance σ.traceLeft ≤ ρ.purifiedDistance σ :=
   purifiedDistance_le_of_squaredFidelity_le
-    (State.squaredFidelity_le_marginalB_squaredFidelity ρ σ)
+    (MState.squaredFidelity_le_traceLeft_squaredFidelity ρ σ)
 
 /-- Taking the first marginal transports purified-distance balls. -/
-theorem purifiedBall_marginalA_of_purifiedBall [Nonempty b]
-    {ρ σ : State (Prod a b)} {ε : ℝ}
+theorem purifiedBall_traceRight_of_purifiedBall [Nonempty b]
+    {ρ σ : MState (a × b)} {ε : ℝ}
     (hball : ρ.purifiedBall ε σ) :
-    ρ.marginalA.purifiedBall ε σ.marginalA :=
-  le_trans (purifiedDistance_marginalA_le ρ σ) hball
+    ρ.traceRight.purifiedBall ε σ.traceRight :=
+  le_trans (purifiedDistance_traceRight_le ρ σ) hball
 
 /-- Taking the second marginal transports purified-distance balls. -/
-theorem purifiedBall_marginalB_of_purifiedBall [Nonempty a]
-    {ρ σ : State (Prod a b)} {ε : ℝ}
+theorem purifiedBall_traceLeft_of_purifiedBall [Nonempty a]
+    {ρ σ : MState (a × b)} {ε : ℝ}
     (hball : ρ.purifiedBall ε σ) :
-    ρ.marginalB.purifiedBall ε σ.marginalB :=
-  le_trans (purifiedDistance_marginalB_le ρ σ) hball
+    ρ.traceLeft.purifiedBall ε σ.traceLeft :=
+  le_trans (purifiedDistance_traceLeft_le ρ σ) hball
 
-end State
+end MState
+
+namespace QIT
 
 variable {b : Type v} [Fintype b] [DecidableEq b]
 
-namespace State
+end QIT
+
+namespace MState
+
+variable {b : Type v} [Fintype b] [DecidableEq b]
 
 variable {b : Type v} [Fintype b] [DecidableEq b]
 
@@ -101,9 +104,10 @@ variable {b : Type v} [Fintype b] [DecidableEq b]
 variable {c : Type w} [Fintype c] [DecidableEq c]
 
 /-- Reindex a purification of an `AB` target so that the discarded `B` system
-is the reference and the kept target is `AC`. -/
+is the reference and the kept target is `AC`.  Permuting the type arguments
+transports the other way, from an `AC` target to an `AB` one. -/
 def abToACReferenceEquiv (c a b : Type*) :
-    Prod c (Prod a b) ≃ Prod b (Prod a c) where
+    (c × (a × b)) ≃ (b × (a × c)) where
   toFun x := (x.2.2, (x.2.1, x.1))
   invFun x := (x.2.2, (x.2.1, x.1))
   left_inv x := by
@@ -115,64 +119,47 @@ def abToACReferenceEquiv (c a b : Type*) :
     cases x with
     | mk y xz =>
       cases xz
-      rfl
-
-/-- Reindex a purification of an `AC` target so that the discarded `C` system
-is the reference and the kept target is `AB`. -/
-def acToABReferenceEquiv (b a c : Type*) :
-    Prod b (Prod a c) ≃ Prod c (Prod a b) where
-  toFun x := (x.2.2, (x.2.1, x.1))
-  invFun x := (x.2.2, (x.2.1, x.1))
-  left_inv x := by
-    cases x with
-    | mk y xz =>
-      cases xz
-      rfl
-  right_inv x := by
-    cases x with
-    | mk z xy =>
-      cases xy
       rfl
 
 /-- The `AB` marginal of a purification whose reference is `C`. -/
-def abMarginalFromTripartitePure (Ψ : PureVector (Prod c (Prod a b))) :
-    State (Prod a b) :=
-  Ψ.state.marginalB
+def abMarginalFromTripartitePure (Ψ : Ket (c × (a × b))) :
+    MState (a × b) :=
+  Ψ.state.traceLeft
 
 /-- The complementary `AC` marginal of a purification of an `AB` target. -/
-def acMarginalFromABPurification (Ψ : PureVector (Prod c (Prod a b))) :
-    State (Prod a c) :=
-  (Ψ.reindex (abToACReferenceEquiv c a b)).state.marginalB
+def acMarginalFromABPurification (Ψ : Ket (c × (a × b))) :
+    MState (a × c) :=
+  (Ψ.reindex (abToACReferenceEquiv c a b)).state.traceLeft
 
 /-- The complementary `AB` marginal of a purification of an `AC` target. -/
-def abMarginalFromACPurification (Ψ : PureVector (Prod b (Prod a c))) :
-    State (Prod a b) :=
-  (Ψ.reindex (acToABReferenceEquiv b a c)).state.marginalB
+def abMarginalFromACPurification (Ψ : Ket (b × (a × c))) :
+    MState (a × b) :=
+  (Ψ.reindex (abToACReferenceEquiv b a c)).state.traceLeft
 
 /-- An `AB` smooth candidate has an embedded complementary `AC⁺` candidate when
 both arise from nearby purifications after embedding the original `C` reference
 into the enlarged register `C⁺ = (A × B) ⊕ C`. -/
 def EmbeddedABToACSmoothCandidate
-    (Ψ : PureVector (Prod c (Prod a b))) (ε : ℝ)
-    (ρAB' : State (Prod a b)) : Prop :=
-  ∃ Φ : PureVector (Prod (Sum (Prod a b) c) (Prod a b)),
+    (Ψ : Ket (c × (a × b))) (ε : ℝ)
+    (ρAB' : MState (a × b)) : Prop :=
+  ∃ Φ : Ket (((a × b) ⊕ c) × (a × b)),
     Φ.Purifies ρAB' ∧
       (acMarginalFromABPurification
-        ((ReferenceIsometry.sumInr (Prod a b) c).applyPureVector Ψ)).purifiedBall ε
+        ((ReferenceIsometry.sumInr (a × b) c).applyKet Ψ)).purifiedBall ε
         (acMarginalFromABPurification Φ)
 
 /-- An `AC` smooth candidate has an embedded complementary `AB⁺` candidate when
 both arise from nearby purifications after embedding the original `B` reference
 into the enlarged register `B⁺ = (A × C) ⊕ B`. -/
 def EmbeddedACToABSmoothCandidate
-    (Ψ : PureVector (Prod c (Prod a b))) (ε : ℝ)
-    (ρAC' : State (Prod a c)) : Prop :=
-  let Ω : PureVector (Prod b (Prod a c)) :=
+    (Ψ : Ket (c × (a × b))) (ε : ℝ)
+    (ρAC' : MState (a × c)) : Prop :=
+  let Ω : Ket (b × (a × c)) :=
     Ψ.reindex (abToACReferenceEquiv c a b)
-  ∃ Φ : PureVector (Prod (Sum (Prod a c) b) (Prod a c)),
+  ∃ Φ : Ket (((a × c) ⊕ b) × (a × c)),
     Φ.Purifies ρAC' ∧
       (abMarginalFromACPurification
-        ((ReferenceIsometry.sumInr (Prod a c) b).applyPureVector Ω)).purifiedBall ε
+        ((ReferenceIsometry.sumInr (a × c) b).applyKet Ω)).purifiedBall ε
         (abMarginalFromACPurification Φ)
 
 /-- Embedded purification-ball transport for smooth min/max candidate pairing.
@@ -181,100 +168,100 @@ This is the mathematically correct finite-dimensional replacement for a fixed
 `B/C` pairing: smoothed candidates are paired after enlarging the complementary
 reference register when necessary. -/
 def EmbeddedSmoothConditionalMinMaxPairing
-    (Ψ : PureVector (Prod c (Prod a b))) (ε : ℝ) : Prop :=
-  (∀ ρAB' : State (Prod a b),
+    (Ψ : Ket (c × (a × b))) (ε : ℝ) : Prop :=
+  (∀ ρAB' : MState (a × b),
       (abMarginalFromTripartitePure Ψ).purifiedBall ε ρAB' →
         EmbeddedABToACSmoothCandidate (a := a) (b := b) (c := c) Ψ ε ρAB') ∧
-    (∀ ρAC' : State (Prod a c),
+    (∀ ρAC' : MState (a × c),
       (acMarginalFromABPurification Ψ).purifiedBall ε ρAC' →
         EmbeddedACToABSmoothCandidate (a := a) (b := b) (c := c) Ψ ε ρAC')
 
 private theorem card_prod_le_sum_prod_left
     {x y : Type*} [Fintype x] [Fintype y] [DecidableEq x] [DecidableEq y] :
-    Fintype.card x ≤ Fintype.card (Sum x y) := by
+    Fintype.card x ≤ Fintype.card (x ⊕ y) := by
   simp [Fintype.card_sum]
 
 /-- Pure-state overlap equality plus arbitrary-purification Uhlmann gives the
 purified-ball transport for the `AB → AC⁺` direction. -/
 private theorem embeddedABToAC_of_purifiedBall
-    (Ψ : PureVector (Prod c (Prod a b))) {ε : ℝ}
-    {ρAB' : State (Prod a b)}
+    (Ψ : Ket (c × (a × b))) {ε : ℝ}
+    {ρAB' : MState (a × b)}
     (hball : (abMarginalFromTripartitePure Ψ).purifiedBall ε ρAB') :
     EmbeddedABToACSmoothCandidate (a := a) (b := b) (c := c) Ψ ε ρAB' := by
   classical
-  let V := ReferenceIsometry.sumInr (Prod a b) c
-  let Ψplus : PureVector (Prod (Sum (Prod a b) c) (Prod a b)) :=
-    V.applyPureVector Ψ
+  let V := ReferenceIsometry.sumInr (a × b) c
+  let Ψplus : Ket (((a × b) ⊕ c) × (a × b)) :=
+    V.applyKet Ψ
   have hΨ : Ψ.Purifies (abMarginalFromTripartitePure Ψ) := by
-    exact PureVector.purifies_marginalB Ψ
+    exact Ket.purifies_traceLeft Ψ
   have hΨplus : Ψplus.Purifies (abMarginalFromTripartitePure Ψ) := by
-    exact V.applyPureVector_purifies hΨ
-  have hcard : Fintype.card (Prod a b) ≤ Fintype.card (Sum (Prod a b) c) := by
-    exact card_prod_le_sum_prod_left (x := Prod a b) (y := c)
+    exact V.applyKet_purifies hΨ
+  have hcard : Fintype.card (a × b) ≤ Fintype.card ((a × b) ⊕ c) := by
+    exact card_prod_le_sum_prod_left (x := a × b) (y := c)
   obtain ⟨Φ, hΦ, hoverlap⟩ :=
-    PureVector.exists_purification_with_overlapSq_eq_squaredFidelity
+    Ket.exists_purification_with_overlapSq_eq_squaredFidelity
       (Ψ := Ψplus) (ρ := abMarginalFromTripartitePure Ψ) (σ := ρAB')
       hΨplus hcard
   refine ⟨Φ, hΦ, ?_⟩
-  let e := abToACReferenceEquiv (Sum (Prod a b) c) a b
+  let e := abToACReferenceEquiv ((a × b) ⊕ c) a b
   have hbasePur :
       (Ψplus.reindex e).Purifies
         (acMarginalFromABPurification Ψplus) := by
-    exact PureVector.purifies_marginalB (Ψplus.reindex e)
+    exact Ket.purifies_traceLeft (Ψplus.reindex e)
   have hcandPur :
       (Φ.reindex e).Purifies
         (acMarginalFromABPurification Φ) := by
-    exact PureVector.purifies_marginalB (Φ.reindex e)
+    exact Ket.purifies_traceLeft (Φ.reindex e)
   have hF :
       (abMarginalFromTripartitePure Ψ).squaredFidelity ρAB' ≤
         (acMarginalFromABPurification Ψplus).squaredFidelity
           (acMarginalFromABPurification Φ) := by
     have hbound :=
-      PureVector.overlapSq_le_squaredFidelity_of_purifies hbasePur hcandPur
-    rw [PureVector.overlapSq_reindex, hoverlap] at hbound
+      Ket.overlapSq_le_squaredFidelity_of_purifies hbasePur hcandPur
+    rw [Ket.overlapSq_reindex, hoverlap] at hbound
     exact hbound
   exact purifiedBall_of_squaredFidelity_le hF hball
 
 /-- Pure-state overlap equality plus arbitrary-purification Uhlmann gives the
 purified-ball transport for the `AC → AB⁺` direction. -/
 private theorem embeddedACToAB_of_purifiedBall
-    (Ψ : PureVector (Prod c (Prod a b))) {ε : ℝ}
-    {ρAC' : State (Prod a c)}
+    (Ψ : Ket (c × (a × b))) {ε : ℝ}
+    {ρAC' : MState (a × c)}
     (hball : (acMarginalFromABPurification Ψ).purifiedBall ε ρAC') :
     EmbeddedACToABSmoothCandidate (a := a) (b := b) (c := c) Ψ ε ρAC' := by
   classical
-  let Ω : PureVector (Prod b (Prod a c)) :=
+  let Ω : Ket (b × (a × c)) :=
     Ψ.reindex (abToACReferenceEquiv c a b)
-  let V := ReferenceIsometry.sumInr (Prod a c) b
-  let Ωplus : PureVector (Prod (Sum (Prod a c) b) (Prod a c)) :=
-    V.applyPureVector Ω
+  let V := ReferenceIsometry.sumInr (a × c) b
+  let Ωplus : Ket (((a × c) ⊕ b) × (a × c)) :=
+    V.applyKet Ω
   have hΩ : Ω.Purifies (acMarginalFromABPurification Ψ) := by
-    exact PureVector.purifies_marginalB Ω
+    exact Ket.purifies_traceLeft Ω
   have hΩplus : Ωplus.Purifies (acMarginalFromABPurification Ψ) := by
-    exact V.applyPureVector_purifies hΩ
-  have hcard : Fintype.card (Prod a c) ≤ Fintype.card (Sum (Prod a c) b) := by
-    exact card_prod_le_sum_prod_left (x := Prod a c) (y := b)
+    exact V.applyKet_purifies hΩ
+  have hcard : Fintype.card (a × c) ≤ Fintype.card ((a × c) ⊕ b) := by
+    exact card_prod_le_sum_prod_left (x := a × c) (y := b)
   obtain ⟨Φ, hΦ, hoverlap⟩ :=
-    PureVector.exists_purification_with_overlapSq_eq_squaredFidelity
+    Ket.exists_purification_with_overlapSq_eq_squaredFidelity
       (Ψ := Ωplus) (ρ := acMarginalFromABPurification Ψ) (σ := ρAC')
       hΩplus hcard
   refine ⟨Φ, hΦ, ?_⟩
-  let e := acToABReferenceEquiv (Sum (Prod a c) b) a c
+  let e := abToACReferenceEquiv ((a × c) ⊕ b) a c
   have hbasePur :
       (Ωplus.reindex e).Purifies
         (abMarginalFromACPurification Ωplus) := by
-    exact PureVector.purifies_marginalB (Ωplus.reindex e)
+    exact Ket.purifies_traceLeft (Ωplus.reindex e)
   have hcandPur :
       (Φ.reindex e).Purifies
         (abMarginalFromACPurification Φ) := by
-    exact PureVector.purifies_marginalB (Φ.reindex e)
+    exact Ket.purifies_traceLeft (Φ.reindex e)
   have hF :
       (acMarginalFromABPurification Ψ).squaredFidelity ρAC' ≤
         (abMarginalFromACPurification Ωplus).squaredFidelity
           (abMarginalFromACPurification Φ) := by
     have hbound :=
-      PureVector.overlapSq_le_squaredFidelity_of_purifies hbasePur hcandPur
-    rw [PureVector.overlapSq_reindex, hoverlap] at hbound
+      Ket.overlapSq_le_squaredFidelity_of_purifies hbasePur hcandPur
+    rw [Ket.overlapSq_reindex, hoverlap] at hbound
     exact hbound
   exact purifiedBall_of_squaredFidelity_le hF hball
 
@@ -283,7 +270,7 @@ private theorem embeddedACToAB_of_purifiedBall
 The theorem deliberately uses enlarged complementary references (`C⁺` and
 `B⁺`) rather than asserting a generally false fixed-register pairing. -/
 theorem embeddedSmoothConditionalMinMaxPairing_of_pure
-    (Ψ : PureVector (Prod c (Prod a b))) (ε : ℝ) :
+    (Ψ : Ket (c × (a × b))) (ε : ℝ) :
     EmbeddedSmoothConditionalMinMaxPairing (a := a) (b := b) (c := c) Ψ ε := by
   constructor
   · intro ρAB' hball
@@ -297,34 +284,38 @@ theorem embeddedSmoothConditionalMinMaxPairing_of_pure
 one pure state on `C × (A × B)`: the first is the `AB` target marginal and the
 second is the complementary `AC` marginal. -/
 def ComplementaryPureMarginalRel
-    (ρAB : State (Prod a b)) (ρAC : State (Prod a c)) : Prop :=
-  ∃ Ψ : PureVector (Prod c (Prod a b)),
+    (ρAB : MState (a × b)) (ρAC : MState (a × c)) : Prop :=
+  ∃ Ψ : Ket (c × (a × b)),
     Ψ.Purifies ρAB ∧ acMarginalFromABPurification Ψ = ρAC
 
 theorem complementaryPureMarginalRel_of_pure
-    (Ψ : PureVector (Prod c (Prod a b))) :
+    (Ψ : Ket (c × (a × b))) :
     ComplementaryPureMarginalRel (a := a) (b := b) (c := c)
       (abMarginalFromTripartitePure Ψ) (acMarginalFromABPurification Ψ) := by
-  exact ⟨Ψ, PureVector.purifies_marginalB Ψ, rfl⟩
+  exact ⟨Ψ, Ket.purifies_traceLeft Ψ, rfl⟩
 
 /-- An embedded `AB` smooth candidate gives a concrete enlarged complementary
 pure-marginal candidate. This is the relation-level handoff from purification
 transport to the unsmoothed min/max duality leaf. -/
 theorem EmbeddedABToACSmoothCandidate.exists_complementaryPureMarginalRel
-    {Ψ : PureVector (Prod c (Prod a b))} {ε : ℝ}
-    {ρAB' : State (Prod a b)}
+    {Ψ : Ket (c × (a × b))} {ε : ℝ}
+    {ρAB' : MState (a × b)}
     (h : EmbeddedABToACSmoothCandidate (a := a) (b := b) (c := c) Ψ ε ρAB') :
-    ∃ ρACplus' : State (Prod a (Sum (Prod a b) c)),
+    ∃ ρACplus' : MState (a × ((a × b) ⊕ c)),
       (acMarginalFromABPurification
-        ((ReferenceIsometry.sumInr (Prod a b) c).applyPureVector Ψ)).purifiedBall ε
+        ((ReferenceIsometry.sumInr (a × b) c).applyKet Ψ)).purifiedBall ε
         ρACplus' ∧
-      ComplementaryPureMarginalRel (a := a) (b := b) (c := Sum (Prod a b) c)
+      ComplementaryPureMarginalRel (a := a) (b := b) (c := (a × b) ⊕ c)
         ρAB' ρACplus' := by
   rcases h with ⟨Φ, hΦ, hball⟩
   refine ⟨acMarginalFromABPurification Φ, hball, ?_⟩
   exact ⟨Φ, hΦ, rfl⟩
 
-end State
+end MState
+
+namespace QIT
+
+variable {b : Type v} [Fintype b] [DecidableEq b]
 
 /-- Moving the center of a subnormalized purified ball only increases the
 radius by the purified distance between the old and new centers. -/
@@ -342,8 +333,8 @@ theorem SubnormalizedState.purifiedBall_center_migration
 
 /-- Normalized-center convenience wrapper for migrating a subnormalized
 purified ball after embedding normalized states. -/
-theorem State.toSubnormalized_purifiedBall_center_migration
-    {ρ η : State a} {τ : SubnormalizedState a} {ε δ : ℝ}
+theorem _root_.MState.toSubnormalized_purifiedBall_center_migration
+    {ρ η : MState a} {τ : SubnormalizedState a} {ε δ : ℝ}
     (hcenter : η.toSubnormalized.purifiedDistance ρ.toSubnormalized ≤ δ)
     (hwit : η.toSubnormalized.purifiedBall ε τ) :
     ρ.toSubnormalized.purifiedBall (ε + δ) τ :=
@@ -362,26 +353,26 @@ theorem SubnormalizedState.generalizedFidelity_le_applyTraceNonincreasingCP
         (σ.applyTraceNonincreasingCP Φ hΦ) := by
   let τ : SubnormalizedState b := ρ.applyTraceNonincreasingCP Φ hΦ
   let υ : SubnormalizedState b := σ.applyTraceNonincreasingCP Φ hΦ
-  let ρhat : State (Sum PUnit.{max u v + 1} a) := ρ.hatExtension
-  let σhat : State (Sum PUnit.{max u v + 1} a) := σ.hatExtension
-  let τhat : State (Sum PUnit.{max u v + 1} b) := τ.hatExtension
-  let υhat : State (Sum PUnit.{max u v + 1} b) := υ.hatExtension
+  let ρhat : MState (PUnit.{max u v + 1} ⊕ a) := ρ.hatExtension
+  let σhat : MState (PUnit.{max u v + 1} ⊕ a) := σ.hatExtension
+  let τhat : MState (PUnit.{max u v + 1} ⊕ b) := τ.hatExtension
+  let υhat : MState (PUnit.{max u v + 1} ⊕ b) := υ.hatExtension
   have hρF : ρ.generalizedFidelity σ = ρhat.squaredFidelity σhat := by
     simpa [ρhat, σhat] using
       (SubnormalizedState.generalizedFidelity_eq_squaredFidelity_hatExtension ρ σ)
   have hτF : τ.generalizedFidelity υ = τhat.squaredFidelity υhat := by
     simpa [τhat, υhat] using
       (SubnormalizedState.generalizedFidelity_eq_squaredFidelity_hatExtension τ υ)
-  have hτhat : τhat = hΦ.hatCompletion.applyState ρhat := by
+  have hτhat : τhat = hΦ.hatCompletion ρhat := by
     simpa [τ, τhat, ρhat] using
       (SubnormalizedState.hatExtension_applyTraceNonincreasingCP ρ Φ hΦ)
-  have hυhat : υhat = hΦ.hatCompletion.applyState σhat := by
+  have hυhat : υhat = hΦ.hatCompletion σhat := by
     simpa [υ, υhat, σhat] using
       (SubnormalizedState.hatExtension_applyTraceNonincreasingCP σ Φ hΦ)
   rw [hρF]
   change τ.generalizedFidelity υ = _ at hτF
   rw [hτF, hτhat, hυhat]
-  exact State.squaredFidelity_le_applyState_squaredFidelity hΦ.hatCompletion ρhat σhat
+  exact MState.squaredFidelity_le_applyState_squaredFidelity hΦ.hatCompletion ρhat σhat
 
 /-- A subnormalized purified-distance ball of radius smaller than
 `sqrt (Tr ρ)` contains only positive-trace witnesses. -/
@@ -410,54 +401,6 @@ theorem SubnormalizedState.purifiedBall_trace_pos_of_lt_sqrt_trace
     change ρ.purifiedDistance σ ≤ ε at hball
     rwa [hdist] at hball
   exact (not_lt_of_ge hle) hε
-
-private theorem punit_psdSqrt_const (r : ℝ) (hr : 0 ≤ r) :
-    psdSqrt (Matrix.of fun _ _ : PUnit.{u + 1} => ((r : ℝ) : ℂ) : CMatrix PUnit.{u + 1}) =
-      (Matrix.of fun _ _ : PUnit.{u + 1} => ((Real.sqrt r : ℝ) : ℂ) :
-        CMatrix PUnit.{u + 1}) := by
-  let A : CMatrix PUnit.{u + 1} := Matrix.of fun _ _ => ((r : ℝ) : ℂ)
-  let S : CMatrix PUnit.{u + 1} := Matrix.of fun _ _ => ((Real.sqrt r : ℝ) : ℂ)
-  have hsqrt_sq : ((Real.sqrt r : ℂ) * (Real.sqrt r : ℂ)) = (r : ℂ) := by
-    rw [← Complex.ofReal_mul, Real.mul_self_sqrt hr]
-  have hSsq : S * S = A := by
-    ext i j
-    cases i
-    cases j
-    simp [S, A, Matrix.mul_apply, Matrix.of_apply, hsqrt_sq]
-  have hSpos : S.PosSemidef := by
-    have hdiag :
-        S = Matrix.diagonal (fun _ : PUnit.{u + 1} => ((Real.sqrt r : ℝ) : ℂ)) := by
-      ext i j
-      cases i
-      cases j
-      simp [S, Matrix.of_apply, Matrix.diagonal]
-    rw [hdiag]
-    exact Matrix.PosSemidef.diagonal fun _ =>
-      Complex.nonneg_iff.mpr ⟨Real.sqrt_nonneg r, by simp⟩
-  change psdSqrt A = S
-  simpa [psdSqrt] using (CFC.sqrt_unique (a := A) (b := S) hSsq hSpos.nonneg)
-
-private theorem traceNorm_punit_const_of_nonneg (r : ℝ) (hr : 0 ≤ r) :
-    traceNorm (Matrix.of fun _ _ : PUnit.{u + 1} => ((r : ℝ) : ℂ) :
-      CMatrix PUnit.{u + 1}) = r := by
-  let A : CMatrix PUnit.{u + 1} := Matrix.of fun _ _ => ((r : ℝ) : ℂ)
-  have hgram :
-      Aᴴ * A =
-        (Matrix.of fun _ _ : PUnit.{u + 1} => ((r * r : ℝ) : ℂ) :
-          CMatrix PUnit.{u + 1}) := by
-    ext i j
-    cases i
-    cases j
-    simp [A, Matrix.mul_apply, Matrix.of_apply, ← Complex.ofReal_mul]
-  have hsqrt : psdSqrt (Aᴴ * A) = A := by
-    rw [hgram]
-    rw [punit_psdSqrt_const (r * r) (mul_self_nonneg r)]
-    ext i j
-    cases i
-    cases j
-    simp [A, Matrix.of_apply, Real.sqrt_mul_self hr]
-  rw [traceNorm, hsqrt]
-  simp [A, Matrix.of_apply, Matrix.trace]
 
 private theorem punit_subnormalized_matrix_eq_trace
     (ρ : SubnormalizedState PUnit.{u + 1}) :
@@ -633,23 +576,22 @@ theorem SubnormalizedState.purifiedBall_trace_lower_bound
     (sq_le_sq₀ hleft_nonneg (Real.sqrt_nonneg σ.matrix.trace.re)).mpr hsqrt_le
   rwa [Real.sq_sqrt σ.trace_nonneg] at hsquare
 
-@[simp]
-theorem State.purifiedDistance_self (ρ : State a) :
+theorem _root_.MState.purifiedDistance_self (ρ : MState a) :
     ρ.purifiedDistance ρ = 0 := by
-  rw [State.purifiedDistance_eq, State.squaredFidelity_self_eq_traceNorm_matrix_sq,
-    traceNorm_posSemidef_eq_trace_re ρ.matrix ρ.pos]
-  have htrace : ρ.matrix.trace.re = 1 := by
-    rw [ρ.trace_eq_one]
+  rw [MState.purifiedDistance_eq, MState.squaredFidelity_self_eq_traceNorm_matrix_sq,
+    traceNorm_posSemidef_eq_trace_re ρ.m ρ.psd]
+  have htrace : ρ.m.trace.re = 1 := by
+    rw [ρ.tr']
     norm_num
   rw [htrace]
   norm_num
 
 /-- Every normalized state lies in its own purified-distance ball for every
 nonnegative radius. -/
-theorem State.purifiedBall_self_of_nonneg
-    (ρ : State a) {ε : ℝ} (hε : 0 ≤ ε) :
+theorem _root_.MState.purifiedBall_self_of_nonneg
+    (ρ : MState a) {ε : ℝ} (hε : 0 ≤ ε) :
     ρ.purifiedBall ε ρ := by
-  rw [State.purifiedBall_eq, State.purifiedDistance_self]
+  rw [MState.purifiedBall_eq, MState.purifiedDistance_self]
   exact hε
 
 /-- The zero-radius purified-distance ball of a normalized state is the
@@ -657,28 +599,27 @@ singleton containing the center.
 
 This is the normalized-state specialization of
 [Tomamichel2015FiniteResources, calculus.tex:398-411]. -/
-theorem State.purifiedBall_zero_iff_eq (ρ σ : State a) :
+theorem _root_.MState.purifiedBall_zero_iff_eq (ρ σ : MState a) :
     ρ.purifiedBall 0 σ ↔ ρ = σ := by
   constructor
   · intro hball
     have hdist_nonneg : 0 ≤ ρ.purifiedDistance σ := by
-      rw [State.purifiedDistance_eq]
+      rw [MState.purifiedDistance_eq]
       exact Real.sqrt_nonneg _
     have hdist : ρ.purifiedDistance σ = 0 := le_antisymm hball hdist_nonneg
     have htrace_le_zero : ρ.normalizedTraceDistance σ ≤ 0 := by
       calc
         ρ.normalizedTraceDistance σ ≤ ρ.purifiedDistance σ :=
-          State.fuchs_van_de_graaf_upper ρ σ
+          MState.fuchs_van_de_graaf_upper ρ σ
         _ = 0 := hdist
     have htrace_nonneg : 0 ≤ ρ.normalizedTraceDistance σ :=
-      State.normalizedTraceDistance_nonneg ρ σ
+      MState.normalizedTraceDistance_nonneg ρ σ
     have htrace : ρ.normalizedTraceDistance σ = 0 :=
       le_antisymm htrace_le_zero htrace_nonneg
-    exact State.eq_of_normalizedTraceDistance_eq_zero htrace
+    exact MState.eq_of_normalizedTraceDistance_eq_zero htrace
   · intro h
-    simpa [h] using State.purifiedBall_self_of_nonneg σ (le_refl (0 : ℝ))
+    simpa [h] using MState.purifiedBall_self_of_nonneg σ (le_refl (0 : ℝ))
 
-@[simp]
 theorem SubnormalizedState.generalizedFidelity_self
     (ρ : SubnormalizedState a) :
     ρ.generalizedFidelity ρ = 1 := by
@@ -694,7 +635,6 @@ theorem SubnormalizedState.generalizedFidelity_self
   rw [hfail]
   ring
 
-@[simp]
 theorem SubnormalizedState.purifiedDistance_self
     (ρ : SubnormalizedState a) :
     ρ.purifiedDistance ρ = 0 := by
@@ -718,12 +658,12 @@ theorem SubnormalizedState.purifiedBall_zero_iff_eq (ρ σ : SubnormalizedState 
     ρ.purifiedBall 0 σ ↔ ρ = σ := by
   constructor
   · intro hball
-    let ρhat : State (Sum PUnit.{u + 1} a) := ρ.hatExtension
-    let σhat : State (Sum PUnit.{u + 1} a) := σ.hatExtension
+    let ρhat : MState (PUnit.{u + 1} ⊕ a) := ρ.hatExtension
+    let σhat : MState (PUnit.{u + 1} ⊕ a) := σ.hatExtension
     have hhat : ρhat.purifiedBall 0 σhat := by
       simpa [ρhat, σhat] using
         (SubnormalizedState.purifiedBall_iff_hatExtension_purifiedBall ρ σ 0).mp hball
-    have hhatEq : ρhat = σhat := (State.purifiedBall_zero_iff_eq ρhat σhat).mp hhat
+    have hhatEq : ρhat = σhat := (MState.purifiedBall_zero_iff_eq ρhat σhat).mp hhat
     exact SubnormalizedState.eq_of_hatExtension_eq (by simpa [ρhat, σhat] using hhatEq)
   · intro h
     simpa [h] using SubnormalizedState.purifiedBall_self_of_nonneg σ (le_refl (0 : ℝ))
@@ -781,57 +721,57 @@ lower bound on generalized fidelity of subnormalized states. -/
 theorem SubnormalizedState.le_generalizedFidelity_of_hatExtension_purification_overlap
     {r : Type v} [Fintype r] [DecidableEq r]
     (ρ σ : SubnormalizedState a)
-    {Ψ Φ : PureVector (Prod r (Sum PUnit.{max u v + 1} a))}
+    {Ψ Φ : Ket (r × (PUnit.{max u v + 1} ⊕ a))}
     (hΨ : Ψ.Purifies ρ.hatExtension) (hΦ : Φ.Purifies σ.hatExtension)
     {t : ℝ} (hoverlap : t ≤ Ψ.overlapSq Φ) :
     t ≤ ρ.generalizedFidelity σ := by
   rw [SubnormalizedState.generalizedFidelity_eq_squaredFidelity_hatExtension]
   exact le_trans hoverlap
-    (PureVector.overlapSq_le_squaredFidelity_of_purifies hΨ hΦ)
+    (Ket.overlapSq_le_squaredFidelity_of_purifies hΨ hΦ)
 
 /-- Purified distance cannot increase after tracing out the second subsystem of
 subnormalized bipartite states. -/
-theorem SubnormalizedState.purifiedDistance_marginalA_le
+theorem SubnormalizedState.purifiedDistance_traceRight_le
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ σ : SubnormalizedState (Prod a b)) :
-    ρ.marginalA.purifiedDistance σ.marginalA ≤ ρ.purifiedDistance σ := by
-  simpa [SubnormalizedState.marginalA, SubnormalizedState.applyTraceNonincreasingCP]
+    (ρ σ : SubnormalizedState (a × b)) :
+    ρ.traceRight.purifiedDistance σ.traceRight ≤ ρ.purifiedDistance σ := by
+  simpa [SubnormalizedState.traceRight, SubnormalizedState.applyTraceNonincreasingCP]
     using SubnormalizedState.purifiedDistance_mono_traceNonincreasingCP ρ σ
-      (MatrixMap.partialTraceB a b) (MatrixMap.partialTraceB_traceNonincreasingCP (a := a) (b := b))
+      (MatrixMap.traceRight a b) (MatrixMap.traceRight_traceNonincreasingCP (a := a) (b := b))
 
 /-- Purified balls are monotone under tracing out the second subsystem of
 subnormalized bipartite states. -/
-theorem SubnormalizedState.purifiedBall_marginalA_of_purifiedBall
+theorem SubnormalizedState.purifiedBall_traceRight_of_purifiedBall
     {b : Type v} [Fintype b] [DecidableEq b]
-    {ρ σ : SubnormalizedState (Prod a b)} {ε : ℝ}
+    {ρ σ : SubnormalizedState (a × b)} {ε : ℝ}
     (hball : ρ.purifiedBall ε σ) :
-    ρ.marginalA.purifiedBall ε σ.marginalA :=
-  le_trans (SubnormalizedState.purifiedDistance_marginalA_le ρ σ) hball
+    ρ.traceRight.purifiedBall ε σ.traceRight :=
+  le_trans (SubnormalizedState.purifiedDistance_traceRight_le ρ σ) hball
 
 /-- Purified distance cannot increase after tracing out the first subsystem of
 subnormalized bipartite states. -/
-theorem SubnormalizedState.purifiedDistance_marginalB_le
+theorem SubnormalizedState.purifiedDistance_traceLeft_le
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ σ : SubnormalizedState (Prod a b)) :
-    ρ.marginalB.purifiedDistance σ.marginalB ≤ ρ.purifiedDistance σ := by
-  simpa [SubnormalizedState.marginalB, SubnormalizedState.applyTraceNonincreasingCP]
+    (ρ σ : SubnormalizedState (a × b)) :
+    ρ.traceLeft.purifiedDistance σ.traceLeft ≤ ρ.purifiedDistance σ := by
+  simpa [SubnormalizedState.traceLeft, SubnormalizedState.applyTraceNonincreasingCP]
     using SubnormalizedState.purifiedDistance_mono_traceNonincreasingCP ρ σ
-      (MatrixMap.partialTraceA a b) (MatrixMap.partialTraceA_traceNonincreasingCP (a := a) (b := b))
+      (MatrixMap.traceLeft a b) (MatrixMap.traceLeft_traceNonincreasingCP (a := a) (b := b))
 
 /-- Purified balls are monotone under tracing out the first subsystem of
 subnormalized bipartite states. -/
-theorem SubnormalizedState.purifiedBall_marginalB_of_purifiedBall
+theorem SubnormalizedState.purifiedBall_traceLeft_of_purifiedBall
     {b : Type v} [Fintype b] [DecidableEq b]
-    {ρ σ : SubnormalizedState (Prod a b)} {ε : ℝ}
+    {ρ σ : SubnormalizedState (a × b)} {ε : ℝ}
     (hball : ρ.purifiedBall ε σ) :
-    ρ.marginalB.purifiedBall ε σ.marginalB :=
-  le_trans (SubnormalizedState.purifiedDistance_marginalB_le ρ σ) hball
+    ρ.traceLeft.purifiedBall ε σ.traceLeft :=
+  le_trans (SubnormalizedState.purifiedDistance_traceLeft_le ρ σ) hball
 
 /-- Purified distance cannot increase under classical diagonal-block
 compression. -/
 theorem SubnormalizedState.purifiedDistance_blockCompression_le
     {ι : Type*} {β : Type*} [Fintype ι] [DecidableEq ι] [Fintype β] [DecidableEq β]
-    (i : ι) (ρ σ : SubnormalizedState (Prod ι β)) :
+    (i : ι) (ρ σ : SubnormalizedState (ι × β)) :
     (ρ.applyTraceNonincreasingCP (MatrixMap.blockCompression (β := β) i)
         (MatrixMap.blockCompression_traceNonincreasingCP (β := β) i)).purifiedDistance
       (σ.applyTraceNonincreasingCP (MatrixMap.blockCompression (β := β) i)
@@ -843,42 +783,42 @@ theorem SubnormalizedState.purifiedDistance_blockCompression_le
 
 /-- The success block of a normalized hat-space state, viewed as a
 subnormalized state on the original system. -/
-def State.successBlockOfHatState (τ : State (Sum PUnit.{u + 1} a)) :
+def _root_.MState.successBlockOfHatState (τ : MState (PUnit.{u + 1} ⊕ a)) :
     SubnormalizedState a :=
   τ.toSubnormalized.applyTraceNonincreasingCP
     (MatrixMap.sumInrCompression (α := a))
     (MatrixMap.sumInrCompression_traceNonincreasingCP (α := a))
 
 @[simp]
-theorem State.successBlockOfHatState_matrix (τ : State (Sum PUnit.{u + 1} a)) :
+theorem _root_.MState.successBlockOfHatState_matrix (τ : MState (PUnit.{u + 1} ⊕ a)) :
     τ.successBlockOfHatState.matrix =
-      (MatrixMap.sumInrCompression (α := a)) τ.matrix :=
+      (MatrixMap.sumInrCompression (α := a)) τ.m :=
   rfl
 
 /-- The success block of the hat extension is the original subnormalized
 state. -/
 theorem SubnormalizedState.successBlockOf_hatExtension_eq (ρ : SubnormalizedState a) :
     ρ.hatExtension.successBlockOfHatState = ρ := by
-  simpa [State.successBlockOfHatState, SubnormalizedState.dropHatExtension]
+  simpa [MState.successBlockOfHatState, SubnormalizedState.dropHatExtension]
     using ρ.dropHatExtension_eq
 
 /-- A normalized candidate in the hat-space purified ball compresses to a
 subnormalized candidate in the original purified ball. -/
 theorem SubnormalizedState.successBlockOfHatState_purifiedBall_of_hat_purifiedBall
-    {ρ : SubnormalizedState a} {τ : State (Sum PUnit.{u + 1} a)} {ε : ℝ}
+    {ρ : SubnormalizedState a} {τ : MState (PUnit.{u + 1} ⊕ a)} {ε : ℝ}
     (hball : ρ.hatExtension.purifiedBall ε τ) :
     ρ.purifiedBall ε τ.successBlockOfHatState := by
   have hsub :
       ρ.hatExtension.toSubnormalized.purifiedBall ε τ.toSubnormalized := by
     change ρ.hatExtension.toSubnormalized.purifiedDistance τ.toSubnormalized ≤ ε
-    rw [State.toSubnormalized_purifiedDistance_eq]
+    rw [MState.toSubnormalized_purifiedDistance_eq]
     exact hball
   have hcompressed :
       (ρ.hatExtension.toSubnormalized.applyTraceNonincreasingCP
           (MatrixMap.sumInrCompression (α := a))
           (MatrixMap.sumInrCompression_traceNonincreasingCP (α := a))).purifiedBall ε
         τ.successBlockOfHatState := by
-    simpa [State.successBlockOfHatState] using
+    simpa [MState.successBlockOfHatState] using
       (SubnormalizedState.purifiedBall_of_traceNonincreasingCP
         (ρ := ρ.hatExtension.toSubnormalized) (σ := τ.toSubnormalized)
         (ε := ε) (MatrixMap.sumInrCompression (α := a))
@@ -890,14 +830,18 @@ theorem SubnormalizedState.successBlockOfHatState_purifiedBall_of_hat_purifiedBa
     SubnormalizedState.successBlockOf_hatExtension_eq ρ
   rwa [hEq] at hcompressed
 
-namespace State
+end QIT
+
+namespace MState
+
+variable {b : Type v} [Fintype b] [DecidableEq b]
 
 /-- Normalized purified balls are exactly the subnormalized purified balls after
-embedding normalized states via `State.toSubnormalized`. -/
-theorem purifiedBall_iff_toSubnormalized_purifiedBall (ρ σ : State a) (ε : ℝ) :
+embedding normalized states via `MState.toSubnormalized`. -/
+theorem purifiedBall_iff_toSubnormalized_purifiedBall (ρ σ : MState a) (ε : ℝ) :
     ρ.purifiedBall ε σ ↔
       ρ.toSubnormalized.purifiedBall ε σ.toSubnormalized := by
-  rw [State.purifiedBall_eq, SubnormalizedState.purifiedBall_eq,
+  rw [MState.purifiedBall_eq, SubnormalizedState.purifiedBall_eq,
     toSubnormalized_purifiedDistance_eq]
 
 /-! ## Conditional min/max entropy definitions -/
@@ -907,23 +851,22 @@ variable {b : Type v} [Fintype b] [DecidableEq b]
 /-- Conditional min-entropy as the supremum of feasible exponents.
 
 This is the normalized-state version of the Tomamichel finite-resources
-definition; the subnormalized-state generalization is deliberately left to a
-later extension. -/
-def conditionalMinEntropy (ρ : State (Prod a b)) : ℝ :=
-  sSup {lam : ℝ | ∃ σ : State b, ConditionalMinEntropyFeasible (a := a) ρ σ lam}
+definition. -/
+def conditionalMinEntropy (ρ : MState (a × b)) : ℝ :=
+  sSup {lam : ℝ | ∃ σ : MState b, ConditionalMinEntropyFeasible (a := a) ρ σ lam}
 
 @[simp]
-theorem conditionalMinEntropy_eq (ρ : State (Prod a b)) :
+theorem conditionalMinEntropy_eq (ρ : MState (a × b)) :
     ρ.conditionalMinEntropy =
-      sSup {lam : ℝ | ∃ σ : State b, ConditionalMinEntropyFeasible (a := a) ρ σ lam} :=
+      sSup {lam : ℝ | ∃ σ : MState b, ConditionalMinEntropyFeasible (a := a) ρ σ lam} :=
   rfl
 
 /-- The candidate value `log₂ F(ρ_AB, I_A ⊗ σ_B)` for conditional max-entropy.
 
 The second argument is positive but not normalized in general, so this uses the
-matrix square-root/trace-norm expression directly rather than `State.fidelity`.
+matrix square-root/trace-norm expression directly rather than `MState.fidelity`.
 The square matches the squared-fidelity convention used elsewhere in QIT. -/
-def conditionalMaxEntropyCandidate (ρ : State (Prod a b)) (σ : State b) : ℝ :=
+def conditionalMaxEntropyCandidate (ρ : MState (a × b)) (σ : MState b) : ℝ :=
   log2 ((traceNorm (ρ.sqrtMatrix *
     psdSqrt (identityTensorStateMatrix (a := a) σ))) ^ 2)
 
@@ -933,16 +876,16 @@ definition-level max-entropy candidate with strictly positive endpoint value.
 The positivity guard is the finite-real-valued replacement for the usual
 extended-real convention `log 0 = -∞`: Lean's total real logarithm has
 `log 0 = 0`, so zero endpoint candidates must not contribute to the supremum. -/
-def conditionalMaxEntropy (ρ : State (Prod a b)) : ℝ :=
-  sSup {h : ℝ | ∃ σ : State b,
+def conditionalMaxEntropy (ρ : MState (a × b)) : ℝ :=
+  sSup {h : ℝ | ∃ σ : MState b,
     0 < (traceNorm (ρ.sqrtMatrix *
       psdSqrt (identityTensorStateMatrix (a := a) σ))) ^ 2 ∧
       h = conditionalMaxEntropyCandidate (a := a) ρ σ}
 
 @[simp]
-theorem conditionalMaxEntropy_eq (ρ : State (Prod a b)) :
+theorem conditionalMaxEntropy_eq (ρ : MState (a × b)) :
     ρ.conditionalMaxEntropy =
-      sSup {h : ℝ | ∃ σ : State b,
+      sSup {h : ℝ | ∃ σ : MState b,
         0 < (traceNorm (ρ.sqrtMatrix *
           psdSqrt (identityTensorStateMatrix (a := a) σ))) ^ 2 ∧
           h = conditionalMaxEntropyCandidate (a := a) ρ σ} :=
@@ -952,30 +895,30 @@ theorem conditionalMaxEntropy_eq (ρ : State (Prod a b)) :
 
 /-- Normalized-state candidate values for the explicit normalized-candidate
 smooth min-entropy variant at smoothing radius `ε`. -/
-def SmoothConditionalMinEntropyCandidate (ρ : State (Prod a b)) (ε h : ℝ) : Prop :=
-  ∃ ρ' : State (Prod a b), ρ.purifiedBall ε ρ' ∧ h = ρ'.conditionalMinEntropy
+def SmoothConditionalMinEntropyCandidate (ρ : MState (a × b)) (ε h : ℝ) : Prop :=
+  ∃ ρ' : MState (a × b), ρ.purifiedBall ε ρ' ∧ h = ρ'.conditionalMinEntropy
 
 @[simp]
-theorem SmoothConditionalMinEntropyCandidate_eq (ρ : State (Prod a b)) (ε h : ℝ) :
+theorem SmoothConditionalMinEntropyCandidate_eq (ρ : MState (a × b)) (ε h : ℝ) :
     SmoothConditionalMinEntropyCandidate (a := a) ρ ε h ↔
-      ∃ ρ' : State (Prod a b), ρ.purifiedBall ε ρ' ∧
+      ∃ ρ' : MState (a × b), ρ.purifiedBall ε ρ' ∧
         h = ρ'.conditionalMinEntropy :=
   Iff.rfl
 
 /-- Normalized-state candidate values for the explicit normalized-candidate
 smooth max-entropy variant at smoothing radius `ε`. -/
-def SmoothConditionalMaxEntropyCandidate (ρ : State (Prod a b)) (ε h : ℝ) : Prop :=
-  ∃ ρ' : State (Prod a b), ρ.purifiedBall ε ρ' ∧ h = ρ'.conditionalMaxEntropy
+def SmoothConditionalMaxEntropyCandidate (ρ : MState (a × b)) (ε h : ℝ) : Prop :=
+  ∃ ρ' : MState (a × b), ρ.purifiedBall ε ρ' ∧ h = ρ'.conditionalMaxEntropy
 
 @[simp]
-theorem SmoothConditionalMaxEntropyCandidate_eq (ρ : State (Prod a b)) (ε h : ℝ) :
+theorem SmoothConditionalMaxEntropyCandidate_eq (ρ : MState (a × b)) (ε h : ℝ) :
     SmoothConditionalMaxEntropyCandidate (a := a) ρ ε h ↔
-      ∃ ρ' : State (Prod a b), ρ.purifiedBall ε ρ' ∧
+      ∃ ρ' : MState (a × b), ρ.purifiedBall ε ρ' ∧
         h = ρ'.conditionalMaxEntropy :=
   Iff.rfl
 
 /-- Smooth min-entropy candidates are monotone in the smoothing radius. -/
-theorem SmoothConditionalMinEntropyCandidate_mono {ρ : State (Prod a b)} {ε δ h : ℝ}
+theorem SmoothConditionalMinEntropyCandidate_mono {ρ : MState (a × b)} {ε δ h : ℝ}
     (hεδ : ε ≤ δ) :
     SmoothConditionalMinEntropyCandidate (a := a) ρ ε h →
       SmoothConditionalMinEntropyCandidate (a := a) ρ δ h := by
@@ -983,7 +926,7 @@ theorem SmoothConditionalMinEntropyCandidate_mono {ρ : State (Prod a b)} {ε δ
   exact ⟨ρ', purifiedBall_mono hεδ hball, hh⟩
 
 /-- Smooth max-entropy candidates are monotone in the smoothing radius. -/
-theorem SmoothConditionalMaxEntropyCandidate_mono {ρ : State (Prod a b)} {ε δ h : ℝ}
+theorem SmoothConditionalMaxEntropyCandidate_mono {ρ : MState (a × b)} {ε δ h : ℝ}
     (hεδ : ε ≤ δ) :
     SmoothConditionalMaxEntropyCandidate (a := a) ρ ε h →
       SmoothConditionalMaxEntropyCandidate (a := a) ρ δ h := by
@@ -993,94 +936,98 @@ theorem SmoothConditionalMaxEntropyCandidate_mono {ρ : State (Prod a b)} {ε δ
 /-- Normalized-candidate variant of smooth conditional min-entropy. Unlike the
 Tomamichel source convention, this supremum ranges only over normalized states. -/
 def smoothConditionalMinEntropyNormalizedCandidates
-    (ρ : State (Prod a b)) (ε : ℝ) : ℝ :=
+    (ρ : MState (a × b)) (ε : ℝ) : ℝ :=
   sSup {h : ℝ | SmoothConditionalMinEntropyCandidate (a := a) ρ ε h}
 
 theorem smoothConditionalMinEntropyNormalizedCandidates_eq_sSup_candidates
-    (ρ : State (Prod a b)) (ε : ℝ) :
+    (ρ : MState (a × b)) (ε : ℝ) :
     ρ.smoothConditionalMinEntropyNormalizedCandidates ε =
       sSup {h : ℝ | SmoothConditionalMinEntropyCandidate (a := a) ρ ε h} :=
   rfl
 
 @[simp]
 theorem smoothConditionalMinEntropyNormalizedCandidates_eq
-    (ρ : State (Prod a b)) (ε : ℝ) :
+    (ρ : MState (a × b)) (ε : ℝ) :
     ρ.smoothConditionalMinEntropyNormalizedCandidates ε =
       sSup {h : ℝ |
-        ∃ ρ' : State (Prod a b), ρ.purifiedBall ε ρ' ∧
+        ∃ ρ' : MState (a × b), ρ.purifiedBall ε ρ' ∧
           h = ρ'.conditionalMinEntropy} :=
   rfl
 
 /-- Normalized-candidate variant of smooth conditional max-entropy. Unlike the
 Tomamichel source convention, this infimum ranges only over normalized states. -/
 def smoothConditionalMaxEntropyNormalizedCandidates
-    (ρ : State (Prod a b)) (ε : ℝ) : ℝ :=
+    (ρ : MState (a × b)) (ε : ℝ) : ℝ :=
   sInf {h : ℝ | SmoothConditionalMaxEntropyCandidate (a := a) ρ ε h}
 
 theorem smoothConditionalMaxEntropyNormalizedCandidates_eq_sInf_candidates
-    (ρ : State (Prod a b)) (ε : ℝ) :
+    (ρ : MState (a × b)) (ε : ℝ) :
     ρ.smoothConditionalMaxEntropyNormalizedCandidates ε =
       sInf {h : ℝ | SmoothConditionalMaxEntropyCandidate (a := a) ρ ε h} :=
   rfl
 
 @[simp]
 theorem smoothConditionalMaxEntropyNormalizedCandidates_eq
-    (ρ : State (Prod a b)) (ε : ℝ) :
+    (ρ : MState (a × b)) (ε : ℝ) :
     ρ.smoothConditionalMaxEntropyNormalizedCandidates ε =
       sInf {h : ℝ |
-        ∃ ρ' : State (Prod a b), ρ.purifiedBall ε ρ' ∧
+        ∃ ρ' : MState (a × b), ρ.purifiedBall ε ρ' ∧
           h = ρ'.conditionalMaxEntropy} :=
   rfl
 
 /-- The normalized-candidate smooth conditional min-entropy agrees with the
 unsmoothed quantity at radius zero. -/
 theorem smoothConditionalMinEntropyNormalizedCandidates_zero
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     ρ.smoothConditionalMinEntropyNormalizedCandidates 0 =
       ρ.conditionalMinEntropy := by
-  rw [State.smoothConditionalMinEntropyNormalizedCandidates_eq]
+  rw [MState.smoothConditionalMinEntropyNormalizedCandidates_eq]
   have hset :
-      {h : ℝ | ∃ ρ' : State (Prod a b),
+      {h : ℝ | ∃ ρ' : MState (a × b),
         ρ.purifiedBall 0 ρ' ∧ h = ρ'.conditionalMinEntropy} =
         {ρ.conditionalMinEntropy} := by
     ext h
     constructor
     · rintro ⟨ρ', hball, hh⟩
       rw [Set.mem_singleton_iff]
-      have hρ' : ρ = ρ' := (State.purifiedBall_zero_iff_eq ρ ρ').mp hball
+      have hρ' : ρ = ρ' := (MState.purifiedBall_zero_iff_eq ρ ρ').mp hball
       subst ρ'
       simpa using hh
     · intro hh
       rw [Set.mem_singleton_iff] at hh
-      exact ⟨ρ, State.purifiedBall_self_of_nonneg ρ (le_refl (0 : ℝ)), hh⟩
+      exact ⟨ρ, MState.purifiedBall_self_of_nonneg ρ (le_refl (0 : ℝ)), hh⟩
   rw [hset]
   exact csSup_singleton ρ.conditionalMinEntropy
 
 /-- The normalized-candidate smooth conditional max-entropy agrees with the
 unsmoothed quantity at radius zero. -/
 theorem smoothConditionalMaxEntropyNormalizedCandidates_zero
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     ρ.smoothConditionalMaxEntropyNormalizedCandidates 0 =
       ρ.conditionalMaxEntropy := by
-  rw [State.smoothConditionalMaxEntropyNormalizedCandidates_eq]
+  rw [MState.smoothConditionalMaxEntropyNormalizedCandidates_eq]
   have hset :
-      {h : ℝ | ∃ ρ' : State (Prod a b),
+      {h : ℝ | ∃ ρ' : MState (a × b),
         ρ.purifiedBall 0 ρ' ∧ h = ρ'.conditionalMaxEntropy} =
         {ρ.conditionalMaxEntropy} := by
     ext h
     constructor
     · rintro ⟨ρ', hball, hh⟩
       rw [Set.mem_singleton_iff]
-      have hρ' : ρ = ρ' := (State.purifiedBall_zero_iff_eq ρ ρ').mp hball
+      have hρ' : ρ = ρ' := (MState.purifiedBall_zero_iff_eq ρ ρ').mp hball
       subst ρ'
       simpa using hh
     · intro hh
       rw [Set.mem_singleton_iff] at hh
-      exact ⟨ρ, State.purifiedBall_self_of_nonneg ρ (le_refl (0 : ℝ)), hh⟩
+      exact ⟨ρ, MState.purifiedBall_self_of_nonneg ρ (le_refl (0 : ℝ)), hh⟩
   rw [hset]
   exact csInf_singleton ρ.conditionalMaxEntropy
 
-end State
+end MState
+
+namespace QIT
+
+variable {b : Type v} [Fintype b] [DecidableEq b]
 
 namespace SubnormalizedState
 
@@ -1094,28 +1041,25 @@ variable {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
 /-- Apply a finite reference isometry to the conditioning/right register of a
 subnormalized state on `A × B`. -/
 def conditioningIsometryApply
-    (ρ : SubnormalizedState (Prod a b)) (V : ReferenceIsometry b bPlus) :
-    SubnormalizedState (Prod a bPlus) :=
+    (ρ : SubnormalizedState (a × b)) (V : ReferenceIsometry b bPlus) :
+    SubnormalizedState (a × bPlus) :=
   ρ.applyTraceNonincreasingCP
-    (MatrixMap.kron (Channel.idChannel a).map (MatrixMap.ofReferenceIsometry V))
+    (MatrixMap.kron (CPTPOp.id (dIn := a)).map (MatrixMap.ofReferenceIsometry V))
     (MatrixMap.traceNonincreasingCP_id_kron
       (a := a) (hΦ := MatrixMap.ofReferenceIsometry_traceNonincreasingCP V))
 
 @[simp]
 theorem conditioningIsometryApply_matrix
-    (ρ : SubnormalizedState (Prod a b)) (V : ReferenceIsometry b bPlus) :
+    (ρ : SubnormalizedState (a × b)) (V : ReferenceIsometry b bPlus) :
     (ρ.conditioningIsometryApply V).matrix = V.applyMatrixRight ρ.matrix := by
-  simp [conditioningIsometryApply,
+  simp [-CPTPOp.id_map, conditioningIsometryApply,
     MatrixMap.kron_id_ofReferenceIsometry_apply_eq_applyMatrixRight]
 
-@[simp]
 theorem conditioningIsometryApply_trace_re
-    (ρ : SubnormalizedState (Prod a b)) (V : ReferenceIsometry b bPlus) :
+    (ρ : SubnormalizedState (a × b)) (V : ReferenceIsometry b bPlus) :
     (ρ.conditioningIsometryApply V).matrix.trace.re = ρ.matrix.trace.re := by
   rw [conditioningIsometryApply, applyTraceNonincreasingCP_matrix]
-  have hTP := MatrixMap.isTracePreserving_kron (Channel.idChannel a).map
-    (MatrixMap.ofReferenceIsometry V)
-    (Channel.idChannel a).tracePreserving
+  have hTP := MatrixMap.IsTracePreserving.kron (CPTPOp.id (dIn := a)).map_TP
     (MatrixMap.ofReferenceIsometry_isTracePreserving V)
   exact congrArg Complex.re (hTP ρ.matrix)
 
@@ -1135,7 +1079,6 @@ theorem referenceIsometryApply_matrix
     (σ.referenceIsometryApply V).matrix = MatrixMap.ofReferenceIsometry V σ.matrix := by
   simp [referenceIsometryApply]
 
-@[simp]
 theorem referenceIsometryApply_trace_re
     (σ : SubnormalizedState b) (V : ReferenceIsometry b c) :
     (σ.referenceIsometryApply V).matrix.trace.re = σ.matrix.trace.re := by
@@ -1147,19 +1090,18 @@ variable {extra : Type*} [Fintype extra] [DecidableEq extra]
 /-- Compress concrete right-summand side padding back to the original side
 register. -/
 def sumInrCompressedSide
-    (σPlus : SubnormalizedState (Sum extra b)) : SubnormalizedState b :=
+    (σPlus : SubnormalizedState (extra ⊕ b)) : SubnormalizedState b :=
   σPlus.applyTraceNonincreasingCP
     (MatrixMap.sumInrBlockCompression (extra := extra) (α := b))
     (MatrixMap.sumInrBlockCompression_traceNonincreasingCP (extra := extra) (α := b))
 
 @[simp]
 theorem sumInrCompressedSide_matrix
-    (σPlus : SubnormalizedState (Sum extra b)) :
+    (σPlus : SubnormalizedState (extra ⊕ b)) :
     σPlus.sumInrCompressedSide.matrix =
       MatrixMap.sumInrBlockCompression (extra := extra) (α := b) σPlus.matrix :=
   rfl
 
-@[simp]
 theorem sumInrCompressedSide_referenceIsometryApply_sumInr_matrix
     (σ : SubnormalizedState b) :
     (σ.referenceIsometryApply (ReferenceIsometry.sumInr extra b)).sumInrCompressedSide.matrix =
@@ -1183,10 +1125,10 @@ theorem sumInrCompressedSide_referenceIsometryApply_sumInr
 /-- Compress a concrete `sumInr` conditioning-register padding back to the
 original joint register. -/
 def conditioningSumInrCompressed
-    (ρPlus : SubnormalizedState (Prod a (Sum extra b))) :
-    SubnormalizedState (Prod a b) :=
+    (ρPlus : SubnormalizedState (a × (extra ⊕ b))) :
+    SubnormalizedState (a × b) :=
   ρPlus.applyTraceNonincreasingCP
-    (MatrixMap.kron (Channel.idChannel a).map
+    (MatrixMap.kron (CPTPOp.id (dIn := a)).map
       (MatrixMap.sumInrBlockCompression (extra := extra) (α := b)))
     (MatrixMap.traceNonincreasingCP_id_kron (a := a)
       (hΦ := MatrixMap.sumInrBlockCompression_traceNonincreasingCP
@@ -1194,15 +1136,14 @@ def conditioningSumInrCompressed
 
 @[simp]
 theorem conditioningSumInrCompressed_matrix
-    (ρPlus : SubnormalizedState (Prod a (Sum extra b))) :
+    (ρPlus : SubnormalizedState (a × (extra ⊕ b))) :
     ρPlus.conditioningSumInrCompressed.matrix =
-      MatrixMap.kron (Channel.idChannel a).map
+      MatrixMap.kron (CPTPOp.id (dIn := a)).map
         (MatrixMap.sumInrBlockCompression (extra := extra) (α := b)) ρPlus.matrix :=
   rfl
 
-@[simp]
 theorem conditioningSumInrCompressed_conditioningIsometryApply_sumInr_matrix
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     ((ρ.conditioningIsometryApply (ReferenceIsometry.sumInr extra b)).conditioningSumInrCompressed).matrix =
       ρ.matrix := by
   ext x y
@@ -1214,7 +1155,7 @@ theorem conditioningSumInrCompressed_conditioningIsometryApply_sumInr_matrix
 
 @[simp]
 theorem conditioningSumInrCompressed_conditioningIsometryApply_sumInr
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     (ρ.conditioningIsometryApply (ReferenceIsometry.sumInr extra b)).conditioningSumInrCompressed =
       ρ := by
   exact SubnormalizedState.ext
@@ -1228,12 +1169,12 @@ theorem conditioningSumInrCompressed_conditioningIsometryApply_sumInr
 This helper is not the canonical endpoint API: `sSup` totalizes the zero-state
 branch in `ℝ`.  Source-facing code must use `conditionalMinEntropy`, or
 `conditionalMinEntropyFinite` after supplying a nonzero-state proof. -/
-def conditionalMinEntropyRaw (ρ : SubnormalizedState (Prod a b)) : ℝ :=
+def conditionalMinEntropyRaw (ρ : SubnormalizedState (a × b)) : ℝ :=
   sSup {lam : ℝ | ∃ σ : SubnormalizedState b,
     ConditionalMinEntropyFeasible (a := a) ρ σ lam}
 
 @[simp]
-theorem conditionalMinEntropyRaw_eq (ρ : SubnormalizedState (Prod a b)) :
+theorem conditionalMinEntropyRaw_eq (ρ : SubnormalizedState (a × b)) :
     ρ.conditionalMinEntropyRaw =
       sSup {lam : ℝ | ∃ σ : SubnormalizedState b,
         ConditionalMinEntropyFeasible (a := a) ρ σ lam} :=
@@ -1244,7 +1185,7 @@ theorem conditionalMinEntropyRaw_eq (ρ : SubnormalizedState (Prod a b)) :
 The nonzero proof prevents callers from silently projecting the canonical
 extended-real zero-state value `⊤` to an arbitrary real number. -/
 def conditionalMinEntropyFinite
-    (ρ : SubnormalizedState (Prod a b)) (_hρ : ρ.matrix ≠ 0) : ℝ :=
+    (ρ : SubnormalizedState (a × b)) (_hρ : ρ.matrix ≠ 0) : ℝ :=
   ρ.conditionalMinEntropyRaw
 
 /-- A positive real trace rules out the zero subnormalized state. -/
@@ -1256,18 +1197,18 @@ theorem matrix_ne_zero_of_trace_re_pos
 
 /-- Canonical subnormalized conditional min-entropy.  The zero state has value
 `⊤`; every nonzero state uses the finite real branch. -/
-def conditionalMinEntropy (ρ : SubnormalizedState (Prod a b)) : EReal :=
+def conditionalMinEntropy (ρ : SubnormalizedState (a × b)) : EReal :=
   if hρ : ρ.matrix = 0 then ⊤ else (ρ.conditionalMinEntropyFinite hρ : EReal)
 
 @[simp]
 theorem conditionalMinEntropy_eq_top_of_matrix_eq_zero
-    {ρ : SubnormalizedState (Prod a b)} (hρ : ρ.matrix = 0) :
+    {ρ : SubnormalizedState (a × b)} (hρ : ρ.matrix = 0) :
     ρ.conditionalMinEntropy = ⊤ := by
   simp [conditionalMinEntropy, hρ]
 
 @[simp]
 theorem conditionalMinEntropy_eq_coe_finite_of_matrix_ne_zero
-    {ρ : SubnormalizedState (Prod a b)} (hρ : ρ.matrix ≠ 0) :
+    {ρ : SubnormalizedState (a × b)} (hρ : ρ.matrix ≠ 0) :
     ρ.conditionalMinEntropy = (ρ.conditionalMinEntropyFinite hρ : EReal) := by
   simp [conditionalMinEntropy, hρ]
 
@@ -1277,7 +1218,7 @@ subnormalized conditional max-entropy.
 The second matrix `I_A ⊗ σ_B` need not be subnormalized, so this definition uses
 the explicit trace-norm square convention rather than `generalizedFidelity`. -/
 def conditionalMaxEntropyFidelityCandidate
-    (ρ : SubnormalizedState (Prod a b)) (σ : SubnormalizedState b) : ℝ :=
+    (ρ : SubnormalizedState (a × b)) (σ : SubnormalizedState b) : ℝ :=
   log2 ((traceNorm (psdSqrt ρ.matrix *
     psdSqrt (identityTensorStateMatrix (a := a) σ))) ^ 2)
 
@@ -1286,14 +1227,14 @@ def conditionalMaxEntropyFidelityCandidate
 The positivity guard removes `log 0` candidates, but `sSup ∅` still totalizes
 the zero state in `ℝ`.  Source-facing code must use `conditionalMaxEntropy`, or
 `conditionalMaxEntropyFinite` after supplying a nonzero-state proof. -/
-def conditionalMaxEntropyRaw (ρ : SubnormalizedState (Prod a b)) : ℝ :=
+def conditionalMaxEntropyRaw (ρ : SubnormalizedState (a × b)) : ℝ :=
   sSup {h : ℝ | ∃ σ : SubnormalizedState b,
     0 < (traceNorm (psdSqrt ρ.matrix *
       psdSqrt (identityTensorStateMatrix (a := a) σ))) ^ 2 ∧
       h = conditionalMaxEntropyFidelityCandidate (a := a) ρ σ}
 
 @[simp]
-theorem conditionalMaxEntropyRaw_eq (ρ : SubnormalizedState (Prod a b)) :
+theorem conditionalMaxEntropyRaw_eq (ρ : SubnormalizedState (a × b)) :
     ρ.conditionalMaxEntropyRaw =
       sSup {h : ℝ | ∃ σ : SubnormalizedState b,
         0 < (traceNorm (psdSqrt ρ.matrix *
@@ -1306,23 +1247,23 @@ theorem conditionalMaxEntropyRaw_eq (ρ : SubnormalizedState (Prod a b)) :
 The nonzero proof prevents callers from silently projecting the canonical
 extended-real zero-state value `⊥` to an arbitrary real number. -/
 def conditionalMaxEntropyFinite
-    (ρ : SubnormalizedState (Prod a b)) (_hρ : ρ.matrix ≠ 0) : ℝ :=
+    (ρ : SubnormalizedState (a × b)) (_hρ : ρ.matrix ≠ 0) : ℝ :=
   ρ.conditionalMaxEntropyRaw
 
 /-- Canonical subnormalized conditional max-entropy.  The zero state has value
 `⊥`; every nonzero state uses the finite real branch. -/
-def conditionalMaxEntropy (ρ : SubnormalizedState (Prod a b)) : EReal :=
+def conditionalMaxEntropy (ρ : SubnormalizedState (a × b)) : EReal :=
   if hρ : ρ.matrix = 0 then ⊥ else (ρ.conditionalMaxEntropyFinite hρ : EReal)
 
 @[simp]
 theorem conditionalMaxEntropy_eq_bot_of_matrix_eq_zero
-    {ρ : SubnormalizedState (Prod a b)} (hρ : ρ.matrix = 0) :
+    {ρ : SubnormalizedState (a × b)} (hρ : ρ.matrix = 0) :
     ρ.conditionalMaxEntropy = ⊥ := by
   simp [conditionalMaxEntropy, hρ]
 
 @[simp]
 theorem conditionalMaxEntropy_eq_coe_finite_of_matrix_ne_zero
-    {ρ : SubnormalizedState (Prod a b)} (hρ : ρ.matrix ≠ 0) :
+    {ρ : SubnormalizedState (a × b)} (hρ : ρ.matrix ≠ 0) :
     ρ.conditionalMaxEntropy = (ρ.conditionalMaxEntropyFinite hρ : EReal) := by
   simp [conditionalMaxEntropy, hρ]
 
@@ -1331,30 +1272,30 @@ theorem conditionalMaxEntropy_eq_coe_finite_of_matrix_ne_zero
 /-- Candidate values for subnormalized smooth conditional min-entropy at
 smoothing radius `ε`. -/
 def SmoothConditionalMinEntropyCandidateRaw
-    (ρ : SubnormalizedState (Prod a b)) (ε h : ℝ) : Prop :=
-  ∃ ρ' : SubnormalizedState (Prod a b),
+    (ρ : SubnormalizedState (a × b)) (ε h : ℝ) : Prop :=
+  ∃ ρ' : SubnormalizedState (a × b),
     ρ.purifiedBall ε ρ' ∧ h = ρ'.conditionalMinEntropyRaw
 
 @[simp]
 theorem SmoothConditionalMinEntropyCandidateRaw_eq
-    (ρ : SubnormalizedState (Prod a b)) (ε h : ℝ) :
+    (ρ : SubnormalizedState (a × b)) (ε h : ℝ) :
     SmoothConditionalMinEntropyCandidateRaw (a := a) ρ ε h ↔
-      ∃ ρ' : SubnormalizedState (Prod a b),
+      ∃ ρ' : SubnormalizedState (a × b),
         ρ.purifiedBall ε ρ' ∧ h = ρ'.conditionalMinEntropyRaw :=
   Iff.rfl
 
 /-- Candidate values for subnormalized smooth conditional max-entropy at
 smoothing radius `ε`. -/
 def SmoothConditionalMaxEntropyCandidateRaw
-    (ρ : SubnormalizedState (Prod a b)) (ε h : ℝ) : Prop :=
-  ∃ ρ' : SubnormalizedState (Prod a b),
+    (ρ : SubnormalizedState (a × b)) (ε h : ℝ) : Prop :=
+  ∃ ρ' : SubnormalizedState (a × b),
     ρ.purifiedBall ε ρ' ∧ h = ρ'.conditionalMaxEntropyRaw
 
 @[simp]
 theorem SmoothConditionalMaxEntropyCandidateRaw_eq
-    (ρ : SubnormalizedState (Prod a b)) (ε h : ℝ) :
+    (ρ : SubnormalizedState (a × b)) (ε h : ℝ) :
     SmoothConditionalMaxEntropyCandidateRaw (a := a) ρ ε h ↔
-      ∃ ρ' : SubnormalizedState (Prod a b),
+      ∃ ρ' : SubnormalizedState (a × b),
         ρ.purifiedBall ε ρ' ∧ h = ρ'.conditionalMaxEntropyRaw :=
   Iff.rfl
 
@@ -1363,15 +1304,15 @@ theorem SmoothConditionalMaxEntropyCandidateRaw_eq
 The nonzero witness makes the finite branch explicit and prevents the
 canonical zero-state value `⊤` from being projected to `ℝ`. -/
 def SmoothConditionalMinEntropyCandidate
-    (ρ : SubnormalizedState (Prod a b)) (ε h : ℝ) : Prop :=
-  ∃ ρ' : SubnormalizedState (Prod a b), ∃ hρ' : ρ'.matrix ≠ 0,
+    (ρ : SubnormalizedState (a × b)) (ε h : ℝ) : Prop :=
+  ∃ ρ' : SubnormalizedState (a × b), ∃ hρ' : ρ'.matrix ≠ 0,
     ρ.purifiedBall ε ρ' ∧ h = ρ'.conditionalMinEntropyFinite hρ'
 
 @[simp]
 theorem SmoothConditionalMinEntropyCandidate_eq
-    (ρ : SubnormalizedState (Prod a b)) (ε h : ℝ) :
+    (ρ : SubnormalizedState (a × b)) (ε h : ℝ) :
     SmoothConditionalMinEntropyCandidate (a := a) ρ ε h ↔
-      ∃ ρ' : SubnormalizedState (Prod a b), ∃ hρ' : ρ'.matrix ≠ 0,
+      ∃ ρ' : SubnormalizedState (a × b), ∃ hρ' : ρ'.matrix ≠ 0,
         ρ.purifiedBall ε ρ' ∧ h = ρ'.conditionalMinEntropyFinite hρ' :=
   Iff.rfl
 
@@ -1380,22 +1321,22 @@ theorem SmoothConditionalMinEntropyCandidate_eq
 The nonzero witness makes the finite branch explicit and prevents the
 canonical zero-state value `⊥` from being projected to `ℝ`. -/
 def SmoothConditionalMaxEntropyCandidate
-    (ρ : SubnormalizedState (Prod a b)) (ε h : ℝ) : Prop :=
-  ∃ ρ' : SubnormalizedState (Prod a b), ∃ hρ' : ρ'.matrix ≠ 0,
+    (ρ : SubnormalizedState (a × b)) (ε h : ℝ) : Prop :=
+  ∃ ρ' : SubnormalizedState (a × b), ∃ hρ' : ρ'.matrix ≠ 0,
     ρ.purifiedBall ε ρ' ∧ h = ρ'.conditionalMaxEntropyFinite hρ'
 
 @[simp]
 theorem SmoothConditionalMaxEntropyCandidate_eq
-    (ρ : SubnormalizedState (Prod a b)) (ε h : ℝ) :
+    (ρ : SubnormalizedState (a × b)) (ε h : ℝ) :
     SmoothConditionalMaxEntropyCandidate (a := a) ρ ε h ↔
-      ∃ ρ' : SubnormalizedState (Prod a b), ∃ hρ' : ρ'.matrix ≠ 0,
+      ∃ ρ' : SubnormalizedState (a × b), ∃ hρ' : ρ'.matrix ≠ 0,
         ρ.purifiedBall ε ρ' ∧ h = ρ'.conditionalMaxEntropyFinite hρ' :=
   Iff.rfl
 
 /-- Subnormalized smooth min-entropy candidates are monotone in the smoothing
 radius. -/
 theorem SmoothConditionalMinEntropyCandidateRaw_mono
-    {ρ : SubnormalizedState (Prod a b)} {ε δ h : ℝ} (hεδ : ε ≤ δ) :
+    {ρ : SubnormalizedState (a × b)} {ε δ h : ℝ} (hεδ : ε ≤ δ) :
     SmoothConditionalMinEntropyCandidateRaw (a := a) ρ ε h →
       SmoothConditionalMinEntropyCandidateRaw (a := a) ρ δ h := by
   rintro ⟨ρ', hball, hh⟩
@@ -1405,7 +1346,7 @@ theorem SmoothConditionalMinEntropyCandidateRaw_mono
 The smoothing radius increases by the purified distance between the old and
 new centers. -/
 theorem SmoothConditionalMinEntropyCandidateRaw_center_migration
-    {ρ η : SubnormalizedState (Prod a b)} {ε δ h : ℝ}
+    {ρ η : SubnormalizedState (a × b)} {ε δ h : ℝ}
     (hcenter : η.purifiedDistance ρ ≤ δ) :
     SmoothConditionalMinEntropyCandidateRaw (a := a) η ε h →
       SmoothConditionalMinEntropyCandidateRaw (a := a) ρ (ε + δ) h := by
@@ -1415,7 +1356,7 @@ theorem SmoothConditionalMinEntropyCandidateRaw_center_migration
 /-- Subnormalized smooth max-entropy candidates are monotone in the smoothing
 radius. -/
 theorem SmoothConditionalMaxEntropyCandidateRaw_mono
-    {ρ : SubnormalizedState (Prod a b)} {ε δ h : ℝ} (hεδ : ε ≤ δ) :
+    {ρ : SubnormalizedState (a × b)} {ε δ h : ℝ} (hεδ : ε ≤ δ) :
     SmoothConditionalMaxEntropyCandidateRaw (a := a) ρ ε h →
       SmoothConditionalMaxEntropyCandidateRaw (a := a) ρ δ h := by
   rintro ⟨ρ', hball, hh⟩
@@ -1429,7 +1370,7 @@ Outside `0 ≤ ε < sqrt (Tr ρ)` it is not the canonical finite-resource entrop
 of [Tomamichel2015FiniteResources, calculus.tex:386-396] and
 [Tomamichel2015FiniteResources, calculus.tex:418-442]. -/
 def smoothConditionalMinEntropyRaw
-    (ρ : SubnormalizedState (Prod a b)) (ε : ℝ) : ℝ :=
+    (ρ : SubnormalizedState (a × b)) (ε : ℝ) : ℝ :=
   sSup {h : ℝ | SmoothConditionalMinEntropyCandidateRaw (a := a) ρ ε h}
 
 /-- Canonical finite-domain subnormalized smooth conditional min-entropy.
@@ -1438,36 +1379,36 @@ The explicit radius hypotheses are the source convention from
 [Tomamichel2015FiniteResources, calculus.tex:386-396], while the entropy
 optimization is [Tomamichel2015FiniteResources, calculus.tex:418-442]. -/
 def smoothConditionalMinEntropy
-    (ρ : SubnormalizedState (Prod a b)) (ε : ℝ)
+    (ρ : SubnormalizedState (a × b)) (ε : ℝ)
     (_hε_nonneg : 0 ≤ ε)
     (_hε_lt : ε < Real.sqrt ρ.matrix.trace.re) : ℝ :=
   ρ.smoothConditionalMinEntropyRaw ε
 
 @[simp]
 theorem smoothConditionalMinEntropy_eq_raw
-    (ρ : SubnormalizedState (Prod a b)) (ε : ℝ)
+    (ρ : SubnormalizedState (a × b)) (ε : ℝ)
     (hε_nonneg : 0 ≤ ε) (hε_lt : ε < Real.sqrt ρ.matrix.trace.re) :
     ρ.smoothConditionalMinEntropy ε hε_nonneg hε_lt =
       ρ.smoothConditionalMinEntropyRaw ε :=
   rfl
 
 theorem smoothConditionalMinEntropyRaw_eq_sSup_candidates
-    (ρ : SubnormalizedState (Prod a b)) (ε : ℝ) :
+    (ρ : SubnormalizedState (a × b)) (ε : ℝ) :
     ρ.smoothConditionalMinEntropyRaw ε =
       sSup {h : ℝ | SmoothConditionalMinEntropyCandidateRaw (a := a) ρ ε h} :=
   rfl
 
 @[simp]
 theorem smoothConditionalMinEntropyRaw_eq
-    (ρ : SubnormalizedState (Prod a b)) (ε : ℝ) :
+    (ρ : SubnormalizedState (a × b)) (ε : ℝ) :
     ρ.smoothConditionalMinEntropyRaw ε =
       sSup {h : ℝ |
-        ∃ ρ' : SubnormalizedState (Prod a b),
+        ∃ ρ' : SubnormalizedState (a × b),
           ρ.purifiedBall ε ρ' ∧ h = ρ'.conditionalMinEntropyRaw} :=
   rfl
 
 theorem smoothConditionalMinEntropy_eq_sSup_candidates
-    (ρ : SubnormalizedState (Prod a b)) (ε : ℝ)
+    (ρ : SubnormalizedState (a × b)) (ε : ℝ)
     (hε_nonneg : 0 ≤ ε) (hε_lt : ε < Real.sqrt ρ.matrix.trace.re) :
     ρ.smoothConditionalMinEntropy ε hε_nonneg hε_lt =
       sSup {h : ℝ | SmoothConditionalMinEntropyCandidateRaw (a := a) ρ ε h} :=
@@ -1475,11 +1416,11 @@ theorem smoothConditionalMinEntropy_eq_sSup_candidates
 
 @[simp]
 theorem smoothConditionalMinEntropy_eq
-    (ρ : SubnormalizedState (Prod a b)) (ε : ℝ)
+    (ρ : SubnormalizedState (a × b)) (ε : ℝ)
     (hε_nonneg : 0 ≤ ε) (hε_lt : ε < Real.sqrt ρ.matrix.trace.re) :
     ρ.smoothConditionalMinEntropy ε hε_nonneg hε_lt =
       sSup {h : ℝ |
-        ∃ ρ' : SubnormalizedState (Prod a b),
+        ∃ ρ' : SubnormalizedState (a × b),
           ρ.purifiedBall ε ρ' ∧ h = ρ'.conditionalMinEntropyRaw} :=
   rfl
 
@@ -1491,41 +1432,41 @@ This totalized `sInf` surface is internal. Source-facing uses must call
 [Tomamichel2015FiniteResources, calculus.tex:386-396] and
 [Tomamichel2015FiniteResources, calculus.tex:418-442]. -/
 def smoothConditionalMaxEntropyRaw
-    (ρ : SubnormalizedState (Prod a b)) (ε : ℝ) : ℝ :=
+    (ρ : SubnormalizedState (a × b)) (ε : ℝ) : ℝ :=
   sInf {h : ℝ | SmoothConditionalMaxEntropyCandidateRaw (a := a) ρ ε h}
 
 /-- Canonical finite-domain subnormalized smooth conditional max-entropy. -/
 def smoothConditionalMaxEntropy
-    (ρ : SubnormalizedState (Prod a b)) (ε : ℝ)
+    (ρ : SubnormalizedState (a × b)) (ε : ℝ)
     (_hε_nonneg : 0 ≤ ε)
     (_hε_lt : ε < Real.sqrt ρ.matrix.trace.re) : ℝ :=
   ρ.smoothConditionalMaxEntropyRaw ε
 
 @[simp]
 theorem smoothConditionalMaxEntropy_eq_raw
-    (ρ : SubnormalizedState (Prod a b)) (ε : ℝ)
+    (ρ : SubnormalizedState (a × b)) (ε : ℝ)
     (hε_nonneg : 0 ≤ ε) (hε_lt : ε < Real.sqrt ρ.matrix.trace.re) :
     ρ.smoothConditionalMaxEntropy ε hε_nonneg hε_lt =
       ρ.smoothConditionalMaxEntropyRaw ε :=
   rfl
 
 theorem smoothConditionalMaxEntropyRaw_eq_sInf_candidates
-    (ρ : SubnormalizedState (Prod a b)) (ε : ℝ) :
+    (ρ : SubnormalizedState (a × b)) (ε : ℝ) :
     ρ.smoothConditionalMaxEntropyRaw ε =
       sInf {h : ℝ | SmoothConditionalMaxEntropyCandidateRaw (a := a) ρ ε h} :=
   rfl
 
 @[simp]
 theorem smoothConditionalMaxEntropyRaw_eq
-    (ρ : SubnormalizedState (Prod a b)) (ε : ℝ) :
+    (ρ : SubnormalizedState (a × b)) (ε : ℝ) :
     ρ.smoothConditionalMaxEntropyRaw ε =
       sInf {h : ℝ |
-        ∃ ρ' : SubnormalizedState (Prod a b),
+        ∃ ρ' : SubnormalizedState (a × b),
           ρ.purifiedBall ε ρ' ∧ h = ρ'.conditionalMaxEntropyRaw} :=
   rfl
 
 theorem smoothConditionalMaxEntropy_eq_sInf_candidates
-    (ρ : SubnormalizedState (Prod a b)) (ε : ℝ)
+    (ρ : SubnormalizedState (a × b)) (ε : ℝ)
     (hε_nonneg : 0 ≤ ε) (hε_lt : ε < Real.sqrt ρ.matrix.trace.re) :
     ρ.smoothConditionalMaxEntropy ε hε_nonneg hε_lt =
       sInf {h : ℝ | SmoothConditionalMaxEntropyCandidateRaw (a := a) ρ ε h} :=
@@ -1533,21 +1474,21 @@ theorem smoothConditionalMaxEntropy_eq_sInf_candidates
 
 @[simp]
 theorem smoothConditionalMaxEntropy_eq
-    (ρ : SubnormalizedState (Prod a b)) (ε : ℝ)
+    (ρ : SubnormalizedState (a × b)) (ε : ℝ)
     (hε_nonneg : 0 ≤ ε) (hε_lt : ε < Real.sqrt ρ.matrix.trace.re) :
     ρ.smoothConditionalMaxEntropy ε hε_nonneg hε_lt =
       sInf {h : ℝ |
-        ∃ ρ' : SubnormalizedState (Prod a b),
+        ∃ ρ' : SubnormalizedState (a × b),
           ρ.purifiedBall ε ρ' ∧ h = ρ'.conditionalMaxEntropyRaw} :=
   rfl
 
 /-- Zero-radius subnormalized smooth conditional min-entropy is the unsmoothed
 conditional min-entropy [Tomamichel2015FiniteResources, calculus.tex:418-442]. -/
-theorem smoothConditionalMinEntropyRaw_zero (ρ : SubnormalizedState (Prod a b)) :
+theorem smoothConditionalMinEntropyRaw_zero (ρ : SubnormalizedState (a × b)) :
     ρ.smoothConditionalMinEntropyRaw 0 = ρ.conditionalMinEntropyRaw := by
   rw [SubnormalizedState.smoothConditionalMinEntropyRaw_eq]
   have hset :
-      {h : ℝ | ∃ ρ' : SubnormalizedState (Prod a b),
+      {h : ℝ | ∃ ρ' : SubnormalizedState (a × b),
         ρ.purifiedBall 0 ρ' ∧ h = ρ'.conditionalMinEntropyRaw} =
         {ρ.conditionalMinEntropyRaw} := by
     ext h
@@ -1566,7 +1507,7 @@ theorem smoothConditionalMinEntropyRaw_zero (ρ : SubnormalizedState (Prod a b))
 
 /-- Zero-radius canonical smooth conditional min-entropy on its finite domain. -/
 theorem smoothConditionalMinEntropy_zero
-    (ρ : SubnormalizedState (Prod a b))
+    (ρ : SubnormalizedState (a × b))
     (htrace : 0 < Real.sqrt ρ.matrix.trace.re) :
     ρ.smoothConditionalMinEntropy 0 (le_refl 0) htrace =
       ρ.conditionalMinEntropyRaw :=
@@ -1574,11 +1515,11 @@ theorem smoothConditionalMinEntropy_zero
 
 /-- Zero-radius subnormalized smooth conditional max-entropy is the unsmoothed
 conditional max-entropy [Tomamichel2015FiniteResources, calculus.tex:418-442]. -/
-theorem smoothConditionalMaxEntropyRaw_zero (ρ : SubnormalizedState (Prod a b)) :
+theorem smoothConditionalMaxEntropyRaw_zero (ρ : SubnormalizedState (a × b)) :
     ρ.smoothConditionalMaxEntropyRaw 0 = ρ.conditionalMaxEntropyRaw := by
   rw [SubnormalizedState.smoothConditionalMaxEntropyRaw_eq]
   have hset :
-      {h : ℝ | ∃ ρ' : SubnormalizedState (Prod a b),
+      {h : ℝ | ∃ ρ' : SubnormalizedState (a × b),
         ρ.purifiedBall 0 ρ' ∧ h = ρ'.conditionalMaxEntropyRaw} =
         {ρ.conditionalMaxEntropyRaw} := by
     ext h
@@ -1597,7 +1538,7 @@ theorem smoothConditionalMaxEntropyRaw_zero (ρ : SubnormalizedState (Prod a b))
 
 /-- Zero-radius canonical smooth conditional max-entropy on its finite domain. -/
 theorem smoothConditionalMaxEntropy_zero
-    (ρ : SubnormalizedState (Prod a b))
+    (ρ : SubnormalizedState (a × b))
     (htrace : 0 < Real.sqrt ρ.matrix.trace.re) :
     ρ.smoothConditionalMaxEntropy 0 (le_refl 0) htrace =
       ρ.conditionalMaxEntropyRaw :=
@@ -1622,11 +1563,11 @@ theorem ofStateScale_normalize_trace_eq
 omit [Fintype a] in
 @[simp]
 theorem identityTensorStateMatrix_ofStateScale
-    (σ : State b) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    (σ : MState b) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
     identityTensorStateMatrix (a := a) (ofStateScale σ t ht0 ht1) =
-      t • State.identityTensorStateMatrix (a := a) σ := by
+      t • MState.identityTensorStateMatrix (a := a) σ := by
   ext i j
-  simp [identityTensorStateMatrix, State.identityTensorStateMatrix, Matrix.kronecker,
+  simp [identityTensorStateMatrix, MState.identityTensorStateMatrix, Matrix.kronecker,
     Matrix.kroneckerMap_apply, Complex.real_smul]
   ring
 
@@ -1636,8 +1577,8 @@ tripartite state.  This fixed-register relation is the candidate relation that
 the later unsmoothed duality leaf is expected to consume; arbitrary smoothing
 candidates generally require enlarged references. -/
 def ComplementaryPureMarginalRel
-    (ρAB : SubnormalizedState (Prod a b)) (ρAC : SubnormalizedState (Prod a c)) : Prop :=
-  ∃ (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht : 0 < t) (ht1 : t ≤ 1),
+    (ρAB : SubnormalizedState (a × b)) (ρAC : SubnormalizedState (a × c)) : Prop :=
+  ∃ (ψ : Ket ((a × b) × c)) (t : ℝ) (ht : 0 < t) (ht1 : t ≤ 1),
     ρAB = abMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
       ψ t ht.le ht1 ∧
     ρAC = acMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
@@ -1646,7 +1587,7 @@ def ComplementaryPureMarginalRel
 /-- A scaled pure tripartite state gives complementary subnormalized `AB` and
 `AC` marginals. -/
 theorem complementaryPureMarginalRel_of_scaled_pure
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht : 0 < t) (ht1 : t ≤ 1) :
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht : 0 < t) (ht1 : t ≤ 1) :
     ComplementaryPureMarginalRel (a := a) (b := b) (c := c)
       (abMarginalFromScaledTripartitePure (a := a) (b := b) (c := c) ψ t ht.le ht1)
       (acMarginalFromScaledTripartitePure (a := a) (b := b) (c := c) ψ t ht.le ht1) := by
@@ -1655,86 +1596,45 @@ theorem complementaryPureMarginalRel_of_scaled_pure
 /-! ## Subnormalized embedded purification-ball transport -/
 
 /-- The hatted `AB` target used to normalize subnormalized `AB` candidates. -/
-abbrev ABHat (a : Type u) (b : Type v) := Sum PUnit.{max u v + 1} (Prod a b)
+abbrev ABHat (a : Type u) (b : Type v) := PUnit.{max u v + 1} ⊕ (a × b)
 
 /-- The hatted `AC` target used to normalize subnormalized `AC` candidates. -/
-abbrev ACHat (a : Type u) (c : Type w) := Sum PUnit.{max u w + 1} (Prod a c)
+abbrev ACHat (a : Type u) (c : Type w) := (PUnit.{max u w + 1} ⊕ (a × c))
 
 private theorem abHatSuccessRestrictedAmp_trace_re
     {R : Type w} [Fintype R] [DecidableEq R]
-    (Φ : PureVector (Prod R (ABHat a b))) :
-    (rankOneMatrix (fun x : Prod (Prod a b) R => Φ.amp (x.2, Sum.inr x.1))).trace.re =
-      (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re := by
+    (Φ : Ket (R × ABHat a b)) :
+    (rankOneMatrix (fun x : (a × b) × R => Φ.vec (x.2, Sum.inr x.1))).trace.re =
+      (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re := by
   classical
-  simp [State.successBlockOfHatState, State.marginalB, partialTraceA,
-    MatrixMap.sumInrCompression_apply, State.toSubnormalized_matrix,
-    PureVector.state_matrix, rankOneMatrix_apply, Matrix.trace, Fintype.sum_prod_type]
+  simp [MState.successBlockOfHatState, Matrix.traceLeft,
+    MatrixMap.sumInrCompression_apply, MState.toSubnormalized_matrix,
+    rankOneMatrix_apply, Matrix.trace, Fintype.sum_prod_type]
 
-private def pureVectorNormalize {α : Type*} [Fintype α] [DecidableEq α]
-    (v : α → ℂ) (hpos : 0 < (rankOneMatrix v).trace.re) : PureVector α where
-  amp := fun x => (((Real.sqrt (rankOneMatrix v).trace.re)⁻¹ : ℝ) : ℂ) * v x
-  trace_rankOne_eq_one := by
-    classical
-    let t : ℝ := (rankOneMatrix v).trace.re
-    have htpos : 0 < t := hpos
-    have ht_nonneg : 0 ≤ t := le_of_lt htpos
-    have hsqrt_ne : Real.sqrt t ≠ 0 := ne_of_gt (Real.sqrt_pos.mpr htpos)
-    have htrace_im : (rankOneMatrix v).trace.im = 0 :=
-      (Matrix.PosSemidef.trace_nonneg (rankOneMatrix_pos v)).2.symm
-    have htrace_complex : (rankOneMatrix v).trace = (t : ℂ) := by
-      apply Complex.ext
-      · rfl
-      · simpa using htrace_im
-    have hcoeff :
-        (((((Real.sqrt t)⁻¹ : ℝ) : ℂ) *
-              ((((Real.sqrt t)⁻¹ : ℝ) : ℂ))) * (t : ℂ)) = 1 := by
-      rw [← Complex.ofReal_mul, ← Complex.ofReal_mul]
-      congr 1
-      field_simp [hsqrt_ne]
-      rw [Real.sq_sqrt ht_nonneg]
-    calc
-      (rankOneMatrix
-          (fun x => ((((Real.sqrt (rankOneMatrix v).trace.re)⁻¹ : ℝ) : ℂ) * v x))).trace =
-          (((((Real.sqrt t)⁻¹ : ℝ) : ℂ) *
-              ((((Real.sqrt t)⁻¹ : ℝ) : ℂ))) * (rankOneMatrix v).trace) := by
-            simp [rankOneMatrix_trace, dotProduct, t, Finset.mul_sum, mul_assoc,
-              mul_left_comm, mul_comm]
-      _ = (((((Real.sqrt t)⁻¹ : ℝ) : ℂ) *
-              ((((Real.sqrt t)⁻¹ : ℝ) : ℂ))) * (t : ℂ)) := by
-            rw [htrace_complex]
-      _ = 1 := hcoeff
-
-@[simp]
-private theorem pureVectorNormalize_amp {α : Type*} [Fintype α] [DecidableEq α]
-    (v : α → ℂ) (hpos : 0 < (rankOneMatrix v).trace.re) :
-    (pureVectorNormalize v hpos).amp =
-      fun x => (((Real.sqrt (rankOneMatrix v).trace.re)⁻¹ : ℝ) : ℂ) * v x :=
-  rfl
-
-private def abHatSuccessRestrictedPureVector
+private def abHatSuccessRestrictedKet
     {R : Type w} [Fintype R] [DecidableEq R]
-    (Φ : PureVector (Prod R (ABHat a b)))
-    (htr : 0 < (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re) :
-    PureVector (Prod (Prod a b) R) :=
-  let v : Prod (Prod a b) R → ℂ := fun x => Φ.amp (x.2, Sum.inr x.1)
-  pureVectorNormalize v (by
+    (Φ : Ket (R × ABHat a b))
+    (htr : 0 < (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re) :
+    Ket ((a × b) × R) :=
+  let v : (a × b) × R → ℂ := fun x => Φ.vec (x.2, Sum.inr x.1)
+  Ket.normalizeRankOne v (by
     simpa [v] using abHatSuccessRestrictedAmp_trace_re (a := a) (b := b) Φ ▸ htr)
 
-private theorem abHatSuccessRestrictedPureVector_ab_marginal
+private theorem abHatSuccessRestrictedKet_ab_marginal
     {R : Type w} [Fintype R] [DecidableEq R]
-    (Φ : PureVector (Prod R (ABHat a b)))
-    (htr : 0 < (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re) :
-    Φ.state.marginalB.successBlockOfHatState =
+    (Φ : Ket (R × ABHat a b))
+    (htr : 0 < (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re) :
+    Φ.state.traceLeft.successBlockOfHatState =
       abMarginalFromScaledTripartitePure (a := a) (b := b) (c := R)
-        (abHatSuccessRestrictedPureVector (a := a) (b := b) Φ htr)
-        (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re htr.le
-        Φ.state.marginalB.successBlockOfHatState.trace_le_one := by
+        (abHatSuccessRestrictedKet (a := a) (b := b) Φ htr)
+        (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re htr.le
+        Φ.state.traceLeft.successBlockOfHatState.trace_le_one := by
   classical
-  let t : ℝ := (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re
+  let t : ℝ := (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re
   let c : ℂ := (((Real.sqrt t)⁻¹ : ℝ) : ℂ)
   have hvtrace :
-      ((fun x : Prod (Prod a b) R => Φ.amp (x.2, Sum.inr x.1)) ⬝ᵥ
-        fun i => (starRingEnd ℂ) (Φ.amp (i.2, Sum.inr i.1))).re = t := by
+      ((fun x : (a × b) × R => Φ.vec (x.2, Sum.inr x.1)) ⬝ᵥ
+        fun i => (starRingEnd ℂ) (Φ.vec (i.2, Sum.inr i.1))).re = t := by
     simpa [rankOneMatrix_trace, t] using
       abHatSuccessRestrictedAmp_trace_re (a := a) (b := b) Φ
   have htpos : 0 < t := htr
@@ -1754,34 +1654,34 @@ private theorem abHatSuccessRestrictedPureVector_ab_marginal
       _ = z * star w := by simp [hcoeff]
   apply SubnormalizedState.ext
   ext x y
-  simp [State.successBlockOfHatState, abMarginalFromScaledTripartitePure, ofStateScale,
-    State.marginalB, State.marginalAB, State.marginalA, partialTraceA, partialTraceB,
-    MatrixMap.sumInrCompression_apply, State.toSubnormalized_matrix,
-    PureVector.state_matrix, rankOneMatrix_apply, abHatSuccessRestrictedPureVector,
+  simp [MState.successBlockOfHatState, abMarginalFromScaledTripartitePure, ofStateScale,
+    MState.marginalAB, Matrix.traceLeft, Matrix.traceRight,
+    MatrixMap.sumInrCompression_apply, MState.toSubnormalized_matrix,
+    abHatSuccessRestrictedKet,
     Complex.real_smul, Finset.mul_sum]
   apply Finset.sum_congr rfl
   intro r _hr
-  simpa [t, c, hvtrace, partialTraceA, rankOneMatrix_apply] using
-    (hscale (Φ.amp (r, Sum.inr x)) (Φ.amp (r, Sum.inr y))).symm
+  simpa [t, c, hvtrace, Matrix.traceLeft, rankOneMatrix_apply] using
+    (hscale (Φ.vec (r, Sum.inr x)) (Φ.vec (r, Sum.inr y))).symm
 
-private theorem abHatSuccessRestrictedPureVector_ac_marginal
+private theorem abHatSuccessRestrictedKet_ac_marginal
     {R : Type w} [Fintype R] [DecidableEq R]
-    (Φ : PureVector (Prod R (ABHat a b)))
-    (htr : 0 < (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re) :
+    (Φ : Ket (R × ABHat a b))
+    (htr : 0 < (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re) :
     SubnormalizedState.applyTraceNonincreasingCP
         Φ.state.toSubnormalized
         (MatrixMap.sumInrTraceDiscard (r := R) (α := a) (β := b))
         (MatrixMap.sumInrTraceDiscard_traceNonincreasingCP (r := R) (α := a) (β := b)) =
       acMarginalFromScaledTripartitePure (a := a) (b := b) (c := R)
-        (abHatSuccessRestrictedPureVector (a := a) (b := b) Φ htr)
-        (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re htr.le
-        Φ.state.marginalB.successBlockOfHatState.trace_le_one := by
+        (abHatSuccessRestrictedKet (a := a) (b := b) Φ htr)
+        (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re htr.le
+        Φ.state.traceLeft.successBlockOfHatState.trace_le_one := by
   classical
-  let t : ℝ := (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re
+  let t : ℝ := (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re
   let c : ℂ := (((Real.sqrt t)⁻¹ : ℝ) : ℂ)
   have hvtrace :
-      ((fun x : Prod (Prod a b) R => Φ.amp (x.2, Sum.inr x.1)) ⬝ᵥ
-        fun i => (starRingEnd ℂ) (Φ.amp (i.2, Sum.inr i.1))).re = t := by
+      ((fun x : (a × b) × R => Φ.vec (x.2, Sum.inr x.1)) ⬝ᵥ
+        fun i => (starRingEnd ℂ) (Φ.vec (i.2, Sum.inr i.1))).re = t := by
     simpa [rankOneMatrix_trace, t] using
       abHatSuccessRestrictedAmp_trace_re (a := a) (b := b) Φ
   have htpos : 0 < t := htr
@@ -1804,87 +1704,87 @@ private theorem abHatSuccessRestrictedPureVector_ac_marginal
   rcases x with ⟨xA, xR⟩
   rcases y with ⟨yA, yR⟩
   simp [SubnormalizedState.applyTraceNonincreasingCP_matrix,
-    MatrixMap.sumInrTraceDiscard_apply, State.toSubnormalized_matrix,
-    acMarginalFromScaledTripartitePure, ofStateScale, State.marginalAC_matrix,
-    PureVector.state_matrix, rankOneMatrix_apply, abHatSuccessRestrictedPureVector,
+    MatrixMap.sumInrTraceDiscard_apply, MState.toSubnormalized_matrix,
+    acMarginalFromScaledTripartitePure, ofStateScale, MState.marginalAC_matrix,
+    Ket.state_matrix, rankOneMatrix_apply, abHatSuccessRestrictedKet,
     Complex.real_smul, Finset.mul_sum]
   apply Finset.sum_congr rfl
   intro b' _hb'
   simpa [t, c, hvtrace] using
-    (hscale (Φ.amp (xR, Sum.inr (xA, b'))) (Φ.amp (yR, Sum.inr (yA, b')))).symm
+    (hscale (Φ.vec (xR, Sum.inr (xA, b'))) (Φ.vec (yR, Sum.inr (yA, b')))).symm
 
-/-- A hatted pure vector with positive success mass gives complementary
+/-- A hatted ket with positive success mass gives complementary
 subnormalized pure marginals after extracting the success `AB` block and
 discarding the success `B` register on the reference-complement side. -/
 private theorem complementaryPureMarginalRel_of_abHat_success
     {R : Type w} [Fintype R] [DecidableEq R]
-    (Φ : PureVector (Prod R (ABHat a b)))
-    (htr : 0 < (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re) :
+    (Φ : Ket (R × ABHat a b))
+    (htr : 0 < (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re) :
     ComplementaryPureMarginalRel (a := a) (b := b) (c := R)
-      Φ.state.marginalB.successBlockOfHatState
+      Φ.state.traceLeft.successBlockOfHatState
       (SubnormalizedState.applyTraceNonincreasingCP
         Φ.state.toSubnormalized
         (MatrixMap.sumInrTraceDiscard (r := R) (α := a) (β := b))
         (MatrixMap.sumInrTraceDiscard_traceNonincreasingCP (r := R) (α := a) (β := b))) := by
-  refine ⟨abHatSuccessRestrictedPureVector (a := a) (b := b) Φ htr,
-    (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re, htr,
-    Φ.state.marginalB.successBlockOfHatState.trace_le_one, ?_, ?_⟩
-  · exact abHatSuccessRestrictedPureVector_ab_marginal (a := a) (b := b) Φ htr
-  · exact abHatSuccessRestrictedPureVector_ac_marginal (a := a) (b := b) Φ htr
+  refine ⟨abHatSuccessRestrictedKet (a := a) (b := b) Φ htr,
+    (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re, htr,
+    Φ.state.traceLeft.successBlockOfHatState.trace_le_one, ?_, ?_⟩
+  · exact abHatSuccessRestrictedKet_ab_marginal (a := a) (b := b) Φ htr
+  · exact abHatSuccessRestrictedKet_ac_marginal (a := a) (b := b) Φ htr
 
-/-- If a pure vector purifies a hatted subnormalized state, its target success
+/-- If a ket purifies a hatted subnormalized state, its target success
 block is the original subnormalized state. -/
-private theorem successBlockOf_marginalB_eq_of_purifies_hatExtension
+private theorem successBlockOf_traceLeft_eq_of_purifies_hatExtension
     {R : Type w} [Fintype R] [DecidableEq R]
-    {ρ : SubnormalizedState (Prod a b)}
-    {Φ : PureVector (Prod R (ABHat a b))}
+    {ρ : SubnormalizedState (a × b)}
+    {Φ : Ket (R × ABHat a b)}
     (hΦ : Φ.Purifies ρ.hatExtension) :
-    Φ.state.marginalB.successBlockOfHatState = ρ := by
-  rw [PureVector.purifies_iff] at hΦ
+    Φ.state.traceLeft.successBlockOfHatState = ρ := by
+  rw [Ket.purifies_iff] at hΦ
   apply SubnormalizedState.ext
-  rw [State.successBlockOfHatState_matrix]
-  change (MatrixMap.sumInrCompression (α := Prod a b)) (partialTraceA Φ.state.matrix) =
+  rw [MState.successBlockOfHatState_matrix, MState.traceLeft_m]
+  change (MatrixMap.sumInrCompression (α := a × b)) (Matrix.traceLeft Φ.state.m) =
     ρ.matrix
   rw [hΦ]
   exact congrArg SubnormalizedState.matrix (SubnormalizedState.successBlockOf_hatExtension_eq ρ)
 
 private theorem acHatSuccessRestrictedAmp_trace_re
     {R : Type w} [Fintype R] [DecidableEq R]
-    (Φ : PureVector (Prod R (ACHat a c))) :
-    (rankOneMatrix (fun x : Prod (Prod a R) c => Φ.amp (x.1.2, Sum.inr (x.1.1, x.2)))).trace.re =
-      (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re := by
+    (Φ : Ket (R × ACHat a c)) :
+    (rankOneMatrix (fun x : (a × R) × c => Φ.vec (x.1.2, Sum.inr (x.1.1, x.2)))).trace.re =
+      (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re := by
   classical
-  simp [State.successBlockOfHatState, State.marginalB, partialTraceA,
-    MatrixMap.sumInrCompression_apply, State.toSubnormalized_matrix,
-    PureVector.state_matrix, rankOneMatrix_apply, Matrix.trace, Fintype.sum_prod_type]
+  simp [MState.successBlockOfHatState, Matrix.traceLeft,
+    MatrixMap.sumInrCompression_apply, MState.toSubnormalized_matrix,
+    rankOneMatrix_apply, Matrix.trace, Fintype.sum_prod_type]
   apply Finset.sum_congr rfl
   intro x _hx
   rw [Finset.sum_comm]
 
-private def acHatSuccessRestrictedPureVector
+private def acHatSuccessRestrictedKet
     {R : Type w} [Fintype R] [DecidableEq R]
-    (Φ : PureVector (Prod R (ACHat a c)))
-    (htr : 0 < (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re) :
-    PureVector (Prod (Prod a R) c) :=
-  let v : Prod (Prod a R) c → ℂ := fun x => Φ.amp (x.1.2, Sum.inr (x.1.1, x.2))
-  pureVectorNormalize v (by
+    (Φ : Ket (R × ACHat a c))
+    (htr : 0 < (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re) :
+    Ket ((a × R) × c) :=
+  let v : (a × R) × c → ℂ := fun x => Φ.vec (x.1.2, Sum.inr (x.1.1, x.2))
+  Ket.normalizeRankOne v (by
     simpa [v] using acHatSuccessRestrictedAmp_trace_re (a := a) (c := c) Φ ▸ htr)
 
-private theorem acHatSuccessRestrictedPureVector_ac_marginal
+private theorem acHatSuccessRestrictedKet_ac_marginal
     {R : Type w} [Fintype R] [DecidableEq R]
-    (Φ : PureVector (Prod R (ACHat a c)))
-    (htr : 0 < (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re) :
-    Φ.state.marginalB.successBlockOfHatState =
+    (Φ : Ket (R × ACHat a c))
+    (htr : 0 < (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re) :
+    Φ.state.traceLeft.successBlockOfHatState =
       acMarginalFromScaledTripartitePure (a := a) (b := R) (c := c)
-        (acHatSuccessRestrictedPureVector (a := a) (c := c) Φ htr)
-        (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re htr.le
-        Φ.state.marginalB.successBlockOfHatState.trace_le_one := by
+        (acHatSuccessRestrictedKet (a := a) (c := c) Φ htr)
+        (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re htr.le
+        Φ.state.traceLeft.successBlockOfHatState.trace_le_one := by
   classical
-  let t : ℝ := (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re
+  let t : ℝ := (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re
   let k : ℂ := (((Real.sqrt t)⁻¹ : ℝ) : ℂ)
   have hvtrace :
-      ((fun x : Prod (Prod a R) c => Φ.amp (x.1.2, Sum.inr (x.1.1, x.2))) ⬝ᵥ
-        fun i => (starRingEnd ℂ) (Φ.amp (i.1.2, Sum.inr (i.1.1, i.2)))).re = t := by
+      ((fun x : (a × R) × c => Φ.vec (x.1.2, Sum.inr (x.1.1, x.2))) ⬝ᵥ
+        fun i => (starRingEnd ℂ) (Φ.vec (i.1.2, Sum.inr (i.1.1, i.2)))).re = t := by
     simpa [rankOneMatrix_trace, t] using
       acHatSuccessRestrictedAmp_trace_re (a := a) (c := c) Φ
   have htpos : 0 < t := htr
@@ -1906,34 +1806,34 @@ private theorem acHatSuccessRestrictedPureVector_ac_marginal
   ext x y
   rcases x with ⟨xA, xC⟩
   rcases y with ⟨yA, yC⟩
-  simp [State.successBlockOfHatState, acMarginalFromScaledTripartitePure, ofStateScale,
-    State.marginalB, State.marginalAC_matrix, partialTraceA,
-    MatrixMap.sumInrCompression_apply, State.toSubnormalized_matrix,
-    PureVector.state_matrix, rankOneMatrix_apply, acHatSuccessRestrictedPureVector,
+  simp [MState.successBlockOfHatState, acMarginalFromScaledTripartitePure, ofStateScale,
+    MState.marginalAC_matrix, Matrix.traceLeft,
+    MatrixMap.sumInrCompression_apply, MState.toSubnormalized_matrix,
+    acHatSuccessRestrictedKet,
     Complex.real_smul, Finset.mul_sum]
   apply Finset.sum_congr rfl
   intro r _hr
-  simpa [t, k, hvtrace, partialTraceA, rankOneMatrix_apply] using
-    (hscale (Φ.amp (r, Sum.inr (xA, xC))) (Φ.amp (r, Sum.inr (yA, yC)))).symm
+  simpa [t, k, hvtrace, Matrix.traceLeft, rankOneMatrix_apply] using
+    (hscale (Φ.vec (r, Sum.inr (xA, xC))) (Φ.vec (r, Sum.inr (yA, yC)))).symm
 
-private theorem acHatSuccessRestrictedPureVector_ab_marginal
+private theorem acHatSuccessRestrictedKet_ab_marginal
     {R : Type w} [Fintype R] [DecidableEq R]
-    (Φ : PureVector (Prod R (ACHat a c)))
-    (htr : 0 < (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re) :
+    (Φ : Ket (R × ACHat a c))
+    (htr : 0 < (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re) :
     SubnormalizedState.applyTraceNonincreasingCP
         Φ.state.toSubnormalized
         (MatrixMap.sumInrTraceDiscard (r := R) (α := a) (β := c))
         (MatrixMap.sumInrTraceDiscard_traceNonincreasingCP (r := R) (α := a) (β := c)) =
       abMarginalFromScaledTripartitePure (a := a) (b := R) (c := c)
-        (acHatSuccessRestrictedPureVector (a := a) (c := c) Φ htr)
-        (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re htr.le
-        Φ.state.marginalB.successBlockOfHatState.trace_le_one := by
+        (acHatSuccessRestrictedKet (a := a) (c := c) Φ htr)
+        (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re htr.le
+        Φ.state.traceLeft.successBlockOfHatState.trace_le_one := by
   classical
-  let t : ℝ := (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re
+  let t : ℝ := (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re
   let k : ℂ := (((Real.sqrt t)⁻¹ : ℝ) : ℂ)
   have hvtrace :
-      ((fun x : Prod (Prod a R) c => Φ.amp (x.1.2, Sum.inr (x.1.1, x.2))) ⬝ᵥ
-        fun i => (starRingEnd ℂ) (Φ.amp (i.1.2, Sum.inr (i.1.1, i.2)))).re = t := by
+      ((fun x : (a × R) × c => Φ.vec (x.1.2, Sum.inr (x.1.1, x.2))) ⬝ᵥ
+        fun i => (starRingEnd ℂ) (Φ.vec (i.1.2, Sum.inr (i.1.1, i.2)))).re = t := by
     simpa [rankOneMatrix_trace, t] using
       acHatSuccessRestrictedAmp_trace_re (a := a) (c := c) Φ
   have htpos : 0 < t := htr
@@ -1956,39 +1856,39 @@ private theorem acHatSuccessRestrictedPureVector_ab_marginal
   rcases x with ⟨xA, xR⟩
   rcases y with ⟨yA, yR⟩
   simp [SubnormalizedState.applyTraceNonincreasingCP_matrix,
-    MatrixMap.sumInrTraceDiscard_apply, State.toSubnormalized_matrix,
-    abMarginalFromScaledTripartitePure, ofStateScale, State.marginalAB,
-    State.marginalA, partialTraceB, PureVector.state_matrix, rankOneMatrix_apply,
-    acHatSuccessRestrictedPureVector, Complex.real_smul, Finset.mul_sum]
+    MatrixMap.sumInrTraceDiscard_apply, MState.toSubnormalized_matrix,
+    abMarginalFromScaledTripartitePure, ofStateScale, MState.marginalAB,
+    Matrix.traceRight, Ket.state_matrix, rankOneMatrix_apply,
+    acHatSuccessRestrictedKet, Complex.real_smul, Finset.mul_sum]
   apply Finset.sum_congr rfl
   intro c' _hc'
   simpa [t, k, hvtrace] using
-    (hscale (Φ.amp (xR, Sum.inr (xA, c'))) (Φ.amp (yR, Sum.inr (yA, c')))).symm
+    (hscale (Φ.vec (xR, Sum.inr (xA, c'))) (Φ.vec (yR, Sum.inr (yA, c')))).symm
 
-/-- A hatted pure vector with positive success mass gives complementary
+/-- A hatted ket with positive success mass gives complementary
 subnormalized pure marginals after extracting the success `AC` block and
 discarding the success `C` register on the reference-complement side. -/
 private theorem complementaryPureMarginalRel_of_acHat_success
     {R : Type w} [Fintype R] [DecidableEq R]
-    (Φ : PureVector (Prod R (ACHat a c)))
-    (htr : 0 < (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re) :
+    (Φ : Ket (R × ACHat a c))
+    (htr : 0 < (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re) :
     ComplementaryPureMarginalRel (a := a) (b := R) (c := c)
       (SubnormalizedState.applyTraceNonincreasingCP
         Φ.state.toSubnormalized
         (MatrixMap.sumInrTraceDiscard (r := R) (α := a) (β := c))
         (MatrixMap.sumInrTraceDiscard_traceNonincreasingCP (r := R) (α := a) (β := c)))
-      Φ.state.marginalB.successBlockOfHatState := by
-  refine ⟨acHatSuccessRestrictedPureVector (a := a) (c := c) Φ htr,
-    (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re, htr,
-    Φ.state.marginalB.successBlockOfHatState.trace_le_one, ?_, ?_⟩
-  · exact acHatSuccessRestrictedPureVector_ab_marginal (a := a) (c := c) Φ htr
-  · exact acHatSuccessRestrictedPureVector_ac_marginal (a := a) (c := c) Φ htr
+      Φ.state.traceLeft.successBlockOfHatState := by
+  refine ⟨acHatSuccessRestrictedKet (a := a) (c := c) Φ htr,
+    (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re, htr,
+    Φ.state.traceLeft.successBlockOfHatState.trace_le_one, ?_, ?_⟩
+  · exact acHatSuccessRestrictedKet_ab_marginal (a := a) (c := c) Φ htr
+  · exact acHatSuccessRestrictedKet_ac_marginal (a := a) (c := c) Φ htr
 
 /-- Failure-aware enlarged complementary reference for `AB → AC⁺` transport. -/
-abbrev ACPlusReference (a : Type u) (b : Type v) (c : Type w) := Sum (ABHat a b) c
+abbrev ACPlusReference (a : Type u) (b : Type v) (c : Type w) := ABHat a b ⊕ c
 
 /-- Failure-aware enlarged complementary reference for `AC → AB⁺` transport. -/
-abbrev ABPlusReference (a : Type u) (b : Type v) (c : Type w) := Sum (ACHat a c) b
+abbrev ABPlusReference (a : Type u) (b : Type v) (c : Type w) := (ACHat a c ⊕ b)
 
 omit [DecidableEq a] [DecidableEq b] [DecidableEq c] in
 theorem card_abHat_le_acPlusReference :
@@ -2001,37 +1901,33 @@ theorem card_acHat_le_abPlusReference :
   simp [ACHat, ABPlusReference, Fintype.card_sum]
 
 /-- Canonical hatted scaled-pure amplitude for the `AB` target.  The success
-branch stores the original `ABC` pure vector in the right `C` summand of the
+branch stores the original `ABC` ket in the right `C` summand of the
 enlarged reference; the hat failure mass is stored in the left failure
 summand. -/
 def abHatCanonicalScaledPureAmp
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) :
-    Prod (ACPlusReference a b c) (ABHat a b) → ℂ
+    (ψ : Ket ((a × b) × c)) (t : ℝ) :
+    ACPlusReference a b c × ABHat a b → ℂ
   | (Sum.inl (Sum.inl _), Sum.inl _) => ((Real.sqrt (1 - t) : ℝ) : ℂ)
-  | (Sum.inr z, Sum.inr (x, y)) => ((Real.sqrt t : ℝ) : ℂ) * ψ.amp ((x, y), z)
+  | (Sum.inr z, Sum.inr (x, y)) => ((Real.sqrt t : ℝ) : ℂ) * ψ.vec ((x, y), z)
   | _ => 0
 
-private theorem abHatCanonicalScaledPureAmp_partialTraceA
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
-    partialTraceA
+private theorem abHatCanonicalScaledPureAmp_traceLeft
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    Matrix.traceLeft
         (rankOneMatrix (abHatCanonicalScaledPureAmp (a := a) (b := b) (c := c) ψ t)) =
       (abMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
-        ψ t ht0 ht1).hatExtension.matrix := by
+        ψ t ht0 ht1).hatExtension.m := by
   classical
   have hABtrace :
-      (trace (partialTraceB (a := Prod a b) (b := c) (rankOneMatrix ψ.amp))).re = 1 := by
-    have hABtraceC :
-        (trace (partialTraceB (a := Prod a b) (b := c) (rankOneMatrix ψ.amp))) = 1 := by
-      simpa [State.marginalAB, State.marginalA, PureVector.state_matrix] using
-        ψ.state.marginalAB.trace_eq_one
-    simpa using congrArg Complex.re hABtraceC
+      (ψ.vec ⬝ᵥ fun i => (starRingEnd ℂ) (ψ.vec i)).re = 1 := by
+    simpa using congrArg Complex.re ψ.trace_rankOne_eq_one
   ext x y
   cases x with
   | inl xf =>
       cases y with
       | inl yf =>
           rw [SubnormalizedState.hatExtension_matrix]
-          simp only [partialTraceA, rankOneMatrix_apply, abHatCanonicalScaledPureAmp]
+          simp only [Matrix.traceLeft, Matrix.of_apply, rankOneMatrix_apply, abHatCanonicalScaledPureAmp]
           rw [SubnormalizedState.hatExtensionMatrix_fail_fail]
           simp [SubnormalizedState.hatFailureMass, abMarginalFromScaledTripartitePure,
             hABtrace]
@@ -2039,61 +1935,59 @@ private theorem abHatCanonicalScaledPureAmp_partialTraceA
           norm_num
       | inr ysuccess =>
           rcases ysuccess with ⟨yA, yB⟩
-          simp [partialTraceA, rankOneMatrix_apply, abHatCanonicalScaledPureAmp,
+          simp [Matrix.traceLeft, rankOneMatrix_apply, abHatCanonicalScaledPureAmp,
             SubnormalizedState.hatExtensionMatrix]
   | inr xsuccess =>
       rcases xsuccess with ⟨xA, xB⟩
       cases y with
       | inl yf =>
-          simp [partialTraceA, rankOneMatrix_apply, abHatCanonicalScaledPureAmp,
+          simp [Matrix.traceLeft, rankOneMatrix_apply, abHatCanonicalScaledPureAmp,
             SubnormalizedState.hatExtensionMatrix]
       | inr ysuccess =>
           rcases ysuccess with ⟨yA, yB⟩
-          simp [partialTraceA, rankOneMatrix_apply, abHatCanonicalScaledPureAmp,
+          simp [Matrix.traceLeft, rankOneMatrix_apply, abHatCanonicalScaledPureAmp,
             SubnormalizedState.hatExtensionMatrix, abMarginalFromScaledTripartitePure,
-            State.marginalAB, State.marginalA, partialTraceB, PureVector.state_matrix,
+            MState.marginalAB, Matrix.traceRight,
             Complex.real_smul]
           rw [Finset.mul_sum]
           apply Finset.sum_congr rfl
           intro z hz
           calc
-            ((Real.sqrt t : ℂ) * ψ.amp ((xA, xB), z) *
-                ((Real.sqrt t : ℂ) * star (ψ.amp ((yA, yB), z)))) =
+            ((Real.sqrt t : ℂ) * ψ.vec ((xA, xB), z) *
+                ((Real.sqrt t : ℂ) * star (ψ.vec ((yA, yB), z)))) =
                 ((Real.sqrt t : ℂ) * (Real.sqrt t : ℂ)) *
-                  (ψ.amp ((xA, xB), z) * star (ψ.amp ((yA, yB), z))) := by
+                  (ψ.vec ((xA, xB), z) * star (ψ.vec ((yA, yB), z))) := by
               ring
-            _ = (t : ℂ) * (ψ.amp ((xA, xB), z) * star (ψ.amp ((yA, yB), z))) := by
+            _ = (t : ℂ) * (ψ.vec ((xA, xB), z) * star (ψ.vec ((yA, yB), z))) := by
               rw [← Complex.ofReal_mul]
               congr 1
               rw [← sq, Real.sq_sqrt ht0]
 
 /-- Canonical hatted scaled-pure purification for the `AB` target. -/
 def abHatCanonicalScaledPure
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
-    PureVector (Prod (ACPlusReference a b c) (ABHat a b)) where
-  amp := abHatCanonicalScaledPureAmp (a := a) (b := b) (c := c) ψ t
-  trace_rankOne_eq_one := by
-    rw [← partialTraceA_trace
-      (a := ACPlusReference a b c) (b := ABHat a b)
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    Ket (ACPlusReference a b c × ABHat a b) :=
+  Ket.ofRankOne (abHatCanonicalScaledPureAmp (a := a) (b := b) (c := c) ψ t) <| by
+    rw [← Matrix.traceLeft_trace
       (rankOneMatrix (abHatCanonicalScaledPureAmp (a := a) (b := b) (c := c) ψ t))]
-    rw [abHatCanonicalScaledPureAmp_partialTraceA (a := a) (b := b) (c := c)
+    rw [abHatCanonicalScaledPureAmp_traceLeft (a := a) (b := b) (c := c)
       ψ t ht0 ht1]
     exact (abMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
-      ψ t ht0 ht1).hatExtension.trace_eq_one
+      ψ t ht0 ht1).hatExtension.tr'
 
 /-- The canonical hatted scaled-pure vector purifies the hatted scaled `AB`
 marginal. -/
 theorem abHatCanonicalScaledPure_purifies
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
     (abHatCanonicalScaledPure (a := a) (b := b) (c := c) ψ t ht0 ht1).Purifies
       (abMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
         ψ t ht0 ht1).hatExtension := by
-  rw [PureVector.purifies_iff, PureVector.state_matrix]
-  exact abHatCanonicalScaledPureAmp_partialTraceA (a := a) (b := b) (c := c)
+  rw [Ket.purifies_iff, Ket.state_matrix]
+  exact abHatCanonicalScaledPureAmp_traceLeft (a := a) (b := b) (c := c)
     ψ t ht0 ht1
 
 private theorem abHatCanonicalScaledPure_sumInrTraceDiscard_matrix
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
     (SubnormalizedState.applyTraceNonincreasingCP
         (abHatCanonicalScaledPure (a := a) (b := b) (c := c) ψ t ht0 ht1).state.toSubnormalized
         (MatrixMap.sumInrTraceDiscard (r := ACPlusReference a b c) (α := a) (β := b))
@@ -2110,8 +2004,8 @@ private theorem abHatCanonicalScaledPure_sumInrTraceDiscard_matrix
   | inl xHat =>
       cases yR <;>
         simp [SubnormalizedState.applyTraceNonincreasingCP_matrix,
-          MatrixMap.sumInrTraceDiscard_apply, State.toSubnormalized_matrix,
-          PureVector.state_matrix, rankOneMatrix_apply, abHatCanonicalScaledPure,
+          MatrixMap.sumInrTraceDiscard_apply, MState.toSubnormalized_matrix,
+          Ket.state_matrix, rankOneMatrix_apply, abHatCanonicalScaledPure,
           abHatCanonicalScaledPureAmp, SubnormalizedState.conditioningIsometryApply_matrix,
           acMarginalFromScaledTripartitePure, ReferenceIsometry.applyMatrixRight,
           ReferenceIsometry.rightBlock, ReferenceIsometry.sumInr, Matrix.mul_apply]
@@ -2119,30 +2013,30 @@ private theorem abHatCanonicalScaledPure_sumInrTraceDiscard_matrix
       cases yR with
       | inl yHat =>
           simp [SubnormalizedState.applyTraceNonincreasingCP_matrix,
-            MatrixMap.sumInrTraceDiscard_apply, State.toSubnormalized_matrix,
-            PureVector.state_matrix, rankOneMatrix_apply, abHatCanonicalScaledPure,
+            MatrixMap.sumInrTraceDiscard_apply, MState.toSubnormalized_matrix,
+            Ket.state_matrix, rankOneMatrix_apply, abHatCanonicalScaledPure,
             abHatCanonicalScaledPureAmp, SubnormalizedState.conditioningIsometryApply_matrix,
             acMarginalFromScaledTripartitePure, ReferenceIsometry.applyMatrixRight,
             ReferenceIsometry.rightBlock, ReferenceIsometry.sumInr, Matrix.mul_apply]
       | inr yC =>
           simp [SubnormalizedState.applyTraceNonincreasingCP_matrix,
-            MatrixMap.sumInrTraceDiscard_apply, State.toSubnormalized_matrix,
-            PureVector.state_matrix, rankOneMatrix_apply, abHatCanonicalScaledPure,
+            MatrixMap.sumInrTraceDiscard_apply, MState.toSubnormalized_matrix,
+            Ket.state_matrix, rankOneMatrix_apply, abHatCanonicalScaledPure,
             abHatCanonicalScaledPureAmp, SubnormalizedState.conditioningIsometryApply_matrix,
-            acMarginalFromScaledTripartitePure, State.marginalAC_matrix,
+            acMarginalFromScaledTripartitePure, MState.marginalAC_matrix,
             ReferenceIsometry.applyMatrixRight, ReferenceIsometry.rightBlock,
             ReferenceIsometry.sumInr, Matrix.mul_apply, Complex.real_smul]
           rw [Finset.mul_sum]
           apply Finset.sum_congr rfl
           intro z hz
           calc
-            ((Real.sqrt t : ℂ) * ψ.amp ((xA, z), xC) *
-                ((Real.sqrt t : ℂ) * star (ψ.amp ((yA, z), yC)))) =
+            ((Real.sqrt t : ℂ) * ψ.vec ((xA, z), xC) *
+                ((Real.sqrt t : ℂ) * star (ψ.vec ((yA, z), yC)))) =
                 ((Real.sqrt t : ℂ) * (Real.sqrt t : ℂ)) *
-                  (ψ.amp ((xA, z), xC) * star (ψ.amp ((yA, z), yC))) := by
+                  (ψ.vec ((xA, z), xC) * star (ψ.vec ((yA, z), yC))) := by
               ring
             _ = (t : ℂ) *
-                  (ψ.amp ((xA, z), xC) * star (ψ.amp ((yA, z), yC))) := by
+                  (ψ.vec ((xA, z), xC) * star (ψ.vec ((yA, z), yC))) := by
               rw [← Complex.ofReal_mul]
               congr 1
               rw [← sq, Real.sq_sqrt ht0]
@@ -2151,7 +2045,7 @@ private theorem abHatCanonicalScaledPure_sumInrTraceDiscard_matrix
 embedded in the right summand of the enlarged reference after discarding the
 success `B` register. -/
 theorem abHatCanonicalScaledPure_sumInrTraceDiscard
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
     SubnormalizedState.applyTraceNonincreasingCP
         (abHatCanonicalScaledPure (a := a) (b := b) (c := c) ψ t ht0 ht1).state.toSubnormalized
         (MatrixMap.sumInrTraceDiscard (r := ACPlusReference a b c) (α := a) (β := b))
@@ -2167,8 +2061,8 @@ theorem abHatCanonicalScaledPure_sumInrTraceDiscard
 /-- Existence package for the canonical hatted scaled-pure `AB → AC⁺` base
 route. -/
 theorem abHatCanonicalScaledPureBridge
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
-    ∃ Φ : PureVector (Prod (ACPlusReference a b c) (ABHat a b)),
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    ∃ Φ : Ket (ACPlusReference a b c × ABHat a b),
       Φ.Purifies
         (abMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
           ψ t ht0 ht1).hatExtension ∧
@@ -2186,22 +2080,22 @@ theorem abHatCanonicalScaledPureBridge
       ψ t ht0 ht1
 
 /-- Canonical hatted scaled-pure amplitude for the `AC` target.  The success
-branch stores the original `ABC` pure vector in the right `B` summand of the
+branch stores the original `ABC` ket in the right `B` summand of the
 enlarged reference; the hat failure mass is stored in the left failure
 summand. -/
 def acHatCanonicalScaledPureAmp
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) :
-    Prod (ABPlusReference a b c) (ACHat a c) → ℂ
+    (ψ : Ket ((a × b) × c)) (t : ℝ) :
+    ABPlusReference a b c × ACHat a c → ℂ
   | (Sum.inl (Sum.inl _), Sum.inl _) => ((Real.sqrt (1 - t) : ℝ) : ℂ)
-  | (Sum.inr y, Sum.inr (x, z)) => ((Real.sqrt t : ℝ) : ℂ) * ψ.amp ((x, y), z)
+  | (Sum.inr y, Sum.inr (x, z)) => ((Real.sqrt t : ℝ) : ℂ) * ψ.vec ((x, y), z)
   | _ => 0
 
-private theorem acHatCanonicalScaledPureAmp_partialTraceA
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
-    partialTraceA
+private theorem acHatCanonicalScaledPureAmp_traceLeft
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    Matrix.traceLeft
         (rankOneMatrix (acHatCanonicalScaledPureAmp (a := a) (b := b) (c := c) ψ t)) =
       (acMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
-        ψ t ht0 ht1).hatExtension.matrix := by
+        ψ t ht0 ht1).hatExtension.m := by
   classical
   have hmass :
       (acMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
@@ -2214,67 +2108,65 @@ private theorem acHatCanonicalScaledPureAmp_partialTraceA
       cases y with
       | inl yf =>
           rw [SubnormalizedState.hatExtension_matrix]
-          simp only [partialTraceA, rankOneMatrix_apply, acHatCanonicalScaledPureAmp]
+          simp only [Matrix.traceLeft, Matrix.of_apply, rankOneMatrix_apply, acHatCanonicalScaledPureAmp]
           rw [SubnormalizedState.hatExtensionMatrix_fail_fail, hmass]
           simp
           rw [← Complex.ofReal_mul, ← sq, Real.sq_sqrt (sub_nonneg.mpr ht1)]
           norm_num
       | inr ysuccess =>
           rcases ysuccess with ⟨yA, yC⟩
-          simp [partialTraceA, rankOneMatrix_apply, acHatCanonicalScaledPureAmp,
+          simp [Matrix.traceLeft, rankOneMatrix_apply, acHatCanonicalScaledPureAmp,
             SubnormalizedState.hatExtensionMatrix]
   | inr xsuccess =>
       rcases xsuccess with ⟨xA, xC⟩
       cases y with
       | inl yf =>
-          simp [partialTraceA, rankOneMatrix_apply, acHatCanonicalScaledPureAmp,
+          simp [Matrix.traceLeft, rankOneMatrix_apply, acHatCanonicalScaledPureAmp,
             SubnormalizedState.hatExtensionMatrix]
       | inr ysuccess =>
           rcases ysuccess with ⟨yA, yC⟩
-          simp [partialTraceA, rankOneMatrix_apply, acHatCanonicalScaledPureAmp,
+          simp [Matrix.traceLeft, rankOneMatrix_apply, acHatCanonicalScaledPureAmp,
             SubnormalizedState.hatExtensionMatrix, acMarginalFromScaledTripartitePure,
-            State.marginalAC_matrix, Complex.real_smul]
+            MState.marginalAC_matrix, Complex.real_smul]
           rw [Finset.mul_sum]
           apply Finset.sum_congr rfl
           intro yB hy
           calc
-            ((Real.sqrt t : ℂ) * ψ.amp ((xA, yB), xC) *
-                ((Real.sqrt t : ℂ) * star (ψ.amp ((yA, yB), yC)))) =
+            ((Real.sqrt t : ℂ) * ψ.vec ((xA, yB), xC) *
+                ((Real.sqrt t : ℂ) * star (ψ.vec ((yA, yB), yC)))) =
                 ((Real.sqrt t : ℂ) * (Real.sqrt t : ℂ)) *
-                  (ψ.amp ((xA, yB), xC) * star (ψ.amp ((yA, yB), yC))) := by
+                  (ψ.vec ((xA, yB), xC) * star (ψ.vec ((yA, yB), yC))) := by
               ring
-            _ = (t : ℂ) * (ψ.amp ((xA, yB), xC) * star (ψ.amp ((yA, yB), yC))) := by
+            _ = (t : ℂ) * (ψ.vec ((xA, yB), xC) * star (ψ.vec ((yA, yB), yC))) := by
               rw [← Complex.ofReal_mul]
               congr 1
               rw [← sq, Real.sq_sqrt ht0]
 
 /-- Canonical hatted scaled-pure purification for the `AC` target. -/
 def acHatCanonicalScaledPure
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
-    PureVector (Prod (ABPlusReference a b c) (ACHat a c)) where
-  amp := acHatCanonicalScaledPureAmp (a := a) (b := b) (c := c) ψ t
-  trace_rankOne_eq_one := by
-    rw [← partialTraceA_trace
-      (a := ABPlusReference a b c) (b := ACHat a c)
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    Ket (ABPlusReference a b c × ACHat a c) :=
+  Ket.ofRankOne (acHatCanonicalScaledPureAmp (a := a) (b := b) (c := c) ψ t) <| by
+    rw [← Matrix.traceLeft_trace
       (rankOneMatrix (acHatCanonicalScaledPureAmp (a := a) (b := b) (c := c) ψ t))]
-    rw [acHatCanonicalScaledPureAmp_partialTraceA (a := a) (b := b) (c := c)
+    rw [acHatCanonicalScaledPureAmp_traceLeft (a := a) (b := b) (c := c)
       ψ t ht0 ht1]
     exact (acMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
-      ψ t ht0 ht1).hatExtension.trace_eq_one
+      ψ t ht0 ht1).hatExtension.tr'
 
 /-- The canonical hatted scaled-pure vector purifies the hatted scaled `AC`
 marginal. -/
 theorem acHatCanonicalScaledPure_purifies
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
     (acHatCanonicalScaledPure (a := a) (b := b) (c := c) ψ t ht0 ht1).Purifies
       (acMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
         ψ t ht0 ht1).hatExtension := by
-  rw [PureVector.purifies_iff, PureVector.state_matrix]
-  exact acHatCanonicalScaledPureAmp_partialTraceA (a := a) (b := b) (c := c)
+  rw [Ket.purifies_iff, Ket.state_matrix]
+  exact acHatCanonicalScaledPureAmp_traceLeft (a := a) (b := b) (c := c)
     ψ t ht0 ht1
 
 private theorem acHatCanonicalScaledPure_sumInrTraceDiscard_matrix
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
     (SubnormalizedState.applyTraceNonincreasingCP
         (acHatCanonicalScaledPure (a := a) (b := b) (c := c) ψ t ht0 ht1).state.toSubnormalized
         (MatrixMap.sumInrTraceDiscard (r := ABPlusReference a b c) (α := a) (β := c))
@@ -2291,8 +2183,8 @@ private theorem acHatCanonicalScaledPure_sumInrTraceDiscard_matrix
   | inl xHat =>
       cases yR <;>
         simp [SubnormalizedState.applyTraceNonincreasingCP_matrix,
-          MatrixMap.sumInrTraceDiscard_apply, State.toSubnormalized_matrix,
-          PureVector.state_matrix, rankOneMatrix_apply, acHatCanonicalScaledPure,
+          MatrixMap.sumInrTraceDiscard_apply, MState.toSubnormalized_matrix,
+          Ket.state_matrix, rankOneMatrix_apply, acHatCanonicalScaledPure,
           acHatCanonicalScaledPureAmp, SubnormalizedState.conditioningIsometryApply_matrix,
           abMarginalFromScaledTripartitePure, ReferenceIsometry.applyMatrixRight,
           ReferenceIsometry.rightBlock, ReferenceIsometry.sumInr, Matrix.mul_apply]
@@ -2300,29 +2192,29 @@ private theorem acHatCanonicalScaledPure_sumInrTraceDiscard_matrix
       cases yR with
       | inl yHat =>
           simp [SubnormalizedState.applyTraceNonincreasingCP_matrix,
-            MatrixMap.sumInrTraceDiscard_apply, State.toSubnormalized_matrix,
-            PureVector.state_matrix, rankOneMatrix_apply, acHatCanonicalScaledPure,
+            MatrixMap.sumInrTraceDiscard_apply, MState.toSubnormalized_matrix,
+            Ket.state_matrix, rankOneMatrix_apply, acHatCanonicalScaledPure,
             acHatCanonicalScaledPureAmp, SubnormalizedState.conditioningIsometryApply_matrix,
             abMarginalFromScaledTripartitePure, ReferenceIsometry.applyMatrixRight,
             ReferenceIsometry.rightBlock, ReferenceIsometry.sumInr, Matrix.mul_apply]
       | inr yB =>
           simp [SubnormalizedState.applyTraceNonincreasingCP_matrix,
-            MatrixMap.sumInrTraceDiscard_apply, State.toSubnormalized_matrix,
-            PureVector.state_matrix, rankOneMatrix_apply, acHatCanonicalScaledPure,
+            MatrixMap.sumInrTraceDiscard_apply, MState.toSubnormalized_matrix,
+            Ket.state_matrix, rankOneMatrix_apply, acHatCanonicalScaledPure,
             acHatCanonicalScaledPureAmp, SubnormalizedState.conditioningIsometryApply_matrix,
-            abMarginalFromScaledTripartitePure, State.marginalAB, State.marginalA,
-            partialTraceB, ReferenceIsometry.applyMatrixRight, ReferenceIsometry.rightBlock,
+            abMarginalFromScaledTripartitePure, MState.marginalAB,
+            Matrix.traceRight, ReferenceIsometry.applyMatrixRight, ReferenceIsometry.rightBlock,
             ReferenceIsometry.sumInr, Matrix.mul_apply, Complex.real_smul]
           rw [Finset.mul_sum]
           apply Finset.sum_congr rfl
           intro z hz
           calc
-            ((Real.sqrt t : ℂ) * ψ.amp ((xA, xB), z) *
-                ((Real.sqrt t : ℂ) * star (ψ.amp ((yA, yB), z)))) =
+            ((Real.sqrt t : ℂ) * ψ.vec ((xA, xB), z) *
+                ((Real.sqrt t : ℂ) * star (ψ.vec ((yA, yB), z)))) =
                 ((Real.sqrt t : ℂ) * (Real.sqrt t : ℂ)) *
-                  (ψ.amp ((xA, xB), z) * star (ψ.amp ((yA, yB), z))) := by
+                  (ψ.vec ((xA, xB), z) * star (ψ.vec ((yA, yB), z))) := by
               ring
-            _ = (t : ℂ) * (ψ.amp ((xA, xB), z) * star (ψ.amp ((yA, yB), z))) := by
+            _ = (t : ℂ) * (ψ.vec ((xA, xB), z) * star (ψ.vec ((yA, yB), z))) := by
               rw [← Complex.ofReal_mul]
               congr 1
               rw [← sq, Real.sq_sqrt ht0]
@@ -2331,7 +2223,7 @@ private theorem acHatCanonicalScaledPure_sumInrTraceDiscard_matrix
 embedded in the right summand of the enlarged reference after discarding the
 success `C` register. -/
 theorem acHatCanonicalScaledPure_sumInrTraceDiscard
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
     SubnormalizedState.applyTraceNonincreasingCP
         (acHatCanonicalScaledPure (a := a) (b := b) (c := c) ψ t ht0 ht1).state.toSubnormalized
         (MatrixMap.sumInrTraceDiscard (r := ABPlusReference a b c) (α := a) (β := c))
@@ -2347,8 +2239,8 @@ theorem acHatCanonicalScaledPure_sumInrTraceDiscard
 /-- Existence package for the canonical hatted scaled-pure `AC → AB⁺` base
 route. -/
 theorem acHatCanonicalScaledPureBridge
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
-    ∃ Φ : PureVector (Prod (ABPlusReference a b c) (ACHat a c)),
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    ∃ Φ : Ket (ABPlusReference a b c × ACHat a c),
       Φ.Purifies
         (acMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
           ψ t ht0 ht1).hatExtension ∧
@@ -2369,14 +2261,14 @@ theorem acHatCanonicalScaledPureBridge
 marginal.  The reference has enough room for both the hat failure branch and the
 original `C` system. -/
 def abHatBasePurificationFromScaledPure
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
-    PureVector (Prod (ACPlusReference a b c) (ABHat a b)) :=
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    Ket (ACPlusReference a b c × ABHat a b) :=
   abHatCanonicalScaledPure (a := a) (b := b) (c := c) ψ t ht0 ht1
 
 /-- The canonical enlarged-reference purification really purifies the hatted
 scaled `AB` marginal. -/
 theorem abHatBasePurificationFromScaledPure_purifies
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
     (abHatBasePurificationFromScaledPure (a := a) (b := b) (c := c) ψ t ht0 ht1).Purifies
       (abMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
         ψ t ht0 ht1).hatExtension :=
@@ -2386,14 +2278,14 @@ theorem abHatBasePurificationFromScaledPure_purifies
 marginal.  The reference has enough room for both the hat failure branch and the
 original `B` system. -/
 def acHatBasePurificationFromScaledPure
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
-    PureVector (Prod (ABPlusReference a b c) (ACHat a c)) :=
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    Ket (ABPlusReference a b c × ACHat a c) :=
   acHatCanonicalScaledPure (a := a) (b := b) (c := c) ψ t ht0 ht1
 
 /-- The canonical enlarged-reference purification really purifies the hatted
 scaled `AC` marginal. -/
 theorem acHatBasePurificationFromScaledPure_purifies
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
     (acHatBasePurificationFromScaledPure (a := a) (b := b) (c := c) ψ t ht0 ht1).Purifies
       (acMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
         ψ t ht0 ht1).hatExtension :=
@@ -2402,8 +2294,8 @@ theorem acHatBasePurificationFromScaledPure_purifies
 /-- The `AC⁺` base complement obtained by keeping the success `A` block and
 discarding the original `B` register from the hatted `AB` purification. -/
 def embeddedACPlusBaseFromScaledPure
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
-    SubnormalizedState (Prod a (ACPlusReference a b c)) :=
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    SubnormalizedState (a × ACPlusReference a b c) :=
   (abHatBasePurificationFromScaledPure (a := a) (b := b) (c := c)
       ψ t ht0 ht1).state.toSubnormalized.applyTraceNonincreasingCP
     (MatrixMap.sumInrTraceDiscard (r := ACPlusReference a b c) (α := a) (β := b))
@@ -2413,8 +2305,8 @@ def embeddedACPlusBaseFromScaledPure
 /-- The `AB⁺` base complement obtained by keeping the success `A` block and
 discarding the original `C` register from the hatted `AC` purification. -/
 def embeddedABPlusBaseFromScaledPure
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
-    SubnormalizedState (Prod a (ABPlusReference a b c)) :=
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    SubnormalizedState (a × ABPlusReference a b c) :=
   (acHatBasePurificationFromScaledPure (a := a) (b := b) (c := c)
       ψ t ht0 ht1).state.toSubnormalized.applyTraceNonincreasingCP
     (MatrixMap.sumInrTraceDiscard (r := ABPlusReference a b c) (α := a) (β := c))
@@ -2424,7 +2316,7 @@ def embeddedABPlusBaseFromScaledPure
 /-- With the canonical hatted base, the embedded `AC⁺` base is exactly the
 right-summand padding of the scaled `AC` marginal. -/
 theorem embeddedACPlusBaseFromScaledPure_eq_conditioningIsometryApply_sumInr
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
     embeddedACPlusBaseFromScaledPure (a := a) (b := b) (c := c) ψ t ht0 ht1 =
       (acMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
         ψ t ht0 ht1).conditioningIsometryApply
@@ -2436,7 +2328,7 @@ theorem embeddedACPlusBaseFromScaledPure_eq_conditioningIsometryApply_sumInr
 /-- With the canonical hatted base, the embedded `AB⁺` base is exactly the
 right-summand padding of the scaled `AB` marginal. -/
 theorem embeddedABPlusBaseFromScaledPure_eq_conditioningIsometryApply_sumInr
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
     embeddedABPlusBaseFromScaledPure (a := a) (b := b) (c := c) ψ t ht0 ht1 =
       (abMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
         ψ t ht0 ht1).conditioningIsometryApply
@@ -2448,9 +2340,9 @@ theorem embeddedABPlusBaseFromScaledPure_eq_conditioningIsometryApply_sumInr
 /-- A fixed-register subnormalized `AB` smooth candidate has an embedded
 failure-aware `AC⁺` complementary candidate. -/
 def EmbeddedABToACSmoothCandidate
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1)
-    (ε : ℝ) (ρAB' : SubnormalizedState (Prod a b)) : Prop :=
-  ∃ Φ : PureVector (Prod (ACPlusReference a b c) (ABHat a b)),
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1)
+    (ε : ℝ) (ρAB' : SubnormalizedState (a × b)) : Prop :=
+  ∃ Φ : Ket (ACPlusReference a b c × ABHat a b),
     Φ.Purifies ρAB'.hatExtension ∧
       (embeddedACPlusBaseFromScaledPure (a := a) (b := b) (c := c)
         ψ t ht0 ht1).purifiedBall ε
@@ -2462,9 +2354,9 @@ def EmbeddedABToACSmoothCandidate
 /-- A fixed-register subnormalized `AC` smooth candidate has an embedded
 failure-aware `AB⁺` complementary candidate. -/
 def EmbeddedACToABSmoothCandidate
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1)
-    (ε : ℝ) (ρAC' : SubnormalizedState (Prod a c)) : Prop :=
-  ∃ Φ : PureVector (Prod (ABPlusReference a b c) (ACHat a c)),
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1)
+    (ε : ℝ) (ρAC' : SubnormalizedState (a × c)) : Prop :=
+  ∃ Φ : Ket (ABPlusReference a b c × ACHat a c),
     Φ.Purifies ρAC'.hatExtension ∧
       (embeddedABPlusBaseFromScaledPure (a := a) (b := b) (c := c)
         ψ t ht0 ht1).purifiedBall ε
@@ -2477,22 +2369,22 @@ def EmbeddedACToABSmoothCandidate
 directions.  The complementary outputs live on enlarged references carrying the
 hat failure branch, not on the original fixed `B/C` registers. -/
 def EmbeddedSmoothConditionalMinMaxPairing
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1)
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1)
     (ε : ℝ) : Prop :=
-  (∀ ρAB' : SubnormalizedState (Prod a b),
+  (∀ ρAB' : SubnormalizedState (a × b),
       (abMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
         ψ t ht0 ht1).purifiedBall ε ρAB' →
         EmbeddedABToACSmoothCandidate (a := a) (b := b) (c := c)
           ψ t ht0 ht1 ε ρAB') ∧
-    (∀ ρAC' : SubnormalizedState (Prod a c),
+    (∀ ρAC' : SubnormalizedState (a × c),
       (acMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
         ψ t ht0 ht1).purifiedBall ε ρAC' →
         EmbeddedACToABSmoothCandidate (a := a) (b := b) (c := c)
           ψ t ht0 ht1 ε ρAC')
 
 private theorem embeddedABToAC_of_scaled_pure_purifiedBall
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1)
-    {ε : ℝ} {ρAB' : SubnormalizedState (Prod a b)}
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1)
+    {ε : ℝ} {ρAB' : SubnormalizedState (a × b)}
     (hball :
       (abMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
         ψ t ht0 ht1).purifiedBall ε ρAB') :
@@ -2512,20 +2404,20 @@ private theorem embeddedABToAC_of_scaled_pure_purifiedBall
   have hcard : Fintype.card (ABHat a b) ≤ Fintype.card (ACPlusReference a b c) :=
     card_abHat_le_acPlusReference (a := a) (b := b) (c := c)
   obtain ⟨Φ, hΦ, hoverlap⟩ :=
-    PureVector.exists_purification_with_overlapSq_eq_squaredFidelity
+    Ket.exists_purification_with_overlapSq_eq_squaredFidelity
       (Ψ := Ψbase) (ρ := ρAB.hatExtension) (σ := ρAB'.hatExtension)
       hΨ hcard
   refine ⟨Φ, hΦ, ?_⟩
   have hF :
       ρAB.hatExtension.squaredFidelity ρAB'.hatExtension ≤
         Ψbase.state.squaredFidelity Φ.state := by
-    have hbound := PureVector.overlapSq_le_state_squaredFidelity Ψbase Φ
+    have hbound := Ket.overlapSq_le_state_squaredFidelity Ψbase Φ
     rwa [hoverlap] at hbound
   have hfull : Ψbase.state.purifiedBall ε Φ.state :=
-    State.purifiedBall_of_squaredFidelity_le hF hhat
+    MState.purifiedBall_of_squaredFidelity_le hF hhat
   have hsub :
       Ψbase.state.toSubnormalized.purifiedBall ε Φ.state.toSubnormalized :=
-    (State.purifiedBall_iff_toSubnormalized_purifiedBall Ψbase.state Φ.state ε).mp hfull
+    (MState.purifiedBall_iff_toSubnormalized_purifiedBall Ψbase.state Φ.state ε).mp hfull
   simpa [EmbeddedABToACSmoothCandidate, embeddedACPlusBaseFromScaledPure, Ψbase] using
     (SubnormalizedState.purifiedBall_of_traceNonincreasingCP
       (ρ := Ψbase.state.toSubnormalized) (σ := Φ.state.toSubnormalized)
@@ -2536,8 +2428,8 @@ private theorem embeddedABToAC_of_scaled_pure_purifiedBall
       hsub)
 
 private theorem embeddedACToAB_of_scaled_pure_purifiedBall
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1)
-    {ε : ℝ} {ρAC' : SubnormalizedState (Prod a c)}
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1)
+    {ε : ℝ} {ρAC' : SubnormalizedState (a × c)}
     (hball :
       (acMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
         ψ t ht0 ht1).purifiedBall ε ρAC') :
@@ -2557,20 +2449,20 @@ private theorem embeddedACToAB_of_scaled_pure_purifiedBall
   have hcard : Fintype.card (ACHat a c) ≤ Fintype.card (ABPlusReference a b c) :=
     card_acHat_le_abPlusReference (a := a) (b := b) (c := c)
   obtain ⟨Φ, hΦ, hoverlap⟩ :=
-    PureVector.exists_purification_with_overlapSq_eq_squaredFidelity
+    Ket.exists_purification_with_overlapSq_eq_squaredFidelity
       (Ψ := Ψbase) (ρ := ρAC.hatExtension) (σ := ρAC'.hatExtension)
       hΨ hcard
   refine ⟨Φ, hΦ, ?_⟩
   have hF :
       ρAC.hatExtension.squaredFidelity ρAC'.hatExtension ≤
         Ψbase.state.squaredFidelity Φ.state := by
-    have hbound := PureVector.overlapSq_le_state_squaredFidelity Ψbase Φ
+    have hbound := Ket.overlapSq_le_state_squaredFidelity Ψbase Φ
     rwa [hoverlap] at hbound
   have hfull : Ψbase.state.purifiedBall ε Φ.state :=
-    State.purifiedBall_of_squaredFidelity_le hF hhat
+    MState.purifiedBall_of_squaredFidelity_le hF hhat
   have hsub :
       Ψbase.state.toSubnormalized.purifiedBall ε Φ.state.toSubnormalized :=
-    (State.purifiedBall_iff_toSubnormalized_purifiedBall Ψbase.state Φ.state ε).mp hfull
+    (MState.purifiedBall_iff_toSubnormalized_purifiedBall Ψbase.state Φ.state ε).mp hfull
   simpa [EmbeddedACToABSmoothCandidate, embeddedABPlusBaseFromScaledPure, Ψbase] using
     (SubnormalizedState.purifiedBall_of_traceNonincreasingCP
       (ρ := Ψbase.state.toSubnormalized) (σ := Φ.state.toSubnormalized)
@@ -2584,7 +2476,7 @@ private theorem embeddedACToAB_of_scaled_pure_purifiedBall
 subnormalized smoothing candidate to an embedded failure-aware complementary
 candidate, in both directions. -/
 theorem embeddedSmoothConditionalMinMaxPairing_of_scaled_pure
-    (ψ : PureVector (Prod (Prod a b) c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1)
+    (ψ : Ket ((a × b) × c)) (t : ℝ) (ht0 : 0 ≤ t) (ht1 : t ≤ 1)
     (ε : ℝ) :
     EmbeddedSmoothConditionalMinMaxPairing (a := a) (b := b) (c := c)
       ψ t ht0 ht1 ε := by
@@ -2599,10 +2491,10 @@ theorem embeddedSmoothConditionalMinMaxPairing_of_scaled_pure
 /-- Project the `AB → AC⁺` direction from embedded subnormalized
 purification-ball transport. -/
 theorem EmbeddedSmoothConditionalMinMaxPairing.ab_to_ac_of_purifiedBall
-    {ψ : PureVector (Prod (Prod a b) c)} {t ε : ℝ} {ht0 : 0 ≤ t} {ht1 : t ≤ 1}
+    {ψ : Ket ((a × b) × c)} {t ε : ℝ} {ht0 : 0 ≤ t} {ht1 : t ≤ 1}
     (hpair : EmbeddedSmoothConditionalMinMaxPairing (a := a) (b := b) (c := c)
       ψ t ht0 ht1 ε)
-    (ρAB' : SubnormalizedState (Prod a b))
+    (ρAB' : SubnormalizedState (a × b))
     (hball :
       (abMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
         ψ t ht0 ht1).purifiedBall ε ρAB') :
@@ -2613,10 +2505,10 @@ theorem EmbeddedSmoothConditionalMinMaxPairing.ab_to_ac_of_purifiedBall
 /-- Project the `AC → AB⁺` direction from embedded subnormalized
 purification-ball transport. -/
 theorem EmbeddedSmoothConditionalMinMaxPairing.ac_to_ab_of_purifiedBall
-    {ψ : PureVector (Prod (Prod a b) c)} {t ε : ℝ} {ht0 : 0 ≤ t} {ht1 : t ≤ 1}
+    {ψ : Ket ((a × b) × c)} {t ε : ℝ} {ht0 : 0 ≤ t} {ht1 : t ≤ 1}
     (hpair : EmbeddedSmoothConditionalMinMaxPairing (a := a) (b := b) (c := c)
       ψ t ht0 ht1 ε)
-    (ρAC' : SubnormalizedState (Prod a c))
+    (ρAC' : SubnormalizedState (a × c))
     (hball :
       (acMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
         ψ t ht0 ht1).purifiedBall ε ρAC') :
@@ -2627,29 +2519,29 @@ theorem EmbeddedSmoothConditionalMinMaxPairing.ac_to_ab_of_purifiedBall
 /-- An embedded `AB → AC⁺` subnormalized candidate gives an enlarged
 complementary pure-marginal relation after extracting the hatted success block. -/
 theorem EmbeddedABToACSmoothCandidate.exists_complementaryPureMarginalRel
-    {ψ : PureVector (Prod (Prod a b) c)} {t ε : ℝ} {ht0 : 0 ≤ t} {ht1 : t ≤ 1}
-    {ρAB' : SubnormalizedState (Prod a b)}
+    {ψ : Ket ((a × b) × c)} {t ε : ℝ} {ht0 : 0 ≤ t} {ht1 : t ≤ 1}
+    {ρAB' : SubnormalizedState (a × b)}
     (h : EmbeddedABToACSmoothCandidate (a := a) (b := b) (c := c)
       ψ t ht0 ht1 ε ρAB')
     (hρ : 0 < ρAB'.matrix.trace.re) :
-    ∃ ρACPlus' : SubnormalizedState (Prod a (ACPlusReference a b c)),
+    ∃ ρACPlus' : SubnormalizedState (a × ACPlusReference a b c),
       (embeddedACPlusBaseFromScaledPure (a := a) (b := b) (c := c)
         ψ t ht0 ht1).purifiedBall ε ρACPlus' ∧
       ComplementaryPureMarginalRel (a := a) (b := b) (c := ACPlusReference a b c)
         ρAB' ρACPlus' := by
   rcases h with ⟨Φ, hΦ, hball⟩
-  let ρACPlus' : SubnormalizedState (Prod a (ACPlusReference a b c)) :=
+  let ρACPlus' : SubnormalizedState (a × ACPlusReference a b c) :=
     Φ.state.toSubnormalized.applyTraceNonincreasingCP
       (MatrixMap.sumInrTraceDiscard (r := ACPlusReference a b c) (α := a) (β := b))
       (MatrixMap.sumInrTraceDiscard_traceNonincreasingCP
         (r := ACPlusReference a b c) (α := a) (β := b))
   refine ⟨ρACPlus', hball, ?_⟩
   have hsuccess :
-      Φ.state.marginalB.successBlockOfHatState = ρAB' :=
-    successBlockOf_marginalB_eq_of_purifies_hatExtension
+      Φ.state.traceLeft.successBlockOfHatState = ρAB' :=
+    successBlockOf_traceLeft_eq_of_purifies_hatExtension
       (a := a) (b := b) (R := ACPlusReference a b c) hΦ
   have htr :
-      0 < (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re := by
+      0 < (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re := by
     rwa [hsuccess]
   simpa [ρACPlus', hsuccess] using
     (complementaryPureMarginalRel_of_abHat_success
@@ -2658,29 +2550,29 @@ theorem EmbeddedABToACSmoothCandidate.exists_complementaryPureMarginalRel
 /-- An embedded `AC → AB⁺` subnormalized candidate gives an enlarged
 complementary pure-marginal relation after extracting the hatted success block. -/
 theorem EmbeddedACToABSmoothCandidate.exists_complementaryPureMarginalRel
-    {ψ : PureVector (Prod (Prod a b) c)} {t ε : ℝ} {ht0 : 0 ≤ t} {ht1 : t ≤ 1}
-    {ρAC' : SubnormalizedState (Prod a c)}
+    {ψ : Ket ((a × b) × c)} {t ε : ℝ} {ht0 : 0 ≤ t} {ht1 : t ≤ 1}
+    {ρAC' : SubnormalizedState (a × c)}
     (h : EmbeddedACToABSmoothCandidate (a := a) (b := b) (c := c)
       ψ t ht0 ht1 ε ρAC')
     (hρ : 0 < ρAC'.matrix.trace.re) :
-    ∃ ρABPlus' : SubnormalizedState (Prod a (ABPlusReference a b c)),
+    ∃ ρABPlus' : SubnormalizedState (a × ABPlusReference a b c),
       (embeddedABPlusBaseFromScaledPure (a := a) (b := b) (c := c)
         ψ t ht0 ht1).purifiedBall ε ρABPlus' ∧
       ComplementaryPureMarginalRel (a := a) (b := ABPlusReference a b c) (c := c)
         ρABPlus' ρAC' := by
   rcases h with ⟨Φ, hΦ, hball⟩
-  let ρABPlus' : SubnormalizedState (Prod a (ABPlusReference a b c)) :=
+  let ρABPlus' : SubnormalizedState (a × ABPlusReference a b c) :=
     Φ.state.toSubnormalized.applyTraceNonincreasingCP
       (MatrixMap.sumInrTraceDiscard (r := ABPlusReference a b c) (α := a) (β := c))
       (MatrixMap.sumInrTraceDiscard_traceNonincreasingCP
         (r := ABPlusReference a b c) (α := a) (β := c))
   refine ⟨ρABPlus', hball, ?_⟩
   have hsuccess :
-      Φ.state.marginalB.successBlockOfHatState = ρAC' :=
-    successBlockOf_marginalB_eq_of_purifies_hatExtension
+      Φ.state.traceLeft.successBlockOfHatState = ρAC' :=
+    successBlockOf_traceLeft_eq_of_purifies_hatExtension
       (a := a) (b := c) (R := ABPlusReference a b c) hΦ
   have htr :
-      0 < (Φ.state.marginalB.successBlockOfHatState.matrix.trace).re := by
+      0 < (Φ.state.traceLeft.successBlockOfHatState.matrix.trace).re := by
     rwa [hsuccess]
   simpa [ρABPlus', hsuccess] using
     (complementaryPureMarginalRel_of_acHat_success
@@ -2689,7 +2581,7 @@ theorem EmbeddedACToABSmoothCandidate.exists_complementaryPureMarginalRel
 /-- Candidate-level relation needed to turn a subnormalized purification-level
 min/max duality proof into the smooth entropy equality. -/
 def SmoothConditionalMinMaxCandidateDuality
-    (ρAB : SubnormalizedState (Prod a b)) (ρAC : SubnormalizedState (Prod a c))
+    (ρAB : SubnormalizedState (a × b)) (ρAC : SubnormalizedState (a × c))
     (ε : ℝ) : Prop :=
   ∀ h : ℝ,
     SmoothConditionalMaxEntropyCandidateRaw (a := a) ρAB ε h ↔
@@ -2697,7 +2589,7 @@ def SmoothConditionalMinMaxCandidateDuality
 
 @[simp]
 theorem SmoothConditionalMinMaxCandidateDuality_eq
-    (ρAB : SubnormalizedState (Prod a b)) (ρAC : SubnormalizedState (Prod a c))
+    (ρAB : SubnormalizedState (a × b)) (ρAC : SubnormalizedState (a × c))
     (ε : ℝ) :
     SmoothConditionalMinMaxCandidateDuality (a := a) ρAB ρAC ε ↔
       ∀ h : ℝ,
@@ -2710,25 +2602,25 @@ duality route.  The entropy equality on each related pair is supplied as a
 separate unsmoothed input; this predicate records only the
 transport-plus-entropy handoff. -/
 def SmoothConditionalMinMaxWitnessDuality
-    (ρAB : SubnormalizedState (Prod a b)) (ρAC : SubnormalizedState (Prod a c))
+    (ρAB : SubnormalizedState (a × b)) (ρAC : SubnormalizedState (a × c))
     (ε : ℝ) : Prop :=
-  (∀ ρAB' : SubnormalizedState (Prod a b), ρAB.purifiedBall ε ρAB' →
-      ∃ ρAC' : SubnormalizedState (Prod a c), ρAC.purifiedBall ε ρAC' ∧
+  (∀ ρAB' : SubnormalizedState (a × b), ρAB.purifiedBall ε ρAB' →
+      ∃ ρAC' : SubnormalizedState (a × c), ρAC.purifiedBall ε ρAC' ∧
         ρAB'.conditionalMaxEntropyRaw = -ρAC'.conditionalMinEntropyRaw) ∧
-    (∀ ρAC' : SubnormalizedState (Prod a c), ρAC.purifiedBall ε ρAC' →
-      ∃ ρAB' : SubnormalizedState (Prod a b), ρAB.purifiedBall ε ρAB' ∧
+    (∀ ρAC' : SubnormalizedState (a × c), ρAC.purifiedBall ε ρAC' →
+      ∃ ρAB' : SubnormalizedState (a × b), ρAB.purifiedBall ε ρAB' ∧
         ρAB'.conditionalMaxEntropyRaw = -ρAC'.conditionalMinEntropyRaw)
 
 @[simp]
 theorem SmoothConditionalMinMaxWitnessDuality_eq
-    (ρAB : SubnormalizedState (Prod a b)) (ρAC : SubnormalizedState (Prod a c))
+    (ρAB : SubnormalizedState (a × b)) (ρAC : SubnormalizedState (a × c))
     (ε : ℝ) :
     SmoothConditionalMinMaxWitnessDuality (a := a) ρAB ρAC ε ↔
-      (∀ ρAB' : SubnormalizedState (Prod a b), ρAB.purifiedBall ε ρAB' →
-          ∃ ρAC' : SubnormalizedState (Prod a c), ρAC.purifiedBall ε ρAC' ∧
+      (∀ ρAB' : SubnormalizedState (a × b), ρAB.purifiedBall ε ρAB' →
+          ∃ ρAC' : SubnormalizedState (a × c), ρAC.purifiedBall ε ρAC' ∧
             ρAB'.conditionalMaxEntropyRaw = -ρAC'.conditionalMinEntropyRaw) ∧
-        (∀ ρAC' : SubnormalizedState (Prod a c), ρAC.purifiedBall ε ρAC' →
-          ∃ ρAB' : SubnormalizedState (Prod a b), ρAB.purifiedBall ε ρAB' ∧
+        (∀ ρAC' : SubnormalizedState (a × c), ρAC.purifiedBall ε ρAC' →
+          ∃ ρAB' : SubnormalizedState (a × b), ρAB.purifiedBall ε ρAB' ∧
             ρAB'.conditionalMaxEntropyRaw = -ρAC'.conditionalMinEntropyRaw) :=
   Iff.rfl
 
@@ -2737,41 +2629,41 @@ candidates.  This records the fixed-register transport property once it is
 available from a separate purification-lifting argument; it does not assert
 that every fixed reference can purify every smoothed candidate. -/
 def SmoothConditionalMinMaxPairing
-    (ρAB : SubnormalizedState (Prod a b)) (ρAC : SubnormalizedState (Prod a c))
+    (ρAB : SubnormalizedState (a × b)) (ρAC : SubnormalizedState (a × c))
     (ε : ℝ)
-    (Rel : SubnormalizedState (Prod a b) → SubnormalizedState (Prod a c) → Prop) :
+    (Rel : SubnormalizedState (a × b) → SubnormalizedState (a × c) → Prop) :
     Prop :=
-  (∀ ρAB' : SubnormalizedState (Prod a b), ρAB.purifiedBall ε ρAB' →
-      ∃ ρAC' : SubnormalizedState (Prod a c), ρAC.purifiedBall ε ρAC' ∧ Rel ρAB' ρAC') ∧
-    (∀ ρAC' : SubnormalizedState (Prod a c), ρAC.purifiedBall ε ρAC' →
-      ∃ ρAB' : SubnormalizedState (Prod a b), ρAB.purifiedBall ε ρAB' ∧ Rel ρAB' ρAC')
+  (∀ ρAB' : SubnormalizedState (a × b), ρAB.purifiedBall ε ρAB' →
+      ∃ ρAC' : SubnormalizedState (a × c), ρAC.purifiedBall ε ρAC' ∧ Rel ρAB' ρAC') ∧
+    (∀ ρAC' : SubnormalizedState (a × c), ρAC.purifiedBall ε ρAC' →
+      ∃ ρAB' : SubnormalizedState (a × b), ρAB.purifiedBall ε ρAB' ∧ Rel ρAB' ρAC')
 
 @[simp]
 theorem SmoothConditionalMinMaxPairing_eq
-    (ρAB : SubnormalizedState (Prod a b)) (ρAC : SubnormalizedState (Prod a c))
+    (ρAB : SubnormalizedState (a × b)) (ρAC : SubnormalizedState (a × c))
     (ε : ℝ)
-    (Rel : SubnormalizedState (Prod a b) → SubnormalizedState (Prod a c) → Prop) :
+    (Rel : SubnormalizedState (a × b) → SubnormalizedState (a × c) → Prop) :
     SmoothConditionalMinMaxPairing (a := a) ρAB ρAC ε Rel ↔
-      (∀ ρAB' : SubnormalizedState (Prod a b), ρAB.purifiedBall ε ρAB' →
-          ∃ ρAC' : SubnormalizedState (Prod a c), ρAC.purifiedBall ε ρAC' ∧ Rel ρAB' ρAC') ∧
-        (∀ ρAC' : SubnormalizedState (Prod a c), ρAC.purifiedBall ε ρAC' →
-          ∃ ρAB' : SubnormalizedState (Prod a b), ρAB.purifiedBall ε ρAB' ∧
+      (∀ ρAB' : SubnormalizedState (a × b), ρAB.purifiedBall ε ρAB' →
+          ∃ ρAC' : SubnormalizedState (a × c), ρAC.purifiedBall ε ρAC' ∧ Rel ρAB' ρAC') ∧
+        (∀ ρAC' : SubnormalizedState (a × c), ρAC.purifiedBall ε ρAC' →
+          ∃ ρAB' : SubnormalizedState (a × b), ρAB.purifiedBall ε ρAB' ∧
             Rel ρAB' ρAC') :=
   Iff.rfl
 
 /-- Package externally supplied fixed-register subnormalized purified-ball
 transport directions as a relation-parametric smooth min/max pairing. -/
 theorem smoothConditionalMinMaxPairing_of_transports
-    {ρAB : SubnormalizedState (Prod a b)} {ρAC : SubnormalizedState (Prod a c)}
+    {ρAB : SubnormalizedState (a × b)} {ρAC : SubnormalizedState (a × c)}
     {ε : ℝ}
-    {Rel : SubnormalizedState (Prod a b) → SubnormalizedState (Prod a c) → Prop}
+    {Rel : SubnormalizedState (a × b) → SubnormalizedState (a × c) → Prop}
     (hABToAC :
-      ∀ ρAB' : SubnormalizedState (Prod a b), ρAB.purifiedBall ε ρAB' →
-        ∃ ρAC' : SubnormalizedState (Prod a c),
+      ∀ ρAB' : SubnormalizedState (a × b), ρAB.purifiedBall ε ρAB' →
+        ∃ ρAC' : SubnormalizedState (a × c),
           ρAC.purifiedBall ε ρAC' ∧ Rel ρAB' ρAC')
     (hACToAB :
-      ∀ ρAC' : SubnormalizedState (Prod a c), ρAC.purifiedBall ε ρAC' →
-        ∃ ρAB' : SubnormalizedState (Prod a b),
+      ∀ ρAC' : SubnormalizedState (a × c), ρAC.purifiedBall ε ρAC' →
+        ∃ ρAB' : SubnormalizedState (a × b),
           ρAB.purifiedBall ε ρAB' ∧ Rel ρAB' ρAC') :
     SmoothConditionalMinMaxPairing (a := a) ρAB ρAC ε Rel :=
   ⟨hABToAC, hACToAB⟩
@@ -2779,24 +2671,24 @@ theorem smoothConditionalMinMaxPairing_of_transports
 /-- Project the externally supplied `AB → AC` direction from a fixed-register
 subnormalized purified-ball pairing. -/
 theorem SmoothConditionalMinMaxPairing.ab_to_ac_of_purifiedBall
-    {ρAB : SubnormalizedState (Prod a b)} {ρAC : SubnormalizedState (Prod a c)}
+    {ρAB : SubnormalizedState (a × b)} {ρAC : SubnormalizedState (a × c)}
     {ε : ℝ}
-    {Rel : SubnormalizedState (Prod a b) → SubnormalizedState (Prod a c) → Prop}
+    {Rel : SubnormalizedState (a × b) → SubnormalizedState (a × c) → Prop}
     (hpair : SmoothConditionalMinMaxPairing (a := a) ρAB ρAC ε Rel)
-    (ρAB' : SubnormalizedState (Prod a b)) (hball : ρAB.purifiedBall ε ρAB') :
-    ∃ ρAC' : SubnormalizedState (Prod a c),
+    (ρAB' : SubnormalizedState (a × b)) (hball : ρAB.purifiedBall ε ρAB') :
+    ∃ ρAC' : SubnormalizedState (a × c),
       ρAC.purifiedBall ε ρAC' ∧ Rel ρAB' ρAC' :=
   hpair.1 ρAB' hball
 
 /-- Project the externally supplied `AC → AB` direction from a fixed-register
 subnormalized purified-ball pairing. -/
 theorem SmoothConditionalMinMaxPairing.ac_to_ab_of_purifiedBall
-    {ρAB : SubnormalizedState (Prod a b)} {ρAC : SubnormalizedState (Prod a c)}
+    {ρAB : SubnormalizedState (a × b)} {ρAC : SubnormalizedState (a × c)}
     {ε : ℝ}
-    {Rel : SubnormalizedState (Prod a b) → SubnormalizedState (Prod a c) → Prop}
+    {Rel : SubnormalizedState (a × b) → SubnormalizedState (a × c) → Prop}
     (hpair : SmoothConditionalMinMaxPairing (a := a) ρAB ρAC ε Rel)
-    (ρAC' : SubnormalizedState (Prod a c)) (hball : ρAC.purifiedBall ε ρAC') :
-    ∃ ρAB' : SubnormalizedState (Prod a b),
+    (ρAC' : SubnormalizedState (a × c)) (hball : ρAC.purifiedBall ε ρAC') :
+    ∃ ρAB' : SubnormalizedState (a × b),
       ρAB.purifiedBall ε ρAB' ∧ Rel ρAB' ρAC' :=
   hpair.2 ρAC' hball
 
@@ -2804,15 +2696,15 @@ theorem SmoothConditionalMinMaxPairing.ac_to_ab_of_purifiedBall
 candidate states.  This is the relation-parametric input consumed by the
 smooth witness bridge. -/
 def ConditionalMinMaxEntropyDualOn
-    (Rel : SubnormalizedState (Prod a b) → SubnormalizedState (Prod a c) → Prop) : Prop :=
-  ∀ ρAB' : SubnormalizedState (Prod a b), ∀ ρAC' : SubnormalizedState (Prod a c),
+    (Rel : SubnormalizedState (a × b) → SubnormalizedState (a × c) → Prop) : Prop :=
+  ∀ ρAB' : SubnormalizedState (a × b), ∀ ρAC' : SubnormalizedState (a × c),
     Rel ρAB' ρAC' → ρAB'.conditionalMaxEntropyRaw = -ρAC'.conditionalMinEntropyRaw
 
 @[simp]
 theorem ConditionalMinMaxEntropyDualOn_eq
-    (Rel : SubnormalizedState (Prod a b) → SubnormalizedState (Prod a c) → Prop) :
+    (Rel : SubnormalizedState (a × b) → SubnormalizedState (a × c) → Prop) :
     ConditionalMinMaxEntropyDualOn (a := a) Rel ↔
-      ∀ ρAB' : SubnormalizedState (Prod a b), ∀ ρAC' : SubnormalizedState (Prod a c),
+      ∀ ρAB' : SubnormalizedState (a × b), ∀ ρAC' : SubnormalizedState (a × c),
         Rel ρAB' ρAC' →
           ρAB'.conditionalMaxEntropyRaw = -ρAC'.conditionalMinEntropyRaw :=
   Iff.rfl
@@ -2820,9 +2712,9 @@ theorem ConditionalMinMaxEntropyDualOn_eq
 /-- Pairing transport plus unsmoothed pairwise duality gives the
 subnormalized witness-level smooth min/max duality predicate. -/
 theorem SmoothConditionalMinMaxWitnessDuality.of_pairing_of_entropy_duality
-    {ρAB : SubnormalizedState (Prod a b)} {ρAC : SubnormalizedState (Prod a c)}
+    {ρAB : SubnormalizedState (a × b)} {ρAC : SubnormalizedState (a × c)}
     {ε : ℝ}
-    {Rel : SubnormalizedState (Prod a b) → SubnormalizedState (Prod a c) → Prop}
+    {Rel : SubnormalizedState (a × b) → SubnormalizedState (a × c) → Prop}
     (hpair : SmoothConditionalMinMaxPairing (a := a) ρAB ρAC ε Rel)
     (hdual : ConditionalMinMaxEntropyDualOn (a := a) Rel) :
     SmoothConditionalMinMaxWitnessDuality (a := a) ρAB ρAC ε := by
@@ -2837,7 +2729,7 @@ theorem SmoothConditionalMinMaxWitnessDuality.of_pairing_of_entropy_duality
 /-- A subnormalized witness-level smoothing duality gives the candidate-set
 duality needed by the order-theoretic bridge. -/
 theorem SmoothConditionalMinMaxCandidateDuality.of_witness_duality
-    {ρAB : SubnormalizedState (Prod a b)} {ρAC : SubnormalizedState (Prod a c)}
+    {ρAB : SubnormalizedState (a × b)} {ρAC : SubnormalizedState (a × c)}
     {ε : ℝ}
     (hwit : SmoothConditionalMinMaxWitnessDuality (a := a) ρAB ρAC ε) :
     SmoothConditionalMinMaxCandidateDuality (a := a) ρAB ρAC ε := by
@@ -2859,7 +2751,7 @@ min-candidate set for `ρAC`, the smooth max entropy is the negative smooth min
 entropy. This is the `sInf`/`sSup` handoff; purification-ball transport and
 unsmoothed endpoint duality supply the candidate relation separately. -/
 theorem smoothConditionalMaxEntropyRaw_eq_neg_smoothConditionalMinEntropyRaw_of_candidate_duality
-    {ρAB : SubnormalizedState (Prod a b)} {ρAC : SubnormalizedState (Prod a c)} {ε : ℝ}
+    {ρAB : SubnormalizedState (a × b)} {ρAC : SubnormalizedState (a × c)} {ε : ℝ}
     (hdual : SmoothConditionalMinMaxCandidateDuality (a := a) ρAB ρAC ε) :
     ρAB.smoothConditionalMaxEntropyRaw ε =
       -ρAC.smoothConditionalMinEntropyRaw ε := by
@@ -2880,7 +2772,7 @@ theorem smoothConditionalMaxEntropyRaw_eq_neg_smoothConditionalMinEntropyRaw_of_
 /-- Composed subnormalized smooth min/max duality bridge from witness-level
 smoothing duality. -/
 theorem smoothConditionalMaxEntropyRaw_eq_neg_smoothConditionalMinEntropyRaw_of_witness_duality
-    {ρAB : SubnormalizedState (Prod a b)} {ρAC : SubnormalizedState (Prod a c)} {ε : ℝ}
+    {ρAB : SubnormalizedState (a × b)} {ρAC : SubnormalizedState (a × c)} {ε : ℝ}
     (hwit : SmoothConditionalMinMaxWitnessDuality (a := a) ρAB ρAC ε) :
     ρAB.smoothConditionalMaxEntropyRaw ε =
       -ρAC.smoothConditionalMinEntropyRaw ε :=
@@ -2891,7 +2783,7 @@ theorem smoothConditionalMaxEntropyRaw_eq_neg_smoothConditionalMinEntropyRaw_of_
 candidate inequalities produced by enlarged-reference transport followed by
 compression. -/
 theorem smoothConditionalMaxEntropyRaw_eq_neg_smoothConditionalMinEntropyRaw_of_candidate_bounds
-    {ρAB : SubnormalizedState (Prod a b)} {ρAC : SubnormalizedState (Prod a c)} {ε : ℝ}
+    {ρAB : SubnormalizedState (a × b)} {ρAC : SubnormalizedState (a × c)} {ε : ℝ}
     (hmaxNonempty :
       ({h : ℝ | SmoothConditionalMaxEntropyCandidateRaw (a := a) ρAB ε h}).Nonempty)
     (hminNonempty :
@@ -2931,8 +2823,8 @@ theorem smoothConditionalMaxEntropyRaw_eq_neg_smoothConditionalMinEntropyRaw_of_
 /-- Subnormalized smooth min/max duality from a relation-parametric
 fixed-register pairing and unsmoothed pairwise duality. -/
 theorem smoothConditionalMaxEntropyRaw_eq_neg_smoothConditionalMinEntropyRaw_of_pairing
-    {ρAB : SubnormalizedState (Prod a b)} {ρAC : SubnormalizedState (Prod a c)} {ε : ℝ}
-    {Rel : SubnormalizedState (Prod a b) → SubnormalizedState (Prod a c) → Prop}
+    {ρAB : SubnormalizedState (a × b)} {ρAC : SubnormalizedState (a × c)} {ε : ℝ}
+    {Rel : SubnormalizedState (a × b) → SubnormalizedState (a × c) → Prop}
     (hpair : SmoothConditionalMinMaxPairing (a := a) ρAB ρAC ε Rel)
     (hdual : ConditionalMinMaxEntropyDualOn (a := a) Rel) :
     ρAB.smoothConditionalMaxEntropyRaw ε =
@@ -2942,21 +2834,25 @@ theorem smoothConditionalMaxEntropyRaw_eq_neg_smoothConditionalMinEntropyRaw_of_
 
 end SubnormalizedState
 
-namespace State
+end QIT
+
+namespace MState
+
+variable {b : Type v} [Fintype b] [DecidableEq b]
 
 /-! ## Source-facing normalized-center smooth entropies -/
 
 /-- Source-facing smooth conditional min-entropy for a normalized center.
 Candidates remain subnormalized, as in Tomamichel's finite-resource convention. -/
 def smoothConditionalMinEntropy
-    (ρ : State (Prod a b)) (ε : ℝ)
+    (ρ : MState (a × b)) (ε : ℝ)
     (hε_nonneg : 0 ≤ ε) (hε_lt : ε < 1) : ℝ :=
   ρ.toSubnormalized.smoothConditionalMinEntropy ε hε_nonneg
     (ρ.epsilon_lt_sqrt_toSubnormalized_trace hε_lt)
 
 @[simp]
 theorem smoothConditionalMinEntropy_eq_toSubnormalized
-    (ρ : State (Prod a b)) (ε : ℝ)
+    (ρ : MState (a × b)) (ε : ℝ)
     (hε_nonneg : 0 ≤ ε) (hε_lt : ε < 1) :
     ρ.smoothConditionalMinEntropy ε hε_nonneg hε_lt =
       ρ.toSubnormalized.smoothConditionalMinEntropy ε hε_nonneg
@@ -2966,14 +2862,14 @@ theorem smoothConditionalMinEntropy_eq_toSubnormalized
 /-- Source-facing smooth conditional max-entropy for a normalized center.
 Candidates remain subnormalized, as in Tomamichel's finite-resource convention. -/
 def smoothConditionalMaxEntropy
-    (ρ : State (Prod a b)) (ε : ℝ)
+    (ρ : MState (a × b)) (ε : ℝ)
     (hε_nonneg : 0 ≤ ε) (hε_lt : ε < 1) : ℝ :=
   ρ.toSubnormalized.smoothConditionalMaxEntropy ε hε_nonneg
     (ρ.epsilon_lt_sqrt_toSubnormalized_trace hε_lt)
 
 @[simp]
 theorem smoothConditionalMaxEntropy_eq_toSubnormalized
-    (ρ : State (Prod a b)) (ε : ℝ)
+    (ρ : MState (a × b)) (ε : ℝ)
     (hε_nonneg : 0 ≤ ε) (hε_lt : ε < 1) :
     ρ.smoothConditionalMaxEntropy ε hε_nonneg hε_lt =
       ρ.toSubnormalized.smoothConditionalMaxEntropy ε hε_nonneg
@@ -2983,30 +2879,30 @@ theorem smoothConditionalMaxEntropy_eq_toSubnormalized
 /-- At radius zero, the normalized-center wrapper reduces to the unsmoothed
 subnormalized entropy of the embedded center. -/
 theorem smoothConditionalMinEntropy_zero_eq_toSubnormalized
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     ρ.smoothConditionalMinEntropy 0 (le_refl 0) (by norm_num) =
       ρ.toSubnormalized.conditionalMinEntropyFinite (by
-        simpa only [State.toSubnormalized_matrix] using ρ.density_matrix_ne_zero) :=
+        simpa only [MState.toSubnormalized_matrix] using ρ.matrix_ne_zero) :=
   SubnormalizedState.smoothConditionalMinEntropy_zero
-    ρ.toSubnormalized (by rw [State.toSubnormalized_trace]; norm_num)
+    ρ.toSubnormalized (by rw [MState.toSubnormalized_trace]; norm_num)
 
 /-- At radius zero, the normalized-center wrapper reduces to the unsmoothed
 subnormalized entropy of the embedded center. -/
 theorem smoothConditionalMaxEntropy_zero_eq_toSubnormalized
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     ρ.smoothConditionalMaxEntropy 0 (le_refl 0) (by norm_num) =
       ρ.toSubnormalized.conditionalMaxEntropyFinite (by
-        simpa only [State.toSubnormalized_matrix] using ρ.density_matrix_ne_zero) :=
+        simpa only [MState.toSubnormalized_matrix] using ρ.matrix_ne_zero) :=
   SubnormalizedState.smoothConditionalMaxEntropy_zero
-    ρ.toSubnormalized (by rw [State.toSubnormalized_trace]; norm_num)
+    ρ.toSubnormalized (by rw [MState.toSubnormalized_trace]; norm_num)
 
 /-! ## Normalized/subnormalized entropy-definition bridges -/
 
 omit [Fintype a] in
 /-- The subnormalized side-information tensor matrix agrees with the normalized
-one after embedding the side state with `State.toSubnormalized`. -/
+one after embedding the side state with `MState.toSubnormalized`. -/
 theorem toSubnormalized_identityTensorStateMatrix_eq
-    {b : Type v} [Fintype b] [DecidableEq b] (σ : State b) :
+    {b : Type v} [Fintype b] [DecidableEq b] (σ : MState b) :
     SubnormalizedState.identityTensorStateMatrix (a := a) σ.toSubnormalized =
       identityTensorStateMatrix (a := a) σ :=
   rfl
@@ -3015,7 +2911,7 @@ theorem toSubnormalized_identityTensorStateMatrix_eq
 normalized feasibility predicate on embedded normalized states. -/
 theorem toSubnormalized_ConditionalMinEntropyFeasible_iff
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State (Prod a b)) (σ : State b) (lam : ℝ) :
+    (ρ : MState (a × b)) (σ : MState b) (lam : ℝ) :
     SubnormalizedState.ConditionalMinEntropyFeasible (a := a)
         ρ.toSubnormalized σ.toSubnormalized lam ↔
       ConditionalMinEntropyFeasible (a := a) ρ σ lam :=
@@ -3025,7 +2921,7 @@ theorem toSubnormalized_ConditionalMinEntropyFeasible_iff
 normalized candidate on embedded normalized states. -/
 theorem toSubnormalized_conditionalMaxEntropyFidelityCandidate_eq
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State (Prod a b)) (σ : State b) :
+    (ρ : MState (a × b)) (σ : MState b) :
     SubnormalizedState.conditionalMaxEntropyFidelityCandidate (a := a)
         ρ.toSubnormalized σ.toSubnormalized =
       conditionalMaxEntropyCandidate (a := a) ρ σ :=
@@ -3033,10 +2929,10 @@ theorem toSubnormalized_conditionalMaxEntropyFidelityCandidate_eq
 
 /-- A normalized smooth min-entropy candidate embeds as a subnormalized smooth
 min-entropy candidate when the candidate state is explicitly converted with
-`State.toSubnormalized`. -/
+`MState.toSubnormalized`. -/
 theorem toSubnormalized_SmoothConditionalMinEntropyCandidate_of
     {b : Type v} [Fintype b] [DecidableEq b]
-    {ρ ρ' : State (Prod a b)} {ε h : ℝ}
+    {ρ ρ' : MState (a × b)} {ε h : ℝ}
     (hball : ρ.purifiedBall ε ρ')
     (hh : h = ρ'.toSubnormalized.conditionalMinEntropyRaw) :
     SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw (a := a)
@@ -3046,10 +2942,10 @@ theorem toSubnormalized_SmoothConditionalMinEntropyCandidate_of
 
 /-- A normalized smooth max-entropy candidate embeds as a subnormalized smooth
 max-entropy candidate when the candidate state is explicitly converted with
-`State.toSubnormalized`. -/
+`MState.toSubnormalized`. -/
 theorem toSubnormalized_SmoothConditionalMaxEntropyCandidate_of
     {b : Type v} [Fintype b] [DecidableEq b]
-    {ρ ρ' : State (Prod a b)} {ε h : ℝ}
+    {ρ ρ' : MState (a × b)} {ε h : ℝ}
     (hball : ρ.purifiedBall ε ρ')
     (hh : h = ρ'.toSubnormalized.conditionalMaxEntropyRaw) :
     SubnormalizedState.SmoothConditionalMaxEntropyCandidateRaw (a := a)
@@ -3068,14 +2964,14 @@ min-entropy candidate of `ρAC`, and conversely. The source-shaped proof of this
 predicate requires the purification-ball lifting and unsmoothed min/max duality
 machinery; the theorem below isolates the order-theoretic `sInf`/`sSup` step. -/
 def SmoothConditionalMinMaxCandidateDuality
-    (ρAB : State (Prod a b)) (ρAC : State (Prod a c)) (ε : ℝ) : Prop :=
+    (ρAB : MState (a × b)) (ρAC : MState (a × c)) (ε : ℝ) : Prop :=
   ∀ h : ℝ,
     SmoothConditionalMaxEntropyCandidate (a := a) ρAB ε h ↔
       SmoothConditionalMinEntropyCandidate (a := a) ρAC ε (-h)
 
 @[simp]
 theorem SmoothConditionalMinMaxCandidateDuality_eq
-    (ρAB : State (Prod a b)) (ρAC : State (Prod a c)) (ε : ℝ) :
+    (ρAB : MState (a × b)) (ρAC : MState (a × c)) (ε : ℝ) :
     SmoothConditionalMinMaxCandidateDuality (a := a) ρAB ρAC ε ↔
       ∀ h : ℝ,
         SmoothConditionalMaxEntropyCandidate (a := a) ρAB ε h ↔
@@ -3089,23 +2985,23 @@ counterpart with unsmoothed `Hmax(AB') = -Hmin(AC')`; the second projection is
 the converse direction. This predicate packages the mathematical handoff from
 purification-ball lifting and unsmoothed min/max duality. -/
 def SmoothConditionalMinMaxWitnessDuality
-    (ρAB : State (Prod a b)) (ρAC : State (Prod a c)) (ε : ℝ) : Prop :=
-  (∀ ρAB' : State (Prod a b), ρAB.purifiedBall ε ρAB' →
-      ∃ ρAC' : State (Prod a c), ρAC.purifiedBall ε ρAC' ∧
+    (ρAB : MState (a × b)) (ρAC : MState (a × c)) (ε : ℝ) : Prop :=
+  (∀ ρAB' : MState (a × b), ρAB.purifiedBall ε ρAB' →
+      ∃ ρAC' : MState (a × c), ρAC.purifiedBall ε ρAC' ∧
         ρAB'.conditionalMaxEntropy = -ρAC'.conditionalMinEntropy) ∧
-    (∀ ρAC' : State (Prod a c), ρAC.purifiedBall ε ρAC' →
-      ∃ ρAB' : State (Prod a b), ρAB.purifiedBall ε ρAB' ∧
+    (∀ ρAC' : MState (a × c), ρAC.purifiedBall ε ρAC' →
+      ∃ ρAB' : MState (a × b), ρAB.purifiedBall ε ρAB' ∧
         ρAB'.conditionalMaxEntropy = -ρAC'.conditionalMinEntropy)
 
 @[simp]
 theorem SmoothConditionalMinMaxWitnessDuality_eq
-    (ρAB : State (Prod a b)) (ρAC : State (Prod a c)) (ε : ℝ) :
+    (ρAB : MState (a × b)) (ρAC : MState (a × c)) (ε : ℝ) :
     SmoothConditionalMinMaxWitnessDuality (a := a) ρAB ρAC ε ↔
-      (∀ ρAB' : State (Prod a b), ρAB.purifiedBall ε ρAB' →
-          ∃ ρAC' : State (Prod a c), ρAC.purifiedBall ε ρAC' ∧
+      (∀ ρAB' : MState (a × b), ρAB.purifiedBall ε ρAB' →
+          ∃ ρAC' : MState (a × c), ρAC.purifiedBall ε ρAC' ∧
             ρAB'.conditionalMaxEntropy = -ρAC'.conditionalMinEntropy) ∧
-        (∀ ρAC' : State (Prod a c), ρAC.purifiedBall ε ρAC' →
-          ∃ ρAB' : State (Prod a b), ρAB.purifiedBall ε ρAB' ∧
+        (∀ ρAC' : MState (a × c), ρAC.purifiedBall ε ρAC' →
+          ∃ ρAB' : MState (a × b), ρAB.purifiedBall ε ρAB' ∧
             ρAB'.conditionalMaxEntropy = -ρAC'.conditionalMinEntropy) :=
   Iff.rfl
 
@@ -3115,43 +3011,43 @@ The relation is intended to express that two candidate states arise as
 complementary marginals of compatible nearby purifications, while this predicate
 only records the bidirectional smoothing transport property. -/
 def SmoothConditionalMinMaxPairing
-    (ρAB : State (Prod a b)) (ρAC : State (Prod a c)) (ε : ℝ)
-    (Rel : State (Prod a b) → State (Prod a c) → Prop) : Prop :=
-  (∀ ρAB' : State (Prod a b), ρAB.purifiedBall ε ρAB' →
-      ∃ ρAC' : State (Prod a c), ρAC.purifiedBall ε ρAC' ∧ Rel ρAB' ρAC') ∧
-    (∀ ρAC' : State (Prod a c), ρAC.purifiedBall ε ρAC' →
-      ∃ ρAB' : State (Prod a b), ρAB.purifiedBall ε ρAB' ∧ Rel ρAB' ρAC')
+    (ρAB : MState (a × b)) (ρAC : MState (a × c)) (ε : ℝ)
+    (Rel : MState (a × b) → MState (a × c) → Prop) : Prop :=
+  (∀ ρAB' : MState (a × b), ρAB.purifiedBall ε ρAB' →
+      ∃ ρAC' : MState (a × c), ρAC.purifiedBall ε ρAC' ∧ Rel ρAB' ρAC') ∧
+    (∀ ρAC' : MState (a × c), ρAC.purifiedBall ε ρAC' →
+      ∃ ρAB' : MState (a × b), ρAB.purifiedBall ε ρAB' ∧ Rel ρAB' ρAC')
 
 @[simp]
 theorem SmoothConditionalMinMaxPairing_eq
-    (ρAB : State (Prod a b)) (ρAC : State (Prod a c)) (ε : ℝ)
-    (Rel : State (Prod a b) → State (Prod a c) → Prop) :
+    (ρAB : MState (a × b)) (ρAC : MState (a × c)) (ε : ℝ)
+    (Rel : MState (a × b) → MState (a × c) → Prop) :
     SmoothConditionalMinMaxPairing (a := a) ρAB ρAC ε Rel ↔
-      (∀ ρAB' : State (Prod a b), ρAB.purifiedBall ε ρAB' →
-          ∃ ρAC' : State (Prod a c), ρAC.purifiedBall ε ρAC' ∧ Rel ρAB' ρAC') ∧
-        (∀ ρAC' : State (Prod a c), ρAC.purifiedBall ε ρAC' →
-          ∃ ρAB' : State (Prod a b), ρAB.purifiedBall ε ρAB' ∧ Rel ρAB' ρAC') :=
+      (∀ ρAB' : MState (a × b), ρAB.purifiedBall ε ρAB' →
+          ∃ ρAC' : MState (a × c), ρAC.purifiedBall ε ρAC' ∧ Rel ρAB' ρAC') ∧
+        (∀ ρAC' : MState (a × c), ρAC.purifiedBall ε ρAC' →
+          ∃ ρAB' : MState (a × b), ρAB.purifiedBall ε ρAB' ∧ Rel ρAB' ρAC') :=
   Iff.rfl
 
 /-- Unsmoothed min/max entropy duality on each related pair of candidate states. -/
 def ConditionalMinMaxEntropyDualOn
-    (Rel : State (Prod a b) → State (Prod a c) → Prop) : Prop :=
-  ∀ ρAB' : State (Prod a b), ∀ ρAC' : State (Prod a c), Rel ρAB' ρAC' →
+    (Rel : MState (a × b) → MState (a × c) → Prop) : Prop :=
+  ∀ ρAB' : MState (a × b), ∀ ρAC' : MState (a × c), Rel ρAB' ρAC' →
     ρAB'.conditionalMaxEntropy = -ρAC'.conditionalMinEntropy
 
 @[simp]
 theorem ConditionalMinMaxEntropyDualOn_eq
-    (Rel : State (Prod a b) → State (Prod a c) → Prop) :
+    (Rel : MState (a × b) → MState (a × c) → Prop) :
     ConditionalMinMaxEntropyDualOn (a := a) Rel ↔
-      ∀ ρAB' : State (Prod a b), ∀ ρAC' : State (Prod a c), Rel ρAB' ρAC' →
+      ∀ ρAB' : MState (a × b), ∀ ρAC' : MState (a × c), Rel ρAB' ρAC' →
         ρAB'.conditionalMaxEntropy = -ρAC'.conditionalMinEntropy :=
   Iff.rfl
 
 /-- Pairing transport plus unsmoothed pairwise duality gives the witness-level
 smooth min/max duality predicate. -/
 theorem SmoothConditionalMinMaxWitnessDuality.of_pairing_of_entropy_duality
-    {ρAB : State (Prod a b)} {ρAC : State (Prod a c)} {ε : ℝ}
-    {Rel : State (Prod a b) → State (Prod a c) → Prop}
+    {ρAB : MState (a × b)} {ρAC : MState (a × c)} {ε : ℝ}
+    {Rel : MState (a × b) → MState (a × c) → Prop}
     (hpair : SmoothConditionalMinMaxPairing (a := a) ρAB ρAC ε Rel)
     (hdual : ConditionalMinMaxEntropyDualOn (a := a) Rel) :
     SmoothConditionalMinMaxWitnessDuality (a := a) ρAB ρAC ε := by
@@ -3166,7 +3062,7 @@ theorem SmoothConditionalMinMaxWitnessDuality.of_pairing_of_entropy_duality
 /-- A witness-level smoothing duality immediately gives the candidate-set
 duality needed by the order-theoretic bridge. -/
 theorem SmoothConditionalMinMaxCandidateDuality.of_witness_duality
-    {ρAB : State (Prod a b)} {ρAC : State (Prod a c)} {ε : ℝ}
+    {ρAB : MState (a × b)} {ρAC : MState (a × c)} {ε : ℝ}
     (hwit : SmoothConditionalMinMaxWitnessDuality (a := a) ρAB ρAC ε) :
     SmoothConditionalMinMaxCandidateDuality (a := a) ρAB ρAC ε := by
   intro h
@@ -3188,7 +3084,7 @@ min-candidate set for `ρAC`, the smooth max entropy is the negative smooth min
 entropy. This proves the `sInf`/`sSup` part of the purified-smoothing duality
 route; the source-level purification theorem supplies the candidate relation. -/
 theorem smoothConditionalMaxEntropyNormalizedCandidates_eq_neg_minEntropyNormalizedCandidates_of_candidate_duality
-    {ρAB : State (Prod a b)} {ρAC : State (Prod a c)} {ε : ℝ}
+    {ρAB : MState (a × b)} {ρAC : MState (a × c)} {ε : ℝ}
     (hdual : SmoothConditionalMinMaxCandidateDuality (a := a) ρAB ρAC ε) :
     ρAB.smoothConditionalMaxEntropyNormalizedCandidates ε =
       -ρAC.smoothConditionalMinEntropyNormalizedCandidates ε := by
@@ -3208,7 +3104,7 @@ theorem smoothConditionalMaxEntropyNormalizedCandidates_eq_neg_minEntropyNormali
 duality. This is the exact handoff point for purification-ball lifting and
 unsmoothed min/max duality. -/
 theorem smoothConditionalMaxEntropyNormalizedCandidates_eq_neg_minEntropyNormalizedCandidates_of_witness_duality
-    {ρAB : State (Prod a b)} {ρAC : State (Prod a c)} {ε : ℝ}
+    {ρAB : MState (a × b)} {ρAC : MState (a × c)} {ε : ℝ}
     (hwit : SmoothConditionalMinMaxWitnessDuality (a := a) ρAB ρAC ε) :
     ρAB.smoothConditionalMaxEntropyNormalizedCandidates ε =
       -ρAC.smoothConditionalMinEntropyNormalizedCandidates ε :=
@@ -3218,8 +3114,8 @@ theorem smoothConditionalMaxEntropyNormalizedCandidates_eq_neg_minEntropyNormali
 /-- Smooth min/max duality from a relation-parametric pairing and unsmoothed
 pairwise duality. -/
 theorem smoothConditionalMaxEntropyNormalizedCandidates_eq_neg_minEntropyNormalizedCandidates_of_pairing
-    {ρAB : State (Prod a b)} {ρAC : State (Prod a c)} {ε : ℝ}
-    {Rel : State (Prod a b) → State (Prod a c) → Prop}
+    {ρAB : MState (a × b)} {ρAC : MState (a × c)} {ε : ℝ}
+    {Rel : MState (a × b) → MState (a × c) → Prop}
     (hpair : SmoothConditionalMinMaxPairing (a := a) ρAB ρAC ε Rel)
     (hdual : ConditionalMinMaxEntropyDualOn (a := a) Rel) :
     ρAB.smoothConditionalMaxEntropyNormalizedCandidates ε =
@@ -3227,9 +3123,9 @@ theorem smoothConditionalMaxEntropyNormalizedCandidates_eq_neg_minEntropyNormali
   smoothConditionalMaxEntropyNormalizedCandidates_eq_neg_minEntropyNormalizedCandidates_of_witness_duality
     (SmoothConditionalMinMaxWitnessDuality.of_pairing_of_entropy_duality hpair hdual)
 
-end State
+end MState
 
-namespace Ensemble
+namespace MEnsemble
 
 variable {ι : Type u} {b : Type v}
 variable [Fintype ι] [DecidableEq ι] [Fintype b] [DecidableEq b]
@@ -3238,41 +3134,31 @@ variable [Fintype ι] [DecidableEq ι] [Fintype b] [DecidableEq b]
 
 For a normalized cq ensemble `E = {p_x, ρ_B(x)}` and POVM `M`, this is
 `∑ x p_x Pr[M outputs x | ρ_B(x)]`. -/
-def cqGuessingScore (E : Ensemble ι b) (M : POVM ι b) : ℝ≥0 :=
+def cqGuessingScore (E : MEnsemble b ι) (M : POVM ι b) : ℝ≥0 :=
   ∑ outcome, E.probs outcome * M.prob (E.states outcome) outcome
 
 @[simp]
-theorem cqGuessingScore_eq (E : Ensemble ι b) (M : POVM ι b) :
+theorem cqGuessingScore_eq (E : MEnsemble b ι) (M : POVM ι b) :
     E.cqGuessingScore M =
       ∑ outcome, E.probs outcome * M.prob (E.states outcome) outcome :=
   rfl
 
 /-- Guessing scores are nonnegative after coercion to real numbers. -/
-theorem cqGuessingScore_nonneg (E : Ensemble ι b) (M : POVM ι b) :
+theorem cqGuessingScore_nonneg (E : MEnsemble b ι) (M : POVM ι b) :
     0 ≤ ((E.cqGuessingScore M : ℝ≥0) : ℝ) :=
   NNReal.coe_nonneg _
 
 /-- Supremum-style guessing probability over all finite POVMs with outcomes
 matching the classical labels of the ensemble. -/
-def cqGuessingProbability (E : Ensemble ι b) : ℝ :=
+def cqGuessingProbability (E : MEnsemble b ι) : ℝ :=
   sSup {score : ℝ | ∃ M : POVM ι b,
     score = ((E.cqGuessingScore M : ℝ≥0) : ℝ)}
 
 @[simp]
-theorem cqGuessingProbability_eq (E : Ensemble ι b) :
+theorem cqGuessingProbability_eq (E : MEnsemble b ι) :
     E.cqGuessingProbability =
       sSup {score : ℝ | ∃ M : POVM ι b,
         score = ((E.cqGuessingScore M : ℝ≥0) : ℝ)} :=
   rfl
 
-end Ensemble
-
-end
-
-/-!
-The full Tomamichel subnormalized-state theory, min/max duality, the SDP
-optimality proof for guessing probability, and the uncertainty-relation proof
-are recorded as downstream source-backed theorem targets.
--/
-
-end QIT
+end MEnsemble

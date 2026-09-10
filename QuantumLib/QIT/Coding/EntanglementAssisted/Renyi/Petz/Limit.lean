@@ -15,7 +15,7 @@ public import QuantumLib.QIT.Util.Order.EReal
 /-!
 # Petz--Renyi alpha-to-one limit for entanglement-assisted information
 
-This module proves the source-shaped `alpha -> 1^-` bridge for the PSD-domain
+This module proves the source-shaped `alpha → 1^-` bridge for the PSD-domain
 barred Petz--Renyi mutual information used in the asymptotic
 entanglement-assisted achievability step
 [KhatriWilde2024Principles, Chapters/EA_capacity.tex:894-982] and the channel
@@ -28,22 +28,21 @@ mutual-information definition
 open scoped ComplexOrder MatrixOrder Topology
 open Filter
 
-namespace QIT
-
-universe u v
-
 noncomputable section
-
+universe u v
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-namespace BinaryHypothesisTest
+open QIT
 
+namespace QIT
+
+namespace BinaryHypothesisTest
 
 /-- KL summand for the product-marginal Nussbaum--Szkola model, with the
 overlap factor cancelling in the `p ≠ 0` branch. -/
 private theorem relativeEntropySummandReal_productMarginalNussbaumSzkolaModel
-    (rhoAB : State (Prod a b)) (xy : (Prod a b) × (Prod a b)) :
+    (rhoAB : MState (a × b)) (xy : (a × b) × (a × b)) :
     relativeEntropySummandReal
         (productMarginalNussbaumSzkolaModel rhoAB).pDistribution
         (productMarginalNussbaumSzkolaModel rhoAB).qDistribution xy =
@@ -119,87 +118,86 @@ private theorem relativeEntropySummandReal_productMarginalNussbaumSzkolaModel
             field_simp [hoR_ne]]
       exact Real.log_div hlam_pos.ne' hmu_pos.ne'
     rw [relativeEntropySummandReal, if_neg (show
-      ¬ (productMarginalNussbaumSzkolaModel rhoAB).pDistribution.prob (x, y) = 0 from hp)]
-    simp [ClassicalBinaryModel.pDistribution_prob, ClassicalBinaryModel.qDistribution_prob,
+      ¬ (productMarginalNussbaumSzkolaModel rhoAB).pDistribution.nnprob (x, y) = 0 from hp)]
+    simp [ClassicalBinaryModel.pDistribution_nnprob, ClassicalBinaryModel.qDistribution_nnprob,
       productMarginalNussbaumSzkolaModel, NNReal.coe_mul, hlog]
-
 
 /-- Product-marginal Nussbaum--Szkola classical relative entropy is the
 entropy-form mutual-information log numerator. -/
 private theorem productMarginalNussbaumSzkolaModel_relativeEntropyReal_eq_log_sums
-    (rhoAB : State (Prod a b)) :
+    (rhoAB : MState (a × b)) :
     relativeEntropyReal
         (productMarginalNussbaumSzkolaModel rhoAB).pDistribution
         (productMarginalNussbaumSzkolaModel rhoAB).qDistribution =
-      (∑ x : Prod a b,
+      (∑ x : a × b,
         ((stateSpectralWeight rhoAB x : NNReal) : ℝ) *
           Real.log ((stateSpectralWeight rhoAB x : NNReal) : ℝ)) -
         ((∑ i : a,
-          ((stateSpectralWeight rhoAB.marginalA i : NNReal) : ℝ) *
-            Real.log ((stateSpectralWeight rhoAB.marginalA i : NNReal) : ℝ)) +
+          ((stateSpectralWeight rhoAB.traceRight i : NNReal) : ℝ) *
+            Real.log ((stateSpectralWeight rhoAB.traceRight i : NNReal) : ℝ)) +
           (∑ j : b,
-            ((stateSpectralWeight rhoAB.marginalB j : NNReal) : ℝ) *
-              Real.log ((stateSpectralWeight rhoAB.marginalB j : NNReal) : ℝ))) := by
+            ((stateSpectralWeight rhoAB.traceLeft j : NNReal) : ℝ) *
+              Real.log ((stateSpectralWeight rhoAB.traceLeft j : NNReal) : ℝ))) := by
   classical
-  let lam : Prod a b → ℝ := fun x =>
+  let lam : a × b → ℝ := fun x =>
     ((stateSpectralWeight rhoAB x : NNReal) : ℝ)
-  let ov : Prod a b → Prod a b → ℝ := fun x y =>
+  let ov : a × b → a × b → ℝ := fun x y =>
     ((productMarginalNussbaumSzkolaOverlap rhoAB x y : NNReal) : ℝ)
-  let mu : Prod a b → ℝ := fun y =>
+  let mu : a × b → ℝ := fun y =>
     ((productMarginalSpectralWeight rhoAB y : NNReal) : ℝ)
   let muA : a → ℝ := fun i =>
-    ((stateSpectralWeight rhoAB.marginalA i : NNReal) : ℝ)
+    ((stateSpectralWeight rhoAB.traceRight i : NNReal) : ℝ)
   let muB : b → ℝ := fun j =>
-    ((stateSpectralWeight rhoAB.marginalB j : NNReal) : ℝ)
-  have hrow : ∀ x : Prod a b, ∑ y : Prod a b, ov x y = 1 := by
+    ((stateSpectralWeight rhoAB.traceLeft j : NNReal) : ℝ)
+  have hrow : ∀ x : a × b, ∑ y : a × b, ov x y = 1 := by
     intro x
     have h :
-        ∑ y : Prod a b,
+        ∑ y : a × b,
           ((productMarginalNussbaumSzkolaOverlap rhoAB x y : NNReal) : ℝ) = 1 := by
       exact_mod_cast productMarginalNussbaumSzkolaOverlap_row_sum rhoAB x
     simpa [ov] using h
-  have hfst : ∀ i : a, ∑ j : b, ∑ x : Prod a b, lam x * ov x (i, j) = muA i := by
+  have hfst : ∀ i : a, ∑ j : b, ∑ x : a × b, lam x * ov x (i, j) = muA i := by
     intro i
     rw [Finset.sum_comm]
     simpa [lam, ov, muA] using
       productMarginalNussbaumSzkolaOverlap_weighted_fst_sum rhoAB i
-  have hsnd : ∀ j : b, ∑ i : a, ∑ x : Prod a b, lam x * ov x (i, j) = muB j := by
+  have hsnd : ∀ j : b, ∑ i : a, ∑ x : a × b, lam x * ov x (i, j) = muB j := by
     intro j
     rw [Finset.sum_comm]
     simpa [lam, ov, muB] using
       productMarginalNussbaumSzkolaOverlap_weighted_snd_sum rhoAB j
   have hfirst :
-      ∑ xy : (Prod a b) × (Prod a b),
+      ∑ xy : (a × b) × (a × b),
           (lam xy.1 * ov xy.1 xy.2) * Real.log (lam xy.1) =
-        ∑ x : Prod a b, lam x * Real.log (lam x) := by
+        ∑ x : a × b, lam x * Real.log (lam x) := by
     rw [Fintype.sum_prod_type]
     calc
-      ∑ x : Prod a b, ∑ y : Prod a b,
+      ∑ x : a × b, ∑ y : a × b,
           (lam x * ov x y) * Real.log (lam x)
           =
-        ∑ x : Prod a b, ∑ y : Prod a b,
+        ∑ x : a × b, ∑ y : a × b,
           ov x y * (lam x * Real.log (lam x)) := by
           simp [mul_assoc, mul_comm]
-      _ = ∑ x : Prod a b,
-          (∑ y : Prod a b, ov x y) * (lam x * Real.log (lam x)) := by
+      _ = ∑ x : a × b,
+          (∑ y : a × b, ov x y) * (lam x * Real.log (lam x)) := by
           simp [Finset.sum_mul]
-      _ = ∑ x : Prod a b, lam x * Real.log (lam x) := by
+      _ = ∑ x : a × b, lam x * Real.log (lam x) := by
           simp [hrow]
   have hsecond :
-      ∑ xy : (Prod a b) × (Prod a b),
+      ∑ xy : (a × b) × (a × b),
           (lam xy.1 * ov xy.1 xy.2) * Real.log (mu xy.2) =
         (∑ i : a, muA i * Real.log (muA i)) +
           (∑ j : b, muB j * Real.log (muB j)) := by
     rw [Fintype.sum_prod_type]
     calc
-      ∑ x : Prod a b, ∑ y : Prod a b,
+      ∑ x : a × b, ∑ y : a × b,
           (lam x * ov x y) * Real.log (mu y)
           =
-        ∑ y : Prod a b, (∑ x : Prod a b, lam x * ov x y) * Real.log (mu y) := by
+        ∑ y : a × b, (∑ x : a × b, lam x * ov x y) * Real.log (mu y) := by
           rw [Finset.sum_comm]
           simp [Finset.sum_mul]
       _ =
-        ∑ y : Prod a b, (∑ x : Prod a b, lam x * ov x y) *
+        ∑ y : a × b, (∑ x : a × b, lam x * ov x y) *
           (Real.log (muA y.1) + Real.log (muB y.2)) := by
           refine Finset.sum_congr rfl ?_
           intro y _hy
@@ -207,15 +205,15 @@ private theorem productMarginalNussbaumSzkolaModel_relativeEntropyReal_eq_log_su
             productMarginalNussbaumSzkolaModel_weighted_log_product rhoAB y
       _ =
         (∑ i : a, ∑ j : b,
-          (∑ x : Prod a b, lam x * ov x (i, j)) * Real.log (muA i)) +
+          (∑ x : a × b, lam x * ov x (i, j)) * Real.log (muA i)) +
           (∑ i : a, ∑ j : b,
-            (∑ x : Prod a b, lam x * ov x (i, j)) * Real.log (muB j)) := by
+            (∑ x : a × b, lam x * ov x (i, j)) * Real.log (muB j)) := by
           rw [Fintype.sum_prod_type]
           simp [mul_add, Finset.sum_add_distrib]
       _ =
-        (∑ i : a, (∑ j : b, ∑ x : Prod a b, lam x * ov x (i, j)) *
+        (∑ i : a, (∑ j : b, ∑ x : a × b, lam x * ov x (i, j)) *
           Real.log (muA i)) +
-          (∑ j : b, (∑ i : a, ∑ x : Prod a b, lam x * ov x (i, j)) *
+          (∑ j : b, (∑ i : a, ∑ x : a × b, lam x * ov x (i, j)) *
             Real.log (muB j)) := by
           congr 1
           · refine Finset.sum_congr rfl ?_
@@ -234,7 +232,7 @@ private theorem productMarginalNussbaumSzkolaModel_relativeEntropyReal_eq_log_su
         (productMarginalNussbaumSzkolaModel rhoAB).pDistribution
         (productMarginalNussbaumSzkolaModel rhoAB).qDistribution
         =
-      ∑ xy : (Prod a b) × (Prod a b),
+      ∑ xy : (a × b) × (a × b),
         (lam xy.1 * ov xy.1 xy.2) *
           (Real.log (lam xy.1) - Real.log (mu xy.2)) := by
         unfold relativeEntropyReal
@@ -243,107 +241,90 @@ private theorem productMarginalNussbaumSzkolaModel_relativeEntropyReal_eq_log_su
         simpa [lam, ov, mu] using
           relativeEntropySummandReal_productMarginalNussbaumSzkolaModel rhoAB xy
     _ =
-      (∑ xy : (Prod a b) × (Prod a b),
+      (∑ xy : (a × b) × (a × b),
           (lam xy.1 * ov xy.1 xy.2) * Real.log (lam xy.1)) -
-        (∑ xy : (Prod a b) × (Prod a b),
+        (∑ xy : (a × b) × (a × b),
           (lam xy.1 * ov xy.1 xy.2) * Real.log (mu xy.2)) := by
         simp [mul_sub, Finset.sum_sub_distrib]
-    _ = (∑ x : Prod a b, lam x * Real.log (lam x)) -
+    _ = (∑ x : a × b, lam x * Real.log (lam x)) -
         ((∑ i : a, muA i * Real.log (muA i)) +
           (∑ j : b, muB j * Real.log (muB j))) := by
         rw [hfirst, hsecond]
 
-private theorem productMarginalNussbaumSzkolaModel_petzChernoffCoefficient_term
-    (p q r : NNReal) {s : ℝ} (hs0 : 0 ≤ s) (hs1 : s ≤ 1) :
-    (p * r) ^ s * (q * r) ^ (1 - s) =
-      p ^ s * q ^ (1 - s) * r := by
-  have hs1' : 0 ≤ 1 - s := sub_nonneg.mpr hs1
-  calc
-    (p * r) ^ s * (q * r) ^ (1 - s) =
-        (p ^ s * r ^ s) * (q ^ (1 - s) * r ^ (1 - s)) := by
-          rw [NNReal.mul_rpow, NNReal.mul_rpow]
-    _ = p ^ s * q ^ (1 - s) * (r ^ s * r ^ (1 - s)) := by
-          ac_rfl
-    _ = p ^ s * q ^ (1 - s) * r ^ (s + (1 - s)) := by
-          rw [NNReal.rpow_add_of_nonneg r hs0 hs1']
-    _ = p ^ s * q ^ (1 - s) * r := by
-          have hsum : s + (1 - s) = 1 := by ring
-          rw [hsum, NNReal.rpow_one]
-
 /-- The product-marginal classical Chernoff coefficient is the Petz
 coefficient for the barred product-marginal pair. -/
 theorem productMarginalNussbaumSzkolaModel_petzChernoffCoefficient_eq
-    (rhoAB : State (Prod a b)) {s : ℝ} (hs0 : 0 ≤ s) (hs1 : s ≤ 1) :
+    (rhoAB : MState (a × b)) {s : ℝ} (hs0 : 0 ≤ s) (hs1 : s ≤ 1) :
     (productMarginalNussbaumSzkolaModel rhoAB).petzChernoffCoefficient s =
       rhoAB.petzRenyiCoefficient
-        (rhoAB.marginalA.prod rhoAB.marginalB) s := by
+        (rhoAB.traceRight.prod rhoAB.traceLeft) s := by
   classical
-  let Urho : Matrix.unitaryGroup (Prod a b) ℂ :=
-    rhoAB.pos.isHermitian.eigenvectorUnitary
-  let Uprod : Matrix.unitaryGroup (Prod a b) ℂ :=
+  let Urho : Matrix.unitaryGroup (a × b) ℂ :=
+    rhoAB.psd.isHermitian.eigenvectorUnitary
+  let Uprod : Matrix.unitaryGroup (a × b) ℂ :=
     productMarginalEigenvectorUnitary rhoAB
-  let sigma : State (Prod a b) := rhoAB.marginalA.prod rhoAB.marginalB
+  let sigma : MState (a × b) := rhoAB.traceRight.prod rhoAB.traceLeft
   have hrho :
-      CFC.rpow rhoAB.matrix s =
-        (Urho : CMatrix (Prod a b)) *
+      CFC.rpow rhoAB.m s =
+        (Urho : CMatrix (a × b)) *
           Matrix.diagonal
-            (fun x : Prod a b =>
+            (fun x : a × b =>
               (((((stateSpectralWeight rhoAB x : NNReal) : ℝ) ^ s : ℝ) : ℂ))) *
-          star (Urho : CMatrix (Prod a b)) := by
+          star (Urho : CMatrix (a × b)) := by
     simpa [Urho, coe_stateSpectralWeight] using
-      cMatrix_rpow_eq_eigenbasis_diagonal rhoAB.pos s
+      cMatrix_rpow_eq_eigenbasis_diagonal rhoAB.psd s
   have hw_nonneg :
-      ∀ y : Prod a b, 0 ≤ ((productMarginalSpectralWeight rhoAB y : NNReal) : ℝ) := by
+      ∀ y : a × b, 0 ≤ ((productMarginalSpectralWeight rhoAB y : NNReal) : ℝ) := by
     intro y
     positivity
   have hsigma_spec :
-      sigma.matrix =
-        (Uprod : CMatrix (Prod a b)) *
+      sigma.m =
+        (Uprod : CMatrix (a × b)) *
           Matrix.diagonal
-            (fun y : Prod a b =>
+            (fun y : a × b =>
               (((productMarginalSpectralWeight rhoAB y : NNReal) : ℝ) : ℂ)) *
-          star (Uprod : CMatrix (Prod a b)) := by
+          star (Uprod : CMatrix (a × b)) := by
     simpa [sigma, Uprod] using
       productMarginal_matrix_eq_productEigenbasis_diagonal rhoAB
   have hsigma :
-      CFC.rpow sigma.matrix (1 - s) =
-        (Uprod : CMatrix (Prod a b)) *
+      CFC.rpow sigma.m (1 - s) =
+        (Uprod : CMatrix (a × b)) *
           Matrix.diagonal
-            (fun y : Prod a b =>
+            (fun y : a × b =>
               ((((productMarginalSpectralWeight rhoAB y : NNReal) : ℝ) ^ (1 - s) : ℝ) : ℂ)) *
-          star (Uprod : CMatrix (Prod a b)) := by
+          star (Uprod : CMatrix (a × b)) := by
     rw [hsigma_spec]
     exact cMatrix_rpow_unitary_conj_diagonal_ofReal
-      Uprod (fun y : Prod a b => ((productMarginalSpectralWeight rhoAB y : NNReal) : ℝ))
+      Uprod (fun y : a × b => ((productMarginalSpectralWeight rhoAB y : NNReal) : ℝ))
       hw_nonneg (1 - s)
   have htrace :
       (rhoAB.petzRenyiCoefficient sigma s : ℝ) =
-        ∑ x : Prod a b, ∑ y : Prod a b,
+        ∑ x : a × b, ∑ y : a × b,
           (((stateSpectralWeight rhoAB x : NNReal) : ℝ) ^ s) *
             ((((productMarginalSpectralWeight rhoAB y : NNReal) : ℝ) ^ (1 - s)) *
               ((productMarginalNussbaumSzkolaOverlap rhoAB x y : NNReal) : ℝ)) := by
-    change ((CFC.rpow rhoAB.matrix s * CFC.rpow sigma.matrix (1 - s)).trace).re = _
+    change ((CFC.rpow rhoAB.m s * CFC.rpow sigma.m (1 - s)).trace).re = _
     rw [hrho, hsigma]
     simpa [Urho, Uprod, coe_productMarginalNussbaumSzkolaOverlap,
       productMarginalNussbaumSzkolaTransitionUnitary, Matrix.star_eq_conjTranspose,
       mul_assoc, mul_left_comm, mul_comm] using
       trace_mul_two_unitary_conj_diagonal_ofReal_re
         Urho Uprod
-        (fun x : Prod a b => (((stateSpectralWeight rhoAB x : NNReal) : ℝ) ^ s : ℝ))
-        (fun y : Prod a b =>
+        (fun x : a × b => (((stateSpectralWeight rhoAB x : NNReal) : ℝ) ^ s : ℝ))
+        (fun y : a × b =>
           (((productMarginalSpectralWeight rhoAB y : NNReal) : ℝ) ^ (1 - s) : ℝ))
   apply NNReal.eq
   calc
     ((productMarginalNussbaumSzkolaModel rhoAB).petzChernoffCoefficient s : ℝ) =
-        ∑ xy : (Prod a b) × (Prod a b),
+        ∑ xy : (a × b) × (a × b),
           (((stateSpectralWeight rhoAB xy.1) ^ s *
             (productMarginalSpectralWeight rhoAB xy.2) ^ (1 - s) *
               productMarginalNussbaumSzkolaOverlap rhoAB xy.1 xy.2 : NNReal) : ℝ) := by
           simp [ClassicalBinaryModel.petzChernoffCoefficient,
             productMarginalNussbaumSzkolaModel,
-            productMarginalNussbaumSzkolaModel_petzChernoffCoefficient_term _ _ _ hs0 hs1,
+            mul_rpow_mul_rpow_one_sub _ _ _ hs0 hs1,
             mul_assoc]
-    _ = ∑ x : Prod a b, ∑ y : Prod a b,
+    _ = ∑ x : a × b, ∑ y : a × b,
           (((stateSpectralWeight rhoAB x : NNReal) : ℝ) ^ s) *
             ((((productMarginalSpectralWeight rhoAB y : NNReal) : ℝ) ^ (1 - s)) *
               ((productMarginalNussbaumSzkolaOverlap rhoAB x y : NNReal) : ℝ)) := by
@@ -353,38 +334,39 @@ theorem productMarginalNussbaumSzkolaModel_petzChernoffCoefficient_eq
 
 end BinaryHypothesisTest
 
-namespace State
+end QIT
 
+namespace MState
 
 /-- The product-marginal Nussbaum--Szkola endpoint is the entropy-form mutual
 information, not the full-rank relative-entropy API. -/
 theorem productMarginalNussbaumSzkolaModel_relativeEntropyReal_div_log_two_eq_mutualInformation
-    (rhoAB : State (Prod a b)) :
+    (rhoAB : MState (a × b)) :
     BinaryHypothesisTest.relativeEntropyReal
         (BinaryHypothesisTest.productMarginalNussbaumSzkolaModel rhoAB).pDistribution
         (BinaryHypothesisTest.productMarginalNussbaumSzkolaModel rhoAB).qDistribution /
       Real.log 2 =
         mutualInformation rhoAB := by
   classical
-  let sAB : ℝ := ∑ x : Prod a b,
+  let sAB : ℝ := ∑ x : a × b,
     ((BinaryHypothesisTest.stateSpectralWeight rhoAB x : NNReal) : ℝ) *
       Real.log ((BinaryHypothesisTest.stateSpectralWeight rhoAB x : NNReal) : ℝ)
   let sA : ℝ := ∑ i : a,
-    ((BinaryHypothesisTest.stateSpectralWeight rhoAB.marginalA i : NNReal) : ℝ) *
-      Real.log ((BinaryHypothesisTest.stateSpectralWeight rhoAB.marginalA i : NNReal) : ℝ)
+    ((BinaryHypothesisTest.stateSpectralWeight rhoAB.traceRight i : NNReal) : ℝ) *
+      Real.log ((BinaryHypothesisTest.stateSpectralWeight rhoAB.traceRight i : NNReal) : ℝ)
   let sB : ℝ := ∑ j : b,
-    ((BinaryHypothesisTest.stateSpectralWeight rhoAB.marginalB j : NNReal) : ℝ) *
-      Real.log ((BinaryHypothesisTest.stateSpectralWeight rhoAB.marginalB j : NNReal) : ℝ)
+    ((BinaryHypothesisTest.stateSpectralWeight rhoAB.traceLeft j : NNReal) : ℝ) *
+      Real.log ((BinaryHypothesisTest.stateSpectralWeight rhoAB.traceLeft j : NNReal) : ℝ)
   have hlog_ne : Real.log 2 ≠ 0 := ne_of_gt (Real.log_pos one_lt_two)
   have hAB : sAB / Real.log 2 = -rhoAB.vonNeumann := by
     simpa [sAB] using
       spectralWeight_mul_log_div_log_two_eq_neg_vonNeumann rhoAB
-  have hA : sA / Real.log 2 = -rhoAB.marginalA.vonNeumann := by
+  have hA : sA / Real.log 2 = -rhoAB.traceRight.vonNeumann := by
     simpa [sA] using
-      spectralWeight_mul_log_div_log_two_eq_neg_vonNeumann rhoAB.marginalA
-  have hB : sB / Real.log 2 = -rhoAB.marginalB.vonNeumann := by
+      spectralWeight_mul_log_div_log_two_eq_neg_vonNeumann rhoAB.traceRight
+  have hB : sB / Real.log 2 = -rhoAB.traceLeft.vonNeumann := by
     simpa [sB] using
-      spectralWeight_mul_log_div_log_two_eq_neg_vonNeumann rhoAB.marginalB
+      spectralWeight_mul_log_div_log_two_eq_neg_vonNeumann rhoAB.traceLeft
   rw [BinaryHypothesisTest.productMarginalNussbaumSzkolaModel_relativeEntropyReal_eq_log_sums]
   change (sAB - (sA + sB)) / Real.log 2 = mutualInformation rhoAB
   calc
@@ -399,19 +381,19 @@ theorem productMarginalNussbaumSzkolaModel_relativeEntropyReal_div_log_two_eq_mu
 /-- In the PSD source branch, barred Petz--Renyi mutual information is the
 base-2 Chernoff log partition of the product-marginal Nussbaum--Szkola model. -/
 theorem barPetzRenyiMutualInformationPSDFinite_eq_productMarginal_chernoffLog2
-    (rhoAB : State (Prod a b)) {alpha : ℝ}
+    (rhoAB : MState (a × b)) {alpha : ℝ}
     (halpha0 : 0 < alpha) (halpha1 : alpha < 1) :
     rhoAB.barPetzRenyiMutualInformationPSDFinite alpha halpha0 (ne_of_lt halpha1) =
       (1 / (alpha - 1)) *
         log2 ((BinaryHypothesisTest.productMarginalNussbaumSzkolaModel rhoAB).chernoffPartition alpha) := by
   classical
-  let sigma : State (Prod a b) := rhoAB.marginalA.prod rhoAB.marginalB
+  let sigma : MState (a × b) := rhoAB.traceRight.prod rhoAB.traceLeft
   let M := BinaryHypothesisTest.productMarginalNussbaumSzkolaModel rhoAB
   have htrace :
-      ((CFC.rpow rhoAB.matrix alpha *
-        CFC.rpow sigma.matrix (1 - alpha)).trace).re =
+      ((CFC.rpow rhoAB.m alpha *
+        CFC.rpow sigma.m (1 - alpha)).trace).re =
         (rhoAB.petzRenyiCoefficient sigma alpha : ℝ) := by
-    have h := State.petzRenyiCoefficient_trace_eq rhoAB sigma alpha
+    have h := MState.petzRenyiCoefficient_trace_eq rhoAB sigma alpha
     have hre := congrArg Complex.re h
     simpa using hre.symm
   have hpart :
@@ -436,21 +418,21 @@ theorem barPetzRenyiMutualInformationPSDFinite_eq_productMarginal_chernoffLog2
       _ = (rhoAB.petzRenyiCoefficient sigma alpha : ℝ) := by rw [hns]
   have hpart' :
       (BinaryHypothesisTest.productMarginalNussbaumSzkolaModel rhoAB).chernoffPartition alpha =
-        (rhoAB.petzRenyiCoefficient (rhoAB.marginalA.prod rhoAB.marginalB) alpha : ℝ) := by
+        (rhoAB.petzRenyiCoefficient (rhoAB.traceRight.prod rhoAB.traceLeft) alpha : ℝ) := by
     simpa [M, sigma] using hpart
-  unfold State.barPetzRenyiMutualInformationPSDFinite State.petzRenyiPSDFinite
+  unfold MState.barPetzRenyiMutualInformationPSDFinite MState.petzRenyiPSDFinite
   change
     (1 / (alpha - 1)) *
-        log2 ((CFC.rpow rhoAB.matrix alpha *
-          CFC.rpow (rhoAB.marginalA.prod rhoAB.marginalB).matrix (1 - alpha)).trace).re =
+        log2 ((CFC.rpow rhoAB.m alpha *
+          CFC.rpow (rhoAB.traceRight.prod rhoAB.traceLeft).m (1 - alpha)).trace).re =
       (1 / (alpha - 1)) *
         log2 ((BinaryHypothesisTest.productMarginalNussbaumSzkolaModel rhoAB).chernoffPartition alpha)
   rw [htrace, ← hpart']
 
-/-- State-level barred PSD Petz--Renyi mutual information converges to the
-entropy-form mutual information as `alpha -> 1^-`. -/
+/-- MState-level barred PSD Petz--Renyi mutual information converges to the
+entropy-form mutual information as `alpha → 1^-`. -/
 theorem barPetzRenyiMutualInformationPSDFinite_tendsto_mutualInformation_left
-    (rhoAB : State (Prod a b)) :
+    (rhoAB : MState (a × b)) :
     Tendsto
       (fun alpha : PetzRenyiAlpha =>
         rhoAB.barPetzRenyiMutualInformationPSDFinite
@@ -484,7 +466,7 @@ theorem barPetzRenyiMutualInformationPSDFinite_tendsto_mutualInformation_left
 /-- The canonical extended-real barred Petz quantity has the same left
 endpoint as its finite representative. -/
 theorem barPetzRenyiMutualInformationPSD_tendsto_mutualInformation_left
-    (rhoAB : State (Prod a b)) :
+    (rhoAB : MState (a × b)) :
     Tendsto
       (fun alpha : PetzRenyiAlpha =>
         rhoAB.barPetzRenyiMutualInformationPSD
@@ -501,7 +483,7 @@ theorem barPetzRenyiMutualInformationPSD_tendsto_mutualInformation_left
 barred PSD Petz--Renyi mutual information is bounded by entropy-form mutual
 information. -/
 theorem barPetzRenyiMutualInformationPSDFinite_le_mutualInformation
-    (rhoAB : State (Prod a b)) (alpha : PetzRenyiAlpha) :
+    (rhoAB : MState (a × b)) (alpha : PetzRenyiAlpha) :
     rhoAB.barPetzRenyiMutualInformationPSDFinite
         alpha.1 alpha.2.1 (ne_of_lt alpha.2.2) ≤
       mutualInformation rhoAB := by
@@ -531,7 +513,7 @@ theorem barPetzRenyiMutualInformationPSDFinite_le_mutualInformation
 /-- Canonical extended-real source-range comparison with entropy-form mutual
 information. -/
 theorem barPetzRenyiMutualInformationPSD_le_mutualInformation
-    (rhoAB : State (Prod a b)) (alpha : PetzRenyiAlpha) :
+    (rhoAB : MState (a × b)) (alpha : PetzRenyiAlpha) :
     rhoAB.barPetzRenyiMutualInformationPSD
         alpha.1 alpha.2.1 alpha.2.2 ≤
       (mutualInformation rhoAB : EReal) := by
@@ -539,10 +521,10 @@ theorem barPetzRenyiMutualInformationPSD_le_mutualInformation
   exact_mod_cast
     barPetzRenyiMutualInformationPSDFinite_le_mutualInformation rhoAB alpha
 
-/-- State-level barred PSD Petz--Renyi mutual information converges to the
+/-- MState-level barred PSD Petz--Renyi mutual information converges to the
 Nussbaum--Szkola classical relative entropy for the product-marginal pair. -/
 theorem barPetzRenyiMutualInformationPSDFinite_tendsto_nussbaumSzkola_relativeEntropyReal_left
-    (rhoAB : State (Prod a b)) :
+    (rhoAB : MState (a × b)) :
     Tendsto
       (fun alpha : PetzRenyiAlpha =>
         rhoAB.barPetzRenyiMutualInformationPSDFinite
@@ -551,25 +533,34 @@ theorem barPetzRenyiMutualInformationPSDFinite_tendsto_nussbaumSzkola_relativeEn
       (nhds
         (BinaryHypothesisTest.relativeEntropyReal
           (BinaryHypothesisTest.nussbaumSzkolaModel rhoAB
-            (rhoAB.marginalA.prod rhoAB.marginalB)).pDistribution
+            (rhoAB.traceRight.prod rhoAB.traceLeft)).pDistribution
           (BinaryHypothesisTest.nussbaumSzkolaModel rhoAB
-            (rhoAB.marginalA.prod rhoAB.marginalB)).qDistribution /
+            (rhoAB.traceRight.prod rhoAB.traceLeft)).qDistribution /
             Real.log 2)) := by
-  simpa [State.barPetzRenyiMutualInformationPSDFinite] using
-    State.petzRenyiPSDFinite_tendsto_nussbaumSzkola_relativeEntropyReal_left
-      rhoAB (rhoAB.marginalA.prod rhoAB.marginalB)
+  simpa [MState.barPetzRenyiMutualInformationPSDFinite] using
+    MState.petzRenyiPSDFinite_tendsto_nussbaumSzkola_relativeEntropyReal_left
+      rhoAB (rhoAB.traceRight.prod rhoAB.traceLeft)
       rhoAB.matrix_supports_prod_marginals
 
-end State
+end MState
 
-namespace Channel
+end
 
-variable (N : Channel a b)
+noncomputable section
+
+namespace CPTPOp
+
+open QIT
+
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+
+variable (N : CPTPMap a b)
 
 /-- The hypothesis-testing and entanglement-assisted output-state APIs use the
 same channel-output state. -/
 theorem hypothesisTestingOutputState_eq_entanglementAssistedOutputState
-    (psi : PureVector (Prod a a)) :
+    (psi : Ket (a × a)) :
     N.hypothesisTestingOutputState psi = N.entanglementAssistedOutputState psi := by
   rfl
 
@@ -577,7 +568,7 @@ theorem hypothesisTestingOutputState_eq_entanglementAssistedOutputState
 the endpoint still expressed as the Nussbaum--Szkola classical relative
 entropy of the output/product-marginal pair. -/
 theorem inputBarPetzRenyiMutualInformationPSDFinite_tendsto_nussbaumSzkola_relativeEntropyReal_left
-    (psi : PureVector (Prod a a)) :
+    (psi : Ket (a × a)) :
     Tendsto
       (fun alpha : PetzRenyiAlpha =>
         N.inputBarPetzRenyiMutualInformationPSDFinite
@@ -587,38 +578,38 @@ theorem inputBarPetzRenyiMutualInformationPSDFinite_tendsto_nussbaumSzkola_relat
         (BinaryHypothesisTest.relativeEntropyReal
           (BinaryHypothesisTest.nussbaumSzkolaModel
             (N.hypothesisTestingOutputState psi)
-            ((N.hypothesisTestingOutputState psi).marginalA.prod
-              (N.hypothesisTestingOutputState psi).marginalB)).pDistribution
+            ((N.hypothesisTestingOutputState psi).traceRight.prod
+              (N.hypothesisTestingOutputState psi).traceLeft)).pDistribution
           (BinaryHypothesisTest.nussbaumSzkolaModel
             (N.hypothesisTestingOutputState psi)
-            ((N.hypothesisTestingOutputState psi).marginalA.prod
-              (N.hypothesisTestingOutputState psi).marginalB)).qDistribution /
+            ((N.hypothesisTestingOutputState psi).traceRight.prod
+              (N.hypothesisTestingOutputState psi).traceLeft)).qDistribution /
             Real.log 2)) := by
-  simpa [Channel.inputBarPetzRenyiMutualInformationPSDFinite] using
-    State.barPetzRenyiMutualInformationPSDFinite_tendsto_nussbaumSzkola_relativeEntropyReal_left
+  simpa [CPTPOp.inputBarPetzRenyiMutualInformationPSDFinite] using
+    MState.barPetzRenyiMutualInformationPSDFinite_tendsto_nussbaumSzkola_relativeEntropyReal_left
       (N.hypothesisTestingOutputState psi)
 
 /-- Fixed-input channel bridge for the PSD barred Petz--Renyi endpoint, with
 the endpoint expressed as entropy-form entanglement-assisted mutual
 information. -/
 theorem inputBarPetzRenyiMutualInformationPSDFinite_tendsto_entanglementAssistedMutualInformation_left
-    (psi : PureVector (Prod a a)) :
+    (psi : Ket (a × a)) :
     Tendsto
       (fun alpha : PetzRenyiAlpha =>
         N.inputBarPetzRenyiMutualInformationPSDFinite
           psi alpha.1 alpha.2.1 (ne_of_lt alpha.2.2))
       PetzRenyiAlpha.leftToOne
       (nhds (N.entanglementAssistedMutualInformation psi)) := by
-  simpa [Channel.inputBarPetzRenyiMutualInformationPSDFinite,
-    Channel.entanglementAssistedMutualInformation,
+  simpa [CPTPOp.inputBarPetzRenyiMutualInformationPSDFinite,
+    CPTPOp.entanglementAssistedMutualInformation,
     N.hypothesisTestingOutputState_eq_entanglementAssistedOutputState psi] using
-    State.barPetzRenyiMutualInformationPSDFinite_tendsto_mutualInformation_left
+    MState.barPetzRenyiMutualInformationPSDFinite_tendsto_mutualInformation_left
       (N.hypothesisTestingOutputState psi)
 
 /-- Canonical extended-real fixed-input barred Petz information converges to
 the ordinary entanglement-assisted mutual information. -/
 theorem inputBarPetzRenyiMutualInformationPSD_tendsto_entanglementAssistedMutualInformation_left
-    (psi : PureVector (Prod a a)) :
+    (psi : Ket (a × a)) :
     Tendsto
       (fun alpha : PetzRenyiAlpha =>
         N.inputBarPetzRenyiMutualInformationPSD
@@ -635,7 +626,7 @@ theorem inputBarPetzRenyiMutualInformationPSD_tendsto_entanglementAssistedMutual
 /-- Fixed-input source-range comparison against the channel's ordinary
 entanglement-assisted information. -/
 theorem inputBarPetzRenyiMutualInformationPSDFinite_le_entanglementAssistedInformation
-    [Nonempty a] (psi : PureVector (Prod a a)) (alpha : PetzRenyiAlpha) :
+    [Nonempty a] (psi : Ket (a × a)) (alpha : PetzRenyiAlpha) :
     N.inputBarPetzRenyiMutualInformationPSDFinite
         psi alpha.1 alpha.2.1 (ne_of_lt alpha.2.2) ≤
       N.entanglementAssistedInformation := by
@@ -645,10 +636,10 @@ theorem inputBarPetzRenyiMutualInformationPSDFinite_le_entanglementAssistedInfor
       (N.hypothesisTestingOutputState psi).barPetzRenyiMutualInformationPSDFinite
         alpha.1 alpha.2.1 (ne_of_lt alpha.2.2) := rfl
     _ ≤ mutualInformation (N.hypothesisTestingOutputState psi) :=
-        State.barPetzRenyiMutualInformationPSDFinite_le_mutualInformation
+        MState.barPetzRenyiMutualInformationPSDFinite_le_mutualInformation
           (N.hypothesisTestingOutputState psi) alpha
     _ = N.entanglementAssistedMutualInformation psi := by
-        simp [Channel.entanglementAssistedMutualInformation,
+        simp [CPTPOp.entanglementAssistedMutualInformation,
           N.hypothesisTestingOutputState_eq_entanglementAssistedOutputState psi]
     _ ≤ N.entanglementAssistedInformation :=
         N.entanglementAssistedMutualInformation_le_information psi
@@ -656,7 +647,7 @@ theorem inputBarPetzRenyiMutualInformationPSDFinite_le_entanglementAssistedInfor
 /-- Canonical fixed-input source-range comparison against the channel's
 ordinary entanglement-assisted information. -/
 theorem inputBarPetzRenyiMutualInformationPSD_le_entanglementAssistedInformation
-    [Nonempty a] (psi : PureVector (Prod a a)) (alpha : PetzRenyiAlpha) :
+    [Nonempty a] (psi : Ket (a × a)) (alpha : PetzRenyiAlpha) :
     N.inputBarPetzRenyiMutualInformationPSD
         psi alpha.1 alpha.2.1 alpha.2.2 ≤
       (N.entanglementAssistedInformation : EReal) := by
@@ -686,8 +677,8 @@ theorem barPetzRenyiMutualInformationPSD_eq_coe_finite
       (N.barPetzRenyiMutualInformationPSDFinite
         alpha.1 alpha.2.1 (ne_of_lt alpha.2.2) : EReal) := by
   classical
-  let : Nonempty (PureVector (Prod a a)) := ⟨PureVector.basisPureVector⟩
-  let f : PureVector (Prod a a) → ℝ := fun psi =>
+  let : Nonempty (Ket (a × a)) := ⟨default⟩
+  let f : Ket (a × a) → ℝ := fun psi =>
     N.inputBarPetzRenyiMutualInformationPSDFinite
       psi alpha.1 alpha.2.1 (ne_of_lt alpha.2.2)
   have hfiniteSet :
@@ -733,7 +724,7 @@ theorem barPetzRenyiMutualInformationPSDFinite_le_entanglementAssistedInformatio
   have hne :
       (N.barPetzRenyiMutualInformationPSDFiniteValueSet
         alpha.1 alpha.2.1 (ne_of_lt alpha.2.2)).Nonempty := by
-    let psi0 : PureVector (Prod a a) := PureVector.basisPureVector
+    let psi0 : Ket (a × a) := default
     refine ⟨N.inputBarPetzRenyiMutualInformationPSDFinite
       psi0 alpha.1 alpha.2.1 (ne_of_lt alpha.2.2), ?_⟩
     exact ⟨psi0, rfl⟩
@@ -756,7 +747,7 @@ theorem barPetzRenyiMutualInformationPSD_le_entanglementAssistedInformation
 
 /-- Source-shaped alpha-to-one theorem for the PSD-domain barred
 Petz--Renyi channel mutual information:
-`lim_{alpha -> 1^-} \bar I_alpha^{Petz,PSD}(N) = I(N)`. -/
+`lim_{alpha → 1^-} \bar I_alpha^{Petz,PSD}(N) = I(N)`. -/
 theorem barPetzRenyiMutualInformationPSDFinite_tendsto_entanglementAssistedInformation_left
     [Nonempty a] :
     Tendsto
@@ -824,8 +815,6 @@ theorem barPetzRenyiMutualInformationPSD_tendsto_entanglementAssistedInformation
   filter_upwards with alpha
   exact (N.barPetzRenyiMutualInformationPSD_eq_coe_finite alpha).symm
 
-end Channel
+end CPTPOp
 
 end
-
-end QIT

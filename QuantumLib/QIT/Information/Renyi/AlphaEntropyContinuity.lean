@@ -12,6 +12,7 @@ public import QuantumLib.QIT.Information.Entropy.RelativeEntropyDPI
 public import QuantumLib.QIT.States.Schatten
 public import QuantumLib.QIT.Util.BlockMatrix
 public import QuantumLib.QIT.Util.Matrix
+public import QuantumLib.QIT.Util.MatrixInstances
 public import Mathlib.Analysis.Convex.Deriv
 public import Mathlib.Analysis.Complex.Exponential
 public import Mathlib.Analysis.Complex.ExponentialBounds
@@ -24,60 +25,38 @@ public import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Exp
 /-!
 # Alpha-to-von-Neumann continuity interface
 
-This module records the fixed-reference endpoint and convergence parameter used
-in Tomamichel--Colbeck--Renner 2008, Lemma `alpha-bound`
-(`tomamichel-colbeck-renner-2008-fqaep.tex`, lines 699--706).
+This module proves Tomamichel--Colbeck--Renner 2008, Lemma `alpha-bound`
+(`tomamichel-colbeck-renner-2008-fqaep.tex`, lines 699--706), together with the
+fixed-reference endpoint and convergence parameter it is stated against.
 
-The hard analytic estimate is downstream: it requires the purification
-trace-bracket representation, the scalar remainder bound for `t^β`, the
-`s_β`/cosh comparison, and Jensen's inequality for the functional calculus of
-`sqrt X + X^{-1/2} + I`.
+The estimate is assembled from the purification trace-bracket representation,
+the scalar remainder bound for `t^β` (`alphaRemainder` against
+`alphaCoshMajorant`), the `s_β`/cosh comparison, and Jensen's inequality for
+the functional calculus of `sqrt X + X^{-1/2} + I`.
 -/
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator
+open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator QIT.MatrixL2
 
 open Matrix Polynomial
 
-namespace QIT
-
+noncomputable section
 universe u v w
 
-noncomputable section
+open QIT
 
-noncomputable local instance cMatrixCStarAlgebraForAlphaEntropyContinuity
-    (n : Type*) [Fintype n] [DecidableEq n] : CStarAlgebra (CMatrix n) := {}
+namespace QIT
 
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-namespace State
+end QIT
 
-private theorem roots_X_pow_map_re_xlog2_sum_zero (n : ℕ) :
-    ((Polynomial.X ^ n : ℂ[X]).roots.map (fun z : ℂ => xlog2 z.re)).sum = 0 := by
-  rw [Polynomial.roots_X_pow, Multiset.map_nsmul, Multiset.sum_nsmul,
-    Multiset.map_singleton, Multiset.sum_singleton]
-  simp [xlog2]
+namespace MState
 
-private theorem roots_re_xlog2_sum_eq_of_X_pow_mul_eq
-    {P Q : ℂ[X]} {m n : ℕ}
-    (hP : P ≠ 0) (hQ : Q ≠ 0)
-    (h : Polynomial.X ^ m * P = Polynomial.X ^ n * Q) :
-    (P.roots.map (fun z : ℂ => xlog2 z.re)).sum =
-      (Q.roots.map (fun z : ℂ => xlog2 z.re)).sum := by
-  have hXm : (Polynomial.X ^ m : ℂ[X]) ≠ 0 := by simp
-  have hXn : (Polynomial.X ^ n : ℂ[X]) ≠ 0 := by simp
-  have hleft_ne : (Polynomial.X ^ m : ℂ[X]) * P ≠ 0 := mul_ne_zero hXm hP
-  have hright_ne : (Polynomial.X ^ n : ℂ[X]) * Q ≠ 0 := mul_ne_zero hXn hQ
-  have hroots := congrArg Polynomial.roots h
-  rw [Polynomial.roots_mul hleft_ne, Polynomial.roots_mul hright_ne] at hroots
-  have hsum :=
-    congrArg (fun s : Multiset ℂ => (s.map (fun z : ℂ => xlog2 z.re)).sum) hroots
-  simp only [Multiset.map_add, Multiset.sum_add] at hsum
-  rw [roots_X_pow_map_re_xlog2_sum_zero m,
-    roots_X_pow_map_re_xlog2_sum_zero n] at hsum
-  simpa using hsum
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
 /-- Von Neumann entropy is invariant under rectangular isometry embedding.
 
@@ -85,27 +64,27 @@ For an isometry `V : a → r`, the embedded state `V ρ Vᴴ` has the same
 nonzero eigenvalues as `ρ`, with only extra zero eigenvalues. The entropy
 convention `xlog2 0 = 0` removes those extra roots. -/
 theorem vonNeumann_eq_of_matrix_eq_isometry_conj
-    (ρ : State a) (σ : State b) (V : Matrix b a ℂ)
+    (ρ : MState a) (σ : MState b) (V : Matrix b a ℂ)
     (hV : Matrix.conjTranspose V * V = (1 : CMatrix a))
-    (hσ : σ.matrix = V * ρ.matrix * Matrix.conjTranspose V) :
+    (hσ : σ.m = V * ρ.m * Matrix.conjTranspose V) :
     σ.vonNeumann = ρ.vonNeumann := by
   rw [vonNeumann_eq_neg_sum_eigenvalueMultiset,
     vonNeumann_eq_neg_sum_eigenvalueMultiset]
   congr 1
-  have hpoly := Matrix.charpoly_isometry_conj (V := V) (A := ρ.matrix) hV
+  have hpoly := Matrix.charpoly_isometry_conj (V := V) (A := ρ.m) hV
   have hpolyσ :
-      Polynomial.X ^ Fintype.card a * σ.matrix.charpoly =
-        Polynomial.X ^ Fintype.card b * ρ.matrix.charpoly := by
+      Polynomial.X ^ Fintype.card a * σ.m.charpoly =
+        Polynomial.X ^ Fintype.card b * ρ.m.charpoly := by
     simpa [hσ] using hpoly
-  have hP : σ.matrix.charpoly ≠ 0 :=
+  have hP : σ.m.charpoly ≠ 0 :=
     (Matrix.charpoly_monic _).ne_zero
-  have hQ : ρ.matrix.charpoly ≠ 0 :=
+  have hQ : ρ.m.charpoly ≠ 0 :=
     (Matrix.charpoly_monic _).ne_zero
   have hroot :=
-    roots_re_xlog2_sum_eq_of_X_pow_mul_eq
-      (P := σ.matrix.charpoly) (Q := ρ.matrix.charpoly) hP hQ hpolyσ
-  have hrootsσ := σ.pos.isHermitian.roots_charpoly_eq_eigenvalues
-  have hrootsρ := ρ.pos.isHermitian.roots_charpoly_eq_eigenvalues
+    QIT.Matrix.roots_re_xlog2_sum_eq_of_X_pow_mul_eq
+      (P := σ.m.charpoly) (Q := ρ.m.charpoly) hP hQ hpolyσ
+  have hrootsσ := σ.psd.isHermitian.roots_charpoly_eq_eigenvalues
+  have hrootsρ := ρ.psd.isHermitian.roots_charpoly_eq_eigenvalues
   rw [hrootsσ, hrootsρ] at hroot
   simpa [eigenvalueMultiset, Multiset.map_map, Function.comp_def] using hroot
 
@@ -114,7 +93,7 @@ private theorem kronecker_one_isometry
     (V : ReferenceIsometry b bPlus) :
     Matrix.conjTranspose (Matrix.kronecker (1 : CMatrix a) V.matrix) *
         Matrix.kronecker (1 : CMatrix a) V.matrix =
-      (1 : CMatrix (Prod a b)) := by
+      (1 : CMatrix (a × b)) := by
   ext x y
   rcases x with ⟨xA, xB⟩
   rcases y with ⟨yA, yB⟩
@@ -132,7 +111,7 @@ private theorem kronecker_one_isometry
 register. -/
 theorem conditionalEntropy_conditioningIsometryApply
     {bPlus : Type w} [Fintype bPlus] [DecidableEq bPlus]
-    (ρ : State (Prod a b)) (V : ReferenceIsometry b bPlus) :
+    (ρ : MState (a × b)) (V : ReferenceIsometry b bPlus) :
     (ρ.conditioningIsometryApply V).conditionalEntropy = ρ.conditionalEntropy := by
   rw [conditionalEntropy_eq, conditionalEntropy_eq]
   have hjoint :
@@ -143,22 +122,22 @@ theorem conditionalEntropy_conditioningIsometryApply
       (kronecker_one_isometry (a := a) V)
       (ρ.conditioningIsometryApply_matrix_eq_kronecker_conj V)
   have hmarg :
-      (ρ.conditioningIsometryApply V).marginalB.vonNeumann =
-        ρ.marginalB.vonNeumann :=
+      (ρ.conditioningIsometryApply V).traceLeft.vonNeumann =
+        ρ.traceLeft.vonNeumann :=
     vonNeumann_eq_of_matrix_eq_isometry_conj
-      (ρ := ρ.marginalB) (σ := (ρ.conditioningIsometryApply V).marginalB)
+      (ρ := ρ.traceLeft) (σ := (ρ.conditioningIsometryApply V).traceLeft)
       (V := V.matrix) V.isometry
-      (ρ.conditioningIsometryApply_marginalB_matrix V)
+      (ρ.conditioningIsometryApply_traceLeft_matrix V)
   rw [hjoint, hmarg]
 
 /-- Compressing the conditioning register to the support of the marginal and
 then comparing ordinary conditional von Neumann entropy loses no entropy. -/
 theorem conditionalEntropy_conditioningSupportCompressedState
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     ρ.conditioningSupportCompressedState.conditionalEntropy = ρ.conditionalEntropy := by
   let V : ReferenceIsometry
-      (psdSupportIndex ρ.marginalB.matrix ρ.marginalB.pos) b :=
-    psdSupportReferenceIsometry ρ.marginalB.matrix ρ.marginalB.pos
+      (psdSupportIndex ρ.traceLeft.m ρ.traceLeft.psd) b :=
+    psdSupportReferenceIsometry ρ.traceLeft.m ρ.traceLeft.psd
   have h :=
     conditionalEntropy_conditioningIsometryApply
       (ρ := ρ.conditioningSupportCompressedState) V
@@ -593,7 +572,7 @@ private theorem cfc_conjStarAlgAut_posDef
     {n : Type u} [Fintype n] [DecidableEq n]
     (u : Matrix.unitaryGroup n ℂ) {A : CMatrix n} (hA : A.PosDef)
     (f : ℝ → ℝ)
-    (hf : ContinuousOn f (spectrum ℝ A)) :
+    (hf : ContinuousOn f (_root_.spectrum ℝ A)) :
     cfc f (Unitary.conjStarAlgAut ℂ _ u A) =
       Unitary.conjStarAlgAut ℂ _ u (cfc f A) := by
   simpa using
@@ -640,18 +619,18 @@ private theorem kronecker_one_mul_mul_assoc
 For full-rank `σ_B`, the CFC logarithm of the reference matrix used by the
 fixed-side conditional Petz entropy is exactly `I_A ⊗ log σ_B`. -/
 theorem psdLog_identityTensorStateMatrix
-    (σ : State b) (hσ : σ.matrix.PosDef) :
+    (σ : MState b) (hσ : σ.m.PosDef) :
     psdLog (identityTensorStateMatrix (a := a) σ)
         (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ) =
-      Matrix.kronecker (1 : CMatrix a) (psdLog σ.matrix hσ) := by
+      Matrix.kronecker (1 : CMatrix a) (psdLog σ.m hσ) := by
   classical
   let Uσ : Matrix.unitaryGroup b ℂ := hσ.1.eigenvectorUnitary
   let UI : Matrix.unitaryGroup a ℂ := ⟨1, by simp⟩
-  let U : Matrix.unitaryGroup (Prod a b) ℂ :=
+  let U : Matrix.unitaryGroup (a × b) ℂ :=
     ⟨Matrix.kronecker (1 : CMatrix a) (Uσ : CMatrix b),
       Matrix.kronecker_mem_unitary UI.2 Uσ.2⟩
   let d : b → ℝ := hσ.1.eigenvalues
-  let dside : Prod a b → ℝ := fun i => d i.2
+  let dside : a × b → ℝ := fun i => d i.2
   have hd_pos : ∀ i, 0 < d i := by
     intro i
     exact hσ.eigenvalues_pos i
@@ -660,12 +639,12 @@ theorem psdLog_identityTensorStateMatrix
     intro i
     exact_mod_cast hd_pos i
   have hDside_pos :
-      (Matrix.diagonal (fun i => (dside i : ℂ)) : CMatrix (Prod a b)).PosDef := by
+      (Matrix.diagonal (fun i => (dside i : ℂ)) : CMatrix (a × b)).PosDef := by
     rw [Matrix.posDef_diagonal_iff]
     intro i
     exact_mod_cast hd_pos i.2
   have hσ_spec :
-      σ.matrix =
+      σ.m =
         Unitary.conjStarAlgAut ℂ _ Uσ (Matrix.diagonal (fun i => (d i : ℂ))) := by
     simpa [Uσ, d, Function.comp_def] using hσ.1.spectral_theorem
   have hside_spec :
@@ -673,7 +652,7 @@ theorem psdLog_identityTensorStateMatrix
         Unitary.conjStarAlgAut ℂ _ U
           (Matrix.diagonal (fun i => (dside i : ℂ))) := by
     have hDside_kr :
-        (Matrix.diagonal (fun i => (dside i : ℂ)) : CMatrix (Prod a b)) =
+        (Matrix.diagonal (fun i => (dside i : ℂ)) : CMatrix (a × b)) =
           Matrix.kronecker (1 : CMatrix a)
             (Matrix.diagonal (fun i => (d i : ℂ)) : CMatrix b) := by
       ext x y
@@ -694,7 +673,7 @@ theorem psdLog_identityTensorStateMatrix
         (Matrix.diagonal (fun i => (d i : ℂ)) : CMatrix b)
         ((Uσ : CMatrix b)ᴴ))
   have hlogσ :
-      psdLog σ.matrix hσ =
+      psdLog σ.m hσ =
         Unitary.conjStarAlgAut ℂ _ Uσ
           (Matrix.diagonal (fun i => ((Real.log (d i) : ℝ) : ℂ))) := by
     rw [psdLog, hσ_spec]
@@ -716,7 +695,7 @@ theorem psdLog_identityTensorStateMatrix
         (ne_of_gt ((Matrix.PosDef.isStrictlyPositive hDside_pos).spectrum_pos hx))).continuousWithinAt
   rw [hlogside, hlogσ]
   have hDside_kr :
-      (Matrix.diagonal (fun i => ((Real.log (dside i) : ℝ) : ℂ)) : CMatrix (Prod a b)) =
+      (Matrix.diagonal (fun i => ((Real.log (dside i) : ℝ) : ℂ)) : CMatrix (a × b)) =
         Matrix.kronecker (1 : CMatrix a)
           (Matrix.diagonal (fun i => ((Real.log (d i) : ℝ) : ℂ)) : CMatrix b) := by
     ext x y
@@ -769,55 +748,55 @@ private theorem posSemidef_eigenvalue_mul_sum_eq_support_sum
 Only positive eigenvalues of `ρ` are indexed, matching the source convention
 that zero spectral weights do not contribute (`0 log 0 = 0`) without requiring
 a global `psdLog ρ`. -/
-def supportEntropyTraceTerm (ρ : State a) : ℝ :=
-  ∑ i : psdSupportIndex ρ.matrix ρ.pos,
-    ρ.pos.isHermitian.eigenvalues i.1 *
-      Real.log (ρ.pos.isHermitian.eigenvalues i.1)
+def supportEntropyTraceTerm (ρ : MState a) : ℝ :=
+  ∑ i : psdSupportIndex ρ.m ρ.psd,
+    ρ.psd.isHermitian.eigenvalues i.1 *
+      Real.log (ρ.psd.isHermitian.eigenvalues i.1)
 
 /-- On positive-definite states, the support-restricted entropy trace is the
 old matrix-log trace term. -/
 theorem supportEntropyTraceTerm_eq_psdLog_trace_of_posDef
-    (ρ : State a) (hρ : ρ.matrix.PosDef) :
+    (ρ : MState a) (hρ : ρ.m.PosDef) :
     ρ.supportEntropyTraceTerm =
-      ((ρ.matrix * psdLog ρ.matrix hρ).trace).re := by
+      ((ρ.m * psdLog ρ.m hρ).trace).re := by
   classical
   have htrace := trace_mul_psdLog_eq_sum_eigenvalues_mul_log ρ hρ
-  have hHerm : hρ.1 = ρ.pos.isHermitian := Subsingleton.elim _ _
+  have hHerm : hρ.1 = ρ.psd.isHermitian := Subsingleton.elim _ _
   rw [htrace]
   unfold supportEntropyTraceTerm
   rw [hHerm]
   exact (posSemidef_eigenvalue_mul_sum_eq_support_sum
-    (M := ρ.matrix) ρ.pos
-    (fun i => Real.log (ρ.pos.isHermitian.eigenvalues i))).symm
+    (M := ρ.m) ρ.psd
+    (fun i => Real.log (ρ.psd.isHermitian.eigenvalues i))).symm
 
 /-- The support-restricted entropy trace is the spectral-sum von Neumann
 entropy numerator for arbitrary finite states. -/
 theorem supportEntropyTraceTerm_eq_neg_vonNeumann_mul_log_two
-    (ρ : State a) :
+    (ρ : MState a) :
     ρ.supportEntropyTraceTerm = -ρ.vonNeumann * Real.log 2 := by
   classical
   have hsum :
       ρ.supportEntropyTraceTerm =
-        ∑ i, ρ.pos.isHermitian.eigenvalues i *
-          Real.log (ρ.pos.isHermitian.eigenvalues i) := by
+        ∑ i, ρ.psd.isHermitian.eigenvalues i *
+          Real.log (ρ.psd.isHermitian.eigenvalues i) := by
     unfold supportEntropyTraceTerm
     exact (posSemidef_eigenvalue_mul_sum_eq_support_sum
-      (M := ρ.matrix) ρ.pos
-      (fun i => Real.log (ρ.pos.isHermitian.eigenvalues i))).symm
+      (M := ρ.m) ρ.psd
+      (fun i => Real.log (ρ.psd.isHermitian.eigenvalues i))).symm
   have hxlog (i : a) :
-      xlog2 (ρ.pos.isHermitian.eigenvalues i) * Real.log 2 =
-        ρ.pos.isHermitian.eigenvalues i *
-          Real.log (ρ.pos.isHermitian.eigenvalues i) := by
-    have hnonneg : 0 ≤ ρ.pos.isHermitian.eigenvalues i :=
-      ρ.pos.eigenvalues_nonneg i
+      xlog2 (ρ.psd.isHermitian.eigenvalues i) * Real.log 2 =
+        ρ.psd.isHermitian.eigenvalues i *
+          Real.log (ρ.psd.isHermitian.eigenvalues i) := by
+    have hnonneg : 0 ≤ ρ.psd.isHermitian.eigenvalues i :=
+      ρ.psd.eigenvalues_nonneg i
     unfold xlog2 log2
-    by_cases hzero : ρ.pos.isHermitian.eigenvalues i = 0
+    by_cases hzero : ρ.psd.isHermitian.eigenvalues i = 0
     · simp [hzero, Real.log_zero]
-    · have hpos : 0 < ρ.pos.isHermitian.eigenvalues i :=
+    · have hpos : 0 < ρ.psd.isHermitian.eigenvalues i :=
         lt_of_le_of_ne hnonneg (Ne.symm hzero)
       simp [hzero]
       field_simp [(Real.log_pos one_lt_two).ne']
-  rw [hsum, State.vonNeumann]
+  rw [hsum, MState.vonNeumann]
   simp_rw [← hxlog]
   rw [← Finset.sum_mul]
   ring
@@ -830,10 +809,10 @@ argument is intentionally the unnormalized reference matrix `I_A ⊗ σ_B`,
 matching the fixed-side Petz candidate in `conditionalPetzRenyiEntropyCandidate`.
 -/
 def conditionalEntropyRelative
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) : ℝ :=
-  -(((ρ.matrix * psdLog ρ.matrix hρ).trace.re -
-      (ρ.matrix *
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) : ℝ :=
+  -(((ρ.m * psdLog ρ.m hρ).trace.re -
+      (ρ.m *
         psdLog (identityTensorStateMatrix (a := a) σ)
           (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace.re) /
     Real.log 2)
@@ -844,20 +823,20 @@ and full-rank reference.
 The left `ρ log ρ` term is the support-restricted spectral sum, while the
 reference log remains an ordinary matrix logarithm because `σ_B` is full-rank. -/
 def conditionalEntropyRelativeFullReference
-    (ρ : State (Prod a b)) (σ : State b) (hσ : σ.matrix.PosDef) : ℝ :=
+    (ρ : MState (a × b)) (σ : MState b) (hσ : σ.m.PosDef) : ℝ :=
   -((ρ.supportEntropyTraceTerm -
-      (ρ.matrix *
+      (ρ.m *
         psdLog (identityTensorStateMatrix (a := a) σ)
           (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace.re) /
     Real.log 2)
 
 @[simp]
 theorem conditionalEntropyRelative_eq
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) :
     ρ.conditionalEntropyRelative hρ σ hσ =
-      -(((ρ.matrix * psdLog ρ.matrix hρ).trace.re -
-          (ρ.matrix *
+      -(((ρ.m * psdLog ρ.m hρ).trace.re -
+          (ρ.m *
             psdLog (identityTensorStateMatrix (a := a) σ)
               (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace.re) /
         Real.log 2) :=
@@ -875,19 +854,19 @@ fixed-reference comparison `lam ≤ H(A|B)_{ρ|σ}`.
 The later source step is to obtain `htrace` from the feasible operator
 inequality by operator monotonicity of the logarithm. -/
 theorem conditionalMinEntropyFeasible_le_conditionalEntropyRelative_of_traceLog_nonneg
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) {lam : ℝ}
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) {lam : ℝ}
     (_hfeas : ConditionalMinEntropyFeasible (a := a) ρ σ lam)
     (htrace :
       0 ≤
-        (((ρ.matrix *
+        (((ρ.m *
             psdLog (identityTensorStateMatrix (a := a) σ)
               (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re -
-          ((ρ.matrix * psdLog ρ.matrix hρ).trace).re) - lam * Real.log 2) :
+          ((ρ.m * psdLog ρ.m hρ).trace).re) - lam * Real.log 2) :
     lam ≤ ρ.conditionalEntropyRelative hρ σ hσ := by
-  let A : ℝ := ((ρ.matrix * psdLog ρ.matrix hρ).trace).re
+  let A : ℝ := ((ρ.m * psdLog ρ.m hρ).trace).re
   let B : ℝ :=
-    ((ρ.matrix *
+    ((ρ.m *
       psdLog (identityTensorStateMatrix (a := a) σ)
         (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re
   have hlog2 : 0 < Real.log 2 := Real.log_pos one_lt_two
@@ -911,46 +890,47 @@ residual used in
 `conditionalMinEntropyFeasible_le_conditionalEntropyRelative_of_traceLog_nonneg`,
 by operator monotonicity of the CFC logarithm. -/
 theorem conditionalMinEntropyFeasible_traceLog_residual_nonneg
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) {lam : ℝ}
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) {lam : ℝ}
     (hfeas : ConditionalMinEntropyFeasible (a := a) ρ σ lam) :
     0 ≤
-      (((ρ.matrix *
+      (((ρ.m *
           psdLog (identityTensorStateMatrix (a := a) σ)
             (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re -
-        ((ρ.matrix * psdLog ρ.matrix hρ).trace).re) - lam * Real.log 2 := by
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+        ((ρ.m * psdLog ρ.m hρ).trace).re) - lam * Real.log 2 := by
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let c : ℝ := Real.rpow 2 (-lam)
   have hc : 0 < c := by
     exact Real.rpow_pos_of_pos (by norm_num : (0 : ℝ) < 2) (-lam)
   have hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
-  have hle : ρ.matrix ≤ (c : ℝ) • τ := by
+  have hle : ρ.m ≤ (c : ℝ) • τ := by
     simpa [ConditionalMinEntropyFeasible, τ, c] using hfeas
-  have hlog_le : CFC.log ρ.matrix ≤ CFC.log ((c : ℝ) • τ) := by
+  have hlog_le : CFC.log ρ.m ≤ CFC.log ((c : ℝ) • τ) := by
     exact CFC.log_le_log hle (ha := Matrix.PosDef.isStrictlyPositive hρ)
   have hlog_smul :
       CFC.log ((c : ℝ) • τ) =
-        algebraMap ℝ (CMatrix (Prod a b)) (Real.log c) + CFC.log τ := by
+        algebraMap ℝ (CMatrix (a × b)) (Real.log c) + CFC.log τ := by
     exact CFC.log_smul' τ hc (ha := Matrix.PosDef.isStrictlyPositive hτpos)
-  have hdiff_pos : (CFC.log ((c : ℝ) • τ) - CFC.log ρ.matrix).PosSemidef := by
+  have hdiff_pos : (CFC.log ((c : ℝ) • τ) - CFC.log ρ.m).PosSemidef := by
     simpa [Matrix.le_iff] using hlog_le
   have htrace_nonneg :
-      0 ≤ ((ρ.matrix *
-        (CFC.log ((c : ℝ) • τ) - CFC.log ρ.matrix)).trace).re :=
-    trace_mul_posSemidef_re_nonneg hρ.posSemidef hdiff_pos
+      0 ≤ ((ρ.m *
+        (CFC.log ((c : ℝ) • τ) - CFC.log ρ.m)).trace).re :=
+    cMatrix_trace_mul_posSemidef_re_nonneg hρ.posSemidef hdiff_pos
   have htrace_expand :
-      ((ρ.matrix * (CFC.log ((c : ℝ) • τ) - CFC.log ρ.matrix)).trace).re =
-        ((ρ.matrix * CFC.log τ).trace).re -
-          ((ρ.matrix * CFC.log ρ.matrix).trace).re + Real.log c := by
+      ((ρ.m * (CFC.log ((c : ℝ) • τ) - CFC.log ρ.m)).trace).re =
+        ((ρ.m * CFC.log τ).trace).re -
+          ((ρ.m * CFC.log ρ.m).trace).re + Real.log c := by
     rw [hlog_smul]
     simp [Matrix.mul_add, Matrix.trace_add, Algebra.algebraMap_eq_smul_one,
-      Matrix.trace_smul, ρ.trace_eq_one, add_comm, add_left_comm, sub_eq_add_neg]
+      Matrix.trace_smul, ρ.tr', add_comm, add_assoc, sub_eq_add_neg]
+    ring
   have hlogc : Real.log c = -lam * Real.log 2 := by
     simp [c, Real.log_rpow (by norm_num : (0 : ℝ) < 2)]
   have hmain :
       0 ≤
-        ((ρ.matrix * CFC.log τ).trace).re -
-          ((ρ.matrix * CFC.log ρ.matrix).trace).re - lam * Real.log 2 := by
+        ((ρ.m * CFC.log τ).trace).re -
+          ((ρ.m * CFC.log ρ.m).trace).re - lam * Real.log 2 := by
     rw [htrace_expand] at htrace_nonneg
     rw [hlogc] at htrace_nonneg
     linarith
@@ -962,8 +942,8 @@ For positive-definite `ρ_AB` and full-rank side reference `σ_B`, every
 normalized conditional-min feasible exponent is bounded above by the
 fixed-reference conditional von Neumann entropy. -/
 theorem conditionalMinEntropyFeasible_le_conditionalEntropyRelative
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) {lam : ℝ}
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) {lam : ℝ}
     (hfeas : ConditionalMinEntropyFeasible (a := a) ρ σ lam) :
     lam ≤ ρ.conditionalEntropyRelative hρ σ hσ :=
   conditionalMinEntropyFeasible_le_conditionalEntropyRelative_of_traceLog_nonneg
@@ -977,19 +957,19 @@ This is the arbitrary-left analogue of
 `conditionalMinEntropyFeasible_le_conditionalEntropyRelative_of_traceLog_nonneg`:
 the `Tr ρ log ρ` term is replaced by the support-restricted spectral trace. -/
 theorem conditionalMinEntropyFeasible_le_conditionalEntropyRelativeFullReference_of_supportTraceLog_nonneg
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef) {lam : ℝ}
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef) {lam : ℝ}
     (_hfeas : ConditionalMinEntropyFeasible (a := a) ρ σ lam)
     (htrace :
       0 ≤
-        (((ρ.matrix *
+        (((ρ.m *
             psdLog (identityTensorStateMatrix (a := a) σ)
               (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re -
           ρ.supportEntropyTraceTerm) - lam * Real.log 2) :
     lam ≤ ρ.conditionalEntropyRelativeFullReference σ hσ := by
   let A : ℝ := ρ.supportEntropyTraceTerm
   let B : ℝ :=
-    ((ρ.matrix *
+    ((ρ.m *
       psdLog (identityTensorStateMatrix (a := a) σ)
         (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re
   have hlog2 : 0 < Real.log 2 := Real.log_pos one_lt_two
@@ -1006,8 +986,8 @@ theorem conditionalMinEntropyFeasible_le_conditionalEntropyRelativeFullReference
   rwa [hrel]
 
 theorem conditionalEntropyRelativeFullReference_eq_conditionalEntropyRelative_of_posDef
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) :
     ρ.conditionalEntropyRelativeFullReference σ hσ =
       ρ.conditionalEntropyRelative hρ σ hσ := by
   rw [conditionalEntropyRelativeFullReference, conditionalEntropyRelative_eq,
@@ -1020,64 +1000,55 @@ identified with the marginal entropy trace term.
 For the canonical reference this isolates the remaining tensor-log bridge:
 `Tr ρ_AB log(I_A ⊗ ρ_B) = Tr ρ_B log ρ_B`. -/
 theorem conditionalEntropyRelative_to_conditionalEntropy_of_reference_trace
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef)
     (href :
-      ((ρ.matrix *
-        psdLog (identityTensorStateMatrix (a := a) ρ.marginalB)
-          (identityTensorStateMatrix_posDef_of_posDef (a := a) ρ.marginalB hρB)).trace).re =
-        ((ρ.marginalB.matrix * psdLog ρ.marginalB.matrix hρB).trace).re) :
-    ρ.conditionalEntropyRelative hρ ρ.marginalB hρB = ρ.conditionalEntropy := by
+      ((ρ.m *
+        psdLog (identityTensorStateMatrix (a := a) ρ.traceLeft)
+          (identityTensorStateMatrix_posDef_of_posDef (a := a) ρ.traceLeft hρB)).trace).re =
+        ((ρ.traceLeft.m * psdLog ρ.traceLeft.m hρB).trace).re) :
+    ρ.conditionalEntropyRelative hρ ρ.traceLeft hρB = ρ.conditionalEntropy := by
   rw [conditionalEntropyRelative_eq, conditionalEntropy_eq,
-    State.vonNeumann_eq_neg_trace_mul_psdLog_div_log_two ρ hρ,
-    State.vonNeumann_eq_neg_trace_mul_psdLog_div_log_two ρ.marginalB hρB,
+    MState.vonNeumann_eq_neg_trace_mul_psdLog_div_log_two ρ hρ,
+    MState.vonNeumann_eq_neg_trace_mul_psdLog_div_log_two ρ.traceLeft hρB,
     href]
   ring
 
 /-- The canonical fixed-reference matrix-log conditional entropy is the usual
 conditional von Neumann entropy in the positive-definite case. -/
 theorem conditionalEntropyRelative_to_conditionalEntropy
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef) :
-    ρ.conditionalEntropyRelative hρ ρ.marginalB hρB = ρ.conditionalEntropy := by
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef) :
+    ρ.conditionalEntropyRelative hρ ρ.traceLeft hρB = ρ.conditionalEntropy := by
   refine
     conditionalEntropyRelative_to_conditionalEntropy_of_reference_trace
       (ρ := ρ) hρ hρB ?_
-  rw [psdLog_identityTensorStateMatrix (a := a) ρ.marginalB hρB]
+  rw [psdLog_identityTensorStateMatrix (a := a) ρ.traceLeft hρB]
   calc
-    ((ρ.matrix *
-      Matrix.kronecker (1 : CMatrix a) (psdLog ρ.marginalB.matrix hρB)).trace).re =
-        ((Matrix.kronecker (1 : CMatrix a) (psdLog ρ.marginalB.matrix hρB) *
-          ρ.matrix).trace).re := by
+    ((ρ.m *
+      Matrix.kronecker (1 : CMatrix a) (psdLog ρ.traceLeft.m hρB)).trace).re =
+        ((Matrix.kronecker (1 : CMatrix a) (psdLog ρ.traceLeft.m hρB) *
+          ρ.m).trace).re := by
       rw [Matrix.trace_mul_comm]
-    _ = ((psdLog ρ.marginalB.matrix hρB *
-          partialTraceA (a := a) (b := b) ρ.matrix).trace).re := by
-      rw [trace_kronecker_one_mul_eq_trace_mul_partialTraceA]
-    _ = ((psdLog ρ.marginalB.matrix hρB * ρ.marginalB.matrix).trace).re := by
-      simp [State.marginalB_matrix]
-    _ = ((ρ.marginalB.matrix * psdLog ρ.marginalB.matrix hρB).trace).re := by
+    _ = ((psdLog ρ.traceLeft.m hρB *
+          Matrix.traceLeft ρ.m).trace).re := by
+      rw [trace_kronecker_one_mul_eq_trace_mul_traceLeft]
+    _ = ((psdLog ρ.traceLeft.m hρB * ρ.traceLeft.m).trace).re := by
+      simp
+    _ = ((ρ.traceLeft.m * psdLog ρ.traceLeft.m hρB).trace).re := by
       rw [Matrix.trace_mul_comm]
-
-theorem marginalB_posDef_of_posDef
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef) :
-    ρ.marginalB.matrix.PosDef := by
-  let : Nonempty a := by
-    rcases ρ.nonempty with ⟨x⟩
-    exact ⟨x.1⟩
-  simpa [State.marginalB_matrix] using
-    (partialTraceA_posDef_of_posDef (a := a) (b := b) (M := ρ.matrix) hρ)
 
 /-- Positive-definite quantum relative entropy is nonnegative. -/
 theorem relativeEntropy_nonneg_of_posDef
-    (ρ σ : State a) (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef) :
+    (ρ σ : MState a) (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef) :
     0 ≤ ρ.relativeEntropyPosDefFinite σ hρ hσ := by
   have hlim :=
     sandwichedRenyiPSDReferenceHighAlphaFinite_tendsto_posDef_traceLog
-      (rho := ρ) (sigma := σ.matrix) hσ
+      (rho := ρ) (sigma := σ.m) hσ
   have hlimRel :
       Filter.Tendsto
-        (fun alpha : {alpha : Real // 1 < alpha} =>
-          ρ.sandwichedRenyiPSDReferenceHighAlphaFinite σ.matrix hσ.posSemidef alpha.1)
+        (fun alpha : {alpha : ℝ // 1 < alpha} =>
+          ρ.sandwichedRenyiPSDReferenceHighAlphaFinite σ.m hσ.posSemidef alpha.1)
         relativeEntropyHighAlphaRightToOne
         (nhds (ρ.relativeEntropyPosDefFinite σ hρ hσ)) := by
     convert hlim using 1
@@ -1095,38 +1066,38 @@ Equivalently,
 `H(A|B)_{ρ|σ} = H(A|B)_ρ - D(ρ_B ‖ σ)`, and the side relative entropy is
 nonnegative for full-rank references. -/
 theorem conditionalEntropyRelative_le_conditionalEntropy
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) :
     ρ.conditionalEntropyRelative hρ σ hσ ≤ ρ.conditionalEntropy := by
-  let hρB : ρ.marginalB.matrix.PosDef := marginalB_posDef_of_posDef ρ hρ
+  let hρB : ρ.traceLeft.m.PosDef := traceLeft_posDef_of_posDef ρ hρ
   have hrefσ :
-      ((ρ.matrix *
+      ((ρ.m *
         psdLog (identityTensorStateMatrix (a := a) σ)
           (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re =
-        ((ρ.marginalB.matrix * psdLog σ.matrix hσ).trace).re := by
+        ((ρ.traceLeft.m * psdLog σ.m hσ).trace).re := by
     rw [psdLog_identityTensorStateMatrix (a := a) σ hσ]
     calc
-      ((ρ.matrix * Matrix.kronecker (1 : CMatrix a) (psdLog σ.matrix hσ)).trace).re =
-          ((Matrix.kronecker (1 : CMatrix a) (psdLog σ.matrix hσ) *
-            ρ.matrix).trace).re := by
+      ((ρ.m * Matrix.kronecker (1 : CMatrix a) (psdLog σ.m hσ)).trace).re =
+          ((Matrix.kronecker (1 : CMatrix a) (psdLog σ.m hσ) *
+            ρ.m).trace).re := by
         rw [Matrix.trace_mul_comm]
-      _ = ((psdLog σ.matrix hσ *
-            partialTraceA (a := a) (b := b) ρ.matrix).trace).re := by
-        rw [trace_kronecker_one_mul_eq_trace_mul_partialTraceA]
-      _ = ((psdLog σ.matrix hσ * ρ.marginalB.matrix).trace).re := by
-        simp [State.marginalB_matrix]
-      _ = ((ρ.marginalB.matrix * psdLog σ.matrix hσ).trace).re := by
+      _ = ((psdLog σ.m hσ *
+            Matrix.traceLeft ρ.m).trace).re := by
+        rw [trace_kronecker_one_mul_eq_trace_mul_traceLeft]
+      _ = ((psdLog σ.m hσ * ρ.traceLeft.m).trace).re := by
+        simp
+      _ = ((ρ.traceLeft.m * psdLog σ.m hσ).trace).re := by
         rw [Matrix.trace_mul_comm]
   have hrel :
       ρ.conditionalEntropyRelative hρ σ hσ =
-        ρ.conditionalEntropy - ρ.marginalB.relativeEntropyPosDefFinite σ hρB hσ := by
+        ρ.conditionalEntropy - ρ.traceLeft.relativeEntropyPosDefFinite σ hρB hσ := by
     rw [conditionalEntropyRelative_eq, conditionalEntropy_eq, relativeEntropyPosDefFinite,
       vonNeumann_eq_neg_trace_mul_psdLog_div_log_two ρ hρ,
-      vonNeumann_eq_neg_trace_mul_psdLog_div_log_two ρ.marginalB hρB,
+      vonNeumann_eq_neg_trace_mul_psdLog_div_log_two ρ.traceLeft hρB,
       hrefσ]
     ring
-  have hD : 0 ≤ ρ.marginalB.relativeEntropyPosDefFinite σ hρB hσ :=
-    relativeEntropy_nonneg_of_posDef ρ.marginalB σ hρB hσ
+  have hD : 0 ≤ ρ.traceLeft.relativeEntropyPosDefFinite σ hρB hσ :=
+    relativeEntropy_nonneg_of_posDef ρ.traceLeft σ hρB hσ
   rw [hrel]
   linarith
 
@@ -1139,42 +1110,42 @@ on the side system is nonnegative by the source-limit PSD-reference DPI
 endpoint, so replacing the side reference by an arbitrary full-rank `σ_B` can
 only decrease `H(A|B)`. -/
 theorem conditionalEntropyRelativeFullReference_le_conditionalEntropy
-    (ρ : State (Prod a b)) (σ : State b) (hσ : σ.matrix.PosDef) :
+    (ρ : MState (a × b)) (σ : MState b) (hσ : σ.m.PosDef) :
     ρ.conditionalEntropyRelativeFullReference σ hσ ≤ ρ.conditionalEntropy := by
   have hrefσ :
-      ((ρ.matrix *
+      ((ρ.m *
         psdLog (identityTensorStateMatrix (a := a) σ)
           (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re =
-        ((ρ.marginalB.matrix * psdLog σ.matrix hσ).trace).re := by
+        ((ρ.traceLeft.m * psdLog σ.m hσ).trace).re := by
     rw [psdLog_identityTensorStateMatrix (a := a) σ hσ]
     calc
-      ((ρ.matrix * Matrix.kronecker (1 : CMatrix a) (psdLog σ.matrix hσ)).trace).re =
-          ((Matrix.kronecker (1 : CMatrix a) (psdLog σ.matrix hσ) *
-            ρ.matrix).trace).re := by
+      ((ρ.m * Matrix.kronecker (1 : CMatrix a) (psdLog σ.m hσ)).trace).re =
+          ((Matrix.kronecker (1 : CMatrix a) (psdLog σ.m hσ) *
+            ρ.m).trace).re := by
         rw [Matrix.trace_mul_comm]
-      _ = ((psdLog σ.matrix hσ *
-            partialTraceA (a := a) (b := b) ρ.matrix).trace).re := by
-        rw [trace_kronecker_one_mul_eq_trace_mul_partialTraceA]
-      _ = ((psdLog σ.matrix hσ * ρ.marginalB.matrix).trace).re := by
-        simp [State.marginalB_matrix]
-      _ = ((ρ.marginalB.matrix * psdLog σ.matrix hσ).trace).re := by
+      _ = ((psdLog σ.m hσ *
+            Matrix.traceLeft ρ.m).trace).re := by
+        rw [trace_kronecker_one_mul_eq_trace_mul_traceLeft]
+      _ = ((psdLog σ.m hσ * ρ.traceLeft.m).trace).re := by
+        simp
+      _ = ((ρ.traceLeft.m * psdLog σ.m hσ).trace).re := by
         rw [Matrix.trace_mul_comm]
   have hsupport :
       ρ.supportEntropyTraceTerm = -ρ.vonNeumann * Real.log 2 :=
     ρ.supportEntropyTraceTerm_eq_neg_vonNeumann_mul_log_two
-  have hD := relativeEntropy_posDefReferenceTraceLog_nonneg ρ.marginalB σ hσ
+  have hD := relativeEntropy_posDefReferenceTraceLog_nonneg ρ.traceLeft σ hσ
   rw [conditionalEntropyRelativeFullReference, conditionalEntropy_eq, hrefσ, hsupport]
   have hlog : Real.log 2 ≠ 0 := (Real.log_pos one_lt_two).ne'
   field_simp [hlog] at hD ⊢
   linarith
 
 theorem conditionalMinEntropyFeasible_le_conditionalEntropy_of_supportTraceLog_nonneg
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef) {lam : ℝ}
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef) {lam : ℝ}
     (hfeas : ConditionalMinEntropyFeasible (a := a) ρ σ lam)
     (htrace :
       0 ≤
-        (((ρ.matrix *
+        (((ρ.m *
             psdLog (identityTensorStateMatrix (a := a) σ)
               (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re -
           ρ.supportEntropyTraceTerm) - lam * Real.log 2) :
@@ -1193,52 +1164,52 @@ source-aligned fixed-reference form of `H_min(A|B)_ρ ≤ H(A|B)_ρ`; passing fr
 the optimized supremum over all side references to this canonical witness is a
 separate endpoint/attainment step. -/
 theorem conditionalMinEntropyFeasible_canonical_le_conditionalEntropy
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef) {lam : ℝ}
-    (hfeas : ConditionalMinEntropyFeasible (a := a) ρ ρ.marginalB lam) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef) {lam : ℝ}
+    (hfeas : ConditionalMinEntropyFeasible (a := a) ρ ρ.traceLeft lam) :
     lam ≤ ρ.conditionalEntropy := by
   exact
     (conditionalMinEntropyFeasible_le_conditionalEntropyRelative
-      ρ hρ ρ.marginalB hρB hfeas).trans_eq
+      ρ hρ ρ.traceLeft hρB hfeas).trans_eq
       (conditionalEntropyRelative_to_conditionalEntropy ρ hρ hρB)
 
 /-- The support-aware canonical fixed-reference entropy is the ordinary
 conditional von Neumann entropy.  Only the side marginal is required to be
 full rank. -/
 theorem conditionalEntropyRelativeFullReference_to_conditionalEntropy
-    (ρ : State (Prod a b)) (hρB : ρ.marginalB.matrix.PosDef) :
-    ρ.conditionalEntropyRelativeFullReference ρ.marginalB hρB =
+    (ρ : MState (a × b)) (hρB : ρ.traceLeft.m.PosDef) :
+    ρ.conditionalEntropyRelativeFullReference ρ.traceLeft hρB =
       ρ.conditionalEntropy := by
   have href :
-      ((ρ.matrix *
-        psdLog (identityTensorStateMatrix (a := a) ρ.marginalB)
-          (identityTensorStateMatrix_posDef_of_posDef (a := a) ρ.marginalB hρB)).trace).re =
-        ((ρ.marginalB.matrix * psdLog ρ.marginalB.matrix hρB).trace).re := by
-    rw [psdLog_identityTensorStateMatrix (a := a) ρ.marginalB hρB]
+      ((ρ.m *
+        psdLog (identityTensorStateMatrix (a := a) ρ.traceLeft)
+          (identityTensorStateMatrix_posDef_of_posDef (a := a) ρ.traceLeft hρB)).trace).re =
+        ((ρ.traceLeft.m * psdLog ρ.traceLeft.m hρB).trace).re := by
+    rw [psdLog_identityTensorStateMatrix (a := a) ρ.traceLeft hρB]
     calc
-      ((ρ.matrix *
-        Matrix.kronecker (1 : CMatrix a) (psdLog ρ.marginalB.matrix hρB)).trace).re =
-          ((Matrix.kronecker (1 : CMatrix a) (psdLog ρ.marginalB.matrix hρB) *
-            ρ.matrix).trace).re := by
+      ((ρ.m *
+        Matrix.kronecker (1 : CMatrix a) (psdLog ρ.traceLeft.m hρB)).trace).re =
+          ((Matrix.kronecker (1 : CMatrix a) (psdLog ρ.traceLeft.m hρB) *
+            ρ.m).trace).re := by
         rw [Matrix.trace_mul_comm]
-      _ = ((psdLog ρ.marginalB.matrix hρB *
-            partialTraceA (a := a) (b := b) ρ.matrix).trace).re := by
-        rw [trace_kronecker_one_mul_eq_trace_mul_partialTraceA]
-      _ = ((psdLog ρ.marginalB.matrix hρB * ρ.marginalB.matrix).trace).re := by
-        simp [State.marginalB_matrix]
-      _ = ((ρ.marginalB.matrix * psdLog ρ.marginalB.matrix hρB).trace).re := by
+      _ = ((psdLog ρ.traceLeft.m hρB *
+            Matrix.traceLeft ρ.m).trace).re := by
+        rw [trace_kronecker_one_mul_eq_trace_mul_traceLeft]
+      _ = ((psdLog ρ.traceLeft.m hρB * ρ.traceLeft.m).trace).re := by
+        simp
+      _ = ((ρ.traceLeft.m * psdLog ρ.traceLeft.m hρB).trace).re := by
         rw [Matrix.trace_mul_comm]
   have hsupport :
       ρ.supportEntropyTraceTerm = -ρ.vonNeumann * Real.log 2 :=
     ρ.supportEntropyTraceTerm_eq_neg_vonNeumann_mul_log_two
   have hmarg :
-      ρ.marginalB.vonNeumann =
-        -((ρ.marginalB.matrix * psdLog ρ.marginalB.matrix hρB).trace.re) /
+      ρ.traceLeft.vonNeumann =
+        -((ρ.traceLeft.m * psdLog ρ.traceLeft.m hρB).trace.re) /
           Real.log 2 :=
-    State.vonNeumann_eq_neg_trace_mul_psdLog_div_log_two ρ.marginalB hρB
+    MState.vonNeumann_eq_neg_trace_mul_psdLog_div_log_two ρ.traceLeft hρB
   have href_vn :
-      ((ρ.marginalB.matrix * psdLog ρ.marginalB.matrix hρB).trace.re) =
-        -ρ.marginalB.vonNeumann * Real.log 2 := by
+      ((ρ.traceLeft.m * psdLog ρ.traceLeft.m hρB).trace.re) =
+        -ρ.traceLeft.vonNeumann * Real.log 2 := by
     have hlog : Real.log 2 ≠ 0 := (Real.log_pos one_lt_two).ne'
     rw [hmarg]
     field_simp [hlog]
@@ -1251,27 +1222,27 @@ theorem conditionalEntropyRelativeFullReference_to_conditionalEntropy
 /-- Canonical fixed-reference conditional entropy is additive on grouped
 IID tensor powers, with no full-rank assumption on the joint state. -/
 theorem tensorPowerBipartite_conditionalEntropyRelativeFullReference_canonical
-    (ρ : State (Prod a b)) (hρB : ρ.marginalB.matrix.PosDef) (n : ℕ)
-    (hρnB : (ρ.tensorPowerBipartite n).marginalB.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρB : ρ.traceLeft.m.PosDef) (n : ℕ)
+    (hρnB : (ρ.tensorPowerBipartite n).traceLeft.m.PosDef) :
     (ρ.tensorPowerBipartite n).conditionalEntropyRelativeFullReference
-        (ρ.tensorPowerBipartite n).marginalB hρnB =
+        (ρ.tensorPowerBipartite n).traceLeft hρnB =
       (n : ℝ) *
-        ρ.conditionalEntropyRelativeFullReference ρ.marginalB hρB := by
+        ρ.conditionalEntropyRelativeFullReference ρ.traceLeft hρB := by
   rw [
     conditionalEntropyRelativeFullReference_to_conditionalEntropy
       (ρ := ρ.tensorPowerBipartite n) hρnB,
     conditionalEntropyRelativeFullReference_to_conditionalEntropy
       (ρ := ρ) hρB]
   have hAB :
-      State.vonNeumann (ρ.tensorPowerBipartite n) =
-        State.vonNeumann (ρ.tensorPower n) := by
-    change State.vonNeumann
+      MState.vonNeumann (ρ.tensorPowerBipartite n) =
+        MState.vonNeumann (ρ.tensorPower n) := by
+    change MState.vonNeumann
         ((ρ.tensorPower n).reindex (tensorPowerProdEquiv a b n)) =
-      State.vonNeumann (ρ.tensorPower n)
-    rw [State.vonNeumann_reindex]
+      MState.vonNeumann (ρ.tensorPower n)
+    rw [MState.vonNeumann_reindex]
   rw [conditionalEntropy_eq, conditionalEntropy_eq, hAB]
-  rw [State.tensorPowerBipartite_marginalB]
-  rw [State.vonNeumann_tensorPower, State.vonNeumann_tensorPower]
+  rw [MState.tensorPowerBipartite_traceLeft]
+  rw [MState.vonNeumann_tensorPower, MState.vonNeumann_tensorPower]
   ring
 
 /-- Fixed-reference Petz trace at `α = 1 + β`, expanded in the eigenbasis of
@@ -1281,77 +1252,77 @@ This is the first matrix-route bridge for TCR Lemma `alpha-bound`: the
 noncommutative trace term is reduced to diagonal weights against the spectral
 values of the fixed reference. -/
 theorem conditionalPetzRenyiTraceTerm_one_add_eq_reference_eigenbasis_sum
-    (ρ : State (Prod a b)) (σ : State b) (β : ℝ) :
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
-    let hτ : τ.PosSemidef := identityTensorStateMatrix_posSemidef_of_state (a := a) σ
-    let U : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    (ρ : MState (a × b)) (σ : MState b) (β : ℝ) :
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
+    let hτ : τ.PosSemidef := identityTensorStateMatrix_posSemidef (a := a) σ
+    let U : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
     ρ.conditionalPetzRenyiTraceTerm σ (1 + β) =
       ∑ i,
-        ((star (U : CMatrix (Prod a b)) *
-          CFC.rpow ρ.matrix (1 + β) * (U : CMatrix (Prod a b))) i i).re *
+        ((star (U : CMatrix (a × b)) *
+          CFC.rpow ρ.m (1 + β) * (U : CMatrix (a × b))) i i).re *
           hτ.isHermitian.eigenvalues i ^ (-β) := by
   classical
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
-  let hτ : τ.PosSemidef := identityTensorStateMatrix_posSemidef_of_state (a := a) σ
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
+  let hτ : τ.PosSemidef := identityTensorStateMatrix_posSemidef (a := a) σ
   have h :=
     trace_mul_cMatrix_rpow_eq_conjugate_diag_sum
-      (M := CFC.rpow ρ.matrix (1 + β)) (N := τ) hτ (-β)
+      (M := CFC.rpow ρ.m (1 + β)) (N := τ) hτ (-β)
   simpa [conditionalPetzRenyiTraceTerm, τ, hτ, sub_eq_add_neg] using h
 
 /-- Matrix-log endpoint against the side reference `τ = I_A ⊗ σ_B`, expanded
 in the same reference eigenbasis as
 `conditionalPetzRenyiTraceTerm_one_add_eq_reference_eigenbasis_sum`. -/
 theorem trace_mul_psdLog_identityTensorStateMatrix_eq_reference_eigenbasis_sum
-    (ρ : State (Prod a b)) (σ : State b) (hσ : σ.matrix.PosDef) :
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b)) (σ : MState b) (hσ : σ.m.PosDef) :
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let U : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    ((ρ.matrix *
+    let U : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    ((ρ.m *
       psdLog (identityTensorStateMatrix (a := a) σ)
         (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re =
       ∑ i,
-        ((star (U : CMatrix (Prod a b)) * ρ.matrix * (U : CMatrix (Prod a b))) i i).re *
+        ((star (U : CMatrix (a × b)) * ρ.m * (U : CMatrix (a × b))) i i).re *
           Real.log (hτ.isHermitian.eigenvalues i) := by
   classical
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let U : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let D : CMatrix (Prod a b) :=
+  let U : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let D : CMatrix (a × b) :=
     Matrix.diagonal fun i => ((Real.log (hτ.isHermitian.eigenvalues i) : ℝ) : ℂ)
   have hlog :
-      psdLog τ hτpos = (U : CMatrix (Prod a b)) * D * star (U : CMatrix (Prod a b)) := by
+      psdLog τ hτpos = (U : CMatrix (a × b)) * D * star (U : CMatrix (a × b)) := by
     rw [psdLog, hτpos.1.cfc_eq]
     simp [U, D, Matrix.IsHermitian.cfc, Unitary.conjStarAlgAut_apply, Function.comp_def]
   have htrace :
-      (ρ.matrix * psdLog τ hτpos).trace =
-        ((star (U : CMatrix (Prod a b)) * ρ.matrix * (U : CMatrix (Prod a b))) *
+      (ρ.m * psdLog τ hτpos).trace =
+        ((star (U : CMatrix (a × b)) * ρ.m * (U : CMatrix (a × b))) *
           D).trace := by
     rw [hlog]
     calc
-      (ρ.matrix * ((U : CMatrix (Prod a b)) * D * star (U : CMatrix (Prod a b)))).trace
-          = (((ρ.matrix * (U : CMatrix (Prod a b))) * D) *
-              star (U : CMatrix (Prod a b))).trace := by
+      (ρ.m * ((U : CMatrix (a × b)) * D * star (U : CMatrix (a × b)))).trace
+          = (((ρ.m * (U : CMatrix (a × b))) * D) *
+              star (U : CMatrix (a × b))).trace := by
             noncomm_ring
-      _ = (star (U : CMatrix (Prod a b)) *
-            ((ρ.matrix * (U : CMatrix (Prod a b))) * D)).trace := by
+      _ = (star (U : CMatrix (a × b)) *
+            ((ρ.m * (U : CMatrix (a × b))) * D)).trace := by
             exact Matrix.trace_mul_comm
-              (((ρ.matrix * (U : CMatrix (Prod a b))) * D))
-              (star (U : CMatrix (Prod a b)))
-      _ = ((star (U : CMatrix (Prod a b)) * ρ.matrix * (U : CMatrix (Prod a b))) *
+              (((ρ.m * (U : CMatrix (a × b))) * D))
+              (star (U : CMatrix (a × b)))
+      _ = ((star (U : CMatrix (a × b)) * ρ.m * (U : CMatrix (a × b))) *
             D).trace := by
             noncomm_ring
   have hdiag :
-      (((star (U : CMatrix (Prod a b)) * ρ.matrix * (U : CMatrix (Prod a b))) *
+      (((star (U : CMatrix (a × b)) * ρ.m * (U : CMatrix (a × b))) *
         D).trace).re =
         ∑ i,
-          ((star (U : CMatrix (Prod a b)) * ρ.matrix * (U : CMatrix (Prod a b))) i i).re *
+          ((star (U : CMatrix (a × b)) * ρ.m * (U : CMatrix (a × b))) i i).re *
             Real.log (hτ.isHermitian.eigenvalues i) := by
     simp [D, Matrix.trace, Matrix.diagonal, Matrix.mul_apply, Complex.mul_re]
-  change ((ρ.matrix * psdLog τ hτpos).trace).re =
+  change ((ρ.m * psdLog τ hτpos).trace).re =
     ∑ i,
-      ((star (U : CMatrix (Prod a b)) * ρ.matrix * (U : CMatrix (Prod a b))) i i).re *
+      ((star (U : CMatrix (a × b)) * ρ.m * (U : CMatrix (a × b))) i i).re *
         Real.log (hτ.isHermitian.eigenvalues i)
   rw [htrace]
   exact hdiag
@@ -1398,50 +1369,50 @@ This is the PSD-left version of
 `conditionalPetzRenyiTraceTerm_one_add_eq_double_eigenbasis_sum`; it does not
 ask for a positive-definite witness for `ρ`. -/
 theorem conditionalPetzRenyiTraceTerm_one_add_eq_double_eigenbasis_sum_psdLeft
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef) (β : ℝ) :
-    let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef) (β : ℝ) :
+    let hρpsd : ρ.m.PosSemidef := ρ.psd
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ρ.conditionalPetzRenyiTraceTerm σ (1 + β) =
       ∑ i,
         (∑ j,
           hρpsd.isHermitian.eigenvalues j ^ (1 + β) *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i)) *
           hτ.isHermitian.eigenvalues i ^ (-β) := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := ρ.psd
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
   have htrace :
       ρ.conditionalPetzRenyiTraceTerm σ (1 + β) =
         ∑ i,
-          ((star (Uτ : CMatrix (Prod a b)) *
-            CFC.rpow ρ.matrix (1 + β) *
-              (Uτ : CMatrix (Prod a b))) i i).re *
+          ((star (Uτ : CMatrix (a × b)) *
+            CFC.rpow ρ.m (1 + β) *
+              (Uτ : CMatrix (a × b))) i i).re *
             hτ.isHermitian.eigenvalues i ^ (-β) := by
     have h :=
       trace_mul_cMatrix_rpow_eq_conjugate_diag_sum
-        (M := CFC.rpow ρ.matrix (1 + β)) (N := τ) hτ (-β)
+        (M := CFC.rpow ρ.m (1 + β)) (N := τ) hτ (-β)
     simpa [conditionalPetzRenyiTraceTerm, τ, hτ, Uτ, sub_eq_add_neg] using h
-  have hdiag (i : Prod a b) :
-      ((star (Uτ : CMatrix (Prod a b)) *
-        CFC.rpow ρ.matrix (1 + β) *
-          (Uτ : CMatrix (Prod a b))) i i).re =
+  have hdiag (i : a × b) :
+      ((star (Uτ : CMatrix (a × b)) *
+        CFC.rpow ρ.m (1 + β) *
+          (Uτ : CMatrix (a × b))) i i).re =
         ∑ j,
           hρpsd.isHermitian.eigenvalues j ^ (1 + β) *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i) := by
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i) := by
     simpa [hρpsd, Uρ] using
       unitary_conj_rpow_diagonal_re_eq_eigenvalue_sum
-        (M := ρ.matrix) hρpsd Uτ (1 + β) i
+        (M := ρ.m) hρpsd Uτ (1 + β) i
   rw [htrace]
   simp_rw [hdiag]
   rfl
@@ -1475,27 +1446,27 @@ private theorem rpow_one_add_mul_rpow_neg_eq_mul_div_rpow_of_nonneg_left
 /-- Ratio form of the PSD-left double-eigenbasis expansion for positive
 `β`. Zero eigenvalues of `ρ` contribute zero weight. -/
 theorem conditionalPetzRenyiTraceTerm_one_add_eq_eigenvalue_ratio_sum_psdLeft
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef) (β : ℝ) (hβ : 0 < β) :
-    let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef) (β : ℝ) (hβ : 0 < β) :
+    let hρpsd : ρ.m.PosSemidef := ρ.psd
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ρ.conditionalPetzRenyiTraceTerm σ (1 + β) =
       ∑ i, ∑ j,
         (hρpsd.isHermitian.eigenvalues j *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j i)) *
           (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) ^ β := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := ρ.psd
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
   have hdouble :=
     conditionalPetzRenyiTraceTerm_one_add_eq_double_eigenbasis_sum_psdLeft
       (ρ := ρ) (σ := σ) hσ β
@@ -1503,8 +1474,8 @@ theorem conditionalPetzRenyiTraceTerm_one_add_eq_eigenvalue_ratio_sum_psdLeft
     ρ.conditionalPetzRenyiTraceTerm σ (1 + β) =
       ∑ i, ∑ j,
         (hρpsd.isHermitian.eigenvalues j *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j i)) *
           (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) ^ β
   rw [hdouble]
   apply Finset.sum_congr rfl
@@ -1523,25 +1494,25 @@ theorem conditionalPetzRenyiTraceTerm_one_add_eq_eigenvalue_ratio_sum_psdLeft
       (β := β) hρeig_nonneg hτeig_pos hβ
   calc
     (hρpsd.isHermitian.eigenvalues j ^ (1 + β) *
-      Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-        (Uτ : CMatrix (Prod a b))) j i)) *
+      Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+        (Uτ : CMatrix (a × b))) j i)) *
         hτ.isHermitian.eigenvalues i ^ (-β)
         =
       (hρpsd.isHermitian.eigenvalues j ^ (1 + β) *
         hτ.isHermitian.eigenvalues i ^ (-β)) *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i) := by
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i) := by
           ring
     _ =
       (hρpsd.isHermitian.eigenvalues j *
         (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) ^ β) *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i) := by
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i) := by
           rw [hratio]
     _ =
       (hρpsd.isHermitian.eigenvalues j *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i)) *
         (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) ^ β := by
           ring
 
@@ -1549,27 +1520,27 @@ theorem conditionalPetzRenyiTraceTerm_one_add_eq_eigenvalue_ratio_sum_psdLeft
 left state. This is the source-aligned form: all ratios are formed only where
 the `ρ` eigenvalue is strictly positive. -/
 theorem conditionalPetzRenyiTraceTerm_one_add_eq_support_eigenvalue_ratio_sum
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef) (β : ℝ) (hβ : 0 < β) :
-    let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef) (β : ℝ) (hβ : 0 < β) :
+    let hρpsd : ρ.m.PosSemidef := ρ.psd
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ρ.conditionalPetzRenyiTraceTerm σ (1 + β) =
-      ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+      ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
         (hρpsd.isHermitian.eigenvalues j.1 *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j.1 i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j.1 i)) *
           (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) ^ β := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := ρ.psd
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
   have hall :=
     conditionalPetzRenyiTraceTerm_one_add_eq_eigenvalue_ratio_sum_psdLeft
       (ρ := ρ) (σ := σ) hσ β hβ
@@ -1578,10 +1549,10 @@ theorem conditionalPetzRenyiTraceTerm_one_add_eq_support_eigenvalue_ratio_sum
   intro i _
   have hsupport :=
     posSemidef_eigenvalue_mul_sum_eq_support_sum
-      (M := ρ.matrix) hρpsd
+      (M := ρ.m) hρpsd
       (fun j =>
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i) *
         (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) ^ β)
   simpa [mul_assoc, mul_left_comm, mul_comm] using hsupport
 
@@ -1591,56 +1562,56 @@ This is the negative-half counterpart needed for the arbitrary-left `Upsilon`.
 The statement is specialized because the all-eigenvalue ratio theorem cannot
 form negative powers at zero left eigenvalues. -/
 theorem conditionalPetzRenyiTraceTerm_half_eq_support_inv_sqrt_sum
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef) :
-    let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef) :
+    let hρpsd : ρ.m.PosSemidef := ρ.psd
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ρ.conditionalPetzRenyiTraceTerm σ (1 / 2) =
-      ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+      ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
         (hρpsd.isHermitian.eigenvalues j.1 *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j.1 i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j.1 i)) *
           (Real.sqrt
             (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i))⁻¹ := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := ρ.psd
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
   have hdouble :=
     conditionalPetzRenyiTraceTerm_one_add_eq_double_eigenbasis_sum_psdLeft
       (ρ := ρ) (σ := σ) hσ (β := -(1 / 2 : ℝ))
-  have hrestrict (i : Prod a b) :
+  have hrestrict (i : a × b) :
       ∑ j,
         hρpsd.isHermitian.eigenvalues j ^ (1 / 2 : ℝ) *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j i) =
-        ∑ j : psdSupportIndex ρ.matrix hρpsd,
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j i) =
+        ∑ j : psdSupportIndex ρ.m hρpsd,
           hρpsd.isHermitian.eigenvalues j.1 ^ (1 / 2 : ℝ) *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j.1 i) := by
-    let d : Prod a b → ℝ := hρpsd.isHermitian.eigenvalues
-    let g : Prod a b → ℝ := fun j =>
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j.1 i) := by
+    let d : a × b → ℝ := hρpsd.isHermitian.eigenvalues
+    let g : a × b → ℝ := fun j =>
       d j ^ (1 / 2 : ℝ) *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i)
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i)
     have hsub :
-        (∑ j : psdSupportIndex ρ.matrix hρpsd,
+        (∑ j : psdSupportIndex ρ.m hρpsd,
           d j.1 ^ (1 / 2 : ℝ) *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j.1 i)) =
-          ∑ j ∈ (Finset.univ : Finset (Prod a b)) with 0 < d j, g j := by
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j.1 i)) =
+          ∑ j ∈ (Finset.univ : Finset (a × b)) with 0 < d j, g j := by
       refine (Finset.sum_subtype _ ?_ g).symm
       intro j
       simp [d]
     have hfilter :
-        (∑ j ∈ (Finset.univ : Finset (Prod a b)) with 0 < d j, g j) =
+        (∑ j ∈ (Finset.univ : Finset (a × b)) with 0 < d j, g j) =
           ∑ j, g j := by
       rw [Finset.sum_filter]
       apply Finset.sum_congr rfl
@@ -1653,10 +1624,10 @@ theorem conditionalPetzRenyiTraceTerm_half_eq_support_inv_sqrt_sum
     rw [hsub, hfilter]
   change
     ρ.conditionalPetzRenyiTraceTerm σ (1 / 2) =
-      ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+      ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
         (hρpsd.isHermitian.eigenvalues j.1 *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j.1 i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j.1 i)) *
           (Real.sqrt
             (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i))⁻¹
   rw [show (1 / 2 : ℝ) = 1 + -(1 / 2 : ℝ) by ring]
@@ -1680,22 +1651,22 @@ theorem conditionalPetzRenyiTraceTerm_half_eq_support_inv_sqrt_sum
     Real.sqrt_pos.2 hratio_pos
   calc
     (hρpsd.isHermitian.eigenvalues j.1 ^ (1 / 2 : ℝ) *
-      Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-        (Uτ : CMatrix (Prod a b))) j.1 i)) *
+      Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+        (Uτ : CMatrix (a × b))) j.1 i)) *
         hτ.isHermitian.eigenvalues i ^ (1 / 2 : ℝ)
         =
       (Real.sqrt (hρpsd.isHermitian.eigenvalues j.1) *
         Real.sqrt (hτ.isHermitian.eigenvalues i)) *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j.1 i) := by
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j.1 i) := by
           rw [← Real.sqrt_eq_rpow, ← Real.sqrt_eq_rpow]
           ring
     _ =
       (hρpsd.isHermitian.eigenvalues j.1 *
         (Real.sqrt
           (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i))⁻¹) *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j.1 i) := by
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j.1 i) := by
           have hsqrt_div :
               Real.sqrt (hρpsd.isHermitian.eigenvalues j.1 /
                 hτ.isHermitian.eigenvalues i) =
@@ -1709,8 +1680,8 @@ theorem conditionalPetzRenyiTraceTerm_half_eq_support_inv_sqrt_sum
           ring_nf
     _ =
       (hρpsd.isHermitian.eigenvalues j.1 *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j.1 i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j.1 i)) *
         (Real.sqrt
           (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i))⁻¹ := by
           ring
@@ -1722,64 +1693,64 @@ The coefficients are the squared overlaps between the two eigenbases. This is
 the finite matrix-route replacement for the source proof's purification
 spectral random variable. -/
 theorem conditionalPetzRenyiTraceTerm_one_add_eq_double_eigenbasis_sum
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) (β : ℝ) :
-    let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) (β : ℝ) :
+    let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ρ.conditionalPetzRenyiTraceTerm σ (1 + β) =
       ∑ i,
         (∑ j,
           hρpsd.isHermitian.eigenvalues j ^ (1 + β) *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i)) *
           hτ.isHermitian.eigenvalues i ^ (-β) := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
   have htrace :
       ρ.conditionalPetzRenyiTraceTerm σ (1 + β) =
         ∑ i,
-          ((star (Uτ : CMatrix (Prod a b)) *
-            CFC.rpow ρ.matrix (1 + β) *
-              (Uτ : CMatrix (Prod a b))) i i).re *
+          ((star (Uτ : CMatrix (a × b)) *
+            CFC.rpow ρ.m (1 + β) *
+              (Uτ : CMatrix (a × b))) i i).re *
             hτ.isHermitian.eigenvalues i ^ (-β) := by
     have h :=
       trace_mul_cMatrix_rpow_eq_conjugate_diag_sum
-        (M := CFC.rpow ρ.matrix (1 + β)) (N := τ) hτ (-β)
+        (M := CFC.rpow ρ.m (1 + β)) (N := τ) hτ (-β)
     simpa [conditionalPetzRenyiTraceTerm, τ, hτ, Uτ, sub_eq_add_neg] using h
-  have hdiag (i : Prod a b) :
-      ((star (Uτ : CMatrix (Prod a b)) *
-        CFC.rpow ρ.matrix (1 + β) *
-          (Uτ : CMatrix (Prod a b))) i i).re =
+  have hdiag (i : a × b) :
+      ((star (Uτ : CMatrix (a × b)) *
+        CFC.rpow ρ.m (1 + β) *
+          (Uτ : CMatrix (a × b))) i i).re =
         ∑ j,
           hρpsd.isHermitian.eigenvalues j ^ (1 + β) *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i) := by
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i) := by
     simpa [hρpsd, Uρ] using
       unitary_conj_rpow_diagonal_re_eq_eigenvalue_sum
-        (M := ρ.matrix) hρpsd Uτ (1 + β) i
+        (M := ρ.m) hρpsd Uτ (1 + β) i
   rw [htrace]
   simp_rw [hdiag]
   change
     (∑ i,
       (∑ j,
         hρpsd.isHermitian.eigenvalues j ^ (1 + β) *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j i)) *
         hτ.isHermitian.eigenvalues i ^ (-β)) =
     (∑ i,
       (∑ j,
         hρpsd.isHermitian.eigenvalues j ^ (1 + β) *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j i)) *
         hτ.isHermitian.eigenvalues i ^ (-β))
   rfl
 
@@ -1810,27 +1781,27 @@ private theorem rpow_one_add_mul_rpow_neg_eq_mul_div_rpow
 The finite sum now exposes the scalar ratios `λ_ρ / λ_τ`, the variables to
 which the TCR scalar remainder `r_β` is applied in the next step. -/
 theorem conditionalPetzRenyiTraceTerm_one_add_eq_eigenvalue_ratio_sum
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) (β : ℝ) :
-    let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) (β : ℝ) :
+    let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ρ.conditionalPetzRenyiTraceTerm σ (1 + β) =
       ∑ i, ∑ j,
         (hρpsd.isHermitian.eigenvalues j *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j i)) *
           (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) ^ β := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
   have hdouble :=
     conditionalPetzRenyiTraceTerm_one_add_eq_double_eigenbasis_sum
       (ρ := ρ) hρ (σ := σ) hσ β
@@ -1838,8 +1809,8 @@ theorem conditionalPetzRenyiTraceTerm_one_add_eq_eigenvalue_ratio_sum
     ρ.conditionalPetzRenyiTraceTerm σ (1 + β) =
       ∑ i, ∑ j,
         (hρpsd.isHermitian.eigenvalues j *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j i)) *
           (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) ^ β
   rw [hdouble]
   apply Finset.sum_congr rfl
@@ -1858,83 +1829,83 @@ theorem conditionalPetzRenyiTraceTerm_one_add_eq_eigenvalue_ratio_sum
       (β := β) hρeig_pos hτeig_pos
   change
     (hρpsd.isHermitian.eigenvalues j ^ (1 + β) *
-      Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-        (Uτ : CMatrix (Prod a b))) j i)) *
+      Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+        (Uτ : CMatrix (a × b))) j i)) *
         hτ.isHermitian.eigenvalues i ^ (-β) =
       (hρpsd.isHermitian.eigenvalues j *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i)) *
         (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) ^ β
   calc
     (hρpsd.isHermitian.eigenvalues j ^ (1 + β) *
-      Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-        (Uτ : CMatrix (Prod a b))) j i)) *
+      Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+        (Uτ : CMatrix (a × b))) j i)) *
         hτ.isHermitian.eigenvalues i ^ (-β)
         =
       (hρpsd.isHermitian.eigenvalues j ^ (1 + β) *
         hτ.isHermitian.eigenvalues i ^ (-β)) *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i) := by
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i) := by
           ring
     _ =
       (hρpsd.isHermitian.eigenvalues j *
         (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) ^ β) *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i) := by
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i) := by
           rw [hratio]
     _ =
       (hρpsd.isHermitian.eigenvalues j *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i)) *
         (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) ^ β := by
           ring
 
 /-- The overlap weights used in the double-eigenbasis expansion of the Petz
 trace form a probability distribution. -/
 theorem conditionalPetzRenyi_eigenbasis_weight_sum_eq_one
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) :
-    let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) :
+    let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ∑ i, ∑ j,
       hρpsd.isHermitian.eigenvalues j *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i) = 1 := by
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i) = 1 := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
-  let W : Matrix.unitaryGroup (Prod a b) ℂ := Uρ⁻¹ * Uτ
-  have hW (j i : Prod a b) :
-      ((W : CMatrix (Prod a b)) j i) =
-        ((star (Uρ : CMatrix (Prod a b)) * (Uτ : CMatrix (Prod a b))) j i) := by
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let W : Matrix.unitaryGroup (a × b) ℂ := Uρ⁻¹ * Uτ
+  have hW (j i : a × b) :
+      ((W : CMatrix (a × b)) j i) =
+        ((star (Uρ : CMatrix (a × b)) * (Uτ : CMatrix (a × b))) j i) := by
     simp [W, Uρ, Uτ]
-  have heig_sum : ∑ j : Prod a b, hρpsd.isHermitian.eigenvalues j = 1 := by
+  have heig_sum : ∑ j : a × b, hρpsd.isHermitian.eigenvalues j = 1 := by
     have htrace := congrArg Complex.re hρpsd.isHermitian.trace_eq_sum_eigenvalues
-    rw [ρ.trace_eq_one] at htrace
+    rw [ρ.tr'] at htrace
     norm_num at htrace
     exact htrace.symm
   calc
     ∑ i, ∑ j,
       hρpsd.isHermitian.eigenvalues j *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i)
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i)
         =
       ∑ j, hρpsd.isHermitian.eigenvalues j *
-        ∑ i, Complex.normSq ((W : CMatrix (Prod a b)) j i) := by
+        ∑ i, Complex.normSq ((W : CMatrix (a × b)) j i) := by
           rw [Finset.sum_comm]
           apply Finset.sum_congr rfl
           intro j _
           simp_rw [← hW j]
           rw [Finset.mul_sum]
-    _ = ∑ j : Prod a b, hρpsd.isHermitian.eigenvalues j := by
+    _ = ∑ j : a × b, hρpsd.isHermitian.eigenvalues j := by
           apply Finset.sum_congr rfl
           intro j _
           rw [unitary_row_normSq_sum W j]
@@ -1943,44 +1914,44 @@ theorem conditionalPetzRenyi_eigenbasis_weight_sum_eq_one
 
 /-- The `ρ`-eigenvalue part of the weighted log-ratio sum is `Tr ρ log ρ`. -/
 theorem conditionalPetzRenyi_eigenbasis_weight_log_state_sum
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) :
-    let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) :
+    let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ∑ i, ∑ j,
       (hρpsd.isHermitian.eigenvalues j *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i)) *
         Real.log (hρpsd.isHermitian.eigenvalues j) =
-      ((ρ.matrix * psdLog ρ.matrix hρ).trace).re := by
+      ((ρ.m * psdLog ρ.m hρ).trace).re := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
-  let W : Matrix.unitaryGroup (Prod a b) ℂ := Uρ⁻¹ * Uτ
-  have hW (j i : Prod a b) :
-      ((W : CMatrix (Prod a b)) j i) =
-        ((star (Uρ : CMatrix (Prod a b)) * (Uτ : CMatrix (Prod a b))) j i) := by
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let W : Matrix.unitaryGroup (a × b) ℂ := Uρ⁻¹ * Uτ
+  have hW (j i : a × b) :
+      ((W : CMatrix (a × b)) j i) =
+        ((star (Uρ : CMatrix (a × b)) * (Uτ : CMatrix (a × b))) j i) := by
     simp [W, Uρ, Uτ]
   have htrace := trace_mul_psdLog_eq_sum_eigenvalues_mul_log ρ hρ
   calc
     ∑ i, ∑ j,
       (hρpsd.isHermitian.eigenvalues j *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i)) *
         Real.log (hρpsd.isHermitian.eigenvalues j)
         =
       ∑ j,
         (hρpsd.isHermitian.eigenvalues j *
           Real.log (hρpsd.isHermitian.eigenvalues j)) *
-          ∑ i, Complex.normSq ((W : CMatrix (Prod a b)) j i) := by
+          ∑ i, Complex.normSq ((W : CMatrix (a × b)) j i) := by
           rw [Finset.sum_comm]
           apply Finset.sum_congr rfl
           intro j _
@@ -1990,73 +1961,73 @@ theorem conditionalPetzRenyi_eigenbasis_weight_log_state_sum
           intro i _
           ring
     _ =
-      ∑ j : Prod a b,
+      ∑ j : a × b,
         hρpsd.isHermitian.eigenvalues j *
           Real.log (hρpsd.isHermitian.eigenvalues j) := by
           apply Finset.sum_congr rfl
           intro j _
           rw [unitary_row_normSq_sum W j]
           ring
-    _ = ((ρ.matrix * psdLog ρ.matrix hρ).trace).re := by
+    _ = ((ρ.m * psdLog ρ.m hρ).trace).re := by
           rw [htrace]
 
 /-- The reference-eigenvalue part of the weighted log-ratio sum is
 `Tr ρ log (I_A ⊗ σ_B)`. -/
 theorem conditionalPetzRenyi_eigenbasis_weight_log_reference_sum
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) :
-    let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) :
+    let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ∑ i, ∑ j,
       (hρpsd.isHermitian.eigenvalues j *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i)) *
         Real.log (hτ.isHermitian.eigenvalues i) =
-      ((ρ.matrix *
+      ((ρ.m *
         psdLog (identityTensorStateMatrix (a := a) σ)
           (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
   have href :=
     trace_mul_psdLog_identityTensorStateMatrix_eq_reference_eigenbasis_sum
       (ρ := ρ) (σ := σ) hσ
-  have hdiag (i : Prod a b) :
-      ((star (Uτ : CMatrix (Prod a b)) * ρ.matrix *
-        (Uτ : CMatrix (Prod a b))) i i).re =
+  have hdiag (i : a × b) :
+      ((star (Uτ : CMatrix (a × b)) * ρ.m *
+        (Uτ : CMatrix (a × b))) i i).re =
         ∑ j,
           hρpsd.isHermitian.eigenvalues j *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i) := by
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i) := by
     have h :=
       unitary_conj_rpow_diagonal_re_eq_eigenvalue_sum
-        (M := ρ.matrix) hρpsd Uτ (1 : ℝ) i
+        (M := ρ.m) hρpsd Uτ (1 : ℝ) i
     simpa [hρpsd, Uρ, Real.rpow_one,
-      CFC.rpow_one ρ.matrix (ha := Matrix.nonneg_iff_posSemidef.mpr hρpsd)] using h
+      CFC.rpow_one ρ.m (ha := Matrix.nonneg_iff_posSemidef.mpr hρpsd)] using h
   calc
     ∑ i, ∑ j,
       (hρpsd.isHermitian.eigenvalues j *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i)) *
         Real.log (hτ.isHermitian.eigenvalues i)
         =
       ∑ i,
-        ((star (Uτ : CMatrix (Prod a b)) * ρ.matrix *
-          (Uτ : CMatrix (Prod a b))) i i).re *
+        ((star (Uτ : CMatrix (a × b)) * ρ.m *
+          (Uτ : CMatrix (a × b))) i i).re *
           Real.log (hτ.isHermitian.eigenvalues i) := by
           apply Finset.sum_congr rfl
           intro i _
           rw [hdiag i]
           rw [Finset.sum_mul]
-    _ = ((ρ.matrix *
+    _ = ((ρ.m *
         psdLog (identityTensorStateMatrix (a := a) σ)
           (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re := by
           rw [href]
@@ -2064,31 +2035,31 @@ theorem conditionalPetzRenyi_eigenbasis_weight_log_reference_sum
 /-- Weighted logarithms of eigenvalue ratios give the matrix-log numerator
 `Tr ρ log ρ - Tr ρ log(I_A ⊗ σ_B)`. -/
 theorem conditionalPetzRenyi_eigenbasis_weight_log_ratio_sum
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) :
-    let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) :
+    let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ∑ i, ∑ j,
       (hρpsd.isHermitian.eigenvalues j *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i)) *
         Real.log
           (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) =
-      ((ρ.matrix * psdLog ρ.matrix hρ).trace).re -
-        ((ρ.matrix *
+      ((ρ.m * psdLog ρ.m hρ).trace).re -
+        ((ρ.m *
           psdLog (identityTensorStateMatrix (a := a) σ)
             (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
   have hstate :=
     conditionalPetzRenyi_eigenbasis_weight_log_state_sum
       (ρ := ρ) hρ (σ := σ) hσ
@@ -2098,19 +2069,19 @@ theorem conditionalPetzRenyi_eigenbasis_weight_log_ratio_sum
   have hsplit :
       ∑ i, ∑ j,
         (hρpsd.isHermitian.eigenvalues j *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j i)) *
           Real.log
             (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) =
         (∑ i, ∑ j,
           (hρpsd.isHermitian.eigenvalues j *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i)) *
             Real.log (hρpsd.isHermitian.eigenvalues j)) -
           (∑ i, ∑ j,
             (hρpsd.isHermitian.eigenvalues j *
-              Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-                (Uτ : CMatrix (Prod a b))) j i)) *
+              Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+                (Uτ : CMatrix (a × b))) j i)) *
               Real.log (hτ.isHermitian.eigenvalues i)) := by
     rw [← Finset.sum_sub_distrib]
     apply Finset.sum_congr rfl
@@ -2127,12 +2098,12 @@ theorem conditionalPetzRenyi_eigenbasis_weight_log_ratio_sum
   change
     ∑ i, ∑ j,
       (hρpsd.isHermitian.eigenvalues j *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i)) *
         Real.log
           (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) =
-      ((ρ.matrix * psdLog ρ.matrix hρ).trace).re -
-        ((ρ.matrix *
+      ((ρ.m * psdLog ρ.m hρ).trace).re -
+        ((ρ.m *
           psdLog (identityTensorStateMatrix (a := a) σ)
             (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re
   rw [hsplit, hstate, href]
@@ -2140,101 +2111,101 @@ theorem conditionalPetzRenyi_eigenbasis_weight_log_ratio_sum
 /-- The support-restricted overlap weights used in the arbitrary-left
 double-eigenbasis expansion form a probability distribution. -/
 theorem conditionalPetzRenyi_eigenbasis_support_weight_sum_eq_one
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef) :
-    let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef) :
+    let hρpsd : ρ.m.PosSemidef := ρ.psd
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
-    ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
       hρpsd.isHermitian.eigenvalues j.1 *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j.1 i) = 1 := by
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j.1 i) = 1 := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := ρ.psd
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
-  let W : Matrix.unitaryGroup (Prod a b) ℂ := Uρ⁻¹ * Uτ
-  have hW (j i : Prod a b) :
-      ((W : CMatrix (Prod a b)) j i) =
-        ((star (Uρ : CMatrix (Prod a b)) * (Uτ : CMatrix (Prod a b))) j i) := by
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let W : Matrix.unitaryGroup (a × b) ℂ := Uρ⁻¹ * Uτ
+  have hW (j i : a × b) :
+      ((W : CMatrix (a × b)) j i) =
+        ((star (Uρ : CMatrix (a × b)) * (Uτ : CMatrix (a × b))) j i) := by
     simp [W, Uρ, Uτ]
-  have heig_sum : ∑ j : Prod a b, hρpsd.isHermitian.eigenvalues j = 1 := by
+  have heig_sum : ∑ j : a × b, hρpsd.isHermitian.eigenvalues j = 1 := by
     have htrace := congrArg Complex.re hρpsd.isHermitian.trace_eq_sum_eigenvalues
-    rw [ρ.trace_eq_one] at htrace
+    rw [ρ.tr'] at htrace
     norm_num at htrace
     exact htrace.symm
   calc
-    ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+    ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
       hρpsd.isHermitian.eigenvalues j.1 *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j.1 i)
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j.1 i)
         =
-      ∑ j : psdSupportIndex ρ.matrix hρpsd,
+      ∑ j : psdSupportIndex ρ.m hρpsd,
         hρpsd.isHermitian.eigenvalues j.1 *
-          ∑ i, Complex.normSq ((W : CMatrix (Prod a b)) j.1 i) := by
+          ∑ i, Complex.normSq ((W : CMatrix (a × b)) j.1 i) := by
           rw [Finset.sum_comm]
           apply Finset.sum_congr rfl
           intro j _
           simp_rw [← hW j.1]
           rw [Finset.mul_sum]
-    _ = ∑ j : psdSupportIndex ρ.matrix hρpsd,
+    _ = ∑ j : psdSupportIndex ρ.m hρpsd,
         hρpsd.isHermitian.eigenvalues j.1 := by
           apply Finset.sum_congr rfl
           intro j _
           rw [unitary_row_normSq_sum W j.1]
           ring
-    _ = ∑ j : Prod a b, hρpsd.isHermitian.eigenvalues j := by
+    _ = ∑ j : a × b, hρpsd.isHermitian.eigenvalues j := by
           simpa using
             (posSemidef_eigenvalue_mul_sum_eq_support_sum
-              (M := ρ.matrix) hρpsd (fun _ => 1)).symm
+              (M := ρ.m) hρpsd (fun _ => 1)).symm
     _ = 1 := heig_sum
 
 /-- The support-restricted `ρ`-eigenvalue logarithm part of the weighted
 log-ratio sum is the arbitrary-state support entropy trace. -/
 theorem conditionalPetzRenyi_eigenbasis_support_weight_log_state_sum
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef) :
-    let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef) :
+    let hρpsd : ρ.m.PosSemidef := ρ.psd
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
-    ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
       (hρpsd.isHermitian.eigenvalues j.1 *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j.1 i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j.1 i)) *
         Real.log (hρpsd.isHermitian.eigenvalues j.1) =
       ρ.supportEntropyTraceTerm := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := ρ.psd
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
-  let W : Matrix.unitaryGroup (Prod a b) ℂ := Uρ⁻¹ * Uτ
-  have hW (j i : Prod a b) :
-      ((W : CMatrix (Prod a b)) j i) =
-        ((star (Uρ : CMatrix (Prod a b)) * (Uτ : CMatrix (Prod a b))) j i) := by
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let W : Matrix.unitaryGroup (a × b) ℂ := Uρ⁻¹ * Uτ
+  have hW (j i : a × b) :
+      ((W : CMatrix (a × b)) j i) =
+        ((star (Uρ : CMatrix (a × b)) * (Uτ : CMatrix (a × b))) j i) := by
     simp [W, Uρ, Uτ]
   calc
-    ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+    ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
       (hρpsd.isHermitian.eigenvalues j.1 *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j.1 i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j.1 i)) *
         Real.log (hρpsd.isHermitian.eigenvalues j.1)
         =
-      ∑ j : psdSupportIndex ρ.matrix hρpsd,
+      ∑ j : psdSupportIndex ρ.m hρpsd,
         (hρpsd.isHermitian.eigenvalues j.1 *
           Real.log (hρpsd.isHermitian.eigenvalues j.1)) *
-          ∑ i, Complex.normSq ((W : CMatrix (Prod a b)) j.1 i) := by
+          ∑ i, Complex.normSq ((W : CMatrix (a × b)) j.1 i) := by
           rw [Finset.sum_comm]
           apply Finset.sum_congr rfl
           intro j _
@@ -2244,7 +2215,7 @@ theorem conditionalPetzRenyi_eigenbasis_support_weight_log_state_sum
           intro i _
           ring
     _ =
-      ∑ j : psdSupportIndex ρ.matrix hρpsd,
+      ∑ j : psdSupportIndex ρ.m hρpsd,
         hρpsd.isHermitian.eigenvalues j.1 *
           Real.log (hρpsd.isHermitian.eigenvalues j.1) := by
           apply Finset.sum_congr rfl
@@ -2257,97 +2228,97 @@ theorem conditionalPetzRenyi_eigenbasis_support_weight_log_state_sum
 /-- The support-restricted reference-eigenvalue part of the weighted
 log-ratio sum is `Tr ρ log (I_A ⊗ σ_B)`. -/
 theorem conditionalPetzRenyi_eigenbasis_support_weight_log_reference_sum
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef) :
-    let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef) :
+    let hρpsd : ρ.m.PosSemidef := ρ.psd
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
-    ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
       (hρpsd.isHermitian.eigenvalues j.1 *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j.1 i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j.1 i)) *
         Real.log (hτ.isHermitian.eigenvalues i) =
-      ((ρ.matrix *
+      ((ρ.m *
         psdLog (identityTensorStateMatrix (a := a) σ)
           (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := ρ.psd
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
   have href :=
     trace_mul_psdLog_identityTensorStateMatrix_eq_reference_eigenbasis_sum
       (ρ := ρ) (σ := σ) hσ
-  have hdiag (i : Prod a b) :
-      ((star (Uτ : CMatrix (Prod a b)) * ρ.matrix *
-        (Uτ : CMatrix (Prod a b))) i i).re =
+  have hdiag (i : a × b) :
+      ((star (Uτ : CMatrix (a × b)) * ρ.m *
+        (Uτ : CMatrix (a × b))) i i).re =
         ∑ j,
           hρpsd.isHermitian.eigenvalues j *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i) := by
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i) := by
     have h :=
       unitary_conj_rpow_diagonal_re_eq_eigenvalue_sum
-        (M := ρ.matrix) hρpsd Uτ (1 : ℝ) i
+        (M := ρ.m) hρpsd Uτ (1 : ℝ) i
     simpa [hρpsd, Uρ, Real.rpow_one,
-      CFC.rpow_one ρ.matrix (ha := Matrix.nonneg_iff_posSemidef.mpr hρpsd)] using h
+      CFC.rpow_one ρ.m (ha := Matrix.nonneg_iff_posSemidef.mpr hρpsd)] using h
   calc
-    ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+    ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
       (hρpsd.isHermitian.eigenvalues j.1 *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j.1 i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j.1 i)) *
         Real.log (hτ.isHermitian.eigenvalues i)
         =
       ∑ i,
-        ((star (Uτ : CMatrix (Prod a b)) * ρ.matrix *
-          (Uτ : CMatrix (Prod a b))) i i).re *
+        ((star (Uτ : CMatrix (a × b)) * ρ.m *
+          (Uτ : CMatrix (a × b))) i i).re *
           Real.log (hτ.isHermitian.eigenvalues i) := by
           apply Finset.sum_congr rfl
           intro i _
           rw [hdiag i]
           have hsupport :=
             posSemidef_eigenvalue_mul_sum_eq_support_sum
-              (M := ρ.matrix) hρpsd
+              (M := ρ.m) hρpsd
               (fun j =>
-                Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-                  (Uτ : CMatrix (Prod a b))) j i) *
+                Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+                  (Uτ : CMatrix (a × b))) j i) *
                 Real.log (hτ.isHermitian.eigenvalues i))
           calc
-            ∑ j : psdSupportIndex ρ.matrix hρpsd,
+            ∑ j : psdSupportIndex ρ.m hρpsd,
               (hρpsd.isHermitian.eigenvalues j.1 *
-                Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-                  (Uτ : CMatrix (Prod a b))) j.1 i)) *
+                Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+                  (Uτ : CMatrix (a × b))) j.1 i)) *
                 Real.log (hτ.isHermitian.eigenvalues i)
                 =
-              ∑ j : psdSupportIndex ρ.matrix hρpsd,
+              ∑ j : psdSupportIndex ρ.m hρpsd,
                 hρpsd.isHermitian.eigenvalues j.1 *
-                  (Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-                    (Uτ : CMatrix (Prod a b))) j.1 i) *
+                  (Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+                    (Uτ : CMatrix (a × b))) j.1 i) *
                   Real.log (hτ.isHermitian.eigenvalues i)) := by
                   apply Finset.sum_congr rfl
                   intro j _
                   ring
             _ =
-              ∑ j : Prod a b,
+              ∑ j : a × b,
                 hρpsd.isHermitian.eigenvalues j *
-                  (Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-                    (Uτ : CMatrix (Prod a b))) j i) *
+                  (Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+                    (Uτ : CMatrix (a × b))) j i) *
                   Real.log (hτ.isHermitian.eigenvalues i)) := hsupport.symm
             _ =
-              (∑ j : Prod a b,
+              (∑ j : a × b,
                 hρpsd.isHermitian.eigenvalues j *
-                  Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-                    (Uτ : CMatrix (Prod a b))) j i)) *
+                  Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+                    (Uτ : CMatrix (a × b))) j i)) *
                 Real.log (hτ.isHermitian.eigenvalues i) := by
                   rw [Finset.sum_mul]
                   apply Finset.sum_congr rfl
                   intro j _
                   ring
-    _ = ((ρ.matrix *
+    _ = ((ρ.m *
         psdLog (identityTensorStateMatrix (a := a) σ)
           (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re := by
           rw [href]
@@ -2355,31 +2326,31 @@ theorem conditionalPetzRenyi_eigenbasis_support_weight_log_reference_sum
 /-- Support-restricted weighted logarithms of eigenvalue ratios give the
 support-aware matrix-log numerator. -/
 theorem conditionalPetzRenyi_eigenbasis_support_weight_log_ratio_sum
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef) :
-    let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef) :
+    let hρpsd : ρ.m.PosSemidef := ρ.psd
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
-    ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
       (hρpsd.isHermitian.eigenvalues j.1 *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j.1 i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j.1 i)) *
         Real.log
           (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) =
       ρ.supportEntropyTraceTerm -
-        ((ρ.matrix *
+        ((ρ.m *
           psdLog (identityTensorStateMatrix (a := a) σ)
             (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := ρ.psd
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
   have hstate :=
     conditionalPetzRenyi_eigenbasis_support_weight_log_state_sum
       (ρ := ρ) (σ := σ) hσ
@@ -2387,21 +2358,21 @@ theorem conditionalPetzRenyi_eigenbasis_support_weight_log_ratio_sum
     conditionalPetzRenyi_eigenbasis_support_weight_log_reference_sum
       (ρ := ρ) (σ := σ) hσ
   have hsplit :
-      ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+      ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
         (hρpsd.isHermitian.eigenvalues j.1 *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j.1 i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j.1 i)) *
           Real.log
             (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) =
-        (∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+        (∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
           (hρpsd.isHermitian.eigenvalues j.1 *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j.1 i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j.1 i)) *
             Real.log (hρpsd.isHermitian.eigenvalues j.1)) -
-          (∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+          (∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
             (hρpsd.isHermitian.eigenvalues j.1 *
-              Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-                (Uτ : CMatrix (Prod a b))) j.1 i)) *
+              Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+                (Uτ : CMatrix (a × b))) j.1 i)) *
               Real.log (hτ.isHermitian.eigenvalues i)) := by
     rw [← Finset.sum_sub_distrib]
     apply Finset.sum_congr rfl
@@ -2415,14 +2386,14 @@ theorem conditionalPetzRenyi_eigenbasis_support_weight_log_ratio_sum
     rw [Real.log_div (ne_of_gt hρeig_pos) (ne_of_gt hτeig_pos)]
     ring
   change
-    ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+    ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
       (hρpsd.isHermitian.eigenvalues j.1 *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j.1 i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j.1 i)) *
         Real.log
           (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) =
       ρ.supportEntropyTraceTerm -
-        ((ρ.matrix *
+        ((ρ.m *
           psdLog (identityTensorStateMatrix (a := a) σ)
             (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re
   rw [hsplit, hstate, href]
@@ -2444,71 +2415,6 @@ private theorem unitary_conj_diagonal_re_le_of_le
     noncomm_ring
   rw [hexpand] at hnonneg
   simpa using hnonneg
-
-private theorem cMatrix_mul_inv_mul_self_le_smul_of_posSemidef_le_posDef
-    {n : Type u} [Fintype n] [DecidableEq n]
-    {A σ : CMatrix n} {c : ℝ}
-    (hA : A.PosSemidef) (hσ : σ.PosDef) (hc : 0 < c)
-    (hAσ : A ≤ (c : ℂ) • σ) :
-    A * σ⁻¹ * A ≤ (c : ℂ) • A := by
-  classical
-  rw [Matrix.le_iff]
-  let C : CMatrix n := (c : ℂ) • σ
-  have hcC : (0 : ℂ) < (c : ℂ) := by
-    exact_mod_cast hc
-  have hC : C.PosDef := by
-    simpa [C] using hσ.smul hcC
-  have hCminusA : (C - A).PosSemidef := by
-    simpa [C, Matrix.le_iff] using hAσ
-  have hblock :
-      (Matrix.fromBlocks A A A C : CMatrix (Sum n n)).PosSemidef :=
-    cMatrix_fromBlocks_self_le_posSemidef hA hCminusA
-  let : Invertible C := hC.isUnit.invertible
-  have hblock' :
-      (Matrix.fromBlocks A A A.conjTranspose C : CMatrix (Sum n n)).PosSemidef := by
-    simpa [hA.isHermitian.eq] using hblock
-  have hschur :
-      (A - A * C⁻¹ * A.conjTranspose).PosSemidef :=
-    (Matrix.PosDef.fromBlocks₂₂ A A (D := C) hC).mp hblock'
-  have hC_le :
-      A * C⁻¹ * A ≤ A := by
-    rw [Matrix.le_iff]
-    simpa [hA.isHermitian.eq] using hschur
-  have hcne : (c : ℂ) ≠ 0 := by
-    exact_mod_cast hc.ne'
-  let : Invertible (c : ℂ) := invertibleOfNonzero hcne
-  have hσdet : IsUnit σ.det := (Matrix.isUnit_iff_isUnit_det σ).mp hσ.isUnit
-  have hCinv : C⁻¹ = ((c : ℂ)⁻¹) • σ⁻¹ := by
-    calc
-      C⁻¹ = (((c : ℂ) • σ))⁻¹ := by rfl
-      _ = ⅟(c : ℂ) • σ⁻¹ := by
-        simpa using Matrix.inv_smul σ (c : ℂ) hσdet
-      _ = ((c : ℂ)⁻¹) • σ⁻¹ := by
-        simp [invOf_eq_inv]
-  have hinvScaled :
-      ((c : ℂ)⁻¹) • (A * σ⁻¹ * A) ≤ A := by
-    simpa [hCinv, Matrix.mul_assoc, Matrix.mul_smul, Matrix.smul_mul] using hC_le
-  rw [Matrix.le_iff] at hinvScaled
-  have hcNonneg : (0 : ℂ) ≤ (c : ℂ) := le_of_lt hcC
-  have hscaled := hinvScaled.smul hcNonneg
-  have hscale_eq :
-      (c : ℂ) • (A - ((c : ℂ)⁻¹) • (A * σ⁻¹ * A)) =
-        (c : ℂ) • A - A * σ⁻¹ * A := by
-    rw [smul_sub, smul_smul, mul_inv_cancel₀ hcne, one_smul]
-  simpa [hscale_eq] using hscaled
-
-private theorem posDef_unitary_conj_diag_re_pos
-    {n : Type u} [Fintype n] [DecidableEq n]
-    {A : CMatrix n} (hA : A.PosDef)
-    (U : Matrix.unitaryGroup n ℂ) (i : n) :
-    0 < ((star (U : CMatrix n) * A * (U : CMatrix n)) i i).re := by
-  let A' : CMatrix n := star (U : CMatrix n) * A * (U : CMatrix n)
-  have hA' : A'.PosDef := by
-    dsimp [A']
-    rw [Matrix.IsUnit.posDef_star_left_conjugate_iff
-      (Unitary.isUnit_coe : IsUnit (U : CMatrix n))]
-    exact hA
-  exact (Complex.pos_iff.mp (hA'.diag_pos (i := i))).1
 
 private theorem posSemidef_eigenbasis_conj_eq_diagonal
     {n : Type u} [Fintype n] [DecidableEq n]
@@ -2634,105 +2540,105 @@ private theorem finset_weighted_log_le_log_weighted_sum
 
 /-- Conditional-min feasibility gives the support-aware trace-log residual. -/
 theorem conditionalMinEntropyFeasible_supportTraceLog_residual_nonneg
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef) {lam : ℝ}
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef) {lam : ℝ}
     (hfeas : ConditionalMinEntropyFeasible (a := a) ρ σ lam) :
     0 ≤
-      (((ρ.matrix *
+      (((ρ.m *
           psdLog (identityTensorStateMatrix (a := a) σ)
             (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re -
         ρ.supportEntropyTraceTerm) - lam * Real.log 2 := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := ρ.psd
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let c : ℝ := Real.rpow 2 (-lam)
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
   have hc : 0 < c :=
     Real.rpow_pos_of_pos (by norm_num : (0 : ℝ) < 2) (-lam)
-  have hle : ρ.matrix ≤ (c : ℂ) • τ := by
+  have hle : ρ.m ≤ (c : ℂ) • τ := by
     simpa [ConditionalMinEntropyFeasible, τ, c] using hfeas
   have hle_quad :
-      ρ.matrix * τ⁻¹ * ρ.matrix ≤ (c : ℂ) • ρ.matrix :=
+      ρ.m * τ⁻¹ * ρ.m ≤ (c : ℂ) • ρ.m :=
     cMatrix_mul_inv_mul_self_le_smul_of_posSemidef_le_posDef
       hρpsd hτpos hc hle
   have hρ_conj :
-      star (Uρ : CMatrix (Prod a b)) * ρ.matrix *
-          (Uρ : CMatrix (Prod a b)) =
+      star (Uρ : CMatrix (a × b)) * ρ.m *
+          (Uρ : CMatrix (a × b)) =
         Matrix.diagonal
           (fun j => ((hρpsd.isHermitian.eigenvalues j : ℝ) : ℂ)) := by
     simpa [hρpsd, Uρ] using
-      posSemidef_eigenbasis_conj_eq_diagonal (M := ρ.matrix) hρpsd
-  have hρ_diag (j : Prod a b) :
-      ((star (Uρ : CMatrix (Prod a b)) * ρ.matrix *
-          (Uρ : CMatrix (Prod a b))) j j).re =
+      posSemidef_eigenbasis_conj_eq_diagonal (M := ρ.m) hρpsd
+  have hρ_diag (j : a × b) :
+      ((star (Uρ : CMatrix (a × b)) * ρ.m *
+          (Uρ : CMatrix (a × b))) j j).re =
         hρpsd.isHermitian.eigenvalues j := by
     simpa [hρpsd, Uρ] using
       posSemidef_eigenbasis_diagonal_re_eq_eigenvalue
-        (M := ρ.matrix) hρpsd j
-  have hτ_diag (j : Prod a b) :
-      ((star (Uρ : CMatrix (Prod a b)) * τ *
-          (Uρ : CMatrix (Prod a b))) j j).re =
+        (M := ρ.m) hρpsd j
+  have hτ_diag (j : a × b) :
+      ((star (Uρ : CMatrix (a × b)) * τ *
+          (Uρ : CMatrix (a × b))) j j).re =
         ∑ i, hτ.isHermitian.eigenvalues i *
           Complex.normSq
-            ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i) := by
+            ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i) := by
     simpa [τ, hτpos, hτ, Uτ, Uρ] using
       unitary_conj_posSemidef_diagonal_re_eq_eigenvalue_weighted_sum
         (M := τ) hτ Uρ j
-  have hscale_diag (j : Prod a b) :
-      ((star (Uρ : CMatrix (Prod a b)) * ((c : ℝ) • τ) *
-          (Uρ : CMatrix (Prod a b))) j j).re =
-        c * ((star (Uρ : CMatrix (Prod a b)) * τ *
-          (Uρ : CMatrix (Prod a b))) j j).re := by
+  have hscale_diag (j : a × b) :
+      ((star (Uρ : CMatrix (a × b)) * ((c : ℝ) • τ) *
+          (Uρ : CMatrix (a × b))) j j).re =
+        c * ((star (Uρ : CMatrix (a × b)) * τ *
+          (Uρ : CMatrix (a × b))) j j).re := by
     have hmat :
-        star (Uρ : CMatrix (Prod a b)) * ((c : ℝ) • τ) *
-            (Uρ : CMatrix (Prod a b)) =
+        star (Uρ : CMatrix (a × b)) * ((c : ℝ) • τ) *
+            (Uρ : CMatrix (a × b)) =
           (c : ℝ) •
-            (star (Uρ : CMatrix (Prod a b)) * τ *
-              (Uρ : CMatrix (Prod a b))) := by
+            (star (Uρ : CMatrix (a × b)) * τ *
+              (Uρ : CMatrix (a × b))) := by
       simp [mul_assoc]
     rw [hmat]
     simp
-  have hrow_sum (j : Prod a b) :
+  have hrow_sum (j : a × b) :
       ∑ i, Complex.normSq
-        ((star (Uρ : CMatrix (Prod a b)) * (Uτ : CMatrix (Prod a b))) j i) = 1 := by
-    let W : Matrix.unitaryGroup (Prod a b) ℂ := Uρ⁻¹ * Uτ
+        ((star (Uρ : CMatrix (a × b)) * (Uτ : CMatrix (a × b))) j i) = 1 := by
+    let W : Matrix.unitaryGroup (a × b) ℂ := Uρ⁻¹ * Uτ
     simpa [W, Uρ, Uτ] using unitary_row_normSq_sum W j
   have hsupport_sum :
-      ∑ j : psdSupportIndex ρ.matrix hρpsd,
+      ∑ j : psdSupportIndex ρ.m hρpsd,
         hρpsd.isHermitian.eigenvalues j.1 = 1 := by
-    have heig_sum : ∑ j : Prod a b, hρpsd.isHermitian.eigenvalues j = 1 := by
+    have heig_sum : ∑ j : a × b, hρpsd.isHermitian.eigenvalues j = 1 := by
       have htrace := congrArg Complex.re hρpsd.isHermitian.trace_eq_sum_eigenvalues
-      rw [ρ.trace_eq_one] at htrace
+      rw [ρ.tr'] at htrace
       norm_num at htrace
       exact htrace.symm
     calc
-      ∑ j : psdSupportIndex ρ.matrix hρpsd,
+      ∑ j : psdSupportIndex ρ.m hρpsd,
           hρpsd.isHermitian.eigenvalues j.1 =
-        ∑ j : Prod a b, hρpsd.isHermitian.eigenvalues j := by
+        ∑ j : a × b, hρpsd.isHermitian.eigenvalues j := by
           simpa using
             (posSemidef_eigenvalue_mul_sum_eq_support_sum
-              (M := ρ.matrix) hρpsd (fun _ => 1)).symm
+              (M := ρ.m) hρpsd (fun _ => 1)).symm
       _ = 1 := heig_sum
-  have hpoint (j : psdSupportIndex ρ.matrix hρpsd) :
+  have hpoint (j : psdSupportIndex ρ.m hρpsd) :
       ∑ i,
         (hρpsd.isHermitian.eigenvalues j.1 *
           Complex.normSq
-            ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j.1 i)) *
+            ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j.1 i)) *
           Real.log
             (hρpsd.isHermitian.eigenvalues j.1 /
               hτ.isHermitian.eigenvalues i) ≤
         hρpsd.isHermitian.eigenvalues j.1 * Real.log c := by
     let r : ℝ := hρpsd.isHermitian.eigenvalues j.1
-    let p : Prod a b → ℝ := fun i =>
+    let p : a × b → ℝ := fun i =>
       Complex.normSq
-        ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j.1 i)
-    let t : Prod a b → ℝ := fun i => hτ.isHermitian.eigenvalues i
+        ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j.1 i)
+    let t : a × b → ℝ := fun i => hτ.isHermitian.eigenvalues i
     have hr_pos : 0 < r := by
       simpa [r] using j.2
     have hp_nonneg : ∀ i, 0 ≤ p i := by
@@ -2744,67 +2650,65 @@ theorem conditionalMinEntropyFeasible_supportTraceLog_residual_nonneg
       intro i
       simpa [t, τ, hτpos, hτ] using hτpos.eigenvalues_pos i
     let q : ℝ :=
-      ((star (Uρ : CMatrix (Prod a b)) * τ⁻¹ *
-        (Uρ : CMatrix (Prod a b))) j.1 j.1).re
+      ((star (Uρ : CMatrix (a × b)) * τ⁻¹ *
+        (Uρ : CMatrix (a × b))) j.1 j.1).re
     have hq_pos : 0 < q := by
       simpa [q, τ, Uρ] using
         posDef_unitary_conj_diag_re_pos (A := τ⁻¹) hτpos.inv Uρ j.1
     have hq_eq :
-        q = ∑ i, (t i)⁻¹ * p i := by
-      have hdiag :=
-        unitary_conj_posDef_inv_diagonal_re_eq_eigenvalue_inv_weighted_sum
-          (M := τ) hτpos Uρ j.1
-      simpa [q, p, t, τ, hτpos, hτ, Uτ, Uρ, mul_comm] using hdiag
+        q = ∑ i, (t i)⁻¹ * p i :=
+      unitary_conj_posDef_inv_diagonal_re_eq_eigenvalue_inv_weighted_sum
+        (M := τ) hτpos Uρ j.1
     have hdiag_quad_le :
-        ((star (Uρ : CMatrix (Prod a b)) * (ρ.matrix * τ⁻¹ * ρ.matrix) *
-            (Uρ : CMatrix (Prod a b))) j.1 j.1).re ≤
-          ((star (Uρ : CMatrix (Prod a b)) * ((c : ℂ) • ρ.matrix) *
-            (Uρ : CMatrix (Prod a b))) j.1 j.1).re :=
+        ((star (Uρ : CMatrix (a × b)) * (ρ.m * τ⁻¹ * ρ.m) *
+            (Uρ : CMatrix (a × b))) j.1 j.1).re ≤
+          ((star (Uρ : CMatrix (a × b)) * ((c : ℂ) • ρ.m) *
+            (Uρ : CMatrix (a × b))) j.1 j.1).re :=
       unitary_conj_diagonal_re_le_of_le hle_quad Uρ j.1
     have hquad_left :
-        ((star (Uρ : CMatrix (Prod a b)) * (ρ.matrix * τ⁻¹ * ρ.matrix) *
-            (Uρ : CMatrix (Prod a b))) j.1 j.1).re =
+        ((star (Uρ : CMatrix (a × b)) * (ρ.m * τ⁻¹ * ρ.m) *
+            (Uρ : CMatrix (a × b))) j.1 j.1).re =
           r ^ 2 * q := by
       have hfactor :
-          star (Uρ : CMatrix (Prod a b)) * (ρ.matrix * τ⁻¹ * ρ.matrix) *
-              (Uρ : CMatrix (Prod a b)) =
-            (star (Uρ : CMatrix (Prod a b)) * ρ.matrix *
-              (Uρ : CMatrix (Prod a b))) *
-              (star (Uρ : CMatrix (Prod a b)) * τ⁻¹ *
-                (Uρ : CMatrix (Prod a b))) *
-              (star (Uρ : CMatrix (Prod a b)) * ρ.matrix *
-                (Uρ : CMatrix (Prod a b))) := by
-        have hUstarU : star (Uρ : CMatrix (Prod a b)) *
-            (Uρ : CMatrix (Prod a b)) = 1 :=
+          star (Uρ : CMatrix (a × b)) * (ρ.m * τ⁻¹ * ρ.m) *
+              (Uρ : CMatrix (a × b)) =
+            (star (Uρ : CMatrix (a × b)) * ρ.m *
+              (Uρ : CMatrix (a × b))) *
+              (star (Uρ : CMatrix (a × b)) * τ⁻¹ *
+                (Uρ : CMatrix (a × b))) *
+              (star (Uρ : CMatrix (a × b)) * ρ.m *
+                (Uρ : CMatrix (a × b))) := by
+        have hUstarU : star (Uρ : CMatrix (a × b)) *
+            (Uρ : CMatrix (a × b)) = 1 :=
           Unitary.coe_star_mul_self Uρ
-        have hUUstar : (Uρ : CMatrix (Prod a b)) *
-            star (Uρ : CMatrix (Prod a b)) = 1 :=
+        have hUUstar : (Uρ : CMatrix (a × b)) *
+            star (Uρ : CMatrix (a × b)) = 1 :=
           Unitary.coe_mul_star_self Uρ
         calc
-          star (Uρ : CMatrix (Prod a b)) * (ρ.matrix * τ⁻¹ * ρ.matrix) *
-              (Uρ : CMatrix (Prod a b)) =
-            star (Uρ : CMatrix (Prod a b)) * ρ.matrix *
-                ((Uρ : CMatrix (Prod a b)) * star (Uρ : CMatrix (Prod a b))) *
+          star (Uρ : CMatrix (a × b)) * (ρ.m * τ⁻¹ * ρ.m) *
+              (Uρ : CMatrix (a × b)) =
+            star (Uρ : CMatrix (a × b)) * ρ.m *
+                ((Uρ : CMatrix (a × b)) * star (Uρ : CMatrix (a × b))) *
               τ⁻¹ *
-                ((Uρ : CMatrix (Prod a b)) * star (Uρ : CMatrix (Prod a b))) *
-              ρ.matrix * (Uρ : CMatrix (Prod a b)) := by
+                ((Uρ : CMatrix (a × b)) * star (Uρ : CMatrix (a × b))) *
+              ρ.m * (Uρ : CMatrix (a × b)) := by
                 rw [hUUstar]
                 simp [Matrix.mul_assoc]
           _ =
-            (star (Uρ : CMatrix (Prod a b)) * ρ.matrix *
-              (Uρ : CMatrix (Prod a b))) *
-              (star (Uρ : CMatrix (Prod a b)) * τ⁻¹ *
-                (Uρ : CMatrix (Prod a b))) *
-              (star (Uρ : CMatrix (Prod a b)) * ρ.matrix *
-                (Uρ : CMatrix (Prod a b))) := by
+            (star (Uρ : CMatrix (a × b)) * ρ.m *
+              (Uρ : CMatrix (a × b))) *
+              (star (Uρ : CMatrix (a × b)) * τ⁻¹ *
+                (Uρ : CMatrix (a × b))) *
+              (star (Uρ : CMatrix (a × b)) * ρ.m *
+                (Uρ : CMatrix (a × b))) := by
                 noncomm_ring
       rw [hfactor, hρ_conj]
-      let Dρ : CMatrix (Prod a b) :=
+      let Dρ : CMatrix (a × b) :=
         Matrix.diagonal
           (fun k => ((hρpsd.isHermitian.eigenvalues k : ℝ) : ℂ))
-      let Bq : CMatrix (Prod a b) :=
-        star (Uρ : CMatrix (Prod a b)) * τ⁻¹ *
-          (Uρ : CMatrix (Prod a b))
+      let Bq : CMatrix (a × b) :=
+        star (Uρ : CMatrix (a × b)) * τ⁻¹ *
+          (Uρ : CMatrix (a × b))
       have hentry :
           (Dρ * Bq * Dρ) j.1 j.1 =
             (r : ℂ) * Bq j.1 j.1 * (r : ℂ) := by
@@ -2818,15 +2722,15 @@ theorem conditionalMinEntropyFeasible_supportTraceLog_residual_nonneg
         ring_nf
       simpa [Dρ, Bq] using hre
     have hquad_right :
-        ((star (Uρ : CMatrix (Prod a b)) * ((c : ℂ) • ρ.matrix) *
-            (Uρ : CMatrix (Prod a b))) j.1 j.1).re =
+        ((star (Uρ : CMatrix (a × b)) * ((c : ℂ) • ρ.m) *
+            (Uρ : CMatrix (a × b))) j.1 j.1).re =
           c * r := by
       have hmat :
-          star (Uρ : CMatrix (Prod a b)) * ((c : ℂ) • ρ.matrix) *
-              (Uρ : CMatrix (Prod a b)) =
+          star (Uρ : CMatrix (a × b)) * ((c : ℂ) • ρ.m) *
+              (Uρ : CMatrix (a × b)) =
             (c : ℂ) •
-              (star (Uρ : CMatrix (Prod a b)) * ρ.matrix *
-                (Uρ : CMatrix (Prod a b))) := by
+              (star (Uρ : CMatrix (a × b)) * ρ.m *
+                (Uρ : CMatrix (a × b))) := by
         rw [Matrix.mul_smul, Matrix.smul_mul]
       rw [hmat]
       simp [hρ_diag j.1, r]
@@ -2871,62 +2775,63 @@ theorem conditionalMinEntropyFeasible_supportTraceLog_residual_nonneg
       apply Finset.sum_congr rfl
       intro i _
       ring
-    simpa [r, p, t, hrewrite] using
-      mul_le_mul_of_nonneg_left hweighted_log_le hr_pos.le
+    have hfinal : ∑ i, (r * p i) * Real.log (r / t i) ≤ r * Real.log c := by
+      rw [hrewrite]
+      exact mul_le_mul_of_nonneg_left hweighted_log_le hr_pos.le
+    exact hfinal
   have hlog_ratio_le :
-      (∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+      (∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
         (hρpsd.isHermitian.eigenvalues j.1 *
           Complex.normSq
-            ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j.1 i)) *
+            ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j.1 i)) *
           Real.log
             (hρpsd.isHermitian.eigenvalues j.1 /
               hτ.isHermitian.eigenvalues i)) ≤ Real.log c := by
     calc
-      ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+      ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
         (hρpsd.isHermitian.eigenvalues j.1 *
           Complex.normSq
-            ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j.1 i)) *
+            ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j.1 i)) *
           Real.log
             (hρpsd.isHermitian.eigenvalues j.1 /
               hτ.isHermitian.eigenvalues i)
           =
-        ∑ j : psdSupportIndex ρ.matrix hρpsd, ∑ i,
+        ∑ j : psdSupportIndex ρ.m hρpsd, ∑ i,
           (hρpsd.isHermitian.eigenvalues j.1 *
             Complex.normSq
-              ((star (Uρ : CMatrix (Prod a b)) *
-                (Uτ : CMatrix (Prod a b))) j.1 i)) *
+              ((star (Uρ : CMatrix (a × b)) *
+                (Uτ : CMatrix (a × b))) j.1 i)) *
             Real.log
               (hρpsd.isHermitian.eigenvalues j.1 /
                 hτ.isHermitian.eigenvalues i) := by
             rw [Finset.sum_comm]
       _ ≤
-        ∑ j : psdSupportIndex ρ.matrix hρpsd,
+        ∑ j : psdSupportIndex ρ.m hρpsd,
           hρpsd.isHermitian.eigenvalues j.1 * Real.log c := by
             exact Finset.sum_le_sum fun j _ => hpoint j
       _ = Real.log c := by
             rw [← Finset.sum_mul, hsupport_sum]
             ring
   have hlog_ratio_eq :
-      (∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+      (∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
         (hρpsd.isHermitian.eigenvalues j.1 *
           Complex.normSq
-            ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j.1 i)) *
+            ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j.1 i)) *
           Real.log
             (hρpsd.isHermitian.eigenvalues j.1 /
               hτ.isHermitian.eigenvalues i)) =
         ρ.supportEntropyTraceTerm -
-          ((ρ.matrix *
+          ((ρ.m *
             psdLog (identityTensorStateMatrix (a := a) σ)
               (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re := by
-    simpa [hρpsd, τ, hτpos, hτ, Uτ, Uρ] using
-      conditionalPetzRenyi_eigenbasis_support_weight_log_ratio_sum
-        (ρ := ρ) (σ := σ) hσ
+    exact conditionalPetzRenyi_eigenbasis_support_weight_log_ratio_sum
+      (ρ := ρ) (σ := σ) hσ
   have hsupport_minus_trace :
       ρ.supportEntropyTraceTerm -
-          ((ρ.matrix *
+          ((ρ.m *
             psdLog (identityTensorStateMatrix (a := a) σ)
               (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re ≤
         Real.log c := by
@@ -2940,35 +2845,35 @@ theorem conditionalMinEntropyFeasible_supportTraceLog_residual_nonneg
 /-- Remainder decomposition of the fixed-reference Petz trace for arbitrary
 left state, with all logarithms and ratios restricted to `supp ρ`. -/
 theorem conditionalPetzRenyiTraceTerm_one_add_eq_one_add_beta_support_log_ratio_sum_add_remainder
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef) (β : ℝ) (hβ : 0 < β) :
-    let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef) (β : ℝ) (hβ : 0 < β) :
+    let hρpsd : ρ.m.PosSemidef := ρ.psd
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ρ.conditionalPetzRenyiTraceTerm σ (1 + β) =
       1 + β *
-        (∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+        (∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
           (hρpsd.isHermitian.eigenvalues j.1 *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j.1 i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j.1 i)) *
             Real.log
               (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i)) +
-        ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+        ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
           (hρpsd.isHermitian.eigenvalues j.1 *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j.1 i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j.1 i)) *
             alphaRemainder β
               (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := ρ.psd
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
   have hratio :=
     conditionalPetzRenyiTraceTerm_one_add_eq_support_eigenvalue_ratio_sum
       (ρ := ρ) (σ := σ) hσ β hβ
@@ -2976,49 +2881,49 @@ theorem conditionalPetzRenyiTraceTerm_one_add_eq_one_add_beta_support_log_ratio_
     conditionalPetzRenyi_eigenbasis_support_weight_sum_eq_one
       (ρ := ρ) (σ := σ) hσ
   have hexpand :
-      ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+      ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
         (hρpsd.isHermitian.eigenvalues j.1 *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j.1 i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j.1 i)) *
           (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) ^ β =
-        (∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+        (∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
           hρpsd.isHermitian.eigenvalues j.1 *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j.1 i)) +
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j.1 i)) +
           β *
-            (∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+            (∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
               (hρpsd.isHermitian.eigenvalues j.1 *
-                Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-                  (Uτ : CMatrix (Prod a b))) j.1 i)) *
+                Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+                  (Uτ : CMatrix (a × b))) j.1 i)) *
                 Real.log
                   (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i)) +
-          ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+          ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
             (hρpsd.isHermitian.eigenvalues j.1 *
-              Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-                (Uτ : CMatrix (Prod a b))) j.1 i)) *
+              Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+                (Uτ : CMatrix (a × b))) j.1 i)) *
               alphaRemainder β
                 (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) := by
     calc
-      ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+      ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
         (hρpsd.isHermitian.eigenvalues j.1 *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j.1 i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j.1 i)) *
           (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) ^ β
           =
-        ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+        ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
           (
           (hρpsd.isHermitian.eigenvalues j.1 *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j.1 i)) +
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j.1 i)) +
             β *
               ((hρpsd.isHermitian.eigenvalues j.1 *
-                Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-                  (Uτ : CMatrix (Prod a b))) j.1 i)) *
+                Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+                  (Uτ : CMatrix (a × b))) j.1 i)) *
                 Real.log
                   (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i)) +
             (hρpsd.isHermitian.eigenvalues j.1 *
-              Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-                (Uτ : CMatrix (Prod a b))) j.1 i)) *
+              Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+                (Uτ : CMatrix (a × b))) j.1 i)) *
               alphaRemainder β
                 (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i)) := by
             apply Finset.sum_congr rfl
@@ -3028,21 +2933,21 @@ theorem conditionalPetzRenyiTraceTerm_one_add_eq_one_add_beta_support_log_ratio_
             rw [alphaRemainder]
             ring
       _ =
-        (∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+        (∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
           hρpsd.isHermitian.eigenvalues j.1 *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j.1 i)) +
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j.1 i)) +
           β *
-            (∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+            (∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
               (hρpsd.isHermitian.eigenvalues j.1 *
-                Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-                  (Uτ : CMatrix (Prod a b))) j.1 i)) *
+                Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+                  (Uτ : CMatrix (a × b))) j.1 i)) *
                 Real.log
                   (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i)) +
-          ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+          ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
             (hρpsd.isHermitian.eigenvalues j.1 *
-              Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-                (Uτ : CMatrix (Prod a b))) j.1 i)) *
+              Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+                (Uτ : CMatrix (a × b))) j.1 i)) *
               alphaRemainder β
                 (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) := by
             simp_rw [Finset.sum_add_distrib, Finset.mul_sum]
@@ -3051,33 +2956,33 @@ theorem conditionalPetzRenyiTraceTerm_one_add_eq_one_add_beta_support_log_ratio_
 /-- Remainder decomposition with the support-aware logarithmic numerator
 rewritten as `Tr_supp ρ log ρ - Tr ρ log(I_A ⊗ σ_B)`. -/
 theorem conditionalPetzRenyiTraceTerm_one_add_eq_one_add_beta_support_entropy_trace_add_remainder
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef) (β : ℝ) (hβ : 0 < β) :
-    let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef) (β : ℝ) (hβ : 0 < β) :
+    let hρpsd : ρ.m.PosSemidef := ρ.psd
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ρ.conditionalPetzRenyiTraceTerm σ (1 + β) =
       1 + β *
         (ρ.supportEntropyTraceTerm -
-          ((ρ.matrix *
+          ((ρ.m *
             psdLog (identityTensorStateMatrix (a := a) σ)
               (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re) +
-        ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+        ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
           (hρpsd.isHermitian.eigenvalues j.1 *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j.1 i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j.1 i)) *
             alphaRemainder β
               (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := ρ.psd
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
   have hremainder :=
     conditionalPetzRenyiTraceTerm_one_add_eq_one_add_beta_support_log_ratio_sum_add_remainder
       (ρ := ρ) (σ := σ) hσ β hβ
@@ -3092,35 +2997,35 @@ eigenbasis variables.
 This is the finite matrix-route analogue of expanding
 `t^β = 1 + β log t + r_β(t)` in the source proof. -/
 theorem conditionalPetzRenyiTraceTerm_one_add_eq_one_add_beta_log_ratio_sum_add_remainder
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) (β : ℝ) :
-    let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) (β : ℝ) :
+    let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ρ.conditionalPetzRenyiTraceTerm σ (1 + β) =
       1 + β *
         (∑ i, ∑ j,
           (hρpsd.isHermitian.eigenvalues j *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i)) *
             Real.log
               (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i)) +
         ∑ i, ∑ j,
           (hρpsd.isHermitian.eigenvalues j *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i)) *
             alphaRemainder β
               (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
   have hratio :=
     conditionalPetzRenyiTraceTerm_one_add_eq_eigenvalue_ratio_sum
       (ρ := ρ) hρ (σ := σ) hσ β
@@ -3130,47 +3035,47 @@ theorem conditionalPetzRenyiTraceTerm_one_add_eq_one_add_beta_log_ratio_sum_add_
   have hexpand :
       ∑ i, ∑ j,
         (hρpsd.isHermitian.eigenvalues j *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j i)) *
           (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) ^ β =
         (∑ i, ∑ j,
           hρpsd.isHermitian.eigenvalues j *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i)) +
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i)) +
           β *
             (∑ i, ∑ j,
               (hρpsd.isHermitian.eigenvalues j *
-                Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-                  (Uτ : CMatrix (Prod a b))) j i)) *
+                Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+                  (Uτ : CMatrix (a × b))) j i)) *
                 Real.log
                   (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i)) +
           ∑ i, ∑ j,
             (hρpsd.isHermitian.eigenvalues j *
-              Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-                (Uτ : CMatrix (Prod a b))) j i)) *
+              Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+                (Uτ : CMatrix (a × b))) j i)) *
               alphaRemainder β
                 (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) := by
     calc
       ∑ i, ∑ j,
         (hρpsd.isHermitian.eigenvalues j *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j i)) *
           (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) ^ β
           =
         ∑ i, ∑ j,
           (
           (hρpsd.isHermitian.eigenvalues j *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i)) +
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i)) +
             β *
               ((hρpsd.isHermitian.eigenvalues j *
-                Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-                  (Uτ : CMatrix (Prod a b))) j i)) *
+                Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+                  (Uτ : CMatrix (a × b))) j i)) *
                 Real.log
                   (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i)) +
             (hρpsd.isHermitian.eigenvalues j *
-              Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-                (Uτ : CMatrix (Prod a b))) j i)) *
+              Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+                (Uτ : CMatrix (a × b))) j i)) *
               alphaRemainder β
                 (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i)) := by
             apply Finset.sum_congr rfl
@@ -3182,19 +3087,19 @@ theorem conditionalPetzRenyiTraceTerm_one_add_eq_one_add_beta_log_ratio_sum_add_
       _ =
         (∑ i, ∑ j,
           hρpsd.isHermitian.eigenvalues j *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i)) +
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i)) +
           β *
             (∑ i, ∑ j,
               (hρpsd.isHermitian.eigenvalues j *
-                Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-                  (Uτ : CMatrix (Prod a b))) j i)) *
+                Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+                  (Uτ : CMatrix (a × b))) j i)) *
                 Real.log
                   (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i)) +
           ∑ i, ∑ j,
             (hρpsd.isHermitian.eigenvalues j *
-              Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-                (Uτ : CMatrix (Prod a b))) j i)) *
+              Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+                (Uτ : CMatrix (a × b))) j i)) *
               alphaRemainder β
                 (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) := by
             simp_rw [Finset.sum_add_distrib, Finset.mul_sum]
@@ -3203,14 +3108,14 @@ theorem conditionalPetzRenyiTraceTerm_one_add_eq_one_add_beta_log_ratio_sum_add_
       1 + β *
         (∑ i, ∑ j,
           (hρpsd.isHermitian.eigenvalues j *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i)) *
             Real.log
               (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i)) +
         ∑ i, ∑ j,
           (hρpsd.isHermitian.eigenvalues j *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i)) *
             alphaRemainder β
               (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i)
   rw [hratio, hexpand, hweights]
@@ -3218,33 +3123,33 @@ theorem conditionalPetzRenyiTraceTerm_one_add_eq_one_add_beta_log_ratio_sum_add_
 /-- Remainder decomposition with the logarithmic numerator already rewritten
 as the fixed-reference matrix-log expression. -/
 theorem conditionalPetzRenyiTraceTerm_one_add_eq_one_add_beta_matrix_log_add_remainder
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) (β : ℝ) :
-    let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) (β : ℝ) :
+    let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ρ.conditionalPetzRenyiTraceTerm σ (1 + β) =
       1 + β *
-        (((ρ.matrix * psdLog ρ.matrix hρ).trace).re -
-          ((ρ.matrix *
+        (((ρ.m * psdLog ρ.m hρ).trace).re -
+          ((ρ.m *
             psdLog (identityTensorStateMatrix (a := a) σ)
               (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re) +
         ∑ i, ∑ j,
           (hρpsd.isHermitian.eigenvalues j *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i)) *
             alphaRemainder β
               (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
   have hremainder :=
     conditionalPetzRenyiTraceTerm_one_add_eq_one_add_beta_log_ratio_sum_add_remainder
       (ρ := ρ) hρ (σ := σ) hσ β
@@ -3254,25 +3159,25 @@ theorem conditionalPetzRenyiTraceTerm_one_add_eq_one_add_beta_matrix_log_add_rem
   change
     ρ.conditionalPetzRenyiTraceTerm σ (1 + β) =
       1 + β *
-        (((ρ.matrix * psdLog ρ.matrix hρ).trace).re -
-          ((ρ.matrix *
+        (((ρ.m * psdLog ρ.m hρ).trace).re -
+          ((ρ.m *
             psdLog (identityTensorStateMatrix (a := a) σ)
               (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re) +
         ∑ i, ∑ j,
           (hρpsd.isHermitian.eigenvalues j *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i)) *
             alphaRemainder β
               (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i)
   rw [hremainder, hlog]
 
 /-- Positivity of the fixed-reference Petz trace kernel in the full-rank domain. -/
 theorem conditionalPetzRenyiTraceTerm_pos_of_posDef
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) (α : ℝ) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) (α : ℝ) :
     0 < ρ.conditionalPetzRenyiTraceTerm σ α := by
   dsimp [conditionalPetzRenyiTraceTerm]
-  have : Nonempty (Prod a b) := ρ.nonempty
+  have : Nonempty (a × b) := ρ.nonempty
   exact trace_mul_posDef_re_pos
     (ρ.rpowMatrix_posDef_of_posDef hρ α)
     (cMatrix_rpow_posDef_of_posDef
@@ -3280,8 +3185,8 @@ theorem conditionalPetzRenyiTraceTerm_pos_of_posDef
 
 /-- Exponentiating the fixed-reference Petz candidate recovers its trace term. -/
 theorem rpow_two_one_sub_alpha_mul_conditionalPetzRenyiEntropyCandidate
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     Real.rpow 2
         ((1 - α) *
@@ -3297,18 +3202,18 @@ theorem rpow_two_one_sub_alpha_mul_conditionalPetzRenyiEntropyCandidate
       ((1 - α) *
           ((1 / (1 - α)) *
             log2
-              ((CFC.rpow ρ.matrix α *
+              ((CFC.rpow ρ.m α *
                 CFC.rpow (identityTensorStateMatrix (a := a) σ) (1 - α)).trace).re)) =
-      ((CFC.rpow ρ.matrix α *
+      ((CFC.rpow ρ.m α *
         CFC.rpow (identityTensorStateMatrix (a := a) σ) (1 - α)).trace).re
   have hmul :
       (1 - α) *
           ((1 / (1 - α)) *
             log2
-              ((CFC.rpow ρ.matrix α *
+              ((CFC.rpow ρ.m α *
                 CFC.rpow (identityTensorStateMatrix (a := a) σ) (1 - α)).trace).re) =
         log2
-          ((CFC.rpow ρ.matrix α *
+          ((CFC.rpow ρ.m α *
             CFC.rpow (identityTensorStateMatrix (a := a) σ) (1 - α)).trace).re := by
     field_simp [hden]
   rw [hmul]
@@ -3316,8 +3221,8 @@ theorem rpow_two_one_sub_alpha_mul_conditionalPetzRenyiEntropyCandidate
 
 /-- The `α = 3/2` term in `Υ` is the Petz trace at `3/2`. -/
 theorem rpow_two_neg_half_conditionalPetzRenyiEntropyCandidate_three_halves
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) :
     Real.rpow 2
         (-(1 / 2 : ℝ) *
           ρ.conditionalPetzRenyiEntropyCandidate hρ σ hσ (3 / 2)
@@ -3331,8 +3236,8 @@ theorem rpow_two_neg_half_conditionalPetzRenyiEntropyCandidate_three_halves
 
 /-- The `α = 1/2` term in `Υ` is the Petz trace at `1/2`. -/
 theorem rpow_two_half_conditionalPetzRenyiEntropyCandidate_one_half
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) :
     Real.rpow 2
         ((1 / 2 : ℝ) *
           ρ.conditionalPetzRenyiEntropyCandidate hρ σ hσ (1 / 2)
@@ -3352,8 +3257,8 @@ The `H_α` terms use the fixed-reference conditional Petz candidate from
 `ConditionalPetzRenyi`.
 -/
 def conditionalAlphaConvergenceParameter
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) : ℝ :=
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) : ℝ :=
   Real.rpow 2
       (-(1 / 2 : ℝ) *
         ρ.conditionalPetzRenyiEntropyCandidate hρ σ hσ (3 / 2)
@@ -3373,13 +3278,13 @@ is exactly the sum of the two Petz trace terms at `3/2` and `1/2`.
 This definition is available for arbitrary finite states, using the CFC
 zero-on-kernel convention for the negative half-power. -/
 def conditionalAlphaConvergenceParameterTrace
-    (ρ : State (Prod a b)) (σ : State b) : ℝ :=
+    (ρ : MState (a × b)) (σ : MState b) : ℝ :=
   ρ.conditionalPetzRenyiTraceTerm σ (3 / 2) +
     ρ.conditionalPetzRenyiTraceTerm σ (1 / 2) + 1
 
 /-- The trace-term `Upsilon` is at least `1` for arbitrary states. -/
 theorem one_le_conditionalAlphaConvergenceParameterTrace
-    (ρ : State (Prod a b)) (σ : State b) :
+    (ρ : MState (a × b)) (σ : MState b) :
     1 ≤ ρ.conditionalAlphaConvergenceParameterTrace σ := by
   unfold conditionalAlphaConvergenceParameterTrace
   have h32 : 0 ≤ ρ.conditionalPetzRenyiTraceTerm σ (3 / 2) :=
@@ -3388,56 +3293,57 @@ theorem one_le_conditionalAlphaConvergenceParameterTrace
     ρ.conditionalPetzRenyiTraceTerm_nonneg σ (1 / 2)
   linarith
 
-/-- The canonical side reference of a grouped IID tensor power is full-rank
-when the one-copy side marginal is full-rank. -/
-theorem tensorPowerBipartite_marginalB_posDef_fullReference
-    (ρ : State (Prod a b))
-    (hρB : ρ.marginalB.matrix.PosDef) (n : ℕ) :
-    (ρ.tensorPowerBipartite n).marginalB.matrix.PosDef := by
-  rw [State.tensorPowerBipartite_marginalB ρ n]
-  exact State.tensorPower_posDef hρB n
-
 /-- Successor grouping of IID bipartite tensor powers as a product of one copy
 and the remaining `n` copies. -/
 theorem tensorPowerBipartite_succ_grouped_forAlphaContinuity
-    (ρ : State (Prod a b)) (n : ℕ) :
+    (ρ : MState (a × b)) (n : ℕ) :
     ρ.tensorPowerBipartite (n + 1) =
       (ρ.prod (ρ.tensorPowerBipartite n)).reindex
-        (conditionalPetzRenyiProductGroupingEquiv
+        (Equiv.prodProdProdComm
           a b (TensorPower a n) (TensorPower b n)) := by
+  have hL : (ρ.tensorPowerBipartite (n + 1)).m =
+      (Matrix.kronecker ρ.m (ρ.tensorPower n).m).submatrix
+        (tensorPowerProdEquiv a b (n + 1)).symm (tensorPowerProdEquiv a b (n + 1)).symm := by
+    rw [MState.tensorPowerBipartite_matrix, MState.tensorPower_succ_matrix]
+    rfl
+  have hR : ((ρ.prod (ρ.tensorPowerBipartite n)).reindex
+        (Equiv.prodProdProdComm a b (TensorPower a n) (TensorPower b n))).m =
+      (Matrix.kronecker ρ.m
+          ((ρ.tensorPower n).m.submatrix (tensorPowerProdEquiv a b n).symm
+            (tensorPowerProdEquiv a b n).symm)).submatrix
+        (Equiv.prodProdProdComm a b (TensorPower a n) (TensorPower b n)).symm
+        (Equiv.prodProdProdComm a b (TensorPower a n) (TensorPower b n)).symm := by
+    rw [MState.reindex_matrix, MState.prod_m, MState.tensorPowerBipartite_matrix,
+      ← Matrix.kronecker]
+  refine MState.ext (hL.trans (Eq.trans ?_ hR.symm))
   ext x y
-  rcases x with ⟨⟨xA, xsA⟩, ⟨xB, xsB⟩⟩
-  rcases y with ⟨⟨yA, ysA⟩, ⟨yB, ysB⟩⟩
-  simp [State.tensorPowerBipartite, State.tensorPower_succ,
-    conditionalPetzRenyiProductGroupingEquiv, tensorPowerProdEquiv,
-    State.prod, State.reindex, Matrix.kronecker]
   rfl
 
 /-- The side marginal of the successor grouping is the product of the one-copy
 side marginal and the `n`-copy side marginal. -/
-theorem tensorPowerBipartite_succ_grouped_marginalB_forAlphaContinuity
-    (ρ : State (Prod a b)) (n : ℕ) :
+theorem tensorPowerBipartite_succ_grouped_traceLeft_forAlphaContinuity
+    (ρ : MState (a × b)) (n : ℕ) :
     (((ρ.prod (ρ.tensorPowerBipartite n)).reindex
-        (conditionalPetzRenyiProductGroupingEquiv
-          a b (TensorPower a n) (TensorPower b n))).marginalB) =
-      ρ.marginalB.prod (ρ.tensorPowerBipartite n).marginalB := by
+        (Equiv.prodProdProdComm
+          a b (TensorPower a n) (TensorPower b n))).traceLeft) =
+      ρ.traceLeft.prod (ρ.tensorPowerBipartite n).traceLeft := by
   ext x y
   rcases x with ⟨xB, xsB⟩
   rcases y with ⟨yB, ysB⟩
-  simp [State.marginalB, partialTraceA, State.prod, State.reindex,
-    conditionalPetzRenyiProductGroupingEquiv, Matrix.kronecker,
-    Matrix.kroneckerMap_apply, Fintype.sum_prod_type, Finset.sum_mul,
-    Finset.mul_sum]
+  simp [Matrix.traceLeft, MState.reindex_matrix,
+    Equiv.prodProdProdComm, Matrix.kroneckerMap_apply, Fintype.sum_prod_type,
+    Finset.sum_mul, Finset.mul_sum]
   rw [Finset.sum_comm]
 
 /-- Zeroth tensor power Petz trace for the canonical reference. -/
 theorem tensorPowerBipartite_conditionalPetzRenyiTraceTerm_zero
-    (ρ : State (Prod a b)) (α : ℝ) :
+    (ρ : MState (a × b)) (α : ℝ) :
     (ρ.tensorPowerBipartite 0).conditionalPetzRenyiTraceTerm
-        (ρ.tensorPowerBipartite 0).marginalB α = 1 := by
+        (ρ.tensorPowerBipartite 0).traceLeft α = 1 := by
   have hmat :
-      (ρ.tensorPowerBipartite 0).matrix =
-        (1 : CMatrix (Prod (TensorPower a 0) (TensorPower b 0))) := by
+      (ρ.tensorPowerBipartite 0).m =
+        (1 : CMatrix (TensorPower a 0 × TensorPower b 0)) := by
+    rw [MState.tensorPowerBipartite_matrix, MState.tensorPower_zero_matrix]
     ext x y
     rcases x with ⟨xA, xB⟩
     rcases y with ⟨yA, yB⟩
@@ -3445,25 +3351,21 @@ theorem tensorPowerBipartite_conditionalPetzRenyiTraceTerm_zero
     cases xB
     cases yA
     cases yB
-    simp [State.tensorPowerBipartite, State.tensorPower, State.reindex,
-      State.unit, TensorPower, tensorPowerProdEquiv]
+    simp
   have hBmat :
-      (ρ.tensorPowerBipartite 0).marginalB.matrix =
+      (ρ.tensorPowerBipartite 0).traceLeft.m =
         (1 : CMatrix (TensorPower b 0)) := by
+    rw [MState.traceLeft_m, hmat]
     ext x y
     cases x
     cases y
-    change partialTraceA (a := TensorPower a 0) (b := TensorPower b 0)
-        (ρ.tensorPowerBipartite 0).matrix PUnit.unit PUnit.unit =
-      (1 : CMatrix (TensorPower b 0)) PUnit.unit PUnit.unit
-    rw [hmat]
-    show partialTraceA (a := PUnit) (b := PUnit) (1 : CMatrix (Prod PUnit PUnit))
+    show Matrix.traceLeft (1 : CMatrix (PUnit × PUnit))
         PUnit.unit PUnit.unit = (1 : CMatrix PUnit) PUnit.unit PUnit.unit
-    simp [partialTraceA]
+    simp [Matrix.traceLeft]
   have href :
       identityTensorStateMatrix (a := TensorPower a 0)
-          (ρ.tensorPowerBipartite 0).marginalB =
-        (1 : CMatrix (Prod (TensorPower a 0) (TensorPower b 0))) := by
+          (ρ.tensorPowerBipartite 0).traceLeft =
+        (1 : CMatrix (TensorPower a 0 × TensorPower b 0)) := by
     ext x y
     rcases x with ⟨xA, xB⟩
     rcases y with ⟨yA, yB⟩
@@ -3473,22 +3375,22 @@ theorem tensorPowerBipartite_conditionalPetzRenyiTraceTerm_zero
     cases yB
     change
       (Matrix.kronecker (1 : CMatrix (TensorPower a 0))
-          (ρ.tensorPowerBipartite 0).marginalB.matrix)
+          (ρ.tensorPowerBipartite 0).traceLeft.m)
         (PUnit.unit, PUnit.unit) (PUnit.unit, PUnit.unit) =
-        (1 : CMatrix (Prod (TensorPower a 0) (TensorPower b 0)))
+        (1 : CMatrix (TensorPower a 0 × TensorPower b 0))
           (PUnit.unit, PUnit.unit) (PUnit.unit, PUnit.unit)
     rw [hBmat]
-    simp [TensorPower, Matrix.kronecker]
+    simp [QIT.TensorPower, Matrix.kronecker]
     change (1 : ℂ) * 1 = 1
     norm_num
   unfold conditionalPetzRenyiTraceTerm
   rw [hmat, href]
-  rw [show CFC.rpow (1 : CMatrix (Prod (TensorPower a 0) (TensorPower b 0))) α = 1 by
+  rw [show CFC.rpow (1 : CMatrix (TensorPower a 0 × TensorPower b 0)) α = 1 by
       exact CFC.one_rpow,
-    show CFC.rpow (1 : CMatrix (Prod (TensorPower a 0) (TensorPower b 0))) (1 - α) = 1 by
+    show CFC.rpow (1 : CMatrix (TensorPower a 0 × TensorPower b 0)) (1 - α) = 1 by
       exact CFC.one_rpow,
     one_mul, Matrix.trace_one]
-  have hcard : Fintype.card (Prod (TensorPower a 0) (TensorPower b 0)) = 1 := by
+  have hcard : Fintype.card (TensorPower a 0 × TensorPower b 0) = 1 := by
     change Fintype.card (PUnit × PUnit) = 1
     simp
   simp [hcard]
@@ -3496,81 +3398,81 @@ theorem tensorPowerBipartite_conditionalPetzRenyiTraceTerm_zero
 /-- One-step multiplicativity of the canonical full-reference Petz trace along
 the grouped IID tensor-power decomposition. -/
 theorem tensorPowerBipartite_conditionalPetzRenyiTraceTerm_succ_fullReference
-    (ρ : State (Prod a b)) (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρB : ρ.traceLeft.m.PosDef)
     (α : ℝ) (hα_nonneg : 0 ≤ α) (n : ℕ) :
     (ρ.tensorPowerBipartite (n + 1)).conditionalPetzRenyiTraceTerm
-        (ρ.tensorPowerBipartite (n + 1)).marginalB α =
-      ρ.conditionalPetzRenyiTraceTerm ρ.marginalB α *
+        (ρ.tensorPowerBipartite (n + 1)).traceLeft α =
+      ρ.conditionalPetzRenyiTraceTerm ρ.traceLeft α *
         (ρ.tensorPowerBipartite n).conditionalPetzRenyiTraceTerm
-          (ρ.tensorPowerBipartite n).marginalB α := by
-  let τ : State (Prod (Prod a (TensorPower a n)) (Prod b (TensorPower b n))) :=
+          (ρ.tensorPowerBipartite n).traceLeft α := by
+  let τ : MState ((a × TensorPower a n) × (b × TensorPower b n)) :=
     (ρ.prod (ρ.tensorPowerBipartite n)).reindex
-      (conditionalPetzRenyiProductGroupingEquiv
+      (Equiv.prodProdProdComm
         a b (TensorPower a n) (TensorPower b n))
   have hτ :
       ρ.tensorPowerBipartite (n + 1) = τ :=
     tensorPowerBipartite_succ_grouped_forAlphaContinuity ρ n
   have hτB :
-      τ.marginalB = ρ.marginalB.prod (ρ.tensorPowerBipartite n).marginalB := by
+      τ.traceLeft = ρ.traceLeft.prod (ρ.tensorPowerBipartite n).traceLeft := by
     simpa [τ] using
-      tensorPowerBipartite_succ_grouped_marginalB_forAlphaContinuity ρ n
+      tensorPowerBipartite_succ_grouped_traceLeft_forAlphaContinuity ρ n
   have hregroup :
       (ρ.tensorPowerBipartite (n + 1)).conditionalPetzRenyiTraceTerm
-          (ρ.tensorPowerBipartite (n + 1)).marginalB α =
+          (ρ.tensorPowerBipartite (n + 1)).traceLeft α =
         τ.conditionalPetzRenyiTraceTerm
-          (ρ.marginalB.prod (ρ.tensorPowerBipartite n).marginalB) α := by
+          (ρ.traceLeft.prod (ρ.tensorPowerBipartite n).traceLeft) α := by
     have hτ_matrix :
-        (ρ.tensorPowerBipartite (n + 1)).matrix = τ.matrix :=
-      congrArg State.matrix hτ
+        (ρ.tensorPowerBipartite (n + 1)).m = τ.m :=
+      congrArg DensityOp.m hτ
     have hτ_matrix' :
-        Matrix.submatrix (ρ.tensorPower (n + 1)).matrix
+        Matrix.submatrix (ρ.tensorPower (n + 1)).m
             (tensorPowerProdEquiv a b (n + 1)).symm
             (tensorPowerProdEquiv a b (n + 1)).symm =
-          Matrix.submatrix (ρ.prod (ρ.tensorPowerBipartite n)).matrix
-            (conditionalPetzRenyiProductGroupingEquiv
+          Matrix.submatrix (ρ.prod (ρ.tensorPowerBipartite n)).m
+            (Equiv.prodProdProdComm
               a b (TensorPower a n) (TensorPower b n)).symm
-            (conditionalPetzRenyiProductGroupingEquiv
+            (Equiv.prodProdProdComm
               a b (TensorPower a n) (TensorPower b n)).symm := by
-      simpa [State.tensorPowerBipartite_matrix, τ, State.reindex_matrix] using hτ_matrix
+      simpa [MState.tensorPowerBipartite_matrix, τ, MState.reindex_matrix] using hτ_matrix
     have hτ_matrix_def :
-        τ.matrix =
-          Matrix.submatrix (ρ.prod (ρ.tensorPowerBipartite n)).matrix
-            (conditionalPetzRenyiProductGroupingEquiv
+        τ.m =
+          Matrix.submatrix (ρ.prod (ρ.tensorPowerBipartite n)).m
+            (Equiv.prodProdProdComm
               a b (TensorPower a n) (TensorPower b n)).symm
-            (conditionalPetzRenyiProductGroupingEquiv
+            (Equiv.prodProdProdComm
               a b (TensorPower a n) (TensorPower b n)).symm := by
-      simp [τ, State.reindex_matrix]
+      simp [τ, MState.reindex_matrix]
     have hτB_state :
-        (ρ.tensorPowerBipartite (n + 1)).marginalB =
-          ρ.marginalB.prod (ρ.tensorPowerBipartite n).marginalB := by
+        (ρ.tensorPowerBipartite (n + 1)).traceLeft =
+          ρ.traceLeft.prod (ρ.tensorPowerBipartite n).traceLeft := by
       rw [hτ]
       exact hτB
     have hτB_ref :
         identityTensorStateMatrix (a := TensorPower a (n + 1))
-            (ρ.tensorPowerBipartite (n + 1)).marginalB =
-          identityTensorStateMatrix (a := Prod a (TensorPower a n))
-            (ρ.marginalB.prod (ρ.tensorPowerBipartite n).marginalB) :=
+            (ρ.tensorPowerBipartite (n + 1)).traceLeft =
+          identityTensorStateMatrix (a := a × TensorPower a n)
+            (ρ.traceLeft.prod (ρ.tensorPowerBipartite n).traceLeft) :=
       congrArg (identityTensorStateMatrix (a := TensorPower a (n + 1))) hτB_state
-    dsimp [conditionalPetzRenyiTraceTerm]
+    simp only [conditionalPetzRenyiTraceTerm, MState.tensorPowerBipartite_matrix]
     rw [hτ_matrix', hτB_ref, hτ_matrix_def]
     rfl
   have hprod :=
     conditionalPetzRenyiTraceTerm_prod_grouped_fullReference
-      (ρ₁ := ρ) (σ₁ := ρ.marginalB)
+      (ρ₁ := ρ) (σ₁ := ρ.traceLeft)
       (ρ₂ := ρ.tensorPowerBipartite n)
-      (σ₂ := (ρ.tensorPowerBipartite n).marginalB)
-      hρB (tensorPowerBipartite_marginalB_posDef_fullReference ρ hρB n)
+      (σ₂ := (ρ.tensorPowerBipartite n).traceLeft)
+      hρB (tensorPowerBipartite_traceLeft_posDef ρ hρB n)
       α hα_nonneg
   exact hregroup.trans hprod
 
 /-- Canonical full-reference Petz trace is multiplicative on grouped IID
 tensor powers. -/
 theorem tensorPowerBipartite_conditionalPetzRenyiTraceTerm_fullReference_pow
-    (ρ : State (Prod a b)) (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρB : ρ.traceLeft.m.PosDef)
     (α : ℝ) (hα_nonneg : 0 ≤ α) (n : ℕ) :
     (ρ.tensorPowerBipartite n).conditionalPetzRenyiTraceTerm
-        (ρ.tensorPowerBipartite n).marginalB α =
-      (ρ.conditionalPetzRenyiTraceTerm ρ.marginalB α) ^ n := by
+        (ρ.tensorPowerBipartite n).traceLeft α =
+      (ρ.conditionalPetzRenyiTraceTerm ρ.traceLeft α) ^ n := by
   induction n with
   | zero =>
       rw [tensorPowerBipartite_conditionalPetzRenyiTraceTerm_zero]
@@ -3583,11 +3485,11 @@ theorem tensorPowerBipartite_conditionalPetzRenyiTraceTerm_fullReference_pow
 /-- Exact tensor-power spelling of the trace-style convergence parameter:
 the two Petz trace summands multiply separately. -/
 theorem tensorPowerBipartite_conditionalAlphaConvergenceParameterTrace_canonical_eq_pow_terms
-    (ρ : State (Prod a b)) (hρB : ρ.marginalB.matrix.PosDef) (n : ℕ) :
+    (ρ : MState (a × b)) (hρB : ρ.traceLeft.m.PosDef) (n : ℕ) :
     (ρ.tensorPowerBipartite n).conditionalAlphaConvergenceParameterTrace
-        (ρ.tensorPowerBipartite n).marginalB =
-      (ρ.conditionalPetzRenyiTraceTerm ρ.marginalB (3 / 2)) ^ n +
-        (ρ.conditionalPetzRenyiTraceTerm ρ.marginalB (1 / 2)) ^ n + 1 := by
+        (ρ.tensorPowerBipartite n).traceLeft =
+      (ρ.conditionalPetzRenyiTraceTerm ρ.traceLeft (3 / 2)) ^ n +
+        (ρ.conditionalPetzRenyiTraceTerm ρ.traceLeft (1 / 2)) ^ n + 1 := by
   unfold conditionalAlphaConvergenceParameterTrace
   rw [
     tensorPowerBipartite_conditionalPetzRenyiTraceTerm_fullReference_pow
@@ -3598,8 +3500,8 @@ theorem tensorPowerBipartite_conditionalAlphaConvergenceParameterTrace_canonical
 /-- The witness-based positive-definite `Upsilon` agrees with its trace-term
 spelling. -/
 theorem conditionalAlphaConvergenceParameter_eq_trace
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) :
     ρ.conditionalAlphaConvergenceParameter hρ σ hσ =
       ρ.conditionalAlphaConvergenceParameterTrace σ := by
   unfold conditionalAlphaConvergenceParameter conditionalAlphaConvergenceParameterTrace
@@ -3611,8 +3513,8 @@ theorem conditionalAlphaConvergenceParameter_eq_trace
 
 @[simp]
 theorem conditionalAlphaConvergenceParameter_eq
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) :
     ρ.conditionalAlphaConvergenceParameter hρ σ hσ =
       Real.rpow 2
           (-(1 / 2 : ℝ) *
@@ -3630,33 +3532,33 @@ theorem conditionalAlphaConvergenceParameter_eq
 This is the finite matrix-route version of the source expectation
 `E[X^{1/2}] + E[X^{-1/2}] + 1`. -/
 theorem conditionalAlphaConvergenceParameter_eq_eigenbasis_rpow_sum
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) :
-    let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) :
+    let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ρ.conditionalAlphaConvergenceParameter hρ σ hσ =
       (∑ i, ∑ j,
         (hρpsd.isHermitian.eigenvalues j *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j i)) *
           (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) ^ (1 / 2 : ℝ)) +
       (∑ i, ∑ j,
         (hρpsd.isHermitian.eigenvalues j *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j i)) *
           (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) ^ (-(1 / 2 : ℝ))) +
       1 := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
   have hthree_trace :
       Real.rpow 2
           (-(1 / 2 : ℝ) *
@@ -3677,8 +3579,8 @@ theorem conditionalAlphaConvergenceParameter_eq_eigenbasis_rpow_sum
       ρ.conditionalPetzRenyiTraceTerm σ (3 / 2) =
         ∑ i, ∑ j,
           (hρpsd.isHermitian.eigenvalues j *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i)) *
             (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) ^
               (1 / 2 : ℝ) := by
     convert
@@ -3689,8 +3591,8 @@ theorem conditionalAlphaConvergenceParameter_eq_eigenbasis_rpow_sum
       ρ.conditionalPetzRenyiTraceTerm σ (1 / 2) =
         ∑ i, ∑ j,
           (hρpsd.isHermitian.eigenvalues j *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i)) *
             (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) ^
               (-(1 / 2 : ℝ)) := by
     convert
@@ -3703,35 +3605,35 @@ theorem conditionalAlphaConvergenceParameter_eq_eigenbasis_rpow_sum
 /-- The convergence parameter `Υ` as
 `E[√X] + E[(√X)⁻¹] + 1` in the double-eigenbasis weights. -/
 theorem conditionalAlphaConvergenceParameter_eq_eigenbasis_sqrt_sum
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) :
-    let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) :
+    let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ρ.conditionalAlphaConvergenceParameter hρ σ hσ =
       (∑ i, ∑ j,
         (hρpsd.isHermitian.eigenvalues j *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j i)) *
           Real.sqrt
             (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i)) +
       (∑ i, ∑ j,
         (hρpsd.isHermitian.eigenvalues j *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j i)) *
           (Real.sqrt
             (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i))⁻¹) +
       1 := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
   rw [conditionalAlphaConvergenceParameter_eq_eigenbasis_rpow_sum (ρ := ρ) hρ (σ := σ) hσ]
   congr 2
   · apply Finset.sum_congr rfl
@@ -3755,41 +3657,41 @@ theorem conditionalAlphaConvergenceParameter_eq_eigenbasis_sqrt_sum
 /-- The arbitrary-left trace-style convergence parameter `Upsilon` as
 `E[√X] + E[(√X)⁻¹] + 1` over the positive spectral support of `ρ`. -/
 theorem conditionalAlphaConvergenceParameterTrace_eq_support_eigenbasis_sqrt_sum
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef) :
-    let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef) :
+    let hρpsd : ρ.m.PosSemidef := ρ.psd
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ρ.conditionalAlphaConvergenceParameterTrace σ =
-      (∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+      (∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
         (hρpsd.isHermitian.eigenvalues j.1 *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j.1 i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j.1 i)) *
           Real.sqrt
             (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i)) +
-      (∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+      (∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
         (hρpsd.isHermitian.eigenvalues j.1 *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j.1 i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j.1 i)) *
           (Real.sqrt
             (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i))⁻¹) +
       1 := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := ρ.psd
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
   have hthree_ratio :
       ρ.conditionalPetzRenyiTraceTerm σ (3 / 2) =
-        ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+        ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
           (hρpsd.isHermitian.eigenvalues j.1 *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j.1 i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j.1 i)) *
             (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) ^
               (1 / 2 : ℝ) := by
     convert
@@ -3798,10 +3700,10 @@ theorem conditionalAlphaConvergenceParameterTrace_eq_support_eigenbasis_sqrt_sum
     ring
   have hthree_sqrt :
       ρ.conditionalPetzRenyiTraceTerm σ (3 / 2) =
-        ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+        ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
           (hρpsd.isHermitian.eigenvalues j.1 *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j.1 i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j.1 i)) *
             Real.sqrt
               (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) := by
     rw [hthree_ratio]
@@ -3820,21 +3722,21 @@ theorem conditionalAlphaConvergenceParameterTrace_eq_support_eigenbasis_sqrt_sum
 expansion, this is the weighted AM-GM estimate
 `√x + (√x)⁻¹ + 1 ≥ 3`. -/
 theorem conditionalAlphaConvergenceParameter_ge_three
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) :
     3 ≤ ρ.conditionalAlphaConvergenceParameter hρ σ hσ := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
-  let w : Prod (Prod a b) (Prod a b) → ℝ := fun x =>
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let w : (a × b) × (a × b) → ℝ := fun x =>
     hρpsd.isHermitian.eigenvalues x.2 *
-      Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-        (Uτ : CMatrix (Prod a b))) x.2 x.1)
-  let p : Prod (Prod a b) (Prod a b) → ℝ := fun x =>
+      Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+        (Uτ : CMatrix (a × b))) x.2 x.1)
+  let p : (a × b) × (a × b) → ℝ := fun x =>
     Real.sqrt (hρpsd.isHermitian.eigenvalues x.2 / hτ.isHermitian.eigenvalues x.1) +
       (Real.sqrt
         (hρpsd.isHermitian.eigenvalues x.2 / hτ.isHermitian.eigenvalues x.1))⁻¹ +
@@ -3845,29 +3747,29 @@ theorem conditionalAlphaConvergenceParameter_ge_three
   have hweights_local :
       ∑ i, ∑ j,
         hρpsd.isHermitian.eigenvalues j *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j i) = 1 := by
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j i) = 1 := by
     simpa [hρpsd, τ, hτpos, hτ, Uτ, Uρ] using hweights
   have heta :=
     conditionalAlphaConvergenceParameter_eq_eigenbasis_sqrt_sum
       (ρ := ρ) hρ (σ := σ) hσ
   have hweight_nonneg :
       ∀ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (Prod a b))), 0 ≤ w x := by
+          Finset ((a × b) × (a × b))), 0 ≤ w x := by
     intro x _
     have hρeig_pos : 0 < hρpsd.isHermitian.eigenvalues x.2 := by
       simpa [hρpsd] using hρ.eigenvalues_pos x.2
     exact mul_nonneg hρeig_pos.le (Complex.normSq_nonneg _)
   have hweight_sum :
       ∑ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (Prod a b))), w x = 1 := by
+          Finset ((a × b) × (a × b))), w x = 1 := by
     rw [Finset.product_eq_sprod, Finset.sum_product]
     simpa [w] using hweights_local
   have hpoint :
       ∑ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (Prod a b))), w x * 3 ≤
+          Finset ((a × b) × (a × b))), w x * 3 ≤
         ∑ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (Prod a b))), w x * p x := by
+          Finset ((a × b) × (a × b))), w x * p x := by
     apply Finset.sum_le_sum
     intro x hx
     have hρeig_pos : 0 < hρpsd.isHermitian.eigenvalues x.2 := by
@@ -3880,11 +3782,11 @@ theorem conditionalAlphaConvergenceParameter_ge_three
   have hthree :
       (3 : ℝ) =
         ∑ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (Prod a b))), w x * 3 := by
+          Finset ((a × b) × (a × b))), w x * 3 := by
     rw [← Finset.sum_mul, hweight_sum, one_mul]
   have harg :
       ∑ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (Prod a b))), w x * p x =
+          Finset ((a × b) × (a × b))), w x * p x =
         ρ.conditionalAlphaConvergenceParameter hρ σ hσ := by
     rw [heta]
     rw [Finset.product_eq_sprod, Finset.sum_product]
@@ -3895,9 +3797,9 @@ theorem conditionalAlphaConvergenceParameter_ge_three
   calc
     (3 : ℝ) =
         ∑ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (Prod a b))), w x * 3 := hthree
+          Finset ((a × b) × (a × b))), w x * 3 := hthree
     _ ≤ ∑ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (Prod a b))), w x * p x := hpoint
+          Finset ((a × b) × (a × b))), w x * p x := hpoint
     _ = ρ.conditionalAlphaConvergenceParameter hρ σ hσ := harg
 
 /-- Weighted remainder bound after the scalar step, parameterized by the
@@ -3906,19 +3808,19 @@ remaining Jensen/concavity step.
 The hypothesis `hJensen` is the precise finite Jensen inequality needed to
 turn the weighted `s_{2β}` expectation into `s_{2β}(Υ)`. -/
 theorem conditionalPetzRenyi_weighted_remainder_le_of_jensen
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) (β : ℝ) (hβ : 0 ≤ β)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) (β : ℝ) (hβ : 0 ≤ β)
     (hJensen :
-      (let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-       let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+      (let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+       let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
        let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
        let hτ : τ.PosSemidef := hτpos.posSemidef
-       let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-       let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+       let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+       let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
        ∑ i, ∑ j,
         (hρpsd.isHermitian.eigenvalues j *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j i)) *
           alphaCoshMajorant (2 * β)
             (Real.sqrt
                 (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) +
@@ -3927,38 +3829,38 @@ theorem conditionalPetzRenyi_weighted_remainder_le_of_jensen
               1)) ≤
         alphaCoshMajorant (2 * β)
           (ρ.conditionalAlphaConvergenceParameter hρ σ hσ)) :
-    let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ∑ i, ∑ j,
       (hρpsd.isHermitian.eigenvalues j *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i)) *
         alphaRemainder β
           (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) ≤
       alphaCoshMajorant (2 * β)
         (ρ.conditionalAlphaConvergenceParameter hρ σ hσ) := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
   have hpoint :
       ∑ i, ∑ j,
         (hρpsd.isHermitian.eigenvalues j *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j i)) *
           alphaRemainder β
             (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) ≤
         ∑ i, ∑ j,
           (hρpsd.isHermitian.eigenvalues j *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i)) *
             alphaCoshMajorant (2 * β)
               (Real.sqrt
                   (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) +
@@ -3978,8 +3880,8 @@ theorem conditionalPetzRenyi_weighted_remainder_le_of_jensen
       div_pos hρeig_pos hτeig_pos
     have hweight_nonneg :
         0 ≤ hρpsd.isHermitian.eigenvalues j *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j i) :=
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j i) :=
       mul_nonneg hρeig_pos.le (Complex.normSq_nonneg _)
     exact mul_le_mul_of_nonneg_left
       (alphaRemainder_le_alphaCoshMajorant_sqrt_add_inv_add_one hratio_pos hβ)
@@ -3992,21 +3894,21 @@ concavity of `s_{2β}` on `[3, ∞)`.
 This discharges the matrix/probability part of the Jensen bridge; the remaining
 analytic input is the one-variable concavity hypothesis. -/
 theorem conditionalPetzRenyi_weighted_alphaCoshMajorant_le_of_concaveOn
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) (β : ℝ)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) (β : ℝ)
     (hconc :
       ConcaveOn ℝ (Set.Ici (3 : ℝ))
         (fun x : ℝ => alphaCoshMajorant (2 * β) x)) :
-    let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ∑ i, ∑ j,
       (hρpsd.isHermitian.eigenvalues j *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i)) *
         alphaCoshMajorant (2 * β)
           (Real.sqrt
               (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) +
@@ -4016,17 +3918,17 @@ theorem conditionalPetzRenyi_weighted_alphaCoshMajorant_le_of_concaveOn
       alphaCoshMajorant (2 * β)
         (ρ.conditionalAlphaConvergenceParameter hρ σ hσ) := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
-  let w : Prod (Prod a b) (Prod a b) → ℝ := fun x =>
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let w : (a × b) × (a × b) → ℝ := fun x =>
     hρpsd.isHermitian.eigenvalues x.2 *
-      Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-        (Uτ : CMatrix (Prod a b))) x.2 x.1)
-  let p : Prod (Prod a b) (Prod a b) → ℝ := fun x =>
+      Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+        (Uτ : CMatrix (a × b))) x.2 x.1)
+  let p : (a × b) × (a × b) → ℝ := fun x =>
     Real.sqrt (hρpsd.isHermitian.eigenvalues x.2 / hτ.isHermitian.eigenvalues x.1) +
       (Real.sqrt
         (hρpsd.isHermitian.eigenvalues x.2 / hτ.isHermitian.eigenvalues x.1))⁻¹ +
@@ -4038,27 +3940,27 @@ theorem conditionalPetzRenyi_weighted_alphaCoshMajorant_le_of_concaveOn
   have hweights_local :
       ∑ i, ∑ j,
         hρpsd.isHermitian.eigenvalues j *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j i) = 1 := by
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j i) = 1 := by
     simpa [hρpsd, τ, hτpos, hτ, Uτ, Uρ] using hweights
   have heta :=
     conditionalAlphaConvergenceParameter_eq_eigenbasis_sqrt_sum
       (ρ := ρ) hρ (σ := σ) hσ
   have hweight_nonneg :
       ∀ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (Prod a b))), 0 ≤ w x := by
+          Finset ((a × b) × (a × b))), 0 ≤ w x := by
     intro x _
     have hρeig_pos : 0 < hρpsd.isHermitian.eigenvalues x.2 := by
       simpa [hρpsd] using hρ.eigenvalues_pos x.2
     exact mul_nonneg hρeig_pos.le (Complex.normSq_nonneg _)
   have hweight_sum :
       ∑ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (Prod a b))), w x = 1 := by
+          Finset ((a × b) × (a × b))), w x = 1 := by
     rw [Finset.product_eq_sprod, Finset.sum_product]
     simpa [w] using hweights_local
   have hp_mem :
       ∀ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (Prod a b))), p x ∈ Set.Ici (3 : ℝ) := by
+          Finset ((a × b) × (a × b))), p x ∈ Set.Ici (3 : ℝ) := by
     intro x _
     have hρeig_pos : 0 < hρpsd.isHermitian.eigenvalues x.2 := by
       simpa [hρpsd] using hρ.eigenvalues_pos x.2
@@ -4068,15 +3970,15 @@ theorem conditionalPetzRenyi_weighted_alphaCoshMajorant_le_of_concaveOn
   have hjensen :=
     hconc.le_map_sum
       (t := (Finset.univ.product Finset.univ :
-        Finset (Prod (Prod a b) (Prod a b))))
+        Finset ((a × b) × (a × b))))
       (w := w) (p := p) hweight_nonneg hweight_sum hp_mem
   have hleft :
       ∑ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (Prod a b))), w x * f (p x) =
+          Finset ((a × b) × (a × b))), w x * f (p x) =
         ∑ i, ∑ j,
           (hρpsd.isHermitian.eigenvalues j *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j i)) *
             alphaCoshMajorant (2 * β)
               (Real.sqrt
                   (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) +
@@ -4086,7 +3988,7 @@ theorem conditionalPetzRenyi_weighted_alphaCoshMajorant_le_of_concaveOn
     rw [Finset.product_eq_sprod, Finset.sum_product]
   have harg :
       ∑ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (Prod a b))), w x * p x =
+          Finset ((a × b) × (a × b))), w x * p x =
         ρ.conditionalAlphaConvergenceParameter hρ σ hσ := by
     rw [heta]
     rw [Finset.product_eq_sprod, Finset.sum_product]
@@ -4097,8 +3999,8 @@ theorem conditionalPetzRenyi_weighted_alphaCoshMajorant_le_of_concaveOn
   change
     ∑ i, ∑ j,
       (hρpsd.isHermitian.eigenvalues j *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i)) *
         alphaCoshMajorant (2 * β)
           (Real.sqrt
               (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) +
@@ -4113,21 +4015,21 @@ theorem conditionalPetzRenyi_weighted_alphaCoshMajorant_le_of_concaveOn
 /-- Weighted remainder upper bound with the finite Jensen step discharged from
 the scalar concavity hypothesis. -/
 theorem conditionalPetzRenyi_weighted_remainder_le_of_concaveOn
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) (β : ℝ) (hβ : 0 ≤ β)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) (β : ℝ) (hβ : 0 ≤ β)
     (hconc :
       ConcaveOn ℝ (Set.Ici (3 : ℝ))
         (fun x : ℝ => alphaCoshMajorant (2 * β) x)) :
-    let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ∑ i, ∑ j,
       (hρpsd.isHermitian.eigenvalues j *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i)) *
         alphaRemainder β
           (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) ≤
       alphaCoshMajorant (2 * β)
@@ -4141,19 +4043,19 @@ theorem conditionalPetzRenyi_weighted_remainder_le_of_concaveOn
 /-- Weighted remainder upper bound in the TCR small-parameter range
 `0 ≤ β ≤ 1/4`, with the scalar concavity prerequisite discharged. -/
 theorem conditionalPetzRenyi_weighted_remainder_le
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) (β : ℝ)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) (β : ℝ)
     (hβ0 : 0 ≤ β) (hβquarter : β ≤ 1 / 4) :
-    let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ∑ i, ∑ j,
       (hρpsd.isHermitian.eigenvalues j *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i)) *
         alphaRemainder β
           (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i) ≤
       alphaCoshMajorant (2 * β)
@@ -4169,21 +4071,21 @@ theorem conditionalPetzRenyi_weighted_remainder_le
 This is the support-indexed weighted AM-GM estimate
 `E[√X + (√X)⁻¹ + 1] ≥ 3`. -/
 theorem conditionalAlphaConvergenceParameterTrace_ge_three
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef) :
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef) :
     3 ≤ ρ.conditionalAlphaConvergenceParameterTrace σ := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := ρ.psd
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
-  let w : Prod (Prod a b) (psdSupportIndex ρ.matrix hρpsd) → ℝ := fun x =>
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let w : (a × b) × psdSupportIndex ρ.m hρpsd → ℝ := fun x =>
     hρpsd.isHermitian.eigenvalues x.2.1 *
-      Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-        (Uτ : CMatrix (Prod a b))) x.2.1 x.1)
-  let p : Prod (Prod a b) (psdSupportIndex ρ.matrix hρpsd) → ℝ := fun x =>
+      Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+        (Uτ : CMatrix (a × b))) x.2.1 x.1)
+  let p : (a × b) × psdSupportIndex ρ.m hρpsd → ℝ := fun x =>
     Real.sqrt (hρpsd.isHermitian.eigenvalues x.2.1 / hτ.isHermitian.eigenvalues x.1) +
       (Real.sqrt
         (hρpsd.isHermitian.eigenvalues x.2.1 / hτ.isHermitian.eigenvalues x.1))⁻¹ +
@@ -4192,29 +4094,29 @@ theorem conditionalAlphaConvergenceParameterTrace_ge_three
     conditionalPetzRenyi_eigenbasis_support_weight_sum_eq_one
       (ρ := ρ) (σ := σ) hσ
   have hweights_local :
-      ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+      ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
         hρpsd.isHermitian.eigenvalues j.1 *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j.1 i) = 1 := by
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j.1 i) = 1 := by
     simpa [hρpsd, τ, hτpos, hτ, Uτ, Uρ] using hweights
   have heta :=
     conditionalAlphaConvergenceParameterTrace_eq_support_eigenbasis_sqrt_sum
       (ρ := ρ) (σ := σ) hσ
   have hweight_nonneg :
       ∀ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (psdSupportIndex ρ.matrix hρpsd))), 0 ≤ w x := by
+          Finset ((a × b) × psdSupportIndex ρ.m hρpsd)), 0 ≤ w x := by
     intro x _
     exact mul_nonneg x.2.2.le (Complex.normSq_nonneg _)
   have hweight_sum :
       ∑ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (psdSupportIndex ρ.matrix hρpsd))), w x = 1 := by
+          Finset ((a × b) × psdSupportIndex ρ.m hρpsd)), w x = 1 := by
     rw [Finset.product_eq_sprod, Finset.sum_product]
     simpa [w] using hweights_local
   have hpoint :
       ∑ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (psdSupportIndex ρ.matrix hρpsd))), w x * 3 ≤
+          Finset ((a × b) × psdSupportIndex ρ.m hρpsd)), w x * 3 ≤
         ∑ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (psdSupportIndex ρ.matrix hρpsd))), w x * p x := by
+          Finset ((a × b) × psdSupportIndex ρ.m hρpsd)), w x * p x := by
     apply Finset.sum_le_sum
     intro x hx
     have hτeig_pos : 0 < hτ.isHermitian.eigenvalues x.1 := by
@@ -4225,11 +4127,11 @@ theorem conditionalAlphaConvergenceParameterTrace_ge_three
   have hthree :
       (3 : ℝ) =
         ∑ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (psdSupportIndex ρ.matrix hρpsd))), w x * 3 := by
+          Finset ((a × b) × psdSupportIndex ρ.m hρpsd)), w x * 3 := by
     rw [← Finset.sum_mul, hweight_sum, one_mul]
   have harg :
       ∑ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (psdSupportIndex ρ.matrix hρpsd))), w x * p x =
+          Finset ((a × b) × psdSupportIndex ρ.m hρpsd)), w x * p x =
         ρ.conditionalAlphaConvergenceParameterTrace σ := by
     rw [heta]
     rw [Finset.product_eq_sprod, Finset.sum_product]
@@ -4240,27 +4142,27 @@ theorem conditionalAlphaConvergenceParameterTrace_ge_three
   calc
     (3 : ℝ) =
         ∑ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (psdSupportIndex ρ.matrix hρpsd))), w x * 3 := hthree
+          Finset ((a × b) × psdSupportIndex ρ.m hρpsd)), w x * 3 := hthree
     _ ≤ ∑ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (psdSupportIndex ρ.matrix hρpsd))), w x * p x := hpoint
+          Finset ((a × b) × psdSupportIndex ρ.m hρpsd)), w x * p x := hpoint
     _ = ρ.conditionalAlphaConvergenceParameterTrace σ := harg
 
 /-- Support-indexed weighted remainder bound after the scalar step, assuming
 the finite Jensen/concavity bridge for the trace-style `Upsilon`. -/
 theorem conditionalPetzRenyi_weighted_remainder_le_support_of_jensen
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef) (β : ℝ) (hβ : 0 ≤ β)
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef) (β : ℝ) (hβ : 0 ≤ β)
     (hJensen :
-      (let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-       let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+      (let hρpsd : ρ.m.PosSemidef := ρ.psd
+       let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
        let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
        let hτ : τ.PosSemidef := hτpos.posSemidef
-       let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-       let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
-       ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+       let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+       let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+       ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
         (hρpsd.isHermitian.eigenvalues j.1 *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j.1 i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j.1 i)) *
           alphaCoshMajorant (2 * β)
             (Real.sqrt
                 (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) +
@@ -4269,38 +4171,38 @@ theorem conditionalPetzRenyi_weighted_remainder_le_support_of_jensen
               1)) ≤
         alphaCoshMajorant (2 * β)
           (ρ.conditionalAlphaConvergenceParameterTrace σ)) :
-    let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    let hρpsd : ρ.m.PosSemidef := ρ.psd
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
-    ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
       (hρpsd.isHermitian.eigenvalues j.1 *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j.1 i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j.1 i)) *
         alphaRemainder β
           (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) ≤
       alphaCoshMajorant (2 * β)
         (ρ.conditionalAlphaConvergenceParameterTrace σ) := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := ρ.psd
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
   have hpoint :
-      ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+      ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
         (hρpsd.isHermitian.eigenvalues j.1 *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j.1 i)) *
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j.1 i)) *
           alphaRemainder β
             (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) ≤
-        ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+        ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
           (hρpsd.isHermitian.eigenvalues j.1 *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j.1 i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j.1 i)) *
             alphaCoshMajorant (2 * β)
               (Real.sqrt
                   (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) +
@@ -4318,8 +4220,8 @@ theorem conditionalPetzRenyi_weighted_remainder_le_support_of_jensen
       div_pos j.2 hτeig_pos
     have hweight_nonneg :
         0 ≤ hρpsd.isHermitian.eigenvalues j.1 *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j.1 i) :=
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j.1 i) :=
       mul_nonneg j.2.le (Complex.normSq_nonneg _)
     exact mul_le_mul_of_nonneg_left
       (alphaRemainder_le_alphaCoshMajorant_sqrt_add_inv_add_one hratio_pos hβ)
@@ -4329,21 +4231,21 @@ theorem conditionalPetzRenyi_weighted_remainder_le_support_of_jensen
 /-- Support-indexed finite Jensen step for the weighted `s_{2β}` term,
 assuming scalar concavity on `[3, ∞)`. -/
 theorem conditionalPetzRenyi_weighted_alphaCoshMajorant_le_support_of_concaveOn
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef) (β : ℝ)
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef) (β : ℝ)
     (hconc :
       ConcaveOn ℝ (Set.Ici (3 : ℝ))
         (fun x : ℝ => alphaCoshMajorant (2 * β) x)) :
-    let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    let hρpsd : ρ.m.PosSemidef := ρ.psd
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
-    ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
       (hρpsd.isHermitian.eigenvalues j.1 *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j.1 i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j.1 i)) *
         alphaCoshMajorant (2 * β)
           (Real.sqrt
               (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) +
@@ -4353,17 +4255,17 @@ theorem conditionalPetzRenyi_weighted_alphaCoshMajorant_le_support_of_concaveOn
       alphaCoshMajorant (2 * β)
         (ρ.conditionalAlphaConvergenceParameterTrace σ) := by
   classical
-  let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-  let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let hρpsd : ρ.m.PosSemidef := ρ.psd
+  let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
   let hτ : τ.PosSemidef := hτpos.posSemidef
-  let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-  let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
-  let w : Prod (Prod a b) (psdSupportIndex ρ.matrix hρpsd) → ℝ := fun x =>
+  let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+  let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+  let w : (a × b) × psdSupportIndex ρ.m hρpsd → ℝ := fun x =>
     hρpsd.isHermitian.eigenvalues x.2.1 *
-      Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-        (Uτ : CMatrix (Prod a b))) x.2.1 x.1)
-  let p : Prod (Prod a b) (psdSupportIndex ρ.matrix hρpsd) → ℝ := fun x =>
+      Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+        (Uτ : CMatrix (a × b))) x.2.1 x.1)
+  let p : (a × b) × psdSupportIndex ρ.m hρpsd → ℝ := fun x =>
     Real.sqrt (hρpsd.isHermitian.eigenvalues x.2.1 / hτ.isHermitian.eigenvalues x.1) +
       (Real.sqrt
         (hρpsd.isHermitian.eigenvalues x.2.1 / hτ.isHermitian.eigenvalues x.1))⁻¹ +
@@ -4373,27 +4275,27 @@ theorem conditionalPetzRenyi_weighted_alphaCoshMajorant_le_support_of_concaveOn
     conditionalPetzRenyi_eigenbasis_support_weight_sum_eq_one
       (ρ := ρ) (σ := σ) hσ
   have hweights_local :
-      ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+      ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
         hρpsd.isHermitian.eigenvalues j.1 *
-          Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-            (Uτ : CMatrix (Prod a b))) j.1 i) = 1 := by
+          Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+            (Uτ : CMatrix (a × b))) j.1 i) = 1 := by
     simpa [hρpsd, τ, hτpos, hτ, Uτ, Uρ] using hweights
   have heta :=
     conditionalAlphaConvergenceParameterTrace_eq_support_eigenbasis_sqrt_sum
       (ρ := ρ) (σ := σ) hσ
   have hweight_nonneg :
       ∀ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (psdSupportIndex ρ.matrix hρpsd))), 0 ≤ w x := by
+          Finset ((a × b) × psdSupportIndex ρ.m hρpsd)), 0 ≤ w x := by
     intro x _
     exact mul_nonneg x.2.2.le (Complex.normSq_nonneg _)
   have hweight_sum :
       ∑ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (psdSupportIndex ρ.matrix hρpsd))), w x = 1 := by
+          Finset ((a × b) × psdSupportIndex ρ.m hρpsd)), w x = 1 := by
     rw [Finset.product_eq_sprod, Finset.sum_product]
     simpa [w] using hweights_local
   have hp_mem :
       ∀ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (psdSupportIndex ρ.matrix hρpsd))), p x ∈ Set.Ici (3 : ℝ) := by
+          Finset ((a × b) × psdSupportIndex ρ.m hρpsd)), p x ∈ Set.Ici (3 : ℝ) := by
     intro x _
     have hτeig_pos : 0 < hτ.isHermitian.eigenvalues x.1 := by
       simpa [τ, hτpos, hτ] using hτpos.eigenvalues_pos x.1
@@ -4401,15 +4303,15 @@ theorem conditionalPetzRenyi_weighted_alphaCoshMajorant_le_support_of_concaveOn
   have hjensen :=
     hconc.le_map_sum
       (t := (Finset.univ.product Finset.univ :
-        Finset (Prod (Prod a b) (psdSupportIndex ρ.matrix hρpsd))))
+        Finset ((a × b) × psdSupportIndex ρ.m hρpsd)))
       (w := w) (p := p) hweight_nonneg hweight_sum hp_mem
   have hleft :
       ∑ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (psdSupportIndex ρ.matrix hρpsd))), w x * f (p x) =
-        ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+          Finset ((a × b) × psdSupportIndex ρ.m hρpsd)), w x * f (p x) =
+        ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
           (hρpsd.isHermitian.eigenvalues j.1 *
-            Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-              (Uτ : CMatrix (Prod a b))) j.1 i)) *
+            Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+              (Uτ : CMatrix (a × b))) j.1 i)) *
             alphaCoshMajorant (2 * β)
               (Real.sqrt
                   (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) +
@@ -4419,7 +4321,7 @@ theorem conditionalPetzRenyi_weighted_alphaCoshMajorant_le_support_of_concaveOn
     rw [Finset.product_eq_sprod, Finset.sum_product]
   have harg :
       ∑ x ∈ (Finset.univ.product Finset.univ :
-          Finset (Prod (Prod a b) (psdSupportIndex ρ.matrix hρpsd))), w x * p x =
+          Finset ((a × b) × psdSupportIndex ρ.m hρpsd)), w x * p x =
         ρ.conditionalAlphaConvergenceParameterTrace σ := by
     rw [heta]
     rw [Finset.product_eq_sprod, Finset.sum_product]
@@ -4428,10 +4330,10 @@ theorem conditionalPetzRenyi_weighted_alphaCoshMajorant_le_support_of_concaveOn
     simp_rw [mul_one]
     rw [hweights_local]
   change
-    ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+    ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
       (hρpsd.isHermitian.eigenvalues j.1 *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j.1 i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j.1 i)) *
         alphaCoshMajorant (2 * β)
           (Real.sqrt
               (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) +
@@ -4446,21 +4348,21 @@ theorem conditionalPetzRenyi_weighted_alphaCoshMajorant_le_support_of_concaveOn
 /-- Support-indexed weighted remainder upper bound with scalar concavity as
 the only remaining analytic input. -/
 theorem conditionalPetzRenyi_weighted_remainder_le_support_of_concaveOn
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef) (β : ℝ) (hβ : 0 ≤ β)
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef) (β : ℝ) (hβ : 0 ≤ β)
     (hconc :
       ConcaveOn ℝ (Set.Ici (3 : ℝ))
         (fun x : ℝ => alphaCoshMajorant (2 * β) x)) :
-    let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    let hρpsd : ρ.m.PosSemidef := ρ.psd
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
-    ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
       (hρpsd.isHermitian.eigenvalues j.1 *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j.1 i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j.1 i)) *
         alphaRemainder β
           (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) ≤
       alphaCoshMajorant (2 * β)
@@ -4474,19 +4376,19 @@ theorem conditionalPetzRenyi_weighted_remainder_le_support_of_concaveOn
 /-- Support-indexed weighted remainder upper bound in the TCR small-parameter
 range `0 ≤ β ≤ 1/4`, with the scalar concavity prerequisite discharged. -/
 theorem conditionalPetzRenyi_weighted_remainder_le_support
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef) (β : ℝ)
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef) (β : ℝ)
     (hβ0 : 0 ≤ β) (hβquarter : β ≤ 1 / 4) :
-    let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    let hρpsd : ρ.m.PosSemidef := ρ.psd
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
-    ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
       (hρpsd.isHermitian.eigenvalues j.1 *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j.1 i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j.1 i)) *
         alphaRemainder β
           (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i) ≤
       alphaCoshMajorant (2 * β)
@@ -4499,19 +4401,19 @@ theorem conditionalPetzRenyi_weighted_remainder_le_support
 
 /-- Finite-AEP eta specialized to the canonical side reference `ρ_B`. -/
 def finiteAEPEta
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef) : ℝ :=
-  ρ.conditionalAlphaConvergenceParameter hρ ρ.marginalB hρB
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef) : ℝ :=
+  ρ.conditionalAlphaConvergenceParameter hρ ρ.traceLeft hρB
 
 /-- Arbitrary-state trace-term spelling of the canonical finite-AEP eta
 `Upsilon(A|B)_{rho|rho}`. -/
-def finiteAEPEtaTrace (ρ : State (Prod a b)) : ℝ :=
-  ρ.conditionalAlphaConvergenceParameterTrace ρ.marginalB
+def finiteAEPEtaTrace (ρ : MState (a × b)) : ℝ :=
+  ρ.conditionalAlphaConvergenceParameterTrace ρ.traceLeft
 
 /-- Compressing the conditioning register to the support of the canonical
 reference preserves the trace-term finite-AEP eta. -/
 theorem finiteAEPEtaTrace_conditioningSupportCompressedState
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     ρ.conditioningSupportCompressedState.finiteAEPEtaTrace = ρ.finiteAEPEtaTrace := by
   rw [finiteAEPEtaTrace, finiteAEPEtaTrace, conditionalAlphaConvergenceParameterTrace,
     conditionalAlphaConvergenceParameterTrace]
@@ -4524,18 +4426,18 @@ theorem finiteAEPEtaTrace_conditioningSupportCompressedState
 /-- The finite-AEP trace eta of a tensor power, stated through the exact Petz
 trace powers. -/
 theorem tensorPowerBipartite_finiteAEPEtaTrace_canonical_eq_pow_terms
-    (ρ : State (Prod a b)) (hρB : ρ.marginalB.matrix.PosDef) (n : ℕ) :
+    (ρ : MState (a × b)) (hρB : ρ.traceLeft.m.PosDef) (n : ℕ) :
     (ρ.tensorPowerBipartite n).finiteAEPEtaTrace =
-      (ρ.conditionalPetzRenyiTraceTerm ρ.marginalB (3 / 2)) ^ n +
-        (ρ.conditionalPetzRenyiTraceTerm ρ.marginalB (1 / 2)) ^ n + 1 := by
+      (ρ.conditionalPetzRenyiTraceTerm ρ.traceLeft (3 / 2)) ^ n +
+        (ρ.conditionalPetzRenyiTraceTerm ρ.traceLeft (1 / 2)) ^ n + 1 := by
   rw [finiteAEPEtaTrace,
     tensorPowerBipartite_conditionalAlphaConvergenceParameterTrace_canonical_eq_pow_terms
       (ρ := ρ) hρB n]
 
 /-- The arbitrary trace-term canonical finite-AEP eta is at least `1`. -/
-theorem one_le_finiteAEPEtaTrace (ρ : State (Prod a b)) :
+theorem one_le_finiteAEPEtaTrace (ρ : MState (a × b)) :
     1 ≤ ρ.finiteAEPEtaTrace :=
-  ρ.one_le_conditionalAlphaConvergenceParameterTrace ρ.marginalB
+  ρ.one_le_conditionalAlphaConvergenceParameterTrace ρ.traceLeft
 
 private theorem scalar_pow_terms_le_pow_sum
     {x y : ℝ} (hx : 0 ≤ x) (hy : 0 ≤ y) (n : ℕ) (hn : 0 < n) :
@@ -4594,24 +4496,24 @@ private theorem scalar_pow_terms_le_pow_sum
 /-- The tensor-power finite-AEP trace eta is bounded by the tensor power of
 the one-copy finite-AEP trace eta. -/
 theorem tensorPowerBipartite_finiteAEPEtaTrace_le_pow
-    (ρ : State (Prod a b)) (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρB : ρ.traceLeft.m.PosDef)
     (n : ℕ) (hn : 0 < n) :
     (ρ.tensorPowerBipartite n).finiteAEPEtaTrace ≤
       ρ.finiteAEPEtaTrace ^ n := by
   rw [tensorPowerBipartite_finiteAEPEtaTrace_canonical_eq_pow_terms
     (ρ := ρ) hρB n]
-  have h32 : 0 ≤ ρ.conditionalPetzRenyiTraceTerm ρ.marginalB (3 / 2) :=
-    ρ.conditionalPetzRenyiTraceTerm_nonneg ρ.marginalB (3 / 2)
-  have h12 : 0 ≤ ρ.conditionalPetzRenyiTraceTerm ρ.marginalB (1 / 2) :=
-    ρ.conditionalPetzRenyiTraceTerm_nonneg ρ.marginalB (1 / 2)
+  have h32 : 0 ≤ ρ.conditionalPetzRenyiTraceTerm ρ.traceLeft (3 / 2) :=
+    ρ.conditionalPetzRenyiTraceTerm_nonneg ρ.traceLeft (3 / 2)
+  have h12 : 0 ≤ ρ.conditionalPetzRenyiTraceTerm ρ.traceLeft (1 / 2) :=
+    ρ.conditionalPetzRenyiTraceTerm_nonneg ρ.traceLeft (1 / 2)
   simpa [finiteAEPEtaTrace, conditionalAlphaConvergenceParameterTrace] using
-    scalar_pow_terms_le_pow_sum (x := ρ.conditionalPetzRenyiTraceTerm ρ.marginalB (3 / 2))
-      (y := ρ.conditionalPetzRenyiTraceTerm ρ.marginalB (1 / 2)) h32 h12 n hn
+    scalar_pow_terms_le_pow_sum (x := ρ.conditionalPetzRenyiTraceTerm ρ.traceLeft (3 / 2))
+      (y := ρ.conditionalPetzRenyiTraceTerm ρ.traceLeft (1 / 2)) h32 h12 n hn
 
 /-- Base-two logarithmic form of the tensor-power finite-AEP trace eta
 subadditivity bound. -/
 theorem log2_tensorPowerBipartite_finiteAEPEtaTrace_le
-    (ρ : State (Prod a b)) (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρB : ρ.traceLeft.m.PosDef)
     (n : ℕ) (hn : 0 < n) :
     log2 ((ρ.tensorPowerBipartite n).finiteAEPEtaTrace) ≤
       (n : ℝ) * log2 ρ.finiteAEPEtaTrace := by
@@ -4639,17 +4541,17 @@ theorem log2_tensorPowerBipartite_finiteAEPEtaTrace_le
 
 @[simp]
 theorem finiteAEPEta_eq
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef) :
     ρ.finiteAEPEta hρ hρB =
-      ρ.conditionalAlphaConvergenceParameter hρ ρ.marginalB hρB :=
+      ρ.conditionalAlphaConvergenceParameter hρ ρ.traceLeft hρB :=
   rfl
 
 /-- The positive-definite finite-AEP eta agrees with the arbitrary trace-term
 spelling. -/
 theorem finiteAEPEta_eq_trace
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef) :
     ρ.finiteAEPEta hρ hρB = ρ.finiteAEPEtaTrace := by
   rw [finiteAEPEta_eq, finiteAEPEtaTrace,
     conditionalAlphaConvergenceParameter_eq_trace]
@@ -4659,8 +4561,8 @@ private theorem rpow_two_pos (x : ℝ) : 0 < Real.rpow 2 x :=
 
 /-- The TCR convergence parameter is strictly larger than `1`. -/
 theorem one_lt_conditionalAlphaConvergenceParameter
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) :
     1 < ρ.conditionalAlphaConvergenceParameter hρ σ hσ := by
   unfold conditionalAlphaConvergenceParameter
   have h₁ : 0 < Real.rpow 2
@@ -4677,29 +4579,29 @@ theorem one_lt_conditionalAlphaConvergenceParameter
 
 /-- The TCR convergence parameter is at least `1`. -/
 theorem one_le_conditionalAlphaConvergenceParameter
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) :
     1 ≤ ρ.conditionalAlphaConvergenceParameter hρ σ hσ :=
   le_of_lt (ρ.one_lt_conditionalAlphaConvergenceParameter hρ σ hσ)
 
 /-- The TCR convergence parameter is positive. -/
 theorem conditionalAlphaConvergenceParameter_pos
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) :
     0 < ρ.conditionalAlphaConvergenceParameter hρ σ hσ :=
   lt_trans zero_lt_one (ρ.one_lt_conditionalAlphaConvergenceParameter hρ σ hσ)
 
 /-- The natural logarithm of the TCR convergence parameter is positive. -/
 theorem log_conditionalAlphaConvergenceParameter_pos
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) :
     0 < Real.log (ρ.conditionalAlphaConvergenceParameter hρ σ hσ) :=
   Real.log_pos (ρ.one_lt_conditionalAlphaConvergenceParameter hρ σ hσ)
 
 /-- The base-two logarithm of the TCR convergence parameter is positive. -/
 theorem log2_conditionalAlphaConvergenceParameter_pos
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef) :
     0 < log2 (ρ.conditionalAlphaConvergenceParameter hρ σ hσ) := by
   unfold log2
   exact div_pos (ρ.log_conditionalAlphaConvergenceParameter_pos hρ σ hσ)
@@ -4766,8 +4668,8 @@ private theorem alpha_window_taylor_small
 /-- Positive-definite alpha-to-von-Neumann lower bound for the fixed-reference
 conditional Petz candidate in the TCR small-parameter window. -/
 theorem conditionalPetzRenyiEntropyCandidate_alpha_bound_posDef
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef)
     (α : ℝ)
     (hα_gt : 1 < α)
     (hα_lt :
@@ -4784,21 +4686,21 @@ theorem conditionalPetzRenyiEntropyCandidate_alpha_bound_posDef
   let η : ℝ := ρ.conditionalAlphaConvergenceParameter hρ σ hσ
   let H : ℝ := ρ.conditionalEntropyRelative hρ σ hσ
   let L : ℝ :=
-    ((ρ.matrix * psdLog ρ.matrix hρ).trace).re -
-      ((ρ.matrix *
+    ((ρ.m * psdLog ρ.m hρ).trace).re -
+      ((ρ.m *
         psdLog (identityTensorStateMatrix (a := a) σ)
           (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re
   let R : ℝ :=
-    let hρpsd : ρ.matrix.PosSemidef := hρ.posSemidef
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    let hρpsd : ρ.m.PosSemidef := hρ.posSemidef
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
     ∑ i, ∑ j,
       (hρpsd.isHermitian.eigenvalues j *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j i)) *
         alphaRemainder β
           (hρpsd.isHermitian.eigenvalues j / hτ.isHermitian.eigenvalues i)
   have hβ_pos : 0 < β := by
@@ -4869,10 +4771,10 @@ theorem conditionalPetzRenyiEntropyCandidate_alpha_bound_posDef
         -(1 / β) * log2 (ρ.conditionalPetzRenyiTraceTerm σ α) := by
     dsimp [conditionalPetzRenyiEntropyCandidate, conditionalPetzRenyiTraceTerm]
     change (1 / (1 - α)) *
-        log2 ((CFC.rpow ρ.matrix α *
+        log2 ((CFC.rpow ρ.m α *
           CFC.rpow (identityTensorStateMatrix (a := a) σ) (1 - α)).trace).re =
       -(1 / β) *
-        log2 ((CFC.rpow ρ.matrix α *
+        log2 ((CFC.rpow ρ.m α *
           CFC.rpow (identityTensorStateMatrix (a := a) σ) (1 - α)).trace).re
     have hone : 1 - α = -β := by
       dsimp [β]
@@ -4907,8 +4809,8 @@ theorem conditionalPetzRenyiEntropyCandidate_alpha_bound_posDef
 /-- Arbitrary-left, full-reference alpha-to-von-Neumann lower bound for the
 fixed-reference conditional Petz candidate in the TCR small-parameter window. -/
 theorem conditionalPetzRenyiEntropyCandidateFullReference_alpha_bound
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef)
     (α : ℝ)
     (hα_gt : 1 < α)
     (hα_lt :
@@ -4926,20 +4828,20 @@ theorem conditionalPetzRenyiEntropyCandidateFullReference_alpha_bound
   let H : ℝ := ρ.conditionalEntropyRelativeFullReference σ hσ
   let L : ℝ :=
     ρ.supportEntropyTraceTerm -
-      ((ρ.matrix *
+      ((ρ.m *
         psdLog (identityTensorStateMatrix (a := a) σ)
           (identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ)).trace).re
   let R : ℝ :=
-    let hρpsd : ρ.matrix.PosSemidef := ρ.pos
-    let τ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+    let hρpsd : ρ.m.PosSemidef := ρ.psd
+    let τ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
     let hτpos : τ.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
     let hτ : τ.PosSemidef := hτpos.posSemidef
-    let Uτ : Matrix.unitaryGroup (Prod a b) ℂ := hτ.isHermitian.eigenvectorUnitary
-    let Uρ : Matrix.unitaryGroup (Prod a b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
-    ∑ i, ∑ j : psdSupportIndex ρ.matrix hρpsd,
+    let Uτ : Matrix.unitaryGroup (a × b) ℂ := hτ.isHermitian.eigenvectorUnitary
+    let Uρ : Matrix.unitaryGroup (a × b) ℂ := hρpsd.isHermitian.eigenvectorUnitary
+    ∑ i, ∑ j : psdSupportIndex ρ.m hρpsd,
       (hρpsd.isHermitian.eigenvalues j.1 *
-        Complex.normSq ((star (Uρ : CMatrix (Prod a b)) *
-          (Uτ : CMatrix (Prod a b))) j.1 i)) *
+        Complex.normSq ((star (Uρ : CMatrix (a × b)) *
+          (Uτ : CMatrix (a × b))) j.1 i)) *
         alphaRemainder β
           (hρpsd.isHermitian.eigenvalues j.1 / hτ.isHermitian.eigenvalues i)
   have hβ_pos : 0 < β := by
@@ -5041,53 +4943,56 @@ theorem conditionalPetzRenyiEntropyCandidateFullReference_alpha_bound
 
 /-- The canonical finite-AEP eta is strictly larger than `1`. -/
 theorem one_lt_finiteAEPEta
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef) :
     1 < ρ.finiteAEPEta hρ hρB := by
   rw [finiteAEPEta_eq]
-  exact ρ.one_lt_conditionalAlphaConvergenceParameter hρ ρ.marginalB hρB
+  exact ρ.one_lt_conditionalAlphaConvergenceParameter hρ ρ.traceLeft hρB
 
 /-- The canonical finite-AEP eta is at least `1`. -/
 theorem one_le_finiteAEPEta
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef) :
     1 ≤ ρ.finiteAEPEta hρ hρB :=
   le_of_lt (ρ.one_lt_finiteAEPEta hρ hρB)
 
 /-- The canonical finite-AEP eta is at least `3`, the numerical lower bound
 used in the TCR alpha-window estimates. -/
 theorem three_le_finiteAEPEta
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef) :
     3 ≤ ρ.finiteAEPEta hρ hρB := by
   rw [finiteAEPEta_eq]
   exact conditionalAlphaConvergenceParameter_ge_three (ρ := ρ) hρ
-    (σ := ρ.marginalB) hρB
+    (σ := ρ.traceLeft) hρB
 
 /-- The canonical finite-AEP eta is positive. -/
 theorem finiteAEPEta_pos
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef) :
     0 < ρ.finiteAEPEta hρ hρB :=
   lt_trans zero_lt_one (ρ.one_lt_finiteAEPEta hρ hρB)
 
 /-- The natural logarithm of the canonical finite-AEP eta is positive. -/
 theorem log_finiteAEPEta_pos
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef) :
     0 < Real.log (ρ.finiteAEPEta hρ hρB) :=
   Real.log_pos (ρ.one_lt_finiteAEPEta hρ hρB)
 
 /-- The base-two logarithm of the canonical finite-AEP eta is positive. -/
 theorem log2_finiteAEPEta_pos
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef) :
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef) :
     0 < log2 (ρ.finiteAEPEta hρ hρB) := by
   unfold log2
   exact div_pos (ρ.log_finiteAEPEta_pos hρ hρB) (Real.log_pos one_lt_two)
 
-end State
+end MState
 
-end
+namespace QIT
+
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
 end QIT

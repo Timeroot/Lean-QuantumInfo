@@ -12,7 +12,7 @@ public import QuantumLib.QIT.Util.BlockMatrix
 /-!
 # Trace norm of block matrices
 
-State-layer specializations of the generic block-matrix algebra to positive
+MState-layer specializations of the generic block-matrix algebra to positive
 semidefinite square roots and the trace norm.
 -/
 
@@ -33,33 +33,33 @@ the block diagonal of the positive square roots. -/
 theorem fromBlocks_diagonal_psdSqrt [Fintype α] [DecidableEq α]
     [Fintype β] [DecidableEq β] {A : Matrix α α ℂ} {D : Matrix β β ℂ}
     (hA : A.PosSemidef) (hD : D.PosSemidef) :
-    QIT.psdSqrt (Matrix.fromBlocks A 0 0 D : Matrix (Sum α β) (Sum α β) ℂ) =
+    QIT.psdSqrt (Matrix.fromBlocks A 0 0 D : Matrix (α ⊕ β) (α ⊕ β) ℂ) =
       Matrix.fromBlocks (QIT.psdSqrt A) 0 0 (QIT.psdSqrt D) := by
   classical
-  let S : Matrix (Sum α β) (Sum α β) ℂ :=
+  let S : Matrix (α ⊕ β) (α ⊕ β) ℂ :=
     Matrix.fromBlocks (QIT.psdSqrt A) 0 0 (QIT.psdSqrt D)
   have hSpos : S.PosSemidef := by
     dsimp [S]
     exact fromBlocks_diagonal_posSemidef (QIT.psdSqrt_pos A) (QIT.psdSqrt_pos D)
-  have hSsq : S * S = (Matrix.fromBlocks A 0 0 D : Matrix (Sum α β) (Sum α β) ℂ) := by
+  have hSsq : S * S = (Matrix.fromBlocks A 0 0 D : Matrix (α ⊕ β) (α ⊕ β) ℂ) := by
     dsimp [S]
     rw [Matrix.fromBlocks_multiply]
     simp [QIT.psdSqrt_mul_self_of_posSemidef hA,
       QIT.psdSqrt_mul_self_of_posSemidef hD]
   simpa [QIT.psdSqrt, S] using
-    (CFC.sqrt_unique (a := (Matrix.fromBlocks A 0 0 D : Matrix (Sum α β) (Sum α β) ℂ))
+    (CFC.sqrt_unique (a := (Matrix.fromBlocks A 0 0 D : Matrix (α ⊕ β) (α ⊕ β) ℂ))
       (b := S) hSsq hSpos.nonneg)
 
 /-- The trace norm of a block-diagonal matrix is the sum of the trace norms of
 the diagonal blocks. -/
 theorem traceNorm_fromBlocks_diagonal [Fintype α] [DecidableEq α]
     [Fintype β] [DecidableEq β] (X : Matrix α α ℂ) (Y : Matrix β β ℂ) :
-    QIT.traceNorm (Matrix.fromBlocks X 0 0 Y : Matrix (Sum α β) (Sum α β) ℂ) =
+    QIT.traceNorm (Matrix.fromBlocks X 0 0 Y : Matrix (α ⊕ β) (α ⊕ β) ℂ) =
       QIT.traceNorm X + QIT.traceNorm Y := by
   classical
   have hgram :
-      (Matrix.fromBlocks X 0 0 Y : Matrix (Sum α β) (Sum α β) ℂ)ᴴ *
-          (Matrix.fromBlocks X 0 0 Y : Matrix (Sum α β) (Sum α β) ℂ) =
+      (Matrix.fromBlocks X 0 0 Y : Matrix (α ⊕ β) (α ⊕ β) ℂ)ᴴ *
+          (Matrix.fromBlocks X 0 0 Y : Matrix (α ⊕ β) (α ⊕ β) ℂ) =
         Matrix.fromBlocks (Xᴴ * X) 0 0 (Yᴴ * Y) := by
     rw [Matrix.fromBlocks_conjTranspose, Matrix.fromBlocks_multiply]
     simp

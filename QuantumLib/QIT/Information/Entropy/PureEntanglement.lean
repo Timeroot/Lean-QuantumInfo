@@ -27,34 +27,51 @@ universe u v
 
 noncomputable section
 
-namespace PureVector
+end
+end QIT
+
+namespace Ket
+
+noncomputable section
+
+open QIT
+universe u v
 
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a]
 variable [Fintype b] [DecidableEq b]
 
 /-- Entanglement entropy of a finite bipartite pure state. -/
-def entanglementEntropy (psi : PureVector (Prod a b)) : Real :=
-  psi.state.marginalB.vonNeumann
+def entanglementEntropy (psi : Ket (a × b)) : ℝ :=
+  psi.state.traceLeft.vonNeumann
 
 /-- Either marginal computes the entanglement entropy of a bipartite pure state. -/
-theorem entanglementEntropy_eq_marginalA (psi : PureVector (Prod a b)) :
-    psi.entanglementEntropy = psi.state.marginalA.vonNeumann := by
+theorem entanglementEntropy_eq_traceRight (psi : Ket (a × b)) :
+    psi.entanglementEntropy = psi.state.traceRight.vonNeumann := by
   rw [entanglementEntropy]
-  exact (State.pureVector_marginalA_vonNeumann_eq_marginalB psi).symm
+  exact (MState.ket_traceRight_vonNeumann_eq_traceLeft psi).symm
 
 /-- Swapping the two tensor factors does not change pure-state entanglement. -/
-theorem entanglementEntropy_reindex_prodComm (psi : PureVector (Prod a b)) :
+theorem entanglementEntropy_reindex_prodComm (psi : Ket (a × b)) :
     (psi.reindex (Equiv.prodComm a b)).entanglementEntropy = psi.entanglementEntropy := by
   have hswap :
-      (psi.reindex (Equiv.prodComm a b)).state.marginalB = psi.state.marginalA := by
-    apply State.ext
+      (psi.reindex (Equiv.prodComm a b)).state.traceLeft = psi.state.traceRight := by
+    apply MState.ext
+    rw [MState.traceLeft_m, MState.traceRight_m, Ket.state_matrix,
+      Ket.state_matrix]
     ext i j
     rfl
   rw [entanglementEntropy, entanglementEntropy, hswap]
-  exact State.pureVector_marginalA_vonNeumann_eq_marginalB psi
+  exact MState.ket_traceRight_vonNeumann_eq_traceLeft psi
 
-end PureVector
+end
+
+end Ket
+
+namespace QIT
+noncomputable section
+
+universe u v
 
 end
 

@@ -8,6 +8,35 @@ module
 
 public import QuantumLib.QIT.Coding.Classical.HSWDirect.Rates
 
+/-!
+# Reshaping HSW codes, and the bridge to a direct-coding witness
+
+A block code for `N^⊗k` used `t` times is not literally a code for `N` used `t * k` times, and a
+code of length `m` is not literally a code of length `m + r`; both are codes for a reindexed system.
+This module supplies the three reshapings the achievability argument performs, each as a
+`HSWClassicalCode` constructor together with the effect on the rate and on the maximal error:
+
+* `castLength`, transporting along an equality of block lengths, which changes neither;
+* `flattenBlock`, turning a length-`t` code for `N^⊗k` into a length-`t * k` code for `N` by
+  relabelling along `TensorPower.blockFlattenEquiv`, dividing the rate by `k`;
+* `padRight`, extending a length-`m` code to length `m + r` by appending a fixed tail state along
+  `TensorPower.appendEquiv`, scaling the rate by `m / (m + r)`.
+
+The error-preservation statements come in pairs.  The `_of_outputState` versions take the
+channel-output compatibility as a hypothesis and are pure decoding-probability bookkeeping; the
+plain versions discharge that hypothesis from the transport laws in
+`HSWDirect.TensorPower`.  Composing the last two gives
+`flattenBlock_padRight_rate_ge_of_ratio`, which is what converts exact-multiple block codes into
+codes at every sufficiently large length.
+
+The final section is a bridge rather than a construction: given a completed spectral
+packing-hypotheses bundle, an input-codeword lift, and a rate estimate,
+`HSWPackingHypothesesSpectral.toAverageErrorPackingWitness` assembles the average-error witness, and
+`exists_directCodingWitness_expurgated` expurgates it to a maximal-error one at the cost of `1 / n`
+in rate and a factor two in error.  No random coding, typicality estimate, or block-channel lift is
+hidden in either statement.
+-/
+
 @[expose] public section
 
 open scoped ComplexOrder MatrixOrder NNReal
@@ -23,7 +52,7 @@ namespace HSWClassicalCode
 variable {a : Type uIn} {b : Type uOut} {M : Type uMessage}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 variable [Fintype M] [DecidableEq M] [Nonempty M]
-variable {N : Channel a b} {t k : ℕ}
+variable {N : CPTPMap a b} {t k : ℕ}
 
 /-- Transport an HSW code across an equality of block lengths. -/
 def castLength {n n' : ℕ} (h : n = n') (C : HSWClassicalCode N n M) :
@@ -52,7 +81,7 @@ channel-action compatibility needed to preserve decoding probabilities. -/
 def flattenBlock (C : HSWClassicalCode (N.tensorPower k) t M) :
     HSWClassicalCode N (t * k) M where
   encoder m := (C.encoder m).reindex (TensorPower.blockFlattenEquiv a t k)
-  decoder := C.decoder.hswReindex (TensorPower.blockFlattenEquiv b t k)
+  decoder := C.decoder.reindex (TensorPower.blockFlattenEquiv b t k)
 
 /-- Exact-multiple block flattening divides the block-channel code rate by the
 inner block size `k`. -/
@@ -64,7 +93,7 @@ theorem flattenBlock_rate_eq_div (C : HSWClassicalCode (N.tensorPower k) t M)
   have htk_ne : t * k ≠ 0 := Nat.mul_ne_zero ht_ne hk_ne
   have ht_pos : (0 : ℝ) < t := by exact_mod_cast ht
   have hk_pos : (0 : ℝ) < k := by exact_mod_cast hk
-  unfold flattenBlock HSWClassicalCode.rate hswMessageRate
+  unfold flattenBlock HSWClassicalCode.rate messageRate
   rw [if_neg htk_ne, if_neg ht_ne]
   field_simp [ne_of_gt ht_pos, ne_of_gt hk_pos]
   rw [Nat.cast_mul]
@@ -95,7 +124,7 @@ theorem flattenBlock_successProbability_of_outputState
     C.flattenBlock.successProbability m = C.successProbability m := by
   unfold HSWClassicalCode.successProbability
   rw [houtput m]
-  exact POVM.hswReindex_prob_reindex_state C.decoder (C.outputState m)
+  exact POVM.prob_reindex_state C.decoder (C.outputState m)
     (TensorPower.blockFlattenEquiv b t k) m
 
 /-- Under the explicit output-state compatibility, exact-multiple block
@@ -119,7 +148,7 @@ theorem flattenBlock_outputState
     C.flattenBlock.outputState m =
       (C.outputState m).reindex (TensorPower.blockFlattenEquiv b t k) := by
   unfold HSWClassicalCode.outputState HSWClassicalCode.flattenBlock
-  exact Channel.tensorPower_blockFlatten_applyState N t k (C.encoder m)
+  exact CPTPOp.tensorPower_blockFlatten_applyState N t k (C.encoder m)
 
 /-- Exact-multiple block flattening preserves each message success probability. -/
 theorem flattenBlock_successProbability
@@ -138,46 +167,46 @@ theorem flattenBlock_maxErrorAtMost
 ignoring the tail output register.
 
 This is the code-level primitive needed to convert exact-multiple block codes
-into codes at arbitrary sufficiently large lengths.  The channel-output product
-identity for `N^{⊗ (m+r)}` is kept as an explicit proof obligation in the
-preservation theorems below. -/
+into codes at arbitrary sufficiently large lengths.  The preservation theorems
+below take the channel-output product identity for `N^{⊗ (m+r)}` as an explicit
+hypothesis. -/
 def padRight {m r : ℕ} (C : HSWClassicalCode N m M)
-    (tail : State (TensorPower a r)) : HSWClassicalCode N (m + r) M where
+    (tail : MState (TensorPower a r)) : HSWClassicalCode N (m + r) M where
   encoder msg :=
     ((C.encoder msg).prod tail).reindex (TensorPower.appendEquiv a m r)
   decoder :=
-    (C.decoder.hswTensorRightIdentity (TensorPower b r)).hswReindex
+    (C.decoder.tensorRightIdentity (TensorPower b r)).reindex
       (TensorPower.appendEquiv b m r)
 
 /-- Under the explicit product-output compatibility, right padding preserves
 each message success probability. -/
 theorem padRight_successProbability_of_outputState {m r : ℕ}
-    (C : HSWClassicalCode N m M) (tail : State (TensorPower a r))
+    (C : HSWClassicalCode N m M) (tail : MState (TensorPower a r))
     (houtput : ∀ msg : M,
       (C.padRight tail).outputState msg =
-        ((C.outputState msg).prod ((N.tensorPower r).applyState tail)).reindex
+        ((C.outputState msg).prod ((N.tensorPower r) tail)).reindex
           (TensorPower.appendEquiv b m r))
     (msg : M) :
     (C.padRight tail).successProbability msg = C.successProbability msg := by
   unfold HSWClassicalCode.successProbability
   rw [houtput msg]
   change
-    (((C.decoder.hswTensorRightIdentity (TensorPower b r)).hswReindex
+    (((C.decoder.tensorRightIdentity (TensorPower b r)).reindex
         (TensorPower.appendEquiv b m r)).prob
-      (((C.outputState msg).prod ((N.tensorPower r).applyState tail)).reindex
+      (((C.outputState msg).prod ((N.tensorPower r) tail)).reindex
         (TensorPower.appendEquiv b m r)) msg : ℝ) =
       (C.decoder.prob (C.outputState msg) msg : ℝ)
-  rw [POVM.hswReindex_prob_reindex_state]
-  exact POVM.hswTensorRightIdentity_prob_prod C.decoder (C.outputState msg)
-    ((N.tensorPower r).applyState tail) msg
+  rw [POVM.prob_reindex_state]
+  exact POVM.tensorRightIdentity_prob_prod C.decoder (C.outputState msg)
+    ((N.tensorPower r) tail) msg
 
 /-- Under the explicit product-output compatibility, right padding preserves
 maximal-error reliability. -/
 theorem padRight_maxErrorAtMost_of_outputState {m r : ℕ}
-    (C : HSWClassicalCode N m M) (tail : State (TensorPower a r)) {ε : ℝ}
+    (C : HSWClassicalCode N m M) (tail : MState (TensorPower a r)) {ε : ℝ}
     (houtput : ∀ msg : M,
       (C.padRight tail).outputState msg =
-        ((C.outputState msg).prod ((N.tensorPower r).applyState tail)).reindex
+        ((C.outputState msg).prod ((N.tensorPower r) tail)).reindex
           (TensorPower.appendEquiv b m r))
     (hC : C.maxErrorAtMost ε) :
     (C.padRight tail).maxErrorAtMost ε := by
@@ -189,22 +218,22 @@ theorem padRight_maxErrorAtMost_of_outputState {m r : ℕ}
 /-- Right padding has the expected product output under the tensor-power
 append transport. -/
 theorem padRight_outputState {m r : ℕ}
-    (C : HSWClassicalCode N m M) (tail : State (TensorPower a r)) (msg : M) :
+    (C : HSWClassicalCode N m M) (tail : MState (TensorPower a r)) (msg : M) :
     (C.padRight tail).outputState msg =
-      ((C.outputState msg).prod ((N.tensorPower r).applyState tail)).reindex
+      ((C.outputState msg).prod ((N.tensorPower r) tail)).reindex
         (TensorPower.appendEquiv b m r) := by
   unfold HSWClassicalCode.outputState HSWClassicalCode.padRight
-  exact Channel.tensorPower_append_applyState_prod N m r (C.encoder msg) tail
+  exact CPTPOp.tensorPower_append_applyState_prod N m r (C.encoder msg) tail
 
 /-- Right padding preserves each message success probability. -/
 theorem padRight_successProbability {m r : ℕ}
-    (C : HSWClassicalCode N m M) (tail : State (TensorPower a r)) (msg : M) :
+    (C : HSWClassicalCode N m M) (tail : MState (TensorPower a r)) (msg : M) :
     (C.padRight tail).successProbability msg = C.successProbability msg :=
   C.padRight_successProbability_of_outputState tail (C.padRight_outputState tail) msg
 
 /-- Right padding preserves maximal-error reliability. -/
 theorem padRight_maxErrorAtMost {m r : ℕ}
-    (C : HSWClassicalCode N m M) (tail : State (TensorPower a r)) {ε : ℝ}
+    (C : HSWClassicalCode N m M) (tail : MState (TensorPower a r)) {ε : ℝ}
     (hC : C.maxErrorAtMost ε) :
     (C.padRight tail).maxErrorAtMost ε :=
   C.padRight_maxErrorAtMost_of_outputState tail (C.padRight_outputState tail) hC
@@ -214,12 +243,12 @@ padding.  The hypothesis `hratio` is the explicit large-block arithmetic that
 absorbs the padding loss. -/
 theorem flattenBlock_padRight_rate_ge_of_ratio
     {r : ℕ} (C : HSWClassicalCode (N.tensorPower k) t M)
-    (tail : State (TensorPower a r)) {A B : ℝ} (ht : 0 < t) (hk : 0 < k)
+    (tail : MState (TensorPower a r)) {A B : ℝ} (ht : 0 < t) (hk : 0 < k)
     (hbase : A ≤ C.rate / (k : ℝ))
     (hratio : B ≤ A * (((t * k : ℕ) : ℝ) / ((t * k + r : ℕ) : ℝ))) :
     B ≤ (C.flattenBlock.padRight tail).rate := by
-  change B ≤ hswMessageRate M (t * k + r)
-  exact hswMessageRate.block_pad_ge_of_ratio (M := M) ht hk hbase hratio
+  change B ≤ messageRate M (t * k + r)
+  exact messageRate.block_pad_ge_of_ratio (M := M) ht hk hbase hratio
 
 end HSWClassicalCode
 
@@ -239,12 +268,12 @@ theorem toAverageErrorPackingWitness
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype ι] [DecidableEq ι] [Fintype 𝒳] [DecidableEq 𝒳]
     [Fintype M] [DecidableEq M] [Nonempty M]
-    (N : Channel a b) (E₀ : Ensemble ι a) {n : ℕ} {typicalitySlack rateSlack : ℝ}
-    {Eout : Ensemble 𝒳 (TensorPower b n)}
+    (N : CPTPMap a b) (E₀ : MEnsemble a ι) {n : ℕ} {typicalitySlack rateSlack : ℝ}
+    {Eout : MEnsemble (TensorPower b n) 𝒳}
     (H : HSWPackingHypothesesSpectral Eout typicalitySlack)
-    (φ : 𝒳 → State (TensorPower a n))
-    (houtput : ∀ x, (N.tensorPower n).applyState (φ x) = Eout.states x)
-    (hrate : hswMessageRate M n ≥ N.hswHolevoRate E₀ - rateSlack) :
+    (φ : 𝒳 → MState (TensorPower a n))
+    (houtput : ∀ x, (N.tensorPower n) (φ x) = Eout.states x)
+    (hrate : messageRate M n ≥ N.hswHolevoRate E₀ - rateSlack) :
     Nonempty
       (HSWAverageErrorPackingWitness N E₀ n rateSlack
         (2 * (H.ε + 2 * Real.sqrt H.ε) +
@@ -260,20 +289,20 @@ by operational achievability.
 
 The additional `1/n` rate slack and the factor-two error loss are exactly the
 average-to-maximal expurgation losses formalized in `HSW.lean`.  The positivity
-assumption on the displayed packing-error expression is not hidden: it is the
-side condition required by that expurgation step. -/
+assumption on the displayed packing-error expression is the side condition
+required by that expurgation step. -/
 theorem exists_directCodingWitness_expurgated
     {a : Type uIn} {b : Type uOut} {ι : Type uEnsemble}
     {𝒳 : Type uAux} {M : Type uMessage}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype ι] [DecidableEq ι] [Fintype 𝒳] [DecidableEq 𝒳]
     [Fintype M] [DecidableEq M] [Nonempty M]
-    (N : Channel a b) (E₀ : Ensemble ι a) {n : ℕ} {typicalitySlack rateSlack : ℝ}
-    {Eout : Ensemble 𝒳 (TensorPower b n)}
+    (N : CPTPMap a b) (E₀ : MEnsemble a ι) {n : ℕ} {typicalitySlack rateSlack : ℝ}
+    {Eout : MEnsemble (TensorPower b n) 𝒳}
     (H : HSWPackingHypothesesSpectral Eout typicalitySlack)
-    (φ : 𝒳 → State (TensorPower a n))
-    (houtput : ∀ x, (N.tensorPower n).applyState (φ x) = Eout.states x)
-    (hrate : hswMessageRate M n ≥ N.hswHolevoRate E₀ - rateSlack)
+    (φ : 𝒳 → MState (TensorPower a n))
+    (houtput : ∀ x, (N.tensorPower n) (φ x) = Eout.states x)
+    (hrate : messageRate M n ≥ N.hswHolevoRate E₀ - rateSlack)
     (hn : 0 < n)
     (hpackingError_pos :
       0 < 2 * (H.ε + 2 * Real.sqrt H.ε) +

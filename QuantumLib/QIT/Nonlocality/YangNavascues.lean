@@ -12,10 +12,10 @@ public import QuantumLib.QIT.Core.Pure
 public import Mathlib.LinearAlgebra.UnitaryGroup
 
 /-!
-# Yang-Navascues self-testing target scaffold
+# Yang-Navascues self-testing targets
 
-This module starts the Yang-Navascues sufficient-criterion route by recording
-the finite Schmidt-target convention from
+This module records the finite Schmidt-target convention of the
+Yang-Navascues sufficient criterion, from
 [ColadangeloGohScarani2016SelfTesting, all_pure_v2.tex:161-188].  The target
 pure state is represented as `sum_i c_i |ii>`, with positive finite Schmidt
 coefficients whose squared sum is one.
@@ -89,24 +89,23 @@ theorem trace_rankOne_eq_one (target : SchmidtTarget ι) :
     _ = 1 := by
           simp [target.coeff_sq_sum]
 
-/-- The Yang-Navascues diagonal target as a normalized pure vector. -/
-def pureVector (target : SchmidtTarget ι) : PureVector (ι × ι) where
-  amp := target.amp
-  trace_rankOne_eq_one := target.trace_rankOne_eq_one
+/-- The Yang-Navascues diagonal target as a normalized ket. -/
+def ket (target : SchmidtTarget ι) : Ket (ι × ι) :=
+  Ket.ofRankOne target.amp target.trace_rankOne_eq_one
 
 /-- The Yang-Navascues diagonal target as a density state. -/
-def state (target : SchmidtTarget ι) : State (ι × ι) :=
-  target.pureVector.state
+def state (target : SchmidtTarget ι) : MState (ι × ι) :=
+  target.ket.state
 
 @[simp]
-theorem pureVector_amp (target : SchmidtTarget ι) :
-    target.pureVector.amp = target.amp :=
+theorem ket_vec (target : SchmidtTarget ι) :
+    target.ket.vec = target.amp :=
   rfl
 
 @[simp]
 theorem state_matrix (target : SchmidtTarget ι) :
-    target.state.matrix = rankOneMatrix target.amp :=
-  rfl
+    target.state.m = rankOneMatrix target.amp :=
+  Ket.state_matrix _
 
 end SchmidtTarget
 
@@ -187,39 +186,39 @@ def transformedBobProjectionOp (k : ι) : CMatrix (HA × HB) :=
   data.unitaryOp k * data.bobProjectionOp k
 
 /-- Density matrix after applying an unnormalized linear operator. -/
-def postMatrix (_data : YNData ι HA HB) (rho : State (HA × HB)) (op : CMatrix (HA × HB)) :
+def postMatrix (_data : YNData ι HA HB) (rho : MState (HA × HB)) (op : CMatrix (HA × HB)) :
     CMatrix (HA × HB) :=
-  op * rho.matrix * Matrix.conjTranspose op
+  op * rho.m * Matrix.conjTranspose op
 
 /-- Density version of `P_A^(k)|psi>`. -/
-def projectionAgreementMatrix (rho : State (HA × HB)) (k : ι) : CMatrix (HA × HB) :=
+def projectionAgreementMatrix (rho : MState (HA × HB)) (k : ι) : CMatrix (HA × HB) :=
   data.postMatrix rho (data.aliceProjectionOp k)
 
 /-- Density version of `P_B^(k)|psi>`. -/
-def bobProjectionAgreementMatrix (rho : State (HA × HB)) (k : ι) : CMatrix (HA × HB) :=
+def bobProjectionAgreementMatrix (rho : MState (HA × HB)) (k : ι) : CMatrix (HA × HB) :=
   data.postMatrix rho (data.bobProjectionOp k)
 
 /-- The support projection of Bob's post-selected density matrix for outcome `k`. -/
-def bobProjectedSupport (rho : State (HA × HB)) (k : ι) : CMatrix (HA × HB) :=
+def bobProjectedSupport (rho : MState (HA × HB)) (k : ι) : CMatrix (HA × HB) :=
   Matrix.rangeProjection (data.bobProjectionAgreementMatrix rho k)
 
 /-- Density matrix after applying a Bob-local operator. -/
-def bobLocalPostMatrix (rho : State (HA × HB)) (Q : CMatrix HB) : CMatrix (HA × HB) :=
+def bobLocalPostMatrix (rho : MState (HA × HB)) (Q : CMatrix HB) : CMatrix (HA × HB) :=
   data.postMatrix rho (data.bobLocalOp Q)
 
 /--
 Two Bob-local operators have the same state-supported action on `rho` when
 their lifted post-selected density matrices agree.
 -/
-def BobLocalSamePostMatrix (rho : State (HA × HB)) (Q R : CMatrix HB) : Prop :=
+def BobLocalSamePostMatrix (rho : MState (HA × HB)) (Q R : CMatrix HB) : Prop :=
   data.bobLocalPostMatrix rho Q = data.bobLocalPostMatrix rho R
 
 /-- Density version of `X_A^(k) X_B^(k) P_B^(k)|psi>`. -/
-def unitaryCoefficientMatrix (rho : State (HA × HB)) (k : ι) : CMatrix (HA × HB) :=
+def unitaryCoefficientMatrix (rho : MState (HA × HB)) (k : ι) : CMatrix (HA × HB) :=
   data.postMatrix rho (data.transformedBobProjectionOp k)
 
 /-- Density version of `P_A^(0)|psi>`, using the target's distinguished base. -/
-def baseProjectionMatrix (rho : State (HA × HB)) : CMatrix (HA × HB) :=
+def baseProjectionMatrix (rho : MState (HA × HB)) : CMatrix (HA × HB) :=
   data.postMatrix rho (data.aliceProjectionOp data.target.base)
 
 @[simp]
@@ -270,33 +269,33 @@ theorem unitaryOp_isometry (k : ι) :
   rw [hA, hB, Matrix.one_kronecker_one]
 
 @[simp]
-theorem bobLocalPostMatrix_eq (rho : State (HA × HB)) (Q : CMatrix HB) :
+theorem bobLocalPostMatrix_eq (rho : MState (HA × HB)) (Q : CMatrix HB) :
     data.bobLocalPostMatrix rho Q = data.postMatrix rho (data.bobLocalOp Q) :=
   rfl
 
 @[simp]
 theorem bobProjectionAgreementMatrix_eq_bobLocalPostMatrix
-    (rho : State (HA × HB)) (k : ι) :
+    (rho : MState (HA × HB)) (k : ι) :
     data.bobProjectionAgreementMatrix rho k =
       data.bobLocalPostMatrix rho ((data.bobProjection k).matrix) :=
   rfl
 
 @[simp]
-theorem bobProjectedSupport_eq (rho : State (HA × HB)) (k : ι) :
+theorem bobProjectedSupport_eq (rho : MState (HA × HB)) (k : ι) :
     data.bobProjectedSupport rho k =
       Matrix.rangeProjection (data.bobProjectionAgreementMatrix rho k) :=
   rfl
 
-theorem bobLocalSamePostMatrix_refl (rho : State (HA × HB)) (Q : CMatrix HB) :
+theorem bobLocalSamePostMatrix_refl (rho : MState (HA × HB)) (Q : CMatrix HB) :
     data.BobLocalSamePostMatrix rho Q Q :=
   rfl
 
-theorem bobLocalSamePostMatrix_symm {rho : State (HA × HB)} {Q R : CMatrix HB}
+theorem bobLocalSamePostMatrix_symm {rho : MState (HA × HB)} {Q R : CMatrix HB}
     (h : data.BobLocalSamePostMatrix rho Q R) :
     data.BobLocalSamePostMatrix rho R Q :=
   h.symm
 
-theorem bobLocalSamePostMatrix_trans {rho : State (HA × HB)} {Q R S : CMatrix HB}
+theorem bobLocalSamePostMatrix_trans {rho : MState (HA × HB)} {Q R S : CMatrix HB}
     (hQR : data.BobLocalSamePostMatrix rho Q R)
     (hRS : data.BobLocalSamePostMatrix rho R S) :
     data.BobLocalSamePostMatrix rho Q S :=
@@ -305,10 +304,10 @@ theorem bobLocalSamePostMatrix_trans {rho : State (HA × HB)} {Q R S : CMatrix H
 /-- If two Bob-local lifted operators agree on the bipartite state support,
 then they produce the same Bob-local post-selected density matrix. -/
 theorem bobLocalSamePostMatrix_of_sameOnStateSupport
-    (rho : State (HA × HB)) (Q R : CMatrix HB)
-    (h : Matrix.sameOnStateSupport rho.matrix (data.bobLocalOp Q) (data.bobLocalOp R)) :
+    (rho : MState (HA × HB)) (Q R : CMatrix HB)
+    (h : Matrix.sameOnStateSupport rho.m (data.bobLocalOp Q) (data.bobLocalOp R)) :
     data.BobLocalSamePostMatrix rho Q R := by
-  exact Matrix.postMatrix_eq_of_sameOnStateSupport rho.pos.isHermitian h
+  exact Matrix.postMatrix_eq_of_sameOnStateSupport rho.psd.isHermitian h
 
 /-- Alice's lifted projective effect is Hermitian. -/
 theorem aliceProjectionOp_isHermitian (k : ι) :
@@ -347,72 +346,72 @@ theorem aliceProjectionOp_sum_eq_one :
   by_cases hhb : hb = hb'
   · subst hb'
     have hAlice := congrArg (fun M : CMatrix HA => M ha ha')
-      data.aliceProjection.sum_effects
+      data.aliceProjection.sum_eq_one
     simpa [aliceProjectionOp, Matrix.sum_apply, Matrix.kronecker,
       Matrix.one_apply] using hAlice
   · simp [aliceProjectionOp, Matrix.sum_apply, Matrix.kronecker, hhb]
 
 /-- Alice's lifted projection fixes its own post-selected density matrix. -/
 theorem projectionAgreementMatrix_fixed_by_aliceProjectionOp
-    (rho : State (HA × HB)) (k : ι) :
+    (rho : MState (HA × HB)) (k : ι) :
     data.aliceProjectionOp k * data.projectionAgreementMatrix rho k =
       data.projectionAgreementMatrix rho k := by
   unfold projectionAgreementMatrix postMatrix
   let A := data.aliceProjectionOp k
-  change A * (A * rho.matrix * Matrix.conjTranspose A) =
-    A * rho.matrix * Matrix.conjTranspose A
+  change A * (A * rho.m * Matrix.conjTranspose A) =
+    A * rho.m * Matrix.conjTranspose A
   calc
-    A * (A * rho.matrix * Matrix.conjTranspose A)
-        = (A * A) * rho.matrix * Matrix.conjTranspose A := by
-            rw [← Matrix.mul_assoc A (A * rho.matrix) (Matrix.conjTranspose A)]
-            rw [← Matrix.mul_assoc A A rho.matrix]
-    _ = A * rho.matrix * Matrix.conjTranspose A := by
+    A * (A * rho.m * Matrix.conjTranspose A)
+        = (A * A) * rho.m * Matrix.conjTranspose A := by
+            rw [← Matrix.mul_assoc A (A * rho.m) (Matrix.conjTranspose A)]
+            rw [← Matrix.mul_assoc A A rho.m]
+    _ = A * rho.m * Matrix.conjTranspose A := by
             rw [data.aliceProjectionOp_idempotent k]
 
 /-- The lifted Alice projective post-selections have total trace one. -/
-theorem projectionAgreementMatrix_trace_sum_eq_one (ψ : PureVector (HA × HB)) :
+theorem projectionAgreementMatrix_trace_sum_eq_one (ψ : Ket (HA × HB)) :
     ∑ k : ι, (data.projectionAgreementMatrix ψ.state k).trace = 1 := by
   have hterm :
       ∀ k : ι,
         (data.projectionAgreementMatrix ψ.state k).trace =
-          (ψ.state.matrix * data.aliceProjectionOp k).trace := by
+          (ψ.state.m * data.aliceProjectionOp k).trace := by
     intro k
     unfold projectionAgreementMatrix postMatrix
     let P := data.aliceProjectionOp k
     have hHerm : Matrix.conjTranspose P = P := data.aliceProjectionOp_isHermitian k
     have hIdem : P * P = P := data.aliceProjectionOp_idempotent k
     calc
-      (P * ψ.state.matrix * Matrix.conjTranspose P).trace =
-          (P * ψ.state.matrix * P).trace := by rw [hHerm]
-      _ = ((P * ψ.state.matrix) * P).trace := by rw [Matrix.mul_assoc]
-      _ = (P * (P * ψ.state.matrix)).trace := by rw [Matrix.trace_mul_comm]
-      _ = ((P * P) * ψ.state.matrix).trace := by rw [Matrix.mul_assoc]
-      _ = (P * ψ.state.matrix).trace := by rw [hIdem]
-      _ = (ψ.state.matrix * P).trace := by rw [Matrix.trace_mul_comm]
+      (P * ψ.state.m * Matrix.conjTranspose P).trace =
+          (P * ψ.state.m * P).trace := by rw [hHerm]
+      _ = ((P * ψ.state.m) * P).trace := by rw [Matrix.mul_assoc]
+      _ = (P * (P * ψ.state.m)).trace := by rw [Matrix.trace_mul_comm]
+      _ = ((P * P) * ψ.state.m).trace := by rw [Matrix.mul_assoc]
+      _ = (P * ψ.state.m).trace := by rw [hIdem]
+      _ = (ψ.state.m * P).trace := by rw [Matrix.trace_mul_comm]
   calc
     ∑ k : ι, (data.projectionAgreementMatrix ψ.state k).trace =
-        ∑ k : ι, (ψ.state.matrix * data.aliceProjectionOp k).trace := by
+        ∑ k : ι, (ψ.state.m * data.aliceProjectionOp k).trace := by
           exact Finset.sum_congr rfl (fun k _ => hterm k)
-    _ = (∑ k : ι, ψ.state.matrix * data.aliceProjectionOp k).trace := by
+    _ = (∑ k : ι, ψ.state.m * data.aliceProjectionOp k).trace := by
           rw [Matrix.trace_sum]
-    _ = (ψ.state.matrix * ∑ k : ι, data.aliceProjectionOp k).trace := by
+    _ = (ψ.state.m * ∑ k : ι, data.aliceProjectionOp k).trace := by
           congr 1
-          exact (Matrix.mul_sum Finset.univ data.aliceProjectionOp ψ.state.matrix).symm
-    _ = (ψ.state.matrix * 1).trace := by rw [data.aliceProjectionOp_sum_eq_one]
-    _ = 1 := by simpa [PureVector.state_matrix] using ψ.trace_rankOne_eq_one
+          exact (Matrix.mul_sum Finset.univ data.aliceProjectionOp ψ.state.m).symm
+    _ = (ψ.state.m * 1).trace := by rw [data.aliceProjectionOp_sum_eq_one]
+    _ = 1 := by simpa [Ket.state_matrix] using ψ.trace_rankOne_eq_one
 
 /-- The local unitary in the YN coefficient condition preserves post-selected trace. -/
 theorem unitaryCoefficientMatrix_trace_eq_bobProjectionAgreementMatrix_trace
-    (rho : State (HA × HB)) (k : ι) :
+    (rho : MState (HA × HB)) (k : ι) :
     (data.unitaryCoefficientMatrix rho k).trace =
       (data.bobProjectionAgreementMatrix rho k).trace := by
   unfold unitaryCoefficientMatrix bobProjectionAgreementMatrix transformedBobProjectionOp postMatrix
   let U := data.unitaryOp k
   let P := data.bobProjectionOp k
-  let A := P * rho.matrix * Matrix.conjTranspose P
+  let A := P * rho.m * Matrix.conjTranspose P
   have hU : Matrix.conjTranspose U * U = 1 := data.unitaryOp_isometry k
   calc
-    (U * P * rho.matrix * Matrix.conjTranspose (U * P)).trace =
+    (U * P * rho.m * Matrix.conjTranspose (U * P)).trace =
         (U * A * Matrix.conjTranspose U).trace := by
           rw [Matrix.conjTranspose_mul]
           congr 1
@@ -460,7 +459,7 @@ the same action on the state for the purposes of the YN construction.
 structure StateSupportedBobOrthogonalization {ι : Type u} {HA : Type v} {HB : Type w}
     [Fintype ι] [DecidableEq ι]
     [Fintype HA] [DecidableEq HA] [Fintype HB] [DecidableEq HB]
-    (data : YNData ι HA HB) (rho : State (HA × HB)) where
+    (data : YNData ι HA HB) (rho : MState (HA × HB)) where
   /-- Orthogonalized projection effects on the bipartite support space. -/
   effects : ι → CMatrix (HA × HB)
   /-- Each witness effect is Hermitian. -/
@@ -484,7 +483,7 @@ squared.
 def YNConditions {ι : Type u} {HA : Type v} {HB : Type w}
     [Fintype ι] [DecidableEq ι]
     [Fintype HA] [DecidableEq HA] [Fintype HB] [DecidableEq HB]
-    (data : YNData ι HA HB) (rho : State (HA × HB)) : Prop :=
+    (data : YNData ι HA HB) (rho : MState (HA × HB)) : Prop :=
   (∀ k : ι,
     data.projectionAgreementMatrix rho k =
       data.bobProjectionAgreementMatrix rho k) ∧
@@ -498,7 +497,7 @@ namespace YNConditions
 variable {ι : Type u} {HA : Type v} {HB : Type w}
 variable [Fintype ι] [DecidableEq ι]
 variable [Fintype HA] [DecidableEq HA] [Fintype HB] [DecidableEq HB]
-variable {data : YNData ι HA HB} {rho : State (HA × HB)}
+variable {data : YNData ι HA HB} {rho : MState (HA × HB)}
 
 /-- Extract the projection-agreement part of the YN conditions. -/
 theorem projectionAgreement (h : YNConditions data rho) (k : ι) :
@@ -543,7 +542,7 @@ theorem projectionAgreementMatrix_trace_eq_coeff_mul_base
 
 /-- For a pure YN witness, the base projection has trace `c_0^2`. -/
 theorem baseProjectionMatrix_trace_eq_coeff_base_sq
-    {ψ : PureVector (HA × HB)} (h : YNConditions data ψ.state) :
+    {ψ : Ket (HA × HB)} (h : YNConditions data ψ.state) :
     (data.baseProjectionMatrix ψ.state).trace =
       (((data.target.coeff data.target.base) ^ 2 : ℝ) : ℂ) := by
   let T : ℂ := (data.baseProjectionMatrix ψ.state).trace

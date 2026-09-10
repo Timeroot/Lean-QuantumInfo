@@ -19,7 +19,10 @@ Permutation-invariant states are approximated by mixtures of i.i.d. states
 (renner-2007-symmetry-independence, sub.tex:618 thm:main;
 christandl-koenig-renner-2008-postselection, .tex:291 thm:main).
 
-The full de Finetti/post-selection proof is intentionally not stated here.
-This module currently exposes only the route surface that imports the symmetric
-tensor-power support.
+The pieces live in the submodules: `DeFinetti.ProfilesMixtures` sets up the type
+profiles and the finite i.i.d. mixtures the approximation is measured against,
+`DeFinetti.Twirling` and `DeFinetti.RennerProjectors` supply the symmetry
+averaging and the symmetric-subspace projectors, and `DeFinetti.Domination` and
+`DeFinetti.Postselection` give the operator domination and post-selection
+bounds.  This module only re-exports them.
 -/

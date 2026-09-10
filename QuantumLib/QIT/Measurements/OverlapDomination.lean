@@ -9,6 +9,7 @@ module
 public import QuantumLib.QIT.Measurements.Overlap
 public import QuantumLib.QIT.States.Purification.PureGeometry
 public import QuantumLib.QIT.Util.Matrix
+public import QuantumLib.QIT.Util.MatrixInstances
 
 /-!
 # Overlap domination for two projective measurements
@@ -31,7 +32,7 @@ overlap-domination step and the substitution into `eq:ur-proof1`).
 @[expose] public section
 
 open scoped ComplexOrder MatrixOrder NNReal Kronecker
-open scoped Matrix.Norms.L2Operator
+open scoped Matrix.Norms.L2Operator QIT.MatrixL2
 
 open Matrix
 
@@ -47,14 +48,6 @@ variable [Fintype y] [DecidableEq y]
 variable [Fintype a] [DecidableEq a]
 variable [Fintype b] [DecidableEq b]
 variable (P : ProjectiveMeasurement x a) (Q : ProjectiveMeasurement y a)
-
-noncomputable local instance instCMatrixNonUnitalCStarAlgebraForOverlapDomination
-    (n : Type*) [Fintype n] [DecidableEq n] :
-    NonUnitalCStarAlgebra (Matrix n n ℂ) := ⟨⟩
-
-noncomputable local instance instCMatrixCStarAlgebraForOverlapDomination
-    (n : Type*) [Fintype n] [DecidableEq n] :
-    CStarAlgebra (Matrix n n ℂ) := ⟨⟩
 
 namespace ProjectiveMeasurement
 
@@ -124,7 +117,7 @@ omit [DecidableEq b] [DecidableEq y] in
 
 Under rank-one bridge hypotheses for `P` and `Q`, the trace weight
 `Tr(P_i Q_j)` equals the squared pure-state overlap
-`|⟨φ_i|ϑ_j⟩|²` (`PureVector.rankOneMatrix_mul_trace_re_eq_overlapSq`), giving the
+`|⟨φ_i|ϑ_j⟩|²` (`Ket.rankOneMatrix_mul_trace_re_eq_overlapSq`), giving the
 source-facing domination through `c = max_{i,j} |⟨φ_i|ϑ_j⟩|²`. -/
 theorem overlap_domination_le_rankOne (hP : P.IsRankOne) (hQ : Q.IsRankOne)
     (M : y → CMatrix b) (hM : ∀ j, (M j).PosSemidef) :
@@ -135,8 +128,8 @@ theorem overlap_domination_le_rankOne (hP : P.IsRankOne) (hQ : Q.IsRankOne)
   have hkey : ∀ i j,
       ((P.effects i * Q.effects j).trace).re = (hP.vector i).overlapSq (hQ.vector j) := by
     intro i j
-    rw [hP.effect_eq i, hQ.effect_eq j]
-    exact PureVector.rankOneMatrix_mul_trace_re_eq_overlapSq (hP.vector i) (hQ.vector j)
+    rw [hP.effect_eq i, hQ.effect_eq j, Ket.state_matrix, Ket.state_matrix]
+    exact Ket.rankOneMatrix_mul_trace_re_eq_overlapSq (hP.vector i) (hQ.vector j)
   simp only [← hkey]
   exact P.overlap_domination_le Q M hM
 

@@ -14,10 +14,12 @@ public import QuantumLib.QIT.Measurements.Projective
 public import QuantumLib.QIT.OneShot.CQGuessing
 
 /-!
-# cq/block algebra
+# Block algebra for cq states
 
-Responsibility layer of the sandwiched conditional Renyi classical-conditioning
-source route.
+The coordinate-`Y` projective measurement together with the states and
+ensembles it pinches, and the block-diagonality and positive-definiteness facts
+about a cq reference that the rest of the sandwiched conditional Renyi
+classical-conditioning route rests on.
 -/
 
 @[expose] public section
@@ -25,18 +27,16 @@ source route.
 open scoped ComplexOrder MatrixOrder NNReal Pointwise
 open Matrix
 
-namespace QIT
-
-universe u v w
-
 noncomputable section
-
+universe u v w
 variable {A : Type u} {B : Type v} {Y : Type w}
 variable [Fintype A] [DecidableEq A]
 variable [Fintype B] [DecidableEq B]
 variable [Fintype Y] [DecidableEq Y]
 
-namespace State
+open QIT
+
+namespace MState
 
 /-! ### Coordinate pinching of a classical register -/
 
@@ -147,10 +147,10 @@ def coordinateYProjectiveMeasurement :
     · simp [Matrix.sum_apply, Matrix.diagonal, hxx]
 
 theorem coordinateYProjectiveMeasurement_apply_cq
-    (E : Ensemble Y (A × B)) :
-    (coordinateYProjectiveMeasurement (A := A) (B := B) (Y := Y)).pinchingChannel.applyState
-        (State.cqConditioningState E) = State.cqConditioningState E := by
-  apply State.ext
+    (E : MEnsemble (A × B) Y) :
+    (coordinateYProjectiveMeasurement (A := A) (B := B) (Y := Y)).pinchingChannel
+        (MState.cqConditioningState E) = MState.cqConditioningState E := by
+  apply MState.ext
   rw [ProjectiveMeasurement.pinchingChannel_applyState_matrix,
     conditionalRenyiState_eq_rightBlockDiagonal E]
   ext x x'
@@ -170,11 +170,9 @@ theorem coordinateYProjectiveMeasurement_apply_cq
     simp [coordinateYProjectiveMeasurement, conditionalRenyiRightBlockDiagonal,
       Matrix.mul_apply, Matrix.diagonal, Matrix.sum_apply, hblock]
 
-/-! The same coordinate measurement on the public `B × Y` reference system.
-
-This is kept local to the source route so that the tensor identity used by the
-reference is visible in the pinching proof. -/
-
+/-- The coordinate measurement of the classical label on the `B × Y` conditioning system: the
+projective measurement whose `y`-th effect is diagonal with support on the coordinates whose second
+component is `y`. -/
 def coordinateYProjectiveMeasurementRight :
     ProjectiveMeasurement Y (B × Y) where
   effects := fun y =>
@@ -213,80 +211,87 @@ def coordinateYProjectiveMeasurementRight :
       simp [Matrix.sum_apply, Matrix.diagonal]
     · simp [Matrix.sum_apply, Matrix.diagonal, hxx]
 
-def coordinateYPinchedState (σ : State (B × Y)) : State (B × Y) :=
-  (coordinateYProjectiveMeasurementRight (B := B) (Y := Y)).pinchingChannel.applyState σ
+/-- A conditioning state pinched into its classical-label blocks by
+`coordinateYProjectiveMeasurementRight`.  Since the cq state is fixed by the pinching, data
+processing says the entropy against the pinched reference is no smaller, so the upward optimization
+may be restricted to block-diagonal references. -/
+def coordinateYPinchedState (σ : MState (B × Y)) : MState (B × Y) :=
+  (coordinateYProjectiveMeasurementRight (B := B) (Y := Y)).pinchingChannel σ
 
-private theorem coordinateYPinchedState_maximallyMixed_fixed
+private theorem coordinateYPinchedState_uniform_fixed
     [Nonempty (B × Y)] :
-    coordinateYPinchedState (State.maximallyMixed (B × Y)) =
-      State.maximallyMixed (B × Y) := by
-  apply State.ext
-  change (coordinateYProjectiveMeasurementRight (B := B) (Y := Y)).pinchingMap
-      (State.maximallyMixed (B × Y)).matrix = _
-  rw [State.maximallyMixed_matrix]
+    coordinateYPinchedState (MState.uniform : MState (B × Y)) =
+      (MState.uniform : MState (B × Y)) := by
+  apply MState.ext
+  rw [coordinateYPinchedState,
+    ProjectiveMeasurement.pinchingChannel_applyState_matrix_eq_pinchingMap,
+    MState.uniform_matrix]
   apply ProjectiveMeasurement.pinchingMap_eq_self_of_commute
   intro outcome
   simp
 
-theorem coordinateYPinchedState_regularized_maximallyMixed_fixed
+theorem coordinateYPinchedState_regularized_uniform_fixed
     [Nonempty (B × Y)]
-    (σ : State (B × Y)) (δ : ℝ) (hδ0 : 0 ≤ δ) (hδ1 : δ ≤ 1) :
+    (σ : MState (B × Y)) (δ : ℝ) (hδ0 : 0 ≤ δ) (hδ1 : δ ≤ 1) :
     coordinateYPinchedState
         (fullRankApproxState (coordinateYPinchedState σ)
-          (State.maximallyMixed (B × Y)) δ hδ0 hδ1) =
+          (MState.uniform : MState (B × Y)) δ hδ0 hδ1) =
       fullRankApproxState (coordinateYPinchedState σ)
-        (State.maximallyMixed (B × Y)) δ hδ0 hδ1 := by
-  apply State.ext
-  change (coordinateYProjectiveMeasurementRight (B := B) (Y := Y)).pinchingMap
-      (fullRankApproxState (coordinateYPinchedState σ)
-        (State.maximallyMixed (B × Y)) δ hδ0 hδ1).matrix = _
-  rw [fullRankApproxState_matrix]
+        (MState.uniform : MState (B × Y)) δ hδ0 hδ1 := by
+  apply MState.ext
+  rw [coordinateYPinchedState,
+    ProjectiveMeasurement.pinchingChannel_applyState_matrix_eq_pinchingMap,
+    fullRankApproxState_matrix]
   unfold fullRankApproxMatrix regularizedStateMatrix
   rw [map_add, map_smul, map_smul]
-  have hσ : (coordinateYPinchedState σ).matrix =
-      (coordinateYProjectiveMeasurementRight (B := B) (Y := Y)).pinchingMap σ.matrix := by
-    rfl
-  have hμ : (State.maximallyMixed (B × Y)).matrix =
+  have hσ : (coordinateYPinchedState σ).m =
+      (coordinateYProjectiveMeasurementRight (B := B) (Y := Y)).pinchingMap σ.m := by
+    rw [coordinateYPinchedState,
+      ProjectiveMeasurement.pinchingChannel_applyState_matrix_eq_pinchingMap]
+  have hμ : (MState.uniform : MState (B × Y)).m =
       (coordinateYProjectiveMeasurementRight (B := B) (Y := Y)).pinchingMap
-        (State.maximallyMixed (B × Y)).matrix := by
-    exact (congrArg State.matrix coordinateYPinchedState_maximallyMixed_fixed).symm
+        (MState.uniform : MState (B × Y)).m := by
+    have h := congrArg DensityOp.m
+      (coordinateYPinchedState_uniform_fixed (B := B) (Y := Y))
+    rw [coordinateYPinchedState,
+      ProjectiveMeasurement.pinchingChannel_applyState_matrix_eq_pinchingMap] at h
+    exact h.symm
   rw [hσ, ← hμ]
   rw [ProjectiveMeasurement.pinchingMap_idempotent]
 
-theorem coordinateYPinchedState_fixed (σ : State (B × Y)) :
+theorem coordinateYPinchedState_fixed (σ : MState (B × Y)) :
     coordinateYPinchedState (coordinateYPinchedState σ) =
       coordinateYPinchedState σ := by
-  apply State.ext
-  change (coordinateYProjectiveMeasurementRight (B := B) (Y := Y)).pinchingMap
-      ((coordinateYProjectiveMeasurementRight (B := B) (Y := Y)).pinchingMap σ.matrix) =
-        (coordinateYProjectiveMeasurementRight (B := B) (Y := Y)).pinchingMap σ.matrix
+  apply MState.ext
+  simp only [coordinateYPinchedState,
+    ProjectiveMeasurement.pinchingChannel_applyState_matrix_eq_pinchingMap]
   rw [ProjectiveMeasurement.pinchingMap_idempotent]
 
 /-- The source-coordinate ensemble of a reference after reindexing its
 classical coordinate to the first position.  This is the reference-side
-counterpart of the public input ensemble `E : Ensemble Y (A × B)`. -/
-def coordinateYPinchedEnsemble [Nonempty B] (σ : State (B × Y)) : Ensemble Y B :=
+counterpart of the public input ensemble `E : MEnsemble (A × B) Y`. -/
+def coordinateYPinchedEnsemble [Nonempty B] (σ : MState (B × Y)) : MEnsemble B Y :=
   (σ.reindex (Equiv.prodComm B Y)).sourceCoordinatePinchEnsemble
 
 theorem coordinateYPinchedEnsemble_cqState_reindex [Nonempty B]
-    (σ : State (B × Y)) :
+    (σ : MState (B × Y)) :
     (coordinateYPinchedEnsemble (B := B) (Y := Y) σ).cqState.reindex
         (Equiv.prodComm Y B) = coordinateYPinchedState σ := by
   classical
-  apply State.ext
-  rw [State.reindex_matrix, coordinateYPinchedState,
+  apply MState.ext
+  rw [MState.reindex_matrix, coordinateYPinchedState,
     ProjectiveMeasurement.pinchingChannel_applyState_matrix]
   have hsource := sourceCoordinatePinchEnsemble_cqState_toSubnormalized
     (ρ := σ.reindex (Equiv.prodComm B Y))
   have hsource_matrix := congrArg SubnormalizedState.matrix hsource
-  rw [State.toSubnormalized_matrix,
+  rw [MState.toSubnormalized_matrix,
     SubnormalizedState.sourceCoordinatePinch_matrix_eq_blockDiagonal] at hsource_matrix
   rw [Classical.cqState_eq_blockDiagonal] at hsource_matrix
   have hcq :
-      (coordinateYPinchedEnsemble (B := B) (Y := Y) σ).cqState.matrix =
+      (coordinateYPinchedEnsemble (B := B) (Y := Y) σ).cqState.m =
         Classical.blockDiagonal (fun x =>
           ((coordinateYPinchedEnsemble (B := B) (Y := Y) σ).probs x : ℂ) •
-            ((coordinateYPinchedEnsemble (B := B) (Y := Y) σ).states x).matrix) := by
+            ((coordinateYPinchedEnsemble (B := B) (Y := Y) σ).states x).m) := by
     exact Classical.cqState_eq_blockDiagonal
       (coordinateYPinchedEnsemble (B := B) (Y := Y) σ)
   rw [hcq]
@@ -295,22 +300,22 @@ theorem coordinateYPinchedEnsemble_cqState_reindex [Nonempty B]
   · subst y'
     change Classical.block (Classical.blockDiagonal (fun x =>
       ((coordinateYPinchedEnsemble (B := B) (Y := Y) σ).probs x : ℂ) •
-        ((coordinateYPinchedEnsemble (B := B) (Y := Y) σ).states x).matrix))
+        ((coordinateYPinchedEnsemble (B := B) (Y := Y) σ).states x).m))
         y y b b' = _
     rw [Classical.blockDiagonal_block_self]
     have hblock := congrFun (congrFun hsource_matrix (y, b)) (y, b')
     simp [Classical.blockDiagonal, Matrix.sum_apply, Matrix.single_apply,
-      State.toSubnormalized_matrix] at hblock
+      MState.toSubnormalized_matrix] at hblock
     have hpinch :
-        Classical.block (σ.reindex (Equiv.prodComm B Y)).matrix y y b b' =
+        Classical.block (σ.m.submatrix Prod.swap Prod.swap) y y b b' =
           (∑ c, (coordinateYProjectiveMeasurementRight (B := B) (Y := Y)).effects c *
-            σ.matrix * (coordinateYProjectiveMeasurementRight (B := B) (Y := Y)).effects c)
+            σ.m * (coordinateYProjectiveMeasurementRight (B := B) (Y := Y)).effects c)
             (b, y) (b', y) := by
-      change σ.matrix (b, y) (b', y) = _
+      change σ.m (b, y) (b', y) = _
       rw [Matrix.sum_apply]
-      show σ.matrix (b, y) (b', y) =
+      show σ.m (b, y) (b', y) =
         ∑ c, ((coordinateYProjectiveMeasurementRight (B := B) (Y := Y)).effects c *
-          σ.matrix * (coordinateYProjectiveMeasurementRight (B := B) (Y := Y)).effects c)
+          σ.m * (coordinateYProjectiveMeasurementRight (B := B) (Y := Y)).effects c)
           (b, y) (b', y)
       rw [Finset.sum_eq_single y]
       · simp [coordinateYProjectiveMeasurementRight, Matrix.mul_apply,
@@ -320,11 +325,11 @@ theorem coordinateYPinchedEnsemble_cqState_reindex [Nonempty B]
         simp [coordinateYProjectiveMeasurementRight, Matrix.mul_apply,
           Matrix.diagonal, hyc]
       · simp
-    simpa [coordinateYPinchedEnsemble, State.reindex_matrix,
+    simpa [coordinateYPinchedEnsemble, MState.reindex_matrix,
       Matrix.submatrix] using hblock.trans hpinch
   · change Classical.block (Classical.blockDiagonal (fun x =>
       ((coordinateYPinchedEnsemble (B := B) (Y := Y) σ).probs x : ℂ) •
-        ((coordinateYPinchedEnsemble (B := B) (Y := Y) σ).states x).matrix))
+        ((coordinateYPinchedEnsemble (B := B) (Y := Y) σ).states x).m))
         y y' b b' = _
     rw [Classical.blockDiagonal_block_ne _ hyy]
     change (0 : ℂ) = _
@@ -338,25 +343,25 @@ theorem coordinateYPinchedEnsemble_cqState_reindex [Nonempty B]
     exact (hyy (hy.trans hy'.symm)).elim
 
 theorem coordinateYPinchedFullRankPath_posDef
-    [Nonempty B] (σ : State (B × Y)) {δ : ℝ}
+    [Nonempty B] (σ : MState (B × Y)) {δ : ℝ}
     (hδ : δ ∈ Set.Ioo (0 : ℝ) 1) :
     ((coordinateYPinchedEnsemble (B := B) (Y := Y)
       (fullRankApproxMaximallyMixedStatePath
         (coordinateYPinchedState σ) δ)).cqState.reindex
-          (Equiv.prodComm Y B)).matrix.PosDef := by
+          (Equiv.prodComm Y B)).m.PosDef := by
   let : Nonempty Y := by
     rcases σ.nonempty with ⟨⟨b, y⟩⟩
     exact ⟨y⟩
   rw [coordinateYPinchedEnsemble_cqState_reindex]
   rw [fullRankApproxMaximallyMixedStatePath, fullRankApproxStatePath,
     dif_pos hδ]
-  rw [coordinateYPinchedState_regularized_maximallyMixed_fixed]
+  rw [coordinateYPinchedState_regularized_uniform_fixed]
   exact fullRankApproxState_posDef_of_noise
-    (coordinateYPinchedState σ) (State.maximallyMixed (B × Y))
-    State.maximallyMixed_posDef hδ.1.le hδ.2.le hδ.1
+    (coordinateYPinchedState σ) (MState.uniform : MState (B × Y))
+    MState.uniform_posDef hδ.1.le hδ.2.le hδ.1
 
 theorem identityTensorStateMatrix_coordinateYPinching
-    (σ : State (B × Y)) :
+    (σ : MState (B × Y)) :
     (coordinateYProjectiveMeasurement (A := A) (B := B) (Y := Y)).pinchingChannel.map
         (identityTensorStateMatrix (a := A) σ) =
       identityTensorStateMatrix (a := A)
@@ -364,7 +369,7 @@ theorem identityTensorStateMatrix_coordinateYPinching
   rw [ProjectiveMeasurement.pinchingChannel_map]
   rw [coordinateYPinchedState]
   change _ = Matrix.kronecker (1 : CMatrix A)
-    (((coordinateYProjectiveMeasurementRight (B := B) (Y := Y)).pinchingChannel).applyState σ).matrix
+    (((coordinateYProjectiveMeasurementRight (B := B) (Y := Y)).pinchingChannel) σ).m
   rw [ProjectiveMeasurement.pinchingChannel_applyState_matrix]
   ext ⟨a, b, y⟩ ⟨a', b', y'⟩
   by_cases haa : a = a'
@@ -385,26 +390,26 @@ theorem identityTensorStateMatrix_coordinateYPinching
       Matrix.diagonal, Matrix.sum_apply, haa]
 
 theorem conditionalSandwichedRenyiUp_candidate_le_of_coordinateYPinching
-    (E : Ensemble Y (A × B)) (σ : State (B × Y)) (α : ℝ)
+    (E : MEnsemble (A × B) Y) (σ : MState (B × Y)) (α : ℝ)
     (hα : 1 / 2 ≤ α) (hα_ne_one : α ≠ 1) :
     -sandwichedRenyiPSDReferenceE
-        (State.cqConditioningState E)
+        (MState.cqConditioningState E)
         (identityTensorStateMatrix (a := A) σ)
-        (identityTensorStateMatrix_posSemidef_of_state (a := A) σ) α ≤
+        (identityTensorStateMatrix_posSemidef (a := A) σ) α ≤
       -sandwichedRenyiPSDReferenceE
-        (State.cqConditioningState E)
+        (MState.cqConditioningState E)
         (identityTensorStateMatrix (a := A)
           (coordinateYPinchedState σ))
-        (identityTensorStateMatrix_posSemidef_of_state (a := A)
+        (identityTensorStateMatrix_posSemidef (a := A)
           (coordinateYPinchedState σ)) α := by
   have hα_range : (1 / 2 ≤ α ∧ α < 1) ∨ 1 < α := by
     rcases lt_or_gt_of_ne hα_ne_one with hlt | hgt
     · exact Or.inl ⟨hα, hlt⟩
     · exact Or.inr hgt
   let P := coordinateYProjectiveMeasurement (A := A) (B := B) (Y := Y)
-  let Φ : Channel (A × (B × Y)) (A × (B × Y)) := P.pinchingChannel
-  have hρfix : Φ.applyState (State.cqConditioningState E) =
-      State.cqConditioningState E := by
+  let Φ : CPTPMap (A × (B × Y)) (A × (B × Y)) := P.pinchingChannel
+  have hρfix : Φ (MState.cqConditioningState E) =
+      MState.cqConditioningState E := by
     exact coordinateYProjectiveMeasurement_apply_cq E
   have hσmap : Φ.map (identityTensorStateMatrix (a := A) σ) =
       identityTensorStateMatrix (a := A)
@@ -412,73 +417,27 @@ theorem conditionalSandwichedRenyiUp_candidate_le_of_coordinateYPinching
     exact identityTensorStateMatrix_coordinateYPinching σ
   have hDPI :=
     sandwichedRenyiPSDReferenceE_dataProcessing_channel_ge_of_half_le_lt_one_or_one_lt
-      (State.cqConditioningState E)
-      (identityTensorStateMatrix_posSemidef_of_state (a := A) σ)
+      (MState.cqConditioningState E)
+      (identityTensorStateMatrix_posSemidef (a := A) σ)
       Φ α hα_range
   have hDPI' :
       sandwichedRenyiPSDReferenceE
-          (State.cqConditioningState E)
+          (MState.cqConditioningState E)
           (identityTensorStateMatrix (a := A) σ)
-          (identityTensorStateMatrix_posSemidef_of_state (a := A) σ) α ≥
+          (identityTensorStateMatrix_posSemidef (a := A) σ) α ≥
         sandwichedRenyiPSDReferenceE
-          (State.cqConditioningState E)
+          (MState.cqConditioningState E)
           (identityTensorStateMatrix (a := A) (coordinateYPinchedState σ))
-          (identityTensorStateMatrix_posSemidef_of_state (a := A)
+          (identityTensorStateMatrix_posSemidef (a := A)
             (coordinateYPinchedState σ)) α := by
     simpa only [hρfix, hσmap] using hDPI
   exact EReal.neg_le_neg_iff.mpr hDPI'
 
 /-! ### The source `Q` decomposition -/
 
-/-! The reference used by the down-arrow has the same right-block structure as
-the cq input.  We keep the proof entrywise so that a zero probability is
-handled as a zero block before any power or logarithm is introduced. -/
-
-theorem sandwiched_conditionalReference_blockDiagonal
-    (E : Ensemble Y (A × B)) :
-    identityTensorStateMatrix (a := A) (State.cqConditioningState E).marginalB =
-      conditionalRenyiRightBlockDiagonal (fun y =>
-        (E.probs y : ℂ) • identityTensorStateMatrix (a := A)
-          (E.states y).marginalB) := by
-  rw [Ensemble.conditionalRenyiState_marginalB_eq_conditionalMarginalBYState]
-  ext ⟨a, b, y⟩ ⟨a', b', y'⟩
-  by_cases hyy : y = y'
-  · subst y'
-    simp [conditionalRenyiRightBlockDiagonal, identityTensorStateMatrix,
-      Ensemble.conditionalMarginalBYState, Ensemble.conditionalMarginalB,
-      Ensemble.cqState_matrix, State.reindex_matrix, Matrix.kronecker,
-      Matrix.kroneckerMap_apply, State.classicalConditioningEquiv_symm_apply,
-      partialTraceA, Matrix.sum_apply]
-    simp only [Matrix.one_apply]
-    rw [Finset.sum_eq_single_of_mem y (Finset.mem_univ y)]
-    · conv_rhs =>
-        unfold Classical.blockDiagonal
-        rw [Matrix.sum_apply]
-        rw [Finset.sum_eq_single_of_mem y (Finset.mem_univ y) (by
-          intro z _ hzy
-          simp [hzy])]
-      simp [Matrix.kronecker,
-        Matrix.kroneckerMap_apply, partialTraceA]
-      by_cases haa : a = a'
-      · subst a'
-        rw [NNReal.smul_def]
-        simp [Complex.real_smul]
-      · simp [haa]
-    · intro z _ hzy
-      simp [hzy]
-  · have hxy : ∀ x : Y, ¬(x = y ∧ x = y') := by
-      intro x h
-      exact hyy (h.1.symm.trans h.2)
-    simp [conditionalRenyiRightBlockDiagonal, identityTensorStateMatrix,
-      Ensemble.conditionalMarginalBYState, Ensemble.conditionalMarginalB,
-      Ensemble.cqState_matrix, State.reindex_matrix,
-      Matrix.kronecker, Matrix.kroneckerMap_apply,
-      State.classicalConditioningEquiv_symm_apply, partialTraceA,
-      Matrix.sum_apply, Classical.blockDiagonal, hxy]
-
 omit [Fintype A] in
 theorem sandwiched_reference_cq_blockDiagonal
-    (F : Ensemble Y B) :
+    (F : MEnsemble B Y) :
     identityTensorStateMatrix (a := A)
         (F.cqState.reindex (Equiv.prodComm Y B)) =
       conditionalRenyiRightBlockDiagonal (fun y =>
@@ -489,27 +448,24 @@ theorem sandwiched_reference_cq_blockDiagonal
     by_cases hyy : y = y'
     · subst y'
       simp [conditionalRenyiRightBlockDiagonal, identityTensorStateMatrix,
-        Ensemble.cqState_matrix, State.reindex_matrix, Matrix.kronecker,
+        MEnsemble.cqState_matrix, MState.reindex_matrix, Matrix.kronecker,
         Matrix.kroneckerMap_apply, Matrix.sum_apply,
         Classical.blockDiagonal, Matrix.single_apply]
       rw [NNReal.smul_def]
       simp
     · simp [conditionalRenyiRightBlockDiagonal, identityTensorStateMatrix,
-        Ensemble.cqState_matrix, State.reindex_matrix, Matrix.kronecker,
+        MEnsemble.cqState_matrix, MState.reindex_matrix, Matrix.kronecker,
         Matrix.kroneckerMap_apply, Matrix.sum_apply,
         Classical.blockDiagonal, Matrix.single_apply]
       apply Finset.sum_congr rfl
       intro x hx
       simp [NNReal.smul_def]
   · simp [conditionalRenyiRightBlockDiagonal, identityTensorStateMatrix,
-      Ensemble.cqState_matrix, State.reindex_matrix, Matrix.kronecker,
+      MEnsemble.cqState_matrix, MState.reindex_matrix, Matrix.kronecker,
       Matrix.kroneckerMap_apply, Matrix.sum_apply,
       Classical.blockDiagonal, Matrix.single_apply, haa]
 
-/-! A positive-definite cq reference has positive-definite weighted blocks.
-This is the finite-dimensional principal-submatrix fact needed before the
-source full-rank candidate can be applied branch by branch. -/
-
+/-- A block diagonal matrix with positive definite blocks is positive definite. -/
 theorem classical_blockDiagonal_posDef
     {ι D : Type*} [Fintype ι] [DecidableEq ι]
     [Fintype D] [DecidableEq D]
@@ -581,62 +537,62 @@ theorem classical_blockDiagonal_posDef
   exact hdiag
 
 theorem sandwiched_reference_cq_block_posDef
-    (F : Ensemble Y B)
-    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).matrix.PosDef)
+    (F : MEnsemble B Y)
+    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).m.PosDef)
     (y : Y) :
-    ((F.probs y : ℂ) • (F.states y).matrix).PosDef := by
+    ((F.probs y : ℂ) • (F.states y).m).PosDef := by
   have hinj : Function.Injective (fun b : B => (b, y)) := by
     intro b b' h
     exact congrArg Prod.fst h
   have hsub := hF.submatrix hinj
   have heq :
-      (F.cqState.reindex (Equiv.prodComm Y B)).matrix.submatrix
+      (F.cqState.reindex (Equiv.prodComm Y B)).m.submatrix
           (fun b : B => (b, y)) (fun b : B => (b, y)) =
-        (F.probs y : ℂ) • (F.states y).matrix := by
+        (F.probs y : ℂ) • (F.states y).m := by
     ext b b'
-    simp [State.reindex, Ensemble.cqState_matrix, Matrix.kronecker,
+    simp [MEnsemble.cqState_matrix, Matrix.kronecker,
       Matrix.kroneckerMap_apply, Matrix.submatrix, Matrix.sum_apply,
       Matrix.single_apply, smul_eq_mul, NNReal.smul_def, Complex.real_smul]
   rw [← heq]
   exact hsub
 
 theorem sandwiched_reference_cq_posDef_of_positive
-    (F : Ensemble Y B) (hprob : ∀ y, 0 < F.probs y)
-    (hstate : ∀ y, (F.states y).matrix.PosDef) :
-    (F.cqState.reindex (Equiv.prodComm Y B)).matrix.PosDef := by
+    (F : MEnsemble B Y) (hprob : ∀ y, 0 < F.probs y)
+    (hstate : ∀ y, (F.states y).m.PosDef) :
+    (F.cqState.reindex (Equiv.prodComm Y B)).m.PosDef := by
   have hblocks : ∀ y,
-      ((F.probs y : ℂ) • (F.states y).matrix).PosDef := by
+      ((F.probs y : ℂ) • (F.states y).m).PosDef := by
     intro y
     exact (hstate y).smul (by exact_mod_cast hprob y)
   have hbd := classical_blockDiagonal_posDef
-    (fun y => (F.probs y : ℂ) • (F.states y).matrix) hblocks
-  have hcq : F.cqState.matrix.PosDef := by
+    (fun y => (F.probs y : ℂ) • (F.states y).m) hblocks
+  have hcq : F.cqState.m.PosDef := by
     rw [Classical.cqState_eq_blockDiagonal]
     exact hbd
-  exact State.reindex_posDef_of_posDef F.cqState hcq (Equiv.prodComm Y B)
+  exact MState.reindex_posDef F.cqState (Equiv.prodComm Y B) hcq
 
 theorem sandwiched_reference_cq_prob_pos
-    (F : Ensemble Y B)
-    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).matrix.PosDef)
+    (F : MEnsemble B Y)
+    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).m.PosDef)
     (y : Y) :
     0 < F.probs y := by
   let : Nonempty B := (F.states y).nonempty
   have hblock := sandwiched_reference_cq_block_posDef F hF y
   have htrace := Matrix.PosDef.trace_pos hblock
-  have htrace_re : 0 < (((F.probs y : ℂ) • (F.states y).matrix).trace).re := by
+  have htrace_re : 0 < (((F.probs y : ℂ) • (F.states y).m).trace).re := by
     exact (Complex.pos_iff.mp htrace).1
-  have hstate_trace : ((F.states y).matrix.trace).re = 1 := by
-    rw [(F.states y).trace_eq_one]
+  have hstate_trace : ((F.states y).m.trace).re = 1 := by
+    rw [(F.states y).tr']
     norm_num
   have htrace_re' : 0 < (F.probs y : ℝ) * 1 := by
     simpa [Matrix.trace_smul, Complex.real_smul, hstate_trace] using htrace_re
   exact_mod_cast (by simpa using htrace_re' : 0 < (F.probs y : ℝ))
 
 theorem sandwiched_reference_cq_state_posDef
-    (F : Ensemble Y B)
-    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).matrix.PosDef)
+    (F : MEnsemble B Y)
+    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).m.PosDef)
     (y : Y) :
-    (F.states y).matrix.PosDef := by
+    (F.states y).m.PosDef := by
   let : Nonempty B := (F.states y).nonempty
   have hqNN : 0 < F.probs y := sandwiched_reference_cq_prob_pos F hF y
   have hq : 0 < (F.probs y : ℝ) := by exact_mod_cast hqNN
@@ -645,7 +601,7 @@ theorem sandwiched_reference_cq_state_posDef
   have hinv : 0 < ((F.probs y : ℂ)⁻¹) := inv_pos.mpr hqC
   have hscaled := hblock.smul hinv
   change (((F.probs y : ℂ)⁻¹) •
-    ((F.probs y : ℂ) • (F.states y).matrix)).PosDef at hscaled
+    ((F.probs y : ℂ) • (F.states y).m)).PosDef at hscaled
   simpa only [smul_smul, inv_mul_cancel₀ hqC.ne', one_smul] using hscaled
 
 /-- The sandwich exponent used by the matrix-level sandwiched `Q` functional. -/
@@ -659,229 +615,9 @@ theorem sandwichedConditioningExponent_nonneg {α : ℝ}
   exact div_nonneg (sub_nonneg.mpr hα_lt_one)
     (mul_nonneg (by norm_num) (le_of_lt hα_pos))
 
-private theorem matrixBlockDiagonal_rpow
-    (blocks : Y → CMatrix (A × B))
-    (hblocks : ∀ y, (blocks y).PosSemidef) (s : ℝ) :
-    CFC.rpow (Matrix.blockDiagonal blocks) s =
-      Matrix.blockDiagonal (fun y => CFC.rpow (blocks y) s) := by
-  classical
-  let U : Y → Matrix.unitaryGroup (A × B) ℂ := fun y =>
-    (hblocks y).isHermitian.eigenvectorUnitary
-  let d : Y → (A × B) → ℝ := fun y =>
-    (hblocks y).isHermitian.eigenvalues
-  have hd : ∀ y i, 0 ≤ d y i := by
-    intro y i
-    exact (hblocks y).eigenvalues_nonneg i
-  have hspec : ∀ y, blocks y =
-      (U y : CMatrix (A × B)) *
-          Matrix.diagonal (fun i => (d y i : ℂ)) *
-        star (U y : CMatrix (A × B)) := by
-    intro y
-    simpa [U, d, Unitary.conjStarAlgAut_apply, Matrix.mul_assoc,
-      Function.comp_def] using (hblocks y).isHermitian.spectral_theorem
-  let Ubig : Matrix.unitaryGroup ((A × B) × Y) ℂ :=
-    ⟨Matrix.blockDiagonal (fun y => (U y : CMatrix (A × B))), by
-      rw [Matrix.mem_unitaryGroup_iff']
-      change Matrix.conjTranspose (Matrix.blockDiagonal
-        (fun y => (U y : CMatrix (A × B)))) *
-          Matrix.blockDiagonal (fun y => (U y : CMatrix (A × B))) = 1
-      rw [Matrix.blockDiagonal_conjTranspose]
-      rw [← Matrix.blockDiagonal_mul
-        (fun y => Matrix.conjTranspose (U y : CMatrix (A × B)))
-        (fun y => (U y : CMatrix (A × B)))]
-      have hpoint : (fun y => Matrix.conjTranspose (U y : CMatrix (A × B)) *
-          (U y : CMatrix (A × B))) =
-          (1 : Y → CMatrix (A × B)) := by
-        funext y
-        simpa [Matrix.star_eq_conjTranspose] using
-          (Unitary.coe_star_mul_self (U y))
-      rw [hpoint, Matrix.blockDiagonal_one]⟩
-  let dBig : ((A × B) × Y) → ℝ := fun iy => d iy.2 iy.1
-  have hD :
-      Matrix.blockDiagonal (fun y =>
-          Matrix.diagonal (fun i => (d y i : ℂ))) =
-        Matrix.diagonal (fun iy => (dBig iy : ℂ)) := by
-    simp [dBig]
-  have hconj :
-      Matrix.blockDiagonal blocks =
-        (Ubig : CMatrix ((A × B) × Y)) *
-            Matrix.diagonal (fun iy => (dBig iy : ℂ)) *
-          star (Ubig : CMatrix ((A × B) × Y)) := by
-    calc
-      Matrix.blockDiagonal blocks = Matrix.blockDiagonal (fun y =>
-          (U y : CMatrix (A × B)) *
-              Matrix.diagonal (fun i => (d y i : ℂ)) *
-            star (U y : CMatrix (A × B))) := by
-          congr 1
-          funext y
-          exact hspec y
-      _ = Matrix.blockDiagonal (fun y => (U y : CMatrix (A × B))) *
-          Matrix.blockDiagonal (fun y =>
-            Matrix.diagonal (fun i => (d y i : ℂ))) *
-          star (Matrix.blockDiagonal (fun y => (U y : CMatrix (A × B)))) := by
-            rw [show star (Matrix.blockDiagonal (fun y =>
-              (U y : CMatrix (A × B)))) =
-                Matrix.blockDiagonal (fun y => star (U y : CMatrix (A × B))) by
-              change Matrix.conjTranspose (Matrix.blockDiagonal
-                (fun y => (U y : CMatrix (A × B)))) = _
-              exact Matrix.blockDiagonal_conjTranspose _]
-            rw [← Matrix.blockDiagonal_mul, ← Matrix.blockDiagonal_mul]
-      _ = (Ubig : CMatrix ((A × B) × Y)) *
-            Matrix.diagonal (fun iy => (dBig iy : ℂ)) *
-          star (Ubig : CMatrix ((A × B) × Y)) := by
-            rw [hD]
-  have hpow : ∀ y, CFC.rpow (blocks y) s =
-      (U y : CMatrix (A × B)) *
-          Matrix.diagonal (fun i => (((d y i) ^ s : ℝ) : ℂ)) *
-        star (U y : CMatrix (A × B)) := by
-    intro y
-    rw [hspec y]
-    exact cMatrix_rpow_unitary_conj_diagonal_ofReal
-      (U y) (d y) (hd y) s
-  have hDpow :
-      Matrix.blockDiagonal (fun y =>
-          Matrix.diagonal (fun i => (((d y i) ^ s : ℝ) : ℂ))) =
-        Matrix.diagonal (fun iy => (((dBig iy) ^ s : ℝ) : ℂ)) := by
-    simp [dBig]
-  have hconjpow :
-      Matrix.blockDiagonal (fun y => CFC.rpow (blocks y) s) =
-        (Ubig : CMatrix ((A × B) × Y)) *
-            Matrix.diagonal (fun iy => (((dBig iy) ^ s : ℝ) : ℂ)) *
-          star (Ubig : CMatrix ((A × B) × Y)) := by
-    calc
-      Matrix.blockDiagonal (fun y => CFC.rpow (blocks y) s) =
-          Matrix.blockDiagonal (fun y =>
-            (U y : CMatrix (A × B)) *
-                Matrix.diagonal (fun i => (((d y i) ^ s : ℝ) : ℂ)) *
-              star (U y : CMatrix (A × B))) := by
-            congr 1
-            funext y
-            exact hpow y
-      _ = Matrix.blockDiagonal (fun y => (U y : CMatrix (A × B))) *
-          Matrix.blockDiagonal (fun y =>
-            Matrix.diagonal (fun i => (((d y i) ^ s : ℝ) : ℂ))) *
-          star (Matrix.blockDiagonal (fun y => (U y : CMatrix (A × B)))) := by
-            rw [show star (Matrix.blockDiagonal (fun y =>
-              (U y : CMatrix (A × B)))) =
-                Matrix.blockDiagonal (fun y => star (U y : CMatrix (A × B))) by
-              change Matrix.conjTranspose (Matrix.blockDiagonal
-                (fun y => (U y : CMatrix (A × B)))) = _
-              exact Matrix.blockDiagonal_conjTranspose _]
-            rw [← Matrix.blockDiagonal_mul, ← Matrix.blockDiagonal_mul]
-      _ = (Ubig : CMatrix ((A × B) × Y)) *
-            Matrix.diagonal (fun iy => (((dBig iy) ^ s : ℝ) : ℂ)) *
-          star (Ubig : CMatrix ((A × B) × Y)) := by
-            rw [hDpow]
-  rw [hconj]
-  exact (cMatrix_rpow_unitary_conj_diagonal_ofReal Ubig dBig
-    (fun iy => hd iy.2 iy.1) s).trans hconjpow.symm
-
-private theorem matrixBlockDiagonal_rpow_nonneg
-    (blocks : Y → CMatrix (A × B))
-    (hblocks : ∀ y, (blocks y).PosSemidef) {s : ℝ} (_hs : 0 ≤ s) :
-    CFC.rpow (Matrix.blockDiagonal blocks) s =
-      Matrix.blockDiagonal (fun y => CFC.rpow (blocks y) s) :=
-  matrixBlockDiagonal_rpow blocks hblocks s
-
-private theorem conditionalRightBlockDiagonal_rpow_nonneg
-    (blocks : Y → CMatrix (A × B))
-    (hblocks : ∀ y, (blocks y).PosSemidef) {s : ℝ} (hs : 0 ≤ s) :
-    CFC.rpow (conditionalRenyiRightBlockDiagonal blocks) s =
-      conditionalRenyiRightBlockDiagonal (fun y => CFC.rpow (blocks y) s) := by
-  let e : (A × B) × Y ≃ Y × (A × B) := Equiv.prodComm (A × B) Y
-  have hblock :
-      (Matrix.blockDiagonal blocks).submatrix e.symm e.symm =
-        Classical.blockDiagonal blocks := by
-    simpa [e] using conditionalRenyi_blockDiagonal_reindex blocks
-  have hmath_pos : (Matrix.blockDiagonal blocks).PosSemidef := by
-    have hclassical := Classical.blockDiagonal_posSemidef blocks hblocks
-    have hreindexed := hclassical.submatrix e
-    rw [← hblock] at hreindexed
-    simpa using hreindexed
-  have hclassical_rpow :
-      CFC.rpow (Classical.blockDiagonal blocks) s =
-        Classical.blockDiagonal (fun y => CFC.rpow (blocks y) s) := by
-    calc
-      CFC.rpow (Classical.blockDiagonal blocks) s =
-          CFC.rpow ((Matrix.blockDiagonal blocks).submatrix e.symm e.symm) s := by
-            rw [hblock]
-      _ = (CFC.rpow (Matrix.blockDiagonal blocks) s).submatrix e.symm e.symm :=
-        conditionalRenyi_rpow_reindex_nonneg
-          (Matrix.blockDiagonal blocks) hmath_pos e.symm hs
-      _ = (Matrix.blockDiagonal (fun y => CFC.rpow (blocks y) s)).submatrix
-          e.symm e.symm := by
-            rw [matrixBlockDiagonal_rpow_nonneg blocks hblocks hs]
-      _ = Classical.blockDiagonal (fun y => CFC.rpow (blocks y) s) :=
-        conditionalRenyi_blockDiagonal_reindex
-          (fun y => CFC.rpow (blocks y) s)
-  rw [conditionalRenyiRightBlockDiagonal_rpow_reindex_nonneg
-    blocks hblocks hs, hclassical_rpow]
-  rfl
-
-theorem sandwichedRenyiQ_fixedReference_blockDiagonal_lowAlpha
-    (rho sigma : Y → CMatrix (A × B))
-    (hrho : ∀ y, (rho y).PosSemidef)
-    (hsigma : ∀ y, (sigma y).PosSemidef)
-    {α : ℝ} (hα_half : 1 / 2 ≤ α) (hα_lt_one : α < 1) :
-    sandwichedRenyiQ (conditionalRenyiRightBlockDiagonal rho)
-        (conditionalRenyiRightBlockDiagonal sigma)
-        (conditionalRenyiRightBlockDiagonal_posSemidef rho hrho)
-        (conditionalRenyiRightBlockDiagonal_posSemidef sigma hsigma) α =
-      ∑ y, sandwichedRenyiQ (rho y) (sigma y) (hrho y) (hsigma y) α := by
-  have hα_pos : 0 < α := by linarith
-  have hα_nonneg : 0 ≤ α := le_of_lt hα_pos
-  have hs_nonneg : 0 ≤ sandwichedConditioningExponent α :=
-    sandwichedConditioningExponent_nonneg hα_pos (le_of_lt hα_lt_one)
-  have hinner : ∀ y,
-      (CFC.rpow (sigma y) (sandwichedConditioningExponent α) *
-        rho y * CFC.rpow (sigma y) (sandwichedConditioningExponent α)).PosSemidef := by
-    intro y
-    simpa [sandwichedRenyiQInner, sandwichedConditioningExponent] using
-      (sandwichedRenyiQInner_posSemidef (hrho y) (hsigma y) α)
-  have hinner_power : ∀ y,
-      (CFC.rpow (CFC.rpow (sigma y) (sandwichedConditioningExponent α) *
-        rho y * CFC.rpow (sigma y) (sandwichedConditioningExponent α)) α).PosSemidef := by
-    intro y
-    exact cMatrix_rpow_posSemidef (A :=
-      CFC.rpow (sigma y) (sandwichedConditioningExponent α) *
-        rho y * CFC.rpow (sigma y) (sandwichedConditioningExponent α))
-      (s := α) (hinner y)
-  have hglobal_inner :
-      CFC.rpow
-          (CFC.rpow (conditionalRenyiRightBlockDiagonal sigma)
-              (sandwichedConditioningExponent α) *
-            conditionalRenyiRightBlockDiagonal rho *
-            CFC.rpow (conditionalRenyiRightBlockDiagonal sigma)
-              (sandwichedConditioningExponent α)) α =
-        conditionalRenyiRightBlockDiagonal (fun y =>
-          CFC.rpow (CFC.rpow (sigma y) (sandwichedConditioningExponent α) *
-            rho y * CFC.rpow (sigma y) (sandwichedConditioningExponent α)) α) := by
-    rw [conditionalRightBlockDiagonal_rpow_nonneg sigma hsigma hs_nonneg]
-    rw [conditionalRenyiRightBlockDiagonal_mul,
-      conditionalRenyiRightBlockDiagonal_mul]
-    rw [conditionalRightBlockDiagonal_rpow_nonneg
-      (fun y => CFC.rpow (sigma y) (sandwichedConditioningExponent α) *
-        rho y * CFC.rpow (sigma y) (sandwichedConditioningExponent α))
-      hinner hα_nonneg]
-  dsimp [sandwichedRenyiQ]
-  change
-    (CFC.rpow
-        (CFC.rpow (conditionalRenyiRightBlockDiagonal sigma)
-            (sandwichedConditioningExponent α) *
-          conditionalRenyiRightBlockDiagonal rho *
-          CFC.rpow (conditionalRenyiRightBlockDiagonal sigma)
-            (sandwichedConditioningExponent α)) α).trace.re =
-      ∑ y, (CFC.rpow
-        (CFC.rpow (sigma y) (sandwichedConditioningExponent α) *
-          rho y * CFC.rpow (sigma y) (sandwichedConditioningExponent α)) α).trace.re
-  rw [hglobal_inner, conditionalRenyiRightBlockDiagonal_trace]
-  rw [Complex.re_sum]
-
-/-! The same block calculation is valid on the high-order branch.  The only
-extra point is that the sandwich exponent may be negative; the shared
-support-aware power theorem is used throughout, so a zero block is never
-turned into an informal `0 * infinity` expression. -/
-
+/-- The sandwiched trace `Q_α` of two block diagonal matrices is the sum of the blockwise traces,
+at every positive order.  The sandwich exponent may be negative, so the support-aware power theorem
+is used throughout. -/
 theorem sandwichedRenyiQ_fixedReference_blockDiagonal
     (rho sigma : Y → CMatrix (A × B))
     (hrho : ∀ y, (rho y).PosSemidef)
@@ -939,11 +675,8 @@ theorem sandwichedRenyiQ_fixedReference_blockDiagonal
   rw [hglobal_inner, conditionalRenyiRightBlockDiagonal_trace]
   rw [Complex.re_sum]
 
-/-! Scaling both arguments by the same classical weight produces exactly one
-copy of that weight.  This is the sandwiched analogue of the scalar step in
-`eq:qc-div`; proving it at matrix level also covers a zero-probability block
-without forming a logarithm. -/
-
+/-- Scaling both arguments of `Q_α` by the same nonnegative weight produces exactly one copy of
+that weight: `Q_α(p ρ ‖ p σ) = p Q_α(ρ ‖ σ)`, for `0 < α < 1`. -/
 theorem sandwichedQ_real_smul_both
     {X : Type*} [Fintype X] [DecidableEq X]
     (M N : CMatrix X) (hM : M.PosSemidef) (hN : N.PosSemidef)
@@ -1028,12 +761,8 @@ theorem sandwichedQ_real_smul_both
     rw [hfactor]
     simp [Complex.mul_re, Complex.ofReal_re, Complex.ofReal_im]
 
-/-! The upward block calculation needs independent weights on the state and
-reference blocks.  This is the matrix form of
-`Q_alpha(p rho || q sigma) = p^alpha q^(1-alpha) Q_alpha(rho || sigma)`.
-The zero cases are discharged before any logarithm or negative power is
-introduced. -/
-
+/-- Independent nonnegative weights on the two arguments of `Q_α` factor out as
+`Q_α(p ρ ‖ q σ) = p ^ α * q ^ (1 - α) * Q_α(ρ ‖ σ)`. -/
 theorem sandwichedQ_real_smul_left_right
     {X : Type*} [Fintype X] [DecidableEq X]
     (M N : CMatrix X) (hM : M.PosSemidef) (hN : N.PosSemidef)
@@ -1136,9 +865,4 @@ theorem sandwichedQ_real_smul_left_right
       dsimp [s, sandwichedConditioningExponent]
       simp
 
-
-end State
-
-end
-
-end QIT
+end MState

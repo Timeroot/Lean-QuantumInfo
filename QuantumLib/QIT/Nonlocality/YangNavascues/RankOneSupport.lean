@@ -50,12 +50,12 @@ theorem bobAmplitudeMatrix_apply (φ : HA × HB → ℂ) (b : HB) (a : HA) :
 omit [DecidableEq HA] [Fintype HB] [DecidableEq HB] in
 /-- Tracing out Alice from a rank-one bipartite vector gives the Bob-side
 amplitude Gram matrix. -/
-theorem partialTraceA_rankOneMatrix_eq_bobAmplitudeMatrix_mul_conjTranspose
+theorem traceLeft_rankOneMatrix_eq_bobAmplitudeMatrix_mul_conjTranspose
     (φ : HA × HB → ℂ) :
-    partialTraceA (a := HA) (b := HB) (rankOneMatrix φ) =
+    Matrix.traceLeft (rankOneMatrix φ) =
       bobAmplitudeMatrix φ * Matrix.conjTranspose (bobAmplitudeMatrix φ) := by
   ext b b'
-  simp [partialTraceA, rankOneMatrix_apply, bobAmplitudeMatrix, Matrix.mul_apply]
+  simp [Matrix.traceLeft, rankOneMatrix_apply, bobAmplitudeMatrix, Matrix.mul_apply]
 
 omit [DecidableEq HB] in
 /-- Applying a Bob-local operator corresponds to left multiplication of the
@@ -83,9 +83,8 @@ theorem kronecker_one_mulVec_apply
 orthogonal projection, then the orthogonal projection onto `range (P ∘ T)`
 sends `T x` to `P (T x)`. -/
 theorem starProjection_range_comp_projection_apply
-    {E F : Type*} [NormedAddCommGroup E] [InnerProductSpace ℂ E] [CompleteSpace E]
-    [NormedAddCommGroup F] [InnerProductSpace ℂ F] [CompleteSpace F]
-    [FiniteDimensional ℂ F]
+    {E F : Type*} [NormedAddCommGroup E] [InnerProductSpace ℂ E]
+    [NormedAddCommGroup F] [InnerProductSpace ℂ F] [FiniteDimensional ℂ F]
     (T : E →ₗ[ℂ] F) (P : F →ₗ[ℂ] F)
     (hPsym : P.IsSymmetric) (hPid : P.comp P = P) (x : E) :
     (LinearMap.range (P.comp T)).starProjection (T x) = P (T x) := by
@@ -139,19 +138,19 @@ theorem rangeProjection_amplitudeGram_mulVec
 
 /-- Generic rank-one bridge: the Bob-local lift of the reduced support of a
 rank-one bipartite vector fixes that vector. -/
-theorem kronecker_rangeProjection_partialTraceA_rankOne_mulVec
+theorem kronecker_rangeProjection_traceLeft_rankOne_mulVec
     (φ : HA × HB → ℂ) :
     (Matrix.kronecker (1 : CMatrix HA)
-      (Matrix.rangeProjection (partialTraceA (a := HA) (b := HB) (rankOneMatrix φ)))).mulVec φ =
+      (Matrix.rangeProjection (Matrix.traceLeft (rankOneMatrix φ)))).mulVec φ =
         φ := by
   let A := bobAmplitudeMatrix φ
   have hM :
-      partialTraceA (a := HA) (b := HB) (rankOneMatrix φ) =
+      Matrix.traceLeft (rankOneMatrix φ) =
         A * Matrix.conjTranspose A := by
-    rw [partialTraceA_rankOneMatrix_eq_bobAmplitudeMatrix_mul_conjTranspose]
+    rw [traceLeft_rankOneMatrix_eq_bobAmplitudeMatrix_mul_conjTranspose]
   change
     (Matrix.kronecker (1 : CMatrix HA)
-      (Matrix.rangeProjection (partialTraceA (a := HA) (b := HB) (rankOneMatrix φ)))).mulVec φ =
+      (Matrix.rangeProjection (Matrix.traceLeft (rankOneMatrix φ)))).mulVec φ =
         φ
   rw [hM]
   funext x
@@ -221,27 +220,27 @@ theorem rangeProjection_projection_amplitudeGram_mulVec
 /-- Rank-one support bridge: for a Bob-local projection `P`, the support of
 the reduced Bob state of `(1 ⊗ P)φ` acts on the original bipartite vector
 exactly as `(1 ⊗ P)` does. -/
-theorem kronecker_rangeProjection_partialTraceA_rankOne_projection_mulVec
+theorem kronecker_rangeProjection_traceLeft_rankOne_projection_mulVec
     (P : CMatrix HB) (hPherm : P.IsHermitian) (hPid : P * P = P)
     (φ : HA × HB → ℂ) :
     (Matrix.kronecker (1 : CMatrix HA)
       (Matrix.rangeProjection
-        (partialTraceA (a := HA) (b := HB)
+        (Matrix.traceLeft
           (rankOneMatrix ((Matrix.kronecker (1 : CMatrix HA) P).mulVec φ))))).mulVec φ =
       (Matrix.kronecker (1 : CMatrix HA) P).mulVec φ := by
   let A := bobAmplitudeMatrix φ
   have hAmp :=
     bobAmplitudeMatrix_kronecker_mulVec (HA := HA) (HB := HB) P φ
   have hM :
-      partialTraceA (a := HA) (b := HB)
+      Matrix.traceLeft
           (rankOneMatrix ((Matrix.kronecker (1 : CMatrix HA) P).mulVec φ)) =
         (P * A) * Matrix.conjTranspose (P * A) := by
-    rw [partialTraceA_rankOneMatrix_eq_bobAmplitudeMatrix_mul_conjTranspose]
+    rw [traceLeft_rankOneMatrix_eq_bobAmplitudeMatrix_mul_conjTranspose]
     rw [hAmp]
   change
     (Matrix.kronecker (1 : CMatrix HA)
       (Matrix.rangeProjection
-        (partialTraceA (a := HA) (b := HB)
+        (Matrix.traceLeft
           (rankOneMatrix ((Matrix.kronecker (1 : CMatrix HA) P).mulVec φ))))).mulVec φ =
       (Matrix.kronecker (1 : CMatrix HA) P).mulVec φ
   rw [hM]
@@ -284,31 +283,31 @@ variable [Fintype HA] [DecidableEq HA] [Fintype HB] [DecidableEq HB]
 
 variable (data : YNData ι HA HB)
 
-/-- The pure vector obtained by applying Bob's original projection `P_B^(k)`. -/
-def bobProjectedVector (ψ : PureVector (HA × HB)) (k : ι) : HA × HB → ℂ :=
-  (data.bobProjectionOp k).mulVec ψ.amp
+/-- The ket obtained by applying Bob's original projection `P_B^(k)`. -/
+def bobProjectedVector (ψ : Ket (HA × HB)) (k : ι) : HA × HB → ℂ :=
+  (data.bobProjectionOp k).mulVec ψ.vec
 
-/-- Bob's reduced density matrix of the projected pure vector. -/
-def bobProjectedReducedMatrix (ψ : PureVector (HA × HB)) (k : ι) : CMatrix HB :=
-  partialTraceA (a := HA) (b := HB) (rankOneMatrix (data.bobProjectedVector ψ k))
+/-- Bob's reduced density matrix of the projected ket. -/
+def bobProjectedReducedMatrix (ψ : Ket (HA × HB)) (k : ι) : CMatrix HB :=
+  Matrix.traceLeft (rankOneMatrix (data.bobProjectedVector ψ k))
 
 /-- Support projection of Bob's reduced projected density matrix. -/
-def bobProjectedReducedSupport (ψ : PureVector (HA × HB)) (k : ι) : CMatrix HB :=
+def bobProjectedReducedSupport (ψ : Ket (HA × HB)) (k : ι) : CMatrix HB :=
   Matrix.rangeProjection (data.bobProjectedReducedMatrix ψ k)
 
 @[simp]
-theorem bobProjectedVector_eq (ψ : PureVector (HA × HB)) (k : ι) :
-    data.bobProjectedVector ψ k = (data.bobProjectionOp k).mulVec ψ.amp :=
+theorem bobProjectedVector_eq (ψ : Ket (HA × HB)) (k : ι) :
+    data.bobProjectedVector ψ k = (data.bobProjectionOp k).mulVec ψ.vec :=
   rfl
 
 @[simp]
-theorem bobProjectedReducedMatrix_eq (ψ : PureVector (HA × HB)) (k : ι) :
+theorem bobProjectedReducedMatrix_eq (ψ : Ket (HA × HB)) (k : ι) :
     data.bobProjectedReducedMatrix ψ k =
-      partialTraceA (a := HA) (b := HB) (rankOneMatrix (data.bobProjectedVector ψ k)) :=
+      Matrix.traceLeft (rankOneMatrix (data.bobProjectedVector ψ k)) :=
   rfl
 
 @[simp]
-theorem bobProjectedReducedSupport_eq (ψ : PureVector (HA × HB)) (k : ι) :
+theorem bobProjectedReducedSupport_eq (ψ : Ket (HA × HB)) (k : ι) :
     data.bobProjectedReducedSupport ψ k =
       Matrix.rangeProjection (data.bobProjectedReducedMatrix ψ k) :=
   rfl
@@ -321,32 +320,32 @@ This is deliberately a pure/rank-one theorem.  It does not claim an arbitrary
 mixed-state support bridge or an arbitrary support-fixing replacement theorem.
 -/
 theorem bobProjectedReducedSupport_sameOnStateSupport
-    (ψ : PureVector (HA × HB)) (k : ι) :
-    Matrix.sameOnStateSupport ψ.state.matrix
+    (ψ : Ket (HA × HB)) (k : ι) :
+    Matrix.sameOnStateSupport ψ.state.m
       (data.bobLocalOp (data.bobProjectedReducedSupport ψ k))
       (data.bobProjectionOp k) := by
   have hvec :
-      (data.bobLocalOp (data.bobProjectedReducedSupport ψ k)).mulVec ψ.amp =
-        (data.bobProjectionOp k).mulVec ψ.amp := by
+      (data.bobLocalOp (data.bobProjectedReducedSupport ψ k)).mulVec ψ.vec =
+        (data.bobProjectionOp k).mulVec ψ.vec := by
     rw [bobLocalOp_eq, bobProjectionOp_eq]
     change
       (Matrix.kronecker (1 : CMatrix HA)
         (Matrix.rangeProjection
-          (partialTraceA (a := HA) (b := HB)
+          (Matrix.traceLeft
             (rankOneMatrix ((Matrix.kronecker (1 : CMatrix HA)
-              ((data.bobProjection k).matrix)).mulVec ψ.amp))))).mulVec ψ.amp =
-        (Matrix.kronecker (1 : CMatrix HA) ((data.bobProjection k).matrix)).mulVec ψ.amp
-    exact Matrix.kronecker_rangeProjection_partialTraceA_rankOne_projection_mulVec
+              ((data.bobProjection k).matrix)).mulVec ψ.vec))))).mulVec ψ.vec =
+        (Matrix.kronecker (1 : CMatrix HA) ((data.bobProjection k).matrix)).mulVec ψ.vec
+    exact Matrix.kronecker_rangeProjection_traceLeft_rankOne_projection_mulVec
       ((data.bobProjection k).matrix)
       (data.bobProjection k).isHermitian
       (data.bobProjection k).idempotent
-      ψ.amp
-  simpa [PureVector.state_matrix] using
+      ψ.vec
+  simpa [Ket.state_matrix] using
     Matrix.sameOnStateSupport_rankOneMatrix_of_mulVec_eq hvec
 
 /-- Wrapper form directly usable by the Bob-local post-selected matrix API. -/
 theorem bobProjectedReducedSupport_bobLocalSamePostMatrix
-    (ψ : PureVector (HA × HB)) (k : ι) :
+    (ψ : Ket (HA × HB)) (k : ι) :
     data.BobLocalSamePostMatrix ψ.state
       (data.bobProjectedReducedSupport ψ k)
       ((data.bobProjection k).matrix) := by

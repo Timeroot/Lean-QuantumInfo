@@ -8,6 +8,7 @@ module
 
 public import QuantumLib.QIT.Information.Entropy.RelativeEntropyTraceLog
 public import QuantumLib.QIT.Information.Renyi.FrankLieb.DPI
+public import QuantumLib.QIT.Util.MatrixInstances
 public import Mathlib.Analysis.Calculus.DSlope
 public import Mathlib.Analysis.CStarAlgebra.Matrix
 public import Mathlib.Analysis.SpecialFunctions.Log.Deriv
@@ -26,78 +27,65 @@ endpoint bridge declarations for sandwiched Renyi.
 @[expose] public section
 
 open Filter
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator UniformConvergence
+open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator UniformConvergence QIT.MatrixL2
+
+noncomputable section
+universe u v
+
+open QIT
 
 namespace QIT
 
-universe u v
+end QIT
 
-noncomputable section
-
-noncomputable local instance cMatrixCStarAlgebraForRelativeEntropyDPI
-    {n : Type*} [Fintype n] [DecidableEq n] : CStarAlgebra (CMatrix n) := {}
-
-namespace State
+namespace MState
 
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
-private theorem terminalMeasureChannel_map_state_matrix (σ : State a) :
-    (terminalMeasureChannel a).map σ.matrix = (1 : CMatrix PUnit.{1}) := by
+private theorem terminalMeasureChannel_map_state_matrix (σ : MState a) :
+    (terminalMeasureChannel a).map σ.m = (1 : CMatrix PUnit.{1}) := by
   ext i j
   cases i
   cases j
-  simp [terminalMeasureChannel, terminalPOVM, Channel.measure, Channel.measureMap,
-    σ.trace_eq_one]
-
-private theorem sandwichedRenyiPSDReferenceHighAlphaFinite_unit_one_eq_zero
-    (α : ℝ) (_hα : 1 < α) :
-    sandwichedRenyiPSDReferenceHighAlphaFinite (State.unit : State PUnit.{1})
-      (1 : CMatrix PUnit.{1}) Matrix.PosSemidef.one α = 0 := by
-  have htrace :
-      ((Matrix.trace ((State.unit.matrix : CMatrix PUnit.{1}) ^ α)).re) = 1 := by
-    rw [show (State.unit.matrix : CMatrix PUnit.{1}) = 1 by rfl]
-    rw [CFC.one_rpow]
-    simp
-  simp [sandwichedRenyiPSDReferenceHighAlphaFinite, sandwichedRenyiReferenceInner,
-    psdTracePower, log2, CFC.one_rpow, htrace]
+  simp [terminalMeasureChannel, terminalPOVM, POVM.measureDiscard_map, σ.tr']
 
 theorem sandwichedRenyiPSDReferenceHighAlphaFinite_nonneg_of_posDef_reference
-    (ρ σ : State a) (hσ : σ.matrix.PosDef)
+    (ρ σ : MState a) (hσ : σ.m.PosDef)
     (alpha : {alpha : ℝ // 1 < alpha}) :
     0 ≤ sandwichedRenyiPSDReferenceHighAlphaFinite
-      ρ σ.matrix hσ.posSemidef alpha.1 := by
-  let Φ : Channel a PUnit.{1} := terminalMeasureChannel a
+      ρ σ.m hσ.posSemidef alpha.1 := by
+  let Φ : CPTPMap a PUnit.{1} := terminalMeasureChannel a
   have hDPIE :=
     sandwichedRenyiPSDReferenceE_dataProcessing_channel_ge_of_half_le_lt_one_or_one_lt
       ρ hσ.posSemidef Φ alpha.1 (Or.inr alpha.2)
   rw [sandwichedRenyiPSDReferenceE_eq_highAlphaE_of_one_lt _ _ alpha.2,
     sandwichedRenyiPSDReferenceE_eq_highAlphaE_of_one_lt _ _ alpha.2] at hDPIE
-  have hinSupport : Matrix.Supports ρ.matrix σ.matrix :=
-    Matrix.Supports.of_right_posDef ρ.matrix σ.matrix hσ
-  have hmap : Φ.map σ.matrix = (1 : CMatrix PUnit.{1}) := by
+  have hinSupport : Matrix.Supports ρ.m σ.m :=
+    Matrix.Supports.of_right_posDef ρ.m σ.m hσ
+  have hmap : Φ.map σ.m = (1 : CMatrix PUnit.{1}) := by
     simpa [Φ] using terminalMeasureChannel_map_state_matrix σ
-  have houtState : Φ.applyState ρ = State.unit := by
+  have houtState : Φ ρ = MState.unit := by
     simpa [Φ] using terminalMeasureChannel_applyState ρ
-  have houtSupport : Matrix.Supports (Φ.applyState ρ).matrix (Φ.map σ.matrix) := by
+  have houtSupport : Matrix.Supports (Φ ρ).m (Φ.map σ.m) := by
     rw [hmap]
-    exact Matrix.Supports.of_right_posDef (Φ.applyState ρ).matrix
+    exact Matrix.Supports.of_right_posDef (Φ ρ).m
       (1 : CMatrix PUnit.{1}) Matrix.PosDef.one
   rw [sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_of_supports
       ρ hσ.posSemidef alpha.1 hinSupport,
     sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_of_supports
-      (Φ.applyState ρ) (Φ.mapsPositive σ.matrix hσ.posSemidef) alpha.1
+      (Φ ρ) (Φ.mapsPositive σ.m hσ.posSemidef) alpha.1
       houtSupport] at hDPIE
   have hreal :
       sandwichedRenyiPSDReferenceHighAlphaFinite
-          (Φ.applyState ρ) (Φ.map σ.matrix)
-          (Φ.mapsPositive σ.matrix hσ.posSemidef) alpha.1 ≤
+          (Φ ρ) (Φ.map σ.m)
+          (Φ.mapsPositive σ.m hσ.posSemidef) alpha.1 ≤
         sandwichedRenyiPSDReferenceHighAlphaFinite
-          ρ σ.matrix hσ.posSemidef alpha.1 := by
+          ρ σ.m hσ.posSemidef alpha.1 := by
     exact EReal.coe_le_coe_iff.mp hDPIE
   have houtZero :
       sandwichedRenyiPSDReferenceHighAlphaFinite
-          (Φ.applyState ρ) (Φ.map σ.matrix)
-          (Φ.mapsPositive σ.matrix hσ.posSemidef) alpha.1 = 0 := by
+          (Φ ρ) (Φ.map σ.m)
+          (Φ.mapsPositive σ.m hσ.posSemidef) alpha.1 = 0 := by
     simpa [houtState, hmap] using
       sandwichedRenyiPSDReferenceHighAlphaFinite_unit_one_eq_zero
         alpha.1 alpha.2
@@ -106,14 +94,14 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_nonneg_of_posDef_reference
 /-- Positive-definite matrix logarithms are the right endpoint of the
 positive-power CFC difference quotient.
 
-This is the fixed-reference CFC ingredient for the `alpha -> 1+` trace-log
+This is the fixed-reference CFC ingredient for the `alpha → 1+` trace-log
 endpoint: for a strictly positive matrix `sigma`,
-`p^{-1}(sigma^p - I) -> log sigma` as `p -> 0+`. -/
+`p^{-1}(sigma^p - I) → log sigma` as `p → 0+`. -/
 theorem cMatrix_cfc_rpow_sub_one_tendsto_psdLog_posDef
     {sigma : CMatrix a} (hSigma : sigma.PosDef) :
     Filter.Tendsto
-      (fun p : Real => cfc (fun x : Real => p⁻¹ * (x ^ p - 1)) sigma)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
+      (fun p : ℝ => cfc (fun x : ℝ => p⁻¹ * (x ^ p - 1)) sigma)
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
       (nhds (psdLog sigma hSigma)) := by
   simpa [psdLog, CFC.log] using
     (CFC.tendsto_cfc_rpow_sub_one_log
@@ -126,16 +114,16 @@ For fixed state `rho` and positive-definite reference `sigma`, the scalar
 pairing against `rho` converges to the `Tr rho log sigma` contribution in the
 trace-log endpoint. -/
 theorem trace_mul_cfc_rpow_sub_one_tendsto_trace_mul_psdLog_posDef
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosDef) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosDef) :
     Filter.Tendsto
-      (fun p : Real =>
-        ((rho.matrix * cfc (fun x : Real => p⁻¹ * (x ^ p - 1)) sigma).trace).re)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
-      (nhds ((rho.matrix * psdLog sigma hSigma).trace.re)) := by
+      (fun p : ℝ =>
+        ((rho.m * cfc (fun x : ℝ => p⁻¹ * (x ^ p - 1)) sigma).trace).re)
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
+      (nhds ((rho.m * psdLog sigma hSigma).trace.re)) := by
   have hmatrix := cMatrix_cfc_rpow_sub_one_tendsto_psdLog_posDef hSigma
   have hcont :
-      Continuous fun X : CMatrix a => ((rho.matrix * X).trace).re := by
-    have hmul : Continuous fun X : CMatrix a => rho.matrix * X := by
+      Continuous fun X : CMatrix a => ((rho.m * X).trace).re := by
+    have hmul : Continuous fun X : CMatrix a => rho.m * X := by
       fun_prop
     exact Complex.continuous_re.comp (Continuous.matrix_trace hmul)
   exact (hcont.tendsto (psdLog sigma hSigma)).comp hmatrix
@@ -158,19 +146,19 @@ theorem psdLog_inv_eq_neg_psdLog_posDef
   have huStrict : IsStrictlyPositive (u : CMatrix a) := by
     simpa [hu] using Matrix.PosDef.isStrictlyPositive hSigma
   have hLogCont :
-      ContinuousOn Real.log ((fun x : Real => x⁻¹) '' spectrum Real (u : CMatrix a)) := by
+      ContinuousOn Real.log ((fun x : ℝ => x⁻¹) '' _root_.spectrum ℝ (u : CMatrix a)) := by
     intro y hy
     rcases hy with ⟨x, hx, rfl⟩
     exact (Real.continuousAt_log
       (ne_of_gt (inv_pos.mpr (huStrict.spectrum_pos hx)))).continuousWithinAt
   have hcomp :
-      cfc (fun x : Real => Real.log x⁻¹) (u : CMatrix a) =
+      cfc (fun x : ℝ => Real.log x⁻¹) (u : CMatrix a) =
         cfc Real.log (u⁻¹ : CMatrix a) := by
     simpa using (cfc_comp_inv (A := CMatrix a) (p := IsSelfAdjoint)
       (f := Real.log) (a := u) (hf := hLogCont))
   rw [← hcomp]
   have hneg :
-      cfc (fun x : Real => - Real.log x) (u : CMatrix a) =
+      cfc (fun x : ℝ => - Real.log x) (u : CMatrix a) =
         - cfc Real.log (u : CMatrix a) := by
     simpa using (cfc_neg (A := CMatrix a) (p := IsSelfAdjoint)
       (f := Real.log) (a := (u : CMatrix a)))
@@ -182,56 +170,56 @@ theorem psdLog_inv_eq_neg_psdLog_posDef
 /-- Positive-definite inverse powers tend to the identity at exponent `0+`.
 
 This is the zero-order moving-reference ingredient for the high-`alpha`
-endpoint: if `sigma` is full rank, then `sigma^{-p} -> I` as `p -> 0+`. -/
+endpoint: if `sigma` is full rank, then `sigma^{-p} → I` as `p → 0+`. -/
 theorem cMatrix_rpow_inv_tendsto_one_right_posDef
     {sigma : CMatrix a} (hSigma : sigma.PosDef) :
     Filter.Tendsto
-      (fun p : Real => CFC.rpow sigma⁻¹ p)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
+      (fun p : ℝ => CFC.rpow sigma⁻¹ p)
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
       (nhds (1 : CMatrix a)) := by
-  let l : Filter Real := nhdsWithin (0 : Real) (Set.Ioi 0)
+  let l : Filter ℝ := nhdsWithin (0 : ℝ) (Set.Ioi 0)
   have hquot :=
     cMatrix_cfc_rpow_sub_one_tendsto_psdLog_posDef
       (sigma := sigma⁻¹) hSigma.inv
-  have hp : Filter.Tendsto (fun p : Real => p) l (nhds (0 : Real)) := by
+  have hp : Filter.Tendsto (fun p : ℝ => p) l (nhds (0 : ℝ)) := by
     exact
       (tendsto_nhdsWithin_iff.mp
-        (tendsto_id : Filter.Tendsto (fun p : Real => p) l l)).1
+        (tendsto_id : Filter.Tendsto (fun p : ℝ => p) l l)).1
   have hprod :
       Filter.Tendsto
-        (fun p : Real =>
-          p • cfc (fun x : Real => p⁻¹ * (x ^ p - 1)) (sigma⁻¹))
+        (fun p : ℝ =>
+          p • cfc (fun x : ℝ => p⁻¹ * (x ^ p - 1)) (sigma⁻¹))
         l
-        (nhds ((0 : Real) • psdLog (sigma⁻¹) hSigma.inv)) := by
+        (nhds ((0 : ℝ) • psdLog (sigma⁻¹) hSigma.inv)) := by
     exact hp.smul hquot
   have hzero :
-      ((0 : Real) • psdLog (sigma⁻¹) hSigma.inv : CMatrix a) = 0 := by
+      ((0 : ℝ) • psdLog (sigma⁻¹) hSigma.inv : CMatrix a) = 0 := by
     simp
   rw [hzero] at hprod
   have hdiff :
       Filter.Tendsto
-        (fun p : Real => CFC.rpow (sigma⁻¹) p - (1 : CMatrix a))
+        (fun p : ℝ => CFC.rpow (sigma⁻¹) p - (1 : CMatrix a))
         l (nhds 0) := by
     refine hprod.congr' ?_
     filter_upwards [self_mem_nhdsWithin] with p hp0
     have hpne : p ≠ 0 := ne_of_gt hp0
     have hcfc :
-        cfc (fun x : Real => p⁻¹ * (x ^ p - 1)) (sigma⁻¹) =
-          (p⁻¹ : Real) • (CFC.rpow (sigma⁻¹) p - (1 : CMatrix a)) := by
-      change cfc (fun x : Real => p⁻¹ • (x ^ p - 1)) (sigma⁻¹) =
-        (p⁻¹ : Real) • (CFC.rpow (sigma⁻¹) p - (1 : CMatrix a))
+        cfc (fun x : ℝ => p⁻¹ * (x ^ p - 1)) (sigma⁻¹) =
+          (p⁻¹ : ℝ) • (CFC.rpow (sigma⁻¹) p - (1 : CMatrix a)) := by
+      change cfc (fun x : ℝ => p⁻¹ • (x ^ p - 1)) (sigma⁻¹) =
+        (p⁻¹ : ℝ) • (CFC.rpow (sigma⁻¹) p - (1 : CMatrix a))
       have hpowCont :
-          ContinuousOn (fun x : Real => x ^ p) (spectrum Real (sigma⁻¹)) :=
+          ContinuousOn (fun x : ℝ => x ^ p) (_root_.spectrum ℝ (sigma⁻¹)) :=
         (Real.continuous_rpow_const (le_of_lt hp0)).continuousOn
       have hsubCont :
-          ContinuousOn (fun x : Real => x ^ p - 1) (spectrum Real (sigma⁻¹)) :=
+          ContinuousOn (fun x : ℝ => x ^ p - 1) (_root_.spectrum ℝ (sigma⁻¹)) :=
         hpowCont.sub continuousOn_const
       rw [cfc_smul _ (hf := hsubCont),
         cfc_sub _ _ (hf := hpowCont),
-        cfc_const_one Real (sigma⁻¹)
+        cfc_const_one ℝ (sigma⁻¹)
           (ha := Matrix.IsHermitian.isSelfAdjoint hSigma.inv.isHermitian)]
       have hrpowReal :
-          CFC.rpow (sigma⁻¹) p = cfc (fun x : Real => x ^ p) (sigma⁻¹) := by
+          CFC.rpow (sigma⁻¹) p = cfc (fun x : ℝ => x ^ p) (sigma⁻¹) := by
         simpa [CFC.rpow_eq_pow] using
           (CFC.rpow_eq_cfc_real (a := sigma⁻¹) (y := p)
             (ha := Matrix.nonneg_iff_posSemidef.mpr hSigma.inv.posSemidef))
@@ -240,35 +228,35 @@ theorem cMatrix_rpow_inv_tendsto_one_right_posDef
     simp [smul_smul, hpne]
   have hone :
       Filter.Tendsto
-        (fun p : Real => (CFC.rpow (sigma⁻¹) p - (1 : CMatrix a)) + 1)
+        (fun p : ℝ => (CFC.rpow (sigma⁻¹) p - (1 : CMatrix a)) + 1)
         l (nhds (0 + (1 : CMatrix a))) :=
     hdiff.add tendsto_const_nhds
   simpa [sub_add_cancel] using hone
 
 /-- The reference-weighted inner operator itself converges to the input state
-matrix as `alpha = 1 + p -> 1+`.
+matrix as `alpha = 1 + p → 1+`.
 
 This is the zero-order moving-base endpoint behind the source trace-log bridge.
 The remaining first-order endpoint is the derivative of the trace power around
 this convergent moving base. -/
 theorem sandwichedRenyiReferenceInner_one_add_tendsto_state_matrix_posDef
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosDef) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosDef) :
     Filter.Tendsto
-      (fun p : Real => sandwichedRenyiReferenceInner rho sigma (1 + p))
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
-      (nhds rho.matrix) := by
-  let l : Filter Real := nhdsWithin (0 : Real) (Set.Ioi 0)
-  let q : Real -> Real := fun p => p / (2 * (1 + p))
-  have hidWithin : Filter.Tendsto (fun p : Real => p) l l := tendsto_id
-  have hid : Filter.Tendsto (fun p : Real => p) l (nhds 0) := by
+      (fun p : ℝ => sandwichedRenyiReferenceInner rho sigma (1 + p))
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
+      (nhds rho.m) := by
+  let l : Filter ℝ := nhdsWithin (0 : ℝ) (Set.Ioi 0)
+  let q : ℝ → ℝ := fun p => p / (2 * (1 + p))
+  have hidWithin : Filter.Tendsto (fun p : ℝ => p) l l := tendsto_id
+  have hid : Filter.Tendsto (fun p : ℝ => p) l (nhds 0) := by
     exact (tendsto_nhdsWithin_iff.mp hidWithin).1
   have hq_nhds : Filter.Tendsto q l (nhds 0) := by
-    have hcont : ContinuousAt (fun p : Real => p / (2 * (1 + p))) 0 := by
+    have hcont : ContinuousAt (fun p : ℝ => p / (2 * (1 + p))) 0 := by
       exact continuousAt_id.div
         (continuousAt_const.mul (continuousAt_const.add continuousAt_id))
         (by norm_num)
     simpa [q, Function.comp_def] using hcont.tendsto.comp hid
-  have hq_pos : ∀ᶠ p in l, q p ∈ Set.Ioi (0 : Real) := by
+  have hq_pos : ∀ᶠ p in l, q p ∈ Set.Ioi (0 : ℝ) := by
     filter_upwards [self_mem_nhdsWithin] with p hp
     have hp0 : 0 < p := by simpa using hp
     have hden : 0 < 2 * (1 + p) := by
@@ -276,15 +264,15 @@ theorem sandwichedRenyiReferenceInner_one_add_tendsto_state_matrix_posDef
     dsimp [q]
     exact div_pos hp0 hden
   have hq_tendsto :
-      Filter.Tendsto q l (nhdsWithin (0 : Real) (Set.Ioi 0)) :=
+      Filter.Tendsto q l (nhdsWithin (0 : ℝ) (Set.Ioi 0)) :=
     tendsto_nhdsWithin_iff.mpr ⟨hq_nhds, hq_pos⟩
   have hpowInv :
-      Filter.Tendsto (fun p : Real => CFC.rpow (sigma⁻¹) (q p))
+      Filter.Tendsto (fun p : ℝ => CFC.rpow (sigma⁻¹) (q p))
         l (nhds (1 : CMatrix a)) :=
     (cMatrix_rpow_inv_tendsto_one_right_posDef hSigma).comp hq_tendsto
   have hpow :
       Filter.Tendsto
-        (fun p : Real => CFC.rpow sigma ((1 - (1 + p)) / (2 * (1 + p))))
+        (fun p : ℝ => CFC.rpow sigma ((1 - (1 + p)) / (2 * (1 + p))))
         l (nhds (1 : CMatrix a)) := by
     refine hpowInv.congr' ?_
     filter_upwards [self_mem_nhdsWithin] with p hp
@@ -297,16 +285,16 @@ theorem sandwichedRenyiReferenceInner_one_add_tendsto_state_matrix_posDef
     rw [hs, ← cMatrix_rpow_nonsing_inv_eq_rpow_neg hSigma (q p)]
   have hleft :
       Filter.Tendsto
-        (fun p : Real =>
-          CFC.rpow sigma ((1 - (1 + p)) / (2 * (1 + p))) * rho.matrix)
-        l (nhds ((1 : CMatrix a) * rho.matrix)) :=
-    hpow.mul (tendsto_const_nhds (x := rho.matrix))
+        (fun p : ℝ =>
+          CFC.rpow sigma ((1 - (1 + p)) / (2 * (1 + p))) * rho.m)
+        l (nhds ((1 : CMatrix a) * rho.m)) :=
+    hpow.mul (tendsto_const_nhds (x := rho.m))
   have hinner :
       Filter.Tendsto
-        (fun p : Real =>
-          (CFC.rpow sigma ((1 - (1 + p)) / (2 * (1 + p))) * rho.matrix) *
+        (fun p : ℝ =>
+          (CFC.rpow sigma ((1 - (1 + p)) / (2 * (1 + p))) * rho.m) *
             CFC.rpow sigma ((1 - (1 + p)) / (2 * (1 + p))))
-        l (nhds (((1 : CMatrix a) * rho.matrix) * (1 : CMatrix a))) :=
+        l (nhds (((1 : CMatrix a) * rho.m) * (1 : CMatrix a))) :=
     hleft.mul hpow
   simpa [sandwichedRenyiReferenceInner, Matrix.one_mul, Matrix.mul_one] using hinner
 
@@ -316,12 +304,12 @@ inverse reference.
 Equivalently, the right derivative of the inverse-reference power contributes
 `- Tr rho log sigma`. -/
 theorem trace_mul_cfc_rpow_sub_one_inv_tendsto_neg_trace_mul_psdLog_posDef
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosDef) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosDef) :
     Filter.Tendsto
-      (fun p : Real =>
-        ((rho.matrix * cfc (fun x : Real => p⁻¹ * (x ^ p - 1)) sigma⁻¹).trace).re)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
-      (nhds (-((rho.matrix * psdLog sigma hSigma).trace.re))) := by
+      (fun p : ℝ =>
+        ((rho.m * cfc (fun x : ℝ => p⁻¹ * (x ^ p - 1)) sigma⁻¹).trace).re)
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
+      (nhds (-((rho.m * psdLog sigma hSigma).trace.re))) := by
   have h :=
     trace_mul_cfc_rpow_sub_one_tendsto_trace_mul_psdLog_posDef
       (rho := rho) (sigma := sigma⁻¹) hSigma.inv
@@ -330,13 +318,13 @@ theorem trace_mul_cfc_rpow_sub_one_inv_tendsto_neg_trace_mul_psdLog_posDef
 /-- Trace pairing form of the inverse-reference endpoint, with the scalar
 difference quotient outside the CFC expression. -/
 theorem trace_mul_cfc_rpow_sub_one_inv_div_tendsto_neg_trace_mul_psdLog_posDef
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosDef) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosDef) :
     Filter.Tendsto
-      (fun p : Real =>
-        ((rho.matrix *
+      (fun p : ℝ =>
+        ((rho.m *
           (CFC.rpow sigma⁻¹ p - (1 : CMatrix a))).trace).re / p)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
-      (nhds (-((rho.matrix * psdLog sigma hSigma).trace.re))) := by
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
+      (nhds (-((rho.m * psdLog sigma hSigma).trace.re))) := by
   have h :=
     trace_mul_cfc_rpow_sub_one_inv_tendsto_neg_trace_mul_psdLog_posDef
       (rho := rho) (sigma := sigma) hSigma
@@ -344,33 +332,33 @@ theorem trace_mul_cfc_rpow_sub_one_inv_div_tendsto_neg_trace_mul_psdLog_posDef
   filter_upwards [self_mem_nhdsWithin] with p hp
   have hpne : p ≠ 0 := ne_of_gt hp
   have hcfc :
-      cfc (fun x : Real => p⁻¹ * (x ^ p - 1)) sigma⁻¹ =
-        (p⁻¹ : Real) • (CFC.rpow sigma⁻¹ p - (1 : CMatrix a)) := by
-    change cfc (fun x : Real => p⁻¹ • (x ^ p - 1)) sigma⁻¹ =
-      (p⁻¹ : Real) • (CFC.rpow sigma⁻¹ p - (1 : CMatrix a))
+      cfc (fun x : ℝ => p⁻¹ * (x ^ p - 1)) sigma⁻¹ =
+        (p⁻¹ : ℝ) • (CFC.rpow sigma⁻¹ p - (1 : CMatrix a)) := by
+    change cfc (fun x : ℝ => p⁻¹ • (x ^ p - 1)) sigma⁻¹ =
+      (p⁻¹ : ℝ) • (CFC.rpow sigma⁻¹ p - (1 : CMatrix a))
     have hpowCont :
-        ContinuousOn (fun x : Real => x ^ p) (spectrum Real sigma⁻¹) :=
+        ContinuousOn (fun x : ℝ => x ^ p) (_root_.spectrum ℝ sigma⁻¹) :=
       (Real.continuous_rpow_const (le_of_lt hp)).continuousOn
     have hsubCont :
-        ContinuousOn (fun x : Real => x ^ p - 1) (spectrum Real sigma⁻¹) :=
+        ContinuousOn (fun x : ℝ => x ^ p - 1) (_root_.spectrum ℝ sigma⁻¹) :=
       hpowCont.sub continuousOn_const
     rw [cfc_smul _ (hf := hsubCont),
       cfc_sub _ _ (hf := hpowCont),
-      cfc_const_one Real (sigma⁻¹)
+      cfc_const_one ℝ (sigma⁻¹)
         (ha := Matrix.IsHermitian.isSelfAdjoint hSigma.inv.isHermitian)]
     have hrpowReal :
-        CFC.rpow sigma⁻¹ p = cfc (fun x : Real => x ^ p) sigma⁻¹ := by
+        CFC.rpow sigma⁻¹ p = cfc (fun x : ℝ => x ^ p) sigma⁻¹ := by
       simpa [CFC.rpow_eq_pow] using
         (CFC.rpow_eq_cfc_real (a := sigma⁻¹) (y := p)
           (ha := Matrix.nonneg_iff_posSemidef.mpr hSigma.inv.posSemidef))
     rw [← hrpowReal]
   calc
-    ((rho.matrix *
-        cfc (fun x : Real => p⁻¹ * (x ^ p - 1)) sigma⁻¹).trace).re =
-        ((rho.matrix *
-          ((p⁻¹ : Real) • (CFC.rpow sigma⁻¹ p - (1 : CMatrix a)))).trace).re := by
+    ((rho.m *
+        cfc (fun x : ℝ => p⁻¹ * (x ^ p - 1)) sigma⁻¹).trace).re =
+        ((rho.m *
+          ((p⁻¹ : ℝ) • (CFC.rpow sigma⁻¹ p - (1 : CMatrix a)))).trace).re := by
           rw [hcfc]
-    _ = ((rho.matrix *
+    _ = ((rho.m *
           (CFC.rpow sigma⁻¹ p - (1 : CMatrix a))).trace).re / p := by
           simp [Matrix.trace_smul, div_eq_mul_inv,
             mul_comm, mul_assoc]
@@ -379,18 +367,18 @@ theorem trace_mul_cfc_rpow_sub_one_inv_div_tendsto_neg_trace_mul_psdLog_posDef
 /-- The trace of the high-`alpha` reference-weighted inner operator is the
 trace pairing against the doubled reference power. -/
 theorem sandwichedRenyiReferenceInner_trace_re_eq_trace_mul_reference_rpow_posDef
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosDef)
-    {alpha : Real} (hAlpha : alpha ≠ 0) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosDef)
+    {alpha : ℝ} (hAlpha : alpha ≠ 0) :
     (sandwichedRenyiReferenceInner rho sigma alpha).trace.re =
-      (rho.matrix * CFC.rpow sigma ((1 - alpha) / alpha)).trace.re := by
-  let s : Real := (1 - alpha) / (2 * alpha)
+      (rho.m * CFC.rpow sigma ((1 - alpha) / alpha)).trace.re := by
+  let s : ℝ := (1 - alpha) / (2 * alpha)
   let C : CMatrix a := CFC.rpow sigma s
   have hcycle :
-      (C * rho.matrix * C).trace = (rho.matrix * (C * C)).trace := by
-    have h1 : (C * rho.matrix * C).trace = (C * C * rho.matrix).trace :=
-      Matrix.trace_mul_cycle C rho.matrix C
-    have h2 : (C * C * rho.matrix).trace = (rho.matrix * (C * C)).trace := by
-      simpa [Matrix.mul_assoc] using Matrix.trace_mul_comm (C * C) rho.matrix
+      (C * rho.m * C).trace = (rho.m * (C * C)).trace := by
+    have h1 : (C * rho.m * C).trace = (C * C * rho.m).trace :=
+      Matrix.trace_mul_cycle C rho.m C
+    have h2 : (C * C * rho.m).trace = (rho.m * (C * C)).trace := by
+      simpa [Matrix.mul_assoc] using Matrix.trace_mul_comm (C * C) rho.m
     exact h1.trans h2
   have hpow :
       C * C = CFC.rpow sigma (s + s) := by
@@ -402,44 +390,44 @@ theorem sandwichedRenyiReferenceInner_trace_re_eq_trace_mul_reference_rpow_posDe
     ring_nf
   calc
     (sandwichedRenyiReferenceInner rho sigma alpha).trace.re =
-        (rho.matrix * (C * C)).trace.re := by
+        (rho.m * (C * C)).trace.re := by
           simpa [sandwichedRenyiReferenceInner, C, s] using congrArg Complex.re hcycle
-    _ = (rho.matrix * CFC.rpow sigma (s + s)).trace.re := by rw [hpow]
-    _ = (rho.matrix * CFC.rpow sigma ((1 - alpha) / alpha)).trace.re := by rw [hs]
+    _ = (rho.m * CFC.rpow sigma (s + s)).trace.re := by rw [hpow]
+    _ = (rho.m * CFC.rpow sigma ((1 - alpha) / alpha)).trace.re := by rw [hs]
 
 /-- The reference-weighted inner trace contributes the `- Tr rho log sigma`
-term in the high-`alpha`, `alpha -> 1+` endpoint. -/
+term in the high-`alpha`, `alpha → 1+` endpoint. -/
 theorem sandwichedRenyiReferenceInner_trace_re_one_add_slope_tendsto_neg_trace_mul_psdLog_posDef
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosDef) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosDef) :
     Filter.Tendsto
-      (fun p : Real =>
+      (fun p : ℝ =>
         ((sandwichedRenyiReferenceInner rho sigma (1 + p)).trace.re - 1) / p)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
-      (nhds (-((rho.matrix * psdLog sigma hSigma).trace.re))) := by
-  let l : Filter Real := nhdsWithin (0 : Real) (Set.Ioi 0)
-  let q : Real -> Real := fun p => p / (1 + p)
-  have hidWithin : Filter.Tendsto (fun p : Real => p) l l := tendsto_id
-  have hid : Filter.Tendsto (fun p : Real => p) l (nhds 0) := by
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
+      (nhds (-((rho.m * psdLog sigma hSigma).trace.re))) := by
+  let l : Filter ℝ := nhdsWithin (0 : ℝ) (Set.Ioi 0)
+  let q : ℝ → ℝ := fun p => p / (1 + p)
+  have hidWithin : Filter.Tendsto (fun p : ℝ => p) l l := tendsto_id
+  have hid : Filter.Tendsto (fun p : ℝ => p) l (nhds 0) := by
     exact (tendsto_nhdsWithin_iff.mp hidWithin).1
   have hq_nhds : Filter.Tendsto q l (nhds 0) := by
-    have hcont : ContinuousAt (fun p : Real => p / (1 + p)) 0 := by
+    have hcont : ContinuousAt (fun p : ℝ => p / (1 + p)) 0 := by
       exact continuousAt_id.div (continuousAt_const.add continuousAt_id) (by norm_num)
     simpa [q, Function.comp_def] using hcont.tendsto.comp hid
-  have hq_pos : ∀ᶠ p in l, q p ∈ Set.Ioi (0 : Real) := by
+  have hq_pos : ∀ᶠ p in l, q p ∈ Set.Ioi (0 : ℝ) := by
     filter_upwards [self_mem_nhdsWithin] with p hp
     have hp0 : 0 < p := by simpa using hp
     dsimp [q]
     exact div_pos hp0 (by linarith)
   have hq_tendsto :
-      Filter.Tendsto q l (nhdsWithin (0 : Real) (Set.Ioi 0)) :=
+      Filter.Tendsto q l (nhdsWithin (0 : ℝ) (Set.Ioi 0)) :=
     tendsto_nhdsWithin_iff.mpr ⟨hq_nhds, hq_pos⟩
   have hbase :=
     (trace_mul_cfc_rpow_sub_one_inv_div_tendsto_neg_trace_mul_psdLog_posDef
       (rho := rho) (sigma := sigma) hSigma).comp hq_tendsto
-  have hfactor : Filter.Tendsto (fun p : Real => q p / p) l (nhds 1) := by
-    have hcont : ContinuousAt (fun p : Real => (1 : Real) / (1 + p)) 0 := by
+  have hfactor : Filter.Tendsto (fun p : ℝ => q p / p) l (nhds 1) := by
+    have hcont : ContinuousAt (fun p : ℝ => (1 : ℝ) / (1 + p)) 0 := by
       exact continuousAt_const.div (continuousAt_const.add continuousAt_id) (by norm_num)
-    have hlim : Filter.Tendsto (fun p : Real => (1 : Real) / (1 + p)) l (nhds 1) := by
+    have hlim : Filter.Tendsto (fun p : ℝ => (1 : ℝ) / (1 + p)) l (nhds 1) := by
       simpa [Function.comp_def] using hcont.tendsto.comp hid
     refine hlim.congr' ?_
     filter_upwards [self_mem_nhdsWithin] with p hp
@@ -451,12 +439,12 @@ theorem sandwichedRenyiReferenceInner_trace_re_one_add_slope_tendsto_neg_trace_m
   have hprod := hbase.mul hfactor
   have htarget :
       Filter.Tendsto
-        (fun p : Real =>
-          (((rho.matrix *
+        (fun p : ℝ =>
+          (((rho.m *
             (CFC.rpow sigma⁻¹ (q p) - (1 : CMatrix a))).trace).re / q p) *
               (q p / p))
         l
-        (nhds (-((rho.matrix * psdLog sigma hSigma).trace.re))) := by
+        (nhds (-((rho.m * psdLog sigma hSigma).trace.re))) := by
     simpa using hprod
   refine htarget.congr' ?_
   filter_upwards [self_mem_nhdsWithin] with p hp
@@ -476,62 +464,62 @@ theorem sandwichedRenyiReferenceInner_trace_re_one_add_slope_tendsto_neg_trace_m
     ring
   rw [hexp, ← cMatrix_rpow_nonsing_inv_eq_rpow_neg hSigma (q p)] at htrace
   have hdiff :
-      (rho.matrix * CFC.rpow sigma⁻¹ (q p)).trace.re - 1 =
-        (rho.matrix * (CFC.rpow sigma⁻¹ (q p) - (1 : CMatrix a))).trace.re := by
+      (rho.m * CFC.rpow sigma⁻¹ (q p)).trace.re - 1 =
+        (rho.m * (CFC.rpow sigma⁻¹ (q p) - (1 : CMatrix a))).trace.re := by
     rw [Matrix.mul_sub, Matrix.trace_sub, Matrix.mul_one]
-    simp [rho.trace_eq_one]
+    simp [rho.tr']
   symm
   calc
     ((sandwichedRenyiReferenceInner rho sigma (1 + p)).trace.re - 1) / p =
-        ((rho.matrix * CFC.rpow sigma⁻¹ (q p)).trace.re - 1) / p := by
+        ((rho.m * CFC.rpow sigma⁻¹ (q p)).trace.re - 1) / p := by
           rw [htrace]
-    _ = ((rho.matrix * (CFC.rpow sigma⁻¹ (q p) - (1 : CMatrix a))).trace.re) / p := by
+    _ = ((rho.m * (CFC.rpow sigma⁻¹ (q p) - (1 : CMatrix a))).trace.re) / p := by
           rw [hdiff]
-    _ = (((rho.matrix *
+    _ = (((rho.m *
             (CFC.rpow sigma⁻¹ (q p) - (1 : CMatrix a))).trace).re / q p) *
           (q p / p) := by
           field_simp [hpne, hqne]
 
-/-- Once the moving-matrix self power term has its `alpha -> 1+` slope, the
+/-- Once the moving-matrix self power term has its `alpha → 1+` slope, the
 raw sandwiched trace-power slope follows from the proved reference-trace
 endpoint. -/
 theorem sandwichedRenyiReferenceInner_tracePower_slope_tendsto_of_power_minus_trace_slope_posDef
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosDef)
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosDef)
     (hPowerMinusTrace :
       Filter.Tendsto
-        (fun p : Real =>
+        (fun p : ℝ =>
           (psdTracePower (sandwichedRenyiReferenceInner rho sigma (1 + p))
               (sandwichedRenyiReferenceInner_posSemidef
                 rho hSigma.posSemidef (1 + p))
               (1 + p) -
             (sandwichedRenyiReferenceInner rho sigma (1 + p)).trace.re) / p)
-        (nhdsWithin (0 : Real) (Set.Ioi 0))
+        (nhdsWithin (0 : ℝ) (Set.Ioi 0))
         (nhds (-rho.vonNeumann * Real.log 2))) :
     Filter.Tendsto
-      (fun p : Real =>
+      (fun p : ℝ =>
         (psdTracePower (sandwichedRenyiReferenceInner rho sigma (1 + p))
             (sandwichedRenyiReferenceInner_posSemidef
               rho hSigma.posSemidef (1 + p))
             (1 + p) - 1) / p)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
       (nhds
         (-rho.vonNeumann * Real.log 2 -
-          (rho.matrix * psdLog sigma hSigma).trace.re)) := by
+          (rho.m * psdLog sigma hSigma).trace.re)) := by
   have hTrace :=
     sandwichedRenyiReferenceInner_trace_re_one_add_slope_tendsto_neg_trace_mul_psdLog_posDef
       rho hSigma
   have hsum := hPowerMinusTrace.add hTrace
   have hsum' :
       Filter.Tendsto
-        (fun p : Real =>
+        (fun p : ℝ =>
           (psdTracePower (sandwichedRenyiReferenceInner rho sigma (1 + p))
               (sandwichedRenyiReferenceInner_posSemidef
                 rho hSigma.posSemidef (1 + p))
               (1 + p) - 1) / p)
-        (nhdsWithin (0 : Real) (Set.Ioi 0))
+        (nhdsWithin (0 : ℝ) (Set.Ioi 0))
         (nhds
           ((-rho.vonNeumann * Real.log 2) +
-            -((rho.matrix * psdLog sigma hSigma).trace.re))) := by
+            -((rho.m * psdLog sigma hSigma).trace.re))) := by
     refine hsum.congr' ?_
     filter_upwards [self_mem_nhdsWithin] with p hp
     have hp0 : 0 < p := by simpa using hp
@@ -545,26 +533,26 @@ theorem sandwichedRenyiReferenceInner_tracePower_slope_tendsto_of_power_minus_tr
 For `x = 0` the right-neighborhood branch is identically zero; for `x > 0`
 this is the ordinary derivative of `p ↦ x^(1+p)` at `p = 0`. -/
 theorem real_rpow_one_add_sub_self_div_tendsto_mul_log_of_nonneg
-    {x : Real} (hx : 0 ≤ x) :
+    {x : ℝ} (hx : 0 ≤ x) :
     Filter.Tendsto
-      (fun p : Real => (x ^ (1 + p) - x) / p)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
+      (fun p : ℝ => (x ^ (1 + p) - x) / p)
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
       (nhds (x * Real.log x)) := by
   rcases lt_or_eq_of_le hx with hxpos | rfl
   · have hderiv :
-        HasDerivAt (fun p : Real => x ^ (1 + p)) (x * Real.log x) 0 := by
+        HasDerivAt (fun p : ℝ => x ^ (1 + p)) (x * Real.log x) 0 := by
       have hpow0 :
-          HasDerivAt (fun p : Real => x ^ p)
-            (x ^ (0 : Real) * Real.log x) 0 :=
+          HasDerivAt (fun p : ℝ => x ^ p)
+            (x ^ (0 : ℝ) * Real.log x) 0 :=
         (Real.hasStrictDerivAt_const_rpow hxpos 0).hasDerivAt
-      have hpow : HasDerivAt (fun p : Real => x ^ p) (Real.log x) 0 := by
+      have hpow : HasDerivAt (fun p : ℝ => x ^ p) (Real.log x) 0 := by
         simpa using hpow0
-      have hmul : HasDerivAt (fun p : Real => x * x ^ p) (x * Real.log x) 0 :=
+      have hmul : HasDerivAt (fun p : ℝ => x * x ^ p) (x * Real.log x) 0 :=
         hpow.const_mul x
       refine hmul.congr_of_eventuallyEq ?_
       filter_upwards with p
       calc
-        x ^ (1 + p) = x ^ (1 : Real) * x ^ p := by
+        x ^ (1 + p) = x ^ (1 : ℝ) * x ^ p := by
           exact Real.rpow_add hxpos 1 p
         _ = x * x ^ p := by rw [Real.rpow_one]
     have hslope := hderiv.tendsto_slope_zero_right
@@ -573,7 +561,7 @@ theorem real_rpow_one_add_sub_self_div_tendsto_mul_log_of_nonneg
     simp [div_eq_mul_inv, mul_comm]
   · refine tendsto_const_nhds.congr' ?_
     filter_upwards [eventually_mem_nhdsWithin] with p hp
-    have hp_ne : (1 : Real) + p ≠ 0 := by
+    have hp_ne : (1 : ℝ) + p ≠ 0 := by
       have hp_pos : 0 < p := hp
       linarith
     simp [Real.zero_rpow hp_ne]
@@ -581,15 +569,15 @@ theorem real_rpow_one_add_sub_self_div_tendsto_mul_log_of_nonneg
 /-- Finite nonnegative spectral-sum version of
 `real_rpow_one_add_sub_self_div_tendsto_mul_log_of_nonneg`. -/
 theorem finite_sum_rpow_one_add_sub_self_div_tendsto_sum_mul_log
-    {ι : Type*} [Fintype ι] (d : ι -> Real) (hd : ∀ i, 0 ≤ d i) :
+    {ι : Type*} [Fintype ι] (d : ι → ℝ) (hd : ∀ i, 0 ≤ d i) :
     Filter.Tendsto
-      (fun p : Real => ((∑ i, d i ^ (1 + p)) - (∑ i, d i)) / p)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
+      (fun p : ℝ => ((∑ i, d i ^ (1 + p)) - (∑ i, d i)) / p)
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
       (nhds (∑ i, d i * Real.log (d i))) := by
   have hsum :
       Filter.Tendsto
-        (fun p : Real => ∑ i, (d i ^ (1 + p) - d i) / p)
-        (nhdsWithin (0 : Real) (Set.Ioi 0))
+        (fun p : ℝ => ∑ i, (d i ^ (1 + p) - d i) / p)
+        (nhdsWithin (0 : ℝ) (Set.Ioi 0))
         (nhds (∑ i, d i * Real.log (d i))) := by
     simpa using
       tendsto_finsetSum (Finset.univ : Finset ι)
@@ -599,50 +587,39 @@ theorem finite_sum_rpow_one_add_sub_self_div_tendsto_sum_mul_log
   filter_upwards with p
   rw [← Finset.sum_sub_distrib, Finset.sum_div]
 
-/-- The `x log_2 x` convention agrees with `x log x` after multiplying by
-`log 2`, including at `x = 0`. -/
-theorem xlog2_mul_log2_self_of_nonneg {x : Real} (hx : 0 ≤ x) :
-    xlog2 x * Real.log 2 = x * Real.log x := by
-  by_cases hzx : x = 0
-  · simp [xlog2, hzx, Real.log_zero]
-  · have hxp : 0 < x := lt_of_le_of_ne hx (Ne.symm hzx)
-    have hlog2 : Real.log 2 ≠ 0 := (Real.log_pos one_lt_two).ne'
-    simp only [xlog2, if_neg hzx, log2]
-    field_simp [hlog2]
-
 /-- CFC trace form of the von Neumann entropy endpoint.
 
-This rewrites the eigenvalue definition of `State.vonNeumann` as the natural-log
+This rewrites the eigenvalue definition of `MState.vonNeumann` as the natural-log
 trace expression `Tr rho log rho`, with the `0 log 0 = 0` convention carried by
 the continuous scalar function `x * log x`. -/
 theorem trace_cfc_mul_log_state_eq_neg_vonNeumann_mul_log2
-    (rho : State a) :
-    ((cfc (fun x : Real => x * Real.log x) rho.matrix).trace).re =
+    (rho : MState a) :
+    ((cfc (fun x : ℝ => x * Real.log x) rho.m).trace).re =
       -rho.vonNeumann * Real.log 2 := by
   have hcfc :
-      cfc (fun x : Real => x * Real.log x) rho.matrix =
-        rho.pos.isHermitian.cfc (fun x : Real => x * Real.log x) :=
-    Matrix.IsHermitian.cfc_eq (𝕜 := Complex) rho.pos.isHermitian
-      (fun x : Real => x * Real.log x)
+      cfc (fun x : ℝ => x * Real.log x) rho.m =
+        rho.psd.isHermitian.cfc (fun x : ℝ => x * Real.log x) :=
+    Matrix.IsHermitian.cfc_eq (𝕜 := ℂ) rho.psd.isHermitian
+      (fun x : ℝ => x * Real.log x)
   rw [hcfc]
   unfold Matrix.IsHermitian.cfc
   rw [Unitary.conjStarAlgAut_apply, Matrix.trace_mul_cycle,
     Unitary.coe_star_mul_self, one_mul, Matrix.trace_diagonal]
   have hsum :
-      (∑ i, rho.pos.isHermitian.eigenvalues i *
-          Real.log (rho.pos.isHermitian.eigenvalues i)) =
-        (∑ i, xlog2 (rho.pos.isHermitian.eigenvalues i)) * Real.log 2 := by
+      (∑ i, rho.psd.isHermitian.eigenvalues i *
+          Real.log (rho.psd.isHermitian.eigenvalues i)) =
+        (∑ i, xlog2 (rho.psd.isHermitian.eigenvalues i)) * Real.log 2 := by
     rw [Finset.sum_mul]
     refine Finset.sum_congr rfl ?_
     intro i _hi
-    exact (xlog2_mul_log2_self_of_nonneg (rho.pos.eigenvalues_nonneg i)).symm
-  rw [State.vonNeumann]
+    exact (xlog2_mul_log2_self (rho.psd.eigenvalues_nonneg i)).symm
+  rw [MState.vonNeumann]
   simp [hsum]
 
 /-- Near zero, the positive right difference quotient
 `(x^(1+p)-x)/p` is controlled by the continuous `0 log 0` envelope. -/
 theorem abs_rpow_one_add_sub_self_div_le_neg_mul_log_of_Icc
-    {x p : Real} (hp : 0 < p) (hx0 : 0 ≤ x) (hx1 : x ≤ 1) :
+    {x p : ℝ} (hp : 0 < p) (hx0 : 0 ≤ x) (hx1 : x ≤ 1) :
     |(x ^ (1 + p) - x) / p| ≤ -(x * Real.log x) := by
   rcases lt_or_eq_of_le hx0 with hxpos | rfl
   · have hpne : p ≠ 0 := ne_of_gt hp
@@ -680,32 +657,32 @@ theorem abs_rpow_one_add_sub_self_div_le_neg_mul_log_of_Icc
           = x * (1 - x ^ p) / p := hleft
       _ ≤ x * (-p * Real.log x) / p := hscaled
       _ = -(x * Real.log x) := hright
-  · have hp1 : (1 : Real) + p ≠ 0 := by linarith
+  · have hp1 : (1 : ℝ) + p ≠ 0 := by linarith
     simp [Real.zero_rpow hp1]
 
 /-- The scalar self-entropy difference quotient converges uniformly on compact
 nonnegative intervals, including the singular endpoint `x = 0`. -/
 theorem tendstoUniformlyOn_rpow_one_add_sub_self_div_mul_log_Icc
-    {M : Real} (hM : 0 ≤ M) :
+    {M : ℝ} (hM : 0 ≤ M) :
     TendstoUniformlyOn
-      (fun p : Real => fun x : Real => (x ^ (1 + p) - x) / p)
-      (fun x : Real => x * Real.log x)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
-      (Set.Icc (0 : Real) M) := by
+      (fun p : ℝ => fun x : ℝ => (x ^ (1 + p) - x) / p)
+      (fun x : ℝ => x * Real.log x)
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
+      (Set.Icc (0 : ℝ) M) := by
   rw [Metric.tendstoUniformlyOn_iff]
   intro ε hε
   have hε3 : 0 < ε / 3 := by positivity
   have hmul_tendsto :
-      Filter.Tendsto (fun x : Real => x * Real.log x)
-        (nhds (0 : Real)) (nhds (0 : Real)) := by
-    simpa [Real.log_zero] using (Real.continuous_mul_log.tendsto (0 : Real))
+      Filter.Tendsto (fun x : ℝ => x * Real.log x)
+        (nhds (0 : ℝ)) (nhds (0 : ℝ)) := by
+    simpa [Real.log_zero] using (Real.continuous_mul_log.tendsto (0 : ℝ))
   have hsmall_eventually :
-      ∀ᶠ x : Real in nhds (0 : Real),
-        dist (x * Real.log x) (0 : Real) < ε / 3 := by
+      ∀ᶠ x : ℝ in nhds (0 : ℝ),
+        dist (x * Real.log x) (0 : ℝ) < ε / 3 := by
     exact hmul_tendsto (Metric.ball_mem_nhds _ hε3)
   rw [Metric.eventually_nhds_iff] at hsmall_eventually
   rcases hsmall_eventually with ⟨δ0, hδ0pos, hδ0small⟩
-  let δ : Real := min (δ0 / 2) 1
+  let δ : ℝ := min (δ0 / 2) 1
   have hδpos : 0 < δ := by
     dsimp [δ]
     exact lt_min (half_pos hδ0pos) zero_lt_one
@@ -720,9 +697,9 @@ theorem tendstoUniformlyOn_rpow_one_add_sub_self_div_mul_log_Icc
       _ < δ0 := by linarith
   have hawayBase :
       TendstoUniformlyOn
-        (fun p : Real => fun x : Real => p⁻¹ * (x ^ p - 1))
+        (fun p : ℝ => fun x : ℝ => p⁻¹ * (x ^ p - 1))
         Real.log
-        (nhdsWithin (0 : Real) (Set.Ioi 0))
+        (nhdsWithin (0 : ℝ) (Set.Ioi 0))
         (Set.Icc δ M) := by
     have hloc := Real.tendstoLocallyUniformlyOn_rpow_sub_one_log
     rw [tendstoLocallyUniformlyOn_iff_forall_isCompact isOpen_Ioi] at hloc
@@ -740,7 +717,7 @@ theorem tendstoUniformlyOn_rpow_one_add_sub_self_div_mul_log_Icc
   · have hx0 : 0 ≤ x := hx.1
     have hxleδ : x ≤ δ := le_of_lt hxsmall
     have hxle1 : x ≤ 1 := hxleδ.trans hδle1
-    have hxball : dist x (0 : Real) < δ0 := by
+    have hxball : dist x (0 : ℝ) < δ0 := by
       rw [Real.dist_eq]
       have habs : |x - 0| = x := by
         simp [abs_of_nonneg hx0]
@@ -806,76 +783,76 @@ theorem tendstoUniformlyOn_rpow_one_add_sub_self_div_mul_log_Icc
 /-- Joint CFC trace endpoint for the moving scalar functions
 `x ↦ (x^(1+p)-x)/p` along PSD matrices converging to a state. -/
 theorem cfc_trace_rpow_one_add_sub_self_div_tendsto_of_tendsto_posSemidef
-    {F : Real -> CMatrix a} (rho : State a)
+    {F : ℝ → CMatrix a} (rho : MState a)
     (hF :
-      Filter.Tendsto F (nhdsWithin (0 : Real) (Set.Ioi 0)) (nhds rho.matrix))
+      Filter.Tendsto F (nhdsWithin (0 : ℝ) (Set.Ioi 0)) (nhds rho.m))
     (hFpsd :
-      ∀ᶠ p : Real in nhdsWithin (0 : Real) (Set.Ioi 0), (F p).PosSemidef) :
+      ∀ᶠ p : ℝ in nhdsWithin (0 : ℝ) (Set.Ioi 0), (F p).PosSemidef) :
     Filter.Tendsto
-      (fun p : Real =>
-        ((cfc (fun x : Real => (x ^ (1 + p) - x) / p) (F p)).trace).re)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
-      (nhds ((cfc (fun x : Real => x * Real.log x) rho.matrix).trace).re) := by
+      (fun p : ℝ =>
+        ((cfc (fun x : ℝ => (x ^ (1 + p) - x) / p) (F p)).trace).re)
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
+      (nhds ((cfc (fun x : ℝ => x * Real.log x) rho.m).trace).re) := by
   have : Nonempty a := rho.nonempty
-  let M : Real := ‖rho.matrix‖ + 2
-  let S : Set Real := Set.Icc (0 : Real) M
+  let M : ℝ := ‖rho.m‖ + 2
+  let S : Set ℝ := Set.Icc (0 : ℝ) M
   have hMpos : 0 < M := by
     dsimp [M]
     positivity
   have hMnonneg : 0 ≤ M := le_of_lt hMpos
-  let G : Real -> (Real →ᵤ[{S}] Real) := fun p =>
-    UniformOnFun.ofFun {S} (fun x : Real => (x ^ (1 + p) - x) / p)
-  let G0 : Real →ᵤ[{S}] Real :=
-    UniformOnFun.ofFun {S} (fun x : Real => x * Real.log x)
+  let G : ℝ → (ℝ →ᵤ[{S}] ℝ) := fun p =>
+    UniformOnFun.ofFun {S} (fun x : ℝ => (x ^ (1 + p) - x) / p)
+  let G0 : ℝ →ᵤ[{S}] ℝ :=
+    UniformOnFun.ofFun {S} (fun x : ℝ => x * Real.log x)
   have hGunif :
       TendstoUniformlyOn
-        (fun p : Real => fun x : Real => (x ^ (1 + p) - x) / p)
-        (fun x : Real => x * Real.log x)
-        (nhdsWithin (0 : Real) (Set.Ioi 0)) S := by
+        (fun p : ℝ => fun x : ℝ => (x ^ (1 + p) - x) / p)
+        (fun x : ℝ => x * Real.log x)
+        (nhdsWithin (0 : ℝ) (Set.Ioi 0)) S := by
     simpa [S] using
       (tendstoUniformlyOn_rpow_one_add_sub_self_div_mul_log_Icc
         (M := M) hMnonneg)
-  have hG : Filter.Tendsto G (nhdsWithin (0 : Real) (Set.Ioi 0)) (nhds G0) := by
+  have hG : Filter.Tendsto G (nhdsWithin (0 : ℝ) (Set.Ioi 0)) (nhds G0) := by
     rw [UniformOnFun.tendsto_iff_tendstoUniformlyOn]
     intro s hs
     simp only [Set.mem_singleton_iff] at hs
     subst hs
     simpa [G, G0, Function.comp_def, UniformOnFun.toFun_ofFun] using hGunif
-  let pair : Real -> (Real →ᵤ[{S}] Real) × CMatrix a := fun p => (G p, F p)
-  let pair0 : (Real →ᵤ[{S}] Real) × CMatrix a := (G0, rho.matrix)
-  have hpair : Filter.Tendsto pair (nhdsWithin (0 : Real) (Set.Ioi 0)) (nhds pair0) := by
+  let pair : ℝ → (ℝ →ᵤ[{S}] ℝ) × CMatrix a := fun p => (G p, F p)
+  let pair0 : (ℝ →ᵤ[{S}] ℝ) × CMatrix a := (G0, rho.m)
+  have hpair : Filter.Tendsto pair (nhdsWithin (0 : ℝ) (Set.Ioi 0)) (nhds pair0) := by
     simpa [pair, pair0, nhds_prod_eq] using hG.prodMk hF
-  let domain : Set ((Real →ᵤ[{S}] Real) × CMatrix a) :=
-    {f : Real →ᵤ[{S}] Real | ContinuousOn (UniformOnFun.toFun {S} f) S} ×ˢ
-      {A : CMatrix a | IsSelfAdjoint A ∧ spectrum Real A ⊆ S}
+  let domain : Set ((ℝ →ᵤ[{S}] ℝ) × CMatrix a) :=
+    {f : ℝ →ᵤ[{S}] ℝ | ContinuousOn (UniformOnFun.toFun {S} f) S} ×ˢ
+      {A : CMatrix a | IsSelfAdjoint A ∧ _root_.spectrum ℝ A ⊆ S}
   have hG0cont : ContinuousOn (UniformOnFun.toFun {S} G0) S := by
     simpa [G0, UniformOnFun.toFun_ofFun] using
       Real.continuous_mul_log.continuousOn
-  have hspec_rho : spectrum Real rho.matrix ⊆ S := by
+  have hspec_rho : _root_.spectrum ℝ rho.m ⊆ S := by
     intro x hx
     constructor
-    · exact spectrum_nonneg_of_nonneg (Matrix.nonneg_iff_posSemidef.mpr rho.pos) hx
-    · have hxabs : |x| ≤ ‖rho.matrix‖ := by
+    · exact spectrum_nonneg_of_nonneg (Matrix.nonneg_iff_posSemidef.mpr rho.psd) hx
+    · have hxabs : |x| ≤ ‖rho.m‖ := by
         simpa [Real.norm_eq_abs] using spectrum.norm_le_norm_of_mem hx
-      have hxle : x ≤ ‖rho.matrix‖ := le_trans (le_abs_self x) hxabs
+      have hxle : x ≤ ‖rho.m‖ := le_trans (le_abs_self x) hxabs
       dsimp [S, M]
       linarith
   have hpair0_mem : pair0 ∈ domain := by
     constructor
     · exact hG0cont
     · constructor
-      · exact Matrix.IsHermitian.isSelfAdjoint rho.pos.isHermitian
+      · exact Matrix.IsHermitian.isSelfAdjoint rho.psd.isHermitian
       · exact hspec_rho
-  have hevent_domain : ∀ᶠ p : Real in nhdsWithin (0 : Real) (Set.Ioi 0),
+  have hevent_domain : ∀ᶠ p : ℝ in nhdsWithin (0 : ℝ) (Set.Ioi 0),
       pair p ∈ domain := by
-    have hclose : ∀ᶠ p : Real in nhdsWithin (0 : Real) (Set.Ioi 0),
-        dist (F p) rho.matrix < 1 := by
+    have hclose : ∀ᶠ p : ℝ in nhdsWithin (0 : ℝ) (Set.Ioi 0),
+        dist (F p) rho.m < 1 := by
       exact hF (Metric.ball_mem_nhds _ zero_lt_one)
     filter_upwards [self_mem_nhdsWithin, hFpsd, hclose] with p hp_pos hp_psd hp_close
     constructor
     · dsimp [pair, G, domain]
       have hpowCont :
-          ContinuousOn (fun x : Real => x ^ (1 + p)) S :=
+          ContinuousOn (fun x : ℝ => x ^ (1 + p)) S :=
         (Real.continuous_rpow_const (by
           have hp_gt : 0 < p := hp_pos
           linarith)).continuousOn
@@ -887,26 +864,26 @@ theorem cfc_trace_rpow_one_add_sub_self_div_tendsto_of_tendsto_posSemidef
         · exact spectrum_nonneg_of_nonneg (Matrix.nonneg_iff_posSemidef.mpr hp_psd) hx
         · have hxabs : |x| ≤ ‖F p‖ := by
             simpa [Real.norm_eq_abs] using spectrum.norm_le_norm_of_mem hx
-          have hnorm_le : ‖F p‖ < ‖rho.matrix‖ + 1 := by
-            have hdist_norm : ‖F p - rho.matrix‖ < 1 := by
+          have hnorm_le : ‖F p‖ < ‖rho.m‖ + 1 := by
+            have hdist_norm : ‖F p - rho.m‖ < 1 := by
               simpa [dist_eq_norm] using hp_close
-            have := norm_le_norm_add_norm_sub' (F p) rho.matrix
+            have := norm_le_norm_add_norm_sub' (F p) rho.m
             nlinarith
-          have hxle : x < ‖rho.matrix‖ + 1 :=
+          have hxle : x < ‖rho.m‖ + 1 :=
             lt_of_le_of_lt (le_trans (le_abs_self x) hxabs) hnorm_le
           dsimp [S, M]
           linarith
   have hwithin : Filter.Tendsto pair
-      (nhdsWithin (0 : Real) (Set.Ioi 0)) (nhdsWithin pair0 domain) := by
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0)) (nhdsWithin pair0 domain) := by
     rw [tendsto_nhdsWithin_iff]
     exact ⟨hpair, hevent_domain⟩
   have hcont :=
     (continuousOn_cfc_setProd (A := CMatrix a) (s := S) isCompact_Icc).continuousWithinAt
       hpair0_mem
   have hcfc : Filter.Tendsto
-      (fun p : Real => cfc (UniformOnFun.toFun {S} (G p)) (F p))
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
-      (nhds (cfc (UniformOnFun.toFun {S} G0) rho.matrix)) := by
+      (fun p : ℝ => cfc (UniformOnFun.toFun {S} (G p)) (F p))
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
+      (nhds (cfc (UniformOnFun.toFun {S} G0) rho.m)) := by
     simpa [pair, pair0, Function.comp_def] using hcont.tendsto.comp hwithin
   have htraceCont : Continuous fun M : CMatrix a => M.trace :=
     Continuous.matrix_trace continuous_id
@@ -917,16 +894,16 @@ theorem cfc_trace_rpow_one_add_sub_self_div_tendsto_of_tendsto_posSemidef
 /-- CFC self endpoint for the sandwiched inner operator with positive-definite
 reference. -/
 theorem sandwichedRenyiReferenceInner_cfc_self_endpoint_posDef
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosDef) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosDef) :
     Filter.Tendsto
-      (fun p : Real =>
-        ((cfc (fun x : Real => (x ^ (1 + p) - x) / p)
+      (fun p : ℝ =>
+        ((cfc (fun x : ℝ => (x ^ (1 + p) - x) / p)
           (sandwichedRenyiReferenceInner rho sigma (1 + p))).trace).re)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
       (nhds (-rho.vonNeumann * Real.log 2)) := by
   have hEndpoint :=
     cfc_trace_rpow_one_add_sub_self_div_tendsto_of_tendsto_posSemidef
-      (F := fun p : Real => sandwichedRenyiReferenceInner rho sigma (1 + p))
+      (F := fun p : ℝ => sandwichedRenyiReferenceInner rho sigma (1 + p))
       rho
       (sandwichedRenyiReferenceInner_one_add_tendsto_state_matrix_posDef rho hSigma)
       (Filter.Eventually.of_forall fun p =>
@@ -940,33 +917,33 @@ This algebraic bridge turns
 `(Tr A^(1+p) - Tr A) / p` into the trace of the continuous scalar function
 `x ↦ (x^(1+p) - x) / p` applied by CFC. -/
 theorem psdTracePower_one_add_sub_trace_div_eq_trace_cfc_rpow_sub_self_div
-    {A : CMatrix a} (hA : A.PosSemidef) {p : Real} (hp : 0 < p) :
+    {A : CMatrix a} (hA : A.PosSemidef) {p : ℝ} (hp : 0 < p) :
     (psdTracePower A hA (1 + p) - A.trace.re) / p =
-      ((cfc (fun x : Real => (x ^ (1 + p) - x) / p) A).trace).re := by
+      ((cfc (fun x : ℝ => (x ^ (1 + p) - x) / p) A).trace).re := by
   have hpne : p ≠ 0 := ne_of_gt hp
   have hpowCont :
-      ContinuousOn (fun x : Real => x ^ (1 + p)) (spectrum Real A) :=
+      ContinuousOn (fun x : ℝ => x ^ (1 + p)) (_root_.spectrum ℝ A) :=
     (Real.continuous_rpow_const (by linarith : 0 ≤ 1 + p)).continuousOn
   have hsubCont :
-      ContinuousOn (fun x : Real => x ^ (1 + p) - x) (spectrum Real A) :=
+      ContinuousOn (fun x : ℝ => x ^ (1 + p) - x) (_root_.spectrum ℝ A) :=
     hpowCont.sub continuousOn_id
   have hcfc :
-      cfc (fun x : Real => (x ^ (1 + p) - x) / p) A =
-        (p⁻¹ : Real) • (CFC.rpow A (1 + p) - A) := by
+      cfc (fun x : ℝ => (x ^ (1 + p) - x) / p) A =
+        (p⁻¹ : ℝ) • (CFC.rpow A (1 + p) - A) := by
     have hfun :
-        (fun x : Real => (x ^ (1 + p) - x) / p) =
-          (fun x : Real => p⁻¹ • (x ^ (1 + p) - x)) := by
+        (fun x : ℝ => (x ^ (1 + p) - x) / p) =
+          (fun x : ℝ => p⁻¹ • (x ^ (1 + p) - x)) := by
       funext x
       simp [div_eq_mul_inv, mul_comm]
     rw [hfun]
     rw [cfc_smul _ (hf := hsubCont)]
-    rw [show cfc (fun x : Real => x ^ (1 + p) - x) A =
-        cfc (fun x : Real => x ^ (1 + p)) A - cfc (fun x : Real => x) A from
-      cfc_sub (fun x : Real => x ^ (1 + p)) (fun x : Real => x) A
+    rw [show cfc (fun x : ℝ => x ^ (1 + p) - x) A =
+        cfc (fun x : ℝ => x ^ (1 + p)) A - cfc (fun x : ℝ => x) A from
+      cfc_sub (fun x : ℝ => x ^ (1 + p)) (fun x : ℝ => x) A
         (hf := hpowCont) (hg := continuousOn_id)]
-    rw [cfc_id' Real A (ha := Matrix.IsHermitian.isSelfAdjoint hA.isHermitian)]
+    rw [cfc_id' ℝ A (ha := Matrix.IsHermitian.isSelfAdjoint hA.isHermitian)]
     have hrpowReal :
-        CFC.rpow A (1 + p) = cfc (fun x : Real => x ^ (1 + p)) A := by
+        CFC.rpow A (1 + p) = cfc (fun x : ℝ => x ^ (1 + p)) A := by
       simpa [CFC.rpow_eq_pow] using
         (CFC.rpow_eq_cfc_real (a := A) (y := 1 + p)
           (ha := Matrix.nonneg_iff_posSemidef.mpr hA))
@@ -977,22 +954,22 @@ theorem psdTracePower_one_add_sub_trace_div_eq_trace_cfc_rpow_sub_self_div
 /-- A CFC self-endpoint for the moving sandwiched inner operator implies the
 raw self trace-power endpoint used by the high-`alpha` bridge. -/
 theorem sandwichedRenyiReferenceInner_power_minus_trace_slope_tendsto_of_cfc_self_endpoint
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    {L : Real}
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    {L : ℝ}
     (hEndpoint :
       Filter.Tendsto
-        (fun p : Real =>
-          ((cfc (fun x : Real => (x ^ (1 + p) - x) / p)
+        (fun p : ℝ =>
+          ((cfc (fun x : ℝ => (x ^ (1 + p) - x) / p)
             (sandwichedRenyiReferenceInner rho sigma (1 + p))).trace).re)
-        (nhdsWithin (0 : Real) (Set.Ioi 0))
+        (nhdsWithin (0 : ℝ) (Set.Ioi 0))
         (nhds L)) :
     Filter.Tendsto
-      (fun p : Real =>
+      (fun p : ℝ =>
         (psdTracePower (sandwichedRenyiReferenceInner rho sigma (1 + p))
             (sandwichedRenyiReferenceInner_posSemidef rho hSigma (1 + p))
             (1 + p) -
           (sandwichedRenyiReferenceInner rho sigma (1 + p)).trace.re) / p)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
       (nhds L) := by
   refine hEndpoint.congr' ?_
   filter_upwards [self_mem_nhdsWithin] with p hp
@@ -1008,24 +985,24 @@ The reference trace derivative is supplied by
 the only remaining input is the CFC endpoint for
 `x ↦ (x^(1+p)-x)/p` along the moving inner operator. -/
 theorem sandwichedRenyiReferenceInner_tracePower_slope_tendsto_of_cfc_self_endpoint_posDef
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosDef)
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosDef)
     (hEndpoint :
       Filter.Tendsto
-        (fun p : Real =>
-          ((cfc (fun x : Real => (x ^ (1 + p) - x) / p)
+        (fun p : ℝ =>
+          ((cfc (fun x : ℝ => (x ^ (1 + p) - x) / p)
             (sandwichedRenyiReferenceInner rho sigma (1 + p))).trace).re)
-        (nhdsWithin (0 : Real) (Set.Ioi 0))
+        (nhdsWithin (0 : ℝ) (Set.Ioi 0))
         (nhds (-rho.vonNeumann * Real.log 2))) :
     Filter.Tendsto
-      (fun p : Real =>
+      (fun p : ℝ =>
         (psdTracePower (sandwichedRenyiReferenceInner rho sigma (1 + p))
             (sandwichedRenyiReferenceInner_posSemidef
               rho hSigma.posSemidef (1 + p))
             (1 + p) - 1) / p)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
       (nhds
         (-rho.vonNeumann * Real.log 2 -
-          (rho.matrix * psdLog sigma hSigma).trace.re)) := by
+          (rho.m * psdLog sigma hSigma).trace.re)) := by
   exact
     sandwichedRenyiReferenceInner_tracePower_slope_tendsto_of_power_minus_trace_slope_posDef
       rho hSigma
@@ -1034,20 +1011,20 @@ theorem sandwichedRenyiReferenceInner_tracePower_slope_tendsto_of_cfc_self_endpo
 
 /-- Positive-definite reference raw trace-power endpoint at `alpha = 1+`.
 
-This closes the endpoint input previously supplied as a hypothesis: the moving
-CFC self term is handled by the zero-inclusive uniform scalar endpoint above. -/
+The moving CFC self term is handled by the zero-inclusive uniform scalar
+endpoint above. -/
 theorem sandwichedRenyiReferenceInner_tracePower_slope_tendsto_posDef
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosDef) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosDef) :
     Filter.Tendsto
-      (fun p : Real =>
+      (fun p : ℝ =>
         (psdTracePower (sandwichedRenyiReferenceInner rho sigma (1 + p))
             (sandwichedRenyiReferenceInner_posSemidef
               rho hSigma.posSemidef (1 + p))
             (1 + p) - 1) / p)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
       (nhds
         (-rho.vonNeumann * Real.log 2 -
-          (rho.matrix * psdLog sigma hSigma).trace.re)) := by
+          (rho.m * psdLog sigma hSigma).trace.re)) := by
   exact
     sandwichedRenyiReferenceInner_tracePower_slope_tendsto_of_cfc_self_endpoint_posDef
       rho hSigma
@@ -1058,16 +1035,16 @@ theorem sandwichedRenyiReferenceInner_tracePower_slope_tendsto_posDef
 This identifies the right derivative of `Tr rho^(1+p)` at `p = 0` with the
 natural-log version of the von Neumann entropy contribution. -/
 theorem state_psdTracePower_one_add_sub_one_div_tendsto_neg_vonNeumann_mul_log2
-    (rho : State a) :
+    (rho : MState a) :
     Filter.Tendsto
-      (fun p : Real => (psdTracePower rho.matrix rho.pos (1 + p) - 1) / p)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
+      (fun p : ℝ => (psdTracePower rho.m rho.psd (1 + p) - 1) / p)
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
       (nhds (-rho.vonNeumann * Real.log 2)) := by
-  let d : a -> Real := fun i => rho.pos.isHermitian.eigenvalues i
-  have hd : ∀ i, 0 ≤ d i := fun i => rho.pos.eigenvalues_nonneg i
+  let d : a → ℝ := fun i => rho.psd.isHermitian.eigenvalues i
+  have hd : ∀ i, 0 ≤ d i := fun i => rho.psd.eigenvalues_nonneg i
   have hsumOne : (∑ i, d i) = 1 := by
-    have htrace := congrArg Complex.re rho.pos.isHermitian.trace_eq_sum_eigenvalues
-    simpa [d] using htrace.symm.trans (congrArg Complex.re rho.trace_eq_one)
+    have htrace := congrArg Complex.re rho.psd.isHermitian.trace_eq_sum_eigenvalues
+    simpa [d] using htrace.symm.trans (congrArg Complex.re rho.tr')
   have htarget :
       (∑ i, d i * Real.log (d i)) = -rho.vonNeumann * Real.log 2 := by
     calc
@@ -1075,39 +1052,39 @@ theorem state_psdTracePower_one_add_sub_one_div_tendsto_neg_vonNeumann_mul_log2
           = ∑ i, xlog2 (d i) * Real.log 2 := by
               refine Finset.sum_congr rfl ?_
               intro i _
-              exact (xlog2_mul_log2_self_of_nonneg (hd i)).symm
+              exact (xlog2_mul_log2_self (hd i)).symm
       _ = (∑ i, xlog2 (d i)) * Real.log 2 := by
               rw [Finset.sum_mul]
       _ = -rho.vonNeumann * Real.log 2 := by
-              simp [State.vonNeumann, d]
+              simp [MState.vonNeumann, d]
   have hsum :=
     finite_sum_rpow_one_add_sub_self_div_tendsto_sum_mul_log d hd
   have hsum' :
       Filter.Tendsto
-        (fun p : Real => (psdTracePower rho.matrix rho.pos (1 + p) - 1) / p)
-        (nhdsWithin (0 : Real) (Set.Ioi 0))
+        (fun p : ℝ => (psdTracePower rho.m rho.psd (1 + p) - 1) / p)
+        (nhdsWithin (0 : ℝ) (Set.Ioi 0))
         (nhds (∑ i, d i * Real.log (d i))) := by
     refine hsum.congr' ?_
     filter_upwards with p
-    rw [← psdTracePower_eq_sum_eigenvalues_rpow rho.matrix rho.pos (1 + p)]
+    rw [← psdTracePower_eq_sum_eigenvalues_rpow rho.m rho.psd (1 + p)]
     simp [psdTracePower, d, hsumOne]
   simpa [htarget] using hsum'
 
 /-- Turning a value-slope endpoint at `1` into a natural-log slope endpoint.
 
 This isolates the elementary real-analysis step used after proving a raw
-trace-power derivative: if `T -> 1` and `(T - 1) / denom -> L`, then
-`log T / denom -> L`.  The `dslope` formulation handles points where `T = 1`
+trace-power derivative: if `T → 1` and `(T - 1) / denom → L`, then
+`log T / denom → L`.  The `dslope` formulation handles points where `T = 1`
 without requiring an eventual `T ≠ 1` side condition. -/
 theorem real_log_slope_tendsto_of_value_slope_tendsto
-    {β : Type*} {l : Filter β} {T denom : β -> Real} {L : Real}
+    {β : Type*} {l : Filter β} {T denom : β → ℝ} {L : ℝ}
     (hT : Filter.Tendsto T l (nhds 1))
     (hslope : Filter.Tendsto (fun b => (T b - 1) / denom b) l (nhds L))
     (hdenom : ∀ᶠ b in l, denom b ≠ 0) :
     Filter.Tendsto (fun b => Real.log (T b) / denom b) l (nhds L) := by
   have hlogSlope :
-      Filter.Tendsto (dslope Real.log 1) (nhds 1) (nhds (1 : Real)) := by
-    have hcont : ContinuousAt (dslope Real.log 1) (1 : Real) :=
+      Filter.Tendsto (dslope Real.log 1) (nhds 1) (nhds (1 : ℝ)) := by
+    have hcont : ContinuousAt (dslope Real.log 1) (1 : ℝ) :=
       continuousAt_dslope_same.2
         (Real.hasDerivAt_log one_ne_zero).differentiableAt
     simpa [dslope_same, Real.deriv_log] using hcont.tendsto
@@ -1135,7 +1112,7 @@ theorem real_log_slope_tendsto_of_value_slope_tendsto
 
 /-- Base-2 version of `real_log_slope_tendsto_of_value_slope_tendsto`. -/
 theorem real_log2_slope_tendsto_of_value_slope_tendsto
-    {β : Type*} {l : Filter β} {T denom : β -> Real} {L : Real}
+    {β : Type*} {l : Filter β} {T denom : β → ℝ} {L : ℝ}
     (hT : Filter.Tendsto T l (nhds 1))
     (hslope : Filter.Tendsto (fun b => (T b - 1) / denom b) l (nhds L))
     (hdenom : ∀ᶠ b in l, denom b ≠ 0) :
@@ -1152,7 +1129,7 @@ theorem real_log2_slope_tendsto_of_value_slope_tendsto
 /-- A finite difference-quotient endpoint forces the underlying value to
 converge to the base point when the denominator tends to zero. -/
 theorem real_value_tendsto_one_of_sub_div_tendsto
-    {β : Type*} {l : Filter β} {T denom : β -> Real} {L : Real}
+    {β : Type*} {l : Filter β} {T denom : β → ℝ} {L : ℝ}
     (hdenom0 : Filter.Tendsto denom l (nhds 0))
     (hslope : Filter.Tendsto (fun b => (T b - 1) / denom b) l (nhds L))
     (hdenom : ∀ᶠ b in l, denom b ≠ 0) :
@@ -1177,13 +1154,13 @@ theorem real_value_tendsto_one_of_sub_div_tendsto
     hsub.add tendsto_const_nhds
   simpa using hadd
 
-/-- The right-neighborhood filter `alpha -> 1+` on orders satisfying
+/-- The right-neighborhood filter `alpha → 1+` on orders satisfying
 `1 < alpha`. -/
-def relativeEntropyHighAlphaRightToOne : Filter {alpha : Real // 1 < alpha} :=
-  Filter.comap (fun alpha : {alpha : Real // 1 < alpha} => alpha.1)
-    (nhdsWithin (1 : Real) (Set.Ioi 1))
+def relativeEntropyHighAlphaRightToOne : Filter {alpha : ℝ // 1 < alpha} :=
+  Filter.comap (fun alpha : {alpha : ℝ // 1 < alpha} => alpha.1)
+    (nhdsWithin (1 : ℝ) (Set.Ioi 1))
 
-/-- The right-neighborhood filter `alpha -> 1+` is nontrivial on the subtype
+/-- The right-neighborhood filter `alpha → 1+` is nontrivial on the subtype
 `1 < alpha`. -/
 theorem relativeEntropyHighAlphaRightToOne_neBot :
     Filter.NeBot relativeEntropyHighAlphaRightToOne := by
@@ -1191,10 +1168,10 @@ theorem relativeEntropyHighAlphaRightToOne_neBot :
   refine Filter.comap_neBot ?_
   intro t ht
   have hflt :
-      t ∩ Set.Ioi (1 : Real) ∈ nhdsWithin (1 : Real) (Set.Ioi 1) := by
+      t ∩ Set.Ioi (1 : ℝ) ∈ nhdsWithin (1 : ℝ) (Set.Ioi 1) := by
     exact Filter.inter_mem ht self_mem_nhdsWithin
-  have : Filter.NeBot (nhdsWithin (1 : Real) (Set.Ioi 1)) :=
-    nhdsWithin_Ioi_neBot (α := Real) (a := 1) (b := 1) le_rfl
+  have : Filter.NeBot (nhdsWithin (1 : ℝ) (Set.Ioi 1)) :=
+    nhdsWithin_Ioi_neBot (α := ℝ) (a := 1) (b := 1) le_rfl
   rcases Filter.nonempty_of_mem hflt with ⟨x, hx⟩
   exact ⟨⟨x, hx.2⟩, hx.1⟩
 
@@ -1202,23 +1179,23 @@ theorem relativeEntropyHighAlphaRightToOne_neBot :
 zero. -/
 theorem relativeEntropyHighAlphaRightToOne_sub_tendsto_zero :
     Filter.Tendsto
-      (fun alpha : {alpha : Real // 1 < alpha} => alpha.1 - 1)
+      (fun alpha : {alpha : ℝ // 1 < alpha} => alpha.1 - 1)
       relativeEntropyHighAlphaRightToOne
       (nhds 0) := by
   unfold relativeEntropyHighAlphaRightToOne
   have hsub :
-      Filter.Tendsto (fun x : Real => x - 1)
-        (nhdsWithin (1 : Real) (Set.Ioi 1)) (nhds 0) := by
+      Filter.Tendsto (fun x : ℝ => x - 1)
+        (nhdsWithin (1 : ℝ) (Set.Ioi 1)) (nhds 0) := by
     have hxWithin :
-        Filter.Tendsto (fun x : Real => x)
-          (nhdsWithin (1 : Real) (Set.Ioi 1))
-          (nhdsWithin (1 : Real) (Set.Ioi 1)) :=
+        Filter.Tendsto (fun x : ℝ => x)
+          (nhdsWithin (1 : ℝ) (Set.Ioi 1))
+          (nhdsWithin (1 : ℝ) (Set.Ioi 1)) :=
       tendsto_id
-    have hx : Filter.Tendsto (fun x : Real => x)
-        (nhdsWithin (1 : Real) (Set.Ioi 1)) (nhds 1) :=
+    have hx : Filter.Tendsto (fun x : ℝ => x)
+        (nhdsWithin (1 : ℝ) (Set.Ioi 1)) (nhds 1) :=
       (tendsto_nhdsWithin_iff.mp hxWithin).1
-    have hconst : Filter.Tendsto (fun _ : Real => (1 : Real))
-        (nhdsWithin (1 : Real) (Set.Ioi 1)) (nhds 1) :=
+    have hconst : Filter.Tendsto (fun _ : ℝ => (1 : ℝ))
+        (nhdsWithin (1 : ℝ) (Set.Ioi 1)) (nhds 1) :=
       tendsto_const_nhds
     simpa using hx.sub hconst
   exact hsub.comp Filter.tendsto_comap
@@ -1227,9 +1204,9 @@ theorem relativeEntropyHighAlphaRightToOne_sub_tendsto_zero :
 from the right. -/
 theorem relativeEntropyHighAlphaRightToOne_sub_tendsto_zero_within :
     Filter.Tendsto
-      (fun alpha : {alpha : Real // 1 < alpha} => alpha.1 - 1)
+      (fun alpha : {alpha : ℝ // 1 < alpha} => alpha.1 - 1)
       relativeEntropyHighAlphaRightToOne
-      (nhdsWithin (0 : Real) (Set.Ioi 0)) := by
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0)) := by
   rw [tendsto_nhdsWithin_iff]
   exact
     ⟨relativeEntropyHighAlphaRightToOne_sub_tendsto_zero,
@@ -1238,9 +1215,9 @@ theorem relativeEntropyHighAlphaRightToOne_sub_tendsto_zero_within :
 /-- Positive-definite reference raw trace-power endpoint along the high-`alpha`
 subtype filter. -/
 theorem sandwichedRenyiReferenceInner_tracePower_slope_tendsto_posDef_highAlpha
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosDef) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosDef) :
     Filter.Tendsto
-      (fun alpha : {alpha : Real // 1 < alpha} =>
+      (fun alpha : {alpha : ℝ // 1 < alpha} =>
         (psdTracePower (sandwichedRenyiReferenceInner rho sigma alpha.1)
             (sandwichedRenyiReferenceInner_posSemidef
               rho hSigma.posSemidef alpha.1)
@@ -1248,32 +1225,32 @@ theorem sandwichedRenyiReferenceInner_tracePower_slope_tendsto_posDef_highAlpha
       relativeEntropyHighAlphaRightToOne
       (nhds
         (-rho.vonNeumann * Real.log 2 -
-          (rho.matrix * psdLog sigma hSigma).trace.re)) := by
+          (rho.m * psdLog sigma hSigma).trace.re)) := by
   have hp := sandwichedRenyiReferenceInner_tracePower_slope_tendsto_posDef rho hSigma
   have hsub := relativeEntropyHighAlphaRightToOne_sub_tendsto_zero_within
   have hcomp := hp.comp hsub
   refine hcomp.congr' ?_
   filter_upwards with alpha
-  have hadd : (1 : Real) + (alpha.1 - 1) = alpha.1 := by ring
+  have hadd : (1 : ℝ) + (alpha.1 - 1) = alpha.1 := by ring
   simp [hadd, psdTracePower]
 
 /-- The high-`alpha` sandwiched Renyi curve used to define the source-limit
 relative entropy quantity. -/
 def sandwichedRenyiPSDReferenceHighAlphaCurve
-    (rho : State a) (sigma : CMatrix a) (hSigma : sigma.PosSemidef) :
-    {alpha : Real // 1 < alpha} -> EReal :=
+    (rho : MState a) (sigma : CMatrix a) (hSigma : sigma.PosSemidef) :
+    {alpha : ℝ // 1 < alpha} → EReal :=
   fun alpha => sandwichedRenyiPSDReferenceE rho sigma hSigma alpha.1
 
 /-- Source-limit extended-real PSD-reference relative entropy.
 
 For supported inputs this is the `limsup` of the high-`alpha` sandwiched Renyi
-relative entropy along `alpha -> 1+`; unsupported inputs use the standard
+relative entropy along `alpha → 1+`; unsupported inputs use the standard
 extended-real top branch. -/
 noncomputable def relativeEntropyPSDReferenceE
-    (rho : State a) (sigma : CMatrix a) (hSigma : sigma.PosSemidef) : EReal := by
+    (rho : MState a) (sigma : CMatrix a) (hSigma : sigma.PosSemidef) : EReal := by
   classical
   exact
-    if Matrix.Supports rho.matrix sigma then
+    if Matrix.Supports rho.m sigma then
       Filter.limsup
         (sandwichedRenyiPSDReferenceHighAlphaCurve rho sigma hSigma)
         relativeEntropyHighAlphaRightToOne
@@ -1282,15 +1259,15 @@ noncomputable def relativeEntropyPSDReferenceE
 
 @[simp]
 theorem relativeEntropyPSDReferenceE_eq_top_of_not_supports
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (hSupport : ¬ Matrix.Supports rho.matrix sigma) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (hSupport : ¬ Matrix.Supports rho.m sigma) :
     relativeEntropyPSDReferenceE rho sigma hSigma = (⊤ : EReal) := by
   simp [relativeEntropyPSDReferenceE, hSupport]
 
 @[simp]
 theorem relativeEntropyPSDReferenceE_eq_limsup_of_supports
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (hSupport : Matrix.Supports rho.matrix sigma) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (hSupport : Matrix.Supports rho.m sigma) :
     relativeEntropyPSDReferenceE rho sigma hSigma =
       Filter.limsup
         (sandwichedRenyiPSDReferenceHighAlphaCurve rho sigma hSigma)
@@ -1300,15 +1277,15 @@ theorem relativeEntropyPSDReferenceE_eq_limsup_of_supports
 /-- Raw trace-power slope endpoint implies the high-`alpha` finite branch has
 the trace-log endpoint.
 
-This is the outer real-analysis bridge for the sandwiched `alpha -> 1+`
+This is the outer real-analysis bridge for the sandwiched `alpha → 1+`
 endpoint.  It leaves only the noncommutative raw trace-power derivative
 `Tr[(sigma^s rho sigma^s)^alpha]` as the remaining mathematical input. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFinite_tendsto_traceLogFinite_of_tracePower_slope
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (hSupport : Matrix.Supports rho.matrix sigma)
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (hSupport : Matrix.Supports rho.m sigma)
     (hTracePower :
       Filter.Tendsto
-        (fun alpha : {alpha : Real // 1 < alpha} =>
+        (fun alpha : {alpha : ℝ // 1 < alpha} =>
           psdTracePower (sandwichedRenyiReferenceInner rho sigma alpha.1)
             (sandwichedRenyiReferenceInner_posSemidef rho hSigma alpha.1)
             alpha.1)
@@ -1316,7 +1293,7 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_tendsto_traceLogFinite_of_tra
         (nhds 1))
     (hTracePowerSlope :
       Filter.Tendsto
-        (fun alpha : {alpha : Real // 1 < alpha} =>
+        (fun alpha : {alpha : ℝ // 1 < alpha} =>
           (psdTracePower (sandwichedRenyiReferenceInner rho sigma alpha.1)
               (sandwichedRenyiReferenceInner_posSemidef rho hSigma alpha.1)
               alpha.1 - 1) / (alpha.1 - 1))
@@ -1325,18 +1302,18 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_tendsto_traceLogFinite_of_tra
           (relativeEntropyPSDReferenceTraceLogFinite rho sigma hSigma hSupport *
             Real.log 2))) :
     Filter.Tendsto
-      (fun alpha : {alpha : Real // 1 < alpha} =>
+      (fun alpha : {alpha : ℝ // 1 < alpha} =>
         sandwichedRenyiPSDReferenceHighAlphaFinite rho sigma hSigma alpha.1)
       relativeEntropyHighAlphaRightToOne
       (nhds (relativeEntropyPSDReferenceTraceLogFinite rho sigma hSigma hSupport)) := by
-  let T : {alpha : Real // 1 < alpha} -> Real := fun alpha =>
+  let T : {alpha : ℝ // 1 < alpha} → ℝ := fun alpha =>
     psdTracePower (sandwichedRenyiReferenceInner rho sigma alpha.1)
       (sandwichedRenyiReferenceInner_posSemidef rho hSigma alpha.1)
       alpha.1
-  let denom : {alpha : Real // 1 < alpha} -> Real := fun alpha => alpha.1 - 1
+  let denom : {alpha : ℝ // 1 < alpha} → ℝ := fun alpha => alpha.1 - 1
   change Filter.Tendsto T relativeEntropyHighAlphaRightToOne (nhds 1) at hTracePower
   change
-    Filter.Tendsto (fun alpha : {alpha : Real // 1 < alpha} =>
+    Filter.Tendsto (fun alpha : {alpha : ℝ // 1 < alpha} =>
       (T alpha - 1) / denom alpha) relativeEntropyHighAlphaRightToOne
       (nhds
         (relativeEntropyPSDReferenceTraceLogFinite rho sigma hSigma hSupport *
@@ -1353,13 +1330,10 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_tendsto_traceLogFinite_of_tra
           Real.log 2) / Real.log 2 =
         relativeEntropyPSDReferenceTraceLogFinite rho sigma hSigma hSupport := by
     field_simp [(Real.log_pos one_lt_two).ne']
-  have hscale' :
-      Real.log 2 * ((Real.log 2)⁻¹ *
-          relativeEntropyPSDReferenceTraceLogFinite rho sigma hSigma hSupport) =
-        relativeEntropyPSDReferenceTraceLogFinite rho sigma hSigma hSupport := by
-    rw [← mul_assoc, mul_inv_cancel₀ (ne_of_gt (Real.log_pos one_lt_two)), one_mul]
+  have hcancel : Real.log 2 * (Real.log 2)⁻¹ = 1 :=
+    mul_inv_cancel₀ (ne_of_gt (Real.log_pos one_lt_two))
   simpa [T, denom, sandwichedRenyiPSDReferenceHighAlphaFinite, one_div,
-    div_eq_mul_inv, mul_comm, mul_left_comm, mul_assoc, hscale, hscale'] using hlog2
+    div_eq_mul_inv, mul_comm, mul_left_comm, mul_assoc, hscale, hcancel] using hlog2
 
 /-- A raw trace-power slope endpoint already implies the value endpoint needed
 by the high-`alpha` finite-branch bridge.
@@ -1367,11 +1341,11 @@ by the high-`alpha` finite-branch bridge.
 This form is closer to the remaining noncommutative endpoint obligation: the
 only supplied input is the first-order trace-power expansion at `alpha = 1`. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFinite_tendsto_traceLogFinite_of_tracePower_slope_only
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (hSupport : Matrix.Supports rho.matrix sigma)
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (hSupport : Matrix.Supports rho.m sigma)
     (hTracePowerSlope :
       Filter.Tendsto
-        (fun alpha : {alpha : Real // 1 < alpha} =>
+        (fun alpha : {alpha : ℝ // 1 < alpha} =>
           (psdTracePower (sandwichedRenyiReferenceInner rho sigma alpha.1)
               (sandwichedRenyiReferenceInner_posSemidef rho hSigma alpha.1)
               alpha.1 - 1) / (alpha.1 - 1))
@@ -1380,17 +1354,17 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_tendsto_traceLogFinite_of_tra
           (relativeEntropyPSDReferenceTraceLogFinite rho sigma hSigma hSupport *
             Real.log 2))) :
     Filter.Tendsto
-      (fun alpha : {alpha : Real // 1 < alpha} =>
+      (fun alpha : {alpha : ℝ // 1 < alpha} =>
         sandwichedRenyiPSDReferenceHighAlphaFinite rho sigma hSigma alpha.1)
       relativeEntropyHighAlphaRightToOne
       (nhds (relativeEntropyPSDReferenceTraceLogFinite rho sigma hSigma hSupport)) := by
-  let T : {alpha : Real // 1 < alpha} -> Real := fun alpha =>
+  let T : {alpha : ℝ // 1 < alpha} → ℝ := fun alpha =>
     psdTracePower (sandwichedRenyiReferenceInner rho sigma alpha.1)
       (sandwichedRenyiReferenceInner_posSemidef rho hSigma alpha.1)
       alpha.1
-  let denom : {alpha : Real // 1 < alpha} -> Real := fun alpha => alpha.1 - 1
+  let denom : {alpha : ℝ // 1 < alpha} → ℝ := fun alpha => alpha.1 - 1
   change
-    Filter.Tendsto (fun alpha : {alpha : Real // 1 < alpha} =>
+    Filter.Tendsto (fun alpha : {alpha : ℝ // 1 < alpha} =>
       (T alpha - 1) / denom alpha) relativeEntropyHighAlphaRightToOne
       (nhds
         (relativeEntropyPSDReferenceTraceLogFinite rho sigma hSigma hSupport *
@@ -1411,28 +1385,28 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_tendsto_traceLogFinite_of_tra
 finite branch to any declared real endpoint whose natural-log scaling is the
 slope. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFinite_tendsto_of_tracePower_slope_only
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (D : Real)
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (D : ℝ)
     (hTracePowerSlope :
       Filter.Tendsto
-        (fun alpha : {alpha : Real // 1 < alpha} =>
+        (fun alpha : {alpha : ℝ // 1 < alpha} =>
           (psdTracePower (sandwichedRenyiReferenceInner rho sigma alpha.1)
               (sandwichedRenyiReferenceInner_posSemidef rho hSigma alpha.1)
               alpha.1 - 1) / (alpha.1 - 1))
         relativeEntropyHighAlphaRightToOne
         (nhds (D * Real.log 2))) :
     Filter.Tendsto
-      (fun alpha : {alpha : Real // 1 < alpha} =>
+      (fun alpha : {alpha : ℝ // 1 < alpha} =>
         sandwichedRenyiPSDReferenceHighAlphaFinite rho sigma hSigma alpha.1)
       relativeEntropyHighAlphaRightToOne
       (nhds D) := by
-  let T : {alpha : Real // 1 < alpha} -> Real := fun alpha =>
+  let T : {alpha : ℝ // 1 < alpha} → ℝ := fun alpha =>
     psdTracePower (sandwichedRenyiReferenceInner rho sigma alpha.1)
       (sandwichedRenyiReferenceInner_posSemidef rho hSigma alpha.1)
       alpha.1
-  let denom : {alpha : Real // 1 < alpha} -> Real := fun alpha => alpha.1 - 1
+  let denom : {alpha : ℝ // 1 < alpha} → ℝ := fun alpha => alpha.1 - 1
   change
-    Filter.Tendsto (fun alpha : {alpha : Real // 1 < alpha} =>
+    Filter.Tendsto (fun alpha : {alpha : ℝ // 1 < alpha} =>
       (T alpha - 1) / denom alpha) relativeEntropyHighAlphaRightToOne
       (nhds (D * Real.log 2)) at hTracePowerSlope
   have hdenom0 : Filter.Tendsto denom relativeEntropyHighAlphaRightToOne (nhds 0) := by
@@ -1458,29 +1432,29 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_tendsto_of_tracePower_slope_o
 /-- Positive-definite reference high-`alpha` finite branch endpoint, in the
 trace-log convention. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFinite_tendsto_posDef_traceLog
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosDef) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosDef) :
     Filter.Tendsto
-      (fun alpha : {alpha : Real // 1 < alpha} =>
+      (fun alpha : {alpha : ℝ // 1 < alpha} =>
         sandwichedRenyiPSDReferenceHighAlphaFinite
           rho sigma hSigma.posSemidef alpha.1)
       relativeEntropyHighAlphaRightToOne
       (nhds
         (-rho.vonNeumann -
-          ((rho.matrix * psdLog sigma hSigma).trace.re / Real.log 2))) := by
+          ((rho.m * psdLog sigma hSigma).trace.re / Real.log 2))) := by
   refine
     sandwichedRenyiPSDReferenceHighAlphaFinite_tendsto_of_tracePower_slope_only
       rho hSigma.posSemidef
       (-rho.vonNeumann -
-        ((rho.matrix * psdLog sigma hSigma).trace.re / Real.log 2)) ?_
+        ((rho.m * psdLog sigma hSigma).trace.re / Real.log 2)) ?_
   have hSlope :=
     sandwichedRenyiReferenceInner_tracePower_slope_tendsto_posDef_highAlpha
       rho hSigma
   have hscale :
       (-rho.vonNeumann -
-          ((rho.matrix * psdLog sigma hSigma).trace.re / Real.log 2)) *
+          ((rho.m * psdLog sigma hSigma).trace.re / Real.log 2)) *
           Real.log 2 =
         -rho.vonNeumann * Real.log 2 -
-          (rho.matrix * psdLog sigma hSigma).trace.re := by
+          (rho.m * psdLog sigma hSigma).trace.re := by
     field_simp [(Real.log_pos one_lt_two).ne']
   simpa [hscale] using hSlope
 
@@ -1488,12 +1462,12 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_tendsto_posDef_traceLog
 nonnegative in the source trace-log convention, with no full-rank assumption on
 the left state.
 
-This is the `α -> 1+` endpoint of high-`α` PSD-reference Renyi
+This is the `α → 1+` endpoint of high-`α` PSD-reference Renyi
 nonnegativity, itself obtained from DPI to the terminal one-outcome channel. -/
 theorem relativeEntropy_posDefReferenceTraceLog_nonneg
-    (ρ σ : State a) (hσ : σ.matrix.PosDef) :
+    (ρ σ : MState a) (hσ : σ.m.PosDef) :
     0 ≤ -ρ.vonNeumann -
-      ((ρ.matrix * psdLog σ.matrix hσ).trace.re / Real.log 2) := by
+      ((ρ.m * psdLog σ.m hσ).trace.re / Real.log 2) := by
   have hlim :=
     sandwichedRenyiPSDReferenceHighAlphaFinite_tendsto_posDef_traceLog
       ρ hσ
@@ -1507,11 +1481,11 @@ theorem relativeEntropy_posDefReferenceTraceLog_nonneg
 /-- The finite trace-power endpoint lifts to the source-facing `EReal`
 high-`alpha` PSD-reference curve on supported inputs. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaCurve_tendsto_traceLogFinite_of_tracePower_slope
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (hSupport : Matrix.Supports rho.matrix sigma)
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (hSupport : Matrix.Supports rho.m sigma)
     (hTracePower :
       Filter.Tendsto
-        (fun alpha : {alpha : Real // 1 < alpha} =>
+        (fun alpha : {alpha : ℝ // 1 < alpha} =>
           psdTracePower (sandwichedRenyiReferenceInner rho sigma alpha.1)
             (sandwichedRenyiReferenceInner_posSemidef rho hSigma alpha.1)
             alpha.1)
@@ -1519,7 +1493,7 @@ theorem sandwichedRenyiPSDReferenceHighAlphaCurve_tendsto_traceLogFinite_of_trac
         (nhds 1))
     (hTracePowerSlope :
       Filter.Tendsto
-        (fun alpha : {alpha : Real // 1 < alpha} =>
+        (fun alpha : {alpha : ℝ // 1 < alpha} =>
           (psdTracePower (sandwichedRenyiReferenceInner rho sigma alpha.1)
               (sandwichedRenyiReferenceInner_posSemidef rho hSigma alpha.1)
               alpha.1 - 1) / (alpha.1 - 1))
@@ -1533,7 +1507,7 @@ theorem sandwichedRenyiPSDReferenceHighAlphaCurve_tendsto_traceLogFinite_of_trac
       (nhds (relativeEntropyPSDReferenceTraceLogFinite rho sigma hSigma hSupport : EReal)) := by
   have hFinite :
       Filter.Tendsto
-        (fun alpha : {alpha : Real // 1 < alpha} =>
+        (fun alpha : {alpha : ℝ // 1 < alpha} =>
           sandwichedRenyiPSDReferenceHighAlphaFinite rho sigma hSigma alpha.1)
         relativeEntropyHighAlphaRightToOne
         (nhds (relativeEntropyPSDReferenceTraceLogFinite rho sigma hSigma hSupport)) :=
@@ -1548,11 +1522,11 @@ theorem sandwichedRenyiPSDReferenceHighAlphaCurve_tendsto_traceLogFinite_of_trac
 /-- The raw trace-power slope endpoint alone lifts to the source-facing
 `EReal` high-`alpha` PSD-reference curve on supported inputs. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaCurve_tendsto_traceLogFinite_of_tracePower_slope_only
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (hSupport : Matrix.Supports rho.matrix sigma)
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (hSupport : Matrix.Supports rho.m sigma)
     (hTracePowerSlope :
       Filter.Tendsto
-        (fun alpha : {alpha : Real // 1 < alpha} =>
+        (fun alpha : {alpha : ℝ // 1 < alpha} =>
           (psdTracePower (sandwichedRenyiReferenceInner rho sigma alpha.1)
               (sandwichedRenyiReferenceInner_posSemidef rho hSigma alpha.1)
               alpha.1 - 1) / (alpha.1 - 1))
@@ -1566,7 +1540,7 @@ theorem sandwichedRenyiPSDReferenceHighAlphaCurve_tendsto_traceLogFinite_of_trac
       (nhds (relativeEntropyPSDReferenceTraceLogFinite rho sigma hSigma hSupport : EReal)) := by
   have hFinite :
       Filter.Tendsto
-        (fun alpha : {alpha : Real // 1 < alpha} =>
+        (fun alpha : {alpha : ℝ // 1 < alpha} =>
           sandwichedRenyiPSDReferenceHighAlphaFinite rho sigma hSigma alpha.1)
         relativeEntropyHighAlphaRightToOne
         (nhds (relativeEntropyPSDReferenceTraceLogFinite rho sigma hSigma hSupport)) :=
@@ -1581,8 +1555,8 @@ theorem sandwichedRenyiPSDReferenceHighAlphaCurve_tendsto_traceLogFinite_of_trac
 /-- Supported PSD references have the source trace-log endpoint after
 compression to the positive spectral support. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaCurve_tendsto_traceLogFinite_of_supports
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (hSupport : Matrix.Supports rho.matrix sigma) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (hSupport : Matrix.Supports rho.m sigma) :
     Filter.Tendsto
       (sandwichedRenyiPSDReferenceHighAlphaCurve rho sigma hSigma)
       relativeEntropyHighAlphaRightToOne
@@ -1590,27 +1564,27 @@ theorem sandwichedRenyiPSDReferenceHighAlphaCurve_tendsto_traceLogFinite_of_supp
   classical
   let : Nonempty (psdSupportIndex sigma hSigma) :=
     psdSupportCompressedState_support_nonempty rho hSigma hSupport
-  let rhoC : State (psdSupportIndex sigma hSigma) :=
+  let rhoC : MState (psdSupportIndex sigma hSigma) :=
     psdSupportCompressedState rho hSigma hSupport
   let sigmaC : CMatrix (psdSupportIndex sigma hSigma) :=
     psdSupportCompress sigma hSigma sigma
   have hSigmaC : sigmaC.PosDef := by
-    simpa [sigmaC] using psdSupportCompressedState_reference_posDef hSigma
+    simpa [sigmaC] using psdSupportCompress_self_posDef _ hSigma
   have hFiniteC :=
     sandwichedRenyiPSDReferenceHighAlphaFinite_tendsto_posDef_traceLog
       rhoC hSigmaC
   have hFiniteC' :
       Filter.Tendsto
-        (fun alpha : {alpha : Real // 1 < alpha} =>
+        (fun alpha : {alpha : ℝ // 1 < alpha} =>
           sandwichedRenyiPSDReferenceHighAlphaFinite
             rhoC sigmaC hSigmaC.posSemidef alpha.1)
         relativeEntropyHighAlphaRightToOne
         (nhds (relativeEntropyPSDReferenceTraceLogFinite rho sigma hSigma hSupport)) := by
     simpa [relativeEntropyPSDReferenceTraceLogFinite, rhoC, sigmaC, hSigmaC,
-      State.psdSupportCompressedState] using hFiniteC
+      _root_.QIT.psdSupportCompressedState] using hFiniteC
   have hFinite :
       Filter.Tendsto
-        (fun alpha : {alpha : Real // 1 < alpha} =>
+        (fun alpha : {alpha : ℝ // 1 < alpha} =>
           sandwichedRenyiPSDReferenceHighAlphaFinite rho sigma hSigma alpha.1)
         relativeEntropyHighAlphaRightToOne
         (nhds (relativeEntropyPSDReferenceTraceLogFinite rho sigma hSigma hSupport)) := by
@@ -1628,8 +1602,8 @@ theorem sandwichedRenyiPSDReferenceHighAlphaCurve_tendsto_traceLogFinite_of_supp
 /-- On the unsupported branch, the source-limit and trace-log conventions both
 return `+infty`. -/
 theorem relativeEntropyPSDReferenceE_eq_traceLogE_of_not_supports
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (hSupport : ¬ Matrix.Supports rho.matrix sigma) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (hSupport : ¬ Matrix.Supports rho.m sigma) :
     relativeEntropyPSDReferenceE rho sigma hSigma =
       relativeEntropyPSDReferenceTraceLogE rho sigma hSigma := by
   rw [relativeEntropyPSDReferenceE_eq_top_of_not_supports rho hSigma hSupport,
@@ -1639,8 +1613,8 @@ theorem relativeEntropyPSDReferenceE_eq_traceLogE_of_not_supports
 on the supported branch, then the source-limit convention agrees with the
 trace-log convention there. -/
 theorem relativeEntropyPSDReferenceE_eq_traceLogE_of_supports_of_tendsto
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (hSupport : Matrix.Supports rho.matrix sigma)
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (hSupport : Matrix.Supports rho.m sigma)
     (hEndpoint :
       Filter.Tendsto
         (sandwichedRenyiPSDReferenceHighAlphaCurve rho sigma hSigma)
@@ -1657,11 +1631,11 @@ theorem relativeEntropyPSDReferenceE_eq_traceLogE_of_supports_of_tendsto
 /-- A raw trace-power endpoint on the supported branch identifies the
 source-limit and trace-log conventions. -/
 theorem relativeEntropyPSDReferenceE_eq_traceLogE_of_supports_of_tracePower_slope
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (hSupport : Matrix.Supports rho.matrix sigma)
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (hSupport : Matrix.Supports rho.m sigma)
     (hTracePower :
       Filter.Tendsto
-        (fun alpha : {alpha : Real // 1 < alpha} =>
+        (fun alpha : {alpha : ℝ // 1 < alpha} =>
           psdTracePower (sandwichedRenyiReferenceInner rho sigma alpha.1)
             (sandwichedRenyiReferenceInner_posSemidef rho hSigma alpha.1)
             alpha.1)
@@ -1669,7 +1643,7 @@ theorem relativeEntropyPSDReferenceE_eq_traceLogE_of_supports_of_tracePower_slop
         (nhds 1))
     (hTracePowerSlope :
       Filter.Tendsto
-        (fun alpha : {alpha : Real // 1 < alpha} =>
+        (fun alpha : {alpha : ℝ // 1 < alpha} =>
           (psdTracePower (sandwichedRenyiReferenceInner rho sigma alpha.1)
               (sandwichedRenyiReferenceInner_posSemidef rho hSigma alpha.1)
               alpha.1 - 1) / (alpha.1 - 1))
@@ -1689,11 +1663,11 @@ theorem relativeEntropyPSDReferenceE_eq_traceLogE_of_supports_of_tracePower_slop
 source-limit and trace-log conventions; the value endpoint is derived from the
 same first-order expansion. -/
 theorem relativeEntropyPSDReferenceE_eq_traceLogE_of_supports_of_tracePower_slope_only
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (hSupport : Matrix.Supports rho.matrix sigma)
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (hSupport : Matrix.Supports rho.m sigma)
     (hTracePowerSlope :
       Filter.Tendsto
-        (fun alpha : {alpha : Real // 1 < alpha} =>
+        (fun alpha : {alpha : ℝ // 1 < alpha} =>
           (psdTracePower (sandwichedRenyiReferenceInner rho sigma alpha.1)
               (sandwichedRenyiReferenceInner_posSemidef rho hSigma alpha.1)
               alpha.1 - 1) / (alpha.1 - 1))
@@ -1712,9 +1686,9 @@ theorem relativeEntropyPSDReferenceE_eq_traceLogE_of_supports_of_tracePower_slop
 /-- A pointwise endpoint theorem on the supported branch is enough to identify
 the source-limit and trace-log conventions for all support cases. -/
 theorem relativeEntropyPSDReferenceE_eq_traceLogE_of_supported_endpoint
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
     (hEndpoint :
-      ∀ hSupport : Matrix.Supports rho.matrix sigma,
+      ∀ hSupport : Matrix.Supports rho.m sigma,
         Filter.Tendsto
           (sandwichedRenyiPSDReferenceHighAlphaCurve rho sigma hSigma)
           relativeEntropyHighAlphaRightToOne
@@ -1723,7 +1697,7 @@ theorem relativeEntropyPSDReferenceE_eq_traceLogE_of_supported_endpoint
     relativeEntropyPSDReferenceE rho sigma hSigma =
       relativeEntropyPSDReferenceTraceLogE rho sigma hSigma := by
   classical
-  by_cases hSupport : Matrix.Supports rho.matrix sigma
+  by_cases hSupport : Matrix.Supports rho.m sigma
   · exact relativeEntropyPSDReferenceE_eq_traceLogE_of_supports_of_tendsto
       rho hSigma hSupport (hEndpoint hSupport)
   · exact relativeEntropyPSDReferenceE_eq_traceLogE_of_not_supports
@@ -1732,7 +1706,7 @@ theorem relativeEntropyPSDReferenceE_eq_traceLogE_of_supported_endpoint
 /-- The source-limit PSD-reference relative entropy agrees with the
 source-facing trace-log support convention. -/
 theorem relativeEntropyPSDReferenceE_eq_traceLogE
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef) :
     relativeEntropyPSDReferenceE rho sigma hSigma =
       relativeEntropyPSDReferenceTraceLogE rho sigma hSigma := by
   exact
@@ -1742,8 +1716,4 @@ theorem relativeEntropyPSDReferenceE_eq_traceLogE
         sandwichedRenyiPSDReferenceHighAlphaCurve_tendsto_traceLogFinite_of_supports
           rho hSigma hSupport)
 
-end State
-
-end
-
-end QIT
+end MState

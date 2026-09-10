@@ -60,6 +60,13 @@ theorem log2_rpow_pos {x : ℝ} (hx : 0 < x) (y : ℝ) :
   rw [Real.log_rpow hx]
   ring
 
+/-- Base-two logarithms linearize natural-number powers. -/
+theorem log2_pow (x : ℝ) (n : ℕ) :
+    log2 (x ^ n) = (n : ℝ) * log2 x := by
+  unfold log2
+  rw [Real.log_pow]
+  ring
+
 /-- `log₂` is monotone on the positive half-line. -/
 theorem log2_mono_of_pos {x y : ℝ} (hx : 0 < x) (hxy : x ≤ y) :
     log2 x ≤ log2 y := by
@@ -85,6 +92,14 @@ theorem log2_two : log2 2 = 1 := by
 theorem log2_one : log2 1 = 0 := by
   unfold log2
   simp
+
+/-- `log₂` of the cardinality of a nonempty finite type is nonnegative. -/
+theorem log2_card_nonneg (α : Type*) [Fintype α] [Nonempty α] :
+    0 ≤ log2 (Fintype.card α : ℝ) := by
+  have hcard_pos : 0 < Fintype.card α := Fintype.card_pos_iff.mpr inferInstance
+  have hcard_one : (1 : ℝ) ≤ (Fintype.card α : ℝ) := by exact_mod_cast hcard_pos
+  unfold log2
+  exact div_nonneg (Real.log_nonneg hcard_one) (le_of_lt (Real.log_pos one_lt_two))
 
 /-- `x log₂ x = x · log₂ x`: the `0 log 0 := 0` convention agrees with the
 pointwise product on all reals (since `log₂ 0 = 0`). -/

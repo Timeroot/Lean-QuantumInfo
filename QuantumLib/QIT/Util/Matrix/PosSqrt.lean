@@ -12,10 +12,10 @@ public import Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Order
 /-!
 # Positive semidefinite square roots
 
-This module provides the matrix-level QIT wrapper around mathlib's continuous
-functional calculus square root and the inverse square root on the support.
-It is quantum-state independent and may be consumed by other `QIT.Util`
-developments without importing the state layer.
+This module provides the matrix-level QIT wrappers around mathlib's continuous
+functional calculus square root, the inverse square root on the support, and
+real matrix powers.  It is quantum-state independent and may be consumed by
+other `QIT.Util` developments without importing the state layer.
 -/
 
 @[expose] public section
@@ -49,9 +49,7 @@ theorem psdSqrt_mul_self_of_posSemidef {M : CMatrix a} (hM : M.PosSemidef) :
     psdSqrt M * psdSqrt M = M := by
   simpa [psdSqrt, sq] using (CFC.sq_sqrt M hM.nonneg)
 
-/-! These scalar identities belong to the matrix square-root layer; they are
-used by normalized state constructors and lower-level matrix developments. -/
-
+/-- The square root of a nonnegative real multiple of the identity. -/
 theorem psdSqrt_real_smul_one {a : Type u} [Fintype a] [DecidableEq a]
     {r : ℝ} (hr : 0 ≤ r) :
     psdSqrt (((r : ℂ) • (1 : CMatrix a))) =
@@ -65,6 +63,7 @@ theorem psdSqrt_real_smul_one {a : Type u} [Fintype a] [DecidableEq a]
   rw [hscalar r hr, hscalar _ (Real.sqrt_nonneg r), Real.sqrt, Real.toNNReal_coe, psdSqrt,
     CFC.sqrt_algebraMap]
 
+/-- A nonnegative real scalar comes out of the square root as its own square root. -/
 theorem psdSqrt_real_smul {a : Type u} [Fintype a] [DecidableEq a]
     {r : ℝ} (hr : 0 ≤ r) {M : CMatrix a} (hM : M.PosSemidef) :
     psdSqrt (((r : ℂ) • M)) =
@@ -296,6 +295,75 @@ theorem psdInvSqrt_support_le_one
   rw [Matrix.posSemidef_diagonal_iff]
   intro i
   by_cases hi : 0 < hM.isHermitian.eigenvalues i <;> simp [hi]
+
+/-- Real powers of positive semidefinite matrices are positive semidefinite. -/
+theorem cMatrix_rpow_posSemidef {s : ℝ} {A : CMatrix a}
+    (_hA : A.PosSemidef) :
+    (CFC.rpow A s).PosSemidef :=
+  Matrix.nonneg_iff_posSemidef.mp (CFC.rpow_nonneg (a := A) (y := s))
+
+/-- Power-of-power reduction for PSD matrices and nonnegative exponents. -/
+theorem cMatrix_rpow_rpow_of_nonneg {A : CMatrix a} (hA : A.PosSemidef)
+    {r t s : ℝ} (hr : 0 ≤ r) (ht : 0 ≤ t) (hrt : r * t = s) :
+    CFC.rpow (CFC.rpow A r) t = CFC.rpow A s := by
+  rw [show CFC.rpow (CFC.rpow A r) t = CFC.rpow A (r * t) by
+    exact CFC.rpow_rpow_of_exponent_nonneg A r t hr ht
+      (Matrix.nonneg_iff_posSemidef.mpr hA)]
+  rw [hrt]
+
+/-- The trace product of two PSD matrices is nonnegative in real part. -/
+theorem cMatrix_trace_mul_posSemidef_re_nonneg {A B : CMatrix a}
+    (hA : A.PosSemidef) (hB : B.PosSemidef) :
+    0 ≤ ((A * B).trace).re := by
+  let S := psdSqrt A
+  have hpsd : (S * B * S).PosSemidef := by
+    have h := hB.mul_mul_conjTranspose_same S
+    dsimp [S] at h
+    rw [psdSqrt_isHermitian A] at h
+    exact h
+  have htrace : 0 ≤ (S * B * S).trace :=
+    Matrix.PosSemidef.trace_nonneg hpsd
+  have hEq : (A * B).trace = (S * B * S).trace := by
+    have hsqrt : S * S = A := by
+      simpa [S] using psdSqrt_mul_self_of_posSemidef hA
+    rw [← hsqrt]
+    calc
+      ((S * S) * B).trace = (S * (S * B)).trace := by
+        rw [Matrix.mul_assoc]
+      _ = ((S * B) * S).trace := by
+        rw [Matrix.trace_mul_comm]
+      _ = (S * B * S).trace := by
+        rw [Matrix.mul_assoc]
+  rw [hEq]
+  exact htrace.1
+
+/-- Positive trace functionals preserve Loewner inequalities. -/
+theorem cMatrix_trace_mul_le_of_le_posSemidef_left
+    {A B W : CMatrix a} (hW : W.PosSemidef) (hAB : A ≤ B) :
+    ((W * A).trace).re ≤ ((W * B).trace).re := by
+  have hdiff : (B - A).PosSemidef := Matrix.le_iff.mp hAB
+  have hnonneg : 0 ≤ ((W * (B - A)).trace).re :=
+    cMatrix_trace_mul_posSemidef_re_nonneg hW hdiff
+  have htrace :
+      ((W * (B - A)).trace).re =
+        ((W * B).trace).re - ((W * A).trace).re := by
+    simp [Matrix.mul_sub, Matrix.trace_sub]
+  rw [htrace] at hnonneg
+  linarith
+
+/-- Trace pairing with a fixed positive test matrix is monotone in the Loewner
+order. -/
+theorem cMatrix_trace_mul_le_of_le_posSemidef_right
+    {A B C : CMatrix a} (hC : C.PosSemidef) (hAB : A ≤ B) :
+    ((A * C).trace).re ≤ ((B * C).trace).re := by
+  have hdiff : (B - A).PosSemidef := Matrix.le_iff.mp hAB
+  have hnonneg : 0 ≤ (((B - A) * C).trace).re :=
+    cMatrix_trace_mul_posSemidef_re_nonneg hdiff hC
+  have htrace :
+      (((B - A) * C).trace).re =
+        ((B * C).trace).re - ((A * C).trace).re := by
+    rw [Matrix.sub_mul, Matrix.trace_sub, Complex.sub_re]
+  linarith
 
 end
 

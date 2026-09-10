@@ -6,9 +6,9 @@ Authors: QuAIR Team
 
 module
 
+public import QuantumLib.QIT.Util.Order.Majorization
 public import QuantumLib.QIT.Entanglement.Separable
 public import QuantumLib.QIT.Entanglement.PPT
-public import QuantumLib.QIT.Entanglement.Majorization
 public import QuantumLib.QIT.Entanglement.MaximallyEntangled
 
 /-!
@@ -17,11 +17,3 @@ public import QuantumLib.QIT.Entanglement.MaximallyEntangled
 Thin entanglement import surface for separability, PPT, and reusable
 majorization support.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace Entanglement
-
-end Entanglement
-end QIT

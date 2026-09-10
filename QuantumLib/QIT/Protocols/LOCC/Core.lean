@@ -35,27 +35,27 @@ variable [Fintype b] [DecidableEq b]
 variable [Fintype r] [DecidableEq r]
 
 /-- A trace-preserving map on the left tensor factor leaves the right marginal unchanged. -/
-theorem partialTraceA_kron_idChannel_of_tracePreserving
-    (Phi : MatrixMap a b) (hPhi : IsTracePreserving Phi)
-    (X : CMatrix (Prod a r)) :
-    QIT.partialTraceA (a := b) (b := r)
-        (MatrixMap.kron Phi (Channel.idChannel r).map X) =
-      QIT.partialTraceA (a := a) (b := r) X := by
+theorem traceLeft_kron_idChannel_of_tracePreserving
+    (Phi : MatrixMap a b) (hPhi : MatrixMap.IsTracePreserving Phi)
+    (X : CMatrix (a × r)) :
+    Matrix.traceLeft
+        (MatrixMap.kron Phi (CPTPOp.id (dIn := r)).map X) =
+      Matrix.traceLeft X := by
   ext i j
   have htrace := hPhi (Matrix.of fun x x' => X (x, i) (x', j))
-  simpa [QIT.partialTraceA, Matrix.trace, Matrix.of_apply,
+  simpa [-CPTPOp.id_map, Matrix.traceLeft, Matrix.trace, Matrix.of_apply,
     MatrixMap.kron_idChannel_apply_slice] using htrace
 
 /-- A trace-preserving map on the right tensor factor leaves the left marginal unchanged. -/
-theorem partialTraceB_kron_idChannel_of_tracePreserving
-    (Phi : MatrixMap a b) (hPhi : IsTracePreserving Phi)
-    (X : CMatrix (Prod r a)) :
-    QIT.partialTraceB (a := r) (b := b)
-        (MatrixMap.kron (Channel.idChannel r).map Phi X) =
-      QIT.partialTraceB (a := r) (b := a) X := by
+theorem traceRight_kron_idChannel_of_tracePreserving
+    (Phi : MatrixMap a b) (hPhi : MatrixMap.IsTracePreserving Phi)
+    (X : CMatrix (r × a)) :
+    Matrix.traceRight
+        (MatrixMap.kron (CPTPOp.id (dIn := r)).map Phi X) =
+      Matrix.traceRight X := by
   ext i j
   have htrace := hPhi (Matrix.of fun x x' => X (i, x) (j, x'))
-  simpa [QIT.partialTraceB, Matrix.trace, Matrix.of_apply,
+  simpa [-CPTPOp.id_map, Matrix.traceRight, Matrix.trace, Matrix.of_apply,
     MatrixMap.kron_idChannel_left_apply_slice] using htrace
 
 end MatrixMap
@@ -67,10 +67,14 @@ structure FiniteInstrument
     [Fintype input] [DecidableEq input]
     [Fintype output] [DecidableEq output]
     [Fintype outcome] where
+  /-- The map applied on each outcome branch. -/
   branch : outcome → MatrixMap input output
+  /-- Each branch is completely positive and trace-nonincreasing. -/
   branchTraceNonincreasingCP :
     ∀ result, MatrixMap.TraceNonincreasingCP (branch result)
-  total : Channel input output
+  /-- The channel obtained by forgetting the outcome. -/
+  total : CPTPMap input output
+  /-- The branches sum to the total channel. -/
   sum_branch_eq_total : (∑ result, branch result) = total.map
 
 namespace FiniteInstrument
@@ -81,7 +85,7 @@ variable [Fintype output] [DecidableEq output]
 variable [Fintype outcome]
 
 /-- The channel obtained by forgetting the classical outcome. -/
-def totalChannel (M : FiniteInstrument input output outcome) : Channel input output :=
+def totalChannel (M : FiniteInstrument input output outcome) : CPTPMap input output :=
   M.total
 
 theorem branch_completelyPositive
@@ -101,9 +105,13 @@ structure OneWayLOCC
     [Fintype bobInput] [DecidableEq bobInput]
     [Fintype bobOutput] [DecidableEq bobOutput]
     [Fintype outcome] where
+  /-- Alice's instrument, whose outcome she communicates to Bob. -/
   aliceInstrument : FiniteInstrument aliceInput aliceOutput outcome
-  bobChannel : outcome → Channel bobInput bobOutput
-  realization : Channel (Prod aliceInput bobInput) (Prod aliceOutput bobOutput)
+  /-- Bob's channel, chosen according to Alice's outcome. -/
+  bobChannel : outcome → CPTPMap bobInput bobOutput
+  /-- The joint channel realizing the protocol. -/
+  realization : CPTPMap (aliceInput × bobInput) (aliceOutput × bobOutput)
+  /-- The joint channel is the outcome-averaged product of the two local maps. -/
   realization_map :
     realization.map =
       ∑ result,
@@ -122,7 +130,7 @@ variable [Fintype outcome]
 /-- The CPTP map computed by the one-way LOCC realization. -/
 def toChannel
     (L : OneWayLOCC aliceInput aliceOutput bobInput bobOutput outcome) :
-    Channel (Prod aliceInput bobInput) (Prod aliceOutput bobOutput) :=
+    CPTPMap (aliceInput × bobInput) (aliceOutput × bobOutput) :=
   L.realization
 
 theorem toChannel_map

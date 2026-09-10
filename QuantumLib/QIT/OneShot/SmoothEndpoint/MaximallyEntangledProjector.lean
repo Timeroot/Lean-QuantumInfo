@@ -9,31 +9,32 @@ module
 public import QuantumLib.QIT.OneShot.SmoothEndpoint.Order
 public import QuantumLib.QIT.States.MaximallyEntangled
 
+/-!
+# The maximally entangled projector across a middle register
+
+`MState.maximallyEntangledProjectorWithMiddle b` is the canonical maximally entangled projector on
+the two outer copies of `a` in `(a × b) × a`, tensored with the identity on the middle register
+`b`.  Its entries are `(Fintype.card a)⁻¹` on the index pairs the projector selects and zero
+elsewhere, so pairing it against an observable `O` collapses the trace to a triple sum of entries
+of `O`: `trace_maximallyEntangledProjectorWithMiddle_mul` and
+`trace_mul_maximallyEntangledProjectorWithMiddle` are that identity on either side.  Those are what
+the SDP duality argument for the smooth endpoint quantities uses it for.
+-/
+
 @[expose] public section
 
 open scoped ComplexOrder MatrixOrder Kronecker
 open Matrix
 
-namespace QIT
-
+noncomputable section
 universe u v
 
-noncomputable section
+open QIT
 
-namespace State
+namespace MState
 
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
-
-/-- Register regrouping from `((A × A') × B)` to `((A × B) × A')` for the
-middle-projector representation. -/
-def maximallyEntangledProjectorWithMiddleReindexEquiv
-    (a : Type u) (b : Type v) :
-    Prod (Prod a a) b ≃ Prod (Prod a b) a where
-  toFun x := ((x.1.1, x.2), x.1.2)
-  invFun x := ((x.1.1, x.2), x.1.2)
-  left_inv := by intro x; cases x; rfl
-  right_inv := by intro x; cases x; rfl
 
 omit [DecidableEq a] in
 private theorem maximallyEntangledProjectorWithMiddle_coeff [Nonempty a] :
@@ -58,26 +59,15 @@ projector `|Ω⟩⟨Ω|_{AA'}` tensored with `I_B`, then reindexed into the endp
 register order. -/
 def maximallyEntangledProjectorWithMiddle [Nonempty a] (b : Type v) [Fintype b]
     [DecidableEq b] :
-    CMatrix (Prod (Prod a b) a) :=
+    CMatrix ((a × b) × a) :=
   Matrix.reindex
-    (maximallyEntangledProjectorWithMiddleReindexEquiv a b)
-    (maximallyEntangledProjectorWithMiddleReindexEquiv a b)
-    ((State.maximallyEntangled (Equiv.refl a)).matrix ⊗ₖ (1 : CMatrix b))
-
-/-- Semantic bridge: the endpoint middle projector is the normalized canonical
-maximally entangled projector tensored with middle identity and reindexed into
-endpoint register order. -/
-theorem maximallyEntangledProjectorWithMiddle_semantic_bridge [Nonempty a] :
-    maximallyEntangledProjectorWithMiddle (a := a) b =
-      Matrix.reindex
-        (maximallyEntangledProjectorWithMiddleReindexEquiv a b)
-        (maximallyEntangledProjectorWithMiddleReindexEquiv a b)
-        ((State.maximallyEntangled (Equiv.refl a)).matrix ⊗ₖ (1 : CMatrix b)) := by
-  rfl
+    (prodABCToACBEquiv a a b)
+    (prodABCToACBEquiv a a b)
+    ((MState.maximallyEntangled (Equiv.refl a)).m ⊗ₖ (1 : CMatrix b))
 
 @[simp]
 theorem maximallyEntangledProjectorWithMiddle_apply [Nonempty a]
-    {b : Type v} [Fintype b] [DecidableEq b] (x y : Prod (Prod a b) a) :
+    {b : Type v} [Fintype b] [DecidableEq b] (x y : (a × b) × a) :
     maximallyEntangledProjectorWithMiddle (a := a) b x y =
       if x.1.2 = y.1.2 ∧ x.1.1 = x.2 ∧ y.1.1 = y.2 then
         (((Fintype.card a : ℝ)⁻¹ : ℝ) : ℂ)
@@ -85,29 +75,29 @@ theorem maximallyEntangledProjectorWithMiddle_apply [Nonempty a]
         0 := by
   have hentry :
       maximallyEntangledProjectorWithMiddle (a := a) b x y =
-        (State.maximallyEntangled (Equiv.refl a)).matrix (x.1.1, x.2) (y.1.1, y.2) *
+        (MState.maximallyEntangled (Equiv.refl a)).m (x.1.1, x.2) (y.1.1, y.2) *
           (1 : CMatrix b) x.1.2 y.1.2 := by
-    simp [maximallyEntangledProjectorWithMiddle, maximallyEntangledProjectorWithMiddleReindexEquiv,
+    simp [maximallyEntangledProjectorWithMiddle, prodABCToACBEquiv,
       Matrix.reindex_apply, Matrix.submatrix_apply]
   rw [hentry]
   by_cases hb : x.1.2 = y.1.2
   · by_cases hx : x.1.1 = x.2
     · by_cases hy : y.1.1 = y.2
       · rw [maximallyEntangledProjectorWithMiddle_coeff (a := a)]
-        simp [State.maximallyEntangled, PureVector.maximallyEntangled, PureVector.state,
+        simp [MState.maximallyEntangled, Ket.maximallyEntangled, Ket.state,
           rankOneMatrix_apply, Matrix.one_apply, hb, hx, hy]
-      · simp [State.maximallyEntangled, PureVector.maximallyEntangled, PureVector.state,
+      · simp [MState.maximallyEntangled, Ket.maximallyEntangled, Ket.state,
           rankOneMatrix_apply, hb, hx, hy]
-    · simp [State.maximallyEntangled, PureVector.maximallyEntangled, PureVector.state,
+    · simp [MState.maximallyEntangled, Ket.maximallyEntangled, Ket.state,
         rankOneMatrix_apply, hb, hx]
-  · simp [State.maximallyEntangled, PureVector.maximallyEntangled, PureVector.state,
+  · simp [MState.maximallyEntangled, Ket.maximallyEntangled, Ket.state,
       rankOneMatrix_apply, hb]
 
 theorem maximallyEntangledProjectorWithMiddle_posSemidef [Nonempty a] :
     (maximallyEntangledProjectorWithMiddle (a := a) b).PosSemidef := by
   simpa [maximallyEntangledProjectorWithMiddle, Matrix.reindex_apply] using
-    (((State.maximallyEntangled (Equiv.refl a)).pos).kronecker Matrix.PosSemidef.one).submatrix
-      (maximallyEntangledProjectorWithMiddleReindexEquiv a b).symm
+    (((MState.maximallyEntangled (Equiv.refl a)).psd).kronecker Matrix.PosSemidef.one).submatrix
+      (prodABCToACBEquiv a a b).symm
 
 private theorem sum_projector_delta_state_full {α : Type*} {β : Type*}
     [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
@@ -207,7 +197,7 @@ private theorem sum_projector_delta_state_full_right {α : Type*} {β : Type*}
       simp [Finset.mul_sum]
 
 theorem trace_maximallyEntangledProjectorWithMiddle_mul [Nonempty a]
-    (O : CMatrix (Prod (Prod a b) a)) :
+    (O : CMatrix ((a × b) × a)) :
     (((maximallyEntangledProjectorWithMiddle (a := a) b) * O).trace) =
       (((Fintype.card a : ℝ)⁻¹ : ℝ) : ℂ) *
         (∑ i : a, ∑ i' : a, ∑ j : b, O ((i', j), i') ((i, j), i)) := by
@@ -219,7 +209,7 @@ theorem trace_maximallyEntangledProjectorWithMiddle_mul [Nonempty a]
       (fun x y u z v w => O ((z, v), w) ((x, y), u))
 
 theorem trace_mul_maximallyEntangledProjectorWithMiddle [Nonempty a]
-    (O : CMatrix (Prod (Prod a b) a)) :
+    (O : CMatrix ((a × b) × a)) :
     ((O * (maximallyEntangledProjectorWithMiddle (a := a) b)).trace) =
       (((Fintype.card a : ℝ)⁻¹ : ℝ) : ℂ) *
         (∑ i : a, ∑ i' : a, ∑ j : b, O ((i, j), i) ((i', j), i')) := by
@@ -231,8 +221,4 @@ theorem trace_mul_maximallyEntangledProjectorWithMiddle [Nonempty a]
       ((((Fintype.card a : ℝ)⁻¹ : ℝ) : ℂ))
       (fun x y u z v w => O ((x, y), u) ((z, v), w))
 
-end State
-
-end
-
-end QIT
+end MState

@@ -33,49 +33,49 @@ noncomputable section
 variable {r : Type u} {a : Type v}
 variable [Fintype r] [DecidableEq r] [Fintype a] [DecidableEq a]
 
-private def rankOneAmplitudeMatrix (psi : Prod r a → ℂ) : Matrix a r ℂ :=
+private def rankOneAmplitudeMatrix (psi : r × a → ℂ) : Matrix a r ℂ :=
   fun x i => psi (i, x)
 
 omit [Fintype r] [DecidableEq r] [DecidableEq a] in
-private theorem partialTraceB_rankOneMatrix_eq_transpose_rankOneAmplitudeMatrix_mul_conjTranspose
-    (psi : Prod r a → ℂ) :
-    partialTraceB (a := r) (b := a) (rankOneMatrix psi) =
+private theorem traceRight_rankOneMatrix_eq_transpose_rankOneAmplitudeMatrix_mul_conjTranspose
+    (psi : r × a → ℂ) :
+    Matrix.traceRight (rankOneMatrix psi) =
       Matrix.transpose (rankOneAmplitudeMatrix psi) *
         Matrix.conjTranspose (Matrix.transpose (rankOneAmplitudeMatrix psi)) := by
   ext i j
-  simp [partialTraceB, rankOneMatrix_apply, rankOneAmplitudeMatrix, Matrix.mul_apply,
+  simp [Matrix.traceRight, rankOneMatrix_apply, rankOneAmplitudeMatrix, Matrix.mul_apply,
     Matrix.conjTranspose_apply, Matrix.transpose_apply]
 
 omit [DecidableEq r] [Fintype a] [DecidableEq a] in
-private theorem partialTraceA_rankOneMatrix_eq_rankOneAmplitudeMatrix_mul_conjTranspose
-    (psi : Prod r a → ℂ) :
-    partialTraceA (a := r) (b := a) (rankOneMatrix psi) =
+private theorem traceLeft_rankOneMatrix_eq_rankOneAmplitudeMatrix_mul_conjTranspose
+    (psi : r × a → ℂ) :
+    Matrix.traceLeft (rankOneMatrix psi) =
       rankOneAmplitudeMatrix psi * Matrix.conjTranspose (rankOneAmplitudeMatrix psi) := by
   ext x y
-  simp [partialTraceA, rankOneMatrix_apply, rankOneAmplitudeMatrix, Matrix.mul_apply]
+  simp [Matrix.traceLeft, rankOneMatrix_apply, rankOneAmplitudeMatrix, Matrix.mul_apply]
 
 /-- The two partial traces of an arbitrary finite-dimensional rank-one
 bipartite operator have equal positive power traces. -/
-theorem psdTracePower_partialTraceB_rankOneMatrix_eq_partialTraceA_rankOneMatrix
-    (psi : Prod r a → ℂ) {p : ℝ} (hp : 0 < p) :
+theorem psdTracePower_traceRight_rankOneMatrix_eq_traceLeft_rankOneMatrix
+    (psi : r × a → ℂ) {p : ℝ} (hp : 0 < p) :
     psdTracePower
-        (partialTraceB (a := r) (b := a) (rankOneMatrix psi))
-        (partialTraceB_posSemidef (rankOneMatrix_pos psi)) p =
+        (Matrix.traceRight (rankOneMatrix psi))
+        (traceRight_posSemidef (rankOneMatrix_pos psi)) p =
       psdTracePower
-        (partialTraceA (a := r) (b := a) (rankOneMatrix psi))
-        (partialTraceA_posSemidef (rankOneMatrix_pos psi)) p := by
+        (Matrix.traceLeft (rankOneMatrix psi))
+        (traceLeft_posSemidef (rankOneMatrix_pos psi)) p := by
   let A : Matrix a r ℂ := rankOneAmplitudeMatrix psi
   let AT : Matrix r a ℂ := Matrix.transpose A
   have hLeft :
-      partialTraceB (a := r) (b := a) (rankOneMatrix psi) =
+      Matrix.traceRight (rankOneMatrix psi) =
         AT * Matrix.conjTranspose AT := by
     simpa [A, AT] using
-      partialTraceB_rankOneMatrix_eq_transpose_rankOneAmplitudeMatrix_mul_conjTranspose psi
+      traceRight_rankOneMatrix_eq_transpose_rankOneAmplitudeMatrix_mul_conjTranspose psi
   have hRight :
-      partialTraceA (a := r) (b := a) (rankOneMatrix psi) =
+      Matrix.traceLeft (rankOneMatrix psi) =
         A * Matrix.conjTranspose A := by
     simpa [A] using
-      partialTraceA_rankOneMatrix_eq_rankOneAmplitudeMatrix_mul_conjTranspose psi
+      traceLeft_rankOneMatrix_eq_rankOneAmplitudeMatrix_mul_conjTranspose psi
   have hConjTransposeMul :
       Matrix.conjTranspose AT * AT =
         Matrix.transpose (A * Matrix.conjTranspose A) := by
@@ -86,72 +86,91 @@ theorem psdTracePower_partialTraceB_rankOneMatrix_eq_partialTraceA_rankOneMatrix
     psdTracePower_eq_sum_eigenvalues_rpow]
   have hChar :
       Polynomial.X ^ Fintype.card a *
-          (partialTraceB (a := r) (b := a) (rankOneMatrix psi)).charpoly =
+          (Matrix.traceRight (rankOneMatrix psi)).charpoly =
         Polynomial.X ^ Fintype.card r *
-          (partialTraceA (a := r) (b := a) (rankOneMatrix psi)).charpoly := by
+          (Matrix.traceLeft (rankOneMatrix psi)).charpoly := by
     rw [hLeft, hRight]
     have hComm :=
       Matrix.charpoly_mul_comm' (A := AT) (B := Matrix.conjTranspose AT)
     rw [hConjTransposeMul, Matrix.charpoly_transpose] at hComm
     simpa [A, AT, Matrix.mul_assoc] using hComm
   have hP :
-      (partialTraceB (a := r) (b := a) (rankOneMatrix psi)).charpoly ≠ 0 :=
+      (Matrix.traceRight (rankOneMatrix psi)).charpoly ≠ 0 :=
     (Matrix.charpoly_monic _).ne_zero
   have hQ :
-      (partialTraceA (a := r) (b := a) (rankOneMatrix psi)).charpoly ≠ 0 :=
+      (Matrix.traceLeft (rankOneMatrix psi)).charpoly ≠ 0 :=
     (Matrix.charpoly_monic _).ne_zero
   have hRoot :=
     Matrix.roots_re_rpow_sum_eq_of_X_pow_mul_eq (p := p) hp hP hQ hChar
   have hRootsLeft :=
-    (partialTraceB_posSemidef (rankOneMatrix_pos psi)).isHermitian.roots_charpoly_eq_eigenvalues
+    (traceRight_posSemidef (rankOneMatrix_pos psi)).isHermitian.roots_charpoly_eq_eigenvalues
   have hRootsRight :=
-    (partialTraceA_posSemidef (rankOneMatrix_pos psi)).isHermitian.roots_charpoly_eq_eigenvalues
+    (traceLeft_posSemidef (rankOneMatrix_pos psi)).isHermitian.roots_charpoly_eq_eigenvalues
   rw [hRootsLeft, hRootsRight] at hRoot
   simpa using hRoot
 
 /-- The two partial traces of an arbitrary finite-dimensional rank-one
 bipartite operator have equal PSD Schatten `p` expressions. -/
-theorem psdSchattenPNorm_partialTraceB_rankOneMatrix_eq_partialTraceA_rankOneMatrix
-    (psi : Prod r a → ℂ) (p : SchattenOrder) :
+theorem psdSchattenPNorm_traceRight_rankOneMatrix_eq_traceLeft_rankOneMatrix
+    (psi : r × a → ℂ) (p : SchattenOrder) :
     psdSchattenPNorm
-        (partialTraceB (a := r) (b := a) (rankOneMatrix psi))
-        (partialTraceB_posSemidef (rankOneMatrix_pos psi)) p =
+        (Matrix.traceRight (rankOneMatrix psi))
+        (traceRight_posSemidef (rankOneMatrix_pos psi)) p =
       psdSchattenPNorm
-        (partialTraceA (a := r) (b := a) (rankOneMatrix psi))
-        (partialTraceA_posSemidef (rankOneMatrix_pos psi)) p := by
+        (Matrix.traceLeft (rankOneMatrix psi))
+        (traceLeft_posSemidef (rankOneMatrix_pos psi)) p := by
   simpa [psdSchattenPNorm, Internal.psdSchattenExpression] using
-    congrArg (fun x : ℝ => Real.rpow x (1 / (p : Real)))
-      (psdTracePower_partialTraceB_rankOneMatrix_eq_partialTraceA_rankOneMatrix
+    congrArg (fun x : ℝ => Real.rpow x (1 / (p : ℝ)))
+      (psdTracePower_traceRight_rankOneMatrix_eq_traceLeft_rankOneMatrix
         psi p.property)
 
-namespace PureVector
+end
+end QIT
+
+namespace Ket
+
+noncomputable section
+
+open QIT
+universe u v
+variable {r : Type u} {a : Type v}
+variable [Fintype r] [DecidableEq r] [Fintype a] [DecidableEq a]
 
 /-- The two marginals of a rank-one bipartite pure operator have equal positive
 power traces. -/
-theorem psdTracePower_marginalA_eq_marginalB
-    (Ψ : PureVector (Prod r a)) {p : ℝ} (hp : 0 < p) :
+theorem psdTracePower_traceRight_eq_traceLeft
+    (Ψ : Ket (r × a)) {p : ℝ} (hp : 0 < p) :
     psdTracePower
-        (partialTraceB (a := r) (b := a) (rankOneMatrix Ψ.amp))
-        (partialTraceB_posSemidef (rankOneMatrix_pos Ψ.amp)) p =
+        (Matrix.traceRight (rankOneMatrix Ψ.vec))
+        (traceRight_posSemidef (rankOneMatrix_pos Ψ.vec)) p =
       psdTracePower
-        (partialTraceA (a := r) (b := a) (rankOneMatrix Ψ.amp))
-        (partialTraceA_posSemidef (rankOneMatrix_pos Ψ.amp)) p :=
-  psdTracePower_partialTraceB_rankOneMatrix_eq_partialTraceA_rankOneMatrix Ψ.amp hp
+        (Matrix.traceLeft (rankOneMatrix Ψ.vec))
+        (traceLeft_posSemidef (rankOneMatrix_pos Ψ.vec)) p :=
+  psdTracePower_traceRight_rankOneMatrix_eq_traceLeft_rankOneMatrix Ψ.vec hp
 
 /-- The two marginals of a rank-one bipartite pure operator have equal PSD
 Schatten `p` expressions. -/
-theorem psdSchattenPNorm_marginalA_eq_marginalB
-    (Ψ : PureVector (Prod r a)) (p : SchattenOrder) :
+theorem psdSchattenPNorm_traceRight_eq_traceLeft
+    (Ψ : Ket (r × a)) (p : SchattenOrder) :
     psdSchattenPNorm
-        (partialTraceB (a := r) (b := a) (rankOneMatrix Ψ.amp))
-        (partialTraceB_posSemidef (rankOneMatrix_pos Ψ.amp)) p =
+        (Matrix.traceRight (rankOneMatrix Ψ.vec))
+        (traceRight_posSemidef (rankOneMatrix_pos Ψ.vec)) p =
       psdSchattenPNorm
-        (partialTraceA (a := r) (b := a) (rankOneMatrix Ψ.amp))
-        (partialTraceA_posSemidef (rankOneMatrix_pos Ψ.amp)) p :=
-  psdSchattenPNorm_partialTraceB_rankOneMatrix_eq_partialTraceA_rankOneMatrix
-    Ψ.amp p
+        (Matrix.traceLeft (rankOneMatrix Ψ.vec))
+        (traceLeft_posSemidef (rankOneMatrix_pos Ψ.vec)) p :=
+  psdSchattenPNorm_traceRight_rankOneMatrix_eq_traceLeft_rankOneMatrix
+    Ψ.vec p
 
-end PureVector
+end
+
+end Ket
+
+namespace QIT
+noncomputable section
+
+universe u v
+variable {r : Type u} {a : Type v}
+variable [Fintype r] [DecidableEq r] [Fintype a] [DecidableEq a]
 
 end
 

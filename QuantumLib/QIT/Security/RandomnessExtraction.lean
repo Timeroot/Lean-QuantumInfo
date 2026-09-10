@@ -41,14 +41,14 @@ side information.
 
 [Tomamichel2015FiniteResources, apps.tex:256-292]
 -/
-def IsEpsilonSecretExtractor (H : HashFamily F Z S) (ε : ℝ) (E : Ensemble Z e) :
+def IsEpsilonSecretExtractor (H : HashFamily F Z S) (ε : ℝ) (E : MEnsemble e Z) :
     Prop :=
   extractorSecrecyDistance (extractorOutputState H E) ≤ ε
 
 omit [Nonempty F] [DecidableEq Z] in
 @[simp]
 theorem isEpsilonSecretExtractor_iff
-    (H : HashFamily F Z S) (ε : ℝ) (E : Ensemble Z e) :
+    (H : HashFamily F Z S) (ε : ℝ) (E : MEnsemble e Z) :
     H.IsEpsilonSecretExtractor ε E ↔
       extractorSecrecyDistance (extractorOutputState H E) ≤ ε :=
   Iff.rfl
@@ -62,7 +62,7 @@ bridges can discharge them from a purified-distance ball between input cq
 states without changing this secrecy-transfer theorem.
 -/
 theorem isEpsilonSecretExtractor_of_output_ideal_closeness
-    (H : HashFamily F Z S) (E E' : Ensemble Z e) {δ ε : ℝ}
+    (H : HashFamily F Z S) (E E' : MEnsemble e Z) {δ ε : ℝ}
     (hstate :
       (extractorOutputState H E).normalizedTraceDistance
         (extractorOutputState H E') ≤ δ)
@@ -81,7 +81,7 @@ public-seed extractor output states.  The ideal-output perturbation is handled
 by the reusable idealization-channel contraction.
 -/
 theorem isEpsilonSecretExtractor_of_output_closeness
-    (H : HashFamily F Z S) (E E' : Ensemble Z e) {δ ε : ℝ}
+    (H : HashFamily F Z S) (E E' : MEnsemble e Z) {δ ε : ℝ}
     (hstate :
       (extractorOutputState H E).normalizedTraceDistance
         (extractorOutputState H E') ≤ δ)
@@ -98,15 +98,15 @@ normalized trace distance, and the extractor-output channel gives data
 processing for the public-seed output.
 -/
 theorem isEpsilonSecretExtractor_of_purifiedBall_cqState
-    (H : HashFamily F Z S) (E E' : Ensemble Z e) {ε₁ ε₂ : ℝ}
+    (H : HashFamily F Z S) (E E' : MEnsemble e Z) {ε₁ ε₂ : ℝ}
     (hball : E.cqState.purifiedBall ε₁ E'.cqState)
     (hsecret : H.IsEpsilonSecretExtractor ε₂ E') :
     H.IsEpsilonSecretExtractor (2 * ε₁ + ε₂) E := by
   have htrace :
       E.cqState.normalizedTraceDistance E'.cqState ≤
         E.cqState.purifiedDistance E'.cqState := by
-    simpa [State.purifiedDistance_eq] using
-      State.fuchs_van_de_graaf_upper E.cqState E'.cqState
+    simpa [MState.purifiedDistance_eq] using
+      MState.fuchs_van_de_graaf_upper E.cqState E'.cqState
   have hclose :
       (extractorOutputState H E).normalizedTraceDistance
           (extractorOutputState H E') ≤ ε₁ :=
@@ -115,7 +115,7 @@ theorem isEpsilonSecretExtractor_of_purifiedBall_cqState
   exact H.isEpsilonSecretExtractor_of_output_closeness E E' hclose hsecret
 
 /-- The source output alphabet size `d_S` of a finite extractor. -/
-def outputLength (_H : HashFamily F Z S) : Nat :=
+def outputLength (_H : HashFamily F Z S) : ℕ :=
   Fintype.card S
 
 omit [DecidableEq F] [Nonempty F] [Fintype Z] [DecidableEq Z] [DecidableEq S] [Nonempty S] in
@@ -128,7 +128,7 @@ end HashFamily
 
 /-- The full-function `Fin ell` specialization has output length `ell`. -/
 theorem finFullFunctionHashFamily_outputLength
-    {Z : Type uZ} [Fintype Z] [DecidableEq Z] {ell : Nat} (hell : 0 < ell) :
+    {Z : Type uZ} [Fintype Z] [DecidableEq Z] {ell : ℕ} (hell : 0 < ell) :
     (FinFullFunctionHashFamily (Z := Z) ell hell).outputLength = ell := by
   let : Nonempty (Fin ell) := ⟨⟨0, hell⟩⟩
   simp [HashFamily.outputLength]
@@ -141,7 +141,7 @@ alphabet, and a hash family whose extractor is `ε`-secret on `E`.
 [Tomamichel2015FiniteResources, apps.tex:294-299]
 -/
 def ExtractorOutputLengthAchievable
-    (E : Ensemble Z e) (ε : ℝ) (ell : Nat) : Prop :=
+    (E : MEnsemble e Z) (ε : ℝ) (ell : ℕ) : Prop :=
   ∃ (S : Type uS) (instS : Fintype S) (decS : DecidableEq S) (nonS : Nonempty S),
     letI : Fintype S := instS
     letI : DecidableEq S := decS
@@ -159,7 +159,7 @@ extraction at secrecy error `ε`.
 [Tomamichel2015FiniteResources, apps.tex:294-299]
 -/
 def ExtractableRandomnessLengthSet
-    (E : Ensemble Z e) (ε : ℝ) : Set Nat :=
+    (E : MEnsemble e Z) (ε : ℝ) : Set ℕ :=
   {ell | ExtractorOutputLengthAchievable.{uF, uZ, uS, ue} E ε ell}
 
 /--
@@ -172,15 +172,15 @@ equivalence layer.
 [Tomamichel2015FiniteResources, apps.tex:294-299]
 -/
 def ExtractableRandomnessLogValueSet
-    (E : Ensemble Z e) (ε : ℝ) : Set ℝ :=
-  {r | ∃ ell : Nat,
+    (E : MEnsemble e Z) (ε : ℝ) : Set ℝ :=
+  {r | ∃ ell : ℕ,
     ExtractorOutputLengthAchievable.{uF, uZ, uS, ue} E ε ell ∧ r = log2 (ell : ℝ)}
 
 omit [DecidableEq Z] in
 /-- An achievable output length is positive, because it is the cardinality of a
 nonempty output alphabet. -/
 theorem extractorOutputLengthAchievable_pos
-    {E : Ensemble Z e} {ε : ℝ} {ell : Nat}
+    {E : MEnsemble e Z} {ε : ℝ} {ell : ℕ}
     (hach : ExtractorOutputLengthAchievable.{uF, uZ, uS, ue} E ε ell) :
     0 < ell := by
   rcases hach with
@@ -198,7 +198,7 @@ reproving the interface layer.
 
 [Tomamichel2015FiniteResources, apps.tex:294-299]
 -/
-def extractableRandomnessLog (E : Ensemble Z e) (ε : ℝ) : ℝ :=
+def extractableRandomnessLog (E : MEnsemble e Z) (ε : ℝ) : ℝ :=
   sSup (ExtractableRandomnessLogValueSet.{uF, uZ, uS, ue} E ε)
 
 namespace HashFamily
@@ -206,7 +206,7 @@ namespace HashFamily
 omit [DecidableEq Z] in
 /-- A concrete `ε`-secret extractor witnesses achievability of its output length. -/
 theorem outputLengthAchievable
-    (H : HashFamily F Z S) (E : Ensemble Z e) {ε : ℝ}
+    (H : HashFamily F Z S) (E : MEnsemble e Z) {ε : ℝ}
     (hsecret : H.IsEpsilonSecretExtractor ε E) :
     ExtractorOutputLengthAchievable.{uF, uZ, uS, ue} E ε H.outputLength := by
   refine ⟨S, inferInstance, inferInstance, inferInstance, ?_⟩
@@ -217,7 +217,7 @@ theorem outputLengthAchievable
 omit [DecidableEq Z] in
 /-- A concrete `ε`-secret extractor contributes its `log₂ |S|` value. -/
 theorem extractableRandomnessLogValue_mem
-    (H : HashFamily F Z S) (E : Ensemble Z e) {ε : ℝ}
+    (H : HashFamily F Z S) (E : MEnsemble e Z) {ε : ℝ}
     (hsecret : H.IsEpsilonSecretExtractor ε E) :
     log2 (H.outputLength : ℝ) ∈
       ExtractableRandomnessLogValueSet.{uF, uZ, uS, ue} E ε := by
@@ -233,9 +233,9 @@ side-information reference state.
 -/
 theorem extractorSeedAverageTraceDistance_sq_le_card_mul_rpow_of_collisionUniform_conditionalMinEntropyFeasible_posDef
     (H : HashFamily F Z S) (hH : H.CollisionUniform)
-    (E : Ensemble Z e) (σ : State e) (lam : ℝ)
-    (hσ : σ.matrix.PosDef)
-    (hmin : State.ConditionalMinEntropyFeasible (a := Z) E.cqState σ lam) :
+    (E : MEnsemble e Z) (σ : MState e) (lam : ℝ)
+    (hσ : σ.m.PosDef)
+    (hmin : MState.ConditionalMinEntropyFeasible (a := Z) E.cqState σ lam) :
     (extractorSeedAverageTraceDistance H E) ^ 2 ≤
       (Fintype.card S : ℝ) * Real.rpow 2 (-lam) := by
   classical
@@ -274,13 +274,13 @@ Seed-averaged direct extractor bound from a positive-definite conditional
 min-entropy candidate.
 
 This wrapper exposes the optimized-entropy proof route without asserting that
-the supremum in `State.conditionalMinEntropy` is attained.
+the supremum in `MState.conditionalMinEntropy` is attained.
 -/
 theorem extractorSeedAverageTraceDistance_sq_le_card_mul_rpow_of_collisionUniform_conditionalMinEntropyCandidate_posDef
     (H : HashFamily F Z S) (hH : H.CollisionUniform)
-    (E : Ensemble Z e) (lam : ℝ)
-    (hwit : ∃ σ : State e,
-      σ.matrix.PosDef ∧ State.ConditionalMinEntropyFeasible (a := Z) E.cqState σ lam) :
+    (E : MEnsemble e Z) (lam : ℝ)
+    (hwit : ∃ σ : MState e,
+      σ.m.PosDef ∧ MState.ConditionalMinEntropyFeasible (a := Z) E.cqState σ lam) :
     (extractorSeedAverageTraceDistance H E) ^ 2 ≤
       (Fintype.card S : ℝ) * Real.rpow 2 (-lam) := by
   rcases hwit with ⟨σ, hσ, hmin⟩
@@ -293,14 +293,14 @@ omit [Nonempty F] in
 Direct leftover-hash achievability bound for extractor secrecy distance.
 
 The theorem proves the direct bound only, under `CollisionUniform` and
-`σ.matrix.PosDef`; Tomamichel's converse and the full two-sided extractable
+`σ.m.PosDef`; Tomamichel's converse and the full two-sided extractable
 length theorem are intentionally outside this statement.
 -/
 theorem extractorSecrecyDistance_le_sqrt_card_mul_rpow_of_collisionUniform_conditionalMinEntropyFeasible_posDef
     (H : HashFamily F Z S) (hH : H.CollisionUniform)
-    (E : Ensemble Z e) (σ : State e) (lam : ℝ)
-    (hσ : σ.matrix.PosDef)
-    (hmin : State.ConditionalMinEntropyFeasible (a := Z) E.cqState σ lam) :
+    (E : MEnsemble e Z) (σ : MState e) (lam : ℝ)
+    (hσ : σ.m.PosDef)
+    (hmin : MState.ConditionalMinEntropyFeasible (a := Z) E.cqState σ lam) :
     extractorSecrecyDistance (extractorOutputState H E) ≤
       Real.sqrt ((Fintype.card S : ℝ) * Real.rpow 2 (-lam)) := by
   classical
@@ -345,13 +345,13 @@ conditional min-entropy candidate.
 This is the source-shaped candidate bridge: a feasible witness `σ` for `lam`
 feeds the existing fixed-witness extractor proof.  It intentionally keeps the
 optimization step explicit instead of silently replacing `lam` by
-`State.conditionalMinEntropy`.
+`MState.conditionalMinEntropy`.
 -/
 theorem extractorSecrecyDistance_le_sqrt_card_mul_rpow_of_collisionUniform_conditionalMinEntropyCandidate_posDef
     (H : HashFamily F Z S) (hH : H.CollisionUniform)
-    (E : Ensemble Z e) (lam : ℝ)
-    (hwit : ∃ σ : State e,
-      σ.matrix.PosDef ∧ State.ConditionalMinEntropyFeasible (a := Z) E.cqState σ lam) :
+    (E : MEnsemble e Z) (lam : ℝ)
+    (hwit : ∃ σ : MState e,
+      σ.m.PosDef ∧ MState.ConditionalMinEntropyFeasible (a := Z) E.cqState σ lam) :
     extractorSecrecyDistance (extractorOutputState H E) ≤
       Real.sqrt ((Fintype.card S : ℝ) * Real.rpow 2 (-lam)) := by
   rcases hwit with ⟨σ, hσ, hmin⟩
@@ -371,19 +371,19 @@ def trivialHashFamily (Z : Type uZ) [Fintype Z] : HashFamily PUnit Z PUnit where
 omit [DecidableEq Z] in
 /-- The trivial extractor output is already ideal, since the output alphabet is
 the singleton alphabet. -/
-theorem trivialHashFamily_outputState_eq_ideal (E : Ensemble Z e) :
+theorem trivialHashFamily_outputState_eq_ideal (E : MEnsemble e Z) :
     extractorOutputState (trivialHashFamily Z) E =
       idealExtractorOutputState (extractorOutputState (trivialHashFamily Z) E) := by
   ext x y
   simp [trivialHashFamily, extractorOutputState, idealExtractorOutputState,
-    extractorOutputMatrix, State.prod, State.marginalB,
-    partialTraceA, uniformExtractorOutputState, uniformExtractorOutputProb]
+    extractorOutputMatrix,
+    Matrix.traceLeft, uniformExtractorOutputState, uniformExtractorOutputProb]
 
 omit [DecidableEq Z] in
 /-- The trivial extractor has zero secrecy distance. -/
-theorem trivialHashFamily_extractorSecrecyDistance_eq_zero (E : Ensemble Z e) :
+theorem trivialHashFamily_extractorSecrecyDistance_eq_zero (E : MEnsemble e Z) :
     extractorSecrecyDistance (extractorOutputState (trivialHashFamily Z) E) = 0 := by
-  let ρ : State (PUnit × (PUnit × e)) := extractorOutputState (trivialHashFamily Z) E
+  let ρ : MState (PUnit × (PUnit × e)) := extractorOutputState (trivialHashFamily Z) E
   have hstate : ρ = idealExtractorOutputState ρ := by
     dsimp [ρ]
     exact trivialHashFamily_outputState_eq_ideal E
@@ -391,12 +391,12 @@ theorem trivialHashFamily_extractorSecrecyDistance_eq_zero (E : Ensemble Z e) :
     extractorSecrecyDistance (extractorOutputState (trivialHashFamily Z) E) =
         ρ.normalizedTraceDistance (idealExtractorOutputState ρ) := by rfl
     _ = ρ.normalizedTraceDistance ρ := by rw [← hstate]
-    _ = 0 := State.normalizedTraceDistance_self ρ
+    _ = 0 := MState.normalizedTraceDistance_self ρ
 
 omit [DecidableEq Z] in
 /-- The trivial extractor is `ε`-secret for every nonnegative `ε`. -/
 theorem trivialHashFamily_isEpsilonSecretExtractor
-    (E : Ensemble Z e) {ε : ℝ} (hε : 0 ≤ ε) :
+    (E : MEnsemble e Z) {ε : ℝ} (hε : 0 ≤ ε) :
     (trivialHashFamily Z).IsEpsilonSecretExtractor ε E := by
   rw [HashFamily.isEpsilonSecretExtractor_iff]
   rw [trivialHashFamily_extractorSecrecyDistance_eq_zero]
@@ -406,7 +406,7 @@ omit [DecidableEq Z] in
 /-- The one-output trivial extractor is always achievable for nonnegative
 secrecy error. -/
 theorem extractorOutputLengthAchievable_one_of_nonneg
-    (E : Ensemble Z e) {ε : ℝ} (hε : 0 ≤ ε) :
+    (E : MEnsemble e Z) {ε : ℝ} (hε : 0 ≤ ε) :
     ExtractorOutputLengthAchievable.{uF, uZ, uS, ue} E ε 1 := by
   refine ⟨PUnit, inferInstance, inferInstance, inferInstance, ?_⟩
   dsimp
@@ -417,7 +417,7 @@ omit [DecidableEq Z] in
 /-- The achievable output-length set is nonempty for every nonnegative secrecy
 parameter. -/
 theorem extractableRandomnessLengthSet_nonempty_of_nonneg
-    (E : Ensemble Z e) {ε : ℝ} (hε : 0 ≤ ε) :
+    (E : MEnsemble e Z) {ε : ℝ} (hε : 0 ≤ ε) :
     (ExtractableRandomnessLengthSet.{uF, uZ, uS, ue} E ε).Nonempty := by
   exact ⟨1, extractorOutputLengthAchievable_one_of_nonneg E hε⟩
 
@@ -425,9 +425,9 @@ omit [DecidableEq Z] in
 /-- Achievable extractable-randomness log values are nonempty for every
 nonnegative secrecy parameter. -/
 theorem extractableRandomnessLogValueSet_nonempty_of_nonneg
-    (E : Ensemble Z e) {ε : ℝ} (hε : 0 ≤ ε) :
+    (E : MEnsemble e Z) {ε : ℝ} (hε : 0 ≤ ε) :
     (ExtractableRandomnessLogValueSet.{uF, uZ, uS, ue} E ε).Nonempty := by
-  refine ⟨log2 ((1 : Nat) : ℝ), ?_⟩
+  refine ⟨log2 ((1 : ℕ) : ℝ), ?_⟩
   exact ⟨1, extractorOutputLengthAchievable_one_of_nonneg E hε, rfl⟩
 
 end

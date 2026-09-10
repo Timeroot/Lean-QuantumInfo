@@ -78,32 +78,44 @@ variable [Fintype a] [DecidableEq a]
 variable [Fintype b] [DecidableEq b]
 variable [Fintype r] [DecidableEq r]
 
-namespace PureVector
+end
+end QIT
+
+namespace Ket
+
+noncomputable section
+
+open QIT
+universe u v w x y z p q
+variable {a : Type u} {b : Type v} {r : Type w}
+variable [Fintype a] [DecidableEq a]
+variable [Fintype b] [DecidableEq b]
+variable [Fintype r] [DecidableEq r]
 
 /-- Every unrestricted canonically achievable state-merging rate is at least
 the source conditional entropy. -/
 theorem conditionalEntropy_le_of_isAchievableStateMergingRate
-    (psi : PureVector (Prod (Prod a b) r)) (R : Real)
+    (psi : Ket ((a × b) × r)) (R : ℝ)
     (hR : IsAchievableStateMergingRate.{u, v, w, x, y, z, p, q} psi R) :
-    psi.state.marginalA.conditionalEntropy ≤ R := by
+    psi.state.traceRight.conditionalEntropy ≤ R := by
   let : Nonempty a := ⟨(Classical.choice psi.state.nonempty).1.1⟩
   let : Nonempty r := ⟨(Classical.choice psi.state.nonempty).2⟩
-  let eta : Real := 1 / 2
+  let eta : ℝ := 1 / 2
   have hetaPos : 0 < eta := by simp [eta]
   have heta0 : 0 ≤ eta := le_of_lt hetaPos
   have heta1 : eta < 1 := by norm_num [eta]
-  let H : Real := psi.state.marginalA.conditionalEntropy
-  let f : ℕ → Real := fun n =>
+  let H : ℝ := psi.state.traceRight.conditionalEntropy
+  let f : ℕ → ℝ := fun n =>
     psi.state.marginalAC.tensorPowerSubnormalizedSmoothConditionalMinEntropyRate
       eta n heta0 heta1
   have hduality : psi.state.marginalAC.conditionalEntropy = -H := by
-    have h := State.PureVector.conditionalEntropy_marginalAB_eq_neg_marginalAC psi
-    rw [State.marginalAB_eq_marginalA] at h
+    have h := Ket.conditionalEntropy_marginalAB_eq_neg_marginalAC psi
+    rw [MState.marginalAB_eq_traceRight] at h
     dsimp only [H]
     linarith
   have hf : Tendsto f atTop (nhds (-H)) := by
     simpa only [f, hduality] using
-      (State.tensorPowerSubnormalizedSmoothConditionalMinEntropyRate_tendsto
+      (MState.tensorPowerSubnormalizedSmoothConditionalMinEntropyRate_tendsto
         psi.state.marginalAC eta hetaPos heta1)
   apply rate_lower_bound_of_tendsto_neg H R f hf
   intro delta hdelta
@@ -139,7 +151,18 @@ theorem conditionalEntropy_le_of_isAchievableStateMergingRate
     C.oneShotSmoothMinEntropyRate_converse eta heta1 hradius
       (Nat.zero_lt_of_lt hnOne)
 
-end PureVector
+end
+
+end Ket
+
+namespace QIT
+noncomputable section
+
+universe u v w x y z p q
+variable {a : Type u} {b : Type v} {r : Type w}
+variable [Fintype a] [DecidableEq a]
+variable [Fintype b] [DecidableEq b]
+variable [Fintype r] [DecidableEq r]
 
 end
 

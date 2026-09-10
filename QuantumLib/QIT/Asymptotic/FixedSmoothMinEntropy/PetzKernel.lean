@@ -11,22 +11,24 @@ public import QuantumLib.QIT.OneShot.SmoothEndpoint
 public import QuantumLib.QIT.Information.Renyi.AlphaEntropyContinuity
 public import QuantumLib.QIT.Information.Renyi.ConditionalPetzRenyi
 public import QuantumLib.QIT.Asymptotic.AEP
-public import QuantumLib.QIT.Information.Renyi.RpowOperatorConvex
+public import QuantumLib.QIT.Util.RpowOperatorConvex
 public import QuantumLib.QIT.Information.Renyi.FrankLieb.ScalarOperator
 public import QuantumLib.QIT.States.Geometry.FuchsVdG
 public import QuantumLib.QIT.OneShot.GentleMeasurement
 public import QuantumLib.QIT.States.TraceNorm.Audenaert
 import QuantumLib.QIT.Util.CMatrixCLM
+import QuantumLib.QIT.Util.CMatrixIntegral
 public import QuantumLib.QIT.States.PosSqrtOrder
 public import QuantumLib.QIT.Util.BlockMatrix
+public import QuantumLib.QIT.Util.MatrixInstances
 public import Mathlib.LinearAlgebra.Matrix.Vec
 
 /-!
 # Fixed-side smooth conditional min-entropy
 
 This module adds the fixed-reference side of the conditional min-entropy API.
-The existing `State.conditionalMinEntropy` optimizes over the conditioning
-state, while the source-facing `State.smoothConditionalMinEntropy` delegates to
+The existing `MState.conditionalMinEntropy` optimizes over the conditioning
+state, while the source-facing `MState.smoothConditionalMinEntropy` delegates to
 the subnormalized smoothing convention. For the finite fully quantum AEP route,
 we also need the candidate where the same reference state `σ_B` is kept fixed
 through the purified-distance smoothing ball, plus the order bridge into the
@@ -35,7 +37,7 @@ optimized quantity.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Kronecker NNReal
+open scoped ComplexOrder MatrixOrder Kronecker NNReal QIT.MatrixL2
 open Filter
 
 namespace QIT
@@ -593,18 +595,6 @@ private theorem scalar_effect_threshold_le_scaled_petz
       linarith
     exact hleft_le_gap.trans (by simpa using hscalar)
 
-private theorem posDef_unitary_conj_diag_re_pos
-    {ι : Type*} [Fintype ι] [DecidableEq ι]
-    {A : CMatrix ι} (hA : A.PosDef) (U : Matrix.unitaryGroup ι ℂ) (i : ι) :
-    0 < ((star (U : CMatrix ι) * A * (U : CMatrix ι)) i i).re := by
-  let A' : CMatrix ι := star (U : CMatrix ι) * A * (U : CMatrix ι)
-  have hA' : A'.PosDef := by
-    dsimp [A']
-    rw [Matrix.IsUnit.posDef_star_left_conjugate_iff (Unitary.isUnit_coe :
-      IsUnit (U : CMatrix ι))]
-    exact hA
-  exact (Complex.pos_iff.mp (hA'.diag_pos (i := i))).1
-
 private theorem posSemidef_unitary_conj_diag_re_nonneg
     {ι : Type*} [Fintype ι] [DecidableEq ι]
     {A : CMatrix ι} (hA : A.PosSemidef) (U : Matrix.unitaryGroup ι ℂ) (i : ι) :
@@ -968,89 +958,6 @@ theorem cMatrix_rpowIntegrand₁₂_kronecker_inv_mul_right_eq_petzPerspective
         simp [cMatrixPetzPerspectiveResolventIntegrand,
           Matrix.andoResolventIntegrand, X, Y, D]
 
-private theorem cMatrixPetz_integrableOn_mul_right
-    {ι : Type*} [Fintype ι] [DecidableEq ι]
-    {μ : MeasureTheory.Measure ℝ} {s : Set ℝ} {f : ℝ → CMatrix ι}
-    (hf : MeasureTheory.IntegrableOn f s μ) (R : CMatrix ι) :
-    MeasureTheory.IntegrableOn (fun r => f r * R) s μ := by
-  have hf' : MeasureTheory.Integrable f (μ.restrict s) := by
-    simpa [MeasureTheory.IntegrableOn] using hf
-  have h :=
-    (ContinuousLinearMap.mulLeftRight ℝ (CMatrix ι) (1 : CMatrix ι) R).integrable_comp hf'
-  simpa [ContinuousLinearMap.mulLeftRight_apply, MeasureTheory.IntegrableOn] using h
-
-private theorem cMatrixPetz_setIntegral_mul_right
-    {ι : Type*} [Fintype ι] [DecidableEq ι]
-    {μ : MeasureTheory.Measure ℝ} {s : Set ℝ} {f : ℝ → CMatrix ι}
-    (hf : MeasureTheory.IntegrableOn f s μ) (R : CMatrix ι) :
-    (∫ r in s, f r ∂μ) * R = ∫ r in s, f r * R ∂μ := by
-  have hf' : MeasureTheory.Integrable f (μ.restrict s) := by
-    simpa [MeasureTheory.IntegrableOn] using hf
-  have h :=
-    (ContinuousLinearMap.mulLeftRight ℝ (CMatrix ι) (1 : CMatrix ι) R).integral_comp_comm hf'
-  simpa [ContinuousLinearMap.mulLeftRight_apply] using h.symm
-
-private theorem cMatrixPetz_integral_conjTranspose
-    {α : Type*} [MeasurableSpace α]
-    {μ : MeasureTheory.Measure α} {ι : Type*} [Fintype ι] [DecidableEq ι]
-    {f : α → CMatrix ι} (hf : MeasureTheory.Integrable f μ) :
-    Matrix.conjTranspose (∫ x, f x ∂μ) =
-      ∫ x, Matrix.conjTranspose (f x) ∂μ := by
-  simpa [cMatrixConjTransposeCLM] using
-    ((cMatrixConjTransposeCLM (ι := ι)).integral_comp_comm hf).symm
-
-private theorem cMatrixPetz_integral_dotProduct_mulVec
-    {α : Type*} [MeasurableSpace α]
-    {μ : MeasureTheory.Measure α} {ι : Type*} [Fintype ι] [DecidableEq ι]
-    {f : α → CMatrix ι} (hf : MeasureTheory.Integrable f μ) (x : ι → ℂ) :
-    dotProduct (star x) (Matrix.mulVec (∫ t, f t ∂μ) x) =
-      ∫ t, dotProduct (star x) (Matrix.mulVec (f t) x) ∂μ := by
-  simp_rw [← cMatrixQuadraticCLM_apply x]
-  exact
-    ((cMatrixQuadraticCLM x).integral_comp_comm hf).symm
-
-private theorem cMatrixPetz_integral_posSemidef_of_ae
-    {α : Type*} [MeasurableSpace α]
-    {μ : MeasureTheory.Measure α} {ι : Type*} [Fintype ι] [DecidableEq ι]
-    {f : α → CMatrix ι} (hf : MeasureTheory.Integrable f μ)
-    (hpos : ∀ᵐ t ∂μ, (f t).PosSemidef) :
-    (∫ t, f t ∂μ).PosSemidef := by
-  refine Matrix.PosSemidef.of_dotProduct_mulVec_nonneg ?_ ?_
-  · rw [Matrix.IsHermitian, cMatrixPetz_integral_conjTranspose (hf := hf)]
-    apply MeasureTheory.integral_congr_ae
-    exact hpos.mono fun _ ht => ht.isHermitian.eq
-  · intro x
-    rw [cMatrixPetz_integral_dotProduct_mulVec (hf := hf) x]
-    exact MeasureTheory.integral_nonneg_of_ae
-      (hpos.mono fun _ ht => ht.dotProduct_mulVec_nonneg x)
-
-private theorem cMatrixPetz_setIntegral_mono
-    {ι : Type*} [Fintype ι] [DecidableEq ι]
-    {μ : MeasureTheory.Measure ℝ} {s : Set ℝ} (hs : MeasurableSet s)
-    {f g : ℝ → CMatrix ι}
-    (hf : MeasureTheory.IntegrableOn f s μ) (hg : MeasureTheory.IntegrableOn g s μ)
-    (hle : ∀ r ∈ s, f r ≤ g r) :
-    ∫ r in s, f r ∂μ ≤ ∫ r in s, g r ∂μ := by
-  have hdiffInt : MeasureTheory.IntegrableOn (fun r : ℝ => g r - f r) s μ := hg.sub hf
-  have hdiffPSD :
-      (∫ r in s, (g r - f r) ∂μ).PosSemidef := by
-    have hdiffInt' :
-        MeasureTheory.Integrable (fun r : ℝ => g r - f r) (μ.restrict s) := by
-      simpa [MeasureTheory.IntegrableOn] using hdiffInt
-    exact
-      cMatrixPetz_integral_posSemidef_of_ae (μ := μ.restrict s) hdiffInt'
-        ((MeasureTheory.ae_restrict_iff' hs).mpr
-          (MeasureTheory.ae_of_all μ fun r hr => Matrix.le_iff.mp (hle r hr)))
-  have hsub :
-      ∫ r in s, (g r - f r) ∂μ =
-        (∫ r in s, g r ∂μ) - (∫ r in s, f r ∂μ) := by
-    simpa [MeasureTheory.IntegrableOn] using
-      MeasureTheory.integral_sub (μ := μ.restrict s)
-        (by simpa [MeasureTheory.IntegrableOn] using hg)
-        (by simpa [MeasureTheory.IntegrableOn] using hf)
-  rw [hsub] at hdiffPSD
-  exact Matrix.le_iff.mpr hdiffPSD
-
 private theorem cMatrixPetz_setIntegral_finset_sum_smul
     {κ ι : Type*} [Fintype κ] [Fintype ι] [DecidableEq ι]
     {μ : MeasureTheory.Measure ℝ} {s : Set ℝ} {f : κ → ℝ → CMatrix ι}
@@ -1073,67 +980,6 @@ private theorem cMatrixPetz_setIntegral_finset_sum_smul
         intro k _
         rw [MeasureTheory.integral_smul]
     _ = ∑ k, c • ∫ r in s, f k r ∂μ := rfl
-
-private theorem cMatrixPetz_rpow_nonsing_inv_eq_rpow_neg
-    {ι : Type*} [Fintype ι] [DecidableEq ι]
-    {B : CMatrix ι} (hB : B.PosDef) (p : ℝ) :
-    CFC.rpow B⁻¹ p = CFC.rpow B (-p) := by
-  obtain ⟨u, hu⟩ := hB.isUnit
-  have hBnonneg : (0 : CMatrix ι) ≤ B :=
-    Matrix.nonneg_iff_posSemidef.mpr hB.posSemidef
-  have hinv : B⁻¹ = (↑u⁻¹ : CMatrix ι) := by
-    rw [Matrix.nonsing_inv_eq_ringInverse, ← hu]
-    simp
-  calc
-    CFC.rpow B⁻¹ p = CFC.rpow (↑u⁻¹ : CMatrix ι) p := by
-      rw [hinv]
-    _ = CFC.rpow (↑u : CMatrix ι) (-p) := by
-      exact (CFC.rpow_neg u p (ha' := by simpa [hu] using hBnonneg)).symm
-    _ = CFC.rpow B (-p) := by
-      rw [hu]
-
-private theorem cMatrixPetz_rpow_kronecker_inv_mul_right_eq_tensor_one_sub
-    {a b : Type*} [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
-    {A : CMatrix a} {B : CMatrix b}
-    (hA : A.PosSemidef) (hB : B.PosDef)
-    {p : ℝ} (hp0 : 0 ≤ p) :
-    CFC.rpow (Matrix.kronecker A B⁻¹) p *
-        Matrix.kronecker (1 : CMatrix a) B =
-      Matrix.kronecker (CFC.rpow A p) (CFC.rpow B (1 - p)) := by
-  have hBinv_psd : B⁻¹.PosSemidef := hB.inv.posSemidef
-  have hpowK :
-      CFC.rpow (Matrix.kronecker A B⁻¹) p =
-        Matrix.kronecker (CFC.rpow A p) (CFC.rpow B⁻¹ p) := by
-    simpa using
-      cMatrix_rpow_kronecker_nonneg
-        (A := A) (B := B⁻¹) hA hBinv_psd hp0
-  have hBpow : CFC.rpow B⁻¹ p * B = CFC.rpow B (1 - p) := by
-    rw [cMatrixPetz_rpow_nonsing_inv_eq_rpow_neg hB p]
-    have hBpowone : CFC.rpow B (1 : ℝ) = B :=
-      CFC.rpow_one B (ha := Matrix.nonneg_iff_posSemidef.mpr hB.posSemidef)
-    calc
-      CFC.rpow B (-p) * B =
-          CFC.rpow B (-p) * CFC.rpow B (1 : ℝ) := by
-        rw [hBpowone]
-      _ = CFC.rpow B (-p + 1) := by
-        exact (CFC.rpow_add (a := B) (x := -p) (y := 1) hB.isUnit).symm
-      _ = CFC.rpow B (1 - p) := by
-        ring_nf
-  calc
-    CFC.rpow (Matrix.kronecker A B⁻¹) p *
-        Matrix.kronecker (1 : CMatrix a) B =
-      Matrix.kronecker (CFC.rpow A p) (CFC.rpow B⁻¹ p) *
-        Matrix.kronecker (1 : CMatrix a) B := by
-        rw [hpowK]
-    _ =
-      Matrix.kronecker (CFC.rpow A p * (1 : CMatrix a))
-        (CFC.rpow B⁻¹ p * B) := by
-        simpa [Matrix.kronecker] using
-          (Matrix.mul_kronecker_mul
-            (CFC.rpow A p) (1 : CMatrix a) (CFC.rpow B⁻¹ p) B).symm
-    _ = Matrix.kronecker (CFC.rpow A p) (CFC.rpow B (1 - p)) := by
-        rw [hBpow]
-        simp
 
 /-- High-alpha integral representation for the Petz perspective resolvent
 integrand. -/
@@ -1176,7 +1022,7 @@ theorem cMatrixPetzPerspectiveIntegralRepresentation_Ioo_one_two
         MeasureTheory.IntegrableOn
           (fun r : ℝ => cfcₙ (Real.rpowIntegrand₁₂ p r) C * Y)
           (Set.Ioi 0) μ :=
-      cMatrixPetz_integrableOn_mul_right hCInt Y
+      cMatrix_integrableOn_mul_right hCInt Y
     let F : ℝ → CMatrix (a × b) := fun r =>
       cfcₙ (Real.rpowIntegrand₁₂ p r) C * Y
     let G : ℝ → CMatrix (a × b) := fun r =>
@@ -1194,7 +1040,6 @@ theorem cMatrixPetzPerspectiveIntegralRepresentation_Ioo_one_two
   · intro A B hA hB
     let C : CMatrix (a × b) := Matrix.kronecker A B⁻¹
     let Y : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) B
-    have hp0 : 0 ≤ p := le_trans zero_le_one hp.1.le
     have hpNN_pos : 0 < pNN := by
       exact lt_trans zero_lt_one hpNN.1
     have hCpsd : C.PosSemidef := by
@@ -1230,7 +1075,7 @@ theorem cMatrixPetzPerspectiveIntegralRepresentation_Ioo_one_two
             (∫ r in Set.Ioi 0, cfcₙ (Real.rpowIntegrand₁₂ p r) C ∂μ) * Y := by
           rw [hCpow]
         _ = ∫ r in Set.Ioi 0, cfcₙ (Real.rpowIntegrand₁₂ p r) C * Y ∂μ := by
-          rw [cMatrixPetz_setIntegral_mul_right hCInt Y]
+          rw [cMatrix_setIntegral_mul_right hCInt Y]
         _ = ∫ r in Set.Ioi 0, F r ∂μ := by
           rfl
     have hFGint : ∫ r in Set.Ioi 0, F r ∂μ = ∫ r in Set.Ioi 0, G r ∂μ := by
@@ -1240,8 +1085,8 @@ theorem cMatrixPetzPerspectiveIntegralRepresentation_Ioo_one_two
         CFC.rpow C p * Y =
           Matrix.kronecker (CFC.rpow A p) (CFC.rpow B (1 - p)) := by
       simpa [C, Y] using
-        cMatrixPetz_rpow_kronecker_inv_mul_right_eq_tensor_one_sub
-          (a := a) (b := b) (A := A) (B := B) hA hB hp0
+        cMatrix_rpow_kronecker_inv_mul_right_eq_tensor_one_sub
+          (a := a) (b := b) (A := A) (B := B) hA hB p
     calc
       Matrix.kronecker (CFC.rpow A p) (CFC.rpow B (1 - p)) =
           CFC.rpow C p * Y := by
@@ -1973,67 +1818,6 @@ private theorem cMatrixPetz_submatrix_prodSwap_complex_smul_finset_sum
   ext i j
   simp [Matrix.sum_apply, Matrix.smul_apply]
 
-private def cMatrixPetzConjStarAlgEquiv
-    {ι : Type*} [Fintype ι] [DecidableEq ι] : CMatrix ι ≃⋆ₐ[ℝ] CMatrix ι :=
-  StarAlgEquiv.ofAlgEquiv (AlgEquiv.mapMatrix (Complex.conjAe)) (by
-    intro A
-    ext i j
-    simp)
-
-private theorem cMatrixPetz_map_star_eq_transpose_of_posSemidef
-    {ι : Type*} {A : CMatrix ι} (hA : A.PosSemidef) :
-    A.map star = A.transpose := by
-  ext i j
-  simpa using hA.isHermitian.apply j i
-
-private theorem cMatrixPetz_rpow_map_star_posDef
-    {ι : Type*} [Fintype ι] [DecidableEq ι]
-    {A : CMatrix ι} (hA : A.PosDef) (s : ℝ) :
-    CFC.rpow (A.map star) s = (CFC.rpow A s).map star := by
-  have hA_nonneg : 0 ≤ A := Matrix.nonneg_iff_posSemidef.mpr hA.posSemidef
-  have hmap_eq : A.map star = A.transpose :=
-    cMatrixPetz_map_star_eq_transpose_of_posSemidef hA.posSemidef
-  have hmap_nonneg : 0 ≤ A.map star := by
-    rw [hmap_eq]
-    exact Matrix.nonneg_iff_posSemidef.mpr hA.posSemidef.transpose
-  change (A.map star) ^ s = (A ^ s).map star
-  rw [CFC.rpow_eq_cfc_real (a := A.map star) (y := s) hmap_nonneg]
-  rw [CFC.rpow_eq_cfc_real (a := A) (y := s) hA_nonneg]
-  simpa [cMatrixPetzConjStarAlgEquiv] using
-    (StarAlgHomClass.map_cfc
-      (cMatrixPetzConjStarAlgEquiv (ι := ι))
-      (fun x : ℝ => x ^ s) A
-      (hf := by
-        intro x hx
-        exact
-          (Real.continuousAt_rpow_const x s
-            (.inl (ne_of_gt
-              ((Matrix.PosDef.isStrictlyPositive hA).spectrum_pos hx)))).continuousWithinAt)
-      (hφ := by
-        change Continuous fun A : CMatrix ι => A.map star
-        fun_prop)
-      (hφa := by
-        change IsSelfAdjoint (A.map star)
-        rw [hmap_eq]
-        exact hA.posSemidef.transpose.isHermitian)).symm
-
-private theorem cMatrixPetz_rpow_transpose_posDef
-    {ι : Type*} [Fintype ι] [DecidableEq ι]
-    {A : CMatrix ι} (hA : A.PosDef) (s : ℝ) :
-    CFC.rpow A.transpose s = (CFC.rpow A s).transpose := by
-  have hmapA : A.map star = A.transpose :=
-    cMatrixPetz_map_star_eq_transpose_of_posSemidef hA.posSemidef
-  have hpowmap :
-      CFC.rpow (A.map star) s = (CFC.rpow A s).map star :=
-    cMatrixPetz_rpow_map_star_posDef hA s
-  have hpowPSD : (CFC.rpow A s).PosSemidef :=
-    cMatrix_rpow_posSemidef (A := A) (s := s) hA.posSemidef
-  have hpowmapTranspose :
-      (CFC.rpow A s).map star = (CFC.rpow A s).transpose :=
-    cMatrixPetz_map_star_eq_transpose_of_posSemidef hpowPSD
-  rw [← hmapA, hpowmap, hpowmapTranspose]
-
-set_option maxHeartbeats 800000 in
 private theorem cMatrixPetz_rawTensorUniformJointConvex_Ioo_one_two
     {κ a b : Type*} [Fintype κ] [Nonempty κ]
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
@@ -2120,7 +1904,7 @@ private theorem cMatrixPetz_rawTensorUniformJointConvex_Ioo_one_two
   have hintegral_le :
       ∫ r in Set.Ioi 0, Fbar r ∂μ ≤
         ∫ r in Set.Ioi 0, (∑ k, w • Fk k r) ∂μ :=
-    cMatrixPetz_setIntegral_mono measurableSet_Ioi hFbarInt hsumInt hmono
+    cMatrix_setIntegral_mono measurableSet_Ioi hFbarInt hsumInt hmono
   have hrepbar :
       Matrix.kronecker (CFC.rpow Abar alpha) (CFC.rpow Bbar (1 - alpha)) =
         ∫ r in Set.Ioi 0, Fbar r ∂μ := by
@@ -2195,7 +1979,7 @@ theorem cMatrixPetzTraceKernelUniformJointConvex_Ioo_one_two
       CFC.rpow (∑ k, ((Fintype.card κ : ℝ)⁻¹) • (B k).transpose) (1 - alpha) =
         (CFC.rpow ((((Fintype.card κ : ℂ)⁻¹) • ∑ k, B k)) (1 - alpha)).transpose := by
     rw [cMatrixPetz_real_uniform_average_transpose]
-    rw [cMatrixPetz_rpow_transpose_posDef hBbar]
+    rw [cMatrix_rpow_transpose_posDef hBbar]
     rw [cMatrixPetz_real_uniform_average_eq_complex_smul_sum]
   have hBavgC_rpow :
       CFC.rpow (((Fintype.card κ : ℂ)⁻¹) • ∑ k, (B k).transpose) (1 - alpha) =
@@ -2207,7 +1991,7 @@ theorem cMatrixPetzTraceKernelUniformJointConvex_Ioo_one_two
       ∀ k, CFC.rpow (B k).transpose (1 - alpha) =
         (CFC.rpow (B k) (1 - alpha)).transpose := by
     intro k
-    exact cMatrixPetz_rpow_transpose_posDef (hB k) (1 - alpha)
+    exact cMatrix_rpow_transpose_posDef (hB k) (1 - alpha)
   rw [hBavg_rpow] at hreindex
   simp_rw [hBk_rpow] at hreindex
   simpa [cMatrixPetzTraceKernel, e, w,
@@ -2257,7 +2041,7 @@ private theorem cMatrixPetz_squarePerspective_uniform_average_le
         exact Matrix.IsHermitian.add (Matrix.IsHermitian.smul (hX k) hw_self) ih
   have hblock_k : ∀ k,
       (Matrix.fromBlocks (X k * (Y k)⁻¹ * X k) (X k) (X k) (Y k) :
-        CMatrix (Sum n n)).PosSemidef := by
+        CMatrix (n ⊕ n)).PosSemidef := by
     intro k
     let : Invertible (Y k) := (hY k).isUnit.invertible
     have hschur := Matrix.PosDef.fromBlocks₂₂
@@ -2267,12 +2051,12 @@ private theorem cMatrixPetz_squarePerspective_uniform_average_le
     simpa [hX k |>.eq] using hblock'
   have hsumBlock :
       (∑ k, w • (Matrix.fromBlocks (X k * (Y k)⁻¹ * X k) (X k) (X k) (Y k) :
-        CMatrix (Sum n n))).PosSemidef := by
+        CMatrix (n ⊕ n))).PosSemidef := by
     exact Matrix.posSemidef_sum Finset.univ fun k _ =>
       Matrix.PosSemidef.smul (hblock_k k) hw_nonneg
   have hblockAvg :
       (Matrix.fromBlocks (∑ k, w • (X k * (Y k)⁻¹ * X k)) Xbar Xbar Ybar :
-        CMatrix (Sum n n)).PosSemidef := by
+        CMatrix (n ⊕ n)).PosSemidef := by
     convert hsumBlock using 1
     ext (_ | _) (_ | _) <;>
       simp [Xbar, Ybar, Matrix.sum_apply, Matrix.smul_apply, Matrix.fromBlocks_smul]
@@ -2366,7 +2150,7 @@ private theorem cMatrixPetzTraceKernel_two_eq_squarePerspective
     simpa [pow_two] using
       (CFC.rpow_natCast A 2 (Matrix.nonneg_iff_posSemidef.mpr hA))
   have hB_neg_one : CFC.rpow B (-1 : ℝ) = B⁻¹ := by
-    have h := cMatrixPetz_rpow_nonsing_inv_eq_rpow_neg hB (1 : ℝ)
+    have h := cMatrix_rpow_nonsing_inv_eq_rpow_neg hB (1 : ℝ)
     have hBpow1 : CFC.rpow B⁻¹ (1 : ℝ) = B⁻¹ :=
       CFC.rpow_one B⁻¹ (ha := Matrix.nonneg_iff_posSemidef.mpr hB.inv.posSemidef)
     rw [hBpow1] at h

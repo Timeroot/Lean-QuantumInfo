@@ -18,8 +18,8 @@ upper bounds for entanglement-assisted classical communication.
 Source alignment:
 * [KhatriWilde2024Principles, Chapters/EA_capacity.tex:411-427] states the
   weak-converse and sandwiched-Renyi one-shot upper bounds:
-  `C_EA^epsilon(N) <= (I(N) + h_2(epsilon)) / (1 - epsilon)` and
-  `C_EA^epsilon(N) <= I~_alpha(N) +
+  `C_EA^epsilon(N) ≤ (I(N) + h_2(epsilon)) / (1 - epsilon)` and
+  `C_EA^epsilon(N) ≤ I~_alpha(N) +
     alpha / (alpha - 1) * log2 (1 / (1 - epsilon))`.
 
 The two proof ingredients are supplied by
@@ -32,18 +32,18 @@ them into one source-shaped theorem for the public catalog node.
 
 open scoped ComplexOrder MatrixOrder
 
-namespace QIT
-
 universe u v w x y
 
 noncomputable section
 
+namespace CPTPOp
+
+open QIT
+
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-namespace Channel
-
-variable (N : Channel a b)
+variable (N : CPTPMap a b)
 
 /-- Extended-real sandwiched-Renyi one-shot converse bound. -/
 def entanglementAssistedSandwichedOneShotConverseBoundE
@@ -107,8 +107,6 @@ theorem oneShotEntanglementAssistedClassicalCapacityE_upperBounds
       N.oneShotEntanglementAssistedClassicalCapacityE_le_sandwichedRenyiMutualInformationE_add
         hepsilon_nonneg hepsilon_lt_one halpha
 
-end Channel
+end CPTPOp
 
 end
-
-end QIT

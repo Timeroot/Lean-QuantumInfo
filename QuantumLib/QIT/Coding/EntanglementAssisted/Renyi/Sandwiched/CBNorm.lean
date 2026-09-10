@@ -17,7 +17,7 @@ public import QuantumLib.QIT.Coding.EntanglementAssisted.Renyi.Sandwiched.CBNorm
 public import QuantumLib.QIT.Coding.EntanglementAssisted.Renyi.Sandwiched.CBNorm.Alternate
 
 /-!
-# Completely bounded `1 -> alpha` norm API for EA sandwiched Renyi proofs
+# Completely bounded `1 → alpha` norm API for EA sandwiched Renyi proofs
 
 Aggregate import surface for the source-shaped CB norm definitions and proofs.
 -/

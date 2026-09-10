@@ -12,8 +12,8 @@ public import QuantumLib.QIT.Information.Renyi.FrankLieb.Variational
 /-!
 # Concavity and reference twirl support for EA CB norms
 
-This module collects no-placeholder support for the Khatri--Wilde
-entanglement-assisted completely bounded norm collapse route.
+This module collects support for the Khatri--Wilde entanglement-assisted
+completely bounded norm collapse route.
 
 Source alignment:
 * KhatriWilde2024Principles, Chapters/EA_capacity.tex lines 2254-2265 average
@@ -37,7 +37,7 @@ universe u v w
 
 noncomputable section
 
-open State
+open MState
 
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
@@ -89,7 +89,7 @@ theorem cp_map_rpow_posSemidef
     (cMatrix_rpow_posSemidef (A := X) (s := 1 / alpha) hX)
 
 /-- Rank-one PSD tensor weight obtained by vectorizing a rectangular Kraus
-operator `K : a -> b` as a vector on `a × b`. -/
+operator `K : a → b` as a vector on `a × b`. -/
 def rectangularKrausVecWeight (K : Matrix b a ℂ) : CMatrix (a × b) :=
   rankOneMatrix (fun p : a × b => star (K p.2 p.1))
 
@@ -282,12 +282,12 @@ theorem cp_map_psd_trace_rpow_value_concave
 /-- Source concavity theorem for the CP-map Schatten value
 `X ↦ ||Phi(X^(1/alpha))||_alpha`, for `alpha > 1`.
 
-This is the no-placeholder Lean form of
+This is the Lean form of
 KhatriWilde2024Principles, Chapters/EA_capacity.tex lines 2283-2399. -/
 theorem cp_psdSchatten_rpow_value_concave
     (Phi : MatrixMap a b) (hPhi : MatrixMap.IsCompletelyPositive Phi)
-    {alpha lambda : Real} (halpha : 1 < alpha)
-    (hlambda0 : 0 <= lambda) (hlambda1 : lambda <= 1)
+    {alpha lambda : ℝ} (halpha : 1 < alpha)
+    (hlambda0 : 0 ≤ lambda) (hlambda1 : lambda ≤ 1)
     {X0 X1 : CMatrix a} (hX0 : X0.PosSemidef) (hX1 : X1.PosSemidef) :
     lambda *
         psdSchattenPNorm
@@ -302,7 +302,7 @@ theorem cp_psdSchatten_rpow_value_concave
           (MatrixMap.isCompletelyPositive_mapsPositive Phi hPhi
             (CFC.rpow X1 (1 / alpha))
             (cMatrix_rpow_posSemidef hX1))
-          (SchattenOrder.ofOneLt halpha) <=
+          (SchattenOrder.ofOneLt halpha) ≤
     psdSchattenPNorm
       (Phi (CFC.rpow (lambda • X0 + (1 - lambda) • X1) (1 / alpha)))
       (MatrixMap.isCompletelyPositive_mapsPositive Phi hPhi
@@ -462,35 +462,35 @@ theorem cp_psdSchatten_rpow_value_concave
     exact le_trans htrace_concave hholder_t
   simpa [N0, N1, Nt, p] using hmain
 
-variable {r : Type u}
+variable {r : Type w}
 variable [Fintype r] [DecidableEq r]
 
 /-- The unitary acting on the left/reference tensor factor as `U` and as the
 identity on the right/application tensor factor. -/
 def localReferenceUnitary (U : Matrix.unitaryGroup r ℂ) :
-    Matrix.unitaryGroup (Prod r a) ℂ :=
+    Matrix.unitaryGroup (r × a) ℂ :=
   ⟨Matrix.kronecker (U : CMatrix r) (1 : CMatrix a), by
     let I : Matrix.unitaryGroup a ℂ := ⟨1, by simp⟩
     simpa using Matrix.kronecker_mem_unitary U.2 I.2⟩
 
 @[simp] theorem localReferenceUnitary_coe (U : Matrix.unitaryGroup r ℂ) :
-    (localReferenceUnitary (a := a) U : CMatrix (Prod r a)) =
+    (localReferenceUnitary (a := a) U : CMatrix (r × a)) =
       Matrix.kronecker (U : CMatrix r) (1 : CMatrix a) := rfl
 
 theorem diagonalSignReferenceUnitary_conj_apply
-    (ε : r → Bool) (X : CMatrix (Prod r a)) (i i' : r) (j j' : a) :
+    (ε : r → Bool) (X : CMatrix (r × a)) (i i' : r) (j j' : a) :
     (((localReferenceUnitary (a := a) (diagonalSignUnitary ε) :
-          CMatrix (Prod r a)) *
+          CMatrix (r × a)) *
         X * star (localReferenceUnitary (a := a) (diagonalSignUnitary ε) :
-          CMatrix (Prod r a))) (i, j) (i', j')) =
+          CMatrix (r × a))) (i, j) (i', j')) =
       boolSignComplex (ε i) * X (i, j) (i', j') * boolSignComplex (ε i') := by
   simp only [localReferenceUnitary_coe, diagonalSignUnitary_coe,
     Matrix.star_eq_conjTranspose, Matrix.conjTranspose_kronecker,
     Matrix.conjTranspose_one, Matrix.mul_apply, Matrix.kronecker,
     Matrix.kroneckerMap_apply, Matrix.one_apply, Matrix.diagonal, Matrix.of_apply,
     Matrix.conjTranspose_apply]
-  have hinner : ∀ x : Prod r a,
-      (∑ y : Prod r a,
+  have hinner : ∀ x : r × a,
+      (∑ y : r × a,
         (((if i = y.1 then boolSignComplex (ε i) else 0) *
             if j = y.2 then 1 else 0) * X y x)) =
         boolSignComplex (ε i) * X (i, j) x := by
@@ -525,18 +525,18 @@ theorem diagonalSignReferenceUnitary_conj_apply
   · simp [mul_assoc]
 
 theorem permutationReferenceUnitary_conj_apply
-    (π : Equiv.Perm r) (X : CMatrix (Prod r a)) (i i' : r) (j j' : a) :
+    (π : Equiv.Perm r) (X : CMatrix (r × a)) (i i' : r) (j j' : a) :
     (((localReferenceUnitary (a := a) (permutationUnitary π) :
-          CMatrix (Prod r a)) *
+          CMatrix (r × a)) *
         X * star (localReferenceUnitary (a := a) (permutationUnitary π) :
-          CMatrix (Prod r a))) (i, j) (i', j')) =
+          CMatrix (r × a))) (i, j) (i', j')) =
       X (π i, j) (π i', j') := by
   simp only [localReferenceUnitary_coe, permutationUnitary_coe, Matrix.of_apply,
     Matrix.star_eq_conjTranspose, Matrix.conjTranspose_kronecker,
     Matrix.conjTranspose_one, Matrix.mul_apply, Matrix.kronecker,
     Matrix.kroneckerMap_apply, Matrix.one_apply, Matrix.conjTranspose_apply]
-  have hinner : ∀ x : Prod r a,
-      (∑ y : Prod r a,
+  have hinner : ∀ x : r × a,
+      (∑ y : r × a,
         (((if π i = y.1 then 1 else 0) * if j = y.2 then 1 else 0) * X y x)) =
         X (π i, j) x := by
     intro x
@@ -571,9 +571,9 @@ theorem permutationReferenceUnitary_conj_apply
 
 /-- Local-reference unitaries respect multiplication. -/
 theorem localReferenceUnitary_mul (U V : Matrix.unitaryGroup r ℂ) :
-    (localReferenceUnitary (a := a) (U * V) : CMatrix (Prod r a)) =
-      (localReferenceUnitary (a := a) U : CMatrix (Prod r a)) *
-        (localReferenceUnitary (a := a) V : CMatrix (Prod r a)) := by
+    (localReferenceUnitary (a := a) (U * V) : CMatrix (r × a)) =
+      (localReferenceUnitary (a := a) U : CMatrix (r × a)) *
+        (localReferenceUnitary (a := a) V : CMatrix (r × a)) := by
   rw [localReferenceUnitary_coe, localReferenceUnitary_coe, localReferenceUnitary_coe]
   simpa using
     (Matrix.mul_kronecker_mul (U : CMatrix r) (V : CMatrix r)
@@ -582,30 +582,30 @@ theorem localReferenceUnitary_mul (U V : Matrix.unitaryGroup r ℂ) :
 /-- Entrywise formula for the finite reference-unitary family obtained by
 first dephasing with a diagonal sign and then permuting the reference factor. -/
 theorem localReferenceSignPermutationUnitary_conj_apply
-    (ε : r → Bool) (π : Equiv.Perm r) (X : CMatrix (Prod r a))
+    (ε : r → Bool) (π : Equiv.Perm r) (X : CMatrix (r × a))
     (i i' : r) (j j' : a) :
     (((localReferenceUnitary (a := a) (permutationUnitary π * diagonalSignUnitary ε) :
-          CMatrix (Prod r a)) *
+          CMatrix (r × a)) *
         X *
         star (localReferenceUnitary (a := a) (permutationUnitary π * diagonalSignUnitary ε) :
-          CMatrix (Prod r a))) (i, j) (i', j')) =
+          CMatrix (r × a))) (i, j) (i', j')) =
       boolSignComplex (ε (π i)) * X (π i, j) (π i', j') *
         boolSignComplex (ε (π i')) := by
   classical
-  let P : CMatrix (Prod r a) := localReferenceUnitary (a := a) (permutationUnitary π)
-  let D : CMatrix (Prod r a) := localReferenceUnitary (a := a) (diagonalSignUnitary ε)
+  let P : CMatrix (r × a) := localReferenceUnitary (a := a) (permutationUnitary π)
+  let D : CMatrix (r × a) := localReferenceUnitary (a := a) (diagonalSignUnitary ε)
   have hmul :
       (localReferenceUnitary (a := a) (permutationUnitary π * diagonalSignUnitary ε) :
-          CMatrix (Prod r a)) = P * D := by
+          CMatrix (r × a)) = P * D := by
     simpa [P, D] using
       localReferenceUnitary_mul (a := a) (U := permutationUnitary π)
         (V := diagonalSignUnitary ε)
   calc
     (((localReferenceUnitary (a := a) (permutationUnitary π * diagonalSignUnitary ε) :
-          CMatrix (Prod r a)) *
+          CMatrix (r × a)) *
         X *
         star (localReferenceUnitary (a := a) (permutationUnitary π * diagonalSignUnitary ε) :
-          CMatrix (Prod r a))) (i, j) (i', j')) =
+          CMatrix (r × a))) (i, j) (i', j')) =
         (P * (D * X * star D) * star P) (i, j) (i', j') := by
           rw [hmul, star_mul]
           simp [P, D, mul_assoc]
@@ -621,8 +621,8 @@ theorem localReferenceSignPermutationUnitary_conj_apply
 
 /-- Finite sign-permutation depolarizing twirl on the left/reference tensor
 factor. -/
-def referenceDepolarizingTwirl [Nonempty r] (X : CMatrix (Prod r a)) :
-    CMatrix (Prod r a) :=
+def referenceDepolarizingTwirl [Nonempty r] (X : CMatrix (r × a)) :
+    CMatrix (r × a) :=
   ∑ idx : (r → Bool) × Equiv.Perm r,
     ((Fintype.card ((r → Bool) × Equiv.Perm r) : ℂ)⁻¹) •
       ((Matrix.kronecker
@@ -638,16 +638,16 @@ def referenceDepolarizingTwirl [Nonempty r] (X : CMatrix (Prod r a)) :
 /-- The finite local-reference sign-permutation twirl realizes the source
 identity `π_R ⊗ Tr_R[X]`.
 
-For `X : CMatrix (Prod r a)`, the reference system is the left tensor factor,
-so `Tr_R[X]` is `partialTraceA (a := r) (b := a) X`; using `partialTraceB`
+For `X : CMatrix (r × a)`, the reference system is the left tensor factor,
+so `Tr_R[X]` is `Matrix.traceLeft X`; using `Matrix.traceRight`
 would trace out the application system and leave the wrong type.  This is the
 finite sign-permutation version of the depolarizing twirl used in
 KhatriWilde2024Principles, Chapters/EA_capacity.tex lines 2254-2265. -/
-theorem localReferenceTwirl_eq_maximallyMixed_tensor_partialTrace
-    [Nonempty r] (X : CMatrix (Prod r a)) :
+theorem localReferenceTwirl_eq_uniform_tensor_partialTrace
+    [Nonempty r] (X : CMatrix (r × a)) :
     referenceDepolarizingTwirl (r := r) (a := a) X =
-      Matrix.kronecker (maximallyMixed r).matrix
-        (partialTraceA (a := r) (b := a) X) := by
+      Matrix.kronecker (MState.uniform : MState r).m
+        (Matrix.traceLeft X) := by
   classical
   ext x y
   rcases x with ⟨i, j⟩
@@ -684,8 +684,19 @@ theorem localReferenceTwirl_eq_maximallyMixed_tensor_partialTrace
             boolSignComplex (idx.1 (idx.2 i))) =
           (Fintype.card (r → Bool) : ℂ) *
             ∑ π : Equiv.Perm r, X (π i, j) (π i, j') := by
-      rw [Fintype.sum_prod_type]
-      simp [Finset.mul_sum, mul_left_comm, mul_comm]
+      rw [Fintype.sum_prod_type, Finset.sum_comm, Finset.mul_sum]
+      refine Finset.sum_congr rfl fun π _ => ?_
+      calc
+        (∑ ε : r → Bool,
+          boolSignComplex (ε (π i)) * X (π i, j) (π i, j') *
+            boolSignComplex (ε (π i))) =
+            (∑ ε : r → Bool,
+              boolSignComplex (ε (π i)) * boolSignComplex (ε (π i))) *
+              X (π i, j) (π i, j') := by
+          rw [Finset.sum_mul]
+          exact Finset.sum_congr rfl fun ε _ => by ring
+        _ = (Fintype.card (r → Bool) : ℂ) * X (π i, j) (π i, j') := by
+          rw [boolSignComplex_sum_mul_eq_card]
     rw [hsum, hcard]
     calc
       ((Fintype.card (r → Bool) : ℂ)⁻¹ *
@@ -697,9 +708,9 @@ theorem localReferenceTwirl_eq_maximallyMixed_tensor_partialTrace
         field_simp [hS, hP]
       _ = (Fintype.card r : ℂ)⁻¹ * ∑ k : r, X (k, j) (k, j') := by
         exact perm_orbit_average_eq_uniform (fun k : r => X (k, j) (k, j')) i
-      _ = (Matrix.kronecker (maximallyMixed r).matrix
-            (partialTraceA (a := r) (b := a) X)) (i, j) (i, j') := by
-        simp [partialTraceA, maximallyMixed_matrix, Matrix.kronecker,
+      _ = (Matrix.kronecker (MState.uniform : MState r).m
+            (Matrix.traceLeft X)) (i, j) (i, j') := by
+        simp [Matrix.traceLeft, uniform_matrix, Matrix.kronecker,
           Matrix.kroneckerMap_apply, hcastR]
   · have hsum :
         (∑ idx : (r → Bool) × Equiv.Perm r,
@@ -718,11 +729,12 @@ theorem localReferenceTwirl_eq_maximallyMixed_tensor_partialTrace
             X (π i, j) (π i', j') *
               (∑ ε : r → Bool,
                 boolSignComplex (ε (π i)) * boolSignComplex (ε (π i'))) := by
-          simp [Finset.mul_sum, mul_assoc, mul_comm]
+          rw [Finset.mul_sum]
+          exact Finset.sum_congr rfl fun ε _ => by ring
         _ = 0 := by
           rw [boolSignComplex_sum_mul_eq_zero_of_ne hne, mul_zero]
     rw [hsum, mul_zero]
-    simp [partialTraceA, maximallyMixed_matrix, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    simp [Matrix.traceLeft, uniform_matrix, Matrix.kronecker, Matrix.kroneckerMap_apply,
       hii']
 
 end

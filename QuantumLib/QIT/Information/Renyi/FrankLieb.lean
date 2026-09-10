@@ -17,15 +17,3 @@ public import QuantumLib.QIT.Information.Renyi.FrankLieb.DPI
 Facade for the dependency-ordered Frank--Lieb scalar/operator, variational,
 concavity, and DPI assembly modules.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace Information
-namespace Renyi
-namespace FrankLieb
-
-end FrankLieb
-end Renyi
-end Information
-end QIT

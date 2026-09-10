@@ -15,6 +15,7 @@ public import QuantumLib.QIT.Measurements.Projective
 public import QuantumLib.QIT.States.Purification.Uhlmann
 public import QuantumLib.QIT.States.Schatten
 public import QuantumLib.QIT.States.MaximallyMixed
+public import QuantumLib.QIT.Util.MatrixInstances
 public import Mathlib.Analysis.Complex.Hadamard
 public import Mathlib.Analysis.CStarAlgebra.Matrix
 public import Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Order
@@ -32,15 +33,15 @@ open scoped ComplexOrder MatrixOrder NNReal
 
 open Matrix
 
-namespace QIT
-
-universe u v w
-
 noncomputable section
-
+universe u v w
 variable {a : Type u} {b : Type v} {c : Type w}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 variable [Fintype c] [DecidableEq c]
+
+open QIT
+
+namespace QIT
 
 section ComplexInterpolation
 
@@ -313,13 +314,7 @@ namespace MatrixMap
 
 section L2OperatorEndpoint
 
-open scoped Matrix.Norms.L2Operator
-
-local instance cMatrixNonUnitalCStarAlgebraForEndpoint (n : Type*) [Fintype n]
-    [DecidableEq n] : NonUnitalCStarAlgebra (Matrix n n ℂ) := ⟨⟩
-
-local instance cMatrixCStarAlgebraForEndpoint (n : Type*) [Fintype n]
-    [DecidableEq n] : CStarAlgebra (Matrix n n ℂ) := ⟨⟩
+open scoped Matrix.Norms.L2Operator QIT.MatrixL2
 
 /-- The L2-operator norm of the finite matrix identity is at most one.
 
@@ -647,12 +642,12 @@ theorem traceNorm_complex_smul_le (c : ℂ) (M : CMatrix a) :
         c * ((M * (U : CMatrix a)).trace) := by
     simp [Matrix.trace_smul]
   have habs :
-      Complex.abs (c * ((M * (U : CMatrix a)).trace)) =
-        ‖c‖ * Complex.abs ((M * (U : CMatrix a)).trace) := by
-    simp [Complex.abs]
+       ‖c * ((M * (U : CMatrix a)).trace)‖ =
+        ‖c‖ * ‖(M * (U : CMatrix a)).trace‖ := by
+    simp
   calc
-    Complex.abs (((c • M) * (U : CMatrix a)).trace) =
-        ‖c‖ * Complex.abs ((M * (U : CMatrix a)).trace) := by
+     ‖((c • M) * (U : CMatrix a)).trace‖ =
+        ‖c‖ * ‖(M * (U : CMatrix a)).trace‖ := by
           rw [htrace, habs]
     _ ≤ ‖c‖ * traceNorm M :=
         mul_le_mul_of_nonneg_left
@@ -664,11 +659,11 @@ theorem abs_trace_mul_le_of_traceNorm_le_of_contraction
     (Y W : CMatrix a) {C : ℝ}
     (hY : traceNorm Y ≤ C)
     (hW : Matrix.conjTranspose W * W ≤ 1) :
-    Complex.abs ((W * Y).trace) ≤ C := by
+     ‖(W * Y).trace‖ ≤ C := by
   have hcycle : (W * Y).trace = (Y * W).trace := by
     rw [Matrix.trace_mul_comm]
   calc
-    Complex.abs ((W * Y).trace) = Complex.abs ((Y * W).trace) := by rw [hcycle]
+     ‖(W * Y).trace‖ = ‖(Y * W).trace‖ := by rw [hcycle]
     _ ≤ traceNorm Y := traceNorm_variational_contraction_abs_trace_le Y W hW
     _ ≤ C := hY
 
@@ -679,13 +674,13 @@ theorem abs_trace_mul_le_of_traceNorm_le_one_of_scaled_contraction
     (hY : traceNorm Y ≤ 1)
     (hW : Matrix.conjTranspose (((C : ℂ)⁻¹) • W) *
         (((C : ℂ)⁻¹) • W) ≤ 1) :
-    Complex.abs ((W * Y).trace) ≤ C := by
+     ‖(W * Y).trace‖ ≤ C := by
   let W' : CMatrix a := ((C : ℂ)⁻¹) • W
   have hW_eq : W = (C : ℂ) • W' := by
     ext i j
     have hCne : (C : ℂ) ≠ 0 := by exact_mod_cast ne_of_gt hCpos
     simp [W', Matrix.smul_apply, hCne]
-  have hpair : Complex.abs ((W' * Y).trace) ≤ 1 :=
+  have hpair : ‖(W' * Y).trace‖ ≤ 1 :=
     abs_trace_mul_le_of_traceNorm_le_of_contraction Y W' hY (by simpa [W'] using hW)
   have htrace : (W * Y).trace = (C : ℂ) * (W' * Y).trace := by
     rw [hW_eq]
@@ -693,9 +688,9 @@ theorem abs_trace_mul_le_of_traceNorm_le_one_of_scaled_contraction
   have hnormC : ‖(C : ℂ)‖ = C := by
     rw [Complex.norm_real, Real.norm_of_nonneg (le_of_lt hCpos)]
   calc
-    Complex.abs ((W * Y).trace) =
+     ‖(W * Y).trace‖ =
         ‖(C : ℂ) * (W' * Y).trace‖ := by rw [htrace]
-    _ = C * Complex.abs ((W' * Y).trace) := by
+    _ = C * ‖(W' * Y).trace‖ := by
           rw [norm_mul, hnormC]
     _ ≤ C * 1 := mul_le_mul_of_nonneg_left hpair (le_of_lt hCpos)
     _ = C := by ring
@@ -1157,46 +1152,37 @@ theorem stochasticOutput_sum
 /-- A row-stochastic classical kernel as a CPTP channel between diagonal
 classical registers. -/
 def stochasticChannel (T : a → b → ℝ≥0) (hT_sum : ∀ i, ∑ y, T i y = 1) :
-    Channel a b :=
-  Channel.prepare fun i => diagonalState (T i) (hT_sum i)
+    CPTPMap a b :=
+  CPTPOp.prepare fun i => diagonalState (T i) (hT_sum i)
 
 /-- The stochastic channel sends a diagonal state to the diagonal push-forward
 distribution. -/
 theorem stochasticChannel_applyState_diagonalState
     (p : a → ℝ≥0) (T : a → b → ℝ≥0)
     (hp_sum : ∑ i, p i = 1) (hT_sum : ∀ i, ∑ y, T i y = 1) :
-    (stochasticChannel T hT_sum).applyState (diagonalState p hp_sum) =
+    (stochasticChannel T hT_sum) (diagonalState p hp_sum) =
       diagonalState (stochasticOutput p T) (stochasticOutput_sum p T hp_sum hT_sum) := by
   classical
-  apply State.ext
+  apply MState.ext
   ext y y'
   by_cases hyy : y = y'
   · subst y'
-    simp only [stochasticChannel, Channel.applyState, Channel.prepare, Channel.prepareMap,
-      LinearMap.coe_mk, AddHom.coe_mk, diagonalState_matrix, Matrix.sum_apply,
-      Matrix.smul_apply, Matrix.diagonal_apply_eq, stochasticOutput]
+    simp only [CPTPOp.mat_coe_eq_apply_mat, stochasticChannel, CPTPOp.prepare_map,
+      diagonalState_matrix, Matrix.sum_apply, Matrix.smul_apply,
+      Matrix.diagonal_apply_eq, stochasticOutput]
     change (∑ x, ((p x : ℂ) * (T x y : ℂ))) =
       (((∑ x, p x * T x y) : ℝ≥0) : ℂ)
     simp
-  · simp [stochasticChannel, Channel.applyState, Channel.prepare, Channel.prepareMap,
+  · simp [CPTPOp.mat_coe_eq_apply_mat, stochasticChannel, CPTPOp.prepare, CPTPOp.prepareMap,
       diagonalState_matrix, Matrix.sum_apply, Matrix.diagonal, hyy]
 
 end Classical
 
-namespace State
+end QIT
 
-omit [Fintype a] in
-theorem cMatrix_real_smul_one_posDef_local {r : ℝ} (hr : 0 < r) :
-    (r • (1 : CMatrix a)).PosDef := by
-  rw [show r • (1 : CMatrix a) = Matrix.diagonal (fun _ : a => (r : ℂ)) by
-    ext i j
-    by_cases hij : i = j
-    · subst j
-      simp
-    · simp [hij]]
-  rw [Matrix.posDef_diagonal_iff]
-  intro i
-  exact_mod_cast hr
+namespace MState
+
+variable {ι : Type*} [Fintype ι]
 
 omit [Fintype a] in
 theorem cMatrix_le_add_pos_smul_one {A : CMatrix a}
@@ -1204,7 +1190,7 @@ theorem cMatrix_le_add_pos_smul_one {A : CMatrix a}
     A ≤ A + ε • (1 : CMatrix a) := by
   rw [Matrix.le_iff]
   have hpos : (ε • (1 : CMatrix a)).PosSemidef :=
-    (cMatrix_real_smul_one_posDef_local (a := a) hε).posSemidef
+    (cMatrix_real_smul_one_posDef (a := a) hε).posSemidef
   simpa [sub_eq_add_neg, add_comm, add_left_comm, add_assoc] using hpos
 
 omit [Fintype a] in
@@ -1212,7 +1198,7 @@ theorem cMatrix_posSemidef_add_pos_smul_one_posDef {A : CMatrix a}
     (hA : A.PosSemidef) {ε : ℝ} (hε : 0 < ε) :
     (A + ε • (1 : CMatrix a)).PosDef :=
   Matrix.PosDef.posSemidef_add hA
-    (cMatrix_real_smul_one_posDef_local (a := a) hε)
+    (cMatrix_real_smul_one_posDef (a := a) hε)
 
 /-- The sandwiched inner operator of a state with itself is the reference
 power `σ^(1/α)` in the full-rank domain.
@@ -1220,66 +1206,66 @@ power `σ^(1/α)` in the full-rank domain.
 This algebraic identity is one endpoint needed for the α > 1 interpolation
 route. -/
 theorem sandwichedRenyiInner_self_eq_rpow
-    (σ : State a) (hσ : σ.matrix.PosDef) (α : ℝ) (hα_ne_zero : α ≠ 0) :
-    sandwichedRenyiInner σ σ α = CFC.rpow σ.matrix (1 / α) := by
+    (σ : MState a) (hσ : σ.m.PosDef) (α : ℝ) (hα_ne_zero : α ≠ 0) :
+    sandwichedRenyiInner σ σ α = CFC.rpow σ.m (1 / α) := by
   let s : ℝ := (1 - α) / (2 * α)
-  have hnonneg : 0 ≤ σ.matrix :=
+  have hnonneg : 0 ≤ σ.m :=
     Matrix.nonneg_iff_posSemidef.mpr hσ.posSemidef
-  have hpow_one : CFC.rpow σ.matrix (1 : ℝ) = σ.matrix :=
-    CFC.rpow_one σ.matrix (ha := hnonneg)
+  have hpow_one : CFC.rpow σ.m (1 : ℝ) = σ.m :=
+    CFC.rpow_one σ.m (ha := hnonneg)
   have hs_left :
-      CFC.rpow σ.matrix s * σ.matrix = CFC.rpow σ.matrix (s + 1) := by
+      CFC.rpow σ.m s * σ.m = CFC.rpow σ.m (s + 1) := by
     calc
-      CFC.rpow σ.matrix s * σ.matrix =
-          CFC.rpow σ.matrix s * CFC.rpow σ.matrix (1 : ℝ) := by
+      CFC.rpow σ.m s * σ.m =
+          CFC.rpow σ.m s * CFC.rpow σ.m (1 : ℝ) := by
             rw [hpow_one]
-      _ = CFC.rpow σ.matrix (s + 1) := by
-            exact (CFC.rpow_add (a := σ.matrix) (x := s) (y := 1) hσ.isUnit).symm
+      _ = CFC.rpow σ.m (s + 1) := by
+            exact (CFC.rpow_add (a := σ.m) (x := s) (y := 1) hσ.isUnit).symm
   have hs_total :
-      CFC.rpow σ.matrix (s + 1) * CFC.rpow σ.matrix s =
-        CFC.rpow σ.matrix ((s + 1) + s) := by
-    exact (CFC.rpow_add (a := σ.matrix) (x := s + 1) (y := s) hσ.isUnit).symm
+      CFC.rpow σ.m (s + 1) * CFC.rpow σ.m s =
+        CFC.rpow σ.m ((s + 1) + s) := by
+    exact (CFC.rpow_add (a := σ.m) (x := s + 1) (y := s) hσ.isUnit).symm
   have hexp : (s + 1) + s = 1 / α := by
     dsimp [s]
     field_simp [hα_ne_zero]
     ring
   unfold sandwichedRenyiInner
-  change CFC.rpow σ.matrix s * σ.matrix * CFC.rpow σ.matrix s =
-    CFC.rpow σ.matrix (1 / α)
+  change CFC.rpow σ.m s * σ.m * CFC.rpow σ.m s =
+    CFC.rpow σ.m (1 / α)
   calc
-    CFC.rpow σ.matrix s * σ.matrix * CFC.rpow σ.matrix s =
-        (CFC.rpow σ.matrix s * σ.matrix) * CFC.rpow σ.matrix s := by
+    CFC.rpow σ.m s * σ.m * CFC.rpow σ.m s =
+        (CFC.rpow σ.m s * σ.m) * CFC.rpow σ.m s := by
           rw [Matrix.mul_assoc]
-    _ = CFC.rpow σ.matrix (s + 1) * CFC.rpow σ.matrix s := by
+    _ = CFC.rpow σ.m (s + 1) * CFC.rpow σ.m s := by
           rw [hs_left]
-    _ = CFC.rpow σ.matrix ((s + 1) + s) := hs_total
-    _ = CFC.rpow σ.matrix (1 / α) := by rw [hexp]
+    _ = CFC.rpow σ.m ((s + 1) + s) := hs_total
+    _ = CFC.rpow σ.m (1 / α) := by rw [hexp]
 
 /-- The interpolation reference endpoint `σ^(1/α)` has normalized
 `α`-power trace. -/
 theorem state_rpow_one_div_psdTracePower_eq_one
-    (σ : State a) (hσ : σ.matrix.PosDef) (α : ℝ) (hα_pos : 0 < α) :
-    psdTracePower (CFC.rpow σ.matrix (1 / α))
+    (σ : MState a) (hσ : σ.m.PosDef) (α : ℝ) (hα_pos : 0 < α) :
+    psdTracePower (CFC.rpow σ.m (1 / α))
         (σ.rpowMatrix_posSemidef (1 / α)) α = 1 := by
-  have hσ_nonneg : 0 ≤ σ.matrix :=
+  have hσ_nonneg : 0 ≤ σ.m :=
     Matrix.nonneg_iff_posSemidef.mpr hσ.posSemidef
   have hα_nonneg : 0 ≤ α := le_of_lt hα_pos
   have hone_div_nonneg : 0 ≤ 1 / α := by positivity
   have hα_ne_zero : α ≠ 0 := ne_of_gt hα_pos
   have hpow :
-      CFC.rpow (CFC.rpow σ.matrix (1 / α)) α =
-        CFC.rpow σ.matrix (1 : ℝ) := by
+      CFC.rpow (CFC.rpow σ.m (1 / α)) α =
+        CFC.rpow σ.m (1 : ℝ) := by
     calc
-      CFC.rpow (CFC.rpow σ.matrix (1 / α)) α =
-          CFC.rpow σ.matrix ((1 / α) * α) := by
-            exact CFC.rpow_rpow_of_exponent_nonneg σ.matrix
+      CFC.rpow (CFC.rpow σ.m (1 / α)) α =
+          CFC.rpow σ.m ((1 / α) * α) := by
+            exact CFC.rpow_rpow_of_exponent_nonneg σ.m
               (1 / α) α hone_div_nonneg hα_nonneg hσ_nonneg
-      _ = CFC.rpow σ.matrix (1 : ℝ) := by
+      _ = CFC.rpow σ.m (1 : ℝ) := by
             congr 1
             field_simp [hα_ne_zero]
-  have hone : CFC.rpow σ.matrix (1 : ℝ) = σ.matrix :=
-    CFC.rpow_one σ.matrix (ha := hσ_nonneg)
-  rw [psdTracePower, hpow, hone, σ.trace_eq_one]
+  have hone : CFC.rpow σ.m (1 : ℝ) = σ.m :=
+    CFC.rpow_one σ.m (ha := hσ_nonneg)
+  rw [psdTracePower, hpow, hone, σ.tr']
   norm_num
 
 /-- The full-rank sandwiched Renyi divergence of a state from itself is zero.
@@ -1288,11 +1274,11 @@ This is the normalization endpoint needed for turning the already-proved
 `β > 1` DPI into ordinary nonnegativity once a discard/terminal channel is
 available. -/
 theorem sandwichedRenyi_self_eq_zero
-    (σ : State a) (hσ : σ.matrix.PosDef)
+    (σ : MState a) (hσ : σ.m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     sandwichedRenyi σ σ hσ hσ α hα_pos hα_ne_one = 0 := by
   have hinner :
-      sandwichedRenyiInner σ σ α = CFC.rpow σ.matrix (1 / α) :=
+      sandwichedRenyiInner σ σ α = CFC.rpow σ.m (1 / α) :=
     sandwichedRenyiInner_self_eq_rpow σ hσ α (ne_of_gt hα_pos)
   have htrace :
       psdTracePower (sandwichedRenyiInner σ σ α)
@@ -1306,71 +1292,66 @@ theorem sandwichedRenyi_self_eq_zero
 This is the `Q_α(ω,ω)=1` factor needed when local-unitary twirling produces a
 common maximally mixed tensor factor. -/
 theorem sandwichedRenyiQ_state_self
-    (σ : State a) (hσ : σ.matrix.PosDef)
+    (σ : MState a) (hσ : σ.m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) :
-    sandwichedRenyiQ σ.matrix σ.matrix σ.pos σ.pos α = 1 := by
+    sandwichedRenyiQ σ.m σ.m σ.psd σ.psd α = 1 := by
   rw [sandwichedRenyiQ_eq_psdTracePower_inner]
   simpa [sandwichedRenyiInner_self_eq_rpow σ hσ α (ne_of_gt hα_pos), psdTracePower]
     using state_rpow_one_div_psdTracePower_eq_one σ hσ α hα_pos
 
 /-- The maximally mixed tensor factor contributes unit `Q` mass. -/
-theorem sandwichedRenyiQ_maximallyMixed_self [Nonempty a]
+theorem sandwichedRenyiQ_uniform_self [Nonempty a]
     (α : ℝ) (hα_pos : 0 < α) :
     sandwichedRenyiQ
-      (maximallyMixed a).matrix (maximallyMixed a).matrix
-      (maximallyMixed a).pos (maximallyMixed a).pos α = 1 :=
-  sandwichedRenyiQ_state_self (maximallyMixed a)
-    (maximallyMixed_posDef (a := a)) α hα_pos
+      (MState.uniform : MState a).m (MState.uniform : MState a).m
+      (MState.uniform : MState a).psd (MState.uniform : MState a).psd α = 1 :=
+  sandwichedRenyiQ_state_self (MState.uniform : MState a)
+    (MState.uniform_posDef (d := a)) α hα_pos
 
 /-- Tensoring both arguments with the same maximally mixed state leaves the
 low-`α` `Q` functional unchanged.
 
 This is the normalization side of the local-unitary twirling route for partial
 trace monotonicity. -/
-theorem sandwichedRenyiQ_kronecker_maximallyMixed_right [Nonempty b]
+theorem sandwichedRenyiQ_kronecker_uniform_right [Nonempty b]
     {ρ σ : CMatrix a} (hρ : ρ.PosSemidef) (hσ : σ.PosSemidef)
     (α : ℝ) (hα_half : 1 / 2 < α) (hα_lt_one : α < 1) :
     sandwichedRenyiQ
-        (Matrix.kronecker ρ (maximallyMixed b).matrix)
-        (Matrix.kronecker σ (maximallyMixed b).matrix)
-        (hρ.kronecker (maximallyMixed b).pos)
-        (hσ.kronecker (maximallyMixed b).pos) α =
+        (Matrix.kronecker ρ (MState.uniform : MState b).m)
+        (Matrix.kronecker σ (MState.uniform : MState b).m)
+        (hρ.kronecker (MState.uniform : MState b).psd)
+        (hσ.kronecker (MState.uniform : MState b).psd) α =
       sandwichedRenyiQ ρ σ hρ hσ α := by
   have hα_pos : 0 < α := by linarith
-  have hα_nonneg : 0 ≤ α := le_of_lt hα_pos
-  have hs_nonneg : 0 ≤ (1 - α) / (2 * α) := by
-    have hnum : 0 ≤ 1 - α := le_of_lt (sub_pos.mpr hα_lt_one)
-    have hden : 0 ≤ 2 * α := by positivity
-    exact div_nonneg hnum hden
-  rw [sandwichedRenyiQ_kronecker hρ hσ (maximallyMixed b).pos
-    (maximallyMixed b).pos α hs_nonneg hα_nonneg]
-  rw [sandwichedRenyiQ_maximallyMixed_self (a := b) α hα_pos]
+  rw [sandwichedRenyiQ_kronecker hρ hσ (MState.uniform : MState b).psd
+    (MState.uniform : MState b).psd α]
+  rw [sandwichedRenyiQ_uniform_self (a := b) α hα_pos]
   ring
 
 /-- The unitary acting as identity on the left tensor factor and as `U` on the
 right tensor factor. -/
 def localRightUnitary (U : Matrix.unitaryGroup b ℂ) :
-    Matrix.unitaryGroup (Prod a b) ℂ :=
+    Matrix.unitaryGroup (a × b) ℂ :=
   ⟨Matrix.kronecker (1 : CMatrix a) (U : CMatrix b), by
     let I : Matrix.unitaryGroup a ℂ := ⟨1, by simp⟩
     simpa using Matrix.kronecker_mem_unitary I.2 U.2⟩
 
 @[simp] theorem localRightUnitary_coe (U : Matrix.unitaryGroup b ℂ) :
-    (localRightUnitary (a := a) U : CMatrix (Prod a b)) =
+    (localRightUnitary (a := a) U : CMatrix (a × b)) =
       Matrix.kronecker (1 : CMatrix a) (U : CMatrix b) := rfl
 
 /-- The low-`α` `Q` functional is invariant under unitary conjugation on the
 right tensor factor. -/
 theorem sandwichedRenyiQ_localRightUnitary_conj
-    {ρ σ : CMatrix (Prod a b)}
+    {ρ σ : CMatrix (a × b)}
     (hρ : ρ.PosSemidef) (hσ : σ.PosSemidef)
     (U : Matrix.unitaryGroup b ℂ) (α : ℝ)
     (hs_nonneg : 0 ≤ (1 - α) / (2 * α)) (hα_nonneg : 0 ≤ α) :
     sandwichedRenyiQ
-        ((localRightUnitary (a := a) U : CMatrix (Prod a b)) * ρ *
-          star (localRightUnitary (a := a) U : CMatrix (Prod a b)))
-        ((localRightUnitary (a := a) U : CMatrix (Prod a b)) * σ *
-          star (localRightUnitary (a := a) U : CMatrix (Prod a b)))
+        ((localRightUnitary (a := a) U : CMatrix (a × b)) * ρ *
+          star (localRightUnitary (a := a) U : CMatrix (a × b)))
+        ((localRightUnitary (a := a) U : CMatrix (a × b)) * σ *
+          star (localRightUnitary (a := a) U : CMatrix (a × b)))
         (by
           simpa using
             posSemidef_unitary_conj hρ (localRightUnitary (a := a) U)⁻¹)
@@ -1382,8 +1363,10 @@ theorem sandwichedRenyiQ_localRightUnitary_conj
   sandwichedRenyiQ_unitary_conj hρ hσ (localRightUnitary (a := a) U)
     α hs_nonneg hα_nonneg
 
-end State
+end MState
 
-end
+namespace QIT
+
+variable {ι : Type*} [Fintype ι]
 
 end QIT

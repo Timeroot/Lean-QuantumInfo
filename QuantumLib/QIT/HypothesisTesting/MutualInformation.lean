@@ -21,7 +21,7 @@ the entanglement-assisted classical communication lower- and upper-bound
 queues.  The definitions use the beta-first convention
 `D_H^epsilon(rho || sigma) = -log_2 beta_epsilon(rho || sigma)`, where
 `beta_epsilon` is the infimum of the type-II error over effects
-`0 <= Lambda <= 1` with `Tr[Lambda rho] >= 1 - epsilon`.
+`0 ≤ Lambda ≤ 1` with `Tr[Lambda rho] ≥ 1 - epsilon`.
 
 The channel-level optimized quantity `I_H^epsilon(N)` follows
 [KhatriWilde2024Principles, Chapters/entropies.tex:8042-8052].  The barred
@@ -29,124 +29,72 @@ non-optimized quantity `bar I_H^epsilon(N)` follows the one-shot
 entanglement-assisted lower-bound statement
 [KhatriWilde2024Principles, Chapters/EA_capacity.tex:530-665].
 
-This is a definition-level API: SDP duality, optimizer existence,
-position-based coding, sequential decoding, and the one-shot lower-bound
-theorem are downstream proof obligations.
+This module is the definition layer.  The SDP duality it is phrased against is
+in `QuantumLib.QIT.Util.SDP.HermitianPSDTraceDuality`; the operational content
+-- position-based coding, sequential decoding, and the resulting one-shot
+lower bound -- is in `QuantumLib.QIT.Coding.EntanglementAssisted`.
 -/
 
 @[expose] public section
 
 open scoped ComplexOrder MatrixOrder
 
-namespace QIT
-
-universe u v w
-
 noncomputable section
-
+universe u v w
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-private theorem state_matrix_le_one_for_htmi (rho : State a) :
-    rho.matrix ≤ 1 := by
-  classical
-  rw [Matrix.le_iff]
-  let U : Matrix.unitaryGroup a ℂ := rho.pos.1.eigenvectorUnitary
-  let D : CMatrix a := Matrix.diagonal fun i => ((rho.pos.1.eigenvalues i : ℝ) : ℂ)
-  have hdiag : rho.matrix = (U : CMatrix a) * D * star (U : CMatrix a) := by
-    simpa [U, D, Function.comp_def, Matrix.IsHermitian.spectral_theorem,
-      Unitary.conjStarAlgAut_apply]
-      using rho.pos.1.spectral_theorem
-  have heig_sum : ∑ i, rho.pos.1.eigenvalues i = 1 := by
-    have hc : (∑ i, ((rho.pos.1.eigenvalues i : ℝ) : ℂ)) = 1 := by
-      exact rho.pos.1.trace_eq_sum_eigenvalues.symm.trans rho.trace_eq_one
-    exact Complex.ofReal_injective (by simpa using hc)
-  have heig_le_one : ∀ i, rho.pos.1.eigenvalues i ≤ 1 := by
-    intro i
-    have hnonneg (j : a) : 0 ≤ rho.pos.1.eigenvalues j :=
-      rho.pos.eigenvalues_nonneg j
-    calc rho.pos.1.eigenvalues i
-        ≤ rho.pos.1.eigenvalues i +
-            ∑ j ∈ Finset.univ.erase i, rho.pos.1.eigenvalues j :=
-          le_add_of_nonneg_right (Finset.sum_nonneg (fun j _ => hnonneg j))
-      _ = ∑ j, rho.pos.1.eigenvalues j := by
-          rw [add_comm]
-          exact Finset.sum_erase_add (s := Finset.univ)
-            (f := fun j => rho.pos.1.eigenvalues j) (Finset.mem_univ i)
-      _ = 1 := heig_sum
-  have hsub :
-      1 - rho.matrix = (U : CMatrix a) * (1 - D) * star (U : CMatrix a) := by
-    rw [hdiag]
-    have hUstar : (U : CMatrix a) * star (U : CMatrix a) = 1 := by
-      simp
-    calc
-      1 - (U : CMatrix a) * D * star (U : CMatrix a) =
-          (U : CMatrix a) * 1 * star (U : CMatrix a) -
-            (U : CMatrix a) * D * star (U : CMatrix a) := by
-            rw [Matrix.mul_one, hUstar]
-      _ = (U : CMatrix a) * (1 - D) * star (U : CMatrix a) := by
-            noncomm_ring
-  have hdiag_sub :
-      (1 : CMatrix a) - D =
-        Matrix.diagonal fun i => (((1 : ℝ) - rho.pos.1.eigenvalues i : ℝ) : ℂ) := by
-    ext i j
-    by_cases hij : i = j
-    · subst hij
-      simp [D]
-    · simp [D, Matrix.diagonal, hij]
-  rw [hsub]
-  rw [Matrix.IsUnit.posSemidef_star_right_conjugate_iff (Unitary.isUnit_coe :
-    IsUnit (U : CMatrix a))]
-  rw [hdiag_sub]
-  rw [Matrix.posSemidef_diagonal_iff]
-  intro i
-  have hnonneg : 0 ≤ (1 : ℝ) - rho.pos.1.eigenvalues i := by
-    exact sub_nonneg.mpr (heig_le_one i)
-  exact_mod_cast hnonneg
+open QIT
+
+namespace QIT
 
 /-- Accept probability of an effect against a state, written as a real trace. -/
-def effectAcceptProbability (rho : State a) (Lambda : CMatrix a) : ℝ :=
-  ((rho.matrix * Lambda).trace).re
+def effectAcceptProbability (rho : MState a) (Lambda : CMatrix a) : ℝ :=
+  ((rho.m * Lambda).trace).re
 
 /-- Type-II error of an effect against the second hypothesis. -/
-def effectTypeIIError (sigma : State a) (Lambda : CMatrix a) : ℝ :=
+def effectTypeIIError (sigma : MState a) (Lambda : CMatrix a) : ℝ :=
   effectAcceptProbability sigma Lambda
 
 /-- A feasible hypothesis-testing effect for the type-I constraint
-`Tr[Lambda rho] >= 1 - epsilon`. -/
-structure HypothesisTestingEffect (rho : State a) (epsilon : ℝ) where
+`Tr[Lambda rho] ≥ 1 - epsilon`. -/
+structure HypothesisTestingEffect (rho : MState a) (epsilon : ℝ) where
+  /-- The underlying effect matrix. -/
   effect : CMatrix a
+  /-- The effect is positive semidefinite. -/
   pos : effect.PosSemidef
+  /-- The effect is bounded above by the identity. -/
   le_one : effect ≤ 1
+  /-- The type-I error is at most `epsilon`. -/
   accept_ge : 1 - epsilon ≤ effectAcceptProbability rho effect
 
 namespace HypothesisTestingEffect
 
-variable {rho sigma : State a} {epsilon : ℝ}
+variable {rho sigma : MState a} {epsilon : ℝ}
 
 /-- The type-II error induced by a feasible effect. -/
-def typeIIError (Lambda : HypothesisTestingEffect rho epsilon) (sigma : State a) : ℝ :=
+def typeIIError (Lambda : HypothesisTestingEffect rho epsilon) (sigma : MState a) : ℝ :=
   effectTypeIIError sigma Lambda.effect
 
 @[simp]
-theorem typeIIError_eq (Lambda : HypothesisTestingEffect rho epsilon) (sigma : State a) :
+theorem typeIIError_eq (Lambda : HypothesisTestingEffect rho epsilon) (sigma : MState a) :
     Lambda.typeIIError sigma = effectTypeIIError sigma Lambda.effect :=
   rfl
 
 theorem typeIIError_nonneg_htmi (Lambda : HypothesisTestingEffect rho epsilon)
-    (sigma : State a) :
+    (sigma : MState a) :
     0 ≤ Lambda.typeIIError sigma := by
   unfold typeIIError effectTypeIIError effectAcceptProbability
-  exact cMatrix_trace_mul_posSemidef_re_nonneg sigma.pos Lambda.pos
+  exact cMatrix_trace_mul_posSemidef_re_nonneg sigma.psd Lambda.pos
 
-theorem effectAcceptProbability_real_smul (rho : State a)
+theorem effectAcceptProbability_real_smul (rho : MState a)
     (c : ℝ) (E : CMatrix a) :
     effectAcceptProbability rho (c • E) = c * effectAcceptProbability rho E := by
   unfold effectAcceptProbability
   rw [Matrix.mul_smul, Matrix.trace_smul]
   simp
 
-theorem effectTypeIIError_real_smul (sigma : State a)
+theorem effectTypeIIError_real_smul (sigma : MState a)
     (c : ℝ) (E : CMatrix a) :
     effectTypeIIError sigma (c • E) = c * effectTypeIIError sigma E := by
   exact effectAcceptProbability_real_smul sigma c E
@@ -189,7 +137,7 @@ theorem one_minus_epsilon_div_accept_le_one
 
 The source proof of the weak-converse comparison restricts the optimizer to
 tests with `Tr[Lambda rho] = 1 - epsilon`.  The repository's beta-first API
-uses the equivalent `>=` feasibility convention; this construction is the
+uses the equivalent `≥` feasibility convention; this construction is the
 bridge from the repository convention to the source equality convention. -/
 def scaleToAcceptEquality (Lambda : HypothesisTestingEffect rho epsilon)
     (hε_lt_one : epsilon < 1) : HypothesisTestingEffect rho epsilon where
@@ -220,7 +168,7 @@ theorem scaleToAcceptEquality_accept_eq
 
 theorem scaleToAcceptEquality_typeIIError_le
     (Lambda : HypothesisTestingEffect rho epsilon) (hε_lt_one : epsilon < 1)
-    (sigma : State a) :
+    (sigma : MState a) :
     (Lambda.scaleToAcceptEquality hε_lt_one).typeIIError sigma ≤
       Lambda.typeIIError sigma := by
   have hcoef0 :=
@@ -235,46 +183,43 @@ theorem scaleToAcceptEquality_typeIIError_le
 
 @[simp]
 theorem effectAcceptProbability_effect (Lambda : HypothesisTestingEffect rho epsilon) :
-    effectAcceptProbability rho Lambda.effect = ((rho.matrix * Lambda.effect).trace).re :=
+    effectAcceptProbability rho Lambda.effect = ((rho.m * Lambda.effect).trace).re :=
   rfl
 
-/-- The identity effect is feasible whenever `epsilon >= 0`. -/
-def identity (rho : State a) (epsilon : ℝ) (hε : 0 ≤ epsilon) :
+/-- The identity effect is feasible whenever `epsilon ≥ 0`. -/
+def identity (rho : MState a) (epsilon : ℝ) (hε : 0 ≤ epsilon) :
     HypothesisTestingEffect rho epsilon where
   effect := 1
   pos := Matrix.PosSemidef.one
   le_one := le_rfl
   accept_ge := by
     unfold effectAcceptProbability
-    rw [Matrix.mul_one, rho.trace_eq_one]
+    rw [Matrix.mul_one, rho.tr']
     simp
     linarith
 
 @[simp]
-theorem identity_effect (rho : State a) (epsilon : ℝ) (hε : 0 ≤ epsilon) :
+theorem identity_effect (rho : MState a) (epsilon : ℝ) (hε : 0 ≤ epsilon) :
     (identity rho epsilon hε).effect = 1 :=
   rfl
 
-@[simp]
-theorem identity_typeIIError (rho sigma : State a) (epsilon : ℝ) (hε : 0 ≤ epsilon) :
+theorem identity_typeIIError (rho sigma : MState a) (epsilon : ℝ) (hε : 0 ≤ epsilon) :
     (identity rho epsilon hε).typeIIError sigma = 1 := by
   unfold typeIIError effectTypeIIError effectAcceptProbability identity
-  rw [Matrix.mul_one, sigma.trace_eq_one]
+  rw [Matrix.mul_one, sigma.tr']
   simp
 
 /-- A feasible hypothesis-testing effect determines a binary POVM whose `true`
 outcome accepts the first hypothesis. -/
 def toBinaryHypothesisTest (Lambda : HypothesisTestingEffect rho epsilon) :
-    BinaryHypothesisTest a where
-  effects := fun accept => if accept then Lambda.effect else 1 - Lambda.effect
-  pos := by
-    intro accept
-    by_cases haccept : accept
-    · simp [haccept, Lambda.pos]
-    · have hcomp : (1 - Lambda.effect).PosSemidef := by
-        simpa [Matrix.le_iff] using Lambda.le_one
-      simp [haccept, hcomp]
-  sum_eq_one := by
+    BinaryHypothesisTest a :=
+  .ofMatrices (fun accept => if accept then Lambda.effect else 1 - Lambda.effect)
+    (fun accept => by
+      by_cases haccept : accept
+      · simp [haccept, Lambda.pos]
+      · have hcomp : (1 - Lambda.effect).PosSemidef := by
+          simpa [Matrix.le_iff] using Lambda.le_one
+        simp [haccept, hcomp]) <| by
     rw [Fintype.sum_bool]
     simp
 
@@ -297,11 +242,11 @@ theorem toBinaryHypothesisTest_acceptProb_ge
   exact Lambda.accept_ge
 
 theorem toBinaryHypothesisTest_typeIIError
-    (Lambda : HypothesisTestingEffect rho epsilon) (sigma : State a) :
+    (Lambda : HypothesisTestingEffect rho epsilon) (sigma : MState a) :
     (Lambda.toBinaryHypothesisTest.typeIIError sigma : ℝ) =
       Lambda.typeIIError sigma := by
   change (Lambda.toBinaryHypothesisTest.prob sigma true : ℝ) =
-    ((sigma.matrix * Lambda.effect).trace).re
+    ((sigma.m * Lambda.effect).trace).re
   rw [POVM.prob_eq_trace_re]
   rfl
 
@@ -309,7 +254,7 @@ end HypothesisTestingEffect
 
 namespace BinaryHypothesisTest
 
-variable {rho : State a} {epsilon : ℝ}
+variable {rho : MState a} {epsilon : ℝ}
 
 /-- A two-outcome POVM whose accept probability meets the type-I constraint
 gives a feasible hypothesis-testing effect. -/
@@ -330,9 +275,8 @@ theorem toHypothesisTestingEffect_effect (T : BinaryHypothesisTest a)
     (T.toHypothesisTestingEffect haccept).effect = T.acceptRhoEffect :=
   rfl
 
-@[simp]
 theorem toHypothesisTestingEffect_typeIIError (T : BinaryHypothesisTest a)
-    (haccept : 1 - epsilon ≤ (T.acceptProb rho : ℝ)) (sigma : State a) :
+    (haccept : 1 - epsilon ≤ (T.acceptProb rho : ℝ)) (sigma : MState a) :
     (T.toHypothesisTestingEffect haccept).typeIIError sigma = (T.typeIIError sigma : ℝ) := by
   unfold HypothesisTestingEffect.typeIIError effectTypeIIError effectAcceptProbability
     toHypothesisTestingEffect BinaryHypothesisTest.typeIIError
@@ -340,9 +284,11 @@ theorem toHypothesisTestingEffect_typeIIError (T : BinaryHypothesisTest a)
 
 end BinaryHypothesisTest
 
-namespace State
+end QIT
 
-variable (rho sigma : State a) (epsilon : ℝ)
+namespace MState
+
+variable (rho sigma : MState a) (epsilon : ℝ)
 
 /-- Candidate set for the beta quantity in hypothesis-testing relative entropy. -/
 def hypothesisTestingBetaCandidateSet : Set ℝ :=
@@ -417,12 +363,12 @@ theorem hypothesisTestingBeta_nonneg (hε : 0 ≤ epsilon) :
 private theorem effectAcceptProbability_le_effect_trace_for_htmi
     (Lambda : HypothesisTestingEffect rho epsilon) :
     effectAcceptProbability rho Lambda.effect ≤ Lambda.effect.trace.re := by
-  have hle : rho.matrix ≤ (1 : CMatrix a) := state_matrix_le_one_for_htmi rho
+  have hle : rho.m ≤ (1 : CMatrix a) := rho.matrix_le_one
   have htrace := cMatrix_trace_mul_le_of_le_posSemidef_left Lambda.pos hle
   unfold effectAcceptProbability
   calc
-    ((rho.matrix * Lambda.effect).trace).re =
-        ((Lambda.effect * rho.matrix).trace).re := by
+    ((rho.m * Lambda.effect).trace).re =
+        ((Lambda.effect * rho.m).trace).re := by
           rw [Matrix.trace_mul_comm]
     _ ≤ ((Lambda.effect * (1 : CMatrix a)).trace).re := htrace
     _ = Lambda.effect.trace.re := by
@@ -436,7 +382,7 @@ private theorem real_smul_one_effect_trace_re_for_htmi
 
 private theorem scalar_trace_le_typeIIError_of_matrix_lower_bound_for_htmi
     {c : ℝ} (Lambda : HypothesisTestingEffect rho epsilon)
-    (hlower : c • (1 : CMatrix a) ≤ sigma.matrix) :
+    (hlower : c • (1 : CMatrix a) ≤ sigma.m) :
     c * Lambda.effect.trace.re ≤ Lambda.typeIIError sigma := by
   have htrace := cMatrix_trace_mul_le_of_le_posSemidef_left Lambda.pos hlower
   unfold HypothesisTestingEffect.typeIIError effectTypeIIError effectAcceptProbability
@@ -444,8 +390,8 @@ private theorem scalar_trace_le_typeIIError_of_matrix_lower_bound_for_htmi
     c * Lambda.effect.trace.re =
         ((Lambda.effect * (c • (1 : CMatrix a))).trace).re := by
           rw [real_smul_one_effect_trace_re_for_htmi]
-    _ ≤ ((Lambda.effect * sigma.matrix).trace).re := htrace
-    _ = ((sigma.matrix * Lambda.effect).trace).re := by
+    _ ≤ ((Lambda.effect * sigma.m).trace).re := htrace
+    _ = ((sigma.m * Lambda.effect).trace).re := by
           rw [Matrix.trace_mul_comm]
 
 /-- If the second hypothesis dominates a positive scalar multiple of the
@@ -453,7 +399,7 @@ identity, then every feasible effect has type-II error bounded below by
 `c * (1 - ε)`. -/
 theorem hypothesisTestingEffect_typeIIError_ge_scalar_one_minus_epsilon
     {c : ℝ} (Lambda : HypothesisTestingEffect rho epsilon)
-    (hc : 0 ≤ c) (hlower : c • (1 : CMatrix a) ≤ sigma.matrix) :
+    (hc : 0 ≤ c) (hlower : c • (1 : CMatrix a) ≤ sigma.m) :
     c * (1 - epsilon) ≤ Lambda.typeIIError sigma := by
   have haccept_trace :
       1 - epsilon ≤ Lambda.effect.trace.re :=
@@ -471,7 +417,7 @@ theorem hypothesisTestingEffect_typeIIError_ge_scalar_one_minus_epsilon
 beta branch strictly positive for `ε < 1`. -/
 theorem hypothesisTestingBeta_pos_of_matrix_lower_bound
     {c : ℝ} (hε_nonneg : 0 ≤ epsilon) (hε_lt_one : epsilon < 1)
-    (hc : 0 < c) (hlower : c • (1 : CMatrix a) ≤ sigma.matrix) :
+    (hc : 0 < c) (hlower : c • (1 : CMatrix a) ≤ sigma.m) :
     0 < rho.hypothesisTestingBeta sigma epsilon := by
   have hcandidate_nonempty :
       (rho.hypothesisTestingBetaCandidateSet sigma epsilon).Nonempty :=
@@ -491,71 +437,6 @@ theorem hypothesisTestingBeta_pos_of_matrix_lower_bound
   have hpos : 0 < c * (1 - epsilon) :=
     mul_pos hc (sub_pos.mpr hε_lt_one)
   exact hpos.trans_le hβ_ge
-
-/-- A positive-definite state matrix dominates a positive scalar multiple of
-the identity.  The scalar is the finite minimum eigenvalue. -/
-theorem exists_pos_scalar_smul_one_le_matrix_of_posDef
-    (hσ : sigma.matrix.PosDef) :
-    ∃ c : ℝ, 0 < c ∧ c • (1 : CMatrix a) ≤ sigma.matrix := by
-  classical
-  have : Nonempty a := sigma.nonempty
-  let c : ℝ := Finset.univ.inf' Finset.univ_nonempty
-    (fun i : a => hσ.1.eigenvalues i)
-  have hc_pos : 0 < c := by
-    dsimp [c]
-    rw [Finset.lt_inf'_iff]
-    intro i hi
-    exact hσ.eigenvalues_pos i
-  have hc_le_eig : ∀ i : a, c ≤ hσ.1.eigenvalues i := by
-    intro i
-    exact Finset.inf'_le (f := fun i : a => hσ.1.eigenvalues i) (Finset.mem_univ i)
-  refine ⟨c, hc_pos, ?_⟩
-  rw [Matrix.le_iff]
-  let U : Matrix.unitaryGroup a ℂ := hσ.1.eigenvectorUnitary
-  let D : CMatrix a := Matrix.diagonal fun i => ((hσ.1.eigenvalues i : ℝ) : ℂ)
-  have hdiag : sigma.matrix = (U : CMatrix a) * D * star (U : CMatrix a) := by
-    simpa [U, D, Function.comp_def, Matrix.IsHermitian.spectral_theorem,
-      Unitary.conjStarAlgAut_apply]
-      using hσ.1.spectral_theorem
-  have hUstar : (U : CMatrix a) * star (U : CMatrix a) = 1 := by
-    simp
-  have hscalar :
-      (U : CMatrix a) * (c • (1 : CMatrix a)) * star (U : CMatrix a) =
-        c • (1 : CMatrix a) := by
-    calc
-      (U : CMatrix a) * (c • (1 : CMatrix a)) * star (U : CMatrix a) =
-          c • ((U : CMatrix a) * (1 : CMatrix a) * star (U : CMatrix a)) := by
-            simp
-      _ = c • (1 : CMatrix a) := by
-            rw [Matrix.mul_one, hUstar]
-  have hsub :
-      sigma.matrix - c • (1 : CMatrix a) =
-        (U : CMatrix a) * (D - c • (1 : CMatrix a)) * star (U : CMatrix a) := by
-    calc
-      sigma.matrix - c • (1 : CMatrix a) =
-          (U : CMatrix a) * D * star (U : CMatrix a) -
-            (U : CMatrix a) * (c • (1 : CMatrix a)) * star (U : CMatrix a) := by
-            rw [hdiag, hscalar]
-      _ = (U : CMatrix a) * (D - c • (1 : CMatrix a)) *
-            star (U : CMatrix a) := by
-            rw [Matrix.mul_sub, Matrix.sub_mul]
-  have hdiag_sub :
-      D - c • (1 : CMatrix a) =
-        Matrix.diagonal fun i => (((hσ.1.eigenvalues i : ℝ) - c : ℝ) : ℂ) := by
-    ext i j
-    by_cases hij : i = j
-    · subst hij
-      simp [D]
-    · simp [D, Matrix.diagonal, hij]
-  rw [hsub]
-  rw [Matrix.IsUnit.posSemidef_star_right_conjugate_iff (Unitary.isUnit_coe :
-    IsUnit (U : CMatrix a))]
-  rw [hdiag_sub]
-  rw [Matrix.posSemidef_diagonal_iff]
-  intro i
-  have hnonneg : 0 ≤ (hσ.1.eigenvalues i : ℝ) - c :=
-    sub_nonneg.mpr (hc_le_eig i)
-  exact_mod_cast hnonneg
 
 /-- Approximate the beta infimum by a concrete feasible effect.  This is the
 non-optimizer form needed by one-shot coding proofs: whenever a strict upper
@@ -654,70 +535,70 @@ theorem exists_hypothesisTestingEffect_typeIIError_lt_rpow_two_neg_of_lt_relativ
 
 /-- Finite-real candidate set retained for internal real arithmetic. -/
 def hypothesisTestingMutualInformationFiniteCandidateSet
-    (rhoAB : State (Prod a b)) (epsilon : ℝ) : Set ℝ :=
-  {value | ∃ sigmaB : State b,
+    (rhoAB : MState (a × b)) (epsilon : ℝ) : Set ℝ :=
+  {value | ∃ sigmaB : MState b,
     value =
-      rhoAB.hypothesisTestingRelativeEntropyFinite (rhoAB.marginalA.prod sigmaB) epsilon}
+      rhoAB.hypothesisTestingRelativeEntropyFinite (rhoAB.traceRight.prod sigmaB) epsilon}
 
 /-- Candidate set for optimized extended-real state hypothesis-testing mutual
 information. -/
 def hypothesisTestingMutualInformationCandidateSet
-    (rhoAB : State (Prod a b)) (epsilon : ℝ) : Set EReal :=
-  {value | ∃ sigmaB : State b,
+    (rhoAB : MState (a × b)) (epsilon : ℝ) : Set EReal :=
+  {value | ∃ sigmaB : MState b,
     value =
-      rhoAB.hypothesisTestingRelativeEntropy (rhoAB.marginalA.prod sigmaB) epsilon}
+      rhoAB.hypothesisTestingRelativeEntropy (rhoAB.traceRight.prod sigmaB) epsilon}
 
 /-- Finite-real helper for optimized hypothesis-testing mutual information. -/
 def hypothesisTestingMutualInformationFinite
-    (rhoAB : State (Prod a b)) (epsilon : ℝ) : ℝ :=
+    (rhoAB : MState (a × b)) (epsilon : ℝ) : ℝ :=
   sInf (hypothesisTestingMutualInformationFiniteCandidateSet (a := a) (b := b) rhoAB epsilon)
 
 /-- Canonical extended-real optimized hypothesis-testing mutual information. -/
 def hypothesisTestingMutualInformation
-    (rhoAB : State (Prod a b)) (epsilon : ℝ) : EReal :=
+    (rhoAB : MState (a × b)) (epsilon : ℝ) : EReal :=
   sInf (hypothesisTestingMutualInformationCandidateSet (a := a) (b := b) rhoAB epsilon)
 
 /-- Finite-real helper for non-optimized barred hypothesis-testing mutual
 information. -/
 def barHypothesisTestingMutualInformationFinite
-    (rhoAB : State (Prod a b)) (epsilon : ℝ) : ℝ :=
-  rhoAB.hypothesisTestingRelativeEntropyFinite (rhoAB.marginalA.prod rhoAB.marginalB) epsilon
+    (rhoAB : MState (a × b)) (epsilon : ℝ) : ℝ :=
+  rhoAB.hypothesisTestingRelativeEntropyFinite (rhoAB.traceRight.prod rhoAB.traceLeft) epsilon
 
 /-- Non-optimized, barred extended-real hypothesis-testing mutual information
 `bar I_H^epsilon(A;B)_rho`, with the source-faithful zero-beta branch. -/
 def barHypothesisTestingMutualInformation
-    (rhoAB : State (Prod a b)) (epsilon : ℝ) : EReal :=
-  rhoAB.hypothesisTestingRelativeEntropy (rhoAB.marginalA.prod rhoAB.marginalB) epsilon
+    (rhoAB : MState (a × b)) (epsilon : ℝ) : EReal :=
+  rhoAB.hypothesisTestingRelativeEntropy (rhoAB.traceRight.prod rhoAB.traceLeft) epsilon
 
 theorem hypothesisTestingMutualInformationFinite_eq_sInf
-    (rhoAB : State (Prod a b)) (epsilon : ℝ) :
+    (rhoAB : MState (a × b)) (epsilon : ℝ) :
     rhoAB.hypothesisTestingMutualInformationFinite epsilon =
       sInf (hypothesisTestingMutualInformationFiniteCandidateSet (a := a) (b := b) rhoAB epsilon) :=
   rfl
 
 theorem hypothesisTestingMutualInformation_eq_sInf
-    (rhoAB : State (Prod a b)) (epsilon : ℝ) :
+    (rhoAB : MState (a × b)) (epsilon : ℝ) :
     rhoAB.hypothesisTestingMutualInformation epsilon =
       sInf (hypothesisTestingMutualInformationCandidateSet (a := a) (b := b) rhoAB epsilon) :=
   rfl
 
 theorem barHypothesisTestingMutualInformationFinite_eq
-    (rhoAB : State (Prod a b)) (epsilon : ℝ) :
+    (rhoAB : MState (a × b)) (epsilon : ℝ) :
     rhoAB.barHypothesisTestingMutualInformationFinite epsilon =
-      rhoAB.hypothesisTestingRelativeEntropyFinite (rhoAB.marginalA.prod rhoAB.marginalB) epsilon :=
+      rhoAB.hypothesisTestingRelativeEntropyFinite (rhoAB.traceRight.prod rhoAB.traceLeft) epsilon :=
   rfl
 
 theorem barHypothesisTestingMutualInformation_eq
-    (rhoAB : State (Prod a b)) (epsilon : ℝ) :
+    (rhoAB : MState (a × b)) (epsilon : ℝ) :
     rhoAB.barHypothesisTestingMutualInformation epsilon =
       rhoAB.hypothesisTestingRelativeEntropy
-        (rhoAB.marginalA.prod rhoAB.marginalB) epsilon :=
+        (rhoAB.traceRight.prod rhoAB.traceLeft) epsilon :=
   rfl
 
 /-- The real-valued barred hypothesis-testing mutual information embeds below
 the extended-real source-faithful version. -/
 theorem barHypothesisTestingMutualInformationFinite_le_E
-    (rhoAB : State (Prod a b)) (epsilon : ℝ) :
+    (rhoAB : MState (a × b)) (epsilon : ℝ) :
     (rhoAB.barHypothesisTestingMutualInformationFinite epsilon : EReal) ≤
       rhoAB.barHypothesisTestingMutualInformation epsilon := by
   rw [barHypothesisTestingMutualInformationFinite_eq,
@@ -725,46 +606,63 @@ theorem barHypothesisTestingMutualInformationFinite_le_E
     hypothesisTestingRelativeEntropy_eq]
   by_cases hzero :
       rhoAB.hypothesisTestingBeta
-        (rhoAB.marginalA.prod rhoAB.marginalB) epsilon = 0
+        (rhoAB.traceRight.prod rhoAB.traceLeft) epsilon = 0
   · simp [hzero]
   · simp [hzero]
 
-end State
+end MState
 
-namespace Channel
+end
 
-variable (N : Channel a b)
+noncomputable section
+
+namespace CPTPOp
+
+open QIT
+
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+
+variable (N : CPTPMap a b)
 
 /-- Output state `(id_R tensor N)(|psi><psi|)` for one-shot information quantities. -/
 def hypothesisTestingOutputState {r : Type w} [Fintype r] [DecidableEq r]
-    (psi : PureVector (Prod r a)) : State (Prod r b) :=
-  ((Channel.idChannel r).prod N).applyState psi.state
+    (psi : Ket (r × a)) : MState (r × b) :=
+  ((CPTPOp.id (dIn := r)).prod N) psi.state
+
+/-- The output-state density matrix is the reference-lifted channel applied to the input. -/
+@[simp]
+theorem hypothesisTestingOutputState_matrix {r : Type w} [Fintype r] [DecidableEq r]
+    (psi : Ket (r × a)) :
+    (N.hypothesisTestingOutputState psi).m =
+      MatrixMap.kron (CPTPOp.id (dIn := r)).map N.map psi.state.m := by
+  simp only [hypothesisTestingOutputState, CPTPOp.mat_coe_eq_apply_mat, CPTPOp.prod_map]
 
 /-- Finite-real input-state helper for optimized hypothesis-testing mutual information. -/
 def inputHypothesisTestingMutualInformationFinite {r : Type w} [Fintype r] [DecidableEq r]
-    (psi : PureVector (Prod r a)) (epsilon : ℝ) : ℝ :=
+    (psi : Ket (r × a)) (epsilon : ℝ) : ℝ :=
   (N.hypothesisTestingOutputState psi).hypothesisTestingMutualInformationFinite epsilon
 
 /-- Optimized extended-real hypothesis-testing mutual information of an
 input-reference pure state. -/
 def inputHypothesisTestingMutualInformation {r : Type w} [Fintype r] [DecidableEq r]
-    (psi : PureVector (Prod r a)) (epsilon : ℝ) : EReal :=
+    (psi : Ket (r × a)) (epsilon : ℝ) : EReal :=
   (N.hypothesisTestingOutputState psi).hypothesisTestingMutualInformation epsilon
 
 /-- Non-optimized barred hypothesis-testing mutual information of an input-reference pure state. -/
 def inputBarHypothesisTestingMutualInformationFinite {r : Type w} [Fintype r] [DecidableEq r]
-    (psi : PureVector (Prod r a)) (epsilon : ℝ) : ℝ :=
+    (psi : Ket (r × a)) (epsilon : ℝ) : ℝ :=
   (N.hypothesisTestingOutputState psi).barHypothesisTestingMutualInformationFinite epsilon
 
 /-- Non-optimized barred extended-real hypothesis-testing mutual information
 of an input-reference pure state. -/
 def inputBarHypothesisTestingMutualInformation {r : Type w} [Fintype r] [DecidableEq r]
-    (psi : PureVector (Prod r a)) (epsilon : ℝ) : EReal :=
+    (psi : Ket (r × a)) (epsilon : ℝ) : EReal :=
   (N.hypothesisTestingOutputState psi).barHypothesisTestingMutualInformation epsilon
 
 /-- Finite-real value set for channel `I_H^epsilon(N)`. -/
 def hypothesisTestingMutualInformationFiniteValueSet (epsilon : ℝ) : Set ℝ :=
-  Set.range fun psi : PureVector (Prod a a) =>
+  Set.range fun psi : Ket (a × a) =>
     N.inputHypothesisTestingMutualInformationFinite psi epsilon
 
 /-- Finite-real helper for channel hypothesis-testing mutual information. -/
@@ -774,7 +672,7 @@ def hypothesisTestingMutualInformationFinite (epsilon : ℝ) : ℝ :=
 /-- Value set for channel extended-real `I_H^epsilon(N)`, using a reference copy
 of the input system. -/
 def hypothesisTestingMutualInformationValueSet (epsilon : ℝ) : Set EReal :=
-  Set.range fun psi : PureVector (Prod a a) =>
+  Set.range fun psi : Ket (a × a) =>
     N.inputHypothesisTestingMutualInformation psi epsilon
 
 /-- Canonical extended-real channel hypothesis-testing mutual information. -/
@@ -783,7 +681,7 @@ def hypothesisTestingMutualInformation (epsilon : ℝ) : EReal :=
 
 /-- Value set for the barred non-optimized channel quantity `bar I_H^epsilon(N)`. -/
 def barHypothesisTestingMutualInformationFiniteValueSet (epsilon : ℝ) : Set ℝ :=
-  Set.range fun psi : PureVector (Prod a a) =>
+  Set.range fun psi : Ket (a × a) =>
     N.inputBarHypothesisTestingMutualInformationFinite psi epsilon
 
 /-- Barred non-optimized channel hypothesis-testing mutual information
@@ -794,7 +692,7 @@ def barHypothesisTestingMutualInformationFinite (epsilon : ℝ) : ℝ :=
 /-- Value set for the barred non-optimized extended-real channel quantity
 `bar I_H^epsilon(N)`. -/
 def barHypothesisTestingMutualInformationValueSet (epsilon : ℝ) : Set EReal :=
-  Set.range fun psi : PureVector (Prod a a) =>
+  Set.range fun psi : Ket (a × a) =>
     N.inputBarHypothesisTestingMutualInformation psi epsilon
 
 /-- Barred non-optimized extended-real channel hypothesis-testing mutual
@@ -803,9 +701,9 @@ def barHypothesisTestingMutualInformation (epsilon : ℝ) : EReal :=
   sSup (N.barHypothesisTestingMutualInformationValueSet epsilon)
 
 theorem hypothesisTestingOutputState_eq {r : Type w} [Fintype r] [DecidableEq r]
-    (psi : PureVector (Prod r a)) :
+    (psi : Ket (r × a)) :
     N.hypothesisTestingOutputState psi =
-      ((Channel.idChannel r).prod N).applyState psi.state :=
+      ((CPTPOp.id (dIn := r)).prod N) psi.state :=
   rfl
 
 theorem hypothesisTestingMutualInformationFinite_eq_sSup (epsilon : ℝ) :
@@ -819,7 +717,7 @@ theorem hypothesisTestingMutualInformation_eq_sSup (epsilon : ℝ) :
   rfl
 
 theorem inputHypothesisTestingMutualInformation_le_channel
-    (epsilon : ℝ) (psi : PureVector (Prod a a)) :
+    (epsilon : ℝ) (psi : Ket (a × a)) :
     N.inputHypothesisTestingMutualInformation psi epsilon ≤
       N.hypothesisTestingMutualInformation epsilon := by
   rw [hypothesisTestingMutualInformation_eq_sSup]
@@ -827,10 +725,10 @@ theorem inputHypothesisTestingMutualInformation_le_channel
 
 theorem inputBarHypothesisTestingMutualInformationFinite_le_E {r : Type w}
     [Fintype r] [DecidableEq r]
-    (psi : PureVector (Prod r a)) (epsilon : ℝ) :
+    (psi : Ket (r × a)) (epsilon : ℝ) :
     (N.inputBarHypothesisTestingMutualInformationFinite psi epsilon : EReal) ≤
       N.inputBarHypothesisTestingMutualInformation psi epsilon := by
-  exact State.barHypothesisTestingMutualInformationFinite_le_E
+  exact MState.barHypothesisTestingMutualInformationFinite_le_E
     (N.hypothesisTestingOutputState psi) epsilon
 
 theorem barHypothesisTestingMutualInformationFinite_eq_sSup (epsilon : ℝ) :
@@ -844,7 +742,7 @@ theorem barHypothesisTestingMutualInformation_eq_sSup (epsilon : ℝ) :
   rfl
 
 theorem inputBarHypothesisTestingMutualInformation_le_channel
-    (epsilon : ℝ) (psi : PureVector (Prod a a)) :
+    (epsilon : ℝ) (psi : Ket (a × a)) :
     N.inputBarHypothesisTestingMutualInformation psi epsilon ≤
       N.barHypothesisTestingMutualInformation epsilon := by
   rw [barHypothesisTestingMutualInformation_eq_sSup]
@@ -853,15 +751,15 @@ theorem inputBarHypothesisTestingMutualInformation_le_channel
 /-- Approximate the barred extended-real channel hypothesis-testing mutual
 information supremum by a concrete pure input-reference state. -/
 theorem exists_inputBarHypothesisTestingMutualInformation_gt_of_lt
-    [Nonempty (PureVector (Prod a a))]
+    [Nonempty (Ket (a × a))]
     {epsilon lower : ℝ}
     (hlower : (lower : EReal) < N.barHypothesisTestingMutualInformation epsilon) :
-    ∃ psi : PureVector (Prod a a),
+    ∃ psi : Ket (a × a),
       (lower : EReal) < N.inputBarHypothesisTestingMutualInformation psi epsilon := by
   rw [barHypothesisTestingMutualInformation_eq_sSup] at hlower
   obtain ⟨value, hvalue_mem, hlt⟩ :=
     exists_lt_of_lt_csSup (Set.range_nonempty
-      (fun psi : PureVector (Prod a a) =>
+      (fun psi : Ket (a × a) =>
         N.inputBarHypothesisTestingMutualInformation psi epsilon)) hlower
   rcases hvalue_mem with ⟨psi, rfl⟩
   exact ⟨psi, hlt⟩
@@ -870,15 +768,15 @@ theorem exists_inputBarHypothesisTestingMutualInformation_gt_of_lt
 supremum by a concrete pure input-reference state.  This avoids assuming a
 maximizer while giving downstream coding proofs the concrete state they need. -/
 theorem exists_inputBarHypothesisTestingMutualInformationFinite_gt_of_lt
-    [Nonempty (PureVector (Prod a a))]
+    [Nonempty (Ket (a × a))]
     {epsilon lower : ℝ}
     (hlower : lower < N.barHypothesisTestingMutualInformationFinite epsilon) :
-    ∃ psi : PureVector (Prod a a),
+    ∃ psi : Ket (a × a),
       lower < N.inputBarHypothesisTestingMutualInformationFinite psi epsilon := by
   rw [barHypothesisTestingMutualInformationFinite_eq_sSup] at hlower
   obtain ⟨value, hvalue_mem, hlt⟩ :=
     exists_lt_of_lt_csSup (Set.range_nonempty
-      (fun psi : PureVector (Prod a a) =>
+      (fun psi : Ket (a × a) =>
         N.inputBarHypothesisTestingMutualInformationFinite psi epsilon)) hlower
   rcases hvalue_mem with ⟨psi, rfl⟩
   exact ⟨psi, hlt⟩
@@ -886,7 +784,7 @@ theorem exists_inputBarHypothesisTestingMutualInformationFinite_gt_of_lt
 /-- The real barred channel hypothesis-testing information embeds below the
 extended-real barred channel information. -/
 theorem barHypothesisTestingMutualInformationFinite_le_E
-    [Nonempty (PureVector (Prod a a))] (epsilon : ℝ) :
+    [Nonempty (Ket (a × a))] (epsilon : ℝ) :
     (N.barHypothesisTestingMutualInformationFinite epsilon : EReal) ≤
       N.barHypothesisTestingMutualInformation epsilon := by
   rw [barHypothesisTestingMutualInformationFinite_eq_sSup]
@@ -911,66 +809,64 @@ state `D_H` gives a feasible test whose type-II error is below the corresponding
 power-of-two threshold.  The beta positivity hypothesis marks the real-valued
 branch; the extended-real zero-beta branch is handled separately downstream. -/
 theorem exists_inputBarHypothesisTestingEffect_typeIIError_lt_rpow_two_neg_of_lt_Finite
-    [Nonempty (PureVector (Prod a a))]
+    [Nonempty (Ket (a × a))]
     {epsilon lower : ℝ}
     (hε : 0 ≤ epsilon)
     (hlower : lower < N.barHypothesisTestingMutualInformationFinite epsilon)
     (hbeta_pos :
-      ∀ psi : PureVector (Prod a a),
+      ∀ psi : Ket (a × a),
         lower < N.inputBarHypothesisTestingMutualInformationFinite psi epsilon →
           0 <
             (N.hypothesisTestingOutputState psi).hypothesisTestingBeta
-              ((N.hypothesisTestingOutputState psi).marginalA.prod
-                (N.hypothesisTestingOutputState psi).marginalB)
+              ((N.hypothesisTestingOutputState psi).traceRight.prod
+                (N.hypothesisTestingOutputState psi).traceLeft)
               epsilon) :
-    ∃ psi : PureVector (Prod a a),
+    ∃ psi : Ket (a × a),
       ∃ Lambda : HypothesisTestingEffect (N.hypothesisTestingOutputState psi) epsilon,
         Lambda.typeIIError
-            ((N.hypothesisTestingOutputState psi).marginalA.prod
-              (N.hypothesisTestingOutputState psi).marginalB)
+            ((N.hypothesisTestingOutputState psi).traceRight.prod
+              (N.hypothesisTestingOutputState psi).traceLeft)
           < Real.rpow 2 (-lower) := by
   obtain ⟨psi, hpsi⟩ :=
     N.exists_inputBarHypothesisTestingMutualInformationFinite_gt_of_lt hlower
-  unfold inputBarHypothesisTestingMutualInformationFinite State.barHypothesisTestingMutualInformationFinite
+  unfold inputBarHypothesisTestingMutualInformationFinite MState.barHypothesisTestingMutualInformationFinite
     at hpsi
   obtain ⟨Lambda, hLambda⟩ :=
     (N.hypothesisTestingOutputState psi)
       |>.exists_hypothesisTestingEffect_typeIIError_lt_rpow_two_neg_of_lt_relativeEntropyFinite
-        ((N.hypothesisTestingOutputState psi).marginalA.prod
-          (N.hypothesisTestingOutputState psi).marginalB)
+        ((N.hypothesisTestingOutputState psi).traceRight.prod
+          (N.hypothesisTestingOutputState psi).traceLeft)
         epsilon hε (hbeta_pos psi (by
           simpa [inputBarHypothesisTestingMutualInformationFinite,
-            State.barHypothesisTestingMutualInformationFinite] using hpsi))
+            MState.barHypothesisTestingMutualInformationFinite] using hpsi))
         hpsi
   exact ⟨psi, Lambda, hLambda⟩
 
 /-- Extended-real concrete input-state and feasible-effect extraction for the
 barred channel hypothesis-testing information. -/
 theorem exists_inputBarHypothesisTestingEffect_typeIIError_lt_rpow_two_neg_of_lt
-    [Nonempty (PureVector (Prod a a))]
+    [Nonempty (Ket (a × a))]
     {epsilon lower : ℝ}
     (hε : 0 ≤ epsilon)
     (hlower : (lower : EReal) < N.barHypothesisTestingMutualInformation epsilon) :
-    ∃ psi : PureVector (Prod a a),
+    ∃ psi : Ket (a × a),
       ∃ Lambda : HypothesisTestingEffect (N.hypothesisTestingOutputState psi) epsilon,
         Lambda.typeIIError
-            ((N.hypothesisTestingOutputState psi).marginalA.prod
-              (N.hypothesisTestingOutputState psi).marginalB)
+            ((N.hypothesisTestingOutputState psi).traceRight.prod
+              (N.hypothesisTestingOutputState psi).traceLeft)
           < Real.rpow 2 (-lower) := by
   obtain ⟨psi, hpsi⟩ :=
     N.exists_inputBarHypothesisTestingMutualInformation_gt_of_lt hlower
-  unfold inputBarHypothesisTestingMutualInformation State.barHypothesisTestingMutualInformation
+  unfold inputBarHypothesisTestingMutualInformation MState.barHypothesisTestingMutualInformation
     at hpsi
   obtain ⟨Lambda, hLambda⟩ :=
     (N.hypothesisTestingOutputState psi)
       |>.exists_hypothesisTestingEffect_typeIIError_lt_rpow_two_neg_of_lt_relativeEntropy
-        ((N.hypothesisTestingOutputState psi).marginalA.prod
-          (N.hypothesisTestingOutputState psi).marginalB)
+        ((N.hypothesisTestingOutputState psi).traceRight.prod
+          (N.hypothesisTestingOutputState psi).traceLeft)
         epsilon hε hpsi
   exact ⟨psi, Lambda, hLambda⟩
 
-end Channel
+end CPTPOp
 
 end
-
-end QIT

@@ -14,10 +14,11 @@ public import QuantumLib.QIT.Measurements.Projective
 public import QuantumLib.QIT.Information.Renyi.ConditionalSandwichedRenyiClassicalConditioning.BlockAlgebra
 
 /-!
-# low-alpha Q decomposition
+# Low-alpha decomposition of the sandwiched `Q` quantity
 
-Responsibility layer of the sandwiched conditional Renyi classical-conditioning
-source route.
+The decomposition of the sandwiched `Q` quantity of a cq state into
+per-symbol branches, and the `alpha < 1` source formula for the downward
+conditional entropy that follows from it.
 -/
 
 @[expose] public section
@@ -25,57 +26,55 @@ source route.
 open scoped ComplexOrder MatrixOrder NNReal Pointwise
 open Matrix
 
-namespace QIT
-
-universe u v w
-
 noncomputable section
-
+universe u v w
 variable {A : Type u} {B : Type v} {Y : Type w}
 variable [Fintype A] [DecidableEq A]
 variable [Fintype B] [DecidableEq B]
 variable [Fintype Y] [DecidableEq Y]
 
-namespace State
+open QIT
+
+namespace MState
 
 /-! ### Ensemble specialization and support sum -/
 
 theorem sandwichedRenyiQ_cq_reference_decomposition
-    (E : Ensemble Y (A × B)) (F : Ensemble Y B) {α : ℝ}
+    (E : MEnsemble (A × B) Y) (F : MEnsemble B Y) {α : ℝ}
     (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     sandwichedRenyiQ
-        (State.cqConditioningState E).matrix
+        (MState.cqConditioningState E).m
         (identityTensorStateMatrix (a := A)
           (F.cqState.reindex (Equiv.prodComm Y B)))
-        (State.cqConditioningState E).pos
-        (identityTensorStateMatrix_posSemidef_of_state (a := A)
+        (MState.cqConditioningState E).psd
+        (identityTensorStateMatrix_posSemidef (a := A)
           (F.cqState.reindex (Equiv.prodComm Y B))) α =
       ∑ y, (E.probs y : ℝ) ^ α * (F.probs y : ℝ) ^ (1 - α) *
-        sandwichedRenyiQ (E.states y).matrix
+        sandwichedRenyiQ (E.states y).m
           (identityTensorStateMatrix (a := A) (F.states y))
-          (E.states y).pos
-          (identityTensorStateMatrix_posSemidef_of_state (a := A)
+          (E.states y).psd
+          (identityTensorStateMatrix_posSemidef (a := A)
             (F.states y)) α := by
   have hdecomp := sandwichedRenyiQ_fixedReference_blockDiagonal
       (fun y => conditionalRenyiBlock E y)
       (fun y => (F.probs y : ℂ) •
         identityTensorStateMatrix (a := A) (F.states y))
       (fun y => conditionalRenyiBlock_posSemidef E y)
-      (fun y => (identityTensorStateMatrix_posSemidef_of_state
+      (fun y => (identityTensorStateMatrix_posSemidef
         (a := A) (F.states y)).smul (by
           exact_mod_cast NNReal.coe_nonneg (F.probs y))) hα_pos
   have hdecomp' :
       sandwichedRenyiQ
-          (State.cqConditioningState E).matrix
+          (MState.cqConditioningState E).m
           (identityTensorStateMatrix (a := A)
             (F.cqState.reindex (Equiv.prodComm Y B)))
-          (State.cqConditioningState E).pos
-          (identityTensorStateMatrix_posSemidef_of_state (a := A)
+          (MState.cqConditioningState E).psd
+          (identityTensorStateMatrix_posSemidef (a := A)
             (F.cqState.reindex (Equiv.prodComm Y B))) α =
         ∑ y, sandwichedRenyiQ (conditionalRenyiBlock E y)
           ((F.probs y : ℂ) • identityTensorStateMatrix (a := A) (F.states y))
           (conditionalRenyiBlock_posSemidef E y)
-          ((identityTensorStateMatrix_posSemidef_of_state
+          ((identityTensorStateMatrix_posSemidef
             (a := A) (F.states y)).smul (by
               exact_mod_cast NNReal.coe_nonneg (F.probs y))) α := by
     simpa only [conditionalRenyiState_eq_rightBlockDiagonal E,
@@ -84,34 +83,41 @@ theorem sandwichedRenyiQ_cq_reference_decomposition
   apply Finset.sum_congr rfl
   intro y hy
   have hscale := sandwichedQ_real_smul_left_right
-    (E.states y).matrix
+    (E.states y).m
     (identityTensorStateMatrix (a := A) (F.states y))
-      (E.states y).pos
-      (identityTensorStateMatrix_posSemidef_of_state (a := A) (F.states y))
+      (E.states y).psd
+      (identityTensorStateMatrix_posSemidef (a := A) (F.states y))
       (E.probs y) (F.probs y) hα_pos hα_ne_one
   simpa only [conditionalRenyiBlock_eq_weighted_state] using hscale
 
+/-- The upward sandwiched entropy at a *fixed* conditioning ensemble `F`, written out branchwise:
+`log₂` of `∑_y p(y)^α q(y)^(1-α) Q̃_α(ρ_y ‖ I ⊗ σ_y)`, divided by `1 - α`. -/
 noncomputable def sandwichedUpFixedReferenceFormulaReal
-    (E : Ensemble Y (A × B)) (F : Ensemble Y B) (α : ℝ) : ℝ :=
+    (E : MEnsemble (A × B) Y) (F : MEnsemble B Y) (α : ℝ) : ℝ :=
   (1 / (1 - α)) * log2
     (∑ y, (E.probs y : ℝ) ^ α * (F.probs y : ℝ) ^ (1 - α) *
-      sandwichedRenyiQ (E.states y).matrix
+      sandwichedRenyiQ (E.states y).m
         (identityTensorStateMatrix (a := A) (F.states y))
-        (E.states y).pos
-        (identityTensorStateMatrix_posSemidef_of_state
+        (E.states y).psd
+        (identityTensorStateMatrix_posSemidef
           (a := A) (F.states y)) α)
 
+/-- The `y`-th branch value of the fixed-reference upward program: the upward sandwiched entropy
+candidate of the component state against the component reference. -/
 noncomputable def sandwichedFixedReferenceBranchValue
-    (E : Ensemble Y (A × B)) (F : Ensemble Y B) (y : Y) (α : ℝ)
-    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).matrix.PosDef)
+    (E : MEnsemble (A × B) Y) (F : MEnsemble B Y) (y : Y) (α : ℝ)
+    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).m.PosDef)
     (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) : ℝ :=
   (E.states y).conditionalSandwichedRenyiUpSourceCandidate
     (F.states y) (sandwiched_reference_cq_state_posDef F hF y)
     α hα_pos hα_ne_one
 
+/-- `sandwichedUpFixedReferenceFormulaReal` with each `Q̃_α` factor rewritten as `2^((1-α)·H)` in
+terms of its branch value; the two agree by
+`sandwichedUpFixedReferenceFormulaReal_eq_branchFormula`. -/
 noncomputable def sandwichedUpFixedReferenceBranchFormulaReal
-    (E : Ensemble Y (A × B)) (F : Ensemble Y B) (α : ℝ)
-    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).matrix.PosDef)
+    (E : MEnsemble (A × B) Y) (F : MEnsemble B Y) (α : ℝ)
+    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).m.PosDef)
     (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) : ℝ :=
   (1 / (1 - α)) * log2
     (∑ y, (E.probs y : ℝ) ^ α * (F.probs y : ℝ) ^ (1 - α) *
@@ -119,8 +125,8 @@ noncomputable def sandwichedUpFixedReferenceBranchFormulaReal
         sandwichedFixedReferenceBranchValue E F y α hF hα_pos hα_ne_one))
 
 theorem sandwichedUpFixedReferenceFormulaReal_eq_branchFormula
-    (E : Ensemble Y (A × B)) (F : Ensemble Y B)
-    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).matrix.PosDef)
+    (E : MEnsemble (A × B) Y) (F : MEnsemble B Y)
+    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     sandwichedUpFixedReferenceFormulaReal E F α =
       sandwichedUpFixedReferenceBranchFormulaReal E F α hF hα_pos hα_ne_one := by
@@ -129,7 +135,7 @@ theorem sandwichedUpFixedReferenceFormulaReal_eq_branchFormula
   apply congrArg (fun x : ℝ => (1 / (1 - α)) * log2 x)
   apply Finset.sum_congr rfl
   intro y hy
-  have hyF : (F.states y).matrix.PosDef :=
+  have hyF : (F.states y).m.PosDef :=
     sandwiched_reference_cq_state_posDef F hF y
   have hQypos := sandwichedRenyiQ_pos_of_state_posDef_reference
     (E.states y)
@@ -141,10 +147,10 @@ theorem sandwichedUpFixedReferenceFormulaReal_eq_branchFormula
       (E.states y).conditionalSandwichedRenyiUpSourceCandidate
           (F.states y) hyF α hα_pos hα_ne_one =
         -(1 / (α - 1)) * log2
-          (sandwichedRenyiQ (E.states y).matrix
+          (sandwichedRenyiQ (E.states y).m
             (identityTensorStateMatrix (a := A) (F.states y))
-            (E.states y).pos
-            (identityTensorStateMatrix_posSemidef_of_state
+            (E.states y).psd
+            (identityTensorStateMatrix_posSemidef
               (a := A) (F.states y)) α) := by
     simpa [conditionalSandwichedRenyiUpSourceTraceTerm,
       sandwichedRenyiQ_eq_psdTracePower_referenceInner] using htrace
@@ -152,10 +158,10 @@ theorem sandwichedUpFixedReferenceFormulaReal_eq_branchFormula
       Real.rpow 2 ((1 - α) *
           (E.states y).conditionalSandwichedRenyiUpSourceCandidate
             (F.states y) hyF α hα_pos hα_ne_one) =
-        sandwichedRenyiQ (E.states y).matrix
+        sandwichedRenyiQ (E.states y).m
           (identityTensorStateMatrix (a := A) (F.states y))
-          (E.states y).pos
-          (identityTensorStateMatrix_posSemidef_of_state
+          (E.states y).psd
+          (identityTensorStateMatrix_posSemidef
             (a := A) (F.states y)) α := by
     rw [htrace']
     have harg : (1 - α) * (-(1 / (α - 1))) = 1 := by
@@ -163,22 +169,22 @@ theorem sandwichedUpFixedReferenceFormulaReal_eq_branchFormula
       ring
     have harg' :
         (1 - α) * (-(1 / (α - 1)) *
-          log2 (sandwichedRenyiQ (E.states y).matrix
+          log2 (sandwichedRenyiQ (E.states y).m
             (identityTensorStateMatrix (a := A) (F.states y))
-            (E.states y).pos
-            (identityTensorStateMatrix_posSemidef_of_state
+            (E.states y).psd
+            (identityTensorStateMatrix_posSemidef
               (a := A) (F.states y)) α)) =
-          log2 (sandwichedRenyiQ (E.states y).matrix
+          log2 (sandwichedRenyiQ (E.states y).m
             (identityTensorStateMatrix (a := A) (F.states y))
-            (E.states y).pos
-            (identityTensorStateMatrix_posSemidef_of_state
+            (E.states y).psd
+            (identityTensorStateMatrix_posSemidef
               (a := A) (F.states y)) α) := by
       calc
         _ = ((1 - α) * (-(1 / (α - 1)))) *
-            log2 (sandwichedRenyiQ (E.states y).matrix
+            log2 (sandwichedRenyiQ (E.states y).m
               (identityTensorStateMatrix (a := A) (F.states y))
-              (E.states y).pos
-              (identityTensorStateMatrix_posSemidef_of_state
+              (E.states y).psd
+              (identityTensorStateMatrix_posSemidef
                 (a := A) (F.states y)) α) := by ring
         _ = _ := by rw [harg]; ring
     rw [harg']
@@ -187,43 +193,43 @@ theorem sandwichedUpFixedReferenceFormulaReal_eq_branchFormula
   rw [hpow]
 
 theorem sandwichedRenyiPSDReferenceE_cq_fullrank_reference_formula
-    (E : Ensemble Y (A × B)) (F : Ensemble Y B)
-    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).matrix.PosDef)
+    (E : MEnsemble (A × B) Y) (F : MEnsemble B Y)
+    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     -sandwichedRenyiPSDReferenceE
-        (State.cqConditioningState E)
+        (MState.cqConditioningState E)
         (identityTensorStateMatrix (a := A)
           (F.cqState.reindex (Equiv.prodComm Y B)))
-        (identityTensorStateMatrix_posSemidef_of_state
+        (identityTensorStateMatrix_posSemidef
           (a := A) (F.cqState.reindex (Equiv.prodComm Y B))) α =
       (sandwichedUpFixedReferenceFormulaReal E F α : EReal) := by
-  let ρ := State.cqConditioningState E
+  let ρ := MState.cqConditioningState E
   let σ := F.cqState.reindex (Equiv.prodComm Y B)
   have hτ : (identityTensorStateMatrix (a := A) σ).PosDef :=
     identityTensorStateMatrix_posDef_of_posDef (a := A) σ hF
-  have hQ : 0 < sandwichedRenyiQ ρ.matrix
-      (identityTensorStateMatrix (a := A) σ) ρ.pos hτ.posSemidef α := by
+  have hQ : 0 < sandwichedRenyiQ ρ.m
+      (identityTensorStateMatrix (a := A) σ) ρ.psd hτ.posSemidef α := by
     exact sandwichedRenyiQ_pos_of_state_posDef_reference ρ hτ α
   have hdecomp := sandwichedRenyiQ_cq_reference_decomposition
     (A := A) (B := B) (Y := Y) E F hα_pos hα_ne_one
   have hdecomp' :
-      sandwichedRenyiQ ρ.matrix
-          (identityTensorStateMatrix (a := A) σ) ρ.pos hτ.posSemidef α =
+      sandwichedRenyiQ ρ.m
+          (identityTensorStateMatrix (a := A) σ) ρ.psd hτ.posSemidef α =
         ∑ y, (E.probs y : ℝ) ^ α * (F.probs y : ℝ) ^ (1 - α) *
-          sandwichedRenyiQ (E.states y).matrix
+          sandwichedRenyiQ (E.states y).m
             (identityTensorStateMatrix (a := A) (F.states y))
-            (E.states y).pos
-            (identityTensorStateMatrix_posSemidef_of_state
+            (E.states y).psd
+            (identityTensorStateMatrix_posSemidef
               (a := A) (F.states y)) α := by
     simpa [ρ, σ] using hdecomp
   have hbranch : ∀ y,
-      0 < sandwichedRenyiQ (E.states y).matrix
+      0 < sandwichedRenyiQ (E.states y).m
         (identityTensorStateMatrix (a := A) (F.states y))
-        (E.states y).pos
-        (identityTensorStateMatrix_posSemidef_of_state
+        (E.states y).psd
+        (identityTensorStateMatrix_posSemidef
           (a := A) (F.states y)) α := by
     intro y
-    have hyF : (F.states y).matrix.PosDef :=
+    have hyF : (F.states y).m.PosDef :=
       sandwiched_reference_cq_state_posDef F hF y
     exact sandwichedRenyiQ_pos_of_state_posDef_reference
       (E.states y)
@@ -231,17 +237,17 @@ theorem sandwichedRenyiPSDReferenceE_cq_fullrank_reference_formula
         (F.states y) hyF) α
   have hsum :
       0 < ∑ y, (E.probs y : ℝ) ^ α * (F.probs y : ℝ) ^ (1 - α) *
-        sandwichedRenyiQ (E.states y).matrix
+        sandwichedRenyiQ (E.states y).m
           (identityTensorStateMatrix (a := A) (F.states y))
-          (E.states y).pos
-          (identityTensorStateMatrix_posSemidef_of_state
+          (E.states y).psd
+          (identityTensorStateMatrix_posSemidef
             (a := A) (F.states y)) α := by
     rw [← hdecomp]
     exact hQ
   by_cases hα_lt_one : α < 1
   · rw [sandwichedRenyiPSDReferenceE_eq_lowAlphaE_of_lt_one _ _ hα_lt_one,
       sandwichedRenyiPSDReferenceLowAlphaE_eq_coe_of_Q_ne_zero
-        ρ (identityTensorStateMatrix_posSemidef_of_state (a := A) σ) α
+        ρ (identityTensorStateMatrix_posSemidef (a := A) σ) α
         hQ.ne']
     unfold sandwichedRenyiPSDReferenceLowAlpha
       sandwichedUpFixedReferenceFormulaReal
@@ -252,7 +258,7 @@ theorem sandwichedRenyiPSDReferenceE_cq_fullrank_reference_formula
     ring
   · have hα_gt_one : 1 < α :=
       lt_of_le_of_ne (not_lt.mp hα_lt_one) hα_ne_one.symm
-    have hsupport : Matrix.Supports ρ.matrix
+    have hsupport : Matrix.Supports ρ.m
         (identityTensorStateMatrix (a := A) σ) :=
       Matrix.Supports.of_right_posDef _ _ hτ
     rw [sandwichedRenyiPSDReferenceE_eq_highAlphaE_of_one_lt _ _ hα_gt_one,
@@ -269,173 +275,174 @@ theorem sandwichedRenyiPSDReferenceE_cq_fullrank_reference_formula
     ring
 
 private theorem sandwiched_down_normalized_q_pos
-    (ρ : State (A × B)) (α : ℝ) :
-    0 < sandwichedRenyiQ ρ.matrix
-      (identityTensorStateMatrix (a := A) ρ.marginalB)
-      ρ.pos
-      (identityTensorStateMatrix_posSemidef_of_state (a := A) ρ.marginalB) α := by
+    (ρ : MState (A × B)) (α : ℝ) :
+    0 < sandwichedRenyiQ ρ.m
+      (identityTensorStateMatrix (a := A) ρ.traceLeft)
+      ρ.psd
+      (identityTensorStateMatrix_posSemidef (a := A) ρ.traceLeft) α := by
   rw [sandwichedRenyiQ_eq_psdTracePower_referenceInner]
-  have hSupport : Matrix.Supports ρ.matrix
-      (identityTensorStateMatrix (a := A) ρ.marginalB) := by
+  have hSupport : Matrix.Supports ρ.m
+      (identityTensorStateMatrix (a := A) ρ.traceLeft) := by
     simpa [identityTensorStateMatrix] using
-      (matrix_supports_identityTensor_marginalB ρ)
+      (matrix_supports_identityTensor_traceLeft ρ)
   exact sandwichedRenyiReferenceInner_psdTracePower_pos_of_supports
-    ρ (identityTensorStateMatrix_posSemidef_of_state (a := A) ρ.marginalB)
+    ρ (identityTensorStateMatrix_posSemidef (a := A) ρ.traceLeft)
     hSupport α
 
 /-- The real sandwiched down-arrow entropy of the normalized `y`-component. -/
 noncomputable def sandwichedDownComponentEntropy
-    (E : Ensemble Y (A × B)) (y : Y) (α : ℝ) : ℝ :=
+    (E : MEnsemble (A × B) Y) (y : Y) (α : ℝ) : ℝ :=
   (1 / (1 - α)) * log2
-    (sandwichedRenyiQ (E.states y).matrix
-      (identityTensorStateMatrix (a := A) (E.states y).marginalB)
-      (E.states y).pos
-      (identityTensorStateMatrix_posSemidef_of_state
-        (a := A) (E.states y).marginalB) α)
+    (sandwichedRenyiQ (E.states y).m
+      (identityTensorStateMatrix (a := A) (E.states y).traceLeft)
+      (E.states y).psd
+      (identityTensorStateMatrix_posSemidef
+        (a := A) (E.states y).traceLeft) α)
 
 omit [DecidableEq Y] in
 /-- Every normalized component has a strictly positive sandwiched `Q_α`. -/
 theorem sandwichedDownComponentQ_pos
-    (E : Ensemble Y (A × B)) (y : Y) (α : ℝ) :
-    0 < sandwichedRenyiQ (E.states y).matrix
-      (identityTensorStateMatrix (a := A) (E.states y).marginalB)
-      (E.states y).pos
-      (identityTensorStateMatrix_posSemidef_of_state
-        (a := A) (E.states y).marginalB) α :=
+    (E : MEnsemble (A × B) Y) (y : Y) (α : ℝ) :
+    0 < sandwichedRenyiQ (E.states y).m
+      (identityTensorStateMatrix (a := A) (E.states y).traceLeft)
+      (E.states y).psd
+      (identityTensorStateMatrix_posSemidef
+        (a := A) (E.states y).traceLeft) α :=
   sandwiched_down_normalized_q_pos (E.states y) α
 
 /-- The normalized global cq state has a strictly positive sandwiched `Q_α`. -/
 theorem sandwichedDownClassicalQ_pos
-    (E : Ensemble Y (A × B)) (α : ℝ) :
+    (E : MEnsemble (A × B) Y) (α : ℝ) :
     0 < sandwichedRenyiQ
-      (State.cqConditioningState E).matrix
+      (MState.cqConditioningState E).m
       (identityTensorStateMatrix (a := A)
-        (State.cqConditioningState E).marginalB)
-      (State.cqConditioningState E).pos
-      (identityTensorStateMatrix_posSemidef_of_state
-        (a := A) (State.cqConditioningState E).marginalB) α :=
-  sandwiched_down_normalized_q_pos (State.cqConditioningState E) α
+        (MState.cqConditioningState E).traceLeft)
+      (MState.cqConditioningState E).psd
+      (identityTensorStateMatrix_posSemidef
+        (a := A) (MState.cqConditioningState E).traceLeft) α :=
+  sandwiched_down_normalized_q_pos (MState.cqConditioningState E) α
 
 omit [DecidableEq Y] in
 /-- Exponentiating a normalized component entropy recovers its sandwiched
 `Q_α` value. -/
 theorem sandwichedDownComponentQ_eq_rpow_entropy
-    (E : Ensemble Y (A × B)) (y : Y) (α : ℝ) (hα_ne_one : α ≠ 1) :
+    (E : MEnsemble (A × B) Y) (y : Y) (α : ℝ) (hα_ne_one : α ≠ 1) :
     Real.rpow 2 ((1 - α) * sandwichedDownComponentEntropy E y α) =
-      sandwichedRenyiQ (E.states y).matrix
-        (identityTensorStateMatrix (a := A) (E.states y).marginalB)
-        (E.states y).pos
-        (identityTensorStateMatrix_posSemidef_of_state
-          (a := A) (E.states y).marginalB) α := by
+      sandwichedRenyiQ (E.states y).m
+        (identityTensorStateMatrix (a := A) (E.states y).traceLeft)
+        (E.states y).psd
+        (identityTensorStateMatrix_posSemidef
+          (a := A) (E.states y).traceLeft) α := by
   have hq := sandwichedDownComponentQ_pos E y α
   unfold sandwichedDownComponentEntropy
   have hcancel :
       (1 - α) * ((1 / (1 - α)) * log2
-        (sandwichedRenyiQ (E.states y).matrix
-          (identityTensorStateMatrix (a := A) (E.states y).marginalB)
-          (E.states y).pos
-          (identityTensorStateMatrix_posSemidef_of_state
-            (a := A) (E.states y).marginalB) α)) =
-        log2 (sandwichedRenyiQ (E.states y).matrix
-          (identityTensorStateMatrix (a := A) (E.states y).marginalB)
-          (E.states y).pos
-          (identityTensorStateMatrix_posSemidef_of_state
-            (a := A) (E.states y).marginalB) α) := by
+        (sandwichedRenyiQ (E.states y).m
+          (identityTensorStateMatrix (a := A) (E.states y).traceLeft)
+          (E.states y).psd
+          (identityTensorStateMatrix_posSemidef
+            (a := A) (E.states y).traceLeft) α)) =
+        log2 (sandwichedRenyiQ (E.states y).m
+          (identityTensorStateMatrix (a := A) (E.states y).traceLeft)
+          (E.states y).psd
+          (identityTensorStateMatrix_posSemidef
+            (a := A) (E.states y).traceLeft) α) := by
     field_simp [hα_ne_one]
   rw [hcancel, QIT.rpow_two_log2_pos hq]
 
 theorem sandwichedRenyiQ_classical_decomposition_lowAlpha
-    (E : Ensemble Y (A × B)) {α : ℝ}
+    (E : MEnsemble (A × B) Y) {α : ℝ}
     (hα_half : 1 / 2 ≤ α) (hα_lt_one : α < 1) :
     sandwichedRenyiQ
-        (State.cqConditioningState E).matrix
+        (MState.cqConditioningState E).m
         (identityTensorStateMatrix (a := A)
-          (State.cqConditioningState E).marginalB)
-        (State.cqConditioningState E).pos
-        (identityTensorStateMatrix_posSemidef_of_state
-          (a := A) (State.cqConditioningState E).marginalB) α =
+          (MState.cqConditioningState E).traceLeft)
+        (MState.cqConditioningState E).psd
+        (identityTensorStateMatrix_posSemidef
+          (a := A) (MState.cqConditioningState E).traceLeft) α =
       ∑ y, (E.probs y : ℝ) *
-        sandwichedRenyiQ (E.states y).matrix
-          (identityTensorStateMatrix (a := A) (E.states y).marginalB)
-          (E.states y).pos
-          (identityTensorStateMatrix_posSemidef_of_state
-            (a := A) (E.states y).marginalB) α := by
+        sandwichedRenyiQ (E.states y).m
+          (identityTensorStateMatrix (a := A) (E.states y).traceLeft)
+          (E.states y).psd
+          (identityTensorStateMatrix_posSemidef
+            (a := A) (E.states y).traceLeft) α := by
   have hstate := conditionalRenyiState_eq_rightBlockDiagonal E
-  have href := sandwiched_conditionalReference_blockDiagonal E
-  have hgeneric := sandwichedRenyiQ_fixedReference_blockDiagonal_lowAlpha
+  have href := conditionalReference_blockDiagonal E
+  have hα_pos : 0 < α := by linarith
+  have hgeneric := sandwichedRenyiQ_fixedReference_blockDiagonal
     (A := A) (B := B)
     (fun y => conditionalRenyiBlock E y)
     (fun y => (E.probs y : ℂ) • identityTensorStateMatrix (a := A)
-      (E.states y).marginalB) (fun y => conditionalRenyiBlock_posSemidef E y)
+      (E.states y).traceLeft) (fun y => conditionalRenyiBlock_posSemidef E y)
     (fun y => by
       have hp : 0 ≤ (E.probs y : ℂ) := by
         exact_mod_cast NNReal.coe_nonneg (E.probs y)
-      exact (identityTensorStateMatrix_posSemidef_of_state
-        (a := A) (E.states y).marginalB).smul hp)
-    hα_half hα_lt_one
+      exact (identityTensorStateMatrix_posSemidef
+        (a := A) (E.states y).traceLeft).smul hp)
+    hα_pos
   have hblock :
       sandwichedRenyiQ
-          (State.cqConditioningState E).matrix
+          (MState.cqConditioningState E).m
           (identityTensorStateMatrix (a := A)
-            (State.cqConditioningState E).marginalB)
-          (State.cqConditioningState E).pos
-          (identityTensorStateMatrix_posSemidef_of_state
-            (a := A) (State.cqConditioningState E).marginalB) α =
+            (MState.cqConditioningState E).traceLeft)
+          (MState.cqConditioningState E).psd
+          (identityTensorStateMatrix_posSemidef
+            (a := A) (MState.cqConditioningState E).traceLeft) α =
         ∑ y, sandwichedRenyiQ (conditionalRenyiBlock E y)
           ((E.probs y : ℂ) • identityTensorStateMatrix (a := A)
-            (E.states y).marginalB)
+            (E.states y).traceLeft)
           (conditionalRenyiBlock_posSemidef E y)
           (by
             have hp : 0 ≤ (E.probs y : ℂ) := by
               exact_mod_cast NNReal.coe_nonneg (E.probs y)
-            exact (identityTensorStateMatrix_posSemidef_of_state
-              (a := A) (E.states y).marginalB).smul hp) α := by
+            exact (identityTensorStateMatrix_posSemidef
+              (a := A) (E.states y).traceLeft).smul hp) α := by
     simpa only [sandwichedRenyiQ, hstate, href] using hgeneric
   calc
     _ = ∑ y, sandwichedRenyiQ (conditionalRenyiBlock E y)
           ((E.probs y : ℂ) • identityTensorStateMatrix (a := A)
-            (E.states y).marginalB)
+            (E.states y).traceLeft)
           (conditionalRenyiBlock_posSemidef E y)
           (by
             have hp : 0 ≤ (E.probs y : ℂ) := by
               exact_mod_cast NNReal.coe_nonneg (E.probs y)
-            exact (identityTensorStateMatrix_posSemidef_of_state
-              (a := A) (E.states y).marginalB).smul hp) α := hblock
+            exact (identityTensorStateMatrix_posSemidef
+              (a := A) (E.states y).traceLeft).smul hp) α := hblock
     _ = ∑ y, (E.probs y : ℝ) *
-        sandwichedRenyiQ (E.states y).matrix
-          (identityTensorStateMatrix (a := A) (E.states y).marginalB)
-          (E.states y).pos
-          (identityTensorStateMatrix_posSemidef_of_state
-            (a := A) (E.states y).marginalB) α := by
+        sandwichedRenyiQ (E.states y).m
+          (identityTensorStateMatrix (a := A) (E.states y).traceLeft)
+          (E.states y).psd
+          (identityTensorStateMatrix_posSemidef
+            (a := A) (E.states y).traceLeft) α := by
       apply Finset.sum_congr rfl
       intro y hy
       simpa only [sandwichedRenyiQ,
         conditionalRenyiBlock_eq_weighted_state] using
         (sandwichedQ_real_smul_both
-          (E.states y).matrix
-          (identityTensorStateMatrix (a := A) (E.states y).marginalB)
-          (E.states y).pos
-          (identityTensorStateMatrix_posSemidef_of_state
-            (a := A) (E.states y).marginalB)
+          (E.states y).m
+          (identityTensorStateMatrix (a := A) (E.states y).traceLeft)
+          (E.states y).psd
+          (identityTensorStateMatrix_posSemidef
+            (a := A) (E.states y).traceLeft)
           (E.probs y) (by linarith) hα_lt_one)
 
 theorem sandwichedRenyiQ_classical_decomposition_lowAlpha_support
-    (E : Ensemble Y (A × B)) {α : ℝ}
+    (E : MEnsemble (A × B) Y) {α : ℝ}
     (hα_half : 1 / 2 ≤ α) (hα_lt_one : α < 1) :
     sandwichedRenyiQ
-        (State.cqConditioningState E).matrix
+        (MState.cqConditioningState E).m
         (identityTensorStateMatrix (a := A)
-          (State.cqConditioningState E).marginalB)
-        (State.cqConditioningState E).pos
-        (identityTensorStateMatrix_posSemidef_of_state
-          (a := A) (State.cqConditioningState E).marginalB) α =
+          (MState.cqConditioningState E).traceLeft)
+        (MState.cqConditioningState E).psd
+        (identityTensorStateMatrix_posSemidef
+          (a := A) (MState.cqConditioningState E).traceLeft) α =
       E.conditionalRenyiSupport.sum (fun y =>
         (E.probs y : ℝ) *
-          sandwichedRenyiQ (E.states y).matrix
-            (identityTensorStateMatrix (a := A) (E.states y).marginalB)
-            (E.states y).pos
-            (identityTensorStateMatrix_posSemidef_of_state
-              (a := A) (E.states y).marginalB) α) := by
+          sandwichedRenyiQ (E.states y).m
+            (identityTensorStateMatrix (a := A) (E.states y).traceLeft)
+            (E.states y).psd
+            (identityTensorStateMatrix_posSemidef
+              (a := A) (E.states y).traceLeft) α) := by
   rw [sandwichedRenyiQ_classical_decomposition_lowAlpha E hα_half hα_lt_one]
   rw [show E.conditionalRenyiSupport =
       (Finset.univ : Finset Y).filter (fun y => E.probs y ≠ 0) by
@@ -451,32 +458,32 @@ theorem sandwichedRenyiQ_classical_decomposition_lowAlpha_support
 range.  The zero-weight case is separated before combining real powers, so
 the high-order negative exponent never creates an informal `0 * ∞` term. -/
 theorem sandwichedRenyiQ_classical_decomposition_support_safe
-    (E : Ensemble Y (A × B)) {α : ℝ}
+    (E : MEnsemble (A × B) Y) {α : ℝ}
     (hα_half : 1 / 2 ≤ α) (hα_ne_one : α ≠ 1) :
     sandwichedRenyiQ
-        (State.cqConditioningState E).matrix
+        (MState.cqConditioningState E).m
         (identityTensorStateMatrix (a := A)
-          (State.cqConditioningState E).marginalB)
-        (State.cqConditioningState E).pos
-        (identityTensorStateMatrix_posSemidef_of_state
-          (a := A) (State.cqConditioningState E).marginalB) α =
+          (MState.cqConditioningState E).traceLeft)
+        (MState.cqConditioningState E).psd
+        (identityTensorStateMatrix_posSemidef
+          (a := A) (MState.cqConditioningState E).traceLeft) α =
       ∑ y, (E.probs y : ℝ) *
-        sandwichedRenyiQ (E.states y).matrix
-          (identityTensorStateMatrix (a := A) (E.states y).marginalB)
-          (E.states y).pos
-          (identityTensorStateMatrix_posSemidef_of_state
-            (a := A) (E.states y).marginalB) α := by
+        sandwichedRenyiQ (E.states y).m
+          (identityTensorStateMatrix (a := A) (E.states y).traceLeft)
+          (E.states y).psd
+          (identityTensorStateMatrix_posSemidef
+            (a := A) (E.states y).traceLeft) α := by
   have hα_pos : 0 < α := by linarith
   have hdecomp := sandwichedRenyiQ_cq_reference_decomposition
     (A := A) (B := B) (Y := Y) E E.conditionalMarginalB
     hα_pos hα_ne_one
-  rw [Ensemble.conditionalRenyiState_marginalB_eq_conditionalMarginalBYState]
+  rw [MEnsemble.conditionalRenyiState_traceLeft_eq_conditionalMarginalBYState]
   change sandwichedRenyiQ
-      (State.cqConditioningState E).matrix
+      (MState.cqConditioningState E).m
       (identityTensorStateMatrix (a := A)
         (E.conditionalMarginalB.cqState.reindex (Equiv.prodComm Y B)))
-      (State.cqConditioningState E).pos
-      (identityTensorStateMatrix_posSemidef_of_state
+      (MState.cqConditioningState E).psd
+      (identityTensorStateMatrix_posSemidef
         (a := A) (E.conditionalMarginalB.cqState.reindex (Equiv.prodComm Y B))) α = _
   rw [hdecomp]
   apply Finset.sum_congr rfl
@@ -486,48 +493,53 @@ theorem sandwichedRenyiQ_classical_decomposition_support_safe
   · have hp : 0 < (E.probs y : ℝ) := by
       exact NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr hpy)
     rw [show (E.conditionalMarginalB.probs y : ℝ) = (E.probs y : ℝ) by rfl]
-    rw [show E.conditionalMarginalB.states y = (E.states y).marginalB by rfl]
+    rw [show E.conditionalMarginalB.states y = (E.states y).traceLeft by rfl]
     rw [← Real.rpow_add hp]
     norm_num
 
+/-- The sandwiched `Q̃_α` of the cq state, decomposed as the probability-weighted sum of the
+branch values over the labels of positive probability. -/
 noncomputable def sandwichedDownFiniteSupportQ
-    (E : Ensemble Y (A × B)) (α : ℝ) : ℝ :=
+    (E : MEnsemble (A × B) Y) (α : ℝ) : ℝ :=
   E.conditionalRenyiSupport.sum (fun y =>
     (E.probs y : ℝ) *
-      sandwichedRenyiQ (E.states y).matrix
-        (identityTensorStateMatrix (a := A) (E.states y).marginalB)
-        (E.states y).pos
-        (identityTensorStateMatrix_posSemidef_of_state
-          (a := A) (E.states y).marginalB) α)
+      sandwichedRenyiQ (E.states y).m
+        (identityTensorStateMatrix (a := A) (E.states y).traceLeft)
+        (E.states y).psd
+        (identityTensorStateMatrix_posSemidef
+          (a := A) (E.states y).traceLeft) α)
 
+/-- The downward sandwiched divergence of a classically conditioned ensemble against its own
+conditioning marginal: `log₂ (sandwichedDownFiniteSupportQ)` divided by `α - 1`.  The conditional
+entropy is its negation. -/
 noncomputable def sandwichedDownFiniteSupportFormulaReal
-    (E : Ensemble Y (A × B)) (α : ℝ) : ℝ :=
+    (E : MEnsemble (A × B) Y) (α : ℝ) : ℝ :=
   (1 / (α - 1)) * log2 (sandwichedDownFiniteSupportQ E α)
 
 theorem sandwichedDownFiniteSupportQ_eq_globalQ_lowAlpha
-    (E : Ensemble Y (A × B)) {α : ℝ}
+    (E : MEnsemble (A × B) Y) {α : ℝ}
     (hα_half : 1 / 2 ≤ α) (hα_lt_one : α < 1) :
     sandwichedDownFiniteSupportQ E α =
       sandwichedRenyiQ
-        (State.cqConditioningState E).matrix
+        (MState.cqConditioningState E).m
         (identityTensorStateMatrix (a := A)
-          (State.cqConditioningState E).marginalB)
-        (State.cqConditioningState E).pos
-        (identityTensorStateMatrix_posSemidef_of_state
-          (a := A) (State.cqConditioningState E).marginalB) α := by
+          (MState.cqConditioningState E).traceLeft)
+        (MState.cqConditioningState E).psd
+        (identityTensorStateMatrix_posSemidef
+          (a := A) (MState.cqConditioningState E).traceLeft) α := by
   exact (sandwichedRenyiQ_classical_decomposition_lowAlpha_support
     E hα_half hα_lt_one).symm
 
 theorem conditionalSandwichedRenyiDown_classicalConditioning_source_formula_of_lt_one
-    (E : Ensemble Y (A × B)) (α : ℝ) (hα : 1 / 2 ≤ α)
+    (E : MEnsemble (A × B) Y) (α : ℝ) (hα : 1 / 2 ≤ α)
     (hα_ne_one : α ≠ 1) (hα_lt_one : α < 1)
     (hQne : sandwichedRenyiQ
-        (State.cqConditioningState E).matrix
+        (MState.cqConditioningState E).m
         (identityTensorStateMatrix (a := A)
-          (State.cqConditioningState E).marginalB)
-        (State.cqConditioningState E).pos
-        (identityTensorStateMatrix_posSemidef_of_state
-          (a := A) (State.cqConditioningState E).marginalB) α ≠ 0) :
+          (MState.cqConditioningState E).traceLeft)
+        (MState.cqConditioningState E).psd
+        (identityTensorStateMatrix_posSemidef
+          (a := A) (MState.cqConditioningState E).traceLeft) α ≠ 0) :
     conditionalSandwichedRenyiDownE E α hα hα_ne_one =
       (-(sandwichedDownFiniteSupportFormulaReal E α) : EReal) := by
   unfold conditionalSandwichedRenyiDownE
@@ -538,9 +550,4 @@ theorem conditionalSandwichedRenyiDown_classicalConditioning_source_formula_of_l
     sandwichedDownFiniteSupportFormulaReal
   rw [sandwichedDownFiniteSupportQ_eq_globalQ_lowAlpha E hα hα_lt_one]
 
-
-end State
-
-end
-
-end QIT
+end MState

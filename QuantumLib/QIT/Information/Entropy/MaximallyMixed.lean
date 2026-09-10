@@ -11,6 +11,9 @@ public import QuantumLib.QIT.States.MaximallyMixed
 
 /-!
 # Entropy of the maximally mixed state
+
+The uniform state on a finite register has von Neumann entropy `log₂ d`, the largest value any
+state on that register can take.
 -/
 
 @[expose] public section
@@ -18,27 +21,26 @@ public import QuantumLib.QIT.States.MaximallyMixed
 open scoped ComplexOrder MatrixOrder
 open Matrix
 
-namespace QIT
-
+noncomputable section
 universe u
 
-noncomputable section
+open QIT
 
-namespace State
+namespace MState
 
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
-theorem vonNeumann_maximallyMixed [Nonempty a] :
-    (maximallyMixed a).vonNeumann = log2 (Fintype.card a : ℝ) := by
+theorem vonNeumann_uniform [Nonempty a] :
+    (MState.uniform : MState a).vonNeumann = log2 (Fintype.card a : ℝ) := by
   have hdiag :
-      (maximallyMixed a).matrix =
+      (MState.uniform : MState a).m =
         Matrix.diagonal (fun _ : a => (((Fintype.card a : ℝ)⁻¹ : ℝ) : ℂ)) := by
     ext i j
     by_cases hij : i = j
     · subst j
-      simp [maximallyMixed]
-    · simp [maximallyMixed, hij]
-  rw [State.vonNeumann_eq_neg_sum_xlog2_of_diagonal _ _ hdiag]
+      simp
+    · simp [hij]
+  rw [MState.vonNeumann_eq_neg_sum_xlog2_of_diagonal _ _ hdiag]
   have hcard_pos : 0 < (Fintype.card a : ℝ) := by
     exact_mod_cast Fintype.card_pos_iff.mpr inferInstance
   have hcard_ne : (Fintype.card a : ℝ) ≠ 0 := ne_of_gt hcard_pos
@@ -48,7 +50,4 @@ theorem vonNeumann_maximallyMixed [Nonempty a] :
   rw [Real.log_inv]
   field_simp [hcard_ne]
 
-end State
-
-end
-end QIT
+end MState

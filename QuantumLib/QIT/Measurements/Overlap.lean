@@ -8,6 +8,7 @@ module
 
 public import QuantumLib.QIT.Measurements.Projective
 public import QuantumLib.QIT.Core.Pure
+public import QuantumLib.QIT.Util.MatrixInstances
 public import Mathlib.Analysis.CStarAlgebra.Matrix
 
 /-!
@@ -25,7 +26,7 @@ Source: Tomamichel2015FiniteResources, `apps.tex` (Eq. `eq:defc`).
 @[expose] public section
 
 open scoped ComplexOrder MatrixOrder NNReal
-open scoped Matrix.Norms.L2Operator
+open scoped Matrix.Norms.L2Operator QIT.MatrixL2
 
 open Matrix
 
@@ -41,15 +42,7 @@ variable (P : ProjectiveMeasurement x a) (Q : ProjectiveMeasurement y a)
 
 namespace ProjectiveMeasurement
 
-noncomputable local instance instCMatrixNonUnitalCStarAlgebraForMeasurementOverlap
-    (n : Type*) [Fintype n] [DecidableEq n] :
-    NonUnitalCStarAlgebra (Matrix n n ℂ) := ⟨⟩
-
-noncomputable local instance instCMatrixCStarAlgebraForMeasurementOverlap
-    (n : Type*) [Fintype n] [DecidableEq n] :
-    CStarAlgebra (Matrix n n ℂ) := ⟨⟩
-
-/-- `Tr(P_i Q_j) >= 0` for projective effects.
+/-- `Tr(P_i Q_j) ≥ 0` for projective effects.
 
 Proved via the idempotent congruence `Tr(P_i Q_j) = Tr(P_i Q_j P_i)` with
 `P_i Q_j P_i` positive semidefinite (congruence of the PSD `Q_j` by the
@@ -72,12 +65,15 @@ rank-one-measurement library: each effect is represented by a normalized vector,
 and the elementary norm/trace bridge against normalized vector effects is
 available for the overlap comparison below. -/
 structure IsRankOne where
-  vector : x → PureVector a
-  effect_eq : ∀ outcome, P.effects outcome = (vector outcome).state.matrix
+  /-- The normalized vector representing each effect. -/
+  vector : x → Ket a
+  /-- Each effect is the rank-one projector onto its vector. -/
+  effect_eq : ∀ outcome, P.effects outcome = (vector outcome).state.m
+  /-- The norm/trace bridge used by the overlap comparison. -/
   norm_sq_mul_state_trace :
-    ∀ outcome (φ : PureVector a),
-      ‖P.effects outcome * φ.state.matrix‖ ^ 2 =
-        ((P.effects outcome * φ.state.matrix).trace).re
+    ∀ outcome (φ : Ket a),
+      ‖P.effects outcome * φ.state.m‖ ^ 2 =
+        ((P.effects outcome * φ.state.m).trace).re
 
 /-- The arbitrary-projective-measurement overlap
 `c = max_{i,j} ‖P_i Q_j‖∞^2` as a nonnegative real. -/

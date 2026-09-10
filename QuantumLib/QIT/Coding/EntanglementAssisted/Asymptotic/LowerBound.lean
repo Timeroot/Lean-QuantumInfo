@@ -12,9 +12,7 @@ public import QuantumLib.QIT.Coding.EntanglementAssisted.Asymptotic.SandwichedTe
 # Asymptotic lower-bound support
 
 This module is part of the entanglement-assisted classical communication
-asymptotic proof spine.  It was split out mechanically from the historical
-`EntanglementAssistedAsymptotic` files; theorem statements and proof routes are
-unchanged.
+asymptotic proof spine.
 -/
 
 @[expose] public section
@@ -22,27 +20,25 @@ unchanged.
 open scoped ComplexOrder MatrixOrder NNReal Topology
 open Filter
 
-namespace QIT
-
 universe u v w x y
 
 noncomputable section
 
+namespace CPTPOp
+
+open QIT
+
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-namespace Channel
-
-variable (N : Channel a b)
+variable (N : CPTPMap a b)
 
 namespace OneShotNonempty
 
 /-- The unique-outcome POVM, used only to show one-shot code candidate sets are
 nonempty. -/
-def unitPOVM (q : Type*) [Fintype q] [DecidableEq q] : POVM PUnit q where
-  effects _ := 1
-  pos _ := Matrix.PosSemidef.one
-  sum_eq_one := by
+def unitPOVM (q : Type*) [Fintype q] [DecidableEq q] : POVM PUnit q :=
+  .ofMatrices (fun _ => 1) (fun _ => Matrix.PosSemidef.one) <| by
     ext i j
     simp
 
@@ -52,11 +48,11 @@ end OneShotNonempty
 one-shot operational supremum. -/
 def trivialOneShotEntanglementAssistedCode [Nonempty a] :
     EntanglementAssistedClassicalCode N 1 PUnit PUnit PUnit where
-  sharedState := State.unit.prod State.unit
+  sharedState := MState.unit.prod MState.unit
   encoder _ :=
-    Channel.prepare (fun _ : PUnit =>
-      (PureVector.basisPureVector : PureVector (QIT.TensorPower a 1)).state)
-  decoder := OneShotNonempty.unitPOVM (Prod (QIT.TensorPower b 1) PUnit)
+    CPTPOp.prepare (fun _ : PUnit =>
+      (default : Ket (QIT.TensorPower a 1)).state)
+  decoder := OneShotNonempty.unitPOVM (QIT.TensorPower b 1 × PUnit)
 
 theorem trivialOneShotEntanglementAssistedCode_maxErrorAtMost
     [Nonempty a] {ε : ℝ} (hε : 0 ≤ ε) :
@@ -134,12 +130,12 @@ theorem entanglementAssistedInformation_tensorPower_lower_bound
           (ψ.tensorPowerBipartite n) =
         (n : ℝ) * N.entanglementAssistedInformation := by
     rw [hψ]
-    unfold Channel.entanglementAssistedMutualInformation
-    rw [← Channel.hypothesisTestingOutputState_eq_entanglementAssistedOutputState
+    unfold CPTPOp.entanglementAssistedMutualInformation
+    rw [← CPTPOp.hypothesisTestingOutputState_eq_entanglementAssistedOutputState
       (N.tensorPower n) (ψ.tensorPowerBipartite n)]
-    rw [Channel.hypothesisTestingOutputState_tensorPowerBipartite]
-    rw [Channel.hypothesisTestingOutputState_eq_entanglementAssistedOutputState]
-    exact State.mutualInformation_tensorPowerBipartite
+    rw [CPTPOp.hypothesisTestingOutputState_tensorPowerBipartite]
+    rw [CPTPOp.hypothesisTestingOutputState_eq_entanglementAssistedOutputState]
+    exact MState.mutualInformation_tensorPowerBipartite
       (N.entanglementAssistedOutputState ψ) n
   calc
     (n : ℝ) * N.entanglementAssistedInformation =
@@ -152,16 +148,16 @@ theorem entanglementAssistedInformation_tensorPower_lower_bound
 /-- Fixed-input PSD barred Petz--Renyi mutual information is additive under
 memoryless tensor powers. -/
 theorem inputBarPetzRenyiMutualInformationPSDFinite_tensorPowerBipartite
-    (ψ : PureVector (Prod a a)) (n : ℕ) (alpha : PetzRenyiAlpha) :
+    (ψ : Ket (a × a)) (n : ℕ) (alpha : PetzRenyiAlpha) :
     (N.tensorPower n).inputBarPetzRenyiMutualInformationPSDFinite
         (ψ.tensorPowerBipartite n)
         alpha.1 alpha.2.1 (ne_of_lt alpha.2.2) =
       (n : ℝ) *
         N.inputBarPetzRenyiMutualInformationPSDFinite
           ψ alpha.1 alpha.2.1 (ne_of_lt alpha.2.2) := by
-  unfold Channel.inputBarPetzRenyiMutualInformationPSDFinite
-  rw [Channel.hypothesisTestingOutputState_tensorPowerBipartite]
-  exact State.barPetzRenyiMutualInformationPSDFinite_tensorPowerBipartite
+  unfold CPTPOp.inputBarPetzRenyiMutualInformationPSDFinite
+  rw [CPTPOp.hypothesisTestingOutputState_tensorPowerBipartite]
+  exact MState.barPetzRenyiMutualInformationPSDFinite_tensorPowerBipartite
     (N.hypothesisTestingOutputState ψ) alpha.2.1 alpha.2.2 n
 
 /-- The PSD barred Petz--Renyi channel mutual information is superadditive
@@ -182,7 +178,7 @@ theorem barPetzRenyiMutualInformationPSDFinite_tensorPower_lower_bound
   let T := (N.tensorPower n).barPetzRenyiMutualInformationPSDFiniteValueSet
     alpha.1 alpha.2.1 (ne_of_lt alpha.2.2)
   have hne : S.Nonempty := by
-    let ψ0 : PureVector (Prod a a) := PureVector.basisPureVector
+    let ψ0 : Ket (a × a) := default
     refine ⟨N.inputBarPetzRenyiMutualInformationPSDFinite
       ψ0 alpha.1 alpha.2.1 (ne_of_lt alpha.2.2), ?_⟩
     exact ⟨ψ0, rfl⟩
@@ -226,8 +222,11 @@ structure EntanglementAssistedNUseLowerBoundWitness
     (M : Type u) [Fintype M] [DecidableEq M] [Nonempty M]
     (EA : Type u) [Fintype EA] [DecidableEq EA]
     (EB : Type u) [Fintype EB] [DecidableEq EB] where
+  /-- The underlying `n`-use entanglement-assisted code. -/
   code : EntanglementAssistedClassicalCode N n M EA EB
+  /-- Every message is decoded with error at most `ε`. -/
   maxError_le : code.maxErrorAtMost ε
+  /-- The code attains at least the claimed rate. -/
   lowerBound_le_rate : lowerBound ≤ code.rate
 
 /-- A reliable one-shot code for the block channel `N^{⊗n}` gives the
@@ -298,10 +297,6 @@ theorem entanglementAssisted_achievable_of_nUseLowerBoundWitness
   let : DecidableEq EB := hEBdec
   exact N.exists_code_of_nUseLowerBoundWitness W
 
-set_option maxHeartbeats 2000000
-
-end Channel
+end CPTPOp
 
 end
-
-end QIT

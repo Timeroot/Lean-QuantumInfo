@@ -13,7 +13,7 @@ public import QuantumLib.QIT.Protocols.LOCC.Core
 # Pure-state entanglement under finite instruments
 
 This module refines every outcome of a finite instrument by its chosen Kraus
-family.  Positive-weight refined branches are normalized as pure vectors; zero
+family.  Positive-weight refined branches are normalized as kets; zero
 branches are retained in the algebraic completeness sum but are never normalized.
 -/
 
@@ -44,24 +44,26 @@ def refinedKraus (M : FiniteInstrument A A' R) (i : M.refinedBranchIndex) :
   (M.branchTraceNonincreasingCP i.1).kraus i.2
 
 /-- Unnormalized output amplitudes after one refined Kraus branch acts on Alice. -/
-def postAmplitude (M : FiniteInstrument A A' R) (ψ : PureVector (Prod A B))
-    (i : M.refinedBranchIndex) : Prod A' B → ℂ :=
-  fun x => ∑ a : A, M.refinedKraus i x.1 a * ψ.amp (a, x.2)
+def postAmplitude (M : FiniteInstrument A A' R) (ψ : Ket (A × B))
+    (i : M.refinedBranchIndex) : A' × B → ℂ :=
+  fun x => ∑ a : A, M.refinedKraus i x.1 a * ψ.vec (a, x.2)
 
 /-- Probability weight of a refined branch, represented as a nonnegative real. -/
-def branchWeight (M : FiniteInstrument A A' R) (ψ : PureVector (Prod A B))
+def branchWeight (M : FiniteInstrument A A' R) (ψ : Ket (A × B))
     (i : M.refinedBranchIndex) : NNReal :=
   ⟨(rankOneMatrix (M.postAmplitude ψ i)).trace.re,
     (Matrix.PosSemidef.trace_nonneg (rankOneMatrix_pos (M.postAmplitude ψ i))).1⟩
 
+omit [DecidableEq B] in
 @[simp]
-theorem branchWeight_coe (M : FiniteInstrument A A' R) (ψ : PureVector (Prod A B))
+theorem branchWeight_coe (M : FiniteInstrument A A' R) (ψ : Ket (A × B))
     (i : M.refinedBranchIndex) :
     (M.branchWeight ψ i : ℝ) = (rankOneMatrix (M.postAmplitude ψ i)).trace.re :=
   rfl
 
+omit [DecidableEq B] in
 theorem branchWeight_nonneg (M : FiniteInstrument A A' R)
-    (ψ : PureVector (Prod A B)) (i : M.refinedBranchIndex) :
+    (ψ : Ket (A × B)) (i : M.refinedBranchIndex) :
     0 ≤ (M.branchWeight ψ i : ℝ) :=
   NNReal.coe_nonneg _
 
@@ -83,10 +85,10 @@ theorem ofKraus_refinedKraus_eq_total (M : FiniteInstrument A A' R) :
     _ = M.total.map := M.sum_branch_eq_total
 
 private theorem sum_rankOne_localPostAmplitude_eq_kron_ofKraus
-    {κ : Type y} [Fintype κ] (K : κ → Matrix A' A ℂ) (v : Prod A B → ℂ) :
+    {κ : Type y} [Fintype κ] (K : κ → Matrix A' A ℂ) (v : A × B → ℂ) :
     (∑ k : κ,
-        rankOneMatrix (fun x : Prod A' B => ∑ a : A, K k x.1 a * v (a, x.2))) =
-      MatrixMap.kron (MatrixMap.ofKraus K) (Channel.idChannel B).map
+        rankOneMatrix (fun x : A' × B => ∑ a : A, K k x.1 a * v (a, x.2))) =
+      MatrixMap.kron (MatrixMap.ofKraus K) (CPTPOp.id (dIn := B)).map
         (rankOneMatrix v) := by
   classical
   ext x y
@@ -99,11 +101,11 @@ private theorem sum_rankOne_localPostAmplitude_eq_kron_ofKraus
 
 private theorem sum_rankOne_rightPostAmplitude_eq_kron_ofKraus
     {κ : Type y} [Fintype κ] [DecidableEq R]
-    (K : κ → Matrix B R ℂ) (v : Prod A' R → ℂ) :
+    (K : κ → Matrix B R ℂ) (v : A' × R → ℂ) :
     (∑ k : κ,
-        rankOneMatrix (fun x : Prod A' B =>
+        rankOneMatrix (fun x : A' × B =>
           ∑ r : R, K k x.2 r * v (x.1, r))) =
-      MatrixMap.kron (Channel.idChannel A').map (MatrixMap.ofKraus K)
+      MatrixMap.kron (CPTPOp.id (dIn := A')).map (MatrixMap.ofKraus K)
         (rankOneMatrix v) := by
   classical
   ext x z
@@ -119,23 +121,23 @@ input into the corresponding sum of unnormalized rank-one branches. -/
 theorem sum_rankOne_bilocalPostAmplitude_eq_kron_ofKraus
     {κA : Type y} {κB : Type*} [Fintype κA] [Fintype κB] [DecidableEq R]
     (KA : κA → Matrix A' A ℂ) (KB : κB → Matrix B R ℂ)
-    (v : Prod A R → ℂ) :
+    (v : A × R → ℂ) :
     (∑ k : κA × κB,
-        rankOneMatrix (fun x : Prod A' B =>
+        rankOneMatrix (fun x : A' × B =>
           ∑ a : A, ∑ r : R,
             KA k.1 x.1 a * KB k.2 x.2 r * v (a, r))) =
       MatrixMap.kron (MatrixMap.ofKraus KA) (MatrixMap.ofKraus KB)
         (rankOneMatrix v) := by
   classical
-  let localPostAmplitude : κA → Prod A' R → ℂ :=
+  let localPostAmplitude : κA → A' × R → ℂ :=
     fun k x => ∑ a : A, KA k x.1 a * v (a, x.2)
   calc
     (∑ k : κA × κB,
-        rankOneMatrix (fun x : Prod A' B =>
+        rankOneMatrix (fun x : A' × B =>
           ∑ a : A, ∑ r : R,
             KA k.1 x.1 a * KB k.2 x.2 r * v (a, r))) =
         ∑ kA : κA, ∑ kB : κB,
-          rankOneMatrix (fun x : Prod A' B =>
+          rankOneMatrix (fun x : A' × B =>
             ∑ r : R, KB kB x.2 r * localPostAmplitude kA (x.1, r)) := by
       rw [Fintype.sum_prod_type]
       apply Finset.sum_congr rfl
@@ -148,20 +150,20 @@ theorem sum_rankOne_bilocalPostAmplitude_eq_kron_ofKraus
       conv_lhs => rw [Finset.sum_comm]
       simp only [mul_assoc, mul_left_comm]
     _ = ∑ kA : κA,
-        MatrixMap.kron (Channel.idChannel A').map (MatrixMap.ofKraus KB)
+        MatrixMap.kron (CPTPOp.id (dIn := A')).map (MatrixMap.ofKraus KB)
           (rankOneMatrix (localPostAmplitude kA)) := by
       apply Finset.sum_congr rfl
       intro kA _
       exact sum_rankOne_rightPostAmplitude_eq_kron_ofKraus
         (A' := A') (R := R) KB (localPostAmplitude kA)
-    _ = MatrixMap.kron (Channel.idChannel A').map (MatrixMap.ofKraus KB)
+    _ = MatrixMap.kron (CPTPOp.id (dIn := A')).map (MatrixMap.ofKraus KB)
         (∑ kA : κA, rankOneMatrix (localPostAmplitude kA)) := by
       rw [map_sum]
-    _ = MatrixMap.kron (Channel.idChannel A').map (MatrixMap.ofKraus KB)
-        (MatrixMap.kron (MatrixMap.ofKraus KA) (Channel.idChannel R).map
+    _ = MatrixMap.kron (CPTPOp.id (dIn := A')).map (MatrixMap.ofKraus KB)
+        (MatrixMap.kron (MatrixMap.ofKraus KA) (CPTPOp.id (dIn := R)).map
           (rankOneMatrix v)) := by
       rw [show (∑ kA : κA, rankOneMatrix (localPostAmplitude kA)) =
-          MatrixMap.kron (MatrixMap.ofKraus KA) (Channel.idChannel R).map
+          MatrixMap.kron (MatrixMap.ofKraus KA) (CPTPOp.id (dIn := R)).map
             (rankOneMatrix v) by
         simpa [localPostAmplitude] using
           (sum_rankOne_localPostAmplitude_eq_kron_ofKraus
@@ -169,80 +171,77 @@ theorem sum_rankOne_bilocalPostAmplitude_eq_kron_ofKraus
     _ = MatrixMap.kron (MatrixMap.ofKraus KA) (MatrixMap.ofKraus KB)
         (rankOneMatrix v) := by
       calc
-        MatrixMap.kron (Channel.idChannel A').map (MatrixMap.ofKraus KB)
-            (MatrixMap.kron (MatrixMap.ofKraus KA) (Channel.idChannel R).map
+        MatrixMap.kron (CPTPOp.id (dIn := A')).map (MatrixMap.ofKraus KB)
+            (MatrixMap.kron (MatrixMap.ofKraus KA) (CPTPOp.id (dIn := R)).map
               (rankOneMatrix v)) =
             MatrixMap.kron
-              ((Channel.idChannel A').map.comp (MatrixMap.ofKraus KA))
-              ((MatrixMap.ofKraus KB).comp (Channel.idChannel R).map)
+              ((CPTPOp.id (dIn := A')).map.comp (MatrixMap.ofKraus KA))
+              ((MatrixMap.ofKraus KB).comp (CPTPOp.id (dIn := R)).map)
               (rankOneMatrix v) :=
           MatrixMap.kron_comp_apply_general
             (α := A') (β := A') (γ := R) (δ := B) (η := A) (θ := R)
-            (Channel.idChannel A').map (MatrixMap.ofKraus KB)
-            (MatrixMap.ofKraus KA) (Channel.idChannel R).map (rankOneMatrix v)
+            (CPTPOp.id (dIn := A')).map (MatrixMap.ofKraus KB)
+            (MatrixMap.ofKraus KA) (CPTPOp.id (dIn := R)).map (rankOneMatrix v)
         _ = MatrixMap.kron (MatrixMap.ofKraus KA) (MatrixMap.ofKraus KB)
             (rankOneMatrix v) := by
-          rw [Channel.idChannel_map_eq_linearMap_id (α := A'),
-            Channel.idChannel_map_eq_linearMap_id (α := R)]
+          rw [CPTPOp.id_map (dIn := A'),
+            CPTPOp.id_map (dIn := R)]
           simp only [LinearMap.id_comp, LinearMap.comp_id]
 
 /-- The sum of unnormalized refined pure branches is the total local channel action. -/
 theorem sum_rankOne_postAmplitude_eq_totalAction
-    (M : FiniteInstrument A A' R) (ψ : PureVector (Prod A B)) :
+    (M : FiniteInstrument A A' R) (ψ : Ket (A × B)) :
     (∑ i : M.refinedBranchIndex, rankOneMatrix (M.postAmplitude ψ i)) =
-      MatrixMap.kron M.total.map (Channel.idChannel B).map ψ.state.matrix := by
-  rw [← M.ofKraus_refinedKraus_eq_total, PureVector.state_matrix]
-  exact sum_rankOne_localPostAmplitude_eq_kron_ofKraus (B := B) M.refinedKraus ψ.amp
+      MatrixMap.kron M.total.map (CPTPOp.id (dIn := B)).map ψ.state.m := by
+  rw [← M.ofKraus_refinedKraus_eq_total, Ket.state_matrix]
+  exact sum_rankOne_localPostAmplitude_eq_kron_ofKraus (B := B) M.refinedKraus ψ.vec
 
 /-- Refined branch weights form a probability distribution. -/
 theorem sum_branchWeight_eq_one
-    (M : FiniteInstrument A A' R) (ψ : PureVector (Prod A B)) :
+    (M : FiniteInstrument A A' R) (ψ : Ket (A × B)) :
     (∑ i : M.refinedBranchIndex, M.branchWeight ψ i) = 1 := by
   classical
   apply NNReal.eq
   simp only [NNReal.coe_sum, branchWeight_coe, NNReal.coe_one]
-  have htrace := MatrixMap.isTracePreserving_kron M.total.map
-    (Channel.idChannel B).map M.total.tracePreserving
-    (Channel.idChannel B).tracePreserving ψ.state.matrix
+  have htrace := MatrixMap.IsTracePreserving.kron M.total.map_TP (CPTPOp.id (dIn := B)).map_TP ψ.state.m
   calc
     (∑ i : M.refinedBranchIndex,
         (rankOneMatrix (M.postAmplitude ψ i)).trace.re) =
         ((∑ i : M.refinedBranchIndex,
           rankOneMatrix (M.postAmplitude ψ i)).trace).re := by
       simp [Matrix.trace_sum]
-    _ = (MatrixMap.kron M.total.map (Channel.idChannel B).map
-          ψ.state.matrix).trace.re := by
+    _ = (MatrixMap.kron M.total.map (CPTPOp.id (dIn := B)).map
+          ψ.state.m).trace.re := by
       rw [M.sum_rankOne_postAmplitude_eq_totalAction ψ]
-    _ = ψ.state.matrix.trace.re := congrArg Complex.re htrace
-    _ = 1 := by rw [ψ.state.trace_eq_one]; norm_num
+    _ = ψ.state.m.trace.re := congrArg Complex.re htrace
+    _ = 1 := by rw [ψ.state.tr']; norm_num
 
 /-- Refined branches on which normalization is mathematically valid. -/
-abbrev positiveSupport (M : FiniteInstrument A A' R) (ψ : PureVector (Prod A B)) :=
+abbrev positiveSupport (M : FiniteInstrument A A' R) (ψ : Ket (A × B)) :=
   { i : M.refinedBranchIndex // 0 < M.branchWeight ψ i }
 
 /-- The normalized pure output on a strictly positive refined branch. -/
-def normalizedBranch (M : FiniteInstrument A A' R) (ψ : PureVector (Prod A B))
-    (i : M.positiveSupport ψ) : PureVector (Prod A' B) :=
-  PureVector.normalize (M.postAmplitude ψ i.1) (by
+def normalizedBranch (M : FiniteInstrument A A' R) (ψ : Ket (A × B))
+    (i : M.positiveSupport ψ) : Ket (A' × B) :=
+  Ket.normalizeRankOne (M.postAmplitude ψ i.1) (by
     have hi : 0 < (M.branchWeight ψ i.1 : ℝ) := by
       exact_mod_cast i.2
     simpa using hi)
 
-@[simp]
 theorem normalizedBranch_state_matrix
-    (M : FiniteInstrument A A' R) (ψ : PureVector (Prod A B))
+    (M : FiniteInstrument A A' R) (ψ : Ket (A × B))
     (i : M.positiveSupport ψ) :
-    (M.normalizedBranch ψ i).state.matrix =
+    (M.normalizedBranch ψ i).state.m =
       ((((M.branchWeight ψ i.1 : ℝ)⁻¹ : ℝ) : ℂ) •
         rankOneMatrix (M.postAmplitude ψ i.1)) := by
-  rw [normalizedBranch, PureVector.normalize_state_matrix]
+  rw [normalizedBranch, Ket.normalizeRankOne_state_matrix]
   rfl
 
 /-- Weighting a normalized positive branch recovers its unnormalized rank-one state. -/
 theorem branchWeight_smul_normalizedBranch_state_matrix
-    (M : FiniteInstrument A A' R) (ψ : PureVector (Prod A B))
+    (M : FiniteInstrument A A' R) (ψ : Ket (A × B))
     (i : M.positiveSupport ψ) :
-    M.branchWeight ψ i.1 • (M.normalizedBranch ψ i).state.matrix =
+    M.branchWeight ψ i.1 • (M.normalizedBranch ψ i).state.m =
       rankOneMatrix (M.postAmplitude ψ i.1) := by
   rw [M.normalizedBranch_state_matrix ψ i]
   have hi : 0 < (M.branchWeight ψ i.1 : ℝ) := by
@@ -263,9 +262,10 @@ theorem branchWeight_smul_normalizedBranch_state_matrix
     rankOneMatrix (M.postAmplitude ψ i.1) x y
   rw [← mul_assoc, hcomplex, one_mul]
 
+omit [DecidableEq B] in
 /-- A zero-weight refined branch has an identically zero unnormalized state. -/
 theorem rankOne_postAmplitude_eq_zero_of_branchWeight_eq_zero
-    (M : FiniteInstrument A A' R) (ψ : PureVector (Prod A B))
+    (M : FiniteInstrument A A' R) (ψ : Ket (A × B))
     (i : M.refinedBranchIndex) (hi : M.branchWeight ψ i = 0) :
     rankOneMatrix (M.postAmplitude ψ i) = 0 := by
   apply (Matrix.PosSemidef.trace_eq_zero_iff
@@ -281,7 +281,7 @@ theorem rankOne_postAmplitude_eq_zero_of_branchWeight_eq_zero
 
 /-- Restricting the branch weights to positive support preserves their total mass. -/
 theorem sum_positiveSupport_branchWeight_eq_one
-    (M : FiniteInstrument A A' R) (ψ : PureVector (Prod A B)) :
+    (M : FiniteInstrument A A' R) (ψ : Ket (A × B)) :
     (∑ i : M.positiveSupport ψ, M.branchWeight ψ i.1) = 1 := by
   classical
   rw [← M.sum_branchWeight_eq_one ψ]
@@ -299,61 +299,63 @@ theorem sum_positiveSupport_branchWeight_eq_one
 
 /-- The full refined branch sum has the same remote marginal as the input state. -/
 theorem sum_remoteBranchMatrix_eq_inputMarginal
-    (M : FiniteInstrument A A' R) (ψ : PureVector (Prod A B)) :
+    (M : FiniteInstrument A A' R) (ψ : Ket (A × B)) :
     (∑ i : M.refinedBranchIndex,
-        QIT.partialTraceA (a := A') (b := B)
+        Matrix.traceLeft
           (rankOneMatrix (M.postAmplitude ψ i))) =
-      ψ.state.marginalB.matrix := by
+      ψ.state.traceLeft.m := by
   classical
   calc
     (∑ i : M.refinedBranchIndex,
-        QIT.partialTraceA (a := A') (b := B)
+        Matrix.traceLeft
           (rankOneMatrix (M.postAmplitude ψ i))) =
-        QIT.partialTraceA (a := A') (b := B)
+        Matrix.traceLeft
           (∑ i : M.refinedBranchIndex,
             rankOneMatrix (M.postAmplitude ψ i)) := by
       ext b b'
-      simp only [QIT.partialTraceA, Matrix.sum_apply]
+      simp only [Matrix.traceLeft, Matrix.of_apply, Matrix.sum_apply]
       rw [Finset.sum_comm]
-    _ = QIT.partialTraceA (a := A') (b := B)
-        (MatrixMap.kron M.total.map (Channel.idChannel B).map
-          ψ.state.matrix) := by
+    _ = Matrix.traceLeft
+        (MatrixMap.kron M.total.map (CPTPOp.id (dIn := B)).map
+          ψ.state.m) := by
       rw [M.sum_rankOne_postAmplitude_eq_totalAction ψ]
-    _ = QIT.partialTraceA (a := A) (b := B) ψ.state.matrix :=
-      MatrixMap.partialTraceA_kron_idChannel_of_tracePreserving
-        M.total.map M.total.tracePreserving ψ.state.matrix
-    _ = ψ.state.marginalB.matrix := rfl
+    _ = Matrix.traceLeft ψ.state.m :=
+      MatrixMap.traceLeft_kron_idChannel_of_tracePreserving
+        M.total.map M.total.map_TP ψ.state.m
+    _ = ψ.state.traceLeft.m := (MState.traceLeft_m ψ.state).symm
 
+omit [DecidableEq B] in
 /-- Zero branches contribute no remote subnormalized state. -/
 theorem remoteBranchMatrix_eq_zero_of_not_positive
-    (M : FiniteInstrument A A' R) (ψ : PureVector (Prod A B))
+    (M : FiniteInstrument A A' R) (ψ : Ket (A × B))
     (i : M.refinedBranchIndex) (hi : ¬ 0 < M.branchWeight ψ i) :
-    QIT.partialTraceA (a := A') (b := B)
+    Matrix.traceLeft
         (rankOneMatrix (M.postAmplitude ψ i)) = 0 := by
   have hweight : M.branchWeight ψ i = 0 :=
     le_antisymm (not_lt.mp hi) bot_le
   rw [M.rankOne_postAmplitude_eq_zero_of_branchWeight_eq_zero ψ i hweight]
   ext b b'
-  simp [QIT.partialTraceA]
+  simp [Matrix.traceLeft]
 
+omit [DecidableEq B] in
 /-- Positive support carries the entire remote subnormalized-state sum. -/
 theorem sum_positiveSupport_remoteBranchMatrix_eq_sum
-    (M : FiniteInstrument A A' R) (ψ : PureVector (Prod A B)) :
+    (M : FiniteInstrument A A' R) (ψ : Ket (A × B)) :
     (∑ i : M.positiveSupport ψ,
-        QIT.partialTraceA (a := A') (b := B)
+        Matrix.traceLeft
           (rankOneMatrix (M.postAmplitude ψ i.1))) =
       ∑ i : M.refinedBranchIndex,
-        QIT.partialTraceA (a := A') (b := B)
+        Matrix.traceLeft
           (rankOneMatrix (M.postAmplitude ψ i)) := by
   classical
   conv_rhs =>
     rw [← Fintype.sum_subtype_add_sum_subtype
       (fun i : M.refinedBranchIndex => 0 < M.branchWeight ψ i)
-      (fun i => QIT.partialTraceA (a := A') (b := B)
+      (fun i => Matrix.traceLeft
         (rankOneMatrix (M.postAmplitude ψ i)))]
   have hzero :
       (∑ i : { i : M.refinedBranchIndex // ¬ 0 < M.branchWeight ψ i },
-        QIT.partialTraceA (a := A') (b := B)
+        Matrix.traceLeft
           (rankOneMatrix (M.postAmplitude ψ i.1))) = 0 := by
     apply Finset.sum_eq_zero
     intro i _
@@ -361,15 +363,15 @@ theorem sum_positiveSupport_remoteBranchMatrix_eq_sum
   rw [hzero, add_zero]
 
 /-- A weighted normalized remote marginal is its unnormalized branch marginal. -/
-theorem branchWeight_smul_normalizedBranch_marginalB_matrix
-    (M : FiniteInstrument A A' R) (ψ : PureVector (Prod A B))
+theorem branchWeight_smul_normalizedBranch_traceLeft_matrix
+    (M : FiniteInstrument A A' R) (ψ : Ket (A × B))
     (i : M.positiveSupport ψ) :
-    M.branchWeight ψ i.1 • (M.normalizedBranch ψ i).state.marginalB.matrix =
-      QIT.partialTraceA (a := A') (b := B)
+    M.branchWeight ψ i.1 • (M.normalizedBranch ψ i).state.traceLeft.m =
+      Matrix.traceLeft
         (rankOneMatrix (M.postAmplitude ψ i.1)) := by
   have hmatrix := M.branchWeight_smul_normalizedBranch_state_matrix ψ i
   ext b b'
-  simp only [State.marginalB_matrix, QIT.partialTraceA, Matrix.smul_apply]
+  simp only [MState.traceLeft_m, Matrix.traceLeft, Matrix.of_apply, Matrix.smul_apply]
   rw [Finset.smul_sum]
   apply Finset.sum_congr rfl
   intro a' _
@@ -378,52 +380,54 @@ theorem branchWeight_smul_normalizedBranch_marginalB_matrix
 
 /-- Remote marginals of the normalized positive branches, with canonical weights. -/
 def remoteMarginalEnsemble
-    (M : FiniteInstrument A A' R) (ψ : PureVector (Prod A B)) :
-    Ensemble (M.positiveSupport ψ) B where
-  probs := fun i => M.branchWeight ψ i.1
-  weights_sum := M.sum_positiveSupport_branchWeight_eq_one ψ
-  states := fun i => (M.normalizedBranch ψ i).state.marginalB
+    (M : FiniteInstrument A A' R) (ψ : Ket (A × B)) :
+    MEnsemble B (M.positiveSupport ψ) :=
+  .ofProbs
+    (fun i => M.branchWeight ψ i.1)
+    (M.sum_positiveSupport_branchWeight_eq_one ψ)
+    (fun i => (M.normalizedBranch ψ i).state.traceLeft)
 
 /-- The canonical remote marginal ensemble averages exactly to the input remote marginal. -/
 theorem remoteMarginalEnsemble_averageState
-    (M : FiniteInstrument A A' R) (ψ : PureVector (Prod A B)) :
-    (M.remoteMarginalEnsemble ψ).averageState = ψ.state.marginalB := by
+    (M : FiniteInstrument A A' R) (ψ : Ket (A × B)) :
+    (M.remoteMarginalEnsemble ψ).averageState = ψ.state.traceLeft := by
   classical
-  apply State.ext
+  apply MState.ext
+  rw [MEnsemble.averageState_matrix]
   change (∑ i : M.positiveSupport ψ,
       M.branchWeight ψ i.1 •
-        (M.normalizedBranch ψ i).state.marginalB.matrix) =
-    ψ.state.marginalB.matrix
+        (M.normalizedBranch ψ i).state.traceLeft.m) =
+    ψ.state.traceLeft.m
   calc
     (∑ i : M.positiveSupport ψ,
         M.branchWeight ψ i.1 •
-          (M.normalizedBranch ψ i).state.marginalB.matrix) =
+          (M.normalizedBranch ψ i).state.traceLeft.m) =
         ∑ i : M.positiveSupport ψ,
-          QIT.partialTraceA (a := A') (b := B)
+          Matrix.traceLeft
             (rankOneMatrix (M.postAmplitude ψ i.1)) := by
       apply Finset.sum_congr rfl
       intro i _
-      exact M.branchWeight_smul_normalizedBranch_marginalB_matrix ψ i
+      exact M.branchWeight_smul_normalizedBranch_traceLeft_matrix ψ i
     _ = ∑ i : M.refinedBranchIndex,
-        QIT.partialTraceA (a := A') (b := B)
+        Matrix.traceLeft
           (rankOneMatrix (M.postAmplitude ψ i)) :=
       M.sum_positiveSupport_remoteBranchMatrix_eq_sum ψ
-    _ = ψ.state.marginalB.matrix :=
+    _ = ψ.state.traceLeft.m :=
       M.sum_remoteBranchMatrix_eq_inputMarginal ψ
 
 /-- Probability-weighted remote entropy of the normalized refined pure branches. -/
 def refinedBranchAverageEntanglement
-    (M : FiniteInstrument A A' R) (ψ : PureVector (Prod A B)) : ℝ :=
+    (M : FiniteInstrument A A' R) (ψ : Ket (A × B)) : ℝ :=
   ∑ i : M.positiveSupport ψ,
     (M.branchWeight ψ i.1 : ℝ) *
-      (M.normalizedBranch ψ i).state.marginalB.vonNeumann
+      (M.normalizedBranch ψ i).state.traceLeft.vonNeumann
 
 /-- A finite local instrument cannot increase average pure-state entanglement. -/
 theorem average_pure_entanglement_le
-    (M : FiniteInstrument A A' R) (ψ : PureVector (Prod A B)) :
-    M.refinedBranchAverageEntanglement ψ ≤ ψ.state.marginalB.vonNeumann := by
+    (M : FiniteInstrument A A' R) (ψ : Ket (A × B)) :
+    M.refinedBranchAverageEntanglement ψ ≤ ψ.state.traceLeft.vonNeumann := by
   classical
-  have h := Ensemble.vonNeumann_average_ge_sum (M.remoteMarginalEnsemble ψ)
+  have h := MEnsemble.vonNeumann_average_ge_sum (M.remoteMarginalEnsemble ψ)
   rw [M.remoteMarginalEnsemble_averageState ψ] at h
   simpa [refinedBranchAverageEntanglement, remoteMarginalEnsemble] using h
 

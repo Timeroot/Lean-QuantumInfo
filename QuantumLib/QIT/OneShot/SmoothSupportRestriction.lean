@@ -10,8 +10,6 @@ public import QuantumLib.QIT.OneShot.SmoothAttainment
 public import QuantumLib.QIT.OneShot.SmoothEndpoint
 public import QuantumLib.QIT.Information.Renyi.RenyiDPI.Domain
 
-set_option maxHeartbeats 1000000
-
 /-!
 # Support restriction for smooth conditional entropies
 
@@ -49,60 +47,60 @@ theorem supportProjector_apply (M : CMatrix a) (hM : M.PosSemidef) :
   rfl
 
 /-- The product support projector associated with a bipartite state. -/
-def bipartiteSupportProjector (ρ : SubnormalizedState (Prod a b)) :
-    CMatrix (Prod a b) :=
+def bipartiteSupportProjector (ρ : SubnormalizedState (a × b)) :
+    CMatrix (a × b) :=
   Matrix.kronecker
-    (supportProjector ρ.marginalA.matrix ρ.marginalA.pos)
-    (supportProjector ρ.marginalB.matrix ρ.marginalB.pos)
+    (supportProjector ρ.traceRight.matrix ρ.traceRight.pos)
+    (supportProjector ρ.traceLeft.matrix ρ.traceLeft.pos)
 
 /-- The one-Kraus support filter on a bipartite matrix. -/
-def supportFilter (ρ : SubnormalizedState (Prod a b)) :
-    MatrixMap (Prod a b) (Prod a b) :=
+def supportFilter (ρ : SubnormalizedState (a × b)) :
+    MatrixMap (a × b) (a × b) :=
   MatrixMap.ofKraus (fun _ : Unit => bipartiteSupportProjector ρ)
 
 @[simp]
-theorem supportFilter_apply (ρ : SubnormalizedState (Prod a b))
-    (X : CMatrix (Prod a b)) :
+theorem supportFilter_apply (ρ : SubnormalizedState (a × b))
+    (X : CMatrix (a × b)) :
     supportFilter ρ X =
       bipartiteSupportProjector ρ * X *
         Matrix.conjTranspose (bipartiteSupportProjector ρ) := by
   simp [supportFilter, MatrixMap.ofKraus]
 
 theorem supportFilter_completelyPositive
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     MatrixMap.IsCompletelyPositive (supportFilter ρ) := by
-  exact MatrixMap.ofKraus_isCompletelyPositive _
+  exact MatrixMap.ofKraus_completelyPositive _
 
-/- The order estimate for the product support projector is kept as a local
-   lemma.  It is the only algebraic input needed to construct the TNI map. -/
+/-- The product support projector is positive semidefinite.  This is the
+algebraic input needed to construct the TNI map. -/
 theorem bipartiteSupportProjector_posSemidef
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     (bipartiteSupportProjector ρ).PosSemidef := by
   apply Matrix.PosSemidef.kronecker
-  · exact psdInvSqrt_support_posSemidef ρ.marginalA.pos
-  · exact psdInvSqrt_support_posSemidef ρ.marginalB.pos
+  · exact psdInvSqrt_support_posSemidef ρ.traceRight.pos
+  · exact psdInvSqrt_support_posSemidef ρ.traceLeft.pos
 
 theorem supportFilter_traceNonincreasing
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     MatrixMap.IsTraceNonincreasing (supportFilter ρ) := by
   intro X hX
   have hP : (bipartiteSupportProjector ρ).PosSemidef :=
     bipartiteSupportProjector_posSemidef ρ
-  have hPle : bipartiteSupportProjector ρ ≤ (1 : CMatrix (Prod a b)) := by
-    let PA : CMatrix a := supportProjector ρ.marginalA.matrix ρ.marginalA.pos
-    let PB : CMatrix b := supportProjector ρ.marginalB.matrix ρ.marginalB.pos
+  have hPle : bipartiteSupportProjector ρ ≤ (1 : CMatrix (a × b)) := by
+    let PA : CMatrix a := supportProjector ρ.traceRight.matrix ρ.traceRight.pos
+    let PB : CMatrix b := supportProjector ρ.traceLeft.matrix ρ.traceLeft.pos
     have hPA : PA.PosSemidef := by
-      exact psdInvSqrt_support_posSemidef ρ.marginalA.pos
+      exact psdInvSqrt_support_posSemidef ρ.traceRight.pos
     have hPB : PB.PosSemidef := by
-      exact psdInvSqrt_support_posSemidef ρ.marginalB.pos
+      exact psdInvSqrt_support_posSemidef ρ.traceLeft.pos
     have hPAle : PA ≤ (1 : CMatrix a) := by
-      exact psdInvSqrt_support_le_one ρ.marginalA.pos
+      exact psdInvSqrt_support_le_one ρ.traceRight.pos
     have hPBle : PB ≤ (1 : CMatrix b) := by
-      exact psdInvSqrt_support_le_one ρ.marginalB.pos
+      exact psdInvSqrt_support_le_one ρ.traceLeft.pos
     have hleft : ((1 : CMatrix a) - PA).PosSemidef := Matrix.le_iff.mp hPAle
     have hright : ((1 : CMatrix b) - PB).PosSemidef := Matrix.le_iff.mp hPBle
     have hdecomp :
-        (1 : CMatrix (Prod a b)) - Matrix.kronecker PA PB =
+        (1 : CMatrix (a × b)) - Matrix.kronecker PA PB =
           Matrix.kronecker ((1 : CMatrix a) - PA) PB +
             Matrix.kronecker (1 : CMatrix a) ((1 : CMatrix b) - PB) := by
       ext i j
@@ -125,11 +123,11 @@ theorem supportFilter_traceNonincreasing
     rw [hdecomp]
     exact (hleft.kronecker hPB).add (Matrix.PosSemidef.one.kronecker hright)
   have hdiff :
-      ((1 : CMatrix (Prod a b)) - bipartiteSupportProjector ρ).PosSemidef :=
+      ((1 : CMatrix (a × b)) - bipartiteSupportProjector ρ).PosSemidef :=
     Matrix.le_iff.mp hPle
   have hnonneg := cMatrix_trace_mul_posSemidef_re_nonneg hX hdiff
   have htrace :
-      (X * ((1 : CMatrix (Prod a b)) - bipartiteSupportProjector ρ)).trace.re =
+      (X * ((1 : CMatrix (a × b)) - bipartiteSupportProjector ρ)).trace.re =
         X.trace.re -
           (X * bipartiteSupportProjector ρ).trace.re := by
     rw [Matrix.mul_sub, Matrix.trace_sub, Complex.sub_re]
@@ -138,12 +136,12 @@ theorem supportFilter_traceNonincreasing
     exact hP.isHermitian
   have hPid : bipartiteSupportProjector ρ * bipartiteSupportProjector ρ =
       bipartiteSupportProjector ρ := by
-    let PA : CMatrix a := supportProjector ρ.marginalA.matrix ρ.marginalA.pos
-    let PB : CMatrix b := supportProjector ρ.marginalB.matrix ρ.marginalB.pos
+    let PA : CMatrix a := supportProjector ρ.traceRight.matrix ρ.traceRight.pos
+    let PB : CMatrix b := supportProjector ρ.traceLeft.matrix ρ.traceLeft.pos
     have hPAid : PA * PA = PA := by
-      exact psdInvSqrt_support_idempotent ρ.marginalA.pos
+      exact psdInvSqrt_support_idempotent ρ.traceRight.pos
     have hPBid : PB * PB = PB := by
-      exact psdInvSqrt_support_idempotent ρ.marginalB.pos
+      exact psdInvSqrt_support_idempotent ρ.traceLeft.pos
     change Matrix.kronecker PA PB * Matrix.kronecker PA PB =
       Matrix.kronecker PA PB
     calc
@@ -162,19 +160,19 @@ theorem supportFilter_traceNonincreasing
   linarith
 
 theorem supportFilter_traceNonincreasingCP
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     MatrixMap.TraceNonincreasingCP (supportFilter ρ) := by
   exact ⟨supportFilter_completelyPositive ρ,
     supportFilter_traceNonincreasing ρ⟩
 
 /-- Applying the support filter gives a state on the original ambient space. -/
-def supportFilterState (ρ τ : SubnormalizedState (Prod a b)) :
-    SubnormalizedState (Prod a b) :=
+def supportFilterState (ρ τ : SubnormalizedState (a × b)) :
+    SubnormalizedState (a × b) :=
   τ.applyTraceNonincreasingCP (supportFilter ρ)
     (supportFilter_traceNonincreasingCP ρ)
 
 @[simp]
-theorem supportFilterState_matrix (ρ τ : SubnormalizedState (Prod a b)) :
+theorem supportFilterState_matrix (ρ τ : SubnormalizedState (a × b)) :
     (supportFilterState ρ τ).matrix =
       bipartiteSupportProjector ρ * τ.matrix *
         Matrix.conjTranspose (bipartiteSupportProjector ρ) := by
@@ -182,7 +180,7 @@ theorem supportFilterState_matrix (ρ τ : SubnormalizedState (Prod a b)) :
   exact supportFilter_apply ρ τ.matrix
 
 theorem supportFilterState_purifiedBall
-    {ρ τ : SubnormalizedState (Prod a b)} {ε : ℝ}
+    {ρ τ : SubnormalizedState (a × b)} {ε : ℝ}
     (hfix : supportFilterState ρ ρ = ρ)
     (hball : ρ.purifiedBall ε τ) :
     ρ.purifiedBall ε (supportFilterState ρ τ) := by
@@ -195,9 +193,9 @@ theorem supportFilterState_purifiedBall
   exact hball'
 
 theorem bipartiteSupport_center_support
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     Matrix.Supports ρ.matrix
-      (ρ.marginalA.prod ρ.marginalB).matrix := by
+      (ρ.traceRight.prod ρ.traceLeft).matrix := by
   by_cases htr : ρ.matrix.trace.re = 0
   · have hzero : ρ.matrix = 0 := by
       apply (Matrix.PosSemidef.trace_eq_zero_iff ρ.pos).mp
@@ -206,30 +204,28 @@ theorem bipartiteSupport_center_support
       · exact ρ.trace_im_zero
     rw [hzero]
     exact Matrix.Supports.zero_left _
-  · let ρn : State (Prod a b) := ρ.normalize htr
+  · let ρn : MState (a × b) := ρ.normalize htr
     have hnorm := ρn.matrix_supports_prod_marginals
     intro v hv
-    have hA : ρn.marginalA.matrix =
-        (ρ.matrix.trace.re)⁻¹ • ρ.marginalA.matrix := by
+    have hA : ρn.traceRight.m =
+        (ρ.matrix.trace.re)⁻¹ • ρ.traceRight.matrix := by
       dsimp [ρn]
       ext i j
-      simp [QIT.partialTraceB, Matrix.smul_apply, Finset.mul_sum]
-    have hB : ρn.marginalB.matrix =
-        (ρ.matrix.trace.re)⁻¹ • ρ.marginalB.matrix := by
+      simp [Matrix.traceRight, Matrix.smul_apply, Finset.mul_sum]
+    have hB : ρn.traceLeft.m =
+        (ρ.matrix.trace.re)⁻¹ • ρ.traceLeft.matrix := by
       dsimp [ρn]
       ext i j
-      simp [QIT.partialTraceA, Matrix.smul_apply, Finset.mul_sum]
-    have hprod : (ρn.marginalA.prod ρn.marginalB).matrix =
+      simp [Matrix.traceLeft, Matrix.smul_apply, Finset.mul_sum]
+    have hprod : (ρn.traceRight.prod ρn.traceLeft).m =
         (ρ.matrix.trace.re)⁻¹ ^ 2 •
-          (ρ.marginalA.prod ρ.marginalB).matrix := by
-      change Matrix.kronecker ρn.marginalA.matrix ρn.marginalB.matrix =
-        (ρ.matrix.trace.re)⁻¹ ^ 2 •
-          Matrix.kronecker ρ.marginalA.matrix ρ.marginalB.matrix
-      rw [hA, hB]
+          (ρ.traceRight.prod ρ.traceLeft).matrix := by
+      rw [MState.prod_m, hA, hB]
       ext x y
-      simp [Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.smul_apply]
+      simp [SubnormalizedState.prod, Matrix.kronecker, Matrix.kroneckerMap_apply,
+        Matrix.smul_apply]
       ring
-    have hvn : (ρn.marginalA.prod ρn.marginalB).matrix.mulVec v = 0 := by
+    have hvn : (ρn.traceRight.prod ρn.traceLeft).m.mulVec v = 0 := by
       rw [hprod]
       simp [Matrix.smul_mulVec, hv]
     have hmn := hnorm v hvn
@@ -237,44 +233,20 @@ theorem bipartiteSupport_center_support
     rw [Matrix.smul_mulVec] at hmn
     exact (smul_eq_zero.mp hmn).resolve_left (inv_ne_zero htr)
 
-private theorem fixes_of_supports_projector
-    {M P : CMatrix (Prod a b)} (hM : M.PosSemidef)
-    (hP : P.PosSemidef) (hPid : P * P = P)
-    (hSupport : Matrix.Supports M P) : P * M = M ∧ M * P = M := by
-  have hPcomp : P * (1 - P) = 0 := by
-    rw [Matrix.mul_sub, Matrix.mul_one, hPid]
-    abel
-  have hMcomp : M * (1 - P) = 0 := by
-    ext i j
-    have hv := hSupport (fun k => (1 - P) k j) (by
-      ext i'
-      change ∑ k, P i' k * (1 - P) k j = 0
-      simpa [Matrix.mul_apply] using congrFun (congrFun hPcomp i') j )
-    simpa [Matrix.mul_apply, Matrix.mulVec, dotProduct] using congrFun hv i
-  have hright : M * P = M := by
-    calc
-      M * P = M * (1 - (1 - P)) := by noncomm_ring
-      _ = M := by rw [Matrix.mul_sub, hMcomp, Matrix.mul_one]; abel
-  have hleft : P * M = M := by
-    have hconj := congrArg Matrix.conjTranspose hright
-    simpa [Matrix.conjTranspose_mul, hP.isHermitian.eq, hM.isHermitian.eq]
-      using hconj
-  exact ⟨hleft, hright⟩
-
-theorem supportFilterState_center (ρ : SubnormalizedState (Prod a b)) :
+theorem supportFilterState_center (ρ : SubnormalizedState (a × b)) :
     supportFilterState ρ ρ = ρ := by
   apply SubnormalizedState.ext
   have hcenter := bipartiteSupport_center_support ρ
-  let NA : CMatrix a := ρ.marginalA.matrix
-  let NB : CMatrix b := ρ.marginalB.matrix
-  let PA : CMatrix a := supportProjector NA ρ.marginalA.pos
-  let PB : CMatrix b := supportProjector NB ρ.marginalB.pos
+  let NA : CMatrix a := ρ.traceRight.matrix
+  let NB : CMatrix b := ρ.traceLeft.matrix
+  let PA : CMatrix a := supportProjector NA ρ.traceRight.pos
+  let PB : CMatrix b := supportProjector NB ρ.traceLeft.pos
   have hNA : NA * PA = NA := by
     exact (supportProjector_fixes_of_supports (M := NA) (N := NA)
-      ρ.marginalA.pos ρ.marginalA.pos (Matrix.Supports.refl NA)).2
+      ρ.traceRight.pos ρ.traceRight.pos (Matrix.Supports.refl NA)).2
   have hNB : NB * PB = NB := by
     exact (supportProjector_fixes_of_supports (M := NB) (N := NB)
-      ρ.marginalB.pos ρ.marginalB.pos (Matrix.Supports.refl NB)).2
+      ρ.traceLeft.pos ρ.traceLeft.pos (Matrix.Supports.refl NB)).2
   have hNP : Matrix.kronecker NA NB * Matrix.kronecker PA PB =
       Matrix.kronecker NA NB := by
     calc
@@ -288,21 +260,21 @@ theorem supportFilterState_center (ρ : SubnormalizedState (Prod a b)) :
   have hρP : Matrix.Supports ρ.matrix (Matrix.kronecker PA PB) := by
     exact hcenter.trans hNPsupport
   have hP : (Matrix.kronecker PA PB).PosSemidef :=
-    (ρ.marginalA.pos |> psdInvSqrt_support_posSemidef).kronecker
-      (ρ.marginalB.pos |> psdInvSqrt_support_posSemidef)
+    (ρ.traceRight.pos |> psdInvSqrt_support_posSemidef).kronecker
+      (ρ.traceLeft.pos |> psdInvSqrt_support_posSemidef)
   have hPid : Matrix.kronecker PA PB * Matrix.kronecker PA PB =
       Matrix.kronecker PA PB := by
     have hPAid : PA * PA = PA := by
-      exact psdInvSqrt_support_idempotent ρ.marginalA.pos
+      exact psdInvSqrt_support_idempotent ρ.traceRight.pos
     have hPBid : PB * PB = PB := by
-      exact psdInvSqrt_support_idempotent ρ.marginalB.pos
+      exact psdInvSqrt_support_idempotent ρ.traceLeft.pos
     calc
       Matrix.kronecker PA PB * Matrix.kronecker PA PB =
           Matrix.kronecker (PA * PA) (PB * PB) := by
             exact (Matrix.mul_kronecker_mul PA PA PB PB).symm
       _ = Matrix.kronecker PA PB := by
         rw [hPAid, hPBid]
-  have hfix := fixes_of_supports_projector ρ.pos hP hPid hρP
+  have hfix := Matrix.Supports.projector_fixes ρ.pos hP hPid hρP
   rw [supportFilterState_matrix]
   change bipartiteSupportProjector ρ * ρ.matrix *
       Matrix.conjTranspose (bipartiteSupportProjector ρ) = ρ.matrix
@@ -310,7 +282,7 @@ theorem supportFilterState_center (ρ : SubnormalizedState (Prod a b)) :
     (hP.isHermitian).eq, hfix.1, hfix.2]
 
 theorem supportFilterState_supports_projector
-    (ρ τ : SubnormalizedState (Prod a b)) :
+    (ρ τ : SubnormalizedState (a × b)) :
     Matrix.Supports (supportFilterState ρ τ).matrix
       (bipartiteSupportProjector ρ) := by
   apply Matrix.Supports.of_mul_right_eq_self
@@ -318,10 +290,10 @@ theorem supportFilterState_supports_projector
   have hP := bipartiteSupportProjector_posSemidef ρ
   have hPid : bipartiteSupportProjector ρ * bipartiteSupportProjector ρ =
       bipartiteSupportProjector ρ := by
-    let PA : CMatrix a := supportProjector ρ.marginalA.matrix ρ.marginalA.pos
-    let PB : CMatrix b := supportProjector ρ.marginalB.matrix ρ.marginalB.pos
-    have hPA : PA * PA = PA := psdInvSqrt_support_idempotent ρ.marginalA.pos
-    have hPB : PB * PB = PB := psdInvSqrt_support_idempotent ρ.marginalB.pos
+    let PA : CMatrix a := supportProjector ρ.traceRight.matrix ρ.traceRight.pos
+    let PB : CMatrix b := supportProjector ρ.traceLeft.matrix ρ.traceLeft.pos
+    have hPA : PA * PA = PA := psdInvSqrt_support_idempotent ρ.traceRight.pos
+    have hPB : PB * PB = PB := psdInvSqrt_support_idempotent ρ.traceLeft.pos
     change Matrix.kronecker PA PB * Matrix.kronecker PA PB = _
     calc
       Matrix.kronecker PA PB * Matrix.kronecker PA PB =
@@ -333,16 +305,16 @@ theorem supportFilterState_supports_projector
 
 private theorem supportFilter_side_trace_le
     {T : CMatrix b} (hT : T.PosSemidef)
-    (ρ : SubnormalizedState (Prod a b)) :
-    ((supportProjector ρ.marginalB.matrix ρ.marginalB.pos * T *
-      supportProjector ρ.marginalB.matrix ρ.marginalB.pos).trace).re ≤
+    (ρ : SubnormalizedState (a × b)) :
+    ((supportProjector ρ.traceLeft.matrix ρ.traceLeft.pos * T *
+      supportProjector ρ.traceLeft.matrix ρ.traceLeft.pos).trace).re ≤
       T.trace.re := by
-  let PB : CMatrix b := supportProjector ρ.marginalB.matrix ρ.marginalB.pos
-  have hPle : PB ≤ (1 : CMatrix b) := psdInvSqrt_support_le_one ρ.marginalB.pos
+  let PB : CMatrix b := supportProjector ρ.traceLeft.matrix ρ.traceLeft.pos
+  have hPle : PB ≤ (1 : CMatrix b) := psdInvSqrt_support_le_one ρ.traceLeft.pos
   have hdiff : ((1 : CMatrix b) - PB).PosSemidef := Matrix.le_iff.mp hPle
   have hnonneg := cMatrix_trace_mul_posSemidef_re_nonneg hT hdiff
-  have hPid : PB * PB = PB := psdInvSqrt_support_idempotent ρ.marginalB.pos
-  have hPherm : PB.IsHermitian := psdInvSqrt_support_isHermitian ρ.marginalB.pos
+  have hPid : PB * PB = PB := psdInvSqrt_support_idempotent ρ.traceLeft.pos
+  have hPherm : PB.IsHermitian := psdInvSqrt_support_isHermitian ρ.traceLeft.pos
   have hout : (PB * T * PB).trace.re = (T * PB).trace.re := by
     rw [Matrix.trace_mul_cycle, hPid]
     exact congrArg Complex.re (Matrix.trace_mul_comm _ _)
@@ -352,72 +324,12 @@ private theorem supportFilter_side_trace_le
     rw [Matrix.mul_sub, Matrix.trace_sub, Complex.sub_re, Matrix.mul_one]
   linarith
 
-private theorem transpose_referenceIsometry_matrix_mem_unitary
-    (V : ReferenceIsometry a a) :
-    Matrix.transpose V.matrix ∈ Matrix.unitaryGroup a ℂ := by
-  classical
-  rw [Matrix.mem_unitaryGroup_iff]
-  ext i j
-  have h := congrFun (congrFun V.isometry j) i
-  simpa [Matrix.mul_apply, Matrix.conjTranspose, Matrix.transpose, Matrix.one_apply,
-    Finset.mul_sum, mul_comm, eq_comm] using h
-
-private theorem supportRestriction_psdSqrt_projector_factor
-    (E A : CMatrix a) (hA : A.PosSemidef)
-    (hEherm : E.IsHermitian) :
-    ∃ U : Matrix.unitaryGroup a ℂ,
-      psdSqrt (E * A * E) = E * psdSqrt A * (U : CMatrix a) := by
-  have hEA : (E * A * E).PosSemidef := by
-    have h := hA.conjTranspose_mul_mul_same E
-    rw [hEherm.eq] at h
-    simpa [Matrix.mul_assoc] using h
-  let X : CMatrix a := E * psdSqrt A
-  let S : CMatrix a := psdSqrt (E * A * E)
-  have hSsq : S * Matrix.conjTranspose S = E * A * E := by
-    dsimp [S]
-    rw [psdSqrt_isHermitian (E * A * E), psdSqrt_mul_self_of_posSemidef hEA]
-  have hXgram : X * Matrix.conjTranspose X = E * A * E := by
-    dsimp [X]
-    rw [Matrix.conjTranspose_mul, hEherm.eq, psdSqrt_isHermitian A]
-    calc
-      E * psdSqrt A * (psdSqrt A * E) =
-          E * (psdSqrt A * psdSqrt A) * E := by simp [Matrix.mul_assoc]
-      _ = E * A * E := by rw [psdSqrt_mul_self_of_posSemidef hA]
-  obtain ⟨V, hV⟩ :=
-    ReferenceIsometry.exists_eq_mul_transpose_of_mul_conjTranspose_eq
-      (A := X) (B := S) (by rw [hXgram, hSsq]) (Nat.le_refl _)
-  let U : Matrix.unitaryGroup a ℂ :=
-    ⟨Matrix.transpose V.matrix, transpose_referenceIsometry_matrix_mem_unitary V⟩
-  refine ⟨U, ?_⟩
-  simpa [X, S, U] using hV
-
-private theorem supportRestriction_traceNorm_psdSqrt_mul_psdSqrt_eq_trace_psdSqrt_sandwich
-    (A B : CMatrix a) (hA : A.PosSemidef) :
-    traceNorm (psdSqrt A * psdSqrt B) =
-      (psdSqrt (psdSqrt B * A * psdSqrt B)).trace.re := by
-  rw [← traceNorm_conjTranspose (psdSqrt A * psdSqrt B)]
-  rw [Matrix.conjTranspose_mul, psdSqrt_isHermitian A,
-    psdSqrt_isHermitian B]
-  rw [traceNorm_eq_trace_psdSqrt_mul_conjTranspose]
-  rw [Matrix.conjTranspose_mul, psdSqrt_isHermitian A,
-    psdSqrt_isHermitian B]
-  have hinside :
-      psdSqrt B * psdSqrt A * (psdSqrt A * psdSqrt B) =
-        psdSqrt B * A * psdSqrt B := by
-    calc
-      psdSqrt B * psdSqrt A * (psdSqrt A * psdSqrt B) =
-          psdSqrt B * (psdSqrt A * psdSqrt A) * psdSqrt B := by
-            simp [Matrix.mul_assoc]
-      _ = psdSqrt B * A * psdSqrt B := by
-            rw [psdSqrt_mul_self_of_posSemidef hA]
-  rw [hinside]
-
 private theorem supportRestriction_trace_psdSqrt_projector_compression_le
     (P X : CMatrix a) (hX : X.PosSemidef)
     (hPherm : P.IsHermitian)
     (hPle : Matrix.conjTranspose P * P ≤ (1 : CMatrix a)) :
     (psdSqrt (P * X * P)).trace.re ≤ (psdSqrt X).trace.re := by
-  obtain ⟨U, hU⟩ := supportRestriction_psdSqrt_projector_factor P X hX hPherm
+  obtain ⟨U, hU⟩ := exists_unitary_psdSqrt_conj_eq P X hX hPherm
   have hnorm : traceNorm (psdSqrt (P * X * P)) ≤ traceNorm (psdSqrt X) := by
     rw [hU]
     have hUunit : Matrix.conjTranspose (U : CMatrix a) * (U : CMatrix a) = 1 := by
@@ -470,7 +382,7 @@ private theorem supportRestriction_candidate_compression_le
   calc
     traceNorm (psdSqrt (P * A * P) * psdSqrt R) =
         (psdSqrt (psdSqrt R * (P * A * P) * psdSqrt R)).trace.re :=
-      supportRestriction_traceNorm_psdSqrt_mul_psdSqrt_eq_trace_psdSqrt_sandwich
+      traceNorm_psdSqrt_mul_psdSqrt_eq_trace_psdSqrt_sandwich
         (P * A * P) R (by
           simpa [hPherm.eq, Matrix.mul_assoc] using hA.conjTranspose_mul_mul_same P)
     _ = (psdSqrt (P * (psdSqrt R * A * psdSqrt R) * P)).trace.re := by rw [hsand]
@@ -482,72 +394,23 @@ private theorem supportRestriction_candidate_compression_le
       · exact hPherm
       · exact hPle
     _ = traceNorm (psdSqrt A * psdSqrt R) :=
-      (supportRestriction_traceNorm_psdSqrt_mul_psdSqrt_eq_trace_psdSqrt_sandwich
+      (traceNorm_psdSqrt_mul_psdSqrt_eq_trace_psdSqrt_sandwich
         A R hA).symm
 
-private theorem supportRestriction_candidate_side_compression_eq
-    (A R E : CMatrix a) (hR : R.PosSemidef)
-    (hER : (E * R * E).PosSemidef)
-    (hleft : psdSqrt A * E = psdSqrt A)
-    (hright : E * psdSqrt A = psdSqrt A) :
-    traceNorm (psdSqrt A * psdSqrt R) =
-      traceNorm (psdSqrt A * psdSqrt (E * R * E)) := by
-  have hsand : psdSqrt A * R * psdSqrt A =
-      psdSqrt A * (E * R * E) * psdSqrt A := by
-    calc
-      psdSqrt A * R * psdSqrt A =
-          (psdSqrt A * E) * R * (E * psdSqrt A) := by rw [hleft, hright]
-      _ = psdSqrt A * (E * R * E) * psdSqrt A := by simp [Matrix.mul_assoc]
-  calc
-    traceNorm (psdSqrt A * psdSqrt R) =
-        traceNorm (psdSqrt R * psdSqrt A) := by
-      rw [← traceNorm_conjTranspose]
-      rw [Matrix.conjTranspose_mul, (psdSqrt_isHermitian R).eq,
-        (psdSqrt_isHermitian A).eq]
-    _ = (psdSqrt (psdSqrt A * R * psdSqrt A)).trace.re :=
-      supportRestriction_traceNorm_psdSqrt_mul_psdSqrt_eq_trace_psdSqrt_sandwich
-        R A hR
-    _ = (psdSqrt (psdSqrt A * (E * R * E) * psdSqrt A)).trace.re := by rw [hsand]
-    _ = traceNorm (psdSqrt (E * R * E) * psdSqrt A) :=
-      (supportRestriction_traceNorm_psdSqrt_mul_psdSqrt_eq_trace_psdSqrt_sandwich
-        (E * R * E) A hER).symm
-    _ = traceNorm (psdSqrt A * psdSqrt (E * R * E)) := by
-      rw [← traceNorm_conjTranspose]
-      rw [Matrix.conjTranspose_mul, (psdSqrt_isHermitian A).eq,
-        (psdSqrt_isHermitian (E * R * E)).eq]
-
-private theorem supportRestriction_projector_complement_posSemidef
-    (P : CMatrix a) (hP : P.PosSemidef) (hPid : P * P = P) :
-    ((1 : CMatrix a) - P).PosSemidef := by
-  have h1P_herm : ((1 : CMatrix a) - P).IsHermitian :=
-    (Matrix.isHermitian_one).sub hP.isHermitian
-  have h1P_conj : Matrix.conjTranspose ((1 : CMatrix a) - P) = 1 - P :=
-    h1P_herm.eq
-  have h1P_sq : ((1 : CMatrix a) - P) * (1 - P) = 1 - P := by
-    have e : ((1 : CMatrix a) - P) * (1 - P) = 1 - P - P + P * P := by
-      noncomm_ring
-    rw [e, hPid]
-    abel
-  have hkey : (1 : CMatrix a) - P =
-      Matrix.conjTranspose ((1 : CMatrix a) - P) * (1 - P) := by
-    rw [h1P_conj, h1P_sq]
-  rw [hkey]
-  exact Matrix.posSemidef_conjTranspose_mul_self (1 - P)
-
-private def sideSupportFilter (ρ : SubnormalizedState (Prod a b)) :
+private def sideSupportFilter (ρ : SubnormalizedState (a × b)) :
     MatrixMap b b :=
   MatrixMap.ofKraus (fun _ : Unit =>
-    supportProjector ρ.marginalB.matrix ρ.marginalB.pos)
+    supportProjector ρ.traceLeft.matrix ρ.traceLeft.pos)
 
 private theorem sideSupportFilter_traceNonincreasingCP
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     MatrixMap.TraceNonincreasingCP (sideSupportFilter ρ) := by
-  let Q : CMatrix b := supportProjector ρ.marginalB.matrix ρ.marginalB.pos
-  have hQpos : Q.PosSemidef := psdInvSqrt_support_posSemidef ρ.marginalB.pos
-  have hQle : Q ≤ (1 : CMatrix b) := psdInvSqrt_support_le_one ρ.marginalB.pos
-  have hQid : Q * Q = Q := psdInvSqrt_support_idempotent ρ.marginalB.pos
-  have hQherm : Q.IsHermitian := psdInvSqrt_support_isHermitian ρ.marginalB.pos
-  refine ⟨MatrixMap.ofKraus_isCompletelyPositive _, ?_⟩
+  let Q : CMatrix b := supportProjector ρ.traceLeft.matrix ρ.traceLeft.pos
+  have hQpos : Q.PosSemidef := psdInvSqrt_support_posSemidef ρ.traceLeft.pos
+  have hQle : Q ≤ (1 : CMatrix b) := psdInvSqrt_support_le_one ρ.traceLeft.pos
+  have hQid : Q * Q = Q := psdInvSqrt_support_idempotent ρ.traceLeft.pos
+  have hQherm : Q.IsHermitian := psdInvSqrt_support_isHermitian ρ.traceLeft.pos
+  refine ⟨MatrixMap.ofKraus_completelyPositive _, ?_⟩
   intro X hX
   have hineq : (Q * X * Matrix.conjTranspose Q).trace.re ≤ X.trace.re := by
     have hdiff : ((1 : CMatrix b) - Q).PosSemidef := Matrix.le_iff.mp hQle
@@ -560,55 +423,55 @@ private theorem sideSupportFilter_traceNonincreasingCP
         X.trace.re - (X * Q).trace.re := by
       rw [Matrix.mul_sub, Matrix.trace_sub, Complex.sub_re, Matrix.mul_one]
     linarith
-  have hQdef : Q = supportProjector ρ.marginalB.matrix ρ.marginalB.pos := rfl
+  have hQdef : Q = supportProjector ρ.traceLeft.matrix ρ.traceLeft.pos := rfl
   rw [hQdef] at hineq
   simpa [sideSupportFilter, MatrixMap.ofKraus, -supportProjector_apply] using hineq
 
 private def sideSupportState
-    (ρ : SubnormalizedState (Prod a b)) (σ : SubnormalizedState b) :
+    (ρ : SubnormalizedState (a × b)) (σ : SubnormalizedState b) :
     SubnormalizedState b :=
   σ.applyTraceNonincreasingCP (sideSupportFilter ρ)
     (sideSupportFilter_traceNonincreasingCP ρ)
 
 @[simp]
 private theorem sideSupportState_matrix
-    (ρ : SubnormalizedState (Prod a b)) (σ : SubnormalizedState b) :
+    (ρ : SubnormalizedState (a × b)) (σ : SubnormalizedState b) :
     (sideSupportState ρ σ).matrix =
-      supportProjector ρ.marginalB.matrix ρ.marginalB.pos * σ.matrix *
-        Matrix.conjTranspose (supportProjector ρ.marginalB.matrix ρ.marginalB.pos) := by
+      supportProjector ρ.traceLeft.matrix ρ.traceLeft.pos * σ.matrix *
+        Matrix.conjTranspose (supportProjector ρ.traceLeft.matrix ρ.traceLeft.pos) := by
   change sideSupportFilter ρ σ.matrix = _
   simp [sideSupportFilter, MatrixMap.ofKraus]
 
 private theorem supportFilter_conditionalMaxEntropyExponentCandidate_le
-    (ρ τ : SubnormalizedState (Prod a b)) (σ : SubnormalizedState b) :
+    (ρ τ : SubnormalizedState (a × b)) (σ : SubnormalizedState b) :
     (supportFilterState ρ τ).conditionalMaxEntropyExponentCandidate σ ≤
       τ.conditionalMaxEntropyExponentCandidate (sideSupportState ρ σ) := by
-  let PA : CMatrix a := supportProjector ρ.marginalA.matrix ρ.marginalA.pos
-  let PB : CMatrix b := supportProjector ρ.marginalB.matrix ρ.marginalB.pos
-  let P : CMatrix (Prod a b) := bipartiteSupportProjector ρ
+  let PA : CMatrix a := supportProjector ρ.traceRight.matrix ρ.traceRight.pos
+  let PB : CMatrix b := supportProjector ρ.traceLeft.matrix ρ.traceLeft.pos
+  let P : CMatrix (a × b) := bipartiteSupportProjector ρ
   let Q : CMatrix b := PB
-  let R : CMatrix (Prod a b) :=
+  let R : CMatrix (a × b) :=
     identityTensorStateMatrix (a := a) (sideSupportState ρ σ)
-  have hPA : PA.PosSemidef := psdInvSqrt_support_posSemidef ρ.marginalA.pos
-  have hPB : PB.PosSemidef := psdInvSqrt_support_posSemidef ρ.marginalB.pos
+  have hPA : PA.PosSemidef := psdInvSqrt_support_posSemidef ρ.traceRight.pos
+  have hPB : PB.PosSemidef := psdInvSqrt_support_posSemidef ρ.traceLeft.pos
   have hP : P.PosSemidef := hPA.kronecker hPB
   have hPherm : P.IsHermitian := hP.isHermitian
   have hPid : P * P = P := by
-    have hPAid : PA * PA = PA := psdInvSqrt_support_idempotent ρ.marginalA.pos
-    have hPBid : PB * PB = PB := psdInvSqrt_support_idempotent ρ.marginalB.pos
+    have hPAid : PA * PA = PA := psdInvSqrt_support_idempotent ρ.traceRight.pos
+    have hPBid : PB * PB = PB := psdInvSqrt_support_idempotent ρ.traceLeft.pos
     change Matrix.kronecker PA PB * Matrix.kronecker PA PB = Matrix.kronecker PA PB
     simp only [Matrix.kronecker]
     rw [← Matrix.mul_kronecker_mul, hPAid, hPBid]
-  have hPle : Matrix.conjTranspose P * P ≤ (1 : CMatrix (Prod a b)) := by
-    have hPone : P ≤ (1 : CMatrix (Prod a b)) :=
-      Matrix.le_iff.mpr (supportRestriction_projector_complement_posSemidef P hP hPid)
+  have hPle : Matrix.conjTranspose P * P ≤ (1 : CMatrix (a × b)) := by
+    have hPone : P ≤ (1 : CMatrix (a × b)) :=
+      Matrix.le_iff.mpr (MatrixMap.posSemidef_one_sub_of_posSemidef_idempotent P hP hPid)
     rw [hPherm.eq, hPid]
     exact hPone
-  have hPBherm : PB.IsHermitian := psdInvSqrt_support_isHermitian ρ.marginalB.pos
-  have hPBid : PB * PB = PB := psdInvSqrt_support_idempotent ρ.marginalB.pos
+  have hPBherm : PB.IsHermitian := psdInvSqrt_support_isHermitian ρ.traceLeft.pos
+  have hPBid : PB * PB = PB := psdInvSqrt_support_idempotent ρ.traceLeft.pos
   have hσp : (sideSupportState ρ σ).matrix = PB * σ.matrix * PB := by
     rw [sideSupportState_matrix, hPBherm.eq]
-  obtain ⟨Uσ, hUσ⟩ := supportRestriction_psdSqrt_projector_factor
+  obtain ⟨Uσ, hUσ⟩ := exists_unitary_psdSqrt_conj_eq
     PB σ.matrix (by exact σ.pos) hPBherm
   have hσsqrt_left : PB * psdSqrt (sideSupportState ρ σ).matrix =
       psdSqrt (sideSupportState ρ σ).matrix := by
@@ -663,14 +526,14 @@ private theorem supportFilter_conditionalMaxEntropyExponentCandidate_le
               Matrix.kronecker PA PB =
           psdSqrt R * Matrix.kronecker PA PB
         rw [hsqrtR]
-  let A0 : SubnormalizedState (Prod a b) := supportFilterState ρ τ
-  let E : CMatrix (Prod a b) := Matrix.kronecker (1 : CMatrix a) PB
-  let R0 : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
+  let A0 : SubnormalizedState (a × b) := supportFilterState ρ τ
+  let E : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) PB
+  let R0 : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
   have hER : E * R0 * E = R := by
     dsimp [E, R0, R, identityTensorStateMatrix]
     rw [← Matrix.mul_kronecker_mul, ← Matrix.mul_kronecker_mul]
     rw [hσp]
-    simp only [ mul_one]
+    simp only [mul_one]
   have hEP : E * P = P := by
     change Matrix.kronecker (1 : CMatrix a) PB * Matrix.kronecker PA PB =
       Matrix.kronecker PA PB
@@ -686,7 +549,7 @@ private theorem supportFilter_conditionalMaxEntropyExponentCandidate_le
   have hAstate : A0.matrix = P * τ.matrix * P := by
     dsimp [A0]
     rw [supportFilterState_matrix, hPherm.eq]
-  obtain ⟨UA, hUA⟩ := supportRestriction_psdSqrt_projector_factor
+  obtain ⟨UA, hUA⟩ := exists_unitary_psdSqrt_conj_eq
     P A0.matrix A0.pos hPherm
   have hAfix : P * A0.matrix * P = A0.matrix := by
     rw [hAstate]
@@ -699,9 +562,9 @@ private theorem supportFilter_conditionalMaxEntropyExponentCandidate_le
     rw [hAfix] at hUA'
     calc
       P * psdSqrt A0.matrix =
-          P * (P * psdSqrt A0.matrix * (UA : CMatrix (Prod a b))) := by
-            exact congrArg (fun X : CMatrix (Prod a b) => P * X) hUA'
-      _ = P * psdSqrt A0.matrix * (UA : CMatrix (Prod a b)) := by
+          P * (P * psdSqrt A0.matrix * (UA : CMatrix (a × b))) := by
+            exact congrArg (fun X : CMatrix (a × b) => P * X) hUA'
+      _ = P * psdSqrt A0.matrix * (UA : CMatrix (a × b)) := by
             rw [Matrix.mul_assoc, ← Matrix.mul_assoc P P, hPid]
       _ = psdSqrt A0.matrix := hUA'.symm
   have hArightP : psdSqrt A0.matrix * P = psdSqrt A0.matrix := by
@@ -727,7 +590,7 @@ private theorem supportFilter_conditionalMaxEntropyExponentCandidate_le
     calc
       traceNorm (psdSqrt A0.matrix * psdSqrt R0) =
           traceNorm (psdSqrt A0.matrix * psdSqrt (E * R0 * E)) :=
-        supportRestriction_candidate_side_compression_eq
+        traceNorm_psdSqrt_mul_psdSqrt_conj_eq
           A0.matrix R0 E
           (identityTensorStateMatrix_posSemidef (a := a) σ)
           (by rw [hER]; exact hR) hArightE hAleftE
@@ -751,19 +614,19 @@ private theorem supportFilter_conditionalMaxEntropyExponentCandidate_le
     (sq_le_sq₀ (traceNorm_nonneg _) (traceNorm_nonneg _)).2 htrace0
 
 theorem conditionalMinEntropyScaleFeasible_supportFilter
-    {τ : SubnormalizedState (Prod a b)} {T : CMatrix b}
+    {τ : SubnormalizedState (a × b)} {T : CMatrix b}
     (hT : ConditionalMinEntropyScaleFeasible (a := a) τ T)
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     ConditionalMinEntropyScaleFeasible (a := a) (supportFilterState ρ τ)
-      (supportProjector ρ.marginalB.matrix ρ.marginalB.pos * T *
-        supportProjector ρ.marginalB.matrix ρ.marginalB.pos) := by
-  let PA : CMatrix a := supportProjector ρ.marginalA.matrix ρ.marginalA.pos
-  let PB : CMatrix b := supportProjector ρ.marginalB.matrix ρ.marginalB.pos
-  let P : CMatrix (Prod a b) := bipartiteSupportProjector ρ
+      (supportProjector ρ.traceLeft.matrix ρ.traceLeft.pos * T *
+        supportProjector ρ.traceLeft.matrix ρ.traceLeft.pos) := by
+  let PA : CMatrix a := supportProjector ρ.traceRight.matrix ρ.traceRight.pos
+  let PB : CMatrix b := supportProjector ρ.traceLeft.matrix ρ.traceLeft.pos
+  let P : CMatrix (a × b) := bipartiteSupportProjector ρ
   let T' : CMatrix b := PB * T * PB
-  have hPA : PA.PosSemidef := psdInvSqrt_support_posSemidef ρ.marginalA.pos
-  have hPB : PB.PosSemidef := psdInvSqrt_support_posSemidef ρ.marginalB.pos
-  have hPAle : PA ≤ (1 : CMatrix a) := psdInvSqrt_support_le_one ρ.marginalA.pos
+  have hPA : PA.PosSemidef := psdInvSqrt_support_posSemidef ρ.traceRight.pos
+  have hPB : PB.PosSemidef := psdInvSqrt_support_posSemidef ρ.traceLeft.pos
+  have hPAle : PA ≤ (1 : CMatrix a) := psdInvSqrt_support_le_one ρ.traceRight.pos
   have hQ : T'.PosSemidef := by
     change (PB * T * PB).PosSemidef
     have h := hT.1.conjTranspose_mul_mul_same PB
@@ -774,8 +637,8 @@ theorem conditionalMinEntropyScaleFeasible_supportFilter
   · have hsand := hT.2.conjTranspose_mul_mul_same P
     have hPherm : P.IsHermitian := (hPA.kronecker hPB).isHermitian
     rw [hPherm.eq] at hsand
-    have hPAid : PA * PA = PA := psdInvSqrt_support_idempotent ρ.marginalA.pos
-    have hPBid : PB * PB = PB := psdInvSqrt_support_idempotent ρ.marginalB.pos
+    have hPAid : PA * PA = PA := psdInvSqrt_support_idempotent ρ.traceRight.pos
+    have hPBid : PB * PB = PB := psdInvSqrt_support_idempotent ρ.traceLeft.pos
     have hPITP :
         P * Matrix.kronecker (1 : CMatrix a) T * P =
           Matrix.kronecker PA T' := by
@@ -830,7 +693,7 @@ theorem conditionalMinEntropyScaleFeasible_supportFilter
     exact (Matrix.le_iff).mpr hdiff
 
 theorem conditionalMinEntropyScale_supportFilter_le
-    (ρ τ : SubnormalizedState (Prod a b)) :
+    (ρ τ : SubnormalizedState (a × b)) :
     (supportFilterState ρ τ).conditionalMinEntropyScale (a := a) ≤
       τ.conditionalMinEntropyScale (a := a) := by
   rw [conditionalMinEntropyScale_eq_sInf_scaleValueSet,
@@ -847,7 +710,7 @@ theorem conditionalMinEntropyScale_supportFilter_le
 
 theorem conditionalMinEntropyRaw_le_supportFilter_of_trace_pos
     [Nonempty a] [Nonempty b]
-    (ρ τ : SubnormalizedState (Prod a b)) (hτ : 0 < τ.matrix.trace.re)
+    (ρ τ : SubnormalizedState (a × b)) (hτ : 0 < τ.matrix.trace.re)
     (hfilter : 0 < (supportFilterState ρ τ).matrix.trace.re) :
     τ.conditionalMinEntropyRaw ≤
       (supportFilterState ρ τ).conditionalMinEntropyRaw := by
@@ -866,14 +729,14 @@ theorem conditionalMinEntropyRaw_le_supportFilter_of_trace_pos
 
 theorem smoothConditionalMinEntropy_exists_support_optimizer
     [Nonempty a] [Nonempty b]
-    (ρ : SubnormalizedState (Prod a b)) {ε : ℝ}
+    (ρ : SubnormalizedState (a × b)) {ε : ℝ}
     (hε_nonneg : 0 ≤ ε) (hε : ε < Real.sqrt ρ.matrix.trace.re) :
-    ∃ ρmin : SubnormalizedState (Prod a b),
+    ∃ ρmin : SubnormalizedState (a × b),
       ∃ hρmin : ρmin.matrix ≠ 0,
       ρ.purifiedBall ε ρmin ∧
         ρ.smoothConditionalMinEntropy ε hε_nonneg hε =
           ρmin.conditionalMinEntropyFinite hρmin ∧
-        (∀ ρ' : SubnormalizedState (Prod a b),
+        (∀ ρ' : SubnormalizedState (a × b),
           ∀ hρ' : ρ'.matrix ≠ 0, ρ.purifiedBall ε ρ' →
             ρ'.conditionalMinEntropyFinite hρ' ≤
               ρmin.conditionalMinEntropyFinite hρmin) ∧
@@ -909,12 +772,12 @@ theorem smoothConditionalMinEntropy_exists_support_optimizer
 
 theorem supportFilter_conditionalMaxEntropyRaw_le
     [Nonempty a] [Nonempty b]
-    (ρ τ : SubnormalizedState (Prod a b))
+    (ρ τ : SubnormalizedState (a × b))
     (hτ : 0 < τ.matrix.trace.re)
     (hfilter : 0 < (supportFilterState ρ τ).matrix.trace.re) :
     (supportFilterState ρ τ).conditionalMaxEntropyRaw ≤
       τ.conditionalMaxEntropyRaw := by
-  let τproj : SubnormalizedState (Prod a b) := supportFilterState ρ τ
+  let τproj : SubnormalizedState (a × b) := supportFilterState ρ τ
   have hne_τ :
       (τ.conditionalMaxEntropyPositiveExponentValueSet (a := a)).Nonempty :=
     τ.conditionalMaxEntropyPositiveExponentValueSet_nonempty_of_trace_pos
@@ -969,15 +832,15 @@ theorem supportFilter_conditionalMaxEntropyRaw_le
 
 theorem smoothConditionalMaxEntropy_exists_support_optimizer
     [Nonempty a] [Nonempty b]
-    (ρ : SubnormalizedState (Prod a b)) {ε : ℝ}
+    (ρ : SubnormalizedState (a × b)) {ε : ℝ}
     (hε_nonneg : 0 ≤ ε) (hε : ε < Real.sqrt ρ.matrix.trace.re)
     :
-    ∃ ρmax : SubnormalizedState (Prod a b),
+    ∃ ρmax : SubnormalizedState (a × b),
       ∃ hρmax : ρmax.matrix ≠ 0,
       ρ.purifiedBall ε ρmax ∧
         ρ.smoothConditionalMaxEntropy ε hε_nonneg hε =
           ρmax.conditionalMaxEntropyFinite hρmax ∧
-        (∀ ρ' : SubnormalizedState (Prod a b),
+        (∀ ρ' : SubnormalizedState (a × b),
           ∀ hρ' : ρ'.matrix ≠ 0, ρ.purifiedBall ε ρ' →
             ρmax.conditionalMaxEntropyFinite hρmax ≤
               ρ'.conditionalMaxEntropyFinite hρ') ∧
@@ -1011,10 +874,10 @@ theorem smoothConditionalMaxEntropy_exists_support_optimizer
 
 theorem smoothConditionalMinMaxEntropy_exists_support_optimizers
     [Nonempty a] [Nonempty b]
-    (ρ : SubnormalizedState (Prod a b)) {ε : ℝ}
+    (ρ : SubnormalizedState (a × b)) {ε : ℝ}
     (hε_nonneg : 0 ≤ ε) (hε : ε < Real.sqrt ρ.matrix.trace.re)
     :
-    ∃ ρmin ρmax : SubnormalizedState (Prod a b),
+    ∃ ρmin ρmax : SubnormalizedState (a × b),
       ∃ (hρmin : ρmin.matrix ≠ 0) (hρmax : ρmax.matrix ≠ 0),
       ρ.purifiedBall ε ρmin ∧ ρ.purifiedBall ε ρmax ∧
         ρ.smoothConditionalMinEntropy ε hε_nonneg hε =

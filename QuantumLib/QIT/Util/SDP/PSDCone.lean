@@ -72,21 +72,6 @@ private theorem continuous_conjTranspose' : Continuous (fun A : CMatrix n => con
   intro j
   exact continuous_star.comp ((continuous_apply i).comp (continuous_apply j))
 
-private theorem isClosed_setOf_zero_le_complex : IsClosed ({z : ℂ | 0 ≤ z} : Set ℂ) := by
-  have h : ({z : ℂ | 0 ≤ z} : Set ℂ) = {z | 0 ≤ z.re} ∩ {z | z.im = 0} := by
-    ext z
-    simp only [Set.mem_inter_iff, Set.mem_ofPred_eq]
-    constructor
-    · intro hz
-      simp [Complex.le_def] at hz ⊢
-      tauto
-    · rintro ⟨hre, him⟩
-      simp [Complex.le_def]
-      exact ⟨hre, him.symm⟩
-  rw [h]
-  exact (isClosed_Ici.preimage continuous_re).inter
-    (isClosed_singleton.preimage continuous_im)
-
 private theorem entry_continuous (i j : n) : Continuous (fun A : CMatrix n => A i j) :=
   (continuous_apply j).comp (continuous_apply i)
 
@@ -123,7 +108,7 @@ def psdCone : ProperCone ℝ (CMatrix n) :=
         rw [hH]
         exact isClosed_eq (continuous_conjTranspose' n) continuous_id
       · exact isClosed_iInter fun x =>
-          isClosed_setOf_zero_le_complex.preimage (continuous_quadraticForm n x) }
+          isClosed_Ici.preimage (continuous_quadraticForm n x) }
 
 omit [Fintype n] [DecidableEq n] in
 theorem psdCone_mem (A : CMatrix n) : A ∈ psdCone n ↔ A.PosSemidef := Iff.rfl

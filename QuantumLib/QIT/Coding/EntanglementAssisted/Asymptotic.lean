@@ -17,9 +17,7 @@ public import QuantumLib.QIT.Coding.EntanglementAssisted.Asymptotic.ConverseWitn
 # Entanglement-assisted asymptotic support facade
 
 This module is part of the entanglement-assisted classical communication
-asymptotic proof spine.  It was split out mechanically from the historical
-`EntanglementAssistedAsymptotic` files; theorem statements and proof routes are
-unchanged.
+asymptotic proof spine.
 -/
 
 @[expose] public section
@@ -35,7 +33,6 @@ noncomputable section
 
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
-
 
 end
 

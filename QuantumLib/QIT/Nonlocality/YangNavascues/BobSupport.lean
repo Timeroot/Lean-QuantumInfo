@@ -152,9 +152,9 @@ variable (data : YNData ι HA HB)
 /-- Pure-state post-selection unfolds to the rank-one matrix of the transformed
 amplitude vector. -/
 theorem postMatrix_pure_eq_rankOneMatrix_mulVec
-    (ψ : PureVector (HA × HB)) (op : CMatrix (HA × HB)) :
-    data.postMatrix ψ.state op = rankOneMatrix (op.mulVec ψ.amp) := by
-  simp [postMatrix, PureVector.state_matrix, Matrix.mul_rankOneMatrix_mul_conjTranspose]
+    (ψ : Ket (HA × HB)) (op : CMatrix (HA × HB)) :
+    data.postMatrix ψ.state op = rankOneMatrix (op.mulVec ψ.vec) := by
+  simp [postMatrix, Ket.state_matrix, Matrix.mul_rankOneMatrix_mul_conjTranspose]
 
 /-- Bob's lifted source projection is Hermitian. -/
 theorem bobProjectionOp_isHermitian (k : ι) :
@@ -191,9 +191,9 @@ Under the YN projection-agreement hypothesis, distinct Bob source projections
 are orthogonal when acting on the pure realization vector.
 -/
 theorem bobProjectionOp_mul_bobProjectionOp_mulVec_eq_zero
-    (ψ : PureVector (HA × HB)) (h : YNConditions data ψ.state)
+    (ψ : Ket (HA × HB)) (h : YNConditions data ψ.state)
     (i j : ι) (hij : i ≠ j) :
-    (data.bobProjectionOp i * data.bobProjectionOp j).mulVec ψ.amp = 0 := by
+    (data.bobProjectionOp i * data.bobProjectionOp j).mulVec ψ.vec = 0 := by
   apply Matrix.mulVec_eq_zero_of_rankOneMatrix_eq_zero
   have hpost :
       data.postMatrix ψ.state (data.bobProjectionOp i * data.bobProjectionOp j) = 0 := by
@@ -230,19 +230,19 @@ theorem bobProjectionOp_mul_bobProjectionOp_mulVec_eq_zero
               rw [hBi, data.aliceProjectionOp_isHermitian j]
               calc
                 data.bobProjectionOp i *
-                    (data.aliceProjectionOp j * ψ.state.matrix * data.aliceProjectionOp j) *
+                    (data.aliceProjectionOp j * ψ.state.m * data.aliceProjectionOp j) *
                     data.bobProjectionOp i
                     =
                   (data.bobProjectionOp i * data.aliceProjectionOp j) *
-                    ψ.state.matrix * (data.aliceProjectionOp j * data.bobProjectionOp i) := by
+                    ψ.state.m * (data.aliceProjectionOp j * data.bobProjectionOp i) := by
                     noncomm_ring
                 _ =
                   (data.aliceProjectionOp j * data.bobProjectionOp i) *
-                    ψ.state.matrix * (data.bobProjectionOp i * data.aliceProjectionOp j) := by
+                    ψ.state.m * (data.bobProjectionOp i * data.aliceProjectionOp j) := by
                     rw [hcomm_i_j', hcomm_i_j]
                 _ =
                   data.aliceProjectionOp j *
-                      (data.bobProjectionOp i * ψ.state.matrix * data.bobProjectionOp i) *
+                      (data.bobProjectionOp i * ψ.state.m * data.bobProjectionOp i) *
                     data.aliceProjectionOp j := by
                     noncomm_ring
       _ =
@@ -257,11 +257,11 @@ theorem bobProjectionOp_mul_bobProjectionOp_mulVec_eq_zero
                 data.aliceProjectionOp_orthogonal j i (Ne.symm hij)
               calc
                 data.aliceProjectionOp j *
-                    (data.aliceProjectionOp i * ψ.state.matrix * data.aliceProjectionOp i) *
+                    (data.aliceProjectionOp i * ψ.state.m * data.aliceProjectionOp i) *
                     data.aliceProjectionOp j
                     =
                   (data.aliceProjectionOp j * data.aliceProjectionOp i) *
-                    ψ.state.matrix * (data.aliceProjectionOp i * data.aliceProjectionOp j) := by
+                    ψ.state.m * (data.aliceProjectionOp i * data.aliceProjectionOp j) := by
                     noncomm_ring
                 _ = 0 := by
                     rw [horth]
@@ -280,7 +280,7 @@ records the Hermitian/idempotent projection facts needed by later Bob-local
 replacement constructions.
 -/
 def bobProjectedReducedSupportProjection
-    (ψ : PureVector (HA × HB)) (k : ι) : Projection HB where
+    (ψ : Ket (HA × HB)) (k : ι) : Projection HB where
   matrix := data.bobProjectedReducedSupport ψ k
   isHermitian := by
     simp [bobProjectedReducedSupport_eq, Matrix.rangeProjection_isHermitian]
@@ -289,18 +289,18 @@ def bobProjectedReducedSupportProjection
 
 @[simp]
 theorem bobProjectedReducedSupportProjection_matrix
-    (ψ : PureVector (HA × HB)) (k : ι) :
+    (ψ : Ket (HA × HB)) (k : ι) :
     (data.bobProjectedReducedSupportProjection ψ k).matrix =
       data.bobProjectedReducedSupport ψ k :=
   rfl
 
 theorem bobProjectedReducedSupportProjection_isHermitian
-    (ψ : PureVector (HA × HB)) (k : ι) :
+    (ψ : Ket (HA × HB)) (k : ι) :
     ((data.bobProjectedReducedSupportProjection ψ k).matrix).IsHermitian :=
   (data.bobProjectedReducedSupportProjection ψ k).isHermitian
 
 theorem bobProjectedReducedSupportProjection_idempotent
-    (ψ : PureVector (HA × HB)) (k : ι) :
+    (ψ : Ket (HA × HB)) (k : ι) :
     (data.bobProjectedReducedSupportProjection ψ k).matrix *
         (data.bobProjectedReducedSupportProjection ψ k).matrix =
       (data.bobProjectedReducedSupportProjection ψ k).matrix :=
@@ -311,7 +311,7 @@ The reduced support projection has the same Bob-local post-selected density
 action on the rank-one state `ψ.state` as Bob's original projection.
 -/
 theorem bobProjectedReducedSupportProjection_preserves_postMatrix
-    (ψ : PureVector (HA × HB)) (k : ι) :
+    (ψ : Ket (HA × HB)) (k : ι) :
     data.BobLocalSamePostMatrix ψ.state
       (data.bobProjectedReducedSupportProjection ψ k).matrix
       ((data.bobProjection k).matrix) := by
@@ -326,7 +326,7 @@ orthogonal.  Orthogonality is proved only for the reduced-support replacement
 projections assembled into a Bob-local witness.
 -/
 theorem bobProjectedReducedSupportProjection_orthogonal
-    (ψ : PureVector (HA × HB)) (h : YNConditions data ψ.state)
+    (ψ : Ket (HA × HB)) (h : YNConditions data ψ.state)
     (i j : ι) (hij : i ≠ j) :
     (data.bobProjectedReducedSupportProjection ψ i).matrix *
         (data.bobProjectedReducedSupportProjection ψ j).matrix = 0 := by
@@ -334,7 +334,7 @@ theorem bobProjectedReducedSupportProjection_orthogonal
     data.bobProjectionOp_mul_bobProjectionOp_mulVec_eq_zero ψ h i j hij
   have hvecLocal :
       (Matrix.kronecker (1 : CMatrix HA)
-        ((data.bobProjection i).matrix * (data.bobProjection j).matrix)).mulVec ψ.amp = 0 := by
+        ((data.bobProjection i).matrix * (data.bobProjection j).matrix)).mulVec ψ.vec = 0 := by
     simpa [bobProjectionOp_eq, ← Matrix.mul_kronecker_mul, Matrix.one_mul] using hvec
   have hAmp :
       Matrix.conjTranspose (Matrix.bobAmplitudeMatrix (data.bobProjectedVector ψ i)) *
@@ -344,13 +344,13 @@ theorem bobProjectedReducedSupportProjection_orthogonal
       ((data.bobProjection i).matrix)
       ((data.bobProjection j).matrix)
       (data.bobProjection i).isHermitian
-      ψ.amp hvecLocal
+      ψ.vec hvecLocal
   change
     Matrix.rangeProjection (data.bobProjectedReducedMatrix ψ i) *
         Matrix.rangeProjection (data.bobProjectedReducedMatrix ψ j) = 0
   rw [bobProjectedReducedMatrix_eq, bobProjectedReducedMatrix_eq]
-  rw [Matrix.partialTraceA_rankOneMatrix_eq_bobAmplitudeMatrix_mul_conjTranspose,
-    Matrix.partialTraceA_rankOneMatrix_eq_bobAmplitudeMatrix_mul_conjTranspose]
+  rw [Matrix.traceLeft_rankOneMatrix_eq_bobAmplitudeMatrix_mul_conjTranspose,
+    Matrix.traceLeft_rankOneMatrix_eq_bobAmplitudeMatrix_mul_conjTranspose]
   exact Matrix.rangeProjection_amplitudeGram_mul_rangeProjection_eq_zero
     (Matrix.bobAmplitudeMatrix (data.bobProjectedVector ψ i))
     (Matrix.bobAmplitudeMatrix (data.bobProjectedVector ψ j))

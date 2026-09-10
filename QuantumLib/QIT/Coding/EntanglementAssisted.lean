@@ -29,13 +29,3 @@ Import surface for one-shot, asymptotic, Petz-Renyi, sandwiched-Renyi, and
 completely bounded norm infrastructure for entanglement-assisted classical
 communication.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace Coding
-namespace EntanglementAssisted
-
-end EntanglementAssisted
-end Coding
-end QIT

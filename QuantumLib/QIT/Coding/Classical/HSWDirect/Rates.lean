@@ -8,6 +8,27 @@ module
 
 public import QuantumLib.QIT.Coding.Classical.HSWDirect.TensorPower
 
+/-!
+# Rate arithmetic and error budgets for HSW direct achievability
+
+`messageRate M n` is `log₂ (card M) / n`.  This module collects what the direct part of the
+Holevo--Schumacher--Westmoreland theorem needs about it, and about the numerical size of the
+packing-lemma error.
+
+On the rate side: the rate is nonnegative, exponentiates back exactly to the message cardinality
+(`rpow_two_mul_rate_eq_card`), degrades predictably when a block code of length `t * k` is padded
+out to `t * k + r`, and can be prescribed in advance — `exists_finite_message_type_rate_ge` builds a
+message type of at least any requested rate as `Fin (max 1 ⌈2 ^ (n R)⌉)`.
+
+On the error side, the packing bound splits into a self term `2 (η + 2 √η)` and a cross term
+`4 (card M - 1) · d / D`.  The self term is disposed of once and for all by the explicit choice
+`hswSelfPackingEpsilon ε = min (ε / 32) ((ε / 32) ^ 2)`, which keeps it below `ε / 4`.  The cross
+term is where the rate enters: `hsw_crossExponent_rpow_bound` bounds it by `8 · 2 ^ (-n δ / 4)`
+once the typicality slacks are small enough against the gap `δ` between the Holevo rate and the
+rate being achieved, and `exists_hsw_crossExponentBound_slacks` produces such slacks for any
+ensemble and any positive gap.
+-/
+
 @[expose] public section
 
 open scoped ComplexOrder MatrixOrder NNReal
@@ -18,26 +39,26 @@ universe u v
 
 noncomputable section
 
-namespace hswMessageRate
+namespace messageRate
 
 theorem nonneg {M : Type u} [Fintype M] [Nonempty M] (n : ℕ) :
-    0 ≤ hswMessageRate M n := by
+    0 ≤ messageRate M n := by
   by_cases hn : n = 0
-  · simp [hswMessageRate, hn]
+  · simp [messageRate, hn]
   · have hcard_pos_nat : 0 < Fintype.card M := Fintype.card_pos_iff.mpr inferInstance
     have hcard_one : (1 : ℝ) ≤ (Fintype.card M : ℝ) := by exact_mod_cast hcard_pos_nat
     have hlog_nonneg : 0 ≤ log2 (Fintype.card M : ℝ) := by
       unfold log2
       exact div_nonneg (Real.log_nonneg hcard_one)
         (le_of_lt (Real.log_pos one_lt_two))
-    unfold hswMessageRate
+    unfold messageRate
     rw [if_neg hn]
     exact div_nonneg hlog_nonneg (Nat.cast_nonneg n)
 
 theorem block_pad_eq
     {M : Type u} [Fintype M] {t k r : ℕ} (ht : 0 < t) (hk : 0 < k) :
-    hswMessageRate M (t * k + r) =
-      (hswMessageRate M t / (k : ℝ)) *
+    messageRate M (t * k + r) =
+      (messageRate M t / (k : ℝ)) *
         (((t * k : ℕ) : ℝ) / ((t * k + r : ℕ) : ℝ)) := by
   have ht_ne : t ≠ 0 := Nat.ne_of_gt ht
   have hk_ne : k ≠ 0 := Nat.ne_of_gt hk
@@ -47,7 +68,7 @@ theorem block_pad_eq
   have ht_pos : (0 : ℝ) < t := by exact_mod_cast ht
   have hk_pos : (0 : ℝ) < k := by exact_mod_cast hk
   have hsum_pos_real : (0 : ℝ) < t * k + r := by exact_mod_cast hsum_pos
-  unfold hswMessageRate
+  unfold messageRate
   rw [if_neg hsum_ne, if_neg ht_ne]
   rw [Nat.cast_add, Nat.cast_mul]
   field_simp [ne_of_gt ht_pos, ne_of_gt hk_pos, ne_of_gt hsum_pos_real]
@@ -55,31 +76,30 @@ theorem block_pad_eq
 theorem block_pad_ge_of_ratio
     {M : Type u} [Fintype M] {t k r : ℕ} {A B : ℝ}
     (ht : 0 < t) (hk : 0 < k)
-    (hbase : A ≤ hswMessageRate M t / (k : ℝ))
+    (hbase : A ≤ messageRate M t / (k : ℝ))
     (hratio : B ≤ A * (((t * k : ℕ) : ℝ) / ((t * k + r : ℕ) : ℝ))) :
-    B ≤ hswMessageRate M (t * k + r) := by
+    B ≤ messageRate M (t * k + r) := by
   have hratio_nonneg :
       0 ≤ (((t * k : ℕ) : ℝ) / ((t * k + r : ℕ) : ℝ)) := by
     exact div_nonneg (Nat.cast_nonneg _) (Nat.cast_nonneg _)
   calc
     B ≤ A * (((t * k : ℕ) : ℝ) / ((t * k + r : ℕ) : ℝ)) := hratio
-    _ ≤ (hswMessageRate M t / (k : ℝ)) *
+    _ ≤ (messageRate M t / (k : ℝ)) *
           (((t * k : ℕ) : ℝ) / ((t * k + r : ℕ) : ℝ)) :=
         mul_le_mul_of_nonneg_right hbase hratio_nonneg
-    _ = hswMessageRate M (t * k + r) := by
+    _ = messageRate M (t * k + r) := by
         rw [block_pad_eq (M := M) ht hk]
-
 
 /-- The operational message rate exactly exponentiates back to the message
 cardinality for positive block lengths. -/
 theorem rpow_two_mul_rate_eq_card
     {M : Type u} [Fintype M] [Nonempty M] {n : ℕ} (hn : 0 < n) :
-    Real.rpow 2 ((n : ℝ) * hswMessageRate M n) = (Fintype.card M : ℝ) := by
+    Real.rpow 2 ((n : ℝ) * messageRate M n) = (Fintype.card M : ℝ) := by
   have hn_ne : n ≠ 0 := Nat.ne_of_gt hn
   have hn_pos : (0 : ℝ) < n := by exact_mod_cast hn
   have hcard_pos : (0 : ℝ) < Fintype.card M := by
     exact_mod_cast Fintype.card_pos_iff.mpr inferInstance
-  unfold hswMessageRate
+  unfold messageRate
   rw [if_neg hn_ne]
   have hmul :
       (n : ℝ) * (log2 (Fintype.card M : ℝ) / (n : ℝ)) =
@@ -89,22 +109,22 @@ theorem rpow_two_mul_rate_eq_card
   exact rpow_two_log2_pos hcard_pos
 
 /-- The cross-codeword cardinality factor is bounded by the exponential of the
-HSW message rate. -/
+message rate. -/
 theorem card_sub_one_le_rpow_two_mul_rate
     {M : Type u} [Fintype M] [Nonempty M] {n : ℕ} (hn : 0 < n) :
-    (Fintype.card M : ℝ) - 1 ≤ Real.rpow 2 ((n : ℝ) * hswMessageRate M n) := by
+    (Fintype.card M : ℝ) - 1 ≤ Real.rpow 2 ((n : ℝ) * messageRate M n) := by
   rw [rpow_two_mul_rate_eq_card (M := M) hn]
   linarith
 
-/-- Choose a finite nonempty message type whose `n`-use HSW message rate is at
+/-- Choose a finite nonempty message type whose `n`-use message rate is at
 least any prescribed real value.
 
-The construction uses `Fin (max 1 ⌈2^(nR)⌉)`.  This lemma is deliberately
-rate-only: the HSW packing-error side condition still has to be discharged from
-the separate typical-estimate exponents. -/
+The construction uses `Fin (max 1 ⌈2^(nR)⌉)`.  This lemma concerns the rate
+only; the HSW packing-error side condition comes from the typical-estimate
+exponents separately. -/
 theorem exists_finite_message_type_rate_ge {n : ℕ} (hn : 0 < n) (R : ℝ) :
     ∃ (M : Type u), ∃ (_ : Fintype M), ∃ (_ : DecidableEq M), ∃ (_ : Nonempty M),
-      R ≤ hswMessageRate M n := by
+      R ≤ messageRate M n := by
   let m : ℕ := max 1 (Nat.ceil (Real.rpow 2 ((n : ℝ) * R)))
   have hm_pos : 0 < m := lt_of_lt_of_le Nat.zero_lt_one (Nat.le_max_left 1 _)
   have hceil_le_m : Nat.ceil (Real.rpow 2 ((n : ℝ) * R)) ≤ m := Nat.le_max_right 1 _
@@ -126,7 +146,7 @@ packing-error exponent is separated from the code construction. -/
 theorem exists_finite_message_type_rate_ge_card_sub_one_le
     {n : ℕ} (hn : 0 < n) (R : ℝ) :
     ∃ (M : Type u), ∃ (_ : Fintype M), ∃ (_ : DecidableEq M), ∃ (_ : Nonempty M),
-      R ≤ hswMessageRate M n ∧
+      R ≤ messageRate M n ∧
         (Fintype.card M : ℝ) - 1 ≤ Real.rpow 2 ((n : ℝ) * R) := by
   let x : ℝ := Real.rpow 2 ((n : ℝ) * R)
   let m : ℕ := max 1 (Nat.ceil x)
@@ -159,7 +179,7 @@ theorem exists_finite_message_type_rate_ge_card_sub_one_le
     exact lowerBound_le_of_rpow_two_mul_le_card (M := ULift.{u} (Fin m)) hn hcard
   · simpa [x] using hm_sub_le
 
-end hswMessageRate
+end messageRate
 
 /-- Combine the two HSW packing-error terms after the message-cardinality
 factor has been bounded by an exponential rate estimate. -/
@@ -430,7 +450,7 @@ budget is exactly the sum of the conditionally-typical dimension slack and the
 source-projector product-mass slack. -/
 theorem hsw_crossExponentBound_of_typicalitySlack
     {ι : Type u} {out : Type v} [Fintype ι] [Fintype out] [DecidableEq out]
-    (E : Ensemble ι out) (n : ℕ) (δ δx δc : ℝ)
+    (E : MEnsemble out ι) (n : ℕ) (δ δx δc : ℝ)
     (hslack :
       δc + δx * ∑ x, |(E.states x).vonNeumann| +
           ((Fintype.card ι : ℝ) * (δx + δc)) *
@@ -440,7 +460,7 @@ theorem hsw_crossExponentBound_of_typicalitySlack
     4 * Real.rpow 2 ((n : ℝ) * (E.holevoInformation - δ / 2)) *
           (E.strongTypicalDimensionEnvelope n δx δc /
             ((1 - (1 / 2 : ℝ)) *
-              QIT.FiniteDistribution.strongTypicalMassScale
+              ProbDistribution.strongTypicalMassScale
                 (HSWPackingHypothesesSpectral.stateEigenvalueDistribution E.averageState)
                 n ((Fintype.card ι : ℝ) * (δx + δc)))) ≤
         8 * Real.rpow 2 (-(n : ℝ) * (δ / 4)) := by
@@ -453,14 +473,14 @@ theorem hsw_crossExponentBound_of_typicalitySlack
         E.averageState).logTypicalitySlack
   have hχ : E.holevoInformation = avg - cond := by
     dsimp [avg, cond]
-    rw [Ensemble.holevoInformation_def]
+    rw [MEnsemble.holevoInformation_def]
   have hslack' : ex + ey ≤ δ / 4 := by
     dsimp [ex, ey]
     simpa [add_assoc] using hslack
   have h :=
     hsw_crossExponent_rpow_bound (n := n) (χ := E.holevoInformation) (avg := avg)
       (cond := cond) (ex := ex) (ey := ey) (δ := δ) hχ hslack'
-  simpa [Ensemble.strongTypicalDimensionEnvelope, QIT.FiniteDistribution.strongTypicalMassScale,
+  simpa [MEnsemble.strongTypicalDimensionEnvelope, ProbDistribution.strongTypicalMassScale,
     HSWPackingHypothesesSpectral.stateEigenvalueDistribution_shannonEntropy, avg, cond, ex, ey,
     add_assoc, mul_assoc] using h
 
@@ -469,13 +489,13 @@ positive typicality slacks making the HSW cross term uniformly exponentially
 small in the blocklength. -/
 theorem exists_hsw_crossExponentBound_slacks
     {ι : Type u} {out : Type v} [Fintype ι] [Fintype out] [DecidableEq out]
-    (E : Ensemble ι out) {δ : ℝ} (hδ : 0 < δ) :
+    (E : MEnsemble out ι) {δ : ℝ} (hδ : 0 < δ) :
     ∃ δx δc : ℝ, 0 < δx ∧ 0 < δc ∧
       ∀ n : ℕ,
         4 * Real.rpow 2 ((n : ℝ) * (E.holevoInformation - δ / 2)) *
             (E.strongTypicalDimensionEnvelope n δx δc /
               ((1 - (1 / 2 : ℝ)) *
-                QIT.FiniteDistribution.strongTypicalMassScale
+                ProbDistribution.strongTypicalMassScale
                   (HSWPackingHypothesesSpectral.stateEigenvalueDistribution E.averageState)
                   n ((Fintype.card ι : ℝ) * (δx + δc)))) ≤
           8 * Real.rpow 2 (-(n : ℝ) * (δ / 4)) := by
@@ -489,7 +509,7 @@ theorem exists_hsw_crossExponentBound_slacks
     exact Finset.sum_nonneg fun x _ => abs_nonneg _
   have hL : 0 ≤ L := by
     dsimp [L]
-    exact QIT.FiniteDistribution.logTypicalitySlack_nonneg
+    exact ProbDistribution.logTypicalitySlack_nonneg
       (HSWPackingHypothesesSpectral.stateEigenvalueDistribution E.averageState)
   have hB : 0 ≤ B := by
     dsimp [B]
@@ -512,7 +532,6 @@ theorem exists_hsw_crossExponentBound_slacks
               E.averageState).logTypicalitySlack) *
             (δx + δc) := by ring
     _ ≤ δ / 4 := hbudget
-
 
 end
 

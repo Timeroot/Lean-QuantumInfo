@@ -26,31 +26,48 @@ variable [Fintype a] [DecidableEq a]
 variable [Fintype b] [DecidableEq b]
 variable [Fintype r] [DecidableEq r]
 
-namespace PureVector
+end QIT
+
+namespace Ket
+
+open QIT
+universe u v w
+variable {a : Type u} {b : Type v} {r : Type w}
+variable [Fintype a] [DecidableEq a]
+variable [Fintype b] [DecidableEq b]
+variable [Fintype r] [DecidableEq r]
 
 /-- The net quantum communication rate of FQSW followed by teleportation is
 the source conditional entropy, as in ADHW `fqsw.tex:402-420`. -/
 theorem fqswCommunicationRate_sub_ebitYieldRate_eq_conditionalEntropy
-    (psi : PureVector (Prod (Prod a b) r)) :
+    (psi : Ket ((a × b) × r)) :
     psi.fqswCommunicationRate - psi.fqswEbitYieldRate =
-      psi.state.marginalA.conditionalEntropy := by
+      psi.state.traceRight.conditionalEntropy := by
   unfold fqswCommunicationRate fqswEbitYieldRate
   rw [adhwFQSWMutualInformationAR_eq_entropyA_add_entropyR_sub_entropyB,
     adhwFQSWMutualInformationAB_eq_entropyA_add_entropyB_sub_entropyR]
-  rw [State.conditionalEntropy_eq,
+  rw [MState.conditionalEntropy_eq,
     adhwFQSWSourceAB_vonNeumann_eq_entropyR]
   unfold adhwFQSWEntropyB adhwFQSWSystemBState
   ring
 
 /-- The FQSW ebit-yield exponent is nonnegative. -/
 theorem fqswEbitYieldRate_nonneg
-    (psi : PureVector (Prod (Prod a b) r)) :
+    (psi : Ket ((a × b) × r)) :
     0 ≤ psi.fqswEbitYieldRate := by
   unfold fqswEbitYieldRate
   exact mul_nonneg (by norm_num)
-    (State.mutualInformation_nonneg psi.state.marginalA)
+    (MState.mutualInformation_nonneg psi.state.traceRight)
 
-end PureVector
+end Ket
+
+namespace QIT
+
+universe u v w
+variable {a : Type u} {b : Type v} {r : Type w}
+variable [Fintype a] [DecidableEq a]
+variable [Fintype b] [DecidableEq b]
+variable [Fintype r] [DecidableEq r]
 
 /-- A finite nonempty register bounded by a base-two exponential has the
 corresponding base-two logarithmic size bound. The `Nonempty` assumption is

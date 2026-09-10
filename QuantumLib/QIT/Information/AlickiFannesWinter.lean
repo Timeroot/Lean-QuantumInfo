@@ -25,68 +25,49 @@ normalized trace distance `1/2 ‖ρ - σ‖₁` and the modulus
 
 @[expose] public section
 
-namespace QIT
-
+noncomputable section
 open Filter
 open scoped ComplexOrder MatrixOrder NNReal
-
 universe u v
 
-noncomputable section
+open QIT
 
-/-- Binary entropy in bits, with the repository's `0 log 0 = 0` convention. -/
-def binaryEntropy (ε : ℝ) : ℝ :=
-  -xlog2 ε - xlog2 (1 - ε)
-
-namespace State
+namespace MState
 
 variable {a : Type u} [Fintype a] [DecidableEq a]
 variable {b : Type v} [Fintype b] [DecidableEq b]
 
-private def punitProdEquiv (α : Type v) : α ≃ Prod PUnit.{1} α where
-  toFun x := (PUnit.unit, x)
-  invFun x := x.2
-  left_inv := by intro x; rfl
-  right_inv := by rintro ⟨⟨⟩, x⟩; rfl
-
 /-- The von Neumann entropy of a finite-dimensional pure state is zero. -/
-theorem pureVector_vonNeumann_eq_zero
-    {α : Type v} [Fintype α] [DecidableEq α] (Ψ : PureVector α) :
+theorem ket_vonNeumann_eq_zero
+    {α : Type v} [Fintype α] [DecidableEq α] (Ψ : Ket α) :
     Ψ.state.vonNeumann = 0 := by
-  let Φ : PureVector (Prod PUnit.{1} α) := Ψ.reindex (punitProdEquiv α)
-  have hmargA : Φ.state.marginalA.vonNeumann = 0 :=
-    vonNeumann_punit_eq_zero Φ.state.marginalA
-  have hmargB : Φ.state.marginalB = Ψ.state := by
-    apply State.ext
+  let Φ : Ket (PUnit.{1} × α) := Ψ.reindex (Equiv.punitProd α).symm
+  have hmargA : Φ.state.traceRight.vonNeumann = 0 :=
+    vonNeumann_punit_eq_zero Φ.state.traceRight
+  have hmargB : Φ.state.traceLeft = Ψ.state := by
+    apply MState.ext
     ext i j
-    simp [Φ, State.marginalB, punitProdEquiv, QIT.partialTraceA]
-  have hdual := pureVector_marginalA_vonNeumann_eq_marginalB Φ
+    simp [Φ, Matrix.traceLeft]
+  have hdual := ket_traceRight_vonNeumann_eq_traceLeft Φ
   rw [hmargA, hmargB] at hdual
   exact hdual.symm
 
-private def assocLeftEquiv (a : Type u) (b : Type v) (c : Type*) :
-    Prod (Prod a b) c ≃ Prod a (Prod b c) where
-  toFun x := (x.1.1, (x.1.2, x.2))
-  invFun x := ((x.1, x.2.1), x.2.2)
-  left_inv := by rintro ⟨⟨x, y⟩, z⟩; rfl
-  right_inv := by rintro ⟨x, y, z⟩; rfl
-
-private theorem pureVector_marginalBC_vonNeumann_eq_marginalA
+private theorem ket_marginalBC_vonNeumann_eq_traceRight
     {c : Type*} [Fintype c] [DecidableEq c]
-    (Ψ : PureVector (Prod (Prod a b) c)) :
-    Ψ.state.marginalBC.vonNeumann = Ψ.state.marginalA.marginalA.vonNeumann := by
-  let Φ : PureVector (Prod a (Prod b c)) := Ψ.reindex (assocLeftEquiv a b c)
-  have hA : Φ.state.marginalA = Ψ.state.marginalA.marginalA := by
-    apply State.ext
+    (Ψ : Ket ((a × b) × c)) :
+    Ψ.state.marginalBC.vonNeumann = Ψ.state.traceRight.traceRight.vonNeumann := by
+  let Φ : Ket (a × (b × c)) := Ψ.reindex (Equiv.prodAssoc a b c)
+  have hA : Φ.state.traceRight = Ψ.state.traceRight.traceRight := by
+    apply MState.ext
     ext i j
-    simp [Φ, assocLeftEquiv, PureVector.reindex_state, State.reindex,
-      State.marginalA, QIT.partialTraceB, Fintype.sum_prod_type]
-  have hB : Φ.state.marginalB = Ψ.state.marginalBC := by
-    apply State.ext
+    simp [Φ, Equiv.prodAssoc, Ket.reindex_state,
+      Matrix.traceRight, Fintype.sum_prod_type]
+  have hB : Φ.state.traceLeft = Ψ.state.marginalBC := by
+    apply MState.ext
     ext i j
-    simp [Φ, assocLeftEquiv, PureVector.reindex_state, State.reindex,
-      State.marginalB, State.marginalBC, QIT.partialTraceA]
-  have hdual := pureVector_marginalA_vonNeumann_eq_marginalB Φ
+    simp [Φ, Equiv.prodAssoc, Ket.reindex_state, MState.reindex_matrix,
+      MState.marginalBC_matrix, Matrix.traceLeft]
+  have hdual := ket_traceRight_vonNeumann_eq_traceLeft Φ
   rw [hA, hB] at hdual
   exact hdual.symm
 
@@ -95,83 +76,79 @@ finite-dimensional pure tripartite state.
 
 This is the von Neumann entropy duality used in TCR 2008, Theorem `thm:qaep`,
 after the smooth min/max duality substitution. -/
-theorem PureVector.conditionalEntropy_marginalAB_eq_neg_marginalAC
+theorem _root_.Ket.conditionalEntropy_marginalAB_eq_neg_marginalAC
     {c : Type*} [Fintype c] [DecidableEq c]
-    (Ψ : PureVector (Prod (Prod a b) c)) :
+    (Ψ : Ket ((a × b) × c)) :
     Ψ.state.marginalAB.conditionalEntropy =
       -Ψ.state.marginalAC.conditionalEntropy := by
   classical
-  let Ω : PureVector (Prod (Prod a c) b) :=
+  let Ω : Ket ((a × c) × b) :=
     Ψ.reindex
       { toFun := fun x => ((x.1.1, x.2), x.1.2)
         invFun := fun x => ((x.1.1, x.2), x.1.2)
         left_inv := by rintro ⟨⟨x, y⟩, z⟩; rfl
         right_inv := by rintro ⟨⟨x, z⟩, y⟩; rfl }
-  have hAB_C : Ψ.state.marginalAB.vonNeumann = Ψ.state.marginalB.vonNeumann := by
-    rw [State.marginalAB_eq_marginalA]
-    exact pureVector_marginalA_vonNeumann_eq_marginalB Ψ
+  have hAB_C : Ψ.state.marginalAB.vonNeumann = Ψ.state.traceLeft.vonNeumann := by
+    rw [MState.marginalAB_eq_traceRight]
+    exact ket_traceRight_vonNeumann_eq_traceLeft Ψ
   have hAC_B : Ψ.state.marginalAC.vonNeumann = Ψ.state.marginalBOfABC.vonNeumann := by
-    have hΩA : Ω.state.marginalA = Ψ.state.marginalAC := by
-      apply State.ext
+    have hΩA : Ω.state.traceRight = Ψ.state.marginalAC := by
+      apply MState.ext
       ext i j
-      simp [Ω, State.marginalAC_matrix, State.marginalA, State.reindex,
-        PureVector.reindex_state, QIT.partialTraceB,
-        PureVector.state_matrix, rankOneMatrix_apply]
-    have hΩB : Ω.state.marginalB = Ψ.state.marginalBOfABC := by
-      apply State.ext
+      simp [Ω, MState.marginalAC_matrix,
+        Ket.reindex_state, Matrix.traceRight,
+        Ket.state_matrix, rankOneMatrix_apply]
+    have hΩB : Ω.state.traceLeft = Ψ.state.marginalBOfABC := by
+      apply MState.ext
       ext i j
-      simp [Ω, State.marginalBOfABC, State.marginalB, State.reindex,
-        PureVector.reindex_state, QIT.partialTraceA, QIT.partialTraceB,
-        PureVector.state_matrix, rankOneMatrix_apply, Fintype.sum_prod_type]
-    have hdual := pureVector_marginalA_vonNeumann_eq_marginalB Ω
+      simp [Ω, MState.marginalBOfABC,
+        Ket.reindex_state, Matrix.traceLeft, Matrix.traceRight,
+        Ket.state_matrix, rankOneMatrix_apply, Fintype.sum_prod_type]
+    have hdual := ket_traceRight_vonNeumann_eq_traceLeft Ω
     rwa [hΩA, hΩB] at hdual
-  have hABmB : Ψ.state.marginalAB.marginalB = Ψ.state.marginalBOfABC := by
-    rw [State.marginalBOfABC_eq, State.marginalAB_eq_marginalA]
-  have hACmB : Ψ.state.marginalAC.marginalB = Ψ.state.marginalB := by
-    apply State.ext
+  have hABmB : Ψ.state.marginalAB.traceLeft = Ψ.state.marginalBOfABC := by
+    rw [MState.marginalBOfABC_eq, MState.marginalAB_eq_traceRight]
+  have hACmB : Ψ.state.marginalAC.traceLeft = Ψ.state.traceLeft := by
+    apply MState.ext
     ext i j
-    simp [State.marginalAC_matrix, State.marginalB, QIT.partialTraceA,
+    simp [MState.marginalAC_matrix, Matrix.traceLeft,
       Fintype.sum_prod_type]
-  rw [State.conditionalEntropy_eq, State.conditionalEntropy_eq]
+  rw [MState.conditionalEntropy_eq, MState.conditionalEntropy_eq]
   rw [hAB_C, hAC_B, hABmB, hACmB]
   ring
 
 /-- Araki--Lieb half-inequality in conditional-entropy form:
 `H(A|B)_τ ≥ -H(A)_τ`, equivalently `H(AB)_τ ≥ H(B)_τ - H(A)_τ`. -/
-theorem conditionalEntropy_neg_marginalA_le (τ : State (Prod a b)) :
-    -τ.marginalA.vonNeumann ≤ τ.conditionalEntropy := by
-  let Ψ₀ : PureVector (Prod (Prod a b) (Prod a b)) :=
-    τ.canonicalPurification.reindex (Equiv.prodComm (Prod a b) (Prod a b))
-  have hAB : Ψ₀.state.marginalA = τ := by
-    apply State.ext
+theorem conditionalEntropy_neg_traceRight_le (τ : MState (a × b)) :
+    -τ.traceRight.vonNeumann ≤ τ.conditionalEntropy := by
+  let Ψ₀ : Ket ((a × b) × (a × b)) :=
+    τ.canonicalPurification.reindex (Equiv.prodComm (a × b) (a × b))
+  have hAB : Ψ₀.state.traceRight = τ := by
+    apply MState.ext
     have hpur :
-        partialTraceB ((rankOneMatrix τ.canonicalPurification.amp).submatrix
-          Prod.swap Prod.swap) = τ.matrix := τ.canonicalPurification_purifies
-    simpa [Ψ₀, State.marginalA, State.marginalB, PureVector.reindex_state,
-      State.reindex, QIT.partialTraceA, QIT.partialTraceB,
-      PureVector.state_matrix, rankOneMatrix_apply] using hpur
-  have hB : Ψ₀.state.marginalBOfABC = τ.marginalB := by
-    rw [State.marginalBOfABC_eq, State.marginalAB_eq_marginalA, hAB]
-  have hA : Ψ₀.state.marginalA.marginalA = τ.marginalA := by
+        Matrix.traceRight ((rankOneMatrix τ.canonicalPurification.vec).submatrix
+          Prod.swap Prod.swap) = τ.m := by
+      have h : Matrix.traceLeft
+          τ.canonicalPurification.state.m = τ.m :=
+        τ.canonicalPurification_purifies
+      rw [Ket.state_matrix] at h
+      rw [← h]
+      ext i j
+      rfl
+    simpa [Ψ₀, Ket.reindex_state,
+      Matrix.traceLeft, Matrix.traceRight,
+      Ket.state_matrix, rankOneMatrix_apply] using hpur
+  have hB : Ψ₀.state.marginalBOfABC = τ.traceLeft := by
+    rw [MState.marginalBOfABC_eq, MState.marginalAB_eq_traceRight, hAB]
+  have hA : Ψ₀.state.traceRight.traceRight = τ.traceRight := by
     rw [hAB]
-  have hwhole : Ψ₀.state.vonNeumann = 0 := pureVector_vonNeumann_eq_zero Ψ₀
+  have hwhole : Ψ₀.state.vonNeumann = 0 := ket_vonNeumann_eq_zero Ψ₀
   have hBC :
-      Ψ₀.state.marginalBC.vonNeumann = τ.marginalA.vonNeumann := by
-    rw [pureVector_marginalBC_vonNeumann_eq_marginalA Ψ₀, hA]
-  have hssa := State.condMutualInfo_nonneg (ρ := Ψ₀.state)
-  rw [State.condMutualInfo_eq, State.marginalAB_eq_marginalA, hAB, hB, hBC, hwhole] at hssa
+      Ψ₀.state.marginalBC.vonNeumann = τ.traceRight.vonNeumann := by
+    rw [ket_marginalBC_vonNeumann_eq_traceRight Ψ₀, hA]
+  have hssa := MState.condMutualInfo_nonneg (ρ := Ψ₀.state)
+  rw [MState.condMutualInfo_eq, MState.marginalAB_eq_traceRight, hAB, hB, hBC, hwhole] at hssa
   rw [conditionalEntropy_eq]
-  linarith
-
-theorem mutualInformation_nonneg (ρ : State (Prod a b)) :
-    0 ≤ QIT.mutualInformation ρ := by
-  have hDPI :=
-    QIT.mutualInformation_dataProcessing_local_channels_ge ρ
-      (terminalMeasureChannel a) (terminalMeasureChannel b)
-  have hzero :
-      QIT.mutualInformation
-          (((terminalMeasureChannel a).prod (terminalMeasureChannel b)).applyState ρ) = 0 :=
-    mutualInformation_punit_punit_eq_zero _
   linarith
 
 /-- Quantum mutual information dimension bound: `I(A;B)_τ ≤ 2 log dim A`.
@@ -179,14 +156,14 @@ theorem mutualInformation_nonneg (ρ : State (Prod a b)) :
 This is the dimension bound for the quantum mutual information used in the
 Schumacher converse [Wilde2011Qst, qit-notes.tex:31610-31690]. It follows from
 the Araki--Lieb half-inequality `H(AB)_τ ≥ H(B)_τ - H(A)_τ` (available here as
-`conditionalEntropy_neg_marginalA_le`) together with `H(A)_τ ≤ log dim A`:
+`conditionalEntropy_neg_traceRight_le`) together with `H(A)_τ ≤ log dim A`:
 `I(A;B) = H(A) + H(B) - H(AB) ≤ 2 H(A) ≤ 2 log dim A`. -/
-theorem mutualInformation_le_two_log_card_left (τ : State (Prod a b)) :
+theorem mutualInformation_le_two_log_card_left (τ : MState (a × b)) :
     QIT.mutualInformation τ ≤ 2 * log2 (Fintype.card a) := by
-  have hAraki : -τ.marginalA.vonNeumann ≤ τ.conditionalEntropy :=
-    conditionalEntropy_neg_marginalA_le τ
-  have hA : τ.marginalA.vonNeumann ≤ log2 (Fintype.card a) :=
-    vonNeumann_le_log_card τ.marginalA
+  have hAraki : -τ.traceRight.vonNeumann ≤ τ.conditionalEntropy :=
+    conditionalEntropy_neg_traceRight_le τ
+  have hA : τ.traceRight.vonNeumann ≤ log2 (Fintype.card a) :=
+    vonNeumann_le_log_card τ.traceRight
   rw [QIT.mutualInformation]
   rw [conditionalEntropy_eq] at hAraki
   linarith
@@ -194,46 +171,48 @@ theorem mutualInformation_le_two_log_card_left (τ : State (Prod a b)) :
 /-- Quantum mutual information dimension bound (right system): `I(A;B)_τ ≤ 2 log dim B`,
 symmetric to `mutualInformation_le_two_log_card_left`.
 
-This is the right/marginalB version of the dimension bound for the quantum
+This is the right-system version of the dimension bound for the quantum
 mutual information.  It follows by applying the left bound
 `mutualInformation_le_two_log_card_left` to the `prodComm`-reindexed state:
 mutual information is invariant under swapping the bipartition, since the
-marginalA and marginalB terms exchange and the von Neumann entropy is
+two marginal terms exchange and the von Neumann entropy is
 reindex-invariant. -/
-theorem mutualInformation_le_two_log_card_right (τ : State (Prod a b)) :
+theorem mutualInformation_le_two_log_card_right (τ : MState (a × b)) :
     QIT.mutualInformation τ ≤ 2 * log2 (Fintype.card b) := by
-  have hstA : (τ.reindex (Equiv.prodComm a b)).marginalA = τ.marginalB := by
-    apply State.ext
+  have hstA : (τ.reindex (Equiv.prodComm a b)).traceRight = τ.traceLeft := by
+    apply MState.ext
+    rw [MState.traceRight_m, MState.traceLeft_m, MState.reindex_matrix]
     ext (i i' : b)
     rfl
-  have hstB : (τ.reindex (Equiv.prodComm a b)).marginalB = τ.marginalA := by
-    apply State.ext
+  have hstB : (τ.reindex (Equiv.prodComm a b)).traceLeft = τ.traceRight := by
+    apply MState.ext
+    rw [MState.traceLeft_m, MState.traceRight_m, MState.reindex_matrix]
     ext (i i' : a)
     rfl
   have hmA :
-      vonNeumann (τ.reindex (Equiv.prodComm a b)).marginalA =
-        vonNeumann τ.marginalB :=
-    congrArg State.vonNeumann hstA
+      vonNeumann (τ.reindex (Equiv.prodComm a b)).traceRight =
+        vonNeumann τ.traceLeft :=
+    congrArg MState.vonNeumann hstA
   have hmB :
-      vonNeumann (τ.reindex (Equiv.prodComm a b)).marginalB =
-        vonNeumann τ.marginalA :=
-    congrArg State.vonNeumann hstB
+      vonNeumann (τ.reindex (Equiv.prodComm a b)).traceLeft =
+        vonNeumann τ.traceRight :=
+    congrArg MState.vonNeumann hstB
   have hmi_swap :
       QIT.mutualInformation (τ.reindex (Equiv.prodComm a b)) =
         QIT.mutualInformation τ := by
     rw [QIT.mutualInformation, QIT.mutualInformation, hmA, hmB,
-      State.vonNeumann_reindex]
+      MState.vonNeumann_reindex]
     ring
   rw [← hmi_swap]
   exact mutualInformation_le_two_log_card_left (τ.reindex (Equiv.prodComm a b))
 
 /-- Conditional entropy is bounded above by the logarithm of the left
 system dimension. -/
-theorem conditionalEntropy_le_log_card_left (τ : State (Prod a b)) :
+theorem conditionalEntropy_le_log_card_left (τ : MState (a × b)) :
     τ.conditionalEntropy ≤ log2 (Fintype.card a) := by
   have hI : 0 ≤ QIT.mutualInformation τ := mutualInformation_nonneg τ
-  have hA : τ.marginalA.vonNeumann ≤ log2 (Fintype.card a) :=
-    vonNeumann_le_log_card τ.marginalA
+  have hA : τ.traceRight.vonNeumann ≤ log2 (Fintype.card a) :=
+    vonNeumann_le_log_card τ.traceRight
   rw [QIT.mutualInformation] at hI
   rw [conditionalEntropy_eq]
   linarith
@@ -241,118 +220,70 @@ theorem conditionalEntropy_le_log_card_left (τ : State (Prod a b)) :
 /-- Conditional entropy is bounded below by minus the logarithm of the left
 system dimension.  This is the lower half of the finite-dimensional
 dimension sandwich used at the end of Winter's AFW proof. -/
-theorem conditionalEntropy_neg_log_card_left_le (τ : State (Prod a b)) :
+theorem conditionalEntropy_neg_log_card_left_le (τ : MState (a × b)) :
     -log2 (Fintype.card a) ≤ τ.conditionalEntropy := by
-  have hAraki : -τ.marginalA.vonNeumann ≤ τ.conditionalEntropy :=
-    conditionalEntropy_neg_marginalA_le τ
-  have hA : τ.marginalA.vonNeumann ≤ log2 (Fintype.card a) :=
-    vonNeumann_le_log_card τ.marginalA
+  have hAraki : -τ.traceRight.vonNeumann ≤ τ.conditionalEntropy :=
+    conditionalEntropy_neg_traceRight_le τ
+  have hA : τ.traceRight.vonNeumann ≤ log2 (Fintype.card a) :=
+    vonNeumann_le_log_card τ.traceRight
   linarith
 
-private theorem binaryWeights_sum (p : ℝ) (hp0 : 0 ≤ p) (hp1 : p ≤ 1) :
-    Real.toNNReal (1 - p) + Real.toNNReal p = 1 := by
-  apply Subtype.ext
-  simp [Real.toNNReal_of_nonneg hp0, Real.toNNReal_of_nonneg (sub_nonneg.mpr hp1)]
-
-/-- Binary convex mixture `(1 - p)ρ + pτ` of two states. -/
-def binaryMix (p : ℝ) (ρ τ : State a) (hp0 : 0 ≤ p) (hp1 : p ≤ 1) : State a where
-  matrix := (Real.toNNReal (1 - p)) • ρ.matrix + (Real.toNNReal p) • τ.matrix
-  pos := by
-    exact Matrix.PosSemidef.add
-      (ρ.pos.smul (NNReal.coe_nonneg _))
-      (τ.pos.smul (NNReal.coe_nonneg _))
-  trace_eq_one := by
-    rw [Matrix.trace_add, Matrix.trace_smul, Matrix.trace_smul,
-      ρ.trace_eq_one, τ.trace_eq_one]
-    rw [NNReal.smul_def, NNReal.smul_def]
-    simp [Algebra.smul_def, Real.toNNReal_of_nonneg hp0,
-      Real.toNNReal_of_nonneg (sub_nonneg.mpr hp1)]
-
-@[simp]
-theorem binaryMix_matrix (p : ℝ) (ρ τ : State a) (hp0 : 0 ≤ p) (hp1 : p ≤ 1) :
-    (binaryMix p ρ τ hp0 hp1).matrix =
-      (Real.toNNReal (1 - p)) • ρ.matrix + (Real.toNNReal p) • τ.matrix :=
-  rfl
-
-/-- The two-point ensemble with weights `(1-p,p)`. -/
-private def binaryEnsemble (p : ℝ) (ρ τ : State a) (hp0 : 0 ≤ p) (hp1 : p ≤ 1) :
-    Ensemble Bool a where
-  probs := fun b => if b then Real.toNNReal p else Real.toNNReal (1 - p)
-  weights_sum := by
-    apply Subtype.ext
-    simp [Real.toNNReal_of_nonneg hp0, Real.toNNReal_of_nonneg (sub_nonneg.mpr hp1)]
-  states := fun b => if b then τ else ρ
-
-private theorem binaryEnsemble_averageState (p : ℝ) (ρ τ : State a)
-    (hp0 : 0 ≤ p) (hp1 : p ≤ 1) :
-    (binaryEnsemble p ρ τ hp0 hp1).averageState =
-      binaryMix p ρ τ hp0 hp1 := by
-  apply State.ext
-  rw [Ensemble.averageState_matrix, binaryMix_matrix]
-  ext i j
-  simp [binaryEnsemble, Matrix.add_apply, add_comm]
-
 private theorem binaryEnsemble_shannon_eq_binaryEntropy (p : ℝ)
-    (ρ τ : State a) (hp0 : 0 ≤ p) (hp1 : p ≤ 1) :
+    (ρ τ : MState a) (hp0 : 0 ≤ p) (hp1 : p ≤ 1) :
     -(∑ x : Bool, xlog2 (((binaryEnsemble p ρ τ hp0 hp1).probs x : ℝ))) =
       binaryEntropy p := by
-  simp [binaryEnsemble, Real.toNNReal_of_nonneg hp0,
-    Real.toNNReal_of_nonneg (sub_nonneg.mpr hp1), add_comm]
+  simp
   rw [binaryEntropy]
   ring
 
 /-- Binary conditional entropy is not too concave: mixing costs at most the
 binary Shannon entropy of the mixing weight. -/
-theorem conditionalEntropy_binaryMix_le
-    (p : ℝ) (ρ τ : State (Prod a b)) (hp0 : 0 ≤ p) (hp1 : p ≤ 1) :
-    (binaryMix p ρ τ hp0 hp1).conditionalEntropy ≤
-      binaryEntropy p + (1 - p) * ρ.conditionalEntropy + p * τ.conditionalEntropy := by
-  let E : Ensemble Bool (Prod a b) := binaryEnsemble p ρ τ hp0 hp1
-  have havg : E.averageState = binaryMix p ρ τ hp0 hp1 := by
+theorem conditionalEntropy_convexCombination_le
+    (p : ℝ) (ρ τ : MState (a × b)) (hp0 : 0 ≤ p) (hp1 : p ≤ 1) :
+    (convexCombination p ρ τ hp0 hp1).conditionalEntropy ≤
+      binaryEntropy p + p * ρ.conditionalEntropy + (1 - p) * τ.conditionalEntropy := by
+  let E : MEnsemble (a × b) Bool := binaryEnsemble p ρ τ hp0 hp1
+  have havg : E.averageState = convexCombination p ρ τ hp0 hp1 := by
     simpa [E] using binaryEnsemble_averageState p ρ τ hp0 hp1
-  have hAB := Ensemble.vonNeumann_average_le_shannon_add_sum E
-  have hB := Ensemble.vonNeumann_average_ge_sum E.marginalBipartiteB
-  have hBavg : E.marginalBipartiteB.averageState = E.averageState.marginalB :=
-    Ensemble.marginalBipartiteB_averageState E
+  have hAB := MEnsemble.vonNeumann_average_le_shannon_add_sum E
+  have hB := MEnsemble.vonNeumann_average_ge_sum E.marginalBipartiteB
+  have hBavg : E.marginalBipartiteB.averageState = E.averageState.traceLeft :=
+    MEnsemble.marginalBipartiteB_averageState E
   have hAB' :
-      (binaryMix p ρ τ hp0 hp1).vonNeumann ≤
-        binaryEntropy p + (1 - p) * ρ.vonNeumann + p * τ.vonNeumann := by
+      (convexCombination p ρ τ hp0 hp1).vonNeumann ≤
+        binaryEntropy p + p * ρ.vonNeumann + (1 - p) * τ.vonNeumann := by
     have hsh := binaryEnsemble_shannon_eq_binaryEntropy (p := p) ρ τ hp0 hp1
     have hAB0 :
-        (binaryMix p ρ τ hp0 hp1).vonNeumann ≤
-          -(∑ x : Bool, xlog2 (((E : Ensemble Bool (Prod a b)).probs x : ℝ))) +
-            ((1 - p) * ρ.vonNeumann + p * τ.vonNeumann) := by
+        (convexCombination p ρ τ hp0 hp1).vonNeumann ≤
+          -(∑ x : Bool, xlog2 (((E : MEnsemble (a × b) Bool).probs x : ℝ))) +
+            (p * ρ.vonNeumann + (1 - p) * τ.vonNeumann) := by
       rw [← havg]
-      simpa [E, binaryEnsemble, Real.toNNReal_of_nonneg hp0,
-        Real.toNNReal_of_nonneg (sub_nonneg.mpr hp1), add_comm, add_left_comm, add_assoc]
-        using hAB
+      simpa [E, add_comm, add_left_comm, add_assoc] using hAB
     rw [hsh] at hAB0
     linarith
   have hB' :
-      (1 - p) * ρ.marginalB.vonNeumann + p * τ.marginalB.vonNeumann ≤
-        (binaryMix p ρ τ hp0 hp1).marginalB.vonNeumann := by
+      p * ρ.traceLeft.vonNeumann + (1 - p) * τ.traceLeft.vonNeumann ≤
+        (convexCombination p ρ τ hp0 hp1).traceLeft.vonNeumann := by
     rw [← havg, ← hBavg]
-    simpa [E, binaryEnsemble, Real.toNNReal_of_nonneg hp0,
-      Real.toNNReal_of_nonneg (sub_nonneg.mpr hp1), add_comm, add_left_comm, add_assoc]
-      using hB
+    simpa [E, add_comm, add_left_comm, add_assoc] using hB
   rw [conditionalEntropy_eq, conditionalEntropy_eq, conditionalEntropy_eq]
   linarith
 
 /-- Binary specialization of concavity of conditional entropy. -/
-theorem conditionalEntropy_binaryMix_ge
-    (p : ℝ) (ρ τ : State (Prod a b)) (hp0 : 0 ≤ p) (hp1 : p ≤ 1) :
-    (1 - p) * ρ.conditionalEntropy + p * τ.conditionalEntropy ≤
-      (binaryMix p ρ τ hp0 hp1).conditionalEntropy := by
-  let E : Ensemble Bool (Prod a b) := binaryEnsemble p ρ τ hp0 hp1
-  have hconc := State.conditionalEntropy_concave (E := E)
-  have havg : E.averageState = binaryMix p ρ τ hp0 hp1 := by
+theorem conditionalEntropy_convexCombination_ge
+    (p : ℝ) (ρ τ : MState (a × b)) (hp0 : 0 ≤ p) (hp1 : p ≤ 1) :
+    p * ρ.conditionalEntropy + (1 - p) * τ.conditionalEntropy ≤
+      (convexCombination p ρ τ hp0 hp1).conditionalEntropy := by
+  let E : MEnsemble (a × b) Bool := binaryEnsemble p ρ τ hp0 hp1
+  have hconc := MState.conditionalEntropy_concave (E := E)
+  have havg : E.averageState = convexCombination p ρ τ hp0 hp1 := by
     simpa [E] using binaryEnsemble_averageState p ρ τ hp0 hp1
   rw [havg] at hconc
-  simpa [E, binaryEnsemble, Real.toNNReal_of_nonneg hp0,
-    Real.toNNReal_of_nonneg (sub_nonneg.mpr hp1), add_comm, add_left_comm, add_assoc]
-    using hconc
+  simpa [E, add_comm, add_left_comm, add_assoc] using hconc
 
-end State
+end MState
+
+namespace QIT
 
 /-- Scalar right-hand side in Winter's Alicki--Fannes--Winter bound:
 `2 ε log₂ d + (1 + ε) h₂(ε / (1 + ε))`. -/
@@ -650,67 +581,65 @@ theorem afwContinuityModulus_mono_epsilon {d : ℕ} {δ ε : ℝ}
   unfold afwContinuityModulus
   linarith
 
-namespace State
+end QIT
+
+namespace MState
 
 variable {a : Type u} [Fintype a] [DecidableEq a]
 variable {b : Type v} [Fintype b] [DecidableEq b]
 
-private theorem afw_one_sub_weight_eq {δ : ℝ} (hδ0 : 0 ≤ δ) :
-    1 - δ / (1 + δ) = (1 + δ)⁻¹ := by
-  have hden : 1 + δ ≠ 0 := by linarith
-  field_simp [hden]
-  ring
-
 private theorem afw_common_state_eq
-    (ρ σ : State (Prod a b)) (hδ : 0 < ρ.normalizedTraceDistance σ) :
-    binaryMix (ρ.normalizedTraceDistance σ / (1 + ρ.normalizedTraceDistance σ))
-        σ (ρ.traceDistancePosPartState σ hδ)
+    (ρ σ : MState (a × b)) (hδ : 0 < ρ.normalizedTraceDistance σ) :
+    convexCombination
+        (ρ.normalizedTraceDistance σ / (1 + ρ.normalizedTraceDistance σ))
+        (ρ.traceDistancePosPartState σ hδ) σ
         (afw_binaryEntropy_argument_nonneg hδ.le)
         (afw_binaryEntropy_argument_le_one hδ.le) =
-      binaryMix (ρ.normalizedTraceDistance σ / (1 + ρ.normalizedTraceDistance σ))
-        ρ (ρ.traceDistanceNegPartState σ hδ)
+      convexCombination
+        (ρ.normalizedTraceDistance σ / (1 + ρ.normalizedTraceDistance σ))
+        (ρ.traceDistanceNegPartState σ hδ) ρ
         (afw_binaryEntropy_argument_nonneg hδ.le)
         (afw_binaryEntropy_argument_le_one hδ.le) := by
   let δ : ℝ := ρ.normalizedTraceDistance σ
   have hδ0 : 0 ≤ δ := hδ.le
-  have hδpos : 0 < δ := hδ
   have hδden : 1 + δ ≠ 0 := by linarith
-  have hp0 : 0 ≤ δ / (1 + δ) := afw_binaryEntropy_argument_nonneg hδ0
-  have hp1 : δ / (1 + δ) ≤ 1 := afw_binaryEntropy_argument_le_one hδ0
-  have honep0 : 0 ≤ 1 - δ / (1 + δ) := sub_nonneg.mpr hp1
   have hcommon :=
-    State.sigma_add_normalizedTraceDistance_smul_traceDistancePosPartState_eq ρ σ hδ
-  change σ.matrix + ((δ : ℝ) : ℂ) • (ρ.traceDistancePosPartState σ hδ).matrix =
-    ρ.matrix + ((δ : ℝ) : ℂ) • (ρ.traceDistanceNegPartState σ hδ).matrix at hcommon
-  apply State.ext
-  rw [binaryMix_matrix, binaryMix_matrix]
+    MState.sigma_add_normalizedTraceDistance_smul_traceDistancePosPartState_eq ρ σ hδ
+  change σ.m + ((δ : ℝ) : ℂ) • (ρ.traceDistancePosPartState σ hδ).m =
+    ρ.m + ((δ : ℝ) : ℂ) • (ρ.traceDistanceNegPartState σ hδ).m at hcommon
+  have hcoef : (1 - δ / (1 + δ)) * δ = δ / (1 + δ) := by
+    field_simp
+    ring
+  have hcoefC :
+      ((1 - δ / (1 + δ) : ℝ) : ℂ) * ((δ : ℝ) : ℂ) = ((δ / (1 + δ) : ℝ) : ℂ) := by
+    exact_mod_cast hcoef
+  have hscaled :
+      ((1 - δ / (1 + δ) : ℝ) : ℂ) •
+          (σ.m + ((δ : ℝ) : ℂ) • (ρ.traceDistancePosPartState σ hδ).m) =
+        ((1 - δ / (1 + δ) : ℝ) : ℂ) •
+          (ρ.m + ((δ : ℝ) : ℂ) • (ρ.traceDistanceNegPartState σ hδ).m) := by
+    rw [hcommon]
+  rw [smul_add, smul_add, smul_smul, smul_smul, hcoefC] at hscaled
+  apply MState.ext
+  rw [convexCombination_matrix, convexCombination_matrix]
   change
-    (Real.toNNReal (1 - δ / (1 + δ))) • σ.matrix +
-        (Real.toNNReal (δ / (1 + δ))) • (ρ.traceDistancePosPartState σ hδ).matrix =
-      (Real.toNNReal (1 - δ / (1 + δ))) • ρ.matrix +
-        (Real.toNNReal (δ / (1 + δ))) • (ρ.traceDistanceNegPartState σ hδ).matrix
-  ext i j
-  have hentry := congrFun (congrFun hcommon i) j
-  simp only [Matrix.add_apply] at hentry ⊢
-  rw [NNReal.smul_def, NNReal.smul_def, NNReal.smul_def, NNReal.smul_def]
-  simp [Algebra.smul_def, Real.toNNReal_of_nonneg hp0,
-    Real.toNNReal_of_nonneg honep0] at hentry ⊢
-  have hδdenC : (1 + (δ : ℂ)) ≠ 0 := by
-    simpa [Complex.ofReal_add] using
-      (Complex.ofReal_ne_zero.mpr hδden : ((1 + δ : ℝ) : ℂ) ≠ 0)
-  field_simp [hδdenC]
-  simpa [mul_add, add_comm, add_left_comm, add_assoc, mul_comm, mul_left_comm,
-    mul_assoc] using hentry
+    ((δ / (1 + δ) : ℝ) : ℂ) • (ρ.traceDistancePosPartState σ hδ).m +
+        ((1 - δ / (1 + δ) : ℝ) : ℂ) • σ.m =
+      ((δ / (1 + δ) : ℝ) : ℂ) • (ρ.traceDistanceNegPartState σ hδ).m +
+        ((1 - δ / (1 + δ) : ℝ) : ℂ) • ρ.m
+  rw [add_comm (((δ / (1 + δ) : ℝ) : ℂ) • (ρ.traceDistancePosPartState σ hδ).m),
+    add_comm (((δ / (1 + δ) : ℝ) : ℂ) • (ρ.traceDistanceNegPartState σ hδ).m)]
+  exact hscaled
 
 private theorem conditionalEntropy_sub_le_afwModulus
-    (ρ σ : State (Prod a b)) :
+    (ρ σ : MState (a × b)) :
     σ.conditionalEntropy - ρ.conditionalEntropy ≤
       afwContinuityModulus (Fintype.card a) (ρ.normalizedTraceDistance σ) := by
   let δ : ℝ := ρ.normalizedTraceDistance σ
-  have hδ0 : 0 ≤ δ := State.normalizedTraceDistance_nonneg ρ σ
+  have hδ0 : 0 ≤ δ := MState.normalizedTraceDistance_nonneg ρ σ
   by_cases hδzero : δ = 0
   · have hρσ : ρ = σ := by
-      exact State.eq_of_normalizedTraceDistance_eq_zero (rho := ρ) (sigma := σ) hδzero
+      exact MState.eq_of_normalizedTraceDistance_eq_zero (rho := ρ) (sigma := σ) hδzero
     subst σ
     have hmod : 0 ≤ afwContinuityModulus (Fintype.card a) 0 :=
       afwContinuityModulus_nonneg (d := Fintype.card a) (ε := 0) (by norm_num)
@@ -719,26 +648,26 @@ private theorem conditionalEntropy_sub_le_afwModulus
     let p : ℝ := δ / (1 + δ)
     have hp0 : 0 ≤ p := afw_binaryEntropy_argument_nonneg hδ0
     have hp1 : p ≤ 1 := afw_binaryEntropy_argument_le_one hδ0
-    let Δ : State (Prod a b) := ρ.traceDistancePosPartState σ hδpos
-    let Δ' : State (Prod a b) := ρ.traceDistanceNegPartState σ hδpos
-    let ω : State (Prod a b) := binaryMix p σ Δ hp0 hp1
+    let Δ : MState (a × b) := ρ.traceDistancePosPartState σ hδpos
+    let Δ' : MState (a × b) := ρ.traceDistanceNegPartState σ hδpos
+    let ω : MState (a × b) := convexCombination p Δ σ hp0 hp1
     have hω :
-        ω = binaryMix p ρ Δ' hp0 hp1 := by
+        ω = convexCombination p Δ' ρ hp0 hp1 := by
       simpa [ω, Δ, Δ', p, δ] using afw_common_state_eq ρ σ hδpos
     have hlower :
-        (1 - p) * σ.conditionalEntropy + p * Δ.conditionalEntropy ≤
+        p * Δ.conditionalEntropy + (1 - p) * σ.conditionalEntropy ≤
           ω.conditionalEntropy := by
-      simpa [ω] using conditionalEntropy_binaryMix_ge p σ Δ hp0 hp1
+      simpa [ω] using conditionalEntropy_convexCombination_ge p Δ σ hp0 hp1
     have hupper :
         ω.conditionalEntropy ≤
-          binaryEntropy p + (1 - p) * ρ.conditionalEntropy +
-            p * Δ'.conditionalEntropy := by
+          binaryEntropy p + p * Δ'.conditionalEntropy +
+            (1 - p) * ρ.conditionalEntropy := by
       rw [hω]
-      simpa using conditionalEntropy_binaryMix_le p ρ Δ' hp0 hp1
+      simpa using conditionalEntropy_convexCombination_le p Δ' ρ hp0 hp1
     have hcombine :
-        (1 - p) * σ.conditionalEntropy + p * Δ.conditionalEntropy ≤
-          binaryEntropy p + (1 - p) * ρ.conditionalEntropy +
-            p * Δ'.conditionalEntropy :=
+        p * Δ.conditionalEntropy + (1 - p) * σ.conditionalEntropy ≤
+          binaryEntropy p + p * Δ'.conditionalEntropy +
+            (1 - p) * ρ.conditionalEntropy :=
       le_trans hlower hupper
     have hscale_nonneg : 0 ≤ 1 + δ := by linarith
     have hmul := mul_le_mul_of_nonneg_left hcombine hscale_nonneg
@@ -751,18 +680,18 @@ private theorem conditionalEntropy_sub_le_afwModulus
         (1 + δ) * (1 - p) = (1 + δ) - (1 + δ) * p := by ring
         _ = 1 := by rw [hp_scale]; ring
     have hleft_scale :
-        (1 + δ) * ((1 - p) * σ.conditionalEntropy + p * Δ.conditionalEntropy) =
+        (1 + δ) * (p * Δ.conditionalEntropy + (1 - p) * σ.conditionalEntropy) =
           σ.conditionalEntropy + δ * Δ.conditionalEntropy := by
-      rw [mul_add, ← mul_assoc, ← mul_assoc, hone_scale, hp_scale]
+      rw [mul_add, ← mul_assoc, ← mul_assoc, hp_scale, hone_scale]
       ring
     have hright_scale :
         (1 + δ) *
-            (binaryEntropy p + (1 - p) * ρ.conditionalEntropy +
-              p * Δ'.conditionalEntropy) =
+            (binaryEntropy p + p * Δ'.conditionalEntropy +
+              (1 - p) * ρ.conditionalEntropy) =
           (1 + δ) * binaryEntropy p + ρ.conditionalEntropy +
             δ * Δ'.conditionalEntropy := by
-      rw [mul_add, mul_add, ← mul_assoc (1 + δ) (1 - p),
-        ← mul_assoc (1 + δ) p, hone_scale, hp_scale]
+      rw [mul_add, mul_add, ← mul_assoc (1 + δ) p,
+        ← mul_assoc (1 + δ) (1 - p), hp_scale, hone_scale]
       ring
     rw [hleft_scale, hright_scale] at hmul
     have hdiff :
@@ -792,13 +721,13 @@ private theorem conditionalEntropy_sub_le_afwModulus
 distance.  This follows Winter's positive/negative trace-distance split and
 then sandwiches the two auxiliary conditional entropies by `± log |A|`. -/
 theorem conditionalEntropy_dist_le_afwModulus
-    (ρ σ : State (Prod a b)) :
+    (ρ σ : MState (a × b)) :
     |ρ.conditionalEntropy - σ.conditionalEntropy| ≤
       afwContinuityModulus (Fintype.card a) (ρ.normalizedTraceDistance σ) := by
   rw [abs_sub_le_iff]
   constructor
   · have h := conditionalEntropy_sub_le_afwModulus σ ρ
-    rwa [State.normalizedTraceDistance_comm σ ρ] at h
+    rwa [MState.normalizedTraceDistance_comm σ ρ] at h
   · exact conditionalEntropy_sub_le_afwModulus ρ σ
 
 /-- Source-shaped Alicki--Fannes--Winter continuity bound with an external
@@ -806,16 +735,12 @@ error parameter `ε`.  Nonnegativity of `ε` is forced by
 `normalizedTraceDistance_nonneg` and `hεdist`, so no extra hypothesis is
 needed. -/
 theorem alickiFannesWinter_conditionalEntropy
-    (ρ σ : State (Prod a b)) (ε : ℝ)
+    (ρ σ : MState (a × b)) (ε : ℝ)
     (hεdist : ρ.normalizedTraceDistance σ ≤ ε) :
     |ρ.conditionalEntropy - σ.conditionalEntropy| ≤
       afwContinuityModulus (Fintype.card a) ε := by
   exact (conditionalEntropy_dist_le_afwModulus ρ σ).trans
     (afwContinuityModulus_mono_epsilon
-      (State.normalizedTraceDistance_nonneg ρ σ) hεdist)
+      (MState.normalizedTraceDistance_nonneg ρ σ) hεdist)
 
-end State
-
-end
-
-end QIT
+end MState

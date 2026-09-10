@@ -20,9 +20,3 @@ public import QuantumLib.QIT.HypothesisTesting.Asymptotic
 Public import surface for finite-dimensional binary hypothesis tests and
 one-shot hypothesis-testing information APIs.
 -/
-
-@[expose] public section
-
-namespace QIT
-
-end QIT

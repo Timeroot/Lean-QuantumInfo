@@ -20,7 +20,7 @@ communication
 The source proof combines the hypothesis-testing one-shot lower bound with
 the comparison
 
-`D_H^epsilon(rho || sigma) >= D_alpha(rho || sigma)
+`D_H^epsilon(rho || sigma) ≥ D_alpha(rho || sigma)
   + alpha / (alpha - 1) * log2 (1 / epsilon)`
 
 from
@@ -36,40 +36,38 @@ channel-level comparison hypothesis.
 
 open scoped ComplexOrder MatrixOrder
 
-namespace QIT
-
-universe u v
-
 noncomputable section
-
+universe u v
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-namespace State
+open QIT
+
+namespace MState
 
 /-- Non-optimized barred Petz--Renyi mutual information
 `bar I_alpha(A;B)_rho = D_alpha(rho_AB || rho_A tensor rho_B)`.
 
-The current `State.petzRenyi` kernel is a positive-definite API, so this
+The current `MState.petzRenyi` kernel is a positive-definite API, so this
 definition exposes the corresponding positivity witnesses explicitly. -/
 def barPetzRenyiMutualInformation
-    (rhoAB : State (Prod a b))
-    (hρ : rhoAB.matrix.PosDef)
-    (hA : rhoAB.marginalA.matrix.PosDef)
-    (hB : rhoAB.marginalB.matrix.PosDef)
+    (rhoAB : MState (a × b))
+    (hρ : rhoAB.m.PosDef)
+    (hA : rhoAB.traceRight.m.PosDef)
+    (hB : rhoAB.traceLeft.m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) : ℝ :=
-  rhoAB.petzRenyi (rhoAB.marginalA.prod rhoAB.marginalB)
-    hρ (State.prod_posDef hA hB) α hα_pos hα_ne_one
+  rhoAB.petzRenyi (rhoAB.traceRight.prod rhoAB.traceLeft)
+    hρ (MState.PosDef.kron hA hB) α hα_pos hα_ne_one
 
 theorem barPetzRenyiMutualInformation_eq
-    (rhoAB : State (Prod a b))
-    (hρ : rhoAB.matrix.PosDef)
-    (hA : rhoAB.marginalA.matrix.PosDef)
-    (hB : rhoAB.marginalB.matrix.PosDef)
+    (rhoAB : MState (a × b))
+    (hρ : rhoAB.m.PosDef)
+    (hA : rhoAB.traceRight.m.PosDef)
+    (hB : rhoAB.traceLeft.m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     rhoAB.barPetzRenyiMutualInformation hρ hA hB α hα_pos hα_ne_one =
-      rhoAB.petzRenyi (rhoAB.marginalA.prod rhoAB.marginalB)
-        hρ (State.prod_posDef hA hB) α hα_pos hα_ne_one :=
+      rhoAB.petzRenyi (rhoAB.traceRight.prod rhoAB.traceLeft)
+        hρ (MState.PosDef.kron hA hB) α hα_pos hα_ne_one :=
   rfl
 
 /-- PSD-domain barred Petz--Renyi mutual information
@@ -79,39 +77,39 @@ theorem barPetzRenyiMutualInformation_eq
 Unlike the compatibility definition above, this one does not require positive
 definiteness of `rho_AB` or its marginals. -/
 def barPetzRenyiMutualInformationPSDFinite
-    (rhoAB : State (Prod a b))
+    (rhoAB : MState (a × b))
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) : ℝ :=
-  rhoAB.petzRenyiPSDFinite (rhoAB.marginalA.prod rhoAB.marginalB)
+  rhoAB.petzRenyiPSDFinite (rhoAB.traceRight.prod rhoAB.traceLeft)
     α hα_pos hα_ne_one
 
 theorem barPetzRenyiMutualInformationPSDFinite_eq
-    (rhoAB : State (Prod a b))
+    (rhoAB : MState (a × b))
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     rhoAB.barPetzRenyiMutualInformationPSDFinite α hα_pos hα_ne_one =
-      rhoAB.petzRenyiPSDFinite (rhoAB.marginalA.prod rhoAB.marginalB)
+      rhoAB.petzRenyiPSDFinite (rhoAB.traceRight.prod rhoAB.traceLeft)
         α hα_pos hα_ne_one :=
   rfl
 
 /-- Canonical extended-real barred Petz--Renyi mutual information in the PSD
 source range `0 < α < 1`. -/
 noncomputable def barPetzRenyiMutualInformationPSD
-    (rhoAB : State (Prod a b))
+    (rhoAB : MState (a × b))
     (α : ℝ) (hα_pos : 0 < α) (hα_lt_one : α < 1) : EReal :=
-  rhoAB.petzRenyiPSD (rhoAB.marginalA.prod rhoAB.marginalB)
+  rhoAB.petzRenyiPSD (rhoAB.traceRight.prod rhoAB.traceLeft)
     α hα_pos hα_lt_one
 
 theorem barPetzRenyiMutualInformationPSD_eq
-    (rhoAB : State (Prod a b))
+    (rhoAB : MState (a × b))
     (α : ℝ) (hα_pos : 0 < α) (hα_lt_one : α < 1) :
     rhoAB.barPetzRenyiMutualInformationPSD α hα_pos hα_lt_one =
-      rhoAB.petzRenyiPSD (rhoAB.marginalA.prod rhoAB.marginalB)
+      rhoAB.petzRenyiPSD (rhoAB.traceRight.prod rhoAB.traceLeft)
         α hα_pos hα_lt_one :=
   rfl
 
 /-- The canonical barred PSD value is finite for a state paired with the
 product of its marginals. -/
 theorem barPetzRenyiMutualInformationPSD_eq_coe_finite
-    (rhoAB : State (Prod a b))
+    (rhoAB : MState (a × b))
     (alpha : ℝ) (halpha0 : 0 < alpha) (halpha1 : alpha < 1) :
     rhoAB.barPetzRenyiMutualInformationPSD alpha halpha0 halpha1 =
       (rhoAB.barPetzRenyiMutualInformationPSDFinite
@@ -119,14 +117,23 @@ theorem barPetzRenyiMutualInformationPSD_eq_coe_finite
   unfold barPetzRenyiMutualInformationPSD barPetzRenyiMutualInformationPSDFinite
   apply rhoAB.petzRenyiPSD_eq_coe_finite_of_traceCoeff_pos
   exact rhoAB.petzRenyiPSDTraceCoeff_pos_of_support
-    (rhoAB.marginalA.prod rhoAB.marginalB)
+    (rhoAB.traceRight.prod rhoAB.traceLeft)
       (rhoAB.rpow_matrix_supports_prod_marginals halpha0)
 
-end State
+end MState
 
-namespace Channel
+end
 
-variable (N : Channel a b)
+noncomputable section
+
+namespace CPTPOp
+
+open QIT
+
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+
+variable (N : CPTPMap a b)
 
 /-- Barred Petz--Renyi mutual information of an input-reference pure state.
 
@@ -134,10 +141,10 @@ The positivity witnesses are explicit because the current Petz kernel is
 positive-definite.  This is the state-level quantity appearing in
 `bar I_alpha(N)` before taking the channel supremum. -/
 def inputBarPetzRenyiMutualInformation
-    (ψ : PureVector (Prod a a))
-    (hω : (N.hypothesisTestingOutputState ψ).matrix.PosDef)
-    (hR : (N.hypothesisTestingOutputState ψ).marginalA.matrix.PosDef)
-    (hB : (N.hypothesisTestingOutputState ψ).marginalB.matrix.PosDef)
+    (ψ : Ket (a × a))
+    (hω : (N.hypothesisTestingOutputState ψ).m.PosDef)
+    (hR : (N.hypothesisTestingOutputState ψ).traceRight.m.PosDef)
+    (hB : (N.hypothesisTestingOutputState ψ).traceLeft.m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) : ℝ :=
   (N.hypothesisTestingOutputState ψ).barPetzRenyiMutualInformation
     hω hR hB α hα_pos hα_ne_one
@@ -145,14 +152,14 @@ def inputBarPetzRenyiMutualInformation
 /-- PSD-domain barred Petz--Renyi mutual information of an input-reference
 pure state. -/
 def inputBarPetzRenyiMutualInformationPSDFinite
-    (ψ : PureVector (Prod a a))
+    (ψ : Ket (a × a))
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) : ℝ :=
   (N.hypothesisTestingOutputState ψ).barPetzRenyiMutualInformationPSDFinite
     α hα_pos hα_ne_one
 
 /-- Canonical extended-real PSD barred Petz value for a fixed channel input. -/
 noncomputable def inputBarPetzRenyiMutualInformationPSD
-    (ψ : PureVector (Prod a a))
+    (ψ : Ket (a × a))
     (α : ℝ) (hα_pos : 0 < α) (hα_lt_one : α < 1) : EReal :=
   (N.hypothesisTestingOutputState ψ).barPetzRenyiMutualInformationPSD
     α hα_pos hα_lt_one
@@ -160,22 +167,22 @@ noncomputable def inputBarPetzRenyiMutualInformationPSD
 /-- The canonical fixed-input barred PSD value is the coercion of its finite
 real representative. -/
 theorem inputBarPetzRenyiMutualInformationPSD_eq_coe_finite
-    (ψ : PureVector (Prod a a))
+    (ψ : Ket (a × a))
     (alpha : ℝ) (halpha0 : 0 < alpha) (halpha1 : alpha < 1) :
     N.inputBarPetzRenyiMutualInformationPSD ψ alpha halpha0 halpha1 =
       (N.inputBarPetzRenyiMutualInformationPSDFinite
         ψ alpha halpha0 (ne_of_lt halpha1) : EReal) := by
-  exact State.barPetzRenyiMutualInformationPSD_eq_coe_finite
+  exact MState.barPetzRenyiMutualInformationPSD_eq_coe_finite
     (N.hypothesisTestingOutputState ψ) alpha halpha0 halpha1
 
 /-- Value set for the barred channel Petz--Renyi quantity. -/
 def barPetzRenyiMutualInformationValueSet
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) : Set ℝ :=
   {value |
-    ∃ ψ : PureVector (Prod a a),
-      ∃ hω : (N.hypothesisTestingOutputState ψ).matrix.PosDef,
-        ∃ hR : (N.hypothesisTestingOutputState ψ).marginalA.matrix.PosDef,
-          ∃ hB : (N.hypothesisTestingOutputState ψ).marginalB.matrix.PosDef,
+    ∃ ψ : Ket (a × a),
+      ∃ hω : (N.hypothesisTestingOutputState ψ).m.PosDef,
+        ∃ hR : (N.hypothesisTestingOutputState ψ).traceRight.m.PosDef,
+          ∃ hB : (N.hypothesisTestingOutputState ψ).traceLeft.m.PosDef,
             value =
               N.inputBarPetzRenyiMutualInformation ψ hω hR hB
                 α hα_pos hα_ne_one}
@@ -192,7 +199,7 @@ def barPetzRenyiMutualInformation
 def barPetzRenyiMutualInformationPSDFiniteValueSet
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) : Set ℝ :=
   {value |
-    ∃ ψ : PureVector (Prod a a),
+    ∃ ψ : Ket (a × a),
       value = N.inputBarPetzRenyiMutualInformationPSDFinite ψ
         α hα_pos hα_ne_one}
 
@@ -219,7 +226,7 @@ theorem barPetzRenyiMutualInformationPSDFinite_eq_sSup
 noncomputable def barPetzRenyiMutualInformationPSDValueSet
     (α : ℝ) (hα_pos : 0 < α) (hα_lt_one : α < 1) : Set EReal :=
   {value |
-    ∃ ψ : PureVector (Prod a a),
+    ∃ ψ : Ket (a × a),
       value = N.inputBarPetzRenyiMutualInformationPSD ψ α hα_pos hα_lt_one}
 
 /-- Canonical PSD barred Petz--Renyi channel mutual information. -/
@@ -318,7 +325,7 @@ stated with the source-faithful extended-real barred information.  The bridge
 below inserts the canonical embedding `bar I_H ≤ bar I_H^E`.
 -/
 theorem oneShotEntanglementAssistedClassicalCapacityE_petzLowerBound_of_comparison_E
-    [Nonempty (PureVector (Prod a a))]
+    [Nonempty (Ket (a × a))]
     {ε η α : ℝ} (hα_pos : 0 < α) (hα_lt_one : α < 1)
     (hHT :
       N.barHypothesisTestingMutualInformation (ε - η) -
@@ -477,8 +484,6 @@ theorem oneShotEntanglementAssistedClassicalCapacityE_petzPSDLowerBound_of_compa
   rw [hleft]
   exact (EReal.sub_le_sub hcmp le_rfl).trans hHT
 
-end Channel
+end CPTPOp
 
 end
-
-end QIT

@@ -20,9 +20,7 @@ import QuantumLib.QIT.Util.TensorPower
 # Asymptotic basic helpers
 
 This module is part of the entanglement-assisted classical communication
-asymptotic proof spine.  It was split out mechanically from the historical
-`EntanglementAssistedAsymptotic` files; theorem statements and proof routes are
-unchanged.
+asymptotic proof spine.
 -/
 
 @[expose] public section
@@ -30,20 +28,14 @@ unchanged.
 open scoped ComplexOrder MatrixOrder NNReal Topology
 open Filter
 
-namespace QIT
-
-universe u v w x y
-
 noncomputable section
-
+universe u v w x y
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-private theorem log2_pow_nat (x : ℝ) (n : ℕ) :
-    log2 (x ^ n) = (n : ℝ) * log2 x := by
-  unfold log2
-  rw [Real.log_pow]
-  ring
+open QIT
+
+namespace QIT
 
 namespace PetzRenyiAlpha
 
@@ -84,20 +76,25 @@ def outputReindex (Phi : MatrixMap α β) (e : β ≃ γ) : MatrixMap α γ wher
     ext i j
     simp [Matrix.reindex_apply]
 
+@[simp]
+theorem outputReindex_apply (Phi : MatrixMap α β) (e : β ≃ γ) (X : CMatrix α) (i j : γ) :
+    Phi.outputReindex e X i j = Phi X (e.symm i) (e.symm j) :=
+  rfl
+
 theorem outputReindex_isCompletelyPositive
     (Phi : MatrixMap α β) (e : β ≃ γ)
     (hPhi : MatrixMap.IsCompletelyPositive Phi) :
     MatrixMap.IsCompletelyPositive (Phi.outputReindex e) := by
-  change (MatrixMap.choi (Phi.outputReindex e)).PosSemidef
+  rw [MatrixMap.isCompletelyPositive_iff_choi]
   have hchoi :
       MatrixMap.choi (Phi.outputReindex e) =
         (MatrixMap.choi Phi).submatrix
-          (fun x : Prod α γ => (x.1, e.symm x.2))
-          (fun x : Prod α γ => (x.1, e.symm x.2)) := by
+          (fun x : α × γ => (x.1, e.symm x.2))
+          (fun x : α × γ => (x.1, e.symm x.2)) := by
     ext x y
     rfl
   rw [hchoi]
-  exact hPhi.submatrix _
+  exact ((MatrixMap.isCompletelyPositive_iff_choi _).mp hPhi).submatrix _
 
 theorem outputReindex_isTracePreserving
     (Phi : MatrixMap α β) (e : β ≃ γ)
@@ -126,18 +123,18 @@ theorem kron_apply_slice_right
     {a₀ : Type u} {b₀ : Type v} {a₁ : Type w} {b₁ : Type x}
     [Fintype a₀] [DecidableEq a₀] [Fintype b₀] [DecidableEq b₀]
     [Fintype a₁] [DecidableEq a₁] [Fintype b₁] [DecidableEq b₁]
-    (Φ : MatrixMap a₀ b₀) (Ψ : MatrixMap a₁ b₁) (X : CMatrix (Prod a₀ a₁))
+    (Φ : MatrixMap a₀ b₀) (Ψ : MatrixMap a₁ b₁) (X : CMatrix (a₀ × a₁))
     (x₀ y₀ : b₀) (x₁ y₁ : b₁) :
     MatrixMap.kron Φ Ψ X (x₀, x₁) (y₀, y₁) =
       Ψ (fun j j' => Φ (fun i i' => X (i, j) (i', j')) x₀ y₀) x₁ y₁ := by
-  unfold MatrixMap.kron
+  rw [MatrixMap.kron_apply]
   rw [map_eq_sum_single Ψ
     (fun j j' => Φ (fun i i' => X (i, j) (i', j')) x₀ y₀)]
   simp only [Matrix.sum_apply]
   have hΦ : ∀ j j',
       Φ (fun i i' => X (i, j) (i', j')) x₀ y₀ =
         ∑ i : a₀, ∑ i' : a₀,
-          X (i, j) (i', j') * Φ (Matrix.single i i' (1 : Complex)) x₀ y₀ := by
+          X (i, j) (i', j') * Φ (Matrix.single i i' (1 : ℂ)) x₀ y₀ := by
     intro j j'
     have h := congrFun
       (congrFun (map_eq_sum_single Φ (fun i i' => X (i, j) (i', j'))) x₀)
@@ -146,87 +143,63 @@ theorem kron_apply_slice_right
   simp_rw [hΦ]
   simp [Finset.sum_mul, mul_assoc]
 
+/-- Relabelling the output of the left factor of a Kronecker product of matrix maps relabels the
+left component of the output index. -/
+theorem kron_outputReindex_left
+    {α : Type u} {β : Type v} {γ : Type w} {δ : Type x} {ε : Type y}
+    [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β] [Fintype γ] [DecidableEq γ]
+    [Fintype δ] [DecidableEq δ] [Fintype ε] [DecidableEq ε]
+    (Φ : MatrixMap α β) (Ψ : MatrixMap δ ε) (e : β ≃ γ) (X : CMatrix (α × δ)) :
+    MatrixMap.kron (Φ.outputReindex e) Ψ X =
+      (MatrixMap.kron Φ Ψ X).submatrix
+        (Equiv.prodCongr e (Equiv.refl ε)).symm (Equiv.prodCongr e (Equiv.refl ε)).symm := by
+  ext p q
+  rw [Matrix.submatrix_apply, MatrixMap.kron_apply, MatrixMap.kron_apply]
+  simp only [outputReindex_apply, Equiv.prodCongr_symm, Equiv.refl_symm, Equiv.prodCongr_apply,
+    Equiv.coe_refl, Prod.map_fst, Prod.map_snd, id_eq]
+
 end MatrixMap
 
-namespace Channel
+end QIT
+end
+
+noncomputable section
+
+namespace CPTPOp
+
+open QIT
 
 variable {α : Type u} {β : Type v} {γ : Type w}
 variable [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
 variable [Fintype γ] [DecidableEq γ]
 
 /-- Relabel the output basis of a finite-dimensional channel. -/
-def outputReindex (Phi : Channel α β) (e : β ≃ γ) : Channel α γ where
-  map := Phi.map.outputReindex e
-  completelyPositive :=
-    MatrixMap.outputReindex_isCompletelyPositive Phi.map e Phi.completelyPositive
-  tracePreserving :=
-    MatrixMap.outputReindex_isTracePreserving Phi.map e Phi.tracePreserving
-  mapsPositive :=
-    MatrixMap.outputReindex_mapsPositive Phi.map e Phi.mapsPositive
+def outputReindex (Phi : CPTPMap α β) (e : β ≃ γ) : CPTPMap α γ :=
+  CPTPOp.ofMat
+    (Phi.map.outputReindex e)
+    (MatrixMap.outputReindex_isCompletelyPositive Phi.map e Phi.map_cp)
+    (MatrixMap.outputReindex_isTracePreserving Phi.map e Phi.map_TP)
 
 @[simp]
-theorem outputReindex_applyState (Phi : Channel α β) (ρ : State α) (e : β ≃ γ) :
-    (Phi.outputReindex e).applyState ρ = (Phi.applyState ρ).reindex e := by
-  apply State.ext
+theorem outputReindex_applyState (Phi : CPTPMap α β) (ρ : MState α) (e : β ≃ γ) :
+    (Phi.outputReindex e) ρ = MState.reindex (Phi ρ) e := by
+  apply MState.ext
+  simp only [CPTPOp.mat_coe_eq_apply_mat, MState.reindex_matrix, outputReindex,
+    CPTPOp.map_ofMat]
   rfl
 
-end Channel
+end CPTPOp
 
-namespace POVM
+end
 
-variable {α : Type u} {β : Type v} {m : Type w}
-variable [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
-variable [Fintype m] [DecidableEq m]
+noncomputable section
 
-/-- Relabel the measured system of a finite POVM. -/
-def reindex (M : POVM m α) (e : α ≃ β) : POVM m β where
-  effects y := Matrix.reindex e e (M.effects y)
-  pos y := (M.pos y).submatrix e.symm
-  sum_eq_one := by
-    ext i j
-    have h := congrFun (congrFun M.sum_eq_one (e.symm i)) (e.symm j)
-    simpa [Matrix.sum_apply, Matrix.reindex_apply, Matrix.one_apply] using h
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-omit [DecidableEq m] in
-@[simp]
-theorem reindex_effects (M : POVM m α) (e : α ≃ β) (y : m) :
-    (M.reindex e).effects y = Matrix.reindex e e (M.effects y) :=
-  rfl
+open QIT
 
-/-- Born probabilities are invariant under simultaneous state/effect relabeling. -/
-theorem prob_reindex_state (M : POVM m α) (ρ : State α) (e : α ≃ β) (y : m) :
-    ((M.reindex e).prob (ρ.reindex e) y : ℝ) = (M.prob ρ y : ℝ) := by
-  rw [POVM.prob_eq_trace_re, POVM.prob_eq_trace_re]
-  change Complex.re
-      (((Matrix.reindex e e ρ.matrix) *
-        (Matrix.reindex e e (M.effects y))).trace) =
-    Complex.re ((ρ.matrix * M.effects y).trace)
-  change Complex.re
-      ((((Matrix.reindexAlgEquiv ℂ ℂ e) ρ.matrix) *
-        ((Matrix.reindexAlgEquiv ℂ ℂ e) (M.effects y))).trace) =
-    Complex.re ((ρ.matrix * M.effects y).trace)
-  rw [← map_mul (Matrix.reindexAlgEquiv ℂ ℂ e) ρ.matrix (M.effects y)]
-  change Complex.re ((Matrix.reindex e e (ρ.matrix * M.effects y)).trace) =
-    Complex.re ((ρ.matrix * M.effects y).trace)
-  rw [cMatrix_trace_reindex e]
-
-end POVM
-
-theorem state_reindex_reindex_symm {α : Type u} {β : Type v}
-    [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
-    (ρ : State α) (e : α ≃ β) :
-    (ρ.reindex e).reindex e.symm = ρ := by
-  apply State.ext
-  ext i j
-  simp [State.reindex]
-
-theorem state_reindex_symm_reindex {α : Type u} {β : Type v}
-    [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
-    (ρ : State β) (e : α ≃ β) :
-    (ρ.reindex e.symm).reindex e = ρ := by
-  apply State.ext
-  ext i j
-  simp [State.reindex]
+namespace QIT
 
 theorem cMatrix_rpow_reindex_nonneg {α : Type u} {β : Type v}
     [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
@@ -246,10 +219,12 @@ theorem cMatrix_rpow_reindex_nonneg {α : Type u} {β : Type v}
       (fun x : ℝ => x ^ s) A
       (hf := (Real.continuous_rpow_const hs0).continuousOn)
       (hφ := by
-        change Continuous (Matrix.reindex e e : CMatrix α -> CMatrix β)
+        change Continuous (Matrix.reindex e e : CMatrix α → CMatrix β)
         fun_prop)).symm
 
-namespace State
+end QIT
+
+namespace MState
 
 /-- Re-associate a product-channel output so that the second channel is the
 right-local channel with reference `(R × B₁)`. -/
@@ -258,48 +233,48 @@ theorem applyState_id_prod_prod_assoc_symm
     [Fintype r] [DecidableEq r]
     [Fintype a₁] [DecidableEq a₁] [Fintype b₁] [DecidableEq b₁]
     [Fintype a₂] [DecidableEq a₂] [Fintype b₂] [DecidableEq b₂]
-    (N₁ : Channel a₁ b₁) (N₂ : Channel a₂ b₂)
-    (ρ : State (Prod r (Prod a₁ a₂))) :
-    (((Channel.idChannel r).prod (N₁.prod N₂)).applyState ρ).reindex
+    (N₁ : CPTPMap a₁ b₁) (N₂ : CPTPMap a₂ b₂)
+    (ρ : MState (r × (a₁ × a₂))) :
+    MState.reindex (((CPTPOp.id (dIn := r)).prod (N₁.prod N₂)) ρ)
         (Equiv.prodAssoc r b₁ b₂).symm =
-      (((Channel.idChannel (Prod r b₁)).prod N₂).applyState
-        ((((Channel.idChannel r).prod (N₁.prod (Channel.idChannel a₂))).applyState ρ).reindex
+      (((CPTPOp.id (dIn := r × b₁)).prod N₂)
+        (MState.reindex ((((CPTPOp.id (dIn := r)).prod (N₁.prod (CPTPOp.id (dIn := a₂)))) ρ))
           (Equiv.prodAssoc r b₁ a₂).symm)) := by
-  apply State.ext
+  apply MState.ext
   ext x y
   rcases x with ⟨xRB1, xB2⟩
   rcases y with ⟨yRB1, yB2⟩
   rcases xRB1 with ⟨xR, xB1⟩
   rcases yRB1 with ⟨yR, yB1⟩
-  simp only [Channel.applyState, Channel.prod, State.reindex_matrix,
-    Matrix.submatrix_apply]
+  simp only [CPTPOp.mat_coe_eq_apply_mat, CPTPOp.prod_map,
+    MState.reindex_matrix, Matrix.submatrix_apply]
   rw [MatrixMap.kron_idChannel_left_apply_slice]
   rw [MatrixMap.kron_idChannel_left_apply_slice]
-  simp [Equiv.prodAssoc]
+  simp [Equiv.prodAssoc, -CPTPOp.id_map]
   simp_rw [MatrixMap.kron_idChannel_left_apply_slice]
   change MatrixMap.kron N₁.map N₂.map
-      (Matrix.of fun j j' => ρ.matrix (xR, j) (yR, j'))
+      (Matrix.of fun j j' => ρ.m (xR, j) (yR, j'))
       (xB1, xB2) (yB1, yB2) =
     N₂.map
       (Matrix.of fun j j' =>
-        (MatrixMap.kron N₁.map (Channel.idChannel a₂).map
-          (Matrix.of fun z z' => ρ.matrix (xR, z) (yR, z')))
+        (MatrixMap.kron N₁.map (CPTPOp.id (dIn := a₂)).map
+          (Matrix.of fun z z' => ρ.m (xR, z) (yR, z')))
           (xB1, j) (yB1, j'))
       xB2 yB2
   have hslice :
       (Matrix.of fun j j' =>
-        (MatrixMap.kron N₁.map (Channel.idChannel a₂).map
-          (Matrix.of fun z z' => ρ.matrix (xR, z) (yR, z')))
+        (MatrixMap.kron N₁.map (CPTPOp.id (dIn := a₂)).map
+          (Matrix.of fun z z' => ρ.m (xR, z) (yR, z')))
           (xB1, j) (yB1, j')) =
         (Matrix.of fun j j' =>
-          N₁.map (Matrix.of fun i i' => ρ.matrix (xR, (i, j)) (yR, (i', j'))) xB1 yB1) := by
+          N₁.map (Matrix.of fun i i' => ρ.m (xR, (i, j)) (yR, (i', j'))) xB1 yB1) := by
     ext j j'
     simp only [Matrix.of_apply]
     rw [MatrixMap.kron_idChannel_apply_slice]
     rfl
   rw [hslice]
   exact MatrixMap.kron_apply_slice_right
-    N₁.map N₂.map (Matrix.of fun j j' => ρ.matrix (xR, j) (yR, j'))
+    N₁.map N₂.map (Matrix.of fun j j' => ρ.m (xR, j) (yR, j'))
     xB1 yB1 xB2 yB2
 
 /-- The `(R × B₁)` marginal of the partially processed state is the output of
@@ -309,26 +284,26 @@ theorem partialProductOutput_marginalAB
     [Fintype r] [DecidableEq r]
     [Fintype a₁] [DecidableEq a₁] [Fintype b₁] [DecidableEq b₁]
     [Fintype a₂] [DecidableEq a₂]
-    (N₁ : Channel a₁ b₁) (ρ : State (Prod r (Prod a₁ a₂))) :
-    (((((Channel.idChannel r).prod (N₁.prod (Channel.idChannel a₂))).applyState ρ).reindex
+    (N₁ : CPTPMap a₁ b₁) (ρ : MState (r × (a₁ × a₂))) :
+    ((MState.reindex ((((CPTPOp.id (dIn := r)).prod (N₁.prod (CPTPOp.id (dIn := a₂)))) ρ))
           (Equiv.prodAssoc r b₁ a₂).symm).marginalAB) =
-      ((Channel.idChannel r).prod N₁).applyState
+      ((CPTPOp.id (dIn := r)).prod N₁)
         ((ρ.reindex (Equiv.prodAssoc r a₁ a₂).symm).marginalAB) := by
-  apply State.ext
+  apply MState.ext
   ext x y
   rcases x with ⟨xR, xB1⟩
   rcases y with ⟨yR, yB1⟩
-  simp only [State.marginalAB, State.marginalA, QIT.partialTraceB, State.reindex_matrix,
-    Channel.applyState, Channel.prod, Matrix.submatrix_apply]
-  simp [Equiv.prodAssoc]
+  simp only [MState.marginalAB_eq_traceRight, MState.traceRight_m, Matrix.traceRight,
+    Matrix.of_apply, MState.reindex_matrix, CPTPOp.mat_coe_eq_apply_mat, CPTPOp.prod_map]
+  simp [Equiv.prodAssoc, -CPTPOp.id_map]
   simp_rw [MatrixMap.kron_idChannel_left_apply_slice]
   change
     (∑ x_1 : a₂,
-      (MatrixMap.kron N₁.map (Channel.idChannel a₂).map
-        (Matrix.of fun j j' => ρ.matrix (xR, j) (yR, j')))
+      (MatrixMap.kron N₁.map (CPTPOp.id (dIn := a₂)).map
+        (Matrix.of fun j j' => ρ.m (xR, j) (yR, j')))
         (xB1, x_1) (yB1, x_1)) =
       N₁.map
-        (Matrix.of fun j j' => ∑ x_1 : a₂, ρ.matrix (xR, (j, x_1)) (yR, (j', x_1)))
+        (Matrix.of fun j j' => ∑ x_1 : a₂, ρ.m (xR, (j, x_1)) (yR, (j', x_1)))
         xB1 yB1
   simp_rw [MatrixMap.kron_idChannel_apply_slice]
   have hsum :=
@@ -336,14 +311,14 @@ theorem partialProductOutput_marginalAB
       (congrFun
         (map_sum N₁.map
           (fun x_1 : a₂ => Matrix.of fun i i' =>
-            ρ.matrix (xR, (i, x_1)) (yR, (i', x_1)))
+            ρ.m (xR, (i, x_1)) (yR, (i', x_1)))
           Finset.univ)
         xB1)
       yB1
   simp only [Matrix.sum_apply] at hsum
   have hmatrix :
-      (Matrix.of fun j j' => ∑ x_1 : a₂, ρ.matrix (xR, (j, x_1)) (yR, (j', x_1))) =
-        (∑ x_1 : a₂, Matrix.of fun i i' => ρ.matrix (xR, (i, x_1)) (yR, (i', x_1))) := by
+      (Matrix.of fun j j' => ∑ x_1 : a₂, ρ.m (xR, (j, x_1)) (yR, (j', x_1))) =
+        (∑ x_1 : a₂, Matrix.of fun i i' => ρ.m (xR, (i, x_1)) (yR, (i', x_1))) := by
     ext j j'
     simp [Matrix.sum_apply, Matrix.of_apply]
   rw [hmatrix]
@@ -353,14 +328,14 @@ theorem mutualInformation_bipartiteProduct
     {a₁ : Type u} {b₁ : Type v} {a₂ : Type w} {b₂ : Type x}
     [Fintype a₁] [DecidableEq a₁] [Fintype b₁] [DecidableEq b₁]
     [Fintype a₂] [DecidableEq a₂] [Fintype b₂] [DecidableEq b₂]
-    (ρ : State (Prod a₁ b₁)) (σ : State (Prod a₂ b₂)) :
+    (ρ : MState (a₁ × b₁)) (σ : MState (a₂ × b₂)) :
     mutualInformation (ρ.bipartiteProduct σ) =
       mutualInformation ρ + mutualInformation σ := by
   unfold mutualInformation
-  rw [State.bipartiteProduct_marginalA, State.bipartiteProduct_marginalB]
-  rw [State.vonNeumann_prod, State.vonNeumann_prod]
-  unfold State.bipartiteProduct
-  rw [State.vonNeumann_reindex, State.vonNeumann_prod]
+  rw [MState.bipartiteProduct_traceRight, MState.bipartiteProduct_traceLeft]
+  rw [MState.vonNeumann_prod, MState.vonNeumann_prod]
+  unfold MState.bipartiteProduct
+  rw [MState.vonNeumann_reindex, MState.vonNeumann_prod]
   ring
 
 /-- Chain-rule form used for the channel mutual-information additivity upper
@@ -375,30 +350,30 @@ theorem mutualInformation_assoc_chain
     {r : Type u} {b₁ : Type v} {b₂ : Type w}
     [Fintype r] [DecidableEq r] [Fintype b₁] [DecidableEq b₁]
     [Fintype b₂] [DecidableEq b₂]
-    (ρ : State (Prod (Prod r b₁) b₂)) :
+    (ρ : MState ((r × b₁) × b₂)) :
     mutualInformation (ρ.reindex (Equiv.prodAssoc r b₁ b₂)) =
       mutualInformation ρ.marginalAB + mutualInformation ρ -
         mutualInformation ρ.marginalBC := by
   unfold mutualInformation
   have hA :
-      (ρ.reindex (Equiv.prodAssoc r b₁ b₂)).marginalA =
-        ρ.marginalAB.marginalA := by
-    apply State.ext
+      (ρ.reindex (Equiv.prodAssoc r b₁ b₂)).traceRight =
+        ρ.marginalAB.traceRight := by
+    apply MState.ext
     ext x y
-    simp [State.reindex, State.marginalA, State.marginalAB, QIT.partialTraceB,
-      Equiv.prodAssoc, Fintype.sum_prod_type]
+    simp [MState.reindex_matrix, MState.marginalAB_eq_traceRight,
+      Matrix.traceRight, Equiv.prodAssoc, Fintype.sum_prod_type]
   have hB :
-      (ρ.reindex (Equiv.prodAssoc r b₁ b₂)).marginalB =
+      (ρ.reindex (Equiv.prodAssoc r b₁ b₂)).traceLeft =
         ρ.marginalBC := by
-    apply State.ext
+    apply MState.ext
     ext x y
-    simp [State.reindex, State.marginalB, State.marginalBC, QIT.partialTraceA,
-      Equiv.prodAssoc]
-  rw [hA, hB, State.vonNeumann_reindex]
-  rw [State.marginalAB_eq_marginalA]
-  rw [State.marginalBC_marginalA_eq_marginalBOfABC,
-    State.marginalBC_marginalB_eq_marginalB]
-  rw [State.marginalBOfABC_eq, State.marginalAB_eq_marginalA]
+    simp [MState.reindex_matrix, MState.marginalBC_matrix,
+      Matrix.traceLeft, Equiv.prodAssoc]
+  rw [hA, hB, MState.vonNeumann_reindex]
+  rw [MState.marginalAB_eq_traceRight]
+  rw [MState.marginalBC_traceRight_eq_marginalBOfABC,
+    MState.marginalBC_traceLeft_eq_traceLeft]
+  rw [MState.marginalBOfABC_eq, MState.marginalAB_eq_traceRight]
   ring
 
 /-- Chain-rule upper bound obtained from
@@ -408,76 +383,76 @@ theorem mutualInformation_assoc_le
     {r : Type u} {b₁ : Type v} {b₂ : Type w}
     [Fintype r] [DecidableEq r] [Fintype b₁] [DecidableEq b₁]
     [Fintype b₂] [DecidableEq b₂]
-    (ρ : State (Prod (Prod r b₁) b₂)) :
+    (ρ : MState ((r × b₁) × b₂)) :
     mutualInformation (ρ.reindex (Equiv.prodAssoc r b₁ b₂)) ≤
       mutualInformation ρ.marginalAB + mutualInformation ρ := by
-  rw [State.mutualInformation_assoc_chain]
+  rw [MState.mutualInformation_assoc_chain]
   have hnonneg : 0 ≤ mutualInformation ρ.marginalBC :=
-    State.mutualInformation_nonneg ρ.marginalBC
+    MState.mutualInformation_nonneg ρ.marginalBC
   linarith
 
 /-- Mutual information is additive on IID bipartite tensor powers:
 `I(A^n;B^n)_{ρ^{⊗n}} = n I(A;B)_ρ`. -/
-theorem mutualInformation_tensorPowerBipartite (ρ : State (Prod a b)) (n : ℕ) :
+theorem mutualInformation_tensorPowerBipartite (ρ : MState (a × b)) (n : ℕ) :
     mutualInformation (ρ.tensorPowerBipartite n) =
       (n : ℝ) * mutualInformation ρ := by
   unfold mutualInformation
-  rw [ρ.tensorPowerBipartite_marginalA n,
-    ρ.tensorPowerBipartite_marginalB n]
-  rw [State.vonNeumann_tensorPower,
-    State.vonNeumann_tensorPower,
+  rw [ρ.tensorPowerBipartite_traceRight n,
+    ρ.tensorPowerBipartite_traceLeft n]
+  rw [MState.vonNeumann_tensorPower,
+    MState.vonNeumann_tensorPower,
     show vonNeumann (ρ.tensorPowerBipartite n) =
       vonNeumann ((ρ.tensorPower n).reindex (tensorPowerProdEquiv a b n)) from rfl,
-    State.vonNeumann_reindex,
-    State.vonNeumann_tensorPower]
+    MState.vonNeumann_reindex,
+    MState.vonNeumann_tensorPower]
   ring
 
 /-- PSD-domain Petz--Renyi divergence is invariant under simultaneous finite
-basis relabeling in the source range `0 <= alpha <= 1`. -/
+basis relabeling in the source range `0 ≤ alpha ≤ 1`. -/
 theorem petzRenyiPSDFinite_reindex {α : Type u} {β : Type v}
     [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
-    (ρ σ : State α) (e : α ≃ β)
+    (ρ σ : MState α) (e : α ≃ β)
     (alphaR : ℝ) (halpha_pos : 0 < alphaR) (halpha_lt_one : alphaR < 1) :
     (ρ.reindex e).petzRenyiPSDFinite (σ.reindex e)
         alphaR halpha_pos (ne_of_lt halpha_lt_one) =
       ρ.petzRenyiPSDFinite σ alphaR halpha_pos (ne_of_lt halpha_lt_one) := by
-  unfold State.petzRenyiPSDFinite
+  unfold MState.petzRenyiPSDFinite
   have halpha_nonneg : 0 ≤ alphaR := le_of_lt halpha_pos
   have hone_sub_nonneg : 0 ≤ 1 - alphaR := sub_nonneg.mpr (le_of_lt halpha_lt_one)
-  rw [State.reindex_matrix, State.reindex_matrix]
+  rw [MState.reindex_matrix, MState.reindex_matrix]
   change (1 / (alphaR - 1)) *
-      log2 (((CFC.rpow (Matrix.reindex e e ρ.matrix) alphaR *
-        CFC.rpow (Matrix.reindex e e σ.matrix) (1 - alphaR)).trace).re) =
+      log2 (((CFC.rpow (Matrix.reindex e e ρ.m) alphaR *
+        CFC.rpow (Matrix.reindex e e σ.m) (1 - alphaR)).trace).re) =
     (1 / (alphaR - 1)) *
-      log2 (((CFC.rpow ρ.matrix alphaR *
-        CFC.rpow σ.matrix (1 - alphaR)).trace).re)
-  rw [cMatrix_rpow_reindex_nonneg e ρ.matrix ρ.pos halpha_nonneg]
-  rw [cMatrix_rpow_reindex_nonneg e σ.matrix σ.pos hone_sub_nonneg]
+      log2 (((CFC.rpow ρ.m alphaR *
+        CFC.rpow σ.m (1 - alphaR)).trace).re)
+  rw [cMatrix_rpow_reindex_nonneg e ρ.m ρ.psd halpha_nonneg]
+  rw [cMatrix_rpow_reindex_nonneg e σ.m σ.psd hone_sub_nonneg]
   change (1 / (alphaR - 1)) *
-      log2 ((((Matrix.reindexAlgEquiv ℂ ℂ e) (CFC.rpow ρ.matrix alphaR) *
+      log2 ((((Matrix.reindexAlgEquiv ℂ ℂ e) (CFC.rpow ρ.m alphaR) *
         (Matrix.reindexAlgEquiv ℂ ℂ e)
-          (CFC.rpow σ.matrix (1 - alphaR))).trace).re) =
+          (CFC.rpow σ.m (1 - alphaR))).trace).re) =
     (1 / (alphaR - 1)) *
-      log2 (((CFC.rpow ρ.matrix alphaR *
-        CFC.rpow σ.matrix (1 - alphaR)).trace).re)
+      log2 (((CFC.rpow ρ.m alphaR *
+        CFC.rpow σ.m (1 - alphaR)).trace).re)
   rw [← map_mul (Matrix.reindexAlgEquiv ℂ ℂ e)
-    (CFC.rpow ρ.matrix alphaR) (CFC.rpow σ.matrix (1 - alphaR))]
+    (CFC.rpow ρ.m alphaR) (CFC.rpow σ.m (1 - alphaR))]
   change (1 / (alphaR - 1)) *
       log2 (((Matrix.reindex e e
-        (CFC.rpow ρ.matrix alphaR *
-          CFC.rpow σ.matrix (1 - alphaR))).trace).re) =
+        (CFC.rpow ρ.m alphaR *
+          CFC.rpow σ.m (1 - alphaR))).trace).re) =
     (1 / (alphaR - 1)) *
-      log2 (((CFC.rpow ρ.matrix alphaR *
-        CFC.rpow σ.matrix (1 - alphaR)).trace).re)
+      log2 (((CFC.rpow ρ.m alphaR *
+        CFC.rpow σ.m (1 - alphaR)).trace).re)
   rw [cMatrix_trace_reindex e]
 
 /-- The product-marginal Petz coefficient is strictly positive in the source
 range `0 < alpha < 1`, because the product-marginal Nussbaum--Szkola model has
 nonempty common support. -/
 theorem petzRenyiCoefficient_productMarginal_pos
-    (ρ : State (Prod a b)) {alphaR : ℝ}
+    (ρ : MState (a × b)) {alphaR : ℝ}
     (halpha_pos : 0 < alphaR) (halpha_lt_one : alphaR < 1) :
-    0 < ρ.petzRenyiCoefficient (ρ.marginalA.prod ρ.marginalB) alphaR := by
+    0 < ρ.petzRenyiCoefficient (ρ.traceRight.prod ρ.traceLeft) alphaR := by
   classical
   let M := BinaryHypothesisTest.productMarginalNussbaumSzkolaModel ρ
   have hpq : M.pDistribution.SupportedBy M.q := by
@@ -496,7 +471,7 @@ theorem petzRenyiCoefficient_productMarginal_pos
       (M := M) halpha_pos halpha_lt_one
   have hcoeff :
       M.petzChernoffCoefficient alphaR =
-        ρ.petzRenyiCoefficient (ρ.marginalA.prod ρ.marginalB) alphaR := by
+        ρ.petzRenyiCoefficient (ρ.traceRight.prod ρ.traceLeft) alphaR := by
     simpa [M] using
       BinaryHypothesisTest.productMarginalNussbaumSzkolaModel_petzChernoffCoefficient_eq
         ρ (le_of_lt halpha_pos) (le_of_lt halpha_lt_one)
@@ -505,24 +480,22 @@ theorem petzRenyiCoefficient_productMarginal_pos
 /-- PSD-domain Petz--Renyi divergence is additive on IID tensor powers when
 the base coefficient is positive. -/
 theorem petzRenyiPSDFinite_tensorPower
-    {α : Type u} [Fintype α] [DecidableEq α] (ρ σ : State α)
+    {α : Type u} [Fintype α] [DecidableEq α] (ρ σ : MState α)
     {alphaR : ℝ} (halpha_pos : 0 < alphaR) (halpha_lt_one : alphaR < 1)
     (hcoeff : 0 < ρ.petzRenyiCoefficient σ alphaR) (n : ℕ) :
     (ρ.tensorPower n).petzRenyiPSDFinite (σ.tensorPower n)
         alphaR halpha_pos (ne_of_lt halpha_lt_one) =
       (n : ℝ) * ρ.petzRenyiPSDFinite σ alphaR halpha_pos (ne_of_lt halpha_lt_one) := by
-  unfold State.petzRenyiPSDFinite
-  have halpha_nonneg : 0 ≤ alphaR := le_of_lt halpha_pos
-  have halpha_le_one : alphaR ≤ 1 := le_of_lt halpha_lt_one
+  unfold MState.petzRenyiPSDFinite
   have htrace_tensor :
-      ((CFC.rpow (ρ.tensorPower n).matrix alphaR *
-          CFC.rpow (σ.tensorPower n).matrix (1 - alphaR)).trace).re =
+      ((CFC.rpow (ρ.tensorPower n).m alphaR *
+          CFC.rpow (σ.tensorPower n).m (1 - alphaR)).trace).re =
         ((ρ.petzRenyiCoefficient σ alphaR : ℝ) ^ n) := by
     have htrace :
-        ((CFC.rpow (ρ.tensorPower n).matrix alphaR *
-            CFC.rpow (σ.tensorPower n).matrix (1 - alphaR)).trace).re =
+        ((CFC.rpow (ρ.tensorPower n).m alphaR *
+            CFC.rpow (σ.tensorPower n).m (1 - alphaR)).trace).re =
           (((ρ.tensorPower n).petzRenyiCoefficient (σ.tensorPower n) alphaR : ℝ)) := by
-      have h := State.petzRenyiCoefficient_trace_eq
+      have h := MState.petzRenyiCoefficient_trace_eq
         (ρ.tensorPower n) (σ.tensorPower n) alphaR
       have hre := congrArg Complex.re h
       simpa using hre.symm
@@ -530,33 +503,32 @@ theorem petzRenyiPSDFinite_tensorPower
         (((ρ.tensorPower n).petzRenyiCoefficient
             (σ.tensorPower n) alphaR : ℝ) =
           ((ρ.petzRenyiCoefficient σ alphaR : ℝ) ^ n)) := by
-      exact_mod_cast State.petzRenyiCoefficient_tensorPower
-        ρ σ halpha_nonneg halpha_le_one n
+      exact_mod_cast MState.petzRenyiCoefficient_tensorPower ρ σ alphaR n
     rw [htrace, hcoeff_tensor]
   have htrace_base :
-      ((CFC.rpow ρ.matrix alphaR *
-          CFC.rpow σ.matrix (1 - alphaR)).trace).re =
+      ((CFC.rpow ρ.m alphaR *
+          CFC.rpow σ.m (1 - alphaR)).trace).re =
         (ρ.petzRenyiCoefficient σ alphaR : ℝ) := by
-    have h := State.petzRenyiCoefficient_trace_eq ρ σ alphaR
+    have h := MState.petzRenyiCoefficient_trace_eq ρ σ alphaR
     have hre := congrArg Complex.re h
     simpa using hre.symm
   change (1 / (alphaR - 1)) *
-      log2 ((CFC.rpow (ρ.tensorPower n).matrix alphaR *
-        CFC.rpow (σ.tensorPower n).matrix (1 - alphaR)).trace).re =
+      log2 ((CFC.rpow (ρ.tensorPower n).m alphaR *
+        CFC.rpow (σ.tensorPower n).m (1 - alphaR)).trace).re =
     (n : ℝ) *
       ((1 / (alphaR - 1)) *
-        log2 ((CFC.rpow ρ.matrix alphaR *
-          CFC.rpow σ.matrix (1 - alphaR)).trace).re)
+        log2 ((CFC.rpow ρ.m alphaR *
+          CFC.rpow σ.m (1 - alphaR)).trace).re)
   rw [htrace_tensor, htrace_base]
   have hcoeff_real_pos : 0 < (ρ.petzRenyiCoefficient σ alphaR : ℝ) := by
     exact_mod_cast hcoeff
-  rw [log2_pow_nat (ρ.petzRenyiCoefficient σ alphaR : ℝ) n]
+  rw [log2_pow (ρ.petzRenyiCoefficient σ alphaR : ℝ) n]
   ring
 
 /-- PSD-domain barred Petz--Renyi mutual information is additive on IID
 bipartite tensor powers. -/
 theorem barPetzRenyiMutualInformationPSDFinite_tensorPowerBipartite
-    (ρ : State (Prod a b)) {alphaR : ℝ}
+    (ρ : MState (a × b)) {alphaR : ℝ}
     (halpha_pos : 0 < alphaR) (halpha_lt_one : alphaR < 1) (n : ℕ) :
     (ρ.tensorPowerBipartite n).barPetzRenyiMutualInformationPSDFinite
         alphaR halpha_pos (ne_of_lt halpha_lt_one) =
@@ -564,55 +536,51 @@ theorem barPetzRenyiMutualInformationPSDFinite_tensorPowerBipartite
         ρ.barPetzRenyiMutualInformationPSDFinite
           alphaR halpha_pos (ne_of_lt halpha_lt_one) := by
   have hcomp :
-      (ρ.tensorPowerBipartite n).marginalA.prod
-          (ρ.tensorPowerBipartite n).marginalB =
-        (ρ.marginalA.prod ρ.marginalB).tensorPowerBipartite n := by
+      (ρ.tensorPowerBipartite n).traceRight.prod
+          (ρ.tensorPowerBipartite n).traceLeft =
+        (ρ.traceRight.prod ρ.traceLeft).tensorPowerBipartite n := by
     calc
-      (ρ.tensorPowerBipartite n).marginalA.prod
-          (ρ.tensorPowerBipartite n).marginalB =
-        (ρ.marginalA.tensorPower n).prod
-          (ρ.marginalB.tensorPower n) := by
-          rw [ρ.tensorPowerBipartite_marginalA n,
-            ρ.tensorPowerBipartite_marginalB n]
-      _ = (ρ.marginalA.prod ρ.marginalB).tensorPowerBipartite n :=
-          (State.prod_tensorPowerBipartite ρ.marginalA ρ.marginalB n).symm
-  unfold State.barPetzRenyiMutualInformationPSDFinite
+      (ρ.tensorPowerBipartite n).traceRight.prod
+          (ρ.tensorPowerBipartite n).traceLeft =
+        (ρ.traceRight.tensorPower n).prod
+          (ρ.traceLeft.tensorPower n) := by
+          rw [ρ.tensorPowerBipartite_traceRight n,
+            ρ.tensorPowerBipartite_traceLeft n]
+      _ = (ρ.traceRight.prod ρ.traceLeft).tensorPowerBipartite n :=
+          (MState.prod_tensorPowerBipartite ρ.traceRight ρ.traceLeft n).symm
+  unfold MState.barPetzRenyiMutualInformationPSDFinite
   calc
     (ρ.tensorPowerBipartite n).petzRenyiPSDFinite
-        ((ρ.tensorPowerBipartite n).marginalA.prod
-          (ρ.tensorPowerBipartite n).marginalB)
+        ((ρ.tensorPowerBipartite n).traceRight.prod
+          (ρ.tensorPowerBipartite n).traceLeft)
         alphaR halpha_pos (ne_of_lt halpha_lt_one) =
       (ρ.tensorPowerBipartite n).petzRenyiPSDFinite
-        ((ρ.marginalA.prod ρ.marginalB).tensorPowerBipartite n)
+        ((ρ.traceRight.prod ρ.traceLeft).tensorPowerBipartite n)
         alphaR halpha_pos (ne_of_lt halpha_lt_one) := by
-        unfold State.petzRenyiPSDFinite
-        rw [congrArg State.matrix hcomp]
+        unfold MState.petzRenyiPSDFinite
+        rw [congrArg DensityOp.m hcomp]
     _ =
       (n : ℝ) *
-        ρ.petzRenyiPSDFinite (ρ.marginalA.prod ρ.marginalB)
+        ρ.petzRenyiPSDFinite (ρ.traceRight.prod ρ.traceLeft)
           alphaR halpha_pos (ne_of_lt halpha_lt_one) := by
         change
           ((ρ.tensorPower n).reindex (tensorPowerProdEquiv a b n)).petzRenyiPSDFinite
-            (((ρ.marginalA.prod ρ.marginalB).tensorPower n).reindex
+            (((ρ.traceRight.prod ρ.traceLeft).tensorPower n).reindex
               (tensorPowerProdEquiv a b n))
             alphaR halpha_pos (ne_of_lt halpha_lt_one) =
           (n : ℝ) *
-            ρ.petzRenyiPSDFinite (ρ.marginalA.prod ρ.marginalB)
+            ρ.petzRenyiPSDFinite (ρ.traceRight.prod ρ.traceLeft)
               alphaR halpha_pos (ne_of_lt halpha_lt_one)
-        rw [State.petzRenyiPSDFinite_reindex
+        rw [MState.petzRenyiPSDFinite_reindex
           (ρ.tensorPower n)
-          ((ρ.marginalA.prod ρ.marginalB).tensorPower n)
+          ((ρ.traceRight.prod ρ.traceLeft).tensorPower n)
           (tensorPowerProdEquiv a b n)
           alphaR halpha_pos halpha_lt_one]
-        exact State.petzRenyiPSDFinite_tensorPower ρ
-          (ρ.marginalA.prod ρ.marginalB)
+        exact MState.petzRenyiPSDFinite_tensorPower ρ
+          (ρ.traceRight.prod ρ.traceLeft)
           halpha_pos halpha_lt_one
-          (State.petzRenyiCoefficient_productMarginal_pos
+          (MState.petzRenyiCoefficient_productMarginal_pos
             ρ halpha_pos halpha_lt_one)
           n
 
-end State
-
-end
-
-end QIT
+end MState

@@ -14,7 +14,7 @@ public import QuantumLib.QIT.Information.Entropy.Log2Lemmas
 # Optimized conditional-min-entropy extractor bound
 
 This module adds the slack step from feasible conditional-min-entropy
-candidates to the optimized `State.conditionalMinEntropy` value.  The slack is
+candidates to the optimized `MState.conditionalMinEntropy` value.  The slack is
 kept explicit, so no theorem asserts that the supremum defining the entropy is
 attained.
 -/
@@ -23,48 +23,47 @@ attained.
 
 open scoped ComplexOrder MatrixOrder NNReal
 
-namespace QIT
-
+noncomputable section
 universe uF uZ uS ue
 
-noncomputable section
+open QIT
 
-namespace State
+namespace MState
 
 variable {a : Type uZ} {b : Type ue}
 variable [Fintype a] [DecidableEq a]
 variable [Fintype b] [DecidableEq b]
 
 /-- A full-rank perturbation of a side-information state. -/
-def fullRankPerturb [Nonempty b] (σ : State b) (t : ℝ)
-    (ht0 : 0 ≤ t) (ht1 : t ≤ 1) : State b where
-  matrix := t • σ.matrix + (1 - t) • (maximallyMixed b).matrix
-  pos := by
+def fullRankPerturb [Nonempty b] (σ : MState b) (t : ℝ)
+    (ht0 : 0 ≤ t) (ht1 : t ≤ 1) : MState b := .ofMatrix
+  (matrix := t • σ.m + (1 - t) • (MState.uniform : MState b).m)
+  (pos := by
     exact Matrix.PosSemidef.add
-      (Matrix.PosSemidef.smul σ.pos ht0)
-      (Matrix.PosSemidef.smul (maximallyMixed b).pos (sub_nonneg.mpr ht1))
-  trace_eq_one := by
+      (Matrix.PosSemidef.smul σ.psd ht0)
+      (Matrix.PosSemidef.smul (MState.uniform : MState b).psd (sub_nonneg.mpr ht1)))
+  (trace_eq_one := by
     rw [Matrix.trace_add, Matrix.trace_smul, Matrix.trace_smul,
-      σ.trace_eq_one, (maximallyMixed b).trace_eq_one]
-    norm_num
+      σ.tr', (MState.uniform : MState b).tr']
+    norm_num)
 
 @[simp]
-theorem fullRankPerturb_matrix [Nonempty b] (σ : State b) (t : ℝ)
+theorem fullRankPerturb_matrix [Nonempty b] (σ : MState b) (t : ℝ)
     (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
-    (fullRankPerturb σ t ht0 ht1).matrix =
-      t • σ.matrix + (1 - t) • (maximallyMixed b).matrix :=
-  rfl
+    (fullRankPerturb σ t ht0 ht1).m =
+      t • σ.m + (1 - t) • (MState.uniform : MState b).m :=
+  MState.matrix_ofMatrix _ _ _
 
 /-- A nontrivial full-rank perturbation is positive definite. -/
-theorem fullRankPerturb_posDef [Nonempty b] (σ : State b) {t : ℝ}
+theorem fullRankPerturb_posDef [Nonempty b] (σ : MState b) {t : ℝ}
     (ht0 : 0 ≤ t) (ht1 : t ≤ 1) (ht_lt : t < 1) :
-    (fullRankPerturb σ t ht0 ht1).matrix.PosDef := by
+    (fullRankPerturb σ t ht0 ht1).m.PosDef := by
   have hσ :
-      (t • σ.matrix).PosSemidef :=
-    Matrix.PosSemidef.smul σ.pos ht0
+      (t • σ.m).PosSemidef :=
+    Matrix.PosSemidef.smul σ.psd ht0
   have hmm :
-      ((1 - t) • (maximallyMixed b).matrix).PosDef :=
-    Matrix.PosDef.smul (maximallyMixed_posDef (a := b)) (sub_pos.mpr ht_lt)
+      ((1 - t) • (MState.uniform : MState b).m).PosDef :=
+    Matrix.PosDef.smul (MState.uniform_posDef (d := b)) (sub_pos.mpr ht_lt)
   simpa [fullRankPerturb] using Matrix.PosDef.posSemidef_add hσ hmm
 
 private theorem rpow_two_neg_sub_mul_rpow_two_neg (lam η : ℝ) :
@@ -81,11 +80,11 @@ Any normalized conditional-min feasible witness can be made positive definite
 after losing an arbitrary positive exponent slack.
 -/
 theorem ConditionalMinEntropyFeasible.exists_posDef_of_sub_slack
-    [Nonempty b] {ρ : State (Prod a b)} {σ : State b} {lam η : ℝ}
+    [Nonempty b] {ρ : MState (a × b)} {σ : MState b} {lam η : ℝ}
     (hη : 0 < η)
     (hfeas : ConditionalMinEntropyFeasible (a := a) ρ σ lam) :
-    ∃ τ : State b,
-      τ.matrix.PosDef ∧ ConditionalMinEntropyFeasible (a := a) ρ τ (lam - η) := by
+    ∃ τ : MState b,
+      τ.m.PosDef ∧ ConditionalMinEntropyFeasible (a := a) ρ τ (lam - η) := by
   let t : ℝ := Real.rpow 2 (-η)
   have ht0 : 0 ≤ t := by
     dsimp [t]
@@ -99,7 +98,7 @@ theorem ConditionalMinEntropyFeasible.exists_posDef_of_sub_slack
             rw [Real.rpow_neg (by norm_num : (0 : ℝ) ≤ 2)]
       _ < 1 := inv_lt_one_of_one_lt₀ hpow_gt
   have ht1 : t ≤ 1 := le_of_lt ht_lt
-  let τ : State b := fullRankPerturb σ t ht0 ht1
+  let τ : MState b := fullRankPerturb σ t ht0 ht1
   refine ⟨τ, fullRankPerturb_posDef σ ht0 ht1 ht_lt, ?_⟩
   rw [ConditionalMinEntropyFeasible] at hfeas ⊢
   let cMu : ℝ := Real.rpow 2 (-(lam - η))
@@ -113,7 +112,7 @@ theorem ConditionalMinEntropyFeasible.exists_posDef_of_sub_slack
       (cMu : ℂ) • identityTensorStateMatrix (a := a) τ =
         (cLam : ℂ) • identityTensorStateMatrix (a := a) σ +
           ((cMu * (1 - t) : ℝ) : ℂ) •
-            identityTensorStateMatrix (a := a) (maximallyMixed b) := by
+            identityTensorStateMatrix (a := a) (MState.uniform : MState b) := by
     ext x y
     by_cases hxy : x.1 = y.1
     · simp [τ, fullRankPerturb, identityTensorStateMatrix, Matrix.kronecker,
@@ -124,23 +123,25 @@ theorem ConditionalMinEntropyFeasible.exists_posDef_of_sub_slack
         Matrix.kroneckerMap_apply, Matrix.one_apply, hxy]
   have hterm_psd :
       (((cMu * (1 - t) : ℝ) : ℂ) •
-          identityTensorStateMatrix (a := a) (maximallyMixed b)).PosSemidef := by
+          identityTensorStateMatrix (a := a) (MState.uniform : MState b)).PosSemidef := by
     have hcMu : 0 ≤ cMu := by
       dsimp [cMu]
       exact Real.rpow_nonneg (by norm_num : (0 : ℝ) ≤ 2) (-(lam - η))
     have hcoeff : (0 : ℂ) ≤ (((cMu * (1 - t) : ℝ) : ℂ)) := by
       exact_mod_cast mul_nonneg hcMu (sub_nonneg.mpr ht1)
     exact Matrix.PosSemidef.smul
-      (identityTensorStateMatrix_posSemidef (a := a) (maximallyMixed b)) hcoeff
+      (identityTensorStateMatrix_posSemidef (a := a) (MState.uniform : MState b)) hcoeff
   have hterm_nonneg :
-      (0 : CMatrix (Prod a b)) ≤
+      (0 : CMatrix (a × b)) ≤
         ((cMu * (1 - t) : ℝ) : ℂ) •
-          identityTensorStateMatrix (a := a) (maximallyMixed b) := by
+          identityTensorStateMatrix (a := a) (MState.uniform : MState b) := by
     simpa [Matrix.le_iff] using hterm_psd
   rw [hside]
   exact le_trans hfeas (le_add_of_nonneg_right hterm_nonneg)
 
-end State
+end MState
+
+namespace QIT
 
 namespace Security
 
@@ -159,15 +160,6 @@ private theorem rpow_two_two_mul_log2_pos {x : ℝ} (hx : 0 < x) :
           exact Real.rpow_mul (by norm_num : (0 : ℝ) ≤ 2) (log2 x) (2 : ℝ)
     _ = x ^ (2 : ℝ) := by rw [rpow_two_log2_pos hx]
     _ = x ^ 2 := by exact Real.rpow_two x
-
-private theorem rpow_two_log2_sub_eq_mul_rpow_neg {x h : ℝ} (hx : 0 < x) :
-    Real.rpow 2 (log2 x - h) = x * Real.rpow 2 (-h) := by
-  calc
-    Real.rpow 2 (log2 x - h) =
-        Real.rpow 2 (log2 x + -h) := by ring_nf
-    _ = Real.rpow 2 (log2 x) * Real.rpow 2 (-h) := by
-          exact Real.rpow_add (by norm_num : (0 : ℝ) < 2) (log2 x) (-h)
-    _ = x * Real.rpow 2 (-h) := by rw [rpow_two_log2_pos hx]
 
 private theorem rpow_two_neg_two_mul_log2_one_div_pos {ε : ℝ} (hε : 0 < ε) :
     Real.rpow 2 (-2 * log2 (1 / ε)) = ε ^ 2 := by
@@ -192,7 +184,7 @@ private theorem sqrt_mul_rpow_two_neg_le_of_log2_le_sub_two_log2_one_div
       Real.rpow 2 (log2 x - h) ≤
         Real.rpow 2 (-2 * log2 (1 / ε)) :=
     Real.rpow_le_rpow_of_exponent_le (by norm_num : (1 : ℝ) ≤ 2) hexponent
-  rw [rpow_two_log2_sub_eq_mul_rpow_neg hx,
+  rw [rpow_two_log2_sub hx,
     rpow_two_neg_two_mul_log2_one_div_pos hε] at hpow
   have hsqrt :
       Real.sqrt (x * Real.rpow 2 (-h)) ≤ Real.sqrt (ε ^ 2) :=
@@ -214,15 +206,15 @@ used or asserted.
 -/
 theorem extractorSecrecyDistance_le_sqrt_card_mul_rpow_of_collisionUniform_conditionalMinEntropy_sub_slack
     (H : HashFamily F Z S) (hH : H.CollisionUniform)
-    (E : Ensemble Z e) {η : ℝ} (hη : 0 < η) :
+    (E : MEnsemble e Z) {η : ℝ} (hη : 0 < η) :
     extractorSecrecyDistance (extractorOutputState H E) ≤
       Real.sqrt
         ((Fintype.card S : ℝ) *
           Real.rpow 2 (-(E.cqState.conditionalMinEntropy - η))) := by
   classical
-  have hprod : Nonempty (Prod Z e) := E.cqState.nonempty
-  let : Nonempty (Prod Z e) := hprod
-  let prodWitness : Prod Z e := Classical.choice hprod
+  have hprod : Nonempty (Z × e) := E.cqState.nonempty
+  let : Nonempty (Z × e) := hprod
+  let prodWitness : Z × e := Classical.choice hprod
   let : Nonempty Z := ⟨prodWitness.1⟩
   let : Nonempty e := ⟨prodWitness.2⟩
   let δ : ℝ := η / 2
@@ -233,8 +225,8 @@ theorem extractorSecrecyDistance_le_sqrt_card_mul_rpow_of_collisionUniform_condi
       E.cqState.conditionalMinEntropyFeasibleExponentValueSet_nonempty (a := Z)
   have hs_eq :
       E.cqState.conditionalMinEntropy = sSup s := by
-    simp [s, State.conditionalMinEntropy_eq,
-      State.conditionalMinEntropyFeasibleExponentValueSet]
+    simp [s, MState.conditionalMinEntropy_eq,
+      MState.conditionalMinEntropyFeasibleExponentValueSet]
   have hlt_sup :
       E.cqState.conditionalMinEntropy - δ < sSup s := by
     rw [← hs_eq]
@@ -242,7 +234,7 @@ theorem extractorSecrecyDistance_le_sqrt_card_mul_rpow_of_collisionUniform_condi
   rcases exists_lt_of_lt_csSup hs_nonempty hlt_sup with
     ⟨lam, hlam_mem, hlt_lam⟩
   rcases hlam_mem with ⟨σ, hσfeas⟩
-  rcases State.ConditionalMinEntropyFeasible.exists_posDef_of_sub_slack
+  rcases MState.ConditionalMinEntropyFeasible.exists_posDef_of_sub_slack
       (a := Z) (b := e) (η := δ) hδ_pos hσfeas with
     ⟨τ, hτ_pos, hτ_feas⟩
   have hbase :
@@ -265,7 +257,7 @@ theorem extractorSecrecyDistance_le_sqrt_card_mul_rpow_of_collisionUniform_condi
 omit [DecidableEq S] [Nonempty S] in
 /-- Right-continuity at zero of the direct leftover-hash bound's slack factor. -/
 private theorem extractorSecrecyDistance_conditionalMinEntropy_slack_rhs_tendsto
-    (E : Ensemble Z e) :
+    (E : MEnsemble e Z) :
     Filter.Tendsto
       (fun η : ℝ =>
         Real.sqrt
@@ -286,8 +278,7 @@ private theorem extractorSecrecyDistance_conditionalMinEntropy_slack_rhs_tendsto
       (fun η : ℝ =>
         Real.sqrt
           ((Fintype.card S : ℝ) *
-            Real.rpow 2 (-(E.cqState.conditionalMinEntropy - η))))
-      :=
+            Real.rpow 2 (-(E.cqState.conditionalMinEntropy - η)))) :=
     Real.continuous_sqrt.comp (continuous_const.mul hrpow)
   have hcont0 : ContinuousAt
       (fun η : ℝ =>
@@ -307,7 +298,7 @@ assert that the supremum defining conditional min-entropy is attained.
 -/
 theorem extractorSecrecyDistance_le_sqrt_card_mul_rpow_of_collisionUniform_conditionalMinEntropy
     (H : HashFamily F Z S) (hH : H.CollisionUniform)
-    (E : Ensemble Z e) :
+    (E : MEnsemble e Z) :
     extractorSecrecyDistance (extractorOutputState H E) ≤
       Real.sqrt
         ((Fintype.card S : ℝ) *
@@ -332,7 +323,7 @@ secrecy guarantee back to `E`.
 -/
 theorem isEpsilonSecretExtractor_of_collisionUniform_cqSmoothConditionalMinEntropyCandidate_le
     (H : HashFamily F Z S) (hH : H.CollisionUniform)
-    (E : Ensemble Z e) {ε₁ ε₂ h : ℝ}
+    (E : MEnsemble e Z) {ε₁ ε₂ h : ℝ}
     (hcq : E.CqSmoothConditionalMinEntropyCandidate ε₁ h)
     (hε :
       Real.sqrt ((Fintype.card S : ℝ) * Real.rpow 2 (-h)) ≤ ε₂) :
@@ -361,7 +352,7 @@ hash family's output length.
 -/
 theorem outputLengthAchievable_of_collisionUniform_conditionalMinEntropy_le
     (H : HashFamily F Z S) (hH : H.CollisionUniform)
-    (E : Ensemble Z e) {ε : ℝ}
+    (E : MEnsemble e Z) {ε : ℝ}
     (hε :
       Real.sqrt
         ((Fintype.card S : ℝ) *
@@ -379,7 +370,7 @@ family's output length with the expected `2ε₁ + ε₂` smoothing/stability lo
 -/
 theorem outputLengthAchievable_of_collisionUniform_cqSmoothConditionalMinEntropyCandidate_le
     (H : HashFamily F Z S) (hH : H.CollisionUniform)
-    (E : Ensemble Z e) {ε₁ ε₂ h : ℝ}
+    (E : MEnsemble e Z) {ε₁ ε₂ h : ℝ}
     (hcq : E.CqSmoothConditionalMinEntropyCandidate ε₁ h)
     (hε :
       Real.sqrt ((Fintype.card S : ℝ) * Real.rpow 2 (-h)) ≤ ε₂) :
@@ -395,7 +386,7 @@ The direct source-form leftover-hash bound contributes the concrete
 -/
 theorem extractableRandomnessLogValue_mem_of_collisionUniform_conditionalMinEntropy_le
     (H : HashFamily F Z S) (hH : H.CollisionUniform)
-    (E : Ensemble Z e) {ε : ℝ}
+    (E : MEnsemble e Z) {ε : ℝ}
     (hε :
       Real.sqrt
         ((Fintype.card S : ℝ) *
@@ -413,7 +404,7 @@ extractable-randomness value set after the `2ε₁ + ε₂` stability loss.
 -/
 theorem extractableRandomnessLogValue_mem_of_collisionUniform_cqSmoothConditionalMinEntropyCandidate_le
     (H : HashFamily F Z S) (hH : H.CollisionUniform)
-    (E : Ensemble Z e) {ε₁ ε₂ h : ℝ}
+    (E : MEnsemble e Z) {ε₁ ε₂ h : ℝ}
     (hcq : E.CqSmoothConditionalMinEntropyCandidate ε₁ h)
     (hε :
       Real.sqrt ((Fintype.card S : ℝ) * Real.rpow 2 (-h)) ≤ ε₂) :
@@ -432,7 +423,7 @@ The full-function `Fin ell` family witnesses direct achievability for every
 positive concrete output length satisfying the unsmoothed source-form bound.
 -/
 theorem finFullFunctionHashFamily_outputLengthAchievable_of_conditionalMinEntropy_le
-    {ell : Nat} (hell : 0 < ell) (E : Ensemble Z e) {ε : ℝ}
+    {ell : ℕ} (hell : 0 < ell) (E : MEnsemble e Z) {ε : ℝ}
     (hε :
       Real.sqrt
         ((ell : ℝ) *
@@ -458,7 +449,7 @@ The full-function `Fin ell` family witnesses direct achievability from a
 cq-restricted smooth min-entropy candidate.
 -/
 theorem finFullFunctionHashFamily_outputLengthAchievable_of_cqSmoothConditionalMinEntropyCandidate_le
-    {ell : Nat} (hell : 0 < ell) (E : Ensemble Z e) {ε₁ ε₂ h : ℝ}
+    {ell : ℕ} (hell : 0 < ell) (E : MEnsemble e Z) {ε₁ ε₂ h : ℝ}
     (hcq : E.CqSmoothConditionalMinEntropyCandidate ε₁ h)
     (hε :
       Real.sqrt ((ell : ℝ) * Real.rpow 2 (-h)) ≤ ε₂) :
@@ -485,7 +476,7 @@ The full-function `Fin ell` family contributes `log₂ ell` to the direct
 extractable-randomness value set under the unsmoothed source-form bound.
 -/
 theorem finFullFunctionHashFamily_extractableRandomnessLogValue_mem_of_conditionalMinEntropy_le
-    {ell : Nat} (hell : 0 < ell) (E : Ensemble Z e) {ε : ℝ}
+    {ell : ℕ} (hell : 0 < ell) (E : MEnsemble e Z) {ε : ℝ}
     (hε :
       Real.sqrt
         ((ell : ℝ) *
@@ -513,7 +504,7 @@ The full-function `Fin ell` family contributes `log₂ ell` to the smooth direct
 value set from a cq-restricted smooth min-entropy candidate.
 -/
 theorem finFullFunctionHashFamily_extractableRandomnessLogValue_mem_of_cqSmoothConditionalMinEntropyCandidate_le
-    {ell : Nat} (hell : 0 < ell) (E : Ensemble Z e) {ε₁ ε₂ h : ℝ}
+    {ell : ℕ} (hell : 0 < ell) (E : MEnsemble e Z) {ε₁ ε₂ h : ℝ}
     (hcq : E.CqSmoothConditionalMinEntropyCandidate ε₁ h)
     (hε :
       Real.sqrt ((ell : ℝ) * Real.rpow 2 (-h)) ≤ ε₂) :
@@ -547,7 +538,7 @@ the purified-distance bridge contributes the expected `2ε₁` stability loss,
 so the extractable-randomness value set is evaluated at `2ε₁ + ε₂`.
 -/
 theorem finFullFunctionHashFamily_extractableRandomnessLogValue_mem_of_cqSmoothConditionalMinEntropyCandidate_log_le
-    {ell : Nat} (hell : 0 < ell) (E : Ensemble Z e) {ε₁ ε₂ h : ℝ}
+    {ell : ℕ} (hell : 0 < ell) (E : MEnsemble e Z) {ε₁ ε₂ h : ℝ}
     (hε₂ : 0 < ε₂)
     (hcq : E.CqSmoothConditionalMinEntropyCandidate ε₁ h)
     (hlog : log2 (ell : ℝ) ≤ h - 2 * log2 (1 / ε₂)) :
@@ -564,7 +555,5 @@ theorem finFullFunctionHashFamily_extractableRandomnessLogValue_mem_of_cqSmoothC
       (Z := Z) hell E hcq hε
 
 end Security
-
-end
 
 end QIT

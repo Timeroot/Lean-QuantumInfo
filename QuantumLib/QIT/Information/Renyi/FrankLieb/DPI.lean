@@ -21,17 +21,15 @@ including the source-facing extended-real theorem.
 
 open scoped ComplexOrder MatrixOrder NNReal Topology Matrix.Norms.L2Operator
 
-namespace QIT
-
-universe u v w
-
 noncomputable section
-
+universe u v w
 variable {a : Type u} {b : Type v} {c : Type w}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 variable [Fintype c] [DecidableEq c]
 
-namespace State
+open QIT
+
+namespace MState
 
 open RenyiDPI.Statement
 
@@ -42,16 +40,16 @@ This is the finite-dimensional Gour/Frank--Lieb proof spine: use Frank--Lieb
 joint concavity of `Q`, average over a finite local-right-unitary design
 (diagonal signs and basis permutations), then identify the twirled state with
 `Tr_B(X) ⊗ π_B` and cancel the maximally mixed tensor factor. -/
-theorem sandwichedRenyiQ_marginalA_ge_of_half_lt_lt_one
+theorem sandwichedRenyiQ_traceRight_ge_of_half_lt_lt_one
     {b : Type v} [Fintype b] [DecidableEq b] [Nonempty a] [Nonempty b]
-    {ρ σ : CMatrix (Prod a b)}
+    {ρ σ : CMatrix (a × b)}
     (hρ : ρ.PosSemidef) (hσ : σ.PosSemidef)
     {α : ℝ} (hα_half : 1 / 2 < α) (hα_lt_one : α < 1) :
     sandwichedRenyiQ ρ σ hρ hσ α ≤
       sandwichedRenyiQ
-        (partialTraceB ρ) (partialTraceB σ)
-        (partialTraceB_posSemidef hρ)
-        (partialTraceB_posSemidef hσ)
+        (Matrix.traceRight ρ) (Matrix.traceRight σ)
+        (traceRight_posSemidef hρ)
+        (traceRight_posSemidef hσ)
         α := by
   classical
   let ι : Type v := (b → Bool) × Equiv.Perm b
@@ -73,22 +71,22 @@ theorem sandwichedRenyiQ_marginalA_ge_of_half_lt_lt_one
     norm_num [hcardR]
   have hTwirlρ :
       (∑ i ∈ (Finset.univ : Finset ι), (w i : ℂ) •
-        ((localRightUnitary (a := a) (U i) : CMatrix (Prod a b)) * ρ *
-          star (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)))) =
-        Matrix.kronecker (partialTraceB ρ) (maximallyMixed b).matrix := by
+        ((localRightUnitary (a := a) (U i) : CMatrix (a × b)) * ρ *
+          star (localRightUnitary (a := a) (U i) : CMatrix (a × b)))) =
+        Matrix.kronecker (Matrix.traceRight ρ) (MState.uniform : MState b).m := by
     simpa [ι, w, U, hcast] using
-      localRightSignPermutationTwirl_eq_marginalA_kronecker_maximallyMixed
+      localRightSignPermutationTwirl_eq_traceRight_kronecker_uniform
         (a := a) (b := b) ρ
   have hTwirlσ :
       (∑ i ∈ (Finset.univ : Finset ι), (w i : ℂ) •
-        ((localRightUnitary (a := a) (U i) : CMatrix (Prod a b)) * σ *
-          star (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)))) =
-        Matrix.kronecker (partialTraceB σ) (maximallyMixed b).matrix := by
+        ((localRightUnitary (a := a) (U i) : CMatrix (a × b)) * σ *
+          star (localRightUnitary (a := a) (U i) : CMatrix (a × b)))) =
+        Matrix.kronecker (Matrix.traceRight σ) (MState.uniform : MState b).m := by
     simpa [ι, w, U, hcast] using
-      localRightSignPermutationTwirl_eq_marginalA_kronecker_maximallyMixed
+      localRightSignPermutationTwirl_eq_traceRight_kronecker_uniform
         (a := a) (b := b) σ
   exact
-    sandwichedRenyiQ_marginalA_ge_of_localRightUnitary_twirling
+    sandwichedRenyiQ_traceRight_ge_of_localRightUnitary_twirling
       (a := a) (b := b) (s := Finset.univ) (w := w) (U := U)
       hρ hσ hα_half hα_lt_one hw_nonneg hw_sum hTwirlρ hTwirlσ
 
@@ -103,21 +101,21 @@ theorem sandwichedRenyiQ_stinespringLiftState
     [Fintype κ] [DecidableEq κ]
     (K : κ → Matrix b a ℂ)
     (hTP : MatrixMap.IsTracePreserving (MatrixMap.ofKraus K))
-    (ρ σ : State a) {α : ℝ}
+    (ρ σ : MState a) {α : ℝ}
     (hα_half : 1 / 2 < α) (hα_lt_one : α < 1) :
     sandwichedRenyiQ
-        (stinespringLiftState K hTP ρ).matrix
-        (stinespringLiftState K hTP σ).matrix
-        (stinespringLiftState K hTP ρ).pos
-        (stinespringLiftState K hTP σ).pos α =
-      sandwichedRenyiQ ρ.matrix σ.matrix ρ.pos σ.pos α := by
+        (stinespringLiftState K hTP ρ).m
+        (stinespringLiftState K hTP σ).m
+        (stinespringLiftState K hTP ρ).psd
+        (stinespringLiftState K hTP σ).psd α =
+      sandwichedRenyiQ ρ.m σ.m ρ.psd σ.psd α := by
   let V := MatrixMap.krausStinespringIsometry K hTP
   have hα_pos : 0 < α := by linarith
   have hs_pos : 0 < (1 - α) / (2 * α) := by
     exact div_pos (sub_pos.mpr hα_lt_one) (mul_pos two_pos hα_pos)
   simpa [stinespringLiftState, V] using
     sandwichedRenyiQ_isometry_conj
-      (V := V.matrix) V.isometry ρ.pos σ.pos α hs_pos hα_pos
+      (V := V.matrix) V.isometry ρ.psd σ.psd α hs_pos hα_pos
 
 /-- Matrix-level Stinespring lift associated to a trace-preserving Kraus
 family.
@@ -129,7 +127,7 @@ def stinespringLiftMatrix {b : Type v} {κ : Type w}
     [Fintype b] [DecidableEq b] [Fintype κ] [DecidableEq κ]
     (K : κ → Matrix b a ℂ)
     (hTP : MatrixMap.IsTracePreserving (MatrixMap.ofKraus K))
-    (X : CMatrix a) : CMatrix (Prod b κ) :=
+    (X : CMatrix a) : CMatrix (b × κ) :=
   (MatrixMap.krausStinespringIsometry K hTP).matrix * X *
     Matrix.conjTranspose (MatrixMap.krausStinespringIsometry K hTP).matrix
 
@@ -147,15 +145,15 @@ theorem stinespringLiftMatrix_posSemidef
 
 /-- Tracing the environment of the matrix-level Stinespring lift recovers the
 Kraus map. -/
-theorem partialTraceB_stinespringLiftMatrix
+theorem traceRight_stinespringLiftMatrix
     {b : Type v} {κ : Type w} [Fintype b] [DecidableEq b]
     [Fintype κ] [DecidableEq κ]
     (K : κ → Matrix b a ℂ)
     (hTP : MatrixMap.IsTracePreserving (MatrixMap.ofKraus K))
     (X : CMatrix a) :
-    partialTraceB (stinespringLiftMatrix K hTP X) = MatrixMap.ofKraus K X := by
+    Matrix.traceRight (stinespringLiftMatrix K hTP X) = MatrixMap.ofKraus K X := by
   simpa [stinespringLiftMatrix] using
-    MatrixMap.partialTraceB_krausStinespringIsometry K hTP X
+    MatrixMap.traceRight_krausStinespringIsometry K hTP X
 
 /-- Stinespring isometry invariance of the PSD-friendly low-`α` `Q`
 functional for a normalized state and an arbitrary PSD matrix reference.
@@ -168,21 +166,21 @@ theorem sandwichedRenyiQ_stinespringLiftMatrix_reference
     [Fintype κ] [DecidableEq κ]
     (K : κ → Matrix b a ℂ)
     (hTP : MatrixMap.IsTracePreserving (MatrixMap.ofKraus K))
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) {α : ℝ}
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) {α : ℝ}
     (hα_half : 1 / 2 < α) (hα_lt_one : α < 1) :
     sandwichedRenyiQ
-        (stinespringLiftState K hTP ρ).matrix
+        (stinespringLiftState K hTP ρ).m
         (stinespringLiftMatrix K hTP σ)
-        (stinespringLiftState K hTP ρ).pos
+        (stinespringLiftState K hTP ρ).psd
         (stinespringLiftMatrix_posSemidef K hTP hσ) α =
-      sandwichedRenyiQ ρ.matrix σ ρ.pos hσ α := by
+      sandwichedRenyiQ ρ.m σ ρ.psd hσ α := by
   let V := MatrixMap.krausStinespringIsometry K hTP
   have hα_pos : 0 < α := by linarith
   have hs_pos : 0 < (1 - α) / (2 * α) := by
     exact div_pos (sub_pos.mpr hα_lt_one) (mul_pos two_pos hα_pos)
   simpa [stinespringLiftState, stinespringLiftMatrix, V] using
     sandwichedRenyiQ_isometry_conj
-      (V := V.matrix) V.isometry ρ.pos hσ α hs_pos hα_pos
+      (V := V.matrix) V.isometry ρ.psd hσ α hs_pos hα_pos
 
 /-- Strict low-`α` `Q`-functional data processing for a channel acting on a
 state and a PSD matrix reference.
@@ -193,49 +191,49 @@ reference to be normalized or positive definite.  It is later packaged as a
 singular PSD-reference divergence via the regularization/limit convention. -/
 theorem sandwichedRenyiQ_dataProcessing_channel_reference_of_half_lt_lt_one
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
     (α : ℝ) (hα_half : 1 / 2 < α) (hα_lt_one : α < 1) :
-    sandwichedRenyiQ ρ.matrix σ ρ.pos hσ α ≤
-      sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.map σ)
-        (Φ.applyState ρ).pos (Φ.mapsPositive σ hσ) α := by
+    sandwichedRenyiQ ρ.m σ ρ.psd hσ α ≤
+      sandwichedRenyiQ (Φ ρ).m (Φ.map σ)
+        (Φ ρ).psd (Φ.mapsPositive σ hσ) α := by
   classical
   obtain ⟨K, hK⟩ :=
-    MatrixMap.exists_kraus_of_choi_psd Φ.map Φ.completelyPositive
+    MatrixMap.exists_kraus_of_choi_psd Φ.map Φ.map_cp
   have hTP : MatrixMap.IsTracePreserving (MatrixMap.ofKraus K) := by
     rw [← hK]
-    exact Φ.tracePreserving
+    exact Φ.map_TP
   let ρL := stinespringLiftState K hTP ρ
-  let σL : CMatrix (Prod b (a × b)) := stinespringLiftMatrix K hTP σ
+  let σL : CMatrix (b × (a × b)) := stinespringLiftMatrix K hTP σ
   let : Nonempty a := ρ.nonempty
-  let : Nonempty b := (Φ.applyState ρ).nonempty
+  let : Nonempty b := MState.nonempty (Φ ρ)
   have hσL : σL.PosSemidef := by
     simpa [σL] using stinespringLiftMatrix_posSemidef K hTP hσ
   have hPT :
-      sandwichedRenyiQ ρL.matrix σL ρL.pos hσL α ≤
-        sandwichedRenyiQ (partialTraceB ρL.matrix) (partialTraceB σL)
-          (partialTraceB_posSemidef ρL.pos) (partialTraceB_posSemidef hσL) α := by
-    exact sandwichedRenyiQ_marginalA_ge_of_half_lt_lt_one
-      (a := b) (b := a × b) (hρ := ρL.pos) (hσ := hσL)
+      sandwichedRenyiQ ρL.m σL ρL.psd hσL α ≤
+        sandwichedRenyiQ (Matrix.traceRight ρL.m) (Matrix.traceRight σL)
+          (traceRight_posSemidef ρL.psd) (traceRight_posSemidef hσL) α := by
+    exact sandwichedRenyiQ_traceRight_ge_of_half_lt_lt_one
+      (a := b) (b := a × b) (hρ := ρL.psd) (hσ := hσL)
       hα_half hα_lt_one
   have hIso :
-      sandwichedRenyiQ ρL.matrix σL ρL.pos hσL α =
-        sandwichedRenyiQ ρ.matrix σ ρ.pos hσ α := by
+      sandwichedRenyiQ ρL.m σL ρL.psd hσL α =
+        sandwichedRenyiQ ρ.m σ ρ.psd hσ α := by
     simpa [ρL, σL] using
       sandwichedRenyiQ_stinespringLiftMatrix_reference
         K hTP ρ hσ hα_half hα_lt_one
-  have hρout : partialTraceB ρL.matrix = (Φ.applyState ρ).matrix := by
-    have hstate := stinespringLiftState_marginalA_eq_applyState K Φ hK hTP ρ
-    have hm := congrArg State.matrix hstate
-    simpa [ρL, State.marginalA] using hm
-  have hσout : partialTraceB σL = Φ.map σ := by
-    simpa [σL, hK] using partialTraceB_stinespringLiftMatrix K hTP σ
+  have hρout : Matrix.traceRight ρL.m = (Φ ρ).m := by
+    have hstate := stinespringLiftState_traceRight_eq_applyState K Φ hK hTP ρ
+    have hm := congrArg DensityOp.m hstate
+    simpa [ρL] using hm
+  have hσout : Matrix.traceRight σL = Φ.map σ := by
+    simpa [σL, hK] using traceRight_stinespringLiftMatrix K hTP σ
   calc
-    sandwichedRenyiQ ρ.matrix σ ρ.pos hσ α =
-        sandwichedRenyiQ ρL.matrix σL ρL.pos hσL α := hIso.symm
-    _ ≤ sandwichedRenyiQ (partialTraceB ρL.matrix) (partialTraceB σL)
-        (partialTraceB_posSemidef ρL.pos) (partialTraceB_posSemidef hσL) α := hPT
-    _ = sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.map σ)
-        (Φ.applyState ρ).pos (Φ.mapsPositive σ hσ) α := by
+    sandwichedRenyiQ ρ.m σ ρ.psd hσ α =
+        sandwichedRenyiQ ρL.m σL ρL.psd hσL α := hIso.symm
+    _ ≤ sandwichedRenyiQ (Matrix.traceRight ρL.m) (Matrix.traceRight σL)
+        (traceRight_posSemidef ρL.psd) (traceRight_posSemidef hσL) α := hPT
+    _ = sandwichedRenyiQ (Φ ρ).m (Φ.map σ)
+        (Φ ρ).psd (Φ.mapsPositive σ hσ) α := by
       simp [sandwichedRenyiQ, hρout, hσout]
 
 /-! ### Source regularization surface for singular PSD references -/
@@ -316,22 +314,23 @@ monotonicity: if the input state/operator is supported on the input reference,
 then the channel output is supported on the output reference. -/
 theorem channel_map_supports
     {b : Type v} [Fintype b] [DecidableEq b]
-    (Φ : Channel a b) {M N : CMatrix a} (hN : N.PosSemidef)
+    (Φ : CPTPMap a b) {M N : CMatrix a} (hN : N.PosSemidef)
     (hSupport : Matrix.Supports M N) :
     Matrix.Supports (Φ.map M) (Φ.map N) := by
   obtain ⟨K, hK⟩ :=
-    MatrixMap.exists_kraus_of_choi_psd Φ.map Φ.completelyPositive
+    MatrixMap.exists_kraus_of_choi_psd Φ.map Φ.map_cp
   simpa [← hK] using matrixMap_ofKraus_supports K hN hSupport
 
-/-- State/reference support domination is preserved by applying a channel.
+/-- MState/reference support domination is preserved by applying a channel.
 
 This is the source-domain statement `ρ ≪ σ ⇒ Φ(ρ) ≪ Φ(σ)` for PSD matrix
 references. -/
 theorem channel_applyState_supports_of_supports
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
-    (hSupport : Matrix.Supports ρ.matrix σ) :
-    Matrix.Supports (Φ.applyState ρ).matrix (Φ.map σ) := by
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
+    (hSupport : Matrix.Supports ρ.m σ) :
+    Matrix.Supports (Φ ρ).m (Φ.map σ) := by
+  rw [CPTPOp.mat_coe_eq_apply_mat]
   exact channel_map_supports Φ hσ hSupport
 
 /-- Khatri--Wilde/Gour reference regularization `σ_ε = σ + ε I`.
@@ -383,13 +382,13 @@ before taking `ε → 0+`: even if `Φ(σ + εI)` is singular, the output state 
 supported on it. -/
 theorem channel_applyState_supports_regularized_reference
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
     {ε : ℝ} (hε : 0 < ε) :
-    Matrix.Supports (Φ.applyState ρ).matrix
+    Matrix.Supports (Φ ρ).m
       (Φ.map (sandwichedRenyiReferenceRegularization σ ε)) := by
   exact channel_applyState_supports_of_supports ρ
     (sandwichedRenyiReferenceRegularization_posSemidef hσ (le_of_lt hε)) Φ
-    (supports_sandwichedRenyiReferenceRegularization_of_pos ρ.matrix hσ hε)
+    (supports_sandwichedRenyiReferenceRegularization_of_pos ρ.m hσ hε)
 
 omit [Fintype a] in
 /-- The regularization path `σ + εI` converges to `σ` as `ε → 0+`. -/
@@ -405,14 +404,14 @@ of the PSD reference.  This is the non-regularized support-compression form:
 after conjugating by the reference eigenbasis, the inner operator is a diagonal
 weight sandwich of the conjugated input state. -/
 theorem sandwichedRenyiReferenceInner_conj_eigenbasis
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (α : ℝ) :
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (α : ℝ) :
     let s : ℝ := (1 - α) / (2 * α)
     let U : Matrix.unitaryGroup a ℂ := hσ.isHermitian.eigenvectorUnitary
     let D : CMatrix a := Matrix.diagonal
       (fun i => ((hσ.isHermitian.eigenvalues i ^ s : ℝ) : ℂ))
     star (U : CMatrix a) *
         sandwichedRenyiReferenceInner ρ σ α * (U : CMatrix a) =
-      D * (star (U : CMatrix a) * ρ.matrix * (U : CMatrix a)) * D := by
+      D * (star (U : CMatrix a) * ρ.m * (U : CMatrix a)) * D := by
   classical
   dsimp
   let s : ℝ := (1 - α) / (2 * α)
@@ -427,14 +426,14 @@ theorem sandwichedRenyiReferenceInner_conj_eigenbasis
   have hUUstar : (U : CMatrix a) * star (U : CMatrix a) = 1 := by
     simp
   change star (U : CMatrix a) *
-      ((CFC.rpow σ s) * ρ.matrix * (CFC.rpow σ s)) * (U : CMatrix a) =
-    D * (star (U : CMatrix a) * ρ.matrix * (U : CMatrix a)) * D
+      ((CFC.rpow σ s) * ρ.m * (CFC.rpow σ s)) * (U : CMatrix a) =
+    D * (star (U : CMatrix a) * ρ.m * (U : CMatrix a)) * D
   rw [hpow]
   calc
     star (U : CMatrix a) *
-        (((U : CMatrix a) * D * star (U : CMatrix a)) * ρ.matrix *
+        (((U : CMatrix a) * D * star (U : CMatrix a)) * ρ.m *
           ((U : CMatrix a) * D * star (U : CMatrix a))) * (U : CMatrix a)
-        = D * (star (U : CMatrix a) * ρ.matrix * (U : CMatrix a)) * D := by
+        = D * (star (U : CMatrix a) * ρ.m * (U : CMatrix a)) * D := by
           simp [Matrix.mul_assoc, hUstarU]
           rw [← Matrix.mul_assoc, hUstarU, Matrix.one_mul]
 
@@ -442,7 +441,7 @@ theorem sandwichedRenyiReferenceInner_conj_eigenbasis
 the original PSD reference eigenbasis.  For `ε ≥ 0`, `σ + εI` has the same
 eigenvectors as `σ`, with eigenvalues shifted by `ε`. -/
 theorem sandwichedRenyiReferenceInner_regularized_conj_eigenbasis
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
     {ε : ℝ} (hε : 0 ≤ ε) (α : ℝ) :
     let s : ℝ := (1 - α) / (2 * α)
     let U : Matrix.unitaryGroup a ℂ := hσ.isHermitian.eigenvectorUnitary
@@ -451,7 +450,7 @@ theorem sandwichedRenyiReferenceInner_regularized_conj_eigenbasis
     star (U : CMatrix a) *
         sandwichedRenyiReferenceInner ρ
           (sandwichedRenyiReferenceRegularization σ ε) α * (U : CMatrix a) =
-      Dε * (star (U : CMatrix a) * ρ.matrix * (U : CMatrix a)) * Dε := by
+      Dε * (star (U : CMatrix a) * ρ.m * (U : CMatrix a)) * Dε := by
   classical
   dsimp
   let s : ℝ := (1 - α) / (2 * α)
@@ -468,15 +467,15 @@ theorem sandwichedRenyiReferenceInner_regularized_conj_eigenbasis
   have hUUstar : (U : CMatrix a) * star (U : CMatrix a) = 1 := by
     simp
   change star (U : CMatrix a) *
-      ((CFC.rpow (sandwichedRenyiReferenceRegularization σ ε) s) * ρ.matrix *
+      ((CFC.rpow (sandwichedRenyiReferenceRegularization σ ε) s) * ρ.m *
         (CFC.rpow (sandwichedRenyiReferenceRegularization σ ε) s)) * (U : CMatrix a) =
-    Dε * (star (U : CMatrix a) * ρ.matrix * (U : CMatrix a)) * Dε
+    Dε * (star (U : CMatrix a) * ρ.m * (U : CMatrix a)) * Dε
   rw [hpow]
   calc
     star (U : CMatrix a) *
-        (((U : CMatrix a) * Dε * star (U : CMatrix a)) * ρ.matrix *
+        (((U : CMatrix a) * Dε * star (U : CMatrix a)) * ρ.m *
           ((U : CMatrix a) * Dε * star (U : CMatrix a))) * (U : CMatrix a)
-        = Dε * (star (U : CMatrix a) * ρ.matrix * (U : CMatrix a)) * Dε := by
+        = Dε * (star (U : CMatrix a) * ρ.m * (U : CMatrix a)) * Dε := by
           simp [Matrix.mul_assoc, hUstarU]
           rw [← Matrix.mul_assoc, hUstarU, Matrix.one_mul]
 
@@ -489,8 +488,8 @@ reference exponent: the shifted factors `(λᵢ + ε)^s` may diverge when
 `λᵢ = 0`, but the supported conjugated input matrix has zero row and column in
 those directions. -/
 theorem sandwichedRenyiReferenceInner_regularized_conj_eigenbasis_entry_eq_zero
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (hSupport : Matrix.Supports ρ.matrix σ)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (hSupport : Matrix.Supports ρ.m σ)
     {ε : ℝ} (hε : 0 ≤ ε) (α : ℝ) {i j : a}
     (hzero : hσ.isHermitian.eigenvalues i = 0 ∨
       hσ.isHermitian.eigenvalues j = 0) :
@@ -503,11 +502,11 @@ theorem sandwichedRenyiReferenceInner_regularized_conj_eigenbasis_entry_eq_zero
   let U : Matrix.unitaryGroup a ℂ := hσ.isHermitian.eigenvectorUnitary
   let Dε : CMatrix a := Matrix.diagonal
     (fun k => (((hσ.isHermitian.eigenvalues k + ε) ^ s : ℝ) : ℂ))
-  let M' : CMatrix a := star (U : CMatrix a) * ρ.matrix * (U : CMatrix a)
+  let M' : CMatrix a := star (U : CMatrix a) * ρ.m * (U : CMatrix a)
   have hMzero : M' i j = 0 := by
     simpa [M', U] using
       supports_conjugate_entry_eq_zero_of_left_or_right_zero
-        (M := ρ.matrix) (N := σ) ρ.pos hσ hSupport (i := i) (j := j) hzero
+        (M := ρ.m) (N := σ) ρ.psd hσ hSupport (i := i) (j := j) hzero
   have hform :=
     sandwichedRenyiReferenceInner_regularized_conj_eigenbasis
       ρ hσ hε α
@@ -519,8 +518,8 @@ theorem sandwichedRenyiReferenceInner_regularized_conj_eigenbasis_entry_eq_zero
 inner operator has no spectral-basis entries touching the zero eigenspace of a
 supporting singular reference. -/
 theorem sandwichedRenyiReferenceInner_conj_eigenbasis_entry_eq_zero
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (hSupport : Matrix.Supports ρ.matrix σ)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (hSupport : Matrix.Supports ρ.m σ)
     (α : ℝ) {i j : a}
     (hzero : hσ.isHermitian.eigenvalues i = 0 ∨
       hσ.isHermitian.eigenvalues j = 0) :
@@ -532,11 +531,11 @@ theorem sandwichedRenyiReferenceInner_conj_eigenbasis_entry_eq_zero
   let U : Matrix.unitaryGroup a ℂ := hσ.isHermitian.eigenvectorUnitary
   let D : CMatrix a := Matrix.diagonal
     (fun k => ((hσ.isHermitian.eigenvalues k ^ s : ℝ) : ℂ))
-  let M' : CMatrix a := star (U : CMatrix a) * ρ.matrix * (U : CMatrix a)
+  let M' : CMatrix a := star (U : CMatrix a) * ρ.m * (U : CMatrix a)
   have hMzero : M' i j = 0 := by
     simpa [M', U] using
       supports_conjugate_entry_eq_zero_of_left_or_right_zero
-        (M := ρ.matrix) (N := σ) ρ.pos hσ hSupport (i := i) (j := j) hzero
+        (M := ρ.m) (N := σ) ρ.psd hσ hSupport (i := i) (j := j) hzero
   have hform :=
     sandwichedRenyiReferenceInner_conj_eigenbasis
       ρ hσ α
@@ -547,7 +546,7 @@ theorem sandwichedRenyiReferenceInner_conj_eigenbasis_entry_eq_zero
 /-- Entrywise form of the source-regularized high-`α` inner operator in the
 original PSD reference eigenbasis. -/
 theorem sandwichedRenyiReferenceInner_regularized_conj_eigenbasis_entry
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
     {ε : ℝ} (hε : 0 ≤ ε) (α : ℝ) (i j : a) :
     let s : ℝ := (1 - α) / (2 * α)
     let U : Matrix.unitaryGroup a ℂ := hσ.isHermitian.eigenvectorUnitary
@@ -556,7 +555,7 @@ theorem sandwichedRenyiReferenceInner_regularized_conj_eigenbasis_entry
           (sandwichedRenyiReferenceRegularization σ ε) α *
         (U : CMatrix a)) i j =
       (((hσ.isHermitian.eigenvalues i + ε) ^ s : ℝ) : ℂ) *
-        (star (U : CMatrix a) * ρ.matrix * (U : CMatrix a)) i j *
+        (star (U : CMatrix a) * ρ.m * (U : CMatrix a)) i j *
           (((hσ.isHermitian.eigenvalues j + ε) ^ s : ℝ) : ℂ) := by
   classical
   dsimp
@@ -564,7 +563,7 @@ theorem sandwichedRenyiReferenceInner_regularized_conj_eigenbasis_entry
   let U : Matrix.unitaryGroup a ℂ := hσ.isHermitian.eigenvectorUnitary
   let Dε : CMatrix a := Matrix.diagonal
     (fun k => (((hσ.isHermitian.eigenvalues k + ε) ^ s : ℝ) : ℂ))
-  let M' : CMatrix a := star (U : CMatrix a) * ρ.matrix * (U : CMatrix a)
+  let M' : CMatrix a := star (U : CMatrix a) * ρ.m * (U : CMatrix a)
   have hform :=
     sandwichedRenyiReferenceInner_regularized_conj_eigenbasis
       ρ hσ hε α
@@ -578,7 +577,7 @@ theorem sandwichedRenyiReferenceInner_regularized_conj_eigenbasis_entry
 eigenbasis.  Together with the regularized entry formula, this is the local
 calculation needed for the supported `ε → 0+` limit. -/
 theorem sandwichedRenyiReferenceInner_conj_eigenbasis_entry
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
     (α : ℝ) (i j : a) :
     let s : ℝ := (1 - α) / (2 * α)
     let U : Matrix.unitaryGroup a ℂ := hσ.isHermitian.eigenvectorUnitary
@@ -586,7 +585,7 @@ theorem sandwichedRenyiReferenceInner_conj_eigenbasis_entry
         sandwichedRenyiReferenceInner ρ σ α *
         (U : CMatrix a)) i j =
       ((hσ.isHermitian.eigenvalues i ^ s : ℝ) : ℂ) *
-        (star (U : CMatrix a) * ρ.matrix * (U : CMatrix a)) i j *
+        (star (U : CMatrix a) * ρ.m * (U : CMatrix a)) i j *
           ((hσ.isHermitian.eigenvalues j ^ s : ℝ) : ℂ) := by
   classical
   dsimp
@@ -594,7 +593,7 @@ theorem sandwichedRenyiReferenceInner_conj_eigenbasis_entry
   let U : Matrix.unitaryGroup a ℂ := hσ.isHermitian.eigenvectorUnitary
   let D : CMatrix a := Matrix.diagonal
     (fun k => ((hσ.isHermitian.eigenvalues k ^ s : ℝ) : ℂ))
-  let M' : CMatrix a := star (U : CMatrix a) * ρ.matrix * (U : CMatrix a)
+  let M' : CMatrix a := star (U : CMatrix a) * ρ.m * (U : CMatrix a)
   have hform :=
     sandwichedRenyiReferenceInner_conj_eigenbasis
       ρ hσ α
@@ -609,8 +608,8 @@ eigenbasis.  This is the pointwise Gour/source support-compression step for
 the high-`α` finite branch: zero spectral directions are killed by the support
 condition, while positive directions use ordinary scalar power continuity. -/
 theorem sandwichedRenyiReferenceInner_regularized_conj_eigenbasis_entry_tendsto
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (hSupport : Matrix.Supports ρ.matrix σ)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (hSupport : Matrix.Supports ρ.m σ)
     (α : ℝ) (i j : a) :
     Filter.Tendsto
       (fun ε : ℝ =>
@@ -627,7 +626,7 @@ theorem sandwichedRenyiReferenceInner_regularized_conj_eigenbasis_entry_tendsto
   let l := nhdsWithin (0 : ℝ) (Set.Ioi 0)
   let s : ℝ := (1 - α) / (2 * α)
   let U : Matrix.unitaryGroup a ℂ := hσ.isHermitian.eigenvectorUnitary
-  let M' : CMatrix a := star (U : CMatrix a) * ρ.matrix * (U : CMatrix a)
+  let M' : CMatrix a := star (U : CMatrix a) * ρ.m * (U : CMatrix a)
   by_cases hi0 : hσ.isHermitian.eigenvalues i = 0
   · have htarget :
         (star (U : CMatrix a) *
@@ -736,8 +735,8 @@ theorem sandwichedRenyiReferenceInner_regularized_conj_eigenbasis_entry_tendsto
 /-- Matrix form of the supported source-regularization convergence in the
 reference eigenbasis. -/
 theorem sandwichedRenyiReferenceInner_regularized_conj_eigenbasis_tendsto
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (hSupport : Matrix.Supports ρ.matrix σ)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (hSupport : Matrix.Supports ρ.m σ)
     (α : ℝ) :
     Filter.Tendsto
       (fun ε : ℝ =>
@@ -777,8 +776,8 @@ support-domain route.  The proof conjugates to the PSD reference eigenbasis,
 uses entrywise support cancellation there, then conjugates back by the fixed
 unitary. -/
 theorem sandwichedRenyiReferenceInner_regularization_tendsto_of_supports
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (hSupport : Matrix.Supports ρ.matrix σ)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (hSupport : Matrix.Supports ρ.m σ)
     (α : ℝ) :
     Filter.Tendsto
       (fun ε : ℝ =>
@@ -845,14 +844,14 @@ operator is nonzero.  In the reference eigenbasis, the supported state has no
 entries touching the zero eigenspace; on the positive eigenspace the reference
 power factors are nonzero scalars. -/
 theorem sandwichedRenyiReferenceInner_ne_zero_of_supports
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (hSupport : Matrix.Supports ρ.matrix σ)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (hSupport : Matrix.Supports ρ.m σ)
     (α : ℝ) :
     sandwichedRenyiReferenceInner ρ σ α ≠ 0 := by
   classical
   let s : ℝ := (1 - α) / (2 * α)
   let U : Matrix.unitaryGroup a ℂ := hσ.isHermitian.eigenvectorUnitary
-  let M' : CMatrix a := star (U : CMatrix a) * ρ.matrix * (U : CMatrix a)
+  let M' : CMatrix a := star (U : CMatrix a) * ρ.m * (U : CMatrix a)
   intro hinner_zero
   have hconj_zero :
       star (U : CMatrix a) * sandwichedRenyiReferenceInner ρ σ α *
@@ -864,12 +863,12 @@ theorem sandwichedRenyiReferenceInner_ne_zero_of_supports
     by_cases hi0 : hσ.isHermitian.eigenvalues i = 0
     · simpa [M', U] using
         supports_conjugate_entry_eq_zero_of_left_or_right_zero
-          (M := ρ.matrix) (N := σ) ρ.pos hσ hSupport
+          (M := ρ.m) (N := σ) ρ.psd hσ hSupport
           (i := i) (j := j) (Or.inl hi0)
     by_cases hj0 : hσ.isHermitian.eigenvalues j = 0
     · simpa [M', U] using
         supports_conjugate_entry_eq_zero_of_left_or_right_zero
-          (M := ρ.matrix) (N := σ) ρ.pos hσ hSupport
+          (M := ρ.m) (N := σ) ρ.psd hσ hSupport
           (i := i) (j := j) (Or.inr hj0)
     have hi_pos : 0 < hσ.isHermitian.eigenvalues i := by
       exact lt_of_le_of_ne (hσ.eigenvalues_nonneg i) (by
@@ -905,24 +904,24 @@ theorem sandwichedRenyiReferenceInner_ne_zero_of_supports
         ((hσ.isHermitian.eigenvalues i ^ s : ℝ) : ℂ) * M' i j = 0 :=
       (mul_eq_zero.mp hentry_zero).resolve_right hj_ne
     exact (mul_eq_zero.mp hleft).resolve_left hi_ne
-  have hρ_zero : ρ.matrix = 0 := by
+  have hρ_zero : ρ.m = 0 := by
     have hUstarU : star (U : CMatrix a) * (U : CMatrix a) = 1 := by
       simp
     have hUUstar : (U : CMatrix a) * star (U : CMatrix a) = 1 := by
       simp
     calc
-      ρ.matrix = (U : CMatrix a) * M' * star (U : CMatrix a) := by
+      ρ.m = (U : CMatrix a) * M' * star (U : CMatrix a) := by
         symm
         calc
           (U : CMatrix a) * M' * star (U : CMatrix a) =
               (U : CMatrix a) *
-                (star (U : CMatrix a) * ρ.matrix * (U : CMatrix a)) *
+                (star (U : CMatrix a) * ρ.m * (U : CMatrix a)) *
                   star (U : CMatrix a) := by
                 rfl
-          _ = ((U : CMatrix a) * star (U : CMatrix a)) * ρ.matrix *
+          _ = ((U : CMatrix a) * star (U : CMatrix a)) * ρ.m *
                 ((U : CMatrix a) * star (U : CMatrix a)) := by
                 noncomm_ring
-          _ = ρ.matrix := by
+          _ = ρ.m := by
                 rw [hUUstar]
                 simp
       _ = 0 := by
@@ -933,8 +932,8 @@ theorem sandwichedRenyiReferenceInner_ne_zero_of_supports
 /-- The supported singular-reference high-`α` inner operator has strictly
 positive power trace. -/
 theorem sandwichedRenyiReferenceInner_psdTracePower_pos_of_supports
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (hSupport : Matrix.Supports ρ.matrix σ)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (hSupport : Matrix.Supports ρ.m σ)
     (α : ℝ) :
     0 <
       psdTracePower (sandwichedRenyiReferenceInner ρ σ α)
@@ -951,8 +950,8 @@ The statement is written without a dependent PSD witness for the regularized
 reference because the source filter supplies `ε > 0` only eventually.  Callers
 can unfold `psdTracePower` on that eventual positive branch. -/
 theorem sandwichedRenyiReferenceInner_tracePower_regularization_tendsto_of_supports
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (hSupport : Matrix.Supports ρ.matrix σ)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (hSupport : Matrix.Supports ρ.m σ)
     (α : ℝ) (hα_pos : 0 < α) :
     Filter.Tendsto
       (fun ε : ℝ =>
@@ -986,14 +985,14 @@ functional `Q_α(ρ, σ)`.  The caller must supply positivity of this `Q` value
 when using logarithmic order lemmas; this keeps the finite real-valued branch
 separate from the extended-real singular case where `Q_α = 0`. -/
 def sandwichedRenyiPSDReferenceLowAlpha
-    (ρ : State a) (σ : CMatrix a) (hσ : σ.PosSemidef) (α : ℝ) : ℝ :=
-  (1 / (α - 1)) * log2 (sandwichedRenyiQ ρ.matrix σ ρ.pos hσ α)
+    (ρ : MState a) (σ : CMatrix a) (hσ : σ.PosSemidef) (α : ℝ) : ℝ :=
+  (1 / (α - 1)) * log2 (sandwichedRenyiQ ρ.m σ ρ.psd hσ α)
 
 /-- On positive-definite references, the PSD low-`α` finite branch agrees with
 the existing positive-definite reference divergence surface. -/
 theorem sandwichedRenyiPSDReferenceLowAlpha_eq_reference_posDef
-    (ρ : State a) {σ : CMatrix a}
-    (hρ : ρ.matrix.PosDef) (hσ : σ.PosDef)
+    (ρ : MState a) {σ : CMatrix a}
+    (hρ : ρ.m.PosDef) (hσ : σ.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     sandwichedRenyiPSDReferenceLowAlpha ρ σ hσ.posSemidef α =
       sandwichedRenyiReference ρ σ hρ hσ α hα_pos hα_ne_one := by
@@ -1008,19 +1007,19 @@ prefactor for `α < 1`.  The hypothesis `hQpos` selects the finite branch
 `Q` value. -/
 theorem sandwichedRenyiPSDReferenceLowAlpha_dataProcessing_channel
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
     (α : ℝ) (hα_half : 1 / 2 < α) (hα_lt_one : α < 1)
-    (hQpos : 0 < sandwichedRenyiQ ρ.matrix σ ρ.pos hσ α) :
+    (hQpos : 0 < sandwichedRenyiQ ρ.m σ ρ.psd hσ α) :
     sandwichedRenyiPSDReferenceLowAlpha
-        (Φ.applyState ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
+        (Φ ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
       sandwichedRenyiPSDReferenceLowAlpha ρ σ hσ α := by
   have hQ :=
     sandwichedRenyiQ_dataProcessing_channel_reference_of_half_lt_lt_one
       ρ hσ Φ α hα_half hα_lt_one
   have hlog :
-      log2 (sandwichedRenyiQ ρ.matrix σ ρ.pos hσ α) ≤
-        log2 (sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.map σ)
-          (Φ.applyState ρ).pos (Φ.mapsPositive σ hσ) α) := by
+      log2 (sandwichedRenyiQ ρ.m σ ρ.psd hσ α) ≤
+        log2 (sandwichedRenyiQ (Φ ρ).m (Φ.map σ)
+          (Φ ρ).psd (Φ.mapsPositive σ hσ) α) := by
     unfold log2
     exact div_le_div_of_nonneg_right (Real.log_le_log hQpos hQ)
       (le_of_lt (Real.log_pos one_lt_two))
@@ -1037,7 +1036,7 @@ strict low-`α` branch.
 The branch is total on `ℝ`; along the source filter `ε → 0+`, it unfolds to
 `D̃_α(ρ || σ + εI)` expressed through the PSD-friendly `Q` functional. -/
 def sandwichedRenyiPSDReferenceLowAlphaRegularizedInputCurve
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
     (α : ℝ) (ε : ℝ) : ℝ :=
   if hε : 0 ≤ ε then
     sandwichedRenyiPSDReferenceLowAlpha ρ
@@ -1053,15 +1052,15 @@ The output reference is `Φ(σ + εI)`, not `Φσ + εI`; this is the correct
 Schrödinger-picture regularization path. -/
 def sandwichedRenyiPSDReferenceLowAlphaRegularizedOutputCurve
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (Φ : Channel a b) (α : ℝ) (ε : ℝ) : ℝ :=
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (Φ : CPTPMap a b) (α : ℝ) (ε : ℝ) : ℝ :=
   if hε : 0 ≤ ε then
-    sandwichedRenyiPSDReferenceLowAlpha (Φ.applyState ρ)
+    sandwichedRenyiPSDReferenceLowAlpha (Φ ρ)
       (Φ.map (sandwichedRenyiReferenceRegularization σ ε))
       (Φ.mapsPositive (sandwichedRenyiReferenceRegularization σ ε)
         (sandwichedRenyiReferenceRegularization_posSemidef hσ hε)) α
   else
-    sandwichedRenyiPSDReferenceLowAlpha (Φ.applyState ρ)
+    sandwichedRenyiPSDReferenceLowAlpha (Φ ρ)
       (Φ.map σ) (Φ.mapsPositive σ hσ) α
 
 /-- The strict low-`α` PSD-reference regularized curves satisfy pointwise DPI
@@ -1072,7 +1071,7 @@ PSD-friendly `Q` branch directly and therefore does not require an output
 positive-definiteness assumption on `Φ(σ + εI)`. -/
 theorem sandwichedRenyiPSDReferenceLowAlphaRegularizedCurves_eventually_le
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
     (α : ℝ) (hα_half : 1 / 2 < α) (hα_lt_one : α < 1) :
     ∀ᶠ ε in nhdsWithin (0 : ℝ) (Set.Ioi 0),
       sandwichedRenyiPSDReferenceLowAlphaRegularizedOutputCurve ρ hσ Φ α ε ≤
@@ -1086,9 +1085,9 @@ theorem sandwichedRenyiPSDReferenceLowAlphaRegularizedCurves_eventually_le
       (sandwichedRenyiReferenceRegularization σ ε).PosDef :=
     sandwichedRenyiReferenceRegularization_posDef hσ hε
   have hQpos :
-      0 < sandwichedRenyiQ ρ.matrix
+      0 < sandwichedRenyiQ ρ.m
         (sandwichedRenyiReferenceRegularization σ ε)
-        ρ.pos hσreg_psd α :=
+        ρ.psd hσreg_psd α :=
     sandwichedRenyiQ_pos_of_state_posDef_reference ρ hσreg_pd α
   have hDPI :=
     sandwichedRenyiPSDReferenceLowAlpha_dataProcessing_channel
@@ -1100,9 +1099,9 @@ theorem sandwichedRenyiPSDReferenceLowAlphaRegularizedCurves_eventually_le
 /-- The input regularization curve converges to the finite PSD-reference
 strict low-`α` branch when the limiting `Q` value is positive. -/
 theorem sandwichedRenyiPSDReferenceLowAlphaRegularizedInputCurve_tendsto
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
     (α : ℝ) (hα_half : 1 / 2 < α) (hα_lt_one : α < 1)
-    (hQpos : 0 < sandwichedRenyiQ ρ.matrix σ ρ.pos hσ α) :
+    (hQpos : 0 < sandwichedRenyiQ ρ.m σ ρ.psd hσ α) :
     Filter.Tendsto
       (sandwichedRenyiPSDReferenceLowAlphaRegularizedInputCurve ρ hσ α)
       (nhdsWithin (0 : ℝ) (Set.Ioi 0))
@@ -1129,17 +1128,17 @@ theorem sandwichedRenyiPSDReferenceLowAlphaRegularizedInputCurve_tendsto
     exact Filter.Tendsto.congr' hcongr hreg
   have hQ_tend :
       Filter.Tendsto
-        (fun ε => sandwichedRenyiQ ρ.matrix (σF ε) ρ.pos (hσF_psd ε) α)
+        (fun ε => sandwichedRenyiQ ρ.m (σF ε) ρ.psd (hσF_psd ε) α)
         l
-        (nhds (sandwichedRenyiQ ρ.matrix σ ρ.pos hσ α)) :=
+        (nhds (sandwichedRenyiQ ρ.m σ ρ.psd hσ α)) :=
     sandwichedRenyiQ_tendsto_of_tendsto_posSemidef
       hα_pos hs_pos tendsto_const_nhds hσF_tend
-      (fun _ => ρ.pos) hσF_psd ρ.pos hσ
+      (fun _ => ρ.psd) hσF_psd ρ.psd hσ
   have hlog_tend :
       Filter.Tendsto
-        (fun ε => log2 (sandwichedRenyiQ ρ.matrix (σF ε) ρ.pos (hσF_psd ε) α))
+        (fun ε => log2 (sandwichedRenyiQ ρ.m (σF ε) ρ.psd (hσF_psd ε) α))
         l
-        (nhds (log2 (sandwichedRenyiQ ρ.matrix σ ρ.pos hσ α))) := by
+        (nhds (log2 (sandwichedRenyiQ ρ.m σ ρ.psd hσ α))) := by
     have hraw := Filter.Tendsto.log hQ_tend (ne_of_gt hQpos)
     simp only [log2]
     exact hraw.div tendsto_const_nhds (ne_of_gt (Real.log_pos one_lt_two))
@@ -1147,16 +1146,16 @@ theorem sandwichedRenyiPSDReferenceLowAlphaRegularizedInputCurve_tendsto
       Filter.Tendsto
         (fun ε =>
           (1 / (α - 1)) *
-            log2 (sandwichedRenyiQ ρ.matrix (σF ε) ρ.pos (hσF_psd ε) α))
+            log2 (sandwichedRenyiQ ρ.m (σF ε) ρ.psd (hσF_psd ε) α))
         l
         (nhds
           ((1 / (α - 1)) *
-            log2 (sandwichedRenyiQ ρ.matrix σ ρ.pos hσ α))) :=
+            log2 (sandwichedRenyiQ ρ.m σ ρ.psd hσ α))) :=
     hlog_tend.const_mul (1 / (α - 1))
   have hcurve :
       (fun ε =>
           (1 / (α - 1)) *
-            log2 (sandwichedRenyiQ ρ.matrix (σF ε) ρ.pos (hσF_psd ε) α))
+            log2 (sandwichedRenyiQ ρ.m (σF ε) ρ.psd (hσF_psd ε) α))
         =ᶠ[l]
       sandwichedRenyiPSDReferenceLowAlphaRegularizedInputCurve ρ hσ α := by
     filter_upwards [self_mem_nhdsWithin] with ε hε
@@ -1169,18 +1168,18 @@ theorem sandwichedRenyiPSDReferenceLowAlphaRegularizedInputCurve_tendsto
 strict low-`α` branch when the limiting output `Q` value is positive. -/
 theorem sandwichedRenyiPSDReferenceLowAlphaRegularizedOutputCurve_tendsto
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (Φ : CPTPMap a b)
     (α : ℝ) (hα_half : 1 / 2 < α) (hα_lt_one : α < 1)
     (hQpos :
-      0 < sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.map σ)
-        (Φ.applyState ρ).pos (Φ.mapsPositive σ hσ) α) :
+      0 < sandwichedRenyiQ (Φ ρ).m (Φ.map σ)
+        (Φ ρ).psd (Φ.mapsPositive σ hσ) α) :
     Filter.Tendsto
       (sandwichedRenyiPSDReferenceLowAlphaRegularizedOutputCurve ρ hσ Φ α)
       (nhdsWithin (0 : ℝ) (Set.Ioi 0))
       (nhds
         (sandwichedRenyiPSDReferenceLowAlpha
-          (Φ.applyState ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α)) := by
+          (Φ ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α)) := by
   let l : Filter ℝ := nhdsWithin (0 : ℝ) (Set.Ioi 0)
   let σF : ℝ → CMatrix b := fun ε =>
     if hε : 0 ≤ ε then
@@ -1212,25 +1211,25 @@ theorem sandwichedRenyiPSDReferenceLowAlphaRegularizedOutputCurve_tendsto
     exact Filter.Tendsto.congr' hcongr hmap
   have hQ_tend :
       Filter.Tendsto
-        (fun ε => sandwichedRenyiQ (Φ.applyState ρ).matrix (σF ε)
-          (Φ.applyState ρ).pos (hσF_psd ε) α)
+        (fun ε => sandwichedRenyiQ (Φ ρ).m (σF ε)
+          (Φ ρ).psd (hσF_psd ε) α)
         l
         (nhds
-          (sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.map σ)
-            (Φ.applyState ρ).pos (Φ.mapsPositive σ hσ) α)) :=
+          (sandwichedRenyiQ (Φ ρ).m (Φ.map σ)
+            (Φ ρ).psd (Φ.mapsPositive σ hσ) α)) :=
     sandwichedRenyiQ_tendsto_of_tendsto_posSemidef
       hα_pos hs_pos tendsto_const_nhds hσF_tend
-      (fun _ => (Φ.applyState ρ).pos) hσF_psd
-      (Φ.applyState ρ).pos (Φ.mapsPositive σ hσ)
+      (fun _ => (Φ ρ).psd) hσF_psd
+      (Φ ρ).psd (Φ.mapsPositive σ hσ)
   have hlog_tend :
       Filter.Tendsto
         (fun ε => log2
-          (sandwichedRenyiQ (Φ.applyState ρ).matrix (σF ε)
-            (Φ.applyState ρ).pos (hσF_psd ε) α))
+          (sandwichedRenyiQ (Φ ρ).m (σF ε)
+            (Φ ρ).psd (hσF_psd ε) α))
         l
         (nhds (log2
-          (sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.map σ)
-            (Φ.applyState ρ).pos (Φ.mapsPositive σ hσ) α))) := by
+          (sandwichedRenyiQ (Φ ρ).m (Φ.map σ)
+            (Φ ρ).psd (Φ.mapsPositive σ hσ) α))) := by
     have hraw := Filter.Tendsto.log hQ_tend (ne_of_gt hQpos)
     simp only [log2]
     exact hraw.div tendsto_const_nhds (ne_of_gt (Real.log_pos one_lt_two))
@@ -1239,21 +1238,21 @@ theorem sandwichedRenyiPSDReferenceLowAlphaRegularizedOutputCurve_tendsto
         (fun ε =>
           (1 / (α - 1)) *
             log2
-              (sandwichedRenyiQ (Φ.applyState ρ).matrix (σF ε)
-                (Φ.applyState ρ).pos (hσF_psd ε) α))
+              (sandwichedRenyiQ (Φ ρ).m (σF ε)
+                (Φ ρ).psd (hσF_psd ε) α))
         l
         (nhds
           ((1 / (α - 1)) *
             log2
-              (sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.map σ)
-                (Φ.applyState ρ).pos (Φ.mapsPositive σ hσ) α))) :=
+              (sandwichedRenyiQ (Φ ρ).m (Φ.map σ)
+                (Φ ρ).psd (Φ.mapsPositive σ hσ) α))) :=
     hlog_tend.const_mul (1 / (α - 1))
   have hcurve :
       (fun ε =>
           (1 / (α - 1)) *
             log2
-              (sandwichedRenyiQ (Φ.applyState ρ).matrix (σF ε)
-                (Φ.applyState ρ).pos (hσF_psd ε) α))
+              (sandwichedRenyiQ (Φ ρ).m (σF ε)
+                (Φ ρ).psd (hσF_psd ε) α))
         =ᶠ[l]
       sandwichedRenyiPSDReferenceLowAlphaRegularizedOutputCurve ρ hσ Φ α := by
     filter_upwards [self_mem_nhdsWithin] with ε hε
@@ -1261,13 +1260,6 @@ theorem sandwichedRenyiPSDReferenceLowAlphaRegularizedOutputCurve_tendsto
     simp [sandwichedRenyiPSDReferenceLowAlphaRegularizedOutputCurve,
       sandwichedRenyiPSDReferenceLowAlpha, σF, hε_nonneg]
   exact Filter.Tendsto.congr' hcurve hdiv_tend
-
-private theorem frankLieb_log2_mono_of_pos {x y : ℝ} (hx : 0 < x)
-    (hxy : x ≤ y) :
-    log2 x ≤ log2 y := by
-  unfold log2
-  exact div_le_div_of_nonneg_right (Real.log_le_log hx hxy)
-    (le_of_lt (Real.log_pos one_lt_two))
 
 /-- Convert a low-`α` `Q` inequality into a matrix-reference sandwiched Renyi
 divergence inequality.
@@ -1277,14 +1269,14 @@ order reverses.  This is the non-normalized-reference analogue of
 `sandwichedRenyi_dataProcessing_le_of_lowAlphaQ_ge`. -/
 theorem sandwichedRenyiReference_le_of_lowAlphaQ_ge
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρIn : State a) {σIn : CMatrix a}
-    (ρOut : State b) {σOut : CMatrix b}
-    (hρIn : ρIn.matrix.PosDef) (hσIn : σIn.PosDef)
-    (hρOut : ρOut.matrix.PosDef) (hσOut : σOut.PosDef)
+    (ρIn : MState a) {σIn : CMatrix a}
+    (ρOut : MState b) {σOut : CMatrix b}
+    (hρIn : ρIn.m.PosDef) (hσIn : σIn.PosDef)
+    (hρOut : ρOut.m.PosDef) (hσOut : σOut.PosDef)
     (α : ℝ) (hα_half : 1 / 2 < α) (hα_lt_one : α < 1)
     (hQ :
-      sandwichedRenyiQ ρIn.matrix σIn ρIn.pos hσIn.posSemidef α ≤
-        sandwichedRenyiQ ρOut.matrix σOut ρOut.pos hσOut.posSemidef α) :
+      sandwichedRenyiQ ρIn.m σIn ρIn.psd hσIn.posSemidef α ≤
+        sandwichedRenyiQ ρOut.m σOut ρOut.psd hσOut.posSemidef α) :
     sandwichedRenyiReference ρOut σOut hρOut hσOut α
         (by linarith) (ne_of_lt hα_lt_one) ≤
       sandwichedRenyiReference ρIn σIn hρIn hσIn α
@@ -1306,7 +1298,7 @@ theorem sandwichedRenyiReference_le_of_lowAlphaQ_ge
         psdTracePower (sandwichedRenyiReferenceInner ρIn σIn α)
           (sandwichedRenyiReferenceInner_posSemidef ρIn hσIn.posSemidef α) α :=
     sandwichedRenyiReferenceInner_psdTracePower_pos ρIn hρIn hσIn α
-  have hlog := frankLieb_log2_mono_of_pos hin_pos hpower
+  have hlog := log2_mono_of_pos hin_pos hpower
   have hcoef_nonpos : 1 / (α - 1) ≤ 0 := by
     have hcoef_neg : 1 / (α - 1) < 0 := by
       simpa [one_div] using (inv_lt_zero.2 (sub_neg.mpr hα_lt_one))
@@ -1323,12 +1315,12 @@ current `sandwichedRenyiReference` divergence API is real-valued on `PosDef`
 references. -/
 theorem sandwichedRenyiReference_dataProcessing_channel_of_half_lt_lt_one
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (Φ : Channel a b)
-    (hρ : ρ.matrix.PosDef) (hσ : σ.PosDef)
-    (hρΦ : (Φ.applyState ρ).matrix.PosDef)
+    (ρ : MState a) {σ : CMatrix a} (Φ : CPTPMap a b)
+    (hρ : ρ.m.PosDef) (hσ : σ.PosDef)
+    (hρΦ : (Φ ρ).m.PosDef)
     (hσΦ : (Φ.map σ).PosDef)
     (α : ℝ) (hα_half : 1 / 2 < α) (hα_lt_one : α < 1) :
-    sandwichedRenyiReference (Φ.applyState ρ) (Φ.map σ)
+    sandwichedRenyiReference (Φ ρ) (Φ.map σ)
         hρΦ hσΦ α (by linarith) (ne_of_lt hα_lt_one) ≤
       sandwichedRenyiReference ρ σ hρ hσ α
         (by linarith) (ne_of_lt hα_lt_one) := by
@@ -1337,7 +1329,7 @@ theorem sandwichedRenyiReference_dataProcessing_channel_of_half_lt_lt_one
       ρ hσ.posSemidef Φ α hα_half hα_lt_one
   exact
     sandwichedRenyiReference_le_of_lowAlphaQ_ge
-      ρ (Φ.applyState ρ) hρ hσ hρΦ hσΦ α hα_half hα_lt_one hQ
+      ρ (Φ ρ) hρ hσ hρΦ hσΦ α hα_half hα_lt_one hQ
 
 /-- Strict low-`α` full-rank sandwiched Renyi DPI for an arbitrary
 finite-dimensional channel.
@@ -1349,54 +1341,54 @@ is applied at `Q` level, and only the full-rank input/output endpoints are
 converted back to the sandwiched Renyi divergence. -/
 theorem sandwichedRenyi_dataProcessing_channel_statement_of_half_lt_lt_one_channel
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ σ : State a) (Φ : Channel a b)
-    (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef)
-    (hρΦ : (Φ.applyState ρ).matrix.PosDef)
-    (hσΦ : (Φ.applyState σ).matrix.PosDef)
+    (ρ σ : MState a) (Φ : CPTPMap a b)
+    (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
+    (hρΦ : (Φ ρ).m.PosDef)
+    (hσΦ : (Φ σ).m.PosDef)
     (α : ℝ) (hα_half : 1 / 2 < α) (hα_lt_one : α < 1) :
     sandwichedRenyi_dataProcessing_channel_statement ρ σ Φ
       hρ hσ hρΦ hσΦ α (le_of_lt hα_half) (ne_of_lt hα_lt_one) := by
   classical
   obtain ⟨K, hK⟩ :=
-    MatrixMap.exists_kraus_of_choi_psd Φ.map Φ.completelyPositive
+    MatrixMap.exists_kraus_of_choi_psd Φ.map Φ.map_cp
   have hTP : MatrixMap.IsTracePreserving (MatrixMap.ofKraus K) := by
     rw [← hK]
-    exact Φ.tracePreserving
+    exact Φ.map_TP
   let ρL := stinespringLiftState K hTP ρ
   let σL := stinespringLiftState K hTP σ
   let : Nonempty a := ρ.nonempty
-  let : Nonempty b := (Φ.applyState ρ).nonempty
+  let : Nonempty b := MState.nonempty (Φ ρ)
   have hPT :
-      sandwichedRenyiQ ρL.matrix σL.matrix ρL.pos σL.pos α ≤
-        sandwichedRenyiQ (partialTraceB ρL.matrix) (partialTraceB σL.matrix)
-          (partialTraceB_posSemidef ρL.pos) (partialTraceB_posSemidef σL.pos) α := by
-    exact sandwichedRenyiQ_marginalA_ge_of_half_lt_lt_one
-      (a := b) (b := a × b) (hρ := ρL.pos) (hσ := σL.pos)
+      sandwichedRenyiQ ρL.m σL.m ρL.psd σL.psd α ≤
+        sandwichedRenyiQ (Matrix.traceRight ρL.m) (Matrix.traceRight σL.m)
+          (traceRight_posSemidef ρL.psd) (traceRight_posSemidef σL.psd) α := by
+    exact sandwichedRenyiQ_traceRight_ge_of_half_lt_lt_one
+      (a := b) (b := a × b) (hρ := ρL.psd) (hσ := σL.psd)
       hα_half hα_lt_one
   have hIso :
-      sandwichedRenyiQ ρL.matrix σL.matrix ρL.pos σL.pos α =
-        sandwichedRenyiQ ρ.matrix σ.matrix ρ.pos σ.pos α := by
+      sandwichedRenyiQ ρL.m σL.m ρL.psd σL.psd α =
+        sandwichedRenyiQ ρ.m σ.m ρ.psd σ.psd α := by
     simpa [ρL, σL] using
       sandwichedRenyiQ_stinespringLiftState K hTP ρ σ hα_half hα_lt_one
-  have hρout : partialTraceB ρL.matrix = (Φ.applyState ρ).matrix := by
-    have hstate := stinespringLiftState_marginalA_eq_applyState K Φ hK hTP ρ
-    have hm := congrArg State.matrix hstate
-    simpa [ρL, State.marginalA] using hm
-  have hσout : partialTraceB σL.matrix = (Φ.applyState σ).matrix := by
-    have hstate := stinespringLiftState_marginalA_eq_applyState K Φ hK hTP σ
-    have hm := congrArg State.matrix hstate
-    simpa [σL, State.marginalA] using hm
+  have hρout : Matrix.traceRight ρL.m = (Φ ρ).m := by
+    have hstate := stinespringLiftState_traceRight_eq_applyState K Φ hK hTP ρ
+    have hm := congrArg DensityOp.m hstate
+    simpa [ρL] using hm
+  have hσout : Matrix.traceRight σL.m = (Φ σ).m := by
+    have hstate := stinespringLiftState_traceRight_eq_applyState K Φ hK hTP σ
+    have hm := congrArg DensityOp.m hstate
+    simpa [σL] using hm
   have hQ :
-      sandwichedRenyiQ ρ.matrix σ.matrix ρ.pos σ.pos α ≤
-        sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.applyState σ).matrix
-          (Φ.applyState ρ).pos (Φ.applyState σ).pos α := by
+      sandwichedRenyiQ ρ.m σ.m ρ.psd σ.psd α ≤
+        sandwichedRenyiQ (Φ ρ).m (Φ σ).m
+          (Φ ρ).psd (Φ σ).psd α := by
     calc
-      sandwichedRenyiQ ρ.matrix σ.matrix ρ.pos σ.pos α =
-          sandwichedRenyiQ ρL.matrix σL.matrix ρL.pos σL.pos α := hIso.symm
-      _ ≤ sandwichedRenyiQ (partialTraceB ρL.matrix) (partialTraceB σL.matrix)
-          (partialTraceB_posSemidef ρL.pos) (partialTraceB_posSemidef σL.pos) α := hPT
-      _ = sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.applyState σ).matrix
-          (Φ.applyState ρ).pos (Φ.applyState σ).pos α := by
+      sandwichedRenyiQ ρ.m σ.m ρ.psd σ.psd α =
+          sandwichedRenyiQ ρL.m σL.m ρL.psd σL.psd α := hIso.symm
+      _ ≤ sandwichedRenyiQ (Matrix.traceRight ρL.m) (Matrix.traceRight σL.m)
+          (traceRight_posSemidef ρL.psd) (traceRight_posSemidef σL.psd) α := hPT
+      _ = sandwichedRenyiQ (Φ ρ).m (Φ σ).m
+          (Φ ρ).psd (Φ σ).psd α := by
         simp [sandwichedRenyiQ, hρout, hσout]
   exact
     sandwichedRenyi_dataProcessing_le_of_lowAlphaQ_ge
@@ -1407,14 +1399,14 @@ range `(1 / 2 ≤ α ∧ α < 1) ∨ 1 < α`.
 
 This combines the fidelity endpoint, the Gour/Frank--Lieb strict low-`α`
 argument, and the Beigi high-`α` weighted Schatten contraction theorem.  The
-statement remains the current full-rank `State + PosDef` surface; the public
+statement remains the current full-rank `MState + PosDef` surface; the public
 PSD-reference extension is a separate remaining task. -/
 theorem sandwichedRenyi_dataProcessing_channel_statement_of_half_le_lt_one_or_one_lt_channel
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ σ : State a) (Φ : Channel a b)
-    (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef)
-    (hρΦ : (Φ.applyState ρ).matrix.PosDef)
-    (hσΦ : (Φ.applyState σ).matrix.PosDef)
+    (ρ σ : MState a) (Φ : CPTPMap a b)
+    (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef)
+    (hρΦ : (Φ ρ).m.PosDef)
+    (hσΦ : (Φ σ).m.PosDef)
     (α : ℝ) (hα_range : (1 / 2 ≤ α ∧ α < 1) ∨ 1 < α) :
     sandwichedRenyi_dataProcessing_channel_statement ρ σ Φ
       hρ hσ hρΦ hσΦ α
@@ -1443,18 +1435,18 @@ non-normalized reference operator.
 
 This is the first source-facing reference-domain extension of the full-rank
 channel theorem: the reference is a positive-definite matrix rather than a
-normalized `State`.  The proof normalizes the reference by its trace, applies
-the already proved full-rank `State + PosDef` channel DPI, and cancels the
+normalized `MState`.  The proof normalizes the reference by its trace, applies
+the already proved full-rank `MState + PosDef` channel DPI, and cancels the
 identical logarithmic scaling shift on both sides.  Singular PSD references
 remain a separate regularization/support-continuity task. -/
 theorem sandwichedRenyi_dataProcessing_channel_posDef_reference
     {b : Type v} [Fintype b] [DecidableEq b] [Nonempty a]
-    (ρ : State a) (σ : CMatrix a) (Φ : Channel a b)
-    (hρ : ρ.matrix.PosDef) (hσ : σ.PosDef)
-    (hρΦ : (Φ.applyState ρ).matrix.PosDef)
+    (ρ : MState a) (σ : CMatrix a) (Φ : CPTPMap a b)
+    (hρ : ρ.m.PosDef) (hσ : σ.PosDef)
+    (hρΦ : (Φ ρ).m.PosDef)
     (hσΦ : (Φ.map σ).PosDef)
     (α : ℝ) (hα_range : (1 / 2 ≤ α ∧ α < 1) ∨ 1 < α) :
-    sandwichedRenyiReference (Φ.applyState ρ) (Φ.map σ) hρΦ hσΦ α
+    sandwichedRenyiReference (Φ ρ) (Φ.map σ) hρΦ hσΦ α
         (by
           rcases hα_range with hlow | hhigh
           · linarith
@@ -1484,13 +1476,13 @@ theorem sandwichedRenyi_dataProcessing_channel_posDef_reference
     rcases hα_range with hlow | hhigh
     · exact ne_of_lt hlow.2
     · exact ne_of_gt hhigh
-  let σ₀ : State a := stateOfPosDefReference σ hσ
-  have hσ₀ : σ₀.matrix.PosDef := by
+  let σ₀ : MState a := stateOfPosDefReference σ hσ
+  have hσ₀ : σ₀.m.PosDef := by
     simpa [σ₀] using stateOfPosDefReference_posDef σ hσ
-  have hσ₀Φ : (Φ.applyState σ₀).matrix.PosDef := by
+  have hσ₀Φ : (Φ σ₀).m.PosDef := by
     have hmap :
-        (Φ.applyState σ₀).matrix = lambda • Φ.map σ := by
-      change Φ.map (lambda • σ : CMatrix a) = lambda • Φ.map σ
+        (Φ σ₀).m = lambda • Φ.map σ := by
+      simp only [σ₀, CPTPOp.mat_coe_eq_apply_mat, stateOfPosDefReference_matrix]
       change Φ.map (((lambda : ℝ) : ℂ) • σ) =
         (((lambda : ℝ) : ℂ) • Φ.map σ)
       simp [lambda]
@@ -1508,23 +1500,23 @@ theorem sandwichedRenyi_dataProcessing_channel_posDef_reference
       sandwichedRenyiReference_real_smul_reference
         ρ hρ hσ hlambda_pos α hα_pos hα_ne_one
   have hout :
-      sandwichedRenyi (Φ.applyState ρ) (Φ.applyState σ₀)
+      sandwichedRenyi (Φ ρ) (Φ σ₀)
           hρΦ hσ₀Φ α hα_pos hα_ne_one =
-        sandwichedRenyiReference (Φ.applyState ρ) (Φ.map σ)
+        sandwichedRenyiReference (Φ ρ) (Φ.map σ)
           hρΦ hσΦ α hα_pos hα_ne_one - log2 lambda := by
     rw [← sandwichedRenyiReference_state
-      (Φ.applyState ρ) (Φ.applyState σ₀) hρΦ hσ₀Φ α hα_pos hα_ne_one]
+      (Φ ρ) (Φ σ₀) hρΦ hσ₀Φ α hα_pos hα_ne_one]
     have hmap :
-        (Φ.applyState σ₀).matrix = lambda • Φ.map σ := by
-      change Φ.map (lambda • σ : CMatrix a) = lambda • Φ.map σ
+        (Φ σ₀).m = lambda • Φ.map σ := by
+      simp only [σ₀, CPTPOp.mat_coe_eq_apply_mat, stateOfPosDefReference_matrix]
       change Φ.map (((lambda : ℝ) : ℂ) • σ) =
         (((lambda : ℝ) : ℂ) • Φ.map σ)
       simp [lambda]
     simpa [hmap] using
       sandwichedRenyiReference_real_smul_reference
-        (Φ.applyState ρ) hρΦ hσΦ hlambda_pos α hα_pos hα_ne_one
+        (Φ ρ) hρΦ hσΦ hlambda_pos α hα_pos hα_ne_one
   have hshift :
-      sandwichedRenyiReference (Φ.applyState ρ) (Φ.map σ)
+      sandwichedRenyiReference (Φ ρ) (Φ.map σ)
           hρΦ hσΦ α hα_pos hα_ne_one - log2 lambda ≤
         sandwichedRenyiReference ρ σ hρ hσ α hα_pos hα_ne_one -
           log2 lambda := by
@@ -1537,9 +1529,9 @@ regularization `Φ(σ + εI) = Φ(σ) + ε Φ(I)`.
 This is the correct Schrödinger-picture form used before taking limits; in
 general `Φ(I) ≠ I`, so the output regularization must not be simplified to
 `Φ(σ) + εI`. -/
-theorem Channel.map_sandwichedRenyiReferenceRegularization
+theorem CPTPOp.map_sandwichedRenyiReferenceRegularization
     {b : Type v} [Fintype b] [DecidableEq b]
-    (Φ : Channel a b) (σ : CMatrix a) (ε : ℝ) :
+    (Φ : CPTPMap a b) (σ : CMatrix a) (ε : ℝ) :
     Φ.map (sandwichedRenyiReferenceRegularization σ ε) =
       Φ.map σ + ε • Φ.map (1 : CMatrix a) := by
   change Φ.map (σ + (((ε : ℝ) : ℂ) • (1 : CMatrix a))) =
@@ -1552,9 +1544,9 @@ of the identity.
 This follows by applying support preservation to the trivial input-domain
 support condition `σ ≪ I`.  It is the first half of the fixed-output-support
 description for the Gour source regularization `Φ(σ + εI)`. -/
-theorem Channel.map_supports_map_one
+theorem CPTPOp.map_supports_map_one
     {b : Type v} [Fintype b] [DecidableEq b]
-    (Φ : Channel a b) {σ : CMatrix a} (_hσ : σ.PosSemidef) :
+    (Φ : CPTPMap a b) {σ : CMatrix a} (_hσ : σ.PosSemidef) :
     Matrix.Supports (Φ.map σ) (Φ.map (1 : CMatrix a)) := by
   exact channel_map_supports Φ Matrix.PosSemidef.one
     (Matrix.Supports.of_right_posDef σ (1 : CMatrix a) Matrix.PosDef.one)
@@ -1564,48 +1556,48 @@ theorem Channel.map_supports_map_one
 This gives the fixed-output-support side of the high-`α` singular-reference
 compression route: all states produced by the channel live on the same support
 as the channel image of the identity. -/
-theorem Channel.applyState_fixed_by_map_one_supportProjector
+theorem CPTPOp.applyState_fixed_by_map_one_supportProjector
     {b : Type v} [Fintype b] [DecidableEq b]
-    (Φ : Channel a b) (ρ : State a) :
+    (Φ : CPTPMap a b) (ρ : MState a) :
     let Pi : CMatrix b :=
       psdInvSqrt (Φ.map (1 : CMatrix a))
           (Φ.mapsPositive (1 : CMatrix a) Matrix.PosSemidef.one).isHermitian *
         (Φ.map (1 : CMatrix a)) *
         psdInvSqrt (Φ.map (1 : CMatrix a))
           (Φ.mapsPositive (1 : CMatrix a) Matrix.PosSemidef.one).isHermitian
-    Pi * (Φ.applyState ρ).matrix = (Φ.applyState ρ).matrix ∧
-      (Φ.applyState ρ).matrix * Pi = (Φ.applyState ρ).matrix := by
+    Pi * (Φ ρ).m = (Φ ρ).m ∧
+      (Φ ρ).m * Pi = (Φ ρ).m := by
   exact
     _root_.QIT.supportProjector_fixes_of_supports
-      (M := (Φ.applyState ρ).matrix)
+      (M := (Φ ρ).m)
       (N := Φ.map (1 : CMatrix a))
-      (Φ.applyState ρ).pos
+      (Φ ρ).psd
       (Φ.mapsPositive (1 : CMatrix a) Matrix.PosSemidef.one)
       (channel_applyState_supports_of_supports ρ Matrix.PosSemidef.one Φ
-        (Matrix.Supports.of_right_posDef ρ.matrix (1 : CMatrix a)
+        (Matrix.Supports.of_right_posDef ρ.m (1 : CMatrix a)
           Matrix.PosDef.one))
 
 /-- Every channel output state is supported by the channel image of the
 identity. -/
-theorem Channel.applyState_supports_map_one
+theorem CPTPOp.applyState_supports_map_one
     {b : Type v} [Fintype b] [DecidableEq b]
-    (Φ : Channel a b) (ρ : State a) :
-    Matrix.Supports (Φ.applyState ρ).matrix (Φ.map (1 : CMatrix a)) :=
+    (Φ : CPTPMap a b) (ρ : MState a) :
+    Matrix.Supports (Φ ρ).m (Φ.map (1 : CMatrix a)) :=
   channel_applyState_supports_of_supports ρ Matrix.PosSemidef.one Φ
-    (Matrix.Supports.of_right_posDef ρ.matrix (1 : CMatrix a)
+    (Matrix.Supports.of_right_posDef ρ.m (1 : CMatrix a)
       Matrix.PosDef.one)
 
 /-- The channel-compatible regularized output reference
 `Φ(σ + εI)` is supported by `Φ(I)`. -/
-theorem Channel.map_regularized_reference_supports_map_one
+theorem CPTPOp.map_regularized_reference_supports_map_one
     {b : Type v} [Fintype b] [DecidableEq b]
-    (Φ : Channel a b) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (Φ : CPTPMap a b) {σ : CMatrix a} (hσ : σ.PosSemidef)
     {ε : ℝ} (_hε : 0 ≤ ε) :
     Matrix.Supports (Φ.map (sandwichedRenyiReferenceRegularization σ ε))
       (Φ.map (1 : CMatrix a)) := by
-  rw [Channel.map_sandwichedRenyiReferenceRegularization]
+  rw [CPTPOp.map_sandwichedRenyiReferenceRegularization]
   exact Matrix.Supports.add_left
-    (Channel.map_supports_map_one Φ hσ)
+    (CPTPOp.map_supports_map_one Φ hσ)
     (Matrix.Supports.smul_left (((ε : ℝ) : ℂ)
       ) (Matrix.Supports.refl (Φ.map (1 : CMatrix a))))
 
@@ -1616,13 +1608,13 @@ Thus `Φ(σ + εI)` has the same support as `Φ(I)` for every positive
 regularization parameter, even when neither is full-rank on the ambient output
 space.  This is the fixed-support domain fact needed before restricting the
 high-`α` finite branch to the output support. -/
-theorem Channel.map_one_supports_regularized_reference
+theorem CPTPOp.map_one_supports_regularized_reference
     {b : Type v} [Fintype b] [DecidableEq b]
-    (Φ : Channel a b) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (Φ : CPTPMap a b) {σ : CMatrix a} (hσ : σ.PosSemidef)
     {ε : ℝ} (hε : 0 < ε) :
     Matrix.Supports (Φ.map (1 : CMatrix a))
       (Φ.map (sandwichedRenyiReferenceRegularization σ ε)) := by
-  rw [Channel.map_sandwichedRenyiReferenceRegularization]
+  rw [CPTPOp.map_sandwichedRenyiReferenceRegularization]
   exact Matrix.Supports.of_pos_smul_right_add
     (Φ.mapsPositive (1 : CMatrix a) Matrix.PosSemidef.one)
     (Φ.mapsPositive σ hσ) hε
@@ -1631,12 +1623,12 @@ theorem Channel.map_one_supports_regularized_reference
 regularized output reference `Φ(σ + εI)`.
 
 This is the projector form of
-`Channel.map_regularized_reference_supports_map_one`, and is the algebraic
+`CPTPOp.map_regularized_reference_supports_map_one`, and is the algebraic
 entry point for later restricting the high-`α` finite branch to the fixed
 output support of `Φ(I)`. -/
-theorem Channel.map_regularized_reference_fixed_by_map_one_supportProjector
+theorem CPTPOp.map_regularized_reference_fixed_by_map_one_supportProjector
     {b : Type v} [Fintype b] [DecidableEq b]
-    (Φ : Channel a b) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (Φ : CPTPMap a b) {σ : CMatrix a} (hσ : σ.PosSemidef)
     {ε : ℝ} (hε : 0 ≤ ε) :
     let Pi : CMatrix b :=
       psdInvSqrt (Φ.map (1 : CMatrix a))
@@ -1655,18 +1647,18 @@ theorem Channel.map_regularized_reference_fixed_by_map_one_supportProjector
       (Φ.mapsPositive (sandwichedRenyiReferenceRegularization σ ε)
         (sandwichedRenyiReferenceRegularization_posSemidef hσ hε))
       (Φ.mapsPositive (1 : CMatrix a) Matrix.PosSemidef.one)
-      (Channel.map_regularized_reference_supports_map_one Φ hσ hε)
+      (CPTPOp.map_regularized_reference_supports_map_one Φ hσ hε)
 
 /-- For `ε > 0`, the support projector of `Φ(σ + εI)` fixes `Φ(I)`.
 
 Together with
-`Channel.map_regularized_reference_fixed_by_map_one_supportProjector`, this
+`CPTPOp.map_regularized_reference_fixed_by_map_one_supportProjector`, this
 states that positive source regularization does not change the output support
 relative to `Φ(I)`, even when that support is a proper subspace of the ambient
 codomain. -/
-theorem Channel.map_one_fixed_by_regularized_reference_supportProjector
+theorem CPTPOp.map_one_fixed_by_regularized_reference_supportProjector
     {b : Type v} [Fintype b] [DecidableEq b]
-    (Φ : Channel a b) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (Φ : CPTPMap a b) {σ : CMatrix a} (hσ : σ.PosSemidef)
     {ε : ℝ} (hε : 0 < ε) :
     let SigmaEps : CMatrix b := Φ.map (sandwichedRenyiReferenceRegularization σ ε)
     let hSigmaEps : SigmaEps.PosSemidef :=
@@ -1684,7 +1676,7 @@ theorem Channel.map_one_fixed_by_regularized_reference_supportProjector
       (Φ.mapsPositive (1 : CMatrix a) Matrix.PosSemidef.one)
       (Φ.mapsPositive (sandwichedRenyiReferenceRegularization σ ε)
         (sandwichedRenyiReferenceRegularization_posSemidef hσ (le_of_lt hε)))
-      (Channel.map_one_supports_regularized_reference Φ hσ hε)
+      (CPTPOp.map_one_supports_regularized_reference Φ hσ hε)
 
 /-- For every positive source regularization parameter, the channel output
 state is supported by the channel-compatible output reference `Φ(σ + εI)`.
@@ -1693,16 +1685,16 @@ This is the domain side needed by the Gour high-`α` finite-branch
 regularization route when `Φ(σ + εI)` is singular in the ambient output
 space: the output state lives on the fixed support of `Φ(I)`, and for
 `ε > 0` that support is contained in the support of `Φ(σ + εI)`. -/
-theorem Channel.applyState_supports_map_regularized_reference
+theorem CPTPOp.applyState_supports_map_regularized_reference
     {b : Type v} [Fintype b] [DecidableEq b]
-    (Φ : Channel a b) (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (Φ : CPTPMap a b) (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
     {ε : ℝ} (hε : 0 < ε) :
-    Matrix.Supports (Φ.applyState ρ).matrix
+    Matrix.Supports (Φ ρ).m
       (Φ.map (sandwichedRenyiReferenceRegularization σ ε)) := by
   intro v hv
   exact
-    (Channel.applyState_supports_map_one Φ ρ) v
-      ((Channel.map_one_supports_regularized_reference Φ hσ hε) v hv)
+    (CPTPOp.applyState_supports_map_one Φ ρ) v
+      ((CPTPOp.map_one_supports_regularized_reference Φ hσ hε) v hv)
 
 /-- The channel image of a positive regularized PSD reference is positive
 definite when supplied with the positive-definiteness witness required by the
@@ -1713,14 +1705,14 @@ support/domain condition.  This theorem deliberately keeps it explicit rather
 than assuming the Schrödinger-picture channel is faithful or unital. -/
 theorem sandwichedRenyiReference_dataProcessing_channel_regularized
     {b : Type v} [Fintype b] [DecidableEq b] [Nonempty a]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
-    (hρ : ρ.matrix.PosDef)
-    (hρΦ : (Φ.applyState ρ).matrix.PosDef)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
+    (hρ : ρ.m.PosDef)
+    (hρΦ : (Φ ρ).m.PosDef)
     (α : ℝ) (hα_range : (1 / 2 ≤ α ∧ α < 1) ∨ 1 < α)
     {ε : ℝ} (hε : 0 < ε)
     (hσΦε :
       (Φ.map (sandwichedRenyiReferenceRegularization σ ε)).PosDef) :
-    sandwichedRenyiReference (Φ.applyState ρ)
+    sandwichedRenyiReference (Φ ρ)
         (Φ.map (sandwichedRenyiReferenceRegularization σ ε))
         hρΦ hσΦε α
         (by
@@ -1783,7 +1775,7 @@ theorem sandwichedRenyiReferenceRegularizationLimitGate.le_of_eventually_le
 The `if` branch keeps the function total on `ℝ`; along the source filter
 `ε → 0+` it always unfolds to the positive-definite branch. -/
 def sandwichedRenyiReferenceRegularizedInputCurve
-    (ρ : State a) {σ : CMatrix a} (hρ : ρ.matrix.PosDef) (hσ : σ.PosSemidef)
+    (ρ : MState a) {σ : CMatrix a} (hρ : ρ.m.PosDef) (hσ : σ.PosSemidef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) (ε : ℝ) : ℝ :=
   if hε : 0 < ε then
     sandwichedRenyiReference ρ (sandwichedRenyiReferenceRegularization σ ε)
@@ -1801,14 +1793,14 @@ positive definite references unless a support/faithfulness hypothesis is
 available. -/
 def sandwichedRenyiReferenceRegularizedOutputCurve
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (Φ : Channel a b)
-    (hρΦ : (Φ.applyState ρ).matrix.PosDef)
+    (ρ : MState a) {σ : CMatrix a} (Φ : CPTPMap a b)
+    (hρΦ : (Φ ρ).m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) (ε : ℝ) : ℝ :=
   by
     classical
     exact
       if hσΦε : (Φ.map (sandwichedRenyiReferenceRegularization σ ε)).PosDef then
-        sandwichedRenyiReference (Φ.applyState ρ)
+        sandwichedRenyiReference (Φ ρ)
           (Φ.map (sandwichedRenyiReferenceRegularization σ ε))
           hρΦ hσΦε α hα_pos hα_ne_one
       else
@@ -1818,9 +1810,9 @@ def sandwichedRenyiReferenceRegularizedOutputCurve
 regularized input/output divergence curves, eventually along `ε → 0+`. -/
 theorem sandwichedRenyiReferenceRegularizedCurves_eventually_le
     {b : Type v} [Fintype b] [DecidableEq b] [Nonempty a]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
-    (hρ : ρ.matrix.PosDef)
-    (hρΦ : (Φ.applyState ρ).matrix.PosDef)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
+    (hρ : ρ.m.PosDef)
+    (hρΦ : (Φ ρ).m.PosDef)
     (α : ℝ) (hα_range : (1 / 2 ≤ α ∧ α < 1) ∨ 1 < α)
     (hσΦε :
       ∀ᶠ ε in nhdsWithin (0 : ℝ) (Set.Ioi 0),
@@ -1861,9 +1853,9 @@ the current positive-definite divergence domain, the singular-reference DPI
 follows from the already proved positive-definite regularized theorem. -/
 theorem sandwichedRenyiReference_dataProcessing_channel_of_regularizationLimitGate
     {b : Type v} [Fintype b] [DecidableEq b] [Nonempty a]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
-    (hρ : ρ.matrix.PosDef)
-    (hρΦ : (Φ.applyState ρ).matrix.PosDef)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
+    (hρ : ρ.m.PosDef)
+    (hρΦ : (Φ ρ).m.PosDef)
     (α : ℝ) (hα_range : (1 / 2 ≤ α ∧ α < 1) ∨ 1 < α)
     (DIn DOut : ℝ)
     (hσΦε :
@@ -1907,48 +1899,27 @@ output positivity needed for `log` follows from the already proved
 `Q_α(ρ,σ) ≤ Q_α(Φρ,Φσ)` inequality. -/
 theorem sandwichedRenyiPSDReferenceLowAlpha_regularizationLimitGate
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
     (α : ℝ) (hα_half : 1 / 2 < α) (hα_lt_one : α < 1)
-    (hQpos : 0 < sandwichedRenyiQ ρ.matrix σ ρ.pos hσ α) :
+    (hQpos : 0 < sandwichedRenyiQ ρ.m σ ρ.psd hσ α) :
     sandwichedRenyiReferenceRegularizationLimitGate
       (sandwichedRenyiPSDReferenceLowAlphaRegularizedInputCurve ρ hσ α)
       (sandwichedRenyiPSDReferenceLowAlphaRegularizedOutputCurve ρ hσ Φ α)
       (sandwichedRenyiPSDReferenceLowAlpha ρ σ hσ α)
       (sandwichedRenyiPSDReferenceLowAlpha
-        (Φ.applyState ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α) := by
+        (Φ ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α) := by
   have hQ :=
     sandwichedRenyiQ_dataProcessing_channel_reference_of_half_lt_lt_one
       ρ hσ Φ α hα_half hα_lt_one
   have hQout_pos :
-      0 < sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.map σ)
-        (Φ.applyState ρ).pos (Φ.mapsPositive σ hσ) α :=
+      0 < sandwichedRenyiQ (Φ ρ).m (Φ.map σ)
+        (Φ ρ).psd (Φ.mapsPositive σ hσ) α :=
     lt_of_lt_of_le hQpos hQ
   exact
     ⟨sandwichedRenyiPSDReferenceLowAlphaRegularizedInputCurve_tendsto
         ρ hσ α hα_half hα_lt_one hQpos,
       sandwichedRenyiPSDReferenceLowAlphaRegularizedOutputCurve_tendsto
         ρ hσ Φ α hα_half hα_lt_one hQout_pos⟩
-
-/-- Source-regularization proof of strict low-`α` DPI for the finite PSD
-reference branch.
-
-This packages the Gour/Frank--Lieb `Q`-functional DPI in the same shape as the
-singular-reference source proof: prove the inequality for the regularized
-references `σ + εI`, take `ε → 0+`, and use the finite low-`α` limit gate. -/
-theorem sandwichedRenyiPSDReferenceLowAlpha_dataProcessing_channel_of_sourceRegularization
-    {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
-    (α : ℝ) (hα_half : 1 / 2 < α) (hα_lt_one : α < 1)
-    (hQpos : 0 < sandwichedRenyiQ ρ.matrix σ ρ.pos hσ α) :
-    sandwichedRenyiPSDReferenceLowAlpha
-        (Φ.applyState ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
-      sandwichedRenyiPSDReferenceLowAlpha ρ σ hσ α := by
-  exact
-    sandwichedRenyiReferenceRegularizationLimitGate.le_of_eventually_le
-      (sandwichedRenyiPSDReferenceLowAlpha_regularizationLimitGate
-        ρ hσ Φ α hα_half hα_lt_one hQpos)
-      (sandwichedRenyiPSDReferenceLowAlphaRegularizedCurves_eventually_le
-        ρ hσ Φ α hα_half hα_lt_one)
 
 /-- Extended-real strict low-`α` PSD-reference sandwiched Renyi branch.
 
@@ -1957,23 +1928,23 @@ positive-power `Q_α` functional.  If `Q_α(ρ, σ) = 0`, the logarithmic branch
 `+∞` because the prefactor `1 / (α - 1)` is negative; otherwise this agrees
 with the finite real branch `sandwichedRenyiPSDReferenceLowAlpha`. -/
 def sandwichedRenyiPSDReferenceLowAlphaE
-    (ρ : State a) (σ : CMatrix a) (hσ : σ.PosSemidef) (α : ℝ) : EReal :=
-  if sandwichedRenyiQ ρ.matrix σ ρ.pos hσ α = 0 then
+    (ρ : MState a) (σ : CMatrix a) (hσ : σ.PosSemidef) (α : ℝ) : EReal :=
+  if sandwichedRenyiQ ρ.m σ ρ.psd hσ α = 0 then
     ⊤
   else
     (sandwichedRenyiPSDReferenceLowAlpha ρ σ hσ α : EReal)
 
 @[simp]
 theorem sandwichedRenyiPSDReferenceLowAlphaE_eq_top_of_Q_eq_zero
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (α : ℝ)
-    (hQzero : sandwichedRenyiQ ρ.matrix σ ρ.pos hσ α = 0) :
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (α : ℝ)
+    (hQzero : sandwichedRenyiQ ρ.m σ ρ.psd hσ α = 0) :
     sandwichedRenyiPSDReferenceLowAlphaE ρ σ hσ α = ⊤ := by
   simp [sandwichedRenyiPSDReferenceLowAlphaE, hQzero]
 
 @[simp]
 theorem sandwichedRenyiPSDReferenceLowAlphaE_eq_coe_of_Q_ne_zero
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (α : ℝ)
-    (hQne : sandwichedRenyiQ ρ.matrix σ ρ.pos hσ α ≠ 0) :
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (α : ℝ)
+    (hQne : sandwichedRenyiQ ρ.m σ ρ.psd hσ α ≠ 0) :
     sandwichedRenyiPSDReferenceLowAlphaE ρ σ hσ α =
       (sandwichedRenyiPSDReferenceLowAlpha ρ σ hσ α : EReal) := by
   simp [sandwichedRenyiPSDReferenceLowAlphaE, hQne]
@@ -1995,32 +1966,32 @@ This is the PSD analogue of `stateOfPosDefReference`, kept local to the
 Frank--Lieb PSD-reference endpoint so that the `α = 1/2` argument can use the
 already proved normalized-state fidelity monotonicity theorem. -/
 def stateOfPSDReference [Nonempty a] (σ : CMatrix a) (hσ : σ.PosSemidef)
-    (htr : 0 < σ.trace.re) : State a where
-  matrix := (σ.trace.re)⁻¹ • σ
-  pos := by
-    exact Matrix.PosSemidef.smul hσ (inv_nonneg.mpr (le_of_lt htr))
-  trace_eq_one := by
+    (htr : 0 < σ.trace.re) : MState a := .ofMatrix
+  (matrix := (σ.trace.re)⁻¹ • σ)
+  (pos := by
+    exact Matrix.PosSemidef.smul hσ (inv_nonneg.mpr (le_of_lt htr)))
+  (trace_eq_one := by
     have htr_im : σ.trace.im = 0 := (Matrix.PosSemidef.trace_nonneg hσ).2.symm
     rw [Matrix.trace_smul]
     apply Complex.ext
     · simp [Complex.real_smul, ne_of_gt htr]
-    · simp [Complex.real_smul, htr_im]
+    · simp [Complex.real_smul, htr_im])
 
 @[simp]
 theorem stateOfPSDReference_matrix [Nonempty a] (σ : CMatrix a)
     (hσ : σ.PosSemidef) (htr : 0 < σ.trace.re) :
-    (stateOfPSDReference σ hσ htr).matrix = (σ.trace.re)⁻¹ • σ :=
-  rfl
+    (stateOfPSDReference σ hσ htr).m = (σ.trace.re)⁻¹ • σ :=
+  MState.matrix_ofMatrix _ _ _
 
 /-- At `α = 1/2`, scaling the PSD reference by a positive real scales
 `Q_{1/2}` by the square root of the scalar. -/
 theorem sandwichedRenyiQ_real_smul_reference_half
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
     {lambda : ℝ} (hlambda : 0 < lambda) :
-    sandwichedRenyiQ ρ.matrix (lambda • σ : CMatrix a)
-        ρ.pos (Matrix.PosSemidef.smul hσ (le_of_lt hlambda)) (1 / 2 : ℝ) =
+    sandwichedRenyiQ ρ.m (lambda • σ : CMatrix a)
+        ρ.psd (Matrix.PosSemidef.smul hσ (le_of_lt hlambda)) (1 / 2 : ℝ) =
       lambda ^ (1 / 2 : ℝ) *
-        sandwichedRenyiQ ρ.matrix σ ρ.pos hσ (1 / 2 : ℝ) := by
+        sandwichedRenyiQ ρ.m σ ρ.psd hσ (1 / 2 : ℝ) := by
   have hlambda_nonneg : 0 ≤ lambda := le_of_lt hlambda
   have hscale :=
     sandwichedRenyiReferenceInner_psdTracePower_real_smul_reference
@@ -2075,8 +2046,8 @@ theorem sandwichedRenyiQ_real_smul_reference_half
 
 /-- The low-`α` `Q` functional vanishes at the endpoint `α = 1/2` when the
 reference matrix is zero. -/
-theorem sandwichedRenyiQ_zero_right_half (ρ : State a) :
-    sandwichedRenyiQ ρ.matrix (0 : CMatrix a) ρ.pos Matrix.PosSemidef.zero
+theorem sandwichedRenyiQ_zero_right_half (ρ : MState a) :
+    sandwichedRenyiQ ρ.m (0 : CMatrix a) ρ.psd Matrix.PosSemidef.zero
       (1 / 2 : ℝ) = 0 := by
   have hs : (1 - (1 / 2 : ℝ)) / (2 * (1 / 2 : ℝ)) = (1 / 2 : ℝ) := by
     norm_num
@@ -2097,11 +2068,11 @@ theorem sandwichedRenyiQ_zero_right_half (ρ : State a) :
   rw [hs]
   change
     (CFC.rpow
-      (CFC.rpow (0 : CMatrix a) (1 / 2 : ℝ) * ρ.matrix *
+      (CFC.rpow (0 : CMatrix a) (1 / 2 : ℝ) * ρ.m *
         CFC.rpow (0 : CMatrix a) (1 / 2 : ℝ))
       (1 / 2 : ℝ)).trace.re = 0
   have hinner_zero :
-      CFC.rpow (0 : CMatrix a) (1 / 2 : ℝ) * ρ.matrix *
+      CFC.rpow (0 : CMatrix a) (1 / 2 : ℝ) * ρ.m *
           CFC.rpow (0 : CMatrix a) (1 / 2 : ℝ) = 0 := by
     rw [hzero]
     simp
@@ -2115,48 +2086,48 @@ The proof normalizes the PSD reference, applies the normalized-state fidelity
 monotonicity theorem, and cancels the common square-root trace factor. -/
 theorem sandwichedRenyiQ_dataProcessing_channel_reference_half_of_trace_pos
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
     (htr : 0 < σ.trace.re) :
-    sandwichedRenyiQ ρ.matrix σ ρ.pos hσ (1 / 2 : ℝ) ≤
-      sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.map σ)
-        (Φ.applyState ρ).pos (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) := by
+    sandwichedRenyiQ ρ.m σ ρ.psd hσ (1 / 2 : ℝ) ≤
+      sandwichedRenyiQ (Φ ρ).m (Φ.map σ)
+        (Φ ρ).psd (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) := by
   classical
   let : Nonempty a := ρ.nonempty
   let lambda : ℝ := (σ.trace.re)⁻¹
   have hlambda_pos : 0 < lambda := inv_pos.mpr htr
-  let σ₀ : State a := stateOfPSDReference σ hσ htr
+  let σ₀ : MState a := stateOfPSDReference σ hσ htr
   have hmap :
-      (Φ.applyState σ₀).matrix = lambda • Φ.map σ := by
-    change Φ.map (lambda • σ : CMatrix a) = lambda • Φ.map σ
+      (Φ σ₀).m = lambda • Φ.map σ := by
+    simp only [σ₀, CPTPOp.mat_coe_eq_apply_mat, stateOfPSDReference_matrix]
     change Φ.map (((lambda : ℝ) : ℂ) • σ) =
       (((lambda : ℝ) : ℂ) • Φ.map σ)
     simp [lambda]
   have hin_scale :
-      sandwichedRenyiQ ρ.matrix σ₀.matrix ρ.pos σ₀.pos (1 / 2 : ℝ) =
+      sandwichedRenyiQ ρ.m σ₀.m ρ.psd σ₀.psd (1 / 2 : ℝ) =
         lambda ^ (1 / 2 : ℝ) *
-          sandwichedRenyiQ ρ.matrix σ ρ.pos hσ (1 / 2 : ℝ) := by
+          sandwichedRenyiQ ρ.m σ ρ.psd hσ (1 / 2 : ℝ) := by
     simpa [σ₀, lambda, stateOfPSDReference] using
       sandwichedRenyiQ_real_smul_reference_half ρ hσ hlambda_pos
   have hout_scale :
-      sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.applyState σ₀).matrix
-          (Φ.applyState ρ).pos (Φ.applyState σ₀).pos (1 / 2 : ℝ) =
+      sandwichedRenyiQ (Φ ρ).m (Φ σ₀).m
+          (Φ ρ).psd (Φ σ₀).psd (1 / 2 : ℝ) =
         lambda ^ (1 / 2 : ℝ) *
-          sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.map σ)
-            (Φ.applyState ρ).pos (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) := by
+          sandwichedRenyiQ (Φ ρ).m (Φ.map σ)
+            (Φ ρ).psd (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) := by
     simpa [hmap, sandwichedRenyiQ] using
       sandwichedRenyiQ_real_smul_reference_half
-        (Φ.applyState ρ) (Φ.mapsPositive σ hσ) hlambda_pos
-  have hfid_sq := State.squaredFidelity_le_applyState_squaredFidelity Φ ρ σ₀
+        (Φ ρ) (Φ.mapsPositive σ hσ) hlambda_pos
+  have hfid_sq := MState.squaredFidelity_le_applyState_squaredFidelity Φ ρ σ₀
   have hfid :
-      ρ.fidelity σ₀ ≤ (Φ.applyState ρ).fidelity (Φ.applyState σ₀) := by
-    rw [State.squaredFidelity_eq_fidelity_sq,
-      State.squaredFidelity_eq_fidelity_sq] at hfid_sq
-    exact (sq_le_sq₀ (State.fidelity_nonneg ρ σ₀)
-      (State.fidelity_nonneg (Φ.applyState ρ) (Φ.applyState σ₀))).mp hfid_sq
+      ρ.fidelity σ₀ ≤ MState.fidelity (Φ ρ) (Φ σ₀) := by
+    rw [MState.squaredFidelity_eq_fidelity_sq,
+      MState.squaredFidelity_eq_fidelity_sq] at hfid_sq
+    exact (sq_le_sq₀ (MState.fidelity_nonneg ρ σ₀)
+      (MState.fidelity_nonneg (Φ ρ) (Φ σ₀))).mp hfid_sq
   have hQ_state :
-      sandwichedRenyiQ ρ.matrix σ₀.matrix ρ.pos σ₀.pos (1 / 2 : ℝ) ≤
-        sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.applyState σ₀).matrix
-          (Φ.applyState ρ).pos (Φ.applyState σ₀).pos (1 / 2 : ℝ) := by
+      sandwichedRenyiQ ρ.m σ₀.m ρ.psd σ₀.psd (1 / 2 : ℝ) ≤
+        sandwichedRenyiQ (Φ ρ).m (Φ σ₀).m
+          (Φ ρ).psd (Φ σ₀).psd (1 / 2 : ℝ) := by
     rw [sandwichedRenyiQ_eq_psdTracePower_inner,
       sandwichedRenyiInner_psdTracePower_half_eq_fidelity,
       sandwichedRenyiQ_eq_psdTracePower_inner,
@@ -2164,19 +2135,19 @@ theorem sandwichedRenyiQ_dataProcessing_channel_reference_half_of_trace_pos
     exact hfid
   have hscaled :
       lambda ^ (1 / 2 : ℝ) *
-          sandwichedRenyiQ ρ.matrix σ ρ.pos hσ (1 / 2 : ℝ) ≤
+          sandwichedRenyiQ ρ.m σ ρ.psd hσ (1 / 2 : ℝ) ≤
         lambda ^ (1 / 2 : ℝ) *
-          sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.map σ)
-            (Φ.applyState ρ).pos (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) := by
+          sandwichedRenyiQ (Φ ρ).m (Φ.map σ)
+            (Φ ρ).psd (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) := by
     calc
       lambda ^ (1 / 2 : ℝ) *
-          sandwichedRenyiQ ρ.matrix σ ρ.pos hσ (1 / 2 : ℝ) =
-          sandwichedRenyiQ ρ.matrix σ₀.matrix ρ.pos σ₀.pos (1 / 2 : ℝ) := hin_scale.symm
-      _ ≤ sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.applyState σ₀).matrix
-          (Φ.applyState ρ).pos (Φ.applyState σ₀).pos (1 / 2 : ℝ) := hQ_state
+          sandwichedRenyiQ ρ.m σ ρ.psd hσ (1 / 2 : ℝ) =
+          sandwichedRenyiQ ρ.m σ₀.m ρ.psd σ₀.psd (1 / 2 : ℝ) := hin_scale.symm
+      _ ≤ sandwichedRenyiQ (Φ ρ).m (Φ σ₀).m
+          (Φ ρ).psd (Φ σ₀).psd (1 / 2 : ℝ) := hQ_state
       _ = lambda ^ (1 / 2 : ℝ) *
-          sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.map σ)
-            (Φ.applyState ρ).pos (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) := hout_scale
+          sandwichedRenyiQ (Φ ρ).m (Φ.map σ)
+            (Φ ρ).psd (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) := hout_scale
   exact le_of_mul_le_mul_left hscaled
     (Real.rpow_pos_of_pos hlambda_pos (1 / 2 : ℝ))
 
@@ -2184,17 +2155,17 @@ theorem sandwichedRenyiQ_dataProcessing_channel_reference_half_of_trace_pos
 input endpoint `Q` value being positive. -/
 theorem sandwichedRenyiPSDReferenceLowAlpha_dataProcessing_channel_half
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
     (htr : 0 < σ.trace.re)
-    (hQpos : 0 < sandwichedRenyiQ ρ.matrix σ ρ.pos hσ (1 / 2 : ℝ)) :
+    (hQpos : 0 < sandwichedRenyiQ ρ.m σ ρ.psd hσ (1 / 2 : ℝ)) :
     sandwichedRenyiPSDReferenceLowAlpha
-        (Φ.applyState ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) ≤
+        (Φ ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) ≤
       sandwichedRenyiPSDReferenceLowAlpha ρ σ hσ (1 / 2 : ℝ) := by
   have hQmono :=
     sandwichedRenyiQ_dataProcessing_channel_reference_half_of_trace_pos
       ρ hσ Φ htr
   unfold sandwichedRenyiPSDReferenceLowAlpha
-  have hlog := frankLieb_log2_mono_of_pos hQpos hQmono
+  have hlog := log2_mono_of_pos hQpos hQmono
   have hcoef : 1 / ((1 / 2 : ℝ) - 1) = -2 := by norm_num
   rw [hcoef]
   exact mul_le_mul_of_nonpos_left hlog (by norm_num)
@@ -2203,18 +2174,18 @@ theorem sandwichedRenyiPSDReferenceLowAlpha_dataProcessing_channel_half
 branch. -/
 theorem sandwichedRenyiPSDReferenceLowAlphaE_dataProcessing_channel_half
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b) :
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b) :
     sandwichedRenyiPSDReferenceLowAlphaE
-        (Φ.applyState ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) ≤
+        (Φ ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) ≤
       sandwichedRenyiPSDReferenceLowAlphaE ρ σ hσ (1 / 2 : ℝ) := by
   by_cases hQin_zero :
-      sandwichedRenyiQ ρ.matrix σ ρ.pos hσ (1 / 2 : ℝ) = 0
+      sandwichedRenyiQ ρ.m σ ρ.psd hσ (1 / 2 : ℝ) = 0
   · rw [sandwichedRenyiPSDReferenceLowAlphaE_eq_top_of_Q_eq_zero
       ρ hσ (1 / 2 : ℝ) hQin_zero]
     exact le_top
   · have hQin_pos :
-        0 < sandwichedRenyiQ ρ.matrix σ ρ.pos hσ (1 / 2 : ℝ) :=
-      sandwichedRenyiQ_pos_of_ne_zero ρ.pos hσ (1 / 2 : ℝ) hQin_zero
+        0 < sandwichedRenyiQ ρ.m σ ρ.psd hσ (1 / 2 : ℝ) :=
+      sandwichedRenyiQ_pos_of_ne_zero ρ.psd hσ (1 / 2 : ℝ) hQin_zero
     have hσ_ne_zero : σ ≠ 0 := by
       intro hσzero
       exact hQin_zero (by
@@ -2229,27 +2200,27 @@ theorem sandwichedRenyiPSDReferenceLowAlphaE_dataProcessing_channel_half
     have htr_pos : 0 < σ.trace.re := by
       exact lt_of_le_of_ne (Matrix.PosSemidef.trace_nonneg hσ).1 (Ne.symm htr_ne)
     have hQmono :
-        sandwichedRenyiQ ρ.matrix σ ρ.pos hσ (1 / 2 : ℝ) ≤
-          sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.map σ)
-            (Φ.applyState ρ).pos (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) :=
+        sandwichedRenyiQ ρ.m σ ρ.psd hσ (1 / 2 : ℝ) ≤
+          sandwichedRenyiQ (Φ ρ).m (Φ.map σ)
+            (Φ ρ).psd (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) :=
       sandwichedRenyiQ_dataProcessing_channel_reference_half_of_trace_pos
         ρ hσ Φ htr_pos
     have hQout_pos :
-        0 < sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.map σ)
-          (Φ.applyState ρ).pos (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) :=
+        0 < sandwichedRenyiQ (Φ ρ).m (Φ.map σ)
+          (Φ ρ).psd (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) :=
       lt_of_lt_of_le hQin_pos hQmono
     have hQout_ne :
-        sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.map σ)
-          (Φ.applyState ρ).pos (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) ≠ 0 :=
+        sandwichedRenyiQ (Φ ρ).m (Φ.map σ)
+          (Φ ρ).psd (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) ≠ 0 :=
       ne_of_gt hQout_pos
     have hDPI :
         sandwichedRenyiPSDReferenceLowAlpha
-            (Φ.applyState ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) ≤
+            (Φ ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) ≤
           sandwichedRenyiPSDReferenceLowAlpha ρ σ hσ (1 / 2 : ℝ) :=
       sandwichedRenyiPSDReferenceLowAlpha_dataProcessing_channel_half
         ρ hσ Φ htr_pos hQin_pos
     rw [sandwichedRenyiPSDReferenceLowAlphaE_eq_coe_of_Q_ne_zero
-        (Φ.applyState ρ) (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) hQout_ne,
+        (Φ ρ) (Φ.mapsPositive σ hσ) (1 / 2 : ℝ) hQout_ne,
       sandwichedRenyiPSDReferenceLowAlphaE_eq_coe_of_Q_ne_zero
         ρ hσ (1 / 2 : ℝ) hQin_zero]
     exact_mod_cast hDPI
@@ -2262,36 +2233,37 @@ This is the singular-reference continuation of the Gour/Frank--Lieb
 `Q`-monotonicity theorem makes the output branch finite as well. -/
 theorem sandwichedRenyiPSDReferenceLowAlphaE_dataProcessing_channel
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
     (α : ℝ) (hα_half : 1 / 2 < α) (hα_lt_one : α < 1) :
     sandwichedRenyiPSDReferenceLowAlphaE
-        (Φ.applyState ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
+        (Φ ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
       sandwichedRenyiPSDReferenceLowAlphaE ρ σ hσ α := by
-  by_cases hQin_zero : sandwichedRenyiQ ρ.matrix σ ρ.pos hσ α = 0
+  by_cases hQin_zero : sandwichedRenyiQ ρ.m σ ρ.psd hσ α = 0
   · simp [sandwichedRenyiPSDReferenceLowAlphaE, hQin_zero]
   · have hQin_pos :
-        0 < sandwichedRenyiQ ρ.matrix σ ρ.pos hσ α :=
-      sandwichedRenyiQ_pos_of_ne_zero ρ.pos hσ α hQin_zero
+        0 < sandwichedRenyiQ ρ.m σ ρ.psd hσ α :=
+      sandwichedRenyiQ_pos_of_ne_zero ρ.psd hσ α hQin_zero
     have hQmono :
-        sandwichedRenyiQ ρ.matrix σ ρ.pos hσ α ≤
-          sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.map σ)
-            (Φ.applyState ρ).pos (Φ.mapsPositive σ hσ) α :=
+        sandwichedRenyiQ ρ.m σ ρ.psd hσ α ≤
+          sandwichedRenyiQ (Φ ρ).m (Φ.map σ)
+            (Φ ρ).psd (Φ.mapsPositive σ hσ) α :=
       sandwichedRenyiQ_dataProcessing_channel_reference_of_half_lt_lt_one
         ρ hσ Φ α hα_half hα_lt_one
     have hQout_pos :
-        0 < sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.map σ)
-          (Φ.applyState ρ).pos (Φ.mapsPositive σ hσ) α :=
+        0 < sandwichedRenyiQ (Φ ρ).m (Φ.map σ)
+          (Φ ρ).psd (Φ.mapsPositive σ hσ) α :=
       lt_of_lt_of_le hQin_pos hQmono
     have hQout_ne :
-        sandwichedRenyiQ (Φ.applyState ρ).matrix (Φ.map σ)
-          (Φ.applyState ρ).pos (Φ.mapsPositive σ hσ) α ≠ 0 :=
+        sandwichedRenyiQ (Φ ρ).m (Φ.map σ)
+          (Φ ρ).psd (Φ.mapsPositive σ hσ) α ≠ 0 :=
       ne_of_gt hQout_pos
     have hDPI :
         sandwichedRenyiPSDReferenceLowAlpha
-            (Φ.applyState ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
+            (Φ ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
           sandwichedRenyiPSDReferenceLowAlpha ρ σ hσ α :=
-      sandwichedRenyiPSDReferenceLowAlpha_dataProcessing_channel_of_sourceRegularization
+      sandwichedRenyiPSDReferenceLowAlpha_dataProcessing_channel
         ρ hσ Φ α hα_half hα_lt_one hQin_pos
+    simp only [CPTPOp.mat_coe_eq_apply_mat] at hQout_ne
     simp [sandwichedRenyiPSDReferenceLowAlphaE, hQin_zero, hQout_ne,
       EReal.coe_le_coe_iff, hDPI]
 
@@ -2301,14 +2273,14 @@ PSD-reference branch agrees with the existing real-valued reference divergence.
 This is the audit bridge between the source-facing PSD semantics and the
 pre-existing `sandwichedRenyiReference` API. -/
 theorem sandwichedRenyiPSDReferenceLowAlphaE_eq_coe_reference_posDef
-    (ρ : State a) {σ : CMatrix a}
-    (hρ : ρ.matrix.PosDef) (hσ : σ.PosDef)
+    (ρ : MState a) {σ : CMatrix a}
+    (hρ : ρ.m.PosDef) (hσ : σ.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     sandwichedRenyiPSDReferenceLowAlphaE ρ σ hσ.posSemidef α =
       (sandwichedRenyiReference ρ σ hρ hσ α hα_pos hα_ne_one : EReal) := by
   have hQpos := sandwichedRenyiQ_pos_of_state_posDef_reference ρ hσ α
   have hQne :
-      sandwichedRenyiQ ρ.matrix σ ρ.pos hσ.posSemidef α ≠ 0 :=
+      sandwichedRenyiQ ρ.m σ ρ.psd hσ.posSemidef α ≠ 0 :=
     ne_of_gt hQpos
   rw [sandwichedRenyiPSDReferenceLowAlphaE_eq_coe_of_Q_ne_zero
     ρ hσ.posSemidef α hQne]
@@ -2324,10 +2296,18 @@ For `α > 1`, the source statement uses the usual support convention:
 matrix-reference inner operator and PSD trace-power API.  The extended-real
 wrapper below supplies the support-domain split. -/
 def sandwichedRenyiPSDReferenceHighAlphaFinite
-    (ρ : State a) (σ : CMatrix a) (hσ : σ.PosSemidef) (α : ℝ) : ℝ :=
+    (ρ : MState a) (σ : CMatrix a) (hσ : σ.PosSemidef) (α : ℝ) : ℝ :=
   (1 / (α - 1)) *
     log2 (psdTracePower (sandwichedRenyiReferenceInner ρ σ α)
       (sandwichedRenyiReferenceInner_posSemidef ρ hσ α) α)
+
+/-- The unit-output high-`α` PSD-reference finite branch is zero. -/
+theorem sandwichedRenyiPSDReferenceHighAlphaFinite_unit_one_eq_zero
+    (α : ℝ) (_hα : 1 < α) :
+    sandwichedRenyiPSDReferenceHighAlphaFinite (MState.unit : MState PUnit.{1})
+      (1 : CMatrix PUnit.{1}) Matrix.PosSemidef.one α = 0 := by
+  simp [sandwichedRenyiPSDReferenceHighAlphaFinite, sandwichedRenyiReferenceInner,
+    psdTracePower, log2, CFC.one_rpow]
 
 /-- Scaling a positive-definite matrix reference shifts the high-`α`
 finite PSD-reference branch by the logarithm of the scaling factor.
@@ -2337,7 +2317,7 @@ version does not need the input state to be positive definite.  It is the
 scaling step needed to pass the Beigi finite-branch theorem from normalized
 state references to arbitrary positive-definite matrix references. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFinite_real_smul_reference
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosDef)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosDef)
     {lambda : ℝ} (hlambda : 0 < lambda)
     (α : ℝ) (hα : 1 < α) :
     sandwichedRenyiPSDReferenceHighAlphaFinite ρ
@@ -2410,13 +2390,13 @@ the reference and the channel output reference are required to be
 positive-definite. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFinite_dataProcessing_channel_stateReference_posDef
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ σ : State a) (Φ : Channel a b)
-    (hσ : σ.matrix.PosDef)
-    (hσΦ : (Φ.applyState σ).matrix.PosDef)
+    (ρ σ : MState a) (Φ : CPTPMap a b)
+    (hσ : σ.m.PosDef)
+    (hσΦ : (Φ σ).m.PosDef)
     (α : ℝ) (hα : 1 < α) :
     sandwichedRenyiPSDReferenceHighAlphaFinite
-        (Φ.applyState ρ) (Φ.applyState σ).matrix (Φ.applyState σ).pos α ≤
-      sandwichedRenyiPSDReferenceHighAlphaFinite ρ σ.matrix σ.pos α := by
+        (Φ ρ) (Φ σ).m (Φ σ).psd α ≤
+      sandwichedRenyiPSDReferenceHighAlphaFinite ρ σ.m σ.psd α := by
   have hpower :=
     sandwichedRenyiInner_tracePower_le_of_one_lt_channel
       ρ σ Φ hσ hσΦ α hα
@@ -2424,25 +2404,25 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_dataProcessing_channel_stateR
       0 <
         psdTracePower
           (sandwichedRenyiReferenceInner
-            (Φ.applyState ρ) (Φ.applyState σ).matrix α)
+            (Φ ρ) (Φ σ).m α)
           (sandwichedRenyiReferenceInner_posSemidef
-            (Φ.applyState ρ) (Φ.applyState σ).pos α)
+            (Φ ρ) (Φ σ).psd α)
           α := by
     simpa [sandwichedRenyiInner, sandwichedRenyiReferenceInner] using
       sandwichedRenyiReferenceInner_psdTracePower_pos_of_reference_posDef
-        (Φ.applyState ρ) (σ := (Φ.applyState σ).matrix) hσΦ α
+        (Φ ρ) (σ := (Φ σ).m) hσΦ α
   have hlog :
       log2
           (psdTracePower
             (sandwichedRenyiReferenceInner
-              (Φ.applyState ρ) (Φ.applyState σ).matrix α)
+              (Φ ρ) (Φ σ).m α)
             (sandwichedRenyiReferenceInner_posSemidef
-              (Φ.applyState ρ) (Φ.applyState σ).pos α)
+              (Φ ρ) (Φ σ).psd α)
             α) ≤
         log2
-          (psdTracePower (sandwichedRenyiReferenceInner ρ σ.matrix α)
-            (sandwichedRenyiReferenceInner_posSemidef ρ σ.pos α) α) := by
-    exact frankLieb_log2_mono_of_pos hout_pos (by
+          (psdTracePower (sandwichedRenyiReferenceInner ρ σ.m α)
+            (sandwichedRenyiReferenceInner_posSemidef ρ σ.psd α) α) := by
+    exact log2_mono_of_pos hout_pos (by
       simpa [sandwichedRenyiInner, sandwichedRenyiReferenceInner] using hpower)
   have hcoef_nonneg : 0 ≤ 1 / (α - 1) := by
     exact le_of_lt (one_div_pos.2 (sub_pos.mpr hα))
@@ -2455,15 +2435,15 @@ possibly non-normalized reference operator.
 This extends the normalized-state-reference Beigi finite branch by normalizing
 the reference, applying the state-reference theorem, and cancelling the same
 `-log₂ λ` scaling shift on input and output.  The singular supported PSD
-finite branch remains a separate support-compression/continuity step. -/
+finite branch is a separate support-compression/continuity step. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFinite_dataProcessing_channel_posDef_reference
     {b : Type v} [Fintype b] [DecidableEq b] [Nonempty a]
-    (ρ : State a) {σ : CMatrix a} (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (Φ : CPTPMap a b)
     (hσ : σ.PosDef)
     (hσΦ : (Φ.map σ).PosDef)
     (α : ℝ) (hα : 1 < α) :
     sandwichedRenyiPSDReferenceHighAlphaFinite
-        (Φ.applyState ρ) (Φ.map σ) hσΦ.posSemidef α ≤
+        (Φ ρ) (Φ.map σ) hσΦ.posSemidef α ≤
       sandwichedRenyiPSDReferenceHighAlphaFinite ρ σ hσ.posSemidef α := by
   classical
   let lambda : ℝ := (σ.trace.re)⁻¹
@@ -2471,23 +2451,23 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_dataProcessing_channel_posDef
     (Complex.pos_iff.mp (Matrix.PosDef.trace_pos hσ)).1
   have hlambda_pos : 0 < lambda := by
     exact inv_pos.mpr htr_pos
-  let σ₀ : State a := stateOfPosDefReference σ hσ
-  have hσ₀ : σ₀.matrix.PosDef := by
+  let σ₀ : MState a := stateOfPosDefReference σ hσ
+  have hσ₀ : σ₀.m.PosDef := by
     simpa [σ₀] using stateOfPosDefReference_posDef σ hσ
   have hmap :
-      (Φ.applyState σ₀).matrix = lambda • Φ.map σ := by
-    change Φ.map (lambda • σ : CMatrix a) = lambda • Φ.map σ
+      (Φ σ₀).m = lambda • Φ.map σ := by
+    simp only [σ₀, CPTPOp.mat_coe_eq_apply_mat, stateOfPosDefReference_matrix]
     change Φ.map (((lambda : ℝ) : ℂ) • σ) =
       (((lambda : ℝ) : ℂ) • Φ.map σ)
     simp [lambda]
-  have hσ₀Φ : (Φ.applyState σ₀).matrix.PosDef := by
+  have hσ₀Φ : (Φ σ₀).m.PosDef := by
     rw [hmap]
     exact Matrix.PosDef.smul hσΦ hlambda_pos
   have hDPI :=
     sandwichedRenyiPSDReferenceHighAlphaFinite_dataProcessing_channel_stateReference_posDef
       ρ σ₀ Φ hσ₀ hσ₀Φ α hα
   have hin :
-      sandwichedRenyiPSDReferenceHighAlphaFinite ρ σ₀.matrix σ₀.pos α =
+      sandwichedRenyiPSDReferenceHighAlphaFinite ρ σ₀.m σ₀.psd α =
         sandwichedRenyiPSDReferenceHighAlphaFinite ρ σ hσ.posSemidef α -
           log2 lambda := by
     simpa [σ₀, lambda, stateOfPosDefReference] using
@@ -2495,20 +2475,21 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_dataProcessing_channel_posDef
         ρ hσ hlambda_pos α hα
   have hout :
       sandwichedRenyiPSDReferenceHighAlphaFinite
-          (Φ.applyState ρ) (Φ.applyState σ₀).matrix
-          (Φ.applyState σ₀).pos α =
+          (Φ ρ) (Φ σ₀).m
+          (Φ σ₀).psd α =
         sandwichedRenyiPSDReferenceHighAlphaFinite
-            (Φ.applyState ρ) (Φ.map σ) hσΦ.posSemidef α -
+            (Φ ρ) (Φ.map σ) hσΦ.posSemidef α -
           log2 lambda := by
     simpa [hmap, lambda] using
       sandwichedRenyiPSDReferenceHighAlphaFinite_real_smul_reference
-        (Φ.applyState ρ) hσΦ hlambda_pos α hα
+        (Φ ρ) hσΦ hlambda_pos α hα
   have hshift :
       sandwichedRenyiPSDReferenceHighAlphaFinite
-          (Φ.applyState ρ) (Φ.map σ) hσΦ.posSemidef α - log2 lambda ≤
+          (Φ ρ) (Φ.map σ) hσΦ.posSemidef α - log2 lambda ≤
         sandwichedRenyiPSDReferenceHighAlphaFinite ρ σ hσ.posSemidef α -
           log2 lambda := by
-    simpa [hin, hout] using hDPI
+    rw [← hin, ← hout]
+    exact hDPI
   linarith
 
 /-- Input-side source regularization curve for the finite high-`α`
@@ -2517,7 +2498,7 @@ PSD-reference branch.
 The branch is total on `ℝ`; along the source filter `ε → 0+`, it unfolds to the
 finite branch for the positive-definite reference `σ + εI`. -/
 def sandwichedRenyiPSDReferenceHighAlphaFiniteRegularizedInputCurve
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
     (α : ℝ) (ε : ℝ) : ℝ :=
   if hε : 0 < ε then
     sandwichedRenyiPSDReferenceHighAlphaFinite ρ
@@ -2532,8 +2513,8 @@ the supported singular-reference finite branch.
 This is the source-side limit needed by the Gour/source support-domain
 regularization route. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFiniteRegularizedInputCurve_tendsto_of_supports
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (hSupport : Matrix.Supports ρ.matrix σ)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (hSupport : Matrix.Supports ρ.m σ)
     (α : ℝ) (hα : 1 < α) :
     Filter.Tendsto
       (sandwichedRenyiPSDReferenceHighAlphaFiniteRegularizedInputCurve ρ hσ α)
@@ -2600,7 +2581,7 @@ when the limiting reference is already full-rank, the negative reference power
 in the high-`α` inner operator is handled by CFC continuity on the
 positive-definite cone. -/
 theorem sandwichedRenyiReferenceInner_tracePower_tendsto_of_tendsto_posDef_reference
-    {X : Type*} {l : Filter X} (ρ : State a)
+    {X : Type*} {l : Filter X} (ρ : MState a)
     {σF : X → CMatrix a} {σ : CMatrix a}
     (hσF : Filter.Tendsto σF l (nhds σ))
     (hσFpd : ∀ᶠ x in l, (σF x).PosDef)
@@ -2640,16 +2621,16 @@ curve carries that witness in its positive branch and falls back to the
 unregularized finite expression outside the verified domain. -/
 def sandwichedRenyiPSDReferenceHighAlphaFiniteRegularizedOutputCurve
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (Φ : Channel a b) (α : ℝ) (ε : ℝ) : ℝ := by
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (Φ : CPTPMap a b) (α : ℝ) (ε : ℝ) : ℝ := by
   classical
   exact
     if hσΦε : (Φ.map (sandwichedRenyiReferenceRegularization σ ε)).PosDef then
-      sandwichedRenyiPSDReferenceHighAlphaFinite (Φ.applyState ρ)
+      sandwichedRenyiPSDReferenceHighAlphaFinite (Φ ρ)
         (Φ.map (sandwichedRenyiReferenceRegularization σ ε))
         hσΦε.posSemidef α
     else
-      sandwichedRenyiPSDReferenceHighAlphaFinite (Φ.applyState ρ)
+      sandwichedRenyiPSDReferenceHighAlphaFinite (Φ ρ)
         (Φ.map σ) (Φ.mapsPositive σ hσ) α
 
 /-- If the channel output of the unregularized reference is already
@@ -2659,12 +2640,12 @@ positive-definite for every `ε ≥ 0`.
 This is a small reusable domain lemma for the high-`α` source-regularized
 finite branch.  It deliberately assumes positivity of `Φσ`; arbitrary channels
 need a separate support-compression argument when `Φσ` is singular. -/
-theorem Channel.map_sandwichedRenyiReferenceRegularization_posDef_of_map_posDef
+theorem CPTPOp.map_sandwichedRenyiReferenceRegularization_posDef_of_map_posDef
     {b : Type v} [Fintype b] [DecidableEq b]
-    (Φ : Channel a b) {σ : CMatrix a} (_hσ : σ.PosSemidef)
+    (Φ : CPTPMap a b) {σ : CMatrix a} (_hσ : σ.PosSemidef)
     (hσΦ : (Φ.map σ).PosDef) {ε : ℝ} (hε : 0 ≤ ε) :
     (Φ.map (sandwichedRenyiReferenceRegularization σ ε)).PosDef := by
-  rw [Channel.map_sandwichedRenyiReferenceRegularization]
+  rw [CPTPOp.map_sandwichedRenyiReferenceRegularization]
   exact hσΦ.add_posSemidef
       (Matrix.PosSemidef.smul
         (Φ.mapsPositive (1 : CMatrix a) Matrix.PosSemidef.one) hε)
@@ -2677,8 +2658,8 @@ subcase.  The genuinely singular-output case remains separate because
 `Φ(σ + εI) = Φσ + ε ΦI` need not be full-rank. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFiniteRegularizedOutputCurve_tendsto_of_map_posDef
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (Φ : Channel a b) (hσΦ : (Φ.map σ).PosDef)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (Φ : CPTPMap a b) (hσΦ : (Φ.map σ).PosDef)
     (α : ℝ) (hα : 1 < α) :
     Filter.Tendsto
       (sandwichedRenyiPSDReferenceHighAlphaFiniteRegularizedOutputCurve
@@ -2686,7 +2667,7 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFiniteRegularizedOutputCurve_tendsto
       (nhdsWithin (0 : ℝ) (Set.Ioi 0))
       (nhds
         (sandwichedRenyiPSDReferenceHighAlphaFinite
-          (Φ.applyState ρ) (Φ.map σ) hσΦ.posSemidef α)) := by
+          (Φ ρ) (Φ.map σ) hσΦ.posSemidef α)) := by
   let l : Filter ℝ := nhdsWithin (0 : ℝ) (Set.Ioi 0)
   let σF : ℝ → CMatrix b := fun ε =>
     if hε : 0 ≤ ε then
@@ -2698,7 +2679,7 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFiniteRegularizedOutputCurve_tendsto
     intro ε
     by_cases hε : 0 ≤ ε
     · simpa [σF, hε] using
-        Channel.map_sandwichedRenyiReferenceRegularization_posDef_of_map_posDef
+        CPTPOp.map_sandwichedRenyiReferenceRegularization_posDef_of_map_posDef
           Φ hσ hσΦ hε
     · simpa [σF, hε] using hσΦ
   have hσF_tend : Filter.Tendsto σF l (nhds (Φ.map σ)) := by
@@ -2717,28 +2698,28 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFiniteRegularizedOutputCurve_tendsto
     exact Filter.Tendsto.congr' hcongr hmap
   have htrace :=
     sandwichedRenyiReferenceInner_tracePower_tendsto_of_tendsto_posDef_reference
-      (Φ.applyState ρ) hσF_tend
+      (Φ ρ) hσF_tend
       (Filter.Eventually.of_forall (fun ε => hσF_pd ε)) hσΦ α hα_pos
   have htarget_pos :
       0 <
         (((CFC.rpow
-          (sandwichedRenyiReferenceInner (Φ.applyState ρ) (Φ.map σ) α)
+          (sandwichedRenyiReferenceInner (Φ ρ) (Φ.map σ) α)
           α).trace).re) := by
     simpa [psdTracePower] using
       sandwichedRenyiReferenceInner_psdTracePower_pos_of_reference_posDef
-        (Φ.applyState ρ) hσΦ α
+        (Φ ρ) hσΦ α
   have hlog :
       Filter.Tendsto
         (fun ε : ℝ =>
           log2
             (((CFC.rpow
-              (sandwichedRenyiReferenceInner (Φ.applyState ρ) (σF ε) α)
+              (sandwichedRenyiReferenceInner (Φ ρ) (σF ε) α)
               α).trace).re))
         l
         (nhds
           (log2
             (((CFC.rpow
-              (sandwichedRenyiReferenceInner (Φ.applyState ρ) (Φ.map σ) α)
+              (sandwichedRenyiReferenceInner (Φ ρ) (Φ.map σ) α)
               α).trace).re))) := by
     have hrawLog := Filter.Tendsto.log htrace (ne_of_gt htarget_pos)
     simp only [log2]
@@ -2749,14 +2730,14 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFiniteRegularizedOutputCurve_tendsto
           (1 / (α - 1)) *
             log2
               (((CFC.rpow
-                (sandwichedRenyiReferenceInner (Φ.applyState ρ) (σF ε) α)
+                (sandwichedRenyiReferenceInner (Φ ρ) (σF ε) α)
                 α).trace).re))
         l
         (nhds
           ((1 / (α - 1)) *
             log2
               (((CFC.rpow
-                (sandwichedRenyiReferenceInner (Φ.applyState ρ) (Φ.map σ) α)
+                (sandwichedRenyiReferenceInner (Φ ρ) (Φ.map σ) α)
                 α).trace).re))) :=
     hlog.const_mul (1 / (α - 1))
   have hcurve :
@@ -2764,7 +2745,7 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFiniteRegularizedOutputCurve_tendsto
           (1 / (α - 1)) *
             log2
               (((CFC.rpow
-                (sandwichedRenyiReferenceInner (Φ.applyState ρ) (σF ε) α)
+                (sandwichedRenyiReferenceInner (Φ ρ) (σF ε) α)
                 α).trace).re))
         =ᶠ[l]
       sandwichedRenyiPSDReferenceHighAlphaFiniteRegularizedOutputCurve
@@ -2774,7 +2755,7 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFiniteRegularizedOutputCurve_tendsto
     have hε_nonneg : 0 ≤ ε := le_of_lt hε_pos
     have hσFε_pos :
         (Φ.map (sandwichedRenyiReferenceRegularization σ ε)).PosDef :=
-      Channel.map_sandwichedRenyiReferenceRegularization_posDef_of_map_posDef
+      CPTPOp.map_sandwichedRenyiReferenceRegularization_posDef_of_map_posDef
         Φ hσ hσΦ hε_nonneg
     simp [sandwichedRenyiPSDReferenceHighAlphaFiniteRegularizedOutputCurve,
       sandwichedRenyiPSDReferenceHighAlphaFinite, psdTracePower, σF,
@@ -2786,7 +2767,7 @@ eventual DPI whenever the regularized output references are eventually in the
 positive-definite domain of the already proved Beigi/Gour finite theorem. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFiniteRegularizedCurves_eventually_le
     {b : Type v} [Fintype b] [DecidableEq b] [Nonempty a]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
     (α : ℝ) (hα : 1 < α)
     (hσΦε :
       ∀ᶠ ε in nhdsWithin (0 : ℝ) (Set.Ioi 0),
@@ -2816,7 +2797,7 @@ require the support-compression/continuity argument isolated by the more general
 regularization gate below. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFiniteRegularizedCurves_eventually_le_of_map_posDef
     {b : Type v} [Fintype b] [DecidableEq b] [Nonempty a]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
     (hσΦ : (Φ.map σ).PosDef)
     (α : ℝ) (hα : 1 < α) :
     ∀ᶠ ε in nhdsWithin (0 : ℝ) (Set.Ioi 0),
@@ -2829,7 +2810,7 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFiniteRegularizedCurves_eventually_l
       ρ hσ Φ α hα ?_
   filter_upwards [self_mem_nhdsWithin] with ε hε
   exact
-    Channel.map_sandwichedRenyiReferenceRegularization_posDef_of_map_posDef
+    CPTPOp.map_sandwichedRenyiReferenceRegularization_posDef_of_map_posDef
       Φ hσ hσΦ (le_of_lt hε)
 
 /-- Source-regularization reduction for the finite high-`α` PSD-reference
@@ -2841,7 +2822,7 @@ eventually positive-definite, then the supported singular finite-branch DPI
 follows from the already proved positive-definite Beigi/Gour theorem. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFinite_dataProcessing_channel_of_regularizationLimitGate
     {b : Type v} [Fintype b] [DecidableEq b] [Nonempty a]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
     (α : ℝ) (hα : 1 < α)
     (DIn DOut : ℝ)
     (hσΦε :
@@ -2872,23 +2853,23 @@ The arbitrary singular-output case needs the separate channel-compatible
 support-compression continuity theorem for `Φ(σ + εI)`. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFinite_dataProcessing_channel_of_map_posDef
     {b : Type v} [Fintype b] [DecidableEq b] [Nonempty a]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
-    (hSupport : Matrix.Supports ρ.matrix σ)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
+    (hSupport : Matrix.Supports ρ.m σ)
     (hσΦ : (Φ.map σ).PosDef)
     (α : ℝ) (hα : 1 < α) :
     sandwichedRenyiPSDReferenceHighAlphaFinite
-        (Φ.applyState ρ) (Φ.map σ) hσΦ.posSemidef α ≤
+        (Φ ρ) (Φ.map σ) hσΦ.posSemidef α ≤
       sandwichedRenyiPSDReferenceHighAlphaFinite ρ σ hσ α := by
   refine
     sandwichedRenyiPSDReferenceHighAlphaFinite_dataProcessing_channel_of_regularizationLimitGate
       ρ hσ Φ α hα
       (sandwichedRenyiPSDReferenceHighAlphaFinite ρ σ hσ α)
       (sandwichedRenyiPSDReferenceHighAlphaFinite
-        (Φ.applyState ρ) (Φ.map σ) hσΦ.posSemidef α)
+        (Φ ρ) (Φ.map σ) hσΦ.posSemidef α)
       ?_ ?_
   · filter_upwards [self_mem_nhdsWithin] with ε hε
     exact
-      Channel.map_sandwichedRenyiReferenceRegularization_posDef_of_map_posDef
+      CPTPOp.map_sandwichedRenyiReferenceRegularization_posDef_of_map_posDef
         Φ hσ hσΦ (le_of_lt hε)
   · exact
       ⟨sandwichedRenyiPSDReferenceHighAlphaFiniteRegularizedInputCurve_tendsto_of_supports
@@ -2902,26 +2883,26 @@ This matches the source-domain convention for singular references: if
 `ρ` is not supported by `σ`, the value is `+∞`; otherwise the finite branch is
 the same power-trace expression used by the positive-definite API. -/
 noncomputable def sandwichedRenyiPSDReferenceHighAlphaE
-    (ρ : State a) (σ : CMatrix a) (hσ : σ.PosSemidef) (α : ℝ) : EReal :=
+    (ρ : MState a) (σ : CMatrix a) (hσ : σ.PosSemidef) (α : ℝ) : EReal :=
   by
     classical
     exact
-      if Matrix.Supports ρ.matrix σ then
+      if Matrix.Supports ρ.m σ then
         (sandwichedRenyiPSDReferenceHighAlphaFinite ρ σ hσ α : EReal)
       else
         ⊤
 
 @[simp]
 theorem sandwichedRenyiPSDReferenceHighAlphaE_eq_top_of_not_supports
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (α : ℝ)
-    (hSupport : ¬ Matrix.Supports ρ.matrix σ) :
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (α : ℝ)
+    (hSupport : ¬ Matrix.Supports ρ.m σ) :
     sandwichedRenyiPSDReferenceHighAlphaE ρ σ hσ α = ⊤ := by
   simp [sandwichedRenyiPSDReferenceHighAlphaE, hSupport]
 
 @[simp]
 theorem sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_of_supports
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (α : ℝ)
-    (hSupport : Matrix.Supports ρ.matrix σ) :
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (α : ℝ)
+    (hSupport : Matrix.Supports ρ.m σ) :
     sandwichedRenyiPSDReferenceHighAlphaE ρ σ hσ α =
       (sandwichedRenyiPSDReferenceHighAlphaFinite ρ σ hσ α : EReal) := by
   simp [sandwichedRenyiPSDReferenceHighAlphaE, hSupport]
@@ -2933,7 +2914,7 @@ This is the input-side domain handoff for the Gour/source regularization
 route: `σ + εI` is positive definite for `ε > 0`, so every state is supported
 by the regularized reference. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaE_regularized_input_eq_coe
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (α : ℝ)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (α : ℝ)
     {ε : ℝ} (hε : 0 < ε) :
     sandwichedRenyiPSDReferenceHighAlphaE ρ
         (sandwichedRenyiReferenceRegularization σ ε)
@@ -2943,9 +2924,9 @@ theorem sandwichedRenyiPSDReferenceHighAlphaE_regularized_input_eq_coe
         (sandwichedRenyiReferenceRegularization_posDef hσ hε).posSemidef α :
         EReal) := by
   have hSupport :
-      Matrix.Supports ρ.matrix
+      Matrix.Supports ρ.m
         (sandwichedRenyiReferenceRegularization σ ε) :=
-    Matrix.Supports.of_right_posDef ρ.matrix
+    Matrix.Supports.of_right_posDef ρ.m
       (sandwichedRenyiReferenceRegularization σ ε)
       (sandwichedRenyiReferenceRegularization_posDef hσ hε)
   exact
@@ -2963,24 +2944,24 @@ state is supported by it for `ε > 0`, so the EReal branch unfolds to the finite
 power-trace expression rather than `+∞`. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaE_regularized_output_eq_coe
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (Φ : Channel a b) (α : ℝ) {ε : ℝ} (hε : 0 < ε) :
-    sandwichedRenyiPSDReferenceHighAlphaE (Φ.applyState ρ)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (Φ : CPTPMap a b) (α : ℝ) {ε : ℝ} (hε : 0 < ε) :
+    sandwichedRenyiPSDReferenceHighAlphaE (Φ ρ)
         (Φ.map (sandwichedRenyiReferenceRegularization σ ε))
         (Φ.mapsPositive (sandwichedRenyiReferenceRegularization σ ε)
           (sandwichedRenyiReferenceRegularization_posDef hσ hε).posSemidef) α =
-      (sandwichedRenyiPSDReferenceHighAlphaFinite (Φ.applyState ρ)
+      (sandwichedRenyiPSDReferenceHighAlphaFinite (Φ ρ)
         (Φ.map (sandwichedRenyiReferenceRegularization σ ε))
         (Φ.mapsPositive (sandwichedRenyiReferenceRegularization σ ε)
           (sandwichedRenyiReferenceRegularization_posDef hσ hε).posSemidef) α :
         EReal) := by
   have hSupport :
-      Matrix.Supports (Φ.applyState ρ).matrix
+      Matrix.Supports (Φ ρ).m
         (Φ.map (sandwichedRenyiReferenceRegularization σ ε)) :=
-    Channel.applyState_supports_map_regularized_reference Φ ρ hσ hε
+    CPTPOp.applyState_supports_map_regularized_reference Φ ρ hσ hε
   exact
     sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_of_supports
-      (Φ.applyState ρ)
+      (Φ ρ)
       (Φ.mapsPositive (sandwichedRenyiReferenceRegularization σ ε)
         (sandwichedRenyiReferenceRegularization_posDef hσ hε).posSemidef) α
       hSupport
@@ -2992,7 +2973,7 @@ For `ε > 0` this is the source-regularized branch
 the curve total on `ℝ`; it is never used along the source filter
 `ε → 0+`. -/
 noncomputable def sandwichedRenyiPSDReferenceHighAlphaERegularizedInputCurve
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
     (α : ℝ) (ε : ℝ) : EReal :=
   by
     classical
@@ -3012,18 +2993,18 @@ For `ε > 0` this is the Gour/source output path
 when `Φ(σ + εI)` is singular in the ambient codomain. -/
 noncomputable def sandwichedRenyiPSDReferenceHighAlphaERegularizedOutputCurve
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (Φ : Channel a b) (α : ℝ) (ε : ℝ) : EReal :=
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (Φ : CPTPMap a b) (α : ℝ) (ε : ℝ) : EReal :=
   by
     classical
     exact
       if hε : 0 < ε then
-        sandwichedRenyiPSDReferenceHighAlphaE (Φ.applyState ρ)
+        sandwichedRenyiPSDReferenceHighAlphaE (Φ ρ)
           (Φ.map (sandwichedRenyiReferenceRegularization σ ε))
           (Φ.mapsPositive (sandwichedRenyiReferenceRegularization σ ε)
             (sandwichedRenyiReferenceRegularization_posDef hσ hε).posSemidef) α
       else
-        sandwichedRenyiPSDReferenceHighAlphaE (Φ.applyState ρ)
+        sandwichedRenyiPSDReferenceHighAlphaE (Φ ρ)
           (Φ.map σ) (Φ.mapsPositive σ hσ) α
 
 /-- Along positive regularization parameters, a finite-branch high-`α`
@@ -3035,12 +3016,12 @@ support-domain bookkeeping is needed to pass to the source-facing EReal curves.
 -/
 theorem sandwichedRenyiPSDReferenceHighAlphaERegularizedCurves_eventually_le_of_finite
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (Φ : Channel a b) (α : ℝ)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (Φ : CPTPMap a b) (α : ℝ)
     (hfinite :
       ∀ᶠ ε in nhdsWithin (0 : ℝ) (Set.Ioi 0),
         ∀ hε : 0 < ε,
-          sandwichedRenyiPSDReferenceHighAlphaFinite (Φ.applyState ρ)
+          sandwichedRenyiPSDReferenceHighAlphaFinite (Φ ρ)
               (Φ.map (sandwichedRenyiReferenceRegularization σ ε))
               (Φ.mapsPositive (sandwichedRenyiReferenceRegularization σ ε)
                 (sandwichedRenyiReferenceRegularization_posDef hσ hε).posSemidef)
@@ -3074,20 +3055,20 @@ finite, and the finite-branch PosDef-reference theorem supplies the numerical
 inequality. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaE_dataProcessing_channel_posDef_reference_finite
     {b : Type v} [Fintype b] [DecidableEq b] [Nonempty a]
-    (ρ : State a) {σ : CMatrix a} (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (Φ : CPTPMap a b)
     (hσ : σ.PosDef)
     (hσΦ : (Φ.map σ).PosDef)
     (α : ℝ) (hα : 1 < α) :
     sandwichedRenyiPSDReferenceHighAlphaE
-        (Φ.applyState ρ) (Φ.map σ) hσΦ.posSemidef α ≤
+        (Φ ρ) (Φ.map σ) hσΦ.posSemidef α ≤
       sandwichedRenyiPSDReferenceHighAlphaE ρ σ hσ.posSemidef α := by
-  have hSupport : Matrix.Supports ρ.matrix σ :=
-    Matrix.Supports.of_right_posDef ρ.matrix σ hσ
+  have hSupport : Matrix.Supports ρ.m σ :=
+    Matrix.Supports.of_right_posDef ρ.m σ hσ
   have hSupportOut :
-      Matrix.Supports (Φ.applyState ρ).matrix (Φ.map σ) :=
-    Matrix.Supports.of_right_posDef (Φ.applyState ρ).matrix (Φ.map σ) hσΦ
+      Matrix.Supports (Φ ρ).m (Φ.map σ) :=
+    Matrix.Supports.of_right_posDef (Φ ρ).m (Φ.map σ) hσΦ
   rw [sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_of_supports
-      (Φ.applyState ρ) hσΦ.posSemidef α hSupportOut,
+      (Φ ρ) hσΦ.posSemidef α hSupportOut,
     sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_of_supports
       ρ hσ.posSemidef α hSupport]
   exact_mod_cast
@@ -3100,13 +3081,13 @@ with the existing real-valued matrix-reference divergence.
 This is the audit bridge from the source-facing support-aware semantics back
 to the current `sandwichedRenyiReference` API. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_reference_posDef
-    (ρ : State a) {σ : CMatrix a}
-    (hρ : ρ.matrix.PosDef) (hσ : σ.PosDef)
+    (ρ : MState a) {σ : CMatrix a}
+    (hρ : ρ.m.PosDef) (hσ : σ.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     sandwichedRenyiPSDReferenceHighAlphaE ρ σ hσ.posSemidef α =
       (sandwichedRenyiReference ρ σ hρ hσ α hα_pos hα_ne_one : EReal) := by
-  have hSupport : Matrix.Supports ρ.matrix σ :=
-    Matrix.Supports.of_right_posDef ρ.matrix σ hσ
+  have hSupport : Matrix.Supports ρ.m σ :=
+    Matrix.Supports.of_right_posDef ρ.m σ hσ
   rw [sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_of_supports
     ρ hσ.posSemidef α hSupport]
   simp [sandwichedRenyiPSDReferenceHighAlphaFinite,
@@ -3120,25 +3101,12 @@ The supported finite branch is the remaining high-`α` PSD task; this theorem
 separates the source-domain split from that finite-branch inequality. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaE_dataProcessing_channel_of_not_supports
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
-    (α : ℝ) (hSupport : ¬ Matrix.Supports ρ.matrix σ) :
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
+    (α : ℝ) (hSupport : ¬ Matrix.Supports ρ.m σ) :
     sandwichedRenyiPSDReferenceHighAlphaE
-        (Φ.applyState ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
+        (Φ ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
       sandwichedRenyiPSDReferenceHighAlphaE ρ σ hσ α := by
   simp [sandwichedRenyiPSDReferenceHighAlphaE, hSupport]
-
-/-- Channel preservation of the finite high-`α` support domain, expressed in
-the source-facing PSD-reference branch.
-
-Once the input finite branch is available (`ρ ≪ σ`), the output finite branch
-is also in-domain (`Φρ ≪ Φσ`).  The numerical finite-branch inequality remains
-the nontrivial high-`α` PSD step. -/
-theorem sandwichedRenyiPSDReferenceHighAlphaE_output_supports_of_input_supports
-    {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
-    (hSupport : Matrix.Supports ρ.matrix σ) :
-    Matrix.Supports (Φ.applyState ρ).matrix (Φ.map σ) :=
-  channel_applyState_supports_of_supports ρ hσ Φ hSupport
 
 /-- If the input finite high-`α` support condition holds, the spectral support
 projector of the output reference `Φσ` fixes the output state on both sides.
@@ -3149,20 +3117,19 @@ projector identities needed before restricting the Beigi/Gour finite theorem
 to the support of `Φσ`. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaE_output_supportProjector_fixes_of_input_supports
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
-    (hSupport : Matrix.Supports ρ.matrix σ) :
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
+    (hSupport : Matrix.Supports ρ.m σ) :
     let Pi : CMatrix b :=
       psdInvSqrt (Φ.map σ) (Φ.mapsPositive σ hσ).isHermitian *
         (Φ.map σ) *
         psdInvSqrt (Φ.map σ) (Φ.mapsPositive σ hσ).isHermitian
-    Pi * (Φ.applyState ρ).matrix = (Φ.applyState ρ).matrix ∧
-      (Φ.applyState ρ).matrix * Pi = (Φ.applyState ρ).matrix := by
+    Pi * (Φ ρ).m = (Φ ρ).m ∧
+      (Φ ρ).m * Pi = (Φ ρ).m := by
   exact
     _root_.QIT.supportProjector_fixes_of_supports
-      (M := (Φ.applyState ρ).matrix) (N := Φ.map σ)
-      (Φ.applyState ρ).pos (Φ.mapsPositive σ hσ)
-      (sandwichedRenyiPSDReferenceHighAlphaE_output_supports_of_input_supports
-        ρ hσ Φ hSupport)
+      (M := (Φ ρ).m) (N := Φ.map σ)
+      (Φ ρ).psd (Φ.mapsPositive σ hσ)
+      (channel_applyState_supports_of_supports ρ hσ Φ hSupport)
 
 /-- Positive-definite reference specialization of the high-`α` extended-real
 PSD-reference DPI.
@@ -3172,24 +3139,24 @@ only changes the outer source-facing semantics from real-valued
 `sandwichedRenyiReference` to the support-aware EReal branch. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaE_dataProcessing_channel_posDef_reference
     {b : Type v} [Fintype b] [DecidableEq b] [Nonempty a]
-    (ρ : State a) {σ : CMatrix a} (Φ : Channel a b)
-    (hρ : ρ.matrix.PosDef) (hσ : σ.PosDef)
-    (hρΦ : (Φ.applyState ρ).matrix.PosDef)
+    (ρ : MState a) {σ : CMatrix a} (Φ : CPTPMap a b)
+    (hρ : ρ.m.PosDef) (hσ : σ.PosDef)
+    (hρΦ : (Φ ρ).m.PosDef)
     (hσΦ : (Φ.map σ).PosDef)
     (α : ℝ) (hα : 1 < α) :
     sandwichedRenyiPSDReferenceHighAlphaE
-        (Φ.applyState ρ) (Φ.map σ) hσΦ.posSemidef α ≤
+        (Φ ρ) (Φ.map σ) hσΦ.posSemidef α ≤
       sandwichedRenyiPSDReferenceHighAlphaE ρ σ hσ.posSemidef α := by
   have hα_pos : 0 < α := by linarith
   have hα_ne_one : α ≠ 1 := ne_of_gt hα
   have hDPI :
-      sandwichedRenyiReference (Φ.applyState ρ) (Φ.map σ)
+      sandwichedRenyiReference (Φ ρ) (Φ.map σ)
           hρΦ hσΦ α hα_pos hα_ne_one ≤
         sandwichedRenyiReference ρ σ hρ hσ α hα_pos hα_ne_one :=
     sandwichedRenyi_dataProcessing_channel_posDef_reference
       ρ σ Φ hρ hσ hρΦ hσΦ α (Or.inr hα)
   rw [sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_reference_posDef
-      (Φ.applyState ρ) hρΦ hσΦ α hα_pos hα_ne_one,
+      (Φ ρ) hρΦ hσΦ α hα_pos hα_ne_one,
     sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_reference_posDef
       ρ hρ hσ α hα_pos hα_ne_one]
   exact_mod_cast hDPI
@@ -3202,21 +3169,20 @@ enough to obtain the EReal DPI.  This isolates the remaining high-`α` singular
 PSD work from the already solved support-domain bookkeeping. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaE_dataProcessing_channel_of_supported_finite_le
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
-    (α : ℝ) (hSupport : Matrix.Supports ρ.matrix σ)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
+    (α : ℝ) (hSupport : Matrix.Supports ρ.m σ)
     (hfinite :
       sandwichedRenyiPSDReferenceHighAlphaFinite
-          (Φ.applyState ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
+          (Φ ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
         sandwichedRenyiPSDReferenceHighAlphaFinite ρ σ hσ α) :
     sandwichedRenyiPSDReferenceHighAlphaE
-        (Φ.applyState ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
+        (Φ ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
       sandwichedRenyiPSDReferenceHighAlphaE ρ σ hσ α := by
   have hSupportOut :
-      Matrix.Supports (Φ.applyState ρ).matrix (Φ.map σ) :=
-    sandwichedRenyiPSDReferenceHighAlphaE_output_supports_of_input_supports
-      ρ hσ Φ hSupport
+      Matrix.Supports (Φ ρ).m (Φ.map σ) :=
+    channel_applyState_supports_of_supports ρ hσ Φ hSupport
   rw [sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_of_supports
-      (Φ.applyState ρ) (Φ.mapsPositive σ hσ) α hSupportOut,
+      (Φ ρ) (Φ.mapsPositive σ hσ) α hSupportOut,
     sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_of_supports
       ρ hσ α hSupport]
   exact_mod_cast hfinite
@@ -3229,17 +3195,17 @@ branch is reduced to the numeric finite-branch inequality after channel
 support preservation. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaE_dataProcessing_channel_of_finite_branch
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
     (α : ℝ)
     (hfinite :
-      Matrix.Supports ρ.matrix σ →
+      Matrix.Supports ρ.m σ →
         sandwichedRenyiPSDReferenceHighAlphaFinite
-            (Φ.applyState ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
+            (Φ ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
           sandwichedRenyiPSDReferenceHighAlphaFinite ρ σ hσ α) :
     sandwichedRenyiPSDReferenceHighAlphaE
-        (Φ.applyState ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
+        (Φ ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
       sandwichedRenyiPSDReferenceHighAlphaE ρ σ hσ α := by
-  by_cases hSupport : Matrix.Supports ρ.matrix σ
+  by_cases hSupport : Matrix.Supports ρ.m σ
   · exact
       sandwichedRenyiPSDReferenceHighAlphaE_dataProcessing_channel_of_supported_finite_le
         ρ hσ Φ α hSupport (hfinite hSupport)
@@ -3255,11 +3221,11 @@ is immediate from the source support convention.  The remaining public-scope
 high-`α` PSD task is exactly the case where `Φσ` is singular. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaE_dataProcessing_channel_of_map_posDef
     {b : Type v} [Fintype b] [DecidableEq b] [Nonempty a]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
     (hσΦ : (Φ.map σ).PosDef)
     (α : ℝ) (hα : 1 < α) :
     sandwichedRenyiPSDReferenceHighAlphaE
-        (Φ.applyState ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
+        (Φ ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
       sandwichedRenyiPSDReferenceHighAlphaE ρ σ hσ α := by
   refine
     sandwichedRenyiPSDReferenceHighAlphaE_dataProcessing_channel_of_finite_branch
@@ -3269,36 +3235,6 @@ theorem sandwichedRenyiPSDReferenceHighAlphaE_dataProcessing_channel_of_map_posD
     sandwichedRenyiPSDReferenceHighAlphaFinite_dataProcessing_channel_of_map_posDef
       ρ hσ Φ hSupport hσΦ α hα
   simpa using hfinite
-
-/-- A state supported by a PSD reference compresses to a state on the
-reference's positive spectral support.  This is the state-side object needed
-for the Gour support-compression route when the output reference is singular:
-the compressed reference is positive definite by
-`Matrix.psdSupportCompress_self_posDef`, and the compressed output state keeps
-trace one by support. -/
-noncomputable def psdSupportCompressedState
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (hSupport : Matrix.Supports ρ.matrix σ) :
-    State (psdSupportIndex σ hσ) :=
-  _root_.QIT.psdSupportCompressedState ρ hσ hSupport
-
-@[simp]
-theorem psdSupportCompressedState_matrix
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (hSupport : Matrix.Supports ρ.matrix σ) :
-    (psdSupportCompressedState ρ hσ hSupport).matrix =
-      psdSupportCompress σ hσ ρ.matrix := rfl
-
-theorem psdSupportCompressedState_reference_posDef
-    {σ : CMatrix a} (hσ : σ.PosSemidef) :
-    (psdSupportCompress σ hσ σ).PosDef :=
-  _root_.QIT.psdSupportCompressedState_reference_posDef hσ
-
-theorem psdSupportCompressedState_support_nonempty
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (hSupport : Matrix.Supports ρ.matrix σ) :
-    Nonempty (psdSupportIndex σ hσ) :=
-  _root_.QIT.psdSupportCompressedState_support_nonempty ρ hσ hSupport
 
 /-- Embedding map from the positive spectral support of a PSD reference back
 to the ambient system. -/
@@ -3337,61 +3273,47 @@ channel used to reduce the singular high-`α` finite branch to the existing
 positive-definite theorem. -/
 noncomputable def psdSupportRestrictedChannel
     {b : Type v} [Fintype b] [DecidableEq b]
-    (Φ : Channel a b) (σ : CMatrix a) (hσ : σ.PosSemidef) :
-    Channel (psdSupportIndex σ hσ)
-      (psdSupportIndex (Φ.map σ) (Φ.mapsPositive σ hσ)) where
-  map :=
-    (psdSupportCompressionMap (Φ.map σ) (Φ.mapsPositive σ hσ)).comp
-      (Φ.map.comp (psdSupportEmbeddingMap σ hσ))
-  completelyPositive := by
-    refine MatrixMap.isCompletelyPositive_comp
-      (psdSupportCompressionMap (Φ.map σ) (Φ.mapsPositive σ hσ))
-      (Φ.map.comp (psdSupportEmbeddingMap σ hσ)) ?_ ?_
-    · exact MatrixMap.ofKraus_completelyPositive _
-    · exact MatrixMap.isCompletelyPositive_comp Φ.map
-        (psdSupportEmbeddingMap σ hσ)
-        Φ.completelyPositive (MatrixMap.ofKraus_completelyPositive _)
-  tracePreserving := by
-    intro X
-    let τ : CMatrix b := Φ.map σ
-    let hτ : τ.PosSemidef := Φ.mapsPositive σ hσ
-    have hEmbedSupport :
-        Matrix.Supports ((psdSupportEmbeddingMap σ hσ) X) σ := by
-      simpa [psdSupportEmbeddingMap_apply] using
-        _root_.QIT.psdSupportIsometry_conj_supports σ hσ X
-    have hOutSupport :
-        Matrix.Supports (Φ.map ((psdSupportEmbeddingMap σ hσ) X)) τ := by
-      simpa [τ] using channel_map_supports Φ hσ hEmbedSupport
-    calc
-      ((psdSupportCompressionMap τ hτ).comp
-          (Φ.map.comp (psdSupportEmbeddingMap σ hσ)) X).trace =
-          (psdSupportCompress τ hτ
-            (Φ.map ((psdSupportEmbeddingMap σ hσ) X))).trace := by
-            simp [τ, psdSupportCompressionMap_apply]
-      _ = (Φ.map ((psdSupportEmbeddingMap σ hσ) X)).trace := by
-            exact psdSupportCompress_trace_of_supports_right hτ hOutSupport
-      _ = ((psdSupportEmbeddingMap σ hσ) X).trace := Φ.tracePreserving _
-      _ = X.trace := by
-            simp [psdSupportEmbeddingMap_apply, psdSupportIsometry_conj_trace]
-  mapsPositive := by
-    intro X hX
-    exact
-      MatrixMap.isCompletelyPositive_mapsPositive
-        ((psdSupportCompressionMap (Φ.map σ) (Φ.mapsPositive σ hσ)).comp
-          (Φ.map.comp (psdSupportEmbeddingMap σ hσ)))
-        (MatrixMap.isCompletelyPositive_comp
-          (psdSupportCompressionMap (Φ.map σ) (Φ.mapsPositive σ hσ))
-          (Φ.map.comp (psdSupportEmbeddingMap σ hσ))
-          (MatrixMap.ofKraus_completelyPositive _)
-          (MatrixMap.isCompletelyPositive_comp Φ.map
-            (psdSupportEmbeddingMap σ hσ)
-            Φ.completelyPositive (MatrixMap.ofKraus_completelyPositive _)))
-        X hX
+    (Φ : CPTPMap a b) (σ : CMatrix a) (hσ : σ.PosSemidef) :
+    CPTPMap (psdSupportIndex σ hσ)
+      (psdSupportIndex (Φ.map σ) (Φ.mapsPositive σ hσ)) :=
+  CPTPOp.ofMat
+    ((psdSupportCompressionMap (Φ.map σ) (Φ.mapsPositive σ hσ)).comp
+      (Φ.map.comp (psdSupportEmbeddingMap σ hσ)))
+    (by
+      refine MatrixMap.isCompletelyPositive_comp
+        (psdSupportCompressionMap (Φ.map σ) (Φ.mapsPositive σ hσ))
+        (Φ.map.comp (psdSupportEmbeddingMap σ hσ)) ?_ ?_
+      · exact MatrixMap.ofKraus_completelyPositive _
+      · exact MatrixMap.isCompletelyPositive_comp Φ.map
+          (psdSupportEmbeddingMap σ hσ)
+          Φ.map_cp (MatrixMap.ofKraus_completelyPositive _))
+    (by
+      intro X
+      let τ : CMatrix b := Φ.map σ
+      let hτ : τ.PosSemidef := Φ.mapsPositive σ hσ
+      have hEmbedSupport :
+          Matrix.Supports ((psdSupportEmbeddingMap σ hσ) X) σ := by
+        simpa [psdSupportEmbeddingMap_apply] using
+          _root_.QIT.psdSupportIsometry_conj_supports σ hσ X
+      have hOutSupport :
+          Matrix.Supports (Φ.map ((psdSupportEmbeddingMap σ hσ) X)) τ := by
+        simpa [τ] using channel_map_supports Φ hσ hEmbedSupport
+      calc
+        ((psdSupportCompressionMap τ hτ).comp
+            (Φ.map.comp (psdSupportEmbeddingMap σ hσ)) X).trace =
+            (psdSupportCompress τ hτ
+              (Φ.map ((psdSupportEmbeddingMap σ hσ) X))).trace := by
+              simp [τ, psdSupportCompressionMap_apply]
+        _ = (Φ.map ((psdSupportEmbeddingMap σ hσ) X)).trace := by
+              exact psdSupportCompress_trace_of_supports_right hτ hOutSupport
+        _ = ((psdSupportEmbeddingMap σ hσ) X).trace := Φ.map_TP _
+        _ = X.trace := by
+              simp [psdSupportEmbeddingMap_apply, psdSupportIsometry_conj_trace])
 
 @[simp]
 theorem psdSupportRestrictedChannel_map_reference
     {b : Type v} [Fintype b] [DecidableEq b]
-    (Φ : Channel a b) (σ : CMatrix a) (hσ : σ.PosSemidef) :
+    (Φ : CPTPMap a b) (σ : CMatrix a) (hσ : σ.PosSemidef) :
     (psdSupportRestrictedChannel Φ σ hσ).map
         (psdSupportCompress σ hσ σ) =
       psdSupportCompress (Φ.map σ) (Φ.mapsPositive σ hσ) (Φ.map σ) := by
@@ -3405,22 +3327,22 @@ theorem psdSupportRestrictedChannel_map_reference
 @[simp]
 theorem psdSupportRestrictedChannel_applyState_compressed
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (Φ : Channel a b) (hSupport : Matrix.Supports ρ.matrix σ) :
-    (psdSupportRestrictedChannel Φ σ hσ).applyState
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (Φ : CPTPMap a b) (hSupport : Matrix.Supports ρ.m σ) :
+    (psdSupportRestrictedChannel Φ σ hσ)
         (psdSupportCompressedState ρ hσ hSupport) =
-      psdSupportCompressedState (Φ.applyState ρ) (Φ.mapsPositive σ hσ)
+      psdSupportCompressedState (Φ ρ) (Φ.mapsPositive σ hσ)
         (channel_applyState_supports_of_supports ρ hσ Φ hSupport) := by
-  apply State.ext
+  apply MState.ext
   have hrec :
       psdSupportIsometry σ hσ *
-          psdSupportCompress σ hσ ρ.matrix *
+          psdSupportCompress σ hσ ρ.m *
           Matrix.conjTranspose (psdSupportIsometry σ hσ) =
-        ρ.matrix := by
+        ρ.m := by
     simpa using
       psdSupportCompress_reconstruct_of_supports
-        (M := ρ.matrix) (N := σ) ρ.pos hσ hSupport
-  simp [Channel.applyState, psdSupportRestrictedChannel,
+        (M := ρ.m) (N := σ) ρ.psd hσ hSupport
+  simp [CPTPOp.mat_coe_eq_apply_mat, psdSupportRestrictedChannel,
     psdSupportEmbeddingMap_apply, psdSupportCompressionMap_apply, hrec]
 
 /-- High-`α` finite-branch DPI after compressing both the input and output
@@ -3429,35 +3351,35 @@ references to their positive spectral supports.
 This is the closed Beigi/Gour support-domain core: the restricted channel is
 CPTP between support systems, both compressed references are positive
 definite, and the existing positive-definite finite-branch theorem applies
-without any regularization or support-domain placeholder. -/
+without any regularization or support-domain side condition. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFinite_dataProcessing_channel_supportCompressed
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
-    (hSupport : Matrix.Supports ρ.matrix σ)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
+    (hSupport : Matrix.Supports ρ.m σ)
     (α : ℝ) (hα : 1 < α) :
     sandwichedRenyiPSDReferenceHighAlphaFinite
-        (psdSupportCompressedState (Φ.applyState ρ) (Φ.mapsPositive σ hσ)
+        (psdSupportCompressedState (Φ ρ) (Φ.mapsPositive σ hσ)
           (channel_applyState_supports_of_supports ρ hσ Φ hSupport))
         (psdSupportCompress (Φ.map σ) (Φ.mapsPositive σ hσ) (Φ.map σ))
-        (psdSupportCompressedState_reference_posDef
+        (psdSupportCompress_self_posDef _
           (Φ.mapsPositive σ hσ)).posSemidef α ≤
       sandwichedRenyiPSDReferenceHighAlphaFinite
         (psdSupportCompressedState ρ hσ hSupport)
         (psdSupportCompress σ hσ σ)
-        (psdSupportCompressedState_reference_posDef hσ).posSemidef α := by
+        (psdSupportCompress_self_posDef _ hσ).posSemidef α := by
   classical
   let : Nonempty (psdSupportIndex σ hσ) :=
     psdSupportCompressedState_support_nonempty ρ hσ hSupport
-  let ρc : State (psdSupportIndex σ hσ) :=
+  let ρc : MState (psdSupportIndex σ hσ) :=
     psdSupportCompressedState ρ hσ hSupport
   let σc : CMatrix (psdSupportIndex σ hσ) :=
     psdSupportCompress σ hσ σ
   let Ψ := psdSupportRestrictedChannel Φ σ hσ
   have hσc : σc.PosDef := by
-    simpa [σc] using psdSupportCompressedState_reference_posDef hσ
+    simpa [σc] using psdSupportCompress_self_posDef _ hσ
   have hσcΨ : (Ψ.map σc).PosDef := by
     simpa [Ψ, σc] using
-      psdSupportCompressedState_reference_posDef (Φ.mapsPositive σ hσ)
+      psdSupportCompress_self_posDef _ (Φ.mapsPositive σ hσ)
   have hDPI :=
     sandwichedRenyiPSDReferenceHighAlphaFinite_dataProcessing_channel_posDef_reference
       ρc Ψ hσc hσcΨ α hα
@@ -3470,19 +3392,19 @@ This is the Gour support-domain reconstruction step: negative reference
 powers are computed on the strictly positive support of `σ`, while the final
 positive trace power is invariant under embedding by the support isometry. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFinite_supportCompress_eq
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (hSupport : Matrix.Supports ρ.matrix σ)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef)
+    (hSupport : Matrix.Supports ρ.m σ)
     (α : ℝ) (hα : 1 < α) :
     sandwichedRenyiPSDReferenceHighAlphaFinite ρ σ hσ α =
       sandwichedRenyiPSDReferenceHighAlphaFinite
         (psdSupportCompressedState ρ hσ hSupport)
         (psdSupportCompress σ hσ σ)
-        (psdSupportCompressedState_reference_posDef hσ).posSemidef α := by
+        (psdSupportCompress_self_posDef _ hσ).posSemidef α := by
   classical
   let : Nonempty (psdSupportIndex σ hσ) :=
     psdSupportCompressedState_support_nonempty ρ hσ hSupport
   let V : Matrix a (psdSupportIndex σ hσ) ℂ := psdSupportIsometry σ hσ
-  let ρc : State (psdSupportIndex σ hσ) :=
+  let ρc : MState (psdSupportIndex σ hσ) :=
     psdSupportCompressedState ρ hσ hSupport
   let σc : CMatrix (psdSupportIndex σ hσ) :=
     psdSupportCompress σ hσ σ
@@ -3496,10 +3418,10 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_supportCompress_eq
       (1 : CMatrix (psdSupportIndex σ hσ)) := by
     simpa [V] using psdSupportIsometry_isometry σ hσ
   have hρ_embed :
-      V * ρc.matrix * Matrix.conjTranspose V = ρ.matrix := by
+      V * ρc.m * Matrix.conjTranspose V = ρ.m := by
     simpa [V, ρc, psdSupportCompressedState_matrix] using
       psdSupportCompress_reconstruct_of_supports
-        (M := ρ.matrix) (N := σ) ρ.pos hσ hSupport
+        (M := ρ.m) (N := σ) ρ.psd hσ hSupport
   have hpow_embed :
       V * CFC.rpow σc s * Matrix.conjTranspose V = CFC.rpow σ s := by
     simpa [V, σc, s] using
@@ -3512,7 +3434,7 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_supportCompress_eq
     unfold sandwichedRenyiReferenceInner
     dsimp [ρc, σc, s]
     let P : CMatrix (psdSupportIndex σ hσ) := CFC.rpow σc s
-    let R : CMatrix (psdSupportIndex σ hσ) := ρc.matrix
+    let R : CMatrix (psdSupportIndex σ hσ) := ρc.m
     have halg :
         V * (P * R * P) * Matrix.conjTranspose V =
           (V * P * Matrix.conjTranspose V) *
@@ -3533,20 +3455,20 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_supportCompress_eq
         _ = V * (P * R * P) * Matrix.conjTranspose V := by
               simp [Matrix.mul_assoc]
     calc
-      V * (CFC.rpow σc s * ρc.matrix * CFC.rpow σc s) *
+      V * (CFC.rpow σc s * ρc.m * CFC.rpow σc s) *
           Matrix.conjTranspose V =
         (V * CFC.rpow σc s * Matrix.conjTranspose V) *
-          (V * ρc.matrix * Matrix.conjTranspose V) *
+          (V * ρc.m * Matrix.conjTranspose V) *
           (V * CFC.rpow σc s * Matrix.conjTranspose V) := by
             simpa [P, R] using halg
-      _ = CFC.rpow σ s * ρ.matrix * CFC.rpow σ s := by
+      _ = CFC.rpow σ s * ρ.m * CFC.rpow σ s := by
             rw [hpow_embed, hρ_embed]
   let A : CMatrix (psdSupportIndex σ hσ) :=
     sandwichedRenyiReferenceInner ρc σc α
   have hA : A.PosSemidef := by
     simpa [A, ρc, σc] using
       sandwichedRenyiReferenceInner_posSemidef
-        ρc (psdSupportCompressedState_reference_posDef hσ).posSemidef α
+        ρc (psdSupportCompress_self_posDef _ hσ).posSemidef α
   have hpower :
       psdTracePower (sandwichedRenyiReferenceInner ρ σ α)
           (sandwichedRenyiReferenceInner_posSemidef ρ hσ α) α =
@@ -3570,19 +3492,19 @@ gives the positive-definite finite-branch DPI, and support-compression
 invariance transports the result back to the source-facing finite branch. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFinite_dataProcessing_channel_supported
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
     (α : ℝ) (hα : 1 < α)
-    (hSupport : Matrix.Supports ρ.matrix σ) :
+    (hSupport : Matrix.Supports ρ.m σ) :
     sandwichedRenyiPSDReferenceHighAlphaFinite
-        (Φ.applyState ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
+        (Φ ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
       sandwichedRenyiPSDReferenceHighAlphaFinite ρ σ hσ α := by
   classical
   have hSupportOut :
-      Matrix.Supports (Φ.applyState ρ).matrix (Φ.map σ) :=
+      Matrix.Supports (Φ ρ).m (Φ.map σ) :=
     channel_applyState_supports_of_supports ρ hσ Φ hSupport
   have hout :=
     sandwichedRenyiPSDReferenceHighAlphaFinite_supportCompress_eq
-      (Φ.applyState ρ) (Φ.mapsPositive σ hσ) hSupportOut α hα
+      (Φ ρ) (Φ.mapsPositive σ hσ) hSupportOut α hα
   have hin :=
     sandwichedRenyiPSDReferenceHighAlphaFinite_supportCompress_eq
       ρ hσ hSupport α hα
@@ -3598,10 +3520,10 @@ The unsupported branch is handled by the source convention `+∞`; the
 supported finite branch is the support-compression theorem above. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaE_dataProcessing_channel
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
     (α : ℝ) (hα : 1 < α) :
     sandwichedRenyiPSDReferenceHighAlphaE
-        (Φ.applyState ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
+        (Φ ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
       sandwichedRenyiPSDReferenceHighAlphaE ρ σ hσ α := by
   refine
     sandwichedRenyiPSDReferenceHighAlphaE_dataProcessing_channel_of_finite_branch
@@ -3617,7 +3539,7 @@ For `α < 1` this uses the positive-power `Q_α` branch.  At `α = 1` it uses
 the ordinary trace-log/Umegaki relative entropy with the PSD-reference support
 convention.  For `1 < α` it uses the support-aware high-`α` branch. -/
 noncomputable def sandwichedRenyiPSDReferenceE
-    (ρ : State a) (σ : CMatrix a) (hσ : σ.PosSemidef) (α : ℝ) : EReal :=
+    (ρ : MState a) (σ : CMatrix a) (hσ : σ.PosSemidef) (α : ℝ) : EReal :=
   if α < 1 then
     sandwichedRenyiPSDReferenceLowAlphaE ρ σ hσ α
   else if α = 1 then
@@ -3627,7 +3549,7 @@ noncomputable def sandwichedRenyiPSDReferenceE
 
 @[simp]
 theorem sandwichedRenyiPSDReferenceE_eq_lowAlphaE_of_lt_one
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) {α : ℝ}
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) {α : ℝ}
     (hα : α < 1) :
     sandwichedRenyiPSDReferenceE ρ σ hσ α =
       sandwichedRenyiPSDReferenceLowAlphaE ρ σ hσ α := by
@@ -3635,7 +3557,7 @@ theorem sandwichedRenyiPSDReferenceE_eq_lowAlphaE_of_lt_one
 
 @[simp]
 theorem sandwichedRenyiPSDReferenceE_eq_traceLogE_of_eq_one
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) {α : ℝ}
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) {α : ℝ}
     (hα : α = 1) :
     sandwichedRenyiPSDReferenceE ρ σ hσ α =
       relativeEntropyPSDReferenceTraceLogE ρ σ hσ := by
@@ -3644,7 +3566,7 @@ theorem sandwichedRenyiPSDReferenceE_eq_traceLogE_of_eq_one
 
 @[simp]
 theorem sandwichedRenyiPSDReferenceE_eq_highAlphaE_of_one_lt
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) {α : ℝ}
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) {α : ℝ}
     (hα : 1 < α) :
     sandwichedRenyiPSDReferenceE ρ σ hσ α =
       sandwichedRenyiPSDReferenceHighAlphaE ρ σ hσ α := by
@@ -3659,10 +3581,10 @@ The remaining public endpoint gap is the singular PSD-reference case
 `α = 1/2`; the full-rank endpoint is already proved elsewhere. -/
 theorem sandwichedRenyiPSDReferenceE_dataProcessing_channel_of_half_lt_lt_one_or_one_lt
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
     (α : ℝ) (hα_range : (1 / 2 < α ∧ α < 1) ∨ 1 < α) :
     sandwichedRenyiPSDReferenceE
-        (Φ.applyState ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
+        (Φ ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
       sandwichedRenyiPSDReferenceE ρ σ hσ α := by
   by_cases hlt : α < 1
   · rw [sandwichedRenyiPSDReferenceE_eq_lowAlphaE_of_lt_one _ _ hlt,
@@ -3688,10 +3610,10 @@ endpoint `α = 1 / 2` supplied by normalized-reference fidelity monotonicity;
 the high branch uses the support-aware Beigi weighted-Schatten route. -/
 theorem sandwichedRenyiPSDReferenceE_dataProcessing_channel_of_half_le_lt_one_or_one_lt
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
     (α : ℝ) (hα_range : (1 / 2 ≤ α ∧ α < 1) ∨ 1 < α) :
     sandwichedRenyiPSDReferenceE
-        (Φ.applyState ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
+        (Φ ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α ≤
       sandwichedRenyiPSDReferenceE ρ σ hσ α := by
   by_cases hlt : α < 1
   · rw [sandwichedRenyiPSDReferenceE_eq_lowAlphaE_of_lt_one _ _ hlt,
@@ -3722,11 +3644,11 @@ This is the same source-facing PSD-reference theorem, written as
 `D(ρ || σ) ≥ D(Φρ || Φσ)`. -/
 theorem sandwichedRenyiPSDReferenceE_dataProcessing_channel_ge_of_half_le_lt_one_or_one_lt
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : Channel a b)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosSemidef) (Φ : CPTPMap a b)
     (α : ℝ) (hα_range : (1 / 2 ≤ α ∧ α < 1) ∨ 1 < α) :
     sandwichedRenyiPSDReferenceE ρ σ hσ α ≥
       sandwichedRenyiPSDReferenceE
-        (Φ.applyState ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α := by
+        (Φ ρ) (Φ.map σ) (Φ.mapsPositive σ hσ) α := by
   exact
     sandwichedRenyiPSDReferenceE_dataProcessing_channel_of_half_le_lt_one_or_one_lt
       ρ hσ Φ α hα_range
@@ -3860,8 +3782,4 @@ theorem sandwichedRenyiQ_jointConcave_lowAlpha_diagonal
       (hρ₁ i) (hρ₂ i) (hσ₁ i) (hσ₂ i)
       hα_nonneg hα_le_one ht0 ht1
 
-end State
-
-end
-
-end QIT
+end MState

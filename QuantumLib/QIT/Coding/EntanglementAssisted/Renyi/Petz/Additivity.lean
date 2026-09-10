@@ -22,33 +22,33 @@ It realizes the tensor-product candidate step inside the source proof
 
 open scoped ComplexOrder MatrixOrder
 
-namespace QIT
-
-universe u v
-
 noncomputable section
-
+universe u v
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-namespace PureVector
+open QIT
 
-def tensorPowerBipartite (psi : PureVector (Prod a b)) (n : Nat) :
-    PureVector (Prod (TensorPower a n) (TensorPower b n)) :=
+namespace Ket
+
+/-- The `n`-fold tensor power of a bipartite pure state, regrouped so that the `a` factors and the
+`b` factors each form a tensor power of their own. -/
+def tensorPowerBipartite (psi : Ket (a × b)) (n : ℕ) :
+    Ket (TensorPower a n × TensorPower b n) :=
   (psi.tensorPower n).reindex (tensorPowerProdEquiv a b n)
 
-theorem tensorPowerBipartite_state (psi : PureVector (Prod a b)) (n : Nat) :
+theorem tensorPowerBipartite_state (psi : Ket (a × b)) (n : ℕ) :
     (psi.tensorPowerBipartite n).state = psi.state.tensorPowerBipartite n := by
-  unfold tensorPowerBipartite State.tensorPowerBipartite
-  rw [PureVector.reindex_state, PureVector.tensorPower_state]
+  unfold tensorPowerBipartite MState.tensorPowerBipartite
+  rw [Ket.reindex_state, Ket.tensorPower_state]
 
-end PureVector
+end Ket
 
-namespace State
+namespace MState
 
-theorem prod_punit_ext (rho sigma : State (Prod PUnit PUnit)) :
+theorem prod_punit_ext (rho sigma : MState (PUnit × PUnit)) :
     rho = sigma := by
-  apply State.ext
+  apply MState.ext
   ext x y
   rcases x with ⟨xA, xB⟩
   rcases y with ⟨yA, yB⟩
@@ -56,15 +56,17 @@ theorem prod_punit_ext (rho sigma : State (Prod PUnit PUnit)) :
   cases xB
   cases yA
   cases yB
-  have hrho : rho.matrix (PUnit.unit, PUnit.unit) (PUnit.unit, PUnit.unit) = 1 := by
-    simpa [Matrix.trace, Fintype.sum_prod_type] using rho.trace_eq_one
-  have hsigma : sigma.matrix (PUnit.unit, PUnit.unit) (PUnit.unit, PUnit.unit) = 1 := by
-    simpa [Matrix.trace, Fintype.sum_prod_type] using sigma.trace_eq_one
+  have hrho : rho.m (PUnit.unit, PUnit.unit) (PUnit.unit, PUnit.unit) = 1 := by
+    simpa [Matrix.trace, Fintype.sum_prod_type] using rho.tr'
+  have hsigma : sigma.m (PUnit.unit, PUnit.unit) (PUnit.unit, PUnit.unit) = 1 := by
+    simpa [Matrix.trace, Fintype.sum_prod_type] using sigma.tr'
   rw [hrho, hsigma]
 
-def tensorPowerBipartiteSuccEquiv (a : Type u) (b : Type v) (n : Nat) :
-    Prod (Prod a b) (Prod (TensorPower a n) (TensorPower b n)) ≃
-      Prod (TensorPower a (n + 1)) (TensorPower b (n + 1)) where
+/-- Splitting one copy off a bipartite tensor power:
+`(a × b) × (a^⊗n × b^⊗n) ≃ a^⊗(n+1) × b^⊗(n+1)`. -/
+def tensorPowerBipartiteSuccEquiv (a : Type u) (b : Type v) (n : ℕ) :
+    ((a × b) × (TensorPower a n × TensorPower b n)) ≃
+      (TensorPower a (n + 1) × TensorPower b (n + 1)) where
   toFun x := ((x.1.1, x.2.1), (x.1.2, x.2.2))
   invFun x := ((x.1.1, x.2.1), (x.1.2, x.2.2))
   left_inv := by
@@ -74,55 +76,38 @@ def tensorPowerBipartiteSuccEquiv (a : Type u) (b : Type v) (n : Nat) :
     intro x
     rfl
 
-theorem tensorPowerBipartite_succ (rho : State (Prod a b)) (n : Nat) :
+theorem tensorPowerBipartite_succ (rho : MState (a × b)) (n : ℕ) :
     rho.tensorPowerBipartite (n + 1) =
       (rho.prod (rho.tensorPowerBipartite n)).reindex
-        (tensorPowerBipartiteSuccEquiv a b n) := rfl
+        (tensorPowerBipartiteSuccEquiv a b n) := by
+  apply MState.ext
+  simp only [MState.tensorPowerBipartite_matrix, MState.reindex_matrix, MState.prod_m,
+    MState.tensorPower_succ_matrix]
+  ext x y
+  rfl
 
-theorem reindex_posDef {alpha : Type u} {beta : Type v}
-    [Fintype alpha] [DecidableEq alpha] [Fintype beta] [DecidableEq beta]
-    (rho : State alpha) (e : alpha ≃ beta) (h : rho.matrix.PosDef) :
-    (rho.reindex e).matrix.PosDef := by
-  rw [State.reindex_matrix]
-  exact h.submatrix e.symm.injective
-
-theorem tensorPowerBipartite_posDef (rho : State (Prod a b)) (h : rho.matrix.PosDef) (n : Nat) :
-    (rho.tensorPowerBipartite n).matrix.PosDef := by
-  unfold State.tensorPowerBipartite
-  exact State.reindex_posDef (rho.tensorPower n) (tensorPowerProdEquiv a b n)
-    (rho.tensorPower_posDef h n)
-
-theorem prod_tensorPowerBipartite (rho : State a) (sigma : State b) :
-    (n : Nat) ->
+theorem prod_tensorPowerBipartite (rho : MState a) (sigma : MState b) :
+    (n : ℕ) →
       (rho.prod sigma).tensorPowerBipartite n =
         (rho.tensorPower n).prod (sigma.tensorPower n)
   | 0 => by
-      exact State.prod_punit_ext _ _
+      exact MState.prod_punit_ext _ _
   | n + 1 => by
       have ih := prod_tensorPowerBipartite rho sigma n
-      rw [State.tensorPowerBipartite_succ, ih]
-      apply State.ext
+      rw [MState.tensorPowerBipartite_succ, ih]
+      apply MState.ext
+      simp only [MState.reindex_matrix, MState.prod_m, MState.tensorPower_succ_matrix]
       ext x y
-      show rho.matrix x.1.1 y.1.1 * sigma.matrix x.2.1 y.2.1 *
-          ((rho.tensorPower n).matrix x.1.2 y.1.2 *
-            (sigma.tensorPower n).matrix x.2.2 y.2.2) =
-        rho.matrix x.1.1 y.1.1 * (rho.tensorPower n).matrix x.1.2 y.1.2 *
-          (sigma.matrix x.2.1 y.2.1 * (sigma.tensorPower n).matrix x.2.2 y.2.2)
+      show rho.m x.1.1 y.1.1 * sigma.m x.2.1 y.2.1 *
+          ((rho.tensorPower n).m x.1.2 y.1.2 *
+            (sigma.tensorPower n).m x.2.2 y.2.2) =
+        rho.m x.1.1 y.1.1 * (rho.tensorPower n).m x.1.2 y.1.2 *
+          (sigma.m x.2.1 y.2.1 * (sigma.tensorPower n).m x.2.2 y.2.2)
       ring
 
-end State
+end MState
 
-noncomputable def cMatrixReindexStarAlgEquiv {alpha : Type u} {beta : Type v}
-    [Fintype alpha] [DecidableEq alpha] [Fintype beta] [DecidableEq beta]
-    (e : alpha ≃ beta) :
-    CMatrix alpha ≃⋆ₐ[ℂ] CMatrix beta where
-  __ := Matrix.reindexAlgEquiv ℂ ℂ e
-  map_smul' r A := by
-    ext i j
-    simp [Matrix.reindex_apply, Matrix.submatrix_apply]
-  map_star' A := by
-    ext i j
-    simp [Matrix.reindex_apply, Matrix.submatrix_apply]
+namespace QIT
 
 theorem cMatrix_rpow_reindex_posDef {alpha : Type u} {beta : Type v}
     [Fintype alpha] [DecidableEq alpha] [Fintype beta] [DecidableEq beta]
@@ -144,129 +129,109 @@ theorem cMatrix_rpow_reindex_posDef {alpha : Type u} {beta : Type v}
         exact (Real.continuousAt_rpow_const x s
           (.inl (ne_of_gt ((Matrix.PosDef.isStrictlyPositive hA).spectrum_pos hx)))).continuousWithinAt)
       (hφ := by
-        change Continuous (Matrix.reindex e e : CMatrix alpha -> CMatrix beta)
+        change Continuous (Matrix.reindex e e : CMatrix alpha → CMatrix beta)
         fun_prop)).symm
 
-theorem cMatrix_trace_reindex {alpha : Type u} {beta : Type v}
-    [Fintype alpha] [DecidableEq alpha] [Fintype beta] [DecidableEq beta]
-    (e : alpha ≃ beta) (A : CMatrix alpha) :
-    (Matrix.reindex e e A).trace = A.trace := by
-  rw [Matrix.trace, Matrix.trace]
-  exact Fintype.sum_equiv e.symm
-    (fun i : beta => Matrix.reindex e e A i i)
-    (fun i : alpha => A i i)
-    (by intro i; simp [Matrix.reindex_apply, Matrix.submatrix_apply])
+end QIT
 
-namespace State
+namespace MState
 
 theorem petzRenyi_reindex {alpha : Type u} {beta : Type v}
     [Fintype alpha] [DecidableEq alpha] [Fintype beta] [DecidableEq beta]
-    (rho sigma : State alpha) (e : alpha ≃ beta)
-    (hrho : rho.matrix.PosDef) (hsigma : sigma.matrix.PosDef)
+    (rho sigma : MState alpha) (e : alpha ≃ beta)
+    (hrho : rho.m.PosDef) (hsigma : sigma.m.PosDef)
     (alphaR : ℝ) (halpha_pos : 0 < alphaR) (halpha_ne_one : alphaR ≠ 1) :
     (rho.reindex e).petzRenyi (sigma.reindex e)
-        (State.reindex_posDef rho e hrho) (State.reindex_posDef sigma e hsigma)
+        (MState.reindex_posDef rho e hrho) (MState.reindex_posDef sigma e hsigma)
         alphaR halpha_pos halpha_ne_one =
       rho.petzRenyi sigma hrho hsigma alphaR halpha_pos halpha_ne_one := by
-  unfold State.petzRenyi
-  rw [State.reindex_matrix, State.reindex_matrix]
+  unfold MState.petzRenyi
+  rw [MState.reindex_matrix, MState.reindex_matrix]
   change (1 / (alphaR - 1)) *
-      log2 (((CFC.rpow (Matrix.reindex e e rho.matrix) alphaR *
-        CFC.rpow (Matrix.reindex e e sigma.matrix) (1 - alphaR)).trace).re) =
+      log2 (((CFC.rpow (Matrix.reindex e e rho.m) alphaR *
+        CFC.rpow (Matrix.reindex e e sigma.m) (1 - alphaR)).trace).re) =
     (1 / (alphaR - 1)) *
-      log2 (((CFC.rpow rho.matrix alphaR *
-        CFC.rpow sigma.matrix (1 - alphaR)).trace).re)
-  rw [cMatrix_rpow_reindex_posDef e rho.matrix hrho alphaR]
-  rw [cMatrix_rpow_reindex_posDef e sigma.matrix hsigma (1 - alphaR)]
+      log2 (((CFC.rpow rho.m alphaR *
+        CFC.rpow sigma.m (1 - alphaR)).trace).re)
+  rw [cMatrix_rpow_reindex_posDef e rho.m hrho alphaR]
+  rw [cMatrix_rpow_reindex_posDef e sigma.m hsigma (1 - alphaR)]
   change (1 / (alphaR - 1)) *
-      log2 ((((Matrix.reindexAlgEquiv ℂ ℂ e) (CFC.rpow rho.matrix alphaR) *
+      log2 ((((Matrix.reindexAlgEquiv ℂ ℂ e) (CFC.rpow rho.m alphaR) *
         (Matrix.reindexAlgEquiv ℂ ℂ e)
-          (CFC.rpow sigma.matrix (1 - alphaR))).trace).re) =
+          (CFC.rpow sigma.m (1 - alphaR))).trace).re) =
     (1 / (alphaR - 1)) *
-      log2 (((CFC.rpow rho.matrix alphaR *
-        CFC.rpow sigma.matrix (1 - alphaR)).trace).re)
+      log2 (((CFC.rpow rho.m alphaR *
+        CFC.rpow sigma.m (1 - alphaR)).trace).re)
   rw [← map_mul (Matrix.reindexAlgEquiv ℂ ℂ e)
-    (CFC.rpow rho.matrix alphaR) (CFC.rpow sigma.matrix (1 - alphaR))]
+    (CFC.rpow rho.m alphaR) (CFC.rpow sigma.m (1 - alphaR))]
   change (1 / (alphaR - 1)) *
       log2 ((((Matrix.reindex e e
-        (CFC.rpow rho.matrix alphaR *
-          CFC.rpow sigma.matrix (1 - alphaR))).trace).re)) =
+        (CFC.rpow rho.m alphaR *
+          CFC.rpow sigma.m (1 - alphaR))).trace).re)) =
     (1 / (alphaR - 1)) *
-      log2 (((CFC.rpow rho.matrix alphaR *
-        CFC.rpow sigma.matrix (1 - alphaR)).trace).re)
+      log2 (((CFC.rpow rho.m alphaR *
+        CFC.rpow sigma.m (1 - alphaR)).trace).re)
   rw [cMatrix_trace_reindex e]
 
-theorem tensorPowerBipartite_marginalA_posDef (rho : State (Prod a b))
-    (hA : rho.marginalA.matrix.PosDef) (n : Nat) :
-    (rho.tensorPowerBipartite n).marginalA.matrix.PosDef := by
-  rw [rho.tensorPowerBipartite_marginalA n]
-  exact State.tensorPower_posDef hA n
-
-theorem tensorPowerBipartite_marginalB_posDef (rho : State (Prod a b))
-    (hB : rho.marginalB.matrix.PosDef) (n : Nat) :
-    (rho.tensorPowerBipartite n).marginalB.matrix.PosDef := by
-  rw [rho.tensorPowerBipartite_marginalB n]
-  exact State.tensorPower_posDef hB n
-
 theorem barPetzRenyiMutualInformation_tensorPowerBipartite
-    (rhoAB : State (Prod a b))
-    (hrho : rhoAB.matrix.PosDef)
-    (hA : rhoAB.marginalA.matrix.PosDef)
-    (hB : rhoAB.marginalB.matrix.PosDef)
+    (rhoAB : MState (a × b))
+    (hrho : rhoAB.m.PosDef)
+    (hA : rhoAB.traceRight.m.PosDef)
+    (hB : rhoAB.traceLeft.m.PosDef)
     (alphaR : ℝ) (halpha_pos : 0 < alphaR) (halpha_ne_one : alphaR ≠ 1)
-    (n : Nat) :
+    (n : ℕ) :
     (rhoAB.tensorPowerBipartite n).barPetzRenyiMutualInformation
         (rhoAB.tensorPowerBipartite_posDef hrho n)
-        (rhoAB.tensorPowerBipartite_marginalA_posDef hA n)
-        (rhoAB.tensorPowerBipartite_marginalB_posDef hB n)
+        (rhoAB.tensorPowerBipartite_traceRight_posDef hA n)
+        (rhoAB.tensorPowerBipartite_traceLeft_posDef hB n)
         alphaR halpha_pos halpha_ne_one =
       (n : ℝ) *
         rhoAB.barPetzRenyiMutualInformation hrho hA hB
           alphaR halpha_pos halpha_ne_one := by
   have hcomp :
-      (rhoAB.tensorPowerBipartite n).marginalA.prod
-          (rhoAB.tensorPowerBipartite n).marginalB =
-        (rhoAB.marginalA.prod rhoAB.marginalB).tensorPowerBipartite n := by
+      (rhoAB.tensorPowerBipartite n).traceRight.prod
+          (rhoAB.tensorPowerBipartite n).traceLeft =
+        (rhoAB.traceRight.prod rhoAB.traceLeft).tensorPowerBipartite n := by
     calc
-      (rhoAB.tensorPowerBipartite n).marginalA.prod
-          (rhoAB.tensorPowerBipartite n).marginalB =
-        (rhoAB.marginalA.tensorPower n).prod
-          (rhoAB.marginalB.tensorPower n) := by
-          rw [rhoAB.tensorPowerBipartite_marginalA n,
-            rhoAB.tensorPowerBipartite_marginalB n]
-      _ = (rhoAB.marginalA.prod rhoAB.marginalB).tensorPowerBipartite n :=
-          (State.prod_tensorPowerBipartite rhoAB.marginalA rhoAB.marginalB n).symm
-  unfold State.barPetzRenyiMutualInformation
+      (rhoAB.tensorPowerBipartite n).traceRight.prod
+          (rhoAB.tensorPowerBipartite n).traceLeft =
+        (rhoAB.traceRight.tensorPower n).prod
+          (rhoAB.traceLeft.tensorPower n) := by
+          rw [rhoAB.tensorPowerBipartite_traceRight n,
+            rhoAB.tensorPowerBipartite_traceLeft n]
+      _ = (rhoAB.traceRight.prod rhoAB.traceLeft).tensorPowerBipartite n :=
+          (MState.prod_tensorPowerBipartite rhoAB.traceRight rhoAB.traceLeft n).symm
+  unfold MState.barPetzRenyiMutualInformation
   calc
     (rhoAB.tensorPowerBipartite n).petzRenyi
-        ((rhoAB.tensorPowerBipartite n).marginalA.prod
-          (rhoAB.tensorPowerBipartite n).marginalB)
+        ((rhoAB.tensorPowerBipartite n).traceRight.prod
+          (rhoAB.tensorPowerBipartite n).traceLeft)
         _ _ alphaR halpha_pos halpha_ne_one =
       (rhoAB.tensorPowerBipartite n).petzRenyi
-        ((rhoAB.marginalA.prod rhoAB.marginalB).tensorPowerBipartite n)
+        ((rhoAB.traceRight.prod rhoAB.traceLeft).tensorPowerBipartite n)
         _ _ alphaR halpha_pos halpha_ne_one := by
-        unfold State.petzRenyi
-        rw [congrArg State.matrix hcomp]
+        unfold MState.petzRenyi
+        rw [congrArg DensityOp.m hcomp]
     _ =
       (n : ℝ) *
-        rhoAB.petzRenyi (rhoAB.marginalA.prod rhoAB.marginalB)
-          hrho (State.prod_posDef hA hB) alphaR halpha_pos halpha_ne_one := by
-        have hreindex := State.petzRenyi_reindex (rhoAB.tensorPower n)
-          ((rhoAB.marginalA.prod rhoAB.marginalB).tensorPower n)
+        rhoAB.petzRenyi (rhoAB.traceRight.prod rhoAB.traceLeft)
+          hrho (MState.PosDef.kron hA hB) alphaR halpha_pos halpha_ne_one := by
+        have hreindex := MState.petzRenyi_reindex (rhoAB.tensorPower n)
+          ((rhoAB.traceRight.prod rhoAB.traceLeft).tensorPower n)
           (tensorPowerProdEquiv a b n)
-          (State.tensorPower_posDef hrho n)
-          (State.tensorPower_posDef (State.prod_posDef hA hB) n)
+          (MState.tensorPower_posDef hrho n)
+          (MState.tensorPower_posDef (MState.PosDef.kron hA hB) n)
           alphaR halpha_pos halpha_ne_one
-        exact hreindex.trans (State.petzRenyi_tensorPower rhoAB
-          (rhoAB.marginalA.prod rhoAB.marginalB)
-          hrho (State.prod_posDef hA hB) alphaR halpha_pos halpha_ne_one n)
+        exact hreindex.trans (MState.petzRenyi_tensorPower rhoAB
+          (rhoAB.traceRight.prod rhoAB.traceLeft)
+          hrho (MState.PosDef.kron hA hB) alphaR halpha_pos halpha_ne_one n)
 
 theorem barPetzRenyiMutualInformation_congr
-    {rho sigma : State (Prod a b)} (h : rho = sigma)
-    (hrho : rho.matrix.PosDef) (hA : rho.marginalA.matrix.PosDef)
-    (hB : rho.marginalB.matrix.PosDef)
-    (hsigma : sigma.matrix.PosDef) (hsA : sigma.marginalA.matrix.PosDef)
-    (hsB : sigma.marginalB.matrix.PosDef)
+    {rho sigma : MState (a × b)} (h : rho = sigma)
+    (hrho : rho.m.PosDef) (hA : rho.traceRight.m.PosDef)
+    (hB : rho.traceLeft.m.PosDef)
+    (hsigma : sigma.m.PosDef) (hsA : sigma.traceRight.m.PosDef)
+    (hsB : sigma.traceLeft.m.PosDef)
     (alphaR : ℝ) (halpha_pos : 0 < alphaR) (halpha_ne_one : alphaR ≠ 1) :
     rho.barPetzRenyiMutualInformation hrho hA hB
         alphaR halpha_pos halpha_ne_one =
@@ -275,20 +240,29 @@ theorem barPetzRenyiMutualInformation_congr
   cases h
   rfl
 
-end State
+end MState
 
-namespace Channel
+end
+
+noncomputable section
+
+namespace CPTPOp
+
+open QIT
+
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
 theorem applyState_hypothesisTensor_succ_reindex
-    (N : Channel a b) (n : Nat)
-    (rho : State (Prod a a))
-    (sigma : State (Prod (QIT.TensorPower a n) (QIT.TensorPower a n))) :
-    (((Channel.idChannel (QIT.TensorPower a (n + 1))).prod (N.tensorPower (n + 1))).applyState
-        ((rho.prod sigma).reindex (State.tensorPowerBipartiteSuccEquiv a a n))) =
-      ((((Channel.idChannel a).prod N).applyState rho).prod
-          (((Channel.idChannel (QIT.TensorPower a n)).prod (N.tensorPower n)).applyState sigma)).reindex
-        (State.tensorPowerBipartiteSuccEquiv a b n) := by
-  apply State.ext
+    (N : CPTPMap a b) (n : ℕ)
+    (rho : MState (a × a))
+    (sigma : MState (QIT.TensorPower a n × QIT.TensorPower a n)) :
+    (((CPTPOp.id (dIn := QIT.TensorPower a (n + 1))).prod (N.tensorPower (n + 1)))
+        ((rho.prod sigma).reindex (MState.tensorPowerBipartiteSuccEquiv a a n))) =
+      (MState.prod (((CPTPOp.id (dIn := a)).prod N) rho)
+          (((CPTPOp.id (dIn := QIT.TensorPower a n)).prod (N.tensorPower n)) sigma)).reindex
+        (MState.tensorPowerBipartiteSuccEquiv a b n) := by
+  apply MState.ext
   ext x y
   rcases x with ⟨xR, xB⟩
   rcases y with ⟨yR, yB⟩
@@ -296,131 +270,126 @@ theorem applyState_hypothesisTensor_succ_reindex
   rcases xB with ⟨xB0, xBs⟩
   rcases yR with ⟨yR0, yRs⟩
   rcases yB with ⟨yB0, yBs⟩
-  simp only [Channel.applyState, Channel.prod, State.reindex_matrix,
-    State.prod_matrix_kronecker, Matrix.submatrix_apply]
+  simp only [CPTPOp.mat_coe_eq_apply_mat, CPTPOp.prod_map,
+    MState.reindex_matrix, MState.prod_m, Matrix.submatrix_apply]
   rw [MatrixMap.kron_idChannel_left_apply_slice]
   have hslice :
       (Matrix.of fun j j' =>
-          (Matrix.kronecker rho.matrix sigma.matrix).submatrix
-            (State.tensorPowerBipartiteSuccEquiv a a n).symm
-            (State.tensorPowerBipartiteSuccEquiv a a n).symm
+          (Matrix.kronecker rho.m sigma.m).submatrix
+            (MState.tensorPowerBipartiteSuccEquiv a a n).symm
+            (MState.tensorPowerBipartiteSuccEquiv a a n).symm
             (((xR0, xRs), (xB0, xBs)).1, j)
             (((yR0, yRs), (yB0, yBs)).1, j')) =
         Matrix.kronecker
-          (Matrix.of fun i i' => rho.matrix (xR0, i) (yR0, i'))
-          (Matrix.of fun is is' => sigma.matrix (xRs, is) (yRs, is')) := by
+          (Matrix.of fun i i' => rho.m (xR0, i) (yR0, i'))
+          (Matrix.of fun is is' => sigma.m (xRs, is) (yRs, is')) := by
     ext z z'
     rcases z with ⟨z0, zs⟩
     rcases z' with ⟨z0', zs'⟩
-    simp [State.tensorPowerBipartiteSuccEquiv, Matrix.kronecker,
+    simp [MState.tensorPowerBipartiteSuccEquiv, Matrix.kronecker,
       Matrix.kroneckerMap_apply, Matrix.of_apply]
     rfl
-  rw [hslice]
-  rw [Channel.tensorPower_succ]
-  change MatrixMap.kron N.map (N.tensorPower n).map
-      (Matrix.kronecker
-        (Matrix.of fun i i' => rho.matrix (xR0, i) (yR0, i'))
-        (Matrix.of fun is is' => sigma.matrix (xRs, is) (yRs, is')))
-      (xB0, xBs) (yB0, yBs) = _
-  rw [MatrixMap.kron_apply_kronecker]
-  simp [Matrix.kronecker, Matrix.kroneckerMap_apply,
-    State.tensorPowerBipartiteSuccEquiv]
+  rw [← Matrix.kronecker, hslice]
+  rw [CPTPOp.tensorPower_succ]
+  refine Eq.trans (CPTPOp.prod_map_kronecker_apply N (N.tensorPower n) _ _ _ _ _ _) ?_
+  simp [-CPTPOp.id_map, Matrix.kroneckerMap_apply,
+    MState.tensorPowerBipartiteSuccEquiv]
   rw [MatrixMap.kron_idChannel_left_apply_slice]
   rw [MatrixMap.kron_idChannel_left_apply_slice]
 
 theorem hypothesisTestingOutputState_tensorPowerBipartite
-    (N : Channel a b) (psi : PureVector (Prod a a)) (n : Nat) :
+    (N : CPTPMap a b) (psi : Ket (a × a)) (n : ℕ) :
       (N.tensorPower n).hypothesisTestingOutputState (psi.tensorPowerBipartite n) =
         (N.hypothesisTestingOutputState psi).tensorPowerBipartite n := by
   induction n with
   | zero =>
-      exact State.prod_punit_ext _ _
+      exact MState.prod_punit_ext _ _
   | succ n ih =>
       have ih_state :
-          (((Channel.idChannel (QIT.TensorPower a n)).prod (N.tensorPower n)).applyState
+          (((CPTPOp.id (dIn := QIT.TensorPower a n)).prod (N.tensorPower n))
               (psi.state.tensorPowerBipartite n)) =
             (N.hypothesisTestingOutputState psi).tensorPowerBipartite n := by
-        rw [← PureVector.tensorPowerBipartite_state psi n]
+        rw [← Ket.tensorPowerBipartite_state psi n]
         exact ih
-      rw [Channel.hypothesisTestingOutputState, PureVector.tensorPowerBipartite_state]
-      rw [State.tensorPowerBipartite_succ]
-      rw [Channel.applyState_hypothesisTensor_succ_reindex]
+      rw [CPTPOp.hypothesisTestingOutputState, Ket.tensorPowerBipartite_state]
+      rw [MState.tensorPowerBipartite_succ]
+      rw [CPTPOp.applyState_hypothesisTensor_succ_reindex]
       rw [ih_state]
       change ((N.hypothesisTestingOutputState psi).prod
           ((N.hypothesisTestingOutputState psi).tensorPowerBipartite n)).reindex
-        (State.tensorPowerBipartiteSuccEquiv a b n) =
+        (MState.tensorPowerBipartiteSuccEquiv a b n) =
           (N.hypothesisTestingOutputState psi).tensorPowerBipartite (n + 1)
-      rw [← State.tensorPowerBipartite_succ]
+      rw [← MState.tensorPowerBipartite_succ]
 
 theorem hypothesisTestingOutputState_tensorPowerBipartite_posDef
-    (N : Channel a b) (psi : PureVector (Prod a a))
-    (homega : (N.hypothesisTestingOutputState psi).matrix.PosDef) (n : Nat) :
+    (N : CPTPMap a b) (psi : Ket (a × a))
+    (homega : (N.hypothesisTestingOutputState psi).m.PosDef) (n : ℕ) :
     ((N.tensorPower n).hypothesisTestingOutputState
-      (psi.tensorPowerBipartite n)).matrix.PosDef := by
-  rw [Channel.hypothesisTestingOutputState_tensorPowerBipartite]
-  exact State.tensorPowerBipartite_posDef (N.hypothesisTestingOutputState psi) homega n
+      (psi.tensorPowerBipartite n)).m.PosDef := by
+  rw [CPTPOp.hypothesisTestingOutputState_tensorPowerBipartite]
+  exact MState.tensorPowerBipartite_posDef (N.hypothesisTestingOutputState psi) homega n
 
-theorem hypothesisTestingOutputState_tensorPowerBipartite_marginalA_posDef
-    (N : Channel a b) (psi : PureVector (Prod a a))
-    (hR : (N.hypothesisTestingOutputState psi).marginalA.matrix.PosDef) (n : Nat) :
+theorem hypothesisTestingOutputState_tensorPowerBipartite_traceRight_posDef
+    (N : CPTPMap a b) (psi : Ket (a × a))
+    (hR : (N.hypothesisTestingOutputState psi).traceRight.m.PosDef) (n : ℕ) :
     ((N.tensorPower n).hypothesisTestingOutputState
-      (psi.tensorPowerBipartite n)).marginalA.matrix.PosDef := by
-  rw [Channel.hypothesisTestingOutputState_tensorPowerBipartite]
-  exact State.tensorPowerBipartite_marginalA_posDef
+      (psi.tensorPowerBipartite n)).traceRight.m.PosDef := by
+  rw [CPTPOp.hypothesisTestingOutputState_tensorPowerBipartite]
+  exact MState.tensorPowerBipartite_traceRight_posDef
     (N.hypothesisTestingOutputState psi) hR n
 
-theorem hypothesisTestingOutputState_tensorPowerBipartite_marginalB_posDef
-    (N : Channel a b) (psi : PureVector (Prod a a))
-    (hB : (N.hypothesisTestingOutputState psi).marginalB.matrix.PosDef) (n : Nat) :
+theorem hypothesisTestingOutputState_tensorPowerBipartite_traceLeft_posDef
+    (N : CPTPMap a b) (psi : Ket (a × a))
+    (hB : (N.hypothesisTestingOutputState psi).traceLeft.m.PosDef) (n : ℕ) :
     ((N.tensorPower n).hypothesisTestingOutputState
-      (psi.tensorPowerBipartite n)).marginalB.matrix.PosDef := by
-  rw [Channel.hypothesisTestingOutputState_tensorPowerBipartite]
-  exact State.tensorPowerBipartite_marginalB_posDef
+      (psi.tensorPowerBipartite n)).traceLeft.m.PosDef := by
+  rw [CPTPOp.hypothesisTestingOutputState_tensorPowerBipartite]
+  exact MState.tensorPowerBipartite_traceLeft_posDef
     (N.hypothesisTestingOutputState psi) hB n
 
 theorem inputBarPetzRenyiMutualInformation_tensorPowerBipartite
-    (N : Channel a b) (psi : PureVector (Prod a a))
-    (homega : (N.hypothesisTestingOutputState psi).matrix.PosDef)
-    (hR : (N.hypothesisTestingOutputState psi).marginalA.matrix.PosDef)
-    (hB : (N.hypothesisTestingOutputState psi).marginalB.matrix.PosDef)
+    (N : CPTPMap a b) (psi : Ket (a × a))
+    (homega : (N.hypothesisTestingOutputState psi).m.PosDef)
+    (hR : (N.hypothesisTestingOutputState psi).traceRight.m.PosDef)
+    (hB : (N.hypothesisTestingOutputState psi).traceLeft.m.PosDef)
     (alphaR : ℝ) (halpha_pos : 0 < alphaR) (halpha_ne_one : alphaR ≠ 1)
-    (n : Nat) :
+    (n : ℕ) :
     (N.tensorPower n).inputBarPetzRenyiMutualInformation
         (psi.tensorPowerBipartite n)
         (N.hypothesisTestingOutputState_tensorPowerBipartite_posDef
           psi homega n)
-        (N.hypothesisTestingOutputState_tensorPowerBipartite_marginalA_posDef
+        (N.hypothesisTestingOutputState_tensorPowerBipartite_traceRight_posDef
           psi hR n)
-        (N.hypothesisTestingOutputState_tensorPowerBipartite_marginalB_posDef
+        (N.hypothesisTestingOutputState_tensorPowerBipartite_traceLeft_posDef
           psi hB n)
         alphaR halpha_pos halpha_ne_one =
       (n : ℝ) *
         N.inputBarPetzRenyiMutualInformation psi homega hR hB
           alphaR halpha_pos halpha_ne_one := by
-  unfold Channel.inputBarPetzRenyiMutualInformation
+  unfold CPTPOp.inputBarPetzRenyiMutualInformation
   calc
     ((N.tensorPower n).hypothesisTestingOutputState
         (psi.tensorPowerBipartite n)).barPetzRenyiMutualInformation
         _ _ _ alphaR halpha_pos halpha_ne_one =
       (((N.hypothesisTestingOutputState psi).tensorPowerBipartite n).barPetzRenyiMutualInformation
           _ _ _ alphaR halpha_pos halpha_ne_one) := by
-        exact State.barPetzRenyiMutualInformation_congr
-          (Channel.hypothesisTestingOutputState_tensorPowerBipartite N psi n)
+        exact MState.barPetzRenyiMutualInformation_congr
+          (CPTPOp.hypothesisTestingOutputState_tensorPowerBipartite N psi n)
           _ _ _
           ((N.hypothesisTestingOutputState psi).tensorPowerBipartite_posDef homega n)
-          ((N.hypothesisTestingOutputState psi).tensorPowerBipartite_marginalA_posDef hR n)
-          ((N.hypothesisTestingOutputState psi).tensorPowerBipartite_marginalB_posDef hB n)
+          ((N.hypothesisTestingOutputState psi).tensorPowerBipartite_traceRight_posDef hR n)
+          ((N.hypothesisTestingOutputState psi).tensorPowerBipartite_traceLeft_posDef hB n)
           alphaR halpha_pos halpha_ne_one
     _ =
       (n : ℝ) *
         (N.hypothesisTestingOutputState psi).barPetzRenyiMutualInformation
           homega hR hB alphaR halpha_pos halpha_ne_one := by
-        exact State.barPetzRenyiMutualInformation_tensorPowerBipartite
+        exact MState.barPetzRenyiMutualInformation_tensorPowerBipartite
           (N.hypothesisTestingOutputState psi) homega hR hB
           alphaR halpha_pos halpha_ne_one n
 
 theorem barPetzRenyiMutualInformation_tensorPower_lower_bound
-    (N : Channel a b) {n : Nat} (hn : 0 < n)
+    (N : CPTPMap a b) {n : ℕ} (hn : 0 < n)
     {alphaR : ℝ} (halpha_pos : 0 < alphaR) (halpha_lt_one : alphaR < 1)
     (hne :
       (N.barPetzRenyiMutualInformationValueSet alphaR halpha_pos
@@ -452,12 +421,12 @@ theorem barPetzRenyiMutualInformation_tensorPower_lower_bound
       refine ⟨psi.tensorPowerBipartite n,
         N.hypothesisTestingOutputState_tensorPowerBipartite_posDef
           psi homega n,
-        N.hypothesisTestingOutputState_tensorPowerBipartite_marginalA_posDef
+        N.hypothesisTestingOutputState_tensorPowerBipartite_traceRight_posDef
           psi hR n,
-        N.hypothesisTestingOutputState_tensorPowerBipartite_marginalB_posDef
+        N.hypothesisTestingOutputState_tensorPowerBipartite_traceLeft_posDef
           psi hB n,
         ?_⟩
-      exact (Channel.inputBarPetzRenyiMutualInformation_tensorPowerBipartite
+      exact (CPTPOp.inputBarPetzRenyiMutualInformation_tensorPowerBipartite
         N psi homega hR hB alphaR halpha_pos
         (ne_of_lt halpha_lt_one) n).symm
     have hleT :
@@ -472,8 +441,6 @@ theorem barPetzRenyiMutualInformation_tensorPower_lower_bound
     _ = sSup T := by
       field_simp [ne_of_gt hnR]
 
-end Channel
+end CPTPOp
 
 end
-
-end QIT

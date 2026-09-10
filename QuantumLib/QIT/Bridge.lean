@@ -3,33 +3,26 @@ Copyright (c) 2026 Alex Meiburg. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Alex Meiburg
 -/
-import QuantumLib.QIT.Bridge.Channel
-import QuantumLib.QIT.Bridge.Entropy
-import QuantumLib.QIT.Bridge.Map
-import QuantumLib.QIT.Bridge.Measurement
-import QuantumLib.QIT.Bridge.Pure
-import QuantumLib.QIT.Bridge.State
+
+module
+
+public import QuantumLib.QIT.Bridge.Entropy
 
 /-!
 # The bridge between Lean-QIT and the rest of QuantumLib
 
-Lean-QIT builds its own tower of quantum information objects on top of Mathlib: `QIT.CMatrix`,
-`QIT.MatrixMap`, `QIT.State`, `QIT.Channel`, `QIT.PureVector` and `QIT.POVM`. physlib builds a
-parallel tower whose states and channels are operators rather than matrices: `MState`, `CPTPMap`,
-`Ket` and `POVM`. The files gathered here identify the two.
+Lean-QIT arrived with a tower of quantum information objects of its own — states, kets, POVMs,
+channels and the maps between matrix algebras — built on top of Mathlib alongside the one physlib
+already had. The two towers are now one. States are `MState`, kets are `Ket`, measurements are
+`POVM`, channels are `CPTPOp`, and `QIT.MatrixMap a b` is `MatrixMap a b ℂ`, so at the level of
+objects there is nothing left to translate: Lean-QIT's theories of matrix maps, of states, of kets
+and of POVMs are derived from physlib's in `QuantumLib.QIT.Core.Map`, `QuantumLib.QIT.Core.State`,
+`QuantumLib.QIT.Core.Pure` and `QuantumLib.QIT.Core.Measurement`, and the operations agree on the
+nose — taking products, tracing out a factor, relabelling, applying and composing channels, forming
+the rank-one state of a ket, and measuring.
 
-At the level of maps there is nothing to identify: `QIT.MatrixMap a b` and `MatrixMap a b ℂ` are the
-same type, and their trace-preservation predicates are the same predicate. Their Choi matrices
-differ only in the order of the two index factors. Everything above that level is an equivalence of
-structures carrying the same data:
-
-* `QIT.State.equivMState : QIT.State a ≃ MState a`
-* `QIT.Channel.equivCPTPMap : QIT.Channel a b ≃ CPTPMap a b`
-* `QIT.PureVector.equivKet : QIT.PureVector a ≃ Ket a`
-* `QIT.POVM.equivPOVM : QIT.POVM x a ≃ POVM x a`
-
-The identifications are compatible with the operations each library defines on those types: taking
-products, tracing out a factor, relabelling, applying a channel, composing channels, forming the
-rank-one state of a pure vector, and measuring. Entropies agree once the change of log base is
-accounted for, Lean-QIT counting in bits and physlib in nats.
+What is left is a convention. Lean-QIT counts entropy in bits and physlib in nats, so the two
+disagree by a factor of `Real.log 2`; `QuantumLib.QIT.Bridge.Entropy` records that factor for the
+conditional entropy and the mutual information, and the von Neumann entropies themselves are
+identified where `MState.vonNeumann` is defined.
 -/

@@ -9,7 +9,7 @@ module
 public import QuantumLib.QIT.Coding.EntanglementAssisted.Renyi.Sandwiched.Additivity.WeightedSion
 
 /-!
-# Pure-vector bridge for sandwiched EA additivity
+# Ket bridge for sandwiched EA additivity
 
 This module is part of the Khatri--Wilde sandwiched-Renyi additivity proof
 spine for entanglement-assisted classical communication.
@@ -25,24 +25,15 @@ universe u1 v1 u2 v2
 
 noncomputable section
 
-namespace PureVector
+end
+end QIT
 
-/-- Reindex `(A1B1C1) x (A2B2C2)` into the KW product-purification order
-`((A1 x A2) x (B1 x B2)) x (C1 x C2)`. -/
-def bipartiteProductPurificationEquiv
-    {a1 b1 c1 a2 b2 c2 : Type*} :
-    Prod (Prod (Prod a1 b1) c1) (Prod (Prod a2 b2) c2) ≃
-      Prod (Prod (Prod a1 a2) (Prod b1 b2)) (Prod c1 c2) where
-  toFun x := (((x.1.1.1, x.2.1.1), (x.1.1.2, x.2.1.2)), (x.1.2, x.2.2))
-  invFun x := (((x.1.1.1, x.1.2.1), x.2.1), ((x.1.1.2, x.1.2.2), x.2.2))
-  left_inv := by
-    intro x
-    rcases x with ⟨⟨⟨i1, j1⟩, k1⟩, ⟨⟨i2, j2⟩, k2⟩⟩
-    rfl
-  right_inv := by
-    intro x
-    rcases x with ⟨⟨⟨i1, i2⟩, ⟨j1, j2⟩⟩, ⟨k1, k2⟩⟩
-    rfl
+namespace Ket
+
+noncomputable section
+
+open QIT
+universe u1 v1 u2 v2
 
 /-- Product purification arranged in the KW order
 `((A1 x A2) x (B1 x B2)) x (C1 x C2)`.
@@ -55,23 +46,23 @@ def bipartiteProductPurification
     [Fintype a1] [DecidableEq a1] [Fintype b1] [DecidableEq b1]
     [Fintype c1] [DecidableEq c1] [Fintype a2] [DecidableEq a2]
     [Fintype b2] [DecidableEq b2] [Fintype c2] [DecidableEq c2]
-    (psi : PureVector (Prod (Prod a1 b1) c1))
-    (phi : PureVector (Prod (Prod a2 b2) c2)) :
-    PureVector (Prod (Prod (Prod a1 a2) (Prod b1 b2)) (Prod c1 c2)) :=
-  (psi.prod phi).reindex bipartiteProductPurificationEquiv
+    (psi : Ket ((a1 × b1) × c1))
+    (phi : Ket ((a2 × b2) × c2)) :
+    Ket (((a1 × a2) × (b1 × b2)) × (c1 × c2)) :=
+  (psi.prod phi).reindex prodTripartiteZipEquiv
 
 @[simp]
-theorem bipartiteProductPurification_amp
+theorem bipartiteProductPurification_vec
     {a1 b1 c1 a2 b2 c2 : Type*}
     [Fintype a1] [DecidableEq a1] [Fintype b1] [DecidableEq b1]
     [Fintype c1] [DecidableEq c1] [Fintype a2] [DecidableEq a2]
     [Fintype b2] [DecidableEq b2] [Fintype c2] [DecidableEq c2]
-    (psi : PureVector (Prod (Prod a1 b1) c1))
-    (phi : PureVector (Prod (Prod a2 b2) c2))
-    (p : Prod (Prod (Prod a1 a2) (Prod b1 b2)) (Prod c1 c2)) :
-    (bipartiteProductPurification psi phi).amp p =
-      psi.amp ((p.1.1.1, p.1.2.1), p.2.1) *
-        phi.amp ((p.1.1.2, p.1.2.2), p.2.2) :=
+    (psi : Ket ((a1 × b1) × c1))
+    (phi : Ket ((a2 × b2) × c2))
+    (p : ((a1 × a2) × (b1 × b2)) × (c1 × c2)) :
+    (bipartiteProductPurification psi phi).vec p =
+      psi.vec ((p.1.1.1, p.1.2.1), p.2.1) *
+        phi.vec ((p.1.1.2, p.1.2.2), p.2.2) :=
   rfl
 
 /-- Definition-level bridge from the source common bracket to the raw matrix
@@ -80,10 +71,10 @@ theorem upwardRenyiDualityCommonBracket_re_eq_abcSidePowerTraceRe
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (ψ : PureVector (Prod (Prod a b) c)) (σB : State b) (τC : State c)
+    (ψ : Ket ((a × b) × c)) (σB : MState b) (τC : MState c)
     (alphaPrime : ℝ) :
     (ψ.upwardRenyiDualityCommonBracket σB τC alphaPrime).re =
-      State.abcSidePowerTraceRe (a := a) ψ.state.matrix σB.matrix τC.matrix
+      MState.abcSidePowerTraceRe (a := a) ψ.state.m σB.m τC.m
         alphaPrime := by
   rfl
 
@@ -93,41 +84,41 @@ def sandwichedMutualInformationSionBracketRe
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (σB : State b) (τC : State c) (alpha : ℝ) : ℝ :=
-  State.abcWeightedSidePowerTraceRe
-    (CFC.rpow rhoA.matrix ((1 - alpha) / alpha))
-    ψ.state.matrix σB.matrix τC.matrix ((alpha - 1) / alpha)
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (σB : MState b) (τC : MState c) (alpha : ℝ) : ℝ :=
+  MState.abcWeightedSidePowerTraceRe
+    (CFC.rpow rhoA.m ((1 - alpha) / alpha))
+    ψ.state.m σB.m τC.m ((alpha - 1) / alpha)
 
 /-- The KW sandwiched mutual-information Sion bracket is nonnegative. -/
 theorem sandwichedMutualInformationSionBracketRe_nonneg
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (σB : State b) (τC : State c) (alpha : ℝ) :
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (σB : MState b) (τC : MState c) (alpha : ℝ) :
     0 ≤ sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha := by
   unfold sandwichedMutualInformationSionBracketRe
-  exact State.abcWeightedSidePowerTraceRe_nonneg
+  exact MState.abcWeightedSidePowerTraceRe_nonneg
     (cMatrix_rpow_posSemidef
-      (A := rhoA.matrix) (s := (1 - alpha) / alpha) rhoA.pos)
-    ψ.state.pos σB.pos τC.pos ((alpha - 1) / alpha)
+      (A := rhoA.m) (s := (1 - alpha) / alpha) rhoA.psd)
+    ψ.state.psd σB.psd τC.psd ((alpha - 1) / alpha)
 
 /-- Definition-level source form of the KW fixed-`rho_A` Sion bracket. -/
 theorem sandwichedMutualInformationSionBracketRe_eq_source
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (σB : State b) (τC : State c) (alpha : ℝ) :
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (σB : MState b) (τC : MState c) (alpha : ℝ) :
     sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha =
       ((Matrix.kronecker
           (Matrix.kronecker
-            (CFC.rpow rhoA.matrix ((1 - alpha) / alpha))
-            (CFC.rpow σB.matrix ((1 - alpha) / alpha)))
-          (CFC.rpow τC.matrix ((alpha - 1) / alpha)) *
-        ψ.state.matrix).trace).re := by
-  unfold sandwichedMutualInformationSionBracketRe State.abcWeightedSidePowerTraceRe
+            (CFC.rpow rhoA.m ((1 - alpha) / alpha))
+            (CFC.rpow σB.m ((1 - alpha) / alpha)))
+          (CFC.rpow τC.m ((alpha - 1) / alpha)) *
+        ψ.state.m).trace).re := by
+  unfold sandwichedMutualInformationSionBracketRe MState.abcWeightedSidePowerTraceRe
   have hsigma_exp : -((alpha - 1) / alpha) = (1 - alpha) / alpha := by
     ring
   rw [hsigma_exp]
@@ -139,41 +130,41 @@ def sandwichedMutualInformationACTraceMatrix
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (τC : State c) (alpha : ℝ) : CMatrix b :=
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (τC : MState c) (alpha : ℝ) : CMatrix b :=
   fun j j' =>
     ∑ i : a, ∑ k : c,
       ((Matrix.kronecker
           (Matrix.kronecker
-            (CFC.rpow rhoA.matrix ((1 - alpha) / alpha))
+            (CFC.rpow rhoA.m ((1 - alpha) / alpha))
             (1 : CMatrix b))
-          (CFC.rpow τC.matrix ((alpha - 1) / alpha)) *
-        ψ.state.matrix) ((i, j), k) ((i, j'), k))
+          (CFC.rpow τC.m ((alpha - 1) / alpha)) *
+        ψ.state.m) ((i, j), k) ((i, j'), k))
 
 /-- The `AC`-side weight from KW `EA_capacity.tex:2028-2035`, after
 grouping the traced systems together. -/
 def sandwichedMutualInformationACWeight
     {a : Type u1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype c] [DecidableEq c]
-    (rhoA : State a) (τC : State c) (alpha : ℝ) : CMatrix (Prod a c) :=
+    (rhoA : MState a) (τC : MState c) (alpha : ℝ) : CMatrix (a × c) :=
   Matrix.kronecker
-    (CFC.rpow rhoA.matrix ((1 - alpha) / alpha))
-    (CFC.rpow τC.matrix ((alpha - 1) / alpha))
+    (CFC.rpow rhoA.m ((1 - alpha) / alpha))
+    (CFC.rpow τC.m ((alpha - 1) / alpha))
 
 /-- Coordinate form of the KW trace-out-`AC` matrix. -/
 theorem sandwichedMutualInformationACTraceMatrix_apply
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (τC : State c) (alpha : ℝ) (j j' : b) :
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (τC : MState c) (alpha : ℝ) (j j' : b) :
     sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha j j' =
       ∑ i : a, ∑ k : c, ∑ i' : a, ∑ k' : c,
         sandwichedMutualInformationACWeight rhoA τC alpha (i, k) (i', k') *
-          ψ.amp ((i', j), k') * star (ψ.amp ((i, j'), k)) := by
+          ψ.vec ((i', j), k') * star (ψ.vec ((i, j'), k)) := by
   simp [sandwichedMutualInformationACTraceMatrix, sandwichedMutualInformationACWeight,
     Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
-    PureVector.state_matrix, rankOneMatrix_apply, Fintype.sum_prod_type, mul_assoc]
+    Ket.state_matrix, rankOneMatrix_apply, Fintype.sum_prod_type, mul_assoc]
 
 /-- The `AC`-grouped amplitude obtained by applying the square-root of the
 KW `AC` weight and leaving the `B` system untouched.  Its rank-one matrix is
@@ -183,33 +174,33 @@ def sandwichedMutualInformationACWeightedAmp
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (τC : State c) (alpha : ℝ) : Prod (Prod a c) b → ℂ :=
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (τC : MState c) (alpha : ℝ) : (a × c) × b → ℂ :=
   Matrix.mulVec
     (Matrix.kronecker
       (CFC.sqrt (sandwichedMutualInformationACWeight rhoA τC alpha))
       (1 : CMatrix b))
-    (fun p : Prod (Prod a c) b => ψ.amp ((p.1.1, p.2), p.1.2))
+    (fun p : (a × c) × b => ψ.vec ((p.1.1, p.2), p.1.2))
 
 /-- The KW `AC` weight is positive semidefinite. -/
 theorem sandwichedMutualInformationACWeight_posSemidef
     {a : Type u1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype c] [DecidableEq c]
-    (rhoA : State a) (τC : State c) (alpha : ℝ) :
+    (rhoA : MState a) (τC : MState c) (alpha : ℝ) :
     (sandwichedMutualInformationACWeight rhoA τC alpha).PosSemidef := by
   exact
     (cMatrix_rpow_posSemidef
-        (A := rhoA.matrix) (s := (1 - alpha) / alpha) rhoA.pos).kronecker
+        (A := rhoA.m) (s := (1 - alpha) / alpha) rhoA.psd).kronecker
       (cMatrix_rpow_posSemidef
-        (A := τC.matrix) (s := (alpha - 1) / alpha) τC.pos)
+        (A := τC.m) (s := (alpha - 1) / alpha) τC.psd)
 
 /-- The KW `AC` weight is positive definite when both side weights are full
 rank. -/
 theorem sandwichedMutualInformationACWeight_posDef
     {a : Type u1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype c] [DecidableEq c]
-    (rhoA : State a) (τC : State c)
-    (hrhoA : rhoA.matrix.PosDef) (hτC : τC.matrix.PosDef) (alpha : ℝ) :
+    (rhoA : MState a) (τC : MState c)
+    (hrhoA : rhoA.m.PosDef) (hτC : τC.m.PosDef) (alpha : ℝ) :
     (sandwichedMutualInformationACWeight rhoA τC alpha).PosDef := by
   exact
     (cMatrix_rpow_posDef_of_posDef hrhoA ((1 - alpha) / alpha)).kronecker
@@ -219,7 +210,7 @@ theorem sandwichedMutualInformationACWeight_posDef
 theorem sandwichedMutualInformationACWeight_sqrt_mul_self
     {a : Type u1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype c] [DecidableEq c]
-    (rhoA : State a) (τC : State c) (alpha : ℝ) :
+    (rhoA : MState a) (τC : MState c) (alpha : ℝ) :
     CFC.sqrt (sandwichedMutualInformationACWeight rhoA τC alpha) *
         CFC.sqrt (sandwichedMutualInformationACWeight rhoA τC alpha) =
       sandwichedMutualInformationACWeight rhoA τC alpha := by
@@ -230,7 +221,7 @@ theorem sandwichedMutualInformationACWeight_sqrt_mul_self
 theorem sandwichedMutualInformationACWeight_sqrt_isHermitian
     {a : Type u1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype c] [DecidableEq c]
-    (rhoA : State a) (τC : State c) (alpha : ℝ) :
+    (rhoA : MState a) (τC : MState c) (alpha : ℝ) :
     (CFC.sqrt (sandwichedMutualInformationACWeight rhoA τC alpha)).IsHermitian := by
   exact (Matrix.nonneg_iff_posSemidef.mp
     (CFC.sqrt_nonneg (sandwichedMutualInformationACWeight rhoA τC alpha))).isHermitian
@@ -239,8 +230,8 @@ theorem sandwichedMutualInformationACWeight_sqrt_isHermitian
 theorem sandwichedMutualInformationACWeight_sqrt_isUnit_posDef
     {a : Type u1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype c] [DecidableEq c]
-    (rhoA : State a) (τC : State c)
-    (hrhoA : rhoA.matrix.PosDef) (hτC : τC.matrix.PosDef) (alpha : ℝ) :
+    (rhoA : MState a) (τC : MState c)
+    (hrhoA : rhoA.m.PosDef) (hτC : τC.m.PosDef) (alpha : ℝ) :
     IsUnit (CFC.sqrt (sandwichedMutualInformationACWeight rhoA τC alpha)) := by
   have hW : (sandwichedMutualInformationACWeight rhoA τC alpha).PosDef :=
     sandwichedMutualInformationACWeight_posDef rhoA τC hrhoA hτC alpha
@@ -256,15 +247,15 @@ theorem sandwichedMutualInformationACWeightedAmp_rankOne_posSemidef
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (τC : State c) (alpha : ℝ) :
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (τC : MState c) (alpha : ℝ) :
     (rankOneMatrix
       (sandwichedMutualInformationACWeightedAmp rhoA ψ τC alpha)).PosSemidef :=
   rankOneMatrix_pos (sandwichedMutualInformationACWeightedAmp rhoA ψ τC alpha)
 
 /-- A rank-one kernel is zero exactly when its generating vector is zero. -/
 private theorem rankOneMatrix_eq_zero_iff
-    {d : Type*} (v : d → Complex) :
+    {d : Type*} (v : d → ℂ) :
     rankOneMatrix v = 0 ↔ v = 0 := by
   constructor
   · intro h
@@ -276,21 +267,21 @@ private theorem rankOneMatrix_eq_zero_iff
     ext i j
     simp [rankOneMatrix_apply, h]
 
-/-- Repartitioning a normalized `ABC` pure vector as an `ACB` amplitude does not
+/-- Repartitioning a normalized `ABC` ket as an `ACB` amplitude does not
 make it zero. -/
-private theorem pureVector_acb_amp_ne_zero
+private theorem ket_acb_amp_ne_zero
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (ψ : PureVector (Prod (Prod a b) c)) :
-    (fun p : Prod (Prod a c) b => ψ.amp ((p.1.1, p.2), p.1.2)) ≠ 0 := by
+    (ψ : Ket ((a × b) × c)) :
+    (fun p : (a × c) × b => ψ.vec ((p.1.1, p.2), p.1.2)) ≠ 0 := by
   intro hzero
-  have hamp_zero : ψ.amp = 0 := by
+  have hamp_zero : ψ.vec = 0 := by
     funext x
     rcases x with ⟨⟨i, j⟩, k⟩
     have hentry := congrFun hzero ((i, k), j)
     simpa using hentry
-  have htrace_zero : (rankOneMatrix ψ.amp).trace = 0 := by
+  have htrace_zero : (rankOneMatrix ψ.vec).trace = 0 := by
     rw [hamp_zero]
     simp [rankOneMatrix]
   rw [ψ.trace_rankOne_eq_one] at htrace_zero
@@ -302,14 +293,14 @@ theorem sandwichedMutualInformationACWeightedAmp_ne_zero_posDef
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (τC : State c) (hrhoA : rhoA.matrix.PosDef) (hτC : τC.matrix.PosDef)
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (τC : MState c) (hrhoA : rhoA.m.PosDef) (hτC : τC.m.PosDef)
     (alpha : ℝ) :
     sandwichedMutualInformationACWeightedAmp rhoA ψ τC alpha ≠ 0 := by
-  let S : CMatrix (Prod a c) := CFC.sqrt (sandwichedMutualInformationACWeight rhoA τC alpha)
-  let psiACB : Prod (Prod a c) b → Complex := fun p => ψ.amp ((p.1.1, p.2), p.1.2)
+  let S : CMatrix (a × c) := CFC.sqrt (sandwichedMutualInformationACWeight rhoA τC alpha)
+  let psiACB : (a × c) × b → ℂ := fun p => ψ.vec ((p.1.1, p.2), p.1.2)
   have hpsi : psiACB ≠ 0 := by
-    simpa [psiACB] using pureVector_acb_amp_ne_zero ψ
+    simpa [psiACB] using ket_acb_amp_ne_zero ψ
   have hS : IsUnit S := by
     simpa [S] using
       sandwichedMutualInformationACWeight_sqrt_isUnit_posDef rhoA τC hrhoA hτC alpha
@@ -330,70 +321,39 @@ theorem sandwichedMutualInformationACWeightedAmp_apply
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (τC : State c) (alpha : ℝ) (i : a) (k : c) (j : b) :
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (τC : MState c) (alpha : ℝ) (i : a) (k : c) (j : b) :
     sandwichedMutualInformationACWeightedAmp rhoA ψ τC alpha ((i, k), j) =
       ∑ i' : a, ∑ k' : c,
         (CFC.sqrt (sandwichedMutualInformationACWeight rhoA τC alpha)) (i, k) (i', k') *
-          ψ.amp ((i', j), k') := by
+          ψ.vec ((i', j), k') := by
   unfold sandwichedMutualInformationACWeightedAmp
   simp only [Matrix.mulVec, dotProduct, Matrix.kronecker, Matrix.kroneckerMap_apply,
     Matrix.one_apply]
   simp [Fintype.sum_prod_type]
 
-/-- Moving a Hermitian square-root weight from a rank-one vector back to the
-left-hand weight before tracing out the weighted system. -/
-theorem partialTraceA_rankOne_kron_left_mulVec_eq_weight_mul
-    {d : Type u1} {b : Type v1} [Fintype d] [DecidableEq d]
-    [Fintype b] [DecidableEq b]
-    (S : CMatrix d) (hS : S.IsHermitian) (psi : Prod d b → ℂ) :
-    partialTraceA (a := d) (b := b)
-        (rankOneMatrix (Matrix.mulVec (Matrix.kronecker S (1 : CMatrix b)) psi)) =
-      partialTraceA (a := d) (b := b)
-        (Matrix.kronecker (S * S) (1 : CMatrix b) * rankOneMatrix psi) := by
-  ext j j'
-  have hstar : ∀ x y : d, star (S x y) = S y x := by
-    intro x y
-    simpa [Matrix.conjTranspose_apply] using congrFun (congrFun hS.eq y) x
-  have hstar' : ∀ x y : d, (starRingEnd ℂ) (S x y) = S y x := hstar
-  simp [partialTraceA, rankOneMatrix_apply, Matrix.mulVec, dotProduct, Matrix.mul_apply,
-    Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply, Fintype.sum_prod_type,
-    Finset.mul_sum, Finset.sum_mul, mul_assoc]
-  simp_rw [hstar']
-  conv_lhs =>
-    rw [Finset.sum_comm]
-    enter [2, z]
-    rw [Finset.sum_comm]
-  refine Finset.sum_congr rfl ?_
-  intro x _
-  refine Finset.sum_congr rfl ?_
-  intro x_1 _
-  refine Finset.sum_congr rfl ?_
-  intro x_2 _
-  ring_nf
-
 /-- The KW trace-out-`AC` matrix is the partial trace of the square-root
 weighted rank-one vector.  This provides the PSD representative needed for the
 reverse-Holder variational formula in `EA_capacity.tex:2032-2035`. -/
-theorem partialTraceA_rankOne_ACWeightedAmp_eq_ACTraceMatrix
+theorem traceLeft_rankOne_ACWeightedAmp_eq_ACTraceMatrix
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (τC : State c) (alpha : ℝ) :
-    partialTraceA (a := Prod a c) (b := b)
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (τC : MState c) (alpha : ℝ) :
+    Matrix.traceLeft
         (rankOneMatrix
           (sandwichedMutualInformationACWeightedAmp rhoA ψ τC alpha)) =
       sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha := by
-  let S : CMatrix (Prod a c) :=
+  let S : CMatrix (a × c) :=
     CFC.sqrt (sandwichedMutualInformationACWeight rhoA τC alpha)
-  let psiACB : Prod (Prod a c) b → ℂ := fun p => ψ.amp ((p.1.1, p.2), p.1.2)
+  let psiACB : (a × c) × b → ℂ := fun p => ψ.vec ((p.1.1, p.2), p.1.2)
   have hmove :
-      partialTraceA (a := Prod a c) (b := b)
+      Matrix.traceLeft
           (rankOneMatrix (Matrix.mulVec (Matrix.kronecker S (1 : CMatrix b)) psiACB)) =
-        partialTraceA (a := Prod a c) (b := b)
+        Matrix.traceLeft
           (Matrix.kronecker (S * S) (1 : CMatrix b) * rankOneMatrix psiACB) := by
-    exact partialTraceA_rankOne_kron_left_mulVec_eq_weight_mul S
+    exact traceLeft_rankOne_kron_left_mulVec_eq_weight_mul S
       (by
         simpa [S] using
           (sandwichedMutualInformationACWeight_sqrt_isHermitian rhoA τC alpha))
@@ -403,25 +363,25 @@ theorem partialTraceA_rankOne_ACWeightedAmp_eq_ACTraceMatrix
     simpa [S] using
       (sandwichedMutualInformationACWeight_sqrt_mul_self rhoA τC alpha)
   calc
-    partialTraceA (a := Prod a c) (b := b)
+    Matrix.traceLeft
         (rankOneMatrix
           (sandwichedMutualInformationACWeightedAmp rhoA ψ τC alpha))
         =
-      partialTraceA (a := Prod a c) (b := b)
+      Matrix.traceLeft
           (rankOneMatrix (Matrix.mulVec (Matrix.kronecker S (1 : CMatrix b)) psiACB)) := by
         simp [sandwichedMutualInformationACWeightedAmp, S, psiACB]
     _ =
-      partialTraceA (a := Prod a c) (b := b)
+      Matrix.traceLeft
         (Matrix.kronecker (S * S) (1 : CMatrix b) * rankOneMatrix psiACB) := hmove
     _ =
-      partialTraceA (a := Prod a c) (b := b)
+      Matrix.traceLeft
         (Matrix.kronecker (sandwichedMutualInformationACWeight rhoA τC alpha)
           (1 : CMatrix b) * rankOneMatrix psiACB) := by
         rw [hsqrt]
     _ = sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha := by
         ext j j'
         rw [sandwichedMutualInformationACTraceMatrix_apply]
-        simp [partialTraceA, rankOneMatrix_apply, Matrix.mul_apply, Matrix.kronecker,
+        simp [Matrix.traceLeft, rankOneMatrix_apply, Matrix.mul_apply, Matrix.kronecker,
           Matrix.kroneckerMap_apply, Matrix.one_apply, Fintype.sum_prod_type,
           mul_assoc, psiACB]
 
@@ -431,16 +391,16 @@ theorem sandwichedMutualInformationACTraceMatrix_posSemidef
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (τC : State c) (alpha : ℝ) :
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (τC : MState c) (alpha : ℝ) :
     (sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha).PosSemidef := by
   have hpt :
-      (partialTraceA (a := Prod a c) (b := b)
+      (Matrix.traceLeft
         (rankOneMatrix
           (sandwichedMutualInformationACWeightedAmp rhoA ψ τC alpha))).PosSemidef :=
-    partialTraceA_posSemidef
+    traceLeft_posSemidef
       (sandwichedMutualInformationACWeightedAmp_rankOne_posSemidef rhoA ψ τC alpha)
-  have heq := partialTraceA_rankOne_ACWeightedAmp_eq_ACTraceMatrix rhoA ψ τC alpha
+  have heq := traceLeft_rankOne_ACWeightedAmp_eq_ACTraceMatrix rhoA ψ τC alpha
   simpa [heq] using hpt
 
 /-- Full-rank side weights make the KW `AC` trace matrix nonzero. -/
@@ -448,11 +408,11 @@ theorem sandwichedMutualInformationACTraceMatrix_ne_zero_posDef
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (τC : State c) (hrhoA : rhoA.matrix.PosDef) (hτC : τC.matrix.PosDef)
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (τC : MState c) (hrhoA : rhoA.m.PosDef) (hτC : τC.m.PosDef)
     (alpha : ℝ) :
     sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha ≠ 0 := by
-  let v : Prod (Prod a c) b → Complex :=
+  let v : (a × c) × b → ℂ :=
     sandwichedMutualInformationACWeightedAmp rhoA ψ τC alpha
   have hvne : v ≠ 0 := by
     simpa [v] using
@@ -460,19 +420,19 @@ theorem sandwichedMutualInformationACTraceMatrix_ne_zero_posDef
         rhoA ψ τC hrhoA hτC alpha
   intro hzero
   have hptzero :
-      partialTraceA (a := Prod a c) (b := b) (rankOneMatrix v) = 0 := by
-    rw [partialTraceA_rankOne_ACWeightedAmp_eq_ACTraceMatrix]
+      Matrix.traceLeft (rankOneMatrix v) = 0 := by
+    rw [traceLeft_rankOne_ACWeightedAmp_eq_ACTraceMatrix]
     simpa [v] using hzero
   have htrace_zero : (rankOneMatrix v).trace = 0 := by
     have htrace := congrArg Matrix.trace hptzero
-    simpa [partialTraceA_trace] using htrace
+    simpa [Matrix.traceLeft_trace] using htrace
   have hrank_zero : rankOneMatrix v = 0 :=
     (Matrix.PosSemidef.trace_eq_zero_iff (rankOneMatrix_pos v)).mp htrace_zero
   exact hvne ((rankOneMatrix_eq_zero_iff v).mp hrank_zero)
 
 /-- Positive Schatten order `alpha / (2 * alpha - 1)` used by the high-alpha
 alternate-expression route. -/
-def sandwichedAlternateSchattenOrder {alpha : Real} (halpha : 1 < alpha) :
+def sandwichedAlternateSchattenOrder {alpha : ℝ} (halpha : 1 < alpha) :
     SchattenOrder := by
   refine ⟨alpha / (2 * alpha - 1), ?_⟩
   have halpha_pos : 0 < alpha := lt_trans zero_lt_one halpha
@@ -480,9 +440,9 @@ def sandwichedAlternateSchattenOrder {alpha : Real} (halpha : 1 < alpha) :
   exact div_pos halpha_pos hden_pos
 
 @[simp]
-theorem sandwichedAlternateSchattenOrder_coe {alpha : Real}
+theorem sandwichedAlternateSchattenOrder_coe {alpha : ℝ}
     (halpha : 1 < alpha) :
-    (sandwichedAlternateSchattenOrder halpha : Real) =
+    (sandwichedAlternateSchattenOrder halpha : ℝ) =
       alpha / (2 * alpha - 1) := rfl
 
 /-- Full-rank side weights make the KW `AC` trace-matrix Schatten norm strictly
@@ -491,8 +451,8 @@ theorem psdSchattenPNorm_ACTraceMatrix_pos_posDef
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (τC : State c) (hrhoA : rhoA.matrix.PosDef) (hτC : τC.matrix.PosDef)
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (τC : MState c) (hrhoA : rhoA.m.PosDef) (hτC : τC.m.PosDef)
     {alpha : ℝ} (_halpha : 1 < alpha) :
     0 <
       psdSchattenPNorm
@@ -507,7 +467,7 @@ theorem psdSchattenPNorm_ACTraceMatrix_pos_posDef
 
 private theorem sum_b_a_c_a_b_c_reorder
     {aa bb cc : Type*} [Fintype aa] [Fintype bb] [Fintype cc]
-    (f : bb -> aa -> cc -> aa -> bb -> cc -> ℂ) :
+    (f : bb → aa → cc → aa → bb → cc → ℂ) :
     (∑ j : bb, ∑ i : aa, ∑ k : cc, ∑ i' : aa, ∑ j' : bb, ∑ k' : cc,
         f j i k i' j' k') =
       ∑ k : cc, ∑ i : aa, ∑ j : bb, ∑ i' : aa, ∑ j' : bb, ∑ k' : cc,
@@ -554,10 +514,10 @@ theorem sandwichedMutualInformationSionBracketRe_eq_trace_sigma_mul_ACTraceMatri
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (σB : State b) (τC : State c) (alpha : ℝ) :
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (σB : MState b) (τC : MState c) (alpha : ℝ) :
     sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha =
-      ((CFC.rpow σB.matrix ((1 - alpha) / alpha) *
+      ((CFC.rpow σB.m ((1 - alpha) / alpha) *
         sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha).trace).re := by
   rw [sandwichedMutualInformationSionBracketRe_eq_source]
   simp only [sandwichedMutualInformationACTraceMatrix, Matrix.trace, Matrix.diag,
@@ -606,79 +566,24 @@ theorem sandwichedMutualInformationSionBracketRe_eq_trace_ACTraceMatrix_mul_sigm
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (σB : State b) (τC : State c) (alpha : ℝ) :
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (σB : MState b) (τC : MState c) (alpha : ℝ) :
     sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha =
       ((sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha *
-        CFC.rpow σB.matrix ((1 - alpha) / alpha)).trace).re := by
+        CFC.rpow σB.m ((1 - alpha) / alpha)).trace).re := by
   rw [sandwichedMutualInformationSionBracketRe_eq_trace_sigma_mul_ACTraceMatrix]
   exact congrArg Complex.re (Matrix.trace_mul_comm
-    (CFC.rpow σB.matrix ((1 - alpha) / alpha))
+    (CFC.rpow σB.m ((1 - alpha) / alpha))
     (sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha))
 
 /-- The `AB`-side weight in the proof of KW `eq-sand_rel_mut_inf_alt`. -/
 def sandwichedMutualInformationABWeight
     {a : Type u1} {b : Type v1}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
-    (rhoA : State a) (σB : State b) (alpha : ℝ) : CMatrix (Prod a b) :=
+    (rhoA : MState a) (σB : MState b) (alpha : ℝ) : CMatrix (a × b) :=
   Matrix.kronecker
-    (CFC.rpow rhoA.matrix ((1 - alpha) / (2 * alpha)))
-    (CFC.rpow σB.matrix ((1 - alpha) / (2 * alpha)))
-
-/-- Coordinate form of a left tensor factor acting on a bipartite vector. -/
-theorem kronecker_left_one_mulVec_apply
-    {d : Type u1} {c : Type u2} [Fintype d] [DecidableEq d]
-    [Fintype c] [DecidableEq c]
-    (W : CMatrix d) (psi : Prod d c → ℂ) (i : d) (k : c) :
-    (Matrix.kronecker W (1 : CMatrix c)).mulVec psi (i, k) =
-      W.mulVec (fun j => psi (j, k)) i := by
-  simp only [Matrix.mulVec, dotProduct, Matrix.kronecker]
-  rw [← Finset.univ_product_univ, Finset.sum_product]
-  simp [Matrix.one_apply]
-
-/-- Applying `W ⊗ I` to a bipartite rank-one vector and tracing out the
-second system sandwiches the original first-system marginal by `W`.
-
-This is the finite-sum kernel of the weighted-purification identity in
-KW `EA_capacity.tex:1989-1996`. -/
-theorem partialTraceB_rankOne_kron_left_mulVec_eq
-    {d : Type u1} {c : Type u2} [Fintype d] [DecidableEq d]
-    [Fintype c] [DecidableEq c]
-    (W : CMatrix d) (psi : Prod d c → ℂ) :
-    partialTraceB (a := d) (b := c)
-        (rankOneMatrix (Matrix.mulVec (Matrix.kronecker W (1 : CMatrix c)) psi)) =
-      W * partialTraceB (a := d) (b := c) (rankOneMatrix psi) *
-        Matrix.conjTranspose W := by
-  ext x y
-  have hmulVec :
-      Matrix.mulVec (Matrix.kronecker W (1 : CMatrix c)) psi =
-        fun p : Prod d c => W.mulVec (fun i => psi (i, p.2)) p.1 := by
-    ext p
-    exact kronecker_left_one_mulVec_apply W psi p.1 p.2
-  rw [hmulVec]
-  let F : c → d → d → ℂ := fun k i j =>
-    W x i * (psi (i, k) * (star (W y j) * star (psi (j, k))))
-  calc
-    partialTraceB (a := d) (b := c)
-        (rankOneMatrix (fun p : Prod d c => W.mulVec (fun i => psi (i, p.2)) p.1)) x y
-        =
-      ∑ k : c, ∑ j : d, ∑ i : d, F k i j := by
-        simp [F, partialTraceB, rankOneMatrix_apply, Matrix.mulVec, dotProduct,
-          Finset.mul_sum, Finset.sum_mul, mul_assoc]
-    _ = ∑ j : d, ∑ k : c, ∑ i : d, F k i j := by
-        rw [Finset.sum_comm]
-    _ = ∑ j : d, ∑ i : d, ∑ k : c, F k i j := by
-        apply Finset.sum_congr rfl
-        intro j _
-        rw [Finset.sum_comm]
-    _ = ∑ j : d, star (W y j) *
-          ∑ i : d, W x i * ∑ k : c, psi (i, k) * star (psi (j, k)) := by
-        simp [F, Finset.mul_sum, mul_left_comm]
-    _ =
-      (W * partialTraceB (a := d) (b := c) (rankOneMatrix psi) *
-        Matrix.conjTranspose W) x y := by
-        simp [partialTraceB, rankOneMatrix_apply, Matrix.mul_apply,
-          Matrix.conjTranspose_apply, mul_comm]
+    (CFC.rpow rhoA.m ((1 - alpha) / (2 * alpha)))
+    (CFC.rpow σB.m ((1 - alpha) / (2 * alpha)))
 
 /-- The weighted purification vector used in the proof of KW
 `eq-sand_rel_mut_inf_alt`.
@@ -690,52 +595,33 @@ def sandwichedMutualInformationWeightedPurificationAmp
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (σB : State b)
-    (ψ : PureVector (Prod (Prod a b) c)) (alpha : ℝ) :
-    Prod (Prod a b) c → ℂ :=
+    (rhoA : MState a) (σB : MState b)
+    (ψ : Ket ((a × b) × c)) (alpha : ℝ) :
+    (a × b) × c → ℂ :=
   Matrix.mulVec
     (Matrix.kronecker
       (sandwichedMutualInformationABWeight rhoA σB alpha)
       (1 : CMatrix c))
-    ψ.amp
+    ψ.vec
 
 /-- Partial tracing the KW weighted purification over the purifying system
 produces the sandwich of the original `AB` marginal by the source weight.
 
 This is the matrix identity behind KW `EA_capacity.tex:1989-1996`. -/
-theorem partialTraceB_rankOne_weightedPurificationAmp_eq
+theorem traceRight_rankOne_weightedPurificationAmp_eq
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (σB : State b)
-    (ψ : PureVector (Prod (Prod a b) c)) (alpha : ℝ) :
-    partialTraceB (a := Prod a b) (b := c)
+    (rhoA : MState a) (σB : MState b)
+    (ψ : Ket ((a × b) × c)) (alpha : ℝ) :
+    Matrix.traceRight
         (rankOneMatrix
           (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha)) =
       sandwichedMutualInformationABWeight rhoA σB alpha *
-        partialTraceB (a := Prod a b) (b := c) (rankOneMatrix ψ.amp) *
+        Matrix.traceRight (rankOneMatrix ψ.vec) *
         Matrix.conjTranspose (sandwichedMutualInformationABWeight rhoA σB alpha) := by
-  exact partialTraceB_rankOne_kron_left_mulVec_eq
-    (sandwichedMutualInformationABWeight rhoA σB alpha) ψ.amp
-
-private theorem sandwiched_partialTraceA_mul_trace_eq_trace_mul_rightKroneckerOne
-    {d : Type u1} {c : Type u2} [Fintype d] [DecidableEq d] [Fintype c] [DecidableEq c]
-    (X : CMatrix (Prod d c)) (T : CMatrix c) :
-    ((partialTraceA (a := d) (b := c) X) * T).trace =
-      (X * Matrix.kronecker (1 : CMatrix d) T).trace := by
-  rw [← partialTraceA_mul_rightKroneckerOne X T]
-  exact partialTraceA_trace (a := d) (b := c)
-    (X * Matrix.kronecker (1 : CMatrix d) T)
-
-private theorem rankOneMatrix_mulVec_eq_mul_rankOneMatrix_mul_conjTranspose
-    {d : Type u1} [Fintype d] [DecidableEq d] (M : CMatrix d) (v : d → ℂ) :
-    rankOneMatrix (M.mulVec v) = M * rankOneMatrix v * Matrix.conjTranspose M := by
-  rw [rankOneMatrix, rankOneMatrix]
-  rw [Matrix.mul_vecMulVec]
-  rw [Matrix.vecMulVec_mul]
-  congr
-  ext i
-  simp [Matrix.mulVec, Matrix.vecMul, dotProduct, Matrix.conjTranspose, mul_comm]
+  exact traceRight_rankOne_kron_left_mulVec_eq
+    (sandwichedMutualInformationABWeight rhoA σB alpha) ψ.vec
 
 /-- Trace-pairing form of the KW weighted-purification bracket.
 
@@ -743,42 +629,42 @@ This is the cyclic trace/partial-trace bridge in `EA_capacity.tex:2006-2025`:
 after applying the `AB` square weights to the purification, pairing the
 purifying marginal with `tau_C^((alpha-1)/alpha)` is exactly the Sion trace
 bracket on the full-rank side-reference branch. -/
-theorem sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_partialTraceA_mul_tau
+theorem sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_traceLeft_mul_tau
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (σB : State b) (τC : State c)
-    (hrhoA : rhoA.matrix.PosDef) (hσB : σB.matrix.PosDef) (alpha : ℝ) :
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (σB : MState b) (τC : MState c)
+    (hrhoA : rhoA.m.PosDef) (hσB : σB.m.PosDef) (alpha : ℝ) :
     sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha =
-      ((partialTraceA (a := Prod a b) (b := c)
+      ((Matrix.traceLeft
           (rankOneMatrix
             (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha)) *
-        CFC.rpow τC.matrix ((alpha - 1) / alpha)).trace).re := by
+        CFC.rpow τC.m ((alpha - 1) / alpha)).trace).re := by
   let s : ℝ := (1 - alpha) / (2 * alpha)
-  let T : CMatrix c := CFC.rpow τC.matrix ((alpha - 1) / alpha)
-  let Wab : CMatrix (Prod a b) := sandwichedMutualInformationABWeight rhoA σB alpha
-  let W : CMatrix (Prod (Prod a b) c) := Matrix.kronecker Wab (1 : CMatrix c)
-  let K : CMatrix (Prod (Prod a b) c) := Matrix.kronecker (1 : CMatrix (Prod a b)) T
+  let T : CMatrix c := CFC.rpow τC.m ((alpha - 1) / alpha)
+  let Wab : CMatrix (a × b) := sandwichedMutualInformationABWeight rhoA σB alpha
+  let W : CMatrix ((a × b) × c) := Matrix.kronecker Wab (1 : CMatrix c)
+  let K : CMatrix ((a × b) × c) := Matrix.kronecker (1 : CMatrix (a × b)) T
   have hρpow :
-      CFC.rpow rhoA.matrix s * CFC.rpow rhoA.matrix s =
-        CFC.rpow rhoA.matrix ((1 - alpha) / alpha) := by
+      CFC.rpow rhoA.m s * CFC.rpow rhoA.m s =
+        CFC.rpow rhoA.m ((1 - alpha) / alpha) := by
     calc
-      CFC.rpow rhoA.matrix s * CFC.rpow rhoA.matrix s =
-          CFC.rpow rhoA.matrix (s + s) := by
-            exact (CFC.rpow_add (a := rhoA.matrix) (x := s) (y := s) hrhoA.isUnit).symm
-      _ = CFC.rpow rhoA.matrix ((1 - alpha) / alpha) := by
+      CFC.rpow rhoA.m s * CFC.rpow rhoA.m s =
+          CFC.rpow rhoA.m (s + s) := by
+            exact (CFC.rpow_add (a := rhoA.m) (x := s) (y := s) hrhoA.isUnit).symm
+      _ = CFC.rpow rhoA.m ((1 - alpha) / alpha) := by
             congr 1
             simp [s]
             ring
   have hσpow :
-      CFC.rpow σB.matrix s * CFC.rpow σB.matrix s =
-        CFC.rpow σB.matrix ((1 - alpha) / alpha) := by
+      CFC.rpow σB.m s * CFC.rpow σB.m s =
+        CFC.rpow σB.m ((1 - alpha) / alpha) := by
     calc
-      CFC.rpow σB.matrix s * CFC.rpow σB.matrix s =
-          CFC.rpow σB.matrix (s + s) := by
-            exact (CFC.rpow_add (a := σB.matrix) (x := s) (y := s) hσB.isUnit).symm
-      _ = CFC.rpow σB.matrix ((1 - alpha) / alpha) := by
+      CFC.rpow σB.m s * CFC.rpow σB.m s =
+          CFC.rpow σB.m (s + s) := by
+            exact (CFC.rpow_add (a := σB.m) (x := s) (y := s) hσB.isUnit).symm
+      _ = CFC.rpow σB.m ((1 - alpha) / alpha) := by
             congr 1
             simp [s]
             ring
@@ -786,44 +672,44 @@ theorem sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_p
     have hWab : Wab.IsHermitian := by
       unfold Wab sandwichedMutualInformationABWeight
       exact kronecker_isHermitian
-        (CFC.rpow rhoA.matrix s)
-        (CFC.rpow σB.matrix s)
-        (cMatrix_rpow_posSemidef (A := rhoA.matrix) (s := s) rhoA.pos).isHermitian
-        (cMatrix_rpow_posSemidef (A := σB.matrix) (s := s) σB.pos).isHermitian
+        (CFC.rpow rhoA.m s)
+        (CFC.rpow σB.m s)
+        (cMatrix_rpow_posSemidef (A := rhoA.m) (s := s) rhoA.psd).isHermitian
+        (cMatrix_rpow_posSemidef (A := σB.m) (s := s) σB.psd).isHermitian
     unfold W
     exact (kronecker_isHermitian Wab (1 : CMatrix c) hWab (by simp)).eq
   have hWKW :
       W * K * W =
         Matrix.kronecker
           (Matrix.kronecker
-            (CFC.rpow rhoA.matrix ((1 - alpha) / alpha))
-            (CFC.rpow σB.matrix ((1 - alpha) / alpha)))
+            (CFC.rpow rhoA.m ((1 - alpha) / alpha))
+            (CFC.rpow σB.m ((1 - alpha) / alpha)))
           T := by
     have hWK : W * K = Matrix.kronecker Wab T := by
       unfold W K
       simpa using
-        (Matrix.mul_kronecker_mul Wab (1 : CMatrix (Prod a b)) (1 : CMatrix c) T).symm
+        (Matrix.mul_kronecker_mul Wab (1 : CMatrix (a × b)) (1 : CMatrix c) T).symm
     have hWab2 :
         Wab * Wab =
           Matrix.kronecker
-            (CFC.rpow rhoA.matrix ((1 - alpha) / alpha))
-            (CFC.rpow σB.matrix ((1 - alpha) / alpha)) := by
+            (CFC.rpow rhoA.m ((1 - alpha) / alpha))
+            (CFC.rpow σB.m ((1 - alpha) / alpha)) := by
       unfold Wab sandwichedMutualInformationABWeight
-      let R : CMatrix a := CFC.rpow rhoA.matrix ((1 - alpha) / (2 * alpha))
-      let S : CMatrix b := CFC.rpow σB.matrix ((1 - alpha) / (2 * alpha))
+      let R : CMatrix a := CFC.rpow rhoA.m ((1 - alpha) / (2 * alpha))
+      let S : CMatrix b := CFC.rpow σB.m ((1 - alpha) / (2 * alpha))
       have hR :
-          R * R = CFC.rpow rhoA.matrix ((1 - alpha) / alpha) := by
+          R * R = CFC.rpow rhoA.m ((1 - alpha) / alpha) := by
         simpa [R, s, mul_comm] using hρpow
       have hS :
-          S * S = CFC.rpow σB.matrix ((1 - alpha) / alpha) := by
+          S * S = CFC.rpow σB.m ((1 - alpha) / alpha) := by
         simpa [S, s, mul_comm] using hσpow
       calc
         Matrix.kronecker R S * Matrix.kronecker R S =
             Matrix.kronecker (R * R) (S * S) := by
               exact (Matrix.mul_kronecker_mul R R S S).symm
         _ = Matrix.kronecker
-              (CFC.rpow rhoA.matrix ((1 - alpha) / alpha))
-              (CFC.rpow σB.matrix ((1 - alpha) / alpha)) := by
+              (CFC.rpow rhoA.m ((1 - alpha) / alpha))
+              (CFC.rpow σB.m ((1 - alpha) / alpha)) := by
               rw [hR, hS]
     calc
       W * K * W = Matrix.kronecker Wab T * W := by rw [hWK]
@@ -833,27 +719,28 @@ theorem sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_p
             exact (Matrix.mul_kronecker_mul Wab Wab T (1 : CMatrix c)).symm
       _ = Matrix.kronecker
             (Matrix.kronecker
-              (CFC.rpow rhoA.matrix ((1 - alpha) / alpha))
-              (CFC.rpow σB.matrix ((1 - alpha) / alpha)))
+              (CFC.rpow rhoA.m ((1 - alpha) / alpha))
+              (CFC.rpow σB.m ((1 - alpha) / alpha)))
             T := by
             rw [hWab2]
             simp
   have hrank :
       rankOneMatrix
           (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha) =
-        W * rankOneMatrix ψ.amp * W := by
+        W * rankOneMatrix ψ.vec * W := by
     unfold sandwichedMutualInformationWeightedPurificationAmp W Wab
     rw [rankOneMatrix_mulVec_eq_mul_rankOneMatrix_mul_conjTranspose]
     rw [hWstar]
   rw [sandwichedMutualInformationSionBracketRe_eq_source]
-  rw [sandwiched_partialTraceA_mul_trace_eq_trace_mul_rightKroneckerOne]
+  rw [traceLeft_mul_trace_eq_trace_mul_kronecker_one_right,
+    Ket.state_matrix]
   change
     ((Matrix.kronecker
           (Matrix.kronecker
-            (CFC.rpow rhoA.matrix ((1 - alpha) / alpha))
-            (CFC.rpow σB.matrix ((1 - alpha) / alpha)))
+            (CFC.rpow rhoA.m ((1 - alpha) / alpha))
+            (CFC.rpow σB.m ((1 - alpha) / alpha)))
           T *
-        rankOneMatrix ψ.amp).trace).re =
+        rankOneMatrix ψ.vec).trace).re =
       ((rankOneMatrix
           (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha) *
         K).trace).re
@@ -861,48 +748,48 @@ theorem sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_p
   calc
     ((Matrix.kronecker
           (Matrix.kronecker
-            (CFC.rpow rhoA.matrix ((1 - alpha) / alpha))
-            (CFC.rpow σB.matrix ((1 - alpha) / alpha)))
+            (CFC.rpow rhoA.m ((1 - alpha) / alpha))
+            (CFC.rpow σB.m ((1 - alpha) / alpha)))
           T *
-        rankOneMatrix ψ.amp).trace).re =
-        ((W * K * W * rankOneMatrix ψ.amp).trace).re := by rw [hWKW]
-    _ = (((W * rankOneMatrix ψ.amp * W) * K).trace).re := by
+        rankOneMatrix ψ.vec).trace).re =
+        ((W * K * W * rankOneMatrix ψ.vec).trace).re := by rw [hWKW]
+    _ = (((W * rankOneMatrix ψ.vec * W) * K).trace).re := by
           congr 1
           simpa [Matrix.mul_assoc] using
-            Matrix.trace_mul_cycle W K (W * rankOneMatrix ψ.amp)
+            Matrix.trace_mul_cycle W K (W * rankOneMatrix ψ.vec)
 
 /-- Support-convention trace-pairing form of the KW weighted-purification
 bracket.
 
 The older lemma
-`sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_partialTraceA_mul_tau`
+`sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_traceLeft_mul_tau`
 used `CFC.rpow_add` and therefore required `rho_A` to be full rank.  KW
 `EA_capacity.tex:2006-2025` does not impose that hypothesis.  This sibling
 keeps the source statement: only the optimized side state `sigma_B` is
 full-rank, while the fixed `rho_A` is an arbitrary state.  The `rho_A` square
 weight is multiplied using the repository support convention for PSD real
 powers. -/
-theorem sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_partialTraceA_mul_tau_support
+theorem sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_traceLeft_mul_tau_support
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (σB : State b) (τC : State c)
-    (hσB : σB.matrix.PosDef) {alpha : ℝ} (halpha : 1 < alpha) :
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (σB : MState b) (τC : MState c)
+    (hσB : σB.m.PosDef) {alpha : ℝ} (halpha : 1 < alpha) :
     sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha =
-      ((partialTraceA (a := Prod a b) (b := c)
+      ((Matrix.traceLeft
           (rankOneMatrix
             (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha)) *
-        CFC.rpow τC.matrix ((alpha - 1) / alpha)).trace).re := by
+        CFC.rpow τC.m ((alpha - 1) / alpha)).trace).re := by
   let s : ℝ := (1 - alpha) / (2 * alpha)
-  let T : CMatrix c := CFC.rpow τC.matrix ((alpha - 1) / alpha)
-  let Wab : CMatrix (Prod a b) := sandwichedMutualInformationABWeight rhoA σB alpha
-  let W : CMatrix (Prod (Prod a b) c) := Matrix.kronecker Wab (1 : CMatrix c)
-  let K : CMatrix (Prod (Prod a b) c) := Matrix.kronecker (1 : CMatrix (Prod a b)) T
+  let T : CMatrix c := CFC.rpow τC.m ((alpha - 1) / alpha)
+  let Wab : CMatrix (a × b) := sandwichedMutualInformationABWeight rhoA σB alpha
+  let W : CMatrix ((a × b) × c) := Matrix.kronecker Wab (1 : CMatrix c)
+  let K : CMatrix ((a × b) × c) := Matrix.kronecker (1 : CMatrix (a × b)) T
   have hρpow :
-      CFC.rpow rhoA.matrix s * CFC.rpow rhoA.matrix s =
-        CFC.rpow rhoA.matrix ((1 - alpha) / alpha) := by
-    refine cMatrix_rpow_mul_rpow_of_posSemidef_scalar rhoA.pos ?_
+      CFC.rpow rhoA.m s * CFC.rpow rhoA.m s =
+        CFC.rpow rhoA.m ((1 - alpha) / alpha) := by
+    refine cMatrix_rpow_mul_rpow_of_posSemidef_scalar rhoA.psd ?_
     intro x hx
     by_cases hx0 : x = 0
     · subst x
@@ -921,13 +808,13 @@ theorem sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_p
       simp [s]
       ring
   have hσpow :
-      CFC.rpow σB.matrix s * CFC.rpow σB.matrix s =
-        CFC.rpow σB.matrix ((1 - alpha) / alpha) := by
+      CFC.rpow σB.m s * CFC.rpow σB.m s =
+        CFC.rpow σB.m ((1 - alpha) / alpha) := by
     calc
-      CFC.rpow σB.matrix s * CFC.rpow σB.matrix s =
-          CFC.rpow σB.matrix (s + s) := by
-            exact (CFC.rpow_add (a := σB.matrix) (x := s) (y := s) hσB.isUnit).symm
-      _ = CFC.rpow σB.matrix ((1 - alpha) / alpha) := by
+      CFC.rpow σB.m s * CFC.rpow σB.m s =
+          CFC.rpow σB.m (s + s) := by
+            exact (CFC.rpow_add (a := σB.m) (x := s) (y := s) hσB.isUnit).symm
+      _ = CFC.rpow σB.m ((1 - alpha) / alpha) := by
             congr 1
             simp [s]
             ring
@@ -935,44 +822,44 @@ theorem sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_p
     have hWab : Wab.IsHermitian := by
       unfold Wab sandwichedMutualInformationABWeight
       exact kronecker_isHermitian
-        (CFC.rpow rhoA.matrix s)
-        (CFC.rpow σB.matrix s)
-        (cMatrix_rpow_posSemidef (A := rhoA.matrix) (s := s) rhoA.pos).isHermitian
-        (cMatrix_rpow_posSemidef (A := σB.matrix) (s := s) σB.pos).isHermitian
+        (CFC.rpow rhoA.m s)
+        (CFC.rpow σB.m s)
+        (cMatrix_rpow_posSemidef (A := rhoA.m) (s := s) rhoA.psd).isHermitian
+        (cMatrix_rpow_posSemidef (A := σB.m) (s := s) σB.psd).isHermitian
     unfold W
     exact (kronecker_isHermitian Wab (1 : CMatrix c) hWab (by simp)).eq
   have hWKW :
       W * K * W =
         Matrix.kronecker
           (Matrix.kronecker
-            (CFC.rpow rhoA.matrix ((1 - alpha) / alpha))
-            (CFC.rpow σB.matrix ((1 - alpha) / alpha)))
+            (CFC.rpow rhoA.m ((1 - alpha) / alpha))
+            (CFC.rpow σB.m ((1 - alpha) / alpha)))
           T := by
     have hWK : W * K = Matrix.kronecker Wab T := by
       unfold W K
       simpa using
-        (Matrix.mul_kronecker_mul Wab (1 : CMatrix (Prod a b)) (1 : CMatrix c) T).symm
+        (Matrix.mul_kronecker_mul Wab (1 : CMatrix (a × b)) (1 : CMatrix c) T).symm
     have hWab2 :
         Wab * Wab =
           Matrix.kronecker
-            (CFC.rpow rhoA.matrix ((1 - alpha) / alpha))
-            (CFC.rpow σB.matrix ((1 - alpha) / alpha)) := by
+            (CFC.rpow rhoA.m ((1 - alpha) / alpha))
+            (CFC.rpow σB.m ((1 - alpha) / alpha)) := by
       unfold Wab sandwichedMutualInformationABWeight
-      let R : CMatrix a := CFC.rpow rhoA.matrix ((1 - alpha) / (2 * alpha))
-      let S : CMatrix b := CFC.rpow σB.matrix ((1 - alpha) / (2 * alpha))
+      let R : CMatrix a := CFC.rpow rhoA.m ((1 - alpha) / (2 * alpha))
+      let S : CMatrix b := CFC.rpow σB.m ((1 - alpha) / (2 * alpha))
       have hR :
-          R * R = CFC.rpow rhoA.matrix ((1 - alpha) / alpha) := by
+          R * R = CFC.rpow rhoA.m ((1 - alpha) / alpha) := by
         simpa [R, s, mul_comm] using hρpow
       have hS :
-          S * S = CFC.rpow σB.matrix ((1 - alpha) / alpha) := by
+          S * S = CFC.rpow σB.m ((1 - alpha) / alpha) := by
         simpa [S, s, mul_comm] using hσpow
       calc
         Matrix.kronecker R S * Matrix.kronecker R S =
             Matrix.kronecker (R * R) (S * S) := by
               exact (Matrix.mul_kronecker_mul R R S S).symm
         _ = Matrix.kronecker
-              (CFC.rpow rhoA.matrix ((1 - alpha) / alpha))
-              (CFC.rpow σB.matrix ((1 - alpha) / alpha)) := by
+              (CFC.rpow rhoA.m ((1 - alpha) / alpha))
+              (CFC.rpow σB.m ((1 - alpha) / alpha)) := by
               rw [hR, hS]
     calc
       W * K * W = Matrix.kronecker Wab T * W := by rw [hWK]
@@ -982,27 +869,28 @@ theorem sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_p
             exact (Matrix.mul_kronecker_mul Wab Wab T (1 : CMatrix c)).symm
       _ = Matrix.kronecker
             (Matrix.kronecker
-              (CFC.rpow rhoA.matrix ((1 - alpha) / alpha))
-              (CFC.rpow σB.matrix ((1 - alpha) / alpha)))
+              (CFC.rpow rhoA.m ((1 - alpha) / alpha))
+              (CFC.rpow σB.m ((1 - alpha) / alpha)))
             T := by
             rw [hWab2]
             simp
   have hrank :
       rankOneMatrix
           (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha) =
-        W * rankOneMatrix ψ.amp * W := by
+        W * rankOneMatrix ψ.vec * W := by
     unfold sandwichedMutualInformationWeightedPurificationAmp W Wab
     rw [rankOneMatrix_mulVec_eq_mul_rankOneMatrix_mul_conjTranspose]
     rw [hWstar]
   rw [sandwichedMutualInformationSionBracketRe_eq_source]
-  rw [sandwiched_partialTraceA_mul_trace_eq_trace_mul_rightKroneckerOne]
+  rw [traceLeft_mul_trace_eq_trace_mul_kronecker_one_right,
+    Ket.state_matrix]
   change
     ((Matrix.kronecker
           (Matrix.kronecker
-            (CFC.rpow rhoA.matrix ((1 - alpha) / alpha))
-            (CFC.rpow σB.matrix ((1 - alpha) / alpha)))
+            (CFC.rpow rhoA.m ((1 - alpha) / alpha))
+            (CFC.rpow σB.m ((1 - alpha) / alpha)))
           T *
-        rankOneMatrix ψ.amp).trace).re =
+        rankOneMatrix ψ.vec).trace).re =
       ((rankOneMatrix
           (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha) *
         K).trace).re
@@ -1010,15 +898,15 @@ theorem sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_p
   calc
     ((Matrix.kronecker
           (Matrix.kronecker
-            (CFC.rpow rhoA.matrix ((1 - alpha) / alpha))
-            (CFC.rpow σB.matrix ((1 - alpha) / alpha)))
+            (CFC.rpow rhoA.m ((1 - alpha) / alpha))
+            (CFC.rpow σB.m ((1 - alpha) / alpha)))
           T *
-        rankOneMatrix ψ.amp).trace).re =
-        ((W * K * W * rankOneMatrix ψ.amp).trace).re := by rw [hWKW]
-    _ = (((W * rankOneMatrix ψ.amp * W) * K).trace).re := by
+        rankOneMatrix ψ.vec).trace).re =
+        ((W * K * W * rankOneMatrix ψ.vec).trace).re := by rw [hWKW]
+    _ = (((W * rankOneMatrix ψ.vec * W) * K).trace).re := by
           congr 1
           simpa [Matrix.mul_assoc] using
-            Matrix.trace_mul_cycle W K (W * rankOneMatrix ψ.amp)
+            Matrix.trace_mul_cycle W K (W * rankOneMatrix ψ.vec)
 
 /-- Every full-rank side-reference Sion bracket value lies below the Holder
 unit-ball supremum of the KW weighted purification marginal.
@@ -1030,23 +918,23 @@ theorem sandwichedMutualInformationSionBracketRe_le_weightedPurification_holderU
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (σB : State b) (τC : State c)
-    (hrhoA : rhoA.matrix.PosDef) (hσB : σB.matrix.PosDef)
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (σB : MState b) (τC : MState c)
+    (hrhoA : rhoA.m.PosDef) (hσB : σB.m.PosDef)
     {alpha : ℝ} (halpha : 1 < alpha) :
     sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha ≤
       sSup
         (psdTraceHolderUnitBallValueSet
-          (partialTraceA (a := Prod a b) (b := c)
+          (Matrix.traceLeft
             (rankOneMatrix
               (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha)))
           (Real.conjExponent alpha)) := by
   let M : CMatrix c :=
-    partialTraceA (a := Prod a b) (b := c)
+    Matrix.traceLeft
       (rankOneMatrix
         (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha))
   let hM : M.PosSemidef :=
-    partialTraceA_posSemidef
+    traceLeft_posSemidef
       (rankOneMatrix_pos
         (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha))
   let r : ℝ := (alpha - 1) / alpha
@@ -1057,18 +945,18 @@ theorem sandwichedMutualInformationSionBracketRe_le_weightedPurification_holderU
     have hsub_ne : alpha - 1 ≠ 0 := ne_of_gt (sub_pos.mpr halpha)
     unfold r Real.conjExponent
     field_simp [halpha_ne, hsub_ne]
-  have hτtrace : τC.matrix.trace.re = 1 := by
-    simpa using congrArg Complex.re τC.trace_eq_one
+  have hτtrace : τC.m.trace.re = 1 := by
+    simp
   have hvar :
-      ((M * CFC.rpow τC.matrix r).trace).re ≤
+      ((M * CFC.rpow τC.m r).trace).re ≤
         psdSchattenPNorm M hM (SchattenOrder.ofOneLt halpha) := by
     exact psd_trace_rpow_holder_variational_upper
-      (M := M) (N := τC.matrix) hM τC.pos hτtrace hpq hr
+      (M := M) (N := τC.m) hM τC.psd hτtrace hpq hr
   have htrace :
       sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha =
-        ((M * CFC.rpow τC.matrix r).trace).re := by
+        ((M * CFC.rpow τC.m r).trace).re := by
     simpa [M, r] using
-      sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_partialTraceA_mul_tau
+      sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_traceLeft_mul_tau
         rhoA ψ σB τC hrhoA hσB alpha
   rw [htrace]
   rw [psdTraceHolderUnitBall_sSup_eq (M := M) hM (p := alpha)
@@ -1086,22 +974,22 @@ theorem sandwichedMutualInformationSionBracketRe_le_weightedPurification_holderU
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (σB : State b) (τC : State c) (hσB : σB.matrix.PosDef)
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (σB : MState b) (τC : MState c) (hσB : σB.m.PosDef)
     {alpha : ℝ} (halpha : 1 < alpha) :
     sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha ≤
       sSup
         (psdTraceHolderUnitBallValueSet
-          (partialTraceA (a := Prod a b) (b := c)
+          (Matrix.traceLeft
             (rankOneMatrix
               (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha)))
           (Real.conjExponent alpha)) := by
   let M : CMatrix c :=
-    partialTraceA (a := Prod a b) (b := c)
+    Matrix.traceLeft
       (rankOneMatrix
         (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha))
   let hM : M.PosSemidef :=
-    partialTraceA_posSemidef
+    traceLeft_posSemidef
       (rankOneMatrix_pos
         (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha))
   let r : ℝ := (alpha - 1) / alpha
@@ -1112,18 +1000,18 @@ theorem sandwichedMutualInformationSionBracketRe_le_weightedPurification_holderU
     have hsub_ne : alpha - 1 ≠ 0 := ne_of_gt (sub_pos.mpr halpha)
     unfold r Real.conjExponent
     field_simp [halpha_ne, hsub_ne]
-  have hτtrace : τC.matrix.trace.re = 1 := by
-    simpa using congrArg Complex.re τC.trace_eq_one
+  have hτtrace : τC.m.trace.re = 1 := by
+    simp
   have hvar :
-      ((M * CFC.rpow τC.matrix r).trace).re ≤
+      ((M * CFC.rpow τC.m r).trace).re ≤
         psdSchattenPNorm M hM (SchattenOrder.ofOneLt halpha) := by
     exact psd_trace_rpow_holder_variational_upper
-      (M := M) (N := τC.matrix) hM τC.pos hτtrace hpq hr
+      (M := M) (N := τC.m) hM τC.psd hτtrace hpq hr
   have htrace :
       sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha =
-        ((M * CFC.rpow τC.matrix r).trace).re := by
+        ((M * CFC.rpow τC.m r).trace).re := by
     simpa [M, r] using
-      sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_partialTraceA_mul_tau_support
+      sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_traceLeft_mul_tau_support
         rhoA ψ σB τC hσB halpha
   rw [htrace]
   rw [psdTraceHolderUnitBall_sSup_eq (M := M) hM (p := alpha)
@@ -1136,30 +1024,30 @@ optimizing the trace bracket over normalized purifying side states.
 This is the converse direction to
 `sandwichedMutualInformationSionBracketRe_le_weightedPurification_holderUnitBall_sSup`
 and formalizes the normalization step in KW `EA_capacity.tex:2010-2018`: a PSD
-Holder witness `B` with `Tr B^q <= 1` is either zero, or its normalized
+Holder witness `B` with `Tr B^q ≤ 1` is either zero, or its normalized
 `q`-power is a state `tau_C` whose `q`-root dominates the original witness. -/
 theorem weightedPurification_holderUnitBall_sSup_le_sandwichedMutualInformationSionBracketRe_sSup
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c] [Nonempty c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (σB : State b)
-    (hrhoA : rhoA.matrix.PosDef) (hσB : σB.matrix.PosDef)
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (σB : MState b)
+    (hrhoA : rhoA.m.PosDef) (hσB : σB.m.PosDef)
     {alpha : ℝ} (halpha : 1 < alpha) :
     sSup
         (psdTraceHolderUnitBallValueSet
-          (partialTraceA (a := Prod a b) (b := c)
+          (Matrix.traceLeft
             (rankOneMatrix
               (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha)))
           (Real.conjExponent alpha)) ≤
-      sSup (Set.range fun τC : State c =>
+      sSup (Set.range fun τC : MState c =>
         sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha) := by
   let M : CMatrix c :=
-    partialTraceA (a := Prod a b) (b := c)
+    Matrix.traceLeft
       (rankOneMatrix
         (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha))
   let hM : M.PosSemidef :=
-    partialTraceA_posSemidef
+    traceLeft_posSemidef
       (rankOneMatrix_pos
         (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha))
   let q : ℝ := Real.conjExponent alpha
@@ -1180,7 +1068,7 @@ theorem weightedPurification_holderUnitBall_sSup_le_sandwichedMutualInformationS
     rw [hr]
     exact mul_one_div_cancel hq_pos.ne'
   have hstateBdd :
-      BddAbove (Set.range fun τC : State c =>
+      BddAbove (Set.range fun τC : MState c =>
         sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha) := by
     refine ⟨psdSchattenPNorm M hM (SchattenOrder.ofOneLt halpha), ?_⟩
     rintro y ⟨τC, rfl⟩
@@ -1195,7 +1083,7 @@ theorem weightedPurification_holderUnitBall_sSup_le_sandwichedMutualInformationS
       (psdTraceHolderUnitBallValueSet M q).Nonempty :=
     Set.nonempty_of_mem (psdTraceHolderUnitBall_isGreatest hM hpq).1
   change sSup (psdTraceHolderUnitBallValueSet M q) ≤
-    sSup (Set.range fun τC : State c =>
+    sSup (Set.range fun τC : MState c =>
       sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha)
   refine csSup_le hholderNonempty ?_
   intro x hx
@@ -1204,18 +1092,18 @@ theorem weightedPurification_holderUnitBall_sSup_le_sandwichedMutualInformationS
   · have hvalue_zero : ((M * B).trace).re = 0 := by
       simp [hBzero]
     rw [hvalue_zero]
-    let τ0 : State c := State.maximallyMixed c
+    let τ0 : MState c := (MState.uniform : MState c)
     have hτ0_nonneg :
         0 ≤ sandwichedMutualInformationSionBracketRe rhoA ψ σB τ0 alpha := by
       have htrace :
           sandwichedMutualInformationSionBracketRe rhoA ψ σB τ0 alpha =
-            ((M * CFC.rpow τ0.matrix r).trace).re := by
+            ((M * CFC.rpow τ0.m r).trace).re := by
         simpa [M, r] using
-          sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_partialTraceA_mul_tau
+          sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_traceLeft_mul_tau
             rhoA ψ σB τ0 hrhoA hσB alpha
       rw [htrace]
       exact cMatrix_trace_mul_posSemidef_re_nonneg hM
-        (cMatrix_rpow_posSemidef (A := τ0.matrix) (s := r) τ0.pos)
+        (cMatrix_rpow_posSemidef (A := τ0.m) (s := r) τ0.psd)
     exact hτ0_nonneg.trans (le_csSup hstateBdd ⟨τ0, rfl⟩)
   · let S : ℝ := psdTracePower B hB q
     have hSpos : 0 < S := by
@@ -1240,9 +1128,10 @@ theorem weightedPurification_holderUnitBall_sSup_le_sandwichedMutualInformationS
       apply Complex.ext
       · exact hTtrace_re
       · simpa using (Matrix.PosSemidef.trace_nonneg hT).2.symm
-    let τC : State c := { matrix := T, pos := hT, trace_eq_one := hTtrace }
-    have hτpow : CFC.rpow τC.matrix r = N := by
-      dsimp [τC, T]
+    let τC : MState c := .ofMatrix (matrix := T) (pos := hT) (trace_eq_one := hTtrace)
+    have hτpow : CFC.rpow τC.m r = N := by
+      simp only [τC, MState.matrix_ofMatrix]
+      dsimp [T]
       rw [CFC.rpow_rpow_of_exponent_nonneg N q r hq_nonneg hr_nonneg
         (Matrix.nonneg_iff_posSemidef.mpr hN)]
       rw [hqr]
@@ -1251,7 +1140,7 @@ theorem weightedPurification_holderUnitBall_sSup_le_sandwichedMutualInformationS
         sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha =
           ((M * N).trace).re := by
       have htrace :=
-        sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_partialTraceA_mul_tau
+        sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_traceLeft_mul_tau
           rhoA ψ σB τC hrhoA hσB alpha
       rw [hτpow] at htrace
       simpa [M, r] using htrace
@@ -1282,23 +1171,23 @@ theorem weightedPurification_holderUnitBall_sSup_le_sandwichedMutualInformationS
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c] [Nonempty c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (σB : State b) (hσB : σB.matrix.PosDef)
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (σB : MState b) (hσB : σB.m.PosDef)
     {alpha : ℝ} (halpha : 1 < alpha) :
     sSup
         (psdTraceHolderUnitBallValueSet
-          (partialTraceA (a := Prod a b) (b := c)
+          (Matrix.traceLeft
             (rankOneMatrix
               (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha)))
           (Real.conjExponent alpha)) ≤
-      sSup (Set.range fun τC : State c =>
+      sSup (Set.range fun τC : MState c =>
         sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha) := by
   let M : CMatrix c :=
-    partialTraceA (a := Prod a b) (b := c)
+    Matrix.traceLeft
       (rankOneMatrix
         (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha))
   let hM : M.PosSemidef :=
-    partialTraceA_posSemidef
+    traceLeft_posSemidef
       (rankOneMatrix_pos
         (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha))
   let q : ℝ := Real.conjExponent alpha
@@ -1319,7 +1208,7 @@ theorem weightedPurification_holderUnitBall_sSup_le_sandwichedMutualInformationS
     rw [hr]
     exact mul_one_div_cancel hq_pos.ne'
   have hstateBdd :
-      BddAbove (Set.range fun τC : State c =>
+      BddAbove (Set.range fun τC : MState c =>
         sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha) := by
     refine ⟨psdSchattenPNorm M hM (SchattenOrder.ofOneLt halpha), ?_⟩
     rintro y ⟨τC, rfl⟩
@@ -1334,7 +1223,7 @@ theorem weightedPurification_holderUnitBall_sSup_le_sandwichedMutualInformationS
       (psdTraceHolderUnitBallValueSet M q).Nonempty :=
     Set.nonempty_of_mem (psdTraceHolderUnitBall_isGreatest hM hpq).1
   change sSup (psdTraceHolderUnitBallValueSet M q) ≤
-    sSup (Set.range fun τC : State c =>
+    sSup (Set.range fun τC : MState c =>
       sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha)
   refine csSup_le hholderNonempty ?_
   intro x hx
@@ -1343,18 +1232,18 @@ theorem weightedPurification_holderUnitBall_sSup_le_sandwichedMutualInformationS
   · have hvalue_zero : ((M * B).trace).re = 0 := by
       simp [hBzero]
     rw [hvalue_zero]
-    let τ0 : State c := State.maximallyMixed c
+    let τ0 : MState c := (MState.uniform : MState c)
     have hτ0_nonneg :
         0 ≤ sandwichedMutualInformationSionBracketRe rhoA ψ σB τ0 alpha := by
       have htrace :
           sandwichedMutualInformationSionBracketRe rhoA ψ σB τ0 alpha =
-            ((M * CFC.rpow τ0.matrix r).trace).re := by
+            ((M * CFC.rpow τ0.m r).trace).re := by
         simpa [M, r] using
-          sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_partialTraceA_mul_tau_support
+          sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_traceLeft_mul_tau_support
             rhoA ψ σB τ0 hσB halpha
       rw [htrace]
       exact cMatrix_trace_mul_posSemidef_re_nonneg hM
-        (cMatrix_rpow_posSemidef (A := τ0.matrix) (s := r) τ0.pos)
+        (cMatrix_rpow_posSemidef (A := τ0.m) (s := r) τ0.psd)
     exact hτ0_nonneg.trans (le_csSup hstateBdd ⟨τ0, rfl⟩)
   · let S : ℝ := psdTracePower B hB q
     have hSpos : 0 < S := by
@@ -1379,9 +1268,10 @@ theorem weightedPurification_holderUnitBall_sSup_le_sandwichedMutualInformationS
       apply Complex.ext
       · exact hTtrace_re
       · simpa using (Matrix.PosSemidef.trace_nonneg hT).2.symm
-    let τC : State c := { matrix := T, pos := hT, trace_eq_one := hTtrace }
-    have hτpow : CFC.rpow τC.matrix r = N := by
-      dsimp [τC, T]
+    let τC : MState c := .ofMatrix (matrix := T) (pos := hT) (trace_eq_one := hTtrace)
+    have hτpow : CFC.rpow τC.m r = N := by
+      simp only [τC, MState.matrix_ofMatrix]
+      dsimp [T]
       rw [CFC.rpow_rpow_of_exponent_nonneg N q r hq_nonneg hr_nonneg
         (Matrix.nonneg_iff_posSemidef.mpr hN)]
       rw [hqr]
@@ -1390,7 +1280,7 @@ theorem weightedPurification_holderUnitBall_sSup_le_sandwichedMutualInformationS
         sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha =
           ((M * N).trace).re := by
       have htrace :=
-        sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_partialTraceA_mul_tau_support
+        sandwichedMutualInformationSionBracketRe_eq_trace_weightedPurification_traceLeft_mul_tau_support
           rhoA ψ σB τC hσB halpha
       rw [hτpow] at htrace
       simpa [M, r] using htrace
@@ -1416,54 +1306,52 @@ sandwiched-Renyi inner operator for the source reference
 
 This is the Lean matrix form of KW `EA_capacity.tex:1989-1996` in the
 full-rank high-`alpha` branch. -/
-theorem partialTraceB_rankOne_weightedPurificationAmp_eq_referenceInner
+theorem traceRight_rankOne_weightedPurificationAmp_eq_referenceInner
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (σB : State b) (ψ : PureVector (Prod (Prod a b) c))
-    (hA : ψ.state.marginalAB.marginalA.matrix.PosDef)
-    (hσ : σB.matrix.PosDef) (alpha : ℝ) :
-    partialTraceB (a := Prod a b) (b := c)
+    (σB : MState b) (ψ : Ket ((a × b) × c))
+    (hA : ψ.state.marginalAB.traceRight.m.PosDef)
+    (hσ : σB.m.PosDef) (alpha : ℝ) :
+    Matrix.traceRight
         (rankOneMatrix
           (sandwichedMutualInformationWeightedPurificationAmp
-            ψ.state.marginalAB.marginalA σB ψ alpha)) =
-      State.sandwichedRenyiReferenceInner ψ.state.marginalAB
-        (ψ.state.marginalAB.marginalA.prod σB).matrix alpha := by
-  let W : CMatrix (Prod a b) :=
-    sandwichedMutualInformationABWeight ψ.state.marginalAB.marginalA σB alpha
+            ψ.state.marginalAB.traceRight σB ψ alpha)) =
+      MState.sandwichedRenyiReferenceInner ψ.state.marginalAB
+        (ψ.state.marginalAB.traceRight.prod σB).m alpha := by
+  let W : CMatrix (a × b) :=
+    sandwichedMutualInformationABWeight ψ.state.marginalAB.traceRight σB alpha
   have hW :
       Matrix.conjTranspose W = W := by
     unfold W sandwichedMutualInformationABWeight
     exact (kronecker_isHermitian
-      (CFC.rpow ψ.state.marginalAB.marginalA.matrix ((1 - alpha) / (2 * alpha)))
-      (CFC.rpow σB.matrix ((1 - alpha) / (2 * alpha)))
+      (CFC.rpow ψ.state.marginalAB.traceRight.m ((1 - alpha) / (2 * alpha)))
+      (CFC.rpow σB.m ((1 - alpha) / (2 * alpha)))
       (cMatrix_rpow_posSemidef
-        (A := ψ.state.marginalAB.marginalA.matrix)
+        (A := ψ.state.marginalAB.traceRight.m)
         (s := (1 - alpha) / (2 * alpha))
-        ψ.state.marginalAB.marginalA.pos).isHermitian
+        ψ.state.marginalAB.traceRight.psd).isHermitian
       (cMatrix_rpow_posSemidef
-        (A := σB.matrix)
+        (A := σB.m)
         (s := (1 - alpha) / (2 * alpha))
-        σB.pos).isHermitian).eq
-  rw [partialTraceB_rankOne_weightedPurificationAmp_eq]
-  unfold State.sandwichedRenyiReferenceInner
-  rw [show (ψ.state.marginalAB.marginalA.prod σB).matrix =
-      Matrix.kronecker ψ.state.marginalAB.marginalA.matrix σB.matrix from rfl]
-  change sandwichedMutualInformationABWeight ψ.state.marginalAB.marginalA σB alpha *
-      partialTraceB (a := Prod a b) (b := c) (rankOneMatrix ψ.amp) *
+        σB.psd).isHermitian).eq
+  rw [traceRight_rankOne_weightedPurificationAmp_eq]
+  unfold MState.sandwichedRenyiReferenceInner
+  rw [MState.prod_m ψ.state.marginalAB.traceRight σB]
+  change sandwichedMutualInformationABWeight ψ.state.marginalAB.traceRight σB alpha *
+      Matrix.traceRight (rankOneMatrix ψ.vec) *
         Matrix.conjTranspose
-          (sandwichedMutualInformationABWeight ψ.state.marginalAB.marginalA σB alpha) =
-    CFC.rpow (Matrix.kronecker ψ.state.marginalAB.marginalA.matrix σB.matrix)
+          (sandwichedMutualInformationABWeight ψ.state.marginalAB.traceRight σB alpha) =
+    CFC.rpow (Matrix.kronecker ψ.state.marginalAB.traceRight.m σB.m)
         ((1 - alpha) / (2 * alpha)) *
-      ψ.state.marginalAB.matrix *
-      CFC.rpow (Matrix.kronecker ψ.state.marginalAB.marginalA.matrix σB.matrix)
+      ψ.state.marginalAB.m *
+      CFC.rpow (Matrix.kronecker ψ.state.marginalAB.traceRight.m σB.m)
         ((1 - alpha) / (2 * alpha))
-  rw [cMatrix_rpow_kronecker_posDef hA hσ ((1 - alpha) / (2 * alpha))]
-  change W * partialTraceB (a := Prod a b) (b := c) (rankOneMatrix ψ.amp) *
+  rw [cMatrix_rpow_kronecker hA.posSemidef hσ.posSemidef ((1 - alpha) / (2 * alpha))]
+  change W * Matrix.traceRight (rankOneMatrix ψ.vec) *
       Matrix.conjTranspose W =
-    W * ψ.state.marginalAB.matrix * W
-  rw [hW]
-  rfl
+    W * ψ.state.marginalAB.m * W
+  rw [hW, MState.marginalAB_eq_traceRight, MState.traceRight_m, Ket.state_matrix]
 
 /-- The two partial traces of the KW weighted purification rank-one operator
 have equal Schatten `p` norms.
@@ -1471,30 +1359,30 @@ have equal Schatten `p` norms.
 This is the Lean form of the same-nonzero-eigenvalues step in
 KW `EA_capacity.tex:1990-2004`, before the reverse-Holder variational formula
 is applied. -/
-theorem psdSchattenPNorm_weightedPurification_partialTraceC_eq_partialTraceAB
+theorem psdSchattenPNorm_weightedPurification_partialTraceC_eq_traceLeftB
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (σB : State b)
-    (ψ : PureVector (Prod (Prod a b) c)) (alpha : ℝ)
+    (rhoA : MState a) (σB : MState b)
+    (ψ : Ket ((a × b) × c)) (alpha : ℝ)
     {p : ℝ} (hp : 0 < p) :
     psdSchattenPNorm
-        (partialTraceB (a := Prod a b) (b := c)
+        (Matrix.traceRight
           (rankOneMatrix
             (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha)))
-        (partialTraceB_posSemidef
+        (traceRight_posSemidef
           (rankOneMatrix_pos
             (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha)))
         (SchattenOrder.ofPositive hp) =
       psdSchattenPNorm
-        (partialTraceA (a := Prod a b) (b := c)
+        (Matrix.traceLeft
           (rankOneMatrix
             (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha)))
-        (partialTraceA_posSemidef
+        (traceLeft_posSemidef
           (rankOneMatrix_pos
             (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha)))
         (SchattenOrder.ofPositive hp) := by
-  exact psdSchattenPNorm_partialTraceB_rankOneMatrix_eq_partialTraceA_rankOneMatrix
+  exact psdSchattenPNorm_traceRight_rankOneMatrix_eq_traceLeft_rankOneMatrix
     (sandwichedMutualInformationWeightedPurificationAmp rhoA σB ψ alpha)
     (SchattenOrder.ofPositive hp)
 
@@ -1503,65 +1391,65 @@ theorem psdSchattenPNorm_weightedPurification_partialTraceC_eq_partialTraceAB
 The reference-inner Schatten expression on the `AB` system equals the Schatten
 expression of the complementary `C` marginal of the weighted purification,
 matching KW `EA_capacity.tex:1990-2004`. -/
-theorem psdSchattenPNorm_referenceInner_eq_weightedPurification_partialTraceA
+theorem psdSchattenPNorm_referenceInner_eq_weightedPurification_traceLeft
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (σB : State b) (ψ : PureVector (Prod (Prod a b) c))
-    (hA : ψ.state.marginalAB.marginalA.matrix.PosDef)
-    (hσ : σB.matrix.PosDef) (alpha : ℝ) {p : ℝ} (hp : 0 < p) :
+    (σB : MState b) (ψ : Ket ((a × b) × c))
+    (hA : ψ.state.marginalAB.traceRight.m.PosDef)
+    (hσ : σB.m.PosDef) (alpha : ℝ) {p : ℝ} (hp : 0 < p) :
     psdSchattenPNorm
-        (State.sandwichedRenyiReferenceInner ψ.state.marginalAB
-          (ψ.state.marginalAB.marginalA.prod σB).matrix alpha)
-        (State.sandwichedRenyiReferenceInner_posSemidef ψ.state.marginalAB
-          (State.prod_posDef hA hσ).posSemidef alpha)
+        (MState.sandwichedRenyiReferenceInner ψ.state.marginalAB
+          (ψ.state.marginalAB.traceRight.prod σB).m alpha)
+        (MState.sandwichedRenyiReferenceInner_posSemidef ψ.state.marginalAB
+          (MState.PosDef.kron hA hσ).posSemidef alpha)
         (SchattenOrder.ofPositive hp) =
       psdSchattenPNorm
-        (partialTraceA (a := Prod a b) (b := c)
+        (Matrix.traceLeft
           (rankOneMatrix
             (sandwichedMutualInformationWeightedPurificationAmp
-              ψ.state.marginalAB.marginalA σB ψ alpha)))
-        (partialTraceA_posSemidef
+              ψ.state.marginalAB.traceRight σB ψ alpha)))
+        (traceLeft_posSemidef
           (rankOneMatrix_pos
             (sandwichedMutualInformationWeightedPurificationAmp
-              ψ.state.marginalAB.marginalA σB ψ alpha)))
+              ψ.state.marginalAB.traceRight σB ψ alpha)))
         (SchattenOrder.ofPositive hp) := by
   let amp :=
     sandwichedMutualInformationWeightedPurificationAmp
-      ψ.state.marginalAB.marginalA σB ψ alpha
-  let hB : (partialTraceB (a := Prod a b) (b := c)
+      ψ.state.marginalAB.traceRight σB ψ alpha
+  let hB : (Matrix.traceRight
       (rankOneMatrix amp)).PosSemidef :=
-    partialTraceB_posSemidef (rankOneMatrix_pos amp)
+    traceRight_posSemidef (rankOneMatrix_pos amp)
   let hRef :
-      (State.sandwichedRenyiReferenceInner ψ.state.marginalAB
-        (ψ.state.marginalAB.marginalA.prod σB).matrix alpha).PosSemidef :=
-    State.sandwichedRenyiReferenceInner_posSemidef ψ.state.marginalAB
-      (State.prod_posDef hA hσ).posSemidef alpha
+      (MState.sandwichedRenyiReferenceInner ψ.state.marginalAB
+        (ψ.state.marginalAB.traceRight.prod σB).m alpha).PosSemidef :=
+    MState.sandwichedRenyiReferenceInner_posSemidef ψ.state.marginalAB
+      (MState.PosDef.kron hA hσ).posSemidef alpha
   have hmatrix :
-      partialTraceB (a := Prod a b) (b := c) (rankOneMatrix amp) =
-        State.sandwichedRenyiReferenceInner ψ.state.marginalAB
-          (ψ.state.marginalAB.marginalA.prod σB).matrix alpha := by
+      Matrix.traceRight (rankOneMatrix amp) =
+        MState.sandwichedRenyiReferenceInner ψ.state.marginalAB
+          (ψ.state.marginalAB.traceRight.prod σB).m alpha := by
     simpa [amp] using
-      partialTraceB_rankOne_weightedPurificationAmp_eq_referenceInner
+      traceRight_rankOne_weightedPurificationAmp_eq_referenceInner
         σB ψ hA hσ alpha
   have hnormB :
-      psdSchattenPNorm (partialTraceB (a := Prod a b) (b := c)
+      psdSchattenPNorm (Matrix.traceRight
           (rankOneMatrix amp)) hB (SchattenOrder.ofPositive hp) =
         psdSchattenPNorm
-          (State.sandwichedRenyiReferenceInner ψ.state.marginalAB
-            (ψ.state.marginalAB.marginalA.prod σB).matrix alpha)
+          (MState.sandwichedRenyiReferenceInner ψ.state.marginalAB
+            (ψ.state.marginalAB.traceRight.prod σB).m alpha)
           hRef (SchattenOrder.ofPositive hp) :=
     psdSchattenPNorm_congr hmatrix hB hRef (SchattenOrder.ofPositive hp)
   have hBA :
-      psdSchattenPNorm (partialTraceB (a := Prod a b) (b := c)
+      psdSchattenPNorm (Matrix.traceRight
           (rankOneMatrix amp)) hB (SchattenOrder.ofPositive hp) =
         psdSchattenPNorm
-          (partialTraceA (a := Prod a b) (b := c) (rankOneMatrix amp))
-          (partialTraceA_posSemidef (rankOneMatrix_pos amp))
+          (Matrix.traceLeft (rankOneMatrix amp))
+          (traceLeft_posSemidef (rankOneMatrix_pos amp))
           (SchattenOrder.ofPositive hp) := by
     simpa [amp, hB] using
-      psdSchattenPNorm_weightedPurification_partialTraceC_eq_partialTraceAB
-        ψ.state.marginalAB.marginalA σB ψ alpha hp
+      psdSchattenPNorm_weightedPurification_partialTraceC_eq_traceLeftB
+        ψ.state.marginalAB.traceRight σB ψ alpha hp
   exact hnormB.symm.trans hBA
 
 /-- Pure-state specialization of the KW high-`alpha` Sion exchange. -/
@@ -1569,23 +1457,23 @@ theorem sandwichedAlpha_sion_abcSidePowerTraceRe_state_EReal
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] [Nonempty b]
     [Fintype c] [DecidableEq c]
-    (ψ : PureVector (Prod (Prod a b) c))
+    (ψ : Ket ((a × b) × c))
     {delta alpha : ℝ} (hdelta_pos : 0 < delta)
     (hdelta_le : delta ≤ (Fintype.card b : ℝ)⁻¹)
     (halpha : 1 < alpha) :
-    (⨅ σ ∈ State.uniformlyPositiveDensityMatrixSet delta b,
-        ⨆ τ ∈ State.densityMatrixSet c,
-          (State.abcSidePowerTraceRe (a := a) ψ.state.matrix σ τ
+    (⨅ σ ∈ MState.uniformlyPositiveDensityMatrixSet delta b,
+        ⨆ τ ∈ MState.densityMatrixSet c,
+          (MState.abcSidePowerTraceRe (a := a) ψ.state.m σ τ
               ((alpha - 1) / alpha) : EReal)) =
-      ⨆ τ ∈ State.densityMatrixSet c,
-        ⨅ σ ∈ State.uniformlyPositiveDensityMatrixSet delta b,
-          (State.abcSidePowerTraceRe (a := a) ψ.state.matrix σ τ
+      ⨆ τ ∈ MState.densityMatrixSet c,
+        ⨅ σ ∈ MState.uniformlyPositiveDensityMatrixSet delta b,
+          (MState.abcSidePowerTraceRe (a := a) ψ.state.m σ τ
               ((alpha - 1) / alpha) : EReal) := by
   exact sandwichedAlpha_sion_abcSidePowerTraceRe_EReal
     (a := a) (b := b) (c := c)
-    hdelta_pos hdelta_le ψ.state.pos halpha
+    hdelta_pos hdelta_le ψ.state.psd halpha
 
-/-- State-domain form of the KW high-`alpha` Sion exchange.
+/-- MState-domain form of the KW high-`alpha` Sion exchange.
 
 The sigma side remains restricted to the compact full-support lower-bound
 domain used by the already proved Sion theorem; the tau side is the ordinary
@@ -1594,56 +1482,56 @@ theorem sandwichedAlpha_sion_uniformlyPositiveState_EReal
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] [Nonempty b]
     [Fintype c] [DecidableEq c]
-    (ψ : PureVector (Prod (Prod a b) c))
+    (ψ : Ket ((a × b) × c))
     {delta alpha : ℝ} (hdelta_pos : 0 < delta)
     (hdelta_le : delta ≤ (Fintype.card b : ℝ)⁻¹)
     (halpha : 1 < alpha) :
-    (⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
-        ⨆ τ : State c,
-          (State.abcSidePowerTraceRe (a := a) ψ.state.matrix σ.val.matrix τ.matrix
+    (⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
+        ⨆ τ : MState c,
+          (MState.abcSidePowerTraceRe (a := a) ψ.state.m σ.val.m τ.m
               ((alpha - 1) / alpha) : EReal)) =
-      ⨆ τ : State c,
-        ⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
-          (State.abcSidePowerTraceRe (a := a) ψ.state.matrix σ.val.matrix τ.matrix
+      ⨆ τ : MState c,
+        ⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
+          (MState.abcSidePowerTraceRe (a := a) ψ.state.m σ.val.m τ.m
               ((alpha - 1) / alpha) : EReal) := by
   let F : CMatrix b → CMatrix c → EReal := fun σ τ =>
-    (State.abcSidePowerTraceRe (a := a) ψ.state.matrix σ τ ((alpha - 1) / alpha) :
+    (MState.abcSidePowerTraceRe (a := a) ψ.state.m σ τ ((alpha - 1) / alpha) :
       EReal)
   calc
-    (⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
-        ⨆ τ : State c, F σ.val.matrix τ.matrix)
+    (⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
+        ⨆ τ : MState c, F σ.val.m τ.m)
         =
       ⨅ σ : CMatrix b,
-        ⨅ hσ : σ ∈ State.uniformlyPositiveDensityMatrixSet delta b,
-          ⨆ τ : State c, F σ τ.matrix := by
+        ⨅ hσ : σ ∈ MState.uniformlyPositiveDensityMatrixSet delta b,
+          ⨆ τ : MState c, F σ τ.m := by
         exact uniformlyPositiveState_iInf_matrix_eq_uniformlyPositiveDensityMatrixSet_iInf
-          (fun σ => ⨆ τ : State c, F σ τ.matrix)
+          (fun σ => ⨆ τ : MState c, F σ τ.m)
     _ =
       ⨅ σ : CMatrix b,
-        ⨅ hσ : σ ∈ State.uniformlyPositiveDensityMatrixSet delta b,
-          ⨆ τ : CMatrix c, ⨆ hτ : τ ∈ State.densityMatrixSet c, F σ τ := by
+        ⨅ hσ : σ ∈ MState.uniformlyPositiveDensityMatrixSet delta b,
+          ⨆ τ : CMatrix c, ⨆ hτ : τ ∈ MState.densityMatrixSet c, F σ τ := by
         simp_rw [state_iSup_matrix_eq_densityMatrixSet_iSup]
     _ =
       ⨆ τ : CMatrix c,
-        ⨆ hτ : τ ∈ State.densityMatrixSet c,
+        ⨆ hτ : τ ∈ MState.densityMatrixSet c,
           ⨅ σ : CMatrix b,
-            ⨅ hσ : σ ∈ State.uniformlyPositiveDensityMatrixSet delta b, F σ τ := by
+            ⨅ hσ : σ ∈ MState.uniformlyPositiveDensityMatrixSet delta b, F σ τ := by
         exact sandwichedAlpha_sion_abcSidePowerTraceRe_state_EReal
           (a := a) (b := b) (c := c) ψ hdelta_pos hdelta_le halpha
     _ =
       ⨆ τ : CMatrix c,
-        ⨆ hτ : τ ∈ State.densityMatrixSet c,
-          ⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
-            F σ.val.matrix τ := by
+        ⨆ hτ : τ ∈ MState.densityMatrixSet c,
+          ⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
+            F σ.val.m τ := by
         simp_rw [
           ← uniformlyPositiveState_iInf_matrix_eq_uniformlyPositiveDensityMatrixSet_iInf]
     _ =
-      ⨆ τ : State c,
-        ⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
-          F σ.val.matrix τ.matrix := by
+      ⨆ τ : MState c,
+        ⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
+          F σ.val.m τ.m := by
         exact (state_iSup_matrix_eq_densityMatrixSet_iSup
-          (fun τ => ⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
-            F σ.val.matrix τ)).symm
+          (fun τ => ⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
+            F σ.val.m τ)).symm
 
 /-- Source-bracket form of the compact-domain Sion exchange in KW
 `EA_capacity.tex:2020-2025`. -/
@@ -1651,16 +1539,16 @@ theorem sandwichedAlpha_sion_commonBracket_EReal
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] [Nonempty b]
     [Fintype c] [DecidableEq c]
-    (ψ : PureVector (Prod (Prod a b) c))
+    (ψ : Ket ((a × b) × c))
     {delta alpha : ℝ} (hdelta_pos : 0 < delta)
     (hdelta_le : delta ≤ (Fintype.card b : ℝ)⁻¹)
     (halpha : 1 < alpha) :
-    (⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
-        ⨆ τ : State c,
+    (⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
+        ⨆ τ : MState c,
           ((ψ.upwardRenyiDualityCommonBracket σ.val τ ((alpha - 1) / alpha)).re :
             EReal)) =
-      ⨆ τ : State c,
-        ⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
+      ⨆ τ : MState c,
+        ⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
           ((ψ.upwardRenyiDualityCommonBracket σ.val τ ((alpha - 1) / alpha)).re :
             EReal) := by
   simpa [upwardRenyiDualityCommonBracket_re_eq_abcSidePowerTraceRe] using
@@ -1673,65 +1561,65 @@ theorem sandwichedAlpha_sion_mutualInformationBracket_EReal
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] [Nonempty b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
     {delta alpha : ℝ} (hdelta_pos : 0 < delta)
     (hdelta_le : delta ≤ (Fintype.card b : ℝ)⁻¹)
     (halpha : 1 < alpha) :
-    (⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
-        ⨆ τ : State c,
+    (⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
+        ⨆ τ : MState c,
           (sandwichedMutualInformationSionBracketRe rhoA ψ σ.val τ alpha : EReal)) =
-      ⨆ τ : State c,
-        ⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
+      ⨆ τ : MState c,
+        ⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
           (sandwichedMutualInformationSionBracketRe rhoA ψ σ.val τ alpha : EReal) := by
-  let A : CMatrix a := CFC.rpow rhoA.matrix ((1 - alpha) / alpha)
-  let F : CMatrix b -> CMatrix c -> EReal := fun σ τ =>
-    (State.abcWeightedSidePowerTraceRe (a := a) A ψ.state.matrix σ τ
+  let A : CMatrix a := CFC.rpow rhoA.m ((1 - alpha) / alpha)
+  let F : CMatrix b → CMatrix c → EReal := fun σ τ =>
+    (MState.abcWeightedSidePowerTraceRe (a := a) A ψ.state.m σ τ
       ((alpha - 1) / alpha) : EReal)
   have hA : A.PosSemidef :=
-    cMatrix_rpow_posSemidef (A := rhoA.matrix) (s := (1 - alpha) / alpha) rhoA.pos
+    cMatrix_rpow_posSemidef (A := rhoA.m) (s := (1 - alpha) / alpha) rhoA.psd
   calc
-    (⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
-        ⨆ τ : State c,
+    (⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
+        ⨆ τ : MState c,
           (sandwichedMutualInformationSionBracketRe rhoA ψ σ.val τ alpha : EReal))
         =
-      ⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
-        ⨆ τ : State c, F σ.val.matrix τ.matrix := by
+      ⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
+        ⨆ τ : MState c, F σ.val.m τ.m := by
         simp [sandwichedMutualInformationSionBracketRe, F, A]
     _ =
       ⨅ σ : CMatrix b,
-        ⨅ hσ : σ ∈ State.uniformlyPositiveDensityMatrixSet delta b,
-          ⨆ τ : State c, F σ τ.matrix := by
+        ⨅ hσ : σ ∈ MState.uniformlyPositiveDensityMatrixSet delta b,
+          ⨆ τ : MState c, F σ τ.m := by
         exact uniformlyPositiveState_iInf_matrix_eq_uniformlyPositiveDensityMatrixSet_iInf
-          (fun σ => ⨆ τ : State c, F σ τ.matrix)
+          (fun σ => ⨆ τ : MState c, F σ τ.m)
     _ =
       ⨅ σ : CMatrix b,
-        ⨅ hσ : σ ∈ State.uniformlyPositiveDensityMatrixSet delta b,
-          ⨆ τ : CMatrix c, ⨆ hτ : τ ∈ State.densityMatrixSet c, F σ τ := by
+        ⨅ hσ : σ ∈ MState.uniformlyPositiveDensityMatrixSet delta b,
+          ⨆ τ : CMatrix c, ⨆ hτ : τ ∈ MState.densityMatrixSet c, F σ τ := by
         simp_rw [state_iSup_matrix_eq_densityMatrixSet_iSup]
     _ =
       ⨆ τ : CMatrix c,
-        ⨆ hτ : τ ∈ State.densityMatrixSet c,
+        ⨆ hτ : τ ∈ MState.densityMatrixSet c,
           ⨅ σ : CMatrix b,
-            ⨅ hσ : σ ∈ State.uniformlyPositiveDensityMatrixSet delta b, F σ τ := by
+            ⨅ hσ : σ ∈ MState.uniformlyPositiveDensityMatrixSet delta b, F σ τ := by
         exact sandwichedAlpha_sion_abcWeightedSidePowerTraceRe_EReal
-          (a := a) (b := b) (c := c) hdelta_pos hdelta_le hA ψ.state.pos halpha
+          (a := a) (b := b) (c := c) hdelta_pos hdelta_le hA ψ.state.psd halpha
     _ =
       ⨆ τ : CMatrix c,
-        ⨆ hτ : τ ∈ State.densityMatrixSet c,
-          ⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
-            F σ.val.matrix τ := by
+        ⨆ hτ : τ ∈ MState.densityMatrixSet c,
+          ⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
+            F σ.val.m τ := by
         simp_rw [
           ← uniformlyPositiveState_iInf_matrix_eq_uniformlyPositiveDensityMatrixSet_iInf]
     _ =
-      ⨆ τ : State c,
-        ⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
-          F σ.val.matrix τ.matrix := by
+      ⨆ τ : MState c,
+        ⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
+          F σ.val.m τ.m := by
         exact (state_iSup_matrix_eq_densityMatrixSet_iSup
-          (fun τ => ⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
-            F σ.val.matrix τ)).symm
+          (fun τ => ⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
+            F σ.val.m τ)).symm
     _ =
-      ⨆ τ : State c,
-        ⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
+      ⨆ τ : MState c,
+        ⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
           (sandwichedMutualInformationSionBracketRe rhoA ψ σ.val τ alpha : EReal) := by
         simp [sandwichedMutualInformationSionBracketRe, F, A]
 
@@ -1739,68 +1627,68 @@ theorem sandwichedAlpha_sion_mutualInformationBracket_EReal
 information bracket.
 
 This is the state-language form of
-`State.fullRankDensityMatrixSet_sion_abcWeightedSidePowerTraceRe_EReal` and
+`MState.fullRankDensityMatrixSet_sion_abcWeightedSidePowerTraceRe_EReal` and
 matches the no-cutoff route in KW `EA_capacity.tex:2018-2035`. -/
 theorem sandwichedAlpha_fullRank_sion_mutualInformationBracket_EReal
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c] [Nonempty c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
     {alpha : ℝ} (halpha : 1 < alpha) :
-    (⨅ σ : {σ : State b // σ.matrix.PosDef},
-        ⨆ τ : State c,
+    (⨅ σ : {σ : MState b // σ.m.PosDef},
+        ⨆ τ : MState c,
           (sandwichedMutualInformationSionBracketRe rhoA ψ σ.val τ alpha : EReal)) =
-      ⨆ τ : State c,
-        ⨅ σ : {σ : State b // σ.matrix.PosDef},
+      ⨆ τ : MState c,
+        ⨅ σ : {σ : MState b // σ.m.PosDef},
           (sandwichedMutualInformationSionBracketRe rhoA ψ σ.val τ alpha : EReal) := by
-  let A : CMatrix a := CFC.rpow rhoA.matrix ((1 - alpha) / alpha)
+  let A : CMatrix a := CFC.rpow rhoA.m ((1 - alpha) / alpha)
   let F : CMatrix b → CMatrix c → EReal := fun sigma tau =>
-    (State.abcWeightedSidePowerTraceRe (a := a) A ψ.state.matrix sigma tau
+    (MState.abcWeightedSidePowerTraceRe (a := a) A ψ.state.m sigma tau
       ((alpha - 1) / alpha) : EReal)
   have hA : A.PosSemidef :=
-    cMatrix_rpow_posSemidef (A := rhoA.matrix) (s := (1 - alpha) / alpha) rhoA.pos
+    cMatrix_rpow_posSemidef (A := rhoA.m) (s := (1 - alpha) / alpha) rhoA.psd
   have hp := sandwichedAlphaPrime_pos_lt_one halpha
   calc
-    (⨅ σ : {σ : State b // σ.matrix.PosDef},
-        ⨆ τ : State c,
+    (⨅ σ : {σ : MState b // σ.m.PosDef},
+        ⨆ τ : MState c,
           (sandwichedMutualInformationSionBracketRe rhoA ψ σ.val τ alpha : EReal))
         =
       ⨅ sigma : CMatrix b,
-        ⨅ _hSigma : (State.fullRankDensityMatrixSet b) sigma,
-          ⨆ τ : State c, F sigma τ.matrix := by
+        ⨅ _hSigma : (MState.fullRankDensityMatrixSet b) sigma,
+          ⨆ τ : MState c, F sigma τ.m := by
         exact fullRankState_iInf_matrix_eq_fullRankDensityMatrixSet_iInf
-          (fun sigma => ⨆ τ : State c, F sigma τ.matrix)
+          (fun sigma => ⨆ τ : MState c, F sigma τ.m)
     _ =
       ⨅ sigma : CMatrix b,
-        ⨅ _hSigma : (State.fullRankDensityMatrixSet b) sigma,
+        ⨅ _hSigma : (MState.fullRankDensityMatrixSet b) sigma,
           ⨆ tau : CMatrix c,
-            ⨆ _hTau : (State.densityMatrixSet c) tau, F sigma tau := by
+            ⨆ _hTau : (MState.densityMatrixSet c) tau, F sigma tau := by
         simp_rw [state_iSup_matrix_eq_densityMatrixSet_iSup]
         rfl
     _ =
       ⨆ tau : CMatrix c,
-        ⨆ _hTau : (State.densityMatrixSet c) tau,
+        ⨆ _hTau : (MState.densityMatrixSet c) tau,
           ⨅ sigma : CMatrix b,
-            ⨅ _hSigma : (State.fullRankDensityMatrixSet b) sigma, F sigma tau := by
-        exact State.fullRankDensityMatrixSet_sion_abcWeightedSidePowerTraceRe_EReal
-          (a := a) (b := b) (c := c) hA ψ.state.pos hp.1 (le_of_lt hp.2)
+            ⨅ _hSigma : (MState.fullRankDensityMatrixSet b) sigma, F sigma tau := by
+        exact MState.fullRankDensityMatrixSet_sion_abcWeightedSidePowerTraceRe_EReal
+          (a := a) (b := b) (c := c) hA ψ.state.psd hp.1 (le_of_lt hp.2)
     _ =
-      ⨆ τ : State c,
+      ⨆ τ : MState c,
         ⨅ sigma : CMatrix b,
-          ⨅ _hSigma : (State.fullRankDensityMatrixSet b) sigma, F sigma τ.matrix := by
+          ⨅ _hSigma : (MState.fullRankDensityMatrixSet b) sigma, F sigma τ.m := by
         exact (state_iSup_matrix_eq_densityMatrixSet_iSup
           (fun tau => ⨅ sigma : CMatrix b,
-            ⨅ _hSigma : (State.fullRankDensityMatrixSet b) sigma, F sigma tau)).symm
+            ⨅ _hSigma : (MState.fullRankDensityMatrixSet b) sigma, F sigma tau)).symm
     _ =
-      ⨆ τ : State c,
-        ⨅ σ : {σ : State b // σ.matrix.PosDef}, F σ.val.matrix τ.matrix := by
+      ⨆ τ : MState c,
+        ⨅ σ : {σ : MState b // σ.m.PosDef}, F σ.val.m τ.m := by
         apply iSup_congr
         intro τ
         exact (fullRankState_iInf_matrix_eq_fullRankDensityMatrixSet_iInf
-          (fun sigma => F sigma τ.matrix)).symm
+          (fun sigma => F sigma τ.m)).symm
     _ =
-      ⨆ τ : State c,
-        ⨅ σ : {σ : State b // σ.matrix.PosDef},
+      ⨆ τ : MState c,
+        ⨅ σ : {σ : MState b // σ.m.PosDef},
           (sandwichedMutualInformationSionBracketRe rhoA ψ σ.val τ alpha : EReal) := by
         simp [sandwichedMutualInformationSionBracketRe, F, A]
 
@@ -1814,39 +1702,46 @@ theorem sandwichedAlpha_fullRank_iInf_iSup_le_uniformlyPositive_iSup_iInf
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] [Nonempty b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
     {delta alpha : ℝ} (hdelta_pos : 0 < delta)
     (hdelta_le : delta ≤ (Fintype.card b : ℝ)⁻¹)
     (halpha : 1 < alpha) :
-    (⨅ σ : {σ : State b // σ.matrix.PosDef},
-        ⨆ τ : State c,
+    (⨅ σ : {σ : MState b // σ.m.PosDef},
+        ⨆ τ : MState c,
           (sandwichedMutualInformationSionBracketRe rhoA ψ σ.val τ alpha : EReal)) ≤
-      ⨆ τ : State c,
-        ⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
+      ⨆ τ : MState c,
+        ⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
           (sandwichedMutualInformationSionBracketRe rhoA ψ σ.val τ alpha : EReal) := by
   calc
-    (⨅ σ : {σ : State b // σ.matrix.PosDef},
-        ⨆ τ : State c,
+    (⨅ σ : {σ : MState b // σ.m.PosDef},
+        ⨆ τ : MState c,
           (sandwichedMutualInformationSionBracketRe rhoA ψ σ.val τ alpha : EReal))
         ≤
-      (⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
-        ⨆ τ : State c,
+      (⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
+        ⨆ τ : MState c,
           (sandwichedMutualInformationSionBracketRe rhoA ψ σ.val τ alpha : EReal)) := by
         exact fullRankState_iInf_le_uniformlyPositiveState_iInf_EReal hdelta_pos
-          (fun σ : State b =>
-            ⨆ τ : State c,
+          (fun σ : MState b =>
+            ⨆ τ : MState c,
               (sandwichedMutualInformationSionBracketRe rhoA ψ σ τ alpha : EReal))
     _ =
-      ⨆ τ : State c,
-        ⨅ σ : {σ : State b // delta • (1 : CMatrix b) ≤ σ.matrix},
+      ⨆ τ : MState c,
+        ⨅ σ : {σ : MState b // delta • (1 : CMatrix b) ≤ σ.m},
           (sandwichedMutualInformationSionBracketRe rhoA ψ σ.val τ alpha : EReal) :=
         sandwichedAlpha_sion_mutualInformationBracket_EReal
           rhoA ψ hdelta_pos hdelta_le halpha
 
-end PureVector
+end
+
+end Ket
+
+namespace QIT
+noncomputable section
+
+universe u1 v1 u2 v2
 
 /-- Every full-rank state belongs to some uniformly-positive compact Sion
-domain with the source normalization bound `delta <= 1 / |B|`.
+domain with the source normalization bound `delta ≤ 1 / |B|`.
 
 This is the local regularization bookkeeping used when the KW proof removes
 the compact full-support cutoff after applying Sion: positive definiteness gives
@@ -1854,9 +1749,9 @@ a scalar lower spectral bound, and we shrink it if needed to meet the
 `uniformlyPositiveDensityMatrixSet_nonempty` side condition. -/
 theorem exists_uniformlyPositiveDensityMatrixSet_mem_of_posDef
     {b : Type v1} [Fintype b] [DecidableEq b]
-    (σ : State b) (hσ : σ.matrix.PosDef) :
+    (σ : MState b) (hσ : σ.m.PosDef) :
     ∃ delta : ℝ, 0 < delta ∧ delta ≤ (Fintype.card b : ℝ)⁻¹ ∧
-      σ.matrix ∈ State.uniformlyPositiveDensityMatrixSet delta b := by
+      σ.m ∈ MState.uniformlyPositiveDensityMatrixSet delta b := by
   classical
   have : Nonempty b := σ.nonempty
   rcases σ.exists_pos_scalar_smul_one_le_matrix_of_posDef hσ with ⟨c, hc_pos, hc_le⟩
@@ -1875,20 +1770,20 @@ theorem exists_uniformlyPositiveDensityMatrixSet_mem_of_posDef
     rw [← sub_smul]
     exact Matrix.PosSemidef.smul Matrix.PosSemidef.one (sub_nonneg.mpr hdelta_le_c)
   refine ⟨delta, hdelta_pos, hdelta_le_card, ?_⟩
-  exact ⟨State.state_matrix_mem_densityMatrixSet σ, hdelta_one_le_c_one.trans hc_le⟩
+  exact ⟨MState.state_matrix_mem_densityMatrixSet σ, hdelta_one_le_c_one.trans hc_le⟩
 
 /-- Pointwise removal of the compact uniformly-positive cutoff.
 
 For a fixed objective over side states, optimizing over all full-rank states is
-the same as first imposing a source-valid cutoff `delta • I <= sigma` and then
+the same as first imposing a source-valid cutoff `delta • I ≤ sigma` and then
 letting `delta` range over all positive values allowed by the Sion compactness
 side condition.  This is the order-theoretic core of the KW `delta downarrow 0`
 step before any supremum over the purifying side is considered. -/
 theorem fullRankState_iInf_eq_iInf_uniformlyPositiveState_iInf_EReal
-    {b : Type v1} [Fintype b] [DecidableEq b] (f : State b → EReal) :
-    (⨅ σ : {σ : State b // σ.matrix.PosDef}, f σ.val) =
+    {b : Type v1} [Fintype b] [DecidableEq b] (f : MState b → EReal) :
+    (⨅ σ : {σ : MState b // σ.m.PosDef}, f σ.val) =
       ⨅ delta : {delta : ℝ // 0 < delta ∧ delta ≤ (Fintype.card b : ℝ)⁻¹},
-        ⨅ σ : {σ : State b // delta.val • (1 : CMatrix b) ≤ σ.matrix}, f σ.val := by
+        ⨅ σ : {σ : MState b // delta.val • (1 : CMatrix b) ≤ σ.m}, f σ.val := by
   refine le_antisymm ?_ ?_
   · refine le_iInf ?_
     intro delta
@@ -1899,45 +1794,53 @@ theorem fullRankState_iInf_eq_iInf_uniformlyPositiveState_iInf_EReal
       ⟨delta, hdelta_pos, hdelta_le, hσmem⟩
     have hleft :
         (⨅ delta : {delta : ℝ // 0 < delta ∧ delta ≤ (Fintype.card b : ℝ)⁻¹},
-          ⨅ τ : {τ : State b // delta.val • (1 : CMatrix b) ≤ τ.matrix}, f τ.val) ≤
-          ⨅ τ : {τ : State b // delta • (1 : CMatrix b) ≤ τ.matrix}, f τ.val :=
+          ⨅ τ : {τ : MState b // delta.val • (1 : CMatrix b) ≤ τ.m}, f τ.val) ≤
+          ⨅ τ : {τ : MState b // delta • (1 : CMatrix b) ≤ τ.m}, f τ.val :=
       iInf_le
         (fun delta : {delta : ℝ // 0 < delta ∧ delta ≤ (Fintype.card b : ℝ)⁻¹} =>
-          ⨅ τ : {τ : State b // delta.val • (1 : CMatrix b) ≤ τ.matrix}, f τ.val)
+          ⨅ τ : {τ : MState b // delta.val • (1 : CMatrix b) ≤ τ.m}, f τ.val)
         ⟨delta, hdelta_pos, hdelta_le⟩
     have hright :
-        (⨅ τ : {τ : State b // delta • (1 : CMatrix b) ≤ τ.matrix}, f τ.val) ≤
+        (⨅ τ : {τ : MState b // delta • (1 : CMatrix b) ≤ τ.m}, f τ.val) ≤
           f σ.val :=
       iInf_le
-        (fun τ : {τ : State b // delta • (1 : CMatrix b) ≤ τ.matrix} => f τ.val)
+        (fun τ : {τ : MState b // delta • (1 : CMatrix b) ≤ τ.m} => f τ.val)
         ⟨σ.val, hσmem.2⟩
     exact hleft.trans hright
 
-namespace PureVector
+end
+end QIT
+
+namespace Ket
+
+noncomputable section
+
+open QIT
+universe u1 v1 u2 v2
 
 /-- Fixed-`tau_C` specialization of the pointwise `delta downarrow 0` removal
 for the KW Sion bracket.
 
 This is the exact statement obtained by applying
 `fullRankState_iInf_eq_iInf_uniformlyPositiveState_iInf_EReal` to the source
-bracket.  It is intentionally pointwise in `tau_C`; the remaining reverse
-alternate-expression step must still justify moving this cutoff removal through
-the `tau_C` supremum. -/
+bracket.  It is pointwise in `tau_C`; moving the cutoff removal through the
+`tau_C` supremum is a separate step of the reverse alternate-expression
+argument. -/
 theorem sandwichedMutualInformationSionBracketRe_fullRank_iInf_eq_iInf_uniformlyPositive
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] [Nonempty b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (τ : State c) {alpha : ℝ} :
-    (⨅ σ : {σ : State b // σ.matrix.PosDef},
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (τ : MState c) {alpha : ℝ} :
+    (⨅ σ : {σ : MState b // σ.m.PosDef},
         (sandwichedMutualInformationSionBracketRe rhoA ψ σ.val τ alpha : EReal)) =
       ⨅ delta : {delta : ℝ // 0 < delta ∧ delta ≤ (Fintype.card b : ℝ)⁻¹},
-        ⨅ σ : {σ : State b // delta.val • (1 : CMatrix b) ≤ σ.matrix},
+        ⨅ σ : {σ : MState b // delta.val • (1 : CMatrix b) ≤ σ.m},
           (sandwichedMutualInformationSionBracketRe rhoA ψ σ.val τ alpha : EReal) := by
   simpa using
     fullRankState_iInf_eq_iInf_uniformlyPositiveState_iInf_EReal
       (b := b)
-      (fun σ : State b =>
+      (fun σ : MState b =>
         (sandwichedMutualInformationSionBracketRe rhoA ψ σ τ alpha : EReal))
 
 /-- Logarithmic fixed-`tau_C` form of the pointwise `delta downarrow 0`
@@ -1946,40 +1849,33 @@ theorem sandwichedMutualInformationSionBracketLog_fullRank_iInf_eq_iInf_uniforml
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] [Nonempty b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (τ : State c) {alpha : ℝ} :
-    (⨅ σ : {σ : State b // σ.matrix.PosDef},
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (τ : MState c) {alpha : ℝ} :
+    (⨅ σ : {σ : MState b // σ.m.PosDef},
         ((alpha / (alpha - 1) *
           log2 (sandwichedMutualInformationSionBracketRe rhoA ψ σ.val τ alpha) : ℝ) :
           EReal)) =
       ⨅ delta : {delta : ℝ // 0 < delta ∧ delta ≤ (Fintype.card b : ℝ)⁻¹},
-        ⨅ σ : {σ : State b // delta.val • (1 : CMatrix b) ≤ σ.matrix},
+        ⨅ σ : {σ : MState b // delta.val • (1 : CMatrix b) ≤ σ.m},
           ((alpha / (alpha - 1) *
             log2 (sandwichedMutualInformationSionBracketRe rhoA ψ σ.val τ alpha) : ℝ) :
             EReal) := by
   simpa using
     fullRankState_iInf_eq_iInf_uniformlyPositiveState_iInf_EReal
       (b := b)
-      (fun σ : State b =>
+      (fun σ : MState b =>
         ((alpha / (alpha - 1) *
           log2 (sandwichedMutualInformationSionBracketRe rhoA ψ σ τ alpha) : ℝ) :
           EReal))
 
-end PureVector
+end
 
-/-- The positive prefactor `alpha / (alpha - 1)` appearing in every
-sandwiched-Renyi alternate expression for `alpha > 1`. -/
-theorem sandwichedCoeff_pos {alpha : ℝ} (halpha : 1 < alpha) :
-    0 < alpha / (alpha - 1) := by
-  exact div_pos (lt_trans zero_lt_one halpha) (sub_pos.mpr halpha)
+end Ket
 
-/-- The output-side weighting exponent used in
-`S_sigma^(alpha)` is negative on the high-alpha branch. -/
-theorem sandwichedSideWeightExponent_neg {alpha : ℝ} (halpha : 1 < alpha) :
-    (1 - alpha) / (2 * alpha) < 0 := by
-  have halpha_pos : 0 < alpha := lt_trans zero_lt_one halpha
-  have hden_pos : 0 < 2 * alpha := by positivity
-  exact div_neg_of_neg_of_pos (by linarith) hden_pos
+namespace QIT
+noncomputable section
+
+universe u1 v1 u2 v2
 
 /-- Doubling the two-sided sandwich exponent gives the one-sided exponent in
 the trace-bracket expression of KW `eq-sand_rel_mut_inf_alt`. -/
@@ -2042,7 +1938,15 @@ theorem sandwichedAlternate_reverseHolderExponent
   field_simp [ne_of_gt halpha_pos, hden_ne]
   all_goals ring_nf
 
-namespace PureVector
+end
+end QIT
+
+namespace Ket
+
+noncomputable section
+
+open QIT
+universe u1 v1 u2 v2
 
 /-- Each supported side-information state gives a reverse-Holder objective
 value for the KW `AC` trace matrix. -/
@@ -2050,17 +1954,17 @@ theorem sandwichedMutualInformationSionBracketRe_mem_reverseHolderStateValueSet
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (σB : State b) (τC : State c) {alpha : ℝ} (halpha : 1 < alpha)
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (σB : MState b) (τC : MState c) {alpha : ℝ} (halpha : 1 < alpha)
     (hSupport :
       Matrix.Supports (sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha)
-        σB.matrix) :
+        σB.m) :
     sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha ∈
       psdTraceReverseHolderStateValueSet
         (sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha)
         (alpha / (2 * alpha - 1)) := by
-  refine ⟨σB.matrix, σB.pos, ?_, hSupport, ?_⟩
-  · simpa using congrArg Complex.re σB.trace_eq_one
+  refine ⟨σB.m, σB.psd, ?_, hSupport, ?_⟩
+  · simp
   · rw [sandwichedMutualInformationSionBracketRe_eq_trace_ACTraceMatrix_mul_sigma]
     rw [sandwichedAlternate_reverseHolderExponent halpha]
 
@@ -2070,11 +1974,11 @@ theorem psdSchattenPNorm_ACTraceMatrix_le_SionBracketRe_of_support
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (σB : State b) (τC : State c) {alpha : ℝ} (halpha : 1 < alpha)
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (σB : MState b) (τC : MState c) {alpha : ℝ} (halpha : 1 < alpha)
     (hSupport :
       Matrix.Supports (sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha)
-        σB.matrix) :
+        σB.m) :
     psdSchattenPNorm
         (sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha)
         (sandwichedMutualInformationACTraceMatrix_posSemidef rhoA ψ τC alpha)
@@ -2104,13 +2008,13 @@ theorem sandwichedACTraceMatrixLog_le_SionBracketLog_of_support
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (σB : State b) (τC : State c)
-    (hrhoA : rhoA.matrix.PosDef) (hτC : τC.matrix.PosDef)
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (σB : MState b) (τC : MState c)
+    (hrhoA : rhoA.m.PosDef) (hτC : τC.m.PosDef)
     {alpha : ℝ} (halpha : 1 < alpha)
     (hSupport :
       Matrix.Supports (sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha)
-        σB.matrix) :
+        σB.m) :
     alpha / (alpha - 1) *
         log2
           (psdSchattenPNorm
@@ -2137,7 +2041,7 @@ theorem sandwichedACTraceMatrixLog_le_SionBracketLog_of_support
     unfold log2
     exact div_le_div_of_nonneg_right (Real.log_le_log hnorm_pos hnorm_le)
       (le_of_lt (Real.log_pos one_lt_two))
-  exact mul_le_mul_of_nonneg_left hlog (le_of_lt (sandwichedCoeff_pos halpha))
+  exact mul_le_mul_of_nonneg_left hlog (le_of_lt (highAlpha_conjExponent_pos halpha))
 
 /-- Full-rank side-information specialization of
 `sandwichedACTraceMatrixLog_le_SionBracketLog_of_support`.
@@ -2148,10 +2052,10 @@ theorem sandwichedACTraceMatrixLog_le_SionBracketLog_posDef
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (σB : State b) (τC : State c)
-    (hrhoA : rhoA.matrix.PosDef) (hσB : σB.matrix.PosDef)
-    (hτC : τC.matrix.PosDef) {alpha : ℝ} (halpha : 1 < alpha) :
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (σB : MState b) (τC : MState c)
+    (hrhoA : rhoA.m.PosDef) (hσB : σB.m.PosDef)
+    (hτC : τC.m.PosDef) {alpha : ℝ} (halpha : 1 < alpha) :
     alpha / (alpha - 1) *
         log2
           (psdSchattenPNorm
@@ -2173,8 +2077,8 @@ theorem sandwichedACTraceMatrixLog_le_fullRankSionBracketLog_iInf
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Nonempty b] [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (τC : State c) (hrhoA : rhoA.matrix.PosDef) (hτC : τC.matrix.PosDef)
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (τC : MState c) (hrhoA : rhoA.m.PosDef) (hτC : τC.m.PosDef)
     {alpha : ℝ} (halpha : 1 < alpha) :
     alpha / (alpha - 1) *
         log2
@@ -2182,11 +2086,11 @@ theorem sandwichedACTraceMatrixLog_le_fullRankSionBracketLog_iInf
             (sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha)
             (sandwichedMutualInformationACTraceMatrix_posSemidef rhoA ψ τC alpha)
             (sandwichedAlternateSchattenOrder halpha)) ≤
-      sInf (Set.range fun σB : {σ : State b // σ.matrix.PosDef} =>
+      sInf (Set.range fun σB : {σ : MState b // σ.m.PosDef} =>
         alpha / (alpha - 1) *
           log2 (sandwichedMutualInformationSionBracketRe rhoA ψ σB.1 τC alpha)) := by
-  have : Nonempty {σ : State b // σ.matrix.PosDef} :=
-    ⟨⟨State.maximallyMixed b, State.maximallyMixed_posDef⟩⟩
+  have : Nonempty {σ : MState b // σ.m.PosDef} :=
+    ⟨⟨(MState.uniform : MState b), MState.uniform_posDef⟩⟩
   refine le_csInf (Set.range_nonempty _) ?_
   rintro y ⟨σB, rfl⟩
   exact sandwichedACTraceMatrixLog_le_SionBracketLog_posDef
@@ -2198,12 +2102,12 @@ theorem exists_state_SionBracketRe_eq_psdSchattenPNorm_of_ACTraceMatrix_ne_zero
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (τC : State c) {alpha : ℝ} (halpha : 1 < alpha)
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (τC : MState c) {alpha : ℝ} (halpha : 1 < alpha)
     (hMne : sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha ≠ 0) :
-    ∃ σB : State b,
+    ∃ σB : MState b,
       Matrix.Supports (sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha)
-        σB.matrix ∧
+        σB.m ∧
       sandwichedMutualInformationSionBracketRe rhoA ψ σB τC alpha =
         psdSchattenPNorm
           (sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha)
@@ -2228,7 +2132,7 @@ theorem exists_state_SionBracketRe_eq_psdSchattenPNorm_of_ACTraceMatrix_ne_zero
         (M * CFC.rpow N ((1 - alpha) / alpha)).trace.re := by
     rw [sandwichedAlternate_reverseHolderExponent halpha] at hattain
     exact hattain
-  let σB : State b := { matrix := N, pos := hN, trace_eq_one := hNtrace }
+  let σB : MState b := .ofMatrix (matrix := N) (pos := hN) (trace_eq_one := hNtrace)
   refine ⟨σB, ?_, ?_⟩
   · simpa [σB, M] using hSupport
   · rw [sandwichedMutualInformationSionBracketRe_eq_trace_ACTraceMatrix_mul_sigma]
@@ -2244,13 +2148,13 @@ theorem sandwichedMutualInformationSionBracketRe_supported_sInf_eq_psdSchattenPN
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (ψ : PureVector (Prod (Prod a b) c))
-    (τC : State c) {alpha : ℝ} (halpha : 1 < alpha)
+    (rhoA : MState a) (ψ : Ket ((a × b) × c))
+    (τC : MState c) {alpha : ℝ} (halpha : 1 < alpha)
     (hMne : sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha ≠ 0) :
     sInf (Set.range fun σB :
-        {σ : State b //
+        {σ : MState b //
           Matrix.Supports (sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha)
-            σ.matrix} =>
+            σ.m} =>
       sandwichedMutualInformationSionBracketRe rhoA ψ σB.1 τC alpha) =
         psdSchattenPNorm
           (sandwichedMutualInformationACTraceMatrix rhoA ψ τC alpha)
@@ -2262,7 +2166,7 @@ theorem sandwichedMutualInformationSionBracketRe_supported_sInf_eq_psdSchattenPN
   let target : ℝ :=
     psdSchattenPNorm M hM (sandwichedAlternateSchattenOrder halpha)
   let S : Set ℝ := Set.range fun σB :
-      {σ : State b // Matrix.Supports M σ.matrix} =>
+      {σ : MState b // Matrix.Supports M σ.m} =>
     sandwichedMutualInformationSionBracketRe rhoA ψ σB.1 τC alpha
   rcases exists_state_SionBracketRe_eq_psdSchattenPNorm_of_ACTraceMatrix_ne_zero
       rhoA ψ τC halpha hMne with
@@ -2287,13 +2191,13 @@ theorem sandwichedMutualInformationSionBracketRe_supported_sInf_eq_psdSchattenPN
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] [Nonempty b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (psi : PureVector (Prod (Prod a b) c))
-    (tauC : State c) {alpha : Real} (halpha : 1 < alpha)
+    (rhoA : MState a) (psi : Ket ((a × b) × c))
+    (tauC : MState c) {alpha : ℝ} (halpha : 1 < alpha)
     (hMzero : sandwichedMutualInformationACTraceMatrix rhoA psi tauC alpha = 0) :
     sInf (Set.range fun sigmaB :
-        {sigma : State b //
+        {sigma : MState b //
           Matrix.Supports (sandwichedMutualInformationACTraceMatrix rhoA psi tauC alpha)
-            sigma.matrix} =>
+            sigma.m} =>
       sandwichedMutualInformationSionBracketRe rhoA psi sigmaB.1 tauC alpha) =
         psdSchattenPNorm
           (sandwichedMutualInformationACTraceMatrix rhoA psi tauC alpha)
@@ -2301,10 +2205,10 @@ theorem sandwichedMutualInformationSionBracketRe_supported_sInf_eq_psdSchattenPN
           (sandwichedAlternateSchattenOrder halpha) := by
   let M : CMatrix b := sandwichedMutualInformationACTraceMatrix rhoA psi tauC alpha
   let hM : M.PosSemidef := sandwichedMutualInformationACTraceMatrix_posSemidef rhoA psi tauC alpha
-  let target : Real :=
+  let target : ℝ :=
     psdSchattenPNorm M hM (sandwichedAlternateSchattenOrder halpha)
-  let S : Set Real := Set.range fun sigmaB :
-      {sigma : State b // Matrix.Supports M sigma.matrix} =>
+  let S : Set ℝ := Set.range fun sigmaB :
+      {sigma : MState b // Matrix.Supports M sigma.m} =>
     sandwichedMutualInformationSionBracketRe rhoA psi sigmaB.1 tauC alpha
   have hMzero' : M = 0 := by
     simpa [M] using hMzero
@@ -2320,22 +2224,22 @@ theorem sandwichedMutualInformationSionBracketRe_supported_sInf_eq_psdSchattenPN
     rw [hcongr]
     exact psdSchattenPNorm_zero (sandwichedAlternateSchattenOrder halpha)
   have hvalue :
-      forall sigmaB : {sigma : State b // Matrix.Supports M sigma.matrix},
+      ∀ sigmaB : {sigma : MState b // Matrix.Supports M sigma.m},
         sandwichedMutualInformationSionBracketRe rhoA psi sigmaB.1 tauC alpha = 0 := by
     intro sigmaB
     rw [sandwichedMutualInformationSionBracketRe_eq_trace_ACTraceMatrix_mul_sigma]
     simp [M, hMzero']
-  let sigma0 : {sigma : State b // Matrix.Supports M sigma.matrix} :=
-    ⟨State.maximallyMixed b, by
+  let sigma0 : {sigma : MState b // Matrix.Supports M sigma.m} :=
+    ⟨(MState.uniform : MState b), by
       intro v hv
       simp [M, hMzero']⟩
-  have hmem : (0 : Real) ∈ S := by
+  have hmem : (0 : ℝ) ∈ S := by
     refine ⟨sigma0, ?_⟩
     exact hvalue sigma0
-  have hLower : (0 : Real) ∈ lowerBounds S := by
+  have hLower : (0 : ℝ) ∈ lowerBounds S := by
     intro y hy
     rcases hy with ⟨sigmaB, rfl⟩
-    change (0 : Real) <=
+    change (0 : ℝ) ≤
       sandwichedMutualInformationSionBracketRe rhoA psi sigmaB.1 tauC alpha
     rw [hvalue sigmaB]
   have hS : sInf S = 0 := by
@@ -2352,12 +2256,12 @@ theorem sandwichedMutualInformationSionBracketRe_supported_sInf_eq_psdSchattenPN
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] [Nonempty b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (psi : PureVector (Prod (Prod a b) c))
-    (tauC : State c) {alpha : Real} (halpha : 1 < alpha) :
+    (rhoA : MState a) (psi : Ket ((a × b) × c))
+    (tauC : MState c) {alpha : ℝ} (halpha : 1 < alpha) :
     sInf (Set.range fun sigmaB :
-        {sigma : State b //
+        {sigma : MState b //
           Matrix.Supports (sandwichedMutualInformationACTraceMatrix rhoA psi tauC alpha)
-            sigma.matrix} =>
+            sigma.m} =>
       sandwichedMutualInformationSionBracketRe rhoA psi sigmaB.1 tauC alpha) =
         psdSchattenPNorm
           (sandwichedMutualInformationACTraceMatrix rhoA psi tauC alpha)
@@ -2382,9 +2286,9 @@ theorem sandwichedMutualInformationSionBracketRe_fullRank_sInf_eq_psdSchattenPNo
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] [Nonempty b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (psi : PureVector (Prod (Prod a b) c))
-    (tauC : State c) {alpha : Real} (halpha : 1 < alpha) :
-    sInf (Set.range fun sigmaB : {sigma : State b // sigma.matrix.PosDef} =>
+    (rhoA : MState a) (psi : Ket ((a × b) × c))
+    (tauC : MState c) {alpha : ℝ} (halpha : 1 < alpha) :
+    sInf (Set.range fun sigmaB : {sigma : MState b // sigma.m.PosDef} =>
       sandwichedMutualInformationSionBracketRe rhoA psi sigmaB.1 tauC alpha) =
         psdSchattenPNorm
           (sandwichedMutualInformationACTraceMatrix rhoA psi tauC alpha)
@@ -2394,19 +2298,19 @@ theorem sandwichedMutualInformationSionBracketRe_fullRank_sInf_eq_psdSchattenPNo
   let hM : M.PosSemidef :=
     sandwichedMutualInformationACTraceMatrix_posSemidef rhoA psi tauC alpha
   let p : SchattenOrder := sandwichedAlternateSchattenOrder halpha
-  let r : Real := (1 - alpha) / alpha
-  let target : Real := psdSchattenPNorm M hM p
-  let S := {sigma : State b // sigma.matrix.PosDef}
-  let f : S -> Real := fun sigmaB =>
+  let r : ℝ := (1 - alpha) / alpha
+  let target : ℝ := psdSchattenPNorm M hM p
+  let S := {sigma : MState b // sigma.m.PosDef}
+  let f : S → ℝ := fun sigmaB =>
     sandwichedMutualInformationSionBracketRe rhoA psi sigmaB.1 tauC alpha
-  have : Nonempty S := ⟨⟨State.maximallyMixed b, State.maximallyMixed_posDef⟩⟩
+  have : Nonempty S := ⟨⟨(MState.uniform : MState b), MState.uniform_posDef⟩⟩
   have hLower : target ∈ lowerBounds (Set.range f) := by
     intro y hy
     rcases hy with ⟨sigmaB, rfl⟩
     simpa [target, p, f, M, hM] using
       psdSchattenPNorm_ACTraceMatrix_le_SionBracketRe_of_support
         rhoA psi sigmaB.1 tauC halpha
-        (Matrix.Supports.of_right_posDef M sigmaB.1.matrix sigmaB.2)
+        (Matrix.Supports.of_right_posDef M sigmaB.1.m sigmaB.2)
   have hBdd : BddBelow (Set.range f) := ⟨target, hLower⟩
   change sInf (Set.range f) = target
   by_cases hMzero : M = 0
@@ -2427,70 +2331,70 @@ theorem sandwichedMutualInformationSionBracketRe_fullRank_sInf_eq_psdSchattenPNo
     rcases exists_state_SionBracketRe_eq_psdSchattenPNorm_of_ACTraceMatrix_ne_zero
         rhoA psi tauC halpha (by simpa [M] using hMne) with
       ⟨sigma0, hSupport0, hsigma0⟩
-    let N0 : CMatrix b := sigma0.matrix
-    have hN0 : N0.PosSemidef := sigma0.pos
-    have hN0trace : N0.trace = 1 := sigma0.trace_eq_one
+    let N0 : CMatrix b := sigma0.m
+    have hN0 : N0.PosSemidef := sigma0.psd
+    have hN0trace : N0.trace = 1 := sigma0.tr'
     have hN0trace_re : N0.trace.re = 1 := by
-      simpa [N0] using congrArg Complex.re hN0trace
+      simp [N0]
     have htrace_target :
         ((M * CFC.rpow N0 r).trace).re = target := by
       have h := hsigma0
       rw [sandwichedMutualInformationSionBracketRe_eq_trace_ACTraceMatrix_mul_sigma] at h
       simpa [M, N0, r, target, p, hM] using h
-    let raw : Real -> Real := fun eps =>
+    let raw : ℝ → ℝ := fun eps =>
       ((M * CFC.rpow (N0 + eps • (1 : CMatrix b)) r).trace).re
-    let scale : Real -> Real := fun eps =>
+    let scale : ℝ → ℝ := fun eps =>
       ((N0 + eps • (1 : CMatrix b)).trace.re)⁻¹
-    let reg : Real -> CMatrix b := fun eps =>
+    let reg : ℝ → CMatrix b := fun eps =>
       scale eps • (N0 + eps • (1 : CMatrix b))
     have hraw :
-        Filter.Tendsto raw (nhdsWithin (0 : Real) (Set.Ioi 0)) (nhds target) := by
+        Filter.Tendsto raw (nhdsWithin (0 : ℝ) (Set.Ioi 0)) (nhds target) := by
       have h :=
         trace_mul_cMatrix_rpow_add_pos_smul_one_tendsto_of_support
           hN0 (by simpa [M, N0] using hSupport0) r
       have h' :
-          Filter.Tendsto raw (nhdsWithin (0 : Real) (Set.Ioi 0))
+          Filter.Tendsto raw (nhdsWithin (0 : ℝ) (Set.Ioi 0))
             (nhds ((M * CFC.rpow N0 r).trace.re)) := by
         simpa [raw, M, N0] using h
       rw [← htrace_target]
       exact h'
     have htraceScale :
-        Filter.Tendsto scale (nhdsWithin (0 : Real) (Set.Ioi 0)) (nhds 1) := by
+        Filter.Tendsto scale (nhdsWithin (0 : ℝ) (Set.Ioi 0)) (nhds 1) := by
       have htrace :
-          Filter.Tendsto (fun eps : Real => (N0 + eps • (1 : CMatrix b)).trace.re)
-            (nhdsWithin (0 : Real) (Set.Ioi 0)) (nhds 1) := by
-        have hcont : Continuous fun eps : Real =>
+          Filter.Tendsto (fun eps : ℝ => (N0 + eps • (1 : CMatrix b)).trace.re)
+            (nhdsWithin (0 : ℝ) (Set.Ioi 0)) (nhds 1) := by
+        have hcont : Continuous fun eps : ℝ =>
             (N0 + eps • (1 : CMatrix b)).trace.re := by
           fun_prop
-        have hlim := (hcont.tendsto (0 : Real)).mono_left
-          (nhdsWithin_le_nhds (a := (0 : Real)) (s := Set.Ioi (0 : Real)))
+        have hlim := (hcont.tendsto (0 : ℝ)).mono_left
+          (nhdsWithin_le_nhds (a := (0 : ℝ)) (s := Set.Ioi (0 : ℝ)))
         simpa [N0, hN0trace_re] using hlim
       simpa [scale] using htrace.inv₀ one_ne_zero
     have hscalePow :
-        Filter.Tendsto (fun eps : Real => scale eps ^ r)
-          (nhdsWithin (0 : Real) (Set.Ioi 0)) (nhds (1 : Real)) := by
+        Filter.Tendsto (fun eps : ℝ => scale eps ^ r)
+          (nhdsWithin (0 : ℝ) (Set.Ioi 0)) (nhds (1 : ℝ)) := by
       have hpow :=
-        (Real.continuousAt_rpow_const (1 : Real) r (Or.inl one_ne_zero)).tendsto.comp
+        (Real.continuousAt_rpow_const (1 : ℝ) r (Or.inl one_ne_zero)).tendsto.comp
           htraceScale
       simpa [Function.comp_def] using hpow
     have hregValue :
         Filter.Tendsto
-          (fun eps : Real => ((M * CFC.rpow (reg eps) r).trace).re)
-          (nhdsWithin (0 : Real) (Set.Ioi 0)) (nhds target) := by
+          (fun eps : ℝ => ((M * CFC.rpow (reg eps) r).trace).re)
+          (nhdsWithin (0 : ℝ) (Set.Ioi 0)) (nhds target) := by
       have heq :
-          (fun eps : Real => ((M * CFC.rpow (reg eps) r).trace).re)
-            =ᶠ[nhdsWithin (0 : Real) (Set.Ioi 0)]
-          fun eps : Real => scale eps ^ r * raw eps := by
+          (fun eps : ℝ => ((M * CFC.rpow (reg eps) r).trace).re)
+            =ᶠ[nhdsWithin (0 : ℝ) (Set.Ioi 0)]
+          fun eps : ℝ => scale eps ^ r * raw eps := by
         filter_upwards [self_mem_nhdsWithin] with eps heps
         have hBpos : (N0 + eps • (1 : CMatrix b)).PosDef :=
-          State.cMatrix_posSemidef_add_pos_smul_one_posDef hN0 heps
+          MState.cMatrix_posSemidef_add_pos_smul_one_posDef hN0 heps
         have hscale_pos : 0 < scale eps := by
           have htr_pos : 0 < (N0 + eps • (1 : CMatrix b)).trace.re := by
             exact (Matrix.PosDef.trace_pos hBpos).1
           exact inv_pos.mpr htr_pos
         have hpow :
             CFC.rpow (reg eps) r =
-              (scale eps ^ r : Real) •
+              (scale eps ^ r : ℝ) •
                 CFC.rpow (N0 + eps • (1 : CMatrix b)) r := by
           simpa [reg] using
             cMatrix_rpow_real_smul_posSemidef_schatten hBpos.posSemidef
@@ -2499,15 +2403,15 @@ theorem sandwichedMutualInformationSionBracketRe_fullRank_sInf_eq_psdSchattenPNo
         rw [hpow]
         simp [raw, Matrix.trace_smul, Complex.real_smul]
       have hprod :
-          Filter.Tendsto (fun eps : Real => scale eps ^ r * raw eps)
-            (nhdsWithin (0 : Real) (Set.Ioi 0)) (nhds target) := by
+          Filter.Tendsto (fun eps : ℝ => scale eps ^ r * raw eps)
+            (nhdsWithin (0 : ℝ) (Set.Ioi 0)) (nhds target) := by
         simpa using hscalePow.mul hraw
       exact hprod.congr' heq.symm
-    have hupper : sInf (Set.range f) <= target := by
+    have hupper : sInf (Set.range f) ≤ target := by
       exact ge_of_tendsto hregValue (by
         filter_upwards [self_mem_nhdsWithin] with eps heps
         have hBpos : (N0 + eps • (1 : CMatrix b)).PosDef :=
-          State.cMatrix_posSemidef_add_pos_smul_one_posDef hN0 heps
+          MState.cMatrix_posSemidef_add_pos_smul_one_posDef hN0 heps
         have htr_pos : 0 < (N0 + eps • (1 : CMatrix b)).trace.re := by
           exact (Matrix.PosDef.trace_pos hBpos).1
         have hscale_pos : 0 < scale eps := inv_pos.mpr htr_pos
@@ -2516,36 +2420,38 @@ theorem sandwichedMutualInformationSionBracketRe_fullRank_sInf_eq_psdSchattenPNo
         have hreg_trace : (reg eps).trace = 1 := by
           have htr_real :
               (N0 + eps • (1 : CMatrix b)).trace =
-                ((N0 + eps • (1 : CMatrix b)).trace.re : Complex) := by
+                ((N0 + eps • (1 : CMatrix b)).trace.re : ℂ) := by
             exact posSemidef_trace_eq_re_coe hBpos.posSemidef
           have htr_ne : (N0 + eps • (1 : CMatrix b)).trace.re ≠ 0 :=
             ne_of_gt htr_pos
           calc
             (reg eps).trace =
-                (scale eps : Complex) * (N0 + eps • (1 : CMatrix b)).trace := by
+                (scale eps : ℂ) * (N0 + eps • (1 : CMatrix b)).trace := by
                   change (scale eps • (N0 + eps • (1 : CMatrix b))).trace =
-                    (scale eps : Complex) * (N0 + eps • (1 : CMatrix b)).trace
+                    (scale eps : ℂ) * (N0 + eps • (1 : CMatrix b)).trace
                   rw [Matrix.trace_smul]
                   simpa using (Complex.real_smul (x := scale eps)
                     (z := (N0 + eps • (1 : CMatrix b)).trace))
-            _ = (scale eps : Complex) *
-                ((N0 + eps • (1 : CMatrix b)).trace.re : Complex) := by
-                  exact congrArg (fun z : Complex => (scale eps : Complex) * z) htr_real
+            _ = (scale eps : ℂ) *
+                ((N0 + eps • (1 : CMatrix b)).trace.re : ℂ) := by
+                  exact congrArg (fun z : ℂ => (scale eps : ℂ) * z) htr_real
             _ = 1 := by
                   have htr_ne_complex :
-                      ((N0 + eps • (1 : CMatrix b)).trace.re : Complex) ≠ 0 := by
+                      ((N0 + eps • (1 : CMatrix b)).trace.re : ℂ) ≠ 0 := by
                     exact_mod_cast htr_ne
                   have hscale_eq :
-                      (scale eps : Complex) =
-                        ((((N0 + eps • (1 : CMatrix b)).trace.re)⁻¹ : Real) : Complex) := by
-                    change ((((N0 + eps • (1 : CMatrix b)).trace.re)⁻¹ : Real) : Complex) =
-                      ((((N0 + eps • (1 : CMatrix b)).trace.re)⁻¹ : Real) : Complex)
+                      (scale eps : ℂ) =
+                        ((((N0 + eps • (1 : CMatrix b)).trace.re)⁻¹ : ℝ) : ℂ) := by
+                    change ((((N0 + eps • (1 : CMatrix b)).trace.re)⁻¹ : ℝ) : ℂ) =
+                      ((((N0 + eps • (1 : CMatrix b)).trace.re)⁻¹ : ℝ) : ℂ)
                     rfl
                   rw [hscale_eq]
                   simpa using inv_mul_cancel₀ htr_ne_complex
-        let sigmaReg : State b :=
-          { matrix := reg eps, pos := hreg_pos.posSemidef, trace_eq_one := hreg_trace }
-        have hsigmaReg : sigmaReg.matrix.PosDef := hreg_pos
+        let sigmaReg : MState b :=
+          .ofMatrix (matrix := reg eps) (pos := hreg_pos.posSemidef) (trace_eq_one := hreg_trace)
+        have hsigmaReg : sigmaReg.m.PosDef := by
+          simp only [sigmaReg, MState.matrix_ofMatrix]
+          exact hreg_pos
         have hmem :
             ((M * CFC.rpow (reg eps) r).trace).re ∈ Set.range f := by
           refine ⟨⟨sigmaReg, hsigmaReg⟩, ?_⟩
@@ -2555,7 +2461,7 @@ theorem sandwichedMutualInformationSionBracketRe_fullRank_sInf_eq_psdSchattenPNo
             sandwichedMutualInformationSionBracketRe_eq_trace_ACTraceMatrix_mul_sigma
               rhoA psi sigmaReg tauC alpha
         exact csInf_le hBdd hmem)
-    have hlower : target <= sInf (Set.range f) :=
+    have hlower : target ≤ sInf (Set.range f) :=
       le_csInf (Set.range_nonempty f) hLower
     exact le_antisymm hupper hlower
 
@@ -2570,10 +2476,10 @@ theorem sandwichedMutualInformationSionBracketLog_fullRank_sInf_eq_ACTraceMatrix
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] [Nonempty b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (psi : PureVector (Prod (Prod a b) c))
-    (tauC : State c) (hrhoA : rhoA.matrix.PosDef) (htauC : tauC.matrix.PosDef)
-    {alpha : Real} (halpha : 1 < alpha) :
-    sInf (Set.range fun sigmaB : {sigma : State b // sigma.matrix.PosDef} =>
+    (rhoA : MState a) (psi : Ket ((a × b) × c))
+    (tauC : MState c) (hrhoA : rhoA.m.PosDef) (htauC : tauC.m.PosDef)
+    {alpha : ℝ} (halpha : 1 < alpha) :
+    sInf (Set.range fun sigmaB : {sigma : MState b // sigma.m.PosDef} =>
       alpha / (alpha - 1) *
         log2 (sandwichedMutualInformationSionBracketRe rhoA psi sigmaB.1 tauC alpha)) =
       alpha / (alpha - 1) *
@@ -2582,7 +2488,7 @@ theorem sandwichedMutualInformationSionBracketLog_fullRank_sInf_eq_ACTraceMatrix
             (sandwichedMutualInformationACTraceMatrix rhoA psi tauC alpha)
             (sandwichedMutualInformationACTraceMatrix_posSemidef rhoA psi tauC alpha)
             (sandwichedAlternateSchattenOrder halpha)) := by
-  let S := {sigma : State b // sigma.matrix.PosDef}
+  let S := {sigma : MState b // sigma.m.PosDef}
   let raw : S → ℝ := fun sigmaB =>
     sandwichedMutualInformationSionBracketRe rhoA psi sigmaB.1 tauC alpha
   let coeff : ℝ := alpha / (alpha - 1)
@@ -2591,7 +2497,7 @@ theorem sandwichedMutualInformationSionBracketLog_fullRank_sInf_eq_ACTraceMatrix
       (sandwichedMutualInformationACTraceMatrix rhoA psi tauC alpha)
       (sandwichedMutualInformationACTraceMatrix_posSemidef rhoA psi tauC alpha)
       (sandwichedAlternateSchattenOrder halpha)
-  have : Nonempty S := ⟨⟨State.maximallyMixed b, State.maximallyMixed_posDef⟩⟩
+  have : Nonempty S := ⟨⟨(MState.uniform : MState b), MState.uniform_posDef⟩⟩
   have hraw_sInf : sInf (Set.range raw) = target := by
     simpa [S, raw, target] using
       sandwichedMutualInformationSionBracketRe_fullRank_sInf_eq_psdSchattenPNorm
@@ -2604,7 +2510,7 @@ theorem sandwichedMutualInformationSionBracketLog_fullRank_sInf_eq_ACTraceMatrix
         rhoA psi sigmaB.1 tauC halpha
         (Matrix.Supports.of_right_posDef
           (sandwichedMutualInformationACTraceMatrix rhoA psi tauC alpha)
-          sigmaB.1.matrix sigmaB.2)
+          sigmaB.1.m sigmaB.2)
   have hraw_bdd : BddBelow (Set.range raw) := ⟨target, htarget_lower⟩
   have htarget_pos : 0 < target := by
     simpa [target] using
@@ -2626,7 +2532,7 @@ theorem sandwichedMutualInformationSionBracketLog_fullRank_sInf_eq_ACTraceMatrix
     rw [himage, real_log2_sInf_image_eq (Set.range_nonempty raw) hraw_bdd hinf_pos,
       hraw_sInf]
   have hcoeff_nonneg : 0 ≤ coeff := le_of_lt (by
-    simpa [coeff] using sandwichedCoeff_pos halpha)
+    simpa [coeff] using highAlpha_conjExponent_pos halpha)
   have hscaled :
       sInf (Set.range fun sigmaB : S => coeff * log2 (raw sigmaB)) =
         coeff * log2 target := by
@@ -2675,10 +2581,10 @@ theorem sandwichedMutualInformationSionBracketLog_fullRank_sInf_eq_ACTraceMatrix
     {a : Type u1} {b : Type v1} {c : Type u2}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] [Nonempty b]
     [Fintype c] [DecidableEq c]
-    (rhoA : State a) (psi : PureVector (Prod (Prod a b) c))
-    (tauC : State c) {alpha : Real} (halpha : 1 < alpha)
+    (rhoA : MState a) (psi : Ket ((a × b) × c))
+    (tauC : MState c) {alpha : ℝ} (halpha : 1 < alpha)
     (hMne : sandwichedMutualInformationACTraceMatrix rhoA psi tauC alpha ≠ 0) :
-    sInf (Set.range fun sigmaB : {sigma : State b // sigma.matrix.PosDef} =>
+    sInf (Set.range fun sigmaB : {sigma : MState b // sigma.m.PosDef} =>
       alpha / (alpha - 1) *
         log2 (sandwichedMutualInformationSionBracketRe rhoA psi sigmaB.1 tauC alpha)) =
       alpha / (alpha - 1) *
@@ -2687,7 +2593,7 @@ theorem sandwichedMutualInformationSionBracketLog_fullRank_sInf_eq_ACTraceMatrix
             (sandwichedMutualInformationACTraceMatrix rhoA psi tauC alpha)
             (sandwichedMutualInformationACTraceMatrix_posSemidef rhoA psi tauC alpha)
             (sandwichedAlternateSchattenOrder halpha)) := by
-  let S := {sigma : State b // sigma.matrix.PosDef}
+  let S := {sigma : MState b // sigma.m.PosDef}
   let raw : S → ℝ := fun sigmaB =>
     sandwichedMutualInformationSionBracketRe rhoA psi sigmaB.1 tauC alpha
   let coeff : ℝ := alpha / (alpha - 1)
@@ -2696,7 +2602,7 @@ theorem sandwichedMutualInformationSionBracketLog_fullRank_sInf_eq_ACTraceMatrix
       (sandwichedMutualInformationACTraceMatrix rhoA psi tauC alpha)
       (sandwichedMutualInformationACTraceMatrix_posSemidef rhoA psi tauC alpha)
       (sandwichedAlternateSchattenOrder halpha)
-  have : Nonempty S := ⟨⟨State.maximallyMixed b, State.maximallyMixed_posDef⟩⟩
+  have : Nonempty S := ⟨⟨(MState.uniform : MState b), MState.uniform_posDef⟩⟩
   have hraw_sInf : sInf (Set.range raw) = target := by
     simpa [S, raw, target] using
       sandwichedMutualInformationSionBracketRe_fullRank_sInf_eq_psdSchattenPNorm
@@ -2709,7 +2615,7 @@ theorem sandwichedMutualInformationSionBracketLog_fullRank_sInf_eq_ACTraceMatrix
         rhoA psi sigmaB.1 tauC halpha
         (Matrix.Supports.of_right_posDef
           (sandwichedMutualInformationACTraceMatrix rhoA psi tauC alpha)
-          sigmaB.1.matrix sigmaB.2)
+          sigmaB.1.m sigmaB.2)
   have hraw_bdd : BddBelow (Set.range raw) := ⟨target, htarget_lower⟩
   have htarget_pos : 0 < target := by
     convert
@@ -2735,7 +2641,7 @@ theorem sandwichedMutualInformationSionBracketLog_fullRank_sInf_eq_ACTraceMatrix
     rw [himage, real_log2_sInf_image_eq (Set.range_nonempty raw) hraw_bdd hinf_pos,
       hraw_sInf]
   have hcoeff_nonneg : 0 ≤ coeff := le_of_lt (by
-    simpa [coeff] using sandwichedCoeff_pos halpha)
+    simpa [coeff] using highAlpha_conjExponent_pos halpha)
   have hscaled :
       sInf (Set.range fun sigmaB : S => coeff * log2 (raw sigmaB)) =
         coeff * log2 target := by
@@ -2771,7 +2677,14 @@ theorem sandwichedMutualInformationSionBracketLog_fullRank_sInf_eq_ACTraceMatrix
             rw [hlog_sInf]
   simpa [S, raw, coeff, target] using hscaled
 
-end PureVector
+end
+
+end Ket
+
+namespace QIT
+noncomputable section
+
+universe u1 v1 u2 v2
 end
 
 end QIT

@@ -8,13 +8,15 @@ module
 
 public import QuantumLib.QIT.Core.Map
 public import QuantumLib.QIT.Core.Measurement
+public import QuantumInfo.Channels.CPTP
 
 /-!
 # Channels
 
-Finite-dimensional channels are complex-linear matrix maps equipped with
-Choi-positive complete positivity and trace preservation data. Tensor products
-of channels model parallel channel uses [HolevoGiovannetti2012QuantumChannels,
+Finite-dimensional channels are `CPTPMap`s: complex-linear matrix maps carrying complete
+positivity and trace preservation data. A channel is applied to a state by the `FunLike`
+action `Phi rho`, and `CPTPOp.mat_coe_eq_apply_mat` reads off the underlying matrix. Tensor
+products of channels model parallel channel uses [HolevoGiovannetti2012QuantumChannels,
 arxive.tex:965-974,1986-1993].
 -/
 
@@ -22,71 +24,46 @@ arxive.tex:965-974,1986-1993].
 
 open scoped ComplexOrder MatrixOrder
 
-namespace QIT
-
-universe u v w x y
+attribute [simp] CPTPOp.mat_coe_eq_apply_mat
 
 noncomputable section
-
+universe u v w x y
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-/-- A finite-dimensional CPTP channel. -/
-structure Channel (a : Type u) (b : Type v) [Fintype a] [DecidableEq a]
-    [Fintype b] [DecidableEq b] where
-  map : MatrixMap a b
-  completelyPositive : MatrixMap.IsCompletelyPositive map
-  tracePreserving : MatrixMap.IsTracePreserving map
-  mapsPositive : forall X : CMatrix a, X.PosSemidef -> (map X).PosSemidef
+open QIT
 
-namespace Channel
+namespace CPTPOp
 
-def applyState (Phi : Channel a b) (rho : State a) : State b where
-  matrix := Phi.map rho.matrix
-  pos := Phi.mapsPositive rho.matrix rho.pos
-  trace_eq_one := by
-    rw [Phi.tracePreserving rho.matrix, rho.trace_eq_one]
+/-- A channel takes positive semidefinite matrices to positive semidefinite matrices. -/
+theorem mapsPositive (Phi : CPTPMap a b) :
+    ∀ X : CMatrix a, X.PosSemidef → (Phi.map X).PosSemidef :=
+  QIT.MatrixMap.isCompletelyPositive_mapsPositive Phi.map Phi.map_cp
 
-variable {c : Type w}
-variable [Fintype c] [DecidableEq c]
+/-- The finite-dimensional identity channel acts as the identity matrix map. -/
+theorem idChannel_map (X : CMatrix a) :
+    (CPTPOp.id (dIn := a)).map X = X := by
+  simp
 
-/-- Composition of finite-dimensional quantum channels. -/
-def comp (Psi : Channel b c) (Phi : Channel a b) : Channel a c where
-  map := Psi.map.comp Phi.map
-  completelyPositive :=
-    MatrixMap.isCompletelyPositive_comp Psi.map Phi.map
-      Psi.completelyPositive Phi.completelyPositive
-  tracePreserving :=
-    MatrixMap.isTracePreserving_comp Psi.map Phi.map
-      Psi.tracePreserving Phi.tracePreserving
-  mapsPositive := by
-    intro X hX
-    exact Psi.mapsPositive (Phi.map X) (Phi.mapsPositive X hX)
-
-/-- Applying a composed channel is the same as applying the two channels in
-sequence. -/
-theorem applyState_comp (Psi : Channel b c) (Phi : Channel a b) (rho : State a) :
-    (Psi.comp Phi).applyState rho = Psi.applyState (Phi.applyState rho) := by
-  apply State.ext
-  rfl
-
+/-- The preparation map `X ↦ ∑ x, X x x • rho x`: it reads the diagonal of a classical input and
+prepares the corresponding state from the family `rho`. -/
 def prepareMap {x : Type w} [Fintype x] [DecidableEq x]
-    (rho : x → State b) : MatrixMap x b where
-  toFun X := ∑ x, X x x • (rho x).matrix
+    (rho : x → MState b) : QIT.MatrixMap x b where
+  toFun X := ∑ x, X x x • (rho x).m
   map_add' X Y := by
     simp [Finset.sum_add_distrib, add_smul]
   map_smul' r X := by
     simp [Finset.smul_sum, smul_smul]
 
 theorem prepareMap_single {x : Type w} [Fintype x] [DecidableEq x]
-    (rho : x → State b) (i i' : x) :
-    prepareMap rho (Matrix.single i i' (1 : Complex)) =
-      if i = i' then (rho i).matrix else (0 : CMatrix b) := by
+    (rho : x → MState b) (i i' : x) :
+    prepareMap rho (Matrix.single i i' (1 : ℂ)) =
+      if i = i' then (rho i).m else (0 : CMatrix b) := by
   ext r s
   by_cases h : i = i'
   · subst h
     rw [if_pos rfl]
-    change (∑ x, Matrix.single i i (1 : Complex) x x • (rho x).matrix) r s = (rho i).matrix r s
+    change (∑ x, Matrix.single i i (1 : ℂ) x x • (rho x).m) r s = (rho i).m r s
     simp only [Matrix.sum_apply, Matrix.smul_apply]
     rw [Finset.sum_eq_single i]
     · simp [Matrix.single]
@@ -98,7 +75,7 @@ theorem prepareMap_single {x : Type w} [Fintype x] [DecidableEq x]
     · intro hi
       simp at hi
   · rw [if_neg h]
-    change (∑ x, Matrix.single i i' (1 : Complex) x x • (rho x).matrix) r s = 0
+    change (∑ x, Matrix.single i i' (1 : ℂ) x x • (rho x).m) r s = 0
     simp only [Matrix.sum_apply, Matrix.smul_apply]
     refine Finset.sum_eq_zero fun x _ => ?_
     by_cases hx : i = x
@@ -109,15 +86,15 @@ theorem prepareMap_single {x : Type w} [Fintype x] [DecidableEq x]
     · simp [Matrix.single, hx]
 
 theorem prepareMap_choi {x : Type w} [Fintype x] [DecidableEq x]
-    (rho : x → State b) :
-    MatrixMap.choi (prepareMap rho) =
-      ∑ x, Matrix.kronecker (Matrix.single x x (1 : Complex)) (rho x).matrix := by
+    (rho : x → MState b) :
+    QIT.MatrixMap.choi (prepareMap rho) =
+      ∑ x, Matrix.kronecker (Matrix.single x x (1 : ℂ)) (rho x).m := by
   ext xb xb'
   rcases xb with ⟨x, b1⟩
   rcases xb' with ⟨x', b2⟩
   by_cases h : x = x'
   · subst h
-    rw [MatrixMap.choi, prepareMap_single rho x x, if_pos rfl]
+    rw [QIT.MatrixMap.choi, prepareMap_single rho x x, if_pos rfl]
     simp only [Matrix.sum_apply]
     rw [Finset.sum_eq_single x]
     · simp [Matrix.kronecker, Matrix.single]
@@ -125,7 +102,7 @@ theorem prepareMap_choi {x : Type w} [Fintype x] [DecidableEq x]
       simp [Matrix.kronecker, Matrix.single, hz]
     · intro hx
       simp at hx
-  · rw [MatrixMap.choi, prepareMap_single rho x x', if_neg h]
+  · rw [QIT.MatrixMap.choi, prepareMap_single rho x x', if_neg h]
     simp only [Matrix.sum_apply, Matrix.kronecker, Matrix.single]
     symm
     refine Finset.sum_eq_zero fun z _ => ?_
@@ -135,62 +112,69 @@ theorem prepareMap_choi {x : Type w} [Fintype x] [DecidableEq x]
     simp [hneq]
 
 theorem prepareMap_isCompletelyPositive {x : Type w} [Fintype x] [DecidableEq x]
-    (rho : x → State b) :
+    (rho : x → MState b) :
     MatrixMap.IsCompletelyPositive (prepareMap rho) := by
-  rw [MatrixMap.IsCompletelyPositive, prepareMap_choi rho]
+  rw [QIT.MatrixMap.isCompletelyPositive_iff_choi, prepareMap_choi rho]
   exact Matrix.posSemidef_sum Finset.univ fun x _ =>
-    (posSemidef_single x).kronecker (rho x).pos
+    (posSemidef_single x).kronecker (rho x).psd
 
 theorem prepareMap_isTracePreserving {x : Type w} [Fintype x] [DecidableEq x]
-    (rho : x → State b) :
+    (rho : x → MState b) :
     MatrixMap.IsTracePreserving (prepareMap rho) := by
   intro X
-  change (∑ x, X x x • (rho x).matrix).trace = X.trace
+  change (∑ x, X x x • (rho x).m).trace = X.trace
   calc
-    (∑ x, X x x • (rho x).matrix).trace = ∑ x, X x x := by
+    (∑ x, X x x • (rho x).m).trace = ∑ x, X x x := by
       simp only [Matrix.trace_sum, Matrix.trace_smul]
       refine Finset.sum_congr rfl fun x _ => ?_
-      simpa using congrArg (fun z => X x x • z) (rho x).trace_eq_one
+      simp
     _ = X.trace := by
       rw [Matrix.trace]
       simp [Matrix.diag]
 
+/-- The measurement map `X ↦ ∑ y, (X * M y).trace • |y⟩⟨y|`: it records the POVM outcome
+probabilities of `M` on the diagonal of a classical output. -/
 def measureMap {y : Type x} [Fintype y] [DecidableEq y]
-    (M : POVM y a) : MatrixMap a y where
-  toFun X := ∑ y, (X * M.effects y).trace • Matrix.single y y (1 : Complex)
+    (M : POVM y a) : QIT.MatrixMap a y where
+  toFun X := ∑ y, (X * M.effects y).trace • Matrix.single y y (1 : ℂ)
   map_add' X Y := by
     simp [Matrix.add_mul, Finset.sum_add_distrib, add_smul]
   map_smul' r X := by
     simp [Matrix.trace_smul, Finset.smul_sum]
 
+theorem measureMap_apply {y : Type x} [Fintype y] [DecidableEq y]
+    (M : POVM y a) (X : CMatrix a) :
+    measureMap M X = ∑ y, (X * M.effects y).trace • Matrix.single y y (1 : ℂ) :=
+  rfl
+
 theorem measureMap_choi {y : Type x} [Fintype y] [DecidableEq y]
     (M : POVM y a) :
-    MatrixMap.choi (measureMap M) =
-      ∑ y, Matrix.kronecker (Matrix.transpose (M.effects y)) (Matrix.single y y (1 : Complex)) := by
+    QIT.MatrixMap.choi (measureMap M) =
+      ∑ y, Matrix.kronecker (Matrix.transpose (M.effects y)) (Matrix.single y y (1 : ℂ)) := by
   ext ay ay'
   rcases ay with ⟨a1, y1⟩
   rcases ay' with ⟨a2, y2⟩
   change
-    ((∑ x, (Matrix.single a1 a2 (1 : Complex) * M.effects x).trace • Matrix.single x x (1 : Complex))
+    ((∑ x, (Matrix.single a1 a2 (1 : ℂ) * M.effects x).trace • Matrix.single x x (1 : ℂ))
       y1 y2) =
-      (∑ x, Matrix.kronecker (Matrix.transpose (M.effects x)) (Matrix.single x x (1 : Complex)))
+      (∑ x, Matrix.kronecker (Matrix.transpose (M.effects x)) (Matrix.single x x (1 : ℂ)))
         (a1, y1) (a2, y2)
   simp only [Matrix.sum_apply, Matrix.smul_apply, Matrix.kronecker]
   change
     (∑ x,
-      (Matrix.single a1 a2 (1 : Complex) * M.effects x).trace *
-        Matrix.single x x (1 : Complex) y1 y2) =
-      ∑ x, (M.effects x) a2 a1 * Matrix.single x x (1 : Complex) y1 y2
+      (Matrix.single a1 a2 (1 : ℂ) * M.effects x).trace *
+        Matrix.single x x (1 : ℂ) y1 y2) =
+      ∑ x, (M.effects x) a2 a1 * Matrix.single x x (1 : ℂ) y1 y2
   refine Finset.sum_congr rfl fun x _ => ?_
   have htrace :
-      ((Matrix.single a1 a2 (1 : Complex)) * M.effects x).trace = (M.effects x) a2 a1 := by
-    simpa using (Matrix.trace_single_mul a1 a2 (1 : Complex) (M.effects x))
+      ((Matrix.single a1 a2 (1 : ℂ)) * M.effects x).trace = (M.effects x) a2 a1 := by
+    simpa using (Matrix.trace_single_mul a1 a2 (1 : ℂ) (M.effects x))
   rw [htrace]
 
 theorem measureMap_isCompletelyPositive {y : Type x} [Fintype y] [DecidableEq y]
     (M : POVM y a) :
     MatrixMap.IsCompletelyPositive (measureMap M) := by
-  rw [MatrixMap.IsCompletelyPositive, measureMap_choi M]
+  rw [QIT.MatrixMap.isCompletelyPositive_iff_choi, measureMap_choi M]
   exact Matrix.posSemidef_sum Finset.univ fun y _ =>
     (M.pos y).transpose.kronecker (posSemidef_single y)
 
@@ -198,9 +182,9 @@ theorem measureMap_isTracePreserving {y : Type x} [Fintype y] [DecidableEq y]
     (M : POVM y a) :
     MatrixMap.IsTracePreserving (measureMap M) := by
   intro X
-  change (∑ y, (X * M.effects y).trace • Matrix.single y y (1 : Complex)).trace = X.trace
+  change (∑ y, (X * M.effects y).trace • Matrix.single y y (1 : ℂ)).trace = X.trace
   calc
-    (∑ y, (X * M.effects y).trace • Matrix.single y y (1 : Complex)).trace =
+    (∑ y, (X * M.effects y).trace • Matrix.single y y (1 : ℂ)).trace =
         ∑ y, (X * M.effects y).trace := by
       simp only [Matrix.trace_sum, Matrix.trace_smul]
       refine Finset.sum_congr rfl fun y _ => ?_
@@ -215,189 +199,139 @@ theorem measureMap_isTracePreserving {y : Type x} [Fintype y] [DecidableEq y]
 
 /-- A classical-quantum preparation channel from a finite register into states. -/
 def prepare {x : Type w} [Fintype x] [DecidableEq x]
-    (rho : x → State b) : Channel x b where
-  map := prepareMap rho
-  completelyPositive := prepareMap_isCompletelyPositive rho
-  tracePreserving := prepareMap_isTracePreserving rho
-  mapsPositive :=
-    MatrixMap.isCompletelyPositive_mapsPositive (prepareMap rho)
-      (prepareMap_isCompletelyPositive rho)
-
-/-- A quantum-classical measurement channel associated to a discrete POVM. -/
-def measure {y : Type x} [Fintype y] [DecidableEq y]
-    (M : POVM y a) : Channel a y where
-  map := measureMap M
-  completelyPositive := measureMap_isCompletelyPositive M
-  tracePreserving := measureMap_isTracePreserving M
-  mapsPositive :=
-    MatrixMap.isCompletelyPositive_mapsPositive (measureMap M)
-      (measureMap_isCompletelyPositive M)
+    (rho : x → MState b) : CPTPMap x b :=
+  ofMat (prepareMap rho) (prepareMap_isCompletelyPositive rho)
+    (prepareMap_isTracePreserving rho)
 
 /-- The preparation channel acts by reading the diagonal classical weights. -/
 @[simp]
 theorem prepare_map {x : Type w} [Fintype x] [DecidableEq x]
-    (rho : x → State b) (X : CMatrix x) :
-    (prepare rho).map X = ∑ x, X x x • (rho x).matrix := by
-  show prepareMap rho X = _
+    (rho : x → MState b) (X : CMatrix x) :
+    (prepare rho).map X = ∑ x, X x x • (rho x).m := by
+  rw [prepare, map_ofMat]
   rfl
 
 /-- The preparation channel maps basis projectors to the prepared states. -/
 theorem prepare_map_single_eq {x : Type w} [Fintype x] [DecidableEq x]
-    (rho : x → State b) (x0 : x) :
-    (prepare rho).map (Matrix.single x0 x0 (1 : Complex)) = (rho x0).matrix := by
-  show prepareMap rho (Matrix.single x0 x0 (1 : Complex)) = (rho x0).matrix
+    (rho : x → MState b) (x0 : x) :
+    (prepare rho).map (Matrix.single x0 x0 (1 : ℂ)) = (rho x0).m := by
+  rw [prepare, map_ofMat]
   simpa using (prepareMap_single rho x0 x0)
 
-/-- The measurement channel returns the Born-rule diagonal classical state. -/
-@[simp]
-theorem measure_map {y : Type x} [Fintype y] [DecidableEq y]
-    (M : POVM y a) (X : CMatrix a) :
-    (measure M).map X = ∑ y, (X * M.effects y).trace • Matrix.single y y (1 : Complex) := by
-  show measureMap M X = _
-  rfl
-
-/-- The measurement channel applied to a state yields a diagonal classical state. -/
-theorem measure_map_state_diagonal {y : Type x} [Fintype y] [DecidableEq y]
-    (M : POVM y a) (rho : State a) :
-    (measure M).map rho.matrix =
-      Matrix.diagonal (fun y => (rho.matrix * M.effects y).trace) := by
-  rw [measure_map]
-  simpa using (Matrix.sum_single_eq_diagonal fun y => (rho.matrix * M.effects y).trace)
-
 /-- The identity channel on the unit system. -/
-def unit : Channel PUnit.{u + 1} PUnit.{v + 1} where
-  map := MatrixMap.unit
-  completelyPositive := MatrixMap.unit_isCompletelyPositive
-  tracePreserving := MatrixMap.unit_isTracePreserving
-  mapsPositive := MatrixMap.unit_mapsPositive
+def unit : CPTPMap PUnit.{u + 1} PUnit.{v + 1} :=
+  ofMat QIT.MatrixMap.unit QIT.MatrixMap.unit_isCompletelyPositive
+    QIT.MatrixMap.unit_isTracePreserving
 
-/-- The identity channel on an arbitrary finite system, realized as a
-single-Kraus map with the identity operator as its sole Kraus operator. -/
-def idChannel (a : Type u) [Fintype a] [DecidableEq a] : Channel a a where
-  map := MatrixMap.ofKraus (fun (_ : Unit) => (1 : CMatrix a))
-  completelyPositive := by
-    rw [MatrixMap.IsCompletelyPositive, MatrixMap.choi_ofKraus]
-    exact Matrix.posSemidef_sum Finset.univ (fun _ _ =>
-      Matrix.posSemidef_vecMulVec_self_star
-        (fun x : a × a => (1 : CMatrix a) x.2 x.1))
-  tracePreserving := by
-    intro X
-    show (MatrixMap.ofKraus (fun (_ : Unit) => (1 : CMatrix a)) X).trace = X.trace
-    simp only [MatrixMap.ofKraus, LinearMap.coe_mk, AddHom.coe_mk,
-      Matrix.conjTranspose_one, Matrix.one_mul, Matrix.mul_one]
-    simp
-  mapsPositive := MatrixMap.ofKraus_mapsPositive (fun (_ : Unit) => (1 : CMatrix a))
+@[simp]
+theorem unit_map : (unit : CPTPMap PUnit.{u + 1} PUnit.{v + 1}).map = QIT.MatrixMap.unit :=
+  map_ofMat _ _ _
 
 variable {c : Type w} {d : Type x}
 variable [Fintype c] [DecidableEq c] [Fintype d] [DecidableEq d]
 
-/-- An `n`-use channel surface between recursive tensor-power systems. -/
-abbrev TensorPower (a : Type u) (b : Type v) [Fintype a] [DecidableEq a]
-    [Fintype b] [DecidableEq b] (n : Nat) :=
-  Channel (QIT.TensorPower a n) (QIT.TensorPower b n)
-
-/-- Product channel between tensor-product systems. Tensor products of channels
-model parallel or block channels and are again completely positive
-[HolevoGiovannetti2012QuantumChannels, arxive.tex:965-974]. -/
-def prod (Phi : Channel a b) (Psi : Channel c d) : Channel (Prod a c) (Prod b d) where
-  map := MatrixMap.kron Phi.map Psi.map
-  completelyPositive :=
-    MatrixMap.isCompletelyPositive_kron Phi.map Psi.map
-      Phi.completelyPositive Psi.completelyPositive
-  tracePreserving :=
-    MatrixMap.isTracePreserving_kron Phi.map Psi.map
-      Phi.tracePreserving Psi.tracePreserving
-  mapsPositive :=
-    MatrixMap.isCompletelyPositive_mapsPositive (MatrixMap.kron Phi.map Psi.map)
-      (MatrixMap.isCompletelyPositive_kron Phi.map Psi.map
-        Phi.completelyPositive Psi.completelyPositive)
-
 /-- The product channel acts componentwise on Kronecker products of matrices. -/
-theorem prod_map_kronecker (Phi : Channel a b) (Psi : Channel c d)
+theorem prod_map_kronecker (Phi : CPTPMap a b) (Psi : CPTPMap c d)
     (X : CMatrix a) (Y : CMatrix c) :
     (prod Phi Psi).map (Matrix.kronecker X Y) =
-      Matrix.kronecker (Phi.map X) (Psi.map Y) :=
-  MatrixMap.kron_apply_kronecker Phi.map Psi.map X Y
+      Matrix.kronecker (Phi.map X) (Psi.map Y) := by
+  rw [prod_map]
+  exact MatrixMap.kron_map_of_kron_state Phi.map Psi.map X Y
 
-/-- A product channel sends product states to product states. This derived lemma
-follows from the product-channel action law and the product-state definition
-[Wilde2011Qst, qit-notes.tex:7294-7299]. -/
-theorem applyState_prod (Phi : Channel a b) (Psi : Channel c d)
-    (rho : State a) (sigma : State c) :
-    (Phi.prod Psi).applyState (rho.prod sigma) = (Phi.applyState rho).prod (Psi.applyState sigma) := by
-  apply State.ext
-  change (Phi.prod Psi).map (Matrix.kronecker rho.matrix sigma.matrix) =
-    Matrix.kronecker (Phi.map rho.matrix) (Psi.map sigma.matrix)
-  exact prod_map_kronecker Phi Psi rho.matrix sigma.matrix
+/-- Entrywise form of `prod_map_kronecker`. -/
+theorem prod_map_kronecker_apply (Phi : CPTPMap a b) (Psi : CPTPMap c d)
+    (X : CMatrix a) (Y : CMatrix c) (xb yb : b) (xd yd : d) :
+    (prod Phi Psi).map (Matrix.kronecker X Y) (xb, xd) (yb, yd) =
+      Phi.map X xb yb * Psi.map Y xd yd := by
+  rw [prod_map_kronecker]
+  rfl
 
 /-- Tracing out the first output of a product-channel output leaves the second
 output marginal. -/
-theorem partialTraceA_applyState_prod (Phi : Channel a b) (Psi : Channel c d)
-    (rho : State a) (sigma : State c) :
-    partialTraceA (a := b) (b := d) ((Phi.prod Psi).applyState (rho.prod sigma)).matrix =
-      (Psi.applyState sigma).matrix := by
-  rw [applyState_prod]
-  exact State.partialTraceA_prod (Phi.applyState rho) (Psi.applyState sigma)
+theorem traceLeft_applyState_prod (Phi : CPTPMap a b) (Psi : CPTPMap c d)
+    (rho : MState a) (sigma : MState c) :
+    Matrix.traceLeft ((Phi.prod Psi) (rho.prod sigma)).m = (Psi sigma).m := by
+  rw [prod_apply_prod]
+  exact MState.traceLeft_prod (Phi rho) (Psi sigma)
 
 /-- Tracing out the second output of a product-channel output leaves the first
 output marginal. -/
-theorem partialTraceB_applyState_prod (Phi : Channel a b) (Psi : Channel c d)
-    (rho : State a) (sigma : State c) :
-    partialTraceB (a := b) (b := d) ((Phi.prod Psi).applyState (rho.prod sigma)).matrix =
-      (Phi.applyState rho).matrix := by
-  rw [applyState_prod]
-  exact State.partialTraceB_prod (Phi.applyState rho) (Psi.applyState sigma)
+theorem traceRight_applyState_prod (Phi : CPTPMap a b) (Psi : CPTPMap c d)
+    (rho : MState a) (sigma : MState c) :
+    Matrix.traceRight ((Phi.prod Psi) (rho.prod sigma)).m = (Phi rho).m := by
+  rw [prod_apply_prod]
+  exact MState.traceRight_prod (Phi rho) (Psi sigma)
 
-end Channel
+/-- Recursive tensor power of a channel for memoryless repeated uses. -/
+def tensorPower (Phi : CPTPMap a b) :
+    (n : ℕ) → CPTPMap (QIT.TensorPower a n) (QIT.TensorPower b n)
+  | 0 => unit
+  | n + 1 => Phi.prod (tensorPower Phi n)
 
-namespace State
+/-- The zeroth channel tensor power is the unit-system identity channel. -/
+theorem tensorPower_zero (Phi : CPTPMap a b) :
+    tensorPower Phi 0 = unit := rfl
+
+/-- The zeroth channel tensor power acts by the unit matrix map. -/
+@[simp]
+theorem tensorPower_zero_map (Phi : CPTPMap a b) :
+    (tensorPower Phi 0).map =
+      (QIT.MatrixMap.unit : QIT.MatrixMap (QIT.TensorPower a 0) (QIT.TensorPower b 0)) :=
+  unit_map
+
+/-- Successor channel tensor powers unfold by adding one product-channel factor. -/
+theorem tensorPower_succ (Phi : CPTPMap a b) (n : ℕ) :
+    tensorPower Phi (n + 1) = Phi.prod (tensorPower Phi n) := rfl
+
+end CPTPOp
+
+namespace POVM
+
+variable {y : Type x} [Fintype y] [DecidableEq y]
+
+/-- The measure-and-record channel returns the Born-rule diagonal classical state. -/
+@[simp]
+theorem measureDiscard_map (M : POVM y a) (X : CMatrix a) :
+    M.measureDiscard.map X = ∑ y, (X * M.effects y).trace • Matrix.single y y (1 : ℂ) := by
+  have hofMat :
+      CPTPOp.ofMat (CPTPOp.measureMap M) (CPTPOp.measureMap_isCompletelyPositive M)
+        (CPTPOp.measureMap_isTracePreserving M) = M.measureDiscard := by
+    rw [CPTPOp.funext_iff]
+    intro rho
+    refine DensityOp.ext_m ?_
+    rw [CPTPOp.mat_coe_eq_apply_mat, CPTPOp.map_ofMat, CPTPOp.measureMap_apply,
+      POVM.measureDiscard_apply, MState.ofClassical, DensityOp.m_ofMat,
+      HermitianMat.diagonal_mat, ← Matrix.sum_single_eq_diagonal]
+    refine Finset.sum_congr rfl fun y _ => ?_
+    rw [Matrix.smul_single, smul_eq_mul, mul_one]
+    exact congrArg (Matrix.single y y) (M.coe_measure rho y).symm
+  rw [← hofMat, CPTPOp.map_ofMat, CPTPOp.measureMap_apply]
+
+/-- Measuring a state with a POVM yields a diagonal classical state. -/
+theorem measureDiscard_map_state_diagonal (M : POVM y a) (rho : MState a) :
+    M.measureDiscard.map rho.m =
+      Matrix.diagonal (fun y => (rho.m * M.effects y).trace) := by
+  rw [measureDiscard_map]
+  simpa using (Matrix.sum_single_eq_diagonal fun y => (rho.m * M.effects y).trace)
+
+end POVM
+
+namespace MState
 
 variable {c : Type w} [Fintype c] [DecidableEq c]
-
-/-- The identity channel leaves every input state unchanged. -/
-theorem idChannel_applyState (rho : State a) :
-    (Channel.idChannel a).applyState rho = rho := by
-  apply State.ext
-  change (Channel.idChannel a).map rho.matrix = rho.matrix
-  simp [Channel.idChannel, MatrixMap.ofKraus]
 
 /-- Applying a channel on the right tensor factor to a product state leaves the
 left factor untouched. -/
 theorem applyState_id_prod_prod
-    (rhoA : State a) (sigmaB : State b) (D : Channel b c) :
-    ((Channel.idChannel a).prod D).applyState (rhoA.prod sigmaB) =
-      rhoA.prod (D.applyState sigmaB) := by
-  rw [Channel.applyState_prod, idChannel_applyState]
+    (rhoA : MState a) (sigmaB : MState b) (D : CPTPMap b c) :
+    ((CPTPOp.id (dIn := a)).prod D) (rhoA.prod sigmaB) = rhoA.prod (D sigmaB) := by
+  rw [CPTPOp.prod_apply_prod, CPTPOp.id_MState]
 
 /-- Applying a channel on the left tensor factor to a product state leaves the
 right factor untouched. -/
 theorem applyState_prod_id_prod
-    (rhoA : State a) (sigmaB : State b) (D : Channel a c) :
-    (D.prod (Channel.idChannel b)).applyState (rhoA.prod sigmaB) =
-      (D.applyState rhoA).prod sigmaB := by
-  rw [Channel.applyState_prod, idChannel_applyState]
+    (rhoA : MState a) (sigmaB : MState b) (D : CPTPMap a c) :
+    (D.prod (CPTPOp.id (dIn := b))) (rhoA.prod sigmaB) = MState.prod (D rhoA) sigmaB := by
+  rw [CPTPOp.prod_apply_prod, CPTPOp.id_MState]
 
-end State
-
-namespace Channel
-
-variable (Phi : Channel a b)
-
-/-- Recursive tensor power of a channel for memoryless repeated uses. -/
-def tensorPower : (n : Nat) -> TensorPower a b n
-  | 0 => unit
-  | n + 1 => Phi.prod (tensorPower n)
-
-/-- The zeroth channel tensor power is the unit-system identity channel. -/
-theorem tensorPower_zero :
-    tensorPower Phi 0 = unit := rfl
-
-/-- Successor channel tensor powers unfold by adding one product-channel factor. -/
-theorem tensorPower_succ (n : Nat) :
-    tensorPower Phi (n + 1) = Phi.prod (tensorPower Phi n) := rfl
-
-end Channel
-
-end
-
-end QIT
+end MState

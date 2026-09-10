@@ -42,24 +42,24 @@ variable [Fintype b] [DecidableEq b]
 
 /-- Reassociate `(K x A) x B` as `K x (A x B)` using the canonical reindexing
 channel. -/
-def sourceAssocReindex (rho : SubnormalizedState (Prod (Prod k a) b)) :
-    SubnormalizedState (Prod k (Prod a b)) :=
+def sourceAssocReindex (rho : SubnormalizedState ((k × a) × b)) :
+    SubnormalizedState (k × (a × b)) :=
   rho.applyTraceNonincreasingCP
-    (Channel.reindex (Equiv.prodAssoc k a b)).map
-    (Channel.reindex (Equiv.prodAssoc k a b)).traceNonincreasingCP_map
+    (CPTPOp.reindex (Equiv.prodAssoc k a b)).map
+    (CPTPOp.reindex (Equiv.prodAssoc k a b)).traceNonincreasingCP_map
 
 /-- Trace out the first source factor `K` from a state on `(K x A) x B`. -/
-def sourceDiscard (rho : SubnormalizedState (Prod (Prod k a) b)) :
-    SubnormalizedState (Prod a b) :=
-  rho.sourceAssocReindex.marginalB
+def sourceDiscard (rho : SubnormalizedState ((k × a) × b)) :
+    SubnormalizedState (a × b) :=
+  rho.sourceAssocReindex.traceLeft
 
 @[simp]
-theorem sourceAssocReindex_matrix (rho : SubnormalizedState (Prod (Prod k a) b)) :
+theorem sourceAssocReindex_matrix (rho : SubnormalizedState ((k × a) × b)) :
     rho.sourceAssocReindex.matrix =
       rho.matrix.submatrix (Equiv.prodAssoc k a b).symm
         (Equiv.prodAssoc k a b).symm := by
   ext i j
-  simp [sourceAssocReindex, Channel.reindex, MatrixMap.ofReferenceIsometry_apply,
+  simp [sourceAssocReindex, CPTPOp.reindex, MatrixMap.ofReferenceIsometry_apply,
     ReferenceIsometry.ofEquiv, Matrix.mul_apply]
   rw [Finset.sum_eq_single ((Equiv.prodAssoc k a b).symm j)]
   · rw [Finset.sum_eq_single ((Equiv.prodAssoc k a b).symm i)]
@@ -84,15 +84,14 @@ theorem sourceAssocReindex_matrix (rho : SubnormalizedState (Prod (Prod k a) b))
   · simp
 
 @[simp]
-theorem sourceDiscard_matrix (rho : SubnormalizedState (Prod (Prod k a) b)) :
+theorem sourceDiscard_matrix (rho : SubnormalizedState ((k × a) × b)) :
     rho.sourceDiscard.matrix =
-      partialTraceA (a := k) (b := Prod a b)
+      Matrix.traceLeft
         (rho.matrix.submatrix (Equiv.prodAssoc k a b).symm
           (Equiv.prodAssoc k a b).symm) := by
   simp [sourceDiscard]
 
-@[simp]
-theorem sourceAssocReindex_trace_re (rho : SubnormalizedState (Prod (Prod k a) b)) :
+theorem sourceAssocReindex_trace_re (rho : SubnormalizedState ((k × a) × b)) :
     rho.sourceAssocReindex.matrix.trace.re = rho.matrix.trace.re := by
   rw [sourceAssocReindex_matrix]
   congr 1
@@ -101,96 +100,81 @@ theorem sourceAssocReindex_trace_re (rho : SubnormalizedState (Prod (Prod k a) b
   intro x
   rfl
 
-@[simp]
-theorem sourceDiscard_trace_re (rho : SubnormalizedState (Prod (Prod k a) b)) :
+theorem sourceDiscard_trace_re (rho : SubnormalizedState ((k × a) × b)) :
     rho.sourceDiscard.matrix.trace.re = rho.matrix.trace.re := by
-  rw [sourceDiscard, marginalB_matrix, partialTraceA_trace,
+  rw [sourceDiscard, traceLeft_matrix, Matrix.traceLeft_trace,
     sourceAssocReindex_trace_re]
 
 /-- Discarding the first source factor contracts purified distance. -/
 theorem purifiedDistance_sourceDiscard_le
-    (rho sigma : SubnormalizedState (Prod (Prod k a) b)) :
-    rho.sourceDiscard.purifiedDistance sigma.sourceDiscard <=
+    (rho sigma : SubnormalizedState ((k × a) × b)) :
+    rho.sourceDiscard.purifiedDistance sigma.sourceDiscard ≤
       rho.purifiedDistance sigma := by
-  refine le_trans (SubnormalizedState.purifiedDistance_marginalB_le
+  refine le_trans (SubnormalizedState.purifiedDistance_traceLeft_le
     rho.sourceAssocReindex sigma.sourceAssocReindex) ?_
   simpa [sourceAssocReindex] using
     SubnormalizedState.purifiedDistance_mono_traceNonincreasingCP rho sigma
-      (Channel.reindex (Equiv.prodAssoc k a b)).map
-      (Channel.reindex (Equiv.prodAssoc k a b)).traceNonincreasingCP_map
+      (CPTPOp.reindex (Equiv.prodAssoc k a b)).map
+      (CPTPOp.reindex (Equiv.prodAssoc k a b)).traceNonincreasingCP_map
 
 /-- Purified-distance balls are preserved when the first source factor is
 discarded. -/
 theorem purifiedBall_sourceDiscard_of_purifiedBall
-    {rho sigma : SubnormalizedState (Prod (Prod k a) b)} {epsilon : Real}
+    {rho sigma : SubnormalizedState ((k × a) × b)} {epsilon : ℝ}
     (hball : rho.purifiedBall epsilon sigma) :
     rho.sourceDiscard.purifiedBall epsilon sigma.sourceDiscard :=
   le_trans (purifiedDistance_sourceDiscard_le rho sigma) hball
 
-omit [DecidableEq k] [DecidableEq a] [DecidableEq b] in
-private theorem partialTraceA_mono_sourceDiscard
-    {X Y : CMatrix (Prod k (Prod a b))} (hXY : X <= Y) :
-    partialTraceA (a := k) (b := Prod a b) X <=
-      partialTraceA (a := k) (b := Prod a b) Y := by
-  rw [Matrix.le_iff] at hXY ⊢
-  have hpos := partialTraceA_posSemidef (a := k) (b := Prod a b) hXY
-  have heq : partialTraceA (a := k) (b := Prod a b) (Y - X) =
-      partialTraceA (a := k) (b := Prod a b) Y -
-        partialTraceA (a := k) (b := Prod a b) X := by
-    ext i j
-    simp [partialTraceA, Matrix.sub_apply, Finset.sum_sub_distrib]
-  rwa [heq] at hpos
-
 omit [Fintype a] [Fintype b] [DecidableEq b] in
-private theorem partialTraceA_assoc_identityTensor
+private theorem traceLeft_assoc_identityTensor
     (T : CMatrix b) :
-    partialTraceA (a := k) (b := Prod a b)
-        ((Matrix.kronecker (1 : CMatrix (Prod k a)) T).submatrix
+    Matrix.traceLeft
+        ((Matrix.kronecker (1 : CMatrix (k × a)) T).submatrix
           (Equiv.prodAssoc k a b).symm (Equiv.prodAssoc k a b).symm) =
-      (Fintype.card k : Real) • Matrix.kronecker (1 : CMatrix a) T := by
+      (Fintype.card k : ℝ) • Matrix.kronecker (1 : CMatrix a) T := by
   ext i j
   rcases i with ⟨iA, iB⟩
   rcases j with ⟨jA, jB⟩
-  simp [partialTraceA, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  simp [Matrix.traceLeft, Matrix.kronecker, Matrix.kroneckerMap_apply,
     Equiv.prodAssoc, Matrix.one_apply]
 
 /-- A feasible side operator for `(K x A)|B` remains feasible after discarding
 `K` when it is multiplied by the source dimension. -/
 theorem ConditionalMinEntropyScaleFeasible.sourceDiscard
-    {rho : SubnormalizedState (Prod (Prod k a) b)} {T : CMatrix b}
-    (hT : ConditionalMinEntropyScaleFeasible (a := Prod k a) rho T) :
+    {rho : SubnormalizedState ((k × a) × b)} {T : CMatrix b}
+    (hT : ConditionalMinEntropyScaleFeasible (a := k × a) rho T) :
     ConditionalMinEntropyScaleFeasible (a := a) rho.sourceDiscard
-      ((Fintype.card k : Real) • T) := by
+      ((Fintype.card k : ℝ) • T) := by
   constructor
   · exact Matrix.PosSemidef.smul hT.1 (Nat.cast_nonneg (Fintype.card k))
   · have hAssoc :
-        rho.sourceAssocReindex.matrix <=
-          (Matrix.kronecker (1 : CMatrix (Prod k a)) T).submatrix
+        rho.sourceAssocReindex.matrix ≤
+          (Matrix.kronecker (1 : CMatrix (k × a)) T).submatrix
             (Equiv.prodAssoc k a b).symm (Equiv.prodAssoc k a b).symm := by
       rw [sourceAssocReindex_matrix, Matrix.le_iff] at ⊢
       exact hT.2.submatrix (Equiv.prodAssoc k a b).symm
-    have hPartial := partialTraceA_mono_sourceDiscard (a := a) (b := b) hAssoc
-    change partialTraceA (a := k) (b := Prod a b) rho.sourceAssocReindex.matrix <=
-      Matrix.kronecker (1 : CMatrix a) ((Fintype.card k : Real) • T)
-    rw [partialTraceA_assoc_identityTensor (k := k) (a := a) (b := b)] at hPartial
+    have hPartial := traceLeft_mono (a := k) (b := a × b) hAssoc
+    change Matrix.traceLeft rho.sourceAssocReindex.matrix ≤
+      Matrix.kronecker (1 : CMatrix a) ((Fintype.card k : ℝ) • T)
+    rw [traceLeft_assoc_identityTensor (k := k) (a := a) (b := b)] at hPartial
     simpa [Matrix.kronecker_smul] using hPartial
 
 /-- The conditional-min endpoint scale after discarding `K` is at most
 `|K|` times the original endpoint scale. -/
 theorem conditionalMinEntropyScale_sourceDiscard_le_card_mul
-    [Nonempty k] (rho : SubnormalizedState (Prod (Prod k a) b)) :
-    rho.sourceDiscard.conditionalMinEntropyScale (a := a) <=
-      (Fintype.card k : Real) * rho.conditionalMinEntropyScale (a := Prod k a) := by
-  let d : Real := Fintype.card k
+    [Nonempty k] (rho : SubnormalizedState ((k × a) × b)) :
+    rho.sourceDiscard.conditionalMinEntropyScale (a := a) ≤
+      (Fintype.card k : ℝ) * rho.conditionalMinEntropyScale (a := k × a) := by
+  let d : ℝ := Fintype.card k
   have hd : 0 < d := by
     dsimp [d]
     exact_mod_cast Fintype.card_pos_iff.mpr inferInstance
   have hdiv :
-      rho.sourceDiscard.conditionalMinEntropyScale (a := a) / d <=
-        rho.conditionalMinEntropyScale (a := Prod k a) := by
+      rho.sourceDiscard.conditionalMinEntropyScale (a := a) / d ≤
+        rho.conditionalMinEntropyScale (a := k × a) := by
     rw [conditionalMinEntropyScale_eq_sInf_scaleValueSet]
     refine le_csInf
-      (rho.conditionalMinEntropyScaleValueSet_nonempty (a := Prod k a)) ?_
+      (rho.conditionalMinEntropyScaleValueSet_nonempty (a := k × a)) ?_
     intro t ht
     rcases ht with ⟨T, hT, rfl⟩
     apply (div_le_iff₀ hd).2
@@ -210,35 +194,35 @@ theorem conditionalMinEntropyScale_sourceDiscard_le_card_mul
 min-entropy by at most the logarithm of that register's dimension. -/
 theorem conditionalMinEntropyRaw_le_log2_card_add_sourceDiscard
     [Nonempty k] [Nonempty a] [Nonempty b]
-    (rho : SubnormalizedState (Prod (Prod k a) b))
+    (rho : SubnormalizedState ((k × a) × b))
     (hrho : 0 < rho.matrix.trace.re) :
-    rho.conditionalMinEntropyRaw <=
-      log2 (Fintype.card k : Real) + rho.sourceDiscard.conditionalMinEntropyRaw := by
+    rho.conditionalMinEntropyRaw ≤
+      log2 (Fintype.card k : ℝ) + rho.sourceDiscard.conditionalMinEntropyRaw := by
   have hrhoDiscard : 0 < rho.sourceDiscard.matrix.trace.re := by
     rw [sourceDiscard_trace_re]
     exact hrho
   rw [rho.conditionalMinEntropy_eq_neg_log2_scale_of_trace_pos
-      (a := Prod k a) hrho,
+      (a := k × a) hrho,
     rho.sourceDiscard.conditionalMinEntropy_eq_neg_log2_scale_of_trace_pos
       (a := a) hrhoDiscard]
-  let d : Real := Fintype.card k
-  let sourceScale := rho.conditionalMinEntropyScale (a := Prod k a)
+  let d : ℝ := Fintype.card k
+  let sourceScale := rho.conditionalMinEntropyScale (a := k × a)
   let discardedScale := rho.sourceDiscard.conditionalMinEntropyScale (a := a)
   have hd : 0 < d := by
     dsimp [d]
     exact_mod_cast Fintype.card_pos_iff.mpr inferInstance
   have hsource : 0 < sourceScale := by
     dsimp [sourceScale]
-    exact rho.conditionalMinEntropyScale_pos_of_trace_pos (a := Prod k a) hrho
+    exact rho.conditionalMinEntropyScale_pos_of_trace_pos (a := k × a) hrho
   have hdiscarded : 0 < discardedScale := by
     dsimp [discardedScale]
     exact rho.sourceDiscard.conditionalMinEntropyScale_pos_of_trace_pos
       (a := a) hrhoDiscard
-  have hscale : discardedScale <= d * sourceScale := by
+  have hscale : discardedScale ≤ d * sourceScale := by
     simpa [d, sourceScale, discardedScale] using
       rho.conditionalMinEntropyScale_sourceDiscard_le_card_mul
         (k := k) (a := a) (b := b)
-  have hlog : log2 discardedScale <= log2 (d * sourceScale) := by
+  have hlog : log2 discardedScale ≤ log2 (d * sourceScale) := by
     unfold log2
     exact div_le_div_of_nonneg_right
       (Real.log_le_log hdiscarded hscale) (le_of_lt (Real.log_pos one_lt_two))
@@ -254,10 +238,10 @@ theorem conditionalMinEntropyRaw_le_log2_card_add_sourceDiscard
 the nonzero witnesses required by both real-valued entropy accessors. -/
 theorem conditionalMinEntropyFinite_le_log2_card_add_sourceDiscard
     [Nonempty k] [Nonempty a] [Nonempty b]
-    (rho : SubnormalizedState (Prod (Prod k a) b))
+    (rho : SubnormalizedState ((k × a) × b))
     (hrho : 0 < rho.matrix.trace.re) :
-    rho.conditionalMinEntropyFinite (rho.matrix_ne_zero_of_trace_re_pos hrho) <=
-      log2 (Fintype.card k : Real) +
+    rho.conditionalMinEntropyFinite (rho.matrix_ne_zero_of_trace_re_pos hrho) ≤
+      log2 (Fintype.card k : ℝ) +
         rho.sourceDiscard.conditionalMinEntropyFinite
           (rho.sourceDiscard.matrix_ne_zero_of_trace_re_pos (by
             rwa [sourceDiscard_trace_re])) := by
@@ -270,16 +254,16 @@ Every nearby source state is sent to a nearby discarded state by the same CPTP
 map, and the unsmoothed dimension bound is then optimized pointwise. -/
 theorem smoothConditionalMinEntropyRaw_le_log2_card_add_sourceDiscard
     [Nonempty k] [Nonempty a] [Nonempty b]
-    (rho : SubnormalizedState (Prod (Prod k a) b)) {epsilon : Real}
-    (hepsilon0 : 0 <= epsilon)
+    (rho : SubnormalizedState ((k × a) × b)) {epsilon : ℝ}
+    (hepsilon0 : 0 ≤ epsilon)
     (hepsilon : epsilon < Real.sqrt rho.matrix.trace.re) :
-    rho.smoothConditionalMinEntropyRaw epsilon <=
-      log2 (Fintype.card k : Real) +
+    rho.smoothConditionalMinEntropyRaw epsilon ≤
+      log2 (Fintype.card k : ℝ) +
         rho.sourceDiscard.smoothConditionalMinEntropyRaw epsilon := by
   rw [smoothConditionalMinEntropyRaw_eq_sSup_candidates]
   refine csSup_le
     (SmoothConditionalMinEntropyCandidateRaw_set_nonempty_of_nonneg
-      (a := Prod k a) rho hepsilon0) ?_
+      (a := k × a) rho hepsilon0) ?_
   intro h hh
   rcases hh with ⟨rho', hball, rfl⟩
   have hrho' : 0 < rho'.matrix.trace.re :=
@@ -298,7 +282,7 @@ theorem smoothConditionalMinEntropyRaw_le_log2_card_add_sourceDiscard
     ⟨rho'.sourceDiscard,
       purifiedBall_sourceDiscard_of_purifiedBall hball, rfl⟩
   have hdiscardLe :
-      rho'.sourceDiscard.conditionalMinEntropyRaw <=
+      rho'.sourceDiscard.conditionalMinEntropyRaw ≤
         rho.sourceDiscard.smoothConditionalMinEntropyRaw epsilon := by
     rw [smoothConditionalMinEntropyRaw_eq_sSup_candidates]
     exact le_csSup
@@ -307,16 +291,16 @@ theorem smoothConditionalMinEntropyRaw_le_log2_card_add_sourceDiscard
       hdiscardCandidate
   exact hchain.trans (by
     simpa [add_comm] using
-      add_le_add_left hdiscardLe (log2 (Fintype.card k : Real)))
+      add_le_add_left hdiscardLe (log2 (Fintype.card k : ℝ)))
 
 /-- Canonical finite-domain smooth source-discard chain rule. -/
 theorem smoothConditionalMinEntropy_le_log2_card_add_sourceDiscard
     [Nonempty k] [Nonempty a] [Nonempty b]
-    (rho : SubnormalizedState (Prod (Prod k a) b)) (epsilon : Real)
-    (hepsilon0 : 0 <= epsilon)
+    (rho : SubnormalizedState ((k × a) × b)) (epsilon : ℝ)
+    (hepsilon0 : 0 ≤ epsilon)
     (hepsilon : epsilon < Real.sqrt rho.matrix.trace.re) :
-    rho.smoothConditionalMinEntropy epsilon hepsilon0 hepsilon <=
-      log2 (Fintype.card k : Real) +
+    rho.smoothConditionalMinEntropy epsilon hepsilon0 hepsilon ≤
+      log2 (Fintype.card k : ℝ) +
         rho.sourceDiscard.smoothConditionalMinEntropy epsilon hepsilon0
           (by rwa [sourceDiscard_trace_re]) := by
   exact rho.smoothConditionalMinEntropyRaw_le_log2_card_add_sourceDiscard

@@ -7,6 +7,7 @@ Authors: QuAIR Team
 module
 
 public import QuantumLib.QIT.States.PosSqrt
+public import QuantumLib.QIT.Util.MatrixInstances
 public import Mathlib.Analysis.CStarAlgebra.Matrix
 public import Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Order
 public import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Order
@@ -19,20 +20,17 @@ The square root is operator monotone on positive semidefinite matrices: for
 continuous-functional-calculus image of the scalar monotonicity of `Real.sqrt`,
 reached through mathlib's C⋆-algebra monotonicity lemma `CFC.sqrt_le_sqrt`.
 
-To access the C⋆-algebra-level monotonicity lemmas on a finite complex matrix we
-register the canonical (L2-operator-norm) `NonUnitalCStarAlgebra` structure on
-`Matrix n n ℂ`. Mathlib exposes this norm behind the `Matrix.Norms.L2Operator`
-scope rather than committing to a single global matrix norm; we declare the
-composite instance here so that the continuous-functional-calculus order lemmas
-apply to `CMatrix`. The structure is sound for finite matrices: the eigenbasis
-continuous functional calculus already registered on `Matrix` is continuous in
-any Hausdorff topology, hence is a valid calculus for the operator-norm algebra.
+The C⋆-algebra-level monotonicity lemmas need the canonical (L2-operator-norm)
+C⋆-algebra structure on `Matrix n n ℂ`, which `QIT.MatrixL2` supplies. The
+structure is sound for finite matrices: the eigenbasis continuous functional
+calculus already registered on `Matrix` is continuous in any Hausdorff topology,
+hence is a valid calculus for the operator-norm algebra.
 [Wilde2011Qst, qit-notes.tex:29562-29630] -/
 
 @[expose] public section
 
 open scoped ComplexOrder MatrixOrder
-open scoped Matrix.Norms.L2Operator
+open scoped Matrix.Norms.L2Operator QIT.MatrixL2
 
 namespace QIT
 
@@ -41,18 +39,6 @@ universe u
 noncomputable section
 
 variable {a : Type u} [Fintype a] [DecidableEq a]
-
-/-- The canonical non-unital C⋆-algebra structure on a finite complex matrix,
-carried by the L2-operator norm. Mathlib keeps this behind the
-`Matrix.Norms.L2Operator` scope to avoid choosing a global matrix norm; we
-declare the composite instance here so that continuous-functional-calculus
-order lemmas (`CFC.sqrt_le_sqrt`, operator monotonicity of `CFC.rpow`) apply to
-`CMatrix`. -/
-noncomputable instance instCMatrixNonUnitalCStarAlgebra (n : Type u)
-    [Fintype n] [DecidableEq n] : NonUnitalCStarAlgebra (Matrix n n ℂ) := ⟨⟩
-
-noncomputable local instance instCMatrixCStarAlgebraForRpowOrder (n : Type u)
-    [Fintype n] [DecidableEq n] : CStarAlgebra (CMatrix n) := {}
 
 /-- Operator monotonicity of the square root: `A ≤ B` implies
 `psdSqrt A ≤ psdSqrt B`. -/

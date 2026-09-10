@@ -8,28 +8,38 @@ module
 
 public import QuantumLib.QIT.Protocols.FQSW.IIDTypical
 public import QuantumLib.QIT.Information.Entropy.Log2Lemmas
+public import QuantumLib.QIT.Util.MatrixInstances
 
 /-!
-# FQSW IID rate and register arithmetic
+# Rate and register arithmetic for the i.i.d. FQSW theorem
 
-This file is a dependency-ordered leaf of `QIT.Protocols.FQSW`.  Declaration
-names, namespaces, statements, and proof terms are preserved from the original
-monolithic module.
+Between the one-shot theorem and the direct theorem sits bookkeeping: the compressed registers must
+be embedded into honest finite types of the right cardinality, and the one-shot error bound must be
+turned into a bound decaying like `2^(-nδ/4)`.  Both are done here.
+
+On the rate side, `adhwFQSWIidCommunicationLogTarget` is the target `n (I(A;R)/2 + 2δ)` for the
+message register, with rounded upper and lower companions absorbing the slack lost when a real
+target is replaced by an integer cardinality.  The `skoro` bridges convert a bound on the fourth
+root argument into exponential decay of `adhwFQSWOneShotErrorBound` at those targets.
+
+On the register side, a typical subspace is only a subspace, so
+`ADHWFQSWPaddedAtypEmbedding` pads it up to a product `A₁ × A₂` of the chosen cardinalities and
+`fqswSumInrRetractionChannel` retracts along that embedding, which is what lets a protocol built on
+the padded registers be read back on the original ones.  `ADHWFQSWIidBalancedCardinalityChoice`
+records a choice of all four register cardinalities meeting the rate targets and the cardinality
+side conditions of the one-shot theorem simultaneously, and the `_eventually` forms produce such a
+choice for all large enough `n`.
 -/
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder
+open scoped ComplexOrder MatrixOrder QIT.MatrixL2
 
 namespace QIT
 
 universe u v w x y z p u1 v1 w1
 
 noncomputable section
-
-local instance fqswIIDRatesCMatrixContinuousENorm {ι : Type*} [Fintype ι] [DecidableEq ι] :
-    ContinuousENorm (CMatrix ι) :=
-  SeminormedAddGroup.toContinuousENorm
 
 variable {a : Type u} {b : Type v} {r : Type w}
 variable {q : Type x} {e : Type y} {et : Type z}
@@ -90,59 +100,6 @@ private theorem fqsw_skoro_bound_le_iid_decay
     _ ≤ (4 * A) / B := hdiv
     _ = 4 * (A / B) := by ring
     _ = 4 * (2 : ℝ) ^ (-(n : ℝ) * δ) := by rw [hratio]
-
-/-- Scalar denominator bridge for the rounded finite-register ADHW route: the
-lower `A₁` cardinality target `I/2 + 7δ/4` still converts the source `skoro`
-denominator into an exponentially decaying i.i.d. tail, now with exponent
-`δ / 2`. -/
-private theorem fqsw_rounded_skoro_bound_le_iid_decay
-    (n : ℕ) (I δ Q : ℝ)
-    (hQ :
-      (2 : ℝ) ^ ((n : ℝ) * ((1 / 2 : ℝ) * I + (7 / 4 : ℝ) * δ)) ≤ Q) :
-    4 * (2 : ℝ) ^ ((n : ℝ) * (I + 3 * δ)) / (Q ^ 2) ≤
-      4 * (2 : ℝ) ^ (-(n : ℝ) * (δ / 2)) := by
-  let L : ℝ := (2 : ℝ) ^ ((n : ℝ) * ((1 / 2 : ℝ) * I + (7 / 4 : ℝ) * δ))
-  let B : ℝ := (2 : ℝ) ^ ((n : ℝ) * (I + (7 / 2 : ℝ) * δ))
-  let A : ℝ := (2 : ℝ) ^ ((n : ℝ) * (I + 3 * δ))
-  have hL_nonneg : 0 ≤ L := by
-    dsimp [L]
-    exact Real.rpow_nonneg (by norm_num : (0 : ℝ) ≤ 2) _
-  have hL_pos : 0 < L := by
-    dsimp [L]
-    exact Real.rpow_pos_of_pos (by norm_num : (0 : ℝ) < 2) _
-  have hQ_pos : 0 < Q := lt_of_lt_of_le hL_pos (by simpa [L] using hQ)
-  have hQ_nonneg : 0 ≤ Q := hQ_pos.le
-  have hsq_raw : L ^ 2 ≤ Q ^ 2 :=
-    (sq_le_sq₀ hL_nonneg hQ_nonneg).mpr (by simpa [L] using hQ)
-  have hL_sq : L ^ 2 = B := by
-    dsimp [L, B]
-    rw [← Real.rpow_natCast]
-    rw [← Real.rpow_mul (by norm_num : (0 : ℝ) ≤ 2)]
-    congr 1
-    ring
-  have hden : B ≤ Q ^ 2 := by
-    simpa [hL_sq] using hsq_raw
-  have hB_pos : 0 < B := by
-    dsimp [B]
-    exact Real.rpow_pos_of_pos (by norm_num : (0 : ℝ) < 2) _
-  have hA_nonneg : 0 ≤ A := by
-    dsimp [A]
-    exact Real.rpow_nonneg (by norm_num : (0 : ℝ) ≤ 2) _
-  have hnum_nonneg : 0 ≤ 4 * A := by nlinarith
-  have hdiv :
-      (4 * A) / (Q ^ 2) ≤ (4 * A) / B :=
-    div_le_div_of_nonneg_left hnum_nonneg hB_pos hden
-  have hratio : A / B = (2 : ℝ) ^ (-(n : ℝ) * (δ / 2)) := by
-    dsimp [A, B]
-    rw [← Real.rpow_sub (by norm_num : (0 : ℝ) < 2)]
-    congr 1
-    ring
-  calc
-    4 * (2 : ℝ) ^ ((n : ℝ) * (I + 3 * δ)) / (Q ^ 2) =
-        (4 * A) / (Q ^ 2) := by rfl
-    _ ≤ (4 * A) / B := hdiv
-    _ = 4 * (A / B) := by ring
-    _ = 4 * (2 : ℝ) ^ (-(n : ℝ) * (δ / 2)) := by rw [hratio]
 
 /-- Mixed-slack scalar denominator bridge for the padded source route: any
 source numerator slack up to `7δ / 2` is absorbed by the source lower `A₁`
@@ -218,12 +175,12 @@ private theorem fqsw_skoro_bound_le_iid_decay_of_num_slack
 one-shot argument bound plus the chosen/lower-bounded `A₁` dimension imply the
 simplified i.i.d. one-shot error exponent. -/
 theorem adhwFQSWOneShotErrorBound_le_iid_entropy_exponent_of_skoro_bound
-    (ψ : PureVector (Prod (Prod a b) r))
+    (ψ : Ket ((a × b) × r))
     {a1 : Type u1} {b1 : Type v1} {r1 : Type w1}
     [Fintype a1] [DecidableEq a1]
     [Fintype b1] [DecidableEq b1]
     [Fintype r1] [DecidableEq r1]
-    (φ : PureVector (Prod (Prod a1 b1) r1))
+    (φ : Ket ((a1 × b1) × r1))
     (q : Type x) [Fintype q]
     (n : ℕ) (δ : ℝ)
     (hskoro :
@@ -240,7 +197,7 @@ theorem adhwFQSWOneShotErrorBound_le_iid_entropy_exponent_of_skoro_bound
   have hcard :
       (2 : ℝ) ^ ((n : ℝ) * ((1 / 2 : ℝ) * I + 2 * δ)) ≤
         (Fintype.card q : ℝ) := by
-    simpa [I, PureVector.fqswCommunicationRate] using hcardA1
+    simpa [I, Ket.fqswCommunicationRate] using hcardA1
   have hdecay :=
     fqsw_skoro_bound_le_iid_decay
       (n := n) (I := I) (δ := δ) (Q := (Fintype.card q : ℝ)) hcard
@@ -256,33 +213,33 @@ theorem adhwFQSWOneShotErrorBound_le_iid_entropy_exponent_of_skoro_bound
 finite registers while keeping the public ADHW communication-rate target at
 `+2δ`. -/
 def adhwFQSWIidCommunicationLogLowerTarget
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ : ℝ) : ℝ :=
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ : ℝ) : ℝ :=
   (n : ℝ) * (ψ.fqswCommunicationRate + (7 / 4 : ℝ) * δ)
 
 /-- ADHW source-route communication log target
 `n [I(A;R)/2 + 2δ]` from fqsw.tex lines 1164-1178. -/
 def adhwFQSWIidCommunicationLogTarget
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ : ℝ) : ℝ :=
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ : ℝ) : ℝ :=
   (n : ℝ) * (ψ.fqswCommunicationRate + 2 * δ)
 
 /-- Rounded upper `A₁` communication log target used only to absorb the
 finite-register ceiling slack while keeping the source lower target at
 `I(A;R)/2 + 2δ`. -/
 def adhwFQSWIidRoundedCommunicationLogUpperTarget
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ : ℝ) : ℝ :=
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ : ℝ) : ℝ :=
   (n : ℝ) * (ψ.fqswCommunicationRate + (9 / 4 : ℝ) * δ)
 
 /-- Rounded ADHW `skoro` bridge for the finite-register i.i.d. route: the
 source line-1158 numerator combines with the restored source lower `A₁` target
 `I(A;R)/2 + 2δ`, and for nonnegative `δ` the stronger ADHW `δ / 4` decay
-weakens to the legacy rounded `δ / 8` tail. -/
+weakens to the rounded `δ / 8` tail. -/
 theorem adhwFQSWOneShotErrorBound_le_iid_entropy_exponent_of_rounded_skoro_bound
-    (ψ : PureVector (Prod (Prod a b) r))
+    (ψ : Ket ((a × b) × r))
     {a1 : Type u1} {b1 : Type v1} {r1 : Type w1}
     [Fintype a1] [DecidableEq a1]
     [Fintype b1] [DecidableEq b1]
     [Fintype r1] [DecidableEq r1]
-    (φ : PureVector (Prod (Prod a1 b1) r1))
+    (φ : Ket ((a1 × b1) × r1))
     (q : Type x) [Fintype q]
     (n : ℕ) (δ : ℝ)
     (hδ : 0 ≤ δ)
@@ -316,12 +273,12 @@ theorem adhwFQSWOneShotErrorBound_le_iid_entropy_exponent_of_rounded_skoro_bound
 source numerator may use any slack `cδ` with `c ≤ 7/2`; the finite-register
 source lower `A₁` target still yields the rounded `δ / 8` one-shot tail. -/
 theorem adhwFQSWOneShotErrorBound_le_iid_entropy_exponent_of_slack_skoro_bound
-    (ψ : PureVector (Prod (Prod a b) r))
+    (ψ : Ket ((a × b) × r))
     {a1 : Type u1} {b1 : Type v1} {r1 : Type w1}
     [Fintype a1] [DecidableEq a1]
     [Fintype b1] [DecidableEq b1]
     [Fintype r1] [DecidableEq r1]
-    (φ : PureVector (Prod (Prod a1 b1) r1))
+    (φ : Ket ((a1 × b1) × r1))
     (q : Type x) [Fintype q]
     (n : ℕ) (δ c : ℝ)
     (hδ : 0 ≤ δ) (hc : c ≤ (7 / 2 : ℝ))
@@ -339,7 +296,7 @@ theorem adhwFQSWOneShotErrorBound_le_iid_entropy_exponent_of_slack_skoro_bound
   have hcard :
       (2 : ℝ) ^ ((n : ℝ) * ((1 / 2 : ℝ) * I + 2 * δ)) ≤
         (Fintype.card q : ℝ) := by
-    simpa [I, adhwFQSWIidCommunicationLogTarget, PureVector.fqswCommunicationRate]
+    simpa [I, adhwFQSWIidCommunicationLogTarget, Ket.fqswCommunicationRate]
       using hcardA1
   have hdecay :=
     fqsw_skoro_bound_le_iid_decay_of_num_slack
@@ -360,12 +317,12 @@ from an externally named typical register. -/
 def adhwFQSWTypicalSupportIsometryOfEquiv
     {α : Type u} {ι : Type v}
     [Fintype α] [DecidableEq α] [Fintype ι] [DecidableEq ι]
-    (ρ : State α) (n : ℕ) (δ : ℝ)
-    (E : ι ≃ State.TypicalSubspaceIndex ρ n δ) :
+    (ρ : MState α) (n : ℕ) (δ : ℝ)
+    (E : ι ≃ MState.TypicalSubspaceIndex ρ n δ) :
     ReferenceIsometry ι (TensorPower α n) :=
-  ({ matrix := State.typicalIsometry ρ n δ
-     isometry := State.typicalIsometry_conjTranspose_mul_self ρ n δ } :
-    ReferenceIsometry (State.TypicalSubspaceIndex ρ n δ) (TensorPower α n)).comp
+  ({ matrix := MState.typicalIsometry ρ n δ
+     isometry := MState.typicalIsometry_conjTranspose_mul_self ρ n δ } :
+    ReferenceIsometry (MState.TypicalSubspaceIndex ρ n δ) (TensorPower α n)).comp
       (ReferenceIsometry.ofEquiv E)
 
 /-- The reindexed Schumacher support isometry has the expected typical
@@ -373,15 +330,15 @@ projector as its range projection. -/
 theorem adhwFQSWTypicalSupportIsometryOfEquiv_range_projector
     {α : Type u} {ι : Type v}
     [Fintype α] [DecidableEq α] [Fintype ι] [DecidableEq ι]
-    (ρ : State α) (n : ℕ) (δ : ℝ)
-    (E : ι ≃ State.TypicalSubspaceIndex ρ n δ) :
+    (ρ : MState α) (n : ℕ) (δ : ℝ)
+    (E : ι ≃ MState.TypicalSubspaceIndex ρ n δ) :
     (adhwFQSWTypicalSupportIsometryOfEquiv ρ n δ E).matrix *
         Matrix.conjTranspose
           (adhwFQSWTypicalSupportIsometryOfEquiv ρ n δ E).matrix =
       ρ.typicalSubspaceProjector n δ := by
   unfold adhwFQSWTypicalSupportIsometryOfEquiv
   dsimp [ReferenceIsometry.comp]
-  let V := State.typicalIsometry ρ n δ
+  let V := MState.typicalIsometry ρ n δ
   let U := (ReferenceIsometry.ofEquiv E).matrix
   change (V * U) * Matrix.conjTranspose (V * U) = ρ.typicalSubspaceProjector n δ
   rw [Matrix.conjTranspose_mul]
@@ -389,25 +346,25 @@ theorem adhwFQSWTypicalSupportIsometryOfEquiv_range_projector
     (V * U) * (Matrix.conjTranspose U * Matrix.conjTranspose V) =
         V * (U * Matrix.conjTranspose U) * Matrix.conjTranspose V := by
           simp [Matrix.mul_assoc]
-    _ = V * (1 : CMatrix (State.TypicalSubspaceIndex ρ n δ)) *
+    _ = V * (1 : CMatrix (MState.TypicalSubspaceIndex ρ n δ)) *
         Matrix.conjTranspose V := by
           rw [referenceIsometry_ofEquiv_mul_conjTranspose E]
     _ = V * Matrix.conjTranspose V := by simp
     _ = ρ.typicalSubspaceProjector n δ := by
-          simpa [V] using State.typicalIsometry_mul_conjTranspose ρ n δ
+          simpa [V] using MState.typicalIsometry_mul_conjTranspose ρ n δ
 
 /-- Schumacher's typical decoder is the channel induced by its support isometry. -/
-theorem State.typicalDecoder_eq_fqswChannelOfReferenceIsometry
+theorem _root_.MState.typicalDecoder_eq_fqswChannelOfReferenceIsometry
     {α : Type u} [Fintype α] [DecidableEq α]
-    (ρ : State α) (n : ℕ) (δ : ℝ) :
-    State.typicalDecoder ρ n δ =
+    (ρ : MState α) (n : ℕ) (δ : ℝ) :
+    MState.typicalDecoder ρ n δ =
       fqswChannelOfReferenceIsometry
-        ({ matrix := State.typicalIsometry ρ n δ
-           isometry := State.typicalIsometry_conjTranspose_mul_self ρ n δ } :
-          ReferenceIsometry (State.TypicalSubspaceIndex ρ n δ) (TensorPower α n)) := by
-  rw [Channel.mk.injEq]
+        ({ matrix := MState.typicalIsometry ρ n δ
+           isometry := MState.typicalIsometry_conjTranspose_mul_self ρ n δ } :
+          ReferenceIsometry (MState.TypicalSubspaceIndex ρ n δ) (TensorPower α n)) := by
+  refine CPTPOp.ext_map ?_
   ext X i j
-  simp [State.typicalDecoder, fqswChannelOfReferenceIsometry,
+  simp [MState.typicalDecoder, fqswChannelOfReferenceIsometry,
     MatrixMap.ofReferenceIsometry_apply, MatrixMap.ofKraus]
 
 /-- Kraus family for a trace-preserving retraction from a padded sum register.
@@ -417,7 +374,7 @@ def fqswSumInrRetractionKraus
     {extra : Type u} {α : Type v}
     [Fintype extra] [DecidableEq extra]
     [Fintype α] [DecidableEq α]
-    (i0 : α) : (Unit ⊕ extra) → Matrix α (Sum extra α) ℂ
+    (i0 : α) : (Unit ⊕ extra) → Matrix α (extra ⊕ α) ℂ
   | Sum.inl _ => Matrix.conjTranspose (ReferenceIsometry.sumInr extra α).matrix
   | Sum.inr k => Matrix.single i0 (Sum.inl k) 1
 
@@ -478,55 +435,27 @@ def fqswSumInrRetractionChannel
     {extra : Type u} {α : Type v}
     [Fintype extra] [DecidableEq extra]
     [Fintype α] [DecidableEq α]
-    (i0 : α) : Channel (Sum extra α) α where
-  map := MatrixMap.ofKraus (fqswSumInrRetractionKraus (extra := extra) i0)
-  completelyPositive := MatrixMap.ofKraus_completelyPositive _
-  tracePreserving := MatrixMap.ofKraus_isTracePreserving_of_krausAdjoint_one _
-    (fqswSumInrRetractionKraus_adjoint_one i0)
-  mapsPositive := MatrixMap.ofKraus_mapsPositive _
+    (i0 : α) : CPTPMap (extra ⊕ α) α :=
+  CPTPOp.ofMat
+    (MatrixMap.ofKraus (fqswSumInrRetractionKraus (extra := extra) i0))
+    (MatrixMap.ofKraus_completelyPositive _)
+    (MatrixMap.ofKraus_isTracePreserving_of_krausAdjoint_one _
+      (fqswSumInrRetractionKraus_adjoint_one i0))
 
 theorem fqswSumInrRetractionChannel_comp_inclusion
     {extra : Type u} {α : Type v}
     [Fintype extra] [DecidableEq extra]
     [Fintype α] [DecidableEq α]
     (i0 : α) :
-    (fqswSumInrRetractionChannel (extra := extra) i0).comp
+    (fqswSumInrRetractionChannel (extra := extra) i0) ∘ₘ
         (fqswChannelOfReferenceIsometry (ReferenceIsometry.sumInr extra α)) =
-      Channel.idChannel α := by
-  rw [Channel.mk.injEq]
+      CPTPOp.id (dIn := α) := by
+  refine CPTPOp.ext_map ?_
   ext X i j
-  simp [Channel.comp, fqswSumInrRetractionChannel,
+  simp [CPTPOp.compose_map, fqswSumInrRetractionChannel,
     fqswSumInrRetractionKraus, fqswChannelOfReferenceIsometry,
     MatrixMap.ofReferenceIsometry_apply, ReferenceIsometry.sumInr,
-    MatrixMap.ofKraus, Matrix.mul_apply, Channel.idChannel]
-
-theorem fqswChannel_comp_assoc
-    {α : Type u} {β : Type v} {γ : Type w} {ζ : Type x}
-    [Fintype α] [DecidableEq α]
-    [Fintype β] [DecidableEq β]
-    [Fintype γ] [DecidableEq γ]
-    [Fintype ζ] [DecidableEq ζ]
-    (Φ : Channel γ ζ) (Ψ : Channel β γ) (Ω : Channel α β) :
-    (Φ.comp Ψ).comp Ω = Φ.comp (Ψ.comp Ω) := by
-  rw [Channel.mk.injEq]
-  rfl
-
-/-- Composing a channel with the identity on its input leaves it unchanged. -/
-theorem Channel.comp_idChannel
-    {α : Type u} {β : Type v} [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
-    (Φ : Channel α β) : Φ.comp (Channel.idChannel α) = Φ := by
-  rw [Channel.mk.injEq]
-  ext X i j
-  simp [Channel.comp, Channel.idChannel, MatrixMap.ofKraus]
-
-/-- Composing the identity on a channel's output leaves the channel unchanged. -/
-theorem Channel.idChannel_comp
-    {alpha : Type u} {beta : Type v}
-    [Fintype alpha] [DecidableEq alpha] [Fintype beta] [DecidableEq beta]
-    (Phi : Channel alpha beta) : (Channel.idChannel beta).comp Phi = Phi := by
-  rw [Channel.mk.injEq]
-  ext X i j
-  simp [Channel.comp, Channel.idChannel, MatrixMap.ofKraus]
+    MatrixMap.ofKraus, Matrix.mul_apply, CPTPOp.id_map]
 
 theorem fqswChannelOfReferenceIsometry_comp
     {α : Type u} {β : Type v} {γ : Type w}
@@ -534,11 +463,11 @@ theorem fqswChannelOfReferenceIsometry_comp
     [Fintype β] [DecidableEq β]
     [Fintype γ] [DecidableEq γ]
     (W : ReferenceIsometry β γ) (V : ReferenceIsometry α β) :
-    (fqswChannelOfReferenceIsometry W).comp (fqswChannelOfReferenceIsometry V) =
+    (fqswChannelOfReferenceIsometry W) ∘ₘ (fqswChannelOfReferenceIsometry V) =
       fqswChannelOfReferenceIsometry (W.comp V) := by
-  rw [Channel.mk.injEq]
+  refine CPTPOp.ext_map ?_
   ext X i j
-  simp [Channel.comp, fqswChannelOfReferenceIsometry,
+  simp [CPTPOp.compose_map, fqswChannelOfReferenceIsometry,
     MatrixMap.ofReferenceIsometry_apply, ReferenceIsometry.comp,
     Matrix.conjTranspose_mul, Matrix.mul_assoc]
 
@@ -546,12 +475,11 @@ theorem fqswChannelOfReferenceIsometry_comp
 theorem fqswChannelOfReferenceIsometry_ofEquiv_refl
     {α : Type u} [Fintype α] [DecidableEq α] :
     fqswChannelOfReferenceIsometry (ReferenceIsometry.ofEquiv (Equiv.refl α)) =
-      Channel.idChannel α := by
-  rw [Channel.mk.injEq]
+      CPTPOp.id (dIn := α) := by
+  refine CPTPOp.ext_map ?_
   ext X i j
-  simp [fqswChannelOfReferenceIsometry, Channel.idChannel,
-    MatrixMap.ofReferenceIsometry_apply, ReferenceIsometry.ofEquiv, MatrixMap.ofKraus,
-    Matrix.mul_apply]
+  simp [fqswChannelOfReferenceIsometry, CPTPOp.id_map,
+    MatrixMap.ofReferenceIsometry_apply, ReferenceIsometry.ofEquiv, Matrix.mul_apply]
   rw [Finset.sum_eq_single_of_mem j (Finset.mem_univ j)]
   · rw [Finset.sum_eq_single_of_mem i (Finset.mem_univ i)]
     · simp
@@ -563,8 +491,8 @@ theorem fqswChannelOfReferenceIsometry_ofEquiv_refl
 private theorem fqswChannel_reindex_symm_comp_reindex
     {α : Type u} {β : Type v} [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
     (E : α ≃ β) :
-    (Channel.reindex E.symm).comp (Channel.reindex E) = Channel.idChannel α := by
-  rw [Channel.mk.injEq]
+    (CPTPOp.reindex E.symm) ∘ₘ (CPTPOp.reindex E) = CPTPOp.id (dIn := α) := by
+  refine CPTPOp.ext_map ?_
   ext X i j
   let V := ReferenceIsometry.ofEquiv E
   have hsymm : (ReferenceIsometry.ofEquiv E.symm).matrix = Matrix.conjTranspose V.matrix := by
@@ -576,12 +504,8 @@ private theorem fqswChannel_reindex_symm_comp_reindex
         apply h
         simpa using (congrArg E h').symm
       simp [V, ReferenceIsometry.ofEquiv, Matrix.conjTranspose, h, h']
-  change
-    ((MatrixMap.ofReferenceIsometry (ReferenceIsometry.ofEquiv E.symm)).comp
-      (MatrixMap.ofReferenceIsometry (ReferenceIsometry.ofEquiv E))) X i j =
-    MatrixMap.ofKraus (fun _ : Unit => (1 : CMatrix α)) X i j
-  simp only [LinearMap.comp_apply, MatrixMap.ofKraus, LinearMap.coe_mk, AddHom.coe_mk,
-    Fintype.sum_unique, Matrix.conjTranspose_one, Matrix.one_mul, Matrix.mul_one]
+  simp only [CPTPOp.compose_map, CPTPOp.reindex, CPTPOp.map_ofMat, CPTPOp.id_map,
+    LinearMap.comp_apply, LinearMap.id_coe, id_eq]
   rw [MatrixMap.ofReferenceIsometry_apply, MatrixMap.ofReferenceIsometry_apply, hsymm,
     Matrix.conjTranspose_conjTranspose]
   have hmatrix :
@@ -596,19 +520,19 @@ private theorem fqswChannel_reindex_symm_comp_reindex
   simp
 
 /-- Parallel channel composition distributes over product channels. -/
-theorem Channel.prod_comp_prod
+theorem CPTPOp.prod_comp_prod
     {α₁ : Type u} {β₁ : Type v} {γ₁ : Type w}
     {α₂ : Type x} {β₂ : Type y} {γ₂ : Type z}
     [Fintype α₁] [DecidableEq α₁] [Fintype β₁] [DecidableEq β₁]
     [Fintype γ₁] [DecidableEq γ₁] [Fintype α₂] [DecidableEq α₂]
     [Fintype β₂] [DecidableEq β₂] [Fintype γ₂] [DecidableEq γ₂]
-    (Φ₁ : Channel β₁ γ₁) (Φ₂ : Channel β₂ γ₂)
-    (Ψ₁ : Channel α₁ β₁) (Ψ₂ : Channel α₂ β₂) :
-    (Φ₁.prod Φ₂).comp (Ψ₁.prod Ψ₂) = (Φ₁.comp Ψ₁).prod (Φ₂.comp Ψ₂) := by
-  rw [Channel.mk.injEq]
+    (Φ₁ : CPTPMap β₁ γ₁) (Φ₂ : CPTPMap β₂ γ₂)
+    (Ψ₁ : CPTPMap α₁ β₁) (Ψ₂ : CPTPMap α₂ β₂) :
+    (Φ₁.prod Φ₂) ∘ₘ (Ψ₁.prod Ψ₂) = (Φ₁ ∘ₘ Ψ₁).prod (Φ₂ ∘ₘ Ψ₂) := by
+  refine CPTPOp.ext_map ?_
   ext X i j
-  change (MatrixMap.kron Φ₁.map Φ₂.map (MatrixMap.kron Ψ₁.map Ψ₂.map X)) i j =
-    (MatrixMap.kron (Φ₁.map.comp Ψ₁.map) (Φ₂.map.comp Ψ₂.map) X) i j
+  simp only [CPTPOp.compose_map, CPTPOp.prod_map,
+    LinearMap.comp_apply]
   rw [MatrixMap.kron_comp_apply_general]
 
 /-- The channel induced by a product isometry is the product of the induced channels. -/
@@ -619,10 +543,9 @@ theorem fqswChannelOfReferenceIsometry_prod
     (V : ReferenceIsometry α₁ β₁) (W : ReferenceIsometry α₂ β₂) :
     fqswChannelOfReferenceIsometry (V.prod W) =
       (fqswChannelOfReferenceIsometry V).prod (fqswChannelOfReferenceIsometry W) := by
-  rw [Channel.mk.injEq]
+  refine CPTPOp.ext_map ?_
   ext X i j
-  change MatrixMap.ofReferenceIsometry (V.prod W) X i j =
-    MatrixMap.kron (MatrixMap.ofReferenceIsometry V) (MatrixMap.ofReferenceIsometry W) X i j
+  simp only [fqswChannelOfReferenceIsometry, CPTPOp.map_ofMat, CPTPOp.prod_map]
   rw [MatrixMap.map_eq_sum_single
     (MatrixMap.ofReferenceIsometry (V.prod W)) X]
   rw [MatrixMap.map_eq_sum_single
@@ -635,7 +558,8 @@ theorem fqswChannelOfReferenceIsometry_prod
   rcases ef with ⟨a, c⟩
   rcases ef' with ⟨a', c'⟩
   rw [single_prod_eq_kronecker_single]
-  rw [MatrixMap.kron_apply_kronecker]
+  simp only [Matrix.kronecker]
+  rw [MatrixMap.kron_map_of_kron_state]
   simp only [MatrixMap.ofReferenceIsometry_apply, ReferenceIsometry.prod]
   change
     (Matrix.kronecker V.matrix W.matrix *
@@ -669,30 +593,38 @@ theorem fqswChannelOfReferenceIsometry_prod
 `A₁ × A₂`, replacing the exact factorization assumption in fqsw.tex lines
 1140-1147 by an injective finite-dimensional basis embedding. -/
 structure ADHWFQSWPaddedAtypEmbedding
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ : ℝ)
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ : ℝ)
     (atyp : Type p) (q : Type x) (e : Type y)
     [Fintype atyp] [DecidableEq atyp] [Fintype q] [DecidableEq q]
     [Fintype e] [DecidableEq e] where
+  /-- `atyp` has exactly the dimension of the typical subspace. -/
   atypDimension_eq_projector_rank :
     (Fintype.card atyp : ℝ) =
       (adhwFQSWSystemAState ψ).typicalSubspaceDimension n δ
+  /-- The chosen indexing of `atyp` by typical sequences. -/
   typicalIndexEquiv :
-    atyp ≃ State.TypicalSubspaceIndex (adhwFQSWSystemAState ψ) n δ
+    atyp ≃ MState.TypicalSubspaceIndex (adhwFQSWSystemAState ψ) n δ
+  /-- The isometry embedding `atyp` into `A^n`. -/
   supportIsometry : ReferenceIsometry atyp (TensorPower a n)
+  /-- The support isometry is the one determined by `typicalIndexEquiv`. -/
   supportIsometry_eq_typicalIndexEquiv :
     supportIsometry = adhwFQSWTypicalSupportIsometryOfEquiv
       (adhwFQSWSystemAState ψ) n δ typicalIndexEquiv
+  /-- The support isometry's range is the typical subspace. -/
   supportIsometry_range_projector_eq :
     supportIsometry.matrix * Matrix.conjTranspose supportIsometry.matrix =
       (adhwFQSWSystemAState ψ).typicalSubspaceProjector n δ
-  embedding : atyp ↪ Prod q e
+  /-- The basis embedding of `atyp` into the padded register `q × e`. -/
+  embedding : atyp ↪ (q × e)
+  /-- The number of padded basis vectors outside the image of `embedding`. -/
   paddingSlack : ℕ
+  /-- The padding accounts for exactly the unused dimensions. -/
   card_add_padding_eq :
-    Fintype.card atyp + paddingSlack = Fintype.card (Prod q e)
+    Fintype.card atyp + paddingSlack = Fintype.card (q × e)
 
 namespace ADHWFQSWPaddedAtypEmbedding
 
-variable {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ : ℝ}
+variable {ψ : Ket ((a × b) × r)} {n : ℕ} {δ : ℝ}
 variable {atyp : Type p} {q : Type x} {e : Type y}
 variable [Fintype atyp] [DecidableEq atyp] [Fintype q] [DecidableEq q]
 variable [Fintype e] [DecidableEq e]
@@ -701,17 +633,17 @@ variable [Fintype e] [DecidableEq e]
 replacement for the exact tensor factorization in ADHW fqsw.tex lines
 1140-1147. -/
 def isometry (P : ADHWFQSWPaddedAtypEmbedding ψ n δ atyp q e) :
-    ReferenceIsometry atyp (Prod q e) :=
+    ReferenceIsometry atyp (q × e) :=
   ReferenceIsometry.ofInjective P.embedding P.embedding.injective
 
 /-- Basis coordinates unused by the padded typical-support embedding. -/
 def paddingComplement (P : ADHWFQSWPaddedAtypEmbedding ψ n δ atyp q e) :=
-  {x : Prod q e // x ∉ Set.range P.embedding}
+  {x : (q × e) // x ∉ Set.range P.embedding}
 
 /-- Split the padded register into unused coordinates and the embedded true
 typical register.  The true typical coordinates occupy the right summand. -/
 def paddingEquiv (P : ADHWFQSWPaddedAtypEmbedding ψ n δ atyp q e) :
-    Sum P.paddingComplement atyp ≃ Prod q e :=
+    (P.paddingComplement ⊕ atyp) ≃ (q × e) :=
   (Equiv.sumComm P.paddingComplement atyp).trans <|
     (Equiv.sumCongr P.embedding.toEquivRange (Equiv.refl P.paddingComplement)).trans <|
       Equiv.Set.sumCompl (Set.range P.embedding)
@@ -753,12 +685,12 @@ produces the canonical right-summand inclusion channel. -/
 theorem reindex_comp_isometry_eq_sumInrChannel
     (P : ADHWFQSWPaddedAtypEmbedding ψ n δ atyp q e)
     [Fintype P.paddingComplement] [DecidableEq P.paddingComplement] :
-    (Channel.reindex P.paddingEquiv.symm).comp
+    (CPTPOp.reindex P.paddingEquiv.symm) ∘ₘ
         (fqswChannelOfReferenceIsometry P.isometry) =
       fqswChannelOfReferenceIsometry
         (ReferenceIsometry.sumInr P.paddingComplement atyp) := by
   change
-    (fqswChannelOfReferenceIsometry (ReferenceIsometry.ofEquiv P.paddingEquiv.symm)).comp
+    (fqswChannelOfReferenceIsometry (ReferenceIsometry.ofEquiv P.paddingEquiv.symm)) ∘ₘ
         (fqswChannelOfReferenceIsometry P.isometry) = _
   rw [fqswChannelOfReferenceIsometry_comp,
     ADHWFQSWPaddedAtypEmbedding.reindexed_isometry_eq_sumInr P]
@@ -767,43 +699,43 @@ theorem reindex_comp_isometry_eq_sumInrChannel
 register.  Off-support padding coordinates are sent to a fixed fallback basis
 state; this behavior is physical but irrelevant on the encoded support. -/
 def paddingRetraction (P : ADHWFQSWPaddedAtypEmbedding ψ n δ atyp q e)
-    [Nonempty atyp] : Channel (Prod q e) atyp := by
+    [Nonempty atyp] : CPTPMap (q × e) atyp := by
   classical
   letI : Finite P.paddingComplement :=
     Finite.of_injective Subtype.val Subtype.val_injective
   letI : Fintype P.paddingComplement := Fintype.ofFinite P.paddingComplement
   letI : DecidableEq P.paddingComplement := Classical.decEq P.paddingComplement
   exact
-    (fqswSumInrRetractionChannel (Nonempty.some inferInstance)).comp
-      (Channel.reindex P.paddingEquiv.symm)
+    (fqswSumInrRetractionChannel (Nonempty.some inferInstance)) ∘ₘ
+      (CPTPOp.reindex P.paddingEquiv.symm)
 
 /-- Physical Schumacher encoder followed by the padded coordinate embedding. -/
 def physicalEncoder (P : ADHWFQSWPaddedAtypEmbedding ψ n δ atyp q e)
-    [Nonempty atyp] : Channel (TensorPower a n) (Prod q e) :=
-  (fqswChannelOfReferenceIsometry P.isometry).comp <|
-    (Channel.reindex P.typicalIndexEquiv.symm).comp <|
-      State.typicalEncoder (adhwFQSWSystemAState ψ) n δ
-        (P.typicalIndexEquiv (Nonempty.some inferInstance))
+    [Nonempty atyp] : CPTPMap (TensorPower a n) (q × e) :=
+  (fqswChannelOfReferenceIsometry P.isometry) ∘ₘ
+    ((CPTPOp.reindex P.typicalIndexEquiv.symm) ∘ₘ
+      MState.typicalEncoder (adhwFQSWSystemAState ψ) n δ
+        (P.typicalIndexEquiv (Nonempty.some inferInstance)))
 
 /-- Physical decoder from padded coordinates into the original Alice block. -/
 def physicalDecoder (P : ADHWFQSWPaddedAtypEmbedding ψ n δ atyp q e)
-    [Nonempty atyp] : Channel (Prod q e) (TensorPower a n) :=
-  (State.typicalDecoder (adhwFQSWSystemAState ψ) n δ).comp <|
-    (Channel.reindex P.typicalIndexEquiv).comp P.paddingRetraction
+    [Nonempty atyp] : CPTPMap (q × e) (TensorPower a n) :=
+  (MState.typicalDecoder (adhwFQSWSystemAState ψ) n δ) ∘ₘ
+    ((CPTPOp.reindex P.typicalIndexEquiv) ∘ₘ P.paddingRetraction)
 
 /-- The padded retraction is exactly a left inverse on encoded typical
 coordinates. -/
 theorem paddingRetraction_comp_isometry
     (P : ADHWFQSWPaddedAtypEmbedding ψ n δ atyp q e)
     [Nonempty atyp] :
-    P.paddingRetraction.comp (fqswChannelOfReferenceIsometry P.isometry) =
-      Channel.idChannel atyp := by
+    P.paddingRetraction ∘ₘ (fqswChannelOfReferenceIsometry P.isometry) =
+      CPTPOp.id (dIn := atyp) := by
   classical
   let : Finite P.paddingComplement :=
     Finite.of_injective Subtype.val Subtype.val_injective
   let : Fintype P.paddingComplement := Fintype.ofFinite P.paddingComplement
   let : DecidableEq P.paddingComplement := Classical.decEq P.paddingComplement
-  rw [paddingRetraction, fqswChannel_comp_assoc,
+  rw [paddingRetraction, CPTPOp.compose_assoc,
     ADHWFQSWPaddedAtypEmbedding.reindex_comp_isometry_eq_sumInrChannel P]
   exact fqswSumInrRetractionChannel_comp_inclusion (Nonempty.some inferInstance)
 
@@ -811,39 +743,38 @@ theorem paddingRetraction_comp_isometry
 theorem physicalEncoder_comp_supportIsometry
     (P : ADHWFQSWPaddedAtypEmbedding ψ n δ atyp q e)
     [Nonempty atyp] :
-    P.physicalEncoder.comp (fqswChannelOfReferenceIsometry P.supportIsometry) =
+    P.physicalEncoder ∘ₘ (fqswChannelOfReferenceIsometry P.supportIsometry) =
       fqswChannelOfReferenceIsometry P.isometry := by
   have hdecoder :
       fqswChannelOfReferenceIsometry P.supportIsometry =
-        (State.typicalDecoder (adhwFQSWSystemAState ψ) n δ).comp
-          (Channel.reindex P.typicalIndexEquiv) := by
+        (MState.typicalDecoder (adhwFQSWSystemAState ψ) n δ) ∘ₘ
+          (CPTPOp.reindex P.typicalIndexEquiv) := by
     rw [P.supportIsometry_eq_typicalIndexEquiv]
     change
       fqswChannelOfReferenceIsometry
-          (({ matrix := State.typicalIsometry (adhwFQSWSystemAState ψ) n δ
-              isometry := State.typicalIsometry_conjTranspose_mul_self
+          (({ matrix := MState.typicalIsometry (adhwFQSWSystemAState ψ) n δ
+              isometry := MState.typicalIsometry_conjTranspose_mul_self
                 (adhwFQSWSystemAState ψ) n δ } :
               ReferenceIsometry
-                (State.TypicalSubspaceIndex (adhwFQSWSystemAState ψ) n δ)
+                (MState.TypicalSubspaceIndex (adhwFQSWSystemAState ψ) n δ)
                 (TensorPower a n)).comp
             (ReferenceIsometry.ofEquiv P.typicalIndexEquiv)) =
-        (State.typicalDecoder (adhwFQSWSystemAState ψ) n δ).comp
+        (MState.typicalDecoder (adhwFQSWSystemAState ψ) n δ) ∘ₘ
           (fqswChannelOfReferenceIsometry (ReferenceIsometry.ofEquiv P.typicalIndexEquiv))
-    rw [State.typicalDecoder_eq_fqswChannelOfReferenceIsometry,
+    rw [MState.typicalDecoder_eq_fqswChannelOfReferenceIsometry,
       fqswChannelOfReferenceIsometry_comp]
   have hid_left :
-      (Channel.idChannel (State.TypicalSubspaceIndex (adhwFQSWSystemAState ψ) n δ)).comp
-          (Channel.reindex P.typicalIndexEquiv) =
-        Channel.reindex P.typicalIndexEquiv := by
-    rw [Channel.mk.injEq]
+      (CPTPOp.id (dIn := MState.TypicalSubspaceIndex (adhwFQSWSystemAState ψ) n δ)) ∘ₘ
+          (CPTPOp.reindex P.typicalIndexEquiv) =
+        CPTPOp.reindex P.typicalIndexEquiv := by
+    refine CPTPOp.ext_map ?_
     ext X i j
-    simp [Channel.comp, Channel.idChannel, Channel.reindex,
-      MatrixMap.ofReferenceIsometry_apply, ReferenceIsometry.ofEquiv, MatrixMap.ofKraus,
+    simp [CPTPOp.reindex, MatrixMap.ofReferenceIsometry_apply, ReferenceIsometry.ofEquiv,
       Matrix.mul_apply]
   have hreindex :
-      (Channel.reindex P.typicalIndexEquiv.symm).comp
-          (Channel.reindex P.typicalIndexEquiv) = Channel.idChannel atyp := by
-    rw [Channel.mk.injEq]
+      (CPTPOp.reindex P.typicalIndexEquiv.symm) ∘ₘ
+          (CPTPOp.reindex P.typicalIndexEquiv) = CPTPOp.id (dIn := atyp) := by
+    refine CPTPOp.ext_map ?_
     ext X i j
     let V := ReferenceIsometry.ofEquiv P.typicalIndexEquiv
     have hsymm :
@@ -857,12 +788,8 @@ theorem physicalEncoder_comp_supportIsometry
           apply h
           simpa using (congrArg P.typicalIndexEquiv h').symm
         simp [V, ReferenceIsometry.ofEquiv, Matrix.conjTranspose, h, h']
-    change
-      ((MatrixMap.ofReferenceIsometry (ReferenceIsometry.ofEquiv P.typicalIndexEquiv.symm)).comp
-        (MatrixMap.ofReferenceIsometry (ReferenceIsometry.ofEquiv P.typicalIndexEquiv))) X i j =
-      MatrixMap.ofKraus (fun _ : Unit => (1 : CMatrix atyp)) X i j
-    simp only [LinearMap.comp_apply, MatrixMap.ofKraus, LinearMap.coe_mk, AddHom.coe_mk,
-      Fintype.sum_unique, Matrix.conjTranspose_one, Matrix.one_mul, Matrix.mul_one]
+    simp only [CPTPOp.compose_map, CPTPOp.reindex, CPTPOp.map_ofMat, CPTPOp.id_map,
+      LinearMap.comp_apply, LinearMap.id_coe, id_eq]
     rw [MatrixMap.ofReferenceIsometry_apply, MatrixMap.ofReferenceIsometry_apply]
     change
       ((ReferenceIsometry.ofEquiv P.typicalIndexEquiv.symm).matrix *
@@ -881,62 +808,60 @@ theorem physicalEncoder_comp_supportIsometry
     rw [hmatrix, V.isometry]
     simp
   have hid_right :
-      (fqswChannelOfReferenceIsometry P.isometry).comp (Channel.idChannel atyp) =
+      (fqswChannelOfReferenceIsometry P.isometry) ∘ₘ (CPTPOp.id (dIn := atyp)) =
         fqswChannelOfReferenceIsometry P.isometry := by
-    rw [Channel.mk.injEq]
+    refine CPTPOp.ext_map ?_
     ext X i j
-    simp [Channel.comp, Channel.idChannel, fqswChannelOfReferenceIsometry,
-      MatrixMap.ofReferenceIsometry_apply, MatrixMap.ofKraus]
+    simp [fqswChannelOfReferenceIsometry, MatrixMap.ofReferenceIsometry_apply]
   rw [hdecoder]
   unfold physicalEncoder
-  rw [fqswChannel_comp_assoc, fqswChannel_comp_assoc]
-  rw [← fqswChannel_comp_assoc
-    (State.typicalEncoder (adhwFQSWSystemAState ψ) n δ
+  rw [CPTPOp.compose_assoc, CPTPOp.compose_assoc]
+  rw [← CPTPOp.compose_assoc
+    (MState.typicalEncoder (adhwFQSWSystemAState ψ) n δ
       (P.typicalIndexEquiv (Nonempty.some inferInstance)))
-    (State.typicalDecoder (adhwFQSWSystemAState ψ) n δ)
-    (Channel.reindex P.typicalIndexEquiv)]
-  rw [State.typicalEncoder_comp_typicalDecoder_eq_idChannel, hid_left, hreindex, hid_right]
+    (MState.typicalDecoder (adhwFQSWSystemAState ψ) n δ)
+    (CPTPOp.reindex P.typicalIndexEquiv)]
+  rw [MState.typicalEncoder_comp_typicalDecoder_eq_idChannel, hid_left, hreindex, hid_right]
 
 /-- Decoding after the padded embedding recovers the true typical-support channel. -/
 theorem physicalDecoder_comp_isometry_eq_supportIsometryChannel
     (P : ADHWFQSWPaddedAtypEmbedding ψ n δ atyp q e)
     [Nonempty atyp] :
-    P.physicalDecoder.comp (fqswChannelOfReferenceIsometry P.isometry) =
+    P.physicalDecoder ∘ₘ (fqswChannelOfReferenceIsometry P.isometry) =
       fqswChannelOfReferenceIsometry P.supportIsometry := by
   have hdecoder :
-      (State.typicalDecoder (adhwFQSWSystemAState ψ) n δ).comp
-          (Channel.reindex P.typicalIndexEquiv) =
+      (MState.typicalDecoder (adhwFQSWSystemAState ψ) n δ) ∘ₘ
+          (CPTPOp.reindex P.typicalIndexEquiv) =
         fqswChannelOfReferenceIsometry P.supportIsometry := by
     rw [P.supportIsometry_eq_typicalIndexEquiv]
     change
-      (State.typicalDecoder (adhwFQSWSystemAState ψ) n δ).comp
+      (MState.typicalDecoder (adhwFQSWSystemAState ψ) n δ) ∘ₘ
           (fqswChannelOfReferenceIsometry (ReferenceIsometry.ofEquiv P.typicalIndexEquiv)) =
         fqswChannelOfReferenceIsometry
-          (({ matrix := State.typicalIsometry (adhwFQSWSystemAState ψ) n δ
-              isometry := State.typicalIsometry_conjTranspose_mul_self
+          (({ matrix := MState.typicalIsometry (adhwFQSWSystemAState ψ) n δ
+              isometry := MState.typicalIsometry_conjTranspose_mul_self
                 (adhwFQSWSystemAState ψ) n δ } :
               ReferenceIsometry
-                (State.TypicalSubspaceIndex (adhwFQSWSystemAState ψ) n δ)
+                (MState.TypicalSubspaceIndex (adhwFQSWSystemAState ψ) n δ)
                 (TensorPower a n)).comp
             (ReferenceIsometry.ofEquiv P.typicalIndexEquiv))
-    rw [State.typicalDecoder_eq_fqswChannelOfReferenceIsometry,
+    rw [MState.typicalDecoder_eq_fqswChannelOfReferenceIsometry,
       fqswChannelOfReferenceIsometry_comp]
   have hid_right :
-      (Channel.reindex P.typicalIndexEquiv).comp
-          (Channel.idChannel atyp) = Channel.reindex P.typicalIndexEquiv := by
-    rw [Channel.mk.injEq]
+      (CPTPOp.reindex P.typicalIndexEquiv) ∘ₘ
+          (CPTPOp.id (dIn := atyp)) = CPTPOp.reindex P.typicalIndexEquiv := by
+    refine CPTPOp.ext_map ?_
     ext X i j
-    simp [Channel.comp, Channel.idChannel, Channel.reindex,
-      MatrixMap.ofReferenceIsometry_apply, ReferenceIsometry.ofEquiv, MatrixMap.ofKraus]
+    simp [CPTPOp.reindex, MatrixMap.ofReferenceIsometry_apply, ReferenceIsometry.ofEquiv]
   unfold physicalDecoder
-  rw [fqswChannel_comp_assoc, fqswChannel_comp_assoc,
+  rw [CPTPOp.compose_assoc, CPTPOp.compose_assoc,
     paddingRetraction_comp_isometry, hid_right, hdecoder]
 
 /-- Lift a padded one-shot Alice coordinate back into the true typical Alice
 support inside `A^n`: first project from `A₁ × A₂` onto the embedded `A^typ`
 coordinates, then include the typical support into the full tensor power. -/
 def supportLiftMatrix (P : ADHWFQSWPaddedAtypEmbedding ψ n δ atyp q e) :
-    Matrix (TensorPower a n) (Prod q e) ℂ :=
+    Matrix (TensorPower a n) (q × e) ℂ :=
   P.supportIsometry.matrix * Matrix.conjTranspose P.isometry.matrix
 
 end ADHWFQSWPaddedAtypEmbedding
@@ -944,7 +869,7 @@ end ADHWFQSWPaddedAtypEmbedding
 /-- The padded Alice lift has range equal to the true `A^n` typical
 subspace projector. -/
 theorem ADHWFQSWPaddedAtypEmbedding.supportLiftMatrix_mul_conjTranspose
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δ : ℝ}
     {atyp : Type p} {q : Type x} {e : Type y}
     [Fintype atyp] [DecidableEq atyp]
     [Fintype q] [DecidableEq q]
@@ -968,7 +893,7 @@ theorem ADHWFQSWPaddedAtypEmbedding.supportLiftMatrix_mul_conjTranspose
 /-- The padded Alice lift has initial projection equal to the embedded
 `A^typ` support inside the padded `A₁ × A₂` register. -/
 theorem ADHWFQSWPaddedAtypEmbedding.supportLiftMatrix_conjTranspose_mul
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δ : ℝ}
     {atyp : Type p} {q : Type x} {e : Type y}
     [Fintype atyp] [DecidableEq atyp]
     [Fintype q] [DecidableEq q]
@@ -990,7 +915,7 @@ theorem ADHWFQSWPaddedAtypEmbedding.supportLiftMatrix_conjTranspose_mul
 /-- The padded Alice lift is supported on the embedded `A^typ` coordinates in
 the padded `A₁ × A₂` register. -/
 theorem ADHWFQSWPaddedAtypEmbedding.supportLiftMatrix_mul_initialProjection
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δ : ℝ}
     {atyp : Type p} {q : Type x} {e : Type y}
     [Fintype atyp] [DecidableEq atyp]
     [Fintype q] [DecidableEq q]
@@ -1013,23 +938,23 @@ theorem ADHWFQSWPaddedAtypEmbedding.supportLiftMatrix_mul_initialProjection
 /-- Construct the padded `A^typ ↪ A₁ × A₂` embedding from the rank identity and
 the finite cardinality inequality. -/
 theorem exists_adhwFQSWPaddedAtypEmbedding
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ : ℝ)
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ : ℝ)
     (atyp : Type p) (q : Type x) (e : Type y)
     [Fintype atyp] [DecidableEq atyp] [Fintype q] [DecidableEq q]
     [Fintype e] [DecidableEq e]
     (hdim :
       (Fintype.card atyp : ℝ) =
         (adhwFQSWSystemAState ψ).typicalSubspaceDimension n δ)
-    (hcard : Fintype.card atyp ≤ Fintype.card (Prod q e)) :
+    (hcard : Fintype.card atyp ≤ Fintype.card (q × e)) :
     Nonempty (ADHWFQSWPaddedAtypEmbedding ψ n δ atyp q e) := by
   classical
   let atypIndex : Type u :=
-    State.TypicalSubspaceIndex (adhwFQSWSystemAState ψ) n δ
+    MState.TypicalSubspaceIndex (adhwFQSWSystemAState ψ) n δ
   have hindex :
       (Fintype.card atypIndex : ℝ) =
         (adhwFQSWSystemAState ψ).typicalSubspaceDimension n δ := by
     simpa [atypIndex] using
-      State.card_typicalSubspaceIndex (adhwFQSWSystemAState ψ) n δ
+      MState.card_typicalSubspaceIndex (adhwFQSWSystemAState ψ) n δ
   have hcardIndex : Fintype.card atyp = Fintype.card atypIndex := by
     have hreal : (Fintype.card atyp : ℝ) = (Fintype.card atypIndex : ℝ) :=
       hdim.trans hindex.symm
@@ -1050,13 +975,13 @@ theorem exists_adhwFQSWPaddedAtypEmbedding
        supportIsometry_eq_typicalIndexEquiv := rfl
        supportIsometry_range_projector_eq := hrangeA
        embedding := Classical.choice (Function.Embedding.nonempty_of_card_le hcard)
-       paddingSlack := Fintype.card (Prod q e) - Fintype.card atyp
+       paddingSlack := Fintype.card (q × e) - Fintype.card atyp
        card_add_padding_eq := Nat.add_sub_cancel' hcard }⟩
 
 /-- ADHW source-route ebit-yield log lower target
 `n [I(A;B)/2 - 3δ]` from fqsw.tex lines 1177-1180. -/
 def adhwFQSWIidEbitYieldLogLower
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ : ℝ) : ℝ :=
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ : ℝ) : ℝ :=
   (n : ℝ) * (ψ.fqswEbitYieldRate - 3 * δ)
 
 /-- Post-compression trace-norm bound
@@ -1182,20 +1107,20 @@ source lower target, but its finite rounded size is only required to stay below
 the separate `+9δ/4` upper target.  `A₂` records the resulting ebit-yield lower
 bound. -/
 structure ADHWFQSWIidRateChoice
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ : ℝ)
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ : ℝ)
     (q : Type x) (e : Type y) [Fintype q] [Fintype e] where
   communication_log_le :
     log2 (Fintype.card q : ℝ) ≤
       adhwFQSWIidRoundedCommunicationLogUpperTarget ψ n δ
   communication_card_lower :
-    (2 : ℝ) ^ adhwFQSWIidCommunicationLogTarget ψ n δ <=
+    (2 : ℝ) ^ adhwFQSWIidCommunicationLogTarget ψ n δ ≤
       (Fintype.card q : ℝ)
   ebitYield_log_ge :
     adhwFQSWIidEbitYieldLogLower ψ n δ ≤ log2 (Fintype.card e : ℝ)
 
 namespace ADHWFQSWIidRateChoice
 
-variable {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ : ℝ}
+variable {ψ : Ket ((a × b) × r)} {n : ℕ} {δ : ℝ}
 variable {q : Type x} {e : Type y} {et : Type z}
 variable [Fintype q] [DecidableEq q]
 variable [Fintype e] [DecidableEq e] [Nonempty e]
@@ -1248,13 +1173,13 @@ end ADHWFQSWIidRateChoice
 /-- Construct the finite-register ADHW i.i.d. rate choice from the two rounded
 log-dimension inequalities. -/
 theorem exists_adhwFQSWIidRateChoice
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ : ℝ)
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ : ℝ)
     (q : Type x) (e : Type y) [Fintype q] [Fintype e]
     (hcomm :
       log2 (Fintype.card q : ℝ) ≤
         adhwFQSWIidRoundedCommunicationLogUpperTarget ψ n δ)
     (hcommLower :
-      (2 : ℝ) ^ adhwFQSWIidCommunicationLogTarget ψ n δ <=
+      (2 : ℝ) ^ adhwFQSWIidCommunicationLogTarget ψ n δ ≤
         (Fintype.card q : ℝ))
     (hebit :
       adhwFQSWIidEbitYieldLogLower ψ n δ ≤ log2 (Fintype.card e : ℝ)) :
@@ -1268,7 +1193,7 @@ choice: `q` is chosen from the source `+2δ` lower communication-card target,
 while the separate rounded `+9δ/4` communication-rate cap absorbs the `+1`
 ceiling error once the residual slack `δ / 4` is at least one bit. -/
 theorem exists_adhwFQSWIidRateChoice_registers
-    (ψ : PureVector (Prod (Prod a b) r)) {δ : ℝ} (hδ : 0 < δ) :
+    (ψ : Ket ((a × b) × r)) {δ : ℝ} (hδ : 0 < δ) :
     ∃ N : ℕ, ∀ n : ℕ, n ≥ N →
       ∃ (q : Type x), ∃ (_ : Fintype q), ∃ (_ : DecidableEq q), ∃ (_ : Nonempty q),
         ∃ (e : Type y), ∃ (_ : Fintype e), ∃ (_ : DecidableEq e), ∃ (_ : Nonempty e),
@@ -1320,9 +1245,9 @@ theorem exists_adhwFQSWIidRateChoice_registers
   have hlower_nonneg : 0 ≤ lower := by
     have hI_nonneg :
         0 ≤ mutualInformation ψ.state.coherentTransferReferenceState :=
-      State.mutualInformation_nonneg ψ.state.coherentTransferReferenceState
+      MState.mutualInformation_nonneg ψ.state.coherentTransferReferenceState
     have hinner : 0 ≤ ψ.fqswCommunicationRate + 2 * δ := by
-      unfold PureVector.fqswCommunicationRate
+      unfold Ket.fqswCommunicationRate
       nlinarith
     have hn_nonneg : 0 ≤ (n : ℝ) := by exact_mod_cast Nat.zero_le n
     dsimp [lower, adhwFQSWIidCommunicationLogTarget]
@@ -1399,14 +1324,14 @@ theorem exists_adhwFQSWIidRateChoice_registers
 /-- Rounded ADHW i.i.d. rate choice together with the tighter `A₂` window
 needed to balance the finite cardinality side conditions. -/
 structure ADHWFQSWIidBalancedRateChoice
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ : ℝ)
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ : ℝ)
     (q : Type x) (e : Type y) [Fintype q] [Fintype e] where
   rateChoice : ADHWFQSWIidRateChoice ψ n δ q e
   ebit_card_lower_for_padding :
-    (2 : ℝ) ^ ((n : ℝ) * (ψ.fqswEbitYieldRate - δ)) <=
+    (2 : ℝ) ^ ((n : ℝ) * (ψ.fqswEbitYieldRate - δ)) ≤
       (Fintype.card e : ℝ)
   ebit_card_upper_for_target :
-    (Fintype.card e : ℝ) <=
+    (Fintype.card e : ℝ) ≤
       (2 : ℝ) ^ ((n : ℝ) * ψ.fqswEbitYieldRate)
 
 /-- Finite `q`/`e` register construction for the balanced ADHW i.i.d. rate
@@ -1414,7 +1339,7 @@ choice: `A₁` keeps the existing rounded communication bounds, while `A₂`
 is rounded inside the balanced window
 `[2^(n (I(A;B)/2 - δ)), 2^(n I(A;B)/2)]`. -/
 theorem exists_adhwFQSWIidBalancedRateChoice_registers
-    (ψ : PureVector (Prod (Prod a b) r)) {δ : ℝ} (hδ : 0 < δ) :
+    (ψ : Ket ((a × b) × r)) {δ : ℝ} (hδ : 0 < δ) :
     ∃ N : ℕ, ∀ n : ℕ, n ≥ N →
       ∃ (q : Type x), ∃ (_ : Fintype q), ∃ (_ : DecidableEq q), ∃ (_ : Nonempty q),
         ∃ (e : Type y), ∃ (_ : Fintype e), ∃ (_ : DecidableEq e), ∃ (_ : Nonempty e),
@@ -1468,9 +1393,9 @@ theorem exists_adhwFQSWIidBalancedRateChoice_registers
   have hlower_nonneg : 0 ≤ lower := by
     have hI_nonneg :
         0 ≤ mutualInformation ψ.state.coherentTransferReferenceState :=
-      State.mutualInformation_nonneg ψ.state.coherentTransferReferenceState
+      MState.mutualInformation_nonneg ψ.state.coherentTransferReferenceState
     have hinner : 0 ≤ ψ.fqswCommunicationRate + 2 * δ := by
-      unfold PureVector.fqswCommunicationRate
+      unfold Ket.fqswCommunicationRate
       nlinarith
     have hn_nonneg : 0 ≤ (n : ℝ) := by exact_mod_cast Nat.zero_le n
     dsimp [lower, adhwFQSWIidCommunicationLogTarget]
@@ -1533,9 +1458,9 @@ theorem exists_adhwFQSWIidBalancedRateChoice_registers
       exact_mod_cast hecard
     simpa [eLower, hecardR] using hceil
   have hEbit_nonneg : 0 ≤ ψ.fqswEbitYieldRate := by
-    unfold PureVector.fqswEbitYieldRate
-    have hmi_nonneg : 0 ≤ mutualInformation ψ.state.marginalA :=
-      State.mutualInformation_nonneg ψ.state.marginalA
+    unfold Ket.fqswEbitYieldRate
+    have hmi_nonneg : 0 ≤ mutualInformation ψ.state.traceRight :=
+      MState.mutualInformation_nonneg ψ.state.traceRight
     nlinarith
   have heUpper_nonneg : 0 ≤ eUpper := by
     have hn_nonneg : 0 ≤ (n : ℝ) := by exact_mod_cast Nat.zero_le n
@@ -1547,7 +1472,7 @@ theorem exists_adhwFQSWIidBalancedRateChoice_registers
     dsimp [eUpper, eLower]
     ring
   have hebit_card_upper :
-      (Fintype.card e : ℝ) <= (2 : ℝ) ^ ((n : ℝ) * ψ.fqswEbitYieldRate) := by
+      (Fintype.card e : ℝ) ≤ (2 : ℝ) ^ ((n : ℝ) * ψ.fqswEbitYieldRate) := by
     by_cases hlow_nonpos : eLower ≤ 0
     · have hpow_le_one : (2 : ℝ) ^ eLower ≤ 1 := by
         exact Real.rpow_le_one_of_one_le_of_nonpos (by norm_num : (1 : ℝ) ≤ 2) hlow_nonpos
@@ -1627,19 +1552,24 @@ theorem exists_adhwFQSWIidBalancedRateChoice_registers
 /-- Finite Bob typical register matching the simultaneous-typicality `B`
 subspace dimension used in the ADHW i.i.d. source route. -/
 structure ADHWFQSWIidTypicalBobRegister
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ ε : ℝ)
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ ε : ℝ)
     (T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε)
     (btyp : Type u1) [Fintype btyp] [DecidableEq btyp] where
+  /-- `btyp` has exactly the dimension of Bob's typical subspace. -/
   card_eq_projector_rank :
     (Fintype.card btyp : ℝ) =
       (adhwFQSWSystemBState ψ).typicalSubspaceDimension n T.typicalitySlack
+  /-- The chosen indexing of `btyp` by typical sequences. -/
   typicalIndexEquiv :
-    btyp ≃ State.TypicalSubspaceIndex
+    btyp ≃ MState.TypicalSubspaceIndex
       (adhwFQSWSystemBState ψ) n T.typicalitySlack
+  /-- The isometry embedding `btyp` into `B^n`. -/
   supportIsometry : ReferenceIsometry btyp (TensorPower b n)
+  /-- The support isometry is the one determined by `typicalIndexEquiv`. -/
   supportIsometry_eq_typicalIndexEquiv :
     supportIsometry = adhwFQSWTypicalSupportIsometryOfEquiv
       (adhwFQSWSystemBState ψ) n T.typicalitySlack typicalIndexEquiv
+  /-- The support isometry's range is Bob's typical subspace. -/
   supportIsometry_range_projector_eq :
     supportIsometry.matrix * Matrix.conjTranspose supportIsometry.matrix =
       (adhwFQSWSystemBState ψ).typicalSubspaceProjector n T.typicalitySlack
@@ -1647,26 +1577,31 @@ structure ADHWFQSWIidTypicalBobRegister
 /-- Finite reference typical register matching the simultaneous-typicality `R`
 subspace dimension used in the ADHW i.i.d. source route. -/
 structure ADHWFQSWIidTypicalRefRegister
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ ε : ℝ)
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ ε : ℝ)
     (T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε)
     (rtyp : Type v1) [Fintype rtyp] [DecidableEq rtyp] where
+  /-- `rtyp` has exactly the dimension of the reference typical subspace. -/
   card_eq_projector_rank :
     (Fintype.card rtyp : ℝ) =
       (adhwFQSWSystemRState ψ).typicalSubspaceDimension n T.typicalitySlack
+  /-- The chosen indexing of `rtyp` by typical sequences. -/
   typicalIndexEquiv :
-    rtyp ≃ State.TypicalSubspaceIndex
+    rtyp ≃ MState.TypicalSubspaceIndex
       (adhwFQSWSystemRState ψ) n T.typicalitySlack
+  /-- The isometry embedding `rtyp` into `R^n`. -/
   supportIsometry : ReferenceIsometry rtyp (TensorPower r n)
+  /-- The support isometry is the one determined by `typicalIndexEquiv`. -/
   supportIsometry_eq_typicalIndexEquiv :
     supportIsometry = adhwFQSWTypicalSupportIsometryOfEquiv
       (adhwFQSWSystemRState ψ) n T.typicalitySlack typicalIndexEquiv
+  /-- The support isometry's range is the reference typical subspace. -/
   supportIsometry_range_projector_eq :
     supportIsometry.matrix * Matrix.conjTranspose supportIsometry.matrix =
       (adhwFQSWSystemRState ψ).typicalSubspaceProjector n T.typicalitySlack
 
 namespace ADHWFQSWIidTypicalBobRegister
 
-variable {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ ε : ℝ}
+variable {ψ : Ket ((a × b) × r)} {n : ℕ} {δ ε : ℝ}
 variable {T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε}
 variable {btyp : Type u1} [Fintype btyp] [DecidableEq btyp]
 
@@ -1674,65 +1609,64 @@ variable {btyp : Type u1} [Fintype btyp] [DecidableEq btyp]
 finite typical register used by the one-shot FQSW protocol. -/
 def physicalEncoder
     (B : ADHWFQSWIidTypicalBobRegister ψ n δ ε T btyp)
-    [Nonempty btyp] : Channel (TensorPower b n) btyp :=
-  (Channel.reindex B.typicalIndexEquiv.symm).comp <|
-    State.typicalEncoder (adhwFQSWSystemBState ψ) n T.typicalitySlack
-      (B.typicalIndexEquiv (Nonempty.some inferInstance))
+    [Nonempty btyp] : CPTPMap (TensorPower b n) btyp :=
+  (CPTPOp.reindex B.typicalIndexEquiv.symm) ∘ₘ
+    (MState.typicalEncoder (adhwFQSWSystemBState ψ) n T.typicalitySlack
+      (B.typicalIndexEquiv (Nonempty.some inferInstance)))
 
 /-- Isometric decoder from Bob's typical register back to `B^n`. -/
 def physicalDecoder
     (B : ADHWFQSWIidTypicalBobRegister ψ n δ ε T btyp) :
-    Channel btyp (TensorPower b n) :=
-  (State.typicalDecoder (adhwFQSWSystemBState ψ) n T.typicalitySlack).comp
-    (Channel.reindex B.typicalIndexEquiv)
+    CPTPMap btyp (TensorPower b n) :=
+  (MState.typicalDecoder (adhwFQSWSystemBState ψ) n T.typicalitySlack) ∘ₘ
+    (CPTPOp.reindex B.typicalIndexEquiv)
 
 /-- Bob's physical encoder is a left inverse of the chosen typical-support
 isometry. -/
 theorem physicalEncoder_comp_supportIsometry
     (B : ADHWFQSWIidTypicalBobRegister ψ n δ ε T btyp)
     [Nonempty btyp] :
-    B.physicalEncoder.comp (fqswChannelOfReferenceIsometry B.supportIsometry) =
-      Channel.idChannel btyp := by
+    B.physicalEncoder ∘ₘ (fqswChannelOfReferenceIsometry B.supportIsometry) =
+      CPTPOp.id (dIn := btyp) := by
   have hdecoder :
       fqswChannelOfReferenceIsometry B.supportIsometry =
-        (State.typicalDecoder (adhwFQSWSystemBState ψ) n T.typicalitySlack).comp
-          (Channel.reindex B.typicalIndexEquiv) := by
+        (MState.typicalDecoder (adhwFQSWSystemBState ψ) n T.typicalitySlack) ∘ₘ
+          (CPTPOp.reindex B.typicalIndexEquiv) := by
     rw [B.supportIsometry_eq_typicalIndexEquiv]
     change
       fqswChannelOfReferenceIsometry
-          (({ matrix := State.typicalIsometry (adhwFQSWSystemBState ψ) n T.typicalitySlack
-              isometry := State.typicalIsometry_conjTranspose_mul_self
+          (({ matrix := MState.typicalIsometry (adhwFQSWSystemBState ψ) n T.typicalitySlack
+              isometry := MState.typicalIsometry_conjTranspose_mul_self
                 (adhwFQSWSystemBState ψ) n T.typicalitySlack } :
               ReferenceIsometry
-                (State.TypicalSubspaceIndex
+                (MState.TypicalSubspaceIndex
                   (adhwFQSWSystemBState ψ) n T.typicalitySlack)
                 (TensorPower b n)).comp
             (ReferenceIsometry.ofEquiv B.typicalIndexEquiv)) =
-        (State.typicalDecoder (adhwFQSWSystemBState ψ) n T.typicalitySlack).comp
+        (MState.typicalDecoder (adhwFQSWSystemBState ψ) n T.typicalitySlack) ∘ₘ
           (fqswChannelOfReferenceIsometry
             (ReferenceIsometry.ofEquiv B.typicalIndexEquiv))
-    rw [State.typicalDecoder_eq_fqswChannelOfReferenceIsometry,
+    rw [MState.typicalDecoder_eq_fqswChannelOfReferenceIsometry,
       fqswChannelOfReferenceIsometry_comp]
   have hid_left :
-      (Channel.idChannel
-          (State.TypicalSubspaceIndex
-            (adhwFQSWSystemBState ψ) n T.typicalitySlack)).comp
-          (Channel.reindex B.typicalIndexEquiv) =
-        Channel.reindex B.typicalIndexEquiv := by
-    rw [Channel.mk.injEq]
+      (CPTPOp.id (dIn :=
+          MState.TypicalSubspaceIndex
+            (adhwFQSWSystemBState ψ) n T.typicalitySlack)) ∘ₘ
+          (CPTPOp.reindex B.typicalIndexEquiv) =
+        CPTPOp.reindex B.typicalIndexEquiv := by
+    refine CPTPOp.ext_map ?_
     ext X i j
-    simp [Channel.comp, Channel.idChannel, Channel.reindex,
-      MatrixMap.ofReferenceIsometry_apply, ReferenceIsometry.ofEquiv, MatrixMap.ofKraus,
+    simp [CPTPOp.reindex, MatrixMap.ofReferenceIsometry_apply, ReferenceIsometry.ofEquiv,
       Matrix.mul_apply]
   rw [hdecoder]
   unfold physicalEncoder
-  rw [fqswChannel_comp_assoc]
-  rw [← fqswChannel_comp_assoc
-    (State.typicalEncoder (adhwFQSWSystemBState ψ) n T.typicalitySlack
+  rw [CPTPOp.compose_assoc]
+  rw [← CPTPOp.compose_assoc
+    (MState.typicalEncoder (adhwFQSWSystemBState ψ) n T.typicalitySlack
       (B.typicalIndexEquiv (Nonempty.some inferInstance)))
-    (State.typicalDecoder (adhwFQSWSystemBState ψ) n T.typicalitySlack)
-    (Channel.reindex B.typicalIndexEquiv)]
-  rw [State.typicalEncoder_comp_typicalDecoder_eq_idChannel, hid_left,
+    (MState.typicalDecoder (adhwFQSWSystemBState ψ) n T.typicalitySlack)
+    (CPTPOp.reindex B.typicalIndexEquiv)]
+  rw [MState.typicalEncoder_comp_typicalDecoder_eq_idChannel, hid_left,
     fqswChannel_reindex_symm_comp_reindex]
 
 /-- Bob's physical decoder is exactly the channel of the chosen typical-support
@@ -1742,26 +1676,26 @@ theorem physicalDecoder_eq_supportIsometryChannel
     B.physicalDecoder = fqswChannelOfReferenceIsometry B.supportIsometry := by
   rw [B.supportIsometry_eq_typicalIndexEquiv]
   change
-    (State.typicalDecoder (adhwFQSWSystemBState ψ) n T.typicalitySlack).comp
+    (MState.typicalDecoder (adhwFQSWSystemBState ψ) n T.typicalitySlack) ∘ₘ
         (fqswChannelOfReferenceIsometry
           (ReferenceIsometry.ofEquiv B.typicalIndexEquiv)) =
       fqswChannelOfReferenceIsometry
-        (({ matrix := State.typicalIsometry (adhwFQSWSystemBState ψ) n T.typicalitySlack
-            isometry := State.typicalIsometry_conjTranspose_mul_self
+        (({ matrix := MState.typicalIsometry (adhwFQSWSystemBState ψ) n T.typicalitySlack
+            isometry := MState.typicalIsometry_conjTranspose_mul_self
               (adhwFQSWSystemBState ψ) n T.typicalitySlack } :
             ReferenceIsometry
-              (State.TypicalSubspaceIndex
+              (MState.TypicalSubspaceIndex
                 (adhwFQSWSystemBState ψ) n T.typicalitySlack)
               (TensorPower b n)).comp
           (ReferenceIsometry.ofEquiv B.typicalIndexEquiv))
-  rw [State.typicalDecoder_eq_fqswChannelOfReferenceIsometry,
+  rw [MState.typicalDecoder_eq_fqswChannelOfReferenceIsometry,
     fqswChannelOfReferenceIsometry_comp]
 
 end ADHWFQSWIidTypicalBobRegister
 
 namespace ADHWFQSWIidTypicalRefRegister
 
-variable {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ ε : ℝ}
+variable {ψ : Ket ((a × b) × r)} {n : ℕ} {δ ε : ℝ}
 variable {T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε}
 variable {rtyp : Type v1} [Fintype rtyp] [DecidableEq rtyp]
 
@@ -1769,9 +1703,9 @@ variable {rtyp : Type v1} [Fintype rtyp] [DecidableEq rtyp]
 `R^n`. -/
 def physicalDecoder
     (R : ADHWFQSWIidTypicalRefRegister ψ n δ ε T rtyp) :
-    Channel rtyp (TensorPower r n) :=
-  (State.typicalDecoder (adhwFQSWSystemRState ψ) n T.typicalitySlack).comp
-    (Channel.reindex R.typicalIndexEquiv)
+    CPTPMap rtyp (TensorPower r n) :=
+  (MState.typicalDecoder (adhwFQSWSystemRState ψ) n T.typicalitySlack) ∘ₘ
+    (CPTPOp.reindex R.typicalIndexEquiv)
 
 /-- The reference decoder is exactly the channel of its typical-support
 isometry. -/
@@ -1780,19 +1714,19 @@ theorem physicalDecoder_eq_supportIsometryChannel
     R.physicalDecoder = fqswChannelOfReferenceIsometry R.supportIsometry := by
   rw [R.supportIsometry_eq_typicalIndexEquiv]
   change
-    (State.typicalDecoder (adhwFQSWSystemRState ψ) n T.typicalitySlack).comp
+    (MState.typicalDecoder (adhwFQSWSystemRState ψ) n T.typicalitySlack) ∘ₘ
         (fqswChannelOfReferenceIsometry
           (ReferenceIsometry.ofEquiv R.typicalIndexEquiv)) =
       fqswChannelOfReferenceIsometry
-        (({ matrix := State.typicalIsometry (adhwFQSWSystemRState ψ) n T.typicalitySlack
-            isometry := State.typicalIsometry_conjTranspose_mul_self
+        (({ matrix := MState.typicalIsometry (adhwFQSWSystemRState ψ) n T.typicalitySlack
+            isometry := MState.typicalIsometry_conjTranspose_mul_self
               (adhwFQSWSystemRState ψ) n T.typicalitySlack } :
             ReferenceIsometry
-              (State.TypicalSubspaceIndex
+              (MState.TypicalSubspaceIndex
                 (adhwFQSWSystemRState ψ) n T.typicalitySlack)
               (TensorPower r n)).comp
           (ReferenceIsometry.ofEquiv R.typicalIndexEquiv))
-  rw [State.typicalDecoder_eq_fqswChannelOfReferenceIsometry,
+  rw [MState.typicalDecoder_eq_fqswChannelOfReferenceIsometry,
     fqswChannelOfReferenceIsometry_comp]
 
 end ADHWFQSWIidTypicalRefRegister
@@ -1801,7 +1735,7 @@ end ADHWFQSWIidTypicalRefRegister
 `R^typ` used in the ADHW i.i.d. source route directly from the existing
 Schumacher typical-subspace index types. -/
 theorem exists_adhwFQSWIidTypicalSupportRegisters
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ ε : ℝ)
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ ε : ℝ)
     (T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε) :
     ∃ (atyp : Type u), ∃ (_ : Fintype atyp), ∃ (_ : DecidableEq atyp),
       ∃ (btyp : Type v), ∃ (_ : Fintype btyp), ∃ (_ : DecidableEq btyp),
@@ -1811,19 +1745,19 @@ theorem exists_adhwFQSWIidTypicalSupportRegisters
           Nonempty (ADHWFQSWIidTypicalBobRegister ψ n δ ε T btyp) ∧
           Nonempty (ADHWFQSWIidTypicalRefRegister ψ n δ ε T rtyp) := by
   let atyp : Type u :=
-    State.TypicalSubspaceIndex (adhwFQSWSystemAState ψ) n T.typicalitySlack
+    MState.TypicalSubspaceIndex (adhwFQSWSystemAState ψ) n T.typicalitySlack
   let btyp : Type v :=
-    State.TypicalSubspaceIndex (adhwFQSWSystemBState ψ) n T.typicalitySlack
+    MState.TypicalSubspaceIndex (adhwFQSWSystemBState ψ) n T.typicalitySlack
   let rtyp : Type w :=
-    State.TypicalSubspaceIndex (adhwFQSWSystemRState ψ) n T.typicalitySlack
+    MState.TypicalSubspaceIndex (adhwFQSWSystemRState ψ) n T.typicalitySlack
   refine ⟨atyp, inferInstance, inferInstance,
     btyp, inferInstance, inferInstance,
     rtyp, inferInstance, inferInstance, ?_⟩
   refine ⟨?_, ?_, ?_⟩
   · simpa [atyp] using
-      State.card_typicalSubspaceIndex
+      MState.card_typicalSubspaceIndex
         (adhwFQSWSystemAState ψ) n T.typicalitySlack
-  · let E : btyp ≃ State.TypicalSubspaceIndex
+  · let E : btyp ≃ MState.TypicalSubspaceIndex
         (adhwFQSWSystemBState ψ) n T.typicalitySlack := Equiv.refl btyp
     let supportIsometry : ReferenceIsometry btyp (TensorPower b n) :=
       adhwFQSWTypicalSupportIsometryOfEquiv
@@ -1832,7 +1766,7 @@ theorem exists_adhwFQSWIidTypicalSupportRegisters
         (Fintype.card btyp : ℝ) =
           (adhwFQSWSystemBState ψ).typicalSubspaceDimension n T.typicalitySlack := by
       simpa [btyp] using
-        State.card_typicalSubspaceIndex
+        MState.card_typicalSubspaceIndex
           (adhwFQSWSystemBState ψ) n T.typicalitySlack
     have hrangeB :
         supportIsometry.matrix * Matrix.conjTranspose supportIsometry.matrix =
@@ -1841,7 +1775,7 @@ theorem exists_adhwFQSWIidTypicalSupportRegisters
         adhwFQSWTypicalSupportIsometryOfEquiv_range_projector
           (adhwFQSWSystemBState ψ) n T.typicalitySlack E
     exact ⟨⟨hcardB, E, supportIsometry, rfl, hrangeB⟩⟩
-  · let E : rtyp ≃ State.TypicalSubspaceIndex
+  · let E : rtyp ≃ MState.TypicalSubspaceIndex
         (adhwFQSWSystemRState ψ) n T.typicalitySlack := Equiv.refl rtyp
     let supportIsometry : ReferenceIsometry rtyp (TensorPower r n) :=
       adhwFQSWTypicalSupportIsometryOfEquiv
@@ -1850,7 +1784,7 @@ theorem exists_adhwFQSWIidTypicalSupportRegisters
         (Fintype.card rtyp : ℝ) =
           (adhwFQSWSystemRState ψ).typicalSubspaceDimension n T.typicalitySlack := by
       simpa [rtyp] using
-        State.card_typicalSubspaceIndex
+        MState.card_typicalSubspaceIndex
           (adhwFQSWSystemRState ψ) n T.typicalitySlack
     have hrangeR :
         supportIsometry.matrix * Matrix.conjTranspose supportIsometry.matrix =
@@ -1864,7 +1798,7 @@ theorem exists_adhwFQSWIidTypicalSupportRegisters
 once `A₁` meets the communication lower target and `A₂` meets the balanced
 padding lower target. -/
 private theorem adhwFQSWIid_atyp_card_le_padded_of_bounds
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ ε : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δ ε : ℝ}
     (T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε)
     {atyp : Type p} {q : Type x} {e : Type y}
     [Fintype atyp] [Fintype q] [Fintype e]
@@ -1872,7 +1806,7 @@ private theorem adhwFQSWIid_atyp_card_le_padded_of_bounds
       (Fintype.card atyp : ℝ) =
         (adhwFQSWSystemAState ψ).typicalSubspaceDimension n T.typicalitySlack)
     (R : ADHWFQSWIidBalancedRateChoice ψ n δ q e) :
-    Fintype.card atyp ≤ Fintype.card (Prod q e) := by
+    Fintype.card atyp ≤ Fintype.card (q × e) := by
   have hA_upper :
       (Fintype.card atyp : ℝ) ≤
         (2 : ℝ) ^ ((n : ℝ) * (adhwFQSWEntropyA ψ + δ)) := by
@@ -1884,8 +1818,8 @@ private theorem adhwFQSWIid_atyp_card_le_padded_of_bounds
       ((n : ℝ) * (adhwFQSWEntropyA ψ + δ)) =
         adhwFQSWIidCommunicationLogTarget ψ n δ +
           ((n : ℝ) * (ψ.fqswEbitYieldRate - δ)) := by
-    unfold adhwFQSWIidCommunicationLogTarget PureVector.fqswCommunicationRate
-      PureVector.fqswEbitYieldRate
+    unfold adhwFQSWIidCommunicationLogTarget Ket.fqswCommunicationRate
+      Ket.fqswEbitYieldRate
     rw [adhwFQSWMutualInformationAR_eq_entropyA_add_entropyR_sub_entropyB,
       adhwFQSWMutualInformationAB_eq_entropyA_add_entropyB_sub_entropyR]
     ring
@@ -1900,7 +1834,7 @@ private theorem adhwFQSWIid_atyp_card_le_padded_of_bounds
         (by positivity)
         (by positivity)
   have hreal :
-      (Fintype.card atyp : ℝ) ≤ (Fintype.card (Prod q e) : ℝ) := by
+      (Fintype.card atyp : ℝ) ≤ (Fintype.card (q × e) : ℝ) := by
     calc
       (Fintype.card atyp : ℝ) ≤ (2 : ℝ) ^ ((n : ℝ) * (adhwFQSWEntropyA ψ + δ)) := hA_upper
       _ =
@@ -1908,7 +1842,7 @@ private theorem adhwFQSWIid_atyp_card_le_padded_of_bounds
             (2 : ℝ) ^ ((n : ℝ) * (ψ.fqswEbitYieldRate - δ)) := by
               rw [hexp, Real.rpow_add (by norm_num : (0 : ℝ) < 2)]
       _ ≤ (Fintype.card q : ℝ) * (Fintype.card e : ℝ) := hproduct_lower
-      _ = (Fintype.card (Prod q e) : ℝ) := by
+      _ = (Fintype.card (q × e) : ℝ) := by
             norm_num [Fintype.card_prod]
   exact_mod_cast hreal
 
@@ -1916,7 +1850,7 @@ private theorem adhwFQSWIid_atyp_card_le_padded_of_bounds
 projectors use `δtyp`, while the finite `q/e` registers use `δrate`; the
 rank window transfers as soon as `δtyp ≤ δrate`. -/
 theorem adhwFQSWIid_atyp_card_le_padded_of_mixed_bounds
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δtyp δrate ε : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δtyp δrate ε : ℝ}
     (T : ADHWFQSWSimultaneousTypicalProjectors ψ n δtyp ε)
     {atyp : Type p} {q : Type x} {e : Type y}
     [Fintype atyp] [Fintype q] [Fintype e]
@@ -1925,7 +1859,7 @@ theorem adhwFQSWIid_atyp_card_le_padded_of_mixed_bounds
         (adhwFQSWSystemAState ψ).typicalSubspaceDimension n T.typicalitySlack)
     (R : ADHWFQSWIidBalancedRateChoice ψ n δrate q e)
     (hδtyp_le_rate : δtyp ≤ δrate) :
-    Fintype.card atyp ≤ Fintype.card (Prod q e) := by
+    Fintype.card atyp ≤ Fintype.card (q × e) := by
   have hA_upper_typ :
       (Fintype.card atyp : ℝ) ≤
         (2 : ℝ) ^ ((n : ℝ) * (adhwFQSWEntropyA ψ + δtyp)) := by
@@ -1947,8 +1881,8 @@ theorem adhwFQSWIid_atyp_card_le_padded_of_mixed_bounds
       ((n : ℝ) * (adhwFQSWEntropyA ψ + δrate)) =
         adhwFQSWIidCommunicationLogTarget ψ n δrate +
           ((n : ℝ) * (ψ.fqswEbitYieldRate - δrate)) := by
-    unfold adhwFQSWIidCommunicationLogTarget PureVector.fqswCommunicationRate
-      PureVector.fqswEbitYieldRate
+    unfold adhwFQSWIidCommunicationLogTarget Ket.fqswCommunicationRate
+      Ket.fqswEbitYieldRate
     rw [adhwFQSWMutualInformationAR_eq_entropyA_add_entropyR_sub_entropyB,
       adhwFQSWMutualInformationAB_eq_entropyA_add_entropyB_sub_entropyR]
     ring
@@ -1963,7 +1897,7 @@ theorem adhwFQSWIid_atyp_card_le_padded_of_mixed_bounds
         (by positivity)
         (by positivity)
   have hreal :
-      (Fintype.card atyp : ℝ) ≤ (Fintype.card (Prod q e) : ℝ) := by
+      (Fintype.card atyp : ℝ) ≤ (Fintype.card (q × e) : ℝ) := by
     calc
       (Fintype.card atyp : ℝ) ≤
           (2 : ℝ) ^ ((n : ℝ) * (adhwFQSWEntropyA ψ + δrate)) := hA_upper
@@ -1972,14 +1906,14 @@ theorem adhwFQSWIid_atyp_card_le_padded_of_mixed_bounds
             (2 : ℝ) ^ ((n : ℝ) * (ψ.fqswEbitYieldRate - δrate)) := by
               rw [hexp, Real.rpow_add (by norm_num : (0 : ℝ) < 2)]
       _ ≤ (Fintype.card q : ℝ) * (Fintype.card e : ℝ) := hproduct_lower
-      _ = (Fintype.card (Prod q e) : ℝ) := by
+      _ = (Fintype.card (q × e) : ℝ) := by
             norm_num [Fintype.card_prod]
   exact_mod_cast hreal
 
 /-- The balanced `A₂` upper window and the existing `A₁` lower target imply
 the active ADHW target/reference finite-cardinality side condition. -/
 private theorem adhwFQSWIid_target_ref_card_le_of_bounds
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ ε : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δ ε : ℝ}
     (T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε)
     {btyp : Type u1} {rtyp : Type v1} {q : Type x} {e : Type y}
     [Fintype btyp] [DecidableEq btyp] [Fintype rtyp] [DecidableEq rtyp]
@@ -1987,9 +1921,9 @@ private theorem adhwFQSWIid_target_ref_card_le_of_bounds
     (hbtyp : ADHWFQSWIidTypicalBobRegister ψ n δ ε T btyp)
     (hrtyp : ADHWFQSWIidTypicalRefRegister ψ n δ ε T rtyp)
     (R : ADHWFQSWIidBalancedRateChoice ψ n δ q e) :
-    Fintype.card (Prod e rtyp) ≤ Fintype.card (Prod q btyp) := by
+    Fintype.card (e × rtyp) ≤ Fintype.card (q × btyp) := by
   have hleft_upper :
-      (Fintype.card (Prod e rtyp) : ℝ) ≤
+      (Fintype.card (e × rtyp) : ℝ) ≤
         (2 : ℝ) ^ (((n : ℝ) * ψ.fqswEbitYieldRate) +
           ((n : ℝ) * (adhwFQSWEntropyR ψ + δ))) := by
     have hrtyp_upper :
@@ -2001,7 +1935,7 @@ private theorem adhwFQSWIid_target_ref_card_le_of_bounds
               hrtyp.card_eq_projector_rank
         _ ≤ (2 : ℝ) ^ ((n : ℝ) * (adhwFQSWEntropyR ψ + δ)) := T.rankR_upper
     calc
-      (Fintype.card (Prod e rtyp) : ℝ) =
+      (Fintype.card (e × rtyp) : ℝ) =
           (Fintype.card e : ℝ) * (Fintype.card rtyp : ℝ) := by
             norm_num [Fintype.card_prod]
       _ ≤ (2 : ℝ) ^ ((n : ℝ) * ψ.fqswEbitYieldRate) *
@@ -2018,7 +1952,7 @@ private theorem adhwFQSWIid_target_ref_card_le_of_bounds
   have hright_lower :
       (2 : ℝ) ^ (adhwFQSWIidCommunicationLogTarget ψ n δ +
           ((n : ℝ) * (adhwFQSWEntropyB ψ - δ))) ≤
-        (Fintype.card (Prod q btyp) : ℝ) := by
+        (Fintype.card (q × btyp) : ℝ) := by
     have hbtyp_lower :
         (2 : ℝ) ^ ((n : ℝ) * (adhwFQSWEntropyB ψ - δ)) ≤
           (Fintype.card btyp : ℝ) := by
@@ -2040,34 +1974,34 @@ private theorem adhwFQSWIid_target_ref_card_le_of_bounds
                 hbtyp_lower
                 (by positivity)
                 (by positivity)
-      _ = (Fintype.card (Prod q btyp) : ℝ) := by
+      _ = (Fintype.card (q × btyp) : ℝ) := by
             norm_num [Fintype.card_prod]
   have hexp :
       ((n : ℝ) * ψ.fqswEbitYieldRate) +
           ((n : ℝ) * (adhwFQSWEntropyR ψ + δ)) =
         adhwFQSWIidCommunicationLogTarget ψ n δ +
           ((n : ℝ) * (adhwFQSWEntropyB ψ - δ)) := by
-    unfold adhwFQSWIidCommunicationLogTarget PureVector.fqswCommunicationRate
-      PureVector.fqswEbitYieldRate
+    unfold adhwFQSWIidCommunicationLogTarget Ket.fqswCommunicationRate
+      Ket.fqswEbitYieldRate
     rw [adhwFQSWMutualInformationAR_eq_entropyA_add_entropyR_sub_entropyB,
       adhwFQSWMutualInformationAB_eq_entropyA_add_entropyB_sub_entropyR]
     ring
   have hreal :
-      (Fintype.card (Prod e rtyp) : ℝ) ≤ (Fintype.card (Prod q btyp) : ℝ) := by
+      (Fintype.card (e × rtyp) : ℝ) ≤ (Fintype.card (q × btyp) : ℝ) := by
     calc
-      (Fintype.card (Prod e rtyp) : ℝ) ≤
+      (Fintype.card (e × rtyp) : ℝ) ≤
           (2 : ℝ) ^ (((n : ℝ) * ψ.fqswEbitYieldRate) +
             ((n : ℝ) * (adhwFQSWEntropyR ψ + δ))) := hleft_upper
       _ = (2 : ℝ) ^ (adhwFQSWIidCommunicationLogTarget ψ n δ +
             ((n : ℝ) * (adhwFQSWEntropyB ψ - δ))) := by rw [hexp]
-      _ ≤ (Fintype.card (Prod q btyp) : ℝ) := hright_lower
+      _ ≤ (Fintype.card (q × btyp) : ℝ) := hright_lower
   exact_mod_cast hreal
 
 /-- Mixed-slack version of the active `B^typ R^typ` cardinality side
 condition.  The `B`/`R` typical ranks use `δtyp`, while `A₁` and `A₂` use the
 finite register slack `δrate`. -/
 theorem adhwFQSWIid_target_ref_card_le_of_mixed_bounds
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δtyp δrate ε : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δtyp δrate ε : ℝ}
     (T : ADHWFQSWSimultaneousTypicalProjectors ψ n δtyp ε)
     {btyp : Type u1} {rtyp : Type v1} {q : Type x} {e : Type y}
     [Fintype btyp] [DecidableEq btyp] [Fintype rtyp] [DecidableEq rtyp]
@@ -2076,9 +2010,9 @@ theorem adhwFQSWIid_target_ref_card_le_of_mixed_bounds
     (hrtyp : ADHWFQSWIidTypicalRefRegister ψ n δtyp ε T rtyp)
     (R : ADHWFQSWIidBalancedRateChoice ψ n δrate q e)
     (hδtyp_le_rate : δtyp ≤ δrate) :
-    Fintype.card (Prod e rtyp) ≤ Fintype.card (Prod q btyp) := by
+    Fintype.card (e × rtyp) ≤ Fintype.card (q × btyp) := by
   have hleft_upper :
-      (Fintype.card (Prod e rtyp) : ℝ) ≤
+      (Fintype.card (e × rtyp) : ℝ) ≤
         (2 : ℝ) ^ (((n : ℝ) * ψ.fqswEbitYieldRate) +
           ((n : ℝ) * (adhwFQSWEntropyR ψ + δtyp))) := by
     have hrtyp_upper :
@@ -2090,7 +2024,7 @@ theorem adhwFQSWIid_target_ref_card_le_of_mixed_bounds
               hrtyp.card_eq_projector_rank
         _ ≤ (2 : ℝ) ^ ((n : ℝ) * (adhwFQSWEntropyR ψ + δtyp)) := T.rankR_upper
     calc
-      (Fintype.card (Prod e rtyp) : ℝ) =
+      (Fintype.card (e × rtyp) : ℝ) =
           (Fintype.card e : ℝ) * (Fintype.card rtyp : ℝ) := by
             norm_num [Fintype.card_prod]
       _ ≤ (2 : ℝ) ^ ((n : ℝ) * ψ.fqswEbitYieldRate) *
@@ -2107,7 +2041,7 @@ theorem adhwFQSWIid_target_ref_card_le_of_mixed_bounds
   have hright_lower :
       (2 : ℝ) ^ (adhwFQSWIidCommunicationLogTarget ψ n δrate +
           ((n : ℝ) * (adhwFQSWEntropyB ψ - δtyp))) ≤
-        (Fintype.card (Prod q btyp) : ℝ) := by
+        (Fintype.card (q × btyp) : ℝ) := by
     have hbtyp_lower :
         (2 : ℝ) ^ ((n : ℝ) * (adhwFQSWEntropyB ψ - δtyp)) ≤
           (Fintype.card btyp : ℝ) := by
@@ -2129,7 +2063,7 @@ theorem adhwFQSWIid_target_ref_card_le_of_mixed_bounds
                 hbtyp_lower
                 (by positivity)
                 (by positivity)
-      _ = (Fintype.card (Prod q btyp) : ℝ) := by
+      _ = (Fintype.card (q × btyp) : ℝ) := by
             norm_num [Fintype.card_prod]
   have hexp_le :
       ((n : ℝ) * ψ.fqswEbitYieldRate) +
@@ -2137,21 +2071,21 @@ theorem adhwFQSWIid_target_ref_card_le_of_mixed_bounds
         adhwFQSWIidCommunicationLogTarget ψ n δrate +
           ((n : ℝ) * (adhwFQSWEntropyB ψ - δtyp)) := by
     have hn : 0 ≤ (n : ℝ) := by exact_mod_cast Nat.zero_le n
-    unfold adhwFQSWIidCommunicationLogTarget PureVector.fqswCommunicationRate
-      PureVector.fqswEbitYieldRate
+    unfold adhwFQSWIidCommunicationLogTarget Ket.fqswCommunicationRate
+      Ket.fqswEbitYieldRate
     rw [adhwFQSWMutualInformationAR_eq_entropyA_add_entropyR_sub_entropyB,
       adhwFQSWMutualInformationAB_eq_entropyA_add_entropyB_sub_entropyR]
     nlinarith
   have hreal :
-      (Fintype.card (Prod e rtyp) : ℝ) ≤ (Fintype.card (Prod q btyp) : ℝ) := by
+      (Fintype.card (e × rtyp) : ℝ) ≤ (Fintype.card (q × btyp) : ℝ) := by
     calc
-      (Fintype.card (Prod e rtyp) : ℝ) ≤
+      (Fintype.card (e × rtyp) : ℝ) ≤
           (2 : ℝ) ^ (((n : ℝ) * ψ.fqswEbitYieldRate) +
             ((n : ℝ) * (adhwFQSWEntropyR ψ + δtyp))) := hleft_upper
       _ ≤ (2 : ℝ) ^ (adhwFQSWIidCommunicationLogTarget ψ n δrate +
             ((n : ℝ) * (adhwFQSWEntropyB ψ - δtyp))) :=
           Real.rpow_le_rpow_of_exponent_le (by norm_num : (1 : ℝ) ≤ 2) hexp_le
-      _ ≤ (Fintype.card (Prod q btyp) : ℝ) := hright_lower
+      _ ≤ (Fintype.card (q × btyp) : ℝ) := hright_lower
   exact_mod_cast hreal
 
 /-- Cardinality side conditions for the ADHW i.i.d. one-shot invocation on the
@@ -2161,16 +2095,16 @@ structure ADHWFQSWIidOneShotCardinalitySideConditions
     (atyp : Type p) (btyp : Type u1) (rtyp : Type v1) (q : Type x) (e : Type y)
     [Fintype atyp] [Fintype btyp] [Fintype rtyp] [Fintype q] [Fintype e] where
   target_ref_card_le :
-    Fintype.card (Prod e rtyp) <= Fintype.card (Prod q btyp)
+    Fintype.card (e × rtyp) ≤ Fintype.card (q × btyp)
   padded_bob_ref_card_le :
-    Fintype.card (Prod q btyp) <=
-      Fintype.card (Prod (Prod (Prod q e) btyp) e)
+    Fintype.card (q × btyp) ≤
+      Fintype.card (((q × e) × btyp) × e)
 
 /-- Package the rounded `q`/`e` choice with the source-shaped cardinality
 inequalities needed to build the padded embedding and one-shot side
 conditions. -/
 structure ADHWFQSWIidBalancedCardinalityChoice
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ : ℝ)
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ : ℝ)
     (atyp : Type p) (btyp : Type u1) (rtyp : Type v1)
     (q : Type x) (e : Type y)
     [Fintype atyp] [DecidableEq atyp]
@@ -2180,13 +2114,13 @@ structure ADHWFQSWIidBalancedCardinalityChoice
     [Fintype e] [DecidableEq e] where
   balancedRateChoice : ADHWFQSWIidBalancedRateChoice ψ n δ q e
   atyp_card_le_padded :
-    Fintype.card atyp <= Fintype.card (Prod q e)
+    Fintype.card atyp ≤ Fintype.card (q × e)
   target_ref_card_le :
-    Fintype.card (Prod e rtyp) <= Fintype.card (Prod q btyp)
+    Fintype.card (e × rtyp) ≤ Fintype.card (q × btyp)
 
 namespace ADHWFQSWIidBalancedCardinalityChoice
 
-variable {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ : ℝ}
+variable {ψ : Ket ((a × b) × r)} {n : ℕ} {δ : ℝ}
 variable {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
 variable {q : Type x} {e : Type y}
 variable [Fintype atyp] [DecidableEq atyp]
@@ -2207,7 +2141,7 @@ end ADHWFQSWIidBalancedCardinalityChoice
 /-- Build the balanced finite-cardinality choice record from the rounded rate
 choice plus the padded-embedding and target/reference inequalities. -/
 theorem exists_adhwFQSWIidBalancedCardinalityChoice
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δ : ℝ)
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δ : ℝ)
     (atyp : Type p) (btyp : Type u1) (rtyp : Type v1) (q : Type x) (e : Type y)
     [Fintype atyp] [DecidableEq atyp]
     [Fintype btyp] [DecidableEq btyp]
@@ -2215,8 +2149,8 @@ theorem exists_adhwFQSWIidBalancedCardinalityChoice
     [Fintype q] [DecidableEq q]
     [Fintype e] [DecidableEq e]
     (balancedRateChoice : ADHWFQSWIidBalancedRateChoice ψ n δ q e)
-    (hatyp : Fintype.card atyp <= Fintype.card (Prod q e))
-    (htarget : Fintype.card (Prod e rtyp) <= Fintype.card (Prod q btyp)) :
+    (hatyp : Fintype.card atyp ≤ Fintype.card (q × e))
+    (htarget : Fintype.card (e × rtyp) ≤ Fintype.card (q × btyp)) :
     Nonempty (ADHWFQSWIidBalancedCardinalityChoice ψ n δ atyp btyp rtyp q e) :=
   ⟨{ balancedRateChoice := balancedRateChoice
      atyp_card_le_padded := hatyp
@@ -2225,7 +2159,7 @@ theorem exists_adhwFQSWIidBalancedCardinalityChoice
 /-- Build the mixed-slack finite-cardinality choice record from simultaneous
 typical support data at `δtyp` and balanced finite-register data at `δrate`. -/
 theorem exists_adhwFQSWIidBalancedCardinalityChoice_mixed
-    (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ) (δtyp δrate ε : ℝ)
+    (ψ : Ket ((a × b) × r)) (n : ℕ) (δtyp δrate ε : ℝ)
     (T : ADHWFQSWSimultaneousTypicalProjectors ψ n δtyp ε)
     (atyp : Type p) (btyp : Type u1) (rtyp : Type v1) (q : Type x) (e : Type y)
     [Fintype atyp] [DecidableEq atyp]
@@ -2242,11 +2176,11 @@ theorem exists_adhwFQSWIidBalancedCardinalityChoice_mixed
     (hδtyp_le_rate : δtyp ≤ δrate) :
     Nonempty (ADHWFQSWIidBalancedCardinalityChoice ψ n δrate atyp btyp rtyp q e) := by
   have hatyp :
-      Fintype.card atyp ≤ Fintype.card (Prod q e) :=
+      Fintype.card atyp ≤ Fintype.card (q × e) :=
     adhwFQSWIid_atyp_card_le_padded_of_mixed_bounds
       T hatypDim balancedRateChoice hδtyp_le_rate
   have htarget :
-      Fintype.card (Prod e rtyp) ≤ Fintype.card (Prod q btyp) :=
+      Fintype.card (e × rtyp) ≤ Fintype.card (q × btyp) :=
     adhwFQSWIid_target_ref_card_le_of_mixed_bounds
       T Btyp Rtyp balancedRateChoice hδtyp_le_rate
   exact
@@ -2263,14 +2197,14 @@ theorem exists_adhwFQSWIidOneShotCardinalitySideConditions
     [Fintype q] [DecidableEq q]
     [Fintype e] [DecidableEq e] [Nonempty e]
     (htarget :
-      Fintype.card (Prod e rtyp) <= Fintype.card (Prod q btyp))
+      Fintype.card (e × rtyp) ≤ Fintype.card (q × btyp))
     : Nonempty (ADHWFQSWIidOneShotCardinalitySideConditions atyp btyp rtyp q e) := by
   have he_pos : 0 < Fintype.card e := Fintype.card_pos_iff.mpr inferInstance
   have hone_le_ee : 1 ≤ Fintype.card e * Fintype.card e := by
     nlinarith
   have hpadded :
-      Fintype.card (Prod q btyp) <=
-        Fintype.card (Prod (Prod (Prod q e) btyp) e) := by
+      Fintype.card (q × btyp) ≤
+        Fintype.card (((q × e) × btyp) × e) := by
     simpa [Fintype.card_prod, Nat.mul_assoc, Nat.mul_left_comm, Nat.mul_comm] using
       Nat.mul_le_mul_left (Fintype.card q * Fintype.card btyp) hone_le_ee
   exact
@@ -2280,7 +2214,7 @@ theorem exists_adhwFQSWIidOneShotCardinalitySideConditions
 /-- A balanced-cardinality choice supplies the existing padded embedding and
 one-shot side-condition records once the `A^typ` dimension identity is fixed. -/
 theorem ADHWFQSWIidBalancedCardinalityChoice.to_padded_and_sideConditions
-    {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ} {δ δtyp : ℝ}
+    {ψ : Ket ((a × b) × r)} {n : ℕ} {δ δtyp : ℝ}
     {atyp : Type p} {btyp : Type u1} {rtyp : Type v1}
     {q : Type x} {e : Type y}
     [Fintype atyp] [DecidableEq atyp]
@@ -2314,12 +2248,12 @@ theorem exists_adhwFQSWIidCompressedOneShotBound
     [Fintype q] [DecidableEq q] [Nonempty q]
     [Fintype e] [DecidableEq e] [Nonempty e]
     (compressedOneShotSource :
-      PureVector (Prod (Prod (Prod q e) btyp) rtyp))
+      Ket (((q × e) × btyp) × rtyp))
     (S : ADHWFQSWIidOneShotCardinalitySideConditions atyp btyp rtyp q e) :
     Nonempty
       (ADHWFQSWOneShotBound
-        compressedOneShotSource q e (Equiv.refl (Prod q e))) := by
-  let split : Prod q e ≃ Prod q e := Equiv.refl (Prod q e)
+        compressedOneShotSource q e (Equiv.refl (q × e))) := by
+  let split : (q × e) ≃ (q × e) := Equiv.refl (q × e)
   obtain ⟨D⟩ :=
     exists_adhwFQSWTraceNormDecouplingBound_of_hilbertSchmidtAverage
       compressedOneShotSource split
@@ -2337,7 +2271,7 @@ theorem exists_adhwFQSWIidCompressedOneShotBound
 balanced rounded `A₁`/`A₂` choice eventually assemble the ADHW cardinality
 package needed for the finite one-shot invocation. -/
 theorem exists_adhwFQSWIidBalancedCardinalityChoice_eventually
-    (ψ : PureVector (Prod (Prod a b) r)) {δ ε : ℝ}
+    (ψ : Ket ((a × b) × r)) {δ ε : ℝ}
     (hδ : 0 < δ) (hε : 0 < ε) :
     ∃ N : ℕ, ∀ n : ℕ, n ≥ N →
       ∃ (T : ADHWFQSWSimultaneousTypicalProjectors ψ n δ ε),
@@ -2383,10 +2317,10 @@ theorem exists_adhwFQSWIidBalancedCardinalityChoice_eventually
   obtain ⟨Btyp⟩ := hbtypReg
   obtain ⟨Rtyp⟩ := hrtypReg
   have hatypCard :
-      Fintype.card atyp ≤ Fintype.card (Prod q e) :=
+      Fintype.card atyp ≤ Fintype.card (q × e) :=
     adhwFQSWIid_atyp_card_le_padded_of_bounds T hatypDim R
   have htarget :
-      Fintype.card (Prod e rtyp) ≤ Fintype.card (Prod q btyp) :=
+      Fintype.card (e × rtyp) ≤ Fintype.card (q × btyp) :=
     adhwFQSWIid_target_ref_card_le_of_bounds T Btyp Rtyp R
   obtain ⟨B⟩ :=
     exists_adhwFQSWIidBalancedCardinalityChoice
@@ -2399,7 +2333,7 @@ theorem exists_adhwFQSWIidBalancedCardinalityChoice_eventually
 support registers, balanced `q/e` registers, and the finite-cardinality choice.
 The intended final source route instantiates `δtyp = δrate / 4`. -/
 theorem exists_adhwFQSWIidBalancedCardinalityChoice_mixed_eventually
-    (ψ : PureVector (Prod (Prod a b) r)) {δtyp δrate ε : ℝ}
+    (ψ : Ket ((a × b) × r)) {δtyp δrate ε : ℝ}
     (hδtyp : 0 < δtyp) (hδrate : 0 < δrate) (hε : 0 < ε)
     (hδtyp_le_quarter : δtyp ≤ δrate / 4) :
     ∃ N : ℕ, ∀ n : ℕ, n ≥ N →

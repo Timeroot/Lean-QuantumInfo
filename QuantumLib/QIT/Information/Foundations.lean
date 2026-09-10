@@ -21,13 +21,3 @@ public import QuantumLib.QIT.OneShot.SmoothEndpoint
 Low-conflict facade for entropy, fidelity, Rényi, and smooth entropy
 infrastructure.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace Information
-namespace Foundations
-
-end Foundations
-end Information
-end QIT

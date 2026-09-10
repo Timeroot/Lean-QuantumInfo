@@ -185,7 +185,7 @@ end CPTPOp
 /-! ### The `QECC` structure -/
 
 /-- A quantum error-correcting code: an `encoder` mapping the logical space `d1` into an `i`-indexed
-register of `d2`-qudits, and a `decoder` mapping back. No properties are required at this stage; the
+register of `d2`-qudits, and a `decoder` mapping back. No properties are required of the pair; the
 useful ones (`Decodes`, `CorrectsErrors`, `DetectsErrors`) are predicates defined below. -/
 structure QECC (d1 i d2 : Type*)
     [Fintype i] [DecidableEq i] [Fintype d1] [DecidableEq d1] [Fintype d2] [DecidableEq d2] where

@@ -33,7 +33,7 @@ This module provides:
 - `uniformProb` / `uniformEnsemble` / `cqChannelOutputState` — the cq state
   `τ_{MBⁿ} = (1/|M|) Σ_m |m⟩⟨m|_M ⊗ N^{⊗n}(C.encoder m)` induced by a uniform
   message distribution and an `HSWClassicalCode`
-- `cqChannelOutputState_marginalB_eq_average` — the quantum marginal of `τ_{MBⁿ}`
+- `cqChannelOutputState_traceLeft_eq_average` — the quantum marginal of `τ_{MBⁿ}`
   is the uniform average of the channel output states (proved)
 - `uniformDecodedMessageState` — the classical joint state of a uniform
   transmitted message and Bob's decoded message (proved to be the local
@@ -55,7 +55,7 @@ noncomputable section
 
 variable {a : Type uIn} {b : Type uOut}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
-variable (N : Channel a b)
+variable (N : CPTPMap a b)
 
 /-- Sum over `x` of `if x = anchor then c else 0` is `c` (the single matching
 term). -/
@@ -76,56 +76,56 @@ private theorem sum_if_eq_left {α : Type u} [Fintype α] [DecidableEq α]
 `|M|⁻¹` on each `|m,m⟩`-correlated diagonal entry and zero elsewhere. It has
 `|M|` equal eigenvalues `1/|M|`, so `I(M;M')_{Φ̄} = log₂ |M|`. -/
 noncomputable def maximallyCorrelated (M : Type u) [Fintype M] [DecidableEq M]
-    [Nonempty M] : State (Prod M M) where
-  matrix :=
-    Matrix.diagonal fun (ij : Prod M M) =>
-      if ij.1 = ij.2 then ((Fintype.card M : ℝ)⁻¹ : ℂ) else 0
-  pos := by
+    [Nonempty M] : MState (M × M) := .ofMatrix
+  (matrix :=
+    Matrix.diagonal fun (ij : M × M) =>
+      if ij.1 = ij.2 then ((Fintype.card M : ℝ)⁻¹ : ℂ) else 0)
+  (pos := by
     refine Matrix.PosSemidef.diagonal ?_
-    intro (ij : Prod M M)
+    intro (ij : M × M)
     dsimp only
-    split_ifs <;> positivity
-  trace_eq_one := by
+    split_ifs <;> positivity)
+  (trace_eq_one := by
     have hk : (0 : ℝ) < Fintype.card M := by exact_mod_cast Fintype.card_pos
     rw [Matrix.trace_diagonal, Fintype.sum_prod_type]
     simp only [sum_if_eq_left, Finset.sum_const, nsmul_eq_mul]
     have key : ((Fintype.card M : ℝ)) * ((Fintype.card M : ℝ)⁻¹) = (1 : ℝ) :=
       mul_inv_cancel₀ (ne_of_gt hk)
-    exact_mod_cast key
+    exact_mod_cast key)
 
 @[simp]
 theorem maximallyCorrelated_matrix (M : Type u) [Fintype M] [DecidableEq M]
     [Nonempty M] :
-    (maximallyCorrelated M).matrix =
-      Matrix.diagonal fun (ij : Prod M M) =>
-        if ij.1 = ij.2 then ((Fintype.card M : ℝ)⁻¹ : ℂ) else 0 := by
-  rfl
+    (maximallyCorrelated M).m =
+      Matrix.diagonal fun (ij : M × M) =>
+        if ij.1 = ij.2 then ((Fintype.card M : ℝ)⁻¹ : ℂ) else 0 :=
+  MState.matrix_ofMatrix _ _ _
 
 /-- Each marginal of the maximally-correlated state is the maximally mixed
-state: `Φ̄.marginalA.matrix = Φ̄.marginalB.matrix` is the diagonal matrix with
+state: `Φ̄.traceRight.m = Φ̄.traceLeft.m` is the diagonal matrix with
 every diagonal entry `1/|M|` (equivalently `(1/|M|) · 1`). -/
-theorem maximallyCorrelated_marginalA_matrix (M : Type u) [Fintype M]
+theorem maximallyCorrelated_traceRight_matrix (M : Type u) [Fintype M]
     [DecidableEq M] [Nonempty M] :
-    (maximallyCorrelated M).marginalA.matrix =
+    (maximallyCorrelated M).traceRight.m =
       Matrix.diagonal fun (_ : M) => ((Fintype.card M : ℝ)⁻¹ : ℂ) := by
   ext i i'
   set c : ℂ := ((Fintype.card M : ℝ)⁻¹ : ℂ)
-  have hmarg : (maximallyCorrelated M).marginalA.matrix i i' =
-      ∑ j : M, (maximallyCorrelated M).matrix (i, j) (i', j) := by
-    show partialTraceB _ i i' = _
+  have hmarg : (maximallyCorrelated M).traceRight.m i i' =
+      ∑ j : M, (maximallyCorrelated M).m (i, j) (i', j) := by
+    rw [MState.traceRight_m]
     rfl
-  have hsum : ∑ j : M, (maximallyCorrelated M).matrix (i, j) (i', j) =
+  have hsum : ∑ j : M, (maximallyCorrelated M).m (i, j) (i', j) =
       (if i = i' then c else 0) := by
     rw [maximallyCorrelated_matrix]
     by_cases h : i = i'
     · subst h
       have hentry : ∀ j : M,
-          (Matrix.diagonal fun (ij : Prod M M) => if ij.1 = ij.2 then c else 0) (i, j) (i, j) =
+          (Matrix.diagonal fun (ij : M × M) => if ij.1 = ij.2 then c else 0) (i, j) (i, j) =
             (if i = j then c else 0) := fun j => by
         rw [Matrix.diagonal_apply, if_pos rfl]
       rw [Finset.sum_congr rfl (fun j _ => hentry j), sum_if_eq_left, if_pos rfl]
     · have h0 : ∀ j : M,
-          (Matrix.diagonal fun (ij : Prod M M) => if ij.1 = ij.2 then c else 0) (i, j) (i', j)
+          (Matrix.diagonal fun (ij : M × M) => if ij.1 = ij.2 then c else 0) (i, j) (i', j)
             = 0 := by
         intro j
         rw [Matrix.diagonal_apply]
@@ -136,28 +136,28 @@ theorem maximallyCorrelated_marginalA_matrix (M : Type u) [Fintype M]
       rw [Finset.sum_congr rfl (fun j _ => h0 j), Finset.sum_const_zero, if_neg h]
   rw [hmarg, hsum, Matrix.diagonal_apply]
 
-theorem maximallyCorrelated_marginalB_matrix (M : Type u) [Fintype M]
+theorem maximallyCorrelated_traceLeft_matrix (M : Type u) [Fintype M]
     [DecidableEq M] [Nonempty M] :
-    (maximallyCorrelated M).marginalB.matrix =
+    (maximallyCorrelated M).traceLeft.m =
       Matrix.diagonal fun (_ : M) => ((Fintype.card M : ℝ)⁻¹ : ℂ) := by
   ext j j'
   set c : ℂ := ((Fintype.card M : ℝ)⁻¹ : ℂ)
-  have hmarg : (maximallyCorrelated M).marginalB.matrix j j' =
-      ∑ i : M, (maximallyCorrelated M).matrix (i, j) (i, j') := by
-    show partialTraceA _ j j' = _
+  have hmarg : (maximallyCorrelated M).traceLeft.m j j' =
+      ∑ i : M, (maximallyCorrelated M).m (i, j) (i, j') := by
+    rw [MState.traceLeft_m]
     rfl
-  have hsum : ∑ i : M, (maximallyCorrelated M).matrix (i, j) (i, j') =
+  have hsum : ∑ i : M, (maximallyCorrelated M).m (i, j) (i, j') =
       (if j = j' then c else 0) := by
     rw [maximallyCorrelated_matrix]
     by_cases h : j = j'
     · subst h
       have hentry : ∀ i : M,
-          (Matrix.diagonal fun (ij : Prod M M) => if ij.1 = ij.2 then c else 0) (i, j) (i, j) =
+          (Matrix.diagonal fun (ij : M × M) => if ij.1 = ij.2 then c else 0) (i, j) (i, j) =
             (if i = j then c else 0) := fun i => by
         rw [Matrix.diagonal_apply, if_pos rfl]
       rw [Finset.sum_congr rfl (fun i _ => hentry i), sum_if_eq_right, if_pos rfl]
     · have h0 : ∀ i : M,
-          (Matrix.diagonal fun (ij : Prod M M) => if ij.1 = ij.2 then c else 0) (i, j) (i, j')
+          (Matrix.diagonal fun (ij : M × M) => if ij.1 = ij.2 then c else 0) (i, j) (i, j')
             = 0 := by
         intro i
         rw [Matrix.diagonal_apply]
@@ -170,11 +170,11 @@ theorem maximallyCorrelated_marginalB_matrix (M : Type u) [Fintype M]
 
 /-- The first marginal of the classically correlated shared-randomness state is
 the canonical maximally mixed state. -/
-theorem maximallyCorrelated_marginalA (M : Type u) [Fintype M]
+theorem maximallyCorrelated_traceRight (M : Type u) [Fintype M]
     [DecidableEq M] [Nonempty M] :
-    (maximallyCorrelated M).marginalA = State.maximallyMixed M := by
-  apply State.ext
-  rw [maximallyCorrelated_marginalA_matrix, State.maximallyMixed_matrix]
+    (maximallyCorrelated M).traceRight = (MState.uniform : MState M) := by
+  apply MState.ext
+  rw [maximallyCorrelated_traceRight_matrix, MState.uniform_matrix]
   ext i j
   by_cases h : i = j
   · subst j
@@ -183,11 +183,11 @@ theorem maximallyCorrelated_marginalA (M : Type u) [Fintype M]
 
 /-- The second marginal of the classically correlated shared-randomness state is
 the canonical maximally mixed state. -/
-theorem maximallyCorrelated_marginalB (M : Type u) [Fintype M]
+theorem maximallyCorrelated_traceLeft (M : Type u) [Fintype M]
     [DecidableEq M] [Nonempty M] :
-    (maximallyCorrelated M).marginalB = State.maximallyMixed M := by
-  apply State.ext
-  rw [maximallyCorrelated_marginalB_matrix, State.maximallyMixed_matrix]
+    (maximallyCorrelated M).traceLeft = (MState.uniform : MState M) := by
+  apply MState.ext
+  rw [maximallyCorrelated_traceLeft_matrix, MState.uniform_matrix]
   ext i j
   by_cases h : i = j
   · subst j
@@ -197,22 +197,11 @@ theorem maximallyCorrelated_marginalB (M : Type u) [Fintype M]
 /-- On `Bool`, the classically correlated shared-randomness state is not the
 canonical coherent maximally entangled two-qubit state. -/
 theorem maximallyCorrelated_bool_ne_maximallyEntangled :
-    maximallyCorrelated Bool ≠ State.maximallyEntangled (Equiv.refl Bool) := by
+    maximallyCorrelated Bool ≠ MState.maximallyEntangled (Equiv.refl Bool) := by
   intro h
-  have hentry := congrArg (fun ρ => ρ.matrix (false, false) (true, true)) h
-  simp [maximallyCorrelated, State.maximallyEntangled, PureVector.maximallyEntangled,
-    PureVector.state, rankOneMatrix_apply] at hentry
-
-/-- `xlog2 x * Real.log 2 = x * Real.log x` for `0 ≤ x` (the `0 log 0` convention
-absorbs the zero case). Scaling by `Real.log 2 ≠ 0` eliminates the base-2
-division in `log2`. -/
-private lemma xlog2_mul_log2_self {x : ℝ} (hx : 0 ≤ x) :
-    xlog2 x * Real.log 2 = x * Real.log x := by
-  by_cases hzx : x = 0
-  · simp [xlog2, hzx, Real.log_zero]
-  · have hxp : 0 < x := lt_of_le_of_ne hx (Ne.symm hzx)
-    simp only [xlog2, if_neg hzx, log2]
-    field_simp
+  have hentry := congrArg (fun ρ => ρ.m (false, false) (true, true)) h
+  simp [maximallyCorrelated, MState.maximallyEntangled, Ket.maximallyEntangled,
+    Ket.state, rankOneMatrix_apply] at hentry
 
 /-- Product rule for `xlog2` on nonnegative real inputs. -/
 private lemma xlog2_mul_of_nonneg {x y : ℝ} (_hx : 0 ≤ x) (_hy : 0 ≤ y) :
@@ -226,22 +215,18 @@ private lemma xlog2_mul_of_nonneg {x y : ℝ} (_hx : 0 ≤ x) (_hy : 0 ≤ y) :
   rw [Real.log_mul hx0 hy0]
   ring
 
-/-- Binary entropy in bits, written with the repository's `xlog2` convention. -/
-def binaryEntropyBits (p : ℝ) : ℝ :=
-  -xlog2 p - xlog2 (1 - p)
-
 /-- The local bits convention agrees with mathlib's natural-log binary entropy
 after division by `log 2` on the probability interval. -/
-theorem binaryEntropyBits_eq_binEntropy_div_log_two {p : ℝ} (hp0 : 0 ≤ p) (hp1 : p ≤ 1) :
-    binaryEntropyBits p = Real.binEntropy p / Real.log 2 := by
+theorem binaryEntropy_eq_binEntropy_div_log_two {p : ℝ} (hp0 : 0 ≤ p) (hp1 : p ≤ 1) :
+    binaryEntropy p = Real.binEntropy p / Real.log 2 := by
   have hlog2_ne : Real.log 2 ≠ 0 := ne_of_gt (Real.log_pos one_lt_two)
   have hmul :
-      binaryEntropyBits p * Real.log 2 = Real.binEntropy p := by
+      binaryEntropy p * Real.log 2 = Real.binEntropy p := by
     rw [Real.binEntropy_eq_negMulLog_add_negMulLog_one_sub]
     calc
-      binaryEntropyBits p * Real.log 2 =
+      binaryEntropy p * Real.log 2 =
           -(xlog2 p * Real.log 2) - xlog2 (1 - p) * Real.log 2 := by
-            unfold binaryEntropyBits
+            unfold binaryEntropy
             ring
       _ = -(p * Real.log p) - (1 - p) * Real.log (1 - p) := by
             rw [xlog2_mul_log2_self hp0, xlog2_mul_log2_self (sub_nonneg.mpr hp1)]
@@ -249,20 +234,20 @@ theorem binaryEntropyBits_eq_binEntropy_div_log_two {p : ℝ} (hp0 : 0 ≤ p) (h
             simp [Real.negMulLog]
             ring
   calc
-    binaryEntropyBits p = binaryEntropyBits p * Real.log 2 / Real.log 2 := by
+    binaryEntropy p = binaryEntropy p * Real.log 2 / Real.log 2 := by
       field_simp [hlog2_ne]
     _ = Real.binEntropy p / Real.log 2 := by rw [hmul]
 
 /-- Jensen's inequality for binary entropy in bits over a finite probability
 mass. -/
-theorem binaryEntropyBits_weighted_sum_le
+theorem binaryEntropy_weighted_sum_le
     {ι : Type u} [Fintype ι] {w t : ι → ℝ}
     (hw_nonneg : ∀ i, 0 ≤ w i)
     (hw_sum : ∑ i : ι, w i = 1)
     (ht_nonneg : ∀ i, 0 ≤ t i)
     (ht_le_one : ∀ i, t i ≤ 1) :
-    ∑ i : ι, w i * binaryEntropyBits (t i) ≤
-      binaryEntropyBits (∑ i : ι, w i * t i) := by
+    ∑ i : ι, w i * binaryEntropy (t i) ≤
+      binaryEntropy (∑ i : ι, w i * t i) := by
   classical
   have hlog_pos : 0 < Real.log 2 := Real.log_pos one_lt_two
   have hmem : ∀ i ∈ (Finset.univ : Finset ι), t i ∈ Set.Icc (0 : ℝ) 1 := by
@@ -287,14 +272,14 @@ theorem binaryEntropyBits_weighted_sum_le
       _ = 1 := by
         simp [hw_sum]
   have hleft :
-      ∑ i : ι, w i * binaryEntropyBits (t i) =
+      ∑ i : ι, w i * binaryEntropy (t i) =
         (∑ i : ι, w i * Real.binEntropy (t i)) / Real.log 2 := by
     calc
-      ∑ i : ι, w i * binaryEntropyBits (t i) =
+      ∑ i : ι, w i * binaryEntropy (t i) =
           ∑ i : ι, w i * (Real.binEntropy (t i) / Real.log 2) := by
             refine Finset.sum_congr rfl ?_
             intro i _
-            rw [binaryEntropyBits_eq_binEntropy_div_log_two (ht_nonneg i) (ht_le_one i)]
+            rw [binaryEntropy_eq_binEntropy_div_log_two (ht_nonneg i) (ht_le_one i)]
       _ = ∑ i : ι, (w i * Real.binEntropy (t i)) / Real.log 2 := by
             refine Finset.sum_congr rfl ?_
             intro i _
@@ -302,9 +287,9 @@ theorem binaryEntropyBits_weighted_sum_le
       _ = (∑ i : ι, w i * Real.binEntropy (t i)) / Real.log 2 := by
             rw [Finset.sum_div]
   have hright :
-      binaryEntropyBits (∑ i : ι, w i * t i) =
+      binaryEntropy (∑ i : ι, w i * t i) =
         Real.binEntropy (∑ i : ι, w i * t i) / Real.log 2 :=
-    binaryEntropyBits_eq_binEntropy_div_log_two havg_nonneg havg_le_one
+    binaryEntropy_eq_binEntropy_div_log_two havg_nonneg havg_le_one
   rw [hleft, hright]
   exact div_le_div_of_nonneg_right hjensen hlog_pos.le
 
@@ -320,11 +305,11 @@ theorem fanoEntropyRhs_eq_nats_div_log_two
     (hε0 : 0 ≤ ε) (hε1 : ε ≤ 1) :
     ε * log2 (Fintype.card M : ℝ) - xlog2 ε - xlog2 (1 - ε) =
       fanoEntropyNats M ε / Real.log 2 := by
-  have hbin := binaryEntropyBits_eq_binEntropy_div_log_two hε0 hε1
+  have hbin := binaryEntropy_eq_binEntropy_div_log_two hε0 hε1
   calc
     ε * log2 (Fintype.card M : ℝ) - xlog2 ε - xlog2 (1 - ε) =
-        ε * log2 (Fintype.card M : ℝ) + binaryEntropyBits ε := by
-          unfold binaryEntropyBits
+        ε * log2 (Fintype.card M : ℝ) + binaryEntropy ε := by
+          unfold binaryEntropy
           ring
     _ = ε * (Real.log (Fintype.card M : ℝ) / Real.log 2) +
         Real.binEntropy ε / Real.log 2 := by
@@ -558,9 +543,9 @@ theorem log_card_le_fanoEntropyRhs_of_threshold_le
 /-- Scaling identity for binary entropy in bits:
 `r h₂(e/r) = -xlog₂ e - xlog₂(r-e) + xlog₂ r`.  This is the
 algebraic heart of the fiberwise Fano proof. -/
-theorem mul_binaryEntropyBits_div_eq
+theorem mul_binaryEntropy_div_eq
     {e r : ℝ} (he : 0 ≤ e) (her : e ≤ r) (hr : 0 < r) :
-    r * binaryEntropyBits (e / r) =
+    r * binaryEntropy (e / r) =
       -xlog2 e - xlog2 (r - e) + xlog2 r := by
   have hrne : r ≠ 0 := ne_of_gt hr
   have hfrac_nonneg : 0 ≤ e / r := div_nonneg he hr.le
@@ -581,7 +566,7 @@ theorem mul_binaryEntropyBits_div_eq
       xlog2 (r - e) = xlog2 (r * (1 - e / r)) := congrArg xlog2 hsucc_eq
       _ = (1 - e / r) * xlog2 r + r * xlog2 (1 - e / r) :=
             xlog2_mul_of_nonneg hr.le hcompl_nonneg
-  unfold binaryEntropyBits
+  unfold binaryEntropy
   rw [hx_e, hx_succ]
   ring
 
@@ -621,10 +606,10 @@ private lemma xlog2_ite {c : Prop} [Decidable c] {a : ℝ} :
 
 /-- Sum of `xlog2` of the maximally-correlated diagonal over `M × M`. -/
 private lemma sum_xlog2_diag_prod (M : Type u) [Fintype M] [DecidableEq M] [Nonempty M] :
-    ∑ (ij : Prod M M), xlog2 (if ij.1 = ij.2 then ((Fintype.card M : ℝ)⁻¹) else 0) =
+    ∑ (ij : M × M), xlog2 (if ij.1 = ij.2 then ((Fintype.card M : ℝ)⁻¹) else 0) =
       -log2 (Fintype.card M) := by
-  rw [show ∑ (ij : Prod M M), xlog2 (if ij.1 = ij.2 then _ else 0) =
-        ∑ (ij : Prod M M), (if ij.1 = ij.2 then xlog2 ((Fintype.card M : ℝ)⁻¹) else 0) from by
+  rw [show ∑ (ij : M × M), xlog2 (if ij.1 = ij.2 then _ else 0) =
+        ∑ (ij : M × M), (if ij.1 = ij.2 then xlog2 ((Fintype.card M : ℝ)⁻¹) else 0) from by
         simp only [xlog2_ite]]
   rw [Fintype.sum_prod_type]
   show ∑ i : M, ∑ j : M, (if i = j then xlog2 ((Fintype.card M : ℝ)⁻¹) else 0) =
@@ -643,22 +628,22 @@ shared-randomness identity — the maximally-correlated state carries
 theorem mutualInformation_maximallyCorrelated_statement
     (M : Type u) [Fintype M] [DecidableEq M] [Nonempty M] :
     mutualInformation (maximallyCorrelated M) = log2 (Fintype.card M) := by
-  have hA : State.vonNeumann (maximallyCorrelated M).marginalA =
+  have hA : MState.vonNeumann (maximallyCorrelated M).traceRight =
       log2 (Fintype.card M) := by
-    rw [State.vonNeumann_eq_neg_sum_xlog2_of_diagonal (maximallyCorrelated M).marginalA
+    rw [MState.vonNeumann_eq_neg_sum_xlog2_of_diagonal (maximallyCorrelated M).traceRight
         (fun (_ : M) => (Fintype.card M : ℝ)⁻¹)
-        (by push_cast; exact maximallyCorrelated_marginalA_matrix M), sum_xlog2_inv_card]
+        (by push_cast; exact maximallyCorrelated_traceRight_matrix M), sum_xlog2_inv_card]
     ring
-  have hB : State.vonNeumann (maximallyCorrelated M).marginalB =
+  have hB : MState.vonNeumann (maximallyCorrelated M).traceLeft =
       log2 (Fintype.card M) := by
-    rw [State.vonNeumann_eq_neg_sum_xlog2_of_diagonal (maximallyCorrelated M).marginalB
+    rw [MState.vonNeumann_eq_neg_sum_xlog2_of_diagonal (maximallyCorrelated M).traceLeft
         (fun (_ : M) => (Fintype.card M : ℝ)⁻¹)
-        (by push_cast; exact maximallyCorrelated_marginalB_matrix M), sum_xlog2_inv_card]
+        (by push_cast; exact maximallyCorrelated_traceLeft_matrix M), sum_xlog2_inv_card]
     ring
-  have hΦ : State.vonNeumann (maximallyCorrelated M) = log2 (Fintype.card M) := by
-    rw [State.vonNeumann_eq_neg_sum_xlog2_of_diagonal (maximallyCorrelated M)
-        (fun (ij : Prod M M) => if ij.1 = ij.2 then (Fintype.card M : ℝ)⁻¹ else 0)
-        (by ext (a b : Prod M M)
+  have hΦ : MState.vonNeumann (maximallyCorrelated M) = log2 (Fintype.card M) := by
+    rw [MState.vonNeumann_eq_neg_sum_xlog2_of_diagonal (maximallyCorrelated M)
+        (fun (ij : M × M) => if ij.1 = ij.2 then (Fintype.card M : ℝ)⁻¹ else 0)
+        (by ext (a b : M × M)
             by_cases hab : a = b
             · subst hab
               simp only [maximallyCorrelated_matrix, Matrix.diagonal_apply, if_true]
@@ -666,9 +651,9 @@ theorem mutualInformation_maximallyCorrelated_statement
             · simp only [hab, maximallyCorrelated_matrix, Matrix.diagonal_apply, if_false]),
         sum_xlog2_diag_prod]
     ring
-  show State.vonNeumann (maximallyCorrelated M).marginalA +
-      State.vonNeumann (maximallyCorrelated M).marginalB -
-      State.vonNeumann (maximallyCorrelated M) = log2 (Fintype.card M)
+  show MState.vonNeumann (maximallyCorrelated M).traceRight +
+      MState.vonNeumann (maximallyCorrelated M).traceLeft -
+      MState.vonNeumann (maximallyCorrelated M) = log2 (Fintype.card M)
   rw [hA, hB, hΦ]
   ring
 
@@ -688,8 +673,8 @@ theorem uniformProbs_sum_eq_one (M : Type u) [Fintype M] [Nonempty M] :
 noncomputable def uniformEnsemble
     (M : Type u) [Fintype M] [DecidableEq M] [Nonempty M]
     {a : Type uIn} [Fintype a] [DecidableEq a]
-    (ρ : M → State a) : Ensemble M a :=
-  Ensemble.mk (uniformProbs M) (uniformProbs_sum_eq_one M) ρ
+    (ρ : M → MState a) : MEnsemble a M :=
+  MEnsemble.ofProbs (uniformProbs M) (uniformProbs_sum_eq_one M) ρ
 
 /-- The cq channel output state `τ_{MBⁿ}` induced by a uniform message
 distribution and the `n`-use channel encoding:
@@ -702,17 +687,17 @@ maximally mixed, and the quantum register `Bⁿ` carries the channel output
 conditioned on the message. -/
 noncomputable def cqChannelOutputState
     (n : ℕ) (M : Type u) [Fintype M] [DecidableEq M] [Nonempty M]
-    (C : HSWClassicalCode N n M) : State (Prod M (TensorPower b n)) :=
+    (C : HSWClassicalCode N n M) : MState (M × TensorPower b n) :=
   (uniformEnsemble M C.outputState).cqState
 
 /-- The quantum marginal of `cqChannelOutputState` is the uniform average of the
 channel output states: `τ_{Bⁿ} = (1/|M|) Σ_m N^{⊗n}(C.encoder m)`. -/
-theorem cqChannelOutputState_marginalB_eq_average
+theorem cqChannelOutputState_traceLeft_eq_average
     (n : ℕ) (M : Type u) [Fintype M] [DecidableEq M] [Nonempty M]
     (C : HSWClassicalCode N n M) :
-    (cqChannelOutputState N n M C).marginalB =
+    (cqChannelOutputState N n M C).traceLeft =
       (uniformEnsemble M C.outputState).averageState := by
-  simp [cqChannelOutputState, Ensemble.cqState_marginalB_eq_averageState]
+  simp [cqChannelOutputState, MEnsemble.cqState_traceLeft_eq_averageState]
 
 /-! ## Decoded classical message pair -/
 
@@ -722,14 +707,14 @@ to the channel output. -/
 def uniformDecodedMessageProb
     (n : ℕ) (M : Type u) [Fintype M] [DecidableEq M] [Nonempty M]
     (C : HSWClassicalCode N n M) :
-    Prod M M → ℝ≥0 :=
+    M × M → ℝ≥0 :=
   fun p => uniformMessageProb (M := M) p.1 * C.decoder.prob (C.outputState p.1) p.2
 
 /-- The transmitted/decoded-message joint probabilities sum to one. -/
 theorem uniformDecodedMessageProb_sum
     (n : ℕ) (M : Type u) [Fintype M] [DecidableEq M] [Nonempty M]
     (C : HSWClassicalCode N n M) :
-    ∑ p : Prod M M, uniformDecodedMessageProb N n M C p = 1 := by
+    ∑ p : M × M, uniformDecodedMessageProb N n M C p = 1 := by
   rw [Fintype.sum_prod_type]
   calc
     (∑ m : M, ∑ mhat : M,
@@ -748,7 +733,7 @@ theorem uniformDecodedMessageProb_sum
 /-- Joint classical state of the transmitted message and Bob's decoded message. -/
 def uniformDecodedMessageState
     (n : ℕ) (M : Type u) [Fintype M] [DecidableEq M] [Nonempty M]
-    (C : HSWClassicalCode N n M) : State (Prod M M) :=
+    (C : HSWClassicalCode N n M) : MState (M × M) :=
   Classical.diagonalState (uniformDecodedMessageProb N n M C)
     (uniformDecodedMessageProb_sum N n M C)
 
@@ -758,42 +743,44 @@ theorem uniformDecodedMessageState_eq_measure_cqChannelOutputState
     (n : ℕ) (M : Type u) [Fintype M] [DecidableEq M] [Nonempty M]
     (C : HSWClassicalCode N n M) :
     uniformDecodedMessageState N n M C =
-      ((Channel.idChannel M).prod (Channel.measure C.decoder)).applyState
+      ((CPTPOp.id (dIn := M)).prod (POVM.measureDiscard C.decoder))
         (cqChannelOutputState N n M C) := by
-  apply State.ext
+  apply MState.ext
   ext p q
   rcases p with ⟨m, mhat⟩
   rcases q with ⟨m', mhat'⟩
-  change (uniformDecodedMessageState N n M C).matrix (m, mhat) (m', mhat') =
-    (((Channel.idChannel M).prod (Channel.measure C.decoder)).applyState
-      (uniformEnsemble M C.outputState).cqState).matrix (m, mhat) (m', mhat')
+  change (uniformDecodedMessageState N n M C).m (m, mhat) (m', mhat') =
+    (((CPTPOp.id (dIn := M)).prod (POVM.measureDiscard C.decoder))
+      (uniformEnsemble M C.outputState).cqState).m (m, mhat) (m', mhat')
   rw [applyState_id_prod_cqState_matrix (uniformEnsemble M C.outputState)
-    (Channel.measure C.decoder)]
+    (POVM.measureDiscard C.decoder)]
   simp only [Matrix.sum_apply, Matrix.smul_apply]
   by_cases hm : m = m'
   · subst m'
     by_cases hhat : mhat = mhat'
     · subst mhat'
       have hmeas :
-          ((Channel.measure C.decoder).applyState (C.outputState m)).matrix mhat mhat =
+          ((POVM.measureDiscard C.decoder) (C.outputState m)).m mhat mhat =
             (C.decoder.prob (C.outputState m) mhat : ℂ) := by
         rw [← Classical.measuredState_eq_measure_applyState]
         simp
+      simp only [CPTPOp.mat_coe_eq_apply_mat] at hmeas
       rw [Finset.sum_eq_single m]
       · simp [uniformDecodedMessageState, Classical.diagonalState,
           uniformDecodedMessageProb, uniformEnsemble, uniformProbs, uniformMessageProb,
-          Matrix.kronecker, hmeas]
+          Matrix.kronecker, -POVM.measureDiscard_map, hmeas]
       · intro x _ hx
         simp [Matrix.kronecker, hx]
       · simp
     · have hmeas :
-          ((Channel.measure C.decoder).applyState (C.outputState m)).matrix mhat mhat' = 0 := by
+          ((POVM.measureDiscard C.decoder) (C.outputState m)).m mhat mhat' = 0 := by
         rw [← Classical.measuredState_eq_measure_applyState]
         exact Classical.measuredState_apply_ne C.decoder (C.outputState m) hhat
+      simp only [CPTPOp.mat_coe_eq_apply_mat] at hmeas
       rw [Finset.sum_eq_single m]
       · simp [uniformDecodedMessageState, Classical.diagonalState,
           uniformDecodedMessageProb, uniformEnsemble, uniformProbs, uniformMessageProb,
-          Matrix.kronecker, hhat, hmeas]
+          Matrix.kronecker, -POVM.measureDiscard_map, hhat, hmeas]
       · intro x _ hx
         simp [Matrix.kronecker, hx]
       · simp
@@ -817,19 +804,19 @@ theorem mutualInformation_uniformDecodedMessageState_le_cqChannelOutputState
   simpa using
     mutualInformation_dataProcessing_local_channels_ge
       (cqChannelOutputState N n M C)
-      (Channel.idChannel M)
-      (Channel.measure C.decoder)
+      (CPTPOp.id (dIn := M))
+      (POVM.measureDiscard C.decoder)
 
 /-- The transmitted-message marginal of the decoded classical pair is uniform. -/
-theorem uniformDecodedMessageState_marginalA
+theorem uniformDecodedMessageState_traceRight
     (n : ℕ) (M : Type u) [Fintype M] [DecidableEq M] [Nonempty M]
     (C : HSWClassicalCode N n M) :
-    (uniformDecodedMessageState N n M C).marginalA = uniformMessageState (M := M) := by
-  apply State.ext
+    (uniformDecodedMessageState N n M C).traceRight = uniformMessageState (M := M) := by
+  apply MState.ext
   ext m m'
   by_cases h : m = m'
   · subst m'
-    simp only [State.marginalA_matrix, partialTraceB, uniformDecodedMessageState,
+    simp only [MState.traceRight_m, Matrix.traceRight, Matrix.of_apply, uniformDecodedMessageState,
       Classical.diagonalState_matrix, uniformDecodedMessageProb, uniformMessageState_matrix,
       Matrix.diagonal_apply_eq]
     have hsum :
@@ -838,7 +825,7 @@ theorem uniformDecodedMessageState_marginalA
           uniformMessageProb (M := M) m := by
       rw [← Finset.mul_sum, C.decoder.sum_prob, mul_one]
     exact_mod_cast hsum
-  · simp [State.marginalA, partialTraceB, uniformDecodedMessageState,
+  · simp [Matrix.traceRight, uniformDecodedMessageState,
       Classical.diagonalState, uniformDecodedMessageProb, uniformMessageState, h]
 
 /-- The equality-comparator accept probability is the uniform average decoding
@@ -850,11 +837,11 @@ theorem uniformDecodedMessageState_comparator_accept
       ∑ m : M, (uniformMessageProb (M := M) m : ℝ) * C.successProbability m := by
   unfold effectAcceptProbability HSWClassicalCode.successProbability
   calc
-    (∑ p : Prod M M,
-        (∑ q : Prod M M,
-          (uniformDecodedMessageState N n M C).matrix p q * comparatorEffect (M := M) q p)).re =
-        (∑ p : Prod M M,
-          (uniformDecodedMessageState N n M C).matrix p p *
+    (∑ p : M × M,
+        (∑ q : M × M,
+          (uniformDecodedMessageState N n M C).m p q * comparatorEffect (M := M) q p)).re =
+        (∑ p : M × M,
+          (uniformDecodedMessageState N n M C).m p p *
             comparatorEffect (M := M) p p).re := by
           congr 1
           refine Finset.sum_congr rfl ?_
@@ -865,7 +852,7 @@ theorem uniformDecodedMessageState_comparator_accept
               unfold comparatorEffect
               exact Matrix.diagonal_apply_ne _ hq
             rw [hzero, mul_zero])
-    _ = (∑ p : Prod M M,
+    _ = (∑ p : M × M,
           (if p.1 = p.2 then
             (uniformMessageProb (M := M) p.1 : ℂ) *
               (C.decoder.prob (C.outputState p.1) p.2 : ℂ)
@@ -931,9 +918,9 @@ finite Shannon entropy. -/
 theorem diagonalState_vonNeumann_eq_classicalEntropy
     {α : Type u} [Fintype α] [DecidableEq α]
     (p : α → ℝ≥0) (hp : ∑ x : α, p x = 1) :
-    State.vonNeumann (Classical.diagonalState p hp) = classicalEntropy p := by
+    MState.vonNeumann (Classical.diagonalState p hp) = classicalEntropy p := by
   unfold classicalEntropy
-  exact State.vonNeumann_eq_neg_sum_xlog2_of_diagonal (Classical.diagonalState p hp)
+  exact MState.vonNeumann_eq_neg_sum_xlog2_of_diagonal (Classical.diagonalState p hp)
     (fun x => (p x : ℝ)) (by
       ext i j
       rw [Classical.diagonalState_matrix, Matrix.diagonal_apply])
@@ -955,7 +942,7 @@ theorem classicalEntropy_le_log_card
     (p : α → ℝ≥0) (hp : ∑ x : α, p x = 1) :
     classicalEntropy p ≤ log2 (Fintype.card α : ℝ) := by
   have hS :=
-    State.vonNeumann_le_log_card (Classical.diagonalState p hp)
+    MState.vonNeumann_le_log_card (Classical.diagonalState p hp)
   rwa [diagonalState_vonNeumann_eq_classicalEntropy p hp] at hS
 
 /-- Normalize a positive-mass finite subdistribution. -/
@@ -1034,25 +1021,25 @@ theorem classicalEntropy_eq_zero_of_sum_zero
 
 /-- First marginal of a classical decoded-pair law. -/
 def decodedPairMarginalAProb
-    (M : Type u) [Fintype M] (p : Prod M M → ℝ≥0) : M → ℝ≥0 :=
+    (M : Type u) [Fintype M] (p : M × M → ℝ≥0) : M → ℝ≥0 :=
   fun m => ∑ mhat : M, p (m, mhat)
 
 /-- Second marginal of a classical decoded-pair law. -/
 def decodedPairMarginalBProb
-    (M : Type u) [Fintype M] (p : Prod M M → ℝ≥0) : M → ℝ≥0 :=
+    (M : Type u) [Fintype M] (p : M × M → ℝ≥0) : M → ℝ≥0 :=
   fun mhat => ∑ m : M, p (m, mhat)
 
 theorem decodedPairMarginalAProb_sum
-    (M : Type u) [Fintype M] (p : Prod M M → ℝ≥0)
-    (hp : ∑ pair : Prod M M, p pair = 1) :
+    (M : Type u) [Fintype M] (p : M × M → ℝ≥0)
+    (hp : ∑ pair : M × M, p pair = 1) :
     ∑ m : M, decodedPairMarginalAProb M p m = 1 := by
   unfold decodedPairMarginalAProb
   rw [← hp]
   rw [Fintype.sum_prod_type]
 
 theorem decodedPairMarginalBProb_sum
-    (M : Type u) [Fintype M] (p : Prod M M → ℝ≥0)
-    (hp : ∑ pair : Prod M M, p pair = 1) :
+    (M : Type u) [Fintype M] (p : M × M → ℝ≥0)
+    (hp : ∑ pair : M × M, p pair = 1) :
     ∑ mhat : M, decodedPairMarginalBProb M p mhat = 1 := by
   unfold decodedPairMarginalBProb
   rw [← hp]
@@ -1061,88 +1048,88 @@ theorem decodedPairMarginalBProb_sum
 
 /-- The first marginal of a diagonal decoded-pair state is the diagonal state
 of the first classical marginal. -/
-theorem diagonalDecodedPair_marginalA_matrix
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0)
-    (hp : ∑ pair : Prod M M, p pair = 1) :
-    (Classical.diagonalState p hp).marginalA.matrix =
+theorem diagonalDecodedPair_traceRight_matrix
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0)
+    (hp : ∑ pair : M × M, p pair = 1) :
+    (Classical.diagonalState p hp).traceRight.m =
       Matrix.diagonal fun m : M => (decodedPairMarginalAProb M p m : ℂ) := by
   ext m m'
-  rw [State.marginalA_matrix]
-  show partialTraceB (Classical.diagonalState p hp).matrix m m' =
+  rw [MState.traceRight_m]
+  show Matrix.traceRight (Classical.diagonalState p hp).m m m' =
     (Matrix.diagonal fun m : M => (decodedPairMarginalAProb M p m : ℂ)) m m'
   by_cases h : m = m'
   · subst m'
-    simp [partialTraceB, decodedPairMarginalAProb]
-  · simp [partialTraceB, decodedPairMarginalAProb, h]
+    simp [Matrix.traceRight, decodedPairMarginalAProb]
+  · simp [Matrix.traceRight, decodedPairMarginalAProb, h]
 
 /-- The second marginal of a diagonal decoded-pair state is the diagonal state
 of the second classical marginal. -/
-theorem diagonalDecodedPair_marginalB_matrix
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0)
-    (hp : ∑ pair : Prod M M, p pair = 1) :
-    (Classical.diagonalState p hp).marginalB.matrix =
+theorem diagonalDecodedPair_traceLeft_matrix
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0)
+    (hp : ∑ pair : M × M, p pair = 1) :
+    (Classical.diagonalState p hp).traceLeft.m =
       Matrix.diagonal fun mhat : M => (decodedPairMarginalBProb M p mhat : ℂ) := by
   ext mhat mhat'
-  rw [State.marginalB_matrix]
-  show partialTraceA (Classical.diagonalState p hp).matrix mhat mhat' =
+  rw [MState.traceLeft_m]
+  show Matrix.traceLeft (Classical.diagonalState p hp).m mhat mhat' =
     (Matrix.diagonal fun mhat : M => (decodedPairMarginalBProb M p mhat : ℂ)) mhat mhat'
   by_cases h : mhat = mhat'
   · subst mhat'
-    simp [partialTraceA, decodedPairMarginalBProb]
-  · simp [partialTraceA, decodedPairMarginalBProb, h]
+    simp [Matrix.traceLeft, decodedPairMarginalBProb]
+  · simp [Matrix.traceLeft, decodedPairMarginalBProb, h]
 
 /-- Mutual information of a finite diagonal decoded-pair law is the classical
 expression `H(A) + H(B) - H(AB)`. -/
 theorem diagonalDecodedPair_mutualInformation_eq_classicalEntropy
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0)
-    (hp : ∑ pair : Prod M M, p pair = 1) :
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0)
+    (hp : ∑ pair : M × M, p pair = 1) :
     mutualInformation (Classical.diagonalState p hp) =
       classicalEntropy (decodedPairMarginalAProb M p) +
         classicalEntropy (decodedPairMarginalBProb M p) -
         classicalEntropy p := by
   unfold mutualInformation
   have hA :
-      State.vonNeumann (Classical.diagonalState p hp).marginalA =
+      MState.vonNeumann (Classical.diagonalState p hp).traceRight =
         classicalEntropy (decodedPairMarginalAProb M p) := by
     unfold classicalEntropy
-    exact State.vonNeumann_eq_neg_sum_xlog2_of_diagonal
-      (Classical.diagonalState p hp).marginalA
+    exact MState.vonNeumann_eq_neg_sum_xlog2_of_diagonal
+      (Classical.diagonalState p hp).traceRight
       (fun m : M => (decodedPairMarginalAProb M p m : ℝ))
-      (diagonalDecodedPair_marginalA_matrix M p hp)
+      (diagonalDecodedPair_traceRight_matrix M p hp)
   have hB :
-      State.vonNeumann (Classical.diagonalState p hp).marginalB =
+      MState.vonNeumann (Classical.diagonalState p hp).traceLeft =
         classicalEntropy (decodedPairMarginalBProb M p) := by
     unfold classicalEntropy
-    exact State.vonNeumann_eq_neg_sum_xlog2_of_diagonal
-      (Classical.diagonalState p hp).marginalB
+    exact MState.vonNeumann_eq_neg_sum_xlog2_of_diagonal
+      (Classical.diagonalState p hp).traceLeft
       (fun m : M => (decodedPairMarginalBProb M p m : ℝ))
-      (diagonalDecodedPair_marginalB_matrix M p hp)
+      (diagonalDecodedPair_traceLeft_matrix M p hp)
   have hAB :
-      State.vonNeumann (Classical.diagonalState p hp) = classicalEntropy p :=
+      MState.vonNeumann (Classical.diagonalState p hp) = classicalEntropy p :=
     diagonalState_vonNeumann_eq_classicalEntropy p hp
   rw [hA, hB, hAB]
 
 /-- Conditional entropy of the first decoded-pair register given the second,
 written purely as finite classical entropies. -/
 def decodedPairConditionalEntropy
-    (M : Type u) [Fintype M] (p : Prod M M → ℝ≥0) : ℝ :=
+    (M : Type u) [Fintype M] (p : M × M → ℝ≥0) : ℝ :=
   classicalEntropy p - classicalEntropy (decodedPairMarginalBProb M p)
 
 /-- The unnormalized posterior fiber `m ↦ p(m, \hat m)` of a decoded-pair
 law at a fixed decoded value `\hat m`. -/
 def decodedPairFiberProb
-    (M : Type u) [Fintype M] (p : Prod M M → ℝ≥0) (mhat : M) : M → ℝ≥0 :=
+    (M : Type u) [Fintype M] (p : M × M → ℝ≥0) (mhat : M) : M → ℝ≥0 :=
   fun m => p (m, mhat)
 
 theorem decodedPairFiberProb_sum
-    (M : Type u) [Fintype M] (p : Prod M M → ℝ≥0) (mhat : M) :
+    (M : Type u) [Fintype M] (p : M × M → ℝ≥0) (mhat : M) :
     ∑ m : M, decodedPairFiberProb M p mhat m = decodedPairMarginalBProb M p mhat := by
   rfl
 
 /-- Classical entropy of a decoded-pair joint law decomposes as the sum of
 the entropies of its unnormalized posterior fibers. -/
 theorem classicalEntropy_decodedPair_eq_sum_fiber
-    (M : Type u) [Fintype M] (p : Prod M M → ℝ≥0) :
+    (M : Type u) [Fintype M] (p : M × M → ℝ≥0) :
     classicalEntropy p =
       ∑ mhat : M, classicalEntropy (decodedPairFiberProb M p mhat) := by
   unfold classicalEntropy decodedPairFiberProb
@@ -1153,7 +1140,7 @@ theorem classicalEntropy_decodedPair_eq_sum_fiber
 /-- Conditional entropy of a decoded-pair law as a sum of unnormalized
 posterior-fiber contributions. -/
 theorem decodedPairConditionalEntropy_eq_sum_fiber
-    (M : Type u) [Fintype M] (p : Prod M M → ℝ≥0) :
+    (M : Type u) [Fintype M] (p : M × M → ℝ≥0) :
     decodedPairConditionalEntropy M p =
       ∑ mhat : M,
         (classicalEntropy (decodedPairFiberProb M p mhat) +
@@ -1171,7 +1158,7 @@ finite inequality
 `H(M | \hat M) ≤ ε log₂ |M| - xlog₂ ε - xlog₂(1-ε)`. -/
 theorem decodedMessageFano_of_conditionalEntropy_le
     (M : Type u) [Fintype M] [DecidableEq M] [Nonempty M]
-    (p : Prod M M → ℝ≥0) (hp : ∑ pair : Prod M M, p pair = 1) (ε : ℝ)
+    (p : M × M → ℝ≥0) (hp : ∑ pair : M × M, p pair = 1) (ε : ℝ)
     (hmarg : decodedPairMarginalAProb M p = uniformMessageProb (M := M))
     (hcond :
       decodedPairConditionalEntropy M p ≤
@@ -1190,34 +1177,34 @@ theorem decodedMessageFano_of_conditionalEntropy_le
 
 /-- Equality-success probability of a classical decoded-pair law. -/
 def decodedPairSuccessProb
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0) : ℝ≥0 :=
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0) : ℝ≥0 :=
   ∑ m : M, p (m, m)
 
 /-- Error probability of a classical decoded-pair law. -/
 def decodedPairErrorProb
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0) : ℝ≥0 :=
-  ∑ pair : Prod M M, if pair.1 = pair.2 then 0 else p pair
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0) : ℝ≥0 :=
+  ∑ pair : M × M, if pair.1 = pair.2 then 0 else p pair
 
 /-- Correct mass in the posterior fiber indexed by a decoded value `\hat m`. -/
 def decodedPairFiberCorrectProb
-    (M : Type u) [Fintype M] (p : Prod M M → ℝ≥0) (mhat : M) : ℝ≥0 :=
+    (M : Type u) [Fintype M] (p : M × M → ℝ≥0) (mhat : M) : ℝ≥0 :=
   p (mhat, mhat)
 
 /-- Error mass in the posterior fiber indexed by a decoded value `\hat m`. -/
 def decodedPairFiberErrorProb
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0) (mhat : M) :
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0) (mhat : M) :
     ℝ≥0 :=
   ∑ m : M, if m = mhat then 0 else p (m, mhat)
 
 /-- The wrong-message subdistribution inside the posterior fiber indexed by
 `\hat m`, extended by zero at the correct message. -/
 def decodedPairFiberWrongProb
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0) (mhat : M) :
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0) (mhat : M) :
     M → ℝ≥0 :=
   fun m => if m = mhat then 0 else p (m, mhat)
 
 theorem decodedPairFiberWrongProb_sum
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0) (mhat : M) :
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0) (mhat : M) :
     ∑ m : M, decodedPairFiberWrongProb M p mhat m =
       decodedPairFiberErrorProb M p mhat := by
   rfl
@@ -1225,7 +1212,7 @@ theorem decodedPairFiberWrongProb_sum
 /-- A fiber's Shannon entropy splits into the correct-message atom and the
 wrong-message subdistribution. -/
 theorem classicalEntropy_decodedPairFiber_eq_correct_wrong
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0) (mhat : M) :
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0) (mhat : M) :
     classicalEntropy (decodedPairFiberProb M p mhat) =
       -xlog2 (decodedPairFiberCorrectProb M p mhat : ℝ) +
         classicalEntropy (decodedPairFiberWrongProb M p mhat) := by
@@ -1263,7 +1250,7 @@ theorem classicalEntropy_decodedPairFiber_eq_correct_wrong
 by its total error mass times `log₂ |M|`, plus the binary split term for that
 mass. -/
 theorem classicalEntropy_decodedPairFiberWrong_le
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0) (mhat : M) :
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0) (mhat : M) :
     classicalEntropy (decodedPairFiberWrongProb M p mhat) ≤
       -xlog2 (decodedPairFiberErrorProb M p mhat : ℝ) +
         (decodedPairFiberErrorProb M p mhat : ℝ) * log2 (Fintype.card M : ℝ) := by
@@ -1281,7 +1268,7 @@ theorem classicalEntropy_decodedPairFiberWrong_le
 
 /-- A posterior fiber splits into its correct mass and its error mass. -/
 theorem decodedPairFiberCorrect_add_errorProb
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0) (mhat : M) :
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0) (mhat : M) :
     decodedPairFiberCorrectProb M p mhat + decodedPairFiberErrorProb M p mhat =
       decodedPairMarginalBProb M p mhat := by
   unfold decodedPairFiberCorrectProb decodedPairFiberErrorProb decodedPairMarginalBProb
@@ -1303,8 +1290,8 @@ theorem decodedPairFiberCorrect_add_errorProb
 
 /-- The error mass in one decoded fiber is bounded by the total mass of that
 fiber. -/
-theorem decodedPairFiberErrorProb_le_marginalB
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0) (mhat : M) :
+theorem decodedPairFiberErrorProb_le_traceLeft
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0) (mhat : M) :
     (decodedPairFiberErrorProb M p mhat : ℝ) ≤
       (decodedPairMarginalBProb M p mhat : ℝ) := by
   have hsplit :
@@ -1316,8 +1303,8 @@ theorem decodedPairFiberErrorProb_le_marginalB
 
 /-- If a decoded fiber has zero total mass, then its correct and error masses
 are both zero. -/
-theorem decodedPairFiberCorrect_eq_zero_of_marginalB_eq_zero
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0) (mhat : M)
+theorem decodedPairFiberCorrect_eq_zero_of_traceLeft_eq_zero
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0) (mhat : M)
     (hmarg : decodedPairMarginalBProb M p mhat = 0) :
     decodedPairFiberCorrectProb M p mhat = 0 := by
   have hsplit := decodedPairFiberCorrect_add_errorProb M p mhat
@@ -1331,8 +1318,8 @@ theorem decodedPairFiberCorrect_eq_zero_of_marginalB_eq_zero
   · exact bot_le
 
 /-- If a decoded fiber has zero total mass, then its error mass is zero. -/
-theorem decodedPairFiberError_eq_zero_of_marginalB_eq_zero
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0) (mhat : M)
+theorem decodedPairFiberError_eq_zero_of_traceLeft_eq_zero
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0) (mhat : M)
     (hmarg : decodedPairMarginalBProb M p mhat = 0) :
     decodedPairFiberErrorProb M p mhat = 0 := by
   have hsplit := decodedPairFiberCorrect_add_errorProb M p mhat
@@ -1349,18 +1336,18 @@ theorem decodedPairFiberError_eq_zero_of_marginalB_eq_zero
 to `H(M|\hat M)` is controlled by the fiber error rate and the number of
 messages. -/
 theorem decodedPairFiberConditionalEntropy_le
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0) (mhat : M) :
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0) (mhat : M) :
     classicalEntropy (decodedPairFiberProb M p mhat) +
         xlog2 (decodedPairMarginalBProb M p mhat : ℝ) ≤
       (decodedPairMarginalBProb M p mhat : ℝ) *
-          binaryEntropyBits
+          binaryEntropy
             ((decodedPairFiberErrorProb M p mhat : ℝ) /
               (decodedPairMarginalBProb M p mhat : ℝ)) +
         (decodedPairFiberErrorProb M p mhat : ℝ) *
           log2 (Fintype.card M : ℝ) := by
   by_cases hmarg : decodedPairMarginalBProb M p mhat = 0
-  · have hcorr := decodedPairFiberCorrect_eq_zero_of_marginalB_eq_zero M p mhat hmarg
-    have herr := decodedPairFiberError_eq_zero_of_marginalB_eq_zero M p mhat hmarg
+  · have hcorr := decodedPairFiberCorrect_eq_zero_of_traceLeft_eq_zero M p mhat hmarg
+    have herr := decodedPairFiberError_eq_zero_of_traceLeft_eq_zero M p mhat hmarg
     have hfiber_zero :
         ∑ m : M, decodedPairFiberProb M p mhat m = 0 := by
       rw [decodedPairFiberProb_sum, hmarg]
@@ -1374,7 +1361,7 @@ theorem decodedPairFiberConditionalEntropy_le
     have herr_le_marg :
         (decodedPairFiberErrorProb M p mhat : ℝ) ≤
           (decodedPairMarginalBProb M p mhat : ℝ) :=
-      decodedPairFiberErrorProb_le_marginalB M p mhat
+      decodedPairFiberErrorProb_le_traceLeft M p mhat
     have hcorr_eq :
         (decodedPairFiberCorrectProb M p mhat : ℝ) =
           (decodedPairMarginalBProb M p mhat : ℝ) -
@@ -1401,7 +1388,7 @@ theorem decodedPairFiberConditionalEntropy_le
       linarith
     have hbinary :
         (decodedPairMarginalBProb M p mhat : ℝ) *
-            binaryEntropyBits
+            binaryEntropy
               ((decodedPairFiberErrorProb M p mhat : ℝ) /
                 (decodedPairMarginalBProb M p mhat : ℝ)) =
           -xlog2 (decodedPairFiberErrorProb M p mhat : ℝ) -
@@ -1409,7 +1396,7 @@ theorem decodedPairFiberConditionalEntropy_le
                 ((decodedPairMarginalBProb M p mhat : ℝ) -
                   (decodedPairFiberErrorProb M p mhat : ℝ)) +
             xlog2 (decodedPairMarginalBProb M p mhat : ℝ) :=
-      mul_binaryEntropyBits_div_eq herr_nonneg herr_le_marg hmarg_pos
+      mul_binaryEntropy_div_eq herr_nonneg herr_le_marg hmarg_pos
     rw [hcorr_eq] at hbase
     rw [hbinary]
     (convert hbase using 1; ring)
@@ -1417,7 +1404,7 @@ theorem decodedPairFiberConditionalEntropy_le
 /-- A single decoded fiber contributes at most its total mass times `log₂ |M|`
 to the conditional entropy. -/
 theorem decodedPairFiberConditionalEntropy_le_log_card
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0) (mhat : M) :
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0) (mhat : M) :
     classicalEntropy (decodedPairFiberProb M p mhat) +
         xlog2 (decodedPairMarginalBProb M p mhat : ℝ) ≤
       (decodedPairMarginalBProb M p mhat : ℝ) * log2 (Fintype.card M : ℝ) := by
@@ -1437,7 +1424,7 @@ theorem decodedPairFiberConditionalEntropy_le_log_card
 
 /-- Total decoded-pair error is the sum of posterior-fiber error masses. -/
 theorem decodedPairErrorProb_eq_sum_fiberError
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0) :
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0) :
     decodedPairErrorProb M p =
       ∑ mhat : M, decodedPairFiberErrorProb M p mhat := by
   unfold decodedPairErrorProb decodedPairFiberErrorProb
@@ -1446,8 +1433,8 @@ theorem decodedPairErrorProb_eq_sum_fiberError
 
 /-- The decoded-pair error probability is the decoded-marginal weighted average
 of the posterior fiber error rates.  Zero-mass decoded fibers contribute zero. -/
-theorem decodedPairErrorProb_eq_sum_marginalB_mul_errorRate
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0) :
+theorem decodedPairErrorProb_eq_sum_traceLeft_mul_errorRate
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0) :
     (decodedPairErrorProb M p : ℝ) =
       ∑ mhat : M,
         (decodedPairMarginalBProb M p mhat : ℝ) *
@@ -1465,22 +1452,22 @@ theorem decodedPairErrorProb_eq_sum_marginalB_mul_errorRate
           refine Finset.sum_congr rfl ?_
           intro mhat _
           by_cases hmarg : decodedPairMarginalBProb M p mhat = 0
-          · have herr := decodedPairFiberError_eq_zero_of_marginalB_eq_zero M p mhat hmarg
+          · have herr := decodedPairFiberError_eq_zero_of_traceLeft_eq_zero M p mhat hmarg
             simp [hmarg, herr]
           · have hmarg_ne : (decodedPairMarginalBProb M p mhat : ℝ) ≠ 0 := by
               exact_mod_cast hmarg
             field_simp [hmarg_ne]
 
 /-- Weighted Jensen step for decoded-pair posterior binary entropies. -/
-theorem decodedPair_weighted_binaryEntropyBits_le
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0)
-    (hp : ∑ pair : Prod M M, p pair = 1) :
+theorem decodedPair_weighted_binaryEntropy_le
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0)
+    (hp : ∑ pair : M × M, p pair = 1) :
     ∑ mhat : M,
         (decodedPairMarginalBProb M p mhat : ℝ) *
-          binaryEntropyBits
+          binaryEntropy
             ((decodedPairFiberErrorProb M p mhat : ℝ) /
               (decodedPairMarginalBProb M p mhat : ℝ)) ≤
-      binaryEntropyBits (decodedPairErrorProb M p : ℝ) := by
+      binaryEntropy (decodedPairErrorProb M p : ℝ) := by
   classical
   let w : M → ℝ := fun mhat => (decodedPairMarginalBProb M p mhat : ℝ)
   let t : M → ℝ := fun mhat =>
@@ -1500,25 +1487,25 @@ theorem decodedPair_weighted_binaryEntropyBits_le
   have ht_le_one : ∀ mhat : M, t mhat ≤ 1 := by
     intro mhat
     by_cases hmarg : decodedPairMarginalBProb M p mhat = 0
-    · have herr := decodedPairFiberError_eq_zero_of_marginalB_eq_zero M p mhat hmarg
+    · have herr := decodedPairFiberError_eq_zero_of_traceLeft_eq_zero M p mhat hmarg
       simp [t, hmarg, herr]
     · have hmarg_pos : 0 < (decodedPairMarginalBProb M p mhat : ℝ) := by
         exact_mod_cast (pos_iff_ne_zero.mpr hmarg)
       have herr_le_marg :=
-        decodedPairFiberErrorProb_le_marginalB M p mhat
+        decodedPairFiberErrorProb_le_traceLeft M p mhat
       simpa [t] using (div_le_one hmarg_pos).mpr herr_le_marg
-  have hj := binaryEntropyBits_weighted_sum_le
+  have hj := binaryEntropy_weighted_sum_le
     (w := w) (t := t) hw_nonneg hw_sum ht_nonneg ht_le_one
   have hmean :
       ∑ mhat : M, w mhat * t mhat = (decodedPairErrorProb M p : ℝ) := by
-    rw [← decodedPairErrorProb_eq_sum_marginalB_mul_errorRate M p]
+    rw [← decodedPairErrorProb_eq_sum_traceLeft_mul_errorRate M p]
   simpa [w, t, hmean] using hj
 
 /-- Decoded-pair Fano conditional-entropy bound at the actual decoded error
 probability. -/
 theorem decodedPairConditionalEntropy_le_actualError
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0)
-    (hp : ∑ pair : Prod M M, p pair = 1) :
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0)
+    (hp : ∑ pair : M × M, p pair = 1) :
     decodedPairConditionalEntropy M p ≤
       (decodedPairErrorProb M p : ℝ) * log2 (Fintype.card M : ℝ) -
         xlog2 (decodedPairErrorProb M p : ℝ) -
@@ -1530,7 +1517,7 @@ theorem decodedPairConditionalEntropy_le_actualError
             xlog2 (decodedPairMarginalBProb M p mhat : ℝ)) ≤
         ∑ mhat : M,
           ((decodedPairMarginalBProb M p mhat : ℝ) *
-              binaryEntropyBits
+              binaryEntropy
                 ((decodedPairFiberErrorProb M p mhat : ℝ) /
                   (decodedPairMarginalBProb M p mhat : ℝ)) +
             (decodedPairFiberErrorProb M p mhat : ℝ) *
@@ -1538,7 +1525,7 @@ theorem decodedPairConditionalEntropy_le_actualError
     refine Finset.sum_le_sum ?_
     intro mhat _
     exact decodedPairFiberConditionalEntropy_le M p mhat
-  have hbin := decodedPair_weighted_binaryEntropyBits_le M p hp
+  have hbin := decodedPair_weighted_binaryEntropy_le M p hp
   have herr_sum :
       ∑ mhat : M,
           (decodedPairFiberErrorProb M p mhat : ℝ) *
@@ -1554,7 +1541,7 @@ theorem decodedPairConditionalEntropy_le_actualError
           xlog2 (decodedPairMarginalBProb M p mhat : ℝ)) ≤
         ∑ mhat : M,
           ((decodedPairMarginalBProb M p mhat : ℝ) *
-              binaryEntropyBits
+              binaryEntropy
                 ((decodedPairFiberErrorProb M p mhat : ℝ) /
                   (decodedPairMarginalBProb M p mhat : ℝ)) +
             (decodedPairFiberErrorProb M p mhat : ℝ) *
@@ -1562,7 +1549,7 @@ theorem decodedPairConditionalEntropy_le_actualError
     _ =
         (∑ mhat : M,
           (decodedPairMarginalBProb M p mhat : ℝ) *
-              binaryEntropyBits
+              binaryEntropy
                 ((decodedPairFiberErrorProb M p mhat : ℝ) /
                   (decodedPairMarginalBProb M p mhat : ℝ))) +
           ∑ mhat : M,
@@ -1570,21 +1557,21 @@ theorem decodedPairConditionalEntropy_le_actualError
               log2 (Fintype.card M : ℝ) := by
           rw [Finset.sum_add_distrib]
     _ ≤
-        binaryEntropyBits (decodedPairErrorProb M p : ℝ) +
+        binaryEntropy (decodedPairErrorProb M p : ℝ) +
           (decodedPairErrorProb M p : ℝ) * log2 (Fintype.card M : ℝ) := by
           exact add_le_add hbin (le_of_eq herr_sum)
     _ =
         (decodedPairErrorProb M p : ℝ) * log2 (Fintype.card M : ℝ) -
           xlog2 (decodedPairErrorProb M p : ℝ) -
           xlog2 (1 - (decodedPairErrorProb M p : ℝ)) := by
-          unfold binaryEntropyBits
+          unfold binaryEntropy
           ring
 
 /-- Decoded-pair conditional entropy is bounded by the logarithm of the
 transmitted-message alphabet. -/
 theorem decodedPairConditionalEntropy_le_log_card
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0)
-    (hp : ∑ pair : Prod M M, p pair = 1) :
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0)
+    (hp : ∑ pair : M × M, p pair = 1) :
     decodedPairConditionalEntropy M p ≤ log2 (Fintype.card M : ℝ) := by
   have hfiber_sum := decodedPairConditionalEntropy_eq_sum_fiber M p
   have hfiber_bound :
@@ -1611,31 +1598,31 @@ theorem decodedPairConditionalEntropy_le_log_card
 /-- The decoded-pair success probability plus error probability is the total
 mass of the joint law. -/
 theorem decodedPairSuccessProb_add_errorProb
-    (M : Type u) [Fintype M] [DecidableEq M] (p : Prod M M → ℝ≥0) :
-    decodedPairSuccessProb M p + decodedPairErrorProb M p = ∑ pair : Prod M M, p pair := by
+    (M : Type u) [Fintype M] [DecidableEq M] (p : M × M → ℝ≥0) :
+    decodedPairSuccessProb M p + decodedPairErrorProb M p = ∑ pair : M × M, p pair := by
   classical
   unfold decodedPairSuccessProb decodedPairErrorProb
   calc
     (∑ m : M, p (m, m)) +
-        ∑ pair : Prod M M, (if pair.1 = pair.2 then 0 else p pair) =
-        (∑ pair : Prod M M, if pair.1 = pair.2 then p pair else 0) +
-          ∑ pair : Prod M M, (if pair.1 = pair.2 then 0 else p pair) := by
+        ∑ pair : M × M, (if pair.1 = pair.2 then 0 else p pair) =
+        (∑ pair : M × M, if pair.1 = pair.2 then p pair else 0) +
+          ∑ pair : M × M, (if pair.1 = pair.2 then 0 else p pair) := by
           congr 1
           rw [Fintype.sum_prod_type]
           refine Finset.sum_congr rfl ?_
           intro m _
           simp
-    _ = ∑ pair : Prod M M,
+    _ = ∑ pair : M × M,
           ((if pair.1 = pair.2 then p pair else 0) +
             if pair.1 = pair.2 then 0 else p pair) := by
           rw [Finset.sum_add_distrib]
-    _ = ∑ pair : Prod M M, p pair := by
+    _ = ∑ pair : M × M, p pair := by
           refine Finset.sum_congr rfl ?_
           intro pair _
           by_cases hpair : pair.1 = pair.2 <;> simp [hpair]
 
 /-- The uniform decoded-message law has uniform transmitted-message marginal. -/
-theorem uniformDecodedMessageProb_marginalA
+theorem uniformDecodedMessageProb_traceRight
     (n : ℕ) (M : Type u) [Fintype M] [DecidableEq M] [Nonempty M]
     (C : HSWClassicalCode N n M) :
     decodedPairMarginalAProb M (uniformDecodedMessageProb N n M C) =
@@ -1707,7 +1694,7 @@ The source probability range `0 ≤ ε ≤ 1` and the classical decoded-pair
 assumptions are explicit. -/
 def decodedMessageFano_statement
     (M : Type u) [Fintype M] [DecidableEq M] [Nonempty M] : Prop :=
-  ∀ (p : Prod M M → ℝ≥0) (hp : ∑ pair : Prod M M, p pair = 1) (ε : ℝ),
+  ∀ (p : M × M → ℝ≥0) (hp : ∑ pair : M × M, p pair = 1) (ε : ℝ),
     decodedPairMarginalAProb M p = uniformMessageProb (M := M) →
     (decodedPairErrorProb M p : ℝ) ≤ ε →
     0 ≤ ε → ε ≤ 1 →
@@ -1785,7 +1772,7 @@ theorem hswCode_randomnessDistribution_of_decodedMessageFano
       (1 - ε) * log2 (Fintype.card M : ℝ) + xlog2 ε + xlog2 (1 - ε) ≤
         mutualInformation (uniformDecodedMessageState N n M C) :=
     hFano (uniformDecodedMessageProb N n M C) (uniformDecodedMessageProb_sum N n M C) ε
-      (uniformDecodedMessageProb_marginalA N n M C)
+      (uniformDecodedMessageProb_traceRight N n M C)
       (uniformDecodedMessageProb_error_le_of_maxErrorAtMost N n M C hC) hε0 hε1
   exact hdecoded.trans (mutualInformation_uniformDecodedMessageState_le_cqChannelOutputState N n M C)
 

@@ -13,9 +13,7 @@ public import QuantumLib.QIT.Coding.EntanglementAssisted.Asymptotic.Upper.Assemb
 # Asymptotic upper-bound public facade
 
 This module is part of the entanglement-assisted classical communication
-asymptotic proof spine.  It was split out mechanically from the historical
-`EntanglementAssistedAsymptotic` files; theorem statements and proof routes are
-unchanged.
+asymptotic proof spine.
 -/
 
 @[expose] public section
@@ -23,18 +21,18 @@ unchanged.
 open scoped ComplexOrder MatrixOrder NNReal Topology
 open Filter
 
-namespace QIT
-
 universe u v w x y
 
 noncomputable section
 
+namespace CPTPOp
+
+open QIT
+
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-namespace Channel
-
-variable (N : Channel a b)
+variable (N : CPTPMap a b)
 
 /-- The two finite-block, per-code upper bounds in the Khatri--Wilde
 entanglement-assisted converse route.
@@ -87,7 +85,7 @@ sandwiched-Renyi route.
 
 This closes the source-shaped route in Chapters/EA_capacity.tex:1902-1906: the
 one-shot upper bound is lifted to all blocklengths, the sandwiched-Renyi channel
-quantity is additive and tends to `I(N)` as `α -> 1+`, and the lower-bound
+quantity is additive and tends to `I(N)` as `α → 1+`, and the lower-bound
 achievability theorem supplies the nonempty achievable-rate set needed for the
 capacity inequalities. -/
 theorem entanglementAssisted_asymptoticUpperBounds_of_sandwichedLimit
@@ -142,8 +140,6 @@ theorem entanglementAssisted_capacity_and_strongConverseCapacity_eq_information_
     (N.entanglementAssisted_sourceConverseWitnessFamily_of_sourceAsymptoticUpperInput
       (N.entanglementAssisted_sourceAsymptoticUpperInput_of_sandwichedLimit))
 
-end Channel
+end CPTPOp
 
 end
-
-end QIT

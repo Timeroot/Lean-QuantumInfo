@@ -52,19 +52,8 @@ theorem exists_logical_weight_eq_distance (h : ∃ g, S.IsLogical g) :
 have a detectable "difference" `E⁻¹F`, hence are jointly correctable. -/
 theorem detectable_of_le_half_distance {t : ℕ} {E F : PauliOp n}
     (hE : weight E ≤ t) (hF : weight F ≤ t) (hd : 2 * t < S.distance) :
-    S.Detectable (E⁻¹ * F) := by
-  apply S.detectable_of_weight_lt_distance
-  calc weight (E⁻¹ * F) ≤ weight E⁻¹ + weight F := weight_mul_le _ _
-    _ = weight E + weight F := by rw [weight_inv]
-    _ ≤ t + t := by omega
-    _ = 2 * t := by ring
-    _ < S.distance := hd
-
-/-- A code of distance `d` corrects all errors of weight `≤ ⌊(d-1)/2⌋`. -/
-theorem corrects_of_two_mul_lt_distance {E F : PauliOp n}
-    (hE : 2 * weight E < S.distance) (hF : 2 * weight F < S.distance) :
-    S.Detectable (E⁻¹ * F) := by
-      exact StabGroup.detectable_mul_of_weight_lt S hE hF
+    S.Detectable (E⁻¹ * F) :=
+  S.detectable_mul_of_weight_lt (by omega) (by omega)
 
 /-- Being logical is unaffected by multiplying by a phase, which is central and acts trivially on
 the code space. -/

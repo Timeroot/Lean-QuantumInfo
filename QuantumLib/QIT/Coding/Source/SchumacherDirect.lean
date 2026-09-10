@@ -28,74 +28,70 @@ closing section for the detailed proof outline.
 
 open scoped ComplexOrder MatrixOrder Kronecker
 
-namespace QIT
-
-open Filter
-
-universe u v
-
 noncomputable section
-
+open Filter
+universe u v
 attribute [local instance] Classical.propDecidable
-
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
-namespace State
+open QIT
+
+namespace MState
 
 /-- The compressed register for typical-subspace compression: the subtype of
 `ρ^{⊗ n}` eigenvalue indices whose eigenvalue is `(n, δ)`-typical. -/
-def TypicalSubspaceIndex (ρ : State a) (n : ℕ) (δ : ℝ) : Type u :=
+def TypicalSubspaceIndex (ρ : MState a) (n : ℕ) (δ : ℝ) : Type u :=
   { i : TensorPower a n // typicalEigenvalue ρ n δ
-      ((ρ.tensorPower n).pos.isHermitian.eigenvalues i) }
+      ((ρ.tensorPower n).psd.isHermitian.eigenvalues i) }
 
-instance (ρ : State a) (n : ℕ) (δ : ℝ) :
+instance (ρ : MState a) (n : ℕ) (δ : ℝ) :
     Fintype (TypicalSubspaceIndex ρ n δ) :=
   inferInstanceAs (Fintype { i : TensorPower a n // typicalEigenvalue ρ n δ
-      ((ρ.tensorPower n).pos.isHermitian.eigenvalues i) })
+      ((ρ.tensorPower n).psd.isHermitian.eigenvalues i) })
 
-instance (ρ : State a) (n : ℕ) (δ : ℝ) :
+instance (ρ : MState a) (n : ℕ) (δ : ℝ) :
     DecidableEq (TypicalSubspaceIndex ρ n δ) :=
   inferInstanceAs (DecidableEq { i : TensorPower a n // typicalEigenvalue ρ n δ
-      ((ρ.tensorPower n).pos.isHermitian.eigenvalues i) })
+      ((ρ.tensorPower n).psd.isHermitian.eigenvalues i) })
 
 /-- The atypical eigenvalue indices, indexing the encoder's correction Kraus. -/
-def AtypicalSubspaceIndex (ρ : State a) (n : ℕ) (δ : ℝ) : Type u :=
+def AtypicalSubspaceIndex (ρ : MState a) (n : ℕ) (δ : ℝ) : Type u :=
   { i : TensorPower a n // ¬ typicalEigenvalue ρ n δ
-      ((ρ.tensorPower n).pos.isHermitian.eigenvalues i) }
+      ((ρ.tensorPower n).psd.isHermitian.eigenvalues i) }
 
-instance (ρ : State a) (n : ℕ) (δ : ℝ) :
+instance (ρ : MState a) (n : ℕ) (δ : ℝ) :
     Fintype (AtypicalSubspaceIndex ρ n δ) :=
   inferInstanceAs (Fintype { i : TensorPower a n // ¬ typicalEigenvalue ρ n δ
-      ((ρ.tensorPower n).pos.isHermitian.eigenvalues i) })
+      ((ρ.tensorPower n).psd.isHermitian.eigenvalues i) })
 
-instance (ρ : State a) (n : ℕ) (δ : ℝ) :
+instance (ρ : MState a) (n : ℕ) (δ : ℝ) :
     DecidableEq (AtypicalSubspaceIndex ρ n δ) :=
   inferInstanceAs (DecidableEq { i : TensorPower a n // ¬ typicalEigenvalue ρ n δ
-      ((ρ.tensorPower n).pos.isHermitian.eigenvalues i) })
+      ((ρ.tensorPower n).psd.isHermitian.eigenvalues i) })
 
 /-- The eigenbasis unitary of `ρ^{⊗ n}` (columns are orthonormal eigenvectors). -/
-def tensorPowerEigenvectorUnitary (ρ : State a) (n : ℕ) : CMatrix (TensorPower a n) :=
-  (ρ.tensorPower n).pos.isHermitian.eigenvectorUnitary
+def tensorPowerEigenvectorUnitary (ρ : MState a) (n : ℕ) : CMatrix (TensorPower a n) :=
+  (ρ.tensorPower n).psd.isHermitian.eigenvectorUnitary
 
 /-- The eigenvalue mask selecting typical indices in the eigenbasis. -/
-def typicalEigenvalueMask (ρ : State a) (n : ℕ) (δ : ℝ) :
+def typicalEigenvalueMask (ρ : MState a) (n : ℕ) (δ : ℝ) :
     TensorPower a n → ℂ :=
   fun i => if typicalEigenvalue ρ n δ
-      ((ρ.tensorPower n).pos.isHermitian.eigenvalues i) then 1 else 0
+      ((ρ.tensorPower n).psd.isHermitian.eigenvalues i) then 1 else 0
 
 /-- The typical-subspace isometry `V : An → W`, selecting the typical columns
 of the eigenbasis unitary. -/
-def typicalIsometry (ρ : State a) (n : ℕ) (δ : ℝ) :
+def typicalIsometry (ρ : MState a) (n : ℕ) (δ : ℝ) :
     Matrix (TensorPower a n) (TypicalSubspaceIndex ρ n δ) ℂ :=
   (tensorPowerEigenvectorUnitary ρ n).submatrix (fun x => x) Subtype.val
 
 /-- Entries of the typical-subspace isometry are eigenbasis entries. -/
-theorem typicalIsometry_apply (ρ : State a) (n : ℕ) (δ : ℝ)
+theorem typicalIsometry_apply (ρ : MState a) (n : ℕ) (δ : ℝ)
     (i : TensorPower a n) (j : TypicalSubspaceIndex ρ n δ) :
     typicalIsometry ρ n δ i j = tensorPowerEigenvectorUnitary ρ n i j.val := rfl
 
 /-- Entries of the adjoint typical-subspace isometry are eigenbasis entries. -/
-theorem conjTranspose_typicalIsometry_apply (ρ : State a) (n : ℕ) (δ : ℝ)
+theorem conjTranspose_typicalIsometry_apply (ρ : MState a) (n : ℕ) (δ : ℝ)
     (j : TypicalSubspaceIndex ρ n δ) (i : TensorPower a n) :
     Matrix.conjTranspose (typicalIsometry ρ n δ) j i =
       Matrix.conjTranspose (tensorPowerEigenvectorUnitary ρ n) j.val i := rfl
@@ -117,7 +113,7 @@ private theorem sum_subtype_val_eq_indicator {α : Type u} {β : Type v}
   rw [h1, h2, add_zero]
 
 /-- The cardinality of the typical register equals the trace-count dimension. -/
-theorem card_typicalSubspaceIndex (ρ : State a) (n : ℕ) (δ : ℝ) :
+theorem card_typicalSubspaceIndex (ρ : MState a) (n : ℕ) (δ : ℝ) :
     (Fintype.card (TypicalSubspaceIndex ρ n δ) : ℝ) =
       ρ.typicalSubspaceDimension n δ := by
   classical
@@ -126,13 +122,13 @@ theorem card_typicalSubspaceIndex (ρ : State a) (n : ℕ) (δ : ℝ) :
     rw [Fintype.card, Finset.card_eq_sum_ones, Nat.cast_sum, Nat.cast_one]
   have h := sum_subtype_val_eq_indicator
     (p := fun i => typicalEigenvalue ρ n δ
-      ((ρ.tensorPower n).pos.isHermitian.eigenvalues i))
+      ((ρ.tensorPower n).psd.isHermitian.eigenvalues i))
     (fun _ : TensorPower a n => (1 : ℝ))
   rw [hcard]
   exact h
 
 /-- `V† V = I_W`: the typical columns of a unitary are orthonormal. -/
-theorem typicalIsometry_conjTranspose_mul_self (ρ : State a) (n : ℕ) (δ : ℝ) :
+theorem typicalIsometry_conjTranspose_mul_self (ρ : MState a) (n : ℕ) (δ : ℝ) :
     Matrix.conjTranspose (typicalIsometry ρ n δ) * typicalIsometry ρ n δ = 1 := by
   classical
   let U : CMatrix (TensorPower a n) := tensorPowerEigenvectorUnitary ρ n
@@ -159,7 +155,7 @@ theorem typicalIsometry_conjTranspose_mul_self (ρ : State a) (n : ℕ) (δ : �
     simp [hjk, hne]
 
 /-- `typicalSubspaceProjector` unfolds to the eigenbasis conjugated mask. -/
-theorem typicalSubspaceProjector_eq (ρ : State a) (n : ℕ) (δ : ℝ) :
+theorem typicalSubspaceProjector_eq (ρ : MState a) (n : ℕ) (δ : ℝ) :
     ρ.typicalSubspaceProjector n δ =
       tensorPowerEigenvectorUnitary ρ n *
         Matrix.diagonal (typicalEigenvalueMask ρ n δ) *
@@ -184,7 +180,7 @@ private theorem matrix_mul_diagonal_mul_conjTranspose_apply
   ring
 
 /-- `V V† = Pi`: the typical-column outer product is the typical projector. -/
-theorem typicalIsometry_mul_conjTranspose (ρ : State a) (n : ℕ) (δ : ℝ) :
+theorem typicalIsometry_mul_conjTranspose (ρ : MState a) (n : ℕ) (δ : ℝ) :
     typicalIsometry ρ n δ * Matrix.conjTranspose (typicalIsometry ρ n δ) =
       ρ.typicalSubspaceProjector n δ := by
   classical
@@ -196,32 +192,32 @@ theorem typicalIsometry_mul_conjTranspose (ρ : State a) (n : ℕ) (δ : ℝ) :
       tensorPowerEigenvectorUnitary ρ n i x.val *
       Matrix.conjTranspose (tensorPowerEigenvectorUnitary ρ n) x.val i') =
       ∑ k : TensorPower a n,
-        (if typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues k)
+        (if typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues k)
           then tensorPowerEigenvectorUnitary ρ n i k *
             Matrix.conjTranspose (tensorPowerEigenvectorUnitary ρ n) k i' else 0) := by
     exact sum_subtype_val_eq_indicator
       (p := fun j => typicalEigenvalue ρ n δ
-        ((ρ.tensorPower n).pos.isHermitian.eigenvalues j))
+        ((ρ.tensorPower n).psd.isHermitian.eigenvalues j))
       (fun j => tensorPowerEigenvectorUnitary ρ n i j *
         Matrix.conjTranspose (tensorPowerEigenvectorUnitary ρ n) j i')
   rw [hconv]
   simp only [typicalEigenvalueMask]
   apply Finset.sum_congr rfl
   intro k _
-  by_cases hk : typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues k)
+  by_cases hk : typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues k)
   · simp only [hk, if_true, one_mul]
   · simp only [hk, if_false, zero_mul]
 
 /-- The encoder's atypical-correction Kraus operator `K_l = |i₀⟩⟨φ_l|`, where
 `|φ_l⟩` is the `l`-th atypical eigenvector of `ρ^{⊗ n}`. -/
-def atypicalEncoderKraus (ρ : State a) (n : ℕ) (δ : ℝ)
+def atypicalEncoderKraus (ρ : MState a) (n : ℕ) (δ : ℝ)
     (i0 : TypicalSubspaceIndex ρ n δ) (l : AtypicalSubspaceIndex ρ n δ) :
     Matrix (TypicalSubspaceIndex ρ n δ) (TensorPower a n) ℂ :=
   fun w j => if w = i0 then
     star (tensorPowerEigenvectorUnitary ρ n j l.val) else 0
 
 /-- The encoder's full Kraus family: `{V†} ∪ {K_l : l atypical}`. -/
-def typicalEncoderKraus (ρ : State a) (n : ℕ) (δ : ℝ)
+def typicalEncoderKraus (ρ : MState a) (n : ℕ) (δ : ℝ)
     (i0 : TypicalSubspaceIndex ρ n δ) :
     (Unit ⊕ AtypicalSubspaceIndex ρ n δ) →
       Matrix (TypicalSubspaceIndex ρ n δ) (TensorPower a n) ℂ :=
@@ -230,7 +226,7 @@ def typicalEncoderKraus (ρ : State a) (n : ℕ) (δ : ℝ)
     | Sum.inr l => atypicalEncoderKraus ρ n δ i0 l
 
 /-- The encoder Kraus family is trace-preserving (`Σ_e K_e† K_e = I`). -/
-theorem typicalEncoderKraus_krausAdjoint_one (ρ : State a) (n : ℕ) (δ : ℝ)
+theorem typicalEncoderKraus_krausAdjoint_one (ρ : MState a) (n : ℕ) (δ : ℝ)
     (i0 : TypicalSubspaceIndex ρ n δ) :
     MatrixMap.krausAdjoint (typicalEncoderKraus ρ n δ i0) (1 : CMatrix _) = 1 := by
   classical
@@ -238,13 +234,13 @@ theorem typicalEncoderKraus_krausAdjoint_one (ρ : State a) (n : ℕ) (δ : ℝ)
   have hUU : U * Matrix.conjTranspose U = 1 := Unitary.coe_mul_star_self _
   have hPient : ∀ i i', ρ.typicalSubspaceProjector n δ i i' =
       ∑ k : TensorPower a n,
-        (if typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues k)
+        (if typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues k)
           then U i k * Matrix.conjTranspose U k i' else 0) := by
     intro i i'
     rw [typicalSubspaceProjector_eq, matrix_mul_diagonal_mul_conjTranspose_apply]
     apply Finset.sum_congr rfl
     intro k _
-    by_cases hk : typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues k)
+    by_cases hk : typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues k)
     · simp only [hk, typicalEigenvalueMask, if_true, one_mul]
       rfl
     · simp only [hk, typicalEigenvalueMask, if_false, zero_mul]
@@ -253,7 +249,7 @@ theorem typicalEncoderKraus_krausAdjoint_one (ρ : State a) (n : ℕ) (δ : ℝ)
         ((Matrix.conjTranspose (atypicalEncoderKraus ρ n δ i0 l) *
             atypicalEncoderKraus ρ n δ i0 l)) i i' =
         ∑ k : TensorPower a n,
-          (if ¬ typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues k)
+          (if ¬ typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues k)
             then U i k * Matrix.conjTranspose U k i' else 0) := by
     intro i i'
     have hstep : ∑ l : AtypicalSubspaceIndex ρ n δ,
@@ -275,7 +271,7 @@ theorem typicalEncoderKraus_krausAdjoint_one (ρ : State a) (n : ℕ) (δ : ℝ)
     rw [hstep]
     exact sum_subtype_val_eq_indicator
       (p := fun k => ¬ typicalEigenvalue ρ n δ
-        ((ρ.tensorPower n).pos.isHermitian.eigenvalues k))
+        ((ρ.tensorPower n).psd.isHermitian.eigenvalues k))
       (fun k => U i k * Matrix.conjTranspose U k i')
   ext i i'
   simp only [MatrixMap.krausAdjoint, Matrix.mul_one, Matrix.sum_apply,
@@ -287,39 +283,39 @@ theorem typicalEncoderKraus_krausAdjoint_one (ρ : State a) (n : ℕ) (δ : ℝ)
   rw [← Finset.sum_add_distrib, ← hUU, Matrix.mul_apply]
   apply Finset.sum_congr rfl
   intro k _
-  by_cases hk : typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues k)
-  · have hnk : ¬ ¬ typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues k) :=
+  by_cases hk : typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues k)
+  · have hnk : ¬ ¬ typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues k) :=
       fun h => h hk
     simp only [if_pos hk, if_neg hnk, add_zero]
   · simp only [if_neg hk, if_pos hk, zero_add]
 
 /-- The decoder: isometry channel with single Kraus `V`. -/
-def typicalDecoder (ρ : State a) (n : ℕ) (δ : ℝ) :
-    Channel (TypicalSubspaceIndex ρ n δ) (TensorPower a n) where
-  map := MatrixMap.ofKraus (fun _ : Unit => typicalIsometry ρ n δ)
-  completelyPositive := MatrixMap.ofKraus_completelyPositive _
-  tracePreserving := MatrixMap.ofKraus_isTracePreserving_of_krausAdjoint_one _
-    (by show ∑ _ : Unit, Matrix.conjTranspose (typicalIsometry ρ n δ) * (1 : CMatrix _) *
-          typicalIsometry ρ n δ = 1
-        simp [Matrix.mul_one,
-          typicalIsometry_conjTranspose_mul_self])
-  mapsPositive := MatrixMap.ofKraus_mapsPositive _
+def typicalDecoder (ρ : MState a) (n : ℕ) (δ : ℝ) :
+    CPTPMap (TypicalSubspaceIndex ρ n δ) (TensorPower a n) :=
+  CPTPOp.ofMat
+    (MatrixMap.ofKraus (fun _ : Unit => typicalIsometry ρ n δ))
+    (MatrixMap.ofKraus_completelyPositive _)
+    (MatrixMap.ofKraus_isTracePreserving_of_krausAdjoint_one _
+      (by show ∑ _ : Unit, Matrix.conjTranspose (typicalIsometry ρ n δ) * (1 : CMatrix _) *
+            typicalIsometry ρ n δ = 1
+          simp [Matrix.mul_one,
+            typicalIsometry_conjTranspose_mul_self]))
 
 /-- The encoder: Wilde's typical-subspace compression channel. -/
-def typicalEncoder (ρ : State a) (n : ℕ) (δ : ℝ)
+def typicalEncoder (ρ : MState a) (n : ℕ) (δ : ℝ)
     (i0 : TypicalSubspaceIndex ρ n δ) :
-    Channel (TensorPower a n) (TypicalSubspaceIndex ρ n δ) where
-  map := MatrixMap.ofKraus (typicalEncoderKraus ρ n δ i0)
-  completelyPositive := MatrixMap.ofKraus_completelyPositive _
-  tracePreserving := MatrixMap.ofKraus_isTracePreserving_of_krausAdjoint_one _
-    (typicalEncoderKraus_krausAdjoint_one ρ n δ i0)
-  mapsPositive := MatrixMap.ofKraus_mapsPositive _
+    CPTPMap (TensorPower a n) (TypicalSubspaceIndex ρ n δ) :=
+  CPTPOp.ofMat
+    (MatrixMap.ofKraus (typicalEncoderKraus ρ n δ i0))
+    (MatrixMap.ofKraus_completelyPositive _)
+    (MatrixMap.ofKraus_isTracePreserving_of_krausAdjoint_one _
+      (typicalEncoderKraus_krausAdjoint_one ρ n δ i0))
 
 /-- An atypical correction branch vanishes after the typical-support decoder.
 The corresponding columns of the eigenbasis unitary have disjoint typicality
 predicates, hence are orthogonal. -/
 private theorem atypicalEncoderKraus_mul_typicalIsometry
-    (ρ : State a) (n : ℕ) (δ : ℝ)
+    (ρ : MState a) (n : ℕ) (δ : ℝ)
     (i0 : TypicalSubspaceIndex ρ n δ)
     (l : AtypicalSubspaceIndex ρ n δ) :
     atypicalEncoderKraus ρ n δ i0 l * typicalIsometry ρ n δ = 0 := by
@@ -342,13 +338,13 @@ private theorem atypicalEncoderKraus_mul_typicalIsometry
 /-- Schumacher compression is lossless on the typical register: decoding into
 the typical support and immediately re-encoding is the identity channel. -/
 theorem typicalEncoder_comp_typicalDecoder_eq_idChannel
-    (ρ : State a) (n : ℕ) (δ : ℝ)
+    (ρ : MState a) (n : ℕ) (δ : ℝ)
     (i0 : TypicalSubspaceIndex ρ n δ) :
-    (typicalEncoder ρ n δ i0).comp (typicalDecoder ρ n δ) =
-      Channel.idChannel (TypicalSubspaceIndex ρ n δ) := by
-  rw [Channel.mk.injEq]
-  show (MatrixMap.ofKraus (typicalEncoderKraus ρ n δ i0)).comp
-      (MatrixMap.ofKraus (fun _ : Unit => typicalIsometry ρ n δ)) = _
+    (typicalEncoder ρ n δ i0) ∘ₘ (typicalDecoder ρ n δ) =
+      CPTPOp.id (dIn := TypicalSubspaceIndex ρ n δ) := by
+  refine CPTPOp.ext_map ?_
+  rw [CPTPOp.compose_map]
+  simp only [typicalEncoder, typicalDecoder, CPTPOp.map_ofMat]
   rw [MatrixMap.ofKraus_comp_ofKraus]
   ext X i j
   simp only [MatrixMap.ofKraus, LinearMap.coe_mk, AddHom.coe_mk,
@@ -359,10 +355,10 @@ theorem typicalEncoder_comp_typicalDecoder_eq_idChannel
   have hatyp : ∀ l : AtypicalSubspaceIndex ρ n δ,
       atypicalEncoderKraus ρ n δ i0 l * typicalIsometry ρ n δ = 0 :=
     atypicalEncoderKraus_mul_typicalIsometry ρ n δ i0
-  simp [hatyp, Channel.idChannel, MatrixMap.ofKraus]
+  simp [hatyp, CPTPOp.id_map]
 
 /-- The Schumacher compression code built from the typical isometry. -/
-def typicalCompressionCode (ρ : State a) (n : ℕ) (δ : ℝ)
+def typicalCompressionCode (ρ : MState a) (n : ℕ) (δ : ℝ)
     (i0 : TypicalSubspaceIndex ρ n δ) :
     SchumacherCompressionCode ρ n (TypicalSubspaceIndex ρ n δ) where
   encoder := typicalEncoder ρ n δ i0
@@ -370,9 +366,8 @@ def typicalCompressionCode (ρ : State a) (n : ℕ) (δ : ℝ)
 
 /-! ### Bipartite Kraus action
 
-The key bipartite lemma blocked on by the prior agent: tensoring an identity
-channel with a Kraus-form map `(ofKraus M)` acts on a bipartite matrix as a sum
-of `I ⊗ M_k` conjugations.  Proved entry-wise via the slice formula
+Tensoring an identity channel with a Kraus-form map `(ofKraus M)` acts on a
+bipartite matrix as a sum of `I ⊗ M_k` conjugations.  Proved entry-wise via the slice formula
 `MatrixMap.kron_idChannel_left_apply_slice` from `QIT.Channels.Diamond`. -/
 
 section BipartiteKraus
@@ -381,23 +376,11 @@ variable {α : Type u} {β : Type v}
     [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
     {κ : Type v} [Fintype κ] [DecidableEq κ]
 
-/-- Single-point collapse of an indicator sum. -/
-private lemma sum_ite_eq_single_f (i : α) (T : α → ℂ) :
-    ∑ a : α, (if i = a then T a else (0 : ℂ)) = T i := by
-  have hkey : ∑ a : α, (if i = a then T a else (0 : ℂ)) =
-      (if i = i then T i else (0 : ℂ)) := by
-    apply Finset.sum_eq_single (a := i)
-    · intro a _ ha
-      exact if_neg ha.symm
-    · intro h
-      exact (h (Finset.mem_univ i)).elim
-  rw [hkey, if_pos rfl]
-
 omit [DecidableEq β] in
 /-- Entry of a `(I ⊗ A) X (I ⊗ A)ᴴ` conjugation collapses to a partial slice.
 Here `A` is square on `β` (the right-factor system). -/
 private theorem kron_one_mul_conjTranspose_entry (A : CMatrix β)
-    (X : CMatrix (Prod α β)) (i : α) (d d' : β) (i' : α) :
+    (X : CMatrix (α × β)) (i : α) (d d' : β) (i' : α) :
     (Matrix.kronecker (1 : CMatrix α) A * X *
         (Matrix.kronecker (1 : CMatrix α) A).conjTranspose) (i, d) (i', d') =
       ∑ p : β, ∑ q : β, A d p * X (i, p) (i', q) * star (A d' q) := by
@@ -449,8 +432,8 @@ omit [DecidableEq κ] in
 /-- Tensoring the identity channel with a Kraus-form map acts entry-wise as a
 sum of `(I ⊗ M_k) X (I ⊗ M_k)ᴴ` conjugations, in the natural slice form. -/
 private theorem kron_idChannel_ofKraus_apply_entry
-    (M : κ → CMatrix β) (X : CMatrix (Prod α β)) (i : α) (d d' : β) (i' : α) :
-    (MatrixMap.kron (Channel.idChannel α).map (MatrixMap.ofKraus M) X)
+    (M : κ → CMatrix β) (X : CMatrix (α × β)) (i : α) (d d' : β) (i' : α) :
+    (MatrixMap.kron (CPTPOp.id (dIn := α)).map (MatrixMap.ofKraus M) X)
         (i, d) (i', d') =
       ∑ k : κ, ∑ q : β, (∑ p : β, M k d p * X (i, p) (i', q)) * star (M k d' q) := by
   rw [MatrixMap.kron_idChannel_left_apply_slice]
@@ -461,15 +444,15 @@ omit [DecidableEq κ] in
 /-- The matrix form: `kron id (ofKraus M)` is the sum of `(I⊗M_k) X (I⊗M_k)ᴴ`
 Kraus conjugations. -/
 private theorem kron_idChannel_ofKraus_apply
-    (M : κ → CMatrix β) (X : CMatrix (Prod α β)) :
-    MatrixMap.kron (Channel.idChannel α).map (MatrixMap.ofKraus M) X =
+    (M : κ → CMatrix β) (X : CMatrix (α × β)) :
+    MatrixMap.kron (CPTPOp.id (dIn := α)).map (MatrixMap.ofKraus M) X =
       ∑ k, Matrix.kronecker (1 : CMatrix α) (M k) * X *
         (Matrix.kronecker (1 : CMatrix α) (M k)).conjTranspose := by
   ext ⟨i, d⟩ ⟨i', d'⟩
   rw [kron_idChannel_ofKraus_apply_entry]
   rw [show ((∑ k, Matrix.kronecker (1 : CMatrix α) (M k) * X *
         (Matrix.kronecker (1 : CMatrix α) (M k)).conjTranspose) :
-        CMatrix (Prod α β)) (i, d) (i', d') =
+        CMatrix (α × β)) (i, d) (i', d') =
       ∑ k, (Matrix.kronecker (1 : CMatrix α) (M k) * X *
         (Matrix.kronecker (1 : CMatrix α) (M k)).conjTranspose) (i, d) (i', d') from
     Matrix.sum_apply (i, d) (i', d') Finset.univ _]
@@ -493,42 +476,41 @@ estimates combine at the end of the section to give `schumacher_direct_achievabl
 /-- The composed compression channel's Kraus family.  Index `(encoder idx, decoder idx)`;
 the decoder contributes a single Kraus `V` (the typical isometry), so each entry is
 `V · (encoder Kraus)`. -/
-private def typicalCompressionKraus (ρ : State a) (n : ℕ) (δ : ℝ)
+private def typicalCompressionKraus (ρ : MState a) (n : ℕ) (δ : ℝ)
     (i0 : TypicalSubspaceIndex ρ n δ) :
     ((Unit ⊕ AtypicalSubspaceIndex ρ n δ) × Unit) → CMatrix (TensorPower a n) :=
   fun kl => typicalIsometry ρ n δ * typicalEncoderKraus ρ n δ i0 kl.1
 
-/-- `N := (typicalCompressionCode ρ n δ i0).decoder.comp …encoder` has Kraus form
+/-- `N := (typicalCompressionCode ρ n δ i0).decoder ∘ₘ …encoder` has Kraus form
 `ofKraus (typicalCompressionKraus …)`, by `ofKraus_comp_ofKraus` applied to the
 decoder's single-Kraus form and the encoder's Kraus family. -/
-private theorem typicalCompression_comp_map_ofKraus (ρ : State a) (n : ℕ) (δ : ℝ)
+private theorem typicalCompression_comp_map_ofKraus (ρ : MState a) (n : ℕ) (δ : ℝ)
     (i0 : TypicalSubspaceIndex ρ n δ) :
-    ((typicalCompressionCode ρ n δ i0).decoder.comp
+    ((typicalCompressionCode ρ n δ i0).decoder ∘ₘ
       (typicalCompressionCode ρ n δ i0).encoder).map =
       MatrixMap.ofKraus (typicalCompressionKraus ρ n δ i0) := by
-  show (MatrixMap.ofKraus (fun _ : Unit => typicalIsometry ρ n δ)).comp
-      (MatrixMap.ofKraus (typicalEncoderKraus ρ n δ i0)) =
-    MatrixMap.ofKraus (typicalCompressionKraus ρ n δ i0)
+  rw [CPTPOp.compose_map]
+  simp only [typicalCompressionCode, typicalEncoder, typicalDecoder, CPTPOp.map_ofMat]
   rw [MatrixMap.ofKraus_comp_ofKraus]
   rfl
 
 /-- The atypical-correction Kraus operator `K_l = V · |i₀⟩⟨φ_l|`, obtained as the
 decoder's isometry `V` times the `l`-th atypical encoder Kraus. -/
-private def typicalCorrectionKraus (ρ : State a) (n : ℕ) (δ : ℝ)
+private def typicalCorrectionKraus (ρ : MState a) (n : ℕ) (δ : ℝ)
     (i0 : TypicalSubspaceIndex ρ n δ) (l : AtypicalSubspaceIndex ρ n δ) :
     CMatrix (TensorPower a n) :=
   typicalIsometry ρ n δ * atypicalEncoderKraus ρ n δ i0 l
 
-/-- `ω.matrix` decomposes as `PiMat · φ · PiMat + ω_corr`, where `PiMat = I ⊗ Pi` is
+/-- `ω.m` decomposes as `PiMat · φ · PiMat + ω_corr`, where `PiMat = I ⊗ Pi` is
 the lifted typical projector and `ω_corr` is a sum of `(I ⊗ K_l) φ (I ⊗ K_l)ᴴ`
 conjugations over the atypical encoder Kraus operators.  This is the bipartite
 Kraus lemma applied to the composed channel `N = D ∘ E`, with the `Unit`-indexed
 decoder Kraus collapsed and the encoder-Kraus sum split into the `V†` branch
 (giving `V · V† = Pi`) and the atypical branch. -/
-private theorem typicalCompression_omega_matrix_eq (ρ : State a) (n : ℕ) (δ : ℝ)
+private theorem typicalCompression_omega_matrix_eq (ρ : MState a) (n : ℕ) (δ : ℝ)
     (i0 : TypicalSubspaceIndex ρ n δ)
-    (φ : CMatrix (Prod (TensorPower a n) (TensorPower a n))) :
-    MatrixMap.kron (Channel.idChannel (TensorPower a n)).map
+    (φ : CMatrix (TensorPower a n × TensorPower a n)) :
+    MatrixMap.kron (CPTPOp.id (dIn := TensorPower a n)).map
       (MatrixMap.ofKraus (typicalCompressionKraus ρ n δ i0)) φ =
     Matrix.kronecker (1 : CMatrix (TensorPower a n))
       (ρ.typicalSubspaceProjector n δ) * φ *
@@ -544,36 +526,37 @@ private theorem typicalCompression_omega_matrix_eq (ρ : State a) (n : ℕ) (δ 
   simp only [typicalCompressionKraus, typicalEncoderKraus, typicalCorrectionKraus]
   rw [typicalIsometry_mul_conjTranspose]
 
+set_option maxRecDepth 4000 in
 /-- The joint (purification) trace-distance error of the typical-subspace code is
 at most `√(atypicalSubspaceSpectralWeight) + atypicalSubspaceSpectralWeight / 2`.
 
 This is the Wilde direct-achievability fidelity bound
-[Wilde2011Qst, qit-notes.tex:31457-31598]: splitting `ω.matrix` into the gentle
+[Wilde2011Qst, qit-notes.tex:31457-31598]: splitting `ω.m` into the gentle
 projective part `PiMat · φ · PiMat` (controlled by `gentle_projector`) and the PSD
 correction sum (whose trace is exactly the atypical spectral weight), then
 applying the trace-norm triangle. -/
-public theorem typicalCompressionCode_jointError_le (ρ : State a) (n : ℕ) (δ : ℝ)
+public theorem typicalCompressionCode_jointError_le (ρ : MState a) (n : ℕ) (δ : ℝ)
     (i0 : TypicalSubspaceIndex ρ n δ) :
     (typicalCompressionCode ρ n δ i0).jointError ≤
       Real.sqrt (ρ.atypicalSubspaceSpectralWeight n δ) +
         ρ.atypicalSubspaceSpectralWeight n δ / 2 := by
-  let An := TensorPower a n
+  let An := QIT.TensorPower a n
   let Pi := ρ.typicalSubspaceProjector n δ
-  let PiMat : CMatrix (Prod An An) := Matrix.kronecker (1 : CMatrix An) Pi
-  let ψ : PureVector (Prod a a) := State.canonicalPurification ρ
-  let φ : State (Prod An An) := ψ.state.tensorPowerBipartite n
+  let PiMat : CMatrix (An × An) := Matrix.kronecker (1 : CMatrix An) Pi
+  let ψ : Ket (a × a) := MState.canonicalPurification ρ
+  let φ : MState (An × An) := ψ.state.tensorPowerBipartite n
   let C := typicalCompressionCode ρ n δ i0
-  let N : Channel An An := C.decoder.comp C.encoder
-  let ω : State (Prod An An) := ((Channel.idChannel An).prod N).applyState φ
-  let ω_corr : CMatrix (Prod An An) :=
+  let N : CPTPMap An An := C.decoder ∘ₘ C.encoder
+  let ω : MState (An × An) := ((CPTPOp.id (dIn := An)).prod N) φ
+  let ω_corr : CMatrix (An × An) :=
     ∑ l : AtypicalSubspaceIndex ρ n δ,
       Matrix.kronecker (1 : CMatrix An) (typicalCorrectionKraus ρ n δ i0 l) *
-        φ.matrix *
+        φ.m *
       (Matrix.kronecker (1 : CMatrix An)
         (typicalCorrectionKraus ρ n δ i0 l)).conjTranspose
-  -- 0. `C.jointError = ½ · traceNorm (ω.matrix - φ.matrix)`.
-  have herr_def : C.jointError = (1 / 2 : ℝ) * traceNorm (ω.matrix - φ.matrix) := by
-    show (1 / 2 : ℝ) * QIT.traceNormDistance ω.matrix φ.matrix = _
+  -- 0. `C.jointError = ½ · traceNorm (ω.m - φ.m)`.
+  have herr_def : C.jointError = (1 / 2 : ℝ) * traceNorm (ω.m - φ.m) := by
+    show (1 / 2 : ℝ) * QIT.traceNormDistance ω.m φ.m = _
     rw [traceNormDistance_eq_traceNorm_sub]
   -- 1. `PiMat.PosSemidef`, hence `PiMat.conjTranspose = PiMat`.
   have hPiMat_psd : PiMat.PosSemidef :=
@@ -585,61 +568,61 @@ public theorem typicalCompressionCode_jointError_le (ρ : State a) (n : ℕ) (δ
     show ((1 : CMatrix An) ⊗ₖ Pi) * ((1 : CMatrix An) ⊗ₖ Pi) = (1 ⊗ₖ Pi)
     rw [← Matrix.mul_kronecker_mul, Matrix.mul_one,
       ρ.typicalSubspaceProjector_idempotent n δ]
-  -- 3. `partialTraceA φ.matrix = (ρ.tensorPower n).matrix`.
-  have hψ_mB : ψ.state.marginalB = ρ := by
-    apply State.ext
-    rw [State.marginalB_matrix]
+  -- 3. `Matrix.traceLeft φ.m = (ρ.tensorPower n).m`.
+  have hψ_mB : ψ.state.traceLeft = ρ := by
+    apply MState.ext
+    rw [MState.traceLeft_m]
     exact canonicalPurification_purifies ρ
-  have hφ_pTA : partialTraceA (a := An) (b := An) φ.matrix = (ρ.tensorPower n).matrix := by
-    have hφmB : φ.marginalB = ρ.tensorPower n := by
+  have hφ_pTA : Matrix.traceLeft φ.m = (ρ.tensorPower n).m := by
+    have hφmB : φ.traceLeft = ρ.tensorPower n := by
       rw [show φ = ψ.state.tensorPowerBipartite n from rfl,
-        tensorPowerBipartite_marginalB ψ.state n, hψ_mB]
-    rw [← State.marginalB_matrix, hφmB]
-  -- 4. `((PiMat * φ.matrix).trace).re = typicalSubspaceSpectralWeight ρ n δ`.
-  have htrace_PiMat_φ : ((PiMat * φ.matrix).trace).re =
+        tensorPowerBipartite_traceLeft ψ.state n, hψ_mB]
+    rw [← MState.traceLeft_m, hφmB]
+  -- 4. `((PiMat * φ.m).trace).re = typicalSubspaceSpectralWeight ρ n δ`.
+  have htrace_PiMat_φ : ((PiMat * φ.m).trace).re =
       ρ.typicalSubspaceSpectralWeight n δ := by
-    have hkey : (Matrix.kronecker (1 : CMatrix An) Pi * φ.matrix).trace =
-        (Pi * (ρ.tensorPower n).matrix).trace := by
-      rw [trace_kronecker_one_mul_eq_trace_mul_partialTraceA, hφ_pTA]
+    have hkey : (Matrix.kronecker (1 : CMatrix An) Pi * φ.m).trace =
+        (Pi * (ρ.tensorPower n).m).trace := by
+      rw [trace_kronecker_one_mul_eq_trace_mul_traceLeft, hφ_pTA]
     rw [hkey, Matrix.trace_mul_comm,
       ρ.typicalSubspaceProjector_trace_mul_re n δ]
-  -- 5. `ω.matrix = PiMat · φ · PiMat + ω_corr`.
-  have hsplit : ω.matrix = PiMat * φ.matrix * PiMat + ω_corr := by
+  -- 5. `ω.m = PiMat · φ · PiMat + ω_corr`.
+  have hsplit : ω.m = PiMat * φ.m * PiMat + ω_corr := by
     have hN_map : N.map = MatrixMap.ofKraus (typicalCompressionKraus ρ n δ i0) :=
       typicalCompression_comp_map_ofKraus ρ n δ i0
-    have hkey : ((Channel.idChannel An).prod N).map φ.matrix =
-        MatrixMap.kron (Channel.idChannel An).map
-          (MatrixMap.ofKraus (typicalCompressionKraus ρ n δ i0)) φ.matrix := by
-      rw [show ((Channel.idChannel An).prod N).map φ.matrix =
-          MatrixMap.kron (Channel.idChannel An).map N.map φ.matrix from rfl, hN_map]
-    rw [show ω.matrix = ((Channel.idChannel An).prod N).map φ.matrix from rfl, hkey,
+    have hkey : ((CPTPOp.id (dIn := An)).prod N).map φ.m =
+        MatrixMap.kron (CPTPOp.id (dIn := An)).map
+          (MatrixMap.ofKraus (typicalCompressionKraus ρ n δ i0)) φ.m := by
+      rw [CPTPOp.prod_map, hN_map]
+    rw [show ω.m = ((CPTPOp.id (dIn := An)).prod N).map φ.m from
+        CPTPOp.mat_coe_eq_apply_mat _ _, hkey,
       typicalCompression_omega_matrix_eq, hPiMat_cT]
   -- 6. `ω_corr.PosSemidef` (each summand `(I⊗K) φ (I⊗K)ᴴ` is PSD via
   -- `mul_mul_conjTranspose_same`; sum of PSD is PSD).
   have hω_corr_psd : ω_corr.PosSemidef := by
     show (∑ l : AtypicalSubspaceIndex ρ n δ,
         Matrix.kronecker (1 : CMatrix An) (typicalCorrectionKraus ρ n δ i0 l) *
-          φ.matrix *
+          φ.m *
         (Matrix.kronecker (1 : CMatrix An)
           (typicalCorrectionKraus ρ n δ i0 l)).conjTranspose).PosSemidef
     exact Matrix.posSemidef_sum Finset.univ (fun l _ =>
-      φ.pos.mul_mul_conjTranspose_same _)
+      φ.psd.mul_mul_conjTranspose_same _)
   -- 7. `ω_corr.trace.re = atypicalSubspaceSpectralWeight`.  Use
-  -- `ω.matrix.trace.re = 1`, `PiMat φ PiMat` trace `.re = typical weight`
+  -- `ω.m.trace.re = 1`, `PiMat φ PiMat` trace `.re = typical weight`
   -- (idempotence + Step 4), and the partition identity.
-  have htrace_ω : (ω.matrix.trace).re = 1 := by
-    rw [show ω.matrix.trace = (1 : ℂ) from ω.trace_eq_one]
+  have htrace_ω : (ω.m.trace).re = 1 := by
+    rw [show ω.m.trace = (1 : ℂ) from ω.tr']
     simp
-  have htrace_PiMat_φ_PiMat : ((PiMat * φ.matrix * PiMat).trace).re =
+  have htrace_PiMat_φ_PiMat : ((PiMat * φ.m * PiMat).trace).re =
       ρ.typicalSubspaceSpectralWeight n δ := by
-    have hcyc : (PiMat * φ.matrix * PiMat).trace = (PiMat * φ.matrix).trace := by
+    have hcyc : (PiMat * φ.m * PiMat).trace = (PiMat * φ.m).trace := by
       rw [Matrix.trace_mul_cycle, hPiMat_idem]
     rw [hcyc, htrace_PiMat_φ]
   have htrace_ω_corr : (ω_corr.trace).re = ρ.atypicalSubspaceSpectralWeight n δ := by
-    have hsum : ω.matrix.trace = (PiMat * φ.matrix * PiMat).trace + ω_corr.trace := by
+    have hsum : ω.m.trace = (PiMat * φ.m * PiMat).trace + ω_corr.trace := by
       rw [hsplit, Matrix.trace_add]
-    have hre : (ω.matrix.trace).re =
-        ((PiMat * φ.matrix * PiMat).trace).re + (ω_corr.trace).re := by
+    have hre : (ω.m.trace).re =
+        ((PiMat * φ.m * PiMat).trace).re + (ω_corr.trace).re := by
       have := congrArg Complex.re hsum
       simpa using this
     rw [htrace_ω, htrace_PiMat_φ_PiMat] at hre
@@ -648,26 +631,26 @@ public theorem typicalCompressionCode_jointError_le (ρ : State a) (n : ℕ) (δ
   have htn_ω_corr : traceNorm ω_corr = ρ.atypicalSubspaceSpectralWeight n δ := by
     rw [traceNorm_posSemidef_eq_trace_re _ hω_corr_psd, htrace_ω_corr]
   -- 9. Gentle projector bound on the projective part.
-  have hgentle : traceNorm (PiMat * φ.matrix * PiMat - φ.matrix) ≤
+  have hgentle : traceNorm (PiMat * φ.m * PiMat - φ.m) ≤
       2 * Real.sqrt (ρ.atypicalSubspaceSpectralWeight n δ) := by
     have hg := gentle_projector PiMat hPiMat_psd hPiMat_idem φ
-    have hsub : 1 - ((PiMat * φ.matrix).trace).re =
+    have hsub : 1 - ((PiMat * φ.m).trace).re =
         ρ.atypicalSubspaceSpectralWeight n δ := by
       rw [htrace_PiMat_φ]
       linarith [ρ.typicalSubspaceSpectralWeight_add_atypical n δ]
     rw [hsub] at hg
     exact hg
-  -- 10. Triangle: `traceNorm (ω.matrix - φ.matrix) ≤ 2√atypical + atypical`.
-  have htri_diff : ω.matrix - φ.matrix =
-      (PiMat * φ.matrix * PiMat - φ.matrix) + ω_corr := by
+  -- 10. Triangle: `traceNorm (ω.m - φ.m) ≤ 2√atypical + atypical`.
+  have htri_diff : ω.m - φ.m =
+      (PiMat * φ.m * PiMat - φ.m) + ω_corr := by
     rw [hsplit]
     abel
-  have htn_total : traceNorm (ω.matrix - φ.matrix) ≤
+  have htn_total : traceNorm (ω.m - φ.m) ≤
       2 * Real.sqrt (ρ.atypicalSubspaceSpectralWeight n δ) +
         ρ.atypicalSubspaceSpectralWeight n δ := by
     rw [htri_diff]
-    calc traceNorm ((PiMat * φ.matrix * PiMat - φ.matrix) + ω_corr)
-          ≤ traceNorm (PiMat * φ.matrix * PiMat - φ.matrix) + traceNorm ω_corr :=
+    calc traceNorm ((PiMat * φ.m * PiMat - φ.m) + ω_corr)
+          ≤ traceNorm (PiMat * φ.m * PiMat - φ.m) + traceNorm ω_corr :=
         traceNorm_add_le _ _
       _ ≤ 2 * Real.sqrt (ρ.atypicalSubspaceSpectralWeight n δ) +
             ρ.atypicalSubspaceSpectralWeight n δ := by
@@ -689,7 +672,7 @@ Uses `card_typicalSubspaceIndex`, `typicalSubspaceDimension_le_two_pow`, and the
 base-two logarithm monotonicity / inversion lemmas (QIT's custom `log2`).  The
 `Nonempty` of the typical register (provided by `i0`) gives the strict
 positivity of `typicalSubspaceDimension` required by `log2_mono_of_pos`. -/
-public theorem typicalCompressionCode_rate_le (ρ : State a) (n : ℕ) (δ : ℝ)
+public theorem typicalCompressionCode_rate_le (ρ : MState a) (n : ℕ) (δ : ℝ)
     (hn : 1 ≤ n) (i0 : TypicalSubspaceIndex ρ n δ) :
     (typicalCompressionCode ρ n δ i0).rate ≤ ρ.schumacherRate + δ := by
   have hn_ne : n ≠ 0 := by omega
@@ -716,7 +699,7 @@ public theorem typicalCompressionCode_rate_le (ρ : State a) (n : ℕ) (δ : ℝ
 /-- If the typical spectral weight is strictly positive, the typical register is
 nonempty (at least one eigenvalue index is typical). -/
 public theorem TypicalSubspaceIndex_nonempty_of_typical_pos
-    (ρ : State a) (n : ℕ) (δ : ℝ)
+    (ρ : MState a) (n : ℕ) (δ : ℝ)
     (h : 0 < ρ.typicalSubspaceSpectralWeight n δ) :
     Nonempty (TypicalSubspaceIndex ρ n δ) := by
   classical
@@ -727,7 +710,7 @@ public theorem TypicalSubspaceIndex_nonempty_of_typical_pos
     apply Finset.sum_eq_zero
     intro i _
     by_cases hi : typicalEigenvalue ρ n δ
-        ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
+        ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
     · exact (hne ⟨i, hi⟩).elim
     · simp [hi]
   linarith
@@ -744,9 +727,9 @@ rate at most `S(ρ) + δ` and joint error at most `ε`.  The error bound uses
 below `min ((ε/2)²) (min ε 1)`, which bounds `√atypical + atypical/2 ≤ ε`
 (by `typicalCompressionCode_jointError_le`) and ensures the typical register is
 nonempty (by `TypicalSubspaceIndex_nonempty_of_typical_pos`). -/
-theorem schumacher_direct_achievable (ρ : State a) :
+theorem schumacher_direct_achievable (ρ : MState a) :
     ρ.IsAchievableSchumacherRate ρ.schumacherRate := by
-  apply State.schumacher_direct_achievable_of_typicalCompressionWitness
+  apply MState.schumacher_direct_achievable_of_typicalCompressionWitness
   intro δ hδ ε hε
   -- Cap `ε` at `1` so the atypical-weight threshold can be at most `1`, forcing
   -- `atypical < 1` and hence the typical register to be nonempty.
@@ -800,8 +783,4 @@ theorem schumacher_direct_achievable (ρ : State a) :
       refine ⟨div_nonneg hε'_pos.le (by norm_num), h_atyp_sq⟩
     linarith
 
-end State
-
-end
-
-end QIT
+end MState

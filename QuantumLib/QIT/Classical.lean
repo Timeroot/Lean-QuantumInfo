@@ -6,6 +6,8 @@ Authors: QuAIR Team
 
 module
 
+public import QuantumLib.QIT.Classical.Distribution
+public import QuantumLib.QIT.Classical.Channel
 public import QuantumLib.QIT.Classical.Ensemble
 public import QuantumLib.QIT.Classical.CQState
 public import QuantumLib.QIT.Classical.Bridge
@@ -16,11 +18,3 @@ public import QuantumLib.QIT.Classical.Bridge
 Thin classical-information import surface for the local classical-register and
 cq-state bridge work.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace Classical
-
-end Classical
-end QIT

@@ -94,22 +94,6 @@ theorem weighted_average_sq_le_scaled_quadratic_sum (τ : F → ℝ≥0)
       refine Finset.sum_congr rfl fun f _ => ?_
       ring
 
-/--
-Extractor trace-distance average bridge.
-
-The names `traceDist` and `quadratic` mirror Tomamichel's proof route: the
-first is the per-seed trace-distance term, and the second is the corresponding
-quadratic expression obtained from the Holder step.
--/
-theorem extractor_traceDistance_average_sq_le (τ : F → ℝ≥0)
-    (hτ : (∑ f, τ f) = 1) (d : ℝ) (traceDist quadratic : F → ℝ)
-    (hd : 0 ≤ d) (htrace : ∀ f, 0 ≤ traceDist f) (hquad : ∀ f, 0 ≤ quadratic f)
-    (hholder : ∀ f, traceDist f ≤ Real.sqrt (d * quadratic f)) :
-    (∑ f, (τ f : ℝ) * traceDist f) ^ 2 ≤
-      d * ∑ f, (τ f : ℝ) * quadratic f :=
-  weighted_average_sq_le_scaled_quadratic_sum τ hτ d traceDist quadratic
-    hd htrace hquad hholder
-
 namespace PrivacyAmplification
 
 /-- Public catalog entrypoint for the finite extractor trace-distance averaging bridge. -/
@@ -119,7 +103,7 @@ public theorem main (τ : F → ℝ≥0)
     (hholder : ∀ f, traceDist f ≤ Real.sqrt (d * quadratic f)) :
     (∑ f, (τ f : ℝ) * traceDist f) ^ 2 ≤
       d * ∑ f, (τ f : ℝ) * quadratic f :=
-  extractor_traceDistance_average_sq_le τ hτ d traceDist quadratic
+  weighted_average_sq_le_scaled_quadratic_sum τ hτ d traceDist quadratic
     hd htrace hquad hholder
 
 end PrivacyAmplification

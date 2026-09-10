@@ -31,11 +31,3 @@ Top-level import facade for smooth entropy, one-shot decoupling, gentle
 measurement tools, hypothesis-testing information, and one-shot comparison
 tools.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace OneShot
-
-end OneShot
-end QIT

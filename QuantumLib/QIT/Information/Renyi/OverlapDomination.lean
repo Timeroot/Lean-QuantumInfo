@@ -28,15 +28,13 @@ open scoped ComplexOrder MatrixOrder
 
 open Matrix
 
-namespace QIT
-
-universe u
-
 noncomputable section
-
+universe u
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
-namespace State
+open QIT
+
+namespace MState
 
 /-- The algebraic `-log₂ c` Renyi offset from overlap domination.
 
@@ -53,8 +51,8 @@ substitution step of `apps.tex:214`. This compatibility theorem retains the
 former assumption-based surface; the canonical theorem below discharges the
 reference-order step using `sandwichedRenyiReference_antitone_reference`. -/
 theorem overlap_domination_renyi_offset_algebraicTarget
-    (ρ : State a) (τ σ_small : CMatrix a)
-    (hρ : ρ.matrix.PosDef) (hτ : τ.PosDef) (hσ_small : σ_small.PosDef)
+    (ρ : MState a) (τ σ_small : CMatrix a)
+    (hρ : ρ.m.PosDef) (hτ : τ.PosDef) (hσ_small : σ_small.PosDef)
     (c : ℝ) (hc : 0 < c)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1)
     (hdom : σ_small ≤ c • τ)
@@ -74,8 +72,8 @@ theorem overlap_domination_renyi_offset_algebraicTarget
 /-- The source `-log₂ c` Renyi offset from overlap domination, with reference
 antitonicity discharged by the closed-order theorem. -/
 theorem overlap_domination_renyi_offset
-    (ρ : State a) (τ σ_small : CMatrix a)
-    (hρ : ρ.matrix.PosDef) (hτ : τ.PosDef) (hσ_small : σ_small.PosDef)
+    (ρ : MState a) (τ σ_small : CMatrix a)
+    (hρ : ρ.m.PosDef) (hτ : τ.PosDef) (hσ_small : σ_small.PosDef)
     (c : ℝ) (hc : 0 < c)
     (α : ℝ) (hα_half : 1 / 2 ≤ α) (hα_ne_one : α ≠ 1)
     (hdom : σ_small ≤ c • τ) :
@@ -91,7 +89,7 @@ theorem overlap_domination_renyi_offset
   exact hle
 
 /-- Shape check at equality in the overlap domination. -/
-example (ρ : State a) (τ : CMatrix a) (hρ : ρ.matrix.PosDef) (hτ : τ.PosDef)
+example (ρ : MState a) (τ : CMatrix a) (hρ : ρ.m.PosDef) (hτ : τ.PosDef)
     (c : ℝ) (hc : 0 < c) (α : ℝ) (hα_half : 1 / 2 ≤ α)
     (hα_ne_one : α ≠ 1) :
     sandwichedRenyiReference ρ τ hρ hτ α
@@ -102,8 +100,4 @@ example (ρ : State a) (τ : CMatrix a) (hρ : ρ.matrix.PosDef) (hτ : τ.PosDe
   exact overlap_domination_renyi_offset ρ τ (c • τ) hρ hτ hτc c hc α hα_half
     hα_ne_one (le_refl _)
 
-end State
-
-end
-
-end QIT
+end MState

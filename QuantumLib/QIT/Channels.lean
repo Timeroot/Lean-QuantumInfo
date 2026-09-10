@@ -13,13 +13,5 @@ public import QuantumLib.QIT.Channels.Diamond
 /-!
 # Channel interfaces
 
-Thin channel-facing import surface for the local QIT incubator.
+Thin channel-facing import surface for Lean-QIT.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace Channels
-
-end Channels
-end QIT

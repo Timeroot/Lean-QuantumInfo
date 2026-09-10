@@ -33,9 +33,9 @@ import Mathlib.LinearAlgebra.Dimension.Constructions
 This module separates the raw endpoint optimization values underneath the
 definition-level conditional min/max entropies in `QIT.OneShot.Smooth`.
 
-The declarations here are intentionally exponent/scale level.  The final
-smooth min/max duality proof will need to connect these raw optimization values
-to endpoint SDP duality before translating back through `log₂`.
+The declarations here are at the exponent/scale level; the smooth min/max
+duality argument connects these raw optimization values to endpoint SDP duality
+before translating back through `log₂`.
 -/
 
 @[expose] public section
@@ -52,39 +52,26 @@ universe u v w x
 
 noncomputable section
 
-theorem State.squaredFidelity_comm {a : Type u} [Fintype a] [DecidableEq a]
-    (ρ σ : State a) :
-    ρ.squaredFidelity σ = σ.squaredFidelity ρ := by
-  rw [State.squaredFidelity_eq_traceNorm_sqrtMatrix_mul_sqrtMatrix_sq,
-    State.squaredFidelity_eq_traceNorm_sqrtMatrix_mul_sqrtMatrix_sq]
-  congr 1
-  have hconj :
-      Matrix.conjTranspose (ρ.sqrtMatrix * σ.sqrtMatrix) =
-        σ.sqrtMatrix * ρ.sqrtMatrix := by
-    rw [Matrix.conjTranspose_mul, ρ.sqrtMatrix_isHermitian.eq,
-      σ.sqrtMatrix_isHermitian.eq]
-  rw [← hconj, traceNorm_conjTranspose]
-
-theorem PureVector.overlapSq_comm_endpoint {a : Type u} [Fintype a] [DecidableEq a]
-    (Ψ Φ : PureVector a) :
+theorem _root_.Ket.overlapSq_comm_endpoint {a : Type u} [Fintype a] [DecidableEq a]
+    (Ψ Φ : Ket a) :
     Ψ.overlapSq Φ = Φ.overlapSq Ψ := by
-  rw [PureVector.overlapSq_eq_normSq, PureVector.overlapSq_eq_normSq]
+  rw [Ket.overlapSq_eq_normSq, Ket.overlapSq_eq_normSq]
   have hconj : Ψ.overlap Φ = star (Φ.overlap Ψ) := by
-    simp [PureVector.overlap, mul_comm]
+    simp [Ket.overlap, mul_comm]
   rw [hconj]
   simp [Complex.normSq]
 
-theorem PureVector.normSq_sum_star_mul_le_rankOne_trace
+theorem _root_.Ket.normSq_sum_star_mul_le_rankOne_trace
     {a : Type u} [Fintype a] [DecidableEq a]
-    (v : a → ℂ) (η : PureVector a) :
-    Complex.normSq (∑ i, star (v i) * η.amp i) ≤
+    (v : a → ℂ) (η : Ket a) :
+    Complex.normSq (∑ i, star (v i) * η.vec i) ≤
       (rankOneMatrix v).trace.re := by
   classical
   let x : EuclideanSpace ℂ a := WithLp.toLp 2 v
-  let y : EuclideanSpace ℂ a := WithLp.toLp 2 η.amp
+  let y : EuclideanSpace ℂ a := WithLp.toLp 2 η.vec
   have hcs := norm_inner_le_norm (𝕜 := ℂ) x y
   have hinner :
-      inner ℂ x y = ∑ i, star (v i) * η.amp i := by
+      inner ℂ x y = ∑ i, star (v i) * η.vec i := by
     dsimp [x, y]
     rw [EuclideanSpace.inner_toLp_toLp]
     simp [dotProduct, mul_comm]
@@ -111,22 +98,22 @@ theorem PureVector.normSq_sum_star_mul_le_rankOne_trace
 /-- A scalar phase can rotate any complex number so that its real part is its
 absolute value. -/
 theorem exists_complex_phase_mul_re_eq_abs (z : ℂ) :
-    ∃ c : ℂ, c * star c = 1 ∧ (c * z).re = Complex.abs z := by
+    ∃ c : ℂ, c * star c = 1 ∧ (c * z).re = ‖z‖ := by
   by_cases hz : z = 0
   · refine ⟨1, ?_, ?_⟩
     · simp
     · simp [hz]
-  · refine ⟨(Complex.abs z : ℂ) / z, ?_, ?_⟩
+  · refine ⟨( ‖z‖ : ℂ) / z, ?_, ?_⟩
     · rw [div_eq_mul_inv]
       rw [star_mul]
-      rw [show star ((Complex.abs z : ℂ)) = (Complex.abs z : ℂ) by
+      rw [show star (( ‖z‖ : ℂ)) = ( ‖z‖ : ℂ) by
         apply Complex.ext <;> simp]
       have hzstar : star z ≠ 0 := by
         intro h
         apply hz
         simpa using congrArg star h
-      have habs_ne : (Complex.abs z : ℂ) ≠ 0 := by
-        exact_mod_cast (norm_ne_zero_iff.mpr hz : Complex.abs z ≠ 0)
+      have habs_ne : ( ‖z‖ : ℂ) ≠ 0 := by
+        exact_mod_cast (norm_ne_zero_iff.mpr hz : ‖z‖ ≠ 0)
       field_simp [hz, hzstar, habs_ne]
       rw [show star (1 / z) = (star z)⁻¹ by simp [div_eq_mul_inv]]
       field_simp [hzstar]
@@ -136,19 +123,10 @@ theorem exists_complex_phase_mul_re_eq_abs (z : ℂ) :
       rw [Complex.normSq_eq_norm_sq]
       change ((‖z‖ : ℝ) : ℂ) ^ 2 = ((‖z‖ ^ 2 : ℝ) : ℂ)
       norm_num
-    · have hmul : (((Complex.abs z : ℂ) / z) * z) = (Complex.abs z : ℂ) := by
+    · have hmul : ((( ‖z‖ : ℂ) / z) * z) = ( ‖z‖ : ℂ) := by
         field_simp [hz]
       rw [hmul]
       simp
-
-theorem psdSqrt_kronecker {a : Type u} {b : Type v}
-    [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
-    {A : CMatrix a} {B : CMatrix b}
-    (hA : A.PosSemidef) (hB : B.PosSemidef) :
-    psdSqrt (Matrix.kronecker A B) =
-      Matrix.kronecker (psdSqrt A) (psdSqrt B) := by
-  simp only [psdSqrt, CFC.sqrt_eq_rpow]
-  exact cMatrix_rpow_kronecker_nonneg hA hB (by norm_num : (0 : ℝ) ≤ 1 / 2)
 
 /-- A block-diagonal matrix with positive semidefinite diagonal blocks is
 positive semidefinite.  This small local bridge is the block-cone constructor
@@ -157,7 +135,7 @@ theorem cMatrix_fromBlocks_diagonal_posSemidef {a : Type u} {b : Type v}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     {A : CMatrix a} {D : CMatrix b}
     (hA : A.PosSemidef) (hD : D.PosSemidef) :
-    (Matrix.fromBlocks A 0 0 D : CMatrix (Sum a b)).PosSemidef := by
+    (Matrix.fromBlocks A 0 0 D : CMatrix (a ⊕ b)).PosSemidef := by
   classical
   refine Matrix.PosSemidef.of_dotProduct_mulVec_nonneg ?_ ?_
   · rw [Matrix.IsHermitian.ext_iff]
@@ -192,16 +170,16 @@ semidefinite.  It factors as `T†T`, with `T = [[I,U],[0,0]]`. -/
 theorem cMatrix_fromBlocks_unitary_posSemidef {a : Type u}
     [Fintype a] [DecidableEq a] (U : Matrix.unitaryGroup a ℂ) :
     (Matrix.fromBlocks (1 : CMatrix a) (U : CMatrix a) (star (U : CMatrix a)) 1 :
-      CMatrix (Sum a a)).PosSemidef := by
+      CMatrix (a ⊕ a)).PosSemidef := by
   classical
-  let T : CMatrix (Sum a a) :=
+  let T : CMatrix (a ⊕ a) :=
     Matrix.fromBlocks (1 : CMatrix a) (U : CMatrix a) 0 0
   have hpsd : (star T * T).PosSemidef :=
     Matrix.posSemidef_conjTranspose_mul_self T
   have hfactor :
       star T * T =
         (Matrix.fromBlocks (1 : CMatrix a) (U : CMatrix a) (star (U : CMatrix a)) 1 :
-          CMatrix (Sum a a)) := by
+          CMatrix (a ⊕ a)) := by
     have hUconj : ((U : CMatrix a)ᴴ) * (U : CMatrix a) = 1 := by
       simpa [Matrix.star_eq_conjTranspose] using
         Matrix.UnitaryGroup.star_mul_self U
@@ -221,7 +199,7 @@ variable {r₁ : Type w} {r₂ : Type x}
 variable [Fintype r₁] [DecidableEq r₁] [Fintype r₂] [DecidableEq r₂]
 
 omit [DecidableEq a] [DecidableEq r₁] in
-theorem rightBlock_mul (X Y : CMatrix (Prod a r₁)) (i j : a) :
+theorem rightBlock_mul (X Y : CMatrix (a × r₁)) (i j : a) :
     rightBlock (X * Y) i j =
       ∑ k : a, rightBlock X i k * rightBlock Y k j := by
   ext x y
@@ -233,7 +211,7 @@ theorem rightBlock_mul (X Y : CMatrix (Prod a r₁)) (i j : a) :
 
 omit [DecidableEq a] in
 theorem applyMatrixRight_mul (V : ReferenceIsometry r₁ r₂)
-    (X Y : CMatrix (Prod a r₁)) :
+    (X Y : CMatrix (a × r₁)) :
     V.applyMatrixRight X * V.applyMatrixRight Y = V.applyMatrixRight (X * Y) := by
   ext p q
   calc
@@ -241,7 +219,7 @@ theorem applyMatrixRight_mul (V : ReferenceIsometry r₁ r₂)
         (∑ k : a,
           ((V.matrix * rightBlock X p.1 k * Matrix.conjTranspose V.matrix) *
             (V.matrix * rightBlock Y k q.1 * Matrix.conjTranspose V.matrix)) p.2 q.2) := by
-      change (∑ j : Prod a r₂, V.applyMatrixRight X p j * V.applyMatrixRight Y j q) = _
+      change (∑ j : a × r₂, V.applyMatrixRight X p j * V.applyMatrixRight Y j q) = _
       rw [← Finset.univ_product_univ, Finset.sum_product]
       simp [applyMatrixRight, Matrix.mul_apply]
     _ = (∑ k : a,
@@ -266,21 +244,19 @@ theorem applyMatrixRight_mul (V : ReferenceIsometry r₁ r₂)
       rfl
 
 theorem applyMatrixRight_posSemidef (V : ReferenceIsometry r₁ r₂)
-    {X : CMatrix (Prod a r₁)} (hX : X.PosSemidef) :
+    {X : CMatrix (a × r₁)} (hX : X.PosSemidef) :
     (V.applyMatrixRight X).PosSemidef := by
   rw [← MatrixMap.kron_id_ofReferenceIsometry_apply_eq_applyMatrixRight]
   exact MatrixMap.isCompletelyPositive_mapsPositive
-    (MatrixMap.kron (Channel.idChannel a).map (MatrixMap.ofReferenceIsometry V))
-    (MatrixMap.isCompletelyPositive_kron (Channel.idChannel a).map
-      (MatrixMap.ofReferenceIsometry V)
-      (Channel.idChannel a).completelyPositive
+    (MatrixMap.kron (CPTPOp.id (dIn := a)).map (MatrixMap.ofReferenceIsometry V))
+    (MatrixMap.IsCompletelyPositive.kron (CPTPOp.id (dIn := a)).map_cp
       (MatrixMap.ofReferenceIsometry_isCompletelyPositive V))
     X hX
 
 theorem psdSqrt_applyMatrixRight (V : ReferenceIsometry r₁ r₂)
-    {X : CMatrix (Prod a r₁)} (hX : X.PosSemidef) :
+    {X : CMatrix (a × r₁)} (hX : X.PosSemidef) :
     psdSqrt (V.applyMatrixRight X) = V.applyMatrixRight (psdSqrt X) := by
-  let S : CMatrix (Prod a r₂) := V.applyMatrixRight (psdSqrt X)
+  let S : CMatrix (a × r₂) := V.applyMatrixRight (psdSqrt X)
   have hSpos : S.PosSemidef := by
     simpa [S] using V.applyMatrixRight_posSemidef (a := a) (psdSqrt_pos X)
   have hSsq : S * S = V.applyMatrixRight X := by
@@ -292,7 +268,7 @@ theorem psdSqrt_applyMatrixRight (V : ReferenceIsometry r₁ r₂)
 /-- Concrete right-summand reference padding commutes with the positive square root. -/
 theorem psdSqrt_applyMatrixRight_sumInr
     {extra : Type w} [Fintype extra] [DecidableEq extra]
-    {X : CMatrix (Prod a b)} (hX : X.PosSemidef) :
+    {X : CMatrix (a × b)} (hX : X.PosSemidef) :
     psdSqrt ((ReferenceIsometry.sumInr extra b).applyMatrixRight X) =
       (ReferenceIsometry.sumInr extra b).applyMatrixRight (psdSqrt X) :=
   (ReferenceIsometry.sumInr extra b).psdSqrt_applyMatrixRight hX
@@ -303,8 +279,10 @@ namespace MatrixMap
 
 variable {κ : Type x} [Fintype κ]
 
+/-- A Kraus family stacked into a single tall matrix `κ × b ← a`, so that `K† K = ∑ₓ Kₓ† Kₓ` is a
+single matrix product. -/
 def smoothEndpointKrausStack (K : κ → Matrix b a ℂ) :
-    Matrix (Prod κ b) a ℂ :=
+    Matrix (κ × b) a ℂ :=
   fun x i => K x.1 x.2 i
 
 omit [Fintype a] [DecidableEq a] in

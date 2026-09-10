@@ -20,9 +20,9 @@ does not prove new typicality estimates; it packages a completed
 `HSWPackingHypothesesSpectral` bundle into the average-error coding witness
 used by the operational direct-achievability assembly.
 
-The full HSW direct theorem still requires a source-shaped family of these
-witnesses for every block-channel ensemble, including the message-size and
-packing-error asymptotics.  This module proves the downstream operational
-assembly and the block-channel rate-normalization transport.
+What it proves is the operational assembly and the block-channel
+rate-normalization transport; supplying such a bundle for every block-channel
+ensemble, with the accompanying message-size and packing-error asymptotics, is
+the job of the packing and conditional-typicality layers it sits on.
 [Wilde2011Qst, qit-notes.tex:33634-33808]
 -/

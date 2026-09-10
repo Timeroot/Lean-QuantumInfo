@@ -38,7 +38,7 @@ open SequentialDecoding
 
 namespace HypothesisTestingEffect
 
-variable {ρ σ : State a} {ε : ℝ}
+variable {ρ σ : MState a} {ε : ℝ}
 
 /-- The Naimark accept projector associated to a feasible hypothesis-testing
 effect.  It is the projective measurement outcome corresponding to accepting
@@ -57,7 +57,7 @@ theorem acceptNaimarkProjection_matrix (Λ : HypothesisTestingEffect ρ ε) :
 
 /-- Naimark dilation preserves the accept probability of any tested state. -/
 theorem effectTrace_fixedNaimark_accept
-    (Λ : HypothesisTestingEffect ρ ε) (τ : State a) :
+    (Λ : HypothesisTestingEffect ρ ε) (τ : MState a) :
     effectTrace
         (Λ.toBinaryHypothesisTest.fixedNaimarkLiftState τ)
         Λ.acceptNaimarkProjection.matrix =
@@ -78,7 +78,7 @@ theorem effectTrace_fixedNaimark_accept_source
 
 /-- Naimark dilation preserves the type-II error of the comparison state. -/
 theorem effectTrace_fixedNaimark_accept_comparison
-    (Λ : HypothesisTestingEffect ρ ε) (σ : State a) :
+    (Λ : HypothesisTestingEffect ρ ε) (σ : MState a) :
     effectTrace
         (Λ.toBinaryHypothesisTest.fixedNaimarkLiftState σ)
         Λ.acceptNaimarkProjection.matrix =

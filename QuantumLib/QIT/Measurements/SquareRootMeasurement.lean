@@ -114,16 +114,14 @@ def pgmEffects (S : ι → CMatrix a) (hS : ∀ i, (S i).PosSemidef) (o : Option
 outcome `none` carrying `1 - Σᵢ Λᵢ` so that the effects sum to the identity.
 [Wilde2011Qst, qit-notes.tex:29363-29415] -/
 def SquareRootMeasurement (S : ι → CMatrix a) (hS : ∀ i, (S i).PosSemidef) :
-    POVM (Option ι) a where
-  effects := pgmEffects S hS
-  pos := by
-    intro o
-    cases o with
-    | some i => exact pgmEffect_posSemidef S hS i
-    | none =>
-      -- `none` carries `1 - ΣΛᵢ`, which is PSD because `ΣΛᵢ ≤ 1`.
-      exact Matrix.le_iff.mp (sum_pgmEffect_le_one S hS)
-  sum_eq_one := by
+    POVM (Option ι) a :=
+  .ofMatrices (pgmEffects S hS)
+    (fun o => by
+      cases o with
+      | some i => exact pgmEffect_posSemidef S hS i
+      | none =>
+        -- `none` carries `1 - ΣΛᵢ`, which is PSD because `ΣΛᵢ ≤ 1`.
+        exact Matrix.le_iff.mp (sum_pgmEffect_le_one S hS)) <| by
     ext k j
     classical
     have huniv :

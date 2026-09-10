@@ -12,9 +12,7 @@ public import QuantumLib.QIT.Coding.EntanglementAssisted.Asymptotic.Upper.Witnes
 # Asymptotic upper-bound assembly helpers
 
 This module is part of the entanglement-assisted classical communication
-asymptotic proof spine.  It was split out mechanically from the historical
-`EntanglementAssistedAsymptotic` files; theorem statements and proof routes are
-unchanged.
+asymptotic proof spine.
 -/
 
 @[expose] public section
@@ -22,18 +20,18 @@ unchanged.
 open scoped ComplexOrder MatrixOrder NNReal Topology
 open Filter
 
-namespace QIT
-
 universe u v w x y
 
 noncomputable section
 
+namespace CPTPOp
+
+open QIT
+
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-namespace Channel
-
-variable (N : Channel a b)
+variable (N : CPTPMap a b)
 
 /-- Assembly theorem for the source-shaped asymptotic upper-bound route.
 
@@ -60,8 +58,6 @@ theorem entanglementAssisted_asymptoticUpperBounds_of_sourceAsymptoticUpperInput
       N.strongConverseEntanglementAssistedClassicalCapacity_le_information_of_sourceAsymptoticUpperInput
         hach H⟩
 
-end Channel
+end CPTPOp
 
 end
-
-end QIT

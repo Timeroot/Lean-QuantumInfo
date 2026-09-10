@@ -25,13 +25,15 @@ reusable layer is a position-wise tensor-power projector constructor.
 
 open scoped ComplexOrder MatrixOrder Kronecker
 
-namespace QIT
+noncomputable section
 
 universe u v w
 
-noncomputable section
-
 variable {a : Type u} [Fintype a] [DecidableEq a]
+
+open QIT
+
+namespace QIT
 
 namespace ProjectionMatrix
 
@@ -137,72 +139,38 @@ theorem tensorPowerAt_idempotent (P : ProjectionMatrix a) {n : ℕ} (i : Fin n) 
 
 end ProjectionMatrix
 
-namespace TensorPower
+end QIT
+
+namespace MState
 
 variable {b : Type v} [Fintype b] [DecidableEq b]
 
-omit [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] in
-/-- First-coordinate projection of `tensorPowerProdEquiv`, read at a tensor
-position. -/
-theorem tensorPowerProdEquiv_fst_apply
-    (n : ℕ) (z : TensorPower (Prod a b) n) (i : Fin n) :
-    tensorPowerEquiv (a := a) n ((tensorPowerProdEquiv a b n z).1) i =
-      (tensorPowerEquiv (a := Prod a b) n z i).1 := by
-  induction n with
-  | zero => exact Fin.elim0 i
-  | succ n ih =>
-      cases z with
-      | mk _ tail =>
-          cases i using Fin.cases with
-          | zero => rfl
-          | succ i =>
-              simp [tensorPowerProdEquiv, tensorPowerEquiv]
-              exact ih tail i
+section
 
-omit [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] in
-/-- Second-coordinate projection of `tensorPowerProdEquiv`, read at a tensor
-position. -/
-theorem tensorPowerProdEquiv_snd_apply
-    (n : ℕ) (z : TensorPower (Prod a b) n) (i : Fin n) :
-    tensorPowerEquiv (a := b) n ((tensorPowerProdEquiv a b n z).2) i =
-      (tensorPowerEquiv (a := Prod a b) n z i).2 := by
-  induction n with
-  | zero => exact Fin.elim0 i
-  | succ n ih =>
-      cases z with
-      | mk _ tail =>
-          cases i using Fin.cases with
-          | zero => rfl
-          | succ i =>
-              simp [tensorPowerProdEquiv, tensorPowerEquiv]
-              exact ih tail i
-
-namespace State
-
-variable (ρ : State (Prod a b))
+variable (ρ : MState (a × b))
 
 /-- Coordinatewise matrix formula for an IID bipartite tensor-power state,
 after reading it as `A^n × B^n`. -/
 theorem tensorPowerBipartite_matrix_apply_fin
     (n : ℕ) (x x' : TensorPower a n) (y y' : TensorPower b n) :
-    (ρ.tensorPowerBipartite n).matrix (x, y) (x', y') =
+    (ρ.tensorPowerBipartite n).m (x, y) (x', y') =
       ∏ i : Fin n,
-        ρ.matrix
+        ρ.m
           (tensorPowerEquiv (a := a) n x i,
             tensorPowerEquiv (a := b) n y i)
           (tensorPowerEquiv (a := a) n x' i,
             tensorPowerEquiv (a := b) n y' i) := by
-  rw [State.tensorPowerBipartite_matrix]
-  change (ρ.tensorPower n).matrix
+  rw [MState.tensorPowerBipartite_matrix]
+  change (ρ.tensorPower n).m
       ((tensorPowerProdEquiv a b n).symm (x, y))
       ((tensorPowerProdEquiv a b n).symm (x', y')) =
     ∏ i : Fin n,
-      ρ.matrix
+      ρ.m
         (tensorPowerEquiv (a := a) n x i,
           tensorPowerEquiv (a := b) n y i)
         (tensorPowerEquiv (a := a) n x' i,
           tensorPowerEquiv (a := b) n y' i)
-  rw [State.tensorPower_matrix_apply]
+  rw [MState.tensorPower_matrix_apply]
   refine Finset.prod_congr rfl ?_
   intro i _
   let z := (tensorPowerProdEquiv a b n).symm (x, y)
@@ -211,15 +179,15 @@ theorem tensorPowerBipartite_matrix_apply_fin
   have hx0 :
       tensorPowerEquiv (a := a) n
           ((tensorPowerProdEquiv a b n z).1) i =
-        (tensorPowerEquiv (a := Prod a b) n z i).1 :=
-    TensorPower.tensorPowerProdEquiv_fst_apply (a := a) (b := b) n z i
+        (tensorPowerEquiv (a := a × b) n z i).1 :=
+    tensorPowerProdEquiv_fst_apply (a := a) (b := b) n z i
   have hy0 :
       tensorPowerEquiv (a := b) n
           ((tensorPowerProdEquiv a b n z).2) i =
-        (tensorPowerEquiv (a := Prod a b) n z i).2 :=
-    TensorPower.tensorPowerProdEquiv_snd_apply (a := a) (b := b) n z i
+        (tensorPowerEquiv (a := a × b) n z i).2 :=
+    tensorPowerProdEquiv_snd_apply (a := a) (b := b) n z i
   have hleft :
-      tensorPowerEquiv (a := Prod a b) n z i =
+      tensorPowerEquiv (a := a × b) n z i =
         (tensorPowerEquiv (a := a) n x i,
           tensorPowerEquiv (a := b) n y i) := by
     apply Prod.ext
@@ -231,15 +199,15 @@ theorem tensorPowerBipartite_matrix_apply_fin
   have hx0' :
       tensorPowerEquiv (a := a) n
           ((tensorPowerProdEquiv a b n z').1) i =
-        (tensorPowerEquiv (a := Prod a b) n z' i).1 :=
-    TensorPower.tensorPowerProdEquiv_fst_apply (a := a) (b := b) n z' i
+        (tensorPowerEquiv (a := a × b) n z' i).1 :=
+    tensorPowerProdEquiv_fst_apply (a := a) (b := b) n z' i
   have hy0' :
       tensorPowerEquiv (a := b) n
           ((tensorPowerProdEquiv a b n z').2) i =
-        (tensorPowerEquiv (a := Prod a b) n z' i).2 :=
-    TensorPower.tensorPowerProdEquiv_snd_apply (a := a) (b := b) n z' i
+        (tensorPowerEquiv (a := a × b) n z' i).2 :=
+    tensorPowerProdEquiv_snd_apply (a := a) (b := b) n z' i
   have hright :
-      tensorPowerEquiv (a := Prod a b) n z' i =
+      tensorPowerEquiv (a := a × b) n z' i =
         (tensorPowerEquiv (a := a) n x' i,
           tensorPowerEquiv (a := b) n y' i) := by
     apply Prod.ext
@@ -247,33 +215,41 @@ theorem tensorPowerBipartite_matrix_apply_fin
     · simpa [hz'] using hy0'.symm
   rw [hleft, hright]
 
-end State
+end
 
-namespace State
+section
 
-variable (ρ : State a)
+variable (ρ : MState a)
 
 /-- The diagonal tensor-product weight over an arbitrary finite coordinate
 family sums to one. -/
 theorem diagonalPiProduct_sum_eq_one {ι : Type v} [Fintype ι] [DecidableEq ι] :
-    (∑ z : ι → a, ∏ i : ι, ρ.matrix (z i) (z i)) = (1 : ℂ) := by
+    (∑ z : ι → a, ∏ i : ι, ρ.m (z i) (z i)) = (1 : ℂ) := by
   have huniv : (Finset.univ : Finset (ι → a)) =
       Fintype.piFinset (fun _ : ι => (Finset.univ : Finset a)) :=
     (Fintype.piFinset_univ (α := ι) (β := fun _ : ι => a)).symm
   have hprod :
       (∑ z ∈ Fintype.piFinset (fun _ : ι => (Finset.univ : Finset a)),
-          ∏ i : ι, ρ.matrix (z i) (z i)) =
-        ∏ i : ι, ∑ x : a, ρ.matrix x x := by
+          ∏ i : ι, ρ.m (z i) (z i)) =
+        ∏ i : ι, ∑ x : a, ρ.m x x := by
     simpa using
       (Finset.prod_univ_sum
         (t := fun _ : ι => (Finset.univ : Finset a))
-        (f := fun (_ : ι) (x : a) => ρ.matrix x x)).symm
+        (f := fun (_ : ι) (x : a) => ρ.m x x)).symm
   rw [huniv, hprod]
-  have htrace : (∑ x : a, ρ.matrix x x) = (1 : ℂ) := by
-    simpa [Matrix.trace] using ρ.trace_eq_one
+  have htrace : (∑ x : a, ρ.m x x) = (1 : ℂ) := by
+    simpa [Matrix.trace] using ρ.tr'
   simp [htrace]
 
-end State
+end
+
+end MState
+
+namespace QIT
+
+namespace TensorPower
+
+variable {b : Type v} [Fintype b] [DecidableEq b]
 
 private def selectedOptionEquiv {ι : Type v} [DecidableEq ι] (m : ι) :
     ι ≃ Option {i : ι // i ≠ m} where
@@ -313,13 +289,13 @@ private theorem prod_if_selected_eq {ι : Type v} [Fintype ι] [DecidableEq ι]
     · simp [selectedOptionEquiv, h]
   · simp
 
-private theorem pureVector_diagonalFunction_sum_eq_one
+private theorem ket_diagonalFunction_sum_eq_one
     {ι : Type v} [Fintype ι] [DecidableEq ι]
-    (ψ : PureVector (Prod a a)) :
+    (ψ : Ket (a × a)) :
     (∑ x : ι → a, ∑ y : ι → a,
-        ∏ i : ι, ψ.amp (x i, y i) * star (ψ.amp (x i, y i))) = (1 : ℂ) := by
+        ∏ i : ι, ψ.vec (x i, y i) * star (ψ.vec (x i, y i))) = (1 : ℂ) := by
   classical
-  let e : Prod (ι → a) (ι → a) ≃ (ι → Prod a a) := {
+  let e : ((ι → a) × (ι → a)) ≃ (ι → a × a) := {
     toFun xy := fun i => (xy.1 i, xy.2 i)
     invFun z := (fun i => (z i).1, fun i => (z i).2)
     left_inv := by
@@ -331,63 +307,63 @@ private theorem pureVector_diagonalFunction_sum_eq_one
       funext i
       exact Prod.ext rfl rfl
   }
-  have hdiag := State.diagonalPiProduct_sum_eq_one (ρ := ψ.state) (ι := ι)
+  have hdiag := MState.diagonalPiProduct_sum_eq_one (ρ := ψ.state) (ι := ι)
   have hsum :
-      (∑ xy : Prod (ι → a) (ι → a),
-          ∏ i : ι, ψ.amp (xy.1 i, xy.2 i) * star (ψ.amp (xy.1 i, xy.2 i))) =
-        ∑ z : ι → Prod a a, ∏ i : ι, ψ.state.matrix (z i) (z i) := by
+      (∑ xy : (ι → a) × (ι → a),
+          ∏ i : ι, ψ.vec (xy.1 i, xy.2 i) * star (ψ.vec (xy.1 i, xy.2 i))) =
+        ∑ z : ι → a × a, ∏ i : ι, ψ.state.m (z i) (z i) := by
     refine Fintype.sum_equiv e
-      (fun xy : Prod (ι → a) (ι → a) =>
-        ∏ i : ι, ψ.amp (xy.1 i, xy.2 i) * star (ψ.amp (xy.1 i, xy.2 i)))
-      (fun z : ι → Prod a a => ∏ i : ι, ψ.state.matrix (z i) (z i)) ?_
+      (fun xy : (ι → a) × (ι → a) =>
+        ∏ i : ι, ψ.vec (xy.1 i, xy.2 i) * star (ψ.vec (xy.1 i, xy.2 i)))
+      (fun z : ι → a × a => ∏ i : ι, ψ.state.m (z i) (z i)) ?_
     intro xy
-    simp [e, PureVector.state, rankOneMatrix_apply]
+    simp [e, Ket.state, rankOneMatrix_apply]
   simpa [Fintype.sum_prod_type] using hsum.trans hdiag
 
 private theorem selectedProductAmplitude_sum
     {ι : Type v} [Fintype ι] [DecidableEq ι]
-    (ψ : PureVector (Prod a a)) (m : ι) (xr xa yr ya : a) :
+    (ψ : Ket (a × a)) (m : ι) (xr xa yr ya : a) :
     (∑ x : {i : ι // i ≠ m} → a,
         ∑ y : {i : ι // i ≠ m} → a,
           ∏ i : ι,
-            ψ.amp
+            ψ.vec
               (if h : i = m then xr else x ⟨i, h⟩,
                 if h : i = m then xa else y ⟨i, h⟩) *
               star
-                (ψ.amp
+                (ψ.vec
                   (if h : i = m then yr else x ⟨i, h⟩,
                     if h : i = m then ya else y ⟨i, h⟩))) =
-      ψ.amp (xr, xa) * star (ψ.amp (yr, ya)) := by
+      ψ.vec (xr, xa) * star (ψ.vec (yr, ya)) := by
   classical
-  let selected : ℂ := ψ.amp (xr, xa) * star (ψ.amp (yr, ya))
+  let selected : ℂ := ψ.vec (xr, xa) * star (ψ.vec (yr, ya))
   have hsplit :
       ∀ x : {i : ι // i ≠ m} → a,
         ∀ y : {i : ι // i ≠ m} → a,
           (∏ i : ι,
-            ψ.amp
+            ψ.vec
               (if h : i = m then xr else x ⟨i, h⟩,
                 if h : i = m then xa else y ⟨i, h⟩) *
               star
-                (ψ.amp
+                (ψ.vec
                   (if h : i = m then yr else x ⟨i, h⟩,
                     if h : i = m then ya else y ⟨i, h⟩))) =
             selected *
               ∏ i : {i : ι // i ≠ m},
-                ψ.amp (x i, y i) * star (ψ.amp (x i, y i)) := by
+                ψ.vec (x i, y i) * star (ψ.vec (x i, y i)) := by
     intro x y
     calc
       (∏ i : ι,
-        ψ.amp
+        ψ.vec
           (if h : i = m then xr else x ⟨i, h⟩,
             if h : i = m then xa else y ⟨i, h⟩) *
           star
-            (ψ.amp
+            (ψ.vec
               (if h : i = m then yr else x ⟨i, h⟩,
                 if h : i = m then ya else y ⟨i, h⟩))) =
           ∏ i : ι,
             if h : i = m then selected
-            else ψ.amp (x ⟨i, h⟩, y ⟨i, h⟩) *
-              star (ψ.amp (x ⟨i, h⟩, y ⟨i, h⟩)) := by
+            else ψ.vec (x ⟨i, h⟩, y ⟨i, h⟩) *
+              star (ψ.vec (x ⟨i, h⟩, y ⟨i, h⟩)) := by
             refine Finset.prod_congr rfl ?_
             intro i _
             by_cases h : i = m
@@ -396,27 +372,27 @@ private theorem selectedProductAmplitude_sum
             · simp [h]
       _ = selected *
             ∏ i : {i : ι // i ≠ m},
-              ψ.amp (x i, y i) * star (ψ.amp (x i, y i)) := by
+              ψ.vec (x i, y i) * star (ψ.vec (x i, y i)) := by
             exact prod_if_selected_eq (m := m) (selected := selected)
               (tail := fun i : {i : ι // i ≠ m} =>
-                ψ.amp (x i, y i) * star (ψ.amp (x i, y i)))
+                ψ.vec (x i, y i) * star (ψ.vec (x i, y i)))
   simp_rw [hsplit]
   have hdiag :=
-    pureVector_diagonalFunction_sum_eq_one (ψ := ψ)
+    ket_diagonalFunction_sum_eq_one (ψ := ψ)
       (ι := {i : ι // i ≠ m})
   calc
     (∑ x : {i : ι // i ≠ m} → a,
         ∑ y : {i : ι // i ≠ m} → a,
           selected *
             ∏ i : {i : ι // i ≠ m},
-              ψ.amp (x i, y i) * star (ψ.amp (x i, y i))) =
+              ψ.vec (x i, y i) * star (ψ.vec (x i, y i))) =
         selected *
           (∑ x : {i : ι // i ≠ m} → a,
             ∑ y : {i : ι // i ≠ m} → a,
               ∏ i : {i : ι // i ≠ m},
-                ψ.amp (x i, y i) * star (ψ.amp (x i, y i))) := by
+                ψ.vec (x i, y i) * star (ψ.vec (x i, y i))) := by
           simp [Finset.mul_sum]
-    _ = ψ.amp (xr, xa) * star (ψ.amp (yr, ya)) := by
+    _ = ψ.vec (xr, xa) * star (ψ.vec (yr, ya)) := by
           rw [hdiag]
           simp [selected]
 
@@ -494,25 +470,24 @@ private theorem prod_if_two_selected_eq {ι : Type v} [Fintype ι] [DecidableEq 
     _ = fr * fs * ∏ i : {i : ι // i ≠ r ∧ i ≠ s}, tail i := by
           rw [mul_assoc]
 
-set_option maxHeartbeats 800000 in
 private theorem distinctProductAmplitude_sum
     {ι : Type v} [Fintype ι] [DecidableEq ι]
-    (ψ : PureVector (Prod a a)) {r s : ι} (hrs : r ≠ s)
+    (ψ : Ket (a × a)) {r s : ι} (hrs : r ≠ s)
     (xr yr xa ya : a) :
     (∑ x : {i : ι // i ≠ s} → a,
         ∑ y : {i : ι // i ≠ r} → a,
           ∏ i : ι,
-            ψ.amp
+            ψ.vec
               (if hr : i = r then xr else y ⟨i, hr⟩,
                 if hs : i = s then xa else x ⟨i, hs⟩) *
               star
-                (ψ.amp
+                (ψ.vec
                   (if hr : i = r then yr else y ⟨i, hr⟩,
                     if hs : i = s then ya else x ⟨i, hs⟩))) =
-      ψ.state.marginalA.matrix xr yr * ψ.state.marginalB.matrix xa ya := by
+      ψ.state.traceRight.m xr yr * ψ.state.traceLeft.m xa ya := by
   classical
   let D := {i : ι // i ≠ r ∧ i ≠ s}
-  let ex : ({i : ι // i ≠ s} → a) ≃ Prod a (D → a) := {
+  let ex : ({i : ι // i ≠ s} → a) ≃ (a × (D → a)) := {
     toFun x := (x ⟨r, hrs⟩, fun i => x ⟨i.1, i.2.2⟩)
     invFun p := fun i => if h : i.1 = r then p.1 else p.2 ⟨i.1, h, i.2⟩
     left_inv := by
@@ -531,7 +506,7 @@ private theorem distinctProductAmplitude_sum
       · simp
       · funext i
         simp [D, i.2.1] }
-  let ey : ({i : ι // i ≠ r} → a) ≃ Prod a (D → a) := {
+  let ey : ({i : ι // i ≠ r} → a) ≃ (a × (D → a)) := {
     toFun y := (y ⟨s, Ne.symm hrs⟩, fun i => y ⟨i.1, i.2.1⟩)
     invFun p := fun i => if h : i.1 = s then p.1 else p.2 ⟨i.1, i.2, h⟩
     left_inv := by
@@ -552,39 +527,39 @@ private theorem distinctProductAmplitude_sum
         simp [D, i.2.2] }
   let F (x : {i : ι // i ≠ s} → a) (y : {i : ι // i ≠ r} → a) : ℂ :=
     ∏ i : ι,
-      ψ.amp
+      ψ.vec
         (if hr : i = r then xr else y ⟨i, hr⟩,
           if hs : i = s then xa else x ⟨i, hs⟩) *
         star
-          (ψ.amp
+          (ψ.vec
             (if hr : i = r then yr else y ⟨i, hr⟩,
               if hs : i = s then ya else x ⟨i, hs⟩))
   have hprod :
-      ∀ xp : Prod a (D → a), ∀ yp : Prod a (D → a),
+      ∀ xp : a × (D → a), ∀ yp : a × (D → a),
         F (ex.symm xp) (ey.symm yp) =
-          (ψ.amp (xr, xp.1) * star (ψ.amp (yr, xp.1))) *
-            (ψ.amp (yp.1, xa) * star (ψ.amp (yp.1, ya))) *
+          (ψ.vec (xr, xp.1) * star (ψ.vec (yr, xp.1))) *
+            (ψ.vec (yp.1, xa) * star (ψ.vec (yp.1, ya))) *
               ∏ i : D,
-                ψ.amp (yp.2 i, xp.2 i) * star (ψ.amp (yp.2 i, xp.2 i)) := by
+                ψ.vec (yp.2 i, xp.2 i) * star (ψ.vec (yp.2 i, xp.2 i)) := by
     intro xp yp
     unfold F
     calc
       (∏ i : ι,
-        ψ.amp
+        ψ.vec
           (if hr : i = r then xr else (ey.symm yp) ⟨i, hr⟩,
             if hs : i = s then xa else (ex.symm xp) ⟨i, hs⟩) *
           star
-            (ψ.amp
+            (ψ.vec
               (if hr : i = r then yr else (ey.symm yp) ⟨i, hr⟩,
                 if hs : i = s then ya else (ex.symm xp) ⟨i, hs⟩))) =
           ∏ i : ι,
             if hr : i = r then
-              ψ.amp (xr, xp.1) * star (ψ.amp (yr, xp.1))
+              ψ.vec (xr, xp.1) * star (ψ.vec (yr, xp.1))
             else if hs : i = s then
-              ψ.amp (yp.1, xa) * star (ψ.amp (yp.1, ya))
+              ψ.vec (yp.1, xa) * star (ψ.vec (yp.1, ya))
             else
-              ψ.amp (yp.2 ⟨i, hr, hs⟩, xp.2 ⟨i, hr, hs⟩) *
-                star (ψ.amp (yp.2 ⟨i, hr, hs⟩, xp.2 ⟨i, hr, hs⟩)) := by
+              ψ.vec (yp.2 ⟨i, hr, hs⟩, xp.2 ⟨i, hr, hs⟩) *
+                star (ψ.vec (yp.2 ⟨i, hr, hs⟩, xp.2 ⟨i, hr, hs⟩)) := by
             refine Finset.prod_congr rfl ?_
             intro i _
             by_cases hr : i = r
@@ -596,79 +571,79 @@ private theorem distinctProductAmplitude_sum
                 simp [ey, hr]
               · simp [ex, ey, hr, hs]
       _ =
-          (ψ.amp (xr, xp.1) * star (ψ.amp (yr, xp.1))) *
-            (ψ.amp (yp.1, xa) * star (ψ.amp (yp.1, ya))) *
+          (ψ.vec (xr, xp.1) * star (ψ.vec (yr, xp.1))) *
+            (ψ.vec (yp.1, xa) * star (ψ.vec (yp.1, ya))) *
               ∏ i : D,
-                ψ.amp (yp.2 i, xp.2 i) * star (ψ.amp (yp.2 i, xp.2 i)) := by
+                ψ.vec (yp.2 i, xp.2 i) * star (ψ.vec (yp.2 i, xp.2 i)) := by
             exact prod_if_two_selected_eq (hrs := hrs)
-              (fr := ψ.amp (xr, xp.1) * star (ψ.amp (yr, xp.1)))
-              (fs := ψ.amp (yp.1, xa) * star (ψ.amp (yp.1, ya)))
+              (fr := ψ.vec (xr, xp.1) * star (ψ.vec (yr, xp.1)))
+              (fs := ψ.vec (yp.1, xa) * star (ψ.vec (yp.1, ya)))
               (tail := fun i : D =>
-                ψ.amp (yp.2 i, xp.2 i) * star (ψ.amp (yp.2 i, xp.2 i)))
+                ψ.vec (yp.2 i, xp.2 i) * star (ψ.vec (yp.2 i, xp.2 i)))
   have hdiag :=
-    pureVector_diagonalFunction_sum_eq_one (ψ := ψ) (ι := D)
+    ket_diagonalFunction_sum_eq_one (ψ := ψ) (ι := D)
   have htail :
       (∑ x : D → a, ∑ y : D → a,
-          ∏ i : D, ψ.amp (y i, x i) * star (ψ.amp (y i, x i))) = (1 : ℂ) := by
+          ∏ i : D, ψ.vec (y i, x i) * star (ψ.vec (y i, x i))) = (1 : ℂ) := by
     calc
       (∑ x : D → a, ∑ y : D → a,
-          ∏ i : D, ψ.amp (y i, x i) * star (ψ.amp (y i, x i))) =
+          ∏ i : D, ψ.vec (y i, x i) * star (ψ.vec (y i, x i))) =
           ∑ y : D → a, ∑ x : D → a,
-            ∏ i : D, ψ.amp (y i, x i) * star (ψ.amp (y i, x i)) := by
+            ∏ i : D, ψ.vec (y i, x i) * star (ψ.vec (y i, x i)) := by
             rw [Finset.sum_comm]
       _ = 1 := hdiag
   have hmA :
-      (∑ z : a, ψ.amp (xr, z) * star (ψ.amp (yr, z))) =
-        ψ.state.marginalA.matrix xr yr := by
-    simp [State.marginalA, partialTraceB, PureVector.state, rankOneMatrix_apply]
+      (∑ z : a, ψ.vec (xr, z) * star (ψ.vec (yr, z))) =
+        ψ.state.traceRight.m xr yr := by
+    simp [Matrix.traceRight, Ket.state, rankOneMatrix_apply]
   have hmB :
-      (∑ z : a, ψ.amp (z, xa) * star (ψ.amp (z, ya))) =
-        ψ.state.marginalB.matrix xa ya := by
-    simp [State.marginalB, partialTraceA, PureVector.state, rankOneMatrix_apply]
+      (∑ z : a, ψ.vec (z, xa) * star (ψ.vec (z, ya))) =
+        ψ.state.traceLeft.m xa ya := by
+    simp [Matrix.traceLeft, Ket.state, rankOneMatrix_apply]
   calc
     (∑ x : {i : ι // i ≠ s} → a, ∑ y : {i : ι // i ≠ r} → a, F x y) =
-        ∑ xp : Prod a (D → a),
-          ∑ yp : Prod a (D → a), F (ex.symm xp) (ey.symm yp) := by
+        ∑ xp : a × (D → a),
+          ∑ yp : a × (D → a), F (ex.symm xp) (ey.symm yp) := by
           refine Fintype.sum_equiv ex
             (fun x : {i : ι // i ≠ s} → a =>
               ∑ y : {i : ι // i ≠ r} → a, F x y)
-            (fun xp : Prod a (D → a) =>
-              ∑ yp : Prod a (D → a), F (ex.symm xp) (ey.symm yp)) ?_
+            (fun xp : a × (D → a) =>
+              ∑ yp : a × (D → a), F (ex.symm xp) (ey.symm yp)) ?_
           intro x
           have hx : ex.symm (ex x) = x := by
             exact ex.left_inv x
           calc
             (fun x : {i : ι // i ≠ s} → a =>
                 ∑ y : {i : ι // i ≠ r} → a, F x y) x =
-                ∑ yp : Prod a (D → a), F x (ey.symm yp) := by
+                ∑ yp : a × (D → a), F x (ey.symm yp) := by
                   refine Fintype.sum_equiv ey
                     (fun y : {i : ι // i ≠ r} → a => F x y)
-                    (fun yp : Prod a (D → a) => F x (ey.symm yp)) ?_
+                    (fun yp : a × (D → a) => F x (ey.symm yp)) ?_
                   intro y
                   simp
-            _ = (fun xp : Prod a (D → a) =>
-                ∑ yp : Prod a (D → a), F (ex.symm xp) (ey.symm yp)) (ex x) := by
-                  change (∑ yp : Prod a (D → a), F x (ey.symm yp)) =
-                    ∑ yp : Prod a (D → a), F (ex.symm (ex x)) (ey.symm yp)
+            _ = (fun xp : a × (D → a) =>
+                ∑ yp : a × (D → a), F (ex.symm xp) (ey.symm yp)) (ex x) := by
+                  change (∑ yp : a × (D → a), F x (ey.symm yp)) =
+                    ∑ yp : a × (D → a), F (ex.symm (ex x)) (ey.symm yp)
                   rw [hx]
     _ =
-        (∑ z : a, ψ.amp (xr, z) * star (ψ.amp (yr, z))) *
-          (∑ z : a, ψ.amp (z, xa) * star (ψ.amp (z, ya))) := by
+        (∑ z : a, ψ.vec (xr, z) * star (ψ.vec (yr, z))) *
+          (∑ z : a, ψ.vec (z, xa) * star (ψ.vec (z, ya))) := by
           simp_rw [hprod]
-          let A : a → ℂ := fun z => ψ.amp (xr, z) * star (ψ.amp (yr, z))
-          let B : a → ℂ := fun z => ψ.amp (z, xa) * star (ψ.amp (z, ya))
+          let A : a → ℂ := fun z => ψ.vec (xr, z) * star (ψ.vec (yr, z))
+          let B : a → ℂ := fun z => ψ.vec (z, xa) * star (ψ.vec (z, ya))
           let T : (D → a) → (D → a) → ℂ := fun x y =>
-            ∏ i : D, ψ.amp (y i, x i) * star (ψ.amp (y i, x i))
+            ∏ i : D, ψ.vec (y i, x i) * star (ψ.vec (y i, x i))
           have hT : (∑ x : D → a, ∑ y : D → a, T x y) = (1 : ℂ) := by
             simpa [T] using htail
           calc
-            (∑ xp : Prod a (D → a),
-                ∑ yp : Prod a (D → a),
-                  (ψ.amp (xr, xp.1) * star (ψ.amp (yr, xp.1))) *
-                    (ψ.amp (yp.1, xa) * star (ψ.amp (yp.1, ya))) *
+            (∑ xp : a × (D → a),
+                ∑ yp : a × (D → a),
+                  (ψ.vec (xr, xp.1) * star (ψ.vec (yr, xp.1))) *
+                    (ψ.vec (yp.1, xa) * star (ψ.vec (yp.1, ya))) *
                       ∏ i : D,
-                        ψ.amp (yp.2 i, xp.2 i) *
-                          star (ψ.amp (yp.2 i, xp.2 i))) =
+                        ψ.vec (yp.2 i, xp.2 i) *
+                          star (ψ.vec (yp.2 i, xp.2 i))) =
                 ∑ x0 : a, ∑ xt : D → a, ∑ y0 : a, ∑ yt : D → a,
                   A x0 * B y0 * T xt yt := by
                   simp [Fintype.sum_prod_type, A, B, T]
@@ -685,7 +660,7 @@ private theorem distinctProductAmplitude_sum
                   simp
             _ = (∑ z : a, A z) * (∑ z : a, B z) := by
                   simp [Finset.mul_sum, mul_comm]
-    _ = ψ.state.marginalA.matrix xr yr * ψ.state.marginalB.matrix xa ya := by
+    _ = ψ.state.traceRight.m xr yr * ψ.state.traceLeft.m xa ya := by
           rw [hmA, hmB]
 
 /-- Reindex an operational position-based output so that the pair consisting
@@ -697,8 +672,8 @@ unwraps that single use and pairs it with the selected reference coordinate.
 It is the finite-dimensional bookkeeping behind the source projectors `P_i`
 in the Khatri--Wilde position-based proof. -/
 def outputReferenceCoordEquiv (k : ℕ) (m : Fin k) :
-    Prod (TensorPower b 1) (TensorPower a k) ≃
-      Prod (Prod a b) (CoordComplement (a := a) k m) where
+    (TensorPower b 1 × TensorPower a k) ≃
+      ((a × b) × CoordComplement (a := a) k m) where
   toFun x :=
     ((tensorPowerEquiv (a := a) k x.2 m, x.1.1),
       fun i => tensorPowerEquiv (a := a) k x.2 i.1)
@@ -728,7 +703,7 @@ def outputReferenceCoordEquiv (k : ℕ) (m : Fin k) :
 omit [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] in
 @[simp]
 theorem outputReferenceCoordEquiv_apply_fst_fst
-    (k : ℕ) (m : Fin k) (x : Prod (TensorPower b 1) (TensorPower a k)) :
+    (k : ℕ) (m : Fin k) (x : TensorPower b 1 × TensorPower a k) :
     ((outputReferenceCoordEquiv (a := a) (b := b) k m x).1).1 =
       tensorPowerEquiv (a := a) k x.2 m :=
   rfl
@@ -736,7 +711,7 @@ theorem outputReferenceCoordEquiv_apply_fst_fst
 omit [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] in
 @[simp]
 theorem outputReferenceCoordEquiv_apply_fst_snd
-    (k : ℕ) (m : Fin k) (x : Prod (TensorPower b 1) (TensorPower a k)) :
+    (k : ℕ) (m : Fin k) (x : TensorPower b 1 × TensorPower a k) :
     ((outputReferenceCoordEquiv (a := a) (b := b) k m x).1).2 =
       x.1.1 :=
   rfl
@@ -744,7 +719,7 @@ theorem outputReferenceCoordEquiv_apply_fst_snd
 omit [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] in
 @[simp]
 theorem outputReferenceCoordEquiv_apply_snd
-    (k : ℕ) (m : Fin k) (x : Prod (TensorPower b 1) (TensorPower a k))
+    (k : ℕ) (m : Fin k) (x : TensorPower b 1 × TensorPower a k)
     (i : {i : Fin k // i ≠ m}) :
     (outputReferenceCoordEquiv (a := a) (b := b) k m x).2 i =
       tensorPowerEquiv (a := a) k x.2 i.1 :=
@@ -752,18 +727,28 @@ theorem outputReferenceCoordEquiv_apply_snd
 
 end TensorPower
 
-namespace Channel
+end QIT
+end
+
+noncomputable section
+
+namespace CPTPOp
+
+open QIT
+
+variable {a : Type u} [Fintype a] [DecidableEq a]
 
 /-- Matrix-entry form of coordinate selection: selecting coordinate `m` and
 discarding the complement sums over the discarded tail. -/
 theorem positionSelectionMap_apply_sum (k : ℕ) (m : Fin k)
     (X : CMatrix (QIT.TensorPower a k)) (out out' : QIT.TensorPower a 1) :
-    (Channel.positionSelection (a := a) k m).map X out out' =
+    (CPTPOp.positionSelection (a := a) k m).map X out out' =
       ∑ tail : TensorPower.CoordComplement (a := a) k m,
         X ((TensorPower.coordSplitEquiv (a := a) k m).symm (out, tail))
           ((TensorPower.coordSplitEquiv (a := a) k m).symm (out', tail)) := by
   classical
-  unfold Channel.positionSelection Channel.positionSelectionMap MatrixMap.ofKraus
+  rw [CPTPOp.positionSelection_map]
+  unfold CPTPOp.positionSelectionMap MatrixMap.ofKraus
   simp only [LinearMap.coe_mk, AddHom.coe_mk, Matrix.sum_apply]
   refine Finset.sum_congr rfl fun tail _ => ?_
   rw [Matrix.mul_apply]
@@ -772,7 +757,7 @@ theorem positionSelectionMap_apply_sum (k : ℕ) (m : Fin k)
   · rw [Matrix.mul_apply]
     rw [Finset.sum_eq_single
       ((TensorPower.coordSplitEquiv (a := a) k m).symm (out, tail))]
-    · simp [Channel.positionSelectionKraus]
+    · simp [CPTPOp.positionSelectionKraus]
     · intro y _ hy
       have hneq :
           TensorPower.coordSplitEquiv (a := a) k m y ≠ (out, tail) := by
@@ -780,7 +765,7 @@ theorem positionSelectionMap_apply_sum (k : ℕ) (m : Fin k)
         exact hy ((TensorPower.coordSplitEquiv (a := a) k m).injective
           (h.trans (Equiv.apply_symm_apply
             (TensorPower.coordSplitEquiv (a := a) k m) (out, tail)).symm))
-      simp [Channel.positionSelectionKraus, hneq]
+      simp [CPTPOp.positionSelectionKraus, hneq]
     · intro hnot
       exact False.elim (hnot (Finset.mem_univ _))
   · intro y _ hy
@@ -790,67 +775,58 @@ theorem positionSelectionMap_apply_sum (k : ℕ) (m : Fin k)
       exact hy ((TensorPower.coordSplitEquiv (a := a) k m).injective
         (h.trans (Equiv.apply_symm_apply
           (TensorPower.coordSplitEquiv (a := a) k m) (out', tail)).symm))
-    simp [Channel.positionSelectionKraus, hneq]
+    simp [CPTPOp.positionSelectionKraus, hneq]
   · intro hnot
     exact False.elim (hnot (Finset.mem_univ _))
 
 /-- Slice form of coordinate selection tensored with an idle reference
 register. -/
-theorem positionSelection_prod_id_applyState_matrix
+theorem positionSelection_prod_id_map_apply
     {r : Type v} [Fintype r] [DecidableEq r]
-    (k : ℕ) (m : Fin k) (ρ : State (Prod (QIT.TensorPower a k) r))
-    (x y : Prod (QIT.TensorPower a 1) r) :
-    (((Channel.positionSelection (a := a) k m).prod (Channel.idChannel r)).applyState ρ).matrix
-        x y =
+    (k : ℕ) (m : Fin k) (X : CMatrix (QIT.TensorPower a k × r))
+    (x y : QIT.TensorPower a 1 × r) :
+    ((CPTPOp.positionSelection (a := a) k m).prod (CPTPOp.id (dIn := r))).map X x y =
       ∑ tail : TensorPower.CoordComplement (a := a) k m,
-        ρ.matrix
-          ((TensorPower.coordSplitEquiv (a := a) k m).symm (x.1, tail), x.2)
+        X ((TensorPower.coordSplitEquiv (a := a) k m).symm (x.1, tail), x.2)
           ((TensorPower.coordSplitEquiv (a := a) k m).symm (y.1, tail), y.2) := by
-  change MatrixMap.kron (Channel.positionSelection (a := a) k m).map
-      (Channel.idChannel r).map ρ.matrix x y = _
+  simp only [CPTPOp.prod_map]
   rw [MatrixMap.kron_idChannel_apply_slice]
-  exact Channel.positionSelectionMap_apply_sum (a := a) k m
-    (Matrix.of fun i i' => ρ.matrix (i, x.2) (i', y.2)) x.1 y.1
+  exact CPTPOp.positionSelectionMap_apply_sum (a := a) k m
+    (Matrix.of fun i i' => X (i, x.2) (i', y.2)) x.1 y.1
 
-private theorem unit_map_eq_idChannel_for_positionTrace :
-    (Channel.unit : Channel PUnit PUnit).map = (Channel.idChannel PUnit).map := by
-  ext X i j
-  cases i
-  cases j
-  simp [Channel.unit, MatrixMap.unit, Channel.idChannel, MatrixMap.ofKraus]
-
-set_option maxHeartbeats 800000 in
 /-- Applying a one-use channel to the selected transmitted coordinate commutes
 with taking the selected reference/output marginal. -/
 theorem selectedReferenceOutputMarginal_apply_channel
     {b : Type v} [Fintype b] [DecidableEq b]
-    (N : Channel a b)
+    (N : CPTPMap a b)
     (k : ℕ) (m : Fin k)
-    (ρ : State (Prod (QIT.TensorPower a 1) (QIT.TensorPower a k))) :
-    ((((N.tensorPower 1).prod (Channel.idChannel (QIT.TensorPower a k))).applyState ρ)
-        |>.reindex (TensorPower.outputReferenceCoordEquiv
-          (a := a) (b := b) k m)).marginalA =
-      ((Channel.idChannel a).prod N).applyState
+    (ρ : MState (QIT.TensorPower a 1 × QIT.TensorPower a k)) :
+    (MState.reindex (((N.tensorPower 1).prod (CPTPOp.id (dIn := QIT.TensorPower a k))) ρ)
+        (TensorPower.outputReferenceCoordEquiv
+          (a := a) (b := b) k m)).traceRight =
+      ((CPTPOp.id (dIn := a)).prod N)
         ((ρ.reindex (TensorPower.outputReferenceCoordEquiv
-          (a := a) (b := a) k m)).marginalA) := by
-  apply State.ext
+          (a := a) (b := a) k m)).traceRight) := by
+  apply MState.ext
+  simp only [CPTPOp.mat_coe_eq_apply_mat, MState.traceRight_m, MState.reindex_matrix,
+    CPTPOp.prod_map]
   ext x y
   rcases x with ⟨xr, xb⟩
   rcases y with ⟨yr, yb⟩
   change
     (∑ tail : TensorPower.CoordComplement (a := a) k m,
       MatrixMap.kron (N.tensorPower 1).map
-          (Channel.idChannel (QIT.TensorPower a k)).map ρ.matrix
+          (CPTPOp.id (dIn := QIT.TensorPower a k)).map ρ.m
         ((xb, PUnit.unit),
           (TensorPower.coordSplitEquiv (a := a) k m).symm
             ((xr, PUnit.unit), tail))
         ((yb, PUnit.unit),
           (TensorPower.coordSplitEquiv (a := a) k m).symm
             ((yr, PUnit.unit), tail))) =
-      MatrixMap.kron (Channel.idChannel a).map N.map
+      MatrixMap.kron (CPTPOp.id (dIn := a)).map N.map
         (Matrix.of fun p p' =>
           ∑ tail : TensorPower.CoordComplement (a := a) k m,
-            ρ.matrix
+            ρ.m
               ((p.2, PUnit.unit),
                 (TensorPower.coordSplitEquiv (a := a) k m).symm
                   ((p.1, PUnit.unit), tail))
@@ -863,7 +839,7 @@ theorem selectedReferenceOutputMarginal_apply_channel
   have hsum :
       (Matrix.of fun j j' =>
           ∑ tail : TensorPower.CoordComplement (a := a) k m,
-            ρ.matrix
+            ρ.m
               ((j, PUnit.unit),
                 (TensorPower.coordSplitEquiv (a := a) k m).symm
                   ((xr, PUnit.unit), tail))
@@ -872,7 +848,7 @@ theorem selectedReferenceOutputMarginal_apply_channel
                   ((yr, PUnit.unit), tail))) =
         ∑ tail : TensorPower.CoordComplement (a := a) k m,
           (Matrix.of fun j j' =>
-            ρ.matrix
+            ρ.m
               ((j, PUnit.unit),
                 (TensorPower.coordSplitEquiv (a := a) k m).symm
                   ((xr, PUnit.unit), tail))
@@ -886,7 +862,7 @@ theorem selectedReferenceOutputMarginal_apply_channel
       N.map
         (∑ tail : TensorPower.CoordComplement (a := a) k m,
           (Matrix.of fun j j' =>
-            ρ.matrix
+            ρ.m
               ((j, PUnit.unit),
                 (TensorPower.coordSplitEquiv (a := a) k m).symm
                   ((xr, PUnit.unit), tail))
@@ -896,7 +872,7 @@ theorem selectedReferenceOutputMarginal_apply_channel
         ∑ tail : TensorPower.CoordComplement (a := a) k m,
           N.map
             (Matrix.of fun j j' =>
-              ρ.matrix
+              ρ.m
                 ((j, PUnit.unit),
                   (TensorPower.coordSplitEquiv (a := a) k m).symm
                     ((xr, PUnit.unit), tail))
@@ -907,7 +883,7 @@ theorem selectedReferenceOutputMarginal_apply_channel
   change
     (∑ tail : TensorPower.CoordComplement (a := a) k m,
       MatrixMap.kron (N.tensorPower 1).map
-          (Channel.idChannel (QIT.TensorPower a k)).map ρ.matrix
+          (CPTPOp.id (dIn := QIT.TensorPower a k)).map ρ.m
         ((xb, PUnit.unit),
           (TensorPower.coordSplitEquiv (a := a) k m).symm
             ((xr, PUnit.unit), tail))
@@ -917,7 +893,7 @@ theorem selectedReferenceOutputMarginal_apply_channel
       N.map
         (∑ tail : TensorPower.CoordComplement (a := a) k m,
           (Matrix.of fun j j' =>
-            ρ.matrix
+            ρ.m
               ((j, PUnit.unit),
                 (TensorPower.coordSplitEquiv (a := a) k m).symm
                   ((xr, PUnit.unit), tail))
@@ -929,7 +905,7 @@ theorem selectedReferenceOutputMarginal_apply_channel
   refine Finset.sum_congr rfl fun tail _ => ?_
   calc
     MatrixMap.kron (N.tensorPower 1).map
-        (Channel.idChannel (QIT.TensorPower a k)).map ρ.matrix
+        (CPTPOp.id (dIn := QIT.TensorPower a k)).map ρ.m
         ((xb, PUnit.unit),
           (TensorPower.coordSplitEquiv (a := a) k m).symm
             ((xr, PUnit.unit), tail))
@@ -938,7 +914,7 @@ theorem selectedReferenceOutputMarginal_apply_channel
             ((yr, PUnit.unit), tail)) =
         (N.tensorPower 1).map
           (Matrix.of fun i i' =>
-            ρ.matrix
+            ρ.m
               (i, (TensorPower.coordSplitEquiv (a := a) k m).symm
                 ((xr, PUnit.unit), tail))
               (i', (TensorPower.coordSplitEquiv (a := a) k m).symm
@@ -947,7 +923,7 @@ theorem selectedReferenceOutputMarginal_apply_channel
           exact MatrixMap.kron_idChannel_apply_slice
             (a := QIT.TensorPower a 1) (b := QIT.TensorPower b 1)
             (r := QIT.TensorPower a k)
-            (Φ := (N.tensorPower 1).map) (X := ρ.matrix)
+            (Φ := (N.tensorPower 1).map) (X := ρ.m)
             (br := ((xb, PUnit.unit),
               (TensorPower.coordSplitEquiv (a := a) k m).symm
                 ((xr, PUnit.unit), tail)))
@@ -956,104 +932,29 @@ theorem selectedReferenceOutputMarginal_apply_channel
                 ((yr, PUnit.unit), tail)))
     _ = N.map
           (Matrix.of fun j j' =>
-            ρ.matrix
+            ρ.m
               ((j, PUnit.unit),
                 (TensorPower.coordSplitEquiv (a := a) k m).symm
                   ((xr, PUnit.unit), tail))
               ((j', PUnit.unit),
                 (TensorPower.coordSplitEquiv (a := a) k m).symm
                   ((yr, PUnit.unit), tail))) xb yb := by
-          rw [Channel.tensorPower_succ, Channel.tensorPower_zero]
-          change
-            MatrixMap.kron N.map (Channel.unit).map
-                (Matrix.of fun i i' =>
-                  ρ.matrix
-                    (i, (TensorPower.coordSplitEquiv (a := a) k m).symm
-                      ((xr, PUnit.unit), tail))
-                    (i', (TensorPower.coordSplitEquiv (a := a) k m).symm
-                      ((yr, PUnit.unit), tail)))
-                (xb, PUnit.unit) (yb, PUnit.unit) =
-              N.map
-                (Matrix.of fun j j' =>
-                  ρ.matrix
-                    ((j, PUnit.unit),
-                      (TensorPower.coordSplitEquiv (a := a) k m).symm
-                        ((xr, PUnit.unit), tail))
-                    ((j', PUnit.unit),
-                      (TensorPower.coordSplitEquiv (a := a) k m).symm
-                        ((yr, PUnit.unit), tail))) xb yb
-          rw [unit_map_eq_idChannel_for_positionTrace]
-          exact MatrixMap.kron_idChannel_apply_slice
-            (a := a) (b := b) (r := PUnit)
-            (Φ := N.map)
-            (X := Matrix.of fun i i' =>
-              ρ.matrix
-                (i, (TensorPower.coordSplitEquiv (a := a) k m).symm
-                  ((xr, PUnit.unit), tail))
-                (i', (TensorPower.coordSplitEquiv (a := a) k m).symm
-                  ((yr, PUnit.unit), tail)))
-            (br := (xb, PUnit.unit)) (br' := (yb, PUnit.unit))
+          rw [CPTPOp.tensorPower_succ]
+          change (N.prod (N.tensorPower 0)).map _ _ _ = _
+          simp only [CPTPOp.prod_map, CPTPOp.tensorPower_zero_map]
+          exact MatrixMap.kron_unit_apply_slice N.map _ _ _
 
-/-- A right-local channel sends the right marginal to the channel output on
-that marginal. -/
-theorem marginalB_applyState_id_prod_local
-    {b : Type v} [Fintype b] [DecidableEq b]
-    {c : Type w} [Fintype c] [DecidableEq c]
-    (ρ : State (Prod a b)) (D : Channel b c) :
-    (((Channel.idChannel a).prod D).applyState ρ).marginalB =
-      D.applyState ρ.marginalB := by
-  apply State.ext
-  change partialTraceA (a := a) (b := c)
-      (MatrixMap.kron (Channel.idChannel a).map D.map ρ.matrix) =
-    D.map (partialTraceA (a := a) (b := b) ρ.matrix)
-  ext j j'
-  simp only [partialTraceA]
-  let S : a → CMatrix b := fun i => Matrix.of fun x x' => ρ.matrix (i, x) (i, x')
-  have hsum :
-      (fun x x' => ∑ i : a, ρ.matrix (i, x) (i, x')) =
-        ∑ i : a, S i := by
-    ext x x'
-    simp only [Matrix.sum_apply]
-    rfl
-  change (∑ i : a,
-      MatrixMap.kron (Channel.idChannel a).map D.map ρ.matrix (i, j) (i, j')) =
-    D.map (fun x x' => ∑ i : a, ρ.matrix (i, x) (i, x')) j j'
-  rw [hsum, map_sum]
-  simp only [Matrix.sum_apply]
-  refine Finset.sum_congr rfl fun i _ => ?_
-  simpa [S] using
-    (MatrixMap.kron_idChannel_left_apply_slice (a := a)
-      (Φ := D.map) (X := ρ.matrix) (ad := (i, j)) (ad' := (i, j')))
+end CPTPOp
 
-/-- A right-local channel preserves the left marginal.  This local copy keeps
-the position-based lower-bound infrastructure independent of later DPI
-convenience wrappers. -/
-theorem marginalA_applyState_id_prod_local
-    {b : Type v} [Fintype b] [DecidableEq b]
-    {c : Type w} [Fintype c] [DecidableEq c]
-    (ρ : State (Prod a b)) (D : Channel b c) :
-    (((Channel.idChannel a).prod D).applyState ρ).marginalA = ρ.marginalA := by
-  apply State.ext
-  change partialTraceB (a := a) (b := c)
-      (MatrixMap.kron (Channel.idChannel a).map D.map ρ.matrix) =
-    partialTraceB (a := a) (b := b) ρ.matrix
-  ext i i'
-  simp only [partialTraceB]
-  let S : CMatrix b := Matrix.of fun j j' => ρ.matrix (i, j) (i', j')
-  have htrace :
-      (D.map S).trace = S.trace :=
-    D.tracePreserving S
-  calc
-    ∑ j : c, MatrixMap.kron (Channel.idChannel a).map D.map ρ.matrix (i, j) (i', j) =
-        ∑ j : c, D.map S j j := by
-          refine Finset.sum_congr rfl fun j _ => ?_
-          simpa [S] using
-            (MatrixMap.kron_idChannel_left_apply_slice (a := a)
-              (Φ := D.map) (X := ρ.matrix) (ad := (i, j)) (ad' := (i', j)))
-    _ = ∑ j : b, ρ.matrix (i, j) (i', j) := by
-          simpa [S, Matrix.trace, Matrix.diag_apply] using htrace
+end
 
-end Channel
+noncomputable section
+
+namespace QIT
+
+open QIT
+
+variable {a : Type u} [Fintype a] [DecidableEq a]
 
 namespace ProjectionMatrix
 
@@ -1062,9 +963,9 @@ variable {b : Type v} [Fintype b] [DecidableEq b]
 /-- Lift an effect on a reference/output pair to the full position-based output
 space, testing one reference coordinate together with the common output and
 acting as identity on all remaining reference coordinates. -/
-def commonOutputReferenceEffectAt (E : CMatrix (Prod a b))
+def commonOutputReferenceEffectAt (E : CMatrix (a × b))
     (k : ℕ) (m : Fin k) :
-    CMatrix (Prod (TensorPower b 1) (TensorPower a k)) :=
+    CMatrix (TensorPower b 1 × TensorPower a k) :=
   (Matrix.kronecker E
       (1 : CMatrix (TensorPower.CoordComplement (a := a) k m))).submatrix
     (TensorPower.outputReferenceCoordEquiv (a := a) (b := b) k m)
@@ -1073,7 +974,7 @@ def commonOutputReferenceEffectAt (E : CMatrix (Prod a b))
 omit [Fintype a] [Fintype b] [DecidableEq b] in
 @[simp]
 theorem commonOutputReferenceEffectAt_eq
-    (E : CMatrix (Prod a b))
+    (E : CMatrix (a × b))
     (k : ℕ) (m : Fin k) :
     commonOutputReferenceEffectAt (a := a) (b := b) E k m =
       (Matrix.kronecker E
@@ -1086,7 +987,7 @@ omit [DecidableEq b] in
 /-- The lifted common-output/reference effect is positive whenever the local
 effect is positive. -/
 theorem commonOutputReferenceEffectAt_posSemidef
-    {E : CMatrix (Prod a b)} (hE : E.PosSemidef) (k : ℕ) (m : Fin k) :
+    {E : CMatrix (a × b)} (hE : E.PosSemidef) (k : ℕ) (m : Fin k) :
     (commonOutputReferenceEffectAt (a := a) (b := b) E k m).PosSemidef := by
   unfold commonOutputReferenceEffectAt
   exact (hE.kronecker Matrix.PosSemidef.one).submatrix
@@ -1096,7 +997,7 @@ omit [Fintype a] [Fintype b] in
 /-- Complementing a lifted common-output/reference effect is the same as
 lifting the complement effect. -/
 theorem one_sub_commonOutputReferenceEffectAt
-    (E : CMatrix (Prod a b)) (k : ℕ) (m : Fin k) :
+    (E : CMatrix (a × b)) (k : ℕ) (m : Fin k) :
     1 - commonOutputReferenceEffectAt (a := a) (b := b) E k m =
       commonOutputReferenceEffectAt (a := a) (b := b) (1 - E) k m := by
   let e := TensorPower.outputReferenceCoordEquiv (a := a) (b := b) k m
@@ -1121,7 +1022,7 @@ theorem one_sub_commonOutputReferenceEffectAt
 /-- The lifted common-output/reference effect is bounded by the identity
 whenever the local effect is. -/
 theorem commonOutputReferenceEffectAt_le_one
-    {E : CMatrix (Prod a b)} (hE : E ≤ 1) (k : ℕ) (m : Fin k) :
+    {E : CMatrix (a × b)} (hE : E ≤ 1) (k : ℕ) (m : Fin k) :
     commonOutputReferenceEffectAt (a := a) (b := b) E k m ≤ 1 := by
   rw [Matrix.le_iff] at hE ⊢
   rw [one_sub_commonOutputReferenceEffectAt]
@@ -1131,11 +1032,11 @@ theorem commonOutputReferenceEffectAt_le_one
 /-- Lift a test on a reference/output pair to the full position-based output
 space, testing one reference coordinate together with the common output and
 acting as identity on all remaining reference coordinates. -/
-def commonOutputReferenceAt (P : ProjectionMatrix (Prod a b))
+def commonOutputReferenceAt (P : ProjectionMatrix (a × b))
     (k : ℕ) (m : Fin k) :
-    ProjectionMatrix (Prod (TensorPower b 1) (TensorPower a k)) :=
+    ProjectionMatrix (TensorPower b 1 × TensorPower a k) :=
   let localProj : ProjectionMatrix
-      (Prod (Prod a b) (TensorPower.CoordComplement (a := a) k m)) :=
+      ((a × b) × TensorPower.CoordComplement (a := a) k m) :=
     { matrix := Matrix.kronecker P.matrix
         (1 : CMatrix (TensorPower.CoordComplement (a := a) k m))
       isHermitian := by
@@ -1151,7 +1052,7 @@ def commonOutputReferenceAt (P : ProjectionMatrix (Prod a b))
   localProj.reindex (TensorPower.outputReferenceCoordEquiv (a := a) (b := b) k m)
 
 @[simp]
-theorem commonOutputReferenceAt_matrix (P : ProjectionMatrix (Prod a b))
+theorem commonOutputReferenceAt_matrix (P : ProjectionMatrix (a × b))
     (k : ℕ) (m : Fin k) :
     (P.commonOutputReferenceAt k m).matrix =
       commonOutputReferenceEffectAt (a := a) (b := b) P.matrix k m :=
@@ -1163,81 +1064,47 @@ namespace SequentialDecoding
 
 variable {n : ℕ}
 
-private theorem trace_mul_submatrix_equiv {α : Type u} {β : Type v}
-    [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
-    (e : α ≃ β) (M U : CMatrix β) :
-    ((M.submatrix e e) * (U.submatrix e e)).trace = (M * U).trace := by
-  rw [Matrix.trace]
-  rw [Matrix.trace]
-  apply Fintype.sum_equiv e
-    (fun x : α => ((M.submatrix e e) * (U.submatrix e e)) x x)
-    (fun y : β => (M * U) y y)
-  intro x
-  rw [Matrix.mul_apply, Matrix.mul_apply]
-  exact Fintype.sum_equiv e
-    (fun z : α => M (e x) (e z) * U (e z) (e x))
-    (fun y : β => M (e x) y * U y (e x))
-    (by intro z; rfl)
-
 /-- Effect traces are invariant under simultaneous finite basis reindexing. -/
 theorem effectTrace_reindex {α : Type u} {β : Type v}
     [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
-    (ρ : State α) (E : CMatrix β) (e : α ≃ β) :
+    (ρ : MState α) (E : CMatrix β) (e : α ≃ β) :
     effectTrace ρ (E.submatrix e e) = effectTrace (ρ.reindex e) E := by
-  have hρ : (ρ.reindex e).matrix.submatrix e e = ρ.matrix := by
+  have hρ : (ρ.reindex e).m.submatrix e e = ρ.m := by
     ext i j
-    simp [State.reindex]
+    simp
   unfold effectTrace effectAcceptProbability
   rw [← hρ]
-  exact congrArg Complex.re (trace_mul_submatrix_equiv e (ρ.reindex e).matrix E)
-
-omit [DecidableEq a] in private theorem partialTraceB_mul_kronecker_one_left
-    {b : Type v} [Fintype b] [DecidableEq b]
-    (X : CMatrix (Prod a b)) (U : CMatrix a) :
-    partialTraceB (a := a) (b := b) (X * Matrix.kronecker U (1 : CMatrix b)) =
-      partialTraceB (a := a) (b := b) X * U := by
-  ext i i'
-  simp [partialTraceB, Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
-    Matrix.one_apply, Fintype.sum_prod_type, Finset.sum_mul]
-  rw [Finset.sum_comm]
-
-omit [DecidableEq a] in private theorem partialTraceB_mul_trace_eq_trace_mul_kronecker_one_left
-    {b : Type v} [Fintype b] [DecidableEq b]
-    (X : CMatrix (Prod a b)) (U : CMatrix a) :
-    ((partialTraceB (a := a) (b := b) X) * U).trace =
-      (X * Matrix.kronecker U (1 : CMatrix b)).trace := by
-  rw [← partialTraceB_mul_kronecker_one_left X U]
-  exact partialTraceB_trace (a := a) (b := b)
-    (X * Matrix.kronecker U (1 : CMatrix b))
+  exact congrArg Complex.re (trace_mul_submatrix_equiv e (ρ.reindex e).m E)
 
 /-- Testing the first subsystem of an arbitrary bipartite state is equivalent
 to testing its first marginal. -/
-theorem effectTrace_marginalA
+theorem effectTrace_traceRight
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ρ : State (Prod a b)) (E : CMatrix a) :
+    (ρ : MState (a × b)) (E : CMatrix a) :
     effectTrace ρ (Matrix.kronecker E (1 : CMatrix b)) =
-      effectTrace ρ.marginalA E := by
-  unfold effectTrace effectAcceptProbability State.marginalA
+      effectTrace ρ.traceRight E := by
+  unfold effectTrace effectAcceptProbability
+  rw [MState.traceRight_m]
   exact congrArg Complex.re
-    (partialTraceB_mul_trace_eq_trace_mul_kronecker_one_left ρ.matrix E).symm
+    (trace_mul_kronecker_one_right_eq_traceRight ρ.m E)
 
 /-- The common-output/reference-coordinate lifted effect tests precisely the
 corresponding pair marginal. -/
 theorem effectTrace_commonOutputReferenceEffectAt
     {b : Type v} [Fintype b] [DecidableEq b]
     {k : ℕ}
-    (ρ : State (Prod (TensorPower b 1) (TensorPower a k)))
-    (E : CMatrix (Prod a b)) (m : Fin k) :
+    (ρ : MState (TensorPower b 1 × TensorPower a k))
+    (E : CMatrix (a × b)) (m : Fin k) :
     effectTrace ρ (ProjectionMatrix.commonOutputReferenceEffectAt (a := a) (b := b) E k m) =
       effectTrace
-        ((ρ.reindex (TensorPower.outputReferenceCoordEquiv (a := a) (b := b) k m)).marginalA)
+        ((ρ.reindex (TensorPower.outputReferenceCoordEquiv (a := a) (b := b) k m)).traceRight)
         E := by
   rw [ProjectionMatrix.commonOutputReferenceEffectAt_eq]
   rw [effectTrace_reindex ρ
     (Matrix.kronecker E
       (1 : CMatrix (TensorPower.CoordComplement (a := a) k m)))
     (TensorPower.outputReferenceCoordEquiv (a := a) (b := b) k m)]
-  exact effectTrace_marginalA
+  exact effectTrace_traceRight
     (ρ.reindex (TensorPower.outputReferenceCoordEquiv (a := a) (b := b) k m))
     E
 
@@ -1246,11 +1113,11 @@ the corresponding pair marginal. -/
 theorem effectTrace_commonOutputReferenceAt
     {b : Type v} [Fintype b] [DecidableEq b]
     {k : ℕ}
-    (ρ : State (Prod (TensorPower b 1) (TensorPower a k)))
-    (P : ProjectionMatrix (Prod a b)) (m : Fin k) :
+    (ρ : MState (TensorPower b 1 × TensorPower a k))
+    (P : ProjectionMatrix (a × b)) (m : Fin k) :
     effectTrace ρ (P.commonOutputReferenceAt k m).matrix =
       effectTrace
-        ((ρ.reindex (TensorPower.outputReferenceCoordEquiv (a := a) (b := b) k m)).marginalA)
+        ((ρ.reindex (TensorPower.outputReferenceCoordEquiv (a := a) (b := b) k m)).traceRight)
         P.matrix := by
   rw [ProjectionMatrix.commonOutputReferenceAt_matrix]
   exact effectTrace_commonOutputReferenceEffectAt ρ P.matrix m
@@ -1259,58 +1126,58 @@ theorem effectTrace_commonOutputReferenceAt
 independent tail preserves its trace against a product state. -/
 theorem effectTrace_prod_left
     {b : Type u} [Fintype b] [DecidableEq b]
-    (ρ : State a) (σ : State b) (E : CMatrix a) :
+    (ρ : MState a) (σ : MState b) (E : CMatrix a) :
     effectTrace (ρ.prod σ) (Matrix.kronecker E (1 : CMatrix b)) =
       effectTrace ρ E := by
   unfold effectTrace effectAcceptProbability
-  simp only [State.prod]
-  change ((ρ.matrix ⊗ₖ σ.matrix) * (E ⊗ₖ (1 : CMatrix b))).trace.re =
-    (ρ.matrix * E).trace.re
+  rw [MState.prod_m]
+  change ((ρ.m ⊗ₖ σ.m) * (E ⊗ₖ (1 : CMatrix b))).trace.re =
+    (ρ.m * E).trace.re
   rw [← Matrix.mul_kronecker_mul]
   rw [Matrix.mul_one]
-  rw [Matrix.trace_kronecker, σ.trace_eq_one]
+  rw [Matrix.trace_kronecker, σ.tr']
   simp
 
 /-- Tensoring the identity on an independent head subsystem with a tail effect
 preserves the effect trace against the tail product factor. -/
 theorem effectTrace_prod_right
     {b : Type u} [Fintype b] [DecidableEq b]
-    (ρ : State a) (σ : State b) (E : CMatrix b) :
+    (ρ : MState a) (σ : MState b) (E : CMatrix b) :
     effectTrace (ρ.prod σ) (Matrix.kronecker (1 : CMatrix a) E) =
       effectTrace σ E := by
   unfold effectTrace effectAcceptProbability
-  simp only [State.prod]
-  change ((ρ.matrix ⊗ₖ σ.matrix) * ((1 : CMatrix a) ⊗ₖ E)).trace.re =
-    (σ.matrix * E).trace.re
+  rw [MState.prod_m]
+  change ((ρ.m ⊗ₖ σ.m) * ((1 : CMatrix a) ⊗ₖ E)).trace.re =
+    (σ.m * E).trace.re
   rw [← Matrix.mul_kronecker_mul]
   rw [Matrix.mul_one]
-  rw [Matrix.trace_kronecker, ρ.trace_eq_one]
+  rw [Matrix.trace_kronecker, ρ.tr']
   simp
 
 /-- Testing the head tensor factor of an IID product state has the same trace
 as testing one copy.  This is the head-position instance of the trace
 identities used in the Khatri--Wilde position-based proof. -/
 theorem effectTrace_tensorPowerHead
-    (P : ProjectionMatrix a) (ρ : State a) (n : ℕ) :
+    (P : ProjectionMatrix a) (ρ : MState a) (n : ℕ) :
     effectTrace (ρ.tensorPower (n + 1)) (P.tensorPowerHead n).matrix =
       effectTrace ρ P.matrix := by
-  rw [State.tensorPower_succ, ProjectionMatrix.tensorPowerHead_matrix]
+  rw [MState.tensorPower_succ, ProjectionMatrix.tensorPowerHead_matrix]
   exact effectTrace_prod_left ρ (ρ.tensorPower n) P.matrix
 
 /-- Moving a position-wise projector one step into the tail of an IID tensor
 power preserves its trace after discarding the independent head factor. -/
 theorem effectTrace_tensorPowerAt_succ
-    (P : ProjectionMatrix a) (ρ : State a) {n : ℕ} (i : Fin n) :
+    (P : ProjectionMatrix a) (ρ : MState a) {n : ℕ} (i : Fin n) :
     effectTrace (ρ.tensorPower (n + 1)) (P.tensorPowerAt i.succ).matrix =
       effectTrace (ρ.tensorPower n) (P.tensorPowerAt i).matrix := by
-  rw [State.tensorPower_succ, ProjectionMatrix.tensorPowerAt_tail]
+  rw [MState.tensorPower_succ, ProjectionMatrix.tensorPowerAt_tail]
   exact effectTrace_prod_right ρ (ρ.tensorPower n) (P.tensorPowerAt i).matrix
 
 /-- Testing any tensor-power position of an IID product state gives the same
 trace as testing one copy.  This is the source-independent trace identity
 behind the false-alarm terms in Khatri--Wilde's position-based proof. -/
 theorem effectTrace_tensorPowerAt
-    (P : ProjectionMatrix a) (ρ : State a) {n : ℕ} (i : Fin n) :
+    (P : ProjectionMatrix a) (ρ : MState a) {n : ℕ} (i : Fin n) :
     effectTrace (ρ.tensorPower n) (P.tensorPowerAt i).matrix =
       effectTrace ρ P.matrix := by
   induction n with
@@ -1367,7 +1234,7 @@ theorem tensorPowerHead_compl_matrix
 state has the same trace as testing the complement on the head state. -/
 theorem effectTrace_prod_left_compl_head
     {b : Type u} [Fintype b] [DecidableEq b]
-    (P : ProjectionMatrix a) (ρ : State a) (σ : State b) :
+    (P : ProjectionMatrix a) (ρ : MState a) (σ : MState b) :
     effectTrace (ρ.prod σ)
         (Matrix.kronecker P.compl.matrix (1 : CMatrix b)) =
       effectTrace ρ P.compl.matrix :=
@@ -1376,8 +1243,8 @@ theorem effectTrace_prod_left_compl_head
 /-- Canonical trace-model output state for one transmitted position after the
 fixed Naimark lift: the true tested copy is in the head factor and the
 `n` earlier false-alarm copies are IID comparison states in the tail. -/
-def positionTraceState (ρ σ : State a) (n : ℕ) :
-    State (TensorPower a (n + 1)) :=
+def positionTraceState (ρ σ : MState a) (n : ℕ) :
+    MState (TensorPower a (n + 1)) :=
   ρ.prod (σ.tensorPower n)
 
 /-- Canonical sequential projectors for the position-trace model.  Earlier
@@ -1411,7 +1278,7 @@ theorem positionTraceProjectionSequence_last
 testing any earlier comparison position gives the one-copy comparison
 acceptance trace. -/
 theorem positionTrace_falseAlarm_identity
-    (P : ProjectionMatrix a) (ρ σ : State a) {n : ℕ} (i : Fin n) :
+    (P : ProjectionMatrix a) (ρ σ : MState a) {n : ℕ} (i : Fin n) :
     effectTrace (positionTraceState ρ σ n)
         (positionTraceProjectionSequence P n (Fin.castSucc i)).matrix =
       effectTrace σ P.matrix := by
@@ -1427,7 +1294,7 @@ theorem positionTrace_falseAlarm_identity
 /-- Missed-detection trace identity for the canonical position-trace model:
 rejecting the final/source position gives the one-copy source reject trace. -/
 theorem positionTrace_missedDetection_identity
-    (P : ProjectionMatrix a) (ρ σ : State a) (n : ℕ) :
+    (P : ProjectionMatrix a) (ρ σ : MState a) (n : ℕ) :
     effectTrace (positionTraceState ρ σ n)
         (positionTraceProjectionSequence P n (Fin.last n)).compl.matrix =
       effectTrace ρ P.compl.matrix := by
@@ -1449,7 +1316,7 @@ missed-detection term, and the earlier projectors contribute at most `n`
 copies of the false-alarm term.
 -/
 theorem decoderError_le_of_trace_bounds
-    (A : ProjectionSequence a (n + 1)) (ρ : State a)
+    (A : ProjectionSequence a (n + 1)) (ρ : MState a)
     {c α β : ℝ} (hc : 0 < c)
     (hmiss : effectTrace ρ (A (Fin.last n)).compl.matrix ≤ α)
     (hfalse : ∀ i : Fin n, effectTrace ρ (A (Fin.castSucc i)).matrix ≤ β) :
@@ -1494,7 +1361,7 @@ After the source trace identities reduce the missed-detection term to
 error at most `ε`.
 -/
 theorem decoderError_le_epsilon_of_trace_bounds
-    (A : ProjectionSequence a (n + 1)) (ρ : State a)
+    (A : ProjectionSequence a (n + 1)) (ρ : MState a)
     {ε η β : ℝ} (hη_pos : 0 < η) (hη_lt : η < ε)
     (hmiss : effectTrace ρ (A (Fin.last n)).compl.matrix ≤ ε - η)
     (hfalse : ∀ i : Fin n, effectTrace ρ (A (Fin.castSucc i)).matrix ≤ β)
@@ -1527,7 +1394,7 @@ end SequentialDecoding
 namespace PositionBasedCodingProtocol
 
 variable {b : Type v} [Fintype b] [DecidableEq b]
-variable {N : Channel a b}
+variable {N : CPTPMap a b}
 variable {M : Type u} [Fintype M] [DecidableEq M] [Nonempty M]
 variable {e : Type u} [Fintype e] [DecidableEq e]
 
@@ -1547,7 +1414,7 @@ theorem lowerBound_le_oneShotEntanglementAssistedClassicalCapacityE_of_sequentia
     (P : PositionBasedCodingProtocol N M e) {seqLen : ℕ}
     (A :
       M → ProjectionSequence
-        (Prod (TensorPower b 1) (TensorPower e (Fintype.card M))) (seqLen + 1))
+        (TensorPower b 1 × TensorPower e (Fintype.card M)) (seqLen + 1))
     {ε η β lowerBound : ℝ} (hη_pos : 0 < η) (hη_lt : η < ε)
     (hseq :
       ∀ m : M,
@@ -1572,49 +1439,48 @@ theorem lowerBound_le_oneShotEntanglementAssistedClassicalCapacityE_of_sequentia
     (SequentialDecoding.decoderError_le_epsilon_of_trace_bounds
       (A m) (P.positionOutputState m) hη_pos hη_lt (hmiss m) (hfalse m) hsize)
 
-set_option maxHeartbeats 800000 in
 /-- Before the physical channel acts, the pair consisting of the selected
 input coordinate and its retained reference coordinate is the original
 one-copy input/reference state, with the source orientation restored to
 reference/input order. -/
 theorem canonicalIndexed_truePairInputMarginal
-    (ψ : PureVector (Prod a a))
+    (ψ : Ket (a × a))
     (messageIndex : M ≃ Fin (Fintype.card M))
-    (decoder : POVM M (Prod (TensorPower b 1) (TensorPower a (Fintype.card M))))
+    (decoder : POVM M (TensorPower b 1 × TensorPower a (Fintype.card M)))
     (m : M) :
     (((PositionBasedCodingProtocol.canonicalIndexed (N := N)
           (ψ.state.reindex (Equiv.prodComm a a)) messageIndex decoder).encodedPositionState m)
         |>.reindex
           (TensorPower.outputReferenceCoordEquiv
-            (a := a) (b := a) (Fintype.card M) (messageIndex m))).marginalA =
+            (a := a) (b := a) (Fintype.card M) (messageIndex m))).traceRight =
       ψ.state := by
-  apply State.ext
+  apply MState.ext
   ext x y
   rcases x with ⟨xr, xa⟩
   rcases y with ⟨yr, ya⟩
   simpa [PositionBasedCodingProtocol.canonicalIndexed_encodedPositionState,
-    State.marginalA, partialTraceB, State.reindex,
-    Channel.positionSelection_prod_id_applyState_matrix,
-    TensorPower.State.tensorPowerBipartite_matrix_apply_fin,
+    MState.traceRight_m, Matrix.traceRight, MState.reindex_matrix,
+    -CPTPOp.prod_map, CPTPOp.positionSelection_prod_id_map_apply,
+    MState.tensorPowerBipartite_matrix_apply_fin,
+    -MState.tensorPowerBipartite_matrix,
     TensorPower.outputReferenceCoordEquiv,
     TensorPower.coordSplitEquiv, TensorPower.finFunctionCoordSplitEquiv,
     rankOneMatrix_apply] using
     TensorPower.selectedProductAmplitude_sum (ψ := ψ) (m := messageIndex m)
       (xr := xr) (xa := xa) (yr := yr) (ya := ya)
 
-set_option maxHeartbeats 800000 in
 /-- After the selected input coordinate is sent through the channel, the tested
 reference/output marginal is the one-copy hypothesis-testing output state. -/
 theorem canonicalIndexed_truePairOutputMarginal
-    (ψ : PureVector (Prod a a))
+    (ψ : Ket (a × a))
     (messageIndex : M ≃ Fin (Fintype.card M))
-    (decoder : POVM M (Prod (TensorPower b 1) (TensorPower a (Fintype.card M))))
+    (decoder : POVM M (TensorPower b 1 × TensorPower a (Fintype.card M)))
     (m : M) :
     (((PositionBasedCodingProtocol.canonicalIndexed (N := N)
           (ψ.state.reindex (Equiv.prodComm a a)) messageIndex decoder).positionOutputState m)
         |>.reindex
           (TensorPower.outputReferenceCoordEquiv
-            (a := a) (b := b) (Fintype.card M) (messageIndex m))).marginalA =
+            (a := a) (b := b) (Fintype.card M) (messageIndex m))).traceRight =
       N.hypothesisTestingOutputState ψ := by
   let P :=
     PositionBasedCodingProtocol.canonicalIndexed (N := N)
@@ -1623,41 +1489,40 @@ theorem canonicalIndexed_truePairOutputMarginal
     ((P.positionOutputState m)
         |>.reindex
           (TensorPower.outputReferenceCoordEquiv
-            (a := a) (b := b) (Fintype.card M) (messageIndex m))).marginalA =
-        ((Channel.idChannel a).prod N).applyState
+            (a := a) (b := b) (Fintype.card M) (messageIndex m))).traceRight =
+        ((CPTPOp.id (dIn := a)).prod N)
           (((P.encodedPositionState m)
               |>.reindex
                 (TensorPower.outputReferenceCoordEquiv
-                  (a := a) (b := a) (Fintype.card M) (messageIndex m))).marginalA) := by
+                  (a := a) (b := a) (Fintype.card M) (messageIndex m))).traceRight) := by
           simpa [P, PositionBasedCodingProtocol.canonicalIndexed_positionOutputState] using
-            Channel.selectedReferenceOutputMarginal_apply_channel
+            CPTPOp.selectedReferenceOutputMarginal_apply_channel
               (N := N) (k := Fintype.card M) (m := messageIndex m)
               (ρ := P.encodedPositionState m)
-    _ = ((Channel.idChannel a).prod N).applyState ψ.state := by
+    _ = ((CPTPOp.id (dIn := a)).prod N) ψ.state := by
           rw [canonicalIndexed_truePairInputMarginal
             (N := N) (ψ := ψ) (messageIndex := messageIndex)
             (decoder := decoder) (m := m)]
     _ = N.hypothesisTestingOutputState ψ := by
           rfl
 
-set_option maxHeartbeats 800000 in
 /-- Before the physical channel acts, a retained reference coordinate different
 from the transmitted coordinate is independent of the transmitted input share.
 
 This is the finite IID tensor-product calculation behind the false-alarm
 trace identity in Khatri--Wilde position-based coding. -/
 theorem canonicalIndexed_falsePairInputMarginal
-    (ψ : PureVector (Prod a a))
+    (ψ : Ket (a × a))
     (messageIndex : M ≃ Fin (Fintype.card M))
-    (decoder : POVM M (Prod (TensorPower b 1) (TensorPower a (Fintype.card M))))
+    (decoder : POVM M (TensorPower b 1 × TensorPower a (Fintype.card M)))
     (m : M) (i : Fin (Fintype.card M)) (hi : i ≠ messageIndex m) :
     (((PositionBasedCodingProtocol.canonicalIndexed (N := N)
           (ψ.state.reindex (Equiv.prodComm a a)) messageIndex decoder).encodedPositionState m)
         |>.reindex
           (TensorPower.outputReferenceCoordEquiv
-            (a := a) (b := a) (Fintype.card M) i)).marginalA =
-      ψ.state.marginalA.prod ψ.state.marginalB := by
-  apply State.ext
+            (a := a) (b := a) (Fintype.card M) i)).traceRight =
+      ψ.state.traceRight.prod ψ.state.traceLeft := by
+  apply MState.ext
   ext x y
   rcases x with ⟨xr, xa⟩
   rcases y with ⟨yr, ya⟩
@@ -1667,9 +1532,10 @@ theorem canonicalIndexed_falsePairInputMarginal
       (xr := xr) (yr := yr) (xa := xa) (ya := ya)
   rw [Finset.sum_comm] at hdistinct
   simpa [PositionBasedCodingProtocol.canonicalIndexed_encodedPositionState,
-    State.marginalA, State.prod, partialTraceB, State.reindex,
-    Channel.positionSelection_prod_id_applyState_matrix,
-    TensorPower.State.tensorPowerBipartite_matrix_apply_fin,
+    MState.traceRight_m, MState.prod_m, Matrix.traceRight, MState.reindex_matrix,
+    -CPTPOp.prod_map, CPTPOp.positionSelection_prod_id_map_apply,
+    MState.tensorPowerBipartite_matrix_apply_fin,
+    -MState.tensorPowerBipartite_matrix,
     TensorPower.outputReferenceCoordEquiv,
     TensorPower.coordSplitEquiv, TensorPower.finFunctionCoordSplitEquiv,
     rankOneMatrix_apply] using hdistinct
@@ -1682,23 +1548,23 @@ the one-use channel output marginal.
 This separates the channel bookkeeping from the remaining IID tensor-product
 coordinate calculation in the Khatri--Wilde position-based proof. -/
 theorem canonicalIndexed_falsePairOutputMarginal_of_inputMarginal
-    (ψ : PureVector (Prod a a))
+    (ψ : Ket (a × a))
     (messageIndex : M ≃ Fin (Fintype.card M))
-    (decoder : POVM M (Prod (TensorPower b 1) (TensorPower a (Fintype.card M))))
+    (decoder : POVM M (TensorPower b 1 × TensorPower a (Fintype.card M)))
     (m : M) (i : Fin (Fintype.card M))
     (hinput :
       (((PositionBasedCodingProtocol.canonicalIndexed (N := N)
             (ψ.state.reindex (Equiv.prodComm a a)) messageIndex decoder).encodedPositionState m)
           |>.reindex
             (TensorPower.outputReferenceCoordEquiv
-              (a := a) (b := a) (Fintype.card M) i)).marginalA =
-        ψ.state.marginalA.prod ψ.state.marginalB) :
+              (a := a) (b := a) (Fintype.card M) i)).traceRight =
+        ψ.state.traceRight.prod ψ.state.traceLeft) :
     (((PositionBasedCodingProtocol.canonicalIndexed (N := N)
           (ψ.state.reindex (Equiv.prodComm a a)) messageIndex decoder).positionOutputState m)
         |>.reindex
           (TensorPower.outputReferenceCoordEquiv
-            (a := a) (b := b) (Fintype.card M) i)).marginalA =
-      ψ.state.marginalA.prod (N.applyState ψ.state.marginalB) := by
+            (a := a) (b := b) (Fintype.card M) i)).traceRight =
+      ψ.state.traceRight.prod (N ψ.state.traceLeft) := by
   let P :=
     PositionBasedCodingProtocol.canonicalIndexed (N := N)
       (ψ.state.reindex (Equiv.prodComm a a)) messageIndex decoder
@@ -1706,82 +1572,81 @@ theorem canonicalIndexed_falsePairOutputMarginal_of_inputMarginal
     ((P.positionOutputState m)
         |>.reindex
           (TensorPower.outputReferenceCoordEquiv
-            (a := a) (b := b) (Fintype.card M) i)).marginalA =
-        ((Channel.idChannel a).prod N).applyState
+            (a := a) (b := b) (Fintype.card M) i)).traceRight =
+        ((CPTPOp.id (dIn := a)).prod N)
           (((P.encodedPositionState m)
               |>.reindex
                 (TensorPower.outputReferenceCoordEquiv
-                  (a := a) (b := a) (Fintype.card M) i)).marginalA) := by
+                  (a := a) (b := a) (Fintype.card M) i)).traceRight) := by
           simpa [P, PositionBasedCodingProtocol.canonicalIndexed_positionOutputState] using
-            Channel.selectedReferenceOutputMarginal_apply_channel
+            CPTPOp.selectedReferenceOutputMarginal_apply_channel
               (N := N) (k := Fintype.card M) (m := i)
               (ρ := P.encodedPositionState m)
-    _ = ((Channel.idChannel a).prod N).applyState
-          (ψ.state.marginalA.prod ψ.state.marginalB) := by
+    _ = ((CPTPOp.id (dIn := a)).prod N)
+          (ψ.state.traceRight.prod ψ.state.traceLeft) := by
           rw [hinput]
-    _ = ψ.state.marginalA.prod (N.applyState ψ.state.marginalB) := by
-          rw [Channel.applyState_prod]
+    _ = ψ.state.traceRight.prod (N ψ.state.traceLeft) := by
+          rw [CPTPOp.prod_apply_prod]
           have hid :
-              (Channel.idChannel a).applyState ψ.state.marginalA =
-                ψ.state.marginalA := by
-            apply State.ext
-            change (Channel.idChannel a).map ψ.state.marginalA.matrix =
-              ψ.state.marginalA.matrix
-            simp [Channel.idChannel, MatrixMap.ofKraus]
+              (CPTPOp.id (dIn := a)) ψ.state.traceRight =
+                ψ.state.traceRight := by
+            apply MState.ext
+            rw [CPTPOp.mat_coe_eq_apply_mat]
+            simp
           rw [hid]
 
 /-- False-pair output marginal in the exact comparison-state form used by the
 hypothesis-testing mutual-information API, assuming the remaining pre-channel
 IID coordinate marginal calculation. -/
 theorem canonicalIndexed_falsePairOutputMarginal_comparison_of_inputMarginal
-    (ψ : PureVector (Prod a a))
+    (ψ : Ket (a × a))
     (messageIndex : M ≃ Fin (Fintype.card M))
-    (decoder : POVM M (Prod (TensorPower b 1) (TensorPower a (Fintype.card M))))
+    (decoder : POVM M (TensorPower b 1 × TensorPower a (Fintype.card M)))
     (m : M) (i : Fin (Fintype.card M))
     (hinput :
       (((PositionBasedCodingProtocol.canonicalIndexed (N := N)
             (ψ.state.reindex (Equiv.prodComm a a)) messageIndex decoder).encodedPositionState m)
           |>.reindex
             (TensorPower.outputReferenceCoordEquiv
-              (a := a) (b := a) (Fintype.card M) i)).marginalA =
-        ψ.state.marginalA.prod ψ.state.marginalB) :
+              (a := a) (b := a) (Fintype.card M) i)).traceRight =
+        ψ.state.traceRight.prod ψ.state.traceLeft) :
     (((PositionBasedCodingProtocol.canonicalIndexed (N := N)
           (ψ.state.reindex (Equiv.prodComm a a)) messageIndex decoder).positionOutputState m)
         |>.reindex
           (TensorPower.outputReferenceCoordEquiv
-            (a := a) (b := b) (Fintype.card M) i)).marginalA =
-      (N.hypothesisTestingOutputState ψ).marginalA.prod
-        (N.hypothesisTestingOutputState ψ).marginalB := by
+            (a := a) (b := b) (Fintype.card M) i)).traceRight =
+      (N.hypothesisTestingOutputState ψ).traceRight.prod
+        (N.hypothesisTestingOutputState ψ).traceLeft := by
   have hbase :=
     canonicalIndexed_falsePairOutputMarginal_of_inputMarginal
       (N := N) (ψ := ψ) (messageIndex := messageIndex)
       (decoder := decoder) (m := m) (i := i) hinput
   have hA :
-      (N.hypothesisTestingOutputState ψ).marginalA =
-        ψ.state.marginalA := by
-    simpa [Channel.hypothesisTestingOutputState] using
-      Channel.marginalA_applyState_id_prod_local (ρ := ψ.state) (D := N)
+      (N.hypothesisTestingOutputState ψ).traceRight =
+        ψ.state.traceRight := by
+    simpa [CPTPOp.hypothesisTestingOutputState] using
+      MState.traceRight_applyState_id_prod (ρ := ψ.state) (D := N)
   have hB :
-      (N.hypothesisTestingOutputState ψ).marginalB =
-        N.applyState ψ.state.marginalB := by
-    simpa [Channel.hypothesisTestingOutputState] using
-      Channel.marginalB_applyState_id_prod_local (ρ := ψ.state) (D := N)
+      (N.hypothesisTestingOutputState ψ).traceLeft =
+        N ψ.state.traceLeft := by
+    simpa [CPTPOp.hypothesisTestingOutputState] using
+      MState.traceLeft_applyState_id_prod (ρ := ψ.state) (D := N)
   rw [hbase, hA, hB]
 
 /-- False-pair output marginal in the exact comparison-state form used by the
 hypothesis-testing mutual-information API. -/
 theorem canonicalIndexed_falsePairOutputMarginal_comparison
-    (ψ : PureVector (Prod a a))
+    (ψ : Ket (a × a))
     (messageIndex : M ≃ Fin (Fintype.card M))
-    (decoder : POVM M (Prod (TensorPower b 1) (TensorPower a (Fintype.card M))))
+    (decoder : POVM M (TensorPower b 1 × TensorPower a (Fintype.card M)))
     (m : M) (i : Fin (Fintype.card M)) (hi : i ≠ messageIndex m) :
     (((PositionBasedCodingProtocol.canonicalIndexed (N := N)
           (ψ.state.reindex (Equiv.prodComm a a)) messageIndex decoder).positionOutputState m)
         |>.reindex
           (TensorPower.outputReferenceCoordEquiv
-            (a := a) (b := b) (Fintype.card M) i)).marginalA =
-      (N.hypothesisTestingOutputState ψ).marginalA.prod
-        (N.hypothesisTestingOutputState ψ).marginalB :=
+            (a := a) (b := b) (Fintype.card M) i)).traceRight =
+      (N.hypothesisTestingOutputState ψ).traceRight.prod
+        (N.hypothesisTestingOutputState ψ).traceLeft :=
   canonicalIndexed_falsePairOutputMarginal_comparison_of_inputMarginal
     (N := N) (ψ := ψ) (messageIndex := messageIndex)
     (decoder := decoder) (m := m) (i := i)
@@ -1790,7 +1655,5 @@ theorem canonicalIndexed_falsePairOutputMarginal_comparison
       (decoder := decoder) (m := m) (i := i) hi)
 
 end PositionBasedCodingProtocol
-
-end
 
 end QIT

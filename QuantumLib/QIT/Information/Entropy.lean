@@ -24,13 +24,3 @@ public import QuantumLib.QIT.Information.Entropy.PureEntanglement
 Entropy definitions, tensor-power entropy identities, and entropy-based
 data-processing and convexity interfaces.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace Information
-namespace Entropy
-
-end Entropy
-end Information
-end QIT

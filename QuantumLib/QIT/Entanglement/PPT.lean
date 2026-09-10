@@ -31,14 +31,14 @@ noncomputable section
 
 variable {a : Type u} {b : Type v}
 
-private theorem partialTransposeB_smul_nnreal (c : ℝ≥0) (X : CMatrix (Prod a b)) :
+private theorem partialTransposeB_smul_nnreal (c : ℝ≥0) (X : CMatrix (a × b)) :
     partialTransposeB (a := a) (b := b) (c • X) =
       c • partialTransposeB (a := a) (b := b) X := by
   ext x y
   rfl
 
 private theorem partialTransposeB_sum {ι : Type w} [Fintype ι]
-    (f : ι → CMatrix (Prod a b)) :
+    (f : ι → CMatrix (a × b)) :
     partialTransposeB (a := a) (b := b) (∑ i, f i) =
       ∑ i, partialTransposeB (a := a) (b := b) (f i) := by
   ext x y
@@ -64,26 +64,26 @@ variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
 /-- A bipartite state is PPT when the partial transpose on the second subsystem
 is positive semidefinite. -/
-def IsPPT (rho : State (Prod a b)) : Prop :=
-  Matrix.PosSemidef (partialTransposeB rho.matrix)
+def IsPPT (rho : MState (a × b)) : Prop :=
+  Matrix.PosSemidef (partialTransposeB rho.m)
 
 /-- Product states are PPT. -/
-theorem isPPT_prod (rho : State a) (sigma : State b) :
+theorem isPPT_prod (rho : MState a) (sigma : MState b) :
     IsPPT (rho.prod sigma) := by
-  rw [IsPPT, State.prod, partialTransposeB_kronecker]
-  exact rho.pos.kronecker sigma.pos.transpose
+  rw [IsPPT, MState.prod_m, ← Matrix.kronecker, partialTransposeB_kronecker]
+  exact rho.psd.kronecker sigma.psd.transpose
 
 /-- PPT states are closed under finite convex mixing. -/
 theorem isPPT_averageState {ι : Type w} [Fintype ι]
-    (E : Ensemble ι (Prod a b)) (hE : ∀ i, IsPPT (E.states i)) :
+    (E : MEnsemble (a × b) ι) (hE : ∀ i, IsPPT (E.states i)) :
     IsPPT E.averageState := by
-  rw [IsPPT, Ensemble.averageState_matrix, partialTransposeB_sum]
+  rw [IsPPT, MEnsemble.averageState_matrix, partialTransposeB_sum]
   simp_rw [partialTransposeB_smul_nnreal]
   exact Matrix.posSemidef_sum Finset.univ fun i _ =>
     (hE i).smul (NNReal.coe_nonneg (E.probs i))
 
 /-- Every separable state is PPT. -/
-theorem isPPT_of_isSeparable {rho : State (Prod a b)}
+theorem isPPT_of_isSeparable {rho : MState (a × b)}
     (hrho : IsSeparable.{u, v, w} rho) : IsPPT rho := by
   induction hrho with
   | product rhoA rhoB =>

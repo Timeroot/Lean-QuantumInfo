@@ -13,9 +13,7 @@ public import QuantumLib.QIT.Coding.EntanglementAssisted.Asymptotic.Upper.Input
 # Asymptotic upper-bound witness consequences
 
 This module is part of the entanglement-assisted classical communication
-asymptotic proof spine.  It was split out mechanically from the historical
-`EntanglementAssistedAsymptotic` files; theorem statements and proof routes are
-unchanged.
+asymptotic proof spine.
 -/
 
 @[expose] public section
@@ -23,18 +21,18 @@ unchanged.
 open scoped ComplexOrder MatrixOrder NNReal Topology
 open Filter
 
-namespace QIT
-
 universe u v w x y
 
 noncomputable section
 
+namespace CPTPOp
+
+open QIT
+
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-namespace Channel
-
-variable (N : Channel a b)
+variable (N : CPTPMap a b)
 
 /-- The source-shaped asymptotic upper input gives the source-consistent
 converse witness family used by the KW strong-converse route. -/
@@ -85,8 +83,6 @@ theorem strongConverseEntanglementAssistedClassicalCapacity_le_information_of_so
   N.strongConverseEntanglementAssistedClassicalCapacity_le_information hach
     (N.entanglementAssistedInformation_isStrongConverseRate_of_sourceAsymptoticUpperInput H)
 
-end Channel
+end CPTPOp
 
 end
-
-end QIT

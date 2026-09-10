@@ -18,7 +18,7 @@ qit-notes.tex:10320-10338] and [Gour2024Resources,
 BookQRT.tex:2051-2069].
 
 The statements stay at the abstract `LinearIsometry`/`Submodule` layer: matrix
-coordinates, `ReferenceIsometry`, `PureVector`, fidelity, and Uhlmann's theorem
+coordinates, `ReferenceIsometry`, `Ket`, fidelity, and Uhlmann's theorem
 are handled by downstream leaves.
 -/
 
@@ -76,8 +76,6 @@ theorem exists_extension_of_finrank_le
         simp only [← LS.finrank_add_finrank_orthogonal, add_tsub_cancel_left]
   let E : Sᗮ →ₗᵢ[ℂ] LSᗮ := ofFinrankLE hperp
   let L3 : Sᗮ →ₗᵢ[ℂ] E₂ := LSᗮ.subtypeₗᵢ.comp E
-  have : CompleteSpace S := FiniteDimensional.complete ℂ S
-  have : CompleteSpace E₁ := FiniteDimensional.complete ℂ E₁
   let p1 := S.orthogonalProjectionOnto.toLinearMap
   let p2 := Sᗮ.orthogonalProjectionOnto.toLinearMap
   let M : E₁ →ₗ[ℂ] E₂ := U.toLinearMap.comp p1 + L3.toLinearMap.comp p2

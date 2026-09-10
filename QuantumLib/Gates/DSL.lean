@@ -164,15 +164,16 @@ open Lean
 /-- A qubit reference like `q[0]`. -/
 syntax qasmRef := ident "[" num "]"
 
-declare_syntax_cat qasm_stmt
+/-- One QASM statement: a register declaration or a gate application. -/
+declare_syntax_cat qasmStmt
 /-- Register declaration, e.g. `qreg q[3]`. -/
-syntax "qreg" ident "[" num "]" : qasm_stmt
+syntax "qreg" ident "[" num "]" : qasmStmt
 /-- Gate application, e.g. `cx q[0], q[1]`. -/
-syntax ident qasmRef,+ : qasm_stmt
+syntax ident qasmRef,+ : qasmStmt
 
 /-- A block of QASM-style statements, each terminated by `;`, elaborating to a
 `List 𝐔[Fin n → Fin 2]`. -/
-syntax (name := qasmBlock) "qasm%" "{" (qasm_stmt ";")* "}" : term
+syntax (name := qasmBlock) "qasm%" "{" (qasmStmt ";")* "}" : term
 
 /-- Map a gate name to (its defining constant, its arity). -/
 private def gateInfo : String → Option (Name × Nat)
@@ -188,17 +189,17 @@ private def gateInfo : String → Option (Name × Nat)
   | _ => none
 
 /-- Turn the parsed statements into the list-of-unitaries term. -/
-private def expandQasm (stmts : Array (TSyntax `qasm_stmt)) : MacroM Term := do
+private def expandQasm (stmts : Array (TSyntax `qasmStmt)) : MacroM Term := do
   -- Find the (unique) register declaration.
   let mut reg? : Option (Name × Nat) := none
-  let mut gateStmts : Array (TSyntax `qasm_stmt) := #[]
+  let mut gateStmts : Array (TSyntax `qasmStmt) := #[]
   for stmt in stmts do
     match stmt with
-    | `(qasm_stmt| qreg $r:ident [ $sz:num ]) =>
+    | `(qasmStmt| qreg $r:ident [ $sz:num ]) =>
         if reg?.isSome then
           Macro.throwErrorAt stmt "at most one `qreg` declaration is supported"
         reg? := some (r.getId, sz.getNat)
-    | `(qasm_stmt| $_:ident $_,*) =>
+    | `(qasmStmt| $_:ident $_,*) =>
         gateStmts := gateStmts.push stmt
     | _ => Macro.throwErrorAt stmt "unrecognized QASM statement"
   let some (regName, n) := reg?
@@ -206,7 +207,7 @@ private def expandQasm (stmts : Array (TSyntax `qasm_stmt)) : MacroM Term := do
   let nLit : Term := quote n
   let mut gates : Array Term := #[]
   for stmt in gateStmts do
-    let `(qasm_stmt| $g:ident $refsSep,*) := stmt
+    let `(qasmStmt| $g:ident $refsSep,*) := stmt
       | Macro.throwErrorAt stmt "malformed gate statement"
     let refs := refsSep.getElems
     let some (gConst, arity) := gateInfo g.getId.toString
@@ -240,7 +241,7 @@ private def expandQasm (stmts : Array (TSyntax `qasm_stmt)) : MacroM Term := do
   `(term| ([ $gates,* ] : List 𝐔[Fin $nLit → Fin 2]))
 
 macro_rules
-  | `(qasm% { $[ $stmts:qasm_stmt ; ]* }) => expandQasm stmts
+  | `(qasm% { $[ $stmts:qasmStmt ; ]* }) => expandQasm stmts
 
 end DSL
 

@@ -13,6 +13,5 @@ public import QuantumLib.QIT.Information.BinaryHypothesisTest.Spectral
 /-!
 # Binary hypothesis test spectral API
 
-Facade for the BinaryHypothesisTest spectral API relocated to information layer
-L2 from QIT/HypothesisTesting/ChernoffSupport.lean as part of the L3-to-L2 layering cleanup.
+Facade for the BinaryHypothesisTest spectral API at information layer L2.
 -/

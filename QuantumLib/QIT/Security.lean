@@ -23,8 +23,3 @@ public import QuantumLib.QIT.Security.BB84
 
 Import surface for quantum security and key distribution.
 -/
-
-@[expose] public section
-
-namespace QIT.Security
-end QIT.Security

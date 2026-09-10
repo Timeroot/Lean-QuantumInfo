@@ -7,6 +7,7 @@ Authors: QuAIR Team
 module
 
 public import QuantumLib.QIT.Coding.Classical
+public import QuantumLib.QIT.Coding.Rate
 public import QuantumLib.QIT.Coding.Source
 public import QuantumLib.QIT.Coding.EntanglementAssisted
 
@@ -16,11 +17,3 @@ public import QuantumLib.QIT.Coding.EntanglementAssisted
 Top-level import facade for classical, entanglement-assisted, and related
 coding surfaces.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace Coding
-
-end Coding
-end QIT

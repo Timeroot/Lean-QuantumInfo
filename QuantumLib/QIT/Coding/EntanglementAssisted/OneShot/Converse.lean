@@ -7,6 +7,7 @@ Authors: QuAIR Team
 module
 
 public import QuantumLib.QIT.Coding.EntanglementAssisted.Basic
+public import QuantumLib.QIT.Util.TensorPower
 public import QuantumLib.QIT.Information.CQChannel
 public import QuantumLib.QIT.HypothesisTesting.ComparatorTest
 public import QuantumLib.QIT.HypothesisTesting.DPI
@@ -28,9 +29,9 @@ by `QIT.HypothesisTesting.DPI`.
 
 open scoped ComplexOrder MatrixOrder NNReal
 
-namespace QIT
-
 universe u v w x y
+
+namespace QIT
 
 noncomputable section
 
@@ -39,31 +40,27 @@ variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
 namespace EntanglementAssistedClassicalCode
 
-variable {N : Channel a b} {n : ℕ}
+variable {N : CPTPMap a b} {n : ℕ}
 variable {M : Type w} [Fintype M] [DecidableEq M] [Nonempty M]
 variable {EA : Type x} [Fintype EA] [DecidableEq EA]
 variable {EB : Type y} [Fintype EB] [DecidableEq EB]
 
 /-- Uniform message ensemble of Bob's pre-decoding output states. -/
 def uniformOutputEnsemble (C : EntanglementAssistedClassicalCode N n M EA EB) :
-    Ensemble M (Prod (TensorPower b n) EB) where
-  probs := uniformMessageProb (M := M)
-  weights_sum := uniformMessageProb_sum (M := M)
-  states := C.outputState
+    MEnsemble (TensorPower b n × EB) M :=
+  .ofProbs (uniformMessageProb (M := M)) (uniformMessageProb_sum (M := M)) C.outputState
 
 /-- Uniform message ensemble of Alice's channel-input and Bob side-information
 states before the communication channel acts. -/
 def uniformInputEnsemble (C : EntanglementAssistedClassicalCode N n M EA EB) :
-    Ensemble M (Prod (TensorPower a n) EB) where
-  probs := uniformMessageProb (M := M)
-  weights_sum := uniformMessageProb_sum (M := M)
-  states := C.channelInputState
+    MEnsemble (TensorPower a n × EB) M :=
+  .ofProbs (uniformMessageProb (M := M)) (uniformMessageProb_sum (M := M)) C.channelInputState
 
 /-- Cq state whose classical register is the uniform transmitted message and
 whose quantum register is Bob's pre-decoding state for that message. -/
 def preDecodedMessageOutputState
     (C : EntanglementAssistedClassicalCode N n M EA EB) :
-    State (Prod M (Prod (TensorPower b n) EB)) :=
+    MState (M × (TensorPower b n × EB)) :=
   C.uniformOutputEnsemble.cqState
 
 /-- Cq state whose classical register is the uniform transmitted message and
@@ -71,7 +68,7 @@ whose quantum register is the encoded channel input together with Bob's retained
 side-information. -/
 def preDecodedMessageInputState
     (C : EntanglementAssistedClassicalCode N n M EA EB) :
-    State (Prod M (Prod (TensorPower a n) EB)) :=
+    MState (M × (TensorPower a n × EB)) :=
   C.uniformInputEnsemble.cqState
 
 /-- The pre-decoding message/output cq state is obtained from the corresponding
@@ -80,30 +77,30 @@ leaving Bob's side-information untouched. -/
 theorem preDecodedMessageOutputState_eq_channel_preDecodedMessageInputState
     (C : EntanglementAssistedClassicalCode N n M EA EB) :
     C.preDecodedMessageOutputState =
-      ((Channel.idChannel M).prod ((N.tensorPower n).prod (Channel.idChannel EB))).applyState
+      ((CPTPOp.id (dIn := M)).prod ((N.tensorPower n).prod (CPTPOp.id (dIn := EB))))
         C.preDecodedMessageInputState := by
-  apply State.ext
-  change C.uniformOutputEnsemble.cqState.matrix =
-    (((Channel.idChannel M).prod ((N.tensorPower n).prod (Channel.idChannel EB))).applyState
-      C.uniformInputEnsemble.cqState).matrix
+  apply MState.ext
+  change C.uniformOutputEnsemble.cqState.m =
+    (((CPTPOp.id (dIn := M)).prod ((N.tensorPower n).prod (CPTPOp.id (dIn := EB))))
+      C.uniformInputEnsemble.cqState).m
   rw [applyState_id_prod_cqState_matrix C.uniformInputEnsemble
-    ((N.tensorPower n).prod (Channel.idChannel EB))]
-  rw [Ensemble.cqState_matrix]
+    ((N.tensorPower n).prod (CPTPOp.id (dIn := EB)))]
+  rw [MEnsemble.cqState_matrix]
   refine Finset.sum_congr rfl ?_
   intro m _
   change
     ((uniformMessageProb (M := M) m : ℂ) •
-      Matrix.kronecker (Matrix.single m m (1 : ℂ)) (C.outputState m).matrix) =
+      Matrix.kronecker (Matrix.single m m (1 : ℂ)) (C.outputState m).m) =
     ((uniformMessageProb (M := M) m : ℂ) •
       Matrix.kronecker (Matrix.single m m (1 : ℂ))
-        (((N.tensorPower n).prod (Channel.idChannel EB)).applyState
-          (C.channelInputState m)).matrix)
+        (((N.tensorPower n).prod (CPTPOp.id (dIn := EB)))
+          (C.channelInputState m)).m)
   rfl
 
 /-- For one channel use, repartition `M × (A¹ × E_B)` as `(M × E_B) × A`,
 dropping the terminal unit tensor-power register. -/
 def oneUseMessageSideInfoChannelEquiv
-    (M q EB : Type*) : Prod M (Prod (TensorPower q 1) EB) ≃ Prod (Prod M EB) q where
+    (M q EB : Type*) : (M × (TensorPower q 1 × EB)) ≃ ((M × EB) × q) where
   toFun x := ((x.1, x.2.2), x.2.1.1)
   invFun y := (y.1.1, ((y.2, PUnit.unit), y.1.2))
   left_inv x := by
@@ -114,41 +111,24 @@ def oneUseMessageSideInfoChannelEquiv
     rcases y with ⟨⟨m, eb⟩, q⟩
     rfl
 
-/-- Drop the terminal unit register in a one-fold tensor power. -/
-def tensorPowerOneEquiv (q : Type*) : TensorPower q 1 ≃ q where
-  toFun x := x.1
-  invFun y := (y, PUnit.unit)
-  left_inv x := by
-    rcases x with ⟨q, u⟩
-    cases u
-    rfl
-  right_inv y := rfl
-
 /-- For one channel use, drop the terminal unit tensor-power register in the
 right side of a message/output cq state. -/
 def oneUseMessageOutputEquiv
-    (M q EB : Type*) : Prod M (Prod (TensorPower q 1) EB) ≃ Prod M (Prod q EB) :=
+    (M q EB : Type*) : (M × (TensorPower q 1 × EB)) ≃ (M × (q × EB)) :=
   Equiv.prodCongr (Equiv.refl M) (Equiv.prodCongr (tensorPowerOneEquiv q) (Equiv.refl EB))
-
-private theorem unit_map_eq_idChannel :
-    (Channel.unit : Channel PUnit PUnit).map = (Channel.idChannel PUnit).map := by
-  ext X i j
-  cases i
-  cases j
-  simp [Channel.unit, MatrixMap.unit, Channel.idChannel, MatrixMap.ofKraus]
 
 /-- One-use pre-channel state with the message and Bob side-information grouped
 as the reference register and the channel input as the target register. -/
 def oneUseReferenceInputState
     (C : EntanglementAssistedClassicalCode N 1 M EA EB) :
-    State (Prod (Prod M EB) a) :=
+    MState ((M × EB) × a) :=
   C.preDecodedMessageInputState.reindex (oneUseMessageSideInfoChannelEquiv M a EB)
 
 /-- One-use pre-decoding output state with the message and Bob side-information
 grouped as the reference register and the channel output as the target register. -/
 def oneUseReferenceOutputState
     (C : EntanglementAssistedClassicalCode N 1 M EA EB) :
-    State (Prod (Prod M EB) b) :=
+    MState ((M × EB) × b) :=
   C.preDecodedMessageOutputState.reindex (oneUseMessageSideInfoChannelEquiv M b EB)
 
 /-- In one channel use, the reference-grouped pre-decoding state is exactly the
@@ -156,108 +136,74 @@ output of `N` acting on the reference-grouped encoded input state. -/
 theorem oneUseReferenceOutputState_eq_channel_referenceInputState
     (C : EntanglementAssistedClassicalCode N 1 M EA EB) :
     C.oneUseReferenceOutputState =
-      ((Channel.idChannel (Prod M EB)).prod N).applyState C.oneUseReferenceInputState := by
-  apply State.ext
+      ((CPTPOp.id (dIn := M × EB)).prod N) C.oneUseReferenceInputState := by
+  apply MState.ext
+  simp only [oneUseReferenceOutputState, MState.reindex_matrix, CPTPOp.mat_coe_eq_apply_mat,
+    CPTPOp.prod_map]
   ext x y
   rcases x with ⟨⟨xm, xe⟩, xb⟩
   rcases y with ⟨⟨ym, ye⟩, yb⟩
-  have h :=
-    congrFun
-      (congrFun
-        (congrArg State.matrix
-          (C.preDecodedMessageOutputState_eq_channel_preDecodedMessageInputState))
-        (xm, ((xb, PUnit.unit), xe)))
-      (ym, ((yb, PUnit.unit), ye))
+  have h0 :=
+    congrArg DensityOp.m
+      (C.preDecodedMessageOutputState_eq_channel_preDecodedMessageInputState)
+  rw [CPTPOp.mat_coe_eq_apply_mat] at h0
+  have h := congrFun (congrFun h0 (xm, ((xb, PUnit.unit), xe))) (ym, ((yb, PUnit.unit), ye))
   change
-    C.preDecodedMessageOutputState.matrix (xm, ((xb, PUnit.unit), xe))
+    C.preDecodedMessageOutputState.m ((xm, ((xb, PUnit.unit), xe)) : M × (TensorPower b 1 × EB))
         (ym, ((yb, PUnit.unit), ye)) =
-      (((Channel.idChannel (Prod M EB)).prod N).applyState
-        C.oneUseReferenceInputState).matrix ((xm, xe), xb) ((ym, ye), yb)
-  rw [h]
-  change
-    MatrixMap.kron (Channel.idChannel M).map
-        ((N.tensorPower 1).prod (Channel.idChannel EB)).map
-        C.preDecodedMessageInputState.matrix
-        (xm, ((xb, PUnit.unit), xe)) (ym, ((yb, PUnit.unit), ye)) =
-      MatrixMap.kron (Channel.idChannel (Prod M EB)).map N.map
-        C.oneUseReferenceInputState.matrix
+      MatrixMap.kron (CPTPOp.id (dIn := M × EB)).map N.map
+        C.oneUseReferenceInputState.m
         ((xm, xe), xb) ((ym, ye), yb)
-  rw [MatrixMap.kron_idChannel_left_apply_slice]
+  rw [h, CPTPOp.prod_map,
+    MatrixMap.kron_idChannel_left_apply_slice]
   change
-    ((N.tensorPower 1).prod (Channel.idChannel EB)).map
+    ((N.tensorPower 1).prod (CPTPOp.id (dIn := EB))).map
         (Matrix.of fun z z' =>
-          C.preDecodedMessageInputState.matrix (xm, z) (ym, z'))
+          C.preDecodedMessageInputState.m (xm, z) (ym, z'))
         ((xb, PUnit.unit), xe) ((yb, PUnit.unit), ye) =
-      MatrixMap.kron (Channel.idChannel (Prod M EB)).map N.map
-        C.oneUseReferenceInputState.matrix
+      MatrixMap.kron (CPTPOp.id (dIn := M × EB)).map N.map
+        C.oneUseReferenceInputState.m
         ((xm, xe), xb) ((ym, ye), yb)
-  change
-    MatrixMap.kron (N.tensorPower 1).map (Channel.idChannel EB).map
-        (Matrix.of fun z z' =>
-          C.preDecodedMessageInputState.matrix (xm, z) (ym, z'))
-        ((xb, PUnit.unit), xe) ((yb, PUnit.unit), ye) =
-      MatrixMap.kron (Channel.idChannel (Prod M EB)).map N.map
-        C.oneUseReferenceInputState.matrix
-        ((xm, xe), xb) ((ym, ye), yb)
-  rw [MatrixMap.kron_idChannel_apply_slice]
-  change
-    (N.tensorPower 1).map
-        (Matrix.of fun z z' =>
-          C.preDecodedMessageInputState.matrix (xm, (z, xe)) (ym, (z', ye)))
-        (xb, PUnit.unit) (yb, PUnit.unit) =
-      MatrixMap.kron (Channel.idChannel (Prod M EB)).map N.map
-        C.oneUseReferenceInputState.matrix
-        ((xm, xe), xb) ((ym, ye), yb)
-  rw [Channel.tensorPower_succ, Channel.tensorPower_zero]
-  change
-    MatrixMap.kron N.map (Channel.unit).map
-        (Matrix.of fun z z' =>
-          C.preDecodedMessageInputState.matrix (xm, (z, xe)) (ym, (z', ye)))
-        (xb, PUnit.unit) (yb, PUnit.unit) =
-      MatrixMap.kron (Channel.idChannel (Prod M EB)).map N.map
-        C.oneUseReferenceInputState.matrix
-        ((xm, xe), xb) ((ym, ye), yb)
-  rw [unit_map_eq_idChannel]
-  rw [MatrixMap.kron_idChannel_apply_slice]
+  rw [CPTPOp.prod_map,
+    MatrixMap.kron_idChannel_apply_slice]
+  rw [CPTPOp.tensorPower_succ]
+  change (N.prod (N.tensorPower 0)).map _ _ _ = _
+  simp only [CPTPOp.prod_map, CPTPOp.tensorPower_zero_map]
+  refine Eq.trans (MatrixMap.kron_unit_apply_slice N.map _ _ _) ?_
   rw [MatrixMap.kron_idChannel_left_apply_slice]
-  change
-    N.map
-        (Matrix.of fun i i' =>
-          C.preDecodedMessageInputState.matrix (xm, (i, PUnit.unit), xe)
-            (ym, (i', PUnit.unit), ye)) xb yb =
-      N.map
-        (Matrix.of fun j j' =>
-          C.preDecodedMessageInputState.matrix (xm, (j, PUnit.unit), xe)
-            (ym, (j', PUnit.unit), ye)) xb yb
+  simp only [oneUseReferenceInputState, MState.reindex_matrix, Matrix.submatrix_apply,
+    oneUseMessageSideInfoChannelEquiv, Equiv.coe_fn_symm_mk]
   rfl
 
 /-- Alice's encoding is local to her share, so Bob's retained side-information
 marginal is unchanged. -/
-theorem channelInputState_marginalB
+theorem channelInputState_traceLeft
     (C : EntanglementAssistedClassicalCode N n M EA EB) (m : M) :
-    (C.channelInputState m).marginalB = C.sharedState.marginalB := by
+    (C.channelInputState m).traceLeft = C.sharedState.traceLeft := by
   unfold channelInputState
-  exact State.marginalB_applyState_prod_id C.sharedState (C.encoder m)
+  exact MState.traceLeft_applyState_prod_id C.sharedState (C.encoder m)
 
 /-- The transmitted-message marginal of the pre-channel cq state is uniform. -/
-theorem preDecodedMessageInputState_marginalA
+theorem preDecodedMessageInputState_traceRight
     (C : EntanglementAssistedClassicalCode N n M EA EB) :
-    C.preDecodedMessageInputState.marginalA = uniformMessageState (M := M) := by
-  apply State.ext
-  change partialTraceB (a := M) (b := Prod (TensorPower a n) EB)
-      C.uniformInputEnsemble.cqState.matrix =
-    (uniformMessageState (M := M)).matrix
-  rw [Classical.partialTraceB_cqState_eq_diagonalState]
+    C.preDecodedMessageInputState.traceRight = uniformMessageState (M := M) := by
+  apply MState.ext
+  rw [MState.traceRight_m]
+  change Matrix.traceRight
+      C.uniformInputEnsemble.cqState.m =
+    (uniformMessageState (M := M)).m
+  rw [Classical.traceRight_cqState_eq_diagonalState]
   rfl
 
 /-- For one use, after grouping message and Bob side-information together as
 the reference register, the input reference marginal is the product
 `π_M ⊗ ρ_{E_B}`. -/
-theorem oneUseReferenceInputState_marginalA
+theorem oneUseReferenceInputState_traceRight
     (C : EntanglementAssistedClassicalCode N 1 M EA EB) :
-    C.oneUseReferenceInputState.marginalA =
-      (uniformMessageState (M := M)).prod C.sharedState.marginalB := by
-  apply State.ext
+    C.oneUseReferenceInputState.traceRight =
+      (uniformMessageState (M := M)).prod C.sharedState.traceLeft := by
+  apply MState.ext
+  simp only [oneUseReferenceInputState, MState.traceRight_m, MState.reindex_matrix]
   ext x y
   rcases x with ⟨xm, xe⟩
   rcases y with ⟨ym, ye⟩
@@ -265,18 +211,21 @@ theorem oneUseReferenceInputState_marginalA
   · subst ym
     change
       (∑ z : a,
-        C.preDecodedMessageInputState.matrix (xm, ((z, PUnit.unit), xe))
+        C.preDecodedMessageInputState.m
+            ((xm, ((z, PUnit.unit), xe)) : M × (TensorPower a 1 × EB))
           (xm, ((z, PUnit.unit), ye))) =
-      ((uniformMessageState (M := M)).prod C.sharedState.marginalB).matrix (xm, xe) (xm, ye)
+      ((uniformMessageState (M := M)).prod C.sharedState.traceLeft).m (xm, xe) (xm, ye)
     have hblock :
         ∀ z : a,
-          C.preDecodedMessageInputState.matrix (xm, ((z, PUnit.unit), xe))
+          C.preDecodedMessageInputState.m
+                ((xm, ((z, PUnit.unit), xe)) : M × (TensorPower a 1 × EB))
               (xm, ((z, PUnit.unit), ye)) =
             uniformMessageProb (M := M) xm •
-              (C.channelInputState xm).matrix ((z, PUnit.unit), xe) ((z, PUnit.unit), ye) := by
+              (C.channelInputState xm).m (((z, PUnit.unit), xe) : TensorPower a 1 × EB)
+                ((z, PUnit.unit), ye) := by
       intro z
-      unfold preDecodedMessageInputState
-      simp only [uniformInputEnsemble, Ensemble.cqState_matrix, Matrix.sum_apply,
+      show C.uniformInputEnsemble.cqState.m _ _ = _
+      simp only [uniformInputEnsemble, MEnsemble.cqState_matrix, Matrix.sum_apply,
         Matrix.smul_apply]
       rw [Finset.sum_eq_single xm]
       · simp [Matrix.kronecker]
@@ -288,25 +237,26 @@ theorem oneUseReferenceInputState_marginalA
     have hmarg :=
       congrFun
         (congrFun
-          (congrArg State.matrix (C.channelInputState_marginalB xm)) xe) ye
+          (congrArg DensityOp.m (C.channelInputState_traceLeft xm)) xe) ye
     have hmarg' :
         (∑ z : a,
-          (C.channelInputState xm).matrix ((z, PUnit.unit), xe) ((z, PUnit.unit), ye)) =
-            C.sharedState.marginalB.matrix xe ye := by
+          (C.channelInputState xm).m (((z, PUnit.unit), xe) : TensorPower a 1 × EB)
+            ((z, PUnit.unit), ye)) =
+            C.sharedState.traceLeft.m xe ye := by
       have hmargTensor :
           (∑ i : TensorPower a 1,
-            (C.channelInputState xm).matrix (i, xe) (i, ye)) =
-              C.sharedState.marginalB.matrix xe ye := by
-        simpa [State.marginalB, partialTraceA] using hmarg
+            (C.channelInputState xm).m (i, xe) (i, ye)) =
+              C.sharedState.traceLeft.m xe ye := by
+        simpa [MState.traceLeft_m, Matrix.traceLeft] using hmarg
       have hsumTensor :
           (∑ i : TensorPower a 1,
-            (C.channelInputState xm).matrix (i, xe) (i, ye)) =
+            (C.channelInputState xm).m (i, xe) (i, ye)) =
           ∑ z : a,
-            (C.channelInputState xm).matrix ((z, PUnit.unit), xe)
+            (C.channelInputState xm).m (((z, PUnit.unit), xe) : TensorPower a 1 × EB)
               ((z, PUnit.unit), ye) := by
         exact Fintype.sum_equiv (tensorPowerOneEquiv a)
-          (fun i : TensorPower a 1 => (C.channelInputState xm).matrix (i, xe) (i, ye))
-          (fun z : a => (C.channelInputState xm).matrix ((z, PUnit.unit), xe)
+          (fun i : TensorPower a 1 => (C.channelInputState xm).m (i, xe) (i, ye))
+          (fun z : a => (C.channelInputState xm).m (((z, PUnit.unit), xe) : TensorPower a 1 × EB)
             ((z, PUnit.unit), ye))
           (by
             intro i
@@ -317,24 +267,27 @@ theorem oneUseReferenceInputState_marginalA
     change
       uniformMessageProb (M := M) xm •
           (∑ z : a,
-            (C.channelInputState xm).matrix ((z, PUnit.unit), xe) ((z, PUnit.unit), ye)) =
-        ((uniformMessageState (M := M)).prod C.sharedState.marginalB).matrix
+            (C.channelInputState xm).m (((z, PUnit.unit), xe) : TensorPower a 1 × EB)
+              ((z, PUnit.unit), ye)) =
+        ((uniformMessageState (M := M)).prod C.sharedState.traceLeft).m
           (xm, xe) (xm, ye)
     rw [hmarg']
-    simp [State.marginalB, partialTraceA, State.prod, Matrix.kronecker,
-      uniformMessageState, Classical.diagonalState, uniformMessageProb, Algebra.smul_def]
+    simp [Matrix.traceLeft,
+      uniformMessageState, Classical.diagonalState_matrix, uniformMessageProb, Algebra.smul_def]
   · change
       (∑ z : a,
-        C.preDecodedMessageInputState.matrix (xm, ((z, PUnit.unit), xe))
+        C.preDecodedMessageInputState.m
+            ((xm, ((z, PUnit.unit), xe)) : M × (TensorPower a 1 × EB))
           (ym, ((z, PUnit.unit), ye))) =
-      ((uniformMessageState (M := M)).prod C.sharedState.marginalB).matrix (xm, xe) (ym, ye)
+      ((uniformMessageState (M := M)).prod C.sharedState.traceLeft).m (xm, xe) (ym, ye)
     have hblock :
         ∀ z : a,
-          C.preDecodedMessageInputState.matrix (xm, ((z, PUnit.unit), xe))
+          C.preDecodedMessageInputState.m
+                ((xm, ((z, PUnit.unit), xe)) : M × (TensorPower a 1 × EB))
               (ym, ((z, PUnit.unit), ye)) = 0 := by
       intro z
-      unfold preDecodedMessageInputState
-      simp only [uniformInputEnsemble, Ensemble.cqState_matrix, Matrix.sum_apply,
+      show C.uniformInputEnsemble.cqState.m _ _ = _
+      simp only [uniformInputEnsemble, MEnsemble.cqState_matrix, Matrix.sum_apply,
         Matrix.smul_apply]
       rw [Finset.sum_eq_zero]
       intro m _
@@ -342,37 +295,38 @@ theorem oneUseReferenceInputState_marginalA
       · subst m
         simp [Matrix.kronecker, hm]
       · simp [Matrix.kronecker, hmx]
-    simp [hblock, State.prod, Matrix.kronecker, uniformMessageState,
-      Classical.diagonalState, hm]
+    simp [hblock, uniformMessageState, Classical.diagonalState_matrix, hm]
 
 /-- For one use, the output reference marginal is the same product
 `π_M ⊗ ρ_{E_B}` because the physical channel acts only on the output register. -/
-theorem oneUseReferenceOutputState_marginalA
+theorem oneUseReferenceOutputState_traceRight
     (C : EntanglementAssistedClassicalCode N 1 M EA EB) :
-    C.oneUseReferenceOutputState.marginalA =
-      (uniformMessageState (M := M)).prod C.sharedState.marginalB := by
+    C.oneUseReferenceOutputState.traceRight =
+      (uniformMessageState (M := M)).prod C.sharedState.traceLeft := by
   rw [C.oneUseReferenceOutputState_eq_channel_referenceInputState]
-  rw [State.marginalA_applyState_id_prod]
-  exact C.oneUseReferenceInputState_marginalA
+  rw [MState.traceRight_applyState_id_prod]
+  exact C.oneUseReferenceInputState_traceRight
 
 /-- The one-use reference marginal of the pre-decoding output state factors as
 the product of its message and Bob-side-information marginals. -/
-theorem oneUseReferenceOutputState_marginalA_eq_prod_marginals
+theorem oneUseReferenceOutputState_traceRight_eq_prod_marginals
     (C : EntanglementAssistedClassicalCode N 1 M EA EB) :
-    C.oneUseReferenceOutputState.marginalA =
-      C.oneUseReferenceOutputState.marginalA.marginalA.prod
-        C.oneUseReferenceOutputState.marginalA.marginalB := by
-  rw [C.oneUseReferenceOutputState_marginalA]
+    C.oneUseReferenceOutputState.traceRight =
+      C.oneUseReferenceOutputState.traceRight.traceRight.prod
+        C.oneUseReferenceOutputState.traceRight.traceLeft := by
+  rw [C.oneUseReferenceOutputState_traceRight]
   have hA :
-      (((uniformMessageState (M := M)).prod C.sharedState.marginalB).marginalA =
+      (((uniformMessageState (M := M)).prod C.sharedState.traceLeft).traceRight =
         uniformMessageState (M := M)) := by
-    apply State.ext
-    exact State.partialTraceB_prod (uniformMessageState (M := M)) C.sharedState.marginalB
+    apply MState.ext
+    rw [MState.traceRight_m]
+    exact MState.traceRight_prod (uniformMessageState (M := M)) C.sharedState.traceLeft
   have hB :
-      (((uniformMessageState (M := M)).prod C.sharedState.marginalB).marginalB =
-        C.sharedState.marginalB) := by
-    apply State.ext
-    exact State.partialTraceA_prod (uniformMessageState (M := M)) C.sharedState.marginalB
+      (((uniformMessageState (M := M)).prod C.sharedState.traceLeft).traceLeft =
+        C.sharedState.traceLeft) := by
+    apply MState.ext
+    rw [MState.traceLeft_m]
+    exact MState.traceLeft_prod (uniformMessageState (M := M)) C.sharedState.traceLeft
   rw [hA, hB]
 
 /-- Dropping the terminal unit tensor-power register identifies the usual
@@ -381,13 +335,15 @@ message/output cq state with the source proof's repartitioned
 theorem preDecodedMessageOutputState_reindex_oneUseMessageOutputEquiv
     (C : EntanglementAssistedClassicalCode N 1 M EA EB) :
     C.preDecodedMessageOutputState.reindex (oneUseMessageOutputEquiv M b EB) =
-      C.oneUseReferenceOutputState.reindex (State.messageOutputSideInfoEquiv M EB b) := by
-  apply State.ext
+      C.oneUseReferenceOutputState.reindex (MState.messageOutputSideInfoEquiv M EB b) := by
+  apply MState.ext
+  simp only [oneUseReferenceOutputState, MState.reindex_matrix]
   ext x y
   rcases x with ⟨xm, xb, xe⟩
   rcases y with ⟨ym, yb, ye⟩
   rfl
 
+set_option maxRecDepth 4000 in
 /-- One-use pre-decoding message/output states are bounded by the channel
 optimized extended-real hypothesis-testing mutual information.
 
@@ -400,27 +356,27 @@ theorem preDecodedMessageOutputState_hypothesisTestingMutualInformation_le_chann
     (ε : ℝ) (hε : 0 ≤ ε) :
     C.preDecodedMessageOutputState.hypothesisTestingMutualInformation ε ≤
       N.hypothesisTestingMutualInformation ε := by
-  let dropBE : Prod (TensorPower b 1) EB ≃ Prod b EB :=
+  let dropBE : (TensorPower b 1 × EB) ≃ (b × EB) :=
     Equiv.prodCongr (tensorPowerOneEquiv b) (Equiv.refl EB)
   have hdrop :
       (C.preDecodedMessageOutputState.reindex
           (Equiv.prodCongr (Equiv.refl M) dropBE)).hypothesisTestingMutualInformation ε =
         C.preDecodedMessageOutputState.hypothesisTestingMutualInformation ε := by
-    exact State.hypothesisTestingMutualInformation_reindex_prodCongr
+    exact MState.hypothesisTestingMutualInformation_reindex_prodCongr
       C.preDecodedMessageOutputState ε hε (Equiv.refl M) dropBE
   have hstate :
       C.preDecodedMessageOutputState.reindex
           (Equiv.prodCongr (Equiv.refl M) dropBE) =
-        C.oneUseReferenceOutputState.reindex (State.messageOutputSideInfoEquiv M EB b) := by
+        C.oneUseReferenceOutputState.reindex (MState.messageOutputSideInfoEquiv M EB b) := by
     simpa [dropBE, oneUseMessageOutputEquiv] using
       C.preDecodedMessageOutputState_reindex_oneUseMessageOutputEquiv
   have hrepart :
       (C.oneUseReferenceOutputState.reindex
-          (State.messageOutputSideInfoEquiv M EB b)).hypothesisTestingMutualInformation ε ≤
+          (MState.messageOutputSideInfoEquiv M EB b)).hypothesisTestingMutualInformation ε ≤
         C.oneUseReferenceOutputState.hypothesisTestingMutualInformation ε :=
-    State.hypothesisTestingMutualInformation_repartition_le_of_marginalA_eq_prod
+    MState.hypothesisTestingMutualInformation_repartition_le_of_traceRight_eq_prod
       C.oneUseReferenceOutputState ε hε
-      C.oneUseReferenceOutputState_marginalA_eq_prod_marginals
+      C.oneUseReferenceOutputState_traceRight_eq_prod_marginals
   have hchan :
       C.oneUseReferenceOutputState.hypothesisTestingMutualInformation ε ≤
         N.hypothesisTestingMutualInformation ε := by
@@ -435,13 +391,13 @@ theorem preDecodedMessageOutputState_hypothesisTestingMutualInformation_le_chann
 from the classical distribution induced by the decoder POVM. -/
 def uniformDecodedMessageProb
     (C : EntanglementAssistedClassicalCode N n M EA EB) :
-    Prod M M → ℝ≥0 :=
+    M × M → ℝ≥0 :=
   fun p => uniformMessageProb (M := M) p.1 * C.decoder.prob (C.outputState p.1) p.2
 
 /-- The transmitted/decoded-message joint probabilities sum to one. -/
 theorem uniformDecodedMessageProb_sum
     (C : EntanglementAssistedClassicalCode N n M EA EB) :
-    ∑ p : Prod M M, C.uniformDecodedMessageProb p = 1 := by
+    ∑ p : M × M, C.uniformDecodedMessageProb p = 1 := by
   rw [Fintype.sum_prod_type]
   calc
     (∑ m : M, ∑ mhat : M,
@@ -460,7 +416,7 @@ theorem uniformDecodedMessageProb_sum
 /-- Joint state of the transmitted message and Bob's decoded message. -/
 def uniformDecodedMessageState
     (C : EntanglementAssistedClassicalCode N n M EA EB) :
-    State (Prod M M) :=
+    MState (M × M) :=
   Classical.diagonalState C.uniformDecodedMessageProb C.uniformDecodedMessageProb_sum
 
 /-- The decoded classical message-pair state is obtained by measuring the
@@ -468,48 +424,45 @@ pre-decoding cq state with Bob's decoder on the second register. -/
 theorem uniformDecodedMessageState_eq_measure_preDecoded
     (C : EntanglementAssistedClassicalCode N n M EA EB) :
     C.uniformDecodedMessageState =
-      ((Channel.idChannel M).prod (Channel.measure C.decoder)).applyState
+      ((CPTPOp.id (dIn := M)).prod (POVM.measureDiscard C.decoder))
         C.preDecodedMessageOutputState := by
-  apply State.ext
+  apply MState.ext
   ext p q
   rcases p with ⟨m, mhat⟩
   rcases q with ⟨m', mhat'⟩
-  change C.uniformDecodedMessageState.matrix (m, mhat) (m', mhat') =
-    (((Channel.idChannel M).prod (Channel.measure C.decoder)).applyState
-      C.uniformOutputEnsemble.cqState).matrix (m, mhat) (m', mhat')
+  change C.uniformDecodedMessageState.m (m, mhat) (m', mhat') =
+    (((CPTPOp.id (dIn := M)).prod (POVM.measureDiscard C.decoder))
+      C.uniformOutputEnsemble.cqState).m (m, mhat) (m', mhat')
   rw [applyState_id_prod_cqState_matrix C.uniformOutputEnsemble
-    (Channel.measure C.decoder)]
+    (POVM.measureDiscard C.decoder)]
   simp only [Matrix.sum_apply, Matrix.smul_apply]
   by_cases hm : m = m'
   · subst m'
     by_cases hhat : mhat = mhat'
     · subst mhat'
-      have hmeas :
-          ((Channel.measure C.decoder).applyState (C.outputState m)).matrix mhat mhat =
-            (C.decoder.prob (C.outputState m) mhat : ℂ) := by
-        rw [← Classical.measuredState_eq_measure_applyState]
+      have hmeas : ((C.outputState m).m * C.decoder.effects mhat).trace =
+          (C.decoder.prob (C.outputState m) mhat : ℂ) := by
+        rw [← Matrix.diagonal_apply_eq
+            (fun y => ((C.outputState m).m * C.decoder.effects y).trace) mhat,
+          ← POVM.measureDiscard_map_state_diagonal, ← CPTPOp.mat_coe_eq_apply_mat,
+          ← Classical.measuredState_eq_measure_applyState]
         simp
       rw [Finset.sum_eq_single m]
-      · simp [uniformDecodedMessageState, Classical.diagonalState,
+      · simp [uniformDecodedMessageState, Matrix.sum_apply, Matrix.single_apply,
           uniformDecodedMessageProb, uniformOutputEnsemble, Matrix.kronecker,
           hmeas]
       · intro x _ hx
         simp [Matrix.kronecker, hx]
       · simp
-    · have hmeas :
-          ((Channel.measure C.decoder).applyState (C.outputState m)).matrix mhat mhat' = 0 := by
-        rw [← Classical.measuredState_eq_measure_applyState]
-        exact Classical.measuredState_apply_ne C.decoder (C.outputState m) hhat
-      rw [Finset.sum_eq_single m]
-      · simp [uniformDecodedMessageState, Classical.diagonalState,
-          uniformDecodedMessageProb, uniformOutputEnsemble, Matrix.kronecker,
-          hhat, hmeas]
+    · rw [Finset.sum_eq_single m]
+      · have hne : ∀ c : M, ¬(c = mhat ∧ c = mhat') := fun c hc => hhat (hc.1 ▸ hc.2)
+        simp [uniformDecodedMessageState, Matrix.sum_apply,
+          uniformOutputEnsemble, Matrix.kronecker, hne, hhat]
       · intro x _ hx
         simp [Matrix.kronecker, hx]
       · simp
   · rw [Finset.sum_eq_zero]
-    · simp [uniformDecodedMessageState, Classical.diagonalState,
-        uniformDecodedMessageProb, hm]
+    · simp [uniformDecodedMessageState, hm]
     · intro x _
       by_cases hx : x = m
       · subst x
@@ -523,30 +476,31 @@ theorem uniformDecodedMessageState_hypothesisTestingMutualInformation_le_preDeco
     C.uniformDecodedMessageState.hypothesisTestingMutualInformation ε ≤
       C.preDecodedMessageOutputState.hypothesisTestingMutualInformation ε := by
   rw [C.uniformDecodedMessageState_eq_measure_preDecoded]
-  exact State.hypothesisTestingMutualInformation_dataProcessing_right
-    C.preDecodedMessageOutputState (Channel.measure C.decoder) ε hε
+  exact MState.hypothesisTestingMutualInformation_dataProcessing_right
+    C.preDecodedMessageOutputState (POVM.measureDiscard C.decoder) ε hε
 
 /-- The transmitted-message marginal of the pre-decoding cq state is uniform. -/
-theorem preDecodedMessageOutputState_marginalA
+theorem preDecodedMessageOutputState_traceRight
     (C : EntanglementAssistedClassicalCode N n M EA EB) :
-    C.preDecodedMessageOutputState.marginalA = uniformMessageState (M := M) := by
-  apply State.ext
-  change partialTraceB (a := M) (b := Prod (TensorPower b n) EB)
-      C.uniformOutputEnsemble.cqState.matrix =
-    (uniformMessageState (M := M)).matrix
-  rw [Classical.partialTraceB_cqState_eq_diagonalState]
+    C.preDecodedMessageOutputState.traceRight = uniformMessageState (M := M) := by
+  apply MState.ext
+  rw [MState.traceRight_m]
+  change Matrix.traceRight
+      C.uniformOutputEnsemble.cqState.m =
+    (uniformMessageState (M := M)).m
+  rw [Classical.traceRight_cqState_eq_diagonalState]
   rfl
 
 /-- Decoding is a right-local channel, so the transmitted-message marginal of
 the decoded classical pair remains uniform. -/
-theorem uniformDecodedMessageState_marginalA
+theorem uniformDecodedMessageState_traceRight
     (C : EntanglementAssistedClassicalCode N n M EA EB) :
-    C.uniformDecodedMessageState.marginalA = uniformMessageState (M := M) := by
-  apply State.ext
+    C.uniformDecodedMessageState.traceRight = uniformMessageState (M := M) := by
+  apply MState.ext
   ext m m'
   by_cases h : m = m'
   · subst m'
-    simp only [State.marginalA_matrix, partialTraceB, uniformDecodedMessageState,
+    simp only [MState.traceRight_m, Matrix.traceRight, Matrix.of_apply, uniformDecodedMessageState,
       Classical.diagonalState_matrix, uniformDecodedMessageProb, uniformMessageState_matrix,
       Matrix.diagonal_apply_eq]
     have hsum :
@@ -555,7 +509,7 @@ theorem uniformDecodedMessageState_marginalA
           uniformMessageProb (M := M) m := by
       rw [← Finset.mul_sum, C.decoder.sum_prob, mul_one]
     exact_mod_cast hsum
-  · simp [State.marginalA, partialTraceB, uniformDecodedMessageState,
+  · simp [Matrix.traceRight, uniformDecodedMessageState,
       Classical.diagonalState, uniformDecodedMessageProb, uniformMessageState, h]
 
 /-- The equality-comparator accept probability is the uniform average decoding
@@ -566,11 +520,11 @@ theorem uniformDecodedMessageState_comparator_accept
       ∑ m : M, (uniformMessageProb (M := M) m : ℝ) * C.successProbability m := by
   unfold effectAcceptProbability EntanglementAssistedClassicalCode.successProbability
   calc
-    (∑ p : Prod M M,
-        (∑ q : Prod M M,
-          C.uniformDecodedMessageState.matrix p q * comparatorEffect (M := M) q p)).re =
-        (∑ p : Prod M M,
-          C.uniformDecodedMessageState.matrix p p *
+    (∑ p : M × M,
+        (∑ q : M × M,
+          C.uniformDecodedMessageState.m p q * comparatorEffect (M := M) q p)).re =
+        (∑ p : M × M,
+          C.uniformDecodedMessageState.m p p *
             comparatorEffect (M := M) p p).re := by
           congr 1
           refine Finset.sum_congr rfl ?_
@@ -581,7 +535,7 @@ theorem uniformDecodedMessageState_comparator_accept
               unfold comparatorEffect
               exact Matrix.diagonal_apply_ne _ hq
             rw [hzero, mul_zero])
-    _ = (∑ p : Prod M M,
+    _ = (∑ p : M × M,
           (if p.1 = p.2 then
             (uniformMessageProb (M := M) p.1 : ℂ) *
               (C.decoder.prob (C.outputState p.1) p.2 : ℂ)
@@ -639,7 +593,7 @@ theorem log_card_le_uniformDecodedMessageState_hypothesisTestingMutualInformatio
       C.uniformDecodedMessageState.hypothesisTestingMutualInformation ε := by
   exact comparator_hypothesisTestingMutualInformation_lower_bound
     C.uniformDecodedMessageState ε
-    C.uniformDecodedMessageState_marginalA
+    C.uniformDecodedMessageState_traceRight
     (C.comparator_accept_ge_of_maxErrorAtMost hC)
 
 /-- Reliable decoding and decoder data processing give the pre-decoding
@@ -664,9 +618,19 @@ theorem log_card_le_channel_hypothesisTestingMutualInformation
 
 end EntanglementAssistedClassicalCode
 
-namespace Channel
+end
+end QIT
 
-variable (N : Channel a b)
+noncomputable section
+
+namespace CPTPOp
+
+open QIT
+
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+
+variable (N : CPTPMap a b)
 
 /-- The one-shot hypothesis-testing mutual information is an extended-real
 upper bound on every `ε`-reliable one-use entanglement-assisted classical code. -/
@@ -688,8 +652,6 @@ theorem oneShotEntanglementAssistedClassicalCapacityE_le_hypothesisTestingMutual
     (N.hypothesisTestingMutualInformation_isOneShotEntanglementAssistedClassicalCapacityUpperBoundE
       hε)
 
-end Channel
+end CPTPOp
 
 end
-
-end QIT

@@ -34,18 +34,27 @@ variable [Fintype a] [DecidableEq a]
 variable [Fintype b] [DecidableEq b]
 variable [Fintype r] [DecidableEq r]
 
-namespace PureVector
+end QIT
+
+namespace Ket
+
+open QIT
+universe u v w x y
+variable {a : Type u} {b : Type v} {r : Type w}
+variable [Fintype a] [DecidableEq a]
+variable [Fintype b] [DecidableEq b]
+variable [Fintype r] [DecidableEq r]
 
 /-- The conditional entropy is the least achievable standard state-merging
 net entanglement rate.  The membership half is the concrete ADHW
 FQSW-plus-teleportation construction; minimality follows from Berta's
 dimension-independent smooth-min-entropy converse on the HOW rate domain. -/
 theorem conditionalEntropy_isLeast_stateMergingRates
-    (psi : PureVector (Prod (Prod a b) r)) :
+    (psi : Ket ((a × b) × r)) :
     IsLeast
-      {R : Real |
+      {R : ℝ |
         IsAchievableStateMergingRate.{u, v, w, x, x, y, y, x} psi R}
-      psi.state.marginalA.conditionalEntropy :=
+      psi.state.traceRight.conditionalEntropy :=
   ⟨stateMerging_direct_achievable_at_conditionalEntropy psi,
     fun R hR => conditionalEntropy_le_of_isAchievableStateMergingRate psi R hR⟩
 
@@ -53,14 +62,14 @@ theorem conditionalEntropy_isLeast_stateMergingRates
 tripartite source, the infimum net entanglement cost of standard one-way-LOCC
 state merging equals `H(A|B)` of the source. -/
 theorem stateMergingCost_eq_conditionalEntropy
-    (psi : PureVector (Prod (Prod a b) r)) :
+    (psi : Ket ((a × b) × r)) :
     stateMergingCost.{u, v, w, x, x, y, y, x} psi =
-      psi.state.marginalA.conditionalEntropy := by
-  let S : Set Real :=
+      psi.state.traceRight.conditionalEntropy := by
+  let S : Set ℝ :=
     {R | IsAchievableStateMergingRate.{u, v, w, x, x, y, y, x} psi R}
   have hleast := conditionalEntropy_isLeast_stateMergingRates.{u, v, w, x, y} psi
-  have hnonempty : S.Nonempty := ⟨psi.state.marginalA.conditionalEntropy, hleast.1⟩
-  have hbddBelow : BddBelow S := ⟨psi.state.marginalA.conditionalEntropy, hleast.2⟩
+  have hnonempty : S.Nonempty := ⟨psi.state.traceRight.conditionalEntropy, hleast.1⟩
+  have hbddBelow : BddBelow S := ⟨psi.state.traceRight.conditionalEntropy, hleast.2⟩
   apply le_antisymm
   · exact csInf_le hbddBelow hleast.1
   · exact le_csInf hnonempty hleast.2
@@ -68,26 +77,34 @@ theorem stateMergingCost_eq_conditionalEntropy
 /-- Positive conditional entropy means that optimal state merging consumes
 net entanglement. -/
 theorem stateMergingCost_pos_of_conditionalEntropy_pos
-    (psi : PureVector (Prod (Prod a b) r))
-    (h : 0 < psi.state.marginalA.conditionalEntropy) :
+    (psi : Ket ((a × b) × r))
+    (h : 0 < psi.state.traceRight.conditionalEntropy) :
     0 < stateMergingCost.{u, v, w, x, x, y, y, x} psi := by
   rwa [stateMergingCost_eq_conditionalEntropy.{u, v, w, x, y} psi]
 
 /-- Zero conditional entropy gives zero optimal net entanglement cost. -/
 theorem stateMergingCost_eq_zero_of_conditionalEntropy_eq_zero
-    (psi : PureVector (Prod (Prod a b) r))
-    (h : psi.state.marginalA.conditionalEntropy = 0) :
+    (psi : Ket ((a × b) × r))
+    (h : psi.state.traceRight.conditionalEntropy = 0) :
     stateMergingCost.{u, v, w, x, x, y, y, x} psi = 0 := by
   rw [stateMergingCost_eq_conditionalEntropy.{u, v, w, x, y} psi, h]
 
 /-- Negative conditional entropy means that optimal state merging generates
 net entanglement. -/
 theorem stateMergingCost_neg_of_conditionalEntropy_neg
-    (psi : PureVector (Prod (Prod a b) r))
-    (h : psi.state.marginalA.conditionalEntropy < 0) :
+    (psi : Ket ((a × b) × r))
+    (h : psi.state.traceRight.conditionalEntropy < 0) :
     stateMergingCost.{u, v, w, x, x, y, y, x} psi < 0 := by
   rwa [stateMergingCost_eq_conditionalEntropy.{u, v, w, x, y} psi]
 
-end PureVector
+end Ket
+
+namespace QIT
+
+universe u v w x y
+variable {a : Type u} {b : Type v} {r : Type w}
+variable [Fintype a] [DecidableEq a]
+variable [Fintype b] [DecidableEq b]
+variable [Fintype r] [DecidableEq r]
 
 end QIT

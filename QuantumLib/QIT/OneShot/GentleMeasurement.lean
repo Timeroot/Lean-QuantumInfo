@@ -6,6 +6,7 @@ Authors: QuAIR Team
 
 module
 
+public import QuantumLib.QIT.Core.Map
 public import QuantumLib.QIT.States.TraceNorm.Variational
 public import QuantumLib.QIT.States.PosSqrtOrder
 public import QuantumLib.QIT.Util.SDP.HermitianPSDTraceDuality
@@ -135,8 +136,7 @@ private theorem traceNorm_mul_le_frobenius (A B : CMatrix a) :
         Real.sqrt ((B * Matrix.conjTranspose B).trace).re ^ 2 := by
       rw [hnormB, Real.sq_sqrt hBpos]
     exact (sq_eq_sq₀ hnnB (Real.sqrt_nonneg _)).mp h1
-  -- Assemble: `‖A B‖₁ = |Tr((A B) U)| = ‖Tr((A B) U)‖` (attainment).
-  -- `Complex.abs` is definitionally the complex norm.
+  -- Assemble: `‖A B‖₁ = ‖Tr((A B) U)‖` (attainment).
   have habs_eq : traceNorm (A * B) =
       ‖(((A * B) * (U : CMatrix a)).trace)‖ := hU.symm
   calc traceNorm (A * B)
@@ -219,9 +219,9 @@ detection probability `Re Tr(Λρ)` is at least `1 - ε`, this yields the
 `2√ε` bound of Wilde's gentle-operator lemma.
 [Wilde2011Qst, qit-notes.tex:15961-16010] -/
 theorem gentle_operator (Λ : CMatrix a) (hΛ0 : Λ.PosSemidef)
-    (hΛ1 : (1 - Λ).PosSemidef) (ρ : State a) :
-    traceNorm (psdSqrt Λ * ρ.matrix * psdSqrt Λ - ρ.matrix) ≤
-      2 * Real.sqrt (1 - ((Λ * ρ.matrix).trace).re) := by
+    (hΛ1 : (1 - Λ).PosSemidef) (ρ : MState a) :
+    traceNorm (psdSqrt Λ * ρ.m * psdSqrt Λ - ρ.m) ≤
+      2 * Real.sqrt (1 - ((Λ * ρ.m).trace).re) := by
   have hΛsq_herm : (psdSqrt Λ).IsHermitian := psdSqrt_isHermitian Λ
   have hΛsq_pos : (psdSqrt Λ).PosSemidef := psdSqrt_pos Λ
   have hΛ_le_one : Λ ≤ 1 := by simpa [Matrix.le_iff] using hΛ1
@@ -229,21 +229,21 @@ theorem gentle_operator (Λ : CMatrix a) (hΛ0 : Λ.PosSemidef)
   have hR_herm : R.IsHermitian := hΛsq_herm
   have hR_pos : R.PosSemidef := hΛsq_pos
   have hRR : R * R = Λ := psdSqrt_mul_self_of_posSemidef hΛ0
-  have hρ : ρ.matrix.PosSemidef := ρ.pos
-  have hρ_herm : ρ.matrix.IsHermitian := hρ.isHermitian
-  have htrρ : ρ.matrix.trace = 1 := ρ.trace_eq_one
-  set P : CMatrix a := psdSqrt ρ.matrix with hP_def
-  have hP_herm : P.IsHermitian := psdSqrt_isHermitian ρ.matrix
-  have hPP : P * P = ρ.matrix := psdSqrt_mul_self_of_posSemidef hρ
+  have hρ : ρ.m.PosSemidef := ρ.psd
+  have hρ_herm : ρ.m.IsHermitian := hρ.isHermitian
+  have htrρ : ρ.m.trace = 1 := ρ.tr'
+  set P : CMatrix a := psdSqrt ρ.m with hP_def
+  have hP_herm : P.IsHermitian := psdSqrt_isHermitian ρ.m
+  have hPP : P * P = ρ.m := psdSqrt_mul_self_of_posSemidef hρ
   -- Split `ρ - √Λ ρ √Λ = (1 - √Λ) ρ + √Λ ρ (1 - √Λ)`.
-  have hsplit : ρ.matrix - R * ρ.matrix * R = (1 - R) * ρ.matrix + R * ρ.matrix * (1 - R) := by
+  have hsplit : ρ.m - R * ρ.m * R = (1 - R) * ρ.m + R * ρ.m * (1 - R) := by
     have : R * R = Λ := hRR
     noncomm_ring
   -- Term 1: `‖(1 - R) ρ‖₁ = ‖(1 - R) P · P‖₁ ≤ ‖(1-R) P‖_F · ‖P‖_F`.
-  have hfact1 : (1 - R) * ρ.matrix = ((1 - R) * P) * P := by
+  have hfact1 : (1 - R) * ρ.m = ((1 - R) * P) * P := by
     rw [← hPP, Matrix.mul_assoc]
-  have hterm1 : traceNorm ((1 - R) * ρ.matrix) ≤
-      Real.sqrt (((1 - R) * (1 - R) * ρ.matrix).trace).re := by
+  have hterm1 : traceNorm ((1 - R) * ρ.m) ≤
+      Real.sqrt (((1 - R) * (1 - R) * ρ.m).trace).re := by
     have h1 := traceNorm_mul_le_frobenius ((1 - R) * P) P
     -- `‖P‖_F² = Tr(P Pᴴ) = Tr(P P) = Tr ρ = 1`.
     have hnormP : ((P * Matrix.conjTranspose P).trace).re = 1 := by
@@ -253,48 +253,48 @@ theorem gentle_operator (Λ : CMatrix a) (hΛ0 : Λ.PosSemidef)
       simp
     -- `‖(1-R) P‖_F² = Tr((1-R) P P (1-R)) = Tr((1-R)² ρ)` (cycle, PP = ρ).
     have hnormLRP : (((1 - R) * P * Matrix.conjTranspose ((1 - R) * P)).trace).re =
-        (((1 - R) * (1 - R) * ρ.matrix).trace).re := by
+        (((1 - R) * (1 - R) * ρ.m).trace).re := by
       have hconjP : Matrix.conjTranspose ((1 - R) * P) = P * (1 - R) := by
         rw [Matrix.conjTranspose_mul,
           show Matrix.conjTranspose (1 - R) = 1 - R from by
             rw [Matrix.conjTranspose_sub, Matrix.conjTranspose_one, hR_herm.eq],
           show Matrix.conjTranspose P = P from hP_herm.eq]
-      have e1 : (1 - R) * P * (P * (1 - R)) = (1 - R) * ρ.matrix * (1 - R) := by
+      have e1 : (1 - R) * P * (P * (1 - R)) = (1 - R) * ρ.m * (1 - R) := by
         rw [show (1 - R) * P * (P * (1 - R)) = ((1 - R) * P * P) * (1 - R) from by
               noncomm_ring,
             Matrix.mul_assoc (1 - R) P P, hPP]
       rw [hconjP, e1, Matrix.trace_mul_cycle]
     -- `(1-R)ρ = (1-R)P·P`, then apply HS-CS, simplify `‖P‖_F = √1 = 1`.
-    calc traceNorm ((1 - R) * ρ.matrix)
+    calc traceNorm ((1 - R) * ρ.m)
         = traceNorm ((1 - R) * P * P) := by rw [hfact1]
       _ ≤ Real.sqrt (((1 - R) * P * Matrix.conjTranspose ((1 - R) * P)).trace).re *
             Real.sqrt ((P * Matrix.conjTranspose P).trace).re := h1
-      _ = Real.sqrt (((1 - R) * (1 - R) * ρ.matrix).trace).re *
+      _ = Real.sqrt (((1 - R) * (1 - R) * ρ.m).trace).re *
             Real.sqrt 1 := by rw [hnormLRP, hnormP]
-      _ = Real.sqrt (((1 - R) * (1 - R) * ρ.matrix).trace).re := by simp
+      _ = Real.sqrt (((1 - R) * (1 - R) * ρ.m).trace).re := by simp
   -- Term 2: `‖R ρ (1-R)‖₁ = ‖R P · P (1-R)‖₁ ≤ ‖R P‖_F · ‖P(1-R)‖_F`.
-  have hfact2 : R * ρ.matrix * (1 - R) = (R * P) * (P * (1 - R)) := by
+  have hfact2 : R * ρ.m * (1 - R) = (R * P) * (P * (1 - R)) := by
     rw [← hPP, Matrix.mul_assoc, Matrix.mul_assoc]
     noncomm_ring
-  have hterm2 : traceNorm (R * ρ.matrix * (1 - R)) ≤
-      Real.sqrt (((Λ * ρ.matrix).trace).re *
-        (((1 - R) * (1 - R) * ρ.matrix).trace).re) := by
+  have hterm2 : traceNorm (R * ρ.m * (1 - R)) ≤
+      Real.sqrt (((Λ * ρ.m).trace).re *
+        (((1 - R) * (1 - R) * ρ.m).trace).re) := by
     have h2 := traceNorm_mul_le_frobenius (R * P) (P * (1 - R))
     -- `‖R P‖_F² = Tr(R P P R) = Tr(R ρ R) = Tr(R² ρ) = Tr(Λ ρ)`.
     have hnormRP : (((R * P) * Matrix.conjTranspose (R * P)).trace).re =
-        ((Λ * ρ.matrix).trace).re := by
+        ((Λ * ρ.m).trace).re := by
       have hconjRP : Matrix.conjTranspose (R * P) = P * R := by
         rw [Matrix.conjTranspose_mul,
           show Matrix.conjTranspose R = R from hR_herm.eq,
           show Matrix.conjTranspose P = P from hP_herm.eq]
-      -- `R * P * (P * R) = R * ρ.matrix * R`, then cycle to `R * R * ρ.matrix = Λ * ρ.matrix`.
-      have e1 : R * P * (P * R) = R * ρ.matrix * R := by
+      -- `R * P * (P * R) = R * ρ.m * R`, then cycle to `R * R * ρ.m = Λ * ρ.m`.
+      have e1 : R * P * (P * R) = R * ρ.m * R := by
         rw [show R * P * (P * R) = (R * P * P) * R from by noncomm_ring,
           Matrix.mul_assoc R P P, hPP]
       rw [hconjRP, e1, Matrix.trace_mul_cycle, ← hRR]
     -- `‖P(1-R)‖_F² = Tr(P (1-R)² P) = Tr(ρ (1-R)²)`.
     have hnormP1R : (((P * (1 - R)) * Matrix.conjTranspose (P * (1 - R))).trace).re =
-        (((1 - R) * (1 - R) * ρ.matrix).trace).re := by
+        (((1 - R) * (1 - R) * ρ.m).trace).re := by
       have hconj : Matrix.conjTranspose (P * (1 - R)) = (1 - R) * P := by
         rw [Matrix.conjTranspose_mul,
           show Matrix.conjTranspose (1 - R) = 1 - R from by
@@ -302,49 +302,49 @@ theorem gentle_operator (Λ : CMatrix a) (hΛ0 : Λ.PosSemidef)
           show Matrix.conjTranspose P = P from hP_herm.eq]
       rw [hconj, Matrix.trace_mul_comm]
       -- After comm: `((1-R)*P * P*(1-R)).trace`, reduce `P*P` to ρ, then cycle.
-      have e1 : (1 - R) * P * (P * (1 - R)) = (1 - R) * ρ.matrix * (1 - R) := by
+      have e1 : (1 - R) * P * (P * (1 - R)) = (1 - R) * ρ.m * (1 - R) := by
         rw [show (1 - R) * P * (P * (1 - R)) = ((1 - R) * P * P) * (1 - R) from by
               noncomm_ring,
             Matrix.mul_assoc (1 - R) P P, hPP]
       rw [e1, Matrix.trace_mul_cycle]
     -- Assemble.
-    calc traceNorm (R * ρ.matrix * (1 - R))
+    calc traceNorm (R * ρ.m * (1 - R))
         = traceNorm ((R * P) * (P * (1 - R))) := by rw [hfact2]
       _ ≤ Real.sqrt (((R * P) * Matrix.conjTranspose (R * P)).trace).re *
             Real.sqrt (((P * (1 - R)) * Matrix.conjTranspose (P * (1 - R))).trace).re := h2
-      _ = Real.sqrt ((Λ * ρ.matrix).trace).re *
-            Real.sqrt (((1 - R) * (1 - R) * ρ.matrix).trace).re := by
+      _ = Real.sqrt ((Λ * ρ.m).trace).re *
+            Real.sqrt (((1 - R) * (1 - R) * ρ.m).trace).re := by
             rw [hnormRP, hnormP1R]
-      _ = Real.sqrt (((Λ * ρ.matrix).trace).re *
-            (((1 - R) * (1 - R) * ρ.matrix).trace).re) := by
-            have hΛρ_nonneg : 0 ≤ ((Λ * ρ.matrix).trace).re :=
+      _ = Real.sqrt (((Λ * ρ.m).trace).re *
+            (((1 - R) * (1 - R) * ρ.m).trace).re) := by
+            have hΛρ_nonneg : 0 ≤ ((Λ * ρ.m).trace).re :=
               cMatrix_trace_mul_posSemidef_re_nonneg hΛ0 hρ
             rw [← Real.sqrt_mul hΛρ_nonneg _]
   -- Operator-inequality reduction `(1-R)² ρ`-trace ≤ `(1-Λ) ρ`-trace.
-  have honeR_sq_le : (((1 - R) * (1 - R) * ρ.matrix).trace).re ≤
-      (((1 - Λ) * ρ.matrix).trace).re := by
+  have honeR_sq_le : (((1 - R) * (1 - R) * ρ.m).trace).re ≤
+      (((1 - Λ) * ρ.m).trace).re := by
     have := trace_one_sub_sq_rho_le hΛ0 hΛ_le_one hρ
     simpa [R, hR_def] using this
   -- Detection traces: `Re Tr(Λ ρ) ≥ 0`, `≤ 1`; `Re Tr((1-Λ)ρ) = 1 - Re Tr(Λρ)`.
-  have htrΛρ_nonneg : 0 ≤ ((Λ * ρ.matrix).trace).re :=
+  have htrΛρ_nonneg : 0 ≤ ((Λ * ρ.m).trace).re :=
     cMatrix_trace_mul_posSemidef_re_nonneg hΛ0 hρ
-  have htrΛρ_le_one : ((Λ * ρ.matrix).trace).re ≤ 1 := by
-    have hkey : 0 ≤ (((1 - Λ) * ρ.matrix).trace).re :=
+  have htrΛρ_le_one : ((Λ * ρ.m).trace).re ≤ 1 := by
+    have hkey : 0 ≤ (((1 - Λ) * ρ.m).trace).re :=
       cMatrix_trace_mul_posSemidef_re_nonneg
         (by simpa [Matrix.le_iff] using hΛ1 : (1 - Λ).PosSemidef) hρ
-    have hcyc : ((1 - Λ) * ρ.matrix).trace = (1 : ℂ) - (Λ * ρ.matrix).trace := by
-      have : (1 - Λ) * ρ.matrix = ρ.matrix - Λ * ρ.matrix := by noncomm_ring
+    have hcyc : ((1 - Λ) * ρ.m).trace = (1 : ℂ) - (Λ * ρ.m).trace := by
+      have : (1 - Λ) * ρ.m = ρ.m - Λ * ρ.m := by noncomm_ring
       rw [this, Matrix.trace_sub]
-      rw [show ρ.matrix.trace = (1 : ℂ) from htrρ]
+      rw [show ρ.m.trace = (1 : ℂ) from htrρ]
     rw [hcyc] at hkey
     rw [Complex.sub_re, Complex.one_re] at hkey
     linarith
-  have honeΛ_def : 0 ≤ 1 - ((Λ * ρ.matrix).trace).re := by linarith
+  have honeΛ_def : 0 ≤ 1 - ((Λ * ρ.m).trace).re := by linarith
   -- `Re Tr((1-Λ)ρ) = 1 - Re Tr(Λρ)`.
-  have htr1Lρ_re : (((1 - Λ) * ρ.matrix).trace).re = 1 - ((Λ * ρ.matrix).trace).re := by
-    have hcyc : ((1 - Λ) * ρ.matrix).trace = (1 : ℂ) - (Λ * ρ.matrix).trace := by
-      have : (1 - Λ) * ρ.matrix = ρ.matrix - Λ * ρ.matrix := by noncomm_ring
-      rw [this, Matrix.trace_sub, show ρ.matrix.trace = (1 : ℂ) from htrρ]
+  have htr1Lρ_re : (((1 - Λ) * ρ.m).trace).re = 1 - ((Λ * ρ.m).trace).re := by
+    have hcyc : ((1 - Λ) * ρ.m).trace = (1 : ℂ) - (Λ * ρ.m).trace := by
+      have : (1 - Λ) * ρ.m = ρ.m - Λ * ρ.m := by noncomm_ring
+      rw [this, Matrix.trace_sub, show ρ.m.trace = (1 : ℂ) from htrρ]
     rw [hcyc, Complex.sub_re, Complex.one_re]
   -- Assemble the two-term chain.
   -- `‖...‖₁ ≤ √(Tr((1-R)²ρ)) + √(Tr(Λρ) · Tr((1-R)²ρ))`
@@ -352,72 +352,55 @@ theorem gentle_operator (Λ : CMatrix a) (hΛ0 : Λ.PosSemidef)
   --        = √(Tr((1-Λ)ρ)) (1 + √(Tr(Λρ)))
   --        ≤ √(Tr((1-Λ)ρ)) · 2                          (Tr(Λρ) ≤ 1)
   --        = 2 √(1 - Re Tr(Λρ))`.
-  have hs1 : Real.sqrt (((1 - R) * (1 - R) * ρ.matrix).trace).re +
-      Real.sqrt (((Λ * ρ.matrix).trace).re *
-        (((1 - R) * (1 - R) * ρ.matrix).trace).re) ≤
-    Real.sqrt (((1 - Λ) * ρ.matrix).trace).re +
-      Real.sqrt (((Λ * ρ.matrix).trace).re *
-        (((1 - Λ) * ρ.matrix).trace).re) := by
+  have hs1 : Real.sqrt (((1 - R) * (1 - R) * ρ.m).trace).re +
+      Real.sqrt (((Λ * ρ.m).trace).re *
+        (((1 - R) * (1 - R) * ρ.m).trace).re) ≤
+    Real.sqrt (((1 - Λ) * ρ.m).trace).re +
+      Real.sqrt (((Λ * ρ.m).trace).re *
+        (((1 - Λ) * ρ.m).trace).re) := by
     refine add_le_add ?_ ?_
     · exact Real.sqrt_le_sqrt honeR_sq_le
     · exact Real.sqrt_le_sqrt (mul_le_mul_of_nonneg_left honeR_sq_le htrΛρ_nonneg)
-  have hs2 : Real.sqrt (((1 - Λ) * ρ.matrix).trace).re +
-      Real.sqrt (((Λ * ρ.matrix).trace).re *
-        (((1 - Λ) * ρ.matrix).trace).re) =
-      Real.sqrt (((1 - Λ) * ρ.matrix).trace).re *
-        (1 + Real.sqrt ((Λ * ρ.matrix).trace).re) := by
+  have hs2 : Real.sqrt (((1 - Λ) * ρ.m).trace).re +
+      Real.sqrt (((Λ * ρ.m).trace).re *
+        (((1 - Λ) * ρ.m).trace).re) =
+      Real.sqrt (((1 - Λ) * ρ.m).trace).re *
+        (1 + Real.sqrt ((Λ * ρ.m).trace).re) := by
     rw [Real.sqrt_mul htrΛρ_nonneg]
     ring
-  have hΛρ_root_le_one : Real.sqrt ((Λ * ρ.matrix).trace).re ≤ 1 :=
+  have hΛρ_root_le_one : Real.sqrt ((Λ * ρ.m).trace).re ≤ 1 :=
     Real.sqrt_le_one.mpr htrΛρ_le_one
-  have hs3 : Real.sqrt (((1 - Λ) * ρ.matrix).trace).re *
-      (1 + Real.sqrt ((Λ * ρ.matrix).trace).re) ≤
-      2 * Real.sqrt (((1 - Λ) * ρ.matrix).trace).re := by
-    have h0 : 0 ≤ Real.sqrt (((1 - Λ) * ρ.matrix).trace).re := Real.sqrt_nonneg _
-    have h1 : 1 + Real.sqrt ((Λ * ρ.matrix).trace).re ≤ 2 := by
+  have hs3 : Real.sqrt (((1 - Λ) * ρ.m).trace).re *
+      (1 + Real.sqrt ((Λ * ρ.m).trace).re) ≤
+      2 * Real.sqrt (((1 - Λ) * ρ.m).trace).re := by
+    have h0 : 0 ≤ Real.sqrt (((1 - Λ) * ρ.m).trace).re := Real.sqrt_nonneg _
+    have h1 : 1 + Real.sqrt ((Λ * ρ.m).trace).re ≤ 2 := by
       linarith [hΛρ_root_le_one]
     linarith [mul_le_mul_of_nonneg_left h1 h0]
-  have hs4 : 2 * Real.sqrt (((1 - Λ) * ρ.matrix).trace).re =
-      2 * Real.sqrt (1 - ((Λ * ρ.matrix).trace).re) := by
+  have hs4 : 2 * Real.sqrt (((1 - Λ) * ρ.m).trace).re =
+      2 * Real.sqrt (1 - ((Λ * ρ.m).trace).re) := by
     rw [htr1Lρ_re]
   -- Final chain: `‖RρR - ρ‖₁ = ‖ρ - RρR‖ = ‖(1-R)ρ + Rρ(1-R)‖ ≤ ... ≤ 2√(1-Tr(Λρ))`.
-  have hsymm : traceNorm (R * ρ.matrix * R - ρ.matrix) =
-      traceNorm (ρ.matrix - R * ρ.matrix * R) := by
-    rw [show R * ρ.matrix * R - ρ.matrix = -(ρ.matrix - R * ρ.matrix * R) from
+  have hsymm : traceNorm (R * ρ.m * R - ρ.m) =
+      traceNorm (ρ.m - R * ρ.m * R) := by
+    rw [show R * ρ.m * R - ρ.m = -(ρ.m - R * ρ.m * R) from
         (neg_sub _ _).symm, traceNorm_neg]
-  calc traceNorm (R * ρ.matrix * R - ρ.matrix)
-      = traceNorm (ρ.matrix - R * ρ.matrix * R) := hsymm
-    _ = traceNorm ((1 - R) * ρ.matrix + R * ρ.matrix * (1 - R)) := by rw [hsplit]
-    _ ≤ traceNorm ((1 - R) * ρ.matrix) + traceNorm (R * ρ.matrix * (1 - R)) :=
+  calc traceNorm (R * ρ.m * R - ρ.m)
+      = traceNorm (ρ.m - R * ρ.m * R) := hsymm
+    _ = traceNorm ((1 - R) * ρ.m + R * ρ.m * (1 - R)) := by rw [hsplit]
+    _ ≤ traceNorm ((1 - R) * ρ.m) + traceNorm (R * ρ.m * (1 - R)) :=
         traceNorm_add_le _ _
-    _ ≤ Real.sqrt (((1 - R) * (1 - R) * ρ.matrix).trace).re +
-        Real.sqrt (((Λ * ρ.matrix).trace).re *
-          (((1 - R) * (1 - R) * ρ.matrix).trace).re) :=
+    _ ≤ Real.sqrt (((1 - R) * (1 - R) * ρ.m).trace).re +
+        Real.sqrt (((Λ * ρ.m).trace).re *
+          (((1 - R) * (1 - R) * ρ.m).trace).re) :=
         add_le_add hterm1 hterm2
-    _ ≤ Real.sqrt (((1 - Λ) * ρ.matrix).trace).re +
-        Real.sqrt (((Λ * ρ.matrix).trace).re *
-          (((1 - Λ) * ρ.matrix).trace).re) := hs1
-    _ = Real.sqrt (((1 - Λ) * ρ.matrix).trace).re *
-        (1 + Real.sqrt ((Λ * ρ.matrix).trace).re) := hs2
-    _ ≤ 2 * Real.sqrt (((1 - Λ) * ρ.matrix).trace).re := hs3
-    _ = 2 * Real.sqrt (1 - ((Λ * ρ.matrix).trace).re) := hs4
-
-/-- A positive semidefinite idempotent matrix has positive semidefinite
-orthogonal complement. -/
-theorem projector_one_sub_posSemidef (P : CMatrix a) (hP : P.PosSemidef)
-    (hPid : P * P = P) :
-    (1 - P).PosSemidef := by
-  have h1P_herm : (1 - P).IsHermitian :=
-    (Matrix.isHermitian_one).sub hP.isHermitian
-  have h1P_conj : Matrix.conjTranspose (1 - P) = 1 - P := h1P_herm.eq
-  have h1P_sq : (1 - P) * (1 - P) = 1 - P := by
-    have e : (1 - P) * (1 - P) = 1 - P - P + P * P := by noncomm_ring
-    rw [e, hPid]
-    abel
-  have hkey : (1 - P) = Matrix.conjTranspose (1 - P) * (1 - P) := by
-    rw [h1P_conj, h1P_sq]
-  rw [hkey]
-  exact Matrix.posSemidef_conjTranspose_mul_self (1 - P)
+    _ ≤ Real.sqrt (((1 - Λ) * ρ.m).trace).re +
+        Real.sqrt (((Λ * ρ.m).trace).re *
+          (((1 - Λ) * ρ.m).trace).re) := hs1
+    _ = Real.sqrt (((1 - Λ) * ρ.m).trace).re *
+        (1 + Real.sqrt ((Λ * ρ.m).trace).re) := hs2
+    _ ≤ 2 * Real.sqrt (((1 - Λ) * ρ.m).trace).re := hs3
+    _ = 2 * Real.sqrt (1 - ((Λ * ρ.m).trace).re) := hs4
 
 /-- **Gentle projector lemma.** Specialization of the gentle-operator lemma to
 a measurement described by an orthogonal projector `Π` (`Π.PosSemidef`,
@@ -427,16 +410,16 @@ eigenvalues in `{0, 1}`, one has `Π ≤ I` (i.e. `(1 - Π).PosSemidef`) and
 `psdSqrt Π = Π`, reducing the bound to that of `gentle_operator`.
 [Wilde2011Qst, qit-notes.tex:15961-16010] -/
 theorem gentle_projector (Λ : CMatrix a) (hΛ : Λ.PosSemidef)
-    (hΛid : Λ * Λ = Λ) (ρ : State a) :
-    traceNorm (Λ * ρ.matrix * Λ - ρ.matrix) ≤
-      2 * Real.sqrt (1 - ((Λ * ρ.matrix).trace).re) := by
+    (hΛid : Λ * Λ = Λ) (ρ : MState a) :
+    traceNorm (Λ * ρ.m * Λ - ρ.m) ≤
+      2 * Real.sqrt (1 - ((Λ * ρ.m).trace).re) := by
   -- `psdSqrt Λ = Λ`: `Λ` is itself a PSD square root of `Λ` (since `Λ*Λ = Λ`),
   -- and the PSD square root is unique (`CFC.sqrt_unique`).
   have hsqrt : psdSqrt Λ = Λ := by
     rw [psdSqrt]
     exact CFC.sqrt_unique hΛid (Matrix.nonneg_iff_posSemidef.mpr hΛ)
   have hΛ_le_one : (1 - Λ).PosSemidef :=
-    projector_one_sub_posSemidef Λ hΛ hΛid
+    MatrixMap.posSemidef_one_sub_of_posSemidef_idempotent Λ hΛ hΛid
   -- Reduce to `gentle_operator` with the projector as the effect.
   -- `gentle_operator` concludes `traceNorm (psdSqrt Λ * ρ * psdSqrt Λ - ρ) ≤ ...`;
   -- rewrite `psdSqrt Λ = Λ` (via `hsqrt`) into its conclusion.
@@ -446,33 +429,33 @@ theorem gentle_projector (Λ : CMatrix a) (hΛ : Λ.PosSemidef)
 
 /-- Projector sandwiches of states are positive semidefinite. -/
 theorem projector_sandwich_posSemidef (P : CMatrix a) (hP : P.PosSemidef)
-    (ρ : State a) :
-    (P * ρ.matrix * P).PosSemidef := by
-  have h := ρ.pos.mul_mul_conjTranspose_same P
+    (ρ : MState a) :
+    (P * ρ.m * P).PosSemidef := by
+  have h := ρ.psd.mul_mul_conjTranspose_same P
   simpa [hP.isHermitian.eq, Matrix.mul_assoc] using h
 
 /-- The real trace of a projector sandwich is the projector acceptance
 probability. -/
 theorem projector_sandwich_trace_re_eq_acceptance (P : CMatrix a)
-    (hPid : P * P = P) (ρ : State a) :
-    ((P * ρ.matrix * P).trace).re = ((P * ρ.matrix).trace).re := by
-  have htrace : (P * ρ.matrix * P).trace = (P * ρ.matrix).trace := by
+    (hPid : P * P = P) (ρ : MState a) :
+    ((P * ρ.m * P).trace).re = ((P * ρ.m).trace).re := by
+  have htrace : (P * ρ.m * P).trace = (P * ρ.m).trace := by
     calc
-      (P * ρ.matrix * P).trace = (P * P * ρ.matrix).trace := by
+      (P * ρ.m * P).trace = (P * P * ρ.m).trace := by
         rw [Matrix.trace_mul_cycle]
-      _ = (P * ρ.matrix).trace := by
+      _ = (P * ρ.m).trace := by
         rw [hPid]
   exact congrArg Complex.re htrace
 
 /-- A projector sandwich with acceptance at least `1 - η` has nonzero trace
 when `η < 1`. -/
 theorem projector_sandwich_trace_re_ne_zero_of_acceptance (P : CMatrix a)
-    (hPid : P * P = P) (ρ : State a) {η : ℝ} (hη_lt_one : η < 1)
-    (hacc : 1 - η ≤ ((P * ρ.matrix).trace).re) :
-    (P * ρ.matrix * P).trace.re ≠ 0 := by
+    (hPid : P * P = P) (ρ : MState a) {η : ℝ} (hη_lt_one : η < 1)
+    (hacc : 1 - η ≤ ((P * ρ.m).trace).re) :
+    (P * ρ.m * P).trace.re ≠ 0 := by
   have htrace := projector_sandwich_trace_re_eq_acceptance P hPid ρ
   have hpos_one_sub : 0 < 1 - η := by linarith
-  have hpos : 0 < (P * ρ.matrix * P).trace.re := by
+  have hpos : 0 < (P * ρ.m * P).trace.re := by
     rw [htrace]
     exact lt_of_lt_of_le hpos_one_sub hacc
   exact hpos.ne'
@@ -484,49 +467,49 @@ generic and dimension-free: the unnormalized disturbance is controlled by
 probability. -/
 theorem normalizedTraceDistance_normalize_projector_sandwich_le
     (P : CMatrix a) (hP : P.PosSemidef) (hPid : P * P = P)
-    (ρ : State a) {η : ℝ} (hη_nonneg : 0 ≤ η) (hη_lt_one : η < 1)
-    (hacc : 1 - η ≤ ((P * ρ.matrix).trace).re) :
-    let τM := P * ρ.matrix * P
+    (ρ : MState a) {η : ℝ} (hη_nonneg : 0 ≤ η) (hη_lt_one : η < 1)
+    (hacc : 1 - η ≤ ((P * ρ.m).trace).re) :
+    let τM := P * ρ.m * P
     let hτ : τM.PosSemidef := projector_sandwich_posSemidef P hP ρ
     let htr : τM.trace.re ≠ 0 :=
       projector_sandwich_trace_re_ne_zero_of_acceptance P hPid ρ hη_lt_one hacc
-    (State.normalizePSD τM hτ htr).normalizedTraceDistance ρ ≤
+    (MState.normalizePSD τM hτ htr).normalizedTraceDistance ρ ≤
       Real.sqrt η + η := by
   dsimp only
-  let τM : CMatrix a := P * ρ.matrix * P
+  let τM : CMatrix a := P * ρ.m * P
   have hτ : τM.PosSemidef := by
     simpa [τM] using projector_sandwich_posSemidef P hP ρ
   have htr : τM.trace.re ≠ 0 := by
     simpa [τM] using
       projector_sandwich_trace_re_ne_zero_of_acceptance P hPid ρ hη_lt_one hacc
-  have htrace : τM.trace.re = ((P * ρ.matrix).trace).re := by
+  have htrace : τM.trace.re = ((P * ρ.m).trace).re := by
     simpa [τM] using projector_sandwich_trace_re_eq_acceptance P hPid ρ
   have htr_pos : 0 < τM.trace.re := by
     rw [htrace]
     exact lt_of_lt_of_le (by linarith : 0 < 1 - η) hacc
-  have hacc_le_one : ((P * ρ.matrix).trace).re ≤ 1 := by
-    have hkey : 0 ≤ (((1 - P) * ρ.matrix).trace).re :=
+  have hacc_le_one : ((P * ρ.m).trace).re ≤ 1 := by
+    have hkey : 0 ≤ (((1 - P) * ρ.m).trace).re :=
       cMatrix_trace_mul_posSemidef_re_nonneg
-        (projector_one_sub_posSemidef P hP hPid) ρ.pos
-    have hcyc : ((1 - P) * ρ.matrix).trace =
-        (1 : ℂ) - (P * ρ.matrix).trace := by
-      have : (1 - P) * ρ.matrix = ρ.matrix - P * ρ.matrix := by
+        (MatrixMap.posSemidef_one_sub_of_posSemidef_idempotent P hP hPid) ρ.psd
+    have hcyc : ((1 - P) * ρ.m).trace =
+        (1 : ℂ) - (P * ρ.m).trace := by
+      have : (1 - P) * ρ.m = ρ.m - P * ρ.m := by
         noncomm_ring
-      rw [this, Matrix.trace_sub, ρ.trace_eq_one]
+      rw [this, Matrix.trace_sub, ρ.tr']
     rw [hcyc, Complex.sub_re, Complex.one_re] at hkey
     linarith
   have htr_le_one : τM.trace.re ≤ 1 := by
     rw [htrace]
     exact hacc_le_one
-  have hgentle_eta : traceNorm (τM - ρ.matrix) ≤ 2 * Real.sqrt η := by
+  have hgentle_eta : traceNorm (τM - ρ.m) ≤ 2 * Real.sqrt η := by
     have hgentle := gentle_projector P hP hPid ρ
-    have hsqrt : Real.sqrt (1 - ((P * ρ.matrix).trace).re) ≤ Real.sqrt η := by
+    have hsqrt : Real.sqrt (1 - ((P * ρ.m).trace).re) ≤ Real.sqrt η := by
       refine Real.sqrt_le_sqrt ?_
       linarith [hη_nonneg]
     calc
-      traceNorm (τM - ρ.matrix)
-          = traceNorm (P * ρ.matrix * P - ρ.matrix) := by rfl
-      _ ≤ 2 * Real.sqrt (1 - ((P * ρ.matrix).trace).re) := hgentle
+      traceNorm (τM - ρ.m)
+          = traceNorm (P * ρ.m * P - ρ.m) := by rfl
+      _ ≤ 2 * Real.sqrt (1 - ((P * ρ.m).trace).re) := hgentle
       _ ≤ 2 * Real.sqrt η := by
         exact mul_le_mul_of_nonneg_left hsqrt (by norm_num)
   have hcoeff_nonneg : 0 ≤ (τM.trace.re)⁻¹ - 1 := by
@@ -559,26 +542,26 @@ theorem normalizedTraceDistance_normalize_projector_sandwich_le
           ≤ ((τM.trace.re)⁻¹ - 1) * traceNorm τM := hscale
       _ = 1 - τM.trace.re := hmul
       _ ≤ η := hrejection_le
-  have htri : traceNorm ((τM.trace.re)⁻¹ • τM - ρ.matrix) ≤
+  have htri : traceNorm ((τM.trace.re)⁻¹ • τM - ρ.m) ≤
       traceNorm ((τM.trace.re)⁻¹ • τM - τM) +
-        traceNorm (τM - ρ.matrix) := by
-    have hdecomp : (τM.trace.re)⁻¹ • τM - ρ.matrix =
-        ((τM.trace.re)⁻¹ • τM - τM) + (τM - ρ.matrix) := by
+        traceNorm (τM - ρ.m) := by
+    have hdecomp : (τM.trace.re)⁻¹ • τM - ρ.m =
+        ((τM.trace.re)⁻¹ • τM - τM) + (τM - ρ.m) := by
       ext i j
       simp [Matrix.sub_apply, Matrix.add_apply, Matrix.smul_apply, Complex.real_smul]
     rw [hdecomp]
     exact traceNorm_add_le _ _
   calc
-    (State.normalizePSD (P * ρ.matrix * P)
+    (MState.normalizePSD (P * ρ.m * P)
         (projector_sandwich_posSemidef P hP ρ)
         (projector_sandwich_trace_re_ne_zero_of_acceptance P hPid ρ hη_lt_one hacc)
       ).normalizedTraceDistance ρ
-        = (1 / 2 : ℝ) * traceNorm ((τM.trace.re)⁻¹ • τM - ρ.matrix) := by
-          simp [τM, State.normalizedTraceDistance, normalizedTraceDistance,
-            traceNormDistance, State.normalizePSD_matrix]
+        = (1 / 2 : ℝ) * traceNorm ((τM.trace.re)⁻¹ • τM - ρ.m) := by
+          simp [τM, MState.normalizedTraceDistance, normalizedTraceDistance,
+            traceNormDistance, MState.normalizePSD_matrix]
     _ ≤ (1 / 2 : ℝ) *
         (traceNorm ((τM.trace.re)⁻¹ • τM - τM) +
-          traceNorm (τM - ρ.matrix)) := by
+          traceNorm (τM - ρ.m)) := by
           exact mul_le_mul_of_nonneg_left htri (by norm_num)
     _ ≤ (1 / 2 : ℝ) * (η + 2 * Real.sqrt η) := by
           refine mul_le_mul_of_nonneg_left ?_ (by norm_num)

@@ -106,7 +106,7 @@ the weaker `≤` form; this predicate records the equality form needed for the
 centered quadratic cancellation in the direct proof route.
 -/
 def CollisionUniform : Prop :=
-  ∀ z z' : Z, z ≠ z' ->
+  ∀ z z' : Z, z ≠ z' →
     H.collisionProbability z z' = (Fintype.card S : ℝ≥0)⁻¹
 
 omit [DecidableEq F] [Fintype Z] [DecidableEq Z] in
@@ -125,7 +125,7 @@ terms collide with probability one, and off-diagonal terms are bounded by the
 two-universal collision probability.
 -/
 theorem twoUniversal_pairCollisionAverage_le (hH : H.TwoUniversal)
-    (K : Z -> Z -> ℝ≥0) :
+    (K : Z → Z → ℝ≥0) :
     (∑ z : Z, ∑ z' : Z, K z z' * H.collisionProbability z z') ≤
       ∑ z : Z, ∑ z' : Z,
         if z = z' then K z z' else K z z' * (Fintype.card S : ℝ≥0)⁻¹ := by
@@ -147,7 +147,7 @@ variable [Fintype Z] [DecidableEq Z]
 variable [Fintype S] [DecidableEq S] [Nonempty S]
 
 private def fullFunctionCollisionEquiv (z z' : Z) (hzz : z ≠ z') :
-    {f : Z -> S // f z = f z'} ≃ ({x : Z // x ≠ z'} -> S) where
+    {f : Z → S // f z = f z'} ≃ ({x : Z // x ≠ z'} → S) where
   toFun f := fun x => f.1 x.1
   invFun g :=
     ⟨fun x => if hx : x = z' then g ⟨z, hzz⟩ else g ⟨x, hx⟩, by
@@ -164,12 +164,12 @@ private def fullFunctionCollisionEquiv (z z' : Z) (hzz : z ≠ z') :
 
 omit [Nonempty S] in
 private theorem fullFunctionCollisionSubtype_card (z z' : Z) (hzz : z ≠ z') :
-    Fintype.card {f : Z -> S // f z = f z'} =
+    Fintype.card {f : Z → S // f z = f z'} =
       Fintype.card S ^ (Fintype.card Z - 1) := by
   classical
   calc
-    Fintype.card {f : Z -> S // f z = f z'} =
-        Fintype.card ({x : Z // x ≠ z'} -> S) := by
+    Fintype.card {f : Z → S // f z = f z'} =
+        Fintype.card ({x : Z // x ≠ z'} → S) := by
           exact Fintype.card_congr (fullFunctionCollisionEquiv (S := S) z z' hzz)
     _ = Fintype.card S ^ Fintype.card {x : Z // x ≠ z'} := by
           rw [Fintype.card_fun]
@@ -179,11 +179,11 @@ private theorem fullFunctionCollisionSubtype_card (z z' : Z) (hzz : z ≠ z') :
 
 omit [DecidableEq S] in
 private theorem fullFunctionCollisionRatio (z : Z) :
-    ((Fintype.card S ^ (Fintype.card Z - 1) : Nat) : ℝ≥0) *
-        ((Fintype.card (Z -> S) : Nat) : ℝ≥0)⁻¹ =
+    ((Fintype.card S ^ (Fintype.card Z - 1) : ℕ) : ℝ≥0) *
+        ((Fintype.card (Z → S) : ℕ) : ℝ≥0)⁻¹ =
       (Fintype.card S : ℝ≥0)⁻¹ := by
   classical
-  have hcard_fun : Fintype.card (Z -> S) = Fintype.card S ^ Fintype.card Z := by
+  have hcard_fun : Fintype.card (Z → S) = Fintype.card S ^ Fintype.card Z := by
     rw [Fintype.card_fun]
   have ha : (Fintype.card S : ℝ≥0) ≠ 0 := by
     exact_mod_cast (Fintype.card_ne_zero : Fintype.card S ≠ 0)
@@ -215,10 +215,10 @@ private theorem fullFunctionCollisionRatio (z : Z) :
 
 omit [Nonempty S] in
 private theorem fullFunctionCollisionIndicator_sum (z z' : Z) :
-    (∑ f : Z -> S,
-      (if f z = f z' then (Fintype.card (Z -> S) : ℝ≥0)⁻¹ else 0 : ℝ≥0)) =
-      (Fintype.card {f : Z -> S // f z = f z'} : ℝ≥0) *
-        (Fintype.card (Z -> S) : ℝ≥0)⁻¹ := by
+    (∑ f : Z → S,
+      (if f z = f z' then (Fintype.card (Z → S) : ℝ≥0)⁻¹ else 0 : ℝ≥0)) =
+      (Fintype.card {f : Z → S // f z = f z'} : ℝ≥0) *
+        (Fintype.card (Z → S) : ℝ≥0)⁻¹ := by
   classical
   rw [← Finset.sum_filter]
   simp [Finset.sum_const, nsmul_eq_mul, Fintype.card_subtype]
@@ -233,8 +233,8 @@ theorem fullFunctionHashFamily_collisionProbability (z z' : Z) (hzz : z ≠ z') 
     (FullFunctionHashFamily (Z := Z) (S := S)).collisionProbability z z' =
       (Fintype.card S : ℝ≥0)⁻¹ := by
   have hchain :
-      (∑ f : Z -> S,
-        (if f z = f z' then (Fintype.card (Z -> S) : ℝ≥0)⁻¹ else 0 : ℝ≥0)) =
+      (∑ f : Z → S,
+        (if f z = f z' then (Fintype.card (Z → S) : ℝ≥0)⁻¹ else 0 : ℝ≥0)) =
         (Fintype.card S : ℝ≥0)⁻¹ := by
     rw [fullFunctionCollisionIndicator_sum (S := S) z z',
       fullFunctionCollisionSubtype_card (S := S) z z' hzz]
@@ -257,7 +257,7 @@ theorem fullFunctionHashFamily_twoUniversal :
 omit [Fintype S] [DecidableEq S] [Nonempty S] in
 /-- `Fin ell` specialization of full-function collision uniformity. -/
 theorem finFullFunctionHashFamily_collisionUniform
-    {Z : Type uZ} [Fintype Z] [DecidableEq Z] {ell : Nat} (hell : 0 < ell) :
+    {Z : Type uZ} [Fintype Z] [DecidableEq Z] {ell : ℕ} (hell : 0 < ell) :
     (FinFullFunctionHashFamily (Z := Z) ell hell).CollisionUniform := by
   let _ : Nonempty (Fin ell) := ⟨⟨0, hell⟩⟩
   exact fullFunctionHashFamily_collisionUniform (Z := Z) (S := Fin ell)
@@ -265,7 +265,7 @@ theorem finFullFunctionHashFamily_collisionUniform
 omit [Fintype S] [DecidableEq S] [Nonempty S] in
 /-- `Fin ell` specialization of full-function two-universality. -/
 theorem finFullFunctionHashFamily_twoUniversal
-    {Z : Type uZ} [Fintype Z] [DecidableEq Z] {ell : Nat} (hell : 0 < ell) :
+    {Z : Type uZ} [Fintype Z] [DecidableEq Z] {ell : ℕ} (hell : 0 < ell) :
     (FinFullFunctionHashFamily (Z := Z) ell hell).TwoUniversal :=
   (finFullFunctionHashFamily_collisionUniform (Z := Z) hell).toTwoUniversal
 
@@ -275,34 +275,34 @@ variable [Nonempty F]
 variable (H : HashFamily F Z S)
 
 /-- Per-seed extractor output matrix on `S × E`, without the public seed register. -/
-def extractorSeedOutputMatrix (E : Ensemble Z e) (f : F) : CMatrix (S × e) :=
+def extractorSeedOutputMatrix (E : MEnsemble e Z) (f : F) : CMatrix (S × e) :=
   ∑ z, (E.probs z) •
     Matrix.kronecker
       (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
-      (E.states z).matrix
+      (E.states z).m
 
 omit [DecidableEq F] [DecidableEq Z] [Fintype S] [Nonempty F] in
 @[simp]
-theorem extractorSeedOutputMatrix_eq_sum (E : Ensemble Z e) (f : F) :
+theorem extractorSeedOutputMatrix_eq_sum (E : MEnsemble e Z) (f : F) :
     extractorSeedOutputMatrix H E f =
       ∑ z, (E.probs z) •
         Matrix.kronecker
           (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
-          (E.states z).matrix :=
+          (E.states z).m :=
   rfl
 
 /-- The `f`-seed block of the full extractor output matrix, retaining `S × E`. -/
-def extractorOutputSeedBlock (E : Ensemble Z e) (f : F) : CMatrix (S × e) :=
+def extractorOutputSeedBlock (E : MEnsemble e Z) (f : F) : CMatrix (S × e) :=
   fun se se' => extractorOutputMatrix H E (se.1, (f, se.2)) (se'.1, (f, se'.2))
 
 omit [DecidableEq Z] [Fintype S] [Nonempty F] in
 /-- The seed block of the full `S × (F × E)` output matrix as an explicit finite sum. -/
-theorem extractorOutputSeedBlock_eq_sum (E : Ensemble Z e) (f : F) :
+theorem extractorOutputSeedBlock_eq_sum (E : MEnsemble e Z) (f : F) :
     extractorOutputSeedBlock H E f =
       ∑ z, (E.probs z * H.prob f) •
         Matrix.kronecker
           (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
-          (E.states z).matrix := by
+          (E.states z).m := by
   ext se se'
   simp only [extractorOutputSeedBlock, extractorOutputMatrix,
     Matrix.sum_apply, Matrix.smul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]

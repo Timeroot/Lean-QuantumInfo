@@ -26,14 +26,14 @@ and evaluated at the unnormalized trace distance `‖ρ - σ‖₁`.
 
 @[expose] public section
 
-namespace QIT
-
+noncomputable section
 open Filter
 open scoped ComplexOrder MatrixOrder NNReal
-
 universe u v
 
-noncomputable section
+open QIT
+
+namespace QIT
 
 /-- The source modulus `η(t)` from the HOW ordinary-entropy Fannes bound. -/
 def howFannesEta (t : ℝ) : ℝ :=
@@ -620,68 +620,28 @@ private theorem classical_entropy_sum_dist_le_howFannes
       change log2 n * (t + howFannesCorrection t) = log2 n * howFannesEta t
       rw [howFannesEta_eq_add_correction]
 
-private theorem fannes_posSemidef_diagonal_re_mul_log2_le_eigenvalue_sum
+private theorem _root_.MState.vonNeumann_le_eigenbasisDiagonalEntropy
     {a : Type u} [Fintype a] [DecidableEq a]
-    {B : CMatrix a} (hB : B.PosSemidef) (i : a) :
-    (B i i).re * log2 (B i i).re ≤
-      ∑ j, Complex.normSq ((hB.isHermitian.eigenvectorUnitary : CMatrix a) i j) *
-        (hB.isHermitian.eigenvalues j * log2 (hB.isHermitian.eigenvalues j)) := by
-  classical
-  let w : a → ℝ := fun j =>
-    Complex.normSq ((hB.isHermitian.eigenvectorUnitary : CMatrix a) i j)
-  let evals : a → ℝ := fun j => hB.isHermitian.eigenvalues j
-  have hw_nonneg : ∀ j ∈ (Finset.univ : Finset a), 0 ≤ w j := by
-    intro j _
-    exact Complex.normSq_nonneg _
-  have hw_sum : ∑ j ∈ (Finset.univ : Finset a), w j = 1 := by
-    simpa [w] using unitary_row_normSq_sum hB.isHermitian.eigenvectorUnitary i
-  have hevals_mem :
-      ∀ j ∈ (Finset.univ : Finset a), evals j ∈ Set.Ici (0 : ℝ) := by
-    intro j _
-    exact hB.eigenvalues_nonneg j
-  have hjensen :=
-    Real.convexOn_mul_log.map_sum_le
-      (t := (Finset.univ : Finset a)) (w := w) (p := evals)
-      hw_nonneg hw_sum hevals_mem
-  have hdiag :
-      (B i i).re = ∑ j ∈ (Finset.univ : Finset a), w j * evals j := by
-    simpa [w, evals, mul_comm] using
-      posSemidef_diagonal_re_eq_eigenvalue_weighted_sum hB i
-  have hnat :
-      (B i i).re * Real.log (B i i).re ≤
-        ∑ j, Complex.normSq
-            ((hB.isHermitian.eigenvectorUnitary : CMatrix a) i j) *
-          (hB.isHermitian.eigenvalues j * Real.log (hB.isHermitian.eigenvalues j)) := by
-    rw [hdiag]
-    simpa [w, evals, smul_eq_mul, mul_comm, mul_left_comm, mul_assoc] using hjensen
-  have hscale : 0 ≤ (Real.log 2)⁻¹ :=
-    inv_nonneg.mpr (le_of_lt (Real.log_pos one_lt_two))
-  have hscaled := mul_le_mul_of_nonneg_right hnat hscale
-  simpa [log2, div_eq_mul_inv, Finset.mul_sum, mul_comm, mul_left_comm, mul_assoc]
-    using hscaled
-
-private theorem State.vonNeumann_le_eigenbasisDiagonalEntropy
-    {a : Type u} [Fintype a] [DecidableEq a]
-    (rho : State a) (U : Matrix.unitaryGroup a ℂ) :
+    (rho : MState a) (U : Matrix.unitaryGroup a ℂ) :
     rho.vonNeumann ≤
-      ∑ i, -((star (U : CMatrix a) * rho.matrix * (U : CMatrix a)) i i).re *
-        log2 ((star (U : CMatrix a) * rho.matrix * (U : CMatrix a)) i i).re := by
+      ∑ i, -((star (U : CMatrix a) * rho.m * (U : CMatrix a)) i i).re *
+        log2 ((star (U : CMatrix a) * rho.m * (U : CMatrix a)) i i).re := by
   classical
-  let B : CMatrix a := star (U : CMatrix a) * rho.matrix * (U : CMatrix a)
+  let B : CMatrix a := star (U : CMatrix a) * rho.m * (U : CMatrix a)
   have hB : B.PosSemidef := by
-    simpa [B] using posSemidef_unitary_conj rho.pos U
-  have hchar : B.charpoly = rho.matrix.charpoly := by
+    simpa [B] using posSemidef_unitary_conj rho.psd U
+  have hchar : B.charpoly = rho.m.charpoly := by
     simpa [B, Unitary.conjStarAlgAut_apply] using
-      charpoly_conjStarAlgAut rho.matrix (star U)
-  have heigs : hB.isHermitian.eigenvalues = rho.pos.isHermitian.eigenvalues :=
-    (hB.isHermitian.eigenvalues_eq_eigenvalues_iff rho.pos.isHermitian).mpr hchar
+      charpoly_conjStarAlgAut rho.m (star U)
+  have heigs : hB.isHermitian.eigenvalues = rho.psd.isHermitian.eigenvalues :=
+    (hB.isHermitian.eigenvalues_eq_eigenvalues_iff rho.psd.isHermitian).mpr hchar
   have hpoint (i : a) :
       -( ∑ j, Complex.normSq
             ((hB.isHermitian.eigenvectorUnitary : CMatrix a) i j) *
           (hB.isHermitian.eigenvalues j * log2 (hB.isHermitian.eigenvalues j))) ≤
         -(B i i).re * log2 (B i i).re := by
     simpa only [neg_mul] using
-      neg_le_neg (fannes_posSemidef_diagonal_re_mul_log2_le_eigenvalue_sum hB i)
+      neg_le_neg (posSemidef_diagonal_re_mul_log2_le_eigenvalue_weighted_mul_log2 hB i)
   have hdouble :
       (∑ i, ∑ j, Complex.normSq
           ((hB.isHermitian.eigenvectorUnitary : CMatrix a) i j) *
@@ -707,7 +667,7 @@ private theorem State.vonNeumann_le_eigenbasisDiagonalEntropy
               rw [Finset.sum_neg_distrib]
       _ ≤ ∑ i, -(B i i).re * log2 (B i i).re :=
         Finset.sum_le_sum fun i _ => hpoint i
-  rw [State.vonNeumann]
+  rw [MState.vonNeumann]
   simp_rw [xlog2_eq_mul_log2]
   rw [← heigs]
   simpa [B] using hsum
@@ -730,27 +690,6 @@ private def fannesDiagonalSignUnitary
     rw [hstar, Matrix.diagonal_mul_diagonal]
     ext i j
     by_cases hdi : 0 ≤ d i <;> simp [Matrix.diagonal, Matrix.one_apply, hdi]⟩
-
-private theorem fannes_trace_mul_unitary_conj_diagonal_right_re
-    {a : Type u} [Fintype a] [DecidableEq a]
-    (U : Matrix.unitaryGroup a ℂ) (B : CMatrix a) (e : a → ℝ) :
-    ((B * ((U : CMatrix a) * (Matrix.diagonal fun i => ((e i : ℝ) : ℂ)) *
-      star (U : CMatrix a))).trace).re =
-      ∑ i : a, ((star (U : CMatrix a) * B * (U : CMatrix a)) i i).re * e i := by
-  let D : CMatrix a := Matrix.diagonal fun i => ((e i : ℝ) : ℂ)
-  have htrace :
-      (B * ((U : CMatrix a) * D * star (U : CMatrix a))).trace =
-        ((star (U : CMatrix a) * B * (U : CMatrix a)) * D).trace := by
-    calc
-      (B * ((U : CMatrix a) * D * star (U : CMatrix a))).trace =
-          (((B * (U : CMatrix a)) * D) * star (U : CMatrix a)).trace := by
-            simp [Matrix.mul_assoc]
-      _ = (star (U : CMatrix a) * ((B * (U : CMatrix a)) * D)).trace :=
-        Matrix.trace_mul_comm _ _
-      _ = ((star (U : CMatrix a) * B * (U : CMatrix a)) * D).trace := by
-        simp [Matrix.mul_assoc]
-  rw [htrace]
-  simp [D, Matrix.trace, Matrix.diagonal, Matrix.mul_apply, Complex.mul_re]
 
 private theorem sum_abs_unitary_conjugate_diagonal_re_le_traceNorm
     {a : Type u} [Fintype a] [DecidableEq a]
@@ -776,7 +715,7 @@ private theorem sum_abs_unitary_conjugate_diagonal_re_le_traceNorm
     simp [V, hcoeS]
   have hscore :
       ((B * (V : CMatrix a)).trace).re = ∑ i, |d i| := by
-    rw [hcoeV, fannes_trace_mul_unitary_conj_diagonal_right_re]
+    rw [hcoeV, Matrix.trace_mul_unitary_conj_diagonal_right_re]
     apply Finset.sum_congr rfl
     intro i _
     change d i * s i = |d i|
@@ -788,51 +727,53 @@ private theorem sum_abs_unitary_conjugate_diagonal_re_le_traceNorm
     ∑ i, |((star (U : CMatrix a) * B * (U : CMatrix a)) i i).re| =
         ((B * (V : CMatrix a)).trace).re := by
           simpa [d] using hscore.symm
-    _ ≤ Complex.abs ((B * (V : CMatrix a)).trace) := by
+    _ ≤ ‖(B * (V : CMatrix a)).trace‖ := by
       calc
         ((B * (V : CMatrix a)).trace).re ≤
             |((B * (V : CMatrix a)).trace).re| := le_abs_self _
         _ ≤ ‖(B * (V : CMatrix a)).trace‖ := Complex.abs_re_le_norm _
-        _ = Complex.abs ((B * (V : CMatrix a)).trace) := rfl
+        _ = ‖(B * (V : CMatrix a)).trace‖ := rfl
     _ ≤ traceNorm B := traceNorm_variational_unitary_abs_trace_le B V
 
-namespace State
+end QIT
+
+namespace MState
 
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
 /-- The unnormalized trace distance between density states lies in `[0, 2]`. -/
-theorem traceNormDistance_le_two (ρ σ : State a) : ρ.traceNormDistance σ ≤ 2 := by
+theorem traceNormDistance_le_two (ρ σ : MState a) : ρ.traceNormDistance σ ≤ 2 := by
   calc
-    ρ.traceNormDistance σ = traceNorm (ρ.matrix + -σ.matrix) := by
-      simp [State.traceNormDistance, QIT.traceNormDistance, sub_eq_add_neg]
-    _ ≤ traceNorm ρ.matrix + traceNorm (-σ.matrix) := traceNorm_add_le _ _
+    ρ.traceNormDistance σ = traceNorm (ρ.m + -σ.m) := by
+      simp [MState.traceNormDistance, QIT.traceNormDistance, sub_eq_add_neg]
+    _ ≤ traceNorm ρ.m + traceNorm (-σ.m) := traceNorm_add_le _ _
     _ = 1 + 1 := by
-      rw [traceNorm_neg, traceNorm_posSemidef_eq_trace_re ρ.matrix ρ.pos,
-        traceNorm_posSemidef_eq_trace_re σ.matrix σ.pos, ρ.trace_eq_one, σ.trace_eq_one]
+      rw [traceNorm_neg, traceNorm_posSemidef_eq_trace_re ρ.m ρ.psd,
+        traceNorm_posSemidef_eq_trace_re σ.m σ.psd, ρ.tr', σ.tr']
       norm_num
     _ = 2 := by norm_num
 
 private theorem vonNeumann_sub_le_howFannes
-    (rho sigma : State a) (hcard : 2 ≤ Fintype.card a) :
+    (rho sigma : MState a) (hcard : 2 ≤ Fintype.card a) :
     rho.vonNeumann - sigma.vonNeumann ≤
       log2 (Fintype.card a : ℝ) * howFannesEta (rho.traceNormDistance sigma) := by
   classical
   let _ : Nonempty a := rho.nonempty
-  let U : Matrix.unitaryGroup a ℂ := sigma.pos.isHermitian.eigenvectorUnitary
+  let U : Matrix.unitaryGroup a ℂ := sigma.psd.isHermitian.eigenvectorUnitary
   let p : a → ℝ := fun i =>
     (ProjectiveMeasurement.eigenbasisDiagonalProb rho sigma i : ℝ)
-  let q : a → ℝ := fun i => sigma.pos.isHermitian.eigenvalues i
+  let q : a → ℝ := fun i => sigma.psd.isHermitian.eigenvalues i
   have hp0 (i : a) : 0 ≤ p i := by
     exact NNReal.coe_nonneg _
   have hq0 (i : a) : 0 ≤ q i := by
-    exact sigma.pos.eigenvalues_nonneg i
+    exact sigma.psd.eigenvalues_nonneg i
   have hpSum : ∑ i, p i = 1 := by
     simpa [p] using congrArg (fun x : ℝ≥0 => (x : ℝ))
       (ProjectiveMeasurement.eigenbasisDiagonalProb_sum rho sigma)
   have hqSum : ∑ i, q i = 1 := by
     have hcomplex :
-        (∑ i, ((sigma.pos.isHermitian.eigenvalues i : ℝ) : ℂ)) = 1 :=
-      sigma.pos.isHermitian.trace_eq_sum_eigenvalues.symm.trans sigma.trace_eq_one
+        (∑ i, ((sigma.psd.isHermitian.eigenvalues i : ℝ) : ℂ)) = 1 :=
+      sigma.psd.isHermitian.trace_eq_sum_eigenvalues.symm.trans sigma.tr'
     have hreal := congrArg Complex.re hcomplex
     simpa [q] using hreal
   have hp1 (i : a) : p i ≤ 1 := by
@@ -846,13 +787,13 @@ private theorem vonNeumann_sub_le_howFannes
         Finset.single_le_sum (fun j _ => hq0 j) (Finset.mem_univ i)
       _ = 1 := hqSum
   have hsigmaDiag :
-      star (U : CMatrix a) * sigma.matrix * (U : CMatrix a) =
+      star (U : CMatrix a) * sigma.m * (U : CMatrix a) =
         Matrix.diagonal (fun i => ((q i : ℝ) : ℂ)) := by
     let D : CMatrix a := Matrix.diagonal (fun i => ((q i : ℝ) : ℂ))
     have hstate :
-        sigma.matrix = (U : CMatrix a) * D * star (U : CMatrix a) := by
+        sigma.m = (U : CMatrix a) * D * star (U : CMatrix a) := by
       simpa [U, D, q, Function.comp_def, Unitary.conjStarAlgAut_apply] using
-        sigma.pos.isHermitian.spectral_theorem
+        sigma.psd.isHermitian.spectral_theorem
     rw [hstate]
     change star (U : CMatrix a) * ((U : CMatrix a) * D * star (U : CMatrix a)) *
         (U : CMatrix a) = D
@@ -863,37 +804,37 @@ private theorem vonNeumann_sub_le_howFannes
             (star (U : CMatrix a) * (U : CMatrix a)) := by noncomm_ring
       _ = D := by rw [Unitary.coe_star_mul_self]; simp
   have hqDiag (i : a) :
-      q i = ((star (U : CMatrix a) * sigma.matrix * (U : CMatrix a)) i i).re := by
+      q i = ((star (U : CMatrix a) * sigma.m * (U : CMatrix a)) i i).re := by
     have h := congrArg (fun M : CMatrix a => (M i i).re) hsigmaDiag
     simpa [q, Matrix.diagonal] using h.symm
   have hdiff (i : a) :
       p i - q i =
-        ((star (U : CMatrix a) * (rho.matrix - sigma.matrix) *
+        ((star (U : CMatrix a) * (rho.m - sigma.m) *
           (U : CMatrix a)) i i).re := by
     rw [hqDiag]
     change
-      ((star (U : CMatrix a) * rho.matrix * (U : CMatrix a)) i i).re -
-          ((star (U : CMatrix a) * sigma.matrix * (U : CMatrix a)) i i).re = _
+      ((star (U : CMatrix a) * rho.m * (U : CMatrix a)) i i).re -
+          ((star (U : CMatrix a) * sigma.m * (U : CMatrix a)) i i).re = _
     simp [Matrix.mul_sub, Matrix.sub_mul]
   have hdist : ∑ i, |p i - q i| ≤ rho.traceNormDistance sigma := by
     calc
       ∑ i, |p i - q i| =
-          ∑ i, |((star (U : CMatrix a) * (rho.matrix - sigma.matrix) *
+          ∑ i, |((star (U : CMatrix a) * (rho.m - sigma.m) *
             (U : CMatrix a)) i i).re| := by
               apply Finset.sum_congr rfl
               intro i _
               rw [hdiff]
-      _ ≤ traceNorm (rho.matrix - sigma.matrix) :=
+      _ ≤ traceNorm (rho.m - sigma.m) :=
         sum_abs_unitary_conjugate_diagonal_re_le_traceNorm
-          (rho.matrix - sigma.matrix) U
+          (rho.m - sigma.m) U
       _ = rho.traceNormDistance sigma := by
         rfl
   have hrhoEntropy :
       rho.vonNeumann ≤ ∑ i, -p i * log2 (p i) :=
-    State.vonNeumann_le_eigenbasisDiagonalEntropy rho U
+    MState.vonNeumann_le_eigenbasisDiagonalEntropy rho U
   have hsigmaEntropy :
       sigma.vonNeumann = ∑ i, -q i * log2 (q i) := by
-    rw [State.vonNeumann]
+    rw [MState.vonNeumann]
     simp_rw [xlog2_eq_mul_log2]
     rw [← Finset.sum_neg_distrib]
     apply Finset.sum_congr rfl
@@ -926,7 +867,7 @@ private theorem vonNeumann_sub_le_howFannes
 
 /-- Finite-dimensional von Neumann entropy continuity with the exact HOW
 ordinary-entropy modulus and the repository's unnormalized trace distance. -/
-theorem vonNeumann_dist_le_howFannes (rho sigma : State a) :
+theorem vonNeumann_dist_le_howFannes (rho sigma : MState a) :
     |rho.vonNeumann - sigma.vonNeumann| ≤
       log2 (Fintype.card a : ℝ) * howFannesEta (rho.traceNormDistance sigma) := by
   classical
@@ -949,7 +890,9 @@ theorem vonNeumann_dist_le_howFannes (rho sigma : State a) :
     · linarith
     · exact hforward
 
-end State
+end MState
+
+namespace QIT
 
 /-- The HOW modulus tends to zero as its nonnegative argument tends to zero. -/
 theorem tendsto_howFannesEta_nhdsWithin_zero_right :
@@ -970,7 +913,5 @@ theorem tendsto_howFannesEta_nhdsWithin_zero_right :
     with t ht
   change t < 1 / Real.exp 1 at ht
   rw [howFannesEta, if_pos ht.le]
-
-end
 
 end QIT

@@ -17,15 +17,15 @@ spine for entanglement-assisted classical communication.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Pointwise
-
-namespace QIT
+open scoped ComplexOrder MatrixOrder Pointwise Kronecker
 
 universe u1 v1 u2 v2
 
 noncomputable section
 
-namespace Channel
+namespace CPTPOp
+
+open QIT
 
 variable {a1 : Type u1} {b1 : Type v1} {a2 : Type u2} {b2 : Type v2}
 variable [Fintype a1] [DecidableEq a1] [Fintype b1] [DecidableEq b1]
@@ -39,24 +39,24 @@ restricting the side-reference infimum to product states, matching
 `EA_capacity.tex:1247-1252`. -/
 theorem sandwichedRenyiMutualInformationE_prod_le_fullRankProductCB_sInf
     [Nonempty a1] [Nonempty a2] [Nonempty b1] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
     (hBelow :
       BddBelow (Set.range fun
-          p : {sigma : State b1 // sigma.matrix.PosDef} ×
-              {sigma : State b2 // sigma.matrix.PosDef} =>
+          p : {sigma : MState b1 // sigma.m.PosDef} ×
+              {sigma : MState b2 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression (N1.prod N2) (p.1.1.prod p.2.1)
           (SchattenOrder.ofOneLt halpha))) :
     (N1.prod N2).sandwichedRenyiMutualInformationE alpha ≤
       ((sInf (Set.range fun
-          p : {sigma : State b1 // sigma.matrix.PosDef} ×
-              {sigma : State b2 // sigma.matrix.PosDef} =>
+          p : {sigma : MState b1 // sigma.m.PosDef} ×
+              {sigma : MState b2 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression (N1.prod N2) (p.1.1.prod p.2.1)
           (SchattenOrder.ofOneLt halpha)) :
           ℝ) : EReal) := by
-  let S1 := {sigma : State b1 // sigma.matrix.PosDef}
-  let S2 := {sigma : State b2 // sigma.matrix.PosDef}
-  have : Nonempty S1 := ⟨⟨State.maximallyMixed b1, State.maximallyMixed_posDef⟩⟩
-  have : Nonempty S2 := ⟨⟨State.maximallyMixed b2, State.maximallyMixed_posDef⟩⟩
+  let S1 := {sigma : MState b1 // sigma.m.PosDef}
+  let S2 := {sigma : MState b2 // sigma.m.PosDef}
+  have : Nonempty S1 := ⟨⟨(MState.uniform : MState b1), MState.uniform_posDef⟩⟩
+  have : Nonempty S2 := ⟨⟨(MState.uniform : MState b2), MState.uniform_posDef⟩⟩
   let f : S1 × S2 → ℝ := fun p =>
     sandwichedRenyiCBNormExpression (N1.prod N2) (p.1.1.prod p.2.1)
       (SchattenOrder.ofOneLt halpha)
@@ -72,8 +72,8 @@ theorem sandwichedRenyiMutualInformationE_prod_le_fullRankProductCB_sInf
         sInf (Set.range fun p : S1 × S2 => ((f p : ℝ) : EReal)) := by
     refine le_csInf (Set.range_nonempty _) ?_
     rintro z ⟨p, rfl⟩
-    have hsigma : (p.1.1.prod p.2.1).matrix.PosDef :=
-      State.prod_posDef p.1.2 p.2.2
+    have hsigma : (p.1.1.prod p.2.1).m.PosDef :=
+      MState.PosDef.kron p.1.2 p.2.2
     simpa [S1, S2, f] using
       inputSandwichedRenyiMutualInformationE_le_CBNormExpression
         (N1.prod N2) (p.1.1.prod p.2.1) psi hsigma halpha
@@ -88,18 +88,18 @@ full-rank product states, without importing the real bounded-below hypotheses
 used by the scalar split theorem. -/
 theorem sandwichedRenyiMutualInformationE_prod_le_fullRankProductCB_sInf_EReal
     [Nonempty a1] [Nonempty a2] [Nonempty b1] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2) {alpha : ℝ} (halpha : 1 < alpha) :
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2) {alpha : ℝ} (halpha : 1 < alpha) :
     (N1.prod N2).sandwichedRenyiMutualInformationE alpha ≤
       sInf (Set.range fun
-          p : Prod {sigma : State b1 // sigma.matrix.PosDef}
-              {sigma : State b2 // sigma.matrix.PosDef} =>
+          p : {sigma : MState b1 // sigma.m.PosDef} ×
+              {sigma : MState b2 // sigma.m.PosDef} =>
         ((sandwichedRenyiCBNormExpression (N1.prod N2) (p.1.1.prod p.2.1)
           (SchattenOrder.ofOneLt halpha) : ℝ) : EReal)) := by
-  let S1 := {sigma : State b1 // sigma.matrix.PosDef}
-  let S2 := {sigma : State b2 // sigma.matrix.PosDef}
-  have : Nonempty S1 := ⟨⟨State.maximallyMixed b1, State.maximallyMixed_posDef⟩⟩
-  have : Nonempty S2 := ⟨⟨State.maximallyMixed b2, State.maximallyMixed_posDef⟩⟩
-  let f : Prod S1 S2 → ℝ := fun p =>
+  let S1 := {sigma : MState b1 // sigma.m.PosDef}
+  let S2 := {sigma : MState b2 // sigma.m.PosDef}
+  have : Nonempty S1 := ⟨⟨(MState.uniform : MState b1), MState.uniform_posDef⟩⟩
+  have : Nonempty S2 := ⟨⟨(MState.uniform : MState b2), MState.uniform_posDef⟩⟩
+  let f : S1 × S2 → ℝ := fun p =>
     sandwichedRenyiCBNormExpression (N1.prod N2) (p.1.1.prod p.2.1)
       (SchattenOrder.ofOneLt halpha)
   rw [(N1.prod N2).sandwichedRenyiMutualInformationE_eq_sSup]
@@ -107,37 +107,37 @@ theorem sandwichedRenyiMutualInformationE_prod_le_fullRankProductCB_sInf_EReal
   rintro y ⟨psi, rfl⟩
   refine le_csInf (Set.range_nonempty _) ?_
   rintro z ⟨p, rfl⟩
-  have hsigma : (p.1.1.prod p.2.1).matrix.PosDef :=
-    State.prod_posDef p.1.2 p.2.2
+  have hsigma : (p.1.1.prod p.2.1).m.PosDef :=
+    MState.PosDef.kron p.1.2 p.2.2
   simpa [S1, S2, f] using
     inputSandwichedRenyiMutualInformationE_le_CBNormExpression
       (N1.prod N2) (p.1.1.prod p.2.1) psi hsigma halpha
 
 /-- For full-rank side information, the maximally mixed source-side CB
 candidate has strictly positive value under the KW weighted channel map. -/
-theorem cbOneToAlphaOriginalValue_sandwichedSideWeightedMap_maximallyMixed_pos_of_posDef
-    [Nonempty a1] (N : Channel a1 b1) (sigma : State b1)
-    (hsigma : sigma.matrix.PosDef) {alpha : ℝ} (halpha : 0 < alpha) :
+theorem cbOneToAlphaOriginalValue_sandwichedSideWeightedMap_uniform_pos_of_posDef
+    [Nonempty a1] (N : CPTPMap a1 b1) (sigma : MState b1)
+    (hsigma : sigma.m.PosDef) {alpha : ℝ} (halpha : 0 < alpha) :
     0 <
       MatrixMap.cbOneToAlphaOriginalValue
         (sandwichedSideWeightedMap N sigma alpha)
         (sandwichedSideWeightedMap_completelyPositive N sigma alpha)
-        { matrix := (State.maximallyMixed a1).matrix,
-          pos := (State.maximallyMixed a1).pos,
+        { matrix := (MState.uniform : MState a1).m,
+          pos := (MState.uniform : MState a1).psd,
           trace_le_one := by
-            rw [(State.maximallyMixed a1).trace_eq_one]
+            rw [(MState.uniform : MState a1).tr']
             norm_num }
         (SchattenOrder.ofPositive halpha) := by
   let Y0 : MatrixMap.CBOneToAlphaOriginalDomain a1 :=
-    { matrix := (State.maximallyMixed a1).matrix,
-      pos := (State.maximallyMixed a1).pos,
+    { matrix := (MState.uniform : MState a1).m,
+      pos := (MState.uniform : MState a1).psd,
       trace_le_one := by
-        rw [(State.maximallyMixed a1).trace_eq_one]
+        rw [(MState.uniform : MState a1).tr']
         norm_num }
-  let X : CMatrix (Prod a1 a1) := MatrixMap.cbOneToAlphaOriginalInput Y0.matrix alpha
+  let X : CMatrix (a1 × a1) := MatrixMap.cbOneToAlphaOriginalInput Y0.matrix alpha
   let hX : X.PosSemidef := MatrixMap.cbOneToAlphaOriginalInput_posSemidef Y0.pos alpha
   have hXne : X ≠ 0 := by
-    simpa [X, Y0] using MatrixMap.cbOneToAlphaOriginalInput_maximallyMixed_ne_zero
+    simpa [X, Y0] using MatrixMap.cbOneToAlphaOriginalInput_uniform_ne_zero
       (a1 := a1) halpha
   have hPhiXne :
       MatrixMap.referenceLift (sandwichedSideWeightedMap N sigma alpha) X ≠ 0 :=
@@ -154,18 +154,18 @@ theorem cbOneToAlphaOriginalValue_sandwichedSideWeightedMap_maximallyMixed_pos_o
 /-- Full-rank side information makes the KW weighted-channel CB norm strictly
 positive, so the source logarithm is on the nonzero branch. -/
 theorem cbOneToAlphaNorm_sandwichedSideWeightedMap_pos_of_posDef
-    [Nonempty a1] (N : Channel a1 b1) (sigma : State b1)
-    (hsigma : sigma.matrix.PosDef) {alpha : ℝ} (halpha : 1 < alpha) :
+    [Nonempty a1] (N : CPTPMap a1 b1) (sigma : MState b1)
+    (hsigma : sigma.m.PosDef) {alpha : ℝ} (halpha : 1 < alpha) :
     0 <
       MatrixMap.cbOneToAlphaNorm
         (sandwichedSideWeightedMap N sigma alpha)
         (sandwichedSideWeightedMap_completelyPositive N sigma alpha)
         (SchattenOrder.ofOneLt halpha) := by
   let Y0 : MatrixMap.CBOneToAlphaOriginalDomain a1 :=
-    { matrix := (State.maximallyMixed a1).matrix,
-      pos := (State.maximallyMixed a1).pos,
+    { matrix := (MState.uniform : MState a1).m,
+      pos := (MState.uniform : MState a1).psd,
       trace_le_one := by
-        rw [(State.maximallyMixed a1).trace_eq_one]
+        rw [(MState.uniform : MState a1).tr']
         norm_num }
   have hval_pos :
       0 <
@@ -174,7 +174,7 @@ theorem cbOneToAlphaNorm_sandwichedSideWeightedMap_pos_of_posDef
           (sandwichedSideWeightedMap_completelyPositive N sigma alpha)
           Y0
           (SchattenOrder.ofOneLt halpha) := by
-    exact cbOneToAlphaOriginalValue_sandwichedSideWeightedMap_maximallyMixed_pos_of_posDef
+    exact cbOneToAlphaOriginalValue_sandwichedSideWeightedMap_uniform_pos_of_posDef
       N sigma hsigma (lt_trans zero_lt_one halpha)
   have hval_le :
       MatrixMap.cbOneToAlphaOriginalValue
@@ -196,8 +196,8 @@ theorem cbOneToAlphaNorm_sandwichedSideWeightedMap_pos_of_posDef
 /-- Full-rank side information also makes the KW alternate CB expression
 strictly positive after substituting the proved CB alternate-expression theorem. -/
 theorem cbOneToAlphaAlternateExpression_sandwichedSideWeightedMap_pos_of_posDef
-    [Nonempty a1] (N : Channel a1 b1) (sigma : State b1)
-    (hsigma : sigma.matrix.PosDef) {alpha : ℝ} (halpha : 1 < alpha) :
+    [Nonempty a1] (N : CPTPMap a1 b1) (sigma : MState b1)
+    (hsigma : sigma.m.PosDef) {alpha : ℝ} (halpha : 1 < alpha) :
     0 <
       MatrixMap.cbOneToAlphaAlternateExpression
         (sandwichedSideWeightedMap N sigma alpha)
@@ -214,25 +214,23 @@ theorem cbOneToAlphaAlternateExpression_sandwichedSideWeightedMap_pos_of_posDef
 product channel, repartitioned from `(A1 x A1) x (A2 x A2)` to
 `(A1 x A2) x (A1 x A2)`. -/
 def sandwichedRenyiProductInput
-    (psi : PureVector (Prod a1 a1)) (phi : PureVector (Prod a2 a2)) :
-    PureVector (Prod (Prod a1 a2) (Prod a1 a2)) :=
+    (psi : Ket (a1 × a1)) (phi : Ket (a2 × a2)) :
+    Ket ((a1 × a2) × (a1 × a2)) :=
   (psi.prod phi).reindex
-    (State.bipartiteProductEquiv (a1 := a1) (b1 := a1) (a2 := a2) (b2 := a2))
+    (Equiv.prodProdProdComm a1 a1 a2 a2)
 
 /-- Applying a product channel to a repartitioned product input yields the
 repartitioned product of the two individual output states. -/
-private theorem applyState_prod_reindex_sandwichedRenyiProductInput
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2)
-    (rho : State (Prod a1 a1)) (sigma : State (Prod a2 a2)) :
-    (((Channel.idChannel (Prod a1 a2)).prod (N1.prod N2)).applyState
+theorem applyState_prod_reindex_prodProdProdComm
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2)
+    (rho : MState (a1 × a1)) (sigma : MState (a2 × a2)) :
+    (((CPTPOp.id (dIn := a1 × a2)).prod (N1.prod N2))
         ((rho.prod sigma).reindex
-          (State.bipartiteProductEquiv
-            (a1 := a1) (b1 := a1) (a2 := a2) (b2 := a2)))) =
-      ((((Channel.idChannel a1).prod N1).applyState rho).prod
-          (((Channel.idChannel a2).prod N2).applyState sigma)).reindex
-        (State.bipartiteProductEquiv
-          (a1 := a1) (b1 := b1) (a2 := a2) (b2 := b2)) := by
-  apply State.ext
+          (Equiv.prodProdProdComm a1 a1 a2 a2))) =
+      (MState.prod (((CPTPOp.id (dIn := a1)).prod N1) rho)
+          (((CPTPOp.id (dIn := a2)).prod N2) sigma)).reindex
+        (Equiv.prodProdProdComm a1 b1 a2 b2) := by
+  apply MState.ext
   ext x y
   rcases x with ⟨xR, xB⟩
   rcases y with ⟨yR, yB⟩
@@ -240,58 +238,55 @@ private theorem applyState_prod_reindex_sandwichedRenyiProductInput
   rcases xB with ⟨xB1, xB2⟩
   rcases yR with ⟨yR1, yR2⟩
   rcases yB with ⟨yB1, yB2⟩
-  simp only [Channel.applyState, Channel.prod, State.reindex_matrix,
-    State.prod_matrix_kronecker, Matrix.submatrix_apply]
+  simp only [CPTPOp.mat_coe_eq_apply_mat, CPTPOp.prod_map, MState.reindex_matrix,
+    MState.prod_m, Matrix.submatrix_apply]
   rw [MatrixMap.kron_idChannel_left_apply_slice]
   have hslice :
       (Matrix.of fun j j' =>
-          (Matrix.kronecker rho.matrix sigma.matrix).submatrix
-            (State.bipartiteProductEquiv
-              (a1 := a1) (b1 := a1) (a2 := a2) (b2 := a2)).symm
-            (State.bipartiteProductEquiv
-              (a1 := a1) (b1 := a1) (a2 := a2) (b2 := a2)).symm
+          (Matrix.kronecker rho.m sigma.m).submatrix
+            (Equiv.prodProdProdComm a1 a1 a2 a2).symm
+            (Equiv.prodProdProdComm a1 a1 a2 a2).symm
             (((xR1, xR2), (xB1, xB2)).1, j)
             (((yR1, yR2), (yB1, yB2)).1, j')) =
-        Matrix.kronecker
-          (Matrix.of fun i i' => rho.matrix (xR1, i) (yR1, i'))
-          (Matrix.of fun k k' => sigma.matrix (xR2, k) (yR2, k')) := by
+        (Matrix.of fun i i' => rho.m (xR1, i) (yR1, i')) ⊗ₖ
+          (Matrix.of fun k k' => sigma.m (xR2, k) (yR2, k')) := by
     ext z z'
     rcases z with ⟨z1, z2⟩
     rcases z' with ⟨z1', z2'⟩
-    simp [State.bipartiteProductEquiv, Matrix.kronecker,
+    simp [Equiv.prodProdProdComm, Matrix.kronecker,
       Matrix.kroneckerMap_apply, Matrix.of_apply]
-  rw [hslice, MatrixMap.kron_apply_kronecker]
-  simp [State.bipartiteProductEquiv, Matrix.kronecker,
-    Matrix.kroneckerMap_apply]
+  rw [← Matrix.kronecker, hslice, MatrixMap.kron_map_of_kron_state]
+  simp [Equiv.prodProdProdComm, Matrix.kroneckerMap_apply, -CPTPOp.id_map]
   rw [MatrixMap.kron_idChannel_left_apply_slice]
   rw [MatrixMap.kron_idChannel_left_apply_slice]
 
+set_option maxRecDepth 4000 in
 /-- Product-channel output states factor on the product pure inputs used by the
 sandwiched entanglement-assisted objective. -/
 theorem hypothesisTestingOutputState_prod
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2)
-    (psi : PureVector (Prod a1 a1)) (phi : PureVector (Prod a2 a2)) :
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2)
+    (psi : Ket (a1 × a1)) (phi : Ket (a2 × a2)) :
     (N1.prod N2).hypothesisTestingOutputState
         (sandwichedRenyiProductInput psi phi) =
       (N1.hypothesisTestingOutputState psi).bipartiteProduct
         (N2.hypothesisTestingOutputState phi) := by
-  unfold Channel.hypothesisTestingOutputState sandwichedRenyiProductInput
-  rw [PureVector.reindex_state, PureVector.prod_state]
-  exact applyState_prod_reindex_sandwichedRenyiProductInput
+  unfold CPTPOp.hypothesisTestingOutputState sandwichedRenyiProductInput
+  rw [Ket.reindex_state, Ket.prod_state]
+  exact applyState_prod_reindex_prodProdProdComm
     N1 N2 psi.state phi.state
 
 /-- Product pure inputs reduce the channel sandwiched-Renyi objective to the
 bipartite product output state.  This is the first source step in the
 superadditivity half of Khatri--Wilde, `EA_capacity.tex:1224-1234`. -/
 theorem inputSandwichedRenyiMutualInformationE_prodProductInput
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2)
-    (psi : PureVector (Prod a1 a1)) (phi : PureVector (Prod a2 a2))
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2)
+    (psi : Ket (a1 × a1)) (phi : Ket (a2 × a2))
     (alpha : ℝ) :
     (N1.prod N2).inputSandwichedRenyiMutualInformationE
         (sandwichedRenyiProductInput psi phi) alpha =
       ((N1.hypothesisTestingOutputState psi).bipartiteProduct
         (N2.hypothesisTestingOutputState phi)).sandwichedRenyiMutualInformationE alpha := by
-  unfold Channel.inputSandwichedRenyiMutualInformationE
+  unfold CPTPOp.inputSandwichedRenyiMutualInformationE
   rw [hypothesisTestingOutputState_prod]
 
 /-- The product-output state value obtained from product pure inputs is below
@@ -299,8 +294,8 @@ the optimized product-channel sandwiched-Renyi mutual information.  This is the
 order-theoretic supremum step in the superadditivity half of
 Khatri--Wilde, `EA_capacity.tex:1224-1234`. -/
 theorem bipartiteProduct_output_sandwichedRenyiMutualInformationE_le_prodChannel
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2)
-    (psi : PureVector (Prod a1 a1)) (phi : PureVector (Prod a2 a2))
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2)
+    (psi : Ket (a1 × a1)) (phi : Ket (a2 × a2))
     (alpha : ℝ) :
     ((N1.hypothesisTestingOutputState psi).bipartiteProduct
         (N2.hypothesisTestingOutputState phi)).sandwichedRenyiMutualInformationE alpha ≤
@@ -317,9 +312,9 @@ channel optimization to product pure inputs gives the corresponding
 channel-level lower bound. -/
 theorem sandwichedRenyiMutualInformationE_prod_ge_add_of_state_product_ge
     [Nonempty a1] [Nonempty a2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2) (alpha : ℝ)
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2) (alpha : ℝ)
     (hstate :
-      ∀ psi : PureVector (Prod a1 a1), ∀ phi : PureVector (Prod a2 a2),
+      ∀ psi : Ket (a1 × a1), ∀ phi : Ket (a2 × a2),
         N1.inputSandwichedRenyiMutualInformationE psi alpha +
             N2.inputSandwichedRenyiMutualInformationE phi alpha ≤
           ((N1.hypothesisTestingOutputState psi).bipartiteProduct
@@ -327,8 +322,8 @@ theorem sandwichedRenyiMutualInformationE_prod_ge_add_of_state_product_ge
     N1.sandwichedRenyiMutualInformationE alpha +
         N2.sandwichedRenyiMutualInformationE alpha ≤
       (N1.prod N2).sandwichedRenyiMutualInformationE alpha := by
-  have : Nonempty (PureVector (Prod a1 a1)) := ⟨PureVector.basisPureVector⟩
-  have : Nonempty (PureVector (Prod a2 a2)) := ⟨PureVector.basisPureVector⟩
+  have : Nonempty (Ket (a1 × a1)) := ⟨default⟩
+  have : Nonempty (Ket (a2 × a2)) := ⟨default⟩
   rw [N1.sandwichedRenyiMutualInformationE_eq_sSup,
     N2.sandwichedRenyiMutualInformationE_eq_sSup]
   refine EReal.add_le_of_forall_lt ?_
@@ -336,13 +331,13 @@ theorem sandwichedRenyiMutualInformationE_prod_ge_add_of_state_product_ge
   obtain ⟨value1, hvalue1, hxvalue1⟩ :=
     exists_lt_of_lt_csSup
       (Set.range_nonempty
-        (fun psi : PureVector (Prod a1 a1) =>
+        (fun psi : Ket (a1 × a1) =>
           N1.inputSandwichedRenyiMutualInformationE psi alpha))
       hx
   obtain ⟨value2, hvalue2, hyvalue2⟩ :=
     exists_lt_of_lt_csSup
       (Set.range_nonempty
-        (fun phi : PureVector (Prod a2 a2) =>
+        (fun phi : Ket (a2 × a2) =>
           N2.inputSandwichedRenyiMutualInformationE phi alpha))
       hy
   rcases hvalue1 with ⟨psi, rfl⟩
@@ -359,9 +354,9 @@ The hypothesis is exactly the state-level lower-bound half of
 step used in `EA_capacity.tex:1229-1238`. -/
 theorem sandwichedRenyiMutualInformationE_prod_ge_add_of_bipartiteProduct_ge
     [Nonempty a1] [Nonempty a2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2) (alpha : ℝ)
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2) (alpha : ℝ)
     (hstate :
-      ∀ xi : State (Prod a1 b1), ∀ omega : State (Prod a2 b2),
+      ∀ xi : MState (a1 × b1), ∀ omega : MState (a2 × b2),
         xi.sandwichedRenyiMutualInformationE alpha +
             omega.sandwichedRenyiMutualInformationE alpha ≤
           (xi.bipartiteProduct omega).sandwichedRenyiMutualInformationE alpha) :
@@ -375,58 +370,58 @@ theorem sandwichedRenyiMutualInformationE_prod_ge_add_of_bipartiteProduct_ge
 
 /-- KW channel superadditivity from the completed state-product lower branch.
 
-This is the unconditional version of the `>=` half in
+This is the unconditional version of the `≥` half in
 `EA_capacity.tex:1224-1238`: restrict the product-channel optimization to
 product pure inputs, then apply state-level product additivity to the two
 output states. -/
 theorem sandwichedRenyiMutualInformationE_prod_ge_add
     [Nonempty a1] [Nonempty a2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2) {alpha : ℝ} (halpha : 1 < alpha) :
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2) {alpha : ℝ} (halpha : 1 < alpha) :
     N1.sandwichedRenyiMutualInformationE alpha +
         N2.sandwichedRenyiMutualInformationE alpha ≤
       (N1.prod N2).sandwichedRenyiMutualInformationE alpha := by
   refine sandwichedRenyiMutualInformationE_prod_ge_add_of_bipartiteProduct_ge
     N1 N2 alpha ?_
   intro xi omega
-  exact State.sandwichedRenyiMutualInformationE_bipartiteProduct_ge_add
+  exact MState.sandwichedRenyiMutualInformationE_bipartiteProduct_ge_add
     xi omega halpha
 
-/-- The CB `1 -> alpha` norm is multiplicative on the maps underlying product
+/-- The CB `1 → alpha` norm is multiplicative on the maps underlying product
 channels.  This is the channel-level instance of the Khatri--Wilde
 subadditivity step, `EA_capacity.tex:1242-1254`, using the source-backed
 MatrixMap theorem from the CB-norm module. -/
 theorem cbOneToAlphaNorm_prod_map_eq_mul
     [Nonempty a1] [Nonempty a2] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2)
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2)
     {alpha : ℝ} (halpha : 1 < alpha) :
-    MatrixMap.cbOneToAlphaNorm (N1.prod N2).map (N1.prod N2).completelyPositive (SchattenOrder.ofOneLt halpha) =
-      MatrixMap.cbOneToAlphaNorm N1.map N1.completelyPositive (SchattenOrder.ofOneLt halpha) *
-        MatrixMap.cbOneToAlphaNorm N2.map N2.completelyPositive (SchattenOrder.ofOneLt halpha) := by
-  simpa [Channel.prod] using
+    MatrixMap.cbOneToAlphaNorm (N1.prod N2).map (N1.prod N2).map_cp (SchattenOrder.ofOneLt halpha) =
+      MatrixMap.cbOneToAlphaNorm N1.map N1.map_cp (SchattenOrder.ofOneLt halpha) *
+        MatrixMap.cbOneToAlphaNorm N2.map N2.map_cp (SchattenOrder.ofOneLt halpha) := by
+  simpa [CPTPOp.prod] using
     (MatrixMap.cbOneToAlphaNorm_kron_eq_mul
-      N1.map N1.completelyPositive N2.map N2.completelyPositive halpha)
+      N1.map N1.map_cp N2.map N2.map_cp halpha)
 
 /-- Channel-level form of the KW weighting-map product identity. -/
 theorem sandwichedSideWeightMap_prod_comp_prod_map_posDef
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2)
-    (sigma1 : State b1) (sigma2 : State b2)
-    (hsigma1 : sigma1.matrix.PosDef) (hsigma2 : sigma2.matrix.PosDef)
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2)
+    (sigma1 : MState b1) (sigma2 : MState b2)
+    (hsigma1 : sigma1.m.PosDef) (hsigma2 : sigma2.m.PosDef)
     (alpha : ℝ) :
     (MatrixMap.sandwichedSideWeightMap (sigma1.prod sigma2) alpha).comp
         (N1.prod N2).map =
       MatrixMap.kron
         ((MatrixMap.sandwichedSideWeightMap sigma1 alpha).comp N1.map)
         ((MatrixMap.sandwichedSideWeightMap sigma2 alpha).comp N2.map) := by
-  simpa [Channel.prod] using
+  simpa [CPTPOp.prod] using
     MatrixMap.sandwichedSideWeightMap_prod_comp_kron_posDef
       sigma1 sigma2 N1.map N2.map hsigma1 hsigma2 alpha
 
 /-- Weighted product-channel maps factor as products of the weighted component
 maps on full-rank product references. -/
 theorem sandwichedSideWeightedMap_prod_posDef
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2)
-    (sigma1 : State b1) (sigma2 : State b2)
-    (hsigma1 : sigma1.matrix.PosDef) (hsigma2 : sigma2.matrix.PosDef)
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2)
+    (sigma1 : MState b1) (sigma2 : MState b2)
+    (hsigma1 : sigma1.m.PosDef) (hsigma2 : sigma2.m.PosDef)
     (alpha : ℝ) :
     sandwichedSideWeightedMap (N1.prod N2) (sigma1.prod sigma2) alpha =
       MatrixMap.kron (sandwichedSideWeightedMap N1 sigma1 alpha)
@@ -439,9 +434,9 @@ theorem sandwichedSideWeightedMap_prod_posDef
 references, the map-norm step in KW `EA_capacity.tex:1242-1254`. -/
 theorem cbOneToAlphaNorm_sandwichedSideWeightMap_prod_map_eq_mul_posDef
     [Nonempty a1] [Nonempty a2] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2)
-    (sigma1 : State b1) (sigma2 : State b2)
-    (hsigma1 : sigma1.matrix.PosDef) (hsigma2 : sigma2.matrix.PosDef)
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2)
+    (sigma1 : MState b1) (sigma2 : MState b2)
+    (hsigma1 : sigma1.m.PosDef) (hsigma2 : sigma2.m.PosDef)
     {alpha : ℝ} (halpha : 1 < alpha) :
     MatrixMap.cbOneToAlphaNorm
         ((MatrixMap.sandwichedSideWeightMap (sigma1.prod sigma2) alpha).comp
@@ -449,32 +444,32 @@ theorem cbOneToAlphaNorm_sandwichedSideWeightMap_prod_map_eq_mul_posDef
         (MatrixMap.isCompletelyPositive_comp _ _
           (MatrixMap.sandwichedSideWeightMap_completelyPositive
             (sigma1.prod sigma2) alpha)
-          (N1.prod N2).completelyPositive)
+          (N1.prod N2).map_cp)
         (SchattenOrder.ofOneLt halpha) =
       MatrixMap.cbOneToAlphaNorm
           ((MatrixMap.sandwichedSideWeightMap sigma1 alpha).comp N1.map)
           (MatrixMap.isCompletelyPositive_comp _ _
             (MatrixMap.sandwichedSideWeightMap_completelyPositive sigma1 alpha)
-            N1.completelyPositive)
+            N1.map_cp)
           (SchattenOrder.ofOneLt halpha) *
         MatrixMap.cbOneToAlphaNorm
           ((MatrixMap.sandwichedSideWeightMap sigma2 alpha).comp N2.map)
           (MatrixMap.isCompletelyPositive_comp _ _
             (MatrixMap.sandwichedSideWeightMap_completelyPositive sigma2 alpha)
-            N2.completelyPositive)
+            N2.map_cp)
           (SchattenOrder.ofOneLt halpha) := by
-  simpa [Channel.prod] using
+  simpa [CPTPOp.prod] using
     MatrixMap.cbOneToAlphaNorm_sandwichedSideWeightMap_prod_comp_kron_eq_mul_posDef
-      sigma1 sigma2 N1.map N1.completelyPositive N2.map N2.completelyPositive
+      sigma1 sigma2 N1.map N1.map_cp N2.map N2.map_cp
       hsigma1 hsigma2 halpha
 
 /-- Weighted-map CB-norm multiplicativity, stated using the local weighted-map
 abbreviation. -/
 theorem cbOneToAlphaNorm_sandwichedSideWeightedMap_prod_eq_mul_posDef
     [Nonempty a1] [Nonempty a2] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2)
-    (sigma1 : State b1) (sigma2 : State b2)
-    (hsigma1 : sigma1.matrix.PosDef) (hsigma2 : sigma2.matrix.PosDef)
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2)
+    (sigma1 : MState b1) (sigma2 : MState b2)
+    (hsigma1 : sigma1.m.PosDef) (hsigma2 : sigma2.m.PosDef)
     {alpha : ℝ} (halpha : 1 < alpha) :
     MatrixMap.cbOneToAlphaNorm
         (sandwichedSideWeightedMap (N1.prod N2) (sigma1.prod sigma2) alpha)
@@ -498,9 +493,9 @@ side references, obtained by substituting the proved CB alternate-expression
 theorem into the CB-norm multiplicativity step. -/
 theorem cbOneToAlphaAlternateExpression_sandwichedSideWeightedMap_prod_eq_mul_posDef
     [Nonempty a1] [Nonempty a2] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2)
-    (sigma1 : State b1) (sigma2 : State b2)
-    (hsigma1 : sigma1.matrix.PosDef) (hsigma2 : sigma2.matrix.PosDef)
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2)
+    (sigma1 : MState b1) (sigma2 : MState b2)
+    (hsigma1 : sigma1.m.PosDef) (hsigma2 : sigma2.m.PosDef)
     {alpha : ℝ} (halpha : 1 < alpha) :
     MatrixMap.cbOneToAlphaAlternateExpression
         (sandwichedSideWeightedMap (N1.prod N2) (sigma1.prod sigma2) alpha)
@@ -536,9 +531,9 @@ references.  This is the alternate-expression version of the scalar step used
 in KW `EA_capacity.tex:1265-1267`. -/
 theorem sandwichedRenyiCBAlternateExpression_prod_posDef
     [Nonempty a1] [Nonempty a2] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2)
-    (sigma1 : State b1) (sigma2 : State b2)
-    (hsigma1 : sigma1.matrix.PosDef) (hsigma2 : sigma2.matrix.PosDef)
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2)
+    (sigma1 : MState b1) (sigma2 : MState b2)
+    (hsigma1 : sigma1.m.PosDef) (hsigma2 : sigma2.m.PosDef)
     {alpha : ℝ} (halpha : 1 < alpha) :
     alpha / (alpha - 1) *
         log2 (MatrixMap.cbOneToAlphaAlternateExpression
@@ -569,51 +564,51 @@ theorem sandwichedRenyiCBAlternateExpression_prod_posDef
 alternate CB expression.
 
 This is the source scalar optimization step after the CB alternate-expression
-substitution.  The theorem is intentionally restricted to the full-rank domain;
-the later channel alternate-expression theorem must still prove the singular
-reference closure before this can close the optimized additivity theorem. -/
+substitution.  The theorem is restricted to the full-rank domain; the
+singular-reference closure needed to reach the optimized additivity theorem
+comes from the channel alternate-expression layer. -/
 theorem sandwichedRenyiCBAlternateExpression_fullRankProduct_sInf_eq_add
     [Nonempty a1] [Nonempty a2] [Nonempty b1] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
     (hN1 :
-      BddBelow (Set.range fun sigma1 : {sigma : State b1 // sigma.matrix.PosDef} =>
+      BddBelow (Set.range fun sigma1 : {sigma : MState b1 // sigma.m.PosDef} =>
         alpha / (alpha - 1) *
           log2 (MatrixMap.cbOneToAlphaAlternateExpression
             (sandwichedSideWeightedMap N1 sigma1.1 alpha)
             (sandwichedSideWeightedMap_completelyPositive N1 sigma1.1 alpha)
             (SchattenOrder.ofOneLt halpha))))
     (hN2 :
-      BddBelow (Set.range fun sigma2 : {sigma : State b2 // sigma.matrix.PosDef} =>
+      BddBelow (Set.range fun sigma2 : {sigma : MState b2 // sigma.m.PosDef} =>
         alpha / (alpha - 1) *
           log2 (MatrixMap.cbOneToAlphaAlternateExpression
             (sandwichedSideWeightedMap N2 sigma2.1 alpha)
             (sandwichedSideWeightedMap_completelyPositive N2 sigma2.1 alpha)
             (SchattenOrder.ofOneLt halpha)))) :
     sInf (Set.range fun
-        p : {sigma : State b1 // sigma.matrix.PosDef} ×
-            {sigma : State b2 // sigma.matrix.PosDef} =>
+        p : {sigma : MState b1 // sigma.m.PosDef} ×
+            {sigma : MState b2 // sigma.m.PosDef} =>
       alpha / (alpha - 1) *
         log2 (MatrixMap.cbOneToAlphaAlternateExpression
           (sandwichedSideWeightedMap (N1.prod N2) (p.1.1.prod p.2.1) alpha)
           (sandwichedSideWeightedMap_completelyPositive (N1.prod N2)
             (p.1.1.prod p.2.1) alpha)
           (SchattenOrder.ofOneLt halpha))) =
-      sInf (Set.range fun sigma1 : {sigma : State b1 // sigma.matrix.PosDef} =>
+      sInf (Set.range fun sigma1 : {sigma : MState b1 // sigma.m.PosDef} =>
         alpha / (alpha - 1) *
           log2 (MatrixMap.cbOneToAlphaAlternateExpression
             (sandwichedSideWeightedMap N1 sigma1.1 alpha)
             (sandwichedSideWeightedMap_completelyPositive N1 sigma1.1 alpha)
             (SchattenOrder.ofOneLt halpha))) +
-      sInf (Set.range fun sigma2 : {sigma : State b2 // sigma.matrix.PosDef} =>
+      sInf (Set.range fun sigma2 : {sigma : MState b2 // sigma.m.PosDef} =>
         alpha / (alpha - 1) *
           log2 (MatrixMap.cbOneToAlphaAlternateExpression
             (sandwichedSideWeightedMap N2 sigma2.1 alpha)
             (sandwichedSideWeightedMap_completelyPositive N2 sigma2.1 alpha)
             (SchattenOrder.ofOneLt halpha))) := by
-  let S1 := {sigma : State b1 // sigma.matrix.PosDef}
-  let S2 := {sigma : State b2 // sigma.matrix.PosDef}
-  have : Nonempty S1 := ⟨⟨State.maximallyMixed b1, State.maximallyMixed_posDef⟩⟩
-  have : Nonempty S2 := ⟨⟨State.maximallyMixed b2, State.maximallyMixed_posDef⟩⟩
+  let S1 := {sigma : MState b1 // sigma.m.PosDef}
+  let S2 := {sigma : MState b2 // sigma.m.PosDef}
+  have : Nonempty S1 := ⟨⟨(MState.uniform : MState b1), MState.uniform_posDef⟩⟩
+  have : Nonempty S2 := ⟨⟨(MState.uniform : MState b2), MState.uniform_posDef⟩⟩
   let f : S1 → ℝ := fun sigma1 =>
     alpha / (alpha - 1) *
       log2 (MatrixMap.cbOneToAlphaAlternateExpression
@@ -647,9 +642,9 @@ for `log2_mul`; they are not a replacement for the missing source alternate
 expression equating this candidate with optimized channel mutual information. -/
 theorem sandwichedRenyiCBNormExpression_prod_posDef_of_ne
     [Nonempty a1] [Nonempty a2] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2)
-    (sigma1 : State b1) (sigma2 : State b2)
-    (hsigma1 : sigma1.matrix.PosDef) (hsigma2 : sigma2.matrix.PosDef)
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2)
+    (sigma1 : MState b1) (sigma2 : MState b2)
+    (hsigma1 : sigma1.m.PosDef) (hsigma2 : sigma2.m.PosDef)
     {alpha : ℝ} (halpha : 1 < alpha)
     (hN1 :
       MatrixMap.cbOneToAlphaNorm
@@ -676,9 +671,9 @@ references, with the logarithm side conditions discharged from positivity of
 the weighted-channel CB norms. -/
 theorem sandwichedRenyiCBNormExpression_prod_posDef
     [Nonempty a1] [Nonempty a2] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2)
-    (sigma1 : State b1) (sigma2 : State b2)
-    (hsigma1 : sigma1.matrix.PosDef) (hsigma2 : sigma2.matrix.PosDef)
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2)
+    (sigma1 : MState b1) (sigma2 : MState b2)
+    (hsigma1 : sigma1.m.PosDef) (hsigma2 : sigma2.m.PosDef)
     {alpha : ℝ} (halpha : 1 < alpha) :
     sandwichedRenyiCBNormExpression (N1.prod N2) (sigma1.prod sigma2) (SchattenOrder.ofOneLt halpha) =
       sandwichedRenyiCBNormExpression N1 sigma1 (SchattenOrder.ofOneLt halpha) +
@@ -700,25 +695,25 @@ currently proved logarithmic CB-expression lemmas; the singular-reference
 closure still belongs to the missing channel alternate-expression layer. -/
 theorem sandwichedRenyiCBNormExpression_fullRankProduct_sInf_eq_add
     [Nonempty a1] [Nonempty a2] [Nonempty b1] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
     (hN1 :
-      BddBelow (Set.range fun sigma1 : {sigma : State b1 // sigma.matrix.PosDef} =>
+      BddBelow (Set.range fun sigma1 : {sigma : MState b1 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression N1 sigma1.1 (SchattenOrder.ofOneLt halpha)))
     (hN2 :
-      BddBelow (Set.range fun sigma2 : {sigma : State b2 // sigma.matrix.PosDef} =>
+      BddBelow (Set.range fun sigma2 : {sigma : MState b2 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression N2 sigma2.1 (SchattenOrder.ofOneLt halpha))) :
     sInf (Set.range fun
-        p : {sigma : State b1 // sigma.matrix.PosDef} ×
-            {sigma : State b2 // sigma.matrix.PosDef} =>
+        p : {sigma : MState b1 // sigma.m.PosDef} ×
+            {sigma : MState b2 // sigma.m.PosDef} =>
       sandwichedRenyiCBNormExpression (N1.prod N2) (p.1.1.prod p.2.1) (SchattenOrder.ofOneLt halpha)) =
-      sInf (Set.range fun sigma1 : {sigma : State b1 // sigma.matrix.PosDef} =>
+      sInf (Set.range fun sigma1 : {sigma : MState b1 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression N1 sigma1.1 (SchattenOrder.ofOneLt halpha)) +
-      sInf (Set.range fun sigma2 : {sigma : State b2 // sigma.matrix.PosDef} =>
+      sInf (Set.range fun sigma2 : {sigma : MState b2 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression N2 sigma2.1 (SchattenOrder.ofOneLt halpha)) := by
-  let S1 := {sigma : State b1 // sigma.matrix.PosDef}
-  let S2 := {sigma : State b2 // sigma.matrix.PosDef}
-  have : Nonempty S1 := ⟨⟨State.maximallyMixed b1, State.maximallyMixed_posDef⟩⟩
-  have : Nonempty S2 := ⟨⟨State.maximallyMixed b2, State.maximallyMixed_posDef⟩⟩
+  let S1 := {sigma : MState b1 // sigma.m.PosDef}
+  let S2 := {sigma : MState b2 // sigma.m.PosDef}
+  have : Nonempty S1 := ⟨⟨(MState.uniform : MState b1), MState.uniform_posDef⟩⟩
+  have : Nonempty S2 := ⟨⟨(MState.uniform : MState b2), MState.uniform_posDef⟩⟩
   let f : S1 → ℝ := fun sigma1 => sandwichedRenyiCBNormExpression N1 sigma1.1 (SchattenOrder.ofOneLt halpha)
   let g : S2 → ℝ := fun sigma2 => sandwichedRenyiCBNormExpression N2 sigma2.1 (SchattenOrder.ofOneLt halpha)
   have hpoint :
@@ -739,16 +734,16 @@ full-rank `inf` into the real-valued expression used in the KW
 `EA_capacity.tex:1247-1267` subadditivity chain. -/
 theorem sandwichedRenyiCBNormExpression_fullRankProduct_bddBelow
     [Nonempty a1] [Nonempty a2] [Nonempty b1] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
     (hN1 :
-      BddBelow (Set.range fun sigma1 : {sigma : State b1 // sigma.matrix.PosDef} =>
+      BddBelow (Set.range fun sigma1 : {sigma : MState b1 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression N1 sigma1.1 (SchattenOrder.ofOneLt halpha)))
     (hN2 :
-      BddBelow (Set.range fun sigma2 : {sigma : State b2 // sigma.matrix.PosDef} =>
+      BddBelow (Set.range fun sigma2 : {sigma : MState b2 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression N2 sigma2.1 (SchattenOrder.ofOneLt halpha))) :
     BddBelow (Set.range fun
-        p : Prod {sigma : State b1 // sigma.matrix.PosDef}
-            {sigma : State b2 // sigma.matrix.PosDef} =>
+        p : {sigma : MState b1 // sigma.m.PosDef} ×
+            {sigma : MState b2 // sigma.m.PosDef} =>
       sandwichedRenyiCBNormExpression (N1.prod N2) (p.1.1.prod p.2.1) (SchattenOrder.ofOneLt halpha)) := by
   rcases hN1 with ⟨l1, hl1⟩
   rcases hN2 with ⟨l2, hl2⟩
@@ -765,24 +760,24 @@ condition for the product-reference KW channel alternate-expression upper
 bound. -/
 theorem sandwichedRenyiMutualInformationE_prod_le_fullRankProductCB_sInf_of_outputs_posDef
     [Nonempty a1] [Nonempty a2] [Nonempty b1] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
-    (hOut1 : ∀ psi : PureVector (Prod a1 a1),
-      (N1.hypothesisTestingOutputState psi).matrix.PosDef)
-    (hOut2 : ∀ phi : PureVector (Prod a2 a2),
-      (N2.hypothesisTestingOutputState phi).matrix.PosDef) :
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
+    (hOut1 : ∀ psi : Ket (a1 × a1),
+      (N1.hypothesisTestingOutputState psi).m.PosDef)
+    (hOut2 : ∀ phi : Ket (a2 × a2),
+      (N2.hypothesisTestingOutputState phi).m.PosDef) :
     (N1.prod N2).sandwichedRenyiMutualInformationE alpha ≤
       ((sInf (Set.range fun
-          p : {sigma : State b1 // sigma.matrix.PosDef} ×
-              {sigma : State b2 // sigma.matrix.PosDef} =>
+          p : {sigma : MState b1 // sigma.m.PosDef} ×
+              {sigma : MState b2 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression (N1.prod N2) (p.1.1.prod p.2.1) (SchattenOrder.ofOneLt halpha)) :
           ℝ) : EReal) := by
   have hN1Below :
-      BddBelow (Set.range fun sigma1 : {sigma : State b1 // sigma.matrix.PosDef} =>
+      BddBelow (Set.range fun sigma1 : {sigma : MState b1 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression N1 sigma1.1 (SchattenOrder.ofOneLt halpha)) :=
     sandwichedRenyiCBNormExpression_fullRank_bddBelow_of_outputs_posDef
       N1 halpha hOut1
   have hN2Below :
-      BddBelow (Set.range fun sigma2 : {sigma : State b2 // sigma.matrix.PosDef} =>
+      BddBelow (Set.range fun sigma2 : {sigma : MState b2 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression N2 sigma2.1 (SchattenOrder.ofOneLt halpha)) :=
     sandwichedRenyiCBNormExpression_fullRank_bddBelow_of_outputs_posDef
       N2 halpha hOut2
@@ -804,38 +799,38 @@ alternate-expression theorem itself, and it is not a completion claim for
 the unconditional channel additivity result. -/
 theorem sandwichedRenyiMutualInformationE_prod_le_add_of_cb_fullRankAlternate
     [Nonempty a1] [Nonempty a2] [Nonempty b1] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
     (hN1Below :
-      BddBelow (Set.range fun sigma1 : {sigma : State b1 // sigma.matrix.PosDef} =>
+      BddBelow (Set.range fun sigma1 : {sigma : MState b1 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression N1 sigma1.1 (SchattenOrder.ofOneLt halpha)))
     (hN2Below :
-      BddBelow (Set.range fun sigma2 : {sigma : State b2 // sigma.matrix.PosDef} =>
+      BddBelow (Set.range fun sigma2 : {sigma : MState b2 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression N2 sigma2.1 (SchattenOrder.ofOneLt halpha)))
     (hprodAltLe :
       (N1.prod N2).sandwichedRenyiMutualInformationE alpha ≤
         ((sInf (Set.range fun
-            p : Prod {sigma : State b1 // sigma.matrix.PosDef}
-                {sigma : State b2 // sigma.matrix.PosDef} =>
+            p : {sigma : MState b1 // sigma.m.PosDef} ×
+                {sigma : MState b2 // sigma.m.PosDef} =>
           sandwichedRenyiCBNormExpression (N1.prod N2) (p.1.1.prod p.2.1)
             (SchattenOrder.ofOneLt halpha)) : ℝ) : EReal))
     (hN1Alt :
       N1.sandwichedRenyiMutualInformationE alpha =
-        ((sInf (Set.range fun sigma1 : {sigma : State b1 // sigma.matrix.PosDef} =>
+        ((sInf (Set.range fun sigma1 : {sigma : MState b1 // sigma.m.PosDef} =>
           sandwichedRenyiCBNormExpression N1 sigma1.1 (SchattenOrder.ofOneLt halpha)) : ℝ) : EReal))
     (hN2Alt :
       N2.sandwichedRenyiMutualInformationE alpha =
-        ((sInf (Set.range fun sigma2 : {sigma : State b2 // sigma.matrix.PosDef} =>
+        ((sInf (Set.range fun sigma2 : {sigma : MState b2 // sigma.m.PosDef} =>
           sandwichedRenyiCBNormExpression N2 sigma2.1 (SchattenOrder.ofOneLt halpha)) : ℝ) : EReal)) :
     (N1.prod N2).sandwichedRenyiMutualInformationE alpha ≤
       N1.sandwichedRenyiMutualInformationE alpha +
         N2.sandwichedRenyiMutualInformationE alpha := by
-  let S1 := {sigma : State b1 // sigma.matrix.PosDef}
-  let S2 := {sigma : State b2 // sigma.matrix.PosDef}
+  let S1 := {sigma : MState b1 // sigma.m.PosDef}
+  let S2 := {sigma : MState b2 // sigma.m.PosDef}
   let f : S1 → ℝ := fun sigma1 =>
     sandwichedRenyiCBNormExpression N1 sigma1.1 (SchattenOrder.ofOneLt halpha)
   let g : S2 → ℝ := fun sigma2 =>
     sandwichedRenyiCBNormExpression N2 sigma2.1 (SchattenOrder.ofOneLt halpha)
-  let prodF : Prod S1 S2 → ℝ := fun p =>
+  let prodF : S1 × S2 → ℝ := fun p =>
     sandwichedRenyiCBNormExpression (N1.prod N2) (p.1.1.prod p.2.1) (SchattenOrder.ofOneLt halpha)
   have hsplit :
       sInf (Set.range prodF) = sInf (Set.range f) + sInf (Set.range g) := by
@@ -872,32 +867,32 @@ generated internally from the two single-channel CB alternate expressions.
 Compared with `sandwichedRenyiMutualInformationE_prod_le_add_of_cb_fullRankAlternate`,
 this removes the separate product boundedness/upper-bound input: it follows
 from the weighted-map product identity and the pointwise CB expression
-additivity already proved above.  The remaining hypotheses are the genuinely
-missing one-channel alternate-expression equalities. -/
+additivity already proved above.  The remaining hypotheses are the
+one-channel alternate-expression equalities. -/
 theorem sandwichedRenyiMutualInformationE_prod_le_add_of_single_cb_fullRankAlternate
     [Nonempty a1] [Nonempty a2] [Nonempty b1] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
     (hN1Below :
-      BddBelow (Set.range fun sigma1 : {sigma : State b1 // sigma.matrix.PosDef} =>
+      BddBelow (Set.range fun sigma1 : {sigma : MState b1 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression N1 sigma1.1 (SchattenOrder.ofOneLt halpha)))
     (hN2Below :
-      BddBelow (Set.range fun sigma2 : {sigma : State b2 // sigma.matrix.PosDef} =>
+      BddBelow (Set.range fun sigma2 : {sigma : MState b2 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression N2 sigma2.1 (SchattenOrder.ofOneLt halpha)))
     (hN1Alt :
       N1.sandwichedRenyiMutualInformationE alpha =
-        ((sInf (Set.range fun sigma1 : {sigma : State b1 // sigma.matrix.PosDef} =>
+        ((sInf (Set.range fun sigma1 : {sigma : MState b1 // sigma.m.PosDef} =>
           sandwichedRenyiCBNormExpression N1 sigma1.1 (SchattenOrder.ofOneLt halpha)) : ℝ) : EReal))
     (hN2Alt :
       N2.sandwichedRenyiMutualInformationE alpha =
-        ((sInf (Set.range fun sigma2 : {sigma : State b2 // sigma.matrix.PosDef} =>
+        ((sInf (Set.range fun sigma2 : {sigma : MState b2 // sigma.m.PosDef} =>
           sandwichedRenyiCBNormExpression N2 sigma2.1 (SchattenOrder.ofOneLt halpha)) : ℝ) : EReal)) :
     (N1.prod N2).sandwichedRenyiMutualInformationE alpha ≤
       N1.sandwichedRenyiMutualInformationE alpha +
         N2.sandwichedRenyiMutualInformationE alpha := by
   have hProdBelow :
       BddBelow (Set.range fun
-          p : Prod {sigma : State b1 // sigma.matrix.PosDef}
-              {sigma : State b2 // sigma.matrix.PosDef} =>
+          p : {sigma : MState b1 // sigma.m.PosDef} ×
+              {sigma : MState b2 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression (N1.prod N2) (p.1.1.prod p.2.1)
           (SchattenOrder.ofOneLt halpha)) :=
     sandwichedRenyiCBNormExpression_fullRankProduct_bddBelow
@@ -905,8 +900,8 @@ theorem sandwichedRenyiMutualInformationE_prod_le_add_of_single_cb_fullRankAlter
   have hprodAltLe :
       (N1.prod N2).sandwichedRenyiMutualInformationE alpha ≤
         ((sInf (Set.range fun
-            p : Prod {sigma : State b1 // sigma.matrix.PosDef}
-                {sigma : State b2 // sigma.matrix.PosDef} =>
+            p : {sigma : MState b1 // sigma.m.PosDef} ×
+                {sigma : MState b2 // sigma.m.PosDef} =>
           sandwichedRenyiCBNormExpression (N1.prod N2) (p.1.1.prod p.2.1)
             (SchattenOrder.ofOneLt halpha)) : ℝ) : EReal) :=
     sandwichedRenyiMutualInformationE_prod_le_fullRankProductCB_sInf
@@ -917,21 +912,21 @@ theorem sandwichedRenyiMutualInformationE_prod_le_add_of_single_cb_fullRankAlter
 /-- KW channel subadditivity after the channel alternate expression has been
 proved in real `sInf` form.
 
-This is the unconditional `<=` half of `EA_capacity.tex:1242-1267`: restrict
+This is the unconditional `≤` half of `EA_capacity.tex:1242-1267`: restrict
 the product side-reference optimization to full-rank product references, use
 CB-norm multiplicativity, and split the independent real infima. -/
 theorem sandwichedRenyiMutualInformationE_prod_le_add
     [Nonempty a1] [Nonempty a2] [Nonempty b1] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2) {alpha : ℝ} (halpha : 1 < alpha) :
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2) {alpha : ℝ} (halpha : 1 < alpha) :
     (N1.prod N2).sandwichedRenyiMutualInformationE alpha ≤
       N1.sandwichedRenyiMutualInformationE alpha +
         N2.sandwichedRenyiMutualInformationE alpha := by
   have hN1Below :
-      BddBelow (Set.range fun sigma1 : {sigma : State b1 // sigma.matrix.PosDef} =>
+      BddBelow (Set.range fun sigma1 : {sigma : MState b1 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression N1 sigma1.1 (SchattenOrder.ofOneLt halpha)) := by
     simpa using sandwichedRenyiCBNormExpression_fullRank_bddBelow N1 halpha
   have hN2Below :
-      BddBelow (Set.range fun sigma2 : {sigma : State b2 // sigma.matrix.PosDef} =>
+      BddBelow (Set.range fun sigma2 : {sigma : MState b2 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression N2 sigma2.1 (SchattenOrder.ofOneLt halpha)) := by
     simpa using sandwichedRenyiCBNormExpression_fullRank_bddBelow N2 halpha
   exact sandwichedRenyiMutualInformationE_prod_le_add_of_single_cb_fullRankAlternate
@@ -949,36 +944,36 @@ channel alternate-expression equality.  The state-product lower branch is
 already support-convention/unconditional. -/
 theorem sandwichedRenyiMutualInformationE_prod_eq_add_of_output_posDef_cb_fullRankAlternate
     [Nonempty a1] [Nonempty a2] [Nonempty b1] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
-    (hOut1 : ∀ psi : PureVector (Prod a1 a1),
-      (N1.hypothesisTestingOutputState psi).matrix.PosDef)
-    (hOut2 : ∀ phi : PureVector (Prod a2 a2),
-      (N2.hypothesisTestingOutputState phi).matrix.PosDef)
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
+    (hOut1 : ∀ psi : Ket (a1 × a1),
+      (N1.hypothesisTestingOutputState psi).m.PosDef)
+    (hOut2 : ∀ phi : Ket (a2 × a2),
+      (N2.hypothesisTestingOutputState phi).m.PosDef)
     (hprodAltLe :
       (N1.prod N2).sandwichedRenyiMutualInformationE alpha ≤
         ((sInf (Set.range fun
-            p : Prod {sigma : State b1 // sigma.matrix.PosDef}
-                {sigma : State b2 // sigma.matrix.PosDef} =>
+            p : {sigma : MState b1 // sigma.m.PosDef} ×
+                {sigma : MState b2 // sigma.m.PosDef} =>
           sandwichedRenyiCBNormExpression (N1.prod N2) (p.1.1.prod p.2.1)
             (SchattenOrder.ofOneLt halpha)) : ℝ) : EReal))
     (hN1Alt :
       N1.sandwichedRenyiMutualInformationE alpha =
-        ((sInf (Set.range fun sigma1 : {sigma : State b1 // sigma.matrix.PosDef} =>
+        ((sInf (Set.range fun sigma1 : {sigma : MState b1 // sigma.m.PosDef} =>
           sandwichedRenyiCBNormExpression N1 sigma1.1 (SchattenOrder.ofOneLt halpha)) : ℝ) : EReal))
     (hN2Alt :
       N2.sandwichedRenyiMutualInformationE alpha =
-        ((sInf (Set.range fun sigma2 : {sigma : State b2 // sigma.matrix.PosDef} =>
+        ((sInf (Set.range fun sigma2 : {sigma : MState b2 // sigma.m.PosDef} =>
           sandwichedRenyiCBNormExpression N2 sigma2.1 (SchattenOrder.ofOneLt halpha)) : ℝ) : EReal)) :
     (N1.prod N2).sandwichedRenyiMutualInformationE alpha =
       N1.sandwichedRenyiMutualInformationE alpha +
         N2.sandwichedRenyiMutualInformationE alpha := by
   have hN1Below :
-      BddBelow (Set.range fun sigma1 : {sigma : State b1 // sigma.matrix.PosDef} =>
+      BddBelow (Set.range fun sigma1 : {sigma : MState b1 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression N1 sigma1.1 (SchattenOrder.ofOneLt halpha)) :=
     sandwichedRenyiCBNormExpression_fullRank_bddBelow_of_outputs_posDef
       N1 halpha hOut1
   have hN2Below :
-      BddBelow (Set.range fun sigma2 : {sigma : State b2 // sigma.matrix.PosDef} =>
+      BddBelow (Set.range fun sigma2 : {sigma : MState b2 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression N2 sigma2.1 (SchattenOrder.ofOneLt halpha)) :=
     sandwichedRenyiCBNormExpression_fullRank_bddBelow_of_outputs_posDef
       N2 halpha hOut2
@@ -999,29 +994,29 @@ auxiliary real-valued full-rank CB assembly: component boundedness supplied by
 full-support outputs and the one-channel CB alternate expression identities. -/
 theorem sandwichedRenyiMutualInformationE_prod_eq_add_of_fullSupport_cb_fullRankAlternate
     [Nonempty a1] [Nonempty a2] [Nonempty b1] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
-    (hOut1 : ∀ psi : PureVector (Prod a1 a1),
-      (N1.hypothesisTestingOutputState psi).matrix.PosDef)
-    (hOut2 : ∀ phi : PureVector (Prod a2 a2),
-      (N2.hypothesisTestingOutputState phi).matrix.PosDef)
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
+    (hOut1 : ∀ psi : Ket (a1 × a1),
+      (N1.hypothesisTestingOutputState psi).m.PosDef)
+    (hOut2 : ∀ phi : Ket (a2 × a2),
+      (N2.hypothesisTestingOutputState phi).m.PosDef)
     (hN1Alt :
       N1.sandwichedRenyiMutualInformationE alpha =
-        ((sInf (Set.range fun sigma1 : {sigma : State b1 // sigma.matrix.PosDef} =>
+        ((sInf (Set.range fun sigma1 : {sigma : MState b1 // sigma.m.PosDef} =>
           sandwichedRenyiCBNormExpression N1 sigma1.1 (SchattenOrder.ofOneLt halpha)) : ℝ) : EReal))
     (hN2Alt :
       N2.sandwichedRenyiMutualInformationE alpha =
-        ((sInf (Set.range fun sigma2 : {sigma : State b2 // sigma.matrix.PosDef} =>
+        ((sInf (Set.range fun sigma2 : {sigma : MState b2 // sigma.m.PosDef} =>
           sandwichedRenyiCBNormExpression N2 sigma2.1 (SchattenOrder.ofOneLt halpha)) : ℝ) : EReal)) :
     (N1.prod N2).sandwichedRenyiMutualInformationE alpha =
       N1.sandwichedRenyiMutualInformationE alpha +
         N2.sandwichedRenyiMutualInformationE alpha := by
   have hN1Below :
-      BddBelow (Set.range fun sigma1 : {sigma : State b1 // sigma.matrix.PosDef} =>
+      BddBelow (Set.range fun sigma1 : {sigma : MState b1 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression N1 sigma1.1 (SchattenOrder.ofOneLt halpha)) :=
     sandwichedRenyiCBNormExpression_fullRank_bddBelow_of_outputs_posDef
       N1 halpha hOut1
   have hN2Below :
-      BddBelow (Set.range fun sigma2 : {sigma : State b2 // sigma.matrix.PosDef} =>
+      BddBelow (Set.range fun sigma2 : {sigma : MState b2 // sigma.m.PosDef} =>
         sandwichedRenyiCBNormExpression N2 sigma2.1 (SchattenOrder.ofOneLt halpha)) :=
     sandwichedRenyiCBNormExpression_fullRank_bddBelow_of_outputs_posDef
       N2 halpha hOut2
@@ -1043,11 +1038,11 @@ branches, so the final product-channel theorem carries no full-support output
 assumptions. -/
 theorem sandwichedRenyiMutualInformationE_prod_eq_add_of_fullSupport_sionExchange
     [Nonempty a1] [Nonempty a2] [Nonempty b1] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
-    (hOut1 : ∀ psi : PureVector (Prod a1 a1),
-      (N1.hypothesisTestingOutputState psi).matrix.PosDef)
-    (hOut2 : ∀ phi : PureVector (Prod a2 a2),
-      (N2.hypothesisTestingOutputState phi).matrix.PosDef)
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
+    (hOut1 : ∀ psi : Ket (a1 × a1),
+      (N1.hypothesisTestingOutputState psi).m.PosDef)
+    (hOut2 : ∀ phi : Ket (a2 × a2),
+      (N2.hypothesisTestingOutputState phi).m.PosDef)
     (hSion1 : N1.sandwichedChannelAlternateSionExchange alpha halpha)
     (hSion2 : N2.sandwichedChannelAlternateSionExchange alpha halpha) :
     (N1.prod N2).sandwichedRenyiMutualInformationE alpha =
@@ -1055,13 +1050,13 @@ theorem sandwichedRenyiMutualInformationE_prod_eq_add_of_fullSupport_sionExchang
         N2.sandwichedRenyiMutualInformationE alpha := by
   have hN1Alt :
       N1.sandwichedRenyiMutualInformationE alpha =
-        ((sInf (Set.range fun sigma1 : {sigma : State b1 // sigma.matrix.PosDef} =>
+        ((sInf (Set.range fun sigma1 : {sigma : MState b1 // sigma.m.PosDef} =>
           sandwichedRenyiCBNormExpression N1 sigma1.1 (SchattenOrder.ofOneLt halpha)) : ℝ) : EReal) :=
     sandwichedRenyiMutualInformationE_eq_fullRankCB_sInf_of_outputs_posDef_sionExchange
       N1 halpha hOut1 hSion1
   have hN2Alt :
       N2.sandwichedRenyiMutualInformationE alpha =
-        ((sInf (Set.range fun sigma2 : {sigma : State b2 // sigma.matrix.PosDef} =>
+        ((sInf (Set.range fun sigma2 : {sigma : MState b2 // sigma.m.PosDef} =>
           sandwichedRenyiCBNormExpression N2 sigma2.1 (SchattenOrder.ofOneLt halpha)) : ℝ) : EReal) :=
     sandwichedRenyiMutualInformationE_eq_fullRankCB_sInf_of_outputs_posDef_sionExchange
       N2 halpha hOut2 hSion2
@@ -1071,11 +1066,11 @@ theorem sandwichedRenyiMutualInformationE_prod_eq_add_of_fullSupport_sionExchang
 /-- Full-support channel-additivity assembly with the KW Sion exchange proved. -/
 theorem sandwichedRenyiMutualInformationE_prod_eq_add_of_fullSupport
     [Nonempty a1] [Nonempty a2] [Nonempty b1] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
-    (hOut1 : ∀ psi : PureVector (Prod a1 a1),
-      (N1.hypothesisTestingOutputState psi).matrix.PosDef)
-    (hOut2 : ∀ phi : PureVector (Prod a2 a2),
-      (N2.hypothesisTestingOutputState phi).matrix.PosDef) :
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2) {alpha : ℝ} (halpha : 1 < alpha)
+    (hOut1 : ∀ psi : Ket (a1 × a1),
+      (N1.hypothesisTestingOutputState psi).m.PosDef)
+    (hOut2 : ∀ phi : Ket (a2 × a2),
+      (N2.hypothesisTestingOutputState phi).m.PosDef) :
     (N1.prod N2).sandwichedRenyiMutualInformationE alpha =
       N1.sandwichedRenyiMutualInformationE alpha +
         N2.sandwichedRenyiMutualInformationE alpha := by
@@ -1093,8 +1088,8 @@ and the upper bound comes from the channel CB-norm alternate expression and
 multiplicativity. -/
 theorem sandwichedRenyiMutualInformationE_prod_eq_add
     [Nonempty a1] [Nonempty a2] [Nonempty b1] [Nonempty b2]
-    (N1 : Channel a1 b1) (N2 : Channel a2 b2)
-    {alpha : Real} (halpha : 1 < alpha) :
+    (N1 : CPTPMap a1 b1) (N2 : CPTPMap a2 b2)
+    {alpha : ℝ} (halpha : 1 < alpha) :
     (N1.prod N2).sandwichedRenyiMutualInformationE alpha =
       N1.sandwichedRenyiMutualInformationE alpha +
         N2.sandwichedRenyiMutualInformationE alpha := by
@@ -1102,8 +1097,6 @@ theorem sandwichedRenyiMutualInformationE_prod_eq_add
     (sandwichedRenyiMutualInformationE_prod_le_add N1 N2 halpha)
     (sandwichedRenyiMutualInformationE_prod_ge_add N1 N2 halpha)
 
-end Channel
+end CPTPOp
 
 end
-
-end QIT

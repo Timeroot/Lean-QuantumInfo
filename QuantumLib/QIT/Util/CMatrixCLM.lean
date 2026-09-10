@@ -15,9 +15,9 @@ public import Mathlib.Analysis.Normed.Module.FiniteDimension
 
 The canonical real- and complex-linear continuous maps on `CMatrix ι` that
 recur across the analysis layers: entry extraction, conjugate transpose, and
-the quadratic form `A ↦ x† A x`.  Consolidating them here removes the private
-duplicates that previously lived in the unitary-twirl, Frank–Lieb scalar
-operator, cq-guessing, and Petz-kernel modules.
+the quadratic form `A ↦ x† A x`.  They are collected here so that the
+unitary-twirl, Frank–Lieb scalar operator, cq-guessing, and Petz-kernel modules
+share one copy.
 -/
 
 @[expose] public section
@@ -45,7 +45,7 @@ noncomputable def cMatrixEntryCLM {ι : Type u} [Fintype ι] [DecidableEq ι]
       CMatrix ι →ₗ[ℝ] ℂ)
 
 /-- The complex-linear entry-extraction map `A ↦ A i j`. -/
-noncomputable def cMatrixEntryCLM_complex {ι : Type u} [Fintype ι] [DecidableEq ι]
+noncomputable def cMatrixEntryCLMComplex {ι : Type u} [Fintype ι] [DecidableEq ι]
     (i j : ι) : CMatrix ι →L[ℂ] ℂ :=
   LinearMap.toContinuousLinearMap
     ({ toFun := fun A => A i j
@@ -71,16 +71,36 @@ noncomputable def cMatrixConjTransposeCLM {ι : Type u} [Fintype ι] [DecidableE
         simp } :
       CMatrix ι →ₗ[ℝ] CMatrix ι)
 
+/-- The real-linear trace pairing `A ↦ Re Tr(T A)` against a fixed matrix `T`. -/
+noncomputable def cMatrixTracePairingCLM {ι : Type u} [Fintype ι] [DecidableEq ι]
+    (T : CMatrix ι) : CMatrix ι →L[ℝ] ℝ :=
+  Complex.reCLM.comp
+    (LinearMap.toContinuousLinearMap
+      ({ toFun := fun A => (T * A).trace
+         map_add' := by
+          intro A B
+          simp [Matrix.mul_add, Matrix.trace_add]
+         map_smul' := by
+          intro c A
+          simp [Matrix.trace_smul, Complex.real_smul] } :
+        CMatrix ι →ₗ[ℝ] ℂ))
+
+@[simp]
+theorem cMatrixTracePairingCLM_apply {ι : Type u} [Fintype ι] [DecidableEq ι]
+    (T A : CMatrix ι) :
+    cMatrixTracePairingCLM T A = ((T * A).trace).re :=
+  rfl
+
 /-- The complex-linear quadratic form `A ↦ x† A x`. -/
 noncomputable def cMatrixQuadraticCLM {ι : Type u} [Fintype ι] [DecidableEq ι]
     (x : ι → ℂ) : CMatrix ι →L[ℂ] ℂ :=
-  ∑ i, ∑ j, (star (x i) * x j) • cMatrixEntryCLM_complex (ι := ι) i j
+  ∑ i, ∑ j, (star (x i) * x j) • cMatrixEntryCLMComplex (ι := ι) i j
 
 /-- The quadratic-form CLM unfolds to the dot-product expression `x† (Ax)`. -/
 theorem cMatrixQuadraticCLM_apply {ι : Type u} [Fintype ι] [DecidableEq ι]
     (x : ι → ℂ) (A : CMatrix ι) :
     cMatrixQuadraticCLM x A = dotProduct (star x) (Matrix.mulVec A x) := by
-  simp [cMatrixQuadraticCLM, cMatrixEntryCLM_complex, Matrix.mulVec, dotProduct]
+  simp [cMatrixQuadraticCLM, cMatrixEntryCLMComplex, Matrix.mulVec, dotProduct]
   refine Finset.sum_congr rfl ?_
   intro i _
   rw [Finset.mul_sum]

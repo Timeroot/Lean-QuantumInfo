@@ -22,15 +22,3 @@ Facade for the dependency-ordered Renyi DPI domain, high/low-alpha,
 conditional measurement, trace-log bridge, alpha-to-one, reference-order, and
 source measurement-monotonicity modules.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace Information
-namespace Renyi
-namespace RenyiDPI
-
-end RenyiDPI
-end Renyi
-end Information
-end QIT

@@ -40,7 +40,7 @@ abbrev nonpositiveSpectralIndex (H : CMatrix a) (hH : H.IsHermitian) : Type u :=
 
 /-- Reindex the eigenvalue index type by the positive/nonpositive spectral split. -/
 def spectralSignIndexEquiv (H : CMatrix a) (hH : H.IsHermitian) :
-    Sum (positiveSpectralIndex H hH) (nonpositiveSpectralIndex H hH) ≃ a :=
+    (positiveSpectralIndex H hH ⊕ nonpositiveSpectralIndex H hH) ≃ a :=
   Equiv.sumCompl fun i : a => 0 < hH.eigenvalues i
 
 /-- Conjugate a matrix into the Hermitian eigenbasis of `H`. -/
@@ -51,31 +51,24 @@ def hermitianEigenbasisConjugate (H : CMatrix a) (hH : H.IsHermitian)
 /-- Reindex the Hermitian eigenbasis by positive and nonpositive eigenvalue indices. -/
 def spectralSignBlockMatrix (H : CMatrix a) (hH : H.IsHermitian)
     (X : CMatrix a) :
-    CMatrix (Sum (positiveSpectralIndex H hH) (nonpositiveSpectralIndex H hH)) :=
+    CMatrix (positiveSpectralIndex H hH ⊕ nonpositiveSpectralIndex H hH) :=
   (hermitianEigenbasisConjugate H hH X).submatrix
     (spectralSignIndexEquiv H hH) (spectralSignIndexEquiv H hH)
 
 /-- Lift a positive/nonpositive spectral block matrix back to the original coordinates. -/
 def spectralSignUnblockMatrix (H : CMatrix a) (hH : H.IsHermitian)
-    (B : CMatrix (Sum (positiveSpectralIndex H hH) (nonpositiveSpectralIndex H hH))) :
+    (B : CMatrix (positiveSpectralIndex H hH ⊕ nonpositiveSpectralIndex H hH)) :
     CMatrix a :=
   (hH.eigenvectorUnitary : CMatrix a) *
     B.submatrix (spectralSignIndexEquiv H hH).symm (spectralSignIndexEquiv H hH).symm *
       star (hH.eigenvectorUnitary : CMatrix a)
-
-private theorem trace_submatrix_equiv {ι κ : Type*} [Fintype ι] [Fintype κ]
-    (e : ι ≃ κ) (M : Matrix κ κ ℂ) :
-    (M.submatrix e e).trace = M.trace := by
-  rw [Matrix.trace, Matrix.trace]
-  exact Fintype.sum_equiv e (fun i : ι => M (e i) (e i)) (fun j : κ => M j j)
-    (fun _ => rfl)
 
 /-- Trace is preserved by the sign reindexing and eigenbasis conjugation. -/
 theorem spectralSignBlockMatrix_trace (H : CMatrix a) (hH : H.IsHermitian)
     (X : CMatrix a) :
     (spectralSignBlockMatrix H hH X).trace = X.trace := by
   unfold spectralSignBlockMatrix hermitianEigenbasisConjugate
-  rw [trace_submatrix_equiv (spectralSignIndexEquiv H hH)]
+  rw [Matrix.trace_submatrix _ (spectralSignIndexEquiv H hH)]
   calc
     (star (hH.eigenvectorUnitary : CMatrix a) * X *
         (hH.eigenvectorUnitary : CMatrix a)).trace =
@@ -86,11 +79,11 @@ theorem spectralSignBlockMatrix_trace (H : CMatrix a) (hH : H.IsHermitian)
 
 /-- Trace is preserved by lifting a sign-block matrix back to original coordinates. -/
 theorem spectralSignUnblockMatrix_trace (H : CMatrix a) (hH : H.IsHermitian)
-    (B : CMatrix (Sum (positiveSpectralIndex H hH) (nonpositiveSpectralIndex H hH))) :
+    (B : CMatrix (positiveSpectralIndex H hH ⊕ nonpositiveSpectralIndex H hH)) :
     (spectralSignUnblockMatrix H hH B).trace = B.trace := by
   unfold spectralSignUnblockMatrix
   rw [Matrix.trace_mul_cycle]
-  simp [trace_submatrix_equiv (spectralSignIndexEquiv H hH).symm]
+  simp
 
 /-- The sign-block matrix is recovered from its four blocks. -/
 theorem spectralSignBlockMatrix_blockDecomposition (H : CMatrix a) (hH : H.IsHermitian)

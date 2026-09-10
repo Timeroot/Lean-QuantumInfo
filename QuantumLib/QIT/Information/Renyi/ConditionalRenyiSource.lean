@@ -27,33 +27,31 @@ open scoped ComplexOrder MatrixOrder NNReal
 
 open Matrix
 
-namespace QIT
-
-universe u v
-
 noncomputable section
-
+universe u v
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-namespace State
+open QIT
+
+namespace MState
 
 /-- Source-shaped Petz conditional Renyi entropy `H_α^↓(A|B)_ρ`.
 
 This fixes the reference side to the canonical marginal `ρ_B`, matching
 Tomamichel2015FiniteResources, `cond.tex:87-98`. -/
-def conditionalPetzRenyiDown (ρ : State (Prod a b))
-    (hρB : ρ.marginalB.matrix.PosDef)
+def conditionalPetzRenyiDown (ρ : MState (a × b))
+    (hρB : ρ.traceLeft.m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) : ℝ :=
-  ρ.conditionalPetzRenyiEntropyCandidateFullReference ρ.marginalB hρB
+  ρ.conditionalPetzRenyiEntropyCandidateFullReference ρ.traceLeft hρB
     α hα_pos hα_ne_one
 
 @[simp]
-theorem conditionalPetzRenyiDown_eq (ρ : State (Prod a b))
-    (hρB : ρ.marginalB.matrix.PosDef)
+theorem conditionalPetzRenyiDown_eq (ρ : MState (a × b))
+    (hρB : ρ.traceLeft.m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     ρ.conditionalPetzRenyiDown hρB α hα_pos hα_ne_one =
-      ρ.conditionalPetzRenyiEntropyCandidateFullReference ρ.marginalB hρB
+      ρ.conditionalPetzRenyiEntropyCandidateFullReference ρ.traceLeft hρB
         α hα_pos hα_ne_one :=
   rfl
 
@@ -62,16 +60,16 @@ entropy `H_α^↑(A|B)_ρ`.
 
 The supremum ranges over normalized full-rank side-information states, matching
 Tomamichel2015FiniteResources, `cond.tex:87-98`. -/
-def conditionalPetzRenyiUpValueSet (ρ : State (Prod a b))
+def conditionalPetzRenyiUpValueSet (ρ : MState (a × b))
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) : Set ℝ :=
-  {h | ∃ σ : State b, ∃ hσ : σ.matrix.PosDef,
+  {h | ∃ σ : MState b, ∃ hσ : σ.m.PosDef,
     h = ρ.conditionalPetzRenyiEntropyCandidateFullReference σ hσ α hα_pos hα_ne_one}
 
 @[simp]
-theorem conditionalPetzRenyiUpValueSet_eq (ρ : State (Prod a b))
+theorem conditionalPetzRenyiUpValueSet_eq (ρ : MState (a × b))
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     ρ.conditionalPetzRenyiUpValueSet α hα_pos hα_ne_one =
-      {h | ∃ σ : State b, ∃ hσ : σ.matrix.PosDef,
+      {h | ∃ σ : MState b, ∃ hσ : σ.m.PosDef,
         h = ρ.conditionalPetzRenyiEntropyCandidateFullReference
           σ hσ α hα_pos hα_ne_one} :=
   rfl
@@ -80,12 +78,12 @@ theorem conditionalPetzRenyiUpValueSet_eq (ρ : State (Prod a b))
 
 This is the `sSup` over the full-rank side-reference value set from
 Tomamichel2015FiniteResources, `cond.tex:87-98`. -/
-def conditionalPetzRenyiUp (ρ : State (Prod a b))
+def conditionalPetzRenyiUp (ρ : MState (a × b))
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) : ℝ :=
   sSup (ρ.conditionalPetzRenyiUpValueSet α hα_pos hα_ne_one)
 
 @[simp]
-theorem conditionalPetzRenyiUp_eq (ρ : State (Prod a b))
+theorem conditionalPetzRenyiUp_eq (ρ : MState (a × b))
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     ρ.conditionalPetzRenyiUp α hα_pos hα_ne_one =
       sSup (ρ.conditionalPetzRenyiUpValueSet α hα_pos hα_ne_one) :=
@@ -95,35 +93,35 @@ theorem conditionalPetzRenyiUp_eq (ρ : State (Prod a b))
 
 This fixes the reference side to `I_A ⊗ ρ_B`, matching
 Tomamichel2015FiniteResources, `cond.tex:87-98`. -/
-def conditionalSandwichedRenyiDown (ρ : State (Prod a b))
-    (hρ : ρ.matrix.PosDef) (hρB : ρ.marginalB.matrix.PosDef)
+def conditionalSandwichedRenyiDown (ρ : MState (a × b))
+    (hρ : ρ.m.PosDef) (hρB : ρ.traceLeft.m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) : ℝ :=
   - sandwichedRenyiReference ρ
-      (identityTensorStateMatrix (a := a) ρ.marginalB) hρ
-      (identityTensorStateMatrix_posDef_of_posDef (a := a) ρ.marginalB hρB)
+      (identityTensorStateMatrix (a := a) ρ.traceLeft) hρ
+      (identityTensorStateMatrix_posDef_of_posDef (a := a) ρ.traceLeft hρB)
       α hα_pos hα_ne_one
 
 @[simp]
-theorem conditionalSandwichedRenyiDown_eq (ρ : State (Prod a b))
-    (hρ : ρ.matrix.PosDef) (hρB : ρ.marginalB.matrix.PosDef)
+theorem conditionalSandwichedRenyiDown_eq (ρ : MState (a × b))
+    (hρ : ρ.m.PosDef) (hρB : ρ.traceLeft.m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     ρ.conditionalSandwichedRenyiDown hρ hρB α hα_pos hα_ne_one =
       - sandwichedRenyiReference ρ
-          (identityTensorStateMatrix (a := a) ρ.marginalB) hρ
-          (identityTensorStateMatrix_posDef_of_posDef (a := a) ρ.marginalB hρB)
+          (identityTensorStateMatrix (a := a) ρ.traceLeft) hρ
+          (identityTensorStateMatrix_posDef_of_posDef (a := a) ρ.traceLeft hρB)
           α hα_pos hα_ne_one :=
   rfl
 
 /-- Source-shaped sandwiched upward conditional Renyi entropy `H̃_α^↑(A|B)_ρ`.
 
 Compatibility wrapper around the existing upward sandwiched API, preserving
-`State.conditionalSandwichedRenyi`. -/
-def conditionalSandwichedRenyiUp (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
+`MState.conditionalSandwichedRenyi`. -/
+def conditionalSandwichedRenyiUp (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
     (α : ℝ) (hα : 1 / 2 ≤ α) (hα_ne_one : α ≠ 1) : ℝ :=
   ρ.conditionalSandwichedRenyi hρ α hα hα_ne_one
 
 @[simp]
-theorem conditionalSandwichedRenyiUp_eq (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
+theorem conditionalSandwichedRenyiUp_eq (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
     (α : ℝ) (hα : 1 / 2 ≤ α) (hα_ne_one : α ≠ 1) :
     ρ.conditionalSandwichedRenyiUp hρ α hα hα_ne_one =
       ρ.conditionalSandwichedRenyi hρ α hα hα_ne_one :=
@@ -132,7 +130,7 @@ theorem conditionalSandwichedRenyiUp_eq (ρ : State (Prod a b)) (hρ : ρ.matrix
 /-- Every full-rank side-information state contributes its Petz full-reference
 candidate value to the upward Petz value set. -/
 theorem conditionalPetzRenyiEntropyCandidateFullReference_mem_upValueSet
-    (ρ : State (Prod a b)) (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b)) (σ : MState b) (hσ : σ.m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     ρ.conditionalPetzRenyiEntropyCandidateFullReference σ hσ α hα_pos hα_ne_one ∈
       ρ.conditionalPetzRenyiUpValueSet α hα_pos hα_ne_one :=
@@ -143,7 +141,7 @@ theorem conditionalPetzRenyiEntropyCandidateFullReference_mem_upValueSet
 The witness is the full-rank uniform diagonal state on the conditioning
 register. -/
 theorem conditionalPetzRenyiUpValueSet_nonempty [Nonempty b]
-    (ρ : State (Prod a b))
+    (ρ : MState (a × b))
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     (ρ.conditionalPetzRenyiUpValueSet α hα_pos hα_ne_one).Nonempty := by
   classical
@@ -155,8 +153,8 @@ theorem conditionalPetzRenyiUpValueSet_nonempty [Nonempty b]
     have hcard_pos : 0 < (Fintype.card b : ℝ≥0) := by
       exact_mod_cast (Fintype.card_pos_iff.mpr ⟨i⟩)
     exact_mod_cast inv_pos.mpr hcard_pos
-  let σ : State b := Classical.diagonalState u husum
-  have hσ : σ.matrix.PosDef := by
+  let σ : MState b := Classical.diagonalState u husum
+  have hσ : σ.m.PosDef := by
     simpa [σ] using Classical.diagonalState_posDef u husum hupos
   exact
     ⟨ρ.conditionalPetzRenyiEntropyCandidateFullReference σ hσ α hα_pos hα_ne_one,
@@ -166,10 +164,10 @@ theorem conditionalPetzRenyiUpValueSet_nonempty [Nonempty b]
 /-- A uniform upper bound on all full-rank side-reference Petz candidates makes
 the upward Petz value set bounded above. -/
 theorem conditionalPetzRenyiUpValueSet_bddAbove_of_forall_candidate_le
-    (ρ : State (Prod a b))
+    (ρ : MState (a × b))
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1)
     {C : ℝ}
-    (hC : ∀ σ : State b, ∀ hσ : σ.matrix.PosDef,
+    (hC : ∀ σ : MState b, ∀ hσ : σ.m.PosDef,
       ρ.conditionalPetzRenyiEntropyCandidateFullReference
         σ hσ α hα_pos hα_ne_one ≤ C) :
     BddAbove (ρ.conditionalPetzRenyiUpValueSet α hα_pos hα_ne_one) := by
@@ -181,7 +179,7 @@ theorem conditionalPetzRenyiUpValueSet_bddAbove_of_forall_candidate_le
 /-- Petz full-reference candidates are bounded by the upward Petz entropy when
 the value set is bounded above. -/
 theorem conditionalPetzRenyiEntropyCandidateFullReference_le_conditionalPetzRenyiUp_of_bddAbove
-    (ρ : State (Prod a b)) (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b)) (σ : MState b) (hσ : σ.m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1)
     (hbdd : BddAbove (ρ.conditionalPetzRenyiUpValueSet α hα_pos hα_ne_one)) :
     ρ.conditionalPetzRenyiEntropyCandidateFullReference σ hσ α hα_pos hα_ne_one ≤
@@ -193,10 +191,10 @@ theorem conditionalPetzRenyiEntropyCandidateFullReference_le_conditionalPetzReny
 
 /-- Upward Petz entropy upper bound from a pointwise candidate upper bound. -/
 theorem conditionalPetzRenyiUp_le_of_forall_candidate_le [Nonempty b]
-    (ρ : State (Prod a b))
+    (ρ : MState (a × b))
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1)
     {C : ℝ}
-    (hC : ∀ σ : State b, ∀ hσ : σ.matrix.PosDef,
+    (hC : ∀ σ : MState b, ∀ hσ : σ.m.PosDef,
       ρ.conditionalPetzRenyiEntropyCandidateFullReference
         σ hσ α hα_pos hα_ne_one ≤ C) :
     ρ.conditionalPetzRenyiUp α hα_pos hα_ne_one ≤ C := by
@@ -206,8 +204,4 @@ theorem conditionalPetzRenyiUp_le_of_forall_candidate_le [Nonempty b]
   rcases hx with ⟨σ, hσ, rfl⟩
   exact hC σ hσ
 
-end State
-
-end
-
-end QIT
+end MState

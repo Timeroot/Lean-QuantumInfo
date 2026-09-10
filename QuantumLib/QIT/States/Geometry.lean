@@ -14,17 +14,7 @@ public import QuantumLib.QIT.States.Geometry.PurifiedDistance
 public import QuantumLib.QIT.States.Geometry.PurifiedDistanceAngle
 
 /-!
-# State geometry
+# MState geometry
 
-State-facing geometry tools such as fidelity and trace-distance comparison.
+MState-facing geometry tools such as fidelity and trace-distance comparison.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace States
-namespace Geometry
-
-end Geometry
-end States
-end QIT

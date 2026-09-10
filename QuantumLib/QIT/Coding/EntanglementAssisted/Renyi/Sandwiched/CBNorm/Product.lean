@@ -10,13 +10,13 @@ public import QuantumLib.QIT.Coding.EntanglementAssisted.Renyi.Sandwiched.CBNorm
 public import QuantumLib.QIT.Coding.EntanglementAssisted.Renyi.Sandwiched.CBNorm.ComplementBridge
 
 /-!
-# Product bounds for the positive `alpha -> alpha` and CB `1 -> alpha` norms
+# Product bounds for the positive `alpha → alpha` and CB `1 → alpha` norms
 
 This module formalizes the registered multiplicativity claim
 [KhatriWilde2024Principles, Chapters/EA_capacity.tex:2152-2240]: its
 product-input lower bound appears in source lines 2174-2190, the
 identity-extension/complement upper bound in source lines 2208-2238, and the
-final CB `1 -> alpha` multiplicativity conclusion at source line 2240.
+final CB `1 → alpha` multiplicativity conclusion at source line 2240.
 -/
 
 @[expose] public section
@@ -42,7 +42,7 @@ private theorem psdSchattenPNorm_le_trace_re_of_one_le
     (hp : 1 ≤ (p : ℝ)) :
     psdSchattenPNorm A hA p ≤ A.trace.re := by
   classical
-  let p : Real := (p : Real)
+  let p : ℝ := (p : ℝ)
   let S : ℝ := ∑ i, hA.isHermitian.eigenvalues i
   have hp_pos : 0 < p := lt_of_lt_of_le zero_lt_one hp
   have hS_nonneg : 0 ≤ S := by
@@ -138,36 +138,20 @@ private theorem psdTracePower_le_one_of_psdSchattenPNorm_le_one
   have hnorm_nonneg : 0 ≤ psdSchattenPNorm A hA p :=
     psdSchattenPNorm_nonneg A hA p
   have hpow :
-      (psdSchattenPNorm A hA p) ^ (p : Real) ≤
-        (1 : ℝ) ^ (p : Real) :=
+      (psdSchattenPNorm A hA p) ^ (p : ℝ) ≤
+        (1 : ℝ) ^ (p : ℝ) :=
     Real.rpow_le_rpow hnorm_nonneg hnorm (le_of_lt hp)
   rw [psdSchattenPNorm, Internal.psdSchattenExpression] at hpow
-  change (Real.rpow (psdTracePower A hA p) (1 / (p : Real))) ^
-      (p : Real) ≤ 1 ^ (p : Real) at hpow
+  change (Real.rpow (psdTracePower A hA p) (1 / (p : ℝ))) ^
+      (p : ℝ) ≤ 1 ^ (p : ℝ) at hpow
   calc
     psdTracePower A hA p =
-        (Real.rpow (psdTracePower A hA p) (1 / (p : Real))) ^
-          (p : Real) := by
+        (Real.rpow (psdTracePower A hA p) (1 / (p : ℝ))) ^
+          (p : ℝ) := by
           simpa [one_div] using
             (Real.rpow_inv_rpow htrace_nonneg (ne_of_gt hp)).symm
-    _ ≤ 1 ^ (p : Real) := hpow
-    _ = 1 := Real.one_rpow (p : Real)
-
-omit [DecidableEq a] in
-private theorem trace_re_le_of_le {X Y : CMatrix a} (hXY : X ≤ Y) :
-    X.trace.re ≤ Y.trace.re := by
-  have hdiff : (Y - X).PosSemidef := Matrix.le_iff.mp hXY
-  have htrace_complex := Matrix.PosSemidef.trace_nonneg hdiff
-  have htrace_re : 0 ≤ (Y.trace - X.trace).re := by
-    have hle_re : X.trace.re ≤ Y.trace.re := by
-      have h :
-          X.trace.re ≤ Y.trace.re ∧ X.trace.im = Y.trace.im := by
-        simpa [Matrix.trace_sub, Complex.le_def, Complex.sub_re, Complex.sub_im]
-          using htrace_complex
-      exact h.1
-    simpa [Complex.sub_re] using sub_nonneg.mpr hle_re
-  rw [Complex.sub_re] at htrace_re
-  linarith
+    _ ≤ 1 ^ (p : ℝ) := hpow
+    _ = 1 := Real.one_rpow (p : ℝ)
 
 private theorem isCompletelyPositive_monotone
     (Phi : MatrixMap a b) (hPhi : MatrixMap.IsCompletelyPositive Phi)
@@ -253,7 +237,7 @@ private theorem alphaToAlphaPositiveValue_le_trace_map_one
     _ ≤ (Phi X).trace.re :=
         psdSchattenPNorm_le_trace_re_of_one_le hPhiX (le_of_lt halpha)
     _ ≤ (Phi (1 : CMatrix a)).trace.re :=
-        trace_re_le_of_le hPhiX_le_one
+        cMatrix_trace_re_le_of_le hPhiX_le_one
 
 private theorem alphaToAlphaPositiveValueSet_bddAbove_of_one_lt
     (Phi : MatrixMap a b) (hPhi : MatrixMap.IsCompletelyPositive Phi)
@@ -284,7 +268,7 @@ private theorem alphaToAlphaNorm_nonneg_of_one_lt
     exact alphaToAlphaPositiveValue_nonneg Phi hPhi Z)
 
 /-- Trace-normalized candidates are bounded by the positive-input induced
-`alpha -> alpha` norm. -/
+`alpha → alpha` norm. -/
 theorem alphaToAlphaTraceValue_le_alphaToAlphaNorm_of_one_lt
     (Phi : MatrixMap a b) (hPhi : MatrixMap.IsCompletelyPositive Phi)
     {alpha : ℝ} (halpha : 1 < alpha)
@@ -309,7 +293,7 @@ theorem alphaToAlphaTraceValue_le_alphaToAlphaNorm_of_one_lt
       halpha Y (by simpa [Z, hZ, normZ] using hnormZ_pos)).trans
         (alphaToAlphaPositiveValue_le_alphaToAlphaNorm_of_one_lt Phi hPhi halpha X)
 
-/-- Original CB `1 -> alpha` candidates are bounded by the CB norm. -/
+/-- Original CB `1 → alpha` candidates are bounded by the CB norm. -/
 theorem cbOneToAlphaOriginalValue_le_cbOneToAlphaNorm_of_one_lt
     (Phi : MatrixMap a b) (hPhi : MatrixMap.IsCompletelyPositive Phi)
     {alpha : ℝ} (halpha : 1 < alpha) (Y : CBOneToAlphaOriginalDomain a) :
@@ -429,7 +413,7 @@ private theorem alphaToAlphaPositiveValue_comp_le_mul
       (alphaToAlphaPositiveValue_nonneg Phi hPhi Z)
       (alphaToAlphaNorm_nonneg_of_one_lt Psi hPsi halpha)
 
-/-- The positive induced `alpha -> alpha` norm is submultiplicative under
+/-- The positive induced `alpha → alpha` norm is submultiplicative under
 composition for completely positive maps. -/
 theorem alphaToAlphaNorm_comp_le_mul
     (Psi : MatrixMap b c) (hPsi : MatrixMap.IsCompletelyPositive Psi)
@@ -469,7 +453,8 @@ private theorem alphaToAlphaNorm_congr_map
   subst hmap
   rfl
 
-private theorem cbOneToAlphaNorm_congr_map
+/-- The CB one-to-alpha norm only depends on the underlying map. -/
+theorem cbOneToAlphaNorm_congr_map
     {Phi Psi : MatrixMap a b}
     (hmap : Phi = Psi)
     (hPhi : MatrixMap.IsCompletelyPositive Phi)
@@ -483,37 +468,37 @@ private theorem cbOneToAlphaNorm_congr_map
 private theorem kron_eq_comp_identity_extensions
     (Phi : MatrixMap a b) (Psi : MatrixMap c d) :
     MatrixMap.kron Phi Psi =
-      (MatrixMap.kron Phi (Channel.idChannel d).map).comp
-        (MatrixMap.kron (Channel.idChannel a).map Psi) := by
+      (MatrixMap.kron Phi (CPTPOp.id (dIn := d)).map).comp
+        (MatrixMap.kron (CPTPOp.id (dIn := a)).map Psi) := by
   ext X bd bd'
   have hmat :
       MatrixMap.kron Phi Psi X =
-        MatrixMap.kron Phi (Channel.idChannel d).map
-          (MatrixMap.kron (Channel.idChannel a).map Psi X) := by
+        MatrixMap.kron Phi (CPTPOp.id (dIn := d)).map
+          (MatrixMap.kron (CPTPOp.id (dIn := a)).map Psi X) := by
     calc
       MatrixMap.kron Phi Psi X =
         MatrixMap.kron
-          (Phi.comp (Channel.idChannel a).map)
-          ((Channel.idChannel d).map.comp Psi) X := by
-          have hid_left : Phi.comp (Channel.idChannel a).map = Phi := by
+          (Phi.comp (CPTPOp.id (dIn := a)).map)
+          ((CPTPOp.id (dIn := d)).map.comp Psi) X := by
+          have hid_left : Phi.comp (CPTPOp.id (dIn := a)).map = Phi := by
             ext Y i j
-            simp [LinearMap.comp_apply, Channel.idChannel_map]
-          have hid_right : (Channel.idChannel d).map.comp Psi = Psi := by
+            simp
+          have hid_right : (CPTPOp.id (dIn := d)).map.comp Psi = Psi := by
             ext Y i j
-            simp [LinearMap.comp_apply, Channel.idChannel_map]
+            simp
           rw [hid_left, hid_right]
       _ =
-        MatrixMap.kron Phi (Channel.idChannel d).map
-          (MatrixMap.kron (Channel.idChannel a).map Psi X) := by
+        MatrixMap.kron Phi (CPTPOp.id (dIn := d)).map
+          (MatrixMap.kron (CPTPOp.id (dIn := a)).map Psi X) := by
           exact (kron_comp_apply_general
             (Φ₁ := Phi)
-            (Ψ₁ := (Channel.idChannel d).map)
-            (Φ₂ := (Channel.idChannel a).map)
+            (Ψ₁ := (CPTPOp.id (dIn := d)).map)
+            (Φ₂ := (CPTPOp.id (dIn := a)).map)
             (Ψ₂ := Psi)
             X).symm
   exact congrFun (congrFun hmat bd) bd'
 
-/-- Source product upper bound for the positive induced `alpha -> alpha` norm:
+/-- Source product upper bound for the positive induced `alpha → alpha` norm:
 the product map factors through the two identity-reference extensions, and the
 collapse lemmas identify their norms with the one-system norms. -/
 theorem alphaToAlphaNorm_kron_le_mul
@@ -522,37 +507,35 @@ theorem alphaToAlphaNorm_kron_le_mul
     (Psi : MatrixMap c d) (hPsi : MatrixMap.IsCompletelyPositive Psi)
     {alpha : ℝ} (halpha : 1 < alpha) :
     alphaToAlphaNorm (MatrixMap.kron Phi Psi)
-        (MatrixMap.isCompletelyPositive_kron Phi Psi hPhi hPsi)
+        (MatrixMap.IsCompletelyPositive.kron hPhi hPsi)
         (SchattenOrder.ofOneLt halpha) ≤
       alphaToAlphaNorm Phi hPhi (SchattenOrder.ofOneLt halpha) *
         alphaToAlphaNorm Psi hPsi (SchattenOrder.ofOneLt halpha) := by
-  let K₁ : MatrixMap (Prod a c) (Prod a d) :=
-    MatrixMap.kron (Channel.idChannel a).map Psi
-  let K₂ : MatrixMap (Prod a d) (Prod b d) :=
-    MatrixMap.kron Phi (Channel.idChannel d).map
+  let K₁ : MatrixMap (a × c) (a × d) :=
+    MatrixMap.kron (CPTPOp.id (dIn := a)).map Psi
+  let K₂ : MatrixMap (a × d) (b × d) :=
+    MatrixMap.kron Phi (CPTPOp.id (dIn := d)).map
   let hK₁ : MatrixMap.IsCompletelyPositive K₁ :=
-    MatrixMap.isCompletelyPositive_kron
-      (Channel.idChannel a).map Psi (Channel.idChannel a).completelyPositive hPsi
+    MatrixMap.IsCompletelyPositive.kron (CPTPOp.id (dIn := a)).map_cp hPsi
   let hK₂ : MatrixMap.IsCompletelyPositive K₂ :=
-    MatrixMap.isCompletelyPositive_kron
-      Phi (Channel.idChannel d).map hPhi (Channel.idChannel d).completelyPositive
+    MatrixMap.IsCompletelyPositive.kron hPhi (CPTPOp.id (dIn := d)).map_cp
   have hmap :
       MatrixMap.kron Phi Psi = K₂.comp K₁ := by
     simpa [K₁, K₂] using kron_eq_comp_identity_extensions Phi Psi
   have hnorm_eq :
       alphaToAlphaNorm (MatrixMap.kron Phi Psi)
-          (MatrixMap.isCompletelyPositive_kron Phi Psi hPhi hPsi)
+          (MatrixMap.IsCompletelyPositive.kron hPhi hPsi)
           (SchattenOrder.ofOneLt halpha) =
         alphaToAlphaNorm (K₂.comp K₁)
           (MatrixMap.isCompletelyPositive_comp K₂ K₁ hK₂ hK₁)
           (SchattenOrder.ofOneLt halpha) := by
     exact alphaToAlphaNorm_congr_map hmap
-      (MatrixMap.isCompletelyPositive_kron Phi Psi hPhi hPsi)
+      (MatrixMap.IsCompletelyPositive.kron hPhi hPsi)
       (MatrixMap.isCompletelyPositive_comp K₂ K₁ hK₂ hK₁)
       (SchattenOrder.ofOneLt halpha)
   calc
     alphaToAlphaNorm (MatrixMap.kron Phi Psi)
-        (MatrixMap.isCompletelyPositive_kron Phi Psi hPhi hPsi)
+        (MatrixMap.IsCompletelyPositive.kron hPhi hPsi)
         (SchattenOrder.ofOneLt halpha) =
       alphaToAlphaNorm (K₂.comp K₁)
         (MatrixMap.isCompletelyPositive_comp K₂ K₁ hK₂ hK₁)
@@ -573,7 +556,7 @@ private theorem alphaToAlphaPositiveValue_kron_product_eq_mul
     (X : AlphaToAlphaPositiveDomain a (SchattenOrder.ofOneLt halpha))
     (Y : AlphaToAlphaPositiveDomain c (SchattenOrder.ofOneLt halpha)) :
     alphaToAlphaPositiveValue (MatrixMap.kron Phi Psi)
-        (MatrixMap.isCompletelyPositive_kron Phi Psi hPhi hPsi)
+        (MatrixMap.IsCompletelyPositive.kron hPhi hPsi)
         { matrix := Matrix.kronecker X.matrix Y.matrix,
           pos := X.pos.kronecker Y.pos,
           norm_pos := by
@@ -583,7 +566,7 @@ private theorem alphaToAlphaPositiveValue_kron_product_eq_mul
       alphaToAlphaPositiveValue Phi hPhi X *
         alphaToAlphaPositiveValue Psi hPsi Y := by
   let hKron : MatrixMap.IsCompletelyPositive (MatrixMap.kron Phi Psi) :=
-    MatrixMap.isCompletelyPositive_kron Phi Psi hPhi hPsi
+    MatrixMap.IsCompletelyPositive.kron hPhi hPsi
   let hPhiX : (Phi X.matrix).PosSemidef :=
     MatrixMap.isCompletelyPositive_mapsPositive Phi hPhi X.matrix X.pos
   let hPsiY : (Psi Y.matrix).PosSemidef :=
@@ -601,7 +584,7 @@ private theorem alphaToAlphaPositiveValue_kron_product_eq_mul
           (hPhiX.kronecker hPsiY)
           (SchattenOrder.ofOneLt halpha) := by
     exact psdSchattenPNorm_congr
-      (MatrixMap.kron_apply_kronecker Phi Psi X.matrix Y.matrix)
+      (MatrixMap.kron_map_of_kron_state Phi Psi X.matrix Y.matrix)
       (MatrixMap.isCompletelyPositive_mapsPositive (MatrixMap.kron Phi Psi)
         hKron (Matrix.kronecker X.matrix Y.matrix) (X.pos.kronecker Y.pos))
       (hPhiX.kronecker hPsiY)
@@ -620,7 +603,7 @@ private theorem alphaToAlphaNorm_mul_le_kron
     alphaToAlphaNorm Phi hPhi (SchattenOrder.ofOneLt halpha) *
         alphaToAlphaNorm Psi hPsi (SchattenOrder.ofOneLt halpha) ≤
       alphaToAlphaNorm (MatrixMap.kron Phi Psi)
-        (MatrixMap.isCompletelyPositive_kron Phi Psi hPhi hPsi)
+        (MatrixMap.IsCompletelyPositive.kron hPhi hPsi)
         (SchattenOrder.ofOneLt halpha) := by
   have hsup_product :
       alphaToAlphaNorm Phi hPhi (SchattenOrder.ofOneLt halpha) *
@@ -646,7 +629,7 @@ private theorem alphaToAlphaNorm_mul_le_kron
         alphaToAlphaPositiveValue Phi hPhi X *
           alphaToAlphaPositiveValue Psi hPsi Y) ≤
       alphaToAlphaNorm (MatrixMap.kron Phi Psi)
-        (MatrixMap.isCompletelyPositive_kron Phi Psi hPhi hPsi)
+        (MatrixMap.IsCompletelyPositive.kron hPhi hPsi)
         (SchattenOrder.ofOneLt halpha)
   have : Nonempty
       (AlphaToAlphaPositiveDomain a (SchattenOrder.ofOneLt halpha)) :=
@@ -658,7 +641,7 @@ private theorem alphaToAlphaNorm_mul_le_kron
   intro X
   refine ciSup_le ?_
   intro Y
-  let Z : AlphaToAlphaPositiveDomain (Prod a c)
+  let Z : AlphaToAlphaPositiveDomain (a × c)
       (SchattenOrder.ofOneLt halpha) :=
     { matrix := Matrix.kronecker X.matrix Y.matrix,
       pos := X.pos.kronecker Y.pos,
@@ -668,7 +651,7 @@ private theorem alphaToAlphaNorm_mul_le_kron
         exact mul_pos X.norm_pos Y.norm_pos }
   have hvalue :
       alphaToAlphaPositiveValue (MatrixMap.kron Phi Psi)
-          (MatrixMap.isCompletelyPositive_kron Phi Psi hPhi hPsi)
+          (MatrixMap.IsCompletelyPositive.kron hPhi hPsi)
           Z =
         alphaToAlphaPositiveValue Phi hPhi X *
           alphaToAlphaPositiveValue Psi hPsi Y := by
@@ -678,10 +661,10 @@ private theorem alphaToAlphaNorm_mul_le_kron
   rw [← hvalue]
   exact alphaToAlphaPositiveValue_le_alphaToAlphaNorm_of_one_lt
     (MatrixMap.kron Phi Psi)
-    (MatrixMap.isCompletelyPositive_kron Phi Psi hPhi hPsi)
+    (MatrixMap.IsCompletelyPositive.kron hPhi hPsi)
     halpha Z
 
-/-- Source-backed product equality for the positive induced `alpha -> alpha`
+/-- Source-backed product equality for the positive induced `alpha → alpha`
 norm.  The lower bound is the product-input restriction from
 [KhatriWilde2024Principles, Chapters/EA_capacity.tex:2152-2240], source lines
 2174-2190, and the upper bound is the complement/alpha route formalized by
@@ -692,7 +675,7 @@ theorem alphaToAlphaNorm_kron_eq_mul
     (Psi : MatrixMap c d) (hPsi : MatrixMap.IsCompletelyPositive Psi)
     {alpha : ℝ} (halpha : 1 < alpha) :
     alphaToAlphaNorm (MatrixMap.kron Phi Psi)
-        (MatrixMap.isCompletelyPositive_kron Phi Psi hPhi hPsi)
+        (MatrixMap.IsCompletelyPositive.kron hPhi hPsi)
         (SchattenOrder.ofOneLt halpha) =
       alphaToAlphaNorm Phi hPhi (SchattenOrder.ofOneLt halpha) *
         alphaToAlphaNorm Psi hPsi (SchattenOrder.ofOneLt halpha) := by
@@ -701,7 +684,7 @@ theorem alphaToAlphaNorm_kron_eq_mul
     (alphaToAlphaNorm_mul_le_kron Phi hPhi Psi hPsi halpha)
 
 /-- Final source-backed multiplicativity of the completely bounded
-`1 -> alpha` norm for tensor products of completely positive maps, matching
+`1 → alpha` norm for tensor products of completely positive maps, matching
 [KhatriWilde2024Principles, Chapters/EA_capacity.tex:2152-2240], specifically
 source line 2240. -/
 theorem cbOneToAlphaNorm_kron_eq_mul
@@ -710,7 +693,7 @@ theorem cbOneToAlphaNorm_kron_eq_mul
     (Psi : MatrixMap c d) (hPsi : MatrixMap.IsCompletelyPositive Psi)
     {alpha : ℝ} (halpha : 1 < alpha) :
     cbOneToAlphaNorm (MatrixMap.kron Phi Psi)
-        (MatrixMap.isCompletelyPositive_kron Phi Psi hPhi hPsi)
+        (MatrixMap.IsCompletelyPositive.kron hPhi hPsi)
         (SchattenOrder.ofOneLt halpha) =
       cbOneToAlphaNorm Phi hPhi (SchattenOrder.ofOneLt halpha) *
         cbOneToAlphaNorm Psi hPsi (SchattenOrder.ofOneLt halpha) := by
@@ -745,14 +728,14 @@ theorem cbOneToAlphaNorm_kron_eq_mul
       (SchattenOrder.ofOneLt halpha)
   calc
     cbOneToAlphaNorm (MatrixMap.kron Phi Psi)
-        (MatrixMap.isCompletelyPositive_kron Phi Psi hPhi hPsi)
+        (MatrixMap.IsCompletelyPositive.kron hPhi hPsi)
         (SchattenOrder.ofOneLt halpha) =
       cbOneToAlphaNorm
         (MatrixMap.ofKraus (MatrixMap.krausProduct K₁ K₂))
         (MatrixMap.ofKraus_completelyPositive (MatrixMap.krausProduct K₁ K₂))
         (SchattenOrder.ofOneLt halpha) := by
           exact cbOneToAlphaNorm_congr_map hkron_kraus
-            (MatrixMap.isCompletelyPositive_kron Phi Psi hPhi hPsi)
+            (MatrixMap.IsCompletelyPositive.kron hPhi hPsi)
             (MatrixMap.ofKraus_completelyPositive (MatrixMap.krausProduct K₁ K₂))
             (SchattenOrder.ofOneLt halpha)
     _ =
@@ -768,20 +751,14 @@ theorem cbOneToAlphaNorm_kron_eq_mul
         (MatrixMap.kron
           (MatrixMap.krausComplement K₁)
           (MatrixMap.krausComplement K₂))
-        (MatrixMap.isCompletelyPositive_kron
-          (MatrixMap.krausComplement K₁)
-          (MatrixMap.krausComplement K₂)
-          (MatrixMap.krausComplement_isCompletelyPositive K₁)
+        (MatrixMap.IsCompletelyPositive.kron (MatrixMap.krausComplement_isCompletelyPositive K₁)
           (MatrixMap.krausComplement_isCompletelyPositive K₂))
         (SchattenOrder.ofOneLt halpha) := by
           exact alphaToAlphaNorm_congr_map
             (MatrixMap.krausComplement_krausProduct_eq_kron K₁ K₂)
             (MatrixMap.krausComplement_isCompletelyPositive
               (MatrixMap.krausProduct K₁ K₂))
-            (MatrixMap.isCompletelyPositive_kron
-              (MatrixMap.krausComplement K₁)
-              (MatrixMap.krausComplement K₂)
-              (MatrixMap.krausComplement_isCompletelyPositive K₁)
+            (MatrixMap.IsCompletelyPositive.kron (MatrixMap.krausComplement_isCompletelyPositive K₁)
               (MatrixMap.krausComplement_isCompletelyPositive K₂))
             (SchattenOrder.ofOneLt halpha)
     _ =

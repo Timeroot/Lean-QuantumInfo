@@ -41,9 +41,13 @@ It represents the primal maximization problem
 structure ContinuousConeProgram (E : Type u) (F : Type v)
     [NormedAddCommGroup E] [NormedSpace ℝ E] [FiniteDimensional ℝ E]
     [NormedAddCommGroup F] [NormedSpace ℝ F] [FiniteDimensional ℝ F] where
+  /-- The cone that the primal variable is confined to. -/
   K : ProperCone ℝ E
+  /-- The left-hand side of the primal equality constraint `A x = b`. -/
   A : E →L[ℝ] F
+  /-- The right-hand side of the primal equality constraint `A x = b`. -/
   b : F
+  /-- The primal objective, maximized over the feasible set. -/
   c : E →L[ℝ] ℝ
 
 namespace ContinuousConeProgram

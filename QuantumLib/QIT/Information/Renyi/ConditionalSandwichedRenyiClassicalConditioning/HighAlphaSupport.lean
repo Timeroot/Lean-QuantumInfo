@@ -15,10 +15,11 @@ public import QuantumLib.QIT.Information.Renyi.ConditionalSandwichedRenyiClassic
 public import QuantumLib.QIT.Information.Renyi.ConditionalSandwichedRenyiClassicalConditioning.LowAlphaQDecomposition
 
 /-!
-# high-alpha support route
+# High-alpha support route
 
-Responsibility layer of the sandwiched conditional Renyi classical-conditioning
-source route.
+The `alpha > 1` source formula for the downward sandwiched conditional Renyi
+entropy under classical conditioning, obtained from the low-alpha decomposition
+on the support of the reference.
 -/
 
 @[expose] public section
@@ -26,18 +27,16 @@ source route.
 open scoped ComplexOrder MatrixOrder NNReal Pointwise
 open Matrix
 
-namespace QIT
-
-universe u v w
-
 noncomputable section
-
+universe u v w
 variable {A : Type u} {B : Type v} {Y : Type w}
 variable [Fintype A] [DecidableEq A]
 variable [Fintype B] [DecidableEq B]
 variable [Fintype Y] [DecidableEq Y]
 
-namespace State
+open QIT
+
+namespace MState
 
 /-! ### High-alpha support branch
 
@@ -47,30 +46,25 @@ its right marginal; this closes the EReal-to-finite high-alpha branch without
 introducing a zero block into a negative matrix power. -/
 
 theorem conditionalSandwichedRenyiDown_classicalConditioning_source_formula_of_one_lt
-    (E : Ensemble Y (A × B)) (α : ℝ) (hα : 1 / 2 ≤ α)
+    (E : MEnsemble (A × B) Y) (α : ℝ) (hα : 1 / 2 ≤ α)
     (hα_ne_one : α ≠ 1) (hα_gt_one : 1 < α) :
     conditionalSandwichedRenyiDownE E α hα hα_ne_one =
       -(sandwichedRenyiPSDReferenceHighAlphaFinite
-        (State.cqConditioningState E)
+        (MState.cqConditioningState E)
         (identityTensorStateMatrix (a := A)
-          (State.cqConditioningState E).marginalB)
-        (identityTensorStateMatrix_posSemidef_of_state
-          (a := A) (State.cqConditioningState E).marginalB) α : EReal) := by
+          (MState.cqConditioningState E).traceLeft)
+        (identityTensorStateMatrix_posSemidef
+          (a := A) (MState.cqConditioningState E).traceLeft) α : EReal) := by
   have hSupport :
-      Matrix.Supports (State.cqConditioningState E).matrix
+      Matrix.Supports (MState.cqConditioningState E).m
         (identityTensorStateMatrix (a := A)
-          (State.cqConditioningState E).marginalB) := by
+          (MState.cqConditioningState E).traceLeft) := by
     simpa [identityTensorStateMatrix] using
-      (matrix_supports_identityTensor_marginalB
-        (State.cqConditioningState E))
+      (matrix_supports_identityTensor_traceLeft
+        (MState.cqConditioningState E))
   unfold conditionalSandwichedRenyiDownE
   rw [sandwichedRenyiPSDReferenceE_eq_highAlphaE_of_one_lt _ _ hα_gt_one,
     sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_of_supports
       _ _ _ hSupport]
 
-
-end State
-
-end
-
-end QIT
+end MState

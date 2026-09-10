@@ -32,20 +32,22 @@ theorem applyState_id_prod_cqState_matrix
     {ι : Type u} {c : Type v} {d : Type w}
     [Fintype ι] [DecidableEq ι] [Fintype c] [DecidableEq c]
     [Fintype d] [DecidableEq d]
-    (E : Ensemble ι c) (D : Channel c d) :
-    (((Channel.idChannel ι).prod D).applyState E.cqState).matrix =
+    (E : MEnsemble c ι) (D : CPTPMap c d) :
+    (((CPTPOp.id (dIn := ι)).prod D) E.cqState).m =
       ∑ i : ι, (E.probs i : ℂ) •
-        Matrix.kronecker (Matrix.single i i (1 : ℂ)) (D.applyState (E.states i)).matrix := by
-  change MatrixMap.kron (Channel.idChannel ι).map D.map E.cqState.matrix = _
-  rw [Ensemble.cqState_matrix]
-  change MatrixMap.kron (Channel.idChannel ι).map D.map
+        Matrix.kronecker (Matrix.single i i (1 : ℂ)) (D (E.states i)).m := by
+  rw [CPTPOp.mat_coe_eq_apply_mat, CPTPOp.prod_map,
+    MEnsemble.cqState_matrix]
+  change MatrixMap.kron (CPTPOp.id (dIn := ι)).map D.map
       (∑ i : ι, (E.probs i : ℂ) •
-        Matrix.kronecker (Matrix.single i i (1 : ℂ)) (E.states i).matrix) = _
+        Matrix.kronecker (Matrix.single i i (1 : ℂ)) (E.states i).m) = _
   rw [map_sum]
   refine Finset.sum_congr rfl ?_
   intro i _
-  rw [map_smul, MatrixMap.kron_apply_kronecker]
-  simp [Channel.applyState, Channel.idChannel, MatrixMap.ofKraus]
+  rw [map_smul]
+  simp only [Matrix.kronecker]
+  rw [MatrixMap.kron_map_of_kron_state]
+  simp [CPTPOp.mat_coe_eq_apply_mat, CPTPOp.id_map]
 
 /-- Applying a left-local classical preparation channel to a cq state prepares
 the output state selected by each classical block and leaves the quantum block
@@ -54,22 +56,23 @@ theorem applyState_prepare_prod_id_cqState_matrix
     {ι : Type u} {c : Type v} {d : Type w}
     [Fintype ι] [DecidableEq ι] [Fintype c] [DecidableEq c]
     [Fintype d] [DecidableEq d]
-    (E : Ensemble ι c) (ρ : ι → State d) :
-    (((Channel.prepare ρ).prod (Channel.idChannel c)).applyState E.cqState).matrix =
+    (E : MEnsemble c ι) (ρ : ι → MState d) :
+    (((CPTPOp.prepare ρ).prod (CPTPOp.id (dIn := c))) E.cqState).m =
       ∑ i : ι, (E.probs i : ℂ) •
-        Matrix.kronecker (ρ i).matrix (E.states i).matrix := by
-  change MatrixMap.kron (Channel.prepare ρ).map (Channel.idChannel c).map
-      E.cqState.matrix = _
-  rw [Ensemble.cqState_matrix]
-  change MatrixMap.kron (Channel.prepare ρ).map (Channel.idChannel c).map
+        Matrix.kronecker (ρ i).m (E.states i).m := by
+  rw [CPTPOp.mat_coe_eq_apply_mat, CPTPOp.prod_map,
+    MEnsemble.cqState_matrix]
+  change MatrixMap.kron (CPTPOp.prepare ρ).map (CPTPOp.id (dIn := c)).map
       (∑ i : ι, (E.probs i : ℂ) •
-        Matrix.kronecker (Matrix.single i i (1 : ℂ)) (E.states i).matrix) = _
+        Matrix.kronecker (Matrix.single i i (1 : ℂ)) (E.states i).m) = _
   rw [map_sum]
   refine Finset.sum_congr rfl ?_
   intro i _
-  rw [map_smul, MatrixMap.kron_apply_kronecker]
-  rw [Channel.prepare_map_single_eq]
-  simp [Channel.idChannel, MatrixMap.ofKraus]
+  rw [map_smul]
+  simp only [Matrix.kronecker]
+  rw [MatrixMap.kron_map_of_kron_state]
+  rw [CPTPOp.prepare_map_single_eq]
+  simp [CPTPOp.id_map]
 
 end
 

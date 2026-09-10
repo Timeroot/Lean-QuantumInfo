@@ -151,7 +151,6 @@ def lieAlgebra (hH : IsMulSubgroup H) (hcl : IsClosed H) : Submodule ℝ 𝔸 wh
 theorem mem_lieAlgebra (hH : IsMulSubgroup H) (hcl : IsClosed H) {A : 𝔸} :
     A ∈ hH.lieAlgebra hcl ↔ A ∈ expTangent H := Iff.rfl
 
-
 /-- **Cartan's closed subgroup theorem**, local form: near `1`, a closed subgroup of the
 multiplicative group of a finite-dimensional normed algebra consists exactly of the
 exponentials of elements of its Lie algebra. -/
@@ -287,7 +286,6 @@ theorem exists_exp_eq_of_mem_ball (hH : IsMulSubgroup H) (hcl : IsClosed H) :
   have hsplit : φ (ψ h) = exp ((ψ h).1 : 𝔸) := by simp [hφdef, hz hhH]
   rw [← hsplit]
   exact hinv
-
 
 /-- **Cartan's closed subgroup theorem**, global form for a compact group: a compact subgroup of
 the multiplicative group of a finite-dimensional normed algebra is covered by finitely many left

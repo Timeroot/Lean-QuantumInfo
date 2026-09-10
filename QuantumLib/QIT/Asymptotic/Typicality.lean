@@ -26,13 +26,13 @@ are typical, and conjugate the diagonal mask back to the original basis.
 
 open scoped ComplexOrder MatrixOrder
 
-namespace QIT
-
-universe u
-
 noncomputable section
-
+universe u
 variable {a : Type u} [Fintype a] [DecidableEq a]
+
+open QIT
+
+namespace QIT
 
 /-! ## Spectral projectors selected by a finite eigenvalue predicate -/
 
@@ -264,14 +264,16 @@ theorem spectralPredicateProjector_compress_le
 /-- The Schumacher compression rate equals the von Neumann entropy.
 
 rate(rho) = S(rho) = -sum lambda_i log2(lambda_i). -/
-def State.schumacherRate (ρ : State a) : ℝ :=
-  State.vonNeumann ρ
+def _root_.MState.schumacherRate (ρ : MState a) : ℝ :=
+  MState.vonNeumann ρ
 
-namespace State
+end QIT
+
+namespace MState
 
 /-- Eigenvalue typicality for the `n`-fold IID state, in bits:
 `-log₂ μ` lies within `n δ` of `n S(ρ)`, and zero eigenvalues are excluded. -/
-def typicalEigenvalue (ρ : State a) (n : ℕ) (δ μ : ℝ) : Prop :=
+def typicalEigenvalue (ρ : MState a) (n : ℕ) (δ μ : ℝ) : Prop :=
   0 < μ ∧ |(-log2 μ) - (n : ℝ) * ρ.vonNeumann| ≤ (n : ℝ) * δ
 
 /-- pack-4 eigenvalue upper bound (equipartition, upper half): every eigenvalue
@@ -280,7 +282,7 @@ accepted by the typicality predicate satisfies
 `2^{-(S + δ)n} ≤ μ ≤ 2^{-(S − δ)n}` equipartition envelope; it follows from
 the left inequality of the predicate's centered-log bound. -/
 theorem typicalEigenvalue_le_eigenvalueUpperBound
-    (ρ : State a) (n : ℕ) (δ μ : ℝ)
+    (ρ : MState a) (n : ℕ) (δ μ : ℝ)
     (h : typicalEigenvalue ρ n δ μ) :
     μ ≤ 2 ^ (-((n : ℝ) * ρ.vonNeumann - (n : ℝ) * δ)) := by
   obtain ⟨hμ_pos, habs⟩ := h
@@ -312,129 +314,129 @@ theorem typicalEigenvalue_le_eigenvalueUpperBound
   refine le_trans (Real.exp_le_exp.mpr hlogμ_le) (le_of_eq hexp)
 
 /-- The finite tensor-power spectral typical-subspace projector. -/
-def typicalSubspaceProjector (ρ : State a) (n : ℕ) (δ : ℝ) :
+def typicalSubspaceProjector (ρ : MState a) (n : ℕ) (δ : ℝ) :
     CMatrix (TensorPower a n) := by
   classical
   let τ := ρ.tensorPower n
-  exact spectralPredicateProjector τ.matrix τ.pos.isHermitian
-    (fun i => typicalEigenvalue ρ n δ (τ.pos.isHermitian.eigenvalues i))
+  exact spectralPredicateProjector τ.m τ.psd.isHermitian
+    (fun i => typicalEigenvalue ρ n δ (τ.psd.isHermitian.eigenvalues i))
 
 /-- Number of selected spectral directions, expressed as a real trace count. -/
-def typicalSubspaceDimension (ρ : State a) (n : ℕ) (δ : ℝ) : ℝ := by
+def typicalSubspaceDimension (ρ : MState a) (n : ℕ) (δ : ℝ) : ℝ := by
   classical
   exact ∑ i : TensorPower a n,
-    if typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
+    if typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
     then (1 : ℝ) else 0
 
 /-- Spectral probability weight accepted by the typical projector. -/
-def typicalSubspaceSpectralWeight (ρ : State a) (n : ℕ) (δ : ℝ) : ℝ := by
+def typicalSubspaceSpectralWeight (ρ : MState a) (n : ℕ) (δ : ℝ) : ℝ := by
   classical
   exact ∑ i : TensorPower a n,
-    if typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
-    then (ρ.tensorPower n).pos.isHermitian.eigenvalues i else 0
+    if typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
+    then (ρ.tensorPower n).psd.isHermitian.eigenvalues i else 0
 
 /-- Spectral probability weight rejected by the typical projector. -/
-def atypicalSubspaceSpectralWeight (ρ : State a) (n : ℕ) (δ : ℝ) : ℝ := by
+def atypicalSubspaceSpectralWeight (ρ : MState a) (n : ℕ) (δ : ℝ) : ℝ := by
   classical
   exact ∑ i : TensorPower a n,
-    if ¬ typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
-    then (ρ.tensorPower n).pos.isHermitian.eigenvalues i else 0
+    if ¬ typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
+    then (ρ.tensorPower n).psd.isHermitian.eigenvalues i else 0
 
 /-- Second moment of the centered log-eigenvalue random variable for
 `ρ^{⊗ n}`. It is the finite spectral-distribution quantity that feeds
 Chebyshev-style concentration estimates; separate tensor-product spectrum
 lemmas are needed to turn it into an explicit `O(n)` variance bound. -/
-def typicalLogDeviationSecondMoment (ρ : State a) (n : ℕ) : ℝ := by
+def typicalLogDeviationSecondMoment (ρ : MState a) (n : ℕ) : ℝ := by
   classical
   exact ∑ i : TensorPower a n,
-    let μ := (ρ.tensorPower n).pos.isHermitian.eigenvalues i
+    let μ := (ρ.tensorPower n).psd.isHermitian.eigenvalues i
     μ * (((-log2 μ) - (n : ℝ) * ρ.vonNeumann) ^ 2)
 
 /-- Eigenvalues of an IID tensor-power density matrix sum to one. -/
-theorem tensorPower_eigenvalue_sum (ρ : State a) (n : ℕ) :
-    ∑ i : TensorPower a n, (ρ.tensorPower n).pos.isHermitian.eigenvalues i = 1 := by
+theorem tensorPower_eigenvalue_sum (ρ : MState a) (n : ℕ) :
+    ∑ i : TensorPower a n, (ρ.tensorPower n).psd.isHermitian.eigenvalues i = 1 := by
   have hc :
       (∑ i : TensorPower a n,
-          (((ρ.tensorPower n).pos.isHermitian.eigenvalues i : ℝ) : ℂ)) = 1 := by
-    exact (ρ.tensorPower n).pos.isHermitian.trace_eq_sum_eigenvalues.symm.trans
-      (ρ.tensorPower n).trace_eq_one
+          (((ρ.tensorPower n).psd.isHermitian.eigenvalues i : ℝ) : ℂ)) = 1 := by
+    exact (ρ.tensorPower n).psd.isHermitian.trace_eq_sum_eigenvalues.symm.trans
+      (ρ.tensorPower n).tr'
   exact Complex.ofReal_injective (by simpa using hc)
 
 /-- The trace-count dimension of the typical subspace is nonnegative. -/
-theorem typicalSubspaceDimension_nonneg (ρ : State a) (n : ℕ) (δ : ℝ) :
+theorem typicalSubspaceDimension_nonneg (ρ : MState a) (n : ℕ) (δ : ℝ) :
     0 ≤ ρ.typicalSubspaceDimension n δ := by
   classical
   unfold typicalSubspaceDimension
   exact Finset.sum_nonneg fun i _ => by
     by_cases hi :
-      typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
+      typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
     · simp [hi]
     · simp [hi]
 
 /-- The trace-count dimension of the typical subspace is at most the ambient
 finite tensor-power dimension. -/
-theorem typicalSubspaceDimension_le_card (ρ : State a) (n : ℕ) (δ : ℝ) :
+theorem typicalSubspaceDimension_le_card (ρ : MState a) (n : ℕ) (δ : ℝ) :
     ρ.typicalSubspaceDimension n δ ≤ (Fintype.card (TensorPower a n) : ℝ) := by
   classical
   unfold typicalSubspaceDimension
   calc
     (∑ i : TensorPower a n,
-        if typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
+        if typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
         then (1 : ℝ) else 0)
         ≤ ∑ _i : TensorPower a n, (1 : ℝ) := by
           apply Finset.sum_le_sum
           intro i _
           by_cases hi :
-            typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
+            typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
           · simp [hi]
           · simp [hi]
     _ = (Fintype.card (TensorPower a n) : ℝ) := by simp
 
 /-- The typical spectral weight is nonnegative. -/
-theorem typicalSubspaceSpectralWeight_nonneg (ρ : State a) (n : ℕ) (δ : ℝ) :
+theorem typicalSubspaceSpectralWeight_nonneg (ρ : MState a) (n : ℕ) (δ : ℝ) :
     0 ≤ ρ.typicalSubspaceSpectralWeight n δ := by
   classical
   unfold typicalSubspaceSpectralWeight
   apply Finset.sum_nonneg
   intro i _
   by_cases hi :
-    typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
-  · simp [hi, (ρ.tensorPower n).pos.eigenvalues_nonneg i]
+    typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
+  · simp [hi, (ρ.tensorPower n).psd.eigenvalues_nonneg i]
   · simp [hi]
 
 /-- The typical spectral weight is at most one. -/
-theorem typicalSubspaceSpectralWeight_le_one (ρ : State a) (n : ℕ) (δ : ℝ) :
+theorem typicalSubspaceSpectralWeight_le_one (ρ : MState a) (n : ℕ) (δ : ℝ) :
     ρ.typicalSubspaceSpectralWeight n δ ≤ 1 := by
   classical
   unfold typicalSubspaceSpectralWeight
   calc
     (∑ i : TensorPower a n,
-        if typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
-        then (ρ.tensorPower n).pos.isHermitian.eigenvalues i else 0)
-        ≤ ∑ i : TensorPower a n, (ρ.tensorPower n).pos.isHermitian.eigenvalues i := by
+        if typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
+        then (ρ.tensorPower n).psd.isHermitian.eigenvalues i else 0)
+        ≤ ∑ i : TensorPower a n, (ρ.tensorPower n).psd.isHermitian.eigenvalues i := by
           apply Finset.sum_le_sum
           intro i _
           by_cases hi :
-            typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
+            typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
           · simp [hi]
-          · simp [hi, (ρ.tensorPower n).pos.eigenvalues_nonneg i]
+          · simp [hi, (ρ.tensorPower n).psd.eigenvalues_nonneg i]
     _ = 1 := tensorPower_eigenvalue_sum ρ n
 
 /-- The atypical spectral weight is nonnegative. -/
-theorem atypicalSubspaceSpectralWeight_nonneg (ρ : State a) (n : ℕ) (δ : ℝ) :
+theorem atypicalSubspaceSpectralWeight_nonneg (ρ : MState a) (n : ℕ) (δ : ℝ) :
     0 ≤ ρ.atypicalSubspaceSpectralWeight n δ := by
   classical
   unfold atypicalSubspaceSpectralWeight
   apply Finset.sum_nonneg
   intro i _
   by_cases hi :
-    typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
+    typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
   · simp [hi]
-  · simp [hi, (ρ.tensorPower n).pos.eigenvalues_nonneg i]
+  · simp [hi, (ρ.tensorPower n).psd.eigenvalues_nonneg i]
 
 /-- The typical and atypical spectral weights partition the tensor-power
 state's total spectral weight. -/
-theorem typicalSubspaceSpectralWeight_add_atypical (ρ : State a) (n : ℕ) (δ : ℝ) :
+theorem typicalSubspaceSpectralWeight_add_atypical (ρ : MState a) (n : ℕ) (δ : ℝ) :
     ρ.typicalSubspaceSpectralWeight n δ +
       ρ.atypicalSubspaceSpectralWeight n δ = 1 := by
   classical
@@ -442,37 +444,37 @@ theorem typicalSubspaceSpectralWeight_add_atypical (ρ : State a) (n : ℕ) (δ 
   rw [← Finset.sum_add_distrib]
   calc
     (∑ i : TensorPower a n,
-        ((if typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
-          then (ρ.tensorPower n).pos.isHermitian.eigenvalues i else 0) +
-        if ¬ typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
-          then (ρ.tensorPower n).pos.isHermitian.eigenvalues i else 0)) =
-        ∑ i : TensorPower a n, (ρ.tensorPower n).pos.isHermitian.eigenvalues i := by
+        ((if typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
+          then (ρ.tensorPower n).psd.isHermitian.eigenvalues i else 0) +
+        if ¬ typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
+          then (ρ.tensorPower n).psd.isHermitian.eigenvalues i else 0)) =
+        ∑ i : TensorPower a n, (ρ.tensorPower n).psd.isHermitian.eigenvalues i := by
           apply Finset.sum_congr rfl
           intro i _
           by_cases hi :
-            typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
+            typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
           · simp [hi]
           · simp [hi]
     _ = 1 := tensorPower_eigenvalue_sum ρ n
 
 /-- The centered log-eigenvalue second moment is nonnegative. -/
-theorem typicalLogDeviationSecondMoment_nonneg (ρ : State a) (n : ℕ) :
+theorem typicalLogDeviationSecondMoment_nonneg (ρ : MState a) (n : ℕ) :
     0 ≤ ρ.typicalLogDeviationSecondMoment n := by
   classical
   unfold typicalLogDeviationSecondMoment
   apply Finset.sum_nonneg
   intro i _
-  exact mul_nonneg ((ρ.tensorPower n).pos.eigenvalues_nonneg i) (sq_nonneg _)
+  exact mul_nonneg ((ρ.tensorPower n).psd.eigenvalues_nonneg i) (sq_nonneg _)
 
 /-- Finite spectral Chebyshev bridge for the typical projector.
 
-This is a genuine concentration-form estimate at the spectral-distribution
-level: the atypical spectral weight times `(n δ)^2` is controlled by the
-centered second moment of the log-eigenvalues of `ρ^{⊗ n}`. A later proof
-can combine it with product-spectrum/variance additivity to obtain the usual
-i.i.d. typical-subspace concentration bounds. -/
+A concentration-form estimate at the spectral-distribution level: the
+atypical spectral weight times `(n δ)^2` is controlled by the centered second
+moment of the log-eigenvalues of `ρ^{⊗ n}`. Together with product-spectrum
+variance additivity this gives the usual i.i.d. typical-subspace
+concentration bounds. -/
 theorem atypicalSubspaceSpectralWeight_mul_sq_le_logDeviationSecondMoment
-    (ρ : State a) {n : ℕ} {δ : ℝ} (hn : 0 < n) (hδ : 0 < δ) :
+    (ρ : MState a) {n : ℕ} {δ : ℝ} (hn : 0 < n) (hδ : 0 < δ) :
     ρ.atypicalSubspaceSpectralWeight n δ * (((n : ℝ) * δ) ^ 2) ≤
       ρ.typicalLogDeviationSecondMoment n := by
   classical
@@ -482,10 +484,10 @@ theorem atypicalSubspaceSpectralWeight_mul_sq_le_logDeviationSecondMoment
   rw [Finset.sum_mul]
   apply Finset.sum_le_sum
   intro i _
-  let μ := (ρ.tensorPower n).pos.isHermitian.eigenvalues i
+  let μ := (ρ.tensorPower n).psd.isHermitian.eigenvalues i
   let d := (-log2 μ) - (n : ℝ) * ρ.vonNeumann
   have hμ_nonneg : 0 ≤ μ := by
-    simpa [μ] using (ρ.tensorPower n).pos.eigenvalues_nonneg i
+    simpa [μ] using (ρ.tensorPower n).psd.eigenvalues_nonneg i
   by_cases htyp : typicalEigenvalue ρ n δ μ
   · have hterm_nonneg : 0 ≤ μ * d ^ 2 := mul_nonneg hμ_nonneg (sq_nonneg d)
     simp [htyp, μ, d, hterm_nonneg]
@@ -507,7 +509,7 @@ theorem atypicalSubspaceSpectralWeight_mul_sq_le_logDeviationSecondMoment
 
 /-- Division form of the finite spectral Chebyshev bridge. -/
 theorem atypicalSubspaceSpectralWeight_le_logDeviationSecondMoment_div_sq
-    (ρ : State a) {n : ℕ} {δ : ℝ} (hn : 0 < n) (hδ : 0 < δ) :
+    (ρ : MState a) {n : ℕ} {δ : ℝ} (hn : 0 < n) (hδ : 0 < δ) :
     ρ.atypicalSubspaceSpectralWeight n δ ≤
       ρ.typicalLogDeviationSecondMoment n / (((n : ℝ) * δ) ^ 2) := by
   have hnR : 0 < (n : ℝ) := by exact_mod_cast hn
@@ -519,7 +521,7 @@ theorem atypicalSubspaceSpectralWeight_le_logDeviationSecondMoment_div_sq
 /-- Lower bound on the accepted typical spectral weight obtained from the
 finite spectral Chebyshev bridge. -/
 theorem one_sub_logDeviationSecondMoment_div_sq_le_typicalSubspaceSpectralWeight
-    (ρ : State a) {n : ℕ} {δ : ℝ} (hn : 0 < n) (hδ : 0 < δ) :
+    (ρ : MState a) {n : ℕ} {δ : ℝ} (hn : 0 < n) (hδ : 0 < δ) :
     1 - ρ.typicalLogDeviationSecondMoment n / (((n : ℝ) * δ) ^ 2) ≤
       ρ.typicalSubspaceSpectralWeight n δ := by
   have hle := ρ.atypicalSubspaceSpectralWeight_le_logDeviationSecondMoment_div_sq hn hδ
@@ -527,19 +529,19 @@ theorem one_sub_logDeviationSecondMoment_div_sq_le_typicalSubspaceSpectralWeight
   linarith
 
 /-- The typical-subspace projector is positive semidefinite. -/
-theorem typicalSubspaceProjector_posSemidef (ρ : State a) (n : ℕ) (δ : ℝ) :
+theorem typicalSubspaceProjector_posSemidef (ρ : MState a) (n : ℕ) (δ : ℝ) :
     (ρ.typicalSubspaceProjector n δ).PosSemidef := by
   classical
   unfold typicalSubspaceProjector
   exact spectralPredicateProjector_posSemidef _ _ _
 
 /-- The typical-subspace projector is Hermitian. -/
-theorem typicalSubspaceProjector_isHermitian (ρ : State a) (n : ℕ) (δ : ℝ) :
+theorem typicalSubspaceProjector_isHermitian (ρ : MState a) (n : ℕ) (δ : ℝ) :
     (ρ.typicalSubspaceProjector n δ).IsHermitian :=
   (ρ.typicalSubspaceProjector_posSemidef n δ).1
 
 /-- The typical-subspace projector is idempotent. -/
-theorem typicalSubspaceProjector_idempotent (ρ : State a) (n : ℕ) (δ : ℝ) :
+theorem typicalSubspaceProjector_idempotent (ρ : MState a) (n : ℕ) (δ : ℝ) :
     ρ.typicalSubspaceProjector n δ * ρ.typicalSubspaceProjector n δ =
       ρ.typicalSubspaceProjector n δ := by
   classical
@@ -547,7 +549,7 @@ theorem typicalSubspaceProjector_idempotent (ρ : State a) (n : ℕ) (δ : ℝ) 
   exact spectralPredicateProjector_idempotent _ _ _
 
 /-- The typical-subspace projector is bounded by the identity effect. -/
-theorem typicalSubspaceProjector_le_one (ρ : State a) (n : ℕ) (δ : ℝ) :
+theorem typicalSubspaceProjector_le_one (ρ : MState a) (n : ℕ) (δ : ℝ) :
     ρ.typicalSubspaceProjector n δ ≤ 1 := by
   classical
   unfold typicalSubspaceProjector
@@ -555,7 +557,7 @@ theorem typicalSubspaceProjector_le_one (ρ : State a) (n : ℕ) (δ : ℝ) :
 
 /-- The trace of the typical-subspace projector counts the selected spectral
 directions of `ρ^{⊗ n}`. -/
-theorem typicalSubspaceProjector_trace_re (ρ : State a) (n : ℕ) (δ : ℝ) :
+theorem typicalSubspaceProjector_trace_re (ρ : MState a) (n : ℕ) (δ : ℝ) :
     (ρ.typicalSubspaceProjector n δ).trace.re =
       ρ.typicalSubspaceDimension n δ := by
   classical
@@ -565,8 +567,8 @@ theorem typicalSubspaceProjector_trace_re (ρ : State a) (n : ℕ) (δ : ℝ) :
 
 /-- The tensor-power state weight accepted by the typical projector is exactly
 the selected eigenvalue sum. -/
-theorem typicalSubspaceProjector_trace_mul_re (ρ : State a) (n : ℕ) (δ : ℝ) :
-    (((ρ.tensorPower n).matrix * ρ.typicalSubspaceProjector n δ).trace).re =
+theorem typicalSubspaceProjector_trace_mul_re (ρ : MState a) (n : ℕ) (δ : ℝ) :
+    (((ρ.tensorPower n).m * ρ.typicalSubspaceProjector n δ).trace).re =
       ρ.typicalSubspaceSpectralWeight n δ := by
   classical
   unfold typicalSubspaceProjector
@@ -576,8 +578,8 @@ theorem typicalSubspaceProjector_trace_mul_re (ρ : State a) (n : ℕ) (δ : ℝ
 /-- The tensor-power state compressed to its spectral typical subspace is
 bounded by the usual typical eigenvalue envelope. -/
 theorem typicalSubspaceProjector_tensorPower_compress_le
-    (ρ : State a) (n : ℕ) (δ : ℝ) :
-    ρ.typicalSubspaceProjector n δ * (ρ.tensorPower n).matrix *
+    (ρ : MState a) (n : ℕ) (δ : ℝ) :
+    ρ.typicalSubspaceProjector n δ * (ρ.tensorPower n).m *
         ρ.typicalSubspaceProjector n δ ≤
       (((((2 : ℝ) ^ (-((n : ℝ) * ρ.vonNeumann - (n : ℝ) * δ))) : ℝ) : ℂ) •
         ρ.typicalSubspaceProjector n δ) := by
@@ -585,23 +587,23 @@ theorem typicalSubspaceProjector_tensorPower_compress_le
   set c : ℝ := (2 : ℝ) ^ (-((n : ℝ) * ρ.vonNeumann - (n : ℝ) * δ))
   have hp :
       ∀ i : TensorPower a n,
-        typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i) →
-          (ρ.tensorPower n).pos.isHermitian.eigenvalues i ≤ c := by
+        typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i) →
+          (ρ.tensorPower n).psd.isHermitian.eigenvalues i ≤ c := by
     intro i hi
     dsimp [c]
     exact ρ.typicalEigenvalue_le_eigenvalueUpperBound n δ
-      ((ρ.tensorPower n).pos.isHermitian.eigenvalues i) hi
+      ((ρ.tensorPower n).psd.isHermitian.eigenvalues i) hi
   simpa [typicalSubspaceProjector, c] using
     (spectralPredicateProjector_compress_le
-      (H := (ρ.tensorPower n).matrix)
-      (hH := (ρ.tensorPower n).pos.isHermitian)
+      (H := (ρ.tensorPower n).m)
+      (hH := (ρ.tensorPower n).psd.isHermitian)
       (p := fun i =>
-        typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i))
+        typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i))
       (c := c) hp)
 
 /-- The bundled projector statement used by downstream theorem routes. -/
 def typicalSubspaceProjector_statement
-    (ρ : State a) (n : ℕ) (δ : ℝ) : Prop :=
+    (ρ : MState a) (n : ℕ) (δ : ℝ) : Prop :=
   (ρ.typicalSubspaceProjector n δ).PosSemidef ∧
     (ρ.typicalSubspaceProjector n δ).IsHermitian ∧
     ρ.typicalSubspaceProjector n δ * ρ.typicalSubspaceProjector n δ =
@@ -610,7 +612,7 @@ def typicalSubspaceProjector_statement
 
 /-- The finite spectral typical-subspace projector satisfies the bundled
 projector statement. -/
-theorem typicalSubspaceProjector_statement_proved (ρ : State a) (n : ℕ) (δ : ℝ) :
+theorem typicalSubspaceProjector_statement_proved (ρ : MState a) (n : ℕ) (δ : ℝ) :
     ρ.typicalSubspaceProjector_statement n δ := by
   exact ⟨ρ.typicalSubspaceProjector_posSemidef n δ,
     ρ.typicalSubspaceProjector_isHermitian n δ,
@@ -623,13 +625,13 @@ This is the closure-level infrastructure consumed by later finite-N AEP
 routes: it records the spectral projector construction, rank/probability
 envelopes, exact trace identities, and the finite spectral Chebyshev
 concentration bridge for the tensor-power density matrix. -/
-structure TypicalProjectorEstimates (ρ : State a) (n : ℕ) (δ : ℝ) : Prop where
+structure TypicalProjectorEstimates (ρ : MState a) (n : ℕ) (δ : ℝ) : Prop where
   projector_statement : ρ.typicalSubspaceProjector_statement n δ
   trace_eq_dimension :
     (ρ.typicalSubspaceProjector n δ).trace.re =
       ρ.typicalSubspaceDimension n δ
   trace_weight_eq_spectralWeight :
-    (((ρ.tensorPower n).matrix * ρ.typicalSubspaceProjector n δ).trace).re =
+    (((ρ.tensorPower n).m * ρ.typicalSubspaceProjector n δ).trace).re =
       ρ.typicalSubspaceSpectralWeight n δ
   dimension_nonneg : 0 ≤ ρ.typicalSubspaceDimension n δ
   dimension_le_card :
@@ -656,7 +658,7 @@ structure TypicalProjectorEstimates (ρ : State a) (n : ℕ) (δ : ℝ) : Prop w
 
 /-- The finite spectral typical-subspace projector satisfies the complete
 estimate package required by the AEP proof route. -/
-theorem typicalSubspaceProjector_estimates (ρ : State a) (n : ℕ) (δ : ℝ) :
+theorem typicalSubspaceProjector_estimates (ρ : MState a) (n : ℕ) (δ : ℝ) :
     ρ.TypicalProjectorEstimates n δ where
   projector_statement := ρ.typicalSubspaceProjector_statement_proved n δ
   trace_eq_dimension := ρ.typicalSubspaceProjector_trace_re n δ
@@ -725,13 +727,13 @@ private lemma centeredLogDev_prod {x y Sx Sy : ℝ}
 /-- The single-system spectrum has mean-zero centered log deviation:
 `Σ_{x ∈ spec(ρ)} x · cd(S(ρ), x) = 0`. This centering is what collapses the
 variance-of-a-sum cross-terms. -/
-private lemma eigenvalueMultiset_centered_sum (ρ : State a) :
+private lemma eigenvalueMultiset_centered_sum (ρ : MState a) :
     (Multiset.map (fun x => x * centeredLogDev ρ.vonNeumann x)
-      (eigenvalueMultiset ρ.pos.isHermitian)).sum = 0 := by
+      (eigenvalueMultiset ρ.psd.isHermitian)).sum = 0 := by
   -- `Σ x · (-log2 x − S) = -Σ xlog2 x − S · Σ x = S − S · 1 = 0`.
-  have hS : ρ.vonNeumann = -((eigenvalueMultiset ρ.pos.isHermitian).map xlog2).sum :=
+  have hS : ρ.vonNeumann = -((eigenvalueMultiset ρ.psd.isHermitian).map xlog2).sum :=
     vonNeumann_eq_neg_sum_eigenvalueMultiset ρ
-  have hSum : (eigenvalueMultiset ρ.pos.isHermitian).sum = 1 :=
+  have hSum : (eigenvalueMultiset ρ.psd.isHermitian).sum = 1 :=
     eigenvalueMultiset_sum ρ
   -- Distribute `x . (-log2 x - S) = -(x . log2 x) - x . S` per element.
   rw [Multiset.map_congr rfl (fun x _ => by
@@ -739,7 +741,7 @@ private lemma eigenvalueMultiset_centered_sum (ρ : State a) :
         -(x * log2 x) + -(x * ρ.vonNeumann)
       simp only [centeredLogDev]
       ring)]
-  rw [multiset_sum_add_distrib]
+  rw [Multiset.sum_map_add]
   -- First summand: `Σ -(x·log2 x) = -Σ xlog2 x` after `x·log2 x = xlog2 x`.
   have hxl : ∀ x : ℝ, x * log2 x = xlog2 x := fun x => by
     by_cases hzx : x = 0 <;> simp [xlog2, hzx]
@@ -747,16 +749,15 @@ private lemma eigenvalueMultiset_centered_sum (ρ : State a) :
   simp only [Multiset.sum_map_neg, Multiset.map_congr rfl (fun x _ => hxl x),
     Multiset.map_congr rfl (fun x _ =>
       (show -(x * ρ.vonNeumann) = x * (-ρ.vonNeumann) from by ring))]
-  rw [multiset_sum_mul_const, Multiset.map_id', hSum, ← hS]
+  rw [Multiset.sum_map_mul_right, Multiset.map_id', hSum, ← hS]
   ring
 
-/-! ### Inner-sum variance-of-a-sum step
+/-! ### Inner-sum variance-of-a-sum step -/
 
-`Σ_{y ∈ t} (x · y) · (px + py)² = x · px² · (Σ t) + 2 · (x · px) · (Σ_t y·py)
+/-- `Σ_{y ∈ t} (x · y) · (px + py)² = x · px² · (Σ t) + 2 · (x · px) · (Σ_t y·py)
 + x · (Σ_t y · py²)`, a pure polynomial identity over a multiset (proved by
 induction with `ring`). Here `px`, `py` are arbitrary per-element reals. -/
-
-private lemma inner_variance_sum (t : Multiset ℝ) (x px : ℝ) (g : ℝ → ℝ) :
+lemma inner_variance_sum (t : Multiset ℝ) (x px : ℝ) (g : ℝ → ℝ) :
     (t.map fun y => x * y * (px + g y) ^ 2).sum =
       x * px ^ 2 * t.sum +
         2 * (x * px) * (t.map fun y => y * g y).sum +
@@ -779,8 +780,7 @@ the product-eigenvalue centered deviation splits as
 (Σ s)·(Σ_t y·gy²)`. This is a pure polynomial-multiset identity (the square
 expands and the `x`, `y` prefactors factor out of the disjoint sums), closed
 by `Multiset.induction_on` with `ring` at each step. -/
-
-private lemma kronecker_second_moment_step
+lemma kronecker_second_moment_step
     (s t : Multiset ℝ) (q : ℝ → ℝ) (pxOf : ℝ → ℝ) (gyOf : ℝ → ℝ)
     (hsplit : ∀ x ∈ s, ∀ y ∈ t,
       x * y * q (x * y) ^ 2 = x * y * (pxOf x + gyOf y) ^ 2) :
@@ -823,13 +823,13 @@ private lemma kronecker_second_moment_step
 deviation scaled by `Real.log 2` (so `Real.log_mul` linearizes the log of
 products; the `0 log 0 := 0` convention absorbs zero eigenvalues through the
 `μ` prefactor), equals `n` times the single-system analogue. -/
-private lemma secondMoment_tensorPower_scaled (ρ : State a) (n : ℕ) :
+private lemma secondMoment_tensorPower_scaled (ρ : MState a) (n : ℕ) :
     (Multiset.map (fun μ => μ *
         (Real.log 2 * centeredLogDev ((n : ℝ) * ρ.vonNeumann) μ) ^ 2)
-      (tensorPowerMultiset (eigenvalueMultiset ρ.pos.isHermitian) n)).sum =
+      (tensorPowerMultiset (eigenvalueMultiset ρ.psd.isHermitian) n)).sum =
       n * (Multiset.map (fun x => x *
         (Real.log 2 * centeredLogDev ρ.vonNeumann x) ^ 2)
-        (eigenvalueMultiset ρ.pos.isHermitian)).sum := by
+        (eigenvalueMultiset ρ.psd.isHermitian)).sum := by
   induction n with
   | zero =>
     rw [tensorPowerMultiset_zero]
@@ -841,8 +841,8 @@ private lemma secondMoment_tensorPower_scaled (ρ : State a) (n : ℕ) :
     -- Per-element product split: `(x*y)·(L·cd((k+1)S, x*y))² =
     -- (x*y)·(L·cd(S,x) + L·cd(kS,y))²`. The `(x*y)` prefactor absorbs the
     -- zero-eigenvalue case; the strictly-positive case uses `Real.log_mul`.
-    have hsplit : ∀ x ∈ eigenvalueMultiset ρ.pos.isHermitian,
-        ∀ y ∈ tensorPowerMultiset (eigenvalueMultiset ρ.pos.isHermitian) k,
+    have hsplit : ∀ x ∈ eigenvalueMultiset ρ.psd.isHermitian,
+        ∀ y ∈ tensorPowerMultiset (eigenvalueMultiset ρ.psd.isHermitian) k,
           x * y * (Real.log 2 * centeredLogDev (↑(k + 1) * ρ.vonNeumann) (x * y)) ^ 2 =
           x * y * (Real.log 2 * centeredLogDev ρ.vonNeumann x +
                     Real.log 2 * centeredLogDev ((k : ℝ) * ρ.vonNeumann) y) ^ 2 := by
@@ -859,8 +859,8 @@ private lemma secondMoment_tensorPower_scaled (ρ : State a) (n : ℕ) :
         ring
     -- Apply the variance-of-a-sum step.
     rw [kronecker_second_moment_step
-        (eigenvalueMultiset ρ.pos.isHermitian)
-        (tensorPowerMultiset (eigenvalueMultiset ρ.pos.isHermitian) k)
+        (eigenvalueMultiset ρ.psd.isHermitian)
+        (tensorPowerMultiset (eigenvalueMultiset ρ.psd.isHermitian) k)
         (fun μ => Real.log 2 * centeredLogDev (↑(k + 1) * ρ.vonNeumann) μ)
         (fun x => Real.log 2 * centeredLogDev ρ.vonNeumann x)
         (fun y => Real.log 2 * centeredLogDev ((k : ℝ) * ρ.vonNeumann) y)
@@ -870,7 +870,7 @@ private lemma secondMoment_tensorPower_scaled (ρ : State a) (n : ℕ) :
     -- Cross-term vanishes: `Σ_x x·(L·cd(S,x)) = L · Σ_x x·cd(S,x) = L·0 = 0`.
     have hCentered : (Multiset.map (fun x => x *
         (Real.log 2 * centeredLogDev ρ.vonNeumann x))
-        (eigenvalueMultiset ρ.pos.isHermitian)).sum = 0 := by
+        (eigenvalueMultiset ρ.psd.isHermitian)).sum = 0 := by
       have h := eigenvalueMultiset_centered_sum ρ
       -- Reorder the summand to `(Real.log 2) * (x · cd)` so `sum_map_mul_left`
       -- pulls the `Real.log 2` factor out of the sum.
@@ -881,11 +881,11 @@ private lemma secondMoment_tensorPower_scaled (ρ : State a) (n : ℕ) :
       ring
     -- Recognize the IH in the surviving `k`-fold second moment, then close by
     -- polynomial arithmetic (`hCentered` kills the cross-term).
-    rw [show ((tensorPowerMultiset (eigenvalueMultiset ρ.pos.isHermitian) k).map
+    rw [show ((tensorPowerMultiset (eigenvalueMultiset ρ.psd.isHermitian) k).map
           (fun y => y * (Real.log 2 * centeredLogDev ((k : ℝ) * ρ.vonNeumann) y) ^ 2)).sum
         = (Multiset.map (fun μ => μ *
             (Real.log 2 * centeredLogDev ((k : ℝ) * ρ.vonNeumann) μ) ^ 2)
-          (tensorPowerMultiset (eigenvalueMultiset ρ.pos.isHermitian) k)).sum from rfl]
+          (tensorPowerMultiset (eigenvalueMultiset ρ.psd.isHermitian) k)).sum from rfl]
     rw [ih]
     -- The cross-term's first factor is exactly `hCentered`; rewrite to `0`.
     rw [hCentered, mul_zero, zero_mul]
@@ -895,36 +895,36 @@ private lemma secondMoment_tensorPower_scaled (ρ : State a) (n : ℕ) :
 /-- Bridge: the `Finset.univ` definition of `typicalLogDeviationSecondMoment`
 is the multiset sum over the tensor-power spectrum, with bare (unscaled)
 centered deviations. -/
-private lemma typicalLogDeviationSecondMoment_eq_multiset (ρ : State a) (m : ℕ) :
+private lemma typicalLogDeviationSecondMoment_eq_multiset (ρ : MState a) (m : ℕ) :
     ρ.typicalLogDeviationSecondMoment m =
       (Multiset.map (fun μ => μ *
         (centeredLogDev ((m : ℝ) * ρ.vonNeumann) μ) ^ 2)
-        (tensorPowerMultiset (eigenvalueMultiset ρ.pos.isHermitian) m)).sum := by
+        (tensorPowerMultiset (eigenvalueMultiset ρ.psd.isHermitian) m)).sum := by
   classical
   unfold typicalLogDeviationSecondMoment
   -- The `let μ := ...` summand zeta-reduces to its body; restate without `let`.
   show (∑ i : TensorPower a m,
-      (ρ.tensorPower m).pos.isHermitian.eigenvalues i *
-        (-log2 ((ρ.tensorPower m).pos.isHermitian.eigenvalues i) -
+      (ρ.tensorPower m).psd.isHermitian.eigenvalues i *
+        (-log2 ((ρ.tensorPower m).psd.isHermitian.eigenvalues i) -
           (m : ℝ) * ρ.vonNeumann) ^ 2) =
     (Multiset.map (fun μ => μ *
       (centeredLogDev ((m : ℝ) * ρ.vonNeumann) μ) ^ 2)
-      (tensorPowerMultiset (eigenvalueMultiset ρ.pos.isHermitian) m)).sum
+      (tensorPowerMultiset (eigenvalueMultiset ρ.psd.isHermitian) m)).sum
   -- Convert the `Finset` sum to a multiset sum over `Finset.univ.val`.
   rw [Finset.sum_eq_multiset_sum]
   -- Restate the LHS map in composed form `((fun μ => μ·body μ) ∘ eig)`.
   conv_lhs => rw [show (fun (i : TensorPower a m) =>
-        (ρ.tensorPower m).pos.isHermitian.eigenvalues i *
-          (-log2 ((ρ.tensorPower m).pos.isHermitian.eigenvalues i) -
+        (ρ.tensorPower m).psd.isHermitian.eigenvalues i *
+          (-log2 ((ρ.tensorPower m).psd.isHermitian.eigenvalues i) -
             (m : ℝ) * ρ.vonNeumann) ^ 2) =
       (fun μ => μ * (-log2 μ - (m : ℝ) * ρ.vonNeumann) ^ 2) ∘
-        (ρ.tensorPower m).pos.isHermitian.eigenvalues from rfl]
+        (ρ.tensorPower m).psd.isHermitian.eigenvalues from rfl]
   -- `(fun μ => μ·body μ) ∘ eig` unfolds to `map (fun μ => μ·body μ) (map eig)`.
   rw [← Multiset.map_map]
   -- `map eig univ.val = eigenvalueMultiset (tensorPower.pos.isHermitian)`.
-  rw [show (Multiset.map (ρ.tensorPower m).pos.isHermitian.eigenvalues
+  rw [show (Multiset.map (ρ.tensorPower m).psd.isHermitian.eigenvalues
         Finset.univ.val) =
-      eigenvalueMultiset ((ρ.tensorPower m).pos.isHermitian) from rfl]
+      eigenvalueMultiset ((ρ.tensorPower m).psd.isHermitian) from rfl]
   -- Apply the tensor-power spectrum keystone.
   rw [eigenvalueMultiset_tensorPower ρ m]
   rfl
@@ -938,7 +938,7 @@ per-symbol centered deviations `(-log₂ μⱼ − S(ρ))` are independent with 
 `0`, so the variance-of-a-sum identity collapses the cross-terms and leaves
 `n` copies of the single-system second moment
 [Wilde2011Qst, qit-notes.tex:33634-33808]. -/
-theorem typicalLogDeviationSecondMoment_tensorPower (ρ : State a) (n : ℕ) :
+theorem typicalLogDeviationSecondMoment_tensorPower (ρ : MState a) (n : ℕ) :
     ρ.typicalLogDeviationSecondMoment n =
       n * ρ.typicalLogDeviationSecondMoment 1 := by
   rw [typicalLogDeviationSecondMoment_eq_multiset ρ n,
@@ -954,7 +954,8 @@ theorem typicalLogDeviationSecondMoment_tensorPower (ρ : State a) (n : ℕ) :
     | empty => simp
     | cons a s ih =>
       rw [Multiset.map_cons, Multiset.sum_cons, ih,
-          Multiset.map_cons, Multiset.sum_cons]; ring
+          Multiset.map_cons, Multiset.sum_cons]
+      ring
   have hL2 : (Real.log 2) ^ 2 ≠ 0 :=
     pow_ne_zero 2 (Real.log_pos (by norm_num : (1 : ℝ) < 2)).ne'
   -- The scaled workhorse: `Σ_{μ ∈ TP_n} μ·(L·cd(nS,μ))² = n·Σ_{x∈s} x·(L·cd(S,x))²`.
@@ -964,52 +965,52 @@ theorem typicalLogDeviationSecondMoment_tensorPower (ρ : State a) (n : ℕ) :
   -- ambiguity of a bare `rw [hFactor] at hScaleN`).
   have hFn : (Multiset.map (fun μ => μ *
         (Real.log 2 * centeredLogDev ((n : ℝ) * ρ.vonNeumann) μ) ^ 2)
-        (tensorPowerMultiset (eigenvalueMultiset ρ.pos.isHermitian) n)).sum =
+        (tensorPowerMultiset (eigenvalueMultiset ρ.psd.isHermitian) n)).sum =
       (Real.log 2) ^ 2 *
         (Multiset.map (fun μ => μ *
           (centeredLogDev ((n : ℝ) * ρ.vonNeumann) μ) ^ 2)
-          (tensorPowerMultiset (eigenvalueMultiset ρ.pos.isHermitian) n)).sum :=
+          (tensorPowerMultiset (eigenvalueMultiset ρ.psd.isHermitian) n)).sum :=
     hFactor _ _
   have hF1 : (Multiset.map (fun x => x *
         (Real.log 2 * centeredLogDev ρ.vonNeumann x) ^ 2)
-        (eigenvalueMultiset ρ.pos.isHermitian)).sum =
+        (eigenvalueMultiset ρ.psd.isHermitian)).sum =
       (Real.log 2) ^ 2 *
         (Multiset.map (fun x => x *
           (centeredLogDev ρ.vonNeumann x) ^ 2)
-          (eigenvalueMultiset ρ.pos.isHermitian)).sum :=
+          (eigenvalueMultiset ρ.psd.isHermitian)).sum :=
     hFactor _ _
   -- Substitute into `hScaleN`: `L² · T_n = n · (L² · T_1)`.
   have hKey : (Real.log 2) ^ 2 *
       (Multiset.map (fun μ => μ *
         (centeredLogDev ((n : ℝ) * ρ.vonNeumann) μ) ^ 2)
-        (tensorPowerMultiset (eigenvalueMultiset ρ.pos.isHermitian) n)).sum =
+        (tensorPowerMultiset (eigenvalueMultiset ρ.psd.isHermitian) n)).sum =
       (Real.log 2) ^ 2 *
         ((n : ℝ) * (Multiset.map (fun x => x *
           (centeredLogDev ρ.vonNeumann x) ^ 2)
-          (eigenvalueMultiset ρ.pos.isHermitian)).sum) := by
+          (eigenvalueMultiset ρ.psd.isHermitian)).sum) := by
     rw [← hFn, hScaleN, hF1]
     ring
   -- Cancel the left factor `L² ≠ 0`.
   have hEq :
       (Multiset.map (fun μ => μ *
         (centeredLogDev ((n : ℝ) * ρ.vonNeumann) μ) ^ 2)
-        (tensorPowerMultiset (eigenvalueMultiset ρ.pos.isHermitian) n)).sum =
+        (tensorPowerMultiset (eigenvalueMultiset ρ.psd.isHermitian) n)).sum =
       (n : ℝ) * (Multiset.map (fun x => x *
         (centeredLogDev ρ.vonNeumann x) ^ 2)
-        (eigenvalueMultiset ρ.pos.isHermitian)).sum :=
+        (eigenvalueMultiset ρ.psd.isHermitian)).sum :=
     mul_left_cancel₀ hL2 hKey
   -- The LHS of the goal is exactly `hEq`'s LHS; close by `hEq` after
   -- recognizing the single-system RHS.
   conv_lhs => rw [hEq]
   -- The goal RHS is `n · Σ_{μ ∈ TP_1} μ·cd((1:ℝ)*S, μ)²`. Recognize
   -- `TP s 1 = s` and `(1:ℝ)*S = S`.
-  have hTP1 : tensorPowerMultiset (eigenvalueMultiset ρ.pos.isHermitian) 1 =
-      eigenvalueMultiset ρ.pos.isHermitian := by
+  have hTP1 : tensorPowerMultiset (eigenvalueMultiset ρ.psd.isHermitian) 1 =
+      eigenvalueMultiset ρ.psd.isHermitian := by
     -- `tensorPowerMultiset s 1 = s.bind (fun x => {1}.map (fun y => x*y))`,
     -- and `{1}.map (· * x) = {x}`, so each `x` maps to the singleton `{x}`;
     -- the bind over `s` of singletons is `s` itself.
     rw [tensorPowerMultiset_succ, tensorPowerMultiset_zero]
-    induction (eigenvalueMultiset ρ.pos.isHermitian) using Multiset.induction_on with
+    induction (eigenvalueMultiset ρ.psd.isHermitian) using Multiset.induction_on with
     | empty => simp
     | cons a s ih =>
       rw [Multiset.cons_bind, Multiset.map_singleton, ih]
@@ -1021,7 +1022,7 @@ theorem typicalLogDeviationSecondMoment_tensorPower (ρ : State a) (n : ℕ) :
 /-- The centered log-eigenvalue second moment is bounded by a constant
 (the single-system second moment) times `n`. This is the linear-in-`n`
 variance bound consumed by the high-probability form below. -/
-theorem typicalLogDeviationSecondMoment_le_tensorPower (ρ : State a) (n : ℕ) :
+theorem typicalLogDeviationSecondMoment_le_tensorPower (ρ : MState a) (n : ℕ) :
     ρ.typicalLogDeviationSecondMoment n ≤
       n * ρ.typicalLogDeviationSecondMoment 1 :=
   (ρ.typicalLogDeviationSecondMoment_tensorPower n).le
@@ -1035,7 +1036,7 @@ Combining the linear-in-`n` variance bound with the spectral Chebyshev
 bridge gives `atypicalWeight ≤ (n · C) / (n δ)² = C / (n · δ²) ≤ ε` once
 `n ≥ C / (ε · δ²)`, hence `typicalWeight = 1 − atypicalWeight ≥ 1 − ε`. -/
 theorem typicalSubspaceSpectralWeight_high_probability
-    (ρ : State a) {n : ℕ} {δ ε : ℝ} (hn : 0 < n) (hδ : 0 < δ) (hε : 0 < ε)
+    (ρ : MState a) {n : ℕ} {δ ε : ℝ} (hn : 0 < n) (hδ : 0 < δ) (hε : 0 < ε)
     (hthresh : (ρ.typicalLogDeviationSecondMoment 1 / (ε * δ ^ 2)) ≤ n) :
     1 - ε ≤ ρ.typicalSubspaceSpectralWeight n δ := by
   -- Chebyshev lower bound.
@@ -1062,11 +1063,10 @@ theorem typicalSubspaceSpectralWeight_high_probability
     linarith [show (n : ℝ) * (ε * δ ^ 2) = ε * ((n : ℝ) * δ ^ 2) from by ring]
   linarith [(div_le_iff₀ (mul_pos hnR hδ2pos)).mpr hrearrange]
 
-
 /-- Dual form: the atypical spectral weight is at most `ε` past the
 threshold `n ≥ C / (ε δ²)`. -/
 theorem atypicalSubspaceSpectralWeight_high_probability
-    (ρ : State a) {n : ℕ} {δ ε : ℝ} (hn : 0 < n) (hδ : 0 < δ) (hε : 0 < ε)
+    (ρ : MState a) {n : ℕ} {δ ε : ℝ} (hn : 0 < n) (hδ : 0 < δ) (hε : 0 < ε)
     (hthresh : (ρ.typicalLogDeviationSecondMoment 1 / (ε * δ ^ 2)) ≤ n) :
     ρ.atypicalSubspaceSpectralWeight n δ ≤ ε := by
   have hpart := ρ.typicalSubspaceSpectralWeight_add_atypical n δ
@@ -1095,7 +1095,7 @@ equipartition envelope; it follows from the right inequality of the
 predicate's centered-log bound, by exponentiating with `2^{x} = exp(x·log 2)`
 [Wilde2011Qst, qit-notes.tex:31457-31598]. -/
 theorem typicalEigenvalue_ge_eigenvalueLowerBound
-    (ρ : State a) (n : ℕ) (δ μ : ℝ) (h : typicalEigenvalue ρ n δ μ) :
+    (ρ : MState a) (n : ℕ) (δ μ : ℝ) (h : typicalEigenvalue ρ n δ μ) :
     2 ^ (-((n : ℝ) * ρ.vonNeumann + (n : ℝ) * δ)) ≤ μ := by
   obtain ⟨hμ_pos, habs⟩ := h
   -- Right half of the absolute-value bound:
@@ -1124,17 +1124,17 @@ theorem typicalEigenvalue_ge_eigenvalueLowerBound
 /-- The single-copy centered log-eigenvalue second moment
 `Σ_{j} λ_j · (-log2 λ_j − S(ρ))²`, the per-system variance consumed by the
 tensor-power second-moment identity. -/
-noncomputable def singleCopyLogDeviationSecondMoment (ρ : State a) : ℝ :=
-  ∑ i : a, (ρ.pos.isHermitian.eigenvalues i) *
-    ((-log2 (ρ.pos.isHermitian.eigenvalues i)) - ρ.vonNeumann) ^ 2
+noncomputable def singleCopyLogDeviationSecondMoment (ρ : MState a) : ℝ :=
+  ∑ i : a, (ρ.psd.isHermitian.eigenvalues i) *
+    ((-log2 (ρ.psd.isHermitian.eigenvalues i)) - ρ.vonNeumann) ^ 2
 
 /-- The single-copy second moment is nonnegative (sum of `λ·(·)²` with `λ ≥ 0`). -/
-theorem singleCopyLogDeviationSecondMoment_nonneg (ρ : State a) :
+theorem singleCopyLogDeviationSecondMoment_nonneg (ρ : MState a) :
     0 ≤ ρ.singleCopyLogDeviationSecondMoment := by
   unfold singleCopyLogDeviationSecondMoment
   apply Finset.sum_nonneg
   intro i _
-  exact mul_nonneg (ρ.pos.eigenvalues_nonneg i) (sq_nonneg _)
+  exact mul_nonneg (ρ.psd.eigenvalues_nonneg i) (sq_nonneg _)
 
 /-- The `n = 1` tensor-power multiset is the original spectrum:
 `tensorPowerMultiset s 1 = s`. -/
@@ -1150,17 +1150,17 @@ private lemma tensorPowerMultiset_one (s : Multiset ℝ) :
 /-- Bridge: the `Finset.univ` definition of `singleCopyLogDeviationSecondMoment`
 is the multiset sum over the eigenvalue spectrum, with bare (unscaled) centered
 deviations. -/
-private lemma singleCopyLogDeviationSecondMoment_eq_multiset (ρ : State a) :
+private lemma singleCopyLogDeviationSecondMoment_eq_multiset (ρ : MState a) :
     ρ.singleCopyLogDeviationSecondMoment =
       (Multiset.map (fun μ => μ * (centeredLogDev ρ.vonNeumann μ) ^ 2)
-        (eigenvalueMultiset ρ.pos.isHermitian)).sum := by
+        (eigenvalueMultiset ρ.psd.isHermitian)).sum := by
   unfold singleCopyLogDeviationSecondMoment
   rw [Finset.sum_eq_multiset_sum]
   conv_lhs => rw [show (fun (i : a) =>
-        (ρ.pos.isHermitian.eigenvalues i) *
-          ((-log2 (ρ.pos.isHermitian.eigenvalues i)) - ρ.vonNeumann) ^ 2) =
+        (ρ.psd.isHermitian.eigenvalues i) *
+          ((-log2 (ρ.psd.isHermitian.eigenvalues i)) - ρ.vonNeumann) ^ 2) =
       (fun μ => μ * (centeredLogDev ρ.vonNeumann μ) ^ 2) ∘
-        ρ.pos.isHermitian.eigenvalues from rfl]
+        ρ.psd.isHermitian.eigenvalues from rfl]
   rw [← Multiset.map_map]
   rfl
 
@@ -1173,7 +1173,7 @@ per-symbol centered deviations `(-log₂ μⱼ − S(ρ))` are independent with 
 `0`, so the variance-of-a-sum identity collapses the cross-terms and leaves
 `n` copies of the single-system second moment
 [Wilde2011Qst, qit-notes.tex:33634-33808]. -/
-theorem typicalLogDeviationSecondMoment_eq (ρ : State a) (n : ℕ) :
+theorem typicalLogDeviationSecondMoment_eq (ρ : MState a) (n : ℕ) :
     ρ.typicalLogDeviationSecondMoment n =
       (n : ℝ) * ρ.singleCopyLogDeviationSecondMoment := by
   -- The multiset-expansion identity is already established as
@@ -1195,7 +1195,7 @@ For each typical eigenvalue `μ`, the lower-bound equipartition (A) gives
 `1 ≤ μ · 2^{n(S+δ)}`; summing over typical indices produces
 `Σ 1 ≤ 2^{n(S+δ)} · typicalWeight ≤ 2^{n(S+δ)}`
 [Wilde2011Qst, qit-notes.tex:31457-31598]. -/
-theorem typicalSubspaceDimension_le_two_pow (ρ : State a) (n : ℕ) (δ : ℝ) :
+theorem typicalSubspaceDimension_le_two_pow (ρ : MState a) (n : ℕ) (δ : ℝ) :
     ρ.typicalSubspaceDimension n δ ≤ 2 ^ ((n : ℝ) * (ρ.vonNeumann + δ)) := by
   classical
   have h2pos : (0 : ℝ) < 2 := by norm_num
@@ -1210,31 +1210,31 @@ theorem typicalSubspaceDimension_le_two_pow (ρ : State a) (n : ℕ) (δ : ℝ) 
   unfold typicalSubspaceDimension
   calc
     (∑ i : TensorPower a n,
-        if typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
+        if typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
         then (1 : ℝ) else 0)
       ≤ ∑ i : TensorPower a n,
-          (if typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
-            then ((ρ.tensorPower n).pos.isHermitian.eigenvalues i) *
+          (if typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
+            then ((ρ.tensorPower n).psd.isHermitian.eigenvalues i) *
               (2 ^ ((n : ℝ) * (ρ.vonNeumann + δ)))
             else (0 : ℝ)) := by
         apply Finset.sum_le_sum
         intro i _
-        by_cases hi : typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
+        by_cases hi : typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
         · simp only [hi, if_true]
           have hlower : 2 ^ (-((n : ℝ) * ρ.vonNeumann + (n : ℝ) * δ))
-              ≤ (ρ.tensorPower n).pos.isHermitian.eigenvalues i :=
+              ≤ (ρ.tensorPower n).psd.isHermitian.eigenvalues i :=
             ρ.typicalEigenvalue_ge_eigenvalueLowerBound n δ _ hi
           rw [h1eq]
           exact mul_le_mul_of_nonneg_right hlower hfactor_pos.le
         · simp only [hi, if_false, le_refl]
     _ = 2 ^ ((n : ℝ) * (ρ.vonNeumann + δ)) *
         ∑ i : TensorPower a n,
-          (if typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
-            then (ρ.tensorPower n).pos.isHermitian.eigenvalues i else (0 : ℝ)) := by
+          (if typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
+            then (ρ.tensorPower n).psd.isHermitian.eigenvalues i else (0 : ℝ)) := by
         rw [Finset.mul_sum]
         apply Finset.sum_congr rfl
         intro i _
-        by_cases hi : typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
+        by_cases hi : typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
         · simp only [hi, if_true]
           ring
         · simp only [hi, if_false]
@@ -1247,7 +1247,7 @@ theorem typicalSubspaceDimension_le_two_pow (ρ : State a) (n : ℕ) (δ : ℝ) 
 /-- The accepted spectral weight is bounded by the number of accepted spectral
 directions times the typical eigenvalue upper envelope. -/
 theorem typicalSubspaceSpectralWeight_le_dimension_mul_eigenvalueUpperBound
-    (ρ : State a) (n : ℕ) (δ : ℝ) :
+    (ρ : MState a) (n : ℕ) (δ : ℝ) :
     ρ.typicalSubspaceSpectralWeight n δ ≤
       ρ.typicalSubspaceDimension n δ *
         2 ^ (-((n : ℝ) * ρ.vonNeumann - (n : ℝ) * δ)) := by
@@ -1258,30 +1258,30 @@ theorem typicalSubspaceSpectralWeight_le_dimension_mul_eigenvalueUpperBound
   unfold typicalSubspaceSpectralWeight typicalSubspaceDimension
   calc
     (∑ i : TensorPower a n,
-        if typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
-        then (ρ.tensorPower n).pos.isHermitian.eigenvalues i else 0)
+        if typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
+        then (ρ.tensorPower n).psd.isHermitian.eigenvalues i else 0)
       ≤ ∑ i : TensorPower a n,
-          (if typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
+          (if typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
             then upper else 0) := by
         apply Finset.sum_le_sum
         intro i _
         by_cases hi : typicalEigenvalue ρ n δ
-            ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
+            ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
         · simp only [hi, if_true]
           exact ρ.typicalEigenvalue_le_eigenvalueUpperBound n δ _ hi
         · simp only [hi, if_false, le_refl]
     _ = (∑ i : TensorPower a n,
-          if typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
+          if typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
           then (1 : ℝ) else 0) * upper := by
         rw [Finset.sum_mul]
         apply Finset.sum_congr rfl
         intro i _
         by_cases hi : typicalEigenvalue ρ n δ
-            ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
+            ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
         · simp only [hi, if_true, one_mul]
         · simp only [hi, if_false, zero_mul]
     _ = (∑ i : TensorPower a n,
-          if typicalEigenvalue ρ n δ ((ρ.tensorPower n).pos.isHermitian.eigenvalues i)
+          if typicalEigenvalue ρ n δ ((ρ.tensorPower n).psd.isHermitian.eigenvalues i)
           then (1 : ℝ) else 0) *
         2 ^ (-((n : ℝ) * ρ.vonNeumann - (n : ℝ) * δ)) := by
         rfl
@@ -1290,7 +1290,7 @@ theorem typicalSubspaceSpectralWeight_le_dimension_mul_eigenvalueUpperBound
 exponent slack between the target rate window `δ` and the internal typicality
 window `δ'`. -/
 theorem two_pow_sub_le_typicalSubspaceDimension_of_half_le_spectralWeight
-    (ρ : State a) {n : ℕ} {δ δ' : ℝ}
+    (ρ : MState a) {n : ℕ} {δ δ' : ℝ}
     (hweight : (1 / 2 : ℝ) ≤ ρ.typicalSubspaceSpectralWeight n δ')
     (hslack : 1 ≤ (n : ℝ) * (δ - δ')) :
     (2 : ℝ) ^ ((n : ℝ) * (ρ.vonNeumann - δ)) ≤
@@ -1328,7 +1328,7 @@ theorem two_pow_sub_le_typicalSubspaceDimension_of_half_le_spectralWeight
 Combines the Chebyshev bridge `atypical ≤ secondMoment / (nδ)²` with the exact
 second-moment identity `secondMoment = n · singleCopy`, giving
 `atypical ≤ singleCopy / (n · δ²) → 0` [Wilde2011Qst, qit-notes.tex:31457-31598]. -/
-theorem tendsto_atypicalSubspaceSpectralWeight (ρ : State a) {δ : ℝ} (hδ : 0 < δ) :
+theorem tendsto_atypicalSubspaceSpectralWeight (ρ : MState a) {δ : ℝ} (hδ : 0 < δ) :
     Tendsto (fun n : ℕ => ρ.atypicalSubspaceSpectralWeight n δ) atTop (nhds 0) := by
   have hδ2pos : 0 < δ ^ 2 := sq_pos_of_pos hδ
   -- Chebyshev bound holds for `n ≥ 1`:
@@ -1373,7 +1373,7 @@ theorem tendsto_atypicalSubspaceSpectralWeight (ρ : State a) {δ : ℝ} (hδ : 
 
 Follows from the partition `typical + atypical = 1` and
 `tendsto_atypicalSubspaceSpectralWeight` [Wilde2011Qst, qit-notes.tex:31457-31598]. -/
-theorem tendsto_typicalSubspaceSpectralWeight (ρ : State a) {δ : ℝ} (hδ : 0 < δ) :
+theorem tendsto_typicalSubspaceSpectralWeight (ρ : MState a) {δ : ℝ} (hδ : 0 < δ) :
     Tendsto (fun n : ℕ => ρ.typicalSubspaceSpectralWeight n δ) atTop (nhds 1) := by
   -- `typical n δ = 1 - atypical n δ` via the partition identity.
   have hCast : (fun n : ℕ => ρ.typicalSubspaceSpectralWeight n δ) =
@@ -1387,7 +1387,7 @@ theorem tendsto_typicalSubspaceSpectralWeight (ρ : State a) {δ : ℝ} (hδ : 0
 `2^{n(S(ρ)-δ)}` when the caller supplies a smaller positive internal
 typicality window `δ' < δ`. -/
 theorem eventually_two_pow_sub_le_typicalSubspaceDimension
-    (ρ : State a) {δ δ' : ℝ} (hδ' : 0 < δ') (hslack : δ' < δ) :
+    (ρ : MState a) {δ δ' : ℝ} (hδ' : 0 < δ') (hslack : δ' < δ) :
     ∃ N : ℕ, ∀ n ≥ N,
       (2 : ℝ) ^ ((n : ℝ) * (ρ.vonNeumann - δ)) ≤
         ρ.typicalSubspaceDimension n δ' := by
@@ -1421,8 +1421,4 @@ theorem eventually_two_pow_sub_le_typicalSubspaceDimension
       hweight hnslack
   exact Filter.eventually_atTop.mp hevent
 
-end State
-
-end
-
-end QIT
+end MState

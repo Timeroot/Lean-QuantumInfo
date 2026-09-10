@@ -45,15 +45,14 @@ right-hand extra terms to zero as `ε → 0⁺` and `δ → 0⁺`, concluding
 
 @[expose] public section
 
-namespace QIT
-
-open Filter
-
-universe u
-
 noncomputable section
-
+open Filter
+universe u
 variable {a : Type u} [Fintype a] [DecidableEq a]
+
+open QIT
+
+namespace QIT
 
 namespace SchumacherCompressionCode
 
@@ -68,23 +67,23 @@ theorem applyState_id_prod_comp_id_prod
     {R : Type u} {A : Type u} {W : Type u} {A' : Type u}
     [Fintype R] [DecidableEq R] [Fintype A] [DecidableEq A]
     [Fintype W] [DecidableEq W] [Fintype A'] [DecidableEq A']
-    (φ : State (Prod R A)) (E : Channel A W) (D : Channel W A') :
-    ((Channel.idChannel R).prod D).applyState
-        (((Channel.idChannel R).prod E).applyState φ) =
-      ((Channel.idChannel R).prod (D.comp E)).applyState φ := by
-  apply State.ext
-  change MatrixMap.kron (Channel.idChannel R).map D.map
-      (MatrixMap.kron (Channel.idChannel R).map E.map φ.matrix) =
-    MatrixMap.kron (Channel.idChannel R).map (D.comp E).map φ.matrix
+    (φ : MState (R × A)) (E : CPTPMap A W) (D : CPTPMap W A') :
+    ((CPTPOp.id (dIn := R)).prod D)
+        (((CPTPOp.id (dIn := R)).prod E) φ) =
+      ((CPTPOp.id (dIn := R)).prod (D ∘ₘ E)) φ := by
+  apply MState.ext
+  simp only [CPTPOp.mat_coe_eq_apply_mat, CPTPOp.prod_map, CPTPOp.compose_map]
   rw [MatrixMap.kron_comp_apply_general,
-    Channel.idChannel_map_eq_linearMap_id]
+    CPTPOp.id_map]
   simp only [LinearMap.id_comp]
-  rfl
 
 end SchumacherCompressionCode
 
-namespace State
+end QIT
 
+namespace MState
+
+set_option maxRecDepth 4000 in
 /-- The single-code Schumacher converse bound (multiplicative form).
 
 For one compression code `C` at block length `n ≥ 1` with joint error at most
@@ -93,26 +92,26 @@ For one compression code `C` at block length `n ≥ 1` with joint error at most
 form avoids division by `n` here; the per-copy form is extracted in the final
 theorem. -/
 theorem schumacher_converse_single_code
-    (ρ : State a) (ε : ℝ) (n : ℕ) (hn : 1 ≤ n)
+    (ρ : MState a) (ε : ℝ) (n : ℕ) (hn : 1 ≤ n)
     {W : Type u} [Fintype W] [DecidableEq W]
     (C : SchumacherCompressionCode ρ n W) (herr : C.jointError ≤ ε) :
     2 * (n : ℝ) * ρ.schumacherRate ≤ 2 * (n : ℝ) * C.rate +
       afwContinuityModulus (Fintype.card (TensorPower a n)) ε := by
-  -- State the type aliases and the canonical Wilde states.
-  let Rn := TensorPower a n
-  let ψ : PureVector (Prod a a) := State.canonicalPurification ρ
-  let φ : State (Prod Rn Rn) := ψ.state.tensorPowerBipartite n
-  let τ : State (Prod Rn W) :=
-    ((Channel.idChannel Rn).prod C.encoder).applyState φ
-  let N : Channel Rn Rn := C.decoder.comp C.encoder
-  let ω : State (Prod Rn Rn) := ((Channel.idChannel Rn).prod N).applyState φ
+  -- Set up the type aliases and the canonical Wilde states.
+  let Rn := QIT.TensorPower a n
+  let ψ : Ket (a × a) := MState.canonicalPurification ρ
+  let φ : MState (Rn × Rn) := ψ.state.tensorPowerBipartite n
+  let τ : MState (Rn × W) :=
+    ((CPTPOp.id (dIn := Rn)).prod C.encoder) φ
+  let N : CPTPMap Rn Rn := C.decoder ∘ₘ C.encoder
+  let ω : MState (Rn × Rn) := ((CPTPOp.id (dIn := Rn)).prod N) φ
   -- (1) `C.jointError` is definitionally `ω.normalizedTraceDistance φ`.
   have herr' : ω.normalizedTraceDistance φ ≤ ε := by
     have heq : C.jointError = ω.normalizedTraceDistance φ := rfl
     rw [← heq]
     exact herr
   -- (2) The two-step `(id ⊗ D) ∘ (id ⊗ E)` equals the one-step `id ⊗ (D ∘ E)`.
-  have hω_two : ((Channel.idChannel Rn).prod C.decoder).applyState τ = ω :=
+  have hω_two : ((CPTPOp.id (dIn := Rn)).prod C.decoder) τ = ω :=
     SchumacherCompressionCode.applyState_id_prod_comp_id_prod φ C.encoder C.decoder
   -- (3) Step 1: right-system dimension bound `I(W;Rⁿ)_τ ≤ 2 log|W|`.
   have hdim : QIT.mutualInformation τ ≤ 2 * log2 (Fintype.card W) :=
@@ -121,26 +120,26 @@ theorem schumacher_converse_single_code
   have hDPI : QIT.mutualInformation ω ≤ QIT.mutualInformation τ := by
     rw [← hω_two]
     exact mutualInformation_dataProcessing_local_channels_ge τ
-      (Channel.idChannel Rn) C.decoder
+      (CPTPOp.id (dIn := Rn)) C.decoder
   -- (5) The Rⁿ marginal is preserved by `(id ⊗ N)`.
-  have hmarg : vonNeumann ω.marginalA = vonNeumann φ.marginalA := by
-    have hωmarg : ω.marginalA = φ.marginalA := by
-      have h1 : (((Channel.idChannel Rn).prod C.decoder).applyState τ).marginalA =
-          τ.marginalA :=
-        State.marginalA_applyState_id_prod τ C.decoder
-      have h2 : (((Channel.idChannel Rn).prod C.encoder).applyState φ).marginalA =
-          φ.marginalA :=
-        State.marginalA_applyState_id_prod φ C.encoder
+  have hmarg : vonNeumann ω.traceRight = vonNeumann φ.traceRight := by
+    have hωmarg : ω.traceRight = φ.traceRight := by
+      have h1 : MState.traceRight (((CPTPOp.id (dIn := Rn)).prod C.decoder) τ) =
+          τ.traceRight :=
+        MState.traceRight_applyState_id_prod τ C.decoder
+      have h2 : MState.traceRight (((CPTPOp.id (dIn := Rn)).prod C.encoder) φ) =
+          φ.traceRight :=
+        MState.traceRight_applyState_id_prod φ C.encoder
       rw [← hω_two, h1, h2]
-    exact congrArg State.vonNeumann hωmarg
+    exact congrArg MState.vonNeumann hωmarg
   -- (6) Step 3: AFW continuity of the conditional entropy.
-  have hMIdecomp (σ : State (Prod Rn Rn)) :
-      QIT.mutualInformation σ = vonNeumann σ.marginalA - σ.conditionalEntropy := by
-    rw [QIT.mutualInformation, State.conditionalEntropy_eq]
+  have hMIdecomp (σ : MState (Rn × Rn)) :
+      QIT.mutualInformation σ = vonNeumann σ.traceRight - σ.conditionalEntropy := by
+    rw [QIT.mutualInformation, MState.conditionalEntropy_eq]
     ring
   have hafw : |ω.conditionalEntropy - φ.conditionalEntropy| ≤
       afwContinuityModulus (Fintype.card Rn) ε :=
-    State.alickiFannesWinter_conditionalEntropy ω φ ε herr'
+    MState.alickiFannesWinter_conditionalEntropy ω φ ε herr'
   have hafw_bound : QIT.mutualInformation ω ≥ QIT.mutualInformation φ -
       afwContinuityModulus (Fintype.card Rn) ε := by
     rw [hMIdecomp ω, hMIdecomp φ, hmarg]
@@ -151,14 +150,15 @@ theorem schumacher_converse_single_code
     mutualInformation_tensorPowerBipartite ψ.state n
   -- (8) Step 5: mutual information of the pure bipartite purification is 2 S(ρ).
   have hψ_pure : ψ.state.vonNeumann = 0 :=
-    pureVector_vonNeumann_eq_zero ψ
-  have hψ_marg : ψ.state.marginalA.vonNeumann = ψ.state.marginalB.vonNeumann :=
-    pureVector_marginalA_vonNeumann_eq_marginalB ψ
-  have hψ_mB : ψ.state.marginalB = ρ := by
-    apply State.ext
-    exact State.canonicalPurification_purifies ρ
-  have hψ_mB_vN : vonNeumann ψ.state.marginalB = vonNeumann ρ :=
-    congrArg State.vonNeumann hψ_mB
+    ket_vonNeumann_eq_zero ψ
+  have hψ_marg : ψ.state.traceRight.vonNeumann = ψ.state.traceLeft.vonNeumann :=
+    ket_traceRight_vonNeumann_eq_traceLeft ψ
+  have hψ_mB : ψ.state.traceLeft = ρ := by
+    apply MState.ext
+    rw [MState.traceLeft_m]
+    exact MState.canonicalPurification_purifies ρ
+  have hψ_mB_vN : vonNeumann ψ.state.traceLeft = vonNeumann ρ :=
+    congrArg MState.vonNeumann hψ_mB
   have hψ_rate : ρ.schumacherRate = vonNeumann ρ := rfl
   have hφ_pure : QIT.mutualInformation ψ.state = 2 * ρ.schumacherRate := by
     rw [QIT.mutualInformation]
@@ -179,7 +179,9 @@ theorem schumacher_converse_single_code
     field_simp
   linarith
 
-end State
+end MState
+
+namespace QIT
 
 omit [DecidableEq a] in
 /-- Per-copy upper bound on the tensor-power AFW modulus.
@@ -197,7 +199,7 @@ private theorem afwContinuityModulus_tensorPower_div_le
   have h2nR_pos : (0 : ℝ) < 2 * (n : ℝ) := by linarith
   have hlog : log2 ((Fintype.card (TensorPower a n) : ℕ) : ℝ) =
       (n : ℝ) * log2 ((Fintype.card a : ℕ) : ℝ) :=
-    State.log2_tensorPower_card n
+    MState.log2_tensorPower_card n
   have hbe : 0 ≤ binaryEntropy (ε / (1 + ε)) :=
     binaryEntropy_afw_argument_nonneg hε0
   have h1pe : 0 ≤ 1 + ε := by linarith
@@ -222,7 +224,7 @@ private theorem afwContinuityModulus_tensorPower_div_le
 Every achievable rate `R` for an IID quantum source `ρ` under the joint
 (purification) trace-distance error criterion satisfies `S(ρ) ≤ R`
 [Wilde2011Qst, qit-notes.tex:31610-31690]. -/
-theorem schumacher_converse (ρ : State a) (R : ℝ)
+theorem schumacher_converse (ρ : MState a) (R : ℝ)
     (hR : ρ.IsAchievableSchumacherRate R) : ρ.schumacherRate ≤ R := by
   by_contra hcontra
   push Not at hcontra
@@ -273,7 +275,7 @@ theorem schumacher_converse (ρ : State a) (R : ℝ)
   let : DecidableEq W := hWdec
   -- Single-code Wilde chain at block length `n`.
   have hsingle :=
-    State.schumacher_converse_single_code ρ ε₀ n hn C herr
+    MState.schumacher_converse_single_code ρ ε₀ n hn C herr
   -- Per-copy AFW modulus bound `afwContinuityModulus |Aⁿ| ε₀ / (2n) ≤` the
   -- block-length-independent estimate.
   have hbound :=

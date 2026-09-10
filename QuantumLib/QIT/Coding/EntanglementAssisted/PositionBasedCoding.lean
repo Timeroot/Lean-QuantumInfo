@@ -27,9 +27,9 @@ one-shot lower bound are separate proof layers.
 
 open scoped ComplexOrder MatrixOrder
 
-namespace QIT
-
 universe u v
+
+namespace QIT
 
 noncomputable section
 
@@ -45,7 +45,7 @@ abbrev CoordComplement (k : ℕ) (m : Fin k) :=
 /-- Split a function on `Fin k` into one distinguished coordinate and the
 remaining coordinates. -/
 def finFunctionCoordSplitEquiv (k : ℕ) (m : Fin k) :
-    (Fin k → a) ≃ Prod (TensorPower a 1) (CoordComplement (a := a) k m) where
+    (Fin k → a) ≃ (TensorPower a 1 × CoordComplement (a := a) k m) where
   toFun f := ((f m, PUnit.unit), fun i => f i.1)
   invFun y := fun i => if h : i = m then y.1.1 else y.2 ⟨i, h⟩
   left_inv f := by
@@ -68,7 +68,7 @@ def finFunctionCoordSplitEquiv (k : ℕ) (m : Fin k) :
 coordinates.  The one-coordinate output is kept in the project's
 `TensorPower a 1` convention so it can be used as a one-use channel input. -/
 def coordSplitEquiv (k : ℕ) (m : Fin k) :
-    TensorPower a k ≃ Prod (TensorPower a 1) (CoordComplement (a := a) k m) :=
+    TensorPower a k ≃ (TensorPower a 1 × CoordComplement (a := a) k m) :=
   (tensorPowerEquiv (a := a) k).trans (finFunctionCoordSplitEquiv (a := a) k m)
 
 omit [Fintype a] [DecidableEq a] in
@@ -115,7 +115,17 @@ theorem coordSplitEquiv_symm_apply_snd
 
 end TensorPower
 
-namespace Channel
+end
+end QIT
+
+noncomputable section
+
+namespace CPTPOp
+
+open QIT
+
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
 /-- Kraus operator for selecting one tensor-power coordinate and tracing out
 all other coordinates. -/
@@ -141,7 +151,7 @@ def positionSelectionMap (k : ℕ) (m : Fin k) :
 theorem positionSelectionMap_isCompletelyPositive (k : ℕ) (m : Fin k) :
     MatrixMap.IsCompletelyPositive (positionSelectionMap (a := a) k m) := by
   unfold positionSelectionMap
-  rw [MatrixMap.IsCompletelyPositive, MatrixMap.choi_ofKraus]
+  rw [MatrixMap.isCompletelyPositive_iff_choi, MatrixMap.choi_ofKraus]
   exact Matrix.posSemidef_sum Finset.univ fun tail _ =>
     Matrix.posSemidef_vecMulVec_self_star
       (fun x : QIT.TensorPower a k × QIT.TensorPower a 1 =>
@@ -227,24 +237,31 @@ theorem positionSelectionMap_tracePreserving (k : ℕ) (m : Fin k) :
 coordinates.  This is the encoder primitive in Khatri--Wilde
 position-based coding. -/
 def positionSelection (k : ℕ) (m : Fin k) :
-    Channel (QIT.TensorPower a k) (QIT.TensorPower a 1) where
-  map := positionSelectionMap (a := a) k m
-  completelyPositive := positionSelectionMap_isCompletelyPositive (a := a) k m
-  tracePreserving := positionSelectionMap_tracePreserving (a := a) k m
-  mapsPositive :=
-    MatrixMap.isCompletelyPositive_mapsPositive (positionSelectionMap (a := a) k m)
-      (positionSelectionMap_isCompletelyPositive (a := a) k m)
+    CPTPMap (QIT.TensorPower a k) (QIT.TensorPower a 1) :=
+  CPTPOp.ofMat
+    (positionSelectionMap (a := a) k m)
+    (positionSelectionMap_isCompletelyPositive (a := a) k m)
+    (positionSelectionMap_tracePreserving (a := a) k m)
 
 @[simp]
 theorem positionSelection_map (k : ℕ) (m : Fin k) :
-    (positionSelection (a := a) k m).map = positionSelectionMap (a := a) k m :=
-  rfl
+    (positionSelection (a := a) k m).map = positionSelectionMap (a := a) k m := by
+  simp [positionSelection]
 
-end Channel
+end CPTPOp
 
-namespace Channel
+end
 
-variable (N : Channel a b)
+noncomputable section
+
+namespace CPTPOp
+
+open QIT
+
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+
+variable (N : CPTPMap a b)
 
 /-- Candidate rates attained by one-shot `ε`-reliable
 entanglement-assisted classical codes. -/
@@ -261,7 +278,16 @@ theorem oneShotEntanglementAssistedClassicalCapacityFinite_eq_sSup (ε : ℝ) :
       sSup (N.oneShotEntanglementAssistedClassicalRateSet ε) :=
   rfl
 
-end Channel
+end CPTPOp
+
+end
+
+namespace QIT
+
+noncomputable section
+
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
 /-- Source-shaped one-shot position-based coding protocol.
 
@@ -271,24 +297,29 @@ copies of the source bipartite state, split into Alice and Bob tensor powers.
 For each message, the encoder is required to produce the declared
 `encodedPositionState`; this is the Lean interface corresponding to sending
 the selected position through the channel. -/
-structure PositionBasedCodingProtocol (N : Channel a b)
+structure PositionBasedCodingProtocol (N : CPTPMap a b)
     (M : Type u) [Fintype M] [DecidableEq M] [Nonempty M]
     (e : Type u) [Fintype e] [DecidableEq e] where
-  sourceState : State (Prod a e)
+  /-- The bipartite source state, one copy of which is shared per message. -/
+  sourceState : MState (a × e)
+  /-- Alice's encoder, selecting the position indexed by the message. -/
   encoder :
-    M → Channel (TensorPower a (Fintype.card M)) (TensorPower a 1)
-  decoder : POVM M (Prod (TensorPower b 1) (TensorPower e (Fintype.card M)))
+    M → CPTPMap (TensorPower a (Fintype.card M)) (TensorPower a 1)
+  /-- Bob's decoding POVM on the channel output and all of his retained shares. -/
+  decoder : POVM M (TensorPower b 1 × TensorPower e (Fintype.card M))
+  /-- The state that selecting a position is required to produce. -/
   encodedPositionState :
-    M → State (Prod (TensorPower a 1) (TensorPower e (Fintype.card M)))
+    M → MState (TensorPower a 1 × TensorPower e (Fintype.card M))
+  /-- The encoder does produce the declared position state. -/
   encoder_eq_position :
     ∀ m : M,
-      ((encoder m).prod (Channel.idChannel (TensorPower e (Fintype.card M)))).applyState
+      ((encoder m).prod (CPTPOp.id (dIn := TensorPower e (Fintype.card M))))
         (sourceState.tensorPowerBipartite (Fintype.card M)) =
           encodedPositionState m
 
 namespace PositionBasedCodingProtocol
 
-variable {N : Channel a b}
+variable {N : CPTPMap a b}
 variable {M : Type u} [Fintype M] [DecidableEq M] [Nonempty M]
 variable {e : Type u} [Fintype e] [DecidableEq e]
 
@@ -302,17 +333,17 @@ position-based one-shot lower-bound route.  It deliberately uses the
 coordinate-selection channel above, rather than a prepare channel, so the
 input-reference correlation in the selected copy is preserved. -/
 def canonicalIndexed
-    (sourceState : State (Prod a e))
+    (sourceState : MState (a × e))
     (messageIndex : M ≃ Fin (Fintype.card M))
-    (decoder : POVM M (Prod (TensorPower b 1) (TensorPower e (Fintype.card M)))) :
+    (decoder : POVM M (TensorPower b 1 × TensorPower e (Fintype.card M))) :
     PositionBasedCodingProtocol N M e where
   sourceState := sourceState
   encoder := fun m =>
-    Channel.positionSelection (a := a) (Fintype.card M) (messageIndex m)
+    CPTPOp.positionSelection (a := a) (Fintype.card M) (messageIndex m)
   decoder := decoder
   encodedPositionState := fun m =>
-    (((Channel.positionSelection (a := a) (Fintype.card M) (messageIndex m)).prod
-      (Channel.idChannel (TensorPower e (Fintype.card M)))).applyState
+    (((CPTPOp.positionSelection (a := a) (Fintype.card M) (messageIndex m)).prod
+      (CPTPOp.id (dIn := TensorPower e (Fintype.card M))))
         (sourceState.tensorPowerBipartite (Fintype.card M)))
   encoder_eq_position := by
     intro m
@@ -320,40 +351,40 @@ def canonicalIndexed
 
 @[simp]
 theorem canonicalIndexed_sourceState
-    (sourceState : State (Prod a e))
+    (sourceState : MState (a × e))
     (messageIndex : M ≃ Fin (Fintype.card M))
-    (decoder : POVM M (Prod (TensorPower b 1) (TensorPower e (Fintype.card M)))) :
+    (decoder : POVM M (TensorPower b 1 × TensorPower e (Fintype.card M))) :
     (canonicalIndexed (N := N) sourceState messageIndex decoder).sourceState =
       sourceState :=
   rfl
 
 @[simp]
 theorem canonicalIndexed_encoder
-    (sourceState : State (Prod a e))
+    (sourceState : MState (a × e))
     (messageIndex : M ≃ Fin (Fintype.card M))
-    (decoder : POVM M (Prod (TensorPower b 1) (TensorPower e (Fintype.card M))))
+    (decoder : POVM M (TensorPower b 1 × TensorPower e (Fintype.card M)))
     (m : M) :
     (canonicalIndexed (N := N) sourceState messageIndex decoder).encoder m =
-      Channel.positionSelection (a := a) (Fintype.card M) (messageIndex m) :=
+      CPTPOp.positionSelection (a := a) (Fintype.card M) (messageIndex m) :=
   rfl
 
 @[simp]
 theorem canonicalIndexed_decoder
-    (sourceState : State (Prod a e))
+    (sourceState : MState (a × e))
     (messageIndex : M ≃ Fin (Fintype.card M))
-    (decoder : POVM M (Prod (TensorPower b 1) (TensorPower e (Fintype.card M)))) :
+    (decoder : POVM M (TensorPower b 1 × TensorPower e (Fintype.card M))) :
     (canonicalIndexed (N := N) sourceState messageIndex decoder).decoder = decoder :=
   rfl
 
 @[simp]
 theorem canonicalIndexed_encodedPositionState
-    (sourceState : State (Prod a e))
+    (sourceState : MState (a × e))
     (messageIndex : M ≃ Fin (Fintype.card M))
-    (decoder : POVM M (Prod (TensorPower b 1) (TensorPower e (Fintype.card M))))
+    (decoder : POVM M (TensorPower b 1 × TensorPower e (Fintype.card M)))
     (m : M) :
     (canonicalIndexed (N := N) sourceState messageIndex decoder).encodedPositionState m =
-      (((Channel.positionSelection (a := a) (Fintype.card M) (messageIndex m)).prod
-        (Channel.idChannel (TensorPower e (Fintype.card M)))).applyState
+      (((CPTPOp.positionSelection (a := a) (Fintype.card M) (messageIndex m)).prod
+        (CPTPOp.id (dIn := TensorPower e (Fintype.card M))))
           (sourceState.tensorPowerBipartite (Fintype.card M))) :=
   rfl
 
@@ -385,13 +416,15 @@ theorem toCode_decoder (P : PositionBasedCodingProtocol N M e) :
 theorem channelInputState_eq_position
     (P : PositionBasedCodingProtocol N M e) (m : M) :
     P.toCode.channelInputState m = P.encodedPositionState m := by
+  unfold EntanglementAssistedClassicalCode.channelInputState
+  rw [toCode_encoder, toCode_sharedState]
   exact P.encoder_eq_position m
 
 /-- Bob's pre-decoding state after the selected position is sent through the
 channel. -/
 def positionOutputState (P : PositionBasedCodingProtocol N M e) (m : M) :
-    State (Prod (TensorPower b 1) (TensorPower e (Fintype.card M))) :=
-  ((N.tensorPower 1).prod (Channel.idChannel (TensorPower e (Fintype.card M)))).applyState
+    MState (TensorPower b 1 × TensorPower e (Fintype.card M)) :=
+  ((N.tensorPower 1).prod (CPTPOp.id (dIn := TensorPower e (Fintype.card M))))
     (P.encodedPositionState m)
 
 /-- The operational output state of the induced code is the position-output
@@ -405,30 +438,31 @@ theorem outputState_eq_positionOutput
 /-- Channel-input state of the canonical position-based protocol. -/
 @[simp]
 theorem canonicalIndexed_channelInputState
-    (sourceState : State (Prod a e))
+    (sourceState : MState (a × e))
     (messageIndex : M ≃ Fin (Fintype.card M))
-    (decoder : POVM M (Prod (TensorPower b 1) (TensorPower e (Fintype.card M))))
+    (decoder : POVM M (TensorPower b 1 × TensorPower e (Fintype.card M)))
     (m : M) :
     (canonicalIndexed (N := N) sourceState messageIndex decoder).toCode.channelInputState m =
-      (((Channel.positionSelection (a := a) (Fintype.card M) (messageIndex m)).prod
-        (Channel.idChannel (TensorPower e (Fintype.card M)))).applyState
-          (sourceState.tensorPowerBipartite (Fintype.card M))) :=
-  rfl
+      (((CPTPOp.positionSelection (a := a) (Fintype.card M) (messageIndex m)).prod
+        (CPTPOp.id (dIn := TensorPower e (Fintype.card M))))
+          (sourceState.tensorPowerBipartite (Fintype.card M))) := by
+  rw [channelInputState_eq_position, canonicalIndexed_encodedPositionState]
 
 /-- Channel-output state of the canonical position-based protocol after the
 selected input share is sent through `N`. -/
 @[simp]
 theorem canonicalIndexed_positionOutputState
-    (sourceState : State (Prod a e))
+    (sourceState : MState (a × e))
     (messageIndex : M ≃ Fin (Fintype.card M))
-    (decoder : POVM M (Prod (TensorPower b 1) (TensorPower e (Fintype.card M))))
+    (decoder : POVM M (TensorPower b 1 × TensorPower e (Fintype.card M)))
     (m : M) :
     (canonicalIndexed (N := N) sourceState messageIndex decoder).positionOutputState m =
-      ((N.tensorPower 1).prod (Channel.idChannel (TensorPower e (Fintype.card M)))).applyState
-        (((Channel.positionSelection (a := a) (Fintype.card M) (messageIndex m)).prod
-          (Channel.idChannel (TensorPower e (Fintype.card M)))).applyState
-            (sourceState.tensorPowerBipartite (Fintype.card M))) :=
-  rfl
+      ((N.tensorPower 1).prod (CPTPOp.id (dIn := TensorPower e (Fintype.card M))))
+        (((CPTPOp.positionSelection (a := a) (Fintype.card M) (messageIndex m)).prod
+          (CPTPOp.id (dIn := TensorPower e (Fintype.card M))))
+            (sourceState.tensorPowerBipartite (Fintype.card M))) := by
+  unfold positionOutputState
+  rw [canonicalIndexed_encodedPositionState]
 
 /-- Success probability of the induced code, written with the position-output
 state. -/
@@ -463,7 +497,7 @@ theorem maxErrorAtMost_of_positionOutput_error_le
 /-- One-shot position-based codes have rate `log_2 |M|`. -/
 theorem rate_eq_log_card (P : PositionBasedCodingProtocol N M e) :
     P.toCode.rate = log2 (Fintype.card M : ℝ) := by
-  unfold EntanglementAssistedClassicalCode.rate entanglementAssistedMessageRate
+  unfold EntanglementAssistedClassicalCode.rate messageRate
   norm_num
 
 /-- A reliable position-based code contributes its rate to the one-shot
@@ -472,7 +506,7 @@ theorem rate_mem_oneShotEntanglementAssistedClassicalRateSet
     (P : PositionBasedCodingProtocol N M e) {ε : ℝ}
     (hε : P.toCode.maxErrorAtMost ε) :
     P.toCode.rate ∈ N.oneShotEntanglementAssistedClassicalRateSet ε := by
-  unfold Channel.oneShotEntanglementAssistedClassicalRateSet
+  unfold CPTPOp.oneShotEntanglementAssistedClassicalRateSet
   exact ⟨M, inferInstance, inferInstance, inferInstance,
     TensorPower a (Fintype.card M), inferInstance, inferInstance,
     TensorPower e (Fintype.card M), inferInstance, inferInstance,
@@ -514,7 +548,7 @@ theorem lowerBound_le_oneShotEntanglementAssistedClassicalCapacityE_of_positionO
     (lowerBound : EReal) ≤ N.oneShotEntanglementAssistedClassicalCapacityE ε := by
   have hε : P.toCode.maxErrorAtMost ε :=
     P.maxErrorAtMost_of_positionOutput_error_le herror
-  unfold Channel.oneShotEntanglementAssistedClassicalCapacityE
+  unfold CPTPOp.oneShotEntanglementAssistedClassicalCapacityE
   calc
     (lowerBound : EReal) ≤ (P.toCode.rate : EReal) := by
       exact_mod_cast hlower
@@ -533,7 +567,7 @@ end PositionBasedCodingProtocol
 
 namespace EntanglementAssistedOneShotAchievabilityWitness
 
-variable {N : Channel a b}
+variable {N : CPTPMap a b}
 variable {M : Type u} [Fintype M] [DecidableEq M] [Nonempty M]
 variable {EA : Type u} [Fintype EA] [DecidableEq EA]
 variable {EB : Type u} [Fintype EB] [DecidableEq EB]
@@ -544,7 +578,7 @@ theorem rate_mem_oneShotEntanglementAssistedClassicalRateSet
     {ε lowerBound : ℝ}
     (W : EntanglementAssistedOneShotAchievabilityWitness N ε lowerBound M EA EB) :
     W.code.rate ∈ N.oneShotEntanglementAssistedClassicalRateSet ε := by
-  unfold Channel.oneShotEntanglementAssistedClassicalRateSet
+  unfold CPTPOp.oneShotEntanglementAssistedClassicalRateSet
   exact ⟨M, inferInstance, inferInstance, inferInstance,
     EA, inferInstance, inferInstance, EB, inferInstance, inferInstance,
     W.code, W.maxError_le, rfl⟩
@@ -556,7 +590,7 @@ theorem lowerBound_le_oneShotEntanglementAssistedClassicalCapacityE
     {ε lowerBound : ℝ}
     (W : EntanglementAssistedOneShotAchievabilityWitness N ε lowerBound M EA EB) :
     (lowerBound : EReal) ≤ N.oneShotEntanglementAssistedClassicalCapacityE ε := by
-  unfold Channel.oneShotEntanglementAssistedClassicalCapacityE
+  unfold CPTPOp.oneShotEntanglementAssistedClassicalCapacityE
   calc
     (lowerBound : EReal) ≤ (W.code.rate : EReal) := by
       exact_mod_cast W.lowerBound_le_rate

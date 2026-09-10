@@ -11,6 +11,7 @@ public import QuantumLib.QIT.Information.Renyi.FrankLieb.ScalarOperator
 public import QuantumLib.QIT.States.TraceNorm.Spectral
 public import QuantumLib.QIT.States.PosSqrtOrder
 public import QuantumLib.QIT.Classical.Bridge
+public import QuantumLib.QIT.Util.MatrixInstances
 public import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.RingInverseOrder
 public import Mathlib.Topology.Sion
 
@@ -31,20 +32,16 @@ Source alignment:
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator NNReal
-
-namespace QIT
-
-universe u v w
+open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator NNReal QIT.MatrixL2
 
 noncomputable section
+universe u v w
 
-namespace State
+open QIT
+
+namespace MState
 
 variable {a : Type u} [Fintype a] [DecidableEq a]
-
-noncomputable local instance instCMatrixCStarAlgebraForConditionalMinimax (n : Type u)
-    [Fintype n] [DecidableEq n] : CStarAlgebra (CMatrix n) := {}
 
 /-- Matrix-level density-state domain used as the compact convex optimization
 set in the conditional Renyi minimax route. -/
@@ -96,20 +93,6 @@ theorem uniformlyPositiveDensityMatrixSet_subset_densityMatrixSet {delta : ℝ} 
   intro M hM
   exact hM.1
 
-omit [Fintype a] in
-/-- A positive real scalar multiple of the identity is positive definite. -/
-theorem cMatrix_real_smul_one_posDef_forConditionalMinimax {r : ℝ} (hr : 0 < r) :
-    (r • (1 : CMatrix a)).PosDef := by
-  rw [show r • (1 : CMatrix a) = Matrix.diagonal (fun _ : a => (r : ℂ)) by
-    ext i j
-    by_cases hij : i = j
-    · subst j
-      simp
-    · simp [hij]]
-  rw [Matrix.posDef_diagonal_iff]
-  intro i
-  exact_mod_cast hr
-
 /-- A positive lower spectral bound turns a uniformly positive density matrix
 into a positive-definite matrix. -/
 theorem uniformlyPositiveDensityMatrixSet_subset_posDef {delta : ℝ} (hdelta : 0 < delta) :
@@ -117,28 +100,28 @@ theorem uniformlyPositiveDensityMatrixSet_subset_posDef {delta : ℝ} (hdelta : 
       ({M : CMatrix a | M.PosDef} : Set (CMatrix a)) := by
   intro M hM
   have hstrict_left : IsStrictlyPositive (delta • (1 : CMatrix a)) :=
-    (cMatrix_real_smul_one_posDef_forConditionalMinimax (a := a) hdelta).isStrictlyPositive
+    (cMatrix_real_smul_one_posDef (a := a) hdelta).isStrictlyPositive
   exact Matrix.isStrictlyPositive_iff_posDef.mp (IsStrictlyPositive.of_le hstrict_left hM.2)
 
-/-- Every normalized `State` matrix lies in the matrix-level density domain. -/
-theorem state_matrix_mem_densityMatrixSet (ρ : State a) :
-    ρ.matrix ∈ densityMatrixSet a := by
-  exact ⟨ρ.pos, ρ.trace_eq_one⟩
+/-- Every normalized `MState` matrix lies in the matrix-level density domain. -/
+theorem state_matrix_mem_densityMatrixSet (ρ : MState a) :
+    ρ.m ∈ densityMatrixSet a := by
+  exact ⟨ρ.psd, ρ.tr'⟩
 
-/-- Repackage a matrix-level density operator as a normalized `State`.
+/-- Repackage a matrix-level density operator as a normalized `MState`.
 
 This is proof-irrelevant in the density-membership witness and lets the Sion
 statement work over compact matrix domains while the surrounding conditional
-Renyi API continues to use `State`. -/
-def densityMatrixSetState (M : CMatrix a) (hM : M ∈ densityMatrixSet a) : State a where
-  matrix := M
-  pos := hM.1
-  trace_eq_one := hM.2
+Renyi API continues to use `MState`. -/
+def densityMatrixSetState (M : CMatrix a) (hM : M ∈ densityMatrixSet a) : MState a := .ofMatrix
+  (matrix := M)
+  (pos := hM.1)
+  (trace_eq_one := hM.2)
 
 @[simp]
 theorem densityMatrixSetState_matrix (M : CMatrix a) (hM : M ∈ densityMatrixSet a) :
-    (densityMatrixSetState M hM).matrix = M :=
-  rfl
+    (densityMatrixSetState M hM).m = M :=
+  MState.matrix_ofMatrix _ _ _
 
 /-- The matrix-level density-state domain is nonempty for a nonempty finite
 index type. -/
@@ -148,7 +131,7 @@ theorem densityMatrixSet_nonempty [Nonempty a] :
   let p : a → ℝ≥0 := fun _ => (Fintype.card a : ℝ≥0)⁻¹
   have hsum : ∑ i, p i = 1 := by
     simp [p, Finset.sum_const, nsmul_eq_mul, Fintype.card_ne_zero]
-  exact ⟨(Classical.diagonalState p hsum).matrix,
+  exact ⟨(Classical.diagonalState p hsum).m,
     state_matrix_mem_densityMatrixSet (Classical.diagonalState p hsum)⟩
 
 /-- The full-rank density-state domain is nonempty for a nonempty finite index
@@ -164,18 +147,18 @@ theorem fullRankDensityMatrixSet_nonempty [Nonempty a] :
     have hcard_pos : 0 < (Fintype.card a : ℝ≥0) := by
       exact_mod_cast (Fintype.card_pos_iff.mpr ⟨i⟩)
     exact_mod_cast inv_pos.mpr hcard_pos
-  refine ⟨(Classical.diagonalState p hsum).matrix, ?_⟩
+  refine ⟨(Classical.diagonalState p hsum).m, ?_⟩
   exact
     ⟨Classical.diagonalState_posDef p hsum hpos,
-      (Classical.diagonalState p hsum).trace_eq_one⟩
+      (Classical.diagonalState p hsum).tr'⟩
 
 /-- The uniformly positive density-state domain is nonempty whenever the lower
 bound is no larger than the maximally mixed eigenvalue. -/
 theorem uniformlyPositiveDensityMatrixSet_nonempty [Nonempty a] {delta : ℝ}
     (hdelta : delta ≤ (Fintype.card a : ℝ)⁻¹) :
     (uniformlyPositiveDensityMatrixSet delta a).Nonempty := by
-  refine ⟨(maximallyMixed a).matrix, state_matrix_mem_densityMatrixSet (maximallyMixed a), ?_⟩
-  rw [maximallyMixed_matrix]
+  refine ⟨(MState.uniform : MState a).m, state_matrix_mem_densityMatrixSet (MState.uniform : MState a), ?_⟩
+  rw [uniform_matrix]
   rw [Matrix.le_iff]
   have hdiff :
       (((((Fintype.card a : ℝ)⁻¹ : ℝ) : ℂ) • (1 : CMatrix a)) -
@@ -311,60 +294,62 @@ Outside the density domains the value is set to zero only to obtain a total
 function. All minimax theorems below restrict the arguments to
 `densityMatrixSet`, where the `if` branches reduce to the source expression. -/
 def upwardRenyiDualityBracketRe
-    (ψ : PureVector (Prod (Prod a b) c))
+    (ψ : Ket ((a × b) × c))
     (σ : CMatrix b) (τ : CMatrix c) (alphaPrime : ℝ) : ℝ := by
   classical
   exact
     if hσ : σ ∈ densityMatrixSet b then
       if hτ : τ ∈ densityMatrixSet c then
-        (PureVector.upwardRenyiDualityCommonBracket ψ
+        (Ket.upwardRenyiDualityCommonBracket ψ
           (densityMatrixSetState σ hσ) (densityMatrixSetState τ hτ) alphaPrime).re
       else 0
     else 0
 
 @[simp]
 theorem upwardRenyiDualityBracketRe_of_mem
-    (ψ : PureVector (Prod (Prod a b) c))
+    (ψ : Ket ((a × b) × c))
     {σ : CMatrix b} (hσ : σ ∈ densityMatrixSet b)
     {τ : CMatrix c} (hτ : τ ∈ densityMatrixSet c)
     (alphaPrime : ℝ) :
     upwardRenyiDualityBracketRe (a := a) ψ σ τ alphaPrime =
-      (PureVector.upwardRenyiDualityCommonBracket ψ
+      (Ket.upwardRenyiDualityCommonBracket ψ
         (densityMatrixSetState σ hσ) (densityMatrixSetState τ hτ) alphaPrime).re := by
   simp [upwardRenyiDualityBracketRe, hσ, hτ]
 
 /-- Extended-real lift of the source bracket, matching mathlib's Sion API. -/
 def upwardRenyiDualityBracketEReal
-    (ψ : PureVector (Prod (Prod a b) c))
+    (ψ : Ket ((a × b) × c))
     (σ : CMatrix b) (τ : CMatrix c) (alphaPrime : ℝ) : EReal :=
   upwardRenyiDualityBracketRe (a := a) ψ σ τ alphaPrime
 
 /-- Raw matrix form of the source bracket
 `Tr[(I_A ⊗ σ_B^{-p} ⊗ τ_C^p) R]`.
 
-This avoids repackaging side matrices as normalized `State`s while proving the
+This avoids repackaging side matrices as normalized `MState`s while proving the
 analytic Sion hypotheses.  On density matrices and `R = |ψ⟩⟨ψ|` it coincides
 with `upwardRenyiDualityBracketRe`. -/
 def abcSidePowerTraceRe
-    (R : CMatrix (Prod (Prod a b) c))
+    (R : CMatrix ((a × b) × c))
     (σ : CMatrix b) (τ : CMatrix c) (p : ℝ) : ℝ :=
   ((Matrix.kronecker
       (Matrix.kronecker (1 : CMatrix a) (CFC.rpow σ (-p)))
       (CFC.rpow τ p) * R).trace).re
 
 theorem upwardRenyiDualityBracketRe_eq_abcSidePowerTraceRe
-    (ψ : PureVector (Prod (Prod a b) c))
+    (ψ : Ket ((a × b) × c))
     {σ : CMatrix b} (hσ : σ ∈ densityMatrixSet b)
     {τ : CMatrix c} (hτ : τ ∈ densityMatrixSet c)
     (alphaPrime : ℝ) :
     upwardRenyiDualityBracketRe (a := a) ψ σ τ alphaPrime =
-      abcSidePowerTraceRe (a := a) ψ.state.matrix σ τ alphaPrime := by
+      abcSidePowerTraceRe (a := a) ψ.state.m σ τ alphaPrime := by
   rw [upwardRenyiDualityBracketRe_of_mem (a := a) ψ hσ hτ alphaPrime]
-  rfl
+  unfold Ket.upwardRenyiDualityCommonBracket Ket.tripartiteBracket
+    MState.abcSideStatePowerMatrix abcSidePowerTraceRe
+  rw [densityMatrixSetState_matrix, densityMatrixSetState_matrix]
 
 omit [DecidableEq a] [DecidableEq b] [DecidableEq c] in
 private theorem trace_kronecker_right_add_smul_add_smul_re
-    (K : CMatrix (Prod a b)) (R : CMatrix (Prod (Prod a b) c))
+    (K : CMatrix (a × b)) (R : CMatrix ((a × b) × c))
     (T U V : CMatrix c) (s t : ℝ) :
     ((Matrix.kronecker K (T + (s • U + t • V)) * R).trace).re =
       ((Matrix.kronecker K T * R).trace).re +
@@ -379,7 +364,7 @@ private theorem trace_kronecker_right_add_smul_add_smul_re
 
 omit [DecidableEq b] [DecidableEq c] in
 private theorem trace_kronecker_middle_add_smul_add_smul_re
-    (R : CMatrix (Prod (Prod a b) c)) (K : CMatrix c)
+    (R : CMatrix ((a × b) × c)) (K : CMatrix c)
     (T U V : CMatrix b) (s t : ℝ) :
     ((Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) (T + (s • U + t • V))) K *
           R).trace).re =
@@ -416,7 +401,7 @@ private theorem trace_kronecker_middle_add_smul_add_smul_re
 
 omit [DecidableEq a] [DecidableEq b] [DecidableEq c] in
 private theorem trace_kronecker_right_continuous
-    (K : CMatrix (Prod a b)) (R : CMatrix (Prod (Prod a b) c)) :
+    (K : CMatrix (a × b)) (R : CMatrix ((a × b) × c)) :
     Continuous fun T : CMatrix c => ((Matrix.kronecker K T * R).trace).re := by
   have hkr :
       Continuous fun T : CMatrix c => Matrix.kronecker K T := by
@@ -428,7 +413,7 @@ private theorem trace_kronecker_right_continuous
 
 omit [DecidableEq b] [DecidableEq c] in
 private theorem trace_kronecker_middle_continuous
-    (R : CMatrix (Prod (Prod a b) c)) (K : CMatrix c) :
+    (R : CMatrix ((a × b) × c)) (K : CMatrix c) :
     Continuous fun T : CMatrix b =>
       ((Matrix.kronecker (Matrix.kronecker (1 : CMatrix a) T) K * R).trace).re := by
   have hinner :
@@ -813,7 +798,7 @@ theorem cMatrix_trace_mul_rpow_quasiconcaveOn_posSemidef_of_pos
 
 /-- The raw source bracket is concave in the positive-power side variable. -/
 theorem abcSidePowerTraceRe_concaveOn_tau
-    {R : CMatrix (Prod (Prod a b) c)} (hR : R.PosSemidef)
+    {R : CMatrix ((a × b) × c)} (hR : R.PosSemidef)
     {σ : CMatrix b} (hσ : σ.PosSemidef)
     {p : ℝ} (hp0 : 0 < p) (hp1 : p ≤ 1) :
     ConcaveOn ℝ ({τ : CMatrix c | τ.PosSemidef} : Set (CMatrix c))
@@ -825,7 +810,7 @@ theorem abcSidePowerTraceRe_concaveOn_tau
       (Matrix.PosSemidef.smul hy ht)
   · intro x hx y hy s t hs ht hst
     let S : CMatrix b := CFC.rpow σ (-p)
-    let K : CMatrix (Prod a b) := Matrix.kronecker (1 : CMatrix a) S
+    let K : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) S
     let T : CMatrix c := CFC.rpow (s • x + t • y) p
     let U : CMatrix c := CFC.rpow x p
     let V : CMatrix c := CFC.rpow y p
@@ -877,7 +862,7 @@ theorem abcSidePowerTraceRe_concaveOn_tau
 
 /-- The raw source bracket is quasiconcave in the positive-power side variable. -/
 theorem abcSidePowerTraceRe_quasiconcaveOn_tau
-    {R : CMatrix (Prod (Prod a b) c)} (hR : R.PosSemidef)
+    {R : CMatrix ((a × b) × c)} (hR : R.PosSemidef)
     {σ : CMatrix b} (hσ : σ.PosSemidef)
     {p : ℝ} (hp0 : 0 < p) (hp1 : p ≤ 1) :
     QuasiconcaveOn ℝ ({τ : CMatrix c | τ.PosSemidef} : Set (CMatrix c))
@@ -887,19 +872,19 @@ theorem abcSidePowerTraceRe_quasiconcaveOn_tau
 /-- The raw source bracket is continuous in the positive-power side variable on
 the PSD cone. -/
 theorem abcSidePowerTraceRe_continuousOn_tau_posSemidef
-    (R : CMatrix (Prod (Prod a b) c)) (σ : CMatrix b)
+    (R : CMatrix ((a × b) × c)) (σ : CMatrix b)
     {p : ℝ} (hp0 : 0 < p) :
     ContinuousOn
       (fun τ : CMatrix c => abcSidePowerTraceRe (a := a) R σ τ p)
       ({τ : CMatrix c | τ.PosSemidef} : Set (CMatrix c)) := by
-  let K : CMatrix (Prod a b) := Matrix.kronecker (1 : CMatrix a) (CFC.rpow σ (-p))
+  let K : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) (CFC.rpow σ (-p))
   have htrace := trace_kronecker_right_continuous (a := a) (b := b) (c := c) K R
   have hpow := cMatrix_rpow_continuousOn_posSemidef_of_pos (a := c) hp0
   simpa [abcSidePowerTraceRe, K, Function.comp_def] using htrace.comp_continuousOn hpow
 
 /-- Lower semicontinuity in the positive-power side variable on the PSD cone. -/
 theorem abcSidePowerTraceRe_lowerSemicontinuousOn_tau_posSemidef
-    (R : CMatrix (Prod (Prod a b) c)) (σ : CMatrix b)
+    (R : CMatrix ((a × b) × c)) (σ : CMatrix b)
     {p : ℝ} (hp0 : 0 < p) :
     LowerSemicontinuousOn
       (fun τ : CMatrix c => abcSidePowerTraceRe (a := a) R σ τ p)
@@ -909,7 +894,7 @@ theorem abcSidePowerTraceRe_lowerSemicontinuousOn_tau_posSemidef
 
 /-- Upper semicontinuity in the positive-power side variable on the PSD cone. -/
 theorem abcSidePowerTraceRe_upperSemicontinuousOn_tau_posSemidef
-    (R : CMatrix (Prod (Prod a b) c)) (σ : CMatrix b)
+    (R : CMatrix ((a × b) × c)) (σ : CMatrix b)
     {p : ℝ} (hp0 : 0 < p) :
     UpperSemicontinuousOn
       (fun τ : CMatrix c => abcSidePowerTraceRe (a := a) R σ τ p)
@@ -920,7 +905,7 @@ theorem abcSidePowerTraceRe_upperSemicontinuousOn_tau_posSemidef
 /-- The raw source bracket is convex in the negative-power side variable on the
 positive-definite cone. -/
 theorem abcSidePowerTraceRe_convexOn_sigma_posDef
-    {R : CMatrix (Prod (Prod a b) c)} (hR : R.PosSemidef)
+    {R : CMatrix ((a × b) × c)} (hR : R.PosSemidef)
     {τ : CMatrix c} (hτ : τ.PosSemidef)
     {p : ℝ} (hp0 : 0 < p) (hp1 : p ≤ 1) :
     ConvexOn ℝ ({σ : CMatrix b | σ.PosDef} : Set (CMatrix b))
@@ -997,7 +982,7 @@ theorem abcSidePowerTraceRe_convexOn_sigma_posDef
 /-- The raw source bracket is quasiconvex in the negative-power side variable
 on the positive-definite cone. -/
 theorem abcSidePowerTraceRe_quasiconvexOn_sigma_posDef
-    {R : CMatrix (Prod (Prod a b) c)} (hR : R.PosSemidef)
+    {R : CMatrix ((a × b) × c)} (hR : R.PosSemidef)
     {τ : CMatrix c} (hτ : τ.PosSemidef)
     {p : ℝ} (hp0 : 0 < p) (hp1 : p ≤ 1) :
     QuasiconvexOn ℝ ({σ : CMatrix b | σ.PosDef} : Set (CMatrix b))
@@ -1007,7 +992,7 @@ theorem abcSidePowerTraceRe_quasiconvexOn_sigma_posDef
 /-- The raw source bracket is continuous in the negative-power side variable on
 the positive-definite cone. -/
 theorem abcSidePowerTraceRe_continuousOn_sigma_posDef
-    (R : CMatrix (Prod (Prod a b) c)) (τ : CMatrix c) (p : ℝ) :
+    (R : CMatrix ((a × b) × c)) (τ : CMatrix c) (p : ℝ) :
     ContinuousOn
       (fun σ : CMatrix b => abcSidePowerTraceRe (a := a) R σ τ p)
       ({σ : CMatrix b | σ.PosDef} : Set (CMatrix b)) := by
@@ -1019,7 +1004,7 @@ theorem abcSidePowerTraceRe_continuousOn_sigma_posDef
 /-- Lower semicontinuity in the negative-power side variable on the
 positive-definite cone. -/
 theorem abcSidePowerTraceRe_lowerSemicontinuousOn_sigma_posDef
-    (R : CMatrix (Prod (Prod a b) c)) (τ : CMatrix c) (p : ℝ) :
+    (R : CMatrix ((a × b) × c)) (τ : CMatrix c) (p : ℝ) :
     LowerSemicontinuousOn
       (fun σ : CMatrix b => abcSidePowerTraceRe (a := a) R σ τ p)
       ({σ : CMatrix b | σ.PosDef} : Set (CMatrix b)) :=
@@ -1029,7 +1014,7 @@ theorem abcSidePowerTraceRe_lowerSemicontinuousOn_sigma_posDef
 /-- Upper semicontinuity in the negative-power side variable on the
 positive-definite cone. -/
 theorem abcSidePowerTraceRe_upperSemicontinuousOn_sigma_posDef
-    (R : CMatrix (Prod (Prod a b) c)) (τ : CMatrix c) (p : ℝ) :
+    (R : CMatrix ((a × b) × c)) (τ : CMatrix c) (p : ℝ) :
     UpperSemicontinuousOn
       (fun σ : CMatrix b => abcSidePowerTraceRe (a := a) R σ τ p)
       ({σ : CMatrix b | σ.PosDef} : Set (CMatrix b)) :=
@@ -1114,7 +1099,7 @@ theorem densityMatrixSet_sion_upwardRenyiDualityBracketEReal
     {a : Type u} {b : Type v} {c : Type w}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] [Nonempty b]
     [Fintype c] [DecidableEq c]
-    (ψ : PureVector (Prod (Prod a b) c)) (alphaPrime : ℝ)
+    (ψ : Ket ((a × b) × c)) (alphaPrime : ℝ)
     (hlscB : ∀ τ ∈ densityMatrixSet c,
       LowerSemicontinuousOn
         (fun σ : CMatrix b =>
@@ -1144,10 +1129,9 @@ theorem densityMatrixSet_sion_upwardRenyiDualityBracketEReal
 density-matrix domains on the two side systems.
 
 This packages the exact compact-convex domain hypotheses for the source trace
-functional.  The remaining downstream work is to prove the listed continuity and
-quasiconvexity/quasiconcavity hypotheses for the concrete conditional-Renyi
-trace functional, including the extended-value treatment at singular boundary
-points. -/
+functional.  Applying it to the concrete conditional-Renyi trace functional
+requires the listed continuity and quasiconvexity/quasiconcavity hypotheses,
+including the extended-value treatment at singular boundary points. -/
 theorem densityMatrixSet_sion_exists_isSaddlePointOn
     {b : Type u} {c : Type v} [Fintype b] [DecidableEq b] [Nonempty b]
     [Fintype c] [DecidableEq c] [Nonempty c] {f : CMatrix b → CMatrix c → ℝ}
@@ -1175,14 +1159,14 @@ theorem densityMatrixSet_sion_exists_isSaddlePointOn
 
 This is the same density-domain specialization as
 `densityMatrixSet_sion_upwardRenyiDualityBracketEReal`, but in the real-valued
-form used by mathlib's saddle-point theorem.  It is ready for downstream
-assembly once the concrete bracket's semicontinuity and quasi-convex/concave
-facts are supplied. -/
+form used by mathlib's saddle-point theorem.  The bracket's semicontinuity and
+quasi-convexity/concavity are hypotheses; what this adds is the nonemptiness,
+convexity and compactness of the two density-matrix domains. -/
 theorem densityMatrixSet_sion_upwardRenyiDualityBracketRe_saddle
     {a : Type u} {b : Type v} {c : Type w}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] [Nonempty b]
     [Fintype c] [DecidableEq c] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c)) (alphaPrime : ℝ)
+    (ψ : Ket ((a × b) × c)) (alphaPrime : ℝ)
     (hlscB : ∀ τ ∈ densityMatrixSet c,
       LowerSemicontinuousOn
         (fun σ : CMatrix b =>
@@ -1221,7 +1205,7 @@ theorem uniformlyPositiveDensityMatrixSet_sion_abcSidePowerTraceRe_saddle
     [Fintype c] [DecidableEq c] [Nonempty c]
     {delta p : ℝ} (hdelta : 0 < delta)
     (hneB : (uniformlyPositiveDensityMatrixSet delta b).Nonempty)
-    {R : CMatrix (Prod (Prod a b) c)} (hR : R.PosSemidef)
+    {R : CMatrix ((a × b) × c)} (hR : R.PosSemidef)
     (hp0 : 0 < p) (hp1 : p ≤ 1) :
     ∃ σ ∈ uniformlyPositiveDensityMatrixSet delta b, ∃ τ ∈ densityMatrixSet c,
       IsSaddlePointOn (uniformlyPositiveDensityMatrixSet delta b) (densityMatrixSet c)
@@ -1262,7 +1246,7 @@ theorem uniformlyPositiveDensityMatrixSet_sion_abcSidePowerTraceRe_EReal
     [Fintype c] [DecidableEq c]
     {delta p : ℝ} (hdelta : 0 < delta)
     (hneB : (uniformlyPositiveDensityMatrixSet delta b).Nonempty)
-    {R : CMatrix (Prod (Prod a b) c)} (hR : R.PosSemidef)
+    {R : CMatrix ((a × b) × c)} (hR : R.PosSemidef)
     (hp0 : 0 < p) (hp1 : p ≤ 1) :
     (⨅ σ ∈ uniformlyPositiveDensityMatrixSet delta b, ⨆ τ ∈ densityMatrixSet c,
         (abcSidePowerTraceRe (a := a) R σ τ p : EReal)) =
@@ -1298,8 +1282,128 @@ theorem uniformlyPositiveDensityMatrixSet_sion_abcSidePowerTraceRe_EReal
           (densityMatrixSet_convex (a := c))).monotone_comp
             EReal.coe_strictMono.monotone)
 
-end State
+end MState
 
-end
+namespace QIT
+
+/-- Optimizing a matrix functional over normalized `MState`s is the same as
+optimizing it over the matrix-level density set used by the Sion API. -/
+theorem state_iInf_matrix_eq_densityMatrixSet_iInf
+    {b : Type v} [Fintype b] [DecidableEq b] (f : CMatrix b → EReal) :
+    (⨅ σ : MState b, f σ.m) =
+      ⨅ M : CMatrix b, ⨅ _hM : M ∈ MState.densityMatrixSet b, f M := by
+  apply le_antisymm
+  · refine le_iInf ?_
+    intro M
+    refine le_iInf ?_
+    intro hM
+    calc
+      (⨅ σ : MState b, f σ.m) ≤
+          f (MState.densityMatrixSetState M hM).m := iInf_le _ _
+      _ = f M := by rw [MState.densityMatrixSetState_matrix]
+  · refine le_iInf ?_
+    intro σ
+    exact le_trans
+      (iInf_le (fun M : CMatrix b => ⨅ hM : M ∈ MState.densityMatrixSet b, f M)
+        σ.m)
+      (iInf_le (fun hM : σ.m ∈ MState.densityMatrixSet b => f σ.m)
+        (MState.state_matrix_mem_densityMatrixSet σ))
+
+/-- Supremum version of `state_iInf_matrix_eq_densityMatrixSet_iInf`. -/
+theorem state_iSup_matrix_eq_densityMatrixSet_iSup
+    {b : Type v} [Fintype b] [DecidableEq b] (f : CMatrix b → EReal) :
+    (⨆ σ : MState b, f σ.m) =
+      ⨆ M : CMatrix b, ⨆ _hM : M ∈ MState.densityMatrixSet b, f M := by
+  apply le_antisymm
+  · refine iSup_le ?_
+    intro σ
+    calc
+      f σ.m ≤
+          (⨆ hM : σ.m ∈ MState.densityMatrixSet b, f σ.m) :=
+        le_iSup
+          (fun hM : σ.m ∈ MState.densityMatrixSet b => f σ.m)
+          (MState.state_matrix_mem_densityMatrixSet σ)
+      _ ≤ ⨆ M : CMatrix b, ⨆ hM : M ∈ MState.densityMatrixSet b, f M :=
+        le_iSup
+          (fun M : CMatrix b => ⨆ hM : M ∈ MState.densityMatrixSet b, f M)
+          σ.m
+  · refine iSup_le ?_
+    intro M
+    refine iSup_le ?_
+    intro hM
+    calc
+      f M = f (MState.densityMatrixSetState M hM).m := by
+        rw [MState.densityMatrixSetState_matrix]
+      _ ≤ (⨆ σ : MState b, f σ.m) :=
+        le_iSup (fun σ : MState b => f σ.m) (MState.densityMatrixSetState M hM)
+
+/-- The full-rank matrix domain is equivalent to optimizing over states whose
+density matrix is positive definite. -/
+theorem fullRankState_iInf_matrix_eq_fullRankDensityMatrixSet_iInf
+    {b : Type v} [Fintype b] [DecidableEq b] (f : CMatrix b → EReal) :
+    (⨅ sigma : {sigma : MState b // sigma.m.PosDef}, f sigma.val.m) =
+      ⨅ M : CMatrix b, ⨅ _hM : M ∈ MState.fullRankDensityMatrixSet b, f M := by
+  apply le_antisymm
+  · refine le_iInf ?_
+    intro M
+    refine le_iInf ?_
+    intro hM
+    let sigma : {sigma : MState b // sigma.m.PosDef} :=
+      ⟨.ofMatrix (matrix := M) (pos := hM.1.posSemidef) (trace_eq_one := hM.2), by
+        rw [MState.matrix_ofMatrix]
+        exact hM.1⟩
+    calc
+      (⨅ sigma : {sigma : MState b // sigma.m.PosDef}, f sigma.val.m) ≤
+          f sigma.val.m := iInf_le _ _
+      _ = f M := by simp only [sigma, MState.matrix_ofMatrix]
+  · refine le_iInf ?_
+    intro sigma
+    exact le_trans
+      (iInf_le
+        (fun M : CMatrix b =>
+          ⨅ hM : M ∈ MState.fullRankDensityMatrixSet b, f M)
+        sigma.val.m)
+      (iInf_le
+        (fun hM : sigma.val.m ∈ MState.fullRankDensityMatrixSet b =>
+          f sigma.val.m)
+        ⟨sigma.property, sigma.val.tr'⟩)
+
+/-- Supremum version of
+`fullRankState_iInf_matrix_eq_fullRankDensityMatrixSet_iInf`. -/
+theorem fullRankState_iSup_matrix_eq_fullRankDensityMatrixSet_iSup
+    {b : Type v} [Fintype b] [DecidableEq b] (f : CMatrix b → EReal) :
+    (⨆ sigma : {sigma : MState b // sigma.m.PosDef}, f sigma.val.m) =
+      ⨆ M : CMatrix b, ⨆ _hM : M ∈ MState.fullRankDensityMatrixSet b, f M := by
+  apply le_antisymm
+  · refine iSup_le ?_
+    intro sigma
+    calc
+      f sigma.val.m ≤
+          (⨆ hM : sigma.val.m ∈ MState.fullRankDensityMatrixSet b,
+            f sigma.val.m) :=
+        le_iSup
+          (fun hM : sigma.val.m ∈ MState.fullRankDensityMatrixSet b =>
+            f sigma.val.m)
+          ⟨sigma.property, sigma.val.tr'⟩
+      _ ≤ ⨆ M : CMatrix b, ⨆ hM : M ∈ MState.fullRankDensityMatrixSet b, f M :=
+        le_iSup
+          (fun M : CMatrix b =>
+            ⨆ hM : M ∈ MState.fullRankDensityMatrixSet b, f M)
+          sigma.val.m
+  · refine iSup_le ?_
+    intro M
+    refine iSup_le ?_
+    intro hM
+    let sigma : {sigma : MState b // sigma.m.PosDef} :=
+      ⟨.ofMatrix (matrix := M) (pos := hM.1.posSemidef) (trace_eq_one := hM.2), by
+        rw [MState.matrix_ofMatrix]
+        exact hM.1⟩
+    calc
+      f M = f sigma.val.m := by simp only [sigma, MState.matrix_ofMatrix]
+      _ ≤ (⨆ sigma : {sigma : MState b // sigma.m.PosDef}, f sigma.val.m) :=
+        le_iSup
+          (fun sigma : {sigma : MState b // sigma.m.PosDef} =>
+            f sigma.val.m)
+          sigma
 
 end QIT

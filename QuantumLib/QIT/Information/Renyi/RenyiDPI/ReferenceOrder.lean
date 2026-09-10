@@ -9,54 +9,54 @@ module
 public import QuantumLib.QIT.Information.Renyi.RenyiDPI.TraceLogBridge
 public import QuantumLib.QIT.Information.Renyi.SandwichedRenyiOptimizedUSC
 public import QuantumLib.QIT.States.PosSqrtOrder
+public import QuantumLib.QIT.Util.MatrixInstances
 
 /-!
 # Reference order for sandwiched Renyi divergence
 
 This module proves the reference-order property used in Tomamichel's direct
-proof of conditional sandwiched-Renyi monotonicity.  If `sigma <= tau`, then
+proof of conditional sandwiched-Renyi monotonicity.  If `sigma ≤ tau`, then
 the divergence is antitone in its reference:
 
-`D_tilde_alpha(rho || tau) <= D_tilde_alpha(rho || sigma)`.
+`D_tilde_alpha(rho || tau) ≤ D_tilde_alpha(rho || sigma)`.
 
 The proof follows the source power-order route.  The sandwiched power trace is
 first rewritten in the alternate form
 `rho^(1/2) sigma^((1-alpha)/alpha) rho^(1/2)`.  Positive reference powers are
 operator monotone below one; negative powers are operator antitone above one.
 Singular high-order references are obtained from positive regularization, and
-the Umegaki endpoint is the right limit as `alpha -> 1+`.
+the Umegaki endpoint is the right limit as `alpha → 1+`.
 
 Tomamichel2015FiniteResources, `renyi.tex:119-124`, property X;
 `renyi.tex:552-575`, Lemma `lm:pinch2a`; and `renyi.tex:679-703`, the
-support-aware `alpha -> 1` endpoint.
+support-aware `alpha → 1` endpoint.
 -/
 
 @[expose] public section
 
 open Filter
-open scoped ComplexOrder MatrixOrder Topology Matrix.Norms.L2Operator
+open scoped ComplexOrder MatrixOrder Topology Matrix.Norms.L2Operator QIT.MatrixL2
+
+noncomputable section
+universe u
+variable {a : Type u} [Fintype a] [DecidableEq a]
+
+open QIT
 
 namespace QIT
 
-universe u
+end QIT
 
-noncomputable section
-
-variable {a : Type u} [Fintype a] [DecidableEq a]
-
-noncomputable local instance instCMatrixCStarAlgebraForReferenceOrder
-    (n : Type u) [Fintype n] [DecidableEq n] : CStarAlgebra (CMatrix n) := {}
-
-namespace State
+namespace MState
 
 /-- Alternate reference-order matrix for the sandwiched power trace. -/
 def sandwichedRenyiReferenceOuter
-    (rho : State a) (sigma : CMatrix a) (alpha : Real) : CMatrix a :=
+    (rho : MState a) (sigma : CMatrix a) (alpha : ℝ) : CMatrix a :=
   rho.sqrtMatrix * CFC.rpow sigma ((1 - alpha) / alpha) * rho.sqrtMatrix
 
 theorem sandwichedRenyiReferenceOuter_posSemidef
-    (rho : State a) {sigma : CMatrix a} (hsigma : sigma.PosSemidef)
-    (alpha : Real) :
+    (rho : MState a) {sigma : CMatrix a} (hsigma : sigma.PosSemidef)
+    (alpha : ℝ) :
     (sandwichedRenyiReferenceOuter rho sigma alpha).PosSemidef := by
   have hpow : (CFC.rpow sigma ((1 - alpha) / alpha)).PosSemidef :=
     cMatrix_rpow_posSemidef hsigma
@@ -65,13 +65,13 @@ theorem sandwichedRenyiReferenceOuter_posSemidef
 
 /-- The source alternate expression for the sandwiched power trace. -/
 theorem sandwichedRenyiReferenceInner_psdTracePower_eq_outer
-    (rho : State a) {sigma : CMatrix a} (hsigma : sigma.PosSemidef)
-    {alpha : Real} (halpha_pos : 0 < alpha) (halpha_ne_one : alpha ≠ 1) :
+    (rho : MState a) {sigma : CMatrix a} (hsigma : sigma.PosSemidef)
+    {alpha : ℝ} (halpha_pos : 0 < alpha) (halpha_ne_one : alpha ≠ 1) :
     psdTracePower (sandwichedRenyiReferenceInner rho sigma alpha)
         (sandwichedRenyiReferenceInner_posSemidef rho hsigma alpha) alpha =
       psdTracePower (sandwichedRenyiReferenceOuter rho sigma alpha)
         (sandwichedRenyiReferenceOuter_posSemidef rho hsigma alpha) alpha := by
-  let s : Real := (1 - alpha) / (2 * alpha)
+  let s : ℝ := (1 - alpha) / (2 * alpha)
   have hs_ne : s ≠ 0 := by
     dsimp [s]
     exact div_ne_zero (sub_ne_zero.mpr halpha_ne_one.symm)
@@ -79,17 +79,17 @@ theorem sandwichedRenyiReferenceInner_psdTracePower_eq_outer
   have htwo_s : 2 * s = (1 - alpha) / alpha := by
     dsimp [s]
     field_simp [halpha_pos.ne']
-  have hsqrt : CFC.rpow rho.matrix (1 / 2 : Real) = rho.sqrtMatrix := by
-    simp [State.sqrtMatrix, psdSqrt, CFC.sqrt_eq_rpow]
+  have hsqrt : CFC.rpow rho.m (1 / 2 : ℝ) = rho.sqrtMatrix := by
+    simp [MState.sqrtMatrix, psdSqrt, CFC.sqrt_eq_rpow]
   unfold psdTracePower
   simpa only [sandwichedRenyiReferenceInner,
       sandwichedRenyiReferenceOuter, hsqrt, htwo_s] using
-    sandwichedRenyiInner_trace_re_congruence rho.pos hsigma hs_ne halpha_pos
+    sandwichedRenyiInner_trace_re_congruence rho.psd hsigma hs_ne halpha_pos
 
 /-- The alternate expression preserves the PSD Schatten expression. -/
 theorem sandwichedRenyiReferenceInner_psdSchattenPNorm_eq_outer
-    (rho : State a) {sigma : CMatrix a} (hsigma : sigma.PosSemidef)
-    {alpha : Real} (halpha_pos : 0 < alpha) (halpha_ne_one : alpha ≠ 1) :
+    (rho : MState a) {sigma : CMatrix a} (hsigma : sigma.PosSemidef)
+    {alpha : ℝ} (halpha_pos : 0 < alpha) (halpha_ne_one : alpha ≠ 1) :
     psdSchattenPNorm (sandwichedRenyiReferenceInner rho sigma alpha)
         (sandwichedRenyiReferenceInner_posSemidef rho hsigma alpha)
         ⟨alpha, halpha_pos⟩ =
@@ -102,10 +102,10 @@ theorem sandwichedRenyiReferenceInner_psdSchattenPNorm_eq_outer
 
 /-- Congruence by `rho^(1/2)` preserves reference-power order. -/
 theorem sandwichedRenyiReferenceOuter_le_of_rpow_le
-    (rho : State a) {sigma tau : CMatrix a} {alpha : Real}
-    (hpow : CFC.rpow sigma ((1 - alpha) / alpha) <=
+    (rho : MState a) {sigma tau : CMatrix a} {alpha : ℝ}
+    (hpow : CFC.rpow sigma ((1 - alpha) / alpha) ≤
       CFC.rpow tau ((1 - alpha) / alpha)) :
-    sandwichedRenyiReferenceOuter rho sigma alpha <=
+    sandwichedRenyiReferenceOuter rho sigma alpha ≤
       sandwichedRenyiReferenceOuter rho tau alpha := by
   rw [Matrix.le_iff]
   have hdiff :
@@ -119,31 +119,31 @@ theorem sandwichedRenyiReferenceOuter_le_of_rpow_le
 /-- In the low-order source range, the positive-power `Q` functional is
 monotone in the PSD reference. -/
 theorem sandwichedRenyiQ_mono_reference_of_half_le_lt_one
-    (rho : State a) {sigma tau : CMatrix a}
+    (rho : MState a) {sigma tau : CMatrix a}
     (hsigma : sigma.PosSemidef) (htau : tau.PosSemidef)
-    (hsigma_tau : sigma <= tau) {alpha : Real}
-    (halpha_half : 1 / 2 <= alpha) (halpha_lt_one : alpha < 1) :
-    sandwichedRenyiQ rho.matrix sigma rho.pos hsigma alpha <=
-      sandwichedRenyiQ rho.matrix tau rho.pos htau alpha := by
+    (hsigma_tau : sigma ≤ tau) {alpha : ℝ}
+    (halpha_half : 1 / 2 ≤ alpha) (halpha_lt_one : alpha < 1) :
+    sandwichedRenyiQ rho.m sigma rho.psd hsigma alpha ≤
+      sandwichedRenyiQ rho.m tau rho.psd htau alpha := by
   have halpha_pos : 0 < alpha := lt_of_lt_of_le (by norm_num) halpha_half
   have halpha_ne_one : alpha ≠ 1 := ne_of_lt halpha_lt_one
-  have hexp_nonneg : 0 <= (1 - alpha) / alpha :=
+  have hexp_nonneg : 0 ≤ (1 - alpha) / alpha :=
     div_nonneg (sub_nonneg.mpr halpha_lt_one.le) halpha_pos.le
-  have hexp_le_one : (1 - alpha) / alpha <= 1 := by
+  have hexp_le_one : (1 - alpha) / alpha ≤ 1 := by
     apply (div_le_one halpha_pos).2
     linarith
-  have hpow : CFC.rpow sigma ((1 - alpha) / alpha) <=
+  have hpow : CFC.rpow sigma ((1 - alpha) / alpha) ≤
       CFC.rpow tau ((1 - alpha) / alpha) :=
     CFC.rpow_le_rpow (Set.mem_Icc.mpr <| And.intro hexp_nonneg hexp_le_one)
       hsigma_tau
   have houter := sandwichedRenyiReferenceOuter_le_of_rpow_le rho hpow
   have htracePower :
       psdTracePower (sandwichedRenyiReferenceOuter rho sigma alpha)
-          (sandwichedRenyiReferenceOuter_posSemidef rho hsigma alpha) alpha <=
+          (sandwichedRenyiReferenceOuter_posSemidef rho hsigma alpha) alpha ≤
         psdTracePower (sandwichedRenyiReferenceOuter rho tau alpha)
           (sandwichedRenyiReferenceOuter_posSemidef rho htau alpha) alpha := by
     have houterPow :
-        CFC.rpow (sandwichedRenyiReferenceOuter rho sigma alpha) alpha <=
+        CFC.rpow (sandwichedRenyiReferenceOuter rho sigma alpha) alpha ≤
           CFC.rpow (sandwichedRenyiReferenceOuter rho tau alpha) alpha :=
       CFC.rpow_le_rpow
         (Set.mem_Icc.mpr <| And.intro halpha_pos.le halpha_lt_one.le) houter
@@ -154,7 +154,7 @@ theorem sandwichedRenyiQ_mono_reference_of_half_le_lt_one
         Matrix.PosSemidef.one houterPow
   change
     psdTracePower (sandwichedRenyiReferenceInner rho sigma alpha)
-        (sandwichedRenyiReferenceInner_posSemidef rho hsigma alpha) alpha <=
+        (sandwichedRenyiReferenceInner_posSemidef rho hsigma alpha) alpha ≤
       psdTracePower (sandwichedRenyiReferenceInner rho tau alpha)
         (sandwichedRenyiReferenceInner_posSemidef rho htau alpha) alpha
   rw [sandwichedRenyiReferenceInner_psdTracePower_eq_outer rho hsigma
@@ -166,27 +166,27 @@ theorem sandwichedRenyiQ_mono_reference_of_half_le_lt_one
 /-- Extended-real low-order sandwiched Renyi divergence is antitone in its PSD
 reference.  The zero-`Q` branch is handled by the source value `+infinity`. -/
 theorem sandwichedRenyiPSDReferenceLowAlphaE_antitone_reference
-    (rho : State a) {sigma tau : CMatrix a}
+    (rho : MState a) {sigma tau : CMatrix a}
     (hsigma : sigma.PosSemidef) (htau : tau.PosSemidef)
-    (hsigma_tau : sigma <= tau) {alpha : Real}
-    (halpha_half : 1 / 2 <= alpha) (halpha_lt_one : alpha < 1) :
-    sandwichedRenyiPSDReferenceLowAlphaE rho tau htau alpha <=
+    (hsigma_tau : sigma ≤ tau) {alpha : ℝ}
+    (halpha_half : 1 / 2 ≤ alpha) (halpha_lt_one : alpha < 1) :
+    sandwichedRenyiPSDReferenceLowAlphaE rho tau htau alpha ≤
       sandwichedRenyiPSDReferenceLowAlphaE rho sigma hsigma alpha := by
   have hQle := sandwichedRenyiQ_mono_reference_of_half_le_lt_one rho
     hsigma htau hsigma_tau halpha_half halpha_lt_one
   by_cases hQsigma_zero :
-      sandwichedRenyiQ rho.matrix sigma rho.pos hsigma alpha = 0
+      sandwichedRenyiQ rho.m sigma rho.psd hsigma alpha = 0
   · rw [sandwichedRenyiPSDReferenceLowAlphaE_eq_top_of_Q_eq_zero
       rho hsigma alpha hQsigma_zero]
     exact le_top
   · have hQsigma_pos :
-        0 < sandwichedRenyiQ rho.matrix sigma rho.pos hsigma alpha :=
-      sandwichedRenyiQ_pos_of_ne_zero rho.pos hsigma alpha hQsigma_zero
+        0 < sandwichedRenyiQ rho.m sigma rho.psd hsigma alpha :=
+      sandwichedRenyiQ_pos_of_ne_zero rho.psd hsigma alpha hQsigma_zero
     have hQtau_pos :
-        0 < sandwichedRenyiQ rho.matrix tau rho.pos htau alpha :=
+        0 < sandwichedRenyiQ rho.m tau rho.psd htau alpha :=
       lt_of_lt_of_le hQsigma_pos hQle
     have hQtau_ne :
-        sandwichedRenyiQ rho.matrix tau rho.pos htau alpha ≠ 0 :=
+        sandwichedRenyiQ rho.m tau rho.psd htau alpha ≠ 0 :=
       ne_of_gt hQtau_pos
     rw [sandwichedRenyiPSDReferenceLowAlphaE_eq_coe_of_Q_ne_zero
         rho htau alpha hQtau_ne,
@@ -195,8 +195,8 @@ theorem sandwichedRenyiPSDReferenceLowAlphaE_antitone_reference
     apply EReal.coe_le_coe_iff.mpr
     unfold sandwichedRenyiPSDReferenceLowAlpha
     have hlog :
-        log2 (sandwichedRenyiQ rho.matrix sigma rho.pos hsigma alpha) <=
-          log2 (sandwichedRenyiQ rho.matrix tau rho.pos htau alpha) := by
+        log2 (sandwichedRenyiQ rho.m sigma rho.psd hsigma alpha) ≤
+          log2 (sandwichedRenyiQ rho.m tau rho.psd htau alpha) := by
       unfold log2
       exact div_le_div_of_nonneg_right
         (Real.log_le_log hQsigma_pos hQle)
@@ -207,10 +207,10 @@ theorem sandwichedRenyiPSDReferenceLowAlphaE_antitone_reference
 /-- Support inclusion is monotone when a PSD reference is enlarged in Loewner
 order. -/
 theorem supports_of_supports_of_reference_le
-    (rho : State a) {sigma tau : CMatrix a}
-    (hsigma : sigma.PosSemidef) (hsigma_tau : sigma <= tau)
-    (hSupport : Matrix.Supports rho.matrix sigma) :
-    Matrix.Supports rho.matrix tau := by
+    (rho : MState a) {sigma tau : CMatrix a}
+    (hsigma : sigma.PosSemidef) (hsigma_tau : sigma ≤ tau)
+    (hSupport : Matrix.Supports rho.m sigma) :
+    Matrix.Supports rho.m tau := by
   have hdiff : (tau - sigma).PosSemidef := Matrix.le_iff.mp hsigma_tau
   have hsigma_support_tau : Matrix.Supports sigma tau := by
     have htau : tau = sigma + (tau - sigma) := by abel
@@ -221,36 +221,36 @@ theorem supports_of_supports_of_reference_le
 /-- Positive-definite high-order finite branches are antitone in the
 reference.  This is the negative-power half of the source proof. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFinite_antitone_reference_of_posDef
-    (rho : State a) {sigma tau : CMatrix a}
+    (rho : MState a) {sigma tau : CMatrix a}
     (hsigma : sigma.PosDef) (htau : tau.PosDef)
-    (hsigma_tau : sigma <= tau) {alpha : Real} (halpha : 1 < alpha) :
-    sandwichedRenyiPSDReferenceHighAlphaFinite rho tau htau.posSemidef alpha <=
+    (hsigma_tau : sigma ≤ tau) {alpha : ℝ} (halpha : 1 < alpha) :
+    sandwichedRenyiPSDReferenceHighAlphaFinite rho tau htau.posSemidef alpha ≤
       sandwichedRenyiPSDReferenceHighAlphaFinite rho sigma hsigma.posSemidef alpha := by
   have halpha_pos : 0 < alpha := lt_trans zero_lt_one halpha
   have halpha_ne_one : alpha ≠ 1 := ne_of_gt halpha
-  let t : Real := (alpha - 1) / alpha
-  have ht_nonneg : 0 <= t := by
+  let t : ℝ := (alpha - 1) / alpha
+  have ht_nonneg : 0 ≤ t := by
     dsimp [t]
     exact div_nonneg (sub_nonneg.mpr halpha.le) halpha_pos.le
-  have ht_le_one : t <= 1 := by
+  have ht_le_one : t ≤ 1 := by
     dsimp [t]
     exact (div_le_one halpha_pos).2 (by linarith)
   have hexp : -t = (1 - alpha) / alpha := by
     dsimp [t]
     field_simp [halpha_pos.ne']
     ring
-  have hpow : CFC.rpow tau ((1 - alpha) / alpha) <=
+  have hpow : CFC.rpow tau ((1 - alpha) / alpha) ≤
       CFC.rpow sigma ((1 - alpha) / alpha) := by
     rw [← hexp]
     exact cMatrix_rpow_neg_le_rpow_neg_of_posDef_le hsigma htau
       ht_nonneg ht_le_one hsigma_tau
-  have houter : sandwichedRenyiReferenceOuter rho tau alpha <=
+  have houter : sandwichedRenyiReferenceOuter rho tau alpha ≤
       sandwichedRenyiReferenceOuter rho sigma alpha :=
     sandwichedRenyiReferenceOuter_le_of_rpow_le rho hpow
   have hnormOuter :
       psdSchattenPNorm (sandwichedRenyiReferenceOuter rho tau alpha)
           (sandwichedRenyiReferenceOuter_posSemidef rho htau.posSemidef alpha)
-          ⟨alpha, halpha_pos⟩ <=
+          ⟨alpha, halpha_pos⟩ ≤
         psdSchattenPNorm (sandwichedRenyiReferenceOuter rho sigma alpha)
           (sandwichedRenyiReferenceOuter_posSemidef rho hsigma.posSemidef alpha)
           ⟨alpha, halpha_pos⟩ :=
@@ -261,7 +261,7 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_antitone_reference_of_posDef
   have hnorm :
       psdSchattenPNorm (sandwichedRenyiReferenceInner rho tau alpha)
           (sandwichedRenyiReferenceInner_posSemidef rho htau.posSemidef alpha)
-          ⟨alpha, halpha_pos⟩ <=
+          ⟨alpha, halpha_pos⟩ ≤
         psdSchattenPNorm (sandwichedRenyiReferenceInner rho sigma alpha)
           (sandwichedRenyiReferenceInner_posSemidef rho hsigma.posSemidef alpha)
           ⟨alpha, halpha_pos⟩ := by
@@ -279,17 +279,17 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_antitone_reference_of_posDef
   have hlog :
       log2 (psdSchattenPNorm (sandwichedRenyiReferenceInner rho tau alpha)
           (sandwichedRenyiReferenceInner_posSemidef rho htau.posSemidef alpha)
-          ⟨alpha, halpha_pos⟩) <=
+          ⟨alpha, halpha_pos⟩) ≤
         log2 (psdSchattenPNorm (sandwichedRenyiReferenceInner rho sigma alpha)
           (sandwichedRenyiReferenceInner_posSemidef rho hsigma.posSemidef alpha)
           ⟨alpha, halpha_pos⟩) := by
     unfold log2
     exact div_le_div_of_nonneg_right (Real.log_le_log hnormTauPos hnorm)
       (le_of_lt <| Real.log_pos one_lt_two)
-  have hSupportTau : Matrix.Supports rho.matrix tau :=
-    Matrix.Supports.of_right_posDef rho.matrix tau htau
-  have hSupportSigma : Matrix.Supports rho.matrix sigma :=
-    Matrix.Supports.of_right_posDef rho.matrix sigma hsigma
+  have hSupportTau : Matrix.Supports rho.m tau :=
+    Matrix.Supports.of_right_posDef rho.m tau htau
+  have hSupportSigma : Matrix.Supports rho.m sigma :=
+    Matrix.Supports.of_right_posDef rho.m sigma hsigma
   rw [sandwichedRenyiPSDReferenceHighAlphaFinite_eq_schatten_log_of_supports
       rho htau.posSemidef hSupportTau halpha,
     sandwichedRenyiPSDReferenceHighAlphaFinite_eq_schatten_log_of_supports
@@ -300,12 +300,12 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_antitone_reference_of_posDef
 /-- Supported singular high-order finite branches inherit reference
 antitonicity from positive regularization. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFinite_antitone_reference
-    (rho : State a) {sigma tau : CMatrix a}
+    (rho : MState a) {sigma tau : CMatrix a}
     (hsigma : sigma.PosSemidef) (htau : tau.PosSemidef)
-    (hsigma_tau : sigma <= tau)
-    (hSupportSigma : Matrix.Supports rho.matrix sigma)
-    {alpha : Real} (halpha : 1 < alpha) :
-    sandwichedRenyiPSDReferenceHighAlphaFinite rho tau htau alpha <=
+    (hsigma_tau : sigma ≤ tau)
+    (hSupportSigma : Matrix.Supports rho.m sigma)
+    {alpha : ℝ} (halpha : 1 < alpha) :
+    sandwichedRenyiPSDReferenceHighAlphaFinite rho tau htau alpha ≤
       sandwichedRenyiPSDReferenceHighAlphaFinite rho sigma hsigma alpha := by
   have hSupportTau := supports_of_supports_of_reference_le rho hsigma
     hsigma_tau hSupportSigma
@@ -330,12 +330,12 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_antitone_reference
 /-- Extended-real high-order sandwiched Renyi divergence is antitone in every
 PSD reference, including the unsupported `+infinity` branch. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaE_antitone_reference
-    (rho : State a) {sigma tau : CMatrix a}
+    (rho : MState a) {sigma tau : CMatrix a}
     (hsigma : sigma.PosSemidef) (htau : tau.PosSemidef)
-    (hsigma_tau : sigma <= tau) {alpha : Real} (halpha : 1 < alpha) :
-    sandwichedRenyiPSDReferenceHighAlphaE rho tau htau alpha <=
+    (hsigma_tau : sigma ≤ tau) {alpha : ℝ} (halpha : 1 < alpha) :
+    sandwichedRenyiPSDReferenceHighAlphaE rho tau htau alpha ≤
       sandwichedRenyiPSDReferenceHighAlphaE rho sigma hsigma alpha := by
-  by_cases hSupportSigma : Matrix.Supports rho.matrix sigma
+  by_cases hSupportSigma : Matrix.Supports rho.m sigma
   · have hSupportTau := supports_of_supports_of_reference_le rho hsigma
       hsigma_tau hSupportSigma
     rw [sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_of_supports
@@ -351,14 +351,14 @@ theorem sandwichedRenyiPSDReferenceHighAlphaE_antitone_reference
 
 /-- The Umegaki trace-log endpoint is antitone in its PSD reference.  The
 proof is the closed-order limit of the already proved high-order property as
-`alpha -> 1+`. -/
+`alpha → 1+`. -/
 theorem relativeEntropyPSDReferenceTraceLogE_antitone_reference
-    (rho : State a) {sigma tau : CMatrix a}
+    (rho : MState a) {sigma tau : CMatrix a}
     (hsigma : sigma.PosSemidef) (htau : tau.PosSemidef)
-    (hsigma_tau : sigma <= tau) :
-    relativeEntropyPSDReferenceTraceLogE rho tau htau <=
+    (hsigma_tau : sigma ≤ tau) :
+    relativeEntropyPSDReferenceTraceLogE rho tau htau ≤
       relativeEntropyPSDReferenceTraceLogE rho sigma hsigma := by
-  by_cases hSupportSigma : Matrix.Supports rho.matrix sigma
+  by_cases hSupportSigma : Matrix.Supports rho.m sigma
   · have hSupportTau := supports_of_supports_of_reference_le rho hsigma
       hsigma_tau hSupportSigma
     rw [relativeEntropyPSDReferenceTraceLogE_eq_coe_of_supports
@@ -386,13 +386,13 @@ theorem relativeEntropyPSDReferenceTraceLogE_antitone_reference
 
 /-- Source-facing reference dominance for the canonical extended-real
 sandwiched Renyi divergence on the full data-processing range
-`1/2 <= alpha < infinity`, including `alpha = 1`. -/
+`1/2 ≤ alpha < infinity`, including `alpha = 1`. -/
 theorem sandwichedRenyiPSDReferenceE_antitone_reference
-    (rho : State a) {sigma tau : CMatrix a}
+    (rho : MState a) {sigma tau : CMatrix a}
     (hsigma : sigma.PosSemidef) (htau : tau.PosSemidef)
-    (hsigma_tau : sigma <= tau) {alpha : Real}
-    (halpha_half : 1 / 2 <= alpha) :
-    sandwichedRenyiPSDReferenceE rho tau htau alpha <=
+    (hsigma_tau : sigma ≤ tau) {alpha : ℝ}
+    (halpha_half : 1 / 2 ≤ alpha) :
+    sandwichedRenyiPSDReferenceE rho tau htau alpha ≤
       sandwichedRenyiPSDReferenceE rho sigma hsigma alpha := by
   by_cases halpha_lt_one : alpha < 1
   · rw [sandwichedRenyiPSDReferenceE_eq_lowAlphaE_of_lt_one
@@ -417,15 +417,17 @@ theorem sandwichedRenyiPSDReferenceE_antitone_reference
       exact sandwichedRenyiPSDReferenceHighAlphaE_antitone_reference rho
         hsigma htau hsigma_tau halpha_one_lt
 
-/-- Compatibility theorem for the legacy finite positive-definite reference
-API.  Its hypotheses expose the same source range as the canonical theorem. -/
+/-- The same reference dominance for the real-valued `sandwichedRenyiReference`, whose reference is
+positive definite rather than merely positive semidefinite.  It covers the data-processing range
+`1/2 ≤ alpha` apart from `alpha = 1`, where only the extended-real
+`sandwichedRenyiPSDReferenceE_antitone_reference` applies. -/
 theorem sandwichedRenyiReference_antitone_reference
-    (rho : State a) {sigma tau : CMatrix a}
-    (hrho : rho.matrix.PosDef) (hsigma : sigma.PosDef) (htau : tau.PosDef)
-    (hsigma_tau : sigma <= tau) {alpha : Real}
-    (halpha_half : 1 / 2 <= alpha) (halpha_ne_one : alpha ≠ 1) :
+    (rho : MState a) {sigma tau : CMatrix a}
+    (hrho : rho.m.PosDef) (hsigma : sigma.PosDef) (htau : tau.PosDef)
+    (hsigma_tau : sigma ≤ tau) {alpha : ℝ}
+    (halpha_half : 1 / 2 ≤ alpha) (halpha_ne_one : alpha ≠ 1) :
     sandwichedRenyiReference rho tau hrho htau alpha
-        (lt_of_lt_of_le (by norm_num) halpha_half) halpha_ne_one <=
+        (lt_of_lt_of_le (by norm_num) halpha_half) halpha_ne_one ≤
       sandwichedRenyiReference rho sigma hrho hsigma alpha
         (lt_of_lt_of_le (by norm_num) halpha_half) halpha_ne_one := by
   have halpha_pos : 0 < alpha := lt_of_lt_of_le (by norm_num) halpha_half
@@ -451,8 +453,4 @@ theorem sandwichedRenyiReference_antitone_reference
         rho hrho hsigma alpha halpha_pos halpha_ne_one] at hcanonical
     exact EReal.coe_le_coe_iff.mp hcanonical
 
-end State
-
-end
-
-end QIT
+end MState

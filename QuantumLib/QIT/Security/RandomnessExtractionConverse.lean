@@ -23,17 +23,17 @@ min-entropy feasibility constraint.
 
 open scoped ComplexOrder MatrixOrder NNReal
 
-namespace QIT
-
 universe uF uZ uS ue
 
 noncomputable section
+
+namespace QIT
 
 /-- Reindex a deterministic graph state from `((Z × S) × E)` to
 `S × (Z × E)`, so tracing out `S` leaves the original `Z × E` cq state. -/
 def deterministicGraphSourceMarginalEquiv
     (Z : Type uZ) (S : Type uS) (e : Type ue) :
-    Prod (Prod Z S) e ≃ Prod S (Prod Z e) where
+    ((Z × S) × e) ≃ (S × (Z × e)) where
   toFun x := (x.1.2, (x.1.1, x.2))
   invFun y := ((y.2.1, y.1), y.2.2)
   left_inv := by
@@ -50,7 +50,7 @@ register, sending `z` to `(z, g z)`. -/
 def deterministicGraphSourceIsometry
     {Z : Type uZ} {S : Type uS} [Fintype Z] [DecidableEq Z]
     [Fintype S] [DecidableEq S] (g : Z → S) :
-    ReferenceIsometry Z (Prod Z S) :=
+    ReferenceIsometry Z (Z × S) :=
   ReferenceIsometry.ofInjective (fun z => (z, g z)) (by
     intro z z' h
     exact congrArg Prod.fst h)
@@ -64,13 +64,13 @@ local postfix:1024 "ᴴ" => Matrix.conjTranspose
 variable {ι : Type uZ} {β : Type ue}
 variable [Fintype ι] [DecidableEq ι] [Fintype β] [DecidableEq β]
 
-private def fiberMatrix (Y : Matrix β (Prod ι β) ℂ) (i : ι) : CMatrix β :=
+private def fiberMatrix (Y : Matrix β (ι × β) ℂ) (i : ι) : CMatrix β :=
   Matrix.of fun x y => Y x (i, y)
 
-private def fiberGram (Y : Matrix β (Prod ι β) ℂ) (i : ι) : CMatrix β :=
+private def fiberGram (Y : Matrix β (ι × β) ℂ) (i : ι) : CMatrix β :=
   fiberMatrix Y i * (fiberMatrix Y i)ᴴ
 
-private def stackedPsdSqrt (A : ι → CMatrix β) : Matrix β (Prod ι β) ℂ :=
+private def stackedPsdSqrt (A : ι → CMatrix β) : Matrix β (ι × β) ℂ :=
   Matrix.of fun x ib => psdSqrt (A ib.1) x ib.2
 
 omit [DecidableEq ι] in
@@ -81,7 +81,7 @@ private theorem stacked_psdSqrt_gram
   ext x y
   simp only [Matrix.mul_apply, Matrix.conjTranspose_apply]
   change
-    (∑ ib : Prod ι β,
+    (∑ ib : ι × β,
         psdSqrt (A ib.1) x ib.2 * star (psdSqrt (A ib.1) y ib.2)) =
       (∑ i : ι, A i) x y
   rw [Matrix.sum_apply]
@@ -98,7 +98,7 @@ private theorem stacked_psdSqrt_gram
 
 omit [DecidableEq ι] [DecidableEq β] in
 private theorem fiber_gram_sum
-    (Y : Matrix β (Prod ι β) ℂ) :
+    (Y : Matrix β (ι × β) ℂ) :
     (∑ i : ι, fiberGram Y i) = Y * Yᴴ := by
   classical
   ext x y
@@ -109,13 +109,13 @@ private theorem fiber_gram_sum
 
 omit [Fintype ι] [DecidableEq ι] [DecidableEq β] in
 private theorem fiber_gram_pos
-    (Y : Matrix β (Prod ι β) ℂ) (i : ι) :
+    (Y : Matrix β (ι × β) ℂ) (i : ι) :
     (fiberGram Y i).PosSemidef :=
   Matrix.posSemidef_self_mul_conjTranspose (fiberMatrix Y i)
 
 omit [DecidableEq ι] in
 private theorem stacked_overlap_trace
-    (A : ι → CMatrix β) (Y : Matrix β (Prod ι β) ℂ) :
+    (A : ι → CMatrix β) (Y : Matrix β (ι × β) ℂ) :
     (((stackedPsdSqrt A)ᴴ * Y).trace) =
       ∑ i : ι, (((psdSqrt (A i))ᴴ * fiberMatrix Y i).trace) := by
   classical
@@ -125,37 +125,37 @@ private theorem stacked_overlap_trace
 
 omit [DecidableEq ι] in
 private theorem stacked_overlap_abs_le_sum_abs
-    (A : ι → CMatrix β) (Y : Matrix β (Prod ι β) ℂ) :
-    Complex.abs (((stackedPsdSqrt A)ᴴ * Y).trace) ≤
-      ∑ i : ι, Complex.abs ((((psdSqrt (A i))ᴴ * fiberMatrix Y i).trace)) := by
+    (A : ι → CMatrix β) (Y : Matrix β (ι × β) ℂ) :
+     ‖((stackedPsdSqrt A)ᴴ * Y).trace‖ ≤
+      ∑ i : ι, ‖(((psdSqrt (A i))ᴴ * fiberMatrix Y i).trace)‖ := by
   rw [stacked_overlap_trace]
-  simpa [Complex.abs] using
+  simpa using
     norm_sum_le (Finset.univ : Finset ι)
       (fun i : ι => (((psdSqrt (A i))ᴴ * fiberMatrix Y i).trace))
 
 private def stateOfPsdTracePos
-    (M : CMatrix β) (hM : M.PosSemidef) (htr : 0 < M.trace.re) : State β where
-  matrix := (M.trace.re)⁻¹ • M
-  pos := Matrix.PosSemidef.smul hM (by
-    exact_mod_cast inv_nonneg.mpr htr.le)
-  trace_eq_one := by
+    (M : CMatrix β) (hM : M.PosSemidef) (htr : 0 < M.trace.re) : MState β := .ofMatrix
+  (matrix := (M.trace.re)⁻¹ • M)
+  (pos := Matrix.PosSemidef.smul hM (by
+    exact_mod_cast inv_nonneg.mpr htr.le))
+  (trace_eq_one := by
     rw [Matrix.trace_smul]
     have htrC : ((M.trace.re : ℂ) ≠ 0) := by exact_mod_cast htr.ne'
     have htrace_im : M.trace.im = 0 := (Matrix.PosSemidef.trace_nonneg hM).2.symm
     apply Complex.ext
     · simp [Complex.real_smul, htr.ne']
-    · simp [Complex.real_smul, htrace_im]
+    · simp [Complex.real_smul, htrace_im])
 
 private theorem stateOfPsdTracePos_matrix
     (M : CMatrix β) (hM : M.PosSemidef) (htr : 0 < M.trace.re) :
-    (stateOfPsdTracePos M hM htr).matrix = (M.trace.re)⁻¹ • M :=
-  rfl
+    (stateOfPsdTracePos M hM htr).m = (M.trace.re)⁻¹ • M :=
+  MState.matrix_ofMatrix _ _ _
 
 private theorem sqrtMatrix_stateOfPsdTracePos
     (M : CMatrix β) (hM : M.PosSemidef) (htr : 0 < M.trace.re) :
     (stateOfPsdTracePos M hM htr).sqrtMatrix =
       (((Real.sqrt M.trace.re)⁻¹ : ℝ) : ℂ) • psdSqrt M := by
-  rw [State.sqrtMatrix, stateOfPsdTracePos_matrix]
+  rw [MState.sqrtMatrix, stateOfPsdTracePos_matrix]
   change psdSqrt ((((M.trace.re)⁻¹ : ℝ) : ℂ) • M) =
     (((Real.sqrt M.trace.re)⁻¹ : ℝ) : ℂ) • psdSqrt M
   have hinv_nonneg : 0 ≤ (M.trace.re)⁻¹ := inv_nonneg.mpr htr.le
@@ -167,8 +167,8 @@ private theorem normalized_psdSqrt_gram
     (A : CMatrix β) (hA : A.PosSemidef) (htr : 0 < A.trace.re) :
     let c : ℂ := (((Real.sqrt A.trace.re)⁻¹ : ℝ) : ℂ)
     (c • psdSqrt A) * (c • psdSqrt A)ᴴ =
-      (stateOfPsdTracePos A hA htr).matrix := by
-  let ρ : State β := stateOfPsdTracePos A hA htr
+      (stateOfPsdTracePos A hA htr).m := by
+  let ρ : MState β := stateOfPsdTracePos A hA htr
   have hsqrt : ρ.sqrtMatrix =
       (((Real.sqrt A.trace.re)⁻¹ : ℝ) : ℂ) • psdSqrt A := by
     simpa [ρ] using sqrtMatrix_stateOfPsdTracePos A hA htr
@@ -191,7 +191,7 @@ private theorem normalized_amplitude_gram
         (by
           dsimp [B]
           exact amplitude_self_mul_conjTranspose_pos Y)
-        htr).matrix := by
+        htr).m := by
   let B : CMatrix β := Y * Yᴴ
   have hB : B.PosSemidef := by
     dsimp [B]
@@ -199,7 +199,7 @@ private theorem normalized_amplitude_gram
   change
     ((((Real.sqrt B.trace.re)⁻¹ : ℝ) : ℂ) • Y) *
         ((((Real.sqrt B.trace.re)⁻¹ : ℝ) : ℂ) • Y)ᴴ =
-      (stateOfPsdTracePos B hB htr).matrix
+      (stateOfPsdTracePos B hB htr).m
   rw [stateOfPsdTracePos_matrix]
   rw [Matrix.conjTranspose_smul, Matrix.smul_mul, Matrix.mul_smul, smul_smul]
   change
@@ -229,7 +229,7 @@ private theorem normalized_stackedPsdSqrt_gram
         (by
           dsimp [Asum]
           exact Matrix.posSemidef_sum Finset.univ fun i _ => hA i)
-        htr).matrix := by
+        htr).m := by
   classical
   let Asum : CMatrix β := ∑ i : ι, A i
   have hAsum : Asum.PosSemidef := by
@@ -238,7 +238,7 @@ private theorem normalized_stackedPsdSqrt_gram
   change
     ((((Real.sqrt Asum.trace.re)⁻¹ : ℝ) : ℂ) • stackedPsdSqrt A) *
         ((((Real.sqrt Asum.trace.re)⁻¹ : ℝ) : ℂ) • stackedPsdSqrt A)ᴴ =
-      (stateOfPsdTracePos Asum hAsum htr).matrix
+      (stateOfPsdTracePos Asum hAsum htr).m
   rw [stateOfPsdTracePos_matrix]
   rw [Matrix.conjTranspose_smul, Matrix.smul_mul, Matrix.mul_smul, smul_smul]
   rw [stacked_psdSqrt_gram A hA]
@@ -260,7 +260,7 @@ private theorem normalized_stackedPsdSqrt_gram
 
 private theorem abs_trace_psdSqrt_mul_amplitude_le
     (A : CMatrix β) (hA : A.PosSemidef) (Y : CMatrix β) :
-    Complex.abs (((psdSqrt A)ᴴ * Y).trace) ≤
+     ‖((psdSqrt A)ᴴ * Y).trace‖ ≤
       traceNorm (psdSqrt A * psdSqrt (Y * Yᴴ)) := by
   classical
   let B : CMatrix β := Y * Yᴴ
@@ -287,42 +287,42 @@ private theorem abs_trace_psdSqrt_mul_amplitude_le
     exact lt_of_le_of_ne (Matrix.PosSemidef.trace_nonneg hA).1 (Ne.symm hAtr0)
   have hBtr_pos : 0 < B.trace.re := by
     exact lt_of_le_of_ne (Matrix.PosSemidef.trace_nonneg hB).1 (Ne.symm hBtr0)
-  let ρ : State β := stateOfPsdTracePos A hA hAtr_pos
-  let σ : State β := stateOfPsdTracePos B hB hBtr_pos
+  let ρ : MState β := stateOfPsdTracePos A hA hAtr_pos
+  let σ : MState β := stateOfPsdTracePos B hB hBtr_pos
   let cA : ℂ := (((Real.sqrt A.trace.re)⁻¹ : ℝ) : ℂ)
   let cB : ℂ := (((Real.sqrt B.trace.re)⁻¹ : ℝ) : ℂ)
   let Xn : CMatrix β := cA • psdSqrt A
   let Yn : CMatrix β := cB • Y
-  have hXgram : Xn * Xnᴴ = ρ.matrix := by
+  have hXgram : Xn * Xnᴴ = ρ.m := by
     change
       ((((Real.sqrt A.trace.re)⁻¹ : ℝ) : ℂ) • psdSqrt A) *
           ((((Real.sqrt A.trace.re)⁻¹ : ℝ) : ℂ) • psdSqrt A)ᴴ =
-        ρ.matrix
+        ρ.m
     simpa [ρ] using normalized_psdSqrt_gram A hA hAtr_pos
-  have hYgram : Yn * Ynᴴ = σ.matrix := by
+  have hYgram : Yn * Ynᴴ = σ.m := by
     change
       ((((Real.sqrt B.trace.re)⁻¹ : ℝ) : ℂ) • Y) *
           ((((Real.sqrt B.trace.re)⁻¹ : ℝ) : ℂ) • Y)ᴴ =
-        σ.matrix
+        σ.m
     simpa [σ, B] using normalized_amplitude_gram Y hBtr_pos
   have hXtrace : (Xn * Xnᴴ).trace = 1 := by
-    rw [hXgram, ρ.trace_eq_one]
+    rw [hXgram, ρ.tr']
   have hYtrace : (Yn * Ynᴴ).trace = 1 := by
-    rw [hYgram, σ.trace_eq_one]
-  let Ψ : PureVector (Prod β β) := PureVector.ofAmplitudeMatrix Xn hXtrace
-  let Φ : PureVector (Prod β β) := PureVector.ofAmplitudeMatrix Yn hYtrace
+    rw [hYgram, σ.tr']
+  let Ψ : Ket (β × β) := Ket.ofAmplitudeMatrix Xn hXtrace
+  let Φ : Ket (β × β) := Ket.ofAmplitudeMatrix Yn hYtrace
   have hΨ : Ψ.Purifies ρ := by
-    exact PureVector.ofAmplitudeMatrix_purifies hXgram hXtrace
+    exact Ket.ofAmplitudeMatrix_purifies hXgram hXtrace
   have hΦ : Φ.Purifies σ := by
-    exact PureVector.ofAmplitudeMatrix_purifies hYgram hYtrace
+    exact Ket.ofAmplitudeMatrix_purifies hYgram hYtrace
   have hbound :
-      Complex.abs ((Xnᴴ * Yn).trace) ≤
+       ‖(Xnᴴ * Yn).trace‖ ≤
         traceNorm (ρ.sqrtMatrix * σ.sqrtMatrix) := by
-    have h := PureVector.abs_overlap_le_fidelity hΨ hΦ
+    have h := Ket.abs_overlap_le_fidelity hΨ hΦ
     have hoverlap : Ψ.overlap Φ = (Xnᴴ * Yn).trace := by
-      rw [PureVector.overlap_eq_trace_conjTranspose_amplitudeMatrix_mul]
-      simp [Ψ, Φ, PureVector.ofAmplitudeMatrix_amplitudeMatrix]
-    simpa [hoverlap, State.fidelity_eq_traceNorm_sqrtMatrix_mul_sqrtMatrix]
+      rw [Ket.overlap_eq_trace_conjTranspose_amplitudeMatrix_mul]
+      simp [Ψ, Φ, Ket.ofAmplitudeMatrix_amplitudeMatrix]
+    simpa [hoverlap, MState.fidelity_eq_traceNorm_sqrtMatrix_mul_sqrtMatrix]
       using h
   let a : ℝ := Real.sqrt A.trace.re
   let b : ℝ := Real.sqrt B.trace.re
@@ -334,8 +334,8 @@ private theorem abs_trace_psdSqrt_mul_amplitude_le
   have hk_pos : 0 < k := by
     exact mul_pos ha_pos hb_pos
   have hleft_norm :
-      Complex.abs ((Xnᴴ * Yn).trace) =
-        k⁻¹ * Complex.abs (((psdSqrt A)ᴴ * Y).trace) := by
+       ‖(Xnᴴ * Yn).trace‖ =
+        k⁻¹ * ‖((psdSqrt A)ᴴ * Y).trace‖ := by
     subst Xn
     subst Yn
     subst cA
@@ -343,8 +343,8 @@ private theorem abs_trace_psdSqrt_mul_amplitude_le
     subst k
     subst a
     subst b
-    simp [Matrix.conjTranspose_smul, Matrix.trace_smul, Complex.abs,
-      Real.sqrt_nonneg, abs_of_nonneg, mul_assoc, mul_comm]
+    simp [Matrix.conjTranspose_smul, Matrix.trace_smul, Real.sqrt_nonneg, abs_of_nonneg,
+      mul_assoc, mul_comm]
   have hright_norm :
       traceNorm (ρ.sqrtMatrix * σ.sqrtMatrix) =
         k⁻¹ * traceNorm (psdSqrt A * psdSqrt (Y * Yᴴ)) := by
@@ -436,43 +436,43 @@ private theorem exists_fiber_psd_split_traceNorm_bound
     exact lt_of_le_of_ne (Matrix.PosSemidef.trace_nonneg hAsum).1 (Ne.symm hAtr0)
   have hBtr_pos : 0 < B.trace.re := by
     exact lt_of_le_of_ne (Matrix.PosSemidef.trace_nonneg hB).1 (Ne.symm hBtr0)
-  let ρ : State β := stateOfPsdTracePos Asum hAsum hAtr_pos
-  let σ : State β := stateOfPsdTracePos B hB hBtr_pos
+  let ρ : MState β := stateOfPsdTracePos Asum hAsum hAtr_pos
+  let σ : MState β := stateOfPsdTracePos B hB hBtr_pos
   let cA : ℂ := (((Real.sqrt Asum.trace.re)⁻¹ : ℝ) : ℂ)
-  let X : Matrix β (Prod ι β) ℂ := stackedPsdSqrt A
-  let Xn : Matrix β (Prod ι β) ℂ := cA • X
-  have hXgram : Xn * Xnᴴ = ρ.matrix := by
+  let X : Matrix β (ι × β) ℂ := stackedPsdSqrt A
+  let Xn : Matrix β (ι × β) ℂ := cA • X
+  have hXgram : Xn * Xnᴴ = ρ.m := by
     change
       ((((Real.sqrt Asum.trace.re)⁻¹ : ℝ) : ℂ) • stackedPsdSqrt A) *
           ((((Real.sqrt Asum.trace.re)⁻¹ : ℝ) : ℂ) • stackedPsdSqrt A)ᴴ =
-        ρ.matrix
+        ρ.m
     simpa [ρ, Asum] using normalized_stackedPsdSqrt_gram A hA hAtr_pos
   have hXtrace : (Xn * Xnᴴ).trace = 1 := by
-    rw [hXgram, ρ.trace_eq_one]
-  let Ψ : PureVector (Prod (Prod ι β) β) := PureVector.ofAmplitudeMatrix Xn hXtrace
+    rw [hXgram, ρ.tr']
+  let Ψ : Ket ((ι × β) × β) := Ket.ofAmplitudeMatrix Xn hXtrace
   have hΨ : Ψ.Purifies ρ := by
-    exact PureVector.ofAmplitudeMatrix_purifies hXgram hXtrace
-  have hcard : Fintype.card β ≤ Fintype.card (Prod ι β) := by
+    exact Ket.ofAmplitudeMatrix_purifies hXgram hXtrace
+  have hcard : Fintype.card β ≤ Fintype.card (ι × β) := by
     have hιpos : 0 < Fintype.card ι := Fintype.card_pos_iff.mpr inferInstance
     calc
       Fintype.card β ≤ Fintype.card ι * Fintype.card β :=
         Nat.le_mul_of_pos_left (Fintype.card β) hιpos
-      _ = Fintype.card (Prod ι β) := by simp [Fintype.card_prod]
+      _ = Fintype.card (ι × β) := by simp [Fintype.card_prod]
   obtain ⟨Φ, hΦ, hoverlap_sq⟩ :=
-    PureVector.exists_purification_with_overlapSq_eq_squaredFidelity
+    Ket.exists_purification_with_overlapSq_eq_squaredFidelity
       (Ψ := Ψ) (ρ := ρ) (σ := σ) hΨ hcard
   have hoverlap_abs :
-      Complex.abs (Ψ.overlap Φ) = ρ.fidelity σ := by
-    rw [PureVector.overlapSq_eq_normSq, Complex.normSq_eq_norm_sq,
-      State.squaredFidelity_eq_fidelity_sq] at hoverlap_sq
-    exact (sq_eq_sq₀ (norm_nonneg _) (State.fidelity_nonneg ρ σ)).mp hoverlap_sq
+       ‖Ψ.overlap Φ‖ = ρ.fidelity σ := by
+    rw [Ket.overlapSq_eq_normSq, Complex.normSq_eq_norm_sq,
+      MState.squaredFidelity_eq_fidelity_sq] at hoverlap_sq
+    exact (sq_eq_sq₀ (norm_nonneg _) (MState.fidelity_nonneg ρ σ)).mp hoverlap_sq
   let b : ℝ := Real.sqrt B.trace.re
-  let Y : Matrix β (Prod ι β) ℂ := ((b : ℝ) : ℂ) • Φ.amplitudeMatrix
+  let Y : Matrix β (ι × β) ℂ := ((b : ℝ) : ℂ) • Φ.amplitudeMatrix
   have hYgram : Y * Yᴴ = B := by
     dsimp [Y, b]
     rw [Matrix.conjTranspose_smul, Matrix.smul_mul, Matrix.mul_smul, smul_smul]
-    have hΦgram : Φ.amplitudeMatrix * Φ.amplitudeMatrixᴴ = σ.matrix :=
-      PureVector.purifies_amplitudeMatrix_mul_conjTranspose_eq hΦ
+    have hΦgram : Φ.amplitudeMatrix * Φ.amplitudeMatrixᴴ = σ.m :=
+      Ket.purifies_amplitudeMatrix_mul_conjTranspose_eq hΦ
     rw [hΦgram]
     rw [stateOfPsdTracePos_matrix]
     rw [smul_smul]
@@ -489,8 +489,8 @@ private theorem exists_fiber_psd_split_traceNorm_bound
     simp
   have hoverlap_trace :
       Ψ.overlap Φ = (Xnᴴ * Φ.amplitudeMatrix).trace := by
-    rw [PureVector.overlap_eq_trace_conjTranspose_amplitudeMatrix_mul]
-    simp [Ψ, PureVector.ofAmplitudeMatrix_amplitudeMatrix]
+    rw [Ket.overlap_eq_trace_conjTranspose_amplitudeMatrix_mul]
+    simp [Ψ, Ket.ofAmplitudeMatrix_amplitudeMatrix]
   let a : ℝ := Real.sqrt Asum.trace.re
   let k : ℝ := a * b
   have ha_pos : 0 < a := by
@@ -499,8 +499,8 @@ private theorem exists_fiber_psd_split_traceNorm_bound
     simpa [b] using Real.sqrt_pos.mpr hBtr_pos
   have hk_pos : 0 < k := mul_pos ha_pos hb_pos
   have htotal_scale :
-      Complex.abs (Ψ.overlap Φ) =
-        k⁻¹ * Complex.abs ((Xᴴ * Y).trace) := by
+       ‖Ψ.overlap Φ‖ =
+        k⁻¹ * ‖(Xᴴ * Y).trace‖ := by
     rw [hoverlap_trace]
     subst Xn
     subst X
@@ -510,13 +510,13 @@ private theorem exists_fiber_psd_split_traceNorm_bound
     subst a
     subst b
     simp [Matrix.conjTranspose_smul, Matrix.smul_mul, Matrix.mul_smul,
-      Matrix.trace_smul, Complex.abs, Real.sqrt_nonneg, abs_of_nonneg,
+      Matrix.trace_smul, Real.sqrt_nonneg, abs_of_nonneg,
       mul_assoc, mul_left_comm, mul_comm]
     rw [← mul_assoc, mul_inv_cancel₀ (Real.sqrt_pos.mpr hBtr_pos).ne', one_mul]
   have hfidelity_scale :
       ρ.fidelity σ =
         k⁻¹ * traceNorm (psdSqrt Asum * psdSqrt B) := by
-    rw [State.fidelity_eq_traceNorm_sqrtMatrix_mul_sqrtMatrix]
+    rw [MState.fidelity_eq_traceNorm_sqrtMatrix_mul_sqrtMatrix]
     have hρsqrt := sqrtMatrix_stateOfPsdTracePos Asum hAsum hAtr_pos
     have hσsqrt := sqrtMatrix_stateOfPsdTracePos B hB hBtr_pos
     rw [hρsqrt, hσsqrt]
@@ -545,8 +545,8 @@ private theorem exists_fiber_psd_split_traceNorm_bound
       (Real.sqrt_pos.mpr hBtr_pos).ne']
   have htotal_eq :
       traceNorm (psdSqrt Asum * psdSqrt B) =
-        Complex.abs ((Xᴴ * Y).trace) := by
-    have hscaled : k⁻¹ * Complex.abs ((Xᴴ * Y).trace) =
+         ‖(Xᴴ * Y).trace‖ := by
+    have hscaled : k⁻¹ * ‖(Xᴴ * Y).trace‖ =
         k⁻¹ * traceNorm (psdSqrt Asum * psdSqrt B) := by
       rw [← htotal_scale, ← hfidelity_scale, hoverlap_abs]
     have hk_ne : k ≠ 0 := ne_of_gt hk_pos
@@ -558,9 +558,9 @@ private theorem exists_fiber_psd_split_traceNorm_bound
   · calc
       traceNorm (psdSqrt (∑ i : ι, A i) * psdSqrt B) =
           traceNorm (psdSqrt Asum * psdSqrt B) := by rfl
-      _ = Complex.abs ((Xᴴ * Y).trace) := htotal_eq
-      _ = Complex.abs (((stackedPsdSqrt A)ᴴ * Y).trace) := by rfl
-      _ ≤ ∑ i : ι, Complex.abs ((((psdSqrt (A i))ᴴ * fiberMatrix Y i).trace)) :=
+      _ = ‖(Xᴴ * Y).trace‖ := htotal_eq
+      _ = ‖((stackedPsdSqrt A)ᴴ * Y).trace‖ := by rfl
+      _ ≤ ∑ i : ι, ‖(((psdSqrt (A i))ᴴ * fiberMatrix Y i).trace)‖ :=
         stacked_overlap_abs_le_sum_abs A Y
       _ ≤ ∑ i : ι, traceNorm (psdSqrt (A i) * psdSqrt (fiberGram Y i)) := by
         refine Finset.sum_le_sum fun i _ => ?_
@@ -596,7 +596,11 @@ private theorem sum_fiber_subtype_eq_if
 
 end FiberPsdSplit
 
-namespace Ensemble
+end QIT
+
+namespace MEnsemble
+
+open QIT
 
 variable {Z : Type uZ} {S : Type uS} {e : Type ue}
 variable [Fintype Z] [DecidableEq Z]
@@ -605,156 +609,158 @@ variable [Fintype e] [DecidableEq e]
 
 /-- The cq state obtained by applying a deterministic function to the classical
 label of an ensemble. -/
-def deterministicPostprocessCqState (E : Ensemble Z e) (g : Z → S) : State (Prod S e) where
-  matrix := ∑ z, (E.probs z) •
-    Matrix.kronecker (Matrix.single (g z) (g z) (1 : ℂ)) (E.states z).matrix
-  pos := by
+def deterministicPostprocessCqState (E : MEnsemble e Z) (g : Z → S) : MState (S × e) := .ofMatrix
+  (matrix := ∑ z, (E.probs z) •
+    Matrix.kronecker (Matrix.single (g z) (g z) (1 : ℂ)) (E.states z).m)
+  (pos := by
     exact Matrix.posSemidef_sum Finset.univ fun z _ =>
-      (((posSemidef_single (g z)).kronecker (E.states z).pos).smul
-        (NNReal.coe_nonneg (E.probs z)))
-  trace_eq_one := by
+      (((posSemidef_single (g z)).kronecker (E.states z).psd).smul
+        (NNReal.coe_nonneg (E.probs z))))
+  (trace_eq_one := by
     simp only [Matrix.trace_sum, Matrix.trace_smul]
     calc
       (∑ z : Z, (E.probs z) •
           (Matrix.kronecker (Matrix.single (g z) (g z) (1 : ℂ))
-            (E.states z).matrix).trace) =
+            (E.states z).m).trace) =
           ∑ z : Z, ((E.probs z : ℝ≥0) : ℂ) := by
         refine Finset.sum_congr rfl fun z _ => ?_
         have htrace :
             (Matrix.kronecker (Matrix.single (g z) (g z) (1 : ℂ))
-              (E.states z).matrix).trace = 1 := by
+              (E.states z).m).trace = 1 := by
           simpa [Matrix.kronecker] using
             (Matrix.trace_kronecker
               (Matrix.single (g z) (g z) (1 : ℂ))
-              (E.states z).matrix).trans
-              (by rw [trace_single_one, if_pos rfl, (E.states z).trace_eq_one]; norm_num)
+              (E.states z).m).trans
+              (by rw [trace_single_one, if_pos rfl, (E.states z).tr']; norm_num)
         rw [htrace]
         exact (Algebra.algebraMap_eq_smul_one _).symm
       _ = ↑(∑ z : Z, E.probs z) := by simp
-      _ = 1 := by rw [E.weights_sum]; rfl
+      _ = 1 := by rw [E.weights_sum]; rfl)
 
 omit [DecidableEq Z] in
 @[simp]
-theorem deterministicPostprocessCqState_matrix (E : Ensemble Z e) (g : Z → S) :
-    (E.deterministicPostprocessCqState g).matrix =
+theorem deterministicPostprocessCqState_matrix (E : MEnsemble e Z) (g : Z → S) :
+    (E.deterministicPostprocessCqState g).m =
       ∑ z, (E.probs z) •
-        Matrix.kronecker (Matrix.single (g z) (g z) (1 : ℂ)) (E.states z).matrix :=
-  rfl
+        Matrix.kronecker (Matrix.single (g z) (g z) (1 : ℂ)) (E.states z).m :=
+  MState.matrix_ofMatrix _ _ _
 
 omit [DecidableEq Z] in
 /-- The deterministically postprocessed cq center is already diagonal in its
 source coordinate, hence source-coordinate pinching fixes it. -/
 theorem deterministicPostprocessCqState_toSubnormalized_sourceCoordinatePinch
-    (E : Ensemble Z e) (g : Z → S) :
+    (E : MEnsemble e Z) (g : Z → S) :
     (E.deterministicPostprocessCqState g).toSubnormalized.sourceCoordinatePinch =
       (E.deterministicPostprocessCqState g).toSubnormalized := by
   apply SubnormalizedState.ext
-  rw [SubnormalizedState.sourceCoordinatePinch_matrix, State.toSubnormalized_matrix]
+  rw [SubnormalizedState.sourceCoordinatePinch_matrix, MState.toSubnormalized_matrix]
   change (SubnormalizedState.sourceCoordinatePinchChannel (a := S) (b := e)).map
-      (E.deterministicPostprocessCqState g).matrix =
-    (E.deterministicPostprocessCqState g).matrix
+      (E.deterministicPostprocessCqState g).m =
+    (E.deterministicPostprocessCqState g).m
   rw [deterministicPostprocessCqState_matrix]
   simp only [map_sum]
   refine Finset.sum_congr rfl fun z _ => ?_
   change (SubnormalizedState.sourceCoordinatePinchChannel (a := S) (b := e)).map
       ((E.probs z : ℂ) •
-        Matrix.kronecker (Matrix.single (g z) (g z) (1 : ℂ)) (E.states z).matrix) =
+        Matrix.kronecker (Matrix.single (g z) (g z) (1 : ℂ)) (E.states z).m) =
     (E.probs z : ℂ) •
-      Matrix.kronecker (Matrix.single (g z) (g z) (1 : ℂ)) (E.states z).matrix
+      Matrix.kronecker (Matrix.single (g z) (g z) (1 : ℂ)) (E.states z).m
   rw [map_smul]
   rw [SubnormalizedState.sourceCoordinatePinchChannel_map_singleTensor]
 
 /-- The cq graph state that remembers both the original classical label `z`
 and the deterministic image `g z`. -/
-def deterministicGraphCqState (E : Ensemble Z e) (g : Z → S) : State (Prod (Prod Z S) e) :=
+def deterministicGraphCqState (E : MEnsemble e Z) (g : Z → S) : MState ((Z × S) × e) :=
   E.deterministicPostprocessCqState fun z => (z, g z)
 
 @[simp]
-theorem deterministicGraphCqState_matrix (E : Ensemble Z e) (g : Z → S) :
-    (E.deterministicGraphCqState g).matrix =
+theorem deterministicGraphCqState_matrix (E : MEnsemble e Z) (g : Z → S) :
+    (E.deterministicGraphCqState g).m =
       ∑ z, (E.probs z) •
-        Matrix.kronecker (Matrix.single (z, g z) (z, g z) (1 : ℂ)) (E.states z).matrix :=
-  rfl
+        Matrix.kronecker (Matrix.single (z, g z) (z, g z) (1 : ℂ)) (E.states z).m :=
+  deterministicPostprocessCqState_matrix E fun z => (z, g z)
 
 /-- The deterministic graph cq center is the original cq center with the
 source register embedded by `z ↦ (z, g z)`. -/
 theorem deterministicGraphCqState_toSubnormalized_eq_sourceIsometryApply
-    (E : Ensemble Z e) (g : Z → S) :
+    (E : MEnsemble e Z) (g : Z → S) :
     E.cqState.toSubnormalized.sourceIsometryApply
         (deterministicGraphSourceIsometry g) =
       (E.deterministicGraphCqState g).toSubnormalized := by
   apply SubnormalizedState.ext
   rw [SubnormalizedState.sourceIsometryApply_matrix,
-    State.toSubnormalized_matrix, State.toSubnormalized_matrix]
+    MState.toSubnormalized_matrix, MState.toSubnormalized_matrix]
   rw [← MatrixMap.kron_ofReferenceIsometry_idChannel_apply_eq_applyMatrixLeft]
-  change MatrixMap.kron (MatrixMap.ofReferenceIsometry (deterministicGraphSourceIsometry g))
-      (Channel.idChannel e).map E.cqState.matrix =
-    (E.deterministicGraphCqState g).matrix
-  rw [Ensemble.cqState_matrix, deterministicGraphCqState_matrix]
+  change MatrixMap.kron (QIT.MatrixMap.ofReferenceIsometry (deterministicGraphSourceIsometry g))
+      (CPTPOp.id (dIn := e)).map E.cqState.m =
+    (E.deterministicGraphCqState g).m
+  rw [MEnsemble.cqState_matrix, deterministicGraphCqState_matrix]
   rw [map_sum]
   refine Finset.sum_congr rfl fun z _ => ?_
-  change MatrixMap.kron (MatrixMap.ofReferenceIsometry (deterministicGraphSourceIsometry g))
-      (Channel.idChannel e).map
+  change MatrixMap.kron (QIT.MatrixMap.ofReferenceIsometry (deterministicGraphSourceIsometry g))
+      (CPTPOp.id (dIn := e)).map
         ((E.probs z : ℂ) •
-          Matrix.kronecker (Matrix.single z z (1 : ℂ)) (E.states z).matrix) =
+          Matrix.kronecker (Matrix.single z z (1 : ℂ)) (E.states z).m) =
     (E.probs z : ℂ) •
-      Matrix.kronecker (Matrix.single (z, g z) (z, g z) (1 : ℂ)) (E.states z).matrix
+      Matrix.kronecker (Matrix.single (z, g z) (z, g z) (1 : ℂ)) (E.states z).m
   rw [map_smul]
   congr 1
-  rw [MatrixMap.kron_apply_kronecker]
+  simp only [Matrix.kronecker]
+  rw [MatrixMap.kron_map_of_kron_state]
   rw [deterministicGraphSourceIsometry]
   rw [MatrixMap.ofReferenceIsometry_ofInjective_single
     (fun z : Z => (z, g z)) (by
       intro z z' h
       exact congrArg Prod.fst h) z z]
-  simp [Channel.idChannel, MatrixMap.ofKraus]
+  simp [CPTPOp.id_map]
 
 /-- The graph state as an ensemble over the enlarged classical label
 `Z × S`, with zero probability away from the graph of `g`. -/
-def deterministicGraphEnsemble (E : Ensemble Z e) (g : Z → S) :
-    Ensemble (Prod Z S) e where
-  probs := fun zs => if zs.2 = g zs.1 then E.probs zs.1 else 0
-  weights_sum := by
-    classical
-    calc
-      (∑ zs : Prod Z S, if zs.2 = g zs.1 then E.probs zs.1 else 0) =
-          ∑ z : Z, ∑ s : S, if s = g z then E.probs z else 0 := by
-        rw [Fintype.sum_prod_type]
-      _ = ∑ z : Z, E.probs z := by
-        refine Finset.sum_congr rfl fun z _ => ?_
-        rw [Finset.sum_eq_single (g z)]
-        · simp
-        · intro s _ hs
-          simp [hs]
-        · simp
-      _ = 1 := E.weights_sum
-  states := fun zs => E.states zs.1
+def deterministicGraphEnsemble (E : MEnsemble e Z) (g : Z → S) :
+    MEnsemble e (Z × S) :=
+  .ofProbs
+    (fun zs => if zs.2 = g zs.1 then E.probs zs.1 else 0)
+    (by
+      classical
+      calc
+        (∑ zs : Z × S, if zs.2 = g zs.1 then E.probs zs.1 else 0) =
+            ∑ z : Z, ∑ s : S, if s = g z then E.probs z else 0 := by
+          rw [Fintype.sum_prod_type]
+        _ = ∑ z : Z, E.probs z := by
+          refine Finset.sum_congr rfl fun z _ => ?_
+          rw [Finset.sum_eq_single (g z)]
+          · simp
+          · intro s _ hs
+            simp [hs]
+          · simp
+        _ = 1 := E.weights_sum)
+    (fun zs => E.states zs.1)
 
 omit [DecidableEq Z] in
 @[simp]
-theorem deterministicGraphEnsemble_probs (E : Ensemble Z e) (g : Z → S)
-    (zs : Prod Z S) :
+theorem deterministicGraphEnsemble_probs (E : MEnsemble e Z) (g : Z → S)
+    (zs : Z × S) :
     (E.deterministicGraphEnsemble g).probs zs =
       if zs.2 = g zs.1 then E.probs zs.1 else 0 :=
   rfl
 
 omit [DecidableEq Z] in
 @[simp]
-theorem deterministicGraphEnsemble_states (E : Ensemble Z e) (g : Z → S)
-    (zs : Prod Z S) :
+theorem deterministicGraphEnsemble_states (E : MEnsemble e Z) (g : Z → S)
+    (zs : Z × S) :
     (E.deterministicGraphEnsemble g).states zs = E.states zs.1 :=
   rfl
 
 /-- The enlarged-label graph ensemble realizes the same cq state as
 `deterministicGraphCqState`. -/
-theorem deterministicGraphEnsemble_cqState (E : Ensemble Z e) (g : Z → S) :
+theorem deterministicGraphEnsemble_cqState (E : MEnsemble e Z) (g : Z → S) :
     (E.deterministicGraphEnsemble g).cqState =
       E.deterministicGraphCqState g := by
-  apply State.ext
+  apply MState.ext
   ext x y
   rcases x with ⟨⟨zx, sx⟩, i⟩
   rcases y with ⟨⟨zy, sy⟩, j⟩
-  simp only [Ensemble.cqState_matrix, deterministicGraphCqState_matrix, Matrix.sum_apply,
+  simp only [MEnsemble.cqState_matrix, deterministicGraphCqState_matrix, Matrix.sum_apply,
     Matrix.smul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
     deterministicGraphEnsemble_probs, deterministicGraphEnsemble_states]
   rw [Fintype.sum_prod_type]
@@ -769,10 +775,10 @@ omit [DecidableEq Z] in
 /-- Applying the second projection to the graph ensemble recovers the
 deterministically postprocessed cq state. -/
 theorem deterministicGraphEnsemble_postprocess_snd
-    (E : Ensemble Z e) (g : Z → S) :
+    (E : MEnsemble e Z) (g : Z → S) :
     (E.deterministicGraphEnsemble g).deterministicPostprocessCqState Prod.snd =
       E.deterministicPostprocessCqState g := by
-  apply State.ext
+  apply MState.ext
   ext x y
   rcases x with ⟨s, i⟩
   rcases y with ⟨s', j⟩
@@ -790,14 +796,14 @@ theorem deterministicGraphEnsemble_postprocess_snd
 /-- Applying the first projection to the graph ensemble recovers the original
 cq state. -/
 theorem deterministicGraphEnsemble_postprocess_fst
-    (E : Ensemble Z e) (g : Z → S) :
+    (E : MEnsemble e Z) (g : Z → S) :
     (E.deterministicGraphEnsemble g).deterministicPostprocessCqState Prod.fst =
       E.cqState := by
-  apply State.ext
+  apply MState.ext
   ext x y
   rcases x with ⟨z, i⟩
   rcases y with ⟨z', j⟩
-  simp only [deterministicPostprocessCqState_matrix, Ensemble.cqState_matrix,
+  simp only [deterministicPostprocessCqState_matrix, MEnsemble.cqState_matrix,
     Matrix.sum_apply, Matrix.smul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
     deterministicGraphEnsemble_probs, deterministicGraphEnsemble_states]
   rw [Fintype.sum_prod_type]
@@ -810,15 +816,15 @@ theorem deterministicGraphEnsemble_postprocess_fst
 
 /-- Tracing the graph state's original `Z` register leaves the deterministic
 postprocessed `S × E` cq state. -/
-theorem deterministicGraphCqState_marginalSE (E : Ensemble Z e) (g : Z → S) :
-    ((E.deterministicGraphCqState g).reindex (Equiv.prodAssoc Z S e)).marginalB =
+theorem deterministicGraphCqState_marginalSE (E : MEnsemble e Z) (g : Z → S) :
+    ((E.deterministicGraphCqState g).reindex (Equiv.prodAssoc Z S e)).traceLeft =
       E.deterministicPostprocessCqState g := by
-  apply State.ext
+  apply MState.ext
   ext x y
   rcases x with ⟨s, i⟩
   rcases y with ⟨s', j⟩
-  simp only [State.marginalB_matrix, State.reindex_matrix, deterministicGraphCqState_matrix,
-    deterministicPostprocessCqState_matrix, partialTraceA, Matrix.submatrix_apply,
+  simp only [MState.traceLeft_m, MState.reindex_matrix, deterministicGraphCqState_matrix,
+    deterministicPostprocessCqState_matrix, Matrix.traceLeft, Matrix.of_apply, Matrix.submatrix_apply,
     Matrix.sum_apply, Matrix.smul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]
   rw [Finset.sum_comm]
   refine Finset.sum_congr rfl fun z _ => ?_
@@ -843,26 +849,26 @@ theorem deterministicGraphCqState_marginalSE (E : Ensemble Z e) (g : Z → S) :
 /-- The subnormalized `S × E` marginal of the embedded graph center is the
 subnormalized deterministic postprocessed center. -/
 theorem deterministicGraphCqState_toSubnormalized_marginalSE
-    (E : Ensemble Z e) (g : Z → S) :
+    (E : MEnsemble e Z) (g : Z → S) :
     ((E.deterministicGraphCqState g).reindex
-        (Equiv.prodAssoc Z S e)).toSubnormalized.marginalB =
+        (Equiv.prodAssoc Z S e)).toSubnormalized.traceLeft =
       (E.deterministicPostprocessCqState g).toSubnormalized := by
   apply SubnormalizedState.ext
-  simpa [SubnormalizedState.marginalB_matrix, State.toSubnormalized_matrix] using
-    congrArg State.matrix (E.deterministicGraphCqState_marginalSE g)
+  simpa [SubnormalizedState.traceLeft_matrix, MState.toSubnormalized_matrix] using
+    congrArg DensityOp.m (E.deterministicGraphCqState_marginalSE g)
 
 /-- Tracing the graph state's deterministic `S` register leaves the original
 `Z × E` cq state. -/
-theorem deterministicGraphCqState_marginalZE (E : Ensemble Z e) (g : Z → S) :
+theorem deterministicGraphCqState_marginalZE (E : MEnsemble e Z) (g : Z → S) :
     ((E.deterministicGraphCqState g).reindex
-        (deterministicGraphSourceMarginalEquiv Z S e)).marginalB =
+        (deterministicGraphSourceMarginalEquiv Z S e)).traceLeft =
       E.cqState := by
-  apply State.ext
+  apply MState.ext
   ext x y
   rcases x with ⟨z, i⟩
   rcases y with ⟨z', j⟩
-  simp only [State.marginalB_matrix, State.reindex_matrix, deterministicGraphCqState_matrix,
-    Ensemble.cqState_matrix, partialTraceA, Matrix.submatrix_apply, Matrix.sum_apply,
+  simp only [MState.traceLeft_m, MState.reindex_matrix, deterministicGraphCqState_matrix,
+    MEnsemble.cqState_matrix, Matrix.traceLeft, Matrix.of_apply, Matrix.submatrix_apply, Matrix.sum_apply,
     Matrix.smul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]
   rw [Finset.sum_comm]
   refine Finset.sum_congr rfl fun z0 _ => ?_
@@ -887,26 +893,26 @@ theorem deterministicGraphCqState_marginalZE (E : Ensemble Z e) (g : Z → S) :
 /-- The subnormalized `Z × E` marginal of the embedded graph center is the
 subnormalized original cq center. -/
 theorem deterministicGraphCqState_toSubnormalized_marginalZE
-    (E : Ensemble Z e) (g : Z → S) :
+    (E : MEnsemble e Z) (g : Z → S) :
     ((E.deterministicGraphCqState g).reindex
-        (deterministicGraphSourceMarginalEquiv Z S e)).toSubnormalized.marginalB =
+        (deterministicGraphSourceMarginalEquiv Z S e)).toSubnormalized.traceLeft =
       E.cqState.toSubnormalized := by
   apply SubnormalizedState.ext
-  simpa [SubnormalizedState.marginalB_matrix, State.toSubnormalized_matrix] using
-    congrArg State.matrix (E.deterministicGraphCqState_marginalZE g)
+  simpa [SubnormalizedState.traceLeft_matrix, MState.toSubnormalized_matrix] using
+    congrArg DensityOp.m (E.deterministicGraphCqState_marginalZE g)
 
 /-- Any subnormalized state in a purified-distance ball around the graph center
 projects to a state in the corresponding ball around the deterministic
 postprocessed center. -/
 theorem deterministicGraphCqState_purifiedBall_marginalSE_of_purifiedBall
-    (E : Ensemble Z e) (g : Z → S)
-    {τ : SubnormalizedState (Prod Z (Prod S e))} {ε : ℝ}
+    (E : MEnsemble e Z) (g : Z → S)
+    {τ : SubnormalizedState (Z × (S × e))} {ε : ℝ}
     (hτ : ((E.deterministicGraphCqState g).reindex
         (Equiv.prodAssoc Z S e)).toSubnormalized.purifiedBall ε τ) :
     (E.deterministicPostprocessCqState g).toSubnormalized.purifiedBall
-      ε τ.marginalB := by
+      ε τ.traceLeft := by
   have h :=
-    SubnormalizedState.purifiedBall_marginalB_of_purifiedBall
+    SubnormalizedState.purifiedBall_traceLeft_of_purifiedBall
       (ρ := ((E.deterministicGraphCqState g).reindex
         (Equiv.prodAssoc Z S e)).toSubnormalized) (σ := τ) hτ
   rwa [E.deterministicGraphCqState_toSubnormalized_marginalSE g] at h
@@ -914,26 +920,26 @@ theorem deterministicGraphCqState_purifiedBall_marginalSE_of_purifiedBall
 /-- A graph-ball witness induces a smooth min-entropy candidate for the
 deterministic postprocessed center by tracing out the original `Z` register. -/
 theorem deterministicGraphCqState_marginalSE_smoothCandidate_of_purifiedBall
-    (E : Ensemble Z e) (g : Z → S)
-    {τ : SubnormalizedState (Prod Z (Prod S e))} {ε : ℝ}
+    (E : MEnsemble e Z) (g : Z → S)
+    {τ : SubnormalizedState (Z × (S × e))} {ε : ℝ}
     (hτ : ((E.deterministicGraphCqState g).reindex
         (Equiv.prodAssoc Z S e)).toSubnormalized.purifiedBall ε τ) :
     SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw (a := S)
       (E.deterministicPostprocessCqState g).toSubnormalized ε
-      τ.marginalB.conditionalMinEntropyRaw :=
-  ⟨τ.marginalB, E.deterministicGraphCqState_purifiedBall_marginalSE_of_purifiedBall g hτ,
+      τ.traceLeft.conditionalMinEntropyRaw :=
+  ⟨τ.traceLeft, E.deterministicGraphCqState_purifiedBall_marginalSE_of_purifiedBall g hτ,
     rfl⟩
 
 /-- Any subnormalized state in a purified-distance ball around the graph center
 projects to a state in the corresponding ball around the original cq center. -/
 theorem deterministicGraphCqState_purifiedBall_marginalZE_of_purifiedBall
-    (E : Ensemble Z e) (g : Z → S)
-    {τ : SubnormalizedState (Prod S (Prod Z e))} {ε : ℝ}
+    (E : MEnsemble e Z) (g : Z → S)
+    {τ : SubnormalizedState (S × (Z × e))} {ε : ℝ}
     (hτ : ((E.deterministicGraphCqState g).reindex
         (deterministicGraphSourceMarginalEquiv Z S e)).toSubnormalized.purifiedBall ε τ) :
-    E.cqState.toSubnormalized.purifiedBall ε τ.marginalB := by
+    E.cqState.toSubnormalized.purifiedBall ε τ.traceLeft := by
   have h :=
-    SubnormalizedState.purifiedBall_marginalB_of_purifiedBall
+    SubnormalizedState.purifiedBall_traceLeft_of_purifiedBall
       (ρ := ((E.deterministicGraphCqState g).reindex
         (deterministicGraphSourceMarginalEquiv Z S e)).toSubnormalized) (σ := τ) hτ
   rwa [E.deterministicGraphCqState_toSubnormalized_marginalZE g] at h
@@ -941,19 +947,19 @@ theorem deterministicGraphCqState_purifiedBall_marginalZE_of_purifiedBall
 /-- A graph-ball witness induces a smooth min-entropy candidate for the
 original cq center by tracing out the deterministic `S` register. -/
 theorem deterministicGraphCqState_marginalZE_smoothCandidate_of_purifiedBall
-    (E : Ensemble Z e) (g : Z → S)
-    {τ : SubnormalizedState (Prod S (Prod Z e))} {ε : ℝ}
+    (E : MEnsemble e Z) (g : Z → S)
+    {τ : SubnormalizedState (S × (Z × e))} {ε : ℝ}
     (hτ : ((E.deterministicGraphCqState g).reindex
         (deterministicGraphSourceMarginalEquiv Z S e)).toSubnormalized.purifiedBall ε τ) :
     SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw (a := Z)
-      E.cqState.toSubnormalized ε τ.marginalB.conditionalMinEntropyRaw :=
-  ⟨τ.marginalB, E.deterministicGraphCqState_purifiedBall_marginalZE_of_purifiedBall g hτ,
+      E.cqState.toSubnormalized ε τ.traceLeft.conditionalMinEntropyRaw :=
+  ⟨τ.traceLeft, E.deterministicGraphCqState_purifiedBall_marginalZE_of_purifiedBall g hτ,
     rfl⟩
 
 omit [DecidableEq Z] in
 /-- A diagonal output block is the sum of all input cq blocks in its preimage. -/
-theorem deterministicPostprocessCqState_block (E : Ensemble Z e) (g : Z → S) (s : S) :
-    Classical.block (E.deterministicPostprocessCqState g).matrix s s =
+theorem deterministicPostprocessCqState_block (E : MEnsemble e Z) (g : Z → S) (s : S) :
+    Classical.block (E.deterministicPostprocessCqState g).m s s =
       ∑ z, if g z = s then E.cqBlock z else 0 := by
   ext i j
   simp only [deterministicPostprocessCqState_matrix, Classical.block, Matrix.sum_apply,
@@ -961,14 +967,14 @@ theorem deterministicPostprocessCqState_block (E : Ensemble Z e) (g : Z → S) (
   refine Finset.sum_congr rfl fun z _ => ?_
   by_cases hz : g z = s
   · subst hz
-    simp [Ensemble.cqBlock, NNReal.smul_def]
+    simp [MEnsemble.cqBlock, NNReal.smul_def]
   · simp [hz]
 
 omit [DecidableEq Z] in
 /-- Filtering the deterministically postprocessed cq center to the image of
 `g` leaves it unchanged. -/
 theorem deterministicPostprocessCqState_toSubnormalized_sourceBlockFilter_image
-    (E : Ensemble Z e) (g : Z → S) :
+    (E : MEnsemble e Z) (g : Z → S) :
     (E.deterministicPostprocessCqState g).toSubnormalized.sourceBlockFilter
         (fun s : S => ∃ z : Z, g z = s) =
       (E.deterministicPostprocessCqState g).toSubnormalized := by
@@ -1006,7 +1012,7 @@ theorem deterministicPostprocessCqState_toSubnormalized_sourceBlockFilter_image
     · have hblock_zero :
           Classical.block
               (E.deterministicPostprocessCqState g).toSubnormalized.matrix s s = 0 := by
-        rw [State.toSubnormalized_matrix, deterministicPostprocessCqState_block]
+        rw [MState.toSubnormalized_matrix, deterministicPostprocessCqState_block]
         apply Finset.sum_eq_zero
         intro z _
         have hz : g z ≠ s := fun h => hs ⟨z, h⟩
@@ -1017,8 +1023,8 @@ theorem deterministicPostprocessCqState_toSubnormalized_sourceBlockFilter_image
 /-- Each original cq block is dominated by the output block of its image under
 the deterministic postprocessing function. -/
 theorem cqBlock_le_deterministicPostprocessCqState_block
-    (E : Ensemble Z e) (g : Z → S) (z : Z) :
-    E.cqBlock z ≤ Classical.block (E.deterministicPostprocessCqState g).matrix (g z) (g z) := by
+    (E : MEnsemble e Z) (g : Z → S) (z : Z) :
+    E.cqBlock z ≤ Classical.block (E.deterministicPostprocessCqState g).m (g z) (g z) := by
   classical
   rw [deterministicPostprocessCqState_block]
   have hzmem : z ∈ (Finset.univ : Finset Z) := Finset.mem_univ z
@@ -1039,17 +1045,17 @@ theorem cqBlock_le_deterministicPostprocessCqState_block
 The construction assigns each reachable output block to one chosen source label
 in its fiber and assigns zero to all other source labels. -/
 theorem sourceImageFilteredWitness_exactSourcePreimage
-    (E : Ensemble Z e) (g : Z → S)
-    (ρSE' : SubnormalizedState (Prod S e)) :
-    ∃ ρZE' : SubnormalizedState (Prod Z e),
+    (E : MEnsemble e Z) (g : Z → S)
+    (ρSE' : SubnormalizedState (S × e)) :
+    ∃ ρZE' : SubnormalizedState (Z × e),
       ρZE'.sourceDeterministicPostprocess g =
         ρSE'.sourceCoordinatePinch.sourceBlockFilter
           (fun s : S => ∃ z : Z, g z = s) := by
   classical
-  have hsource_prod : Nonempty (Prod Z e) := E.cqState.nonempty
+  have hsource_prod : Nonempty (Z × e) := E.cqState.nonempty
   let : Nonempty Z := ⟨(Classical.choice hsource_prod).1⟩
   let imagePred : S → Prop := fun s : S => ∃ z : Z, g z = s
-  let σSE : SubnormalizedState (Prod S e) :=
+  let σSE : SubnormalizedState (S × e) :=
     ρSE'.sourceCoordinatePinch.sourceBlockFilter imagePred
   let rep : S → Z := fun s =>
     if hs : imagePred s then Classical.choose hs else Classical.choice inferInstance
@@ -1157,7 +1163,7 @@ theorem sourceImageFilteredWitness_exactSourcePreimage
       exact htp.symm
     rw [htrace_eq]
     exact σSE.trace_le_one
-  let ρZE' : SubnormalizedState (Prod Z e) :=
+  let ρZE' : SubnormalizedState (Z × e) :=
     SubnormalizedState.ofClassicalBlocks blocks hpos htrace
   refine ⟨ρZE', ?_⟩
   apply SubnormalizedState.ext
@@ -1169,8 +1175,8 @@ corresponding trace-norm fidelity bound gives the exact-source generalized
 fidelity lift needed by the smooth postprocessing endpoint.  This separates the
 smooth bookkeeping from the remaining matrix-analysis split theorem. -/
 theorem sourceImageFilteredWitness_exactSourceFidelityLift_of_blocks
-    (E : Ensemble Z e) (g : Z → S)
-    (ρSE' : SubnormalizedState (Prod S e))
+    (E : MEnsemble e Z) (g : Z → S)
+    (ρSE' : SubnormalizedState (S × e))
     (blocks : Z → CMatrix e)
     (hblocks : ∀ z, (blocks z).PosSemidef)
     (htrace : (∑ z, (blocks z).trace).re ≤ 1)
@@ -1188,7 +1194,7 @@ theorem sourceImageFilteredWitness_exactSourceFidelityLift_of_blocks
         traceNorm
           (psdSqrt E.cqState.toSubnormalized.matrix *
             psdSqrt (Classical.blockDiagonal blocks))) :
-    ∃ ρZE' : SubnormalizedState (Prod Z e),
+    ∃ ρZE' : SubnormalizedState (Z × e),
       (E.deterministicPostprocessCqState g).toSubnormalized.generalizedFidelity
           (ρSE'.sourceCoordinatePinch.sourceBlockFilter
             (fun s : S => ∃ z : Z, g z = s)) ≤
@@ -1198,19 +1204,19 @@ theorem sourceImageFilteredWitness_exactSourceFidelityLift_of_blocks
           (fun s : S => ∃ z : Z, g z = s) := by
   classical
   let imagePred : S → Prop := fun s : S => ∃ z : Z, g z = s
-  let σSE : SubnormalizedState (Prod S e) :=
+  let σSE : SubnormalizedState (S × e) :=
     ρSE'.sourceCoordinatePinch.sourceBlockFilter imagePred
-  let ρZE' : SubnormalizedState (Prod Z e) :=
+  let ρZE' : SubnormalizedState (Z × e) :=
     SubnormalizedState.ofClassicalBlocks blocks hblocks htrace
   have hpost_trace :
       (E.deterministicPostprocessCqState g).toSubnormalized.matrix.trace.re = 1 := by
-    change (E.deterministicPostprocessCqState g).matrix.trace.re = 1
-    rw [(E.deterministicPostprocessCqState g).trace_eq_one]
+    change (E.deterministicPostprocessCqState g).m.trace.re = 1
+    rw [(E.deterministicPostprocessCqState g).tr']
     norm_num
   have hsource_trace :
       E.cqState.toSubnormalized.matrix.trace.re = 1 := by
-    change E.cqState.matrix.trace.re = 1
-    rw [E.cqState.trace_eq_one]
+    change E.cqState.m.trace.re = 1
+    rw [E.cqState.tr']
     norm_num
   refine ⟨ρZE', ?_, ?_⟩
   · exact
@@ -1231,8 +1237,8 @@ theorem sourceImageFilteredWitness_exactSourceFidelityLift_of_blocks
 generalized-fidelity lift.  This is the handoff expected from a future
 fiberwise PSD fidelity-decomposition theorem. -/
 theorem sourceImageFilteredWitness_exactSourceFidelityLift_of_block_bounds
-    (E : Ensemble Z e) (g : Z → S)
-    (ρSE' : SubnormalizedState (Prod S e))
+    (E : MEnsemble e Z) (g : Z → S)
+    (ρSE' : SubnormalizedState (S × e))
     (blocks : Z → CMatrix e)
     (hblocks : ∀ z, (blocks z).PosSemidef)
     (htrace : (∑ z, (blocks z).trace).re ≤ 1)
@@ -1255,7 +1261,7 @@ theorem sourceImageFilteredWitness_exactSourceFidelityLift_of_block_bounds
             if g z = s then
               traceNorm (psdSqrt (E.cqBlock z) * psdSqrt (blocks z))
             else 0) :
-    ∃ ρZE' : SubnormalizedState (Prod Z e),
+    ∃ ρZE' : SubnormalizedState (Z × e),
       (E.deterministicPostprocessCqState g).toSubnormalized.generalizedFidelity
           (ρSE'.sourceCoordinatePinch.sourceBlockFilter
             (fun s : S => ∃ z : Z, g z = s)) ≤
@@ -1265,9 +1271,9 @@ theorem sourceImageFilteredWitness_exactSourceFidelityLift_of_block_bounds
           (fun s : S => ∃ z : Z, g z = s) := by
   classical
   let imagePred : S → Prop := fun s : S => ∃ z : Z, g z = s
-  let ρS : SubnormalizedState (Prod S e) :=
+  let ρS : SubnormalizedState (S × e) :=
     (E.deterministicPostprocessCqState g).toSubnormalized
-  let σSE : SubnormalizedState (Prod S e) :=
+  let σSE : SubnormalizedState (S × e) :=
     ρSE'.sourceCoordinatePinch.sourceBlockFilter imagePred
   have hρS_blockDiagonal :
       ρS.matrix =
@@ -1322,7 +1328,7 @@ theorem sourceImageFilteredWitness_exactSourceFidelityLift_of_block_bounds
   have hsource_blockDiagonal :
       E.cqState.toSubnormalized.matrix =
         Classical.blockDiagonal (fun z : Z => E.cqBlock z) := by
-    simpa [State.toSubnormalized_matrix, Ensemble.cqBlock] using
+    simpa [MState.toSubnormalized_matrix, MEnsemble.cqBlock] using
       (Classical.cqState_eq_blockDiagonal E)
   have hright :
       traceNorm
@@ -1398,7 +1404,7 @@ variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 /-- A subnormalized conditional-min-entropy feasible bound controls every
 diagonal classical block. -/
 theorem subnormalizedBlock_le_of_conditionalMinEntropyFeasible
-    (ρ : SubnormalizedState (Prod a b)) (σ : SubnormalizedState b) (x : a) {lam : ℝ}
+    (ρ : SubnormalizedState (a × b)) (σ : SubnormalizedState b) (x : a) {lam : ℝ}
     (h : SubnormalizedState.ConditionalMinEntropyFeasible (a := a) ρ σ lam) :
     Classical.block ρ.matrix x x ≤ (Real.rpow 2 (-lam) : ℂ) • σ.matrix := by
   let c : ℂ := (Real.rpow 2 (-lam) : ℂ)
@@ -1424,15 +1430,10 @@ private theorem subnormalizedIdentityTensorStateMatrix_trace (σ : Subnormalized
     (Fintype.card a : ℂ) * σ.matrix.trace
   rw [Matrix.trace_kronecker, Matrix.trace_one]
 
-private theorem cqState_eq_subnormalizedBlockDiagonal_cqBlock (E : Ensemble a b) :
-    E.cqState.matrix = Classical.blockDiagonal fun x => E.cqBlock x := by
-  rw [Classical.cqState_eq_blockDiagonal]
-  rfl
-
 /-- Blockwise domination by the same scaled subnormalized `B` state is the
 global cq order constraint used by subnormalized conditional min-entropy. -/
 theorem subnormalizedConditionalMinEntropyFeasible_of_cqBlock_le
-    (E : Ensemble a b) (σ : SubnormalizedState b) (lam : ℝ)
+    (E : MEnsemble b a) (σ : SubnormalizedState b) (lam : ℝ)
     (hblock : ∀ x, E.cqBlock x ≤ (Real.rpow 2 (-lam) : ℂ) • σ.matrix) :
     SubnormalizedState.ConditionalMinEntropyFeasible (a := a)
       E.cqState.toSubnormalized σ lam := by
@@ -1452,7 +1453,7 @@ theorem subnormalizedConditionalMinEntropyFeasible_of_cqBlock_le
           c • Classical.blockDiagonal (fun _ : a => σ.matrix) -
             Classical.blockDiagonal (fun x => E.cqBlock x) := by
             rw [SubnormalizedState.identityTensorStateMatrix_eq_blockDiagonal]
-            rw [State.toSubnormalized_matrix, cqState_eq_subnormalizedBlockDiagonal_cqBlock]
+            rw [MState.toSubnormalized_matrix, cqState_eq_blockDiagonal_cqBlock]
       _ = Classical.blockDiagonal (fun x => c • σ.matrix - E.cqBlock x) := by
             rw [← Classical.blockDiagonal_smul]
             rw [← Classical.blockDiagonal_sub]
@@ -1461,18 +1462,18 @@ theorem subnormalizedConditionalMinEntropyFeasible_of_cqBlock_le
     (fun x => c • σ.matrix - E.cqBlock x) hblocks
 
 /-- Feasible subnormalized exponents for a normalized state embedded by
-`State.toSubnormalized` are bounded by the classical-register dimension. -/
+`MState.toSubnormalized` are bounded by the classical-register dimension. -/
 theorem subnormalizedConditionalMinEntropyFeasible_toSubnormalized_le_log2_card_left
-    {ρ : State (Prod a b)} {σ : SubnormalizedState b} {lam : ℝ}
+    {ρ : MState (a × b)} {σ : SubnormalizedState b} {lam : ℝ}
     (h : SubnormalizedState.ConditionalMinEntropyFeasible (a := a)
       ρ.toSubnormalized σ lam) :
     lam ≤ log2 (Fintype.card a : ℝ) := by
   classical
   have : Nonempty a := ⟨(Classical.choice ρ.nonempty).1⟩
   let r : ℝ := Real.rpow 2 (-lam)
-  have htrace := State.trace_re_le_of_le h
-  have hleft : ρ.matrix.trace.re = 1 := by
-    rw [ρ.trace_eq_one]
+  have htrace := cMatrix_trace_re_le_of_le h
+  have hleft : ρ.m.trace.re = 1 := by
+    rw [ρ.tr']
     norm_num
   have hid_trace_re :
       (SubnormalizedState.identityTensorStateMatrix (a := a) σ).trace.re =
@@ -1480,9 +1481,9 @@ theorem subnormalizedConditionalMinEntropyFeasible_toSubnormalized_le_log2_card_
     rw [subnormalizedIdentityTensorStateMatrix_trace]
     simp [Complex.mul_re, σ.trace_im_zero]
   have htrace_bound' :
-      ρ.matrix.trace.re ≤
+      ρ.m.trace.re ≤
         r * ((Fintype.card a : ℝ) * σ.matrix.trace.re) := by
-    simpa [State.toSubnormalized_matrix, r, hid_trace_re] using htrace
+    simpa [MState.toSubnormalized_matrix, r, hid_trace_re] using htrace
   have htrace_bound : 1 ≤ r * ((Fintype.card a : ℝ) * σ.matrix.trace.re) := by
     simpa [hleft] using htrace_bound'
   have hcard_pos : 0 < (Fintype.card a : ℝ) := by
@@ -1516,7 +1517,7 @@ theorem subnormalizedConditionalMinEntropyFeasible_toSubnormalized_le_log2_card_
 /-- The subnormalized feasible exponent set of an embedded normalized state is
 bounded above. -/
 theorem subnormalizedConditionalMinEntropyFeasibleExponentValueSet_toSubnormalized_bddAbove
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     BddAbove (ρ.toSubnormalized.conditionalMinEntropyFeasibleExponentValueSet (a := a)) := by
   refine ⟨log2 (Fintype.card a : ℝ), ?_⟩
   intro lam hlam
@@ -1527,27 +1528,27 @@ theorem subnormalizedConditionalMinEntropyFeasibleExponentValueSet_toSubnormaliz
 /-- Deterministic postprocessing feasibility pushes back to the original cq
 state, the unsmoothed core of `H_min(g(Z)|E) ≤ H_min(Z|E)`. -/
 theorem conditionalMinEntropyFeasible_of_deterministicPostprocessCqState
-    (E : Ensemble Z e) (g : Z → S) (σ : State e) {lam : ℝ}
-    (hpost : State.ConditionalMinEntropyFeasible (a := S)
+    (E : MEnsemble e Z) (g : Z → S) (σ : MState e) {lam : ℝ}
+    (hpost : MState.ConditionalMinEntropyFeasible (a := S)
       (E.deterministicPostprocessCqState g) σ lam) :
-    State.ConditionalMinEntropyFeasible (a := Z) E.cqState σ lam := by
-  refine Ensemble.conditionalMinEntropyFeasible_of_cqBlock_le E σ lam ?_
+    MState.ConditionalMinEntropyFeasible (a := Z) E.cqState σ lam := by
+  refine MEnsemble.conditionalMinEntropyFeasible_of_cqBlock_le E σ lam ?_
   intro z
   exact (E.cqBlock_le_deterministicPostprocessCqState_block g z).trans
-    (State.block_le_of_conditionalMinEntropyFeasible
+    (MState.block_le_of_conditionalMinEntropyFeasible
       (E.deterministicPostprocessCqState g) σ (g z) hpost)
 
 /-- Deterministic postprocessing cannot increase normalized cq conditional
 min-entropy. -/
 theorem conditionalMinEntropy_deterministicPostprocessCqState_le
-    (E : Ensemble Z e) (g : Z → S) :
+    (E : MEnsemble e Z) (g : Z → S) :
     (E.deterministicPostprocessCqState g).conditionalMinEntropy ≤
       E.cqState.conditionalMinEntropy := by
   classical
-  have hsource_prod : Nonempty (Prod Z e) := E.cqState.nonempty
+  have hsource_prod : Nonempty (Z × e) := E.cqState.nonempty
   let : Nonempty Z := ⟨(Classical.choice hsource_prod).1⟩
   let : Nonempty e := ⟨(Classical.choice hsource_prod).2⟩
-  have hpost_prod : Nonempty (Prod S e) := (E.deterministicPostprocessCqState g).nonempty
+  have hpost_prod : Nonempty (S × e) := (E.deterministicPostprocessCqState g).nonempty
   let : Nonempty S := ⟨(Classical.choice hpost_prod).1⟩
   let spost : Set ℝ :=
     (E.deterministicPostprocessCqState g).conditionalMinEntropyFeasibleExponentValueSet
@@ -1559,15 +1560,15 @@ theorem conditionalMinEntropy_deterministicPostprocessCqState_le
         (a := S)
   have hsource_bdd : BddAbove ssource := by
     simpa [ssource] using
-      State.conditionalMinEntropyFeasibleExponentValueSet_bddAbove (a := Z) E.cqState
+      MState.conditionalMinEntropyFeasibleExponentValueSet_bddAbove (a := Z) E.cqState
   have hpost_eq :
       (E.deterministicPostprocessCqState g).conditionalMinEntropy = sSup spost := by
-    simp [spost, State.conditionalMinEntropy_eq,
-      State.conditionalMinEntropyFeasibleExponentValueSet]
+    simp [spost, MState.conditionalMinEntropy_eq,
+      MState.conditionalMinEntropyFeasibleExponentValueSet]
   have hsource_eq :
       E.cqState.conditionalMinEntropy = sSup ssource := by
-    simp [ssource, State.conditionalMinEntropy_eq,
-      State.conditionalMinEntropyFeasibleExponentValueSet]
+    simp [ssource, MState.conditionalMinEntropy_eq,
+      MState.conditionalMinEntropyFeasibleExponentValueSet]
   rw [hpost_eq, hsource_eq]
   refine csSup_le hpost_nonempty ?_
   intro lam hlam
@@ -1579,7 +1580,7 @@ theorem conditionalMinEntropy_deterministicPostprocessCqState_le
 original cq state. This is the subnormalized unsmoothed core needed by the
 smooth deterministic-function DPI route. -/
 theorem subnormalizedConditionalMinEntropyFeasible_of_deterministicPostprocessCqState
-    (E : Ensemble Z e) (g : Z → S) (σ : SubnormalizedState e) {lam : ℝ}
+    (E : MEnsemble e Z) (g : Z → S) (σ : SubnormalizedState e) {lam : ℝ}
     (hpost : SubnormalizedState.ConditionalMinEntropyFeasible (a := S)
       (E.deterministicPostprocessCqState g).toSubnormalized σ lam) :
     SubnormalizedState.ConditionalMinEntropyFeasible (a := Z)
@@ -1593,14 +1594,14 @@ theorem subnormalizedConditionalMinEntropyFeasible_of_deterministicPostprocessCq
 /-- Deterministic postprocessing cannot increase subnormalized cq conditional
 min-entropy after embedding the normalized cq states. -/
 theorem subnormalizedConditionalMinEntropy_deterministicPostprocessCqState_le
-    (E : Ensemble Z e) (g : Z → S) :
+    (E : MEnsemble e Z) (g : Z → S) :
     (E.deterministicPostprocessCqState g).toSubnormalized.conditionalMinEntropyRaw ≤
       E.cqState.toSubnormalized.conditionalMinEntropyRaw := by
   classical
-  have hsource_prod : Nonempty (Prod Z e) := E.cqState.nonempty
+  have hsource_prod : Nonempty (Z × e) := E.cqState.nonempty
   let : Nonempty Z := ⟨(Classical.choice hsource_prod).1⟩
   let : Nonempty e := ⟨(Classical.choice hsource_prod).2⟩
-  have hpost_prod : Nonempty (Prod S e) := (E.deterministicPostprocessCqState g).nonempty
+  have hpost_prod : Nonempty (S × e) := (E.deterministicPostprocessCqState g).nonempty
   let : Nonempty S := ⟨(Classical.choice hpost_prod).1⟩
   let spost : Set ℝ :=
     (E.deterministicPostprocessCqState g).toSubnormalized
@@ -1613,7 +1614,7 @@ theorem subnormalizedConditionalMinEntropy_deterministicPostprocessCqState_le
         (a := S)
     refine ⟨lam, ?_⟩
     exact ⟨σ.toSubnormalized,
-      (State.toSubnormalized_ConditionalMinEntropyFeasible_iff
+      (MState.toSubnormalized_ConditionalMinEntropyFeasible_iff
         (a := S) (E.deterministicPostprocessCqState g) σ lam).2 hσ⟩
   have hsource_bdd : BddAbove ssource := by
     simpa [ssource] using
@@ -1637,7 +1638,7 @@ label from the deterministic graph state cannot increase conditional
 min-entropy. This is a reusable normalized-state form of the first half of the
 source proof of `pr:func`. -/
 theorem conditionalMinEntropy_deterministicPostprocessCqState_le_deterministicGraphCqState
-    (E : Ensemble Z e) (g : Z → S) :
+    (E : MEnsemble e Z) (g : Z → S) :
     (E.deterministicPostprocessCqState g).conditionalMinEntropy ≤
       (E.deterministicGraphCqState g).conditionalMinEntropy := by
   have h :=
@@ -1649,7 +1650,7 @@ theorem conditionalMinEntropy_deterministicPostprocessCqState_le_deterministicGr
 /-- Subnormalized version of
 `conditionalMinEntropy_deterministicPostprocessCqState_le_deterministicGraphCqState`. -/
 theorem subnormalizedConditionalMinEntropy_deterministicPostprocessCqState_le_deterministicGraphCqState
-    (E : Ensemble Z e) (g : Z → S) :
+    (E : MEnsemble e Z) (g : Z → S) :
     (E.deterministicPostprocessCqState g).toSubnormalized.conditionalMinEntropyRaw ≤
       (E.deterministicGraphCqState g).toSubnormalized.conditionalMinEntropyRaw := by
   have h :=
@@ -1663,7 +1664,7 @@ min-entropy as the original cq state. This packages the graph/source
 isometry part of the unsmoothed source proof using the existing deterministic
 postprocessing DPI in both directions. -/
 theorem conditionalMinEntropy_deterministicGraphCqState_eq_cqState
-    (E : Ensemble Z e) (g : Z → S) :
+    (E : MEnsemble e Z) (g : Z → S) :
     (E.deterministicGraphCqState g).conditionalMinEntropy =
       E.cqState.conditionalMinEntropy := by
   apply le_antisymm
@@ -1679,7 +1680,7 @@ theorem conditionalMinEntropy_deterministicGraphCqState_eq_cqState
 /-- Subnormalized graph/source version of
 `conditionalMinEntropy_deterministicGraphCqState_eq_cqState`. -/
 theorem subnormalizedConditionalMinEntropy_deterministicGraphCqState_eq_cqState
-    (E : Ensemble Z e) (g : Z → S) :
+    (E : MEnsemble e Z) (g : Z → S) :
     (E.deterministicGraphCqState g).toSubnormalized.conditionalMinEntropyRaw =
       E.cqState.toSubnormalized.conditionalMinEntropyRaw := by
   apply le_antisymm
@@ -1698,11 +1699,11 @@ postprocessed min-entropy is bounded by the smooth graph min-entropy. This
 isolates the endpoint step for the smooth version of the first half of
 `pr:class/bounds-1`. -/
 theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_graphCqState_of_witness_lift
-    (E : Ensemble Z e) (g : Z → S) {ε : ℝ}
+    (E : MEnsemble e Z) (g : Z → S) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1)
     (hlift : ∀ ρSE',
       (E.deterministicPostprocessCqState g).toSubnormalized.purifiedBall ε ρSE' →
-        ∃ τ : SubnormalizedState (Prod (Prod Z S) e),
+        ∃ τ : SubnormalizedState ((Z × S) × e),
           (E.deterministicGraphCqState g).toSubnormalized.purifiedBall ε τ ∧
           ρSE'.conditionalMinEntropyRaw ≤ τ.conditionalMinEntropyRaw) :
     (E.deterministicPostprocessCqState g).toSubnormalized.smoothConditionalMinEntropy ε hε0
@@ -1710,21 +1711,21 @@ theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_graphCqSt
       (E.deterministicGraphCqState g).toSubnormalized.smoothConditionalMinEntropy ε hε0
         ((E.deterministicGraphCqState g).epsilon_lt_sqrt_toSubnormalized_trace hε1) := by
   classical
-  have hgraph_prod : Nonempty (Prod (Prod Z S) e) :=
+  have hgraph_prod : Nonempty ((Z × S) × e) :=
     (E.deterministicGraphCqState g).nonempty
-  let : Nonempty (Prod Z S) := ⟨(Classical.choice hgraph_prod).1⟩
+  let : Nonempty (Z × S) := ⟨(Classical.choice hgraph_prod).1⟩
   let : Nonempty e := ⟨(Classical.choice hgraph_prod).2⟩
   have hεgraph : ε < Real.sqrt
       (E.deterministicGraphCqState g).toSubnormalized.matrix.trace.re := by
-    change ε < Real.sqrt (E.deterministicGraphCqState g).matrix.trace.re
-    have htrace : (E.deterministicGraphCqState g).matrix.trace.re = 1 := by
-      rw [(E.deterministicGraphCqState g).trace_eq_one]
+    change ε < Real.sqrt (E.deterministicGraphCqState g).m.trace.re
+    have htrace : (E.deterministicGraphCqState g).m.trace.re = 1 := by
+      rw [(E.deterministicGraphCqState g).tr']
       norm_num
     rw [htrace]
     simpa using hε1
   exact
     SubnormalizedState.smoothConditionalMinEntropyRaw_le_of_witness_lift_of_lt_sqrt_trace
-      (a := S) (source := Prod Z S)
+      (a := S) (source := Z × S)
       (E.deterministicPostprocessCqState g).toSubnormalized
       (E.deterministicGraphCqState g).toSubnormalized
       hε0 hεgraph hlift
@@ -1734,10 +1735,10 @@ lifted to a smooth source candidate with no smaller endpoint value, then the
 smooth graph min-entropy is bounded by the smooth source min-entropy. This is
 the endpoint wrapper for the source proof's graph/source isometry step. -/
 theorem subnormalizedSmoothConditionalMinEntropy_graphCqState_le_cqState_of_candidate_lift
-    (E : Ensemble Z e) (g : Z → S) {ε : ℝ}
+    (E : MEnsemble e Z) (g : Z → S) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1)
     (hlift : ∀ h,
-      SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw (a := Prod Z S)
+      SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw (a := Z × S)
         (E.deterministicGraphCqState g).toSubnormalized ε h →
         ∃ h',
           SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw (a := Z)
@@ -1747,47 +1748,47 @@ theorem subnormalizedSmoothConditionalMinEntropy_graphCqState_le_cqState_of_cand
       E.cqState.toSubnormalized.smoothConditionalMinEntropy ε hε0
         (E.cqState.epsilon_lt_sqrt_toSubnormalized_trace hε1) := by
   classical
-  have hsource_prod : Nonempty (Prod Z e) := E.cqState.nonempty
+  have hsource_prod : Nonempty (Z × e) := E.cqState.nonempty
   let : Nonempty Z := ⟨(Classical.choice hsource_prod).1⟩
   let : Nonempty e := ⟨(Classical.choice hsource_prod).2⟩
   have hεsource : ε < Real.sqrt E.cqState.toSubnormalized.matrix.trace.re := by
-    change ε < Real.sqrt E.cqState.matrix.trace.re
-    have htrace : E.cqState.matrix.trace.re = 1 := by
-      rw [E.cqState.trace_eq_one]
+    change ε < Real.sqrt E.cqState.m.trace.re
+    have htrace : E.cqState.m.trace.re = 1 := by
+      rw [E.cqState.tr']
       norm_num
     rw [htrace]
     simpa using hε1
   exact
     SubnormalizedState.smoothConditionalMinEntropyRaw_le_of_candidate_lift_of_lt_sqrt_trace
-      (a := Prod Z S) (source := Z)
+      (a := Z × S) (source := Z)
       (E.deterministicGraphCqState g).toSubnormalized E.cqState.toSubnormalized
       hε0 hεsource hlift
 
 /-- The concrete graph/source isometry compresses any smooth graph candidate
 back to a smooth source candidate with no smaller endpoint value. -/
 theorem deterministicGraphCqState_smoothCandidate_lift_to_cqState
-    (E : Ensemble Z e) (g : Z → S) {ε h : ℝ}
+    (E : MEnsemble e Z) (g : Z → S) {ε h : ℝ}
     (hε1 : ε < 1)
     (hcand :
-      SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw (a := Prod Z S)
+      SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw (a := Z × S)
         (E.deterministicGraphCqState g).toSubnormalized ε h) :
     ∃ h',
       SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw (a := Z)
         E.cqState.toSubnormalized ε h' ∧ h ≤ h' := by
   classical
-  have hsource_prod : Nonempty (Prod Z e) := E.cqState.nonempty
+  have hsource_prod : Nonempty (Z × e) := E.cqState.nonempty
   let : Nonempty Z := ⟨(Classical.choice hsource_prod).1⟩
   let : Nonempty e := ⟨(Classical.choice hsource_prod).2⟩
   let : Nonempty S := ⟨g (Classical.choice hsource_prod).1⟩
   have hεsource : ε < Real.sqrt E.cqState.toSubnormalized.matrix.trace.re := by
-    change ε < Real.sqrt E.cqState.matrix.trace.re
-    have htrace : E.cqState.matrix.trace.re = 1 := by
-      rw [E.cqState.trace_eq_one]
+    change ε < Real.sqrt E.cqState.m.trace.re
+    have htrace : E.cqState.m.trace.re = 1 := by
+      rw [E.cqState.tr']
       norm_num
     rw [htrace]
     simpa using hε1
   have hcandIso :
-      SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw (a := Prod Z S)
+      SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw (a := Z × S)
         (E.cqState.toSubnormalized.sourceIsometryApply
           (deterministicGraphSourceIsometry g)) ε h := by
     simpa [E.deterministicGraphCqState_toSubnormalized_eq_sourceIsometryApply g] using hcand
@@ -1799,21 +1800,21 @@ theorem deterministicGraphCqState_smoothCandidate_lift_to_cqState
 /-- The concrete graph/source isometry preserves the smooth conditional
 min-entropy of the source cq center. -/
 theorem subnormalizedSmoothConditionalMinEntropy_graphCqState_eq_cqState
-    (E : Ensemble Z e) (g : Z → S) {ε : ℝ}
+    (E : MEnsemble e Z) (g : Z → S) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1) :
     (E.deterministicGraphCqState g).toSubnormalized.smoothConditionalMinEntropy ε hε0
         ((E.deterministicGraphCqState g).epsilon_lt_sqrt_toSubnormalized_trace hε1) =
       E.cqState.toSubnormalized.smoothConditionalMinEntropy ε hε0
         (E.cqState.epsilon_lt_sqrt_toSubnormalized_trace hε1) := by
   classical
-  have hsource_prod : Nonempty (Prod Z e) := E.cqState.nonempty
+  have hsource_prod : Nonempty (Z × e) := E.cqState.nonempty
   let : Nonempty Z := ⟨(Classical.choice hsource_prod).1⟩
   let : Nonempty e := ⟨(Classical.choice hsource_prod).2⟩
   let : Nonempty S := ⟨g (Classical.choice hsource_prod).1⟩
   have hεsource : ε < Real.sqrt E.cqState.toSubnormalized.matrix.trace.re := by
-    change ε < Real.sqrt E.cqState.matrix.trace.re
-    have htrace : E.cqState.matrix.trace.re = 1 := by
-      rw [E.cqState.trace_eq_one]
+    change ε < Real.sqrt E.cqState.m.trace.re
+    have htrace : E.cqState.m.trace.re = 1 := by
+      rw [E.cqState.tr']
       norm_num
     rw [htrace]
     simpa using hε1
@@ -1828,7 +1829,7 @@ theorem subnormalizedSmoothConditionalMinEntropy_graphCqState_eq_cqState
 /-- Concrete graph/source smooth endpoint obtained by instantiating the source
 proof's graph embedding isometry `z ↦ (z, g z)`. -/
 theorem subnormalizedSmoothConditionalMinEntropy_graphCqState_le_cqState
-    (E : Ensemble Z e) (g : Z → S) {ε : ℝ}
+    (E : MEnsemble e Z) (g : Z → S) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1) :
     (E.deterministicGraphCqState g).toSubnormalized.smoothConditionalMinEntropy ε hε0
         ((E.deterministicGraphCqState g).epsilon_lt_sqrt_toSubnormalized_trace hε1) ≤
@@ -1842,15 +1843,15 @@ theorem subnormalizedSmoothConditionalMinEntropy_graphCqState_le_cqState
 witness lift to the graph state plus a graph-to-source candidate lift implies
 the desired smooth deterministic-function data-processing inequality. -/
 theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_graph_and_source_candidate_lifts
-    (E : Ensemble Z e) (g : Z → S) {ε : ℝ}
+    (E : MEnsemble e Z) (g : Z → S) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1)
     (hgraph : ∀ ρSE',
       (E.deterministicPostprocessCqState g).toSubnormalized.purifiedBall ε ρSE' →
-        ∃ τ : SubnormalizedState (Prod (Prod Z S) e),
+        ∃ τ : SubnormalizedState ((Z × S) × e),
           (E.deterministicGraphCqState g).toSubnormalized.purifiedBall ε τ ∧
           ρSE'.conditionalMinEntropyRaw ≤ τ.conditionalMinEntropyRaw)
     (hsource : ∀ h,
-      SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw (a := Prod Z S)
+      SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw (a := Z × S)
         (E.deterministicGraphCqState g).toSubnormalized ε h →
         ∃ h',
           SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw (a := Z)
@@ -1869,7 +1870,7 @@ omit [DecidableEq Z] in
 be replaced by its source-coordinate pinching without decreasing the candidate
 entropy. -/
 theorem deterministicPostprocessCqState_smoothCandidate_sourceCoordinatePinch
-    (E : Ensemble Z e) (g : Z → S) {ε h : ℝ}
+    (E : MEnsemble e Z) (g : Z → S) {ε h : ℝ}
     (hε1 : ε < 1)
     (hcand :
       SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw (a := S)
@@ -1878,17 +1879,17 @@ theorem deterministicPostprocessCqState_smoothCandidate_sourceCoordinatePinch
       SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw (a := S)
         (E.deterministicPostprocessCqState g).toSubnormalized ε h' ∧ h ≤ h' := by
   classical
-  have hpost_prod : Nonempty (Prod S e) :=
+  have hpost_prod : Nonempty (S × e) :=
     (E.deterministicPostprocessCqState g).nonempty
   let : Nonempty S := ⟨(Classical.choice hpost_prod).1⟩
   let : Nonempty e := ⟨(Classical.choice hpost_prod).2⟩
   have hεpost :
       ε < Real.sqrt
         (E.deterministicPostprocessCqState g).toSubnormalized.matrix.trace.re := by
-    change ε < Real.sqrt (E.deterministicPostprocessCqState g).matrix.trace.re
+    change ε < Real.sqrt (E.deterministicPostprocessCqState g).m.trace.re
     have htrace :
-        (E.deterministicPostprocessCqState g).matrix.trace.re = 1 := by
-      rw [(E.deterministicPostprocessCqState g).trace_eq_one]
+        (E.deterministicPostprocessCqState g).m.trace.re = 1 := by
+      rw [(E.deterministicPostprocessCqState g).tr']
       norm_num
     rw [htrace]
     simpa using hε1
@@ -1902,7 +1903,7 @@ lift from every smoothed postprocessed witness back to the original cq center.
 This packages the supremum/boundedness endpoint separately from the concrete
 purified-distance witness lift. -/
 theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_candidate_lift
-    (E : Ensemble Z e) (g : Z → S) {ε : ℝ}
+    (E : MEnsemble e Z) (g : Z → S) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1)
     (hlift : ∀ h,
       SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw (a := S)
@@ -1915,13 +1916,13 @@ theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_candid
       E.cqState.toSubnormalized.smoothConditionalMinEntropy ε hε0
         (E.cqState.epsilon_lt_sqrt_toSubnormalized_trace hε1) := by
   classical
-  have hsource_prod : Nonempty (Prod Z e) := E.cqState.nonempty
+  have hsource_prod : Nonempty (Z × e) := E.cqState.nonempty
   let : Nonempty Z := ⟨(Classical.choice hsource_prod).1⟩
   let : Nonempty e := ⟨(Classical.choice hsource_prod).2⟩
   have hεsource : ε < Real.sqrt E.cqState.toSubnormalized.matrix.trace.re := by
-    change ε < Real.sqrt E.cqState.matrix.trace.re
-    have htrace : E.cqState.matrix.trace.re = 1 := by
-      rw [E.cqState.trace_eq_one]
+    change ε < Real.sqrt E.cqState.m.trace.re
+    have htrace : E.cqState.m.trace.re = 1 := by
+      rw [E.cqState.tr']
       norm_num
     rw [htrace]
     simpa using hε1
@@ -1935,7 +1936,7 @@ theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_candid
 lift from each nearby postprocessed state to a nearby original cq state whose
 ordinary conditional min-entropy is no smaller. -/
 theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_witness_lift
-    (E : Ensemble Z e) (g : Z → S) {ε : ℝ}
+    (E : MEnsemble e Z) (g : Z → S) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1)
     (hlift : ∀ ρSE',
       (E.deterministicPostprocessCqState g).toSubnormalized.purifiedBall ε ρSE' →
@@ -1947,13 +1948,13 @@ theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_witnes
       E.cqState.toSubnormalized.smoothConditionalMinEntropy ε hε0
         (E.cqState.epsilon_lt_sqrt_toSubnormalized_trace hε1) := by
   classical
-  have hsource_prod : Nonempty (Prod Z e) := E.cqState.nonempty
+  have hsource_prod : Nonempty (Z × e) := E.cqState.nonempty
   let : Nonempty Z := ⟨(Classical.choice hsource_prod).1⟩
   let : Nonempty e := ⟨(Classical.choice hsource_prod).2⟩
   have hεsource : ε < Real.sqrt E.cqState.toSubnormalized.matrix.trace.re := by
-    change ε < Real.sqrt E.cqState.matrix.trace.re
-    have htrace : E.cqState.matrix.trace.re = 1 := by
-      rw [E.cqState.trace_eq_one]
+    change ε < Real.sqrt E.cqState.m.trace.re
+    have htrace : E.cqState.m.trace.re = 1 := by
+      rw [E.cqState.tr']
       norm_num
     rw [htrace]
     simpa using hε1
@@ -1968,9 +1969,9 @@ deterministically postprocessed center.  Arbitrary witnesses are first pinched;
 the postprocessed cq center is fixed by this pinching, the purified ball is
 preserved, and subnormalized conditional min-entropy can only increase. -/
 theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_sourceCoordinatePinch_witness_lift
-    (E : Ensemble Z e) (g : Z → S) {ε : ℝ}
+    (E : MEnsemble e Z) (g : Z → S) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1)
-    (hlift : ∀ ρSE' : SubnormalizedState (Prod S e),
+    (hlift : ∀ ρSE' : SubnormalizedState (S × e),
       (E.deterministicPostprocessCqState g).toSubnormalized.purifiedBall
         ε ρSE'.sourceCoordinatePinch →
         ∃ ρZE',
@@ -1982,17 +1983,17 @@ theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_source
       E.cqState.toSubnormalized.smoothConditionalMinEntropy ε hε0
         (E.cqState.epsilon_lt_sqrt_toSubnormalized_trace hε1) := by
   classical
-  have hpost_prod : Nonempty (Prod S e) :=
+  have hpost_prod : Nonempty (S × e) :=
     (E.deterministicPostprocessCqState g).nonempty
   let : Nonempty S := ⟨(Classical.choice hpost_prod).1⟩
   let : Nonempty e := ⟨(Classical.choice hpost_prod).2⟩
   have hεpost :
       ε < Real.sqrt
         (E.deterministicPostprocessCqState g).toSubnormalized.matrix.trace.re := by
-    change ε < Real.sqrt (E.deterministicPostprocessCqState g).matrix.trace.re
+    change ε < Real.sqrt (E.deterministicPostprocessCqState g).m.trace.re
     have htrace :
-        (E.deterministicPostprocessCqState g).matrix.trace.re = 1 := by
-      rw [(E.deterministicPostprocessCqState g).trace_eq_one]
+        (E.deterministicPostprocessCqState g).m.trace.re = 1 := by
+      rw [(E.deterministicPostprocessCqState g).tr']
       norm_num
     rw [htrace]
     simpa using hε1
@@ -2021,12 +2022,12 @@ lift.  If every source-coordinate-pinched postprocessed witness has an exact
 data-processing inequality follows from source pinching plus the generic
 deterministic source coarse-graining API. -/
 theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_sourceCoordinatePinch_exact_witness_lift
-    (E : Ensemble Z e) (g : Z → S) {ε : ℝ}
+    (E : MEnsemble e Z) (g : Z → S) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1)
-    (hlift : ∀ ρSE' : SubnormalizedState (Prod S e),
+    (hlift : ∀ ρSE' : SubnormalizedState (S × e),
       (E.deterministicPostprocessCqState g).toSubnormalized.purifiedBall
         ε ρSE'.sourceCoordinatePinch →
-        ∃ ρZE' : SubnormalizedState (Prod Z e),
+        ∃ ρZE' : SubnormalizedState (Z × e),
           E.cqState.toSubnormalized.purifiedBall ε ρZE' ∧
           ρZE'.sourceDeterministicPostprocess g =
             ρSE'.sourceCoordinatePinch) :
@@ -2035,13 +2036,13 @@ theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_source
       E.cqState.toSubnormalized.smoothConditionalMinEntropy ε hε0
         (E.cqState.epsilon_lt_sqrt_toSubnormalized_trace hε1) := by
   classical
-  have hsource_prod : Nonempty (Prod Z e) := E.cqState.nonempty
+  have hsource_prod : Nonempty (Z × e) := E.cqState.nonempty
   let : Nonempty Z := ⟨(Classical.choice hsource_prod).1⟩
   let : Nonempty e := ⟨(Classical.choice hsource_prod).2⟩
   have hεsource : ε < Real.sqrt E.cqState.toSubnormalized.matrix.trace.re := by
-    change ε < Real.sqrt E.cqState.matrix.trace.re
-    have htrace : E.cqState.matrix.trace.re = 1 := by
-      rw [E.cqState.trace_eq_one]
+    change ε < Real.sqrt E.cqState.m.trace.re
+    have htrace : E.cqState.m.trace.re = 1 := by
+      rw [E.cqState.tr']
       norm_num
     rw [htrace]
     simpa using hε1
@@ -2054,7 +2055,7 @@ theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_source
       E.cqState.toSubnormalized.purifiedBall ε ρZE'.sourceCoordinatePinch :=
     E.cqState.toSubnormalized
       |>.purifiedBall_sourceCoordinatePinch_of_fixed
-        (Ensemble.cqState_toSubnormalized_sourceCoordinatePinch E)
+        (MEnsemble.cqState_toSubnormalized_sourceCoordinatePinch E)
         hρZE'
   have hρZE_pinch_pos : 0 < ρZE'.sourceCoordinatePinch.matrix.trace.re :=
     SubnormalizedState.purifiedBall_trace_pos_of_lt_sqrt_trace
@@ -2077,14 +2078,14 @@ to the image of `g`.  This is the non-surjective-safe form: arbitrary
 postprocessed witnesses are source-coordinate pinched and then restricted to
 reachable output labels before an exact `Z × E` fiber refinement is requested. -/
 theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_sourceImageFilter_exact_witness_lift
-    (E : Ensemble Z e) (g : Z → S) {ε : ℝ}
+    (E : MEnsemble e Z) (g : Z → S) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1)
-    (hlift : ∀ ρSE' : SubnormalizedState (Prod S e),
+    (hlift : ∀ ρSE' : SubnormalizedState (S × e),
       (E.deterministicPostprocessCqState g).toSubnormalized.purifiedBall
         ε
         (ρSE'.sourceCoordinatePinch.sourceBlockFilter
           (fun s : S => ∃ z : Z, g z = s)) →
-        ∃ ρZE' : SubnormalizedState (Prod Z e),
+        ∃ ρZE' : SubnormalizedState (Z × e),
           E.cqState.toSubnormalized.purifiedBall ε ρZE' ∧
           ρZE'.sourceDeterministicPostprocess g =
             ρSE'.sourceCoordinatePinch.sourceBlockFilter
@@ -2094,26 +2095,26 @@ theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_source
       E.cqState.toSubnormalized.smoothConditionalMinEntropy ε hε0
         (E.cqState.epsilon_lt_sqrt_toSubnormalized_trace hε1) := by
   classical
-  have hsource_prod : Nonempty (Prod Z e) := E.cqState.nonempty
+  have hsource_prod : Nonempty (Z × e) := E.cqState.nonempty
   let : Nonempty Z := ⟨(Classical.choice hsource_prod).1⟩
   let : Nonempty e := ⟨(Classical.choice hsource_prod).2⟩
-  have hpost_prod : Nonempty (Prod S e) :=
+  have hpost_prod : Nonempty (S × e) :=
     (E.deterministicPostprocessCqState g).nonempty
   let : Nonempty S := ⟨(Classical.choice hpost_prod).1⟩
   have hεpost :
       ε < Real.sqrt
         (E.deterministicPostprocessCqState g).toSubnormalized.matrix.trace.re := by
-    change ε < Real.sqrt (E.deterministicPostprocessCqState g).matrix.trace.re
+    change ε < Real.sqrt (E.deterministicPostprocessCqState g).m.trace.re
     have htrace :
-        (E.deterministicPostprocessCqState g).matrix.trace.re = 1 := by
-      rw [(E.deterministicPostprocessCqState g).trace_eq_one]
+        (E.deterministicPostprocessCqState g).m.trace.re = 1 := by
+      rw [(E.deterministicPostprocessCqState g).tr']
       norm_num
     rw [htrace]
     simpa using hε1
   have hεsource : ε < Real.sqrt E.cqState.toSubnormalized.matrix.trace.re := by
-    change ε < Real.sqrt E.cqState.matrix.trace.re
-    have htrace : E.cqState.matrix.trace.re = 1 := by
-      rw [E.cqState.trace_eq_one]
+    change ε < Real.sqrt E.cqState.m.trace.re
+    have htrace : E.cqState.m.trace.re = 1 := by
+      rw [E.cqState.tr']
       norm_num
     rw [htrace]
     simpa using hε1
@@ -2122,7 +2123,7 @@ theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_source
       g hε0 hε1 ?_
   intro ρSE' hball
   let imagePred : S → Prop := fun s => ∃ z : Z, g z = s
-  let σSE : SubnormalizedState (Prod S e) :=
+  let σSE : SubnormalizedState (S × e) :=
     ρSE'.sourceCoordinatePinch.sourceBlockFilter imagePred
   have hρSE'_pos : 0 < ρSE'.matrix.trace.re :=
     SubnormalizedState.purifiedBall_trace_pos_of_lt_sqrt_trace
@@ -2166,7 +2167,7 @@ theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_source
       E.cqState.toSubnormalized.purifiedBall ε ρZE'.sourceCoordinatePinch :=
     E.cqState.toSubnormalized
       |>.purifiedBall_sourceCoordinatePinch_of_fixed
-        (Ensemble.cqState_toSubnormalized_sourceCoordinatePinch E)
+        (MEnsemble.cqState_toSubnormalized_sourceCoordinatePinch E)
         hρZE'
   have hρZE_pinch_pos : 0 < ρZE'.sourceCoordinatePinch.matrix.trace.re :=
     SubnormalizedState.purifiedBall_trace_pos_of_lt_sqrt_trace
@@ -2192,14 +2193,14 @@ witness.  The purified-distance bookkeeping is discharged by the reusable
 `SubnormalizedState.purifiedBall_of_generalizedFidelity_le` API, so the
 remaining concrete task is the fiberwise fidelity construction. -/
 theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_sourceImageFilter_exact_fidelity_lift
-    (E : Ensemble Z e) (g : Z → S) {ε : ℝ}
+    (E : MEnsemble e Z) (g : Z → S) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1)
-    (hlift : ∀ ρSE' : SubnormalizedState (Prod S e),
+    (hlift : ∀ ρSE' : SubnormalizedState (S × e),
       (E.deterministicPostprocessCqState g).toSubnormalized.purifiedBall
         ε
         (ρSE'.sourceCoordinatePinch.sourceBlockFilter
           (fun s : S => ∃ z : Z, g z = s)) →
-        ∃ ρZE' : SubnormalizedState (Prod Z e),
+        ∃ ρZE' : SubnormalizedState (Z × e),
           (E.deterministicPostprocessCqState g).toSubnormalized.generalizedFidelity
               (ρSE'.sourceCoordinatePinch.sourceBlockFilter
                 (fun s : S => ∃ z : Z, g z = s)) ≤
@@ -2231,9 +2232,9 @@ splits of each source-image-filtered witness.  The only remaining concrete
 work for the unconditional theorem is to construct such `blocks` with the
 blockwise fidelity bounds. -/
 theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_sourceImageFilter_block_bounds
-    (E : Ensemble Z e) (g : Z → S) {ε : ℝ}
+    (E : MEnsemble e Z) (g : Z → S) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1)
-    (hlift : ∀ ρSE' : SubnormalizedState (Prod S e),
+    (hlift : ∀ ρSE' : SubnormalizedState (S × e),
       (E.deterministicPostprocessCqState g).toSubnormalized.purifiedBall
         ε
         (ρSE'.sourceCoordinatePinch.sourceBlockFilter
@@ -2277,7 +2278,7 @@ register is deterministically postprocessed.  The proof refines each reachable
 postprocessed witness block along the corresponding source fiber and then uses
 the blockwise fidelity lift above. -/
 theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le
-    (E : Ensemble Z e) (g : Z → S) {ε : ℝ}
+    (E : MEnsemble e Z) (g : Z → S) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1) :
     (E.deterministicPostprocessCqState g).toSubnormalized.smoothConditionalMinEntropy ε hε0
         ((E.deterministicPostprocessCqState g).epsilon_lt_sqrt_toSubnormalized_trace hε1) ≤
@@ -2289,7 +2290,7 @@ theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le
       g hε0 hε1 ?_
   intro ρSE' _hball
   let imagePred : S → Prop := fun s : S => ∃ z : Z, g z = s
-  let σSE : SubnormalizedState (Prod S e) :=
+  let σSE : SubnormalizedState (S × e) :=
     ρSE'.sourceCoordinatePinch.sourceBlockFilter imagePred
   have hσ_matrix :
       σSE.matrix =
@@ -2315,7 +2316,7 @@ theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le
         Classical.block (E.deterministicPostprocessCqState g).toSubnormalized.matrix s s =
           ∑ zf : {z : Z // g z = s}, E.cqBlock zf.1 := by
     intro s
-    rw [State.toSubnormalized_matrix, deterministicPostprocessCqState_block]
+    rw [MState.toSubnormalized_matrix, deterministicPostprocessCqState_block]
     simpa using
       (sum_fiber_subtype_eq_if g s
         (fun zf : {z : Z // g z = s} => E.cqBlock zf.1))
@@ -2484,16 +2485,16 @@ pinched smoothed postprocessed witnesses.  The graph witness is then projected
 to the original source-side witness using the existing graph/source marginal
 API. -/
 theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_sourceCoordinatePinch_graph_witness_lift
-    (E : Ensemble Z e) (g : Z → S) {ε : ℝ}
+    (E : MEnsemble e Z) (g : Z → S) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1)
-    (hlift : ∀ ρSE' : SubnormalizedState (Prod S e),
+    (hlift : ∀ ρSE' : SubnormalizedState (S × e),
       (E.deterministicPostprocessCqState g).toSubnormalized.purifiedBall
         ε ρSE'.sourceCoordinatePinch →
-        ∃ τ : SubnormalizedState (Prod S (Prod Z e)),
+        ∃ τ : SubnormalizedState (S × (Z × e)),
           ((E.deterministicGraphCqState g).reindex
             (deterministicGraphSourceMarginalEquiv Z S e)).toSubnormalized.purifiedBall ε τ ∧
           ρSE'.sourceCoordinatePinch.conditionalMinEntropyRaw ≤
-            τ.marginalB.conditionalMinEntropyRaw) :
+            τ.traceLeft.conditionalMinEntropyRaw) :
     (E.deterministicPostprocessCqState g).toSubnormalized.smoothConditionalMinEntropy ε hε0
         ((E.deterministicPostprocessCqState g).epsilon_lt_sqrt_toSubnormalized_trace hε1) ≤
       E.cqState.toSubnormalized.smoothConditionalMinEntropy ε hε0
@@ -2501,7 +2502,7 @@ theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_source
   E.subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_sourceCoordinatePinch_witness_lift
     g hε0 hε1 fun ρSE' hρSE' => by
       rcases hlift ρSE' hρSE' with ⟨τ, hτball, hle⟩
-      exact ⟨τ.marginalB,
+      exact ⟨τ.traceLeft,
         E.deterministicGraphCqState_purifiedBall_marginalZE_of_purifiedBall g hτball,
         hle⟩
 
@@ -2511,23 +2512,23 @@ has a graph-ball lift whose `Z × E` marginal is already coordinate-pinched and
 coarse-grains exactly back to that witness, the entropy comparison follows
 from the generic deterministic source coarse-graining API. -/
 theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_sourceCoordinatePinch_exact_graph_witness_lift
-    (E : Ensemble Z e) (g : Z → S) {ε : ℝ}
+    (E : MEnsemble e Z) (g : Z → S) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1)
-    (hlift : ∀ ρSE' : SubnormalizedState (Prod S e),
+    (hlift : ∀ ρSE' : SubnormalizedState (S × e),
       (E.deterministicPostprocessCqState g).toSubnormalized.purifiedBall
         ε ρSE'.sourceCoordinatePinch →
-        ∃ τ : SubnormalizedState (Prod S (Prod Z e)),
+        ∃ τ : SubnormalizedState (S × (Z × e)),
           ((E.deterministicGraphCqState g).reindex
             (deterministicGraphSourceMarginalEquiv Z S e)).toSubnormalized.purifiedBall ε τ ∧
-          τ.marginalB.sourceDeterministicPostprocess g =
+          τ.traceLeft.sourceDeterministicPostprocess g =
             ρSE'.sourceCoordinatePinch ∧
-          τ.marginalB.sourceCoordinatePinch = τ.marginalB) :
+          τ.traceLeft.sourceCoordinatePinch = τ.traceLeft) :
     (E.deterministicPostprocessCqState g).toSubnormalized.smoothConditionalMinEntropy ε hε0
         ((E.deterministicPostprocessCqState g).epsilon_lt_sqrt_toSubnormalized_trace hε1) ≤
       E.cqState.toSubnormalized.smoothConditionalMinEntropy ε hε0
         (E.cqState.epsilon_lt_sqrt_toSubnormalized_trace hε1) := by
   classical
-  have hsource_prod : Nonempty (Prod Z e) := E.cqState.nonempty
+  have hsource_prod : Nonempty (Z × e) := E.cqState.nonempty
   let : Nonempty Z := ⟨(Classical.choice hsource_prod).1⟩
   let : Nonempty e := ⟨(Classical.choice hsource_prod).2⟩
   have hεgraph : ε < Real.sqrt
@@ -2535,12 +2536,12 @@ theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_source
         (deterministicGraphSourceMarginalEquiv Z S e)).toSubnormalized.matrix.trace.re := by
     change ε < Real.sqrt
       ((E.deterministicGraphCqState g).reindex
-        (deterministicGraphSourceMarginalEquiv Z S e)).matrix.trace.re
+        (deterministicGraphSourceMarginalEquiv Z S e)).m.trace.re
     have htrace :
         ((E.deterministicGraphCqState g).reindex
-          (deterministicGraphSourceMarginalEquiv Z S e)).matrix.trace.re = 1 := by
+          (deterministicGraphSourceMarginalEquiv Z S e)).m.trace.re = 1 := by
       rw [((E.deterministicGraphCqState g).reindex
-        (deterministicGraphSourceMarginalEquiv Z S e)).trace_eq_one]
+        (deterministicGraphSourceMarginalEquiv Z S e)).tr']
       norm_num
     rw [htrace]
     simpa using hε1
@@ -2554,13 +2555,13 @@ theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_source
       ((E.deterministicGraphCqState g).reindex
         (deterministicGraphSourceMarginalEquiv Z S e)).toSubnormalized τ
       hεgraph hτball
-  have hτmarg_pos : 0 < τ.marginalB.matrix.trace.re := by
-    rw [SubnormalizedState.marginalB_matrix, partialTraceA_trace]
+  have hτmarg_pos : 0 < τ.traceLeft.matrix.trace.re := by
+    rw [SubnormalizedState.traceLeft_matrix, Matrix.traceLeft_trace]
     exact hτpos
   have hentropy :
-      (τ.marginalB.sourceDeterministicPostprocess g).conditionalMinEntropyRaw ≤
-        τ.marginalB.sourceCoordinatePinch.conditionalMinEntropyRaw :=
-    τ.marginalB
+      (τ.traceLeft.sourceDeterministicPostprocess g).conditionalMinEntropyRaw ≤
+        τ.traceLeft.sourceCoordinatePinch.conditionalMinEntropyRaw :=
+    τ.traceLeft
       |>.conditionalMinEntropy_sourceDeterministicPostprocess_le_sourceCoordinatePinch_of_trace_pos
         g hτmarg_pos
   exact ⟨τ, hτball, by
@@ -2570,14 +2571,14 @@ theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_source
 smooth deterministic postprocessing inequality. The source witness is obtained
 by tracing out the deterministic output register of the graph witness. -/
 theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_graph_witness_lift
-    (E : Ensemble Z e) (g : Z → S) {ε : ℝ}
+    (E : MEnsemble e Z) (g : Z → S) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1)
     (hlift : ∀ ρSE',
       (E.deterministicPostprocessCqState g).toSubnormalized.purifiedBall ε ρSE' →
-        ∃ τ : SubnormalizedState (Prod S (Prod Z e)),
+        ∃ τ : SubnormalizedState (S × (Z × e)),
           ((E.deterministicGraphCqState g).reindex
             (deterministicGraphSourceMarginalEquiv Z S e)).toSubnormalized.purifiedBall ε τ ∧
-          ρSE'.conditionalMinEntropyRaw ≤ τ.marginalB.conditionalMinEntropyRaw) :
+          ρSE'.conditionalMinEntropyRaw ≤ τ.traceLeft.conditionalMinEntropyRaw) :
     (E.deterministicPostprocessCqState g).toSubnormalized.smoothConditionalMinEntropy ε hε0
         ((E.deterministicPostprocessCqState g).epsilon_lt_sqrt_toSubnormalized_trace hε1) ≤
       E.cqState.toSubnormalized.smoothConditionalMinEntropy ε hε0
@@ -2585,10 +2586,12 @@ theorem subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_graph_
   E.subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le_of_witness_lift
     g hε0 hε1 fun ρSE' hρSE' => by
       rcases hlift ρSE' hρSE' with ⟨τ, hτball, hle⟩
-      exact ⟨τ.marginalB,
+      exact ⟨τ.traceLeft,
         E.deterministicGraphCqState_purifiedBall_marginalZE_of_purifiedBall g hτball, hle⟩
 
-end Ensemble
+end MEnsemble
+
+namespace QIT
 
 namespace Security
 
@@ -2614,34 +2617,34 @@ variable [Fintype e] [DecidableEq e]
 
 /-- The extractor uniform-output state is the existing maximally mixed state on
 the output alphabet. -/
-theorem uniformExtractorOutputState_eq_maximallyMixed :
-    QIT.Security.uniformExtractorOutputState (S := S) = State.maximallyMixed S := by
+theorem uniformExtractorOutputState_eq_uniform :
+    QIT.Security.uniformExtractorOutputState (S := S) = (MState.uniform : MState S) := by
   ext s t
   by_cases hst : s = t
   · subst t
     simp [QIT.Security.uniformExtractorOutputState_matrix,
-      QIT.Security.uniformExtractorOutputProb, State.maximallyMixed_matrix]
+      QIT.Security.uniformExtractorOutputProb, MState.uniform_matrix]
   · simp [QIT.Security.uniformExtractorOutputState_matrix,
-      QIT.Security.uniformExtractorOutputProb, State.maximallyMixed_matrix, hst]
+      QIT.Security.uniformExtractorOutputProb, MState.uniform_matrix, hst]
 
 /-- The ideal uniform extractor output tensor arbitrary side information has
 conditional min-entropy `log₂ |S|`. -/
 theorem conditionalMinEntropy_uniformExtractorOutputState_prod
-    (σ : State e) :
+    (σ : MState e) :
     ((QIT.Security.uniformExtractorOutputState (S := S)).prod σ).conditionalMinEntropy =
       log2 (Fintype.card S : ℝ) := by
-  rw [uniformExtractorOutputState_eq_maximallyMixed (S := S)]
-  exact State.conditionalMinEntropy_maximallyMixed_prod (a := S) σ
+  rw [uniformExtractorOutputState_eq_uniform (S := S)]
+  exact MState.conditionalMinEntropy_uniform_prod (a := S) σ
 
 /-- The idealized extractor output state has conditional min-entropy
 `log₂ |S|` on the extractor-output register. -/
 theorem idealExtractorOutputState_conditionalMinEntropy
-    (ρ : State (Prod S (Prod F e))) :
+    (ρ : MState (S × (F × e))) :
     (QIT.Security.idealExtractorOutputState ρ).conditionalMinEntropy =
       log2 (Fintype.card S : ℝ) := by
   rw [QIT.Security.idealExtractorOutputState]
   exact conditionalMinEntropy_uniformExtractorOutputState_prod
-    (S := S) ρ.marginalB
+    (S := S) ρ.traceLeft
 
 namespace HashFamily
 
@@ -2652,31 +2655,32 @@ variable [Nonempty F]
 system.  The classical source label is `(z, f)` and the side information is
 `(f, e)`. -/
 def seededSourceEnsemble
-    (H : QIT.Security.HashFamily F Z S) (E : Ensemble Z e) :
-    Ensemble (Prod Z F) (Prod F e) where
-  probs := fun zf => E.probs zf.1 * H.prob zf.2
-  weights_sum := by
-    rw [Fintype.sum_prod_type]
-    calc
-      (∑ z : Z, ∑ f : F, E.probs z * H.prob f) =
-          ∑ z : Z, E.probs z * (∑ f : F, H.prob f) := by
-        simp [Finset.mul_sum]
-      _ = ∑ z : Z, E.probs z * 1 := by rw [H.prob_sum]
-      _ = ∑ z : Z, E.probs z := by simp
-      _ = 1 := E.weights_sum
-  states := fun zf => (Classical.basisState zf.2).prod (E.states zf.1)
+    (H : QIT.Security.HashFamily F Z S) (E : MEnsemble e Z) :
+    MEnsemble (F × e) (Z × F) :=
+  .ofProbs
+    (fun zf => E.probs zf.1 * H.prob zf.2)
+    (by
+      rw [Fintype.sum_prod_type]
+      calc
+        (∑ z : Z, ∑ f : F, E.probs z * H.prob f) =
+            ∑ z : Z, E.probs z * (∑ f : F, H.prob f) := by
+          simp [Finset.mul_sum]
+        _ = ∑ z : Z, E.probs z * 1 := by rw [H.prob_sum]
+        _ = ∑ z : Z, E.probs z := by simp
+        _ = 1 := E.weights_sum)
+    (fun zf => (Classical.basisState zf.2).prod (E.states zf.1))
 
 omit [Fintype S] [DecidableEq S] [Nonempty S] [DecidableEq Z] [Nonempty F] in
 @[simp]
 theorem seededSourceEnsemble_probs
-    (H : QIT.Security.HashFamily F Z S) (E : Ensemble Z e) (z : Z) (f : F) :
+    (H : QIT.Security.HashFamily F Z S) (E : MEnsemble e Z) (z : Z) (f : F) :
     (H.seededSourceEnsemble E).probs (z, f) = E.probs z * H.prob f :=
   rfl
 
 omit [Fintype S] [DecidableEq S] [Nonempty S] [DecidableEq Z] [Nonempty F] in
 @[simp]
 theorem seededSourceEnsemble_states
-    (H : QIT.Security.HashFamily F Z S) (E : Ensemble Z e) (z : Z) (f : F) :
+    (H : QIT.Security.HashFamily F Z S) (E : MEnsemble e Z) (z : Z) (f : F) :
     (H.seededSourceEnsemble E).states (z, f) =
       (Classical.basisState f).prod (E.states z) :=
   rfl
@@ -2686,10 +2690,10 @@ omit [Fintype S] [DecidableEq S] [Nonempty S] [Nonempty F] in
 seed value `f` in the conditioning system, is the original `z` cq block scaled
 by the seed probability. -/
 theorem seededSourceEnsemble_cqBlock_seedBlock
-    (H : QIT.Security.HashFamily F Z S) (E : Ensemble Z e) (z : Z) (f : F) :
+    (H : QIT.Security.HashFamily F Z S) (E : MEnsemble e Z) (z : Z) (f : F) :
     Classical.block
-        (Classical.block (H.seededSourceEnsemble E).cqState.matrix (z, f) (z, f)) f f =
-      (((E.probs z * H.prob f : ℝ≥0) : ℂ) • (E.states z).matrix) := by
+        (Classical.block (H.seededSourceEnsemble E).cqState.m (z, f) (z, f)) f f =
+      (((E.probs z * H.prob f : ℝ≥0) : ℂ) • (E.states z).m) := by
   rw [Classical.cqState_block_self]
   ext i j
   simp [Classical.block, Matrix.smul_apply]
@@ -2697,10 +2701,10 @@ theorem seededSourceEnsemble_cqBlock_seedBlock
 omit [Fintype S] [DecidableEq S] [Nonempty S] [Nonempty F] in
 /-- Summing over the copied seed blocks recovers the original source cq block. -/
 theorem seededSourceEnsemble_cqBlock_seedBlock_sum
-    (H : QIT.Security.HashFamily F Z S) (E : Ensemble Z e) (z : Z) :
+    (H : QIT.Security.HashFamily F Z S) (E : MEnsemble e Z) (z : Z) :
     (∑ f : F,
         Classical.block
-          (Classical.block (H.seededSourceEnsemble E).cqState.matrix (z, f) (z, f)) f f) =
+          (Classical.block (H.seededSourceEnsemble E).cqState.m (z, f) (z, f)) f f) =
       E.cqBlock z := by
   simp_rw [H.seededSourceEnsemble_cqBlock_seedBlock E z]
   have hsum_prob :
@@ -2716,7 +2720,7 @@ theorem seededSourceEnsemble_cqBlock_seedBlock_sum
             rw [H.prob_sum]
             simp
   ext i j
-  simp only [Matrix.sum_apply, Matrix.smul_apply, Ensemble.cqBlock_eq]
+  simp only [Matrix.sum_apply, Matrix.smul_apply, MEnsemble.cqBlock_eq]
   rw [← Finset.sum_smul, hsum_prob]
 
 omit [Fintype S] [DecidableEq S] [Nonempty S] [Nonempty F] in
@@ -2724,112 +2728,112 @@ omit [Fintype S] [DecidableEq S] [Nonempty S] [Nonempty F] in
 back to a feasible witness for the original source by tracing out the public
 seed from the conditioning system. -/
 theorem conditionalMinEntropyFeasible_of_seededSourceEnsemble
-    (H : QIT.Security.HashFamily F Z S) (E : Ensemble Z e)
-    (σ : State (Prod F e)) {lam : ℝ}
-    (hseed : State.ConditionalMinEntropyFeasible (a := Prod Z F)
+    (H : QIT.Security.HashFamily F Z S) (E : MEnsemble e Z)
+    (σ : MState (F × e)) {lam : ℝ}
+    (hseed : MState.ConditionalMinEntropyFeasible (a := Z × F)
       (H.seededSourceEnsemble E).cqState σ lam) :
-    State.ConditionalMinEntropyFeasible (a := Z) E.cqState σ.marginalB lam := by
+    MState.ConditionalMinEntropyFeasible (a := Z) E.cqState σ.traceLeft lam := by
   classical
-  refine Ensemble.conditionalMinEntropyFeasible_of_cqBlock_le E σ.marginalB lam ?_
+  refine MEnsemble.conditionalMinEntropyFeasible_of_cqBlock_le E σ.traceLeft lam ?_
   intro z
   let c : ℂ := (Real.rpow 2 (-lam) : ℂ)
   have hsum_left :
       E.cqBlock z =
         ∑ f : F,
           Classical.block
-            (Classical.block (H.seededSourceEnsemble E).cqState.matrix (z, f) (z, f)) f f :=
+            (Classical.block (H.seededSourceEnsemble E).cqState.m (z, f) (z, f)) f f :=
     (H.seededSourceEnsemble_cqBlock_seedBlock_sum E z).symm
   rw [hsum_left]
   have hsum_le :
       (∑ f : F,
           Classical.block
-            (Classical.block (H.seededSourceEnsemble E).cqState.matrix (z, f) (z, f)) f f) ≤
-        ∑ f : F, c • Classical.block σ.matrix f f := by
+            (Classical.block (H.seededSourceEnsemble E).cqState.m (z, f) (z, f)) f f) ≤
+        ∑ f : F, c • Classical.block σ.m f f := by
     refine Finset.sum_le_sum fun f _ => ?_
     have houter :
-        Classical.block (H.seededSourceEnsemble E).cqState.matrix (z, f) (z, f) ≤
-          c • σ.matrix := by
+        Classical.block (H.seededSourceEnsemble E).cqState.m (z, f) (z, f) ≤
+          c • σ.m := by
       simpa [c] using
-        State.block_le_of_conditionalMinEntropyFeasible
+        MState.block_le_of_conditionalMinEntropyFeasible
           (H.seededSourceEnsemble E).cqState σ (z, f) hseed
     have hblock := Classical.block_le_block_of_le houter f
-    have hsmul : Classical.block (c • σ.matrix) f f = c • Classical.block σ.matrix f f := rfl
+    have hsmul : Classical.block (c • σ.m) f f = c • Classical.block σ.m f f := rfl
     rwa [hsmul] at hblock
   refine hsum_le.trans_eq ?_
-  rw [State.marginalB_matrix]
-  rw [Classical.partialTraceA_eq_sum_blocks]
+  rw [MState.traceLeft_m]
+  rw [Classical.traceLeft_eq_sum_blocks]
   simpa [c] using
     (Finset.smul_sum.symm :
-      (∑ f : F, c • Classical.block σ.matrix f f) =
-        c • ∑ f : F, Classical.block σ.matrix f f)
+      (∑ f : F, c • Classical.block σ.m f f) =
+        c • ∑ f : F, Classical.block σ.m f f)
 
 omit [Fintype S] [DecidableEq S] [Nonempty S] [Nonempty F] in
 /-- Copying an independent public seed into both the source label and the
 conditioning system does not increase normalized cq conditional min-entropy. -/
 theorem conditionalMinEntropy_seededSourceEnsemble_le_source
-    (H : QIT.Security.HashFamily F Z S) (E : Ensemble Z e) :
+    (H : QIT.Security.HashFamily F Z S) (E : MEnsemble e Z) :
     (H.seededSourceEnsemble E).cqState.conditionalMinEntropy ≤
       E.cqState.conditionalMinEntropy := by
   classical
-  have hsource_prod : Nonempty (Prod Z e) := E.cqState.nonempty
+  have hsource_prod : Nonempty (Z × e) := E.cqState.nonempty
   let : Nonempty Z := ⟨(Classical.choice hsource_prod).1⟩
   let : Nonempty e := ⟨(Classical.choice hsource_prod).2⟩
-  have hseed_prod : Nonempty (Prod (Prod Z F) (Prod F e)) :=
+  have hseed_prod : Nonempty ((Z × F) × (F × e)) :=
     (H.seededSourceEnsemble E).cqState.nonempty
-  let : Nonempty (Prod Z F) := ⟨(Classical.choice hseed_prod).1⟩
-  let : Nonempty (Prod F e) := ⟨(Classical.choice hseed_prod).2⟩
+  let : Nonempty (Z × F) := ⟨(Classical.choice hseed_prod).1⟩
+  let : Nonempty (F × e) := ⟨(Classical.choice hseed_prod).2⟩
   let sseed : Set ℝ :=
     (H.seededSourceEnsemble E).cqState.conditionalMinEntropyFeasibleExponentValueSet
-      (a := Prod Z F)
+      (a := Z × F)
   let ssource : Set ℝ := E.cqState.conditionalMinEntropyFeasibleExponentValueSet (a := Z)
   have hseed_nonempty : sseed.Nonempty := by
     simpa [sseed] using
       (H.seededSourceEnsemble E).cqState.conditionalMinEntropyFeasibleExponentValueSet_nonempty
-        (a := Prod Z F)
+        (a := Z × F)
   have hsource_bdd : BddAbove ssource := by
     simpa [ssource] using
-      State.conditionalMinEntropyFeasibleExponentValueSet_bddAbove (a := Z) E.cqState
+      MState.conditionalMinEntropyFeasibleExponentValueSet_bddAbove (a := Z) E.cqState
   have hseed_eq :
       (H.seededSourceEnsemble E).cqState.conditionalMinEntropy = sSup sseed := by
-    simp [sseed, State.conditionalMinEntropy_eq,
-      State.conditionalMinEntropyFeasibleExponentValueSet]
+    simp [sseed, MState.conditionalMinEntropy_eq,
+      MState.conditionalMinEntropyFeasibleExponentValueSet]
   have hsource_eq :
       E.cqState.conditionalMinEntropy = sSup ssource := by
-    simp [ssource, State.conditionalMinEntropy_eq,
-      State.conditionalMinEntropyFeasibleExponentValueSet]
+    simp [ssource, MState.conditionalMinEntropy_eq,
+      MState.conditionalMinEntropyFeasibleExponentValueSet]
   rw [hseed_eq, hsource_eq]
   refine csSup_le hseed_nonempty ?_
   intro lam hlam
   rcases hlam with ⟨σ, hσ⟩
   exact le_csSup hsource_bdd
-    ⟨σ.marginalB, H.conditionalMinEntropyFeasible_of_seededSourceEnsemble E σ hσ⟩
+    ⟨σ.traceLeft, H.conditionalMinEntropyFeasible_of_seededSourceEnsemble E σ hσ⟩
 
 omit [Fintype S] [DecidableEq S] [Nonempty S] [Nonempty F] in
 /-- A subnormalized feasible conditional-min-entropy witness for the seeded
 source pushes back to the original source by tracing out the public seed from
 the conditioning system. -/
 theorem subnormalizedConditionalMinEntropyFeasible_of_seededSourceEnsemble
-    (H : QIT.Security.HashFamily F Z S) (E : Ensemble Z e)
-    (σ : SubnormalizedState (Prod F e)) {lam : ℝ}
-    (hseed : SubnormalizedState.ConditionalMinEntropyFeasible (a := Prod Z F)
+    (H : QIT.Security.HashFamily F Z S) (E : MEnsemble e Z)
+    (σ : SubnormalizedState (F × e)) {lam : ℝ}
+    (hseed : SubnormalizedState.ConditionalMinEntropyFeasible (a := Z × F)
       (H.seededSourceEnsemble E).cqState.toSubnormalized σ lam) :
     SubnormalizedState.ConditionalMinEntropyFeasible (a := Z)
-      E.cqState.toSubnormalized σ.marginalB lam := by
+      E.cqState.toSubnormalized σ.traceLeft lam := by
   classical
-  refine Ensemble.subnormalizedConditionalMinEntropyFeasible_of_cqBlock_le E σ.marginalB lam ?_
+  refine MEnsemble.subnormalizedConditionalMinEntropyFeasible_of_cqBlock_le E σ.traceLeft lam ?_
   intro z
   let c : ℂ := (Real.rpow 2 (-lam) : ℂ)
   have hsum_left :
       E.cqBlock z =
         ∑ f : F,
           Classical.block
-            (Classical.block (H.seededSourceEnsemble E).cqState.matrix (z, f) (z, f)) f f :=
+            (Classical.block (H.seededSourceEnsemble E).cqState.m (z, f) (z, f)) f f :=
     (H.seededSourceEnsemble_cqBlock_seedBlock_sum E z).symm
   rw [hsum_left]
   have hsum_le :
       (∑ f : F,
           Classical.block
-            (Classical.block (H.seededSourceEnsemble E).cqState.matrix (z, f) (z, f)) f f) ≤
+            (Classical.block (H.seededSourceEnsemble E).cqState.m (z, f) (z, f)) f f) ≤
         ∑ f : F, c • Classical.block σ.matrix f f := by
     refine Finset.sum_le_sum fun f _ => ?_
     have houter :
@@ -2837,15 +2841,15 @@ theorem subnormalizedConditionalMinEntropyFeasible_of_seededSourceEnsemble
             (z, f) (z, f) ≤
           c • σ.matrix := by
       simpa [c] using
-        Ensemble.subnormalizedBlock_le_of_conditionalMinEntropyFeasible
+        MEnsemble.subnormalizedBlock_le_of_conditionalMinEntropyFeasible
           (H.seededSourceEnsemble E).cqState.toSubnormalized σ (z, f) hseed
     have hblock := Classical.block_le_block_of_le houter f
     have hsmul : Classical.block (c • σ.matrix) f f = c • Classical.block σ.matrix f f := rfl
-    rw [hsmul, State.toSubnormalized_matrix] at hblock
+    rw [hsmul, MState.toSubnormalized_matrix] at hblock
     exact hblock
   refine hsum_le.trans_eq ?_
-  rw [SubnormalizedState.marginalB_matrix]
-  rw [Classical.partialTraceA_eq_sum_blocks]
+  rw [SubnormalizedState.traceLeft_matrix]
+  rw [Classical.traceLeft_eq_sum_blocks]
   simpa [c] using
     (Finset.smul_sum.symm :
       (∑ f : F, c • Classical.block σ.matrix f f) =
@@ -2856,33 +2860,33 @@ omit [Fintype S] [DecidableEq S] [Nonempty S] [Nonempty F] in
 conditioning system does not increase subnormalized cq conditional min-entropy
 after embedding the normalized cq states. -/
 theorem subnormalizedConditionalMinEntropy_seededSourceEnsemble_le_source
-    (H : QIT.Security.HashFamily F Z S) (E : Ensemble Z e) :
+    (H : QIT.Security.HashFamily F Z S) (E : MEnsemble e Z) :
     (H.seededSourceEnsemble E).cqState.toSubnormalized.conditionalMinEntropyRaw ≤
       E.cqState.toSubnormalized.conditionalMinEntropyRaw := by
   classical
-  have hsource_prod : Nonempty (Prod Z e) := E.cqState.nonempty
+  have hsource_prod : Nonempty (Z × e) := E.cqState.nonempty
   let : Nonempty Z := ⟨(Classical.choice hsource_prod).1⟩
   let : Nonempty e := ⟨(Classical.choice hsource_prod).2⟩
-  have hseed_prod : Nonempty (Prod (Prod Z F) (Prod F e)) :=
+  have hseed_prod : Nonempty ((Z × F) × (F × e)) :=
     (H.seededSourceEnsemble E).cqState.nonempty
-  let : Nonempty (Prod Z F) := ⟨(Classical.choice hseed_prod).1⟩
-  let : Nonempty (Prod F e) := ⟨(Classical.choice hseed_prod).2⟩
+  let : Nonempty (Z × F) := ⟨(Classical.choice hseed_prod).1⟩
+  let : Nonempty (F × e) := ⟨(Classical.choice hseed_prod).2⟩
   let sseed : Set ℝ :=
     (H.seededSourceEnsemble E).cqState.toSubnormalized
-      |>.conditionalMinEntropyFeasibleExponentValueSet (a := Prod Z F)
+      |>.conditionalMinEntropyFeasibleExponentValueSet (a := Z × F)
   let ssource : Set ℝ :=
     E.cqState.toSubnormalized.conditionalMinEntropyFeasibleExponentValueSet (a := Z)
   have hseed_nonempty : sseed.Nonempty := by
     obtain ⟨lam, σ, hσ⟩ :=
       (H.seededSourceEnsemble E).cqState.conditionalMinEntropyFeasibleExponentValueSet_nonempty
-        (a := Prod Z F)
+        (a := Z × F)
     refine ⟨lam, ?_⟩
     exact ⟨σ.toSubnormalized,
-      (State.toSubnormalized_ConditionalMinEntropyFeasible_iff
-        (a := Prod Z F) (H.seededSourceEnsemble E).cqState σ lam).2 hσ⟩
+      (MState.toSubnormalized_ConditionalMinEntropyFeasible_iff
+        (a := Z × F) (H.seededSourceEnsemble E).cqState σ lam).2 hσ⟩
   have hsource_bdd : BddAbove ssource := by
     simpa [ssource] using
-      Ensemble.subnormalizedConditionalMinEntropyFeasibleExponentValueSet_toSubnormalized_bddAbove
+      MEnsemble.subnormalizedConditionalMinEntropyFeasibleExponentValueSet_toSubnormalized_bddAbove
         (a := Z) E.cqState
   have hseed_eq :
       (H.seededSourceEnsemble E).cqState.toSubnormalized.conditionalMinEntropyRaw =
@@ -2896,10 +2900,10 @@ theorem subnormalizedConditionalMinEntropy_seededSourceEnsemble_le_source
   intro lam hlam
   rcases hlam with ⟨σ, hσ⟩
   exact le_csSup hsource_bdd
-    ⟨σ.marginalB, H.subnormalizedConditionalMinEntropyFeasible_of_seededSourceEnsemble E σ hσ⟩
+    ⟨σ.traceLeft, H.subnormalizedConditionalMinEntropyFeasible_of_seededSourceEnsemble E σ hσ⟩
 
 private def matchedSeedSourceEquiv (Z : Type uZ) (F : Type uF) (e : Type ue) :
-    Prod (Prod Z F) (Prod F e) ≃ Prod (Prod (Prod Z F) F) e where
+    ((Z × F) × (F × e)) ≃ (((Z × F) × F) × e) where
   toFun x := (((x.1.1, x.1.2), x.2.1), x.2.2)
   invFun y := ((y.1.1.1, y.1.1.2), (y.1.2, y.2))
   left_inv := by
@@ -2912,38 +2916,38 @@ private def matchedSeedSourceEquiv (Z : Type uZ) (F : Type uF) (e : Type ue) :
     rfl
 
 private def matchedSeedReindexedState
-    (τ : SubnormalizedState (Prod (Prod Z F) (Prod F e))) :
-    SubnormalizedState (Prod (Prod (Prod Z F) F) e) :=
+    (τ : SubnormalizedState ((Z × F) × (F × e))) :
+    SubnormalizedState (((Z × F) × F) × e) :=
   τ.applyTraceNonincreasingCP
-    (Channel.reindex (matchedSeedSourceEquiv Z F e)).map
+    (CPTPOp.reindex (matchedSeedSourceEquiv Z F e)).map
     (MatrixMap.traceNonincreasingCP_of_tracePreserving
-      (Channel.reindex (matchedSeedSourceEquiv Z F e)).completelyPositive
-      (Channel.reindex (matchedSeedSourceEquiv Z F e)).tracePreserving)
+      (CPTPOp.reindex (matchedSeedSourceEquiv Z F e)).map_cp
+      (CPTPOp.reindex (matchedSeedSourceEquiv Z F e)).map_TP)
 
 private def matchedSeedFilteredState
-    (τ : SubnormalizedState (Prod (Prod Z F) (Prod F e))) :
-    SubnormalizedState (Prod (Prod (Prod Z F) F) e) :=
+    (τ : SubnormalizedState ((Z × F) × (F × e))) :
+    SubnormalizedState (((Z × F) × F) × e) :=
   (matchedSeedReindexedState (Z := Z) (F := F) (e := e) τ).sourceBlockFilter
-    (fun x : Prod (Prod Z F) F => x.1.2 = x.2)
+    (fun x : (Z × F) × F => x.1.2 = x.2)
 
 private def matchedSeedSourceState
-    (τ : SubnormalizedState (Prod (Prod Z F) (Prod F e))) :
-    SubnormalizedState (Prod Z e) :=
+    (τ : SubnormalizedState ((Z × F) × (F × e))) :
+    SubnormalizedState (Z × e) :=
   (matchedSeedFilteredState (Z := Z) (F := F) (e := e) τ).sourceDeterministicPostprocess
-    (fun x : Prod (Prod Z F) F => x.1.1)
+    (fun x : (Z × F) × F => x.1.1)
 
 omit [Nonempty F] in
 private theorem matchedSeedReindexedState_matrix_apply
-    (τ : SubnormalizedState (Prod (Prod Z F) (Prod F e)))
+    (τ : SubnormalizedState ((Z × F) × (F × e)))
     (z z' : Z) (fs fs' ft ft' : F) (i j : e) :
     (matchedSeedReindexedState (Z := Z) (F := F) (e := e) τ).matrix
         (((z, fs), ft), i) (((z', fs'), ft'), j) =
       τ.matrix ((z, fs), (ft, i)) ((z', fs'), (ft', j)) := by
-  simp [matchedSeedReindexedState, matchedSeedSourceEquiv, Channel.reindex,
+  simp [matchedSeedReindexedState, matchedSeedSourceEquiv, CPTPOp.reindex,
     MatrixMap.ofReferenceIsometry_apply, ReferenceIsometry.ofEquiv, Matrix.mul_apply]
-  rw [Finset.sum_eq_single (((z', fs'), (ft', j)) : Prod (Prod Z F) (Prod F e))]
+  rw [Finset.sum_eq_single (((z', fs'), (ft', j)) : (Z × F) × (F × e))]
   · simp only [and_self, ↓reduceIte]
-    rw [Finset.sum_eq_single (((z, fs), (ft, i)) : Prod (Prod Z F) (Prod F e))]
+    rw [Finset.sum_eq_single (((z, fs), (ft, i)) : (Z × F) × (F × e))]
     · simp
     · intro x _ hx
       rcases x with ⟨⟨zx, fsx⟩, ⟨ftx, ix⟩⟩
@@ -2968,7 +2972,7 @@ private theorem matchedSeedReindexedState_matrix_apply
 
 omit [Nonempty F] in
 private theorem matchedSeedFilteredState_block
-    (τ : SubnormalizedState (Prod (Prod Z F) (Prod F e)))
+    (τ : SubnormalizedState ((Z × F) × (F × e)))
     (z : Z) (fs ft : F) :
     Classical.block (matchedSeedFilteredState (Z := Z) (F := F) (e := e) τ).matrix
         ((z, fs), ft) ((z, fs), ft) =
@@ -2981,7 +2985,7 @@ private theorem matchedSeedFilteredState_block
   have hblock :=
     congrFun (congrFun
       (Classical.blockDiagonal_block_self
-        (fun x : Prod (Prod Z F) F =>
+        (fun x : (Z × F) × F =>
           if x.1.2 = x.2 then
             Classical.block (matchedSeedReindexedState (Z := Z) (F := F) (e := e) τ).matrix x x
           else 0)
@@ -2994,7 +2998,7 @@ private theorem matchedSeedFilteredState_block
 
 omit [Nonempty F] in
 private theorem matchedSeedSourceState_block
-    (τ : SubnormalizedState (Prod (Prod Z F) (Prod F e))) (z : Z) :
+    (τ : SubnormalizedState ((Z × F) × (F × e))) (z : Z) :
     Classical.block (matchedSeedSourceState (Z := Z) (F := F) (e := e) τ).matrix z z =
       ∑ f : F, Classical.block (Classical.block τ.matrix (z, f) (z, f)) f f := by
   classical
@@ -3006,22 +3010,22 @@ private theorem matchedSeedSourceState_block
   let matchedSum : ℂ :=
     ∑ f : F, τ.matrix ((z, f), (f, i)) ((z, f), (f, j))
   have hleft :
-      (∑ zf : Prod Z F,
+      (∑ zf : Z × F,
           ∑ ft : F,
-            (if (fun x : Prod (Prod Z F) F => x.1.1) (zf, ft) = z then
+            (if (fun x : (Z × F) × F => x.1.1) (zf, ft) = z then
                 Classical.block
                   (matchedSeedFilteredState (Z := Z) (F := F) (e := e) τ).matrix
                   (zf, ft) (zf, ft)
               else 0) i j) = matchedSum := by
     calc
-      (∑ zf : Prod Z F,
+      (∑ zf : Z × F,
           ∑ ft : F,
-            (if (fun x : Prod (Prod Z F) F => x.1.1) (zf, ft) = z then
+            (if (fun x : (Z × F) × F => x.1.1) (zf, ft) = z then
                 Classical.block
                   (matchedSeedFilteredState (Z := Z) (F := F) (e := e) τ).matrix
                   (zf, ft) (zf, ft)
               else 0) i j) =
-          ∑ zf : Prod Z F,
+          ∑ zf : Z × F,
             ∑ ft : F,
               if zf.1 = z ∧ zf.2 = ft then
                 τ.matrix ((zf.1, zf.2), (ft, i)) ((zf.1, zf.2), (ft, j))
@@ -3055,7 +3059,7 @@ private theorem matchedSeedSourceState_block
 
 omit [Nonempty F] in
 private theorem matchedSeedSourceState_matrix_eq_blockDiagonal
-    (τ : SubnormalizedState (Prod (Prod Z F) (Prod F e))) :
+    (τ : SubnormalizedState ((Z × F) × (F × e))) :
     (matchedSeedSourceState (Z := Z) (F := F) (e := e) τ).matrix =
       Classical.blockDiagonal
         (fun z : Z =>
@@ -3083,8 +3087,8 @@ private theorem matchedSeedSourceState_matrix_eq_blockDiagonal
         congrFun (congrFun
           (Classical.blockDiagonal_block_ne
             (fun y : Z =>
-              ∑ x : Prod (Prod Z F) F,
-                if (fun x : Prod (Prod Z F) F => x.1.1) x = y then
+              ∑ x : (Z × F) × F,
+                if (fun x : (Z × F) × F => x.1.1) x = y then
                   Classical.block
                     (matchedSeedFilteredState (Z := Z) (F := F) (e := e) τ).matrix x x
                 else 0)
@@ -3106,22 +3110,22 @@ private theorem matchedSeedSourceState_matrix_eq_blockDiagonal
 
 omit [Nonempty F] in
 private theorem matchedSeedSourceState_ConditionalMinEntropyScaleFeasible
-    (τ : SubnormalizedState (Prod (Prod Z F) (Prod F e)))
-    (T : CMatrix (Prod F e))
+    (τ : SubnormalizedState ((Z × F) × (F × e)))
+    (T : CMatrix (F × e))
     (hT : SubnormalizedState.ConditionalMinEntropyScaleFeasible
-      (a := Prod Z F) τ T) :
+      (a := Z × F) τ T) :
     SubnormalizedState.ConditionalMinEntropyScaleFeasible (a := Z)
       (matchedSeedSourceState (Z := Z) (F := F) (e := e) τ)
-      (partialTraceA (a := F) (b := e) T) := by
+      (Matrix.traceLeft T) := by
   classical
   constructor
-  · exact partialTraceA_posSemidef hT.1
+  · exact traceLeft_posSemidef hT.1
   · rw [Matrix.le_iff]
     let blocks : Z → CMatrix e :=
       fun z : Z =>
         ∑ f : F, Classical.block (Classical.block τ.matrix (z, f) (z, f)) f f
     have hblocks : ∀ z : Z,
-        (partialTraceA (a := F) (b := e) T - blocks z).PosSemidef := by
+        (Matrix.traceLeft T - blocks z).PosSemidef := by
       intro z
       rw [← Matrix.le_iff]
       have hsum_le :
@@ -3135,38 +3139,38 @@ private theorem matchedSeedSourceState_ConditionalMinEntropyScaleFeasible
         have hblock := Classical.block_le_block_of_le houter f
         simpa [Classical.block] using hblock
       exact hsum_le.trans_eq
-        (Classical.partialTraceA_eq_sum_blocks (ι := F) (a := e) T).symm
+        (Classical.traceLeft_eq_sum_blocks (ι := F) (a := e) T).symm
     have hmatrix :
-        Matrix.kronecker (1 : CMatrix Z) (partialTraceA (a := F) (b := e) T) -
+        Matrix.kronecker (1 : CMatrix Z) (Matrix.traceLeft T) -
             (matchedSeedSourceState (Z := Z) (F := F) (e := e) τ).matrix =
           Classical.blockDiagonal
-            (fun z : Z => partialTraceA (a := F) (b := e) T - blocks z) := by
+            (fun z : Z => Matrix.traceLeft T - blocks z) := by
       calc
-        Matrix.kronecker (1 : CMatrix Z) (partialTraceA (a := F) (b := e) T) -
+        Matrix.kronecker (1 : CMatrix Z) (Matrix.traceLeft T) -
             (matchedSeedSourceState (Z := Z) (F := F) (e := e) τ).matrix =
             Classical.blockDiagonal
-                (fun _ : Z => partialTraceA (a := F) (b := e) T) -
+                (fun _ : Z => Matrix.traceLeft T) -
               Classical.blockDiagonal blocks := by
               rw [Classical.identityTensor_eq_blockDiagonal,
                 matchedSeedSourceState_matrix_eq_blockDiagonal
                   (Z := Z) (F := F) (e := e) τ]
         _ = Classical.blockDiagonal
-            (fun z : Z => partialTraceA (a := F) (b := e) T - blocks z) := by
+            (fun z : Z => Matrix.traceLeft T - blocks z) := by
               rw [← Classical.blockDiagonal_sub]
     rw [hmatrix]
     exact Classical.blockDiagonal_posSemidef
-      (fun z : Z => partialTraceA (a := F) (b := e) T - blocks z) hblocks
+      (fun z : Z => Matrix.traceLeft T - blocks z) hblocks
 
 omit [Nonempty F] in
 private theorem matchedSeedSourceState_conditionalMinEntropyScale_le
-    (τ : SubnormalizedState (Prod (Prod Z F) (Prod F e))) :
+    (τ : SubnormalizedState ((Z × F) × (F × e))) :
     (matchedSeedSourceState (Z := Z) (F := F) (e := e) τ).conditionalMinEntropyScale
         (a := Z) ≤
-      τ.conditionalMinEntropyScale (a := Prod Z F) := by
+      τ.conditionalMinEntropyScale (a := Z × F) := by
   classical
   rw [SubnormalizedState.conditionalMinEntropyScale_eq_sInf_scaleValueSet,
     SubnormalizedState.conditionalMinEntropyScale_eq_sInf_scaleValueSet]
-  refine le_csInf (τ.conditionalMinEntropyScaleValueSet_nonempty (a := Prod Z F)) ?_
+  refine le_csInf (τ.conditionalMinEntropyScaleValueSet_nonempty (a := Z × F)) ?_
   intro t ht
   rcases ht with ⟨T, hT, rfl⟩
   have hbdd :
@@ -3176,26 +3180,28 @@ private theorem matchedSeedSourceState_conditionalMinEntropyScale_le
     (matchedSeedSourceState (Z := Z) (F := F) (e := e) τ)
       |>.conditionalMinEntropyScaleValueSet_bddBelow (a := Z)
   refine csInf_le hbdd ?_
-  refine ⟨partialTraceA (a := F) (b := e) T,
+  refine ⟨Matrix.traceLeft T,
     matchedSeedSourceState_ConditionalMinEntropyScaleFeasible
       (Z := Z) (F := F) (e := e) τ T hT, ?_⟩
-  rw [partialTraceA_trace]
+  rw [Matrix.traceLeft_trace]
 
 private theorem conditionalMinEntropy_le_matchedSeedSourceState_of_trace_pos
     [Nonempty Z] [Nonempty e]
-    (τ : SubnormalizedState (Prod (Prod Z F) (Prod F e)))
+    (τ : SubnormalizedState ((Z × F) × (F × e)))
     (hτ : 0 < τ.matrix.trace.re)
     (hmatched :
       0 < (matchedSeedSourceState (Z := Z) (F := F) (e := e) τ).matrix.trace.re) :
     τ.conditionalMinEntropyRaw ≤
       (matchedSeedSourceState (Z := Z) (F := F) (e := e) τ).conditionalMinEntropyRaw := by
   classical
-  have hseed_source_nonempty : Nonempty (Prod Z F) := ⟨(Classical.choice inferInstance, Classical.choice inferInstance)⟩
-  have hseed_side_nonempty : Nonempty (Prod F e) := ⟨(Classical.choice inferInstance, Classical.choice inferInstance)⟩
-  let : Nonempty (Prod Z F) := hseed_source_nonempty
-  let : Nonempty (Prod F e) := hseed_side_nonempty
+  have hseed_source_nonempty : Nonempty (Z × F) :=
+    ⟨(Classical.choice inferInstance, Classical.choice inferInstance)⟩
+  have hseed_side_nonempty : Nonempty (F × e) :=
+    ⟨(Classical.choice inferInstance, Classical.choice inferInstance)⟩
+  let : Nonempty (Z × F) := hseed_source_nonempty
+  let : Nonempty (F × e) := hseed_side_nonempty
   rw [τ.conditionalMinEntropy_eq_neg_log2_scale_of_trace_pos
-      (a := Prod Z F) hτ,
+      (a := Z × F) hτ,
     (matchedSeedSourceState (Z := Z) (F := F) (e := e) τ)
       |>.conditionalMinEntropy_eq_neg_log2_scale_of_trace_pos (a := Z) hmatched]
   have hscale :=
@@ -3211,7 +3217,7 @@ private theorem conditionalMinEntropy_le_matchedSeedSourceState_of_trace_pos
       log2
           (((matchedSeedSourceState (Z := Z) (F := F) (e := e) τ)
             |>.conditionalMinEntropyScale (a := Z))) ≤
-        log2 (τ.conditionalMinEntropyScale (a := Prod Z F)) := by
+        log2 (τ.conditionalMinEntropyScale (a := Z × F)) := by
     unfold log2
     exact div_le_div_of_nonneg_right
       (Real.log_le_log hmatched_scale_pos hscale)
@@ -3222,25 +3228,25 @@ omit [Nonempty F] in
 /-- Applying the deterministic source-coarse-graining matrix map to a
 subnormalized state is the same state as `sourceDeterministicPostprocess`. -/
 private theorem apply_sourceDeterministicPostprocessMap_eq
-    (ρ : SubnormalizedState (Prod (Prod (Prod Z F) F) e)) :
+    (ρ : SubnormalizedState (((Z × F) × F) × e)) :
     ρ.applyTraceNonincreasingCP
         (SubnormalizedState.sourceDeterministicPostprocessMap
-          (a := Prod (Prod Z F) F) (b := e)
-          (fun x : Prod (Prod Z F) F => x.1.1))
+          (a := (Z × F) × F) (b := e)
+          (fun x : (Z × F) × F => x.1.1))
         (SubnormalizedState.sourceDeterministicPostprocessMap_traceNonincreasingCP
-          (a := Prod (Prod Z F) F) (b := e)
-          (fun x : Prod (Prod Z F) F => x.1.1)) =
+          (a := (Z × F) × F) (b := e)
+          (fun x : (Z × F) × F => x.1.1)) =
       ρ.sourceDeterministicPostprocess
-        (fun x : Prod (Prod Z F) F => x.1.1) := by
+        (fun x : (Z × F) × F => x.1.1) := by
   apply SubnormalizedState.ext
   rw [SubnormalizedState.applyTraceNonincreasingCP_matrix]
   exact SubnormalizedState.sourceDeterministicPostprocessMap_apply_matrix
-    (a := Prod (Prod Z F) F) (b := e) ρ
-    (fun x : Prod (Prod Z F) F => x.1.1)
+    (a := (Z × F) × F) (b := e) ρ
+    (fun x : (Z × F) × F => x.1.1)
 
 omit [Fintype S] [DecidableEq S] [Nonempty S] [Nonempty F] in
 private theorem matchedSeedSourceState_seededSourceEnsemble
-    (H : QIT.Security.HashFamily F Z S) (E : Ensemble Z e) :
+    (H : QIT.Security.HashFamily F Z S) (E : MEnsemble e Z) :
     matchedSeedSourceState (Z := Z) (F := F) (e := e)
         (H.seededSourceEnsemble E).cqState.toSubnormalized =
       E.cqState.toSubnormalized := by
@@ -3250,15 +3256,15 @@ private theorem matchedSeedSourceState_seededSourceEnsemble
   rcases zi with ⟨z, i⟩
   rcases zj with ⟨z', j⟩
   rw [matchedSeedSourceState_matrix_eq_blockDiagonal]
-  rw [State.toSubnormalized_matrix, State.toSubnormalized_matrix]
+  rw [MState.toSubnormalized_matrix, MState.toSubnormalized_matrix]
   let blocks : Z → CMatrix e :=
     fun z : Z =>
       ∑ f : F,
         Classical.block
-          (Classical.block (H.seededSourceEnsemble E).cqState.matrix
+          (Classical.block (H.seededSourceEnsemble E).cqState.m
             (z, f) (z, f)) f f
   change Classical.blockDiagonal blocks (z, i) (z', j) =
-    E.cqState.matrix (z, i) (z', j)
+    E.cqState.m (z, i) (z', j)
   rw [Classical.cqState_eq_blockDiagonal E]
   by_cases hzz : z = z'
   · subst z'
@@ -3267,49 +3273,49 @@ private theorem matchedSeedSourceState_seededSourceEnsemble
     have hright :=
       congrFun (congrFun
         (Classical.blockDiagonal_block_self
-          (fun z : Z => (E.probs z : ℂ) • (E.states z).matrix) z) i) j
+          (fun z : Z => (E.probs z : ℂ) • (E.states z).m) z) i) j
     have hsum :=
       congrFun (congrFun
         (H.seededSourceEnsemble_cqBlock_seedBlock_sum E z) i) j
     calc
       Classical.blockDiagonal blocks (z, i) (z, j) = blocks z i j := hleft
-      _ = ((E.probs z : ℂ) • (E.states z).matrix) i j := by
-            simpa [blocks, Ensemble.cqBlock_eq] using hsum
+      _ = ((E.probs z : ℂ) • (E.states z).m) i j := by
+            simpa [blocks, MEnsemble.cqBlock_eq] using hsum
       _ = Classical.blockDiagonal
-            (fun z : Z => (E.probs z : ℂ) • (E.states z).matrix) (z, i) (z, j) :=
+            (fun z : Z => (E.probs z : ℂ) • (E.states z).m) (z, i) (z, j) :=
             hright.symm
   · have hleft :=
       congrFun (congrFun (Classical.blockDiagonal_block_ne blocks hzz) i) j
     have hright :=
       congrFun (congrFun
         (Classical.blockDiagonal_block_ne
-          (fun z : Z => (E.probs z : ℂ) • (E.states z).matrix) hzz) i) j
+          (fun z : Z => (E.probs z : ℂ) • (E.states z).m) hzz) i) j
     have hleft' : Classical.blockDiagonal blocks (z, i) (z', j) = 0 := by
       simpa [Classical.block] using hleft
     have hright' :
-        Classical.blockDiagonal (fun z : Z => (E.probs z : ℂ) • (E.states z).matrix)
+        Classical.blockDiagonal (fun z : Z => (E.probs z : ℂ) • (E.states z).m)
           (z, i) (z', j) = 0 := by
       simpa [Classical.block] using hright
     rw [hleft', hright']
 
 omit [Fintype S] [DecidableEq S] [Nonempty S] [Nonempty F] in
 private theorem matchedSeedSourceState_purifiedBall
-    (H : QIT.Security.HashFamily F Z S) (E : Ensemble Z e)
-    {τ : SubnormalizedState (Prod (Prod Z F) (Prod F e))} {ε : ℝ}
+    (H : QIT.Security.HashFamily F Z S) (E : MEnsemble e Z)
+    {τ : SubnormalizedState ((Z × F) × (F × e))} {ε : ℝ}
     (hτ :
       (H.seededSourceEnsemble E).cqState.toSubnormalized.purifiedBall ε τ) :
     E.cqState.toSubnormalized.purifiedBall ε
       (matchedSeedSourceState (Z := Z) (F := F) (e := e) τ) := by
   classical
-  let center : SubnormalizedState (Prod (Prod Z F) (Prod F e)) :=
+  let center : SubnormalizedState ((Z × F) × (F × e)) :=
     (H.seededSourceEnsemble E).cqState.toSubnormalized
-  let Φreindex : MatrixMap (Prod (Prod Z F) (Prod F e))
-      (Prod (Prod (Prod Z F) F) e) :=
-    (Channel.reindex (matchedSeedSourceEquiv Z F e)).map
+  let Φreindex : MatrixMap ((Z × F) × (F × e))
+      (((Z × F) × F) × e) :=
+    (CPTPOp.reindex (matchedSeedSourceEquiv Z F e)).map
   let hΦreindex : MatrixMap.TraceNonincreasingCP Φreindex :=
     MatrixMap.traceNonincreasingCP_of_tracePreserving
-      (Channel.reindex (matchedSeedSourceEquiv Z F e)).completelyPositive
-      (Channel.reindex (matchedSeedSourceEquiv Z F e)).tracePreserving
+      (CPTPOp.reindex (matchedSeedSourceEquiv Z F e)).map_cp
+      (CPTPOp.reindex (matchedSeedSourceEquiv Z F e)).map_TP
   have hreindex :
       (matchedSeedReindexedState (Z := Z) (F := F) (e := e) center).purifiedBall
         ε (matchedSeedReindexedState (Z := Z) (F := F) (e := e) τ) := by
@@ -3317,7 +3323,7 @@ private theorem matchedSeedSourceState_purifiedBall
       (SubnormalizedState.purifiedBall_of_traceNonincreasingCP
         (ρ := center) (σ := τ) (ε := ε) Φreindex hΦreindex
         (by simpa [center] using hτ))
-  let p : Prod (Prod Z F) F → Prop := fun x => x.1.2 = x.2
+  let p : (Z × F) × F → Prop := fun x => x.1.2 = x.2
   have hfilter :
       (matchedSeedFilteredState (Z := Z) (F := F) (e := e) center).purifiedBall
         ε (matchedSeedFilteredState (Z := Z) (F := F) (e := e) τ) := by
@@ -3327,17 +3333,17 @@ private theorem matchedSeedSourceState_purifiedBall
         (σ := matchedSeedReindexedState (Z := Z) (F := F) (e := e) τ)
         (ε := ε)
         (SubnormalizedState.sourceBlockFilterMap
-          (a := Prod (Prod Z F) F) (b := e) p)
+          (a := (Z × F) × F) (b := e) p)
         (SubnormalizedState.sourceBlockFilterMap_traceNonincreasingCP
-          (a := Prod (Prod Z F) F) (b := e) p)
+          (a := (Z × F) × F) (b := e) p)
         hreindex)
-  let g : Prod (Prod Z F) F → Z := fun x => x.1.1
-  let Φpost : MatrixMap (Prod (Prod (Prod Z F) F) e) (Prod Z e) :=
+  let g : (Z × F) × F → Z := fun x => x.1.1
+  let Φpost : MatrixMap (((Z × F) × F) × e) (Z × e) :=
     SubnormalizedState.sourceDeterministicPostprocessMap
-      (a := Prod (Prod Z F) F) (b := e) g
+      (a := (Z × F) × F) (b := e) g
   let hΦpost : MatrixMap.TraceNonincreasingCP Φpost :=
     SubnormalizedState.sourceDeterministicPostprocessMap_traceNonincreasingCP
-      (a := Prod (Prod Z F) F) (b := e) g
+      (a := (Z × F) × F) (b := e) g
   have hpost :
       ((matchedSeedFilteredState (Z := Z) (F := F) (e := e) center).applyTraceNonincreasingCP
           Φpost hΦpost).purifiedBall ε
@@ -3383,36 +3389,36 @@ omit [Fintype S] [DecidableEq S] [Nonempty S] in
 conditioning system does not increase subnormalized smooth cq conditional
 min-entropy after embedding the normalized cq states. -/
 theorem seededSourceEnsemble_toSubnormalized_smoothConditionalMinEntropy_le_source
-    (H : QIT.Security.HashFamily F Z S) (E : Ensemble Z e) {ε : ℝ}
+    (H : QIT.Security.HashFamily F Z S) (E : MEnsemble e Z) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1) :
     (H.seededSourceEnsemble E).cqState.toSubnormalized.smoothConditionalMinEntropy ε hε0
         ((H.seededSourceEnsemble E).cqState.epsilon_lt_sqrt_toSubnormalized_trace hε1) ≤
       E.cqState.toSubnormalized.smoothConditionalMinEntropy ε hε0
         (E.cqState.epsilon_lt_sqrt_toSubnormalized_trace hε1) := by
   classical
-  have hsource_prod : Nonempty (Prod Z e) := E.cqState.nonempty
+  have hsource_prod : Nonempty (Z × e) := E.cqState.nonempty
   let : Nonempty Z := ⟨(Classical.choice hsource_prod).1⟩
   let : Nonempty e := ⟨(Classical.choice hsource_prod).2⟩
-  let center : SubnormalizedState (Prod (Prod Z F) (Prod F e)) :=
+  let center : SubnormalizedState ((Z × F) × (F × e)) :=
     (H.seededSourceEnsemble E).cqState.toSubnormalized
-  let source : SubnormalizedState (Prod Z e) := E.cqState.toSubnormalized
+  let source : SubnormalizedState (Z × e) := E.cqState.toSubnormalized
   have hεsource : ε < Real.sqrt source.matrix.trace.re := by
-    change ε < Real.sqrt E.cqState.matrix.trace.re
-    have htrace : E.cqState.matrix.trace.re = 1 := by
-      rw [E.cqState.trace_eq_one]
+    change ε < Real.sqrt E.cqState.m.trace.re
+    have htrace : E.cqState.m.trace.re = 1 := by
+      rw [E.cqState.tr']
       norm_num
     rw [htrace]
     simpa using hε1
   have hεcenter : ε < Real.sqrt center.matrix.trace.re := by
-    change ε < Real.sqrt (H.seededSourceEnsemble E).cqState.matrix.trace.re
-    have htrace : (H.seededSourceEnsemble E).cqState.matrix.trace.re = 1 := by
-      rw [(H.seededSourceEnsemble E).cqState.trace_eq_one]
+    change ε < Real.sqrt (H.seededSourceEnsemble E).cqState.m.trace.re
+    have htrace : (H.seededSourceEnsemble E).cqState.m.trace.re = 1 := by
+      rw [(H.seededSourceEnsemble E).cqState.tr']
       norm_num
     rw [htrace]
     simpa using hε1
   exact
     SubnormalizedState.smoothConditionalMinEntropyRaw_le_of_witness_lift_diff_side_of_lt_sqrt_trace
-      (a := Prod Z F) (b := Prod F e) (source := Z) (c := e)
+      (a := Z × F) (b := F × e) (source := Z) (c := e)
       center source hε0 hεsource
       (fun τ hτball => by
         refine ⟨matchedSeedSourceState (Z := Z) (F := F) (e := e) τ, ?_, ?_⟩
@@ -3443,11 +3449,11 @@ omit [Nonempty S] [DecidableEq Z] [Nonempty F] in
 /-- The real public-seed extractor output is the deterministic postprocessing
 of the seeded source ensemble by `(z, f) ↦ H f z`. -/
 theorem extractorOutputState_eq_seededSourceEnsemble_deterministicPostprocessCqState
-    (H : QIT.Security.HashFamily F Z S) (E : Ensemble Z e) :
+    (H : QIT.Security.HashFamily F Z S) (E : MEnsemble e Z) :
     QIT.Security.extractorOutputState H E =
       (H.seededSourceEnsemble E).deterministicPostprocessCqState
-        (fun zf : Prod Z F => H.hash zf.2 zf.1) := by
-  apply State.ext
+        (fun zf : Z × F => H.hash zf.2 zf.1) := by
+  apply MState.ext
   ext x y
   rcases x with ⟨s, fi⟩
   rcases fi with ⟨f, i⟩
@@ -3455,7 +3461,7 @@ theorem extractorOutputState_eq_seededSourceEnsemble_deterministicPostprocessCqS
   rcases fj with ⟨f', j⟩
   simp only [QIT.Security.extractorOutputState_matrix,
     QIT.Security.extractorOutputMatrix_eq_sum,
-    Ensemble.deterministicPostprocessCqState_matrix, Matrix.sum_apply,
+    MEnsemble.deterministicPostprocessCqState_matrix, Matrix.sum_apply,
     Matrix.smul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]
   rw [Fintype.sum_prod_type]
   simp [mul_left_comm]
@@ -3464,7 +3470,7 @@ omit [Nonempty S] [Nonempty F] in
 /-- Deterministic-postprocessing DPI applied to the seeded source
 representation of a public-seed extractor output. -/
 theorem extractorOutputState_toSubnormalized_smoothConditionalMinEntropy_le_seededSource
-    (H : QIT.Security.HashFamily F Z S) (E : Ensemble Z e) {ε : ℝ}
+    (H : QIT.Security.HashFamily F Z S) (E : MEnsemble e Z) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1) :
     (QIT.Security.extractorOutputState H E).toSubnormalized.smoothConditionalMinEntropy ε hε0
         ((QIT.Security.extractorOutputState H E).epsilon_lt_sqrt_toSubnormalized_trace hε1) ≤
@@ -3473,26 +3479,26 @@ theorem extractorOutputState_toSubnormalized_smoothConditionalMinEntropy_le_seed
   rw [H.extractorOutputState_eq_seededSourceEnsemble_deterministicPostprocessCqState E]
   exact (H.seededSourceEnsemble E)
     |>.subnormalizedSmoothConditionalMinEntropy_postprocessCqState_le
-      (fun zf : Prod Z F => H.hash zf.2 zf.1)
+      (fun zf : Z × F => H.hash zf.2 zf.1)
       hε0 hε1
 
 omit [DecidableEq Z] [Nonempty F] in
 /-- If an extractor is `ε`-secret, the ideal uniform output is a smooth
 min-entropy candidate at the converse smoothing radius `sqrt (2ε - ε^2)`. -/
 theorem idealExtractorOutputState_smoothConditionalMinEntropyCandidate_of_isEpsilonSecretExtractor
-    (H : QIT.Security.HashFamily F Z S) (E : Ensemble Z e) {ε : ℝ}
+    (H : QIT.Security.HashFamily F Z S) (E : MEnsemble e Z) {ε : ℝ}
     (hε1 : ε ≤ 1) (hsecret : H.IsEpsilonSecretExtractor ε E) :
-    State.SmoothConditionalMinEntropyCandidate (a := S)
+    MState.SmoothConditionalMinEntropyCandidate (a := S)
       (QIT.Security.extractorOutputState H E) (Real.sqrt (2 * ε - ε ^ 2))
       (log2 (Fintype.card S : ℝ)) := by
   refine ⟨QIT.Security.idealExtractorOutputState (QIT.Security.extractorOutputState H E), ?_, ?_⟩
-  · rw [State.purifiedBall_eq]
+  · rw [MState.purifiedBall_eq]
     have hD :
         (QIT.Security.extractorOutputState H E).normalizedTraceDistance
             (QIT.Security.idealExtractorOutputState
               (QIT.Security.extractorOutputState H E)) ≤ ε := by
       simpa [QIT.Security.extractorSecrecyDistance_eq_normalizedTraceDistance] using hsecret
-    exact State.purifiedDistance_le_sqrt_two_mul_sub_sq_of_normalizedTraceDistance_le
+    exact MState.purifiedDistance_le_sqrt_two_mul_sub_sq_of_normalizedTraceDistance_le
       (QIT.Security.extractorOutputState H E)
       (QIT.Security.idealExtractorOutputState (QIT.Security.extractorOutputState H E))
       hε1 hD
@@ -3504,7 +3510,7 @@ omit [DecidableEq Z] [Nonempty F] in
 output length is bounded by the subnormalized smooth conditional min-entropy of
 its actual output state at the converse smoothing radius. -/
 theorem log2_outputLength_le_toSubnormalized_smoothConditionalMinEntropy_of_isEpsilonSecretExtractor
-    (H : QIT.Security.HashFamily F Z S) (E : Ensemble Z e) {ε : ℝ}
+    (H : QIT.Security.HashFamily F Z S) (E : MEnsemble e Z) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1) (hsecret : H.IsEpsilonSecretExtractor ε E) :
     log2 (H.outputLength : ℝ) ≤
       (QIT.Security.extractorOutputState H E).toSubnormalized.smoothConditionalMinEntropy
@@ -3512,17 +3518,17 @@ theorem log2_outputLength_le_toSubnormalized_smoothConditionalMinEntropy_of_isEp
         ((QIT.Security.extractorOutputState H E).epsilon_lt_sqrt_toSubnormalized_trace
           (sqrt_two_mul_sub_sq_lt_one_of_nonneg_lt_one hε0 hε1)) := by
   classical
-  let ρout : State (Prod S (Prod F e)) := QIT.Security.extractorOutputState H E
-  let ρideal : State (Prod S (Prod F e)) := QIT.Security.idealExtractorOutputState ρout
-  have hside_nonempty : Nonempty (Prod F e) := ⟨(Classical.choice ρout.nonempty).2⟩
-  let : Nonempty (Prod F e) := hside_nonempty
+  let ρout : MState (S × (F × e)) := QIT.Security.extractorOutputState H E
+  let ρideal : MState (S × (F × e)) := QIT.Security.idealExtractorOutputState ρout
+  have hside_nonempty : Nonempty (F × e) := ⟨(Classical.choice ρout.nonempty).2⟩
+  let : Nonempty (F × e) := hside_nonempty
   have hball : ρout.purifiedBall (Real.sqrt (2 * ε - ε ^ 2)) ρideal := by
-    rw [State.purifiedBall_eq]
+    rw [MState.purifiedBall_eq]
     have hD :
         ρout.normalizedTraceDistance ρideal ≤ ε := by
       simpa [ρout, ρideal, QIT.Security.extractorSecrecyDistance_eq_normalizedTraceDistance]
         using hsecret
-    exact State.purifiedDistance_le_sqrt_two_mul_sub_sq_of_normalizedTraceDistance_le
+    exact MState.purifiedDistance_le_sqrt_two_mul_sub_sq_of_normalizedTraceDistance_le
       ρout ρideal hε1.le hD
   have hideal_sub_entropy :
       log2 (Fintype.card S : ℝ) = ρideal.toSubnormalized.conditionalMinEntropyRaw := by
@@ -3530,10 +3536,10 @@ theorem log2_outputLength_le_toSubnormalized_smoothConditionalMinEntropy_of_isEp
         ρideal.toSubnormalized =
           SubnormalizedState.ofStateScale ρideal 1 (by norm_num) (by norm_num) := by
       apply SubnormalizedState.ext
-      simp [SubnormalizedState.ofStateScale_matrix, State.toSubnormalized_matrix]
+      simp [SubnormalizedState.ofStateScale_matrix, MState.toSubnormalized_matrix]
     rw [hscale]
     rw [SubnormalizedState.conditionalMinEntropy_ofStateScale
-      (a := S) (b := Prod F e) ρideal (by norm_num) (by norm_num)]
+      (a := S) (b := F × e) ρideal (by norm_num) (by norm_num)]
     rw [idealExtractorOutputState_conditionalMinEntropy
       (S := S) (F := F) (e := e) (ρ := ρout)]
     simp [log2]
@@ -3541,18 +3547,18 @@ theorem log2_outputLength_le_toSubnormalized_smoothConditionalMinEntropy_of_isEp
       SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw (a := S)
         ρout.toSubnormalized (Real.sqrt (2 * ε - ε ^ 2))
         (log2 (Fintype.card S : ℝ)) := by
-    exact State.toSubnormalized_SmoothConditionalMinEntropyCandidate_of
+    exact MState.toSubnormalized_SmoothConditionalMinEntropyCandidate_of
       (a := S) (ρ := ρout) (ρ' := ρideal) hball hideal_sub_entropy
   have hdelta_lt_one : Real.sqrt (2 * ε - ε ^ 2) < 1 :=
     sqrt_two_mul_sub_sq_lt_one_of_nonneg_lt_one hε0 hε1
   have htrace_out :
-      ρout.matrix.trace.re = 1 := by
-    rw [ρout.trace_eq_one]
+      ρout.m.trace.re = 1 := by
+    rw [ρout.tr']
     norm_num
   have hdelta_lt_trace :
       Real.sqrt (2 * ε - ε ^ 2) <
         Real.sqrt ρout.toSubnormalized.matrix.trace.re := by
-    simpa [State.toSubnormalized_matrix, htrace_out] using hdelta_lt_one
+    simpa [MState.toSubnormalized_matrix, htrace_out] using hdelta_lt_one
   have hle :
       log2 (Fintype.card S : ℝ) ≤
         ρout.toSubnormalized.smoothConditionalMinEntropy
@@ -3567,7 +3573,7 @@ omit [Nonempty F] in
 the smooth conditional min-entropy of the source-shaped ensemble that includes
 the public seed in both the source label and side information. -/
 theorem log2_outputLength_le_seededSource_toSubnormalized_smoothConditionalMinEntropy_of_isEpsilonSecretExtractor
-    (H : QIT.Security.HashFamily F Z S) (E : Ensemble Z e) {ε : ℝ}
+    (H : QIT.Security.HashFamily F Z S) (E : MEnsemble e Z) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1) (hsecret : H.IsEpsilonSecretExtractor ε E) :
     log2 (H.outputLength : ℝ) ≤
       (H.seededSourceEnsemble E).cqState.toSubnormalized.smoothConditionalMinEntropy
@@ -3594,7 +3600,7 @@ theorem log2_outputLength_le_seededSource_toSubnormalized_smoothConditionalMinEn
 is bounded by the subnormalized smooth conditional min-entropy of the original
 source cq state, at the converse smoothing radius. -/
 theorem log2_outputLength_le_source_toSubnormalized_smoothConditionalMinEntropy_of_isEpsilonSecretExtractor
-    (H : QIT.Security.HashFamily F Z S) (E : Ensemble Z e) {ε : ℝ}
+    (H : QIT.Security.HashFamily F Z S) (E : MEnsemble e Z) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1) (hsecret : H.IsEpsilonSecretExtractor ε E) :
     log2 (H.outputLength : ℝ) ≤
       E.cqState.toSubnormalized.smoothConditionalMinEntropy
@@ -3621,13 +3627,13 @@ omit [DecidableEq Z] [Nonempty F] in
 /-- Per-extractor converse endpoint: an `ε`-secret extractor's output length is
 bounded by the smooth conditional min-entropy of its actual output state. -/
 theorem log2_outputLength_le_smoothConditionalMinEntropyNormalizedCandidates_of_isEpsilonSecretExtractor
-    (H : QIT.Security.HashFamily F Z S) (E : Ensemble Z e) {ε : ℝ}
+    (H : QIT.Security.HashFamily F Z S) (E : MEnsemble e Z) {ε : ℝ}
     (hε1 : ε ≤ 1) (hsecret : H.IsEpsilonSecretExtractor ε E) :
     log2 (H.outputLength : ℝ) ≤
       (QIT.Security.extractorOutputState H E).smoothConditionalMinEntropyNormalizedCandidates
         (Real.sqrt (2 * ε - ε ^ 2)) := by
   have hcand :
-      State.SmoothConditionalMinEntropyCandidate (a := S)
+      MState.SmoothConditionalMinEntropyCandidate (a := S)
         (QIT.Security.extractorOutputState H E) (Real.sqrt (2 * ε - ε ^ 2))
         (log2 (Fintype.card S : ℝ)) :=
     idealExtractorOutputState_smoothConditionalMinEntropyCandidate_of_isEpsilonSecretExtractor
@@ -3637,7 +3643,7 @@ theorem log2_outputLength_le_smoothConditionalMinEntropyNormalizedCandidates_of_
       log2 (Fintype.card S : ℝ) ≤
         (QIT.Security.extractorOutputState H E).smoothConditionalMinEntropyNormalizedCandidates
           (Real.sqrt (2 * ε - ε ^ 2)) :=
-    State.le_smoothConditionalMinEntropyNormalizedCandidates_of_candidate (a := S) hcand
+    MState.le_smoothConditionalMinEntropyNormalizedCandidates_of_candidate (a := S) hcand
   simpa [QIT.Security.HashFamily.outputLength_eq_card H] using hle
 
 end HashFamily
@@ -3645,7 +3651,7 @@ end HashFamily
 /-- Every achievable extractor log-length satisfies the source-strength smooth
 conditional min-entropy converse bound. -/
 theorem extractableRandomnessLogValueSet_le_source_toSubnormalized_smoothConditionalMinEntropy
-    (E : Ensemble Z e) {ε r : ℝ}
+    (E : MEnsemble e Z) {ε r : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1)
     (hr : r ∈ ExtractableRandomnessLogValueSet.{uF, uZ, uS, ue} E ε) :
     r ≤
@@ -3675,7 +3681,7 @@ theorem extractableRandomnessLogValueSet_le_source_toSubnormalized_smoothConditi
 /-- Every achievable log-output value lies below the extractable-randomness
 supremum, in the source range where the converse gives boundedness. -/
 theorem extractableRandomnessLogValueSet_member_le_extractableRandomnessLog
-    (E : Ensemble Z e) {ε r : ℝ}
+    (E : MEnsemble e Z) {ε r : ℝ}
     (hε0 : 0 ≤ ε) (hε1 : ε < 1)
     (hr : r ∈ ExtractableRandomnessLogValueSet.{uF, uZ, uS, ue} E ε) :
     r ≤ extractableRandomnessLog.{uF, uZ, uS, ue} E ε := by
@@ -3694,7 +3700,7 @@ theorem extractableRandomnessLogValueSet_member_le_extractableRandomnessLog
 /-- Source-strength converse bound lifted from each extractor to the
 extractable-randomness supremum, assuming the achievable-value set is nonempty. -/
 theorem extractableRandomnessLog_le_source_toSubnormalized_smoothConditionalMinEntropy_of_valueSet_nonempty
-    (E : Ensemble Z e) {ε : ℝ} (hε0 : 0 ≤ ε) (hε1 : ε < 1)
+    (E : MEnsemble e Z) {ε : ℝ} (hε0 : 0 ≤ ε) (hε1 : ε < 1)
     (hne : (ExtractableRandomnessLogValueSet.{uF, uZ, uS, ue} E ε).Nonempty) :
     extractableRandomnessLog.{uF, uZ, uS, ue} E ε ≤
       E.cqState.toSubnormalized.smoothConditionalMinEntropy
@@ -3711,7 +3717,7 @@ theorem extractableRandomnessLog_le_source_toSubnormalized_smoothConditionalMinE
 /-- Source-strength converse bound lifted from each extractor to the
 extractable-randomness supremum. -/
 theorem extractableRandomnessLog_le_source_toSubnormalized_smoothConditionalMinEntropy
-    (E : Ensemble Z e) {ε : ℝ} (hε0 : 0 ≤ ε) (hε1 : ε < 1) :
+    (E : MEnsemble e Z) {ε : ℝ} (hε0 : 0 ≤ ε) (hε1 : ε < 1) :
     extractableRandomnessLog.{uF, uZ, uS, ue} E ε ≤
       E.cqState.toSubnormalized.smoothConditionalMinEntropy
         (Real.sqrt (2 * ε - ε ^ 2)) (Real.sqrt_nonneg _)
@@ -3721,22 +3727,22 @@ theorem extractableRandomnessLog_le_source_toSubnormalized_smoothConditionalMinE
     (E := E) hε0 hε1 (extractableRandomnessLogValueSet_nonempty_of_nonneg E hε0)
 
 /-- Finite-alphabet lower endpoint associated to a real bit lower bound. -/
-def roundedOutputLengthLower (l : Real) : Nat :=
+def roundedOutputLengthLower (l : ℝ) : ℕ :=
   max 1 (Nat.floor (Real.rpow 2 l))
 
-private theorem roundedOutputLengthLower_pos (l : Real) :
+private theorem roundedOutputLengthLower_pos (l : ℝ) :
     0 < roundedOutputLengthLower l := by
   unfold roundedOutputLengthLower
-  exact Nat.lt_of_lt_of_le (by norm_num : 0 < (1 : Nat))
+  exact Nat.lt_of_lt_of_le (by norm_num : 0 < (1 : ℕ))
     (le_max_left 1 (Nat.floor (Real.rpow 2 l)))
 
-private theorem roundedOutputLengthLower_eq_one_of_neg {l : Real} (hl : l < 0) :
+private theorem roundedOutputLengthLower_eq_one_of_neg {l : ℝ} (hl : l < 0) :
     roundedOutputLengthLower l = 1 := by
   unfold roundedOutputLengthLower
   have hpow_nonneg : 0 ≤ Real.rpow 2 l :=
-    Real.rpow_nonneg (by norm_num : (0 : Real) ≤ 2) l
+    Real.rpow_nonneg (by norm_num : (0 : ℝ) ≤ 2) l
   have hpow_lt_one : Real.rpow 2 l < 1 := by
-    have hpow_lt : Real.rpow 2 l < Real.rpow 2 (0 : Real) :=
+    have hpow_lt : Real.rpow 2 l < Real.rpow 2 (0 : ℝ) :=
       Real.rpow_lt_rpow_of_exponent_lt one_lt_two hl
     simpa [Real.rpow_zero] using hpow_lt
   have hfloor_lt : Nat.floor (Real.rpow 2 l) < 1 :=
@@ -3745,29 +3751,29 @@ private theorem roundedOutputLengthLower_eq_one_of_neg {l : Real} (hl : l < 0) :
   rw [hfloor_eq0]
   norm_num
 
-private theorem roundedOutputLengthLower_log2_le_self_of_nonneg {l : Real} (hl : 0 ≤ l) :
-    log2 (roundedOutputLengthLower l : Real) ≤ l := by
+private theorem roundedOutputLengthLower_log2_le_self_of_nonneg {l : ℝ} (hl : 0 ≤ l) :
+    log2 (roundedOutputLengthLower l : ℝ) ≤ l := by
   unfold roundedOutputLengthLower
   have hpow_nonneg : 0 ≤ Real.rpow 2 l :=
-    Real.rpow_nonneg (by norm_num : (0 : Real) ≤ 2) l
+    Real.rpow_nonneg (by norm_num : (0 : ℝ) ≤ 2) l
   have hpow_one_le : 1 ≤ Real.rpow 2 l :=
-    Real.one_le_rpow (by norm_num : (1 : Real) ≤ 2) hl
+    Real.one_le_rpow (by norm_num : (1 : ℝ) ≤ 2) hl
   have hfloor_pos : 0 < Nat.floor (Real.rpow 2 l) :=
     (Nat.floor_pos).mpr hpow_one_le
   have hmax : max 1 (Nat.floor (Real.rpow 2 l)) = Nat.floor (Real.rpow 2 l) := by
     exact max_eq_right hfloor_pos
   rw [hmax]
-  have hfloor_le : (Nat.floor (Real.rpow 2 l) : Real) ≤ Real.rpow 2 l :=
+  have hfloor_le : (Nat.floor (Real.rpow 2 l) : ℝ) ≤ Real.rpow 2 l :=
     Nat.floor_le hpow_nonneg
-  have hfloor_pos_real : 0 < (Nat.floor (Real.rpow 2 l) : Real) := by
+  have hfloor_pos_real : 0 < (Nat.floor (Real.rpow 2 l) : ℝ) := by
     exact_mod_cast hfloor_pos
   exact (log2_mono_of_pos hfloor_pos_real hfloor_le).trans_eq (log2_rpow_two l)
 
 /-- Every achievable output length is bounded by the source-converse ceiling
 bound when `0 ≤ ε < 1`. -/
 private theorem extractorOutputLengthAchievable_le_extractableRandomnessLengthBound
-    (E : Ensemble Z e) {ε : ℝ} (hε0 : 0 ≤ ε) (hε1 : ε < 1)
-    {ell : Nat}
+    (E : MEnsemble e Z) {ε : ℝ} (hε0 : 0 ≤ ε) (hε1 : ε < 1)
+    {ell : ℕ}
     (hach : ExtractorOutputLengthAchievable.{uF, uZ, uS, ue} E ε ell) :
     ell ≤
       Nat.ceil
@@ -3808,7 +3814,7 @@ private theorem extractorOutputLengthAchievable_le_extractableRandomnessLengthBo
 /-- Nat-valued version of Tomamichel's `ell^epsilon`: the maximum achievable
 output length for `0 ≤ ε < 1`. -/
 noncomputable def extractableRandomnessLength
-    (E : Ensemble Z e) (ε : ℝ) (_hε0 : 0 ≤ ε) (_hε1 : ε < 1) : Nat := by
+    (E : MEnsemble e Z) (ε : ℝ) (_hε0 : 0 ≤ ε) (_hε1 : ε < 1) : ℕ := by
   classical
   exact
     Nat.findGreatest
@@ -3822,7 +3828,7 @@ noncomputable def extractableRandomnessLength
 
 /-- The Nat-valued extractable-randomness length is itself achievable. -/
 theorem extractableRandomnessLength_achievable
-    (E : Ensemble Z e) {ε : ℝ} (hε0 : 0 ≤ ε) (hε1 : ε < 1) :
+    (E : MEnsemble e Z) {ε : ℝ} (hε0 : 0 ≤ ε) (hε1 : ε < 1) :
     ExtractorOutputLengthAchievable.{uF, uZ, uS, ue} E ε
       (extractableRandomnessLength.{uF, uZ, uS, ue} E ε hε0 hε1) := by
   classical
@@ -3845,8 +3851,8 @@ theorem extractableRandomnessLength_achievable
 /-- The Nat-valued extractable-randomness length dominates every achievable
 output length. -/
 theorem extractableRandomnessLength_greatest
-    (E : Ensemble Z e) {ε : ℝ} (hε0 : 0 ≤ ε) (hε1 : ε < 1)
-    {ell : Nat}
+    (E : MEnsemble e Z) {ε : ℝ} (hε0 : 0 ≤ ε) (hε1 : ε < 1)
+    {ell : ℕ}
     (hach : ExtractorOutputLengthAchievable.{uF, uZ, uS, ue} E ε ell) :
     ell ≤ extractableRandomnessLength.{uF, uZ, uS, ue} E ε hε0 hε1 := by
   classical
@@ -3859,7 +3865,7 @@ theorem extractableRandomnessLength_greatest
 
 /-- The Nat-valued extractable-randomness length is positive. -/
 theorem extractableRandomnessLength_pos
-    (E : Ensemble Z e) {ε : ℝ} (hε0 : 0 ≤ ε) (hε1 : ε < 1) :
+    (E : MEnsemble e Z) {ε : ℝ} (hε0 : 0 ≤ ε) (hε1 : ε < 1) :
     0 < extractableRandomnessLength.{uF, uZ, uS, ue} E ε hε0 hε1 :=
   extractorOutputLengthAchievable_pos
     (extractableRandomnessLength_achievable (E := E) hε0 hε1)
@@ -3868,7 +3874,7 @@ theorem extractableRandomnessLength_pos
 maximum output length.  This closes the formal convention bridge for
 Tomamichel's `log ell^epsilon`. -/
 theorem extractableRandomnessLog_eq_log2_extractableRandomnessLength
-    (E : Ensemble Z e) {ε : ℝ} (hε0 : 0 ≤ ε) (hε1 : ε < 1) :
+    (E : MEnsemble e Z) {ε : ℝ} (hε0 : 0 ≤ ε) (hε1 : ε < 1) :
     extractableRandomnessLog.{uF, uZ, uS, ue} E ε =
       log2
         (extractableRandomnessLength.{uF, uZ, uS, ue} E ε hε0 hε1 : ℝ) := by
@@ -3910,7 +3916,7 @@ omit [Fintype F] [DecidableEq F] [Fintype S] [DecidableEq S] [Nonempty S] in
 /-- The full-function direct value-set witness gives a concrete lower bound on
 the extractable-randomness supremum. -/
 theorem finFullFunctionHashFamily_log2_le_extractableRandomnessLog_of_cqSmoothConditionalMinEntropyCandidate_log_le
-    {ell : Nat} (hell : 0 < ell) (E : Ensemble Z e) {ε₁ ε₂ h : ℝ}
+    {ell : ℕ} (hell : 0 < ell) (E : MEnsemble e Z) {ε₁ ε₂ h : ℝ}
     (hε₂ : 0 < ε₂)
     (hεdir0 : 0 ≤ 2 * ε₁ + ε₂)
     (hεdir1 : 2 * ε₁ + ε₂ < 1)
@@ -3939,12 +3945,12 @@ real lower endpoint `L` by `log₂ max(1, floor(2^L))`.
 [Tomamichel2015FiniteResources, apps.tex:404-449]
 -/
 theorem extractableRandomnessLog_tomamichel_rounded_source_theorem_of_cqSmoothConditionalMinEntropyCandidate
-    (E : Ensemble Z e) {ε δ h : Real}
+    (E : MEnsemble e Z) {ε δ h : ℝ}
     (hδ0 : 0 < δ) (hδε : δ < ε) (hε1 : ε < 1)
     (hcq : E.CqSmoothConditionalMinEntropyCandidate ((ε - δ) / 2) h) :
     let l := h - 2 * log2 (1 / δ)
     And
-      (log2 (roundedOutputLengthLower l : Real) ≤
+      (log2 (roundedOutputLengthLower l : ℝ) ≤
         extractableRandomnessLog.{uZ, uZ, 0, ue} E ε)
       (extractableRandomnessLog.{uZ, uZ, 0, ue} E ε ≤
         E.cqState.toSubnormalized.smoothConditionalMinEntropy
@@ -3953,7 +3959,7 @@ theorem extractableRandomnessLog_tomamichel_rounded_source_theorem_of_cqSmoothCo
             (sqrt_two_mul_sub_sq_lt_one_of_nonneg_lt_one
               (le_of_lt (hδ0.trans hδε)) hε1))) := by
   dsimp only
-  let l : Real := h - 2 * log2 (1 / δ)
+  let l : ℝ := h - 2 * log2 (1 / δ)
   have hε0 : 0 ≤ ε := le_of_lt (hδ0.trans hδε)
   have hsplit : 2 * ((ε - δ) / 2) + δ = ε := by ring
   have hdir0 : 0 ≤ 2 * ((ε - δ) / 2) + δ := by
@@ -3964,13 +3970,13 @@ theorem extractableRandomnessLog_tomamichel_rounded_source_theorem_of_cqSmoothCo
     exact hε1
   apply And.intro
   · change
-      log2 (roundedOutputLengthLower l : Real) ≤
+      log2 (roundedOutputLengthLower l : ℝ) ≤
         extractableRandomnessLog.{uZ, uZ, 0, ue} E ε
     by_cases hlneg : l < 0
     · have hrounded : roundedOutputLengthLower l = 1 :=
         roundedOutputLengthLower_eq_one_of_neg hlneg
       have hmem :
-          log2 (1 : Real) ∈
+          log2 (1 : ℝ) ∈
             ExtractableRandomnessLogValueSet.{uZ, uZ, 0, ue} E ε :=
         ⟨1, extractorOutputLengthAchievable_one_of_nonneg E hε0, by norm_num⟩
       have hzero_le :=
@@ -3978,7 +3984,7 @@ theorem extractableRandomnessLog_tomamichel_rounded_source_theorem_of_cqSmoothCo
           (E := E) hε0 hε1 hmem
       simpa [hrounded, log2] using hzero_le
     · have hlnonneg : 0 ≤ l := le_of_not_gt hlneg
-      have hrounded_log : log2 (roundedOutputLengthLower l : Real) ≤ l :=
+      have hrounded_log : log2 (roundedOutputLengthLower l : ℝ) ≤ l :=
         roundedOutputLengthLower_log2_le_self_of_nonneg hlnonneg
       have hrounded_pos : 0 < roundedOutputLengthLower l :=
         roundedOutputLengthLower_pos l
@@ -4003,13 +4009,13 @@ as `extractableRandomnessLog_tomamichel_rounded_source_theorem_of_cqSmoothCondit
 [Tomamichel2015FiniteResources, apps.tex:404-449]
 -/
 theorem extractableRandomnessLog_tomamichel_rounded_source_theorem
-    (E : Ensemble Z e) {ε δ : Real}
+    (E : MEnsemble e Z) {ε δ : ℝ}
     (hδ0 : 0 < δ) (hδε : δ < ε) (hε1 : ε < 1) :
     let l :=
       E.cqState.smoothConditionalMinEntropyNormalizedCandidates ((ε - δ) / 2) -
         2 * log2 (1 / δ)
     And
-      (log2 (roundedOutputLengthLower l : Real) ≤
+      (log2 (roundedOutputLengthLower l : ℝ) ≤
         extractableRandomnessLog.{uZ, uZ, 0, ue} E ε)
       (extractableRandomnessLog.{uZ, uZ, 0, ue} E ε ≤
         E.cqState.toSubnormalized.smoothConditionalMinEntropy
@@ -4039,7 +4045,7 @@ the underlying per-extractor converse endpoint.
 -/
 theorem extractableRandomnessLog_source_bounds_of_cqSmoothConditionalMinEntropyCandidate
     [Nonempty F]
-    {ell : Nat} (hell : 0 < ell) (E : Ensemble Z e)
+    {ell : ℕ} (hell : 0 < ell) (E : MEnsemble e Z)
     (H : QIT.Security.HashFamily F Z S) {ε ε₁ ε₂ h : ℝ}
     (hε₂ : 0 < ε₂)
     (hεdir0 : 0 ≤ 2 * ε₁ + ε₂)
@@ -4093,7 +4099,7 @@ Nat-valued maximum-attainment convention for `ell^epsilon` is supplied by
 -/
 theorem extractableRandomnessLog_tomamichel_source_bounds_of_cqSmoothConditionalMinEntropyCandidate
     [Nonempty F]
-    {ell : Nat} (hell : 0 < ell) (E : Ensemble Z e)
+    {ell : ℕ} (hell : 0 < ell) (E : MEnsemble e Z)
     (H : QIT.Security.HashFamily F Z S) {ε δ h : ℝ}
     (hδ0 : 0 < δ) (hδε : δ < ε) (hε1 : ε < 1)
     (hcq : E.CqSmoothConditionalMinEntropyCandidate ((ε - δ) / 2) h)
@@ -4130,6 +4136,6 @@ theorem extractableRandomnessLog_tomamichel_source_bounds_of_cqSmoothConditional
 
 end Security
 
-end
-
 end QIT
+
+end

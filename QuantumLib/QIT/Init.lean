@@ -11,7 +11,7 @@ public import Mathlib.Data.Fintype.Basic
 /-!
 # QIT initialization
 
-Shared import surface for the local QIT incubator.
+Shared import surface for Lean-QIT.
 -/
 
 @[expose] public section

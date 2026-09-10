@@ -57,10 +57,7 @@ namespace ProjectiveMeasurement
 
 variable (P : ProjectiveMeasurement y a)
 
-/-- A projective measurement's effects sum to the identity matrix. -/
-@[simp]
-theorem sum_effects : ∑ outcome, P.effects outcome = 1 :=
-  P.sum_eq_one
+attribute [simp] sum_eq_one
 
 /-- Each projective effect is positive semidefinite. -/
 theorem effect_posSemidef (outcome : y) :
@@ -78,10 +75,8 @@ theorem effect_mul_self_posSemidef (outcome : y) :
   exact P.effect_posSemidef outcome
 
 /-- A finite projective measurement is a finite POVM. -/
-def toPOVM : POVM y a where
-  effects := P.effects
-  pos := P.effect_posSemidef
-  sum_eq_one := P.sum_eq_one
+def toPOVM : POVM y a :=
+  .ofMatrices P.effects P.effect_posSemidef P.sum_eq_one
 
 /-- The POVM associated to a projective measurement has the same effects. -/
 @[simp]
@@ -90,7 +85,6 @@ theorem toPOVM_effects (outcome : y) :
   rfl
 
 /-- The POVM associated to a projective measurement has the same completeness law. -/
-@[simp]
 theorem toPOVM_sum_effects :
     ∑ outcome, P.toPOVM.effects outcome = 1 := by
   simp [toPOVM]
@@ -101,8 +95,8 @@ Tomamichel's measurement-map source route. -/
 theorem toPOVM_measureMap_one_eq_one_of_traceOne
     [DecidableEq y]
     (htrace : ∀ outcome, (P.effects outcome).trace = 1) :
-    (Channel.measure P.toPOVM).map (1 : CMatrix a) = (1 : CMatrix y) := by
-  rw [Channel.measure_map]
+    (POVM.measureDiscard P.toPOVM).map (1 : CMatrix a) = (1 : CMatrix y) := by
+  rw [POVM.measureDiscard_map]
   ext i j
   rw [Matrix.sum_apply]
   by_cases hij : i = j
@@ -192,25 +186,35 @@ theorem pinchingMap_mapsPositive :
   MatrixMap.ofKraus_mapsPositive P.effects
 
 /-- The CPTP channel induced by projective pinching. -/
-def pinchingChannel : Channel a a where
-  map := P.pinchingMap
-  completelyPositive := P.pinchingMap_isCompletelyPositive
-  tracePreserving := P.pinchingMap_isTracePreserving
-  mapsPositive := P.pinchingMap_mapsPositive
+def pinchingChannel : CPTPMap a a :=
+  CPTPOp.ofMat
+    P.pinchingMap
+    P.pinchingMap_isCompletelyPositive
+    P.pinchingMap_isTracePreserving
+
+/-- The pinching channel's matrix map is the pinching matrix map. -/
+theorem pinchingChannel_map_eq_pinchingMap : P.pinchingChannel.map = P.pinchingMap :=
+  CPTPOp.map_ofMat _ _ _
 
 /-- The pinching channel acts by pinching with the projective effects. -/
 @[simp]
 theorem pinchingChannel_map (X : CMatrix a) :
-    P.pinchingChannel.map X = ∑ outcome, P.effects outcome * X * P.effects outcome :=
-  P.pinchingMap_apply X
+    P.pinchingChannel.map X = ∑ outcome, P.effects outcome * X * P.effects outcome := by
+  rw [pinchingChannel_map_eq_pinchingMap]
+  exact P.pinchingMap_apply X
 
 /-- The state obtained by applying the pinching channel has the expected
 pinched matrix. -/
-@[simp]
-theorem pinchingChannel_applyState_matrix (ρ : State a) :
-    (P.pinchingChannel.applyState ρ).matrix =
-      ∑ outcome, P.effects outcome * ρ.matrix * P.effects outcome :=
-  P.pinchingChannel_map ρ.matrix
+theorem pinchingChannel_applyState_matrix (ρ : MState a) :
+    (P.pinchingChannel ρ).m =
+      ∑ outcome, P.effects outcome * ρ.m * P.effects outcome :=
+  (CPTPOp.mat_coe_eq_apply_mat _ _).trans (P.pinchingChannel_map ρ.m)
+
+/-- The pinched state matrix is the pinching matrix map applied to the state
+matrix. -/
+theorem pinchingChannel_applyState_matrix_eq_pinchingMap (ρ : MState a) :
+    (P.pinchingChannel ρ).m = P.pinchingMap ρ.m := by
+  rw [CPTPOp.mat_coe_eq_apply_mat, pinchingChannel_map_eq_pinchingMap]
 
 /-- Projective pinching is idempotent as a matrix map. -/
 theorem pinchingMap_idempotent (X : CMatrix a) :
@@ -272,11 +276,12 @@ theorem pinchingMap_eq_self_of_commute (X : CMatrix a)
 
 /-- Applying the pinching channel twice to a state is the same as applying it
 once. -/
-theorem pinchingChannel_applyState_idempotent (ρ : State a) :
-    P.pinchingChannel.applyState (P.pinchingChannel.applyState ρ) =
-      P.pinchingChannel.applyState ρ := by
-  apply State.ext
-  exact P.pinchingMap_idempotent ρ.matrix
+theorem pinchingChannel_applyState_idempotent (ρ : MState a) :
+    P.pinchingChannel (P.pinchingChannel ρ) =
+      P.pinchingChannel ρ := by
+  apply MState.ext
+  simp only [CPTPOp.mat_coe_eq_apply_mat, pinchingChannel_map_eq_pinchingMap]
+  exact P.pinchingMap_idempotent ρ.m
 
 /-- Pinching by the coordinate rank-one diagonal projectors keeps exactly the
 diagonal part of a matrix. -/
@@ -802,60 +807,61 @@ theorem ofHermitianEigenbasis_pinchingMap_commute (M : CMatrix a) (hM : M.IsHerm
             (fun outcome => P.effects outcome * X * P.effects outcome) M).symm
 
 /-- Spectral pinching of a state in its own eigenbasis fixes the state. -/
-theorem ofHermitianEigenbasis_pinchingChannel_applyState_self (ρ : State a) :
-    (ofHermitianEigenbasis ρ.matrix ρ.pos.isHermitian).pinchingChannel.applyState ρ = ρ := by
-  apply State.ext
-  exact ofHermitianEigenbasis_pinchingMap_self ρ.matrix ρ.pos.isHermitian
+theorem ofHermitianEigenbasis_pinchingChannel_applyState_self (ρ : MState a) :
+    (ofHermitianEigenbasis ρ.m ρ.psd.isHermitian).pinchingChannel ρ = ρ := by
+  apply MState.ext
+  rw [CPTPOp.mat_coe_eq_apply_mat, pinchingChannel_map_eq_pinchingMap]
+  exact ofHermitianEigenbasis_pinchingMap_self ρ.m ρ.psd.isHermitian
 
-/-- State-level form of spectral pinching diagonalization: in the eigenbasis of
+/-- MState-level form of spectral pinching diagonalization: in the eigenbasis of
 the reference state, applying the reference spectral pinching channel keeps
 only diagonal entries of the input state. -/
 theorem ofHermitianEigenbasis_pinchingChannel_applyState_eigenbasis
-    (ρ σ : State a) :
-    star (σ.pos.isHermitian.eigenvectorUnitary : CMatrix a) *
-        ((ofHermitianEigenbasis σ.matrix σ.pos.isHermitian).pinchingChannel.applyState ρ).matrix *
-        (σ.pos.isHermitian.eigenvectorUnitary : CMatrix a) =
+    (ρ σ : MState a) :
+    star (σ.psd.isHermitian.eigenvectorUnitary : CMatrix a) *
+        ((ofHermitianEigenbasis σ.m σ.psd.isHermitian).pinchingChannel ρ).m *
+        (σ.psd.isHermitian.eigenvectorUnitary : CMatrix a) =
       Matrix.diagonal
         (fun i =>
-          (star (σ.pos.isHermitian.eigenvectorUnitary : CMatrix a) * ρ.matrix *
-            (σ.pos.isHermitian.eigenvectorUnitary : CMatrix a)) i i) := by
+          (star (σ.psd.isHermitian.eigenvectorUnitary : CMatrix a) * ρ.m *
+            (σ.psd.isHermitian.eigenvectorUnitary : CMatrix a)) i i) := by
   simpa using
-    ofHermitianEigenbasis_pinchingMap_eigenbasis σ.matrix σ.pos.isHermitian ρ.matrix
+    ofHermitianEigenbasis_pinchingMap_eigenbasis σ.m σ.psd.isHermitian ρ.m
 
 /-- The diagonal distribution of a state in a reference state's eigenbasis. -/
-def eigenbasisDiagonalProb (ρ σ : State a) : a → ℝ≥0 :=
+def eigenbasisDiagonalProb (ρ σ : MState a) : a → ℝ≥0 :=
   fun i =>
-    ⟨((star (σ.pos.isHermitian.eigenvectorUnitary : CMatrix a) * ρ.matrix *
-        (σ.pos.isHermitian.eigenvectorUnitary : CMatrix a)) i i).re,
+    ⟨((star (σ.psd.isHermitian.eigenvectorUnitary : CMatrix a) * ρ.m *
+        (σ.psd.isHermitian.eigenvectorUnitary : CMatrix a)) i i).re,
       by
-        let U : Matrix.unitaryGroup a ℂ := σ.pos.isHermitian.eigenvectorUnitary
+        let U : Matrix.unitaryGroup a ℂ := σ.psd.isHermitian.eigenvectorUnitary
         have hstar : Matrix.conjTranspose (star (U : CMatrix a)) = (U : CMatrix a) := by
           rw [← Matrix.star_eq_conjTranspose, star_star]
         have hpsd :
-            (star (U : CMatrix a) * ρ.matrix * (U : CMatrix a)).PosSemidef := by
-          simpa [hstar] using ρ.pos.mul_mul_conjTranspose_same (star (U : CMatrix a))
+            (star (U : CMatrix a) * ρ.m * (U : CMatrix a)).PosSemidef := by
+          simpa [hstar] using ρ.psd.mul_mul_conjTranspose_same (star (U : CMatrix a))
         exact posSemidef_diagonal_re_nonneg hpsd i⟩
 
 /-- The eigenbasis diagonal distribution of a state sums to one. -/
-theorem eigenbasisDiagonalProb_sum (ρ σ : State a) :
+theorem eigenbasisDiagonalProb_sum (ρ σ : MState a) :
     ∑ i, eigenbasisDiagonalProb ρ σ i = 1 := by
   classical
-  let U : Matrix.unitaryGroup a ℂ := σ.pos.isHermitian.eigenvectorUnitary
-  let Y : CMatrix a := star (U : CMatrix a) * ρ.matrix * (U : CMatrix a)
+  let U : Matrix.unitaryGroup a ℂ := σ.psd.isHermitian.eigenvectorUnitary
+  let Y : CMatrix a := star (U : CMatrix a) * ρ.m * (U : CMatrix a)
   have hUU : (U : CMatrix a) * star (U : CMatrix a) = 1 :=
     Unitary.coe_mul_star_self U
   have htrace : Y.trace = 1 := by
     calc
-      Y.trace = ((star (U : CMatrix a) * ρ.matrix) * (U : CMatrix a)).trace := by
+      Y.trace = ((star (U : CMatrix a) * ρ.m) * (U : CMatrix a)).trace := by
         rfl
-      _ = ((U : CMatrix a) * (star (U : CMatrix a) * ρ.matrix)).trace := by
+      _ = ((U : CMatrix a) * (star (U : CMatrix a) * ρ.m)).trace := by
         rw [Matrix.trace_mul_comm]
-      _ = (((U : CMatrix a) * star (U : CMatrix a)) * ρ.matrix).trace := by
+      _ = (((U : CMatrix a) * star (U : CMatrix a)) * ρ.m).trace := by
         rw [Matrix.mul_assoc]
-      _ = (1 * ρ.matrix).trace := by
+      _ = (1 * ρ.m).trace := by
         rw [hUU]
       _ = 1 := by
-        simpa using ρ.trace_eq_one
+        simp
   apply NNReal.coe_injective
   calc
     ((∑ i, eigenbasisDiagonalProb ρ σ i : ℝ≥0) : ℝ) =
@@ -863,7 +869,7 @@ theorem eigenbasisDiagonalProb_sum (ρ σ : State a) :
           rw [NNReal.coe_sum]
     _ = ∑ i, (Y i i).re := by
           refine Finset.sum_congr rfl fun i _ => ?_
-          change ((star (U : CMatrix a) * ρ.matrix * (U : CMatrix a)) i i).re =
+          change ((star (U : CMatrix a) * ρ.m * (U : CMatrix a)) i i).re =
             (Y i i).re
           rfl
     _ = Y.trace.re := by
@@ -873,40 +879,40 @@ theorem eigenbasisDiagonalProb_sum (ρ σ : State a) :
           norm_num
 
 /-- The eigenvalue distribution of a density state. -/
-def stateEigenvalueProb (σ : State a) : a → ℝ≥0 :=
-  fun i => ⟨σ.pos.isHermitian.eigenvalues i, σ.pos.eigenvalues_nonneg i⟩
+def stateEigenvalueProb (σ : MState a) : a → ℝ≥0 :=
+  fun i => ⟨σ.psd.isHermitian.eigenvalues i, σ.psd.eigenvalues_nonneg i⟩
 
 /-- A density state's eigenvalue distribution sums to one. -/
-theorem stateEigenvalueProb_sum (σ : State a) :
+theorem stateEigenvalueProb_sum (σ : MState a) :
     ∑ i, stateEigenvalueProb σ i = 1 := by
-  have hcomplex : (∑ i, ((σ.pos.isHermitian.eigenvalues i : ℝ) : ℂ)) = 1 :=
-    σ.pos.isHermitian.trace_eq_sum_eigenvalues.symm.trans σ.trace_eq_one
+  have hcomplex : (∑ i, ((σ.psd.isHermitian.eigenvalues i : ℝ) : ℂ)) = 1 :=
+    σ.psd.isHermitian.trace_eq_sum_eigenvalues.symm.trans σ.tr'
   have hreal := congrArg Complex.re hcomplex
   apply NNReal.coe_injective
   calc
     ((∑ i, stateEigenvalueProb σ i : ℝ≥0) : ℝ) =
         ∑ i, ((stateEigenvalueProb σ i : ℝ≥0) : ℝ) := by
           rw [NNReal.coe_sum]
-    _ = ∑ i, σ.pos.isHermitian.eigenvalues i := by
+    _ = ∑ i, σ.psd.isHermitian.eigenvalues i := by
           rfl
     _ = 1 := by
           simpa using hreal
 
 /-- Full-rank density states have strictly positive eigenvalue distribution. -/
-theorem stateEigenvalueProb_pos_of_posDef (σ : State a) (hσ : σ.matrix.PosDef) :
+theorem stateEigenvalueProb_pos_of_posDef (σ : MState a) (hσ : σ.m.PosDef) :
     ∀ i, 0 < (stateEigenvalueProb σ i : ℝ) := by
   intro i
   exact hσ.eigenvalues_pos i
 
 /-- A density matrix reconstructed from its eigenvalue distribution. -/
-theorem state_matrix_eq_unitary_diagonalEigenvalueProb (σ : State a) :
-    σ.matrix =
-      (σ.pos.isHermitian.eigenvectorUnitary : CMatrix a) *
+theorem state_matrix_eq_unitary_diagonalEigenvalueProb (σ : MState a) :
+    σ.m =
+      (σ.psd.isHermitian.eigenvectorUnitary : CMatrix a) *
         Matrix.diagonal (fun i => ((stateEigenvalueProb σ i : ℝ≥0) : ℂ)) *
-        star (σ.pos.isHermitian.eigenvectorUnitary : CMatrix a) := by
-  let U : Matrix.unitaryGroup a ℂ := σ.pos.isHermitian.eigenvectorUnitary
+        star (σ.psd.isHermitian.eigenvectorUnitary : CMatrix a) := by
+  let U : Matrix.unitaryGroup a ℂ := σ.psd.isHermitian.eigenvectorUnitary
   have hdiag :
-      Matrix.diagonal (fun i => ((σ.pos.isHermitian.eigenvalues i : ℝ) : ℂ)) =
+      Matrix.diagonal (fun i => ((σ.psd.isHermitian.eigenvalues i : ℝ) : ℂ)) =
         Matrix.diagonal (fun i => ((stateEigenvalueProb σ i : ℝ≥0) : ℂ)) := by
     ext i j
     by_cases hij : i = j
@@ -915,12 +921,12 @@ theorem state_matrix_eq_unitary_diagonalEigenvalueProb (σ : State a) :
       rfl
     · rw [Matrix.diagonal_apply_ne _ hij, Matrix.diagonal_apply_ne _ hij]
   calc
-    σ.matrix =
+    σ.m =
         (U : CMatrix a) *
-          Matrix.diagonal (fun i => ((σ.pos.isHermitian.eigenvalues i : ℝ) : ℂ)) *
+          Matrix.diagonal (fun i => ((σ.psd.isHermitian.eigenvalues i : ℝ) : ℂ)) *
           star (U : CMatrix a) := by
           simpa [U, Function.comp_def, Unitary.conjStarAlgAut_apply]
-            using σ.pos.isHermitian.spectral_theorem
+            using σ.psd.isHermitian.spectral_theorem
     _ = (U : CMatrix a) *
         Matrix.diagonal (fun i => ((stateEigenvalueProb σ i : ℝ≥0) : ℂ)) *
         star (U : CMatrix a) := by
@@ -929,23 +935,23 @@ theorem state_matrix_eq_unitary_diagonalEigenvalueProb (σ : State a) :
 /-- The reference spectral pinching of a state is exactly the unitary
 reconstruction of its eigenbasis diagonal probability distribution. -/
 theorem ofHermitianEigenbasis_pinchingChannel_applyState_matrix_eq_unitary_diagonalProb
-    (ρ σ : State a) :
-    ((ofHermitianEigenbasis σ.matrix σ.pos.isHermitian).pinchingChannel.applyState ρ).matrix =
-      (σ.pos.isHermitian.eigenvectorUnitary : CMatrix a) *
+    (ρ σ : MState a) :
+    ((ofHermitianEigenbasis σ.m σ.psd.isHermitian).pinchingChannel ρ).m =
+      (σ.psd.isHermitian.eigenvectorUnitary : CMatrix a) *
         Matrix.diagonal (fun i => ((eigenbasisDiagonalProb ρ σ i : ℝ≥0) : ℂ)) *
-        star (σ.pos.isHermitian.eigenvectorUnitary : CMatrix a) := by
+        star (σ.psd.isHermitian.eigenvectorUnitary : CMatrix a) := by
   classical
-  let U : Matrix.unitaryGroup a ℂ := σ.pos.isHermitian.eigenvectorUnitary
+  let U : Matrix.unitaryGroup a ℂ := σ.psd.isHermitian.eigenvectorUnitary
   let Xp : CMatrix a :=
-    ((ofHermitianEigenbasis σ.matrix σ.pos.isHermitian).pinchingChannel.applyState ρ).matrix
-  let Y : CMatrix a := star (U : CMatrix a) * ρ.matrix * (U : CMatrix a)
+    ((ofHermitianEigenbasis σ.m σ.psd.isHermitian).pinchingChannel ρ).m
+  let Y : CMatrix a := star (U : CMatrix a) * ρ.m * (U : CMatrix a)
   let D : CMatrix a := Matrix.diagonal (fun i => ((eigenbasisDiagonalProb ρ σ i : ℝ≥0) : ℂ))
   have hUU : (U : CMatrix a) * star (U : CMatrix a) = 1 :=
     Unitary.coe_mul_star_self U
   have hstar : Matrix.conjTranspose (star (U : CMatrix a)) = (U : CMatrix a) := by
     rw [← Matrix.star_eq_conjTranspose, star_star]
   have hYpsd : Y.PosSemidef := by
-    simpa [Y, hstar] using ρ.pos.mul_mul_conjTranspose_same (star (U : CMatrix a))
+    simpa [Y, hstar] using ρ.psd.mul_mul_conjTranspose_same (star (U : CMatrix a))
   have hYdiag :
       Matrix.diagonal (fun i => Y i i) = D := by
     have hreal_fun : (fun i => (((Y i i).re : ℝ) : ℂ)) = fun i => Y i i := by
@@ -984,13 +990,13 @@ theorem ofHermitianEigenbasis_pinchingChannel_applyState_matrix_eq_unitary_diago
 /-- Pinching a state in the spectral projective measurement of a reference
 state produces a state commuting with that reference. -/
 theorem ofHermitianEigenbasis_pinchingChannel_applyState_commute
-    (ρ σ : State a) :
-    ((ofHermitianEigenbasis σ.matrix σ.pos.isHermitian).pinchingChannel.applyState ρ).matrix *
-        σ.matrix =
-      σ.matrix *
-        ((ofHermitianEigenbasis σ.matrix σ.pos.isHermitian).pinchingChannel.applyState ρ).matrix := by
+    (ρ σ : MState a) :
+    ((ofHermitianEigenbasis σ.m σ.psd.isHermitian).pinchingChannel ρ).m *
+        σ.m =
+      σ.m *
+        ((ofHermitianEigenbasis σ.m σ.psd.isHermitian).pinchingChannel ρ).m := by
   simpa using
-    ofHermitianEigenbasis_pinchingMap_commute σ.matrix σ.pos.isHermitian ρ.matrix
+    ofHermitianEigenbasis_pinchingMap_commute σ.m σ.psd.isHermitian ρ.m
 
 end ProjectiveMeasurement
 

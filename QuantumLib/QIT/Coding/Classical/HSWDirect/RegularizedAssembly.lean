@@ -8,32 +8,62 @@ module
 
 public import QuantumLib.QIT.Coding.Classical.HSWDirect.WitnessAssembly
 
+/-!
+# The direct half of the HSW theorem
+
+The terminal result is `CPTPOp.hsw_regularizedHolevoInformation_direct`: for any channel `N` with
+nonempty input and output systems, every rate strictly below the regularized Holevo information
+`regularizedHolevoInformation N` is operationally achievable, with no hypotheses left over
+[Wilde2011Qst, qit-notes.tex:33634-33808].
+
+Two things stand between the one-letter ladder of `HSWDirect.WitnessAssembly` and that statement.
+The first is normalization: `hsw_blockChannelAchievable_transport` turns an `S`-rate code family for
+the block channel `N^⊗k` into an `S / k`-rate family for `N`, by writing a requested length `ℓ` as
+`t * k + r`, flattening a `t`-use block code and right-padding the leftover `r` uses with a fixed
+input state — the reshapings of `HSWDirect.CodeTransforms`, with the padding loss absorbed into the
+achievability slack.  The second is the supremum: the regularized quantity is a limit over block
+sizes, so every hypothesis here is quantified over all `k > 0` and all finite ensembles for
+`N^⊗k`.
+
+Given those, this module reruns the `WitnessAssembly` ladder one level up, as
+`hsw_regularized_direct_of_block*`, from the block spectral packing bundle down to fixed typicality
+slacks and a bare cross-exponent bound `cross n ≤ 8 · 2 ^ (-n δ / 4)`.  The last rung is discharged
+by `exists_hsw_crossExponentBound_slacks`, which leaves nothing for a caller to supply.
+-/
+
 @[expose] public section
 
 open scoped ComplexOrder MatrixOrder NNReal
 
-namespace QIT
-
 universe u v uEnsemble uMessage uAux uCodebook
+
+namespace QIT
 
 noncomputable section
 
 private def hswBasisState (α : Type uAux) [Fintype α] [DecidableEq α] [Nonempty α] :
-    State α where
-  matrix := Matrix.single (Classical.choice (inferInstance : Nonempty α))
-    (Classical.choice (inferInstance : Nonempty α)) (1 : ℂ)
-  pos := posSemidef_single (Classical.choice (inferInstance : Nonempty α))
-  trace_eq_one := by
+    MState α := .ofMatrix
+  (matrix := Matrix.single (Classical.choice (inferInstance : Nonempty α))
+    (Classical.choice (inferInstance : Nonempty α)) (1 : ℂ))
+  (pos := posSemidef_single (Classical.choice (inferInstance : Nonempty α)))
+  (trace_eq_one := by
     rw [trace_single_one]
-    simp
+    simp)
 
 private def tensorPowerBasisState
     (α : Type uAux) [Fintype α] [DecidableEq α] [Nonempty α] :
-    (n : ℕ) → State (TensorPower α n)
-  | 0 => State.unit
+    (n : ℕ) → MState (TensorPower α n)
+  | 0 => MState.unit
   | n + 1 => (hswBasisState α).prod (tensorPowerBasisState α n)
 
-namespace Channel
+end
+end QIT
+
+noncomputable section
+
+namespace CPTPOp
+
+open QIT
 
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
@@ -48,9 +78,9 @@ constructs `S/k`-rate codes for `N`: for a large requested length `ℓ`, write
 keeps the padding rate loss explicit and absorbs it into the operational
 achievability slack. -/
 theorem hsw_blockChannelAchievable_transport [Nonempty a]
-    (N : Channel a b) (k : ℕ) (hk : 0 < k) (S : ℝ)
-    (hS : (Channel.IsAchievableClassicalRate.{u, v, uMessage} (N.tensorPower k)) S) :
-    (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) (S / (k : ℝ)) := by
+    (N : CPTPMap a b) (k : ℕ) (hk : 0 < k) (S : ℝ)
+    (hS : (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} (N.tensorPower k)) S) :
+    (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) (S / (k : ℝ)) := by
   intro δ hδ ε hε
   have hkR_pos : (0 : ℝ) < k := by exact_mod_cast hk
   let blockSlack : ℝ := (k : ℝ) * (δ / 4)
@@ -74,7 +104,7 @@ theorem hsw_blockChannelAchievable_transport [Nonempty a]
     let : Fintype M := hMfin
     let : DecidableEq M := hMdec
     let : Nonempty M := hMnonempty
-    let tail : State (QIT.TensorPower a r) := tensorPowerBasisState a r
+    let tail : MState (QIT.TensorPower a r) := tensorPowerBasisState a r
     let Cpad : HSWClassicalCode N (t * k + r) M := C.flattenBlock.padRight tail
     have hlen : t * k + r = ℓ := by
       dsimp [t, r]
@@ -83,7 +113,7 @@ theorem hsw_blockChannelAchievable_transport [Nonempty a]
     have hrate_final : Cfinal.rate ≥ S / (k : ℝ) - δ := by
       have hnonneg : 0 ≤ Cpad.rate := by
         dsimp [Cpad, HSWClassicalCode.rate]
-        exact hswMessageRate.nonneg (M := M) (t * k + r)
+        exact messageRate.nonneg (M := M) (t * k + r)
       simpa [Cfinal] using (show Cpad.rate ≥ S / (k : ℝ) - δ by linarith)
     have herr_pad : Cpad.maxErrorAtMost ε := by
       dsimp [Cpad]
@@ -110,7 +140,7 @@ theorem hsw_blockChannelAchievable_transport [Nonempty a]
     let : Fintype M := hMfin
     let : DecidableEq M := hMdec
     let : Nonempty M := hMnonempty
-    let tail : State (QIT.TensorPower a r) := tensorPowerBasisState a r
+    let tail : MState (QIT.TensorPower a r) := tensorPowerBasisState a r
     let Cpad : HSWClassicalCode N (t * k + r) M := C.flattenBlock.padRight tail
     let A : ℝ := S / (k : ℝ) - δ / 4
     have hbase : A ≤ C.rate / (k : ℝ) := by
@@ -192,15 +222,15 @@ This is the block-to-regularized bridge: once every positive block channel has
 ensemble-specific HSW direct coding at its one-letter Holevo rate, the
 regularized direct half for the original channel follows. -/
 theorem hsw_regularized_direct_of_blockChannelEnsembleWitnesses_transport
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblockEnsemble :
       ∀ n : ℕ, 0 < n →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E : Ensemble ι (QIT.TensorPower a n),
-            (Channel.IsAchievableClassicalRate.{u, v, uMessage} (N.tensorPower n))
+          ∀ E : MEnsemble (QIT.TensorPower a n) ι,
+            (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} (N.tensorPower n))
               ((N.tensorPower n).hswHolevoRate E)) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R :=
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R :=
   N.hsw_regularized_direct_of_blockChannelEnsembleWitnesses
     (fun n hn S hS => N.hsw_blockChannelAchievable_transport n hn S hS)
     hblockEnsemble
@@ -215,11 +245,11 @@ block channel.  The theorem then performs both remaining assembly steps:
 ensemble-specific direct coding for each block channel and the
 block-to-base rate-normalization transport. -/
 theorem hsw_regularized_direct_of_blockSpectralPackingHypotheses
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblock :
       ∀ k : ℕ, 0 < k →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E₀ : Ensemble ι (QIT.TensorPower a k),
+          ∀ E₀ : MEnsemble (QIT.TensorPower a k) ι,
             ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
               ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
                 0 < n ∧ (1 : ℝ) / (n : ℝ) ≤ δ / 2 ∧
@@ -227,22 +257,22 @@ theorem hsw_regularized_direct_of_blockSpectralPackingHypotheses
                     ∃ (_ : Nonempty M),
                       ∃ (𝒳 : Type uCodebook), ∃ (_ : Fintype 𝒳), ∃ (_ : DecidableEq 𝒳),
                         ∃ (Eout :
-                            Ensemble 𝒳 (QIT.TensorPower (QIT.TensorPower b k) n)),
+                            MEnsemble (QIT.TensorPower (QIT.TensorPower b k) n) 𝒳),
                           ∃ (typicalitySlack : ℝ),
                             ∃ (H : HSWPackingHypothesesSpectral Eout typicalitySlack),
                               ∃ (φ :
-                                  𝒳 → State (QIT.TensorPower (QIT.TensorPower a k) n)),
+                                  𝒳 → MState (QIT.TensorPower (QIT.TensorPower a k) n)),
                                 (∀ x,
-                                    ((N.tensorPower k).tensorPower n).applyState (φ x) =
+                                    ((N.tensorPower k).tensorPower n) (φ x) =
                                       Eout.states x) ∧
-                                  hswMessageRate M n ≥
+                                  messageRate M n ≥
                                     (N.tensorPower k).hswHolevoRate E₀ - δ / 2 ∧
                                     2 * (H.ε + 2 * Real.sqrt H.ε) +
                                         4 * ((Fintype.card M : ℝ) - 1) *
                                           (H.d / H.D) ≤
                                       ε / 2) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine N.hsw_regularized_direct_of_blockChannelEnsembleWitnesses_transport ?_
   intro k hk ι hιF hιD E₀
   let : Fintype ι := hιF
@@ -255,39 +285,39 @@ estimates, with the finite message set chosen internally at every coding block
 length.
 
 This theorem is the strict direct-achievability assembly point closest to the
-remaining source proof obligations: the caller supplies the asymptotic HSW
+analytic estimates: the caller supplies the asymptotic HSW
 typical/packing estimates for the message type selected by the rate lemma, and
 this theorem performs message-size choice, packing/expurgation assembly,
 block-channel ensemble coding, and block-to-base rate normalization. -/
 theorem hsw_regularized_direct_of_blockSpectralPackingEstimates
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblock :
       ∀ k : ℕ, 0 < k →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E₀ : Ensemble ι (QIT.TensorPower a k),
+          ∀ E₀ : MEnsemble (QIT.TensorPower a k) ι,
             ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
               ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
                 0 < n ∧ (1 : ℝ) / (n : ℝ) ≤ δ / 2 ∧
                   ∀ (M : Type uMessage) (_ : Fintype M) (_ : DecidableEq M)
                     (_ : Nonempty M),
-                    hswMessageRate M n ≥
+                    messageRate M n ≥
                         (N.tensorPower k).hswHolevoRate E₀ - δ / 2 →
                       ∃ (𝒳 : Type uCodebook), ∃ (_ : Fintype 𝒳), ∃ (_ : DecidableEq 𝒳),
                         ∃ (Eout :
-                            Ensemble 𝒳 (QIT.TensorPower (QIT.TensorPower b k) n)),
+                            MEnsemble (QIT.TensorPower (QIT.TensorPower b k) n) 𝒳),
                           ∃ (typicalitySlack : ℝ),
                             ∃ (H : HSWPackingHypothesesSpectral Eout typicalitySlack),
                               ∃ (φ :
-                                  𝒳 → State (QIT.TensorPower (QIT.TensorPower a k) n)),
+                                  𝒳 → MState (QIT.TensorPower (QIT.TensorPower a k) n)),
                                 (∀ x,
-                                    ((N.tensorPower k).tensorPower n).applyState (φ x) =
+                                    ((N.tensorPower k).tensorPower n) (φ x) =
                                       Eout.states x) ∧
                                   2 * (H.ε + 2 * Real.sqrt H.ε) +
                                       4 * ((Fintype.card M : ℝ) - 1) *
                                         (H.d / H.D) ≤
                                     ε / 2) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine N.hsw_regularized_direct_of_blockChannelEnsembleWitnesses_transport ?_
   intro k hk ι hιF hιD E₀
   let : Fintype ι := hιF
@@ -307,32 +337,32 @@ block-to-base-channel rate normalization.
 
 The statement deliberately keeps the diagonal/pinching and asymptotic
 typical-estimate family explicit.  It does not identify the diagonal
-strong-typical projector with the legacy spectral projector, and it does not
+strong-typical projector with the spectral projector, and it does not
 pretend that arbitrary quantum output ensembles have already been reduced to
 the pinched classical kernel. -/
 theorem hsw_regularized_direct_of_blockDiagonalPackingEstimates
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblock :
       ∀ k : ℕ, 0 < k →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E₀ : Ensemble ι (QIT.TensorPower a k),
+          ∀ E₀ : MEnsemble (QIT.TensorPower a k) ι,
             ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
               ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
                 0 < n ∧ (1 : ℝ) / (n : ℝ) ≤ δ / 2 ∧
                   ∀ (M : Type uMessage) (_ : Fintype M) (_ : DecidableEq M)
                     (_ : Nonempty M),
-                    hswMessageRate M n ≥
+                    messageRate M n ≥
                         (N.tensorPower k).hswHolevoRate E₀ - δ / 2 →
                       ∃ (α : Type uAux), ∃ (_ : Fintype α), ∃ (_ : DecidableEq α),
-                        ∃ (p : QIT.FiniteDistribution α),
-                          ∃ (K : QIT.StochasticKernel α (QIT.TensorPower b k)),
+                        ∃ (p : ProbDistribution α),
+                          ∃ (K : DMChannel α (QIT.TensorPower b k)),
                             ∃ (𝒳 : Type uCodebook), ∃ (_ : Fintype 𝒳), ∃ (_ : DecidableEq 𝒳),
                               ∃ (Eout :
-                                  Ensemble 𝒳 (QIT.TensorPower (QIT.TensorPower b k) n)),
+                                  MEnsemble (QIT.TensorPower (QIT.TensorPower b k) n) 𝒳),
                                 ∃ (codewordOf : 𝒳 → Fin n → α),
                                   ∃ (φ :
                                       𝒳 →
-                                        State (QIT.TensorPower (QIT.TensorPower a k) n)),
+                                        MState (QIT.TensorPower (QIT.TensorPower a k) n)),
                                     ∃ (δx : ℝ), ∃ (δc : ℝ), ∃ (packingε : ℝ),
                                       ∃ (d : ℝ), ∃ (D : ℝ),
                                         ∃ (Px :
@@ -342,10 +372,10 @@ theorem hsw_regularized_direct_of_blockDiagonalPackingEstimates
                                                   (QIT.TensorPower b k) n)),
                                           0 ≤ δx ∧ 0 < δc ∧ 0 ≤ packingε ∧ 0 < D ∧
                                             (∀ x,
-                                              (Eout.states x).matrix =
+                                              (Eout.states x).m =
                                                 (HSWPackingHypothesesSpectral.conditionalProductDiagonalState
                                                   K
-                                                  (codewordOf x)).matrix) ∧
+                                                  (codewordOf x)).m) ∧
                                             (∀ x,
                                               ClassicalTypicality.StrongTypical p
                                                 (codewordOf x) δx) ∧
@@ -357,13 +387,13 @@ theorem hsw_regularized_direct_of_blockDiagonalPackingEstimates
                                                 Px x ≤ 1) ∧
                                             (∀ x,
                                               1 - packingε ≤
-                                                ((Px x * (Eout.states x).matrix).trace).re) ∧
+                                                ((Px x * (Eout.states x).m).trace).re) ∧
                                             (∀ x, ((Px x).trace).re ≤ d) ∧
                                             (HSWPackingHypothesesSpectral.strongTypicalDiagonalProjector
                                                   (ClassicalTypicality.inducedMarginal p K)
                                                   n
                                                   ((Fintype.card α : ℝ) * (δx + δc)) *
-                                                Eout.averageState.matrix *
+                                                Eout.averageState.m *
                                                 HSWPackingHypothesesSpectral.strongTypicalDiagonalProjector
                                                   (ClassicalTypicality.inducedMarginal p K)
                                                   n
@@ -374,14 +404,14 @@ theorem hsw_regularized_direct_of_blockDiagonalPackingEstimates
                                                     n
                                                     ((Fintype.card α : ℝ) * (δx + δc))) ∧
                                             (∀ x,
-                                              ((N.tensorPower k).tensorPower n).applyState
+                                              ((N.tensorPower k).tensorPower n)
                                                   (φ x) =
                                                 Eout.states x) ∧
                                             2 * (packingε + 2 * Real.sqrt packingε) +
                                                 4 * ((Fintype.card M : ℝ) - 1) * (d / D) ≤
                                               ε / 2) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine N.hsw_regularized_direct_of_blockChannelEnsembleWitnesses_transport ?_
   intro k hk ι hιF hιD E₀
   let : Fintype ι := hιF
@@ -400,32 +430,31 @@ proved pruned pack-4 bridge supplies the projected-average Loewner bound, the
 one-block HSW assembly supplies an achievable block-channel Holevo rate, and
 the block-transport theorem normalizes the rate back to the original channel.
 
-The theorem still keeps the genuinely asymptotic HSW estimates explicit:
+The genuinely asymptotic HSW estimates stay explicit hypotheses:
 typical-codeword selection, conditionally-typical projectors, marginal-product
-mass envelopes, physical output realizations, and final packing-error
-inequality are not hidden or replaced by placeholders. -/
+mass envelopes, physical output realizations, and the final packing-error
+inequality. -/
 theorem hsw_regularized_direct_of_blockPrunedDiagonalPackingEstimates
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblock :
       ∀ k : ℕ, 0 < k →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E₀ : Ensemble ι (QIT.TensorPower a k),
+          ∀ E₀ : MEnsemble (QIT.TensorPower a k) ι,
             ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
               ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
                 0 < n ∧ (1 : ℝ) / (n : ℝ) ≤ δ / 2 ∧
                   ∀ (M : Type uMessage) (_ : Fintype M) (_ : DecidableEq M)
                     (_ : Nonempty M),
-                    hswMessageRate M n ≥
+                    messageRate M n ≥
                         (N.tensorPower k).hswHolevoRate E₀ - δ / 2 →
                       ∃ (α : Type uAux), ∃ (_ : Fintype α), ∃ (_ : DecidableEq α),
-                        ∃ (p : QIT.FiniteDistribution α),
-                          ∃ (K : QIT.StochasticKernel α (QIT.TensorPower b k)),
+                        ∃ (p : ProbDistribution α),
+                          ∃ (K : DMChannel α (QIT.TensorPower b k)),
                             ∃ (Eout :
-                                Ensemble (Fin n → α)
-                                  (QIT.TensorPower (QIT.TensorPower b k) n)),
+                                MEnsemble (QIT.TensorPower (QIT.TensorPower b k) n) (Fin n → α)),
                               ∃ (φ :
                                   (Fin n → α) →
-                                    State (QIT.TensorPower (QIT.TensorPower a k) n)),
+                                    MState (QIT.TensorPower (QIT.TensorPower a k) n)),
                                 ∃ (δx : ℝ), ∃ (δc : ℝ), ∃ (packingε : ℝ),
                                   ∃ (d : ℝ), ∃ (D : ℝ), ∃ (pruneε : ℝ),
                                     ∃ (Px :
@@ -449,7 +478,7 @@ theorem hsw_regularized_direct_of_blockPrunedDiagonalPackingEstimates
                                             Px x ≤ 1) ∧
                                         (∀ x : Fin n → α,
                                           1 - packingε ≤
-                                            ((Px x * (Eout.states x).matrix).trace).re) ∧
+                                            ((Px x * (Eout.states x).m).trace).re) ∧
                                         (∀ x : Fin n → α, ((Px x).trace).re ≤ d) ∧
                                         (∀ zseq : Fin n → QIT.TensorPower b k,
                                           ClassicalTypicality.StrongTypical
@@ -462,16 +491,16 @@ theorem hsw_regularized_direct_of_blockPrunedDiagonalPackingEstimates
                                         (∀ x : Fin n → α,
                                           (Eout.probs x : ℝ) ≤
                                             (1 - pruneε)⁻¹ *
-                                              ∏ i, (p.prob (x i) : ℝ)) ∧
+                                              ∏ i, (p.nnprob (x i) : ℝ)) ∧
                                         (∀ x : Fin n → α,
-                                          ((N.tensorPower k).tensorPower n).applyState
+                                          ((N.tensorPower k).tensorPower n)
                                               (φ x) =
                                             Eout.states x) ∧
                                         2 * (packingε + 2 * Real.sqrt packingε) +
                                             4 * ((Fintype.card M : ℝ) - 1) *
                                               (d / ((1 - pruneε) * D)) ≤ ε / 2) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine N.hsw_regularized_direct_of_blockChannelEnsembleWitnesses_transport ?_
   intro k hk ι hιF hιD E₀
   let : Fintype ι := hιF
@@ -487,32 +516,31 @@ this entry point no longer asks the caller to construct arbitrary per-codeword
 projectors.  It instantiates the projectors as the conditionally typical
 subspace projectors and consumes the source-shaped second-moment and dimension
 estimates instead.  The remaining explicit assumptions are precisely the
-unproved asymptotic HSW ingredients that are not part of this bridge:
+asymptotic HSW ingredients that are not part of this bridge:
 strong-typical codewords, marginal-product mass envelope, pruned distribution
 domination, physical output realization, and the final packing-error
 inequality. -/
 theorem hsw_regularized_direct_of_blockPrunedDiagonalProjectorEstimates
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblock :
       ∀ k : ℕ, 0 < k →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E₀ : Ensemble ι (QIT.TensorPower a k),
+          ∀ E₀ : MEnsemble (QIT.TensorPower a k) ι,
             ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
               ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
                 0 < n ∧ (1 : ℝ) / (n : ℝ) ≤ δ / 2 ∧
                   ∀ (M : Type uMessage) (_ : Fintype M) (_ : DecidableEq M)
                     (_ : Nonempty M),
-                    hswMessageRate M n ≥
+                    messageRate M n ≥
                         (N.tensorPower k).hswHolevoRate E₀ - δ / 2 →
                       ∃ (α : Type uAux), ∃ (_ : Fintype α), ∃ (_ : DecidableEq α),
-                        ∃ (p : QIT.FiniteDistribution α),
-                          ∃ (K : QIT.StochasticKernel α (QIT.TensorPower b k)),
+                        ∃ (p : ProbDistribution α),
+                          ∃ (K : DMChannel α (QIT.TensorPower b k)),
                             ∃ (Eout :
-                                Ensemble (Fin n → α)
-                                  (QIT.TensorPower (QIT.TensorPower b k) n)),
+                                MEnsemble (QIT.TensorPower (QIT.TensorPower b k) n) (Fin n → α)),
                               ∃ (φ :
                                   (Fin n → α) →
-                                    State (QIT.TensorPower (QIT.TensorPower a k) n)),
+                                    MState (QIT.TensorPower (QIT.TensorPower a k) n)),
                                 ∃ (δx : ℝ), ∃ (δc : ℝ), ∃ (packingε : ℝ),
                                   ∃ (d : ℝ), ∃ (D : ℝ), ∃ (pruneε : ℝ),
                                     0 ≤ δx ∧ 0 < δc ∧ 0 ≤ packingε ∧ 0 < D ∧
@@ -530,13 +558,13 @@ theorem hsw_regularized_direct_of_blockPrunedDiagonalProjectorEstimates
                                         conditionalLogDeviationSecondMoment
                                             (fun i : Fin n =>
                                               Classical.diagonalState
-                                                (K.prob (x i)) (K.sum_eq_one (x i))) /
+                                                (K.nnprob (x i)) (K.sum_nnprob (x i))) /
                                           ((n : ℝ) * δc) ^ 2 ≤ packingε) ∧
                                       (∀ x : Fin n → α,
                                         conditionallyTypicalSubspaceDimension
                                             (fun i : Fin n =>
                                               Classical.diagonalState
-                                                (K.prob (x i)) (K.sum_eq_one (x i)))
+                                                (K.nnprob (x i)) (K.sum_nnprob (x i)))
                                             δc ≤ d) ∧
                                       (∀ zseq : Fin n → QIT.TensorPower b k,
                                         ClassicalTypicality.StrongTypical
@@ -549,16 +577,16 @@ theorem hsw_regularized_direct_of_blockPrunedDiagonalProjectorEstimates
                                       (∀ x : Fin n → α,
                                         (Eout.probs x : ℝ) ≤
                                           (1 - pruneε)⁻¹ *
-                                            ∏ i, (p.prob (x i) : ℝ)) ∧
+                                            ∏ i, (p.nnprob (x i) : ℝ)) ∧
                                       (∀ x : Fin n → α,
-                                        ((N.tensorPower k).tensorPower n).applyState
+                                        ((N.tensorPower k).tensorPower n)
                                             (φ x) =
                                           Eout.states x) ∧
                                       2 * (packingε + 2 * Real.sqrt packingε) +
                                           4 * ((Fintype.card M : ℝ) - 1) *
                                             (d / ((1 - pruneε) * D)) ≤ ε / 2) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine N.hsw_regularized_direct_of_blockChannelEnsembleWitnesses_transport ?_
   intro k hk ι hιF hιD E₀
   let : Fintype ι := hιF
@@ -576,27 +604,26 @@ explicit entropy-exponent choice of `D`; the theorem derives the word-level
 product-mass envelope, constructs the packing hypotheses, and transports the
 block-channel codes back to the original channel. -/
 theorem hsw_regularized_direct_of_blockPrunedDiagonalProjectorEntropyEstimates
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblock :
       ∀ k : ℕ, 0 < k →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E₀ : Ensemble ι (QIT.TensorPower a k),
+          ∀ E₀ : MEnsemble (QIT.TensorPower a k) ι,
             ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
               ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
                 0 < n ∧ (1 : ℝ) / (n : ℝ) ≤ δ / 2 ∧
                   ∀ (M : Type uMessage) (_ : Fintype M) (_ : DecidableEq M)
                     (_ : Nonempty M),
-                    hswMessageRate M n ≥
+                    messageRate M n ≥
                         (N.tensorPower k).hswHolevoRate E₀ - δ / 2 →
                       ∃ (α : Type uAux), ∃ (_ : Fintype α), ∃ (_ : DecidableEq α),
-                        ∃ (p : QIT.FiniteDistribution α),
-                          ∃ (K : QIT.StochasticKernel α (QIT.TensorPower b k)),
+                        ∃ (p : ProbDistribution α),
+                          ∃ (K : DMChannel α (QIT.TensorPower b k)),
                             ∃ (Eout :
-                                Ensemble (Fin n → α)
-                                  (QIT.TensorPower (QIT.TensorPower b k) n)),
+                                MEnsemble (QIT.TensorPower (QIT.TensorPower b k) n) (Fin n → α)),
                               ∃ (φ :
                                   (Fin n → α) →
-                                    State (QIT.TensorPower (QIT.TensorPower a k) n)),
+                                    MState (QIT.TensorPower (QIT.TensorPower a k) n)),
                                 ∃ (δx : ℝ), ∃ (δc : ℝ), ∃ (packingε : ℝ),
                                   ∃ (d : ℝ), ∃ (D : ℝ), ∃ (pruneε : ℝ),
                                     0 ≤ δx ∧ 0 < δc ∧ 0 ≤ packingε ∧ 0 < D ∧
@@ -614,13 +641,13 @@ theorem hsw_regularized_direct_of_blockPrunedDiagonalProjectorEntropyEstimates
                                         conditionalLogDeviationSecondMoment
                                             (fun i : Fin n =>
                                               Classical.diagonalState
-                                                (K.prob (x i)) (K.sum_eq_one (x i))) /
+                                                (K.nnprob (x i)) (K.sum_nnprob (x i))) /
                                           ((n : ℝ) * δc) ^ 2 ≤ packingε) ∧
                                       (∀ x : Fin n → α,
                                         conditionallyTypicalSubspaceDimension
                                             (fun i : Fin n =>
                                               Classical.diagonalState
-                                                (K.prob (x i)) (K.sum_eq_one (x i)))
+                                                (K.nnprob (x i)) (K.sum_nnprob (x i)))
                                             δc ≤ d) ∧
                                       Real.rpow 2
                                         (- (n : ℝ) *
@@ -631,16 +658,16 @@ theorem hsw_regularized_direct_of_blockPrunedDiagonalProjectorEntropyEstimates
                                       (∀ x : Fin n → α,
                                         (Eout.probs x : ℝ) ≤
                                           (1 - pruneε)⁻¹ *
-                                            ∏ i, (p.prob (x i) : ℝ)) ∧
+                                            ∏ i, (p.nnprob (x i) : ℝ)) ∧
                                       (∀ x : Fin n → α,
-                                        ((N.tensorPower k).tensorPower n).applyState
+                                        ((N.tensorPower k).tensorPower n)
                                             (φ x) =
                                           Eout.states x) ∧
                                       2 * (packingε + 2 * Real.sqrt packingε) +
                                           4 * ((Fintype.card M : ℝ) - 1) *
                                             (d / ((1 - pruneε) * D)) ≤ ε / 2) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine N.hsw_regularized_direct_of_blockChannelEnsembleWitnesses_transport ?_
   intro k hk ι hιF hιD E₀
   let : Fintype ι := hιF
@@ -660,27 +687,26 @@ bound is the named value
 `hswConditionalDiagonalDimensionEnvelope p K n δx δc`, derived from codeword
 strong typicality. -/
 theorem hsw_regularized_direct_of_blockPrunedDiagonalProjectorEntropyDimensionEstimates
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblock :
       ∀ k : ℕ, 0 < k →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E₀ : Ensemble ι (QIT.TensorPower a k),
+          ∀ E₀ : MEnsemble (QIT.TensorPower a k) ι,
             ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
               ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
                 0 < n ∧ (1 : ℝ) / (n : ℝ) ≤ δ / 2 ∧
                   ∀ (M : Type uMessage) (_ : Fintype M) (_ : DecidableEq M)
                     (_ : Nonempty M),
-                    hswMessageRate M n ≥
+                    messageRate M n ≥
                         (N.tensorPower k).hswHolevoRate E₀ - δ / 2 →
                       ∃ (α : Type uAux), ∃ (_ : Fintype α), ∃ (_ : DecidableEq α),
-                        ∃ (p : QIT.FiniteDistribution α),
-                          ∃ (K : QIT.StochasticKernel α (QIT.TensorPower b k)),
+                        ∃ (p : ProbDistribution α),
+                          ∃ (K : DMChannel α (QIT.TensorPower b k)),
                             ∃ (Eout :
-                                Ensemble (Fin n → α)
-                                  (QIT.TensorPower (QIT.TensorPower b k) n)),
+                                MEnsemble (QIT.TensorPower (QIT.TensorPower b k) n) (Fin n → α)),
                               ∃ (φ :
                                   (Fin n → α) →
-                                    State (QIT.TensorPower (QIT.TensorPower a k) n)),
+                                    MState (QIT.TensorPower (QIT.TensorPower a k) n)),
                                 ∃ (δx : ℝ), ∃ (δc : ℝ), ∃ (packingε : ℝ),
                                   ∃ (D : ℝ), ∃ (pruneε : ℝ),
                                     0 ≤ δx ∧ 0 < δc ∧ 0 ≤ packingε ∧ 0 < D ∧
@@ -698,7 +724,7 @@ theorem hsw_regularized_direct_of_blockPrunedDiagonalProjectorEntropyDimensionEs
                                         conditionalLogDeviationSecondMoment
                                             (fun i : Fin n =>
                                               Classical.diagonalState
-                                                (K.prob (x i)) (K.sum_eq_one (x i))) /
+                                                (K.nnprob (x i)) (K.sum_nnprob (x i))) /
                                           ((n : ℝ) * δc) ^ 2 ≤ packingε) ∧
                                       Real.rpow 2
                                         (- (n : ℝ) *
@@ -709,9 +735,9 @@ theorem hsw_regularized_direct_of_blockPrunedDiagonalProjectorEntropyDimensionEs
                                       (∀ x : Fin n → α,
                                         (Eout.probs x : ℝ) ≤
                                           (1 - pruneε)⁻¹ *
-                                            ∏ i, (p.prob (x i) : ℝ)) ∧
+                                            ∏ i, (p.nnprob (x i) : ℝ)) ∧
                                       (∀ x : Fin n → α,
-                                        ((N.tensorPower k).tensorPower n).applyState
+                                        ((N.tensorPower k).tensorPower n)
                                             (φ x) =
                                           Eout.states x) ∧
                                       2 * (packingε + 2 * Real.sqrt packingε) +
@@ -719,8 +745,8 @@ theorem hsw_regularized_direct_of_blockPrunedDiagonalProjectorEntropyDimensionEs
                                             (hswConditionalDiagonalDimensionEnvelope
                                                 p K n δx δc /
                                               ((1 - pruneε) * D)) ≤ ε / 2) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine N.hsw_regularized_direct_of_blockChannelEnsembleWitnesses_transport ?_
   intro k hk ι hιF hιD E₀
   let : Fintype ι := hιF
@@ -738,27 +764,26 @@ while pack-3's dimension envelope, pack-4's product-mass scale `D`, the
 packing/expurgation assembly, and block-to-base rate normalization are all
 proved here. -/
 theorem hsw_regularized_direct_of_blockPrunedDiagonalProjectorTypicalityScaleEstimates
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblock :
       ∀ k : ℕ, 0 < k →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E₀ : Ensemble ι (QIT.TensorPower a k),
+          ∀ E₀ : MEnsemble (QIT.TensorPower a k) ι,
             ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
               ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
                 0 < n ∧ (1 : ℝ) / (n : ℝ) ≤ δ / 2 ∧
                   ∀ (M : Type uMessage) (_ : Fintype M) (_ : DecidableEq M)
                     (_ : Nonempty M),
-                    hswMessageRate M n ≥
+                    messageRate M n ≥
                         (N.tensorPower k).hswHolevoRate E₀ - δ / 2 →
                       ∃ (α : Type uAux), ∃ (_ : Fintype α), ∃ (_ : DecidableEq α),
-                        ∃ (p : QIT.FiniteDistribution α),
-                          ∃ (K : QIT.StochasticKernel α (QIT.TensorPower b k)),
+                        ∃ (p : ProbDistribution α),
+                          ∃ (K : DMChannel α (QIT.TensorPower b k)),
                             ∃ (Eout :
-                                Ensemble (Fin n → α)
-                                  (QIT.TensorPower (QIT.TensorPower b k) n)),
+                                MEnsemble (QIT.TensorPower (QIT.TensorPower b k) n) (Fin n → α)),
                               ∃ (φ :
                                   (Fin n → α) →
-                                    State (QIT.TensorPower (QIT.TensorPower a k) n)),
+                                    MState (QIT.TensorPower (QIT.TensorPower a k) n)),
                                 ∃ (δx : ℝ), ∃ (δc : ℝ), ∃ (packingε : ℝ),
                                   ∃ (pruneε : ℝ),
                                     0 ≤ δx ∧ 0 < δc ∧ 0 ≤ packingε ∧
@@ -776,14 +801,14 @@ theorem hsw_regularized_direct_of_blockPrunedDiagonalProjectorTypicalityScaleEst
                                         conditionalLogDeviationSecondMoment
                                             (fun i : Fin n =>
                                               Classical.diagonalState
-                                                (K.prob (x i)) (K.sum_eq_one (x i))) /
+                                                (K.nnprob (x i)) (K.sum_nnprob (x i))) /
                                           ((n : ℝ) * δc) ^ 2 ≤ packingε) ∧
                                       (∀ x : Fin n → α,
                                         (Eout.probs x : ℝ) ≤
                                           (1 - pruneε)⁻¹ *
-                                            ∏ i, (p.prob (x i) : ℝ)) ∧
+                                            ∏ i, (p.nnprob (x i) : ℝ)) ∧
                                       (∀ x : Fin n → α,
-                                        ((N.tensorPower k).tensorPower n).applyState
+                                        ((N.tensorPower k).tensorPower n)
                                             (φ x) =
                                           Eout.states x) ∧
                                       2 * (packingε + 2 * Real.sqrt packingε) +
@@ -794,8 +819,8 @@ theorem hsw_regularized_direct_of_blockPrunedDiagonalProjectorTypicalityScaleEst
                                                 (ClassicalTypicality.inducedMarginal p K).strongTypicalMassScale
                                                   n ((Fintype.card α : ℝ) * (δx + δc)))) ≤
                                             ε / 2) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine N.hsw_regularized_direct_of_blockChannelEnsembleWitnesses_transport ?_
   intro k hk ι hιF hιD E₀
   let : Fintype ι := hιF
@@ -813,36 +838,35 @@ It removes the impossible full-word assumption
 the random-coding index type is the strongly-typical subtype, while the
 remaining independent source obligations are kept explicit. -/
 theorem hsw_regularized_direct_of_blockStrongTypicalCodebookProjectorTypicalityScaleEstimates
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblock :
       ∀ k : ℕ, 0 < k →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E₀ : Ensemble ι (QIT.TensorPower a k),
+          ∀ E₀ : MEnsemble (QIT.TensorPower a k) ι,
             ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
               ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
                 0 < n ∧ (1 : ℝ) / (n : ℝ) ≤ δ / 2 ∧
                   ∀ (M : Type uMessage) (_ : Fintype M) (_ : DecidableEq M)
                     (_ : Nonempty M),
-                    hswMessageRate M n ≥
+                    messageRate M n ≥
                         (N.tensorPower k).hswHolevoRate E₀ - δ / 2 →
                       ∃ (α : Type uAux), ∃ (_ : Fintype α), ∃ (_ : DecidableEq α),
-                        ∃ (p : QIT.FiniteDistribution α),
-                          ∃ (K : QIT.StochasticKernel α (QIT.TensorPower b k)),
+                        ∃ (p : ProbDistribution α),
+                          ∃ (K : DMChannel α (QIT.TensorPower b k)),
                             ∃ (δx : ℝ), ∃ (δc : ℝ), ∃ (packingε : ℝ),
                               ∃ (Eout :
-                                  Ensemble
-                                    (ClassicalTypicality.StrongTypicalWord p n δx)
-                                    (QIT.TensorPower (QIT.TensorPower b k) n)),
+                                  MEnsemble (QIT.TensorPower (QIT.TensorPower b k) n)
+                                    (ClassicalTypicality.StrongTypicalWord p n δx)),
                                 ∃ (φ :
                                     ClassicalTypicality.StrongTypicalWord p n δx →
-                                      State (QIT.TensorPower (QIT.TensorPower a k) n)),
+                                      MState (QIT.TensorPower (QIT.TensorPower a k) n)),
                                   0 ≤ δx ∧ 0 < δc ∧ 0 ≤ packingε ∧
                                     (∀ x,
-                                      (Eout.states x).matrix =
+                                      (Eout.states x).m =
                                         (HSWPackingHypothesesSpectral.conditionalProductDiagonalState
                                           K
                                           (ClassicalTypicality.StrongTypicalWord.codeword
-                                            p δx x)).matrix) ∧
+                                            p δx x)).m) ∧
                                     (Fintype.card α : ℝ) *
                                         (Fintype.card (QIT.TensorPower b k) : ℝ) /
                                         ((n : ℝ) * δc ^ 2) ≤ packingε ∧
@@ -850,10 +874,10 @@ theorem hsw_regularized_direct_of_blockStrongTypicalCodebookProjectorTypicalityS
                                       conditionalLogDeviationSecondMoment
                                           (fun i : Fin n =>
                                             Classical.diagonalState
-                                              (K.prob
+                                              (K.nnprob
                                                 (ClassicalTypicality.StrongTypicalWord.codeword
                                                   p δx x i))
-                                              (K.sum_eq_one
+                                              (K.sum_nnprob
                                                 (ClassicalTypicality.StrongTypicalWord.codeword
                                                   p δx x i))) /
                                         ((n : ℝ) * δc) ^ 2 ≤ packingε) ∧
@@ -861,7 +885,7 @@ theorem hsw_regularized_direct_of_blockStrongTypicalCodebookProjectorTypicalityS
                                           (ClassicalTypicality.inducedMarginal p K)
                                           n
                                           ((Fintype.card α : ℝ) * (δx + δc)) *
-                                        Eout.averageState.matrix *
+                                        Eout.averageState.m *
                                         HSWPackingHypothesesSpectral.strongTypicalDiagonalProjector
                                           (ClassicalTypicality.inducedMarginal p K)
                                           n
@@ -874,7 +898,7 @@ theorem hsw_regularized_direct_of_blockStrongTypicalCodebookProjectorTypicalityS
                                               n
                                               ((Fintype.card α : ℝ) * (δx + δc))) ∧
                                     (∀ x,
-                                      ((N.tensorPower k).tensorPower n).applyState
+                                      ((N.tensorPower k).tensorPower n)
                                           (φ x) =
                                         Eout.states x) ∧
                                     2 * (packingε + 2 * Real.sqrt packingε) +
@@ -884,13 +908,13 @@ theorem hsw_regularized_direct_of_blockStrongTypicalCodebookProjectorTypicalityS
                                             ((ClassicalTypicality.inducedMarginal p K).strongTypicalMassScale
                                               n ((Fintype.card α : ℝ) * (δx + δc)))) ≤
                                           ε / 2) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine N.hsw_regularized_direct_of_blockChannelEnsembleWitnesses_transport ?_
   intro k hk ι hιF hιD E₀
   let : Fintype ι := hιF
   let : DecidableEq ι := hιD
-  exact Channel.hsw_directWitnessAssembly_from_strongTypicalCodebookProjectorTypicalityScaleEstimates
+  exact CPTPOp.hsw_directWitnessAssembly_from_strongTypicalCodebookProjectorTypicalityScaleEstimates
     (N.tensorPower k) E₀ (hblock k hk ι inferInstance inferInstance E₀)
 
 /-- HSW regularized direct achievability from canonical pruned strongly-typical
@@ -904,33 +928,32 @@ the canonical pruned i.i.d. distribution on the strongly-typical subtype, and
 the resulting effective denominator contains the source's `(1 - pruneε)`
 factor. -/
 theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalCodebookProjectorTypicalityScaleEstimates
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblock :
       ∀ k : ℕ, 0 < k →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E₀ : Ensemble ι (QIT.TensorPower a k),
+          ∀ E₀ : MEnsemble (QIT.TensorPower a k) ι,
             ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
               ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
                 0 < n ∧ (1 : ℝ) / (n : ℝ) ≤ δ / 2 ∧
                   ∀ (M : Type uMessage) (_ : Fintype M) (_ : DecidableEq M)
                     (_ : Nonempty M),
-                    hswMessageRate M n ≥
+                    messageRate M n ≥
                         (N.tensorPower k).hswHolevoRate E₀ - δ / 2 →
                       ∃ (α : Type uAux), ∃ (_ : Fintype α), ∃ (_ : DecidableEq α),
-                        ∃ (p : QIT.FiniteDistribution α),
-                          ∃ (K : QIT.StochasticKernel α (QIT.TensorPower b k)),
+                        ∃ (p : ProbDistribution α),
+                          ∃ (K : DMChannel α (QIT.TensorPower b k)),
                             ∃ (δx : ℝ), ∃ (δc : ℝ), ∃ (packingε : ℝ),
                               ∃ (pruneε : ℝ),
                                 ∃ (hmass_pos :
                                     0 < ClassicalTypicality.strongTypicalMass
                                       (n := n) p δx),
                                   ∃ (Eout :
-                                      Ensemble
-                                        (ClassicalTypicality.StrongTypicalWord p n δx)
-                                        (QIT.TensorPower (QIT.TensorPower b k) n)),
+                                      MEnsemble (QIT.TensorPower (QIT.TensorPower b k) n)
+                                        (ClassicalTypicality.StrongTypicalWord p n δx)),
                                     ∃ (φ :
                                         ClassicalTypicality.StrongTypicalWord p n δx →
-                                          State (QIT.TensorPower (QIT.TensorPower a k) n)),
+                                          MState (QIT.TensorPower (QIT.TensorPower a k) n)),
                                       0 ≤ δx ∧ 0 < δc ∧ 0 ≤ packingε ∧
                                         pruneε < 1 ∧
                                         (1 - pruneε : ℝ) ≤
@@ -939,7 +962,7 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalCodebookProjectorTy
                                         (∀ x,
                                           Eout.probs x =
                                             (ClassicalTypicality.prunedStrongTypicalDistribution
-                                              p δx hmass_pos).prob x) ∧
+                                              p δx hmass_pos).nnprob x) ∧
                                         (∀ x,
                                           Eout.states x =
                                             HSWPackingHypothesesSpectral.conditionalProductDiagonalState
@@ -953,15 +976,15 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalCodebookProjectorTy
                                           conditionalLogDeviationSecondMoment
                                               (fun i : Fin n =>
                                                 Classical.diagonalState
-                                                  (K.prob
+                                                  (K.nnprob
                                                     (ClassicalTypicality.StrongTypicalWord.codeword
                                                       p δx x i))
-                                                  (K.sum_eq_one
+                                                  (K.sum_nnprob
                                                     (ClassicalTypicality.StrongTypicalWord.codeword
                                                       p δx x i))) /
                                             ((n : ℝ) * δc) ^ 2 ≤ packingε) ∧
                                         (∀ x,
-                                          ((N.tensorPower k).tensorPower n).applyState
+                                          ((N.tensorPower k).tensorPower n)
                                               (φ x) =
                                             Eout.states x) ∧
                                         2 * (packingε + 2 * Real.sqrt packingε) +
@@ -972,13 +995,13 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalCodebookProjectorTy
                                                   (ClassicalTypicality.inducedMarginal p K).strongTypicalMassScale
                                                     n ((Fintype.card α : ℝ) * (δx + δc)))) ≤
                                               ε / 2) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine N.hsw_regularized_direct_of_blockChannelEnsembleWitnesses_transport ?_
   intro k hk ι hιF hιD E₀
   let : Fintype ι := hιF
   let : DecidableEq ι := hιD
-  exact Channel.hsw_directWitnessAssembly_from_canonicalStrongTypicalCodebookProjectorTypicalityScaleEstimates
+  exact CPTPOp.hsw_directWitnessAssembly_from_canonicalStrongTypicalCodebookProjectorTypicalityScaleEstimates
     (N.tensorPower k) E₀ (hblock k hk ι inferInstance inferInstance E₀)
 
 /-- HSW regularized direct achievability from canonical pruned strongly-typical
@@ -991,26 +1014,26 @@ are still genuinely external to this assembly layer: typical-set mass,
 conditional log-deviation, physical output realization, and final numerical
 packing exponent. -/
 theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalCodebookProjectorTypicalityScaleBounds
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblock :
       ∀ k : ℕ, 0 < k →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E₀ : Ensemble ι (QIT.TensorPower a k),
+          ∀ E₀ : MEnsemble (QIT.TensorPower a k) ι,
             ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
               ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
                 0 < n ∧ (1 : ℝ) / (n : ℝ) ≤ δ / 2 ∧
                   ∀ (M : Type uMessage) (_ : Fintype M) (_ : DecidableEq M)
                     (_ : Nonempty M),
-                    hswMessageRate M n ≥
+                    messageRate M n ≥
                         (N.tensorPower k).hswHolevoRate E₀ - δ / 2 →
                       ∃ (α : Type uAux), ∃ (_ : Fintype α), ∃ (_ : DecidableEq α),
-                        ∃ (p : QIT.FiniteDistribution α),
-                          ∃ (K : QIT.StochasticKernel α (QIT.TensorPower b k)),
+                        ∃ (p : ProbDistribution α),
+                          ∃ (K : DMChannel α (QIT.TensorPower b k)),
                             ∃ (δx : ℝ), ∃ (δc : ℝ), ∃ (packingε : ℝ),
                               ∃ (pruneε : ℝ),
                                 ∃ (φ :
                                     ClassicalTypicality.StrongTypicalWord p n δx →
-                                      State (QIT.TensorPower (QIT.TensorPower a k) n)),
+                                      MState (QIT.TensorPower (QIT.TensorPower a k) n)),
                                   0 ≤ δx ∧ 0 < δc ∧ 0 ≤ packingε ∧
                                     pruneε < 1 ∧
                                     (1 - pruneε : ℝ) ≤
@@ -1023,15 +1046,15 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalCodebookProjectorTy
                                       conditionalLogDeviationSecondMoment
                                           (fun i : Fin n =>
                                             Classical.diagonalState
-                                              (K.prob
+                                              (K.nnprob
                                                 (ClassicalTypicality.StrongTypicalWord.codeword
                                                   p δx x i))
-                                              (K.sum_eq_one
+                                              (K.sum_nnprob
                                                 (ClassicalTypicality.StrongTypicalWord.codeword
                                                   p δx x i))) /
                                         ((n : ℝ) * δc) ^ 2 ≤ packingε) ∧
                                     (∀ x,
-                                      ((N.tensorPower k).tensorPower n).applyState
+                                      ((N.tensorPower k).tensorPower n)
                                           (φ x) =
                                         HSWPackingHypothesesSpectral.conditionalProductDiagonalState
                                           K
@@ -1045,13 +1068,13 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalCodebookProjectorTy
                                               (ClassicalTypicality.inducedMarginal p K).strongTypicalMassScale
                                                 n ((Fintype.card α : ℝ) * (δx + δc)))) ≤
                                           ε / 2) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine N.hsw_regularized_direct_of_blockChannelEnsembleWitnesses_transport ?_
   intro k hk ι hιF hιD E₀
   let : Fintype ι := hιF
   let : DecidableEq ι := hιD
-  exact Channel.hsw_directWitnessAssembly_from_canonicalStrongTypicalCodebookProjectorTypicalityScaleBounds
+  exact CPTPOp.hsw_directWitnessAssembly_from_canonicalStrongTypicalCodebookProjectorTypicalityScaleBounds
     (N.tensorPower k) E₀ (hblock k hk ι inferInstance inferInstance E₀)
 
 /-- Regularized HSW direct-achievability from source-shaped spectral estimates
@@ -1066,17 +1089,17 @@ product input state.  The remaining assumptions are exactly the still-external
 asymptotic estimates for pack-1 cross-capture, conditional log-deviation, and
 the final packing-error exponent. -/
 theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSpectralEstimates
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblock :
       ∀ k : ℕ, 0 < k →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E₀ : Ensemble ι (QIT.TensorPower a k),
+          ∀ E₀ : MEnsemble (QIT.TensorPower a k) ι,
             ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
               ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
                 0 < n ∧ (1 : ℝ) / (n : ℝ) ≤ δ / 2 ∧
                   ∀ (M : Type uMessage) (_ : Fintype M) (_ : DecidableEq M)
                     (_ : Nonempty M),
-                    hswMessageRate M n ≥
+                    messageRate M n ≥
                         (N.tensorPower k).hswHolevoRate E₀ - δ / 2 →
                       ∃ (δx : ℝ), ∃ (δavg : ℝ), ∃ (δc : ℝ),
                         ∃ (packingε : ℝ), ∃ (pruneε : ℝ),
@@ -1085,11 +1108,11 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSpectralEstim
                             (1 - pruneε : ℝ) ≤
                               (ClassicalTypicality.strongTypicalMass
                                 (n := n)
-                                ((N.tensorPower k).outputEnsemble E₀).indexDistribution
+                                ((N.tensorPower k).outputEnsemble E₀).distr
                                 δx : ℝ) ∧
                             (∀ x :
                                 ClassicalTypicality.StrongTypicalWord
-                                  ((N.tensorPower k).outputEnsemble E₀).indexDistribution
+                                  ((N.tensorPower k).outputEnsemble E₀).distr
                                   n δx,
                               1 - packingε ≤
                                 ((((N.tensorPower k).outputEnsemble E₀).averageState.typicalSubspaceProjector
@@ -1097,17 +1120,17 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSpectralEstim
                                   (productState fun i : Fin n =>
                                     ((N.tensorPower k).outputEnsemble E₀).states
                                       (ClassicalTypicality.StrongTypicalWord.codeword
-                                        (((N.tensorPower k).outputEnsemble E₀).indexDistribution)
-                                        δx x i)).matrix).trace.re) ∧
+                                        (((N.tensorPower k).outputEnsemble E₀).distr)
+                                        δx x i)).m).trace.re) ∧
                             (∀ x :
                                 ClassicalTypicality.StrongTypicalWord
-                                  ((N.tensorPower k).outputEnsemble E₀).indexDistribution
+                                  ((N.tensorPower k).outputEnsemble E₀).distr
                                   n δx,
                               conditionalLogDeviationSecondMoment
                                   (fun i : Fin n =>
                                     ((N.tensorPower k).outputEnsemble E₀).states
                                       (ClassicalTypicality.StrongTypicalWord.codeword
-                                        (((N.tensorPower k).outputEnsemble E₀).indexDistribution)
+                                        (((N.tensorPower k).outputEnsemble E₀).distr)
                                         δx x i)) /
                                 ((n : ℝ) * δc) ^ 2 ≤ packingε) ∧
                             2 * (packingε + 2 * Real.sqrt packingε) +
@@ -1120,13 +1143,13 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSpectralEstim
                                             ((N.tensorPower k).outputEnsemble E₀).averageState.vonNeumann -
                                           (n : ℝ) * δavg))) ≤
                                   ε / 2) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine N.hsw_regularized_direct_of_blockChannelEnsembleWitnesses_transport ?_
   intro k hk ι hιF hιD E₀
   let : Fintype ι := hιF
   let : DecidableEq ι := hιD
-  exact Channel.hsw_directWitnessAssembly_from_canonicalStrongTypicalOutputSpectralEstimates
+  exact CPTPOp.hsw_directWitnessAssembly_from_canonicalStrongTypicalOutputSpectralEstimates
     (N.tensorPower k) E₀ (hblock k hk ι inferInstance inferInstance E₀)
 
 /-- Regularized HSW direct achievability from source-projector packing bounds
@@ -1135,22 +1158,22 @@ for the canonical pruned strongly-typical codebook with actual quantum outputs.
 This is the block-channel lift of
 `hsw_directWitnessAssembly_from_canonicalStrongTypicalOutputSourceProjectorBounds`.
 It keeps the remaining asymptotic estimates explicit but no longer asks the
-caller for the legacy arbitrary spectral projector slack `δavg`: the average
+caller for the arbitrary spectral projector slack `δavg`: the average
 projector is the source-shaped eigenbasis typical projector of the block
 average output state, with denominator given by the canonical eigenvalue
 strong-typical mass scale. -/
 theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProjectorBounds
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblock :
       ∀ k : ℕ, 0 < k →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E₀ : Ensemble ι (QIT.TensorPower a k),
+          ∀ E₀ : MEnsemble (QIT.TensorPower a k) ι,
             ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
               ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
                 0 < n ∧ (1 : ℝ) / (n : ℝ) ≤ δ / 2 ∧
                   ∀ (M : Type uMessage) (_ : Fintype M) (_ : DecidableEq M)
                     (_ : Nonempty M),
-                    hswMessageRate M n ≥
+                    messageRate M n ≥
                         (N.tensorPower k).hswHolevoRate E₀ - δ / 2 →
                       ∃ (δx : ℝ), ∃ (δc : ℝ),
                         ∃ (packingε : ℝ), ∃ (pruneε : ℝ),
@@ -1159,20 +1182,20 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProject
                             (1 - pruneε : ℝ) ≤
                               (ClassicalTypicality.strongTypicalMass
                                 (n := n)
-                                ((N.tensorPower k).outputEnsemble E₀).indexDistribution
+                                ((N.tensorPower k).outputEnsemble E₀).distr
                                 δx : ℝ) ∧
                             (Fintype.card ι : ℝ) *
                                 (Fintype.card (QIT.TensorPower b k) : ℝ) /
                                 ((n : ℝ) * δc ^ 2) ≤ packingε ∧
                             (∀ x :
                                 ClassicalTypicality.StrongTypicalWord
-                                  ((N.tensorPower k).outputEnsemble E₀).indexDistribution
+                                  ((N.tensorPower k).outputEnsemble E₀).distr
                                   n δx,
                               conditionalLogDeviationSecondMoment
                                   (fun i : Fin n =>
                                     ((N.tensorPower k).outputEnsemble E₀).states
                                       (ClassicalTypicality.StrongTypicalWord.codeword
-                                        (((N.tensorPower k).outputEnsemble E₀).indexDistribution)
+                                        (((N.tensorPower k).outputEnsemble E₀).distr)
                                         δx x i)) /
                                 ((n : ℝ) * δc) ^ 2 ≤ packingε) ∧
                             2 * (packingε + 2 * Real.sqrt packingε) +
@@ -1180,18 +1203,18 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProject
                                   (((N.tensorPower k).outputEnsemble E₀).strongTypicalDimensionEnvelope
                                       n δx δc /
                                     ((1 - pruneε) *
-                                      QIT.FiniteDistribution.strongTypicalMassScale
+                                      ProbDistribution.strongTypicalMassScale
                                         (HSWPackingHypothesesSpectral.stateEigenvalueDistribution
                                           ((N.tensorPower k).outputEnsemble E₀).averageState)
                                         n ((Fintype.card ι : ℝ) * (δx + δc)))) ≤
                                   ε / 2) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine N.hsw_regularized_direct_of_blockChannelEnsembleWitnesses_transport ?_
   intro k hk ι hιF hιD E₀
   let : Fintype ι := hιF
   let : DecidableEq ι := hιD
-  exact Channel.hsw_directWitnessAssembly_from_canonicalStrongTypicalOutputSourceProjectorBounds
+  exact CPTPOp.hsw_directWitnessAssembly_from_canonicalStrongTypicalOutputSourceProjectorBounds
     (N.tensorPower k) E₀ (hblock k hk ι inferInstance inferInstance E₀)
 
 /-- Regularized HSW direct achievability from source-projector packing bounds
@@ -1205,17 +1228,17 @@ proof: the codebook/source-projector construction has been internalized, and
 the caller must now prove only the genuine large-block estimates for typical
 mass, conditional log-deviation, self-error, and cross-error. -/
 theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProjectorComponentBounds
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblock :
       ∀ k : ℕ, 0 < k →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E₀ : Ensemble ι (QIT.TensorPower a k),
+          ∀ E₀ : MEnsemble (QIT.TensorPower a k) ι,
             ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
               ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
                 0 < n ∧ (1 : ℝ) / (n : ℝ) ≤ δ / 2 ∧
                   ∀ (M : Type uMessage) (_ : Fintype M) (_ : DecidableEq M)
                     (_ : Nonempty M),
-                    hswMessageRate M n ≥
+                    messageRate M n ≥
                         (N.tensorPower k).hswHolevoRate E₀ - δ / 2 →
                       ∃ (δx : ℝ), ∃ (δc : ℝ),
                         ∃ (packingε : ℝ), ∃ (pruneε : ℝ),
@@ -1224,20 +1247,20 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProject
                             (1 - pruneε : ℝ) ≤
                               (ClassicalTypicality.strongTypicalMass
                                 (n := n)
-                                ((N.tensorPower k).outputEnsemble E₀).indexDistribution
+                                ((N.tensorPower k).outputEnsemble E₀).distr
                                 δx : ℝ) ∧
                             (Fintype.card ι : ℝ) *
                                 (Fintype.card (QIT.TensorPower b k) : ℝ) /
                                 ((n : ℝ) * δc ^ 2) ≤ packingε ∧
                             (∀ x :
                                 ClassicalTypicality.StrongTypicalWord
-                                  ((N.tensorPower k).outputEnsemble E₀).indexDistribution
+                                  ((N.tensorPower k).outputEnsemble E₀).distr
                                   n δx,
                               conditionalLogDeviationSecondMoment
                                   (fun i : Fin n =>
                                     ((N.tensorPower k).outputEnsemble E₀).states
                                       (ClassicalTypicality.StrongTypicalWord.codeword
-                                        (((N.tensorPower k).outputEnsemble E₀).indexDistribution)
+                                        (((N.tensorPower k).outputEnsemble E₀).distr)
                                         δx x i)) /
                                 ((n : ℝ) * δc) ^ 2 ≤ packingε) ∧
                             2 * (packingε + 2 * Real.sqrt packingε) ≤ ε / 4 ∧
@@ -1245,19 +1268,19 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProject
                                   (((N.tensorPower k).outputEnsemble E₀).strongTypicalDimensionEnvelope
                                       n δx δc /
                                     ((1 - pruneε) *
-                                      QIT.FiniteDistribution.strongTypicalMassScale
+                                      ProbDistribution.strongTypicalMassScale
                                         (HSWPackingHypothesesSpectral.stateEigenvalueDistribution
                                           ((N.tensorPower k).outputEnsemble E₀).averageState)
                                         n ((Fintype.card ι : ℝ) * (δx + δc)))) ≤
                                   ε / 4) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine N.hsw_regularized_direct_of_blockChannelEnsembleWitnesses_transport ?_
   intro k hk ι hιF hιD E₀
   let : Fintype ι := hιF
   let : DecidableEq ι := hιD
   exact
-    Channel.hsw_directWitnessAssembly_from_canonicalStrongTypicalOutputSourceProjectorComponentBounds
+    CPTPOp.hsw_directWitnessAssembly_from_canonicalStrongTypicalOutputSourceProjectorComponentBounds
       (N.tensorPower k) E₀ (hblock k hk ι inferInstance inferInstance E₀)
 
 /-- Regularized HSW direct achievability from source-projector packing bounds
@@ -1269,17 +1292,17 @@ the block hypothesis no longer contains the strongly-typical codebook mass
 lower bound.  It is replaced by the explicit large-block condition
 `|X|/(nδ_x²) ≤ pruneε`. -/
 theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProjectorFiniteMassBounds
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblock :
       ∀ k : ℕ, 0 < k →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E₀ : Ensemble ι (QIT.TensorPower a k),
+          ∀ E₀ : MEnsemble (QIT.TensorPower a k) ι,
             ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
               ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
                 0 < n ∧ (1 : ℝ) / (n : ℝ) ≤ δ / 2 ∧
                   ∀ (M : Type uMessage) (_ : Fintype M) (_ : DecidableEq M)
                     (_ : Nonempty M),
-                    hswMessageRate M n ≥
+                    messageRate M n ≥
                         (N.tensorPower k).hswHolevoRate E₀ - δ / 2 →
                       ∃ (δx : ℝ), ∃ (δc : ℝ),
                         ∃ (packingε : ℝ), ∃ (pruneε : ℝ),
@@ -1292,13 +1315,13 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProject
                                 ((n : ℝ) * δc ^ 2) ≤ packingε ∧
                             (∀ x :
                                 ClassicalTypicality.StrongTypicalWord
-                                  ((N.tensorPower k).outputEnsemble E₀).indexDistribution
+                                  ((N.tensorPower k).outputEnsemble E₀).distr
                                   n δx,
                               conditionalLogDeviationSecondMoment
                                   (fun i : Fin n =>
                                     ((N.tensorPower k).outputEnsemble E₀).states
                                       (ClassicalTypicality.StrongTypicalWord.codeword
-                                        (((N.tensorPower k).outputEnsemble E₀).indexDistribution)
+                                        (((N.tensorPower k).outputEnsemble E₀).distr)
                                         δx x i)) /
                                 ((n : ℝ) * δc) ^ 2 ≤ packingε) ∧
                             2 * (packingε + 2 * Real.sqrt packingε) ≤ ε / 4 ∧
@@ -1306,19 +1329,19 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProject
                                   (((N.tensorPower k).outputEnsemble E₀).strongTypicalDimensionEnvelope
                                       n δx δc /
                                     ((1 - pruneε) *
-                                      QIT.FiniteDistribution.strongTypicalMassScale
+                                      ProbDistribution.strongTypicalMassScale
                                         (HSWPackingHypothesesSpectral.stateEigenvalueDistribution
                                           ((N.tensorPower k).outputEnsemble E₀).averageState)
                                         n ((Fintype.card ι : ℝ) * (δx + δc)))) ≤
                                   ε / 4) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine N.hsw_regularized_direct_of_blockChannelEnsembleWitnesses_transport ?_
   intro k hk ι hιF hιD E₀
   let : Fintype ι := hιF
   let : DecidableEq ι := hιD
   exact
-    Channel.hsw_directWitnessAssembly_from_canonicalStrongTypicalOutputSourceProjectorFiniteMassBounds
+    CPTPOp.hsw_directWitnessAssembly_from_canonicalStrongTypicalOutputSourceProjectorFiniteMassBounds
       (N.tensorPower k) E₀ (hblock k hk ι inferInstance inferInstance E₀)
 
 /-- Regularized HSW direct achievability from source-projector packing bounds
@@ -1333,17 +1356,17 @@ cross exponent with the factor `2^{n(χ-δ/2)}`, this theorem performs the
 message-set choice, packing/expurgation, block-channel coding, and
 block-to-base-channel rate normalization. -/
 theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProjectorFiniteMassCardBound
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblock :
       ∀ k : ℕ, 0 < k →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E₀ : Ensemble ι (QIT.TensorPower a k),
+          ∀ E₀ : MEnsemble (QIT.TensorPower a k) ι,
             ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
               ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
                 0 < n ∧ (1 : ℝ) / (n : ℝ) ≤ δ / 2 ∧
                   ∀ (M : Type uMessage) (_ : Fintype M) (_ : DecidableEq M)
                     (_ : Nonempty M),
-                    hswMessageRate M n ≥
+                    messageRate M n ≥
                         (N.tensorPower k).hswHolevoRate E₀ - δ / 2 →
                       (Fintype.card M : ℝ) - 1 ≤
                         Real.rpow 2
@@ -1359,13 +1382,13 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProject
                                 ((n : ℝ) * δc ^ 2) ≤ packingε ∧
                             (∀ x :
                                 ClassicalTypicality.StrongTypicalWord
-                                  ((N.tensorPower k).outputEnsemble E₀).indexDistribution
+                                  ((N.tensorPower k).outputEnsemble E₀).distr
                                   n δx,
                               conditionalLogDeviationSecondMoment
                                   (fun i : Fin n =>
                                     ((N.tensorPower k).outputEnsemble E₀).states
                                       (ClassicalTypicality.StrongTypicalWord.codeword
-                                        (((N.tensorPower k).outputEnsemble E₀).indexDistribution)
+                                        (((N.tensorPower k).outputEnsemble E₀).distr)
                                         δx x i)) /
                                 ((n : ℝ) * δc) ^ 2 ≤ packingε) ∧
                             2 * (packingε + 2 * Real.sqrt packingε) ≤ ε / 4 ∧
@@ -1375,19 +1398,19 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProject
                                   (((N.tensorPower k).outputEnsemble E₀).strongTypicalDimensionEnvelope
                                       n δx δc /
                                     ((1 - pruneε) *
-                                      QIT.FiniteDistribution.strongTypicalMassScale
+                                      ProbDistribution.strongTypicalMassScale
                                         (HSWPackingHypothesesSpectral.stateEigenvalueDistribution
                                           ((N.tensorPower k).outputEnsemble E₀).averageState)
                                         n ((Fintype.card ι : ℝ) * (δx + δc)))) ≤
                                   ε / 4) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine N.hsw_regularized_direct_of_blockChannelEnsembleWitnesses_transport ?_
   intro k hk ι hιF hιD E₀
   let : Fintype ι := hιF
   let : DecidableEq ι := hιD
   exact
-    Channel.hsw_directWitnessAssembly_from_canonicalStrongTypicalOutputSourceProjectorFiniteMassCardBound
+    CPTPOp.hsw_directWitnessAssembly_from_canonicalStrongTypicalOutputSourceProjectorFiniteMassCardBound
       (N.tensorPower k) E₀ (hblock k hk ι inferInstance inferInstance E₀)
 
 /-- Regularized HSW direct achievability with the conditional log-deviation
@@ -1400,20 +1423,20 @@ every strongly-typical codeword.  The proved non-iid product variance identity
 in `ConditionalTypicality.lean` shows that every codeword product has centered
 log-deviation second moment bounded by
 `n * E.logDeviationSecondMomentEnvelope`; the caller only supplies the resulting
-large-block ratio bound.  The older cardinal-dimensional moment condition is
-still explicit at this stage and is removed by a later source-estimate layer. -/
+large-block ratio bound.  The cardinal-dimensional moment condition is still an
+explicit hypothesis here. -/
 theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProjectorFiniteMassCardMomentEnvelope
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblock :
       ∀ k : ℕ, 0 < k →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E₀ : Ensemble ι (QIT.TensorPower a k),
+          ∀ E₀ : MEnsemble (QIT.TensorPower a k) ι,
             ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
               ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
                 0 < n ∧ (1 : ℝ) / (n : ℝ) ≤ δ / 2 ∧
                   ∀ (M : Type uMessage) (_ : Fintype M) (_ : DecidableEq M)
                     (_ : Nonempty M),
-                    hswMessageRate M n ≥
+                    messageRate M n ≥
                         (N.tensorPower k).hswHolevoRate E₀ - δ / 2 →
                       (Fintype.card M : ℝ) - 1 ≤
                         Real.rpow 2
@@ -1436,13 +1459,13 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProject
                                   (((N.tensorPower k).outputEnsemble E₀).strongTypicalDimensionEnvelope
                                       n δx δc /
                                     ((1 - pruneε) *
-                                      QIT.FiniteDistribution.strongTypicalMassScale
+                                      ProbDistribution.strongTypicalMassScale
                                         (HSWPackingHypothesesSpectral.stateEigenvalueDistribution
                                           ((N.tensorPower k).outputEnsemble E₀).averageState)
                                         n ((Fintype.card ι : ℝ) * (δx + δc)))) ≤
                                   ε / 4) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine
     N.hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProjectorFiniteMassCardBound
       ?_
@@ -1467,7 +1490,7 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProject
     (((N.tensorPower k).outputEnsemble E₀).conditionalLogDeviationSecondMoment_codeword_ratio_le_of_envelope
       (fun i : Fin n =>
         ClassicalTypicality.StrongTypicalWord.codeword
-          (((N.tensorPower k).outputEnsemble E₀).indexDistribution) δx x i)
+          (((N.tensorPower k).outputEnsemble E₀).distr) δx x i)
       hn_pos hδc hmoment)
 
 /-- Regularized HSW direct achievability with the self-error parameter fixed
@@ -1477,17 +1500,17 @@ This removes the ad hoc `packingε` and `pruneε` choices from the block
 hypothesis.  The caller now proves only the large-block source estimates using
 the concrete choices `packingε = hswSelfPackingEpsilon ε` and `pruneε = 1/2`. -/
 theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProjectorFiniteMassCardMomentEnvelopeSelfError
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblock :
       ∀ k : ℕ, 0 < k →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E₀ : Ensemble ι (QIT.TensorPower a k),
+          ∀ E₀ : MEnsemble (QIT.TensorPower a k) ι,
             ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
               ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
                 0 < n ∧ (1 : ℝ) / (n : ℝ) ≤ δ / 2 ∧
                   ∀ (M : Type uMessage) (_ : Fintype M) (_ : DecidableEq M)
                     (_ : Nonempty M),
-                    hswMessageRate M n ≥
+                    messageRate M n ≥
                         (N.tensorPower k).hswHolevoRate E₀ - δ / 2 →
                       (Fintype.card M : ℝ) - 1 ≤
                         Real.rpow 2
@@ -1507,13 +1530,13 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProject
                                 (((N.tensorPower k).outputEnsemble E₀).strongTypicalDimensionEnvelope
                                     n δx δc /
                                   ((1 - (1 / 2 : ℝ)) *
-                                    QIT.FiniteDistribution.strongTypicalMassScale
+                                    ProbDistribution.strongTypicalMassScale
                                       (HSWPackingHypothesesSpectral.stateEigenvalueDistribution
                                         ((N.tensorPower k).outputEnsemble E₀).averageState)
                                       n ((Fintype.card ι : ℝ) * (δx + δc)))) ≤
                                 ε / 4) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine
     N.hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProjectorFiniteMassCardMomentEnvelope
       ?_
@@ -1546,17 +1569,17 @@ cardinality moment, and log-deviation moment conditions are all of the form
 the caller is the final cross exponent, which carries the actual Holevo-rate
 gap. -/
 theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProjectorFixedSlackCrossEstimate
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblock :
       ∀ k : ℕ, 0 < k →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E₀ : Ensemble ι (QIT.TensorPower a k),
+          ∀ E₀ : MEnsemble (QIT.TensorPower a k) ι,
             ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
               ∃ (δx : ℝ), ∃ (δc : ℝ), 0 < δx ∧ 0 < δc ∧
                 ∃ Ncross : ℕ, ∀ n : ℕ, n ≥ Ncross →
                   ∀ (M : Type uMessage) (_ : Fintype M) (_ : DecidableEq M)
                     (_ : Nonempty M),
-                    hswMessageRate M n ≥
+                    messageRate M n ≥
                         (N.tensorPower k).hswHolevoRate E₀ - δ / 2 →
                       (Fintype.card M : ℝ) - 1 ≤
                         Real.rpow 2
@@ -1567,13 +1590,13 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProject
                               (((N.tensorPower k).outputEnsemble E₀).strongTypicalDimensionEnvelope
                                   n δx δc /
                                 ((1 - (1 / 2 : ℝ)) *
-                                  QIT.FiniteDistribution.strongTypicalMassScale
+                                  ProbDistribution.strongTypicalMassScale
                                     (HSWPackingHypothesesSpectral.stateEigenvalueDistribution
                                       ((N.tensorPower k).outputEnsemble E₀).averageState)
                                     n ((Fintype.card ι : ℝ) * (δx + δc)))) ≤
                               ε / 4) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine
     N.hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProjectorFiniteMassCardMomentEnvelopeSelfError
       ?_
@@ -1650,11 +1673,11 @@ pointwise source exponent bound
 `cross(n) ≤ 8 * 2^{-nδ/4}`.  The proved geometric-decay lemma chooses the
 large enough blocklength making this bound at most `ε/4`. -/
 theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProjectorCrossExponentBound
-    [Nonempty a] [Nonempty b] (N : Channel a b)
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b)
     (hblock :
       ∀ k : ℕ, 0 < k →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E₀ : Ensemble ι (QIT.TensorPower a k),
+          ∀ E₀ : MEnsemble (QIT.TensorPower a k) ι,
             ∀ δ : ℝ, 0 < δ →
               ∃ (δx : ℝ), ∃ (δc : ℝ), 0 < δx ∧ 0 < δc ∧
                 ∀ n : ℕ,
@@ -1664,13 +1687,13 @@ theorem hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProject
                       (((N.tensorPower k).outputEnsemble E₀).strongTypicalDimensionEnvelope
                           n δx δc /
                         ((1 - (1 / 2 : ℝ)) *
-                          QIT.FiniteDistribution.strongTypicalMassScale
+                          ProbDistribution.strongTypicalMassScale
                             (HSWPackingHypothesesSpectral.stateEigenvalueDistribution
                               ((N.tensorPower k).outputEnsemble E₀).averageState)
                             n ((Fintype.card ι : ℝ) * (δx + δc)))) ≤
                     8 * Real.rpow 2 (-(n : ℝ) * (δ / 4))) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine
     N.hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProjectorFixedSlackCrossEstimate
       ?_
@@ -1695,21 +1718,19 @@ lemma/expurgation assembly, block-channel normalization, and the explicit HSW
 cross-exponent slack choice.
 [Wilde2011Qst, qit-notes.tex:33634-33808] -/
 theorem hsw_regularizedHolevoInformation_direct
-    [Nonempty a] [Nonempty b] (N : Channel a b) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{u, v, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
+    [Nonempty a] [Nonempty b] (N : CPTPMap a b) :
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{u, v, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{u, v, uMessage} N) R := by
   refine
     N.hsw_regularized_direct_of_blockCanonicalStrongTypicalOutputSourceProjectorCrossExponentBound
       ?_
   intro k hk ι hιF hιD E₀ δ hδ
   let : Fintype ι := hιF
   let : DecidableEq ι := hιD
-  simpa [Channel.hswHolevoRate] using
+  simpa [CPTPOp.hswHolevoRate] using
     exists_hsw_crossExponentBound_slacks
       (E := ((N.tensorPower k).outputEnsemble E₀)) hδ
 
-end Channel
+end CPTPOp
 
 end
-
-end QIT

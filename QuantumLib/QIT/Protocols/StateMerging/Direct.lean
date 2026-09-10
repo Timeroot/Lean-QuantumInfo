@@ -32,11 +32,20 @@ variable [Fintype a] [DecidableEq a]
 variable [Fintype b] [DecidableEq b]
 variable [Fintype r] [DecidableEq r]
 
-namespace PureVector
+end QIT
+
+namespace Ket
+
+open QIT
+universe u v w x y z p q
+variable {a : Type u} {b : Type v} {r : Type w}
+variable [Fintype a] [DecidableEq a]
+variable [Fintype b] [DecidableEq b]
+variable [Fintype r] [DecidableEq r]
 
 /-- Achievability is monotone in the allowed net entanglement rate. -/
 theorem IsAchievableStateMergingRate.mono
-    {psi : PureVector (Prod (Prod a b) r)} {R S : Real}
+    {psi : Ket ((a × b) × r)} {R S : ℝ}
     (hRS : R ≤ S)
     (hR : IsAchievableStateMergingRate.{u, v, w, x, y, z, p, q} psi R) :
     IsAchievableStateMergingRate.{u, v, w, x, y, z, p, q} psi S := by
@@ -57,15 +66,15 @@ theorem IsAchievableStateMergingRate.mono
 /-- The concrete ADHW FQSW-plus-teleportation construction obeys the stronger
 uniform output-ebit exponent bound used by the original HOW/Fannes converse. -/
 theorem stateMerging_direct_achievable_at_conditionalEntropy_withOutputEbitExponent
-    (psi : PureVector (Prod (Prod a b) r)) :
-    PureVector.IsAchievableStateMergingRateWithOutputEbitExponent.{u, v, w, x, x, y, y, x}
-      psi psi.state.marginalA.conditionalEntropy := by
+    (psi : Ket ((a × b) × r)) :
+    Ket.IsAchievableStateMergingRateWithOutputEbitExponent.{u, v, w, x, x, y, y, x}
+      psi psi.state.traceRight.conditionalEntropy := by
   refine ⟨psi.fqswEbitYieldRate, psi.fqswEbitYieldRate_nonneg, ?_⟩
   intro delta hdelta epsilon hepsilon
-  let rateSlack : Real := delta / 6
-  let typicalSlack : Real := rateSlack / 8
-  let targetFQSWError : Real := epsilon / 2
-  let internalFQSWError : Real := targetFQSWError / 4
+  let rateSlack : ℝ := delta / 6
+  let typicalSlack : ℝ := rateSlack / 8
+  let targetFQSWError : ℝ := epsilon / 2
+  let internalFQSWError : ℝ := targetFQSWError / 4
   have hrateSlack : 0 < rateSlack := by
     dsimp [rateSlack]
     positivity
@@ -118,9 +127,9 @@ theorem stateMerging_direct_achievable_at_conditionalEntropy_withOutputEbitExpon
     have hyield := B.physicalProtocol_ebitYieldRate_ge hnpos
     calc
       B.physicalProtocol.communicationRate - B.physicalProtocol.ebitYieldRate ≤
-          (psi.fqswCommunicationRate + (9 / 4 : Real) * rateSlack) -
+          (psi.fqswCommunicationRate + (9 / 4 : ℝ) * rateSlack) -
             (psi.fqswEbitYieldRate - 3 * rateSlack) := sub_le_sub hcomm hyield
-      _ ≤ psi.state.marginalA.conditionalEntropy + delta := by
+      _ ≤ psi.state.traceRight.conditionalEntropy + delta := by
         rw [← psi.fqswCommunicationRate_sub_ebitYieldRate_eq_conditionalEntropy]
         dsimp [rateSlack]
         linarith
@@ -143,21 +152,29 @@ entropy endpoint for the canonical HOW rate predicate. In particular, this
 includes negative conditional entropy, where the protocol generates net
 entanglement. -/
 theorem stateMerging_direct_achievable_at_conditionalEntropy
-    (psi : PureVector (Prod (Prod a b) r)) :
-    PureVector.IsAchievableStateMergingRate.{u, v, w, x, x, y, y, x}
-      psi psi.state.marginalA.conditionalEntropy :=
+    (psi : Ket ((a × b) × r)) :
+    Ket.IsAchievableStateMergingRate.{u, v, w, x, x, y, y, x}
+      psi psi.state.traceRight.conditionalEntropy :=
   (stateMerging_direct_achievable_at_conditionalEntropy_withOutputEbitExponent psi)
     |>.toIsAchievableStateMergingRate
 
 /-- Every net entanglement rate strictly above the conditional entropy is
 achievable by the concrete FQSW-plus-teleportation route. -/
 theorem stateMerging_direct_achievable
-    (psi : PureVector (Prod (Prod a b) r)) (R : Real)
-    (hR : psi.state.marginalA.conditionalEntropy < R) :
-    PureVector.IsAchievableStateMergingRate.{u, v, w, x, x, y, y, x} psi R :=
+    (psi : Ket ((a × b) × r)) (R : ℝ)
+    (hR : psi.state.traceRight.conditionalEntropy < R) :
+    Ket.IsAchievableStateMergingRate.{u, v, w, x, x, y, y, x} psi R :=
   IsAchievableStateMergingRate.mono hR.le
     (stateMerging_direct_achievable_at_conditionalEntropy psi)
 
-end PureVector
+end Ket
+
+namespace QIT
+
+universe u v w x y z p q
+variable {a : Type u} {b : Type v} {r : Type w}
+variable [Fintype a] [DecidableEq a]
+variable [Fintype b] [DecidableEq b]
+variable [Fintype r] [DecidableEq r]
 
 end QIT

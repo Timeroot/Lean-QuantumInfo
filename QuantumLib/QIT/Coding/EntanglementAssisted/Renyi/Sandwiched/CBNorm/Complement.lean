@@ -12,11 +12,11 @@ public import QuantumLib.QIT.Core.Map
 # Completely positive complements from finite Stinespring stacks
 
 This module supplies the source-backed finite-dimensional primitives used by
-the CB `1 -> alpha` multiplicativity proof.
+the CB `1 → alpha` multiplicativity proof.
 
 Source alignment:
 * KhatriWilde2024Principles, Chapters/EA_capacity.tex lines 2192-2217 choose a
-  Stinespring extension `U_{A -> BE}^M` for a completely positive map `M`,
+  Stinespring extension `U_{A → BE}^M` for a completely positive map `M`,
   requires `Tr_E[U X U†] = M(X)`, and defines the complementary map by
   tracing out `B`.
 
@@ -41,7 +41,7 @@ variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 namespace MatrixMap
 
 /-- A source-local Kraus choice for an arbitrary completely positive finite
-matrix map.  This packages the Choi-positive Kraus-existence theorem for later
+matrix map.  This packages the Kraus-existence theorem for later
 Stinespring/complement constructions. -/
 noncomputable def cpKraus
     (Phi : MatrixMap a b) (hPhi : MatrixMap.IsCompletelyPositive Phi) :
@@ -55,8 +55,8 @@ theorem cpKraus_spec
   exact Classical.choose_spec (MatrixMap.exists_kraus_of_choi_psd Phi hPhi)
 
 /-- Raw non-trace-preserving Stinespring extension associated to a Kraus
-family.  It is the one-Kraus map `X |-> S X S†`, where `S` stacks the Kraus
-operators as an `A -> B × E` matrix. -/
+family.  It is the one-Kraus map `X ↦ S X S†`, where `S` stacks the Kraus
+operators as an `A → B × E` matrix. -/
 def krausStinespringMap
     {κ : Type w} [Fintype κ] [DecidableEq κ]
     (K : κ → Matrix b a ℂ) : MatrixMap a (b × κ) :=
@@ -74,7 +74,7 @@ def krausProduct
     {a₁ : Type u} {b₁ : Type v} {κ₁ : Type w}
     {a₂ : Type x} {b₂ : Type y} {κ₂ : Type z}
     (K₁ : κ₁ → Matrix b₁ a₁ ℂ) (K₂ : κ₂ → Matrix b₂ a₂ ℂ) :
-    (κ₁ × κ₂) → Matrix (Prod b₁ b₂) (Prod a₁ a₂) ℂ :=
+    (κ₁ × κ₂) → Matrix (b₁ × b₂) (a₁ × a₂) ℂ :=
   fun kk => Matrix.kronecker (K₁ kk.1) (K₂ kk.2)
 
 private theorem ofKraus_kronecker_apply
@@ -158,9 +158,15 @@ theorem kron_ofKraus_eq_ofKraus_krausProduct
   intro ac _
   refine Finset.sum_congr rfl ?_
   intro ac' _
-  have hkron_ac := congrFun
+  have hkron_ac :
+      MatrixMap.kron (MatrixMap.ofKraus K₁) (MatrixMap.ofKraus K₂)
+          (Matrix.kronecker (Matrix.single ac.1 ac'.1 (1 : ℂ))
+            (Matrix.single ac.2 ac'.2 (1 : ℂ))) bd bd' =
+        Matrix.kronecker (MatrixMap.ofKraus K₁ (Matrix.single ac.1 ac'.1 (1 : ℂ)))
+          (MatrixMap.ofKraus K₂ (Matrix.single ac.2 ac'.2 (1 : ℂ))) bd bd' :=
+    congrFun
     (congrFun
-      (MatrixMap.kron_apply_kronecker
+      (MatrixMap.kron_map_of_kron_state
         (MatrixMap.ofKraus K₁) (MatrixMap.ofKraus K₂)
         (Matrix.single ac.1 ac'.1 (1 : ℂ))
         (Matrix.single ac.2 ac'.2 (1 : ℂ))) bd) bd'
@@ -210,7 +216,7 @@ theorem krausComplement_isCompletelyPositive
     (fun y : b => fun k i => K k y i)
 
 /-- Complementary completely positive map obtained from the source-local Kraus
-choice of a completely positive map.  For `Phi : A -> B`, the environment is
+choice of a completely positive map.  For `Phi : A → B`, the environment is
 the chosen finite Kraus index `A × B`. -/
 noncomputable def cpComplement
     (Phi : MatrixMap a b) (hPhi : MatrixMap.IsCompletelyPositive Phi) :
@@ -228,15 +234,15 @@ theorem cpComplement_isCompletelyPositive
 /-- Tracing out the Kraus-index environment of the raw Stinespring sandwich
 recovers the original Kraus map, matching
 `Tr_E[U X U†] = M(X)` in the source. -/
-theorem partialTraceB_krausStinespringMatrix
+theorem traceRight_krausStinespringMatrix
     {κ : Type w} [Fintype κ] [DecidableEq κ]
     (K : κ → Matrix b a ℂ) (X : CMatrix a) :
-    partialTraceB (a := b) (b := κ)
+    Matrix.traceRight
       (MatrixMap.krausStinespringMatrix K * X *
         Matrix.conjTranspose (MatrixMap.krausStinespringMatrix K)) =
       MatrixMap.ofKraus K X := by
   ext y y'
-  simp [partialTraceB, MatrixMap.ofKraus, MatrixMap.krausStinespringMatrix,
+  simp [Matrix.traceRight, MatrixMap.ofKraus, MatrixMap.krausStinespringMatrix,
     Matrix.sum_apply, Matrix.mul_apply, Matrix.conjTranspose_apply,
     Finset.sum_mul, mul_assoc]
 
@@ -244,21 +250,21 @@ omit [DecidableEq b] in
 /-- Tracing out the output `B` of the raw Stinespring sandwich recovers the
 complementary map `Tr_B ∘ U`, as used by the source proof before the spectral
 bridge. -/
-theorem partialTraceA_krausStinespringMatrix
+theorem traceLeft_krausStinespringMatrix
     {κ : Type w} [Fintype κ] [DecidableEq κ]
     (K : κ → Matrix b a ℂ) (X : CMatrix a) :
-    partialTraceA (a := b) (b := κ)
+    Matrix.traceLeft
       (MatrixMap.krausStinespringMatrix K * X *
         Matrix.conjTranspose (MatrixMap.krausStinespringMatrix K)) =
       MatrixMap.krausComplement K X := by
   ext k k'
-  simp [partialTraceA, MatrixMap.krausComplement, MatrixMap.ofKraus,
+  simp [Matrix.traceLeft, MatrixMap.krausComplement, MatrixMap.ofKraus,
     MatrixMap.krausStinespringMatrix, Matrix.sum_apply, Matrix.mul_apply,
     Matrix.conjTranspose_apply, Finset.sum_mul, mul_assoc]
 
 omit [DecidableEq a] [DecidableEq b] in
 /-- Positive inputs remain positive after the raw Stinespring sandwich
-`X |-> S X S†`. -/
+`X ↦ S X S†`. -/
 theorem krausStinespringMatrix_sandwich_posSemidef
     {κ : Type w} [Fintype κ] [DecidableEq κ]
     (K : κ → Matrix b a ℂ) (X : CMatrix a) (hX : X.PosSemidef) :

@@ -8,6 +8,8 @@ module
 
 public import QuantumLib.QIT.Symmetry.SymmetricSubspace
 import QuantumLib.QIT.Util.CMatrixCLM
+import QuantumLib.QIT.Util.CMatrixIntegral
+public import QuantumLib.QIT.Util.MatrixInstances
 public import Mathlib.Analysis.CStarAlgebra.Basic
 public import Mathlib.Analysis.CStarAlgebra.Matrix
 public import Mathlib.Analysis.Normed.Module.FiniteDimension
@@ -28,7 +30,7 @@ public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Deriv
 
 This module provides the finite-dimensional unitary Haar averaging support
 needed by Renner's Schur-projection step
-[Renner2007Symmetry, sub.tex:733-747].
+[Renner2007SymmetryIndependence, sub.tex:733-747].
 
 The scope is deliberately narrow: unitary groups of finite matrix algebras,
 their normalized Haar measure, tensor-power unitary actions, and the twirl
@@ -37,7 +39,7 @@ operator used by the de Finetti proof route.
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator
+open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator QIT.MatrixL2
 open MeasureTheory
 
 namespace QIT
@@ -47,10 +49,6 @@ universe u
 noncomputable section
 
 variable {a : Type u} [Fintype a] [DecidableEq a]
-
-local instance unitaryTwirlCMatrixContinuousENorm {ι : Type u} [Fintype ι] [DecidableEq ι] :
-    ContinuousENorm (CMatrix ι) :=
-  SeminormedAddGroup.toContinuousENorm
 
 namespace Matrix
 
@@ -129,6 +127,16 @@ instance unitaryGroupContinuousInv :
 instance unitaryGroupTopologicalGroup :
     IsTopologicalGroup (Matrix.unitaryGroup a ℂ) where
 
+/-- Second countability for finite-dimensional matrix unitary groups, inherited
+from the ambient finite matrix space. -/
+instance unitaryGroupSecondCountableTopology :
+    SecondCountableTopology (Matrix.unitaryGroup a ℂ) := by
+  have : SecondCountableTopology (Matrix a a ℂ) := by
+    change SecondCountableTopology (a → a → ℂ)
+    infer_instance
+  change SecondCountableTopology ({U // U ∈ (Matrix.unitaryGroup a ℂ : Set (Matrix a a ℂ))})
+  infer_instance
+
 end Matrix
 
 /-- The normalized Haar measure on the finite-dimensional unitary group.  We
@@ -153,25 +161,37 @@ instance unitaryHaarMeasure_isMulLeftInvariant [Nonempty a] :
   dsimp [unitaryHaarMeasure]
   infer_instance
 
-/-- Tensor power of a one-copy unitary under the repository's recursive
-`TensorPower` convention. -/
-def unitaryTensorPowerMatrix (U : Matrix.unitaryGroup a ℂ) :
-    (n : ℕ) → Matrix.unitaryGroup (TensorPower a n) ℂ
-  | 0 => 1
-  | n + 1 =>
-      let Un := unitaryTensorPowerMatrix U n
-      ⟨Matrix.kronecker (U : CMatrix a) (Un : CMatrix (TensorPower a n)),
-        Matrix.kronecker_mem_unitary U.2 Un.2⟩
+/-- The unitary group is compact, so its normalized Haar measure is also right invariant. -/
+instance unitaryHaarMeasure_isMulRightInvariant [Nonempty a] :
+    MeasureTheory.Measure.IsMulRightInvariant (unitaryHaarMeasure (a := a)) := by
+  refine ⟨?_⟩
+  intro g
+  let K0 : TopologicalSpace.PositiveCompacts (Matrix.unitaryGroup a ℂ) := ⊤
+  have hmass : (Measure.map (fun U : Matrix.unitaryGroup a ℂ => U * g)
+        (unitaryHaarMeasure (a := a))) K0 = 1 := by
+    rw [Measure.map_apply]
+    · change (unitaryHaarMeasure (a := a)) Set.univ = 1
+      exact unitaryHaarMeasure_univ (a := a)
+    · exact continuous_mul_const g |>.measurable
+    · exact K0.isCompact.measurableSet
+  have hhaar := (Measure.haarMeasure_eq_iff K0
+    (Measure.map (fun U : Matrix.unitaryGroup a ℂ => U * g)
+      (unitaryHaarMeasure (a := a)))).2 hmass
+  simpa [unitaryHaarMeasure, K0] using hhaar.symm
 
-@[simp]
-theorem unitaryTensorPowerMatrix_zero (U : Matrix.unitaryGroup a ℂ) :
-    unitaryTensorPowerMatrix U 0 = 1 := rfl
-
-theorem unitaryTensorPowerMatrix_succ (U : Matrix.unitaryGroup a ℂ) (n : ℕ) :
-    unitaryTensorPowerMatrix U (n + 1) =
-      ⟨Matrix.kronecker (U : CMatrix a)
-          (unitaryTensorPowerMatrix U n : CMatrix (TensorPower a n)),
-        Matrix.kronecker_mem_unitary U.2 (unitaryTensorPowerMatrix U n).2⟩ := rfl
+/-- The normalized unitary Haar measure is invariant under inversion `U ↦ U⁻¹`. -/
+instance unitaryHaarMeasure_isInvInvariant [Nonempty a] :
+    Measure.IsInvInvariant (unitaryHaarMeasure (a := a)) := by
+  refine ⟨?_⟩
+  let K0 : TopologicalSpace.PositiveCompacts (Matrix.unitaryGroup a ℂ) := ⊤
+  have hmass : (unitaryHaarMeasure (a := a)).inv K0 = 1 := by
+    rw [Measure.inv_def, Measure.map_apply]
+    · change (unitaryHaarMeasure (a := a)) Set.univ = 1
+      exact unitaryHaarMeasure_univ (a := a)
+    · exact measurable_inv
+    · exact K0.isCompact.measurableSet
+  have hhaar := (Measure.haarMeasure_eq_iff K0 (unitaryHaarMeasure (a := a)).inv).2 hmass
+  simpa [unitaryHaarMeasure, K0] using hhaar.symm
 
 @[simp]
 theorem unitaryTensorPowerMatrix_mul (U V : Matrix.unitaryGroup a ℂ) (n : ℕ) :
@@ -338,11 +358,11 @@ theorem unitaryTensorPowerMatrix_mul_symmetricProjectionMatrix
 /-- The two-copy antisymmetric projection commutes with `U⊗U`. -/
 theorem antisymmetricProjectionMatrix_two_mul_unitaryTensorPowerMatrix
     (U : Matrix.unitaryGroup a ℂ) :
-    antisymmetricProjectionMatrix_two (a := a) *
+    antisymmetricProjectionMatrixTwo (a := a) *
         (unitaryTensorPowerMatrix U 2 : CMatrix (TensorPower a 2)) =
       (unitaryTensorPowerMatrix U 2 : CMatrix (TensorPower a 2)) *
-        antisymmetricProjectionMatrix_two (a := a) := by
-  rw [antisymmetricProjectionMatrix_two]
+        antisymmetricProjectionMatrixTwo (a := a) := by
+  rw [antisymmetricProjectionMatrixTwo]
   rw [Matrix.sub_mul, Matrix.one_mul, Matrix.mul_sub, Matrix.mul_one,
     symmetricProjectionMatrix_mul_unitaryTensorPowerMatrix]
 
@@ -350,8 +370,8 @@ theorem antisymmetricProjectionMatrix_two_mul_unitaryTensorPowerMatrix
 theorem unitaryTensorPowerMatrix_mul_antisymmetricProjectionMatrix_two
     (U : Matrix.unitaryGroup a ℂ) :
     (unitaryTensorPowerMatrix U 2 : CMatrix (TensorPower a 2)) *
-        antisymmetricProjectionMatrix_two (a := a) =
-      antisymmetricProjectionMatrix_two (a := a) *
+        antisymmetricProjectionMatrixTwo (a := a) =
+      antisymmetricProjectionMatrixTwo (a := a) *
         (unitaryTensorPowerMatrix U 2 : CMatrix (TensorPower a 2)) := by
   rw [antisymmetricProjectionMatrix_two_mul_unitaryTensorPowerMatrix]
 
@@ -630,7 +650,6 @@ theorem profileVectorCoeff_eq_profileMatrixCoeff {n : ℕ}
     (M : CMatrix (TensorPower a n)) (p q : TensorPowerProfile a n) :
     profileVectorCoeff (a := a) M p q = profileMatrixCoeff (a := a) M p q := rfl
 
-@[simp]
 theorem profileVectorCoeff_one {n : ℕ} (p q : TensorPowerProfile a n) :
     profileVectorCoeff (a := a) (1 : CMatrix (TensorPower a n)) p q =
       if p = q then 1 else 0 := by
@@ -832,12 +851,6 @@ theorem unitaryInvariant_profileMatrixCoeff_eq_zero_of_ne
     rw [← hcoeff]
     ring
   exact (mul_eq_zero.mp hmul).resolve_left hnonzero
-
-private theorem unitaryTensorPowerMatrix_mul_star_self (U : Matrix.unitaryGroup a ℂ) (n : ℕ) :
-    (unitaryTensorPowerMatrix U n : CMatrix (TensorPower a n)) *
-        star (unitaryTensorPowerMatrix U n : CMatrix (TensorPower a n)) =
-      1 := by
-  simp
 
 theorem unitaryInvariant_commutes_unitaryTensorPowerMatrix
     {n : ℕ} (B : CMatrix (TensorPower a n))
@@ -1310,13 +1323,6 @@ private theorem twoLevelGeneratorEntry_eq_neg_one_of_left {i j x y : a}
     twoLevelGeneratorEntry i j x y = -1 := by
   rcases hxy with ⟨rfl, rfl⟩
   simp
-
-omit [Fintype a] in
-private theorem twoLevelGeneratorEntry_eq_one_of_right {i j x y : a}
-    (hij : i ≠ j) (hxy : x = j ∧ y = i) :
-    twoLevelGeneratorEntry i j x y = 1 := by
-  rcases hxy with ⟨rfl, rfl⟩
-  exact twoLevelGeneratorEntry_self_right (a := a) hij
 
 /-- The tensor-power infinitesimal generator induced by the two-level
 one-copy generator.  It is written directly on tensor words: sum over the
@@ -2021,6 +2027,9 @@ theorem exists_profileCoeff_summand_ne_zero_of_adjacent {n : ℕ}
     tensorPowerProfileUnitVector_ne_zero_of_mem_class (a := a) q hy
   exact mul_ne_zero hvp (mul_ne_zero hG hvq)
 
+/-- The sum of all entries of `M` in the block indexed by the profile classes of `p` and `q`.
+Up to the two class-size normalizations this is the profile matrix coefficient; see
+`profileMatrixCoeff_eq_inv_sqrt_mul_profileClassMatrixEntrySum`. -/
 noncomputable def profileClassMatrixEntrySum {n : ℕ}
     (M : CMatrix (TensorPower a n)) (p q : TensorPowerProfile a n) : ℂ :=
   ∑ x ∈ tensorPowerProfileClass (a := a) p,
@@ -2164,13 +2173,6 @@ theorem symmetricProjectionMatrix_mulVec_profileUnitVector {n : ℕ}
         Submodule.smul_mem _ _ hvecSub
       exact (mem_symmetricSubmodule_iff (a := a) n _).mp hscaledSub)
 
-theorem rankOneMatrix_mulVec_eq_dotProduct_smul {ι : Type u} [Fintype ι]
-    (v w : ι → ℂ) :
-    (rankOneMatrix v).mulVec w = dotProduct (star v) w • v := by
-  ext i
-  simp [Matrix.mulVec, rankOneMatrix_apply, dotProduct, Finset.mul_sum,
-    mul_comm, mul_left_comm]
-
 private theorem matrix_mulVec_tensorPowerBasisDelta_two
     (M : CMatrix (TensorPower a 2)) (y x : TensorPower a 2) :
     M.mulVec (tensorPowerBasisDelta (a := a) y) x = M x y := by
@@ -2296,8 +2298,8 @@ theorem matrix_mul_antisymmetricProjectionMatrix_two_eq_smul_of_antisymmetricPai
     (hpair : ∀ i j : a,
       B.mulVec (antisymmetricPairVector (a := a) i j) =
         lam • antisymmetricPairVector (a := a) i j) :
-    B * antisymmetricProjectionMatrix_two (a := a) =
-      lam • antisymmetricProjectionMatrix_two (a := a) := by
+    B * antisymmetricProjectionMatrixTwo (a := a) =
+      lam • antisymmetricProjectionMatrixTwo (a := a) := by
   classical
   let S : CMatrix (TensorPower a 2) :=
     ∑ i : a, ∑ j : a, rankOneMatrix (antisymmetricPairVector (a := a) i j)
@@ -2785,6 +2787,7 @@ theorem profileClassComponent_profileUnitVector_ne {n : ℕ}
     simp [profileClassComponent, tensorPowerProfileUnitVector, hxp, hxq]
   · simp [profileClassComponent, hxp]
 
+/-- The length-`n` word all of whose letters are `z₀`. -/
 def constantTensorPowerWord (z₀ : a) (n : ℕ) : TensorPower a n :=
   (tensorPowerEquiv (a := a) n).symm (fun _ => z₀)
 
@@ -2794,6 +2797,8 @@ theorem tensorPowerEquiv_constantTensorPowerWord (z₀ : a) (n : ℕ) (r : Fin n
     tensorPowerEquiv (a := a) n (constantTensorPowerWord (a := a) z₀ n) r = z₀ := by
   simp [constantTensorPowerWord]
 
+/-- The profile of `constantTensorPowerWord z₀ n`, whose class is the singleton containing that
+word alone. -/
 def constantTensorPowerProfile (z₀ : a) (n : ℕ) : TensorPowerProfile a n :=
   ⟨tensorPowerTypeProfile (a := a) n (constantTensorPowerWord (a := a) z₀ n),
     tensorPowerTypeProfile_mem_profiles (a := a) n
@@ -2866,6 +2871,9 @@ theorem tensorPowerProfileUnitVector_constant_apply_of_ne (z₀ : a) (n : ℕ)
     simpa using hx
   simp [tensorPowerProfileUnitVector, hnot]
 
+/-- How many letters of a word with profile `p` differ from the base letter `z₀`.  It vanishes
+exactly on `constantTensorPowerProfile z₀ n`, and induction on it walks any profile back to the
+constant one. -/
 def profileBaseDistance {n : ℕ} (z₀ : a) (p : TensorPowerProfile a n) : ℕ :=
   ∑ z : a, if z = z₀ then 0 else p.1 z
 
@@ -3535,7 +3543,7 @@ theorem symmetricProjectionMatrix_mul_unitaryInvariant_mul_antisymmetricProjecti
       (unitaryTensorPowerMatrix U 2 : CMatrix (TensorPower a 2)) * B *
         star (unitaryTensorPowerMatrix U 2 : CMatrix (TensorPower a 2)) = B) :
     symmetricProjectionMatrix (a := a) 2 * B *
-        antisymmetricProjectionMatrix_two (a := a) = 0 := by
+        antisymmetricProjectionMatrixTwo (a := a) = 0 := by
   classical
   obtain ⟨lam, hlam⟩ :=
     symmetricProjectionMatrix_mul_unitaryInvariant_eq_smul (a := a) B hinv
@@ -3720,7 +3728,7 @@ theorem unitaryInvariant_mulVec_antisymmetricPairVector_eq_smul_of_ne
     · have hno :=
         symmetricProjectionMatrix_mul_unitaryInvariant_mul_antisymmetricProjectionMatrix_two
           (a := a) B hinv
-      have hQv : (antisymmetricProjectionMatrix_two (a := a)).mulVec v = v := by
+      have hQv : (antisymmetricProjectionMatrixTwo (a := a)).mulVec v = v := by
         simpa [v] using
           antisymmetricProjectionMatrix_two_mulVec_antisymmetricPairVector (a := a) i j
       have hPw : (symmetricProjectionMatrix (a := a) 2).mulVec w = 0 := by
@@ -3732,17 +3740,17 @@ theorem unitaryInvariant_mulVec_antisymmetricPairVector_eq_smul_of_ne
           _ = (symmetricProjectionMatrix (a := a) 2 * B).mulVec v := by
               rw [Matrix.mulVec_mulVec]
           _ = (symmetricProjectionMatrix (a := a) 2 * B).mulVec
-                ((antisymmetricProjectionMatrix_two (a := a)).mulVec v) := by
+                ((antisymmetricProjectionMatrixTwo (a := a)).mulVec v) := by
               rw [hQv]
           _ = (symmetricProjectionMatrix (a := a) 2 * B *
-                antisymmetricProjectionMatrix_two (a := a)).mulVec v := by
+                antisymmetricProjectionMatrixTwo (a := a)).mulVec v := by
               rw [Matrix.mulVec_mulVec]
           _ = 0 := by
               simpa using happ
       have hcoord := congrFun hPw (twoCopyTensorWord (a := a) i j)
       rw [symmetricProjectionMatrix_two_eq_half_one_add_swap] at hcoord
       simp [Matrix.smul_mulVec, Matrix.add_mulVec, Matrix.one_mulVec,
-        tensorPowerSwapMatrix_two, permutationMatrix_mulVec,
+        tensorPowerSwapMatrixTwo, permutationMatrix_mulVec,
         permEquiv_twoCopySwapPerm_twoCopyTensorWord] at hcoord
       have hcoord2 : (2 : ℂ)⁻¹ *
           (w (twoCopyTensorWord (a := a) i j) +
@@ -3837,8 +3845,8 @@ theorem unitaryInvariant_mul_antisymmetricProjectionMatrix_two_eq_smul [Nontrivi
       (unitaryTensorPowerMatrix U 2 : CMatrix (TensorPower a 2)) * B *
         star (unitaryTensorPowerMatrix U 2 : CMatrix (TensorPower a 2)) = B) :
     ∃ lam : ℂ,
-      B * antisymmetricProjectionMatrix_two (a := a) =
-        lam • antisymmetricProjectionMatrix_two (a := a) := by
+      B * antisymmetricProjectionMatrixTwo (a := a) =
+        lam • antisymmetricProjectionMatrixTwo (a := a) := by
   obtain ⟨lam, hpair⟩ :=
     unitaryInvariant_antisymmetricPairVector_common_eigen (a := a) B hinv
   exact ⟨lam,
@@ -3851,14 +3859,14 @@ projection.  The hard irreducibility step is exactly the hypothesis
 needed by the final Haar second-moment statement. -/
 theorem mul_antisymmetricProjectionMatrix_two_eq_trace_smul_of_eq_smul [Nontrivial a]
     (B : CMatrix (TensorPower a 2)) {lam : ℂ}
-    (hBQ : B * antisymmetricProjectionMatrix_two (a := a) =
-      lam • antisymmetricProjectionMatrix_two (a := a)) :
-    B * antisymmetricProjectionMatrix_two (a := a) =
-      (((antisymmetricProjectionMatrix_two (a := a) * B).trace) /
-        (antisymmetricProjectionMatrix_two (a := a)).trace) •
-        antisymmetricProjectionMatrix_two (a := a) := by
+    (hBQ : B * antisymmetricProjectionMatrixTwo (a := a) =
+      lam • antisymmetricProjectionMatrixTwo (a := a)) :
+    B * antisymmetricProjectionMatrixTwo (a := a) =
+      (((antisymmetricProjectionMatrixTwo (a := a) * B).trace) /
+        (antisymmetricProjectionMatrixTwo (a := a)).trace) •
+        antisymmetricProjectionMatrixTwo (a := a) := by
   classical
-  let Q : CMatrix (TensorPower a 2) := antisymmetricProjectionMatrix_two (a := a)
+  let Q : CMatrix (TensorPower a 2) := antisymmetricProjectionMatrixTwo (a := a)
   have hQtrace_ne : Q.trace ≠ 0 := by
     simpa [Q] using antisymmetricProjectionMatrix_two_trace_ne_zero (a := a)
   have hscalar :
@@ -3882,10 +3890,10 @@ theorem unitaryInvariant_mul_antisymmetricProjectionMatrix_two_eq_trace_smul [No
     (hinv : ∀ U : Matrix.unitaryGroup a ℂ,
       (unitaryTensorPowerMatrix U 2 : CMatrix (TensorPower a 2)) * B *
         star (unitaryTensorPowerMatrix U 2 : CMatrix (TensorPower a 2)) = B) :
-    B * antisymmetricProjectionMatrix_two (a := a) =
-      (((antisymmetricProjectionMatrix_two (a := a) * B).trace) /
-        (antisymmetricProjectionMatrix_two (a := a)).trace) •
-        antisymmetricProjectionMatrix_two (a := a) := by
+    B * antisymmetricProjectionMatrixTwo (a := a) =
+      (((antisymmetricProjectionMatrixTwo (a := a) * B).trace) /
+        (antisymmetricProjectionMatrixTwo (a := a)).trace) •
+        antisymmetricProjectionMatrixTwo (a := a) := by
   obtain ⟨lam, hBQ⟩ :=
     unitaryInvariant_mul_antisymmetricProjectionMatrix_two_eq_smul (a := a) B hinv
   exact mul_antisymmetricProjectionMatrix_two_eq_trace_smul_of_eq_smul
@@ -3936,57 +3944,6 @@ def unitaryTwirl [Nonempty a] (n : ℕ) (A : CMatrix (TensorPower a n)) :
     unitaryTwirlIntegrand (a := a) n A U
     ∂unitaryHaarMeasure (a := a)
 
-private theorem integral_apply_apply {α : Type*} [MeasurableSpace α]
-    {μ : Measure α} {ι : Type u} [Fintype ι] [DecidableEq ι]
-    {f : α → CMatrix ι} (hf : Integrable f μ) (i j : ι) :
-    (∫ x, f x ∂μ) i j = ∫ x, f x i j ∂μ := by
-  simpa [cMatrixEntryCLM] using
-    ((cMatrixEntryCLM (ι := ι) i j).integral_comp_comm hf).symm
-
-private theorem integrable_apply_apply {α : Type*} [MeasurableSpace α]
-    {μ : Measure α} {ι : Type u} [Fintype ι] [DecidableEq ι]
-    {f : α → CMatrix ι} (hf : Integrable f μ) (i j : ι) :
-    Integrable (fun x => f x i j) μ :=
-  (cMatrixEntryCLM (ι := ι) i j).integrable_comp hf
-
-private theorem integral_matrix_mul_left [Nonempty a] {ι : Type u} [Fintype ι] [DecidableEq ι]
-    (C : CMatrix ι) {f : Matrix.unitaryGroup a ℂ → CMatrix ι}
-    (hf : Integrable f (unitaryHaarMeasure (a := a))) :
-    ∫ U, C * f U ∂unitaryHaarMeasure (a := a) =
-      C * ∫ U, f U ∂unitaryHaarMeasure (a := a) := by
-  ext i j
-  rw [integral_apply_apply (hf := hf.const_mul C)]
-  simp only [Matrix.mul_apply]
-  rw [MeasureTheory.integral_finsetSum]
-  refine Finset.sum_congr rfl ?_
-  intro k _
-  rw [integral_const_mul, ← integral_apply_apply (hf := hf) k j]
-  intro k _
-  exact (integrable_apply_apply (hf := hf) k j).const_mul _
-
-private theorem integral_matrix_mul_right [Nonempty a] {ι : Type u} [Fintype ι] [DecidableEq ι]
-    {f : Matrix.unitaryGroup a ℂ → CMatrix ι}
-    (hf : Integrable f (unitaryHaarMeasure (a := a))) (C : CMatrix ι) :
-    ∫ U, f U * C ∂unitaryHaarMeasure (a := a) =
-      (∫ U, f U ∂unitaryHaarMeasure (a := a)) * C := by
-  ext i j
-  rw [integral_apply_apply (hf := hf.mul_const C)]
-  simp only [Matrix.mul_apply]
-  rw [MeasureTheory.integral_finsetSum]
-  refine Finset.sum_congr rfl ?_
-  intro k _
-  rw [integral_mul_const, ← integral_apply_apply (hf := hf) i k]
-  intro k _
-  exact (integrable_apply_apply (hf := hf) i k).mul_const _
-
-private theorem integral_matrix_conjTranspose [Nonempty a]
-    {ι : Type u} [Fintype ι] [DecidableEq ι]
-    {f : Matrix.unitaryGroup a ℂ → CMatrix ι}
-    (hf : Integrable f (unitaryHaarMeasure (a := a))) :
-    (∫ U, f U ∂unitaryHaarMeasure (a := a)).conjTranspose =
-      ∫ U, (f U).conjTranspose ∂unitaryHaarMeasure (a := a) := by
-  exact ((cMatrixConjTransposeCLM (ι := ι)).integral_comp_comm hf).symm
-
 theorem unitaryTwirl_conj_invariant [Nonempty a] (n : ℕ)
     (A : CMatrix (TensorPower a n)) (V : Matrix.unitaryGroup a ℂ) :
     (unitaryTensorPowerMatrix V n : CMatrix (TensorPower a n)) *
@@ -4011,9 +3968,9 @@ theorem unitaryTwirl_conj_invariant [Nonempty a] (n : ℕ)
   calc
     Vn * unitaryTwirl n A * star Vn
         = (∫ U, Vn * f U ∂unitaryHaarMeasure (a := a)) * star Vn := by
-          rw [unitaryTwirl, integral_matrix_mul_left (a := a) (C := Vn) (hf := hf)]
+          rw [unitaryTwirl, cMatrix_integral_mul_left (C := Vn) (hf := hf)]
     _ = ∫ U, Vn * f U * star Vn ∂unitaryHaarMeasure (a := a) := by
-          rw [integral_matrix_mul_right (a := a) (hf := hf.const_mul Vn) (C := star Vn)]
+          rw [cMatrix_integral_mul_right (hf := hf.const_mul Vn) (C := star Vn)]
     _ = ∫ U : Matrix.unitaryGroup a ℂ,
           unitaryTwirlIntegrand (a := a) n A (V * U)
           ∂unitaryHaarMeasure (a := a) := htranslate
@@ -4034,7 +3991,7 @@ theorem unitaryTwirl_trace [Nonempty a] (n : ℕ) (A : CMatrix (TensorPower a n)
         = ∑ i, ∫ U : Matrix.unitaryGroup a ℂ,
             unitaryTwirlIntegrand (a := a) n A U i i
             ∂unitaryHaarMeasure (a := a) := by
-          simp [Matrix.trace, integral_apply_apply (hf := hf)]
+          simp [Matrix.trace, cMatrix_integral_apply (hf := hf)]
     _ = ∫ U : Matrix.unitaryGroup a ℂ,
           (unitaryTwirlIntegrand (a := a) n A U).trace
           ∂unitaryHaarMeasure (a := a) := by
@@ -4045,7 +4002,7 @@ theorem unitaryTwirl_trace [Nonempty a] (n : ℕ) (A : CMatrix (TensorPower a n)
               ∑ i, unitaryTwirlIntegrand (a := a) n A U i i
               ∂unitaryHaarMeasure (a := a)
           exact (MeasureTheory.integral_finsetSum Finset.univ
-            (fun i _ => integrable_apply_apply (hf := hf) i i)).symm
+            (fun i _ => cMatrix_integrable_apply (hf := hf) i i)).symm
     _ = ∫ _U : Matrix.unitaryGroup a ℂ, A.trace
           ∂unitaryHaarMeasure (a := a) := by
           congr 1
@@ -4095,11 +4052,11 @@ theorem unitaryTwirl_symmetricProjectionMatrix_mul_trace [Nonempty a]
         (∫ U : Matrix.unitaryGroup a ℂ,
           P * unitaryTwirlIntegrand (a := a) n A U
           ∂unitaryHaarMeasure (a := a)).trace := by
-          rw [integral_matrix_mul_left (a := a) (C := P) (hf := hf)]
+          rw [cMatrix_integral_mul_left (C := P) (hf := hf)]
     _ = ∑ i, ∫ U : Matrix.unitaryGroup a ℂ,
           (P * unitaryTwirlIntegrand (a := a) n A U) i i
           ∂unitaryHaarMeasure (a := a) := by
-          simp [Matrix.trace, integral_apply_apply (hf := hf.const_mul P)]
+          simp [Matrix.trace, cMatrix_integral_apply (hf := hf.const_mul P)]
     _ = ∫ U : Matrix.unitaryGroup a ℂ,
           (P * unitaryTwirlIntegrand (a := a) n A U).trace
           ∂unitaryHaarMeasure (a := a) := by
@@ -4110,7 +4067,7 @@ theorem unitaryTwirl_symmetricProjectionMatrix_mul_trace [Nonempty a]
               ∑ i, (P * unitaryTwirlIntegrand (a := a) n A U) i i
               ∂unitaryHaarMeasure (a := a)
           exact (MeasureTheory.integral_finsetSum Finset.univ
-            (fun i _ => integrable_apply_apply (hf := hf.const_mul P) i i)).symm
+            (fun i _ => cMatrix_integrable_apply (hf := hf.const_mul P) i i)).symm
     _ = ∫ _U : Matrix.unitaryGroup a ℂ,
           (P * A).trace ∂unitaryHaarMeasure (a := a) := by
           congr 1
@@ -4123,10 +4080,10 @@ theorem unitaryTwirl_symmetricProjectionMatrix_mul_trace [Nonempty a]
 same trace numerator as before twirling. -/
 private theorem antisymmetricProjectionMatrix_two_mul_unitaryTwirlIntegrand_trace
     (A : CMatrix (TensorPower a 2)) (U : Matrix.unitaryGroup a ℂ) :
-    (antisymmetricProjectionMatrix_two (a := a) *
+    (antisymmetricProjectionMatrixTwo (a := a) *
         unitaryTwirlIntegrand (a := a) 2 A U).trace =
-      (antisymmetricProjectionMatrix_two (a := a) * A).trace := by
-  let Q : CMatrix (TensorPower a 2) := antisymmetricProjectionMatrix_two (a := a)
+      (antisymmetricProjectionMatrixTwo (a := a) * A).trace := by
+  let Q : CMatrix (TensorPower a 2) := antisymmetricProjectionMatrixTwo (a := a)
   let U₂ : CMatrix (TensorPower a 2) := unitaryTensorPowerMatrix U 2
   have hQU : Q * U₂ = U₂ * Q := by
     simpa [Q, U₂] using antisymmetricProjectionMatrix_two_mul_unitaryTensorPowerMatrix
@@ -4148,13 +4105,13 @@ private theorem antisymmetricProjectionMatrix_two_mul_unitaryTwirlIntegrand_trac
 
 theorem unitaryTwirl_antisymmetricProjectionMatrix_two_mul_trace [Nonempty a]
     (A : CMatrix (TensorPower a 2)) :
-    (antisymmetricProjectionMatrix_two (a := a) * unitaryTwirl 2 A).trace =
-      (antisymmetricProjectionMatrix_two (a := a) * A).trace := by
+    (antisymmetricProjectionMatrixTwo (a := a) * unitaryTwirl 2 A).trace =
+      (antisymmetricProjectionMatrixTwo (a := a) * A).trace := by
   rw [unitaryTwirl]
   have hf : Integrable (unitaryTwirlIntegrand (a := a) 2 A)
       (unitaryHaarMeasure (a := a)) :=
     unitaryTwirl_integrand_integrable (a := a) 2 A
-  let Q : CMatrix (TensorPower a 2) := antisymmetricProjectionMatrix_two (a := a)
+  let Q : CMatrix (TensorPower a 2) := antisymmetricProjectionMatrixTwo (a := a)
   calc
     (Q * ∫ U : Matrix.unitaryGroup a ℂ,
         unitaryTwirlIntegrand (a := a) 2 A U
@@ -4162,11 +4119,11 @@ theorem unitaryTwirl_antisymmetricProjectionMatrix_two_mul_trace [Nonempty a]
         (∫ U : Matrix.unitaryGroup a ℂ,
           Q * unitaryTwirlIntegrand (a := a) 2 A U
           ∂unitaryHaarMeasure (a := a)).trace := by
-          rw [integral_matrix_mul_left (a := a) (C := Q) (hf := hf)]
+          rw [cMatrix_integral_mul_left (C := Q) (hf := hf)]
     _ = ∑ i, ∫ U : Matrix.unitaryGroup a ℂ,
           (Q * unitaryTwirlIntegrand (a := a) 2 A U) i i
           ∂unitaryHaarMeasure (a := a) := by
-          simp [Matrix.trace, integral_apply_apply (hf := hf.const_mul Q)]
+          simp [Matrix.trace, cMatrix_integral_apply (hf := hf.const_mul Q)]
     _ = ∫ U : Matrix.unitaryGroup a ℂ,
           (Q * unitaryTwirlIntegrand (a := a) 2 A U).trace
           ∂unitaryHaarMeasure (a := a) := by
@@ -4177,7 +4134,7 @@ theorem unitaryTwirl_antisymmetricProjectionMatrix_two_mul_trace [Nonempty a]
               ∑ i, (Q * unitaryTwirlIntegrand (a := a) 2 A U) i i
               ∂unitaryHaarMeasure (a := a)
           exact (MeasureTheory.integral_finsetSum Finset.univ
-            (fun i _ => integrable_apply_apply (hf := hf.const_mul Q) i i)).symm
+            (fun i _ => cMatrix_integrable_apply (hf := hf.const_mul Q) i i)).symm
     _ = ∫ _U : Matrix.unitaryGroup a ℂ,
           (Q * A).trace ∂unitaryHaarMeasure (a := a) := by
           congr 1
@@ -4201,10 +4158,10 @@ theorem unitaryTwirl_mul_symmetricProjectionMatrix_eq_trace_smul [Nonempty a]
 
 theorem unitaryTwirl_mul_antisymmetricProjectionMatrix_two_eq_trace_smul [Nontrivial a]
     (A : CMatrix (TensorPower a 2)) :
-    unitaryTwirl 2 A * antisymmetricProjectionMatrix_two (a := a) =
-      (((antisymmetricProjectionMatrix_two (a := a) * A).trace) /
-        (antisymmetricProjectionMatrix_two (a := a)).trace) •
-        antisymmetricProjectionMatrix_two (a := a) := by
+    unitaryTwirl 2 A * antisymmetricProjectionMatrixTwo (a := a) =
+      (((antisymmetricProjectionMatrixTwo (a := a) * A).trace) /
+        (antisymmetricProjectionMatrixTwo (a := a)).trace) •
+        antisymmetricProjectionMatrixTwo (a := a) := by
   have hscalarized :=
     unitaryInvariant_mul_antisymmetricProjectionMatrix_two_eq_trace_smul
       (a := a) (unitaryTwirl 2 A)
@@ -4217,20 +4174,20 @@ assuming the antisymmetric block has already been scalarized. -/
 theorem unitaryTwirl_two_eq_symmetric_antisymmetric_trace_decomposition_of_antisymmetric
     [Nonempty a] (A : CMatrix (TensorPower a 2))
     (hanti :
-      unitaryTwirl 2 A * antisymmetricProjectionMatrix_two (a := a) =
-        (((antisymmetricProjectionMatrix_two (a := a) * A).trace) /
-          (antisymmetricProjectionMatrix_two (a := a)).trace) •
-          antisymmetricProjectionMatrix_two (a := a)) :
+      unitaryTwirl 2 A * antisymmetricProjectionMatrixTwo (a := a) =
+        (((antisymmetricProjectionMatrixTwo (a := a) * A).trace) /
+          (antisymmetricProjectionMatrixTwo (a := a)).trace) •
+          antisymmetricProjectionMatrixTwo (a := a)) :
     unitaryTwirl 2 A =
       (((symmetricProjectionMatrix (a := a) 2 * A).trace) /
         (symmetricProjectionMatrix (a := a) 2).trace) •
         symmetricProjectionMatrix (a := a) 2 +
-      (((antisymmetricProjectionMatrix_two (a := a) * A).trace) /
-        (antisymmetricProjectionMatrix_two (a := a)).trace) •
-        antisymmetricProjectionMatrix_two (a := a) := by
+      (((antisymmetricProjectionMatrixTwo (a := a) * A).trace) /
+        (antisymmetricProjectionMatrixTwo (a := a)).trace) •
+        antisymmetricProjectionMatrixTwo (a := a) := by
   let B : CMatrix (TensorPower a 2) := unitaryTwirl 2 A
   let P : CMatrix (TensorPower a 2) := symmetricProjectionMatrix (a := a) 2
-  let Q : CMatrix (TensorPower a 2) := antisymmetricProjectionMatrix_two (a := a)
+  let Q : CMatrix (TensorPower a 2) := antisymmetricProjectionMatrixTwo (a := a)
   calc
     B = B * 1 := by simp
     _ = B * (P + Q) := by
@@ -4240,14 +4197,14 @@ theorem unitaryTwirl_two_eq_symmetric_antisymmetric_trace_decomposition_of_antis
       (((symmetricProjectionMatrix (a := a) 2 * A).trace) /
         (symmetricProjectionMatrix (a := a) 2).trace) •
         symmetricProjectionMatrix (a := a) 2 +
-      (((antisymmetricProjectionMatrix_two (a := a) * A).trace) /
-        (antisymmetricProjectionMatrix_two (a := a)).trace) •
-        antisymmetricProjectionMatrix_two (a := a) := by
+      (((antisymmetricProjectionMatrixTwo (a := a) * A).trace) /
+        (antisymmetricProjectionMatrixTwo (a := a)).trace) •
+        antisymmetricProjectionMatrixTwo (a := a) := by
       have hantiBQ :
           B * Q =
-            (((antisymmetricProjectionMatrix_two (a := a) * A).trace) /
-              (antisymmetricProjectionMatrix_two (a := a)).trace) •
-              antisymmetricProjectionMatrix_two (a := a) := by
+            (((antisymmetricProjectionMatrixTwo (a := a) * A).trace) /
+              (antisymmetricProjectionMatrixTwo (a := a)).trace) •
+              antisymmetricProjectionMatrixTwo (a := a) := by
         simpa [B, Q] using hanti
       rw [unitaryTwirl_mul_symmetricProjectionMatrix_eq_trace_smul (a := a) 2 A]
       rw [hantiBQ]
@@ -4258,9 +4215,9 @@ theorem unitaryTwirl_two_eq_symmetric_antisymmetric_trace_decomposition [Nontriv
       (((symmetricProjectionMatrix (a := a) 2 * A).trace) /
         (symmetricProjectionMatrix (a := a) 2).trace) •
         symmetricProjectionMatrix (a := a) 2 +
-      (((antisymmetricProjectionMatrix_two (a := a) * A).trace) /
-        (antisymmetricProjectionMatrix_two (a := a)).trace) •
-        antisymmetricProjectionMatrix_two (a := a) := by
+      (((antisymmetricProjectionMatrixTwo (a := a) * A).trace) /
+        (antisymmetricProjectionMatrixTwo (a := a)).trace) •
+        antisymmetricProjectionMatrixTwo (a := a) := by
   exact unitaryTwirl_two_eq_symmetric_antisymmetric_trace_decomposition_of_antisymmetric
     (a := a) A (unitaryTwirl_mul_antisymmetricProjectionMatrix_two_eq_trace_smul
       (a := a) A)
@@ -4280,7 +4237,47 @@ theorem tensorPowerKroneckerTwo_apply (P : CMatrix a) (x y : TensorPower a 2) :
   rfl
 
 omit [Fintype a] [DecidableEq a] in
-@[simp]
+/-- Two-copy Kronecker commutes with the matrix adjoint. -/
+theorem tensorPowerKroneckerTwo_star (M : CMatrix a) :
+    tensorPowerKroneckerTwo (a := a) (star M) =
+      star (tensorPowerKroneckerTwo (a := a) M) := by
+  ext x y
+  simp [tensorPowerKroneckerTwo, Matrix.star_apply]
+
+omit [Fintype a] in
+/-- Two-copy Kronecker of the identity is the identity, in the recursive
+`TensorPower` coordinates. -/
+theorem tensorPowerKroneckerTwo_one :
+    tensorPowerKroneckerTwo (a := a) (1 : CMatrix a) = 1 := by
+  ext x y
+  by_cases hxy : x = y
+  · subst y
+    simp [tensorPowerKroneckerTwo]
+  · have hcoord :
+        tensorPowerEquiv (a := a) 2 x 0 ≠ tensorPowerEquiv (a := a) 2 y 0 ∨
+          tensorPowerEquiv (a := a) 2 x 1 ≠ tensorPowerEquiv (a := a) 2 y 1 := by
+      by_contra h
+      push Not at h
+      apply hxy
+      apply (tensorPowerEquiv (a := a) 2).injective
+      funext i
+      fin_cases i <;> simp [h]
+    rcases hcoord with h0 | h1
+    · simp [tensorPowerKroneckerTwo, Matrix.one_apply, h0, hxy]
+    · by_cases h0 : tensorPowerEquiv (a := a) 2 x 0 = tensorPowerEquiv (a := a) 2 y 0
+      · simp [tensorPowerKroneckerTwo, Matrix.one_apply, h0, h1, hxy]
+      · simp [tensorPowerKroneckerTwo, Matrix.one_apply, h0, hxy]
+
+/-- On two copies the tensor-power unitary matrix is the explicit Kronecker square. -/
+theorem unitaryTensorPowerMatrix_two_eq_tensorPowerKroneckerTwo
+    (U : Matrix.unitaryGroup a ℂ) :
+    (unitaryTensorPowerMatrix U 2 : CMatrix (TensorPower a 2)) =
+      tensorPowerKroneckerTwo (a := a) (U : CMatrix a) := by
+  ext x y
+  rw [unitaryTensorPowerMatrix_apply_eq_fin_prod]
+  simp [tensorPowerKroneckerTwo]
+
+omit [Fintype a] [DecidableEq a] in
 theorem tensorPowerKroneckerTwo_apply_twoCopyTensorWord
     (P : CMatrix a) (i j k l : a) :
     tensorPowerKroneckerTwo (a := a) P
@@ -4288,6 +4285,7 @@ theorem tensorPowerKroneckerTwo_apply_twoCopyTensorWord
       P i k * P j l := by
   simp [tensorPowerKroneckerTwo]
 
+omit [DecidableEq a] in
 private def twoCopyTensorWordEquiv : (a × a) ≃ TensorPower a 2 where
   toFun p := twoCopyTensorWord (a := a) p.1 p.2
   invFun x :=
@@ -4298,7 +4296,8 @@ private def twoCopyTensorWordEquiv : (a × a) ≃ TensorPower a 2 where
     exact (twoCopyTensorWord_coords (a := a) x).symm
 
 omit [DecidableEq a] in
-private theorem sum_tensorPower_two {β : Type*} [AddCommMonoid β]
+/-- Enumerate a two-copy tensor power by its first and second tensor words. -/
+theorem sum_tensorPower_twoCopyTensorWord {β : Type*} [AddCommMonoid β]
     (f : TensorPower a 2 → β) :
     (∑ x : TensorPower a 2, f x) =
       ∑ i : a, ∑ j : a, f (twoCopyTensorWord (a := a) i j) := by
@@ -4319,7 +4318,7 @@ private theorem tensorPowerKroneckerTwo_mul_apply_twoCopyTensorWord
     (tensorPowerKroneckerTwo (a := a) P * tensorPowerKroneckerTwo (a := a) Q)
         (twoCopyTensorWord (a := a) i j) (twoCopyTensorWord (a := a) k l) =
       (P * Q) i k * (P * Q) j l := by
-  rw [Matrix.mul_apply, sum_tensorPower_two]
+  rw [Matrix.mul_apply, sum_tensorPower_twoCopyTensorWord]
   simp only [tensorPowerKroneckerTwo_apply_twoCopyTensorWord]
   rw [Matrix.mul_apply, Matrix.mul_apply]
   simp only [Finset.mul_sum, Finset.sum_mul]
@@ -4341,30 +4340,30 @@ theorem tensorPowerKroneckerTwo_mul (P Q : CMatrix a) :
 /-- Hayden's restricted flip `F_R = (P ⊗ P) F_A (P ⊗ P)` in the recursive
 `TensorPower` coordinates. -/
 def haydenRestrictedFlip (P : CMatrix a) : CMatrix (TensorPower a 2) :=
-  tensorPowerKroneckerTwo (a := a) P * tensorPowerSwapMatrix_two (a := a) *
+  tensorPowerKroneckerTwo (a := a) P * tensorPowerSwapMatrixTwo (a := a) *
     tensorPowerKroneckerTwo (a := a) P
 
 omit [DecidableEq a] in
 theorem tensorPowerKroneckerTwo_trace (P : CMatrix a) :
     (tensorPowerKroneckerTwo (a := a) P).trace = P.trace * P.trace := by
-  simp [Matrix.trace, sum_tensorPower_two, Finset.mul_sum,
+  simp [Matrix.trace, sum_tensorPower_twoCopyTensorWord, Finset.mul_sum,
     mul_comm]
 
 theorem tensorPowerKroneckerTwo_mul_tensorPowerSwapMatrix_two_trace (P : CMatrix a) :
-    (tensorPowerKroneckerTwo (a := a) P * tensorPowerSwapMatrix_two (a := a)).trace =
+    (tensorPowerKroneckerTwo (a := a) P * tensorPowerSwapMatrixTwo (a := a)).trace =
       (P * P).trace := by
   calc
-    (tensorPowerKroneckerTwo (a := a) P * tensorPowerSwapMatrix_two (a := a)).trace =
+    (tensorPowerKroneckerTwo (a := a) P * tensorPowerSwapMatrixTwo (a := a)).trace =
         ∑ i : a, ∑ j : a, P i j * P j i := by
-          rw [Matrix.trace, sum_tensorPower_two]
+          rw [Matrix.trace, sum_tensorPower_twoCopyTensorWord]
           refine Finset.sum_congr rfl fun i _ => ?_
           refine Finset.sum_congr rfl fun j _ => ?_
-          change (tensorPowerKroneckerTwo (a := a) P * tensorPowerSwapMatrix_two (a := a))
+          change (tensorPowerKroneckerTwo (a := a) P * tensorPowerSwapMatrixTwo (a := a))
               (twoCopyTensorWord (a := a) i j) (twoCopyTensorWord (a := a) i j) =
             P i j * P j i
           rw [Matrix.mul_apply]
           rw [Finset.sum_eq_single (twoCopyTensorWord (a := a) j i)]
-          · simp [tensorPowerSwapMatrix_two, permutationMatrix, Equiv.Perm.permMatrix,
+          · simp [tensorPowerSwapMatrixTwo, permutationMatrix, Equiv.Perm.permMatrix,
               PEquiv.toMatrix, permEquiv_twoCopySwapPerm_twoCopyTensorWord]
           · intro y _ hy
             have hneq :
@@ -4374,7 +4373,7 @@ theorem tensorPowerKroneckerTwo_mul_tensorPowerSwapMatrix_two_trace (P : CMatrix
               apply hy
               apply (permEquiv (a := a) 2 twoCopySwapPerm).injective
               simp [h, permEquiv_twoCopySwapPerm_twoCopyTensorWord]
-            simp [tensorPowerSwapMatrix_two, permutationMatrix, Equiv.Perm.permMatrix,
+            simp [tensorPowerSwapMatrixTwo, permutationMatrix, Equiv.Perm.permMatrix,
               PEquiv.toMatrix, hneq]
           · intro hnot
             exact False.elim (hnot (Finset.mem_univ _))
@@ -4383,12 +4382,12 @@ theorem tensorPowerKroneckerTwo_mul_tensorPowerSwapMatrix_two_trace (P : CMatrix
 
 theorem tensorPowerSwapMatrix_two_mul_tensorPowerKroneckerTwo_mul_tensorPowerSwapMatrix_two
     (P : CMatrix a) :
-    tensorPowerSwapMatrix_two (a := a) * tensorPowerKroneckerTwo (a := a) P *
-        tensorPowerSwapMatrix_two (a := a) =
+    tensorPowerSwapMatrixTwo (a := a) * tensorPowerKroneckerTwo (a := a) P *
+        tensorPowerSwapMatrixTwo (a := a) =
       tensorPowerKroneckerTwo (a := a) P := by
   ext x y
   rw [← twoCopyTensorWord_coords (a := a) x, ← twoCopyTensorWord_coords (a := a) y]
-  simp [Matrix.mul_apply, sum_tensorPower_two, tensorPowerSwapMatrix_two, permutationMatrix,
+  simp [Matrix.mul_apply, sum_tensorPower_twoCopyTensorWord, tensorPowerSwapMatrixTwo, permutationMatrix,
     Equiv.Perm.permMatrix, PEquiv.toMatrix, permEquiv_twoCopySwapPerm_twoCopyTensorWord,
     mul_comm]
   rw [Finset.sum_eq_single (tensorPowerEquiv (a := a) 2 y 1)]
@@ -4418,21 +4417,21 @@ theorem haydenRestrictedFlip_trace_of_idempotent
   calc
     (haydenRestrictedFlip (a := a) P).trace =
         (tensorPowerKroneckerTwo (a := a) P *
-          tensorPowerSwapMatrix_two (a := a) *
+          tensorPowerSwapMatrixTwo (a := a) *
           tensorPowerKroneckerTwo (a := a) P).trace := by
       rfl
     _ = (tensorPowerKroneckerTwo (a := a) P *
           tensorPowerKroneckerTwo (a := a) P *
-          tensorPowerSwapMatrix_two (a := a)).trace := by
+          tensorPowerSwapMatrixTwo (a := a)).trace := by
       exact Matrix.trace_mul_cycle
         (tensorPowerKroneckerTwo (a := a) P)
-        (tensorPowerSwapMatrix_two (a := a))
+        (tensorPowerSwapMatrixTwo (a := a))
         (tensorPowerKroneckerTwo (a := a) P)
     _ = (tensorPowerKroneckerTwo (a := a) (P * P) *
-          tensorPowerSwapMatrix_two (a := a)).trace := by
+          tensorPowerSwapMatrixTwo (a := a)).trace := by
       rw [tensorPowerKroneckerTwo_mul]
     _ = (tensorPowerKroneckerTwo (a := a) P *
-          tensorPowerSwapMatrix_two (a := a)).trace := by
+          tensorPowerSwapMatrixTwo (a := a)).trace := by
       rw [hP]
     _ = (P * P).trace := by
       rw [tensorPowerKroneckerTwo_mul_tensorPowerSwapMatrix_two_trace]
@@ -4441,18 +4440,18 @@ theorem haydenRestrictedFlip_trace_of_idempotent
 
 theorem tensorPowerSwapMatrix_two_mul_haydenRestrictedFlip_trace_of_idempotent
     (P : CMatrix a) (hP : P * P = P) :
-    (tensorPowerSwapMatrix_two (a := a) * haydenRestrictedFlip (a := a) P).trace =
+    (tensorPowerSwapMatrixTwo (a := a) * haydenRestrictedFlip (a := a) P).trace =
       P.trace * P.trace := by
   calc
-    (tensorPowerSwapMatrix_two (a := a) * haydenRestrictedFlip (a := a) P).trace =
-        (tensorPowerSwapMatrix_two (a := a) *
+    (tensorPowerSwapMatrixTwo (a := a) * haydenRestrictedFlip (a := a) P).trace =
+        (tensorPowerSwapMatrixTwo (a := a) *
           (tensorPowerKroneckerTwo (a := a) P *
-            tensorPowerSwapMatrix_two (a := a) *
+            tensorPowerSwapMatrixTwo (a := a) *
             tensorPowerKroneckerTwo (a := a) P)).trace := by
           rfl
-    _ = (tensorPowerSwapMatrix_two (a := a) *
+    _ = (tensorPowerSwapMatrixTwo (a := a) *
           tensorPowerKroneckerTwo (a := a) P *
-          tensorPowerSwapMatrix_two (a := a) *
+          tensorPowerSwapMatrixTwo (a := a) *
           tensorPowerKroneckerTwo (a := a) P).trace := by
           simp [Matrix.mul_assoc]
     _ = (tensorPowerKroneckerTwo (a := a) P *
@@ -4477,7 +4476,7 @@ theorem symmetricProjectionMatrix_two_mul_haydenRestrictedFlip_trace_of_idempote
 
 theorem antisymmetricProjectionMatrix_two_mul_haydenRestrictedFlip_trace_of_idempotent
     (P : CMatrix a) (hP : P * P = P) :
-    (antisymmetricProjectionMatrix_two (a := a) * haydenRestrictedFlip (a := a) P).trace =
+    (antisymmetricProjectionMatrixTwo (a := a) * haydenRestrictedFlip (a := a) P).trace =
       -(P.trace * (P.trace - 1) / 2) := by
   rw [antisymmetricProjectionMatrix_two_eq_half_one_sub_swap]
   rw [Matrix.smul_mul, Matrix.sub_mul, Matrix.one_mul, Matrix.trace_smul, Matrix.trace_sub]
@@ -4492,8 +4491,8 @@ theorem hayden_secondMomentTwirl_restrictedFlip_decomposition
           (symmetricProjectionMatrix (a := a) 2).trace) •
           symmetricProjectionMatrix (a := a) 2) +
         (((-(P.trace * (P.trace - 1) / 2)) /
-          (antisymmetricProjectionMatrix_two (a := a)).trace) •
-          antisymmetricProjectionMatrix_two (a := a)) := by
+          (antisymmetricProjectionMatrixTwo (a := a)).trace) •
+          antisymmetricProjectionMatrixTwo (a := a)) := by
   rw [unitaryTwirl_two_eq_symmetric_antisymmetric_trace_decomposition]
   rw [symmetricProjectionMatrix_two_mul_haydenRestrictedFlip_trace_of_idempotent (a := a) P hP]
   rw [antisymmetricProjectionMatrix_two_mul_haydenRestrictedFlip_trace_of_idempotent (a := a) P hP]
@@ -4505,12 +4504,12 @@ theorem hayden_secondMomentTwirl_restrictedFlip
         (((((P.trace * P.trace + P.trace) / 2) /
             (symmetricProjectionMatrix (a := a) 2).trace) +
           ((P.trace * (P.trace - 1) / 2) /
-            (antisymmetricProjectionMatrix_two (a := a)).trace)) •
-            tensorPowerSwapMatrix_two (a := a) +
+            (antisymmetricProjectionMatrixTwo (a := a)).trace)) •
+            tensorPowerSwapMatrixTwo (a := a) +
           ((((P.trace * P.trace + P.trace) / 2) /
             (symmetricProjectionMatrix (a := a) 2).trace) -
           ((P.trace * (P.trace - 1) / 2) /
-            (antisymmetricProjectionMatrix_two (a := a)).trace)) • 1) := by
+            (antisymmetricProjectionMatrixTwo (a := a)).trace)) • 1) := by
   rw [hayden_secondMomentTwirl_restrictedFlip_decomposition (a := a) P hP]
   rw [symmetricProjectionMatrix_two_eq_half_one_add_swap]
   rw [antisymmetricProjectionMatrix_two_eq_half_one_sub_swap]
@@ -4567,7 +4566,7 @@ theorem unitaryTwirl_conjTranspose [Nonempty a] (n : ℕ)
   have hf : Integrable (unitaryTwirlIntegrand (a := a) n A)
       (unitaryHaarMeasure (a := a)) :=
     unitaryTwirl_integrand_integrable (a := a) n A
-  rw [integral_matrix_conjTranspose (a := a) (hf := hf)]
+  rw [cMatrix_integral_conjTranspose (hf := hf)]
   congr 1
   funext U
   simp [unitaryTwirlIntegrand, Matrix.conjTranspose_mul, Matrix.star_eq_conjTranspose,
@@ -4586,18 +4585,6 @@ private theorem unitaryTwirlIntegrand_posSemidef (n : ℕ)
     hA.mul_mul_conjTranspose_same
       (unitaryTensorPowerMatrix U n : CMatrix (TensorPower a n))
 
-private theorem integral_dotProduct_mulVec [Nonempty a]
-    {ι : Type u} [Fintype ι] [DecidableEq ι]
-    {f : Matrix.unitaryGroup a ℂ → CMatrix ι}
-    (hf : Integrable f (unitaryHaarMeasure (a := a))) (x : ι → ℂ) :
-    dotProduct (star x)
-        (Matrix.mulVec (∫ U, f U ∂unitaryHaarMeasure (a := a)) x) =
-      ∫ U, dotProduct (star x) (Matrix.mulVec (f U) x)
-        ∂unitaryHaarMeasure (a := a) := by
-  simp_rw [← cMatrixQuadraticCLM_apply x]
-  exact
-    ((cMatrixQuadraticCLM x).integral_comp_comm hf).symm
-
 theorem unitaryTwirl_posSemidef_of_posSemidef [Nonempty a] (n : ℕ)
     {A : CMatrix (TensorPower a n)} (hA : A.PosSemidef) :
     (unitaryTwirl n A).PosSemidef := by
@@ -4607,7 +4594,7 @@ theorem unitaryTwirl_posSemidef_of_posSemidef [Nonempty a] (n : ℕ)
   have hf : Integrable (unitaryTwirlIntegrand (a := a) n A)
       (unitaryHaarMeasure (a := a)) :=
     unitaryTwirl_integrand_integrable (a := a) n A
-  rw [unitaryTwirl, integral_dotProduct_mulVec (a := a) (hf := hf) x]
+  rw [unitaryTwirl, cMatrix_integral_dotProduct_mulVec (hf := hf) x]
   refine integral_nonneg fun U => ?_
   exact (unitaryTwirlIntegrand_posSemidef (a := a) n hA U).dotProduct_mulVec_nonneg x
 

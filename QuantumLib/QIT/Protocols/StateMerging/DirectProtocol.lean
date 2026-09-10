@@ -35,27 +35,6 @@ universe u v w x y p u₁ v₁
 
 noncomputable section
 
-/-- Regroup the FQSW encoder output and Alice's teleportation half so the two
-`q` registers are the input of the Bell instrument and `e` is a spectator. -/
-def fqswStateMergingAliceRegroupEquiv (q : Type x) (e : Type y) :
-    Prod (Prod q e) q ≃ Prod (Prod q q) e where
-  toFun t := ((t.1.1, t.2), t.1.2)
-  invFun t := ((t.1.1, t.2), t.1.2)
-  left_inv := by intro t; rfl
-  right_inv := by intro t; rfl
-
-/-- Remove the unit output of the Bell measurement while retaining Alice's
-FQSW ebit half. The `q` argument fixes the universe of the discarded unit. -/
-def fqswStateMergingAliceOutputEquiv (q : Type x) (e : Type y) :
-    Prod PUnit.{x + 1} e ≃ e :=
-  let _qUniverseWitness := q
-  {
-    toFun := fun t => t.2
-    invFun := fun t => (PUnit.unit, t)
-    left_inv := by intro t; cases t.1; rfl
-    right_inv := by intro t; rfl
-  }
-
 /-- The Bell instrument with Alice's FQSW ebit half carried through as an
 untouched local spectator. -/
 def fqswStateMergingTeleportationAliceInstrument
@@ -63,9 +42,9 @@ def fqswStateMergingTeleportationAliceInstrument
     [Fintype q] [DecidableEq q] [Nonempty q]
     [Fintype e] [DecidableEq e] :
     FiniteInstrument
-      (Prod (Prod q q) e) e (TeleportationOutcome q) :=
+      ((q × q) × e) e (TeleportationOutcome q) :=
   ((teleportationBellInstrument q).prodIdRight (R := e)).postcompChannel
-    (Channel.reindex (fqswStateMergingAliceOutputEquiv q e))
+    (CPTPOp.reindex (Equiv.punitProd e))
 
 /-- Bob's physical teleportation branch with an arbitrary left spectator. -/
 def fqswStateMergingTeleportationBobChannel
@@ -73,9 +52,9 @@ def fqswStateMergingTeleportationBobChannel
     [Fintype q] [DecidableEq q] [Nonempty q]
     [Fintype s] [DecidableEq s]
     (result : TeleportationOutcome q) :
-    Channel (Prod s q) (Prod q s) :=
-  (Channel.reindex (Equiv.prodComm s q)).comp <|
-    (Channel.idChannel s).prod (teleportationCorrection q result)
+    CPTPMap (s × q) (q × s) :=
+  (CPTPOp.reindex (Equiv.prodComm s q)) ∘ₘ
+    ((CPTPOp.id (dIn := s)).prod (teleportationCorrection q result))
 
 /-- Physical teleportation with Alice's output-ebit spectator and Bob's
 source spectator exposed as a finite one-way LOCC. -/
@@ -85,8 +64,8 @@ def fqswStateMergingTeleportationLOCC
     [Fintype e] [DecidableEq e]
     [Fintype s] [DecidableEq s] :
     OneWayLOCC
-      (Prod (Prod q q) e) e
-      (Prod s q) (Prod q s)
+      ((q × q) × e) e
+      (s × q) (q × s)
       (TeleportationOutcome q) :=
   OneWayLOCC.ofFiniteInstrument
     (fqswStateMergingTeleportationAliceInstrument q e)
@@ -99,7 +78,7 @@ variable [Fintype r] [DecidableEq r]
 
 namespace FQSWBlockProtocol
 
-variable {psi : PureVector (Prod (Prod a b) r)} {n : ℕ}
+variable {psi : Ket ((a × b) × r)} {n : ℕ}
 variable {q : Type x} {e : Type y}
 variable [Fintype q] [DecidableEq q] [Nonempty q]
 variable [Fintype e] [DecidableEq e] [Nonempty e]
@@ -110,36 +89,36 @@ variable (C : FQSWBlockProtocol psi n q e e)
 the message and her half of the teleportation resource to the Bell
 instrument. -/
 def stateMergingAlicePreparation :
-    Channel (Prod (TensorPower a n) q) (Prod (Prod q q) e) :=
-  (Channel.reindex (fqswStateMergingAliceRegroupEquiv q e)).comp
-    (C.aliceOperation.prod (Channel.idChannel q))
+    CPTPMap (TensorPower a n × q) ((q × q) × e) :=
+  (CPTPOp.reindex (prodABCToACBEquiv q e q)) ∘ₘ
+    (C.aliceOperation.prod (CPTPOp.id (dIn := q)))
 
 /-- Alice's physical state-merging instrument: run the FQSW encoder, perform
 the Bell instrument on the message and input ebit half, and retain the FQSW
 ebit half. -/
 def stateMergingAliceInstrument :
     FiniteInstrument
-      (Prod (TensorPower a n) q) e (TeleportationOutcome q) :=
+      (TensorPower a n × q) e (TeleportationOutcome q) :=
   (fqswStateMergingTeleportationAliceInstrument q e).precompChannel
     C.stateMergingAlicePreparation
 
 /-- Bob's branch channel: correct his teleportation half, move the recovered
 message before the source `B` register, and run the FQSW decoder. -/
 def stateMergingBobChannel (result : TeleportationOutcome q) :
-    Channel
-      (Prod (TensorPower b n) q)
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) e) :=
-  C.bobOperation.comp
+    CPTPMap
+      (TensorPower b n × q)
+      ((TensorPower a n × TensorPower b n) × e) :=
+  C.bobOperation ∘ₘ
     (fqswStateMergingTeleportationBobChannel q (TensorPower b n) result)
 
 /-- The finite one-way LOCC obtained by replacing the FQSW quantum message
 with physical teleportation. -/
 def stateMergingLOCC :
     OneWayLOCC
-      (Prod (TensorPower a n) q)
+      (TensorPower a n × q)
       e
-      (Prod (TensorPower b n) q)
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) e)
+      (TensorPower b n × q)
+      ((TensorPower a n × TensorPower b n) × e)
       (TeleportationOutcome q) :=
   OneWayLOCC.ofFiniteInstrument C.stateMergingAliceInstrument
     C.stateMergingBobChannel
@@ -154,17 +133,21 @@ def toStateMergingProtocol :
   outputEbitPairing := C.ebitPairing
   locc := C.stateMergingLOCC
 
+omit [DecidableEq b] [DecidableEq r] in
 @[simp]
 theorem stateMergingAliceInstrument_branch
     (result : TeleportationOutcome q) :
     (C.stateMergingAliceInstrument.branch result) =
-      ((Channel.reindex (fqswStateMergingAliceOutputEquiv q e)).map.comp
+      ((CPTPOp.reindex (Equiv.punitProd e)).map.comp
         (MatrixMap.kron
           ((teleportationBellInstrument q).branch result)
-          (Channel.idChannel e).map)).comp
-        C.stateMergingAlicePreparation.map :=
-  rfl
+          (CPTPOp.id (dIn := e)).map)).comp
+        C.stateMergingAlicePreparation.map := by
+  simp only [stateMergingAliceInstrument, FiniteInstrument.precompChannel_branch,
+    fqswStateMergingTeleportationAliceInstrument,
+    FiniteInstrument.postcompChannel_branch, FiniteInstrument.prodIdRight_branch]
 
+omit [DecidableEq r] in
 @[simp]
 theorem stateMergingBobChannel_map
     (result : TeleportationOutcome q) :
@@ -172,8 +155,9 @@ theorem stateMergingBobChannel_map
       C.bobOperation.map.comp
         (fqswStateMergingTeleportationBobChannel
           q (TensorPower b n) result).map :=
-  rfl
+  CPTPOp.compose_map _ _
 
+omit [DecidableEq r] in
 @[simp]
 theorem stateMergingLOCC_toChannel_map :
     C.stateMergingLOCC.toChannel.map =
@@ -181,48 +165,32 @@ theorem stateMergingLOCC_toChannel_map :
         MatrixMap.kron
           (C.stateMergingAliceInstrument.branch result)
           (C.stateMergingBobChannel result).map :=
-  rfl
+  C.stateMergingLOCC.toChannel_map
 
+omit [DecidableEq r] in
 /-- The full one-way LOCC channel factors as Alice's FQSW encoder, the
 physical teleportation core, and Bob's FQSW decoder. -/
 theorem stateMergingLOCC_toChannel_eq_encoder_teleportation_decoder :
     C.stateMergingLOCC.toChannel =
-      ((Channel.idChannel e).prod C.bobOperation).comp
+      ((CPTPOp.id (dIn := e)).prod C.bobOperation) ∘ₘ
         ((fqswStateMergingTeleportationLOCC
-            q e (TensorPower b n)).toChannel.comp
+            q e (TensorPower b n)).toChannel ∘ₘ
           (C.stateMergingAlicePreparation.prod
-            (Channel.idChannel (Prod (TensorPower b n) q)))) := by
-  rw [Channel.mk.injEq]
+            (CPTPOp.id (dIn := TensorPower b n × q)))) := by
+  refine CPTPOp.ext_map ?_
   apply LinearMap.ext
   intro X
-  change
-    (((∑ result : TeleportationOutcome q,
-        MatrixMap.kron
-          (((fqswStateMergingTeleportationAliceInstrument q e).branch result).comp
-            C.stateMergingAlicePreparation.map)
-          (C.bobOperation.map.comp
-            (fqswStateMergingTeleportationBobChannel
-              q (TensorPower b n) result).map)) :
-        MatrixMap
-          (Prod (Prod (TensorPower a n) q) (Prod (TensorPower b n) q))
-          (Prod e (Prod (Prod (TensorPower a n) (TensorPower b n)) e))) X) =
-      MatrixMap.kron (Channel.idChannel e).map C.bobOperation.map
-        (((∑ result : TeleportationOutcome q,
-            MatrixMap.kron
-              ((fqswStateMergingTeleportationAliceInstrument q e).branch result)
-              (fqswStateMergingTeleportationBobChannel
-                q (TensorPower b n) result).map) :
-            MatrixMap
-              (Prod (Prod (Prod q q) e) (Prod (TensorPower b n) q))
-              (Prod e (Prod q (TensorPower b n))))
-          (MatrixMap.kron C.stateMergingAlicePreparation.map
-            (Channel.idChannel (Prod (TensorPower b n) q)).map X))
+  simp only [stateMergingLOCC_toChannel_map, stateMergingAliceInstrument,
+    FiniteInstrument.precompChannel_branch, stateMergingBobChannel_map,
+    CPTPOp.compose_map, CPTPOp.prod_map,
+    LinearMap.comp_apply, fqswStateMergingTeleportationLOCC,
+    OneWayLOCC.ofFiniteInstrument_toChannel_map]
   simp only [LinearMap.sum_apply, map_sum]
   refine Finset.sum_congr rfl fun result _ => ?_
   rw [MatrixMap.kron_comp_apply_general]
   rw [MatrixMap.kron_comp_apply_general]
-  rw [Channel.idChannel_map_eq_linearMap_id,
-    Channel.idChannel_map_eq_linearMap_id]
+  rw [CPTPOp.id_map,
+    CPTPOp.id_map]
   simp only [LinearMap.id_comp, LinearMap.comp_id]
 
 /-- The ideal state-merging target is exactly the FQSW target relabelled into
@@ -240,7 +208,7 @@ end FQSWBlockProtocol
 
 namespace ADHWFQSWIidMixedBlockConstruction
 
-variable {psi : PureVector (Prod (Prod a b) r)} {n : ℕ}
+variable {psi : Ket ((a × b) × r)} {n : ℕ}
 variable {deltaTypical deltaRate epsilon : ℝ}
 variable {atyp : Type p} {btyp : Type u₁} {rtyp : Type v₁}
 variable {q : Type x} {e : Type y}

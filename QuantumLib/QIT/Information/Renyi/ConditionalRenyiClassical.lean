@@ -25,119 +25,17 @@ file never defines a zero weight multiplied by `+infinity`.
 open scoped ComplexOrder MatrixOrder NNReal
 open Matrix
 
-namespace QIT
-
+noncomputable section
 universe u v w
 
-noncomputable section
+open QIT
+
+namespace QIT
 
 namespace Classical
 
-theorem blockDiagonal_rpow_nonneg
-    {ι : Type u} {a : Type v} [Fintype ι] [DecidableEq ι]
-    [Fintype a] [DecidableEq a]
-    (blocks : ι → CMatrix a)
-    (hblocks : ∀ i, (blocks i).PosSemidef)
-    {s : ℝ} (hs : 0 ≤ s) :
-    CFC.rpow (blockDiagonal blocks) s =
-      blockDiagonal (fun i => CFC.rpow (blocks i) s) := by
-  let d : ι → a → ℝ := fun i => (hblocks i).isHermitian.eigenvalues
-  let U : ι → Matrix.unitaryGroup a ℂ :=
-    fun i => (hblocks i).isHermitian.eigenvectorUnitary
-  let W : Matrix.unitaryGroup (ι × a) ℂ :=
-    ⟨blockDiagonal (fun i => (U i : CMatrix a)), by
-      rw [Matrix.mem_unitaryGroup_iff]
-      simp only [star_eq_conjTranspose]
-      rw [blockDiagonal_conjTranspose, blockDiagonal_mul]
-      rw [show (1 : CMatrix (ι × a)) =
-          Matrix.kronecker (1 : CMatrix ι) (1 : CMatrix a) by simp]
-      rw [identityTensor_eq_blockDiagonal (ι := ι) (a := a)
-        (1 : CMatrix a)]
-      apply congrArg blockDiagonal
-      funext i
-      exact Matrix.mem_unitaryGroup_iff.mp (U i).2⟩
-  have hd : ∀ i j, 0 ≤ d i j := by
-    intro i j
-    exact (hblocks i).eigenvalues_nonneg j
-  have hdiag :
-      blockDiagonal blocks =
-        Unitary.conjStarAlgAut ℂ _ W
-          (blockDiagonal (fun i =>
-            Matrix.diagonal (fun j => (d i j : ℂ)))) := by
-    have hspec : blocks = fun i =>
-        Unitary.conjStarAlgAut ℂ _ (U i)
-          (Matrix.diagonal (fun j => (d i j : ℂ))) := by
-      funext i
-      simpa [d, U, Function.comp_def] using
-        (hblocks i).isHermitian.spectral_theorem
-    rw [hspec]
-    simp [Unitary.conjStarAlgAut_apply, star_eq_conjTranspose, W,
-      blockDiagonal_conjTranspose, blockDiagonal_mul]
-  have hdiag_pos :
-      (blockDiagonal (fun i =>
-        Matrix.diagonal (fun j => (d i j : ℂ)))).PosSemidef := by
-    exact blockDiagonal_posSemidef _ (fun i =>
-      Matrix.PosSemidef.diagonal (fun j => by
-        change (0 : ℂ) ≤ (d i j : ℂ)
-        exact_mod_cast hd i j))
-  have hdiag_block (f : ι → a → ℝ) :
-      blockDiagonal (fun i =>
-          Matrix.diagonal (fun j => (f i j : ℂ))) =
-        Matrix.diagonal (fun p : ι × a => (f p.1 p.2 : ℂ)) := by
-    ext ⟨i, j⟩ ⟨i', j'⟩
-    by_cases hii : i = i'
-    · subst i'
-      change block (blockDiagonal (fun i =>
-        Matrix.diagonal (fun j => (f i j : ℂ)))) i i j j' = _
-      have h := congrFun (congrFun
-        (blockDiagonal_block_self (fun i =>
-          Matrix.diagonal (fun j => (f i j : ℂ))) i) j) j'
-      simp [Matrix.diagonal]
-    · change block (blockDiagonal (fun i =>
-        Matrix.diagonal (fun j => (f i j : ℂ)))) i i' j j' = _
-      have h := congrFun (congrFun
-        (blockDiagonal_block_ne (fun i =>
-          Matrix.diagonal (fun j => (f i j : ℂ))) hii) j) j'
-      simp [Matrix.diagonal, hii]
-  have hpow :
-      CFC.rpow (blockDiagonal blocks) s =
-        Unitary.conjStarAlgAut ℂ _ W
-          (blockDiagonal (fun i =>
-            Matrix.diagonal (fun j => ((d i j ^ s : ℝ) : ℂ)))) := by
-    rw [hdiag, cMatrix_rpow_conjStarAlgAut_nonneg W hdiag_pos hs]
-    rw [hdiag_block d]
-    rw [cMatrix_rpow_diagonal_ofReal (fun p : ι × a => d p.1 p.2)
-      (fun p => hd p.1 p.2) s]
-    rw [← hdiag_block (fun i j => d i j ^ s)]
-  rw [hpow]
-  simp only [Unitary.conjStarAlgAut_apply, star_eq_conjTranspose,
-    W, blockDiagonal_conjTranspose, blockDiagonal_mul]
-  apply congrArg blockDiagonal
-  funext i
-  have hi_spec :
-      blocks i =
-        Unitary.conjStarAlgAut ℂ _ (U i)
-          (Matrix.diagonal (fun j => (d i j : ℂ))) := by
-    simpa [d, U, Function.comp_def] using
-      (hblocks i).isHermitian.spectral_theorem
-  have hi_diag :
-      (Matrix.diagonal (fun j => (d i j : ℂ))).PosSemidef :=
-    Matrix.PosSemidef.diagonal (fun j => by
-      change (0 : ℂ) ≤ (d i j : ℂ)
-      exact_mod_cast hd i j)
-  have hi_pow :
-      CFC.rpow (blocks i) s =
-        Unitary.conjStarAlgAut ℂ _ (U i)
-          (Matrix.diagonal (fun j => ((d i j ^ s : ℝ) : ℂ))) := by
-    rw [hi_spec, cMatrix_rpow_conjStarAlgAut_nonneg (U i) hi_diag hs,
-      cMatrix_rpow_diagonal_ofReal (d i) (hd i) s]
-  exact hi_pow.symm
-
-/-! The same block decomposition remains valid for arbitrary real powers.  The
-zero eigenspaces are retained by the support convention of `CFC.rpow`; this is
-why this theorem needs only positive semidefiniteness, rather than
-positive-definiteness. -/
-
+/-- A real power of a block diagonal PSD matrix is taken blockwise.  Zero eigenspaces are retained
+by the support convention of `CFC.rpow`, so positive semidefiniteness suffices. -/
 theorem blockDiagonal_rpow
     {ι : Type u} {a : Type v} [Fintype ι] [DecidableEq ι]
     [Fintype a] [DecidableEq a]
@@ -273,10 +171,8 @@ theorem blockDiagonal_rpow
   exact (cMatrix_rpow_unitary_conj_diagonal_ofReal Ubig dBig
     (fun ia => hd ia.1 ia.2) s).trans hconjpow.symm
 
-/-! Positive-definite blocks permit arbitrary real exponents.  In particular,
-this is the negative-exponent companion needed by the high-alpha Petz route;
-singular branches are still excluded by the support-indexed sums there. -/
-
+/-- The blockwise power formula for positive definite blocks, where the exponent may also be
+negative. -/
 theorem blockDiagonal_rpow_posDef
     {ι : Type u} {a : Type v} [Fintype ι] [DecidableEq ι]
     [Fintype a] [DecidableEq a]
@@ -402,10 +298,8 @@ theorem blockDiagonal_rpow_posDef
     cMatrix_rpow_diagonal_ofReal (d i) (fun j => le_of_lt (hd_pos i j)) s]
   rfl
 
-/-! The trace pairing of two positive-definite block powers is likewise
-blockwise.  This is the arbitrary-real-exponent companion of the
-nonnegative-power trace identity used by the low-alpha route. -/
-
+/-- The trace pairing `Tr(ρ^s σ^t)` of two block diagonal positive definite matrices splits as the
+sum of the blockwise pairings, at arbitrary real exponents. -/
 theorem blockDiagonal_trace_decomposition_posDef
     {ι : Type u} {a : Type v} [Fintype ι] [DecidableEq ι]
     [Fintype a] [DecidableEq a]
@@ -426,135 +320,73 @@ variable [Fintype A] [DecidableEq A]
 variable [Fintype B] [DecidableEq B]
 variable [Fintype Y] [DecidableEq Y]
 
-namespace State
+end QIT
+
+namespace MState
+
+variable {A : Type u} {B : Type v} {Y : Type w}
+variable [Fintype A] [DecidableEq A]
+variable [Fintype B] [DecidableEq B]
+variable [Fintype Y] [DecidableEq Y]
 
 /-! ### The explicit A|BY basis and its cq blocks -/
 
-/-- The finite basis equivalence `Y × (A × B) ≃ A × (B × Y)`. -/
-def classicalConditioningEquiv : Y × (A × B) ≃ A × (B × Y) where
-  toFun := fun y => (y.2.1, (y.2.2, y.1))
-  invFun := fun x => (x.2.2, (x.1, x.2.1))
-  left_inv := by rintro ⟨y, ⟨a, b⟩⟩; rfl
-  right_inv := by rintro ⟨a, ⟨b, y⟩⟩; rfl
-
-omit [Fintype A] [DecidableEq A] [Fintype B] [DecidableEq B]
-    [Fintype Y] [DecidableEq Y] in
-@[simp]
-theorem classicalConditioningEquiv_apply (yab : Y × (A × B)) :
-    classicalConditioningEquiv (A := A) (B := B) (Y := Y) yab =
-      (yab.2.1, (yab.2.2, yab.1)) := rfl
-
-omit [Fintype A] [DecidableEq A] [Fintype B] [DecidableEq B]
-    [Fintype Y] [DecidableEq Y] in
-@[simp]
-theorem classicalConditioningEquiv_symm_apply (aby : A × (B × Y)) :
-    (classicalConditioningEquiv (A := A) (B := B) (Y := Y)).symm aby =
-      (aby.2.2, (aby.1, aby.2.1)) := rfl
-
 /-- The normalized cq state in the `A × (B × Y)` grouping. -/
-def cqConditioningState (E : Ensemble Y (A × B)) : State (A × (B × Y)) :=
-  E.cqState.reindex (classicalConditioningEquiv (A := A) (B := B) (Y := Y))
+def cqConditioningState (E : MEnsemble (A × B) Y) : MState (A × (B × Y)) :=
+  E.cqState.reindex (prodABCToBCAEquiv Y A B)
 
-abbrev conditionalRenyiState (E : Ensemble Y (A × B)) : State (A × (B × Y)) :=
-  State.cqConditioningState E
+/-- Notation for `cqConditioningState` in its role as the state whose conditional Rényi entropies
+are being computed. -/
+abbrev conditionalRenyiState (E : MEnsemble (A × B) Y) : MState (A × (B × Y)) :=
+  MState.cqConditioningState E
 
 @[simp]
-theorem cqConditioningState_matrix (E : Ensemble Y (A × B)) :
-    (State.cqConditioningState E).matrix =
-      E.cqState.matrix.submatrix
-        (classicalConditioningEquiv (A := A) (B := B) (Y := Y)).symm
-        (classicalConditioningEquiv (A := A) (B := B) (Y := Y)).symm := rfl
+theorem cqConditioningState_matrix (E : MEnsemble (A × B) Y) :
+    (MState.cqConditioningState E).m =
+      E.cqState.m.submatrix
+        (prodABCToBCAEquiv Y A B).symm
+        (prodABCToBCAEquiv Y A B).symm :=
+  MState.reindex_matrix _ _
 
-theorem cqConditioningState_is_cq_on_Y (E : Ensemble Y (A × B)) :
-    State.cqConditioningState E =
-      E.cqState.reindex (classicalConditioningEquiv (A := A) (B := B) (Y := Y)) := rfl
+theorem cqConditioningState_is_cq_on_Y (E : MEnsemble (A × B) Y) :
+    MState.cqConditioningState E =
+      E.cqState.reindex (prodABCToBCAEquiv Y A B) := rfl
 
 /-- The `y` diagonal block after the `A × (B × Y)` reindexing. -/
-def conditionalRenyiBlock (E : Ensemble Y (A × B)) (y : Y) : CMatrix (A × B) :=
-  (State.cqConditioningState E).matrix.submatrix
+def conditionalRenyiBlock (E : MEnsemble (A × B) Y) (y : Y) : CMatrix (A × B) :=
+  (MState.cqConditioningState E).m.submatrix
     (fun ab : A × B => (ab.1, (ab.2, y)))
     (fun ab : A × B => (ab.1, (ab.2, y)))
 
 @[simp]
 theorem conditionalRenyiBlock_eq_weighted_state
-    (E : Ensemble Y (A × B)) (y : Y) :
+    (E : MEnsemble (A × B) Y) (y : Y) :
     conditionalRenyiBlock E y =
-      (E.probs y : ℂ) • (E.states y).matrix := by
+      (E.probs y : ℂ) • (E.states y).m := by
+  rw [conditionalRenyiBlock, cqConditioningState_matrix]
   ext ⟨a, b⟩ ⟨a', b'⟩
-  change Classical.block E.cqState.matrix y y (a, b) (a', b') = _
+  change Classical.block E.cqState.m y y (a, b) (a', b') = _
   simpa [Classical.block] using
     congrFun (congrFun (Classical.cqState_block_self E y) (a, b)) (a', b')
 
-@[simp]
 theorem conditionalRenyiBlock_posSemidef
-    (E : Ensemble Y (A × B)) (y : Y) :
+    (E : MEnsemble (A × B) Y) (y : Y) :
     (conditionalRenyiBlock E y).PosSemidef := by
   rw [conditionalRenyiBlock_eq_weighted_state]
   have hp : 0 ≤ (E.probs y : ℂ) := by
     exact_mod_cast NNReal.coe_nonneg (E.probs y)
-  exact (E.states y).pos.smul hp
+  exact (E.states y).psd.smul hp
 
-@[simp]
 theorem conditionalRenyiBlock_trace
-    (E : Ensemble Y (A × B)) (y : Y) :
+    (E : MEnsemble (A × B) Y) (y : Y) :
     (conditionalRenyiBlock E y).trace = (E.probs y : ℂ) := by
   rw [conditionalRenyiBlock_eq_weighted_state, Matrix.trace_smul,
-    (E.states y).trace_eq_one]
+    (E.states y).tr']
   simp
 
 /-! ### Finite reindexing, products, powers, and reconstruction -/
 
-noncomputable def conditionalRenyiReindexStarAlgEquiv
-    {ι κ : Type*} [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq κ]
-    (e : ι ≃ κ) : CMatrix κ ≃⋆ₐ[ℂ] CMatrix ι where
-  __ := Matrix.reindexAlgEquiv ℂ ℂ e.symm
-  map_smul' r M := by
-    ext i j
-    simp [Matrix.reindex_apply]
-  map_star' M := by
-    ext i j
-    simp [Matrix.reindex_apply]
-
-theorem conditionalRenyi_submatrix_equiv_mul
-    {ι κ : Type*} [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq κ]
-    (e : ι ≃ κ) (M N : CMatrix κ) :
-    M.submatrix e e * N.submatrix e e = (M * N).submatrix e e := by
-  exact Matrix.submatrix_mul_equiv M N e e e
-
-theorem conditionalRenyi_submatrix_equiv_trace
-    {ι κ : Type*} [Fintype ι] [Fintype κ]
-    [DecidableEq ι] [DecidableEq κ] (e : ι ≃ κ) (M : CMatrix κ) :
-    (M.submatrix e e).trace = M.trace := by
-  rw [Matrix.trace]
-  apply Fintype.sum_equiv e
-  intro i
-  rfl
-
-theorem conditionalRenyi_rpow_reindex_nonneg
-    {ι κ : Type*} [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq κ]
-    (M : CMatrix κ) (hM : M.PosSemidef) (e : ι ≃ κ)
-    {s : ℝ} (hs : 0 ≤ s) :
-    CFC.rpow (M.submatrix e e) s = (CFC.rpow M s).submatrix e e := by
-  change (M.submatrix e e) ^ s = (M ^ s).submatrix e e
-  have hsub_nonneg : 0 ≤ M.submatrix e e :=
-    Matrix.nonneg_iff_posSemidef.mpr (hM.submatrix e)
-  have hM_nonneg : 0 ≤ M :=
-    Matrix.nonneg_iff_posSemidef.mpr hM
-  rw [CFC.rpow_eq_cfc_real (a := M.submatrix e e) (y := s) hsub_nonneg]
-  rw [CFC.rpow_eq_cfc_real (a := M) (y := s) hM_nonneg]
-  exact
-    (StarAlgHomClass.map_cfc
-      (conditionalRenyiReindexStarAlgEquiv e)
-      (fun x : ℝ => x ^ s) M
-      (hf := (Real.continuous_rpow_const hs).continuousOn)
-      (hφ := by
-        change Continuous fun A : CMatrix κ => A.submatrix e e
-        fun_prop)).symm
-
-/-! Support-convention real powers also commute with a finite permutation when
-the matrix is merely positive semidefinite.  The proof is spectral, so the
-zero eigenspace follows the same `0 ^ s = 0` convention as the PSD rpow API. -/
-
+/-- Reindexing a unitary matrix along an equivalence of index types gives a unitary matrix. -/
 private theorem conditionalRenyi_reindex_mem_unitary
     {ι κ : Type*} [Fintype ι] [DecidableEq ι]
     [Fintype κ] [DecidableEq κ]
@@ -579,6 +411,9 @@ private theorem conditionalRenyi_reindex_mem_unitary
   rw [hsum]
   simpa [Matrix.one_apply] using happ
 
+/-- Real powers of a PSD matrix commute with reindexing along an equivalence of index types.  The
+proof is spectral, so the zero eigenspace follows the same `0 ^ s = 0` convention as the PSD `rpow`
+API. -/
 theorem conditionalRenyi_rpow_reindex_posSemidef_support
     {ι κ : Type*} [Fintype ι] [DecidableEq ι]
     [Fintype κ] [DecidableEq κ]
@@ -694,11 +529,13 @@ theorem conditionalRenyi_blockDiagonal_reindex
     rw [Classical.blockDiagonal_block_ne blocks hyy]
     rfl
 
+/-- A `Y`-indexed family of blocks, assembled block-diagonally and reindexed into the
+`A × (B × Y)` grouping used by the conditional Rényi quantities. -/
 def conditionalRenyiRightBlockDiagonal
     (blocks : Y → CMatrix (A × B)) : CMatrix (A × (B × Y)) :=
   (Classical.blockDiagonal blocks).submatrix
-    (classicalConditioningEquiv (A := A) (B := B) (Y := Y)).symm
-    (classicalConditioningEquiv (A := A) (B := B) (Y := Y)).symm
+    (prodABCToBCAEquiv Y A B).symm
+    (prodABCToBCAEquiv Y A B).symm
 
 omit [Fintype A] [DecidableEq A] [Fintype B] [DecidableEq B] in
 @[simp]
@@ -711,19 +548,21 @@ theorem conditionalRenyiRightBlockDiagonal_block
   change Classical.block (Classical.blockDiagonal blocks) y y (a, b) (a', b') = _
   simp
 
+omit [DecidableEq A] [DecidableEq B] in
 theorem conditionalRenyiRightBlockDiagonal_mul
     (blocks₁ blocks₂ : Y → CMatrix (A × B)) :
     conditionalRenyiRightBlockDiagonal blocks₁ *
         conditionalRenyiRightBlockDiagonal blocks₂ =
       conditionalRenyiRightBlockDiagonal (fun y => blocks₁ y * blocks₂ y) := by
   unfold conditionalRenyiRightBlockDiagonal
-  rw [conditionalRenyi_submatrix_equiv_mul, Classical.blockDiagonal_mul]
+  rw [Matrix.submatrix_mul_equiv, Classical.blockDiagonal_mul]
 
+omit [DecidableEq A] [DecidableEq B] in
 theorem conditionalRenyiRightBlockDiagonal_trace
     (blocks : Y → CMatrix (A × B)) :
     (conditionalRenyiRightBlockDiagonal blocks).trace = ∑ y, (blocks y).trace := by
   unfold conditionalRenyiRightBlockDiagonal
-  rw [conditionalRenyi_submatrix_equiv_trace, Classical.blockDiagonal_trace]
+  rw [Matrix.trace_submatrix, Classical.blockDiagonal_trace]
 
 omit [DecidableEq A] [DecidableEq B] in
 theorem conditionalRenyiRightBlockDiagonal_posSemidef
@@ -733,31 +572,8 @@ theorem conditionalRenyiRightBlockDiagonal_posSemidef
   unfold conditionalRenyiRightBlockDiagonal
   exact (Classical.blockDiagonal_posSemidef blocks hblocks).submatrix _
 
-theorem conditionalRenyiRightBlockDiagonal_rpow_reindex_nonneg
-    (blocks : Y → CMatrix (A × B))
-    (hblocks : ∀ y, (blocks y).PosSemidef) {s : ℝ} (hs : 0 ≤ s) :
-    CFC.rpow (conditionalRenyiRightBlockDiagonal blocks) s =
-      (CFC.rpow (Classical.blockDiagonal blocks) s).submatrix
-        (classicalConditioningEquiv (A := A) (B := B) (Y := Y)).symm
-        (classicalConditioningEquiv (A := A) (B := B) (Y := Y)).symm := by
-  exact conditionalRenyi_rpow_reindex_nonneg
-    (Classical.blockDiagonal blocks)
-    (Classical.blockDiagonal_posSemidef blocks hblocks)
-    (classicalConditioningEquiv (A := A) (B := B) (Y := Y)).symm hs
-
-theorem conditionalRenyiRightBlockDiagonal_rpow_nonneg
-    (blocks : Y → CMatrix (A × B))
-    (hblocks : ∀ y, (blocks y).PosSemidef) {s : ℝ} (hs : 0 ≤ s) :
-    CFC.rpow (conditionalRenyiRightBlockDiagonal blocks) s =
-      conditionalRenyiRightBlockDiagonal (fun y => CFC.rpow (blocks y) s) := by
-  rw [conditionalRenyiRightBlockDiagonal_rpow_reindex_nonneg
-      blocks hblocks hs,
-    Classical.blockDiagonal_rpow_nonneg blocks hblocks hs]
-  rfl
-
-/-! The permutation into the right-conditioning basis preserves the support
-convention for every real exponent. -/
-
+/-- Real powers of `conditionalRenyiRightBlockDiagonal` are taken blockwise: the permutation into
+the right-conditioning basis preserves the support convention at every real exponent. -/
 theorem conditionalRenyiRightBlockDiagonal_rpow_support
     (blocks : Y → CMatrix (A × B))
     (hblocks : ∀ y, (blocks y).PosSemidef) (s : ℝ) :
@@ -766,78 +582,81 @@ theorem conditionalRenyiRightBlockDiagonal_rpow_support
         (fun y => CFC.rpow (blocks y) s) := by
   unfold conditionalRenyiRightBlockDiagonal
   rw [conditionalRenyi_rpow_reindex_posSemidef_support
-      (e := classicalConditioningEquiv (A := A) (B := B) (Y := Y))
+      (e := prodABCToBCAEquiv Y A B)
       (M := Classical.blockDiagonal blocks)
       (Classical.blockDiagonal_posSemidef blocks hblocks) s,
     Classical.blockDiagonal_rpow blocks hblocks s]
 
-theorem conditionalRenyiState_eq_rightBlockDiagonal (E : Ensemble Y (A × B)) :
-    (State.cqConditioningState E).matrix =
+theorem conditionalRenyiState_eq_rightBlockDiagonal (E : MEnsemble (A × B) Y) :
+    (MState.cqConditioningState E).m =
       conditionalRenyiRightBlockDiagonal (conditionalRenyiBlock E) := by
-  rw [conditionalRenyiRightBlockDiagonal]
+  rw [cqConditioningState_matrix, conditionalRenyiRightBlockDiagonal]
   rw [show conditionalRenyiBlock E =
-      (fun y => (E.probs y : ℂ) • (E.states y).matrix) by
+      (fun y => (E.probs y : ℂ) • (E.states y).m) by
         funext y
         exact conditionalRenyiBlock_eq_weighted_state E y]
   exact congrArg (fun M => M.submatrix
-      (classicalConditioningEquiv (A := A) (B := B) (Y := Y)).symm
-      (classicalConditioningEquiv (A := A) (B := B) (Y := Y)).symm)
+      (prodABCToBCAEquiv Y A B).symm
+      (prodABCToBCAEquiv Y A B).symm)
     (Classical.cqState_eq_blockDiagonal E)
 
-theorem conditionalRenyiState_trace_eq_sum_block_trace (E : Ensemble Y (A × B)) :
-    (State.cqConditioningState E).matrix.trace =
+theorem conditionalRenyiState_trace_eq_sum_block_trace (E : MEnsemble (A × B) Y) :
+    (MState.cqConditioningState E).m.trace =
       ∑ y, (conditionalRenyiBlock E y).trace := by
   rw [conditionalRenyiState_eq_rightBlockDiagonal,
     conditionalRenyiRightBlockDiagonal_trace]
 
-theorem conditionalRenyiState_trace_eq_one (E : Ensemble Y (A × B)) :
-    (State.cqConditioningState E).matrix.trace = 1 :=
-  (State.cqConditioningState E).trace_eq_one
+theorem conditionalRenyiState_trace_eq_one (E : MEnsemble (A × B) Y) :
+    (MState.cqConditioningState E).m.trace = 1 :=
+  (MState.cqConditioningState E).tr'
 
 /-! ### Marginals and support-indexed branch logic -/
 
-end State
+end MState
 
-namespace Ensemble
+namespace MEnsemble
 
-abbrev cqConditioningState (E : Ensemble Y (A × B)) : State (A × (B × Y)) :=
-  State.cqConditioningState E
+variable {A : Type u} {B : Type v} {Y : Type w}
+variable [Fintype A] [DecidableEq A]
+variable [Fintype B] [DecidableEq B]
+variable [Fintype Y] [DecidableEq Y]
 
-def conditionalMarginalB (E : Ensemble Y (A × B)) : Ensemble Y B where
-  probs := E.probs
-  weights_sum := E.weights_sum
-  states := fun y => (E.states y).marginalB
+/-- The ensemble of `B` marginals: same probabilities, each state traced over `A`. -/
+def conditionalMarginalB (E : MEnsemble (A × B) Y) : MEnsemble B Y :=
+  .ofProbs E.probs E.weights_sum (fun y => (E.states y).traceLeft)
 
 omit [DecidableEq Y] in
 @[simp]
-theorem conditionalMarginalB_probs (E : Ensemble Y (A × B)) (y : Y) :
+theorem conditionalMarginalB_probs (E : MEnsemble (A × B) Y) (y : Y) :
     E.conditionalMarginalB.probs y = E.probs y := rfl
 
 omit [DecidableEq Y] in
 @[simp]
-theorem conditionalMarginalB_states (E : Ensemble Y (A × B)) (y : Y) :
-    E.conditionalMarginalB.states y = (E.states y).marginalB := rfl
+theorem conditionalMarginalB_states (E : MEnsemble (A × B) Y) (y : Y) :
+    E.conditionalMarginalB.states y = (E.states y).traceLeft := rfl
 
-def conditionalMarginalBYState (E : Ensemble Y (A × B)) : State (B × Y) :=
+/-- The cq state of the `B` marginal ensemble, in the `B × Y` grouping.  It is the conditioning
+marginal of `conditionalRenyiState`. -/
+def conditionalMarginalBYState (E : MEnsemble (A × B) Y) : MState (B × Y) :=
   E.conditionalMarginalB.cqState.reindex (Equiv.prodComm Y B)
 
-theorem conditionalRenyiState_marginalB_eq_conditionalMarginalBYState
-    (E : Ensemble Y (A × B)) :
-    (State.cqConditioningState E).marginalB = E.conditionalMarginalBYState := by
-  apply State.ext
+theorem conditionalRenyiState_traceLeft_eq_conditionalMarginalBYState
+    (E : MEnsemble (A × B) Y) :
+    (MState.cqConditioningState E).traceLeft = E.conditionalMarginalBYState := by
+  apply MState.ext
   ext ⟨b, y⟩ ⟨b', y'⟩
-  simp only [State.cqConditioningState, State.reindex_matrix, State.marginalB_matrix,
-    partialTraceA, Matrix.submatrix, conditionalMarginalBYState,
-    Ensemble.cqState_matrix]
+  simp only [MState.cqConditioningState, MState.reindex_matrix, MState.traceLeft_m,
+    Matrix.traceLeft, Matrix.of_apply, Matrix.submatrix, conditionalMarginalBYState,
+    MEnsemble.cqState_matrix]
   by_cases hyy : y = y'
   · subst y'
-    simp [Ensemble.conditionalMarginalB, Matrix.kronecker,
-      Matrix.kroneckerMap_apply, State.classicalConditioningEquiv_symm_apply,
+    simp [MEnsemble.conditionalMarginalB, Matrix.kronecker,
+      Matrix.kroneckerMap_apply, prodABCToBCAEquiv_symm_apply,
       Matrix.sum_apply]
     conv_lhs => rw [Finset.sum_comm]
     rw [Finset.sum_eq_single_of_mem y (Finset.mem_univ y)]
     · rw [Finset.sum_eq_single_of_mem y (Finset.mem_univ y)]
-      · simp [partialTraceA]
+      · simp [Matrix.traceLeft]
         rw [← Finset.smul_sum]
       · intro x _ hxy
         simp [hxy]
@@ -846,70 +665,74 @@ theorem conditionalRenyiState_marginalB_eq_conditionalMarginalBYState
   · have hxy : ∀ x : Y, ¬(x = y ∧ x = y') := by
       intro x h
       exact hyy (h.1.symm.trans h.2)
-    simp [Ensemble.conditionalMarginalB, Matrix.kronecker,
-      Matrix.kroneckerMap_apply, State.classicalConditioningEquiv_symm_apply,
+    simp [MEnsemble.conditionalMarginalB, Matrix.kronecker,
+      Matrix.kroneckerMap_apply, prodABCToBCAEquiv_symm_apply,
       Matrix.sum_apply, hxy]
 
-def conditionalRenyiSupport (E : Ensemble Y (A × B)) : Finset Y :=
+/-- The classical labels of positive probability.  Restricting sums to it keeps the extended-real
+branch values from meeting a zero weight. -/
+def conditionalRenyiSupport (E : MEnsemble (A × B) Y) : Finset Y :=
   Finset.univ.filter fun y => E.probs y ≠ 0
 
 /-- An EReal branch sum with zero-probability labels removed before the
 coercion and multiplication.  This is the support-indexed form of the
 classical mixture; it does not form `0 * (+infinity)`. -/
 noncomputable def conditionalRenyiSupportWeightedERealSum
-    (E : Ensemble Y (A × B)) (f : Y → EReal) : EReal :=
+    (E : MEnsemble (A × B) Y) (f : Y → EReal) : EReal :=
   E.conditionalRenyiSupport.sum fun y =>
     ((E.probs y : ℝ) : EReal) * f y
 
 omit [DecidableEq Y] in
-theorem mem_conditionalRenyiSupport_iff (E : Ensemble Y (A × B)) (y : Y) :
+theorem mem_conditionalRenyiSupport_iff (E : MEnsemble (A × B) Y) (y : Y) :
     y ∈ E.conditionalRenyiSupport ↔ E.probs y ≠ 0 := by
   simp [conditionalRenyiSupport]
 
 omit [DecidableEq Y] in
-theorem not_mem_conditionalRenyiSupport_iff (E : Ensemble Y (A × B)) (y : Y) :
+theorem not_mem_conditionalRenyiSupport_iff (E : MEnsemble (A × B) Y) (y : Y) :
     y ∉ E.conditionalRenyiSupport ↔ E.probs y = 0 := by
   simp [conditionalRenyiSupport]
 
 omit [DecidableEq Y] in
 theorem conditionalRenyiSupport_weight_ne_zero
-    (E : Ensemble Y (A × B)) {y : Y} (hy : y ∈ E.conditionalRenyiSupport) :
+    (E : MEnsemble (A × B) Y) {y : Y} (hy : y ∈ E.conditionalRenyiSupport) :
     (E.probs y : ℂ) ≠ 0 := by
   exact_mod_cast (E.mem_conditionalRenyiSupport_iff y).mp hy
 
 theorem conditionalRenyiBlock_eq_zero_iff
-    (E : Ensemble Y (A × B)) (y : Y) :
-    State.conditionalRenyiBlock E y = 0 ↔ E.probs y = 0 := by
-  rw [State.conditionalRenyiBlock_eq_weighted_state]
+    (E : MEnsemble (A × B) Y) (y : Y) :
+    MState.conditionalRenyiBlock E y = 0 ↔ E.probs y = 0 := by
+  rw [MState.conditionalRenyiBlock_eq_weighted_state]
   constructor
   · intro h
     by_contra hprob
     have hscalar : (E.probs y : ℂ) ≠ 0 := by exact_mod_cast hprob
     apply hscalar
-    have hstate : (E.states y).matrix = 0 :=
+    have hstate : (E.states y).m = 0 :=
       (smul_eq_zero.mp h).resolve_left hscalar
-    exact False.elim ((E.states y).density_matrix_ne_zero hstate)
+    exact False.elim ((E.states y).matrix_ne_zero hstate)
   · intro h
     simp [h]
 
-end Ensemble
+end MEnsemble
 
-namespace State
+namespace MState
 
-/-! A support relation on a bipartite matrix descends through the partial
-trace.  The proof uses the constant-in-the-left-register embedding of a right
-kernel vector, so it does not diagonalize the reference matrix or assume it
-is full rank. -/
+variable {A : Type u} {B : Type v} {Y : Type w}
+variable [Fintype A] [DecidableEq A]
+variable [Fintype B] [DecidableEq B]
+variable [Fintype Y] [DecidableEq Y]
 
-theorem partialTraceA_supports_of_identityTensor_support
+/-- A support relation `X ≤≤ I_a ⊗ N` descends through the partial trace over `a`:
+`Tr_a X ≤≤ N`.  Neither matrix needs to be full rank. -/
+theorem traceLeft_supports_of_identityTensor_support
     {a : Type u} {b : Type v} [Fintype a] [DecidableEq a]
     [Fintype b] [DecidableEq b]
     {X : CMatrix (a × b)} {N : CMatrix b}
     (hX : Matrix.Supports X (Matrix.kronecker (1 : CMatrix a) N)) :
-    Matrix.Supports (partialTraceA (a := a) (b := b) X) N := by
+    Matrix.Supports (Matrix.traceLeft X) N := by
   intro v hv
   ext j
-  simp only [partialTraceA, Matrix.mulVec, dotProduct]
+  simp only [Matrix.traceLeft, Matrix.of_apply, Matrix.mulVec, dotProduct]
   calc
     ∑ x, (∑ i, X (i, j) (i, x)) * v x =
         ∑ x, ∑ i, X (i, j) (i, x) * v x := by
@@ -938,84 +761,133 @@ theorem partialTraceA_supports_of_identityTensor_support
       simpa [w, Matrix.mulVec, dotProduct, Fintype.sum_prod_type] using
         congrFun hXw (i, j)
 
+/-- The reference `I_A ⊗ ρ_BY` of the downward entropy is block diagonal in the classical label,
+with the `y` block equal to `p y • (I_A ⊗ ρ_{B|y})`. -/
+theorem conditionalReference_blockDiagonal
+    (E : MEnsemble (A × B) Y) :
+    identityTensorStateMatrix (a := A) (MState.cqConditioningState E).traceLeft =
+      conditionalRenyiRightBlockDiagonal (fun y =>
+        (E.probs y : ℂ) • identityTensorStateMatrix (a := A)
+          (E.states y).traceLeft) := by
+  rw [MEnsemble.conditionalRenyiState_traceLeft_eq_conditionalMarginalBYState]
+  ext ⟨a, b, y⟩ ⟨a', b', y'⟩
+  by_cases hyy : y = y'
+  · subst y'
+    simp [conditionalRenyiRightBlockDiagonal, identityTensorStateMatrix,
+      MEnsemble.conditionalMarginalBYState, MEnsemble.conditionalMarginalB,
+      MEnsemble.cqState_matrix, MState.reindex_matrix, Matrix.kronecker,
+      Matrix.kroneckerMap_apply, prodABCToBCAEquiv_symm_apply,
+      Matrix.traceLeft, Matrix.sum_apply]
+    simp only [Matrix.one_apply]
+    rw [Finset.sum_eq_single_of_mem y (Finset.mem_univ y)]
+    · conv_rhs =>
+        unfold Classical.blockDiagonal
+        rw [Matrix.sum_apply]
+        rw [Finset.sum_eq_single_of_mem y (Finset.mem_univ y) (by
+          intro z _ hzy
+          simp [hzy])]
+      simp [Matrix.kronecker, Matrix.kroneckerMap_apply]
+      by_cases haa : a = a'
+      · subst a'
+        rw [NNReal.smul_def]
+        simp [Complex.real_smul]
+      · simp [haa]
+    · intro z _ hzy
+      simp [hzy]
+  · have hxy : ∀ x : Y, ¬(x = y ∧ x = y') := by
+      intro x h
+      exact hyy (h.1.symm.trans h.2)
+    simp [conditionalRenyiRightBlockDiagonal, identityTensorStateMatrix,
+      MEnsemble.conditionalMarginalBYState, MEnsemble.conditionalMarginalB,
+      MEnsemble.cqState_matrix, MState.reindex_matrix, Matrix.kronecker,
+      Matrix.kroneckerMap_apply, prodABCToBCAEquiv_symm_apply,
+      Matrix.traceLeft, Matrix.sum_apply,
+      Classical.blockDiagonal, hxy]
+
 /-! ### EReal reference kernels and public conditional quantities -/
 
-def petzRenyiReferenceFinite (ρ : State A) (σ : CMatrix A)
+/-- The Petz Rényi divergence `log₂ Tr(ρ^α σ^(1-α)) / (α-1)` against a positive semidefinite
+reference, as a real number.  It is only meaningful where the trace is positive; the extended-real
+`petzRenyiReferenceE` decides that. -/
+def petzRenyiReferenceFinite (ρ : MState A) (σ : CMatrix A)
     (_hσ : σ.PosSemidef) (α : ℝ) (_hα_pos : 0 < α) (_hα_ne_one : α ≠ 1) : ℝ :=
   (1 / (α - 1)) *
-    log2 ((CFC.rpow ρ.matrix α * CFC.rpow σ (1 - α)).trace.re)
+    log2 ((CFC.rpow ρ.m α * CFC.rpow σ (1 - α)).trace.re)
 
-noncomputable def petzRenyiReferenceE (ρ : State A) (σ : CMatrix A)
+/-- The support-aware extended-real Petz Rényi divergence.  It is `⊤` when `α < 1` and the trace
+`Tr(ρ^α σ^(1-α))` vanishes, and when `1 < α` and `σ` does not support `ρ`; elsewhere it is the
+real value `petzRenyiReferenceFinite`. -/
+noncomputable def petzRenyiReferenceE (ρ : MState A) (σ : CMatrix A)
     (hσ : σ.PosSemidef) (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) : EReal := by
   classical
-  let q := (CFC.rpow ρ.matrix α * CFC.rpow σ (1 - α)).trace.re
+  let q := (CFC.rpow ρ.m α * CFC.rpow σ (1 - α)).trace.re
   by_cases hα_lt_one : α < 1
   · by_cases hq : q = 0
     · exact ⊤
     · exact (ρ.petzRenyiReferenceFinite σ hσ α hα_pos hα_ne_one : EReal)
-  · by_cases hs : Matrix.Supports ρ.matrix σ
+  · by_cases hs : Matrix.Supports ρ.m σ
     · exact (ρ.petzRenyiReferenceFinite σ hσ α hα_pos hα_ne_one : EReal)
     · exact ⊤
 
-@[simp]
 theorem petzRenyiReferenceE_eq_top_of_lt_one_of_trace_eq_zero
-    (ρ : State A) (σ : CMatrix A) (hσ : σ.PosSemidef)
+    (ρ : MState A) (σ : CMatrix A) (hσ : σ.PosSemidef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) (hα_lt_one : α < 1)
-    (hzero : (CFC.rpow ρ.matrix α * CFC.rpow σ (1 - α)).trace.re = 0) :
+    (hzero : (CFC.rpow ρ.m α * CFC.rpow σ (1 - α)).trace.re = 0) :
     ρ.petzRenyiReferenceE σ hσ α hα_pos hα_ne_one = ⊤ := by
-  change (ρ.matrix ^ α * σ ^ (1 - α)).trace.re = 0 at hzero
+  change (ρ.m ^ α * σ ^ (1 - α)).trace.re = 0 at hzero
   simp [petzRenyiReferenceE, hα_lt_one, hzero]
 
-@[simp]
 theorem petzRenyiReferenceE_eq_coe_of_lt_one_of_trace_ne_zero
-    (ρ : State A) (σ : CMatrix A) (hσ : σ.PosSemidef)
+    (ρ : MState A) (σ : CMatrix A) (hσ : σ.PosSemidef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) (hα_lt_one : α < 1)
-    (hne : (CFC.rpow ρ.matrix α * CFC.rpow σ (1 - α)).trace.re ≠ 0) :
+    (hne : (CFC.rpow ρ.m α * CFC.rpow σ (1 - α)).trace.re ≠ 0) :
     ρ.petzRenyiReferenceE σ hσ α hα_pos hα_ne_one =
       (ρ.petzRenyiReferenceFinite σ hσ α hα_pos hα_ne_one : EReal) := by
-  change (ρ.matrix ^ α * σ ^ (1 - α)).trace.re ≠ 0 at hne
+  change (ρ.m ^ α * σ ^ (1 - α)).trace.re ≠ 0 at hne
   simp [petzRenyiReferenceE, hα_lt_one, hne]
 
 @[simp]
 theorem petzRenyiReferenceE_eq_coe_of_one_lt_of_supports
-    (ρ : State A) (σ : CMatrix A) (hσ : σ.PosSemidef)
+    (ρ : MState A) (σ : CMatrix A) (hσ : σ.PosSemidef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) (hα_gt_one : 1 < α)
-    (hsupport : Matrix.Supports ρ.matrix σ) :
+    (hsupport : Matrix.Supports ρ.m σ) :
     ρ.petzRenyiReferenceE σ hσ α hα_pos hα_ne_one =
       (ρ.petzRenyiReferenceFinite σ hσ α hα_pos hα_ne_one : EReal) := by
   simp [petzRenyiReferenceE, not_lt.mpr (le_of_lt hα_gt_one), hsupport]
 
 @[simp]
 theorem petzRenyiReferenceE_eq_top_of_one_lt_of_not_supports
-    (ρ : State A) (σ : CMatrix A) (hσ : σ.PosSemidef)
+    (ρ : MState A) (σ : CMatrix A) (hσ : σ.PosSemidef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) (hα_gt_one : 1 < α)
-    (hsupport : ¬ Matrix.Supports ρ.matrix σ) :
+    (hsupport : ¬ Matrix.Supports ρ.m σ) :
     ρ.petzRenyiReferenceE σ hσ α hα_pos hα_ne_one = ⊤ := by
   simp [petzRenyiReferenceE, not_lt.mpr (le_of_lt hα_gt_one), hsupport]
 
-noncomputable def conditionalPetzRenyiDownE (E : Ensemble Y (A × B))
+/-- The downward conditional Petz Rényi entropy of a cq ensemble, extended-real and support-aware:
+the Petz divergence of the cq state against `I_A ⊗ ρ_BY`, negated. -/
+noncomputable def conditionalPetzRenyiDownE (E : MEnsemble (A × B) Y)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) : EReal :=
-  -(E.cqConditioningState).petzRenyiReferenceE
-    (identityTensorStateMatrix (a := A) E.cqConditioningState.marginalB)
-    (identityTensorStateMatrix_posSemidef_of_state
-      (a := A) E.cqConditioningState.marginalB) α hα_pos hα_ne_one
+  -(MState.cqConditioningState E).petzRenyiReferenceE
+    (identityTensorStateMatrix (a := A) (MState.cqConditioningState E).traceLeft)
+    (identityTensorStateMatrix_posSemidef
+      (a := A) (MState.cqConditioningState E).traceLeft) α hα_pos hα_ne_one
 
 /-- Bipartite downward Petz conditional Renyi entropy, extended-real and
 support-aware.
 
 This is the direct bipartite analogue of `conditionalPetzRenyiDownE`: it is
-defined on `rho : State (A × B)` with the canonical marginal `rho_B` as the
+defined on `rho : MState (A × B)` with the canonical marginal `rho_B` as the
 reference side, and inherits the support-aware `EReal` behaviour of
-`State.petzRenyiReferenceE`.  Because the reference kernel already tests
+`MState.petzRenyiReferenceE`.  Because the reference kernel already tests
 `Matrix.Supports` on its `> 1` branch, this wrapper needs no `PosDef`
 hypothesis on `rho_B`; singular marginals are handled by the kernel rather than
 by a full-rank assumption.  Matches Tomamichel2015FiniteResources,
 `cond.tex:87-98`. -/
-noncomputable def conditionalPetzRenyiDownGeneralE (rho : State (A × B))
+noncomputable def conditionalPetzRenyiDownGeneralE (rho : MState (A × B))
     (alpha : ℝ) (halpha_pos : 0 < alpha) (halpha_ne_one : alpha ≠ 1) : EReal :=
   -(rho.petzRenyiReferenceE
-      (identityTensorStateMatrix (a := A) rho.marginalB)
-      (identityTensorStateMatrix_posSemidef_of_state (a := A) rho.marginalB)
+      (identityTensorStateMatrix (a := A) rho.traceLeft)
+      (identityTensorStateMatrix_posSemidef (a := A) rho.traceLeft)
       alpha halpha_pos halpha_ne_one)
 
 /-- For any bipartite state and interior parameter `alpha ∈ (0, 2) \ {1}`, the
@@ -1027,79 +899,91 @@ supported on `I_A ⊗ rho_B` (so `Tr(rho^alpha (I ⊗ rho_B)^(1-alpha))` is
 strictly positive), and the `1 < alpha` branch is covered by the same support
 inclusion.  No `PosDef` hypothesis on the marginal is required. -/
 theorem conditionalPetzRenyiDownGeneralE_eq_coe
-    (rho : State (A × B)) (alpha : ℝ)
+    (rho : MState (A × B)) (alpha : ℝ)
     (halpha_pos : 0 < alpha) (halpha_ne_one : alpha ≠ 1) :
     rho.conditionalPetzRenyiDownGeneralE alpha halpha_pos halpha_ne_one =
       (-(rho.petzRenyiReferenceFinite
-          (identityTensorStateMatrix (a := A) rho.marginalB)
-          (identityTensorStateMatrix_posSemidef_of_state (a := A) rho.marginalB)
+          (identityTensorStateMatrix (a := A) rho.traceLeft)
+          (identityTensorStateMatrix_posSemidef (a := A) rho.traceLeft)
           alpha halpha_pos halpha_ne_one) : EReal) := by
   unfold conditionalPetzRenyiDownGeneralE
-  have hsup : Matrix.Supports rho.matrix
-      (identityTensorStateMatrix (a := A) rho.marginalB) :=
-    matrix_supports_identityTensor_marginalB rho
+  have hsup : Matrix.Supports rho.m
+      (identityTensorStateMatrix (a := A) rho.traceLeft) :=
+    matrix_supports_identityTensor_traceLeft rho
   by_cases halpha_lt_one : alpha < 1
   · -- `alpha < 1`: the trace term is strictly positive, so the `< 1` coe
     -- branch of `petzRenyiReferenceE` applies.
-    have hMne : CFC.rpow rho.matrix alpha ≠ 0 := by
-      have hpow_pos : 0 < psdTracePower rho.matrix rho.pos (p := alpha) :=
-        psdTracePower_pos_of_ne_zero rho.matrix rho.pos rho.matrix_ne_zero
+    have hMne : CFC.rpow rho.m alpha ≠ 0 := by
+      have hpow_pos : 0 < psdTracePower rho.m rho.psd (p := alpha) :=
+        psdTracePower_pos_of_ne_zero rho.m rho.psd rho.matrix_ne_zero
       intro hzero
-      have htrace_zero : psdTracePower rho.matrix rho.pos (p := alpha) = 0 := by
+      have htrace_zero : psdTracePower rho.m rho.psd (p := alpha) = 0 := by
         simpa [psdTracePower] using
           congrArg (fun X : CMatrix (A × B) => X.trace.re) hzero
       linarith
     have htrace_pos :
-        0 < ((CFC.rpow rho.matrix alpha *
-            CFC.rpow (identityTensorStateMatrix (a := A) rho.marginalB)
+        0 < ((CFC.rpow rho.m alpha *
+            CFC.rpow (identityTensorStateMatrix (a := A) rho.traceLeft)
               (1 - alpha)).trace).re :=
       trace_mul_cMatrix_rpow_pos_of_support
-        (cMatrix_rpow_posSemidef (A := rho.matrix) (s := alpha) rho.pos)
-        (identityTensorStateMatrix_posSemidef_of_state (a := A) rho.marginalB)
+        (cMatrix_rpow_posSemidef (A := rho.m) (s := alpha) rho.psd)
+        (identityTensorStateMatrix_posSemidef (a := A) rho.traceLeft)
         hMne
-        ((cMatrix_rpow_supports_self rho.pos halpha_pos).trans hsup)
+        ((cMatrix_rpow_supports_self rho.psd halpha_pos).trans hsup)
         (1 - alpha)
     rw [petzRenyiReferenceE_eq_coe_of_lt_one_of_trace_ne_zero
-        rho (identityTensorStateMatrix (a := A) rho.marginalB)
-        (identityTensorStateMatrix_posSemidef_of_state (a := A) rho.marginalB)
+        rho (identityTensorStateMatrix (a := A) rho.traceLeft)
+        (identityTensorStateMatrix_posSemidef (a := A) rho.traceLeft)
         alpha halpha_pos halpha_ne_one halpha_lt_one htrace_pos.ne']
   · -- `1 < alpha`: the support inclusion supplies `Matrix.Supports`, so the
     -- `> 1` coe branch of `petzRenyiReferenceE` applies.
     have hle : 1 ≤ alpha := not_lt.mp halpha_lt_one
     have halpha_gt_one : 1 < alpha := lt_of_le_of_ne hle (ne_comm.mp halpha_ne_one)
     rw [petzRenyiReferenceE_eq_coe_of_one_lt_of_supports
-        rho (identityTensorStateMatrix (a := A) rho.marginalB)
-        (identityTensorStateMatrix_posSemidef_of_state (a := A) rho.marginalB)
+        rho (identityTensorStateMatrix (a := A) rho.traceLeft)
+        (identityTensorStateMatrix_posSemidef (a := A) rho.traceLeft)
         alpha halpha_pos halpha_ne_one halpha_gt_one hsup]
 
-noncomputable def conditionalPetzRenyiUpE (E : Ensemble Y (A × B))
+/-- The upward conditional Petz Rényi entropy of a cq ensemble: the same divergence optimized over
+all conditioning states `σ_BY` rather than fixed at the marginal. -/
+noncomputable def conditionalPetzRenyiUpE (E : MEnsemble (A × B) Y)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) : EReal :=
   sSup {h : EReal |
-    ∃ σ : State (B × Y),
-      h = -(E.cqConditioningState).petzRenyiReferenceE
+    ∃ σ : MState (B × Y),
+      h = -(MState.cqConditioningState E).petzRenyiReferenceE
         (identityTensorStateMatrix (a := A) σ)
-        (identityTensorStateMatrix_posSemidef_of_state (a := A) σ)
+        (identityTensorStateMatrix_posSemidef (a := A) σ)
         α hα_pos hα_ne_one}
 
-noncomputable def conditionalSandwichedRenyiDownE (E : Ensemble Y (A × B))
+/-- The downward conditional sandwiched Rényi entropy of a cq ensemble, against the marginal
+`I_A ⊗ ρ_BY`.  Defined for `1/2 ≤ α ≠ 1`, the range in which the sandwiched divergence is
+monotone under channels. -/
+noncomputable def conditionalSandwichedRenyiDownE (E : MEnsemble (A × B) Y)
     (α : ℝ) (_hα : 1 / 2 ≤ α) (_hα_ne_one : α ≠ 1) : EReal :=
   -sandwichedRenyiPSDReferenceE
-    E.cqConditioningState
-    (identityTensorStateMatrix (a := A) E.cqConditioningState.marginalB)
-    (identityTensorStateMatrix_posSemidef_of_state
-      (a := A) E.cqConditioningState.marginalB) α
+    (MState.cqConditioningState E)
+    (identityTensorStateMatrix (a := A) (MState.cqConditioningState E).traceLeft)
+    (identityTensorStateMatrix_posSemidef
+      (a := A) (MState.cqConditioningState E).traceLeft) α
 
-noncomputable def conditionalSandwichedRenyiUpE (E : Ensemble Y (A × B))
+/-- The upward conditional sandwiched Rényi entropy of a cq ensemble, optimized over the
+conditioning state. -/
+noncomputable def conditionalSandwichedRenyiUpE (E : MEnsemble (A × B) Y)
     (α : ℝ) (_hα : 1 / 2 ≤ α) (_hα_ne_one : α ≠ 1) : EReal :=
   sSup {h : EReal |
-    ∃ σ : State (B × Y),
+    ∃ σ : MState (B × Y),
       h = -sandwichedRenyiPSDReferenceE
-        E.cqConditioningState
+        (MState.cqConditioningState E)
         (identityTensorStateMatrix (a := A) σ)
-        (identityTensorStateMatrix_posSemidef_of_state (a := A) σ) α}
+        (identityTensorStateMatrix_posSemidef (a := A) σ) α}
 
-end State
+end MState
 
-end
+namespace QIT
+
+variable {A : Type u} {B : Type v} {Y : Type w}
+variable [Fintype A] [DecidableEq A]
+variable [Fintype B] [DecidableEq B]
+variable [Fintype Y] [DecidableEq Y]
 
 end QIT

@@ -28,22 +28,22 @@ open scoped ComplexOrder MatrixOrder
 
 open Matrix
 
-namespace QIT
-
-universe u v w x
-
 noncomputable section
-
+universe u v w x
 variable {a : Type u} {b : Type v} {c : Type w} {d : Type x}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 variable [Fintype c] [DecidableEq c] [Fintype d] [DecidableEq d]
 
+open QIT
+
+namespace QIT
+
 /-- The finite conjugate order used in the source additivity proof. -/
-def conditionalRenyiConjugateOrder (alpha : Real) : Real :=
+def conditionalRenyiConjugateOrder (alpha : ℝ) : ℝ :=
   alpha / (2 * alpha - 1)
 
 theorem conditionalRenyiConjugateOrder_conjugate
-    {alpha : Real} (hhalf : 1 / 2 < alpha) :
+    {alpha : ℝ} (hhalf : 1 / 2 < alpha) :
     1 / conditionalRenyiConjugateOrder alpha + 1 / alpha = 2 := by
   have halpha : alpha ≠ 0 := by linarith
   have hdenom : 2 * alpha - 1 ≠ 0 := by linarith
@@ -52,7 +52,7 @@ theorem conditionalRenyiConjugateOrder_conjugate
   ring
 
 theorem conditionalRenyiConjugateOrder_gt_one_of_lt_one
-    {alpha : Real} (hhalf : 1 / 2 < alpha) (hone : alpha < 1) :
+    {alpha : ℝ} (hhalf : 1 / 2 < alpha) (hone : alpha < 1) :
     1 < conditionalRenyiConjugateOrder alpha := by
   have hdenom : 0 < 2 * alpha - 1 := by linarith
   unfold conditionalRenyiConjugateOrder
@@ -60,7 +60,7 @@ theorem conditionalRenyiConjugateOrder_gt_one_of_lt_one
   linarith
 
 theorem conditionalRenyiConjugateOrder_half_lt_of_one_lt
-    {alpha : Real} (hone : 1 < alpha) :
+    {alpha : ℝ} (hone : 1 < alpha) :
     1 / 2 < conditionalRenyiConjugateOrder alpha := by
   have hdenom : 0 < 2 * alpha - 1 := by linarith
   unfold conditionalRenyiConjugateOrder
@@ -68,7 +68,7 @@ theorem conditionalRenyiConjugateOrder_half_lt_of_one_lt
   linarith
 
 theorem conditionalRenyiConjugateOrder_lt_one_of_one_lt
-    {alpha : Real} (hone : 1 < alpha) :
+    {alpha : ℝ} (hone : 1 < alpha) :
     conditionalRenyiConjugateOrder alpha < 1 := by
   have hdenom : 0 < 2 * alpha - 1 := by linarith
   unfold conditionalRenyiConjugateOrder
@@ -76,100 +76,63 @@ theorem conditionalRenyiConjugateOrder_lt_one_of_one_lt
   linarith
 
 private def conditionalRenyiTargetFirstCanonicalPurification
-    (rho : State (Prod a b)) :
-    PureVector (Prod (Prod a b) (Prod a b)) :=
-  rho.canonicalPurification.reindex (Equiv.prodComm (Prod a b) (Prod a b))
+    (rho : MState (a × b)) :
+    Ket ((a × b) × (a × b)) :=
+  rho.canonicalPurification.reindex (Equiv.prodComm (a × b) (a × b))
 
 private theorem conditionalRenyiTargetFirstCanonicalPurification_marginalAB
-    (rho : State (Prod a b)) :
+    (rho : MState (a × b)) :
     (conditionalRenyiTargetFirstCanonicalPurification rho).state.marginalAB = rho := by
-  apply State.ext
+  apply MState.ext
   ext x y
   have hpur := rho.canonicalPurification_purifies
   simpa [conditionalRenyiTargetFirstCanonicalPurification,
-    State.marginalAB_eq_marginalA, PureVector.reindex_state, State.reindex,
-    State.marginalA, partialTraceA, partialTraceB] using
+    MState.marginalAB_eq_traceRight, Ket.reindex_state,
+    Matrix.traceLeft, Matrix.traceRight] using
       congrFun (congrFun hpur x) y
 
-private def conditionalRenyiSwapConditioningReferenceEquiv
-    (a : Type u) (b : Type v) (r : Type w) :
-    Prod (Prod a b) r ≃ Prod (Prod a r) b where
-  toFun x := ((x.1.1, x.2), x.1.2)
-  invFun x := ((x.1.1, x.2), x.1.2)
-  left_inv x := by rcases x with ⟨⟨_, _⟩, _⟩; rfl
-  right_inv x := by rcases x with ⟨⟨_, _⟩, _⟩; rfl
+end QIT
 
-private theorem conditionalRenyiSwapConditioningReference_marginalAC
-    {r : Type w} [Fintype r] [DecidableEq r]
-    (psi : PureVector (Prod (Prod a b) r)) :
-    (psi.reindex (conditionalRenyiSwapConditioningReferenceEquiv a b r)).state.marginalAC =
-      psi.state.marginalAB := by
-  apply State.ext
-  ext x y
-  rcases x with ⟨i, k⟩
-  rcases y with ⟨i', k'⟩
-  simp [State.marginalAC_matrix, State.marginalAB, State.marginalA,
-    partialTraceB, PureVector.reindex_state, State.reindex,
-    conditionalRenyiSwapConditioningReferenceEquiv]
-
-private theorem conditionalRenyiSwapConditioningReference_marginalAB
-    {r : Type w} [Fintype r] [DecidableEq r]
-    (psi : PureVector (Prod (Prod a b) r)) :
-    (psi.reindex (conditionalRenyiSwapConditioningReferenceEquiv a b r)).state.marginalAB =
-      psi.state.marginalAC := by
-  apply State.ext
-  ext x y
-  rcases x with ⟨i, k⟩
-  rcases y with ⟨i', k'⟩
-  simp [State.marginalAC_matrix, State.marginalAB, State.marginalA,
-    partialTraceB, PureVector.reindex_state, State.reindex,
-    conditionalRenyiSwapConditioningReferenceEquiv]
-
-private theorem conditionalRenyi_log2_mono {x y : Real}
-    (hx : 0 < x) (hxy : x ≤ y) : log2 x ≤ log2 y := by
-  unfold log2
-  exact div_le_div_of_nonneg_right (Real.log_le_log hx hxy)
-    (le_of_lt (Real.log_pos one_lt_two))
-
-namespace State
+namespace MState
 
 /-- Regroup the product of states on `A x B` and `C x D` as a state on
 `(A x C) x (B x D)`. -/
 def conditionalRenyiGroupedProduct
-    (rho : State (Prod a b)) (tau : State (Prod c d)) :
-    State (Prod (Prod a c) (Prod b d)) :=
-  (rho.prod tau).reindex (conditionalPetzRenyiProductGroupingEquiv a b c d)
+    (rho : MState (a × b)) (tau : MState (c × d)) :
+    MState ((a × c) × (b × d)) :=
+  (rho.prod tau).reindex (Equiv.prodProdProdComm a b c d)
 
 @[simp]
 theorem conditionalRenyiGroupedProduct_matrix
-    (rho : State (Prod a b)) (tau : State (Prod c d)) :
-    (rho.conditionalRenyiGroupedProduct tau).matrix =
-      (Matrix.kronecker rho.matrix tau.matrix).submatrix
-        (conditionalPetzRenyiProductGroupingEquiv a b c d).symm
-        (conditionalPetzRenyiProductGroupingEquiv a b c d).symm :=
-  rfl
+    (rho : MState (a × b)) (tau : MState (c × d)) :
+    (rho.conditionalRenyiGroupedProduct tau).m =
+      (Matrix.kronecker rho.m tau.m).submatrix
+        (Equiv.prodProdProdComm a b c d).symm
+        (Equiv.prodProdProdComm a b c d).symm := by
+  rw [conditionalRenyiGroupedProduct, MState.reindex_matrix, MState.prod_m, ← Matrix.kronecker]
 
 /-- The conditioning marginal of a grouped product is the product of the two
 conditioning marginals. -/
-theorem conditionalRenyiGroupedProduct_marginalB
-    (rho : State (Prod a b)) (tau : State (Prod c d)) :
-    (rho.conditionalRenyiGroupedProduct tau).marginalB =
-      rho.marginalB.prod tau.marginalB := by
-  apply State.ext
+theorem conditionalRenyiGroupedProduct_traceLeft
+    (rho : MState (a × b)) (tau : MState (c × d)) :
+    (rho.conditionalRenyiGroupedProduct tau).traceLeft =
+      rho.traceLeft.prod tau.traceLeft := by
+  apply MState.ext
+  simp only [MState.traceLeft_m, conditionalRenyiGroupedProduct_matrix,
+    MState.prod_m]
   ext x y
   rcases x with ⟨j, l⟩
   rcases y with ⟨j', l'⟩
-  simp only [conditionalRenyiGroupedProduct, State.marginalB, State.reindex,
-    State.prod, partialTraceA, Matrix.kronecker, Matrix.kroneckerMap_apply,
-    conditionalPetzRenyiProductGroupingEquiv, Fintype.sum_prod_type,
+  simp only [Matrix.traceLeft, Matrix.of_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    Equiv.prodProdProdComm, Fintype.sum_prod_type,
     Matrix.submatrix_apply]
   change (∑ i : a, ∑ k : c,
-      rho.matrix (i, j) (i, j') * tau.matrix (k, l) (k, l')) =
-    (∑ i : a, rho.matrix (i, j) (i, j')) *
-      (∑ k : c, tau.matrix (k, l) (k, l'))
+      rho.m (i, j) (i, j') * tau.m (k, l) (k, l')) =
+    (∑ i : a, rho.m (i, j) (i, j')) *
+      (∑ k : c, tau.m (k, l) (k, l'))
   calc
-    _ = ∑ i : a, rho.matrix (i, j) (i, j') *
-        (∑ k : c, tau.matrix (k, l) (k, l')) := by
+    _ = ∑ i : a, rho.m (i, j) (i, j') *
+        (∑ k : c, tau.m (k, l) (k, l')) := by
           apply Finset.sum_congr rfl
           intro i _
           rw [Finset.mul_sum]
@@ -177,13 +140,13 @@ theorem conditionalRenyiGroupedProduct_marginalB
 
 /-- Conditional von Neumann entropy is additive on grouped product states. -/
 theorem conditionalEntropy_conditionalRenyiGroupedProduct
-    (rho : State (Prod a b)) (tau : State (Prod c d)) :
+    (rho : MState (a × b)) (tau : MState (c × d)) :
     (rho.conditionalRenyiGroupedProduct tau).conditionalEntropy =
       rho.conditionalEntropy + tau.conditionalEntropy := by
-  rw [conditionalEntropy_eq, conditionalRenyiGroupedProduct_marginalB]
+  rw [conditionalEntropy_eq, conditionalRenyiGroupedProduct_traceLeft]
   change ((rho.prod tau).reindex
-      (conditionalPetzRenyiProductGroupingEquiv a b c d)).vonNeumann -
-    (rho.marginalB.prod tau.marginalB).vonNeumann = _
+      (Equiv.prodProdProdComm a b c d)).vonNeumann -
+    (rho.traceLeft.prod tau.traceLeft).vonNeumann = _
   rw [vonNeumann_reindex, vonNeumann_prod, vonNeumann_prod]
   rw [conditionalEntropy_eq, conditionalEntropy_eq]
   ring
@@ -194,10 +157,10 @@ At order one this is conditional von Neumann entropy.  At order one half it
 uses the conditional max-entropy endpoint, while all other positive orders use
 the support-aware source quantity proved in the conditional-duality module. -/
 def conditionalSandwichedRenyiUpFiniteOrder
-    (rho : State (Prod a b)) (alpha : Real) : Real :=
+    (rho : MState (a × b)) (alpha : ℝ) : ℝ :=
   if hOne : alpha = 1 then
     rho.conditionalEntropy
-  else if _hHalf : alpha = (2 : Real)⁻¹ then
+  else if _hHalf : alpha = (2 : ℝ)⁻¹ then
     rho.conditionalMaxEntropy
   else if hpos : 0 < alpha then
     rho.conditionalSandwichedRenyiUpSource alpha hpos hOne
@@ -206,27 +169,27 @@ def conditionalSandwichedRenyiUpFiniteOrder
 
 @[simp]
 theorem conditionalSandwichedRenyiUpFiniteOrder_one
-    (rho : State (Prod a b)) :
+    (rho : MState (a × b)) :
     rho.conditionalSandwichedRenyiUpFiniteOrder 1 = rho.conditionalEntropy := by
   simp [conditionalSandwichedRenyiUpFiniteOrder]
 
 @[simp]
 theorem conditionalSandwichedRenyiUpFiniteOrder_half
-    (rho : State (Prod a b)) :
-    rho.conditionalSandwichedRenyiUpFiniteOrder (2 : Real)⁻¹ =
+    (rho : MState (a × b)) :
+    rho.conditionalSandwichedRenyiUpFiniteOrder (2 : ℝ)⁻¹ =
       rho.conditionalMaxEntropy := by
   norm_num [conditionalSandwichedRenyiUpFiniteOrder]
 
 theorem conditionalSandwichedRenyiUpFiniteOrder_of_pos_ne_one_ne_half
-    (rho : State (Prod a b)) {alpha : Real}
-    (hpos : 0 < alpha) (hone : alpha ≠ 1) (hhalf : alpha ≠ (2 : Real)⁻¹) :
+    (rho : MState (a × b)) {alpha : ℝ}
+    (hpos : 0 < alpha) (hone : alpha ≠ 1) (hhalf : alpha ≠ (2 : ℝ)⁻¹) :
     rho.conditionalSandwichedRenyiUpFiniteOrder alpha =
       rho.conditionalSandwichedRenyiUpSource alpha hpos hone := by
   rw [conditionalSandwichedRenyiUpFiniteOrder, dif_neg hone, dif_neg hhalf,
     dif_pos hpos]
 
 theorem conditionalSandwichedRenyiUpFiniteOrder_prod_grouped_one
-    (rho : State (Prod a b)) (tau : State (Prod c d)) :
+    (rho : MState (a × b)) (tau : MState (c × d)) :
     (rho.conditionalRenyiGroupedProduct tau).conditionalSandwichedRenyiUpFiniteOrder 1 =
       rho.conditionalSandwichedRenyiUpFiniteOrder 1 +
         tau.conditionalSandwichedRenyiUpFiniteOrder 1 := by
@@ -238,7 +201,7 @@ theorem conditionalSandwichedRenyiUpFiniteOrder_prod_grouped_one
 /-- The positive trace-power kernel underneath a source-shaped upward
 sandwiched conditional Renyi candidate. -/
 def conditionalSandwichedRenyiUpSourceTraceTerm
-    (rho : State (Prod a b)) (sigma : State b) (alpha : Real) : Real :=
+    (rho : MState (a × b)) (sigma : MState b) (alpha : ℝ) : ℝ :=
   psdTracePower
     (sandwichedRenyiReferenceInner rho
       (identityTensorStateMatrix (a := a) sigma) alpha)
@@ -247,8 +210,8 @@ def conditionalSandwichedRenyiUpSourceTraceTerm
     alpha
 
 theorem conditionalSandwichedRenyiUpSourceTraceTerm_pos_of_posDef
-    (rho : State (Prod a b)) (sigma : State b) (hsigma : sigma.matrix.PosDef)
-    (alpha : Real) :
+    (rho : MState (a × b)) (sigma : MState b) (hsigma : sigma.m.PosDef)
+    (alpha : ℝ) :
     0 < rho.conditionalSandwichedRenyiUpSourceTraceTerm sigma alpha := by
   exact sandwichedRenyiReferenceInner_psdTracePower_pos_of_reference_posDef
     rho (identityTensorStateMatrix_posDef_of_posDef (a := a) sigma hsigma) alpha
@@ -256,8 +219,8 @@ theorem conditionalSandwichedRenyiUpSourceTraceTerm_pos_of_posDef
 /-- The source candidate is the logarithm of its positive trace-power
 kernel. -/
 theorem conditionalSandwichedRenyiUpSourceCandidate_eq_traceTerm
-    (rho : State (Prod a b)) (sigma : State b) (hsigma : sigma.matrix.PosDef)
-    (alpha : Real) (hpos : 0 < alpha) (hone : alpha ≠ 1) :
+    (rho : MState (a × b)) (sigma : MState b) (hsigma : sigma.m.PosDef)
+    (alpha : ℝ) (hpos : 0 < alpha) (hone : alpha ≠ 1) :
     rho.conditionalSandwichedRenyiUpSourceCandidate sigma hsigma alpha hpos hone =
       -(1 / (alpha - 1)) *
         log2 (rho.conditionalSandwichedRenyiUpSourceTraceTerm sigma alpha) := by
@@ -266,74 +229,75 @@ theorem conditionalSandwichedRenyiUpSourceCandidate_eq_traceTerm
 /-- The sandwiched inner operator for a grouped product and a product side
 state is the grouped Kronecker product of the two inner operators. -/
 theorem sandwichedRenyiReferenceInner_conditionalRenyiGroupedProduct
-    (rho : State (Prod a b)) (sigma : State b)
-    (tau : State (Prod c d)) (omega : State d)
-    (hsigma : sigma.matrix.PosDef) (homega : omega.matrix.PosDef)
-    (alpha : Real) :
+    (rho : MState (a × b)) (sigma : MState b)
+    (tau : MState (c × d)) (omega : MState d)
+    (hsigma : sigma.m.PosDef) (homega : omega.m.PosDef)
+    (alpha : ℝ) :
     sandwichedRenyiReferenceInner
         (rho.conditionalRenyiGroupedProduct tau)
-        (identityTensorStateMatrix (a := Prod a c) (sigma.prod omega)) alpha =
+        (identityTensorStateMatrix (a := a × c) (sigma.prod omega)) alpha =
       (Matrix.kronecker
         (sandwichedRenyiReferenceInner rho
           (identityTensorStateMatrix (a := a) sigma) alpha)
         (sandwichedRenyiReferenceInner tau
           (identityTensorStateMatrix (a := c) omega) alpha)).submatrix
-        (conditionalPetzRenyiProductGroupingEquiv a b c d).symm
-        (conditionalPetzRenyiProductGroupingEquiv a b c d).symm := by
-  let e := conditionalPetzRenyiProductGroupingEquiv a b c d
-  let s : Real := (1 - alpha) / (2 * alpha)
-  let R1 : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) sigma
-  let R2 : CMatrix (Prod c d) := identityTensorStateMatrix (a := c) omega
-  let C1 : CMatrix (Prod a b) := CFC.rpow R1 s
-  let C2 : CMatrix (Prod c d) := CFC.rpow R2 s
+        (Equiv.prodProdProdComm a b c d).symm
+        (Equiv.prodProdProdComm a b c d).symm := by
+  let e := Equiv.prodProdProdComm a b c d
+  let s : ℝ := (1 - alpha) / (2 * alpha)
+  let R1 : CMatrix (a × b) := identityTensorStateMatrix (a := a) sigma
+  let R2 : CMatrix (c × d) := identityTensorStateMatrix (a := c) omega
+  let C1 : CMatrix (a × b) := CFC.rpow R1 s
+  let C2 : CMatrix (c × d) := CFC.rpow R2 s
   have hR1 : R1.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := a) sigma hsigma
   have hR2 : R2.PosDef := identityTensorStateMatrix_posDef_of_posDef (a := c) omega homega
   have hpow :
-      CFC.rpow (identityTensorStateMatrix (a := Prod a c) (sigma.prod omega)) s =
+      CFC.rpow (identityTensorStateMatrix (a := a × c) (sigma.prod omega)) s =
         (Matrix.kronecker C1 C2).submatrix e.symm e.symm := by
     rw [identityTensorStateMatrix_prod_grouping]
     rw [cMatrix_rpow_submatrix_equiv_posDef
       (Matrix.kronecker R1 R2) (hR1.kronecker hR2) e.symm s]
-    rw [cMatrix_rpow_kronecker_posDef hR1 hR2 s]
-  unfold sandwichedRenyiReferenceInner conditionalRenyiGroupedProduct
+    rw [cMatrix_rpow_kronecker hR1.posSemidef hR2.posSemidef s]
+  unfold sandwichedRenyiReferenceInner
+  simp only [conditionalRenyiGroupedProduct_matrix]
   change
-    CFC.rpow (identityTensorStateMatrix (a := Prod a c) (sigma.prod omega)) s *
-          (Matrix.kronecker rho.matrix tau.matrix).submatrix e.symm e.symm *
-          CFC.rpow (identityTensorStateMatrix (a := Prod a c) (sigma.prod omega)) s =
-      (Matrix.kronecker (C1 * rho.matrix * C1) (C2 * tau.matrix * C2)).submatrix
+    CFC.rpow (identityTensorStateMatrix (a := a × c) (sigma.prod omega)) s *
+          (Matrix.kronecker rho.m tau.m).submatrix e.symm e.symm *
+          CFC.rpow (identityTensorStateMatrix (a := a × c) (sigma.prod omega)) s =
+      (Matrix.kronecker (C1 * rho.m * C1) (C2 * tau.m * C2)).submatrix
         e.symm e.symm
   rw [hpow]
   rw [Matrix.submatrix_mul_equiv, Matrix.submatrix_mul_equiv]
-  apply congrArg (fun M : CMatrix (Prod (Prod a b) (Prod c d)) =>
+  apply congrArg (fun M : CMatrix ((a × b) × (c × d)) =>
     M.submatrix e.symm e.symm)
   calc
-    Matrix.kronecker C1 C2 * Matrix.kronecker rho.matrix tau.matrix *
+    Matrix.kronecker C1 C2 * Matrix.kronecker rho.m tau.m *
           Matrix.kronecker C1 C2 =
-        Matrix.kronecker (C1 * rho.matrix) (C2 * tau.matrix) *
+        Matrix.kronecker (C1 * rho.m) (C2 * tau.m) *
           Matrix.kronecker C1 C2 := by
-      exact congrArg (fun M : CMatrix (Prod (Prod a b) (Prod c d)) =>
+      exact congrArg (fun M : CMatrix ((a × b) × (c × d)) =>
         M * Matrix.kronecker C1 C2)
-        (Matrix.mul_kronecker_mul C1 rho.matrix C2 tau.matrix).symm
-    _ = Matrix.kronecker (C1 * rho.matrix * C1) (C2 * tau.matrix * C2) :=
-      (Matrix.mul_kronecker_mul (C1 * rho.matrix) C1
-        (C2 * tau.matrix) C2).symm
+        (Matrix.mul_kronecker_mul C1 rho.m C2 tau.m).symm
+    _ = Matrix.kronecker (C1 * rho.m * C1) (C2 * tau.m * C2) :=
+      (Matrix.mul_kronecker_mul (C1 * rho.m) C1
+        (C2 * tau.m) C2).symm
 
 /-- The fixed-side source trace kernel is multiplicative on grouped product
 states. -/
 theorem conditionalSandwichedRenyiUpSourceTraceTerm_prod_grouped
-    (rho : State (Prod a b)) (sigma : State b)
-    (tau : State (Prod c d)) (omega : State d)
-    (hsigma : sigma.matrix.PosDef) (homega : omega.matrix.PosDef)
-    {alpha : Real} (halpha : 0 ≤ alpha) :
+    (rho : MState (a × b)) (sigma : MState b)
+    (tau : MState (c × d)) (omega : MState d)
+    (hsigma : sigma.m.PosDef) (homega : omega.m.PosDef)
+    {alpha : ℝ} (halpha : 0 ≤ alpha) :
     (rho.conditionalRenyiGroupedProduct tau).conditionalSandwichedRenyiUpSourceTraceTerm
         (sigma.prod omega) alpha =
       rho.conditionalSandwichedRenyiUpSourceTraceTerm sigma alpha *
         tau.conditionalSandwichedRenyiUpSourceTraceTerm omega alpha := by
-  let e := conditionalPetzRenyiProductGroupingEquiv a b c d
-  let inner1 : CMatrix (Prod a b) :=
+  let e := Equiv.prodProdProdComm a b c d
+  let inner1 : CMatrix (a × b) :=
     sandwichedRenyiReferenceInner rho
       (identityTensorStateMatrix (a := a) sigma) alpha
-  let inner2 : CMatrix (Prod c d) :=
+  let inner2 : CMatrix (c × d) :=
     sandwichedRenyiReferenceInner tau
       (identityTensorStateMatrix (a := c) omega) alpha
   have hinner1 : inner1.PosSemidef :=
@@ -345,7 +309,7 @@ theorem conditionalSandwichedRenyiUpSourceTraceTerm_prod_grouped
   have hinner :
       sandwichedRenyiReferenceInner
           (rho.conditionalRenyiGroupedProduct tau)
-          (identityTensorStateMatrix (a := Prod a c) (sigma.prod omega)) alpha =
+          (identityTensorStateMatrix (a := a × c) (sigma.prod omega)) alpha =
         (Matrix.kronecker inner1 inner2).submatrix e.symm e.symm := by
     simpa [e, inner1, inner2] using
       sandwichedRenyiReferenceInner_conditionalRenyiGroupedProduct
@@ -354,18 +318,18 @@ theorem conditionalSandwichedRenyiUpSourceTraceTerm_prod_grouped
   rw [hinner]
   rw [cMatrix_rpow_submatrix_equiv_nonneg
     (Matrix.kronecker inner1 inner2) (hinner1.kronecker hinner2) e.symm halpha]
-  rw [trace_submatrix_equiv e.symm]
-  exact psdTracePower_kronecker hinner1 hinner2 halpha
+  rw [Matrix.trace_submatrix _ e.symm]
+  exact psdTracePower_kronecker hinner1 hinner2
 
 /-- Fixed full-rank product side states make the source entropy candidate
 additive. -/
 theorem conditionalSandwichedRenyiUpSourceCandidate_prod_grouped
-    (rho : State (Prod a b)) (sigma : State b)
-    (tau : State (Prod c d)) (omega : State d)
-    (hsigma : sigma.matrix.PosDef) (homega : omega.matrix.PosDef)
-    {alpha : Real} (halpha : 0 < alpha) (hone : alpha ≠ 1) :
+    (rho : MState (a × b)) (sigma : MState b)
+    (tau : MState (c × d)) (omega : MState d)
+    (hsigma : sigma.m.PosDef) (homega : omega.m.PosDef)
+    {alpha : ℝ} (halpha : 0 < alpha) (hone : alpha ≠ 1) :
     (rho.conditionalRenyiGroupedProduct tau).conditionalSandwichedRenyiUpSourceCandidate
-        (sigma.prod omega) (State.prod_posDef hsigma homega) alpha halpha hone =
+        (sigma.prod omega) (MState.PosDef.kron hsigma homega) alpha halpha hone =
       rho.conditionalSandwichedRenyiUpSourceCandidate sigma hsigma alpha halpha hone +
         tau.conditionalSandwichedRenyiUpSourceCandidate omega homega alpha halpha hone := by
   rw [conditionalSandwichedRenyiUpSourceCandidate_eq_traceTerm,
@@ -386,7 +350,7 @@ The proof uses a target-first canonical purification and the positive common
 Schatten extremum from pure-state duality; no positive-definiteness condition
 is placed on the input state. -/
 theorem conditionalSandwichedRenyiUpSourceValueSet_bddAbove_of_one_lt
-    (rho : State (Prod a b)) {alpha : Real} (halpha : 1 < alpha) :
+    (rho : MState (a × b)) {alpha : ℝ} (halpha : 1 < alpha) :
     BddAbove (rho.conditionalSandwichedRenyiUpSourceValueSet alpha
       (lt_trans zero_lt_one halpha) (ne_of_gt halpha)) := by
   let : Nonempty a := by
@@ -395,9 +359,9 @@ theorem conditionalSandwichedRenyiUpSourceValueSet_bddAbove_of_one_lt
   let : Nonempty b := by
     rcases rho.nonempty with ⟨_, j⟩
     exact ⟨j⟩
-  let psi : PureVector (Prod (Prod a b) (Prod a b)) :=
+  let psi : Ket ((a × b) × (a × b)) :=
     conditionalRenyiTargetFirstCanonicalPurification rho
-  let beta : Real := conditionalRenyiConjugateOrder alpha
+  let beta : ℝ := conditionalRenyiConjugateOrder alpha
   have hbeta_half : 1 / 2 < beta :=
     conditionalRenyiConjugateOrder_half_lt_of_one_lt halpha
   have hbeta_one : beta < 1 :=
@@ -405,10 +369,10 @@ theorem conditionalSandwichedRenyiUpSourceValueSet_bddAbove_of_one_lt
   have hconj : 1 / alpha + 1 / beta = 2 := by
     simpa [beta, add_comm] using conditionalRenyiConjugateOrder_conjugate
       (lt_trans (by norm_num) halpha)
-  let p : Real := PureVector.upwardRenyiDualityParameter alpha
-  let high : {sigma : State b // sigma.matrix.PosDef} → Real := fun sigma =>
+  let p : ℝ := Ket.upwardRenyiDualityParameter alpha
+  let high : {sigma : MState b // sigma.m.PosDef} → ℝ := fun sigma =>
     psi.upwardRenyiDualityHighNorm sigma.1 (SchattenOrder.ofOneLt halpha)
-  have hp : 0 < p := PureVector.upwardRenyiDualityParameter_pos halpha
+  have hp : 0 < p := Ket.upwardRenyiDualityParameter_pos halpha
   have hhigh_bdd : BddBelow (Set.range high) := by
     refine ⟨0, ?_⟩
     rintro x ⟨sigma, rfl⟩
@@ -428,7 +392,7 @@ theorem conditionalSandwichedRenyiUpSourceValueSet_bddAbove_of_one_lt
   have hinf_le : sInf (Set.range high) ≤ high ⟨sigma, hsigma⟩ :=
     csInf_le hhigh_bdd ⟨⟨sigma, hsigma⟩, rfl⟩
   have hlog : log2 (sInf (Set.range high)) ≤ log2 (high ⟨sigma, hsigma⟩) :=
-    conditionalRenyi_log2_mono hinf_pos hinf_le
+    log2_mono_of_pos hinf_pos hinf_le
   have hlog' : log2 (sInf (Set.range high)) ≤
       log2 (psi.upwardRenyiDualityHighNorm sigma
         (SchattenOrder.ofOneLt halpha)) := by
@@ -441,7 +405,7 @@ theorem conditionalSandwichedRenyiUpSourceValueSet_bddAbove_of_one_lt
 bounded above by the reverse-Holder common Schatten bracket of a canonical
 purification. -/
 theorem conditionalSandwichedRenyiUpSourceValueSet_bddAbove_of_half_lt_lt_one
-    (rho : State (Prod a b)) {alpha : Real}
+    (rho : MState (a × b)) {alpha : ℝ}
     (hhalf : 1 / 2 < alpha) (hone : alpha < 1) :
     BddAbove (rho.conditionalSandwichedRenyiUpSourceValueSet alpha
       (lt_trans (by norm_num) hhalf) (ne_of_lt hone)) := by
@@ -451,28 +415,28 @@ theorem conditionalSandwichedRenyiUpSourceValueSet_bddAbove_of_half_lt_lt_one
   let : Nonempty b := by
     rcases rho.nonempty with ⟨_, j⟩
     exact ⟨j⟩
-  let r := Prod a b
-  let psi0 : PureVector (Prod (Prod a b) r) :=
+  let r := (a × b)
+  let psi0 : Ket ((a × b) × r) :=
     conditionalRenyiTargetFirstCanonicalPurification rho
-  let psi : PureVector (Prod (Prod a r) b) :=
-    psi0.reindex (conditionalRenyiSwapConditioningReferenceEquiv a b r)
-  let gamma : Real := conditionalRenyiConjugateOrder alpha
+  let psi : Ket ((a × r) × b) :=
+    psi0.reindex (prodABCToACBEquiv a b r)
+  let gamma : ℝ := conditionalRenyiConjugateOrder alpha
   have hgamma : 1 < gamma :=
     conditionalRenyiConjugateOrder_gt_one_of_lt_one hhalf hone
   have hconj : 1 / gamma + 1 / alpha = 2 := by
     simpa [gamma] using conditionalRenyiConjugateOrder_conjugate hhalf
-  let p : Real := PureVector.upwardRenyiDualityParameter gamma
-  let low : State b → Real := fun omega =>
+  let p : ℝ := Ket.upwardRenyiDualityParameter gamma
+  let low : MState b → ℝ := fun omega =>
     psi.upwardRenyiDualityLowNorm omega gamma
       ⟨alpha, lt_trans (by norm_num) hhalf⟩
-  have hp : 0 < p := PureVector.upwardRenyiDualityParameter_pos hgamma
+  have hp : 0 < p := Ket.upwardRenyiDualityParameter_pos hgamma
   have hlow_bdd : BddAbove (Set.range low) := by
     simpa [low] using psi.upwardRenyiDualityLowNorm_range_bddAbove
       hgamma hhalf hone hconj
   rcases hlow_bdd with ⟨upper, hupper⟩
-  let omega0 : State b := State.maximallyMixed b
-  have homega0 : omega0.matrix.PosDef :=
-    State.maximallyMixed_posDef
+  let omega0 : MState b := (MState.uniform : MState b)
+  have homega0 : omega0.m.PosDef :=
+    MState.uniform_posDef
   have hlow0 : 0 < low omega0 := by
     simpa [low] using psi.upwardRenyiDualityLowNorm_pos_of_posDef
       omega0 homega0 hgamma hhalf hone hconj
@@ -487,7 +451,7 @@ theorem conditionalSandwichedRenyiUpSourceValueSet_bddAbove_of_half_lt_lt_one
   have hpsiAC : psi.state.marginalAC = rho := by
     calc
       psi.state.marginalAC = psi0.state.marginalAB := by
-        simpa [psi] using conditionalRenyiSwapConditioningReference_marginalAC psi0
+        simpa [psi] using Ket.prodABCToACB_marginalAC psi0
       _ = rho := by
         simpa [psi0] using conditionalRenyiTargetFirstCanonicalPurification_marginalAB rho
   rw [hpsiAC] at hcandidate
@@ -497,7 +461,7 @@ theorem conditionalSandwichedRenyiUpSourceValueSet_bddAbove_of_half_lt_lt_one
       omega homega hgamma hhalf hone hconj
   have hlow_le : low omega ≤ upper := hupper ⟨omega, rfl⟩
   have hlog : log2 (low omega) ≤ log2 upper :=
-    conditionalRenyi_log2_mono hlow_pos hlow_le
+    log2_mono_of_pos hlow_pos hlow_le
   have hlog' :
       log2 (psi.upwardRenyiDualityLowNorm omega gamma
         ⟨alpha, lt_trans (by norm_num) hhalf⟩) ≤ log2 upper := by
@@ -506,16 +470,16 @@ theorem conditionalSandwichedRenyiUpSourceValueSet_bddAbove_of_half_lt_lt_one
   exact mul_le_mul_of_nonneg_left hlog' hcoeff
 
 theorem conditionalSandwichedRenyiUpSourceValueSet_nonempty
-    [Nonempty b] (rho : State (Prod a b)) (alpha : Real)
+    [Nonempty b] (rho : MState (a × b)) (alpha : ℝ)
     (hpos : 0 < alpha) (hone : alpha ≠ 1) :
     (rho.conditionalSandwichedRenyiUpSourceValueSet alpha hpos hone).Nonempty := by
-  let sigma : State b := State.maximallyMixed b
-  have hsigma : sigma.matrix.PosDef := State.maximallyMixed_posDef
+  let sigma : MState b := (MState.uniform : MState b)
+  have hsigma : sigma.m.PosDef := MState.uniform_posDef
   exact ⟨rho.conditionalSandwichedRenyiUpSourceCandidate sigma hsigma alpha hpos hone,
     sigma, hsigma, rfl⟩
 
 theorem conditionalSandwichedRenyiUpSourceValueSet_bddAbove
-    (rho : State (Prod a b)) {alpha : Real}
+    (rho : MState (a × b)) {alpha : ℝ}
     (hhalf : 1 / 2 < alpha) (hone : alpha ≠ 1) :
     BddAbove (rho.conditionalSandwichedRenyiUpSourceValueSet alpha
       (lt_trans (by norm_num) hhalf) hone) := by
@@ -527,8 +491,8 @@ theorem conditionalSandwichedRenyiUpSourceValueSet_bddAbove
 /-- Product side-state candidates give the direct inequality in Tomamichel's
 conditional Renyi additivity proof. -/
 theorem conditionalSandwichedRenyiUpSource_prod_grouped_ge_add
-    (rho : State (Prod a b)) (tau : State (Prod c d))
-    {alpha : Real} (hhalf : 1 / 2 < alpha) (hone : alpha ≠ 1) :
+    (rho : MState (a × b)) (tau : MState (c × d))
+    {alpha : ℝ} (hhalf : 1 / 2 < alpha) (hone : alpha ≠ 1) :
     rho.conditionalSandwichedRenyiUpSource alpha
           (lt_trans (by norm_num) hhalf) hone +
         tau.conditionalSandwichedRenyiUpSource alpha
@@ -565,7 +529,7 @@ theorem conditionalSandwichedRenyiUpSource_prod_grouped_ge_add
     rcases hx with ⟨sigma, hsigma, rfl⟩
     rcases hy with ⟨omega, homega, rfl⟩
     refine le_csSup hSP_bdd ?_
-    exact ⟨sigma.prod omega, State.prod_posDef hsigma homega,
+    exact ⟨sigma.prod omega, MState.PosDef.kron hsigma homega,
       (conditionalSandwichedRenyiUpSourceCandidate_prod_grouped
         rho sigma tau omega hsigma homega hpos hone).symm⟩
   unfold conditionalSandwichedRenyiUpSource
@@ -581,46 +545,35 @@ theorem conditionalSandwichedRenyiUpSource_prod_grouped_ge_add
     linarith
   linarith
 
-end State
+end MState
 
-namespace PureVector
-
-/-- Regroup two tripartite pure vectors into the product-purification order
-used in the conditional Renyi additivity proof. -/
-private def conditionalRenyiGroupedProductPurificationEquiv
-    {a b r c d s : Type*} :
-    Prod (Prod (Prod a b) r) (Prod (Prod c d) s) ≃
-      Prod (Prod (Prod a c) (Prod b d)) (Prod r s) where
-  toFun x := (((x.1.1.1, x.2.1.1), (x.1.1.2, x.2.1.2)), (x.1.2, x.2.2))
-  invFun x := (((x.1.1.1, x.1.2.1), x.2.1), ((x.1.1.2, x.1.2.2), x.2.2))
-  left_inv x := by rcases x with ⟨⟨⟨_, _⟩, _⟩, ⟨⟨_, _⟩, _⟩⟩; rfl
-  right_inv x := by rcases x with ⟨⟨⟨_, _⟩, ⟨_, _⟩⟩, ⟨_, _⟩⟩; rfl
+namespace Ket
 
 private def conditionalRenyiGroupedProductPurification
     {r : Type*} {s : Type*} [Fintype r] [DecidableEq r]
     [Fintype s] [DecidableEq s]
-    (psi : PureVector (Prod (Prod a b) r))
-    (phi : PureVector (Prod (Prod c d) s)) :
-    PureVector (Prod (Prod (Prod a c) (Prod b d)) (Prod r s)) :=
-  (psi.prod phi).reindex conditionalRenyiGroupedProductPurificationEquiv
+    (psi : Ket ((a × b) × r))
+    (phi : Ket ((c × d) × s)) :
+    Ket (((a × c) × (b × d)) × (r × s)) :=
+  (psi.prod phi).reindex prodTripartiteZipEquiv
 
 private theorem conditionalRenyiGroupedProductPurification_marginalAB
     {r : Type*} {s : Type*} [Fintype r] [DecidableEq r]
     [Fintype s] [DecidableEq s]
-    (psi : PureVector (Prod (Prod a b) r))
-    (phi : PureVector (Prod (Prod c d) s)) :
+    (psi : Ket ((a × b) × r))
+    (phi : Ket ((c × d) × s)) :
     (conditionalRenyiGroupedProductPurification psi phi).state.marginalAB =
       psi.state.marginalAB.conditionalRenyiGroupedProduct phi.state.marginalAB := by
-  apply State.ext
+  apply MState.ext
   ext x y
   rcases x with ⟨⟨i, k⟩, ⟨j, l⟩⟩
   rcases y with ⟨⟨i', k'⟩, ⟨j', l'⟩⟩
   simp [conditionalRenyiGroupedProductPurification,
-    conditionalRenyiGroupedProductPurificationEquiv,
-    PureVector.reindex_state, State.reindex, State.conditionalRenyiGroupedProduct,
-    State.conditionalPetzRenyiProductGroupingEquiv, State.marginalAB, State.marginalA,
-    partialTraceB, State.prod, Matrix.kronecker, Matrix.kroneckerMap_apply,
-    PureVector.state_matrix, rankOneMatrix_apply, Fintype.sum_prod_type, mul_assoc]
+    prodTripartiteZipEquiv,
+    Ket.reindex_state, MState.conditionalRenyiGroupedProduct,
+    Equiv.prodProdProdComm, MState.marginalAB,
+    Matrix.traceRight, Matrix.kroneckerMap_apply,
+    Ket.state_matrix, rankOneMatrix_apply, Fintype.sum_prod_type, mul_assoc]
   rw [Finset.sum_mul_sum]
   apply Finset.sum_congr rfl
   intro x hx
@@ -631,20 +584,20 @@ private theorem conditionalRenyiGroupedProductPurification_marginalAB
 private theorem conditionalRenyiGroupedProductPurification_marginalAC
     {r : Type*} {s : Type*} [Fintype r] [DecidableEq r]
     [Fintype s] [DecidableEq s]
-    (psi : PureVector (Prod (Prod a b) r))
-    (phi : PureVector (Prod (Prod c d) s)) :
+    (psi : Ket ((a × b) × r))
+    (phi : Ket ((c × d) × s)) :
     (conditionalRenyiGroupedProductPurification psi phi).state.marginalAC =
       psi.state.marginalAC.conditionalRenyiGroupedProduct phi.state.marginalAC := by
-  apply State.ext
+  apply MState.ext
   ext x y
   rcases x with ⟨⟨i, k⟩, ⟨r1, s1⟩⟩
   rcases y with ⟨⟨i', k'⟩, ⟨r1', s1'⟩⟩
   simp [conditionalRenyiGroupedProductPurification,
-    conditionalRenyiGroupedProductPurificationEquiv,
-    PureVector.reindex_state, State.reindex, State.conditionalRenyiGroupedProduct,
-    State.conditionalPetzRenyiProductGroupingEquiv, State.marginalAC_matrix,
-    State.prod, Matrix.kronecker, Matrix.kroneckerMap_apply,
-    PureVector.state_matrix, rankOneMatrix_apply, Fintype.sum_prod_type, mul_assoc]
+    prodTripartiteZipEquiv,
+    Ket.reindex_state, MState.conditionalRenyiGroupedProduct,
+    Equiv.prodProdProdComm, MState.marginalAC_matrix,
+    Matrix.kroneckerMap_apply,
+    Ket.state_matrix, rankOneMatrix_apply, Fintype.sum_prod_type, mul_assoc]
   rw [Finset.sum_mul_sum]
   apply Finset.sum_congr rfl
   intro x hx
@@ -652,16 +605,16 @@ private theorem conditionalRenyiGroupedProductPurification_marginalAC
   intro y hy
   ring
 
-end PureVector
+end Ket
 
-namespace State
+namespace MState
 
 /-- The reverse product inequality in the high-order range, obtained exactly
 as in Tomamichel's source proof: apply the direct product inequality at the
 conjugate low order to complementary marginals, then use pure-state duality. -/
 theorem conditionalSandwichedRenyiUpSource_prod_grouped_le_add_of_one_lt
-    (rho : State (Prod a b)) (tau : State (Prod c d))
-    {alpha : Real} (halpha : 1 < alpha) :
+    (rho : MState (a × b)) (tau : MState (c × d))
+    {alpha : ℝ} (halpha : 1 < alpha) :
     (rho.conditionalRenyiGroupedProduct tau).conditionalSandwichedRenyiUpSource alpha
         (lt_trans zero_lt_one halpha) (ne_of_gt halpha) ≤
       rho.conditionalSandwichedRenyiUpSource alpha
@@ -682,7 +635,7 @@ theorem conditionalSandwichedRenyiUpSource_prod_grouped_le_add_of_one_lt
     exact ⟨l⟩
   let psi := conditionalRenyiTargetFirstCanonicalPurification rho
   let phi := conditionalRenyiTargetFirstCanonicalPurification tau
-  let Psi := PureVector.conditionalRenyiGroupedProductPurification psi phi
+  let Psi := Ket.conditionalRenyiGroupedProductPurification psi phi
   let beta := conditionalRenyiConjugateOrder alpha
   have hbeta_half : 1 / 2 < beta :=
     conditionalRenyiConjugateOrder_half_lt_of_one_lt halpha
@@ -694,12 +647,12 @@ theorem conditionalSandwichedRenyiUpSource_prod_grouped_le_add_of_one_lt
     simpa [beta, add_comm] using conditionalRenyiConjugateOrder_conjugate
       (lt_trans (by norm_num) halpha)
   have hPsiAB : Psi.state.marginalAB = rho.conditionalRenyiGroupedProduct tau := by
-    rw [PureVector.conditionalRenyiGroupedProductPurification_marginalAB]
+    rw [Ket.conditionalRenyiGroupedProductPurification_marginalAB]
     rw [conditionalRenyiTargetFirstCanonicalPurification_marginalAB,
       conditionalRenyiTargetFirstCanonicalPurification_marginalAB]
   have hPsiAC : Psi.state.marginalAC =
       psi.state.marginalAC.conditionalRenyiGroupedProduct phi.state.marginalAC :=
-    PureVector.conditionalRenyiGroupedProductPurification_marginalAC psi phi
+    Ket.conditionalRenyiGroupedProductPurification_marginalAC psi phi
   have hdirect := conditionalSandwichedRenyiUpSource_prod_grouped_ge_add
     psi.state.marginalAC phi.state.marginalAC hbeta_half hbeta_ne_one
   have hdualPsi := Psi.conditionalSandwichedRenyiUpSource_duality
@@ -717,8 +670,8 @@ theorem conditionalSandwichedRenyiUpSource_prod_grouped_le_add_of_one_lt
 and purifying systems are exchanged, so that duality pairs the requested low
 order with a high conjugate order on the complementary marginals. -/
 theorem conditionalSandwichedRenyiUpSource_prod_grouped_le_add_of_half_lt_lt_one
-    (rho : State (Prod a b)) (tau : State (Prod c d))
-    {alpha : Real} (hhalf : 1 / 2 < alpha) (hone : alpha < 1) :
+    (rho : MState (a × b)) (tau : MState (c × d))
+    {alpha : ℝ} (hhalf : 1 / 2 < alpha) (hone : alpha < 1) :
     (rho.conditionalRenyiGroupedProduct tau).conditionalSandwichedRenyiUpSource alpha
         (lt_trans (by norm_num) hhalf) (ne_of_lt hone) ≤
       rho.conditionalSandwichedRenyiUpSource alpha
@@ -739,26 +692,26 @@ theorem conditionalSandwichedRenyiUpSource_prod_grouped_le_add_of_half_lt_lt_one
     exact ⟨l⟩
   let psi := conditionalRenyiTargetFirstCanonicalPurification rho
   let phi := conditionalRenyiTargetFirstCanonicalPurification tau
-  let Psi := PureVector.conditionalRenyiGroupedProductPurification psi phi
+  let Psi := Ket.conditionalRenyiGroupedProductPurification psi phi
   let psiSwap := psi.reindex
-    (conditionalRenyiSwapConditioningReferenceEquiv a b (Prod a b))
+    (prodABCToACBEquiv a b (a × b))
   let phiSwap := phi.reindex
-    (conditionalRenyiSwapConditioningReferenceEquiv c d (Prod c d))
+    (prodABCToACBEquiv c d (c × d))
   let PsiSwap := Psi.reindex
-    (conditionalRenyiSwapConditioningReferenceEquiv
-      (Prod a c) (Prod b d) (Prod (Prod a b) (Prod c d)))
+    (prodABCToACBEquiv
+      (a × c) (b × d) ((a × b) × (c × d)))
   let gamma := conditionalRenyiConjugateOrder alpha
   have hgamma : 1 < gamma :=
     conditionalRenyiConjugateOrder_gt_one_of_lt_one hhalf hone
   have hconj : 1 / gamma + 1 / alpha = 2 := by
     simpa [gamma] using conditionalRenyiConjugateOrder_conjugate hhalf
   have hPsiAB : Psi.state.marginalAB = rho.conditionalRenyiGroupedProduct tau := by
-    rw [PureVector.conditionalRenyiGroupedProductPurification_marginalAB]
+    rw [Ket.conditionalRenyiGroupedProductPurification_marginalAB]
     rw [conditionalRenyiTargetFirstCanonicalPurification_marginalAB,
       conditionalRenyiTargetFirstCanonicalPurification_marginalAB]
   have hPsiAC : Psi.state.marginalAC =
       psi.state.marginalAC.conditionalRenyiGroupedProduct phi.state.marginalAC :=
-    PureVector.conditionalRenyiGroupedProductPurification_marginalAC psi phi
+    Ket.conditionalRenyiGroupedProductPurification_marginalAC psi phi
   have hdirect := conditionalSandwichedRenyiUpSource_prod_grouped_ge_add
     psi.state.marginalAC phi.state.marginalAC (lt_trans (by norm_num) hgamma)
       (ne_of_gt hgamma)
@@ -768,21 +721,21 @@ theorem conditionalSandwichedRenyiUpSource_prod_grouped_le_add_of_half_lt_lt_one
     hgamma hhalf hone hconj
   have hdualPsiRight := phiSwap.conditionalSandwichedRenyiUpSource_duality
     hgamma hhalf hone hconj
-  rw [conditionalRenyiSwapConditioningReference_marginalAB,
-    conditionalRenyiSwapConditioningReference_marginalAC, hPsiAC, hPsiAB] at hdualPsi
-  rw [conditionalRenyiSwapConditioningReference_marginalAB,
-    conditionalRenyiSwapConditioningReference_marginalAC,
+  rw [Ket.prodABCToACB_marginalAB,
+    Ket.prodABCToACB_marginalAC, hPsiAC, hPsiAB] at hdualPsi
+  rw [Ket.prodABCToACB_marginalAB,
+    Ket.prodABCToACB_marginalAC,
     conditionalRenyiTargetFirstCanonicalPurification_marginalAB] at hdualPsiLeft
-  rw [conditionalRenyiSwapConditioningReference_marginalAB,
-    conditionalRenyiSwapConditioningReference_marginalAC,
+  rw [Ket.prodABCToACB_marginalAB,
+    Ket.prodABCToACB_marginalAC,
     conditionalRenyiTargetFirstCanonicalPurification_marginalAB] at hdualPsiRight
   linarith
 
 /-- Upward sandwiched conditional Renyi entropy is additive at every interior
 finite order above one half other than one. -/
 theorem conditionalSandwichedRenyiUpSource_prod_grouped
-    (rho : State (Prod a b)) (tau : State (Prod c d))
-    {alpha : Real} (hhalf : 1 / 2 < alpha) (hone : alpha ≠ 1) :
+    (rho : MState (a × b)) (tau : MState (c × d))
+    {alpha : ℝ} (hhalf : 1 / 2 < alpha) (hone : alpha ≠ 1) :
     (rho.conditionalRenyiGroupedProduct tau).conditionalSandwichedRenyiUpSource alpha
         (lt_trans (by norm_num) hhalf) hone =
       rho.conditionalSandwichedRenyiUpSource alpha
@@ -800,13 +753,13 @@ theorem conditionalSandwichedRenyiUpSource_prod_grouped
 /-- The unified finite-order quantity is additive at every interior order
 above one half other than one. -/
 theorem conditionalSandwichedRenyiUpFiniteOrder_prod_grouped_of_half_lt_ne_one
-    (rho : State (Prod a b)) (tau : State (Prod c d))
-    {alpha : Real} (hhalf : 1 / 2 < alpha) (hone : alpha ≠ 1) :
+    (rho : MState (a × b)) (tau : MState (c × d))
+    {alpha : ℝ} (hhalf : 1 / 2 < alpha) (hone : alpha ≠ 1) :
     (rho.conditionalRenyiGroupedProduct tau).conditionalSandwichedRenyiUpFiniteOrder alpha =
       rho.conditionalSandwichedRenyiUpFiniteOrder alpha +
         tau.conditionalSandwichedRenyiUpFiniteOrder alpha := by
   have hpos : 0 < alpha := lt_trans (by norm_num) hhalf
-  have hneHalf : alpha ≠ (2 : Real)⁻¹ := by
+  have hneHalf : alpha ≠ (2 : ℝ)⁻¹ := by
     intro h
     norm_num at h
     linarith
@@ -818,39 +771,39 @@ theorem conditionalSandwichedRenyiUpFiniteOrder_prod_grouped_of_half_lt_ne_one
 /-- Product side operators remain feasible for the grouped product
 conditional-min SDP. -/
 theorem ConditionalMinEntropyScaleFeasible.prod_grouped
-    {rho : State (Prod a b)} {tau : State (Prod c d)}
+    {rho : MState (a × b)} {tau : MState (c × d)}
     {T : CMatrix b} {U : CMatrix d}
     (hT : ConditionalMinEntropyScaleFeasible (a := a) rho T)
     (hU : ConditionalMinEntropyScaleFeasible (a := c) tau U) :
-    ConditionalMinEntropyScaleFeasible (a := Prod a c)
+    ConditionalMinEntropyScaleFeasible (a := a × c)
       (rho.conditionalRenyiGroupedProduct tau) (Matrix.kronecker T U) := by
   constructor
   · exact hT.1.kronecker hU.1
-  · let e := conditionalPetzRenyiProductGroupingEquiv a b c d
-    let A : CMatrix (Prod a b) := Matrix.kronecker (1 : CMatrix a) T
-    let B : CMatrix (Prod c d) := Matrix.kronecker (1 : CMatrix c) U
+  · let e := Equiv.prodProdProdComm a b c d
+    let A : CMatrix (a × b) := Matrix.kronecker (1 : CMatrix a) T
+    let B : CMatrix (c × d) := Matrix.kronecker (1 : CMatrix c) U
     have hA : A.PosSemidef := Matrix.PosSemidef.one.kronecker hT.1
     have hB : B.PosSemidef := Matrix.PosSemidef.one.kronecker hU.1
-    have hdiffA : (A - rho.matrix).PosSemidef := hT.2
-    have hdiffB : (B - tau.matrix).PosSemidef := hU.2
+    have hdiffA : (A - rho.m).PosSemidef := hT.2
+    have hdiffB : (B - tau.m).PosSemidef := hU.2
     have hraw :
-        (Matrix.kronecker A B - Matrix.kronecker rho.matrix tau.matrix).PosSemidef := by
-      have hsum := (hdiffA.kronecker hB).add (rho.pos.kronecker hdiffB)
-      have heq : Matrix.kronecker A B - Matrix.kronecker rho.matrix tau.matrix =
-          Matrix.kronecker (A - rho.matrix) B +
-            Matrix.kronecker rho.matrix (B - tau.matrix) := by
+        (Matrix.kronecker A B - Matrix.kronecker rho.m tau.m).PosSemidef := by
+      have hsum := (hdiffA.kronecker hB).add (rho.psd.kronecker hdiffB)
+      have heq : Matrix.kronecker A B - Matrix.kronecker rho.m tau.m =
+          Matrix.kronecker (A - rho.m) B +
+            Matrix.kronecker rho.m (B - tau.m) := by
         ext x y
         simp [A, B, Matrix.kronecker, Matrix.kroneckerMap_apply]
         ring
       rw [heq]
       exact hsum
-    change (Matrix.kronecker (1 : CMatrix (Prod a c)) (Matrix.kronecker T U) -
-      (rho.conditionalRenyiGroupedProduct tau).matrix).PosSemidef
+    change (Matrix.kronecker (1 : CMatrix (a × c)) (Matrix.kronecker T U) -
+      (rho.conditionalRenyiGroupedProduct tau).m).PosSemidef
     convert hraw.submatrix e.symm using 1
     ext x y
     rcases x with ⟨⟨i, k⟩, ⟨j, l⟩⟩
     rcases y with ⟨⟨i', k'⟩, ⟨j', l'⟩⟩
-    simp [e, A, B, conditionalPetzRenyiProductGroupingEquiv,
+    simp [e, A, B, Equiv.prodProdProdComm,
       conditionalRenyiGroupedProduct_matrix, Matrix.kronecker,
       Matrix.kroneckerMap_apply]
     by_cases hi : i = i' <;> by_cases hk : k = k' <;>
@@ -868,7 +821,7 @@ private theorem trace_kronecker_re_of_posSemidef
   exact htrace
 
 private theorem conditionalMinEntropyScale_eq_iInf_feasible
-    [Nonempty b] (rho : State (Prod a b)) :
+    [Nonempty b] (rho : MState (a × b)) :
     rho.conditionalMinEntropyScale (a := a) =
       ⨅ T : {T : CMatrix b // ConditionalMinEntropyScaleFeasible (a := a) rho T},
         T.1.trace.re := by
@@ -883,25 +836,25 @@ private theorem conditionalMinEntropyScale_eq_iInf_feasible
 
 /-- Regroup the Kronecker product of two endpoint dual effects. -/
 def conditionalMinEntropyDualEffectGroupedProduct
-    (M : CMatrix (Prod a b)) (N : CMatrix (Prod c d)) :
-    CMatrix (Prod (Prod a c) (Prod b d)) :=
+    (M : CMatrix (a × b)) (N : CMatrix (c × d)) :
+    CMatrix ((a × c) × (b × d)) :=
   (Matrix.kronecker M N).submatrix
-    (conditionalPetzRenyiProductGroupingEquiv a b c d).symm
-    (conditionalPetzRenyiProductGroupingEquiv a b c d).symm
+    (Equiv.prodProdProdComm a b c d).symm
+    (Equiv.prodProdProdComm a b c d).symm
 
 omit [DecidableEq a] [Fintype b] [DecidableEq b] [DecidableEq c]
     [Fintype d] [DecidableEq d] in
-private theorem partialTraceA_conditionalMinEntropyDualEffectGroupedProduct
-    (M : CMatrix (Prod a b)) (N : CMatrix (Prod c d)) :
-    partialTraceA (a := Prod a c) (b := Prod b d)
+private theorem traceLeft_conditionalMinEntropyDualEffectGroupedProduct
+    (M : CMatrix (a × b)) (N : CMatrix (c × d)) :
+    Matrix.traceLeft
         (conditionalMinEntropyDualEffectGroupedProduct M N) =
-      Matrix.kronecker (partialTraceA (a := a) (b := b) M)
-        (partialTraceA (a := c) (b := d) N) := by
+      Matrix.kronecker (Matrix.traceLeft M)
+        (Matrix.traceLeft N) := by
   ext x y
   rcases x with ⟨j, l⟩
   rcases y with ⟨j', l'⟩
-  simp [conditionalMinEntropyDualEffectGroupedProduct, partialTraceA,
-    conditionalPetzRenyiProductGroupingEquiv, Matrix.kronecker,
+  simp [conditionalMinEntropyDualEffectGroupedProduct, Matrix.traceLeft,
+    Equiv.prodProdProdComm, Matrix.kronecker,
     Matrix.kroneckerMap_apply, Fintype.sum_prod_type]
   rw [Finset.sum_mul_sum]
 
@@ -909,22 +862,22 @@ omit [DecidableEq a] [DecidableEq c] in
 /-- Product dual effects remain feasible for the grouped product
 conditional-min SDP. -/
 theorem ConditionalMinEntropyDualEffectFeasible.prod_grouped
-    {M : CMatrix (Prod a b)} {N : CMatrix (Prod c d)}
+    {M : CMatrix (a × b)} {N : CMatrix (c × d)}
     (hM : ConditionalMinEntropyDualEffectFeasible (a := a) M)
     (hN : ConditionalMinEntropyDualEffectFeasible (a := c) N) :
-    ConditionalMinEntropyDualEffectFeasible (a := Prod a c)
+    ConditionalMinEntropyDualEffectFeasible (a := a × c)
       (conditionalMinEntropyDualEffectGroupedProduct M N) := by
   constructor
   · exact (hM.1.kronecker hN.1).submatrix
-      (conditionalPetzRenyiProductGroupingEquiv a b c d).symm
-  · rw [partialTraceA_conditionalMinEntropyDualEffectGroupedProduct]
-    let P : CMatrix b := partialTraceA (a := a) (b := b) M
-    let Q : CMatrix d := partialTraceA (a := c) (b := d) N
-    have hP : P.PosSemidef := partialTraceA_posSemidef hM.1
-    have hQ : Q.PosSemidef := partialTraceA_posSemidef hN.1
+      (Equiv.prodProdProdComm a b c d).symm
+  · rw [traceLeft_conditionalMinEntropyDualEffectGroupedProduct]
+    let P : CMatrix b := Matrix.traceLeft M
+    let Q : CMatrix d := Matrix.traceLeft N
+    have hP : P.PosSemidef := traceLeft_posSemidef hM.1
+    have hQ : Q.PosSemidef := traceLeft_posSemidef hN.1
     have hdiffP : ((1 : CMatrix b) - P).PosSemidef := hM.2
     have hdiffQ : ((1 : CMatrix d) - Q).PosSemidef := hN.2
-    change (Matrix.kronecker P Q ≤ (1 : CMatrix (Prod b d)))
+    change (Matrix.kronecker P Q ≤ (1 : CMatrix (b × d)))
     rw [Matrix.le_iff]
     have hsum := (hdiffP.kronecker Matrix.PosSemidef.one).add (hP.kronecker hdiffQ)
     convert hsum using 1
@@ -935,41 +888,41 @@ theorem ConditionalMinEntropyDualEffectFeasible.prod_grouped
       simp [P, Q, Matrix.kronecker, Matrix.kroneckerMap_apply, hj, hl] <;> ring
 
 private theorem conditionalMinEntropyDualEffectGroupedProduct_value
-    (rho : State (Prod a b)) (tau : State (Prod c d))
-    (M : CMatrix (Prod a b)) (N : CMatrix (Prod c d))
+    (rho : MState (a × b)) (tau : MState (c × d))
+    (M : CMatrix (a × b)) (N : CMatrix (c × d))
     (hM : M.PosSemidef) (hN : N.PosSemidef) :
-    (((rho.conditionalRenyiGroupedProduct tau).matrix *
+    (((rho.conditionalRenyiGroupedProduct tau).m *
         conditionalMinEntropyDualEffectGroupedProduct M N).trace).re =
-      ((rho.matrix * M).trace).re * ((tau.matrix * N).trace).re := by
-  let e := conditionalPetzRenyiProductGroupingEquiv a b c d
+      ((rho.m * M).trace).re * ((tau.m * N).trace).re := by
+  let e := Equiv.prodProdProdComm a b c d
   have htrace :
-      ((rho.conditionalRenyiGroupedProduct tau).matrix *
+      ((rho.conditionalRenyiGroupedProduct tau).m *
           conditionalMinEntropyDualEffectGroupedProduct M N).trace =
-        (rho.matrix * M).trace * (tau.matrix * N).trace := by
+        (rho.m * M).trace * (tau.m * N).trace := by
     rw [conditionalRenyiGroupedProduct_matrix]
     unfold conditionalMinEntropyDualEffectGroupedProduct
     rw [Matrix.submatrix_mul_equiv]
-    rw [State.trace_submatrix_equiv e.symm]
+    rw [Matrix.trace_submatrix _ e.symm]
     calc
-      (Matrix.kronecker rho.matrix tau.matrix * Matrix.kronecker M N).trace =
-          (Matrix.kronecker (rho.matrix * M) (tau.matrix * N)).trace :=
+      (Matrix.kronecker rho.m tau.m * Matrix.kronecker M N).trace =
+          (Matrix.kronecker (rho.m * M) (tau.m * N)).trace :=
         congrArg Matrix.trace
-          (Matrix.mul_kronecker_mul rho.matrix M tau.matrix N).symm
-      _ = (rho.matrix * M).trace * (tau.matrix * N).trace :=
-        Matrix.trace_kronecker (rho.matrix * M) (tau.matrix * N)
-  have hleftIm : ((rho.matrix * M).trace).im = 0 :=
-    trace_mul_posSemidef_im_eq_zero rho.pos hM
-  have hrightIm : ((tau.matrix * N).trace).im = 0 :=
-    trace_mul_posSemidef_im_eq_zero tau.pos hN
+          (Matrix.mul_kronecker_mul rho.m M tau.m N).symm
+      _ = (rho.m * M).trace * (tau.m * N).trace :=
+        Matrix.trace_kronecker (rho.m * M) (tau.m * N)
+  have hleftIm : ((rho.m * M).trace).im = 0 :=
+    trace_mul_posSemidef_im_eq_zero rho.psd hM
+  have hrightIm : ((tau.m * N).trace).im = 0 :=
+    trace_mul_posSemidef_im_eq_zero tau.psd hN
   rw [htrace, Complex.mul_re, hleftIm, hrightIm]
   ring
 
 private theorem conditionalMinEntropyScale_eq_iSup_dualEffect
-    [Nonempty b] (rho : State (Prod a b)) :
+    [Nonempty b] (rho : MState (a × b)) :
     rho.conditionalMinEntropyScale (a := a) =
-      ⨆ M : {M : CMatrix (Prod a b) //
+      ⨆ M : {M : CMatrix (a × b) //
         ConditionalMinEntropyDualEffectFeasible (a := a) M},
-        ((rho.matrix * M.1).trace).re := by
+        ((rho.m * M.1).trace).re := by
   rw [rho.conditionalMinEntropyScale_eq_sSup_dualEffectValueSet (a := a),
     ← sSup_range]
   congr 1
@@ -985,9 +938,9 @@ product states.  The upper bound tensors primal side operators; the lower
 bound tensors dual effects and uses the already-proved finite-dimensional
 strong duality theorem. -/
 theorem conditionalMinEntropyScale_prod_grouped
-    (rho : State (Prod a b)) (tau : State (Prod c d)) :
+    (rho : MState (a × b)) (tau : MState (c × d)) :
     (rho.conditionalRenyiGroupedProduct tau).conditionalMinEntropyScale
-        (a := Prod a c) =
+        (a := a × c) =
       rho.conditionalMinEntropyScale (a := a) *
         tau.conditionalMinEntropyScale (a := c) := by
   let : Nonempty a := by
@@ -1005,14 +958,14 @@ theorem conditionalMinEntropyScale_prod_grouped
   let rhoTau := rho.conditionalRenyiGroupedProduct tau
   let Prho := {T : CMatrix b // ConditionalMinEntropyScaleFeasible (a := a) rho T}
   let Ptau := {U : CMatrix d // ConditionalMinEntropyScaleFeasible (a := c) tau U}
-  let Pprod := {V : CMatrix (Prod b d) //
-    ConditionalMinEntropyScaleFeasible (a := Prod a c) rhoTau V}
-  let Drho := {M : CMatrix (Prod a b) //
+  let Pprod := {V : CMatrix (b × d) //
+    ConditionalMinEntropyScaleFeasible (a := a × c) rhoTau V}
+  let Drho := {M : CMatrix (a × b) //
     ConditionalMinEntropyDualEffectFeasible (a := a) M}
-  let Dtau := {N : CMatrix (Prod c d) //
+  let Dtau := {N : CMatrix (c × d) //
     ConditionalMinEntropyDualEffectFeasible (a := c) N}
-  let Dprod := {K : CMatrix (Prod (Prod a c) (Prod b d)) //
-    ConditionalMinEntropyDualEffectFeasible (a := Prod a c) K}
+  let Dprod := {K : CMatrix ((a × c) × (b × d)) //
+    ConditionalMinEntropyDualEffectFeasible (a := a × c) K}
   let : Nonempty Prho := by
     rcases rho.conditionalMinEntropyScaleValueSet_nonempty (a := a) with
       ⟨_, T, hT, rfl⟩
@@ -1022,7 +975,7 @@ theorem conditionalMinEntropyScale_prod_grouped
       ⟨_, U, hU, rfl⟩
     exact ⟨⟨U, hU⟩⟩
   let : Nonempty Pprod := by
-    rcases rhoTau.conditionalMinEntropyScaleValueSet_nonempty (a := Prod a c) with
+    rcases rhoTau.conditionalMinEntropyScaleValueSet_nonempty (a := a × c) with
       ⟨_, V, hV, rfl⟩
     exact ⟨⟨V, hV⟩⟩
   let : Nonempty Drho :=
@@ -1030,9 +983,9 @@ theorem conditionalMinEntropyScale_prod_grouped
       constructor
       · exact Matrix.PosSemidef.zero
       · rw [Matrix.le_iff]
-        have hzero : partialTraceA (a := a) (b := b) (0 : CMatrix (Prod a b)) = 0 := by
+        have hzero : Matrix.traceLeft (0 : CMatrix (a × b)) = 0 := by
           ext i j
-          simp [partialTraceA]
+          simp [Matrix.traceLeft]
         rw [hzero]
         simpa using
           (Matrix.PosSemidef.one : (1 : CMatrix b).PosSemidef)⟩⟩
@@ -1041,9 +994,9 @@ theorem conditionalMinEntropyScale_prod_grouped
       constructor
       · exact Matrix.PosSemidef.zero
       · rw [Matrix.le_iff]
-        have hzero : partialTraceA (a := c) (b := d) (0 : CMatrix (Prod c d)) = 0 := by
+        have hzero : Matrix.traceLeft (0 : CMatrix (c × d)) = 0 := by
           ext i j
-          simp [partialTraceA]
+          simp [Matrix.traceLeft]
         rw [hzero]
         simpa using
           (Matrix.PosSemidef.one : (1 : CMatrix d).PosSemidef)⟩⟩
@@ -1052,13 +1005,13 @@ theorem conditionalMinEntropyScale_prod_grouped
       constructor
       · exact Matrix.PosSemidef.zero
       · rw [Matrix.le_iff]
-        have hzero : partialTraceA (a := Prod a c) (b := Prod b d)
-            (0 : CMatrix (Prod (Prod a c) (Prod b d))) = 0 := by
+        have hzero : Matrix.traceLeft
+            (0 : CMatrix ((a × c) × (b × d))) = 0 := by
           ext i j
-          simp [partialTraceA]
+          simp [Matrix.traceLeft]
         rw [hzero]
         simpa using
-          (Matrix.PosSemidef.one : (1 : CMatrix (Prod b d)).PosSemidef)⟩⟩
+          (Matrix.PosSemidef.one : (1 : CMatrix (b × d)).PosSemidef)⟩⟩
   have hScaleTauPos : 0 < tau.conditionalMinEntropyScale (a := c) := by
     rw [tau.conditionalMinEntropyScale_eq_normalizedScale (a := c)]
     exact tau.conditionalMinEntropyNormalizedScale_inf_pos (a := c)
@@ -1069,10 +1022,10 @@ theorem conditionalMinEntropyScale_prod_grouped
     rw [← conditionalMinEntropyScale_eq_iInf_feasible tau]
     exact hScaleTauPos.le
   have hDtauSupNonneg :
-      0 ≤ ⨆ N : Dtau, ((tau.matrix * N.1).trace).re := by
-    change 0 ≤ ⨆ N : {N : CMatrix (Prod c d) //
+      0 ≤ ⨆ N : Dtau, ((tau.m * N.1).trace).re := by
+    change 0 ≤ ⨆ N : {N : CMatrix (c × d) //
       ConditionalMinEntropyDualEffectFeasible (a := c) N},
-        ((tau.matrix * N.1).trace).re
+        ((tau.m * N.1).trace).re
     rw [← conditionalMinEntropyScale_eq_iSup_dualEffect tau]
     exact hScaleTauPos.le
   have hPrhoBdd : BddBelow (Set.range fun T : Prho => T.1.trace.re) := by
@@ -1105,16 +1058,16 @@ theorem conditionalMinEntropyScale_prod_grouped
       conditionalMinEntropyScale_eq_iSup_dualEffect rho,
       conditionalMinEntropyScale_eq_iSup_dualEffect tau]
     have hDprodBdd : BddAbove (Set.range fun K : Dprod =>
-        ((rhoTau.matrix * K.1).trace).re) := by
+        ((rhoTau.m * K.1).trace).re) := by
       rcases rhoTau.conditionalMinEntropyDualEffectValueSet_bddAbove
-          (a := Prod a c) with ⟨z, hz⟩
+          (a := a × c) with ⟨z, hz⟩
       refine ⟨z, ?_⟩
       rintro _ ⟨K, rfl⟩
       exact hz ⟨K.1, K.2, rfl⟩
     rw [Real.iSup_mul_of_nonneg hDtauSupNonneg]
     refine ciSup_le fun M : Drho => ?_
-    have hMnonneg : 0 ≤ ((rho.matrix * M.1).trace).re :=
-      cMatrix_trace_mul_posSemidef_re_nonneg rho.pos M.2.1
+    have hMnonneg : 0 ≤ ((rho.m * M.1).trace).re :=
+      cMatrix_trace_mul_posSemidef_re_nonneg rho.psd M.2.1
     rw [Real.mul_iSup_of_nonneg hMnonneg]
     refine ciSup_le fun N : Dtau => ?_
     let K : Dprod := ⟨conditionalMinEntropyDualEffectGroupedProduct M.1 N.1,
@@ -1126,7 +1079,7 @@ theorem conditionalMinEntropyScale_prod_grouped
 
 /-- Conditional min-entropy is additive on grouped product states. -/
 theorem conditionalMinEntropy_prod_grouped
-    (rho : State (Prod a b)) (tau : State (Prod c d)) :
+    (rho : MState (a × b)) (tau : MState (c × d)) :
     (rho.conditionalRenyiGroupedProduct tau).conditionalMinEntropy =
       rho.conditionalMinEntropy + tau.conditionalMinEntropy := by
   let : Nonempty a := by
@@ -1148,7 +1101,7 @@ theorem conditionalMinEntropy_prod_grouped
     rw [tau.conditionalMinEntropyScale_eq_normalizedScale (a := c)]
     exact tau.conditionalMinEntropyNormalizedScale_inf_pos (a := c)
   rw [(rho.conditionalRenyiGroupedProduct tau)
-      |>.conditionalMinEntropy_eq_neg_log2_scale_of_nonempty (a := Prod a c),
+      |>.conditionalMinEntropy_eq_neg_log2_scale_of_nonempty (a := a × c),
     rho.conditionalMinEntropy_eq_neg_log2_scale_of_nonempty (a := a),
     tau.conditionalMinEntropy_eq_neg_log2_scale_of_nonempty (a := c),
     conditionalMinEntropyScale_prod_grouped rho tau,
@@ -1159,7 +1112,7 @@ theorem conditionalMinEntropy_prod_grouped
 purifications, min-entropy SDP additivity on the complementary marginals, and
 the normalized pure-state min/max endpoint duality. -/
 theorem conditionalMaxEntropy_prod_grouped
-    (rho : State (Prod a b)) (tau : State (Prod c d)) :
+    (rho : MState (a × b)) (tau : MState (c × d)) :
     (rho.conditionalRenyiGroupedProduct tau).conditionalMaxEntropy =
       rho.conditionalMaxEntropy + tau.conditionalMaxEntropy := by
   let : Nonempty a := by
@@ -1176,14 +1129,14 @@ theorem conditionalMaxEntropy_prod_grouped
     exact ⟨l⟩
   let psi := conditionalRenyiTargetFirstCanonicalPurification rho
   let phi := conditionalRenyiTargetFirstCanonicalPurification tau
-  let Psi := PureVector.conditionalRenyiGroupedProductPurification psi phi
+  let Psi := Ket.conditionalRenyiGroupedProductPurification psi phi
   have hPsiAB : Psi.state.marginalAB = rho.conditionalRenyiGroupedProduct tau := by
-    rw [PureVector.conditionalRenyiGroupedProductPurification_marginalAB]
+    rw [Ket.conditionalRenyiGroupedProductPurification_marginalAB]
     rw [conditionalRenyiTargetFirstCanonicalPurification_marginalAB,
       conditionalRenyiTargetFirstCanonicalPurification_marginalAB]
   have hPsiAC : Psi.state.marginalAC =
       psi.state.marginalAC.conditionalRenyiGroupedProduct phi.state.marginalAC :=
-    PureVector.conditionalRenyiGroupedProductPurification_marginalAC psi phi
+    Ket.conditionalRenyiGroupedProductPurification_marginalAC psi phi
   have hdualPsi :=
     Psi.conditionalMaxEntropy_marginalAB_eq_neg_conditionalMinEntropy_marginalAC
   have hdualLeft :=
@@ -1200,11 +1153,11 @@ theorem conditionalMaxEntropy_prod_grouped
 /-- The unified finite-order quantity is additive at the order-one-half
 conditional max-entropy endpoint. -/
 theorem conditionalSandwichedRenyiUpFiniteOrder_prod_grouped_half
-    (rho : State (Prod a b)) (tau : State (Prod c d)) :
+    (rho : MState (a × b)) (tau : MState (c × d)) :
     (rho.conditionalRenyiGroupedProduct tau).conditionalSandwichedRenyiUpFiniteOrder
-        (2 : Real)⁻¹ =
-      rho.conditionalSandwichedRenyiUpFiniteOrder (2 : Real)⁻¹ +
-        tau.conditionalSandwichedRenyiUpFiniteOrder (2 : Real)⁻¹ := by
+        (2 : ℝ)⁻¹ =
+      rho.conditionalSandwichedRenyiUpFiniteOrder (2 : ℝ)⁻¹ +
+        tau.conditionalSandwichedRenyiUpFiniteOrder (2 : ℝ)⁻¹ := by
   rw [conditionalSandwichedRenyiUpFiniteOrder_half,
     conditionalSandwichedRenyiUpFiniteOrder_half,
     conditionalSandwichedRenyiUpFiniteOrder_half]
@@ -1213,12 +1166,12 @@ theorem conditionalSandwichedRenyiUpFiniteOrder_prod_grouped_half
 /-- Tomamichel's finite-order tensor-product additivity theorem for upward
 sandwiched conditional Renyi entropy. -/
 theorem conditionalSandwichedRenyiUpFiniteOrder_prod_grouped
-    (rho : State (Prod a b)) (tau : State (Prod c d))
-    {alpha : Real} (halpha : (2 : Real)⁻¹ ≤ alpha) :
+    (rho : MState (a × b)) (tau : MState (c × d))
+    {alpha : ℝ} (halpha : (2 : ℝ)⁻¹ ≤ alpha) :
     (rho.conditionalRenyiGroupedProduct tau).conditionalSandwichedRenyiUpFiniteOrder alpha =
       rho.conditionalSandwichedRenyiUpFiniteOrder alpha +
         tau.conditionalSandwichedRenyiUpFiniteOrder alpha := by
-  by_cases hhalf : alpha = (2 : Real)⁻¹
+  by_cases hhalf : alpha = (2 : ℝ)⁻¹
   · subst alpha
     exact conditionalSandwichedRenyiUpFiniteOrder_prod_grouped_half rho tau
   by_cases hone : alpha = 1
@@ -1230,8 +1183,4 @@ theorem conditionalSandwichedRenyiUpFiniteOrder_prod_grouped
   exact conditionalSandwichedRenyiUpFiniteOrder_prod_grouped_of_half_lt_ne_one
     rho tau hhalfStrict hone
 
-end State
-
-end
-
-end QIT
+end MState

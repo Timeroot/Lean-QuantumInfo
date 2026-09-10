@@ -32,14 +32,14 @@ noncomputable section
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
 private theorem pure_state_mul_state_mul_pure_state
-    (rho : State a) (phi : PureVector a) :
-    phi.state.matrix * rho.matrix * phi.state.matrix =
-      ((rho.matrix * phi.state.matrix).trace) • phi.state.matrix := by
-  let c : ℂ := (star phi.amp ᵥ* rho.matrix) ⬝ᵥ phi.amp
-  have hc : c = (rho.matrix * phi.state.matrix).trace := by
+    (rho : MState a) (phi : Ket a) :
+    phi.state.m * rho.m * phi.state.m =
+      ((rho.m * phi.state.m).trace) • phi.state.m := by
+  let c : ℂ := (star phi.vec ᵥ* rho.m) ⬝ᵥ phi.vec
+  have hc : c = (rho.m * phi.state.m).trace := by
     dsimp [c]
-    simp only [Matrix.vecMul, dotProduct, rankOneMatrix, Matrix.trace, Matrix.diag,
-      Matrix.mul_apply, Matrix.vecMulVec_apply]
+    simp only [Ket.state_matrix, Matrix.vecMul, dotProduct, rankOneMatrix, Matrix.trace,
+      Matrix.diag, Matrix.mul_apply, Matrix.vecMulVec_apply, Pi.star_apply]
     rw [Finset.sum_comm]
     apply Finset.sum_congr rfl
     intro x _
@@ -48,54 +48,54 @@ private theorem pure_state_mul_state_mul_pure_state
     intro y _
     ac_rfl
   rw [← hc]
-  simp only [PureVector.state_matrix, rankOneMatrix]
+  simp only [Ket.state_matrix, rankOneMatrix]
   rw [Matrix.vecMulVec_mul, Matrix.vecMulVec_mul_vecMulVec, Matrix.vecMulVec_smul]
-  change c • vecMulVec phi.amp (fun i => star (phi.amp i)) =
-    c • vecMulVec phi.amp (fun i => star (phi.amp i))
+  change c • vecMulVec phi.vec (fun i => star (phi.vec i)) =
+    c • vecMulVec phi.vec (fun i => star (phi.vec i))
   rfl
 
-private theorem pure_state_sqrtMatrix (phi : PureVector a) :
-    phi.state.sqrtMatrix = phi.state.matrix := by
-  change psdSqrt phi.state.matrix = phi.state.matrix
+private theorem pure_state_sqrtMatrix (phi : Ket a) :
+    phi.state.sqrtMatrix = phi.state.m := by
+  change psdSqrt phi.state.m = phi.state.m
   calc
-    psdSqrt phi.state.matrix = psdSqrt (phi.state.matrix * phi.state.matrix) := by
+    psdSqrt phi.state.m = psdSqrt (phi.state.m * phi.state.m) := by
       rw [phi.state_matrix_mul_self]
-    _ = phi.state.matrix := by
+    _ = phi.state.m := by
       simpa [psdSqrt] using
-        (CFC.sqrt_unique (b := phi.state.matrix) rfl phi.state.pos.nonneg)
+        (CFC.sqrt_unique (b := phi.state.m) rfl phi.state.psd.nonneg)
 
 /-- Squared fidelity against an explicit pure target is its trace overlap. -/
-theorem State.squaredFidelity_pure_right_eq_trace
-    (rho : State a) (phi : PureVector a) :
+theorem _root_.MState.squaredFidelity_pure_right_eq_trace
+    (rho : MState a) (phi : Ket a) :
     rho.squaredFidelity phi.state =
-      ((rho.matrix * phi.state.matrix).trace).re := by
-  let P : CMatrix a := phi.state.matrix
+      ((rho.m * phi.state.m).trace).re := by
+  let P : CMatrix a := phi.state.m
   let M : CMatrix a := rho.sqrtMatrix * P
-  let t : ℝ := ((rho.matrix * P).trace).re
+  let t : ℝ := ((rho.m * P).trace).re
   have hMstar : Matrix.conjTranspose M = P * rho.sqrtMatrix := by
     simp [M, P, Matrix.conjTranspose_mul, rho.sqrtMatrix_isHermitian.eq]
-  have hgramC : Matrix.conjTranspose M * M = ((rho.matrix * P).trace) • P := by
+  have hgramC : Matrix.conjTranspose M * M = ((rho.m * P).trace) • P := by
     rw [hMstar]
-    change P * rho.sqrtMatrix * (rho.sqrtMatrix * P) = ((rho.matrix * P).trace) • P
+    change P * rho.sqrtMatrix * (rho.sqrtMatrix * P) = ((rho.m * P).trace) • P
     rw [show P * rho.sqrtMatrix * (rho.sqrtMatrix * P) =
       P * (rho.sqrtMatrix * rho.sqrtMatrix) * P by noncomm_ring,
       rho.sqrtMatrix_mul_self]
     simpa [P] using pure_state_mul_state_mul_pure_state rho phi
   have hgramPos : (Matrix.conjTranspose M * M).PosSemidef :=
     Matrix.posSemidef_conjTranspose_mul_self M
-  have hc : (rho.matrix * P).trace = (t : ℂ) := by
+  have hc : (rho.m * P).trace = (t : ℂ) := by
     apply Complex.ext
     · rfl
     · have him : (Matrix.conjTranspose M * M).trace.im = 0 :=
         (Matrix.PosSemidef.trace_nonneg hgramPos).2.symm
-      rw [hgramC, Matrix.trace_smul, phi.state.trace_eq_one] at him
+      rw [hgramC, Matrix.trace_smul, phi.state.tr'] at him
       simpa [t] using him
   have hgram : Matrix.conjTranspose M * M = (t : ℂ) • P := by
     rw [hgramC, hc]
-  have ht0 : 0 <= t := by
+  have ht0 : 0 ≤ t := by
     have htrace := (Matrix.PosSemidef.trace_nonneg hgramPos).1
-    change 0 <= (Matrix.conjTranspose M * M).trace.re at htrace
-    rw [hgram, Matrix.trace_smul, phi.state.trace_eq_one] at htrace
+    change 0 ≤ (Matrix.conjTranspose M * M).trace.re at htrace
+    rw [hgram, Matrix.trace_smul, phi.state.tr'] at htrace
     simpa [t] using htrace
   have hsqrt : psdSqrt (Matrix.conjTranspose M * M) = (Real.sqrt t : ℂ) • P := by
     rw [hgram]
@@ -111,36 +111,36 @@ theorem State.squaredFidelity_pure_right_eq_trace
       change (Real.sqrt t : ℂ) * ((Real.sqrt t : ℂ) * P i j) = (t : ℂ) * P i j
       rw [← mul_assoc, hcoeff]
     · apply Matrix.nonneg_iff_posSemidef.mpr
-      simpa [P] using phi.state.pos.smul (Real.sqrt_nonneg t)
-  rw [State.squaredFidelity_eq_traceNorm_sqrtMatrix_mul_sqrtMatrix_sq,
+      simpa [P] using phi.state.psd.smul (Real.sqrt_nonneg t)
+  rw [MState.squaredFidelity_eq_traceNorm_sqrtMatrix_mul_sqrtMatrix_sq,
     pure_state_sqrtMatrix phi]
   change traceNorm M ^ 2 = t
-  rw [traceNorm, hsqrt, Matrix.trace_smul, phi.state.trace_eq_one]
+  rw [traceNorm, hsqrt, Matrix.trace_smul, phi.state.tr']
   simp [Real.sq_sqrt ht0]
 
 /-- Squared fidelity against an explicit pure target is affine over a finite
 weighted pure-state decomposition stated at the matrix level. -/
-theorem State.squaredFidelity_sum_smul_pure_right
-    {i : Type v} [Fintype i] (q : i -> NNReal) (phi : i -> PureVector a)
-    (rho : State a)
-    (hsum : (Finset.univ.sum fun j => (q j : ℂ) • (phi j).state.matrix) = rho.matrix)
-    (target : PureVector a) :
+theorem _root_.MState.squaredFidelity_sum_smul_pure_right
+    {i : Type v} [Fintype i] (q : i → NNReal) (phi : i → Ket a)
+    (rho : MState a)
+    (hsum : (Finset.univ.sum fun j => (q j : ℂ) • (phi j).state.m) = rho.m)
+    (target : Ket a) :
     Finset.univ.sum (fun j => (q j : ℝ) *
       (phi j).state.squaredFidelity target.state) = rho.squaredFidelity target.state := by
-  rw [State.squaredFidelity_pure_right_eq_trace rho target]
+  rw [MState.squaredFidelity_pure_right_eq_trace rho target]
   calc
     Finset.univ.sum (fun j => (q j : ℝ) *
         (phi j).state.squaredFidelity target.state) =
         Finset.univ.sum (fun j =>
-          (((q j : ℂ) * ((phi j).state.matrix * target.state.matrix).trace).re)) := by
+          (((q j : ℂ) * ((phi j).state.m * target.state.m).trace).re)) := by
           apply Finset.sum_congr rfl
           intro j _
-          rw [State.squaredFidelity_pure_right_eq_trace]
+          rw [MState.squaredFidelity_pure_right_eq_trace]
           simp [Complex.mul_re]
     _ = ((Finset.univ.sum fun j =>
-        ((q j : ℂ) • (phi j).state.matrix)) * target.state.matrix).trace.re := by
+        ((q j : ℂ) • (phi j).state.m)) * target.state.m).trace.re := by
           simp [Finset.sum_mul, Matrix.trace_sum, Matrix.trace_smul, Complex.mul_re]
-    _ = ((rho.matrix * target.state.matrix).trace).re := by rw [hsum]
+    _ = ((rho.m * target.state.m).trace).re := by rw [hsum]
 
 end
 

@@ -18,50 +18,60 @@ public import QuantumLib.QIT.States.Schatten
 public import QuantumLib.QIT.States.Subnormalized
 public import QuantumLib.QIT.States.TraceNorm.PositivePart
 public import QuantumLib.QIT.Util.SDP.HermitianPSDTraceDuality
+public import QuantumLib.QIT.Util.MatrixInstances
 public import Mathlib.Analysis.InnerProductSpace.Adjoint
 public import Mathlib.Analysis.InnerProductSpace.PiL2
 public import Mathlib.Analysis.InnerProductSpace.Projection.Submodule
 
+/-!
+# The `n | k` tensor-power split, Renner's m-IID condition, and finite mixtures
+
+Groundwork for the de Finetti development, in three layers.
+
+`tensorPowerTakeDropEquiv a n k` splits `TensorPower a (n + k)` into its first `n` and its last `k`
+factors.  The lemmas around it record how the split interacts with the permutation action, with the
+symmetric subspace — a globally symmetric vector stays symmetric in the right block once the left
+block is fixed — and with tensor powers of a unitary, which factor as a Kronecker product across
+the split.  `MState.traceOutLastK` discards the right block.
+
+`Ket.IsRennerMIIDIn ψ ν` is Renner's condition that, after some permutation of the factors, `ψ` is
+`ν^⊗m` on `m` of the `m + r` factors and arbitrary on the remaining `r`.  The kets satisfying it
+span `RennerMIIDSubspace`, whose orthogonal projector is Renner's `P_id^{m,r}`
+(`rennerMIIDProjectorId`); conjugating by `U^⊗(m+r)` gives the rotated `P_U^{m,r}`
+(`rennerMIIDProjector`), and `MState.SupportedOnRennerMIIDSubspace` is domination by the projector.
+
+Finally the finite mixtures the approximation is measured against.  `FiniteIidMixture` is a
+probability vector over single-system states emitting `∑ᵢ pᵢ ρᵢ^⊗n`, which is permutation
+invariant and fixed by permutation twirling; `FinitePureStateMixture` is the same over kets; and
+`FiniteRennerMIIDMixture` is a mixture of pure components, each `m`-IID in its own prototype.
+These are the finite stand-ins for the source's integrals over one-dimensional projectors.  No
+approximation is asserted here: the theorems comparing a permutation-invariant state to such a
+mixture are in `DeFinetti.Domination` and `DeFinetti.Postselection`.
+-/
+
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator NNReal
+open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator NNReal QIT.MatrixL2
 open MeasureTheory
 
-namespace QIT
-
-universe u v w x
-
 noncomputable section
-
+universe u v w x
 variable {ι : Type u} {a : Type v}
 variable [Fintype ι] [Fintype a] [DecidableEq a]
 
-local instance deFinettiCMatrixContinuousENorm {α : Type v} [Fintype α] [DecidableEq α] :
-    ContinuousENorm (CMatrix α) :=
-  SeminormedAddGroup.toContinuousENorm
+open QIT
 
-namespace TensorPower
+namespace QIT
 
-omit [Fintype a] [DecidableEq a] in
-/-- A nonempty base alphabet gives a nonempty tensor-power basis at every
-block length. -/
-protected theorem nonempty [Nonempty a] :
-    (n : ℕ) → Nonempty (TensorPower a n)
-  | 0 => ⟨⟨⟩⟩
-  | n + 1 =>
-      let hn := TensorPower.nonempty n
-      ⟨(Classical.choice ‹Nonempty a›, Classical.choice hn)⟩
-
-end TensorPower
-
+/-- A nonempty base alphabet gives a nonempty tensor-power basis at every block length. -/
 instance tensorPowerNonempty [Nonempty a] (n : ℕ) : Nonempty (TensorPower a n) :=
-  TensorPower.nonempty (a := a) n
+  tensorPower_nonempty_of_nonempty (α := a) n
 
 namespace TensorPowerProfile
 
 /-- A nonempty base alphabet gives at least one realized tensor-power profile. -/
 protected theorem nonempty [Nonempty a] (n : ℕ) : Nonempty (TensorPowerProfile a n) := by
-  let x : TensorPower a n := Classical.choice (TensorPower.nonempty n)
+  let x : TensorPower a n := Classical.choice (tensorPower_nonempty_of_nonempty (α := a) n)
   exact ⟨⟨tensorPowerTypeProfile (a := a) n x,
     tensorPowerTypeProfile_mem_profiles (a := a) n x⟩⟩
 
@@ -81,7 +91,7 @@ end TensorPowerProfile
 `QIT.TensorPower.takeDropEquiv` API. -/
 def tensorPowerTakeDropEquiv (a : Type v) [Fintype a] [DecidableEq a]
     (n k : ℕ) :
-    TensorPower a (n + k) ≃ Prod (TensorPower a n) (TensorPower a k) :=
+    TensorPower a (n + k) ≃ (TensorPower a n × TensorPower a k) :=
   TensorPower.takeDropEquiv a n k
 
 /-- Embed a permutation of the last `k` tensor positions into a permutation of
@@ -176,7 +186,7 @@ theorem rightBlock_mem_symmetric_of_global_mem_symmetric (n k : ℕ)
 
 private theorem kronecker_one_mulVec_apply {α β : Type*}
     [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
-    (P : CMatrix β) (φ : Prod α β → ℂ) (x : Prod α β) :
+    (P : CMatrix β) (φ : α × β → ℂ) (x : α × β) :
     (Matrix.kronecker (1 : CMatrix α) P).mulVec φ x =
       P.mulVec (fun y : β => φ (x.1, y)) x.2 := by
   simp only [Matrix.mulVec, dotProduct, Matrix.kronecker, Matrix.kroneckerMap_apply]
@@ -191,9 +201,9 @@ theorem kronecker_one_symmetricProjection_mulVec_split_of_global_mem_symmetric
     (hf : f ∈ symmetricSubspace (a := a) (n + k)) :
     (Matrix.kronecker (1 : CMatrix (TensorPower a n))
         (symmetricProjectionMatrix (a := a) k)).mulVec
-      (fun x : Prod (TensorPower a n) (TensorPower a k) =>
+      (fun x : TensorPower a n × TensorPower a k =>
         f ((tensorPowerTakeDropEquiv a n k).symm x)) =
-      (fun x : Prod (TensorPower a n) (TensorPower a k) =>
+      (fun x : TensorPower a n × TensorPower a k =>
         f ((tensorPowerTakeDropEquiv a n k).symm x)) := by
   ext x
   have hright :=
@@ -247,24 +257,6 @@ theorem tensorPowerTakeDropEquiv_zero_fst (m : ℕ)
   rw [tensorPowerTakeDropEquiv_fst_apply]
   simp
 
-private theorem fin_prod_univ_add {M : Type _} [CommMonoid M] (n k : ℕ)
-    (f : Fin (n + k) → M) :
-    (∏ i : Fin (n + k), f i) =
-      (∏ i : Fin n, f (Fin.castAdd k i)) *
-        (∏ j : Fin k, f (Fin.natAdd n j)) := by
-  calc
-    (∏ i : Fin (n + k), f i) =
-        ∏ s : Sum (Fin n) (Fin k), f (finSumFinEquiv s) := by
-          refine (Finset.prod_equiv finSumFinEquiv ?_ ?_).symm
-          · intro s
-            simp
-          · intro s hs
-            rfl
-    _ = (∏ i : Fin n, f (Fin.castAdd k i)) *
-          (∏ j : Fin k, f (Fin.natAdd n j)) := by
-          simp [Fintype.prod_sum_type, finSumFinEquiv_apply_left,
-            finSumFinEquiv_apply_right]
-
 /-- Under the source `n|k` split, a tensor-power unitary factors as the
 Kronecker product of its retained and traced-block tensor powers. -/
 theorem unitaryTensorPowerMatrix_takeDrop_submatrix
@@ -280,7 +272,7 @@ theorem unitaryTensorPowerMatrix_takeDrop_submatrix
   rw [unitaryTensorPowerMatrix_apply_eq_fin_prod,
     unitaryTensorPowerMatrix_apply_eq_fin_prod,
     unitaryTensorPowerMatrix_apply_eq_fin_prod]
-  rw [fin_prod_univ_add]
+  rw [Fin.prod_univ_add]
   have hx_left : ∀ i : Fin n,
       tensorPowerEquiv (n + k) ((tensorPowerTakeDropEquiv a n k).symm x)
           (Fin.castAdd k i) =
@@ -321,7 +313,9 @@ theorem unitaryTensorPowerMatrix_takeDrop_submatrix
     intro j hj
     rw [hx_right j, hy_right j]
 
-namespace PureVector
+end QIT
+
+namespace Ket
 
 variable {b : Type w} [Fintype b] [DecidableEq b]
 
@@ -329,74 +323,56 @@ variable {b : Type w} [Fintype b] [DecidableEq b]
 `m+r` tensor-power form. It says that after some permutation, the rank-one
 state of `ψ` is a product of `ν^⊗m` and an arbitrary residual pure state.
 This is the finite Lean form of the definition preceding
-Theorem `thm:main` [Renner2007Symmetry, sub.tex:608-611]. -/
-def IsRennerMIIDIn {m r : ℕ} (ψ : PureVector (TensorPower a (m + r)))
-    (ν : PureVector a) : Prop :=
-  ∃ σ : Equiv.Perm (Fin (m + r)), ∃ η : PureVector (TensorPower a r),
+Theorem `thm:main` [Renner2007SymmetryIndependence, sub.tex:608-611]. -/
+def IsRennerMIIDIn {m r : ℕ} (ψ : Ket (TensorPower a (m + r)))
+    (ν : Ket a) : Prop :=
+  ∃ σ : Equiv.Perm (Fin (m + r)), ∃ η : Ket (TensorPower a r),
     ψ.state =
       (((ν.tensorPower m).prod η).reindex
         (tensorPowerTakeDropEquiv a m r).symm).state.reindex
           (permEquiv (a := a) (m + r) σ).symm
 
 /-- The pure IID tensor power is Renner `m`-IID with zero residual part. -/
-theorem tensorPower_isRennerMIIDIn_zero (ν : PureVector a) (m : ℕ) :
+theorem tensorPower_isRennerMIIDIn_zero (ν : Ket a) (m : ℕ) :
     (ν.tensorPower m).IsRennerMIIDIn (a := a) (m := m) (r := 0) ν := by
   refine ⟨1, ν.tensorPower 0, ?_⟩
-  apply State.ext
+  apply MState.ext
   ext x y
-  simp [State.reindex_matrix, PureVector.state_matrix, rankOneMatrix_apply, PureVector.prod_amp]
+  simp [MState.reindex_matrix, Ket.state_matrix, rankOneMatrix_apply, Ket.prod_vec]
   have hx : x = ((tensorPowerTakeDropEquiv a m 0) x).1 :=
     (tensorPowerTakeDropEquiv_zero_fst (a := a) m x).symm
   have hy : y = ((tensorPowerTakeDropEquiv a m 0) y).1 :=
     (tensorPowerTakeDropEquiv_zero_fst (a := a) m y).symm
   conv_lhs => rw [hx, hy]
 
-end PureVector
+end Ket
 
-namespace State
-
-/-- Reindexing by an equivalence inverse and then by the equivalence returns
-the original state. -/
-theorem reindex_symm_reindex {α : Type u} {β : Type w}
-    [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
-    (ρ : State β) (e : α ≃ β) :
-    (ρ.reindex e.symm).reindex e = ρ := by
-  apply State.ext
-  ext i j
-  simp [State.reindex]
-
-/-- Product-state marginal on the left subsystem. -/
-theorem marginalA_prod {α : Type u} {β : Type w}
-    [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
-    (ρ : State α) (σ : State β) :
-    (ρ.prod σ).marginalA = ρ := by
-  apply State.ext
-  exact State.partialTraceB_prod ρ σ
+namespace MState
 
 /-- IID tensor powers factor across the `n|k` tensor-power split. -/
-theorem tensorPower_reindex_takeDrop (ρ : State a) (n k : ℕ) :
+theorem tensorPower_reindex_takeDrop (ρ : MState a) (n k : ℕ) :
     (ρ.tensorPower (n + k)).reindex (tensorPowerTakeDropEquiv a n k) =
       (ρ.tensorPower n).prod (ρ.tensorPower k) := by
-  apply State.ext
+  apply MState.ext
   ext x y
-  simp only [State.reindex_matrix, Matrix.submatrix_apply]
-  rw [State.tensorPower_matrix_apply, State.prod]
+  simp only [MState.reindex_matrix, Matrix.submatrix_apply]
+  rw [MState.tensorPower_matrix_apply, MState.prod_m]
   change
     (∏ i : Fin (n + k),
-        ρ.matrix
+        ρ.m
           (tensorPowerEquiv (n + k) ((tensorPowerTakeDropEquiv a n k).symm x) i)
           (tensorPowerEquiv (n + k) ((tensorPowerTakeDropEquiv a n k).symm y) i)) =
-      (ρ.tensorPower n).matrix x.1 y.1 * (ρ.tensorPower k).matrix x.2 y.2
-  rw [fin_prod_univ_add n k]
-  rw [State.tensorPower_matrix_apply ρ n, State.tensorPower_matrix_apply ρ k]
+      (ρ.tensorPower n).m x.1 y.1 * (ρ.tensorPower k).m x.2 y.2
+  rw [Fin.prod_univ_add (a := n) (b := k)]
+  rw [MState.tensorPower_matrix_apply ρ n, MState.tensorPower_matrix_apply ρ k]
   have hleft :
       (∏ i : Fin n,
-          ρ.matrix
+          ρ.m
             (tensorPowerEquiv (n + k) ((tensorPowerTakeDropEquiv a n k).symm x)
               (Fin.castAdd k i))
             (tensorPowerEquiv (n + k) ((tensorPowerTakeDropEquiv a n k).symm y)
               (Fin.castAdd k i))) =
-        ∏ i : Fin n, ρ.matrix (tensorPowerEquiv n x.1 i) (tensorPowerEquiv n y.1 i) := by
+        ∏ i : Fin n, ρ.m (tensorPowerEquiv n x.1 i) (tensorPowerEquiv n y.1 i) := by
     apply Finset.prod_congr rfl
     intro i hi
     have hx := tensorPowerTakeDropEquiv_fst_apply (a := a) n k
@@ -407,12 +383,12 @@ theorem tensorPower_reindex_takeDrop (ρ : State a) (n k : ℕ) :
     rw [← hx, ← hy]
   have hright :
       (∏ j : Fin k,
-          ρ.matrix
+          ρ.m
             (tensorPowerEquiv (n + k) ((tensorPowerTakeDropEquiv a n k).symm x)
               (Fin.natAdd n j))
             (tensorPowerEquiv (n + k) ((tensorPowerTakeDropEquiv a n k).symm y)
               (Fin.natAdd n j))) =
-        ∏ j : Fin k, ρ.matrix (tensorPowerEquiv k x.2 j) (tensorPowerEquiv k y.2 j) := by
+        ∏ j : Fin k, ρ.m (tensorPowerEquiv k x.2 j) (tensorPowerEquiv k y.2 j) := by
     apply Finset.prod_congr rfl
     intro j hj
     have hx := tensorPowerTakeDropEquiv_snd_apply (a := a) n k
@@ -425,95 +401,98 @@ theorem tensorPower_reindex_takeDrop (ρ : State a) (n k : ℕ) :
 
 /-- Trace out the last `k` tensor factors of a state on `a^(n+k)`, using the
 project tensor-power convention. -/
-def traceOutLastK {n k : ℕ} (ρ : State (TensorPower a (n + k))) :
-    State (TensorPower a n) :=
-  (ρ.reindex (tensorPowerTakeDropEquiv a n k)).marginalA
+def traceOutLastK {n k : ℕ} (ρ : MState (TensorPower a (n + k))) :
+    MState (TensorPower a n) :=
+  (ρ.reindex (tensorPowerTakeDropEquiv a n k)).traceRight
 
 @[simp]
-theorem traceOutLastK_matrix {n k : ℕ} (ρ : State (TensorPower a (n + k))) :
-    (ρ.traceOutLastK (a := a) (n := n) (k := k)).matrix =
-      partialTraceB (a := TensorPower a n) (b := TensorPower a k)
-        ((ρ.reindex (tensorPowerTakeDropEquiv a n k)).matrix) := rfl
+theorem traceOutLastK_matrix {n k : ℕ} (ρ : MState (TensorPower a (n + k))) :
+    (ρ.traceOutLastK (a := a) (n := n) (k := k)).m =
+      Matrix.traceRight
+        ((ρ.reindex (tensorPowerTakeDropEquiv a n k)).m) :=
+  MState.traceRight_m _
 
 /-- Tracing out the last `k` factors of a product state written across the
 `n|k` split returns the retained state. -/
 theorem traceOutLastK_reindex_split_prod {n k : ℕ}
-    (ρ : State (TensorPower a n)) (σ : State (TensorPower a k)) :
+    (ρ : MState (TensorPower a n)) (σ : MState (TensorPower a k)) :
     traceOutLastK (a := a) (n := n) (k := k)
         ((ρ.prod σ).reindex (tensorPowerTakeDropEquiv a n k).symm) = ρ := by
-  simp [traceOutLastK, State.reindex_symm_reindex, State.marginalA_prod]
+  simp [traceOutLastK, MState.reindex_symm_reindex, MState.traceRight_prod_eq]
 
 /-- Tracing out the final `k` systems of an IID tensor power leaves the retained
 `n`-fold IID tensor power. -/
-theorem traceOutLastK_tensorPower (ρ : State a) (n k : ℕ) :
+theorem traceOutLastK_tensorPower (ρ : MState a) (n k : ℕ) :
     traceOutLastK (a := a) (n := n) (k := k) (ρ.tensorPower (n + k)) =
       ρ.tensorPower n := by
-  simp [traceOutLastK, State.tensorPower_reindex_takeDrop, State.marginalA_prod]
+  simp [traceOutLastK, MState.tensorPower_reindex_takeDrop, MState.traceRight_prod_eq]
 
 /-- Tracing out the residual factor of a split product pure state preserves the
 rank-one retained component. -/
 theorem traceOutLastK_pure_prod {n k : ℕ}
-    (ψ : PureVector (TensorPower a n)) (η : PureVector (TensorPower a k)) :
+    (ψ : Ket (TensorPower a n)) (η : Ket (TensorPower a k)) :
     traceOutLastK (a := a) (n := n) (k := k)
         (((ψ.prod η).state).reindex (tensorPowerTakeDropEquiv a n k).symm) =
       ψ.state := by
-  rw [PureVector.prod_state, traceOutLastK_reindex_split_prod]
+  rw [Ket.prod_state, traceOutLastK_reindex_split_prod]
 
-/-- A rank-one state whose pure vector is Renner `m`-IID in the prototype `ν`. -/
-def IsRankOneRennerMIIDIn {m r : ℕ} (ρ : State (TensorPower a (m + r)))
-    (ν : PureVector a) : Prop :=
-  ∃ ψ : PureVector (TensorPower a (m + r)),
+/-- A rank-one state whose ket is Renner `m`-IID in the prototype `ν`. -/
+def IsRankOneRennerMIIDIn {m r : ℕ} (ρ : MState (TensorPower a (m + r)))
+    (ν : Ket a) : Prop :=
+  ∃ ψ : Ket (TensorPower a (m + r)),
     ψ.IsRennerMIIDIn (a := a) (m := m) (r := r) ν ∧ ρ = ψ.state
 
-end State
+end MState
 
-/-- The subspace spanned by Renner `m`-IID pure vectors with prototype `ν`.
+namespace QIT
+
+/-- The subspace spanned by Renner `m`-IID kets with prototype `ν`.
 
 This is the finite-dimensional support space behind Renner's projector
-`P_id^{n,r}` [Renner2007Symmetry, sub.tex:833-852]. -/
+`P_id^{n,r}` [Renner2007SymmetryIndependence, sub.tex:833-852]. -/
 def RennerMIIDSubspace (a : Type v) [Fintype a] [DecidableEq a]
-    (m r : ℕ) (ν : PureVector a) :
+    (m r : ℕ) (ν : Ket a) :
     Submodule ℂ (EuclideanSpace ℂ (TensorPower a (m + r))) :=
   Submodule.span ℂ
     {v : EuclideanSpace ℂ (TensorPower a (m + r)) |
-      ∃ ψ : PureVector (TensorPower a (m + r)),
+      ∃ ψ : Ket (TensorPower a (m + r)),
         ψ.IsRennerMIIDIn (a := a) (m := m) (r := r) ν ∧
-          v = WithLp.toLp 2 ψ.amp}
+          v = WithLp.toLp 2 ψ.vec}
 
 @[simp]
-theorem pureVector_mem_RennerMIIDSubspace {m r : ℕ} {ν : PureVector a}
-    {ψ : PureVector (TensorPower a (m + r))}
+theorem ket_mem_RennerMIIDSubspace {m r : ℕ} {ν : Ket a}
+    {ψ : Ket (TensorPower a (m + r))}
     (hψ : ψ.IsRennerMIIDIn (a := a) (m := m) (r := r) ν) :
-    WithLp.toLp 2 ψ.amp ∈ RennerMIIDSubspace a m r ν := by
+    WithLp.toLp 2 ψ.vec ∈ RennerMIIDSubspace a m r ν := by
   exact Submodule.subset_span ⟨ψ, hψ, rfl⟩
 
 /-- Orthogonal projector onto the Renner m-IID support subspace, represented
 as a matrix in the tensor-power computational basis. -/
-def rennerMIIDProjectorFor (m r : ℕ) (ν : PureVector a) :
+def rennerMIIDProjectorFor (m r : ℕ) (ν : Ket a) :
     CMatrix (TensorPower a (m + r)) :=
   Matrix.toEuclideanLin.symm
     ((RennerMIIDSubspace a m r ν).starProjection.toLinearMap)
 
 @[simp]
-theorem rennerMIIDProjectorFor_toEuclideanLin (m r : ℕ) (ν : PureVector a) :
+theorem rennerMIIDProjectorFor_toEuclideanLin (m r : ℕ) (ν : Ket a) :
     (rennerMIIDProjectorFor (a := a) m r ν).toEuclideanLin =
       (RennerMIIDSubspace a m r ν).starProjection.toLinearMap := by
   simp [rennerMIIDProjectorFor]
 
 /-- Source-facing notation for Renner's fixed/base projector `P_id^{m,r}`. -/
-def rennerMIIDProjectorId (m r : ℕ) (ν : PureVector a) :
+def rennerMIIDProjectorId (m r : ℕ) (ν : Ket a) :
     CMatrix (TensorPower a (m + r)) :=
   rennerMIIDProjectorFor (a := a) m r ν
 
 /-- Source-facing notation for Renner's rotated projector
 `P_U^{m,r} = U^⊗(m+r) P_id^{m,r} (U†)^⊗(m+r)`. -/
-def rennerMIIDProjector (m r : ℕ) (ν : PureVector a)
+def rennerMIIDProjector (m r : ℕ) (ν : Ket a)
     (U : Matrix.unitaryGroup a ℂ) : CMatrix (TensorPower a (m + r)) :=
   (unitaryTensorPowerMatrix U (m + r) : CMatrix (TensorPower a (m + r))) *
     rennerMIIDProjectorId (a := a) m r ν *
       star (unitaryTensorPowerMatrix U (m + r) : CMatrix (TensorPower a (m + r)))
 
-theorem rennerMIIDProjector_covariant (m r : ℕ) (ν : PureVector a)
+theorem rennerMIIDProjector_covariant (m r : ℕ) (ν : Ket a)
     (U : Matrix.unitaryGroup a ℂ) :
     rennerMIIDProjector (a := a) m r ν U =
       (unitaryTensorPowerMatrix U (m + r) : CMatrix (TensorPower a (m + r))) *
@@ -523,9 +502,9 @@ theorem rennerMIIDProjector_covariant (m r : ℕ) (ν : PureVector a)
 
 /-- A state is supported in the Renner m-IID span when its matrix is dominated
 by the corresponding orthogonal projector. -/
-def State.SupportedOnRennerMIIDSubspace {m r : ℕ}
-    (ρ : State (TensorPower a (m + r))) (ν : PureVector a) : Prop :=
-  ρ.matrix ≤ rennerMIIDProjectorFor (a := a) m r ν
+def _root_.MState.SupportedOnRennerMIIDSubspace {m r : ℕ}
+    (ρ : MState (TensorPower a (m + r))) (ν : Ket a) : Prop :=
+  ρ.m ≤ rennerMIIDProjectorFor (a := a) m r ν
 
 /-- A finite source-shaped mixture of IID tensor-power states.
 
@@ -540,20 +519,18 @@ structure FiniteIidMixture (ι : Type u) (a : Type v) [Fintype ι]
   /-- The weights form a probability distribution. -/
   weights_sum : (∑ i, probs i) = 1
   /-- The single-system state attached to each mixture index. -/
-  states : ι → State a
+  states : ι → MState a
 
 namespace FiniteIidMixture
 
 variable {n : ℕ} (M : FiniteIidMixture ι a n)
 
 /-- The ensemble of tensor-power states induced by a finite IID mixture. -/
-def tensorPowerEnsemble : Ensemble ι (TensorPower a n) where
-  probs := M.probs
-  weights_sum := M.weights_sum
-  states := fun i => (M.states i).tensorPower n
+def tensorPowerEnsemble : MEnsemble (TensorPower a n) ι :=
+  .ofProbs M.probs M.weights_sum (fun i => (M.states i).tensorPower n)
 
 /-- The finite mixture state `∑ᵢ pᵢ ρᵢ^⊗n`. -/
-def state : State (TensorPower a n) :=
+def state : MState (TensorPower a n) :=
   M.tensorPowerEnsemble.averageState
 
 /-- The finite IID mixture state is the average state of its tensor-power
@@ -572,23 +549,23 @@ theorem tensorPowerEnsemble_states (i : ι) :
 /-- Matrix form of the finite IID mixture state. -/
 @[simp]
 theorem state_matrix :
-    M.state.matrix =
-      ∑ i, (M.probs i) • ((M.states i).tensorPower n).matrix := by
-  rfl
+    M.state.m =
+      ∑ i, (M.probs i) • ((M.states i).tensorPower n).m :=
+  MEnsemble.averageState_matrix _
 
 /-- A finite IID mixture is fixed by every tensor-factor permutation channel. -/
 theorem permutationChannel_apply_state (σ : Equiv.Perm (Fin n)) :
-    (permutationChannel (a := a) n σ).applyState M.state = M.state := by
-  apply State.ext
-  change (permutationChannel (a := a) n σ).map M.state.matrix = M.state.matrix
-  rw [M.state_matrix, map_sum]
+    (permutationChannel (a := a) n σ) M.state = M.state := by
+  apply MState.ext
+  rw [CPTPOp.mat_coe_eq_apply_mat, M.state_matrix, map_sum]
   refine Finset.sum_congr rfl fun i _ => ?_
   change (permutationChannel (a := a) n σ).map
-      ((M.probs i : ℂ) • ((M.states i).tensorPower n).matrix) =
-    (M.probs i : ℂ) • ((M.states i).tensorPower n).matrix
+      ((M.probs i : ℂ) • ((M.states i).tensorPower n).m) =
+    (M.probs i : ℂ) • ((M.states i).tensorPower n).m
   rw [map_smul]
-  have hi := congrArg State.matrix
-    (State.permutationChannel_apply_tensorPower (a := a) (M.states i) n σ)
+  have hi := congrArg DensityOp.m
+    (MState.permutationChannel_apply_tensorPower (a := a) (M.states i) n σ)
+  rw [CPTPOp.mat_coe_eq_apply_mat] at hi
   exact congrArg ((M.probs i : ℂ) • ·) hi
 
 /-- A finite IID mixture state is permutation invariant. -/
@@ -600,20 +577,20 @@ theorem state_isPermutationInvariant :
 /-- Twirling a finite IID mixture state leaves it unchanged. -/
 theorem permutationTwirling_state :
     M.state.permutationTwirling (a := a) = M.state :=
-  State.permutationTwirling_apply_of_isPermutationInvariant
+  MState.permutationTwirling_apply_of_isPermutationInvariant
     (a := a) M.state_isPermutationInvariant
 
 /-- The one-point IID mixture attached to a single state. -/
-def onePoint (ρ : State a) (n : ℕ) : FiniteIidMixture PUnit a n where
+def onePoint (ρ : MState a) (n : ℕ) : FiniteIidMixture PUnit a n where
   probs := fun _ => 1
   weights_sum := by simp
   states := fun _ => ρ
 
 /-- A one-point IID mixture is exactly the corresponding tensor-power state. -/
-theorem onePoint_state (ρ : State a) (n : ℕ) :
+theorem onePoint_state (ρ : MState a) (n : ℕ) :
     (onePoint (a := a) ρ n).state = ρ.tensorPower n := by
   rw [state]
-  exact Ensemble.averageState_of_constant
+  exact MEnsemble.averageState_of_constant
     ((onePoint (a := a) ρ n).tensorPowerEnsemble) (ρ.tensorPower n)
     (fun i => by cases i; rfl)
 
@@ -623,35 +600,33 @@ end FiniteIidMixture
 
 This is the finite Lean substitute layer for the source integral over
 rank-one projectors in Renner's de Finetti theorem
-[Renner2007Symmetry, sub.tex:618-633]. -/
+[Renner2007SymmetryIndependence, sub.tex:618-633]. -/
 structure FinitePureStateMixture (ι : Type u) (a : Type v) [Fintype ι]
     [Fintype a] [DecidableEq a] where
   /-- Nonnegative weights over the finite mixture index. -/
   probs : ι → ℝ≥0
   /-- The weights form a probability distribution. -/
   weights_sum : (∑ i, probs i) = 1
-  /-- The pure vector attached to each mixture index. -/
-  vectors : ι → PureVector a
+  /-- The ket attached to each mixture index. -/
+  vectors : ι → Ket a
 
 namespace FinitePureStateMixture
 
 variable (M : FinitePureStateMixture ι a)
 
 /-- The state ensemble induced by a finite pure-state mixture. -/
-def toEnsemble : Ensemble ι a where
-  probs := M.probs
-  weights_sum := M.weights_sum
-  states := fun i => (M.vectors i).state
+def toEnsemble : MEnsemble a ι :=
+  .ofProbs M.probs M.weights_sum (fun i => (M.vectors i).state)
 
 /-- The barycentric state `∑ᵢ pᵢ |ψᵢ⟩⟨ψᵢ|`. -/
-def state : State a :=
+def state : MState a :=
   M.toEnsemble.averageState
 
 /-- Matrix form of the finite pure-state barycenter. -/
 @[simp]
 theorem state_matrix :
-    M.state.matrix = ∑ i, (M.probs i) • (M.vectors i).state.matrix := by
-  rfl
+    M.state.m = ∑ i, (M.probs i) • (M.vectors i).state.m :=
+  MEnsemble.averageState_matrix _
 
 /-- View a finite pure-state mixture as a finite IID mixture after taking
 one-system pure states as density states. -/
@@ -661,7 +636,7 @@ def toFiniteIidMixture (n : ℕ) : FiniteIidMixture ι a n where
   states := fun i => (M.vectors i).state
 
 /-- The tensor-power barycenter generated by this pure-state mixture. -/
-def tensorPowerState (n : ℕ) : State (TensorPower a n) :=
+def tensorPowerState (n : ℕ) : MState (TensorPower a n) :=
   (M.toFiniteIidMixture n).state
 
 /-- Tensor-power pure mixtures are exactly the existing `FiniteIidMixture`
@@ -672,9 +647,9 @@ theorem tensorPower_state_eq_finiteIidMixture_state (n : ℕ) :
 /-- Matrix form of the tensor-power barycenter. -/
 @[simp]
 theorem tensorPowerState_matrix (n : ℕ) :
-    (M.tensorPowerState n).matrix =
-      ∑ i, (M.probs i) • ((M.vectors i).state.tensorPower n).matrix := by
-  rfl
+    (M.tensorPowerState n).m =
+      ∑ i, (M.probs i) • ((M.vectors i).state.tensorPower n).m :=
+  MEnsemble.averageState_matrix _
 
 end FinitePureStateMixture
 
@@ -692,9 +667,9 @@ structure FiniteRennerMIIDMixture (ι : Type u) (a : Type v) [Fintype ι]
   /-- The weights form a probability distribution. -/
   weights_sum : (∑ i, probs i) = 1
   /-- Pure components on `a^(m+r)`. -/
-  vectors : ι → PureVector (TensorPower a (m + r))
-  /-- The single-system pure vector `ν` witnessing the component's `m`-IID part. -/
-  bases : ι → PureVector a
+  vectors : ι → Ket (TensorPower a (m + r))
+  /-- The single-system ket `ν` witnessing the component's `m`-IID part. -/
+  bases : ι → Ket a
   /-- Each component is Renner `m`-IID in its corresponding rank-one projector. -/
   renner_miid : ∀ i, (vectors i).IsRennerMIIDIn (a := a) (m := m) (r := r) (bases i)
 
@@ -711,14 +686,14 @@ def toFinitePureStateMixture :
   vectors := M.vectors
 
 /-- The finite barycenter of Renner `m`-IID pure components. -/
-def state : State (TensorPower a (m + r)) :=
+def state : MState (TensorPower a (m + r)) :=
   M.toFinitePureStateMixture.state
 
 /-- Matrix form of the finite Renner `m`-IID barycenter. -/
 @[simp]
 theorem state_matrix :
-    M.state.matrix = ∑ i, (M.probs i) • (M.vectors i).state.matrix := by
-  rfl
+    M.state.m = ∑ i, (M.probs i) • (M.vectors i).state.m :=
+  MEnsemble.averageState_matrix _
 
 /-- Each component state satisfies the rank-one Renner `m`-IID wrapper from
 the nested partial-trace API. -/
@@ -728,7 +703,5 @@ theorem component_isRankOneRennerMIIDIn (i : ι) :
   exact ⟨M.vectors i, M.renner_miid i, rfl⟩
 
 end FiniteRennerMIIDMixture
-
-end
 
 end QIT

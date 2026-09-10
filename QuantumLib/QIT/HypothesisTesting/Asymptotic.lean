@@ -34,19 +34,19 @@ namespace BinaryHypothesisTest
 variable {a : Type u} [Fintype a] [DecidableEq a]
 /-- Genuine product Nussbaum--Szkola classical model over the `n`-fold product
 alphabet `(a × a)^n`. -/
-def nussbaumSzkolaProductModel (rho sigma : State a) (n : Nat) :
+def nussbaumSzkolaProductModel (rho sigma : MState a) (n : ℕ) :
     ClassicalBinaryModel (TensorPower (a × a) n) :=
   (nussbaumSzkolaModel rho sigma).tensorPower n
 
 /-- Equal-prior Bayesian error of the genuine product Nussbaum--Szkola
 classical model. -/
-def nussbaumSzkolaProductClassicalError (rho sigma : State a) (n : Nat) : ℝ≥0∞ :=
+def nussbaumSzkolaProductClassicalError (rho sigma : MState a) (n : ℕ) : ℝ≥0∞ :=
   (nussbaumSzkolaProductModel rho sigma n).equalPriorErrorENNReal
 
 /-- The canonical product Nussbaum--Szkola `p` distribution is the product
 spectral weight times the product transition overlap. -/
 theorem nussbaumSzkolaProductModel_p_eq
-    (rho sigma : State a) (n : Nat) (x y : TensorPower a n) :
+    (rho sigma : MState a) (n : ℕ) (x y : TensorPower a n) :
     (nussbaumSzkolaProductModel rho sigma n).p
         ((tensorPowerProdEquiv a a n).symm (x, y)) =
       tensorPowerSpectralWeight rho n x *
@@ -74,7 +74,7 @@ theorem nussbaumSzkolaProductModel_p_eq
 /-- The canonical product Nussbaum--Szkola `q` distribution is the product
 sigma spectral weight times the product transition overlap. -/
 theorem nussbaumSzkolaProductModel_q_eq
-    (rho sigma : State a) (n : Nat) (x y : TensorPower a n) :
+    (rho sigma : MState a) (n : ℕ) (x y : TensorPower a n) :
     (nussbaumSzkolaProductModel rho sigma n).q
         ((tensorPowerProdEquiv a a n).symm (x, y)) =
       tensorPowerSpectralWeight sigma n y *
@@ -108,16 +108,16 @@ states.  It pins the sequence to the canonical product model over
 `(a × a)^n`, avoiding noncanonical choices in degenerate tensor-power
 eigenspaces [Gour2024Resources, BookQRT.tex:15911-15949]. -/
 def HasNussbaumSzkolaProductFiniteComparison
-    (rho sigma : State a) (classicalError : Nat → ℝ≥0∞) : Prop :=
+    (rho sigma : MState a) (classicalError : ℕ → ℝ≥0∞) : Prop :=
   classicalError = nussbaumSzkolaProductClassicalError rho sigma ∧
-    ∀ n : Nat,
+    ∀ n : ℕ,
       quantumChernoffConverseComparisonConstant * classicalError n ≤
         optimalEqualPriorTensorPowerError rho sigma n
 
 /-- Product Nussbaum--Szkola models have multiplicative classical Petz/Chernoff
 coefficient. -/
 theorem nussbaumSzkolaProductModel_petzChernoffCoefficient_eq_pow
-    (rho sigma : State a) {s : ℝ} (hs0 : 0 ≤ s) (hs1 : s ≤ 1) (n : Nat) :
+    (rho sigma : MState a) {s : ℝ} (hs0 : 0 ≤ s) (hs1 : s ≤ 1) (n : ℕ) :
     (nussbaumSzkolaProductModel rho sigma n).petzChernoffCoefficient s =
       rho.petzRenyiCoefficient sigma s ^ n := by
   calc
@@ -129,29 +129,29 @@ theorem nussbaumSzkolaProductModel_petzChernoffCoefficient_eq_pow
           rw [nussbaumSzkolaModel_petzChernoffCoefficient_eq rho sigma hs0 hs1]
 
 theorem tensorPower_trace_one_sub_projection_re_eq_nussbaumSzkolaProduct_source_sum
-    (rho sigma : State a) (n : Nat) {P : CMatrix (TensorPower a n)}
+    (rho sigma : MState a) (n : ℕ) {P : CMatrix (TensorPower a n)}
     (hPherm : P.IsHermitian) (hPidem : P * P = P) :
-    (((rho.tensorPower n).matrix * (1 - P)).trace).re =
+    (((rho.tensorPower n).m * (1 - P)).trace).re =
       ∑ x : TensorPower a n, (tensorPowerSpectralWeight rho n x : ℝ) *
         ∑ y : TensorPower a n,
           Complex.normSq
-            ((star (tensorPowerUnitary rho.pos.isHermitian.eigenvectorUnitary n :
+            ((star (unitaryTensorPowerMatrix rho.psd.isHermitian.eigenvectorUnitary n :
                 CMatrix (TensorPower a n)) *
                 (1 - P) *
-              (tensorPowerUnitary sigma.pos.isHermitian.eigenvectorUnitary n :
+              (unitaryTensorPowerMatrix sigma.psd.isHermitian.eigenvectorUnitary n :
                 CMatrix (TensorPower a n))) x y) := by
   classical
   let UrhoN : Matrix.unitaryGroup (TensorPower a n) ℂ :=
-    tensorPowerUnitary rho.pos.isHermitian.eigenvectorUnitary n
+    unitaryTensorPowerMatrix rho.psd.isHermitian.eigenvectorUnitary n
   let UsigmaN : Matrix.unitaryGroup (TensorPower a n) ℂ :=
-    tensorPowerUnitary sigma.pos.isHermitian.eigenvectorUnitary n
-  have hdiag := tensorPower_matrix_eq_tensorPowerUnitary_diagonal rho n
+    unitaryTensorPowerMatrix sigma.psd.isHermitian.eigenvectorUnitary n
+  have hdiag := tensorPower_matrix_eq_unitaryTensorPowerMatrix_diagonal rho n
   have htrace :=
     trace_mul_unitary_conj_diagonal_ofReal_arbitrary_re
       UrhoN (fun x : TensorPower a n => (tensorPowerSpectralWeight rho n x : ℝ))
       (1 - P)
   calc
-    (((rho.tensorPower n).matrix * (1 - P)).trace).re =
+    (((rho.tensorPower n).m * (1 - P)).trace).re =
         ((((UrhoN : CMatrix (TensorPower a n)) *
             (Matrix.diagonal
               fun x : TensorPower a n =>
@@ -178,37 +178,37 @@ theorem tensorPower_trace_one_sub_projection_re_eq_nussbaumSzkolaProduct_source_
     _ = ∑ x : TensorPower a n, (tensorPowerSpectralWeight rho n x : ℝ) *
           ∑ y : TensorPower a n,
             Complex.normSq
-              ((star (tensorPowerUnitary rho.pos.isHermitian.eigenvectorUnitary n :
+              ((star (unitaryTensorPowerMatrix rho.psd.isHermitian.eigenvectorUnitary n :
                   CMatrix (TensorPower a n)) *
                   (1 - P) *
-                (tensorPowerUnitary sigma.pos.isHermitian.eigenvectorUnitary n :
+                (unitaryTensorPowerMatrix sigma.psd.isHermitian.eigenvectorUnitary n :
                   CMatrix (TensorPower a n))) x y) := by
           rfl
 
 theorem tensorPower_trace_projection_re_eq_nussbaumSzkolaProduct_source_sum
-    (rho sigma : State a) (n : Nat) {P : CMatrix (TensorPower a n)}
+    (rho sigma : MState a) (n : ℕ) {P : CMatrix (TensorPower a n)}
     (hPherm : P.IsHermitian) (hPidem : P * P = P) :
-    (((sigma.tensorPower n).matrix * P).trace).re =
+    (((sigma.tensorPower n).m * P).trace).re =
       ∑ y : TensorPower a n, (tensorPowerSpectralWeight sigma n y : ℝ) *
         ∑ x : TensorPower a n,
           Complex.normSq
-            ((star (tensorPowerUnitary rho.pos.isHermitian.eigenvectorUnitary n :
+            ((star (unitaryTensorPowerMatrix rho.psd.isHermitian.eigenvectorUnitary n :
                 CMatrix (TensorPower a n)) *
                 P *
-              (tensorPowerUnitary sigma.pos.isHermitian.eigenvectorUnitary n :
+              (unitaryTensorPowerMatrix sigma.psd.isHermitian.eigenvectorUnitary n :
                 CMatrix (TensorPower a n))) x y) := by
   classical
   let UrhoN : Matrix.unitaryGroup (TensorPower a n) ℂ :=
-    tensorPowerUnitary rho.pos.isHermitian.eigenvectorUnitary n
+    unitaryTensorPowerMatrix rho.psd.isHermitian.eigenvectorUnitary n
   let UsigmaN : Matrix.unitaryGroup (TensorPower a n) ℂ :=
-    tensorPowerUnitary sigma.pos.isHermitian.eigenvectorUnitary n
-  have hdiag := tensorPower_matrix_eq_tensorPowerUnitary_diagonal sigma n
+    unitaryTensorPowerMatrix sigma.psd.isHermitian.eigenvectorUnitary n
+  have hdiag := tensorPower_matrix_eq_unitaryTensorPowerMatrix_diagonal sigma n
   have htrace :=
     trace_mul_unitary_conj_diagonal_ofReal_arbitrary_re
       UsigmaN (fun y : TensorPower a n => (tensorPowerSpectralWeight sigma n y : ℝ))
       P
   calc
-    (((sigma.tensorPower n).matrix * P).trace).re =
+    (((sigma.tensorPower n).m * P).trace).re =
         ((((UsigmaN : CMatrix (TensorPower a n)) *
             (Matrix.diagonal
               fun y : TensorPower a n =>
@@ -243,27 +243,27 @@ theorem tensorPower_trace_projection_re_eq_nussbaumSzkolaProduct_source_sum
     _ = ∑ y : TensorPower a n, (tensorPowerSpectralWeight sigma n y : ℝ) *
           ∑ x : TensorPower a n,
             Complex.normSq
-              ((star (tensorPowerUnitary rho.pos.isHermitian.eigenvectorUnitary n :
+              ((star (unitaryTensorPowerMatrix rho.psd.isHermitian.eigenvectorUnitary n :
                   CMatrix (TensorPower a n)) *
                   P *
-                (tensorPowerUnitary sigma.pos.isHermitian.eigenvectorUnitary n :
+                (unitaryTensorPowerMatrix sigma.psd.isHermitian.eigenvectorUnitary n :
                   CMatrix (TensorPower a n))) x y) := by
           rfl
 
 /-- Finite projection comparison for the canonical product Nussbaum--Szkola
 sequence, with Gour's exact `1 / 2` constant. -/
 theorem half_nussbaumSzkolaProductModel_equalPriorError_le_projection_error
-    (rho sigma : State a) (n : Nat) {P : CMatrix (TensorPower a n)}
+    (rho sigma : MState a) (n : ℕ) {P : CMatrix (TensorPower a n)}
     (hPherm : P.IsHermitian) (hPidem : P * P = P) :
     (1 / 2 : ℝ) * ((nussbaumSzkolaProductModel rho sigma n).equalPriorError : ℝ) ≤
       (1 / 2 : ℝ) *
-        ((((rho.tensorPower n).matrix * (1 - P)).trace).re +
-          (((sigma.tensorPower n).matrix * P).trace).re) := by
+        ((((rho.tensorPower n).m * (1 - P)).trace).re +
+          (((sigma.tensorPower n).m * P).trace).re) := by
   classical
   let UrhoN : Matrix.unitaryGroup (TensorPower a n) ℂ :=
-    tensorPowerUnitary rho.pos.isHermitian.eigenvectorUnitary n
+    unitaryTensorPowerMatrix rho.psd.isHermitian.eigenvectorUnitary n
   let UsigmaN : Matrix.unitaryGroup (TensorPower a n) ℂ :=
-    tensorPowerUnitary sigma.pos.isHermitian.eigenvectorUnitary n
+    unitaryTensorPowerMatrix sigma.psd.isHermitian.eigenvectorUnitary n
   let rejectAmp : TensorPower a n × TensorPower a n → ℂ := fun xy =>
     (star (UrhoN : CMatrix (TensorPower a n)) * (1 - P) *
       (UsigmaN : CMatrix (TensorPower a n))) xy.1 xy.2
@@ -358,8 +358,8 @@ theorem half_nussbaumSzkolaProductModel_equalPriorError_le_projection_error
   have hrhsDouble :
       rhsDouble =
         (1 / 2 : ℝ) *
-          ((((rho.tensorPower n).matrix * (1 - P)).trace).re +
-            (((sigma.tensorPower n).matrix * P).trace).re) := by
+          ((((rho.tensorPower n).m * (1 - P)).trace).re +
+            (((sigma.tensorPower n).m * P).trace).re) := by
     let rhoPart : ℝ := ∑ xy : TensorPower a n × TensorPower a n,
       ((1 / 2 : ℝ) * (tensorPowerSpectralWeight rho n xy.1 : ℝ)) *
         Complex.normSq (rejectAmp xy)
@@ -371,7 +371,7 @@ theorem half_nussbaumSzkolaProductModel_equalPriorError_le_projection_error
       rw [Finset.sum_add_distrib]
     have hrhoPart :
         rhoPart = (1 / 2 : ℝ) *
-          (((rho.tensorPower n).matrix * (1 - P)).trace).re := by
+          (((rho.tensorPower n).m * (1 - P)).trace).re := by
       calc
         rhoPart =
             (1 / 2 : ℝ) *
@@ -381,11 +381,11 @@ theorem half_nussbaumSzkolaProductModel_equalPriorError_le_projection_error
               rw [Fintype.sum_prod_type]
               simp [Finset.mul_sum, mul_assoc]
         _ = (1 / 2 : ℝ) *
-              (((rho.tensorPower n).matrix * (1 - P)).trace).re := by
+              (((rho.tensorPower n).m * (1 - P)).trace).re := by
               rw [htrace_rho]
     have hsigmaPart :
         sigmaPart = (1 / 2 : ℝ) *
-          (((sigma.tensorPower n).matrix * P).trace).re := by
+          (((sigma.tensorPower n).m * P).trace).re := by
       calc
         sigmaPart =
             (1 / 2 : ℝ) *
@@ -395,21 +395,21 @@ theorem half_nussbaumSzkolaProductModel_equalPriorError_le_projection_error
               rw [Fintype.sum_prod_type, Finset.sum_comm]
               simp [Finset.mul_sum, mul_assoc]
         _ = (1 / 2 : ℝ) *
-              (((sigma.tensorPower n).matrix * P).trace).re := by
+              (((sigma.tensorPower n).m * P).trace).re := by
               rw [htrace_sigma]
     rw [hrhs_split, hrhoPart, hsigmaPart]
     ring
   exact hlhs_le_rhsDouble.trans_eq hrhsDouble
 
 private theorem half_nussbaumSzkolaModel_equalPriorError_le_projection_error
-    (rho sigma : State a) {P : CMatrix a}
+    (rho sigma : MState a) {P : CMatrix a}
     (hPherm : P.IsHermitian) (hPidem : P * P = P) :
     (1 / 2 : ℝ) * ((nussbaumSzkolaModel rho sigma).equalPriorError : ℝ) ≤
       (1 / 2 : ℝ) *
-        (((rho.matrix * (1 - P)).trace).re + ((sigma.matrix * P).trace).re) := by
+        (((rho.m * (1 - P)).trace).re + ((sigma.m * P).trace).re) := by
   classical
-  let Urho : Matrix.unitaryGroup a ℂ := rho.pos.isHermitian.eigenvectorUnitary
-  let Usigma : Matrix.unitaryGroup a ℂ := sigma.pos.isHermitian.eigenvectorUnitary
+  let Urho : Matrix.unitaryGroup a ℂ := rho.psd.isHermitian.eigenvectorUnitary
+  let Usigma : Matrix.unitaryGroup a ℂ := sigma.psd.isHermitian.eigenvectorUnitary
   let rejectAmp : a × a → ℂ := fun xy =>
     (star (Urho : CMatrix a) * (1 - P) * (Usigma : CMatrix a)) xy.1 xy.2
   let acceptAmp : a × a → ℂ := fun xy =>
@@ -478,7 +478,7 @@ private theorem half_nussbaumSzkolaModel_equalPriorError_le_projection_error
   have hrhsDouble :
       rhsDouble =
         (1 / 2 : ℝ) *
-          (((rho.matrix * (1 - P)).trace).re + ((sigma.matrix * P).trace).re) := by
+          (((rho.m * (1 - P)).trace).re + ((sigma.m * P).trace).re) := by
     let rhoPart : ℝ := ∑ xy : a × a,
       ((1 / 2 : ℝ) * (stateSpectralWeight rho xy.1 : ℝ)) *
         Complex.normSq (rejectAmp xy)
@@ -489,7 +489,7 @@ private theorem half_nussbaumSzkolaModel_equalPriorError_le_projection_error
       unfold rhsDouble rhoPart sigmaPart
       rw [Finset.sum_add_distrib]
     have hrhoPart :
-        rhoPart = (1 / 2 : ℝ) * ((rho.matrix * (1 - P)).trace).re := by
+        rhoPart = (1 / 2 : ℝ) * ((rho.m * (1 - P)).trace).re := by
       calc
         rhoPart =
             (1 / 2 : ℝ) *
@@ -498,10 +498,10 @@ private theorem half_nussbaumSzkolaModel_equalPriorError_le_projection_error
               unfold rhoPart
               rw [Fintype.sum_prod_type]
               simp [Finset.mul_sum, mul_assoc]
-        _ = (1 / 2 : ℝ) * ((rho.matrix * (1 - P)).trace).re := by
+        _ = (1 / 2 : ℝ) * ((rho.m * (1 - P)).trace).re := by
               rw [htrace_rho]
     have hsigmaPart :
-        sigmaPart = (1 / 2 : ℝ) * ((sigma.matrix * P).trace).re := by
+        sigmaPart = (1 / 2 : ℝ) * ((sigma.m * P).trace).re := by
       calc
         sigmaPart =
             (1 / 2 : ℝ) *
@@ -510,25 +510,25 @@ private theorem half_nussbaumSzkolaModel_equalPriorError_le_projection_error
               unfold sigmaPart
               rw [Fintype.sum_prod_type, Finset.sum_comm]
               simp [Finset.mul_sum, mul_assoc]
-        _ = (1 / 2 : ℝ) * ((sigma.matrix * P).trace).re := by
+        _ = (1 / 2 : ℝ) * ((sigma.m * P).trace).re := by
               rw [htrace_sigma]
     rw [hrhs_split, hrhoPart, hsigmaPart]
     ring
   exact hlhs_le_rhsDouble.trans_eq hrhsDouble
 
 private theorem half_trace_accept_effect_error_eq_equalPriorError
-    (T : BinaryHypothesisTest a) (rho sigma : State a) :
+    (T : BinaryHypothesisTest a) (rho sigma : MState a) :
     (1 / 2 : ℝ) *
-        (((rho.matrix * (1 - T.acceptRhoEffect)).trace).re +
-          ((sigma.matrix * T.acceptRhoEffect).trace).re) =
+        (((rho.m * (1 - T.acceptRhoEffect)).trace).re +
+          ((sigma.m * T.acceptRhoEffect).trace).re) =
       (T.equalPriorError rho sigma : ℝ) := by
   have hreject_trace :
-      ((rho.matrix * (1 - T.acceptRhoEffect)).trace).re =
+      ((rho.m * (1 - T.acceptRhoEffect)).trace).re =
         (T.rejectProb rho : ℝ) := by
     rw [← T.rejectRhoEffect_eq_one_sub_acceptRhoEffect]
     exact (T.rejectProb_eq_trace_re rho).symm
   have haccept_trace :
-      ((sigma.matrix * T.acceptRhoEffect).trace).re =
+      ((sigma.m * T.acceptRhoEffect).trace).re =
         (T.acceptProb sigma : ℝ) :=
     (T.acceptProb_eq_trace_re sigma).symm
   rw [hreject_trace, haccept_trace]
@@ -541,17 +541,17 @@ private theorem half_trace_accept_effect_error_eq_equalPriorError
 
 At copy number `n`, this uses the spectral Nussbaum--Szkola model associated to
 `rho^⊗n` and `sigma^⊗n`. -/
-def nussbaumSzkolaClassicalError (rho sigma : State a) (n : Nat) : ℝ≥0∞ :=
+def nussbaumSzkolaClassicalError (rho sigma : MState a) (n : ℕ) : ℝ≥0∞ :=
   (nussbaumSzkolaModel (rho.tensorPower n) (sigma.tensorPower n)).equalPriorErrorENNReal
 
 /-- The classical error sequence is the tensor-power Nussbaum--Szkola sequence. -/
 def HasNussbaumSzkolaTensorPowerCompatibility
-    (rho sigma : State a) (classicalError : Nat → ℝ≥0∞) : Prop :=
+    (rho sigma : MState a) (classicalError : ℕ → ℝ≥0∞) : Prop :=
   classicalError = nussbaumSzkolaClassicalError rho sigma
 
 /-- The canonical Nussbaum--Szkola classical error sequence satisfies the
 tensor-power compatibility convention by definition. -/
-theorem nussbaumSzkolaClassicalError_tensorPowerCompatible (rho sigma : State a) :
+theorem nussbaumSzkolaClassicalError_tensorPowerCompatible (rho sigma : MState a) :
     HasNussbaumSzkolaTensorPowerCompatibility
       rho sigma (nussbaumSzkolaClassicalError rho sigma) :=
   rfl
@@ -562,9 +562,9 @@ The first field pins the sequence to the tensor-power Nussbaum--Szkola
 construction.  The second field is the finite quantum-to-classical comparison
 with the source's `1 / 2` constant. -/
 def HasNussbaumSzkolaFiniteComparison
-    (rho sigma : State a) (classicalError : Nat → ℝ≥0∞) : Prop :=
+    (rho sigma : MState a) (classicalError : ℕ → ℝ≥0∞) : Prop :=
   HasNussbaumSzkolaTensorPowerCompatibility rho sigma classicalError ∧
-    ∀ n : Nat,
+    ∀ n : ℕ,
       quantumChernoffConverseComparisonConstant * classicalError n ≤
         optimalEqualPriorTensorPowerError rho sigma n
 
@@ -575,16 +575,16 @@ Nussbaum--Szkola construction: the quantum optimal equal-prior tensor-power
 error dominates one half of a corresponding classical error sequence
 [Gour2024Resources, BookQRT.tex:15911-15949]. -/
 def HasQuantumToClassicalChernoffComparison
-    (rho sigma : State a) (classicalError : Nat → ℝ≥0∞) : Prop :=
-  ∀ n : Nat,
+    (rho sigma : MState a) (classicalError : ℕ → ℝ≥0∞) : Prop :=
+  ∀ n : ℕ,
     quantumChernoffConverseComparisonConstant * classicalError n ≤
       optimalEqualPriorTensorPowerError rho sigma n
 
 /-- The source-shaped Nussbaum--Szkola finite comparison instantiates the
 generic quantum-to-classical Chernoff comparison predicate. -/
 theorem hasQuantumToClassicalChernoffComparison_of_nussbaumSzkola
-    (rho sigma : State a)
-    {classicalError : Nat → ℝ≥0∞}
+    (rho sigma : MState a)
+    {classicalError : ℕ → ℝ≥0∞}
     (hfinite : HasNussbaumSzkolaFiniteComparison rho sigma classicalError) :
     HasQuantumToClassicalChernoffComparison rho sigma classicalError :=
   hfinite.2
@@ -592,8 +592,8 @@ theorem hasQuantumToClassicalChernoffComparison_of_nussbaumSzkola
 /-- Product Nussbaum--Szkola finite comparison instantiates the generic
 quantum-to-classical Chernoff comparison predicate. -/
 theorem hasQuantumToClassicalChernoffComparison_of_nussbaumSzkolaProduct
-    (rho sigma : State a)
-    {classicalError : Nat → ℝ≥0∞}
+    (rho sigma : MState a)
+    {classicalError : ℕ → ℝ≥0∞}
     (hfinite : HasNussbaumSzkolaProductFiniteComparison rho sigma classicalError) :
     HasQuantumToClassicalChernoffComparison rho sigma classicalError :=
   hfinite.2
@@ -601,21 +601,21 @@ theorem hasQuantumToClassicalChernoffComparison_of_nussbaumSzkolaProduct
 /-- The canonical Nussbaum--Szkola sequence satisfies the finite quantum-to-classical
 comparison with Gour's `1 / 2` constant. -/
 theorem hasNussbaumSzkolaFiniteComparison
-    (rho sigma : State a) :
+    (rho sigma : MState a) :
     HasNussbaumSzkolaFiniteComparison
       rho sigma (nussbaumSzkolaClassicalError rho sigma) := by
   refine ⟨nussbaumSzkolaClassicalError_tensorPowerCompatible rho sigma, ?_⟩
   intro n
   classical
-  let rhoN : State (TensorPower a n) := rho.tensorPower n
-  let sigmaN : State (TensorPower a n) := sigma.tensorPower n
+  let rhoN : MState (TensorPower a n) := rho.tensorPower n
+  let sigmaN : MState (TensorPower a n) := sigma.tensorPower n
   let T0 : BinaryHypothesisTest (TensorPower a n) := rhoN.helstromTest sigmaN
   have hPherm : T0.acceptRhoEffect.IsHermitian :=
     T0.acceptRhoEffect_pos.isHermitian
   have hPidem : T0.acceptRhoEffect * T0.acceptRhoEffect = T0.acceptRhoEffect := by
-    let H : CMatrix (TensorPower a n) := rhoN.matrix - sigmaN.matrix
-    let hH : H.IsHermitian := rhoN.pos.isHermitian.sub sigmaN.pos.isHermitian
-    simpa [T0, State.helstromTest, BinaryHypothesisTest.acceptRhoEffect, H, hH]
+    let H : CMatrix (TensorPower a n) := rhoN.m - sigmaN.m
+    let hH : H.IsHermitian := rhoN.psd.isHermitian.sub sigmaN.psd.isHermitian
+    simpa [T0, MState.helstromTest, BinaryHypothesisTest.acceptRhoEffect, H, hH]
       using positiveSpectralProjector_idempotent H hH
   have hsource :
       (1 / 2 : ℝ) * ((nussbaumSzkolaModel rhoN sigmaN).equalPriorError : ℝ) ≤
@@ -628,14 +628,14 @@ theorem hasNussbaumSzkolaFiniteComparison
   have hsource_formula :
       (1 / 2 : ℝ) * ((nussbaumSzkolaModel rhoN sigmaN).equalPriorError : ℝ) ≤
         (1 / 2 : ℝ) * (1 - rhoN.normalizedTraceDistance sigmaN) := by
-    exact hsource.trans_eq (State.helstromTest_equalPriorError_eq rhoN sigmaN)
+    exact hsource.trans_eq (MState.helstromTest_equalPriorError_eq rhoN sigmaN)
   rw [optimalEqualPriorTensorPowerError]
   refine le_iInf ?_
   intro T
   have hTreal :
       (1 / 2 : ℝ) * ((nussbaumSzkolaModel rhoN sigmaN).equalPriorError : ℝ) ≤
         (T.equalPriorTensorPowerError rho sigma : ℝ) := by
-    have hopt := (State.helstrom_equalPriorError_optimal rhoN sigmaN).2 T
+    have hopt := (MState.helstrom_equalPriorError_optimal rhoN sigmaN).2 T
     exact hsource_formula.trans (by
       simpa [BinaryHypothesisTest.equalPriorTensorPowerError, rhoN, sigmaN] using hopt)
   have hTnn :
@@ -654,21 +654,21 @@ theorem hasNussbaumSzkolaFiniteComparison
 /-- The canonical product Nussbaum--Szkola sequence satisfies the finite
 quantum-to-classical comparison with Gour's `1 / 2` constant. -/
 theorem hasNussbaumSzkolaProductFiniteComparison
-    (rho sigma : State a) :
+    (rho sigma : MState a) :
     HasNussbaumSzkolaProductFiniteComparison
       rho sigma (nussbaumSzkolaProductClassicalError rho sigma) := by
   refine ⟨rfl, ?_⟩
   intro n
   classical
-  let rhoN : State (TensorPower a n) := rho.tensorPower n
-  let sigmaN : State (TensorPower a n) := sigma.tensorPower n
+  let rhoN : MState (TensorPower a n) := rho.tensorPower n
+  let sigmaN : MState (TensorPower a n) := sigma.tensorPower n
   let T0 : BinaryHypothesisTest (TensorPower a n) := rhoN.helstromTest sigmaN
   have hPherm : T0.acceptRhoEffect.IsHermitian :=
     T0.acceptRhoEffect_pos.isHermitian
   have hPidem : T0.acceptRhoEffect * T0.acceptRhoEffect = T0.acceptRhoEffect := by
-    let H : CMatrix (TensorPower a n) := rhoN.matrix - sigmaN.matrix
-    let hH : H.IsHermitian := rhoN.pos.isHermitian.sub sigmaN.pos.isHermitian
-    simpa [T0, State.helstromTest, BinaryHypothesisTest.acceptRhoEffect, H, hH]
+    let H : CMatrix (TensorPower a n) := rhoN.m - sigmaN.m
+    let hH : H.IsHermitian := rhoN.psd.isHermitian.sub sigmaN.psd.isHermitian
+    simpa [T0, MState.helstromTest, BinaryHypothesisTest.acceptRhoEffect, H, hH]
       using positiveSpectralProjector_idempotent H hH
   have hsource :
       (1 / 2 : ℝ) * ((nussbaumSzkolaProductModel rho sigma n).equalPriorError : ℝ) ≤
@@ -681,14 +681,14 @@ theorem hasNussbaumSzkolaProductFiniteComparison
   have hsource_formula :
       (1 / 2 : ℝ) * ((nussbaumSzkolaProductModel rho sigma n).equalPriorError : ℝ) ≤
         (1 / 2 : ℝ) * (1 - rhoN.normalizedTraceDistance sigmaN) := by
-    exact hsource.trans_eq (State.helstromTest_equalPriorError_eq rhoN sigmaN)
+    exact hsource.trans_eq (MState.helstromTest_equalPriorError_eq rhoN sigmaN)
   rw [optimalEqualPriorTensorPowerError]
   refine le_iInf ?_
   intro T
   have hTreal :
       (1 / 2 : ℝ) * ((nussbaumSzkolaProductModel rho sigma n).equalPriorError : ℝ) ≤
         (T.equalPriorTensorPowerError rho sigma : ℝ) := by
-    have hopt := (State.helstrom_equalPriorError_optimal rhoN sigmaN).2 T
+    have hopt := (MState.helstrom_equalPriorError_optimal rhoN sigmaN).2 T
     exact hsource_formula.trans (by
       simpa [BinaryHypothesisTest.equalPriorTensorPowerError, rhoN, sigmaN] using hopt)
   have hTnn :
@@ -707,7 +707,7 @@ theorem hasNussbaumSzkolaProductFiniteComparison
 /-- The canonical Nussbaum--Szkola sequence satisfies the generic
 quantum-to-classical comparison predicate. -/
 theorem hasQuantumToClassicalChernoffComparison_nussbaumSzkolaClassicalError
-    (rho sigma : State a) :
+    (rho sigma : MState a) :
     HasQuantumToClassicalChernoffComparison
       rho sigma (nussbaumSzkolaClassicalError rho sigma) :=
   hasQuantumToClassicalChernoffComparison_of_nussbaumSzkola
@@ -716,7 +716,7 @@ theorem hasQuantumToClassicalChernoffComparison_nussbaumSzkolaClassicalError
 /-- The canonical product Nussbaum--Szkola sequence satisfies the generic
 quantum-to-classical comparison predicate. -/
 theorem hasQuantumToClassicalChernoffComparison_nussbaumSzkolaProductClassicalError
-    (rho sigma : State a) :
+    (rho sigma : MState a) :
     HasQuantumToClassicalChernoffComparison
       rho sigma (nussbaumSzkolaProductClassicalError rho sigma) :=
   hasQuantumToClassicalChernoffComparison_of_nussbaumSzkolaProduct
@@ -728,8 +728,8 @@ The source proof lower-bounds classical errors using `(n+1)^(-m)` type-class
 prefactors and then obtains the limsup orientation for the normalized negative
 log error exponent [Gour2024Resources, BookQRT.tex:15414-15469]. -/
 def HasClassicalMethodOfTypesChernoffConverse
-    (rho sigma : State a) (classicalError : Nat → ℝ≥0∞) : Prop :=
-  Filter.limsup (fun n : Nat => normalizedNegLog n (classicalError (n + 1)))
+    (rho sigma : MState a) (classicalError : ℕ → ℝ≥0∞) : Prop :=
+  Filter.limsup (fun n : ℕ => normalizedNegLog n (classicalError (n + 1)))
     atTop ≤ rho.chernoffDistance sigma
 
 /-- Finite-copy exponent form of the classical method-of-types Chernoff converse.
@@ -739,7 +739,7 @@ the type-class lower bounds with the polynomial prefactor `(n+1)^(-m)`: the
 normalized negative log of the classical error is eventually bounded by the
 Chernoff distance plus the finite-alphabet polynomial penalty. -/
 def HasClassicalMethodOfTypesFiniteExponentBound
-    (rho sigma : State a) (classicalError : Nat → ℝ≥0∞) : Prop :=
+    (rho sigma : MState a) (classicalError : ℕ → ℝ≥0∞) : Prop :=
   ∀ᶠ n in atTop,
     normalizedNegLog n (classicalError (n + 1)) ≤
       rho.chernoffDistance sigma + methodOfTypesPolynomialPenalty (a := a) n
@@ -747,24 +747,24 @@ def HasClassicalMethodOfTypesFiniteExponentBound
 /-- The finite method-of-types exponent bound implies the limsup converse
 orientation required by `HasClassicalMethodOfTypesChernoffConverse`. -/
 theorem classicalMethodOfTypes_limsup_le_of_finiteExponentBound
-    (rho sigma : State a) (classicalError : Nat → ℝ≥0∞)
+    (rho sigma : MState a) (classicalError : ℕ → ℝ≥0∞)
     (hfinite :
       ∀ᶠ n in atTop,
         normalizedNegLog n (classicalError (n + 1)) ≤
           rho.chernoffDistance sigma + methodOfTypesPolynomialPenalty (a := a) n) :
-    Filter.limsup (fun n : Nat => normalizedNegLog n (classicalError (n + 1)))
+    Filter.limsup (fun n : ℕ => normalizedNegLog n (classicalError (n + 1)))
         atTop ≤ rho.chernoffDistance sigma := by
   have hpenalty :
-      Tendsto (fun n : Nat => methodOfTypesPolynomialPenalty (a := a) n)
+      Tendsto (fun n : ℕ => methodOfTypesPolynomialPenalty (a := a) n)
         atTop (𝓝 (0 : EReal)) :=
     methodOfTypesPolynomialPenalty_tendsto_zero (a := a)
   have hsum :
       Tendsto
-        (fun n : Nat => rho.chernoffDistance sigma + methodOfTypesPolynomialPenalty (a := a) n)
+        (fun n : ℕ => rho.chernoffDistance sigma + methodOfTypesPolynomialPenalty (a := a) n)
         atTop (𝓝 (rho.chernoffDistance sigma)) := by
     have hpair :
         Tendsto
-          (fun n : Nat => (rho.chernoffDistance sigma, methodOfTypesPolynomialPenalty (a := a) n))
+          (fun n : ℕ => (rho.chernoffDistance sigma, methodOfTypesPolynomialPenalty (a := a) n))
           atTop (𝓝 (rho.chernoffDistance sigma, (0 : EReal))) :=
       tendsto_const_nhds.prodMk_nhds hpenalty
     have hadd :
@@ -775,14 +775,14 @@ theorem classicalMethodOfTypes_limsup_le_of_finiteExponentBound
     simpa [Function.comp_def] using hadd.tendsto.comp hpair
   have hlimsup_le :=
     Filter.limsup_le_limsup hfinite (β := EReal)
-      (u := fun n : Nat => normalizedNegLog n (classicalError (n + 1)))
-      (v := fun n : Nat => rho.chernoffDistance sigma + methodOfTypesPolynomialPenalty (a := a) n)
+      (u := fun n : ℕ => normalizedNegLog n (classicalError (n + 1)))
+      (v := fun n : ℕ => rho.chernoffDistance sigma + methodOfTypesPolynomialPenalty (a := a) n)
   exact hlimsup_le.trans (le_of_eq hsum.limsup_eq)
 
 /-- Source-shaped classical method-of-types route packaged as the existing
 converse predicate. -/
 theorem hasClassicalMethodOfTypesChernoffConverse_of_finiteExponentBound
-    (rho sigma : State a) (classicalError : Nat → ℝ≥0∞)
+    (rho sigma : MState a) (classicalError : ℕ → ℝ≥0∞)
     (hfinite : HasClassicalMethodOfTypesFiniteExponentBound rho sigma classicalError) :
     HasClassicalMethodOfTypesChernoffConverse rho sigma classicalError :=
   classicalMethodOfTypes_limsup_le_of_finiteExponentBound rho sigma classicalError hfinite
@@ -790,7 +790,7 @@ theorem hasClassicalMethodOfTypesChernoffConverse_of_finiteExponentBound
 /-- The generic finite-alphabet method-of-types converse instantiated for the
 canonical product Nussbaum--Szkola classical error sequence. -/
 theorem hasClassicalMethodOfTypesChernoffConverse_nussbaumSzkolaProductClassicalError
-    (rho sigma : State a) :
+    (rho sigma : MState a) :
     HasClassicalMethodOfTypesChernoffConverse
       rho sigma (nussbaumSzkolaProductClassicalError rho sigma) := by
   classical
@@ -806,7 +806,7 @@ Nussbaum--Szkola classical exponent into a pointwise upper bound on the quantum
 optimal-error exponent, with the explicit `log 2 / (n+1)` penalty from the
 source's `1 / 2` comparison constant. -/
 theorem optimalErrorExponent_le_nussbaumSzkolaProductClassicalExponent_add_penalty
-    (rho sigma : State a) (n : Nat) :
+    (rho sigma : MState a) (n : ℕ) :
     optimalEqualPriorTensorPowerErrorExponent rho sigma n ≤
       normalizedNegLog n
         (nussbaumSzkolaProductClassicalError rho sigma (n + 1)) +
@@ -832,20 +832,20 @@ theorem optimalErrorExponent_le_nussbaumSzkolaProductClassicalExponent_add_penal
       nussbaumSzkolaProductClassicalError,
       ClassicalBinaryModel.equalPriorErrorENNReal] using hpenalty)
 
-/-- Limsup-side quantum Chernoff converse obtained from the product
-Nussbaum--Szkola comparison and the generic classical method-of-types
-converse. -/
-theorem limsup_errorExponent_le_chernoffDistance_nussbaumSzkolaProduct
-    (rho sigma : State a) :
+/-- Unconditional limsup-side quantum Chernoff converse, obtained from the
+product Nussbaum--Szkola comparison and the generic classical method-of-types
+converse [Gour2024Resources, BookQRT.tex:15373-15949]. -/
+theorem limsup_errorExponent_le_chernoffDistance
+    (rho sigma : MState a) :
     Filter.limsup
-      (fun n : Nat => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
+      (fun n : ℕ => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
       atTop ≤ rho.chernoffDistance sigma := by
-  let classicalSeq : Nat → EReal := fun n =>
+  let classicalSeq : ℕ → EReal := fun n =>
     normalizedNegLog n (nussbaumSzkolaProductClassicalError rho sigma (n + 1))
-  let priorPenalty : Nat → EReal := fun n => equalPriorAverageLogPenalty n
+  let priorPenalty : ℕ → EReal := fun n => equalPriorAverageLogPenalty n
   have hpoint :
-      (fun n : Nat => optimalEqualPriorTensorPowerErrorExponent rho sigma n) ≤ᶠ[atTop]
-        fun n : Nat => classicalSeq n + priorPenalty n := by
+      (fun n : ℕ => optimalEqualPriorTensorPowerErrorExponent rho sigma n) ≤ᶠ[atTop]
+        fun n : ℕ => classicalSeq n + priorPenalty n := by
     exact Filter.Eventually.of_forall fun n => by
       simpa [classicalSeq, priorPenalty] using
         optimalErrorExponent_le_nussbaumSzkolaProductClassicalExponent_add_penalty
@@ -854,7 +854,7 @@ theorem limsup_errorExponent_le_chernoffDistance_nussbaumSzkolaProduct
       Filter.limsup priorPenalty atTop = (0 : EReal) :=
     equalPriorAverageLogPenalty_tendsto_zero.limsup_eq
   have hsum :
-      Filter.limsup (fun n : Nat => classicalSeq n + priorPenalty n) atTop ≤
+      Filter.limsup (fun n : ℕ => classicalSeq n + priorPenalty n) atTop ≤
         Filter.limsup classicalSeq atTop + Filter.limsup priorPenalty atTop := by
     exact EReal.limsup_add_le
       (u := classicalSeq) (v := priorPenalty) (f := atTop)
@@ -866,59 +866,19 @@ theorem limsup_errorExponent_le_chernoffDistance_nussbaumSzkolaProduct
       rho sigma
   have hbridge :=
     Filter.limsup_le_limsup hpoint (β := EReal)
-      (u := fun n : Nat => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
-      (v := fun n : Nat => classicalSeq n + priorPenalty n)
+      (u := fun n : ℕ => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
+      (v := fun n : ℕ => classicalSeq n + priorPenalty n)
   calc
     Filter.limsup
-        (fun n : Nat => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
+        (fun n : ℕ => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
         atTop
-        ≤ Filter.limsup (fun n : Nat => classicalSeq n + priorPenalty n) atTop :=
+        ≤ Filter.limsup (fun n : ℕ => classicalSeq n + priorPenalty n) atTop :=
           hbridge
     _ ≤ Filter.limsup classicalSeq atTop + Filter.limsup priorPenalty atTop := hsum
     _ = Filter.limsup classicalSeq atTop := by
           rw [hprior_limsup]
           simp
     _ ≤ rho.chernoffDistance sigma := hclassical
-
-/-- Source-backed QCB lower/converse route required before the final squeeze.
-
-This is deliberately a route predicate, not the final unconditional QCB theorem:
-the Nussbaum--Szkola comparison and classical method-of-types machinery are
-explicit upstream obligations.  The last field records the required limsup
-shape `limsup_errorExponent_le_chernoffDistance`, including arbitrary-state
-and zero-overlap boundary cases, before the final squeeze theorem consumes it
-[Gour2024Resources, BookQRT.tex:15373-15949]. -/
-def QuantumChernoffConverseRoute (rho sigma : State a) : Prop :=
-  ∃ classicalError : Nat → ℝ≥0∞,
-    HasQuantumToClassicalChernoffComparison rho sigma classicalError ∧
-    HasClassicalMethodOfTypesChernoffConverse rho sigma classicalError ∧
-    Filter.limsup
-      (fun n : Nat => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
-      atTop ≤ rho.chernoffDistance sigma
-
-/-- Unconditional product Nussbaum--Szkola converse route for the QCB squeeze. -/
-theorem quantumChernoffConverseRoute (rho sigma : State a) :
-    QuantumChernoffConverseRoute rho sigma := by
-  refine ⟨nussbaumSzkolaProductClassicalError rho sigma,
-    hasQuantumToClassicalChernoffComparison_nussbaumSzkolaProductClassicalError
-      rho sigma,
-    hasClassicalMethodOfTypesChernoffConverse_nussbaumSzkolaProductClassicalError
-      rho sigma,
-    limsup_errorExponent_le_chernoffDistance_nussbaumSzkolaProduct
-      rho sigma⟩
-
-/-- Limsup-side QCB bound extracted from a source-backed converse route.
-
-This is the reusable lower/converse route API; it does not claim the final
-asymptotic quantum Chernoff bound statement. -/
-theorem limsup_errorExponent_le_chernoffDistance_of_converseRoute
-    (rho sigma : State a)
-    (h : QuantumChernoffConverseRoute rho sigma) :
-    Filter.limsup
-      (fun n : Nat => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
-      atTop ≤ rho.chernoffDistance sigma := by
-  rcases h with ⟨_classicalError, _hComparison, _hClassical, hlimsup⟩
-  exact hlimsup
 
 /-- Upper-side assembly of the QCB squeeze from pointwise Chernoff exponent
 lower bounds.
@@ -930,7 +890,7 @@ sequence.  This is the reusable bridge from the finite-copy direct bound and
 exponent calculus to the asymptotic squeeze
 [Gour2024Resources, BookQRT.tex:15887-15909]. -/
 theorem chernoffDistance_le_liminf_errorExponent_of_eventually_petzChernoffExponent_le
-    (rho sigma : State a)
+    (rho sigma : MState a)
     (hupper :
       ∀ s : Set.Icc (0 : ℝ) 1,
         ∀ᶠ n in atTop,
@@ -938,9 +898,9 @@ theorem chernoffDistance_le_liminf_errorExponent_of_eventually_petzChernoffExpon
             optimalEqualPriorTensorPowerErrorExponent rho sigma n) :
     rho.chernoffDistance sigma ≤
       Filter.liminf
-        (fun n : Nat => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
+        (fun n : ℕ => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
         atTop := by
-  rw [State.chernoffDistance]
+  rw [MState.chernoffDistance]
   refine iSup_le ?_
   intro s
   exact le_liminf_of_le (by isBoundedDefault) (hupper s)
@@ -952,60 +912,28 @@ of proving the asymptotic QCB statement by name.  A downstream statement can
 instantiate this bridge after supplying the direct `liminf` side and the
 converse `limsup` side. -/
 theorem errorExponent_tendsto_chernoffDistance_of_liminf_limsup
-    (rho sigma : State a)
+    (rho sigma : MState a)
     (hliminf :
       rho.chernoffDistance sigma ≤
         Filter.liminf
-          (fun n : Nat => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
+          (fun n : ℕ => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
           atTop)
     (hlimsup :
       Filter.limsup
-          (fun n : Nat => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
+          (fun n : ℕ => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
           atTop ≤ rho.chernoffDistance sigma) :
     Tendsto
-      (fun n : Nat => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
+      (fun n : ℕ => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
       atTop (𝓝 (rho.chernoffDistance sigma)) := by
   exact tendsto_of_le_liminf_of_limsup_le hliminf hlimsup
-
-/-- QCB squeeze bridge using the registered converse route.
-
-The direct side is stated as the eventual pointwise Petz/Chernoff exponent
-bound produced by the finite-copy upper-bound and exponent-calculus route; the
-converse side is supplied by `QuantumChernoffConverseRoute`.  This is a bridge
-for downstream use, not the public asymptotic QCB theorem entrypoint
-[Gour2024Resources, BookQRT.tex:15373-15949]. -/
-theorem errorExponent_tendsto_chernoffDistance_of_eventually_petzChernoffExponent_le_of_converseRoute
-    (rho sigma : State a)
-    (hupper :
-      ∀ s : Set.Icc (0 : ℝ) 1,
-        ∀ᶠ n in atTop,
-          rho.petzChernoffExponent sigma s.1 ≤
-            optimalEqualPriorTensorPowerErrorExponent rho sigma n)
-    (hroute : QuantumChernoffConverseRoute rho sigma) :
-    Tendsto
-      (fun n : Nat => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
-      atTop (𝓝 (rho.chernoffDistance sigma)) :=
-  errorExponent_tendsto_chernoffDistance_of_liminf_limsup rho sigma
-    (chernoffDistance_le_liminf_errorExponent_of_eventually_petzChernoffExponent_le
-      rho sigma hupper)
-    (limsup_errorExponent_le_chernoffDistance_of_converseRoute rho sigma hroute)
-
-/-- Unconditional limsup-side QCB converse bound. -/
-theorem limsup_errorExponent_le_chernoffDistance
-    (rho sigma : State a) :
-    Filter.limsup
-      (fun n : Nat => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
-      atTop ≤ rho.chernoffDistance sigma :=
-  limsup_errorExponent_le_chernoffDistance_of_converseRoute
-    rho sigma (quantumChernoffConverseRoute rho sigma)
 
 /-- Unconditional direct-side lower bound for the liminf of optimal-error
 exponents. -/
 theorem chernoffDistance_le_liminf_errorExponent
-    (rho sigma : State a) :
+    (rho sigma : MState a) :
     rho.chernoffDistance sigma ≤
       Filter.liminf
-        (fun n : Nat => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
+        (fun n : ℕ => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
         atTop :=
   chernoffDistance_le_liminf_errorExponent_of_eventually_petzChernoffExponent_le
     rho sigma
@@ -1016,9 +944,9 @@ theorem chernoffDistance_le_liminf_errorExponent
 the quantum Chernoff distance.  This is the squeeze API consumed by the
 separate public QCB theorem. -/
 theorem errorExponent_tendsto_chernoffDistance
-    (rho sigma : State a) :
+    (rho sigma : MState a) :
     Tendsto
-      (fun n : Nat => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
+      (fun n : ℕ => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
       atTop (𝓝 (rho.chernoffDistance sigma)) :=
   errorExponent_tendsto_chernoffDistance_of_liminf_limsup rho sigma
     (chernoffDistance_le_liminf_errorExponent rho sigma)
@@ -1026,7 +954,7 @@ theorem errorExponent_tendsto_chernoffDistance
 
 /-- Zero optimal error gives infinite extended exponent. -/
 theorem optimalEqualPriorTensorPowerErrorExponent_eq_top_of_optimalEqualPriorTensorPowerError_eq_zero
-    (rho sigma : State a) (n : Nat)
+    (rho sigma : MState a) (n : ℕ)
     (h : optimalEqualPriorTensorPowerError rho sigma (n + 1) = 0) :
     optimalEqualPriorTensorPowerErrorExponent rho sigma n = ⊤ :=
   normalizedNegLog_eq_top_of_eq_zero n
@@ -1034,7 +962,7 @@ theorem optimalEqualPriorTensorPowerErrorExponent_eq_top_of_optimalEqualPriorTen
 
 /-- Positive optimal error gives the finite real-log exponent; finiteness follows from `≤ 1`. -/
 theorem optimalEqualPriorTensorPowerErrorExponent_eq_coe_real_of_ne_zero
-    (rho sigma : State a) (n : Nat)
+    (rho sigma : MState a) (n : ℕ)
     (h0 : optimalEqualPriorTensorPowerError rho sigma (n + 1) ≠ 0) :
     optimalEqualPriorTensorPowerErrorExponent rho sigma n =
       ((normalizedNegLogReal n
@@ -1050,16 +978,16 @@ This is the finite-limit bridge signature: the only boundary
 assumption is eventual nonzero optimal error; finiteness is derived from the
 probability bound. -/
 theorem optimalEqualPriorTensorPowerErrorExponent_tendsto_of_eventually_finite_real_tendsto
-    (rho sigma : State a) {L : ℝ}
+    (rho sigma : MState a) {L : ℝ}
     (h_nonzero : ∀ᶠ n in atTop,
       optimalEqualPriorTensorPowerError rho sigma (n + 1) ≠ 0)
     (hlim : Tendsto
-      (fun n : Nat =>
+      (fun n : ℕ =>
         normalizedNegLogReal n
           (optimalEqualPriorTensorPowerError rho sigma (n + 1)))
       atTop (𝓝 L)) :
     Tendsto
-      (fun n : Nat => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
+      (fun n : ℕ => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
       atTop (𝓝 (L : EReal)) := by
   have hfinite : ∀ᶠ n in atTop,
       optimalEqualPriorTensorPowerError rho sigma (n + 1) ≠ 0 ∧
@@ -1071,14 +999,14 @@ theorem optimalEqualPriorTensorPowerErrorExponent_tendsto_of_eventually_finite_r
 
 /-- Real convergence to `+∞` of optimal-error exponents lifts to the `EReal` top limit. -/
 theorem optimalEqualPriorTensorPowerErrorExponent_tendsto_top_of_real_tendsto_atTop
-    (rho sigma : State a)
+    (rho sigma : MState a)
     (hlim : Tendsto
-      (fun n : Nat =>
+      (fun n : ℕ =>
         normalizedNegLogReal n
           (optimalEqualPriorTensorPowerError rho sigma (n + 1)))
       atTop atTop) :
     Tendsto
-      (fun n : Nat => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
+      (fun n : ℕ => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
       atTop (𝓝 (⊤ : EReal)) := by
   exact normalizedNegLog_tendsto_top_of_eventually_ne_top_real_tendsto_atTop
     (Filter.Eventually.of_forall fun n =>
@@ -1087,17 +1015,17 @@ theorem optimalEqualPriorTensorPowerErrorExponent_tendsto_top_of_real_tendsto_at
 
 /-- Eventually zero optimal error forces the optimal-error exponent to tend to `⊤`. -/
 theorem optimalEqualPriorTensorPowerErrorExponent_tendsto_top_of_eventually_zero
-    (rho sigma : State a)
+    (rho sigma : MState a)
     (hzero : ∀ᶠ n in atTop,
       optimalEqualPriorTensorPowerError rho sigma (n + 1) = 0) :
     Tendsto
-      (fun n : Nat => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
+      (fun n : ℕ => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
       atTop (𝓝 (⊤ : EReal)) :=
   normalizedNegLog_tendsto_top_of_eventually_eq_zero hzero
 
 /-- Statement shape of the asymptotic quantum Chernoff bound, without proving it. -/
-def asymptoticQuantumChernoffBoundStatement (rho sigma : State a) : Prop :=
-  Tendsto (fun n : Nat => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
+def asymptoticQuantumChernoffBoundStatement (rho sigma : MState a) : Prop :=
+  Tendsto (fun n : ℕ => optimalEqualPriorTensorPowerErrorExponent rho sigma n)
     atTop (𝓝 (rho.chernoffDistance sigma))
 
 /-- Asymptotic quantum Chernoff bound for finite-dimensional states.
@@ -1105,7 +1033,7 @@ def asymptoticQuantumChernoffBoundStatement (rho sigma : State a) : Prop :=
 This packages Tomamichel's asymptotic QCB statement using the Audenaert/Gour
 finite-copy proof route already assembled in the convergence theorem. -/
 theorem asymptoticQuantumChernoffBound
-    (rho sigma : State a) :
+    (rho sigma : MState a) :
     asymptoticQuantumChernoffBoundStatement rho sigma :=
   errorExponent_tendsto_chernoffDistance rho sigma
 

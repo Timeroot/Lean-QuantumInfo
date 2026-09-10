@@ -9,8 +9,6 @@ module
 public import QuantumLib.QIT.OneShot.SmoothSupportRestriction
 public import QuantumLib.QIT.States.Purification.ReferenceIsometry
 
-set_option maxHeartbeats 3000000
-
 /-!
 # Smooth conditional entropy and reference isometries
 
@@ -40,25 +38,25 @@ variable [Fintype r₁] [DecidableEq r₁] [Fintype r₂] [DecidableEq r₂]
 
 omit [Fintype a] [DecidableEq a] in
 private theorem applyMatrixRight_conjTranspose
-    (V : ReferenceIsometry r₁ r₂) (X : CMatrix (Prod a r₁)) :
+    (V : ReferenceIsometry r₁ r₂) (X : CMatrix (a × r₁)) :
     Matrix.conjTranspose (V.applyMatrixRight X) =
       V.applyMatrixRight (Matrix.conjTranspose X) := by
   ext i j
   simp [applyMatrixRight, rightBlock, Matrix.conjTranspose, Matrix.mul_apply,
     Finset.mul_sum, Finset.sum_mul, mul_comm]
   rw [Finset.sum_comm]
-  simp [ mul_comm, mul_left_comm]
+  simp [mul_comm, mul_left_comm]
 
 omit [DecidableEq a] in
 private theorem trace_applyMatrixRight
-    (V : ReferenceIsometry r₁ r₂) (X : CMatrix (Prod a r₁)) :
+    (V : ReferenceIsometry r₁ r₂) (X : CMatrix (a × r₁)) :
     (V.applyMatrixRight X).trace = X.trace := by
-  have h := V.partialTraceB_applyMatrixRight X
+  have h := V.traceRight_applyMatrixRight X
   have ht := congrArg Matrix.trace h
-  simpa [partialTraceB_trace] using ht
+  simpa [Matrix.traceRight_trace] using ht
 
 private theorem traceNorm_applyMatrixRight
-    (V : ReferenceIsometry r₁ r₂) (X : CMatrix (Prod a r₁)) :
+    (V : ReferenceIsometry r₁ r₂) (X : CMatrix (a × r₁)) :
     traceNorm (V.applyMatrixRight X) = traceNorm X := by
   rw [traceNorm_eq_trace_psdSqrt_mul_conjTranspose,
     traceNorm_eq_trace_psdSqrt_mul_conjTranspose]
@@ -72,7 +70,7 @@ private theorem traceNorm_applyMatrixRight
     (psdSqrt (X * Matrix.conjTranspose X)))
 
 theorem applyMatrixRight_eq_kron_conj
-    (V : ReferenceIsometry r₁ r₂) (X : CMatrix (Prod a r₁)) :
+    (V : ReferenceIsometry r₁ r₂) (X : CMatrix (a × r₁)) :
     V.applyMatrixRight X =
       Matrix.kronecker (1 : CMatrix a) V.matrix * X *
         Matrix.conjTranspose (Matrix.kronecker (1 : CMatrix a) V.matrix) := by
@@ -87,7 +85,7 @@ theorem conditioningK_isometry
     (V : ReferenceIsometry r₁ r₂) :
     Matrix.conjTranspose (Matrix.kronecker (1 : CMatrix a) V.matrix) *
         Matrix.kronecker (1 : CMatrix a) V.matrix =
-      (1 : CMatrix (Prod a r₁)) := by
+      (1 : CMatrix (a × r₁)) := by
   have hconj : Matrix.conjTranspose (Matrix.kronecker (1 : CMatrix a) V.matrix) =
       Matrix.kronecker (1 : CMatrix a) (Matrix.conjTranspose V.matrix) := by
     simpa [Matrix.kronecker] using
@@ -97,38 +95,8 @@ theorem conditioningK_isometry
     (Matrix.mul_kronecker_mul (1 : CMatrix a) (1 : CMatrix a)
       (Matrix.conjTranspose V.matrix) V.matrix).symm
 
-private theorem conditioning_projector_left_fixes
-    (V : ReferenceIsometry r₁ r₂) (X : CMatrix (Prod a r₁)) :
-    (Matrix.kronecker (1 : CMatrix a) V.matrix *
-        Matrix.conjTranspose (Matrix.kronecker (1 : CMatrix a) V.matrix)) *
-        V.applyMatrixRight X = V.applyMatrixRight X := by
-  rw [applyMatrixRight_eq_kron_conj V X]
-  let K : Matrix (Prod a r₂) (Prod a r₁) ℂ :=
-    Matrix.kronecker (1 : CMatrix a) V.matrix
-  have hK : Matrix.conjTranspose K * K = (1 : CMatrix (Prod a r₁)) := by
-    simpa [K] using ReferenceIsometry.conditioningK_isometry (a := a) V
-  change K * Matrix.conjTranspose K * (K * X * Matrix.conjTranspose K) =
-    K * X * Matrix.conjTranspose K
-  calc
-    K * Matrix.conjTranspose K * (K * X * Matrix.conjTranspose K) =
-        K * ((Matrix.conjTranspose K * K) * X * Matrix.conjTranspose K) := by
-      simp [Matrix.mul_assoc]
-    _ = K * X * Matrix.conjTranspose K := by rw [hK]; simp [Matrix.mul_assoc]
-
-private theorem applyMatrix_eq_kron_conj
-    (V : ReferenceIsometry r₁ r₂) (X : CMatrix (Prod r₁ a)) :
-    V.applyMatrix X =
-      Matrix.kronecker V.matrix (1 : CMatrix a) * X *
-        Matrix.conjTranspose (Matrix.kronecker V.matrix (1 : CMatrix a)) := by
-  ext i j
-  simp [ReferenceIsometry.applyMatrix, ReferenceIsometry.targetBlock,
-    Matrix.kronecker, Matrix.mul_apply, Finset.mul_sum, Finset.sum_mul,
-    Matrix.conjTranspose_kronecker, Matrix.conjTranspose_apply,
-    Matrix.one_apply, Fintype.sum_prod_type,
-    mul_assoc, mul_comm]
-
 private theorem applyMatrix_conjTranspose
-    (V : ReferenceIsometry r₁ r₂) (X : CMatrix (Prod r₁ a)) :
+    (V : ReferenceIsometry r₁ r₂) (X : CMatrix (r₁ × a)) :
     Matrix.conjTranspose (V.applyMatrix X) =
       V.applyMatrix (Matrix.conjTranspose X) := by
   rw [applyMatrix_eq_kron_conj V X, applyMatrix_eq_kron_conj V
@@ -138,11 +106,11 @@ private theorem applyMatrix_conjTranspose
 
 private theorem applyMatrix_mul
     (V : ReferenceIsometry r₁ r₂)
-    (X Y : CMatrix (Prod r₁ a)) :
+    (X Y : CMatrix (r₁ × a)) :
     V.applyMatrix X * V.applyMatrix Y = V.applyMatrix (X * Y) := by
-  let K : Matrix (Prod r₂ a) (Prod r₁ a) ℂ :=
+  let K : Matrix (r₂ × a) (r₁ × a) ℂ :=
     Matrix.kronecker V.matrix (1 : CMatrix a)
-  have hK : Matrix.conjTranspose K * K = (1 : CMatrix (Prod r₁ a)) := by
+  have hK : Matrix.conjTranspose K * K = (1 : CMatrix (r₁ × a)) := by
     have hconj : Matrix.conjTranspose K =
         Matrix.kronecker (Matrix.conjTranspose V.matrix) (1 : CMatrix a) := by
       dsimp [K]
@@ -156,21 +124,11 @@ private theorem applyMatrix_mul
     applyMatrix_eq_kron_conj V (X * Y)]
   exact ((Matrix.isometryConjNonUnitalStarAlgHom K hK).map_mul X Y).symm
 
-private theorem applyMatrix_posSemidef
-    (V : ReferenceIsometry r₁ r₂) {X : CMatrix (Prod r₁ a)}
-    (hX : X.PosSemidef) :
-    (V.applyMatrix X).PosSemidef := by
-  let K : Matrix (Prod r₂ a) (Prod r₁ a) ℂ :=
-    Matrix.kronecker V.matrix (1 : CMatrix a)
-  have h := hX.conjTranspose_mul_mul_same (Matrix.conjTranspose K)
-  rw [applyMatrix_eq_kron_conj V X]
-  simpa [K, Matrix.conjTranspose_conjTranspose] using h
-
 private theorem psdSqrt_applyMatrix
-    (V : ReferenceIsometry r₁ r₂) {X : CMatrix (Prod r₁ a)}
+    (V : ReferenceIsometry r₁ r₂) {X : CMatrix (r₁ × a)}
     (hX : X.PosSemidef) :
     psdSqrt (V.applyMatrix X) = V.applyMatrix (psdSqrt X) := by
-  let S : CMatrix (Prod r₂ a) := V.applyMatrix (psdSqrt X)
+  let S : CMatrix (r₂ × a) := V.applyMatrix (psdSqrt X)
   have hSpos : S.PosSemidef := by
     simpa [S] using applyMatrix_posSemidef V (psdSqrt_pos X)
   have hSsq : S * S = V.applyMatrix X := by
@@ -179,21 +137,8 @@ private theorem psdSqrt_applyMatrix
   simpa [psdSqrt, S] using
     (CFC.sqrt_unique (a := V.applyMatrix X) (b := S) hSsq hSpos.nonneg)
 
-omit [DecidableEq a] in
-private theorem partialTraceB_applyMatrix
-    (V : ReferenceIsometry r₁ r₂) (X : CMatrix (Prod r₁ a)) :
-    partialTraceB (a := r₂) (b := a) (V.applyMatrix X) =
-      V.matrix * partialTraceB (a := r₁) (b := a) X *
-        Matrix.conjTranspose V.matrix := by
-  ext x y
-  simp [partialTraceB, applyMatrix, targetBlock, Matrix.mul_apply,
-    Finset.sum_mul, Finset.mul_sum, mul_assoc, mul_comm]
-  rw [Finset.sum_comm]
-  refine Finset.sum_congr rfl fun j _ => ?_
-  rw [Finset.sum_comm]
-
 private theorem traceNorm_applyMatrix
-    (V : ReferenceIsometry r₁ r₂) (X : CMatrix (Prod r₁ a)) :
+    (V : ReferenceIsometry r₁ r₂) (X : CMatrix (r₁ × a)) :
     traceNorm (V.applyMatrix X) = traceNorm X := by
   rw [traceNorm_eq_trace_psdSqrt_mul_conjTranspose,
     traceNorm_eq_trace_psdSqrt_mul_conjTranspose]
@@ -205,7 +150,7 @@ private theorem traceNorm_applyMatrix
         V.applyMatrix (X * Matrix.conjTranspose X) := by
     rw [hconj, applyMatrix_mul]
   rw [hmul]
-  let S : CMatrix (Prod r₂ a) :=
+  let S : CMatrix (r₂ × a) :=
     V.applyMatrix (psdSqrt (X * Matrix.conjTranspose X))
   have hsqrt : psdSqrt (V.applyMatrix (X * Matrix.conjTranspose X)) = S := by
     have hSpos : S.PosSemidef := by
@@ -252,115 +197,25 @@ private def referenceIsometryCompressed
   simp [referenceIsometryCompressed, applyTraceNonincreasingCP_matrix,
     MatrixMap.ofKraus]
 
-private theorem smoothIsometry_psdSqrt_projector_factor
-    {c : Type*} [Fintype c] [DecidableEq c]
-    (E A : CMatrix c) (hA : A.PosSemidef)
-    (hEherm : E.IsHermitian) :
-    ∃ U : Matrix.unitaryGroup c ℂ,
-      psdSqrt (E * A * E) = E * psdSqrt A * (U : CMatrix c) := by
-  have hEA : (E * A * E).PosSemidef := by
-    have h := hA.conjTranspose_mul_mul_same E
-    rw [hEherm.eq] at h
-    simpa [Matrix.mul_assoc] using h
-  let X : CMatrix c := E * psdSqrt A
-  let S : CMatrix c := psdSqrt (E * A * E)
-  have hSsq : S * Matrix.conjTranspose S = E * A * E := by
-    dsimp [S]
-    rw [psdSqrt_isHermitian (E * A * E), psdSqrt_mul_self_of_posSemidef hEA]
-  have hXgram : X * Matrix.conjTranspose X = E * A * E := by
-    dsimp [X]
-    rw [Matrix.conjTranspose_mul, hEherm.eq, psdSqrt_isHermitian A]
-    calc
-      E * psdSqrt A * (psdSqrt A * E) =
-          E * (psdSqrt A * psdSqrt A) * E := by simp [Matrix.mul_assoc]
-      _ = E * A * E := by rw [psdSqrt_mul_self_of_posSemidef hA]
-  obtain ⟨V, hV⟩ :=
-    ReferenceIsometry.exists_eq_mul_transpose_of_mul_conjTranspose_eq
-      (A := X) (B := S) (by rw [hXgram, hSsq]) (Nat.le_refl _)
-  let U : Matrix.unitaryGroup c ℂ :=
-    ⟨Matrix.transpose V.matrix, by
-      classical
-      rw [Matrix.mem_unitaryGroup_iff]
-      ext i j
-      have h := congrFun (congrFun V.isometry j) i
-      simpa [Matrix.mul_apply, Matrix.conjTranspose, Matrix.transpose,
-        Matrix.one_apply, Finset.mul_sum, mul_comm, eq_comm] using h⟩
-  refine ⟨U, ?_⟩
-  simpa [X, S, U] using hV
-
-private theorem smoothIsometry_traceNorm_sqrt_mul_sqrt_eq_trace_sandwich
-    {c : Type*} [Fintype c] [DecidableEq c]
-    (A B : CMatrix c) (hA : A.PosSemidef) :
-    traceNorm (psdSqrt A * psdSqrt B) =
-      (psdSqrt (psdSqrt B * A * psdSqrt B)).trace.re := by
-  rw [← traceNorm_conjTranspose (psdSqrt A * psdSqrt B)]
-  rw [Matrix.conjTranspose_mul, psdSqrt_isHermitian A,
-    psdSqrt_isHermitian B]
-  rw [traceNorm_eq_trace_psdSqrt_mul_conjTranspose]
-  rw [Matrix.conjTranspose_mul, psdSqrt_isHermitian A,
-    psdSqrt_isHermitian B]
-  have hinside :
-      psdSqrt B * psdSqrt A * (psdSqrt A * psdSqrt B) =
-        psdSqrt B * A * psdSqrt B := by
-    calc
-      psdSqrt B * psdSqrt A * (psdSqrt A * psdSqrt B) =
-          psdSqrt B * (psdSqrt A * psdSqrt A) * psdSqrt B := by
-            simp [Matrix.mul_assoc]
-      _ = psdSqrt B * A * psdSqrt B := by
-            rw [psdSqrt_mul_self_of_posSemidef hA]
-  rw [hinside]
-
-private theorem smoothIsometry_candidate_side_compression_eq
-    {c : Type*} [Fintype c] [DecidableEq c]
-    (A R E : CMatrix c) (hR : R.PosSemidef)
-    (hER : (E * R * E).PosSemidef)
-    (hleft : psdSqrt A * E = psdSqrt A)
-    (hright : E * psdSqrt A = psdSqrt A) :
-    traceNorm (psdSqrt A * psdSqrt R) =
-      traceNorm (psdSqrt A * psdSqrt (E * R * E)) := by
-  have hsand : psdSqrt A * R * psdSqrt A =
-      psdSqrt A * (E * R * E) * psdSqrt A := by
-    calc
-      psdSqrt A * R * psdSqrt A =
-          (psdSqrt A * E) * R * (E * psdSqrt A) := by rw [hleft, hright]
-      _ = psdSqrt A * (E * R * E) * psdSqrt A := by simp [Matrix.mul_assoc]
-  calc
-    traceNorm (psdSqrt A * psdSqrt R) =
-        traceNorm (psdSqrt R * psdSqrt A) := by
-      rw [← traceNorm_conjTranspose]
-      rw [Matrix.conjTranspose_mul, psdSqrt_isHermitian A,
-        psdSqrt_isHermitian R]
-    _ = (psdSqrt (psdSqrt A * R * psdSqrt A)).trace.re :=
-      smoothIsometry_traceNorm_sqrt_mul_sqrt_eq_trace_sandwich R A hR
-    _ = (psdSqrt (psdSqrt A * (E * R * E) * psdSqrt A)).trace.re := by
-      rw [hsand]
-    _ = traceNorm (psdSqrt (E * R * E) * psdSqrt A) :=
-      (smoothIsometry_traceNorm_sqrt_mul_sqrt_eq_trace_sandwich
-        (E * R * E) A hER).symm
-    _ = traceNorm (psdSqrt A * psdSqrt (E * R * E)) := by
-      rw [← traceNorm_conjTranspose]
-      rw [Matrix.conjTranspose_mul, psdSqrt_isHermitian A,
-        psdSqrt_isHermitian (E * R * E)]
-
 private theorem conditionalMaxEntropyTraceNorm_conditioningIsometryApply_eq
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    (ρ : SubnormalizedState (Prod a b)) (σPlus : SubnormalizedState bPlus)
+    (ρ : SubnormalizedState (a × b)) (σPlus : SubnormalizedState bPlus)
     (V : ReferenceIsometry b bPlus) :
     traceNorm (psdSqrt (ρ.conditioningIsometryApply V).matrix *
         psdSqrt (identityTensorStateMatrix (a := a) σPlus)) =
       traceNorm (psdSqrt ρ.matrix *
         psdSqrt (identityTensorStateMatrix (a := a)
           (referenceIsometryCompressed σPlus V))) := by
-  let K : Matrix (Prod a bPlus) (Prod a b) ℂ :=
+  let K : Matrix (a × bPlus) (a × b) ℂ :=
     Matrix.kronecker (1 : CMatrix a) V.matrix
-  let E : CMatrix (Prod a bPlus) := K * Matrix.conjTranspose K
-  let ρPlus : SubnormalizedState (Prod a bPlus) :=
+  let E : CMatrix (a × bPlus) := K * Matrix.conjTranspose K
+  let ρPlus : SubnormalizedState (a × bPlus) :=
     ρ.conditioningIsometryApply V
   let σ : SubnormalizedState b := referenceIsometryCompressed σPlus V
-  let RPlus : CMatrix (Prod a bPlus) :=
+  let RPlus : CMatrix (a × bPlus) :=
     identityTensorStateMatrix (a := a) σPlus
-  let R : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
-  have hK : Matrix.conjTranspose K * K = (1 : CMatrix (Prod a b)) := by
+  let R : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
+  have hK : Matrix.conjTranspose K * K = (1 : CMatrix (a × b)) := by
     simpa [K] using ReferenceIsometry.conditioningK_isometry (a := a) V
   have hEpos : E.PosSemidef := by
     dsimp [E]
@@ -387,22 +242,22 @@ private theorem conditionalMaxEntropyTraceNorm_conditioningIsometryApply_eq
             (Matrix.conjTranspose K * K)) * Matrix.conjTranspose K := by
               simp [E, Matrix.mul_assoc]
       _ = ρPlus.matrix := by rw [hK]; simp only [one_mul, mul_one]; exact hA.symm
-  obtain ⟨U, hU⟩ := smoothIsometry_psdSqrt_projector_factor E
+  obtain ⟨U, hU⟩ := exists_unitary_psdSqrt_conj_eq E
     ρPlus.matrix ρPlus.pos hEherm
   have hU' : psdSqrt ρPlus.matrix =
-      E * psdSqrt ρPlus.matrix * (U : CMatrix (Prod a bPlus)) := by
+      E * psdSqrt ρPlus.matrix * (U : CMatrix (a × bPlus)) := by
     simpa [hAfix] using hU
   have hright : E * psdSqrt ρPlus.matrix = psdSqrt ρPlus.matrix := by
     calc
       E * psdSqrt ρPlus.matrix =
-          E * (E * psdSqrt ρPlus.matrix * (U : CMatrix (Prod a bPlus))) :=
-            congrArg (fun X : CMatrix (Prod a bPlus) => E * X) hU'
-      _ = E * psdSqrt ρPlus.matrix * (U : CMatrix (Prod a bPlus)) := by
+          E * (E * psdSqrt ρPlus.matrix * (U : CMatrix (a × bPlus))) :=
+            congrArg (fun X : CMatrix (a × bPlus) => E * X) hU'
+      _ = E * psdSqrt ρPlus.matrix * (U : CMatrix (a × bPlus)) := by
             calc
-              E * (E * psdSqrt ρPlus.matrix * (U : CMatrix (Prod a bPlus))) =
-                  (E * E) * psdSqrt ρPlus.matrix * (U : CMatrix (Prod a bPlus)) := by
+              E * (E * psdSqrt ρPlus.matrix * (U : CMatrix (a × bPlus))) =
+                  (E * E) * psdSqrt ρPlus.matrix * (U : CMatrix (a × bPlus)) := by
                     simp [Matrix.mul_assoc]
-              _ = E * psdSqrt ρPlus.matrix * (U : CMatrix (Prod a bPlus)) := by
+              _ = E * psdSqrt ρPlus.matrix * (U : CMatrix (a × bPlus)) := by
                     rw [hEid]
       _ = psdSqrt ρPlus.matrix := hU'.symm
   have hleft : psdSqrt ρPlus.matrix * E = psdSqrt ρPlus.matrix := by
@@ -467,7 +322,7 @@ private theorem conditionalMaxEntropyTraceNorm_conditioningIsometryApply_eq
     exact ReferenceIsometry.applyMatrixRight_posSemidef V hR
   have hroot : psdSqrt (E * RPlus * E) = V.applyMatrixRight (psdSqrt R) := by
     rw [hER, V.psdSqrt_applyMatrixRight hR]
-  have hcandidate := smoothIsometry_candidate_side_compression_eq
+  have hcandidate := traceNorm_psdSqrt_mul_psdSqrt_conj_eq
     ρPlus.matrix RPlus E hRplus hERpos hleft hright
   dsimp [ρPlus, RPlus, R, σ] at *
   rw [hroot, conditioningIsometryApply_matrix,
@@ -478,20 +333,20 @@ private theorem conditionalMaxEntropyTraceNorm_conditioningIsometryApply_eq
 
 private theorem conditionalMaxEntropyTraceNorm_sourceIsometryApply_eq
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
-    (ρ : SubnormalizedState (Prod a b)) (σ : SubnormalizedState b)
+    (ρ : SubnormalizedState (a × b)) (σ : SubnormalizedState b)
     (U : ReferenceIsometry a aPlus) :
     traceNorm (psdSqrt (ρ.sourceIsometryApply U).matrix *
         psdSqrt (identityTensorStateMatrix (a := aPlus) σ)) =
       traceNorm (psdSqrt ρ.matrix *
         psdSqrt (identityTensorStateMatrix (a := a) σ)) := by
-  let K : Matrix (Prod aPlus b) (Prod a b) ℂ :=
+  let K : Matrix (aPlus × b) (a × b) ℂ :=
     Matrix.kronecker U.matrix (1 : CMatrix b)
-  let E : CMatrix (Prod aPlus b) := K * Matrix.conjTranspose K
-  let ρPlus : SubnormalizedState (Prod aPlus b) := ρ.sourceIsometryApply U
-  let RPlus : CMatrix (Prod aPlus b) :=
+  let E : CMatrix (aPlus × b) := K * Matrix.conjTranspose K
+  let ρPlus : SubnormalizedState (aPlus × b) := ρ.sourceIsometryApply U
+  let RPlus : CMatrix (aPlus × b) :=
     identityTensorStateMatrix (a := aPlus) σ
-  let R : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
-  have hK : Matrix.conjTranspose K * K = (1 : CMatrix (Prod a b)) := by
+  let R : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
+  have hK : Matrix.conjTranspose K * K = (1 : CMatrix (a × b)) := by
     have hconj : Matrix.conjTranspose K =
         Matrix.kronecker (Matrix.conjTranspose U.matrix) (1 : CMatrix b) := by
       dsimp [K]
@@ -525,22 +380,22 @@ private theorem conditionalMaxEntropyTraceNorm_sourceIsometryApply_eq
             (Matrix.conjTranspose K * K)) * Matrix.conjTranspose K := by
               simp [E, Matrix.mul_assoc]
       _ = ρPlus.matrix := by rw [hK]; simp only [one_mul, mul_one]; exact hA.symm
-  obtain ⟨W, hW⟩ := smoothIsometry_psdSqrt_projector_factor E
+  obtain ⟨W, hW⟩ := exists_unitary_psdSqrt_conj_eq E
     ρPlus.matrix ρPlus.pos hEherm
   have hW' : psdSqrt ρPlus.matrix =
-      E * psdSqrt ρPlus.matrix * (W : CMatrix (Prod aPlus b)) := by
+      E * psdSqrt ρPlus.matrix * (W : CMatrix (aPlus × b)) := by
     simpa [hAfix] using hW
   have hright : E * psdSqrt ρPlus.matrix = psdSqrt ρPlus.matrix := by
     calc
       E * psdSqrt ρPlus.matrix =
-          E * (E * psdSqrt ρPlus.matrix * (W : CMatrix (Prod aPlus b))) :=
-            congrArg (fun X : CMatrix (Prod aPlus b) => E * X) hW'
-      _ = E * psdSqrt ρPlus.matrix * (W : CMatrix (Prod aPlus b)) := by
+          E * (E * psdSqrt ρPlus.matrix * (W : CMatrix (aPlus × b))) :=
+            congrArg (fun X : CMatrix (aPlus × b) => E * X) hW'
+      _ = E * psdSqrt ρPlus.matrix * (W : CMatrix (aPlus × b)) := by
             calc
-              E * (E * psdSqrt ρPlus.matrix * (W : CMatrix (Prod aPlus b))) =
-                  (E * E) * psdSqrt ρPlus.matrix * (W : CMatrix (Prod aPlus b)) := by
+              E * (E * psdSqrt ρPlus.matrix * (W : CMatrix (aPlus × b))) =
+                  (E * E) * psdSqrt ρPlus.matrix * (W : CMatrix (aPlus × b)) := by
                     simp [Matrix.mul_assoc]
-              _ = E * psdSqrt ρPlus.matrix * (W : CMatrix (Prod aPlus b)) := by
+              _ = E * psdSqrt ρPlus.matrix * (W : CMatrix (aPlus × b)) := by
                     rw [hEid]
       _ = psdSqrt ρPlus.matrix := hW'.symm
   have hleft : psdSqrt ρPlus.matrix * E = psdSqrt ρPlus.matrix := by
@@ -589,7 +444,7 @@ private theorem conditionalMaxEntropyTraceNorm_sourceIsometryApply_eq
     exact ReferenceIsometry.applyMatrix_posSemidef U hR
   have hroot : psdSqrt (E * RPlus * E) = U.applyMatrix (psdSqrt R) := by
     rw [hER, ReferenceIsometry.psdSqrt_applyMatrix U hR]
-  have hcandidate := smoothIsometry_candidate_side_compression_eq
+  have hcandidate := traceNorm_psdSqrt_mul_psdSqrt_conj_eq
     ρPlus.matrix RPlus E hRplus hERpos hleft hright
   dsimp [ρPlus, RPlus, R] at *
   rw [hroot, sourceIsometryApply_matrix,
@@ -601,7 +456,7 @@ private theorem conditionalMaxEntropyTraceNorm_sourceIsometryApply_eq
 
 private theorem conditionalMaxEntropyExponentCandidate_conditioningIsometryApply_compressed_eq
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    (ρ : SubnormalizedState (Prod a b)) (σPlus : SubnormalizedState bPlus)
+    (ρ : SubnormalizedState (a × b)) (σPlus : SubnormalizedState bPlus)
     (V : ReferenceIsometry b bPlus) :
     (ρ.conditioningIsometryApply V).conditionalMaxEntropyExponentCandidate σPlus =
       ρ.conditionalMaxEntropyExponentCandidate
@@ -611,7 +466,7 @@ private theorem conditionalMaxEntropyExponentCandidate_conditioningIsometryApply
 
 private theorem conditionalMaxEntropyFidelityCandidate_conditioningIsometryApply_compressed_eq
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    (ρ : SubnormalizedState (Prod a b)) (σPlus : SubnormalizedState bPlus)
+    (ρ : SubnormalizedState (a × b)) (σPlus : SubnormalizedState bPlus)
     (V : ReferenceIsometry b bPlus) :
     (ρ.conditioningIsometryApply V).conditionalMaxEntropyFidelityCandidate σPlus =
       ρ.conditionalMaxEntropyFidelityCandidate
@@ -636,19 +491,21 @@ private theorem referenceIsometryCompressed_referenceIsometryApply
           simp only [Matrix.mul_assoc]
     _ = σ.matrix := by rw [V.isometry]; simp
 
-private theorem conditioningIsometryCompressed_apply_matrix
+/-- Compressing a subnormalized state through a reference isometry and re-applying the
+isometry conjugates by the isometry's range projector. -/
+theorem conditioningIsometryCompressed_apply_matrix
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    (τPlus : SubnormalizedState (Prod a bPlus)) (V : ReferenceIsometry b bPlus) :
+    (τPlus : SubnormalizedState (a × bPlus)) (V : ReferenceIsometry b bPlus) :
     ((τPlus.conditioningIsometryCompressed V).conditioningIsometryApply V).matrix =
       Matrix.kronecker (1 : CMatrix a) (V.matrix * Matrix.conjTranspose V.matrix) *
           τPlus.matrix *
         Matrix.conjTranspose (Matrix.kronecker (1 : CMatrix a)
           (V.matrix * Matrix.conjTranspose V.matrix)) := by
   rw [conditioningIsometryApply_matrix, conditioningIsometryCompressed_matrix]
-  let K : Matrix (Prod a bPlus) (Prod a b) ℂ :=
+  let K : Matrix (a × bPlus) (a × b) ℂ :=
     Matrix.kronecker (1 : CMatrix a) V.matrix
   have hcompress :
-      MatrixMap.kron (Channel.idChannel a).map
+      MatrixMap.kron (CPTPOp.id (dIn := a)).map
           (MatrixMap.ofKraus (fun _ : Unit => Matrix.conjTranspose V.matrix))
           τPlus.matrix = Matrix.conjTranspose K * τPlus.matrix * K := by
     ext i j
@@ -713,19 +570,19 @@ private theorem conditioningIsometryCompressed_apply_matrix
 
 private theorem sourceIsometryCompressed_apply_matrix
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
-    (τPlus : SubnormalizedState (Prod aPlus b)) (U : ReferenceIsometry a aPlus) :
+    (τPlus : SubnormalizedState (aPlus × b)) (U : ReferenceIsometry a aPlus) :
     ((τPlus.sourceIsometryCompressed U).sourceIsometryApply U).matrix =
       Matrix.kronecker (U.matrix * Matrix.conjTranspose U.matrix)
           (1 : CMatrix b) * τPlus.matrix *
         Matrix.conjTranspose (Matrix.kronecker (U.matrix *
           Matrix.conjTranspose U.matrix) (1 : CMatrix b)) := by
   rw [sourceIsometryApply_matrix, sourceIsometryCompressed_matrix]
-  let K : Matrix (Prod aPlus b) (Prod a b) ℂ :=
+  let K : Matrix (aPlus × b) (a × b) ℂ :=
     Matrix.kronecker U.matrix (1 : CMatrix b)
   have hcompress :
       MatrixMap.kron
           (MatrixMap.ofKraus (fun _ : Unit => Matrix.conjTranspose U.matrix))
-          (Channel.idChannel b).map τPlus.matrix =
+          (CPTPOp.id (dIn := b)).map τPlus.matrix =
         Matrix.conjTranspose K * τPlus.matrix * K := by
     ext i j
     rw [MatrixMap.kron_idChannel_apply_slice]
@@ -785,59 +642,36 @@ private theorem sourceIsometryCompressed_apply_matrix
           Matrix.conjTranspose U.matrix) (1 : CMatrix b)) := by
         rw [hE, hEherm]
 
-private theorem smoothIsometry_fixes_of_supports_projector
-    {c : Type*} [Fintype c] [DecidableEq c]
-    {M P : CMatrix c} (hM : M.PosSemidef) (hP : P.PosSemidef)
-    (hPid : P * P = P) (hSupport : Matrix.Supports M P) :
-    P * M = M ∧ M * P = M := by
-  have hPcomp : P * (1 - P) = 0 := by
-    rw [Matrix.mul_sub, Matrix.mul_one, hPid]
-    abel
-  have hMcomp : M * (1 - P) = 0 := by
-    ext i j
-    have hv := hSupport (fun k => (1 - P) k j) (by
-      ext i'
-      change ∑ k, P i' k * (1 - P) k j = 0
-      simpa [Matrix.mul_apply] using congrFun (congrFun hPcomp i') j)
-    simpa [Matrix.mul_apply, Matrix.mulVec, dotProduct] using congrFun hv i
-  have hright : M * P = M := by
-    calc
-      M * P = M * (1 - (1 - P)) := by noncomm_ring
-      _ = M := by rw [Matrix.mul_sub, hMcomp, Matrix.mul_one]; abel
-  have hleft : P * M = M := by
-    have hconj := congrArg Matrix.conjTranspose hright
-    simpa [Matrix.conjTranspose_mul, hP.isHermitian.eq, hM.isHermitian.eq]
-      using hconj
-  exact ⟨hleft, hright⟩
-
-private theorem conditioning_support_projector_supports_image
+/-- The bipartite support projector of an isometrically conditioned state is supported by
+the isometry's range projector on the reference factor. -/
+theorem conditioning_support_projector_supports_image
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    (ρ : SubnormalizedState (Prod a b)) (V : ReferenceIsometry b bPlus) :
+    (ρ : SubnormalizedState (a × b)) (V : ReferenceIsometry b bPlus) :
     Matrix.Supports
       (bipartiteSupportProjector (ρ.conditioningIsometryApply V))
       (Matrix.kronecker (1 : CMatrix a)
         (V.matrix * Matrix.conjTranspose V.matrix)) := by
   let ρPlus := ρ.conditioningIsometryApply V
   let Q : CMatrix bPlus := V.matrix * Matrix.conjTranspose V.matrix
-  let P : CMatrix (Prod a bPlus) := bipartiteSupportProjector ρPlus
-  have hNB : ρPlus.marginalB.matrix * Q = ρPlus.marginalB.matrix := by
-    rw [SubnormalizedState.marginalB_matrix,
+  let P : CMatrix (a × bPlus) := bipartiteSupportProjector ρPlus
+  have hNB : ρPlus.traceLeft.matrix * Q = ρPlus.traceLeft.matrix := by
+    rw [SubnormalizedState.traceLeft_matrix,
       SubnormalizedState.conditioningIsometryApply_matrix]
-    rw [V.partialTraceA_applyMatrixRight]
+    rw [V.traceLeft_applyMatrixRight]
     calc
-      (V.matrix * ρ.marginalB.matrix * Matrix.conjTranspose V.matrix) *
+      (V.matrix * ρ.traceLeft.matrix * Matrix.conjTranspose V.matrix) *
           (V.matrix * Matrix.conjTranspose V.matrix) =
-        V.matrix * ρ.marginalB.matrix *
+        V.matrix * ρ.traceLeft.matrix *
           (Matrix.conjTranspose V.matrix * V.matrix) *
             Matrix.conjTranspose V.matrix := by simp [Matrix.mul_assoc]
-      _ = V.matrix * ρ.marginalB.matrix * Matrix.conjTranspose V.matrix := by
+      _ = V.matrix * ρ.traceLeft.matrix * Matrix.conjTranspose V.matrix := by
         rw [V.isometry]
         simp
   let PB : CMatrix bPlus :=
-    supportProjector ρPlus.marginalB.matrix ρPlus.marginalB.pos
+    supportProjector ρPlus.traceLeft.matrix ρPlus.traceLeft.pos
   have hPBQ : Matrix.Supports PB Q := by
     apply Matrix.Supports.trans
-      (supportProjector_supports ρPlus.marginalB.matrix ρPlus.marginalB.pos)
+      (supportProjector_supports ρPlus.traceLeft.matrix ρPlus.traceLeft.pos)
     exact Matrix.Supports.of_mul_right_eq_self hNB
   have hPBfix : Q * PB = PB ∧ PB * Q = PB := by
     have hQpos : Q.PosSemidef := Matrix.posSemidef_self_mul_conjTranspose V.matrix
@@ -849,60 +683,60 @@ private theorem conditioning_support_projector_supports_image
           V.matrix * (Matrix.conjTranspose V.matrix * V.matrix) *
             Matrix.conjTranspose V.matrix := by simp [Matrix.mul_assoc]
         _ = Q := by rw [V.isometry]; simp [Q]
-    exact smoothIsometry_fixes_of_supports_projector
-      (psdInvSqrt_support_posSemidef ρPlus.marginalB.pos) hQpos hQid hPBQ
+    exact Matrix.Supports.projector_fixes
+      (psdInvSqrt_support_posSemidef ρPlus.traceLeft.pos) hQpos hQid hPBQ
   have hPE : Matrix.Supports P (Matrix.kronecker (1 : CMatrix a) Q) := by
     apply Matrix.Supports.of_mul_right_eq_self
     dsimp [P]
     change Matrix.kronecker
-        (supportProjector ρPlus.marginalA.matrix ρPlus.marginalA.pos) PB *
+        (supportProjector ρPlus.traceRight.matrix ρPlus.traceRight.pos) PB *
         Matrix.kronecker (1 : CMatrix a) Q =
       Matrix.kronecker
-        (supportProjector ρPlus.marginalA.matrix ρPlus.marginalA.pos) PB
+        (supportProjector ρPlus.traceRight.matrix ρPlus.traceRight.pos) PB
     calc
       Matrix.kronecker
-          (supportProjector ρPlus.marginalA.matrix ρPlus.marginalA.pos) PB *
+          (supportProjector ρPlus.traceRight.matrix ρPlus.traceRight.pos) PB *
           Matrix.kronecker (1 : CMatrix a) Q =
         Matrix.kronecker
-          (supportProjector ρPlus.marginalA.matrix ρPlus.marginalA.pos * 1)
+          (supportProjector ρPlus.traceRight.matrix ρPlus.traceRight.pos * 1)
           (PB * Q) := by
             simpa [Matrix.kronecker] using
               (Matrix.mul_kronecker_mul
-                (supportProjector ρPlus.marginalA.matrix ρPlus.marginalA.pos)
+                (supportProjector ρPlus.traceRight.matrix ρPlus.traceRight.pos)
                 (1 : CMatrix a) PB Q).symm
       _ = Matrix.kronecker
-          (supportProjector ρPlus.marginalA.matrix ρPlus.marginalA.pos) PB := by
+          (supportProjector ρPlus.traceRight.matrix ρPlus.traceRight.pos) PB := by
             rw [mul_one, hPBfix.2]
   simpa [P, Q] using hPE
 
 private theorem source_support_projector_supports_image
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
-    (ρ : SubnormalizedState (Prod a b)) (U : ReferenceIsometry a aPlus) :
+    (ρ : SubnormalizedState (a × b)) (U : ReferenceIsometry a aPlus) :
     Matrix.Supports
       (bipartiteSupportProjector (ρ.sourceIsometryApply U))
       (Matrix.kronecker
         (U.matrix * Matrix.conjTranspose U.matrix) (1 : CMatrix b)) := by
   let ρPlus := ρ.sourceIsometryApply U
   let Q : CMatrix aPlus := U.matrix * Matrix.conjTranspose U.matrix
-  let P : CMatrix (Prod aPlus b) := bipartiteSupportProjector ρPlus
-  have hNA : ρPlus.marginalA.matrix * Q = ρPlus.marginalA.matrix := by
-    rw [SubnormalizedState.marginalA_matrix,
+  let P : CMatrix (aPlus × b) := bipartiteSupportProjector ρPlus
+  have hNA : ρPlus.traceRight.matrix * Q = ρPlus.traceRight.matrix := by
+    rw [SubnormalizedState.traceRight_matrix,
       SubnormalizedState.sourceIsometryApply_matrix]
-    rw [ReferenceIsometry.partialTraceB_applyMatrix U]
+    rw [ReferenceIsometry.traceRight_applyMatrix U]
     calc
-      (U.matrix * ρ.marginalA.matrix * Matrix.conjTranspose U.matrix) *
+      (U.matrix * ρ.traceRight.matrix * Matrix.conjTranspose U.matrix) *
           (U.matrix * Matrix.conjTranspose U.matrix) =
-        U.matrix * ρ.marginalA.matrix *
+        U.matrix * ρ.traceRight.matrix *
           (Matrix.conjTranspose U.matrix * U.matrix) *
             Matrix.conjTranspose U.matrix := by simp [Matrix.mul_assoc]
-      _ = U.matrix * ρ.marginalA.matrix * Matrix.conjTranspose U.matrix := by
+      _ = U.matrix * ρ.traceRight.matrix * Matrix.conjTranspose U.matrix := by
         rw [U.isometry]
         simp
   let PA : CMatrix aPlus :=
-    supportProjector ρPlus.marginalA.matrix ρPlus.marginalA.pos
+    supportProjector ρPlus.traceRight.matrix ρPlus.traceRight.pos
   have hPAQ : Matrix.Supports PA Q := by
     apply Matrix.Supports.trans
-      (supportProjector_supports ρPlus.marginalA.matrix ρPlus.marginalA.pos)
+      (supportProjector_supports ρPlus.traceRight.matrix ρPlus.traceRight.pos)
     exact Matrix.Supports.of_mul_right_eq_self hNA
   have hPAfix : Q * PA = PA ∧ PA * Q = PA := by
     have hQpos : Q.PosSemidef := Matrix.posSemidef_self_mul_conjTranspose U.matrix
@@ -914,41 +748,41 @@ private theorem source_support_projector_supports_image
           U.matrix * (Matrix.conjTranspose U.matrix * U.matrix) *
             Matrix.conjTranspose U.matrix := by simp [Matrix.mul_assoc]
         _ = Q := by rw [U.isometry]; simp [Q]
-    exact smoothIsometry_fixes_of_supports_projector
-      (psdInvSqrt_support_posSemidef ρPlus.marginalA.pos) hQpos hQid hPAQ
+    exact Matrix.Supports.projector_fixes
+      (psdInvSqrt_support_posSemidef ρPlus.traceRight.pos) hQpos hQid hPAQ
   have hPE : Matrix.Supports P (Matrix.kronecker Q (1 : CMatrix b)) := by
     apply Matrix.Supports.of_mul_right_eq_self
     dsimp [P]
     change Matrix.kronecker PA
-        (supportProjector ρPlus.marginalB.matrix ρPlus.marginalB.pos) *
+        (supportProjector ρPlus.traceLeft.matrix ρPlus.traceLeft.pos) *
         Matrix.kronecker Q (1 : CMatrix b) =
       Matrix.kronecker PA
-        (supportProjector ρPlus.marginalB.matrix ρPlus.marginalB.pos)
+        (supportProjector ρPlus.traceLeft.matrix ρPlus.traceLeft.pos)
     calc
       Matrix.kronecker PA
-          (supportProjector ρPlus.marginalB.matrix ρPlus.marginalB.pos) *
+          (supportProjector ρPlus.traceLeft.matrix ρPlus.traceLeft.pos) *
           Matrix.kronecker Q (1 : CMatrix b) =
         Matrix.kronecker (PA * Q)
-          (supportProjector ρPlus.marginalB.matrix ρPlus.marginalB.pos * 1) := by
+          (supportProjector ρPlus.traceLeft.matrix ρPlus.traceLeft.pos * 1) := by
             simpa [Matrix.kronecker] using
               (Matrix.mul_kronecker_mul PA Q
-                (supportProjector ρPlus.marginalB.matrix ρPlus.marginalB.pos)
+                (supportProjector ρPlus.traceLeft.matrix ρPlus.traceLeft.pos)
                 (1 : CMatrix b)).symm
       _ = Matrix.kronecker PA
-          (supportProjector ρPlus.marginalB.matrix ρPlus.marginalB.pos) := by
+          (supportProjector ρPlus.traceLeft.matrix ρPlus.traceLeft.pos) := by
             rw [hPAfix.2, mul_one]
   simpa [P, Q] using hPE
 
 private theorem source_support_reconstruct
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
-    (τPlus : SubnormalizedState (Prod aPlus b)) (U : ReferenceIsometry a aPlus)
-    {P : CMatrix (Prod aPlus b)}
+    (τPlus : SubnormalizedState (aPlus × b)) (U : ReferenceIsometry a aPlus)
+    {P : CMatrix (aPlus × b)}
     (hSupport : Matrix.Supports τPlus.matrix P)
     (hImage : Matrix.Supports P
       (Matrix.kronecker
         (U.matrix * Matrix.conjTranspose U.matrix) (1 : CMatrix b))) :
     (τPlus.sourceIsometryCompressed U).sourceIsometryApply U = τPlus := by
-  let E : CMatrix (Prod aPlus b) := Matrix.kronecker
+  let E : CMatrix (aPlus × b) := Matrix.kronecker
       (U.matrix * Matrix.conjTranspose U.matrix) (1 : CMatrix b)
   have hEpos : E.PosSemidef := by
     dsimp [E]
@@ -971,7 +805,7 @@ private theorem source_support_reconstruct
     rw [hUU, one_mul]
   have hτE : Matrix.Supports τPlus.matrix E :=
     hSupport.trans (by simpa [E] using hImage)
-  have hfix := smoothIsometry_fixes_of_supports_projector τPlus.pos hEpos hEid hτE
+  have hfix := Matrix.Supports.projector_fixes τPlus.pos hEpos hEid hτE
   apply SubnormalizedState.ext
   rw [sourceIsometryCompressed_apply_matrix]
   have hrecon : E * τPlus.matrix * E = τPlus.matrix := by
@@ -981,16 +815,18 @@ private theorem source_support_reconstruct
       _ = τPlus.matrix := hfix.1
   simpa [E, Matrix.conjTranspose_kronecker, Matrix.conjTranspose_mul] using hrecon
 
-private theorem conditioning_support_reconstruct
+/-- A state supported by the isometry's range projector is recovered exactly by compressing
+through the isometry and applying it again. -/
+theorem conditioning_support_reconstruct
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    (τPlus : SubnormalizedState (Prod a bPlus)) (V : ReferenceIsometry b bPlus)
-    {P : CMatrix (Prod a bPlus)}
+    (τPlus : SubnormalizedState (a × bPlus)) (V : ReferenceIsometry b bPlus)
+    {P : CMatrix (a × bPlus)}
     (hSupport : Matrix.Supports τPlus.matrix P)
     (hImage : Matrix.Supports P
       (Matrix.kronecker (1 : CMatrix a)
         (V.matrix * Matrix.conjTranspose V.matrix))) :
     (τPlus.conditioningIsometryCompressed V).conditioningIsometryApply V = τPlus := by
-  let E : CMatrix (Prod a bPlus) := Matrix.kronecker (1 : CMatrix a)
+  let E : CMatrix (a × bPlus) := Matrix.kronecker (1 : CMatrix a)
       (V.matrix * Matrix.conjTranspose V.matrix)
   have hEpos : E.PosSemidef := by
     dsimp [E]
@@ -1013,7 +849,7 @@ private theorem conditioning_support_reconstruct
     rw [one_mul, hVV]
   have hτE : Matrix.Supports τPlus.matrix E :=
     hSupport.trans (by simpa [E] using hImage)
-  have hfix := smoothIsometry_fixes_of_supports_projector τPlus.pos hEpos hEid hτE
+  have hfix := Matrix.Supports.projector_fixes τPlus.pos hEpos hEid hτE
   apply SubnormalizedState.ext
   rw [conditioningIsometryCompressed_apply_matrix]
   have hrecon : E * τPlus.matrix * E = τPlus.matrix := by
@@ -1023,28 +859,10 @@ private theorem conditioning_support_reconstruct
       _ = τPlus.matrix := hfix.1
   simpa [E, Matrix.conjTranspose_kronecker, Matrix.conjTranspose_mul] using hrecon
 
-
-private theorem conditionalMaxEntropyExponentCandidate_conditioningIsometryApply_eq
-    {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    (ρ : SubnormalizedState (Prod a b)) (σ : SubnormalizedState b)
-    (V : ReferenceIsometry b bPlus) :
-    (ρ.conditioningIsometryApply V).conditionalMaxEntropyExponentCandidate
-        (σ.referenceIsometryApply V) =
-      ρ.conditionalMaxEntropyExponentCandidate σ := by
-  unfold conditionalMaxEntropyExponentCandidate
-  rw [conditioningIsometryApply_matrix,
-    identityTensorStateMatrix_referenceIsometryApply]
-  rw [V.psdSqrt_applyMatrixRight ρ.pos,
-    V.psdSqrt_applyMatrixRight
-      (identityTensorStateMatrix_posSemidef (a := a) σ)]
-  have hmul := ReferenceIsometry.applyMatrixRight_mul V
-    (psdSqrt ρ.matrix) (psdSqrt (identityTensorStateMatrix (a := a) σ))
-  rw [hmul, ReferenceIsometry.traceNorm_applyMatrixRight]
-
 theorem conditionalMaxEntropyRaw_conditioningIsometryApply_eq
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
     [Nonempty a] [Nonempty b] [Nonempty bPlus]
-    (ρ : SubnormalizedState (Prod a b)) (V : ReferenceIsometry b bPlus) :
+    (ρ : SubnormalizedState (a × b)) (V : ReferenceIsometry b bPlus) :
     (ρ.conditioningIsometryApply V).conditionalMaxEntropyRaw =
       ρ.conditionalMaxEntropyRaw := by
   unfold conditionalMaxEntropyRaw
@@ -1083,7 +901,7 @@ theorem conditionalMaxEntropyRaw_conditioningIsometryApply_eq
 
 private theorem conditionalMaxEntropyExponentCandidate_sourceIsometryApply_eq
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
-    (ρ : SubnormalizedState (Prod a b)) (σ : SubnormalizedState b)
+    (ρ : SubnormalizedState (a × b)) (σ : SubnormalizedState b)
     (U : ReferenceIsometry a aPlus) :
     (ρ.sourceIsometryApply U).conditionalMaxEntropyExponentCandidate σ =
       ρ.conditionalMaxEntropyExponentCandidate σ := by
@@ -1094,7 +912,7 @@ private theorem conditionalMaxEntropyExponentCandidate_sourceIsometryApply_eq
 private theorem conditionalMaxEntropyRaw_sourceIsometryApply_eq
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
     [Nonempty a] [Nonempty b] [Nonempty aPlus]
-    (ρ : SubnormalizedState (Prod a b)) (U : ReferenceIsometry a aPlus) :
+    (ρ : SubnormalizedState (a × b)) (U : ReferenceIsometry a aPlus) :
     (ρ.sourceIsometryApply U).conditionalMaxEntropyRaw =
       ρ.conditionalMaxEntropyRaw := by
   unfold conditionalMaxEntropyRaw
@@ -1137,7 +955,7 @@ the conditioning register. -/
 theorem smoothConditionalMaxEntropy_conditioningIsometryApply
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
     [Nonempty a] [Nonempty b] [Nonempty bPlus]
-    (ρ : SubnormalizedState (Prod a b)) (V : ReferenceIsometry b bPlus) {ε : ℝ}
+    (ρ : SubnormalizedState (a × b)) (V : ReferenceIsometry b bPlus) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε : ε < Real.sqrt ρ.matrix.trace.re) :
     (ρ.conditioningIsometryApply V).smoothConditionalMaxEntropy ε hε0
         (by rwa [conditioningIsometryApply_trace_re]) =
@@ -1155,7 +973,7 @@ theorem smoothConditionalMaxEntropy_conditioningIsometryApply
     have htrace := conditioningIsometryApply_trace_re (ρ := τ) V
     rw [hzero] at htrace
     simp at htrace
-    exact (State.posSemidef_trace_ne_zero_of_ne_zero τ.pos hτne) htrace.symm
+    exact (MState.posSemidef_trace_ne_zero_of_ne_zero τ.pos hτne) htrace.symm
   have hrawForward := conditionalMaxEntropyRaw_conditioningIsometryApply_eq
     (a := a) τ V
   have hrawBackward := conditionalMaxEntropyRaw_conditioningIsometryApply_eq
@@ -1197,7 +1015,7 @@ the source register. -/
 theorem smoothConditionalMaxEntropy_sourceIsometryApply
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
     [Nonempty a] [Nonempty b] [Nonempty aPlus]
-    (ρ : SubnormalizedState (Prod a b)) (U : ReferenceIsometry a aPlus) {ε : ℝ}
+    (ρ : SubnormalizedState (a × b)) (U : ReferenceIsometry a aPlus) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε : ε < Real.sqrt ρ.matrix.trace.re) :
     (ρ.sourceIsometryApply U).smoothConditionalMaxEntropy ε hε0
         (by rwa [sourceIsometryApply_trace_re]) =
@@ -1215,7 +1033,7 @@ theorem smoothConditionalMaxEntropy_sourceIsometryApply
     have htrace := sourceIsometryApply_trace_re (ρ := τ) U
     rw [hzero] at htrace
     simp at htrace
-    exact (State.posSemidef_trace_ne_zero_of_ne_zero τ.pos hτne) htrace.symm
+    exact (MState.posSemidef_trace_ne_zero_of_ne_zero τ.pos hτne) htrace.symm
   have hrawForward := conditionalMaxEntropyRaw_sourceIsometryApply_eq
     (a := a) τ U
   have hrawBackward := conditionalMaxEntropyRaw_sourceIsometryApply_eq
@@ -1258,7 +1076,7 @@ theorem smoothConditionalMinEntropy_sourceConditioningIsometryApply
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
     [Nonempty a] [Nonempty b] [Nonempty aPlus] [Nonempty bPlus]
-    (ρ : SubnormalizedState (Prod a b)) (U : ReferenceIsometry a aPlus)
+    (ρ : SubnormalizedState (a × b)) (U : ReferenceIsometry a aPlus)
     (V : ReferenceIsometry b bPlus) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε : ε < Real.sqrt ρ.matrix.trace.re) :
     let τ := (ρ.sourceIsometryApply U).conditioningIsometryApply V
@@ -1283,7 +1101,7 @@ theorem smoothConditionalMaxEntropy_sourceConditioningIsometryApply
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
     [Nonempty a] [Nonempty b] [Nonempty aPlus] [Nonempty bPlus]
-    (ρ : SubnormalizedState (Prod a b)) (U : ReferenceIsometry a aPlus)
+    (ρ : SubnormalizedState (a × b)) (U : ReferenceIsometry a aPlus)
     (V : ReferenceIsometry b bPlus) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε : ε < Real.sqrt ρ.matrix.trace.re) :
     let τ := (ρ.sourceIsometryApply U).conditioningIsometryApply V
@@ -1308,7 +1126,7 @@ theorem smoothConditionalMinMaxEntropy_sourceConditioningIsometryApply
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
     [Nonempty a] [Nonempty b] [Nonempty aPlus] [Nonempty bPlus]
-    (ρ : SubnormalizedState (Prod a b)) (U : ReferenceIsometry a aPlus)
+    (ρ : SubnormalizedState (a × b)) (U : ReferenceIsometry a aPlus)
     (V : ReferenceIsometry b bPlus) {ε : ℝ}
     (hε0 : 0 ≤ ε) (hε : ε < Real.sqrt ρ.matrix.trace.re) :
     let τ := (ρ.sourceIsometryApply U).conditioningIsometryApply V

@@ -73,7 +73,8 @@ private theorem fourier_scale_norm (d : ℕ) [NeZero d] :
     _ = (d : ℂ)⁻¹ * (d : ℂ) := by rw [hsq]
     _ = 1 := inv_mul_cancel₀ hdne
 
-private theorem circle_star_mul_self (z : Circle) :
+/-- A point of the unit circle has unit modulus: `star z * z = 1`. -/
+theorem circle_star_mul_self (z : Circle) :
     star (z : ℂ) * (z : ℂ) = 1 := by
   have h : (Complex.normSq (z : ℂ) : ℂ) = star (z : ℂ) * (z : ℂ) :=
     Complex.normSq_eq_conj_mul_self
@@ -234,7 +235,7 @@ namespace BobLocalOrthogonalization
 variable {ι : Type u} {HA : Type v} {HB : Type w}
 variable [Fintype ι] [DecidableEq ι]
 variable [Fintype HA] [DecidableEq HA] [Fintype HB] [DecidableEq HB]
-variable {data : YNData ι HA HB} {rho : State (HA × HB)}
+variable {data : YNData ι HA HB} {rho : MState (HA × HB)}
 
 variable (W : BobLocalOrthogonalization data rho)
 

@@ -8,6 +8,37 @@ module
 
 public import QuantumLib.QIT.OneShot.SmoothEndpoint.Subnormalized
 
+/-!
+# Min/max endpoint duality on complementary marginals
+
+The target is `Ket.conditionalMaxEntropy_marginalAB_eq_neg_conditionalMinEntropy_marginalAC`: for a
+pure state on `(A ⊗ B) ⊗ C`, the conditional max-entropy of the `AB` marginal is minus the
+conditional min-entropy of the `AC` marginal.  `MState` and `SubnormalizedState` versions,
+`conditionalMinMaxEntropyDualOn_complementaryPureMarginals`, repackage it for a purification of a
+mixed state and for a scaled pure state.
+
+A short opening section reconciles the two carriers: `MState.toSubnormalized` leaves all four
+endpoint quantities — min and max, raw and finite — unchanged, and smoothing at radius zero is the
+unsmoothed value.
+
+The duality itself is between the two programs the endpoints are defined by: the min-entropy scale
+on `AC` as a minimization, and the max-entropy on `AB` as a fidelity maximization against the
+maximally entangled state.  What links them is built from a dual effect — `dualEffectLinkOutputABA`
+carries it to an operator on `A ⊗ B ⊗ A`, the transposed variant
+`dualEffectTransposeLinkOutputABA` is positive semidefinite of trace at most one, and
+`dualEffectObjective_re_eq_card_mul_successVector_trace` identifies the dual objective with
+`Fintype.card a` times the trace of `dualEffectKrausSuccessVector`.  One direction is then
+`fidelity_forward_bound_by_scaleFeasible`, the other
+`neg_conditionalMinEntropy_marginalAC_le_conditionalMaxEntropyPositive_marginalAB`.  Both are first
+proved under an explicit numeric hypothesis and then restated with it discharged, which is what the
+long `_of_*` families are.
+
+Three facts wanted downstream close the file: the conditional max-entropy is at least
+`-log₂ (card a)`, Fuchs--van de Graaf turns an `ε` trace-distance bound into the smoothing radius
+`√(2ε - ε²)`, and the normalized smooth min-entropy candidate set is bounded above by
+`log₂ (card a)`.
+-/
+
 @[expose] public section
 
 open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator NNReal Pointwise
@@ -15,30 +46,27 @@ open scoped Topology
 open Matrix
 open Set Filter
 
-namespace QIT
-
-universe u v w x
-
 noncomputable section
+universe u v w x
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+
+open QIT
+
+namespace MState
 
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-namespace State
-
-variable {a : Type u} {b : Type v}
-variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
-
-@[simp]
-theorem toSubnormalized_matrix_ne_zero (ρ : State a) :
+theorem toSubnormalized_matrix_ne_zero (ρ : MState a) :
     ρ.toSubnormalized.matrix ≠ 0 := by
-  simpa only [State.toSubnormalized_matrix] using ρ.density_matrix_ne_zero
+  simpa only [MState.toSubnormalized_matrix] using ρ.matrix_ne_zero
 
 /-- Embedding a normalized center into the subnormalized state space does not
 change its unsmoothed conditional min-entropy. -/
 @[simp]
 theorem toSubnormalized_conditionalMinEntropy_eq
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     ρ.toSubnormalized.conditionalMinEntropy = (ρ.conditionalMinEntropy : EReal) := by
   let : Nonempty a := ⟨(Classical.choice ρ.nonempty).1⟩
   let : Nonempty b := ⟨(Classical.choice ρ.nonempty).2⟩
@@ -57,7 +85,7 @@ theorem toSubnormalized_conditionalMinEntropy_eq
 
 @[simp]
 theorem toSubnormalized_conditionalMinEntropyFinite_eq
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     ρ.toSubnormalized.conditionalMinEntropyFinite ρ.toSubnormalized_matrix_ne_zero =
       ρ.conditionalMinEntropy := by
   let : Nonempty a := ⟨(Classical.choice ρ.nonempty).1⟩
@@ -72,9 +100,8 @@ theorem toSubnormalized_conditionalMinEntropyFinite_eq
   rw [hstate] at hscale
   simpa [SubnormalizedState.conditionalMinEntropyFinite, log2] using hscale
 
-@[simp]
 theorem toSubnormalized_conditionalMinEntropyRaw_eq
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     ρ.toSubnormalized.conditionalMinEntropyRaw = ρ.conditionalMinEntropy := by
   simpa [SubnormalizedState.conditionalMinEntropyFinite] using
     ρ.toSubnormalized_conditionalMinEntropyFinite_eq (a := a) (b := b)
@@ -83,7 +110,7 @@ theorem toSubnormalized_conditionalMinEntropyRaw_eq
 change its unsmoothed conditional max-entropy. -/
 @[simp]
 theorem toSubnormalized_conditionalMaxEntropy_eq
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     ρ.toSubnormalized.conditionalMaxEntropy = (ρ.conditionalMaxEntropy : EReal) := by
   let : Nonempty a := ⟨(Classical.choice ρ.nonempty).1⟩
   let : Nonempty b := ⟨(Classical.choice ρ.nonempty).2⟩
@@ -102,7 +129,7 @@ theorem toSubnormalized_conditionalMaxEntropy_eq
 
 @[simp]
 theorem toSubnormalized_conditionalMaxEntropyFinite_eq
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     ρ.toSubnormalized.conditionalMaxEntropyFinite ρ.toSubnormalized_matrix_ne_zero =
       ρ.conditionalMaxEntropy := by
   let : Nonempty a := ⟨(Classical.choice ρ.nonempty).1⟩
@@ -117,32 +144,31 @@ theorem toSubnormalized_conditionalMaxEntropyFinite_eq
   rw [hstate] at hscale
   simpa [SubnormalizedState.conditionalMaxEntropyFinite, log2] using hscale
 
-@[simp]
 theorem toSubnormalized_conditionalMaxEntropyRaw_eq
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     ρ.toSubnormalized.conditionalMaxEntropyRaw = ρ.conditionalMaxEntropy := by
   simpa [SubnormalizedState.conditionalMaxEntropyFinite] using
     ρ.toSubnormalized_conditionalMaxEntropyFinite_eq (a := a) (b := b)
 
 /-- Zero-radius source-facing smooth conditional min-entropy is the unsmoothed
 conditional min-entropy [Tomamichel2015FiniteResources, calculus.tex:418-442]. -/
-theorem smoothConditionalMinEntropy_zero (ρ : State (Prod a b)) :
+theorem smoothConditionalMinEntropy_zero (ρ : MState (a × b)) :
     ρ.smoothConditionalMinEntropy 0 (le_refl 0) (by norm_num) =
       ρ.conditionalMinEntropy := by
-  rw [State.smoothConditionalMinEntropy_zero_eq_toSubnormalized,
-    State.toSubnormalized_conditionalMinEntropyFinite_eq]
+  rw [MState.smoothConditionalMinEntropy_zero_eq_toSubnormalized,
+    MState.toSubnormalized_conditionalMinEntropyFinite_eq]
 
 /-- Zero-radius source-facing smooth conditional max-entropy is the unsmoothed
 conditional max-entropy [Tomamichel2015FiniteResources, calculus.tex:418-442]. -/
-theorem smoothConditionalMaxEntropy_zero (ρ : State (Prod a b)) :
+theorem smoothConditionalMaxEntropy_zero (ρ : MState (a × b)) :
     ρ.smoothConditionalMaxEntropy 0 (le_refl 0) (by norm_num) =
       ρ.conditionalMaxEntropy := by
-  rw [State.smoothConditionalMaxEntropy_zero_eq_toSubnormalized,
-    State.toSubnormalized_conditionalMaxEntropyFinite_eq]
+  rw [MState.smoothConditionalMaxEntropy_zero_eq_toSubnormalized,
+    MState.toSubnormalized_conditionalMaxEntropyFinite_eq]
 
-end State
+end MState
 
-namespace PureVector
+namespace Ket
 
 variable {a : Type u} {b : Type v} {c : Type*}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
@@ -206,41 +232,45 @@ bracket obtained by lifting that `AC` operator to the pure `ABC` state.
 This is only a representation bridge; it does not use or prove endpoint
 duality. -/
 theorem dualEffectObjective_eq_tripartiteBracket_liftAC
-    (ψ : PureVector (Prod (Prod a b) c)) (M : CMatrix (Prod a c)) :
-    ((ψ.state.marginalAC.matrix * M).trace).re =
-      (ψ.tripartiteBracket (State.liftACToABC (b := b) M)).re := by
+    (ψ : Ket ((a × b) × c)) (M : CMatrix (a × c)) :
+    ((ψ.state.marginalAC.m * M).trace).re =
+      (ψ.tripartiteBracket (MState.liftACToABC (b := b) M)).re := by
   calc
-    ((ψ.state.marginalAC.matrix * M).trace).re =
-        ((M * ψ.state.marginalAC.matrix).trace).re := by
+    ((ψ.state.marginalAC.m * M).trace).re =
+        ((M * ψ.state.marginalAC.m).trace).re := by
       rw [Matrix.trace_mul_comm]
-    _ = (ψ.tripartiteBracket (State.liftACToABC (b := b) M)).re := by
+    _ = (ψ.tripartiteBracket (MState.liftACToABC (b := b) M)).re := by
       rw [ψ.tripartiteBracket_liftACToABC_eq_trace_marginalAC M]
 
 /-! ### Pure endpoint link-map support -/
 
+/-- Contracting a Kraus operator `K x.1 : A → C` of a dual effect against the purifying `C`
+register of `ψ`, at the `B` coordinate `x.2` and normalized by `√(card a)⁻¹`.  Its squared norm
+carries the whole dual objective: `dualEffectObjective_re_eq_card_mul_successVector_trace` says
+`Re (tr (ρ_AC * M)) = card a * ‖dualEffectKrausSuccessVector ψ K‖²`. -/
 def dualEffectKrausSuccessVector [Nonempty a]
-    (ψ : PureVector (Prod (Prod a b) c)) (K : κ → Matrix a c ℂ) :
-    Prod κ b → ℂ :=
+    (ψ : Ket ((a × b) × c)) (K : κ → Matrix a c ℂ) :
+    κ × b → ℂ :=
   fun x =>
     ((Real.sqrt ((Fintype.card a : ℝ)⁻¹) : ℝ) : ℂ) *
-      ∑ i : a, ∑ z : c, K x.1 i z * ψ.amp ((i, x.2), z)
+      ∑ i : a, ∑ z : c, K x.1 i z * ψ.vec ((i, x.2), z)
 
 omit [DecidableEq κ] in
 private theorem dualEffectTransposeMatrixMap_eq_ofKraus_entry
-    {M : CMatrix (Prod a c)} {K : κ → Matrix a c ℂ}
+    {M : CMatrix (a × c)} {K : κ → Matrix a c ℂ}
     (hK :
-      State.conditionalMinEntropyDualEffectTransposeMatrixMap (a := a) (b := c) M =
+      MState.conditionalMinEntropyDualEffectTransposeMatrixMap (a := a) (b := c) M =
         MatrixMap.ofKraus K)
     (i i' : a) (z z' : c) :
     M (i', z') (i, z) =
       ∑ l : κ, K l i z * star (K l i' z') := by
   have hchoi := congrArg MatrixMap.choi hK
   have hentry := congrFun (congrFun hchoi (z, i)) (z', i')
-  rw [State.conditionalMinEntropyDualEffectTransposeMatrixMap,
+  rw [MState.conditionalMinEntropyDualEffectTransposeMatrixMap,
     MatrixMap.choi_ofChoiMatrix, MatrixMap.choi_ofKraus] at hentry
-  simpa [State.conditionalMinEntropyDualEffectTransposeMatrixMap,
-    State.conditionalMinEntropyDualEffectTransposeChoiMatrix,
-    State.conditionalMinEntropyDualEffectChoiMatrix, Matrix.vecMulVec,
+  simpa [MState.conditionalMinEntropyDualEffectTransposeMatrixMap,
+    MState.conditionalMinEntropyDualEffectTransposeChoiMatrix,
+    MState.conditionalMinEntropyDualEffectChoiMatrix, Matrix.vecMulVec,
     Matrix.transpose, Matrix.sum_apply] using hentry
 
 /-- Apply the Choi map induced by an `AC` dual effect to the purifying `C`
@@ -248,85 +278,85 @@ register of a pure `ABC` state, leaving the `AB` registers untouched.
 
 The output lives on `(A × B) × A'`; the final endpoint proof tests the two
 outer `A` registers against a maximally-entangled projector. -/
-def dualEffectLinkOutputABA (ψ : PureVector (Prod (Prod a b) c))
-    (M : CMatrix (Prod a c)) : CMatrix (Prod (Prod a b) a) :=
-  (MatrixMap.kron (LinearMap.id : MatrixMap (Prod a b) (Prod a b))
-    (State.conditionalMinEntropyDualEffectMatrixMap (a := a) (b := c) M)) ψ.state.matrix
+def dualEffectLinkOutputABA (ψ : Ket ((a × b) × c))
+    (M : CMatrix (a × c)) : CMatrix ((a × b) × a) :=
+  (MatrixMap.kron (LinearMap.id : MatrixMap (a × b) (a × b))
+    (MState.conditionalMinEntropyDualEffectMatrixMap (a := a) (b := c) M)) ψ.state.m
 
 /-- The same link-map output, written with the adjoint input matrix.  Since
 pure-state density matrices are Hermitian this is equal to
 `dualEffectLinkOutputABA`, but its matrix-entry expansion has the orientation
 that directly matches `Tr(ρ_AC M)`. -/
-def dualEffectLinkOutputABAStarInput (ψ : PureVector (Prod (Prod a b) c))
-    (M : CMatrix (Prod a c)) : CMatrix (Prod (Prod a b) a) :=
-  (MatrixMap.kron (LinearMap.id : MatrixMap (Prod a b) (Prod a b))
-    (State.conditionalMinEntropyDualEffectMatrixMap (a := a) (b := c) M)) (star ψ.state.matrix)
+def dualEffectLinkOutputABAStarInput (ψ : Ket ((a × b) × c))
+    (M : CMatrix (a × c)) : CMatrix ((a × b) × a) :=
+  (MatrixMap.kron (LinearMap.id : MatrixMap (a × b) (a × b))
+    (MState.conditionalMinEntropyDualEffectMatrixMap (a := a) (b := c) M)) (star ψ.state.m)
 
 /-- Link output using the transpose-Choi orientation of the dual effect.  This
 orientation is the one whose maximally-entangled projector expectation unfolds
 directly to the dual-effect objective `Tr(ρ_AC M)`. -/
-def dualEffectTransposeLinkOutputABA (ψ : PureVector (Prod (Prod a b) c))
-    (M : CMatrix (Prod a c)) : CMatrix (Prod (Prod a b) a) :=
-  (MatrixMap.kron (LinearMap.id : MatrixMap (Prod a b) (Prod a b))
-    (State.conditionalMinEntropyDualEffectTransposeMatrixMap (a := a) (b := c) M))
-      ψ.state.matrix
+def dualEffectTransposeLinkOutputABA (ψ : Ket ((a × b) × c))
+    (M : CMatrix (a × c)) : CMatrix ((a × b) × a) :=
+  (MatrixMap.kron (LinearMap.id : MatrixMap (a × b) (a × b))
+    (MState.conditionalMinEntropyDualEffectTransposeMatrixMap (a := a) (b := c) M))
+      ψ.state.m
 
 theorem dualEffectLinkOutputABAStarInput_eq
-    (ψ : PureVector (Prod (Prod a b) c)) (M : CMatrix (Prod a c)) :
+    (ψ : Ket ((a × b) × c)) (M : CMatrix (a × c)) :
     dualEffectLinkOutputABAStarInput (a := a) (b := b) (c := c) ψ M =
       dualEffectLinkOutputABA (a := a) (b := b) (c := c) ψ M := by
-  have hstar : star ψ.state.matrix = ψ.state.matrix := by
+  have hstar : star ψ.state.m = ψ.state.m := by
     simp [Matrix.star_eq_conjTranspose]
   rw [dualEffectLinkOutputABAStarInput, dualEffectLinkOutputABA, hstar]
 
 @[simp]
 theorem dualEffectLinkOutputABA_apply
-    (ψ : PureVector (Prod (Prod a b) c)) (M : CMatrix (Prod a c))
-    (ab ab' : Prod a b) (i i' : a) :
+    (ψ : Ket ((a × b) × c)) (M : CMatrix (a × c))
+    (ab ab' : a × b) (i i' : a) :
     dualEffectLinkOutputABA (a := a) (b := b) (c := c) ψ M (ab, i) (ab', i') =
       ∑ k : c, ∑ k' : c,
-        ψ.state.matrix (ab, k) (ab', k') * M (i, k) (i', k') := by
+        ψ.state.m (ab, k) (ab', k') * M (i, k) (i', k') := by
   classical
   rcases ab with ⟨j, b0⟩
   rcases ab' with ⟨j', b1⟩
-  simp [dualEffectLinkOutputABA, MatrixMap.kron, MatrixMap.ofChoiMatrix_apply,
-    State.conditionalMinEntropyDualEffectMatrixMap,
-    State.conditionalMinEntropyDualEffectChoiMatrix, PureVector.state_matrix,
+  simp [dualEffectLinkOutputABA, MatrixMap.kron_def, MatrixMap.ofChoiMatrix_apply,
+    MState.conditionalMinEntropyDualEffectMatrixMap,
+    MState.conditionalMinEntropyDualEffectChoiMatrix, Ket.state_matrix,
     rankOneMatrix_apply, Matrix.single, Fintype.sum_prod_type,
-    sum_pair_delta_rev, sum_abab_delta, and_assoc, and_left_comm]
+    sum_pair_delta_rev, sum_abab_delta, and_assoc, and_left_comm, mul_comm]
 
 @[simp]
 theorem dualEffectLinkOutputABAStarInput_apply
-    (ψ : PureVector (Prod (Prod a b) c)) (M : CMatrix (Prod a c))
-    (ab ab' : Prod a b) (i i' : a) :
+    (ψ : Ket ((a × b) × c)) (M : CMatrix (a × c))
+    (ab ab' : a × b) (i i' : a) :
     dualEffectLinkOutputABAStarInput (a := a) (b := b) (c := c) ψ M (ab, i) (ab', i') =
       ∑ k : c, ∑ k' : c,
-        (star ψ.state.matrix) (ab, k) (ab', k') * M (i, k) (i', k') := by
+        (star ψ.state.m) (ab, k) (ab', k') * M (i, k) (i', k') := by
   classical
   rcases ab with ⟨j, b0⟩
   rcases ab' with ⟨j', b1⟩
-  simp [dualEffectLinkOutputABAStarInput, MatrixMap.kron, MatrixMap.ofChoiMatrix_apply,
-    State.conditionalMinEntropyDualEffectMatrixMap,
-    State.conditionalMinEntropyDualEffectChoiMatrix, PureVector.state_matrix,
+  simp [dualEffectLinkOutputABAStarInput, MatrixMap.kron_def, MatrixMap.ofChoiMatrix_apply,
+    MState.conditionalMinEntropyDualEffectMatrixMap,
+    MState.conditionalMinEntropyDualEffectChoiMatrix, Ket.state_matrix,
     rankOneMatrix_apply, Matrix.single, Fintype.sum_prod_type,
-    sum_pair_delta_rev, sum_abab_delta, and_assoc, and_left_comm]
+    sum_pair_delta_rev, sum_abab_delta, and_assoc, and_left_comm, mul_comm]
 
 @[simp]
 theorem dualEffectTransposeLinkOutputABA_apply
-    (ψ : PureVector (Prod (Prod a b) c)) (M : CMatrix (Prod a c))
-    (ab ab' : Prod a b) (i i' : a) :
+    (ψ : Ket ((a × b) × c)) (M : CMatrix (a × c))
+    (ab ab' : a × b) (i i' : a) :
     dualEffectTransposeLinkOutputABA (a := a) (b := b) (c := c) ψ M (ab, i) (ab', i') =
       ∑ k : c, ∑ k' : c,
-        ψ.state.matrix (ab, k) (ab', k') * M (i', k') (i, k) := by
+        ψ.state.m (ab, k) (ab', k') * M (i', k') (i, k) := by
   classical
   rcases ab with ⟨j, b0⟩
   rcases ab' with ⟨j', b1⟩
-  simp [dualEffectTransposeLinkOutputABA, MatrixMap.kron, MatrixMap.ofChoiMatrix_apply,
-    State.conditionalMinEntropyDualEffectTransposeMatrixMap,
-    State.conditionalMinEntropyDualEffectTransposeChoiMatrix,
-    State.conditionalMinEntropyDualEffectChoiMatrix, PureVector.state_matrix,
+  simp [dualEffectTransposeLinkOutputABA, MatrixMap.kron_def, MatrixMap.ofChoiMatrix_apply,
+    MState.conditionalMinEntropyDualEffectTransposeMatrixMap,
+    MState.conditionalMinEntropyDualEffectTransposeChoiMatrix,
+    MState.conditionalMinEntropyDualEffectChoiMatrix, Ket.state_matrix,
     rankOneMatrix_apply, Matrix.single, Fintype.sum_prod_type,
-    sum_pair_delta_rev, sum_abab_delta, and_assoc, and_left_comm, Matrix.transpose]
+    sum_pair_delta_rev, sum_abab_delta, and_assoc, and_left_comm, Matrix.transpose, mul_comm]
 
 private theorem sum_a_a_b_c_c_k_reorder {α : Type*} {β : Type*} {γ : Type*} {δ : Type*}
     [Fintype α] [Fintype β] [Fintype γ] [Fintype δ]
@@ -367,18 +397,6 @@ private theorem sum_a_a_b_c_c_k_reorder {α : Type*} {β : Type*} {γ : Type*} {
         rcases t with ⟨⟨⟨⟨⟨x, y⟩, j⟩, k⟩, l⟩, m⟩
         rfl))
 
-private theorem sum_outer_mul_inner_expand {δ : Type*} {β : Type*} {α : Type*} {γ : Type*}
-    [Fintype δ] [Fintype β] [Fintype α] [Fintype γ]
-    (s : ℂ) (A B : δ → β → α → γ → ℂ)
-    (C : δ → β → α → γ → α → γ → ℂ) :
-    (∑ m : δ, ∑ j : β, ∑ x : α, ∑ k : γ,
-        A m j x k * (s * (B m j x k *
-          ∑ y : α, ∑ l : γ, s * C m j x k y l))) =
-      ∑ m : δ, ∑ j : β, ∑ x : α, ∑ k : γ, ∑ y : α, ∑ l : γ,
-        A m j x k * (s * (s * (B m j x k * C m j x k y l))) := by
-  classical
-  simp [Finset.mul_sum, mul_left_comm]
-
 private theorem sum_success_norm_expand {δ : Type*} {β : Type*} {α : Type*} {γ : Type*}
     [Fintype δ] [Fintype β] [Fintype α] [Fintype γ]
     (s : ℂ) (hs : star s = s) (K : δ → α → γ → ℂ)
@@ -391,19 +409,6 @@ private theorem sum_success_norm_expand {δ : Type*} {β : Type*} {α : Type*} {
           (s * (s * (A m j x k * (star (K m y l) * star (A m j y l))))) := by
   classical
   simp [hs, Finset.mul_sum, mul_assoc, mul_left_comm]
-
-private theorem dotProduct_single_one_left {ι : Type*} [Fintype ι] [DecidableEq ι]
-    (p : ι) (f : ι → ℂ) :
-    (fun j => if p = j then 1 else 0) ⬝ᵥ f = f p := by
-  classical
-  rw [dotProduct]
-  rw [Finset.sum_eq_single p]
-  · simp
-  · intro j _ hj
-    have hpj : p ≠ j := fun h => hj h.symm
-    simp [hpj]
-  · intro hnot
-    simp at hnot
 
 private theorem sum_two_delta_collapse {δ : Type*} {α : Type*} {β : Type*} {γ : Type*}
     [Fintype δ] [DecidableEq δ] [Fintype α] [DecidableEq α]
@@ -443,15 +448,14 @@ private theorem sum_two_delta_collapse {δ : Type*} {α : Type*} {β : Type*} {�
       exact Finset.sum_comm
 
 omit [DecidableEq κ] in
-set_option maxHeartbeats 800000 in
 theorem dualEffectTransposeLink_projector_trace_eq_successVector_trace [Nonempty a]
-    (ψ : PureVector (Prod (Prod a b) c)) {M : CMatrix (Prod a c)}
+    (ψ : Ket ((a × b) × c)) {M : CMatrix (a × c)}
     {K : κ → Matrix a c ℂ}
     (hK :
-      State.conditionalMinEntropyDualEffectTransposeMatrixMap (a := a) (b := c) M =
+      MState.conditionalMinEntropyDualEffectTransposeMatrixMap (a := a) (b := c) M =
         MatrixMap.ofKraus K) :
     ((dualEffectTransposeLinkOutputABA (a := a) (b := b) (c := c) ψ M *
-        State.maximallyEntangledProjectorWithMiddle (a := a) b).trace) =
+        MState.maximallyEntangledProjectorWithMiddle (a := a) b).trace) =
       (rankOneMatrix (dualEffectKrausSuccessVector (a := a) (b := b) (c := c) ψ K)).trace := by
   classical
   have hcard_pos : 0 < (Fintype.card a : ℝ) := by
@@ -466,10 +470,10 @@ theorem dualEffectTransposeLink_projector_trace_eq_successVector_trace [Nonempty
     congr 1
     rw [← sq, Real.sq_sqrt]
     exact inv_nonneg.mpr (le_of_lt hcard_pos)
-  rw [State.trace_mul_maximallyEntangledProjectorWithMiddle]
+  rw [MState.trace_mul_maximallyEntangledProjectorWithMiddle]
   rw [rankOneMatrix_trace]
   simp only [dualEffectTransposeLinkOutputABA_apply, dualEffectKrausSuccessVector,
-    dotProduct, PureVector.state_matrix, rankOneMatrix_apply,
+    dotProduct, Ket.state_matrix, rankOneMatrix_apply,
     Fintype.sum_prod_type, Finset.mul_sum, Finset.sum_mul,
     dualEffectTransposeMatrixMap_eq_ofKraus_entry (a := a) (c := c) hK]
   rw [hcoeff_success]
@@ -480,16 +484,18 @@ theorem dualEffectTransposeLink_projector_trace_eq_successVector_trace [Nonempty
   rw [sum_success_norm_expand
     (δ := κ) (β := b) (α := a) (γ := c)
     ((((Real.sqrt ((Fintype.card a : ℝ)⁻¹)) : ℝ) : ℂ))
-    hscoeff K (fun _ j x k => ψ.amp ((x, j), k))]
-  simpa [mul_assoc, mul_left_comm, mul_comm] using
-    sum_a_a_b_c_c_k_reorder (α := a) (β := b) (γ := c) (δ := κ)
+    hscoeff K (fun _ j x k => ψ.vec ((x, j), k))]
+  rw [← sum_a_a_b_c_c_k_reorder (α := a) (β := b) (γ := c) (δ := κ)
       (fun x y j k l m =>
         K m x k *
           ((((Real.sqrt ((Fintype.card a : ℝ)⁻¹)) : ℝ) : ℂ) *
             ((((Real.sqrt ((Fintype.card a : ℝ)⁻¹)) : ℝ) : ℂ) *
-              (ψ.amp ((x, j), k) *
-                ((starRingEnd ℂ) (K m y l) *
-                  (starRingEnd ℂ) (ψ.amp ((y, j), l)))))))
+              (ψ.vec ((x, j), k) *
+                (star (K m y l) * star (ψ.vec ((y, j), l)))))))]
+  refine Finset.sum_congr rfl fun x _ => Finset.sum_congr rfl fun y _ =>
+    Finset.sum_congr rfl fun j _ => Finset.sum_congr rfl fun k _ =>
+    Finset.sum_congr rfl fun l _ => Finset.sum_congr rfl fun m _ => ?_
+  ring
 
 private theorem sum_a_c_a_c_b_reorder {α : Type*} {β : Type*} {γ : Type*}
     [Fintype α] [Fintype β] [Fintype γ]
@@ -515,15 +521,10 @@ private theorem sum_a_c_a_c_b_reorder {α : Type*} {β : Type*} {γ : Type*}
       intro y _
       rw [Finset.sum_comm]
 
-private theorem idChannel_map_eq_linearMap_id {α : Type*} [Fintype α] [DecidableEq α] :
-    (Channel.idChannel α).map = (LinearMap.id : MatrixMap α α) := by
-  ext X i j
-  simp [Channel.idChannel, MatrixMap.ofKraus]
-
 private def contractionDilationReferenceIsometry {r₁ : Type*} {r₂ : Type*}
     [Fintype r₁] [DecidableEq r₁] [Fintype r₂] [DecidableEq r₂]
     (K : Matrix r₂ r₁ ℂ) (hK : Matrix.conjTranspose K * K ≤ (1 : CMatrix r₁)) :
-    ReferenceIsometry r₁ (Sum r₁ r₂) where
+    ReferenceIsometry r₁ (r₁ ⊕ r₂) where
   matrix := Matrix.of fun x y =>
     match x with
     | Sum.inl i => psdSqrt ((1 : CMatrix r₁) - Matrix.conjTranspose K * K) i y
@@ -561,26 +562,26 @@ private def contractionDilationReferenceIsometry {r₁ : Type*} {r₂ : Type*}
 
 private def referenceIsometryRightBlockK {κ : Type*}
     [Fintype κ] [DecidableEq κ]
-    (V : ReferenceIsometry c (Sum c (Prod κ a))) :
+    (V : ReferenceIsometry c (c ⊕ (κ × a))) :
     κ → Matrix a c ℂ :=
   fun k i z => V.matrix (Sum.inr (k, i)) z
 
 private def referenceIsometryLeftBlockMatrix {κ : Type*}
     [Fintype κ] [DecidableEq κ]
-    (V : ReferenceIsometry c (Sum c (Prod κ a))) :
+    (V : ReferenceIsometry c (c ⊕ (κ × a))) :
     CMatrix c :=
   fun z z' => V.matrix (Sum.inl z) z'
 
 private theorem referenceIsometryRightBlockK_contraction {κ : Type*}
     [Fintype κ] [DecidableEq κ]
-    (V : ReferenceIsometry c (Sum c (Prod κ a))) :
+    (V : ReferenceIsometry c (c ⊕ (κ × a))) :
     Matrix.conjTranspose
         (MatrixMap.smoothEndpointKrausStack (referenceIsometryRightBlockK (a := a) V)) *
         MatrixMap.smoothEndpointKrausStack (referenceIsometryRightBlockK (a := a) V) ≤
       (1 : CMatrix c) := by
   classical
   let L : CMatrix c := referenceIsometryLeftBlockMatrix (a := a) V
-  let Kstack : Matrix (Prod κ a) c ℂ :=
+  let Kstack : Matrix (κ × a) c ℂ :=
     MatrixMap.smoothEndpointKrausStack (referenceIsometryRightBlockK (a := a) V)
   have hdecomp :
       (1 : CMatrix c) - Matrix.conjTranspose Kstack * Kstack =
@@ -599,83 +600,83 @@ private theorem referenceIsometryRightBlockK_contraction {κ : Type*}
 
 theorem dualEffectObjective_eq_card_mul_trace_transposeLink
     [Nonempty a]
-    (ψ : PureVector (Prod (Prod a b) c)) (M : CMatrix (Prod a c)) :
-    ((ψ.state.marginalAC.matrix * M).trace) =
+    (ψ : Ket ((a × b) × c)) (M : CMatrix (a × c)) :
+    ((ψ.state.marginalAC.m * M).trace) =
       ((Fintype.card a : ℂ) *
         ((dualEffectTransposeLinkOutputABA (a := a) (b := b) (c := c) ψ M *
-          State.maximallyEntangledProjectorWithMiddle (a := a) b).trace)) := by
+          MState.maximallyEntangledProjectorWithMiddle (a := a) b).trace)) := by
   classical
-  rw [State.trace_mul_maximallyEntangledProjectorWithMiddle]
-  simpa [dualEffectTransposeLinkOutputABA_apply, State.marginalAC, Matrix.trace,
+  rw [MState.trace_mul_maximallyEntangledProjectorWithMiddle]
+  simpa [dualEffectTransposeLinkOutputABA_apply, MState.marginalAC, Matrix.trace,
     Matrix.mul_apply, Fintype.sum_prod_type, Finset.mul_sum, Finset.sum_mul,
     mul_assoc] using
       sum_a_c_a_c_b_reorder (α := a) (β := b) (γ := c)
         (fun x j k y l =>
-          ψ.amp ((x, j), k) * ((starRingEnd ℂ) (ψ.amp ((y, j), l)) * M (y, l) (x, k)))
+          ψ.vec ((x, j), k) * ((starRingEnd ℂ) (ψ.vec ((y, j), l)) * M (y, l) (x, k)))
 
 theorem dualEffectTransposeLinkOutputABA_posSemidef
-    (ψ : PureVector (Prod (Prod a b) c)) {M : CMatrix (Prod a c)}
-    (hM : State.ConditionalMinEntropyDualEffectFeasible (a := a) M) :
+    (ψ : Ket ((a × b) × c)) {M : CMatrix (a × c)}
+    (hM : MState.ConditionalMinEntropyDualEffectFeasible (a := a) M) :
     (dualEffectTransposeLinkOutputABA (a := a) (b := b) (c := c) ψ M).PosSemidef := by
   classical
   let T : MatrixMap c a :=
-    State.conditionalMinEntropyDualEffectTransposeMatrixMap (a := a) (b := c) M
+    MState.conditionalMinEntropyDualEffectTransposeMatrixMap (a := a) (b := c) M
   have hT : MatrixMap.TraceNonincreasingCP T :=
-    State.conditionalMinEntropyDualEffectTransposeMatrixMap_traceNonincreasingCP
+    MState.conditionalMinEntropyDualEffectTransposeMatrixMap_traceNonincreasingCP
       (a := a) (b := c) hM
   have hkron :
       MatrixMap.TraceNonincreasingCP
-        (MatrixMap.kron (Channel.idChannel (Prod a b)).map T) :=
-    MatrixMap.traceNonincreasingCP_id_kron (a := Prod a b) hT
+        (MatrixMap.kron (CPTPOp.id (dIn := a × b)).map T) :=
+    MatrixMap.traceNonincreasingCP_id_kron (a := a × b) hT
   have hkron' :
       MatrixMap.TraceNonincreasingCP
-        (MatrixMap.kron (LinearMap.id : MatrixMap (Prod a b) (Prod a b)) T) := by
-    simpa [idChannel_map_eq_linearMap_id] using hkron
+        (MatrixMap.kron (LinearMap.id : MatrixMap (a × b) (a × b)) T) := by
+    simpa [CPTPOp.id_map] using hkron
   simpa [dualEffectTransposeLinkOutputABA, T] using
-    hkron'.mapsPositive ψ.state.matrix ψ.state.pos
+    hkron'.mapsPositive ψ.state.m ψ.state.psd
 
 theorem dualEffectTransposeLinkOutputABA_trace_re_le_one
-    (ψ : PureVector (Prod (Prod a b) c)) {M : CMatrix (Prod a c)}
-    (hM : State.ConditionalMinEntropyDualEffectFeasible (a := a) M) :
+    (ψ : Ket ((a × b) × c)) {M : CMatrix (a × c)}
+    (hM : MState.ConditionalMinEntropyDualEffectFeasible (a := a) M) :
     (dualEffectTransposeLinkOutputABA (a := a) (b := b) (c := c) ψ M).trace.re ≤ 1 := by
   classical
   let T : MatrixMap c a :=
-    State.conditionalMinEntropyDualEffectTransposeMatrixMap (a := a) (b := c) M
+    MState.conditionalMinEntropyDualEffectTransposeMatrixMap (a := a) (b := c) M
   have hT : MatrixMap.TraceNonincreasingCP T :=
-    State.conditionalMinEntropyDualEffectTransposeMatrixMap_traceNonincreasingCP
+    MState.conditionalMinEntropyDualEffectTransposeMatrixMap_traceNonincreasingCP
       (a := a) (b := c) hM
   have hkron :
       MatrixMap.TraceNonincreasingCP
-        (MatrixMap.kron (Channel.idChannel (Prod a b)).map T) :=
-    MatrixMap.traceNonincreasingCP_id_kron (a := Prod a b) hT
+        (MatrixMap.kron (CPTPOp.id (dIn := a × b)).map T) :=
+    MatrixMap.traceNonincreasingCP_id_kron (a := a × b) hT
   have hkron' :
       MatrixMap.TraceNonincreasingCP
-        (MatrixMap.kron (LinearMap.id : MatrixMap (Prod a b) (Prod a b)) T) := by
-    simpa [idChannel_map_eq_linearMap_id] using hkron
-  have hle := hkron'.traceNonincreasing ψ.state.matrix ψ.state.pos
-  have htrace : (ψ.amp ⬝ᵥ fun i => (starRingEnd ℂ) (ψ.amp i)).re = 1 := by
-    simpa [PureVector.state_matrix, Matrix.trace, rankOneMatrix_apply, dotProduct,
+        (MatrixMap.kron (LinearMap.id : MatrixMap (a × b) (a × b)) T) := by
+    simpa [CPTPOp.id_map] using hkron
+  have hle := hkron'.traceNonincreasing ψ.state.m ψ.state.psd
+  have htrace : (ψ.vec ⬝ᵥ fun i => (starRingEnd ℂ) (ψ.vec i)).re = 1 := by
+    simpa [Ket.state_matrix, Matrix.trace, rankOneMatrix_apply, dotProduct,
       Complex.mul_re, Complex.conj_re, Complex.conj_im] using
       congrArg Complex.re ψ.trace_rankOne_eq_one
-  change ((MatrixMap.kron (LinearMap.id : MatrixMap (Prod a b) (Prod a b)) T)
-      ψ.state.matrix).trace.re ≤ 1
+  change ((MatrixMap.kron (LinearMap.id : MatrixMap (a × b) (a × b)) T)
+      ψ.state.m).trace.re ≤ 1
   simpa [htrace] using hle
 
 theorem dualEffectTransposeLinkOutputABA_projector_trace_re_nonneg [Nonempty a]
-    (ψ : PureVector (Prod (Prod a b) c)) {M : CMatrix (Prod a c)}
-    (hM : State.ConditionalMinEntropyDualEffectFeasible (a := a) M) :
+    (ψ : Ket ((a × b) × c)) {M : CMatrix (a × c)}
+    (hM : MState.ConditionalMinEntropyDualEffectFeasible (a := a) M) :
     0 ≤ ((dualEffectTransposeLinkOutputABA (a := a) (b := b) (c := c) ψ M *
-      State.maximallyEntangledProjectorWithMiddle (a := a) b).trace).re := by
+      MState.maximallyEntangledProjectorWithMiddle (a := a) b).trace).re := by
   exact cMatrix_trace_mul_posSemidef_re_nonneg
     (ψ.dualEffectTransposeLinkOutputABA_posSemidef (a := a) hM)
-    (State.maximallyEntangledProjectorWithMiddle_posSemidef (a := a) (b := b))
+    (MState.maximallyEntangledProjectorWithMiddle_posSemidef (a := a) (b := b))
 
 theorem dualEffectObjective_re_eq_card_mul_trace_transposeLink [Nonempty a]
-    (ψ : PureVector (Prod (Prod a b) c)) (M : CMatrix (Prod a c)) :
-    ((ψ.state.marginalAC.matrix * M).trace).re =
+    (ψ : Ket ((a × b) × c)) (M : CMatrix (a × c)) :
+    ((ψ.state.marginalAC.m * M).trace).re =
       (Fintype.card a : ℝ) *
         ((dualEffectTransposeLinkOutputABA (a := a) (b := b) (c := c) ψ M *
-          State.maximallyEntangledProjectorWithMiddle (a := a) b).trace).re := by
+          MState.maximallyEntangledProjectorWithMiddle (a := a) b).trace).re := by
   have h :=
     congrArg Complex.re
       (ψ.dualEffectObjective_eq_card_mul_trace_transposeLink (a := a) (b := b) M)
@@ -683,12 +684,12 @@ theorem dualEffectObjective_re_eq_card_mul_trace_transposeLink [Nonempty a]
 
 omit [DecidableEq κ] in
 theorem dualEffectObjective_re_eq_card_mul_successVector_trace [Nonempty a]
-    (ψ : PureVector (Prod (Prod a b) c)) {M : CMatrix (Prod a c)}
+    (ψ : Ket ((a × b) × c)) {M : CMatrix (a × c)}
     {K : κ → Matrix a c ℂ}
     (hK :
-      State.conditionalMinEntropyDualEffectTransposeMatrixMap (a := a) (b := c) M =
+      MState.conditionalMinEntropyDualEffectTransposeMatrixMap (a := a) (b := c) M =
         MatrixMap.ofKraus K) :
-    ((ψ.state.marginalAC.matrix * M).trace).re =
+    ((ψ.state.marginalAC.m * M).trace).re =
       (Fintype.card a : ℝ) *
         (rankOneMatrix
           (dualEffectKrausSuccessVector (a := a) (b := b) (c := c) ψ K)).trace.re := by
@@ -703,29 +704,29 @@ theorem dualEffectObjective_re_eq_card_mul_successVector_trace [Nonempty a]
 omit [DecidableEq κ] in
 theorem dualEffectKrausSuccessVector_card_mul_trace_le_scaleFeasible_trace
     [Nonempty a]
-    (ψ : PureVector (Prod (Prod a b) c)) {K : κ → Matrix a c ℂ}
+    (ψ : Ket ((a × b) × c)) {K : κ → Matrix a c ℂ}
     {T : CMatrix c}
     (hKstack :
       Matrix.conjTranspose (MatrixMap.smoothEndpointKrausStack K) *
         MatrixMap.smoothEndpointKrausStack K ≤ (1 : CMatrix c))
-    (hT : State.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T) :
+    (hT : MState.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T) :
     (Fintype.card a : ℝ) *
         (rankOneMatrix
           (dualEffectKrausSuccessVector (a := a) (b := b) (c := c) ψ K)).trace.re ≤
       T.trace.re := by
-  let M : CMatrix (Prod a c) :=
-    State.conditionalMinEntropyDualEffectOfKraus (a := a) (b := c) K
-  have hM : State.ConditionalMinEntropyDualEffectFeasible (a := a) M := by
-    exact State.conditionalMinEntropyDualEffectOfKraus_feasible
+  let M : CMatrix (a × c) :=
+    MState.conditionalMinEntropyDualEffectOfKraus (a := a) (b := c) K
+  have hM : MState.ConditionalMinEntropyDualEffectFeasible (a := a) M := by
+    exact MState.conditionalMinEntropyDualEffectOfKraus_feasible
       (a := a) (b := c) K hKstack
   have hK :
-      State.conditionalMinEntropyDualEffectTransposeMatrixMap (a := a) (b := c) M =
+      MState.conditionalMinEntropyDualEffectTransposeMatrixMap (a := a) (b := c) M =
         MatrixMap.ofKraus K := by
-    exact State.conditionalMinEntropyDualEffectOfKraus_transposeMatrixMap_eq_ofKraus
+    exact MState.conditionalMinEntropyDualEffectOfKraus_transposeMatrixMap_eq_ofKraus
       (a := a) (b := c) K
   have hweak :
-      ((ψ.state.marginalAC.matrix * M).trace).re ≤ T.trace.re :=
-    State.conditionalMinEntropyDualEffectValue_le_scaleValue
+      ((ψ.state.marginalAC.m * M).trace).re ≤ T.trace.re :=
+    MState.conditionalMinEntropyDualEffectValue_le_scaleValue
       (a := a) hM hT
   have hobj :=
     ψ.dualEffectObjective_re_eq_card_mul_successVector_trace
@@ -735,16 +736,16 @@ theorem dualEffectKrausSuccessVector_card_mul_trace_le_scaleFeasible_trace
 omit [DecidableEq κ] in
 theorem dualEffectObjective_le_card_mul_sSup_fidelityValueSet_of_successVector_trace_le
     [Nonempty a] [Nonempty b]
-    (ψ : PureVector (Prod (Prod a b) c)) {M : CMatrix (Prod a c)}
+    (ψ : Ket ((a × b) × c)) {M : CMatrix (a × c)}
     {K : κ → Matrix a c ℂ}
     (hK :
-      State.conditionalMinEntropyDualEffectTransposeMatrixMap (a := a) (b := c) M =
+      MState.conditionalMinEntropyDualEffectTransposeMatrixMap (a := a) (b := c) M =
         MatrixMap.ofKraus K)
     (hsuccess :
       (rankOneMatrix
         (dualEffectKrausSuccessVector (a := a) (b := b) (c := c) ψ K)).trace.re ≤
           sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a))) :
-    ((ψ.state.marginalAC.matrix * M).trace).re ≤
+    ((ψ.state.marginalAC.m * M).trace).re ≤
       (Fintype.card a : ℝ) *
         sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a)) := by
   rw [ψ.dualEffectObjective_re_eq_card_mul_successVector_trace
@@ -753,96 +754,67 @@ theorem dualEffectObjective_le_card_mul_sSup_fidelityValueSet_of_successVector_t
     exact_mod_cast Nat.zero_le (Fintype.card a)
   exact mul_le_mul_of_nonneg_left hsuccess hcard_nonneg
 
-set_option maxHeartbeats 1200000 in
+private theorem referenceIsometryRightBlockK_overlap_eq_dot
+    [Nonempty a]
+    (ψ : Ket ((a × b) × c))
+    (V : ReferenceIsometry c (c ⊕ (κ × a)))
+    (η : Ket (κ × b)) :
+    let K := referenceIsometryRightBlockK (a := a) V
+    let v := dualEffectKrausSuccessVector (a := a) (b := b) (c := c) ψ K
+    let Ψ₀ : Ket (c × (a × b)) :=
+      ψ.reindex (Equiv.prodComm (a × b) c)
+    let Ψ := V.applyKet Ψ₀
+    let Φ₀ := MState.maxEntangledSideKet (a := a) η
+    let Φ :=
+      (ReferenceIsometry.sumInr c (κ × a)).applyKet Φ₀
+    Ψ.overlap Φ = ∑ x : κ × b, star (v x) * η.vec x := by
+  classical
+  intro K v Ψ₀ Ψ Φ₀ Φ
+  simp [Ket.overlap, Ψ, Φ, Ψ₀, Φ₀, v, K,
+    ReferenceIsometry.applyKet_vec, ReferenceIsometry.applyAmp,
+    ReferenceIsometry.sumInr, MState.maxEntangledSideKet,
+    MState.ketOfAmplitudeMatrix, MState.maxEntangledSideAmplitude,
+    referenceIsometryRightBlockK, dualEffectKrausSuccessVector,
+    Matrix.mulVec, Fintype.sum_sum_type, Fintype.sum_prod_type,
+    dotProduct, Finset.mul_sum, Finset.sum_mul]
+  rw [sum_two_delta_collapse]
+  refine Finset.sum_congr rfl fun m _ => Finset.sum_congr rfl fun j _ =>
+    Finset.sum_congr rfl fun i _ => Finset.sum_congr rfl fun z _ => ?_
+  ring
+
 private theorem dualEffectKrausSuccessVector_dilation_overlap_eq_dot
     [Nonempty a]
-    (ψ : PureVector (Prod (Prod a b) c)) (K : κ → Matrix a c ℂ)
+    (ψ : Ket ((a × b) × c)) (K : κ → Matrix a c ℂ)
     (hKstack :
       Matrix.conjTranspose (MatrixMap.smoothEndpointKrausStack K) *
         MatrixMap.smoothEndpointKrausStack K ≤ (1 : CMatrix c))
-    (η : PureVector (Prod κ b)) :
+    (η : Ket (κ × b)) :
     let v := dualEffectKrausSuccessVector (a := a) (b := b) (c := c) ψ K
-    let Ψ₀ : PureVector (Prod c (Prod a b)) :=
-      ψ.reindex (Equiv.prodComm (Prod a b) c)
+    let Ψ₀ : Ket (c × (a × b)) :=
+      ψ.reindex (Equiv.prodComm (a × b) c)
     let Ψ :=
       (contractionDilationReferenceIsometry
-        (MatrixMap.smoothEndpointKrausStack K) hKstack).applyPureVector Ψ₀
-    let Φ₀ := State.maxEntangledSidePureVector (a := a) η
+        (MatrixMap.smoothEndpointKrausStack K) hKstack).applyKet Ψ₀
+    let Φ₀ := MState.maxEntangledSideKet (a := a) η
     let Φ :=
-      (ReferenceIsometry.sumInr c (Prod κ a)).applyPureVector Φ₀
-    Ψ.overlap Φ = ∑ x : Prod κ b, star (v x) * η.amp x := by
-  classical
-  intro v Ψ₀ Ψ Φ₀ Φ
-  have hscoeff :
-      star ((((Real.sqrt ((Fintype.card a : ℝ)⁻¹)) : ℝ) : ℂ)) =
-        (((Real.sqrt ((Fintype.card a : ℝ)⁻¹)) : ℝ) : ℂ) := by
-    simp
-  simpa [PureVector.overlap, Ψ, Φ, Ψ₀, Φ₀, v,
-    ReferenceIsometry.applyPureVector_amp, ReferenceIsometry.applyAmp,
-    contractionDilationReferenceIsometry, ReferenceIsometry.sumInr,
-    State.maxEntangledSidePureVector, State.pureVectorOfAmplitudeMatrix,
-    State.maxEntangledSideAmplitude,
-    dualEffectKrausSuccessVector, MatrixMap.smoothEndpointKrausStack,
-    Matrix.mulVec, Fintype.sum_sum_type, Fintype.sum_prod_type,
-    dotProduct_single_one_left,
-    dotProduct, map_sum, map_mul,
-    Finset.mul_sum, Finset.sum_mul, hscoeff,
-    mul_assoc, mul_left_comm, mul_comm] using
-      sum_two_delta_collapse (δ := κ) (α := a) (β := b) (γ := c)
-      (fun m i i' j m' z =>
-            (((Real.sqrt ((Fintype.card a : ℝ)⁻¹)) : ℝ) : ℂ) *
-            (η.amp (m', j) *
-              (star (K m i z) * star (ψ.amp ((i', j), z)))))
-
-set_option maxHeartbeats 1200000 in
-private theorem referenceIsometryRightBlockK_overlap_eq_dot
-    [Nonempty a]
-    (ψ : PureVector (Prod (Prod a b) c))
-    (V : ReferenceIsometry c (Sum c (Prod κ a)))
-    (η : PureVector (Prod κ b)) :
-    let K := referenceIsometryRightBlockK (a := a) V
-    let v := dualEffectKrausSuccessVector (a := a) (b := b) (c := c) ψ K
-    let Ψ₀ : PureVector (Prod c (Prod a b)) :=
-      ψ.reindex (Equiv.prodComm (Prod a b) c)
-    let Ψ := V.applyPureVector Ψ₀
-    let Φ₀ := State.maxEntangledSidePureVector (a := a) η
-    let Φ :=
-      (ReferenceIsometry.sumInr c (Prod κ a)).applyPureVector Φ₀
-    Ψ.overlap Φ = ∑ x : Prod κ b, star (v x) * η.amp x := by
-  classical
-  intro K v Ψ₀ Ψ Φ₀ Φ
-  have hscoeff :
-      star ((((Real.sqrt ((Fintype.card a : ℝ)⁻¹)) : ℝ) : ℂ)) =
-        (((Real.sqrt ((Fintype.card a : ℝ)⁻¹)) : ℝ) : ℂ) := by
-    simp
-  simpa [PureVector.overlap, Ψ, Φ, Ψ₀, Φ₀, v, K,
-    ReferenceIsometry.applyPureVector_amp, ReferenceIsometry.applyAmp,
-    ReferenceIsometry.sumInr, State.maxEntangledSidePureVector,
-    State.pureVectorOfAmplitudeMatrix, State.maxEntangledSideAmplitude,
-    referenceIsometryRightBlockK, dualEffectKrausSuccessVector,
-    Matrix.mulVec, Fintype.sum_sum_type, Fintype.sum_prod_type,
-    dotProduct_single_one_left, dotProduct, map_sum, map_mul,
-    Finset.mul_sum, Finset.sum_mul, hscoeff,
-    mul_assoc, mul_left_comm, mul_comm] using
-      sum_two_delta_collapse (δ := κ) (α := a) (β := b) (γ := c)
-        (fun m i i' j m' z =>
-            (((Real.sqrt ((Fintype.card a : ℝ)⁻¹)) : ℝ) : ℂ) *
-            (η.amp (m', j) *
-              (star (V.matrix (Sum.inr (m, i)) z) *
-                star (ψ.amp ((i', j), z)))))
+      (ReferenceIsometry.sumInr c (κ × a)).applyKet Φ₀
+    Ψ.overlap Φ = ∑ x : κ × b, star (v x) * η.vec x :=
+  referenceIsometryRightBlockK_overlap_eq_dot (a := a) (b := b) (c := c) ψ
+    (contractionDilationReferenceIsometry
+      (MatrixMap.smoothEndpointKrausStack K) hKstack) η
 
 private theorem referenceIsometryRightBlockK_card_mul_overlapSq_le_scaleFeasible_trace
     [Nonempty a]
-    (ψ : PureVector (Prod (Prod a b) c))
-    (V : ReferenceIsometry c (Sum c (Prod κ a)))
-    (η : PureVector (Prod κ b))
+    (ψ : Ket ((a × b) × c))
+    (V : ReferenceIsometry c (c ⊕ (κ × a)))
+    (η : Ket (κ × b))
     {T : CMatrix c}
-    (hT : State.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T) :
+    (hT : MState.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T) :
     (Fintype.card a : ℝ) *
-        ((V.applyPureVector
-          (ψ.reindex (Equiv.prodComm (Prod a b) c))).overlapSq
-            ((ReferenceIsometry.sumInr c (Prod κ a)).applyPureVector
-              (State.maxEntangledSidePureVector (a := a) η))) ≤
+        ((V.applyKet
+          (ψ.reindex (Equiv.prodComm (a × b) c))).overlapSq
+            ((ReferenceIsometry.sumInr c (κ × a)).applyKet
+              (MState.maxEntangledSideKet (a := a) η))) ≤
       T.trace.re := by
   classical
   let K := referenceIsometryRightBlockK (a := a) V
@@ -851,9 +823,9 @@ private theorem referenceIsometryRightBlockK_card_mul_overlapSq_le_scaleFeasible
     referenceIsometryRightBlockK_overlap_eq_dot
       (a := a) (b := b) (c := c) ψ V η
   have hcauchy :
-      Complex.normSq (∑ x : Prod κ b, star (v x) * η.amp x) ≤
+      Complex.normSq (∑ x : κ × b, star (v x) * η.vec x) ≤
         (rankOneMatrix v).trace.re :=
-    PureVector.normSq_sum_star_mul_le_rankOne_trace v η
+    Ket.normSq_sum_star_mul_le_rankOne_trace v η
   have hsuccess :
       (Fintype.card a : ℝ) * (rankOneMatrix v).trace.re ≤ T.trace.re :=
     ψ.dualEffectKrausSuccessVector_card_mul_trace_le_scaleFeasible_trace
@@ -863,40 +835,40 @@ private theorem referenceIsometryRightBlockK_card_mul_overlapSq_le_scaleFeasible
     exact_mod_cast Nat.zero_le (Fintype.card a)
   have hmul :
       (Fintype.card a : ℝ) *
-          Complex.normSq (∑ x : Prod κ b, star (v x) * η.amp x) ≤
+          Complex.normSq (∑ x : κ × b, star (v x) * η.vec x) ≤
         (Fintype.card a : ℝ) * (rankOneMatrix v).trace.re :=
     mul_le_mul_of_nonneg_left hcauchy hcard_nonneg
-  rw [PureVector.overlapSq_eq_normSq, hoverlap]
+  rw [Ket.overlapSq_eq_normSq, hoverlap]
   exact hmul.trans hsuccess
 
 theorem fidelity_forward_bound_by_scaleFeasible
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c)) (σ : State b) (T : CMatrix c)
-    (hT : State.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T) :
+    (ψ : Ket ((a × b) × c)) (σ : MState b) (T : CMatrix c)
+    (hT : MState.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T) :
     (Fintype.card a : ℝ) *
-        ψ.state.marginalAB.squaredFidelity ((State.maximallyMixed a).prod σ) ≤
+        ψ.state.marginalAB.squaredFidelity ((MState.uniform : MState a).prod σ) ≤
       T.trace.re := by
   classical
-  let η : PureVector (Prod b b) := σ.canonicalPurification
-  let τ : State (Prod a b) := (State.maximallyMixed a).prod σ
-  let Ψ₀ : PureVector (Prod c (Prod a b)) :=
-    ψ.reindex (Equiv.prodComm (Prod a b) c)
-  let Φ₀ : PureVector (Prod (Prod b a) (Prod a b)) :=
-    State.maxEntangledSidePureVector (a := a) η
-  let Φ : PureVector (Prod (Sum c (Prod b a)) (Prod a b)) :=
-    (ReferenceIsometry.sumInr c (Prod b a)).applyPureVector Φ₀
-  have hη : η.state.marginalB = σ := by
-    apply State.ext
+  let η : Ket (b × b) := σ.canonicalPurification
+  let τ : MState (a × b) := (MState.uniform : MState a).prod σ
+  let Ψ₀ : Ket (c × (a × b)) :=
+    ψ.reindex (Equiv.prodComm (a × b) c)
+  let Φ₀ : Ket ((b × a) × (a × b)) :=
+    MState.maxEntangledSideKet (a := a) η
+  let Φ : Ket ((c ⊕ (b × a)) × (a × b)) :=
+    (ReferenceIsometry.sumInr c (b × a)).applyKet Φ₀
+  have hη : η.state.traceLeft = σ := by
+    apply MState.ext
     have hp : η.Purifies σ := by
       simpa [η] using σ.canonicalPurification_purifies
-    simpa [η, State.marginalB_matrix] using hp
+    simpa [η, MState.traceLeft_m] using hp
   have hΦ₀ : Φ₀.Purifies τ := by
-    simpa [Φ₀, τ, hη] using State.maxEntangledSidePureVector_purifies (a := a) η
+    simpa [Φ₀, τ, hη] using MState.maxEntangledSideKet_purifies (a := a) η
   have hΦ : Φ.Purifies τ := by
     simpa [Φ] using
-      ((ReferenceIsometry.sumInr c (Prod b a)).applyPureVector_purifies hΦ₀)
+      ((ReferenceIsometry.sumInr c (b × a)).applyKet_purifies hΦ₀)
   have hcardTarget :
-      Fintype.card (Prod a b) ≤ Fintype.card (Sum c (Prod b a)) := by
+      Fintype.card (a × b) ≤ Fintype.card (c ⊕ (b × a)) := by
     rw [Fintype.card_sum, Fintype.card_prod, Fintype.card_prod]
     calc
       Fintype.card a * Fintype.card b = Fintype.card b * Fintype.card a :=
@@ -904,35 +876,35 @@ theorem fidelity_forward_bound_by_scaleFeasible
       _ ≤ Fintype.card c + Fintype.card b * Fintype.card a :=
         Nat.le_add_left _ _
   obtain ⟨Ψ, hΨ, hoverlap⟩ :=
-    PureVector.exists_purification_with_overlapSq_eq_squaredFidelity
+    Ket.exists_purification_with_overlapSq_eq_squaredFidelity
       (Ψ := Φ) (ρ := τ) (σ := ψ.state.marginalAB) hΦ hcardTarget
   have hΨ₀ : Ψ₀.Purifies ψ.state.marginalAB := by
-    simpa [Ψ₀] using ψ.reindex_prodComm_purifies_marginalA
+    simpa [Ψ₀] using ψ.reindex_prodComm_purifies_traceRight
   have hcardIso :
-      Fintype.card c ≤ Fintype.card (Sum c (Prod b a)) := by
+      Fintype.card c ≤ Fintype.card (c ⊕ (b × a)) := by
     rw [Fintype.card_sum]
     exact Nat.le_add_right _ _
   obtain ⟨V, hV⟩ :=
-    PureVector.exists_referenceIsometry_applyPureVector_eq_of_purifies_same_state
+    Ket.exists_referenceIsometry_applyKet_eq_of_purifies_same_state
       hΨ₀ hΨ hcardIso
   have hscale :=
     referenceIsometryRightBlockK_card_mul_overlapSq_le_scaleFeasible_trace
       (a := a) (b := b) (c := c) ψ V η hT
   have hfid :
       ψ.state.marginalAB.squaredFidelity τ =
-        (V.applyPureVector Ψ₀).overlapSq Φ := by
+        (V.applyKet Ψ₀).overlapSq Φ := by
     rw [hV] at hoverlap
     calc
       ψ.state.marginalAB.squaredFidelity τ =
-          τ.squaredFidelity ψ.state.marginalAB := State.squaredFidelity_comm _ _
-      _ = Φ.overlapSq (V.applyPureVector Ψ₀) := hoverlap.symm
-      _ = (V.applyPureVector Ψ₀).overlapSq Φ := PureVector.overlapSq_comm_endpoint _ _
+          τ.squaredFidelity ψ.state.marginalAB := MState.squaredFidelity_comm _ _
+      _ = Φ.overlapSq (V.applyKet Ψ₀) := hoverlap.symm
+      _ = (V.applyKet Ψ₀).overlapSq Φ := Ket.overlapSq_comm_endpoint _ _
   rw [hfid]
   simpa [Ψ₀, Φ, τ] using hscale
 
 private theorem dualEffectKrausSuccessVector_dilation_overlap_eq_sqrt_trace
     [Nonempty a]
-    (ψ : PureVector (Prod (Prod a b) c)) (K : κ → Matrix a c ℂ)
+    (ψ : Ket ((a × b) × c)) (K : κ → Matrix a c ℂ)
     (hKstack :
       Matrix.conjTranspose (MatrixMap.smoothEndpointKrausStack K) *
         MatrixMap.smoothEndpointKrausStack K ≤ (1 : CMatrix c))
@@ -940,15 +912,15 @@ private theorem dualEffectKrausSuccessVector_dilation_overlap_eq_sqrt_trace
       0 < (rankOneMatrix
         (dualEffectKrausSuccessVector (a := a) (b := b) (c := c) ψ K)).trace.re) :
     let v := dualEffectKrausSuccessVector (a := a) (b := b) (c := c) ψ K
-    let η := State.pureVectorNormalize v hpos
-    let Ψ₀ : PureVector (Prod c (Prod a b)) :=
-      ψ.reindex (Equiv.prodComm (Prod a b) c)
+    let η := Ket.normalizeRankOne v hpos
+    let Ψ₀ : Ket (c × (a × b)) :=
+      ψ.reindex (Equiv.prodComm (a × b) c)
     let Ψ :=
       (contractionDilationReferenceIsometry
-        (MatrixMap.smoothEndpointKrausStack K) hKstack).applyPureVector Ψ₀
-    let Φ₀ := State.maxEntangledSidePureVector (a := a) η
+        (MatrixMap.smoothEndpointKrausStack K) hKstack).applyKet Ψ₀
+    let Φ₀ := MState.maxEntangledSideKet (a := a) η
     let Φ :=
-      (ReferenceIsometry.sumInr c (Prod κ a)).applyPureVector Φ₀
+      (ReferenceIsometry.sumInr c (κ × a)).applyKet Φ₀
     Ψ.overlap Φ =
       (((Real.sqrt
         (rankOneMatrix
@@ -978,7 +950,7 @@ private theorem dualEffectKrausSuccessVector_dilation_overlap_eq_sqrt_trace
         (((Real.sqrt ((Fintype.card a : ℝ)⁻¹)) : ℝ) : ℂ) := by
     simp
   have hnorm :
-      (∑ x : Prod κ b, star (v x) * v x) = (rankOneMatrix v).trace := by
+      (∑ x : κ × b, star (v x) * v x) = (rankOneMatrix v).trace := by
     simp [rankOneMatrix_trace, dotProduct, mul_comm]
   have hv_dot_re : (v ⬝ᵥ fun i => star (v i)).re = t := by
     simp [t, rankOneMatrix_trace, dotProduct]
@@ -1001,13 +973,14 @@ private theorem dualEffectKrausSuccessVector_dilation_overlap_eq_sqrt_trace
   calc
     Ψ.overlap Φ =
         (((Real.sqrt t)⁻¹ : ℝ) : ℂ) *
-          (∑ x : Prod κ b, star (v x) * v x) := by
+          (∑ x : κ × b, star (v x) * v x) := by
       rw [dualEffectKrausSuccessVector_dilation_overlap_eq_dot
         (a := a) (b := b) (c := c) ψ K hKstack η]
-      simp [η, State.pureVectorNormalize_amp, v, Finset.mul_sum]
+      simp [η, Ket.normalizeRankOne_vec, v, Finset.mul_sum]
       apply Finset.sum_congr rfl
       intro x hx
-      simp [hsqrtdot, mul_assoc, mul_comm]
+      simp only [hsqrtdot]
+      ring
     _ = (((Real.sqrt t)⁻¹ : ℝ) : ℂ) * (rankOneMatrix v).trace := by
       rw [hnorm]
     _ = ((Real.sqrt
@@ -1017,7 +990,7 @@ private theorem dualEffectKrausSuccessVector_dilation_overlap_eq_sqrt_trace
 
 theorem dualEffectKrausSuccessVector_trace_le_sSup_fidelityValueSet
     [Nonempty a] [Nonempty b]
-    (ψ : PureVector (Prod (Prod a b) c)) {K : κ → Matrix a c ℂ}
+    (ψ : Ket ((a × b) × c)) {K : κ → Matrix a c ℂ}
     (hKstack :
       Matrix.conjTranspose (MatrixMap.smoothEndpointKrausStack K) *
         MatrixMap.smoothEndpointKrausStack K ≤ (1 : CMatrix c)) :
@@ -1031,28 +1004,28 @@ theorem dualEffectKrausSuccessVector_trace_le_sSup_fidelityValueSet
     simpa [t] using
       (Matrix.PosSemidef.trace_nonneg (rankOneMatrix_pos v)).1
   by_cases hpos : 0 < t
-  · let η : PureVector (Prod κ b) := State.pureVectorNormalize v (by simpa [t, v] using hpos)
-    let Ψ₀ : PureVector (Prod c (Prod a b)) :=
-      ψ.reindex (Equiv.prodComm (Prod a b) c)
+  · let η : Ket (κ × b) := Ket.normalizeRankOne v (by simpa [t, v] using hpos)
+    let Ψ₀ : Ket (c × (a × b)) :=
+      ψ.reindex (Equiv.prodComm (a × b) c)
     let Ψ :=
       (contractionDilationReferenceIsometry
-        (MatrixMap.smoothEndpointKrausStack K) hKstack).applyPureVector Ψ₀
-    let Φ₀ := State.maxEntangledSidePureVector (a := a) η
+        (MatrixMap.smoothEndpointKrausStack K) hKstack).applyKet Ψ₀
+    let Φ₀ := MState.maxEntangledSideKet (a := a) η
     let Φ :=
-      (ReferenceIsometry.sumInr c (Prod κ a)).applyPureVector Φ₀
+      (ReferenceIsometry.sumInr c (κ × a)).applyKet Φ₀
     have hΨ₀ : Ψ₀.Purifies ψ.state.marginalAB := by
-      simpa [Ψ₀] using ψ.reindex_prodComm_purifies_marginalA
+      simpa [Ψ₀] using ψ.reindex_prodComm_purifies_traceRight
     have hΨ : Ψ.Purifies ψ.state.marginalAB := by
       simpa [Ψ] using
         ((contractionDilationReferenceIsometry
-          (MatrixMap.smoothEndpointKrausStack K) hKstack).applyPureVector_purifies hΨ₀)
+          (MatrixMap.smoothEndpointKrausStack K) hKstack).applyKet_purifies hΨ₀)
     have hΦ₀ :
-        Φ₀.Purifies ((State.maximallyMixed a).prod η.state.marginalB) := by
-      simpa [Φ₀] using State.maxEntangledSidePureVector_purifies (a := a) η
+        Φ₀.Purifies ((MState.uniform : MState a).prod η.state.traceLeft) := by
+      simpa [Φ₀] using MState.maxEntangledSideKet_purifies (a := a) η
     have hΦ :
-        Φ.Purifies ((State.maximallyMixed a).prod η.state.marginalB) := by
+        Φ.Purifies ((MState.uniform : MState a).prod η.state.traceLeft) := by
       simpa [Φ] using
-        ((ReferenceIsometry.sumInr c (Prod κ a)).applyPureVector_purifies hΦ₀)
+        ((ReferenceIsometry.sumInr c (κ × a)).applyKet_purifies hΦ₀)
     have hoverlap :
         Ψ.overlap Φ = (((Real.sqrt t : ℝ) : ℂ)) := by
       simpa [v, t, η, Ψ₀, Ψ, Φ₀, Φ] using
@@ -1060,57 +1033,57 @@ theorem dualEffectKrausSuccessVector_trace_le_sSup_fidelityValueSet
           (a := a) (b := b) (c := c) ψ K hKstack
           (by simpa [v, t] using hpos))
     have habs_le :
-        Complex.abs (Ψ.overlap Φ) ≤
-          ψ.state.marginalAB.fidelity ((State.maximallyMixed a).prod η.state.marginalB) :=
-      State.pureVector_abs_overlap_le_fidelity hΨ hΦ
+         ‖Ψ.overlap Φ‖ ≤
+          ψ.state.marginalAB.fidelity ((MState.uniform : MState a).prod η.state.traceLeft) :=
+      Ket.abs_overlap_le_fidelity hΨ hΦ
     have hsqrt_le :
         Real.sqrt t ≤
-          ψ.state.marginalAB.fidelity ((State.maximallyMixed a).prod η.state.marginalB) := by
+          ψ.state.marginalAB.fidelity ((MState.uniform : MState a).prod η.state.traceLeft) := by
       simpa [hoverlap, abs_of_nonneg (Real.sqrt_nonneg t)] using habs_le
     have ht_le_sq :
         t ≤ ψ.state.marginalAB.squaredFidelity
-          ((State.maximallyMixed a).prod η.state.marginalB) := by
-      rw [State.squaredFidelity_eq_fidelity_sq]
+          ((MState.uniform : MState a).prod η.state.traceLeft) := by
+      rw [MState.squaredFidelity_eq_fidelity_sq]
       have hfid_nonneg :
           0 ≤ ψ.state.marginalAB.fidelity
-            ((State.maximallyMixed a).prod η.state.marginalB) := traceNorm_nonneg _
+            ((MState.uniform : MState a).prod η.state.traceLeft) := traceNorm_nonneg _
       have hsquare := (sq_le_sq₀ (Real.sqrt_nonneg t) hfid_nonneg).mpr hsqrt_le
       simpa [sq, Real.sq_sqrt ht_nonneg, mul_comm] using hsquare
     have hmem :
         ψ.state.marginalAB.squaredFidelity
-            ((State.maximallyMixed a).prod η.state.marginalB) ∈
+            ((MState.uniform : MState a).prod η.state.traceLeft) ∈
           ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a) := by
-      exact ⟨η.state.marginalB, rfl⟩
+      exact ⟨η.state.traceLeft, rfl⟩
     have hsup :
         ψ.state.marginalAB.squaredFidelity
-            ((State.maximallyMixed a).prod η.state.marginalB) ≤
+            ((MState.uniform : MState a).prod η.state.traceLeft) ≤
           sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a)) :=
       le_csSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet_bddAbove (a := a)) hmem
     exact le_trans (by simpa [t, v] using ht_le_sq) hsup
   · have ht_le_zero : t ≤ 0 := le_of_not_gt hpos
     have hzero_le_sup :
         0 ≤ sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a)) := by
-      let σ₀ : State b := State.maximallyMixed b
+      let σ₀ : MState b := (MState.uniform : MState b)
       have hmem :
-          ψ.state.marginalAB.squaredFidelity ((State.maximallyMixed a).prod σ₀) ∈
+          ψ.state.marginalAB.squaredFidelity ((MState.uniform : MState a).prod σ₀) ∈
             ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a) := by
         exact ⟨σ₀, rfl⟩
       have hle_sup :
-          ψ.state.marginalAB.squaredFidelity ((State.maximallyMixed a).prod σ₀) ≤
+          ψ.state.marginalAB.squaredFidelity ((MState.uniform : MState a).prod σ₀) ≤
             sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a)) :=
         le_csSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet_bddAbove (a := a)) hmem
-      exact le_trans (State.squaredFidelity_nonneg _ _) hle_sup
+      exact le_trans (MState.squaredFidelity_nonneg _ _) hle_sup
     exact le_trans (by simpa [t, v] using ht_le_zero) hzero_le_sup
 
 theorem dualEffectObjective_le_card_mul_sSup_fidelityValueSet
     [Nonempty a] [Nonempty b]
-    (ψ : PureVector (Prod (Prod a b) c)) {M : CMatrix (Prod a c)}
-    (hM : State.ConditionalMinEntropyDualEffectFeasible (a := a) M) :
-    ((ψ.state.marginalAC.matrix * M).trace).re ≤
+    (ψ : Ket ((a × b) × c)) {M : CMatrix (a × c)}
+    (hM : MState.ConditionalMinEntropyDualEffectFeasible (a := a) M) :
+    ((ψ.state.marginalAC.m * M).trace).re ≤
       (Fintype.card a : ℝ) *
         sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a)) := by
   classical
-  rcases State.exists_krausStack_contraction_conditionalMinEntropyDualEffectTransposeMatrixMap
+  rcases MState.exists_krausStack_contraction_conditionalMinEntropyDualEffectTransposeMatrixMap
       (a := a) (b := c) hM with ⟨K, hK, hKstack⟩
   exact ψ.dualEffectObjective_le_card_mul_sSup_fidelityValueSet_of_successVector_trace_le
     (a := a) (b := b) hK
@@ -1118,9 +1091,9 @@ theorem dualEffectObjective_le_card_mul_sSup_fidelityValueSet
       (a := a) (b := b) hKstack)
 
 theorem dualEffectObjective_re_nonneg [Nonempty a]
-    (ψ : PureVector (Prod (Prod a b) c)) {M : CMatrix (Prod a c)}
-    (hM : State.ConditionalMinEntropyDualEffectFeasible (a := a) M) :
-    0 ≤ ((ψ.state.marginalAC.matrix * M).trace).re := by
+    (ψ : Ket ((a × b) × c)) {M : CMatrix (a × c)}
+    (hM : MState.ConditionalMinEntropyDualEffectFeasible (a := a) M) :
+    0 ≤ ((ψ.state.marginalAC.m * M).trace).re := by
   rw [ψ.dualEffectObjective_re_eq_card_mul_trace_transposeLink (a := a) (b := b)]
   have hcard_nonneg : 0 ≤ (Fintype.card a : ℝ) := by
     exact_mod_cast Nat.zero_le (Fintype.card a)
@@ -1131,28 +1104,28 @@ theorem dualEffectObjective_re_nonneg [Nonempty a]
 
 theorem dualEffectObjective_le_card_mul_sSup_fidelityValueSet_of_scaled_le
     [Nonempty a] [Nonempty b]
-    (ψ : PureVector (Prod (Prod a b) c)) (M : CMatrix (Prod a c))
-    (σ : State b) {t : ℝ} (ht : 0 ≤ t)
+    (ψ : Ket ((a × b) × c)) (M : CMatrix (a × c))
+    (σ : MState b) {t : ℝ} (ht : 0 ≤ t)
     (hobj :
-      ((ψ.state.marginalAC.matrix * M).trace).re = (Fintype.card a : ℝ) * t)
+      ((ψ.state.marginalAC.m * M).trace).re = (Fintype.card a : ℝ) * t)
     (hle :
-      (((t : ℝ) : ℂ) • ((State.maximallyMixed a).prod σ).matrix) ≤
-        ψ.state.marginalAB.matrix) :
-    ((ψ.state.marginalAC.matrix * M).trace).re ≤
+      (((t : ℝ) : ℂ) • ((MState.uniform : MState a).prod σ).m) ≤
+        ψ.state.marginalAB.m) :
+    ((ψ.state.marginalAC.m * M).trace).re ≤
       (Fintype.card a : ℝ) *
         sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a)) := by
-  let X : CMatrix (Prod a b) :=
-    (((Real.sqrt t : ℝ) : ℂ) • ((State.maximallyMixed a).prod σ).matrix)
+  let X : CMatrix (a × b) :=
+    (((Real.sqrt t : ℝ) : ℂ) • ((MState.uniform : MState a).prod σ).m)
   have hfeas :
-      State.ConditionalMaxFidelityBlockFeasible
+      MState.ConditionalMaxFidelityBlockFeasible
         (a := a) ψ.state.marginalAB σ X := by
-    exact State.ConditionalMaxFidelityBlockFeasible.of_scaled_le
+    exact MState.ConditionalMaxFidelityBlockFeasible.of_scaled_le
       (a := a) (ρ := ψ.state.marginalAB) (σ := σ) ht hle
   have hval :
-      State.conditionalMaxFidelityBlockExponentValue (a := a) X =
+      MState.conditionalMaxFidelityBlockExponentValue (a := a) X =
         (Fintype.card a : ℝ) * t := by
     simpa [X] using
-      (State.ConditionalMaxFidelityBlockFeasible.of_scaled_le_blockExponentValue
+      (MState.ConditionalMaxFidelityBlockFeasible.of_scaled_le_blockExponentValue
         (a := a) (σ := σ) ht)
   have hmem :
       (Fintype.card a : ℝ) * t ∈
@@ -1164,19 +1137,18 @@ theorem dualEffectObjective_le_card_mul_sSup_fidelityValueSet_of_scaled_le
         (ψ.state.marginalAB.conditionalMaxFidelityBlockExponentValueSet (a := a)) :=
     ψ.state.marginalAB.conditionalMaxFidelityBlockExponentValueSet_bddAbove (a := a)
   calc
-    ((ψ.state.marginalAC.matrix * M).trace).re =
+    ((ψ.state.marginalAC.m * M).trace).re =
         (Fintype.card a : ℝ) * t := hobj
     _ ≤ sSup (ψ.state.marginalAB.conditionalMaxFidelityBlockExponentValueSet
           (a := a)) := le_csSup hbdd hmem
     _ = (Fintype.card a : ℝ) *
         sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a)) := by
-          rw [← State.card_mul_sSup_fidelityValueSet_eq_sSup_conditionalMaxFidelityBlockExponentValueSet
+          rw [← MState.card_mul_sSup_fidelityValueSet_eq_sSup_conditionalMaxFidelityBlockExponentValueSet
             (a := a) ψ.state.marginalAB]
-
 
 theorem conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_marginalAC_of_endpoint_scale
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
+    (ψ : Ket ((a × b) × c))
     (hscale :
       (Fintype.card a : ℝ) *
           sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a)) =
@@ -1189,7 +1161,7 @@ theorem conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_ma
 
 theorem conditionalMaxEntropy_marginalAB_eq_neg_conditionalMinEntropy_marginalAC_of_endpoint_scale
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
+    (ψ : Ket ((a × b) × c))
     (hscale :
       (Fintype.card a : ℝ) *
           sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a)) =
@@ -1209,7 +1181,7 @@ source-shaped pure-state obligation is the equality between the dual-effect
 supremum and the fidelity supremum. -/
 theorem card_mul_sSup_fidelityValueSet_eq_conditionalMinEntropyScale_marginalAC_of_dualEffect
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
+    (ψ : Ket ((a × b) × c))
     (hdual :
       (Fintype.card a : ℝ) *
           sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a)) =
@@ -1218,7 +1190,7 @@ theorem card_mul_sSup_fidelityValueSet_eq_conditionalMinEntropyScale_marginalAC_
         sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a)) =
       ψ.state.marginalAC.conditionalMinEntropyScale (a := a) := by
   rw [hdual]
-  exact (State.conditionalMinEntropyScale_eq_sSup_dualEffectValueSet
+  exact (MState.conditionalMinEntropyScale_eq_sSup_dualEffectValueSet
     (a := a) ψ.state.marginalAC).symm
 
 /-- Pure endpoint assembly from the single remaining SDP equality:
@@ -1226,7 +1198,7 @@ the block-SDP endpoint for the `AB` marginal equals the dual-effect endpoint
 for the complementary `AC` marginal. -/
 theorem card_mul_sSup_fidelityValueSet_eq_conditionalMinEntropyScale_marginalAC_of_blockDual
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
+    (ψ : Ket ((a × b) × c))
     (hdual :
       sSup (ψ.state.marginalAB.conditionalMaxFidelityBlockExponentValueSet (a := a)) =
         sSup (ψ.state.marginalAC.conditionalMinEntropyDualEffectValueSet (a := a))) :
@@ -1235,7 +1207,7 @@ theorem card_mul_sSup_fidelityValueSet_eq_conditionalMinEntropyScale_marginalAC_
       ψ.state.marginalAC.conditionalMinEntropyScale (a := a) := by
   refine ψ.card_mul_sSup_fidelityValueSet_eq_conditionalMinEntropyScale_marginalAC_of_dualEffect
     (a := a) ?_
-  rw [State.card_mul_sSup_fidelityValueSet_eq_sSup_conditionalMaxFidelityBlockExponentValueSet
+  rw [MState.card_mul_sSup_fidelityValueSet_eq_sSup_conditionalMaxFidelityBlockExponentValueSet
     (a := a) ψ.state.marginalAB]
   exact hdual
 
@@ -1243,7 +1215,7 @@ theorem card_mul_sSup_fidelityValueSet_eq_conditionalMinEntropyScale_marginalAC_
 bridge is proved. -/
 theorem conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_marginalAC_of_dualEffect
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
+    (ψ : Ket ((a × b) × c))
     (hdual :
       (Fintype.card a : ℝ) *
           sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a)) =
@@ -1257,7 +1229,7 @@ theorem conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_ma
 
 theorem conditionalMaxEntropy_marginalAB_eq_neg_conditionalMinEntropy_marginalAC_of_dualEffect
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
+    (ψ : Ket ((a × b) × c))
     (hdual :
       (Fintype.card a : ℝ) *
           sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a)) =
@@ -1272,7 +1244,7 @@ theorem conditionalMaxEntropy_marginalAB_eq_neg_conditionalMinEntropy_marginalAC
 equality is proved. -/
 theorem conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_marginalAC_of_blockDual
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
+    (ψ : Ket ((a × b) × c))
     (hdual :
       sSup (ψ.state.marginalAB.conditionalMaxFidelityBlockExponentValueSet (a := a)) =
         sSup (ψ.state.marginalAC.conditionalMinEntropyDualEffectValueSet (a := a))) :
@@ -1285,7 +1257,7 @@ theorem conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_ma
 
 theorem conditionalMaxEntropy_marginalAB_eq_neg_conditionalMinEntropy_marginalAC_of_blockDual
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
+    (ψ : Ket ((a × b) × c))
     (hdual :
       sSup (ψ.state.marginalAB.conditionalMaxFidelityBlockExponentValueSet (a := a)) =
         sSup (ψ.state.marginalAC.conditionalMinEntropyDualEffectValueSet (a := a))) :
@@ -1297,13 +1269,13 @@ theorem conditionalMaxEntropy_marginalAB_eq_neg_conditionalMinEntropy_marginalAC
 
 theorem conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_marginalAC_of_endpoint_bounds
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
-    (hforward : ∀ σ : State b, ∀ T : CMatrix c,
-      State.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
+    (ψ : Ket ((a × b) × c))
+    (hforward : ∀ σ : MState b, ∀ T : CMatrix c,
+      MState.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
         (Fintype.card a : ℝ) *
-          ψ.state.marginalAB.squaredFidelity ((State.maximallyMixed a).prod σ) ≤ T.trace.re)
+          ψ.state.marginalAB.squaredFidelity ((MState.uniform : MState a).prod σ) ≤ T.trace.re)
     (hreverse : ∀ T : CMatrix c,
-      State.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
+      MState.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
         T.trace.re ≤
           (Fintype.card a : ℝ) *
             sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a))) :
@@ -1315,11 +1287,11 @@ theorem conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_ma
 
 theorem conditionalMaxEntropyPositive_marginalAB_le_neg_conditionalMinEntropy_marginalAC_of_endpoint_forward_bound
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
-    (hforward : ∀ σ : State b, ∀ T : CMatrix c,
-      State.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
+    (ψ : Ket ((a × b) × c))
+    (hforward : ∀ σ : MState b, ∀ T : CMatrix c,
+      MState.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
         (Fintype.card a : ℝ) *
-          ψ.state.marginalAB.squaredFidelity ((State.maximallyMixed a).prod σ) ≤ T.trace.re) :
+          ψ.state.marginalAB.squaredFidelity ((MState.uniform : MState a).prod σ) ≤ T.trace.re) :
     ψ.state.marginalAB.conditionalMaxEntropyPositive ≤
       -ψ.state.marginalAC.conditionalMinEntropy :=
   ψ.state.marginalAB
@@ -1335,10 +1307,10 @@ max-fidelity candidate.  The conic strong-duality theorem
 dual-effect optimum into the min-entropy scale. -/
 theorem conditionalMaxEntropyPositive_marginalAB_le_neg_conditionalMinEntropy_marginalAC_of_dualEffect_lower_bound
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
-    (hlower : ∀ σ : State b,
+    (ψ : Ket ((a × b) × c))
+    (hlower : ∀ σ : MState b,
       (Fintype.card a : ℝ) *
-        ψ.state.marginalAB.squaredFidelity ((State.maximallyMixed a).prod σ) ≤
+        ψ.state.marginalAB.squaredFidelity ((MState.uniform : MState a).prod σ) ≤
           sSup (ψ.state.marginalAC.conditionalMinEntropyDualEffectValueSet (a := a))) :
     ψ.state.marginalAB.conditionalMaxEntropyPositive ≤
       -ψ.state.marginalAC.conditionalMinEntropy := by
@@ -1379,28 +1351,28 @@ theorem conditionalMaxEntropyPositive_marginalAB_le_neg_conditionalMinEntropy_ma
     (le_of_lt (Real.log_pos one_lt_two))
 
 /-- It suffices to exhibit a concrete feasible dual effect for every
-max-fidelity side state.  This is the most useful proof obligation for the
-remaining pure endpoint forward bridge. -/
+max-fidelity side state.  This is the most convenient entry point for the pure
+endpoint forward bridge. -/
 theorem dualEffect_lower_bound_of_exists_feasible_objective
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
-    (hexists : ∀ σ : State b, ∃ M : CMatrix (Prod a c),
-      State.ConditionalMinEntropyDualEffectFeasible (a := a) M ∧
+    (ψ : Ket ((a × b) × c))
+    (hexists : ∀ σ : MState b, ∃ M : CMatrix (a × c),
+      MState.ConditionalMinEntropyDualEffectFeasible (a := a) M ∧
         (Fintype.card a : ℝ) *
-          ψ.state.marginalAB.squaredFidelity ((State.maximallyMixed a).prod σ) ≤
-            ((ψ.state.marginalAC.matrix * M).trace).re) :
-    ∀ σ : State b,
+          ψ.state.marginalAB.squaredFidelity ((MState.uniform : MState a).prod σ) ≤
+            ((ψ.state.marginalAC.m * M).trace).re) :
+    ∀ σ : MState b,
       (Fintype.card a : ℝ) *
-        ψ.state.marginalAB.squaredFidelity ((State.maximallyMixed a).prod σ) ≤
+        ψ.state.marginalAB.squaredFidelity ((MState.uniform : MState a).prod σ) ≤
           sSup (ψ.state.marginalAC.conditionalMinEntropyDualEffectValueSet (a := a)) := by
   intro σ
   rcases hexists σ with ⟨M, hM, hleM⟩
   have hmem :
-      ((ψ.state.marginalAC.matrix * M).trace).re ∈
+      ((ψ.state.marginalAC.m * M).trace).re ∈
         ψ.state.marginalAC.conditionalMinEntropyDualEffectValueSet (a := a) :=
     ⟨M, hM, rfl⟩
   have hle_sup :
-      ((ψ.state.marginalAC.matrix * M).trace).re ≤
+      ((ψ.state.marginalAC.m * M).trace).re ≤
         sSup (ψ.state.marginalAC.conditionalMinEntropyDualEffectValueSet (a := a)) :=
     le_csSup (ψ.state.marginalAC.conditionalMinEntropyDualEffectValueSet_bddAbove
       (a := a)) hmem
@@ -1410,12 +1382,12 @@ theorem dualEffect_lower_bound_of_exists_feasible_objective
 max-fidelity side state. -/
 theorem conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_marginalAC_of_dualEffect_witness
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
-    (hexists : ∀ σ : State b, ∃ M : CMatrix (Prod a c),
-      State.ConditionalMinEntropyDualEffectFeasible (a := a) M ∧
+    (ψ : Ket ((a × b) × c))
+    (hexists : ∀ σ : MState b, ∃ M : CMatrix (a × c),
+      MState.ConditionalMinEntropyDualEffectFeasible (a := a) M ∧
         (Fintype.card a : ℝ) *
-          ψ.state.marginalAB.squaredFidelity ((State.maximallyMixed a).prod σ) ≤
-            ((ψ.state.marginalAC.matrix * M).trace).re) :
+          ψ.state.marginalAB.squaredFidelity ((MState.uniform : MState a).prod σ) ≤
+            ((ψ.state.marginalAC.m * M).trace).re) :
     ψ.state.marginalAB.conditionalMaxEntropyPositive =
       -ψ.state.marginalAC.conditionalMinEntropy :=
   le_antisymm
@@ -1432,12 +1404,12 @@ theorem conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_ma
 witnesses. -/
 theorem conditionalMaxEntropy_marginalAB_eq_neg_conditionalMinEntropy_marginalAC_of_exists_dualEffect_lower_bound
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
-    (hexists : ∀ σ : State b, ∃ M : CMatrix (Prod a c),
-      State.ConditionalMinEntropyDualEffectFeasible (a := a) M ∧
+    (ψ : Ket ((a × b) × c))
+    (hexists : ∀ σ : MState b, ∃ M : CMatrix (a × c),
+      MState.ConditionalMinEntropyDualEffectFeasible (a := a) M ∧
         (Fintype.card a : ℝ) *
-          ψ.state.marginalAB.squaredFidelity ((State.maximallyMixed a).prod σ) ≤
-            ((ψ.state.marginalAC.matrix * M).trace).re) :
+          ψ.state.marginalAB.squaredFidelity ((MState.uniform : MState a).prod σ) ≤
+            ((ψ.state.marginalAC.m * M).trace).re) :
     ψ.state.marginalAB.conditionalMaxEntropy =
       -ψ.state.marginalAC.conditionalMinEntropy := by
   rw [ψ.state.marginalAB.conditionalMaxEntropy_eq_positive (a := a)]
@@ -1449,10 +1421,10 @@ dual-effect lower bound and the already-proved reverse dual-effect upper
 bound. -/
 theorem conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_marginalAC_of_dualEffect_lower_bound
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
-    (hlower : ∀ σ : State b,
+    (ψ : Ket ((a × b) × c))
+    (hlower : ∀ σ : MState b,
       (Fintype.card a : ℝ) *
-        ψ.state.marginalAB.squaredFidelity ((State.maximallyMixed a).prod σ) ≤
+        ψ.state.marginalAB.squaredFidelity ((MState.uniform : MState a).prod σ) ≤
           sSup (ψ.state.marginalAC.conditionalMinEntropyDualEffectValueSet (a := a))) :
     ψ.state.marginalAB.conditionalMaxEntropyPositive =
       -ψ.state.marginalAC.conditionalMinEntropy :=
@@ -1469,10 +1441,10 @@ theorem conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_ma
 `conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_marginalAC_of_dualEffect_lower_bound`. -/
 theorem conditionalMaxEntropy_marginalAB_eq_neg_conditionalMinEntropy_marginalAC_of_dualEffect_lower_bound
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
-    (hlower : ∀ σ : State b,
+    (ψ : Ket ((a × b) × c))
+    (hlower : ∀ σ : MState b,
       (Fintype.card a : ℝ) *
-        ψ.state.marginalAB.squaredFidelity ((State.maximallyMixed a).prod σ) ≤
+        ψ.state.marginalAB.squaredFidelity ((MState.uniform : MState a).prod σ) ≤
           sSup (ψ.state.marginalAC.conditionalMinEntropyDualEffectValueSet (a := a))) :
     ψ.state.marginalAB.conditionalMaxEntropy =
       -ψ.state.marginalAC.conditionalMinEntropy := by
@@ -1486,9 +1458,9 @@ For the source-faithful endpoint SDP bridge, prefer
 `neg_conditionalMinEntropy_marginalAC_le_conditionalMaxEntropyPositive_marginalAB_of_dualEffect_bound`. -/
 theorem neg_conditionalMinEntropy_marginalAC_le_conditionalMaxEntropyPositive_marginalAB_of_endpoint_reverse_bound
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
+    (ψ : Ket ((a × b) × c))
     (hreverse : ∀ T : CMatrix c,
-      State.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
+      MState.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
         T.trace.re ≤
           (Fintype.card a : ℝ) *
             sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a))) :
@@ -1506,10 +1478,10 @@ link-map obligation: for every `AC` dual effect `M`, bound
 `Tr(ρ_AC M)` by the max-fidelity endpoint on the complementary `AB` marginal. -/
 theorem neg_conditionalMinEntropy_marginalAC_le_conditionalMaxEntropyPositive_marginalAB_of_dualEffect_bound
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
-    (hdual : ∀ M : CMatrix (Prod a c),
-      State.ConditionalMinEntropyDualEffectFeasible (a := a) M →
-        ((ψ.state.marginalAC.matrix * M).trace).re ≤
+    (ψ : Ket ((a × b) × c))
+    (hdual : ∀ M : CMatrix (a × c),
+      MState.ConditionalMinEntropyDualEffectFeasible (a := a) M →
+        ((ψ.state.marginalAC.m * M).trace).re ≤
           (Fintype.card a : ℝ) *
             sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a))) :
     -ψ.state.marginalAC.conditionalMinEntropy ≤
@@ -1520,7 +1492,7 @@ theorem neg_conditionalMinEntropy_marginalAC_le_conditionalMaxEntropyPositive_ma
 
 theorem neg_conditionalMinEntropy_marginalAC_le_conditionalMaxEntropyPositive_marginalAB
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c)) :
+    (ψ : Ket ((a × b) × c)) :
     -ψ.state.marginalAC.conditionalMinEntropy ≤
       ψ.state.marginalAB.conditionalMaxEntropyPositive :=
   ψ.neg_conditionalMinEntropy_marginalAC_le_conditionalMaxEntropyPositive_marginalAB_of_dualEffect_bound
@@ -1532,10 +1504,10 @@ theorem neg_conditionalMinEntropy_marginalAC_le_conditionalMaxEntropyPositive_ma
 effects. -/
 theorem sSup_dualEffectValueSet_marginalAC_le_card_mul_sSup_fidelityValueSet_marginalAB_of_dualEffect_bound
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
-    (hdual : ∀ M : CMatrix (Prod a c),
-      State.ConditionalMinEntropyDualEffectFeasible (a := a) M →
-        ((ψ.state.marginalAC.matrix * M).trace).re ≤
+    (ψ : Ket ((a × b) × c))
+    (hdual : ∀ M : CMatrix (a × c),
+      MState.ConditionalMinEntropyDualEffectFeasible (a := a) M →
+        ((ψ.state.marginalAC.m * M).trace).re ≤
           (Fintype.card a : ℝ) *
             sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a))) :
     sSup (ψ.state.marginalAC.conditionalMinEntropyDualEffectValueSet (a := a)) ≤
@@ -1547,7 +1519,7 @@ theorem sSup_dualEffectValueSet_marginalAC_le_card_mul_sSup_fidelityValueSet_mar
 
 theorem sSup_conditionalMinEntropyDualEffectValueSet_marginalAC_le_card_mul_sSup_fidelityValueSet_marginalAB
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c)) :
+    (ψ : Ket ((a × b) × c)) :
     sSup (ψ.state.marginalAC.conditionalMinEntropyDualEffectValueSet (a := a)) ≤
       (Fintype.card a : ℝ) *
         sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a)) :=
@@ -1561,15 +1533,15 @@ one-sided source obligations: a forward fidelity/scale bound and a reverse
 dual-effect bound. -/
 theorem conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_marginalAC_of_forward_dualEffect_bound
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
-    (hforward : ∀ σ : State b, ∀ T : CMatrix c,
-      State.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
+    (ψ : Ket ((a × b) × c))
+    (hforward : ∀ σ : MState b, ∀ T : CMatrix c,
+      MState.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
         (Fintype.card a : ℝ) *
-          ψ.state.marginalAB.squaredFidelity ((State.maximallyMixed a).prod σ) ≤
+          ψ.state.marginalAB.squaredFidelity ((MState.uniform : MState a).prod σ) ≤
             T.trace.re)
-    (hdual : ∀ M : CMatrix (Prod a c),
-      State.ConditionalMinEntropyDualEffectFeasible (a := a) M →
-        ((ψ.state.marginalAC.matrix * M).trace).re ≤
+    (hdual : ∀ M : CMatrix (a × c),
+      MState.ConditionalMinEntropyDualEffectFeasible (a := a) M →
+        ((ψ.state.marginalAC.m * M).trace).re ≤
           (Fintype.card a : ℝ) *
             sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a))) :
     ψ.state.marginalAB.conditionalMaxEntropyPositive =
@@ -1580,15 +1552,15 @@ theorem conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_ma
 
 theorem conditionalMaxEntropy_marginalAB_eq_neg_conditionalMinEntropy_marginalAC_of_fidelity_forward_dualEffect_bound
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
-    (hforward : ∀ σ : State b, ∀ T : CMatrix c,
-      State.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
+    (ψ : Ket ((a × b) × c))
+    (hforward : ∀ σ : MState b, ∀ T : CMatrix c,
+      MState.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
         (Fintype.card a : ℝ) *
-          ψ.state.marginalAB.squaredFidelity ((State.maximallyMixed a).prod σ) ≤
+          ψ.state.marginalAB.squaredFidelity ((MState.uniform : MState a).prod σ) ≤
             T.trace.re)
-    (hdual : ∀ M : CMatrix (Prod a c),
-      State.ConditionalMinEntropyDualEffectFeasible (a := a) M →
-        ((ψ.state.marginalAC.matrix * M).trace).re ≤
+    (hdual : ∀ M : CMatrix (a × c),
+      MState.ConditionalMinEntropyDualEffectFeasible (a := a) M →
+        ((ψ.state.marginalAC.m * M).trace).re ≤
           (Fintype.card a : ℝ) *
             sSup (ψ.state.marginalAB.conditionalMaxEntropyFidelityValueSet (a := a))) :
     ψ.state.marginalAB.conditionalMaxEntropy =
@@ -1602,19 +1574,19 @@ the fidelity forward bound, because every block-feasible `X` is bounded by the
 corresponding fidelity candidate. -/
 theorem blockFeasible_trace_bound_by_scaleFeasible_of_fidelity_forward_bound
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
-    (hforward : ∀ σ : State b, ∀ T : CMatrix c,
-      State.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
+    (ψ : Ket ((a × b) × c))
+    (hforward : ∀ σ : MState b, ∀ T : CMatrix c,
+      MState.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
         (Fintype.card a : ℝ) *
-          ψ.state.marginalAB.squaredFidelity ((State.maximallyMixed a).prod σ) ≤
+          ψ.state.marginalAB.squaredFidelity ((MState.uniform : MState a).prod σ) ≤
             T.trace.re) :
-    ∀ σ : State b, ∀ T : CMatrix c, ∀ X : CMatrix (Prod a b),
-      State.ConditionalMaxFidelityBlockFeasible (a := a) ψ.state.marginalAB σ X →
-      State.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
-        State.conditionalMaxFidelityBlockExponentValue (a := a) X ≤ T.trace.re := by
+    ∀ σ : MState b, ∀ T : CMatrix c, ∀ X : CMatrix (a × b),
+      MState.ConditionalMaxFidelityBlockFeasible (a := a) ψ.state.marginalAB σ X →
+      MState.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
+        MState.conditionalMaxFidelityBlockExponentValue (a := a) X ≤ T.trace.re := by
   intro σ T X hX hT
   exact (hX.blockExponentValue_le_exponentCandidate (a := a)).trans (by
-    rw [State.conditionalMaxEntropyExponentCandidate_eq_card_mul_squaredFidelity]
+    rw [MState.conditionalMaxEntropyExponentCandidate_eq_card_mul_squaredFidelity]
     exact hforward σ T hT)
 
 /-- A block-SDP trace bound implies the source-shaped fidelity forward bound.
@@ -1624,26 +1596,26 @@ lemma for block feasible `X` to the fidelity value used in the conditional
 max-entropy endpoint. -/
 theorem fidelity_forward_bound_of_blockFeasible_trace_bound
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
-    (hblock : ∀ σ : State b, ∀ T : CMatrix c, ∀ X : CMatrix (Prod a b),
-      State.ConditionalMaxFidelityBlockFeasible (a := a) ψ.state.marginalAB σ X →
-      State.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
-        State.conditionalMaxFidelityBlockExponentValue (a := a) X ≤ T.trace.re) :
-    ∀ σ : State b, ∀ T : CMatrix c,
-      State.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
+    (ψ : Ket ((a × b) × c))
+    (hblock : ∀ σ : MState b, ∀ T : CMatrix c, ∀ X : CMatrix (a × b),
+      MState.ConditionalMaxFidelityBlockFeasible (a := a) ψ.state.marginalAB σ X →
+      MState.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
+        MState.conditionalMaxFidelityBlockExponentValue (a := a) X ≤ T.trace.re) :
+    ∀ σ : MState b, ∀ T : CMatrix c,
+      MState.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
         (Fintype.card a : ℝ) *
-          ψ.state.marginalAB.squaredFidelity ((State.maximallyMixed a).prod σ) ≤
+          ψ.state.marginalAB.squaredFidelity ((MState.uniform : MState a).prod σ) ≤
             T.trace.re := by
   intro σ T hT
   rcases ψ.state.marginalAB.exists_ConditionalMaxFidelityBlockFeasible_trace_re_eq_fidelity
       (a := a) σ with ⟨X, hX, hval⟩
   have hle := hblock σ T X hX hT
-  rw [State.conditionalMaxFidelityBlockExponentValue_eq] at hle
-  rw [State.squaredFidelity_eq_fidelity_sq]
+  rw [MState.conditionalMaxFidelityBlockExponentValue_eq] at hle
+  rw [MState.squaredFidelity_eq_fidelity_sq]
   have htrace :
       X.trace.re =
-        ψ.state.marginalAB.fidelity ((State.maximallyMixed a).prod σ) := by
-    simpa [State.conditionalMaxFidelityBlockValue] using hval
+        ψ.state.marginalAB.fidelity ((MState.uniform : MState a).prod σ) := by
+    simpa [MState.conditionalMaxFidelityBlockValue] using hval
   simpa [htrace] using hle
 
 /-- A block-SDP trace bound plus the already-proved dual-effect reverse bound
@@ -1655,11 +1627,11 @@ appearing as `hblock`; all value-set, logarithm and reverse-duality assembly is
 handled here. -/
 theorem conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_marginalAC_of_blockFeasible_trace_bound
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
-    (hblock : ∀ σ : State b, ∀ T : CMatrix c, ∀ X : CMatrix (Prod a b),
-      State.ConditionalMaxFidelityBlockFeasible (a := a) ψ.state.marginalAB σ X →
-      State.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
-        State.conditionalMaxFidelityBlockExponentValue (a := a) X ≤ T.trace.re) :
+    (ψ : Ket ((a × b) × c))
+    (hblock : ∀ σ : MState b, ∀ T : CMatrix c, ∀ X : CMatrix (a × b),
+      MState.ConditionalMaxFidelityBlockFeasible (a := a) ψ.state.marginalAB σ X →
+      MState.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
+        MState.conditionalMaxFidelityBlockExponentValue (a := a) X ≤ T.trace.re) :
     ψ.state.marginalAB.conditionalMaxEntropyPositive =
       -ψ.state.marginalAC.conditionalMinEntropy :=
   ψ.conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_marginalAC_of_forward_dualEffect_bound
@@ -1672,11 +1644,11 @@ theorem conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_ma
 `conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_marginalAC_of_blockFeasible_trace_bound`. -/
 theorem conditionalMaxEntropy_marginalAB_eq_neg_conditionalMinEntropy_marginalAC_of_blockFeasible_trace_bound
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c))
-    (hblock : ∀ σ : State b, ∀ T : CMatrix c, ∀ X : CMatrix (Prod a b),
-      State.ConditionalMaxFidelityBlockFeasible (a := a) ψ.state.marginalAB σ X →
-      State.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
-        State.conditionalMaxFidelityBlockExponentValue (a := a) X ≤ T.trace.re) :
+    (ψ : Ket ((a × b) × c))
+    (hblock : ∀ σ : MState b, ∀ T : CMatrix c, ∀ X : CMatrix (a × b),
+      MState.ConditionalMaxFidelityBlockFeasible (a := a) ψ.state.marginalAB σ X →
+      MState.ConditionalMinEntropyScaleFeasible (a := a) ψ.state.marginalAC T →
+        MState.conditionalMaxFidelityBlockExponentValue (a := a) X ≤ T.trace.re) :
     ψ.state.marginalAB.conditionalMaxEntropy =
       -ψ.state.marginalAC.conditionalMinEntropy := by
   rw [ψ.state.marginalAB.conditionalMaxEntropy_eq_positive (a := a)]
@@ -1688,7 +1660,7 @@ pure complementary marginals, in the positive-candidate convention for
 conditional max-entropy. -/
 theorem conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_marginalAC
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c)) :
+    (ψ : Ket ((a × b) × c)) :
     ψ.state.marginalAB.conditionalMaxEntropyPositive =
       -ψ.state.marginalAC.conditionalMinEntropy :=
   ψ.conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_marginalAC_of_forward_dualEffect_bound
@@ -1701,14 +1673,16 @@ theorem conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_ma
 pure complementary marginals. -/
 theorem conditionalMaxEntropy_marginalAB_eq_neg_conditionalMinEntropy_marginalAC
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c)) :
+    (ψ : Ket ((a × b) × c)) :
     ψ.state.marginalAB.conditionalMaxEntropy =
       -ψ.state.marginalAC.conditionalMinEntropy := by
   rw [ψ.state.marginalAB.conditionalMaxEntropy_eq_positive (a := a)]
   exact ψ.conditionalMaxEntropyPositive_marginalAB_eq_neg_conditionalMinEntropy_marginalAC
     (a := a)
 
-end PureVector
+end Ket
+
+namespace QIT
 
 namespace SubnormalizedState
 
@@ -1718,7 +1692,7 @@ variable {c : Type x} [Fintype c] [DecidableEq c]
 the normalized complementary-marginal equality through the common scale. -/
 theorem conditionalMaxEntropy_marginalAB_eq_neg_conditionalMinEntropy_marginalAC_of_scaled_pure
     [Nonempty a] [Nonempty b] [Nonempty c]
-    (ψ : PureVector (Prod (Prod a b) c)) {t : ℝ} (ht : 0 < t) (ht1 : t ≤ 1) :
+    (ψ : Ket ((a × b) × c)) {t : ℝ} (ht : 0 < t) (ht1 : t ≤ 1) :
     (abMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
       ψ t ht.le ht1).conditionalMaxEntropyRaw =
       - (acMarginalFromScaledTripartitePure (a := a) (b := b) (c := c)
@@ -1726,7 +1700,7 @@ theorem conditionalMaxEntropy_marginalAB_eq_neg_conditionalMinEntropy_marginalAC
   rw [abMarginalFromScaledTripartitePure, acMarginalFromScaledTripartitePure,
     conditionalMaxEntropy_ofStateScale (a := a) (b := b) ψ.state.marginalAB ht ht1,
     conditionalMinEntropy_ofStateScale (a := a) (b := c) ψ.state.marginalAC ht ht1]
-  rw [PureVector.conditionalMaxEntropy_marginalAB_eq_neg_conditionalMinEntropy_marginalAC
+  rw [Ket.conditionalMaxEntropy_marginalAB_eq_neg_conditionalMinEntropy_marginalAC
     (a := a) (b := b) (c := c) ψ]
   ring
 
@@ -1746,7 +1720,9 @@ theorem conditionalMinMaxEntropyDualOn_complementaryPureMarginals
 
 end SubnormalizedState
 
-namespace State
+end QIT
+
+namespace MState
 
 /-- Unsmoothed conditional min/max entropy duality on complementary pure
 marginals.
@@ -1761,88 +1737,88 @@ theorem conditionalMinMaxEntropyDualOn_complementaryPureMarginals
       (ComplementaryPureMarginalRel (a := a) (b := b) (c := c)) := by
   intro ρAB ρAC hrel
   rcases hrel with ⟨Ψ, hpur, hAC⟩
-  let Ω : PureVector (Prod (Prod a b) c) :=
-    Ψ.reindex (Equiv.prodComm c (Prod a b))
+  let Ω : Ket ((a × b) × c) :=
+    Ψ.reindex (Equiv.prodComm c (a × b))
   have hAB : Ω.state.marginalAB = ρAB := by
-    apply State.ext
+    apply MState.ext
     have hpur' :
-        partialTraceB ((rankOneMatrix Ψ.amp).submatrix Prod.swap Prod.swap) = ρAB.matrix := hpur
-    simpa [Ω, State.marginalAB_eq_marginalA, PureVector.reindex_state, State.reindex,
-      State.marginalA, State.marginalB, partialTraceA, partialTraceB,
-      PureVector.state_matrix, rankOneMatrix_apply] using hpur'
+        Matrix.traceRight (Ψ.state.m.submatrix Prod.swap Prod.swap) = ρAB.m := hpur
+    simpa [Ω, MState.marginalAB_eq_traceRight, Ket.reindex_state,
+      Matrix.traceLeft, Matrix.traceRight,
+      Ket.state_matrix, rankOneMatrix_apply] using hpur'
   have hAC' : Ω.state.marginalAC = ρAC := by
     subst hAC
-    apply State.ext
+    apply MState.ext
     ext ac ac'
-    simp [Ω, acMarginalFromABPurification, State.marginalAC_matrix, State.marginalB_matrix,
-      PureVector.reindex_state, State.reindex, partialTraceA,
-      PureVector.state_matrix, rankOneMatrix_apply, abToACReferenceEquiv]
+    simp [Ω, acMarginalFromABPurification, MState.marginalAC_matrix,
+      Ket.reindex_state, Matrix.traceLeft,
+      Ket.state_matrix, rankOneMatrix_apply, abToACReferenceEquiv]
   rw [← hAB, ← hAC']
-  exact PureVector.conditionalMaxEntropy_marginalAB_eq_neg_conditionalMinEntropy_marginalAC
+  exact Ket.conditionalMaxEntropy_marginalAB_eq_neg_conditionalMinEntropy_marginalAC
     (a := a) (b := b) (c := c) Ω
 
 /-- A normalized finite-dimensional conditional max-entropy is bounded below by
 minus the logarithm of the conditioned register dimension. -/
 theorem neg_log2_card_left_le_conditionalMaxEntropy
-    [Nonempty a] [Nonempty b] (ρ : State (Prod a b)) :
+    [Nonempty a] [Nonempty b] (ρ : MState (a × b)) :
     -log2 (Fintype.card a : ℝ) ≤ ρ.conditionalMaxEntropy := by
   obtain ⟨Ψ, hΨ⟩ :=
-    State.exists_purification_on_reference_of_card_le
-      (r := Prod a b) ρ (Nat.le_refl _)
-  let Ω : PureVector (Prod (Prod a b) (Prod a b)) :=
-    Ψ.reindex (Equiv.prodComm (Prod a b) (Prod a b))
+    MState.exists_purification_on_reference_of_card_le
+      (r := a × b) ρ (Nat.le_refl _)
+  let Ω : Ket ((a × b) × (a × b)) :=
+    Ψ.reindex (Equiv.prodComm (a × b) (a × b))
   have hAB : Ω.state.marginalAB = ρ := by
-    apply State.ext
+    apply MState.ext
     have hΨ' :
-        partialTraceB ((rankOneMatrix Ψ.amp).submatrix Prod.swap Prod.swap) = ρ.matrix := hΨ
-    simpa [Ω, State.marginalAB_eq_marginalA, PureVector.reindex_state, State.reindex,
-      State.marginalA, State.marginalB, partialTraceA, partialTraceB,
-      PureVector.state_matrix, rankOneMatrix_apply] using hΨ'
+        Matrix.traceRight (Ψ.state.m.submatrix Prod.swap Prod.swap) = ρ.m := hΨ
+    simpa [Ω, MState.marginalAB_eq_traceRight, Ket.reindex_state,
+      Matrix.traceLeft, Matrix.traceRight,
+      Ket.state_matrix, rankOneMatrix_apply] using hΨ'
   have hdual :
       Ω.state.marginalAB.conditionalMaxEntropy =
         -Ω.state.marginalAC.conditionalMinEntropy :=
-    PureVector.conditionalMaxEntropy_marginalAB_eq_neg_conditionalMinEntropy_marginalAC
-      (a := a) (b := b) (c := Prod a b) Ω
+    Ket.conditionalMaxEntropy_marginalAB_eq_neg_conditionalMinEntropy_marginalAC
+      (a := a) (b := b) (c := a × b) Ω
   have hmin :
       Ω.state.marginalAC.conditionalMinEntropy ≤ log2 (Fintype.card a : ℝ) :=
     Ω.state.marginalAC.conditionalMinEntropy_le_log2_card_left
-      (a := a) (b := Prod a b)
+      (a := a) (b := a × b)
   rw [← hAB, hdual]
   exact neg_le_neg hmin
 
 /-- Fuchs--van de Graaf converts an `ε` trace-distance bound into the
 smoothing radius `sqrt (2ε - ε^2)`. -/
 theorem purifiedDistance_le_sqrt_two_mul_sub_sq_of_normalizedTraceDistance_le
-    (ρ σ : State a) {ε : ℝ}
+    (ρ σ : MState a) {ε : ℝ}
     (hε1 : ε ≤ 1)
     (hD : ρ.normalizedTraceDistance σ ≤ ε) :
     ρ.purifiedDistance σ ≤ Real.sqrt (2 * ε - ε ^ 2) := by
-  have hlower := State.fuchs_van_de_graaf_lower ρ σ
+  have hlower := MState.fuchs_van_de_graaf_lower ρ σ
   have hfidelity_ge : 1 - ε ≤ ρ.fidelity σ := by
     linarith
   have hleft_nonneg : 0 ≤ 1 - ε := by linarith
-  have hfid_nonneg : 0 ≤ ρ.fidelity σ := State.fidelity_nonneg ρ σ
+  have hfid_nonneg : 0 ≤ ρ.fidelity σ := MState.fidelity_nonneg ρ σ
   have hsquare_ge :
       (1 - ε) ^ 2 ≤ (ρ.fidelity σ) ^ 2 :=
     (sq_le_sq₀ hleft_nonneg hfid_nonneg).mpr hfidelity_ge
   have hinside :
       1 - ρ.squaredFidelity σ ≤ 2 * ε - ε ^ 2 := by
-    rw [State.squaredFidelity_eq_fidelity_sq]
+    rw [MState.squaredFidelity_eq_fidelity_sq]
     nlinarith
-  rw [State.purifiedDistance_eq]
+  rw [MState.purifiedDistance_eq]
   exact Real.sqrt_le_sqrt hinside
 
 /-- Normalized smooth conditional min-entropy candidates are bounded above by
 the logarithm of the conditioned register dimension. -/
 theorem SmoothConditionalMinEntropyCandidate_bddAbove
-    (ρ : State (Prod a b)) (ε : ℝ) :
-    BddAbove {h : ℝ | State.SmoothConditionalMinEntropyCandidate (a := a) ρ ε h} := by
+    (ρ : MState (a × b)) (ε : ℝ) :
+    BddAbove {h : ℝ | MState.SmoothConditionalMinEntropyCandidate (a := a) ρ ε h} := by
   refine ⟨log2 (Fintype.card a : ℝ), ?_⟩
   intro h hh
   rcases hh with ⟨ρ', _hball, rfl⟩
-  rw [State.conditionalMinEntropy_eq]
+  rw [MState.conditionalMinEntropy_eq]
   by_cases hne :
-      ({lam : ℝ | ∃ τ : State b,
+      ({lam : ℝ | ∃ τ : MState b,
         ConditionalMinEntropyFeasible (a := a) ρ' τ lam}).Nonempty
   · exact csSup_le hne fun lam hlam =>
       let ⟨_, hτ⟩ := hlam
@@ -1857,13 +1833,10 @@ theorem SmoothConditionalMinEntropyCandidate_bddAbove
 /-- A smooth min-entropy candidate contributes a lower bound to the smooth
 conditional min-entropy supremum. -/
 theorem le_smoothConditionalMinEntropyNormalizedCandidates_of_candidate
-    {ρ : State (Prod a b)} {ε h : ℝ}
-    (hcand : State.SmoothConditionalMinEntropyCandidate (a := a) ρ ε h) :
+    {ρ : MState (a × b)} {ε h : ℝ}
+    (hcand : MState.SmoothConditionalMinEntropyCandidate (a := a) ρ ε h) :
     h ≤ ρ.smoothConditionalMinEntropyNormalizedCandidates ε := by
-  rw [State.smoothConditionalMinEntropyNormalizedCandidates_eq_sSup_candidates]
-  exact le_csSup (State.SmoothConditionalMinEntropyCandidate_bddAbove (a := a) ρ ε) hcand
+  rw [MState.smoothConditionalMinEntropyNormalizedCandidates_eq_sSup_candidates]
+  exact le_csSup (MState.SmoothConditionalMinEntropyCandidate_bddAbove (a := a) ρ ε) hcand
 
-end State
-end
-
-end QIT
+end MState

@@ -29,61 +29,26 @@ measurement comparison then uses the source Stinespring bridge from
 open scoped ComplexOrder MatrixOrder NNReal
 open Matrix
 
-namespace QIT
-
-universe u v w z
-
 noncomputable section
-
+universe u v w z
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
-namespace State
+open QIT
 
-/-- Scaling a PSD reference by a positive real multiplies the sandwiched
-`Q_alpha` functional by `scale^(1-alpha)`.
-
-This is the scalar-reference identity used in Tomamichel's uncertainty proof
-before taking logarithms. -/
-theorem sandwichedRenyiQ_real_smul_reference_of_pos
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    {scale : Real} (hScale : 0 < scale) (alpha : Real) (hAlpha : 0 < alpha) :
-    sandwichedRenyiQ rho.matrix (scale • sigma) rho.pos
-        (Matrix.PosSemidef.smul hSigma hScale.le) alpha =
-      scale ^ (1 - alpha) *
-        sandwichedRenyiQ rho.matrix sigma rho.pos hSigma alpha := by
-  have hPower :=
-    sandwichedRenyiReferenceInner_psdTracePower_real_smul_reference
-      rho hSigma hScale.le alpha
-  have hFactor :
-      (scale ^ ((1 - alpha) / (2 * alpha)) *
-          scale ^ ((1 - alpha) / (2 * alpha))) ^ alpha =
-        scale ^ (1 - alpha) := by
-    have hMul :
-        scale ^ ((1 - alpha) / (2 * alpha)) *
-            scale ^ ((1 - alpha) / (2 * alpha)) =
-          scale ^ (((1 - alpha) / (2 * alpha)) +
-            ((1 - alpha) / (2 * alpha))) := by
-      rw [Real.rpow_add hScale]
-    rw [hMul, ← Real.rpow_mul hScale.le]
-    congr 1
-    field_simp [ne_of_gt hAlpha]
-    ring
-  rw [sandwichedRenyiQ_eq_psdTracePower_referenceInner,
-    sandwichedRenyiQ_eq_psdTracePower_referenceInner]
-  rw [hPower, hFactor]
+namespace MState
 
 /-- Finite low-order sandwiched Renyi divergence shifts by `-log2 scale`
 when a positive-definite reference is multiplied by `scale`. -/
 theorem sandwichedRenyiPSDReferenceLowAlpha_real_smul_reference
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosDef)
-    {scale : Real} (hScale : 0 < scale)
-    (alpha : Real) (hAlpha : 0 < alpha) (hAlphaOne : alpha ≠ 1) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosDef)
+    {scale : ℝ} (hScale : 0 < scale)
+    (alpha : ℝ) (hAlpha : 0 < alpha) (hAlphaOne : alpha ≠ 1) :
     sandwichedRenyiPSDReferenceLowAlpha rho (scale • sigma)
         (Matrix.PosDef.smul hSigma hScale).posSemidef alpha =
       sandwichedRenyiPSDReferenceLowAlpha rho sigma hSigma.posSemidef alpha -
         log2 scale := by
   have hQ :
-      0 < sandwichedRenyiQ rho.matrix sigma rho.pos hSigma.posSemidef alpha :=
+      0 < sandwichedRenyiQ rho.m sigma rho.psd hSigma.posSemidef alpha :=
     sandwichedRenyiQ_pos_of_state_posDef_reference rho hSigma alpha
   have hScalePower : 0 < scale ^ (1 - alpha) :=
     Real.rpow_pos_of_pos hScale _
@@ -102,18 +67,18 @@ theorem sandwichedRenyiPSDReferenceLowAlpha_real_smul_reference
 /-- Extended-real low-order branch version of positive scalar reference
 scaling, requiring only that the reference is positive definite. -/
 theorem sandwichedRenyiPSDReferenceLowAlphaE_real_smul_reference
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosDef)
-    {scale : Real} (hScale : 0 < scale)
-    (alpha : Real) (hAlpha : 0 < alpha) (hAlphaOne : alpha ≠ 1) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosDef)
+    {scale : ℝ} (hScale : 0 < scale)
+    (alpha : ℝ) (hAlpha : 0 < alpha) (hAlphaOne : alpha ≠ 1) :
     sandwichedRenyiPSDReferenceLowAlphaE rho (scale • sigma)
         (Matrix.PosDef.smul hSigma hScale).posSemidef alpha =
       sandwichedRenyiPSDReferenceLowAlphaE rho sigma hSigma.posSemidef alpha -
         (log2 scale : EReal) := by
   have hQ :
-      0 < sandwichedRenyiQ rho.matrix sigma rho.pos hSigma.posSemidef alpha :=
+      0 < sandwichedRenyiQ rho.m sigma rho.psd hSigma.posSemidef alpha :=
     sandwichedRenyiQ_pos_of_state_posDef_reference rho hSigma alpha
   have hQScaled :
-      0 < sandwichedRenyiQ rho.matrix (scale • sigma) rho.pos
+      0 < sandwichedRenyiQ rho.m (scale • sigma) rho.psd
         (Matrix.PosDef.smul hSigma hScale).posSemidef alpha := by
     rw [sandwichedRenyiQ_real_smul_reference_of_pos rho hSigma.posSemidef
       hScale alpha hAlpha]
@@ -129,17 +94,17 @@ theorem sandwichedRenyiPSDReferenceLowAlphaE_real_smul_reference
 /-- High-order extended-real sandwiched Renyi divergence shifts by
 `-log2 scale` for a positive-definite reference. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaE_real_smul_reference
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosDef)
-    {scale : Real} (hScale : 0 < scale)
-    (alpha : Real) (hAlpha : 1 < alpha) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosDef)
+    {scale : ℝ} (hScale : 0 < scale)
+    (alpha : ℝ) (hAlpha : 1 < alpha) :
     sandwichedRenyiPSDReferenceHighAlphaE rho (scale • sigma)
         (Matrix.PosDef.smul hSigma hScale).posSemidef alpha =
       sandwichedRenyiPSDReferenceHighAlphaE rho sigma hSigma.posSemidef alpha -
         (log2 scale : EReal) := by
-  have hSupport : Matrix.Supports rho.matrix sigma :=
-    Matrix.Supports.of_right_posDef rho.matrix sigma hSigma
-  have hSupportScaled : Matrix.Supports rho.matrix (scale • sigma) :=
-    Matrix.Supports.of_right_posDef rho.matrix (scale • sigma)
+  have hSupport : Matrix.Supports rho.m sigma :=
+    Matrix.Supports.of_right_posDef rho.m sigma hSigma
+  have hSupportScaled : Matrix.Supports rho.m (scale • sigma) :=
+    Matrix.Supports.of_right_posDef rho.m (scale • sigma)
       (Matrix.PosDef.smul hSigma hScale)
   simp only [sandwichedRenyiPSDReferenceHighAlphaE, hSupport, hSupportScaled]
   rw [sandwichedRenyiPSDReferenceHighAlphaFinite_real_smul_reference
@@ -149,9 +114,9 @@ theorem sandwichedRenyiPSDReferenceHighAlphaE_real_smul_reference
 /-- Unified finite-order scalar-reference shift for the source-facing
 sandwiched Renyi divergence, including the Umegaki order `alpha = 1`. -/
 theorem sandwichedRenyiPSDReferenceE_real_smul_reference
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosDef)
-    {scale : Real} (hScale : 0 < scale)
-    (alpha : Real) (hHalf : 1 / 2 ≤ alpha) :
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosDef)
+    {scale : ℝ} (hScale : 0 < scale)
+    (alpha : ℝ) (hHalf : 1 / 2 ≤ alpha) :
     sandwichedRenyiPSDReferenceE rho (scale • sigma)
         (Matrix.PosDef.smul hSigma hScale).posSemidef alpha =
       sandwichedRenyiPSDReferenceE rho sigma hSigma.posSemidef alpha -
@@ -179,7 +144,9 @@ theorem sandwichedRenyiPSDReferenceE_real_smul_reference
       exact sandwichedRenyiPSDReferenceHighAlphaE_real_smul_reference
         rho hSigma hScale alpha hHigh
 
-end State
+end MState
+
+namespace QIT
 
 namespace ProjectiveMeasurement.IsRankOne
 
@@ -214,18 +181,18 @@ information grouped as the conditioning register `Y'B`.
 
 This is the register association used in `apps.tex:202-214`. -/
 def coherentGroupedSideIsometry (hY : Y.IsRankOne) :
-    ReferenceIsometry (Prod a b) (Prod y (Prod y b)) :=
+    ReferenceIsometry (a × b) (y × (y × b)) :=
   (ReferenceIsometry.ofEquiv (Equiv.prodAssoc y y b)).comp
     hY.coherentSideIsometry
 
 @[simp]
 theorem coherentGroupedSideIsometry_matrix
-    (hY : Y.IsRankOne) (out : Prod y (Prod y b)) (input : Prod a b) :
+    (hY : Y.IsRankOne) (out : y × (y × b)) (input : a × b) :
     hY.coherentGroupedSideIsometry.matrix out input =
       hY.coherentSideIsometry.matrix ((out.1, out.2.1), out.2.2) input := by
   classical
-  let e : Prod (Prod y y) b ≃ Prod y (Prod y b) := Equiv.prodAssoc y y b
-  let mid : Prod (Prod y y) b := e.symm out
+  let e : ((y × y) × b) ≃ (y × (y × b)) := Equiv.prodAssoc y y b
+  let mid : (y × y) × b := e.symm out
   change
     (∑ q, (ReferenceIsometry.ofEquiv e).matrix out q *
       hY.coherentSideIsometry.matrix q input) = _
@@ -241,26 +208,25 @@ theorem coherentGroupedSideIsometry_matrix
   · simp
 
 /-- The coherent `Y | Y'B` state from `apps.tex:200-203`. -/
-def coherentMeasurementState (hY : Y.IsRankOne) (rho : State (Prod a b)) :
-    State (Prod y (Prod y b)) :=
-  (Channel.ofReferenceIsometry hY.coherentGroupedSideIsometry).applyState rho
+def coherentMeasurementState (hY : Y.IsRankOne) (rho : MState (a × b)) :
+    MState (y × (y × b)) :=
+  (CPTPOp.ofReferenceIsometry (hY.coherentGroupedSideIsometry (b := b))) rho
 
 /-- The grouped coherent state is the coherent measurement channel on the
 first register, tensored with the identity on side information, followed by
 the source register association `Y x (Y' x B)`. -/
 theorem coherentMeasurementState_eq_reindex_prod
-    (hY : Y.IsRankOne) (rho : State (Prod a b)) :
+    (hY : Y.IsRankOne) (rho : MState (a × b)) :
     hY.coherentMeasurementState rho =
-      ((hY.coherentChannel.prod (Channel.idChannel b)).applyState rho).reindex
+      MState.reindex ((hY.coherentChannel.prod (CPTPOp.id (dIn := b))) rho)
         (Equiv.prodAssoc y y b) := by
   classical
-  apply State.ext
+  apply MState.ext
   ext out out'
-  rw [State.reindex_matrix]
-  change MatrixMap.ofReferenceIsometry hY.coherentGroupedSideIsometry rho.matrix
-      out out' =
-    MatrixMap.kron hY.coherentChannel.map (Channel.idChannel b).map rho.matrix
-      ((out.1, out.2.1), out.2.2) ((out'.1, out'.2.1), out'.2.2)
+  rw [MState.reindex_matrix]
+  simp only [coherentMeasurementState, CPTPOp.mat_coe_eq_apply_mat,
+    CPTPOp.ofReferenceIsometry_map, CPTPOp.prod_map, Matrix.submatrix_apply,
+    Equiv.prodAssoc_symm_apply]
   rw [MatrixMap.kron_idChannel_apply_slice]
   rcases out with ⟨i, j, k⟩
   rcases out' with ⟨i', j', k'⟩
@@ -285,66 +251,67 @@ theorem coherentMeasurementState_eq_reindex_prod
 
 /-- Tracing both coherent outcome registers leaves the original side
 information marginal. -/
-theorem coherentMeasurementState_marginalB_marginalB
-    (hY : Y.IsRankOne) (rho : State (Prod a b)) :
-    (hY.coherentMeasurementState rho).marginalB.marginalB = rho.marginalB := by
-  let out := (hY.coherentChannel.prod (Channel.idChannel b)).applyState rho
+theorem coherentMeasurementState_traceLeft_traceLeft
+    (hY : Y.IsRankOne) (rho : MState (a × b)) :
+    (hY.coherentMeasurementState rho).traceLeft.traceLeft = rho.traceLeft := by
+  let out : MState ((y × y) × b) :=
+    (hY.coherentChannel.prod (CPTPOp.id (dIn := b))) rho
   have hassoc :
-      (out.reindex (Equiv.prodAssoc y y b)).marginalB.marginalB =
-        out.marginalB := by
-    apply State.ext
+      (out.reindex (Equiv.prodAssoc y y b)).traceLeft.traceLeft =
+        out.traceLeft := by
+    apply MState.ext
     ext k k'
-    simp [State.reindex, State.marginalB, partialTraceA,
+    simp [Matrix.traceLeft,
       Fintype.sum_prod_type]
     rw [Finset.sum_comm]
   calc
-    (hY.coherentMeasurementState rho).marginalB.marginalB =
-        (out.reindex (Equiv.prodAssoc y y b)).marginalB.marginalB := by
+    (hY.coherentMeasurementState rho).traceLeft.traceLeft =
+        (out.reindex (Equiv.prodAssoc y y b)).traceLeft.traceLeft := by
       rw [hY.coherentMeasurementState_eq_reindex_prod]
-    _ = out.marginalB := hassoc
-    _ = rho.marginalB := by
-      exact State.marginalB_applyState_prod_id rho hY.coherentChannel
+    _ = out.traceLeft := hassoc
+    _ = rho.traceLeft := by
+      exact MState.traceLeft_applyState_prod_id rho hY.coherentChannel
 
 /-- Measuring the first register leaves the side-information marginal
 unchanged. -/
-theorem measureSubsystemState_marginalB
-    (X : ProjectiveMeasurement x a) (rho : State (Prod a b)) :
-    (measureSubsystemState X.toPOVM rho).marginalB = rho.marginalB := by
+theorem measureSubsystemState_traceLeft
+    (X : ProjectiveMeasurement x a) (rho : MState (a × b)) :
+    (measureSubsystemState X.toPOVM rho).traceLeft = rho.traceLeft := by
   simpa [measureSubsystemState] using
-    State.marginalB_applyState_prod_id rho (Channel.measure X.toPOVM)
+    MState.traceLeft_applyState_prod_id rho (POVM.measureDiscard X.toPOVM)
 
 /-- Compressing `I_Y tensor sigma_{Y'B}` through the grouped coherent
 isometry gives the source pullback `U_Y^*(I_Y tensor sigma)U_Y`. -/
 theorem coherentGroupedSideIsometry_compression_identityTensor
-    (hY : Y.IsRankOne) (sigma : State (Prod y b)) :
-    Matrix.conjTranspose hY.coherentGroupedSideIsometry.matrix *
-          State.identityTensorStateMatrix (a := y) sigma *
-          hY.coherentGroupedSideIsometry.matrix =
-      hY.coherentPullback sigma.matrix := by
-  let e : Prod (Prod y y) b ≃ Prod y (Prod y b) := Equiv.prodAssoc y y b
+    (hY : Y.IsRankOne) (sigma : MState (y × b)) :
+    Matrix.conjTranspose (hY.coherentGroupedSideIsometry (b := b)).matrix *
+          MState.identityTensorStateMatrix (a := y) sigma *
+          (hY.coherentGroupedSideIsometry (b := b)).matrix =
+      hY.coherentPullback sigma.m := by
+  let e : ((y × y) × b) ≃ (y × (y × b)) := Equiv.prodAssoc y y b
   let P := (ReferenceIsometry.ofEquiv e).matrix
-  let V : Matrix (Prod (Prod y y) b) (Prod a b) Complex :=
+  let V : Matrix ((y × y) × b) (a × b) ℂ :=
     (hY.coherentSideIsometry (b := b)).matrix
-  let T := State.identityTensorStateMatrix (a := y) sigma
+  let T := MState.identityTensorStateMatrix (a := y) sigma
   have hreindex : Matrix.conjTranspose P * T * P =
-      copiedIdentityTensor (y := y) sigma.matrix := by
+      copiedIdentityTensor (y := y) sigma.m := by
     simpa [P, T, e, ProjectiveMeasurement.IsRankOne.copiedIdentityTensor,
-      State.identityTensorStateMatrix] using ofEquiv_compression_eq_reindex_symm e T
+      MState.identityTensorStateMatrix] using ofEquiv_compression_eq_reindex_symm e T
   change Matrix.conjTranspose (P * V) * T * (P * V) =
-    Matrix.conjTranspose V * copiedIdentityTensor (y := y) sigma.matrix * V
+    Matrix.conjTranspose V * copiedIdentityTensor (y := y) sigma.m * V
   rw [Matrix.conjTranspose_mul]
   calc
     (Matrix.conjTranspose V * Matrix.conjTranspose P) * T * (P * V) =
         Matrix.conjTranspose V * (Matrix.conjTranspose P * T * P) * V := by
       simp only [Matrix.mul_assoc]
-    _ = Matrix.conjTranspose V * copiedIdentityTensor (y := y) sigma.matrix * V := by
+    _ = Matrix.conjTranspose V * copiedIdentityTensor (y := y) sigma.m * V := by
       rw [hreindex]
 
 private theorem referenceIsometry_compression_mono
     {p q : Type*} [Fintype p] [DecidableEq p]
     [Fintype q] [DecidableEq q] (V : ReferenceIsometry p q)
-    {M N : CMatrix q} (hMN : M <= N) :
-    Matrix.conjTranspose V.matrix * M * V.matrix <=
+    {M N : CMatrix q} (hMN : M ≤ N) :
+    Matrix.conjTranspose V.matrix * M * V.matrix ≤
       Matrix.conjTranspose V.matrix * N * V.matrix := by
   rw [Matrix.le_iff] at hMN ⊢
   have h := Matrix.PosSemidef.conjTranspose_mul_mul_same hMN V.matrix
@@ -353,29 +320,29 @@ private theorem referenceIsometry_compression_mono
 private theorem referenceIsometry_compression_ofReferenceIsometry_applyState
     {p q : Type*} [Fintype p] [DecidableEq p]
     [Fintype q] [DecidableEq q] (V : ReferenceIsometry p q)
-    (rho : State p) :
+    (rho : MState p) :
     Matrix.conjTranspose V.matrix *
-        ((Channel.ofReferenceIsometry V).applyState rho).matrix * V.matrix =
-      rho.matrix := by
-  simp only [Channel.applyState, Channel.ofReferenceIsometry_map,
+        ((CPTPOp.ofReferenceIsometry V) rho).m * V.matrix =
+      rho.m := by
+  simp only [CPTPOp.mat_coe_eq_apply_mat, CPTPOp.ofReferenceIsometry_map,
     MatrixMap.ofReferenceIsometry_apply]
   calc
     Matrix.conjTranspose V.matrix *
-          (V.matrix * rho.matrix * Matrix.conjTranspose V.matrix) * V.matrix =
-        (Matrix.conjTranspose V.matrix * V.matrix) * rho.matrix *
+          (V.matrix * rho.m * Matrix.conjTranspose V.matrix) * V.matrix =
+        (Matrix.conjTranspose V.matrix * V.matrix) * rho.m *
           (Matrix.conjTranspose V.matrix * V.matrix) := by
             simp only [Matrix.mul_assoc]
-    _ = rho.matrix := by rw [V.isometry, Matrix.one_mul, Matrix.mul_one]
+    _ = rho.m := by rw [V.isometry, Matrix.one_mul, Matrix.mul_one]
 
 /-- The diagonal copied-outcome blocks of a `Y'B` state sum to its `B`
 marginal. This is the final equality in `apps.tex:212`. -/
-theorem sum_copiedOutcomeBlock_eq_marginalB
-    (sigma : State (Prod y b)) :
-    (Finset.univ.sum fun outcome => copiedOutcomeBlock sigma.matrix outcome) =
-      sigma.marginalB.matrix := by
+theorem sum_copiedOutcomeBlock_eq_traceLeft
+    (sigma : MState (y × b)) :
+    (Finset.univ.sum fun outcome => copiedOutcomeBlock sigma.m outcome) =
+      sigma.traceLeft.m := by
   apply Matrix.ext
   intro i j
-  simp [Matrix.sum_apply, copiedOutcomeBlock, State.marginalB_matrix, partialTraceA]
+  simp [Matrix.sum_apply, copiedOutcomeBlock, Matrix.traceLeft]
 
 /-- The measured coherent pullback is dominated by the overlap-scaled
 conditional reference, exactly as in `apps.tex:210-213`.
@@ -384,106 +351,106 @@ The right-hand side uses the actual `B` marginal of the supplied `Y'B`
 reference. Positivity of every copied block follows by principal compression,
 so no independent block-positivity certificate is exposed. -/
 theorem measureCoherentPullback_le_overlap_identityTensorMarginal
-    (hX : X.IsRankOne) (hY : Y.IsRankOne) (sigma : State (Prod y b)) :
-    MatrixMap.kron (Channel.measure X.toPOVM).map (Channel.idChannel b).map
-        (hY.coherentPullback sigma.matrix) <=
-      (X.rankOneTraceOverlap Y : Real) •
-        State.identityTensorStateMatrix (a := x) sigma.marginalB := by
-  have hblock : forall outcome,
-      (copiedOutcomeBlock sigma.matrix outcome).PosSemidef := by
+    (hX : X.IsRankOne) (hY : Y.IsRankOne) (sigma : MState (y × b)) :
+    MatrixMap.kron (POVM.measureDiscard X.toPOVM).map (CPTPOp.id (dIn := b)).map
+        (hY.coherentPullback sigma.m) ≤
+      (X.rankOneTraceOverlap Y : ℝ) •
+        MState.identityTensorStateMatrix (a := x) sigma.traceLeft := by
+  have hblock : ∀ outcome,
+      (copiedOutcomeBlock sigma.m outcome).PosSemidef := by
     intro outcome
-    exact sigma.pos.submatrix (fun side : b => (outcome, side))
+    exact sigma.psd.submatrix (fun side : b => (outcome, side))
   rw [hY.measureCoherentPullback_rankOne hX]
   calc
     (Finset.univ.sum fun measured => Finset.univ.sum fun outcome =>
         (hX.vector measured).overlapSq (hY.vector outcome) •
-          Matrix.kronecker (Matrix.single measured measured (1 : Complex))
-            (copiedOutcomeBlock sigma.matrix outcome)) <=
-        (X.rankOneTraceOverlap Y : Real) •
+          Matrix.kronecker (Matrix.single measured measured (1 : ℂ))
+            (copiedOutcomeBlock sigma.m outcome)) ≤
+        (X.rankOneTraceOverlap Y : ℝ) •
           Matrix.kronecker (1 : CMatrix x)
             (Finset.univ.sum fun outcome =>
-              copiedOutcomeBlock sigma.matrix outcome) :=
+              copiedOutcomeBlock sigma.m outcome) :=
       X.overlap_domination_le_rankOne Y hX hY _ hblock
-    _ = (X.rankOneTraceOverlap Y : Real) •
-        State.identityTensorStateMatrix (a := x) sigma.marginalB := by
-      rw [sum_copiedOutcomeBlock_eq_marginalB sigma]
+    _ = (X.rankOneTraceOverlap Y : ℝ) •
+        MState.identityTensorStateMatrix (a := x) sigma.traceLeft := by
+      rw [sum_copiedOutcomeBlock_eq_traceLeft sigma]
       rfl
 
 /-- Every full-rank `Y'B` reference candidate in the coherent state is
 bounded by the corresponding `B`-marginal candidate after measuring `X`,
 with the overlap loss from `apps.tex:208-214`. -/
 theorem conditionalSandwichedRenyiUpSourceCandidate_coherentMeasurement_sub_log2_le
-    (hX : X.IsRankOne) (hY : Y.IsRankOne) (rho : State (Prod a b))
-    (sigma : State (Prod y b)) (hsigma : sigma.matrix.PosDef)
-    (alpha : Real) (halpha_pos : 0 < alpha) (halpha_one : alpha ≠ 1)
-    (halpha_half : 1 / 2 <= alpha) :
+    (hX : X.IsRankOne) (hY : Y.IsRankOne) (rho : MState (a × b))
+    (sigma : MState (y × b)) (hsigma : sigma.m.PosDef)
+    (alpha : ℝ) (halpha_pos : 0 < alpha) (halpha_one : alpha ≠ 1)
+    (halpha_half : 1 / 2 ≤ alpha) :
     (hY.coherentMeasurementState rho).conditionalSandwichedRenyiUpSourceCandidate
           sigma hsigma alpha halpha_pos halpha_one -
-        log2 (X.rankOneTraceOverlap Y) <=
+        log2 (X.rankOneTraceOverlap Y) ≤
       (measureSubsystemState X.toPOVM rho).conditionalSandwichedRenyiUpSourceCandidate
-        sigma.marginalB (sigma.marginalB_posDef_of_posDef hsigma)
+        sigma.traceLeft (sigma.traceLeft_posDef_of_posDef hsigma)
         alpha halpha_pos halpha_one := by
   let : Nonempty a := by
     rcases rho.nonempty with ⟨i, _⟩
     exact ⟨i⟩
   let coherent := hY.coherentMeasurementState rho
   let measured := measureSubsystemState X.toPOVM rho
-  let Phi : Channel (Prod a b) (Prod x b) :=
-    (Channel.measure X.toPOVM).prod (Channel.idChannel b)
-  let rin : CMatrix (Prod a b) := hY.coherentPullback sigma.matrix
-  let rout : CMatrix (Prod x b) :=
-    State.identityTensorStateMatrix (a := x) sigma.marginalB
-  let c : Real := X.rankOneTraceOverlap Y
+  let Phi : CPTPMap (a × b) (x × b) :=
+    (POVM.measureDiscard X.toPOVM).prod (CPTPOp.id (dIn := b))
+  let rin : CMatrix (a × b) := hY.coherentPullback sigma.m
+  let rout : CMatrix (x × b) :=
+    MState.identityTensorStateMatrix (a := x) sigma.traceLeft
+  let c : ℝ := X.rankOneTraceOverlap Y
   have hc : 0 < c := by
     exact hX.rankOneTraceOverlap_pos Y
-  have hsigmaB : sigma.marginalB.matrix.PosDef :=
-    sigma.marginalB_posDef_of_posDef hsigma
+  have hsigmaB : sigma.traceLeft.m.PosDef :=
+    sigma.traceLeft_posDef_of_posDef hsigma
   have hrin : rin.PosDef := by
     exact hY.coherentPullback_posDef hsigma
   have hrout : rout.PosDef := by
-    exact State.identityTensorStateMatrix_posDef_of_posDef
-      (a := x) sigma.marginalB hsigmaB
+    exact MState.identityTensorStateMatrix_posDef_of_posDef
+      (a := x) sigma.traceLeft hsigmaB
   have hambient :
-      (State.identityTensorStateMatrix (a := y) sigma).PosDef :=
-    State.identityTensorStateMatrix_posDef_of_posDef (a := y) sigma hsigma
+      (MState.identityTensorStateMatrix (a := y) sigma).PosDef :=
+    MState.identityTensorStateMatrix_posDef_of_posDef (a := y) sigma hsigma
   have himage :
       coherent.sandwichedRenyiPSDReferenceE
-          (State.identityTensorStateMatrix (a := y) sigma)
-          hambient.posSemidef alpha >=
+          (MState.identityTensorStateMatrix (a := y) sigma)
+          hambient.posSemidef alpha ≥
         rho.sandwichedRenyiPSDReferenceE rin hrin.posSemidef alpha := by
-    have h := State.sandwichedRenyiPSDReferenceE_isometryImage_ge_compression
+    have h := MState.sandwichedRenyiPSDReferenceE_isometryImage_ge_compression
       rho hY.coherentGroupedSideIsometry hambient alpha halpha_half
     simpa [coherent, coherentMeasurementState, rin,
       hY.coherentGroupedSideIsometry_compression_identityTensor sigma] using h
-  have hrange : (1 / 2 <= alpha ∧ alpha < 1) ∨ 1 < alpha := by
+  have hrange : (1 / 2 ≤ alpha ∧ alpha < 1) ∨ 1 < alpha := by
     rcases lt_or_gt_of_ne halpha_one with hlt | hgt
     · exact Or.inl ⟨halpha_half, hlt⟩
     · exact Or.inr hgt
   have hdpi :
       measured.sandwichedRenyiPSDReferenceE
-          (Phi.map rin) (Phi.mapsPositive rin hrin.posSemidef) alpha <=
+          (Phi.map rin) (Phi.mapsPositive rin hrin.posSemidef) alpha ≤
         rho.sandwichedRenyiPSDReferenceE rin hrin.posSemidef alpha := by
     have h :=
-      State.sandwichedRenyiPSDReferenceE_dataProcessing_channel_ge_of_half_le_lt_one_or_one_lt
+      MState.sandwichedRenyiPSDReferenceE_dataProcessing_channel_ge_of_half_le_lt_one_or_one_lt
         rho hrin.posSemidef Phi alpha hrange
     simpa [measured, Phi, measureSubsystemState] using h
-  have hdom : Phi.map rin <= c • rout := by
-    simpa [Phi, rin, rout, c, Channel.prod] using
+  have hdom : Phi.map rin ≤ c • rout := by
+    simpa [Phi, rin, rout, c, CPTPOp.prod] using
       hX.measureCoherentPullback_le_overlap_identityTensorMarginal hY sigma
   have hscaled : (c • rout).PosDef :=
     Matrix.PosDef.smul hrout hc
   have hreference :
       measured.sandwichedRenyiPSDReferenceE (c • rout)
-          hscaled.posSemidef alpha <=
+          hscaled.posSemidef alpha ≤
         measured.sandwichedRenyiPSDReferenceE
           (Phi.map rin) (Phi.mapsPositive rin hrin.posSemidef) alpha :=
-    State.sandwichedRenyiPSDReferenceE_antitone_reference measured
+    MState.sandwichedRenyiPSDReferenceE_antitone_reference measured
       (Phi.mapsPositive rin hrin.posSemidef) hscaled.posSemidef hdom halpha_half
   have hchain :
       measured.sandwichedRenyiPSDReferenceE (c • rout)
-          hscaled.posSemidef alpha <=
+          hscaled.posSemidef alpha ≤
         coherent.sandwichedRenyiPSDReferenceE
-          (State.identityTensorStateMatrix (a := y) sigma)
+          (MState.identityTensorStateMatrix (a := y) sigma)
           hambient.posSemidef alpha :=
     hreference.trans (hdpi.trans himage)
   have hscale :
@@ -491,17 +458,17 @@ theorem conditionalSandwichedRenyiUpSourceCandidate_coherentMeasurement_sub_log2
           hscaled.posSemidef alpha =
         measured.sandwichedRenyiPSDReferenceE rout hrout.posSemidef alpha -
           (log2 c : EReal) := by
-    exact State.sandwichedRenyiPSDReferenceE_real_smul_reference
+    exact MState.sandwichedRenyiPSDReferenceE_real_smul_reference
       measured hrout hc alpha halpha_half
   have hcoherent :=
-    State.conditionalSandwichedRenyiUpSourceCandidate_eq_neg_referenceE
+    MState.conditionalSandwichedRenyiUpSourceCandidate_eq_neg_referenceE
       coherent sigma hsigma alpha halpha_pos halpha_one
   have hmeasured :=
-    State.conditionalSandwichedRenyiUpSourceCandidate_eq_neg_referenceE
-      measured sigma.marginalB hsigmaB alpha halpha_pos halpha_one
+    MState.conditionalSandwichedRenyiUpSourceCandidate_eq_neg_referenceE
+      measured sigma.traceLeft hsigmaB alpha halpha_pos halpha_one
   have hcoherentDiv :
       coherent.sandwichedRenyiPSDReferenceE
-          (State.identityTensorStateMatrix (a := y) sigma)
+          (MState.identityTensorStateMatrix (a := y) sigma)
           hambient.posSemidef alpha =
         -(coherent.conditionalSandwichedRenyiUpSourceCandidate
           sigma hsigma alpha halpha_pos halpha_one : EReal) := by
@@ -510,13 +477,13 @@ theorem conditionalSandwichedRenyiUpSourceCandidate_coherentMeasurement_sub_log2
   have hmeasuredDiv :
       measured.sandwichedRenyiPSDReferenceE rout hrout.posSemidef alpha =
         -(measured.conditionalSandwichedRenyiUpSourceCandidate
-          sigma.marginalB hsigmaB alpha halpha_pos halpha_one : EReal) := by
+          sigma.traceLeft hsigmaB alpha halpha_pos halpha_one : EReal) := by
     rw [hmeasured]
     simp [rout]
   rw [hscale, hmeasuredDiv, hcoherentDiv] at hchain
   have hreal :
       -(measured.conditionalSandwichedRenyiUpSourceCandidate
-          sigma.marginalB hsigmaB alpha halpha_pos halpha_one) - log2 c <=
+          sigma.traceLeft hsigmaB alpha halpha_pos halpha_one) - log2 c ≤
         -(coherent.conditionalSandwichedRenyiUpSourceCandidate
           sigma hsigma alpha halpha_pos halpha_one) := by
     exact_mod_cast hchain
@@ -526,11 +493,11 @@ theorem conditionalSandwichedRenyiUpSourceCandidate_coherentMeasurement_sub_log2
 /-- Tomamichel's `eq:ucr-dual` comparison on the strict finite-order
 interior, obtained by taking the supremum of the candidate inequality above. -/
 theorem conditionalSandwichedRenyiUpSource_coherentMeasurement_sub_log2_le
-    (hX : X.IsRankOne) (hY : Y.IsRankOne) (rho : State (Prod a b))
-    (alpha : Real) (halpha_half : 1 / 2 < alpha) (halpha_one : alpha ≠ 1) :
+    (hX : X.IsRankOne) (hY : Y.IsRankOne) (rho : MState (a × b))
+    (alpha : ℝ) (halpha_half : 1 / 2 < alpha) (halpha_one : alpha ≠ 1) :
     (hY.coherentMeasurementState rho).conditionalSandwichedRenyiUpSource
           alpha (lt_trans (by norm_num) halpha_half) halpha_one -
-        log2 (X.rankOneTraceOverlap Y) <=
+        log2 (X.rankOneTraceOverlap Y) ≤
       (measureSubsystemState X.toPOVM rho).conditionalSandwichedRenyiUpSource
         alpha (lt_trans (by norm_num) halpha_half) halpha_one := by
   let coherent := hY.coherentMeasurementState rho
@@ -540,7 +507,7 @@ theorem conditionalSandwichedRenyiUpSource_coherentMeasurement_sub_log2_le
     alpha hpos halpha_one
   let T := measured.conditionalSandwichedRenyiUpSourceValueSet
     alpha hpos halpha_one
-  let : Nonempty (Prod y b) := by
+  let : Nonempty (y × b) := by
     rcases coherent.nonempty with ⟨_, side⟩
     exact ⟨side⟩
   let : Nonempty b := by
@@ -553,7 +520,7 @@ theorem conditionalSandwichedRenyiUpSource_coherentMeasurement_sub_log2_le
     exact measured.conditionalSandwichedRenyiUpSourceValueSet_bddAbove
       halpha_half halpha_one
   have hpoint : ∀ z, z ∈ S →
-      z - log2 (X.rankOneTraceOverlap Y) <= sSup T := by
+      z - log2 (X.rankOneTraceOverlap Y) ≤ sSup T := by
     intro z hz
     rcases hz with ⟨sigma, hsigma, rfl⟩
     have hcand :=
@@ -561,11 +528,11 @@ theorem conditionalSandwichedRenyiUpSource_coherentMeasurement_sub_log2_le
         hY rho sigma hsigma alpha hpos halpha_one halpha_half.le
     have hmember :
         measured.conditionalSandwichedRenyiUpSourceCandidate
-            sigma.marginalB (sigma.marginalB_posDef_of_posDef hsigma)
+            sigma.traceLeft (sigma.traceLeft_posDef_of_posDef hsigma)
             alpha hpos halpha_one ∈ T := by
-      exact ⟨sigma.marginalB, sigma.marginalB_posDef_of_posDef hsigma, rfl⟩
+      exact ⟨sigma.traceLeft, sigma.traceLeft_posDef_of_posDef hsigma, rfl⟩
     exact hcand.trans (le_csSup hTbdd hmember)
-  change sSup S - log2 (X.rankOneTraceOverlap Y) <= sSup T
+  change sSup S - log2 (X.rankOneTraceOverlap Y) ≤ sSup T
   rw [sub_le_iff_le_add]
   apply csSup_le hS
   intro z hz
@@ -577,88 +544,90 @@ comparison.  The proof follows `apps.tex:202-214`: isometry compression,
 measurement DPI, overlap domination, reference antitonicity, and the
 support-aware canonical trace-log identity. -/
 theorem conditionalEntropy_coherentMeasurement_sub_log2_le
-    (hX : X.IsRankOne) (hY : Y.IsRankOne) (rho : State (Prod a b)) :
+    (hX : X.IsRankOne) (hY : Y.IsRankOne) (rho : MState (a × b)) :
     (hY.coherentMeasurementState rho).conditionalEntropy -
-        log2 (X.rankOneTraceOverlap Y) <=
+        log2 (X.rankOneTraceOverlap Y) ≤
       (measureSubsystemState X.toPOVM rho).conditionalEntropy := by
   let : Nonempty a := by
     rcases rho.nonempty with ⟨input, _side⟩
     exact ⟨input⟩
   let coherent := hY.coherentMeasurementState rho
   let measured := measureSubsystemState X.toPOVM rho
-  let sigma := coherent.marginalB
+  let sigma := coherent.traceLeft
   let V := hY.coherentGroupedSideIsometry (b := b)
-  let Phi : Channel (Prod a b) (Prod x b) :=
-    (Channel.measure X.toPOVM).prod (Channel.idChannel b)
-  let ambient : CMatrix (Prod y (Prod y b)) :=
-    State.identityTensorStateMatrix (a := y) sigma
-  let rin : CMatrix (Prod a b) := hY.coherentPullback sigma.matrix
-  let rout : CMatrix (Prod x b) :=
-    State.identityTensorStateMatrix (a := x) sigma.marginalB
-  let c : Real := X.rankOneTraceOverlap Y
+  let Phi : CPTPMap (a × b) (x × b) :=
+    (POVM.measureDiscard X.toPOVM).prod (CPTPOp.id (dIn := b))
+  let ambient : CMatrix (y × (y × b)) :=
+    MState.identityTensorStateMatrix (a := y) sigma
+  let rin : CMatrix (a × b) := hY.coherentPullback sigma.m
+  let rout : CMatrix (x × b) :=
+    MState.identityTensorStateMatrix (a := x) sigma.traceLeft
+  let c : ℝ := X.rankOneTraceOverlap Y
   have hc : 0 < c := hX.rankOneTraceOverlap_pos Y
   have hambient : ambient.PosSemidef :=
-    State.identityTensorStateMatrix_posSemidef_of_state (a := y) sigma
-  have hsupport : Matrix.Supports coherent.matrix ambient := by
-    simpa [coherent, sigma, ambient, State.identityTensorStateMatrix] using
-      State.matrix_supports_identityTensor_marginalB coherent
-  have hrin : rin.PosSemidef := hY.coherentPullback_posSemidef sigma.pos
+    MState.identityTensorStateMatrix_posSemidef (a := y) sigma
+  have hsupport :
+      Matrix.Supports ((CPTPOp.ofReferenceIsometry V) rho).m ambient := by
+    simpa [V, coherent, coherentMeasurementState, sigma, ambient,
+      MState.identityTensorStateMatrix] using
+      MState.matrix_supports_identityTensor_traceLeft coherent
+  have hrin : rin.PosSemidef := hY.coherentPullback_posSemidef sigma.psd
   have hrout : rout.PosSemidef :=
-    State.identityTensorStateMatrix_posSemidef_of_state (a := x) sigma.marginalB
+    MState.identityTensorStateMatrix_posSemidef (a := x) sigma.traceLeft
   have himage :
-      State.relativeEntropyPSDReferenceTraceLogE coherent ambient hambient >=
-        State.relativeEntropyPSDReferenceTraceLogE rho rin hrin := by
+      MState.relativeEntropyPSDReferenceTraceLogE coherent ambient hambient ≥
+        MState.relativeEntropyPSDReferenceTraceLogE rho rin hrin := by
     have h :=
-      State.relativeEntropyPSDReferenceTraceLogE_isometryImage_ge_compression
+      MState.relativeEntropyPSDReferenceTraceLogE_isometryImage_ge_compression
         rho V hambient hsupport
     simpa [V, coherent, coherentMeasurementState, ambient, rin,
       hY.coherentGroupedSideIsometry_compression_identityTensor sigma] using h
   have hdpi :
-      State.relativeEntropyPSDReferenceTraceLogE measured
-          (Phi.map rin) (Phi.mapsPositive rin hrin) <=
-        State.relativeEntropyPSDReferenceTraceLogE rho rin hrin := by
+      MState.relativeEntropyPSDReferenceTraceLogE measured
+          (Phi.map rin) (Phi.mapsPositive rin hrin) ≤
+        MState.relativeEntropyPSDReferenceTraceLogE rho rin hrin := by
     have h :=
-      State.relativeEntropyPSDReferenceTraceLogE_dataProcessing_channel_ge
+      MState.relativeEntropyPSDReferenceTraceLogE_dataProcessing_channel_ge
         rho hrin Phi
     simpa [measured, Phi, measureSubsystemState] using h
-  have hdom : Phi.map rin <= c • rout := by
-    simpa [Phi, rin, rout, c, Channel.prod] using
+  have hdom : Phi.map rin ≤ c • rout := by
+    simpa [Phi, rin, rout, c, CPTPOp.prod] using
       hX.measureCoherentPullback_le_overlap_identityTensorMarginal hY sigma
   have hscaled : (c • rout).PosSemidef :=
     Matrix.PosSemidef.smul hrout hc.le
   have hreference :
-      State.relativeEntropyPSDReferenceTraceLogE measured (c • rout) hscaled <=
-        State.relativeEntropyPSDReferenceTraceLogE measured
+      MState.relativeEntropyPSDReferenceTraceLogE measured (c • rout) hscaled ≤
+        MState.relativeEntropyPSDReferenceTraceLogE measured
           (Phi.map rin) (Phi.mapsPositive rin hrin) :=
-    State.relativeEntropyPSDReferenceTraceLogE_antitone_reference measured
+    MState.relativeEntropyPSDReferenceTraceLogE_antitone_reference measured
       (Phi.mapsPositive rin hrin) hscaled hdom
   have hchain :
-      State.relativeEntropyPSDReferenceTraceLogE measured (c • rout) hscaled <=
-        State.relativeEntropyPSDReferenceTraceLogE coherent ambient hambient :=
+      MState.relativeEntropyPSDReferenceTraceLogE measured (c • rout) hscaled ≤
+        MState.relativeEntropyPSDReferenceTraceLogE coherent ambient hambient :=
     hreference.trans (hdpi.trans himage)
-  have hsigmaB : sigma.marginalB = rho.marginalB := by
+  have hsigmaB : sigma.traceLeft = rho.traceLeft := by
     simpa [sigma, coherent] using
-      hY.coherentMeasurementState_marginalB_marginalB rho
-  have hmeasuredB : measured.marginalB = rho.marginalB := by
-    simpa [measured] using measureSubsystemState_marginalB X rho
-  have hsides : sigma.marginalB = measured.marginalB :=
+      hY.coherentMeasurementState_traceLeft_traceLeft rho
+  have hmeasuredB : measured.traceLeft = rho.traceLeft := by
+    simpa [measured] using measureSubsystemState_traceLeft X rho
+  have hsides : sigma.traceLeft = measured.traceLeft :=
     hsigmaB.trans hmeasuredB.symm
   have hmeasuredDiv :
-      State.relativeEntropyPSDReferenceTraceLogE measured (c • rout) hscaled =
+      MState.relativeEntropyPSDReferenceTraceLogE measured (c • rout) hscaled =
         (-measured.conditionalEntropy - log2 c : EReal) := by
     simpa [rout, hsides] using
-      State.relativeEntropyPSDReferenceTraceLogE_real_smul_identityTensor_marginalB_eq
+      MState.relativeEntropyPSDReferenceTraceLogE_real_smul_identityTensor_traceLeft_eq
         measured hc
   have hcoherentDiv :
-      State.relativeEntropyPSDReferenceTraceLogE coherent ambient hambient =
+      MState.relativeEntropyPSDReferenceTraceLogE coherent ambient hambient =
         (-coherent.conditionalEntropy : EReal) := by
     have h :=
-      State.relativeEntropyPSDReferenceTraceLogE_real_smul_identityTensor_marginalB_eq
+      MState.relativeEntropyPSDReferenceTraceLogE_real_smul_identityTensor_traceLeft_eq
         coherent (scale := 1) (by norm_num)
     simpa [ambient, sigma, log2] using h
   rw [hmeasuredDiv, hcoherentDiv] at hchain
   have hreal :
-      -measured.conditionalEntropy - log2 c <= -coherent.conditionalEntropy := by
+      -measured.conditionalEntropy - log2 c ≤ -coherent.conditionalEntropy := by
     exact_mod_cast hchain
   dsimp [coherent, measured, c] at hreal ⊢
   linarith
@@ -666,23 +635,23 @@ theorem conditionalEntropy_coherentMeasurement_sub_log2_le
 /-- The closed finite endpoint `alpha = 1/2` of the coherent-measurement
 comparison.  The source entropy is the conditional max-entropy here. -/
 theorem conditionalMaxEntropy_coherentMeasurement_sub_log2_le
-    (hX : X.IsRankOne) (hY : Y.IsRankOne) (rho : State (Prod a b)) :
+    (hX : X.IsRankOne) (hY : Y.IsRankOne) (rho : MState (a × b)) :
     (hY.coherentMeasurementState rho).conditionalMaxEntropy -
-        log2 (X.rankOneTraceOverlap Y) <=
+        log2 (X.rankOneTraceOverlap Y) ≤
       (measureSubsystemState X.toPOVM rho).conditionalMaxEntropy := by
   let coherent := hY.coherentMeasurementState rho
   let measured := measureSubsystemState X.toPOVM rho
   let S := coherent.conditionalSandwichedRenyiUpSourceValueSet
-    (1 / 2 : Real) (by norm_num) (by norm_num)
-  let : Nonempty (Prod y b) := by
+    (1 / 2 : ℝ) (by norm_num) (by norm_num)
+  let : Nonempty (y × b) := by
     rcases coherent.nonempty with ⟨_, side⟩
     exact ⟨side⟩
   have hS : S.Nonempty := by
     exact coherent.conditionalSandwichedRenyiUpSourceValueSet_nonempty
-      (1 / 2 : Real) (by norm_num) (by norm_num)
-  rw [← State.conditionalSandwichedRenyiUpSource_half_eq_conditionalMaxEntropy
+      (1 / 2 : ℝ) (by norm_num) (by norm_num)
+  rw [← MState.conditionalSandwichedRenyiUpSource_half_eq_conditionalMaxEntropy
     coherent]
-  change sSup S - log2 (X.rankOneTraceOverlap Y) <=
+  change sSup S - log2 (X.rankOneTraceOverlap Y) ≤
     measured.conditionalMaxEntropy
   rw [sub_le_iff_le_add]
   apply csSup_le hS
@@ -690,16 +659,16 @@ theorem conditionalMaxEntropy_coherentMeasurement_sub_log2_le
   rcases hz with ⟨sigma, hsigma, rfl⟩
   have hcand :=
     hX.conditionalSandwichedRenyiUpSourceCandidate_coherentMeasurement_sub_log2_le
-      hY rho sigma hsigma (1 / 2 : Real) (by norm_num) (by norm_num) (by norm_num)
-  have htarget := State.sandwichedUpSourceCandidate_half_le_conditionalMaxEntropy
-    measured sigma.marginalB (sigma.marginalB_posDef_of_posDef hsigma)
+      hY rho sigma hsigma (1 / 2 : ℝ) (by norm_num) (by norm_num) (by norm_num)
+  have htarget := MState.sandwichedUpSourceCandidate_half_le_conditionalMaxEntropy
+    measured sigma.traceLeft (sigma.traceLeft_posDef_of_posDef hsigma)
   have hcand' :
       coherent.conditionalSandwichedRenyiUpSourceCandidate
-            sigma hsigma (1 / 2 : Real) (by norm_num) (by norm_num) -
-          log2 (X.rankOneTraceOverlap Y) <=
+            sigma hsigma (1 / 2 : ℝ) (by norm_num) (by norm_num) -
+          log2 (X.rankOneTraceOverlap Y) ≤
         measured.conditionalSandwichedRenyiUpSourceCandidate
-          sigma.marginalB (sigma.marginalB_posDef_of_posDef hsigma)
-          (1 / 2 : Real) (by norm_num) (by norm_num) := by
+          sigma.traceLeft (sigma.traceLeft_posDef_of_posDef hsigma)
+          (1 / 2 : ℝ) (by norm_num) (by norm_num) := by
     simpa [coherent, measured] using hcand
   linarith
 
@@ -707,12 +676,12 @@ theorem conditionalMaxEntropy_coherentMeasurement_sub_log2_le
 with the overlap penalty subtracted from its exponent.  This is the
 `alpha = infinity` instance of the matrix chain in `apps.tex:202-214`. -/
 theorem conditionalMinEntropyFeasible_coherentMeasurement_sub_log2
-    (hX : X.IsRankOne) (hY : Y.IsRankOne) (rho : State (Prod a b))
-    (sigma : State (Prod y b)) (lam : Real)
-    (hfeas : State.ConditionalMinEntropyFeasible (a := y)
+    (hX : X.IsRankOne) (hY : Y.IsRankOne) (rho : MState (a × b))
+    (sigma : MState (y × b)) (lam : ℝ)
+    (hfeas : MState.ConditionalMinEntropyFeasible (a := y)
       (hY.coherentMeasurementState rho) sigma lam) :
-    State.ConditionalMinEntropyFeasible (a := x)
-      (measureSubsystemState X.toPOVM rho) sigma.marginalB
+    MState.ConditionalMinEntropyFeasible (a := x)
+      (measureSubsystemState X.toPOVM rho) sigma.traceLeft
       (lam - log2 (X.rankOneTraceOverlap Y)) := by
   let : Nonempty a := by
     rcases rho.nonempty with ⟨i, _⟩
@@ -720,96 +689,96 @@ theorem conditionalMinEntropyFeasible_coherentMeasurement_sub_log2
   let coherent := hY.coherentMeasurementState rho
   let measured := measureSubsystemState X.toPOVM rho
   let V := hY.coherentGroupedSideIsometry (b := b)
-  let Phi : Channel (Prod a b) (Prod x b) :=
-    (Channel.measure X.toPOVM).prod (Channel.idChannel b)
-  let rin : CMatrix (Prod a b) := hY.coherentPullback sigma.matrix
-  let rout : CMatrix (Prod x b) :=
-    State.identityTensorStateMatrix (a := x) sigma.marginalB
-  let c : Real := X.rankOneTraceOverlap Y
-  let t : Real := Real.rpow 2 (-lam)
+  let Phi : CPTPMap (a × b) (x × b) :=
+    (POVM.measureDiscard X.toPOVM).prod (CPTPOp.id (dIn := b))
+  let rin : CMatrix (a × b) := hY.coherentPullback sigma.m
+  let rout : CMatrix (x × b) :=
+    MState.identityTensorStateMatrix (a := x) sigma.traceLeft
+  let c : ℝ := X.rankOneTraceOverlap Y
+  let t : ℝ := Real.rpow 2 (-lam)
   have hc : 0 < c := hX.rankOneTraceOverlap_pos Y
-  have ht : 0 <= t := Real.rpow_nonneg (by norm_num) _
+  have ht : 0 ≤ t := Real.rpow_nonneg (by norm_num) _
   have hsource :
-      coherent.matrix <= (t : Complex) •
-        State.identityTensorStateMatrix (a := y) sigma := by
-    simpa [coherent, t, State.ConditionalMinEntropyFeasible] using hfeas
-  have hcompressed : rho.matrix <= (t : Complex) • rin := by
+      coherent.m ≤ (t : ℂ) •
+        MState.identityTensorStateMatrix (a := y) sigma := by
+    simpa [coherent, t, MState.ConditionalMinEntropyFeasible] using hfeas
+  have hcompressed : rho.m ≤ (t : ℂ) • rin := by
     have h := referenceIsometry_compression_mono V hsource
     have himage :
-        Matrix.conjTranspose V.matrix * coherent.matrix * V.matrix =
-          rho.matrix := by
+        Matrix.conjTranspose V.matrix * coherent.m * V.matrix =
+          rho.m := by
       simpa [V, coherent, coherentMeasurementState] using
         referenceIsometry_compression_ofReferenceIsometry_applyState V rho
     have href :
         Matrix.conjTranspose V.matrix *
-            State.identityTensorStateMatrix (a := y) sigma * V.matrix = rin := by
+            MState.identityTensorStateMatrix (a := y) sigma * V.matrix = rin := by
       simpa [V, rin] using
         hY.coherentGroupedSideIsometry_compression_identityTensor sigma
     calc
-      rho.matrix = Matrix.conjTranspose V.matrix * coherent.matrix * V.matrix :=
+      rho.m = Matrix.conjTranspose V.matrix * coherent.m * V.matrix :=
         himage.symm
-      _ <= Matrix.conjTranspose V.matrix *
-          ((t : Complex) • State.identityTensorStateMatrix (a := y) sigma) *
+      _ ≤ Matrix.conjTranspose V.matrix *
+          ((t : ℂ) • MState.identityTensorStateMatrix (a := y) sigma) *
             V.matrix := h
-      _ = (t : Complex) • rin := by
+      _ = (t : ℂ) • rin := by
         simp [Matrix.mul_smul, Matrix.smul_mul, href]
-  have hmapFeas : Phi.map rho.matrix <= Phi.map ((t : Complex) • rin) := by
+  have hmapFeas : Phi.map rho.m ≤ Phi.map ((t : ℂ) • rin) := by
     apply Matrix.le_iff.mpr
-    have hpos : (((t : Complex) • rin) - rho.matrix).PosSemidef := by
+    have hpos : (((t : ℂ) • rin) - rho.m).PosSemidef := by
       simpa [Matrix.le_iff] using hcompressed
     simpa [map_sub, map_smul] using Phi.mapsPositive _ hpos
-  have hdom : Phi.map rin <= (c : Complex) • rout := by
-    simpa [Phi, rin, rout, c, Channel.prod] using
+  have hdom : Phi.map rin ≤ (c : ℂ) • rout := by
+    simpa [Phi, rin, rout, c, CPTPOp.prod] using
       hX.measureCoherentPullback_le_overlap_identityTensorMarginal hY sigma
   have hscaled :
-      (t : Complex) • Phi.map rin <=
-        (t : Complex) • ((c : Complex) • rout) :=
+      (t : ℂ) • Phi.map rin ≤
+        (t : ℂ) • ((c : ℂ) • rout) :=
     cMatrix_ofReal_smul_le_smul ht hdom
   have htc : t * c = Real.rpow 2 (-(lam - log2 c)) := by
     dsimp [t]
     rw [show -(lam - log2 c) = -lam + log2 c by ring,
-      Real.rpow_add (by norm_num : (0 : Real) < 2)]
-    exact congrArg (fun z : Real => Real.rpow 2 (-lam) * z)
+      Real.rpow_add (by norm_num : (0 : ℝ) < 2)]
+    exact congrArg (fun z : ℝ => Real.rpow 2 (-lam) * z)
       (QIT.rpow_two_log2_pos hc).symm
-  rw [State.ConditionalMinEntropyFeasible]
-  have hfinal : Phi.map rho.matrix <=
-      (Real.rpow 2 (-(lam - log2 c)) : Complex) • rout := by
+  rw [MState.ConditionalMinEntropyFeasible]
+  have hfinal : Phi.map rho.m ≤
+      (Real.rpow 2 (-(lam - log2 c)) : ℂ) • rout := by
     calc
-      Phi.map rho.matrix <= Phi.map ((t : Complex) • rin) := hmapFeas
-      _ = (t : Complex) • Phi.map rin := by rw [map_smul]
-      _ <= (t : Complex) • ((c : Complex) • rout) := hscaled
-      _ = (Real.rpow 2 (-(lam - log2 c)) : Complex) • rout := by
+      Phi.map rho.m ≤ Phi.map ((t : ℂ) • rin) := hmapFeas
+      _ = (t : ℂ) • Phi.map rin := by rw [map_smul]
+      _ ≤ (t : ℂ) • ((c : ℂ) • rout) := hscaled
+      _ = (Real.rpow 2 (-(lam - log2 c)) : ℂ) • rout := by
         simp only [smul_smul]
         norm_cast
         rw [htc]
-  simpa [Phi, measured, rout, c, measureSubsystemState, Channel.applyState] using hfinal
+  simpa [Phi, measured, rout, c, measureSubsystemState, CPTPOp.mat_coe_eq_apply_mat] using hfinal
 
 /-- The `alpha = infinity` endpoint of Tomamichel's coherent-measurement
 comparison. -/
 theorem conditionalMinEntropy_coherentMeasurement_sub_log2_le
-    (hX : X.IsRankOne) (hY : Y.IsRankOne) (rho : State (Prod a b)) :
+    (hX : X.IsRankOne) (hY : Y.IsRankOne) (rho : MState (a × b)) :
     (hY.coherentMeasurementState rho).conditionalMinEntropy -
-        log2 (X.rankOneTraceOverlap Y) <=
+        log2 (X.rankOneTraceOverlap Y) ≤
       (measureSubsystemState X.toPOVM rho).conditionalMinEntropy := by
   let coherent := hY.coherentMeasurementState rho
   let measured := measureSubsystemState X.toPOVM rho
   let S := coherent.conditionalMinEntropyFeasibleExponentValueSet (a := y)
   let T := measured.conditionalMinEntropyFeasibleExponentValueSet (a := x)
-  let : Nonempty (Prod y b) := by
+  let : Nonempty (y × b) := by
     rcases coherent.nonempty with ⟨_, side⟩
     exact ⟨side⟩
   have hS : S.Nonempty :=
     coherent.conditionalMinEntropyFeasibleExponentValueSet_nonempty (a := y)
   have hTbdd : BddAbove T :=
     measured.conditionalMinEntropyFeasibleExponentValueSet_bddAbove (a := x)
-  rw [State.conditionalMinEntropy_eq, State.conditionalMinEntropy_eq]
-  change sSup S - log2 (X.rankOneTraceOverlap Y) <= sSup T
+  rw [MState.conditionalMinEntropy_eq, MState.conditionalMinEntropy_eq]
+  change sSup S - log2 (X.rankOneTraceOverlap Y) ≤ sSup T
   rw [sub_le_iff_le_add]
   apply csSup_le hS
   intro lam hlam
   rcases hlam with ⟨sigma, hfeas⟩
   have hmember : lam - log2 (X.rankOneTraceOverlap Y) ∈ T := by
-    exact ⟨sigma.marginalB,
+    exact ⟨sigma.traceLeft,
       hX.conditionalMinEntropyFeasible_coherentMeasurement_sub_log2
         hY rho sigma lam hfeas⟩
   have hle := le_csSup hTbdd hmember
@@ -817,7 +786,9 @@ theorem conditionalMinEntropy_coherentMeasurement_sub_log2_le
 
 end ProjectiveMeasurement.IsRankOne
 
-namespace State
+end QIT
+
+namespace MState
 
 variable {x : Type u} {y : Type v} {a : Type w} {b : Type z}
 variable [Fintype x] [DecidableEq x]
@@ -834,30 +805,30 @@ four source routes proved above.  In particular, the endpoint statement does
 not require a full-rank marginal or a separate positivity assumption on the
 rank-one overlap. -/
 theorem conditionalSandwichedRenyiUpExtendedOrder_coherentMeasurementComparison
-    (hX : X.IsRankOne) (hY : Y.IsRankOne) (rho : State (Prod a b))
+    (hX : X.IsRankOne) (hY : Y.IsRankOne) (rho : MState (a × b))
     (alpha : RenyiOrder) :
     (hY.coherentMeasurementState rho).conditionalSandwichedRenyiUpExtendedOrder alpha -
-        log2 (X.rankOneTraceOverlap Y) <=
+        log2 (X.rankOneTraceOverlap Y) ≤
       (measureSubsystemState X.toPOVM rho).conditionalSandwichedRenyiUpExtendedOrder alpha := by
   obtain ⟨val, hval⟩ := alpha
   cases val with
   | top =>
       change (hY.coherentMeasurementState rho).conditionalMinEntropy -
-          log2 (X.rankOneTraceOverlap Y) <=
+          log2 (X.rankOneTraceOverlap Y) ≤
         (measureSubsystemState X.toPOVM rho).conditionalMinEntropy
       exact hX.conditionalMinEntropy_coherentMeasurement_sub_log2_le hY rho
   | coe r =>
-      have hr : 1 / 2 <= r := by exact_mod_cast hval
+      have hr : 1 / 2 ≤ r := by exact_mod_cast hval
       change
         (hY.coherentMeasurementState rho).conditionalSandwichedRenyiUpFiniteOrder r -
-            log2 (X.rankOneTraceOverlap Y) <=
+            log2 (X.rankOneTraceOverlap Y) ≤
           (measureSubsystemState X.toPOVM rho).conditionalSandwichedRenyiUpFiniteOrder r
       by_cases hone : r = 1
       · subst r
         rw [conditionalSandwichedRenyiUpFiniteOrder_one,
           conditionalSandwichedRenyiUpFiniteOrder_one]
         exact hX.conditionalEntropy_coherentMeasurement_sub_log2_le hY rho
-      by_cases hhalf : r = (2 : Real)⁻¹
+      by_cases hhalf : r = (2 : ℝ)⁻¹
       · subst r
         rw [conditionalSandwichedRenyiUpFiniteOrder_half,
           conditionalSandwichedRenyiUpFiniteOrder_half]
@@ -873,8 +844,4 @@ theorem conditionalSandwichedRenyiUpExtendedOrder_coherentMeasurementComparison
         exact hX.conditionalSandwichedRenyiUpSource_coherentMeasurement_sub_log2_le
           hY rho r hhalfStrict hone
 
-end State
-
-end
-
-end QIT
+end MState

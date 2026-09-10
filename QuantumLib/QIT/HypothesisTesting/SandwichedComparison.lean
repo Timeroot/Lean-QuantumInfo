@@ -24,25 +24,25 @@ relative entropy definitions with a PSD matrix reference.
 
 open scoped ComplexOrder MatrixOrder
 
-namespace QIT
-
-universe u v
-
 noncomputable section
-
+universe u v
 variable {a : Type u} [Fintype a] [DecidableEq a]
+
+open QIT
+
+namespace QIT
 
 namespace HypothesisTestingEffect
 
-variable {rho : State a} {epsilon : ℝ}
+variable {rho : MState a} {epsilon : ℝ}
 
 /-- Type-II error of a feasible effect against a PSD matrix reference. -/
 def typeIIErrorPSD (Lambda : HypothesisTestingEffect rho epsilon) (sigma : CMatrix a) : ℝ :=
   ((sigma * Lambda.effect).trace).re
 
 theorem typeIIErrorPSD_eq_state (Lambda : HypothesisTestingEffect rho epsilon)
-    (sigma : State a) :
-    Lambda.typeIIErrorPSD sigma.matrix = Lambda.typeIIError sigma := by
+    (sigma : MState a) :
+    Lambda.typeIIErrorPSD sigma.m = Lambda.typeIIError sigma := by
   rfl
 
 theorem typeIIErrorPSD_nonneg (Lambda : HypothesisTestingEffect rho epsilon)
@@ -56,13 +56,13 @@ strictly positive PSD type-II error.  This is the support-domain handoff in the
 source proof of `prop:sandwich-to-htre`. -/
 theorem typeIIErrorPSD_pos_of_supports (Lambda : HypothesisTestingEffect rho epsilon)
     {sigma : CMatrix a} (hsigma : sigma.PosSemidef)
-    (hSupport : Matrix.Supports rho.matrix sigma) (hε_lt_one : epsilon < 1) :
+    (hSupport : Matrix.Supports rho.m sigma) (hε_lt_one : epsilon < 1) :
     0 < Lambda.typeIIErrorPSD sigma := by
   classical
-  let Phi : Channel a Bool := Channel.measure Lambda.toBinaryHypothesisTest
+  let Phi : CPTPMap a Bool := POVM.measureDiscard Lambda.toBinaryHypothesisTest
   let e : Bool → ℂ := fun b => if b then 1 else 0
-  have hOutSupport : Matrix.Supports (Phi.map rho.matrix) (Phi.map sigma) :=
-    State.channel_map_supports Phi hsigma hSupport
+  have hOutSupport : Matrix.Supports (Phi.map rho.m) (Phi.map sigma) :=
+    MState.channel_map_supports Phi hsigma hSupport
   have hq_nonneg : 0 ≤ Lambda.typeIIErrorPSD sigma :=
     Lambda.typeIIErrorPSD_nonneg hsigma
   by_contra hq_not_pos
@@ -75,13 +75,13 @@ theorem typeIIErrorPSD_pos_of_supports (Lambda : HypothesisTestingEffect rho eps
   have hPhiSigma_e : (Phi.map sigma).mulVec e = 0 := by
     ext b
     cases b <;>
-      simp [Phi, e, Channel.measure_map, Matrix.mulVec, dotProduct,
+      simp [Phi, e, POVM.measureDiscard_map, Matrix.mulVec, dotProduct,
         HypothesisTestingEffect.toBinaryHypothesisTest, htrace_q_zero]
-  have hPhiRho_e : (Phi.map rho.matrix).mulVec e = 0 :=
+  have hPhiRho_e : (Phi.map rho.m).mulVec e = 0 :=
     hOutSupport e hPhiSigma_e
-  have haccept_zero_complex : (rho.matrix * Lambda.effect).trace = 0 := by
+  have haccept_zero_complex : (rho.m * Lambda.effect).trace = 0 := by
     have htrue := congrFun hPhiRho_e true
-    simpa [Phi, e, Channel.measure_map, Matrix.mulVec, dotProduct,
+    simpa [Phi, e, POVM.measureDiscard_map, Matrix.mulVec, dotProduct,
       HypothesisTestingEffect.toBinaryHypothesisTest] using htrue
   have haccept_zero : effectAcceptProbability rho Lambda.effect = 0 := by
     unfold effectAcceptProbability
@@ -92,9 +92,11 @@ theorem typeIIErrorPSD_pos_of_supports (Lambda : HypothesisTestingEffect rho eps
 
 end HypothesisTestingEffect
 
-namespace State
+end QIT
 
-variable (rho : State a) (sigma : CMatrix a) (epsilon : ℝ)
+namespace MState
+
+variable (rho : MState a) (sigma : CMatrix a) (epsilon : ℝ)
 
 /-- Candidate set for the PSD-reference beta quantity. -/
 def hypothesisTestingBetaPSDCandidateSet : Set ℝ :=
@@ -158,8 +160,8 @@ theorem hypothesisTestingBetaPSD_le_of_effect
   rcases hbeta with ⟨Lambda, rfl⟩
   exact Lambda.typeIIErrorPSD_nonneg hsigma
 
-theorem hypothesisTestingRelativeEntropyPSDE_eq_state (sigma : State a) :
-    rho.hypothesisTestingRelativeEntropyPSDE sigma.matrix epsilon =
+theorem hypothesisTestingRelativeEntropyPSDE_eq_state (sigma : MState a) :
+    rho.hypothesisTestingRelativeEntropyPSDE sigma.m epsilon =
       rho.hypothesisTestingRelativeEntropy sigma epsilon := by
   simp [hypothesisTestingRelativeEntropyPSDE, hypothesisTestingRelativeEntropy,
     hypothesisTestingRelativeEntropyPSD, hypothesisTestingRelativeEntropyFinite,
@@ -167,22 +169,6 @@ theorem hypothesisTestingRelativeEntropyPSDE_eq_state (sigma : State a) :
     hypothesisTestingBetaPSDCandidateSet, hypothesisTestingBetaCandidateSet,
     HypothesisTestingEffect.typeIIErrorPSD_eq_state]
   rfl
-
-private theorem sandwich_log2_rpow_pos {x : ℝ} (hx : 0 < x) (y : ℝ) :
-    log2 (x ^ y) = y * log2 x := by
-  unfold log2
-  rw [Real.log_rpow hx y]
-  ring
-
-private theorem rpow_two_neg_le_of_neg_log2_le {q C : ℝ} (hq : 0 < q)
-    (h : -log2 q ≤ C) :
-    Real.rpow 2 (-C) ≤ q := by
-  have hexp : -C ≤ log2 q := by linarith
-  have hpow :=
-    Real.rpow_le_rpow_of_exponent_le (x := (2 : ℝ))
-      (by norm_num : (1 : ℝ) ≤ 2) hexp
-  rw [← rpow_two_log2_pos hq]
-  exact hpow
 
 private theorem scalar_binary_sandwiched_lower
     {p q T epsilon alpha : ℝ} (halpha : 1 < alpha) (hepsilon : epsilon < 1)
@@ -210,8 +196,8 @@ private theorem scalar_binary_sandwiched_lower
         alpha * log2 (1 - epsilon) + (1 - alpha) * log2 q := by
     rw [log2_mul (ne_of_gt (Real.rpow_pos_of_pos heps_pos alpha))
       (ne_of_gt (Real.rpow_pos_of_pos hq (1 - alpha)))]
-    rw [sandwich_log2_rpow_pos heps_pos alpha,
-      sandwich_log2_rpow_pos hq (1 - alpha)]
+    rw [log2_rpow_pos heps_pos alpha,
+      log2_rpow_pos hq (1 - alpha)]
   rw [hlogx] at hlog
   calc
     alpha / (alpha - 1) * log2 (1 - epsilon) - log2 q =
@@ -223,21 +209,9 @@ private theorem scalar_binary_sandwiched_lower
           exact mul_le_mul_of_nonneg_left hlog
             (one_div_nonneg.mpr (le_of_lt hcoef_pos))
 
-private theorem measurement_map_eq_diagonal_re (M : POVM Bool a)
-    {X : CMatrix a} (hX : X.PosSemidef) :
-    (Channel.measure M).map X =
-      (Matrix.diagonal fun b : Bool => (((X * M.effects b).trace).re : ℂ)) := by
-  ext i j
-  cases i <;> cases j
-  all_goals simp [Channel.measure_map, Matrix.diagonal]
-  all_goals
-    apply Complex.ext <;>
-      simp [trace_mul_posSemidef_im_eq_zero hX (M.pos false),
-        trace_mul_posSemidef_im_eq_zero hX (M.pos true)]
-
 private theorem measurement_map_rpow_eq_diagonal_re (M : POVM Bool a)
     {X : CMatrix a} (hX : X.PosSemidef) (s : ℝ) :
-    CFC.rpow ((Channel.measure M).map X) s =
+    CFC.rpow ((POVM.measureDiscard M).map X) s =
       (Matrix.diagonal fun b : Bool =>
         ((((X * M.effects b).trace).re ^ s : ℝ) : ℂ)) := by
   let d : Bool → ℝ := fun b => ((X * M.effects b).trace).re
@@ -245,7 +219,7 @@ private theorem measurement_map_rpow_eq_diagonal_re (M : POVM Bool a)
     intro b
     exact cMatrix_trace_mul_posSemidef_re_nonneg hX (M.pos b)
   have hdiag :
-      (Channel.measure M).map X =
+      (POVM.measureDiscard M).map X =
         (Matrix.diagonal fun b : Bool => ((d b : ℝ) : ℂ)) := by
     simpa [d] using measurement_map_eq_diagonal_re M hX
   rw [hdiag]
@@ -253,11 +227,11 @@ private theorem measurement_map_rpow_eq_diagonal_re (M : POVM Bool a)
   simpa [d] using hpow
 
 private theorem measurement_sandwiched_inner_true_true_re
-    {rho : State a} {epsilon : ℝ} (Lambda : HypothesisTestingEffect rho epsilon)
+    {rho : MState a} {epsilon : ℝ} (Lambda : HypothesisTestingEffect rho epsilon)
     {sigma : CMatrix a} (hsigma : sigma.PosSemidef) {alpha : ℝ}
     (hqpos : 0 < Lambda.typeIIErrorPSD sigma) :
-    let Phi : Channel a Bool := Channel.measure Lambda.toBinaryHypothesisTest
-    ((sandwichedRenyiReferenceInner (Phi.applyState rho) (Phi.map sigma) alpha)
+    let Phi : CPTPMap a Bool := POVM.measureDiscard Lambda.toBinaryHypothesisTest
+    ((sandwichedRenyiReferenceInner (Phi rho) (Phi.map sigma) alpha)
         true true).re =
       effectAcceptProbability rho Lambda.effect *
         (Lambda.typeIIErrorPSD sigma) ^ ((1 - alpha) / alpha) := by
@@ -271,16 +245,16 @@ private theorem measurement_sandwiched_inner_true_true_re
     simpa [Phi] using
       measurement_map_rpow_eq_diagonal_re Lambda.toBinaryHypothesisTest hsigma s
   have hrho_true :
-      ((Phi.applyState rho).matrix true true) =
+      ((Phi rho).m true true) =
         (effectAcceptProbability rho Lambda.effect : ℂ) := by
     exact Complex.ext
       (by
-        simp [Phi, Channel.applyState, Channel.measure_map, effectAcceptProbability,
+        simp [Phi, CPTPOp.mat_coe_eq_apply_mat, POVM.measureDiscard_map, effectAcceptProbability,
           HypothesisTestingEffect.toBinaryHypothesisTest])
       (by
-        simp [Phi, Channel.applyState, Channel.measure_map,
+        simp [Phi, CPTPOp.mat_coe_eq_apply_mat, POVM.measureDiscard_map,
           HypothesisTestingEffect.toBinaryHypothesisTest,
-          trace_mul_posSemidef_im_eq_zero rho.pos Lambda.pos])
+          trace_mul_posSemidef_im_eq_zero rho.psd Lambda.pos])
   have hq_entry :
       ((sigma * Lambda.toBinaryHypothesisTest.effects true).trace).re =
         Lambda.typeIIErrorPSD sigma := by
@@ -295,36 +269,37 @@ private theorem measurement_sandwiched_inner_true_true_re
     field_simp
     ring
   unfold sandwichedRenyiReferenceInner
-  change ((CFC.rpow (Phi.map sigma) s * (Phi.applyState rho).matrix *
+  change ((CFC.rpow (Phi.map sigma) s * (Phi rho).m *
       CFC.rpow (Phi.map sigma) s) true true).re =
     effectAcceptProbability rho Lambda.effect *
       Lambda.typeIIErrorPSD sigma ^ ((1 - alpha) / alpha)
   rw [hrefpow_diag]
-  simp [Matrix.mul_apply, hrho_true, hq_entry, hpowprod, mul_assoc, mul_comm,
-    mul_left_comm]
+  simp only [CPTPOp.mat_coe_eq_apply_mat] at hrho_true
+  simp [Matrix.mul_apply, hrho_true, hq_entry, mul_comm, mul_left_comm]
+  rw [← mul_assoc, hpowprod]
 
 private theorem measurement_sandwiched_tracePower_accept_lower
-    {rho : State a} {epsilon : ℝ} (Lambda : HypothesisTestingEffect rho epsilon)
+    {rho : MState a} {epsilon : ℝ} (Lambda : HypothesisTestingEffect rho epsilon)
     {sigma : CMatrix a} (hsigma : sigma.PosSemidef) {alpha : ℝ}
     (halpha : 1 < alpha) (hqpos : 0 < Lambda.typeIIErrorPSD sigma) :
-    let Phi : Channel a Bool := Channel.measure Lambda.toBinaryHypothesisTest
+    let Phi : CPTPMap a Bool := POVM.measureDiscard Lambda.toBinaryHypothesisTest
     effectAcceptProbability rho Lambda.effect ^ alpha *
         Lambda.typeIIErrorPSD sigma ^ (1 - alpha) ≤
-      psdTracePower (sandwichedRenyiReferenceInner (Phi.applyState rho)
+      psdTracePower (sandwichedRenyiReferenceInner (Phi rho)
           (Phi.map sigma) alpha)
-        (sandwichedRenyiReferenceInner_posSemidef (Phi.applyState rho)
+        (sandwichedRenyiReferenceInner_posSemidef (Phi rho)
           (Phi.mapsPositive sigma hsigma) alpha) alpha := by
   intro Phi
   let B : CMatrix Bool :=
-    sandwichedRenyiReferenceInner (Phi.applyState rho) (Phi.map sigma) alpha
+    sandwichedRenyiReferenceInner (Phi rho) (Phi.map sigma) alpha
   let hB : B.PosSemidef :=
-    sandwichedRenyiReferenceInner_posSemidef (Phi.applyState rho)
+    sandwichedRenyiReferenceInner_posSemidef (Phi rho)
       (Phi.mapsPositive sigma hsigma) alpha
   have hdiag :=
     measurement_sandwiched_inner_true_true_re Lambda hsigma hqpos (alpha := alpha)
   have hp_nonneg : 0 ≤ effectAcceptProbability rho Lambda.effect := by
     unfold effectAcceptProbability
-    exact cMatrix_trace_mul_posSemidef_re_nonneg rho.pos Lambda.pos
+    exact cMatrix_trace_mul_posSemidef_re_nonneg rho.psd Lambda.pos
   have hq_nonneg : 0 ≤ Lambda.typeIIErrorPSD sigma := le_of_lt hqpos
   have hterm_eq :
       (B true true).re ^ alpha =
@@ -367,7 +342,7 @@ private theorem measurement_sandwiched_tracePower_accept_lower
 lower bound, then the PSD-reference hypothesis-testing relative entropy is
 bounded by the corresponding real constant. -/
 theorem hypothesisTestingRelativeEntropyPSDE_le_of_effect_rpow_lower_bound
-    (rho : State a) {sigma : CMatrix a}
+    (rho : MState a) {sigma : CMatrix a}
     {epsilon C : ℝ} (hε : 0 ≤ epsilon)
     (hlower : ∀ Lambda : HypothesisTestingEffect rho epsilon,
       Real.rpow 2 (-C) ≤ Lambda.typeIIErrorPSD sigma) :
@@ -401,9 +376,9 @@ theorem hypothesisTestingRelativeEntropyPSDE_le_of_effect_rpow_lower_bound
 /-- Unsupported high-`alpha` branch of the source comparison.  When the state is
 not supported by the PSD reference, the sandwiched-Renyi side is `+∞`. -/
 theorem hypothesisTestingRelativeEntropyPSDE_le_sandwichedRenyiPSDReferenceE_add_of_not_supports
-    (rho : State a) {sigma : CMatrix a} (hsigma : sigma.PosSemidef)
+    (rho : MState a) {sigma : CMatrix a} (hsigma : sigma.PosSemidef)
     {epsilon alpha : ℝ} (halpha : 1 < alpha)
-    (hSupport : ¬ Matrix.Supports rho.matrix sigma) :
+    (hSupport : ¬ Matrix.Supports rho.m sigma) :
     rho.hypothesisTestingRelativeEntropyPSDE sigma epsilon ≤
       sandwichedRenyiPSDReferenceE rho sigma hsigma alpha +
         ((alpha / (alpha - 1) * log2 (1 / (1 - epsilon)) : ℝ) : EReal) := by
@@ -414,23 +389,23 @@ theorem hypothesisTestingRelativeEntropyPSDE_le_sandwichedRenyiPSDReferenceE_add
   exact le_top
 
 private theorem typeIIErrorPSD_rpow_lower_bound_of_sandwichedRenyi
-    (rho : State a) {sigma : CMatrix a} (hsigma : sigma.PosSemidef)
+    (rho : MState a) {sigma : CMatrix a} (hsigma : sigma.PosSemidef)
     {epsilon alpha : ℝ} (hε_lt_one : epsilon < 1) (halpha : 1 < alpha)
-    (hSupport : Matrix.Supports rho.matrix sigma)
+    (hSupport : Matrix.Supports rho.m sigma)
     (Lambda : HypothesisTestingEffect rho epsilon) :
     Real.rpow 2
         (-(rho.sandwichedRenyiPSDReferenceHighAlphaFinite sigma hsigma alpha +
           alpha / (alpha - 1) * log2 (1 / (1 - epsilon)))) ≤
       Lambda.typeIIErrorPSD sigma := by
-  let Phi : Channel a Bool := Channel.measure Lambda.toBinaryHypothesisTest
+  let Phi : CPTPMap a Bool := POVM.measureDiscard Lambda.toBinaryHypothesisTest
   let q : ℝ := Lambda.typeIIErrorPSD sigma
   have hqpos : 0 < q := by
     simpa [q] using
       Lambda.typeIIErrorPSD_pos_of_supports hsigma hSupport hε_lt_one
   let T : ℝ :=
-    psdTracePower (sandwichedRenyiReferenceInner (Phi.applyState rho)
+    psdTracePower (sandwichedRenyiReferenceInner (Phi rho)
         (Phi.map sigma) alpha)
-      (sandwichedRenyiReferenceInner_posSemidef (Phi.applyState rho)
+      (sandwichedRenyiReferenceInner_posSemidef (Phi rho)
         (Phi.mapsPositive sigma hsigma) alpha) alpha
   have htrace :
       effectAcceptProbability rho Lambda.effect ^ alpha * q ^ (1 - alpha) ≤ T := by
@@ -438,12 +413,12 @@ private theorem typeIIErrorPSD_rpow_lower_bound_of_sandwichedRenyi
       measurement_sandwiched_tracePower_accept_lower Lambda hsigma halpha hqpos
   have hmeasureLower :
       alpha / (alpha - 1) * log2 (1 - epsilon) - log2 q ≤
-        (Phi.applyState rho).sandwichedRenyiPSDReferenceHighAlphaFinite
+        MState.sandwichedRenyiPSDReferenceHighAlphaFinite (Phi rho)
           (Phi.map sigma) (Phi.mapsPositive sigma hsigma) alpha := by
     simpa [T, sandwichedRenyiPSDReferenceHighAlphaFinite] using
       scalar_binary_sandwiched_lower halpha hε_lt_one Lambda.accept_ge hqpos htrace
   have hOutSupport :
-      Matrix.Supports (Phi.applyState rho).matrix (Phi.map sigma) :=
+      Matrix.Supports (Phi rho).m (Phi.map sigma) :=
     channel_applyState_supports_of_supports rho hsigma Phi hSupport
   have hDPIE :=
     sandwichedRenyiPSDReferenceE_dataProcessing_channel_ge_of_half_le_lt_one_or_one_lt
@@ -452,11 +427,11 @@ private theorem typeIIErrorPSD_rpow_lower_bound_of_sandwichedRenyi
     sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_of_supports
       rho hsigma alpha hSupport,
     sandwichedRenyiPSDReferenceE_eq_highAlphaE_of_one_lt
-      (Phi.applyState rho) (Phi.mapsPositive sigma hsigma) halpha,
+      (Phi rho) (Phi.mapsPositive sigma hsigma) halpha,
     sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_of_supports
-      (Phi.applyState rho) (Phi.mapsPositive sigma hsigma) alpha hOutSupport] at hDPIE
+      (Phi rho) (Phi.mapsPositive sigma hsigma) alpha hOutSupport] at hDPIE
   have hDPI :
-      (Phi.applyState rho).sandwichedRenyiPSDReferenceHighAlphaFinite
+      MState.sandwichedRenyiPSDReferenceHighAlphaFinite (Phi rho)
           (Phi.map sigma) (Phi.mapsPositive sigma hsigma) alpha ≤
         rho.sandwichedRenyiPSDReferenceHighAlphaFinite sigma hsigma alpha := by
     exact_mod_cast hDPIE
@@ -480,13 +455,13 @@ PSD matrix reference and the extended-real support convention.
 This is the state-level source theorem `prop:sandwich-to-htre` from
 [KhatriWilde2024Principles, Chapters/entropies.tex:7004-7029]. -/
 theorem hypothesisTestingRelativeEntropyPSDE_le_sandwichedRenyiPSDReferenceE_add
-    (rho : State a) {sigma : CMatrix a} (hsigma : sigma.PosSemidef)
+    (rho : MState a) {sigma : CMatrix a} (hsigma : sigma.PosSemidef)
     {epsilon alpha : ℝ} (hε_nonneg : 0 ≤ epsilon) (hε_lt_one : epsilon < 1)
     (halpha : 1 < alpha) :
     rho.hypothesisTestingRelativeEntropyPSDE sigma epsilon ≤
       rho.sandwichedRenyiPSDReferenceE sigma hsigma alpha +
         ((alpha / (alpha - 1) * log2 (1 / (1 - epsilon)) : ℝ) : EReal) := by
-  by_cases hSupport : Matrix.Supports rho.matrix sigma
+  by_cases hSupport : Matrix.Supports rho.m sigma
   · have hfinite :
         rho.hypothesisTestingRelativeEntropyPSDE sigma epsilon ≤
           ((rho.sandwichedRenyiPSDReferenceHighAlphaFinite sigma hsigma alpha +
@@ -507,8 +482,4 @@ theorem hypothesisTestingRelativeEntropyPSDE_le_sandwichedRenyiPSDReferenceE_add
       hypothesisTestingRelativeEntropyPSDE_le_sandwichedRenyiPSDReferenceE_add_of_not_supports
         rho hsigma halpha hSupport
 
-end State
-
-end
-
-end QIT
+end MState

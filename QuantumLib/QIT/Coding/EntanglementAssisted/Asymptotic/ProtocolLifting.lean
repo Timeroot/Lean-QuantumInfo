@@ -12,9 +12,7 @@ public import QuantumLib.QIT.Coding.EntanglementAssisted.Asymptotic.Basic
 # Protocol lifting and rate normalization
 
 This module is part of the entanglement-assisted classical communication
-asymptotic proof spine.  It was split out mechanically from the historical
-`EntanglementAssistedAsymptotic` files; theorem statements and proof routes are
-unchanged.
+asymptotic proof spine.
 -/
 
 @[expose] public section
@@ -33,18 +31,20 @@ variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
 namespace EntanglementAssistedClassicalCode
 
-variable {N : Channel a b} {n : ℕ}
+variable {N : CPTPMap a b} {n : ℕ}
 variable {M : Type u} [Fintype M] [DecidableEq M] [Nonempty M]
 variable {EA : Type x} [Fintype EA] [DecidableEq EA]
 variable {EB : Type y} [Fintype EB] [DecidableEq EB]
 
+omit [DecidableEq a] in
 /-- Rate normalization for a nonzero `n`-use entanglement-assisted code. -/
 theorem rate_eq_log_card_div (C : EntanglementAssistedClassicalCode N n M EA EB)
     (hn : n ≠ 0) :
     C.rate = log2 (Fintype.card M : ℝ) / (n : ℝ) := by
-  unfold rate entanglementAssistedMessageRate
+  unfold rate messageRate
   simp [hn]
 
+omit [DecidableEq a] in
 /-- If the message set has logarithmic size at least `n * R`, then the
 normalized `n`-use code rate is at least `R`. -/
 theorem rate_ge_of_mul_le_log_card
@@ -57,6 +57,7 @@ theorem rate_ge_of_mul_le_log_card
   have hn_real_pos : 0 < (n : ℝ) := by exact_mod_cast hn_pos
   exact (le_div_iff₀ hn_real_pos).mpr (by simpa [mul_comm] using hlog)
 
+omit [DecidableEq a] in
 /-- If the message set has logarithmic size at most `n * B`, then the
 normalized `n`-use code rate is at most `B`. -/
 theorem rate_le_of_log_card_le_mul
@@ -113,16 +114,13 @@ theorem liftBlockOneShot_channelInputState
     C.liftBlockOneShot.channelInputState m =
       (C.channelInputState m).reindex
         (Equiv.prodCongr (tensorPowerOneEquiv (QIT.TensorPower a n)) (Equiv.refl EB)) := by
-  apply State.ext
-  rfl
+  apply MState.ext
+  simp only [channelInputState, CPTPOp.mat_coe_eq_apply_mat, MState.reindex_matrix,
+    liftBlockOneShot, CPTPOp.prod_map,
+    CPTPOp.outputReindex, CPTPOp.map_ofMat]
+  rw [MatrixMap.kron_outputReindex_left]
 
-private theorem unit_map_eq_idChannel_forAsymptotic :
-    (Channel.unit : Channel PUnit PUnit).map = (Channel.idChannel PUnit).map := by
-  ext X i j
-  cases i
-  cases j
-  simp [Channel.unit, MatrixMap.unit, Channel.idChannel, MatrixMap.ofKraus]
-
+set_option maxRecDepth 4000 in
 /-- Applying a one-fold tensor-power channel and then dropping the terminal unit
 register agrees with dropping the unit input register first and applying the
 underlying channel. -/
@@ -130,41 +128,38 @@ theorem applyState_tensorPower_one_prod_id_reindex
     {q : Type u} {r : Type v} {s : Type x}
     [Fintype q] [DecidableEq q] [Fintype r] [DecidableEq r]
     [Fintype s] [DecidableEq s]
-    (D : Channel q r) (ρ : State (Prod (QIT.TensorPower q 1) s)) :
-    (D.prod (Channel.idChannel s)).applyState
+    (D : CPTPMap q r) (ρ : MState (QIT.TensorPower q 1 × s)) :
+    (D.prod (CPTPOp.id (dIn := s)))
         (ρ.reindex (Equiv.prodCongr (tensorPowerOneEquiv q) (Equiv.refl s))) =
-      (((D.tensorPower 1).prod (Channel.idChannel s)).applyState ρ).reindex
+      MState.reindex ((((D.tensorPower 1).prod (CPTPOp.id (dIn := s))) ρ))
         (Equiv.prodCongr (tensorPowerOneEquiv r) (Equiv.refl s)) := by
-  apply State.ext
+  apply MState.ext
   ext x y
   rcases x with ⟨xr, xs⟩
   rcases y with ⟨yr, ys⟩
+  simp only [CPTPOp.mat_coe_eq_apply_mat, MState.reindex_matrix, CPTPOp.prod_map]
   change
-    MatrixMap.kron D.map (Channel.idChannel s).map
-        (ρ.reindex (Equiv.prodCongr (tensorPowerOneEquiv q) (Equiv.refl s))).matrix
+    MatrixMap.kron D.map (CPTPOp.id (dIn := s)).map
+        (Matrix.of fun z z' =>
+          ρ.m ((z.1, PUnit.unit), z.2) ((z'.1, PUnit.unit), z'.2))
         (xr, xs) (yr, ys) =
-      MatrixMap.kron (D.tensorPower 1).map (Channel.idChannel s).map
-        ρ.matrix ((xr, PUnit.unit), xs) ((yr, PUnit.unit), ys)
+      MatrixMap.kron (D.tensorPower 1).map (CPTPOp.id (dIn := s)).map
+        ρ.m ((xr, PUnit.unit), xs) ((yr, PUnit.unit), ys)
   rw [MatrixMap.kron_idChannel_apply_slice]
   rw [MatrixMap.kron_idChannel_apply_slice]
-  rw [Channel.tensorPower_succ, Channel.tensorPower_zero]
+  rw [CPTPOp.tensorPower_succ]
+  change _ = (D.prod (D.tensorPower 0)).map _ _ _
+  simp only [CPTPOp.prod_map]
+  rw [CPTPOp.tensorPower_zero]
   change
     D.map
         (Matrix.of fun z z' =>
-          (ρ.reindex (Equiv.prodCongr (tensorPowerOneEquiv q) (Equiv.refl s))).matrix
-            (z, xs) (z', ys)) xr yr =
-      MatrixMap.kron D.map (Channel.unit).map
-        (Matrix.of fun z z' => ρ.matrix (z, xs) (z', ys))
+          ρ.m ((z, PUnit.unit), xs) ((z', PUnit.unit), ys)) xr yr =
+      MatrixMap.kron D.map (CPTPOp.unit).map
+        (Matrix.of fun z z' => ρ.m (z, xs) (z', ys))
         (xr, PUnit.unit) (yr, PUnit.unit)
-  rw [unit_map_eq_idChannel_forAsymptotic]
-  rw [MatrixMap.kron_idChannel_apply_slice]
-  change
-    D.map
-        (Matrix.of fun z z' => ρ.matrix ((z, PUnit.unit), xs) ((z', PUnit.unit), ys))
-        xr yr =
-      D.map
-        (Matrix.of fun z z' => ρ.matrix ((z, PUnit.unit), xs) ((z', PUnit.unit), ys))
-        xr yr
+  rw [CPTPOp.unit_map]
+  refine Eq.trans ?_ (MatrixMap.kron_unit_apply_slice D.map _ _ _).symm
   rfl
 
 /-- Output states of the lifted block code are the block one-shot output states
@@ -200,7 +195,6 @@ theorem liftBlockOneShot_maxErrorAtMost
   exact hC m
 
 /-- The block one-shot view has the same logarithmic rate as the message set. -/
-@[simp]
 theorem asBlockOneShot_rate
     (C : EntanglementAssistedClassicalCode N n M EA EB) :
     C.asBlockOneShot.rate = log2 (Fintype.card M : ℝ) :=
@@ -214,7 +208,11 @@ theorem asBlockOneShot_channelInputState
     C.asBlockOneShot.channelInputState m =
       (C.channelInputState m).reindex
         (Equiv.prodCongr (tensorPowerOneEquiv (QIT.TensorPower a n)) (Equiv.refl EB)).symm := by
-  apply State.ext
+  apply MState.ext
+  simp only [channelInputState, CPTPOp.mat_coe_eq_apply_mat, MState.reindex_matrix,
+    asBlockOneShot, CPTPOp.prod_map,
+    CPTPOp.outputReindex, CPTPOp.map_ofMat]
+  rw [MatrixMap.kron_outputReindex_left]
   rfl
 
 /-- Output states of the block one-shot view are the original `n`-use output
@@ -236,7 +234,7 @@ theorem asBlockOneShot_outputState
   have hinput :
       (((C.channelInputState m).reindex ein.symm).reindex ein) =
         C.channelInputState m := by
-    exact state_reindex_reindex_symm (C.channelInputState m) ein.symm
+    exact MState.reindex_reindex_symm (C.channelInputState m) ein.symm
   rw [hinput] at h
   have hout :
       C.outputState m =
@@ -247,7 +245,7 @@ theorem asBlockOneShot_outputState
   calc
     C.asBlockOneShot.outputState m =
         ((C.asBlockOneShot.outputState m).reindex eout).reindex eout.symm := by
-      rw [state_reindex_reindex_symm]
+      rw [MState.reindex_reindex_symm]
     _ = (C.outputState m).reindex eout.symm := by
       rw [← hout]
 

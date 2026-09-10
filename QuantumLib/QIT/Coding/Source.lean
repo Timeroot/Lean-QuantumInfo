@@ -16,13 +16,3 @@ public import QuantumLib.QIT.Coding.Source.SchumacherLimit
 
 Import facade for source-coding results.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace Coding
-namespace Source
-
-end Source
-end Coding
-end QIT

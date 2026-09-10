@@ -56,7 +56,6 @@ theorem convexCombination_matrix (t : ℝ) (ρ σ : SubnormalizedState a)
       ((t : ℂ) • ρ.matrix) + (((1 - t : ℝ) : ℂ) • σ.matrix) :=
   rfl
 
-@[simp]
 theorem convexCombination_trace_re (t : ℝ) (ρ σ : SubnormalizedState a)
     (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
     (convexCombination t ρ σ ht0 ht1).matrix.trace.re =
@@ -69,17 +68,17 @@ theorem convexCombination_trace_re (t : ℝ) (ρ σ : SubnormalizedState a)
 theorem hatExtension_convexCombination (t : ℝ) (ρ σ : SubnormalizedState a)
     (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
     (convexCombination t ρ σ ht0 ht1).hatExtension =
-      State.convexCombination t ρ.hatExtension σ.hatExtension ht0 ht1 := by
-  apply State.ext
+      MState.convexCombination t ρ.hatExtension σ.hatExtension ht0 ht1 := by
+  apply MState.ext
   ext i j
   rcases i with i | i <;> rcases j with j | j
   · cases i
     cases j
-    simp [State.convexCombination, hatFailureMass]
+    simp [MState.convexCombination, hatFailureMass]
     ring
-  · simp [State.convexCombination]
-  · simp [State.convexCombination]
-  · simp [State.convexCombination, convexCombination]
+  · simp [MState.convexCombination]
+  · simp [MState.convexCombination]
+  · simp [MState.convexCombination, convexCombination]
 
 /-- For fixed left input, generalized fidelity is quasiconcave in the right
 subnormalized state. -/
@@ -91,23 +90,23 @@ theorem generalizedFidelity_convexCombination_right_ge_min
     generalizedFidelity_eq_squaredFidelity_hatExtension,
     generalizedFidelity_eq_squaredFidelity_hatExtension,
     hatExtension_convexCombination,
-    State.squaredFidelity_eq_fidelity_sq,
-    State.squaredFidelity_eq_fidelity_sq,
-    State.squaredFidelity_eq_fidelity_sq]
-  let ρhat : State (Sum PUnit.{1} a) := ρ.hatExtension
-  let σhat : State (Sum PUnit.{1} a) := σ.hatExtension
-  let τhat : State (Sum PUnit.{1} a) := τ.hatExtension
+    MState.squaredFidelity_eq_fidelity_sq,
+    MState.squaredFidelity_eq_fidelity_sq,
+    MState.squaredFidelity_eq_fidelity_sq]
+  let ρhat : MState (PUnit.{1} ⊕ a) := ρ.hatExtension
+  let σhat : MState (PUnit.{1} ⊕ a) := σ.hatExtension
+  let τhat : MState (PUnit.{1} ⊕ a) := τ.hatExtension
   change min ((ρhat.fidelity σhat) ^ 2) ((ρhat.fidelity τhat) ^ 2) ≤
-    (ρhat.fidelity (State.convexCombination t σhat τhat ht0 ht1)) ^ 2
-  have hroot := State.fidelity_convexCombination_right_ge_min
+    (ρhat.fidelity (MState.convexCombination t σhat τhat ht0 ht1)) ^ 2
+  have hroot := MState.fidelity_convexCombination_right_ge_min
     ρhat σhat τhat t ht0 ht1
   have hσ0 : 0 ≤ ρhat.fidelity σhat :=
-    State.fidelity_nonneg _ _
+    MState.fidelity_nonneg _ _
   have hτ0 : 0 ≤ ρhat.fidelity τhat :=
-    State.fidelity_nonneg _ _
+    MState.fidelity_nonneg _ _
   have hmix0 :
-      0 ≤ ρhat.fidelity (State.convexCombination t σhat τhat ht0 ht1) :=
-    State.fidelity_nonneg _ _
+      0 ≤ ρhat.fidelity (MState.convexCombination t σhat τhat ht0 ht1) :=
+    MState.fidelity_nonneg _ _
   by_cases hστ : ρhat.fidelity σhat ≤ ρhat.fidelity τhat
   · have hsq :
         (ρhat.fidelity σhat) ^ 2 ≤ (ρhat.fidelity τhat) ^ 2 := by

@@ -24,26 +24,32 @@ supplied independently of the protocol.
 
 open scoped ComplexOrder MatrixOrder
 
-namespace QIT
-
 universe u v w x y
 
 noncomputable section
 
-namespace Channel
+namespace CPTPOp
+
+open QIT
 
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a]
 variable [Fintype b] [DecidableEq b]
 
 /-- Regard a channel as a finite instrument with one classical outcome. -/
-def asSingletonInstrument (N : Channel a b) : FiniteInstrument a b Unit where
+def asSingletonInstrument (N : CPTPMap a b) : FiniteInstrument a b Unit where
   branch _ := N.map
   branchTraceNonincreasingCP _ := N.traceNonincreasingCP_map
   total := N
   sum_branch_eq_total := by simp
 
-end Channel
+end CPTPOp
+
+end
+
+namespace QIT
+
+noncomputable section
 
 namespace OneWayLOCC
 
@@ -67,15 +73,15 @@ abbrev jointBranchIndex (L : OneWayLOCC A A' B B' R) :=
 
 /-- Unnormalized final amplitude on one joint Alice--Bob Kraus branch. -/
 def jointPostAmplitude
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B))
-    (j : L.jointBranchIndex) : Prod A' B' → ℂ :=
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B))
+    (j : L.jointBranchIndex) : A' × B' → ℂ :=
   fun x => ∑ a : A, ∑ b : B,
     L.aliceInstrument.refinedKraus j.1 x.1 a *
-      L.bobRefinedKraus j.1.1 j.2 x.2 b * psi.amp (a, b)
+      L.bobRefinedKraus j.1.1 j.2 x.2 b * psi.vec (a, b)
 
 /-- Probability of a joint Kraus branch. -/
 def jointBranchProbability
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B))
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B))
     (j : L.jointBranchIndex) : NNReal :=
   ⟨(rankOneMatrix (L.jointPostAmplitude psi j)).trace.re,
     (Matrix.PosSemidef.trace_nonneg
@@ -83,31 +89,31 @@ def jointBranchProbability
 
 @[simp]
 theorem jointBranchProbability_coe
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B))
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B))
     (j : L.jointBranchIndex) :
     (L.jointBranchProbability psi j : ℝ) =
       (rankOneMatrix (L.jointPostAmplitude psi j)).trace.re :=
   rfl
 
 theorem jointBranchProbability_nonneg
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B))
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B))
     (j : L.jointBranchIndex) :
     0 ≤ (L.jointBranchProbability psi j : ℝ) :=
   NNReal.coe_nonneg _
 
 /-- Summing every unnormalized joint pure branch recovers the realized LOCC channel. -/
 theorem sum_rankOne_jointPostAmplitude_eq_toChannel
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B)) :
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B)) :
     (∑ j : L.jointBranchIndex, rankOneMatrix (L.jointPostAmplitude psi j)) =
-      L.toChannel.map psi.state.matrix := by
+      L.toChannel.map psi.state.m := by
   classical
   calc
     (∑ j : L.jointBranchIndex, rankOneMatrix (L.jointPostAmplitude psi j)) =
         ∑ r : R, ∑ kA : A × A', ∑ kB : B × B',
-          rankOneMatrix (fun x : Prod A' B' =>
+          rankOneMatrix (fun x : A' × B' =>
             ∑ a : A, ∑ b : B,
               (L.aliceInstrument.branchTraceNonincreasingCP r).kraus kA x.1 a *
-                L.bobRefinedKraus r kB x.2 b * psi.amp (a, b)) := by
+                L.bobRefinedKraus r kB x.2 b * psi.vec (a, b)) := by
       simp only [jointBranchIndex, FiniteInstrument.refinedBranchIndex,
         Fintype.sum_prod_type]
       rfl
@@ -115,54 +121,54 @@ theorem sum_rankOne_jointPostAmplitude_eq_toChannel
         MatrixMap.kron
           (MatrixMap.ofKraus
             (L.aliceInstrument.branchTraceNonincreasingCP r).kraus)
-          (MatrixMap.ofKraus (L.bobRefinedKraus r)) psi.state.matrix := by
+          (MatrixMap.ofKraus (L.bobRefinedKraus r)) psi.state.m := by
       apply Finset.sum_congr rfl
       intro r _
-      simpa [Fintype.sum_prod_type, PureVector.state_matrix] using
+      simpa [Fintype.sum_prod_type, Ket.state_matrix] using
         (FiniteInstrument.sum_rankOne_bilocalPostAmplitude_eq_kron_ofKraus
           (A := A) (A' := A') (B := B') (R := B)
           (L.aliceInstrument.branchTraceNonincreasingCP r).kraus
-          (L.bobRefinedKraus r) psi.amp)
+          (L.bobRefinedKraus r) psi.vec)
     _ = ∑ r : R,
         MatrixMap.kron (L.aliceInstrument.branch r) (L.bobChannel r).map
-          psi.state.matrix := by
+          psi.state.m := by
       apply Finset.sum_congr rfl
       intro r _
       rw [(L.aliceInstrument.branchTraceNonincreasingCP r).ofKraus_kraus]
       rw [show MatrixMap.ofKraus (L.bobRefinedKraus r) =
           (L.bobChannel r).map by
         exact (L.bobChannel r).traceNonincreasingCP_map.ofKraus_kraus]
-    _ = L.toChannel.map psi.state.matrix := by
+    _ = L.toChannel.map psi.state.m := by
       rw [L.toChannel_map]
       rw [LinearMap.sum_apply]
 
 /-- Joint branch probabilities have total mass one. -/
 theorem sum_jointBranchProbability_eq_one
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B)) :
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B)) :
     (∑ j : L.jointBranchIndex, L.jointBranchProbability psi j) = 1 := by
   classical
   apply NNReal.eq
   simp only [NNReal.coe_sum, jointBranchProbability_coe, NNReal.coe_one]
-  have htrace := L.toChannel.tracePreserving psi.state.matrix
+  have htrace := L.toChannel.map_TP psi.state.m
   calc
     (∑ j : L.jointBranchIndex,
         (rankOneMatrix (L.jointPostAmplitude psi j)).trace.re) =
         ((∑ j : L.jointBranchIndex,
           rankOneMatrix (L.jointPostAmplitude psi j)).trace).re := by
       simp [Matrix.trace_sum]
-    _ = (L.toChannel.map psi.state.matrix).trace.re := by
+    _ = (L.toChannel.map psi.state.m).trace.re := by
       rw [L.sum_rankOne_jointPostAmplitude_eq_toChannel psi]
-    _ = psi.state.matrix.trace.re := congrArg Complex.re htrace
-    _ = 1 := by rw [psi.state.trace_eq_one]; norm_num
+    _ = psi.state.m.trace.re := congrArg Complex.re htrace
+    _ = 1 := by rw [psi.state.tr']; norm_num
 
 /-- Physical joint branches on which direct pure-state normalization is valid. -/
 abbrev physicalJointPositiveSupport
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B)) :=
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B)) :=
   { j : L.jointBranchIndex // 0 < L.jointBranchProbability psi j }
 
 /-- A zero-probability joint branch has an identically zero rank-one state. -/
 theorem rankOne_jointPostAmplitude_eq_zero_of_probability_eq_zero
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B))
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B))
     (j : L.jointBranchIndex) (hj : L.jointBranchProbability psi j = 0) :
     rankOneMatrix (L.jointPostAmplitude psi j) = 0 := by
   apply (Matrix.PosSemidef.trace_eq_zero_iff
@@ -178,47 +184,46 @@ theorem rankOne_jointPostAmplitude_eq_zero_of_probability_eq_zero
 
 /-- The directly normalized pure state on a positive-probability physical branch. -/
 def physicalFinalNormalizedBranch
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B))
-    (j : L.physicalJointPositiveSupport psi) : PureVector (Prod A' B') :=
-  PureVector.normalize (L.jointPostAmplitude psi j.1) (by
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B))
+    (j : L.physicalJointPositiveSupport psi) : Ket (A' × B') :=
+  Ket.normalizeRankOne (L.jointPostAmplitude psi j.1) (by
     have hj : 0 < (L.jointBranchProbability psi j.1 : ℝ) := by
       exact_mod_cast j.2
     simpa using hj)
 
-@[simp]
 theorem physicalFinalNormalizedBranch_state_matrix
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B))
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B))
     (j : L.physicalJointPositiveSupport psi) :
-    (L.physicalFinalNormalizedBranch psi j).state.matrix =
+    (L.physicalFinalNormalizedBranch psi j).state.m =
       ((((L.jointBranchProbability psi j.1 : ℝ)⁻¹ : ℝ) : ℂ) •
         rankOneMatrix (L.jointPostAmplitude psi j.1)) := by
-  rw [physicalFinalNormalizedBranch, PureVector.normalize_state_matrix]
+  rw [physicalFinalNormalizedBranch, Ket.normalizeRankOne_state_matrix]
   rfl
 
 /-- Swap an Alice-instrument branch so Bob's conditional channel acts on the first factor. -/
 def bobBranchInput
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B))
-    (i : L.aliceInstrument.positiveSupport psi) : PureVector (Prod B A') :=
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B))
+    (i : L.aliceInstrument.positiveSupport psi) : Ket (B × A') :=
   (L.aliceInstrument.normalizedBranch psi i).reindex (Equiv.prodComm A' B)
 
 /-- Positive branches of the sequential Alice-then-Bob Kraus refinement.
 The dependent index records that Bob's branch belongs to the channel selected
 by Alice's physical outcome. -/
 abbrev jointPositiveSupport
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B)) :=
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B)) :=
   Σ i : L.aliceInstrument.positiveSupport psi,
     ((L.bobChannel i.1.1).asSingletonInstrument).positiveSupport
       (L.bobBranchInput psi i)
 
 /-- The full physical joint Kraus index underlying a positive sequential branch. -/
 def jointPositivePhysicalIndex
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B))
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B))
     (j : L.jointPositiveSupport psi) : L.jointBranchIndex :=
   (j.1.1, j.2.1.2)
 
 /-- Probability of a positive sequential Alice--Bob branch. -/
 def jointPositiveBranchProbability
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B))
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B))
     (j : L.jointPositiveSupport psi) : NNReal :=
   L.aliceInstrument.branchWeight psi j.1.1 *
     ((L.bobChannel j.1.1.1).asSingletonInstrument).branchWeight
@@ -226,8 +231,8 @@ def jointPositiveBranchProbability
 
 /-- Final normalized pure output of a positive sequential joint branch. -/
 def finalNormalizedBranch
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B))
-    (j : L.jointPositiveSupport psi) : PureVector (Prod A' B') :=
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B))
+    (j : L.jointPositiveSupport psi) : Ket (A' × B') :=
   (((L.bobChannel j.1.1.1).asSingletonInstrument).normalizedBranch
     (L.bobBranchInput psi j.1) j.2).reindex (Equiv.prodComm B' A')
 
@@ -279,9 +284,9 @@ private theorem nnreal_smul_inv_smul_matrix
   rw [← mul_assoc, hcomplex, one_mul]
 
 private theorem bobPostAmplitude_reindex_eq_scaled_jointPostAmplitude
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B))
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B))
     (j : L.jointPositiveSupport psi) :
-    (fun z : Prod A' B' =>
+    (fun z : A' × B' =>
       ((L.bobChannel j.1.1.1).asSingletonInstrument).postAmplitude
         (L.bobBranchInput psi j.1) j.2.1 (z.2, z.1)) =
       fun z =>
@@ -291,8 +296,8 @@ private theorem bobPostAmplitude_reindex_eq_scaled_jointPostAmplitude
   classical
   funext z
   simp only [FiniteInstrument.postAmplitude, FiniteInstrument.refinedKraus,
-    Channel.asSingletonInstrument, bobBranchInput, PureVector.reindex_amp,
-    FiniteInstrument.normalizedBranch, PureVector.normalize, jointPostAmplitude,
+    CPTPOp.asSingletonInstrument, bobBranchInput, Ket.reindex_vec,
+    FiniteInstrument.normalizedBranch, Ket.normalizeRankOne, jointPostAmplitude,
     bobRefinedKraus, jointPositivePhysicalIndex, Equiv.prodComm_symm,
     Equiv.prodComm_apply, FiniteInstrument.branchWeight_coe, Prod.swap_prod_mk]
   simp only [Finset.mul_sum]
@@ -304,12 +309,12 @@ private theorem bobPostAmplitude_reindex_eq_scaled_jointPostAmplitude
   ring
 
 private theorem bobBranchWeight_smul_finalNormalizedBranch_state_matrix
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B))
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B))
     (j : L.jointPositiveSupport psi) :
     ((L.bobChannel j.1.1.1).asSingletonInstrument).branchWeight
         (L.bobBranchInput psi j.1) j.2.1 •
-        (L.finalNormalizedBranch psi j).state.matrix =
-      rankOneMatrix (fun z : Prod A' B' =>
+        (L.finalNormalizedBranch psi j).state.m =
+      rankOneMatrix (fun z : A' × B' =>
         ((L.bobChannel j.1.1.1).asSingletonInstrument).postAmplitude
           (L.bobBranchInput psi j.1) j.2.1 (z.2, z.1)) := by
   have hBob :=
@@ -318,14 +323,14 @@ private theorem bobBranchWeight_smul_finalNormalizedBranch_state_matrix
       (L.bobBranchInput psi j.1) j.2
   ext z w
   have hentry := congrFun (congrFun hBob (z.2, z.1)) (w.2, w.1)
-  simpa [finalNormalizedBranch, PureVector.state_matrix, rankOneMatrix_apply, Prod.swap] using hentry
+  simpa [finalNormalizedBranch, Ket.state_matrix, rankOneMatrix_apply, Prod.swap] using hentry
 
 /-- Weighting a positive sequential branch recovers its physical joint Kraus branch. -/
 theorem jointPositiveBranchProbability_smul_finalNormalizedBranch_state_matrix
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B))
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B))
     (j : L.jointPositiveSupport psi) :
     L.jointPositiveBranchProbability psi j •
-        (L.finalNormalizedBranch psi j).state.matrix =
+        (L.finalNormalizedBranch psi j).state.m =
       rankOneMatrix
         (L.jointPostAmplitude psi (L.jointPositivePhysicalIndex psi j)) := by
   rw [jointPositiveBranchProbability, mul_smul]
@@ -337,20 +342,20 @@ theorem jointPositiveBranchProbability_smul_finalNormalizedBranch_state_matrix
 
 /-- The sequential product probability is the probability of its physical joint branch. -/
 theorem jointPositiveBranchProbability_eq_jointBranchProbability
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B))
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B))
     (j : L.jointPositiveSupport psi) :
     L.jointPositiveBranchProbability psi j =
       L.jointBranchProbability psi (L.jointPositivePhysicalIndex psi j) := by
   apply NNReal.eq
   have htrace := congrArg Matrix.trace
     (L.jointPositiveBranchProbability_smul_finalNormalizedBranch_state_matrix psi j)
-  rw [Matrix.trace_smul, (L.finalNormalizedBranch psi j).state.trace_eq_one] at htrace
+  rw [Matrix.trace_smul, (L.finalNormalizedBranch psi j).state.tr'] at htrace
   have hre := congrArg Complex.re htrace
   simpa [NNReal.smul_def] using hre
 
 /-- A positive sequential branch regarded as a positive physical joint branch. -/
 def jointPositiveToPhysicalSupport
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B)) :
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B)) :
     L.jointPositiveSupport psi → L.physicalJointPositiveSupport psi :=
   fun j => ⟨L.jointPositivePhysicalIndex psi j, by
     rw [← L.jointPositiveBranchProbability_eq_jointBranchProbability psi j]
@@ -358,7 +363,7 @@ def jointPositiveToPhysicalSupport
 
 /-- Distinct public dependent branches have distinct full physical Kraus indices. -/
 theorem jointPositivePhysicalIndex_injective
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B)) :
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B)) :
     Function.Injective (L.jointPositivePhysicalIndex psi) := by
   intro j k h
   rcases j with ⟨i, bi⟩
@@ -377,10 +382,10 @@ theorem jointPositivePhysicalIndex_injective
 
 /-- Weighting a normalized positive physical branch recovers its joint rank-one state. -/
 theorem jointBranchProbability_smul_physicalFinalNormalizedBranch_state_matrix
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B))
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B))
     (j : L.physicalJointPositiveSupport psi) :
     L.jointBranchProbability psi j.1 •
-        (L.physicalFinalNormalizedBranch psi j).state.matrix =
+        (L.physicalFinalNormalizedBranch psi j).state.m =
       rankOneMatrix (L.jointPostAmplitude psi j.1) := by
   rw [L.physicalFinalNormalizedBranch_state_matrix psi j]
   exact nnreal_smul_inv_smul_matrix
@@ -389,11 +394,11 @@ theorem jointBranchProbability_smul_physicalFinalNormalizedBranch_state_matrix
 
 /-- Public and physical normalization give the same state on the mapped branch. -/
 theorem finalNormalizedBranch_state_matrix_eq_physical
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B))
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B))
     (j : L.jointPositiveSupport psi) :
-    (L.finalNormalizedBranch psi j).state.matrix =
+    (L.finalNormalizedBranch psi j).state.m =
       (L.physicalFinalNormalizedBranch psi
-        (L.jointPositiveToPhysicalSupport psi j)).state.matrix := by
+        (L.jointPositiveToPhysicalSupport psi j)).state.m := by
   have hPublic :=
     L.jointPositiveBranchProbability_smul_finalNormalizedBranch_state_matrix psi j
   have hPhysical :=
@@ -403,10 +408,10 @@ theorem finalNormalizedBranch_state_matrix_eq_physical
   rw [← L.jointPositiveBranchProbability_eq_jointBranchProbability psi j] at hPhysical
   have hweighted :
       L.jointPositiveBranchProbability psi j •
-          (L.finalNormalizedBranch psi j).state.matrix =
+          (L.finalNormalizedBranch psi j).state.m =
         L.jointPositiveBranchProbability psi j •
           (L.physicalFinalNormalizedBranch psi
-            (L.jointPositiveToPhysicalSupport psi j)).state.matrix :=
+            (L.jointPositiveToPhysicalSupport psi j)).state.m :=
     hPublic.trans hPhysical.symm
   have hp : 0 < L.jointPositiveBranchProbability psi j :=
     mul_pos j.1.2 j.2.2
@@ -418,15 +423,15 @@ theorem finalNormalizedBranch_state_matrix_eq_physical
   have hentry := congrFun (congrFun hweighted x) y
   simp only [Matrix.smul_apply] at hentry
   change (L.jointPositiveBranchProbability psi j : ℂ) *
-      (L.finalNormalizedBranch psi j).state.matrix x y =
+      (L.finalNormalizedBranch psi j).state.m x y =
     (L.jointPositiveBranchProbability psi j : ℂ) *
       (L.physicalFinalNormalizedBranch psi
-        (L.jointPositiveToPhysicalSupport psi j)).state.matrix x y at hentry
+        (L.jointPositiveToPhysicalSupport psi j)).state.m x y at hentry
   exact mul_left_cancel₀ hp_complex hentry
 
 /-- The positive sequential joint branches carry total probability one. -/
 theorem sum_jointPositiveBranchProbability_eq_one
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B)) :
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B)) :
     (∑ j : L.jointPositiveSupport psi, L.jointPositiveBranchProbability psi j) = 1 := by
   classical
   rw [Fintype.sum_sigma]
@@ -458,11 +463,11 @@ theorem sum_jointPositiveBranchProbability_eq_one
 
 /-- The public positive branch ensemble averages to the realized LOCC output state. -/
 theorem sum_jointPositiveBranchProbability_smul_finalNormalizedBranch_state_matrix
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B)) :
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B)) :
     (∑ j : L.jointPositiveSupport psi,
         L.jointPositiveBranchProbability psi j •
-          (L.finalNormalizedBranch psi j).state.matrix) =
-      L.toChannel.map psi.state.matrix := by
+          (L.finalNormalizedBranch psi j).state.m) =
+      L.toChannel.map psi.state.m := by
   classical
   let f : L.jointPositiveSupport psi → L.jointBranchIndex :=
     L.jointPositivePhysicalIndex psi
@@ -522,7 +527,7 @@ theorem sum_jointPositiveBranchProbability_smul_finalNormalizedBranch_state_matr
   calc
     (∑ j : L.jointPositiveSupport psi,
         L.jointPositiveBranchProbability psi j •
-          (L.finalNormalizedBranch psi j).state.matrix) =
+          (L.finalNormalizedBranch psi j).state.m) =
         ∑ j : L.jointPositiveSupport psi,
           rankOneMatrix (L.jointPostAmplitude psi (f j)) := by
       apply Finset.sum_congr rfl
@@ -547,28 +552,28 @@ theorem sum_jointPositiveBranchProbability_smul_finalNormalizedBranch_state_matr
           ∑ q : {q : L.jointBranchIndex // q ∉ Set.range f},
             rankOneMatrix (L.jointPostAmplitude psi q.1)
       rw [hComplementMatrix, add_zero]
-    _ = L.toChannel.map psi.state.matrix :=
+    _ = L.toChannel.map psi.state.m :=
       L.sum_rankOne_jointPostAmplitude_eq_toChannel psi
 
 /-- Average entanglement after refining Bob's conditional channel at one Alice branch. -/
 def bobRefinedBranchAverageEntanglement
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B))
-    (i : L.aliceInstrument.positiveSupport psi) : Real :=
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B))
+    (i : L.aliceInstrument.positiveSupport psi) : ℝ :=
   ((L.bobChannel i.1.1).asSingletonInstrument).refinedBranchAverageEntanglement
     (L.bobBranchInput psi i)
 
 /-- Average pure-state entanglement of the canonical Alice--Bob Kraus refinement. -/
 def refinedBranchAverageEntanglement
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B)) : Real :=
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B)) : ℝ :=
   ∑ j : L.jointPositiveSupport psi,
-    (L.jointPositiveBranchProbability psi j : Real) *
+    (L.jointPositiveBranchProbability psi j : ℝ) *
       (L.finalNormalizedBranch psi j).entanglementEntropy
 
 theorem refinedBranchAverageEntanglement_eq_sequential
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B)) :
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B)) :
     L.refinedBranchAverageEntanglement psi =
       ∑ i : L.aliceInstrument.positiveSupport psi,
-        (L.aliceInstrument.branchWeight psi i.1 : Real) *
+        (L.aliceInstrument.branchWeight psi i.1 : ℝ) *
           L.bobRefinedBranchAverageEntanglement psi i := by
   classical
   rw [refinedBranchAverageEntanglement, Fintype.sum_sigma]
@@ -580,11 +585,11 @@ theorem refinedBranchAverageEntanglement_eq_sequential
   rw [Finset.mul_sum]
   apply Finset.sum_congr rfl
   intro k _
-  rw [PureVector.entanglementEntropy_reindex_prodComm]
-  simp only [PureVector.entanglementEntropy, mul_assoc]
+  rw [Ket.entanglementEntropy_reindex_prodComm]
+  simp only [Ket.entanglementEntropy, mul_assoc]
 
 theorem bobRefinedBranchAverageEntanglement_le
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B))
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B))
     (i : L.aliceInstrument.positiveSupport psi) :
     L.bobRefinedBranchAverageEntanglement psi i ≤
       (L.aliceInstrument.normalizedBranch psi i).entanglementEntropy := by
@@ -594,24 +599,24 @@ theorem bobRefinedBranchAverageEntanglement_le
   calc
     L.bobRefinedBranchAverageEntanglement psi i ≤
         (L.bobBranchInput psi i).entanglementEntropy := by
-      simpa [bobRefinedBranchAverageEntanglement, PureVector.entanglementEntropy] using h
+      simpa [bobRefinedBranchAverageEntanglement, Ket.entanglementEntropy] using h
     _ = (L.aliceInstrument.normalizedBranch psi i).entanglementEntropy := by
-      exact PureVector.entanglementEntropy_reindex_prodComm
+      exact Ket.entanglementEntropy_reindex_prodComm
         (L.aliceInstrument.normalizedBranch psi i)
 
 /-- Finite one-way LOCC cannot increase the average entropy of entanglement
 of a bipartite pure state. -/
 theorem average_pure_entanglement_le
-    (L : OneWayLOCC A A' B B' R) (psi : PureVector (Prod A B)) :
+    (L : OneWayLOCC A A' B B' R) (psi : Ket (A × B)) :
     L.refinedBranchAverageEntanglement psi ≤ psi.entanglementEntropy := by
   classical
   rw [L.refinedBranchAverageEntanglement_eq_sequential psi]
   calc
     (∑ i : L.aliceInstrument.positiveSupport psi,
-          (L.aliceInstrument.branchWeight psi i.1 : Real) *
+          (L.aliceInstrument.branchWeight psi i.1 : ℝ) *
             L.bobRefinedBranchAverageEntanglement psi i) ≤
         ∑ i : L.aliceInstrument.positiveSupport psi,
-          (L.aliceInstrument.branchWeight psi i.1 : Real) *
+          (L.aliceInstrument.branchWeight psi i.1 : ℝ) *
             (L.aliceInstrument.normalizedBranch psi i).entanglementEntropy := by
       apply Finset.sum_le_sum
       intro i _
@@ -620,7 +625,7 @@ theorem average_pure_entanglement_le
     _ = L.aliceInstrument.refinedBranchAverageEntanglement psi := by
       rfl
     _ ≤ psi.entanglementEntropy := by
-      simpa [PureVector.entanglementEntropy] using
+      simpa [Ket.entanglementEntropy] using
         L.aliceInstrument.average_pure_entanglement_le psi
 
 end OneWayLOCC

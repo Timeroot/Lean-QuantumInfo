@@ -129,7 +129,7 @@ they give the same unnormalized left action on that matrix.
 def sameOnStateSupport {b : Type*} [Fintype b] (rho Q R : CMatrix b) : Prop :=
   Q * rho = R * rho
 
-/-- State-support equality is reflexive. -/
+/-- MState-support equality is reflexive. -/
 theorem sameOnStateSupport_refl {b : Type*} [Fintype b] (rho Q : CMatrix b) :
     sameOnStateSupport rho Q Q :=
   rfl

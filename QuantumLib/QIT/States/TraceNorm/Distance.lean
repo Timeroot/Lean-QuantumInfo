@@ -7,6 +7,7 @@ Authors: QuAIR Team
 module
 
 public import QuantumLib.QIT.States.PosSqrt
+public import QuantumLib.QIT.Util.MatrixInstances
 public import Mathlib.Analysis.CStarAlgebra.Classes
 public import Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Basic
 public import Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Continuity
@@ -24,28 +25,26 @@ states. The source gate is registered under
 `m5-trace-norm-definition-and-singular-values` and
 `m5-trace-distance-definition-and-bounds`.
 
-This module intentionally records only locally provable facts. Spectral trace
-norm formulas, triangle inequalities, state upper bounds, and Fuchs-van de
-Graaf remain downstream proof obligations.
+This module records the definitions and the facts provable directly from them.
+The singular-value formula is in `QuantumLib.QIT.States.TraceNorm.Spectral`, the
+variational characterization and the triangle inequality are in
+`QuantumLib.QIT.States.TraceNorm.Variational`, and Fuchs-van de Graaf is in
+`QuantumLib.QIT.States.Geometry.FuchsVdG`.
 -/
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator
+open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator QIT.MatrixL2
 
 open Matrix
 
-namespace QIT
-
-universe u
-
 noncomputable section
-
+universe u
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
-noncomputable local instance cMatrixCStarAlgebraForDistanceContinuity {ι : Type u}
-    [Fintype ι] [DecidableEq ι] :
-    CStarAlgebra (Matrix ι ι ℂ) where
+open QIT
+
+namespace QIT
 
 /-- The trace norm (Schatten 1-norm) ‖M‖₁ = Tr √(Mᴴ M). -/
 def traceNorm (M : CMatrix a) : ℝ :=
@@ -55,6 +54,32 @@ def traceNorm (M : CMatrix a) : ℝ :=
 @[simp]
 theorem psdSqrt_zero : psdSqrt (0 : CMatrix a) = 0 := by
   simp [psdSqrt]
+
+/-- On a one-point index the square root of the constant matrix `r` is the constant
+matrix `√r`. -/
+theorem punit_psdSqrt_const (r : ℝ) (hr : 0 ≤ r) :
+    psdSqrt (Matrix.of fun _ _ : PUnit => ((r : ℝ) : ℂ) : CMatrix PUnit) =
+      (Matrix.of fun _ _ : PUnit => ((Real.sqrt r : ℝ) : ℂ) : CMatrix PUnit) := by
+  let A : CMatrix PUnit := Matrix.of fun _ _ => ((r : ℝ) : ℂ)
+  let S : CMatrix PUnit := Matrix.of fun _ _ => ((Real.sqrt r : ℝ) : ℂ)
+  have hsqrt_sq : ((Real.sqrt r : ℂ) * (Real.sqrt r : ℂ)) = (r : ℂ) := by
+    rw [← Complex.ofReal_mul, Real.mul_self_sqrt hr]
+  have hSsq : S * S = A := by
+    ext i j
+    cases i
+    cases j
+    simp [S, A, Matrix.mul_apply, hsqrt_sq]
+  have hSpos : S.PosSemidef := by
+    have hdiag : S = Matrix.diagonal (fun _ : PUnit => ((Real.sqrt r : ℝ) : ℂ)) := by
+      ext i j
+      cases i
+      cases j
+      simp [S, Matrix.diagonal]
+    rw [hdiag]
+    exact Matrix.PosSemidef.diagonal fun _ =>
+      Complex.nonneg_iff.mpr ⟨Real.sqrt_nonneg r, by simp⟩
+  change psdSqrt A = S
+  simpa [psdSqrt] using (CFC.sqrt_unique (a := A) (b := S) hSsq hSpos.nonneg)
 
 /-- The trace norm is nonnegative. -/
 theorem traceNorm_nonneg (M : CMatrix a) : 0 ≤ traceNorm M := by
@@ -74,6 +99,24 @@ theorem traceNorm_posSemidef_eq_trace_re
     rw [hherm]
     simpa [psdSqrt, sq] using (CFC.sqrt_sq A hA.nonneg)
   rw [hsqrt]
+
+/-- On a one-point index the constant matrix `r ≥ 0` has trace norm `r`. -/
+theorem traceNorm_punit_const_of_nonneg (r : ℝ) (hr : 0 ≤ r) :
+    traceNorm (Matrix.of fun _ _ : PUnit => ((r : ℝ) : ℂ) : CMatrix PUnit) = r := by
+  let A : CMatrix PUnit := Matrix.of fun _ _ => ((r : ℝ) : ℂ)
+  have hgram : Aᴴ * A = (Matrix.of fun _ _ : PUnit => ((r * r : ℝ) : ℂ) : CMatrix PUnit) := by
+    ext i j
+    cases i
+    cases j
+    simp [A, Matrix.mul_apply, ← Complex.ofReal_mul]
+  have hsqrt : psdSqrt (Aᴴ * A) = A := by
+    rw [hgram, punit_psdSqrt_const (r * r) (mul_self_nonneg r)]
+    ext i j
+    cases i
+    cases j
+    simp [A, Real.sqrt_mul_self hr]
+  rw [traceNorm, hsqrt]
+  simp [A, Matrix.trace]
 
 /-- The zero matrix has trace norm zero. -/
 @[simp]
@@ -103,7 +146,6 @@ theorem traceNormDistance_eq_traceNorm_sub (M N : CMatrix a) :
 theorem traceNormDistance_nonneg (M N : CMatrix a) : 0 ≤ traceNormDistance M N :=
   traceNorm_nonneg (M - N)
 
-@[simp]
 theorem traceNormDistance_self (M : CMatrix a) : traceNormDistance M M = 0 := by
   simp [traceNormDistance]
 
@@ -125,7 +167,6 @@ theorem normalizedTraceDistance_nonneg (M N : CMatrix a) :
     0 ≤ normalizedTraceDistance M N :=
   mul_nonneg (by norm_num) (traceNormDistance_nonneg M N)
 
-@[simp]
 theorem normalizedTraceDistance_self (M : CMatrix a) :
     normalizedTraceDistance M M = 0 := by
   simp [normalizedTraceDistance]
@@ -136,7 +177,8 @@ theorem normalizedTraceDistance_comm (M N : CMatrix a) :
   rw [normalizedTraceDistance, normalizedTraceDistance, traceNormDistance_comm]
 
 omit [Fintype a] [DecidableEq a] in
-private theorem decouplingTraceNorm_continuous [Fintype a] [DecidableEq a] :
+/-- The trace norm is continuous on finite-dimensional complex matrices. -/
+theorem traceNorm_continuous [Fintype a] [DecidableEq a] :
     Continuous (traceNorm : CMatrix a → ℝ) := by
   have hgram : Continuous (fun M : CMatrix a => star M * M) := by
     exact (Continuous.star continuous_id).matrix_mul continuous_id
@@ -156,62 +198,52 @@ private theorem decouplingTraceNorm_continuous [Fintype a] [DecidableEq a] :
   rw [heq]
   exact Complex.continuous_re.comp htrace
 
-omit [Fintype a] [DecidableEq a] in
-/-- The trace norm is continuous on finite-dimensional complex matrices. -/
-theorem traceNorm_continuous [Fintype a] [DecidableEq a] :
-    Continuous (traceNorm : CMatrix a → ℝ) :=
-  decouplingTraceNorm_continuous
+end QIT
 
-namespace State
+namespace MState
 
 /-- Unnormalized trace norm of the difference of two states' matrices,
-`‖ρ.matrix - σ.matrix‖₁ ∈ [0, 2]`.  The standard QIT trace distance
-`½ * ‖·‖₁ ∈ [0, 1]` is `State.normalizedTraceDistance`. -/
-def traceNormDistance (rho sigma : State a) : ℝ :=
-  QIT.traceNormDistance rho.matrix sigma.matrix
+`‖ρ.m - σ.m‖₁ ∈ [0, 2]`.  The standard QIT trace distance
+`½ * ‖·‖₁ ∈ [0, 1]` is `MState.normalizedTraceDistance`. -/
+def traceNormDistance (rho sigma : MState a) : ℝ :=
+  QIT.traceNormDistance rho.m sigma.m
 
 /-- Normalized trace distance between density states. -/
-def normalizedTraceDistance (rho sigma : State a) : ℝ :=
-  QIT.normalizedTraceDistance rho.matrix sigma.matrix
+def normalizedTraceDistance (rho sigma : MState a) : ℝ :=
+  QIT.normalizedTraceDistance rho.m sigma.m
 
 @[simp]
-theorem traceNormDistance_eq_matrix (rho sigma : State a) :
-    rho.traceNormDistance sigma = QIT.traceNormDistance rho.matrix sigma.matrix :=
+theorem traceNormDistance_eq_matrix (rho sigma : MState a) :
+    rho.traceNormDistance sigma = QIT.traceNormDistance rho.m sigma.m :=
   rfl
 
-theorem traceNormDistance_nonneg (rho sigma : State a) :
+theorem traceNormDistance_nonneg (rho sigma : MState a) :
     0 ≤ rho.traceNormDistance sigma :=
-  QIT.traceNormDistance_nonneg rho.matrix sigma.matrix
+  QIT.traceNormDistance_nonneg rho.m sigma.m
 
-@[simp]
-theorem traceNormDistance_self (rho : State a) : rho.traceNormDistance rho = 0 := by
-  simp [State.traceNormDistance]
+theorem traceNormDistance_self (rho : MState a) : rho.traceNormDistance rho = 0 := by
+  simp [MState.traceNormDistance]
 
-theorem traceNormDistance_comm (rho sigma : State a) :
+theorem traceNormDistance_comm (rho sigma : MState a) :
     rho.traceNormDistance sigma = sigma.traceNormDistance rho :=
-  QIT.traceNormDistance_comm rho.matrix sigma.matrix
+  QIT.traceNormDistance_comm rho.m sigma.m
 
 @[simp]
-theorem normalizedTraceDistance_eq_matrix (rho sigma : State a) :
+theorem normalizedTraceDistance_eq_matrix (rho sigma : MState a) :
     rho.normalizedTraceDistance sigma =
-      QIT.normalizedTraceDistance rho.matrix sigma.matrix :=
+      QIT.normalizedTraceDistance rho.m sigma.m :=
   rfl
 
-theorem normalizedTraceDistance_nonneg (rho sigma : State a) :
+theorem normalizedTraceDistance_nonneg (rho sigma : MState a) :
     0 ≤ rho.normalizedTraceDistance sigma :=
-  QIT.normalizedTraceDistance_nonneg rho.matrix sigma.matrix
+  QIT.normalizedTraceDistance_nonneg rho.m sigma.m
 
-@[simp]
-theorem normalizedTraceDistance_self (rho : State a) :
+theorem normalizedTraceDistance_self (rho : MState a) :
     rho.normalizedTraceDistance rho = 0 := by
-  simp [State.normalizedTraceDistance]
+  simp [MState.normalizedTraceDistance]
 
-theorem normalizedTraceDistance_comm (rho sigma : State a) :
+theorem normalizedTraceDistance_comm (rho sigma : MState a) :
     rho.normalizedTraceDistance sigma = sigma.normalizedTraceDistance rho :=
-  QIT.normalizedTraceDistance_comm rho.matrix sigma.matrix
+  QIT.normalizedTraceDistance_comm rho.m sigma.m
 
-end State
-
-end
-
-end QIT
+end MState

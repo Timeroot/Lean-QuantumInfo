@@ -11,6 +11,7 @@ public import QuantumLib.QIT.Classical.Bridge
 public import QuantumLib.QIT.Core.Channel
 public import QuantumLib.QIT.Core.POVMProbability
 public import QuantumLib.QIT.Util.SDP.HermitianPSDTraceDuality
+public import QuantumLib.QIT.Coding.Rate
 public import QuantumLib.QIT.Information.Entropy.Log2Lemmas
 import QuantumLib.QIT.Util.TensorPower
 
@@ -21,22 +22,23 @@ Definition of the classical capacity of a quantum channel via the operational
 supremum of achievable rates, the regularized Holevo information interface,
 and the source-shaped direct-achievability interface.
 
-The proved theorem in this module is intentionally conditional on an explicit
-HSW coding witness: constructing the random code, packing-lemma decoder, and
-typical/conditionally typical projector estimates is a separate upstream proof
-obligation.  The full equality follows Wilde's HSW theorem statement
-[Wilde2011Qst, qit-notes.tex:33588-33632], with the direct proof route in
-[Wilde2011Qst, qit-notes.tex:33634-33808].  The converse route is tracked by
-downstream proof leaves before the equality can be marked proved.
+The achievability theorems here are stated relative to an explicit HSW coding
+witness: a random code together with a packing-lemma decoder and the typical and
+conditionally typical projector estimates that bound its error.  Such witnesses
+are built in `QuantumLib.QIT.Coding.Classical.PackingLemma` and
+`QuantumLib.QIT.Coding.Classical.HSWDirect`; the matching upper bound is in
+`QuantumLib.QIT.Coding.Classical.HSWConverse`.  The capacity equality follows
+Wilde's HSW theorem statement [Wilde2011Qst, qit-notes.tex:33588-33632], with
+the direct route in [Wilde2011Qst, qit-notes.tex:33634-33808].
 -/
 
 @[expose] public section
 
 open scoped ComplexOrder MatrixOrder NNReal
 
-namespace QIT
+universe uIn uOut uEnsemble uMessage uAux
 
-universe uIn uOut uEnsemble uMessage uAux uTail
+namespace QIT
 
 noncomputable section
 
@@ -44,52 +46,41 @@ variable {a : Type uIn} {b : Type uOut}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
 /-- The singleton ensemble concentrated on a given state. -/
-private def singletonEnsemble (ρ : State a) : Ensemble PUnit.{uEnsemble + 1} a where
-  probs := fun _ => 1
-  weights_sum := by simp
-  states := fun _ => ρ
+private def singletonEnsemble (ρ : MState a) : MEnsemble a PUnit.{uEnsemble + 1} :=
+  .ofProbs (fun _ => 1) (by simp) (fun _ => ρ)
 
-/-- Cardinality of the recursive tensor-power label type. -/
-private theorem tensorPower_card_real (α : Type uIn) [Fintype α] (n : ℕ) :
-    (Fintype.card (TensorPower α n) : ℝ) = (Fintype.card α : ℝ) ^ n := by
-  exact_mod_cast tensorPower_card (a := α) n
+end
+end QIT
 
-private theorem tensorPower_nonempty (α : Type uIn) [Nonempty α] :
-    (n : ℕ) → Nonempty (TensorPower α n)
-  | 0 => ⟨PUnit.unit⟩
-  | n + 1 => ⟨(Classical.choice (inferInstance : Nonempty α),
-      Classical.choice (tensorPower_nonempty α n))⟩
+noncomputable section
 
-private theorem log2_pow_nat (x : ℝ) (n : ℕ) :
-    log2 (x ^ n) = (n : ℝ) * log2 x := by
-  unfold log2
-  rw [Real.log_pow]
-  ring
+namespace CPTPOp
 
-namespace Channel
+open QIT
 
-variable (N : Channel a b)
+variable {a : Type uIn} {b : Type uOut}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+
+variable (N : CPTPMap a b)
 
 /-- Output ensemble obtained by sending every member of an input ensemble
 through the channel. -/
 def outputEnsemble {ι : Type uEnsemble} [Fintype ι] [DecidableEq ι]
-    (E : Ensemble ι a) : Ensemble ι b where
-  probs := E.probs
-  weights_sum := E.weights_sum
-  states := fun i => N.applyState (E.states i)
+    (E : MEnsemble a ι) : MEnsemble b ι :=
+  .ofProbs E.probs E.weights_sum (fun i => N (E.states i))
 
 /-- Relabeling the classical index commutes with applying a channel to an ensemble. -/
 @[simp]
 theorem outputEnsemble_relabelIndex
     {ι : Type uEnsemble} {κ : Type uAux}
     [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq κ]
-    (E : Ensemble ι a) (e : κ ≃ ι) :
+    (E : MEnsemble a ι) (e : κ ≃ ι) :
     N.outputEnsemble (E.relabelIndex e) = (N.outputEnsemble E).relabelIndex e :=
   rfl
 
 /-- Single-letter HSW Holevo rate for an input ensemble and channel. -/
 def hswHolevoRate {ι : Type uEnsemble} [Fintype ι] [DecidableEq ι]
-    (E : Ensemble ι a) : ℝ :=
+    (E : MEnsemble a ι) : ℝ :=
   (N.outputEnsemble E).holevoInformation
 
 /-- All single-letter Holevo information values realized by finite input
@@ -98,43 +89,43 @@ def holevoInformationValues : Set ℝ :=
   {r : ℝ | ∃ (ι : Type uEnsemble) (instF : Fintype ι) (instD : DecidableEq ι),
     letI : Fintype ι := instF
     letI : DecidableEq ι := instD
-    ∃ E : Ensemble ι a, r = N.hswHolevoRate E}
+    ∃ E : MEnsemble a ι, r = N.hswHolevoRate E}
 
 /-- Channel Holevo information as the supremum over finite input ensembles. -/
 def holevoInformation : ℝ :=
-  sSup (Channel.holevoInformationValues.{uIn, uOut, uEnsemble} N)
+  sSup (CPTPOp.holevoInformationValues.{uIn, uOut, uEnsemble} N)
 
 /-- The finite-ensemble Holevo value set is bounded above by the output
 dimension bound. -/
 theorem mem_holevoInformationValues_le_log_card {r : ℝ}
-    (hr : r ∈ (Channel.holevoInformationValues.{uIn, uOut, uEnsemble} N)) :
+    (hr : r ∈ (CPTPOp.holevoInformationValues.{uIn, uOut, uEnsemble} N)) :
     r ≤ log2 (Fintype.card b) := by
   rcases hr with ⟨ι, hιF, hιD, E, rfl⟩
   let : Fintype ι := hιF
   let : DecidableEq ι := hιD
-  exact Ensemble.holevo_le_log_card (N.outputEnsemble E)
+  exact MEnsemble.holevo_le_log_card (N.outputEnsemble E)
 
-/-- The finite-ensemble Holevo value set is bounded above by the output
-dimension bound. -/
+/-- The finite-ensemble Holevo value set is bounded above, so its supremum is the
+channel Holevo information rather than a junk value. -/
 theorem holevoInformationValues_bddAbove :
-    BddAbove (Channel.holevoInformationValues.{uIn, uOut, uEnsemble} N) := by
+    BddAbove (CPTPOp.holevoInformationValues.{uIn, uOut, uEnsemble} N) := by
   exact ⟨log2 (Fintype.card b), fun _ hr => N.mem_holevoInformationValues_le_log_card hr⟩
 
 /-- The finite-ensemble Holevo value set is nonempty when the channel input
 system admits a state. -/
 theorem holevoInformationValues_nonempty [Nonempty a] :
-    (Channel.holevoInformationValues.{uIn, uOut, uEnsemble} N).Nonempty := by
-  let E : Ensemble PUnit.{uEnsemble + 1} a :=
+    (CPTPOp.holevoInformationValues.{uIn, uOut, uEnsemble} N).Nonempty := by
+  let E : MEnsemble a PUnit.{uEnsemble + 1} :=
     singletonEnsemble (Classical.basisState (Classical.choice (inferInstance : Nonempty a)))
   exact ⟨N.hswHolevoRate E, ⟨PUnit.{uEnsemble + 1}, inferInstance, inferInstance, E, rfl⟩⟩
 
 /-- Approximate the channel Holevo supremum from below by a concrete finite
 input ensemble. -/
 theorem exists_hswHolevoRate_gt_of_lt_holevoInformation
-    (hne : (Channel.holevoInformationValues.{uIn, uOut, uEnsemble} N).Nonempty) {R : ℝ}
-    (hR : R < (Channel.holevoInformation.{uIn, uOut, uEnsemble} N)) :
+    (hne : (CPTPOp.holevoInformationValues.{uIn, uOut, uEnsemble} N).Nonempty) {R : ℝ}
+    (hR : R < (CPTPOp.holevoInformation.{uIn, uOut, uEnsemble} N)) :
     ∃ (ι : Type uEnsemble), ∃ (_ : Fintype ι), ∃ (_ : DecidableEq ι),
-      ∃ E : Ensemble ι a, R < N.hswHolevoRate E := by
+      ∃ E : MEnsemble a ι, R < N.hswHolevoRate E := by
   rw [holevoInformation] at hR
   obtain ⟨r, hr, hRr⟩ := (lt_csSup_iff N.holevoInformationValues_bddAbove hne).mp hR
   rcases hr with ⟨ι, hιF, hιD, E, rfl⟩
@@ -142,24 +133,24 @@ theorem exists_hswHolevoRate_gt_of_lt_holevoInformation
 
 /-- Holevo information of the `n`-use tensor-power channel. -/
 def blockHolevoInformation (n : ℕ) : ℝ :=
-  (Channel.holevoInformation.{uIn, uOut, uEnsemble} (N.tensorPower n))
+  (CPTPOp.holevoInformation.{uIn, uOut, uEnsemble} (N.tensorPower n))
 
 /-- Approximate a positive block Holevo rate from below by a concrete ensemble
 for the block channel. -/
 theorem exists_block_hswHolevoRate_div_gt_of_lt_blockHolevoInformation_div
     {k : ℕ} (hk : 0 < k)
-    (hne : (Channel.holevoInformationValues.{uIn, uOut, uEnsemble} (N.tensorPower k)).Nonempty)
-    {R : ℝ} (hR : R < (Channel.blockHolevoInformation.{uIn, uOut, uEnsemble} N) k / (k : ℝ)) :
+    (hne : (CPTPOp.holevoInformationValues.{uIn, uOut, uEnsemble} (N.tensorPower k)).Nonempty)
+    {R : ℝ} (hR : R < (CPTPOp.blockHolevoInformation.{uIn, uOut, uEnsemble} N) k / (k : ℝ)) :
     ∃ (ι : Type uEnsemble), ∃ (_ : Fintype ι), ∃ (_ : DecidableEq ι),
-      ∃ E : Ensemble ι (QIT.TensorPower a k),
+      ∃ E : MEnsemble (QIT.TensorPower a k) ι,
         R < (N.tensorPower k).hswHolevoRate E / (k : ℝ) := by
   have hkR : (0 : ℝ) < k := by exact_mod_cast hk
-  have hRmul : R * (k : ℝ) < (Channel.blockHolevoInformation.{uIn, uOut, uEnsemble} N) k := by
+  have hRmul : R * (k : ℝ) < (CPTPOp.blockHolevoInformation.{uIn, uOut, uEnsemble} N) k := by
     calc
       R * (k : ℝ) <
-          ((Channel.blockHolevoInformation.{uIn, uOut, uEnsemble} N) k / (k : ℝ)) * (k : ℝ) :=
+          ((CPTPOp.blockHolevoInformation.{uIn, uOut, uEnsemble} N) k / (k : ℝ)) * (k : ℝ) :=
         mul_lt_mul_of_pos_right hR hkR
-      _ = (Channel.blockHolevoInformation.{uIn, uOut, uEnsemble} N) k := by
+      _ = (CPTPOp.blockHolevoInformation.{uIn, uOut, uEnsemble} N) k := by
         field_simp [ne_of_gt hkR]
   obtain ⟨ι, hιF, hιD, E, hgt⟩ :=
     (N.tensorPower k).exists_hswHolevoRate_gt_of_lt_holevoInformation hne
@@ -175,238 +166,74 @@ lengths.  This uses a supremum-safe interface instead of assuming the
 source-style limit exists before it is proved. -/
 def regularizedHolevoRateValues : Set ℝ :=
   {R : ℝ | ∃ n : ℕ, 0 < n ∧
-    R = (Channel.blockHolevoInformation.{uIn, uOut, uEnsemble} N) n / (n : ℝ)}
+    R = (CPTPOp.blockHolevoInformation.{uIn, uOut, uEnsemble} N) n / (n : ℝ)}
 
 /-- Regularized Holevo information as the supremum of positive block rates. -/
 def regularizedHolevoInformation : ℝ :=
-  sSup (Channel.regularizedHolevoRateValues.{uIn, uOut, uEnsemble} N)
+  sSup (CPTPOp.regularizedHolevoRateValues.{uIn, uOut, uEnsemble} N)
 
 /-- The regularized Holevo block-rate set is nonempty when the channel input
 system is nonempty. -/
 theorem regularizedHolevoRateValues_nonempty [Nonempty a] :
-    (Channel.regularizedHolevoRateValues.{uIn, uOut, uEnsemble} N).Nonempty := by
-  refine ⟨(Channel.blockHolevoInformation.{uIn, uOut, uEnsemble} N) 1 / (1 : ℝ), ?_⟩
+    (CPTPOp.regularizedHolevoRateValues.{uIn, uOut, uEnsemble} N).Nonempty := by
+  refine ⟨(CPTPOp.blockHolevoInformation.{uIn, uOut, uEnsemble} N) 1 / (1 : ℝ), ?_⟩
   refine ⟨1, by norm_num, ?_⟩
   simp
 
 /-- The regularized Holevo block-rate set is bounded above by the single-use
 output dimension bound, for nonempty finite input and output systems. -/
 theorem regularizedHolevoRateValues_bddAbove [Nonempty a] [Nonempty b] :
-    BddAbove (Channel.regularizedHolevoRateValues.{uIn, uOut, uEnsemble} N) := by
+    BddAbove (CPTPOp.regularizedHolevoRateValues.{uIn, uOut, uEnsemble} N) := by
   refine ⟨log2 (Fintype.card b), ?_⟩
   intro r hr
   rcases hr with ⟨n, hn, rfl⟩
   have hnR : (0 : ℝ) < n := by exact_mod_cast hn
   have hbound :
-      (Channel.blockHolevoInformation.{uIn, uOut, uEnsemble} N) n ≤
+      (CPTPOp.blockHolevoInformation.{uIn, uOut, uEnsemble} N) n ≤
         log2 (Fintype.card (QIT.TensorPower b n)) := by
-    have : Nonempty (QIT.TensorPower a n) := tensorPower_nonempty a n
-    unfold blockHolevoInformation Channel.holevoInformation
+    have : Nonempty (QIT.TensorPower a n) := tensorPower_nonempty_of_nonempty (α := a) n
+    unfold blockHolevoInformation CPTPOp.holevoInformation
     exact csSup_le
       (N.tensorPower n).holevoInformationValues_nonempty
       (fun r hr => (N.tensorPower n).mem_holevoInformationValues_le_log_card hr)
   calc
-    (Channel.blockHolevoInformation.{uIn, uOut, uEnsemble} N) n / (n : ℝ)
+    (CPTPOp.blockHolevoInformation.{uIn, uOut, uEnsemble} N) n / (n : ℝ)
         ≤ log2 (Fintype.card (QIT.TensorPower b n)) / (n : ℝ) :=
           div_le_div_of_nonneg_right hbound (le_of_lt hnR)
     _ = log2 (Fintype.card b) := by
-      rw [tensorPower_card_real b n, log2_pow_nat]
+      rw [tensorPower_card_real (a := b) n, log2_pow]
       field_simp [ne_of_gt hnR]
 
-end Channel
+end CPTPOp
 
-/-- Register rate for an `n`-use HSW classical message code.  The degenerate
-`n = 0` convention is set to zero; asymptotic statements consume this only for
-sufficiently large block lengths. -/
-def hswMessageRate (M : Type uMessage) [Fintype M] (n : ℕ) : ℝ :=
-  if n = 0 then 0 else log2 (Fintype.card M : ℝ) / (n : ℝ)
+end
 
-namespace hswMessageRate
+namespace QIT
 
-/-- If the message set size is at least `2^(n R)`, then the HSW message rate is
-at least `R`. -/
-theorem lowerBound_le_of_rpow_two_mul_le_card
-    {M : Type uMessage} [Fintype M] {n : ℕ} {R : ℝ} (hn : 0 < n)
-    (hcard : Real.rpow 2 ((n : ℝ) * R) ≤ (Fintype.card M : ℝ)) :
-    R ≤ hswMessageRate M n := by
-  have hn_ne : n ≠ 0 := Nat.ne_of_gt hn
-  have hn_pos : (0 : ℝ) < n := by exact_mod_cast hn
-  have hpow_pos : 0 < Real.rpow 2 ((n : ℝ) * R) :=
-    Real.rpow_pos_of_pos (by norm_num : (0 : ℝ) < 2) _
-  have hlog := log2_mono_of_pos hpow_pos hcard
-  rw [log2_rpow_two] at hlog
-  unfold hswMessageRate
-  rw [if_neg hn_ne]
-  calc
-    R = ((n : ℝ) * R) / (n : ℝ) := by field_simp [ne_of_gt hn_pos]
-    _ ≤ log2 (Fintype.card M : ℝ) / (n : ℝ) :=
-        div_le_div_of_nonneg_right hlog (le_of_lt hn_pos)
+noncomputable section
 
-/-- Keeping at least half the messages costs at most one bit before dividing
-by the block length. -/
-theorem log_card_subtype_ge_sub_one
-    {M M' : Type uMessage} [Fintype M] [Nonempty M] [Fintype M'] [Nonempty M']
-    (hcard : 2 * Fintype.card M' ≥ Fintype.card M) :
-    log2 (Fintype.card M : ℝ) - 1 ≤ log2 (Fintype.card M' : ℝ) := by
-  have hMpos_nat : 0 < Fintype.card M := Fintype.card_pos_iff.mpr inferInstance
-  have hM'pos_nat : 0 < Fintype.card M' := Fintype.card_pos_iff.mpr inferInstance
-  have hMpos : (0 : ℝ) < Fintype.card M := by exact_mod_cast hMpos_nat
-  have hM'ne : (Fintype.card M' : ℝ) ≠ 0 := by exact_mod_cast hM'pos_nat.ne'
-  have htwo_ne : (2 : ℝ) ≠ 0 := by norm_num
-  have hcard_real : (Fintype.card M : ℝ) ≤ 2 * (Fintype.card M' : ℝ) := by
-    exact_mod_cast hcard
-  have hlog := log2_mono_of_pos hMpos hcard_real
-  rw [log2_mul htwo_ne hM'ne, log2_two] at hlog
-  linarith
-
-/-- Expurgating to a survivor set of at least half the messages loses at most
-`1 / n` bits per channel use. -/
-theorem ge_sub_inv_of_two_card_ge
-    {M M' : Type uMessage} [Fintype M] [Nonempty M] [Fintype M'] [Nonempty M']
-    {n : ℕ} (hn : 0 < n) (hcard : 2 * Fintype.card M' ≥ Fintype.card M) :
-    hswMessageRate M n - (1 : ℝ) / (n : ℝ) ≤ hswMessageRate M' n := by
-  have hn_ne : n ≠ 0 := Nat.ne_of_gt hn
-  have hn_pos : (0 : ℝ) < n := by exact_mod_cast hn
-  have hlog := log_card_subtype_ge_sub_one (M := M) (M' := M') hcard
-  unfold hswMessageRate
-  rw [if_neg hn_ne, if_neg hn_ne]
-  calc
-    log2 (Fintype.card M : ℝ) / (n : ℝ) - 1 / (n : ℝ) =
-        (log2 (Fintype.card M : ℝ) - 1) / (n : ℝ) := by ring
-    _ ≤ log2 (Fintype.card M' : ℝ) / (n : ℝ) :=
-        div_le_div_of_nonneg_right hlog (le_of_lt hn_pos)
-
-end hswMessageRate
-
-namespace POVM
-
-variable {out : Type uOut} {tail : Type uTail} {M : Type uMessage}
-variable [Fintype out] [DecidableEq out] [Fintype tail] [DecidableEq tail]
-variable [Fintype M] [DecidableEq M]
-
-omit [DecidableEq out] in
-private theorem hswTrace_reindex {out' : Type uAux} [Fintype out'] [DecidableEq out']
-    (e : out ≃ out') (X : CMatrix out) :
-    (Matrix.reindex e e X).trace = X.trace := by
-  rw [Matrix.trace]
-  apply Fintype.sum_equiv e.symm
-  intro x
-  rfl
-
-/-- HSW-local relabeling of the measured system of a finite POVM.
-
-This is intentionally named differently from the generic `POVM.reindex`
-helpers currently living in other proof modules, so importing HSW does not
-create a declaration-name collision. -/
-def hswReindex {out' : Type uAux} [Fintype out'] [DecidableEq out']
-    (D : POVM M out) (e : out ≃ out') : POVM M out' where
-  effects y := Matrix.reindex e e (D.effects y)
-  pos y := (D.pos y).submatrix e.symm
-  sum_eq_one := by
-    ext i j
-    have h := congrFun (congrFun D.sum_eq_one (e.symm i)) (e.symm j)
-    simpa [Matrix.sum_apply, Matrix.reindex_apply, Matrix.one_apply] using h
-
-omit [DecidableEq M] in
-@[simp]
-theorem hswReindex_effects {out' : Type uAux} [Fintype out'] [DecidableEq out']
-    (D : POVM M out) (e : out ≃ out') (y : M) :
-    (D.hswReindex e).effects y = Matrix.reindex e e (D.effects y) :=
-  rfl
-
-/-- HSW-local relabeling preserves Born probabilities when the state is
-reindexed by the same basis equivalence. -/
-theorem hswReindex_prob_reindex_state {out' : Type uAux} [Fintype out'] [DecidableEq out']
-    (D : POVM M out) (rho : State out) (e : out ≃ out') (y : M) :
-    ((D.hswReindex e).prob (rho.reindex e) y : ℝ) = (D.prob rho y : ℝ) := by
-  rw [POVM.prob_eq_trace_re, POVM.prob_eq_trace_re]
-  change Complex.re
-      (((Matrix.reindex e e rho.matrix) *
-        (Matrix.reindex e e (D.effects y))).trace) =
-    Complex.re ((rho.matrix * D.effects y).trace)
-  change Complex.re
-      ((((Matrix.reindexAlgEquiv ℂ ℂ e) rho.matrix) *
-        ((Matrix.reindexAlgEquiv ℂ ℂ e) (D.effects y))).trace) =
-    Complex.re ((rho.matrix * D.effects y).trace)
-  rw [← map_mul (Matrix.reindexAlgEquiv ℂ ℂ e) rho.matrix (D.effects y)]
-  change Complex.re ((Matrix.reindex e e (rho.matrix * D.effects y)).trace) =
-    Complex.re ((rho.matrix * D.effects y).trace)
-  rw [hswTrace_reindex e]
-
-/-- Extend a POVM on the left output register to a product output register by
-ignoring the right register.
-
-This is the decoder-side primitive needed for padding HSW codes: the original
-decoder acts on the useful output block and the extra channel outputs are
-measured by the identity effect.  The name is HSW-specific to avoid colliding
-with the EA asymptotic module's generic `POVM.reindex` helpers. -/
-def hswTensorRightIdentity (D : POVM M out) (tail : Type uTail)
-    [Fintype tail] [DecidableEq tail] : POVM M (Prod out tail) where
-  effects m := Matrix.kronecker (D.effects m) (1 : CMatrix tail)
-  pos m := (D.pos m).kronecker Matrix.PosSemidef.one
-  sum_eq_one := by
-    ext i j
-    simp only [Matrix.sum_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]
-    rw [← Finset.sum_mul]
-    have hsum :
-        (∑ y, D.effects y i.1 j.1) = (1 : CMatrix out) i.1 j.1 := by
-      simpa [Matrix.sum_apply] using congrFun (congrFun D.sum_eq_one i.1) j.1
-    rw [hsum]
-    by_cases hleft : i.1 = j.1
-    · by_cases hright : i.2 = j.2
-      · have hij : i = j := Prod.ext hleft hright
-        simp [Matrix.one_apply, hij]
-      · have hij : i ≠ j := fun h => hright (congrArg Prod.snd h)
-        simp [Matrix.one_apply, hleft, hright, hij]
-    · have hij : i ≠ j := fun h => hleft (congrArg Prod.fst h)
-      simp [Matrix.one_apply, hleft, hij]
-
-/-- Ignoring an auxiliary right register preserves the original Born
-probability on product states. -/
-theorem hswTensorRightIdentity_prob_prod (D : POVM M out) (rho : State out)
-    (sigma : State tail) (m : M) :
-    ((D.hswTensorRightIdentity tail).prob (rho.prod sigma) m : ℝ) =
-      (D.prob rho m : ℝ) := by
-  rw [POVM.prob_eq_trace_re, POVM.prob_eq_trace_re]
-  change Complex.re
-      (((Matrix.kronecker rho.matrix sigma.matrix) *
-        Matrix.kronecker (D.effects m) (1 : CMatrix tail)).trace) =
-    Complex.re ((rho.matrix * D.effects m).trace)
-  have hmul :
-      Matrix.kronecker rho.matrix sigma.matrix *
-          Matrix.kronecker (D.effects m) (1 : CMatrix tail) =
-        Matrix.kronecker (rho.matrix * D.effects m) (sigma.matrix * 1) :=
-    (Matrix.mul_kronecker_mul rho.matrix (D.effects m) sigma.matrix
-      (1 : CMatrix tail)).symm
-  rw [hmul, Matrix.mul_one]
-  change Complex.re ((Matrix.kronecker (rho.matrix * D.effects m) sigma.matrix).trace) =
-    Complex.re ((rho.matrix * D.effects m).trace)
-  have htrace :
-      (Matrix.kronecker (rho.matrix * D.effects m) sigma.matrix).trace =
-        (rho.matrix * D.effects m).trace * sigma.matrix.trace :=
-    Matrix.trace_kronecker (rho.matrix * D.effects m) sigma.matrix
-  rw [htrace, sigma.trace_eq_one]
-  simp
-
-end POVM
+variable {a : Type uIn} {b : Type uOut}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
 /-- A finite HSW classical communication code for `n` uses of channel `N`.
 
 The encoder assigns one input state on `A^n` to each message; the decoder is a
 POVM on the output system `B^n` with the same message labels as outcomes. -/
-structure HSWClassicalCode (N : Channel a b) (n : ℕ)
+structure HSWClassicalCode (N : CPTPMap a b) (n : ℕ)
     (M : Type uMessage) [Fintype M] [DecidableEq M] [Nonempty M] where
-  encoder : M → State (TensorPower a n)
+  /-- The input state on `A^n` that carries each message. -/
+  encoder : M → MState (TensorPower a n)
+  /-- The decoding POVM on `B^n`, with outcomes labelled by messages. -/
   decoder : POVM M (TensorPower b n)
 
 namespace HSWClassicalCode
 
-variable {N : Channel a b} {n : ℕ}
+variable {N : CPTPMap a b} {n : ℕ}
 variable {M : Type uMessage} [Fintype M] [DecidableEq M] [Nonempty M]
 
 /-- Channel output state for a selected message. -/
-def outputState (C : HSWClassicalCode N n M) (m : M) : State (TensorPower b n) :=
-  (N.tensorPower n).applyState (C.encoder m)
+def outputState (C : HSWClassicalCode N n M) (m : M) : MState (TensorPower b n) :=
+  (N.tensorPower n) (C.encoder m)
 
 /-- Born-rule probability that the decoder returns the transmitted message. -/
 def successProbability (C : HSWClassicalCode N n M) (m : M) : ℝ :=
@@ -422,18 +249,18 @@ def maxErrorAtMost (C : HSWClassicalCode N n M) (ε : ℝ) : Prop :=
 
 /-- Classical communication rate of the message set. -/
 def rate (_C : HSWClassicalCode N n M) : ℝ :=
-  hswMessageRate M n
+  messageRate M n
 
 end HSWClassicalCode
 
-/- Packing-lemma interfaces for a finite family of output states and a
-decoder POVM.
+/-! ### Packing-lemma interfaces
 
-This namespace records exactly the code/decoder performance layer appearing in
-Wilde's packing lemma [Wilde2011Qst, qit-notes.tex:29363-29415]: message-indexed
-output states, a POVM with the same message labels, average success/error, and
-maximal error.  The random-code construction and typical-projector estimates
-which supply such a decoder are separate proof leaves. -/
+The code/decoder performance layer appearing in Wilde's packing lemma
+[Wilde2011Qst, qit-notes.tex:29363-29415]: message-indexed output states, a
+POVM with the same message labels, average success/error, and maximal error.
+The random-code construction and typical-projector estimates that supply such a
+decoder are in `QuantumLib.QIT.Coding.Classical.PackingLemma`. -/
+
 namespace PackingLemma
 
 variable {out : Type uOut}
@@ -444,7 +271,9 @@ variable {M : Type uMessage} [Fintype M] [DecidableEq M] [Nonempty M]
 POVM. -/
 structure DecoderCode (M : Type uMessage) (out : Type uOut)
     [Fintype M] [DecidableEq M] [Nonempty M] [Fintype out] [DecidableEq out] where
-  states : M → State out
+  /-- The output state associated with each message. -/
+  states : M → MState out
+  /-- The decoding POVM, with outcomes labelled by messages. -/
   decoder : POVM M out
 
 namespace DecoderCode
@@ -564,7 +393,7 @@ end PackingLemma
 
 namespace HSWClassicalCode
 
-variable {N : Channel a b} {n : ℕ}
+variable {N : CPTPMap a b} {n : ℕ}
 variable {M : Type uMessage} [Fintype M] [DecidableEq M] [Nonempty M]
 
 /-- The output-state/decoder layer of an HSW classical code, exactly the object
@@ -668,7 +497,7 @@ noncomputable def restrictToFinset (C : HSWClassicalCode N n M)
       rw [show discarded = ∑ m ∈ Sᶜ, C.decoder.effects m from rfl]
       rw [add_comm]
       exact hpartition
-    exact ⟨effects', hpos, hsum⟩
+    exact .ofMatrices effects' hpos hsum
 
 @[simp]
 theorem restrictToFinset_encoder (C : HSWClassicalCode N n M)
@@ -689,7 +518,7 @@ theorem restrictToFinset_error_le (C : HSWClassicalCode N n M)
   have hdiscarded_pos : discarded.PosSemidef :=
     Matrix.posSemidef_sum Sᶜ fun m _ => C.decoder.pos m
   rw [POVM.prob_eq_trace_re, POVM.prob_eq_trace_re]
-  simp only
+  simp only [POVM.effects_ofMatrices]
   by_cases hm : m = m0
   · have hsplit :
         C.decoder.effects m.1 +
@@ -698,10 +527,10 @@ theorem restrictToFinset_error_le (C : HSWClassicalCode N n M)
         simp [hm]
     rw [hsplit, Matrix.mul_add, Matrix.trace_add, Complex.add_re]
     have hnonneg :
-        0 ≤ (((C.outputState m.1).matrix * discarded).trace).re :=
-      cMatrix_trace_mul_posSemidef_re_nonneg (C.outputState m.1).pos hdiscarded_pos
+        0 ≤ (((C.outputState m.1).m * discarded).trace).re :=
+      cMatrix_trace_mul_posSemidef_re_nonneg (C.outputState m.1).psd hdiscarded_pos
     have hnonneg' :
-        0 ≤ (((Channel.applyState (N.tensorPower n) (C.encoder m.1)).matrix *
+        0 ≤ ((((N.tensorPower n) (C.encoder m.1)).m *
           discarded).trace).re := by
       simpa [outputState] using hnonneg
     linarith
@@ -753,13 +582,23 @@ theorem exists_expurgatedCode_of_averageErrorAtMost_rate (C : HSWClassicalCode N
   let : DecidableEq M' := hM'dec
   let : Nonempty M' := hM'nonempty
   refine ⟨M', inferInstance, inferInstance, inferInstance, C', ?_, herr⟩
-  exact hswMessageRate.ge_sub_inv_of_two_card_ge (M := M) (M' := M') hn hcard
+  exact messageRate.ge_sub_inv_of_two_card_ge (M := M) (M' := M') hn hcard
 
 end HSWClassicalCode
 
-namespace Channel
+end
+end QIT
 
-variable (N : Channel a b)
+noncomputable section
+
+namespace CPTPOp
+
+open QIT
+
+variable {a : Type uIn} {b : Type uOut}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+
+variable (N : CPTPMap a b)
 
 /-- Direct achievability of a classical communication rate for a channel.
 
@@ -775,20 +614,28 @@ def IsAchievableClassicalRate (R : ℝ) : Prop :=
 /-- `B` upper-bounds all operationally achievable classical rates for channel
 `N`. -/
 def IsClassicalRateUpperBound (B : ℝ) : Prop :=
-  ∀ R : ℝ, (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R → R ≤ B
+  ∀ R : ℝ, (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R → R ≤ B
 
 /-- Operational classical capacity as the supremum of achievable rates. -/
 def classicalCapacity : ℝ :=
-  sSup {R : ℝ | (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R}
+  sSup {R : ℝ | (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R}
 
-/-- The full Holevo--Schumacher--Westmoreland capacity formula.  Later proof
-leaves prove this proposition by combining the regularized direct coding
-theorem and the converse theorem. -/
+/-- The full Holevo--Schumacher--Westmoreland capacity formula: the operational
+classical capacity equals the regularized Holevo information. -/
 def hswCapacityFormula : Prop :=
-  (Channel.classicalCapacity.{uIn, uOut, uMessage} N) =
-    (Channel.regularizedHolevoInformation.{uIn, uOut, max uEnsemble uMessage} N)
+  (CPTPOp.classicalCapacity.{uIn, uOut, uMessage} N) =
+    (CPTPOp.regularizedHolevoInformation.{uIn, uOut, max uEnsemble uMessage} N)
 
-end Channel
+end CPTPOp
+
+end
+
+namespace QIT
+
+noncomputable section
+
+variable {a : Type uIn} {b : Type uOut}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
 /-- Source-shaped witness for one block of the HSW direct coding proof.
 
@@ -796,10 +643,13 @@ The witness packages the already-constructed code and the two estimates
 delivered by the packing lemma and typical/conditionally typical projectors:
 rate at least the Holevo rate minus `δ`, and maximal error at most `ε`. -/
 structure HSWDirectCodingWitness {ι : Type uEnsemble} [Fintype ι] [DecidableEq ι]
-    (N : Channel a b) (E : Ensemble ι a) (n : ℕ) (δ ε : ℝ)
+    (N : CPTPMap a b) (E : MEnsemble a ι) (n : ℕ) (δ ε : ℝ)
     (M : Type uMessage) [Fintype M] [DecidableEq M] [Nonempty M] where
+  /-- The underlying HSW code. -/
   code : HSWClassicalCode N n M
+  /-- The code's rate is within `δ` of the Holevo rate of `E`. -/
   rate_ge : code.rate ≥ N.hswHolevoRate E - δ
+  /-- Every message is decoded with error at most `ε`. -/
   maxError_le : code.maxErrorAtMost ε
 
 /-- HSW packing-lemma witness at the average-error stage.
@@ -809,16 +659,19 @@ small *average* error.  The separate expurgation theorem below converts this
 into the maximal-error witness consumed by the operational achievability
 definition, with the standard one-bit cardinality loss. -/
 structure HSWAverageErrorPackingWitness {ι : Type uEnsemble} [Fintype ι] [DecidableEq ι]
-    (N : Channel a b) (E : Ensemble ι a) (n : ℕ) (δ ε : ℝ)
+    (N : CPTPMap a b) (E : MEnsemble a ι) (n : ℕ) (δ ε : ℝ)
     (M : Type uMessage) [Fintype M] [DecidableEq M] [Nonempty M] where
+  /-- The underlying HSW code. -/
   code : HSWClassicalCode N n M
+  /-- The code's rate is within `δ` of the Holevo rate of `E`. -/
   rate_ge : code.rate ≥ N.hswHolevoRate E - δ
+  /-- The average decoding error at the packing layer is at most `ε`. -/
   packing_average_error_le : code.toPackingDecoderCode.averageErrorAtMost ε
 
 namespace HSWDirectCodingWitness
 
 variable {ι : Type uEnsemble} [Fintype ι] [DecidableEq ι]
-variable {N : Channel a b} {E : Ensemble ι a} {n : ℕ} {δ ε δ' ε' : ℝ}
+variable {N : CPTPMap a b} {E : MEnsemble a ι} {n : ℕ} {δ ε δ' ε' : ℝ}
 variable {M : Type uMessage} [Fintype M] [DecidableEq M] [Nonempty M]
 
 /-- Direct-coding witnesses are monotone in the allowed rate slack and maximal
@@ -835,7 +688,7 @@ end HSWDirectCodingWitness
 namespace HSWAverageErrorPackingWitness
 
 variable {ι : Type uEnsemble} [Fintype ι] [DecidableEq ι]
-variable {N : Channel a b} {E : Ensemble ι a} {n : ℕ} {δ ε δ' ε' : ℝ}
+variable {N : CPTPMap a b} {E : MEnsemble a ι} {n : ℕ} {δ ε δ' ε' : ℝ}
 variable {M : Type uMessage} [Fintype M] [DecidableEq M] [Nonempty M]
 
 /-- Average-error packing witnesses are monotone in the allowed rate slack and
@@ -857,16 +710,19 @@ The field `packing_max_error_le` is stated at the output-state packing layer;
 `toDirectCodingWitness` below turns it into the direct-coding witness consumed
 by the existing HSW achievability interface. -/
 structure HSWPackingLemmaWitness {ι : Type uEnsemble} [Fintype ι] [DecidableEq ι]
-    (N : Channel a b) (E : Ensemble ι a) (n : ℕ) (δ ε : ℝ)
+    (N : CPTPMap a b) (E : MEnsemble a ι) (n : ℕ) (δ ε : ℝ)
     (M : Type uMessage) [Fintype M] [DecidableEq M] [Nonempty M] where
+  /-- The underlying HSW code. -/
   code : HSWClassicalCode N n M
+  /-- The code's rate is within `δ` of the Holevo rate of `E`. -/
   rate_ge : code.rate ≥ N.hswHolevoRate E - δ
+  /-- The maximal decoding error at the packing layer is at most `ε`. -/
   packing_max_error_le : code.toPackingDecoderCode.maxErrorAtMost ε
 
 namespace HSWPackingLemmaWitness
 
 variable {ι : Type uEnsemble} [Fintype ι] [DecidableEq ι]
-variable {N : Channel a b} {E : Ensemble ι a} {n : ℕ} {δ ε : ℝ}
+variable {N : CPTPMap a b} {E : MEnsemble a ι} {n : ℕ} {δ ε : ℝ}
 variable {M : Type uMessage} [Fintype M] [DecidableEq M] [Nonempty M]
 
 /-- A completed packing-lemma decoder witness is exactly the HSW direct-coding
@@ -884,7 +740,7 @@ end HSWPackingLemmaWitness
 namespace HSWAverageErrorPackingWitness
 
 variable {ι : Type uEnsemble} [Fintype ι] [DecidableEq ι]
-variable {N : Channel a b} {E : Ensemble ι a} {n : ℕ} {δ ε : ℝ}
+variable {N : CPTPMap a b} {E : MEnsemble a ι} {n : ℕ} {δ ε : ℝ}
 variable {M : Type uMessage} [Fintype M] [DecidableEq M] [Nonempty M]
 
 /-- Average-error packing witnesses expurgate to maximal-error direct witnesses.
@@ -907,15 +763,25 @@ theorem exists_directCodingWitness_expurgated
 
 end HSWAverageErrorPackingWitness
 
-namespace Channel
+end
+end QIT
 
-variable (N : Channel a b)
+noncomputable section
+
+namespace CPTPOp
+
+open QIT
+
+variable {a : Type uIn} {b : Type uOut}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+
+variable (N : CPTPMap a b)
 
 /-- Achievability is downward closed in the rate: a code family for rate `S`
 also achieves every smaller rate `R`. -/
 theorem IsAchievableClassicalRate.mono {R S : ℝ}
-    (hS : (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) S) (hRS : R ≤ S) :
-    (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R := by
+    (hS : (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) S) (hRS : R ≤ S) :
+    (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R := by
   intro δ hδ ε hε
   obtain ⟨N0, hN0⟩ := hS δ hδ ε hε
   refine ⟨N0, ?_⟩
@@ -931,13 +797,13 @@ formalized in Lean: the random-coding, packing-lemma, and typical-subspace
 arguments supply the witness family; this theorem records the reusable
 interface from those estimates to operational achievability. -/
 theorem hsw_direct_achievable_of_directCodingWitness
-    {ι : Type uEnsemble} [Fintype ι] [DecidableEq ι] (E : Ensemble ι a)
+    {ι : Type uEnsemble} [Fintype ι] [DecidableEq ι] (E : MEnsemble a ι)
     (h :
       ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
         ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
           ∃ (M : Type uMessage), ∃ (_ : Fintype M), ∃ (_ : DecidableEq M),
             ∃ (_ : Nonempty M), Nonempty (HSWDirectCodingWitness N E n δ ε M)) :
-    (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) (N.hswHolevoRate E) := by
+    (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) (N.hswHolevoRate E) := by
   intro δ hδ ε hε
   obtain ⟨N0, hN0⟩ := h δ hδ ε hε
   refine ⟨N0, ?_⟩
@@ -949,35 +815,30 @@ theorem hsw_direct_achievable_of_directCodingWitness
   exact ⟨M, inferInstance, inferInstance, inferInstance, witness.code,
     witness.rate_ge, witness.maxError_le⟩
 
-end Channel
+end CPTPOp
 
-namespace Channel
+end
 
-variable (N : Channel a b)
+noncomputable section
+
+namespace CPTPOp
+
+open QIT
+
+variable {a : Type uIn} {b : Type uOut}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+
+variable (N : CPTPMap a b)
 
 /-- A packing-lemma witness supplies the direct-coding witness expected by the
 single-ensemble HSW achievability theorem. -/
 theorem hswDirectCodingWitness_nonempty_of_packingWitness
     {ι : Type uEnsemble} [Fintype ι] [DecidableEq ι]
-    (E : Ensemble ι a) {n : ℕ} {δ ε : ℝ}
+    (E : MEnsemble a ι) {n : ℕ} {δ ε : ℝ}
     {M : Type uMessage} [Fintype M] [DecidableEq M] [Nonempty M]
     (W : HSWPackingLemmaWitness N E n δ ε M) :
     Nonempty (HSWDirectCodingWitness N E n δ ε M) :=
   ⟨W.toDirectCodingWitness⟩
-
-/-- Direct-witness assembly: if the random-coding, packing-lemma, and
-typical-subspace estimates provide a direct-coding witness family for all small
-slacks and all sufficiently large block lengths, then the corresponding Holevo
-rate is operationally achievable. -/
-theorem hsw_directWitnessAssembly {ι : Type uEnsemble} [Fintype ι] [DecidableEq ι]
-    (E : Ensemble ι a)
-    (h :
-      ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
-        ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
-          ∃ (M : Type uMessage), ∃ (_ : Fintype M), ∃ (_ : DecidableEq M),
-            ∃ (_ : Nonempty M), Nonempty (HSWDirectCodingWitness N E n δ ε M)) :
-    (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) (N.hswHolevoRate E) :=
-  N.hsw_direct_achievable_of_directCodingWitness E h
 
 /-- Direct-witness assembly from the average-error packing stage.
 
@@ -987,7 +848,7 @@ average-error packing witness with half the rate slack and half the error
 tolerance, while `1/n` is small enough to absorb the expurgation cardinality
 loss. -/
 theorem hsw_directWitnessAssembly_from_averageErrorPacking
-    {ι : Type uEnsemble} [Fintype ι] [DecidableEq ι] (E : Ensemble ι a)
+    {ι : Type uEnsemble} [Fintype ι] [DecidableEq ι] (E : MEnsemble a ι)
     (h :
       ∀ δ : ℝ, 0 < δ → ∀ ε : ℝ, 0 < ε →
         ∃ N0 : ℕ, ∀ n : ℕ, n ≥ N0 →
@@ -995,8 +856,8 @@ theorem hsw_directWitnessAssembly_from_averageErrorPacking
             ∃ (M : Type uMessage), ∃ (_ : Fintype M), ∃ (_ : DecidableEq M),
               ∃ (_ : Nonempty M),
                 Nonempty (HSWAverageErrorPackingWitness N E n (δ / 2) (ε / 2) M)) :
-    (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) (N.hswHolevoRate E) := by
-  refine N.hsw_directWitnessAssembly E ?_
+    (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) (N.hswHolevoRate E) := by
+  refine N.hsw_direct_achievable_of_directCodingWitness E ?_
   intro δ hδ ε hε
   obtain ⟨N0, hN0⟩ := h δ hδ ε hε
   refine ⟨N0, ?_⟩
@@ -1029,10 +890,10 @@ coding theorem. -/
 theorem hsw_holevoInformation_direct_of_ensembleWitnesses [Nonempty a]
     (h :
       ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-        ∀ E : Ensemble ι a,
-          (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) (N.hswHolevoRate E)) :
-    ∀ R : ℝ, R < (Channel.holevoInformation.{uIn, uOut, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R := by
+        ∀ E : MEnsemble a ι,
+          (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) (N.hswHolevoRate E)) :
+    ∀ R : ℝ, R < (CPTPOp.holevoInformation.{uIn, uOut, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R := by
   intro R hR
   rw [holevoInformation] at hR
   obtain ⟨r, hrmem, hRr⟩ :=
@@ -1041,7 +902,7 @@ theorem hsw_holevoInformation_direct_of_ensembleWitnesses [Nonempty a]
   rcases hrmem with ⟨ι, hιF, hιD, E, rfl⟩
   let : Fintype ι := hιF
   let : DecidableEq ι := hιD
-  exact Channel.IsAchievableClassicalRate.mono N
+  exact CPTPOp.IsAchievableClassicalRate.mono N
     (h ι inferInstance inferInstance E) (le_of_lt hRr)
 
 /-- Regularized direct-achievability squeeze from block-rate witnesses.
@@ -1053,29 +914,29 @@ every rate below the regularized Holevo information is achievable.  The
 substantive coding theorem must supply the two hypotheses; no converse input is
 used here. -/
 theorem hsw_regularized_direct_of_blockRateWitnesses
-    (happrox : ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{uIn, uOut, uEnsemble} N) →
+    (happrox : ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{uIn, uOut, uEnsemble} N) →
       ∃ n : ℕ, 0 < n ∧
-        R < (Channel.blockHolevoInformation.{uIn, uOut, uEnsemble} N) n / (n : ℝ))
+        R < (CPTPOp.blockHolevoInformation.{uIn, uOut, uEnsemble} N) n / (n : ℝ))
     (hblock : ∀ n : ℕ, 0 < n →
-      (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} N)
-        ((Channel.blockHolevoInformation.{uIn, uOut, uEnsemble} N) n / (n : ℝ))) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{uIn, uOut, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R := by
+      (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} N)
+        ((CPTPOp.blockHolevoInformation.{uIn, uOut, uEnsemble} N) n / (n : ℝ))) :
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{uIn, uOut, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R := by
   intro R hR
   obtain ⟨n, hn, hlt⟩ := happrox R hR
-  exact Channel.IsAchievableClassicalRate.mono N (hblock n hn) (le_of_lt hlt)
+  exact CPTPOp.IsAchievableClassicalRate.mono N (hblock n hn) (le_of_lt hlt)
 
 /-- Regularized direct-achievability squeeze using the standard `sSup`
 approximation theorem.  The only analytic side conditions are the usual
 nonemptiness and boundedness of the block-rate set. -/
 theorem hsw_regularized_direct_of_blockRateWitnesses_bdd
-    (hne : (Channel.regularizedHolevoRateValues.{uIn, uOut, uEnsemble} N).Nonempty)
-    (hbdd : BddAbove (Channel.regularizedHolevoRateValues.{uIn, uOut, uEnsemble} N))
+    (hne : (CPTPOp.regularizedHolevoRateValues.{uIn, uOut, uEnsemble} N).Nonempty)
+    (hbdd : BddAbove (CPTPOp.regularizedHolevoRateValues.{uIn, uOut, uEnsemble} N))
     (hblock : ∀ n : ℕ, 0 < n →
-      (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} N)
-        ((Channel.blockHolevoInformation.{uIn, uOut, uEnsemble} N) n / (n : ℝ))) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{uIn, uOut, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R := by
+      (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} N)
+        ((CPTPOp.blockHolevoInformation.{uIn, uOut, uEnsemble} N) n / (n : ℝ))) :
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{uIn, uOut, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R := by
   refine N.hsw_regularized_direct_of_blockRateWitnesses ?_ hblock
   intro R hR
   rw [regularizedHolevoInformation] at hR
@@ -1090,13 +951,13 @@ enough to prove that every rate strictly below each positive block Holevo rate
 is achievable; the `sSup` approximation then yields every rate strictly below
 the regularized Holevo information. -/
 theorem hsw_regularized_direct_of_strictBlockRateWitnesses_bdd
-    (hne : (Channel.regularizedHolevoRateValues.{uIn, uOut, uEnsemble} N).Nonempty)
-    (hbdd : BddAbove (Channel.regularizedHolevoRateValues.{uIn, uOut, uEnsemble} N))
+    (hne : (CPTPOp.regularizedHolevoRateValues.{uIn, uOut, uEnsemble} N).Nonempty)
+    (hbdd : BddAbove (CPTPOp.regularizedHolevoRateValues.{uIn, uOut, uEnsemble} N))
     (hblock : ∀ n : ℕ, 0 < n → ∀ R : ℝ,
-      R < (Channel.blockHolevoInformation.{uIn, uOut, uEnsemble} N) n / (n : ℝ) →
-        (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{uIn, uOut, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R := by
+      R < (CPTPOp.blockHolevoInformation.{uIn, uOut, uEnsemble} N) n / (n : ℝ) →
+        (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R) :
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{uIn, uOut, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R := by
   intro R hR
   rw [regularizedHolevoInformation] at hR
   obtain ⟨r, hrmem, hRr⟩ := (lt_csSup_iff hbdd hne).mp hR
@@ -1107,10 +968,10 @@ theorem hsw_regularized_direct_of_strictBlockRateWitnesses_bdd
 standard nonempty finite-system side conditions discharged. -/
 theorem hsw_regularized_direct_of_strictBlockRateWitnesses [Nonempty a] [Nonempty b]
     (hblock : ∀ n : ℕ, 0 < n → ∀ R : ℝ,
-      R < (Channel.blockHolevoInformation.{uIn, uOut, uEnsemble} N) n / (n : ℝ) →
-        (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{uIn, uOut, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R :=
+      R < (CPTPOp.blockHolevoInformation.{uIn, uOut, uEnsemble} N) n / (n : ℝ) →
+        (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R) :
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{uIn, uOut, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R :=
   N.hsw_regularized_direct_of_strictBlockRateWitnesses_bdd
     N.regularizedHolevoRateValues_nonempty
     N.regularizedHolevoRateValues_bddAbove
@@ -1119,45 +980,45 @@ theorem hsw_regularized_direct_of_strictBlockRateWitnesses [Nonempty a] [Nonempt
 /-- Regularized HSW direct-achievability from block-channel ensemble witnesses
 and an explicit block-code transport theorem.
 
-This theorem separates the two remaining direct-proof obligations:
+This theorem separates the two inputs of the direct proof:
 
 * `hblockEnsemble` proves ensemble-specific HSW direct coding for every block
   channel `N^⊗n`;
 * `htransport` turns a code for the block channel `N^⊗n` at rate `S` into a
   code for the original channel `N` at normalized rate `S/n`.
 
-Given those two inputs, the `sSup` regularized-Holevo step is fully proved. -/
+Given those two inputs, the `sSup` regularized-Holevo step follows. -/
 theorem hsw_regularized_direct_of_blockChannelEnsembleWitnesses [Nonempty a] [Nonempty b]
     (htransport :
       ∀ n : ℕ, 0 < n → ∀ S : ℝ,
-        (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} (N.tensorPower n)) S →
-          (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) (S / (n : ℝ)))
+        (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} (N.tensorPower n)) S →
+          (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) (S / (n : ℝ)))
     (hblockEnsemble :
       ∀ n : ℕ, 0 < n →
         ∀ (ι : Type uEnsemble) (_ : Fintype ι) (_ : DecidableEq ι),
-          ∀ E : Ensemble ι (QIT.TensorPower a n),
-            (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} (N.tensorPower n))
+          ∀ E : MEnsemble (QIT.TensorPower a n) ι,
+            (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} (N.tensorPower n))
               ((N.tensorPower n).hswHolevoRate E)) :
-    ∀ R : ℝ, R < (Channel.regularizedHolevoInformation.{uIn, uOut, uEnsemble} N) →
-      (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R := by
+    ∀ R : ℝ, R < (CPTPOp.regularizedHolevoInformation.{uIn, uOut, uEnsemble} N) →
+      (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} N) R := by
   refine N.hsw_regularized_direct_of_strictBlockRateWitnesses ?_
   intro n hn R hR
   have hnR_pos : (0 : ℝ) < n := by exact_mod_cast hn
-  let blockN : Channel (QIT.TensorPower a n) (QIT.TensorPower b n) := N.tensorPower n
+  let blockN : CPTPMap (QIT.TensorPower a n) (QIT.TensorPower b n) := N.tensorPower n
   have hblockRate :
-      (n : ℝ) * R < (Channel.holevoInformation.{uIn, uOut, uEnsemble} blockN) := by
+      (n : ℝ) * R < (CPTPOp.holevoInformation.{uIn, uOut, uEnsemble} blockN) := by
     have hmul := mul_lt_mul_of_pos_left hR hnR_pos
     dsimp [blockN]
     unfold blockHolevoInformation at hmul
     calc
       (n : ℝ) * R <
           (n : ℝ) *
-            ((Channel.holevoInformation.{uIn, uOut, uEnsemble} (N.tensorPower n)) / (n : ℝ)) := hmul
-      _ = (Channel.holevoInformation.{uIn, uOut, uEnsemble} (N.tensorPower n)) := by
+            ((CPTPOp.holevoInformation.{uIn, uOut, uEnsemble} (N.tensorPower n)) / (n : ℝ)) := hmul
+      _ = (CPTPOp.holevoInformation.{uIn, uOut, uEnsemble} (N.tensorPower n)) := by
         field_simp [ne_of_gt hnR_pos]
-  have : Nonempty (QIT.TensorPower a n) := tensorPower_nonempty a n
+  have : Nonempty (QIT.TensorPower a n) := tensorPower_nonempty_of_nonempty (α := a) n
   have hblockAch :
-      (Channel.IsAchievableClassicalRate.{uIn, uOut, uMessage} blockN) ((n : ℝ) * R) := by
+      (CPTPOp.IsAchievableClassicalRate.{uIn, uOut, uMessage} blockN) ((n : ℝ) * R) := by
     dsimp [blockN]
     exact (N.tensorPower n).hsw_holevoInformation_direct_of_ensembleWitnesses
       (fun ι hιF hιD E => hblockEnsemble n hn ι hιF hιD E)
@@ -1166,8 +1027,6 @@ theorem hsw_regularized_direct_of_blockChannelEnsembleWitnesses [Nonempty a] [No
   convert hnorm using 1
   field_simp [ne_of_gt hnR_pos]
 
-end Channel
+end CPTPOp
 
 end
-
-end QIT

@@ -17,11 +17,3 @@ public import QuantumLib.QIT.Symmetry.DeFinetti
 Top-level import facade for symmetric-subspace, twirling, and de Finetti
 infrastructure.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace Symmetry
-
-end Symmetry
-end QIT

@@ -13,7 +13,7 @@ public import QuantumLib.QIT.Information.BinaryHypothesisTest
 # Petz--Renyi endpoint helpers
 
 This module contains the small one-sided alpha-domain API used to state
-source-shaped Petz--Renyi `alpha -> 1^-` limits.
+source-shaped Petz--Renyi `alpha → 1^-` limits.
 -/
 
 @[expose] public section
@@ -21,11 +21,12 @@ source-shaped Petz--Renyi `alpha -> 1^-` limits.
 open scoped ComplexOrder MatrixOrder Topology
 open Filter
 
-namespace QIT
-
+noncomputable section
 universe u
 
-noncomputable section
+open QIT
+
+namespace QIT
 
 /-- The source order range for the barred Petz--Renyi branch, `0 < alpha < 1`. -/
 def PetzRenyiAlpha : Type :=
@@ -33,7 +34,7 @@ def PetzRenyiAlpha : Type :=
 
 namespace PetzRenyiAlpha
 
-/-- The left endpoint filter `alpha -> 1^-` on the subtype `0 < alpha < 1`. -/
+/-- The left endpoint filter `alpha → 1^-` on the subtype `0 < alpha < 1`. -/
 def leftToOne : Filter PetzRenyiAlpha :=
   Filter.comap (fun alpha : PetzRenyiAlpha => alpha.1)
     (nhdsWithin (1 : ℝ) (Set.Iio 1))
@@ -246,7 +247,7 @@ theorem commonSupport_nonempty_of_p_supportedBy_q
     (hpq : M.pDistribution.SupportedBy M.q) :
     Nonempty M.commonSupport := by
   classical
-  rcases ClassicalDistribution.exists_prob_ne_zero M.pDistribution with ⟨x, hx⟩
+  rcases ProbDistribution.exists_nnprob_ne_zero M.pDistribution with ⟨x, hx⟩
   exact ⟨⟨x, hx, hpq x hx⟩⟩
 
 /-- In the source branch `0 < s < 1`, the common-support tilted distribution
@@ -257,7 +258,7 @@ theorem pDistribution_supportedBy_commonSupportTiltedDistribution
     (_hs0 : 0 < s) (_hs1 : s < 1)
     (hZ : M.chernoffPartitionNNReal s ≠ 0) :
     M.pDistribution.SupportedBy
-      (M.commonSupportTiltedDistribution s hZ).prob := by
+      (M.commonSupportTiltedDistribution s hZ).nnprob := by
   intro x hx
   have hq : M.q x ≠ 0 := hpq x hx
   have hxmem : M.p x ≠ 0 ∧ M.q x ≠ 0 := ⟨hx, hq⟩
@@ -266,8 +267,8 @@ theorem pDistribution_supportedBy_commonSupportTiltedDistribution
   have hZ_pos : 0 < M.chernoffPartitionNNReal s :=
     lt_of_le_of_ne (by positivity) (Ne.symm hZ)
   have hprob_pos :
-      0 < (M.commonSupportTiltedDistribution s hZ).prob x := by
-    rw [commonSupportTiltedDistribution_prob]
+      0 < (M.commonSupportTiltedDistribution s hZ).nnprob x := by
+    rw [commonSupportTiltedDistribution_nnprob]
     simp [hxmem]
     positivity
   exact ne_of_gt hprob_pos
@@ -298,12 +299,12 @@ theorem relativeEntropySummandReal_p_commonSupportTilted_of_p_ne_zero
     rw [← chernoffPartitionNNReal_coe]
     exact_mod_cast hZpos_nn
   have ht :
-      ((M.commonSupportTiltedDistribution s hZ).prob x : ℝ) =
+      ((M.commonSupportTiltedDistribution s hZ).nnprob x : ℝ) =
         ((M.p x : ℝ) ^ s) * ((M.q x : ℝ) ^ (1 - s)) /
           M.chernoffPartition s :=
-    commonSupportTiltedDistribution_prob_toReal_of_mem (M := M) (s := s) hZ hxmem
+    commonSupportTiltedDistribution_nnprob_toReal_of_mem (M := M) (s := s) hZ hxmem
   have htpos :
-      0 < ((M.commonSupportTiltedDistribution s hZ).prob x : ℝ) := by
+      0 < ((M.commonSupportTiltedDistribution s hZ).nnprob x : ℝ) := by
     rw [ht]
     positivity
   have hdenom_pos :
@@ -311,9 +312,9 @@ theorem relativeEntropySummandReal_p_commonSupportTilted_of_p_ne_zero
         ((M.p x : ℝ) ^ s) * ((M.q x : ℝ) ^ (1 - s)) /
           M.chernoffPartition s := by
     positivity
-  have hx' : M.pDistribution.prob x ≠ 0 := hx
+  have hx' : M.pDistribution.nnprob x ≠ 0 := hx
   rw [relativeEntropySummandReal, if_neg hx']
-  simp only [pDistribution_prob]
+  simp only [pDistribution_nnprob]
   rw [ht]
   congr 1
   rw [Real.log_div hp.ne' hdenom_pos.ne']
@@ -399,7 +400,7 @@ theorem petzChernoffLog2_le_relativeEntropyReal
       (M := M) (commonSupport_nonempty_of_p_supportedBy_q (M := M) hpq) s).ne'
   have htilt_support :
       M.pDistribution.SupportedBy
-        (M.commonSupportTiltedDistribution s hZ).prob :=
+        (M.commonSupportTiltedDistribution s hZ).nnprob :=
     pDistribution_supportedBy_commonSupportTiltedDistribution
       (M := M) hpq hs0 hs1 hZ
   have hnonneg :
@@ -454,8 +455,8 @@ variable {a : Type u} [Fintype a] [DecidableEq a]
 /-- Matrix support domination lifts to support containment of the associated
 Nussbaum--Szkola classical model. -/
 theorem nussbaumSzkolaModel_p_supportedBy_q_of_matrix_support
-    (rho sigma : State a)
-    (hSupport : Matrix.Supports rho.matrix sigma.matrix) :
+    (rho sigma : MState a)
+    (hSupport : Matrix.Supports rho.m sigma.m) :
     (nussbaumSzkolaModel rho sigma).pDistribution.SupportedBy
       (nussbaumSzkolaModel rho sigma).q := by
   classical
@@ -472,44 +473,44 @@ theorem nussbaumSzkolaModel_p_supportedBy_q_of_matrix_support
         nussbaumSzkolaOverlap rho sigma x y = 0 := by
     simpa [nussbaumSzkolaModel, mul_eq_zero] using hq_zero
   rcases hoverlap_or_sigma with hsigma_zero | hoverlap_zero
-  · let Urho : Matrix.unitaryGroup a ℂ := rho.pos.isHermitian.eigenvectorUnitary
-    let Usigma : Matrix.unitaryGroup a ℂ := sigma.pos.isHermitian.eigenvectorUnitary
+  · let Urho : Matrix.unitaryGroup a ℂ := rho.psd.isHermitian.eigenvectorUnitary
+    let Usigma : Matrix.unitaryGroup a ℂ := sigma.psd.isHermitian.eigenvectorUnitary
     let T : CMatrix a := star (Urho : CMatrix a) * (Usigma : CMatrix a)
-    have hsigma_eig : sigma.pos.isHermitian.eigenvalues y = 0 := by
+    have hsigma_eig : sigma.psd.isHermitian.eigenvalues y = 0 := by
       have hnn :
-          (⟨sigma.pos.isHermitian.eigenvalues y,
-            sigma.pos.eigenvalues_nonneg y⟩ : NNReal) = 0 := by
+          (⟨sigma.psd.isHermitian.eigenvalues y,
+            sigma.psd.eigenvalues_nonneg y⟩ : NNReal) = 0 := by
         change
-          (⟨sigma.pos.isHermitian.eigenvalues y,
-            sigma.pos.eigenvalues_nonneg y⟩ : NNReal) = 0 at hsigma_zero
+          (⟨sigma.psd.isHermitian.eigenvalues y,
+            sigma.psd.eigenvalues_nonneg y⟩ : NNReal) = 0 at hsigma_zero
         exact hsigma_zero
       simpa using congrArg Subtype.val hnn
-    let v : a → ℂ := ⇑(sigma.pos.isHermitian.eigenvectorBasis y)
-    have hsigma_v : sigma.matrix.mulVec v = 0 := by
-      have h := sigma.pos.isHermitian.mulVec_eigenvectorBasis y
+    let v : a → ℂ := ⇑(sigma.psd.isHermitian.eigenvectorBasis y)
+    have hsigma_v : sigma.m.mulVec v = 0 := by
+      have h := sigma.psd.isHermitian.mulVec_eigenvectorBasis y
       rw [hsigma_eig] at h
       simpa [v] using h
-    have hrho_v : rho.matrix.mulVec v = 0 := hSupport v hsigma_v
-    have hcol : ∀ k, (rho.matrix * (Usigma : CMatrix a)) k y = 0 := by
+    have hrho_v : rho.m.mulVec v = 0 := hSupport v hsigma_v
+    have hcol : ∀ k, (rho.m * (Usigma : CMatrix a)) k y = 0 := by
       intro k
       have hk := congrFun hrho_v k
       simpa [v, Usigma, Matrix.mulVec, dotProduct, Matrix.mul_apply,
         Matrix.IsHermitian.eigenvectorUnitary_apply] using hk
-    have hleft : (star (Urho : CMatrix a) * rho.matrix * (Usigma : CMatrix a)) x y = 0 := by
+    have hleft : (star (Urho : CMatrix a) * rho.m * (Usigma : CMatrix a)) x y = 0 := by
       rw [Matrix.mul_assoc]
       simp [Matrix.mul_apply, hcol]
     let Drho : CMatrix a :=
       Matrix.diagonal
-        (fun i : a => ((rho.pos.isHermitian.eigenvalues i : ℝ) : ℂ))
+        (fun i : a => ((rho.psd.isHermitian.eigenvalues i : ℝ) : ℂ))
     have hrho_diag :
-        rho.matrix = (Urho : CMatrix a) * Drho * star (Urho : CMatrix a) := by
+        rho.m = (Urho : CMatrix a) * Drho * star (Urho : CMatrix a) := by
       simpa [Urho, Drho, Function.comp_def, Unitary.conjStarAlgAut_apply]
-        using rho.pos.isHermitian.spectral_theorem
+        using rho.psd.isHermitian.spectral_theorem
     have hleft_diag :
-        (star (Urho : CMatrix a) * rho.matrix * (Usigma : CMatrix a)) x y =
+        (star (Urho : CMatrix a) * rho.m * (Usigma : CMatrix a)) x y =
           (((stateSpectralWeight rho x : ℝ) : ℂ) * T x y) := by
       have hmatrix :
-          star (Urho : CMatrix a) * rho.matrix * (Usigma : CMatrix a) =
+          star (Urho : CMatrix a) * rho.m * (Usigma : CMatrix a) =
             Drho * T := by
         rw [hrho_diag]
         dsimp [Drho, T]
@@ -560,7 +561,9 @@ theorem nussbaumSzkolaModel_p_supportedBy_q_of_matrix_support
 
 end BinaryHypothesisTest
 
-namespace State
+end QIT
+
+namespace MState
 
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
@@ -568,7 +571,7 @@ variable {a : Type u} [Fintype a] [DecidableEq a]
 classical Nussbaum--Szkola log-partition with the repository's base-2
 normalization. -/
 theorem petzRenyiPSDFinite_eq_nussbaumSzkola_chernoffLog2
-    (rho sigma : State a) {alpha : ℝ} (halpha0 : 0 < alpha)
+    (rho sigma : MState a) {alpha : ℝ} (halpha0 : 0 < alpha)
     (halpha1 : alpha < 1) :
     rho.petzRenyiPSDFinite sigma alpha halpha0 (ne_of_lt halpha1) =
       (1 / (alpha - 1)) *
@@ -576,10 +579,10 @@ theorem petzRenyiPSDFinite_eq_nussbaumSzkola_chernoffLog2
   classical
   let M := BinaryHypothesisTest.nussbaumSzkolaModel rho sigma
   have htrace :
-      ((CFC.rpow rho.matrix alpha *
-        CFC.rpow sigma.matrix (1 - alpha)).trace).re =
+      ((CFC.rpow rho.m alpha *
+        CFC.rpow sigma.m (1 - alpha)).trace).re =
         (rho.petzRenyiCoefficient sigma alpha : ℝ) := by
-    have h := State.petzRenyiCoefficient_trace_eq rho sigma alpha
+    have h := MState.petzRenyiCoefficient_trace_eq rho sigma alpha
     have hre := congrArg Complex.re h
     simpa using hre.symm
   have hpart :
@@ -608,8 +611,8 @@ theorem petzRenyiPSDFinite_eq_nussbaumSzkola_chernoffLog2
   unfold petzRenyiPSDFinite
   change
     (1 / (alpha - 1)) *
-        log2 ((CFC.rpow rho.matrix alpha *
-          CFC.rpow sigma.matrix (1 - alpha)).trace).re =
+        log2 ((CFC.rpow rho.m alpha *
+          CFC.rpow sigma.m (1 - alpha)).trace).re =
       (1 / (alpha - 1)) *
         log2 ((BinaryHypothesisTest.nussbaumSzkolaModel rho sigma).chernoffPartition alpha)
   rw [htrace, ← hpart']
@@ -617,7 +620,7 @@ theorem petzRenyiPSDFinite_eq_nussbaumSzkola_chernoffLog2
 /-- Canonical extended-real Petz divergence equals the finite
 Nussbaum--Szkola log-partition whenever `rho` is supported on `sigma`. -/
 theorem petzRenyiPSD_eq_nussbaumSzkola_chernoffLog2
-    (rho sigma : State a) (hSupport : Matrix.Supports rho.matrix sigma.matrix)
+    (rho sigma : MState a) (hSupport : Matrix.Supports rho.m sigma.m)
     {alpha : ℝ} (halpha0 : 0 < alpha) (halpha1 : alpha < 1) :
     rho.petzRenyiPSD sigma alpha halpha0 halpha1 =
       (((1 / (alpha - 1)) *
@@ -628,15 +631,15 @@ theorem petzRenyiPSD_eq_nussbaumSzkola_chernoffLog2
       petzRenyiPSDFinite_eq_nussbaumSzkola_chernoffLog2
         rho sigma halpha0 halpha1
   · exact rho.petzRenyiPSDTraceCoeff_pos_of_support sigma
-      ((cMatrix_rpow_supports_self rho.pos halpha0).trans hSupport)
+      ((cMatrix_rpow_supports_self rho.psd halpha0).trans hSupport)
 
 /-- The PSD Petz--Renyi divergence has the expected left endpoint limit when
 the first state is supported on the second.  The endpoint is expressed through
 the Nussbaum--Szkola classical relative entropy; later channel-level bridges
 specialize this to entropy-form mutual information. -/
 theorem petzRenyiPSDFinite_tendsto_nussbaumSzkola_relativeEntropyReal_left
-    (rho sigma : State a)
-    (hSupport : Matrix.Supports rho.matrix sigma.matrix) :
+    (rho sigma : MState a)
+    (hSupport : Matrix.Supports rho.m sigma.m) :
     Tendsto
       (fun alpha : PetzRenyiAlpha =>
         rho.petzRenyiPSDFinite sigma alpha.1 alpha.2.1 (ne_of_lt alpha.2.2))
@@ -673,8 +676,8 @@ theorem petzRenyiPSDFinite_tendsto_nussbaumSzkola_relativeEntropyReal_left
 /-- Canonical extended-real PSD Petz divergence converges from the left to
 the finite Umegaki endpoint under support inclusion. -/
 theorem petzRenyiPSD_tendsto_nussbaumSzkola_relativeEntropyReal_left
-    (rho sigma : State a)
-    (hSupport : Matrix.Supports rho.matrix sigma.matrix) :
+    (rho sigma : MState a)
+    (hSupport : Matrix.Supports rho.m sigma.m) :
     Tendsto
       (fun alpha : PetzRenyiAlpha =>
         rho.petzRenyiPSD sigma alpha.1 alpha.2.1 alpha.2.2)
@@ -691,10 +694,6 @@ theorem petzRenyiPSD_tendsto_nussbaumSzkola_relativeEntropyReal_left
   exact (rho.petzRenyiPSD_eq_coe_finite_of_traceCoeff_pos
     sigma alpha.1 alpha.2.1 alpha.2.2
       (rho.petzRenyiPSDTraceCoeff_pos_of_support sigma
-        ((cMatrix_rpow_supports_self rho.pos alpha.2.1).trans hSupport))).symm
+        ((cMatrix_rpow_supports_self rho.psd alpha.2.1).trans hSupport))).symm
 
-end State
-
-end
-
-end QIT
+end MState

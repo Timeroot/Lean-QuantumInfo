@@ -28,26 +28,16 @@ open scoped ComplexOrder MatrixOrder
 
 open Matrix
 
-namespace Complex
+noncomputable section
+universe u v
+variable {a : Type u} [Fintype a] [DecidableEq a]
 
-/-- Local source-shaped notation for the complex modulus. Mathlib's canonical
-API uses `‖z‖`; the source and backlog state the variational theorem with
-`|z|`, so this thin alias keeps the public theorem close to the source. -/
-noncomputable abbrev abs (z : ℂ) : ℝ :=
-  ‖z‖
-
-end Complex
+open QIT
 
 namespace QIT
 
-universe u v
-
-noncomputable section
-
-variable {a : Type u} [Fintype a] [DecidableEq a]
-
 theorem complex_normSq_le_sq_of_abs_le {z : ℂ} {r : ℝ}
-    (h : Complex.abs z ≤ r) :
+    (h : ‖z‖ ≤ r) :
     Complex.normSq z ≤ r ^ 2 := by
   have hz : 0 ≤ ‖z‖ := norm_nonneg z
   have hnorm : ‖z‖ ≤ r := h
@@ -55,25 +45,11 @@ theorem complex_normSq_le_sq_of_abs_le {z : ℂ} {r : ℝ}
   rw [Complex.normSq_eq_norm_sq]
   exact (sq_le_sq₀ hz hr).2 hnorm
 
-private theorem transpose_referenceIsometry_matrix_mem_unitary
-    (V : ReferenceIsometry a a) :
-    Matrix.transpose V.matrix ∈ Matrix.unitaryGroup a ℂ := by
-  classical
-  rw [Matrix.mem_unitaryGroup_iff]
-  ext i j
-  have h := congrFun (congrFun V.isometry j) i
-  simpa [Matrix.mul_apply, Matrix.conjTranspose, Matrix.transpose, Matrix.one_apply,
-    Finset.mul_sum, mul_comm, eq_comm] using h
-
-private theorem trace_diagonal_mul_eq_sum (d : a → ℂ) (U : CMatrix a) :
-    (Matrix.diagonal d * U).trace = ∑ i, d i * U i i := by
-  simp [Matrix.trace, Matrix.diagonal_mul]
-
 /-- For a positive semidefinite matrix, every unitary trace pairing is bounded
 by the real trace. -/
 theorem posSemidef_trace_mul_unitary_abs_le_trace_re
     (P : CMatrix a) (hP : P.PosSemidef) (U : Matrix.unitaryGroup a ℂ) :
-    Complex.abs ((P * (U : CMatrix a)).trace) ≤ P.trace.re := by
+     ‖(P * (U : CMatrix a)).trace‖ ≤ P.trace.re := by
   classical
   let E : Matrix.unitaryGroup a ℂ := hP.1.eigenvectorUnitary
   let D : CMatrix a := Matrix.diagonal (fun i => ((hP.1.eigenvalues i : ℝ) : ℂ))
@@ -100,10 +76,10 @@ theorem posSemidef_trace_mul_unitary_abs_le_trace_re
     simpa [D] using trace_diagonal_mul_eq_sum
       (fun i => ((hP.1.eigenvalues i : ℝ) : ℂ)) (U' : CMatrix a)
   have hsum_abs :
-      Complex.abs ((D * (U' : CMatrix a)).trace) ≤
+       ‖(D * (U' : CMatrix a)).trace‖ ≤
         ∑ i, ‖((hP.1.eigenvalues i : ℝ) : ℂ) * (U' : CMatrix a) i i‖ := by
     rw [hdiag]
-    simpa [Complex.abs] using
+    simpa using
       (norm_sum_le (s := Finset.univ)
         (f := fun i => ((hP.1.eigenvalues i : ℝ) : ℂ) * (U' : CMatrix a) i i))
   have hterm :
@@ -127,8 +103,8 @@ theorem posSemidef_trace_mul_unitary_abs_le_trace_re
     have h := hP.1.trace_eq_sum_eigenvalues
     exact (congrArg Complex.re h).trans (by simp)
   calc
-    Complex.abs ((P * (U : CMatrix a)).trace) =
-        Complex.abs ((D * (U' : CMatrix a)).trace) := by rw [htrace]
+     ‖(P * (U : CMatrix a)).trace‖ =
+         ‖(D * (U' : CMatrix a)).trace‖ := by rw [htrace]
     _ ≤ ∑ i, ‖((hP.1.eigenvalues i : ℝ) : ℂ) * (U' : CMatrix a) i i‖ := hsum_abs
     _ ≤ ∑ i, hP.1.eigenvalues i := hsum_le
     _ = P.trace.re := htrace_sum.symm
@@ -199,7 +175,7 @@ bounded by the real trace.  The contraction hypothesis is the finite matrix
 order form `KᴴK ≤ I`. -/
 theorem posSemidef_trace_mul_contraction_abs_le_trace_re
     (P : CMatrix a) (hP : P.PosSemidef) (K : CMatrix a) (hK : Kᴴ * K ≤ 1) :
-    Complex.abs ((P * K).trace) ≤ P.trace.re := by
+     ‖(P * K).trace‖ ≤ P.trace.re := by
   classical
   let E : Matrix.unitaryGroup a ℂ := hP.1.eigenvectorUnitary
   let D : CMatrix a := Matrix.diagonal (fun i => ((hP.1.eigenvalues i : ℝ) : ℂ))
@@ -272,10 +248,10 @@ theorem posSemidef_trace_mul_contraction_abs_le_trace_re
     simpa [D] using trace_diagonal_mul_eq_sum
       (fun i => ((hP.1.eigenvalues i : ℝ) : ℂ)) K'
   have hsum_abs :
-      Complex.abs ((D * K').trace) ≤
+       ‖(D * K').trace‖ ≤
         ∑ i, ‖((hP.1.eigenvalues i : ℝ) : ℂ) * K' i i‖ := by
     rw [hdiag]
-    simpa [Complex.abs] using
+    simpa using
       (norm_sum_le (s := Finset.univ)
         (f := fun i => ((hP.1.eigenvalues i : ℝ) : ℂ) * K' i i))
   have hterm :
@@ -300,18 +276,47 @@ theorem posSemidef_trace_mul_contraction_abs_le_trace_re
     have h := hP.1.trace_eq_sum_eigenvalues
     exact (congrArg Complex.re h).trans (by simp)
   calc
-    Complex.abs ((P * K).trace) =
-        Complex.abs ((D * K').trace) := by rw [htrace]
+     ‖(P * K).trace‖ =
+         ‖(D * K').trace‖ := by rw [htrace]
     _ ≤ ∑ i, ‖((hP.1.eigenvalues i : ℝ) : ℂ) * K' i i‖ := hsum_abs
     _ ≤ ∑ i, hP.1.eigenvalues i := hsum_le
     _ = P.trace.re := htrace_sum.symm
+
+/-- Two square matrices with the same Gram matrix `X Xᴴ = S Sᴴ` differ by a
+unitary factor on the right. -/
+theorem exists_unitary_eq_mul_of_mul_conjTranspose_eq (X S : CMatrix a)
+    (hGram : X * Xᴴ = S * Sᴴ) :
+    ∃ U : Matrix.unitaryGroup a ℂ, S = X * (U : CMatrix a) := by
+  obtain ⟨V, hV⟩ :=
+    ReferenceIsometry.exists_eq_mul_transpose_of_mul_conjTranspose_eq
+      (A := X) (B := S) hGram (Nat.le_refl _)
+  exact ⟨⟨Matrix.transpose V.matrix, V.transpose_matrix_mem_unitary⟩, hV⟩
+
+/-- The square root of a Hermitian conjugation `E A E` factors through the
+square root of `A`: it equals `E √A U` for some unitary `U`. -/
+theorem exists_unitary_psdSqrt_conj_eq (E A : CMatrix a) (hA : A.PosSemidef)
+    (hEherm : E.IsHermitian) :
+    ∃ U : Matrix.unitaryGroup a ℂ,
+      psdSqrt (E * A * E) = E * psdSqrt A * (U : CMatrix a) := by
+  have hEA : (E * A * E).PosSemidef := by
+    have h := hA.conjTranspose_mul_mul_same E
+    rw [hEherm.eq] at h
+    simpa [Matrix.mul_assoc] using h
+  refine exists_unitary_eq_mul_of_mul_conjTranspose_eq (E * psdSqrt A)
+    (psdSqrt (E * A * E)) ?_
+  rw [Matrix.conjTranspose_mul, hEherm.eq, psdSqrt_isHermitian A,
+    psdSqrt_isHermitian (E * A * E), psdSqrt_mul_self_of_posSemidef hEA]
+  calc
+    E * psdSqrt A * (psdSqrt A * E) = E * (psdSqrt A * psdSqrt A) * E := by
+      simp [Matrix.mul_assoc]
+    _ = E * A * E := by rw [psdSqrt_mul_self_of_posSemidef hA]
 
 /-- The unitary-attainment half of the finite-dimensional trace-norm
 variational characterization: there is a unitary matrix attaining
 `|Tr(MU)| = ‖M‖₁`. -/
 theorem traceNorm_variational_exists_unitary_abs_trace (M : CMatrix a) :
     ∃ U : Matrix.unitaryGroup a ℂ,
-      Complex.abs ((M * (U : Matrix a a ℂ)).trace) = traceNorm M := by
+       ‖(M * (U : Matrix a a ℂ)).trace‖ = traceNorm M := by
   classical
   let P : CMatrix a := psdSqrt (Mᴴ * M)
   have hP_hm : P.IsHermitian := psdSqrt_isHermitian (Mᴴ * M)
@@ -324,7 +329,7 @@ theorem traceNorm_variational_exists_unitary_abs_trace (M : CMatrix a) :
       (A := P) (B := Mᴴ) hGram (Nat.le_refl _)
   let W : Matrix a a ℂ := Matrix.transpose V.matrix
   have hW_unit : W ∈ Matrix.unitaryGroup a ℂ := by
-    simpa [W] using transpose_referenceIsometry_matrix_mem_unitary V
+    simpa [W] using V.transpose_matrix_mem_unitary
   refine ⟨⟨W, hW_unit⟩, ?_⟩
   have hM : M = Wᴴ * P := by
     have h := congrArg Matrix.conjTranspose hV
@@ -341,9 +346,9 @@ theorem traceNorm_variational_exists_unitary_abs_trace (M : CMatrix a) :
   have hP_trace_nonneg : 0 ≤ P.trace :=
     Matrix.PosSemidef.trace_nonneg (psdSqrt_pos (Mᴴ * M))
   calc
-    Complex.abs ((M * W).trace) = Complex.abs P.trace := by rw [htrace]
+     ‖(M * W).trace‖ = ‖P.trace‖ := by rw [htrace]
     _ = traceNorm M := by
-      have hnorm : Complex.abs P.trace = P.trace.re := by
+      have hnorm : ‖P.trace‖ = P.trace.re := by
         have hcoe := Complex.eq_coe_norm_of_nonneg hP_trace_nonneg
         have hre : P.trace.re = ‖P.trace‖ := by
           exact (congrArg Complex.re hcoe).trans (by simp)
@@ -355,7 +360,7 @@ variational characterization: every unitary matrix gives
 `|Tr(MU)| ≤ ‖M‖₁`. -/
 theorem traceNorm_variational_unitary_abs_trace_le
     (M : CMatrix a) (U : Matrix.unitaryGroup a ℂ) :
-    Complex.abs ((M * (U : Matrix a a ℂ)).trace) ≤ traceNorm M := by
+     ‖(M * (U : Matrix a a ℂ)).trace‖ ≤ traceNorm M := by
   classical
   let P : CMatrix a := psdSqrt (Mᴴ * M)
   have hP_hm : P.IsHermitian := psdSqrt_isHermitian (Mᴴ * M)
@@ -367,7 +372,7 @@ theorem traceNorm_variational_unitary_abs_trace_le
     ReferenceIsometry.exists_eq_mul_transpose_of_mul_conjTranspose_eq
       (A := P) (B := Mᴴ) hGram (Nat.le_refl _)
   let W : Matrix.unitaryGroup a ℂ :=
-    ⟨Matrix.transpose V.matrix, transpose_referenceIsometry_matrix_mem_unitary V⟩
+    ⟨Matrix.transpose V.matrix, V.transpose_matrix_mem_unitary⟩
   have hM : M = (W : CMatrix a)ᴴ * P := by
     have h := congrArg Matrix.conjTranspose hV
     simpa [W, hP_hm.eq, Matrix.conjTranspose_mul] using h
@@ -384,8 +389,8 @@ theorem traceNorm_variational_unitary_abs_trace_le
   have hP_trace_abs_le :=
     posSemidef_trace_mul_unitary_abs_le_trace_re P (psdSqrt_pos (Mᴴ * M)) Z
   calc
-    Complex.abs ((M * (U : CMatrix a)).trace) =
-        Complex.abs ((P * (Z : CMatrix a)).trace) := by rw [htrace]
+     ‖(M * (U : CMatrix a)).trace‖ =
+         ‖(P * (Z : CMatrix a)).trace‖ := by rw [htrace]
     _ ≤ P.trace.re := hP_trace_abs_le
     _ = traceNorm M := by rfl
 
@@ -396,7 +401,7 @@ matrices to arbitrary finite-dimensional contractions, stated as `KᴴK ≤ I` i
 the matrix order. -/
 theorem traceNorm_variational_contraction_abs_trace_le
     (M K : CMatrix a) (hK : Kᴴ * K ≤ 1) :
-    Complex.abs ((M * K).trace) ≤ traceNorm M := by
+     ‖(M * K).trace‖ ≤ traceNorm M := by
   classical
   let P : CMatrix a := psdSqrt (Mᴴ * M)
   have hP_hm : P.IsHermitian := psdSqrt_isHermitian (Mᴴ * M)
@@ -408,7 +413,7 @@ theorem traceNorm_variational_contraction_abs_trace_le
     ReferenceIsometry.exists_eq_mul_transpose_of_mul_conjTranspose_eq
       (A := P) (B := Mᴴ) hGram (Nat.le_refl _)
   let W : Matrix.unitaryGroup a ℂ :=
-    ⟨Matrix.transpose V.matrix, transpose_referenceIsometry_matrix_mem_unitary V⟩
+    ⟨Matrix.transpose V.matrix, V.transpose_matrix_mem_unitary⟩
   have hM : M = (W : CMatrix a)ᴴ * P := by
     have h := congrArg Matrix.conjTranspose hV
     simpa [W, hP_hm.eq, Matrix.conjTranspose_mul] using h
@@ -452,7 +457,7 @@ theorem traceNorm_variational_contraction_abs_trace_le
         simp [Matrix.mul_assoc]
       _ = (P * Z).trace := rfl
   calc
-    Complex.abs ((M * K).trace) = Complex.abs ((P * Z).trace) := by rw [htrace]
+     ‖(M * K).trace‖ = ‖(P * Z).trace‖ := by rw [htrace]
     _ ≤ P.trace.re :=
           posSemidef_trace_mul_contraction_abs_le_trace_re P
             (psdSqrt_pos (Mᴴ * M)) Z hZ
@@ -463,33 +468,16 @@ characterization: an attaining unitary exists and every unitary is bounded by
 the trace norm. -/
 theorem traceNorm_eq_max_unitary_abs_trace (M : CMatrix a) :
     (∃ U : Matrix.unitaryGroup a ℂ,
-      Complex.abs ((M * (U : Matrix a a ℂ)).trace) = traceNorm M) ∧
+       ‖(M * (U : Matrix a a ℂ)).trace‖ = traceNorm M) ∧
       ∀ U : Matrix.unitaryGroup a ℂ,
-        Complex.abs ((M * (U : Matrix a a ℂ)).trace) ≤ traceNorm M :=
+         ‖(M * (U : Matrix a a ℂ)).trace‖ ≤ traceNorm M :=
   ⟨traceNorm_variational_exists_unitary_abs_trace M,
     traceNorm_variational_unitary_abs_trace_le M⟩
-
-private theorem variational_partialTraceA_mul_kronecker_one_right
-    {b : Type v} [Fintype b] (X : CMatrix (Prod a b)) (U : CMatrix b) :
-    partialTraceA (a := a) (b := b) (X * Matrix.kronecker (1 : CMatrix a) U) =
-      partialTraceA (a := a) (b := b) X * U := by
-  ext j j'
-  simp [partialTraceA, Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
-    Matrix.one_apply, Fintype.sum_prod_type, Finset.sum_mul]
-  rw [Finset.sum_comm]
-
-private theorem variational_partialTraceA_mul_trace_eq_trace_mul_kronecker_one_right
-    {b : Type v} [Fintype b] (X : CMatrix (Prod a b)) (U : CMatrix b) :
-    ((partialTraceA (a := a) (b := b) X) * U).trace =
-      (X * Matrix.kronecker (1 : CMatrix a) U).trace := by
-  rw [← variational_partialTraceA_mul_kronecker_one_right X U]
-  exact partialTraceA_trace (a := a) (b := b)
-    (X * Matrix.kronecker (1 : CMatrix a) U)
 
 private theorem kronecker_one_right_mem_unitaryGroup
     {b : Type v} [Fintype b] [DecidableEq b] (U : Matrix.unitaryGroup b ℂ) :
     Matrix.kronecker (1 : CMatrix a) (U : CMatrix b) ∈
-      Matrix.unitaryGroup (Prod a b) ℂ := by
+      Matrix.unitaryGroup (a × b) ℂ := by
   let I : Matrix.unitaryGroup a ℂ := ⟨1, by simp⟩
   simpa using Matrix.kronecker_mem_unitary I.2 U.2
 
@@ -506,7 +494,7 @@ private theorem referenceIsometry_matrix_mem_unitary
 
 private theorem applyMatrixRight_eq_kronecker_conj
     {b : Type v} [Fintype b] [DecidableEq b]
-    (V : ReferenceIsometry b b) (X : CMatrix (Prod a b)) :
+    (V : ReferenceIsometry b b) (X : CMatrix (a × b)) :
     V.applyMatrixRight X =
       Matrix.kronecker (1 : CMatrix a) V.matrix * X *
         Matrix.conjTranspose (Matrix.kronecker (1 : CMatrix a) V.matrix) := by
@@ -546,97 +534,78 @@ private theorem applyMatrixRight_eq_kronecker_conj
 
 private theorem kronecker_one_referenceIsometry_mem_unitary
     {b : Type v} [Fintype b] [DecidableEq b] (V : ReferenceIsometry b b) :
-    Matrix.kronecker (1 : CMatrix a) V.matrix ∈ Matrix.unitaryGroup (Prod a b) ℂ := by
+    Matrix.kronecker (1 : CMatrix a) V.matrix ∈ Matrix.unitaryGroup (a × b) ℂ := by
   let I : Matrix.unitaryGroup a ℂ := ⟨1, by simp⟩
   exact Matrix.kronecker_mem_unitary I.2 (referenceIsometry_matrix_mem_unitary V)
 
 /-- Trace norm is contractive under tracing out the first subsystem.  This
 standalone trace-norm theorem is the non-circular contraction step used by
 post-selection reductions and by Fuchs--van de Graaf style arguments. -/
-theorem traceNorm_partialTraceA_le_matrix
-    {b : Type v} [Fintype b] [DecidableEq b] (X : CMatrix (Prod a b)) :
-    traceNorm (partialTraceA (a := a) (b := b) X) ≤ traceNorm X := by
+theorem traceNorm_traceLeft_le_matrix
+    {b : Type v} [Fintype b] [DecidableEq b] (X : CMatrix (a × b)) :
+    traceNorm (Matrix.traceLeft X) ≤ traceNorm X := by
   classical
   obtain ⟨U, hU⟩ := traceNorm_variational_exists_unitary_abs_trace
-    (partialTraceA (a := a) (b := b) X)
-  let Ubig : Matrix.unitaryGroup (Prod a b) ℂ :=
+    (Matrix.traceLeft X)
+  let Ubig : Matrix.unitaryGroup (a × b) ℂ :=
     ⟨Matrix.kronecker (1 : CMatrix a) (U : CMatrix b),
       kronecker_one_right_mem_unitaryGroup U⟩
   calc
-    traceNorm (partialTraceA (a := a) (b := b) X)
-        = Complex.abs (((partialTraceA (a := a) (b := b) X) * (U : CMatrix b)).trace) :=
+    traceNorm (Matrix.traceLeft X)
+        = ‖((Matrix.traceLeft X) * (U : CMatrix b)).trace‖ :=
           hU.symm
-    _ = Complex.abs ((X * (Ubig : CMatrix (Prod a b))).trace) := by
+    _ = ‖(X * (Ubig : CMatrix (a × b))).trace‖ := by
           congr 1
           simpa [Ubig] using
-            variational_partialTraceA_mul_trace_eq_trace_mul_kronecker_one_right X
+            traceLeft_mul_trace_eq_trace_mul_kronecker_one_right X
               (U : CMatrix b)
     _ ≤ traceNorm X := traceNorm_variational_unitary_abs_trace_le X Ubig
-
-omit [DecidableEq a] in
-private theorem partialTraceB_mul_kronecker_one_left
-    {b : Type v} [Fintype b] [DecidableEq b] (X : CMatrix (Prod a b)) (U : CMatrix a) :
-    partialTraceB (a := a) (b := b) (X * Matrix.kronecker U (1 : CMatrix b)) =
-      partialTraceB (a := a) (b := b) X * U := by
-  ext i i'
-  simp [partialTraceB, Matrix.mul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply,
-    Matrix.one_apply, Fintype.sum_prod_type, Finset.sum_mul]
-  rw [Finset.sum_comm]
-
-omit [DecidableEq a] in
-private theorem partialTraceB_mul_trace_eq_trace_mul_kronecker_one_left
-    {b : Type v} [Fintype b] [DecidableEq b] (X : CMatrix (Prod a b)) (U : CMatrix a) :
-    ((partialTraceB (a := a) (b := b) X) * U).trace =
-      (X * Matrix.kronecker U (1 : CMatrix b)).trace := by
-  rw [← partialTraceB_mul_kronecker_one_left X U]
-  exact partialTraceB_trace (a := a) (b := b)
-    (X * Matrix.kronecker U (1 : CMatrix b))
 
 private theorem kronecker_one_left_mem_unitaryGroup
     {b : Type v} [Fintype b] [DecidableEq b] (U : Matrix.unitaryGroup a ℂ) :
     Matrix.kronecker (U : CMatrix a) (1 : CMatrix b) ∈
-      Matrix.unitaryGroup (Prod a b) ℂ := by
+      Matrix.unitaryGroup (a × b) ℂ := by
   let I : Matrix.unitaryGroup b ℂ := ⟨1, by simp⟩
   simpa using Matrix.kronecker_mem_unitary U.2 I.2
 
 /-- Trace norm is contractive under tracing out the second subsystem. -/
-theorem traceNorm_partialTraceB_le_matrix
-    {b : Type v} [Fintype b] [DecidableEq b] (X : CMatrix (Prod a b)) :
-    traceNorm (partialTraceB (a := a) (b := b) X) ≤ traceNorm X := by
+theorem traceNorm_traceRight_le_matrix
+    {b : Type v} [Fintype b] [DecidableEq b] (X : CMatrix (a × b)) :
+    traceNorm (Matrix.traceRight X) ≤ traceNorm X := by
   classical
   obtain ⟨U, hU⟩ := traceNorm_variational_exists_unitary_abs_trace
-    (partialTraceB (a := a) (b := b) X)
-  let Ubig : Matrix.unitaryGroup (Prod a b) ℂ :=
+    (Matrix.traceRight X)
+  let Ubig : Matrix.unitaryGroup (a × b) ℂ :=
     ⟨Matrix.kronecker (U : CMatrix a) (1 : CMatrix b),
       kronecker_one_left_mem_unitaryGroup U⟩
   calc
-    traceNorm (partialTraceB (a := a) (b := b) X)
-        = Complex.abs (((partialTraceB (a := a) (b := b) X) * (U : CMatrix a)).trace) :=
+    traceNorm (Matrix.traceRight X)
+        = ‖((Matrix.traceRight X) * (U : CMatrix a)).trace‖ :=
           hU.symm
-    _ = Complex.abs ((X * (Ubig : CMatrix (Prod a b))).trace) := by
+    _ = ‖(X * (Ubig : CMatrix (a × b))).trace‖ := by
           congr 1
           simpa [Ubig] using
-            partialTraceB_mul_trace_eq_trace_mul_kronecker_one_left X
-              (U : CMatrix a)
+            (trace_mul_kronecker_one_right_eq_traceRight X
+              (U : CMatrix a)).symm
     _ ≤ traceNorm X := traceNorm_variational_unitary_abs_trace_le X Ubig
 
 /-- Drop a terminal unit register from a matrix. -/
 def dropRightUnitMatrix {α : Type u} [Fintype α] [DecidableEq α]
-    (X : CMatrix (Prod α PUnit)) : CMatrix α :=
+    (X : CMatrix (α × PUnit)) : CMatrix α :=
   fun i j => X (i, PUnit.unit) (j, PUnit.unit)
 
 /-- Dropping a terminal unit register is a partial trace over that unit
 register, hence it does not increase trace norm. -/
 theorem traceNorm_dropRightUnitMatrix_le
     {α : Type u} [Fintype α] [DecidableEq α]
-    (X : CMatrix (Prod α PUnit)) :
+    (X : CMatrix (α × PUnit)) :
     traceNorm (dropRightUnitMatrix X) ≤ traceNorm X := by
   have hdrop :
-      dropRightUnitMatrix X = partialTraceB (a := α) (b := PUnit) X := by
+      dropRightUnitMatrix X = Matrix.traceRight X := by
     ext i j
-    simp [dropRightUnitMatrix, partialTraceB]
+    simp [dropRightUnitMatrix, Matrix.traceRight]
   rw [hdrop]
-  exact traceNorm_partialTraceB_le_matrix X
+  exact traceNorm_traceRight_le_matrix X
 
 /-- A square reference isometry acting on the right/reference tensor factor
 does not increase the trace norm.  Since the source and target reference
@@ -644,33 +613,33 @@ dimensions agree, the isometry is unitary, so this is unitary conjugation
 invariance expressed in the input-first convention used by CKR reductions. -/
 theorem traceNorm_applyMatrixRight_le
     {b : Type v} [Fintype b] [DecidableEq b]
-    (V : ReferenceIsometry b b) (X : CMatrix (Prod a b)) :
+    (V : ReferenceIsometry b b) (X : CMatrix (a × b)) :
     traceNorm (V.applyMatrixRight X) ≤ traceNorm X := by
   classical
   obtain ⟨U, hU⟩ := traceNorm_variational_exists_unitary_abs_trace (V.applyMatrixRight X)
-  let K : Matrix.unitaryGroup (Prod a b) ℂ :=
+  let K : Matrix.unitaryGroup (a × b) ℂ :=
     ⟨Matrix.kronecker (1 : CMatrix a) V.matrix,
       kronecker_one_referenceIsometry_mem_unitary (a := a) V⟩
-  let Uin : Matrix.unitaryGroup (Prod a b) ℂ := K⁻¹ * U * K
-  have htrace : ((V.applyMatrixRight X) * (U : CMatrix (Prod a b))).trace =
-      (X * (Uin : CMatrix (Prod a b))).trace := by
+  let Uin : Matrix.unitaryGroup (a × b) ℂ := K⁻¹ * U * K
+  have htrace : ((V.applyMatrixRight X) * (U : CMatrix (a × b))).trace =
+      (X * (Uin : CMatrix (a × b))).trace := by
     rw [applyMatrixRight_eq_kronecker_conj]
-    change (((K : CMatrix (Prod a b)) * X * star (K : CMatrix (Prod a b))) * U).trace =
-      (X * (Uin : CMatrix (Prod a b))).trace
+    change (((K : CMatrix (a × b)) * X * star (K : CMatrix (a × b))) * U).trace =
+      (X * (Uin : CMatrix (a × b))).trace
     calc
-      (((K : CMatrix (Prod a b)) * X * star (K : CMatrix (Prod a b))) * U).trace
-          = ((K : CMatrix (Prod a b)) * X * (star (K : CMatrix (Prod a b)) * U)).trace := by
+      (((K : CMatrix (a × b)) * X * star (K : CMatrix (a × b))) * U).trace
+          = ((K : CMatrix (a × b)) * X * (star (K : CMatrix (a × b)) * U)).trace := by
             simp [Matrix.mul_assoc]
-      _ = (X * (star (K : CMatrix (Prod a b)) * U) * (K : CMatrix (Prod a b))).trace := by
+      _ = (X * (star (K : CMatrix (a × b)) * U) * (K : CMatrix (a × b))).trace := by
             rw [Matrix.trace_mul_cycle]
             rw [Matrix.trace_mul_comm]
             simp [Matrix.mul_assoc]
-      _ = (X * (Uin : CMatrix (Prod a b))).trace := by
+      _ = (X * (Uin : CMatrix (a × b))).trace := by
             simp [Uin, Matrix.star_eq_conjTranspose, Matrix.mul_assoc]
   calc
     traceNorm (V.applyMatrixRight X) =
-        Complex.abs (((V.applyMatrixRight X) * (U : CMatrix (Prod a b))).trace) := hU.symm
-    _ = Complex.abs ((X * (Uin : CMatrix (Prod a b))).trace) := by rw [htrace]
+         ‖((V.applyMatrixRight X) * (U : CMatrix (a × b))).trace‖ := hU.symm
+    _ = ‖(X * (Uin : CMatrix (a × b))).trace‖ := by rw [htrace]
     _ ≤ traceNorm X := traceNorm_variational_unitary_abs_trace_le X Uin
 
 /-- Trace norm triangle inequality, proved from the finite-dimensional
@@ -679,19 +648,32 @@ theorem traceNorm_add_le (A B : CMatrix a) :
     traceNorm (A + B) ≤ traceNorm A + traceNorm B := by
   classical
   obtain ⟨U, hU⟩ := traceNorm_variational_exists_unitary_abs_trace (A + B)
-  have htri : Complex.abs (((A + B) * (U : CMatrix a)).trace) ≤
-      Complex.abs ((A * (U : CMatrix a)).trace) +
-        Complex.abs ((B * (U : CMatrix a)).trace) := by
+  have htri : ‖((A + B) * (U : CMatrix a)).trace‖ ≤
+       ‖(A * (U : CMatrix a)).trace‖ +
+         ‖(B * (U : CMatrix a)).trace‖ := by
     rw [Matrix.add_mul, Matrix.trace_add]
-    simpa [Complex.abs] using norm_add_le ((A * (U : CMatrix a)).trace)
+    simpa using norm_add_le ((A * (U : CMatrix a)).trace)
       ((B * (U : CMatrix a)).trace)
   calc
-    traceNorm (A + B) = Complex.abs (((A + B) * (U : CMatrix a)).trace) := hU.symm
-    _ ≤ Complex.abs ((A * (U : CMatrix a)).trace) +
-        Complex.abs ((B * (U : CMatrix a)).trace) := htri
+    traceNorm (A + B) = ‖((A + B) * (U : CMatrix a)).trace‖ := hU.symm
+    _ ≤ ‖(A * (U : CMatrix a)).trace‖ +
+         ‖(B * (U : CMatrix a)).trace‖ := htri
     _ ≤ traceNorm A + traceNorm B := add_le_add
       (traceNorm_variational_unitary_abs_trace_le A U)
       (traceNorm_variational_unitary_abs_trace_le B U)
+
+/-- Triangle inequality for matrix trace distance. -/
+theorem traceNormDistance_triangle (A B C : CMatrix a) :
+    traceNormDistance A C ≤
+      traceNormDistance A B + traceNormDistance B C := by
+  have hdiff : A - C = (A - B) + (B - C) := by
+    ext i j
+    simp [Matrix.sub_apply, Matrix.add_apply]
+  calc
+    traceNormDistance A C = traceNorm ((A - B) + (B - C)) := by
+      rw [traceNormDistance, hdiff]
+    _ ≤ traceNorm (A - B) + traceNorm (B - C) := traceNorm_add_le (A - B) (B - C)
+    _ = traceNormDistance A B + traceNormDistance B C := rfl
 
 /-- Triangle inequality for matrix normalized trace distance. -/
 theorem normalizedTraceDistance_triangle (A B C : CMatrix a) :
@@ -711,15 +693,19 @@ theorem normalizedTraceDistance_triangle (A B C : CMatrix a) :
     _ = normalizedTraceDistance A B + normalizedTraceDistance B C := by
         simp [normalizedTraceDistance, traceNormDistance, mul_add]
 
-namespace State
+end QIT
+
+namespace MState
 
 /-- Triangle inequality for state normalized trace distance. -/
-theorem normalizedTraceDistance_triangle (ρ σ τ : State a) :
+theorem normalizedTraceDistance_triangle (ρ σ τ : MState a) :
     ρ.normalizedTraceDistance τ ≤
       ρ.normalizedTraceDistance σ + σ.normalizedTraceDistance τ :=
-  QIT.normalizedTraceDistance_triangle ρ.matrix σ.matrix τ.matrix
+  QIT.normalizedTraceDistance_triangle ρ.m σ.m τ.m
 
-end State
+end MState
+
+namespace QIT
 
 /-- Trace norm is positively homogeneous for nonnegative real scalars, in the
 one-sided form needed for finite averaging arguments. -/
@@ -734,16 +720,16 @@ theorem traceNorm_real_smul_le {c : ℝ} (hc : 0 ≤ c) (M : CMatrix a) :
     simp [smul_eq_mul]
   calc
     traceNorm (((c : ℂ) • M)) =
-        Complex.abs ((((c : ℂ) • M) * (U : CMatrix a)).trace) := hU.symm
-    _ = c * Complex.abs ((M * (U : CMatrix a)).trace) := by
+         ‖(((c : ℂ) • M) * (U : CMatrix a)).trace‖ := hU.symm
+    _ = c * ‖(M * (U : CMatrix a)).trace‖ := by
       rw [htrace]
-      simp [Complex.abs, Real.norm_eq_abs, abs_of_nonneg hc]
+      simp [Real.norm_eq_abs, abs_of_nonneg hc]
     _ ≤ c * traceNorm M := mul_le_mul_of_nonneg_left
       (traceNorm_variational_unitary_abs_trace_le M U) hc
 
 theorem trace_abs_le_traceNorm {a : Type u} [Fintype a] [DecidableEq a]
     (M : CMatrix a) :
-    Complex.abs M.trace ≤ traceNorm M := by
+     ‖M.trace‖ ≤ traceNorm M := by
   simpa using traceNorm_variational_unitary_abs_trace_le M (1 : Matrix.unitaryGroup a ℂ)
 
 /-- Trace norm is invariant under conjugate transpose. -/
@@ -771,8 +757,8 @@ theorem traceNorm_conjTranspose {a : Type u} [Fintype a] [DecidableEq a]
             Matrix.trace_conjTranspose _
     calc
       traceNorm (Matrix.conjTranspose A) =
-          Complex.abs ((Matrix.conjTranspose A * (U : CMatrix a)).trace) := hU.symm
-      _ = Complex.abs ((A * (V : CMatrix a)).trace) := by simp [htrace]
+           ‖(Matrix.conjTranspose A * (U : CMatrix a)).trace‖ := hU.symm
+      _ = ‖(A * (V : CMatrix a)).trace‖ := by simp [htrace]
       _ ≤ traceNorm A := traceNorm_variational_unitary_abs_trace_le A V
   · obtain ⟨U, hU⟩ := traceNorm_variational_exists_unitary_abs_trace A
     let V : Matrix.unitaryGroup a ℂ := U⁻¹
@@ -791,8 +777,8 @@ theorem traceNorm_conjTranspose {a : Type u} [Fintype a] [DecidableEq a]
         _ = star ((Matrix.conjTranspose A * star (U : CMatrix a)).trace) :=
             Matrix.trace_conjTranspose _
     calc
-      traceNorm A = Complex.abs ((A * (U : CMatrix a)).trace) := hU.symm
-      _ = Complex.abs ((Matrix.conjTranspose A * (V : CMatrix a)).trace) := by
+      traceNorm A = ‖(A * (U : CMatrix a)).trace‖ := hU.symm
+      _ = ‖(Matrix.conjTranspose A * (V : CMatrix a)).trace‖ := by
             simp [htrace]
       _ ≤ traceNorm (Matrix.conjTranspose A) :=
           traceNorm_variational_unitary_abs_trace_le (Matrix.conjTranspose A) V
@@ -836,54 +822,71 @@ theorem traceNorm_eq_of_conjTranspose_mul_eq {A B : CMatrix a}
   apply traceNorm_eq_of_mul_conjTranspose_eq
   simpa [Matrix.conjTranspose_conjTranspose] using h
 
-private theorem reindex_unitary_mem {b : Type v} [Fintype b] [DecidableEq b]
-    (e : a ≃ b) (U : Matrix.unitaryGroup b ℂ) :
-    (U : CMatrix b).submatrix e e ∈ Matrix.unitaryGroup a ℂ := by
-  rw [Matrix.mem_unitaryGroup_iff]
-  ext i j
-  have hU := Matrix.mem_unitaryGroup_iff.mp U.2
-  have happ := congrFun (congrFun hU (e i)) (e j)
-  simp [Matrix.mul_apply, Matrix.star_apply] at happ ⊢
-  have hsum :
-      (∑ x : a, (U : CMatrix b) (e i) (e x) *
-          (starRingEnd ℂ) ((U : CMatrix b) (e j) (e x))) =
-        ∑ y : b, (U : CMatrix b) (e i) y *
-          (starRingEnd ℂ) ((U : CMatrix b) (e j) y) := by
-    exact Fintype.sum_equiv e
-      (fun x : a => (U : CMatrix b) (e i) (e x) *
-        (starRingEnd ℂ) ((U : CMatrix b) (e j) (e x)))
-      (fun y : b => (U : CMatrix b) (e i) y *
-        (starRingEnd ℂ) ((U : CMatrix b) (e j) y))
-      (by intro x; rfl)
-  rw [hsum]
-  simpa [Matrix.one_apply] using happ
+/-- Fidelity-style rewriting of a product of square roots: `‖√A √B‖₁` is the
+trace of `√(√B A √B)`. -/
+theorem traceNorm_psdSqrt_mul_psdSqrt_eq_trace_psdSqrt_sandwich
+    (A B : CMatrix a) (hA : A.PosSemidef) :
+    traceNorm (psdSqrt A * psdSqrt B) =
+      (psdSqrt (psdSqrt B * A * psdSqrt B)).trace.re := by
+  rw [← traceNorm_conjTranspose (psdSqrt A * psdSqrt B)]
+  rw [Matrix.conjTranspose_mul, psdSqrt_isHermitian A,
+    psdSqrt_isHermitian B]
+  rw [traceNorm_eq_trace_psdSqrt_mul_conjTranspose]
+  rw [Matrix.conjTranspose_mul, psdSqrt_isHermitian A,
+    psdSqrt_isHermitian B]
+  have hinside :
+      psdSqrt B * psdSqrt A * (psdSqrt A * psdSqrt B) =
+        psdSqrt B * A * psdSqrt B := by
+    calc
+      psdSqrt B * psdSqrt A * (psdSqrt A * psdSqrt B) =
+          psdSqrt B * (psdSqrt A * psdSqrt A) * psdSqrt B := by
+            simp [Matrix.mul_assoc]
+      _ = psdSqrt B * A * psdSqrt B := by
+            rw [psdSqrt_mul_self_of_posSemidef hA]
+  rw [hinside]
 
-omit [DecidableEq a] in
-private theorem trace_mul_submatrix_equiv {b : Type v} [Fintype b] [DecidableEq b]
-    (e : a ≃ b) (M U : CMatrix b) :
-    ((M.submatrix e e) * (U.submatrix e e)).trace = (M * U).trace := by
-  rw [Matrix.trace]
-  rw [Matrix.trace]
-  apply Fintype.sum_equiv e
-    (fun x : a => ((M.submatrix e e) * (U.submatrix e e)) x x)
-    (fun y : b => (M * U) y y)
-  intro x
-  rw [Matrix.mul_apply, Matrix.mul_apply]
-  exact Fintype.sum_equiv e
-    (fun z : a => M (e x) (e z) * U (e z) (e x))
-    (fun y : b => M (e x) y * U y (e x))
-    (by intro z; rfl)
+/-- If `E` acts as the identity on both sides of `√A`, then compressing the
+second factor by `E` leaves `‖√A √R‖₁` unchanged. -/
+theorem traceNorm_psdSqrt_mul_psdSqrt_conj_eq
+    (A R E : CMatrix a) (hR : R.PosSemidef)
+    (hER : (E * R * E).PosSemidef)
+    (hleft : psdSqrt A * E = psdSqrt A)
+    (hright : E * psdSqrt A = psdSqrt A) :
+    traceNorm (psdSqrt A * psdSqrt R) =
+      traceNorm (psdSqrt A * psdSqrt (E * R * E)) := by
+  have hsand : psdSqrt A * R * psdSqrt A =
+      psdSqrt A * (E * R * E) * psdSqrt A := by
+    calc
+      psdSqrt A * R * psdSqrt A =
+          (psdSqrt A * E) * R * (E * psdSqrt A) := by rw [hleft, hright]
+      _ = psdSqrt A * (E * R * E) * psdSqrt A := by simp [Matrix.mul_assoc]
+  calc
+    traceNorm (psdSqrt A * psdSqrt R) =
+        traceNorm (psdSqrt R * psdSqrt A) := by
+      rw [← traceNorm_conjTranspose]
+      rw [Matrix.conjTranspose_mul, (psdSqrt_isHermitian R).eq,
+        (psdSqrt_isHermitian A).eq]
+    _ = (psdSqrt (psdSqrt A * R * psdSqrt A)).trace.re :=
+      traceNorm_psdSqrt_mul_psdSqrt_eq_trace_psdSqrt_sandwich R A hR
+    _ = (psdSqrt (psdSqrt A * (E * R * E) * psdSqrt A)).trace.re := by rw [hsand]
+    _ = traceNorm (psdSqrt (E * R * E) * psdSqrt A) :=
+      (traceNorm_psdSqrt_mul_psdSqrt_eq_trace_psdSqrt_sandwich
+        (E * R * E) A hER).symm
+    _ = traceNorm (psdSqrt A * psdSqrt (E * R * E)) := by
+      rw [← traceNorm_conjTranspose]
+      rw [Matrix.conjTranspose_mul, (psdSqrt_isHermitian A).eq,
+        (psdSqrt_isHermitian (E * R * E)).eq]
 
 private theorem traceNorm_submatrix_equiv_le {b : Type v} [Fintype b] [DecidableEq b]
     (e : a ≃ b) (M : CMatrix b) :
     traceNorm (M.submatrix e e) ≤ traceNorm M := by
   obtain ⟨U, hU⟩ := traceNorm_variational_exists_unitary_abs_trace (M.submatrix e e)
   let Ubig : Matrix.unitaryGroup b ℂ :=
-    ⟨(U : CMatrix a).submatrix e.symm e.symm, reindex_unitary_mem e.symm U⟩
+    ⟨(U : CMatrix a).submatrix e.symm e.symm, cMatrix_reindex_mem_unitary e U⟩
   calc
     traceNorm (M.submatrix e e) =
-        Complex.abs (((M.submatrix e e) * (U : CMatrix a)).trace) := hU.symm
-    _ = Complex.abs ((M * (Ubig : CMatrix b)).trace) := by
+         ‖((M.submatrix e e) * (U : CMatrix a)).trace‖ := hU.symm
+    _ = ‖(M * (Ubig : CMatrix b)).trace‖ := by
           congr 1
           simpa [Ubig] using (trace_mul_submatrix_equiv e M (Ubig : CMatrix b))
     _ ≤ traceNorm M := traceNorm_variational_unitary_abs_trace_le M Ubig
@@ -898,15 +901,27 @@ theorem traceNorm_submatrix_equiv {b : Type v} [Fintype b] [DecidableEq b]
   · have h := traceNorm_submatrix_equiv_le e.symm (M.submatrix e e)
     simpa using h
 
+/-- Trace distance is invariant under simultaneous reindexing by a finite
+equivalence. -/
+theorem traceNormDistance_submatrix_equiv {b : Type v} [Fintype b] [DecidableEq b]
+    (e : a ≃ b) (M N : CMatrix b) :
+    traceNormDistance (M.submatrix e e) (N.submatrix e e) = traceNormDistance M N := by
+  have hsub : M.submatrix e e - N.submatrix e e = (M - N).submatrix e e := by
+    ext i j
+    rfl
+  rw [traceNormDistance, traceNormDistance, hsub, traceNorm_submatrix_equiv]
+
 namespace ReferenceIsometry
 
 universe w
 
 variable {b : Type v} [Fintype b] [DecidableEq b]
 
+/-- Distributing a product over a sum on the right:
+`(a × extra) ⊕ (a × b) ≃ a × (extra ⊕ b)`. -/
 def prodSumRightEquiv
     (a : Type u) (extra : Type w) (b : Type v) :
-    Sum (Prod a extra) (Prod a b) ≃ Prod a (Sum extra b) where
+    ((a × extra) ⊕ (a × b)) ≃ (a × (extra ⊕ b)) where
   toFun x := match x with
     | Sum.inl ae => (ae.1, Sum.inl ae.2)
     | Sum.inr ab => (ab.1, Sum.inr ab.2)
@@ -919,11 +934,11 @@ def prodSumRightEquiv
 omit [Fintype a] [DecidableEq a] in
 theorem applyMatrixRight_sumInr_submatrix_prodSumRightEquiv
     {extra : Type w} [Fintype extra] [DecidableEq extra]
-    (X : CMatrix (Prod a b)) :
+    (X : CMatrix (a × b)) :
     ((ReferenceIsometry.sumInr extra b).applyMatrixRight X).submatrix
       (prodSumRightEquiv a extra b) (prodSumRightEquiv a extra b) =
-        (Matrix.fromBlocks (0 : CMatrix (Prod a extra)) 0 0 X :
-          CMatrix (Sum (Prod a extra) (Prod a b))) := by
+        (Matrix.fromBlocks (0 : CMatrix (a × extra)) 0 0 X :
+          CMatrix ((a × extra) ⊕ (a × b))) := by
   ext x y
   cases x <;> cases y <;>
     simp [prodSumRightEquiv, ReferenceIsometry.applyMatrixRight,
@@ -932,7 +947,7 @@ theorem applyMatrixRight_sumInr_submatrix_prodSumRightEquiv
 /-- Concrete right-summand reference padding preserves trace norm. -/
 theorem traceNorm_applyMatrixRight_sumInr
     {extra : Type w} [Fintype extra] [DecidableEq extra]
-    (X : CMatrix (Prod a b)) :
+    (X : CMatrix (a × b)) :
     traceNorm ((ReferenceIsometry.sumInr extra b).applyMatrixRight X) =
       traceNorm X := by
   let e := prodSumRightEquiv a extra b
@@ -969,7 +984,7 @@ theorem traceNorm_variational_exists_referenceUnitary_sq (M : CMatrix a) :
   let V : ReferenceUnitary a := ⟨Matrix.UnitaryGroup.transpose U⟩
   refine ⟨V, ?_⟩
   have hAbs :
-      Complex.abs ((M * Matrix.transpose V.matrix).trace) = traceNorm M := by
+       ‖(M * Matrix.transpose V.matrix).trace‖ = traceNorm M := by
     simpa [V] using hU
   simp [Complex.normSq_eq_norm_sq, hAbs]
 
@@ -980,11 +995,20 @@ theorem traceNorm_variational_referenceUnitary_sq_le
     Complex.normSq ((M * Matrix.transpose U.matrix).trace) ≤ (traceNorm M) ^ 2 := by
   classical
   have hAbs :
-      Complex.abs ((M * Matrix.transpose U.matrix).trace) ≤ traceNorm M := by
+       ‖(M * Matrix.transpose U.matrix).trace‖ ≤ traceNorm M := by
     simpa using traceNorm_variational_unitary_abs_trace_le M
       (Matrix.UnitaryGroup.transpose U.matrix)
   exact complex_normSq_le_sq_of_abs_le hAbs
 
-end
-
 end QIT
+
+namespace MState
+
+/-- Normalized trace distance is invariant under state reindexing. -/
+theorem normalizedTraceDistance_reindex_equiv {b : Type v} [Fintype b] [DecidableEq b]
+    (ρ σ : MState a) (e : a ≃ b) :
+    (ρ.reindex e).normalizedTraceDistance (σ.reindex e) = ρ.normalizedTraceDistance σ := by
+  simp only [MState.normalizedTraceDistance, QIT.normalizedTraceDistance, MState.reindex_matrix]
+  rw [QIT.traceNormDistance_submatrix_equiv e.symm ρ.m σ.m]
+
+end MState

@@ -8,6 +8,7 @@ module
 
 public import QuantumLib.QIT.Information.Renyi.SandwichedRenyiMonotonicity
 public import QuantumLib.QIT.States.TraceNorm.Spectral
+public import QuantumLib.QIT.Util.MatrixInstances
 public import Mathlib.Topology.Semicontinuity.Basic
 
 /-!
@@ -22,19 +23,19 @@ sandwiched Renyi mutual information.
 open scoped ComplexOrder MatrixOrder Topology
 open Filter
 
-namespace QIT
-
-universe u v
-
 noncomputable section
-
+universe u v
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+
+open QIT
+
+namespace QIT
 
 /-- Positive definiteness is eventually preserved along PSD-constrained
 matrix paths converging to a positive-definite limit. -/
 theorem eventually_posDef_of_tendsto_posDef
-    {X : Type*} {l : Filter X} {M : X -> CMatrix a} {A : CMatrix a}
+    {X : Type*} {l : Filter X} {M : X → CMatrix a} {A : CMatrix a}
     (hM : Tendsto M l (nhds A))
     (hMpsd : Filter.Eventually (fun x => (M x).PosSemidef) l)
     (hA : A.PosDef) :
@@ -49,166 +50,6 @@ theorem eventually_posDef_of_tendsto_posDef
   filter_upwards [hMpsd, hevent_det] with x hxpsd hxdet
   exact hxpsd.posDef_iff_det_ne_zero.mpr hxdet
 
-/-- Kronecker products commute with `CFC.rpow` for positive semidefinite matrices
-and arbitrary real exponents.
-
-This removes the `0 ≤ s` restriction of `cMatrix_rpow_kronecker_nonneg` (and the
-positive-definiteness restriction of `cMatrix_rpow_kronecker_posDef`): the
-finite-spectrum polynomial-interpolation identity
-`cMatrix_rpow_unitary_conj_diagonal_ofReal` computes the conjugation step for
-every real exponent, including the negative powers `s = (1 - α) / (2 α) < 0`
-that drive the high-`α` sandwiched Rényi inner operator at a singular product
-reference. -/
-theorem cMatrix_rpow_kronecker_psd
-    {A : CMatrix a} {B : CMatrix b} (hA : A.PosSemidef) (hB : B.PosSemidef)
-    (s : ℝ) :
-    CFC.rpow (Matrix.kronecker A B) s =
-      Matrix.kronecker (CFC.rpow A s) (CFC.rpow B s) := by
-  let UA : Matrix.unitaryGroup a ℂ := hA.isHermitian.eigenvectorUnitary
-  let UB : Matrix.unitaryGroup b ℂ := hB.isHermitian.eigenvectorUnitary
-  let U : Matrix.unitaryGroup (Prod a b) ℂ :=
-    ⟨Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b),
-      Matrix.kronecker_mem_unitary UA.2 UB.2⟩
-  let da : a → ℝ := hA.isHermitian.eigenvalues
-  let db : b → ℝ := hB.isHermitian.eigenvalues
-  let dprod : Prod a b → ℝ := fun i => da i.1 * db i.2
-  have hda : ∀ i, 0 ≤ da i := fun i => hA.eigenvalues_nonneg i
-  have hdb : ∀ i, 0 ≤ db i := fun i => hB.eigenvalues_nonneg i
-  have hdprod : ∀ i, 0 ≤ dprod i := fun i => mul_nonneg (hda i.1) (hdb i.2)
-  have hA_spec :
-      A = (UA : CMatrix a) * Matrix.diagonal (fun i => (da i : ℂ)) *
-        star (UA : CMatrix a) := by
-    simpa [UA, da, Function.comp_def] using hA.isHermitian.spectral_theorem
-  have hB_spec :
-      B = (UB : CMatrix b) * Matrix.diagonal (fun i => (db i : ℂ)) *
-        star (UB : CMatrix b) := by
-    simpa [UB, db, Function.comp_def] using hB.isHermitian.spectral_theorem
-  have hAB_spec :
-      Matrix.kronecker A B =
-        (U : CMatrix (Prod a b)) *
-          Matrix.diagonal (fun i => (dprod i : ℂ)) *
-          star (U : CMatrix (Prod a b)) := by
-    rw [hA_spec, hB_spec]
-    simp [U, dprod, Matrix.star_eq_conjTranspose, Matrix.conjTranspose_kronecker,
-      Matrix.mul_kronecker_mul, Matrix.diagonal_kronecker_diagonal,
-      Matrix.mul_assoc]
-  have hleft :
-      CFC.rpow (Matrix.kronecker A B) s =
-        (U : CMatrix (Prod a b)) *
-          Matrix.diagonal (fun i => ((dprod i ^ s : ℝ) : ℂ)) *
-          star (U : CMatrix (Prod a b)) := by
-    rw [hAB_spec]
-    exact cMatrix_rpow_unitary_conj_diagonal_ofReal U dprod hdprod s
-  have hdiag :
-      (Matrix.diagonal fun i : Prod a b => ((dprod i ^ s : ℝ) : ℂ)) =
-        (Matrix.diagonal fun i : Prod a b =>
-          (((da i.1 ^ s) * (db i.2 ^ s) : ℝ) : ℂ)) := by
-    ext i j
-    by_cases hij : i = j
-    · subst j
-      simp [dprod, Real.mul_rpow (hda i.1) (hdb i.2)]
-    · simp [hij]
-  have hA_rpow :
-      CFC.rpow A s =
-        (UA : CMatrix a) *
-          (Matrix.diagonal fun i => ((da i ^ s : ℝ) : ℂ)) *
-          star (UA : CMatrix a) := by
-    rw [hA_spec]
-    exact cMatrix_rpow_unitary_conj_diagonal_ofReal UA da hda s
-  have hB_rpow :
-      CFC.rpow B s =
-        (UB : CMatrix b) *
-          (Matrix.diagonal fun i => ((db i ^ s : ℝ) : ℂ)) *
-          star (UB : CMatrix b) := by
-    rw [hB_spec]
-    exact cMatrix_rpow_unitary_conj_diagonal_ofReal UB db hdb s
-  have hright :
-      Matrix.kronecker (CFC.rpow A s) (CFC.rpow B s) =
-        (U : CMatrix (Prod a b)) *
-          (Matrix.diagonal fun i : Prod a b =>
-            (((da i.1 ^ s) * (db i.2 ^ s) : ℝ) : ℂ)) *
-          star (U : CMatrix (Prod a b)) := by
-    rw [hA_rpow, hB_rpow]
-    simp [U, Matrix.star_eq_conjTranspose, Matrix.conjTranspose_kronecker,
-      Matrix.mul_kronecker_mul, Matrix.diagonal_kronecker_diagonal,
-      Matrix.mul_assoc]
-  rw [hleft, hdiag, hright]
-
-/-- Real powers of a positive semidefinite matrix obey the exponent law
-`A^p * A^q = A^(p + q)` whenever `p + q ≠ 0`.
-
-Unlike `CFC.rpow_add` (which needs `A.IsUnit`, i.e. `A.PosDef`), this variant
-covers singular positive semidefinite matrices via finite-spectrum polynomial
-interpolation; it is the bookkeeping needed to combine the marginal factor
-`A_x` with its negative powers `A_x^s` along a singular-marginal limit. -/
-theorem cMatrix_rpow_add_psd {A : CMatrix a} (hA : A.PosSemidef) {p q : ℝ}
-    (hpq : p + q ≠ 0) :
-    CFC.rpow A p * CFC.rpow A q = CFC.rpow A (p + q) := by
-  let U : Matrix.unitaryGroup a ℂ := hA.isHermitian.eigenvectorUnitary
-  let d : a → ℝ := hA.isHermitian.eigenvalues
-  have hd : ∀ i, 0 ≤ d i := fun i => hA.eigenvalues_nonneg i
-  have hA_spec :
-      A = (U : CMatrix a) *
-        (Matrix.diagonal fun i => (d i : ℂ)) *
-        star (U : CMatrix a) := by
-    simpa [U, d, Function.comp_def] using hA.isHermitian.spectral_theorem
-  have hDp :
-      CFC.rpow A p =
-        (U : CMatrix a) *
-          (Matrix.diagonal fun i => ((d i ^ p : ℝ) : ℂ)) *
-          star (U : CMatrix a) := by
-    rw [hA_spec]
-    exact cMatrix_rpow_unitary_conj_diagonal_ofReal U d hd p
-  have hDq :
-      CFC.rpow A q =
-        (U : CMatrix a) *
-          (Matrix.diagonal fun i => ((d i ^ q : ℝ) : ℂ)) *
-          star (U : CMatrix a) := by
-    rw [hA_spec]
-    exact cMatrix_rpow_unitary_conj_diagonal_ofReal U d hd q
-  have hDpq :
-      CFC.rpow A (p + q) =
-        (U : CMatrix a) *
-          (Matrix.diagonal fun i => ((d i ^ (p + q) : ℝ) : ℂ)) *
-          star (U : CMatrix a) := by
-    rw [hA_spec]
-    exact cMatrix_rpow_unitary_conj_diagonal_ofReal U d hd (p + q)
-  have hconjConj (M : CMatrix a) :
-      (U : CMatrix a) * M * star (U : CMatrix a) =
-        (Unitary.conjStarAlgAut ℂ (CMatrix a) U) M := by
-    simp [Unitary.conjStarAlgAut_apply]
-  have hDiagMul :
-      (Matrix.diagonal fun i => ((d i ^ p : ℝ) : ℂ) : CMatrix a) *
-        (Matrix.diagonal fun i => ((d i ^ q : ℝ) : ℂ)) =
-        (Matrix.diagonal fun i => ((d i ^ (p + q) : ℝ) : ℂ) : CMatrix a) := by
-    ext i j
-    by_cases hij : i = j
-    · subst j
-      simp [Real.rpow_add' (hd i) hpq]
-    · simp [hij]
-  rw [hDp, hDq, hDpq, hconjConj, hconjConj, hconjConj, ← map_mul, hDiagMul]
-
-omit [DecidableEq a] in
-/-- Trace pairing against a right identity Kronecker factor reduces to the
-partial trace over the right subsystem.
-
-This is the public form of the (otherwise `private`)
-`partialTraceB_mul_trace_eq_trace_mul_kronecker_one_left`, needed to relate the
-off-support mass of a bipartite state `ρ` to its left marginal. -/
-theorem trace_mul_kronecker_one_right_eq_partialTraceB
-    (X : CMatrix (Prod a b)) (U : CMatrix a) :
-    (X * Matrix.kronecker U (1 : CMatrix b)).trace =
-      (partialTraceB (a := a) (b := b) X * U).trace := by
-  have h1 :
-      partialTraceB (a := a) (b := b) (X * Matrix.kronecker U (1 : CMatrix b)) =
-        partialTraceB (a := a) (b := b) X * U := by
-    ext i i'
-    simp [partialTraceB, Matrix.mul_apply, Matrix.kronecker,
-      Matrix.kroneckerMap_apply, Matrix.one_apply, Fintype.sum_prod_type,
-      Finset.sum_mul]
-    rw [Finset.sum_comm]
-  rw [← h1, partialTraceB_trace]
-
 /-- The PSD power trace is invariant between `B B*` and `B* B`.
 
 This is the trace-similarity identity `Tr[(B B*)^p] = Tr[(B* B)^p]` for `p > 0`,
@@ -217,7 +58,7 @@ the cyclic handoff that lets the high-`α` sandwiched Rényi trace
 `B = σ^s ρ^{1/2}`, using that `σ^s` and `ρ^{1/2}` are Hermitian). It is the
 trace-only-cancellation primitive behind the singular-marginal USC route: the
 rewritten matrix `ρ^{1/2} σ^{2s} ρ^{1/2}` exposes the partial-trace mass-vs-power
-cancellation directly. Specialized via `cMatrix_rpow_kronecker_psd`, this is the
+cancellation directly. Specialized via `cMatrix_rpow_kronecker`, this is the
 on-support/off-support split that replaces the withdrawn Davis–Kahan reduction. -/
 theorem psdTracePower_mul_conjTranspose_eq
     {n : Type*} [Fintype n] [DecidableEq n] (B : CMatrix n) {p : ℝ} (hp : 0 < p) :
@@ -272,15 +113,13 @@ theorem sandwichedRenyiInner_trace_re_congruence
     calc (CFC.rpow ρ (1 / 2) * CFC.rpow σ s) * (CFC.rpow σ s * CFC.rpow ρ (1 / 2))
         = CFC.rpow ρ (1 / 2) * (CFC.rpow σ s * CFC.rpow σ s) * CFC.rpow ρ (1 / 2) := by ac_rfl
       _ = CFC.rpow ρ (1 / 2) * CFC.rpow σ (2 * s) * CFC.rpow ρ (1 / 2) := by rw [hσ_s_s]
-  have hAB : ((CFC.rpow σ s * CFC.rpow ρ (1 / 2)) * (CFC.rpow ρ (1 / 2) * CFC.rpow σ s)).PosSemidef
-      := by
+  have hAB : ((CFC.rpow σ s * CFC.rpow ρ (1 / 2)) * (CFC.rpow ρ (1 / 2) * CFC.rpow σ s)).PosSemidef := by
     rw [← hLHS_eq]
     have hCs_herm : (CFC.rpow σ s).conjTranspose = CFC.rpow σ s :=
       (cMatrix_rpow_posSemidef hσ).isHermitian.eq
     have hpre := Matrix.PosSemidef.conjTranspose_mul_mul_same hρ (CFC.rpow σ s)
     rwa [hCs_herm] at hpre
-  have hBA : ((CFC.rpow ρ (1 / 2) * CFC.rpow σ s) * (CFC.rpow σ s * CFC.rpow ρ (1 / 2))).PosSemidef
-      := by
+  have hBA : ((CFC.rpow ρ (1 / 2) * CFC.rpow σ s) * (CFC.rpow σ s * CFC.rpow ρ (1 / 2))).PosSemidef := by
     rw [← hRHS_eq]
     have hCs2 : (CFC.rpow σ (2 * s)).PosSemidef := cMatrix_rpow_posSemidef hσ
     have hCr_herm : (CFC.rpow ρ (1 / 2)).conjTranspose = CFC.rpow ρ (1 / 2) :=
@@ -293,21 +132,21 @@ theorem sandwichedRenyiInner_trace_re_congruence
 /-- Trace of a Kronecker-PSD product against a PSD matrix is bounded by the
 right-factor trace times the partial-trace pairing.
 
-For PSD `A, B, ρ`: `Tr[(A ⊗ B) ρ] ≤ B.trace.re · Tr[A · partialTraceB ρ]`.
+For PSD `A, B, ρ`: `Tr[(A ⊗ B) ρ] ≤ B.trace.re · Tr[A · Matrix.traceRight ρ]`.
 The bound follows from `posSemidef_le_trace_re_smul_one` (`B ≤ B.trace.re · I`),
 Kronecker order preservation, and the non-negativity
-`Tr[(PSD ⊗ PSD) · PSD] ≥ 0` (`trace_mul_posSemidef_re_nonneg`). This is the
+`Tr[(PSD ⊗ PSD) · PSD] ≥ 0` (`cMatrix_trace_mul_posSemidef_re_nonneg`). This is the
 partial-trace / mass-cancellation primitive behind the off-support op-norm
 bound for the sandwiched Rényi inner operator at a singular product reference. -/
 theorem posSemidef_trace_mul_kronecker_le_partialTrace
-    {ρ : CMatrix (Prod a b)} (hρ : ρ.PosSemidef)
+    {ρ : CMatrix (a × b)} (hρ : ρ.PosSemidef)
     {A : CMatrix a} (hA : A.PosSemidef) {B : CMatrix b} (hB : B.PosSemidef) :
     ((Matrix.kronecker A B * ρ).trace).re ≤
-      B.trace.re * (A * partialTraceB (a := a) (b := b) ρ).trace.re := by
+      B.trace.re * (A * Matrix.traceRight ρ).trace.re := by
   -- `c • 1 - B` is PSD where `c = B.trace.re`.
   have hC_psd : (((B.trace.re : ℝ) : ℂ) • (1 : CMatrix b) - B).PosSemidef := by
     have hle : B ≤ ((B.trace.re : ℝ) : ℂ) • (1 : CMatrix b) :=
-      State.posSemidef_le_trace_re_smul_one hB
+      MState.posSemidef_le_trace_re_smul_one hB
     exact Matrix.le_iff.mp hle
   -- `A ⊗ (c • 1 - B)` is PSD (Kronecker of PSD).
   have hAC_psd :
@@ -316,7 +155,7 @@ theorem posSemidef_trace_mul_kronecker_le_partialTrace
   -- Non-negativity: `0 ≤ Tr[(A ⊗ (c • 1 - B)) ρ].re`.
   have hnn : 0 ≤
       ((Matrix.kronecker A (((B.trace.re : ℝ) : ℂ) • (1 : CMatrix b) - B) * ρ).trace).re :=
-    trace_mul_posSemidef_re_nonneg hAC_psd hρ
+    cMatrix_trace_mul_posSemidef_re_nonneg hAC_psd hρ
   -- Distribute the Kronecker over the subtraction and scalar (entry-wise).
   rw [show Matrix.kronecker A (((B.trace.re : ℝ) : ℂ) • (1 : CMatrix b) - B) =
         ((B.trace.re : ℝ) : ℂ) • Matrix.kronecker A (1 : CMatrix b) -
@@ -333,61 +172,63 @@ theorem posSemidef_trace_mul_kronecker_le_partialTrace
       B.trace.re * ((Matrix.kronecker A (1 : CMatrix b) * ρ).trace).re := by
     simp [Complex.ofReal_im]
   rw [h_smul_re] at hnn
-  -- Partial-trace pairing: `Tr[(A ⊗ 1) ρ] = Tr[A · partialTraceB ρ]`.
+  -- Partial-trace pairing: `Tr[(A ⊗ 1) ρ] = Tr[A · Matrix.traceRight ρ]`.
   have hpair : ((Matrix.kronecker A (1 : CMatrix b) * ρ).trace).re =
-      (A * partialTraceB (a := a) (b := b) ρ).trace.re := by
+      (A * Matrix.traceRight ρ).trace.re := by
     rw [Matrix.trace_mul_comm (Matrix.kronecker A (1 : CMatrix b)) ρ,
-        trace_mul_kronecker_one_right_eq_partialTraceB ρ A,
-        Matrix.trace_mul_comm (partialTraceB (a := a) (b := b) ρ) A]
+        trace_mul_kronecker_one_right_eq_traceRight ρ A,
+        Matrix.trace_mul_comm (Matrix.traceRight ρ) A]
   rw [hpair] at hnn
   linarith
 
-namespace State
+end QIT
+
+namespace MState
 
 /-- The high-parameter sandwiched trace power is continuous when the input
 state and reference state vary together, provided the reference path is
 eventually full-rank and the limiting reference is full-rank. -/
 theorem sandwichedRenyiReferenceInner_tracePower_tendsto_of_tendsto_posDef_state_reference
-    {X : Type*} {l : Filter X} {rhoF sigmaF : X -> State a} {rho sigma : State a}
+    {X : Type*} {l : Filter X} {rhoF sigmaF : X → MState a} {rho sigma : MState a}
     (hrhoF : Tendsto rhoF l (nhds rho))
     (hsigmaF : Tendsto sigmaF l (nhds sigma))
-    (hsigmaFpd : Filter.Eventually (fun x => (sigmaF x).matrix.PosDef) l)
-    (hsigma : sigma.matrix.PosDef)
-    (alpha : Real) (halpha_pos : 0 < alpha) :
+    (hsigmaFpd : Filter.Eventually (fun x => (sigmaF x).m.PosDef) l)
+    (hsigma : sigma.m.PosDef)
+    (alpha : ℝ) (halpha_pos : 0 < alpha) :
     Tendsto
       (fun x : X =>
         (((CFC.rpow
-          (sandwichedRenyiReferenceInner (rhoF x) (sigmaF x).matrix alpha)
+          (sandwichedRenyiReferenceInner (rhoF x) (sigmaF x).m alpha)
           alpha).trace).re))
       l
       (nhds
         (((CFC.rpow
-          (sandwichedRenyiReferenceInner rho sigma.matrix alpha)
+          (sandwichedRenyiReferenceInner rho sigma.m alpha)
           alpha).trace).re)) := by
-  let s : Real := (1 - alpha) / (2 * alpha)
+  let s : ℝ := (1 - alpha) / (2 * alpha)
   have hrhoMatrix :
-      Tendsto (fun x : X => (rhoF x).matrix) l (nhds rho.matrix) :=
-    State.continuous_matrix.tendsto rho |>.comp hrhoF
+      Tendsto (fun x : X => (rhoF x).m) l (nhds rho.m) :=
+    MState.continuous_matrix.tendsto rho |>.comp hrhoF
   have hsigmaMatrix :
-      Tendsto (fun x : X => (sigmaF x).matrix) l (nhds sigma.matrix) :=
-    State.continuous_matrix.tendsto sigma |>.comp hsigmaF
+      Tendsto (fun x : X => (sigmaF x).m) l (nhds sigma.m) :=
+    MState.continuous_matrix.tendsto sigma |>.comp hsigmaF
   have hsigmaPow :
-      Tendsto (fun x : X => CFC.rpow (sigmaF x).matrix s) l
-        (nhds (CFC.rpow sigma.matrix s)) :=
+      Tendsto (fun x : X => CFC.rpow (sigmaF x).m s) l
+        (nhds (CFC.rpow sigma.m s)) :=
     _root_.QIT.cMatrix_rpow_tendsto_of_tendsto_posDef
       s hsigmaMatrix hsigmaFpd hsigma
   have hinner :
       Tendsto
         (fun x : X =>
-          sandwichedRenyiReferenceInner (rhoF x) (sigmaF x).matrix alpha)
+          sandwichedRenyiReferenceInner (rhoF x) (sigmaF x).m alpha)
         l
-        (nhds (sandwichedRenyiReferenceInner rho sigma.matrix alpha)) := by
+        (nhds (sandwichedRenyiReferenceInner rho sigma.m alpha)) := by
     unfold sandwichedRenyiReferenceInner
     exact (hsigmaPow.mul hrhoMatrix).mul hsigmaPow
   have hinner_psd :
       Filter.Eventually
         (fun x : X =>
-          (sandwichedRenyiReferenceInner (rhoF x) (sigmaF x).matrix alpha).PosSemidef)
+          (sandwichedRenyiReferenceInner (rhoF x) (sigmaF x).m alpha).PosSemidef)
         l :=
     hsigmaFpd.mono fun x hx =>
       sandwichedRenyiReferenceInner_posSemidef (rhoF x) hx.posSemidef alpha
@@ -399,20 +240,20 @@ theorem sandwichedRenyiReferenceInner_tracePower_tendsto_of_tendsto_posDef_state
 /-- The finite high-parameter PSD-reference branch is continuous when the
 input state and a full-rank reference state vary together. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFinite_tendsto_of_tendsto_posDef_state_reference
-    {X : Type*} {l : Filter X} {rhoF sigmaF : X -> State a} {rho sigma : State a}
+    {X : Type*} {l : Filter X} {rhoF sigmaF : X → MState a} {rho sigma : MState a}
     (hrhoF : Tendsto rhoF l (nhds rho))
     (hsigmaF : Tendsto sigmaF l (nhds sigma))
-    (hsigmaFpd : Filter.Eventually (fun x => (sigmaF x).matrix.PosDef) l)
-    (hsigma : sigma.matrix.PosDef)
-    {alpha : Real} (halpha : 1 < alpha) :
+    (hsigmaFpd : Filter.Eventually (fun x => (sigmaF x).m.PosDef) l)
+    (hsigma : sigma.m.PosDef)
+    {alpha : ℝ} (halpha : 1 < alpha) :
     Tendsto
       (fun x : X =>
         sandwichedRenyiPSDReferenceHighAlphaFinite
-          (rhoF x) (sigmaF x).matrix (sigmaF x).pos alpha)
+          (rhoF x) (sigmaF x).m (sigmaF x).psd alpha)
       l
       (nhds
         (sandwichedRenyiPSDReferenceHighAlphaFinite
-          rho sigma.matrix sigma.pos alpha)) := by
+          rho sigma.m sigma.psd alpha)) := by
   have halpha_pos : 0 < alpha := lt_trans zero_lt_one halpha
   have htrace :=
     sandwichedRenyiReferenceInner_tracePower_tendsto_of_tendsto_posDef_state_reference
@@ -420,7 +261,7 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_tendsto_of_tendsto_posDef_sta
   have htarget_pos :
       0 <
         (((CFC.rpow
-          (sandwichedRenyiReferenceInner rho sigma.matrix alpha)
+          (sandwichedRenyiReferenceInner rho sigma.m alpha)
           alpha).trace).re) := by
     simpa [psdTracePower] using
       sandwichedRenyiReferenceInner_psdTracePower_pos_of_reference_posDef
@@ -430,13 +271,13 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_tendsto_of_tendsto_posDef_sta
         (fun x : X =>
           log2
             (((CFC.rpow
-              (sandwichedRenyiReferenceInner (rhoF x) (sigmaF x).matrix alpha)
+              (sandwichedRenyiReferenceInner (rhoF x) (sigmaF x).m alpha)
               alpha).trace).re))
         l
         (nhds
           (log2
             (((CFC.rpow
-              (sandwichedRenyiReferenceInner rho sigma.matrix alpha)
+              (sandwichedRenyiReferenceInner rho sigma.m alpha)
               alpha).trace).re))) := by
     have hrawLog := Filter.Tendsto.log htrace (ne_of_gt htarget_pos)
     simp only [log2]
@@ -447,71 +288,71 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_tendsto_of_tendsto_posDef_sta
 /-- The support-aware high-parameter PSD-reference branch is continuous as an
 extended-real function along full-rank reference paths. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaE_tendsto_of_tendsto_posDef_state_reference
-    {X : Type*} {l : Filter X} {rhoF sigmaF : X -> State a} {rho sigma : State a}
+    {X : Type*} {l : Filter X} {rhoF sigmaF : X → MState a} {rho sigma : MState a}
     (hrhoF : Tendsto rhoF l (nhds rho))
     (hsigmaF : Tendsto sigmaF l (nhds sigma))
-    (hsigmaFpd : Filter.Eventually (fun x => (sigmaF x).matrix.PosDef) l)
-    (hsigma : sigma.matrix.PosDef)
-    {alpha : Real} (halpha : 1 < alpha) :
+    (hsigmaFpd : Filter.Eventually (fun x => (sigmaF x).m.PosDef) l)
+    (hsigma : sigma.m.PosDef)
+    {alpha : ℝ} (halpha : 1 < alpha) :
     Tendsto
       (fun x : X =>
         sandwichedRenyiPSDReferenceHighAlphaE
-          (rhoF x) (sigmaF x).matrix (sigmaF x).pos alpha)
+          (rhoF x) (sigmaF x).m (sigmaF x).psd alpha)
       l
       (nhds
         (sandwichedRenyiPSDReferenceHighAlphaE
-          rho sigma.matrix sigma.pos alpha)) := by
+          rho sigma.m sigma.psd alpha)) := by
   have hfinite :
       Tendsto
         (fun x : X =>
           sandwichedRenyiPSDReferenceHighAlphaFinite
-            (rhoF x) (sigmaF x).matrix (sigmaF x).pos alpha)
+            (rhoF x) (sigmaF x).m (sigmaF x).psd alpha)
         l
         (nhds
           (sandwichedRenyiPSDReferenceHighAlphaFinite
-            rho sigma.matrix sigma.pos alpha)) :=
+            rho sigma.m sigma.psd alpha)) :=
     sandwichedRenyiPSDReferenceHighAlphaFinite_tendsto_of_tendsto_posDef_state_reference
       hrhoF hsigmaF hsigmaFpd hsigma halpha
   have htarget :
       sandwichedRenyiPSDReferenceHighAlphaE
-          rho sigma.matrix sigma.pos alpha =
+          rho sigma.m sigma.psd alpha =
         (sandwichedRenyiPSDReferenceHighAlphaFinite
-          rho sigma.matrix sigma.pos alpha : EReal) := by
+          rho sigma.m sigma.psd alpha : EReal) := by
     rw [sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_of_supports
-      rho sigma.pos alpha
-      (Matrix.Supports.of_right_posDef rho.matrix sigma.matrix hsigma)]
+      rho sigma.psd alpha
+      (Matrix.Supports.of_right_posDef rho.m sigma.m hsigma)]
   have hcongr :
       (fun x : X =>
         sandwichedRenyiPSDReferenceHighAlphaE
-          (rhoF x) (sigmaF x).matrix (sigmaF x).pos alpha)
+          (rhoF x) (sigmaF x).m (sigmaF x).psd alpha)
         =ᶠ[l]
       (fun x : X =>
         (sandwichedRenyiPSDReferenceHighAlphaFinite
-          (rhoF x) (sigmaF x).matrix (sigmaF x).pos alpha : EReal)) := by
+          (rhoF x) (sigmaF x).m (sigmaF x).psd alpha : EReal)) := by
     filter_upwards [hsigmaFpd] with x hx
     rw [sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_of_supports
-      (rhoF x) (sigmaF x).pos alpha
-      (Matrix.Supports.of_right_posDef (rhoF x).matrix (sigmaF x).matrix hx)]
+      (rhoF x) (sigmaF x).psd alpha
+      (Matrix.Supports.of_right_posDef (rhoF x).m (sigmaF x).m hx)]
   simpa [htarget] using (EReal.tendsto_coe.mpr hfinite).congr' hcongr.symm
 
 /-- Product states are continuous in both factors. -/
 theorem prod_tendsto
-    {X : Type*} {l : Filter X} {rhoF : X -> State a} {sigmaF : X -> State b}
-    {rho : State a} {sigma : State b}
+    {X : Type*} {l : Filter X} {rhoF : X → MState a} {sigmaF : X → MState b}
+    {rho : MState a} {sigma : MState b}
     (hrhoF : Tendsto rhoF l (nhds rho))
     (hsigmaF : Tendsto sigmaF l (nhds sigma)) :
     Tendsto (fun x : X => (rhoF x).prod (sigmaF x)) l (nhds (rho.prod sigma)) := by
   have hleft :
-      Tendsto (fun x : X => (rhoF x).matrix) l (nhds rho.matrix) :=
-    State.continuous_matrix.tendsto rho |>.comp hrhoF
+      Tendsto (fun x : X => (rhoF x).m) l (nhds rho.m) :=
+    MState.continuous_matrix.tendsto rho |>.comp hrhoF
   have hright :
-      Tendsto (fun x : X => (sigmaF x).matrix) l (nhds sigma.matrix) :=
-    State.continuous_matrix.tendsto sigma |>.comp hsigmaF
+      Tendsto (fun x : X => (sigmaF x).m) l (nhds sigma.m) :=
+    MState.continuous_matrix.tendsto sigma |>.comp hsigmaF
   have hpair :
       Tendsto
-        (fun x : X => ((rhoF x).matrix, (sigmaF x).matrix))
+        (fun x : X => ((rhoF x).m, (sigmaF x).m))
         l
-        (nhds (rho.matrix, sigma.matrix)) :=
+        (nhds (rho.m, sigma.m)) :=
     hleft.prodMk_nhds hright
   have hkr :
       Continuous fun M : CMatrix a × CMatrix b => Matrix.kronecker M.1 M.2 := by
@@ -521,104 +362,101 @@ theorem prod_tendsto
       exact (continuous_fst.matrix_elem x.1 y.1).mul
         (continuous_snd.matrix_elem x.2 y.2)
   have hmatrix :
-      Tendsto (fun x : X => ((rhoF x).prod (sigmaF x)).matrix)
-        l (nhds (rho.prod sigma).matrix) := by
-    simpa [State.prod, Function.comp_def] using
-      hkr.tendsto (rho.matrix, sigma.matrix) |>.comp hpair
-  rw [Filter.tendsto_iff_comap]
-  rw [nhds_induced]
-  rw [Filter.comap_comap]
-  rw [← Filter.tendsto_iff_comap]
+      Tendsto (fun x : X => ((rhoF x).prod (sigmaF x)).m)
+        l (nhds (rho.prod sigma).m) := by
+    simpa [Function.comp_def] using
+      hkr.tendsto (rho.m, sigma.m) |>.comp hpair
+  refine tendsto_of_tendsto_m ?_
   exact hmatrix
 
 /-- A fixed full-rank side-information candidate is continuous along input
 state paths whose limiting left marginal is full-rank. -/
 theorem sandwichedRenyiMutualInformationCandidateE_tendsto_of_tendsto_posDef
     {X : Type*} {l : Filter X}
-    {rhoF : X -> State (Prod a b)} {rho : State (Prod a b)}
+    {rhoF : X → MState (a × b)} {rho : MState (a × b)}
     (hrhoF : Tendsto rhoF l (nhds rho))
-    (hrhoA : rho.marginalA.matrix.PosDef)
-    (sigmaB : State b) (hsigmaB : sigmaB.matrix.PosDef)
-    {alpha : Real} (halpha : 1 < alpha) :
+    (hrhoA : rho.traceRight.m.PosDef)
+    (sigmaB : MState b) (hsigmaB : sigmaB.m.PosDef)
+    {alpha : ℝ} (halpha : 1 < alpha) :
     Tendsto
       (fun x : X => (rhoF x).sandwichedRenyiMutualInformationCandidateE sigmaB alpha)
       l
       (nhds (rho.sandwichedRenyiMutualInformationCandidateE sigmaB alpha)) := by
   have hmarg :
-      Tendsto (fun x : X => (rhoF x).marginalA) l (nhds rho.marginalA) :=
-    State.marginalA_continuous.tendsto rho |>.comp hrhoF
+      Tendsto (fun x : X => (rhoF x).traceRight) l (nhds rho.traceRight) :=
+    MState.traceRight_continuous.tendsto rho |>.comp hrhoF
   have hmarg_matrix :
-      Tendsto (fun x : X => (rhoF x).marginalA.matrix)
-        l (nhds rho.marginalA.matrix) :=
-    State.continuous_matrix.tendsto rho.marginalA |>.comp hmarg
+      Tendsto (fun x : X => (rhoF x).traceRight.m)
+        l (nhds rho.traceRight.m) :=
+    MState.continuous_matrix.tendsto rho.traceRight |>.comp hmarg
   have hmarg_pd :
-      Filter.Eventually (fun x : X => (rhoF x).marginalA.matrix.PosDef) l :=
+      Filter.Eventually (fun x : X => (rhoF x).traceRight.m.PosDef) l :=
     eventually_posDef_of_tendsto_posDef hmarg_matrix
-      (Filter.Eventually.of_forall fun x => (rhoF x).marginalA.pos) hrhoA
+      (Filter.Eventually.of_forall fun x => (rhoF x).traceRight.psd) hrhoA
   have href_tend :
-      Tendsto (fun x : X => (rhoF x).marginalA.prod sigmaB)
-        l (nhds (rho.marginalA.prod sigmaB)) :=
-    State.prod_tendsto hmarg tendsto_const_nhds
+      Tendsto (fun x : X => (rhoF x).traceRight.prod sigmaB)
+        l (nhds (rho.traceRight.prod sigmaB)) :=
+    MState.prod_tendsto hmarg tendsto_const_nhds
   have href_pd :
       Filter.Eventually
-        (fun x : X => ((rhoF x).marginalA.prod sigmaB).matrix.PosDef) l := by
+        (fun x : X => ((rhoF x).traceRight.prod sigmaB).m.PosDef) l := by
     filter_upwards [hmarg_pd] with x hx
-    exact State.prod_posDef hx hsigmaB
+    exact MState.PosDef.kron hx hsigmaB
   have hhigh :
       Tendsto
         (fun x : X =>
           sandwichedRenyiPSDReferenceHighAlphaE
-            (rhoF x) ((rhoF x).marginalA.prod sigmaB).matrix
-            ((rhoF x).marginalA.prod sigmaB).pos alpha)
+            (rhoF x) ((rhoF x).traceRight.prod sigmaB).m
+            ((rhoF x).traceRight.prod sigmaB).psd alpha)
         l
         (nhds
           (sandwichedRenyiPSDReferenceHighAlphaE
-            rho (rho.marginalA.prod sigmaB).matrix
-            (rho.marginalA.prod sigmaB).pos alpha)) :=
+            rho (rho.traceRight.prod sigmaB).m
+            (rho.traceRight.prod sigmaB).psd alpha)) :=
     sandwichedRenyiPSDReferenceHighAlphaE_tendsto_of_tendsto_posDef_state_reference
-      hrhoF href_tend href_pd (State.prod_posDef hrhoA hsigmaB) halpha
+      hrhoF href_tend href_pd (MState.PosDef.kron hrhoA hsigmaB) halpha
   have htarget :
       rho.sandwichedRenyiMutualInformationCandidateE sigmaB alpha =
         sandwichedRenyiPSDReferenceHighAlphaE
-          rho (rho.marginalA.prod sigmaB).matrix
-          (rho.marginalA.prod sigmaB).pos alpha := by
-    rw [State.sandwichedRenyiMutualInformationCandidateE_eq]
+          rho (rho.traceRight.prod sigmaB).m
+          (rho.traceRight.prod sigmaB).psd alpha := by
+    rw [MState.sandwichedRenyiMutualInformationCandidateE_eq]
     rw [sandwichedRenyiPSDReferenceE_eq_highAlphaE_of_one_lt _ _ halpha]
   have hcongr :
       (fun x : X => (rhoF x).sandwichedRenyiMutualInformationCandidateE sigmaB alpha)
         =ᶠ[l]
       (fun x : X =>
         sandwichedRenyiPSDReferenceHighAlphaE
-          (rhoF x) ((rhoF x).marginalA.prod sigmaB).matrix
-          ((rhoF x).marginalA.prod sigmaB).pos alpha) := by
+          (rhoF x) ((rhoF x).traceRight.prod sigmaB).m
+          ((rhoF x).traceRight.prod sigmaB).psd alpha) := by
     filter_upwards with x
-    rw [State.sandwichedRenyiMutualInformationCandidateE_eq]
+    rw [MState.sandwichedRenyiMutualInformationCandidateE_eq]
     rw [sandwichedRenyiPSDReferenceE_eq_highAlphaE_of_one_lt _ _ halpha]
   simpa [htarget] using hhigh.congr' hcongr.symm
 
 /-- Full-rank fixed-side candidates are continuous at states whose left
 marginal is full-rank. -/
 theorem sandwichedRenyiMutualInformationCandidateE_continuousAt_of_posDef
-    (rho : State (Prod a b)) (hrhoA : rho.marginalA.matrix.PosDef)
-    (sigmaB : State b) (hsigmaB : sigmaB.matrix.PosDef)
-    {alpha : Real} (halpha : 1 < alpha) :
+    (rho : MState (a × b)) (hrhoA : rho.traceRight.m.PosDef)
+    (sigmaB : MState b) (hsigmaB : sigmaB.m.PosDef)
+    {alpha : ℝ} (halpha : 1 < alpha) :
     ContinuousAt
-      (fun rho' : State (Prod a b) =>
+      (fun rho' : MState (a × b) =>
         rho'.sandwichedRenyiMutualInformationCandidateE sigmaB alpha)
       rho := by
   exact sandwichedRenyiMutualInformationCandidateE_tendsto_of_tendsto_posDef
-    (rhoF := fun rho' : State (Prod a b) => rho')
+    (rhoF := fun rho' : MState (a × b) => rho')
     (rho := rho) tendsto_id hrhoA sigmaB hsigmaB halpha
 
 /-- Full-rank fixed-side candidates are upper semicontinuous on the locus where
 the left marginal is full-rank. -/
 theorem sandwichedRenyiMutualInformationCandidateE_upperSemicontinuousOn_posDefMarginalA
-    (sigmaB : State b) (hsigmaB : sigmaB.matrix.PosDef)
-    {alpha : Real} (halpha : 1 < alpha) :
+    (sigmaB : MState b) (hsigmaB : sigmaB.m.PosDef)
+    {alpha : ℝ} (halpha : 1 < alpha) :
     UpperSemicontinuousOn
-      (fun rho : State (Prod a b) =>
+      (fun rho : MState (a × b) =>
         rho.sandwichedRenyiMutualInformationCandidateE sigmaB alpha)
-      {rho : State (Prod a b) | rho.marginalA.matrix.PosDef} := by
+      {rho : MState (a × b) | rho.traceRight.m.PosDef} := by
   intro rho hrho
   exact (sandwichedRenyiMutualInformationCandidateE_continuousAt_of_posDef
     rho hrho sigmaB hsigmaB halpha).continuousWithinAt.upperSemicontinuousWithinAt
@@ -626,9 +464,9 @@ theorem sandwichedRenyiMutualInformationCandidateE_upperSemicontinuousOn_posDefM
 /-- The unrestricted side-state infimum is bounded above by the infimum
 restricted to full-rank side states. -/
 theorem sandwichedRenyiMutualInformationE_le_iInf_posDef_candidates
-    (rhoAB : State (Prod a b)) (alpha : Real) :
+    (rhoAB : MState (a × b)) (alpha : ℝ) :
     rhoAB.sandwichedRenyiMutualInformationE alpha ≤
-      ⨅ sigmaB : {sigmaB : State b // sigmaB.matrix.PosDef},
+      ⨅ sigmaB : {sigmaB : MState b // sigmaB.m.PosDef},
         rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB.1 alpha := by
   refine le_iInf fun sigmaB => ?_
   exact rhoAB.sandwichedRenyiMutualInformationE_le_candidate sigmaB.1 alpha
@@ -636,26 +474,26 @@ theorem sandwichedRenyiMutualInformationE_le_iInf_posDef_candidates
 /-- In the high-`alpha` branch, a fixed side-information candidate is `+∞`
 when the bipartite state is not supported by the product reference. -/
 theorem sandwichedRenyiMutualInformationCandidateE_eq_top_of_not_supports
-    (rhoAB : State (Prod a b)) (sigmaB : State b)
-    {alpha : Real} (halpha : 1 < alpha)
+    (rhoAB : MState (a × b)) (sigmaB : MState b)
+    {alpha : ℝ} (halpha : 1 < alpha)
     (hSupport :
-      ¬ Matrix.Supports rhoAB.matrix (rhoAB.marginalA.prod sigmaB).matrix) :
+      ¬ Matrix.Supports rhoAB.m (rhoAB.traceRight.prod sigmaB).m) :
     rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB alpha = ⊤ := by
-  rw [State.sandwichedRenyiMutualInformationCandidateE_eq]
+  rw [MState.sandwichedRenyiMutualInformationCandidateE_eq]
   rw [sandwichedRenyiPSDReferenceE_eq_highAlphaE_of_one_lt _ _ halpha]
   exact sandwichedRenyiPSDReferenceHighAlphaE_eq_top_of_not_supports
-    rhoAB (rhoAB.marginalA.prod sigmaB).pos alpha hSupport
+    rhoAB (rhoAB.traceRight.prod sigmaB).psd alpha hSupport
 
 /-- A full-rank side state is already present in the restricted candidate
 domain, so the restricted infimum is below that candidate. -/
 theorem iInf_posDef_candidates_le_sandwichedRenyiMutualInformationCandidateE_of_posDef
-    (rhoAB : State (Prod a b)) (alpha : Real)
-    (sigmaB : State b) (hsigmaB : sigmaB.matrix.PosDef) :
-    (⨅ tauB : {tauB : State b // tauB.matrix.PosDef},
+    (rhoAB : MState (a × b)) (alpha : ℝ)
+    (sigmaB : MState b) (hsigmaB : sigmaB.m.PosDef) :
+    (⨅ tauB : {tauB : MState b // tauB.m.PosDef},
       rhoAB.sandwichedRenyiMutualInformationCandidateE tauB.1 alpha) ≤
         rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB alpha := by
   exact iInf_le
-    (fun tauB : {tauB : State b // tauB.matrix.PosDef} =>
+    (fun tauB : {tauB : MState b // tauB.m.PosDef} =>
       rhoAB.sandwichedRenyiMutualInformationCandidateE tauB.1 alpha)
     ⟨sigmaB, hsigmaB⟩
 
@@ -667,32 +505,32 @@ path of full-rank side states has candidate values converging to the target
 candidate, the restricted infimum is below the target candidate. -/
 theorem iInf_posDef_candidates_le_sandwichedRenyiMutualInformationCandidateE_of_tendsto
     {X : Type*} {l : Filter X} [NeBot l]
-    (rhoAB : State (Prod a b)) (alpha : Real)
-    (sigmaF : X -> State b) (sigmaB : State b)
-    (hposDef : ∀ᶠ x in l, (sigmaF x).matrix.PosDef)
+    (rhoAB : MState (a × b)) (alpha : ℝ)
+    (sigmaF : X → MState b) (sigmaB : MState b)
+    (hposDef : ∀ᶠ x in l, (sigmaF x).m.PosDef)
     (htend :
       Tendsto
         (fun x : X => rhoAB.sandwichedRenyiMutualInformationCandidateE (sigmaF x) alpha)
         l
         (nhds (rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB alpha))) :
-    (⨅ tauB : {tauB : State b // tauB.matrix.PosDef},
+    (⨅ tauB : {tauB : MState b // tauB.m.PosDef},
       rhoAB.sandwichedRenyiMutualInformationCandidateE tauB.1 alpha) ≤
         rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB alpha := by
   refine ge_of_tendsto htend ?_
   filter_upwards [hposDef] with x hx
   exact iInf_le
-    (fun tauB : {tauB : State b // tauB.matrix.PosDef} =>
+    (fun tauB : {tauB : MState b // tauB.m.PosDef} =>
       rhoAB.sandwichedRenyiMutualInformationCandidateE tauB.1 alpha)
     ⟨sigmaF x, hx⟩
 
 /-- The unsupported high-`alpha` branch is automatic for the full-rank
 restriction: the target fixed candidate is `+∞`. -/
 theorem iInf_posDef_candidates_le_sandwichedRenyiMutualInformationCandidateE_of_not_supports
-    (rhoAB : State (Prod a b)) (sigmaB : State b)
-    {alpha : Real} (halpha : 1 < alpha)
+    (rhoAB : MState (a × b)) (sigmaB : MState b)
+    {alpha : ℝ} (halpha : 1 < alpha)
     (hSupport :
-      ¬ Matrix.Supports rhoAB.matrix (rhoAB.marginalA.prod sigmaB).matrix) :
-    (⨅ tauB : {tauB : State b // tauB.matrix.PosDef},
+      ¬ Matrix.Supports rhoAB.m (rhoAB.traceRight.prod sigmaB).m) :
+    (⨅ tauB : {tauB : MState b // tauB.m.PosDef},
       rhoAB.sandwichedRenyiMutualInformationCandidateE tauB.1 alpha) ≤
         rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB alpha := by
   rw [sandwichedRenyiMutualInformationCandidateE_eq_top_of_not_supports
@@ -705,25 +543,25 @@ For high `alpha`, a side state which is already full-rank is in the restricted
 domain, while an unsupported side state has candidate value `+∞`. Therefore the
 only remaining approximation obligation is the supported non-full-rank case. -/
 theorem posDef_candidate_approx_of_supported_singular
-    (rhoAB : State (Prod a b)) {alpha : Real} (halpha : 1 < alpha)
+    (rhoAB : MState (a × b)) {alpha : ℝ} (halpha : 1 < alpha)
     (hsingular :
-      ∀ sigmaB : State b,
-        Matrix.Supports rhoAB.matrix (rhoAB.marginalA.prod sigmaB).matrix →
-          ¬ sigmaB.matrix.PosDef →
-            (⨅ tauB : {tauB : State b // tauB.matrix.PosDef},
+      ∀ sigmaB : MState b,
+        Matrix.Supports rhoAB.m (rhoAB.traceRight.prod sigmaB).m →
+          ¬ sigmaB.m.PosDef →
+            (⨅ tauB : {tauB : MState b // tauB.m.PosDef},
               rhoAB.sandwichedRenyiMutualInformationCandidateE tauB.1 alpha) ≤
                 rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB alpha) :
-    ∀ sigmaB : State b,
-      (⨅ tauB : {tauB : State b // tauB.matrix.PosDef},
+    ∀ sigmaB : MState b,
+      (⨅ tauB : {tauB : MState b // tauB.m.PosDef},
         rhoAB.sandwichedRenyiMutualInformationCandidateE tauB.1 alpha) ≤
           rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB alpha := by
   intro sigmaB
-  by_cases hsigmaB : sigmaB.matrix.PosDef
+  by_cases hsigmaB : sigmaB.m.PosDef
   · exact
       iInf_posDef_candidates_le_sandwichedRenyiMutualInformationCandidateE_of_posDef
         rhoAB alpha sigmaB hsigmaB
   · by_cases hSupport :
-        Matrix.Supports rhoAB.matrix (rhoAB.marginalA.prod sigmaB).matrix
+        Matrix.Supports rhoAB.m (rhoAB.traceRight.prod sigmaB).m
     · exact hsingular sigmaB hSupport hsigmaB
     · exact
         iInf_posDef_candidates_le_sandwichedRenyiMutualInformationCandidateE_of_not_supports
@@ -733,19 +571,19 @@ theorem posDef_candidate_approx_of_supported_singular
 reverse inequality needed to restrict the optimized infimum to full-rank side
 states. -/
 theorem iInf_posDef_candidates_le_sandwichedRenyiMutualInformationE_of_le_candidate
-    (rhoAB : State (Prod a b)) (alpha : Real)
+    (rhoAB : MState (a × b)) (alpha : ℝ)
     (happrox :
-      ∀ sigmaB : State b,
-        (⨅ tauB : {tauB : State b // tauB.matrix.PosDef},
+      ∀ sigmaB : MState b,
+        (⨅ tauB : {tauB : MState b // tauB.m.PosDef},
           rhoAB.sandwichedRenyiMutualInformationCandidateE tauB.1 alpha) ≤
             rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB alpha) :
-    (⨅ tauB : {tauB : State b // tauB.matrix.PosDef},
+    (⨅ tauB : {tauB : MState b // tauB.m.PosDef},
       rhoAB.sandwichedRenyiMutualInformationCandidateE tauB.1 alpha) ≤
         rhoAB.sandwichedRenyiMutualInformationE alpha := by
   have : Nonempty b := by
     rcases rhoAB.nonempty with ⟨x⟩
     exact ⟨x.2⟩
-  rw [State.sandwichedRenyiMutualInformationE_eq_sInf]
+  rw [MState.sandwichedRenyiMutualInformationE_eq_sInf]
   refine le_csInf (rhoAB.sandwichedRenyiMutualInformationEValueSet_nonempty alpha) ?_
   intro y hy
   rcases hy with ⟨sigmaB, rfl⟩
@@ -755,36 +593,36 @@ theorem iInf_posDef_candidates_le_sandwichedRenyiMutualInformationE_of_le_candid
 optimized infimum once every side state is dominated by full-rank
 approximants. -/
 theorem sandwichedRenyiMutualInformationE_eq_iInf_posDef_candidates_of_le_candidate
-    (rhoAB : State (Prod a b)) (alpha : Real)
+    (rhoAB : MState (a × b)) (alpha : ℝ)
     (happrox :
-      ∀ sigmaB : State b,
-        (⨅ tauB : {tauB : State b // tauB.matrix.PosDef},
+      ∀ sigmaB : MState b,
+        (⨅ tauB : {tauB : MState b // tauB.m.PosDef},
           rhoAB.sandwichedRenyiMutualInformationCandidateE tauB.1 alpha) ≤
             rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB alpha) :
     rhoAB.sandwichedRenyiMutualInformationE alpha =
-      ⨅ sigmaB : {sigmaB : State b // sigmaB.matrix.PosDef},
+      ⨅ sigmaB : {sigmaB : MState b // sigmaB.m.PosDef},
         rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB.1 alpha := by
   exact le_antisymm
     (sandwichedRenyiMutualInformationE_le_iInf_posDef_candidates rhoAB alpha)
     (iInf_posDef_candidates_le_sandwichedRenyiMutualInformationE_of_le_candidate
       rhoAB alpha happrox)
 
-/-- State optimized monotonicity from the full-rank side-state approximation
+/-- MState optimized monotonicity from the full-rank side-state approximation
 lower bound and monotonicity of all full-rank fixed candidates. -/
 theorem sandwichedRenyiMutualInformationE_mono_of_posDef_candidate_approx_and_candidate_mono
-    (rhoAB : State (Prod a b))
+    (rhoAB : MState (a × b))
     (happrox :
-      ∀ gamma : {gamma : Real // 1 < gamma}, ∀ sigmaB : State b,
-        (⨅ tauB : {tauB : State b // tauB.matrix.PosDef},
+      ∀ gamma : {gamma : ℝ // 1 < gamma}, ∀ sigmaB : MState b,
+        (⨅ tauB : {tauB : MState b // tauB.m.PosDef},
           rhoAB.sandwichedRenyiMutualInformationCandidateE tauB.1 gamma.1) ≤
             rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB gamma.1)
     (hmono :
-      ∀ sigmaB : {sigmaB : State b // sigmaB.matrix.PosDef},
-        ∀ alpha beta : {alpha : Real // 1 < alpha},
+      ∀ sigmaB : {sigmaB : MState b // sigmaB.m.PosDef},
+        ∀ alpha beta : {alpha : ℝ // 1 < alpha},
           alpha.1 ≤ beta.1 →
             rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB.1 alpha.1 ≤
               rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB.1 beta.1) :
-    ∀ alpha beta : {alpha : Real // 1 < alpha},
+    ∀ alpha beta : {alpha : ℝ // 1 < alpha},
       alpha.1 ≤ beta.1 →
         rhoAB.sandwichedRenyiMutualInformationE alpha.1 ≤
           rhoAB.sandwichedRenyiMutualInformationE beta.1 := by
@@ -795,41 +633,41 @@ theorem sandwichedRenyiMutualInformationE_mono_of_posDef_candidate_approx_and_ca
   exact sandwichedRenyiMutualInformationE_eq_iInf_posDef_candidates_of_le_candidate
     rhoAB gamma.1 (happrox gamma)
 
-/-- State optimized monotonicity from the full-rank side-state approximation
+/-- MState optimized monotonicity from the full-rank side-state approximation
 lower bound and a derivative-sign proof for all full-rank fixed candidates. -/
 theorem sandwichedRenyiMutualInformationE_mono_of_posDef_candidate_approx_and_deriv_nonneg
-    (rhoAB : State (Prod a b)) (hrhoA : rhoAB.marginalA.matrix.PosDef)
+    (rhoAB : MState (a × b)) (hrhoA : rhoAB.traceRight.m.PosDef)
     (happrox :
-      ∀ gamma : {gamma : Real // 1 < gamma}, ∀ sigmaB : State b,
-        (⨅ tauB : {tauB : State b // tauB.matrix.PosDef},
+      ∀ gamma : {gamma : ℝ // 1 < gamma}, ∀ sigmaB : MState b,
+        (⨅ tauB : {tauB : MState b // tauB.m.PosDef},
           rhoAB.sandwichedRenyiMutualInformationCandidateE tauB.1 gamma.1) ≤
             rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB gamma.1)
     (hcont :
-      ∀ sigmaB : {sigmaB : State b // sigmaB.matrix.PosDef},
+      ∀ sigmaB : {sigmaB : MState b // sigmaB.m.PosDef},
         ContinuousOn
-          (fun alpha : Real =>
+          (fun alpha : ℝ =>
             sandwichedRenyiPSDReferenceHighAlphaFinite rhoAB
-              (rhoAB.marginalA.prod sigmaB.1).matrix
-              (rhoAB.marginalA.prod sigmaB.1).pos alpha)
-          (Set.Ioi (1 : Real)))
+              (rhoAB.traceRight.prod sigmaB.1).m
+              (rhoAB.traceRight.prod sigmaB.1).psd alpha)
+          (Set.Ioi (1 : ℝ)))
     (hdiff :
-      ∀ sigmaB : {sigmaB : State b // sigmaB.matrix.PosDef},
-        DifferentiableOn Real
-          (fun alpha : Real =>
+      ∀ sigmaB : {sigmaB : MState b // sigmaB.m.PosDef},
+        DifferentiableOn ℝ
+          (fun alpha : ℝ =>
             sandwichedRenyiPSDReferenceHighAlphaFinite rhoAB
-              (rhoAB.marginalA.prod sigmaB.1).matrix
-              (rhoAB.marginalA.prod sigmaB.1).pos alpha)
-          (Set.Ioi (1 : Real)))
+              (rhoAB.traceRight.prod sigmaB.1).m
+              (rhoAB.traceRight.prod sigmaB.1).psd alpha)
+          (Set.Ioi (1 : ℝ)))
     (hderiv :
-      ∀ sigmaB : {sigmaB : State b // sigmaB.matrix.PosDef},
-        ∀ alpha : Real, 1 < alpha →
+      ∀ sigmaB : {sigmaB : MState b // sigmaB.m.PosDef},
+        ∀ alpha : ℝ, 1 < alpha →
           0 ≤ deriv
-            (fun beta : Real =>
+            (fun beta : ℝ =>
               sandwichedRenyiPSDReferenceHighAlphaFinite rhoAB
-                (rhoAB.marginalA.prod sigmaB.1).matrix
-                (rhoAB.marginalA.prod sigmaB.1).pos beta)
+                (rhoAB.traceRight.prod sigmaB.1).m
+                (rhoAB.traceRight.prod sigmaB.1).psd beta)
             alpha) :
-    ∀ alpha beta : {alpha : Real // 1 < alpha},
+    ∀ alpha beta : {alpha : ℝ // 1 < alpha},
       alpha.1 ≤ beta.1 →
         rhoAB.sandwichedRenyiMutualInformationE alpha.1 ≤
           rhoAB.sandwichedRenyiMutualInformationE beta.1 := by
@@ -844,21 +682,21 @@ theorem sandwichedRenyiMutualInformationE_mono_of_posDef_candidate_approx_and_de
 full-rank candidate upper semicontinuity gives optimized upper semicontinuity
 on any locus with full-rank left marginal. -/
 theorem sandwichedRenyiMutualInformationE_upperSemicontinuousOn_of_iInf_posDef_candidates
-    {s : Set (State (Prod a b))}
-    {alpha : Real} (halpha : 1 < alpha)
-    (hposA : ∀ rho ∈ s, rho.marginalA.matrix.PosDef)
+    {s : Set (MState (a × b))}
+    {alpha : ℝ} (halpha : 1 < alpha)
+    (hposA : ∀ rho ∈ s, rho.traceRight.m.PosDef)
     (hfullRankInf :
-      ∀ rho : State (Prod a b),
+      ∀ rho : MState (a × b),
         rho.sandwichedRenyiMutualInformationE alpha =
-          ⨅ sigmaB : {sigmaB : State b // sigmaB.matrix.PosDef},
+          ⨅ sigmaB : {sigmaB : MState b // sigmaB.m.PosDef},
             rho.sandwichedRenyiMutualInformationCandidateE sigmaB.1 alpha) :
     UpperSemicontinuousOn
-      (fun rho : State (Prod a b) => rho.sandwichedRenyiMutualInformationE alpha)
+      (fun rho : MState (a × b) => rho.sandwichedRenyiMutualInformationE alpha)
       s := by
   have hcandidates :
-      ∀ sigmaB : {sigmaB : State b // sigmaB.matrix.PosDef},
+      ∀ sigmaB : {sigmaB : MState b // sigmaB.m.PosDef},
         UpperSemicontinuousOn
-          (fun rho : State (Prod a b) =>
+          (fun rho : MState (a × b) =>
             rho.sandwichedRenyiMutualInformationCandidateE sigmaB.1 alpha)
           s := by
     intro sigmaB
@@ -867,15 +705,15 @@ theorem sandwichedRenyiMutualInformationE_upperSemicontinuousOn_of_iInf_posDef_c
         sigmaB.1 sigmaB.2 halpha).mono hposA
   have hiInf :
       UpperSemicontinuousOn
-        (fun rho : State (Prod a b) =>
-          ⨅ sigmaB : {sigmaB : State b // sigmaB.matrix.PosDef},
+        (fun rho : MState (a × b) =>
+          ⨅ sigmaB : {sigmaB : MState b // sigmaB.m.PosDef},
             rho.sandwichedRenyiMutualInformationCandidateE sigmaB.1 alpha)
         s :=
     upperSemicontinuousOn_iInf hcandidates
   have hfun :
-      (fun rho : State (Prod a b) => rho.sandwichedRenyiMutualInformationE alpha) =
-        (fun rho : State (Prod a b) =>
-          ⨅ sigmaB : {sigmaB : State b // sigmaB.matrix.PosDef},
+      (fun rho : MState (a × b) => rho.sandwichedRenyiMutualInformationE alpha) =
+        (fun rho : MState (a × b) =>
+          ⨅ sigmaB : {sigmaB : MState b // sigmaB.m.PosDef},
             rho.sandwichedRenyiMutualInformationCandidateE sigmaB.1 alpha) := by
     funext rho
     exact hfullRankInf rho
@@ -884,16 +722,16 @@ theorem sandwichedRenyiMutualInformationE_upperSemicontinuousOn_of_iInf_posDef_c
 /-- Optimized upper semicontinuity from the full-rank approximation lower-bound
 form of the side-state restriction. -/
 theorem sandwichedRenyiMutualInformationE_upperSemicontinuousOn_of_posDef_candidate_approx
-    {s : Set (State (Prod a b))}
-    {alpha : Real} (halpha : 1 < alpha)
-    (hposA : ∀ rho ∈ s, rho.marginalA.matrix.PosDef)
+    {s : Set (MState (a × b))}
+    {alpha : ℝ} (halpha : 1 < alpha)
+    (hposA : ∀ rho ∈ s, rho.traceRight.m.PosDef)
     (happrox :
-      ∀ rho : State (Prod a b), ∀ sigmaB : State b,
-        (⨅ tauB : {tauB : State b // tauB.matrix.PosDef},
+      ∀ rho : MState (a × b), ∀ sigmaB : MState b,
+        (⨅ tauB : {tauB : MState b // tauB.m.PosDef},
           rho.sandwichedRenyiMutualInformationCandidateE tauB.1 alpha) ≤
             rho.sandwichedRenyiMutualInformationCandidateE sigmaB alpha) :
     UpperSemicontinuousOn
-      (fun rho : State (Prod a b) => rho.sandwichedRenyiMutualInformationE alpha)
+      (fun rho : MState (a × b) => rho.sandwichedRenyiMutualInformationE alpha)
       s :=
   sandwichedRenyiMutualInformationE_upperSemicontinuousOn_of_iInf_posDef_candidates
     halpha hposA fun rho =>
@@ -904,35 +742,35 @@ theorem sandwichedRenyiMutualInformationE_upperSemicontinuousOn_of_posDef_candid
 
 The path is `(1 - delta) * sigma + delta * mu`; when `mu` is full-rank and
 `delta > 0`, the corresponding normalized state is full-rank. -/
-def fullRankApproxMatrix (sigma mu : State a) (delta : Real) : CMatrix a :=
+def fullRankApproxMatrix (sigma mu : MState a) (delta : ℝ) : CMatrix a :=
   regularizedStateMatrix sigma mu delta
 
 /-- Affine full-rank approximation state for a side state. -/
-def fullRankApproxState (sigma mu : State a) (delta : Real)
-    (hdelta0 : 0 ≤ delta) (hdelta1 : delta ≤ 1) : State a :=
+def fullRankApproxState (sigma mu : MState a) (delta : ℝ)
+    (hdelta0 : 0 ≤ delta) (hdelta1 : delta ≤ 1) : MState a :=
   regularizedWithState sigma mu delta hdelta0 hdelta1
 
 @[simp]
-theorem fullRankApproxState_matrix (sigma mu : State a) (delta : Real)
+theorem fullRankApproxState_matrix (sigma mu : MState a) (delta : ℝ)
     (hdelta0 : 0 ≤ delta) (hdelta1 : delta ≤ 1) :
-    (fullRankApproxState sigma mu delta hdelta0 hdelta1).matrix =
-      fullRankApproxMatrix sigma mu delta := by
-  rfl
+    (fullRankApproxState sigma mu delta hdelta0 hdelta1).m =
+      fullRankApproxMatrix sigma mu delta :=
+  MState.regularizedWithState_matrix sigma mu delta hdelta0 hdelta1
 
 /-- Positive regularization by a full-rank noise state is full-rank. -/
 theorem fullRankApproxState_posDef_of_noise
-    (sigma mu : State a) (hmu : mu.matrix.PosDef) {delta : Real}
+    (sigma mu : MState a) (hmu : mu.m.PosDef) {delta : ℝ}
     (hdelta0 : 0 ≤ delta) (hdelta1 : delta ≤ 1) (hdelta_pos : 0 < delta) :
-    (fullRankApproxState sigma mu delta hdelta0 hdelta1).matrix.PosDef := by
+    (fullRankApproxState sigma mu delta hdelta0 hdelta1).m.PosDef := by
   exact regularizedWithState_posDef_of_noise sigma mu hmu hdelta0 hdelta1 hdelta_pos
 
 /-- The full-rank approximation matrix differs from the scaled base state by
 the scaled noise state. -/
 theorem fullRankApproxMatrix_sub_smul_left
-    (sigma mu : State a) (delta : Real) :
+    (sigma mu : MState a) (delta : ℝ) :
     fullRankApproxMatrix sigma mu delta -
-        (((1 - delta : Real) : ℂ) • sigma.matrix) =
-      ((delta : Real) : ℂ) • mu.matrix := by
+        (((1 - delta : ℝ) : ℂ) • sigma.m) =
+      ((delta : ℝ) : ℂ) • mu.m := by
   ext i j
   simp [fullRankApproxMatrix, regularizedStateMatrix, Matrix.sub_apply,
     Matrix.add_apply, Matrix.smul_apply, smul_eq_mul]
@@ -940,30 +778,30 @@ theorem fullRankApproxMatrix_sub_smul_left
 /-- The full-rank approximation matrix dominates the scaled base state in
 Loewner order. -/
 theorem smul_left_le_fullRankApproxMatrix
-    (sigma mu : State a) {delta : Real} (hdelta : 0 ≤ delta) :
-    (((1 - delta : Real) : ℂ) • sigma.matrix) ≤ fullRankApproxMatrix sigma mu delta := by
+    (sigma mu : MState a) {delta : ℝ} (hdelta : 0 ≤ delta) :
+    (((1 - delta : ℝ) : ℂ) • sigma.m) ≤ fullRankApproxMatrix sigma mu delta := by
   rw [Matrix.le_iff]
   rw [fullRankApproxMatrix_sub_smul_left]
-  have hdeltaC : (0 : ℂ) ≤ ((delta : Real) : ℂ) := by
+  have hdeltaC : (0 : ℂ) ≤ ((delta : ℝ) : ℂ) := by
     exact_mod_cast hdelta
-  exact Matrix.PosSemidef.smul mu.pos hdeltaC
+  exact Matrix.PosSemidef.smul mu.psd hdeltaC
 
 /-- The full-rank approximation matrix path converges back to the side state. -/
-theorem fullRankApproxMatrix_tendsto_zero (sigma mu : State a) :
-    Tendsto (fun delta : Real => fullRankApproxMatrix sigma mu delta)
-      (nhdsWithin (0 : Real) (Set.Ioo 0 1)) (nhds sigma.matrix) := by
+theorem fullRankApproxMatrix_tendsto_zero (sigma mu : MState a) :
+    Tendsto (fun delta : ℝ => fullRankApproxMatrix sigma mu delta)
+      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds sigma.m) := by
   simpa [fullRankApproxMatrix] using regularizedStateMatrix_tendsto_zero sigma mu
 
 /-- Total full-rank approximation path, filled in by the limiting state outside
 the probability interval. -/
-def fullRankApproxStatePath (sigma mu : State a) (delta : Real) : State a :=
-  if hdelta : delta ∈ Set.Ioo (0 : Real) 1 then
+def fullRankApproxStatePath (sigma mu : MState a) (delta : ℝ) : MState a :=
+  if hdelta : delta ∈ Set.Ioo (0 : ℝ) 1 then
     fullRankApproxState sigma mu delta hdelta.1.le hdelta.2.le
   else
     sigma
 
 theorem fullRankApproxStatePath_eq_of_mem
-    (sigma mu : State a) {delta : Real} (hdelta : delta ∈ Set.Ioo (0 : Real) 1) :
+    (sigma mu : MState a) {delta : ℝ} (hdelta : delta ∈ Set.Ioo (0 : ℝ) 1) :
     fullRankApproxStatePath sigma mu delta =
       fullRankApproxState sigma mu delta hdelta.1.le hdelta.2.le := by
   rw [fullRankApproxStatePath, dif_pos hdelta]
@@ -971,34 +809,31 @@ theorem fullRankApproxStatePath_eq_of_mem
 /-- The in-interval full-rank approximation path dominates the scaled base
 state in Loewner order. -/
 theorem smul_left_le_fullRankApproxStatePath_matrix_of_mem
-    (sigma mu : State a) {delta : Real} (hdelta : delta ∈ Set.Ioo (0 : Real) 1) :
-    (((1 - delta : Real) : ℂ) • sigma.matrix) ≤
-      (fullRankApproxStatePath sigma mu delta).matrix := by
+    (sigma mu : MState a) {delta : ℝ} (hdelta : delta ∈ Set.Ioo (0 : ℝ) 1) :
+    (((1 - delta : ℝ) : ℂ) • sigma.m) ≤
+      (fullRankApproxStatePath sigma mu delta).m := by
   rw [fullRankApproxStatePath, dif_pos hdelta]
   simpa [fullRankApproxState_matrix] using
     smul_left_le_fullRankApproxMatrix sigma mu hdelta.1.le
 
 /-- The full-rank approximation path converges back to the side state. -/
-theorem fullRankApproxStatePath_tendsto_zero (sigma mu : State a) :
-    Tendsto (fun delta : Real => fullRankApproxStatePath sigma mu delta)
-      (nhdsWithin (0 : Real) (Set.Ioo 0 1)) (nhds sigma) := by
-  rw [Filter.tendsto_iff_comap]
-  rw [nhds_induced]
-  rw [Filter.comap_comap]
-  rw [← Filter.tendsto_iff_comap]
+theorem fullRankApproxStatePath_tendsto_zero (sigma mu : MState a) :
+    Tendsto (fun delta : ℝ => fullRankApproxStatePath sigma mu delta)
+      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds sigma) := by
+  refine tendsto_of_tendsto_m ?_
   refine Tendsto.congr' ?_ (fullRankApproxMatrix_tendsto_zero sigma mu)
   filter_upwards [self_mem_nhdsWithin] with delta hdelta
   change fullRankApproxMatrix sigma mu delta =
-    (fullRankApproxStatePath sigma mu delta).matrix
+    (fullRankApproxStatePath sigma mu delta).m
   rw [fullRankApproxStatePath, dif_pos hdelta]
-  rfl
+  exact (fullRankApproxState_matrix sigma mu delta _ _).symm
 
 /-- The side-state approximation is eventually full-rank when the noise is
 full-rank. -/
 theorem fullRankApproxStatePath_eventually_posDef_of_noise
-    (sigma mu : State a) (hmu : mu.matrix.PosDef) :
-    ∀ᶠ delta in nhdsWithin (0 : Real) (Set.Ioo 0 1),
-      (fullRankApproxStatePath sigma mu delta).matrix.PosDef := by
+    (sigma mu : MState a) (hmu : mu.m.PosDef) :
+    ∀ᶠ delta in nhdsWithin (0 : ℝ) (Set.Ioo 0 1),
+      (fullRankApproxStatePath sigma mu delta).m.PosDef := by
   filter_upwards [self_mem_nhdsWithin] with delta hdelta
   rw [fullRankApproxStatePath, dif_pos hdelta]
   exact fullRankApproxState_posDef_of_noise
@@ -1007,47 +842,47 @@ theorem fullRankApproxStatePath_eventually_posDef_of_noise
 /-- A full-rank approximation reference eventually supports every fixed input
 matrix. -/
 theorem fullRankApproxStatePath_eventually_supports_of_noise
-    (rho : State a) (sigma mu : State a) (hmu : mu.matrix.PosDef) :
-    ∀ᶠ delta in nhdsWithin (0 : Real) (Set.Ioo 0 1),
-      Matrix.Supports rho.matrix (fullRankApproxStatePath sigma mu delta).matrix := by
+    (rho : MState a) (sigma mu : MState a) (hmu : mu.m.PosDef) :
+    ∀ᶠ delta in nhdsWithin (0 : ℝ) (Set.Ioo 0 1),
+      Matrix.Supports rho.m (fullRankApproxStatePath sigma mu delta).m := by
   filter_upwards [fullRankApproxStatePath_eventually_posDef_of_noise sigma mu hmu]
     with delta hdelta
-  exact Matrix.Supports.of_right_posDef rho.matrix
-    (fullRankApproxStatePath sigma mu delta).matrix hdelta
+  exact Matrix.Supports.of_right_posDef rho.m
+    (fullRankApproxStatePath sigma mu delta).m hdelta
 
 /-- Canonical full-rank approximation path using the maximally mixed state as
 noise. -/
-def fullRankApproxMaximallyMixedStatePath (sigma : State a) (delta : Real) : State a :=
+def fullRankApproxMaximallyMixedStatePath (sigma : MState a) (delta : ℝ) : MState a :=
   letI : Nonempty a := sigma.nonempty
-  fullRankApproxStatePath sigma (maximallyMixed a) delta
+  fullRankApproxStatePath sigma (MState.uniform : MState a) delta
 
 /-- On `0 < delta < 1`, the canonical maximally mixed full-rank approximation
 is a scalar multiple of the unnormalized `sigma + epsilon I` regularization. -/
 theorem fullRankApproxMaximallyMixedStatePath_matrix_eq_smul_referenceRegularization
-    (sigma : State a) {delta : Real} (hdelta : delta ∈ Set.Ioo (0 : Real) 1) :
-    (fullRankApproxMaximallyMixedStatePath sigma delta).matrix =
-      (((1 - delta : Real) : ℂ) •
-        sandwichedRenyiReferenceRegularization sigma.matrix
-          (delta / ((1 - delta) * (Fintype.card a : Real)))) := by
+    (sigma : MState a) {delta : ℝ} (hdelta : delta ∈ Set.Ioo (0 : ℝ) 1) :
+    (fullRankApproxMaximallyMixedStatePath sigma delta).m =
+      (((1 - delta : ℝ) : ℂ) •
+        sandwichedRenyiReferenceRegularization sigma.m
+          (delta / ((1 - delta) * (Fintype.card a : ℝ)))) := by
   let : Nonempty a := sigma.nonempty
-  have hcard_ne : (Fintype.card a : Real) ≠ 0 := by
+  have hcard_ne : (Fintype.card a : ℝ) ≠ 0 := by
     exact_mod_cast (Nat.cast_ne_zero.mpr Fintype.card_ne_zero)
   have hdelta_ne : 1 - delta ≠ 0 := by
     linarith [hdelta.2]
   ext i j
   simp [fullRankApproxMaximallyMixedStatePath, fullRankApproxStatePath,
     fullRankApproxState, regularizedStateMatrix,
-    sandwichedRenyiReferenceRegularization, maximallyMixed_matrix, hdelta,
+    sandwichedRenyiReferenceRegularization, uniform_matrix, hdelta,
     Matrix.add_apply, Matrix.smul_apply, smul_eq_mul]
   by_cases hij : i = j
   · subst j
     simp
     have hdelta_complex_ne : (1 - (delta : ℂ)) ≠ 0 := by
       exact_mod_cast hdelta_ne
-    have hcard_complex_ne : (((Fintype.card a : Real) : ℂ)) ≠ 0 := by
+    have hcard_complex_ne : (((Fintype.card a : ℝ) : ℂ)) ≠ 0 := by
       exact_mod_cast hcard_ne
     have hden_ne :
-        (1 - (delta : ℂ)) * (((Fintype.card a : Real) : ℂ)) ≠ 0 :=
+        (1 - (delta : ℂ)) * (((Fintype.card a : ℝ) : ℂ)) ≠ 0 :=
       mul_ne_zero hdelta_complex_ne hcard_complex_ne
     field_simp [hcard_ne, hdelta_ne, hdelta_complex_ne, hcard_complex_ne, hden_ne]
   · simp [hij]
@@ -1055,13 +890,13 @@ theorem fullRankApproxMaximallyMixedStatePath_matrix_eq_smul_referenceRegulariza
 /-- Filter form of the scalar-regularization bridge for the canonical
 maximally mixed full-rank approximation path. -/
 theorem fullRankApproxMaximallyMixedStatePath_matrix_eventuallyEq_smul_referenceRegularization
-    (sigma : State a) :
-    (fun delta : Real => (fullRankApproxMaximallyMixedStatePath sigma delta).matrix) =ᶠ[
-        nhdsWithin (0 : Real) (Set.Ioo 0 1)]
-      (fun delta : Real =>
-        (((1 - delta : Real) : ℂ) •
-          sandwichedRenyiReferenceRegularization sigma.matrix
-            (delta / ((1 - delta) * (Fintype.card a : Real))))) := by
+    (sigma : MState a) :
+    (fun delta : ℝ => (fullRankApproxMaximallyMixedStatePath sigma delta).m) =ᶠ[
+        nhdsWithin (0 : ℝ) (Set.Ioo 0 1)]
+      (fun delta : ℝ =>
+        (((1 - delta : ℝ) : ℂ) •
+          sandwichedRenyiReferenceRegularization sigma.m
+            (delta / ((1 - delta) * (Fintype.card a : ℝ))))) := by
   filter_upwards [self_mem_nhdsWithin] with delta hdelta
   exact fullRankApproxMaximallyMixedStatePath_matrix_eq_smul_referenceRegularization sigma hdelta
 
@@ -1071,88 +906,88 @@ path tends to zero from the positive side. -/
 theorem fullRankApproxMaximallyMixedRegularizationParameter_tendsto_zero
     [Nonempty a] :
     Tendsto
-      (fun delta : Real => delta / ((1 - delta) * (Fintype.card a : Real)))
-      (nhdsWithin (0 : Real) (Set.Ioo 0 1))
-      (nhdsWithin (0 : Real) (Set.Ioi 0)) := by
+      (fun delta : ℝ => delta / ((1 - delta) * (Fintype.card a : ℝ)))
+      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1))
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0)) := by
   rw [tendsto_nhdsWithin_iff]
   constructor
   · have hdelta :
-        Tendsto (fun delta : Real => delta)
-          (nhdsWithin (0 : Real) (Set.Ioo 0 1)) (nhds (0 : Real)) :=
+        Tendsto (fun delta : ℝ => delta)
+          (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds (0 : ℝ)) :=
       tendsto_id.mono_left nhdsWithin_le_nhds
     have hden :
-        Tendsto (fun delta : Real => (1 - delta) * (Fintype.card a : Real))
-          (nhdsWithin (0 : Real) (Set.Ioo 0 1))
-          (nhds ((1 - (0 : Real)) * (Fintype.card a : Real))) :=
+        Tendsto (fun delta : ℝ => (1 - delta) * (Fintype.card a : ℝ))
+          (nhdsWithin (0 : ℝ) (Set.Ioo 0 1))
+          (nhds ((1 - (0 : ℝ)) * (Fintype.card a : ℝ))) :=
       (tendsto_const_nhds.sub hdelta).mul tendsto_const_nhds
-    have hcard_ne : ((1 - (0 : Real)) * (Fintype.card a : Real)) ≠ 0 := by
-      have hcard_pos : 0 < (Fintype.card a : Real) := by
+    have hcard_ne : ((1 - (0 : ℝ)) * (Fintype.card a : ℝ)) ≠ 0 := by
+      have hcard_pos : 0 < (Fintype.card a : ℝ) := by
         exact_mod_cast (Fintype.card_pos : 0 < Fintype.card a)
       nlinarith
-    have hres : Tendsto (fun delta : Real => delta / ((1 - delta) * (Fintype.card a : Real)))
-        (nhdsWithin (0 : Real) (Set.Ioo 0 1))
-        (nhds ((0 : Real) / ((1 - (0 : Real)) * (Fintype.card a : Real)))) :=
+    have hres : Tendsto (fun delta : ℝ => delta / ((1 - delta) * (Fintype.card a : ℝ)))
+        (nhdsWithin (0 : ℝ) (Set.Ioo 0 1))
+        (nhds ((0 : ℝ) / ((1 - (0 : ℝ)) * (Fintype.card a : ℝ)))) :=
       hdelta.div hden hcard_ne
     simpa using hres
   · filter_upwards [self_mem_nhdsWithin] with delta hdelta
-    have hcard_pos : 0 < (Fintype.card a : Real) := by
+    have hcard_pos : 0 < (Fintype.card a : ℝ) := by
       exact_mod_cast (Fintype.card_pos : 0 < Fintype.card a)
-    have hden_pos : 0 < (1 - delta) * (Fintype.card a : Real) :=
+    have hden_pos : 0 < (1 - delta) * (Fintype.card a : ℝ) :=
       mul_pos (sub_pos.mpr hdelta.2) hcard_pos
     exact div_pos hdelta.1 hden_pos
 
 /-- The canonical full-rank approximation path converges back to the target
 state. -/
-theorem fullRankApproxMaximallyMixedStatePath_tendsto_zero (sigma : State a) :
-    Tendsto (fun delta : Real => fullRankApproxMaximallyMixedStatePath sigma delta)
-      (nhdsWithin (0 : Real) (Set.Ioo 0 1)) (nhds sigma) := by
+theorem fullRankApproxMaximallyMixedStatePath_tendsto_zero (sigma : MState a) :
+    Tendsto (fun delta : ℝ => fullRankApproxMaximallyMixedStatePath sigma delta)
+      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds sigma) := by
   classical
   let : Nonempty a := sigma.nonempty
   simpa [fullRankApproxMaximallyMixedStatePath] using
-    fullRankApproxStatePath_tendsto_zero sigma (maximallyMixed a)
+    fullRankApproxStatePath_tendsto_zero sigma (MState.uniform : MState a)
 
 /-- The canonical full-rank approximation path is eventually full-rank. -/
-theorem fullRankApproxMaximallyMixedStatePath_eventually_posDef (sigma : State a) :
-    ∀ᶠ delta in nhdsWithin (0 : Real) (Set.Ioo 0 1),
-      (fullRankApproxMaximallyMixedStatePath sigma delta).matrix.PosDef := by
+theorem fullRankApproxMaximallyMixedStatePath_eventually_posDef (sigma : MState a) :
+    ∀ᶠ delta in nhdsWithin (0 : ℝ) (Set.Ioo 0 1),
+      (fullRankApproxMaximallyMixedStatePath sigma delta).m.PosDef := by
   classical
   let : Nonempty a := sigma.nonempty
   simpa [fullRankApproxMaximallyMixedStatePath] using
     fullRankApproxStatePath_eventually_posDef_of_noise
-      sigma (maximallyMixed a) (maximallyMixed_posDef (a := a))
+      sigma (MState.uniform : MState a) (MState.uniform_posDef (d := a))
 
 /-- The canonical full-rank approximation path eventually supports every fixed
 input matrix. -/
 theorem fullRankApproxMaximallyMixedStatePath_eventually_supports
-    (rho sigma : State a) :
-    ∀ᶠ delta in nhdsWithin (0 : Real) (Set.Ioo 0 1),
-      Matrix.Supports rho.matrix (fullRankApproxMaximallyMixedStatePath sigma delta).matrix := by
+    (rho sigma : MState a) :
+    ∀ᶠ delta in nhdsWithin (0 : ℝ) (Set.Ioo 0 1),
+      Matrix.Supports rho.m (fullRankApproxMaximallyMixedStatePath sigma delta).m := by
   classical
   let : Nonempty a := sigma.nonempty
   simpa [fullRankApproxMaximallyMixedStatePath] using
     fullRankApproxStatePath_eventually_supports_of_noise
-      rho sigma (maximallyMixed a) (maximallyMixed_posDef (a := a))
+      rho sigma (MState.uniform : MState a) (MState.uniform_posDef (d := a))
 
 /-- Canonical maximally mixed full-rank approximation version of the
 full-rank-restriction handoff. -/
 theorem iInf_posDef_candidates_le_sandwichedRenyiMutualInformationCandidateE_of_fullRankApprox
-    (rhoAB : State (Prod a b)) (sigmaB : State b) (alpha : Real)
+    (rhoAB : MState (a × b)) (sigmaB : MState b) (alpha : ℝ)
     (htend :
       Tendsto
-        (fun delta : Real =>
+        (fun delta : ℝ =>
           rhoAB.sandwichedRenyiMutualInformationCandidateE
             (fullRankApproxMaximallyMixedStatePath sigmaB delta) alpha)
-        (nhdsWithin (0 : Real) (Set.Ioo 0 1))
+        (nhdsWithin (0 : ℝ) (Set.Ioo 0 1))
         (nhds (rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB alpha))) :
-    (⨅ tauB : {tauB : State b // tauB.matrix.PosDef},
+    (⨅ tauB : {tauB : MState b // tauB.m.PosDef},
       rhoAB.sandwichedRenyiMutualInformationCandidateE tauB.1 alpha) ≤
         rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB alpha := by
-  have : NeBot (nhdsWithin (0 : Real) (Set.Ioo 0 1)) :=
+  have : NeBot (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) :=
     left_nhdsWithin_Ioo_neBot zero_lt_one
   exact
     iInf_posDef_candidates_le_sandwichedRenyiMutualInformationCandidateE_of_tendsto
       rhoAB alpha
-      (fun delta : Real => fullRankApproxMaximallyMixedStatePath sigmaB delta)
+      (fun delta : ℝ => fullRankApproxMaximallyMixedStatePath sigmaB delta)
       sigmaB
       (fullRankApproxMaximallyMixedStatePath_eventually_posDef sigmaB)
       htend
@@ -1160,19 +995,19 @@ theorem iInf_posDef_candidates_le_sandwichedRenyiMutualInformationCandidateE_of_
 /-- Full-rank side-state restriction from convergence of the canonical
 full-rank approximation in the only nontrivial branch. -/
 theorem posDef_candidate_approx_of_supported_singular_fullRankApprox_tendsto
-    (rhoAB : State (Prod a b)) {alpha : Real} (halpha : 1 < alpha)
+    (rhoAB : MState (a × b)) {alpha : ℝ} (halpha : 1 < alpha)
     (hsingular :
-      ∀ sigmaB : State b,
-        Matrix.Supports rhoAB.matrix (rhoAB.marginalA.prod sigmaB).matrix →
-          ¬ sigmaB.matrix.PosDef →
+      ∀ sigmaB : MState b,
+        Matrix.Supports rhoAB.m (rhoAB.traceRight.prod sigmaB).m →
+          ¬ sigmaB.m.PosDef →
             Tendsto
-              (fun delta : Real =>
+              (fun delta : ℝ =>
                 rhoAB.sandwichedRenyiMutualInformationCandidateE
                   (fullRankApproxMaximallyMixedStatePath sigmaB delta) alpha)
-              (nhdsWithin (0 : Real) (Set.Ioo 0 1))
+              (nhdsWithin (0 : ℝ) (Set.Ioo 0 1))
               (nhds (rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB alpha))) :
-    ∀ sigmaB : State b,
-      (⨅ tauB : {tauB : State b // tauB.matrix.PosDef},
+    ∀ sigmaB : MState b,
+      (⨅ tauB : {tauB : MState b // tauB.m.PosDef},
         rhoAB.sandwichedRenyiMutualInformationCandidateE tauB.1 alpha) ≤
           rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB alpha := by
   refine posDef_candidate_approx_of_supported_singular rhoAB halpha ?_
@@ -1184,75 +1019,76 @@ theorem posDef_candidate_approx_of_supported_singular_fullRankApprox_tendsto
 /-- If the fixed left reference is full-rank, the product with the full-rank
 side-state approximation is full-rank. -/
 theorem prod_fullRankApproxState_posDef_of_left
-    (rhoA : State a) (sigma mu : State b)
-    (hrhoA : rhoA.matrix.PosDef) (hmu : mu.matrix.PosDef) {delta : Real}
+    (rhoA : MState a) (sigma mu : MState b)
+    (hrhoA : rhoA.m.PosDef) (hmu : mu.m.PosDef) {delta : ℝ}
     (hdelta0 : 0 ≤ delta) (hdelta1 : delta ≤ 1) (hdelta_pos : 0 < delta) :
-    (rhoA.prod (fullRankApproxState sigma mu delta hdelta0 hdelta1)).matrix.PosDef := by
-  exact State.prod_posDef hrhoA
+    (rhoA.prod (fullRankApproxState sigma mu delta hdelta0 hdelta1)).m.PosDef := by
+  exact MState.PosDef.kron hrhoA
     (fullRankApproxState_posDef_of_noise sigma mu hmu hdelta0 hdelta1 hdelta_pos)
 
 /-- Product reference path obtained by regularizing only the side state. -/
 def fullRankApproxProductReferencePath
-    (rhoA : State a) (sigma mu : State b) (delta : Real) : State (Prod a b) :=
+    (rhoA : MState a) (sigma mu : MState b) (delta : ℝ) : MState (a × b) :=
   rhoA.prod (fullRankApproxStatePath sigma mu delta)
 
 /-- Matrix reference obtained by regularizing only the right tensor factor,
 while keeping the left state fixed. -/
 def fixedLeftReferenceRegularization
-    (rhoA : State a) (sigma : State b) (epsilon : Real) : CMatrix (Prod a b) :=
-  Matrix.kronecker rhoA.matrix
-    (sandwichedRenyiReferenceRegularization sigma.matrix epsilon)
+    (rhoA : MState a) (sigma : MState b) (epsilon : ℝ) : CMatrix (a × b) :=
+  Matrix.kronecker rhoA.m
+    (sandwichedRenyiReferenceRegularization sigma.m epsilon)
 
 /-- Product eigenbasis for a tensor-product reference. -/
 def productReferenceEigenvectorUnitary
-    (rhoA : State a) (sigmaB : State b) : Matrix.unitaryGroup (Prod a b) ℂ :=
+    (rhoA : MState a) (sigmaB : MState b) : Matrix.unitaryGroup (a × b) ℂ :=
   let UA : Matrix.unitaryGroup a ℂ :=
-    rhoA.pos.isHermitian.eigenvectorUnitary
+    rhoA.psd.isHermitian.eigenvectorUnitary
   let UB : Matrix.unitaryGroup b ℂ :=
-    sigmaB.pos.isHermitian.eigenvectorUnitary
+    sigmaB.psd.isHermitian.eigenvectorUnitary
   ⟨Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b),
     Matrix.kronecker_mem_unitary UA.2 UB.2⟩
 
 /-- A tensor-product reference is diagonal in the product of the single-system
 eigenbases. -/
 theorem productReference_matrix_eq_productEigenbasis_diagonal
-    (rhoA : State a) (sigmaB : State b) :
-    (rhoA.prod sigmaB).matrix =
-      (productReferenceEigenvectorUnitary rhoA sigmaB : CMatrix (Prod a b)) *
+    (rhoA : MState a) (sigmaB : MState b) :
+    (rhoA.prod sigmaB).m =
+      (productReferenceEigenvectorUnitary rhoA sigmaB : CMatrix (a × b)) *
         Matrix.diagonal
-          (fun y : Prod a b =>
-            ((rhoA.pos.isHermitian.eigenvalues y.1 *
-                sigmaB.pos.isHermitian.eigenvalues y.2 : Real) : ℂ)) *
-        star (productReferenceEigenvectorUnitary rhoA sigmaB : CMatrix (Prod a b)) := by
+          (fun y : a × b =>
+            ((rhoA.psd.isHermitian.eigenvalues y.1 *
+                sigmaB.psd.isHermitian.eigenvalues y.2 : ℝ) : ℂ)) *
+        star (productReferenceEigenvectorUnitary rhoA sigmaB : CMatrix (a × b)) := by
   classical
   let UA : Matrix.unitaryGroup a ℂ :=
-    rhoA.pos.isHermitian.eigenvectorUnitary
+    rhoA.psd.isHermitian.eigenvectorUnitary
   let UB : Matrix.unitaryGroup b ℂ :=
-    sigmaB.pos.isHermitian.eigenvectorUnitary
+    sigmaB.psd.isHermitian.eigenvectorUnitary
   have hA :
-      rhoA.matrix =
+      rhoA.m =
         (UA : CMatrix a) *
           Matrix.diagonal
             (fun x : a =>
-              ((rhoA.pos.isHermitian.eigenvalues x : Real) : ℂ)) *
+              ((rhoA.psd.isHermitian.eigenvalues x : ℝ) : ℂ)) *
           star (UA : CMatrix a) := by
     simpa [UA, Function.comp_def,
-      Unitary.conjStarAlgAut_apply] using rhoA.pos.isHermitian.spectral_theorem
+      Unitary.conjStarAlgAut_apply] using rhoA.psd.isHermitian.spectral_theorem
   have hB :
-      sigmaB.matrix =
+      sigmaB.m =
         (UB : CMatrix b) *
           Matrix.diagonal
             (fun y : b =>
-              ((sigmaB.pos.isHermitian.eigenvalues y : Real) : ℂ)) *
+              ((sigmaB.psd.isHermitian.eigenvalues y : ℝ) : ℂ)) *
           star (UB : CMatrix b) := by
     simpa [UB, Function.comp_def,
-      Unitary.conjStarAlgAut_apply] using sigmaB.pos.isHermitian.spectral_theorem
-  change Matrix.kronecker rhoA.matrix sigmaB.matrix =
+      Unitary.conjStarAlgAut_apply] using sigmaB.psd.isHermitian.spectral_theorem
+  rw [MState.prod_m]
+  change Matrix.kronecker rhoA.m sigmaB.m =
     Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b) *
       Matrix.diagonal
-        (fun y : Prod a b =>
-          ((rhoA.pos.isHermitian.eigenvalues y.1 *
-              sigmaB.pos.isHermitian.eigenvalues y.2 : Real) : ℂ)) *
+        (fun y : a × b =>
+          ((rhoA.psd.isHermitian.eigenvalues y.1 *
+              sigmaB.psd.isHermitian.eigenvalues y.2 : ℝ) : ℂ)) *
       star (Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b))
   conv_lhs =>
     rw [hA, hB]
@@ -1264,21 +1100,21 @@ omit [Fintype a] [DecidableEq a] in
 /-- Source reference regularization is diagonal in the original reference
 eigenbasis, with eigenvalues shifted by the regularization parameter. -/
 theorem referenceRegularization_matrix_eq_eigenbasis_diagonal
-    (sigma : State b) (epsilon : Real) :
-    sandwichedRenyiReferenceRegularization sigma.matrix epsilon =
-      (sigma.pos.isHermitian.eigenvectorUnitary : CMatrix b) *
+    (sigma : MState b) (epsilon : ℝ) :
+    sandwichedRenyiReferenceRegularization sigma.m epsilon =
+      (sigma.psd.isHermitian.eigenvectorUnitary : CMatrix b) *
         Matrix.diagonal
           (fun y : b =>
-            ((sigma.pos.isHermitian.eigenvalues y + epsilon : Real) : ℂ)) *
-        star (sigma.pos.isHermitian.eigenvectorUnitary : CMatrix b) := by
+            ((sigma.psd.isHermitian.eigenvalues y + epsilon : ℝ) : ℂ)) *
+        star (sigma.psd.isHermitian.eigenvectorUnitary : CMatrix b) := by
   classical
-  let U : Matrix.unitaryGroup b ℂ := sigma.pos.isHermitian.eigenvectorUnitary
+  let U : Matrix.unitaryGroup b ℂ := sigma.psd.isHermitian.eigenvectorUnitary
   let D : CMatrix b :=
-    Matrix.diagonal fun y : b => ((sigma.pos.isHermitian.eigenvalues y : Real) : ℂ)
+    Matrix.diagonal fun y : b => ((sigma.psd.isHermitian.eigenvalues y : ℝ) : ℂ)
   have hSigma :
-      sigma.matrix = (U : CMatrix b) * D * star (U : CMatrix b) := by
+      sigma.m = (U : CMatrix b) * D * star (U : CMatrix b) := by
     simpa [U, D, Function.comp_def, Unitary.conjStarAlgAut_apply] using
-      sigma.pos.isHermitian.spectral_theorem
+      sigma.psd.isHermitian.spectral_theorem
   have hOne :
       (1 : CMatrix b) = (U : CMatrix b) * (1 : CMatrix b) * star (U : CMatrix b) := by
     symm
@@ -1300,17 +1136,17 @@ theorem referenceRegularization_matrix_eq_eigenbasis_diagonal
       D + epsilon • (1 : CMatrix b) =
         Matrix.diagonal
           (fun y : b =>
-            ((sigma.pos.isHermitian.eigenvalues y + epsilon : Real) : ℂ)) := by
+            ((sigma.psd.isHermitian.eigenvalues y + epsilon : ℝ) : ℂ)) := by
     ext i j
     by_cases hij : i = j
     · subst j
       simp [D, Matrix.diagonal, Matrix.smul_apply, add_comm]
     · simp [D, Matrix.diagonal, Matrix.smul_apply, hij]
-  change sigma.matrix + epsilon • (1 : CMatrix b) =
+  change sigma.m + epsilon • (1 : CMatrix b) =
       (U : CMatrix b) *
         Matrix.diagonal
           (fun y : b =>
-            ((sigma.pos.isHermitian.eigenvalues y + epsilon : Real) : ℂ)) *
+            ((sigma.psd.isHermitian.eigenvalues y + epsilon : ℝ) : ℂ)) *
         star (U : CMatrix b)
   conv_lhs =>
     rw [hSigma, hOne]
@@ -1324,50 +1160,50 @@ theorem referenceRegularization_matrix_eq_eigenbasis_diagonal
     _ = (U : CMatrix b) *
         Matrix.diagonal
           (fun y : b =>
-            ((sigma.pos.isHermitian.eigenvalues y + epsilon : Real) : ℂ)) *
+            ((sigma.psd.isHermitian.eigenvalues y + epsilon : ℝ) : ℂ)) *
         star (U : CMatrix b) := by
           rw [hdiag]
 
 /-- Fixed-left side regularization is diagonal in the tensor product of the
 left and right reference eigenbases. -/
 theorem fixedLeftReferenceRegularization_matrix_eq_productEigenbasis_diagonal
-    (rhoA : State a) (sigma : State b) (epsilon : Real) :
+    (rhoA : MState a) (sigma : MState b) (epsilon : ℝ) :
     fixedLeftReferenceRegularization rhoA sigma epsilon =
-      (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (Prod a b)) *
+      (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (a × b)) *
         Matrix.diagonal
-          (fun y : Prod a b =>
-            ((rhoA.pos.isHermitian.eigenvalues y.1 *
-                (sigma.pos.isHermitian.eigenvalues y.2 + epsilon) : Real) : ℂ)) *
-        star (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (Prod a b)) := by
+          (fun y : a × b =>
+            ((rhoA.psd.isHermitian.eigenvalues y.1 *
+                (sigma.psd.isHermitian.eigenvalues y.2 + epsilon) : ℝ) : ℂ)) *
+        star (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (a × b)) := by
   classical
   let UA : Matrix.unitaryGroup a ℂ :=
-    rhoA.pos.isHermitian.eigenvectorUnitary
+    rhoA.psd.isHermitian.eigenvectorUnitary
   let UB : Matrix.unitaryGroup b ℂ :=
-    sigma.pos.isHermitian.eigenvectorUnitary
+    sigma.psd.isHermitian.eigenvectorUnitary
   have hA :
-      rhoA.matrix =
+      rhoA.m =
         (UA : CMatrix a) *
           Matrix.diagonal
             (fun x : a =>
-              ((rhoA.pos.isHermitian.eigenvalues x : Real) : ℂ)) *
+              ((rhoA.psd.isHermitian.eigenvalues x : ℝ) : ℂ)) *
           star (UA : CMatrix a) := by
     simpa [UA, Function.comp_def, Unitary.conjStarAlgAut_apply] using
-      rhoA.pos.isHermitian.spectral_theorem
+      rhoA.psd.isHermitian.spectral_theorem
   have hB :
-      sandwichedRenyiReferenceRegularization sigma.matrix epsilon =
+      sandwichedRenyiReferenceRegularization sigma.m epsilon =
         (UB : CMatrix b) *
           Matrix.diagonal
             (fun y : b =>
-              ((sigma.pos.isHermitian.eigenvalues y + epsilon : Real) : ℂ)) *
+              ((sigma.psd.isHermitian.eigenvalues y + epsilon : ℝ) : ℂ)) *
           star (UB : CMatrix b) := by
     simpa [UB] using referenceRegularization_matrix_eq_eigenbasis_diagonal sigma epsilon
-  change Matrix.kronecker rhoA.matrix
-      (sandwichedRenyiReferenceRegularization sigma.matrix epsilon) =
+  change Matrix.kronecker rhoA.m
+      (sandwichedRenyiReferenceRegularization sigma.m epsilon) =
     Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b) *
       Matrix.diagonal
-        (fun y : Prod a b =>
-          ((rhoA.pos.isHermitian.eigenvalues y.1 *
-              (sigma.pos.isHermitian.eigenvalues y.2 + epsilon) : Real) : ℂ)) *
+        (fun y : a × b =>
+          ((rhoA.psd.isHermitian.eigenvalues y.1 *
+              (sigma.psd.isHermitian.eigenvalues y.2 + epsilon) : ℝ) : ℂ)) *
       star (Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b))
   conv_lhs =>
     rw [hA, hB]
@@ -1378,148 +1214,148 @@ theorem fixedLeftReferenceRegularization_matrix_eq_productEigenbasis_diagonal
 /-- Fixed-left side-regularized sandwiched Renyi inner operator in the product
 reference eigenbasis. -/
 theorem sandwichedRenyiReferenceInner_fixedLeftRegularized_conj_productEigenbasis
-    (rhoAB : State (Prod a b)) (rhoA : State a) (sigma : State b)
-    {epsilon : Real} (hepsilon : 0 ≤ epsilon) (alpha : Real) :
-    let s : Real := (1 - alpha) / (2 * alpha)
-    let U : Matrix.unitaryGroup (Prod a b) ℂ :=
+    (rhoAB : MState (a × b)) (rhoA : MState a) (sigma : MState b)
+    {epsilon : ℝ} (hepsilon : 0 ≤ epsilon) (alpha : ℝ) :
+    let s : ℝ := (1 - alpha) / (2 * alpha)
+    let U : Matrix.unitaryGroup (a × b) ℂ :=
       productReferenceEigenvectorUnitary rhoA sigma
-    let Depsilon : CMatrix (Prod a b) := Matrix.diagonal
-      (fun y : Prod a b =>
-        (((rhoA.pos.isHermitian.eigenvalues y.1 *
-            (sigma.pos.isHermitian.eigenvalues y.2 + epsilon)) ^ s : Real) : ℂ))
-    star (U : CMatrix (Prod a b)) *
+    let Depsilon : CMatrix (a × b) := Matrix.diagonal
+      (fun y : a × b =>
+        (((rhoA.psd.isHermitian.eigenvalues y.1 *
+            (sigma.psd.isHermitian.eigenvalues y.2 + epsilon)) ^ s : ℝ) : ℂ))
+    star (U : CMatrix (a × b)) *
         sandwichedRenyiReferenceInner rhoAB
           (fixedLeftReferenceRegularization rhoA sigma epsilon) alpha *
-        (U : CMatrix (Prod a b)) =
-      Depsilon * (star (U : CMatrix (Prod a b)) * rhoAB.matrix *
-        (U : CMatrix (Prod a b))) * Depsilon := by
+        (U : CMatrix (a × b)) =
+      Depsilon * (star (U : CMatrix (a × b)) * rhoAB.m *
+        (U : CMatrix (a × b))) * Depsilon := by
   classical
   dsimp
-  let s : Real := (1 - alpha) / (2 * alpha)
-  let U : Matrix.unitaryGroup (Prod a b) ℂ :=
+  let s : ℝ := (1 - alpha) / (2 * alpha)
+  let U : Matrix.unitaryGroup (a × b) ℂ :=
     productReferenceEigenvectorUnitary rhoA sigma
-  let depsilon : Prod a b -> Real := fun y =>
-    rhoA.pos.isHermitian.eigenvalues y.1 *
-      (sigma.pos.isHermitian.eigenvalues y.2 + epsilon)
-  let Depsilon : CMatrix (Prod a b) :=
-    Matrix.diagonal fun y : Prod a b => ((depsilon y ^ s : Real) : ℂ)
-  have hdepsilon_nonneg : ∀ y : Prod a b, 0 ≤ depsilon y := by
+  let depsilon : a × b → ℝ := fun y =>
+    rhoA.psd.isHermitian.eigenvalues y.1 *
+      (sigma.psd.isHermitian.eigenvalues y.2 + epsilon)
+  let Depsilon : CMatrix (a × b) :=
+    Matrix.diagonal fun y : a × b => ((depsilon y ^ s : ℝ) : ℂ)
+  have hdepsilon_nonneg : ∀ y : a × b, 0 ≤ depsilon y := by
     intro y
-    exact mul_nonneg (rhoA.pos.eigenvalues_nonneg y.1)
-      (add_nonneg (sigma.pos.eigenvalues_nonneg y.2) hepsilon)
+    exact mul_nonneg (rhoA.psd.eigenvalues_nonneg y.1)
+      (add_nonneg (sigma.psd.eigenvalues_nonneg y.2) hepsilon)
   have hpow :
       CFC.rpow (fixedLeftReferenceRegularization rhoA sigma epsilon) s =
-        (U : CMatrix (Prod a b)) * Depsilon *
-          star (U : CMatrix (Prod a b)) := by
+        (U : CMatrix (a × b)) * Depsilon *
+          star (U : CMatrix (a × b)) := by
     rw [fixedLeftReferenceRegularization_matrix_eq_productEigenbasis_diagonal
       rhoA sigma epsilon]
     simpa [U, depsilon, Depsilon] using
       cMatrix_rpow_unitary_conj_diagonal_ofReal U depsilon hdepsilon_nonneg s
   have hUstarU :
-      star (U : CMatrix (Prod a b)) * (U : CMatrix (Prod a b)) = 1 := by
+      star (U : CMatrix (a × b)) * (U : CMatrix (a × b)) = 1 := by
     simp
-  change star (U : CMatrix (Prod a b)) *
+  change star (U : CMatrix (a × b)) *
       ((CFC.rpow (fixedLeftReferenceRegularization rhoA sigma epsilon) s) *
-        rhoAB.matrix *
+        rhoAB.m *
         (CFC.rpow (fixedLeftReferenceRegularization rhoA sigma epsilon) s)) *
-      (U : CMatrix (Prod a b)) =
-    Depsilon * (star (U : CMatrix (Prod a b)) * rhoAB.matrix *
-      (U : CMatrix (Prod a b))) * Depsilon
+      (U : CMatrix (a × b)) =
+    Depsilon * (star (U : CMatrix (a × b)) * rhoAB.m *
+      (U : CMatrix (a × b))) * Depsilon
   rw [hpow]
   calc
-    star (U : CMatrix (Prod a b)) *
-        (((U : CMatrix (Prod a b)) * Depsilon *
-            star (U : CMatrix (Prod a b))) * rhoAB.matrix *
-          ((U : CMatrix (Prod a b)) * Depsilon *
-            star (U : CMatrix (Prod a b)))) *
-        (U : CMatrix (Prod a b)) =
-        Depsilon * (star (U : CMatrix (Prod a b)) * rhoAB.matrix *
-          (U : CMatrix (Prod a b))) * Depsilon := by
+    star (U : CMatrix (a × b)) *
+        (((U : CMatrix (a × b)) * Depsilon *
+            star (U : CMatrix (a × b))) * rhoAB.m *
+          ((U : CMatrix (a × b)) * Depsilon *
+            star (U : CMatrix (a × b)))) *
+        (U : CMatrix (a × b)) =
+        Depsilon * (star (U : CMatrix (a × b)) * rhoAB.m *
+          (U : CMatrix (a × b))) * Depsilon := by
           simp [Matrix.mul_assoc, hUstarU]
           rw [← Matrix.mul_assoc, hUstarU, Matrix.one_mul]
 
 /-- Entrywise fixed-left side-regularized inner-operator formula in the
 product reference eigenbasis. -/
 theorem sandwichedRenyiReferenceInner_fixedLeftRegularized_conj_productEigenbasis_entry
-    (rhoAB : State (Prod a b)) (rhoA : State a) (sigma : State b)
-    {epsilon : Real} (hepsilon : 0 ≤ epsilon) (alpha : Real)
-    (i j : Prod a b) :
-    let s : Real := (1 - alpha) / (2 * alpha)
-    let U : Matrix.unitaryGroup (Prod a b) ℂ :=
+    (rhoAB : MState (a × b)) (rhoA : MState a) (sigma : MState b)
+    {epsilon : ℝ} (hepsilon : 0 ≤ epsilon) (alpha : ℝ)
+    (i j : a × b) :
+    let s : ℝ := (1 - alpha) / (2 * alpha)
+    let U : Matrix.unitaryGroup (a × b) ℂ :=
       productReferenceEigenvectorUnitary rhoA sigma
-    (star (U : CMatrix (Prod a b)) *
+    (star (U : CMatrix (a × b)) *
         sandwichedRenyiReferenceInner rhoAB
           (fixedLeftReferenceRegularization rhoA sigma epsilon) alpha *
-        (U : CMatrix (Prod a b))) i j =
-      (((rhoA.pos.isHermitian.eigenvalues i.1 *
-          (sigma.pos.isHermitian.eigenvalues i.2 + epsilon)) ^ s : Real) : ℂ) *
-        (star (U : CMatrix (Prod a b)) * rhoAB.matrix *
-          (U : CMatrix (Prod a b))) i j *
-        (((rhoA.pos.isHermitian.eigenvalues j.1 *
-          (sigma.pos.isHermitian.eigenvalues j.2 + epsilon)) ^ s : Real) : ℂ) := by
+        (U : CMatrix (a × b))) i j =
+      (((rhoA.psd.isHermitian.eigenvalues i.1 *
+          (sigma.psd.isHermitian.eigenvalues i.2 + epsilon)) ^ s : ℝ) : ℂ) *
+        (star (U : CMatrix (a × b)) * rhoAB.m *
+          (U : CMatrix (a × b))) i j *
+        (((rhoA.psd.isHermitian.eigenvalues j.1 *
+          (sigma.psd.isHermitian.eigenvalues j.2 + epsilon)) ^ s : ℝ) : ℂ) := by
   classical
   dsimp
-  let s : Real := (1 - alpha) / (2 * alpha)
-  let U : Matrix.unitaryGroup (Prod a b) ℂ :=
+  let s : ℝ := (1 - alpha) / (2 * alpha)
+  let U : Matrix.unitaryGroup (a × b) ℂ :=
     productReferenceEigenvectorUnitary rhoA sigma
-  let Depsilon : CMatrix (Prod a b) := Matrix.diagonal
-    (fun y : Prod a b =>
-      (((rhoA.pos.isHermitian.eigenvalues y.1 *
-          (sigma.pos.isHermitian.eigenvalues y.2 + epsilon)) ^ s : Real) : ℂ))
-  let M : CMatrix (Prod a b) :=
-    star (U : CMatrix (Prod a b)) * rhoAB.matrix * (U : CMatrix (Prod a b))
+  let Depsilon : CMatrix (a × b) := Matrix.diagonal
+    (fun y : a × b =>
+      (((rhoA.psd.isHermitian.eigenvalues y.1 *
+          (sigma.psd.isHermitian.eigenvalues y.2 + epsilon)) ^ s : ℝ) : ℂ))
+  let M : CMatrix (a × b) :=
+    star (U : CMatrix (a × b)) * rhoAB.m * (U : CMatrix (a × b))
   have hform :=
     sandwichedRenyiReferenceInner_fixedLeftRegularized_conj_productEigenbasis
       rhoAB rhoA sigma hepsilon alpha
   rw [hform]
   change (Depsilon * M * Depsilon) i j =
-    (((rhoA.pos.isHermitian.eigenvalues i.1 *
-        (sigma.pos.isHermitian.eigenvalues i.2 + epsilon)) ^ s : Real) : ℂ) *
+    (((rhoA.psd.isHermitian.eigenvalues i.1 *
+        (sigma.psd.isHermitian.eigenvalues i.2 + epsilon)) ^ s : ℝ) : ℂ) *
       M i j *
-      (((rhoA.pos.isHermitian.eigenvalues j.1 *
-        (sigma.pos.isHermitian.eigenvalues j.2 + epsilon)) ^ s : Real) : ℂ)
+      (((rhoA.psd.isHermitian.eigenvalues j.1 *
+        (sigma.psd.isHermitian.eigenvalues j.2 + epsilon)) ^ s : ℝ) : ℂ)
   simp [Depsilon, M, Matrix.mul_apply, Matrix.diagonal]
 
 /-- Entrywise product-reference inner-operator formula in the product
 reference eigenbasis. -/
 theorem sandwichedRenyiReferenceInner_productReference_conj_productEigenbasis_entry
-    (rhoAB : State (Prod a b)) (rhoA : State a) (sigma : State b)
-    (alpha : Real) (i j : Prod a b) :
-    let s : Real := (1 - alpha) / (2 * alpha)
-    let U : Matrix.unitaryGroup (Prod a b) ℂ :=
+    (rhoAB : MState (a × b)) (rhoA : MState a) (sigma : MState b)
+    (alpha : ℝ) (i j : a × b) :
+    let s : ℝ := (1 - alpha) / (2 * alpha)
+    let U : Matrix.unitaryGroup (a × b) ℂ :=
       productReferenceEigenvectorUnitary rhoA sigma
-    (star (U : CMatrix (Prod a b)) *
-        sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).matrix alpha *
-        (U : CMatrix (Prod a b))) i j =
-      (((rhoA.pos.isHermitian.eigenvalues i.1 *
-          sigma.pos.isHermitian.eigenvalues i.2) ^ s : Real) : ℂ) *
-        (star (U : CMatrix (Prod a b)) * rhoAB.matrix *
-          (U : CMatrix (Prod a b))) i j *
-        (((rhoA.pos.isHermitian.eigenvalues j.1 *
-          sigma.pos.isHermitian.eigenvalues j.2) ^ s : Real) : ℂ) := by
+    (star (U : CMatrix (a × b)) *
+        sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).m alpha *
+        (U : CMatrix (a × b))) i j =
+      (((rhoA.psd.isHermitian.eigenvalues i.1 *
+          sigma.psd.isHermitian.eigenvalues i.2) ^ s : ℝ) : ℂ) *
+        (star (U : CMatrix (a × b)) * rhoAB.m *
+          (U : CMatrix (a × b))) i j *
+        (((rhoA.psd.isHermitian.eigenvalues j.1 *
+          sigma.psd.isHermitian.eigenvalues j.2) ^ s : ℝ) : ℂ) := by
   classical
   dsimp
-  let hzero : (0 : Real) ≤ (0 : Real) := le_rfl
+  let hzero : (0 : ℝ) ≤ (0 : ℝ) := le_rfl
   have hentry :=
     sandwichedRenyiReferenceInner_fixedLeftRegularized_conj_productEigenbasis_entry
       rhoAB rhoA sigma hzero alpha i j
   simpa [fixedLeftReferenceRegularization, sandwichedRenyiReferenceRegularization,
-    State.prod_matrix_kronecker] using hentry
+    MState.prod_m] using hentry
 
 private theorem diagonalSupport_entry_eq_zero_of_left_or_right_zero
     {ι : Type*} [Fintype ι] [DecidableEq ι]
-    {M : CMatrix ι} {d : ι -> Real}
+    {M : CMatrix ι} {d : ι → ℝ}
     (hM : M.PosSemidef)
     (hSupport :
       Matrix.Supports M
-        (Matrix.diagonal fun k : ι => ((d k : Real) : ℂ)))
+        (Matrix.diagonal fun k : ι => ((d k : ℝ) : ℂ)))
     {i j : ι} (hzero : d i = 0 ∨ d j = 0) :
     M i j = 0 := by
   classical
-  let D : CMatrix ι := Matrix.diagonal fun k : ι => ((d k : Real) : ℂ)
-  have hcol_zero : ∀ {k : ι}, d k = 0 -> ∀ r : ι, M r k = 0 := by
+  let D : CMatrix ι := Matrix.diagonal fun k : ι => ((d k : ℝ) : ℂ)
+  have hcol_zero : ∀ {k : ι}, d k = 0 → ∀ r : ι, M r k = 0 := by
     intro k hk r
-    let e : ι -> ℂ := Pi.single k 1
+    let e : ι → ℂ := Pi.single k 1
     have hDVec : Matrix.mulVec D e = 0 := by
       ext x
       rw [Matrix.mulVec, dotProduct]
@@ -1555,48 +1391,48 @@ private theorem diagonalSupport_entry_eq_zero_of_left_or_right_zero
 /-- In the product reference eigenbasis, support by the product reference kills
 entries touching zero product-reference eigenvalues. -/
 theorem productReference_support_conj_entry_eq_zero_of_left_or_right_zero
-    (rhoAB : State (Prod a b)) (rhoA : State a) (sigma : State b)
-    (hSupport : Matrix.Supports rhoAB.matrix (rhoA.prod sigma).matrix)
-    {i j : Prod a b}
+    (rhoAB : MState (a × b)) (rhoA : MState a) (sigma : MState b)
+    (hSupport : Matrix.Supports rhoAB.m (rhoA.prod sigma).m)
+    {i j : a × b}
     (hzero :
-      rhoA.pos.isHermitian.eigenvalues i.1 *
-          sigma.pos.isHermitian.eigenvalues i.2 = 0 ∨
-        rhoA.pos.isHermitian.eigenvalues j.1 *
-          sigma.pos.isHermitian.eigenvalues j.2 = 0) :
-    (star (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (Prod a b)) *
-        rhoAB.matrix *
-        (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (Prod a b))) i j = 0 := by
+      rhoA.psd.isHermitian.eigenvalues i.1 *
+          sigma.psd.isHermitian.eigenvalues i.2 = 0 ∨
+        rhoA.psd.isHermitian.eigenvalues j.1 *
+          sigma.psd.isHermitian.eigenvalues j.2 = 0) :
+    (star (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (a × b)) *
+        rhoAB.m *
+        (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (a × b))) i j = 0 := by
   classical
-  let U : Matrix.unitaryGroup (Prod a b) ℂ :=
+  let U : Matrix.unitaryGroup (a × b) ℂ :=
     productReferenceEigenvectorUnitary rhoA sigma
-  let M : CMatrix (Prod a b) := star (U : CMatrix (Prod a b)) *
-    rhoAB.matrix * (U : CMatrix (Prod a b))
-  let d : Prod a b -> Real := fun y =>
-    rhoA.pos.isHermitian.eigenvalues y.1 *
-      sigma.pos.isHermitian.eigenvalues y.2
-  let D : CMatrix (Prod a b) := Matrix.diagonal fun y : Prod a b => ((d y : Real) : ℂ)
-  let Uinv : Matrix.unitaryGroup (Prod a b) ℂ := U⁻¹
+  let M : CMatrix (a × b) := star (U : CMatrix (a × b)) *
+    rhoAB.m * (U : CMatrix (a × b))
+  let d : a × b → ℝ := fun y =>
+    rhoA.psd.isHermitian.eigenvalues y.1 *
+      sigma.psd.isHermitian.eigenvalues y.2
+  let D : CMatrix (a × b) := Matrix.diagonal fun y : a × b => ((d y : ℝ) : ℂ)
+  let Uinv : Matrix.unitaryGroup (a × b) ℂ := U⁻¹
   have hRefSpec :
-      (rhoA.prod sigma).matrix =
-        (U : CMatrix (Prod a b)) * D * star (U : CMatrix (Prod a b)) := by
+      (rhoA.prod sigma).m =
+        (U : CMatrix (a × b)) * D * star (U : CMatrix (a × b)) := by
     simpa [U, D, d] using productReference_matrix_eq_productEigenbasis_diagonal rhoA sigma
   have hRefDiag :
-      (Uinv : CMatrix (Prod a b)) * (rhoA.prod sigma).matrix *
-          star (Uinv : CMatrix (Prod a b)) =
+      (Uinv : CMatrix (a × b)) * (rhoA.prod sigma).m *
+          star (Uinv : CMatrix (a × b)) =
         D := by
-    have hUinv : (Uinv : CMatrix (Prod a b)) =
-        star (U : CMatrix (Prod a b)) := by
+    have hUinv : (Uinv : CMatrix (a × b)) =
+        star (U : CMatrix (a × b)) := by
       rfl
     rw [hUinv, star_star, hRefSpec]
     have hUstarU :
-        star (U : CMatrix (Prod a b)) * (U : CMatrix (Prod a b)) = 1 := by
+        star (U : CMatrix (a × b)) * (U : CMatrix (a × b)) = 1 := by
       simp
     calc
-      star (U : CMatrix (Prod a b)) *
-            ((U : CMatrix (Prod a b)) * D * star (U : CMatrix (Prod a b))) *
-          (U : CMatrix (Prod a b)) =
-          (star (U : CMatrix (Prod a b)) * (U : CMatrix (Prod a b))) *
-            D * (star (U : CMatrix (Prod a b)) * (U : CMatrix (Prod a b))) := by
+      star (U : CMatrix (a × b)) *
+            ((U : CMatrix (a × b)) * D * star (U : CMatrix (a × b))) *
+          (U : CMatrix (a × b)) =
+          (star (U : CMatrix (a × b)) * (U : CMatrix (a × b))) *
+            D * (star (U : CMatrix (a × b)) * (U : CMatrix (a × b))) := by
             noncomm_ring
       _ = D := by
             rw [hUstarU]
@@ -1606,7 +1442,7 @@ theorem productReference_support_conj_entry_eq_zero_of_left_or_right_zero
     rw [hRefDiag] at hconj
     simpa [M, Uinv] using hconj
   have hMpsd : M.PosSemidef := by
-    simpa [M, U] using posSemidef_unitary_conj rhoAB.pos U
+    simpa [M, U] using posSemidef_unitary_conj rhoAB.psd U
   simpa [M, U, d] using
     diagonalSupport_entry_eq_zero_of_left_or_right_zero
       (M := M) (d := d) hMpsd hSupportBasis (by simpa [d] using hzero)
@@ -1614,46 +1450,46 @@ theorem productReference_support_conj_entry_eq_zero_of_left_or_right_zero
 /-- Entrywise convergence of the fixed-left side-regularized inner operator in
 the product reference eigenbasis. -/
 theorem sandwichedRenyiReferenceInner_fixedLeftRegularized_conj_productEigenbasis_entry_tendsto
-    (rhoAB : State (Prod a b)) (rhoA : State a) (sigma : State b)
-    (hSupport : Matrix.Supports rhoAB.matrix (rhoA.prod sigma).matrix)
-    (alpha : Real) (i j : Prod a b) :
+    (rhoAB : MState (a × b)) (rhoA : MState a) (sigma : MState b)
+    (hSupport : Matrix.Supports rhoAB.m (rhoA.prod sigma).m)
+    (alpha : ℝ) (i j : a × b) :
     Filter.Tendsto
-      (fun epsilon : Real =>
-        (star (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (Prod a b)) *
+      (fun epsilon : ℝ =>
+        (star (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (a × b)) *
           sandwichedRenyiReferenceInner rhoAB
             (fixedLeftReferenceRegularization rhoA sigma epsilon) alpha *
-          (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (Prod a b))) i j)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
+          (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (a × b))) i j)
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
       (nhds
-        ((star (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (Prod a b)) *
-          sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).matrix alpha *
-          (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (Prod a b))) i j)) := by
+        ((star (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (a × b)) *
+          sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).m alpha *
+          (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (a × b))) i j)) := by
   classical
-  let l := nhdsWithin (0 : Real) (Set.Ioi 0)
-  let s : Real := (1 - alpha) / (2 * alpha)
-  let U : Matrix.unitaryGroup (Prod a b) ℂ :=
+  let l := nhdsWithin (0 : ℝ) (Set.Ioi 0)
+  let s : ℝ := (1 - alpha) / (2 * alpha)
+  let U : Matrix.unitaryGroup (a × b) ℂ :=
     productReferenceEigenvectorUnitary rhoA sigma
-  let M : CMatrix (Prod a b) :=
-    star (U : CMatrix (Prod a b)) * rhoAB.matrix * (U : CMatrix (Prod a b))
-  let d : Prod a b -> Real := fun y =>
-    rhoA.pos.isHermitian.eigenvalues y.1 *
-      sigma.pos.isHermitian.eigenvalues y.2
-  let depsilon : Real -> Prod a b -> Real := fun epsilon y =>
-    rhoA.pos.isHermitian.eigenvalues y.1 *
-      (sigma.pos.isHermitian.eigenvalues y.2 + epsilon)
-  have hd_nonneg : ∀ y : Prod a b, 0 ≤ d y := by
+  let M : CMatrix (a × b) :=
+    star (U : CMatrix (a × b)) * rhoAB.m * (U : CMatrix (a × b))
+  let d : a × b → ℝ := fun y =>
+    rhoA.psd.isHermitian.eigenvalues y.1 *
+      sigma.psd.isHermitian.eigenvalues y.2
+  let depsilon : ℝ → a × b → ℝ := fun epsilon y =>
+    rhoA.psd.isHermitian.eigenvalues y.1 *
+      (sigma.psd.isHermitian.eigenvalues y.2 + epsilon)
+  have hd_nonneg : ∀ y : a × b, 0 ≤ d y := by
     intro y
-    exact mul_nonneg (rhoA.pos.eigenvalues_nonneg y.1)
-      (sigma.pos.eigenvalues_nonneg y.2)
+    exact mul_nonneg (rhoA.psd.eigenvalues_nonneg y.1)
+      (sigma.psd.eigenvalues_nonneg y.2)
   by_cases hi0 : d i = 0
   · have hMzero : M i j = 0 := by
       simpa [M, U, d] using
         productReference_support_conj_entry_eq_zero_of_left_or_right_zero
           rhoAB rhoA sigma hSupport (i := i) (j := j) (Or.inl hi0)
     have htarget :
-        (star (U : CMatrix (Prod a b)) *
-          sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).matrix alpha *
-          (U : CMatrix (Prod a b))) i j = 0 := by
+        (star (U : CMatrix (a × b)) *
+          sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).m alpha *
+          (U : CMatrix (a × b))) i j = 0 := by
       have hentry :=
         sandwichedRenyiReferenceInner_productReference_conj_productEigenbasis_entry
           rhoAB rhoA sigma alpha i j
@@ -1674,9 +1510,9 @@ theorem sandwichedRenyiReferenceInner_fixedLeftRegularized_conj_productEigenbasi
         productReference_support_conj_entry_eq_zero_of_left_or_right_zero
           rhoAB rhoA sigma hSupport (i := i) (j := j) (Or.inr hj0)
     have htarget :
-        (star (U : CMatrix (Prod a b)) *
-          sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).matrix alpha *
-          (U : CMatrix (Prod a b))) i j = 0 := by
+        (star (U : CMatrix (a × b)) *
+          sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).m alpha *
+          (U : CMatrix (a × b))) i j = 0 := by
       have hentry :=
         sandwichedRenyiReferenceInner_productReference_conj_productEigenbasis_entry
           rhoAB rhoA sigma alpha i j
@@ -1700,70 +1536,70 @@ theorem sandwichedRenyiReferenceInner_fixedLeftRegularized_conj_productEigenbasi
       intro h
       exact hj0 h.symm)
   have hepsilon_tendsto :
-      Filter.Tendsto (fun epsilon : Real => epsilon) l (nhds (0 : Real)) :=
+      Filter.Tendsto (fun epsilon : ℝ => epsilon) l (nhds (0 : ℝ)) :=
     tendsto_id.mono_left nhdsWithin_le_nhds
   have hlin_i :
-      Filter.Tendsto (fun epsilon : Real => depsilon epsilon i) l (nhds (d i)) := by
+      Filter.Tendsto (fun epsilon : ℝ => depsilon epsilon i) l (nhds (d i)) := by
     have hright :
         Filter.Tendsto
-          (fun epsilon : Real => sigma.pos.isHermitian.eigenvalues i.2 + epsilon)
-          l (nhds (sigma.pos.isHermitian.eigenvalues i.2 + 0)) :=
+          (fun epsilon : ℝ => sigma.psd.isHermitian.eigenvalues i.2 + epsilon)
+          l (nhds (sigma.psd.isHermitian.eigenvalues i.2 + 0)) :=
       tendsto_const_nhds.add hepsilon_tendsto
     have hmul :=
       (tendsto_const_nhds :
         Filter.Tendsto
-          (fun _ : Real => rhoA.pos.isHermitian.eigenvalues i.1)
-          l (nhds (rhoA.pos.isHermitian.eigenvalues i.1))).mul hright
+          (fun _ : ℝ => rhoA.psd.isHermitian.eigenvalues i.1)
+          l (nhds (rhoA.psd.isHermitian.eigenvalues i.1))).mul hright
     simpa [depsilon, d] using hmul
   have hlin_j :
-      Filter.Tendsto (fun epsilon : Real => depsilon epsilon j) l (nhds (d j)) := by
+      Filter.Tendsto (fun epsilon : ℝ => depsilon epsilon j) l (nhds (d j)) := by
     have hright :
         Filter.Tendsto
-          (fun epsilon : Real => sigma.pos.isHermitian.eigenvalues j.2 + epsilon)
-          l (nhds (sigma.pos.isHermitian.eigenvalues j.2 + 0)) :=
+          (fun epsilon : ℝ => sigma.psd.isHermitian.eigenvalues j.2 + epsilon)
+          l (nhds (sigma.psd.isHermitian.eigenvalues j.2 + 0)) :=
       tendsto_const_nhds.add hepsilon_tendsto
     have hmul :=
       (tendsto_const_nhds :
         Filter.Tendsto
-          (fun _ : Real => rhoA.pos.isHermitian.eigenvalues j.1)
-          l (nhds (rhoA.pos.isHermitian.eigenvalues j.1))).mul hright
+          (fun _ : ℝ => rhoA.psd.isHermitian.eigenvalues j.1)
+          l (nhds (rhoA.psd.isHermitian.eigenvalues j.1))).mul hright
     simpa [depsilon, d] using hmul
   have hpow_i :
-      Filter.Tendsto (fun epsilon : Real => depsilon epsilon i ^ s)
+      Filter.Tendsto (fun epsilon : ℝ => depsilon epsilon i ^ s)
         l (nhds (d i ^ s)) := by
     exact
       (Real.continuousAt_rpow_const (d i) s (Or.inl (ne_of_gt hdi_pos))).tendsto.comp
         hlin_i
   have hpow_j :
-      Filter.Tendsto (fun epsilon : Real => depsilon epsilon j ^ s)
+      Filter.Tendsto (fun epsilon : ℝ => depsilon epsilon j ^ s)
         l (nhds (d j ^ s)) := by
     exact
       (Real.continuousAt_rpow_const (d j) s (Or.inl (ne_of_gt hdj_pos))).tendsto.comp
         hlin_j
   have hcpow_i :
       Filter.Tendsto
-        (fun epsilon : Real => ((depsilon epsilon i ^ s : Real) : ℂ))
-        l (nhds (((d i ^ s : Real) : ℂ))) :=
+        (fun epsilon : ℝ => ((depsilon epsilon i ^ s : ℝ) : ℂ))
+        l (nhds (((d i ^ s : ℝ) : ℂ))) :=
     Complex.continuous_ofReal.tendsto _ |>.comp hpow_i
   have hcpow_j :
       Filter.Tendsto
-        (fun epsilon : Real => ((depsilon epsilon j ^ s : Real) : ℂ))
-        l (nhds (((d j ^ s : Real) : ℂ))) :=
+        (fun epsilon : ℝ => ((depsilon epsilon j ^ s : ℝ) : ℂ))
+        l (nhds (((d j ^ s : ℝ) : ℂ))) :=
     Complex.continuous_ofReal.tendsto _ |>.comp hpow_j
   have hexplicit :
       Filter.Tendsto
-        (fun epsilon : Real =>
-          ((depsilon epsilon i ^ s : Real) : ℂ) * M i j *
-            ((depsilon epsilon j ^ s : Real) : ℂ))
+        (fun epsilon : ℝ =>
+          ((depsilon epsilon i ^ s : ℝ) : ℂ) * M i j *
+            ((depsilon epsilon j ^ s : ℝ) : ℂ))
         l
-        (nhds (((d i ^ s : Real) : ℂ) * M i j *
-          ((d j ^ s : Real) : ℂ))) := by
+        (nhds (((d i ^ s : ℝ) : ℂ) * M i j *
+          ((d j ^ s : ℝ) : ℂ))) := by
     exact (hcpow_i.mul tendsto_const_nhds).mul hcpow_j
   have htarget :
-      (star (U : CMatrix (Prod a b)) *
-          sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).matrix alpha *
-          (U : CMatrix (Prod a b))) i j =
-        ((d i ^ s : Real) : ℂ) * M i j * ((d j ^ s : Real) : ℂ) := by
+      (star (U : CMatrix (a × b)) *
+          sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).m alpha *
+          (U : CMatrix (a × b))) i j =
+        ((d i ^ s : ℝ) : ℂ) * M i j * ((d j ^ s : ℝ) : ℂ) := by
     have hentry :=
       sandwichedRenyiReferenceInner_productReference_conj_productEigenbasis_entry
         rhoAB rhoA sigma alpha i j
@@ -1780,32 +1616,32 @@ theorem sandwichedRenyiReferenceInner_fixedLeftRegularized_conj_productEigenbasi
 /-- Matrix convergence of the fixed-left side-regularized inner operator in the
 product reference eigenbasis. -/
 theorem sandwichedRenyiReferenceInner_fixedLeftRegularized_conj_productEigenbasis_tendsto
-    (rhoAB : State (Prod a b)) (rhoA : State a) (sigma : State b)
-    (hSupport : Matrix.Supports rhoAB.matrix (rhoA.prod sigma).matrix)
-    (alpha : Real) :
+    (rhoAB : MState (a × b)) (rhoA : MState a) (sigma : MState b)
+    (hSupport : Matrix.Supports rhoAB.m (rhoA.prod sigma).m)
+    (alpha : ℝ) :
     Filter.Tendsto
-      (fun epsilon : Real =>
-        star (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (Prod a b)) *
+      (fun epsilon : ℝ =>
+        star (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (a × b)) *
           sandwichedRenyiReferenceInner rhoAB
             (fixedLeftReferenceRegularization rhoA sigma epsilon) alpha *
-          (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (Prod a b)))
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
+          (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (a × b)))
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
       (nhds
-        (star (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (Prod a b)) *
-          sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).matrix alpha *
-          (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (Prod a b)))) := by
+        (star (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (a × b)) *
+          sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).m alpha *
+          (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (a × b)))) := by
   change Filter.Tendsto
-      (fun epsilon : Real => fun i => fun j =>
-        (star (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (Prod a b)) *
+      (fun epsilon : ℝ => fun i => fun j =>
+        (star (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (a × b)) *
           sandwichedRenyiReferenceInner rhoAB
             (fixedLeftReferenceRegularization rhoA sigma epsilon) alpha *
-          (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (Prod a b))) i j)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
+          (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (a × b))) i j)
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
       (nhds
         (fun i => fun j =>
-          (star (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (Prod a b)) *
-            sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).matrix alpha *
-            (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (Prod a b))) i j))
+          (star (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (a × b)) *
+            sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).m alpha *
+            (productReferenceEigenvectorUnitary rhoA sigma : CMatrix (a × b))) i j))
   rw [tendsto_pi_nhds]
   intro i
   rw [tendsto_pi_nhds]
@@ -1817,85 +1653,85 @@ theorem sandwichedRenyiReferenceInner_fixedLeftRegularized_conj_productEigenbasi
 /-- Supported fixed-left side regularization converges for the high-parameter
 inner operator. -/
 theorem sandwichedRenyiReferenceInner_fixedLeftRegularization_tendsto_of_supports
-    (rhoAB : State (Prod a b)) (rhoA : State a) (sigma : State b)
-    (hSupport : Matrix.Supports rhoAB.matrix (rhoA.prod sigma).matrix)
-    (alpha : Real) :
+    (rhoAB : MState (a × b)) (rhoA : MState a) (sigma : MState b)
+    (hSupport : Matrix.Supports rhoAB.m (rhoA.prod sigma).m)
+    (alpha : ℝ) :
     Filter.Tendsto
-      (fun epsilon : Real =>
+      (fun epsilon : ℝ =>
         sandwichedRenyiReferenceInner rhoAB
           (fixedLeftReferenceRegularization rhoA sigma epsilon) alpha)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
-      (nhds (sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).matrix alpha)) := by
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
+      (nhds (sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).m alpha)) := by
   classical
-  let U : Matrix.unitaryGroup (Prod a b) ℂ :=
+  let U : Matrix.unitaryGroup (a × b) ℂ :=
     productReferenceEigenvectorUnitary rhoA sigma
   have hconj :=
     sandwichedRenyiReferenceInner_fixedLeftRegularized_conj_productEigenbasis_tendsto
       rhoAB rhoA sigma hSupport alpha
   have hcont :
-      Continuous fun X : CMatrix (Prod a b) =>
-        (U : CMatrix (Prod a b)) * X * star (U : CMatrix (Prod a b)) := by
+      Continuous fun X : CMatrix (a × b) =>
+        (U : CMatrix (a × b)) * X * star (U : CMatrix (a × b)) := by
     fun_prop
   have hback :=
     (hcont.tendsto
-      (star (U : CMatrix (Prod a b)) *
-        sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).matrix alpha *
-        (U : CMatrix (Prod a b)))).comp hconj
+      (star (U : CMatrix (a × b)) *
+        sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).m alpha *
+        (U : CMatrix (a × b)))).comp hconj
   have hUstarU :
-      star (U : CMatrix (Prod a b)) * (U : CMatrix (Prod a b)) = 1 := by
+      star (U : CMatrix (a × b)) * (U : CMatrix (a × b)) = 1 := by
     simp
   have hUUstar :
-      (U : CMatrix (Prod a b)) * star (U : CMatrix (Prod a b)) = 1 := by
+      (U : CMatrix (a × b)) * star (U : CMatrix (a × b)) = 1 := by
     simp
   change Filter.Tendsto
-      (fun epsilon : Real =>
-        (U : CMatrix (Prod a b)) *
-          (star (U : CMatrix (Prod a b)) *
+      (fun epsilon : ℝ =>
+        (U : CMatrix (a × b)) *
+          (star (U : CMatrix (a × b)) *
             sandwichedRenyiReferenceInner rhoAB
               (fixedLeftReferenceRegularization rhoA sigma epsilon) alpha *
-            (U : CMatrix (Prod a b))) *
-          star (U : CMatrix (Prod a b)))
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
+            (U : CMatrix (a × b))) *
+          star (U : CMatrix (a × b)))
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
       (nhds
-        ((U : CMatrix (Prod a b)) *
-          (star (U : CMatrix (Prod a b)) *
-            sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).matrix alpha *
-            (U : CMatrix (Prod a b))) *
-          star (U : CMatrix (Prod a b)))) at hback
+        ((U : CMatrix (a × b)) *
+          (star (U : CMatrix (a × b)) *
+            sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).m alpha *
+            (U : CMatrix (a × b))) *
+          star (U : CMatrix (a × b)))) at hback
   have htarget :
-      (U : CMatrix (Prod a b)) *
-          (star (U : CMatrix (Prod a b)) *
-            sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).matrix alpha *
-            (U : CMatrix (Prod a b))) *
-          star (U : CMatrix (Prod a b)) =
-        sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).matrix alpha := by
+      (U : CMatrix (a × b)) *
+          (star (U : CMatrix (a × b)) *
+            sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).m alpha *
+            (U : CMatrix (a × b))) *
+          star (U : CMatrix (a × b)) =
+        sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).m alpha := by
     calc
-      (U : CMatrix (Prod a b)) *
-          (star (U : CMatrix (Prod a b)) *
-            sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).matrix alpha *
-            (U : CMatrix (Prod a b))) *
-          star (U : CMatrix (Prod a b)) =
-          ((U : CMatrix (Prod a b)) * star (U : CMatrix (Prod a b))) *
-            sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).matrix alpha *
-            ((U : CMatrix (Prod a b)) * star (U : CMatrix (Prod a b))) := by
+      (U : CMatrix (a × b)) *
+          (star (U : CMatrix (a × b)) *
+            sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).m alpha *
+            (U : CMatrix (a × b))) *
+          star (U : CMatrix (a × b)) =
+          ((U : CMatrix (a × b)) * star (U : CMatrix (a × b))) *
+            sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).m alpha *
+            ((U : CMatrix (a × b)) * star (U : CMatrix (a × b))) := by
             noncomm_ring
-      _ = sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).matrix alpha := by
+      _ = sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).m alpha := by
             rw [hUUstar]
             simp
   rw [htarget] at hback
   refine hback.congr' ?_
   filter_upwards with epsilon
   calc
-    (U : CMatrix (Prod a b)) *
-        (star (U : CMatrix (Prod a b)) *
+    (U : CMatrix (a × b)) *
+        (star (U : CMatrix (a × b)) *
           sandwichedRenyiReferenceInner rhoAB
             (fixedLeftReferenceRegularization rhoA sigma epsilon) alpha *
-          (U : CMatrix (Prod a b))) *
-        star (U : CMatrix (Prod a b)) =
-        ((U : CMatrix (Prod a b)) * star (U : CMatrix (Prod a b))) *
+          (U : CMatrix (a × b))) *
+        star (U : CMatrix (a × b)) =
+        ((U : CMatrix (a × b)) * star (U : CMatrix (a × b))) *
           sandwichedRenyiReferenceInner rhoAB
             (fixedLeftReferenceRegularization rhoA sigma epsilon) alpha *
-          ((U : CMatrix (Prod a b)) * star (U : CMatrix (Prod a b))) := by
+          ((U : CMatrix (a × b)) * star (U : CMatrix (a × b))) := by
           noncomm_ring
     _ = sandwichedRenyiReferenceInner rhoAB
           (fixedLeftReferenceRegularization rhoA sigma epsilon) alpha := by
@@ -1905,34 +1741,34 @@ theorem sandwichedRenyiReferenceInner_fixedLeftRegularization_tendsto_of_support
 /-- Fixed-left side regularization is positive semidefinite for nonnegative
 regularization parameters. -/
 theorem fixedLeftReferenceRegularization_posSemidef
-    (rhoA : State a) (sigma : State b) {epsilon : Real} (hepsilon : 0 ≤ epsilon) :
+    (rhoA : MState a) (sigma : MState b) {epsilon : ℝ} (hepsilon : 0 ≤ epsilon) :
     (fixedLeftReferenceRegularization rhoA sigma epsilon).PosSemidef := by
-  exact rhoA.pos.kronecker
-    (sandwichedRenyiReferenceRegularization_posSemidef sigma.pos hepsilon)
+  exact rhoA.psd.kronecker
+    (sandwichedRenyiReferenceRegularization_posSemidef sigma.psd hepsilon)
 
 /-- The high-parameter raw power trace of the supported fixed-left
 side-regularized inner operator converges to the supported product-reference
 finite branch. -/
 theorem sandwichedRenyiReferenceInner_tracePower_fixedLeftRegularization_tendsto_of_supports
-    (rhoAB : State (Prod a b)) (rhoA : State a) (sigma : State b)
-    (hSupport : Matrix.Supports rhoAB.matrix (rhoA.prod sigma).matrix)
-    (alpha : Real) (halpha_pos : 0 < alpha) :
+    (rhoAB : MState (a × b)) (rhoA : MState a) (sigma : MState b)
+    (hSupport : Matrix.Supports rhoAB.m (rhoA.prod sigma).m)
+    (alpha : ℝ) (halpha_pos : 0 < alpha) :
     Filter.Tendsto
-      (fun epsilon : Real =>
+      (fun epsilon : ℝ =>
         ((CFC.rpow
           (sandwichedRenyiReferenceInner rhoAB
             (fixedLeftReferenceRegularization rhoA sigma epsilon) alpha)
           alpha).trace).re)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
       (nhds
         ((CFC.rpow
-          (sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).matrix alpha)
+          (sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).m alpha)
           alpha).trace).re) := by
   have hinner :=
     sandwichedRenyiReferenceInner_fixedLeftRegularization_tendsto_of_supports
       rhoAB rhoA sigma hSupport alpha
   have hinner_psd_event :
-      ∀ᶠ epsilon in nhdsWithin (0 : Real) (Set.Ioi 0),
+      ∀ᶠ epsilon in nhdsWithin (0 : ℝ) (Set.Ioi 0),
         (sandwichedRenyiReferenceInner rhoAB
           (fixedLeftReferenceRegularization rhoA sigma epsilon) alpha).PosSemidef := by
     filter_upwards [self_mem_nhdsWithin] with epsilon hepsilon
@@ -1943,34 +1779,34 @@ theorem sandwichedRenyiReferenceInner_tracePower_fixedLeftRegularization_tendsto
   exact
     cMatrix_rpow_trace_re_tendsto_of_tendsto_posSemidef
       halpha_pos hinner hinner_psd_event
-      (sandwichedRenyiReferenceInner_posSemidef rhoAB (rhoA.prod sigma).pos alpha)
+      (sandwichedRenyiReferenceInner_posSemidef rhoAB (rhoA.prod sigma).psd alpha)
 
 /-- Input-side fixed-left side-regularization curve for the finite high-parameter
 PSD-reference branch. -/
 def sandwichedRenyiPSDReferenceHighAlphaFiniteFixedLeftRegularizationCurve
-    (rhoAB : State (Prod a b)) (rhoA : State a) (sigma : State b)
-    (alpha : Real) (epsilon : Real) : Real :=
+    (rhoAB : MState (a × b)) (rhoA : MState a) (sigma : MState b)
+    (alpha : ℝ) (epsilon : ℝ) : ℝ :=
   if hepsilon : 0 ≤ epsilon then
     sandwichedRenyiPSDReferenceHighAlphaFinite rhoAB
       (fixedLeftReferenceRegularization rhoA sigma epsilon)
       (fixedLeftReferenceRegularization_posSemidef rhoA sigma hepsilon) alpha
   else
     sandwichedRenyiPSDReferenceHighAlphaFinite rhoAB
-      (rhoA.prod sigma).matrix (rhoA.prod sigma).pos alpha
+      (rhoA.prod sigma).m (rhoA.prod sigma).psd alpha
 
 /-- The fixed-left side-regularized high-parameter finite branch converges to
 the supported product-reference finite branch. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFiniteFixedLeftRegularizationCurve_tendsto_of_supports
-    (rhoAB : State (Prod a b)) (rhoA : State a) (sigma : State b)
-    (hSupport : Matrix.Supports rhoAB.matrix (rhoA.prod sigma).matrix)
-    (alpha : Real) (halpha : 1 < alpha) :
+    (rhoAB : MState (a × b)) (rhoA : MState a) (sigma : MState b)
+    (hSupport : Matrix.Supports rhoAB.m (rhoA.prod sigma).m)
+    (alpha : ℝ) (halpha : 1 < alpha) :
     Filter.Tendsto
       (sandwichedRenyiPSDReferenceHighAlphaFiniteFixedLeftRegularizationCurve
         rhoAB rhoA sigma alpha)
-      (nhdsWithin (0 : Real) (Set.Ioi 0))
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0))
       (nhds
         (sandwichedRenyiPSDReferenceHighAlphaFinite rhoAB
-          (rhoA.prod sigma).matrix (rhoA.prod sigma).pos alpha)) := by
+          (rhoA.prod sigma).m (rhoA.prod sigma).psd alpha)) := by
   have halpha_pos : 0 < alpha := lt_trans zero_lt_one halpha
   have htrace :=
     sandwichedRenyiReferenceInner_tracePower_fixedLeftRegularization_tendsto_of_supports
@@ -1978,54 +1814,54 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFiniteFixedLeftRegularizationCurve_t
   have htarget_pos :
       0 <
         ((CFC.rpow
-          (sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).matrix alpha)
+          (sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).m alpha)
           alpha).trace).re := by
     simpa [psdTracePower] using
       sandwichedRenyiReferenceInner_psdTracePower_pos_of_supports
-        rhoAB (rhoA.prod sigma).pos hSupport alpha
+        rhoAB (rhoA.prod sigma).psd hSupport alpha
   have hlog :
       Filter.Tendsto
-        (fun epsilon : Real =>
+        (fun epsilon : ℝ =>
           log2
             (((CFC.rpow
               (sandwichedRenyiReferenceInner rhoAB
                 (fixedLeftReferenceRegularization rhoA sigma epsilon) alpha)
               alpha).trace).re))
-        (nhdsWithin (0 : Real) (Set.Ioi 0))
+        (nhdsWithin (0 : ℝ) (Set.Ioi 0))
         (nhds
           (log2
             (((CFC.rpow
-              (sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).matrix alpha)
+              (sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).m alpha)
               alpha).trace).re))) := by
     have hrawLog := Filter.Tendsto.log htrace (ne_of_gt htarget_pos)
     simp only [log2]
     exact hrawLog.div tendsto_const_nhds (ne_of_gt (Real.log_pos one_lt_two))
   have hraw :
       Filter.Tendsto
-        (fun epsilon : Real =>
+        (fun epsilon : ℝ =>
           (1 / (alpha - 1)) *
             log2
               (((CFC.rpow
                 (sandwichedRenyiReferenceInner rhoAB
                   (fixedLeftReferenceRegularization rhoA sigma epsilon) alpha)
                 alpha).trace).re))
-        (nhdsWithin (0 : Real) (Set.Ioi 0))
+        (nhdsWithin (0 : ℝ) (Set.Ioi 0))
         (nhds
           ((1 / (alpha - 1)) *
             log2
               (((CFC.rpow
-                (sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).matrix alpha)
+                (sandwichedRenyiReferenceInner rhoAB (rhoA.prod sigma).m alpha)
                 alpha).trace).re))) :=
     tendsto_const_nhds.mul hlog
   have hcurve :
-      (fun epsilon : Real =>
+      (fun epsilon : ℝ =>
           (1 / (alpha - 1)) *
             log2
               (((CFC.rpow
                 (sandwichedRenyiReferenceInner rhoAB
                   (fixedLeftReferenceRegularization rhoA sigma epsilon) alpha)
                 alpha).trace).re))
-        =ᶠ[nhdsWithin (0 : Real) (Set.Ioi 0)]
+        =ᶠ[nhdsWithin (0 : ℝ) (Set.Ioi 0)]
       sandwichedRenyiPSDReferenceHighAlphaFiniteFixedLeftRegularizationCurve
         rhoAB rhoA sigma alpha := by
     filter_upwards [self_mem_nhdsWithin] with epsilon hepsilon
@@ -2037,16 +1873,16 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFiniteFixedLeftRegularizationCurve_t
 /-- Scaling a supported PSD reference shifts the high-parameter finite branch
 by the logarithm of the scaling factor. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFinite_real_smul_reference_of_supports
-    (rho : State a) {sigma : CMatrix a} (hsigma : sigma.PosSemidef)
-    (hSupport : Matrix.Supports rho.matrix sigma)
-    {lambda : Real} (hlambda : 0 < lambda)
-    (alpha : Real) (halpha : 1 < alpha) :
+    (rho : MState a) {sigma : CMatrix a} (hsigma : sigma.PosSemidef)
+    (hSupport : Matrix.Supports rho.m sigma)
+    {lambda : ℝ} (hlambda : 0 < lambda)
+    (alpha : ℝ) (halpha : 1 < alpha) :
     sandwichedRenyiPSDReferenceHighAlphaFinite rho
         (lambda • sigma : CMatrix a)
         (Matrix.PosSemidef.smul hsigma (le_of_lt hlambda)) alpha =
       sandwichedRenyiPSDReferenceHighAlphaFinite rho sigma hsigma alpha -
         log2 lambda := by
-  let s : Real := (1 - alpha) / (2 * alpha)
+  let s : ℝ := (1 - alpha) / (2 * alpha)
   have halpha_pos : 0 < alpha := lt_trans zero_lt_one halpha
   have halpha_ne_one : alpha ≠ 1 := ne_of_gt halpha
   have hlambda_nonneg : 0 ≤ lambda := le_of_lt hlambda
@@ -2105,20 +1941,20 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_real_smul_reference_of_suppor
 /-- The side scaling factor in the canonical full-rank approximation has
 vanishing base-two logarithm at the endpoint. -/
 theorem log2_one_sub_tendsto_zero :
-    Tendsto (fun delta : Real => log2 (1 - delta))
-      (nhdsWithin (0 : Real) (Set.Ioo 0 1)) (nhds 0) := by
-  have hcont : ContinuousAt (fun delta : Real => log2 (1 - delta)) 0 := by
+    Tendsto (fun delta : ℝ => log2 (1 - delta))
+      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds 0) := by
+  have hcont : ContinuousAt (fun delta : ℝ => log2 (1 - delta)) 0 := by
     unfold log2
     exact
-      ((Real.continuousAt_log (by norm_num : (1 - (0 : Real)) ≠ 0)).comp
+      ((Real.continuousAt_log (by norm_num : (1 - (0 : ℝ)) ≠ 0)).comp
         (continuousAt_const.sub continuousAt_id)).div_const _
   simpa [log2, Real.log_one] using hcont.tendsto.mono_left nhdsWithin_le_nhds
 
 /-- The finite high-parameter branch is congruent in the PSD reference matrix. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFinite_congr_reference
-    (rho : State a) {sigma tau : CMatrix a}
+    (rho : MState a) {sigma tau : CMatrix a}
     (hsigma : sigma.PosSemidef) (htau : tau.PosSemidef)
-    (h : sigma = tau) (alpha : Real) :
+    (h : sigma = tau) (alpha : ℝ) :
     sandwichedRenyiPSDReferenceHighAlphaFinite rho sigma hsigma alpha =
       sandwichedRenyiPSDReferenceHighAlphaFinite rho tau htau alpha := by
   cases h
@@ -2127,74 +1963,74 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_congr_reference
 /-- Fixed-left side regularization is positive definite when the fixed left
 state is full-rank and the side regularization parameter is positive. -/
 theorem fixedLeftReferenceRegularization_posDef_of_left
-    (rhoA : State a) (sigma : State b) (hrhoA : rhoA.matrix.PosDef)
-    {epsilon : Real} (hepsilon : 0 < epsilon) :
+    (rhoA : MState a) (sigma : MState b) (hrhoA : rhoA.m.PosDef)
+    {epsilon : ℝ} (hepsilon : 0 < epsilon) :
     (fixedLeftReferenceRegularization rhoA sigma epsilon).PosDef := by
   exact hrhoA.kronecker
-    (sandwichedRenyiReferenceRegularization_posDef sigma.pos hepsilon)
+    (sandwichedRenyiReferenceRegularization_posDef sigma.psd hepsilon)
 
 /-- Fixed-left side regularization converges back to the product reference
 matrix as the side regularization parameter tends to zero. -/
 theorem fixedLeftReferenceRegularization_tendsto_zero
-    (rhoA : State a) (sigma : State b) :
-    Tendsto (fun epsilon : Real => fixedLeftReferenceRegularization rhoA sigma epsilon)
-      (nhdsWithin (0 : Real) (Set.Ioi 0)) (nhds (rhoA.prod sigma).matrix) := by
+    (rhoA : MState a) (sigma : MState b) :
+    Tendsto (fun epsilon : ℝ => fixedLeftReferenceRegularization rhoA sigma epsilon)
+      (nhdsWithin (0 : ℝ) (Set.Ioi 0)) (nhds (rhoA.prod sigma).m) := by
   have hside :
-      Tendsto (fun epsilon : Real =>
-          sandwichedRenyiReferenceRegularization sigma.matrix epsilon)
-        (nhdsWithin (0 : Real) (Set.Ioi 0)) (nhds sigma.matrix) :=
-    sandwichedRenyiReferenceRegularization_tendsto sigma.matrix
+      Tendsto (fun epsilon : ℝ =>
+          sandwichedRenyiReferenceRegularization sigma.m epsilon)
+        (nhdsWithin (0 : ℝ) (Set.Ioi 0)) (nhds sigma.m) :=
+    sandwichedRenyiReferenceRegularization_tendsto sigma.m
   have hkr :
-      Continuous fun M : CMatrix b => Matrix.kronecker rhoA.matrix M := by
+      Continuous fun M : CMatrix b => Matrix.kronecker rhoA.m M := by
     unfold Matrix.kronecker
     exact _root_.continuous_matrix fun x y => by
       simp only [Matrix.kroneckerMap_apply]
       exact continuous_const.mul (continuous_id.matrix_elem x.2 y.2)
-  simpa [fixedLeftReferenceRegularization, State.prod_matrix_kronecker, Function.comp_def] using
-    hkr.tendsto sigma.matrix |>.comp hside
+  simpa [fixedLeftReferenceRegularization, MState.prod_m, Function.comp_def] using
+    hkr.tendsto sigma.m |>.comp hside
 
 /-- Support is preserved when a supported product reference is regularized only
 on the right tensor factor. -/
 theorem supports_fixedLeftReferenceRegularization_of_supports
-    (rhoAB : State (Prod a b)) (rhoA : State a) (sigma : State b)
-    {epsilon : Real} (hepsilon : 0 ≤ epsilon)
-    (hSupport : Matrix.Supports rhoAB.matrix (rhoA.prod sigma).matrix) :
-    Matrix.Supports rhoAB.matrix
+    (rhoAB : MState (a × b)) (rhoA : MState a) (sigma : MState b)
+    {epsilon : ℝ} (hepsilon : 0 ≤ epsilon)
+    (hSupport : Matrix.Supports rhoAB.m (rhoA.prod sigma).m) :
+    Matrix.Supports rhoAB.m
       (fixedLeftReferenceRegularization rhoA sigma epsilon) := by
   classical
-  let M : CMatrix (Prod a b) := (rhoA.prod sigma).matrix
-  let N : CMatrix (Prod a b) :=
-    Matrix.kronecker rhoA.matrix (((epsilon : Real) : Complex) • (1 : CMatrix b))
+  let M : CMatrix (a × b) := (rhoA.prod sigma).m
+  let N : CMatrix (a × b) :=
+    Matrix.kronecker rhoA.m (((epsilon : ℝ) : ℂ) • (1 : CMatrix b))
   have hfixed_eq :
-      fixedLeftReferenceRegularization rhoA sigma epsilon = N + (1 : Real) • M := by
+      fixedLeftReferenceRegularization rhoA sigma epsilon = N + (1 : ℝ) • M := by
     ext i j
     simp [fixedLeftReferenceRegularization, sandwichedRenyiReferenceRegularization,
-      State.prod, M, N, Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.add_apply,
+      M, N, Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.add_apply,
       Matrix.smul_apply]
     ring
   have hM : M.PosSemidef := by
-    simpa [M] using (rhoA.prod sigma).pos
+    simpa [M] using (rhoA.prod sigma).psd
   have hN : N.PosSemidef := by
-    have hepsilonC : (0 : Complex) ≤ ((epsilon : Real) : Complex) := by
+    have hepsilonC : (0 : ℂ) ≤ ((epsilon : ℝ) : ℂ) := by
       exact_mod_cast hepsilon
-    exact rhoA.pos.kronecker
+    exact rhoA.psd.kronecker
       (Matrix.PosSemidef.smul Matrix.PosSemidef.one hepsilonC)
   have hM_fixed : Matrix.Supports M
       (fixedLeftReferenceRegularization rhoA sigma epsilon) := by
-    have hM_sum : Matrix.Supports M (N + (1 : Real) • M) :=
-      Matrix.Supports.of_pos_smul_right_add hM hN (by norm_num : (0 : Real) < 1)
+    have hM_sum : Matrix.Supports M (N + (1 : ℝ) • M) :=
+      Matrix.Supports.of_pos_smul_right_add hM hN (by norm_num : (0 : ℝ) < 1)
     simpa [hfixed_eq] using hM_sum
   exact hSupport.trans hM_fixed
 
 /-- The fixed-left regularization induced by the canonical full-rank side
 state parameter converges to the product reference matrix. -/
 theorem fixedLeftReferenceRegularization_fullRankParameter_tendsto_zero
-    (rhoA : State a) (sigma : State b) :
+    (rhoA : MState a) (sigma : MState b) :
     Tendsto
-      (fun delta : Real =>
+      (fun delta : ℝ =>
         fixedLeftReferenceRegularization rhoA sigma
-          (delta / ((1 - delta) * (Fintype.card b : Real))))
-      (nhdsWithin (0 : Real) (Set.Ioo 0 1)) (nhds (rhoA.prod sigma).matrix) := by
+          (delta / ((1 - delta) * (Fintype.card b : ℝ))))
+      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds (rhoA.prod sigma).m) := by
   let : Nonempty b := sigma.nonempty
   exact
     (fixedLeftReferenceRegularization_tendsto_zero rhoA sigma).comp
@@ -2203,31 +2039,31 @@ theorem fixedLeftReferenceRegularization_fullRankParameter_tendsto_zero
 /-- Canonical side-state full-rank approximation as a scaled fixed-left
 reference regularization. -/
 theorem fullRankApproxMaximallyMixedProductReference_matrix_eq_smul_fixedLeftReferenceRegularization
-    (rhoA : State a) (sigma : State b) {delta : Real}
-    (hdelta : delta ∈ Set.Ioo (0 : Real) 1) :
-    (rhoA.prod (fullRankApproxMaximallyMixedStatePath sigma delta)).matrix =
-      (((1 - delta : Real) : ℂ) •
+    (rhoA : MState a) (sigma : MState b) {delta : ℝ}
+    (hdelta : delta ∈ Set.Ioo (0 : ℝ) 1) :
+    (rhoA.prod (fullRankApproxMaximallyMixedStatePath sigma delta)).m =
+      (((1 - delta : ℝ) : ℂ) •
         fixedLeftReferenceRegularization rhoA sigma
-          (delta / ((1 - delta) * (Fintype.card b : Real)))) := by
-  rw [State.prod_matrix_kronecker]
+          (delta / ((1 - delta) * (Fintype.card b : ℝ)))) := by
+  rw [MState.prod_m]
   rw [fullRankApproxMaximallyMixedStatePath_matrix_eq_smul_referenceRegularization
     sigma hdelta]
   ext i j
   simp [fixedLeftReferenceRegularization, Matrix.kronecker,
-    Matrix.kroneckerMap_apply, Matrix.smul_apply, smul_eq_mul,
-    mul_comm, mul_assoc]
+    Matrix.kroneckerMap_apply, Matrix.smul_apply, smul_eq_mul]
+  ring
 
 /-- Filter form of the canonical side-state full-rank approximation as a
 scaled fixed-left reference regularization. -/
 theorem fullRankApproxMaximallyMixedProductReference_matrix_eventuallyEq_smul_fixedLeftReferenceRegularization
-    (rhoA : State a) (sigma : State b) :
-    (fun delta : Real =>
-        (rhoA.prod (fullRankApproxMaximallyMixedStatePath sigma delta)).matrix) =ᶠ[
-      nhdsWithin (0 : Real) (Set.Ioo 0 1)]
-      (fun delta : Real =>
-        (((1 - delta : Real) : ℂ) •
+    (rhoA : MState a) (sigma : MState b) :
+    (fun delta : ℝ =>
+        (rhoA.prod (fullRankApproxMaximallyMixedStatePath sigma delta)).m) =ᶠ[
+      nhdsWithin (0 : ℝ) (Set.Ioo 0 1)]
+      (fun delta : ℝ =>
+        (((1 - delta : ℝ) : ℂ) •
           fixedLeftReferenceRegularization rhoA sigma
-            (delta / ((1 - delta) * (Fintype.card b : Real))))) := by
+            (delta / ((1 - delta) * (Fintype.card b : ℝ))))) := by
   filter_upwards [self_mem_nhdsWithin] with delta hdelta
   exact
     fullRankApproxMaximallyMixedProductReference_matrix_eq_smul_fixedLeftReferenceRegularization
@@ -2236,14 +2072,14 @@ theorem fullRankApproxMaximallyMixedProductReference_matrix_eventuallyEq_smul_fi
 /-- The fixed-left product reference path differs from the scaled base product
 reference by tensoring the fixed left state with the scaled noise state. -/
 theorem fullRankApproxProductReferencePath_matrix_sub_smul_left
-    (rhoA : State a) (sigma mu : State b) {delta : Real}
-    (hdelta : delta ∈ Set.Ioo (0 : Real) 1) :
-    (fullRankApproxProductReferencePath rhoA sigma mu delta).matrix -
-        (((1 - delta : Real) : ℂ) • (rhoA.prod sigma).matrix) =
-      Matrix.kronecker rhoA.matrix (((delta : Real) : ℂ) • mu.matrix) := by
+    (rhoA : MState a) (sigma mu : MState b) {delta : ℝ}
+    (hdelta : delta ∈ Set.Ioo (0 : ℝ) 1) :
+    (fullRankApproxProductReferencePath rhoA sigma mu delta).m -
+        (((1 - delta : ℝ) : ℂ) • (rhoA.prod sigma).m) =
+      Matrix.kronecker rhoA.m (((delta : ℝ) : ℂ) • mu.m) := by
   ext i j
   simp [fullRankApproxProductReferencePath, fullRankApproxStatePath,
-    fullRankApproxState, regularizedStateMatrix, State.prod,
+    fullRankApproxState, regularizedStateMatrix,
     Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.sub_apply, Matrix.add_apply,
     Matrix.smul_apply, smul_eq_mul, hdelta]
   ring
@@ -2251,62 +2087,62 @@ theorem fullRankApproxProductReferencePath_matrix_sub_smul_left
 /-- The fixed-left product reference path dominates the scaled base product
 reference in Loewner order. -/
 theorem smul_left_le_fullRankApproxProductReferencePath_matrix_of_mem
-    (rhoA : State a) (sigma mu : State b) {delta : Real}
-    (hdelta : delta ∈ Set.Ioo (0 : Real) 1) :
-    (((1 - delta : Real) : ℂ) • (rhoA.prod sigma).matrix) ≤
-      (fullRankApproxProductReferencePath rhoA sigma mu delta).matrix := by
+    (rhoA : MState a) (sigma mu : MState b) {delta : ℝ}
+    (hdelta : delta ∈ Set.Ioo (0 : ℝ) 1) :
+    (((1 - delta : ℝ) : ℂ) • (rhoA.prod sigma).m) ≤
+      (fullRankApproxProductReferencePath rhoA sigma mu delta).m := by
   rw [Matrix.le_iff]
   rw [fullRankApproxProductReferencePath_matrix_sub_smul_left rhoA sigma mu hdelta]
-  have hdeltaC : (0 : ℂ) ≤ ((delta : Real) : ℂ) := by
+  have hdeltaC : (0 : ℂ) ≤ ((delta : ℝ) : ℂ) := by
     exact_mod_cast hdelta.1.le
-  exact rhoA.pos.kronecker (Matrix.PosSemidef.smul mu.pos hdeltaC)
+  exact rhoA.psd.kronecker (Matrix.PosSemidef.smul mu.psd hdeltaC)
 
 /-- Candidate-reference form of the canonical full-rank side-state
 approximation lower bound. -/
 theorem smul_left_le_fullRankApproxMaximallyMixedCandidateReference_matrix_of_mem
-    (rhoA : State a) (sigma : State b) {delta : Real}
-    (hdelta : delta ∈ Set.Ioo (0 : Real) 1) :
-    (((1 - delta : Real) : ℂ) • (rhoA.prod sigma).matrix) ≤
-      (rhoA.prod (fullRankApproxMaximallyMixedStatePath sigma delta)).matrix := by
+    (rhoA : MState a) (sigma : MState b) {delta : ℝ}
+    (hdelta : delta ∈ Set.Ioo (0 : ℝ) 1) :
+    (((1 - delta : ℝ) : ℂ) • (rhoA.prod sigma).m) ≤
+      (rhoA.prod (fullRankApproxMaximallyMixedStatePath sigma delta)).m := by
   let : Nonempty b := sigma.nonempty
   simpa [fullRankApproxProductReferencePath, fullRankApproxMaximallyMixedStatePath] using
     smul_left_le_fullRankApproxProductReferencePath_matrix_of_mem
-      rhoA sigma (maximallyMixed b) hdelta
+      rhoA sigma (MState.uniform : MState b) hdelta
 
 /-- Support is preserved by the canonical full-rank side-state approximation
 of a supported product reference. -/
 theorem supports_fullRankApproxMaximallyMixedProductReference_of_supports
-    (rhoAB : State (Prod a b)) (rhoA : State a) (sigma : State b)
-    {delta : Real} (hdelta : delta ∈ Set.Ioo (0 : Real) 1)
-    (hSupport : Matrix.Supports rhoAB.matrix (rhoA.prod sigma).matrix) :
-    Matrix.Supports rhoAB.matrix
-      (rhoA.prod (fullRankApproxMaximallyMixedStatePath sigma delta)).matrix := by
+    (rhoAB : MState (a × b)) (rhoA : MState a) (sigma : MState b)
+    {delta : ℝ} (hdelta : delta ∈ Set.Ioo (0 : ℝ) 1)
+    (hSupport : Matrix.Supports rhoAB.m (rhoA.prod sigma).m) :
+    Matrix.Supports rhoAB.m
+      (rhoA.prod (fullRankApproxMaximallyMixedStatePath sigma delta)).m := by
   classical
   let : Nonempty b := sigma.nonempty
-  let M : CMatrix (Prod a b) := (rhoA.prod sigma).matrix
-  let N : CMatrix (Prod a b) :=
-    Matrix.kronecker rhoA.matrix (((delta : Real) : ℂ) • (maximallyMixed b).matrix)
+  let M : CMatrix (a × b) := (rhoA.prod sigma).m
+  let N : CMatrix (a × b) :=
+    Matrix.kronecker rhoA.m (((delta : ℝ) : ℂ) • (MState.uniform : MState b).m)
   have hpath_eq :
-      (rhoA.prod (fullRankApproxMaximallyMixedStatePath sigma delta)).matrix =
-        N + ((1 - delta : Real) • M) := by
+      (rhoA.prod (fullRankApproxMaximallyMixedStatePath sigma delta)).m =
+        N + ((1 - delta : ℝ) • M) := by
     ext i j
     simp [fullRankApproxMaximallyMixedStatePath, fullRankApproxStatePath,
-      fullRankApproxState, regularizedStateMatrix, State.prod, M, N,
+      fullRankApproxState, regularizedStateMatrix, M, N,
       Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.add_apply,
-      Matrix.smul_apply, maximallyMixed_matrix, smul_eq_mul, hdelta]
+      Matrix.smul_apply, uniform_matrix, smul_eq_mul, hdelta]
     ring
   have hM : M.PosSemidef := by
-    simpa [M] using (rhoA.prod sigma).pos
+    simpa [M] using (rhoA.prod sigma).psd
   have hN : N.PosSemidef := by
-    have hdeltaC : (0 : ℂ) ≤ ((delta : Real) : ℂ) := by
+    have hdeltaC : (0 : ℂ) ≤ ((delta : ℝ) : ℂ) := by
       exact_mod_cast hdelta.1.le
-    exact rhoA.pos.kronecker
-      (Matrix.PosSemidef.smul (maximallyMixed b).pos hdeltaC)
+    exact rhoA.psd.kronecker
+      (Matrix.PosSemidef.smul (MState.uniform : MState b).psd hdeltaC)
   have hscale : 0 < 1 - delta := sub_pos.mpr hdelta.2
   have hM_path : Matrix.Supports M
-      (rhoA.prod (fullRankApproxMaximallyMixedStatePath sigma delta)).matrix := by
+      (rhoA.prod (fullRankApproxMaximallyMixedStatePath sigma delta)).m := by
     have hM_sum :
-        Matrix.Supports M (N + (1 - delta : Real) • M) :=
+        Matrix.Supports M (N + (1 - delta : ℝ) • M) :=
       Matrix.Supports.of_pos_smul_right_add hM hN hscale
     simpa [hpath_eq] using hM_sum
   exact hSupport.trans hM_path
@@ -2314,141 +2150,141 @@ theorem supports_fullRankApproxMaximallyMixedProductReference_of_supports
 /-- The finite supported branch converges along the canonical full-rank
 side-state approximation path. -/
 theorem sandwichedRenyiPSDReferenceHighAlphaFinite_fullRankApproxMaximallyMixedProductReference_tendsto_of_supports
-    (rhoAB : State (Prod a b)) (sigmaB : State b)
-    (hSupport : Matrix.Supports rhoAB.matrix (rhoAB.marginalA.prod sigmaB).matrix)
-    (alpha : Real) (halpha : 1 < alpha) :
+    (rhoAB : MState (a × b)) (sigmaB : MState b)
+    (hSupport : Matrix.Supports rhoAB.m (rhoAB.traceRight.prod sigmaB).m)
+    (alpha : ℝ) (halpha : 1 < alpha) :
     Tendsto
-      (fun delta : Real =>
+      (fun delta : ℝ =>
         sandwichedRenyiPSDReferenceHighAlphaFinite rhoAB
-          (rhoAB.marginalA.prod
-            (fullRankApproxMaximallyMixedStatePath sigmaB delta)).matrix
-          (rhoAB.marginalA.prod
-            (fullRankApproxMaximallyMixedStatePath sigmaB delta)).pos
+          (rhoAB.traceRight.prod
+            (fullRankApproxMaximallyMixedStatePath sigmaB delta)).m
+          (rhoAB.traceRight.prod
+            (fullRankApproxMaximallyMixedStatePath sigmaB delta)).psd
           alpha)
-      (nhdsWithin (0 : Real) (Set.Ioo 0 1))
+      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1))
       (nhds
         (sandwichedRenyiPSDReferenceHighAlphaFinite rhoAB
-          (rhoAB.marginalA.prod sigmaB).matrix
-          (rhoAB.marginalA.prod sigmaB).pos alpha)) := by
+          (rhoAB.traceRight.prod sigmaB).m
+          (rhoAB.traceRight.prod sigmaB).psd alpha)) := by
   classical
   let : Nonempty b := sigmaB.nonempty
-  let eps : Real → Real := fun delta =>
-    delta / ((1 - delta) * (Fintype.card b : Real))
-  let fixedCurve : Real → Real := fun delta =>
+  let eps : ℝ → ℝ := fun delta =>
+    delta / ((1 - delta) * (Fintype.card b : ℝ))
+  let fixedCurve : ℝ → ℝ := fun delta =>
     sandwichedRenyiPSDReferenceHighAlphaFiniteFixedLeftRegularizationCurve
-      rhoAB rhoAB.marginalA sigmaB alpha (eps delta)
-  let target : Real :=
+      rhoAB rhoAB.traceRight sigmaB alpha (eps delta)
+  let target : ℝ :=
     sandwichedRenyiPSDReferenceHighAlphaFinite rhoAB
-      (rhoAB.marginalA.prod sigmaB).matrix
-      (rhoAB.marginalA.prod sigmaB).pos alpha
+      (rhoAB.traceRight.prod sigmaB).m
+      (rhoAB.traceRight.prod sigmaB).psd alpha
   have hfixed : Tendsto fixedCurve
-      (nhdsWithin (0 : Real) (Set.Ioo 0 1)) (nhds target) := by
+      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds target) := by
     simpa [fixedCurve, eps, target, Function.comp_def] using
       (sandwichedRenyiPSDReferenceHighAlphaFiniteFixedLeftRegularizationCurve_tendsto_of_supports
-        rhoAB rhoAB.marginalA sigmaB hSupport alpha halpha).comp
+        rhoAB rhoAB.traceRight sigmaB hSupport alpha halpha).comp
         (fullRankApproxMaximallyMixedRegularizationParameter_tendsto_zero (a := b))
   have hlog :
-      Tendsto (fun delta : Real => log2 (1 - delta))
-        (nhdsWithin (0 : Real) (Set.Ioo 0 1)) (nhds 0) :=
+      Tendsto (fun delta : ℝ => log2 (1 - delta))
+        (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds 0) :=
     log2_one_sub_tendsto_zero
-  have hscaled : Tendsto (fun delta : Real => fixedCurve delta - log2 (1 - delta))
-      (nhdsWithin (0 : Real) (Set.Ioo 0 1)) (nhds target) := by
+  have hscaled : Tendsto (fun delta : ℝ => fixedCurve delta - log2 (1 - delta))
+      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds target) := by
     simpa using hfixed.sub hlog
   have hpath :
-      (fun delta : Real =>
+      (fun delta : ℝ =>
         sandwichedRenyiPSDReferenceHighAlphaFinite rhoAB
-          (rhoAB.marginalA.prod
-            (fullRankApproxMaximallyMixedStatePath sigmaB delta)).matrix
-          (rhoAB.marginalA.prod
-            (fullRankApproxMaximallyMixedStatePath sigmaB delta)).pos
-          alpha) =ᶠ[nhdsWithin (0 : Real) (Set.Ioo 0 1)]
-      (fun delta : Real => fixedCurve delta - log2 (1 - delta)) := by
+          (rhoAB.traceRight.prod
+            (fullRankApproxMaximallyMixedStatePath sigmaB delta)).m
+          (rhoAB.traceRight.prod
+            (fullRankApproxMaximallyMixedStatePath sigmaB delta)).psd
+          alpha) =ᶠ[nhdsWithin (0 : ℝ) (Set.Ioo 0 1)]
+      (fun delta : ℝ => fixedCurve delta - log2 (1 - delta)) := by
     filter_upwards [self_mem_nhdsWithin] with delta hdelta
     have hscale_pos : 0 < 1 - delta := sub_pos.mpr hdelta.2
-    have hcard_pos : 0 < (Fintype.card b : Real) := by
+    have hcard_pos : 0 < (Fintype.card b : ℝ) := by
       exact_mod_cast (Fintype.card_pos : 0 < Fintype.card b)
-    have hden_pos : 0 < (1 - delta) * (Fintype.card b : Real) :=
+    have hden_pos : 0 < (1 - delta) * (Fintype.card b : ℝ) :=
       mul_pos hscale_pos hcard_pos
     have heps_pos : 0 < eps delta := by
       simp [eps]
       exact div_pos hdelta.1 hden_pos
     have heps_nonneg : 0 ≤ eps delta := le_of_lt heps_pos
     have hfixedSupport :
-        Matrix.Supports rhoAB.matrix
-          (fixedLeftReferenceRegularization rhoAB.marginalA sigmaB (eps delta)) :=
+        Matrix.Supports rhoAB.m
+          (fixedLeftReferenceRegularization rhoAB.traceRight sigmaB (eps delta)) :=
       supports_fixedLeftReferenceRegularization_of_supports
-        rhoAB rhoAB.marginalA sigmaB heps_nonneg hSupport
+        rhoAB rhoAB.traceRight sigmaB heps_nonneg hSupport
     have hpath_matrix :
-        (rhoAB.marginalA.prod
-            (fullRankApproxMaximallyMixedStatePath sigmaB delta)).matrix =
-          ((1 - delta : Real) •
-            fixedLeftReferenceRegularization rhoAB.marginalA sigmaB (eps delta)) := by
+        (rhoAB.traceRight.prod
+            (fullRankApproxMaximallyMixedStatePath sigmaB delta)).m =
+          ((1 - delta : ℝ) •
+            fixedLeftReferenceRegularization rhoAB.traceRight sigmaB (eps delta)) := by
       have hcomplex :=
         fullRankApproxMaximallyMixedProductReference_matrix_eq_smul_fixedLeftReferenceRegularization
-          rhoAB.marginalA sigmaB hdelta
+          rhoAB.traceRight sigmaB hdelta
       ext i j
       rw [hcomplex]
       simp [eps, Matrix.smul_apply]
     have hscale :
         sandwichedRenyiPSDReferenceHighAlphaFinite rhoAB
-            ((1 - delta : Real) •
-              fixedLeftReferenceRegularization rhoAB.marginalA sigmaB (eps delta))
+            ((1 - delta : ℝ) •
+              fixedLeftReferenceRegularization rhoAB.traceRight sigmaB (eps delta))
             (Matrix.PosSemidef.smul
               (fixedLeftReferenceRegularization_posSemidef
-                rhoAB.marginalA sigmaB heps_nonneg)
+                rhoAB.traceRight sigmaB heps_nonneg)
               (le_of_lt hscale_pos))
             alpha =
           sandwichedRenyiPSDReferenceHighAlphaFinite rhoAB
-              (fixedLeftReferenceRegularization rhoAB.marginalA sigmaB (eps delta))
+              (fixedLeftReferenceRegularization rhoAB.traceRight sigmaB (eps delta))
               (fixedLeftReferenceRegularization_posSemidef
-                rhoAB.marginalA sigmaB heps_nonneg)
+                rhoAB.traceRight sigmaB heps_nonneg)
               alpha -
             log2 (1 - delta) :=
       sandwichedRenyiPSDReferenceHighAlphaFinite_real_smul_reference_of_supports
         rhoAB
-        (fixedLeftReferenceRegularization_posSemidef rhoAB.marginalA sigmaB heps_nonneg)
+        (fixedLeftReferenceRegularization_posSemidef rhoAB.traceRight sigmaB heps_nonneg)
         hfixedSupport hscale_pos alpha halpha
     have hcurve_eval :
         fixedCurve delta =
           sandwichedRenyiPSDReferenceHighAlphaFinite rhoAB
-            (fixedLeftReferenceRegularization rhoAB.marginalA sigmaB (eps delta))
+            (fixedLeftReferenceRegularization rhoAB.traceRight sigmaB (eps delta))
             (fixedLeftReferenceRegularization_posSemidef
-              rhoAB.marginalA sigmaB heps_nonneg)
+              rhoAB.traceRight sigmaB heps_nonneg)
             alpha := by
       simp [fixedCurve,
         sandwichedRenyiPSDReferenceHighAlphaFiniteFixedLeftRegularizationCurve,
         heps_nonneg]
     calc
       sandwichedRenyiPSDReferenceHighAlphaFinite rhoAB
-          (rhoAB.marginalA.prod
-            (fullRankApproxMaximallyMixedStatePath sigmaB delta)).matrix
-          (rhoAB.marginalA.prod
-            (fullRankApproxMaximallyMixedStatePath sigmaB delta)).pos
+          (rhoAB.traceRight.prod
+            (fullRankApproxMaximallyMixedStatePath sigmaB delta)).m
+          (rhoAB.traceRight.prod
+            (fullRankApproxMaximallyMixedStatePath sigmaB delta)).psd
           alpha =
         sandwichedRenyiPSDReferenceHighAlphaFinite rhoAB
-          ((1 - delta : Real) •
-            fixedLeftReferenceRegularization rhoAB.marginalA sigmaB (eps delta))
+          ((1 - delta : ℝ) •
+            fixedLeftReferenceRegularization rhoAB.traceRight sigmaB (eps delta))
           (Matrix.PosSemidef.smul
             (fixedLeftReferenceRegularization_posSemidef
-              rhoAB.marginalA sigmaB heps_nonneg)
+              rhoAB.traceRight sigmaB heps_nonneg)
             (le_of_lt hscale_pos))
           alpha := by
             exact
               sandwichedRenyiPSDReferenceHighAlphaFinite_congr_reference
                 rhoAB
-                (rhoAB.marginalA.prod
-                  (fullRankApproxMaximallyMixedStatePath sigmaB delta)).pos
+                (rhoAB.traceRight.prod
+                  (fullRankApproxMaximallyMixedStatePath sigmaB delta)).psd
                 (Matrix.PosSemidef.smul
                   (fixedLeftReferenceRegularization_posSemidef
-                    rhoAB.marginalA sigmaB heps_nonneg)
+                    rhoAB.traceRight sigmaB heps_nonneg)
                   (le_of_lt hscale_pos))
                 hpath_matrix
                 alpha
       _ =
         sandwichedRenyiPSDReferenceHighAlphaFinite rhoAB
-          (fixedLeftReferenceRegularization rhoAB.marginalA sigmaB (eps delta))
+          (fixedLeftReferenceRegularization rhoAB.traceRight sigmaB (eps delta))
           (fixedLeftReferenceRegularization_posSemidef
-            rhoAB.marginalA sigmaB heps_nonneg)
+            rhoAB.traceRight sigmaB heps_nonneg)
           alpha - log2 (1 - delta) := hscale
       _ = fixedCurve delta - log2 (1 - delta) := by
         rw [hcurve_eval]
@@ -2457,63 +2293,63 @@ theorem sandwichedRenyiPSDReferenceHighAlphaFinite_fullRankApproxMaximallyMixedP
 /-- Candidate-level convergence along the canonical full-rank side-state path
 follows from finite-branch convergence on the supported domain. -/
 theorem sandwichedRenyiMutualInformationCandidateE_fullRankApprox_tendsto_of_highAlphaFinite_tendsto
-    (rhoAB : State (Prod a b)) (sigmaB : State b) {alpha : Real}
+    (rhoAB : MState (a × b)) (sigmaB : MState b) {alpha : ℝ}
     (halpha : 1 < alpha)
-    (hSupport : Matrix.Supports rhoAB.matrix (rhoAB.marginalA.prod sigmaB).matrix)
+    (hSupport : Matrix.Supports rhoAB.m (rhoAB.traceRight.prod sigmaB).m)
     (hfinite :
       Tendsto
-        (fun delta : Real =>
+        (fun delta : ℝ =>
           sandwichedRenyiPSDReferenceHighAlphaFinite rhoAB
-            (rhoAB.marginalA.prod
-              (fullRankApproxMaximallyMixedStatePath sigmaB delta)).matrix
-            (rhoAB.marginalA.prod
-              (fullRankApproxMaximallyMixedStatePath sigmaB delta)).pos
+            (rhoAB.traceRight.prod
+              (fullRankApproxMaximallyMixedStatePath sigmaB delta)).m
+            (rhoAB.traceRight.prod
+              (fullRankApproxMaximallyMixedStatePath sigmaB delta)).psd
             alpha)
-        (nhdsWithin (0 : Real) (Set.Ioo 0 1))
+        (nhdsWithin (0 : ℝ) (Set.Ioo 0 1))
         (nhds
           (sandwichedRenyiPSDReferenceHighAlphaFinite rhoAB
-            (rhoAB.marginalA.prod sigmaB).matrix
-            (rhoAB.marginalA.prod sigmaB).pos alpha))) :
+            (rhoAB.traceRight.prod sigmaB).m
+            (rhoAB.traceRight.prod sigmaB).psd alpha))) :
     Tendsto
-      (fun delta : Real =>
+      (fun delta : ℝ =>
         rhoAB.sandwichedRenyiMutualInformationCandidateE
           (fullRankApproxMaximallyMixedStatePath sigmaB delta) alpha)
-      (nhdsWithin (0 : Real) (Set.Ioo 0 1))
+      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1))
       (nhds (rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB alpha)) := by
   have htarget :
       rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB alpha =
         (sandwichedRenyiPSDReferenceHighAlphaFinite rhoAB
-          (rhoAB.marginalA.prod sigmaB).matrix
-          (rhoAB.marginalA.prod sigmaB).pos alpha : EReal) := by
-    rw [State.sandwichedRenyiMutualInformationCandidateE_eq]
+          (rhoAB.traceRight.prod sigmaB).m
+          (rhoAB.traceRight.prod sigmaB).psd alpha : EReal) := by
+    rw [MState.sandwichedRenyiMutualInformationCandidateE_eq]
     rw [sandwichedRenyiPSDReferenceE_eq_highAlphaE_of_one_lt _ _ halpha]
     rw [sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_of_supports
-      rhoAB (rhoAB.marginalA.prod sigmaB).pos alpha hSupport]
+      rhoAB (rhoAB.traceRight.prod sigmaB).psd alpha hSupport]
   have hpath :
-      (fun delta : Real =>
+      (fun delta : ℝ =>
         rhoAB.sandwichedRenyiMutualInformationCandidateE
           (fullRankApproxMaximallyMixedStatePath sigmaB delta) alpha)
-        =ᶠ[nhdsWithin (0 : Real) (Set.Ioo 0 1)]
-      (fun delta : Real =>
+        =ᶠ[nhdsWithin (0 : ℝ) (Set.Ioo 0 1)]
+      (fun delta : ℝ =>
         (sandwichedRenyiPSDReferenceHighAlphaFinite rhoAB
-          (rhoAB.marginalA.prod
-            (fullRankApproxMaximallyMixedStatePath sigmaB delta)).matrix
-          (rhoAB.marginalA.prod
-            (fullRankApproxMaximallyMixedStatePath sigmaB delta)).pos
+          (rhoAB.traceRight.prod
+            (fullRankApproxMaximallyMixedStatePath sigmaB delta)).m
+          (rhoAB.traceRight.prod
+            (fullRankApproxMaximallyMixedStatePath sigmaB delta)).psd
           alpha : EReal)) := by
     filter_upwards [self_mem_nhdsWithin] with delta hdelta
     have hpathSupport :
-        Matrix.Supports rhoAB.matrix
-          (rhoAB.marginalA.prod
-            (fullRankApproxMaximallyMixedStatePath sigmaB delta)).matrix :=
+        Matrix.Supports rhoAB.m
+          (rhoAB.traceRight.prod
+            (fullRankApproxMaximallyMixedStatePath sigmaB delta)).m :=
       supports_fullRankApproxMaximallyMixedProductReference_of_supports
-        rhoAB rhoAB.marginalA sigmaB hdelta hSupport
-    rw [State.sandwichedRenyiMutualInformationCandidateE_eq]
+        rhoAB rhoAB.traceRight sigmaB hdelta hSupport
+    rw [MState.sandwichedRenyiMutualInformationCandidateE_eq]
     rw [sandwichedRenyiPSDReferenceE_eq_highAlphaE_of_one_lt _ _ halpha]
     rw [sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_of_supports
       rhoAB
-      (rhoAB.marginalA.prod
-        (fullRankApproxMaximallyMixedStatePath sigmaB delta)).pos
+      (rhoAB.traceRight.prod
+        (fullRankApproxMaximallyMixedStatePath sigmaB delta)).psd
       alpha hpathSupport]
   simpa [htarget] using (EReal.tendsto_coe.mpr hfinite).congr' hpath.symm
 
@@ -2521,14 +2357,14 @@ theorem sandwichedRenyiMutualInformationCandidateE_fullRankApprox_tendsto_of_hig
 with the finite-branch approximation proved from the supported fixed-left
 regularization path. -/
 theorem sandwichedRenyiMutualInformationCandidateE_fullRankApprox_tendsto_of_supports
-    (rhoAB : State (Prod a b)) (sigmaB : State b) {alpha : Real}
+    (rhoAB : MState (a × b)) (sigmaB : MState b) {alpha : ℝ}
     (halpha : 1 < alpha)
-    (hSupport : Matrix.Supports rhoAB.matrix (rhoAB.marginalA.prod sigmaB).matrix) :
+    (hSupport : Matrix.Supports rhoAB.m (rhoAB.traceRight.prod sigmaB).m) :
     Tendsto
-      (fun delta : Real =>
+      (fun delta : ℝ =>
         rhoAB.sandwichedRenyiMutualInformationCandidateE
           (fullRankApproxMaximallyMixedStatePath sigmaB delta) alpha)
-      (nhdsWithin (0 : Real) (Set.Ioo 0 1))
+      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1))
       (nhds (rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB alpha)) :=
   sandwichedRenyiMutualInformationCandidateE_fullRankApprox_tendsto_of_highAlphaFinite_tendsto
     rhoAB sigmaB halpha hSupport
@@ -2538,9 +2374,9 @@ theorem sandwichedRenyiMutualInformationCandidateE_fullRankApprox_tendsto_of_sup
 /-- Full-rank side-state approximation supplies the lower bound needed to
 restrict the optimized infimum to full-rank side states. -/
 theorem posDef_candidate_approx_of_fullRankApprox
-    (rhoAB : State (Prod a b)) {alpha : Real} (halpha : 1 < alpha) :
-    ∀ sigmaB : State b,
-      (⨅ tauB : {tauB : State b // tauB.matrix.PosDef},
+    (rhoAB : MState (a × b)) {alpha : ℝ} (halpha : 1 < alpha) :
+    ∀ sigmaB : MState b,
+      (⨅ tauB : {tauB : MState b // tauB.m.PosDef},
         rhoAB.sandwichedRenyiMutualInformationCandidateE tauB.1 alpha) ≤
           rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB alpha := by
   refine posDef_candidate_approx_of_supported_singular_fullRankApprox_tendsto
@@ -2553,9 +2389,9 @@ theorem posDef_candidate_approx_of_fullRankApprox
 /-- For high parameters, optimizing over all side states is equivalent to
 optimizing over full-rank side states. -/
 theorem sandwichedRenyiMutualInformationE_eq_iInf_posDef_candidates_highAlpha
-    (rhoAB : State (Prod a b)) {alpha : Real} (halpha : 1 < alpha) :
+    (rhoAB : MState (a × b)) {alpha : ℝ} (halpha : 1 < alpha) :
     rhoAB.sandwichedRenyiMutualInformationE alpha =
-      ⨅ sigmaB : {sigmaB : State b // sigmaB.matrix.PosDef},
+      ⨅ sigmaB : {sigmaB : MState b // sigmaB.m.PosDef},
         rhoAB.sandwichedRenyiMutualInformationCandidateE sigmaB.1 alpha :=
   sandwichedRenyiMutualInformationE_eq_iInf_posDef_candidates_of_le_candidate
     rhoAB alpha (posDef_candidate_approx_of_fullRankApprox rhoAB halpha)
@@ -2575,27 +2411,27 @@ the only remaining obstruction to a fully unconditional optimized USC theorem is
 candidate-level USC at a singular left marginal; see the bridge-B note in
 `.tmp/2026-07-05-task-A2-report.md`. -/
 theorem sandwichedRenyiMutualInformationE_upperSemicontinuousOn_of_posDef_candidate
-    {s : Set (State (Prod a b))} {alpha : Real} (halpha : 1 < alpha)
+    {s : Set (MState (a × b))} {alpha : ℝ} (halpha : 1 < alpha)
     (hcandUSC :
-      ∀ sigmaB : {sigmaB : State b // sigmaB.matrix.PosDef},
+      ∀ sigmaB : {sigmaB : MState b // sigmaB.m.PosDef},
         UpperSemicontinuousOn
-          (fun rho : State (Prod a b) =>
+          (fun rho : MState (a × b) =>
             rho.sandwichedRenyiMutualInformationCandidateE sigmaB.1 alpha)
           s) :
     UpperSemicontinuousOn
-      (fun rho : State (Prod a b) => rho.sandwichedRenyiMutualInformationE alpha)
+      (fun rho : MState (a × b) => rho.sandwichedRenyiMutualInformationE alpha)
       s := by
   have hfullRankInf :
-      ∀ rho : State (Prod a b),
+      ∀ rho : MState (a × b),
         rho.sandwichedRenyiMutualInformationE alpha =
-          ⨅ sigmaB : {sigmaB : State b // sigmaB.matrix.PosDef},
+          ⨅ sigmaB : {sigmaB : MState b // sigmaB.m.PosDef},
             rho.sandwichedRenyiMutualInformationCandidateE sigmaB.1 alpha :=
     fun rho =>
       sandwichedRenyiMutualInformationE_eq_iInf_posDef_candidates_highAlpha rho halpha
   have hiInf :
       UpperSemicontinuousOn
-        (fun rho : State (Prod a b) =>
-          ⨅ sigmaB : {sigmaB : State b // sigmaB.matrix.PosDef},
+        (fun rho : MState (a × b) =>
+          ⨅ sigmaB : {sigmaB : MState b // sigmaB.m.PosDef},
             rho.sandwichedRenyiMutualInformationCandidateE sigmaB.1 alpha)
         s :=
     upperSemicontinuousOn_iInf hcandUSC
@@ -2605,95 +2441,92 @@ theorem sandwichedRenyiMutualInformationE_upperSemicontinuousOn_of_posDef_candid
 
 /-- Matrix convergence of the product reference path with a fixed left state. -/
 theorem fullRankApproxProductReferencePath_matrix_tendsto_zero
-    (rhoA : State a) (sigma mu : State b) :
+    (rhoA : MState a) (sigma mu : MState b) :
     Tendsto
-      (fun delta : Real =>
-        (fullRankApproxProductReferencePath rhoA sigma mu delta).matrix)
-      (nhdsWithin (0 : Real) (Set.Ioo 0 1))
-      (nhds (rhoA.prod sigma).matrix) := by
+      (fun delta : ℝ =>
+        (fullRankApproxProductReferencePath rhoA sigma mu delta).m)
+      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1))
+      (nhds (rhoA.prod sigma).m) := by
   have hside :
-      Tendsto (fun delta : Real => (fullRankApproxStatePath sigma mu delta).matrix)
-        (nhdsWithin (0 : Real) (Set.Ioo 0 1)) (nhds sigma.matrix) :=
-    State.continuous_matrix.tendsto sigma |>.comp
+      Tendsto (fun delta : ℝ => (fullRankApproxStatePath sigma mu delta).m)
+        (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds sigma.m) :=
+    MState.continuous_matrix.tendsto sigma |>.comp
       (fullRankApproxStatePath_tendsto_zero sigma mu)
   have hkr :
-      Continuous fun M : CMatrix b => Matrix.kronecker rhoA.matrix M := by
+      Continuous fun M : CMatrix b => Matrix.kronecker rhoA.m M := by
     unfold Matrix.kronecker
     exact _root_.continuous_matrix fun x y => by
       simp only [Matrix.kroneckerMap_apply]
       exact continuous_const.mul (continuous_id.matrix_elem x.2 y.2)
-  simpa [fullRankApproxProductReferencePath, State.prod, Function.comp_def] using
-    hkr.tendsto sigma.matrix |>.comp hside
+  simpa [fullRankApproxProductReferencePath, Function.comp_def] using
+    hkr.tendsto sigma.m |>.comp hside
 
-/-- State-level convergence of the product reference path with a fixed left
+/-- MState-level convergence of the product reference path with a fixed left
 state. -/
 theorem fullRankApproxProductReferencePath_tendsto_zero
-    (rhoA : State a) (sigma mu : State b) :
-    Tendsto (fun delta : Real => fullRankApproxProductReferencePath rhoA sigma mu delta)
-      (nhdsWithin (0 : Real) (Set.Ioo 0 1)) (nhds (rhoA.prod sigma)) := by
-  rw [Filter.tendsto_iff_comap]
-  rw [nhds_induced]
-  rw [Filter.comap_comap]
-  rw [← Filter.tendsto_iff_comap]
+    (rhoA : MState a) (sigma mu : MState b) :
+    Tendsto (fun delta : ℝ => fullRankApproxProductReferencePath rhoA sigma mu delta)
+      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds (rhoA.prod sigma)) := by
+  refine tendsto_of_tendsto_m ?_
   exact fullRankApproxProductReferencePath_matrix_tendsto_zero rhoA sigma mu
 
 /-- The product reference path with fixed full-rank left state is eventually
 full-rank. -/
 theorem fullRankApproxProductReferencePath_eventually_posDef_of_left
-    (rhoA : State a) (sigma mu : State b)
-    (hrhoA : rhoA.matrix.PosDef) (hmu : mu.matrix.PosDef) :
-    ∀ᶠ delta in nhdsWithin (0 : Real) (Set.Ioo 0 1),
-      (fullRankApproxProductReferencePath rhoA sigma mu delta).matrix.PosDef := by
+    (rhoA : MState a) (sigma mu : MState b)
+    (hrhoA : rhoA.m.PosDef) (hmu : mu.m.PosDef) :
+    ∀ᶠ delta in nhdsWithin (0 : ℝ) (Set.Ioo 0 1),
+      (fullRankApproxProductReferencePath rhoA sigma mu delta).m.PosDef := by
   filter_upwards [fullRankApproxStatePath_eventually_posDef_of_noise sigma mu hmu] with delta hdelta
-  simpa [fullRankApproxProductReferencePath] using State.prod_posDef hrhoA hdelta
+  simpa [fullRankApproxProductReferencePath] using MState.PosDef.kron hrhoA hdelta
 
 /-- A fixed-left product reference path eventually supports every fixed input
 matrix when both product factors are full-rank along the path. -/
 theorem fullRankApproxProductReferencePath_eventually_supports_of_left
-    (rhoAB : State (Prod a b)) (rhoA : State a) (sigma mu : State b)
-    (hrhoA : rhoA.matrix.PosDef) (hmu : mu.matrix.PosDef) :
-    ∀ᶠ delta in nhdsWithin (0 : Real) (Set.Ioo 0 1),
-      Matrix.Supports rhoAB.matrix
-        (fullRankApproxProductReferencePath rhoA sigma mu delta).matrix := by
+    (rhoAB : MState (a × b)) (rhoA : MState a) (sigma mu : MState b)
+    (hrhoA : rhoA.m.PosDef) (hmu : mu.m.PosDef) :
+    ∀ᶠ delta in nhdsWithin (0 : ℝ) (Set.Ioo 0 1),
+      Matrix.Supports rhoAB.m
+        (fullRankApproxProductReferencePath rhoA sigma mu delta).m := by
   filter_upwards [
       fullRankApproxProductReferencePath_eventually_posDef_of_left
         rhoA sigma mu hrhoA hmu] with delta hdelta
-  exact Matrix.Supports.of_right_posDef rhoAB.matrix
-    (fullRankApproxProductReferencePath rhoA sigma mu delta).matrix hdelta
+  exact Matrix.Supports.of_right_posDef rhoAB.m
+    (fullRankApproxProductReferencePath rhoA sigma mu delta).m hdelta
 
 /-- Product reference path obtained by regularizing both marginal reference
 states. -/
 def fullRankApproxProductReferenceBothPath
-    (rhoA muA : State a) (sigma mu : State b) (delta : Real) : State (Prod a b) :=
+    (rhoA muA : MState a) (sigma mu : MState b) (delta : ℝ) : MState (a × b) :=
   (fullRankApproxStatePath rhoA muA delta).prod
     (fullRankApproxStatePath sigma mu delta)
 
 /-- Matrix convergence of the product reference path when both sides are
 regularized. -/
 theorem fullRankApproxProductReferenceBothPath_matrix_tendsto_zero
-    (rhoA muA : State a) (sigma mu : State b) :
+    (rhoA muA : MState a) (sigma mu : MState b) :
     Tendsto
-      (fun delta : Real =>
-        (fullRankApproxProductReferenceBothPath rhoA muA sigma mu delta).matrix)
-      (nhdsWithin (0 : Real) (Set.Ioo 0 1))
-      (nhds (rhoA.prod sigma).matrix) := by
+      (fun delta : ℝ =>
+        (fullRankApproxProductReferenceBothPath rhoA muA sigma mu delta).m)
+      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1))
+      (nhds (rhoA.prod sigma).m) := by
   have hleft :
-      Tendsto (fun delta : Real => (fullRankApproxStatePath rhoA muA delta).matrix)
-        (nhdsWithin (0 : Real) (Set.Ioo 0 1)) (nhds rhoA.matrix) :=
-    State.continuous_matrix.tendsto rhoA |>.comp
+      Tendsto (fun delta : ℝ => (fullRankApproxStatePath rhoA muA delta).m)
+        (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds rhoA.m) :=
+    MState.continuous_matrix.tendsto rhoA |>.comp
       (fullRankApproxStatePath_tendsto_zero rhoA muA)
   have hright :
-      Tendsto (fun delta : Real => (fullRankApproxStatePath sigma mu delta).matrix)
-        (nhdsWithin (0 : Real) (Set.Ioo 0 1)) (nhds sigma.matrix) :=
-    State.continuous_matrix.tendsto sigma |>.comp
+      Tendsto (fun delta : ℝ => (fullRankApproxStatePath sigma mu delta).m)
+        (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds sigma.m) :=
+    MState.continuous_matrix.tendsto sigma |>.comp
       (fullRankApproxStatePath_tendsto_zero sigma mu)
   have hpair :
       Tendsto
-        (fun delta : Real =>
-          ((fullRankApproxStatePath rhoA muA delta).matrix,
-            (fullRankApproxStatePath sigma mu delta).matrix))
-        (nhdsWithin (0 : Real) (Set.Ioo 0 1))
-        (nhds (rhoA.matrix, sigma.matrix)) :=
+        (fun delta : ℝ =>
+          ((fullRankApproxStatePath rhoA muA delta).m,
+            (fullRankApproxStatePath sigma mu delta).m))
+        (nhdsWithin (0 : ℝ) (Set.Ioo 0 1))
+        (nhds (rhoA.m, sigma.m)) :=
     hleft.prodMk_nhds hright
   have hkr :
       Continuous fun M : CMatrix a × CMatrix b => Matrix.kronecker M.1 M.2 := by
@@ -2702,97 +2535,94 @@ theorem fullRankApproxProductReferenceBothPath_matrix_tendsto_zero
       simp only [Matrix.kroneckerMap_apply]
       exact (continuous_fst.matrix_elem x.1 y.1).mul
         (continuous_snd.matrix_elem x.2 y.2)
-  simpa [fullRankApproxProductReferenceBothPath, State.prod, Function.comp_def] using
-    hkr.tendsto (rhoA.matrix, sigma.matrix) |>.comp hpair
+  simpa [fullRankApproxProductReferenceBothPath, Function.comp_def] using
+    hkr.tendsto (rhoA.m, sigma.m) |>.comp hpair
 
-/-- State-level convergence of the product reference path when both sides are
+/-- MState-level convergence of the product reference path when both sides are
 regularized. -/
 theorem fullRankApproxProductReferenceBothPath_tendsto_zero
-    (rhoA muA : State a) (sigma mu : State b) :
-    Tendsto (fun delta : Real => fullRankApproxProductReferenceBothPath rhoA muA sigma mu delta)
-      (nhdsWithin (0 : Real) (Set.Ioo 0 1)) (nhds (rhoA.prod sigma)) := by
-  rw [Filter.tendsto_iff_comap]
-  rw [nhds_induced]
-  rw [Filter.comap_comap]
-  rw [← Filter.tendsto_iff_comap]
+    (rhoA muA : MState a) (sigma mu : MState b) :
+    Tendsto (fun delta : ℝ => fullRankApproxProductReferenceBothPath rhoA muA sigma mu delta)
+      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds (rhoA.prod sigma)) := by
+  refine tendsto_of_tendsto_m ?_
   exact fullRankApproxProductReferenceBothPath_matrix_tendsto_zero rhoA muA sigma mu
 
 /-- Regularizing both marginal reference states by full-rank noise makes the
 product reference path eventually full-rank. -/
 theorem fullRankApproxProductReferenceBothPath_eventually_posDef_of_noise
-    (rhoA muA : State a) (sigma mu : State b)
-    (hmuA : muA.matrix.PosDef) (hmu : mu.matrix.PosDef) :
-    ∀ᶠ delta in nhdsWithin (0 : Real) (Set.Ioo 0 1),
-      (fullRankApproxProductReferenceBothPath rhoA muA sigma mu delta).matrix.PosDef := by
+    (rhoA muA : MState a) (sigma mu : MState b)
+    (hmuA : muA.m.PosDef) (hmu : mu.m.PosDef) :
+    ∀ᶠ delta in nhdsWithin (0 : ℝ) (Set.Ioo 0 1),
+      (fullRankApproxProductReferenceBothPath rhoA muA sigma mu delta).m.PosDef := by
   filter_upwards [
       fullRankApproxStatePath_eventually_posDef_of_noise rhoA muA hmuA,
       fullRankApproxStatePath_eventually_posDef_of_noise sigma mu hmu] with delta hleft hright
-  simpa [fullRankApproxProductReferenceBothPath] using State.prod_posDef hleft hright
+  simpa [fullRankApproxProductReferenceBothPath] using MState.PosDef.kron hleft hright
 
 /-- A product reference path regularized on both factors eventually supports
 every fixed input matrix. -/
 theorem fullRankApproxProductReferenceBothPath_eventually_supports_of_noise
-    (rhoAB : State (Prod a b)) (rhoA muA : State a) (sigma mu : State b)
-    (hmuA : muA.matrix.PosDef) (hmu : mu.matrix.PosDef) :
-    ∀ᶠ delta in nhdsWithin (0 : Real) (Set.Ioo 0 1),
-      Matrix.Supports rhoAB.matrix
-        (fullRankApproxProductReferenceBothPath rhoA muA sigma mu delta).matrix := by
+    (rhoAB : MState (a × b)) (rhoA muA : MState a) (sigma mu : MState b)
+    (hmuA : muA.m.PosDef) (hmu : mu.m.PosDef) :
+    ∀ᶠ delta in nhdsWithin (0 : ℝ) (Set.Ioo 0 1),
+      Matrix.Supports rhoAB.m
+        (fullRankApproxProductReferenceBothPath rhoA muA sigma mu delta).m := by
   filter_upwards [
       fullRankApproxProductReferenceBothPath_eventually_posDef_of_noise
         rhoA muA sigma mu hmuA hmu] with delta hdelta
-  exact Matrix.Supports.of_right_posDef rhoAB.matrix
-    (fullRankApproxProductReferenceBothPath rhoA muA sigma mu delta).matrix hdelta
+  exact Matrix.Supports.of_right_posDef rhoAB.m
+    (fullRankApproxProductReferenceBothPath rhoA muA sigma mu delta).m hdelta
 
 /-- Canonical product reference path obtained by regularizing both factors
 with maximally mixed noise. -/
 def fullRankApproxMaximallyMixedProductReferenceBothPath
-    (rhoA : State a) (sigma : State b) (delta : Real) : State (Prod a b) :=
+    (rhoA : MState a) (sigma : MState b) (delta : ℝ) : MState (a × b) :=
   letI : Nonempty a := rhoA.nonempty
   letI : Nonempty b := sigma.nonempty
-  fullRankApproxProductReferenceBothPath rhoA (maximallyMixed a) sigma (maximallyMixed b) delta
+  fullRankApproxProductReferenceBothPath rhoA (MState.uniform : MState a) sigma (MState.uniform : MState b) delta
 
 /-- The canonical product reference path converges back to the target product
 state. -/
 theorem fullRankApproxMaximallyMixedProductReferenceBothPath_tendsto_zero
-    (rhoA : State a) (sigma : State b) :
+    (rhoA : MState a) (sigma : MState b) :
     Tendsto
-      (fun delta : Real =>
+      (fun delta : ℝ =>
         fullRankApproxMaximallyMixedProductReferenceBothPath rhoA sigma delta)
-      (nhdsWithin (0 : Real) (Set.Ioo 0 1)) (nhds (rhoA.prod sigma)) := by
+      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds (rhoA.prod sigma)) := by
   classical
   let : Nonempty a := rhoA.nonempty
   let : Nonempty b := sigma.nonempty
   simpa [fullRankApproxMaximallyMixedProductReferenceBothPath] using
     fullRankApproxProductReferenceBothPath_tendsto_zero
-      rhoA (maximallyMixed a) sigma (maximallyMixed b)
+      rhoA (MState.uniform : MState a) sigma (MState.uniform : MState b)
 
 /-- The canonical product reference path is eventually full-rank. -/
 theorem fullRankApproxMaximallyMixedProductReferenceBothPath_eventually_posDef
-    (rhoA : State a) (sigma : State b) :
-    ∀ᶠ delta in nhdsWithin (0 : Real) (Set.Ioo 0 1),
-      (fullRankApproxMaximallyMixedProductReferenceBothPath rhoA sigma delta).matrix.PosDef := by
+    (rhoA : MState a) (sigma : MState b) :
+    ∀ᶠ delta in nhdsWithin (0 : ℝ) (Set.Ioo 0 1),
+      (fullRankApproxMaximallyMixedProductReferenceBothPath rhoA sigma delta).m.PosDef := by
   classical
   let : Nonempty a := rhoA.nonempty
   let : Nonempty b := sigma.nonempty
   simpa [fullRankApproxMaximallyMixedProductReferenceBothPath] using
     fullRankApproxProductReferenceBothPath_eventually_posDef_of_noise
-      rhoA (maximallyMixed a) sigma (maximallyMixed b)
-      (maximallyMixed_posDef (a := a)) (maximallyMixed_posDef (a := b))
+      rhoA (MState.uniform : MState a) sigma (MState.uniform : MState b)
+      (MState.uniform_posDef (d := a)) (MState.uniform_posDef (d := b))
 
 /-- The canonical product reference path eventually supports every fixed input
 state. -/
 theorem fullRankApproxMaximallyMixedProductReferenceBothPath_eventually_supports
-    (rhoAB : State (Prod a b)) (rhoA : State a) (sigma : State b) :
-    ∀ᶠ delta in nhdsWithin (0 : Real) (Set.Ioo 0 1),
-      Matrix.Supports rhoAB.matrix
-        (fullRankApproxMaximallyMixedProductReferenceBothPath rhoA sigma delta).matrix := by
+    (rhoAB : MState (a × b)) (rhoA : MState a) (sigma : MState b) :
+    ∀ᶠ delta in nhdsWithin (0 : ℝ) (Set.Ioo 0 1),
+      Matrix.Supports rhoAB.m
+        (fullRankApproxMaximallyMixedProductReferenceBothPath rhoA sigma delta).m := by
   classical
   let : Nonempty a := rhoA.nonempty
   let : Nonempty b := sigma.nonempty
   simpa [fullRankApproxMaximallyMixedProductReferenceBothPath] using
     fullRankApproxProductReferenceBothPath_eventually_supports_of_noise
-      rhoAB rhoA (maximallyMixed a) sigma (maximallyMixed b)
-      (maximallyMixed_posDef (a := a)) (maximallyMixed_posDef (a := b))
+      rhoAB rhoA (MState.uniform : MState a) sigma (MState.uniform : MState b)
+      (MState.uniform_posDef (d := a)) (MState.uniform_posDef (d := b))
 
 /-! ### A2 crux: cutoff-regularized negative-power CFC continuity
 
@@ -3041,25 +2871,7 @@ lemma CMatrix.exists_minPositiveEigenvalue
     Finset.mem_filter.mpr ⟨hi_img, hi⟩
   exact Finset.min'_le _ _ hi_in
 
-open scoped Matrix.Norms.L2Operator
-
-local instance cMatrixNonUnitalCStarAlgebraForCutoffCFC
-    (n : Type*) [Fintype n] [DecidableEq n] :
-    NonUnitalCStarAlgebra (Matrix n n ℂ) := ⟨⟩
-
-local instance cMatrixCStarAlgebraForCutoffCFC
-    (n : Type*) [Fintype n] [DecidableEq n] :
-    CStarAlgebra (Matrix n n ℂ) := ⟨⟩
-
-local instance matrixNormalCFCForCutoffCFC
-    (n : Type*) [Fintype n] [DecidableEq n] :
-    ContinuousFunctionalCalculus ℂ (Matrix n n ℂ) IsStarNormal :=
-  IsStarNormal.instContinuousFunctionalCalculus
-
-local instance matrixNormalIsometricCFCForCutoffCFC
-    (n : Type*) [Fintype n] [DecidableEq n] :
-    IsometricContinuousFunctionalCalculus ℂ (Matrix n n ℂ) IsStarNormal :=
-  IsStarNormal.instIsometricContinuousFunctionalCalculus
+open scoped Matrix.Norms.L2Operator QIT.MatrixL2
 
 /-- `rpowCutoff γ s` is continuous on all of `ℝ≥0` (the per-`M` `Icc 0 M`
 continuity from `rpowCutoff_continuousOn_Icc` lifts to `Set.univ` because every
@@ -3228,8 +3040,8 @@ lemma cfc_rpowCutoffErr_eq_mul_sq
       A * (CFC.rpow A s - cfc (rpowCutoff γ s) A)^2 := by
   have hnnA : 0 ≤ A := Matrix.nonneg_iff_posSemidef.mpr hA
   have hself : IsSelfAdjoint A := Matrix.IsHermitian.isSelfAdjoint hA.isHermitian
-  have hfin : (spectrum ℝ A).Finite := Matrix.finite_real_spectrum
-  have hcont (f : ℝ → ℝ) : ContinuousOn f (spectrum ℝ A) := hfin.continuousOn f
+  have hfin : (_root_.spectrum ℝ A).Finite := Matrix.finite_real_spectrum
+  have hcont (f : ℝ → ℝ) : ContinuousOn f (_root_.spectrum ℝ A) := hfin.continuousOn f
   -- Bridge the `ℝ≥0`-CFC cutoff to its `ℝ`-CFC avatar `rpowCutoffReal γ s`.
   -- (`rpowCutoffReal γ s` is definitionally the `Real.toNNReal` pullback, so the
   -- `cfc_nnreal_eq_real` equation type-checks against it directly.)
@@ -3238,7 +3050,7 @@ lemma cfc_rpowCutoffErr_eq_mul_sq
   -- Bridge the `ℝ≥0`-CFC error to its `ℝ`-CFC avatar (the `toNNReal` pullback).
   rw [cfc_nnreal_eq_real _ A (ha := hnnA)]
   -- On `spectrum ℝ A` (⊆ `ℝ≥0` for PSD `A`), the pullback equals the decomposable form.
-  have hcongr : (spectrum ℝ A).EqOn
+  have hcongr : (_root_.spectrum ℝ A).EqOn
       (fun x ↦ (rpowCutoffErr γ s) x.toNNReal : ℝ → ℝ)
       (fun x : ℝ => x * (x ^ s - rpowCutoffReal γ s x)^2) := by
     intro x hx
@@ -3267,7 +3079,7 @@ agrees with `t^s` on `spectrum ℝ≥0 A` (at `0`: `rpowCutoff γ s 0 = 0 = 0^s`
 `cfc (rpowCutoff γ s) A = CFC.rpow A s` — the on-support CFC limit (Step 3a) IS `A^s`. -/
 lemma cfc_rpowCutoff_eq_rpow_of_spectralGap
     {A : CMatrix a} (_hA : A.PosSemidef) {γ : ℝ≥0} (hγ : 0 < γ) {s : ℝ} (hs : s ≠ 0)
-    (hgap : ∀ μ ∈ spectrum ℝ≥0 A, μ ≠ 0 → γ ≤ μ) :
+    (hgap : ∀ μ ∈ _root_.spectrum ℝ≥0 A, μ ≠ 0 → γ ≤ μ) :
     cfc (rpowCutoff γ s) A = CFC.rpow A s := by
   have hγ2_pos : (0 : ℝ≥0) < γ / 2 := by positivity
   have h2_pos : (0 : ℝ≥0) < 2 := by norm_num
@@ -3290,14 +3102,14 @@ so the error is `0`). Hence `cfc (rpowCutoffErr γ s) A = 0`, so the Step-3b lim
 `Tr[0].re = 0` — the off-support error trace tends to `0` along `A_x → A`. -/
 lemma cfc_rpowCutoffErr_eq_zero_of_spectralGap
     {A : CMatrix a} (_hA : A.PosSemidef) {γ : ℝ≥0} (hγ : 0 < γ) {s : ℝ}
-    (hgap : ∀ μ ∈ spectrum ℝ≥0 A, μ ≠ 0 → γ ≤ μ) :
+    (hgap : ∀ μ ∈ _root_.spectrum ℝ≥0 A, μ ≠ 0 → γ ≤ μ) :
     cfc (rpowCutoffErr γ s) A = 0 := by
   have hγ2_pos : (0 : ℝ≥0) < γ / 2 := by positivity
   have h2_pos : (0 : ℝ≥0) < 2 := by norm_num
   have hγ2_lt_γ : γ / 2 < γ := by
     rw [div_lt_iff₀ h2_pos]
     exact lt_mul_of_one_lt_right hγ (by norm_num : (1:ℝ≥0) < 2)
-  have hcongr : (spectrum ℝ≥0 A).EqOn (rpowCutoffErr γ s) (fun _ => (0 : ℝ≥0)) := by
+  have hcongr : (_root_.spectrum ℝ≥0 A).EqOn (rpowCutoffErr γ s) (fun _ => (0 : ℝ≥0)) := by
     intro μ hμ
     by_cases hμ0 : μ = 0
     · subst hμ0
@@ -3311,42 +3123,43 @@ lemma cfc_rpowCutoffErr_eq_zero_of_spectralGap
   show cfc (0 : ℝ≥0 → ℝ≥0) A = 0
   simp only [cfc_zero]
 
-/-- Op-norm bound for a sandwiched Kronecker product: for a state `ρ` on `Prod a b`
+/-- Op-norm bound for a sandwiched Kronecker product: for a state `ρ` on `(a × b`)
 and PSD `A` (on `a`), PSD `B` (on `b`),
-  `‖ρ.sqrtMatrix * (A ⊗ B) * ρ.sqrtMatrix‖ ≤ B.trace.re * Tr[A · ρ.marginalA.matrix].re`.
+  `‖ρ.sqrtMatrix * (A ⊗ B) * ρ.sqrtMatrix‖ ≤ B.trace.re * Tr[A · ρ.traceRight.m].re`.
 
 The sandwiched product is PSD (a congruence of the PSD Kronecker `A ⊗ B` by
 `ρ.sqrtMatrix`), so its op-norm is at most its trace; trace cyclicity reduces
-`Tr[ρ.sqrtMatrix · (A⊗B) · ρ.sqrtMatrix]` to `Tr[(A⊗B) · ρ.matrix]`, which
+`Tr[ρ.sqrtMatrix · (A⊗B) · ρ.sqrtMatrix]` to `Tr[(A⊗B) · ρ.m]`, which
 `posSemidef_trace_mul_kronecker_le_partialTrace` bounds by
-`B.trace.re * Tr[A · ρ.marginalA.matrix].re`. This is the off-support op-norm
+`B.trace.re * Tr[A · ρ.traceRight.m].re`. This is the off-support op-norm
 bound core of the singular-marginal USC proof (Step 4b). -/
 lemma norm_sqrtMatrix_kronecker_mul_sqrtMatrix_le
-    (ρ : State (Prod a b)) {A : CMatrix a} (hA : A.PosSemidef) {B : CMatrix b} (hB : B.PosSemidef) :
+    (ρ : MState (a × b)) {A : CMatrix a} (hA : A.PosSemidef) {B : CMatrix b} (hB : B.PosSemidef) :
     ‖ρ.sqrtMatrix * Matrix.kronecker A B * ρ.sqrtMatrix‖ ≤
-      B.trace.re * (A * ρ.marginalA.matrix).trace.re := by
+      B.trace.re * (A * ρ.traceRight.m).trace.re := by
   have hK_psd : (Matrix.kronecker A B).PosSemidef := hA.kronecker hB
   have hpsd : (ρ.sqrtMatrix * Matrix.kronecker A B * ρ.sqrtMatrix).PosSemidef := by
     have h := hK_psd.mul_mul_conjTranspose_same ρ.sqrtMatrix
     rwa [ρ.sqrtMatrix_isHermitian.eq] at h
   have htr : (ρ.sqrtMatrix * Matrix.kronecker A B * ρ.sqrtMatrix).trace =
-      (Matrix.kronecker A B * ρ.matrix).trace := by
+      (Matrix.kronecker A B * ρ.m).trace := by
     rw [Matrix.trace_mul_cycle, ρ.sqrtMatrix_mul_self, Matrix.trace_mul_comm]
-  have hone : ‖(1 : CMatrix (Prod a b))‖ ≤ 1 := by
+  have hone : ‖(1 : CMatrix (a × b))‖ ≤ 1 := by
     rw [Matrix.cstar_norm_def]
     simpa [ContinuousLinearMap.one_def] using
-      ContinuousLinearMap.norm_id_le (𝕜 := ℂ) (E := EuclideanSpace ℂ (Prod a b))
+      ContinuousLinearMap.norm_id_le (𝕜 := ℂ) (E := EuclideanSpace ℂ (a × b))
   have htrnn : 0 ≤ (ρ.sqrtMatrix * Matrix.kronecker A B * ρ.sqrtMatrix).trace.re :=
     (Matrix.PosSemidef.trace_nonneg hpsd).1
   calc ‖ρ.sqrtMatrix * Matrix.kronecker A B * ρ.sqrtMatrix‖
       ≤ (ρ.sqrtMatrix * Matrix.kronecker A B * ρ.sqrtMatrix).trace.re *
-          ‖(1 : CMatrix (Prod a b))‖ :=
+          ‖(1 : CMatrix (a × b))‖ :=
         norm_le_trace_re_mul_norm_one_of_posSemidef hpsd
     _ ≤ (ρ.sqrtMatrix * Matrix.kronecker A B * ρ.sqrtMatrix).trace.re * 1 :=
         mul_le_mul_of_nonneg_left hone htrnn
-    _ = (Matrix.kronecker A B * ρ.matrix).trace.re := by rw [mul_one, htr]
-    _ ≤ B.trace.re * (A * ρ.marginalA.matrix).trace.re :=
-        posSemidef_trace_mul_kronecker_le_partialTrace ρ.pos hA hB
+    _ = (Matrix.kronecker A B * ρ.m).trace.re := by rw [mul_one, htr]
+    _ ≤ B.trace.re * (A * ρ.traceRight.m).trace.re := by
+        rw [MState.traceRight_m]
+        exact posSemidef_trace_mul_kronecker_le_partialTrace ρ.psd hA hB
 
 /-- The cutoff CFC image `cfc (rpowCutoff γ s) A` of a Hermitian matrix is
 Hermitian, since `rpowCutoff γ s : ℝ≥0 → ℝ≥0` is fixed pointwise by `star` (the
@@ -3365,12 +3178,12 @@ lemma cfc_rpowCutoff_isHermitian
 g-trick assembly, on-support plus off-support): for a fixed positive-definite
 side state `sigmaB`, the reference inner trace-power
 `Tr[(sigma_x^s rho_x sigma_x^s)^alpha].re` converges to
-`Tr[(sigma^s rho sigma^s)^alpha].re` along `rho_x -> rho` whenever the limit
-marginal `A = rho.marginalA.matrix` has spectral gap `gamma > 0` away from zero
+`Tr[(sigma^s rho sigma^s)^alpha].re` along `rho_x → rho` whenever the limit
+marginal `A = rho.traceRight.m` has spectral gap `gamma > 0` away from zero
 on its support.
 
 The proof uses the `T T*` factorization `inner = T T*` with
-`T := sigma^s * rho.sqrtMatrix` (Hermitian `sigma^s`, `rho.matrix =
+`T := sigma^s * rho.sqrtMatrix` (Hermitian `sigma^s`, `rho.m =
 rho.sqrtMatrix^2`), and splits `T_x = T_x^reg + T_x^err` via the cutoff
 decomposition `A_x^s = cfc (rpowCutoff gamma s) A_x + E_x`. The on-support piece
 `T_x^reg` converges by Step 3a plus `cfc_rpowCutoff_eq_rpow_of_spectralGap` and
@@ -3380,17 +3193,17 @@ together with Step 3b and `cfc_rpowCutoffErr_eq_zero_of_spectralGap`. Step 5
 then lifts the matrix tendsto to the trace-power tendsto via
 `cMatrix_rpow_trace_re_tendsto_of_tendsto_posSemidef` (positive `alpha`). -/
 theorem sandwichedRenyiReferenceInner_rpow_trace_re_tendsto_of_tendsto_state
-    {X : Type*} {l : Filter X} {rhoF : X → State (Prod a b)} {rho : State (Prod a b)}
+    {X : Type*} {l : Filter X} {rhoF : X → MState (a × b)} {rho : MState (a × b)}
     (hrhoF : Filter.Tendsto rhoF l (nhds rho))
     {α : ℝ} (halpha : 1 < α) {γ : ℝ≥0} (hγ : 0 < γ)
-    (hgap : ∀ μ ∈ spectrum ℝ≥0 rho.marginalA.matrix, μ ≠ 0 → γ ≤ μ)
-    (sigmaB : State b) (hsigmaB : sigmaB.matrix.PosDef) :
+    (hgap : ∀ μ ∈ _root_.spectrum ℝ≥0 rho.traceRight.m, μ ≠ 0 → γ ≤ μ)
+    (sigmaB : MState b) (hsigmaB : sigmaB.m.PosDef) :
     Filter.Tendsto (fun x =>
       (CFC.rpow (sandwichedRenyiReferenceInner (rhoF x)
-        (Matrix.kronecker (rhoF x).marginalA.matrix sigmaB.matrix) α) α).trace.re) l
+        (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) α) α).trace.re) l
       (nhds (CFC.rpow (sandwichedRenyiReferenceInner rho
-        (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix) α) α).trace.re) := by
-  -- (1) Scalar bookkeeping: s = (1-alpha)/(2 alpha) is negative, nonzero, <= 1,
+        (Matrix.kronecker rho.traceRight.m sigmaB.m) α) α).trace.re) := by
+  -- (1) Scalar bookkeeping: s = (1-alpha)/(2 alpha) is negative, nonzero, ≤ 1,
   -- and 2*s + 1 = 1/alpha > 0.
   have hα_pos : 0 < α := lt_trans zero_lt_one halpha
   have h2α_pos : 0 < 2 * α := by linarith
@@ -3407,39 +3220,31 @@ theorem sandwichedRenyiReferenceInner_rpow_trace_re_tendsto_of_tendsto_state
     ring
   have h2s1_pos : 0 < 2 * s + 1 := by rw [h2s1_eq]; exact one_div_pos.mpr hα_pos
   -- (2) Marginal matrix tendsto + PSD witnesses.
-  have hAmarg : Filter.Tendsto (fun x => (rhoF x).marginalA.matrix) l
-      (nhds rho.marginalA.matrix) :=
-    (State.continuous_matrix.comp State.marginalA_continuous).tendsto rho |>.comp hrhoF
-  have hAx_psd : ∀ᶠ x in l, (rhoF x).marginalA.matrix.PosSemidef :=
-    Filter.Eventually.of_forall fun x => (rhoF x).marginalA.pos
-  have hA0_psd : rho.marginalA.matrix.PosSemidef := rho.marginalA.pos
-  -- (3) `sqrtMatrix` tendsto (`sqrtMatrix_tendsto_of_tendsto` is in a downstream
-  -- module; re-derive it from `cMatrix_rpow_tendsto_of_tendsto_posSemidef` for `1/2`).
-  have hsqrt : Filter.Tendsto (fun x => (rhoF x).sqrtMatrix) l (nhds rho.sqrtMatrix) := by
-    have hmatrix : Filter.Tendsto (fun x => (rhoF x).matrix) l (nhds rho.matrix) :=
-      State.continuous_matrix.tendsto rho |>.comp hrhoF
-    have hpsd : ∀ᶠ x in l, (rhoF x).matrix.PosSemidef :=
-      Filter.Eventually.of_forall fun x => (rhoF x).pos
-    have hpow :=
-      cMatrix_rpow_tendsto_of_tendsto_posSemidef (a := Prod a b) (p := (1 / 2 : ℝ))
-        (by norm_num) hmatrix hpsd rho.pos
-    simpa [State.sqrtMatrix, psdSqrt, CFC.sqrt_eq_rpow] using hpow
-  -- `Bs := CFC.rpow sigmaB.matrix s` (Hermitian, PSD); `sigmaB.matrix` is PSD.
-  set Bs : CMatrix b := CFC.rpow sigmaB.matrix s with hBs_def
+  have hAmarg : Filter.Tendsto (fun x => (rhoF x).traceRight.m) l
+      (nhds rho.traceRight.m) :=
+    (MState.continuous_matrix.comp MState.traceRight_continuous).tendsto rho |>.comp hrhoF
+  have hAx_psd : ∀ᶠ x in l, (rhoF x).traceRight.m.PosSemidef :=
+    Filter.Eventually.of_forall fun x => (rhoF x).traceRight.psd
+  have hA0_psd : rho.traceRight.m.PosSemidef := rho.traceRight.psd
+  -- (3) `sqrtMatrix` tendsto.
+  have hsqrt : Filter.Tendsto (fun x => (rhoF x).sqrtMatrix) l (nhds rho.sqrtMatrix) :=
+    MState.sqrtMatrix_tendsto_of_tendsto hrhoF
+  -- `Bs := CFC.rpow sigmaB.m s` (Hermitian, PSD); `sigmaB.m` is PSD.
+  set Bs : CMatrix b := CFC.rpow sigmaB.m s with hBs_def
   have hBs_psd : Bs.PosSemidef := cMatrix_rpow_posSemidef hsigmaB.posSemidef
   have hBs_herm : Bs.IsHermitian := hBs_psd.isHermitian
-  -- (4) On-support cutoff tendsto: `Cut_x -> CFC.rpow A s` (Step 3a + linchpin 1).
+  -- (4) On-support cutoff tendsto: `Cut_x → CFC.rpow A s` (Step 3a + linchpin 1).
   have hCut : Filter.Tendsto
-      (fun x => cfc (rpowCutoff γ s) (rhoF x).marginalA.matrix) l
-      (nhds (CFC.rpow rho.marginalA.matrix s)) := by
+      (fun x => cfc (rpowCutoff γ s) (rhoF x).traceRight.m) l
+      (nhds (CFC.rpow rho.traceRight.m s)) := by
     have hstep :=
       cMatrix_cfc_rpowCutoff_tendsto_of_tendsto_posSemidef (s := s) hγ hAmarg hAx_psd hA0_psd
     rw [cfc_rpowCutoff_eq_rpow_of_spectralGap hA0_psd hγ hs_ne hgap] at hstep
     exact hstep
-  -- (5) Off-support trace tendsto: `(cfc (rpowCutoffErr gamma s) A_x).trace.re -> 0`
+  -- (5) Off-support trace tendsto: `(cfc (rpowCutoffErr gamma s) A_x).trace.re → 0`
   -- (Step 3b + linchpin 2: `cfc (rpowCutoffErr gamma s) A = 0`).
   have herrTrace : Filter.Tendsto (fun x =>
-      (cfc (rpowCutoffErr γ s) (rhoF x).marginalA.matrix).trace.re) l (nhds 0) := by
+      (cfc (rpowCutoffErr γ s) (rhoF x).traceRight.m).trace.re) l (nhds 0) := by
     have hstep := cMatrix_cfc_rpowCutoffErr_trace_re_tendsto_of_tendsto_posSemidef
       hγ h2s1_pos hs_le hAmarg hAx_psd hA0_psd
     rw [cfc_rpowCutoffErr_eq_zero_of_spectralGap hA0_psd hγ hgap] at hstep
@@ -3456,19 +3261,19 @@ theorem sandwichedRenyiReferenceInner_rpow_trace_re_tendsto_of_tendsto_state
   -- The bound is `‖M_x‖^2 ≤ (Bs*Bs).trace.re * (cfc (rpowCutoffErr gamma s) A_x).trace.re`,
   -- and the RHS tends to `(Bs*Bs).trace.re * 0 = 0`.
   have herrNorm : Filter.Tendsto (fun x =>
-      Matrix.kronecker (CFC.rpow (rhoF x).marginalA.matrix s -
-        cfc (rpowCutoff γ s) (rhoF x).marginalA.matrix) Bs * (rhoF x).sqrtMatrix) l
+      Matrix.kronecker (CFC.rpow (rhoF x).traceRight.m s -
+        cfc (rpowCutoff γ s) (rhoF x).traceRight.m) Bs * (rhoF x).sqrtMatrix) l
       (nhds 0) := by
     -- Per-element squared-norm bound.
     have hSq_bound : ∀ x : X,
-        ‖Matrix.kronecker (CFC.rpow (rhoF x).marginalA.matrix s -
-          cfc (rpowCutoff γ s) (rhoF x).marginalA.matrix) Bs * (rhoF x).sqrtMatrix‖^2 ≤
-          (Bs * Bs).trace.re * (cfc (rpowCutoffErr γ s) (rhoF x).marginalA.matrix).trace.re := by
+        ‖Matrix.kronecker (CFC.rpow (rhoF x).traceRight.m s -
+          cfc (rpowCutoff γ s) (rhoF x).traceRight.m) Bs * (rhoF x).sqrtMatrix‖^2 ≤
+          (Bs * Bs).trace.re * (cfc (rpowCutoffErr γ s) (rhoF x).traceRight.m).trace.re := by
       intro x
-      set Ax : CMatrix a := (rhoF x).marginalA.matrix with hAx_def
+      set Ax : CMatrix a := (rhoF x).traceRight.m with hAx_def
       set Cut : CMatrix a := cfc (rpowCutoff γ s) Ax with hCut_def
       set E : CMatrix a := CFC.rpow Ax s - Cut with hE_def
-      have hAx_psd : Ax.PosSemidef := (rhoF x).marginalA.pos
+      have hAx_psd : Ax.PosSemidef := (rhoF x).traceRight.psd
       have hAxrpow_herm : (CFC.rpow Ax s).IsHermitian :=
         (cMatrix_rpow_posSemidef hAx_psd).isHermitian
       have hCut_herm : Cut.IsHermitian :=
@@ -3513,25 +3318,25 @@ theorem sandwichedRenyiReferenceInner_rpow_trace_re_tendsto_of_tendsto_state
         _ ≤ (Bs * Bs).trace.re * (cfc (rpowCutoffErr γ s) Ax).trace.re := by
             apply mul_le_mul_of_nonneg_left _ (Matrix.PosSemidef.trace_nonneg hBsBs_psd).1
             rw [Matrix.trace_mul_comm, ← hErr]
-    -- Squeeze `‖M_x‖ -> 0` from `‖M_x‖^2 ≤ bound_x` and `bound_x -> 0`.
+    -- Squeeze `‖M_x‖ → 0` from `‖M_x‖^2 ≤ bound_x` and `bound_x → 0`.
     set bound : X → ℝ := fun x =>
-      (Bs * Bs).trace.re * (cfc (rpowCutoffErr γ s) (rhoF x).marginalA.matrix).trace.re
+      (Bs * Bs).trace.re * (cfc (rpowCutoffErr γ s) (rhoF x).traceRight.m).trace.re
     have hbound_tendsto : Filter.Tendsto bound l (nhds 0) := by
       have h := Tendsto.mul (tendsto_const_nhds (x := (Bs * Bs).trace.re)) herrTrace
       rwa [mul_zero] at h
     have hSq_tendsto : Filter.Tendsto (fun x =>
-        ‖Matrix.kronecker (CFC.rpow (rhoF x).marginalA.matrix s -
-          cfc (rpowCutoff γ s) (rhoF x).marginalA.matrix) Bs * (rhoF x).sqrtMatrix‖^2) l
+        ‖Matrix.kronecker (CFC.rpow (rhoF x).traceRight.m s -
+          cfc (rpowCutoff γ s) (rhoF x).traceRight.m) Bs * (rhoF x).sqrtMatrix‖^2) l
         (nhds 0) := by
       refine tendsto_of_tendsto_of_tendsto_of_le_of_le tendsto_const_nhds hbound_tendsto
         (fun _ => pow_nonneg (norm_nonneg _) 2) (fun x => hSq_bound x)
     have hnorm : Filter.Tendsto (fun x =>
-        ‖Matrix.kronecker (CFC.rpow (rhoF x).marginalA.matrix s -
-          cfc (rpowCutoff γ s) (rhoF x).marginalA.matrix) Bs * (rhoF x).sqrtMatrix‖) l
+        ‖Matrix.kronecker (CFC.rpow (rhoF x).traceRight.m s -
+          cfc (rpowCutoff γ s) (rhoF x).traceRight.m) Bs * (rhoF x).sqrtMatrix‖) l
         (nhds 0) := by
       have h2 : Filter.Tendsto (fun x =>
-          Real.sqrt (‖Matrix.kronecker (CFC.rpow (rhoF x).marginalA.matrix s -
-            cfc (rpowCutoff γ s) (rhoF x).marginalA.matrix) Bs * (rhoF x).sqrtMatrix‖ ^ 2)) l
+          Real.sqrt (‖Matrix.kronecker (CFC.rpow (rhoF x).traceRight.m s -
+            cfc (rpowCutoff γ s) (rhoF x).traceRight.m) Bs * (rhoF x).sqrtMatrix‖ ^ 2)) l
           (nhds 0) := by
         have h := (Real.continuous_sqrt.tendsto 0).comp hSq_tendsto
         rwa [show (nhds (Real.sqrt 0) : Filter ℝ) = nhds 0 from by rw [Real.sqrt_zero]] at h
@@ -3539,116 +3344,116 @@ theorem sandwichedRenyiReferenceInner_rpow_trace_re_tendsto_of_tendsto_state
       filter_upwards with x
       exact Real.sqrt_sq (norm_nonneg _)
     exact tendsto_iff_norm_sub_tendsto_zero.mpr (by simpa only [sub_zero] using hnorm)
-  -- (8) On-support matrix tendsto: `(Cut_x ⊗ Bs) * sqrtMatrix_x -> (A^s ⊗ Bs) * sqrtMatrix`.
+  -- (8) On-support matrix tendsto: `(Cut_x ⊗ Bs) * sqrtMatrix_x → (A^s ⊗ Bs) * sqrtMatrix`.
   have hOn : Filter.Tendsto (fun x =>
-      Matrix.kronecker (cfc (rpowCutoff γ s) (rhoF x).marginalA.matrix) Bs *
+      Matrix.kronecker (cfc (rpowCutoff γ s) (rhoF x).traceRight.m) Bs *
         (rhoF x).sqrtMatrix) l
-    (nhds (Matrix.kronecker (CFC.rpow rho.marginalA.matrix s) Bs * rho.sqrtMatrix)) :=
+    (nhds (Matrix.kronecker (CFC.rpow rho.traceRight.m s) Bs * rho.sqrtMatrix)) :=
     (hKronCont.tendsto _).comp hCut |>.mul hsqrt
-  -- (9) T_x -> T: full matrix T_x = CFC.rpow (kronecker A_x sigmaB.matrix) s * sqrtMatrix_x
-  -- tends to T = CFC.rpow (kronecker A sigmaB.matrix) s * rho.sqrtMatrix, via
+  -- (9) T_x → T: full matrix T_x = CFC.rpow (kronecker A_x sigmaB.m) s * sqrtMatrix_x
+  -- tends to T = CFC.rpow (kronecker A sigmaB.m) s * rho.sqrtMatrix, via
   -- the kron-rpow identity, decomposing `CFC.rpow A_x s = Cut_x + E_x`, and
   -- `Tendsto.add hOn herrNorm`.
   have hTx : Filter.Tendsto (fun x =>
-      CFC.rpow (Matrix.kronecker (rhoF x).marginalA.matrix sigmaB.matrix) s *
+      CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s *
         (rhoF x).sqrtMatrix) l
-    (nhds (CFC.rpow (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix) s *
+    (nhds (CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s *
       rho.sqrtMatrix)) := by
     have hkron_x : ∀ x,
-        CFC.rpow (Matrix.kronecker (rhoF x).marginalA.matrix sigmaB.matrix) s =
-          Matrix.kronecker (CFC.rpow (rhoF x).marginalA.matrix s) Bs := fun x =>
-      cMatrix_rpow_kronecker_psd ((rhoF x).marginalA.pos) hsigmaB.posSemidef s
+        CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s =
+          Matrix.kronecker (CFC.rpow (rhoF x).traceRight.m s) Bs := fun x =>
+      cMatrix_rpow_kronecker ((rhoF x).traceRight.psd) hsigmaB.posSemidef s
     have hkron_lim :
-        CFC.rpow (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix) s =
-          Matrix.kronecker (CFC.rpow rho.marginalA.matrix s) Bs :=
-      cMatrix_rpow_kronecker_psd rho.marginalA.pos hsigmaB.posSemidef s
+        CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s =
+          Matrix.kronecker (CFC.rpow rho.traceRight.m s) Bs :=
+      cMatrix_rpow_kronecker rho.traceRight.psd hsigmaB.posSemidef s
     rw [hkron_lim]
     have hTx_kron : Filter.Tendsto (fun x =>
-        Matrix.kronecker (CFC.rpow (rhoF x).marginalA.matrix s) Bs *
+        Matrix.kronecker (CFC.rpow (rhoF x).traceRight.m s) Bs *
           (rhoF x).sqrtMatrix) l
-      (nhds (Matrix.kronecker (CFC.rpow rho.marginalA.matrix s) Bs * rho.sqrtMatrix)) := by
+      (nhds (Matrix.kronecker (CFC.rpow rho.traceRight.m s) Bs * rho.sqrtMatrix)) := by
       have hsum := hOn.add herrNorm
       rw [add_zero] at hsum
       refine hsum.congr' ?_
       filter_upwards with x
-      have hK : (cfc (rpowCutoff γ s) (rhoF x).marginalA.matrix +
-          (CFC.rpow (rhoF x).marginalA.matrix s -
-            cfc (rpowCutoff γ s) (rhoF x).marginalA.matrix)).kronecker Bs =
-          (cfc (rpowCutoff γ s) (rhoF x).marginalA.matrix).kronecker Bs +
-          Matrix.kronecker (CFC.rpow (rhoF x).marginalA.matrix s -
-            cfc (rpowCutoff γ s) (rhoF x).marginalA.matrix) Bs :=
+      have hK : (cfc (rpowCutoff γ s) (rhoF x).traceRight.m +
+          (CFC.rpow (rhoF x).traceRight.m s -
+            cfc (rpowCutoff γ s) (rhoF x).traceRight.m)).kronecker Bs =
+          (cfc (rpowCutoff γ s) (rhoF x).traceRight.m).kronecker Bs +
+          Matrix.kronecker (CFC.rpow (rhoF x).traceRight.m s -
+            cfc (rpowCutoff γ s) (rhoF x).traceRight.m) Bs :=
         Matrix.add_kronecker _ _ _
-      have hA : cfc (rpowCutoff γ s) (rhoF x).marginalA.matrix +
-          (CFC.rpow (rhoF x).marginalA.matrix s -
-            cfc (rpowCutoff γ s) (rhoF x).marginalA.matrix) =
-          CFC.rpow (rhoF x).marginalA.matrix s := by
+      have hA : cfc (rpowCutoff γ s) (rhoF x).traceRight.m +
+          (CFC.rpow (rhoF x).traceRight.m s -
+            cfc (rpowCutoff γ s) (rhoF x).traceRight.m) =
+          CFC.rpow (rhoF x).traceRight.m s := by
         rw [add_comm, sub_add_cancel]
       rw [← Matrix.add_mul, ← hK, hA]
     refine hTx_kron.congr' ?_
     filter_upwards with x
     rw [hkron_x]
-  -- (10) inner_x -> inner: `inner_x = T_x * star T_x` (Hermitian factors, sqrt square).
+  -- (10) inner_x → inner: `inner_x = T_x * star T_x` (Hermitian factors, sqrt square).
   have hinner : Filter.Tendsto (fun x =>
       sandwichedRenyiReferenceInner (rhoF x)
-        (Matrix.kronecker (rhoF x).marginalA.matrix sigmaB.matrix) α) l
+        (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) α) l
     (nhds (sandwichedRenyiReferenceInner rho
-      (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix) α)) := by
+      (Matrix.kronecker rho.traceRight.m sigmaB.m) α)) := by
     have hCx_herm : ∀ x,
-        (CFC.rpow (Matrix.kronecker (rhoF x).marginalA.matrix sigmaB.matrix) s).IsHermitian :=
+        (CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s).IsHermitian :=
       fun x =>
         (cMatrix_rpow_posSemidef
-          (Matrix.PosSemidef.kronecker (rhoF x).marginalA.pos hsigmaB.posSemidef)).isHermitian
+          (Matrix.PosSemidef.kronecker (rhoF x).traceRight.psd hsigmaB.posSemidef)).isHermitian
     have hC0_herm :
-        (CFC.rpow (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix) s).IsHermitian :=
+        (CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s).IsHermitian :=
       (cMatrix_rpow_posSemidef
-        (Matrix.PosSemidef.kronecker rho.marginalA.pos hsigmaB.posSemidef)).isHermitian
+        (Matrix.PosSemidef.kronecker rho.traceRight.psd hsigmaB.posSemidef)).isHermitian
     have hinner_eq : ∀ x,
         sandwichedRenyiReferenceInner (rhoF x)
-          (Matrix.kronecker (rhoF x).marginalA.matrix sigmaB.matrix) α =
-        (CFC.rpow (Matrix.kronecker (rhoF x).marginalA.matrix sigmaB.matrix) s *
+          (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) α =
+        (CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s *
           (rhoF x).sqrtMatrix) *
-        star (CFC.rpow (Matrix.kronecker (rhoF x).marginalA.matrix sigmaB.matrix) s *
+        star (CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s *
           (rhoF x).sqrtMatrix) := by
       intro x
-      show CFC.rpow (Matrix.kronecker (rhoF x).marginalA.matrix sigmaB.matrix) s *
-            (rhoF x).matrix *
-          CFC.rpow (Matrix.kronecker (rhoF x).marginalA.matrix sigmaB.matrix) s =
-        (CFC.rpow (Matrix.kronecker (rhoF x).marginalA.matrix sigmaB.matrix) s *
+      show CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s *
+            (rhoF x).m *
+          CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s =
+        (CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s *
           (rhoF x).sqrtMatrix) *
-        star (CFC.rpow (Matrix.kronecker (rhoF x).marginalA.matrix sigmaB.matrix) s *
+        star (CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s *
           (rhoF x).sqrtMatrix)
-      rw [show (rhoF x).matrix = (rhoF x).sqrtMatrix * (rhoF x).sqrtMatrix from
+      rw [show (rhoF x).m = (rhoF x).sqrtMatrix * (rhoF x).sqrtMatrix from
         (rhoF x).sqrtMatrix_mul_self.symm]
       have hstar_eq : star
-          (CFC.rpow (Matrix.kronecker (rhoF x).marginalA.matrix sigmaB.matrix) s *
+          (CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s *
             (rhoF x).sqrtMatrix) =
           (rhoF x).sqrtMatrix *
-            CFC.rpow (Matrix.kronecker (rhoF x).marginalA.matrix sigmaB.matrix) s := by
+            CFC.rpow (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) s := by
         rw [Matrix.star_eq_conjTranspose, Matrix.conjTranspose_mul]
         simp only [(rhoF x).sqrtMatrix_isHermitian.eq, (hCx_herm x).eq]
       rw [hstar_eq]
       noncomm_ring
     have hinner_eq_lim :
         sandwichedRenyiReferenceInner rho
-          (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix) α =
-        (CFC.rpow (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix) s *
+          (Matrix.kronecker rho.traceRight.m sigmaB.m) α =
+        (CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s *
           rho.sqrtMatrix) *
-        star (CFC.rpow (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix) s *
+        star (CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s *
           rho.sqrtMatrix) := by
-      show CFC.rpow (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix) s *
-            rho.matrix *
-          CFC.rpow (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix) s =
-        (CFC.rpow (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix) s *
+      show CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s *
+            rho.m *
+          CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s =
+        (CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s *
           rho.sqrtMatrix) *
-        star (CFC.rpow (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix) s *
+        star (CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s *
           rho.sqrtMatrix)
-      rw [show rho.matrix = rho.sqrtMatrix * rho.sqrtMatrix from
+      rw [show rho.m = rho.sqrtMatrix * rho.sqrtMatrix from
         rho.sqrtMatrix_mul_self.symm]
       have hstar_eq : star
-          (CFC.rpow (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix) s *
+          (CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s *
             rho.sqrtMatrix) =
           rho.sqrtMatrix *
-            CFC.rpow (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix) s := by
+            CFC.rpow (Matrix.kronecker rho.traceRight.m sigmaB.m) s := by
         rw [Matrix.star_eq_conjTranspose, Matrix.conjTranspose_mul]
         simp only [rho.sqrtMatrix_isHermitian.eq, hC0_herm.eq]
       rw [hstar_eq]
@@ -3661,57 +3466,28 @@ theorem sandwichedRenyiReferenceInner_rpow_trace_re_tendsto_of_tendsto_state
   -- Schatten PSD trace-power continuity at positive `alpha`.
   have hinner_psd : ∀ᶠ x in l,
       (sandwichedRenyiReferenceInner (rhoF x)
-        (Matrix.kronecker (rhoF x).marginalA.matrix sigmaB.matrix) α).PosSemidef :=
+        (Matrix.kronecker (rhoF x).traceRight.m sigmaB.m) α).PosSemidef :=
     Filter.Eventually.of_forall fun x =>
       sandwichedRenyiReferenceInner_posSemidef (rhoF x)
-        (Matrix.PosSemidef.kronecker (rhoF x).marginalA.pos hsigmaB.posSemidef) α
+        (Matrix.PosSemidef.kronecker (rhoF x).traceRight.psd hsigmaB.posSemidef) α
   have hinner_lim_psd :
       (sandwichedRenyiReferenceInner rho
-        (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix) α).PosSemidef :=
+        (Matrix.kronecker rho.traceRight.m sigmaB.m) α).PosSemidef :=
     sandwichedRenyiReferenceInner_posSemidef rho
-      (Matrix.PosSemidef.kronecker rho.marginalA.pos hsigmaB.posSemidef) α
+      (Matrix.PosSemidef.kronecker rho.traceRight.psd hsigmaB.posSemidef) α
   exact cMatrix_rpow_trace_re_tendsto_of_tendsto_posSemidef
     hα_pos hinner hinner_psd hinner_lim_psd
-
-/-- Local copy of `Matrix.Supports.kronecker_right_of_posDef` (which lives in
-the downstream `EntanglementAssistedSandwichedAdditivity` module and so cannot
-be imported here): a positive-definite right tensor factor can be substituted
-into the right-hand side of support domination without losing the support
-relation. -/
-private lemma supports_kronecker_right_of_posDef_local
-    {a : Type*} [Fintype a] [DecidableEq a]
-    {b : Type*} [Fintype b] [DecidableEq b]
-    (A : CMatrix a) (B C : CMatrix b) (hC : C.PosDef) :
-    Matrix.Supports (Matrix.kronecker A B) (Matrix.kronecker A C) := by
-  let L : CMatrix (Prod a b) := Matrix.kronecker (1 : CMatrix a) (B * C⁻¹)
-  have hCdet : IsUnit C.det := (Matrix.isUnit_iff_isUnit_det C).mp hC.isUnit
-  have hleft : C⁻¹ * C = (1 : CMatrix b) := Matrix.nonsing_inv_mul C hCdet
-  have hfactor : Matrix.kronecker A B = L * Matrix.kronecker A C := by
-    calc Matrix.kronecker A B =
-        Matrix.kronecker (A * (1 : CMatrix a)) (B * (1 : CMatrix b)) := by simp
-      _ = Matrix.kronecker (A * (1 : CMatrix a)) (B * (C⁻¹ * C)) := by rw [hleft]
-      _ = Matrix.kronecker ((1 : CMatrix a) * A) ((B * C⁻¹) * C) := by
-        simp [Matrix.mul_assoc]
-      _ = L * Matrix.kronecker A C := by
-        simpa [L, Matrix.kronecker] using
-          (Matrix.mul_kronecker_mul (1 : CMatrix a) A (B * C⁻¹) C)
-  intro v hv
-  calc Matrix.mulVec (Matrix.kronecker A B) v
-      = Matrix.mulVec (L * Matrix.kronecker A C) v := by rw [hfactor]
-    _ = Matrix.mulVec L (Matrix.mulVec (Matrix.kronecker A C) v) := by
-        rw [Matrix.mulVec_mulVec]
-    _ = 0 := by rw [hv]; simp
 
 lemma CMatrix.exists_minPositiveSpectralValue
     {a : Type*} [Fintype a] [DecidableEq a]
     {A : CMatrix a} (hA : A.PosSemidef) (htr_pos : 0 < A.trace.re) :
     ∃ (γ : ℝ≥0), 0 < γ ∧
-      ∀ μ ∈ spectrum ℝ≥0 A, μ ≠ 0 → γ ≤ μ := by
+      ∀ μ ∈ _root_.spectrum ℝ≥0 A, μ ≠ 0 → γ ≤ μ := by
   rcases CMatrix.exists_minPositiveEigenvalue hA htr_pos with ⟨γ, hγ_pos, hgap_eig⟩
   refine ⟨γ, hγ_pos, ?_⟩
   intro μ hμ_spec hμ_ne
   have hA_nnneg : 0 ≤ A := Matrix.nonneg_iff_posSemidef.mpr hA
-  have hμ_real_spec : (μ : ℝ) ∈ spectrum ℝ A :=
+  have hμ_real_spec : (μ : ℝ) ∈ _root_.spectrum ℝ A :=
     (coe_mem_spectrum_real_of_nonneg (a := A) hA_nnneg).mpr hμ_spec
   rw [hA.isHermitian.spectrum_real_eq_range_eigenvalues] at hμ_real_spec
   obtain ⟨i, hi⟩ := hμ_real_spec
@@ -3730,15 +3506,15 @@ positive-definite side state `sigmaB`, the
 `sandwichedRenyiMutualInformationCandidateE sigmaB alpha` curve is upper
 semicontinuous on `Set.univ` for `1 < alpha`.
 
-At every bipartite state `rho`, the left marginal `rho.marginalA.matrix`
+At every bipartite state `rho`, the left marginal `rho.traceRight.m`
 carries a strictly positive `ℝ≥0`-spectral gap `gamma`
 (`CMatrix.exists_minPositiveSpectralValue`), so the Step 4b+5 reference-trace
 tendsto `sandwichedRenyiReferenceInner_rpow_trace_re_tendsto_of_tendsto_state`
-fires along any `rhoF -> rho`. The KW support convention
-`Matrix.Supports rho.matrix (rho.marginalA.prod sigmaB).matrix` holds at every
-state because the right tensor factor `sigmaB.matrix` is positive definite,
+fires along any `rhoF → rho`. The KW support convention
+`Matrix.Supports rho.m (rho.traceRight.prod sigmaB).m` holds at every
+state because the right tensor factor `sigmaB.m` is positive definite,
 discharging it via `Matrix.Supports.kronecker_right_of_posDef` on top of
-`State.matrix_supports_prod_marginals`; this pins the high-`alpha` PSD-reference
+`MState.matrix_supports_prod_marginals`; this pins the high-`alpha` PSD-reference
 candidate at every state to its finite power-trace branch
 (`sandwichedRenyiPSDReferenceHighAlphaE_eq_coe_of_supports`). Composing the
 trace-power tendsto with `log2` (continuous at the strictly positive limit
@@ -3748,53 +3524,56 @@ scalar `1/(alpha-1)` gives `ContinuousAt` at `rho`; pointwise continuity on
 `..._upperSemicontinuousOn_posDefMarginalA` is thereby removed; faithful to KW
 (cited `ψ`-continuity, no `alpha`-dependent unit-ball shortcut, no `hposA`). -/
 theorem sandwichedRenyiMutualInformationCandidateE_upperSemicontinuousOn
-    (sigmaB : State b) (hsigmaB : sigmaB.matrix.PosDef)
-    {alpha : Real} (halpha : 1 < alpha) :
+    (sigmaB : MState b) (hsigmaB : sigmaB.m.PosDef)
+    {alpha : ℝ} (halpha : 1 < alpha) :
     UpperSemicontinuousOn
-      (fun rho : State (Prod a b) =>
+      (fun rho : MState (a × b) =>
         rho.sandwichedRenyiMutualInformationCandidateE sigmaB alpha)
       Set.univ := by
   intro rho _hrho
-  -- (1) Spectral gap `gamma` of `rho.marginalA.matrix` (free at any state).
-  have hmargA_trace_pos : 0 < rho.marginalA.matrix.trace.re := by
-    have htr := rho.marginalA.trace_eq_one
+  -- (1) Spectral gap `gamma` of `rho.traceRight.m` (free at any state).
+  have hmargA_trace_pos : 0 < rho.traceRight.m.trace.re := by
+    have htr := rho.traceRight.tr'
     rw [htr]
     exact zero_lt_one
   obtain ⟨γ, hγ_pos, hgap⟩ :=
-    CMatrix.exists_minPositiveSpectralValue rho.marginalA.pos hmargA_trace_pos
+    CMatrix.exists_minPositiveSpectralValue rho.traceRight.psd hmargA_trace_pos
   -- (2) The KW support convention holds at every state (`sigmaB` is full rank).
-  have hsupports : ∀ (rho' : State (Prod a b)),
-      Matrix.Supports rho'.matrix (rho'.marginalA.prod sigmaB).matrix := by
+  have hsupports : ∀ (rho' : MState (a × b)),
+      Matrix.Supports rho'.m (rho'.traceRight.prod sigmaB).m := by
     intro rho'
-    rw [State.prod_matrix_kronecker]
-    exact Matrix.Supports.trans rho'.matrix_supports_prod_marginals
-      (supports_kronecker_right_of_posDef_local
-        rho'.marginalA.matrix rho'.marginalB.matrix sigmaB.matrix hsigmaB)
+    rw [MState.prod_m]
+    have hmarg := rho'.matrix_supports_prod_marginals
+    rw [MState.prod_m] at hmarg
+    exact Matrix.Supports.trans hmarg
+      (Matrix.Supports.kronecker_right_of_posDef
+        rho'.traceRight.m rho'.traceLeft.m sigmaB.m hsigmaB)
   have hα_pos : 0 < alpha := lt_trans zero_lt_one halpha
   -- (3) Step 4b+5 trace-power tendsto along the identity filter `nhds rho`.
   have htpow :
       Filter.Tendsto (fun rho' =>
         (CFC.rpow (sandwichedRenyiReferenceInner rho'
-          (Matrix.kronecker rho'.marginalA.matrix sigmaB.matrix) alpha) alpha).trace.re)
+          (Matrix.kronecker rho'.traceRight.m sigmaB.m) alpha) alpha).trace.re)
         (nhds rho)
         (nhds (CFC.rpow (sandwichedRenyiReferenceInner rho
-          (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix) alpha) alpha).trace.re) :=
+          (Matrix.kronecker rho.traceRight.m sigmaB.m) alpha) alpha).trace.re) :=
     sandwichedRenyiReferenceInner_rpow_trace_re_tendsto_of_tendsto_state
-      (rhoF := fun rho' : State (Prod a b) => rho') tendsto_id halpha hγ_pos hgap
+      (rhoF := fun rho' : MState (a × b) => rho') tendsto_id halpha hγ_pos hgap
       sigmaB hsigmaB
   -- (4) Limit trace positivity (supports holds at `rho`).
-  have hkr_psd : (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix).PosSemidef :=
-    Matrix.PosSemidef.kronecker rho.marginalA.pos hsigmaB.posSemidef
+  have hkr_psd : (Matrix.kronecker rho.traceRight.m sigmaB.m).PosSemidef :=
+    Matrix.PosSemidef.kronecker rho.traceRight.psd hsigmaB.posSemidef
   have htpow_pos :
       0 < (CFC.rpow (sandwichedRenyiReferenceInner rho
-        (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix) alpha) alpha).trace.re := by
-    have := sandwichedRenyiReferenceInner_psdTracePower_pos_of_supports rho
-      hkr_psd (hsupports rho) alpha
-    exact this
+        (Matrix.kronecker rho.traceRight.m sigmaB.m) alpha) alpha).trace.re := by
+    have hsup := hsupports rho
+    rw [MState.prod_m] at hsup
+    exact sandwichedRenyiReferenceInner_psdTracePower_pos_of_supports rho
+      hkr_psd hsup alpha
   -- (5) Compose with `log2` (continuous at the strictly positive limit trace).
   have hlog2_cont : ContinuousAt (fun y : ℝ => log2 y)
       (CFC.rpow (sandwichedRenyiReferenceInner rho
-        (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix) alpha) alpha).trace.re := by
+        (Matrix.kronecker rho.traceRight.m sigmaB.m) alpha) alpha).trace.re := by
     unfold log2
     refine ContinuousAt.div ?_ continuousAt_const ?_
     · exact Real.continuousAt_log htpow_pos.ne'
@@ -3802,40 +3581,40 @@ theorem sandwichedRenyiMutualInformationCandidateE_upperSemicontinuousOn
   have hlog2_tendsto :
       Filter.Tendsto (fun rho' =>
         log2 ((CFC.rpow (sandwichedRenyiReferenceInner rho'
-          (Matrix.kronecker rho'.marginalA.matrix sigmaB.matrix) alpha) alpha).trace.re))
+          (Matrix.kronecker rho'.traceRight.m sigmaB.m) alpha) alpha).trace.re))
         (nhds rho)
         (nhds (log2 ((CFC.rpow (sandwichedRenyiReferenceInner rho
-          (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix) alpha) alpha).trace.re))) :=
+          (Matrix.kronecker rho.traceRight.m sigmaB.m) alpha) alpha).trace.re))) :=
     hlog2_cont.tendsto.comp htpow
   -- (6) Scalar multiplication by `1/(alpha-1)` is continuous.
   have hmul_tendsto :
       Filter.Tendsto (fun rho' =>
         (1 / (alpha - 1)) *
           log2 ((CFC.rpow (sandwichedRenyiReferenceInner rho'
-            (Matrix.kronecker rho'.marginalA.matrix sigmaB.matrix) alpha) alpha).trace.re))
+            (Matrix.kronecker rho'.traceRight.m sigmaB.m) alpha) alpha).trace.re))
         (nhds rho)
         (nhds ((1 / (alpha - 1)) *
           log2 ((CFC.rpow (sandwichedRenyiReferenceInner rho
-            (Matrix.kronecker rho.marginalA.matrix sigmaB.matrix) alpha) alpha).trace.re))) :=
+            (Matrix.kronecker rho.traceRight.m sigmaB.m) alpha) alpha).trace.re))) :=
     (continuous_const_mul _).tendsto _ |>.comp hlog2_tendsto
   -- (7) Real-valued finite-branch tendsto: unfold the finite definition to the
   -- scalar-`log2` form and discharge with `hmul_tendsto`.
   have hfinite_real_tendsto :
       Filter.Tendsto (fun rho' =>
         sandwichedRenyiPSDReferenceHighAlphaFinite rho'
-          (rho'.marginalA.prod sigmaB).matrix (rho'.marginalA.prod sigmaB).pos alpha)
+          (rho'.traceRight.prod sigmaB).m (rho'.traceRight.prod sigmaB).psd alpha)
         (nhds rho)
         (nhds (sandwichedRenyiPSDReferenceHighAlphaFinite rho
-          (rho.marginalA.prod sigmaB).matrix (rho.marginalA.prod sigmaB).pos alpha)) := by
-    simp only [sandwichedRenyiPSDReferenceHighAlphaFinite, State.prod_matrix_kronecker,
+          (rho.traceRight.prod sigmaB).m (rho.traceRight.prod sigmaB).psd alpha)) := by
+    simp only [sandwichedRenyiPSDReferenceHighAlphaFinite, MState.prod_m,
       psdTracePower_eq]
     exact hmul_tendsto
   -- (8) The candidate equals the coe of the real finite branch at every state
   -- (high-`alpha` branch, supports holds everywhere via `sigmaB` full rank).
-  have hcand_eq_finE : ∀ (rho' : State (Prod a b)),
+  have hcand_eq_finE : ∀ (rho' : MState (a × b)),
       rho'.sandwichedRenyiMutualInformationCandidateE sigmaB alpha =
         (sandwichedRenyiPSDReferenceHighAlphaFinite rho'
-          (rho'.marginalA.prod sigmaB).matrix (rho'.marginalA.prod sigmaB).pos alpha : EReal) := by
+          (rho'.traceRight.prod sigmaB).m (rho'.traceRight.prod sigmaB).psd alpha : EReal) := by
     intro rho'
     rw [sandwichedRenyiMutualInformationCandidateE_eq,
       sandwichedRenyiPSDReferenceE_eq_highAlphaE_of_one_lt _ _ halpha,
@@ -3844,14 +3623,14 @@ theorem sandwichedRenyiMutualInformationCandidateE_upperSemicontinuousOn
   have hfiniteE_tendsto :
       Filter.Tendsto (fun rho' =>
         (sandwichedRenyiPSDReferenceHighAlphaFinite rho'
-          (rho'.marginalA.prod sigmaB).matrix (rho'.marginalA.prod sigmaB).pos alpha : EReal))
+          (rho'.traceRight.prod sigmaB).m (rho'.traceRight.prod sigmaB).psd alpha : EReal))
         (nhds rho)
         (nhds (sandwichedRenyiPSDReferenceHighAlphaFinite rho
-          (rho.marginalA.prod sigmaB).matrix (rho.marginalA.prod sigmaB).pos alpha : EReal)) :=
+          (rho.traceRight.prod sigmaB).m (rho.traceRight.prod sigmaB).psd alpha : EReal)) :=
     EReal.tendsto_coe.mpr hfinite_real_tendsto
   have hcand_tendsto :
       Filter.Tendsto
-        (fun rho' : State (Prod a b) =>
+        (fun rho' : MState (a × b) =>
           rho'.sandwichedRenyiMutualInformationCandidateE sigmaB alpha)
         (nhds rho)
         (nhds (rho.sandwichedRenyiMutualInformationCandidateE sigmaB alpha)) := by
@@ -3861,7 +3640,7 @@ theorem sandwichedRenyiMutualInformationCandidateE_upperSemicontinuousOn
   -- (10) `ContinuousAt` at `rho` implies USC-within at `rho`.
   have hcontAt :
       ContinuousAt
-        (fun rho' : State (Prod a b) =>
+        (fun rho' : MState (a × b) =>
           rho'.sandwichedRenyiMutualInformationCandidateE sigmaB alpha)
         rho := hcand_tendsto
   exact hcontAt.continuousWithinAt.upperSemicontinuousWithinAt
@@ -3877,17 +3656,13 @@ unconditional candidate USC at `Set.univ` from Step 6 supplies USC at every
 subset via `UpperSemicontinuousOn.mono`. Faithful to KW (no `hposA`, no
 `alpha`-dependent unit-ball shortcut). -/
 theorem sandwichedRenyiMutualInformationE_upperSemicontinuousOn
-    {s : Set (State (Prod a b))} {alpha : Real} (halpha : 1 < alpha) :
+    {s : Set (MState (a × b))} {alpha : ℝ} (halpha : 1 < alpha) :
     UpperSemicontinuousOn
-      (fun rho : State (Prod a b) => rho.sandwichedRenyiMutualInformationE alpha)
+      (fun rho : MState (a × b) => rho.sandwichedRenyiMutualInformationE alpha)
       s := by
   exact sandwichedRenyiMutualInformationE_upperSemicontinuousOn_of_posDef_candidate
     halpha fun sigmaB_hpd =>
       (sandwichedRenyiMutualInformationCandidateE_upperSemicontinuousOn
         sigmaB_hpd.1 sigmaB_hpd.2 halpha).mono (Set.subset_univ _)
 
-end State
-
-end
-
-end QIT
+end MState

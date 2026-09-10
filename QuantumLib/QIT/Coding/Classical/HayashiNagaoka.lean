@@ -40,12 +40,6 @@ universe u
 
 noncomputable section
 
--- The Hayashi--Nagaoka argument expands several large matrix expressions
--- (with `ST = R²` substitutions) via `noncomm_ring`; raise the heartbeats
--- limit so these normalizations complete.
-set_option maxHeartbeats 4000000
-
-
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
 /-- Auxiliary: the inverse square root on the support and the square root of a
@@ -194,48 +188,6 @@ theorem psdInvSqrt_mul_psdSqrt_eq_support {M : CMatrix a} (hM : M.PosSemidef) :
     _ = U * Matrix.diagonal (fun i : a =>
           if 0 < hM.isHermitian.eigenvalues i then (1 : ℂ) else 0) * star U := by rw [hDD]
 
-/-- Auxiliary: a positive semidefinite matrix `A` with a zero diagonal entry
-`A i i = 0` has its entire `i`-th row and column equal to zero. From
-`PosSemidef.dotProduct_mulVec_zero_iff`, the quadratic form `eᵢ† A eᵢ = Aᵢᵢ = 0`
-forces `A eᵢ = 0` (zero column), and Hermiticity gives the zero row.
-[Wilde2011Qst, qit-notes.tex:29363-29415] -/
-private lemma PosSemidef.zero_diag_zero_row_col
-    {n : Type u} [Fintype n] [DecidableEq n]
-    {A : Matrix n n ℂ} (hA : A.PosSemidef) {i : n} (hii : A i i = 0) (j : n) :
-    A i j = 0 ∧ A j i = 0 := by
-  -- The `i`-th standard basis vector `eᵢ = Pi.single i 1`.
-  set e : n → ℂ := Pi.single i 1 with he
-  have hei : e i = (1:ℂ) := by rw [he, Pi.single_apply, if_pos rfl]
-  have hek : ∀ k, k ≠ i → e k = 0 := fun k hk => by
-    rw [he, Pi.single_apply, if_neg hk]
-  -- `A *ᵥ eᵢ` is the `i`-th column of `A`.
-  have hmulVec : Matrix.mulVec A e = fun k => A k i := by
-    ext k
-    rw [Matrix.mulVec, dotProduct, Finset.sum_eq_single i]
-    · simp [hei]
-    · intro m _ hm
-      simp [hek m hm]
-    · simp [hei]
-  -- The quadratic form `eᵢ† A eᵢ = Aᵢᵢ = 0` forces `A eᵢ = 0` (zero column).
-  have hform : dotProduct (star e) (Matrix.mulVec A e) = A i i := by
-    rw [hmulVec, dotProduct, Finset.sum_eq_single i]
-    · simp [hei]
-    · intro k _ hk
-      simp [hek k hk]
-    · simp [hei]
-  have hcol : Matrix.mulVec A e = 0 :=
-    (hA.dotProduct_mulVec_zero_iff e).mp (by rw [hform, hii])
-  -- Column `i` is zero: `A j i` is the `j`-th entry of `A *ᵥ eᵢ`.
-  have hji : A j i = 0 := by
-    have h1 : (fun k => A k i) j = 0 := by rw [← hmulVec, hcol]; simp
-    exact h1
-  refine ⟨?_, hji⟩
-  -- Hermiticity: `A i j = (star A) i j = star (A j i) = star 0 = 0`.
-  have hherm : star A = A := hA.isHermitian.eq
-  have hij : A i j = star (A j i) := by
-    rw [show A i j = star A i j from by rw [hherm], Matrix.star_apply A i j]
-  rw [hij, hji, star_zero]
-
 /-- If `X ≤ M` with `M, X` positive semidefinite, the spectral support projector
 `Π = M^{-1/2} M M^{-1/2}` of `M` fixes `X`: `Π X = X` and `X Π = X`. Indeed
 `X`'s range lies inside the support of `M` (since `X ≤ M`): in the eigenbasis of
@@ -293,7 +245,7 @@ private lemma support_proj_fixes_of_le {M X : CMatrix a}
       rw [hsub, hΛii, hi, Complex.ofReal_zero] at hneg
       simpa using hneg
     have hX'ii : X' i i = 0 := le_antisymm hX'le0 hpos
-    exact (PosSemidef.zero_diag_zero_row_col hX'psd hX'ii j).1
+    exact (hX'psd.zero_diag_zero_row_col hX'ii j).1
   -- `(1 - P) * X' = 0` (P masks out the zero-eigenvalue rows).
   have hmask : (1 - P) * X' = 0 := by
     ext i j

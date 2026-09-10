@@ -20,35 +20,34 @@ PSD-reference sandwiched Renyi data-processing theorem.
 open Filter
 open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator UniformConvergence
 
-namespace QIT
-
+noncomputable section
 universe u v
 
-noncomputable section
+open QIT
 
-namespace State
+namespace MState
 
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
 /-- Data processing for the source-limit PSD-reference relative entropy bridge.
 
-This is obtained by taking `limsup` along `alpha -> 1+` in the proved
+This is obtained by taking `limsup` along `alpha → 1+` in the proved
 PSD-reference sandwiched Renyi data-processing theorem. -/
 theorem relativeEntropyPSDReferenceE_dataProcessing_channel_ge
     {b : Type v} [Fintype b] [DecidableEq b]
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (Phi : Channel a b) :
-    relativeEntropyPSDReferenceE rho sigma hSigma >=
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (Phi : CPTPMap a b) :
+    relativeEntropyPSDReferenceE rho sigma hSigma ≥
       relativeEntropyPSDReferenceE
-        (Phi.applyState rho) (Phi.map sigma) (Phi.mapsPositive sigma hSigma) := by
+        (Phi rho) (Phi.map sigma) (Phi.mapsPositive sigma hSigma) := by
   classical
-  by_cases hSupport : Matrix.Supports rho.matrix sigma
+  by_cases hSupport : Matrix.Supports rho.m sigma
   · have hOutSupport :
-        Matrix.Supports (Phi.applyState rho).matrix (Phi.map sigma) :=
+        Matrix.Supports (Phi rho).m (Phi.map sigma) :=
       channel_applyState_supports_of_supports rho hSigma Phi hSupport
     rw [relativeEntropyPSDReferenceE_eq_limsup_of_supports rho hSigma hSupport,
       relativeEntropyPSDReferenceE_eq_limsup_of_supports
-        (Phi.applyState rho) (Phi.mapsPositive sigma hSigma) hOutSupport]
+        (Phi rho) (Phi.mapsPositive sigma hSigma) hOutSupport]
     exact
       Filter.limsup_le_limsup
         (Filter.Eventually.of_forall fun alpha =>
@@ -58,8 +57,4 @@ theorem relativeEntropyPSDReferenceE_dataProcessing_channel_ge
   · rw [relativeEntropyPSDReferenceE_eq_top_of_not_supports rho hSigma hSupport]
     exact le_top
 
-end State
-
-end
-
-end QIT
+end MState

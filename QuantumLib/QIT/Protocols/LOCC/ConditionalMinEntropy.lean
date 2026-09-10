@@ -37,17 +37,17 @@ variable [Fintype m] [DecidableEq m] [Fintype n] [DecidableEq n]
 
 /-- Rectangular Gram matrices have the same unit Loewner bound on their two
 sides.  This is the Schur-complement form of the equal-nonzero-spectrum step
-used for the two marginals of a pure vector in Berta's proof. -/
+used for the two marginals of a ket in Berta's proof. -/
 theorem conjTranspose_mul_self_le_one_iff_self_mul_conjTranspose_le_one
-    (A : Matrix m n Complex) :
-    Matrix.conjTranspose A * A <= (1 : CMatrix n) <->
-      A * Matrix.conjTranspose A <= (1 : CMatrix m) := by
+    (A : Matrix m n ℂ) :
+    Matrix.conjTranspose A * A ≤ (1 : CMatrix n) ↔
+      A * Matrix.conjTranspose A ≤ (1 : CMatrix m) := by
   constructor
   · intro h
     have hblock :
         (Matrix.fromBlocks (1 : CMatrix m) A
           (Matrix.conjTranspose A) (1 : CMatrix n) :
-            CMatrix (Sum m n)).PosSemidef := by
+            CMatrix (m ⊕ n)).PosSemidef := by
       let : Invertible (1 : CMatrix m) := invertibleOne
       apply (Matrix.PosDef.fromBlocks₁₁
         A (1 : CMatrix n) Matrix.PosDef.one).2
@@ -60,7 +60,7 @@ theorem conjTranspose_mul_self_le_one_iff_self_mul_conjTranspose_le_one
     have hblock :
         (Matrix.fromBlocks (1 : CMatrix m) A
           (Matrix.conjTranspose A) (1 : CMatrix n) :
-            CMatrix (Sum m n)).PosSemidef := by
+            CMatrix (m ⊕ n)).PosSemidef := by
       let : Invertible (1 : CMatrix n) := invertibleOne
       apply (Matrix.PosDef.fromBlocks₂₂
         (1 : CMatrix m) A Matrix.PosDef.one).2
@@ -76,12 +76,12 @@ theorem conjTranspose_mul_self_le_one_iff_self_mul_conjTranspose_le_one
 For a rectangular amplitude matrix, a Loewner bound by `c I` can therefore be
 transported between the two complementary Gram matrices. -/
 theorem conjTranspose_mul_self_le_smul_one_iff_self_mul_conjTranspose_le_smul_one
-    (A : Matrix m n Complex) {c : Real} (hc : 0 < c) :
-    Matrix.conjTranspose A * A <= (c : Complex) • (1 : CMatrix n) <->
-      A * Matrix.conjTranspose A <= (c : Complex) • (1 : CMatrix m) := by
-  let Cn : CMatrix n := (c : Complex) • (1 : CMatrix n)
-  let Cm : CMatrix m := (c : Complex) • (1 : CMatrix m)
-  have hcComplex : (0 : Complex) < (c : Complex) := by
+    (A : Matrix m n ℂ) {c : ℝ} (hc : 0 < c) :
+    Matrix.conjTranspose A * A ≤ (c : ℂ) • (1 : CMatrix n) ↔
+      A * Matrix.conjTranspose A ≤ (c : ℂ) • (1 : CMatrix m) := by
+  let Cn : CMatrix n := (c : ℂ) • (1 : CMatrix n)
+  let Cm : CMatrix m := (c : ℂ) • (1 : CMatrix m)
+  have hcComplex : (0 : ℂ) < (c : ℂ) := by
     exact_mod_cast hc
   have hCn : Cn.PosDef := by
     simpa [Cn] using Matrix.PosDef.smul (Matrix.PosDef.one :
@@ -89,21 +89,21 @@ theorem conjTranspose_mul_self_le_smul_one_iff_self_mul_conjTranspose_le_smul_on
   have hCm : Cm.PosDef := by
     simpa [Cm] using Matrix.PosDef.smul (Matrix.PosDef.one :
       (1 : CMatrix m).PosDef) hcComplex
-  have hcne : (c : Complex) ≠ 0 := ne_of_gt hcComplex
-  let : Invertible (c : Complex) := invertibleOfNonzero hcne
-  have hCnInv : Cn⁻¹ = ((c : Complex)⁻¹) • (1 : CMatrix n) := by
+  have hcne : (c : ℂ) ≠ 0 := ne_of_gt hcComplex
+  let : Invertible (c : ℂ) := invertibleOfNonzero hcne
+  have hCnInv : Cn⁻¹ = ((c : ℂ)⁻¹) • (1 : CMatrix n) := by
     have hdet : IsUnit (1 : CMatrix n).det := by simp
     simpa [Cn, invOf_eq_inv] using
-      (Matrix.inv_smul (1 : CMatrix n) (c : Complex) hdet)
-  have hCmInv : Cm⁻¹ = ((c : Complex)⁻¹) • (1 : CMatrix m) := by
+      (Matrix.inv_smul (1 : CMatrix n) (c : ℂ) hdet)
+  have hCmInv : Cm⁻¹ = ((c : ℂ)⁻¹) • (1 : CMatrix m) := by
     have hdet : IsUnit (1 : CMatrix m).det := by simp
     simpa [Cm, invOf_eq_inv] using
-      (Matrix.inv_smul (1 : CMatrix m) (c : Complex) hdet)
+      (Matrix.inv_smul (1 : CMatrix m) (c : ℂ) hdet)
   constructor
   · intro h
     have hblock :
         (Matrix.fromBlocks (1 : CMatrix m) A (Matrix.conjTranspose A) Cn :
-          CMatrix (Sum m n)).PosSemidef := by
+          CMatrix (m ⊕ n)).PosSemidef := by
       let : Invertible (1 : CMatrix m) := invertibleOne
       apply (Matrix.PosDef.fromBlocks₁₁ A Cn Matrix.PosDef.one).2
       simpa [Cn, Matrix.le_iff] using h
@@ -118,7 +118,7 @@ theorem conjTranspose_mul_self_le_smul_one_iff_self_mul_conjTranspose_le_smul_on
   · intro h
     have hblock :
         (Matrix.fromBlocks Cm A (Matrix.conjTranspose A) (1 : CMatrix n) :
-          CMatrix (Sum m n)).PosSemidef := by
+          CMatrix (m ⊕ n)).PosSemidef := by
       let : Invertible (1 : CMatrix n) := invertibleOne
       apply (Matrix.PosDef.fromBlocks₂₂ Cm A Matrix.PosDef.one).2
       simpa [Cm, Matrix.le_iff] using h
@@ -137,28 +137,28 @@ This is the fixed-reference form of Berta's equal-nonzero-spectrum step: the
 bound on the target Gram matrix is equivalent to the corresponding bound on
 the complementary Gram matrix after inserting the inverse reference. -/
 theorem conjTranspose_mul_inv_mul_self_le_smul_one_iff_self_mul_conjTranspose_le_smul
-    (A : Matrix m n Complex) (Q : CMatrix m) (hQ : Q.PosDef)
-    {c : Real} (hc : 0 < c) :
-    Matrix.conjTranspose A * Q⁻¹ * A <=
-        (c : Complex) • (1 : CMatrix n) <->
-      A * Matrix.conjTranspose A <= (c : Complex) • Q := by
-  let Cn : CMatrix n := (c : Complex) • (1 : CMatrix n)
-  have hcComplex : (0 : Complex) < (c : Complex) := by
+    (A : Matrix m n ℂ) (Q : CMatrix m) (hQ : Q.PosDef)
+    {c : ℝ} (hc : 0 < c) :
+    Matrix.conjTranspose A * Q⁻¹ * A ≤
+        (c : ℂ) • (1 : CMatrix n) ↔
+      A * Matrix.conjTranspose A ≤ (c : ℂ) • Q := by
+  let Cn : CMatrix n := (c : ℂ) • (1 : CMatrix n)
+  have hcComplex : (0 : ℂ) < (c : ℂ) := by
     exact_mod_cast hc
   have hCn : Cn.PosDef := by
     simpa [Cn] using Matrix.PosDef.smul (Matrix.PosDef.one :
       (1 : CMatrix n).PosDef) hcComplex
-  have hcne : (c : Complex) ≠ 0 := ne_of_gt hcComplex
-  let : Invertible (c : Complex) := invertibleOfNonzero hcne
-  have hCnInv : Cn⁻¹ = ((c : Complex)⁻¹ • (1 : CMatrix n)) := by
+  have hcne : (c : ℂ) ≠ 0 := ne_of_gt hcComplex
+  let : Invertible (c : ℂ) := invertibleOfNonzero hcne
+  have hCnInv : Cn⁻¹ = ((c : ℂ)⁻¹ • (1 : CMatrix n)) := by
     have hdet : IsUnit (1 : CMatrix n).det := by simp
     simpa [Cn, invOf_eq_inv] using
-      (Matrix.inv_smul (1 : CMatrix n) (c : Complex) hdet)
+      (Matrix.inv_smul (1 : CMatrix n) (c : ℂ) hdet)
   constructor
   · intro h
     have hblock :
         (Matrix.fromBlocks Q A (Matrix.conjTranspose A) Cn :
-          CMatrix (Sum m n)).PosSemidef := by
+          CMatrix (m ⊕ n)).PosSemidef := by
       let : Invertible Q := hQ.isUnit.invertible
       apply (Matrix.PosDef.fromBlocks₁₁ A Cn hQ).2
       simpa [Cn, Matrix.le_iff] using h
@@ -171,22 +171,22 @@ theorem conjTranspose_mul_inv_mul_self_le_smul_one_iff_self_mul_conjTranspose_le
       smul_smul, hcne] using hscaled
   · intro h
     have hdiff :
-        ((c : Complex) • Q - A * Matrix.conjTranspose A).PosSemidef := by
+        ((c : ℂ) • Q - A * Matrix.conjTranspose A).PosSemidef := by
       simpa [Matrix.le_iff] using h
-    have hcInv : (0 : Complex) <= (c : Complex)⁻¹ :=
+    have hcInv : (0 : ℂ) ≤ (c : ℂ)⁻¹ :=
       le_of_lt (inv_pos.mpr hcComplex)
     have hschur :
         (Q - A * Cn⁻¹ * Matrix.conjTranspose A).PosSemidef := by
       have hscaled := hdiff.smul hcInv
       have hcancel :
-          (c : Complex)⁻¹ • ((c : Complex) • Q) = Q := by
+          (c : ℂ)⁻¹ • ((c : ℂ) • Q) = Q := by
         rw [smul_smul, inv_mul_cancel₀ hcne, one_smul]
       rw [smul_sub, hcancel] at hscaled
       rw [hCnInv]
       simpa [Matrix.mul_smul, Matrix.smul_mul] using hscaled
     have hblock :
         (Matrix.fromBlocks Q A (Matrix.conjTranspose A) Cn :
-          CMatrix (Sum m n)).PosSemidef := by
+          CMatrix (m ⊕ n)).PosSemidef := by
       let : Invertible Cn := hCn.isUnit.invertible
       exact (Matrix.PosDef.fromBlocks₂₂ Q A hCn).2 hschur
     let : Invertible Q := hQ.isUnit.invertible
@@ -197,18 +197,18 @@ theorem conjTranspose_mul_inv_mul_self_le_smul_one_iff_self_mul_conjTranspose_le
 small positive scalar regularization. -/
 theorem posSemidef_of_add_pos_smul_one_posSemidef
     (A : CMatrix m) (hA : A.IsHermitian)
-    (hreg : ∀ epsilon : Real, 0 < epsilon ->
-      (A + (epsilon : Complex) • (1 : CMatrix m)).PosSemidef) :
+    (hreg : ∀ epsilon : ℝ, 0 < epsilon →
+      (A + (epsilon : ℂ) • (1 : CMatrix m)).PosSemidef) :
     A.PosSemidef := by
   refine Matrix.PosSemidef.of_dotProduct_mulVec_nonneg hA ?_
   intro z
-  let q : Complex := star z ⬝ᵥ Matrix.mulVec A z
-  let r : Complex := star z ⬝ᵥ z
-  have hr : 0 <= r := by
+  let q : ℂ := star z ⬝ᵥ Matrix.mulVec A z
+  let r : ℂ := star z ⬝ᵥ z
+  have hr : 0 ≤ r := by
     dsimp [r]
     exact dotProduct_star_self_nonneg z
-  have hquad (epsilon : Real) (hepsilon : 0 < epsilon) :
-      0 <= q + (epsilon : Complex) * r := by
+  have hquad (epsilon : ℝ) (hepsilon : 0 < epsilon) :
+      0 ≤ q + (epsilon : ℂ) * r := by
     have h := (hreg epsilon hepsilon).dotProduct_mulVec_nonneg z
     simpa [q, r, Matrix.add_mulVec, Matrix.smul_mulVec,
       Matrix.one_mulVec, dotProduct_add, dotProduct_smul] using h
@@ -216,8 +216,8 @@ theorem posSemidef_of_add_pos_smul_one_posSemidef
   constructor
   · by_contra hqnonneg
     have hqneg : q.re < 0 := lt_of_not_ge hqnonneg
-    have hrre : 0 <= r.re := (Complex.nonneg_iff.mp hr).1
-    let delta : Real := (-q.re) / (2 * (r.re + 1))
+    have hrre : 0 ≤ r.re := (Complex.nonneg_iff.mp hr).1
+    let delta : ℝ := (-q.re) / (2 * (r.re + 1))
     have hdenpos : 0 < 2 * (r.re + 1) := by nlinarith
     have hdeltapos : 0 < delta := by
       exact div_pos (neg_pos.mpr hqneg) hdenpos
@@ -227,7 +227,7 @@ theorem posSemidef_of_add_pos_smul_one_posSemidef
     have hdeltar_lt : delta * r.re < -q.re := by
       nlinarith
     have hdelta := (Complex.nonneg_iff.mp (hquad delta hdeltapos)).1
-    have hdeltaRe : 0 <= q.re + delta * r.re := by
+    have hdeltaRe : 0 ≤ q.re + delta * r.re := by
       simpa [Complex.add_re, Complex.mul_re] using hdelta
     linarith
   · have hOne := (Complex.nonneg_iff.mp (hquad 1 zero_lt_one)).2
@@ -236,16 +236,6 @@ theorem posSemidef_of_add_pos_smul_one_posSemidef
     norm_num at hOne
     linarith
 end Matrix
-
-/-- Regroup `A (R E)` as `(A R) E`, so that tracing out `E` leaves the
-source and untouched reference registers used by the Berta bound. -/
-def sourceReferenceRegroupEquiv
-    (A : Type u) (R : Type v) (E : Type w) :
-    Prod A (Prod R E) ≃ Prod (Prod A R) E where
-  toFun x := ((x.1, x.2.1), x.2.2)
-  invFun x := (x.1.1, (x.1.2, x.2))
-  left_inv := by intro x; rfl
-  right_inv := by intro x; rfl
 
 namespace FiniteInstrument
 
@@ -258,55 +248,55 @@ variable [Fintype X]
 
 /-- The `AR` state before Alice's instrument, obtained from a chosen pure
 extension `psi : A (R E)`. -/
-def sourceReferenceState (psi : PureVector (Prod A (Prod R E))) :
-    State (Prod A R) :=
-  (psi.state.reindex (sourceReferenceRegroupEquiv A R E)).marginalA
+def sourceReferenceState (psi : Ket (A × (R × E))) :
+    MState (A × R) :=
+  (psi.state.reindex (Equiv.prodAssoc A R E).symm).traceRight
 
 /-- The normalized `A'R` state on a positive refined Alice branch.  The
 purifying register `E` is discarded, while the complete Alice outcome/Kraus
 index remains available as the branch index. -/
 def positiveBranchSourceReferenceState
-    (M : FiniteInstrument A A' X) (psi : PureVector (Prod A (Prod R E)))
-    (i : M.positiveSupport psi) : State (Prod A' R) :=
+    (M : FiniteInstrument A A' X) (psi : Ket (A × (R × E)))
+    (i : M.positiveSupport psi) : MState (A' × R) :=
   ((M.normalizedBranch psi i).state.reindex
-    (sourceReferenceRegroupEquiv A' R E)).marginalA
+    (Equiv.prodAssoc A' R E).symm).traceRight
 
 /-- Target-by-purifier amplitude matrix for the pre-instrument `AR` state. -/
-def sourceReferenceAmplitude (psi : PureVector (Prod A (Prod R E))) :
-    Matrix (Prod A R) E Complex :=
-  fun ar e => psi.amp (ar.1, (ar.2, e))
+def sourceReferenceAmplitude (psi : Ket (A × (R × E))) :
+    Matrix (A × R) E ℂ :=
+  fun ar e => psi.vec (ar.1, (ar.2, e))
 
 /-- Target-by-purifier amplitude matrix of one unnormalized refined Alice
 branch. -/
 def branchSourceReferenceAmplitude
-    (M : FiniteInstrument A A' X) (psi : PureVector (Prod A (Prod R E)))
-    (i : M.refinedBranchIndex) : Matrix (Prod A' R) E Complex :=
+    (M : FiniteInstrument A A' X) (psi : Ket (A × (R × E)))
+    (i : M.refinedBranchIndex) : Matrix (A' × R) E ℂ :=
   fun ar e => M.postAmplitude psi i (ar.1, (ar.2, e))
 
 @[simp]
 theorem sourceReferenceState_matrix
-    (psi : PureVector (Prod A (Prod R E))) :
-    (sourceReferenceState psi).matrix =
+    (psi : Ket (A × (R × E))) :
+    (sourceReferenceState psi).m =
       sourceReferenceAmplitude psi *
         Matrix.conjTranspose (sourceReferenceAmplitude psi) := by
   classical
   ext x y
   simp [sourceReferenceState, sourceReferenceAmplitude,
-    sourceReferenceRegroupEquiv, State.marginalA, State.reindex,
-    partialTraceB, PureVector.state, rankOneMatrix_apply, Matrix.mul_apply]
+    Matrix.traceRight, Ket.state, rankOneMatrix_apply, Matrix.mul_apply]
 
 theorem branchWeight_smul_positiveBranchSourceReferenceState_matrix
-    (M : FiniteInstrument A A' X) (psi : PureVector (Prod A (Prod R E)))
+    (M : FiniteInstrument A A' X) (psi : Ket (A × (R × E)))
     (i : M.positiveSupport psi) :
     M.branchWeight psi i.1 •
-        (M.positiveBranchSourceReferenceState psi i).matrix =
+        (M.positiveBranchSourceReferenceState psi i).m =
       M.branchSourceReferenceAmplitude psi i.1 *
         Matrix.conjTranspose (M.branchSourceReferenceAmplitude psi i.1) := by
   classical
   have hfull := M.branchWeight_smul_normalizedBranch_state_matrix psi i
   ext x y
-  simp only [positiveBranchSourceReferenceState, State.marginalA,
-    State.reindex, sourceReferenceRegroupEquiv, partialTraceB,
+  simp only [positiveBranchSourceReferenceState, MState.traceRight_m,
+    MState.reindex_matrix, Equiv.symm_symm, Equiv.prodAssoc_apply, Matrix.traceRight,
+    Matrix.of_apply,
     Matrix.submatrix_apply, Matrix.smul_apply]
   rw [Finset.smul_sum]
   simp only [Matrix.mul_apply, branchSourceReferenceAmplitude,
@@ -317,10 +307,11 @@ theorem branchWeight_smul_positiveBranchSourceReferenceState_matrix
     (y.1, (y.2, e))
   simpa only [Matrix.smul_apply, rankOneMatrix_apply, Equiv.coe_fn_symm_mk] using hentry
 
+omit [DecidableEq E] in
 /-- A refined branch acts only on Alice's register; the reference and
 purifying registers are untouched. -/
 theorem branchSourceReferenceAmplitude_eq_kronecker_mul
-    (M : FiniteInstrument A A' X) (psi : PureVector (Prod A (Prod R E)))
+    (M : FiniteInstrument A A' X) (psi : Ket (A × (R × E)))
     (i : M.refinedBranchIndex) :
     M.branchSourceReferenceAmplitude psi i =
       Matrix.kronecker (M.refinedKraus i) (1 : CMatrix R) *
@@ -342,7 +333,7 @@ theorem sum_conjTranspose_refinedKraus_mul_refinedKraus
   classical
   have hTP : MatrixMap.IsTracePreserving (MatrixMap.ofKraus M.refinedKraus) := by
     rw [M.ofKraus_refinedKraus_eq_total]
-    exact M.total.tracePreserving
+    exact M.total.map_TP
   simpa [MatrixMap.krausAdjoint] using
     (MatrixMap.krausAdjoint_one_of_tracePreserving M.refinedKraus hTP)
 
@@ -351,19 +342,20 @@ conditional-min dual effect.  This packages the same Kraus-stack contraction
 used by the Gram proof through the repository's existing SDP API. -/
 theorem refinedKraus_conditionalMinEntropyDualEffectFeasible
     (M : FiniteInstrument A A' X) :
-    State.ConditionalMinEntropyDualEffectFeasible (a := A')
-      (State.conditionalMinEntropyDualEffectOfKraus
+    MState.ConditionalMinEntropyDualEffectFeasible (a := A')
+      (MState.conditionalMinEntropyDualEffectOfKraus
         (a := A') (b := A) M.refinedKraus) := by
-  apply State.conditionalMinEntropyDualEffectOfKraus_feasible
+  apply MState.conditionalMinEntropyDualEffectOfKraus_feasible
   rw [MatrixMap.smoothEndpointKrausStack_conjTranspose_mul]
   have hcomplete := M.sum_conjTranspose_refinedKraus_mul_refinedKraus
   simpa [MatrixMap.krausAdjoint, Matrix.mul_one] using hcomplete.le
 
+omit [DecidableEq E] in
 /-- Summing complementary Gram matrices after the complete refined Alice
 instrument recovers the input complementary Gram matrix.  The matrix `S`
 acts only on the untouched reference register. -/
 theorem sum_branchSourceReferenceAmplitude_referenceSandwich
-    (M : FiniteInstrument A A' X) (psi : PureVector (Prod A (Prod R E)))
+    (M : FiniteInstrument A A' X) (psi : Ket (A × (R × E)))
     (S : CMatrix R) :
     (∑ i : M.refinedBranchIndex,
         Matrix.conjTranspose (M.branchSourceReferenceAmplitude psi i) *
@@ -462,9 +454,10 @@ theorem sum_branchSourceReferenceAmplitude_referenceSandwich
         sourceReferenceAmplitude psi := by
       rw [M.sum_conjTranspose_refinedKraus_mul_refinedKraus]
 
+omit [DecidableEq R] [DecidableEq E] in
 /-- A zero-probability refined branch has zero `A'R`-by-`E` amplitude. -/
 theorem branchSourceReferenceAmplitude_eq_zero_of_branchWeight_eq_zero
-    (M : FiniteInstrument A A' X) (psi : PureVector (Prod A (Prod R E)))
+    (M : FiniteInstrument A A' X) (psi : Ket (A × (R × E)))
     (i : M.refinedBranchIndex) (hi : M.branchWeight psi i = 0) :
     M.branchSourceReferenceAmplitude psi i = 0 := by
   classical
@@ -479,16 +472,16 @@ for a positive-definite side operator.  If the same `R` side operator is
 feasible for every positive Alice outcome/Kraus branch, it is feasible for
 the pre-instrument `AR` state. -/
 theorem conditionalMinEntropyScaleFeasible_of_positiveBranches_posDef
-    (M : FiniteInstrument A A' X) (psi : PureVector (Prod A (Prod R E)))
+    (M : FiniteInstrument A A' X) (psi : Ket (A × (R × E)))
     (T : CMatrix R) (hT : T.PosDef)
     (hbranch : ∀ i : M.positiveSupport psi,
-      State.ConditionalMinEntropyScaleFeasible (a := A')
+      MState.ConditionalMinEntropyScaleFeasible (a := A')
         (M.positiveBranchSourceReferenceState psi i) T) :
-    State.ConditionalMinEntropyScaleFeasible (a := A)
+    MState.ConditionalMinEntropyScaleFeasible (a := A)
       (sourceReferenceState psi) T := by
   classical
-  let QA : CMatrix (Prod A R) := Matrix.kronecker (1 : CMatrix A) T
-  let QA' : CMatrix (Prod A' R) := Matrix.kronecker (1 : CMatrix A') T
+  let QA : CMatrix (A × R) := Matrix.kronecker (1 : CMatrix A) T
+  let QA' : CMatrix (A' × R) := Matrix.kronecker (1 : CMatrix A') T
   have hQA : QA.PosDef := by
     simpa [QA] using (Matrix.PosDef.one.kronecker hT)
   have hQA' : QA'.PosDef := by
@@ -499,27 +492,27 @@ theorem conditionalMinEntropyScaleFeasible_of_positiveBranches_posDef
     simpa [QA'] using (Matrix.inv_kronecker (1 : CMatrix A') T)
   have hcomponent : ∀ i : M.refinedBranchIndex,
       Matrix.conjTranspose (M.branchSourceReferenceAmplitude psi i) * QA'⁻¹ *
-          M.branchSourceReferenceAmplitude psi i <=
-        ((M.branchWeight psi i : Real) : Complex) • (1 : CMatrix E) := by
+          M.branchSourceReferenceAmplitude psi i ≤
+        ((M.branchWeight psi i : ℝ) : ℂ) • (1 : CMatrix E) := by
     intro i
     by_cases hi : 0 < M.branchWeight psi i
     · let ipos : M.positiveSupport psi := ⟨i, hi⟩
-      have hpReal : 0 < (M.branchWeight psi i : Real) := by
+      have hpReal : 0 < (M.branchWeight psi i : ℝ) := by
         exact_mod_cast hi
-      have hpComplex : (0 : Complex) <= ((M.branchWeight psi i : Real) : Complex) := by
+      have hpComplex : (0 : ℂ) ≤ ((M.branchWeight psi i : ℝ) : ℂ) := by
         exact_mod_cast hpReal.le
       have hscale := (hbranch ipos).2
       have hscaled := (Matrix.le_iff.mp hscale).smul hpComplex
       have hnn : M.branchWeight psi i •
-            (M.positiveBranchSourceReferenceState psi ipos).matrix =
-          ((M.branchWeight psi i : Real) : Complex) •
-            (M.positiveBranchSourceReferenceState psi ipos).matrix := by
+            (M.positiveBranchSourceReferenceState psi ipos).m =
+          ((M.branchWeight psi i : ℝ) : ℂ) •
+            (M.positiveBranchSourceReferenceState psi ipos).m := by
         ext p q
         simp [NNReal.smul_def, Complex.real_smul]
       have hgram :
           M.branchSourceReferenceAmplitude psi i *
-              Matrix.conjTranspose (M.branchSourceReferenceAmplitude psi i) <=
-            ((M.branchWeight psi i : Real) : Complex) • QA' := by
+              Matrix.conjTranspose (M.branchSourceReferenceAmplitude psi i) ≤
+            ((M.branchWeight psi i : ℝ) : ℂ) • QA' := by
         rw [Matrix.le_iff, ← M.branchWeight_smul_positiveBranchSourceReferenceState_matrix
           psi ipos, hnn]
         simpa [QA', smul_sub, ipos] using hscaled
@@ -535,16 +528,16 @@ theorem conditionalMinEntropyScaleFeasible_of_positiveBranches_posDef
       Finset M.refinedBranchIndex)) => hcomponent i
   have hweightComplex :
       (∑ i : M.refinedBranchIndex,
-          ((M.branchWeight psi i : Real) : Complex)) = 1 := by
+          ((M.branchWeight psi i : ℝ) : ℂ)) = 1 := by
     exact_mod_cast M.sum_branchWeight_eq_one psi
   have hsumWeights :
       (∑ i : M.refinedBranchIndex,
-          ((M.branchWeight psi i : Real) : Complex) • (1 : CMatrix E)) =
+          ((M.branchWeight psi i : ℝ) : ℂ) • (1 : CMatrix E)) =
         (1 : CMatrix E) := by
     rw [← Finset.sum_smul, hweightComplex, one_smul]
   have hcomplement :
       Matrix.conjTranspose (sourceReferenceAmplitude psi) * QA⁻¹ *
-          sourceReferenceAmplitude psi <= (1 : CMatrix E) := by
+          sourceReferenceAmplitude psi ≤ (1 : CMatrix E) := by
     rw [hQAinv]
     rw [← M.sum_branchSourceReferenceAmplitude_referenceSandwich psi T⁻¹]
     rw [hQA'inv] at hsum
@@ -553,11 +546,11 @@ theorem conditionalMinEntropyScaleFeasible_of_positiveBranches_posDef
   refine ⟨hT.posSemidef, ?_⟩
   rw [sourceReferenceState_matrix]
   change sourceReferenceAmplitude psi *
-      Matrix.conjTranspose (sourceReferenceAmplitude psi) <= QA
+      Matrix.conjTranspose (sourceReferenceAmplitude psi) ≤ QA
   have hcomplement' :
       Matrix.conjTranspose (sourceReferenceAmplitude psi) * QA⁻¹ *
-          sourceReferenceAmplitude psi <=
-        (((1 : Real) : Complex) • (1 : CMatrix E)) := by
+          sourceReferenceAmplitude psi ≤
+        (((1 : ℝ) : ℂ) • (1 : CMatrix E)) := by
     norm_num
     exact hcomplement
   have hresult :=
@@ -570,35 +563,35 @@ theorem conditionalMinEntropyScaleFeasible_of_positiveBranches_posDef
 form.  No full-support assumption is needed: an arbitrarily small identity
 regularization is removed using closedness of the PSD cone. -/
 theorem conditionalMinEntropyScaleFeasible_of_positiveBranches
-    (M : FiniteInstrument A A' X) (psi : PureVector (Prod A (Prod R E)))
+    (M : FiniteInstrument A A' X) (psi : Ket (A × (R × E)))
     (T : CMatrix R) (hT : T.PosSemidef)
     (hbranch : ∀ i : M.positiveSupport psi,
-      State.ConditionalMinEntropyScaleFeasible (a := A')
+      MState.ConditionalMinEntropyScaleFeasible (a := A')
         (M.positiveBranchSourceReferenceState psi i) T) :
-    State.ConditionalMinEntropyScaleFeasible (a := A)
+    MState.ConditionalMinEntropyScaleFeasible (a := A)
       (sourceReferenceState psi) T := by
   classical
-  let D : CMatrix (Prod A R) :=
-    Matrix.kronecker (1 : CMatrix A) T - (sourceReferenceState psi).matrix
+  let D : CMatrix (A × R) :=
+    Matrix.kronecker (1 : CMatrix A) T - (sourceReferenceState psi).m
   have hDherm : D.IsHermitian := by
     exact ((Matrix.PosSemidef.one.kronecker hT).isHermitian).sub
-      (sourceReferenceState psi).pos.isHermitian
-  have hreg : ∀ epsilon : Real, 0 < epsilon ->
-      (D + (epsilon : Complex) • (1 : CMatrix (Prod A R))).PosSemidef := by
+      (sourceReferenceState psi).psd.isHermitian
+  have hreg : ∀ epsilon : ℝ, 0 < epsilon →
+      (D + (epsilon : ℂ) • (1 : CMatrix (A × R))).PosSemidef := by
     intro epsilon hepsilon
-    let Tepsilon : CMatrix R := T + (epsilon : Complex) • (1 : CMatrix R)
+    let Tepsilon : CMatrix R := T + (epsilon : ℂ) • (1 : CMatrix R)
     have hTepsilon : Tepsilon.PosDef := by
       simpa [Tepsilon] using
-        (State.cMatrix_posSemidef_add_pos_smul_one_posDef hT hepsilon)
+        (MState.cMatrix_posSemidef_add_pos_smul_one_posDef hT hepsilon)
     have hperturbR :
-        ((epsilon : Complex) • (1 : CMatrix R)).PosSemidef := by
+        ((epsilon : ℂ) • (1 : CMatrix R)).PosSemidef := by
       exact Matrix.PosSemidef.smul Matrix.PosSemidef.one (by
         exact_mod_cast hepsilon.le)
-    have hTle : T <= Tepsilon := by
+    have hTle : T ≤ Tepsilon := by
       rw [Matrix.le_iff]
       simpa [Tepsilon, sub_eq_add_neg, add_assoc] using hperturbR
     have hQle :
-        Matrix.kronecker (1 : CMatrix A') T <=
+        Matrix.kronecker (1 : CMatrix A') T ≤
           Matrix.kronecker (1 : CMatrix A') Tepsilon := by
       rw [Matrix.le_iff]
       have hkron :=
@@ -607,7 +600,7 @@ theorem conditionalMinEntropyScaleFeasible_of_positiveBranches
       simpa [Tepsilon, Matrix.kronecker_add, Matrix.kronecker_smul,
         sub_eq_add_neg, add_assoc] using hkron
     have hbranchEpsilon : ∀ i : M.positiveSupport psi,
-        State.ConditionalMinEntropyScaleFeasible (a := A')
+        MState.ConditionalMinEntropyScaleFeasible (a := A')
           (M.positiveBranchSourceReferenceState psi i) Tepsilon := by
       intro i
       exact ⟨hTepsilon.posSemidef, (hbranch i).2.trans hQle⟩
@@ -628,28 +621,28 @@ The retained classical record is precisely `M.positiveSupport psi`: Alice's
 instrument outcome together with Alice's chosen Kraus refinement.  No Bob
 operation or Bob Kraus record occurs in the statement. -/
 theorem conditionalMinEntropyFeasible_of_positiveBranches
-    (M : FiniteInstrument A A' X) (psi : PureVector (Prod A (Prod R E)))
-    (sigma : State R) (lam : Real)
+    (M : FiniteInstrument A A' X) (psi : Ket (A × (R × E)))
+    (sigma : MState R) (lam : ℝ)
     (hbranch : ∀ i : M.positiveSupport psi,
-      State.ConditionalMinEntropyFeasible (a := A')
+      MState.ConditionalMinEntropyFeasible (a := A')
         (M.positiveBranchSourceReferenceState psi i) sigma lam) :
-    State.ConditionalMinEntropyFeasible (a := A)
+    MState.ConditionalMinEntropyFeasible (a := A)
       (sourceReferenceState psi) sigma lam := by
   classical
-  let T : CMatrix R := (Real.rpow 2 (-lam) : Complex) • sigma.matrix
+  let T : CMatrix R := (Real.rpow 2 (-lam) : ℂ) • sigma.m
   have hcpos : 0 < Real.rpow 2 (-lam) := Real.rpow_pos_of_pos (by norm_num) _
   have hT : T.PosSemidef := by
-    exact Matrix.PosSemidef.smul sigma.pos (by exact_mod_cast hcpos.le)
+    exact Matrix.PosSemidef.smul sigma.psd (by exact_mod_cast hcpos.le)
   have hbranchScale : ∀ i : M.positiveSupport psi,
-      State.ConditionalMinEntropyScaleFeasible (a := A')
+      MState.ConditionalMinEntropyScaleFeasible (a := A')
         (M.positiveBranchSourceReferenceState psi i) T := by
     intro i
     simpa [T] using
-      (State.conditionalMinEntropyScaleFeasible_of_conditionalMinEntropyFeasible
+      (MState.conditionalMinEntropyScaleFeasible_of_conditionalMinEntropyFeasible
         (hbranch i))
   have hinputScale := M.conditionalMinEntropyScaleFeasible_of_positiveBranches
     psi T hT hbranchScale
-  simpa [State.ConditionalMinEntropyFeasible, State.identityTensorStateMatrix,
+  simpa [MState.ConditionalMinEntropyFeasible, MState.identityTensorStateMatrix,
     T, Matrix.kronecker_smul] using hinputScale.2
 
 end FiniteInstrument

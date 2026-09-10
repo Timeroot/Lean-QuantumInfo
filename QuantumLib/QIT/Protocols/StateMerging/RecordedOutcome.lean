@@ -28,13 +28,13 @@ part of the classical record.
 
 open scoped ComplexOrder MatrixOrder NNReal
 
-namespace QIT
-
 universe u v w x y z p q
 
 noncomputable section
 
-namespace Ensemble
+namespace MEnsemble
+
+open QIT
 
 variable {i : Type u} {s : Type v}
 variable [Fintype i] [DecidableEq i] [Fintype s] [DecidableEq s]
@@ -42,28 +42,28 @@ variable [Fintype i] [DecidableEq i] [Fintype s] [DecidableEq s]
 /-- The normalized trace distance between cq states with the same classical
 distribution is the corresponding weighted branch average. -/
 private theorem cqState_normalizedTraceDistance_eq_sum_of_same_probs
-    (E F : Ensemble i s) (hprobs : ∀ j, F.probs j = E.probs j) :
+    (E F : MEnsemble s i) (hprobs : ∀ j, F.probs j = E.probs j) :
     E.cqState.normalizedTraceDistance F.cqState =
       ∑ j, (E.probs j : ℝ) *
         (E.states j).normalizedTraceDistance (F.states j) := by
   classical
-  simp only [State.normalizedTraceDistance, QIT.normalizedTraceDistance,
+  simp only [MState.normalizedTraceDistance, QIT.normalizedTraceDistance,
     QIT.traceNormDistance]
   rw [Classical.cqState_eq_blockDiagonal, Classical.cqState_eq_blockDiagonal]
   have hF :
       Classical.blockDiagonal (fun j =>
-          ((F.probs j : ℝ) : ℂ) • (F.states j).matrix) =
+          ((F.probs j : ℝ) : ℂ) • (F.states j).m) =
         Classical.blockDiagonal (fun j =>
-          ((E.probs j : ℝ) : ℂ) • (F.states j).matrix) := by
+          ((E.probs j : ℝ) : ℂ) • (F.states j).m) := by
     congr 1
     funext j
     rw [hprobs j]
   rw [hF, ← Classical.blockDiagonal_sub]
   have hblocks :
-      (fun j => ((E.probs j : ℝ) : ℂ) • (E.states j).matrix -
-          ((E.probs j : ℝ) : ℂ) • (F.states j).matrix) =
+      (fun j => ((E.probs j : ℝ) : ℂ) • (E.states j).m -
+          ((E.probs j : ℝ) : ℂ) • (F.states j).m) =
         fun j => ((E.probs j : ℝ) : ℂ) •
-          ((E.states j).matrix - (F.states j).matrix) := by
+          ((E.states j).m - (F.states j).m) := by
     funext j
     rw [smul_sub]
   rw [hblocks, Classical.traceNorm_blockDiagonal, Finset.mul_sum]
@@ -73,75 +73,30 @@ private theorem cqState_normalizedTraceDistance_eq_sum_of_same_probs
   ring
 
 omit [DecidableEq i] in
-/-- Trace-norm convexity for the average of a finite ensemble. -/
-private theorem averageState_traceNormDistance_le_sum
-    (E : Ensemble i s) (target : State s) :
-    E.averageState.traceNormDistance target ≤
-      ∑ j, (E.probs j : ℝ) * (E.states j).traceNormDistance target := by
-  classical
-  change traceNorm (E.averageState.matrix - target.matrix) ≤
-    ∑ j, (E.probs j : ℝ) * traceNorm ((E.states j).matrix - target.matrix)
-  have hsub :
-      E.averageState.matrix - target.matrix =
-        ∑ j, (E.probs j) • ((E.states j).matrix - target.matrix) := by
-    calc
-      E.averageState.matrix - target.matrix =
-          (∑ j, (E.probs j) • (E.states j).matrix) -
-            ∑ j, (E.probs j) • target.matrix := by
-        rw [E.averageState_matrix, ← Finset.sum_smul, E.weights_sum, one_smul]
-      _ = ∑ j, ((E.probs j) • (E.states j).matrix -
-          (E.probs j) • target.matrix) := by
-        rw [Finset.sum_sub_distrib]
-      _ = ∑ j, (E.probs j) • ((E.states j).matrix - target.matrix) := by
-        apply Finset.sum_congr rfl
-        intro j _
-        rw [smul_sub]
-  rw [hsub]
-  calc
-    traceNorm
-        (∑ j, (E.probs j) •
-          ((E.states j).matrix - target.matrix)) ≤
-        ∑ j, traceNorm
-          ((E.probs j) •
-            ((E.states j).matrix - target.matrix)) := by
-      simpa using traceNorm_sum_le_sum_traceNorm
-        (s := Finset.univ)
-        (f := fun j => (E.probs j) •
-          ((E.states j).matrix - target.matrix))
-    _ = ∑ j, (E.probs j : ℝ) *
-        traceNorm ((E.states j).matrix - target.matrix) := by
-      apply Finset.sum_congr rfl
-      intro j _
-      change traceNorm (((E.probs j : ℝ) : ℂ) •
-          ((E.states j).matrix - target.matrix)) =
-        (E.probs j : ℝ) * traceNorm ((E.states j).matrix - target.matrix)
-      rw [traceNorm_real_smul_eq (NNReal.coe_nonneg (E.probs j))]
-
-omit [DecidableEq i] in
 /-- Squared fidelity with a pure target is affine over a state ensemble. -/
 private theorem sum_prob_mul_squaredFidelity_eq_averageState
-    (E : Ensemble i s) (target : PureVector s) :
+    (E : MEnsemble s i) (target : Ket s) :
     (∑ j, (E.probs j : ℝ) * (E.states j).squaredFidelity target.state) =
       E.averageState.squaredFidelity target.state := by
-  rw [State.squaredFidelity_pure_right_eq_trace E.averageState target]
+  rw [MState.squaredFidelity_pure_right_eq_trace E.averageState target]
   calc
     (∑ j, (E.probs j : ℝ) * (E.states j).squaredFidelity target.state) =
         ∑ j, (((E.probs j : ℂ) *
-          (((E.states j).matrix * target.state.matrix).trace)).re) := by
+          (((E.states j).m * target.state.m).trace)).re) := by
       apply Finset.sum_congr rfl
       intro j _
-      rw [State.squaredFidelity_pure_right_eq_trace]
+      rw [MState.squaredFidelity_pure_right_eq_trace]
       simp [Complex.mul_re]
-    _ = (((∑ j, (E.probs j : ℂ) • (E.states j).matrix) *
-          target.state.matrix).trace).re := by
+    _ = (((∑ j, (E.probs j : ℂ) • (E.states j).m) *
+          target.state.m).trace).re := by
       simp [Finset.sum_mul, Matrix.trace_sum, Matrix.trace_smul, Complex.mul_re]
-    _ = ((E.averageState.matrix * target.state.matrix).trace).re := by
+    _ = ((E.averageState.m * target.state.m).trace).re := by
       simp [NNReal.smul_def]
 
 omit [DecidableEq i] in
 /-- Jensen's square-root estimate for an arbitrary finite state ensemble. -/
 private theorem sum_prob_mul_sqrt_one_sub_squaredFidelity_le
-    (E : Ensemble i s) (target : PureVector s) :
+    (E : MEnsemble s i) (target : Ket s) :
     (∑ j, (E.probs j : ℝ) *
       Real.sqrt (1 - (E.states j).squaredFidelity target.state)) ≤
       Real.sqrt (1 - E.averageState.squaredFidelity target.state) := by
@@ -150,7 +105,7 @@ private theorem sum_prob_mul_sqrt_one_sub_squaredFidelity_le
     fun j ↦ 1 - (E.states j).squaredFidelity target.state
   have hdeficit : ∀ j, deficit j ∈ Set.Ici (0 : ℝ) := by
     intro j
-    exact sub_nonneg.mpr (State.squaredFidelity_le_one _ _)
+    exact sub_nonneg.mpr (MState.squaredFidelity_le_one _ _)
   have hsum : (∑ j, (E.probs j : ℝ)) = 1 := by
     simpa only [NNReal.coe_sum, NNReal.coe_one] using
       congrArg (fun x : NNReal ↦ (x : ℝ)) E.weights_sum
@@ -186,15 +141,15 @@ omit [DecidableEq i] in
 /-- The average trace distance of a state ensemble from a pure target is
 controlled by the fidelity of its average state. -/
 private theorem sum_prob_mul_traceNormDistance_le_pure
-    (E : Ensemble i s) (target : PureVector s) :
+    (E : MEnsemble s i) (target : Ket s) :
     (∑ j, (E.probs j : ℝ) * (E.states j).traceNormDistance target.state) ≤
       2 * Real.sqrt
         (1 - E.averageState.squaredFidelity target.state) := by
   have hfdg (j : i) :
       (E.states j).traceNormDistance target.state ≤
         2 * Real.sqrt (1 - (E.states j).squaredFidelity target.state) := by
-    have h := State.fuchs_van_de_graaf_upper (E.states j) target.state
-    simpa [State.normalizedTraceDistance, QIT.normalizedTraceDistance] using
+    have h := MState.fuchs_van_de_graaf_upper (E.states j) target.state
+    simpa [MState.normalizedTraceDistance, QIT.normalizedTraceDistance] using
       mul_le_mul_of_nonneg_left h (show (0 : ℝ) ≤ 2 by norm_num)
   calc
     (∑ j, (E.probs j : ℝ) * (E.states j).traceNormDistance target.state) ≤
@@ -214,93 +169,9 @@ private theorem sum_prob_mul_traceNormDistance_le_pure
       mul_le_mul_of_nonneg_left
         (E.sum_prob_mul_sqrt_one_sub_squaredFidelity_le target) (by norm_num)
 
-end Ensemble
+end MEnsemble
 
-private theorem normalizedTraceDistance_reindex_equiv
-    {A : Type u} {B : Type v}
-    [Fintype A] [DecidableEq A] [Fintype B] [DecidableEq B]
-    (rho sigma : State A) (e : A ≃ B) :
-    (rho.reindex e).normalizedTraceDistance (sigma.reindex e) =
-      rho.normalizedTraceDistance sigma := by
-  change (1 / 2 : ℝ) *
-      traceNorm
-        (rho.matrix.submatrix e.symm e.symm - sigma.matrix.submatrix e.symm e.symm) =
-    (1 / 2 : ℝ) * traceNorm (rho.matrix - sigma.matrix)
-  have hsub :
-      rho.matrix.submatrix e.symm e.symm - sigma.matrix.submatrix e.symm e.symm =
-        (rho.matrix - sigma.matrix).submatrix e.symm e.symm := by
-    ext a b
-    rfl
-  rw [hsub, traceNorm_submatrix_equiv]
-
-private theorem squaredFidelity_reindex_equiv
-    {A : Type u} {B : Type v}
-    [Fintype A] [DecidableEq A] [Fintype B] [DecidableEq B]
-    (rho sigma : State A) (e : A ≃ B) :
-    (rho.reindex e).squaredFidelity (sigma.reindex e) =
-      rho.squaredFidelity sigma := by
-  rw [State.squaredFidelity_eq_fidelity_sq, State.squaredFidelity_eq_fidelity_sq,
-    SmoothNormalizedExtension.State.fidelity_reindex]
-
-private theorem reindexChannel_map
-    {A : Type u} {B : Type v}
-    [Fintype A] [DecidableEq A] [Fintype B] [DecidableEq B]
-    (e : A ≃ B) (X : CMatrix A) :
-    (Channel.reindex e).map X = X.submatrix e.symm e.symm := by
-  ext i j
-  simp [Channel.reindex, MatrixMap.ofReferenceIsometry_apply,
-    ReferenceIsometry.ofEquiv, Matrix.mul_apply]
-  rw [Finset.sum_eq_single (e.symm j)]
-  · rw [Finset.sum_eq_single (e.symm i)]
-    · simp
-    · intro x _ hx
-      have hne : i ≠ e x := by
-        intro hi
-        apply hx
-        simp [hi]
-      simp [hne]
-    · simp
-  · intro x _ hx
-    have hne : j ≠ e x := by
-      intro hj
-      apply hx
-      simp [hj]
-    simp [hne]
-  · simp
-
-private theorem reindexChannel_map_single
-    {A : Type u} {B : Type v}
-    [Fintype A] [DecidableEq A] [Fintype B] [DecidableEq B]
-    (e : A ≃ B) (i j : A) :
-    (Channel.reindex e).map (Matrix.single i j (1 : ℂ)) =
-      Matrix.single (e i) (e j) (1 : ℂ) := by
-  rw [reindexChannel_map]
-  ext x y
-  simp only [Matrix.submatrix_apply, Matrix.single_apply]
-  have hx : i = e.symm x ↔ e i = x := by
-    constructor
-    · intro h
-      rw [h, e.apply_symm_apply]
-    · intro h
-      apply e.injective
-      rw [e.apply_symm_apply, h]
-  have hy : j = e.symm y ↔ e j = y := by
-    constructor
-    · intro h
-      rw [h, e.apply_symm_apply]
-    · intro h
-      apply e.injective
-      rw [e.apply_symm_apply, h]
-  simp only [hx, hy]
-
-private theorem reindexChannel_map_symm_map
-    {A : Type u} {B : Type v}
-    [Fintype A] [DecidableEq A] [Fintype B] [DecidableEq B]
-    (e : A ≃ B) (X : CMatrix B) :
-    (Channel.reindex e).map ((Channel.reindex e.symm).map X) = X := by
-  rw [reindexChannel_map, reindexChannel_map]
-  ext i j
-  simp
+namespace QIT
 
 /-- Reassociation commutes with three independent matrix maps. -/
 private theorem prodAssoc_kron_naturality
@@ -313,89 +184,71 @@ private theorem prodAssoc_kron_naturality
     (PhiA : MatrixMap A A') (PhiR : MatrixMap R R')
     (PhiB : MatrixMap B B') :
     (MatrixMap.kron PhiA (MatrixMap.kron PhiR PhiB)).comp
-        (Channel.reindex (Equiv.prodAssoc A R B)).map =
-      (Channel.reindex (Equiv.prodAssoc A' R' B')).map.comp
+        (CPTPOp.reindex (Equiv.prodAssoc A R B)).map =
+      (CPTPOp.reindex (Equiv.prodAssoc A' R' B')).map.comp
         (MatrixMap.kron (MatrixMap.kron PhiA PhiR) PhiB) := by
   apply LinearMap.ext
   intro X
   rw [MatrixMap.map_eq_sum_single
     ((MatrixMap.kron PhiA (MatrixMap.kron PhiR PhiB)).comp
-      (Channel.reindex (Equiv.prodAssoc A R B)).map) X]
+      (CPTPOp.reindex (Equiv.prodAssoc A R B)).map) X]
   rw [MatrixMap.map_eq_sum_single
-    ((Channel.reindex (Equiv.prodAssoc A' R' B')).map.comp
+    ((CPTPOp.reindex (Equiv.prodAssoc A' R' B')).map.comp
       (MatrixMap.kron (MatrixMap.kron PhiA PhiR) PhiB)) X]
   refine Finset.sum_congr rfl fun i _ => ?_
   refine Finset.sum_congr rfl fun j _ => ?_
   congr 1
-  change MatrixMap.kron PhiA (MatrixMap.kron PhiR PhiB)
-      ((Channel.reindex (Equiv.prodAssoc A R B)).map
-        (Matrix.single i j (1 : ℂ))) =
-    (Channel.reindex (Equiv.prodAssoc A' R' B')).map
-      (MatrixMap.kron (MatrixMap.kron PhiA PhiR) PhiB
-        (Matrix.single i j (1 : ℂ)))
-  rw [reindexChannel_map_single]
+  simp only [LinearMap.comp_apply]
+  rw [CPTPOp.reindex_map_single]
   rw [show Matrix.single (Equiv.prodAssoc A R B i)
       (Equiv.prodAssoc A R B j) (1 : ℂ) =
         Matrix.kronecker
           (Matrix.single i.1.1 j.1.1 (1 : ℂ))
           (Matrix.single (i.1.2, i.2) (j.1.2, j.2) (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
-  rw [MatrixMap.kron_apply_kronecker]
+  simp only [Matrix.kronecker]
+  rw [MatrixMap.kron_map_of_kron_state]
   rw [show Matrix.single (i.1.2, i.2) (j.1.2, j.2) (1 : ℂ) =
         Matrix.kronecker
           (Matrix.single i.1.2 j.1.2 (1 : ℂ))
           (Matrix.single i.2 j.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
-  rw [MatrixMap.kron_apply_kronecker]
+  simp only [Matrix.kronecker]
+  rw [MatrixMap.kron_map_of_kron_state]
   rw [show Matrix.single i j (1 : ℂ) =
         Matrix.kronecker
           (Matrix.single i.1 j.1 (1 : ℂ))
           (Matrix.single i.2 j.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
-  rw [MatrixMap.kron_apply_kronecker]
+  simp only [Matrix.kronecker]
+  rw [MatrixMap.kron_map_of_kron_state]
   rw [show Matrix.single i.1 j.1 (1 : ℂ) =
         Matrix.kronecker
           (Matrix.single i.1.1 j.1.1 (1 : ℂ))
           (Matrix.single i.1.2 j.1.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
-  rw [MatrixMap.kron_apply_kronecker, reindexChannel_map]
+  simp only [Matrix.kronecker]
+  rw [MatrixMap.kron_map_of_kron_state, CPTPOp.reindex_map]
   ext k l
-  simp [Matrix.kronecker, mul_assoc]
+  simp [mul_assoc]
 
 private theorem kron_idChannel_idChannel_eq_idChannel_map
     {A : Type u} {B : Type v}
     [Fintype A] [DecidableEq A] [Fintype B] [DecidableEq B] :
-    MatrixMap.kron (Channel.idChannel A).map (Channel.idChannel B).map =
-      (Channel.idChannel (Prod A B)).map := by
-  apply LinearMap.ext
-  intro X
-  rw [MatrixMap.map_eq_sum_single
-    (MatrixMap.kron (Channel.idChannel A).map (Channel.idChannel B).map) X]
-  rw [MatrixMap.map_eq_sum_single (Channel.idChannel (Prod A B)).map X]
-  apply Finset.sum_congr rfl
-  intro i _
-  apply Finset.sum_congr rfl
-  intro j _
-  congr 1
-  rw [show Matrix.single i j (1 : ℂ) =
-      Matrix.kronecker (Matrix.single i.1 j.1 (1 : ℂ))
-        (Matrix.single i.2 j.2 (1 : ℂ)) by
-    exact single_prod_eq_kronecker_single _ _ _ _]
-  rw [MatrixMap.kron_apply_kronecker]
-  rw [Channel.idChannel_map_eq_linearMap_id (α := A),
-    Channel.idChannel_map_eq_linearMap_id (α := B),
-    Channel.idChannel_map_eq_linearMap_id (α := Prod A B)]
-  rfl
+    MatrixMap.kron (CPTPOp.id (dIn := A)).map (CPTPOp.id (dIn := B)).map =
+      (CPTPOp.id (dIn := A × B)).map := by
+  simp only [CPTPOp.id_map]
+  rw [MatrixMap.kron_id_id]
 
 private theorem sum_rankOne_localPostAmplitude_eq_kron_ofKraus
     {A : Type u} {A' : Type v} {B : Type w} {K : Type x}
     [Fintype A] [DecidableEq A] [Fintype A'] [DecidableEq A']
     [Fintype B] [DecidableEq B] [Fintype K]
-    (kraus : K → Matrix A' A ℂ) (amp : Prod A B → ℂ) :
+    (kraus : K → Matrix A' A ℂ) (amp : A × B → ℂ) :
     (∑ k : K,
-        rankOneMatrix (fun out : Prod A' B =>
+        rankOneMatrix (fun out : A' × B =>
           ∑ a : A, kraus k out.1 a * amp (a, out.2))) =
-      MatrixMap.kron (MatrixMap.ofKraus kraus) (Channel.idChannel B).map
+      MatrixMap.kron (MatrixMap.ofKraus kraus) (CPTPOp.id (dIn := B)).map
         (rankOneMatrix amp) := by
   classical
   ext i j
@@ -410,40 +263,23 @@ private theorem FiniteInstrument.sum_rankOne_postAmplitude_fixedOutcome
     {A : Type u} {A' : Type v} {B : Type w} {X : Type x}
     [Fintype A] [DecidableEq A] [Fintype A'] [DecidableEq A']
     [Fintype B] [DecidableEq B] [Fintype X]
-    (M : FiniteInstrument A A' X) (psi : PureVector (Prod A B)) (result : X) :
+    (M : FiniteInstrument A A' X) (psi : Ket (A × B)) (result : X) :
     (∑ k : A × A', rankOneMatrix (M.postAmplitude psi (result, k))) =
-      MatrixMap.kron (M.branch result) (Channel.idChannel B).map
-        psi.state.matrix := by
+      MatrixMap.kron (M.branch result) (CPTPOp.id (dIn := B)).map
+        psi.state.m := by
   rw [← (M.branchTraceNonincreasingCP result).ofKraus_kraus]
-  simp only [PureVector.state_matrix]
+  simp only [Ket.state_matrix]
   exact sum_rankOne_localPostAmplitude_eq_kron_ofKraus
-    (M.branchTraceNonincreasingCP result).kraus psi.amp
+    (M.branchTraceNonincreasingCP result).kraus psi.vec
 
-private theorem traceNormDistance_marginalA_le
+private theorem traceNormDistance_traceRight_le
     {A : Type u} {B : Type v}
     [Fintype A] [DecidableEq A] [Fintype B] [DecidableEq B]
-    (rho sigma : State (Prod A B)) :
-    rho.marginalA.traceNormDistance sigma.marginalA ≤ rho.traceNormDistance sigma := by
-  change traceNorm
-      (partialTraceB (a := A) (b := B) rho.matrix -
-        partialTraceB (a := A) (b := B) sigma.matrix) ≤
-    traceNorm (rho.matrix - sigma.matrix)
-  rw [← partialTraceB_sub]
-  exact traceNorm_partialTraceB_le_matrix (rho.matrix - sigma.matrix)
-
-private theorem sum_sum_sum_mul_right
-    {I : Type u} {K : Type v} {J : Type w}
-    [Fintype I] [Fintype K] [Fintype J]
-    (f : I → K → ℂ) (g : J → ℂ) :
-    (∑ i, ∑ k, ∑ j, f i k * g j) =
-      (∑ j, g j) * (∑ i, ∑ k, f i k) := by
-  calc
-    (∑ i, ∑ k, ∑ j, f i k * g j) =
-        ∑ i, ∑ k, f i k * ∑ j, g j := by
-      simp [Finset.mul_sum]
-    _ = (∑ i, ∑ k, f i k) * ∑ j, g j := by
-      simp [Finset.sum_mul]
-    _ = (∑ j, g j) * (∑ i, ∑ k, f i k) := by ring
+    (rho sigma : MState (A × B)) :
+    rho.traceRight.traceNormDistance sigma.traceRight ≤ rho.traceNormDistance sigma := by
+  simp only [MState.traceNormDistance, QIT.traceNormDistance, MState.traceRight_m]
+  rw [← Matrix.traceRight_sub]
+  exact traceNorm_traceRight_le_matrix (rho.m - sigma.m)
 
 namespace OneWayLOCC
 
@@ -454,22 +290,22 @@ variable [Fintype B] [DecidableEq B] [Fintype B'] [DecidableEq B'] [Fintype X]
 /-- The physical output conditioned only on Alice's refined local outcome;
 Bob's complete channel is applied nonselectively. -/
 def aliceConditionedOutputState
-    (L : OneWayLOCC A A' B B' X) (input : PureVector (Prod A B))
-    (i : L.aliceInstrument.positiveSupport input) : State (Prod A' B') :=
-  ((Channel.idChannel A').prod (L.bobChannel i.1.1)).applyState
+    (L : OneWayLOCC A A' B B' X) (input : Ket (A × B))
+    (i : L.aliceInstrument.positiveSupport input) : MState (A' × B') :=
+  ((CPTPOp.id (dIn := A')).prod (L.bobChannel i.1.1))
     (L.aliceInstrument.normalizedBranch input i).state
 
 /-- Averaging the Alice-conditioned, nonselective Bob outputs recovers the
 realized one-way LOCC output. -/
 theorem sum_alicePositiveBranchWeight_smul_conditionedOutputState_matrix
-    (L : OneWayLOCC A A' B B' X) (input : PureVector (Prod A B)) :
+    (L : OneWayLOCC A A' B B' X) (input : Ket (A × B)) :
     (∑ i : L.aliceInstrument.positiveSupport input,
       L.aliceInstrument.branchWeight input i.1 •
-        (L.aliceConditionedOutputState input i).matrix) =
-      L.toChannel.map input.state.matrix := by
+        (L.aliceConditionedOutputState input i).m) =
+      L.toChannel.map input.state.m := by
   classical
-  let f : L.aliceInstrument.refinedBranchIndex → CMatrix (Prod A' B') :=
-    fun i ↦ ((Channel.idChannel A').prod (L.bobChannel i.1)).map
+  let f : L.aliceInstrument.refinedBranchIndex → CMatrix (A' × B') :=
+    fun i ↦ ((CPTPOp.id (dIn := A')).prod (L.bobChannel i.1)).map
       (rankOneMatrix (L.aliceInstrument.postAmplitude input i))
   have hsupport :
       (∑ i : L.aliceInstrument.positiveSupport input, f i.1) =
@@ -491,15 +327,16 @@ theorem sum_alicePositiveBranchWeight_smul_conditionedOutputState_matrix
   calc
     (∑ i : L.aliceInstrument.positiveSupport input,
         L.aliceInstrument.branchWeight input i.1 •
-          (L.aliceConditionedOutputState input i).matrix) =
+          (L.aliceConditionedOutputState input i).m) =
         ∑ i : L.aliceInstrument.positiveSupport input, f i.1 := by
       apply Finset.sum_congr rfl
       intro i _
       dsimp [f]
+      simp only [aliceConditionedOutputState, CPTPOp.mat_coe_eq_apply_mat]
       change ((L.aliceInstrument.branchWeight input i.1 : ℂ) •
-          ((Channel.idChannel A').prod (L.bobChannel i.1.1)).map
-            (L.aliceInstrument.normalizedBranch input i).state.matrix) =
-        ((Channel.idChannel A').prod (L.bobChannel i.1.1)).map
+          ((CPTPOp.id (dIn := A')).prod (L.bobChannel i.1.1)).map
+            (L.aliceInstrument.normalizedBranch input i).state.m) =
+        ((CPTPOp.id (dIn := A')).prod (L.bobChannel i.1.1)).map
           (rankOneMatrix (L.aliceInstrument.postAmplitude input i.1))
       rw [← map_smul]
       congr 1
@@ -510,68 +347,53 @@ theorem sum_alicePositiveBranchWeight_smul_conditionedOutputState_matrix
     _ = ∑ result : X, ∑ k : A × A', f (result, k) := by
       simp only [FiniteInstrument.refinedBranchIndex, Fintype.sum_prod_type]
     _ = ∑ result : X,
-        ((Channel.idChannel A').prod (L.bobChannel result)).map
+        ((CPTPOp.id (dIn := A')).prod (L.bobChannel result)).map
           (∑ k : A × A',
             rankOneMatrix (L.aliceInstrument.postAmplitude input (result, k))) := by
       apply Finset.sum_congr rfl
       intro result _
       rw [map_sum]
     _ = ∑ result : X,
-        ((Channel.idChannel A').prod (L.bobChannel result)).map
+        ((CPTPOp.id (dIn := A')).prod (L.bobChannel result)).map
           (MatrixMap.kron (L.aliceInstrument.branch result)
-            (Channel.idChannel B).map input.state.matrix) := by
+            (CPTPOp.id (dIn := B)).map input.state.m) := by
       apply Finset.sum_congr rfl
       intro result _
       rw [L.aliceInstrument.sum_rankOne_postAmplitude_fixedOutcome input result]
     _ = ∑ result : X,
         MatrixMap.kron (L.aliceInstrument.branch result)
-          (L.bobChannel result).map input.state.matrix := by
+          (L.bobChannel result).map input.state.m := by
       apply Finset.sum_congr rfl
       intro result _
       calc
-        ((Channel.idChannel A').prod (L.bobChannel result)).map
+        ((CPTPOp.id (dIn := A')).prod (L.bobChannel result)).map
             (MatrixMap.kron (L.aliceInstrument.branch result)
-              (Channel.idChannel B).map input.state.matrix) =
+              (CPTPOp.id (dIn := B)).map input.state.m) =
             MatrixMap.kron
-              ((Channel.idChannel A').map.comp
+              ((CPTPOp.id (dIn := A')).map.comp
                 (L.aliceInstrument.branch result))
-              ((L.bobChannel result).map.comp (Channel.idChannel B).map)
-              input.state.matrix := by
+              ((L.bobChannel result).map.comp (CPTPOp.id (dIn := B)).map)
+              input.state.m := by
+          rw [CPTPOp.prod_map]
           exact MatrixMap.kron_comp_apply_general
-            (Channel.idChannel A').map (L.bobChannel result).map
-            (L.aliceInstrument.branch result) (Channel.idChannel B).map
-            input.state.matrix
+            (CPTPOp.id (dIn := A')).map (L.bobChannel result).map
+            (L.aliceInstrument.branch result) (CPTPOp.id (dIn := B)).map
+            input.state.m
         _ = MatrixMap.kron (L.aliceInstrument.branch result)
-            (L.bobChannel result).map input.state.matrix := by
-          rw [Channel.idChannel_map_eq_linearMap_id (α := A'),
-            Channel.idChannel_map_eq_linearMap_id (α := B)]
+            (L.bobChannel result).map input.state.m := by
+          rw [CPTPOp.id_map (dIn := A'),
+            CPTPOp.id_map (dIn := B)]
           simp only [LinearMap.id_comp, LinearMap.comp_id]
-    _ = L.toChannel.map input.state.matrix := by
+    _ = L.toChannel.map input.state.m := by
       rw [L.toChannel_map, LinearMap.sum_apply]
 
 end OneWayLOCC
-
-/-- Reorder Alice's recorded cq state so that the retained `L_A` register is
-the source and the untouched reference together with Alice's local outcome is
-the conditioning system. -/
-def stateMergingRecordedOutcomeEquiv
-    (J : Type u) (L : Type v) (R : Type w) :
-    Prod J (Prod L R) ≃ Prod L (Prod R J) where
-  toFun t := (t.2.1, (t.2.2, t.1))
-  invFun t := (t.2.2, (t.1, t.2.1))
-  left_inv := by intro t; rfl
-  right_inv := by intro t; rfl
-
-/-- Reorder the untouched reference and Alice's local outcome. -/
-def stateMergingRecordedConditioningEquiv
-    (J : Type u) (R : Type v) : Prod J R ≃ Prod R J :=
-  Equiv.prodComm J R
 
 variable {a : Type u} {b : Type v} {r : Type w}
 variable [Fintype a] [DecidableEq a]
 variable [Fintype b] [DecidableEq b]
 variable [Fintype r] [DecidableEq r]
-variable {psi : PureVector (Prod (Prod a b) r)} {n : ℕ}
+variable {psi : Ket ((a × b) × r)} {n : ℕ}
 variable {kA : Type x} {kB : Type y} {lA : Type z} {lB : Type p}
 variable {outcome : Type q}
 variable [Fintype kA] [DecidableEq kA] [Nonempty kA]
@@ -582,11 +404,13 @@ variable [Fintype outcome] [DecidableEq outcome] [Nonempty outcome]
 
 namespace StateMergingBlockProtocol
 
+/-- Decidable equality on the local-converse output register, assembled from the
+factor instances so that it is definitionally the product instance. -/
 local instance localConverseOutputDecidableEq :
     DecidableEq
-      (Prod lA
-        (Prod (TensorPower r n)
-          (Prod (Prod (TensorPower a n) (TensorPower b n)) lB))) :=
+      (lA ×
+        (TensorPower r n ×
+          ((TensorPower a n × TensorPower b n) × lB))) :=
   @instDecidableEqProd _ _ inferInstance
     (@instDecidableEqProd _ _
       (tensorPowerDecidableEq (a := r) n)
@@ -601,25 +425,25 @@ variable (C : StateMergingBlockProtocol psi n kA kB lA lB outcome)
 /-- The physical converse input regrouped as `A (R B)`, so the original
 Alice instrument acts only on `A` and the untouched reference remains part of
 the purifying side. -/
-def localConverseInputPureVector :
-    PureVector
-      (Prod (Prod (TensorPower a n) kA)
-        (Prod (TensorPower r n) (Prod (TensorPower b n) kB))) :=
-  C.converseInputPureVector.reindex
+def localConverseInputKet :
+    Ket
+      ((TensorPower a n × kA) ×
+        (TensorPower r n × (TensorPower b n × kB))) :=
+  C.converseInputKet.reindex
     (Equiv.prodAssoc
-      (Prod (TensorPower a n) kA)
+      (TensorPower a n × kA)
       (TensorPower r n)
-      (Prod (TensorPower b n) kB))
+      (TensorPower b n × kB))
 
 @[simp]
-theorem localConverseInputPureVector_reindex_symm :
-    C.localConverseInputPureVector.reindex
+theorem localConverseInputKet_reindex_symm :
+    C.localConverseInputKet.reindex
         (Equiv.prodAssoc
-          (Prod (TensorPower a n) kA)
+          (TensorPower a n × kA)
           (TensorPower r n)
-          (Prod (TensorPower b n) kB)).symm =
-      C.converseInputPureVector := by
-  apply PureVector.ext_amp
+          (TensorPower b n × kB)).symm =
+      C.converseInputKet := by
+  apply Ket.ext_vec
   funext i
   rfl
 
@@ -628,72 +452,75 @@ theorem localConverseInputPureVector_reindex_symm :
 instrument; the reference identity is carried only by Bob's channel. -/
 def localConverseLOCC :
     OneWayLOCC
-      (Prod (TensorPower a n) kA)
+      (TensorPower a n × kA)
       lA
-      (Prod (TensorPower r n) (Prod (TensorPower b n) kB))
-      (Prod (TensorPower r n)
-        (Prod (Prod (TensorPower a n) (TensorPower b n)) lB))
+      (TensorPower r n × (TensorPower b n × kB))
+      (TensorPower r n ×
+        ((TensorPower a n × TensorPower b n) × lB))
       outcome :=
   OneWayLOCC.ofFiniteInstrument C.locc.aliceInstrument
     (fun result ↦
-      (Channel.idChannel (TensorPower r n)).prod (C.locc.bobChannel result))
+      (CPTPOp.id (dIn := TensorPower r n)).prod (C.locc.bobChannel result))
 
 /-- The ideal target in the local grouping `L_A | (R^n B')`. -/
-def localConverseTargetPureVector :
-    PureVector
-      (Prod lA
-        (Prod (TensorPower r n)
-          (Prod (Prod (TensorPower a n) (TensorPower b n)) lB))) :=
-  C.converseTargetPureVector.reindex
+def localConverseTargetKet :
+    Ket
+      (lA ×
+        (TensorPower r n ×
+          ((TensorPower a n × TensorPower b n) × lB))) :=
+  C.converseTargetKet.reindex
     (Equiv.prodAssoc lA (TensorPower r n)
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) lB))
+      ((TensorPower a n × TensorPower b n) × lB))
 
 /-- Reassociation identifies the local physical output with the existing
 reference-lifted converse output. -/
 theorem localConverseLOCC_applyState :
-    C.localConverseLOCC.toChannel.applyState C.localConverseInputPureVector.state =
-      (C.converseLOCC.toChannel.applyState C.converseInputPureVector.state).reindex
+    C.localConverseLOCC.toChannel C.localConverseInputKet.state =
+      MState.reindex (C.converseLOCC.toChannel C.converseInputKet.state)
         (Equiv.prodAssoc lA (TensorPower r n)
-          (Prod (Prod (TensorPower a n) (TensorPower b n)) lB)) := by
-  apply State.ext
-  simp only [Channel.applyState, State.reindex]
-  rw [← reindexChannel_map
+          ((TensorPower a n × TensorPower b n) × lB)) := by
+  apply MState.ext
+  simp only [CPTPOp.mat_coe_eq_apply_mat, MState.reindex_matrix]
+  rw [← CPTPOp.reindex_map
     (Equiv.prodAssoc lA (TensorPower r n)
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) lB))
-    (C.converseLOCC.toChannel.map C.converseInputPureVector.state.matrix)]
+      ((TensorPower a n × TensorPower b n) × lB))
+    (C.converseLOCC.toChannel.map C.converseInputKet.state.m)]
   simp only [localConverseLOCC, OneWayLOCC.ofFiniteInstrument,
-    localConverseInputPureVector, PureVector.reindex_state, converseLOCC,
+    localConverseInputKet, Ket.reindex_state, converseLOCC,
     OneWayLOCC.prodIdRight, OneWayLOCC.toChannel_map,
-    FiniteInstrument.prodIdRight_branch, Channel.prod, State.reindex,
+    FiniteInstrument.prodIdRight_branch, CPTPOp.prod_map, MState.reindex_matrix,
     LinearMap.sum_apply, map_sum]
-  rw [← reindexChannel_map
-    (Equiv.prodAssoc (Prod (TensorPower a n) kA) (TensorPower r n)
-      (Prod (TensorPower b n) kB))
-    C.converseInputPureVector.state.matrix]
+  rw [← CPTPOp.reindex_map
+    (Equiv.prodAssoc (TensorPower a n × kA) (TensorPower r n)
+      (TensorPower b n × kB))
+    C.converseInputKet.state.m]
   apply Finset.sum_congr rfl
   intro result _
-  exact LinearMap.congr_fun
+  have h := LinearMap.congr_fun
     (prodAssoc_kron_naturality
       (C.locc.aliceInstrument.branch result)
-      (Channel.idChannel (TensorPower r n)).map
+      (CPTPOp.id (dIn := TensorPower r n)).map
       (C.locc.bobChannel result).map)
-    C.converseInputPureVector.state.matrix
+    C.converseInputKet.state.m
+  simp only [LinearMap.comp_apply] at h
+  with_reducible exact h
 
 /-- The locally grouped protocol has exactly the block protocol's computed
 fidelity deficit. -/
 theorem localConverseLOCC_fidelityError :
-    1 - (C.localConverseLOCC.toChannel.applyState
-        C.localConverseInputPureVector.state).squaredFidelity
-          C.localConverseTargetPureVector.state = C.fidelityError := by
+    1 - MState.squaredFidelity
+        (C.localConverseLOCC.toChannel C.localConverseInputKet.state)
+        C.localConverseTargetKet.state = C.fidelityError := by
   rw [C.localConverseLOCC_applyState]
-  simp only [localConverseTargetPureVector, PureVector.reindex_state,
-    squaredFidelity_reindex_equiv]
+  simp only [localConverseTargetKet, Ket.reindex_state,
+    MState.squaredFidelity_reindex]
   exact C.converseLOCC_fidelityError
 
 /-- Source-faithful refined Alice outcomes before the reference lift. -/
 abbrev originalRecordedOutcomeIndex :=
-  C.locc.aliceInstrument.positiveSupport C.localConverseInputPureVector
+  C.locc.aliceInstrument.positiveSupport C.localConverseInputKet
 
+/-- Instrument outcomes are only assumed finite, so equality is decided classically. -/
 local instance originalRecordedOutcomeIndexDecidableEq :
     DecidableEq C.originalRecordedOutcomeIndex :=
   Classical.decEq _
@@ -702,15 +529,15 @@ local instance originalRecordedOutcomeIndexDecidableEq :
 positive Alice branch.  Bob's Kraus outcomes are summed nonselectively. -/
 def originalAlicePostBobBranchState
     (i : C.originalRecordedOutcomeIndex) :
-    State
-      (Prod (Prod lA (TensorPower r n))
-        (Prod (Prod (TensorPower a n) (TensorPower b n)) lB)) :=
-  ((Channel.idChannel (Prod lA (TensorPower r n))).prod
-      (C.locc.bobChannel i.1.1)).applyState
+    MState
+      ((lA × TensorPower r n) ×
+        ((TensorPower a n × TensorPower b n) × lB)) :=
+  ((CPTPOp.id (dIn := lA × TensorPower r n)).prod
+      (C.locc.bobChannel i.1.1))
     ((C.locc.aliceInstrument.normalizedBranch
-      C.localConverseInputPureVector i).state.reindex
-        (sourceReferenceRegroupEquiv lA (TensorPower r n)
-          (Prod (TensorPower b n) kB)))
+      C.localConverseInputKet i).state.reindex
+        (Equiv.prodAssoc lA (TensorPower r n)
+          (TensorPower b n × kB)).symm)
 
 /-- Reassociating one original Alice branch identifies its nonselective Bob
 output with the corresponding branch of the locally grouped LOCC map. -/
@@ -718,140 +545,121 @@ theorem originalAlicePostBobBranchState_reindex
     (i : C.originalRecordedOutcomeIndex) :
     (C.originalAlicePostBobBranchState i).reindex
         (Equiv.prodAssoc lA (TensorPower r n)
-          (Prod (Prod (TensorPower a n) (TensorPower b n)) lB)) =
+          ((TensorPower a n × TensorPower b n) × lB)) =
       C.localConverseLOCC.aliceConditionedOutputState
-        C.localConverseInputPureVector i := by
-  apply State.ext
+        C.localConverseInputKet i := by
+  apply MState.ext
   simp only [originalAlicePostBobBranchState,
     OneWayLOCC.aliceConditionedOutputState, localConverseLOCC,
-    Channel.applyState, State.reindex]
+    OneWayLOCC.ofFiniteInstrument, CPTPOp.mat_coe_eq_apply_mat,
+    MState.reindex_matrix, CPTPOp.prod_map]
   let rho :=
     (C.locc.aliceInstrument.normalizedBranch
-      C.localConverseInputPureVector i).state
-  rw [← reindexChannel_map
+      C.localConverseInputKet i).state
+  rw [← CPTPOp.reindex_map
     (Equiv.prodAssoc lA (TensorPower r n)
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) lB))]
-  rw [show sourceReferenceRegroupEquiv lA (TensorPower r n)
-      (Prod (TensorPower b n) kB) =
-        (Equiv.prodAssoc lA (TensorPower r n)
-          (Prod (TensorPower b n) kB)).symm by rfl]
-  rw [← reindexChannel_map
+      ((TensorPower a n × TensorPower b n) × lB))]
+  rw [← CPTPOp.reindex_map
     (Equiv.prodAssoc lA (TensorPower r n)
-      (Prod (TensorPower b n) kB)).symm]
-  change (Channel.reindex
-      (Equiv.prodAssoc lA (TensorPower r n)
-        (Prod (Prod (TensorPower a n) (TensorPower b n)) lB))).map
-      (MatrixMap.kron (Channel.idChannel (Prod lA (TensorPower r n))).map
-        (C.locc.bobChannel i.1.1).map
-        ((Channel.reindex
-          (Equiv.prodAssoc lA (TensorPower r n)
-            (Prod (TensorPower b n) kB)).symm).map rho.matrix)) =
-    MatrixMap.kron (Channel.idChannel lA).map
-      (MatrixMap.kron (Channel.idChannel (TensorPower r n)).map
-        (C.locc.bobChannel i.1.1).map) rho.matrix
+      (TensorPower b n × kB)).symm]
   rw [← kron_idChannel_idChannel_eq_idChannel_map
     (A := lA) (B := TensorPower r n)]
   have h := LinearMap.congr_fun
     (prodAssoc_kron_naturality
-      (Channel.idChannel lA).map
-      (Channel.idChannel (TensorPower r n)).map
+      (CPTPOp.id (dIn := lA)).map
+      (CPTPOp.id (dIn := TensorPower r n)).map
       (C.locc.bobChannel i.1.1).map)
-    ((Channel.reindex
+    ((CPTPOp.reindex
       (Equiv.prodAssoc lA (TensorPower r n)
-        (Prod (TensorPower b n) kB)).symm).map rho.matrix)
+        (TensorPower b n × kB)).symm).map rho.m)
   simp only [LinearMap.comp_apply] at h
-  rw [reindexChannel_map_symm_map] at h
-  exact h.symm
+  simp only [CPTPOp.reindex_map_symm_map] at h
+  with_reducible exact h.symm
 
 /-- Bob's trace-preserving conditional channel leaves the retained Alice
 register and untouched reference marginal unchanged. -/
-theorem originalAlicePostBobBranchState_marginalA
+theorem originalAlicePostBobBranchState_traceRight
     (i : C.originalRecordedOutcomeIndex) :
-    (C.originalAlicePostBobBranchState i).marginalA =
+    (C.originalAlicePostBobBranchState i).traceRight =
       C.locc.aliceInstrument.positiveBranchSourceReferenceState
-        C.localConverseInputPureVector i := by
+        C.localConverseInputKet i := by
   rw [originalAlicePostBobBranchState,
-    State.marginalA_applyState_id_prod]
+    MState.traceRight_applyState_id_prod]
   rfl
 
 /-- Original Alice branches after Bob is summed out, with the physical
 Alice branch weights. -/
 def originalAlicePostBobEnsemble :
-    Ensemble C.originalRecordedOutcomeIndex
-      (Prod (Prod lA (TensorPower r n))
-        (Prod (Prod (TensorPower a n) (TensorPower b n)) lB)) where
-  probs i := C.locc.aliceInstrument.branchWeight
-    C.localConverseInputPureVector i.1
-  weights_sum := C.locc.aliceInstrument.sum_positiveSupport_branchWeight_eq_one
-    C.localConverseInputPureVector
-  states i := C.originalAlicePostBobBranchState i
+    MEnsemble ((lA × TensorPower r n) ×
+        ((TensorPower a n × TensorPower b n) × lB)) C.originalRecordedOutcomeIndex :=
+  .ofProbs
+    (fun i => C.locc.aliceInstrument.branchWeight
+      C.localConverseInputKet i.1)
+    (C.locc.aliceInstrument.sum_positiveSupport_branchWeight_eq_one
+      C.localConverseInputKet)
+    (fun i => C.originalAlicePostBobBranchState i)
 
 /-- The nonselective average over original Alice outcomes is the existing
 physical converse output. -/
 theorem originalAlicePostBobEnsemble_averageState :
     C.originalAlicePostBobEnsemble.averageState =
-      C.converseLOCC.toChannel.applyState C.converseInputPureVector.state := by
+      C.converseLOCC.toChannel C.converseInputKet.state := by
   have hlocal :
       C.originalAlicePostBobEnsemble.averageState.reindex
           (Equiv.prodAssoc lA (TensorPower r n)
-            (Prod (Prod (TensorPower a n) (TensorPower b n)) lB)) =
-        C.localConverseLOCC.toChannel.applyState
-          C.localConverseInputPureVector.state := by
-    apply State.ext
-    simp only [State.reindex, Channel.applyState]
-    rw [← reindexChannel_map
+            ((TensorPower a n × TensorPower b n) × lB)) =
+        C.localConverseLOCC.toChannel
+          C.localConverseInputKet.state := by
+    apply MState.ext
+    simp only [MState.reindex_matrix, CPTPOp.mat_coe_eq_apply_mat]
+    rw [← CPTPOp.reindex_map
       (Equiv.prodAssoc lA (TensorPower r n)
-        (Prod (Prod (TensorPower a n) (TensorPower b n)) lB))]
-    change (Channel.reindex
+        ((TensorPower a n × TensorPower b n) × lB))]
+    change (CPTPOp.reindex
         (Equiv.prodAssoc lA (TensorPower r n)
-          (Prod (Prod (TensorPower a n) (TensorPower b n)) lB))).map
-        C.originalAlicePostBobEnsemble.averageState.matrix =
-      C.localConverseLOCC.toChannel.map C.localConverseInputPureVector.state.matrix
-    rw [Ensemble.averageState_matrix, map_sum]
+          ((TensorPower a n × TensorPower b n) × lB))).map
+        C.originalAlicePostBobEnsemble.averageState.m =
+      C.localConverseLOCC.toChannel.map C.localConverseInputKet.state.m
+    rw [MEnsemble.averageState_matrix, map_sum]
     calc
       (∑ i : C.originalRecordedOutcomeIndex,
-          (Channel.reindex
+          (CPTPOp.reindex
             (Equiv.prodAssoc lA (TensorPower r n)
-              (Prod (Prod (TensorPower a n) (TensorPower b n)) lB))).map
+              ((TensorPower a n × TensorPower b n) × lB))).map
             (C.originalAlicePostBobEnsemble.probs i •
-              (C.originalAlicePostBobEnsemble.states i).matrix)) =
+              (C.originalAlicePostBobEnsemble.states i).m)) =
           ∑ i : C.originalRecordedOutcomeIndex,
             C.localConverseLOCC.aliceInstrument.branchWeight
-                C.localConverseInputPureVector i.1 •
+                C.localConverseInputKet i.1 •
               (C.localConverseLOCC.aliceConditionedOutputState
-                C.localConverseInputPureVector i).matrix := by
+                C.localConverseInputKet i).m := by
         apply Finset.sum_congr rfl
         intro i _
-        rw [LinearMap.map_smul_of_tower, reindexChannel_map]
+        rw [LinearMap.map_smul_of_tower, CPTPOp.reindex_map]
         simp only [originalAlicePostBobEnsemble]
-        change (C.locc.aliceInstrument.branchWeight
-              C.localConverseInputPureVector i.1 : Complex) •
-            ((C.originalAlicePostBobBranchState i).reindex
-              (Equiv.prodAssoc lA (TensorPower r n)
-                (Prod (Prod (TensorPower a n) (TensorPower b n)) lB))).matrix = _
-        rw [C.originalAlicePostBobBranchState_reindex i]
+        rw [← MState.reindex_matrix, C.originalAlicePostBobBranchState_reindex i]
         ext j k
         simp [NNReal.smul_def, Matrix.smul_apply, Complex.real_smul,
           localConverseLOCC, OneWayLOCC.ofFiniteInstrument]
       _ = C.localConverseLOCC.toChannel.map
-          C.localConverseInputPureVector.state.matrix :=
+          C.localConverseInputKet.state.m :=
         C.localConverseLOCC.sum_alicePositiveBranchWeight_smul_conditionedOutputState_matrix
-          C.localConverseInputPureVector
+          C.localConverseInputKet
   rw [C.localConverseLOCC_applyState] at hlocal
-  have hcancel : ∀ ρ : State (Prod (Prod lA (TensorPower r n))
-        (Prod (Prod (TensorPower a n) (TensorPower b n)) lB)),
+  have hcancel : ∀ ρ : MState ((lA × TensorPower r n) ×
+        ((TensorPower a n × TensorPower b n) × lB)),
       (ρ.reindex (Equiv.prodAssoc lA (TensorPower r n)
-            (Prod (Prod (TensorPower a n) (TensorPower b n)) lB))).reindex
+            ((TensorPower a n × TensorPower b n) × lB))).reindex
           (Equiv.prodAssoc lA (TensorPower r n)
-            (Prod (Prod (TensorPower a n) (TensorPower b n)) lB)).symm = ρ := by
+            ((TensorPower a n × TensorPower b n) × lB)).symm = ρ := by
     intro ρ
     simpa using ρ.reindex_symm_reindex
       (Equiv.prodAssoc lA (TensorPower r n)
-        (Prod (Prod (TensorPower a n) (TensorPower b n)) lB)).symm
+        ((TensorPower a n × TensorPower b n) × lB)).symm
   have h := congrArg
     (fun rho ↦ rho.reindex
       (Equiv.prodAssoc lA (TensorPower r n)
-        (Prod (Prod (TensorPower a n) (TensorPower b n)) lB)).symm)
+        ((TensorPower a n × TensorPower b n) × lB)).symm)
     hlocal
   simpa [hcancel] using h
 
@@ -859,58 +667,66 @@ theorem originalAlicePostBobEnsemble_averageState :
 original Alice instrument rather than the canonical Kraus refinement of its
 reference lift. -/
 def originalRecordedOutcomeState :
-    State
-      (Prod lA (Prod (TensorPower r n) C.originalRecordedOutcomeIndex)) :=
+    MState
+      (lA × (TensorPower r n × C.originalRecordedOutcomeIndex)) :=
   C.locc.aliceInstrument.recordedSourceReferenceState
-    C.localConverseInputPureVector
+    C.localConverseInputKet
 
 /-- The ideal target on Alice's retained ebit half and the untouched
 reference is the product of the maximally mixed ebit marginal and the source
 reference marginal. -/
-theorem converseTargetPureVector_marginalA_eq_maximallyMixed_prod :
-    C.converseTargetPureVector.state.marginalA =
-      (State.maximallyMixed lA).prod
-        (stateMergingBlockSource psi n).state.marginalB := by
-  apply State.ext
+theorem converseTargetKet_traceRight_eq_uniform_prod :
+    C.converseTargetKet.state.traceRight =
+      (MState.uniform : MState lA).prod
+        (stateMergingBlockSource psi n).state.traceLeft := by
+  apply MState.ext
   ext i j
-  simp [converseTargetPureVector, targetPureVector,
-    stateMergingConverseOutputEquiv, stateMergingTargetEquiv,
-    PureVector.reindex_state, PureVector.prod_state, State.reindex, State.prod,
-    State.maximallyMixed, State.marginalA, State.marginalB, partialTraceA,
-    partialTraceB, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  simp [converseTargetKet, targetKet,
+    prodABCToACBEquiv, stateMergingTargetEquiv,
+    Matrix.traceLeft,
+    Matrix.traceRight, Matrix.kroneckerMap_apply,
     Fintype.sum_prod_type]
   have hebit :
       (∑ k : lB,
-        (PureVector.maximallyEntangled C.outputEbitPairing).amp (i.1, k) *
-          star ((PureVector.maximallyEntangled C.outputEbitPairing).amp (j.1, k))) =
+        (Ket.maximallyEntangled C.outputEbitPairing).vec (i.1, k) *
+          star ((Ket.maximallyEntangled C.outputEbitPairing).vec (j.1, k))) =
         (Fintype.card lA : ℂ)⁻¹ * (1 : CMatrix lA) i.1 j.1 := by
-    have h := congrArg (fun rho : State lA => rho.matrix i.1 j.1)
-      (PureVector.maximallyEntangled_marginalA C.outputEbitPairing)
-    simpa [State.marginalA, partialTraceB, PureVector.state,
-      rankOneMatrix_apply, State.maximallyMixed] using h
+    have h := congrArg (fun rho : MState lA => rho.m i.1 j.1)
+      (Ket.maximallyEntangled_traceRight C.outputEbitPairing)
+    simpa [Matrix.traceRight, Ket.state,
+      rankOneMatrix_apply] using h
   calc
     (∑ x, ∑ y, ∑ k,
-        (stateMergingBlockSource psi n).amp ((x, y), i.2) *
-            star ((stateMergingBlockSource psi n).amp ((x, y), j.2)) *
-          ((PureVector.maximallyEntangled C.outputEbitPairing).amp (i.1, k) *
-            star ((PureVector.maximallyEntangled C.outputEbitPairing).amp (j.1, k)))) =
+        (stateMergingBlockSource psi n).vec ((x, y), i.2) *
+            (Ket.maximallyEntangled C.outputEbitPairing).vec (i.1, k) *
+          (star ((stateMergingBlockSource psi n).vec ((x, y), j.2)) *
+            star ((Ket.maximallyEntangled C.outputEbitPairing).vec (j.1, k)))) =
+        (∑ x, ∑ y, ∑ k,
+          (stateMergingBlockSource psi n).vec ((x, y), i.2) *
+              star ((stateMergingBlockSource psi n).vec ((x, y), j.2)) *
+            ((Ket.maximallyEntangled C.outputEbitPairing).vec (i.1, k) *
+              star ((Ket.maximallyEntangled C.outputEbitPairing).vec (j.1, k)))) := by
+      refine Finset.sum_congr rfl fun x _ => Finset.sum_congr rfl fun y _ =>
+        Finset.sum_congr rfl fun k _ => ?_
+      ring
+    _ =
         (∑ k : lB,
-          (PureVector.maximallyEntangled C.outputEbitPairing).amp (i.1, k) *
-            star ((PureVector.maximallyEntangled C.outputEbitPairing).amp (j.1, k))) *
+          (Ket.maximallyEntangled C.outputEbitPairing).vec (i.1, k) *
+            star ((Ket.maximallyEntangled C.outputEbitPairing).vec (j.1, k))) *
           (∑ x, ∑ y,
-            (stateMergingBlockSource psi n).amp ((x, y), i.2) *
-              star ((stateMergingBlockSource psi n).amp ((x, y), j.2))) := by
+            (stateMergingBlockSource psi n).vec ((x, y), i.2) *
+              star ((stateMergingBlockSource psi n).vec ((x, y), j.2))) := by
       exact sum_sum_sum_mul_right
         (fun x y =>
-          (stateMergingBlockSource psi n).amp ((x, y), i.2) *
-            star ((stateMergingBlockSource psi n).amp ((x, y), j.2)))
+          (stateMergingBlockSource psi n).vec ((x, y), i.2) *
+            star ((stateMergingBlockSource psi n).vec ((x, y), j.2)))
         (fun k =>
-          (PureVector.maximallyEntangled C.outputEbitPairing).amp (i.1, k) *
-            star ((PureVector.maximallyEntangled C.outputEbitPairing).amp (j.1, k)))
+          (Ket.maximallyEntangled C.outputEbitPairing).vec (i.1, k) *
+            star ((Ket.maximallyEntangled C.outputEbitPairing).vec (j.1, k)))
     _ = (Fintype.card lA : ℂ)⁻¹ * (1 : CMatrix lA) i.1 j.1 *
           ∑ x, ∑ y,
-            (stateMergingBlockSource psi n).amp ((x, y), i.2) *
-              star ((stateMergingBlockSource psi n).amp ((x, y), j.2)) := by
+            (stateMergingBlockSource psi n).vec ((x, y), i.2) *
+              star ((stateMergingBlockSource psi n).vec ((x, y), j.2)) := by
       rw [hebit]
 
 /-- Alice's positive refined local-instrument outcomes.  Bob's Kraus index is
@@ -918,6 +734,7 @@ deliberately absent from this source-faithful Berta record. -/
 abbrev recordedOutcomeIndex :=
   C.originalRecordedOutcomeIndex
 
+/-- Instrument outcomes are only assumed finite, so equality is decided classically. -/
 local instance recordedOutcomeIndexDecidableEq :
     DecidableEq C.recordedOutcomeIndex :=
   Classical.decEq _
@@ -925,78 +742,77 @@ local instance recordedOutcomeIndexDecidableEq :
 /-- Physical post-Alice states on `L_A R^n`, with Alice's operational branch
 probabilities. -/
 def recordedOutcomeEnsemble :
-    Ensemble C.recordedOutcomeIndex (Prod lA (TensorPower r n)) where
-  probs i :=
-    C.locc.aliceInstrument.branchWeight C.localConverseInputPureVector i.1
-  weights_sum :=
-    C.locc.aliceInstrument.sum_positiveSupport_branchWeight_eq_one
-      C.localConverseInputPureVector
-  states i :=
-    C.locc.aliceInstrument.positiveBranchSourceReferenceState
-      C.localConverseInputPureVector i
+    MEnsemble (lA × TensorPower r n) C.recordedOutcomeIndex :=
+  .ofProbs
+    (fun i =>
+      C.locc.aliceInstrument.branchWeight C.localConverseInputKet i.1)
+    (C.locc.aliceInstrument.sum_positiveSupport_branchWeight_eq_one
+      C.localConverseInputKet)
+    (fun i =>
+      C.locc.aliceInstrument.positiveBranchSourceReferenceState
+        C.localConverseInputKet i)
 
 /-- The ideal `L_A R^n` branch, repeated with the same Alice-outcome
 distribution as the physical ensemble. -/
 def idealRecordedOutcomeEnsemble :
-    Ensemble C.recordedOutcomeIndex (Prod lA (TensorPower r n)) where
-  probs i :=
-    C.locc.aliceInstrument.branchWeight C.localConverseInputPureVector i.1
-  weights_sum :=
-    C.locc.aliceInstrument.sum_positiveSupport_branchWeight_eq_one
-      C.localConverseInputPureVector
-  states _ :=
-    (State.maximallyMixed lA).prod
-      (stateMergingBlockSource psi n).state.marginalB
+    MEnsemble (lA × TensorPower r n) C.recordedOutcomeIndex :=
+  .ofProbs
+    (fun i =>
+      C.locc.aliceInstrument.branchWeight C.localConverseInputKet i.1)
+    (C.locc.aliceInstrument.sum_positiveSupport_branchWeight_eq_one
+      C.localConverseInputKet)
+    (fun _ =>
+      (MState.uniform : MState lA).prod
+        (stateMergingBlockSource psi n).state.traceLeft)
 
 /-- Alice's physical cq record, reordered onto `L_A (R^n X_A)`. -/
 def recordedOutcomeState :
-    State (Prod lA (Prod (TensorPower r n) C.recordedOutcomeIndex)) :=
+    MState (lA × (TensorPower r n × C.recordedOutcomeIndex)) :=
   C.recordedOutcomeEnsemble.cqState.reindex
-    (stateMergingRecordedOutcomeEquiv
+    (prodABCToBCAEquiv
       C.recordedOutcomeIndex lA (TensorPower r n))
 
 /-- The same-weight ideal cq record on `L_A (R^n X_A)`. -/
 def idealRecordedOutcomeState :
-    State (Prod lA (Prod (TensorPower r n) C.recordedOutcomeIndex)) :=
+    MState (lA × (TensorPower r n × C.recordedOutcomeIndex)) :=
   C.idealRecordedOutcomeEnsemble.cqState.reindex
-    (stateMergingRecordedOutcomeEquiv
+    (prodABCToBCAEquiv
       C.recordedOutcomeIndex lA (TensorPower r n))
 
 /-- The ideal side-information ensemble on the untouched reference. -/
 def idealRecordedConditioningEnsemble :
-    Ensemble C.recordedOutcomeIndex (TensorPower r n) where
-  probs i :=
-    C.locc.aliceInstrument.branchWeight C.localConverseInputPureVector i.1
-  weights_sum :=
-    C.locc.aliceInstrument.sum_positiveSupport_branchWeight_eq_one
-      C.localConverseInputPureVector
-  states _ := (stateMergingBlockSource psi n).state.marginalB
+    MEnsemble (TensorPower r n) C.recordedOutcomeIndex :=
+  .ofProbs
+    (fun i =>
+      C.locc.aliceInstrument.branchWeight C.localConverseInputKet i.1)
+    (C.locc.aliceInstrument.sum_positiveSupport_branchWeight_eq_one
+      C.localConverseInputKet)
+    (fun _ => (stateMergingBlockSource psi n).state.traceLeft)
 
 /-- The ideal conditioning state on `R^n X_A`. -/
 def idealRecordedConditioningState :
-    State (Prod (TensorPower r n) C.recordedOutcomeIndex) :=
+    MState (TensorPower r n × C.recordedOutcomeIndex) :=
   C.idealRecordedConditioningEnsemble.cqState.reindex
-    (stateMergingRecordedConditioningEquiv
-      C.recordedOutcomeIndex (TensorPower r n))
+    (Equiv.prodComm C.recordedOutcomeIndex (TensorPower r n))
 
 @[simp]
 theorem idealRecordedOutcomeEnsemble_states_eq_target
     (i : C.recordedOutcomeIndex) :
     C.idealRecordedOutcomeEnsemble.states i =
-      C.converseTargetPureVector.state.marginalA := by
-  exact C.converseTargetPureVector_marginalA_eq_maximallyMixed_prod.symm
+      C.converseTargetKet.state.traceRight := by
+  exact C.converseTargetKet_traceRight_eq_uniform_prod.symm
 
 /-- The ideal Alice-record state is a uniform retained-ebit register
 independent of the untouched reference and Alice's classical outcome. -/
-theorem idealRecordedOutcomeState_eq_maximallyMixed_prod :
+theorem idealRecordedOutcomeState_eq_uniform_prod :
     C.idealRecordedOutcomeState =
-      (State.maximallyMixed lA).prod C.idealRecordedConditioningState := by
-  apply State.ext
+      (MState.uniform : MState lA).prod C.idealRecordedConditioningState := by
+  apply MState.ext
   ext i j
   simp [idealRecordedOutcomeState, idealRecordedConditioningState,
     idealRecordedOutcomeEnsemble, idealRecordedConditioningEnsemble,
-    stateMergingRecordedOutcomeEquiv, stateMergingRecordedConditioningEquiv,
-    Ensemble.cqState, State.reindex, State.prod, Matrix.kronecker,
+    prodABCToBCAEquiv, Equiv.prodComm,
+    MEnsemble.cqState, Matrix.kronecker,
     Matrix.kroneckerMap_apply]
   simp only [Matrix.sum_apply, Matrix.smul_apply, Matrix.kroneckerMap_apply]
   rw [Finset.mul_sum]
@@ -1009,14 +825,14 @@ independent of `R^n X_A`, so its conditional min-entropy is `log₂ |L_A|`. -/
 theorem idealRecordedOutcomeState_conditionalMinEntropy :
     C.idealRecordedOutcomeState.conditionalMinEntropy =
       log2 (Fintype.card lA : ℝ) := by
-  rw [C.idealRecordedOutcomeState_eq_maximallyMixed_prod]
-  exact State.conditionalMinEntropy_maximallyMixed_prod
+  rw [C.idealRecordedOutcomeState_eq_uniform_prod]
+  exact MState.conditionalMinEntropy_uniform_prod
     C.idealRecordedConditioningState
 
 @[simp]
 theorem idealRecordedOutcomeEnsemble_probs (i : C.recordedOutcomeIndex) :
-    C.idealRecordedOutcomeEnsemble.probs i = C.recordedOutcomeEnsemble.probs i :=
-  rfl
+    C.idealRecordedOutcomeEnsemble.probs i = C.recordedOutcomeEnsemble.probs i := by
+  simp only [idealRecordedOutcomeEnsemble, recordedOutcomeEnsemble, MEnsemble.ofProbs_probs]
 
 /-- Alice's recorded physical state is within `sqrt fidelityError` in
 normalized trace distance of the same-weight ideal record. -/
@@ -1024,46 +840,47 @@ theorem recordedOutcomeState_normalizedTraceDistance_le_sqrt_fidelityError :
     C.recordedOutcomeState.normalizedTraceDistance C.idealRecordedOutcomeState ≤
       Real.sqrt C.fidelityError := by
   rw [recordedOutcomeState, idealRecordedOutcomeState,
-    normalizedTraceDistance_reindex_equiv]
-  rw [Ensemble.cqState_normalizedTraceDistance_eq_sum_of_same_probs
+    MState.normalizedTraceDistance_reindex_equiv]
+  rw [MEnsemble.cqState_normalizedTraceDistance_eq_sum_of_same_probs
     C.recordedOutcomeEnsemble C.idealRecordedOutcomeEnsemble
     C.idealRecordedOutcomeEnsemble_probs]
   have hfull :=
     C.originalAlicePostBobEnsemble.sum_prob_mul_traceNormDistance_le_pure
-      C.converseTargetPureVector
+      C.converseTargetKet
   rw [C.originalAlicePostBobEnsemble_averageState,
     C.converseLOCC_fidelityError] at hfull
   have havg :
       (∑ i : C.recordedOutcomeIndex,
         (C.locc.aliceInstrument.branchWeight
-          C.localConverseInputPureVector i.1 : ℝ) *
+          C.localConverseInputKet i.1 : ℝ) *
           (C.locc.aliceInstrument.positiveBranchSourceReferenceState
-            C.localConverseInputPureVector i).traceNormDistance
-              C.converseTargetPureVector.state.marginalA) ≤
+            C.localConverseInputKet i).traceNormDistance
+              C.converseTargetKet.state.traceRight) ≤
         2 * Real.sqrt C.fidelityError := by
     calc
       (∑ i : C.recordedOutcomeIndex,
           (C.locc.aliceInstrument.branchWeight
-            C.localConverseInputPureVector i.1 : ℝ) *
+            C.localConverseInputKet i.1 : ℝ) *
             (C.locc.aliceInstrument.positiveBranchSourceReferenceState
-              C.localConverseInputPureVector i).traceNormDistance
-                C.converseTargetPureVector.state.marginalA) =
+              C.localConverseInputKet i).traceNormDistance
+                C.converseTargetKet.state.traceRight) =
           ∑ i : C.recordedOutcomeIndex,
             (C.originalAlicePostBobEnsemble.probs i : ℝ) *
-              (C.originalAlicePostBobEnsemble.states i).marginalA.traceNormDistance
-                C.converseTargetPureVector.state.marginalA := by
+              (C.originalAlicePostBobEnsemble.states i).traceRight.traceNormDistance
+                C.converseTargetKet.state.traceRight := by
         apply Finset.sum_congr rfl
         intro i _
-        simp only [originalAlicePostBobEnsemble]
-        rw [C.originalAlicePostBobBranchState_marginalA i]
+        simp only [originalAlicePostBobEnsemble, MEnsemble.ofProbs_probs,
+          MEnsemble.ofProbs_states]
+        rw [C.originalAlicePostBobBranchState_traceRight i]
       _ ≤ ∑ i : C.recordedOutcomeIndex,
           (C.originalAlicePostBobEnsemble.probs i : ℝ) *
             (C.originalAlicePostBobEnsemble.states i).traceNormDistance
-              C.converseTargetPureVector.state := by
+              C.converseTargetKet.state := by
         apply Finset.sum_le_sum
         intro i _
         exact mul_le_mul_of_nonneg_left
-          (traceNormDistance_marginalA_le _ _) (NNReal.coe_nonneg _)
+          (traceNormDistance_traceRight_le _ _) (NNReal.coe_nonneg _)
       _ ≤ 2 * Real.sqrt C.fidelityError := hfull
   calc
     (∑ i : C.recordedOutcomeIndex,
@@ -1073,17 +890,18 @@ theorem recordedOutcomeState_normalizedTraceDistance_le_sqrt_fidelityError :
         (1 / 2 : ℝ) *
           ∑ i : C.recordedOutcomeIndex,
             (C.locc.aliceInstrument.branchWeight
-                C.localConverseInputPureVector i.1 : ℝ) *
+                C.localConverseInputKet i.1 : ℝ) *
               (C.locc.aliceInstrument.positiveBranchSourceReferenceState
-                C.localConverseInputPureVector i).traceNormDistance
-                  C.converseTargetPureVector.state.marginalA := by
+                C.localConverseInputKet i).traceNormDistance
+                  C.converseTargetKet.state.traceRight := by
       rw [Finset.mul_sum]
       apply Finset.sum_congr rfl
       intro i _
-      simp only [recordedOutcomeEnsemble,
+      simp only [recordedOutcomeEnsemble, MEnsemble.ofProbs_probs,
+        MEnsemble.ofProbs_states,
         C.idealRecordedOutcomeEnsemble_states_eq_target,
-        State.normalizedTraceDistance, QIT.normalizedTraceDistance,
-        State.traceNormDistance]
+        MState.normalizedTraceDistance, QIT.normalizedTraceDistance,
+        MState.traceNormDistance]
       ring
     _ ≤ (1 / 2 : ℝ) * (2 * Real.sqrt C.fidelityError) :=
       mul_le_mul_of_nonneg_left havg (by norm_num)
@@ -1100,16 +918,16 @@ theorem recordedOutcomeState_purifiedBall :
   let : DecidableEq (TensorPower a n) := tensorPowerDecidableEq n
   let : DecidableEq (TensorPower b n) := tensorPowerDecidableEq n
   let : DecidableEq (TensorPower r n) := tensorPowerDecidableEq n
-  rw [State.purifiedBall_eq]
-  apply State.purifiedDistance_le_sqrt_two_mul_sub_sq_of_normalizedTraceDistance_le
+  rw [MState.purifiedBall_eq]
+  apply MState.purifiedDistance_le_sqrt_two_mul_sub_sq_of_normalizedTraceDistance_le
   · apply Real.sqrt_le_one.mpr
     unfold fidelityError
-    have hnonneg := State.squaredFidelity_nonneg C.outputState C.targetState
+    have hnonneg := MState.squaredFidelity_nonneg C.outputState C.targetState
     linarith
   · exact C.recordedOutcomeState_normalizedTraceDistance_le_sqrt_fidelityError
 
 end StateMergingBlockProtocol
 
-end
-
 end QIT
+
+end

@@ -23,46 +23,46 @@ material [Tomamichel2015FiniteResources, prelim.tex:617-624].
 
 open scoped ComplexOrder MatrixOrder NNReal
 
-namespace QIT
-
 universe u v
 
 noncomputable section
+
+namespace MEnsemble
+
+open QIT
 
 variable {ι : Type u} {a : Type v}
 variable [Fintype ι] [Fintype a]
 variable [DecidableEq ι] [DecidableEq a]
 
-namespace Ensemble
-
 /-- The classical-quantum state rho_XQ = Sum_x p_x |x><x|_X (x) rho_x. -/
-def cqState (E : Ensemble ι a) : State (Prod ι a) where
-  matrix := ∑ x, (E.probs x) • Matrix.kronecker (Matrix.single x x (1 : ℂ)) (E.states x).matrix
-  pos := by
+def cqState (E : MEnsemble a ι) : MState (ι × a) := .ofMatrix
+  (matrix := ∑ x, (E.probs x) • Matrix.kronecker (Matrix.single x x (1 : ℂ)) (E.states x).m)
+  (pos := by
     exact Matrix.posSemidef_sum Finset.univ fun x _ =>
-      ((posSemidef_single x).kronecker (E.states x).pos).smul (NNReal.coe_nonneg (E.probs x))
-  trace_eq_one := by
-    have hkr : ∀ x, (Matrix.kronecker (Matrix.single x x (1 : ℂ)) (E.states x).matrix).trace =
-        (Matrix.single x x (1 : ℂ)).trace * (E.states x).matrix.trace := fun x =>
+      ((posSemidef_single x).kronecker (E.states x).psd).smul (NNReal.coe_nonneg (E.probs x)))
+  (trace_eq_one := by
+    have hkr : ∀ x, (Matrix.kronecker (Matrix.single x x (1 : ℂ)) (E.states x).m).trace =
+        (Matrix.single x x (1 : ℂ)).trace * (E.states x).m.trace := fun x =>
       Matrix.trace_kronecker _ _
     simp only [Matrix.trace_sum, Matrix.trace_smul]
     rw [Finset.sum_congr rfl fun x _ => by rw [hkr x, trace_single_one, if_pos rfl, one_mul,
-      (E.states x).trace_eq_one]]
+      (E.states x).tr']]
     rw [Finset.sum_congr rfl fun x _ => (Algebra.algebraMap_eq_smul_one _).symm]
-    rw [← map_sum (algebraMap ℝ≥0 ℂ) E.probs Finset.univ, E.weights_sum, map_one]
+    rw [← map_sum (algebraMap ℝ≥0 ℂ) E.probs Finset.univ, E.weights_sum, map_one])
 
 /-- The cq state's matrix is the weighted Kronecker sum. -/
 @[simp]
-theorem cqState_matrix (E : Ensemble ι a) :
-    E.cqState.matrix =
-      ∑ x, (E.probs x) • Matrix.kronecker (Matrix.single x x (1 : ℂ)) (E.states x).matrix := by
-  rfl
+theorem cqState_matrix (E : MEnsemble a ι) :
+    E.cqState.m =
+      ∑ x, (E.probs x) • Matrix.kronecker (Matrix.single x x (1 : ℂ)) (E.states x).m :=
+  MState.matrix_ofMatrix _ _ _
 
 /-- Tracing out the classical register gives the ensemble's average state. -/
-theorem partialTraceA_cqState (E : Ensemble ι a) :
-    partialTraceA (E.cqState.matrix) = E.averageState.matrix := by
+theorem traceLeft_cqState (E : MEnsemble a ι) :
+    Matrix.traceLeft (E.cqState.m) = E.averageState.m := by
   ext j j'
-  simp only [cqState_matrix, averageState_matrix, partialTraceA, Matrix.sum_apply,
+  simp only [cqState_matrix, averageState_matrix, Matrix.traceLeft, Matrix.of_apply, Matrix.sum_apply,
     Matrix.smul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]
   refine Finset.sum_congr rfl fun i _ => ?_
   rw [Finset.sum_eq_single_of_mem i (Finset.mem_univ _)
@@ -72,23 +72,24 @@ theorem partialTraceA_cqState (E : Ensemble ι a) :
   simp only [Matrix.single_apply, and_self_iff, if_true, one_mul]
 
 /-- The quantum marginal of an ensemble cq-state is the ensemble average state. -/
-theorem cqState_marginalB_eq_averageState (E : Ensemble ι a) :
-    E.cqState.marginalB = E.averageState := by
-  apply State.ext
-  exact partialTraceA_cqState E
+theorem cqState_traceLeft_eq_averageState (E : MEnsemble a ι) :
+    E.cqState.traceLeft = E.averageState := by
+  apply MState.ext
+  rw [MState.traceLeft_m]
+  exact traceLeft_cqState E
 
 /-- Tracing out the quantum system gives the classical distribution diag(p). -/
-theorem partialTraceB_cqState (E : Ensemble ι a) :
-    partialTraceB (E.cqState.matrix) = Matrix.diagonal (fun x => ((E.probs x : ℂ))) := by
+theorem traceRight_cqState (E : MEnsemble a ι) :
+    Matrix.traceRight (E.cqState.m) = Matrix.diagonal (fun x => ((E.probs x : ℂ))) := by
   ext x x'
-  simp only [cqState_matrix, partialTraceB, Matrix.sum_apply, Matrix.diagonal_apply,
+  simp only [cqState_matrix, Matrix.traceRight, Matrix.of_apply, Matrix.sum_apply, Matrix.diagonal_apply,
     Matrix.smul_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]
   by_cases h : x = x'
   · subst h
     rw [if_pos rfl]
     have key : ∀ (i : a),
-        (∑ c : ι, (E.probs c • (Matrix.single c c (1 : ℂ) x x * (E.states c).matrix i i) : ℂ)) =
-          (E.probs x • (E.states x).matrix i i : ℂ) := by
+        (∑ c : ι, (E.probs c • (Matrix.single c c (1 : ℂ) x x * (E.states c).m i i) : ℂ)) =
+          (E.probs x • (E.states x).m i i : ℂ) := by
       intro i
       rw [Finset.sum_eq_single_of_mem x (Finset.mem_univ _)
           fun c _ hc => by
@@ -98,8 +99,8 @@ theorem partialTraceB_cqState (E : Ensemble ι a) :
       simp only [Matrix.single_apply, and_self_iff, if_true, one_mul]
     simp only [key]
     rw [← Finset.smul_sum]
-    show (E.probs x) • ((E.states x).matrix.trace) = ↑↑(E.probs x)
-    rw [(E.states x).trace_eq_one, Algebra.smul_def, mul_one]
+    show (E.probs x) • ((E.states x).m.trace) = ↑↑(E.probs x)
+    rw [(E.states x).tr', Algebra.smul_def, mul_one]
     rfl
   · rw [if_neg h]
     refine Finset.sum_eq_zero fun i _ => ?_
@@ -108,7 +109,13 @@ theorem partialTraceB_cqState (E : Ensemble ι a) :
       rw [Matrix.single_apply, if_neg fun hcc => h (hcc.1.symm.trans hcc.2)]
     rw [hz, zero_mul, smul_zero]
 
-end Ensemble
+end MEnsemble
+
+namespace QIT
+
+variable {ι : Type u} {a : Type v}
+variable [Fintype ι] [Fintype a]
+variable [DecidableEq ι] [DecidableEq a]
 
 namespace Classical
 
@@ -116,10 +123,10 @@ variable {ι : Type u} {a : Type v}
 variable [Fintype ι] [DecidableEq ι]
 
 /-- Extract the `(x, x')` classical block of a matrix on a classical-quantum product. -/
-def block (X : CMatrix (Prod ι a)) (x x' : ι) : CMatrix a := fun i j => X (x, i) (x', j)
+def block (X : CMatrix (ι × a)) (x x' : ι) : CMatrix a := fun i j => X (x, i) (x', j)
 
 /-- Reconstruct a block-diagonal classical-quantum matrix from quantum blocks. -/
-def blockDiagonal (blocks : ι → CMatrix a) : CMatrix (Prod ι a) :=
+def blockDiagonal (blocks : ι → CMatrix a) : CMatrix (ι × a) :=
   ∑ x, Matrix.kronecker (Matrix.single x x (1 : ℂ)) (blocks x)
 
 /-- Extracting a diagonal block from a block-diagonal matrix recovers that block. -/
@@ -344,7 +351,7 @@ theorem blockDiagonal_psdSqrt (blocks : ι → CMatrix a)
     psdSqrt (blockDiagonal blocks) =
       blockDiagonal (fun x => psdSqrt (blocks x)) := by
   classical
-  let S : CMatrix (Prod ι a) := blockDiagonal (fun x => psdSqrt (blocks x))
+  let S : CMatrix (ι × a) := blockDiagonal (fun x => psdSqrt (blocks x))
   have hSpos : S.PosSemidef := by
     dsimp [S]
     exact blockDiagonal_posSemidef (fun x => psdSqrt (blocks x))
@@ -388,17 +395,17 @@ theorem traceNorm_psdSqrt_blockDiagonal_mul_psdSqrt_blockDiagonal
 omit [DecidableEq ι] [DecidableEq a] in
 /-- The trace of a matrix on a classical-quantum product is the sum of the
 traces of its diagonal classical blocks. -/
-theorem sum_block_trace (X : CMatrix (Prod ι a)) :
+theorem sum_block_trace (X : CMatrix (ι × a)) :
     (∑ x, (block X x x).trace) = X.trace := by
   rw [Matrix.trace]
   rw [Fintype.sum_prod_type]
   rfl
 
 /-- The cq-state matrix is reconstructed from the weighted diagonal quantum blocks. -/
-theorem cqState_eq_blockDiagonal (E : Ensemble ι a) :
-    E.cqState.matrix = blockDiagonal fun x => (E.probs x : ℂ) • (E.states x).matrix := by
+theorem cqState_eq_blockDiagonal (E : MEnsemble a ι) :
+    E.cqState.m = blockDiagonal fun x => (E.probs x : ℂ) • (E.states x).m := by
   ext xi xj
-  simp only [Ensemble.cqState_matrix, blockDiagonal, Matrix.sum_apply, Matrix.smul_apply,
+  simp only [MEnsemble.cqState_matrix, blockDiagonal, Matrix.sum_apply, Matrix.smul_apply,
     Matrix.kronecker, Matrix.kroneckerMap_apply, smul_eq_mul]
   refine Finset.sum_congr rfl fun x _ => ?_
   rw [Algebra.smul_def]
@@ -406,50 +413,28 @@ theorem cqState_eq_blockDiagonal (E : Ensemble ι a) :
   ring
 
 /-- The `(x, x)` block of a cq-state is the weighted quantum state for `x`. -/
-@[simp]
-theorem cqState_block_self (E : Ensemble ι a) (x : ι) :
-    block E.cqState.matrix x x = (E.probs x : ℂ) • (E.states x).matrix := by
+theorem cqState_block_self (E : MEnsemble a ι) (x : ι) :
+    block E.cqState.m x x = (E.probs x : ℂ) • (E.states x).m := by
   rw [cqState_eq_blockDiagonal]
-  exact blockDiagonal_block_self (fun y => (E.probs y : ℂ) • (E.states y).matrix) x
+  exact blockDiagonal_block_self (fun y => (E.probs y : ℂ) • (E.states y).m) x
 
 /-- Distinct classical labels have zero off-diagonal cq-state blocks. -/
-@[simp]
-theorem cqState_block_ne (E : Ensemble ι a) {x x' : ι} (h : x ≠ x') :
-    block E.cqState.matrix x x' = 0 := by
+theorem cqState_block_ne (E : MEnsemble a ι) {x x' : ι} (h : x ≠ x') :
+    block E.cqState.m x x' = 0 := by
   rw [cqState_eq_blockDiagonal]
-  exact blockDiagonal_block_ne (fun y => (E.probs y : ℂ) • (E.states y).matrix) h
+  exact blockDiagonal_block_ne (fun y => (E.probs y : ℂ) • (E.states y).m) h
 
 /-- A cq-state is reconstructed by placing its extracted diagonal blocks on the diagonal. -/
-theorem cqState_eq_blockDiagonal_blocks (E : Ensemble ι a) :
-    E.cqState.matrix = blockDiagonal fun x => block E.cqState.matrix x x := by
+theorem cqState_eq_blockDiagonal_blocks (E : MEnsemble a ι) :
+    E.cqState.m = blockDiagonal fun x => block E.cqState.m x x := by
   rw [cqState_eq_blockDiagonal]
   apply congrArg blockDiagonal
   funext x
   symm
-  exact blockDiagonal_block_self (fun y => (E.probs y : ℂ) • (E.states y).matrix) x
-
-/-- Local classical bridge alias for the cq-state construction. -/
-abbrev cqState (E : Ensemble ι a) : State (Prod ι a) := Ensemble.cqState E
-
-/-- The cq-state matrix is the weighted Kronecker sum. -/
-@[simp]
-theorem cqState_matrix (E : Ensemble ι a) :
-    E.cqState.matrix =
-      ∑ x, (E.probs x) • Matrix.kronecker (Matrix.single x x (1 : ℂ)) (E.states x).matrix := by
-  rfl
-
-/-- Tracing out the classical register gives the ensemble's average state. -/
-theorem partialTraceA_cqState (E : Ensemble ι a) :
-    partialTraceA (E.cqState.matrix) = E.averageState.matrix := by
-  simpa [cqState] using Ensemble.partialTraceA_cqState E
-
-/-- Tracing out the quantum system gives the classical distribution diag(p). -/
-theorem partialTraceB_cqState (E : Ensemble ι a) :
-    partialTraceB (E.cqState.matrix) = Matrix.diagonal (fun x => ((E.probs x : ℂ))) := by
-  simpa [cqState] using Ensemble.partialTraceB_cqState E
+  exact blockDiagonal_block_self (fun y => (E.probs y : ℂ) • (E.states y).m) x
 
 end Classical
 
-end
-
 end QIT
+
+end

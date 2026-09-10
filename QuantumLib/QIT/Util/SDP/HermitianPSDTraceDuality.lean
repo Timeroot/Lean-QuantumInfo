@@ -62,46 +62,6 @@ theorem trace_mul_isHermitian_im_eq_zero {T A : CMatrix n}
   simp at him
   linarith
 
-/-- The trace product of two PSD matrices is nonnegative in real part. -/
-theorem cMatrix_trace_mul_posSemidef_re_nonneg {A B : CMatrix n}
-    (hA : A.PosSemidef) (hB : B.PosSemidef) :
-    0 ≤ ((A * B).trace).re := by
-  let S := psdSqrt A
-  have hpsd : (S * B * S).PosSemidef := by
-    have h := hB.mul_mul_conjTranspose_same S
-    dsimp [S] at h
-    rw [psdSqrt_isHermitian A] at h
-    exact h
-  have htrace : 0 ≤ (S * B * S).trace :=
-    Matrix.PosSemidef.trace_nonneg hpsd
-  have hEq : (A * B).trace = (S * B * S).trace := by
-    have hsqrt : S * S = A := by
-      simpa [S] using psdSqrt_mul_self_of_posSemidef hA
-    rw [← hsqrt]
-    calc
-      ((S * S) * B).trace = (S * (S * B)).trace := by
-        rw [Matrix.mul_assoc]
-      _ = ((S * B) * S).trace := by
-        rw [Matrix.trace_mul_comm]
-      _ = (S * B * S).trace := by
-        rw [Matrix.mul_assoc]
-  rw [hEq]
-  exact htrace.1
-
-/-- Positive trace functionals preserve Loewner inequalities. -/
-public theorem cMatrix_trace_mul_le_of_le_posSemidef_left
-    {A B W : CMatrix n} (hW : W.PosSemidef) (hAB : A ≤ B) :
-    ((W * A).trace).re ≤ ((W * B).trace).re := by
-  have hdiff : (B - A).PosSemidef := Matrix.le_iff.mp hAB
-  have hnonneg : 0 ≤ ((W * (B - A)).trace).re :=
-    cMatrix_trace_mul_posSemidef_re_nonneg hW hdiff
-  have htrace :
-      ((W * (B - A)).trace).re =
-        ((W * B).trace).re - ((W * A).trace).re := by
-    simp [Matrix.mul_sub, Matrix.trace_sub]
-  rw [htrace] at hnonneg
-  linarith
-
 omit [DecidableEq n] in
 private theorem posSemidef_of_trace_mul_rankOneMatrix_re_nonneg {T : CMatrix n}
     (hT : T.IsHermitian)
@@ -132,7 +92,9 @@ theorem cMatrix_posSemidef_iff_trace_mul_posSemidef_re_nonneg {T : CMatrix n}
 
 /-- Hermitian complex matrices as a dedicated real Hilbert-space wrapper. -/
 structure HermitianMatrix (n : Type u) [Fintype n] [DecidableEq n] where
+  /-- The underlying matrix. -/
   val : CMatrix n
+  /-- The matrix is Hermitian. -/
   isHermitian : val.IsHermitian
 
 namespace HermitianMatrix
@@ -217,15 +179,21 @@ theorem toCMatrixLinear_injective :
     Function.Injective (toCMatrixLinear : HermitianMatrix n →ₗ[ℝ] CMatrix n) :=
   val_injective
 
+/-- The Frobenius (Hilbert--Schmidt) group structure on the ambient matrices,
+transported to `HermitianMatrix` below. -/
 local instance ambientNormedAddCommGroup : NormedAddCommGroup (CMatrix n) :=
   Matrix.toMatrixNormedAddCommGroup (1 : CMatrix n) Matrix.PosDef.one
 
+/-- The Hilbert--Schmidt inner product on the ambient matrices. -/
 local instance ambientComplexInnerProductSpace : InnerProductSpace ℂ (CMatrix n) :=
   Matrix.toMatrixInnerProductSpace (1 : CMatrix n) Matrix.PosSemidef.one
 
+/-- The real part of the Hilbert--Schmidt inner product, which is what the
+duality argument pairs with. -/
 local instance ambientRealInnerProductSpace : InnerProductSpace ℝ (CMatrix n) :=
   InnerProductSpace.complexToReal
 
+/-- The real normed space structure matching `ambientRealInnerProductSpace`. -/
 local instance ambientNormedSpaceReal : NormedSpace ℝ (CMatrix n) :=
   inferInstance
 
@@ -243,9 +211,6 @@ noncomputable instance instInnerProductSpaceReal : InnerProductSpace ℝ (Hermit
 noncomputable instance instFiniteDimensionalReal : FiniteDimensional ℝ (HermitianMatrix n) :=
   FiniteDimensional.of_injective
     (toCMatrixLinear : HermitianMatrix n →ₗ[ℝ] CMatrix n) toCMatrixLinear_injective
-
-noncomputable instance instCompleteSpace : CompleteSpace (HermitianMatrix n) :=
-  FiniteDimensional.complete ℝ (HermitianMatrix n)
 
 end HermitianMatrix
 

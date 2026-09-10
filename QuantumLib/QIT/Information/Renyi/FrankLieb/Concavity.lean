@@ -20,15 +20,15 @@ Frank--Lieb concavity and low-alpha sandwiched Renyi `Q` concavity tools.
 
 open scoped ComplexOrder MatrixOrder NNReal Topology Matrix.Norms.L2Operator
 
-namespace QIT
-
-universe u v w
-
 noncomputable section
-
+universe u v w
 variable {a : Type u} {b : Type v} {c : Type w}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 variable [Fintype c] [DecidableEq c]
+
+open QIT
+
+namespace QIT
 
 /-- Unrestricted finite-dimensional Epstein trace concavity.
 
@@ -87,7 +87,9 @@ theorem epsteinTraceTerm_concave
   rw [heq₁, heq₂] at hconc
   exact hconc.trans hupper
 
-namespace State
+end QIT
+
+namespace MState
 
 open RenyiDPI.Statement
 
@@ -286,29 +288,29 @@ reference to `σ + εI`: the regularized reference is positive definite, so the
 finite real logarithmic branch is available without an additional support
 hypothesis. -/
 theorem sandwichedRenyiQ_pos_of_state_posDef_reference
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosDef)
+    (ρ : MState a) {σ : CMatrix a} (hσ : σ.PosDef)
     (α : ℝ) :
-    0 < sandwichedRenyiQ ρ.matrix σ ρ.pos hσ.posSemidef α := by
-  have hρ_ne : ρ.matrix ≠ 0 := by
+    0 < sandwichedRenyiQ ρ.m σ ρ.psd hσ.posSemidef α := by
+  have hρ_ne : ρ.m ≠ 0 := by
     intro hρ_zero
-    have htrace_zero : ρ.matrix.trace = 0 := by
+    have htrace_zero : ρ.m.trace = 0 := by
       rw [hρ_zero]
       simp
     have hone_zero : (1 : ℂ) = 0 := by
-      rw [ρ.trace_eq_one] at htrace_zero
+      rw [ρ.tr'] at htrace_zero
       exact htrace_zero
     exact one_ne_zero hone_zero
-  have hinner_ne : sandwichedRenyiQInner ρ.matrix σ α ≠ 0 := by
+  have hinner_ne : sandwichedRenyiQInner ρ.m σ α ≠ 0 := by
     intro hinner_zero
     have hρ_zero :
-        ρ.matrix = 0 :=
+        ρ.m = 0 :=
       (sandwichedRenyiQInner_eq_zero_iff_left_eq_zero_of_sigma_posDef
-        (ρ := ρ.matrix) (σ := σ) hσ α).mp hinner_zero
+        (ρ := ρ.m) (σ := σ) hσ α).mp hinner_zero
     exact hρ_ne hρ_zero
-  rw [sandwichedRenyiQ_eq_psdTracePower_QInner ρ.pos hσ.posSemidef α]
+  rw [sandwichedRenyiQ_eq_psdTracePower_QInner ρ.psd hσ.posSemidef α]
   exact psdTracePower_pos_of_ne_zero
-    (sandwichedRenyiQInner ρ.matrix σ α)
-    (sandwichedRenyiQInner_posSemidef ρ.pos hσ.posSemidef α) hinner_ne
+    (sandwichedRenyiQInner ρ.m σ α)
+    (sandwichedRenyiQInner_posSemidef ρ.psd hσ.posSemidef α) hinner_ne
 
 /-- Reverse-Holder side-state objective values for the sandwiched Renyi `Q`
 inner operator.
@@ -383,22 +385,6 @@ theorem sandwichedRenyiQ_reverseHolder_sInf_eq_of_inner_ne_zero
       (sandwichedRenyiQ ρ σ hρ hσ α) ^ (1 / α) :=
   (sandwichedRenyiQ_reverseHolder_isLeast_of_inner_ne_zero
     hρ hσ hα_half hα_lt_one hinner_ne_zero).csInf_eq
-
-omit [Fintype a] [DecidableEq a] in
-/-- The mixed `rho` input in the binary joint-concavity statement is PSD. -/
-theorem sandwichedRenyiQ_rho_mix_posSemidef
-    {ρ₁ ρ₂ : CMatrix a} (hρ₁ : ρ₁.PosSemidef) (hρ₂ : ρ₂.PosSemidef)
-    {t : ℝ} (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
-    (cMatrixConvexCombination t ρ₁ ρ₂).PosSemidef :=
-  cMatrixConvexCombination_posSemidef hρ₁ hρ₂ ht0 ht1
-
-omit [Fintype a] [DecidableEq a] in
-/-- The mixed `sigma` input in the binary joint-concavity statement is PSD. -/
-theorem sandwichedRenyiQ_sigma_mix_posSemidef
-    {σ₁ σ₂ : CMatrix a} (hσ₁ : σ₁.PosSemidef) (hσ₂ : σ₂.PosSemidef)
-    {t : ℝ} (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
-    (cMatrixConvexCombination t σ₁ σ₂).PosSemidef :=
-  cMatrixConvexCombination_posSemidef hσ₁ hσ₂ ht0 ht1
 
 /-- The fixed Frank--Lieb weight `H^(-1/2)` is Hermitian. -/
 theorem frankLieb_weight_isHermitian
@@ -3493,8 +3479,8 @@ theorem sandwichedRenyiQ_jointConcave_lowAlpha_of_additive_sInf_eq
         sandwichedRenyiQ
           (cMatrixConvexCombination t ρ₁ ρ₂)
           (cMatrixConvexCombination t σ₁ σ₂)
-          (sandwichedRenyiQ_rho_mix_posSemidef hρ₁ hρ₂ ht0 ht1)
-          (sandwichedRenyiQ_sigma_mix_posSemidef hσ₁.posSemidef hσ₂.posSemidef
+          (cMatrixConvexCombination_posSemidef hρ₁ hρ₂ ht0 ht1)
+          (cMatrixConvexCombination_posSemidef hσ₁.posSemidef hσ₂.posSemidef
             ht0 ht1)
           α) :
     t * sandwichedRenyiQ ρ₁ σ₁ hρ₁ hσ₁.posSemidef α +
@@ -3502,8 +3488,8 @@ theorem sandwichedRenyiQ_jointConcave_lowAlpha_of_additive_sInf_eq
       sandwichedRenyiQ
         (cMatrixConvexCombination t ρ₁ ρ₂)
         (cMatrixConvexCombination t σ₁ σ₂)
-        (sandwichedRenyiQ_rho_mix_posSemidef hρ₁ hρ₂ ht0 ht1)
-        (sandwichedRenyiQ_sigma_mix_posSemidef hσ₁.posSemidef hσ₂.posSemidef
+        (cMatrixConvexCombination_posSemidef hρ₁ hρ₂ ht0 ht1)
+        (cMatrixConvexCombination_posSemidef hσ₁.posSemidef hσ₂.posSemidef
           ht0 ht1)
         α := by
   let ρt : CMatrix a := cMatrixConvexCombination t ρ₁ ρ₂
@@ -3511,10 +3497,10 @@ theorem sandwichedRenyiQ_jointConcave_lowAlpha_of_additive_sInf_eq
   let Q₁ : ℝ := sandwichedRenyiQ ρ₁ σ₁ hρ₁ hσ₁.posSemidef α
   let Q₂ : ℝ := sandwichedRenyiQ ρ₂ σ₂ hρ₂ hσ₂.posSemidef α
   have hρt : ρt.PosSemidef := by
-    simpa [ρt] using sandwichedRenyiQ_rho_mix_posSemidef hρ₁ hρ₂ ht0 ht1
+    simpa [ρt] using cMatrixConvexCombination_posSemidef hρ₁ hρ₂ ht0 ht1
   have hσt_psd : σt.PosSemidef := by
     simpa [σt] using
-      sandwichedRenyiQ_sigma_mix_posSemidef hσ₁.posSemidef hσ₂.posSemidef
+      cMatrixConvexCombination_posSemidef hσ₁.posSemidef hσ₂.posSemidef
         ht0 ht1
   have hα_nonneg : 0 ≤ α := by linarith
   have hα_le_one : α ≤ 1 := le_of_lt hα_lt_one
@@ -3580,8 +3566,8 @@ theorem sandwichedRenyiQ_jointConcave_lowAlpha_of_additive_sInf_eq
     _ = sandwichedRenyiQ
         (cMatrixConvexCombination t ρ₁ ρ₂)
         (cMatrixConvexCombination t σ₁ σ₂)
-        (sandwichedRenyiQ_rho_mix_posSemidef hρ₁ hρ₂ ht0 ht1)
-        (sandwichedRenyiQ_sigma_mix_posSemidef hσ₁.posSemidef hσ₂.posSemidef
+        (cMatrixConvexCombination_posSemidef hρ₁ hρ₂ ht0 ht1)
+        (cMatrixConvexCombination_posSemidef hσ₁.posSemidef hσ₂.posSemidef
           ht0 ht1)
         α := by
           simp [ρt, σt]
@@ -3612,8 +3598,8 @@ theorem sandwichedRenyiQ_jointConcave_lowAlpha_of_fixedWeight_sInf_eq
         sandwichedRenyiQ
           (cMatrixConvexCombination t ρ₁ ρ₂)
           (cMatrixConvexCombination t σ₁ σ₂)
-          (sandwichedRenyiQ_rho_mix_posSemidef hρ₁ hρ₂ ht0 ht1)
-          (sandwichedRenyiQ_sigma_mix_posSemidef hσ₁.posSemidef hσ₂.posSemidef
+          (cMatrixConvexCombination_posSemidef hρ₁ hρ₂ ht0 ht1)
+          (cMatrixConvexCombination_posSemidef hσ₁.posSemidef hσ₂.posSemidef
             ht0 ht1)
           α) :
     t * sandwichedRenyiQ ρ₁ σ₁ hρ₁ hσ₁.posSemidef α +
@@ -3621,8 +3607,8 @@ theorem sandwichedRenyiQ_jointConcave_lowAlpha_of_fixedWeight_sInf_eq
       sandwichedRenyiQ
         (cMatrixConvexCombination t ρ₁ ρ₂)
         (cMatrixConvexCombination t σ₁ σ₂)
-        (sandwichedRenyiQ_rho_mix_posSemidef hρ₁ hρ₂ ht0 ht1)
-        (sandwichedRenyiQ_sigma_mix_posSemidef hσ₁.posSemidef hσ₂.posSemidef
+        (cMatrixConvexCombination_posSemidef hρ₁ hρ₂ ht0 ht1)
+        (cMatrixConvexCombination_posSemidef hσ₁.posSemidef hσ₂.posSemidef
           ht0 ht1)
         α := by
   let ρt : CMatrix a := cMatrixConvexCombination t ρ₁ ρ₂
@@ -3630,10 +3616,10 @@ theorem sandwichedRenyiQ_jointConcave_lowAlpha_of_fixedWeight_sInf_eq
   let Q₁ : ℝ := sandwichedRenyiQ ρ₁ σ₁ hρ₁ hσ₁.posSemidef α
   let Q₂ : ℝ := sandwichedRenyiQ ρ₂ σ₂ hρ₂ hσ₂.posSemidef α
   have hρt : ρt.PosSemidef := by
-    simpa [ρt] using sandwichedRenyiQ_rho_mix_posSemidef hρ₁ hρ₂ ht0 ht1
+    simpa [ρt] using cMatrixConvexCombination_posSemidef hρ₁ hρ₂ ht0 ht1
   have hσt_psd : σt.PosSemidef := by
     simpa [σt] using
-      sandwichedRenyiQ_sigma_mix_posSemidef hσ₁.posSemidef hσ₂.posSemidef
+      cMatrixConvexCombination_posSemidef hσ₁.posSemidef hσ₂.posSemidef
         ht0 ht1
   have hlower :
       t * Q₁ + (1 - t) * Q₂ ∈
@@ -3683,8 +3669,8 @@ theorem sandwichedRenyiQ_jointConcave_lowAlpha_of_fixedWeight_sInf_eq
     _ = sandwichedRenyiQ
         (cMatrixConvexCombination t ρ₁ ρ₂)
         (cMatrixConvexCombination t σ₁ σ₂)
-        (sandwichedRenyiQ_rho_mix_posSemidef hρ₁ hρ₂ ht0 ht1)
-        (sandwichedRenyiQ_sigma_mix_posSemidef hσ₁.posSemidef hσ₂.posSemidef
+        (cMatrixConvexCombination_posSemidef hρ₁ hρ₂ ht0 ht1)
+        (cMatrixConvexCombination_posSemidef hσ₁.posSemidef hσ₂.posSemidef
           ht0 ht1)
         α := by
           simp [ρt, σt]
@@ -3706,9 +3692,9 @@ theorem sandwichedRenyiQ_jointConcave_lowAlpha_posDef
       sandwichedRenyiQ
         (cMatrixConvexCombination t ρ₁ ρ₂)
         (cMatrixConvexCombination t σ₁ σ₂)
-        (sandwichedRenyiQ_rho_mix_posSemidef hρ₁.posSemidef hρ₂.posSemidef
+        (cMatrixConvexCombination_posSemidef hρ₁.posSemidef hρ₂.posSemidef
           ht0 ht1)
-        (sandwichedRenyiQ_sigma_mix_posSemidef hσ₁.posSemidef hσ₂.posSemidef
+        (cMatrixConvexCombination_posSemidef hσ₁.posSemidef hσ₂.posSemidef
           ht0 ht1)
         α := by
   let ρt : CMatrix a := cMatrixConvexCombination t ρ₁ ρ₂
@@ -3755,8 +3741,8 @@ theorem sandwichedRenyiQ_jointConcave_lowAlpha
       sandwichedRenyiQ
         (cMatrixConvexCombination t ρ₁ ρ₂)
         (cMatrixConvexCombination t σ₁ σ₂)
-        (sandwichedRenyiQ_rho_mix_posSemidef hρ₁ hρ₂ ht0 ht1)
-        (sandwichedRenyiQ_sigma_mix_posSemidef hσ₁ hσ₂ ht0 ht1)
+        (cMatrixConvexCombination_posSemidef hρ₁ hρ₂ ht0 ht1)
+        (cMatrixConvexCombination_posSemidef hσ₁ hσ₂ ht0 ht1)
         α := by
   let l : Filter ℝ := nhdsWithin (0 : ℝ) (Set.Ioi 0)
   let ρ₁ε : ℝ → CMatrix a := fun ε => cMatrixPSDRegularization ρ₁ ε
@@ -3785,9 +3771,9 @@ theorem sandwichedRenyiQ_jointConcave_lowAlpha
     intro ε
     exact cMatrixPSDRegularization_posSemidef hσ₂ ε
   have hρt_psd : ρt.PosSemidef := by
-    simpa [ρt] using sandwichedRenyiQ_rho_mix_posSemidef hρ₁ hρ₂ ht0 ht1
+    simpa [ρt] using cMatrixConvexCombination_posSemidef hρ₁ hρ₂ ht0 ht1
   have hσt_psd : σt.PosSemidef := by
-    simpa [σt] using sandwichedRenyiQ_sigma_mix_posSemidef hσ₁ hσ₂ ht0 ht1
+    simpa [σt] using cMatrixConvexCombination_posSemidef hσ₁ hσ₂ ht0 ht1
   have hρtε_psd : ∀ ε, (ρtε ε).PosSemidef := by
     intro ε
     exact cMatrixConvexCombination_posSemidef
@@ -4098,7 +4084,7 @@ theorem sandwichedRenyiQ_localRightUnitary_weightedAverage_ge
     {b : Type v} [Fintype b] [DecidableEq b] [Nonempty a] [Nonempty b]
     {ι : Type*} (s : Finset ι) (w : ι → ℝ)
     (U : ι → Matrix.unitaryGroup b ℂ)
-    {ρ σ : CMatrix (Prod a b)}
+    {ρ σ : CMatrix (a × b)}
     (hρ : ρ.PosSemidef) (hσ : σ.PosSemidef)
     {α : ℝ} (hα_half : 1 / 2 < α) (hα_lt_one : α < 1)
     (hw_nonneg : ∀ i ∈ s, 0 ≤ w i)
@@ -4106,15 +4092,15 @@ theorem sandwichedRenyiQ_localRightUnitary_weightedAverage_ge
     sandwichedRenyiQ ρ σ hρ hσ α ≤
       sandwichedRenyiQ
         (∑ i ∈ s, (w i : ℂ) •
-          ((localRightUnitary (a := a) (U i) : CMatrix (Prod a b)) * ρ *
-            star (localRightUnitary (a := a) (U i) : CMatrix (Prod a b))))
+          ((localRightUnitary (a := a) (U i) : CMatrix (a × b)) * ρ *
+            star (localRightUnitary (a := a) (U i) : CMatrix (a × b))))
         (∑ i ∈ s, (w i : ℂ) •
-          ((localRightUnitary (a := a) (U i) : CMatrix (Prod a b)) * σ *
-            star (localRightUnitary (a := a) (U i) : CMatrix (Prod a b))))
+          ((localRightUnitary (a := a) (U i) : CMatrix (a × b)) * σ *
+            star (localRightUnitary (a := a) (U i) : CMatrix (a × b))))
         (cMatrix_finset_weightedSum_posSemidef s w
           (fun i =>
-            (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)) * ρ *
-              star (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)))
+            (localRightUnitary (a := a) (U i) : CMatrix (a × b)) * ρ *
+              star (localRightUnitary (a := a) (U i) : CMatrix (a × b)))
           (by
             intro i _
             simpa using
@@ -4122,8 +4108,8 @@ theorem sandwichedRenyiQ_localRightUnitary_weightedAverage_ge
           hw_nonneg)
         (cMatrix_finset_weightedSum_posSemidef s w
           (fun i =>
-            (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)) * σ *
-              star (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)))
+            (localRightUnitary (a := a) (U i) : CMatrix (a × b)) * σ *
+              star (localRightUnitary (a := a) (U i) : CMatrix (a × b)))
           (by
             intro i _
             simpa using
@@ -4131,12 +4117,12 @@ theorem sandwichedRenyiQ_localRightUnitary_weightedAverage_ge
           hw_nonneg)
         α := by
   classical
-  let ρU : ι → CMatrix (Prod a b) := fun i =>
-    (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)) * ρ *
-      star (localRightUnitary (a := a) (U i) : CMatrix (Prod a b))
-  let σU : ι → CMatrix (Prod a b) := fun i =>
-    (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)) * σ *
-      star (localRightUnitary (a := a) (U i) : CMatrix (Prod a b))
+  let ρU : ι → CMatrix (a × b) := fun i =>
+    (localRightUnitary (a := a) (U i) : CMatrix (a × b)) * ρ *
+      star (localRightUnitary (a := a) (U i) : CMatrix (a × b))
+  let σU : ι → CMatrix (a × b) := fun i =>
+    (localRightUnitary (a := a) (U i) : CMatrix (a × b)) * σ *
+      star (localRightUnitary (a := a) (U i) : CMatrix (a × b))
   have hρU : ∀ i ∈ s, (ρU i).PosSemidef := by
     intro i hi
     simpa [ρU] using
@@ -4153,11 +4139,11 @@ theorem sandwichedRenyiQ_localRightUnitary_weightedAverage_ge
     exact div_nonneg hnum hden
   have hterm :
       ∀ i ∈ s,
-        sandwichedRenyiQPair (a := Prod a b) α (ρU i, σU i) =
+        sandwichedRenyiQPair (a := a × b) α (ρU i, σU i) =
           sandwichedRenyiQ ρ σ hρ hσ α := by
     intro i hi
     calc
-      sandwichedRenyiQPair (a := Prod a b) α (ρU i, σU i) =
+      sandwichedRenyiQPair (a := a × b) α (ρU i, σU i) =
           sandwichedRenyiQ (ρU i) (σU i) (hρU i hi) (hσU i hi) α := by
             rw [sandwichedRenyiQPair_eq]
       _ = sandwichedRenyiQ ρ σ hρ hσ α := by
@@ -4165,10 +4151,10 @@ theorem sandwichedRenyiQ_localRightUnitary_weightedAverage_ge
               sandwichedRenyiQ_localRightUnitary_conj hρ hσ (U i) α
                 hs_nonneg hα_nonneg
   have havg :
-      ∑ i ∈ s, w i * sandwichedRenyiQPair (a := Prod a b) α (ρU i, σU i) =
+      ∑ i ∈ s, w i * sandwichedRenyiQPair (a := a × b) α (ρU i, σU i) =
         sandwichedRenyiQ ρ σ hρ hσ α := by
     calc
-      ∑ i ∈ s, w i * sandwichedRenyiQPair (a := Prod a b) α (ρU i, σU i) =
+      ∑ i ∈ s, w i * sandwichedRenyiQPair (a := a × b) α (ρU i, σU i) =
           (∑ i ∈ s, w i) * sandwichedRenyiQ ρ σ hρ hσ α := by
             rw [Finset.sum_mul]
             exact Finset.sum_congr rfl (by
@@ -4178,11 +4164,11 @@ theorem sandwichedRenyiQ_localRightUnitary_weightedAverage_ge
             rw [hw_sum, one_mul]
   have hjensen :=
     sandwichedRenyiQ_finset_weightedAverage_ge_average_lowAlpha
-      (a := Prod a b) s w ρU σU hρU hσU hα_half hα_lt_one
+      (a := a × b) s w ρU σU hρU hσU hα_half hα_lt_one
       hw_nonneg hw_sum
   calc
     sandwichedRenyiQ ρ σ hρ hσ α =
-        ∑ i ∈ s, w i * sandwichedRenyiQPair (a := Prod a b) α (ρU i, σU i) := havg.symm
+        ∑ i ∈ s, w i * sandwichedRenyiQPair (a := a × b) α (ρU i, σU i) := havg.symm
     _ ≤ sandwichedRenyiQ
         (∑ i ∈ s, (w i : ℂ) • ρU i)
         (∑ i ∈ s, (w i : ℂ) • σU i)
@@ -4191,15 +4177,15 @@ theorem sandwichedRenyiQ_localRightUnitary_weightedAverage_ge
         α := hjensen
     _ = sandwichedRenyiQ
         (∑ i ∈ s, (w i : ℂ) •
-          ((localRightUnitary (a := a) (U i) : CMatrix (Prod a b)) * ρ *
-            star (localRightUnitary (a := a) (U i) : CMatrix (Prod a b))))
+          ((localRightUnitary (a := a) (U i) : CMatrix (a × b)) * ρ *
+            star (localRightUnitary (a := a) (U i) : CMatrix (a × b))))
         (∑ i ∈ s, (w i : ℂ) •
-          ((localRightUnitary (a := a) (U i) : CMatrix (Prod a b)) * σ *
-            star (localRightUnitary (a := a) (U i) : CMatrix (Prod a b))))
+          ((localRightUnitary (a := a) (U i) : CMatrix (a × b)) * σ *
+            star (localRightUnitary (a := a) (U i) : CMatrix (a × b))))
         (cMatrix_finset_weightedSum_posSemidef s w
           (fun i =>
-            (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)) * ρ *
-              star (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)))
+            (localRightUnitary (a := a) (U i) : CMatrix (a × b)) * ρ *
+              star (localRightUnitary (a := a) (U i) : CMatrix (a × b)))
           (by
             intro i hi
             simpa using
@@ -4207,8 +4193,8 @@ theorem sandwichedRenyiQ_localRightUnitary_weightedAverage_ge
           hw_nonneg)
         (cMatrix_finset_weightedSum_posSemidef s w
           (fun i =>
-            (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)) * σ *
-              star (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)))
+            (localRightUnitary (a := a) (U i) : CMatrix (a × b)) * σ *
+              star (localRightUnitary (a := a) (U i) : CMatrix (a × b)))
           (by
             intro i hi
             simpa using
@@ -4225,30 +4211,30 @@ This theorem isolates the remaining finite-design input in the Gour/Frank--Lieb
 route.  The hypotheses `hTwirlρ` and `hTwirlσ` are exactly the local twirling
 identity
 `Twirl_B(X) = Tr_B(X) ⊗ π_B`; no DPI or partial-trace monotonicity is assumed. -/
-theorem sandwichedRenyiQ_marginalA_ge_of_localRightUnitary_twirling
+theorem sandwichedRenyiQ_traceRight_ge_of_localRightUnitary_twirling
     {b : Type v} [Fintype b] [DecidableEq b] [Nonempty a] [Nonempty b]
     {ι : Type*} (s : Finset ι) (w : ι → ℝ)
     (U : ι → Matrix.unitaryGroup b ℂ)
-    {ρ σ : CMatrix (Prod a b)}
+    {ρ σ : CMatrix (a × b)}
     (hρ : ρ.PosSemidef) (hσ : σ.PosSemidef)
     {α : ℝ} (hα_half : 1 / 2 < α) (hα_lt_one : α < 1)
     (hw_nonneg : ∀ i ∈ s, 0 ≤ w i)
     (hw_sum : ∑ i ∈ s, w i = 1)
     (hTwirlρ :
       (∑ i ∈ s, (w i : ℂ) •
-        ((localRightUnitary (a := a) (U i) : CMatrix (Prod a b)) * ρ *
-          star (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)))) =
-        Matrix.kronecker (partialTraceB ρ) (maximallyMixed b).matrix)
+        ((localRightUnitary (a := a) (U i) : CMatrix (a × b)) * ρ *
+          star (localRightUnitary (a := a) (U i) : CMatrix (a × b)))) =
+        Matrix.kronecker (Matrix.traceRight ρ) (MState.uniform : MState b).m)
     (hTwirlσ :
       (∑ i ∈ s, (w i : ℂ) •
-        ((localRightUnitary (a := a) (U i) : CMatrix (Prod a b)) * σ *
-          star (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)))) =
-        Matrix.kronecker (partialTraceB σ) (maximallyMixed b).matrix) :
+        ((localRightUnitary (a := a) (U i) : CMatrix (a × b)) * σ *
+          star (localRightUnitary (a := a) (U i) : CMatrix (a × b)))) =
+        Matrix.kronecker (Matrix.traceRight σ) (MState.uniform : MState b).m) :
     sandwichedRenyiQ ρ σ hρ hσ α ≤
       sandwichedRenyiQ
-        (partialTraceB ρ) (partialTraceB σ)
-        (partialTraceB_posSemidef hρ)
-        (partialTraceB_posSemidef hσ)
+        (Matrix.traceRight ρ) (Matrix.traceRight σ)
+        (traceRight_posSemidef hρ)
+        (traceRight_posSemidef hσ)
         α := by
   classical
   have htwirl :=
@@ -4258,15 +4244,15 @@ theorem sandwichedRenyiQ_marginalA_ge_of_localRightUnitary_twirling
   have hsum_tensor :
       sandwichedRenyiQ
         (∑ i ∈ s, (w i : ℂ) •
-          ((localRightUnitary (a := a) (U i) : CMatrix (Prod a b)) * ρ *
-            star (localRightUnitary (a := a) (U i) : CMatrix (Prod a b))))
+          ((localRightUnitary (a := a) (U i) : CMatrix (a × b)) * ρ *
+            star (localRightUnitary (a := a) (U i) : CMatrix (a × b))))
         (∑ i ∈ s, (w i : ℂ) •
-          ((localRightUnitary (a := a) (U i) : CMatrix (Prod a b)) * σ *
-            star (localRightUnitary (a := a) (U i) : CMatrix (Prod a b))))
+          ((localRightUnitary (a := a) (U i) : CMatrix (a × b)) * σ *
+            star (localRightUnitary (a := a) (U i) : CMatrix (a × b))))
         (cMatrix_finset_weightedSum_posSemidef s w
           (fun i =>
-            (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)) * ρ *
-              star (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)))
+            (localRightUnitary (a := a) (U i) : CMatrix (a × b)) * ρ *
+              star (localRightUnitary (a := a) (U i) : CMatrix (a × b)))
           (by
             intro i hi
             simpa using
@@ -4274,8 +4260,8 @@ theorem sandwichedRenyiQ_marginalA_ge_of_localRightUnitary_twirling
           hw_nonneg)
         (cMatrix_finset_weightedSum_posSemidef s w
           (fun i =>
-            (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)) * σ *
-              star (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)))
+            (localRightUnitary (a := a) (U i) : CMatrix (a × b)) * σ *
+              star (localRightUnitary (a := a) (U i) : CMatrix (a × b)))
           (by
             intro i hi
             simpa using
@@ -4283,16 +4269,16 @@ theorem sandwichedRenyiQ_marginalA_ge_of_localRightUnitary_twirling
           hw_nonneg)
         α =
       sandwichedRenyiQ
-        (Matrix.kronecker (partialTraceB ρ) (maximallyMixed b).matrix)
-        (Matrix.kronecker (partialTraceB σ) (maximallyMixed b).matrix)
-        ((partialTraceB_posSemidef hρ).kronecker (maximallyMixed b).pos)
-        ((partialTraceB_posSemidef hσ).kronecker (maximallyMixed b).pos)
+        (Matrix.kronecker (Matrix.traceRight ρ) (MState.uniform : MState b).m)
+        (Matrix.kronecker (Matrix.traceRight σ) (MState.uniform : MState b).m)
+        ((traceRight_posSemidef hρ).kronecker (MState.uniform : MState b).psd)
+        ((traceRight_posSemidef hσ).kronecker (MState.uniform : MState b).psd)
         α :=
     sandwichedRenyiQ_congr
       (cMatrix_finset_weightedSum_posSemidef s w
         (fun i =>
-          (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)) * ρ *
-            star (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)))
+          (localRightUnitary (a := a) (U i) : CMatrix (a × b)) * ρ *
+            star (localRightUnitary (a := a) (U i) : CMatrix (a × b)))
         (by
           intro i hi
           simpa using
@@ -4300,30 +4286,30 @@ theorem sandwichedRenyiQ_marginalA_ge_of_localRightUnitary_twirling
         hw_nonneg)
       (cMatrix_finset_weightedSum_posSemidef s w
         (fun i =>
-          (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)) * σ *
-            star (localRightUnitary (a := a) (U i) : CMatrix (Prod a b)))
+          (localRightUnitary (a := a) (U i) : CMatrix (a × b)) * σ *
+            star (localRightUnitary (a := a) (U i) : CMatrix (a × b)))
         (by
           intro i hi
           simpa using
             posSemidef_unitary_conj hσ (localRightUnitary (a := a) (U i))⁻¹)
         hw_nonneg)
-      ((partialTraceB_posSemidef hρ).kronecker (maximallyMixed b).pos)
-      ((partialTraceB_posSemidef hσ).kronecker (maximallyMixed b).pos)
+      ((traceRight_posSemidef hρ).kronecker (MState.uniform : MState b).psd)
+      ((traceRight_posSemidef hσ).kronecker (MState.uniform : MState b).psd)
       hTwirlρ hTwirlσ α
   have htensor :
       sandwichedRenyiQ
-        (Matrix.kronecker (partialTraceB ρ) (maximallyMixed b).matrix)
-        (Matrix.kronecker (partialTraceB σ) (maximallyMixed b).matrix)
-        ((partialTraceB_posSemidef hρ).kronecker (maximallyMixed b).pos)
-        ((partialTraceB_posSemidef hσ).kronecker (maximallyMixed b).pos)
+        (Matrix.kronecker (Matrix.traceRight ρ) (MState.uniform : MState b).m)
+        (Matrix.kronecker (Matrix.traceRight σ) (MState.uniform : MState b).m)
+        ((traceRight_posSemidef hρ).kronecker (MState.uniform : MState b).psd)
+        ((traceRight_posSemidef hσ).kronecker (MState.uniform : MState b).psd)
         α =
       sandwichedRenyiQ
-        (partialTraceB ρ) (partialTraceB σ)
-        (partialTraceB_posSemidef hρ)
-        (partialTraceB_posSemidef hσ)
+        (Matrix.traceRight ρ) (Matrix.traceRight σ)
+        (traceRight_posSemidef hρ)
+        (traceRight_posSemidef hσ)
         α :=
-    sandwichedRenyiQ_kronecker_maximallyMixed_right
-      (partialTraceB_posSemidef hρ) (partialTraceB_posSemidef hσ)
+    sandwichedRenyiQ_kronecker_uniform_right
+      (traceRight_posSemidef hρ) (traceRight_posSemidef hσ)
       α hα_half hα_lt_one
   exact htwirl.trans_eq (hsum_tensor.trans htensor)
 
@@ -4374,17 +4360,17 @@ def diagonalSignUnitary {b : Type v} [Fintype b] [DecidableEq b]
 
 theorem diagonalSignUnitary_conj_apply
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ε : b → Bool) (X : CMatrix (Prod a b)) (i i' : a) (j j' : b) :
-    (((localRightUnitary (a := a) (diagonalSignUnitary ε) : CMatrix (Prod a b)) *
+    (ε : b → Bool) (X : CMatrix (a × b)) (i i' : a) (j j' : b) :
+    (((localRightUnitary (a := a) (diagonalSignUnitary ε) : CMatrix (a × b)) *
         X * star (localRightUnitary (a := a) (diagonalSignUnitary ε) :
-          CMatrix (Prod a b))) (i, j) (i', j')) =
+          CMatrix (a × b))) (i, j) (i', j')) =
       boolSignComplex (ε j) * X (i, j) (i', j') * boolSignComplex (ε j') := by
   simp only [localRightUnitary_coe, diagonalSignUnitary_coe, Matrix.star_eq_conjTranspose,
     Matrix.conjTranspose_kronecker, Matrix.conjTranspose_one, Matrix.mul_apply,
     Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply, Matrix.diagonal,
     Matrix.of_apply, Matrix.conjTranspose_apply]
-  have hinner : ∀ x : Prod a b,
-      (∑ y : Prod a b,
+  have hinner : ∀ x : a × b,
+      (∑ y : a × b,
         (((if i = y.1 then 1 else 0) *
             if j = y.2 then boolSignComplex (ε j) else 0) * X y x)) =
         boolSignComplex (ε j) * X (i, j) x := by
@@ -4486,15 +4472,15 @@ theorem boolSignComplex_sum_mul_eq_card
 /-- The finite diagonal-sign twirl on the right tensor factor.  It removes the
 off-diagonal blocks in the right subsystem. -/
 def localRightSignTwirl {b : Type v} [Fintype b] [DecidableEq b]
-    (X : CMatrix (Prod a b)) : CMatrix (Prod a b) :=
+    (X : CMatrix (a × b)) : CMatrix (a × b) :=
   ((Fintype.card (b → Bool) : ℂ)⁻¹) •
     ∑ ε : b → Bool,
-      (localRightUnitary (a := a) (diagonalSignUnitary ε) : CMatrix (Prod a b)) *
+      (localRightUnitary (a := a) (diagonalSignUnitary ε) : CMatrix (a × b)) *
         X * star (localRightUnitary (a := a) (diagonalSignUnitary ε) :
-          CMatrix (Prod a b))
+          CMatrix (a × b))
 
 theorem localRightSignTwirl_apply {b : Type v} [Fintype b] [DecidableEq b]
-    (X : CMatrix (Prod a b)) (i i' : a) (j j' : b) :
+    (X : CMatrix (a × b)) (i i' : a) (j j' : b) :
     localRightSignTwirl X (i, j) (i', j') =
       if j = j' then X (i, j) (i', j') else 0 := by
   classical
@@ -4514,7 +4500,8 @@ theorem localRightSignTwirl_apply {b : Type v} [Fintype b] [DecidableEq b]
           boolSignComplex (ε j) * X (i, j) (i', j) * boolSignComplex (ε j)) =
             (∑ ε : b → Bool, boolSignComplex (ε j) * boolSignComplex (ε j)) *
               X (i, j) (i', j) := by
-          simp [mul_left_comm, mul_comm]
+          rw [Finset.sum_mul]
+          exact Finset.sum_congr rfl fun ε _ => by ring
         _ = (Fintype.card (b → Bool) : ℂ) * X (i, j) (i', j) := by
           rw [boolSignComplex_sum_mul_eq_card]
     rw [hsumdiag]
@@ -4530,7 +4517,8 @@ theorem localRightSignTwirl_apply {b : Type v} [Fintype b] [DecidableEq b]
           boolSignComplex (ε j) * X (i, j) (i', j') * boolSignComplex (ε j')) =
             X (i, j) (i', j') *
               (∑ ε : b → Bool, boolSignComplex (ε j) * boolSignComplex (ε j')) := by
-          simp [Finset.mul_sum, mul_assoc, mul_comm]
+          rw [Finset.mul_sum]
+          exact Finset.sum_congr rfl fun ε _ => by ring
         _ = 0 := by
           rw [boolSignComplex_sum_mul_eq_zero_of_ne hjj', mul_zero]
     unfold localRightSignTwirl
@@ -4603,17 +4591,17 @@ def permutationUnitary {b : Type v} [Fintype b] [DecidableEq b]
 
 theorem permutationUnitary_conj_apply
     {b : Type v} [Fintype b] [DecidableEq b]
-    (π : Equiv.Perm b) (X : CMatrix (Prod a b)) (i i' : a) (j j' : b) :
-    (((localRightUnitary (a := a) (permutationUnitary π) : CMatrix (Prod a b)) *
+    (π : Equiv.Perm b) (X : CMatrix (a × b)) (i i' : a) (j j' : b) :
+    (((localRightUnitary (a := a) (permutationUnitary π) : CMatrix (a × b)) *
         X * star (localRightUnitary (a := a) (permutationUnitary π) :
-          CMatrix (Prod a b))) (i, j) (i', j')) =
+          CMatrix (a × b))) (i, j) (i', j')) =
       X (i, π j) (i', π j') := by
   simp only [localRightUnitary_coe, permutationUnitary_coe, Matrix.star_eq_conjTranspose,
     Matrix.conjTranspose_kronecker, Matrix.conjTranspose_one, Matrix.mul_apply,
     Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.one_apply,
     Matrix.of_apply, Matrix.conjTranspose_apply]
-  have hinner : ∀ x : Prod a b,
-      (∑ y : Prod a b,
+  have hinner : ∀ x : a × b,
+      (∑ y : a × b,
         (((if i = y.1 then 1 else 0) * if π j = y.2 then 1 else 0) * X y x)) =
         X (i, π j) x := by
     intro x
@@ -4730,15 +4718,15 @@ theorem perm_orbit_average_eq_uniform {b : Type v} [Fintype b] [DecidableEq b]
 
 /-- Average over right-subsystem basis permutations. -/
 def localRightPermutationTwirl {b : Type v} [Fintype b] [DecidableEq b]
-    (X : CMatrix (Prod a b)) : CMatrix (Prod a b) :=
+    (X : CMatrix (a × b)) : CMatrix (a × b) :=
   ((Fintype.card (Equiv.Perm b) : ℂ)⁻¹) •
     ∑ π : Equiv.Perm b,
-      (localRightUnitary (a := a) (permutationUnitary π) : CMatrix (Prod a b)) *
+      (localRightUnitary (a := a) (permutationUnitary π) : CMatrix (a × b)) *
         X * star (localRightUnitary (a := a) (permutationUnitary π) :
-          CMatrix (Prod a b))
+          CMatrix (a × b))
 
 theorem localRightPermutationTwirl_apply {b : Type v} [Fintype b] [DecidableEq b]
-    (X : CMatrix (Prod a b)) (i i' : a) (j j' : b) :
+    (X : CMatrix (a × b)) (i i' : a) (j j' : b) :
     localRightPermutationTwirl X (i, j) (i', j') =
       (Fintype.card (Equiv.Perm b) : ℂ)⁻¹ *
         ∑ π : Equiv.Perm b, X (i, π j) (i', π j') := by
@@ -4749,7 +4737,7 @@ theorem localRightPermutationTwirl_apply {b : Type v} [Fintype b] [DecidableEq b
 
 theorem localRightPermutationTwirl_signTwirl_apply
     {b : Type v} [Fintype b] [DecidableEq b]
-    (X : CMatrix (Prod a b)) (i i' : a) (j j' : b) :
+    (X : CMatrix (a × b)) (i i' : a) (j j' : b) :
     localRightPermutationTwirl (localRightSignTwirl X) (i, j) (i', j') =
       if j = j' then
         (Fintype.card b : ℂ)⁻¹ * ∑ k : b, X (i, k) (i', k)
@@ -4778,11 +4766,11 @@ theorem localRightPermutationTwirl_signTwirl_apply
     rw [hsum, mul_zero]
     simp [hjj']
 
-theorem localRightPermutationTwirl_signTwirl_eq_marginalA_kronecker_maximallyMixed
+theorem localRightPermutationTwirl_signTwirl_eq_traceRight_kronecker_uniform
     {b : Type v} [Fintype b] [DecidableEq b] [Nonempty b]
-    (X : CMatrix (Prod a b)) :
+    (X : CMatrix (a × b)) :
     localRightPermutationTwirl (localRightSignTwirl X) =
-      Matrix.kronecker (partialTraceB X) (maximallyMixed b).matrix := by
+      Matrix.kronecker (Matrix.traceRight X) (MState.uniform : MState b).m := by
   classical
   ext x y
   rcases x with ⟨i, j⟩
@@ -4796,17 +4784,17 @@ theorem localRightPermutationTwirl_signTwirl_eq_marginalA_kronecker_maximallyMix
     norm_num [hcardR]
   by_cases hjj' : j = j'
   · subst j'
-    simp [partialTraceB, maximallyMixed_matrix, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    simp [Matrix.traceRight, uniform_matrix, Matrix.kronecker, Matrix.kroneckerMap_apply,
       hcast, mul_comm]
-  · simp [partialTraceB, maximallyMixed_matrix, Matrix.kronecker, Matrix.kroneckerMap_apply,
+  · simp [Matrix.traceRight, uniform_matrix, Matrix.kronecker, Matrix.kroneckerMap_apply,
       hjj']
 
 /-- Local-right unitaries respect multiplication. -/
 theorem localRightUnitary_mul {b : Type v} [Fintype b] [DecidableEq b]
     (U V : Matrix.unitaryGroup b ℂ) :
-    (localRightUnitary (a := a) (U * V) : CMatrix (Prod a b)) =
-      (localRightUnitary (a := a) U : CMatrix (Prod a b)) *
-        (localRightUnitary (a := a) V : CMatrix (Prod a b)) := by
+    (localRightUnitary (a := a) (U * V) : CMatrix (a × b)) =
+      (localRightUnitary (a := a) U : CMatrix (a × b)) *
+        (localRightUnitary (a := a) V : CMatrix (a × b)) := by
   rw [localRightUnitary_coe, localRightUnitary_coe, localRightUnitary_coe]
   change Matrix.kronecker (1 : CMatrix a) ((U * V : Matrix.unitaryGroup b ℂ) : CMatrix b) =
     Matrix.kronecker (1 : CMatrix a) (U : CMatrix b) *
@@ -4819,30 +4807,30 @@ theorem localRightUnitary_mul {b : Type v} [Fintype b] [DecidableEq b]
 dephasing with a diagonal sign and then permuting the right tensor factor. -/
 theorem localRightSignPermutationUnitary_conj_apply
     {b : Type v} [Fintype b] [DecidableEq b]
-    (ε : b → Bool) (π : Equiv.Perm b) (X : CMatrix (Prod a b))
+    (ε : b → Bool) (π : Equiv.Perm b) (X : CMatrix (a × b))
     (i i' : a) (j j' : b) :
     (((localRightUnitary (a := a) (permutationUnitary π * diagonalSignUnitary ε) :
-          CMatrix (Prod a b)) *
+          CMatrix (a × b)) *
         X *
         star (localRightUnitary (a := a) (permutationUnitary π * diagonalSignUnitary ε) :
-          CMatrix (Prod a b))) (i, j) (i', j')) =
+          CMatrix (a × b))) (i, j) (i', j')) =
       boolSignComplex (ε (π j)) * X (i, π j) (i', π j') *
         boolSignComplex (ε (π j')) := by
   classical
-  let P : CMatrix (Prod a b) := localRightUnitary (a := a) (permutationUnitary π)
-  let D : CMatrix (Prod a b) := localRightUnitary (a := a) (diagonalSignUnitary ε)
+  let P : CMatrix (a × b) := localRightUnitary (a := a) (permutationUnitary π)
+  let D : CMatrix (a × b) := localRightUnitary (a := a) (diagonalSignUnitary ε)
   have hmul :
       (localRightUnitary (a := a) (permutationUnitary π * diagonalSignUnitary ε) :
-          CMatrix (Prod a b)) = P * D := by
+          CMatrix (a × b)) = P * D := by
     simpa [P, D] using
       localRightUnitary_mul (a := a) (U := permutationUnitary π)
         (V := diagonalSignUnitary ε)
   calc
     (((localRightUnitary (a := a) (permutationUnitary π * diagonalSignUnitary ε) :
-          CMatrix (Prod a b)) *
+          CMatrix (a × b)) *
         X *
         star (localRightUnitary (a := a) (permutationUnitary π * diagonalSignUnitary ε) :
-          CMatrix (Prod a b))) (i, j) (i', j')) =
+          CMatrix (a × b))) (i, j) (i', j')) =
         (P * (D * X * star D) * star P) (i, j) (i', j') := by
           rw [hmul, star_mul]
           simp [P, D, mul_assoc]
@@ -4858,19 +4846,19 @@ theorem localRightSignPermutationUnitary_conj_apply
 Gour/Frank--Lieb route realizes the right-subsystem depolarizing twirl.  The
 ensemble first applies all diagonal sign flips and then all basis
 permutations; its average is `Tr_B(X) ⊗ π_B`. -/
-theorem localRightSignPermutationTwirl_eq_marginalA_kronecker_maximallyMixed
+theorem localRightSignPermutationTwirl_eq_traceRight_kronecker_uniform
     {b : Type v} [Fintype b] [DecidableEq b] [Nonempty b]
-    (X : CMatrix (Prod a b)) :
+    (X : CMatrix (a × b)) :
     (∑ idx : (b → Bool) × Equiv.Perm b,
       ((Fintype.card ((b → Bool) × Equiv.Perm b) : ℂ)⁻¹) •
         ((localRightUnitary (a := a)
             (permutationUnitary idx.2 * diagonalSignUnitary idx.1) :
-              CMatrix (Prod a b)) *
+              CMatrix (a × b)) *
           X *
           star (localRightUnitary (a := a)
             (permutationUnitary idx.2 * diagonalSignUnitary idx.1) :
-              CMatrix (Prod a b)))) =
-      Matrix.kronecker (partialTraceB X) (maximallyMixed b).matrix := by
+              CMatrix (a × b)))) =
+      Matrix.kronecker (Matrix.traceRight X) (MState.uniform : MState b).m := by
   classical
   ext x y
   rcases x with ⟨i, j⟩
@@ -4905,8 +4893,19 @@ theorem localRightSignPermutationTwirl_eq_marginalA_kronecker_maximallyMixed
             boolSignComplex (idx.1 (idx.2 j))) =
           (Fintype.card (b → Bool) : ℂ) *
             ∑ π : Equiv.Perm b, X (i, π j) (i', π j) := by
-      rw [Fintype.sum_prod_type]
-      simp [Finset.mul_sum, mul_left_comm, mul_comm]
+      rw [Fintype.sum_prod_type, Finset.sum_comm, Finset.mul_sum]
+      refine Finset.sum_congr rfl fun π _ => ?_
+      calc
+        (∑ ε : b → Bool,
+          boolSignComplex (ε (π j)) * X (i, π j) (i', π j) *
+            boolSignComplex (ε (π j))) =
+            (∑ ε : b → Bool,
+              boolSignComplex (ε (π j)) * boolSignComplex (ε (π j))) *
+              X (i, π j) (i', π j) := by
+          rw [Finset.sum_mul]
+          exact Finset.sum_congr rfl fun ε _ => by ring
+        _ = (Fintype.card (b → Bool) : ℂ) * X (i, π j) (i', π j) := by
+          rw [boolSignComplex_sum_mul_eq_card]
     rw [hsum, hcard]
     calc
       ((Fintype.card (b → Bool) : ℂ)⁻¹ *
@@ -4918,9 +4917,9 @@ theorem localRightSignPermutationTwirl_eq_marginalA_kronecker_maximallyMixed
         field_simp [hS, hP]
       _ = (Fintype.card b : ℂ)⁻¹ * ∑ k : b, X (i, k) (i', k) := by
         exact perm_orbit_average_eq_uniform (fun k : b => X (i, k) (i', k)) j
-      _ = (Matrix.kronecker (partialTraceB X) (maximallyMixed b).matrix)
+      _ = (Matrix.kronecker (Matrix.traceRight X) (MState.uniform : MState b).m)
           (i, j) (i', j) := by
-        simp [partialTraceB, maximallyMixed_matrix, Matrix.kronecker,
+        simp [Matrix.traceRight, uniform_matrix, Matrix.kronecker,
           Matrix.kroneckerMap_apply, hcastB, mul_comm]
   · have hsum :
         (∑ idx : (b → Bool) × Equiv.Perm b,
@@ -4939,15 +4938,12 @@ theorem localRightSignPermutationTwirl_eq_marginalA_kronecker_maximallyMixed
             X (i, π j) (i', π j') *
               (∑ ε : b → Bool,
                 boolSignComplex (ε (π j)) * boolSignComplex (ε (π j'))) := by
-          simp [Finset.mul_sum, mul_assoc, mul_comm]
+          rw [Finset.mul_sum]
+          exact Finset.sum_congr rfl fun ε _ => by ring
         _ = 0 := by
           rw [boolSignComplex_sum_mul_eq_zero_of_ne hne, mul_zero]
     rw [hsum, mul_zero]
-    simp [partialTraceB, maximallyMixed_matrix, Matrix.kronecker, Matrix.kroneckerMap_apply,
+    simp [Matrix.traceRight, uniform_matrix, Matrix.kronecker, Matrix.kroneckerMap_apply,
       hjj']
 
-end State
-
-end
-
-end QIT
+end MState

@@ -43,7 +43,7 @@ Hermitian square-one observables for each party.
 structure ObservableModel (HA : Type u) (HB : Type v)
     [Fintype HA] [DecidableEq HA] [Fintype HB] [DecidableEq HB] where
   /-- Shared bipartite state. -/
-  rho : State (HA × HB)
+  rho : MState (HA × HB)
   /-- Alice's two `±1` observables. -/
   alice : Fin 2 → CMatrix HA
   /-- Bob's two `±1` observables. -/
@@ -68,7 +68,7 @@ def jointObservable (M : ObservableModel HA HB) (x y : Fin 2) : CMatrix (HA × H
 
 /-- Observable-level correlator `E_xy = Tr(ρ (A_x ⊗ B_y))`, as a real number. -/
 def correlator (M : ObservableModel HA HB) (x y : Fin 2) : ℝ :=
-  ((M.rho.matrix * M.jointObservable x y).trace).re
+  ((M.rho.m * M.jointObservable x y).trace).re
 
 /-- Observable-level CHSH value `E₀₀ + E₀₁ + E₁₀ - E₁₁`. -/
 def value (M : ObservableModel HA HB) : ℝ :=
@@ -196,7 +196,7 @@ theorem sosTerm1_isHermitian (M : ObservableModel HA HB) :
   simp
 
 theorem value_eq_trace_chshOperator (M : ObservableModel HA HB) :
-    M.value = ((M.rho.matrix * M.chshOperator).trace).re := by
+    M.value = ((M.rho.m * M.chshOperator).trace).re := by
   simp [value, correlator, chshOperator, aliceLift_mul_bobLift, Matrix.mul_add,
     Matrix.mul_sub, Matrix.trace_add, Matrix.trace_sub]
 
@@ -256,35 +256,16 @@ theorem tsirelsonSlack_posSemidef (M : ObservableModel HA HB) :
   exact (Matrix.PosSemidef.add (M.sosTerm0_mul_self_posSemidef)
     (M.sosTerm1_mul_self_posSemidef)).smul invSqrtTwo_nonneg
 
-theorem trace_mul_posSemidef_re_nonneg {a : Type u} [Fintype a] [DecidableEq a]
-    (rho : State a) {H : CMatrix a}
-    (hH : H.PosSemidef) :
-    0 ≤ ((rho.matrix * H).trace).re := by
-  have hpsd : (rho.sqrtMatrix * H * rho.sqrtMatrix).PosSemidef := by
-    have h := hH.mul_mul_conjTranspose_same rho.sqrtMatrix
-    rw [rho.sqrtMatrix_isHermitian] at h
-    exact h
-  have htrace : 0 ≤ (rho.sqrtMatrix * H * rho.sqrtMatrix).trace :=
-    Matrix.PosSemidef.trace_nonneg hpsd
-  have htrace_re : 0 ≤ ((rho.sqrtMatrix * H * rho.sqrtMatrix).trace).re := htrace.1
-  have hEq : (rho.matrix * H).trace = (rho.sqrtMatrix * H * rho.sqrtMatrix).trace := by
-    rw [← rho.sqrtMatrix_mul_self]
-    calc
-      ((rho.sqrtMatrix * rho.sqrtMatrix) * H).trace
-          = (rho.sqrtMatrix * (rho.sqrtMatrix * H)).trace := by rw [Matrix.mul_assoc]
-      _ = ((rho.sqrtMatrix * H) * rho.sqrtMatrix).trace := by rw [Matrix.trace_mul_comm]
-      _ = (rho.sqrtMatrix * H * rho.sqrtMatrix).trace := by rw [Matrix.mul_assoc]
-  rwa [hEq]
-
 /-- Observable-level CHSH Tsirelson upper bound. -/
 theorem value_le_two_mul_sqrt_two (M : ObservableModel HA HB) :
     M.value ≤ 2 * Real.sqrt 2 := by
-  have hnonneg := trace_mul_posSemidef_re_nonneg M.rho M.tsirelsonSlack_posSemidef
+  have hnonneg :=
+    cMatrix_trace_mul_posSemidef_re_nonneg M.rho.psd M.tsirelsonSlack_posSemidef
   have hslack :
-      ((M.rho.matrix * M.tsirelsonSlack).trace).re = 2 * Real.sqrt 2 - M.value := by
+      ((M.rho.m * M.tsirelsonSlack).trace).re = 2 * Real.sqrt 2 - M.value := by
     rw [M.value_eq_trace_chshOperator]
     simp [tsirelsonSlack, Matrix.mul_sub, Matrix.trace_sub, Matrix.trace_smul,
-      M.rho.trace_eq_one]
+      M.rho.tr']
   rw [hslack] at hnonneg
   linarith
 
@@ -353,7 +334,7 @@ theorem singletObservableModel_correlator_zero_zero :
     singletObservableModel.correlator 0 0 = Real.sqrt 2 / 2 := by
   norm_num [Fintype.sum_prod_type, singletObservableModel, correlator, jointObservable,
     singletAlice, singletBob,
-    TwoQubit.singletState, TwoQubit.singletPureVector, TwoQubit.singletMatrix,
+    TwoQubit.singletState, TwoQubit.singletKet, TwoQubit.singletMatrix,
     rankOneMatrix, TwoQubit.singletAmp,
     TwoQubit.sigmaX, TwoQubit.sigmaZ, Matrix.vecMulVec_apply, Matrix.kronecker,
     Matrix.mul_apply, Matrix.trace, TwoQubit.invSqrtTwo, TwoQubit.star_invSqrtTwo]
@@ -364,7 +345,7 @@ theorem singletObservableModel_correlator_zero_one :
     singletObservableModel.correlator 0 1 = Real.sqrt 2 / 2 := by
   norm_num [Fintype.sum_prod_type, singletObservableModel, correlator, jointObservable,
     singletAlice, singletBob,
-    TwoQubit.singletState, TwoQubit.singletPureVector, TwoQubit.singletMatrix,
+    TwoQubit.singletState, TwoQubit.singletKet, TwoQubit.singletMatrix,
     rankOneMatrix, TwoQubit.singletAmp,
     TwoQubit.sigmaX, TwoQubit.sigmaZ, Matrix.vecMulVec_apply, Matrix.kronecker,
     Matrix.mul_apply, Matrix.trace, TwoQubit.invSqrtTwo, TwoQubit.star_invSqrtTwo]
@@ -375,7 +356,7 @@ theorem singletObservableModel_correlator_one_zero :
     singletObservableModel.correlator 1 0 = Real.sqrt 2 / 2 := by
   norm_num [Fintype.sum_prod_type, singletObservableModel, correlator, jointObservable,
     singletAlice, singletBob,
-    TwoQubit.singletState, TwoQubit.singletPureVector, TwoQubit.singletMatrix,
+    TwoQubit.singletState, TwoQubit.singletKet, TwoQubit.singletMatrix,
     rankOneMatrix, TwoQubit.singletAmp,
     TwoQubit.sigmaX, TwoQubit.sigmaZ, Matrix.vecMulVec_apply, Matrix.kronecker,
     Matrix.mul_apply, Matrix.trace, TwoQubit.invSqrtTwo, TwoQubit.star_invSqrtTwo]
@@ -386,7 +367,7 @@ theorem singletObservableModel_correlator_one_one :
     singletObservableModel.correlator 1 1 = -(Real.sqrt 2 / 2) := by
   norm_num [Fintype.sum_prod_type, singletObservableModel, correlator, jointObservable,
     singletAlice, singletBob,
-    TwoQubit.singletState, TwoQubit.singletPureVector, TwoQubit.singletMatrix,
+    TwoQubit.singletState, TwoQubit.singletKet, TwoQubit.singletMatrix,
     rankOneMatrix, TwoQubit.singletAmp,
     TwoQubit.sigmaX, TwoQubit.sigmaZ, Matrix.vecMulVec_apply, Matrix.kronecker,
     Matrix.mul_apply, Matrix.trace, TwoQubit.invSqrtTwo, TwoQubit.star_invSqrtTwo]
@@ -411,7 +392,7 @@ rather than necessarily square-one observables.
 structure ContractionModel (HA : Type u) (HB : Type v)
     [Fintype HA] [DecidableEq HA] [Fintype HB] [DecidableEq HB] where
   /-- Shared bipartite state. -/
-  rho : State (HA × HB)
+  rho : MState (HA × HB)
   /-- Alice's two Hermitian contraction observables. -/
   alice : Fin 2 → CMatrix HA
   /-- Bob's two Hermitian contraction observables. -/
@@ -436,7 +417,7 @@ def jointObservable (M : ContractionModel HA HB) (x y : Fin 2) : CMatrix (HA × 
 
 /-- Contraction-level correlator `E_xy = Tr(ρ (A_x ⊗ B_y))`. -/
 def correlator (M : ContractionModel HA HB) (x y : Fin 2) : ℝ :=
-  ((M.rho.matrix * M.jointObservable x y).trace).re
+  ((M.rho.m * M.jointObservable x y).trace).re
 
 /-- Contraction-level CHSH value `E₀₀ + E₀₁ + E₁₀ - E₁₁`. -/
 def value (M : ContractionModel HA HB) : ℝ :=
@@ -566,7 +547,7 @@ theorem sosTerm1_isHermitian (M : ContractionModel HA HB) :
   simp
 
 theorem value_eq_trace_chshOperator (M : ContractionModel HA HB) :
-    M.value = ((M.rho.matrix * M.chshOperator).trace).re := by
+    M.value = ((M.rho.m * M.chshOperator).trace).re := by
   simp [value, correlator, chshOperator, aliceLift_mul_bobLift, Matrix.mul_add,
     Matrix.mul_sub, Matrix.trace_add, Matrix.trace_sub]
 
@@ -632,12 +613,13 @@ theorem tsirelsonSlack_posSemidef (M : ContractionModel HA HB) :
 /-- Contraction-level CHSH Tsirelson upper bound. -/
 theorem value_le_two_mul_sqrt_two (M : ContractionModel HA HB) :
     M.value ≤ 2 * Real.sqrt 2 := by
-  have hnonneg := ObservableModel.trace_mul_posSemidef_re_nonneg M.rho M.tsirelsonSlack_posSemidef
+  have hnonneg :=
+    cMatrix_trace_mul_posSemidef_re_nonneg M.rho.psd M.tsirelsonSlack_posSemidef
   have hslack :
-      ((M.rho.matrix * M.tsirelsonSlack).trace).re = 2 * Real.sqrt 2 - M.value := by
+      ((M.rho.m * M.tsirelsonSlack).trace).re = 2 * Real.sqrt 2 - M.value := by
     rw [M.value_eq_trace_chshOperator]
     simp [tsirelsonSlack, Matrix.mul_sub, Matrix.trace_sub, Matrix.trace_smul,
-      M.rho.trace_eq_one]
+      M.rho.tr']
   rw [hslack] at hnonneg
   linarith
 
@@ -649,25 +631,25 @@ variable {a : Type u} [Fintype a] [DecidableEq a]
 The Hermitian `±1`-valued observable associated to a binary POVM under the
 CHSH convention `false = +1`, `true = -1`.
 -/
-def _root_.QIT.POVM.binaryObservable (M : POVM Bool a) : CMatrix a :=
+def _root_.POVM.binaryObservable (M : POVM Bool a) : CMatrix a :=
   M.effects false - M.effects true
 
-theorem _root_.QIT.POVM.binary_sum_effects (M : POVM Bool a) :
+theorem _root_.POVM.binary_sum_effects (M : POVM Bool a) :
     M.effects false + M.effects true = 1 := by
   simpa [Fintype.sum_bool, add_comm] using M.sum_eq_one
 
-theorem _root_.QIT.POVM.effects_true_eq_one_sub_false (M : POVM Bool a) :
+theorem _root_.POVM.effects_true_eq_one_sub_false (M : POVM Bool a) :
     M.effects true = 1 - M.effects false := by
   have h := M.binary_sum_effects
   rw [← h]
   abel
 
-theorem _root_.QIT.POVM.binaryObservable_isHermitian (M : POVM Bool a) :
+theorem _root_.POVM.binaryObservable_isHermitian (M : POVM Bool a) :
     M.binaryObservable.IsHermitian := by
   rw [Matrix.IsHermitian, POVM.binaryObservable, Matrix.conjTranspose_sub,
     (M.pos false).isHermitian, (M.pos true).isHermitian]
 
-theorem _root_.QIT.POVM.effect_false_sub_square_nonneg (M : POVM Bool a) :
+theorem _root_.POVM.effect_false_sub_square_nonneg (M : POVM Bool a) :
     (0 : CMatrix a) ≤ M.effects false - M.effects false * M.effects false := by
   let E := M.effects false
   have hE0 : (0 : CMatrix a) ≤ E := (M.pos false).nonneg
@@ -698,7 +680,7 @@ theorem _root_.QIT.POVM.effect_false_sub_square_nonneg (M : POVM Bool a) :
     rw [cfc_id (R := ℝ) (A := CMatrix a) (p := IsSelfAdjoint) E]
   simpa [E, hcfceq] using hpos
 
-theorem _root_.QIT.POVM.binaryObservable_contracts (M : POVM Bool a) :
+theorem _root_.POVM.binaryObservable_contracts (M : POVM Bool a) :
     (1 - M.binaryObservable * M.binaryObservable).PosSemidef := by
   let E := M.effects false
   have htrue : M.effects true = 1 - E := by
@@ -764,16 +746,16 @@ theorem _root_.QIT.Bell.QuantumRealization.chshCorrelator_eq_toContractionModel_
   let : Fintype R.HB := R.fintypeHB
   let : DecidableEq R.HB := R.decidableEqHB
   have htrace :
-      ((R.rho.matrix *
+      ((R.rho.m *
             Matrix.kronecker ((R.alice x).effects false - (R.alice x).effects true)
               ((R.bob y).effects false - (R.bob y).effects true)).trace).re =
-        ((R.rho.matrix *
+        ((R.rho.m *
             Matrix.kronecker ((R.alice x).effects false) ((R.bob y).effects false)).trace).re -
-          ((R.rho.matrix *
+          ((R.rho.m *
             Matrix.kronecker ((R.alice x).effects false) ((R.bob y).effects true)).trace).re -
-          ((R.rho.matrix *
+          ((R.rho.m *
             Matrix.kronecker ((R.alice x).effects true) ((R.bob y).effects false)).trace).re +
-          ((R.rho.matrix *
+          ((R.rho.m *
             Matrix.kronecker ((R.alice x).effects true) ((R.bob y).effects true)).trace).re := by
     have hkr :
         Matrix.kronecker ((R.alice x).effects false - (R.alice x).effects true)
@@ -793,7 +775,7 @@ theorem _root_.QIT.Bell.QuantumRealization.chshCorrelator_eq_toContractionModel_
   simp [QuantumRealization.prob, POVM.prob_eq_trace_re, R.joint_effects,
     POVM.binaryObservable, CHSH.outcomeSign, Fintype.sum_prod_type]
   change _ =
-    ((R.rho.matrix *
+    ((R.rho.m *
       Matrix.kronecker ((R.alice x).effects false - (R.alice x).effects true)
         ((R.bob y).effects false - (R.bob y).effects true)).trace).re
   simp only [Matrix.kronecker]

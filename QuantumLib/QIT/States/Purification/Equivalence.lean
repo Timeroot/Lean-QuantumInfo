@@ -31,13 +31,22 @@ universe u v w
 
 noncomputable section
 
-namespace PureVector
+end
+end QIT
+
+namespace Ket
+
+noncomputable section
+
+open QIT
+universe u v w
 
 variable {a : Type u}
 variable [Fintype a] [DecidableEq a]
 
-/-- Pure vectors are extensional in their amplitude functions. -/
-theorem ext_amp {Ψ Φ : PureVector a} (h : Ψ.amp = Φ.amp) : Ψ = Φ := by
+omit [DecidableEq a] in
+/-- Kets are extensional in their amplitude functions. -/
+theorem ext_vec {Ψ Φ : Ket a} (h : Ψ.vec = Φ.vec) : Ψ = Φ := by
   cases Ψ
   cases Φ
   simp only at h
@@ -51,25 +60,32 @@ variable [Fintype a] [DecidableEq a]
 
 /-- Two purifications of the same state are related by a reference-side
 isometry, provided the first reference system embeds into the second. -/
-theorem exists_referenceIsometry_applyPureVector_eq_of_purifies_same_state
-    {Ψ : PureVector (Prod r₁ a)} {Φ : PureVector (Prod r₂ a)} {ρ : State a}
+theorem exists_referenceIsometry_applyKet_eq_of_purifies_same_state
+    {Ψ : Ket (r₁ × a)} {Φ : Ket (r₂ × a)} {ρ : MState a}
     (hΨ : Ψ.Purifies ρ) (hΦ : Φ.Purifies ρ)
     (hcard : Fintype.card r₁ ≤ Fintype.card r₂) :
-    ∃ V : ReferenceIsometry r₁ r₂, Φ = V.applyPureVector Ψ := by
+    ∃ V : ReferenceIsometry r₁ r₂, Φ = V.applyKet Ψ := by
   have hGram :=
     amplitudeMatrix_mul_conjTranspose_eq_of_purifies_same_state hΨ hΦ
   obtain ⟨V, hV⟩ :=
     ReferenceIsometry.exists_eq_mul_transpose_of_mul_conjTranspose_eq
       Ψ.amplitudeMatrix Φ.amplitudeMatrix hGram hcard
   refine ⟨V, ?_⟩
-  apply ext_amp
+  apply ext_vec
   funext p
   have hp := congrFun (congrFun hV p.2) p.1
-  simpa [amplitudeMatrix, ReferenceIsometry.applyPureVector_amp,
+  simpa [amplitudeMatrix, ReferenceIsometry.applyKet_vec,
     ReferenceIsometry.applyAmp, Matrix.mul_apply, Matrix.transpose,
     Matrix.mulVec, dotProduct, mul_comm] using hp
 
-end PureVector
+end
+
+end Ket
+
+namespace QIT
+noncomputable section
+
+universe u v w
 
 end
 

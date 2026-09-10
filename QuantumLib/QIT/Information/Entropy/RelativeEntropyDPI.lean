@@ -21,13 +21,12 @@ source-limit bridge and the trace-log endpoint convention.
 open Filter
 open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator UniformConvergence
 
-namespace QIT
-
+noncomputable section
 universe u v
 
-noncomputable section
+open QIT
 
-namespace State
+namespace MState
 
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
@@ -35,19 +34,19 @@ variable {a : Type u} [Fintype a] [DecidableEq a]
 equalities are available for the input and output pairs. -/
 theorem relativeEntropyPSDReferenceTraceLogE_dataProcessing_channel_ge_of_eq_traceLogE
     {b : Type v} [Fintype b] [DecidableEq b]
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (Phi : Channel a b)
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (Phi : CPTPMap a b)
     (hIn :
       relativeEntropyPSDReferenceE rho sigma hSigma =
         relativeEntropyPSDReferenceTraceLogE rho sigma hSigma)
     (hOut :
       relativeEntropyPSDReferenceE
-          (Phi.applyState rho) (Phi.map sigma) (Phi.mapsPositive sigma hSigma) =
+          (Phi rho) (Phi.map sigma) (Phi.mapsPositive sigma hSigma) =
         relativeEntropyPSDReferenceTraceLogE
-          (Phi.applyState rho) (Phi.map sigma) (Phi.mapsPositive sigma hSigma)) :
-    relativeEntropyPSDReferenceTraceLogE rho sigma hSigma >=
+          (Phi rho) (Phi.map sigma) (Phi.mapsPositive sigma hSigma)) :
+    relativeEntropyPSDReferenceTraceLogE rho sigma hSigma ≥
       relativeEntropyPSDReferenceTraceLogE
-        (Phi.applyState rho) (Phi.map sigma) (Phi.mapsPositive sigma hSigma) := by
+        (Phi rho) (Phi.map sigma) (Phi.mapsPositive sigma hSigma) := by
   rw [← hIn, ← hOut]
   exact relativeEntropyPSDReferenceE_dataProcessing_channel_ge rho hSigma Phi
 
@@ -55,10 +54,10 @@ theorem relativeEntropyPSDReferenceTraceLogE_dataProcessing_channel_ge_of_eq_tra
 available for the input and output pairs. -/
 theorem relativeEntropyPSDReferenceTraceLogE_dataProcessing_channel_ge_of_supported_endpoints
     {b : Type v} [Fintype b] [DecidableEq b]
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (Phi : Channel a b)
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (Phi : CPTPMap a b)
     (hInEndpoint :
-      ∀ hSupport : Matrix.Supports rho.matrix sigma,
+      ∀ hSupport : Matrix.Supports rho.m sigma,
         Filter.Tendsto
           (sandwichedRenyiPSDReferenceHighAlphaCurve rho sigma hSigma)
           relativeEntropyHighAlphaRightToOne
@@ -66,24 +65,24 @@ theorem relativeEntropyPSDReferenceTraceLogE_dataProcessing_channel_ge_of_suppor
             rho sigma hSigma hSupport : EReal)))
     (hOutEndpoint :
       ∀ hSupport :
-          Matrix.Supports (Phi.applyState rho).matrix (Phi.map sigma),
+          Matrix.Supports (Phi rho).m (Phi.map sigma),
         Filter.Tendsto
           (sandwichedRenyiPSDReferenceHighAlphaCurve
-            (Phi.applyState rho) (Phi.map sigma) (Phi.mapsPositive sigma hSigma))
+            (Phi rho) (Phi.map sigma) (Phi.mapsPositive sigma hSigma))
           relativeEntropyHighAlphaRightToOne
           (nhds (relativeEntropyPSDReferenceTraceLogFinite
-            (Phi.applyState rho) (Phi.map sigma) (Phi.mapsPositive sigma hSigma)
+            (Phi rho) (Phi.map sigma) (Phi.mapsPositive sigma hSigma)
             hSupport : EReal))) :
-    relativeEntropyPSDReferenceTraceLogE rho sigma hSigma >=
+    relativeEntropyPSDReferenceTraceLogE rho sigma hSigma ≥
       relativeEntropyPSDReferenceTraceLogE
-        (Phi.applyState rho) (Phi.map sigma) (Phi.mapsPositive sigma hSigma) := by
+        (Phi rho) (Phi.map sigma) (Phi.mapsPositive sigma hSigma) := by
   exact
     relativeEntropyPSDReferenceTraceLogE_dataProcessing_channel_ge_of_eq_traceLogE
       rho hSigma Phi
       (relativeEntropyPSDReferenceE_eq_traceLogE_of_supported_endpoint
         rho hSigma hInEndpoint)
       (relativeEntropyPSDReferenceE_eq_traceLogE_of_supported_endpoint
-        (Phi.applyState rho) (Phi.mapsPositive sigma hSigma) hOutEndpoint)
+        (Phi rho) (Phi.mapsPositive sigma hSigma) hOutEndpoint)
 
 /-- Quantum relative entropy data processing in the source trace-log/support
 convention for PSD references.
@@ -92,30 +91,26 @@ This is the Khatri--Wilde/Tomamichel source-level orientation: finite
 trace-log branch on supported inputs and `+infty` otherwise. -/
 theorem relativeEntropyPSDReferenceTraceLogE_dataProcessing_channel_ge
     {b : Type v} [Fintype b] [DecidableEq b]
-    (rho : State a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
-    (Phi : Channel a b) :
-    relativeEntropyPSDReferenceTraceLogE rho sigma hSigma >=
+    (rho : MState a) {sigma : CMatrix a} (hSigma : sigma.PosSemidef)
+    (Phi : CPTPMap a b) :
+    relativeEntropyPSDReferenceTraceLogE rho sigma hSigma ≥
       relativeEntropyPSDReferenceTraceLogE
-        (Phi.applyState rho) (Phi.map sigma) (Phi.mapsPositive sigma hSigma) := by
+        (Phi rho) (Phi.map sigma) (Phi.mapsPositive sigma hSigma) := by
   exact
     relativeEntropyPSDReferenceTraceLogE_dataProcessing_channel_ge_of_eq_traceLogE
       rho hSigma Phi
       (relativeEntropyPSDReferenceE_eq_traceLogE rho hSigma)
       (relativeEntropyPSDReferenceE_eq_traceLogE
-        (Phi.applyState rho) (Phi.mapsPositive sigma hSigma))
+        (Phi rho) (Phi.mapsPositive sigma hSigma))
 
 /-- Quantum relative entropy data processing for the canonical state-state
 relative entropy API. -/
 theorem relativeEntropy_dataProcessing_channel_ge
     {b : Type v} [Fintype b] [DecidableEq b]
-    (rho sigma : State a) (Phi : Channel a b) :
-    rho.relativeEntropy sigma >=
-      (Phi.applyState rho).relativeEntropy (Phi.applyState sigma) := by
-  simpa [relativeEntropy, Channel.applyState] using
-    relativeEntropyPSDReferenceTraceLogE_dataProcessing_channel_ge rho sigma.pos Phi
+    (rho sigma : MState a) (Phi : CPTPMap a b) :
+    rho.relativeEntropy sigma ≥
+      MState.relativeEntropy (Phi rho) (Phi sigma) := by
+  simpa [relativeEntropy, CPTPOp.mat_coe_eq_apply_mat] using
+    relativeEntropyPSDReferenceTraceLogE_dataProcessing_channel_ge rho sigma.psd Phi
 
-end State
-
-end
-
-end QIT
+end MState

@@ -90,24 +90,25 @@ theorem kronecker_effects (PA : ProjectiveMeasurement A HA)
 
 end ProjectiveMeasurement
 
-namespace POVM
+section POVMNaimark
 
 variable {settings : Type uX} {outcomes : Type uA} {system : Type uB}
 variable [Fintype outcomes] [DecidableEq outcomes] [Inhabited outcomes]
 variable [Fintype system] [DecidableEq system]
 
 /-- Compressing a shared-family Naimark projector recovers the selected POVM effect. -/
-theorem familyNaimark_compression_projector (M : settings → POVM outcomes system)
+theorem _root_.POVM.familyNaimark_compression_projector
+    (M : settings → POVM outcomes system)
     (setting : settings) (outcome : outcomes) :
-    Matrix.conjTranspose (familyNaimarkEmbedding M) *
-        (familyNaimarkProjectiveMeasurement M setting).effects outcome *
-        familyNaimarkEmbedding M =
+    Matrix.conjTranspose (POVM.familyNaimarkEmbedding M) *
+        (POVM.familyNaimarkProjectiveMeasurement M setting).effects outcome *
+        POVM.familyNaimarkEmbedding M =
       (M setting).effects outcome := by
-  simpa [familyNaimarkEmbedding, familyNaimarkProjectiveMeasurement,
-    fixedNaimarkProjectiveMeasurement, fixedNaimarkEmbedding]
+  simpa [POVM.familyNaimarkEmbedding, POVM.familyNaimarkProjectiveMeasurement,
+    POVM.fixedNaimarkProjectiveMeasurement, POVM.fixedNaimarkEmbedding]
     using (M setting).fixedNaimark_compression_projector outcome
 
-end POVM
+end POVMNaimark
 
 namespace Bell
 
@@ -122,14 +123,20 @@ It mirrors `QuantumRealization`, with local and joint projective measurements.
 structure ProjectiveQuantumRealization
     (X : Type uX) (Y : Type uY) (A : Type uA) (B : Type uB)
     [Fintype X] [Fintype Y] [Fintype A] [Fintype B] [DecidableEq A] [DecidableEq B] where
+  /-- Alice's Hilbert space. -/
   HA : Type (max uX uY uA uB)
+  /-- Bob's Hilbert space. -/
   HB : Type (max uX uY uA uB)
+  /-- Alice's Hilbert space is finite dimensional. -/
   [fintypeHA : Fintype HA]
+  /-- Alice's Hilbert space has decidable equality of basis labels. -/
   [decidableEqHA : DecidableEq HA]
+  /-- Bob's Hilbert space is finite dimensional. -/
   [fintypeHB : Fintype HB]
+  /-- Bob's Hilbert space has decidable equality of basis labels. -/
   [decidableEqHB : DecidableEq HB]
   /-- Bipartite state shared by Alice and Bob. -/
-  rho : State (HA × HB)
+  rho : MState (HA × HB)
   /-- Alice's projective measurement for each setting. -/
   alice : X → ProjectiveMeasurement A HA
   /-- Bob's projective measurement for each setting. -/
@@ -160,9 +167,13 @@ variable [Inhabited A] [Inhabited B]
 
 variable (R : QuantumRealization X Y A B)
 
+/-- Alice's Hilbert space of a realization is finite. -/
 local instance : Fintype R.HA := R.fintypeHA
+/-- Alice's Hilbert space of a realization has decidable equality. -/
 local instance : DecidableEq R.HA := R.decidableEqHA
+/-- Bob's Hilbert space of a realization is finite. -/
 local instance : Fintype R.HB := R.fintypeHB
+/-- Bob's Hilbert space of a realization has decidable equality. -/
 local instance : DecidableEq R.HB := R.decidableEqHB
 
 /-- Alice's shared family Naimark embedding for a realization. -/
@@ -191,18 +202,18 @@ theorem jointFamilyEmbedding_isometry :
     POVM.familyNaimarkEmbedding_isometry R.bob, Matrix.one_kronecker_one]
 
 /-- The shared lifted bipartite state for the local family dilations. -/
-def projectiveState : State
-    (POVM.FamilyNaimarkSpace R.alice × POVM.FamilyNaimarkSpace R.bob) where
-  matrix := R.jointFamilyEmbedding * R.rho.matrix * Matrix.conjTranspose R.jointFamilyEmbedding
-  pos := R.rho.pos.mul_mul_conjTranspose_same R.jointFamilyEmbedding
-  trace_eq_one := by
-    rw [Matrix.trace_mul_cycle, R.jointFamilyEmbedding_isometry, Matrix.one_mul, R.rho.trace_eq_one]
+def projectiveState : MState
+    (POVM.FamilyNaimarkSpace R.alice × POVM.FamilyNaimarkSpace R.bob) := .ofMatrix
+  (matrix := R.jointFamilyEmbedding * R.rho.m * Matrix.conjTranspose R.jointFamilyEmbedding)
+  (pos := R.rho.psd.mul_mul_conjTranspose_same R.jointFamilyEmbedding)
+  (trace_eq_one := by
+    rw [Matrix.trace_mul_cycle, R.jointFamilyEmbedding_isometry, Matrix.one_mul, R.rho.tr'])
 
 @[simp]
 theorem projectiveState_matrix :
-    R.projectiveState.matrix =
-      R.jointFamilyEmbedding * R.rho.matrix * Matrix.conjTranspose R.jointFamilyEmbedding :=
-  rfl
+    R.projectiveState.m =
+      R.jointFamilyEmbedding * R.rho.m * Matrix.conjTranspose R.jointFamilyEmbedding :=
+  MState.matrix_ofMatrix _ _ _
 
 /-- The joint projective measurement induced by the local family dilations. -/
 def projectiveJoint (x : X) (y : Y) :
@@ -247,43 +258,43 @@ theorem jointFamily_compression_projector (x : X) (y : Y) (outcome : A × B) :
     POVM.familyNaimark_compression_projector R.bob y outcome.2]
 
 theorem projective_trace_joint_eq (x : X) (y : Y) (outcome : A × B) :
-    (R.projectiveState.matrix * (R.projectiveJoint x y).effects outcome).trace =
-      (R.rho.matrix * (R.joint x y).effects outcome).trace := by
+    (R.projectiveState.m * (R.projectiveJoint x y).effects outcome).trace =
+      (R.rho.m * (R.joint x y).effects outcome).trace := by
   calc
-    (R.projectiveState.matrix * (R.projectiveJoint x y).effects outcome).trace
+    (R.projectiveState.m * (R.projectiveJoint x y).effects outcome).trace
         =
-          (R.rho.matrix *
+          (R.rho.m *
             (Matrix.conjTranspose R.jointFamilyEmbedding *
               (R.projectiveJoint x y).effects outcome *
               R.jointFamilyEmbedding)).trace := by
             rw [projectiveState_matrix]
             calc
-              ((R.jointFamilyEmbedding * R.rho.matrix *
+              ((R.jointFamilyEmbedding * R.rho.m *
                       Matrix.conjTranspose R.jointFamilyEmbedding) *
                     (R.projectiveJoint x y).effects outcome).trace
                   =
-                    (R.jointFamilyEmbedding * R.rho.matrix *
+                    (R.jointFamilyEmbedding * R.rho.m *
                       (Matrix.conjTranspose R.jointFamilyEmbedding *
                         (R.projectiveJoint x y).effects outcome)).trace := by
                     rw [Matrix.mul_assoc, Matrix.mul_assoc]
               _ =
-                    (R.rho.matrix *
+                    (R.rho.m *
                       ((Matrix.conjTranspose R.jointFamilyEmbedding *
                           (R.projectiveJoint x y).effects outcome) *
                         R.jointFamilyEmbedding)).trace := by
                     rw [Matrix.trace_mul_cycle]
                     rw [Matrix.trace_mul_comm]
               _ =
-                    (R.rho.matrix *
+                    (R.rho.m *
                       (Matrix.conjTranspose R.jointFamilyEmbedding *
                         (R.projectiveJoint x y).effects outcome *
                         R.jointFamilyEmbedding)).trace := by
                     rw [Matrix.mul_assoc]
     _ =
-        (R.rho.matrix *
+        (R.rho.m *
           Matrix.kronecker ((R.alice x).effects outcome.1) ((R.bob y).effects outcome.2)).trace := by
           rw [R.jointFamily_compression_projector x y outcome]
-    _ = (R.rho.matrix * (R.joint x y).effects outcome).trace := by
+    _ = (R.rho.m * (R.joint x y).effects outcome).trace := by
           rw [R.joint_effects x y outcome]
 
 /-- The projectivized realization preserves every behavior probability. -/
@@ -296,8 +307,8 @@ theorem toProjective_prob_eq (a : A) (b : B) (x : X) (y : Y) :
   apply NNReal.eq
   unfold ProjectiveQuantumRealization.prob QuantumRealization.prob toProjective
   rw [POVM.prob_eq_trace_re, POVM.prob_eq_trace_re]
-  change Complex.re ((R.projectiveState.matrix * (R.projectiveJoint x y).effects (a, b)).trace) =
-    Complex.re ((R.rho.matrix * (R.joint x y).effects (a, b)).trace)
+  change Complex.re ((R.projectiveState.m * (R.projectiveJoint x y).effects (a, b)).trace) =
+    Complex.re ((R.rho.m * (R.joint x y).effects (a, b)).trace)
   rw [R.projective_trace_joint_eq x y (a, b)]
 
 /--

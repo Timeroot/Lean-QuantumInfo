@@ -21,26 +21,24 @@ reusing the canonical state topology from `QIT.States.Topology`.
 
 open scoped ComplexOrder MatrixOrder
 
-namespace QIT
-
 universe u v
 
 noncomputable section
 
-namespace Channel
+namespace CPTPOp
+
+open QIT
 
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
-variable (N : Channel a b)
+variable (N : CPTPMap a b)
 
 /-- Applying a fixed channel is continuous on the state space. -/
-theorem applyState_continuous : Continuous (fun ρ : State a => N.applyState ρ) := by
-  rw [continuous_induced_rng]
-  change Continuous fun ρ : State a => N.map ρ.matrix
-  exact (LinearMap.continuous_of_finiteDimensional N.map).comp State.continuous_matrix
+theorem applyState_continuous : Continuous (fun ρ : MState a => N ρ) := by
+  refine MState.continuous_of_continuous_m ?_
+  simp only [CPTPOp.mat_coe_eq_apply_mat]
+  exact (LinearMap.continuous_of_finiteDimensional N.map).comp MState.continuous_matrix
 
-end Channel
+end CPTPOp
 
 end
-
-end QIT

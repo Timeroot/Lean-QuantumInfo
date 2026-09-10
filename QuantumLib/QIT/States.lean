@@ -41,15 +41,7 @@ public import QuantumLib.QIT.States.TraceNorm.Variational
 public import QuantumLib.QIT.States.Geometry
 
 /-!
-# State interfaces
+# MState interfaces
 
-State-facing import surface for the local QIT incubator.
+MState-facing import surface for Lean-QIT.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace States
-
-end States
-end QIT

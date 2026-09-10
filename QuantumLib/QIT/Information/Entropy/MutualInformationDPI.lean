@@ -23,119 +23,16 @@ Khatri--Wilde quantum mutual information data-processing statement
 
 open scoped ComplexOrder MatrixOrder
 
-namespace QIT
-
+noncomputable section
 universe u v w x y z
 
-noncomputable section
+namespace MState
 
-namespace Matrix
-
-variable {α : Type u} [Fintype α] [DecidableEq α]
-
-/-- The zero roots contributed by powers of `X` do not affect `xlog2` spectral
-sums. -/
-theorem roots_X_pow_map_re_xlog2_sum_zero (n : ℕ) :
-    ((Polynomial.X ^ n : Polynomial ℂ).roots.map (fun z : ℂ => xlog2 z.re)).sum = 0 := by
-  rw [Polynomial.roots_X_pow, Multiset.map_nsmul, Multiset.sum_nsmul,
-    Multiset.map_singleton, Multiset.sum_singleton]
-  simp [xlog2]
-
-/-- If two characteristic-polynomial identities differ only by powers of `X`,
-then the `xlog2` spectral sums over their nonzero roots agree. -/
-theorem roots_re_xlog2_sum_eq_of_X_pow_mul_eq
-    {P Q : Polynomial ℂ} {m n : ℕ} (hP : P ≠ 0) (hQ : Q ≠ 0)
-    (h : Polynomial.X ^ m * P = Polynomial.X ^ n * Q) :
-    (P.roots.map (fun z : ℂ => xlog2 z.re)).sum =
-      (Q.roots.map (fun z : ℂ => xlog2 z.re)).sum := by
-  have hXm : (Polynomial.X ^ m : Polynomial ℂ) ≠ 0 := by simp
-  have hXn : (Polynomial.X ^ n : Polynomial ℂ) ≠ 0 := by simp
-  have hleft_ne : (Polynomial.X ^ m : Polynomial ℂ) * P ≠ 0 := mul_ne_zero hXm hP
-  have hright_ne : (Polynomial.X ^ n : Polynomial ℂ) * Q ≠ 0 := mul_ne_zero hXn hQ
-  have hroots := congrArg Polynomial.roots h
-  rw [Polynomial.roots_mul hleft_ne, Polynomial.roots_mul hright_ne] at hroots
-  have hsum :=
-    congrArg (fun s : Multiset ℂ => (s.map (fun z : ℂ => xlog2 z.re)).sum) hroots
-  simp only [Multiset.map_add, Multiset.sum_add] at hsum
-  rw [roots_X_pow_map_re_xlog2_sum_zero m,
-    roots_X_pow_map_re_xlog2_sum_zero n] at hsum
-  simpa using hsum
-
-/-- Trace pairing against a diagonal operator in a unitary basis only reads the
-diagonal entries of the other operator in that basis. -/
-theorem trace_mul_unitary_conj_diagonal_right_re
-    (U : Matrix.unitaryGroup α ℂ) (B : CMatrix α) (e : α → ℝ) :
-    ((B * ((U : CMatrix α) * (Matrix.diagonal fun i => ((e i : ℝ) : ℂ)) *
-      star (U : CMatrix α))).trace).re =
-      ∑ i : α, ((star (U : CMatrix α) * B * (U : CMatrix α)) i i).re * e i := by
-  let D : CMatrix α := Matrix.diagonal fun i => ((e i : ℝ) : ℂ)
-  have htrace :
-      (B * ((U : CMatrix α) * D * star (U : CMatrix α))).trace =
-        ((star (U : CMatrix α) * B * (U : CMatrix α)) * D).trace := by
-    calc
-      (B * ((U : CMatrix α) * D * star (U : CMatrix α))).trace =
-          (((B * (U : CMatrix α)) * D) * star (U : CMatrix α)).trace := by
-            simp [Matrix.mul_assoc]
-      _ = (star (U : CMatrix α) * ((B * (U : CMatrix α)) * D)).trace := by
-            rw [Matrix.trace_mul_comm]
-      _ = ((star (U : CMatrix α) * B * (U : CMatrix α)) * D).trace := by
-            simp [Matrix.mul_assoc]
-  rw [htrace]
-  simp [D, Matrix.trace, Matrix.diagonal, Matrix.mul_apply, Complex.mul_re]
-
-end Matrix
-
-namespace Channel
-
-variable {α : Type u} [Fintype α] [DecidableEq α]
-
-/-- The identity channel has the identity matrix map. -/
-theorem idChannel_map_eq_linearMap_id :
-    (idChannel α).map = (LinearMap.id : MatrixMap α α) := by
-  ext X i j
-  simp [idChannel, MatrixMap.ofKraus]
-
-end Channel
-
-namespace State
+open QIT
 
 variable {a : Type u} {b : Type v} {c : Type w} {d : Type x}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 variable [Fintype c] [DecidableEq c] [Fintype d] [DecidableEq d]
-
-/-- Compressing a state to the positive spectral support of a supporting PSD
-reference preserves its von Neumann entropy. -/
-theorem vonNeumann_psdSupportCompressedState_eq
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (hSupport : Matrix.Supports ρ.matrix σ) :
-    (_root_.QIT.psdSupportCompressedState ρ hσ hSupport).vonNeumann = ρ.vonNeumann := by
-  classical
-  let ρc : State (psdSupportIndex σ hσ) :=
-    _root_.QIT.psdSupportCompressedState ρ hσ hSupport
-  let V : Matrix a (psdSupportIndex σ hσ) ℂ := psdSupportIsometry σ hσ
-  have hV : Matrix.conjTranspose V * V = (1 : CMatrix (psdSupportIndex σ hσ)) := by
-    simpa [V] using psdSupportIsometry_isometry σ hσ
-  have hrec : V * ρc.matrix * Matrix.conjTranspose V = ρ.matrix := by
-    simpa [V, ρc] using
-      psdSupportCompress_reconstruct_of_supports
-        (M := ρ.matrix) (N := σ) ρ.pos hσ hSupport
-  rw [State.vonNeumann_eq_neg_sum_eigenvalueMultiset,
-    State.vonNeumann_eq_neg_sum_eigenvalueMultiset]
-  have hpoly := Matrix.charpoly_isometry_conj (V := V) ρc.matrix hV
-  rw [hrec] at hpoly
-  have hP : ρ.matrix.charpoly ≠ 0 := (Matrix.charpoly_monic _).ne_zero
-  have hQ : ρc.matrix.charpoly ≠ 0 := (Matrix.charpoly_monic _).ne_zero
-  have hroot :=
-    Matrix.roots_re_xlog2_sum_eq_of_X_pow_mul_eq
-      (P := ρ.matrix.charpoly) (Q := ρc.matrix.charpoly) hP hQ hpoly
-  have hrootsρ := ρ.pos.isHermitian.roots_charpoly_eq_eigenvalues
-  have hrootsρc := ρc.pos.isHermitian.roots_charpoly_eq_eigenvalues
-  rw [hrootsρ, hrootsρc] at hroot
-  have hsum :
-      ((eigenvalueMultiset ρc.pos.isHermitian).map xlog2).sum =
-        ((eigenvalueMultiset ρ.pos.isHermitian).map xlog2).sum := by
-    simpa [eigenvalueMultiset, Multiset.map_map, Function.comp_def] using hroot.symm
-  rw [hsum]
 
 /-- Embedding the logarithm of the compressed positive support reference gives
 the finite-spectrum `log 0 = 0` functional calculus of the original PSD
@@ -143,7 +40,7 @@ reference. -/
 theorem psdSupportLog_embedding_eq_cfc_logZero
     (σ : CMatrix a) (hσ : σ.PosSemidef) :
     let V : Matrix a (psdSupportIndex σ hσ) ℂ := psdSupportIsometry σ hσ
-    V * State.psdLog (psdSupportCompress σ hσ σ) (psdSupportCompress_self_posDef σ hσ) *
+    V * MState.psdLog (psdSupportCompress σ hσ σ) (psdSupportCompress_self_posDef σ hσ) *
         Matrix.conjTranspose V =
       cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) σ := by
   classical
@@ -168,9 +65,9 @@ theorem psdSupportLog_embedding_eq_cfc_logZero
         (Matrix.diagonal fun i : psdSupportIndex σ hσ => ((d i.1 : ℝ) : ℂ)) := by
     simpa [d] using psdSupportCompress_self_eq_diagonal σ hσ
   have hlogc :
-      State.psdLog (psdSupportCompress σ hσ σ) (psdSupportCompress_self_posDef σ hσ) =
+      MState.psdLog (psdSupportCompress σ hσ σ) (psdSupportCompress_self_posDef σ hσ) =
         (Matrix.diagonal fun i : psdSupportIndex σ hσ => ((Real.log (d i.1) : ℝ) : ℂ)) := by
-    rw [State.psdLog, hσc]
+    rw [MState.psdLog, hσc]
     exact cfc_diagonal_ofReal (fun i : psdSupportIndex σ hσ => d i.1) Real.log
   rw [hlogσ, hlogc]
   ext r s
@@ -201,95 +98,49 @@ theorem psdSupportLog_embedding_eq_cfc_logZero
       exact le_antisymm (not_lt.mp hxpos) (hσ.eigenvalues_nonneg x)
     simp [g, hzero]
 
-/-- The support-compressed trace-log pairing is the same as pairing the
-original state with the finite-dimensional `log 0 = 0` calculus of the PSD
-reference. -/
-theorem trace_mul_psdSupportLog_eq_trace_mul_cfc_logZero
-    (ρ : State a) {σ : CMatrix a} (hσ : σ.PosSemidef)
-    (hSupport : Matrix.Supports ρ.matrix σ) :
-    ((psdSupportCompress σ hσ ρ.matrix *
-      State.psdLog (psdSupportCompress σ hσ σ) (psdSupportCompress_self_posDef σ hσ)).trace).re =
-      ((ρ.matrix * cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) σ).trace).re := by
-  classical
-  let V : Matrix a (psdSupportIndex σ hσ) ℂ := psdSupportIsometry σ hσ
-  let ρc : CMatrix (psdSupportIndex σ hσ) := psdSupportCompress σ hσ ρ.matrix
-  let L : CMatrix (psdSupportIndex σ hσ) :=
-    State.psdLog (psdSupportCompress σ hσ σ) (psdSupportCompress_self_posDef σ hσ)
-  let f : ℝ → ℝ := fun x => if x = 0 then 0 else Real.log x
-  have htrace : ((ρc * L).trace).re =
-      ((V * (ρc * L) * Matrix.conjTranspose V).trace).re := by
-    simpa [V] using
-      (congrArg Complex.re (psdSupportIsometry_conj_trace σ hσ (ρc * L))).symm
-  have hrec : V * ρc * Matrix.conjTranspose V = ρ.matrix := by
-    simpa [V, ρc] using
-      psdSupportCompress_reconstruct_of_supports
-        (M := ρ.matrix) (N := σ) ρ.pos hσ hSupport
-  have hlog : V * L * Matrix.conjTranspose V = cfc f σ := by
-    simpa [V, L, f] using psdSupportLog_embedding_eq_cfc_logZero σ hσ
-  have hmul : V * (ρc * L) * Matrix.conjTranspose V =
-      (V * ρc * Matrix.conjTranspose V) * (V * L * Matrix.conjTranspose V) := by
-    symm
-    calc
-      (V * ρc * Matrix.conjTranspose V) * (V * L * Matrix.conjTranspose V) =
-          V * ρc * (Matrix.conjTranspose V * V) * L * Matrix.conjTranspose V := by
-            simp [Matrix.mul_assoc]
-      _ = V * ρc * L * Matrix.conjTranspose V := by
-            rw [psdSupportIsometry_isometry σ hσ]
-            simp [Matrix.mul_assoc]
-      _ = V * (ρc * L) * Matrix.conjTranspose V := by
-            simp [Matrix.mul_assoc]
-  calc
-    ((psdSupportCompress σ hσ ρ.matrix *
-      State.psdLog (psdSupportCompress σ hσ σ) (psdSupportCompress_self_posDef σ hσ)).trace).re =
-        ((ρc * L).trace).re := by rfl
-    _ = ((V * (ρc * L) * Matrix.conjTranspose V).trace).re := htrace
-    _ = (((V * ρc * Matrix.conjTranspose V) *
-            (V * L * Matrix.conjTranspose V)).trace).re := by rw [hmul]
-    _ = ((ρ.matrix * cfc f σ).trace).re := by rw [hrec, hlog]
-
 /-- Product marginal references contribute exactly the negative marginal
 entropy sum to the trace-log term. -/
 theorem trace_mul_cfc_logZero_prod_marginals_eq_neg_marginal_vonNeumann_sum
-    (ρ : State (Prod a b)) :
-    ((ρ.matrix * cfc (fun x : ℝ => if x = 0 then 0 else Real.log x)
-        (ρ.marginalA.prod ρ.marginalB).matrix).trace).re / Real.log 2 =
-      -(ρ.marginalA.vonNeumann + ρ.marginalB.vonNeumann) := by
+    (ρ : MState (a × b)) :
+    ((ρ.m * cfc (fun x : ℝ => if x = 0 then 0 else Real.log x)
+        (ρ.traceRight.prod ρ.traceLeft).m).trace).re / Real.log 2 =
+      -(ρ.traceRight.vonNeumann + ρ.traceLeft.vonNeumann) := by
   classical
-  let τ : State (Prod a b) := ρ.marginalA.prod ρ.marginalB
-  let Uprod : Matrix.unitaryGroup (Prod a b) ℂ :=
+  let τ : MState (a × b) := ρ.traceRight.prod ρ.traceLeft
+  let Uprod : Matrix.unitaryGroup (a × b) ℂ :=
     BinaryHypothesisTest.productMarginalEigenvectorUnitary ρ
-  let coeff : Prod a b → ℝ := fun y =>
-    ((star (Uprod : CMatrix (Prod a b)) * ρ.matrix *
-      (Uprod : CMatrix (Prod a b))) y y).re
-  let mu : Prod a b → ℝ := fun y =>
+  let coeff : a × b → ℝ := fun y =>
+    ((star (Uprod : CMatrix (a × b)) * ρ.m *
+      (Uprod : CMatrix (a × b))) y y).re
+  let mu : a × b → ℝ := fun y =>
     ((BinaryHypothesisTest.productMarginalSpectralWeight ρ y : NNReal) : ℝ)
   let muA : a → ℝ := fun i =>
-    ((BinaryHypothesisTest.stateSpectralWeight ρ.marginalA i : NNReal) : ℝ)
+    ((BinaryHypothesisTest.stateSpectralWeight ρ.traceRight i : NNReal) : ℝ)
   let muB : b → ℝ := fun j =>
-    ((BinaryHypothesisTest.stateSpectralWeight ρ.marginalB j : NNReal) : ℝ)
-  let w : Prod a b → ℝ := fun y =>
-    ∑ x : Prod a b,
+    ((BinaryHypothesisTest.stateSpectralWeight ρ.traceLeft j : NNReal) : ℝ)
+  let w : a × b → ℝ := fun y =>
+    ∑ x : a × b,
       ((BinaryHypothesisTest.stateSpectralWeight ρ x : NNReal) : ℝ) *
         ((BinaryHypothesisTest.productMarginalNussbaumSzkolaOverlap ρ x y : NNReal) : ℝ)
   let f : ℝ → ℝ := fun x => if x = 0 then 0 else Real.log x
   have hτspec :
-      τ.matrix = (Uprod : CMatrix (Prod a b)) *
-        (Matrix.diagonal fun y : Prod a b => ((mu y : ℝ) : ℂ)) *
-        star (Uprod : CMatrix (Prod a b)) := by
+      τ.m = (Uprod : CMatrix (a × b)) *
+        (Matrix.diagonal fun y : a × b => ((mu y : ℝ) : ℂ)) *
+        star (Uprod : CMatrix (a × b)) := by
     simpa [τ, Uprod, mu] using
       BinaryHypothesisTest.productMarginal_matrix_eq_productEigenbasis_diagonal ρ
   have hlogτ :
-      cfc f τ.matrix = (Uprod : CMatrix (Prod a b)) *
-        (Matrix.diagonal fun y : Prod a b => ((f (mu y) : ℝ) : ℂ)) *
-        star (Uprod : CMatrix (Prod a b)) := by
+      cfc f τ.m = (Uprod : CMatrix (a × b)) *
+        (Matrix.diagonal fun y : a × b => ((f (mu y) : ℝ) : ℂ)) *
+        star (Uprod : CMatrix (a × b)) := by
     rw [hτspec]
     exact cfc_unitary_conj_diagonal_ofReal Uprod mu f
-  have hf_log : ∀ y : Prod a b, f (mu y) = Real.log (mu y) := by
+  have hf_log : ∀ y : a × b, f (mu y) = Real.log (mu y) := by
     intro y
     by_cases hy : mu y = 0
     · simp [f, hy]
     · simp [f, hy]
-  have hcoeff : ∀ y : Prod a b, coeff y = w y := by
+  have hcoeff : ∀ y : a × b, coeff y = w y := by
     intro y
     simpa [coeff, w, Uprod] using
       (BinaryHypothesisTest.productMarginalNussbaumSzkolaOverlap_weighted_col_sum_eq_productBasis_diag
@@ -305,16 +156,16 @@ theorem trace_mul_cfc_logZero_prod_marginals_eq_neg_marginal_vonNeumann_sum
     simpa [w, muB] using
       BinaryHypothesisTest.productMarginalNussbaumSzkolaOverlap_weighted_snd_sum ρ j
   have hsum :
-      ∑ y : Prod a b, coeff y * f (mu y) =
+      ∑ y : a × b, coeff y * f (mu y) =
         (∑ i : a, muA i * Real.log (muA i)) +
           (∑ j : b, muB j * Real.log (muB j)) := by
     calc
-      ∑ y : Prod a b, coeff y * f (mu y) =
-          ∑ y : Prod a b, w y * Real.log (mu y) := by
+      ∑ y : a × b, coeff y * f (mu y) =
+          ∑ y : a × b, w y * Real.log (mu y) := by
             refine Finset.sum_congr rfl ?_
             intro y _hy
             rw [hcoeff y, hf_log y]
-      _ = ∑ y : Prod a b, w y *
+      _ = ∑ y : a × b, w y *
             (Real.log (muA y.1) + Real.log (muB y.2)) := by
             refine Finset.sum_congr rfl ?_
             intro y _hy
@@ -338,29 +189,29 @@ theorem trace_mul_cfc_logZero_prod_marginals_eq_neg_marginal_vonNeumann_sum
           (∑ j : b, muB j * Real.log (muB j)) := by
             simp [hfst, hsnd]
   have htrace :
-      ((ρ.matrix * cfc f τ.matrix).trace).re =
-        ∑ y : Prod a b, coeff y * f (mu y) := by
+      ((ρ.m * cfc f τ.m).trace).re =
+        ∑ y : a × b, coeff y * f (mu y) := by
     rw [hlogτ]
     simpa [coeff] using
-      Matrix.trace_mul_unitary_conj_diagonal_right_re Uprod ρ.matrix
-        (fun y : Prod a b => f (mu y))
+      Matrix.trace_mul_unitary_conj_diagonal_right_re Uprod ρ.m
+        (fun y : a × b => f (mu y))
   have hA : (∑ i : a, muA i * Real.log (muA i)) / Real.log 2 =
-      -ρ.marginalA.vonNeumann := by
+      -ρ.traceRight.vonNeumann := by
     simpa [muA] using
-      State.spectralWeight_mul_log_div_log_two_eq_neg_vonNeumann ρ.marginalA
+      MState.spectralWeight_mul_log_div_log_two_eq_neg_vonNeumann ρ.traceRight
   have hB : (∑ j : b, muB j * Real.log (muB j)) / Real.log 2 =
-      -ρ.marginalB.vonNeumann := by
+      -ρ.traceLeft.vonNeumann := by
     simpa [muB] using
-      State.spectralWeight_mul_log_div_log_two_eq_neg_vonNeumann ρ.marginalB
+      MState.spectralWeight_mul_log_div_log_two_eq_neg_vonNeumann ρ.traceLeft
   have hlog_ne : Real.log 2 ≠ 0 := ne_of_gt (Real.log_pos one_lt_two)
   calc
-    ((ρ.matrix * cfc (fun x : ℝ => if x = 0 then 0 else Real.log x)
-        (ρ.marginalA.prod ρ.marginalB).matrix).trace).re / Real.log 2 =
-        ((ρ.matrix * cfc f τ.matrix).trace).re / Real.log 2 := by rfl
+    ((ρ.m * cfc (fun x : ℝ => if x = 0 then 0 else Real.log x)
+        (ρ.traceRight.prod ρ.traceLeft).m).trace).re / Real.log 2 =
+        ((ρ.m * cfc f τ.m).trace).re / Real.log 2 := by rfl
     _ = ((∑ i : a, muA i * Real.log (muA i)) +
           (∑ j : b, muB j * Real.log (muB j))) / Real.log 2 := by
           rw [htrace, hsum]
-    _ = -(ρ.marginalA.vonNeumann + ρ.marginalB.vonNeumann) := by
+    _ = -(ρ.traceRight.vonNeumann + ρ.traceLeft.vonNeumann) := by
           rw [show ((∑ i : a, muA i * Real.log (muA i)) +
                 (∑ j : b, muB j * Real.log (muB j))) / Real.log 2 =
               (∑ i : a, muA i * Real.log (muA i)) / Real.log 2 +
@@ -372,62 +223,62 @@ theorem trace_mul_cfc_logZero_prod_marginals_eq_neg_marginal_vonNeumann_sum
 /-- The single trace-log term that remains after unfolding
 `D(ρ_AB ‖ ρ_A ⊗ ρ_B)` on the positive support of the product reference. -/
 noncomputable def prodMarginalsSupportTraceLogTerm
-    (ρ : State (Prod a b)) : ℝ := by
+    (ρ : MState (a × b)) : ℝ := by
   classical
-  let τ : State (Prod a b) := ρ.marginalA.prod ρ.marginalB
-  let hSupport : Matrix.Supports ρ.matrix τ.matrix :=
+  let τ : MState (a × b) := ρ.traceRight.prod ρ.traceLeft
+  let hSupport : Matrix.Supports ρ.m τ.m :=
     ρ.matrix_supports_prod_marginals
-  let ρc : State (psdSupportIndex τ.matrix τ.pos) :=
-    _root_.QIT.psdSupportCompressedState ρ τ.pos hSupport
-  let σc : CMatrix (psdSupportIndex τ.matrix τ.pos) :=
-    psdSupportCompress τ.matrix τ.pos τ.matrix
+  let ρc : MState (psdSupportIndex τ.m τ.psd) :=
+    _root_.QIT.psdSupportCompressedState ρ τ.psd hSupport
+  let σc : CMatrix (psdSupportIndex τ.m τ.psd) :=
+    psdSupportCompress τ.m τ.psd τ.m
   have hσc : σc.PosDef := by
-    simpa [σc] using psdSupportCompressedState_reference_posDef τ.pos
-  exact ((ρc.matrix * psdLog σc hσc).trace.re / Real.log 2)
+    simpa [σc] using psdSupportCompress_self_posDef _ τ.psd
+  exact ((ρc.m * psdLog σc hσc).trace.re / Real.log 2)
 
 /-- The mutual-information trace-log bridge reduces to the product-reference
 trace term.  The remaining mathematical input is
 `prodMarginalsSupportTraceLogTerm ρ = -(S(ρ_A) + S(ρ_B))`. -/
 theorem relativeEntropyPSDReferenceTraceLogE_prod_marginals_eq_mutualInformation_of_trace_term
-    (ρ : State (Prod a b))
+    (ρ : MState (a × b))
     (hTrace :
       ρ.prodMarginalsSupportTraceLogTerm =
-        -(ρ.marginalA.vonNeumann + ρ.marginalB.vonNeumann)) :
+        -(ρ.traceRight.vonNeumann + ρ.traceLeft.vonNeumann)) :
     relativeEntropyPSDReferenceTraceLogE ρ
-        (ρ.marginalA.prod ρ.marginalB).matrix
-        (ρ.marginalA.prod ρ.marginalB).pos =
+        (ρ.traceRight.prod ρ.traceLeft).m
+        (ρ.traceRight.prod ρ.traceLeft).psd =
       (mutualInformation ρ : EReal) := by
   classical
-  let τ : State (Prod a b) := ρ.marginalA.prod ρ.marginalB
-  let hSupport : Matrix.Supports ρ.matrix τ.matrix :=
+  let τ : MState (a × b) := ρ.traceRight.prod ρ.traceLeft
+  let hSupport : Matrix.Supports ρ.m τ.m :=
     ρ.matrix_supports_prod_marginals
-  rw [relativeEntropyPSDReferenceTraceLogE_eq_coe_of_supports ρ τ.pos hSupport]
+  rw [relativeEntropyPSDReferenceTraceLogE_eq_coe_of_supports ρ τ.psd hSupport]
   congr 1
   have hEntropy :
-      (_root_.QIT.psdSupportCompressedState ρ τ.pos hSupport).vonNeumann =
+      (_root_.QIT.psdSupportCompressedState ρ τ.psd hSupport).vonNeumann =
         ρ.vonNeumann :=
-    State.vonNeumann_psdSupportCompressedState_eq ρ τ.pos hSupport
+    MState.vonNeumann_psdSupportCompressedState_eq ρ τ.psd hSupport
   have hTrace' :
-      ((psdSupportCompress τ.matrix τ.pos ρ.matrix *
-            psdLog (psdSupportCompress τ.matrix τ.pos τ.matrix)
+      ((psdSupportCompress τ.m τ.psd ρ.m *
+            psdLog (psdSupportCompress τ.m τ.psd τ.m)
               (by
-                simpa using psdSupportCompressedState_reference_posDef τ.pos)).trace.re *
+                simpa using psdSupportCompress_self_posDef _ τ.psd)).trace.re *
           (Real.log 2)⁻¹) =
-        -(ρ.marginalA.vonNeumann + ρ.marginalB.vonNeumann) := by
+        -(ρ.traceRight.vonNeumann + ρ.traceLeft.vonNeumann) := by
     simpa [prodMarginalsSupportTraceLogTerm, τ, div_eq_mul_inv] using hTrace
   simp [relativeEntropyPSDReferenceTraceLogFinite, τ, hTrace',
     mutualInformation, div_eq_mul_inv]
   rw [hEntropy]
   ring_nf
 
-/-- State-state trace-log relative entropy against the product of the marginals
+/-- State-to-state trace-log relative entropy against the product of the marginals
 is mutual information, assuming the product-reference trace term identity. -/
 theorem relativeEntropy_prod_marginals_eq_mutualInformation_of_trace_term
-    (ρ : State (Prod a b))
+    (ρ : MState (a × b))
     (hTrace :
       ρ.prodMarginalsSupportTraceLogTerm =
-        -(ρ.marginalA.vonNeumann + ρ.marginalB.vonNeumann)) :
-    ρ.relativeEntropy (ρ.marginalA.prod ρ.marginalB) =
+        -(ρ.traceRight.vonNeumann + ρ.traceLeft.vonNeumann)) :
+    ρ.relativeEntropy (ρ.traceRight.prod ρ.traceLeft) =
       (mutualInformation ρ : EReal) := by
   simpa [relativeEntropy] using
     relativeEntropyPSDReferenceTraceLogE_prod_marginals_eq_mutualInformation_of_trace_term
@@ -436,143 +287,140 @@ theorem relativeEntropy_prod_marginals_eq_mutualInformation_of_trace_term
 /-- The product-reference trace-log term is the negative sum of the two
 marginal entropies. -/
 theorem prodMarginalsSupportTraceLogTerm_eq_neg_marginal_vonNeumann_sum
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     ρ.prodMarginalsSupportTraceLogTerm =
-      -(ρ.marginalA.vonNeumann + ρ.marginalB.vonNeumann) := by
+      -(ρ.traceRight.vonNeumann + ρ.traceLeft.vonNeumann) := by
   classical
-  let τ : State (Prod a b) := ρ.marginalA.prod ρ.marginalB
-  let hSupport : Matrix.Supports ρ.matrix τ.matrix :=
+  let τ : MState (a × b) := ρ.traceRight.prod ρ.traceLeft
+  let hSupport : Matrix.Supports ρ.m τ.m :=
     ρ.matrix_supports_prod_marginals
   have hTrace :
-      ((psdSupportCompress τ.matrix τ.pos ρ.matrix *
-        State.psdLog (psdSupportCompress τ.matrix τ.pos τ.matrix)
-          (psdSupportCompress_self_posDef τ.matrix τ.pos)).trace).re =
-        ((ρ.matrix * cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) τ.matrix).trace).re :=
-    trace_mul_psdSupportLog_eq_trace_mul_cfc_logZero ρ τ.pos hSupport
+      ((psdSupportCompress τ.m τ.psd ρ.m *
+        MState.psdLog (psdSupportCompress τ.m τ.psd τ.m)
+          (psdSupportCompress_self_posDef τ.m τ.psd)).trace).re =
+        ((ρ.m * cfc (fun x : ℝ => if x = 0 then 0 else Real.log x) τ.m).trace).re :=
+    trace_mul_psdSupportLog_eq_trace_mul_cfc_logZero ρ τ.psd hSupport
   have hProd :=
     trace_mul_cfc_logZero_prod_marginals_eq_neg_marginal_vonNeumann_sum ρ
   calc
     ρ.prodMarginalsSupportTraceLogTerm =
-        ((ρ.matrix * cfc (fun x : ℝ => if x = 0 then 0 else Real.log x)
-          τ.matrix).trace).re / Real.log 2 := by
+        ((ρ.m * cfc (fun x : ℝ => if x = 0 then 0 else Real.log x)
+          τ.m).trace).re / Real.log 2 := by
           simpa [prodMarginalsSupportTraceLogTerm, τ, hSupport] using
             congrArg (fun x : ℝ => x / Real.log 2) hTrace
-    _ = -(ρ.marginalA.vonNeumann + ρ.marginalB.vonNeumann) := by
+    _ = -(ρ.traceRight.vonNeumann + ρ.traceLeft.vonNeumann) := by
           simpa [τ] using hProd
 
 /-- Trace-log relative entropy against the product of the marginals is mutual
 information. -/
 theorem relativeEntropyPSDReferenceTraceLogE_prod_marginals_eq_mutualInformation
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     relativeEntropyPSDReferenceTraceLogE ρ
-        (ρ.marginalA.prod ρ.marginalB).matrix
-        (ρ.marginalA.prod ρ.marginalB).pos =
+        (ρ.traceRight.prod ρ.traceLeft).m
+        (ρ.traceRight.prod ρ.traceLeft).psd =
       (mutualInformation ρ : EReal) :=
   relativeEntropyPSDReferenceTraceLogE_prod_marginals_eq_mutualInformation_of_trace_term
     ρ (prodMarginalsSupportTraceLogTerm_eq_neg_marginal_vonNeumann_sum ρ)
 
-/-- State-state relative entropy against the product of the marginals is mutual
+/-- State-to-state relative entropy against the product of the marginals is mutual
 information. -/
 theorem relativeEntropy_prod_marginals_eq_mutualInformation
-    (ρ : State (Prod a b)) :
-    ρ.relativeEntropy (ρ.marginalA.prod ρ.marginalB) =
+    (ρ : MState (a × b)) :
+    ρ.relativeEntropy (ρ.traceRight.prod ρ.traceLeft) =
       (mutualInformation ρ : EReal) :=
   relativeEntropy_prod_marginals_eq_mutualInformation_of_trace_term
     ρ (prodMarginalsSupportTraceLogTerm_eq_neg_marginal_vonNeumann_sum ρ)
 
 /-- A two-sided product channel maps the left marginal by the left channel. -/
-theorem marginalA_applyState_prod
-    (ρ : State (Prod a b)) (Φ : Channel a c) (Ψ : Channel b d) :
-    ((Φ.prod Ψ).applyState ρ).marginalA = Φ.applyState ρ.marginalA := by
-  let ρ' : State (Prod c b) := (Φ.prod (Channel.idChannel b)).applyState ρ
+theorem traceRight_applyState_prod
+    (ρ : MState (a × b)) (Φ : CPTPMap a c) (Ψ : CPTPMap b d) :
+    MState.traceRight ((Φ.prod Ψ) ρ) = Φ ρ.traceRight := by
+  let ρ' : MState (c × b) := (Φ.prod (CPTPOp.id (dIn := b))) ρ
   have hseq :
-      ((Φ.prod Ψ).applyState ρ) =
-        (((Channel.idChannel c).prod Ψ).applyState ρ') := by
-    apply State.ext
-    change MatrixMap.kron Φ.map Ψ.map ρ.matrix =
-      MatrixMap.kron (Channel.idChannel c).map Ψ.map
-        (MatrixMap.kron Φ.map (Channel.idChannel b).map ρ.matrix)
-    have hleft : (Channel.idChannel c).map.comp Φ.map = Φ.map := by
-      rw [Channel.idChannel_map_eq_linearMap_id]
+      ((Φ.prod Ψ) ρ) =
+        (((CPTPOp.id (dIn := c)).prod Ψ) ρ') := by
+    apply MState.ext
+    simp only [CPTPOp.mat_coe_eq_apply_mat, ρ', CPTPOp.prod_map]
+    have hleft : (CPTPOp.id (dIn := c)).map.comp Φ.map = Φ.map := by
+      rw [CPTPOp.id_map]
       ext X i j
       rfl
-    have hright : Ψ.map.comp (Channel.idChannel b).map = Ψ.map := by
-      rw [Channel.idChannel_map_eq_linearMap_id]
+    have hright : Ψ.map.comp (CPTPOp.id (dIn := b)).map = Ψ.map := by
+      rw [CPTPOp.id_map]
       ext X i j
       rfl
     simpa [hleft, hright] using
       (MatrixMap.kron_comp_apply_general
-        (Channel.idChannel c).map Ψ.map Φ.map (Channel.idChannel b).map ρ.matrix).symm
+        (CPTPOp.id (dIn := c)).map Ψ.map Φ.map (CPTPOp.id (dIn := b)).map ρ.m).symm
   rw [hseq]
   calc
-    ((((Channel.idChannel c).prod Ψ).applyState ρ').marginalA) = ρ'.marginalA := by
-      exact State.marginalA_applyState_id_prod ρ' Ψ
-    _ = Φ.applyState ρ.marginalA := by
-      simpa [ρ'] using State.marginalA_applyState_prod_id ρ Φ
+    MState.traceRight (((CPTPOp.id (dIn := c)).prod Ψ) ρ') = ρ'.traceRight := by
+      exact MState.traceRight_applyState_id_prod ρ' Ψ
+    _ = Φ ρ.traceRight := by
+      simpa [ρ'] using MState.traceRight_applyState_prod_id ρ Φ
 
 /-- A two-sided product channel maps the right marginal by the right channel. -/
-theorem marginalB_applyState_prod
-    (ρ : State (Prod a b)) (Φ : Channel a c) (Ψ : Channel b d) :
-    ((Φ.prod Ψ).applyState ρ).marginalB = Ψ.applyState ρ.marginalB := by
-  let ρ' : State (Prod a d) := ((Channel.idChannel a).prod Ψ).applyState ρ
+theorem traceLeft_applyState_prod
+    (ρ : MState (a × b)) (Φ : CPTPMap a c) (Ψ : CPTPMap b d) :
+    MState.traceLeft ((Φ.prod Ψ) ρ) = Ψ ρ.traceLeft := by
+  let ρ' : MState (a × d) := ((CPTPOp.id (dIn := a)).prod Ψ) ρ
   have hseq :
-      ((Φ.prod Ψ).applyState ρ) =
-        ((Φ.prod (Channel.idChannel d)).applyState ρ') := by
-    apply State.ext
-    change MatrixMap.kron Φ.map Ψ.map ρ.matrix =
-      MatrixMap.kron Φ.map (Channel.idChannel d).map
-        (MatrixMap.kron (Channel.idChannel a).map Ψ.map ρ.matrix)
-    have hleft : Φ.map.comp (Channel.idChannel a).map = Φ.map := by
-      rw [Channel.idChannel_map_eq_linearMap_id]
+      ((Φ.prod Ψ) ρ) =
+        ((Φ.prod (CPTPOp.id (dIn := d))) ρ') := by
+    apply MState.ext
+    simp only [CPTPOp.mat_coe_eq_apply_mat, ρ', CPTPOp.prod_map]
+    have hleft : Φ.map.comp (CPTPOp.id (dIn := a)).map = Φ.map := by
+      rw [CPTPOp.id_map]
       ext X i j
       rfl
-    have hright : (Channel.idChannel d).map.comp Ψ.map = Ψ.map := by
-      rw [Channel.idChannel_map_eq_linearMap_id]
+    have hright : (CPTPOp.id (dIn := d)).map.comp Ψ.map = Ψ.map := by
+      rw [CPTPOp.id_map]
       ext X i j
       rfl
     simpa [hleft, hright] using
       (MatrixMap.kron_comp_apply_general
-        Φ.map (Channel.idChannel d).map (Channel.idChannel a).map Ψ.map ρ.matrix).symm
+        Φ.map (CPTPOp.id (dIn := d)).map (CPTPOp.id (dIn := a)).map Ψ.map ρ.m).symm
   rw [hseq]
   calc
-    (((Φ.prod (Channel.idChannel d)).applyState ρ').marginalB) = ρ'.marginalB := by
-      exact State.marginalB_applyState_prod_id ρ' Φ
-    _ = Ψ.applyState ρ.marginalB := by
+    MState.traceLeft ((Φ.prod (CPTPOp.id (dIn := d))) ρ') = ρ'.traceLeft := by
+      exact MState.traceLeft_applyState_prod_id ρ' Φ
+    _ = Ψ ρ.traceLeft := by
       -- Right-local postprocessing is handled symmetrically by tracing out the
       -- left subsystem.
-      apply State.ext
-      change partialTraceA (a := a) (b := d)
-          (MatrixMap.kron (Channel.idChannel a).map Ψ.map ρ.matrix) =
-        Ψ.map (partialTraceA (a := a) (b := b) ρ.matrix)
+      apply MState.ext
+      simp only [CPTPOp.mat_coe_eq_apply_mat, MState.traceLeft_m, ρ',
+        CPTPOp.prod_map]
       ext j j'
-      simp only [partialTraceA]
-      let S : a → CMatrix b := fun i => Matrix.of fun y y' => ρ.matrix (i, y) (i, y')
+      simp only [Matrix.traceLeft, Matrix.of_apply]
+      let S : a → CMatrix b := fun i => Matrix.of fun y y' => ρ.m (i, y) (i, y')
       have hsum :
-          (fun y y' => ∑ i : a, ρ.matrix (i, y) (i, y')) =
+          (fun y y' => ∑ i : a, ρ.m (i, y) (i, y')) =
             ∑ i : a, S i := by
         ext y y'
         simp only [Matrix.sum_apply]
         rfl
       change (∑ i : a,
-          MatrixMap.kron (Channel.idChannel a).map Ψ.map ρ.matrix (i, j) (i, j')) =
-        Ψ.map (fun y y' => ∑ i : a, ρ.matrix (i, y) (i, y')) j j'
+          MatrixMap.kron (CPTPOp.id (dIn := a)).map Ψ.map ρ.m (i, j) (i, j')) =
+        Ψ.map (fun y y' => ∑ i : a, ρ.m (i, y) (i, y')) j j'
       rw [hsum, map_sum]
       simp only [Matrix.sum_apply]
       refine Finset.sum_congr rfl fun i _ => ?_
       exact MatrixMap.kron_idChannel_left_apply_slice (a := a)
-        (Φ := Ψ.map) (X := ρ.matrix) (ad := (i, j)) (ad' := (i, j'))
+        (Φ := Ψ.map) (X := ρ.m) (ad := (i, j)) (ad' := (i, j'))
 
 /-- Product channels send the product of input marginals to the product of
 output marginals. -/
 theorem applyState_prod_marginals
-    (ρ : State (Prod a b)) (Φ : Channel a c) (Ψ : Channel b d) :
-    (Φ.prod Ψ).applyState (ρ.marginalA.prod ρ.marginalB) =
-      (((Φ.prod Ψ).applyState ρ).marginalA).prod
-        (((Φ.prod Ψ).applyState ρ).marginalB) := by
-  rw [Channel.applyState_prod]
-  rw [marginalA_applyState_prod, marginalB_applyState_prod]
+    (ρ : MState (a × b)) (Φ : CPTPMap a c) (Ψ : CPTPMap b d) :
+    (Φ.prod Ψ) (ρ.traceRight.prod ρ.traceLeft) =
+      MState.prod (MState.traceRight ((Φ.prod Ψ) ρ))
+        (MState.traceLeft ((Φ.prod Ψ) ρ)) := by
+  rw [CPTPOp.prod_apply_prod]
+  rw [traceRight_applyState_prod, traceLeft_applyState_prod]
 
-end State
+end MState
+
+namespace QIT
 
 /-- Once the source-facing trace-log bridge
 `D(ρ_AB ‖ ρ_A ⊗ ρ_B) = I(A;B)_ρ` is available for the input and output
@@ -582,34 +430,36 @@ theorem mutualInformation_dataProcessing_local_channels_ge_of_traceLog_bridge
     {a : Type u} {b : Type v} {c : Type w} {d : Type x}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c] [Fintype d] [DecidableEq d]
-    (ρ : State (Prod a b)) (Φ : Channel a c) (Ψ : Channel b d)
+    (ρ : MState (a × b)) (Φ : CPTPMap a c) (Ψ : CPTPMap b d)
     (hIn :
-      ρ.relativeEntropy (ρ.marginalA.prod ρ.marginalB) =
+      ρ.relativeEntropy (ρ.traceRight.prod ρ.traceLeft) =
         (mutualInformation ρ : EReal))
     (hOut :
-      ((Φ.prod Ψ).applyState ρ).relativeEntropy
-          ((((Φ.prod Ψ).applyState ρ).marginalA).prod
-            (((Φ.prod Ψ).applyState ρ).marginalB)) =
-        (mutualInformation ((Φ.prod Ψ).applyState ρ) : EReal)) :
-    mutualInformation ρ ≥ mutualInformation ((Φ.prod Ψ).applyState ρ) := by
+      MState.relativeEntropy ((Φ.prod Ψ) ρ)
+          (MState.prod (MState.traceRight ((Φ.prod Ψ) ρ))
+            (MState.traceLeft ((Φ.prod Ψ) ρ))) =
+        (mutualInformation ((Φ.prod Ψ) ρ) : EReal)) :
+    mutualInformation ρ ≥ mutualInformation ((Φ.prod Ψ) ρ) := by
   classical
-  let τ : State (Prod a b) := ρ.marginalA.prod ρ.marginalB
-  let ω : State (Prod c d) := (Φ.prod Ψ).applyState ρ
+  let τ : MState (a × b) := ρ.traceRight.prod ρ.traceLeft
+  let ω : MState (c × d) := (Φ.prod Ψ) ρ
   have hτstate :
-      (Φ.prod Ψ).applyState τ = ω.marginalA.prod ω.marginalB := by
+      (Φ.prod Ψ) τ = ω.traceRight.prod ω.traceLeft := by
     simpa [τ, ω] using
-      State.applyState_prod_marginals ρ Φ Ψ
+      MState.applyState_prod_marginals ρ Φ Ψ
   have hOut' :
-      ω.relativeEntropy ((Φ.prod Ψ).applyState τ) =
+      ω.relativeEntropy ((Φ.prod Ψ) τ) =
         (mutualInformation ω : EReal) := by
     simpa [τ, ω, hτstate] using hOut
   have hDPI :
-      ω.relativeEntropy ((Φ.prod Ψ).applyState τ) ≤
+      ω.relativeEntropy ((Φ.prod Ψ) τ) ≤
         ρ.relativeEntropy τ := by
-    exact State.relativeEntropy_dataProcessing_channel_ge ρ τ (Φ.prod Ψ)
+    exact MState.relativeEntropy_dataProcessing_channel_ge ρ τ (Φ.prod Ψ)
   have hE :
       (mutualInformation ω : EReal) ≤ (mutualInformation ρ : EReal) := by
-    simpa [τ, hIn, hOut'] using hDPI
+    rw [hOut'] at hDPI
+    simp only [τ, hIn] at hDPI
+    exact hDPI
   exact EReal.coe_le_coe_iff.mp hE
 
 /-- Quantum mutual information is monotone under local channels:
@@ -618,14 +468,35 @@ theorem mutualInformation_dataProcessing_local_channels_ge
     {a : Type u} {b : Type v} {c : Type w} {d : Type x}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype c] [DecidableEq c] [Fintype d] [DecidableEq d]
-    (ρ : State (Prod a b)) (Φ : Channel a c) (Ψ : Channel b d) :
-    mutualInformation ρ ≥ mutualInformation ((Φ.prod Ψ).applyState ρ) := by
+    (ρ : MState (a × b)) (Φ : CPTPMap a c) (Ψ : CPTPMap b d) :
+    mutualInformation ρ ≥ mutualInformation ((Φ.prod Ψ) ρ) := by
   exact
     mutualInformation_dataProcessing_local_channels_ge_of_traceLog_bridge ρ Φ Ψ
-      (State.relativeEntropy_prod_marginals_eq_mutualInformation ρ)
-      (State.relativeEntropy_prod_marginals_eq_mutualInformation
-        ((Φ.prod Ψ).applyState ρ))
-
-end
+      (MState.relativeEntropy_prod_marginals_eq_mutualInformation ρ)
+      (MState.relativeEntropy_prod_marginals_eq_mutualInformation
+        ((Φ.prod Ψ) ρ))
 
 end QIT
+
+namespace MState
+
+open QIT
+
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+
+/-- Quantum mutual information is nonnegative.  Measuring both sides down to a
+trivial system leaves no correlation, and data processing bounds `I(A;B)` below
+by that zero. -/
+theorem mutualInformation_nonneg (ρ : MState (a × b)) :
+    0 ≤ QIT.mutualInformation ρ := by
+  have hDPI :=
+    QIT.mutualInformation_dataProcessing_local_channels_ge ρ
+      (terminalMeasureChannel a) (terminalMeasureChannel b)
+  have hzero :
+      QIT.mutualInformation
+          (((terminalMeasureChannel a).prod (terminalMeasureChannel b)) ρ) = 0 :=
+    mutualInformation_punit_punit_eq_zero _
+  linarith
+
+end MState

@@ -30,15 +30,15 @@ layers.
 
 open scoped ComplexOrder MatrixOrder
 
-namespace QIT
-
 universe u v w x
+
+namespace QIT
 
 noncomputable section
 
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
-variable {N : Channel a b}
+variable {N : CPTPMap a b}
 variable {M : Type u} [Fintype M] [DecidableEq M] [Nonempty M]
 variable {e : Type u} [Fintype e] [DecidableEq e]
 variable {testSys : Type x} [Fintype testSys] [DecidableEq testSys]
@@ -61,8 +61,8 @@ position-based protocol.
 theorem decoderError_le_epsilon_of_ht_trace_bridges
     {out : Type w} [Fintype out] [DecidableEq out]
     {seqLen : ℕ} {ε η β : ℝ}
-    (A : M → ProjectionSequence out (seqLen + 1)) (ω : M → State out)
-    {ρ σ : State testSys} (Λ : HypothesisTestingEffect ρ (ε - η))
+    (A : M → ProjectionSequence out (seqLen + 1)) (ω : M → MState out)
+    {ρ σ : MState testSys} (Λ : HypothesisTestingEffect ρ (ε - η))
     (hη_pos : 0 < η) (hη_lt : η < ε)
     (hmissBridge :
       ∀ m : M,
@@ -101,7 +101,7 @@ feeds them into the OMW/sequential-decoding estimate.
 -/
 theorem decoderError_le_epsilon_of_canonical_position_trace
     {seqLen : ℕ} {ε η β : ℝ}
-    {ρ σ : State testSys} (Λ : HypothesisTestingEffect ρ (ε - η))
+    {ρ σ : MState testSys} (Λ : HypothesisTestingEffect ρ (ε - η))
     (hη_pos : 0 < η) (hη_lt : η < ε)
     (hβ : Λ.typeIIError σ ≤ β)
     (hsize : (seqLen : ℝ) * β ≤ η ^ 2 / (4 * ε)) :
@@ -160,7 +160,7 @@ end
 
 end SequentialDecoding
 
-namespace POVM
+section POVMNaimark
 
 variable {settings : Type x} {outcomes : Type u} {system : Type w}
 variable [Fintype outcomes] [DecidableEq outcomes] [Inhabited outcomes]
@@ -168,8 +168,8 @@ variable [Fintype system] [DecidableEq system]
 
 /-- The shared-family Naimark dilation preserves real effect traces after
 lifting the state by the fixed family embedding. -/
-theorem effectTrace_familyNaimarkProjectiveMeasurement_eq
-    (M : settings → POVM outcomes system) (ρ : State system)
+theorem _root_.POVM.effectTrace_familyNaimarkProjectiveMeasurement_eq
+    (M : settings → POVM outcomes system) (ρ : MState system)
     (setting : settings) (outcome : outcomes) :
     SequentialDecoding.effectTrace
         (POVM.isometryLiftState ρ
@@ -181,49 +181,49 @@ theorem effectTrace_familyNaimarkProjectiveMeasurement_eq
   rw [POVM.isometryLiftState_matrix]
   congr 1
   calc
-    ((POVM.familyNaimarkEmbedding M * ρ.matrix *
+    ((POVM.familyNaimarkEmbedding M * ρ.m *
           Matrix.conjTranspose (POVM.familyNaimarkEmbedding M)) *
         (POVM.familyNaimarkProjectiveMeasurement M setting).effects outcome).trace
         =
-          (ρ.matrix *
+          (ρ.m *
             (Matrix.conjTranspose (POVM.familyNaimarkEmbedding M) *
               (POVM.familyNaimarkProjectiveMeasurement M setting).effects outcome *
               POVM.familyNaimarkEmbedding M)).trace := by
             calc
-              ((POVM.familyNaimarkEmbedding M * ρ.matrix *
+              ((POVM.familyNaimarkEmbedding M * ρ.m *
                     Matrix.conjTranspose (POVM.familyNaimarkEmbedding M)) *
                   (POVM.familyNaimarkProjectiveMeasurement M setting).effects outcome).trace
                   =
-                    (POVM.familyNaimarkEmbedding M * ρ.matrix *
+                    (POVM.familyNaimarkEmbedding M * ρ.m *
                       (Matrix.conjTranspose (POVM.familyNaimarkEmbedding M) *
                         (POVM.familyNaimarkProjectiveMeasurement M setting).effects outcome)).trace := by
                       rw [Matrix.mul_assoc, Matrix.mul_assoc]
               _ =
-                    (ρ.matrix *
+                    (ρ.m *
                       ((Matrix.conjTranspose (POVM.familyNaimarkEmbedding M) *
                           (POVM.familyNaimarkProjectiveMeasurement M setting).effects outcome) *
                         POVM.familyNaimarkEmbedding M)).trace := by
                       rw [Matrix.trace_mul_cycle]
                       rw [Matrix.trace_mul_comm]
               _ =
-                    (ρ.matrix *
+                    (ρ.m *
                       (Matrix.conjTranspose (POVM.familyNaimarkEmbedding M) *
                         (POVM.familyNaimarkProjectiveMeasurement M setting).effects outcome *
                         POVM.familyNaimarkEmbedding M)).trace := by
                       rw [Matrix.mul_assoc]
-    _ = (ρ.matrix * (M setting).effects outcome).trace := by
+    _ = (ρ.m * (M setting).effects outcome).trace := by
           rw [POVM.familyNaimark_compression_projector_eq M setting outcome]
 
-end POVM
+end POVMNaimark
 
 namespace PositionBasedCodingProtocol
 
 /-- The physical binary POVM obtained by inserting a hypothesis-testing effect
 at one retained reference coordinate and the common channel output. -/
 def positionHypothesisTestingPOVM
-    {ρ : State (Prod a b)} {ε : ℝ} (Λ : HypothesisTestingEffect ρ ε)
+    {ρ : MState (a × b)} {ε : ℝ} (Λ : HypothesisTestingEffect ρ ε)
     (k : ℕ) (i : Fin k) :
-    POVM Bool (Prod (TensorPower b 1) (TensorPower a k)) :=
+    POVM Bool (TensorPower b 1 × TensorPower a k) :=
   POVM.binaryOfEffect
     (ProjectionMatrix.commonOutputReferenceEffectAt (a := a) (b := b) Λ.effect k i)
     (ProjectionMatrix.commonOutputReferenceEffectAt_posSemidef
@@ -233,7 +233,7 @@ def positionHypothesisTestingPOVM
 
 @[simp]
 theorem positionHypothesisTestingPOVM_true_effect
-    {ρ : State (Prod a b)} {ε : ℝ} (Λ : HypothesisTestingEffect ρ ε)
+    {ρ : MState (a × b)} {ε : ℝ} (Λ : HypothesisTestingEffect ρ ε)
     (k : ℕ) (i : Fin k) :
     (positionHypothesisTestingPOVM (a := a) (b := b) Λ k i).effects true =
       ProjectionMatrix.commonOutputReferenceEffectAt (a := a) (b := b) Λ.effect k i :=
@@ -242,7 +242,7 @@ theorem positionHypothesisTestingPOVM_true_effect
 /-- Accept projector in the shared-family Naimark dilation for a
 position-inserted hypothesis-testing effect. -/
 def positionHypothesisTestingProjection
-    {ρ : State (Prod a b)} {ε : ℝ} (Λ : HypothesisTestingEffect ρ ε)
+    {ρ : MState (a × b)} {ε : ℝ} (Λ : HypothesisTestingEffect ρ ε)
     (k : ℕ) (i : Fin k) :
     ProjectionMatrix
       (POVM.FamilyNaimarkSpace
@@ -259,7 +259,7 @@ def positionHypothesisTestingProjection
 
 @[simp]
 theorem positionHypothesisTestingProjection_matrix
-    {ρ : State (Prod a b)} {ε : ℝ} (Λ : HypothesisTestingEffect ρ ε)
+    {ρ : MState (a × b)} {ε : ℝ} (Λ : HypothesisTestingEffect ρ ε)
     (k : ℕ) (i : Fin k) :
     (positionHypothesisTestingProjection (a := a) (b := b) Λ k i).matrix =
       (POVM.familyNaimarkProjectiveMeasurement
@@ -269,13 +269,13 @@ theorem positionHypothesisTestingProjection_matrix
 /-- The lifted family-Naimark accept trace at the transmitted position equals
 the one-copy hypothesis-testing accept trace. -/
 theorem canonicalIndexed_truePair_liftedAcceptTrace
-    (ψ : PureVector (Prod a a))
+    (ψ : Ket (a × a))
     (messageIndex : M ≃ Fin (Fintype.card M))
     {ε : ℝ}
     (Λ : HypothesisTestingEffect (N.hypothesisTestingOutputState ψ) ε)
     (decoder :
       POVM M
-        (Prod (TensorPower b 1) (TensorPower a (Fintype.card M))))
+        (TensorPower b 1 × TensorPower a (Fintype.card M)))
     (m : M) :
     SequentialDecoding.effectTrace
         (POVM.isometryLiftState
@@ -300,13 +300,13 @@ theorem canonicalIndexed_truePair_liftedAcceptTrace
 /-- The lifted family-Naimark accept trace at a false position equals the
 one-copy comparison type-II trace. -/
 theorem canonicalIndexed_falsePair_liftedAcceptTrace
-    (ψ : PureVector (Prod a a))
+    (ψ : Ket (a × a))
     (messageIndex : M ≃ Fin (Fintype.card M))
     {ε : ℝ}
     (Λ : HypothesisTestingEffect (N.hypothesisTestingOutputState ψ) ε)
     (decoder :
       POVM M
-        (Prod (TensorPower b 1) (TensorPower a (Fintype.card M))))
+        (TensorPower b 1 × TensorPower a (Fintype.card M)))
     (m : M) (i : Fin (Fintype.card M)) (hi : i ≠ messageIndex m) :
     SequentialDecoding.effectTrace
         (POVM.isometryLiftState
@@ -319,8 +319,8 @@ theorem canonicalIndexed_falsePair_liftedAcceptTrace
         ((positionHypothesisTestingProjection
             (a := a) (b := b) Λ (Fintype.card M) i).matrix) =
       Λ.typeIIError
-        ((N.hypothesisTestingOutputState ψ).marginalA.prod
-          (N.hypothesisTestingOutputState ψ).marginalB) := by
+        ((N.hypothesisTestingOutputState ψ).traceRight.prod
+          (N.hypothesisTestingOutputState ψ).traceLeft) := by
   rw [positionHypothesisTestingProjection_matrix]
   rw [POVM.effectTrace_familyNaimarkProjectiveMeasurement_eq]
   rw [positionHypothesisTestingPOVM_true_effect]
@@ -413,8 +413,8 @@ theorem ereal_sub_endpoint_le_of_forall_strict_lower_E
 
 /-- Endpoint closure specialized to the barred hypothesis-testing information
 lower-bound shape. -/
-theorem Channel.oneShotEntanglementAssistedClassicalCapacityE_htLowerBound_endpoint
-    (N : Channel a b) {ε η : ℝ}
+theorem CPTPOp.oneShotEntanglementAssistedClassicalCapacityE_htLowerBound_endpoint
+    (N : CPTPMap a b) {ε η : ℝ}
     (hstrict :
       ∀ lower : ℝ,
         lower < N.barHypothesisTestingMutualInformationFinite (ε - η) →
@@ -427,8 +427,8 @@ theorem Channel.oneShotEntanglementAssistedClassicalCapacityE_htLowerBound_endpo
 
 /-- Endpoint closure specialized to the extended-real barred
 hypothesis-testing information lower-bound shape. -/
-theorem Channel.oneShotEntanglementAssistedClassicalCapacityE_htLowerBound_endpoint_E
-    (N : Channel a b) {ε η : ℝ}
+theorem CPTPOp.oneShotEntanglementAssistedClassicalCapacityE_htLowerBound_endpoint_E
+    (N : CPTPMap a b) {ε η : ℝ}
     (hstrict :
       ∀ lower : ℝ,
         (lower : EReal) < N.barHypothesisTestingMutualInformation (ε - η) →
@@ -481,7 +481,7 @@ theorem lowerBound_le_oneShotEntanglementAssistedClassicalCapacityE_of_sequentia
     (P : PositionBasedCodingProtocol N M e) {seqLen : ℕ} {ε lowerBound : ℝ}
     (A :
       M → ProjectionSequence
-        (Prod (TensorPower b 1) (TensorPower e (Fintype.card M))) (seqLen + 1))
+        (TensorPower b 1 × TensorPower e (Fintype.card M)) (seqLen + 1))
     (hseq :
       ∀ m : M,
         1 - (P.decoder.prob (P.positionOutputState m) m : ℝ) ≤
@@ -503,7 +503,7 @@ theorem lowerBound_le_oneShotEntanglementAssistedClassicalCapacityE_of_sequentia
     (P : PositionBasedCodingProtocol N M e) {seqLen : ℕ} {ε lowerBound : ℝ}
     (A :
       M → ProjectionSequence
-        (Prod (TensorPower b 1) (TensorPower e (Fintype.card M))) (seqLen + 1))
+        (TensorPower b 1 × TensorPower e (Fintype.card M)) (seqLen + 1))
     (hseq :
       ∀ m : M,
         1 - (P.decoder.prob (P.positionOutputState m) m : ℝ) ≤
@@ -523,7 +523,7 @@ as a cardinality hypothesis.
 
 This is the last generic bridge before inserting the canonical position-based
 Naimark trace identities: missed-detection and false-alarm identities feed the
-sequential decoder, while `2^lowerBound <= |M|` feeds the operational rate.
+sequential decoder, while `2^lowerBound ≤ |M|` feeds the operational rate.
 -/
 theorem lowerBound_le_oneShotEntanglementAssistedClassicalCapacityE_of_ht_trace_bridges_of_rpow_two_le_card
     (P : PositionBasedCodingProtocol N M e) {testSys : Type x}
@@ -531,8 +531,8 @@ theorem lowerBound_le_oneShotEntanglementAssistedClassicalCapacityE_of_ht_trace_
     {seqLen : ℕ} {ε η β lowerBound : ℝ}
     (A :
       M → ProjectionSequence
-        (Prod (TensorPower b 1) (TensorPower e (Fintype.card M))) (seqLen + 1))
-    {ρ σ : State testSys} (Λ : HypothesisTestingEffect ρ (ε - η))
+        (TensorPower b 1 × TensorPower e (Fintype.card M)) (seqLen + 1))
+    {ρ σ : MState testSys} (Λ : HypothesisTestingEffect ρ (ε - η))
     (hη_pos : 0 < η) (hη_lt : η < ε)
     (hseq :
       ∀ m : M,
@@ -564,10 +564,9 @@ theorem lowerBound_le_oneShotEntanglementAssistedClassicalCapacityE_of_ht_trace_
 /-- Fixed-order sequential-decoder assembly matching the Khatri--Wilde
 `i < m` proof shape.
 
-Unlike the older generic bridge, this theorem uses one genuine decoder POVM for
-all messages.  The outcome `m` is controlled by the prefix of the ordered
-projectors ending at `m`, and the false-alarm contribution is summed only over
-earlier positions. -/
+A single decoder POVM serves all messages: the outcome `m` is controlled by the
+prefix of the ordered projectors ending at `m`, and the false-alarm contribution
+is summed only over earlier positions. -/
 theorem lowerBound_le_oneShotEntanglementAssistedClassicalCapacityE_of_ordered_ht_trace_bridges_of_rpow_two_le_card
     {seqLen : ℕ}
     (P : PositionBasedCodingProtocol N M e)
@@ -577,12 +576,12 @@ theorem lowerBound_le_oneShotEntanglementAssistedClassicalCapacityE_of_ordered_h
     (_hcard_eq : Fintype.card M = seqLen + 1)
     (A :
       ProjectionSequence
-        (Prod (TensorPower b 1) (TensorPower e (Fintype.card M))) (seqLen + 1))
+        (TensorPower b 1 × TensorPower e (Fintype.card M)) (seqLen + 1))
     (hdecoder :
       ∀ m : M,
         P.decoder.effects m =
           (SequentialDecoding.sequentialDecoderPOVM A).effects (messageIndex m))
-    {ρ σ : State testSys} (Λ : HypothesisTestingEffect ρ (ε - η))
+    {ρ σ : MState testSys} (Λ : HypothesisTestingEffect ρ (ε - η))
     (hη_pos : 0 < η) (hη_lt : η < ε)
     (hmissBridge :
       ∀ m : M,
@@ -680,7 +679,7 @@ def oneShotAchievabilityWitness_of_compressed_ordered_trace_bounds_of_rpow_two_l
     {ε η β lowerBound : ℝ}
     (messageIndex : M ≃ Fin (seqLen + 1))
     (A : ProjectionSequence out (seqLen + 1))
-    (V : Matrix out (Prod (TensorPower b 1) (TensorPower e (Fintype.card M))) ℂ)
+    (V : Matrix out (TensorPower b 1 × TensorPower e (Fintype.card M)) ℂ)
     (hV : Matrix.conjTranspose V * V = 1)
     (hdecoder :
       ∀ m : M,
@@ -707,7 +706,7 @@ def oneShotAchievabilityWitness_of_compressed_ordered_trace_bounds_of_rpow_two_l
     (P.lowerBound_le_rate_of_rpow_two_le_card hcard)
   refine P.maxErrorAtMost_of_positionOutput_error_le ?_
   intro m
-  let lifted : State out := POVM.isometryLiftState (P.positionOutputState m) V hV
+  let lifted : MState out := POVM.isometryLiftState (P.positionOutputState m) V hV
   have hseq :
       1 - (P.decoder.prob (P.positionOutputState m) m : ℝ) ≤
         SequentialDecoding.sequenceError
@@ -778,7 +777,7 @@ theorem lowerBound_le_oneShotEntanglementAssistedClassicalCapacityE_of_compresse
     {ε η β lowerBound : ℝ}
     (messageIndex : M ≃ Fin (seqLen + 1))
     (A : ProjectionSequence out (seqLen + 1))
-    (V : Matrix out (Prod (TensorPower b 1) (TensorPower e (Fintype.card M))) ℂ)
+    (V : Matrix out (TensorPower b 1 × TensorPower e (Fintype.card M)) ℂ)
     (hV : Matrix.conjTranspose V * V = 1)
     (hdecoder :
       ∀ m : M,
@@ -815,15 +814,15 @@ along this order, and the trace identities from `PositionNaimarkTrace`
 discharge the missed-detection and false-alarm hypotheses of the
 sequential-decoding assembly. -/
 def oneShotAchievabilityWitness_of_canonical_ht_effect
-    {seqLen : ℕ} (ψ : PureVector (Prod a a))
+    {seqLen : ℕ} (ψ : Ket (a × a))
     (messageIndex : M ≃ Fin (seqLen + 1))
     (hcard_eq : Fintype.card M = seqLen + 1)
     {ε η β lowerBound : ℝ}
     (Λ : HypothesisTestingEffect (N.hypothesisTestingOutputState ψ) (ε - η))
     (hη_pos : 0 < η) (hη_lt : η < ε)
     (hβ : Λ.typeIIError
-        ((N.hypothesisTestingOutputState ψ).marginalA.prod
-          (N.hypothesisTestingOutputState ψ).marginalB) ≤ β)
+        ((N.hypothesisTestingOutputState ψ).traceRight.prod
+          (N.hypothesisTestingOutputState ψ).traceLeft) ≤ β)
     (hβ_nonneg : 0 ≤ β)
     (hsize : (seqLen : ℝ) * β ≤ η ^ 2 / (4 * ε))
     (hcard : Real.rpow 2 lowerBound ≤ (Fintype.card M : ℝ)) :
@@ -836,18 +835,16 @@ def oneShotAchievabilityWitness_of_canonical_ht_effect
     fun i =>
       positionHypothesisTestingProjection (a := a) (b := b) Λ (Fintype.card M)
         (finCongr hcard_eq.symm i)
-  let V : Matrix out (Prod (TensorPower b 1) (TensorPower a (Fintype.card M))) ℂ :=
+  let V : Matrix out (TensorPower b 1 × TensorPower a (Fintype.card M)) ℂ :=
     POVM.familyNaimarkEmbedding basePOVM
   have hV : Matrix.conjTranspose V * V = 1 := by
     simpa [V, basePOVM] using POVM.familyNaimarkEmbedding_isometry basePOVM
   let decoderFin : POVM (Fin (seqLen + 1))
-      (Prod (TensorPower b 1) (TensorPower a (Fintype.card M))) :=
+      (TensorPower b 1 × TensorPower a (Fintype.card M)) :=
     (SequentialDecoding.sequentialDecoderPOVM A).compressByIsometry V hV
-  let decoder : POVM M (Prod (TensorPower b 1) (TensorPower a (Fintype.card M))) := {
-    effects := fun m => decoderFin.effects (messageIndex m)
-    pos := fun m => decoderFin.pos (messageIndex m)
-    sum_eq_one := by
-      change (∑ m : M, decoderFin.effects (messageIndex m)) = 1
+  let decoder : POVM M (TensorPower b 1 × TensorPower a (Fintype.card M)) :=
+    .ofMatrices (fun m => decoderFin.effects (messageIndex m))
+      (fun m => decoderFin.pos (messageIndex m)) <| by
       calc
         (∑ m : M, decoderFin.effects (messageIndex m)) =
             ∑ i : Fin (seqLen + 1), decoderFin.effects i := by
@@ -856,7 +853,6 @@ def oneShotAchievabilityWitness_of_canonical_ht_effect
                 (fun i => decoderFin.effects i)
                 (by intro m; rfl)
         _ = 1 := decoderFin.sum_eq_one
-  }
   let messageIndexCard : M ≃ Fin (Fintype.card M) :=
     messageIndex.trans (finCongr hcard_eq.symm)
   let P : PositionBasedCodingProtocol N M a :=
@@ -871,7 +867,7 @@ def oneShotAchievabilityWitness_of_canonical_ht_effect
   · intro m
     simp [P, decoder, decoderFin]
   · intro m
-    let lifted : State out := POVM.isometryLiftState (P.positionOutputState m) V hV
+    let lifted : MState out := POVM.isometryLiftState (P.positionOutputState m) V hV
     have haccept :
         SequentialDecoding.effectTrace lifted (A (messageIndex m)).matrix =
           effectAcceptProbability (N.hypothesisTestingOutputState ψ) Λ.effect := by
@@ -890,7 +886,7 @@ def oneShotAchievabilityWitness_of_canonical_ht_effect
       simpa [haccept] using Λ.accept_ge
     linarith
   · intro m i
-    let lifted : State out := POVM.isometryLiftState (P.positionOutputState m) V hV
+    let lifted : MState out := POVM.isometryLiftState (P.positionOutputState m) V hV
     let j : Fin (seqLen + 1) := ⟨i.val, by omega⟩
     have hi : finCongr hcard_eq.symm j ≠ messageIndexCard m := by
       intro h
@@ -901,8 +897,8 @@ def oneShotAchievabilityWitness_of_canonical_ht_effect
     have htrace :
         SequentialDecoding.effectTrace lifted (A j).matrix =
           Λ.typeIIError
-            ((N.hypothesisTestingOutputState ψ).marginalA.prod
-              (N.hypothesisTestingOutputState ψ).marginalB) := by
+            ((N.hypothesisTestingOutputState ψ).traceRight.prod
+              (N.hypothesisTestingOutputState ψ).traceLeft) := by
       dsimp [lifted, P, A, V, basePOVM, messageIndexCard, j]
       exact
         canonicalIndexed_falsePair_liftedAcceptTrace
@@ -919,15 +915,15 @@ This capacity-valued wrapper is retained for downstream algebra; the
 witness-valued theorem above is the operational form matching the code
 constructed in Khatri--Wilde's proof. -/
 theorem lowerBound_le_oneShotEntanglementAssistedClassicalCapacityE_of_canonical_ht_effect
-    {seqLen : ℕ} (ψ : PureVector (Prod a a))
+    {seqLen : ℕ} (ψ : Ket (a × a))
     (messageIndex : M ≃ Fin (seqLen + 1))
     (hcard_eq : Fintype.card M = seqLen + 1)
     {ε η β lowerBound : ℝ}
     (Λ : HypothesisTestingEffect (N.hypothesisTestingOutputState ψ) (ε - η))
     (hη_pos : 0 < η) (hη_lt : η < ε)
     (hβ : Λ.typeIIError
-        ((N.hypothesisTestingOutputState ψ).marginalA.prod
-          (N.hypothesisTestingOutputState ψ).marginalB) ≤ β)
+        ((N.hypothesisTestingOutputState ψ).traceRight.prod
+          (N.hypothesisTestingOutputState ψ).traceLeft) ≤ β)
     (hβ_nonneg : 0 ≤ β)
     (hsize : (seqLen : ℝ) * β ≤ η ^ 2 / (4 * ε))
     (hcard : Real.rpow 2 lowerBound ≤ (Fintype.card M : ℝ)) :
@@ -939,7 +935,21 @@ theorem lowerBound_le_oneShotEntanglementAssistedClassicalCapacityE_of_canonical
 
 end PositionBasedCodingProtocol
 
-namespace Channel
+end
+end QIT
+
+noncomputable section
+
+namespace CPTPOp
+
+open QIT
+
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+variable {N : CPTPMap a b}
+variable {M : Type u} [Fintype M] [DecidableEq M] [Nonempty M]
+variable {e : Type u} [Fintype e] [DecidableEq e]
+variable {testSys : Type x} [Fintype testSys] [DecidableEq testSys]
 
 /-- Strict-lower approximation form of the Khatri--Wilde one-shot
 hypothesis-testing lower bound.
@@ -950,21 +960,21 @@ mutual information, the position-based code constructed above achieves
 real-valued branch of `D_H`; a separate extended-real endpoint can remove this
 branch once the zero-beta case is available. -/
 theorem oneShotEntanglementAssistedClassicalCapacityE_htLowerBound_strict
-    (N : Channel a b) [Nonempty a] {ε η lower : ℝ}
+    (N : CPTPMap a b) [Nonempty a] {ε η lower : ℝ}
     (hε_pos : 0 < ε) (hη_pos : 0 < η) (hη_lt : η < ε)
     (hlower : lower < N.barHypothesisTestingMutualInformationFinite (ε - η))
     (hbeta_pos :
-      ∀ psi : PureVector (Prod a a),
+      ∀ psi : Ket (a × a),
         lower < N.inputBarHypothesisTestingMutualInformationFinite psi (ε - η) →
           0 <
             (N.hypothesisTestingOutputState psi).hypothesisTestingBeta
-              ((N.hypothesisTestingOutputState psi).marginalA.prod
-                (N.hypothesisTestingOutputState psi).marginalB)
+              ((N.hypothesisTestingOutputState psi).traceRight.prod
+                (N.hypothesisTestingOutputState psi).traceLeft)
               (ε - η)) :
     ((lower - log2 (4 * ε / η ^ 2) : ℝ) : EReal) ≤
       N.oneShotEntanglementAssistedClassicalCapacityE ε := by
-  have : Nonempty (PureVector (Prod a a)) :=
-    ⟨PureVector.basisPureVector⟩
+  have : Nonempty (Ket (a × a)) :=
+    ⟨default⟩
   have htol_nonneg : 0 ≤ ε - η := le_of_lt (sub_pos.mpr hη_lt)
   obtain ⟨ψ, Λ, hΛlt⟩ :=
     N.exists_inputBarHypothesisTestingEffect_typeIIError_lt_rpow_two_neg_of_lt_Finite
@@ -974,8 +984,8 @@ theorem oneShotEntanglementAssistedClassicalCapacityE_htLowerBound_strict
     exact Real.rpow_pos_of_pos (by norm_num : (0 : ℝ) < 2) (-lower)
   have hΛle :
       Λ.typeIIError
-          ((N.hypothesisTestingOutputState ψ).marginalA.prod
-            (N.hypothesisTestingOutputState ψ).marginalB) ≤ beta := by
+          ((N.hypothesisTestingOutputState ψ).traceRight.prod
+            (N.hypothesisTestingOutputState ψ).traceLeft) ≤ beta := by
     exact le_of_lt (by simpa [beta] using hΛlt)
   obtain ⟨k, hk_pos, hsize, hcard_round⟩ :=
     PositionBasedCodingProtocol.exists_message_card_for_ht_lower_bound_rounding
@@ -1032,7 +1042,7 @@ most `ε` and whose rate is at least
 these witnesses by the supremum closure theorem below.
 -/
 theorem exists_oneShotAchievabilityWitness_htLowerBound_strict_E
-    (N : Channel a b) [Nonempty a] {ε η lower : ℝ}
+    (N : CPTPMap a b) [Nonempty a] {ε η lower : ℝ}
     (hε_pos : 0 < ε) (hη_pos : 0 < η) (hη_lt : η < ε)
     (hlower : (lower : EReal) < N.barHypothesisTestingMutualInformation (ε - η)) :
     ∃ (M : Type u), ∃ (_ : Fintype M), ∃ (_ : DecidableEq M), ∃ (_ : Nonempty M),
@@ -1040,8 +1050,8 @@ theorem exists_oneShotAchievabilityWitness_htLowerBound_strict_E
         ∃ (EB : Type u), ∃ (_ : Fintype EB), ∃ (_ : DecidableEq EB),
           Nonempty (EntanglementAssistedOneShotAchievabilityWitness N ε
             (lower - log2 (4 * ε / η ^ 2)) M EA EB) := by
-  have : Nonempty (PureVector (Prod a a)) :=
-    ⟨PureVector.basisPureVector⟩
+  have : Nonempty (Ket (a × a)) :=
+    ⟨default⟩
   have htol_nonneg : 0 ≤ ε - η := le_of_lt (sub_pos.mpr hη_lt)
   obtain ⟨ψ, Λ, hΛlt⟩ :=
     N.exists_inputBarHypothesisTestingEffect_typeIIError_lt_rpow_two_neg_of_lt
@@ -1051,8 +1061,8 @@ theorem exists_oneShotAchievabilityWitness_htLowerBound_strict_E
     exact Real.rpow_pos_of_pos (by norm_num : (0 : ℝ) < 2) (-lower)
   have hΛle :
       Λ.typeIIError
-          ((N.hypothesisTestingOutputState ψ).marginalA.prod
-            (N.hypothesisTestingOutputState ψ).marginalB) ≤ beta := by
+          ((N.hypothesisTestingOutputState ψ).traceRight.prod
+            (N.hypothesisTestingOutputState ψ).traceLeft) ≤ beta := by
     exact le_of_lt (by simpa [beta] using hΛlt)
   obtain ⟨k, hk_pos, hsize, hcard_round⟩ :=
     PositionBasedCodingProtocol.exists_message_card_for_ht_lower_bound_rounding
@@ -1109,7 +1119,7 @@ penalty moved to the hypothesis.  It is convenient for downstream comparisons:
 any real rate strictly below `\bar I_H^{ε-η}(N) - log₂(4ε/η²)` is achieved by
 a concrete one-shot entanglement-assisted code. -/
 theorem exists_oneShotAchievabilityWitness_htLowerBound_rate_strict_E
-    (N : Channel a b) [Nonempty a] {ε η rate : ℝ}
+    (N : CPTPMap a b) [Nonempty a] {ε η rate : ℝ}
     (hε_pos : 0 < ε) (hη_pos : 0 < η) (hη_lt : η < ε)
     (hrate :
       ((rate + log2 (4 * ε / η ^ 2) : ℝ) : EReal) <
@@ -1150,13 +1160,13 @@ branch: any finite real `lower` strictly below the extended-real
 below `2^{-lower}`, including the zero-beta branch where the information value
 is `⊤`. -/
 theorem oneShotEntanglementAssistedClassicalCapacityE_htLowerBound_strict_E
-    (N : Channel a b) [Nonempty a] {ε η lower : ℝ}
+    (N : CPTPMap a b) [Nonempty a] {ε η lower : ℝ}
     (hε_pos : 0 < ε) (hη_pos : 0 < η) (hη_lt : η < ε)
     (hlower : (lower : EReal) < N.barHypothesisTestingMutualInformation (ε - η)) :
     ((lower - log2 (4 * ε / η ^ 2) : ℝ) : EReal) ≤
       N.oneShotEntanglementAssistedClassicalCapacityE ε := by
-  have : Nonempty (PureVector (Prod a a)) :=
-    ⟨PureVector.basisPureVector⟩
+  have : Nonempty (Ket (a × a)) :=
+    ⟨default⟩
   have htol_nonneg : 0 ≤ ε - η := le_of_lt (sub_pos.mpr hη_lt)
   obtain ⟨ψ, Λ, hΛlt⟩ :=
     N.exists_inputBarHypothesisTestingEffect_typeIIError_lt_rpow_two_neg_of_lt
@@ -1166,8 +1176,8 @@ theorem oneShotEntanglementAssistedClassicalCapacityE_htLowerBound_strict_E
     exact Real.rpow_pos_of_pos (by norm_num : (0 : ℝ) < 2) (-lower)
   have hΛle :
       Λ.typeIIError
-          ((N.hypothesisTestingOutputState ψ).marginalA.prod
-            (N.hypothesisTestingOutputState ψ).marginalB) ≤ beta := by
+          ((N.hypothesisTestingOutputState ψ).traceRight.prod
+            (N.hypothesisTestingOutputState ψ).traceLeft) ≤ beta := by
     exact le_of_lt (by simpa [beta] using hΛlt)
   obtain ⟨k, hk_pos, hsize, hcard_round⟩ :=
     PositionBasedCodingProtocol.exists_message_card_for_ht_lower_bound_rounding
@@ -1219,12 +1229,12 @@ entanglement-assisted classical communication.
 This is the source-shaped extended-real formulation:
 `C_EA^ε(N) ≥ \bar I_H^{ε-η}(N) - log₂(4ε/η²)` for `0 < η < ε`. -/
 theorem oneShotEntanglementAssistedClassicalCapacityE_htLowerBound
-    (N : Channel a b) [Nonempty a] {ε η : ℝ}
+    (N : CPTPMap a b) [Nonempty a] {ε η : ℝ}
     (hε_pos : 0 < ε) (hη_pos : 0 < η) (hη_lt : η < ε) :
     N.barHypothesisTestingMutualInformation (ε - η) -
         (log2 (4 * ε / η ^ 2) : EReal) ≤
       N.oneShotEntanglementAssistedClassicalCapacityE ε :=
-  QIT.PositionBasedCodingProtocol.Channel.oneShotEntanglementAssistedClassicalCapacityE_htLowerBound_endpoint_E
+  QIT.PositionBasedCodingProtocol.CPTPOp.oneShotEntanglementAssistedClassicalCapacityE_htLowerBound_endpoint_E
     N
     (fun _ hlower =>
       N.oneShotEntanglementAssistedClassicalCapacityE_htLowerBound_strict_E
@@ -1238,27 +1248,25 @@ order-theoretic endpoint closure.  The remaining hypothesis records the exact
 place where the current real-valued `D_H` API excludes the zero-beta
 extended-real branch. -/
 theorem oneShotEntanglementAssistedClassicalCapacityE_htLowerBound_endpoint_of_beta_pos
-    (N : Channel a b) [Nonempty a] {ε η : ℝ}
+    (N : CPTPMap a b) [Nonempty a] {ε η : ℝ}
     (hε_pos : 0 < ε) (hη_pos : 0 < η) (hη_lt : η < ε)
     (hbeta_pos :
-      ∀ lower : ℝ, ∀ psi : PureVector (Prod a a),
+      ∀ lower : ℝ, ∀ psi : Ket (a × a),
         lower < N.inputBarHypothesisTestingMutualInformationFinite psi (ε - η) →
           0 <
             (N.hypothesisTestingOutputState psi).hypothesisTestingBeta
-              ((N.hypothesisTestingOutputState psi).marginalA.prod
-                (N.hypothesisTestingOutputState psi).marginalB)
+              ((N.hypothesisTestingOutputState psi).traceRight.prod
+                (N.hypothesisTestingOutputState psi).traceLeft)
               (ε - η)) :
     ((N.barHypothesisTestingMutualInformationFinite (ε - η) -
         log2 (4 * ε / η ^ 2) : ℝ) : EReal) ≤
       N.oneShotEntanglementAssistedClassicalCapacityE ε :=
-  QIT.PositionBasedCodingProtocol.Channel.oneShotEntanglementAssistedClassicalCapacityE_htLowerBound_endpoint
+  QIT.PositionBasedCodingProtocol.CPTPOp.oneShotEntanglementAssistedClassicalCapacityE_htLowerBound_endpoint
     N
     (fun lower hlower =>
       N.oneShotEntanglementAssistedClassicalCapacityE_htLowerBound_strict
         hε_pos hη_pos hη_lt hlower (hbeta_pos lower))
 
-end Channel
+end CPTPOp
 
 end
-
-end QIT

@@ -36,16 +36,6 @@ variable {Z : Type uZ} {e : Type ue}
 variable [Fintype Z] [DecidableEq Z]
 variable [Fintype e] [DecidableEq e]
 
-omit [DecidableEq e] in
-private theorem cMatrix_trace_re_le_of_le {X Y : CMatrix e} (hXY : X ≤ Y) :
-    X.trace.re ≤ Y.trace.re := by
-  rw [Matrix.le_iff] at hXY
-  have htrace : 0 ≤ (Y - X).trace.re :=
-    (Matrix.PosSemidef.trace_nonneg hXY).1
-  have hcalc : (Y - X).trace.re = Y.trace.re - X.trace.re := by
-    simp [Matrix.trace_sub]
-  linarith
-
 private theorem cMatrix_effect_mul_self_le_self {P : CMatrix e}
     (hPpos : P.PosSemidef) (hPle : P ≤ 1) :
     P * P ≤ P := by
@@ -255,66 +245,15 @@ private theorem cMatrix_inv_mul_self_trace_nonneg_of_hermitian_posDef
   rwa [hcyc]
 
 /-- CQ quadratic witness `∑_z tr(σ⁻¹ (p_z ρ_z) (p_z ρ_z))`. -/
-def extractorCqQuadraticTerm (E : Ensemble Z e) (σ : State e) : ℝ :=
-  ∑ z, ((σ.matrix⁻¹ * E.cqBlock z * E.cqBlock z).trace).re
+def extractorCqQuadraticTerm (E : MEnsemble e Z) (σ : MState e) : ℝ :=
+  ∑ z, ((σ.m⁻¹ * E.cqBlock z * E.cqBlock z).trace).re
 
 omit [DecidableEq Z] in
 @[simp]
-theorem extractorCqQuadraticTerm_eq_sum (E : Ensemble Z e) (σ : State e) :
+theorem extractorCqQuadraticTerm_eq_sum (E : MEnsemble e Z) (σ : MState e) :
     extractorCqQuadraticTerm E σ =
-      ∑ z, ((σ.matrix⁻¹ * E.cqBlock z * E.cqBlock z).trace).re :=
+      ∑ z, ((σ.m⁻¹ * E.cqBlock z * E.cqBlock z).trace).re :=
   rfl
-
-theorem cMatrix_mul_inv_mul_self_le_smul_of_posSemidef_le_posDef
-    {A σ : CMatrix e} {c : ℝ}
-    (hA : A.PosSemidef) (hσ : σ.PosDef) (hc : 0 < c)
-    (hAσ : A ≤ (c : ℂ) • σ) :
-    A * σ⁻¹ * A ≤ (c : ℂ) • A := by
-  classical
-  rw [Matrix.le_iff]
-  let C : CMatrix e := (c : ℂ) • σ
-  have hcC : (0 : ℂ) < (c : ℂ) := by
-    exact_mod_cast hc
-  have hC : C.PosDef := by
-    simpa [C] using hσ.smul hcC
-  have hCminusA : (C - A).PosSemidef := by
-    simpa [C, Matrix.le_iff] using hAσ
-  have hblock :
-      (Matrix.fromBlocks A A A C : CMatrix (Sum e e)).PosSemidef :=
-    cMatrix_fromBlocks_self_le_posSemidef (e := e) hA hCminusA
-  let : Invertible C := hC.isUnit.invertible
-  have hblock' :
-      (Matrix.fromBlocks A A A.conjTranspose C : CMatrix (Sum e e)).PosSemidef := by
-    simpa [hA.isHermitian.eq] using hblock
-  have hschur :
-      (A - A * C⁻¹ * A.conjTranspose).PosSemidef :=
-    (Matrix.PosDef.fromBlocks₂₂ A A (D := C) hC).mp hblock'
-  have hC_le :
-      A * C⁻¹ * A ≤ A := by
-    rw [Matrix.le_iff]
-    simpa [hA.isHermitian.eq] using hschur
-  have hcne : (c : ℂ) ≠ 0 := by
-    exact_mod_cast hc.ne'
-  let : Invertible (c : ℂ) := invertibleOfNonzero hcne
-  have hσdet : IsUnit σ.det := (Matrix.isUnit_iff_isUnit_det σ).mp hσ.isUnit
-  have hCinv : C⁻¹ = ((c : ℂ)⁻¹) • σ⁻¹ := by
-    calc
-      C⁻¹ = (((c : ℂ) • σ))⁻¹ := by rfl
-      _ = ⅟(c : ℂ) • σ⁻¹ := by
-        simpa using Matrix.inv_smul σ (c : ℂ) hσdet
-      _ = ((c : ℂ)⁻¹) • σ⁻¹ := by
-        simp [invOf_eq_inv]
-  have hinvScaled :
-      ((c : ℂ)⁻¹) • (A * σ⁻¹ * A) ≤ A := by
-    simpa [hCinv, Matrix.mul_assoc, Matrix.mul_smul, Matrix.smul_mul] using hC_le
-  rw [Matrix.le_iff] at hinvScaled
-  have hcNonneg : (0 : ℂ) ≤ (c : ℂ) := le_of_lt hcC
-  have hscaled := hinvScaled.smul hcNonneg
-  have hscale_eq :
-      (c : ℂ) • (A - ((c : ℂ)⁻¹) • (A * σ⁻¹ * A)) =
-        (c : ℂ) • A - A * σ⁻¹ * A := by
-    rw [smul_sub, smul_smul, mul_inv_cancel₀ hcne, one_smul]
-  simpa [hscale_eq] using hscaled
 
 theorem cMatrix_inv_mul_sq_trace_le_scaled_trace_of_le
     {A σ : CMatrix e} {c : ℝ}
@@ -325,7 +264,7 @@ theorem cMatrix_inv_mul_sq_trace_le_scaled_trace_of_le
   have hle :
       A * σ⁻¹ * A ≤ (c : ℂ) • A :=
     cMatrix_mul_inv_mul_self_le_smul_of_posSemidef_le_posDef hA hσ hc hAσ
-  have htrace_le := cMatrix_trace_re_le_of_le (e := e) hle
+  have htrace_le := cMatrix_trace_re_le_of_le hle
   have hcyc : (σ⁻¹ * A * A).trace = (A * σ⁻¹ * A).trace := by
     calc
       (σ⁻¹ * A * A).trace = ((σ⁻¹ * A) * A).trace := by rw [Matrix.mul_assoc]
@@ -336,9 +275,9 @@ theorem cMatrix_inv_mul_sq_trace_le_scaled_trace_of_le
   simpa [hcyc, hrhs] using htrace_le
 
 theorem extractorCqQuadratic_le_rpow_of_conditionalMinEntropyFeasible_posDef
-    (E : Ensemble Z e) (σ : State e) (lam : ℝ)
-    (hσ : σ.matrix.PosDef)
-    (hmin : State.ConditionalMinEntropyFeasible (a := Z) E.cqState σ lam) :
+    (E : MEnsemble e Z) (σ : MState e) (lam : ℝ)
+    (hσ : σ.m.PosDef)
+    (hmin : MState.ConditionalMinEntropyFeasible (a := Z) E.cqState σ lam) :
     extractorCqQuadraticTerm E σ ≤ Real.rpow 2 (-lam) := by
   classical
   let c : ℝ := Real.rpow 2 (-lam)
@@ -346,40 +285,40 @@ theorem extractorCqQuadratic_le_rpow_of_conditionalMinEntropyFeasible_posDef
     dsimp [c]
     positivity
   have hdual :
-      E.cqDualFeasible ((Real.rpow 2 (-lam) : ℂ) • σ.matrix) :=
-    Ensemble.cqDualFeasible_of_conditionalMinEntropyFeasible E σ lam hmin
+      E.cqDualFeasible ((Real.rpow 2 (-lam) : ℂ) • σ.m) :=
+    MEnsemble.cqDualFeasible_of_conditionalMinEntropyFeasible E σ lam hmin
   have hblock_psd : ∀ z, (E.cqBlock z).PosSemidef := by
     intro z
-    rw [Ensemble.cqBlock_eq]
-    exact (E.states z).pos.smul (by exact_mod_cast NNReal.coe_nonneg (E.probs z))
+    rw [MEnsemble.cqBlock_eq]
+    exact (E.states z).psd.smul (by exact_mod_cast NNReal.coe_nonneg (E.probs z))
   have hterm : ∀ z,
-      ((σ.matrix⁻¹ * E.cqBlock z * E.cqBlock z).trace).re ≤
+      ((σ.m⁻¹ * E.cqBlock z * E.cqBlock z).trace).re ≤
         c * (E.cqBlock z).trace.re := by
     intro z
     simpa [c] using
       cMatrix_inv_mul_sq_trace_le_scaled_trace_of_le
-        (e := e) (A := E.cqBlock z) (σ := σ.matrix) (c := c)
+        (e := e) (A := E.cqBlock z) (σ := σ.m) (c := c)
         (hblock_psd z) hσ hc (by simpa [c] using hdual.2 z)
   have hsum_le :
-      ∑ z, ((σ.matrix⁻¹ * E.cqBlock z * E.cqBlock z).trace).re ≤
+      ∑ z, ((σ.m⁻¹ * E.cqBlock z * E.cqBlock z).trace).re ≤
         ∑ z, c * (E.cqBlock z).trace.re :=
     Finset.sum_le_sum fun z _ => hterm z
   have htrace_sum : ∑ z, (E.cqBlock z).trace.re = 1 := by
     calc
       ∑ z, (E.cqBlock z).trace.re =
-          ∑ z, ((E.probs z : ℂ) * (E.states z).matrix.trace).re := by
+          ∑ z, ((E.probs z : ℂ) * (E.states z).m.trace).re := by
             refine Finset.sum_congr rfl fun z _ => ?_
-            rw [Ensemble.cqBlock_eq, Matrix.trace_smul]
+            rw [MEnsemble.cqBlock_eq, Matrix.trace_smul]
             rfl
       _ = ∑ z, (E.probs z : ℝ) := by
             refine Finset.sum_congr rfl fun z _ => ?_
-            rw [(E.states z).trace_eq_one]
+            rw [(E.states z).tr']
             simp
       _ = 1 := by
             exact_mod_cast E.weights_sum
   calc
     extractorCqQuadraticTerm E σ =
-        ∑ z, ((σ.matrix⁻¹ * E.cqBlock z * E.cqBlock z).trace).re := rfl
+        ∑ z, ((σ.m⁻¹ * E.cqBlock z * E.cqBlock z).trace).re := rfl
     _ ≤ ∑ z, c * (E.cqBlock z).trace.re := hsum_le
     _ = c * ∑ z, (E.cqBlock z).trace.re := by rw [Finset.mul_sum]
     _ = c := by rw [htrace_sum, mul_one]
@@ -394,14 +333,14 @@ variable [Fintype F] [DecidableEq F] [Nonempty F]
 variable [Fintype S] [DecidableEq S] [Nonempty S]
 
 /-- The side-information block landing in output bucket `s` for seed `f`. -/
-def extractorSeedOutputBucket (H : HashFamily F Z S) (E : Ensemble Z e)
+def extractorSeedOutputBucket (H : HashFamily F Z S) (E : MEnsemble e Z)
     (f : F) (s : S) : CMatrix e :=
   ∑ z : Z, if H.hash f z = s then E.cqBlock z else 0
 
 omit [DecidableEq Z] [DecidableEq F] [Nonempty F] [Fintype S] [Nonempty S] in
 @[simp]
 theorem extractorSeedOutputBucket_eq_sum (H : HashFamily F Z S)
-    (E : Ensemble Z e) (f : F) (s : S) :
+    (E : MEnsemble e Z) (f : F) (s : S) :
     H.extractorSeedOutputBucket E f s =
       ∑ z : Z, if H.hash f z = s then E.cqBlock z else 0 :=
   rfl
@@ -409,19 +348,19 @@ theorem extractorSeedOutputBucket_eq_sum (H : HashFamily F Z S)
 omit [DecidableEq F] [Nonempty F] [Fintype S] [Nonempty S] [DecidableEq Z] in
 /-- The source-style output bucket is positive semidefinite. -/
 theorem extractorSeedOutputBucket_posSemidef (H : HashFamily F Z S)
-    (E : Ensemble Z e) (f : F) (s : S) :
+    (E : MEnsemble e Z) (f : F) (s : S) :
     (H.extractorSeedOutputBucket E f s).PosSemidef := by
   classical
   unfold extractorSeedOutputBucket
   refine Matrix.posSemidef_sum Finset.univ fun z _ => ?_
   by_cases hz : H.hash f z = s
-  · simpa [hz] using Ensemble.cqBlock_posSemidef E z
+  · simpa [hz] using MEnsemble.cqBlock_posSemidef E z
   · simp [hz, Matrix.PosSemidef.zero]
 
 omit [DecidableEq Z] [DecidableEq F] [Nonempty F] [Fintype S] [Nonempty S] in
 /-- Trace of one source-style output bucket. -/
 theorem extractorSeedOutputBucket_trace_re (H : HashFamily F Z S)
-    (E : Ensemble Z e) (f : F) (s : S) :
+    (E : MEnsemble e Z) (f : F) (s : S) :
     (H.extractorSeedOutputBucket E f s).trace.re =
       ∑ z : Z, if H.hash f z = s then (E.probs z : ℝ) else 0 := by
   classical
@@ -430,16 +369,13 @@ theorem extractorSeedOutputBucket_trace_re (H : HashFamily F Z S)
   simp only [Complex.re_sum]
   refine Finset.sum_congr rfl fun z _ => ?_
   by_cases hz : H.hash f z = s
-  · have htrace_re : (E.states z).matrix.trace.re = 1 := by
-      rw [(E.states z).trace_eq_one]
-      simp
-    simp [hz, Ensemble.cqBlock_eq, Matrix.trace_smul, htrace_re]
+  · simp [hz, MEnsemble.cqBlock_eq, Matrix.trace_smul]
   · simp [hz]
 
 omit [DecidableEq Z] [DecidableEq F] [Nonempty F] [Fintype S] [Nonempty S] in
 /-- One source-style output bucket has trace at most one. -/
 theorem extractorSeedOutputBucket_trace_re_le_one (H : HashFamily F Z S)
-    (E : Ensemble Z e) (f : F) (s : S) :
+    (E : MEnsemble e Z) (f : F) (s : S) :
     (H.extractorSeedOutputBucket E f s).trace.re ≤ 1 := by
   classical
   rw [H.extractorSeedOutputBucket_trace_re E f s]
@@ -460,7 +396,7 @@ applied.
 
 [Tomamichel2015FiniteResources, apps.tex:256-292]
 -/
-def extractorSeedOutputBucketState (H : HashFamily F Z S) (E : Ensemble Z e)
+def extractorSeedOutputBucketState (H : HashFamily F Z S) (E : MEnsemble e Z)
     (f : F) (s : S) : SubnormalizedState e where
   matrix := H.extractorSeedOutputBucket E f s
   pos := H.extractorSeedOutputBucket_posSemidef E f s
@@ -469,26 +405,25 @@ def extractorSeedOutputBucketState (H : HashFamily F Z S) (E : Ensemble Z e)
 omit [DecidableEq F] [Nonempty F] [Fintype S] [Nonempty S] [DecidableEq Z] in
 @[simp]
 theorem extractorSeedOutputBucketState_matrix (H : HashFamily F Z S)
-    (E : Ensemble Z e) (f : F) (s : S) :
+    (E : MEnsemble e Z) (f : F) (s : S) :
     (H.extractorSeedOutputBucketState E f s).matrix =
       H.extractorSeedOutputBucket E f s :=
   rfl
 
 omit [DecidableEq F] [Nonempty F] [Fintype S] [Nonempty S] [DecidableEq Z] in
-@[simp]
 theorem extractorSeedOutputBucketState_trace_re (H : HashFamily F Z S)
-    (E : Ensemble Z e) (f : F) (s : S) :
+    (E : MEnsemble e Z) (f : F) (s : S) :
     (H.extractorSeedOutputBucketState E f s).matrix.trace.re =
       ∑ z : Z, if H.hash f z = s then (E.probs z : ℝ) else 0 := by
   simpa using H.extractorSeedOutputBucket_trace_re E f s
 
 /-- The total side-information block before hashing. -/
-def extractorCqTotalBlock (_H : HashFamily F Z S) (E : Ensemble Z e) : CMatrix e :=
+def extractorCqTotalBlock (_H : HashFamily F Z S) (E : MEnsemble e Z) : CMatrix e :=
   ∑ z : Z, E.cqBlock z
 
 omit [DecidableEq Z] [DecidableEq F] [Nonempty F] [Fintype S] [DecidableEq S] [Nonempty S] in
 @[simp]
-theorem extractorCqTotalBlock_eq_sum (H : HashFamily F Z S) (E : Ensemble Z e) :
+theorem extractorCqTotalBlock_eq_sum (H : HashFamily F Z S) (E : MEnsemble e Z) :
     H.extractorCqTotalBlock E = ∑ z : Z, E.cqBlock z :=
   rfl
 
@@ -496,7 +431,7 @@ theorem extractorCqTotalBlock_eq_sum (H : HashFamily F Z S) (E : Ensemble Z e) :
 Centered output residual for one seed/output bucket:
 `ρ_{E,s|f} - |S|⁻¹ ρ_E`.
 -/
-def extractorSeedCenteredResidual (H : HashFamily F Z S) (E : Ensemble Z e)
+def extractorSeedCenteredResidual (H : HashFamily F Z S) (E : MEnsemble e Z)
     (f : F) (s : S) : CMatrix e :=
   H.extractorSeedOutputBucket E f s -
     ((Fintype.card S : ℂ)⁻¹) • H.extractorCqTotalBlock E
@@ -516,14 +451,14 @@ private theorem centerCoeffC_eq_ofReal (H : HashFamily F Z S)
 
 omit [DecidableEq Z] [DecidableEq F] [Nonempty F] [Fintype S] [Nonempty S] in
 private theorem if_cqBlock_eq_indicator_smul
-    (H : HashFamily F Z S) (E : Ensemble Z e) (f : F) (s : S) (z : Z) :
+    (H : HashFamily F Z S) (E : MEnsemble e Z) (f : F) (s : S) (z : Z) :
     (if H.hash f z = s then E.cqBlock z else 0) =
       ((if H.hash f z = s then (1 : ℂ) else 0) • E.cqBlock z) := by
   by_cases h : H.hash f z = s <;> simp [h]
 
 omit [DecidableEq Z] [DecidableEq F] [Nonempty F] [Nonempty S] in
 private theorem extractorSeedCenteredResidual_eq_centerCoeff_sum
-    (H : HashFamily F Z S) (E : Ensemble Z e) (f : F) (s : S) :
+    (H : HashFamily F Z S) (E : MEnsemble e Z) (f : F) (s : S) :
     H.extractorSeedCenteredResidual E f s =
       ∑ z : Z, H.centerCoeffC f s z • E.cqBlock z := by
   classical
@@ -669,11 +604,11 @@ private theorem centerCoeff_pair_average_eq_collisionProbability
           exact_mod_cast H.prob_sum
         rw [hprob, mul_one]
 
-private def quad (σ : State e) (A B : CMatrix e) : ℝ :=
-  ((σ.matrix⁻¹ * A * B).trace).re
+private def quad (σ : MState e) (A B : CMatrix e) : ℝ :=
+  ((σ.m⁻¹ * A * B).trace).re
 
 omit [DecidableEq Z] in
-private theorem quad_sum_smul_sum_smul_real (σ : State e)
+private theorem quad_sum_smul_sum_smul_real (σ : MState e)
     (A : Z → CMatrix e) (c d : Z → ℝ) :
     quad σ (∑ z : Z, (c z : ℂ) • A z) (∑ z' : Z, (d z' : ℂ) • A z') =
       ∑ z : Z, ∑ z' : Z, c z * d z' * quad σ (A z) (A z') := by
@@ -683,8 +618,7 @@ private theorem quad_sum_smul_sum_smul_real (σ : State e)
   rw [Finset.sum_comm]
   refine Finset.sum_congr rfl fun z _ => ?_
   refine Finset.sum_congr rfl fun z' _ => ?_
-  simp [Matrix.trace_smul, mul_assoc, mul_comm,
-    mul_left_comm]
+  simp [Matrix.trace_smul, mul_assoc, mul_left_comm]
 
 private theorem sum_reorder_four
     {F : Type uF} {S : Type uS} {Z : Type uZ}
@@ -713,7 +647,7 @@ private theorem sum_reorder_four
 omit [DecidableEq Z] [DecidableEq F] [Nonempty F] [Nonempty S] in
 @[simp]
 theorem extractorSeedCenteredResidual_eq (H : HashFamily F Z S)
-    (E : Ensemble Z e) (f : F) (s : S) :
+    (E : MEnsemble e Z) (f : F) (s : S) :
     H.extractorSeedCenteredResidual E f s =
       H.extractorSeedOutputBucket E f s -
         ((Fintype.card S : ℂ)⁻¹) • H.extractorCqTotalBlock E :=
@@ -721,19 +655,19 @@ theorem extractorSeedCenteredResidual_eq (H : HashFamily F Z S)
 
 /-- Source-shaped centered quadratic witness for one seed. -/
 def extractorSeedCenteredQuadraticTerm (H : HashFamily F Z S)
-    (E : Ensemble Z e) (σ : State e) (f : F) : ℝ :=
+    (E : MEnsemble e Z) (σ : MState e) (f : F) : ℝ :=
   ∑ s : S,
-    ((σ.matrix⁻¹ *
+    ((σ.m⁻¹ *
         H.extractorSeedCenteredResidual E f s *
           H.extractorSeedCenteredResidual E f s).trace).re
 
 omit [DecidableEq Z] [DecidableEq F] [Nonempty F] [Nonempty S] in
 @[simp]
 theorem extractorSeedCenteredQuadraticTerm_eq_sum (H : HashFamily F Z S)
-    (E : Ensemble Z e) (σ : State e) (f : F) :
+    (E : MEnsemble e Z) (σ : MState e) (f : F) :
     H.extractorSeedCenteredQuadraticTerm E σ f =
       ∑ s : S,
-        ((σ.matrix⁻¹ *
+        ((σ.m⁻¹ *
             H.extractorSeedCenteredResidual E f s *
               H.extractorSeedCenteredResidual E f s).trace).re :=
   rfl
@@ -767,7 +701,7 @@ private theorem outputBlock_isHermitian {M : CMatrix (S × e)}
 
 omit [DecidableEq e] [DecidableEq S] [Nonempty S] in
 private theorem trace_mul_output_decomp_complex {D P : CMatrix (S × e)}
-    (hoff : ∀ (s s' : S) (i j : e), s ≠ s' -> D (s, i) (s', j) = 0) :
+    (hoff : ∀ (s s' : S) (i j : e), s ≠ s' → D (s, i) (s', j) = 0) :
     (D * P).trace =
       ∑ s : S, ((outputBlock (e := e) D s) * outputBlock P s).trace := by
   classical
@@ -787,7 +721,7 @@ private theorem trace_mul_output_decomp_complex {D P : CMatrix (S × e)}
 
 omit [DecidableEq e] [DecidableEq S] [Nonempty S] in
 private theorem trace_mul_output_decomp {D P : CMatrix (S × e)}
-    (hoff : ∀ (s s' : S) (i j : e), s ≠ s' -> D (s, i) (s', j) = 0) :
+    (hoff : ∀ (s s' : S) (i j : e), s ≠ s' → D (s, i) (s', j) = 0) :
     ((D * P).trace).re =
       ∑ s : S, (((outputBlock (e := e) D s) * outputBlock P s).trace).re := by
   rw [trace_mul_output_decomp_complex (S := S) (e := e) hoff]
@@ -795,7 +729,7 @@ private theorem trace_mul_output_decomp {D P : CMatrix (S × e)}
 
 omit [DecidableEq Z] [DecidableEq F] [Nonempty F] [Fintype S] [Nonempty S] in
 private theorem extractorSeedOutputMatrix_output_offdiag
-    (H : HashFamily F Z S) (E : Ensemble Z e) (f : F)
+    (H : HashFamily F Z S) (E : MEnsemble e Z) (f : F)
     {s s' : S} {i j : e} (hss : s ≠ s') :
     extractorSeedOutputMatrix H E f (s, i) (s', j) = 0 := by
   unfold extractorSeedOutputMatrix
@@ -811,18 +745,18 @@ private theorem extractorSeedOutputMatrix_output_offdiag
 
 omit [DecidableEq Z] [DecidableEq F] [Nonempty F] [Nonempty S] in
 private theorem extractorSeedSideInfoMatrix_eq_totalBlock
-    (H : HashFamily F Z S) (E : Ensemble Z e) (f : F) :
+    (H : HashFamily F Z S) (E : MEnsemble e Z) (f : F) :
     extractorSeedSideInfoMatrix H E f = H.extractorCqTotalBlock E := by
   ext i j
-  unfold extractorSeedSideInfoMatrix extractorCqTotalBlock partialTraceA extractorSeedOutputMatrix
+  unfold extractorSeedSideInfoMatrix extractorCqTotalBlock Matrix.traceLeft extractorSeedOutputMatrix
   simp only [Matrix.sum_apply, Matrix.smul_apply]
   calc
     (∑ s : S, ∑ z : Z,
         (E.probs z) •
           (Matrix.kronecker
             (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
-            (E.states z).matrix) (s, i) (s, j)) =
-      ∑ z : Z, (E.probs z) • (E.states z).matrix i j := by
+            (E.states z).m) (s, i) (s, j)) =
+      ∑ z : Z, (E.probs z) • (E.states z).m i j := by
         rw [Finset.sum_comm]
         refine Finset.sum_congr rfl fun z _ => ?_
         rw [Finset.sum_eq_single_of_mem (H.hash f z) (Finset.mem_univ _)]
@@ -833,14 +767,14 @@ private theorem extractorSeedSideInfoMatrix_eq_totalBlock
     _ = (∑ z : Z, E.cqBlock z) i j := by
         rw [Matrix.sum_apply]
         refine Finset.sum_congr rfl fun z _ => ?_
-        rw [Ensemble.cqBlock_eq]
+        rw [MEnsemble.cqBlock_eq]
         simp [NNReal.smul_def]
     _ = ∑ z : Z, E.cqBlock z i j := by
         rw [Matrix.sum_apply]
 
 omit [DecidableEq Z] [DecidableEq F] [Nonempty F] in
 private theorem extractorSeedIdealMatrix_output_offdiag
-    (H : HashFamily F Z S) (E : Ensemble Z e) (f : F)
+    (H : HashFamily F Z S) (E : MEnsemble e Z) (f : F)
     {s s' : S} {i j : e} (hss : s ≠ s') :
     extractorSeedIdealMatrix H E f (s, i) (s', j) = 0 := by
   unfold extractorSeedIdealMatrix
@@ -848,7 +782,7 @@ private theorem extractorSeedIdealMatrix_output_offdiag
 
 omit [DecidableEq Z] [DecidableEq F] [Nonempty F] in
 private theorem extractorSeedDiff_output_offdiag
-    (H : HashFamily F Z S) (E : Ensemble Z e) (f : F)
+    (H : HashFamily F Z S) (E : MEnsemble e Z) (f : F)
     {s s' : S} {i j : e} (hss : s ≠ s') :
     (extractorSeedOutputMatrix H E f - extractorSeedIdealMatrix H E f)
         (s, i) (s', j) = 0 := by
@@ -858,7 +792,7 @@ private theorem extractorSeedDiff_output_offdiag
 
 omit [DecidableEq Z] [DecidableEq F] [Nonempty F] in
 private theorem outputBlock_seedDiff_eq_centeredResidual
-    (H : HashFamily F Z S) (E : Ensemble Z e) (f : F) (s : S) :
+    (H : HashFamily F Z S) (E : MEnsemble e Z) (f : F) (s : S) :
     outputBlock (e := e)
         (extractorSeedOutputMatrix H E f - extractorSeedIdealMatrix H E f) s =
       H.extractorSeedCenteredResidual E f s := by
@@ -873,7 +807,7 @@ private theorem outputBlock_seedDiff_eq_centeredResidual
     simp only [Matrix.sum_apply, Matrix.smul_apply, Matrix.kronecker,
       Matrix.kroneckerMap_apply]
     refine Finset.sum_congr rfl fun z _ => ?_
-    rw [Ensemble.cqBlock_eq]
+    rw [MEnsemble.cqBlock_eq]
     by_cases hz : H.hash f z = s
     · simp [hz, NNReal.smul_def]
     · simp [hz]
@@ -887,124 +821,35 @@ private theorem outputBlock_seedDiff_eq_centeredResidual
   rw [hout, hideal]
   rfl
 
-omit [DecidableEq Z] [DecidableEq F] [Nonempty F] [Nonempty S] in
-private theorem extractorSeedOutputMatrix_trace_local (H : HashFamily F Z S)
-    (E : Ensemble Z e) (f : F) :
-    (extractorSeedOutputMatrix H E f).trace = 1 := by
-  unfold extractorSeedOutputMatrix
-  simp only [Matrix.trace_sum, Matrix.trace_smul]
-  calc
-    (∑ z : Z, (E.probs z) •
-        (Matrix.kronecker (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
-          (E.states z).matrix).trace) =
-      ∑ z : Z, ((E.probs z : ℝ≥0) : ℂ) := by
-        refine Finset.sum_congr rfl fun z _ => ?_
-        have htrace :
-            (Matrix.kronecker (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
-              (E.states z).matrix).trace = 1 := by
-          simpa [Matrix.kronecker] using
-            (Matrix.trace_kronecker
-              (Matrix.single (H.hash f z) (H.hash f z) (1 : ℂ))
-              (E.states z).matrix).trans
-              (by rw [trace_single_one, if_pos rfl, (E.states z).trace_eq_one]; norm_num)
-        rw [htrace]
-        exact (Algebra.algebraMap_eq_smul_one _).symm
-    _ = ↑(∑ z : Z, E.probs z) := by simp
-    _ = 1 := by rw [E.weights_sum]; rfl
-
-omit [DecidableEq Z] [DecidableEq F] [Nonempty F] [Nonempty S] in
-private theorem extractorSeedOutputMatrix_posSemidef_local (H : HashFamily F Z S)
-    (E : Ensemble Z e) (f : F) :
-    (extractorSeedOutputMatrix H E f).PosSemidef := by
-  unfold extractorSeedOutputMatrix
-  exact Matrix.posSemidef_sum Finset.univ fun z _ =>
-    (((posSemidef_single (H.hash f z)).kronecker (E.states z).pos).smul
-      (NNReal.coe_nonneg (E.probs z)))
-
-omit [DecidableEq Z] [DecidableEq F] [Nonempty F] in
-private theorem extractorSeedIdealMatrix_trace_local (H : HashFamily F Z S)
-    (E : Ensemble Z e) (f : F) :
-    (extractorSeedIdealMatrix H E f).trace = 1 := by
-  unfold extractorSeedIdealMatrix extractorSeedSideInfoMatrix
-  rw [show (Matrix.kronecker (uniformExtractorOutputState (S := S)).matrix
-      (partialTraceA (extractorSeedOutputMatrix H E f))).trace =
-        (uniformExtractorOutputState (S := S)).matrix.trace *
-          (partialTraceA (extractorSeedOutputMatrix H E f)).trace by
-    simpa [Matrix.kronecker] using
-      Matrix.trace_kronecker (uniformExtractorOutputState (S := S)).matrix
-        (partialTraceA (extractorSeedOutputMatrix H E f))]
-  rw [uniformExtractorOutputState_matrix]
-  have hU : (Matrix.diagonal fun s : S => (uniformExtractorOutputProb (S := S) s : ℂ)).trace = 1 := by
-    change (uniformExtractorOutputState (S := S)).matrix.trace = 1
-    exact (uniformExtractorOutputState (S := S)).trace_eq_one
-  rw [hU, partialTraceA_trace, extractorSeedOutputMatrix_trace_local H E f]
-  norm_num
-
-omit [DecidableEq Z] [DecidableEq F] [Nonempty F] in
-private theorem extractorSeedIdealMatrix_posSemidef_local (H : HashFamily F Z S)
-    (E : Ensemble Z e) (f : F) :
-    (extractorSeedIdealMatrix H E f).PosSemidef := by
-  unfold extractorSeedIdealMatrix extractorSeedSideInfoMatrix
-  exact (uniformExtractorOutputState (S := S)).pos.kronecker
-    (partialTraceA_posSemidef (extractorSeedOutputMatrix_posSemidef_local H E f))
-
-omit [DecidableEq Z] [DecidableEq F] [Nonempty F] in
-private theorem seedDiff_trace_zero_local (H : HashFamily F Z S) (E : Ensemble Z e) (f : F) :
-    (extractorSeedOutputMatrix H E f - extractorSeedIdealMatrix H E f).trace = 0 := by
-  rw [Matrix.trace_sub, extractorSeedOutputMatrix_trace_local H E f,
-    extractorSeedIdealMatrix_trace_local H E f]
-  norm_num
-
-omit [DecidableEq Z] [DecidableEq F] [Nonempty F] in
-private theorem seedDiff_isHermitian_local (H : HashFamily F Z S) (E : Ensemble Z e) (f : F) :
-    (extractorSeedOutputMatrix H E f - extractorSeedIdealMatrix H E f).IsHermitian :=
-  (extractorSeedOutputMatrix_posSemidef_local H E f).isHermitian.sub
-    (extractorSeedIdealMatrix_posSemidef_local H E f).isHermitian
-
-omit [DecidableEq Z] [DecidableEq F] [Nonempty F] in
-private theorem normalizedTraceDistance_eq_posPart_trace_of_seedDiff_local
-    (H : HashFamily F Z S) (E : Ensemble Z e) (f : F) :
-    normalizedTraceDistance (extractorSeedOutputMatrix H E f) (extractorSeedIdealMatrix H E f) =
-      (((extractorSeedOutputMatrix H E f - extractorSeedIdealMatrix H E f)⁺).trace).re := by
-  let D : CMatrix (S × e) := extractorSeedOutputMatrix H E f - extractorSeedIdealMatrix H E f
-  have hnorm := traceNorm_eq_two_posPart_trace_re_of_trace_zero D
-    (by simpa [D] using seedDiff_isHermitian_local H E f)
-    (by simpa [D] using seedDiff_trace_zero_local H E f)
-  calc
-    normalizedTraceDistance (extractorSeedOutputMatrix H E f) (extractorSeedIdealMatrix H E f) =
-        (1 / 2 : ℝ) * traceNorm D := by rfl
-    _ = (1 / 2 : ℝ) * (2 * (D⁺).trace.re) := by rw [hnorm]
-    _ = (D⁺).trace.re := by ring
-
 omit [DecidableEq Z] [DecidableEq F] [Nonempty F] in
 /-- Centered per-seed quadratic terms are nonnegative under a positive-definite reference state. -/
 theorem extractorSeedCenteredQuadraticTerm_nonneg_of_posDef
-    (H : HashFamily F Z S) (E : Ensemble Z e) (σ : State e) (f : F)
-    (hσ : σ.matrix.PosDef) :
+    (H : HashFamily F Z S) (E : MEnsemble e Z) (σ : MState e) (f : F)
+    (hσ : σ.m.PosDef) :
     0 ≤ H.extractorSeedCenteredQuadraticTerm E σ f := by
   unfold extractorSeedCenteredQuadraticTerm
   refine Finset.sum_nonneg fun s _ => ?_
   have hR :
       (H.extractorSeedCenteredResidual E f s).IsHermitian := by
     have hblock :=
-      outputBlock_isHermitian (S := S) (e := e) (seedDiff_isHermitian_local H E f) s
+      outputBlock_isHermitian (S := S) (e := e) (seedDiff_isHermitian H E f) s
     rw [← outputBlock_seedDiff_eq_centeredResidual H E f s]
     exact hblock
   exact cMatrix_inv_mul_self_trace_nonneg_of_hermitian_posDef hR hσ
 
 omit [DecidableEq Z] [DecidableEq F] [Nonempty F] in
 private theorem posPart_trace_seedDiff_le_sum_centered_sqrt
-    (H : HashFamily F Z S) (E : Ensemble Z e) (σ : State e) (f : F)
-    (hσ : σ.matrix.PosDef) :
+    (H : HashFamily F Z S) (E : MEnsemble e Z) (σ : MState e) (f : F)
+    (hσ : σ.m.PosDef) :
     (((extractorSeedOutputMatrix H E f - extractorSeedIdealMatrix H E f)⁺).trace).re ≤
-      ∑ s : S, Real.sqrt (((σ.matrix⁻¹ *
+      ∑ s : S, Real.sqrt (((σ.m⁻¹ *
         H.extractorSeedCenteredResidual E f s *
           H.extractorSeedCenteredResidual E f s).trace).re) := by
   classical
   let D : CMatrix (S × e) :=
     extractorSeedOutputMatrix H E f - extractorSeedIdealMatrix H E f
   have hD : D.IsHermitian := by
-    simpa [D] using seedDiff_isHermitian_local H E f
+    simpa [D] using seedDiff_isHermitian H E f
   let P : CMatrix (S × e) := positiveSpectralProjector D hD
   have hscore : ((D * P).trace).re = (D⁺).trace.re := by
     simpa [P] using positiveSpectralProjector_score_eq_posPart_trace D hD
@@ -1016,7 +861,7 @@ private theorem posPart_trace_seedDiff_le_sum_centered_sqrt
         dsimp [D]
         simpa using extractorSeedDiff_output_offdiag H E f (s := s) (s' := s')
           (i := i) (j := j) hss)
-    _ ≤ ∑ s : S, Real.sqrt (((σ.matrix⁻¹ *
+    _ ≤ ∑ s : S, Real.sqrt (((σ.m⁻¹ *
         H.extractorSeedCenteredResidual E f s *
           H.extractorSeedCenteredResidual E f s).trace).re) := by
       refine Finset.sum_le_sum fun s _ => ?_
@@ -1034,8 +879,8 @@ private theorem posPart_trace_seedDiff_le_sum_centered_sqrt
       have hPle : outputBlock (e := e) P s ≤ 1 :=
         outputBlock_le_one (S := S) (e := e)
           (positiveSpectralProjector_le_one D hD) s
-      have hσtr : σ.matrix.trace.re = 1 := by
-        rw [σ.trace_eq_one]
+      have hσtr : σ.m.trace.re = 1 := by
+        rw [σ.tr']
         norm_num
       exact cMatrix_trace_mul_effect_re_le_sqrt_quadratic hR hσ hPpos hPle hσtr
 
@@ -1048,13 +893,13 @@ normalized trace distance is bounded by the square root of `|S|` times the
 centered residual quadratic term.
 -/
 theorem extractorSeedTraceDistance_le_sqrt_card_mul_centeredQuadraticTerm_posDef
-    (H : HashFamily F Z S) (E : Ensemble Z e) (σ : State e) (f : F)
-    (hσ : σ.matrix.PosDef) :
+    (H : HashFamily F Z S) (E : MEnsemble e Z) (σ : MState e) (f : F)
+    (hσ : σ.m.PosDef) :
     extractorSeedTraceDistance H E f ≤
       Real.sqrt ((Fintype.card S : ℝ) * H.extractorSeedCenteredQuadraticTerm E σ f) := by
   classical
   let q : S → ℝ := fun s =>
-    ((σ.matrix⁻¹ *
+    ((σ.m⁻¹ *
       H.extractorSeedCenteredResidual E f s *
         H.extractorSeedCenteredResidual E f s).trace).re
   have hq : ∀ s, 0 ≤ q s := by
@@ -1062,7 +907,7 @@ theorem extractorSeedTraceDistance_le_sqrt_card_mul_centeredQuadraticTerm_posDef
     have hR :
         (H.extractorSeedCenteredResidual E f s).IsHermitian := by
       have hblock :=
-        outputBlock_isHermitian (S := S) (e := e) (seedDiff_isHermitian_local H E f) s
+        outputBlock_isHermitian (S := S) (e := e) (seedDiff_isHermitian H E f) s
       rw [← outputBlock_seedDiff_eq_centeredResidual H E f s]
       exact hblock
     simpa [q] using cMatrix_inv_mul_self_trace_nonneg_of_hermitian_posDef hR hσ
@@ -1091,7 +936,7 @@ theorem extractorSeedTraceDistance_le_sqrt_card_mul_centeredQuadraticTerm_posDef
     extractorSeedTraceDistance H E f =
         (((extractorSeedOutputMatrix H E f - extractorSeedIdealMatrix H E f)⁺).trace).re := by
           rw [extractorSeedTraceDistance,
-            normalizedTraceDistance_eq_posPart_trace_of_seedDiff_local H E f]
+            normalizedTraceDistance_eq_posPart_trace_of_seedDiff H E f]
     _ ≤ ∑ s : S, Real.sqrt (q s) := by
           simpa [q] using hpos_le
     _ ≤ Real.sqrt ((Fintype.card S : ℝ) * ∑ s : S, q s) := hsum
@@ -1100,7 +945,7 @@ theorem extractorSeedTraceDistance_le_sqrt_card_mul_centeredQuadraticTerm_posDef
 
 omit [DecidableEq Z] [DecidableEq F] [Nonempty F] [Nonempty S] in
 private theorem extractorSeedCenteredQuadraticTerm_eq_coeff_sum
-    (H : HashFamily F Z S) (E : Ensemble Z e) (σ : State e) (f : F) :
+    (H : HashFamily F Z S) (E : MEnsemble e Z) (σ : MState e) (f : F) :
     H.extractorSeedCenteredQuadraticTerm E σ f =
       ∑ s : S, ∑ z : Z, ∑ z' : Z,
         H.centerCoeffR f s z * H.centerCoeffR f s z' *
@@ -1117,7 +962,7 @@ private theorem extractorSeedCenteredQuadraticTerm_eq_coeff_sum
 
 omit [DecidableEq Z] [DecidableEq F] [Nonempty F] in
 private theorem extractorSeedCenteredQuadraticAverage_eq_pair_sum
-    (H : HashFamily F Z S) (E : Ensemble Z e) (σ : State e) :
+    (H : HashFamily F Z S) (E : MEnsemble e Z) (σ : MState e) :
     extractorSeedQuadraticAverage H (fun f => H.extractorSeedCenteredQuadraticTerm E σ f) =
       ∑ z : Z, ∑ z' : Z,
         ((H.collisionProbability z z' : ℝ) - (Fintype.card S : ℝ)⁻¹) *
@@ -1133,32 +978,26 @@ private theorem extractorSeedCenteredQuadraticAverage_eq_pair_sum
   rw [centerCoeff_pair_average_eq_collisionProbability]
 
 omit [DecidableEq Z] in
-private theorem cqBlock_posSemidef (E : Ensemble Z e) (z : Z) :
-    (E.cqBlock z).PosSemidef := by
-  rw [Ensemble.cqBlock_eq]
-  exact (E.states z).pos.smul (by exact_mod_cast NNReal.coe_nonneg (E.probs z))
-
-omit [DecidableEq Z] in
 private theorem quad_cqBlock_self_nonneg_of_posDef
-    (E : Ensemble Z e) (σ : State e) (hσ : σ.matrix.PosDef) (z : Z) :
+    (E : MEnsemble e Z) (σ : MState e) (hσ : σ.m.PosDef) (z : Z) :
     0 ≤ quad σ (E.cqBlock z) (E.cqBlock z) := by
   classical
   let A : CMatrix e := E.cqBlock z
   have hA : A.PosSemidef := by
-    simpa [A] using cqBlock_posSemidef (E := E) z
-  have hpsd : (A * σ.matrix⁻¹ * A).PosSemidef := by
+    simpa [A] using MEnsemble.cqBlock_posSemidef E z
+  have hpsd : (A * σ.m⁻¹ * A).PosSemidef := by
     have h := hσ.inv.posSemidef.mul_mul_conjTranspose_same A
     simpa [hA.isHermitian.eq, Matrix.mul_assoc] using h
-  have htrace : 0 ≤ ((A * σ.matrix⁻¹ * A).trace).re :=
+  have htrace : 0 ≤ ((A * σ.m⁻¹ * A).trace).re :=
     (Matrix.PosSemidef.trace_nonneg hpsd).1
-  have hcyc : (σ.matrix⁻¹ * A * A).trace = (A * σ.matrix⁻¹ * A).trace := by
+  have hcyc : (σ.m⁻¹ * A * A).trace = (A * σ.m⁻¹ * A).trace := by
     calc
-      (σ.matrix⁻¹ * A * A).trace = ((σ.matrix⁻¹ * A) * A).trace := by
+      (σ.m⁻¹ * A * A).trace = ((σ.m⁻¹ * A) * A).trace := by
         rw [Matrix.mul_assoc]
-      _ = (A * (σ.matrix⁻¹ * A)).trace := by rw [Matrix.trace_mul_comm]
-      _ = (A * σ.matrix⁻¹ * A).trace := by rw [Matrix.mul_assoc]
+      _ = (A * (σ.m⁻¹ * A)).trace := by rw [Matrix.trace_mul_comm]
+      _ = (A * σ.m⁻¹ * A).trace := by rw [Matrix.mul_assoc]
   unfold quad
-  change 0 ≤ ((σ.matrix⁻¹ * A * A).trace).re
+  change 0 ≤ ((σ.m⁻¹ * A * A).trace).re
   rw [hcyc]
   exact htrace
 
@@ -1172,8 +1011,8 @@ remaining factor `1 - 1 / |S|` is at most `1`, and the diagonal terms are
 nonnegative when the side-information reference state is positive definite.
 -/
 theorem extractorSeedCenteredQuadraticAverage_le_cqQuadratic_of_collisionUniform_posDef
-    (H : HashFamily F Z S) (E : Ensemble Z e) (σ : State e)
-    (hH : H.CollisionUniform) (hσ : σ.matrix.PosDef) :
+    (H : HashFamily F Z S) (E : MEnsemble e Z) (σ : MState e)
+    (hH : H.CollisionUniform) (hσ : σ.m.PosDef) :
     extractorSeedQuadraticAverage H (fun f => H.extractorSeedCenteredQuadraticTerm E σ f) ≤
       extractorCqQuadraticTerm E σ := by
   classical

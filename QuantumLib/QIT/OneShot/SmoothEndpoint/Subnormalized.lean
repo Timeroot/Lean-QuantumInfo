@@ -8,6 +8,30 @@ module
 
 public import QuantumLib.QIT.OneShot.SmoothEndpoint.Normalized
 
+/-!
+# The conditional endpoint entropies of a subnormalized state
+
+Dropping the normalization of `ρ_AB` changes both endpoint programs.  On the min side the natural
+object is the *scale* `inf {Tr T_B | T_B ≥ 0, ρ_AB ≤ I_A ⊗ T_B}`, which no longer has a normalized
+`σ_B` witness; on the max side the raw exponent `‖√ρ_AB √(I_A ⊗ σ_B)‖₁²` can vanish, so the
+supremum defining `H_max` is taken over the candidates with strictly positive exponent.  This
+module builds both programs, relates them to their normalized counterparts through
+`SubnormalizedState.ofStateScale` (a normalized state times a weight in `[0,1]`), and shows that
+`H_min` of a scaled state is that of the state minus `log₂` of the weight.
+
+The `ReferenceIsometry` machinery is what makes the two registers movable.  A finite isometry can
+be applied to the source register or to the conditioning register, and compressed back by the CP
+map `X ↦ V† X V`; the endpoint quantities are invariant under this, and a smoothing witness on an
+enlarged register compresses to one on the original with no loss.  The concrete right-summand
+embedding `ReferenceIsometry.sumInr` is singled out because padding along it is *exact*, which is
+what `SumInrExactSmoothConditionalMinEntropyCandidate` and its max-entropy twin record.
+
+The source register also carries classical structure: `ofClassicalBlocks` assembles a state from
+PSD diagonal blocks, and coarse-graining along `g : a → c`, filtering the labels by a predicate,
+and pinching in the coordinate basis are each realized as a trace-nonincreasing CP map together
+with the induced monotonicity of the endpoint values.
+-/
+
 @[expose] public section
 
 open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator NNReal Pointwise
@@ -21,23 +45,10 @@ universe u v w x
 
 noncomputable section
 
-
 namespace ReferenceIsometry
 
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
-
-
-private theorem submatrix_equiv_mul {ι κ : Type*} [Fintype ι] [Fintype κ]
-    (e : ι ≃ κ) (A B : CMatrix κ) :
-    (A * B).submatrix e e = A.submatrix e e * B.submatrix e e := by
-  classical
-  ext i j
-  simp only [Matrix.submatrix_apply, Matrix.mul_apply]
-  exact (Fintype.sum_equiv e
-    (fun x => A (e i) (e x) * B (e x) (e j))
-    (fun y => A (e i) y * B y (e j))
-    (by simp)).symm
 
 private theorem eq_of_submatrix_equiv_eq {ι κ : Type*} [Fintype ι]
     [DecidableEq ι] [Fintype κ] [DecidableEq κ] (e : ι ≃ κ)
@@ -49,11 +60,11 @@ private theorem eq_of_submatrix_equiv_eq {ι κ : Type*} [Fintype ι]
 
 private theorem applyMatrixRight_sumInr_sandwich_submatrix_prodSumRightEquiv
     {extra : Type w} [Fintype extra] [DecidableEq extra]
-    (A : CMatrix (Prod a b)) (Y : CMatrix (Prod a (Sum extra b))) :
+    (A : CMatrix (a × b)) (Y : CMatrix (a × (extra ⊕ b))) :
     (((ReferenceIsometry.sumInr extra b).applyMatrixRight A) * Y *
         ((ReferenceIsometry.sumInr extra b).applyMatrixRight A)).submatrix
         (prodSumRightEquiv a extra b) (prodSumRightEquiv a extra b) =
-      Matrix.fromBlocks (0 : CMatrix (Prod a extra)) 0 0
+      Matrix.fromBlocks (0 : CMatrix (a × extra)) 0 0
         (A * Matrix.sumBlock22 (Y.submatrix
           (prodSumRightEquiv a extra b) (prodSumRightEquiv a extra b)) * A) := by
   rw [submatrix_equiv_mul, submatrix_equiv_mul]
@@ -70,7 +81,7 @@ private theorem applyMatrixRight_sumInr_sandwich_submatrix_prodSumRightEquiv
 
 private theorem applyMatrixRight_sumInr_sandwich
     {extra : Type w} [Fintype extra] [DecidableEq extra]
-    (A : CMatrix (Prod a b)) (Y : CMatrix (Prod a (Sum extra b))) :
+    (A : CMatrix (a × b)) (Y : CMatrix (a × (extra ⊕ b))) :
     ((ReferenceIsometry.sumInr extra b).applyMatrixRight A) * Y *
         ((ReferenceIsometry.sumInr extra b).applyMatrixRight A) =
       (ReferenceIsometry.sumInr extra b).applyMatrixRight
@@ -93,7 +104,7 @@ theorem matrix_le_one (ρ : SubnormalizedState a) :
     ρ.matrix ≤ 1 := by
   have htrace :
       ρ.matrix ≤ (((ρ.matrix.trace.re : ℝ) : ℂ) • (1 : CMatrix a)) :=
-    State.posSemidef_le_trace_re_smul_one ρ.pos
+    MState.posSemidef_le_trace_re_smul_one ρ.pos
   have htrace_le_one :
       (((ρ.matrix.trace.re : ℝ) : ℂ) • (1 : CMatrix a)) ≤ 1 := by
     rw [Matrix.le_iff]
@@ -117,12 +128,12 @@ theorem matrix_le_one (ρ : SubnormalizedState a) :
 min-entropy:
 `ρ_AB ≤ I_A ⊗ T_B`, with `T_B ≥ 0`. -/
 def ConditionalMinEntropyScaleFeasible
-    (ρ : SubnormalizedState (Prod a b)) (T : CMatrix b) : Prop :=
+    (ρ : SubnormalizedState (a × b)) (T : CMatrix b) : Prop :=
   T.PosSemidef ∧ ρ.matrix ≤ Matrix.kronecker (1 : CMatrix a) T
 
 @[simp]
 theorem ConditionalMinEntropyScaleFeasible_eq
-    (ρ : SubnormalizedState (Prod a b)) (T : CMatrix b) :
+    (ρ : SubnormalizedState (a × b)) (T : CMatrix b) :
     ConditionalMinEntropyScaleFeasible (a := a) ρ T ↔
       T.PosSemidef ∧ ρ.matrix ≤ Matrix.kronecker (1 : CMatrix a) T :=
   Iff.rfl
@@ -131,7 +142,7 @@ theorem ConditionalMinEntropyScaleFeasible_eq
 conditional-min feasible side operators. -/
 theorem ConditionalMinEntropyScaleFeasible.apply_conditioningIsometry
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    {ρ : SubnormalizedState (Prod a b)} {T : CMatrix b}
+    {ρ : SubnormalizedState (a × b)} {T : CMatrix b}
     (hT : ConditionalMinEntropyScaleFeasible (a := a) ρ T)
     (V : ReferenceIsometry b bPlus) :
     ConditionalMinEntropyScaleFeasible (a := a) (ρ.conditioningIsometryApply V)
@@ -140,12 +151,10 @@ theorem ConditionalMinEntropyScaleFeasible.apply_conditioningIsometry
   · exact MatrixMap.isCompletelyPositive_mapsPositive
       (MatrixMap.ofReferenceIsometry V)
       (MatrixMap.ofReferenceIsometry_isCompletelyPositive V) T hT.1
-  · let Φ : MatrixMap (Prod a b) (Prod a bPlus) :=
-      MatrixMap.kron (Channel.idChannel a).map (MatrixMap.ofReferenceIsometry V)
+  · let Φ : MatrixMap (a × b) (a × bPlus) :=
+      MatrixMap.kron (CPTPOp.id (dIn := a)).map (MatrixMap.ofReferenceIsometry V)
     have hCP : MatrixMap.IsCompletelyPositive Φ :=
-      MatrixMap.isCompletelyPositive_kron (Channel.idChannel a).map
-        (MatrixMap.ofReferenceIsometry V)
-        (Channel.idChannel a).completelyPositive
+      MatrixMap.IsCompletelyPositive.kron (CPTPOp.id (dIn := a)).map_cp
         (MatrixMap.ofReferenceIsometry_isCompletelyPositive V)
     have hdiff : (Matrix.kronecker (1 : CMatrix a) T - ρ.matrix).PosSemidef := hT.2
     have hmap := MatrixMap.isCompletelyPositive_mapsPositive Φ hCP
@@ -155,23 +164,10 @@ theorem ConditionalMinEntropyScaleFeasible.apply_conditioningIsometry
         (ρ.conditioningIsometryApply V).matrix).PosSemidef
     rw [conditioningIsometryApply_matrix]
     convert hmap using 1
-    simp only [Φ, map_sub]
-    rw [MatrixMap.kron_apply_kronecker]
+    simp only [Φ, map_sub, Matrix.kronecker]
+    rw [MatrixMap.kron_map_of_kron_state]
     rw [MatrixMap.kron_id_ofReferenceIsometry_apply_eq_applyMatrixRight]
-    simp [Channel.idChannel, MatrixMap.ofKraus]
-
-private theorem trace_re_mul_le_trace_re_mul_of_le
-    {c : Type*} [Fintype c] [DecidableEq c]
-    {D X Y : CMatrix c} (hD : D.PosSemidef) (hXY : X ≤ Y) :
-    ((D * X).trace).re ≤ ((D * Y).trace).re := by
-  have hdiff : (Y - X).PosSemidef := Matrix.le_iff.mp hXY
-  have hnonneg : 0 ≤ ((D * (Y - X)).trace).re :=
-    cMatrix_trace_mul_posSemidef_re_nonneg hD hdiff
-  have htrace :
-      ((D * (Y - X)).trace).re =
-        ((D * Y).trace).re - ((D * X).trace).re := by
-    rw [Matrix.mul_sub, Matrix.trace_sub, Complex.sub_re]
-  linarith
+    simp [CPTPOp.id_map]
 
 private theorem referenceIsometry_rangeProjection_le_one
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
@@ -232,50 +228,45 @@ private theorem referenceIsometry_applyMatrix_kronecker_one_right_le
 subnormalized state on `A × B`. -/
 def sourceIsometryApply
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
-    (ρ : SubnormalizedState (Prod a b)) (V : ReferenceIsometry a aPlus) :
-    SubnormalizedState (Prod aPlus b) :=
+    (ρ : SubnormalizedState (a × b)) (V : ReferenceIsometry a aPlus) :
+    SubnormalizedState (aPlus × b) :=
   ρ.applyTraceNonincreasingCP
-    (MatrixMap.kron (MatrixMap.ofReferenceIsometry V) (Channel.idChannel b).map)
+    (MatrixMap.kron (MatrixMap.ofReferenceIsometry V) (CPTPOp.id (dIn := b)).map)
     (MatrixMap.traceNonincreasingCP_kron_id
       (a := b) (hΦ := MatrixMap.ofReferenceIsometry_traceNonincreasingCP V))
 
 @[simp]
 theorem sourceIsometryApply_matrix
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
-    (ρ : SubnormalizedState (Prod a b)) (V : ReferenceIsometry a aPlus) :
+    (ρ : SubnormalizedState (a × b)) (V : ReferenceIsometry a aPlus) :
     (ρ.sourceIsometryApply V).matrix = V.applyMatrix ρ.matrix := by
-  simp [sourceIsometryApply,
+  simp [-CPTPOp.id_map, sourceIsometryApply,
     MatrixMap.kron_ofReferenceIsometry_idChannel_apply_eq_applyMatrixLeft]
 
-@[simp]
 theorem sourceIsometryApply_trace_re
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
-    (ρ : SubnormalizedState (Prod a b)) (V : ReferenceIsometry a aPlus) :
+    (ρ : SubnormalizedState (a × b)) (V : ReferenceIsometry a aPlus) :
     (ρ.sourceIsometryApply V).matrix.trace.re = ρ.matrix.trace.re := by
   rw [sourceIsometryApply, applyTraceNonincreasingCP_matrix]
-  have hTP := MatrixMap.isTracePreserving_kron (MatrixMap.ofReferenceIsometry V)
-    (Channel.idChannel b).map
-    (MatrixMap.ofReferenceIsometry_isTracePreserving V)
-    (Channel.idChannel b).tracePreserving
+  have hTP := MatrixMap.IsTracePreserving.kron (MatrixMap.ofReferenceIsometry_isTracePreserving V)
+    (CPTPOp.id (dIn := b)).map_TP
   exact congrArg Complex.re (hTP ρ.matrix)
 
 /-- Source-register isometries transport raw subnormalized conditional-min
 feasible side operators without changing the side operator. -/
 theorem ConditionalMinEntropyScaleFeasible.apply_sourceIsometry
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
-    {ρ : SubnormalizedState (Prod a b)} {T : CMatrix b}
+    {ρ : SubnormalizedState (a × b)} {T : CMatrix b}
     (hT : ConditionalMinEntropyScaleFeasible (a := a) ρ T)
     (V : ReferenceIsometry a aPlus) :
     ConditionalMinEntropyScaleFeasible (a := aPlus) (ρ.sourceIsometryApply V) T := by
   constructor
   · exact hT.1
-  · let Φ : MatrixMap (Prod a b) (Prod aPlus b) :=
-      MatrixMap.kron (MatrixMap.ofReferenceIsometry V) (Channel.idChannel b).map
+  · let Φ : MatrixMap (a × b) (aPlus × b) :=
+      MatrixMap.kron (MatrixMap.ofReferenceIsometry V) (CPTPOp.id (dIn := b)).map
     have hCP : MatrixMap.IsCompletelyPositive Φ :=
-      MatrixMap.isCompletelyPositive_kron (MatrixMap.ofReferenceIsometry V)
-        (Channel.idChannel b).map
-        (MatrixMap.ofReferenceIsometry_isCompletelyPositive V)
-        (Channel.idChannel b).completelyPositive
+      MatrixMap.IsCompletelyPositive.kron (MatrixMap.ofReferenceIsometry_isCompletelyPositive V)
+        (CPTPOp.id (dIn := b)).map_cp
     have hdiff : (Matrix.kronecker (1 : CMatrix a) T - ρ.matrix).PosSemidef := hT.2
     have hmap := MatrixMap.isCompletelyPositive_mapsPositive Φ hCP
       (Matrix.kronecker (1 : CMatrix a) T - ρ.matrix) hdiff
@@ -303,9 +294,9 @@ theorem trace_re_conjTranspose_referenceIsometry_le
     ((Matrix.conjTranspose V.matrix * TPlus * V.matrix).trace).re ≤
       TPlus.trace.re := by
   have hle :=
-    trace_re_mul_le_trace_re_mul_of_le (D := TPlus)
-      (X := V.matrix * Matrix.conjTranspose V.matrix)
-      (Y := 1) hT (referenceIsometry_rangeProjection_le_one V)
+    cMatrix_trace_mul_le_of_le_posSemidef_left (W := TPlus)
+      (A := V.matrix * Matrix.conjTranspose V.matrix)
+      (B := 1) hT (referenceIsometry_rangeProjection_le_one V)
   rw [Matrix.mul_one] at hle
   calc
     ((Matrix.conjTranspose V.matrix * TPlus * V.matrix).trace).re =
@@ -328,18 +319,10 @@ theorem referenceIsometry_conjTranspose_traceNonincreasingCP
     simpa [MatrixMap.ofKraus] using
       trace_re_conjTranspose_referenceIsometry_le V hX
 
-omit [Fintype a] [DecidableEq a] in
-private theorem referenceIsometry_rightBlock_applyMatrixRight
-    {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    (V : ReferenceIsometry b bPlus) (X : CMatrix (Prod a b)) (i j : a) :
-    ReferenceIsometry.rightBlock (V.applyMatrixRight X) i j =
-      V.matrix * ReferenceIsometry.rightBlock X i j * Matrix.conjTranspose V.matrix := by
-  rfl
-
 private theorem referenceIsometry_rightCompression_applyMatrixRight
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    (V : ReferenceIsometry b bPlus) (X : CMatrix (Prod a b)) :
-    MatrixMap.kron (Channel.idChannel a).map
+    (V : ReferenceIsometry b bPlus) (X : CMatrix (a × b)) :
+    MatrixMap.kron (CPTPOp.id (dIn := a)).map
         (MatrixMap.ofKraus (fun _ : Unit => Matrix.conjTranspose V.matrix))
         (V.applyMatrixRight X) =
       X := by
@@ -388,10 +371,10 @@ private theorem referenceIsometry_rightCompression_applyMatrixRight
 
 private theorem referenceIsometry_leftCompression_applyMatrix
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
-    (V : ReferenceIsometry a aPlus) (X : CMatrix (Prod a b)) :
+    (V : ReferenceIsometry a aPlus) (X : CMatrix (a × b)) :
     MatrixMap.kron
         (MatrixMap.ofKraus (fun _ : Unit => Matrix.conjTranspose V.matrix))
-        (Channel.idChannel b).map (V.applyMatrix X) =
+        (CPTPOp.id (dIn := b)).map (V.applyMatrix X) =
       X := by
   ext x y
   rw [MatrixMap.kron_idChannel_apply_slice]
@@ -440,29 +423,29 @@ private theorem referenceIsometry_leftCompression_applyMatrix
 side using the CP map `X ↦ V† X V` on the left tensor factor. -/
 def sourceIsometryCompressed
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
-    (ρPlus : SubnormalizedState (Prod aPlus b)) (V : ReferenceIsometry a aPlus) :
-    SubnormalizedState (Prod a b) :=
+    (ρPlus : SubnormalizedState (aPlus × b)) (V : ReferenceIsometry a aPlus) :
+    SubnormalizedState (a × b) :=
   ρPlus.applyTraceNonincreasingCP
     (MatrixMap.kron
       (MatrixMap.ofKraus (fun _ : Unit => Matrix.conjTranspose V.matrix))
-      (Channel.idChannel b).map)
+      (CPTPOp.id (dIn := b)).map)
     (MatrixMap.traceNonincreasingCP_kron_id (a := b)
       (hΦ := referenceIsometry_conjTranspose_traceNonincreasingCP V))
 
 @[simp]
 theorem sourceIsometryCompressed_matrix
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
-    (ρPlus : SubnormalizedState (Prod aPlus b)) (V : ReferenceIsometry a aPlus) :
+    (ρPlus : SubnormalizedState (aPlus × b)) (V : ReferenceIsometry a aPlus) :
     (ρPlus.sourceIsometryCompressed V).matrix =
       MatrixMap.kron
         (MatrixMap.ofKraus (fun _ : Unit => Matrix.conjTranspose V.matrix))
-        (Channel.idChannel b).map ρPlus.matrix :=
+        (CPTPOp.id (dIn := b)).map ρPlus.matrix :=
   rfl
 
 @[simp]
 theorem sourceIsometryCompressed_sourceIsometryApply
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
-    (ρ : SubnormalizedState (Prod a b)) (V : ReferenceIsometry a aPlus) :
+    (ρ : SubnormalizedState (a × b)) (V : ReferenceIsometry a aPlus) :
     (ρ.sourceIsometryApply V).sourceIsometryCompressed V = ρ := by
   apply SubnormalizedState.ext
   rw [sourceIsometryCompressed_matrix, sourceIsometryApply_matrix]
@@ -472,7 +455,7 @@ theorem sourceIsometryCompressed_sourceIsometryApply
 conditioning register compress back by `T ↦ V† T V`. -/
 theorem ConditionalMinEntropyScaleFeasible.compress_conditioningIsometry
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    {ρ : SubnormalizedState (Prod a b)} {TPlus : CMatrix bPlus}
+    {ρ : SubnormalizedState (a × b)} {TPlus : CMatrix bPlus}
     (V : ReferenceIsometry b bPlus)
     (hT : ConditionalMinEntropyScaleFeasible (a := a)
       (ρ.conditioningIsometryApply V) TPlus) :
@@ -482,13 +465,11 @@ theorem ConditionalMinEntropyScaleFeasible.compress_conditioningIsometry
   · exact Matrix.PosSemidef.conjTranspose_mul_mul_same hT.1 V.matrix
   · let Γ : MatrixMap bPlus b :=
       MatrixMap.ofKraus (fun _ : Unit => Matrix.conjTranspose V.matrix)
-    let Φ : MatrixMap (Prod a bPlus) (Prod a b) :=
-      MatrixMap.kron (Channel.idChannel a).map Γ
+    let Φ : MatrixMap (a × bPlus) (a × b) :=
+      MatrixMap.kron (CPTPOp.id (dIn := a)).map Γ
     have hCP : MatrixMap.IsCompletelyPositive Φ :=
-      MatrixMap.isCompletelyPositive_kron (Channel.idChannel a).map Γ
-        (Channel.idChannel a).completelyPositive
-        (MatrixMap.ofKraus_completelyPositive
-          (fun _ : Unit => Matrix.conjTranspose V.matrix))
+      MatrixMap.IsCompletelyPositive.kron (CPTPOp.id (dIn := a)).map_cp
+        (MatrixMap.ofKraus_completelyPositive (fun _ : Unit => Matrix.conjTranspose V.matrix))
     have hdiff :
         (Matrix.kronecker (1 : CMatrix a) TPlus -
           (ρ.conditioningIsometryApply V).matrix).PosSemidef := hT.2
@@ -500,10 +481,10 @@ theorem ConditionalMinEntropyScaleFeasible.compress_conditioningIsometry
         ρ.matrix).PosSemidef
     convert hmap using 1
     rw [conditioningIsometryApply_matrix]
-    simp only [Φ, Γ, map_sub]
-    rw [MatrixMap.kron_apply_kronecker]
+    simp only [Φ, Γ, map_sub, Matrix.kronecker]
+    rw [MatrixMap.kron_map_of_kron_state]
     rw [referenceIsometry_rightCompression_applyMatrixRight]
-    simp [Channel.idChannel, MatrixMap.ofKraus]
+    simp [CPTPOp.id_map, MatrixMap.ofKraus]
 
 private theorem referenceIsometry_leftCompression_one
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
@@ -516,7 +497,7 @@ private theorem referenceIsometry_leftCompression_one
 register compress back without changing the conditioning side operator. -/
 theorem ConditionalMinEntropyScaleFeasible.sourceIsometryCompressed
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
-    {ρPlus : SubnormalizedState (Prod aPlus b)} {T : CMatrix b}
+    {ρPlus : SubnormalizedState (aPlus × b)} {T : CMatrix b}
     (V : ReferenceIsometry a aPlus)
     (hT : ConditionalMinEntropyScaleFeasible (a := aPlus) ρPlus T) :
     ConditionalMinEntropyScaleFeasible (a := a) (ρPlus.sourceIsometryCompressed V) T := by
@@ -524,13 +505,12 @@ theorem ConditionalMinEntropyScaleFeasible.sourceIsometryCompressed
   · exact hT.1
   · let Γ : MatrixMap aPlus a :=
       MatrixMap.ofKraus (fun _ : Unit => Matrix.conjTranspose V.matrix)
-    let Φ : MatrixMap (Prod aPlus b) (Prod a b) :=
-      MatrixMap.kron Γ (Channel.idChannel b).map
+    let Φ : MatrixMap (aPlus × b) (a × b) :=
+      MatrixMap.kron Γ (CPTPOp.id (dIn := b)).map
     have hCP : MatrixMap.IsCompletelyPositive Φ :=
-      MatrixMap.isCompletelyPositive_kron Γ (Channel.idChannel b).map
-        (MatrixMap.ofKraus_completelyPositive
-          (fun _ : Unit => Matrix.conjTranspose V.matrix))
-        (Channel.idChannel b).completelyPositive
+      MatrixMap.IsCompletelyPositive.kron
+        (MatrixMap.ofKraus_completelyPositive (fun _ : Unit => Matrix.conjTranspose V.matrix))
+        (CPTPOp.id (dIn := b)).map_cp
     have hdiff :
         (Matrix.kronecker (1 : CMatrix aPlus) T - ρPlus.matrix).PosSemidef := hT.2
     have hmap := MatrixMap.isCompletelyPositive_mapsPositive Φ hCP
@@ -539,28 +519,28 @@ theorem ConditionalMinEntropyScaleFeasible.sourceIsometryCompressed
         (ρPlus.sourceIsometryCompressed V).matrix).PosSemidef
     convert hmap using 1
     rw [sourceIsometryCompressed_matrix]
-    simp only [Φ, Γ, map_sub]
-    rw [MatrixMap.kron_apply_kronecker]
+    simp only [Φ, Γ, map_sub, Matrix.kronecker]
+    rw [MatrixMap.kron_map_of_kron_state]
     rw [referenceIsometry_leftCompression_one]
-    simp [Channel.idChannel, MatrixMap.ofKraus]
+    simp [CPTPOp.id_map, MatrixMap.ofKraus]
 
 /-- For concrete right-summand padding, feasible enlarged side operators
 compress back to feasible old side operators by taking the lower-right block. -/
 theorem ConditionalMinEntropyScaleFeasible.compress_sumInr
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    {ρ : SubnormalizedState (Prod a b)} {TPlus : CMatrix (Sum extra b)}
+    {ρ : SubnormalizedState (a × b)} {TPlus : CMatrix (extra ⊕ b)}
     (hT : ConditionalMinEntropyScaleFeasible (a := a)
       (ρ.conditioningIsometryApply (ReferenceIsometry.sumInr extra b)) TPlus) :
     ConditionalMinEntropyScaleFeasible (a := a) ρ (Matrix.sumBlock22 TPlus) := by
   constructor
   · exact Matrix.sumBlock22_posSemidef hT.1
-  · have hsub := hT.2.submatrix (fun x : Prod a b => (x.1, Sum.inr x.2))
+  · have hsub := hT.2.submatrix (fun x : a × b => (x.1, Sum.inr x.2))
     have heq :
         (Matrix.kronecker (1 : CMatrix a) TPlus -
               (ρ.conditioningIsometryApply
                 (ReferenceIsometry.sumInr extra b)).matrix).submatrix
-            (fun x : Prod a b => (x.1, Sum.inr x.2))
-            (fun x : Prod a b => (x.1, Sum.inr x.2)) =
+            (fun x : a × b => (x.1, Sum.inr x.2))
+            (fun x : a × b => (x.1, Sum.inr x.2)) =
           Matrix.kronecker (1 : CMatrix a) (Matrix.sumBlock22 TPlus) - ρ.matrix := by
       ext x y
       simp [Matrix.kronecker, Matrix.sumBlock22, conditioningIsometryApply_matrix,
@@ -575,21 +555,19 @@ theorem ConditionalMinEntropyScaleFeasible.compress_sumInr
 preserves raw subnormalized conditional-min feasibility. -/
 theorem ConditionalMinEntropyScaleFeasible.conditioningSumInrCompressed
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    {ρPlus : SubnormalizedState (Prod a (Sum extra b))}
-    {TPlus : CMatrix (Sum extra b)}
+    {ρPlus : SubnormalizedState (a × (extra ⊕ b))}
+    {TPlus : CMatrix (extra ⊕ b)}
     (hT : ConditionalMinEntropyScaleFeasible (a := a) ρPlus TPlus) :
     ConditionalMinEntropyScaleFeasible (a := a) ρPlus.conditioningSumInrCompressed
       (MatrixMap.sumInrBlockCompression (extra := extra) (α := b) TPlus) := by
   constructor
   · exact (MatrixMap.sumInrBlockCompression_traceNonincreasingCP
       (extra := extra) (α := b)).mapsPositive TPlus hT.1
-  · let Φ : MatrixMap (Prod a (Sum extra b)) (Prod a b) :=
-      MatrixMap.kron (Channel.idChannel a).map
+  · let Φ : MatrixMap (a × (extra ⊕ b)) (a × b) :=
+      MatrixMap.kron (CPTPOp.id (dIn := a)).map
         (MatrixMap.sumInrBlockCompression (extra := extra) (α := b))
     have hCP : MatrixMap.IsCompletelyPositive Φ :=
-      MatrixMap.isCompletelyPositive_kron (Channel.idChannel a).map
-        (MatrixMap.sumInrBlockCompression (extra := extra) (α := b))
-        (Channel.idChannel a).completelyPositive
+      MatrixMap.IsCompletelyPositive.kron (CPTPOp.id (dIn := a)).map_cp
         (MatrixMap.sumInrBlockCompression_traceNonincreasingCP
           (extra := extra) (α := b)).completelyPositive
     have hdiff : (Matrix.kronecker (1 : CMatrix a) TPlus - ρPlus.matrix).PosSemidef := hT.2
@@ -600,18 +578,18 @@ theorem ConditionalMinEntropyScaleFeasible.conditioningSumInrCompressed
         ρPlus.conditioningSumInrCompressed.matrix).PosSemidef
     rw [conditioningSumInrCompressed_matrix]
     convert hmap using 1
-    simp only [Φ, map_sub]
-    rw [MatrixMap.kron_apply_kronecker]
-    simp [Channel.idChannel, MatrixMap.ofKraus]
+    simp only [Φ, map_sub, Matrix.kronecker]
+    rw [MatrixMap.kron_map_of_kron_state]
+    simp [CPTPOp.id_map]
 
 /-- The raw endpoint scale
 `inf {Tr T_B | T_B ≥ 0, ρ_AB ≤ I_A ⊗ T_B}` for subnormalized states. -/
-def conditionalMinEntropyScale (ρ : SubnormalizedState (Prod a b)) : ℝ :=
+def conditionalMinEntropyScale (ρ : SubnormalizedState (a × b)) : ℝ :=
   sInf {t : ℝ | ∃ T : CMatrix b,
     ConditionalMinEntropyScaleFeasible (a := a) ρ T ∧ t = T.trace.re}
 
 @[simp]
-theorem conditionalMinEntropyScale_eq (ρ : SubnormalizedState (Prod a b)) :
+theorem conditionalMinEntropyScale_eq (ρ : SubnormalizedState (a × b)) :
     ρ.conditionalMinEntropyScale =
       sInf {t : ℝ | ∃ T : CMatrix b,
         ConditionalMinEntropyScaleFeasible (a := a) ρ T ∧ t = T.trace.re} :=
@@ -619,31 +597,31 @@ theorem conditionalMinEntropyScale_eq (ρ : SubnormalizedState (Prod a b)) :
 
 /-- The raw side-operator scale values
 `Tr T_B` with `T_B ≥ 0` and `ρ_AB ≤ I_A ⊗ T_B`. -/
-def conditionalMinEntropyScaleValueSet (ρ : SubnormalizedState (Prod a b)) : Set ℝ :=
+def conditionalMinEntropyScaleValueSet (ρ : SubnormalizedState (a × b)) : Set ℝ :=
   {t : ℝ | ∃ T : CMatrix b,
     ConditionalMinEntropyScaleFeasible (a := a) ρ T ∧ t = T.trace.re}
 
 @[simp]
-theorem conditionalMinEntropyScaleValueSet_eq (ρ : SubnormalizedState (Prod a b)) :
+theorem conditionalMinEntropyScaleValueSet_eq (ρ : SubnormalizedState (a × b)) :
     ρ.conditionalMinEntropyScaleValueSet (a := a) =
       {t : ℝ | ∃ T : CMatrix b,
         ConditionalMinEntropyScaleFeasible (a := a) ρ T ∧ t = T.trace.re} :=
   rfl
 
 theorem conditionalMinEntropyScale_eq_sInf_scaleValueSet
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     ρ.conditionalMinEntropyScale =
       sInf (ρ.conditionalMinEntropyScaleValueSet (a := a)) :=
   rfl
 
 theorem conditionalMinEntropyScaleFeasible_trace_nonneg
-    {ρ : SubnormalizedState (Prod a b)} {T : CMatrix b}
+    {ρ : SubnormalizedState (a × b)} {T : CMatrix b}
     (hT : ConditionalMinEntropyScaleFeasible (a := a) ρ T) :
     0 ≤ T.trace.re :=
   (Matrix.PosSemidef.trace_nonneg hT.1).1
 
 theorem conditionalMinEntropyScaleValueSet_nonempty
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     (ρ.conditionalMinEntropyScaleValueSet (a := a)).Nonempty := by
   let T : CMatrix b := 1
   refine ⟨T.trace.re, T, ?_, rfl⟩
@@ -652,21 +630,21 @@ theorem conditionalMinEntropyScaleValueSet_nonempty
   · simpa [T, Matrix.one_kronecker_one] using ρ.matrix_le_one
 
 theorem conditionalMinEntropyScaleValueSet_nonneg
-    {ρ : SubnormalizedState (Prod a b)} {t : ℝ}
+    {ρ : SubnormalizedState (a × b)} {t : ℝ}
     (ht : t ∈ ρ.conditionalMinEntropyScaleValueSet (a := a)) :
     0 ≤ t := by
   rcases ht with ⟨T, hT, rfl⟩
   exact conditionalMinEntropyScaleFeasible_trace_nonneg (a := a) hT
 
 theorem conditionalMinEntropyScaleValueSet_bddBelow
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     BddBelow (ρ.conditionalMinEntropyScaleValueSet (a := a)) := by
   refine ⟨0, ?_⟩
   intro t ht
   exact conditionalMinEntropyScaleValueSet_nonneg (a := a) ht
 
 theorem conditionalMinEntropyScale_nonneg
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     0 ≤ ρ.conditionalMinEntropyScale (a := a) := by
   rw [conditionalMinEntropyScale_eq_sInf_scaleValueSet]
   exact le_csInf (ρ.conditionalMinEntropyScaleValueSet_nonempty (a := a))
@@ -676,7 +654,7 @@ theorem conditionalMinEntropyScale_nonneg
 subnormalized conditional-min endpoint scale. -/
 theorem conditionalMinEntropyScale_conditioningIsometryApply_le
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    (ρ : SubnormalizedState (Prod a b)) (V : ReferenceIsometry b bPlus) :
+    (ρ : SubnormalizedState (a × b)) (V : ReferenceIsometry b bPlus) :
     (ρ.conditioningIsometryApply V).conditionalMinEntropyScale (a := a) ≤
       ρ.conditionalMinEntropyScale (a := a) := by
   rw [conditionalMinEntropyScale_eq_sInf_scaleValueSet,
@@ -692,13 +670,13 @@ theorem conditionalMinEntropyScale_conditioningIsometryApply_le
   exact csInf_le hbddNew
     ⟨MatrixMap.ofReferenceIsometry V T,
       hT.apply_conditioningIsometry V,
-      (State.trace_ofReferenceIsometry_apply V T).symm⟩
+      (MState.trace_ofReferenceIsometry_apply V T).symm⟩
 
 /-- Enlarging the source register by an isometry cannot increase the raw
 subnormalized conditional-min endpoint scale. -/
 theorem conditionalMinEntropyScale_sourceIsometryApply_le
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
-    (ρ : SubnormalizedState (Prod a b)) (V : ReferenceIsometry a aPlus) :
+    (ρ : SubnormalizedState (a × b)) (V : ReferenceIsometry a aPlus) :
     (ρ.sourceIsometryApply V).conditionalMinEntropyScale (a := aPlus) ≤
       ρ.conditionalMinEntropyScale (a := a) := by
   rw [conditionalMinEntropyScale_eq_sInf_scaleValueSet,
@@ -717,7 +695,7 @@ theorem conditionalMinEntropyScale_sourceIsometryApply_le
 endpoint scale also cannot decrease. -/
 theorem conditionalMinEntropyScale_le_conditioningIsometryApply_sumInr
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     ρ.conditionalMinEntropyScale (a := a) ≤
       (ρ.conditioningIsometryApply (ReferenceIsometry.sumInr extra b)).conditionalMinEntropyScale
         (a := a) := by
@@ -733,14 +711,14 @@ theorem conditionalMinEntropyScale_le_conditioningIsometryApply_sumInr
   exact le_trans
     (csInf_le hbddOld
       ⟨Matrix.sumBlock22 TPlus, hTPlus.compress_sumInr, rfl⟩)
-    (State.sumBlock22_trace_re_le_of_posSemidef TPlus hTPlus.1)
+    (MState.sumBlock22_trace_re_le_of_posSemidef TPlus hTPlus.1)
 
 /-- The raw subnormalized conditional-min endpoint scale cannot decrease when
 compressing side operators back from an arbitrary conditioning-register
 isometry. -/
 theorem conditionalMinEntropyScale_le_conditioningIsometryApply
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    (ρ : SubnormalizedState (Prod a b)) (V : ReferenceIsometry b bPlus) :
+    (ρ : SubnormalizedState (a × b)) (V : ReferenceIsometry b bPlus) :
     ρ.conditionalMinEntropyScale (a := a) ≤
       (ρ.conditioningIsometryApply V).conditionalMinEntropyScale (a := a) := by
   rw [conditionalMinEntropyScale_eq_sInf_scaleValueSet,
@@ -762,7 +740,7 @@ theorem conditionalMinEntropyScale_le_conditioningIsometryApply
 compressing source-register isometries back to the original source. -/
 theorem conditionalMinEntropyScale_le_sourceIsometryApply
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
-    (ρ : SubnormalizedState (Prod a b)) (V : ReferenceIsometry a aPlus) :
+    (ρ : SubnormalizedState (a × b)) (V : ReferenceIsometry a aPlus) :
     ρ.conditionalMinEntropyScale (a := a) ≤
       (ρ.sourceIsometryApply V).conditionalMinEntropyScale (a := aPlus) := by
   rw [conditionalMinEntropyScale_eq_sInf_scaleValueSet,
@@ -782,7 +760,7 @@ theorem conditionalMinEntropyScale_le_sourceIsometryApply
 the raw subnormalized conditional-min endpoint scale. -/
 theorem conditionalMinEntropyScale_conditioningSumInrCompressed_le
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    (ρPlus : SubnormalizedState (Prod a (Sum extra b))) :
+    (ρPlus : SubnormalizedState (a × (extra ⊕ b))) :
     ρPlus.conditioningSumInrCompressed.conditionalMinEntropyScale (a := a) ≤
       ρPlus.conditionalMinEntropyScale (a := a) := by
   rw [conditionalMinEntropyScale_eq_sInf_scaleValueSet,
@@ -808,10 +786,10 @@ theorem conditionalMinEntropyScale_conditioningSumInrCompressed_le
     htrace_le
 
 theorem conditionalMinEntropyScaleFeasible_trace_lower_bound [Nonempty a]
-    {ρ : SubnormalizedState (Prod a b)} {T : CMatrix b}
+    {ρ : SubnormalizedState (a × b)} {T : CMatrix b}
     (hT : ConditionalMinEntropyScaleFeasible (a := a) ρ T) :
     ρ.matrix.trace.re / (Fintype.card a : ℝ) ≤ T.trace.re := by
-  have htrace := State.trace_re_le_of_le hT.2
+  have htrace := cMatrix_trace_re_le_of_le hT.2
   have hright :
       (Matrix.kronecker (1 : CMatrix a) T).trace.re =
         (Fintype.card a : ℝ) * T.trace.re := by
@@ -825,7 +803,7 @@ theorem conditionalMinEntropyScaleFeasible_trace_lower_bound [Nonempty a]
   exact (div_le_iff₀ hcard_pos).mpr (by simpa [mul_comm] using htrace)
 
 theorem conditionalMinEntropyScale_pos_of_trace_pos [Nonempty a]
-    {ρ : SubnormalizedState (Prod a b)}
+    {ρ : SubnormalizedState (a × b)}
     (hρ : 0 < ρ.matrix.trace.re) :
     0 < ρ.conditionalMinEntropyScale (a := a) := by
   rw [conditionalMinEntropyScale_eq_sInf_scaleValueSet]
@@ -842,13 +820,13 @@ theorem conditionalMinEntropyScale_pos_of_trace_pos [Nonempty a]
 
 /-- Feasible conditional-min exponents for subnormalized states. -/
 def conditionalMinEntropyFeasibleExponentValueSet
-    (ρ : SubnormalizedState (Prod a b)) : Set ℝ :=
+    (ρ : SubnormalizedState (a × b)) : Set ℝ :=
   {lam : ℝ | ∃ σ : SubnormalizedState b,
     ConditionalMinEntropyFeasible (a := a) ρ σ lam}
 
 @[simp]
 theorem conditionalMinEntropyFeasibleExponentValueSet_eq
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     ρ.conditionalMinEntropyFeasibleExponentValueSet (a := a) =
       {lam : ℝ | ∃ σ : SubnormalizedState b,
         ConditionalMinEntropyFeasible (a := a) ρ σ lam} :=
@@ -858,7 +836,7 @@ theorem conditionalMinEntropyFeasibleExponentValueSet_eq
 side operator. Its trace may be smaller than `2^{-λ}` because the side state is
 only subnormalized. -/
 theorem conditionalMinEntropyScaleFeasible_of_conditionalMinEntropyFeasible
-    {ρ : SubnormalizedState (Prod a b)} {σ : SubnormalizedState b} {lam : ℝ}
+    {ρ : SubnormalizedState (a × b)} {σ : SubnormalizedState b} {lam : ℝ}
     (h : ConditionalMinEntropyFeasible (a := a) ρ σ lam) :
     ConditionalMinEntropyScaleFeasible (a := a) ρ
       ((Real.rpow 2 (-lam) : ℂ) • σ.matrix) := by
@@ -870,7 +848,7 @@ theorem conditionalMinEntropyScaleFeasible_of_conditionalMinEntropyFeasible
       identityTensorStateMatrix, Matrix.kronecker_smul] using h
 
 theorem trace_conditionalMinEntropyScaleFeasible_of_conditionalMinEntropyFeasible
-    {ρ : SubnormalizedState (Prod a b)} {σ : SubnormalizedState b} {lam : ℝ}
+    {ρ : SubnormalizedState (a × b)} {σ : SubnormalizedState b} {lam : ℝ}
     (_h : ConditionalMinEntropyFeasible (a := a) ρ σ lam) :
     (((Real.rpow 2 (-lam) : ℂ) • σ.matrix).trace).re =
       Real.rpow 2 (-lam) * σ.matrix.trace.re := by
@@ -878,7 +856,7 @@ theorem trace_conditionalMinEntropyScaleFeasible_of_conditionalMinEntropyFeasibl
   simp [Complex.mul_re, σ.trace_im_zero]
 
 theorem conditionalMinEntropyScaleValue_le_exponentScale_of_conditionalMinEntropyFeasible
-    {ρ : SubnormalizedState (Prod a b)} {σ : SubnormalizedState b} {lam : ℝ} :
+    {ρ : SubnormalizedState (a × b)} {σ : SubnormalizedState b} {lam : ℝ} :
     ConditionalMinEntropyFeasible (a := a) ρ σ lam →
       (((Real.rpow 2 (-lam) : ℂ) • σ.matrix).trace).re ≤ Real.rpow 2 (-lam) := by
   intro h
@@ -896,11 +874,11 @@ theorem identityTensorStateMatrix_posSemidef (σ : SubnormalizedState b) :
 /-- A positive-trace raw scale feasible side operator gives a subnormalized
 conditional-min feasible exponent at `-log₂ Tr T`. -/
 theorem ConditionalMinEntropyFeasible.of_scaleFeasible_trace_pos
-    {ρ : SubnormalizedState (Prod a b)} {T : CMatrix b}
+    {ρ : SubnormalizedState (a × b)} {T : CMatrix b}
     (hT : ConditionalMinEntropyScaleFeasible (a := a) ρ T)
     (htr : 0 < T.trace.re) :
     ConditionalMinEntropyFeasible (a := a) ρ
-      (State.ofPosSemidefTracePos T hT.1 htr).toSubnormalized
+      (MState.ofPosSemidefTracePos T hT.1 htr).toSubnormalized
       (-log2 T.trace.re) := by
   rw [ConditionalMinEntropyFeasible]
   have hrpow : Real.rpow 2 (-(-log2 T.trace.re)) = T.trace.re := by
@@ -908,20 +886,20 @@ theorem ConditionalMinEntropyFeasible.of_scaleFeasible_trace_pos
   have hside :
       ((T.trace.re : ℂ) •
           identityTensorStateMatrix (a := a)
-            (State.ofPosSemidefTracePos T hT.1 htr).toSubnormalized) =
+            (MState.ofPosSemidefTracePos T hT.1 htr).toSubnormalized) =
         Matrix.kronecker (1 : CMatrix a) T := by
     ext x y
     have htrC : ((T.trace.re : ℂ) ≠ 0) := by
       exact_mod_cast htr.ne'
-    simp [identityTensorStateMatrix, State.toSubnormalized,
-      State.ofPosSemidefTracePos, Matrix.kronecker, Matrix.kroneckerMap_apply]
+    simp [identityTensorStateMatrix, MState.toSubnormalized,
+      MState.ofPosSemidefTracePos, Matrix.kronecker, Matrix.kroneckerMap_apply]
     field_simp [htrC]
   rw [hrpow, hside]
   exact hT.2
 
 theorem negLog2_image_conditionalMinEntropyScaleValueSet_eq_of_trace_pos
     [Nonempty a] [Nonempty b]
-    (ρ : SubnormalizedState (Prod a b))
+    (ρ : SubnormalizedState (a × b))
     (hρ : 0 < ρ.matrix.trace.re) :
     (fun t : ℝ => -log2 t) ''
         ρ.conditionalMinEntropyScaleValueSet (a := a) =
@@ -934,13 +912,13 @@ theorem negLog2_image_conditionalMinEntropyScaleValueSet_eq_of_trace_pos
         exact_mod_cast Fintype.card_pos_iff.mpr inferInstance
       exact lt_of_lt_of_le (div_pos hρ hcard_pos)
         (conditionalMinEntropyScaleFeasible_trace_lower_bound (a := a) hT)
-    exact ⟨(State.ofPosSemidefTracePos T hT.1 htr_pos).toSubnormalized,
+    exact ⟨(MState.ofPosSemidefTracePos T hT.1 htr_pos).toSubnormalized,
       ConditionalMinEntropyFeasible.of_scaleFeasible_trace_pos (a := a) hT htr_pos⟩
   · rintro ⟨σ, hfeas⟩
     let c : ℝ := Real.rpow 2 (-lam)
-    let m : State b := State.maximallyMixed b
+    let m : MState b := (MState.uniform : MState b)
     let pad : ℝ := c * (1 - σ.matrix.trace.re)
-    let T : CMatrix b := (c : ℂ) • σ.matrix + (pad : ℂ) • m.matrix
+    let T : CMatrix b := (c : ℂ) • σ.matrix + (pad : ℂ) • m.m
     have hc_nonneg : 0 ≤ c := by
       dsimp [c]
       exact Real.rpow_nonneg (by norm_num : (0 : ℝ) ≤ 2) (-lam)
@@ -953,7 +931,7 @@ theorem negLog2_image_conditionalMinEntropyScaleValueSet_eq_of_trace_pos
     have hTpos : T.PosSemidef := by
       dsimp [T]
       exact Matrix.PosSemidef.add (Matrix.PosSemidef.smul σ.pos hc_nonneg)
-        (Matrix.PosSemidef.smul m.pos hpad_nonneg)
+        (Matrix.PosSemidef.smul m.psd hpad_nonneg)
     have hpad_id_pos :
         ((pad : ℂ) • identityTensorStateMatrix (a := a) m.toSubnormalized).PosSemidef := by
       have hpadC : (0 : ℂ) ≤ (pad : ℂ) := by exact_mod_cast hpad_nonneg
@@ -965,7 +943,7 @@ theorem negLog2_image_conditionalMinEntropyScaleValueSet_eq_of_trace_pos
             (pad : ℂ) • identityTensorStateMatrix (a := a) m.toSubnormalized := by
       ext x y
       simp [T, identityTensorStateMatrix, Matrix.kronecker, Matrix.kroneckerMap_apply,
-        State.toSubnormalized, mul_add]
+        MState.toSubnormalized, mul_add]
       ring
     have hle :
         ρ.matrix ≤ Matrix.kronecker (1 : CMatrix a) T := by
@@ -974,7 +952,7 @@ theorem negLog2_image_conditionalMinEntropyScaleValueSet_eq_of_trace_pos
       exact le_add_of_nonneg_right (by simpa [Matrix.le_iff] using hpad_id_pos)
     have htr : T.trace.re = c := by
       dsimp [T, pad]
-      rw [Matrix.trace_add, Matrix.trace_smul, Matrix.trace_smul, m.trace_eq_one]
+      rw [Matrix.trace_add, Matrix.trace_smul, Matrix.trace_smul, m.tr']
       simp [Complex.real_smul, σ.trace_im_zero]
       ring
     refine ⟨T.trace.re, ?_, ?_⟩
@@ -984,7 +962,7 @@ theorem negLog2_image_conditionalMinEntropyScaleValueSet_eq_of_trace_pos
 
 theorem conditionalMinEntropy_eq_neg_log2_scale_of_trace_pos
     [Nonempty a] [Nonempty b]
-    (ρ : SubnormalizedState (Prod a b))
+    (ρ : SubnormalizedState (a × b))
     (hρ : 0 < ρ.matrix.trace.re) :
     ρ.conditionalMinEntropyRaw =
       -log2 (ρ.conditionalMinEntropyScale (a := a)) := by
@@ -1002,7 +980,7 @@ increase subnormalized conditional min-entropy, when both traces are positive. -
 theorem conditionalMinEntropy_le_conditioningSumInrCompressed
     {extra : Type*} [Fintype extra] [DecidableEq extra]
     [Nonempty a] [Nonempty b]
-    (ρPlus : SubnormalizedState (Prod a (Sum extra b)))
+    (ρPlus : SubnormalizedState (a × (extra ⊕ b)))
     (hPlus : 0 < ρPlus.matrix.trace.re)
     (hCompressed : 0 < ρPlus.conditioningSumInrCompressed.matrix.trace.re) :
     ρPlus.conditionalMinEntropyRaw ≤
@@ -1037,7 +1015,7 @@ for positive-trace states. -/
 theorem conditionalMinEntropy_conditioningIsometryApply_sumInr
     {extra : Type*} [Fintype extra] [DecidableEq extra]
     [Nonempty a] [Nonempty b]
-    (ρ : SubnormalizedState (Prod a b)) (hρ : 0 < ρ.matrix.trace.re) :
+    (ρ : SubnormalizedState (a × b)) (hρ : 0 < ρ.matrix.trace.re) :
     (ρ.conditioningIsometryApply (ReferenceIsometry.sumInr extra b)).conditionalMinEntropyRaw =
       ρ.conditionalMinEntropyRaw := by
   rw [(ρ.conditioningIsometryApply
@@ -1057,7 +1035,7 @@ conditioning-register reference isometry, for positive-trace states. -/
 theorem conditionalMinEntropy_conditioningIsometryApply
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
     [Nonempty a] [Nonempty b] [Nonempty bPlus]
-    (ρ : SubnormalizedState (Prod a b)) (hρ : 0 < ρ.matrix.trace.re)
+    (ρ : SubnormalizedState (a × b)) (hρ : 0 < ρ.matrix.trace.re)
     (V : ReferenceIsometry b bPlus) :
     (ρ.conditioningIsometryApply V).conditionalMinEntropyRaw =
       ρ.conditionalMinEntropyRaw := by
@@ -1077,7 +1055,7 @@ source-register reference isometry, for positive-trace states. -/
 theorem conditionalMinEntropy_sourceIsometryApply
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
     [Nonempty a] [Nonempty b] [Nonempty aPlus]
-    (ρ : SubnormalizedState (Prod a b)) (hρ : 0 < ρ.matrix.trace.re)
+    (ρ : SubnormalizedState (a × b)) (hρ : 0 < ρ.matrix.trace.re)
     (V : ReferenceIsometry a aPlus) :
     (ρ.sourceIsometryApply V).conditionalMinEntropyRaw =
       ρ.conditionalMinEntropyRaw := by
@@ -1101,7 +1079,7 @@ theorem identityTensorStateMatrix_eq_blockDiagonal (σ : SubnormalizedState b) :
 
 /-- A raw scale-feasible side operator bounds every diagonal source block. -/
 theorem block_le_of_conditionalMinEntropyScaleFeasible
-    (ρ : SubnormalizedState (Prod a b)) (T : CMatrix b) (x : a)
+    (ρ : SubnormalizedState (a × b)) (T : CMatrix b) (x : a)
     (hT : ConditionalMinEntropyScaleFeasible (a := a) ρ T) :
     Classical.block ρ.matrix x x ≤ T := by
   rw [Matrix.le_iff]
@@ -1123,7 +1101,7 @@ diagonal blocks whose total trace is at most one. -/
 def ofClassicalBlocks (blocks : a → CMatrix b)
     (hpos : ∀ x, (blocks x).PosSemidef)
     (htrace : (∑ x, (blocks x).trace).re ≤ 1) :
-    SubnormalizedState (Prod a b) where
+    SubnormalizedState (a × b) where
   matrix := Classical.blockDiagonal blocks
   pos := Classical.blockDiagonal_posSemidef blocks hpos
   trace_le_one := by
@@ -1137,7 +1115,6 @@ theorem ofClassicalBlocks_matrix (blocks : a → CMatrix b)
       Classical.blockDiagonal blocks :=
   rfl
 
-@[simp]
 theorem ofClassicalBlocks_block_self (blocks : a → CMatrix b)
     (hpos : ∀ x, (blocks x).PosSemidef)
     (htrace : (∑ x, (blocks x).trace).re ≤ 1) (x : a) :
@@ -1148,7 +1125,7 @@ theorem ofClassicalBlocks_block_self (blocks : a → CMatrix b)
 private def sourceDeterministicPostprocessKraus
     {c : Type*} [Fintype c] [DecidableEq c]
     (g : a → c) (x : a) :
-    Matrix (Prod c b) (Prod a b) ℂ :=
+    Matrix (c × b) (a × b) ℂ :=
   Matrix.of fun out inp => if inp.1 = x ∧ out = (g x, inp.2) then 1 else 0
 
 /-- Matrix map for deterministic coarse-graining of the source classical
@@ -1156,7 +1133,7 @@ register, summing diagonal source blocks along the fibers of `g`. -/
 noncomputable def sourceDeterministicPostprocessMap
     {c : Type*} [Fintype c] [DecidableEq c]
     (g : a → c) :
-    MatrixMap (Prod a b) (Prod c b) where
+    MatrixMap (a × b) (c × b) where
   toFun X := Matrix.of fun yi yj =>
     if yi.1 = yj.1 then
       ∑ x : a, if g x = yi.1 then X (x, yi.2) (x, yj.2) else 0
@@ -1223,8 +1200,8 @@ private theorem sourceDeterministicPostprocessMap_eq_ofKraus
     rw [if_pos rfl]
     refine Finset.sum_congr rfl fun x _ => ?_
     by_cases hg : g x = y
-    · rw [Finset.sum_eq_single ((x, j) : Prod a b)]
-      · rw [Finset.sum_eq_single ((x, i) : Prod a b)]
+    · rw [Finset.sum_eq_single ((x, j) : a × b)]
+      · rw [Finset.sum_eq_single ((x, i) : a × b)]
         · simp [hg]
         · intro inp _ hinp
           rcases inp with ⟨x', i'⟩
@@ -1241,8 +1218,8 @@ private theorem sourceDeterministicPostprocessMap_eq_ofKraus
       · intro hmem
         simp at hmem
     · calc
-        (∑ out : Prod a b,
-            (∑ inp : Prod a b,
+        (∑ out : a × b,
+            (∑ inp : a × b,
                 if inp.1 = x ∧ y = g x ∧ i = inp.2 then X inp out else 0) *
               star (if out.1 = x ∧ y = g x ∧ j = out.2 then 1 else 0)) = 0 := by
             apply Finset.sum_eq_zero
@@ -1259,11 +1236,11 @@ private theorem sourceDeterministicPostprocessMap_eq_ofKraus
     intro out _
     by_cases hright : out.1 = x ∧ y' = g x ∧ j = out.2
     · have hleft_none :
-          ∀ inp : Prod a b, ¬ (inp.1 = x ∧ y = g x ∧ i = inp.2) := by
+          ∀ inp : a × b, ¬ (inp.1 = x ∧ y = g x ∧ i = inp.2) := by
         intro inp hleft
         exact hyy (hleft.2.1.trans hright.2.1.symm)
       have hinner :
-          (∑ inp : Prod a b,
+          (∑ inp : a × b,
               if inp.1 = x ∧ y = g x ∧ i = inp.2 then X inp out else 0) = 0 := by
         apply Finset.sum_eq_zero
         intro inp _
@@ -1283,7 +1260,7 @@ theorem sourceDeterministicPostprocessMap_completelyPositive
 fiber sums of the input diagonal source blocks. -/
 theorem sourceDeterministicPostprocessMap_apply_eq_blockDiagonal
     {c : Type*} [Fintype c] [DecidableEq c]
-    (g : a → c) (X : CMatrix (Prod a b)) :
+    (g : a → c) (X : CMatrix (a × b)) :
     sourceDeterministicPostprocessMap (a := a) (b := b) g X =
       Classical.blockDiagonal
         (fun y : c => ∑ x : a, if g x = y then Classical.block X x x else 0) := by
@@ -1354,8 +1331,8 @@ theorem sourceDeterministicPostprocessMap_traceNonincreasingCP
 subnormalized state by summing its diagonal source blocks along `g`. -/
 def sourceDeterministicPostprocess
     {c : Type*} [Fintype c] [DecidableEq c]
-    (ρ : SubnormalizedState (Prod a b)) (g : a → c) :
-    SubnormalizedState (Prod c b) :=
+    (ρ : SubnormalizedState (a × b)) (g : a → c) :
+    SubnormalizedState (c × b) :=
   ofClassicalBlocks
     (fun y => ∑ x, if g x = y then Classical.block ρ.matrix x x else 0)
     (by
@@ -1396,7 +1373,7 @@ def sourceDeterministicPostprocess
 @[simp]
 theorem sourceDeterministicPostprocess_matrix
     {c : Type*} [Fintype c] [DecidableEq c]
-    (ρ : SubnormalizedState (Prod a b)) (g : a → c) :
+    (ρ : SubnormalizedState (a × b)) (g : a → c) :
     (ρ.sourceDeterministicPostprocess g).matrix =
       Classical.blockDiagonal
         (fun y => ∑ x, if g x = y then Classical.block ρ.matrix x x else 0) :=
@@ -1404,7 +1381,7 @@ theorem sourceDeterministicPostprocess_matrix
 
 theorem sourceDeterministicPostprocessMap_apply_matrix
     {c : Type*} [Fintype c] [DecidableEq c]
-    (ρ : SubnormalizedState (Prod a b)) (g : a → c) :
+    (ρ : SubnormalizedState (a × b)) (g : a → c) :
     sourceDeterministicPostprocessMap (a := a) (b := b) g ρ.matrix =
       (ρ.sourceDeterministicPostprocess g).matrix := by
   rw [sourceDeterministicPostprocessMap_apply_eq_blockDiagonal,
@@ -1414,7 +1391,7 @@ theorem sourceDeterministicPostprocessMap_apply_matrix
 input blocks in that fiber. -/
 theorem sourceDeterministicPostprocess_block
     {c : Type*} [Fintype c] [DecidableEq c]
-    (ρ : SubnormalizedState (Prod a b)) (g : a → c) (y : c) :
+    (ρ : SubnormalizedState (a × b)) (g : a → c) (y : c) :
     Classical.block (ρ.sourceDeterministicPostprocess g).matrix y y =
       ∑ x, if g x = y then Classical.block ρ.matrix x x else 0 := by
   simp [sourceDeterministicPostprocess]
@@ -1422,7 +1399,7 @@ theorem sourceDeterministicPostprocess_block
 /-- Deterministic source coarse-graining preserves the total trace. -/
 theorem sourceDeterministicPostprocess_trace
     {c : Type*} [Fintype c] [DecidableEq c]
-    (ρ : SubnormalizedState (Prod a b)) (g : a → c) :
+    (ρ : SubnormalizedState (a × b)) (g : a → c) :
     (ρ.sourceDeterministicPostprocess g).matrix.trace = ρ.matrix.trace := by
   rw [sourceDeterministicPostprocess_matrix, Classical.blockDiagonal_trace]
   calc
@@ -1446,10 +1423,9 @@ theorem sourceDeterministicPostprocess_trace
         · simp
     _ = ρ.matrix.trace := Classical.sum_block_trace ρ.matrix
 
-@[simp]
 theorem sourceDeterministicPostprocess_trace_re
     {c : Type*} [Fintype c] [DecidableEq c]
-    (ρ : SubnormalizedState (Prod a b)) (g : a → c) :
+    (ρ : SubnormalizedState (a × b)) (g : a → c) :
     (ρ.sourceDeterministicPostprocess g).matrix.trace.re = ρ.matrix.trace.re := by
   exact congrArg Complex.re (ρ.sourceDeterministicPostprocess_trace g)
 
@@ -1457,7 +1433,7 @@ theorem sourceDeterministicPostprocess_trace_re
 deterministic source coarse-graining. -/
 theorem sourceBlock_le_sourceDeterministicPostprocess_block
     {c : Type*} [Fintype c] [DecidableEq c]
-    (ρ : SubnormalizedState (Prod a b)) (g : a → c) (x : a) :
+    (ρ : SubnormalizedState (a × b)) (g : a → c) (x : a) :
     Classical.block ρ.matrix x x ≤
       Classical.block (ρ.sourceDeterministicPostprocess g).matrix (g x) (g x) := by
   classical
@@ -1479,7 +1455,7 @@ theorem sourceBlock_le_sourceDeterministicPostprocess_block
 /-- Matrix map that keeps exactly the diagonal source blocks whose source
 label satisfies `p`, and drops all source off-diagonal blocks. -/
 def sourceBlockFilterMap (p : a → Prop) [DecidablePred p] :
-    MatrixMap (Prod a b) (Prod a b) where
+    MatrixMap (a × b) (a × b) where
   toFun X := Matrix.of fun xi xj =>
     if xi.1 = xj.1 ∧ p xi.1 then X (xi.1, xi.2) (xi.1, xj.2) else 0
   map_add' X Y := by
@@ -1500,7 +1476,7 @@ def sourceBlockFilterMap (p : a → Prop) [DecidablePred p] :
     · simp [hxy]
 
 private def sourceBlockFilterKraus (p : a → Prop) [DecidablePred p] (x : a) :
-    Matrix (Prod a b) (Prod a b) ℂ :=
+    Matrix (a × b) (a × b) ℂ :=
   Matrix.of fun out inp => if p x ∧ out = inp ∧ out.1 = x then 1 else 0
 
 private theorem sourceBlockFilterMap_eq_ofKraus
@@ -1564,7 +1540,7 @@ theorem sourceBlockFilterMap_completelyPositive
 /-- The source-block filter is the block-diagonal matrix of the selected
 diagonal source blocks. -/
 theorem sourceBlockFilterMap_apply_eq_blockDiagonal
-    (p : a → Prop) [DecidablePred p] (X : CMatrix (Prod a b)) :
+    (p : a → Prop) [DecidablePred p] (X : CMatrix (a × b)) :
     sourceBlockFilterMap (a := a) (b := b) p X =
       Classical.blockDiagonal
         (fun x : a => if p x then Classical.block X x x else 0) := by
@@ -1588,7 +1564,7 @@ theorem sourceBlockFilterMap_apply_eq_blockDiagonal
     simpa [sourceBlockFilterMap, Classical.block, hxy] using hblock.symm
 
 private theorem sourceBlockFilterMap_trace_re_le
-    (p : a → Prop) [DecidablePred p] {X : CMatrix (Prod a b)}
+    (p : a → Prop) [DecidablePred p] {X : CMatrix (a × b)}
     (hX : X.PosSemidef) :
     ((sourceBlockFilterMap (a := a) (b := b) p X).trace).re ≤ X.trace.re := by
   rw [sourceBlockFilterMap_apply_eq_blockDiagonal, Classical.blockDiagonal_trace]
@@ -1624,37 +1600,37 @@ theorem sourceBlockFilterMap_traceNonincreasingCP
 /-- Restrict a subnormalized state to selected diagonal blocks of the source
 classical register.  This pinches the source register and discards all labels
 not satisfying `p`. -/
-def sourceBlockFilter (ρ : SubnormalizedState (Prod a b))
+def sourceBlockFilter (ρ : SubnormalizedState (a × b))
     (p : a → Prop) [DecidablePred p] :
-    SubnormalizedState (Prod a b) :=
+    SubnormalizedState (a × b) :=
   ρ.applyTraceNonincreasingCP
     (sourceBlockFilterMap (a := a) (b := b) p)
     (sourceBlockFilterMap_traceNonincreasingCP (a := a) (b := b) p)
 
 @[simp]
-theorem sourceBlockFilter_matrix (ρ : SubnormalizedState (Prod a b))
+theorem sourceBlockFilter_matrix (ρ : SubnormalizedState (a × b))
     (p : a → Prop) [DecidablePred p] :
     (ρ.sourceBlockFilter p).matrix =
       sourceBlockFilterMap (a := a) (b := b) p ρ.matrix :=
   rfl
 
 theorem sourceBlockFilter_matrix_eq_blockDiagonal
-    (ρ : SubnormalizedState (Prod a b)) (p : a → Prop) [DecidablePred p] :
+    (ρ : SubnormalizedState (a × b)) (p : a → Prop) [DecidablePred p] :
     (ρ.sourceBlockFilter p).matrix =
       Classical.blockDiagonal
         (fun x : a => if p x then Classical.block ρ.matrix x x else 0) := by
   rw [sourceBlockFilter_matrix, sourceBlockFilterMap_apply_eq_blockDiagonal]
 
 theorem sourceBlockFilter_trace_re_le
-    (ρ : SubnormalizedState (Prod a b)) (p : a → Prop) [DecidablePred p] :
+    (ρ : SubnormalizedState (a × b)) (p : a → Prop) [DecidablePred p] :
     (ρ.sourceBlockFilter p).matrix.trace.re ≤ ρ.matrix.trace.re :=
   sourceBlockFilterMap_trace_re_le (a := a) (b := b) p ρ.pos
 
 /-- If the center is already fixed by a source-block filter, filtering a
 nearby witness stays in the same purified-distance ball. -/
 theorem purifiedBall_sourceBlockFilter_of_fixed
-    (ρ : SubnormalizedState (Prod a b)) (p : a → Prop) [DecidablePred p]
-    {σ : SubnormalizedState (Prod a b)} {ε : ℝ}
+    (ρ : SubnormalizedState (a × b)) (p : a → Prop) [DecidablePred p]
+    {σ : SubnormalizedState (a × b)} {ε : ℝ}
     (hρ : ρ.sourceBlockFilter p = ρ) (hball : ρ.purifiedBall ε σ) :
     ρ.purifiedBall ε (σ.sourceBlockFilter p) := by
   have hfiltered :
@@ -1670,7 +1646,7 @@ theorem purifiedBall_sourceBlockFilter_of_fixed
 /-- Filtering source blocks preserves every raw side operator feasible for
 subnormalized conditional min-entropy. -/
 theorem ConditionalMinEntropyScaleFeasible.sourceBlockFilter
-    {ρ : SubnormalizedState (Prod a b)} {T : CMatrix b}
+    {ρ : SubnormalizedState (a × b)} {T : CMatrix b}
     (p : a → Prop) [DecidablePred p]
     (hT : ConditionalMinEntropyScaleFeasible (a := a) ρ T) :
     ConditionalMinEntropyScaleFeasible (a := a) (ρ.sourceBlockFilter p) T := by
@@ -1711,7 +1687,7 @@ theorem ConditionalMinEntropyScaleFeasible.sourceBlockFilter
 /-- Source-block filtering cannot increase the raw subnormalized
 conditional-min endpoint scale. -/
 theorem conditionalMinEntropyScale_sourceBlockFilter_le
-    (ρ : SubnormalizedState (Prod a b)) (p : a → Prop) [DecidablePred p] :
+    (ρ : SubnormalizedState (a × b)) (p : a → Prop) [DecidablePred p] :
     (ρ.sourceBlockFilter p).conditionalMinEntropyScale (a := a) ≤
       ρ.conditionalMinEntropyScale (a := a) := by
   rw [conditionalMinEntropyScale_eq_sInf_scaleValueSet,
@@ -1731,7 +1707,7 @@ theorem conditionalMinEntropyScale_sourceBlockFilter_le
 min-entropy when both the original and filtered states have positive trace. -/
 theorem conditionalMinEntropy_le_sourceBlockFilter_of_trace_pos
     [Nonempty a] [Nonempty b]
-    (ρ : SubnormalizedState (Prod a b)) (p : a → Prop) [DecidablePred p]
+    (ρ : SubnormalizedState (a × b)) (p : a → Prop) [DecidablePred p]
     (hρ : 0 < ρ.matrix.trace.re)
     (hfilter : 0 < (ρ.sourceBlockFilter p).matrix.trace.re) :
     ρ.conditionalMinEntropyRaw ≤ (ρ.sourceBlockFilter p).conditionalMinEntropyRaw := by
@@ -1755,18 +1731,18 @@ theorem conditionalMinEntropy_le_sourceBlockFilter_of_trace_pos
 /-- Coordinate pinching of the source register, implemented as the standard
 coordinate measurement on the source tensor the identity channel on the
 conditioning register. -/
-def sourceCoordinatePinchChannel : Channel (Prod a b) (Prod a b) :=
-  (Channel.measure (POVM.coordinate a)).prod (Channel.idChannel b)
+def sourceCoordinatePinchChannel : CPTPMap (a × b) (a × b) :=
+  (POVM.measureDiscard (POVM.coordinate a)).prod (CPTPOp.id (dIn := b))
 
 private theorem coordinateMeasure_map_one :
-    (Channel.measure (POVM.coordinate a)).map (1 : CMatrix a) = 1 := by
-  rw [Channel.measure_map]
+    (POVM.measureDiscard (POVM.coordinate a)).map (1 : CMatrix a) = 1 := by
+  rw [POVM.measureDiscard_map]
   simpa [POVM.coordinate, trace_single_one] using (POVM.coordinate a).sum_eq_one
 
 private theorem coordinateMeasure_map_single (x : a) :
-    (Channel.measure (POVM.coordinate a)).map (Matrix.single x x (1 : ℂ)) =
+    (POVM.measureDiscard (POVM.coordinate a)).map (Matrix.single x x (1 : ℂ)) =
       Matrix.single x x (1 : ℂ) := by
-  rw [Channel.measure_map]
+  rw [POVM.measureDiscard_map]
   rw [Finset.sum_eq_single x]
   · have hmul :
         Matrix.single x x (1 : ℂ) * (POVM.coordinate a).effects x =
@@ -1793,10 +1769,10 @@ private theorem coordinateMeasure_map_single (x : a) :
     simp at hx
 
 private theorem coordinateMeasure_map_apply (X : CMatrix a) (x x' : a) :
-    (Channel.measure (POVM.coordinate a)).map X x x' =
+    (POVM.measureDiscard (POVM.coordinate a)).map X x x' =
       if x = x' then X x x else 0 := by
   classical
-  rw [Channel.measure_map]
+  rw [POVM.measureDiscard_map]
   simp only [Matrix.sum_apply, Matrix.smul_apply, POVM.coordinate_effects]
   by_cases hxx' : x = x'
   · subst x'
@@ -1816,23 +1792,18 @@ private theorem coordinateMeasure_map_apply (X : CMatrix a) (x x' : a) :
       exact hxx' (hy.1.symm.trans hy.2)
     simp [hnot]
 
-private theorem idChannel_map_eq_self (X : CMatrix b) :
-    (Channel.idChannel b).map X = X := by
-  change MatrixMap.ofKraus (fun _ : Unit => (1 : CMatrix b)) X = X
-  simp [MatrixMap.ofKraus]
-
 /-- Source-coordinate pinching fixes every side-operator tensor `I_A ⊗ T_B`. -/
 theorem sourceCoordinatePinchChannel_map_identityTensor (T : CMatrix b) :
     (sourceCoordinatePinchChannel (a := a) (b := b)).map
         (Matrix.kronecker (1 : CMatrix a) T) =
       Matrix.kronecker (1 : CMatrix a) T := by
   dsimp [sourceCoordinatePinchChannel]
-  change (((Channel.measure (POVM.coordinate a)).prod (Channel.idChannel b)).map
+  change (((POVM.measureDiscard (POVM.coordinate a)).prod (CPTPOp.id (dIn := b))).map
       (Matrix.kronecker (1 : CMatrix a) T)) =
     Matrix.kronecker (1 : CMatrix a) T
-  rw [Channel.prod_map_kronecker]
+  rw [CPTPOp.prod_map_kronecker]
   rw [coordinateMeasure_map_one]
-  rw [idChannel_map_eq_self]
+  rw [CPTPOp.idChannel_map]
 
 /-- Source-coordinate pinching fixes a diagonal source block tensor. -/
 theorem sourceCoordinatePinchChannel_map_singleTensor (x : a) (T : CMatrix b) :
@@ -1840,25 +1811,25 @@ theorem sourceCoordinatePinchChannel_map_singleTensor (x : a) (T : CMatrix b) :
         (Matrix.kronecker (Matrix.single x x (1 : ℂ)) T) =
       Matrix.kronecker (Matrix.single x x (1 : ℂ)) T := by
   dsimp [sourceCoordinatePinchChannel]
-  change (((Channel.measure (POVM.coordinate a)).prod (Channel.idChannel b)).map
+  change (((POVM.measureDiscard (POVM.coordinate a)).prod (CPTPOp.id (dIn := b))).map
       (Matrix.kronecker (Matrix.single x x (1 : ℂ)) T)) =
     Matrix.kronecker (Matrix.single x x (1 : ℂ)) T
-  rw [Channel.prod_map_kronecker]
+  rw [CPTPOp.prod_map_kronecker]
   rw [coordinateMeasure_map_single]
-  rw [idChannel_map_eq_self]
+  rw [CPTPOp.idChannel_map]
 
 /-- Pinch a subnormalized bipartite state in the source register's coordinate
 basis. -/
-def sourceCoordinatePinch (ρ : SubnormalizedState (Prod a b)) :
-    SubnormalizedState (Prod a b) :=
+def sourceCoordinatePinch (ρ : SubnormalizedState (a × b)) :
+    SubnormalizedState (a × b) :=
   ρ.applyTraceNonincreasingCP
     (sourceCoordinatePinchChannel (a := a) (b := b)).map
     (MatrixMap.traceNonincreasingCP_of_tracePreserving
-      (sourceCoordinatePinchChannel (a := a) (b := b)).completelyPositive
-      (sourceCoordinatePinchChannel (a := a) (b := b)).tracePreserving)
+      (sourceCoordinatePinchChannel (a := a) (b := b)).map_cp
+      (sourceCoordinatePinchChannel (a := a) (b := b)).map_TP)
 
 @[simp]
-theorem sourceCoordinatePinch_matrix (ρ : SubnormalizedState (Prod a b)) :
+theorem sourceCoordinatePinch_matrix (ρ : SubnormalizedState (a × b)) :
     ρ.sourceCoordinatePinch.matrix =
       (sourceCoordinatePinchChannel (a := a) (b := b)).map ρ.matrix :=
   rfl
@@ -1866,16 +1837,14 @@ theorem sourceCoordinatePinch_matrix (ρ : SubnormalizedState (Prod a b)) :
 /-- Source-coordinate pinching is the block-diagonal matrix of the original
 diagonal source blocks. -/
 theorem sourceCoordinatePinch_matrix_eq_blockDiagonal
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     ρ.sourceCoordinatePinch.matrix =
       Classical.blockDiagonal (fun x => Classical.block ρ.matrix x x) := by
   ext xi xj
   rcases xi with ⟨x, i⟩
   rcases xj with ⟨x', j⟩
   rw [sourceCoordinatePinch_matrix]
-  change MatrixMap.kron (Channel.measure (POVM.coordinate a)).map
-      (Channel.idChannel b).map ρ.matrix (x, i) (x', j) =
-    Classical.blockDiagonal (fun x => Classical.block ρ.matrix x x) (x, i) (x', j)
+  simp only [sourceCoordinatePinchChannel, CPTPOp.prod_map]
   rw [MatrixMap.kron_idChannel_apply_slice]
   rw [coordinateMeasure_map_apply]
   by_cases hxx' : x = x'
@@ -1894,7 +1863,7 @@ theorem sourceCoordinatePinch_matrix_eq_blockDiagonal
 /-- Source-coordinate pinching is idempotent. -/
 @[simp]
 theorem sourceCoordinatePinch_sourceCoordinatePinch
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     ρ.sourceCoordinatePinch.sourceCoordinatePinch = ρ.sourceCoordinatePinch := by
   apply SubnormalizedState.ext
   rw [sourceCoordinatePinch_matrix_eq_blockDiagonal,
@@ -1907,7 +1876,7 @@ blocks, so precomposing it with source-coordinate pinching has no effect. -/
 @[simp]
 theorem sourceDeterministicPostprocess_sourceCoordinatePinch
     {c : Type*} [Fintype c] [DecidableEq c]
-    (ρ : SubnormalizedState (Prod a b)) (g : a → c) :
+    (ρ : SubnormalizedState (a × b)) (g : a → c) :
     ρ.sourceCoordinatePinch.sourceDeterministicPostprocess g =
       ρ.sourceDeterministicPostprocess g := by
   apply SubnormalizedState.ext
@@ -1938,7 +1907,7 @@ coarse-graining is also raw scale-feasible for source-coordinate pinching of
 the original state. -/
 theorem ConditionalMinEntropyScaleFeasible.sourceCoordinatePinch_of_sourceDeterministicPostprocess
     {c : Type*} [Fintype c] [DecidableEq c]
-    {ρ : SubnormalizedState (Prod a b)} (g : a → c) {T : CMatrix b}
+    {ρ : SubnormalizedState (a × b)} (g : a → c) {T : CMatrix b}
     (hT : ConditionalMinEntropyScaleFeasible (a := c)
       (ρ.sourceDeterministicPostprocess g) T) :
     ConditionalMinEntropyScaleFeasible (a := a) ρ.sourceCoordinatePinch T := by
@@ -1971,7 +1940,7 @@ raw conditional-min endpoint scale relative to the source-coordinate pinched
 state. -/
 theorem conditionalMinEntropyScale_sourceCoordinatePinch_le_sourceDeterministicPostprocess
     {c : Type*} [Fintype c] [DecidableEq c]
-    (ρ : SubnormalizedState (Prod a b)) (g : a → c) :
+    (ρ : SubnormalizedState (a × b)) (g : a → c) :
     ρ.sourceCoordinatePinch.conditionalMinEntropyScale (a := a) ≤
       (ρ.sourceDeterministicPostprocess g).conditionalMinEntropyScale (a := c) := by
   rw [conditionalMinEntropyScale_eq_sInf_scaleValueSet,
@@ -1990,26 +1959,25 @@ theorem conditionalMinEntropyScale_sourceCoordinatePinch_le_sourceDeterministicP
     ⟨T, hT.sourceCoordinatePinch_of_sourceDeterministicPostprocess
       (ρ := ρ) g, rfl⟩
 
-@[simp]
-theorem sourceCoordinatePinch_trace_re (ρ : SubnormalizedState (Prod a b)) :
+theorem sourceCoordinatePinch_trace_re (ρ : SubnormalizedState (a × b)) :
     ρ.sourceCoordinatePinch.matrix.trace.re = ρ.matrix.trace.re := by
   exact congrArg Complex.re
-    ((sourceCoordinatePinchChannel (a := a) (b := b)).tracePreserving ρ.matrix)
+    ((sourceCoordinatePinchChannel (a := a) (b := b)).map_TP ρ.matrix)
 
 /-- Source-coordinate pinching preserves every raw side operator feasible for
 subnormalized conditional min-entropy. -/
 theorem ConditionalMinEntropyScaleFeasible.sourceCoordinatePinch
-    {ρ : SubnormalizedState (Prod a b)} {T : CMatrix b}
+    {ρ : SubnormalizedState (a × b)} {T : CMatrix b}
     (hT : ConditionalMinEntropyScaleFeasible (a := a) ρ T) :
     ConditionalMinEntropyScaleFeasible (a := a) ρ.sourceCoordinatePinch T := by
   constructor
   · exact hT.1
-  · let Φ : MatrixMap (Prod a b) (Prod a b) :=
+  · let Φ : MatrixMap (a × b) (a × b) :=
       (sourceCoordinatePinchChannel (a := a) (b := b)).map
     have hdiff : (Matrix.kronecker (1 : CMatrix a) T - ρ.matrix).PosSemidef :=
       hT.2
     have hmap := MatrixMap.isCompletelyPositive_mapsPositive Φ
-      (sourceCoordinatePinchChannel (a := a) (b := b)).completelyPositive
+      (sourceCoordinatePinchChannel (a := a) (b := b)).map_cp
       (Matrix.kronecker (1 : CMatrix a) T - ρ.matrix) hdiff
     change (Matrix.kronecker (1 : CMatrix a) T - ρ.sourceCoordinatePinch.matrix).PosSemidef
     rw [sourceCoordinatePinch_matrix]
@@ -2020,7 +1988,7 @@ theorem ConditionalMinEntropyScaleFeasible.sourceCoordinatePinch
 /-- Source-coordinate pinching cannot increase the raw subnormalized
 conditional-min endpoint scale. -/
 theorem conditionalMinEntropyScale_sourceCoordinatePinch_le
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     ρ.sourceCoordinatePinch.conditionalMinEntropyScale (a := a) ≤
       ρ.conditionalMinEntropyScale (a := a) := by
   rw [conditionalMinEntropyScale_eq_sInf_scaleValueSet,
@@ -2040,7 +2008,7 @@ theorem conditionalMinEntropyScale_sourceCoordinatePinch_le
 subnormalized conditional min-entropy, for positive-trace states. -/
 theorem conditionalMinEntropy_le_sourceCoordinatePinch_of_trace_pos
     [Nonempty a] [Nonempty b]
-    (ρ : SubnormalizedState (Prod a b)) (hρ : 0 < ρ.matrix.trace.re) :
+    (ρ : SubnormalizedState (a × b)) (hρ : 0 < ρ.matrix.trace.re) :
     ρ.conditionalMinEntropyRaw ≤ ρ.sourceCoordinatePinch.conditionalMinEntropyRaw := by
   rw [ρ.conditionalMinEntropy_eq_neg_log2_scale_of_trace_pos (a := a) hρ,
     ρ.sourceCoordinatePinch.conditionalMinEntropy_eq_neg_log2_scale_of_trace_pos
@@ -2070,7 +2038,7 @@ the source coordinate basis. -/
 theorem conditionalMinEntropy_sourceDeterministicPostprocess_le_sourceCoordinatePinch_of_trace_pos
     {c : Type*} [Fintype c] [DecidableEq c]
     [Nonempty a] [Nonempty b]
-    (ρ : SubnormalizedState (Prod a b)) (g : a → c)
+    (ρ : SubnormalizedState (a × b)) (g : a → c)
     (hρ : 0 < ρ.matrix.trace.re) :
     (ρ.sourceDeterministicPostprocess g).conditionalMinEntropyRaw ≤
       ρ.sourceCoordinatePinch.conditionalMinEntropyRaw := by
@@ -2105,18 +2073,18 @@ theorem conditionalMinEntropy_sourceDeterministicPostprocess_le_sourceCoordinate
 /-- If the center is already fixed by source-coordinate pinching, then pinching
 a nearby witness stays in the same purified-distance ball. -/
 theorem purifiedBall_sourceCoordinatePinch_of_fixed
-    (ρ : SubnormalizedState (Prod a b)) {σ : SubnormalizedState (Prod a b)} {ε : ℝ}
+    (ρ : SubnormalizedState (a × b)) {σ : SubnormalizedState (a × b)} {ε : ℝ}
     (hρ : ρ.sourceCoordinatePinch = ρ) (hball : ρ.purifiedBall ε σ) :
     ρ.purifiedBall ε σ.sourceCoordinatePinch := by
   have hpinched :
       ρ.sourceCoordinatePinch.purifiedBall ε σ.sourceCoordinatePinch := by
-    simpa [sourceCoordinatePinch] using
+    exact
       (SubnormalizedState.purifiedBall_of_traceNonincreasingCP
         (ρ := ρ) (σ := σ)
         ((sourceCoordinatePinchChannel (a := a) (b := b)).map)
         (MatrixMap.traceNonincreasingCP_of_tracePreserving
-          (sourceCoordinatePinchChannel (a := a) (b := b)).completelyPositive
-          (sourceCoordinatePinchChannel (a := a) (b := b)).tracePreserving)
+          (sourceCoordinatePinchChannel (a := a) (b := b)).map_cp
+          (sourceCoordinatePinchChannel (a := a) (b := b)).map_TP)
         hball)
   rwa [hρ] at hpinched
 
@@ -2124,10 +2092,10 @@ theorem purifiedBall_sourceCoordinatePinch_of_fixed
 source side using the CP map `X ↦ V† X V`. -/
 def conditioningIsometryCompressed
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    (ρPlus : SubnormalizedState (Prod a bPlus)) (V : ReferenceIsometry b bPlus) :
-    SubnormalizedState (Prod a b) :=
+    (ρPlus : SubnormalizedState (a × bPlus)) (V : ReferenceIsometry b bPlus) :
+    SubnormalizedState (a × b) :=
   ρPlus.applyTraceNonincreasingCP
-    (MatrixMap.kron (Channel.idChannel a).map
+    (MatrixMap.kron (CPTPOp.id (dIn := a)).map
       (MatrixMap.ofKraus (fun _ : Unit => Matrix.conjTranspose V.matrix)))
     (MatrixMap.traceNonincreasingCP_id_kron (a := a)
       (hΦ := referenceIsometry_conjTranspose_traceNonincreasingCP V))
@@ -2135,9 +2103,9 @@ def conditioningIsometryCompressed
 @[simp]
 theorem conditioningIsometryCompressed_matrix
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    (ρPlus : SubnormalizedState (Prod a bPlus)) (V : ReferenceIsometry b bPlus) :
+    (ρPlus : SubnormalizedState (a × bPlus)) (V : ReferenceIsometry b bPlus) :
     (ρPlus.conditioningIsometryCompressed V).matrix =
-      MatrixMap.kron (Channel.idChannel a).map
+      MatrixMap.kron (CPTPOp.id (dIn := a)).map
         (MatrixMap.ofKraus (fun _ : Unit => Matrix.conjTranspose V.matrix))
         ρPlus.matrix :=
   rfl
@@ -2145,7 +2113,7 @@ theorem conditioningIsometryCompressed_matrix
 @[simp]
 theorem conditioningIsometryCompressed_conditioningIsometryApply
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    (ρ : SubnormalizedState (Prod a b)) (V : ReferenceIsometry b bPlus) :
+    (ρ : SubnormalizedState (a × b)) (V : ReferenceIsometry b bPlus) :
     (ρ.conditioningIsometryApply V).conditioningIsometryCompressed V = ρ := by
   apply SubnormalizedState.ext
   rw [conditioningIsometryCompressed_matrix, conditioningIsometryApply_matrix]
@@ -2155,7 +2123,7 @@ theorem conditioningIsometryCompressed_conditioningIsometryApply
 subnormalized conditional-min feasibility. -/
 theorem ConditionalMinEntropyScaleFeasible.conditioningIsometryCompressed
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    {ρPlus : SubnormalizedState (Prod a bPlus)}
+    {ρPlus : SubnormalizedState (a × bPlus)}
     {TPlus : CMatrix bPlus}
     (V : ReferenceIsometry b bPlus)
     (hT : ConditionalMinEntropyScaleFeasible (a := a) ρPlus TPlus) :
@@ -2165,13 +2133,11 @@ theorem ConditionalMinEntropyScaleFeasible.conditioningIsometryCompressed
   · exact Matrix.PosSemidef.conjTranspose_mul_mul_same hT.1 V.matrix
   · let Γ : MatrixMap bPlus b :=
       MatrixMap.ofKraus (fun _ : Unit => Matrix.conjTranspose V.matrix)
-    let Φ : MatrixMap (Prod a bPlus) (Prod a b) :=
-      MatrixMap.kron (Channel.idChannel a).map Γ
+    let Φ : MatrixMap (a × bPlus) (a × b) :=
+      MatrixMap.kron (CPTPOp.id (dIn := a)).map Γ
     have hCP : MatrixMap.IsCompletelyPositive Φ :=
-      MatrixMap.isCompletelyPositive_kron (Channel.idChannel a).map Γ
-        (Channel.idChannel a).completelyPositive
-        (MatrixMap.ofKraus_completelyPositive
-          (fun _ : Unit => Matrix.conjTranspose V.matrix))
+      MatrixMap.IsCompletelyPositive.kron (CPTPOp.id (dIn := a)).map_cp
+        (MatrixMap.ofKraus_completelyPositive (fun _ : Unit => Matrix.conjTranspose V.matrix))
     have hdiff : (Matrix.kronecker (1 : CMatrix a) TPlus - ρPlus.matrix).PosSemidef :=
       hT.2
     have hmap := MatrixMap.isCompletelyPositive_mapsPositive Φ hCP
@@ -2181,15 +2147,15 @@ theorem ConditionalMinEntropyScaleFeasible.conditioningIsometryCompressed
         (ρPlus.conditioningIsometryCompressed V).matrix).PosSemidef
     rw [conditioningIsometryCompressed_matrix]
     convert hmap using 1
-    simp only [Φ, Γ, map_sub]
-    rw [MatrixMap.kron_apply_kronecker]
-    simp [Channel.idChannel, MatrixMap.ofKraus]
+    simp only [Φ, Γ, map_sub, Matrix.kronecker]
+    rw [MatrixMap.kron_map_of_kron_state]
+    simp [CPTPOp.id_map, MatrixMap.ofKraus]
 
 /-- Compressing an arbitrary conditioning-register isometry cannot raise the
 raw subnormalized conditional-min endpoint scale. -/
 theorem conditionalMinEntropyScale_conditioningIsometryCompressed_le
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    (ρPlus : SubnormalizedState (Prod a bPlus)) (V : ReferenceIsometry b bPlus) :
+    (ρPlus : SubnormalizedState (a × bPlus)) (V : ReferenceIsometry b bPlus) :
     (ρPlus.conditioningIsometryCompressed V).conditionalMinEntropyScale (a := a) ≤
       ρPlus.conditionalMinEntropyScale (a := a) := by
   rw [conditionalMinEntropyScale_eq_sInf_scaleValueSet,
@@ -2217,7 +2183,7 @@ theorem conditionalMinEntropyScale_conditioningIsometryCompressed_le
 subnormalized conditional-min endpoint scale. -/
 theorem conditionalMinEntropyScale_sourceIsometryCompressed_le
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
-    (ρPlus : SubnormalizedState (Prod aPlus b)) (V : ReferenceIsometry a aPlus) :
+    (ρPlus : SubnormalizedState (aPlus × b)) (V : ReferenceIsometry a aPlus) :
     (ρPlus.sourceIsometryCompressed V).conditionalMinEntropyScale (a := a) ≤
       ρPlus.conditionalMinEntropyScale (a := aPlus) := by
   rw [conditionalMinEntropyScale_eq_sInf_scaleValueSet,
@@ -2239,7 +2205,7 @@ subnormalized conditional min-entropy, when both traces are positive. -/
 theorem conditionalMinEntropy_le_conditioningIsometryCompressed
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
     [Nonempty a] [Nonempty b] [Nonempty bPlus]
-    (ρPlus : SubnormalizedState (Prod a bPlus)) (V : ReferenceIsometry b bPlus)
+    (ρPlus : SubnormalizedState (a × bPlus)) (V : ReferenceIsometry b bPlus)
     (hPlus : 0 < ρPlus.matrix.trace.re)
     (hCompressed : 0 < (ρPlus.conditioningIsometryCompressed V).matrix.trace.re) :
     ρPlus.conditionalMinEntropyRaw ≤
@@ -2273,7 +2239,7 @@ subnormalized conditional min-entropy, when both traces are positive. -/
 theorem conditionalMinEntropy_le_sourceIsometryCompressed
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
     [Nonempty a] [Nonempty b] [Nonempty aPlus]
-    (ρPlus : SubnormalizedState (Prod aPlus b)) (V : ReferenceIsometry a aPlus)
+    (ρPlus : SubnormalizedState (aPlus × b)) (V : ReferenceIsometry a aPlus)
     (hPlus : 0 < ρPlus.matrix.trace.re)
     (hCompressed : 0 < (ρPlus.sourceIsometryCompressed V).matrix.trace.re) :
     ρPlus.conditionalMinEntropyRaw ≤
@@ -2306,7 +2272,7 @@ theorem conditionalMinEntropy_le_sourceIsometryCompressed
 subnormalized purified-distance balls. -/
 theorem purifiedBall_conditioningIsometryApply
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    {ρ σ : SubnormalizedState (Prod a b)} {ε : ℝ}
+    {ρ σ : SubnormalizedState (a × b)} {ε : ℝ}
     (V : ReferenceIsometry b bPlus)
     (hball : ρ.purifiedBall ε σ) :
     (ρ.conditioningIsometryApply V).purifiedBall ε
@@ -2314,7 +2280,7 @@ theorem purifiedBall_conditioningIsometryApply
   simpa [conditioningIsometryApply] using
     (SubnormalizedState.purifiedBall_of_traceNonincreasingCP
       (ρ := ρ) (σ := σ) (ε := ε)
-      (MatrixMap.kron (Channel.idChannel a).map
+      (MatrixMap.kron (CPTPOp.id (dIn := a)).map
         (MatrixMap.ofReferenceIsometry V))
       (MatrixMap.traceNonincreasingCP_id_kron (a := a)
         (hΦ := MatrixMap.ofReferenceIsometry_traceNonincreasingCP V))
@@ -2324,7 +2290,7 @@ theorem purifiedBall_conditioningIsometryApply
 subnormalized purified-distance balls. -/
 theorem purifiedBall_sourceIsometryApply
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
-    {ρ σ : SubnormalizedState (Prod a b)} {ε : ℝ}
+    {ρ σ : SubnormalizedState (a × b)} {ε : ℝ}
     (V : ReferenceIsometry a aPlus)
     (hball : ρ.purifiedBall ε σ) :
     (ρ.sourceIsometryApply V).purifiedBall ε
@@ -2333,7 +2299,7 @@ theorem purifiedBall_sourceIsometryApply
     (SubnormalizedState.purifiedBall_of_traceNonincreasingCP
       (ρ := ρ) (σ := σ) (ε := ε)
       (MatrixMap.kron (MatrixMap.ofReferenceIsometry V)
-        (Channel.idChannel b).map)
+        (CPTPOp.id (dIn := b)).map)
       (MatrixMap.traceNonincreasingCP_kron_id
         (a := b) (hΦ := MatrixMap.ofReferenceIsometry_traceNonincreasingCP V))
       hball)
@@ -2342,14 +2308,14 @@ theorem purifiedBall_sourceIsometryApply
 purified-distance balls. -/
 theorem purifiedBall_conditioningIsometryApply_sumInr
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    {ρ σ : SubnormalizedState (Prod a b)} {ε : ℝ}
+    {ρ σ : SubnormalizedState (a × b)} {ε : ℝ}
     (hball : ρ.purifiedBall ε σ) :
     (ρ.conditioningIsometryApply (ReferenceIsometry.sumInr extra b)).purifiedBall ε
       (σ.conditioningIsometryApply (ReferenceIsometry.sumInr extra b)) := by
   simpa [conditioningIsometryApply] using
     (SubnormalizedState.purifiedBall_of_traceNonincreasingCP
       (ρ := ρ) (σ := σ) (ε := ε)
-      (MatrixMap.kron (Channel.idChannel a).map
+      (MatrixMap.kron (CPTPOp.id (dIn := a)).map
         (MatrixMap.ofReferenceIsometry (ReferenceIsometry.sumInr extra b)))
       (MatrixMap.traceNonincreasingCP_id_kron (a := a)
         (hΦ := MatrixMap.ofReferenceIsometry_traceNonincreasingCP
@@ -2360,8 +2326,8 @@ theorem purifiedBall_conditioningIsometryApply_sumInr
 back to the source conditioning register. -/
 theorem purifiedBall_conditioningSumInrCompressed_of_conditioningIsometryApply_sumInr
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    {ρ : SubnormalizedState (Prod a b)}
-    {ρPlus : SubnormalizedState (Prod a (Sum extra b))} {ε : ℝ}
+    {ρ : SubnormalizedState (a × b)}
+    {ρPlus : SubnormalizedState (a × (extra ⊕ b))} {ε : ℝ}
     (hball :
       (ρ.conditioningIsometryApply (ReferenceIsometry.sumInr extra b)).purifiedBall ε ρPlus) :
     ρ.purifiedBall ε ρPlus.conditioningSumInrCompressed := by
@@ -2369,7 +2335,7 @@ theorem purifiedBall_conditioningSumInrCompressed_of_conditioningIsometryApply_s
     SubnormalizedState.purifiedBall_of_traceNonincreasingCP
       (ρ := ρ.conditioningIsometryApply (ReferenceIsometry.sumInr extra b))
       (σ := ρPlus) (ε := ε)
-      (MatrixMap.kron (Channel.idChannel a).map
+      (MatrixMap.kron (CPTPOp.id (dIn := a)).map
         (MatrixMap.sumInrBlockCompression (extra := extra) (α := b)))
       (MatrixMap.traceNonincreasingCP_id_kron (a := a)
         (hΦ := MatrixMap.sumInrBlockCompression_traceNonincreasingCP
@@ -2384,8 +2350,8 @@ theorem purifiedBall_conditioningSumInrCompressed_of_conditioningIsometryApply_s
 a purified ball back to the source conditioning register. -/
 theorem purifiedBall_conditioningIsometryCompressed_of_conditioningIsometryApply
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    {ρ : SubnormalizedState (Prod a b)}
-    {ρPlus : SubnormalizedState (Prod a bPlus)} {ε : ℝ}
+    {ρ : SubnormalizedState (a × b)}
+    {ρPlus : SubnormalizedState (a × bPlus)} {ε : ℝ}
     (V : ReferenceIsometry b bPlus)
     (hball : (ρ.conditioningIsometryApply V).purifiedBall ε ρPlus) :
     ρ.purifiedBall ε (ρPlus.conditioningIsometryCompressed V) := by
@@ -2393,7 +2359,7 @@ theorem purifiedBall_conditioningIsometryCompressed_of_conditioningIsometryApply
     SubnormalizedState.purifiedBall_of_traceNonincreasingCP
       (ρ := ρ.conditioningIsometryApply V)
       (σ := ρPlus) (ε := ε)
-      (MatrixMap.kron (Channel.idChannel a).map
+      (MatrixMap.kron (CPTPOp.id (dIn := a)).map
         (MatrixMap.ofKraus (fun _ : Unit => Matrix.conjTranspose V.matrix)))
       (MatrixMap.traceNonincreasingCP_id_kron (a := a)
         (hΦ := referenceIsometry_conjTranspose_traceNonincreasingCP V))
@@ -2406,8 +2372,8 @@ theorem purifiedBall_conditioningIsometryCompressed_of_conditioningIsometryApply
 purified ball back to the source register. -/
 theorem purifiedBall_sourceIsometryCompressed_of_sourceIsometryApply
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
-    {ρ : SubnormalizedState (Prod a b)}
-    {ρPlus : SubnormalizedState (Prod aPlus b)} {ε : ℝ}
+    {ρ : SubnormalizedState (a × b)}
+    {ρPlus : SubnormalizedState (aPlus × b)} {ε : ℝ}
     (V : ReferenceIsometry a aPlus)
     (hball : (ρ.sourceIsometryApply V).purifiedBall ε ρPlus) :
     ρ.purifiedBall ε (ρPlus.sourceIsometryCompressed V) := by
@@ -2417,7 +2383,7 @@ theorem purifiedBall_sourceIsometryCompressed_of_sourceIsometryApply
       (σ := ρPlus) (ε := ε)
       (MatrixMap.kron
         (MatrixMap.ofKraus (fun _ : Unit => Matrix.conjTranspose V.matrix))
-        (Channel.idChannel b).map)
+        (CPTPOp.id (dIn := b)).map)
       (MatrixMap.traceNonincreasingCP_kron_id (a := b)
         (hΦ := referenceIsometry_conjTranspose_traceNonincreasingCP V))
       hball
@@ -2450,13 +2416,13 @@ theorem psdSqrt_trace_re_pos_of_trace_pos [Nonempty a]
 /-- The raw squared-fidelity expression optimized by subnormalized
 conditional max-entropy, before applying `log₂`. -/
 def conditionalMaxEntropyExponentCandidate
-    (ρ : SubnormalizedState (Prod a b)) (σ : SubnormalizedState b) : ℝ :=
+    (ρ : SubnormalizedState (a × b)) (σ : SubnormalizedState b) : ℝ :=
   (traceNorm (psdSqrt ρ.matrix *
     psdSqrt (identityTensorStateMatrix (a := a) σ))) ^ 2
 
 @[simp]
 theorem conditionalMaxEntropyExponentCandidate_eq
-    (ρ : SubnormalizedState (Prod a b)) (σ : SubnormalizedState b) :
+    (ρ : SubnormalizedState (a × b)) (σ : SubnormalizedState b) :
     ρ.conditionalMaxEntropyExponentCandidate σ =
       (traceNorm (psdSqrt ρ.matrix *
         psdSqrt (identityTensorStateMatrix (a := a) σ))) ^ 2 :=
@@ -2465,7 +2431,7 @@ theorem conditionalMaxEntropyExponentCandidate_eq
 /-- The existing subnormalized conditional max-entropy candidate is the
 logarithm of the raw endpoint candidate. -/
 theorem conditionalMaxEntropyFidelityCandidate_eq_log2_exponentCandidate
-    (ρ : SubnormalizedState (Prod a b)) (σ : SubnormalizedState b) :
+    (ρ : SubnormalizedState (a × b)) (σ : SubnormalizedState b) :
     ρ.conditionalMaxEntropyFidelityCandidate σ =
       log2 (ρ.conditionalMaxEntropyExponentCandidate (a := a) σ) :=
   rfl
@@ -2495,9 +2461,9 @@ theorem identityTensorStateMatrix_referenceIsometryApply
 @[simp]
 theorem identityTensorStateMatrix_sumInrCompressedSide
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    (σPlus : SubnormalizedState (Sum extra b)) :
+    (σPlus : SubnormalizedState (extra ⊕ b)) :
     identityTensorStateMatrix (a := a) σPlus.sumInrCompressedSide =
-      MatrixMap.kron (Channel.idChannel a).map
+      MatrixMap.kron (CPTPOp.id (dIn := a)).map
         (MatrixMap.sumInrBlockCompression (extra := extra) (α := b))
         (identityTensorStateMatrix (a := a) σPlus) := by
   ext x y
@@ -2508,7 +2474,7 @@ theorem identityTensorStateMatrix_sumInrCompressedSide
 omit [Fintype a] in
 private theorem sumBlock22_identityTensorStateMatrix_submatrix_prodSumRightEquiv
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    (σPlus : SubnormalizedState (Sum extra b)) :
+    (σPlus : SubnormalizedState (extra ⊕ b)) :
     Matrix.sumBlock22 ((identityTensorStateMatrix (a := a) σPlus).submatrix
       (ReferenceIsometry.prodSumRightEquiv a extra b)
       (ReferenceIsometry.prodSumRightEquiv a extra b)) =
@@ -2520,7 +2486,7 @@ private theorem sumBlock22_identityTensorStateMatrix_submatrix_prodSumRightEquiv
 
 private theorem sumBlock22_conditioning_matrix_submatrix_prodSumRightEquiv
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    (ρPlus : SubnormalizedState (Prod a (Sum extra b))) :
+    (ρPlus : SubnormalizedState (a × (extra ⊕ b))) :
     Matrix.sumBlock22 (ρPlus.matrix.submatrix
       (ReferenceIsometry.prodSumRightEquiv a extra b)
       (ReferenceIsometry.prodSumRightEquiv a extra b)) =
@@ -2536,21 +2502,21 @@ the joint state is padded by `sumInr` and an arbitrary padded side candidate is
 compressed back to the success block. -/
 theorem traceNorm_conditioningIsometryApply_sumInr_mul_sqrt_identityTensorStateMatrix
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    (ρ : SubnormalizedState (Prod a b)) (σPlus : SubnormalizedState (Sum extra b)) :
+    (ρ : SubnormalizedState (a × b)) (σPlus : SubnormalizedState (extra ⊕ b)) :
     traceNorm
         (psdSqrt (ρ.conditioningIsometryApply (ReferenceIsometry.sumInr extra b)).matrix *
           psdSqrt (identityTensorStateMatrix (a := a) σPlus)) =
       traceNorm
         (psdSqrt ρ.matrix *
           psdSqrt (identityTensorStateMatrix (a := a) σPlus.sumInrCompressedSide)) := by
-  let V : ReferenceIsometry b (Sum extra b) := ReferenceIsometry.sumInr extra b
-  let A : CMatrix (Prod a b) := psdSqrt ρ.matrix
-  let Y : CMatrix (Prod a (Sum extra b)) := identityTensorStateMatrix (a := a) σPlus
-  let Yc : CMatrix (Prod a b) :=
+  let V : ReferenceIsometry b (extra ⊕ b) := ReferenceIsometry.sumInr extra b
+  let A : CMatrix (a × b) := psdSqrt ρ.matrix
+  let Y : CMatrix (a × (extra ⊕ b)) := identityTensorStateMatrix (a := a) σPlus
+  let Yc : CMatrix (a × b) :=
     identityTensorStateMatrix (a := a) σPlus.sumInrCompressedSide
-  let VA : CMatrix (Prod a (Sum extra b)) := V.applyMatrixRight A
-  let VYc : CMatrix (Prod a (Sum extra b)) := V.applyMatrixRight Yc
-  let VsqrtYc : CMatrix (Prod a (Sum extra b)) := V.applyMatrixRight (psdSqrt Yc)
+  let VA : CMatrix (a × (extra ⊕ b)) := V.applyMatrixRight A
+  let VYc : CMatrix (a × (extra ⊕ b)) := V.applyMatrixRight Yc
+  let VsqrtYc : CMatrix (a × (extra ⊕ b)) := V.applyMatrixRight (psdSqrt Yc)
   have hleft_sqrt :
       psdSqrt (ρ.conditioningIsometryApply (ReferenceIsometry.sumInr extra b)).matrix = VA := by
     dsimp [VA, V, A]
@@ -2635,7 +2601,7 @@ theorem traceNorm_conditioningIsometryApply_sumInr_mul_sqrt_identityTensorStateM
 state through exactly the compressed joint block. -/
 theorem traceNorm_conditioningSumInrCompressed_mul_sqrt_identityTensorStateMatrix_referenceIsometryApply_sumInr
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    (ρPlus : SubnormalizedState (Prod a (Sum extra b))) (σ : SubnormalizedState b) :
+    (ρPlus : SubnormalizedState (a × (extra ⊕ b))) (σ : SubnormalizedState b) :
     traceNorm
         (psdSqrt ρPlus.conditioningSumInrCompressed.matrix *
           psdSqrt (identityTensorStateMatrix (a := a) σ)) =
@@ -2643,11 +2609,11 @@ theorem traceNorm_conditioningSumInrCompressed_mul_sqrt_identityTensorStateMatri
         (psdSqrt ρPlus.matrix *
           psdSqrt (identityTensorStateMatrix (a := a)
             (σ.referenceIsometryApply (ReferenceIsometry.sumInr extra b)))) := by
-  let V : ReferenceIsometry b (Sum extra b) := ReferenceIsometry.sumInr extra b
-  let A : CMatrix (Prod a b) := psdSqrt ρPlus.conditioningSumInrCompressed.matrix
-  let Y : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
-  let VA : CMatrix (Prod a (Sum extra b)) := V.applyMatrixRight A
-  let VsqrtY : CMatrix (Prod a (Sum extra b)) := V.applyMatrixRight (psdSqrt Y)
+  let V : ReferenceIsometry b (extra ⊕ b) := ReferenceIsometry.sumInr extra b
+  let A : CMatrix (a × b) := psdSqrt ρPlus.conditioningSumInrCompressed.matrix
+  let Y : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
+  let VA : CMatrix (a × (extra ⊕ b)) := V.applyMatrixRight A
+  let VsqrtY : CMatrix (a × (extra ⊕ b)) := V.applyMatrixRight (psdSqrt Y)
   have hside :
       psdSqrt (identityTensorStateMatrix (a := a)
           (σ.referenceIsometryApply (ReferenceIsometry.sumInr extra b))) =
@@ -2740,7 +2706,7 @@ theorem traceNorm_conditioningSumInrCompressed_mul_sqrt_identityTensorStateMatri
 side candidate preserves the subnormalized max-entropy exponent candidate. -/
 theorem conditionalMaxEntropyExponentCandidate_referenceIsometryApply_sumInr
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    (ρ : SubnormalizedState (Prod a b)) (σ : SubnormalizedState b) :
+    (ρ : SubnormalizedState (a × b)) (σ : SubnormalizedState b) :
     (ρ.conditioningIsometryApply (ReferenceIsometry.sumInr extra b)).conditionalMaxEntropyExponentCandidate
         (a := a) (σ.referenceIsometryApply (ReferenceIsometry.sumInr extra b)) =
       ρ.conditionalMaxEntropyExponentCandidate (a := a) σ := by
@@ -2767,7 +2733,7 @@ the same raw max-entropy exponent candidate as the source joint state tested
 against the compressed side candidate. -/
 theorem conditionalMaxEntropyExponentCandidate_conditioningIsometryApply_sumInr_compressedSide
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    (ρ : SubnormalizedState (Prod a b)) (σPlus : SubnormalizedState (Sum extra b)) :
+    (ρ : SubnormalizedState (a × b)) (σPlus : SubnormalizedState (extra ⊕ b)) :
     (ρ.conditioningIsometryApply (ReferenceIsometry.sumInr extra b)).conditionalMaxEntropyExponentCandidate
         (a := a) σPlus =
       ρ.conditionalMaxEntropyExponentCandidate (a := a) σPlus.sumInrCompressedSide := by
@@ -2778,7 +2744,7 @@ theorem conditionalMaxEntropyExponentCandidate_conditioningIsometryApply_sumInr_
 supported on the right summand is exactly testing the compressed joint state. -/
 theorem conditionalMaxEntropyExponentCandidate_conditioningSumInrCompressed_referenceIsometryApply_sumInr
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    (ρPlus : SubnormalizedState (Prod a (Sum extra b))) (σ : SubnormalizedState b) :
+    (ρPlus : SubnormalizedState (a × (extra ⊕ b))) (σ : SubnormalizedState b) :
     ρPlus.conditioningSumInrCompressed.conditionalMaxEntropyExponentCandidate
         (a := a) σ =
       ρPlus.conditionalMaxEntropyExponentCandidate (a := a)
@@ -2791,7 +2757,7 @@ joint state against an arbitrary padded side candidate and compressing the side
 candidate back to the source register. -/
 theorem conditionalMaxEntropyFidelityCandidate_conditioningIsometryApply_sumInr_compressedSide
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    (ρ : SubnormalizedState (Prod a b)) (σPlus : SubnormalizedState (Sum extra b)) :
+    (ρ : SubnormalizedState (a × b)) (σPlus : SubnormalizedState (extra ⊕ b)) :
     (ρ.conditioningIsometryApply (ReferenceIsometry.sumInr extra b)).conditionalMaxEntropyFidelityCandidate
         (a := a) σPlus =
       ρ.conditionalMaxEntropyFidelityCandidate (a := a) σPlus.sumInrCompressedSide := by
@@ -2802,13 +2768,13 @@ theorem conditionalMaxEntropyFidelityCandidate_conditioningIsometryApply_sumInr_
 /-- The raw endpoint exponent
 `sup_σ ‖√ρ_AB √(I_A ⊗ σ_B)‖₁²` for subnormalized side states. -/
 def conditionalMaxEntropyExponentValueSet
-    (ρ : SubnormalizedState (Prod a b)) : Set ℝ :=
+    (ρ : SubnormalizedState (a × b)) : Set ℝ :=
   {x : ℝ | ∃ σ : SubnormalizedState b,
     x = ρ.conditionalMaxEntropyExponentCandidate (a := a) σ}
 
 @[simp]
 theorem conditionalMaxEntropyExponentValueSet_eq
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     ρ.conditionalMaxEntropyExponentValueSet (a := a) =
       {x : ℝ | ∃ σ : SubnormalizedState b,
         x = ρ.conditionalMaxEntropyExponentCandidate (a := a) σ} :=
@@ -2817,14 +2783,14 @@ theorem conditionalMaxEntropyExponentValueSet_eq
 /-- Positive raw max-entropy exponent candidate values for subnormalized
 states. The positivity filter is required for logarithmic endpoint bridges. -/
 def conditionalMaxEntropyPositiveExponentValueSet
-    (ρ : SubnormalizedState (Prod a b)) : Set ℝ :=
+    (ρ : SubnormalizedState (a × b)) : Set ℝ :=
   {x : ℝ | ∃ σ : SubnormalizedState b,
     0 < ρ.conditionalMaxEntropyExponentCandidate (a := a) σ ∧
       x = ρ.conditionalMaxEntropyExponentCandidate (a := a) σ}
 
 @[simp]
 theorem conditionalMaxEntropyPositiveExponentValueSet_eq
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     ρ.conditionalMaxEntropyPositiveExponentValueSet (a := a) =
       {x : ℝ | ∃ σ : SubnormalizedState b,
         0 < ρ.conditionalMaxEntropyExponentCandidate (a := a) σ ∧
@@ -2833,12 +2799,12 @@ theorem conditionalMaxEntropyPositiveExponentValueSet_eq
 
 /-- The positive-candidate raw endpoint exponent for subnormalized states. -/
 def conditionalMaxEntropyPositiveExponent
-    (ρ : SubnormalizedState (Prod a b)) : ℝ :=
+    (ρ : SubnormalizedState (a × b)) : ℝ :=
   sSup (ρ.conditionalMaxEntropyPositiveExponentValueSet (a := a))
 
 @[simp]
 theorem conditionalMaxEntropyPositiveExponent_eq
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     ρ.conditionalMaxEntropyPositiveExponent =
       sSup (ρ.conditionalMaxEntropyPositiveExponentValueSet (a := a)) :=
   rfl
@@ -2846,14 +2812,14 @@ theorem conditionalMaxEntropyPositiveExponent_eq
 /-- Definition-level max-entropy candidates whose raw exponent is strictly
 positive. -/
 def conditionalMaxEntropyPositiveValueSet
-    (ρ : SubnormalizedState (Prod a b)) : Set ℝ :=
+    (ρ : SubnormalizedState (a × b)) : Set ℝ :=
   {h : ℝ | ∃ σ : SubnormalizedState b,
     0 < ρ.conditionalMaxEntropyExponentCandidate (a := a) σ ∧
       h = ρ.conditionalMaxEntropyFidelityCandidate σ}
 
 @[simp]
 theorem conditionalMaxEntropyPositiveValueSet_eq
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     ρ.conditionalMaxEntropyPositiveValueSet (a := a) =
       {h : ℝ | ∃ σ : SubnormalizedState b,
         0 < ρ.conditionalMaxEntropyExponentCandidate (a := a) σ ∧
@@ -2864,7 +2830,7 @@ theorem conditionalMaxEntropyPositiveValueSet_eq
 candidate set for subnormalized max-entropy. -/
 theorem conditionalMaxEntropyPositiveExponentValueSet_conditioningIsometryApply_sumInr
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     (ρ.conditioningIsometryApply (ReferenceIsometry.sumInr extra b)).conditionalMaxEntropyPositiveExponentValueSet
         (a := a) =
       ρ.conditionalMaxEntropyPositiveExponentValueSet (a := a) := by
@@ -2883,14 +2849,14 @@ theorem conditionalMaxEntropyPositiveExponentValueSet_conditioningIsometryApply_
     · rw [conditionalMaxEntropyExponentCandidate_referenceIsometryApply_sumInr
         (a := a) (extra := extra) ρ σ]
 
-/-- Compatibility name for the positive-candidate subnormalized conditional
-max-entropy. -/
-def conditionalMaxEntropyPositive (ρ : SubnormalizedState (Prod a b)) : ℝ :=
+/-- The subnormalized conditional max-entropy, as a supremum over the candidates whose raw exponent
+is strictly positive. -/
+def conditionalMaxEntropyPositive (ρ : SubnormalizedState (a × b)) : ℝ :=
   sSup (ρ.conditionalMaxEntropyPositiveValueSet (a := a))
 
 @[simp]
 theorem conditionalMaxEntropyPositive_eq
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     ρ.conditionalMaxEntropyPositive =
       sSup (ρ.conditionalMaxEntropyPositiveValueSet (a := a)) :=
   rfl
@@ -2899,7 +2865,7 @@ theorem conditionalMaxEntropyPositive_eq
 max-entropy candidate set. -/
 theorem conditionalMaxEntropyPositiveValueSet_conditioningIsometryApply_sumInr
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     (ρ.conditioningIsometryApply (ReferenceIsometry.sumInr extra b)).conditionalMaxEntropyPositiveValueSet
         (a := a) =
       ρ.conditionalMaxEntropyPositiveValueSet (a := a) := by
@@ -2923,7 +2889,7 @@ theorem conditionalMaxEntropyPositiveValueSet_conditioningIsometryApply_sumInr
 for subnormalized max-entropy. -/
 theorem conditionalMaxEntropyPositiveExponent_conditioningIsometryApply_sumInr
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     (ρ.conditioningIsometryApply (ReferenceIsometry.sumInr extra b)).conditionalMaxEntropyPositiveExponent
         (a := a) =
       ρ.conditionalMaxEntropyPositiveExponent (a := a) := by
@@ -2934,7 +2900,7 @@ theorem conditionalMaxEntropyPositiveExponent_conditioningIsometryApply_sumInr
 max-entropy. -/
 theorem conditionalMaxEntropy_conditioningIsometryApply_sumInr
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     (ρ.conditioningIsometryApply (ReferenceIsometry.sumInr extra b)).conditionalMaxEntropyRaw =
       ρ.conditionalMaxEntropyRaw := by
   change sSup ((ρ.conditioningIsometryApply
@@ -2946,8 +2912,8 @@ theorem conditionalMaxEntropy_conditioningIsometryApply_sumInr
 the source register and is then padded by the concrete right-summand embedding. -/
 def SumInrExactSmoothConditionalMinEntropyCandidate
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    (ρ : SubnormalizedState (Prod a b)) (ε h : ℝ) : Prop :=
-  ∃ ρ' : SubnormalizedState (Prod a b),
+    (ρ : SubnormalizedState (a × b)) (ε h : ℝ) : Prop :=
+  ∃ ρ' : SubnormalizedState (a × b),
     ρ.purifiedBall ε ρ' ∧
       h = (ρ'.conditioningIsometryApply (ReferenceIsometry.sumInr extra b)).conditionalMinEntropyRaw
 
@@ -2955,8 +2921,8 @@ def SumInrExactSmoothConditionalMinEntropyCandidate
 the source register and is then padded by the concrete right-summand embedding. -/
 def SumInrExactSmoothConditionalMaxEntropyCandidate
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    (ρ : SubnormalizedState (Prod a b)) (ε h : ℝ) : Prop :=
-  ∃ ρ' : SubnormalizedState (Prod a b),
+    (ρ : SubnormalizedState (a × b)) (ε h : ℝ) : Prop :=
+  ∃ ρ' : SubnormalizedState (a × b),
     ρ.purifiedBall ε ρ' ∧
       h = (ρ'.conditioningIsometryApply (ReferenceIsometry.sumInr extra b)).conditionalMaxEntropyRaw
 
@@ -2966,7 +2932,7 @@ under the small-radius positive-trace condition. -/
 theorem SmoothConditionalMinEntropyCandidateRaw.conditioningIsometryApply_sumInr_compress
     {extra : Type*} [Fintype extra] [DecidableEq extra]
     [Nonempty a] [Nonempty b]
-    (ρ : SubnormalizedState (Prod a b)) {ε h : ℝ}
+    (ρ : SubnormalizedState (a × b)) {ε h : ℝ}
     (hε : ε < Real.sqrt ρ.matrix.trace.re)
     (hcand :
       SmoothConditionalMinEntropyCandidateRaw (a := a)
@@ -3000,7 +2966,7 @@ large endpoint value, under the small-radius positive-trace condition. -/
 theorem SmoothConditionalMinEntropyCandidateRaw.conditioningIsometryApply_compress
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
     [Nonempty a] [Nonempty b] [Nonempty bPlus]
-    (ρ : SubnormalizedState (Prod a b)) (V : ReferenceIsometry b bPlus) {ε h : ℝ}
+    (ρ : SubnormalizedState (a × b)) (V : ReferenceIsometry b bPlus) {ε h : ℝ}
     (hε : ε < Real.sqrt ρ.matrix.trace.re)
     (hcand :
       SmoothConditionalMinEntropyCandidateRaw (a := a)
@@ -3033,7 +2999,7 @@ conditioning-register reference isometry with the same endpoint value. -/
 theorem SmoothConditionalMinEntropyCandidateRaw.conditioningIsometryApply
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
     [Nonempty a] [Nonempty b] [Nonempty bPlus]
-    (ρ : SubnormalizedState (Prod a b)) (V : ReferenceIsometry b bPlus) {ε h : ℝ}
+    (ρ : SubnormalizedState (a × b)) (V : ReferenceIsometry b bPlus) {ε h : ℝ}
     (hε : ε < Real.sqrt ρ.matrix.trace.re)
     (hcand : SmoothConditionalMinEntropyCandidateRaw (a := a) ρ ε h) :
     SmoothConditionalMinEntropyCandidateRaw (a := a) (ρ.conditioningIsometryApply V) ε h := by
@@ -3050,7 +3016,7 @@ endpoint value, under the small-radius positive-trace condition. -/
 theorem SmoothConditionalMinEntropyCandidateRaw.sourceIsometryApply_compress
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
     [Nonempty a] [Nonempty b] [Nonempty aPlus]
-    (ρ : SubnormalizedState (Prod a b)) (V : ReferenceIsometry a aPlus) {ε h : ℝ}
+    (ρ : SubnormalizedState (a × b)) (V : ReferenceIsometry a aPlus) {ε h : ℝ}
     (hε : ε < Real.sqrt ρ.matrix.trace.re)
     (hcand :
       SmoothConditionalMinEntropyCandidateRaw (a := aPlus)
@@ -3083,7 +3049,7 @@ source-register reference isometry with the same endpoint value. -/
 theorem SmoothConditionalMinEntropyCandidateRaw.sourceIsometryApply
     {aPlus : Type*} [Fintype aPlus] [DecidableEq aPlus]
     [Nonempty a] [Nonempty b] [Nonempty aPlus]
-    (ρ : SubnormalizedState (Prod a b)) (V : ReferenceIsometry a aPlus) {ε h : ℝ}
+    (ρ : SubnormalizedState (a × b)) (V : ReferenceIsometry a aPlus) {ε h : ℝ}
     (hε : ε < Real.sqrt ρ.matrix.trace.re)
     (hcand : SmoothConditionalMinEntropyCandidateRaw (a := a) ρ ε h) :
     SmoothConditionalMinEntropyCandidateRaw (a := aPlus) (ρ.sourceIsometryApply V) ε h := by
@@ -3100,7 +3066,7 @@ ordinary endpoint value. This is the candidate-level classical-smoothing
 regularization step. -/
 theorem SmoothConditionalMinEntropyCandidateRaw.sourceCoordinatePinch_of_fixed
     [Nonempty a] [Nonempty b]
-    {ρ : SubnormalizedState (Prod a b)} {ε h : ℝ}
+    {ρ : SubnormalizedState (a × b)} {ε h : ℝ}
     (hρ : ρ.sourceCoordinatePinch = ρ)
     (hε : ε < Real.sqrt ρ.matrix.trace.re)
     (hcand : SmoothConditionalMinEntropyCandidateRaw (a := a) ρ ε h) :
@@ -3118,7 +3084,7 @@ surface, exact `sumInr` padding does not change smooth min-entropy candidates. -
 theorem sumInrExactSmoothConditionalMinEntropyCandidate_iff
     {extra : Type*} [Fintype extra] [DecidableEq extra]
     [Nonempty a] [Nonempty b]
-    (ρ : SubnormalizedState (Prod a b)) {ε h : ℝ}
+    (ρ : SubnormalizedState (a × b)) {ε h : ℝ}
     (hε : ε < Real.sqrt ρ.matrix.trace.re) :
     SumInrExactSmoothConditionalMinEntropyCandidate (a := a) (extra := extra) ρ ε h ↔
       SmoothConditionalMinEntropyCandidateRaw (a := a) ρ ε h := by
@@ -3137,7 +3103,7 @@ theorem sumInrExactSmoothConditionalMinEntropyCandidate_iff
 /-- Exact `sumInr` padding does not change smooth max-entropy candidates. -/
 theorem sumInrExactSmoothConditionalMaxEntropyCandidate_iff
     {extra : Type*} [Fintype extra] [DecidableEq extra]
-    (ρ : SubnormalizedState (Prod a b)) {ε h : ℝ} :
+    (ρ : SubnormalizedState (a × b)) {ε h : ℝ} :
     SumInrExactSmoothConditionalMaxEntropyCandidate (a := a) (extra := extra) ρ ε h ↔
       SmoothConditionalMaxEntropyCandidateRaw (a := a) ρ ε h := by
   constructor
@@ -3151,7 +3117,7 @@ theorem sumInrExactSmoothConditionalMaxEntropyCandidate_iff
       (extra := extra) ρ']
 
 theorem conditionalMaxEntropyExponentCandidate_nonneg
-    (ρ : SubnormalizedState (Prod a b)) (σ : SubnormalizedState b) :
+    (ρ : SubnormalizedState (a × b)) (σ : SubnormalizedState b) :
     0 ≤ ρ.conditionalMaxEntropyExponentCandidate (a := a) σ := by
   exact sq_nonneg _
 
@@ -3160,16 +3126,16 @@ theorem identityTensorStateMatrix_normalize_smul
     (σ : SubnormalizedState b) (hσ : σ.matrix.trace.re ≠ 0) :
     identityTensorStateMatrix (a := a) σ =
       (σ.matrix.trace.re : ℂ) •
-        State.identityTensorStateMatrix (a := a) (σ.normalize hσ) := by
+        MState.identityTensorStateMatrix (a := a) (σ.normalize hσ) := by
   ext x y
   have hσC : ((σ.matrix.trace.re : ℂ) ≠ 0) := by
     exact_mod_cast hσ
-  simp [identityTensorStateMatrix, State.identityTensorStateMatrix,
+  simp [identityTensorStateMatrix, MState.identityTensorStateMatrix,
     SubnormalizedState.normalize_matrix, Matrix.kronecker, Matrix.kroneckerMap_apply]
   field_simp [hσC]
 
 theorem conditionalMaxEntropyExponentCandidate_eq_zero_of_side_trace_zero
-    (ρ : SubnormalizedState (Prod a b)) {σ : SubnormalizedState b}
+    (ρ : SubnormalizedState (a × b)) {σ : SubnormalizedState b}
     (hσ : σ.matrix.trace.re = 0) :
     ρ.conditionalMaxEntropyExponentCandidate (a := a) σ = 0 := by
   have htrace : σ.matrix.trace = 0 := by
@@ -3187,7 +3153,7 @@ theorem conditionalMaxEntropyExponentCandidate_eq_zero_of_side_trace_zero
   simp
 
 theorem conditionalMaxEntropyExponentCandidate_ofStateScale_normalize
-    (ρ : State (Prod a b)) (σ : SubnormalizedState b)
+    (ρ : MState (a × b)) (σ : SubnormalizedState b)
     {t : ℝ} (ht : 0 < t) (ht1 : t ≤ 1)
     (hσ : 0 < σ.matrix.trace.re) :
     (SubnormalizedState.ofStateScale ρ t ht.le ht1).conditionalMaxEntropyExponentCandidate
@@ -3195,29 +3161,29 @@ theorem conditionalMaxEntropyExponentCandidate_ofStateScale_normalize
       t * σ.matrix.trace.re *
         ρ.conditionalMaxEntropyExponentCandidate (a := a) (σ.normalize hσ.ne') := by
   let s : ℝ := σ.matrix.trace.re
-  let M : CMatrix (Prod a b) :=
-    ρ.sqrtMatrix * psdSqrt (State.identityTensorStateMatrix (a := a)
+  let M : CMatrix (a × b) :=
+    ρ.sqrtMatrix * psdSqrt (MState.identityTensorStateMatrix (a := a)
       (σ.normalize hσ.ne'))
   have hs_nonneg : 0 ≤ s := le_of_lt hσ
   have hsqrt_left :
       psdSqrt (SubnormalizedState.ofStateScale ρ t ht.le ht1).matrix =
         ((Real.sqrt t : ℝ) : ℂ) • ρ.sqrtMatrix := by
     rw [SubnormalizedState.ofStateScale_matrix]
-    simpa [State.sqrtMatrix] using
-      (psdSqrt_real_smul (a := Prod a b) ht.le (M := ρ.matrix) ρ.pos)
+    simpa [MState.sqrtMatrix] using
+      (psdSqrt_real_smul (a := a × b) ht.le (M := ρ.m) ρ.psd)
   have hside :
       identityTensorStateMatrix (a := a) σ =
-        (s : ℂ) • State.identityTensorStateMatrix (a := a) (σ.normalize hσ.ne') := by
+        (s : ℂ) • MState.identityTensorStateMatrix (a := a) (σ.normalize hσ.ne') := by
     dsimp [s]
     exact identityTensorStateMatrix_normalize_smul (a := a) σ hσ.ne'
   have hsqrt_side :
       psdSqrt (identityTensorStateMatrix (a := a) σ) =
         ((Real.sqrt s : ℝ) : ℂ) •
-          psdSqrt (State.identityTensorStateMatrix (a := a) (σ.normalize hσ.ne')) := by
+          psdSqrt (MState.identityTensorStateMatrix (a := a) (σ.normalize hσ.ne')) := by
     rw [hside]
-    exact psdSqrt_real_smul (a := Prod a b) hs_nonneg
-      (M := State.identityTensorStateMatrix (a := a) (σ.normalize hσ.ne'))
-      (State.identityTensorStateMatrix_posSemidef (a := a) (σ.normalize hσ.ne'))
+    exact psdSqrt_real_smul (a := a × b) hs_nonneg
+      (M := MState.identityTensorStateMatrix (a := a) (σ.normalize hσ.ne'))
+      (MState.identityTensorStateMatrix_posSemidef (a := a) (σ.normalize hσ.ne'))
   have hproduct :
       psdSqrt (SubnormalizedState.ofStateScale ρ t ht.le ht1).matrix *
           psdSqrt (identityTensorStateMatrix (a := a) σ) =
@@ -3227,7 +3193,7 @@ theorem conditionalMaxEntropyExponentCandidate_ofStateScale_normalize
     ext x y
     simp [Matrix.mul_apply, Finset.mul_sum, mul_assoc, mul_left_comm]
   rw [conditionalMaxEntropyExponentCandidate_eq,
-    State.conditionalMaxEntropyExponentCandidate_eq]
+    MState.conditionalMaxEntropyExponentCandidate_eq]
   rw [hproduct]
   rw [traceNorm_real_smul_eq (mul_nonneg (Real.sqrt_nonneg t) (Real.sqrt_nonneg s)) M]
   have hsqrt_t_sq : (Real.sqrt t) ^ 2 = t := Real.sq_sqrt ht.le
@@ -3239,29 +3205,29 @@ theorem conditionalMaxEntropyExponentCandidate_ofStateScale_normalize
     _ = t * s * n ^ 2 := by rw [hsqrt_t_sq, hsqrt_s_sq]
 
 theorem conditionalMaxEntropyExponentCandidate_ofStateScale_toSubnormalized
-    (ρ : State (Prod a b)) (τ : State b)
+    (ρ : MState (a × b)) (τ : MState b)
     {t : ℝ} (ht : 0 < t) (ht1 : t ≤ 1) :
     (SubnormalizedState.ofStateScale ρ t ht.le ht1).conditionalMaxEntropyExponentCandidate
         (a := a) τ.toSubnormalized =
       t * ρ.conditionalMaxEntropyExponentCandidate (a := a) τ := by
   have hτtr_pos : 0 < τ.toSubnormalized.matrix.trace.re := by
-    rw [State.toSubnormalized_trace]
+    rw [MState.toSubnormalized_trace]
     norm_num
   have hnorm : τ.toSubnormalized.normalize hτtr_pos.ne' = τ := by
-    apply State.ext
-    rw [SubnormalizedState.normalize_matrix, State.toSubnormalized_matrix,
-      τ.trace_eq_one]
+    apply MState.ext
+    rw [SubnormalizedState.normalize_matrix, MState.toSubnormalized_matrix,
+      τ.tr']
     simp
   rw [conditionalMaxEntropyExponentCandidate_ofStateScale_normalize
     (a := a) ρ τ.toSubnormalized ht ht1 hτtr_pos, hnorm]
-  rw [State.toSubnormalized_trace]
+  rw [MState.toSubnormalized_trace]
   norm_num
 
-theorem conditionalMaxEntropyExponentCandidate_maximallyMixed_pos_of_trace_pos
-    [Nonempty a] [Nonempty b] {ρ : SubnormalizedState (Prod a b)}
+theorem conditionalMaxEntropyExponentCandidate_uniform_pos_of_trace_pos
+    [Nonempty a] [Nonempty b] {ρ : SubnormalizedState (a × b)}
     (hρ : 0 < ρ.matrix.trace.re) :
     0 < ρ.conditionalMaxEntropyExponentCandidate (a := a)
-      (State.maximallyMixed b).toSubnormalized := by
+      (MState.uniform : MState b).toSubnormalized := by
   let c : ℝ := (Fintype.card b : ℝ)⁻¹
   have hc_nonneg : 0 ≤ c := inv_nonneg.mpr (Nat.cast_nonneg _)
   have hc_pos : 0 < Real.sqrt c := by
@@ -3270,37 +3236,35 @@ theorem conditionalMaxEntropyExponentCandidate_maximallyMixed_pos_of_trace_pos
     exact Real.sqrt_pos.mpr (inv_pos.mpr hcard_pos)
   have hsqrt_id :
       psdSqrt (identityTensorStateMatrix (a := a)
-          (State.maximallyMixed b).toSubnormalized) =
-        (((Real.sqrt c : ℝ) : ℂ) • (1 : CMatrix (Prod a b))) := by
+          (MState.uniform : MState b).toSubnormalized) =
+        (((Real.sqrt c : ℝ) : ℂ) • (1 : CMatrix (a × b))) := by
     have hid :
-        identityTensorStateMatrix (a := a) (State.maximallyMixed b).toSubnormalized =
+        identityTensorStateMatrix (a := a) (MState.uniform : MState b).toSubnormalized =
           ((((Fintype.card b : ℝ)⁻¹ : ℝ) : ℂ) •
-            (1 : CMatrix (Prod a b))) := by
+            (1 : CMatrix (a × b))) := by
       ext x y
       by_cases h1 : x.1 = y.1 <;> by_cases h2 : x.2 = y.2 <;>
-        simp [identityTensorStateMatrix, State.maximallyMixed, Matrix.kronecker,
+        simp [identityTensorStateMatrix, Matrix.kronecker,
           Matrix.kroneckerMap_apply, Matrix.one_apply, Prod.ext_iff, h1, h2]
     rw [hid]
-    exact psdSqrt_real_smul_one (a := Prod a b) hc_nonneg
+    exact psdSqrt_real_smul_one (a := a × b) hc_nonneg
   have htrace_eq :
       (psdSqrt ρ.matrix *
           psdSqrt (identityTensorStateMatrix (a := a)
-            (State.maximallyMixed b).toSubnormalized)).trace =
+            (MState.uniform : MState b).toSubnormalized)).trace =
         ((Real.sqrt c : ℝ) : ℂ) * (psdSqrt ρ.matrix).trace := by
     rw [hsqrt_id]
     simp [Matrix.trace_smul]
   have htrace_abs_pos :
-      0 < Complex.abs ((psdSqrt ρ.matrix *
+      0 < ‖(psdSqrt ρ.matrix *
           psdSqrt (identityTensorStateMatrix (a := a)
-            (State.maximallyMixed b).toSubnormalized)).trace) := by
-    rw [htrace_eq]
-    change 0 < ‖((Real.sqrt c : ℝ) : ℂ) * (psdSqrt ρ.matrix).trace‖
-    rw [norm_mul]
+            (MState.uniform : MState b).toSubnormalized)).trace‖ := by
+    rw [htrace_eq, norm_mul]
     have htr_ne : (psdSqrt ρ.matrix).trace ≠ 0 := by
       intro hzero
       have hre : (psdSqrt ρ.matrix).trace.re = 0 := by rw [hzero]; rfl
       have hpos : 0 < (psdSqrt ρ.matrix).trace.re :=
-        psdSqrt_trace_re_pos_of_trace_pos (a := Prod a b) hρ
+        psdSqrt_trace_re_pos_of_trace_pos (a := a × b) hρ
       linarith
     have hc_ne : (((Real.sqrt c : ℝ) : ℂ) : ℂ) ≠ 0 := by
       exact_mod_cast hc_pos.ne'
@@ -3308,44 +3272,44 @@ theorem conditionalMaxEntropyExponentCandidate_maximallyMixed_pos_of_trace_pos
   have htn_pos :
       0 < traceNorm (psdSqrt ρ.matrix *
         psdSqrt (identityTensorStateMatrix (a := a)
-          (State.maximallyMixed b).toSubnormalized)) :=
+          (MState.uniform : MState b).toSubnormalized)) :=
     lt_of_lt_of_le htrace_abs_pos (trace_abs_le_traceNorm _)
   unfold conditionalMaxEntropyExponentCandidate
   exact sq_pos_of_pos htn_pos
 
 theorem conditionalMaxEntropyPositiveExponentValueSet_nonempty_of_trace_pos
-    [Nonempty a] [Nonempty b] {ρ : SubnormalizedState (Prod a b)}
+    [Nonempty a] [Nonempty b] {ρ : SubnormalizedState (a × b)}
     (hρ : 0 < ρ.matrix.trace.re) :
     (ρ.conditionalMaxEntropyPositiveExponentValueSet (a := a)).Nonempty :=
   ⟨ρ.conditionalMaxEntropyExponentCandidate (a := a)
-      (State.maximallyMixed b).toSubnormalized,
-    (State.maximallyMixed b).toSubnormalized,
-    ρ.conditionalMaxEntropyExponentCandidate_maximallyMixed_pos_of_trace_pos
+      (MState.uniform : MState b).toSubnormalized,
+    (MState.uniform : MState b).toSubnormalized,
+    ρ.conditionalMaxEntropyExponentCandidate_uniform_pos_of_trace_pos
       (a := a) hρ,
     rfl⟩
 
 theorem conditionalMaxEntropyExponentValueSet_nonempty_of_trace_pos
-    [Nonempty a] [Nonempty b] {ρ : SubnormalizedState (Prod a b)}
+    [Nonempty a] [Nonempty b] {ρ : SubnormalizedState (a × b)}
     (_hρ : 0 < ρ.matrix.trace.re) :
     (ρ.conditionalMaxEntropyExponentValueSet (a := a)).Nonempty :=
   ⟨ρ.conditionalMaxEntropyExponentCandidate (a := a)
-      (State.maximallyMixed b).toSubnormalized,
-    (State.maximallyMixed b).toSubnormalized,
+      (MState.uniform : MState b).toSubnormalized,
+    (MState.uniform : MState b).toSubnormalized,
     rfl⟩
 
 theorem conditionalMaxEntropyPositiveValueSet_nonempty_of_trace_pos
-    [Nonempty a] [Nonempty b] {ρ : SubnormalizedState (Prod a b)}
+    [Nonempty a] [Nonempty b] {ρ : SubnormalizedState (a × b)}
     (hρ : 0 < ρ.matrix.trace.re) :
     (ρ.conditionalMaxEntropyPositiveValueSet (a := a)).Nonempty :=
   ⟨ρ.conditionalMaxEntropyFidelityCandidate
-      (a := a) (State.maximallyMixed b).toSubnormalized,
-    (State.maximallyMixed b).toSubnormalized,
-    ρ.conditionalMaxEntropyExponentCandidate_maximallyMixed_pos_of_trace_pos
+      (a := a) (MState.uniform : MState b).toSubnormalized,
+    (MState.uniform : MState b).toSubnormalized,
+    ρ.conditionalMaxEntropyExponentCandidate_uniform_pos_of_trace_pos
       (a := a) hρ,
     rfl⟩
 
 theorem conditionalMaxEntropyPositiveValueSet_eq_log2_image
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     ρ.conditionalMaxEntropyPositiveValueSet (a := a) =
       log2 '' ρ.conditionalMaxEntropyPositiveExponentValueSet (a := a) := by
   ext h
@@ -3359,19 +3323,19 @@ theorem conditionalMaxEntropyPositiveValueSet_eq_log2_image
       ρ.conditionalMaxEntropyFidelityCandidate_eq_log2_exponentCandidate σ⟩
 
 theorem conditionalMaxEntropy_eq_sSup_positiveValueSet
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     ρ.conditionalMaxEntropyRaw =
       sSup (ρ.conditionalMaxEntropyPositiveValueSet (a := a)) :=
   rfl
 
 theorem conditionalMaxEntropy_eq_positive
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     ρ.conditionalMaxEntropyRaw = ρ.conditionalMaxEntropyPositive :=
   rfl
 
 theorem conditionalMaxEntropyPositiveExponentValueSet_ofStateScale_le
     [Nonempty a] [Nonempty b]
-    (ρ : State (Prod a b)) {t x : ℝ} (ht : 0 < t) (ht1 : t ≤ 1)
+    (ρ : MState (a × b)) {t x : ℝ} (ht : 0 < t) (ht1 : t ≤ 1)
     (hx : x ∈
       (SubnormalizedState.ofStateScale ρ t ht.le ht1).conditionalMaxEntropyPositiveExponentValueSet
         (a := a)) :
@@ -3390,13 +3354,13 @@ theorem conditionalMaxEntropyPositiveExponentValueSet_ofStateScale_le
         ρ.conditionalMaxEntropyExponentCandidate (a := a)
             (σ.normalize hσtrace_pos.ne') ≤
           ρ.conditionalMaxEntropyExponent (a := a) := by
-      rw [State.conditionalMaxEntropyExponent]
+      rw [MState.conditionalMaxEntropyExponent]
       exact le_csSup (ρ.conditionalMaxEntropyExponentValueSet_bddAbove (a := a))
         ⟨σ.normalize hσtrace_pos.ne', rfl⟩
     have hstate_nonneg :
         0 ≤ ρ.conditionalMaxEntropyExponentCandidate (a := a)
             (σ.normalize hσtrace_pos.ne') :=
-      State.conditionalMaxEntropyExponentCandidate_nonneg (a := a) ρ
+      MState.conditionalMaxEntropyExponentCandidate_nonneg (a := a) ρ
         (σ.normalize hσtrace_pos.ne')
     have hmul :
         σ.matrix.trace.re *
@@ -3417,7 +3381,7 @@ theorem conditionalMaxEntropyPositiveExponentValueSet_ofStateScale_le
 
 theorem conditionalMaxEntropyPositiveExponentValueSet_bddAbove_ofStateScale
     [Nonempty a] [Nonempty b]
-    (ρ : State (Prod a b)) {t : ℝ} (ht : 0 < t) (ht1 : t ≤ 1) :
+    (ρ : MState (a × b)) {t : ℝ} (ht : 0 < t) (ht1 : t ≤ 1) :
     BddAbove
       ((SubnormalizedState.ofStateScale ρ t ht.le ht1).conditionalMaxEntropyPositiveExponentValueSet
         (a := a)) := by
@@ -3427,7 +3391,7 @@ theorem conditionalMaxEntropyPositiveExponentValueSet_bddAbove_ofStateScale
 
 theorem conditionalMaxEntropyPositiveExponentValueSet_bddAbove_of_trace_pos
     [Nonempty a] [Nonempty b]
-    (ρ : SubnormalizedState (Prod a b)) (hρ : 0 < ρ.matrix.trace.re) :
+    (ρ : SubnormalizedState (a × b)) (hρ : 0 < ρ.matrix.trace.re) :
     BddAbove (ρ.conditionalMaxEntropyPositiveExponentValueSet (a := a)) := by
   rw [← ofStateScale_normalize_trace_eq ρ hρ]
   exact conditionalMaxEntropyPositiveExponentValueSet_bddAbove_ofStateScale
@@ -3436,7 +3400,7 @@ theorem conditionalMaxEntropyPositiveExponentValueSet_bddAbove_of_trace_pos
 theorem conditionalMaxEntropyPositiveExponent_conditioningSumInrCompressed_le
     {extra : Type*} [Fintype extra] [DecidableEq extra]
     [Nonempty a] [Nonempty b]
-    (ρPlus : SubnormalizedState (Prod a (Sum extra b)))
+    (ρPlus : SubnormalizedState (a × (extra ⊕ b)))
     (hPlus : 0 < ρPlus.matrix.trace.re)
     (hCompressed : 0 < ρPlus.conditioningSumInrCompressed.matrix.trace.re) :
     ρPlus.conditioningSumInrCompressed.conditionalMaxEntropyPositiveExponent
@@ -3467,15 +3431,15 @@ theorem conditionalMaxEntropyPositiveExponent_conditioningSumInrCompressed_le
 
 theorem conditionalMaxEntropyPositiveExponent_ofStateScale
     [Nonempty a] [Nonempty b]
-    (ρ : State (Prod a b)) {t : ℝ} (ht : 0 < t) (ht1 : t ≤ 1) :
+    (ρ : MState (a × b)) {t : ℝ} (ht : 0 < t) (ht1 : t ≤ 1) :
     (SubnormalizedState.ofStateScale ρ t ht.le ht1).conditionalMaxEntropyPositiveExponent
         (a := a) =
       t * ρ.conditionalMaxEntropyExponent (a := a) := by
-  let ρt : SubnormalizedState (Prod a b) :=
+  let ρt : SubnormalizedState (a × b) :=
     SubnormalizedState.ofStateScale ρ t ht.le ht1
   have htrace_pos : 0 < ρt.matrix.trace.re := by
     dsimp [ρt]
-    rw [Matrix.trace_smul, ρ.trace_eq_one]
+    rw [Matrix.trace_smul, ρ.tr']
     simpa [Complex.real_smul] using ht
   have hne :
       (ρt.conditionalMaxEntropyPositiveExponentValueSet (a := a)).Nonempty :=
@@ -3514,7 +3478,7 @@ theorem conditionalMaxEntropyPositiveExponent_ofStateScale
         sSup ((fun x : ℝ => t * x) ''
             ρ.conditionalMaxEntropyPositiveExponentValueSet (a := a)) =
           t * ρ.conditionalMaxEntropyPositiveExponent (a := a) := by
-      rw [State.conditionalMaxEntropyPositiveExponent]
+      rw [MState.conditionalMaxEntropyPositiveExponent]
       exact mul_sSup_image_eq
         (ρ.conditionalMaxEntropyPositiveExponentValueSet_nonempty (a := a))
         (ρ.conditionalMaxEntropyPositiveExponentValueSet_bddAbove (a := a)) ht
@@ -3522,7 +3486,7 @@ theorem conditionalMaxEntropyPositiveExponent_ofStateScale
     exact hlower
 
 theorem conditionalMaxEntropyPositive_eq_log2_positiveExponent
-    (ρ : SubnormalizedState (Prod a b))
+    (ρ : SubnormalizedState (a × b))
     (hne : (ρ.conditionalMaxEntropyPositiveExponentValueSet (a := a)).Nonempty)
     (hbdd : BddAbove (ρ.conditionalMaxEntropyPositiveExponentValueSet (a := a))) :
     ρ.conditionalMaxEntropyPositive =
@@ -3540,7 +3504,7 @@ decrease subnormalized conditional max-entropy, when both traces are positive. -
 theorem conditionalMaxEntropy_conditioningSumInrCompressed_le
     {extra : Type*} [Fintype extra] [DecidableEq extra]
     [Nonempty a] [Nonempty b]
-    (ρPlus : SubnormalizedState (Prod a (Sum extra b)))
+    (ρPlus : SubnormalizedState (a × (extra ⊕ b)))
     (hPlus : 0 < ρPlus.matrix.trace.re)
     (hCompressed : 0 < ρPlus.conditioningSumInrCompressed.matrix.trace.re) :
     ρPlus.conditioningSumInrCompressed.conditionalMaxEntropyRaw ≤
@@ -3599,7 +3563,7 @@ the small-radius positive-trace condition. -/
 theorem SmoothConditionalMaxEntropyCandidateRaw.conditioningIsometryApply_sumInr_compress
     {extra : Type*} [Fintype extra] [DecidableEq extra]
     [Nonempty a] [Nonempty b]
-    (ρ : SubnormalizedState (Prod a b)) {ε h : ℝ}
+    (ρ : SubnormalizedState (a × b)) {ε h : ℝ}
     (hε : ε < Real.sqrt ρ.matrix.trace.re)
     (hcand :
       SmoothConditionalMaxEntropyCandidateRaw (a := a)
@@ -3629,14 +3593,14 @@ theorem SmoothConditionalMaxEntropyCandidateRaw.conditioningIsometryApply_sumInr
 
 theorem conditionalMaxEntropy_ofStateScale
     [Nonempty a] [Nonempty b]
-    (ρ : State (Prod a b)) {t : ℝ} (ht : 0 < t) (ht1 : t ≤ 1) :
+    (ρ : MState (a × b)) {t : ℝ} (ht : 0 < t) (ht1 : t ≤ 1) :
     (SubnormalizedState.ofStateScale ρ t ht.le ht1).conditionalMaxEntropyRaw =
       ρ.conditionalMaxEntropy + log2 t := by
-  let ρt : SubnormalizedState (Prod a b) :=
+  let ρt : SubnormalizedState (a × b) :=
     SubnormalizedState.ofStateScale ρ t ht.le ht1
   have htrace_pos : 0 < ρt.matrix.trace.re := by
     dsimp [ρt]
-    rw [Matrix.trace_smul, ρ.trace_eq_one]
+    rw [Matrix.trace_smul, ρ.tr']
     simpa [Complex.real_smul] using ht
   have hne :
       (ρt.conditionalMaxEntropyPositiveExponentValueSet (a := a)).Nonempty :=
@@ -3652,21 +3616,21 @@ theorem conditionalMaxEntropy_ofStateScale
   rw [conditionalMaxEntropy_eq_positive,
     conditionalMaxEntropyPositive_eq_log2_positiveExponent (a := a) ρt hne hbdd,
     conditionalMaxEntropyPositiveExponent_ofStateScale (a := a) ρ ht ht1,
-    State.conditionalMaxEntropy_eq_positive (a := a),
-    State.conditionalMaxEntropyPositive_eq_log2_exponent_of_nonempty (a := a)]
+    MState.conditionalMaxEntropy_eq_positive (a := a),
+    MState.conditionalMaxEntropyPositive_eq_log2_exponent_of_nonempty (a := a)]
   unfold log2
   rw [Real.log_mul ht.ne' hρexp_pos.ne']
   ring
 
 theorem ConditionalMinEntropyScaleFeasible.ofStateScale
-    {ρ : State (Prod a b)} {T : CMatrix b} {t : ℝ}
-    (hT : State.ConditionalMinEntropyScaleFeasible (a := a) ρ T)
+    {ρ : MState (a × b)} {T : CMatrix b} {t : ℝ}
+    (hT : MState.ConditionalMinEntropyScaleFeasible (a := a) ρ T)
     (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
     ConditionalMinEntropyScaleFeasible (a := a)
       (SubnormalizedState.ofStateScale ρ t ht0 ht1) (t • T) := by
   constructor
   · exact Matrix.PosSemidef.smul hT.1 ht0
-  · have hscaled := cMatrix_real_smul_le_smul (A := ρ.matrix)
+  · have hscaled := cMatrix_real_smul_le_smul (A := ρ.m)
       (B := Matrix.kronecker (1 : CMatrix a) T) ht0 hT.2
     have hkr :
         Matrix.kronecker (1 : CMatrix a) (t • T) =
@@ -3678,11 +3642,11 @@ theorem ConditionalMinEntropyScaleFeasible.ofStateScale
     exact hscaled
 
 theorem ConditionalMinEntropyScaleFeasible.toStateScale
-    {ρ : State (Prod a b)} {T : CMatrix b} {t : ℝ}
+    {ρ : MState (a × b)} {T : CMatrix b} {t : ℝ}
     (ht : 0 < t) (ht1 : t ≤ 1)
     (hT : ConditionalMinEntropyScaleFeasible (a := a)
       (SubnormalizedState.ofStateScale ρ t ht.le ht1) T) :
-    State.ConditionalMinEntropyScaleFeasible (a := a) ρ (t⁻¹ • T) := by
+    MState.ConditionalMinEntropyScaleFeasible (a := a) ρ (t⁻¹ • T) := by
   constructor
   · exact Matrix.PosSemidef.smul hT.1 (inv_nonneg.mpr ht.le)
   · have hscaled := cMatrix_real_smul_le_smul
@@ -3696,7 +3660,7 @@ theorem ConditionalMinEntropyScaleFeasible.toStateScale
       ring
 
 theorem conditionalMinEntropyScaleValueSet_ofStateScale
-    (ρ : State (Prod a b)) {t : ℝ} (ht : 0 < t) (ht1 : t ≤ 1) :
+    (ρ : MState (a × b)) {t : ℝ} (ht : 0 < t) (ht1 : t ≤ 1) :
     (SubnormalizedState.ofStateScale ρ t ht.le ht1).conditionalMinEntropyScaleValueSet (a := a) =
       (fun r : ℝ => t * r) '' ρ.conditionalMinEntropyScaleValueSet (a := a) := by
   ext x
@@ -3715,11 +3679,11 @@ theorem conditionalMinEntropyScaleValueSet_ofStateScale
     simp [Complex.real_smul]
 
 theorem conditionalMinEntropyScale_ofStateScale
-    (ρ : State (Prod a b)) {t : ℝ} (ht : 0 < t) (ht1 : t ≤ 1) :
+    (ρ : MState (a × b)) {t : ℝ} (ht : 0 < t) (ht1 : t ≤ 1) :
     (SubnormalizedState.ofStateScale ρ t ht.le ht1).conditionalMinEntropyScale (a := a) =
       t * ρ.conditionalMinEntropyScale (a := a) := by
   rw [conditionalMinEntropyScale_eq_sInf_scaleValueSet,
-    State.conditionalMinEntropyScale_eq_sInf_scaleValueSet,
+    MState.conditionalMinEntropyScale_eq_sInf_scaleValueSet,
     conditionalMinEntropyScaleValueSet_ofStateScale (a := a) ρ ht ht1]
   let s : Set ℝ := ρ.conditionalMinEntropyScaleValueSet (a := a)
   have himage : (fun r : ℝ => t * r) '' s = t • s := by
@@ -3735,7 +3699,7 @@ theorem conditionalMinEntropyScale_ofStateScale
 
 theorem conditionalMinEntropy_ofStateScale
     [Nonempty a] [Nonempty b]
-    (ρ : State (Prod a b)) {t : ℝ} (ht : 0 < t) (ht1 : t ≤ 1) :
+    (ρ : MState (a × b)) {t : ℝ} (ht : 0 < t) (ht1 : t ≤ 1) :
     (SubnormalizedState.ofStateScale ρ t ht.le ht1).conditionalMinEntropyRaw =
       ρ.conditionalMinEntropy - log2 t := by
   have htrace_pos :
@@ -3744,7 +3708,7 @@ theorem conditionalMinEntropy_ofStateScale
     exact ht
   rw [conditionalMinEntropy_eq_neg_log2_scale_of_trace_pos (a := a)
       (SubnormalizedState.ofStateScale ρ t ht.le ht1) htrace_pos,
-    State.conditionalMinEntropy_eq_neg_log2_scale_of_nonempty (a := a),
+    MState.conditionalMinEntropy_eq_neg_log2_scale_of_nonempty (a := a),
     conditionalMinEntropyScale_ofStateScale (a := a) ρ ht ht1]
   have hscale_pos : 0 < ρ.conditionalMinEntropyScale (a := a) := by
     rw [ρ.conditionalMinEntropyScale_eq_normalizedScale (a := a)]
@@ -3757,7 +3721,7 @@ theorem conditionalMinEntropy_ofStateScale
 min-entropy, exposing the trace penalty used in the AEP upper-bound route. -/
 theorem conditionalMinEntropy_eq_normalize_sub_log2_trace
     [Nonempty a] [Nonempty b]
-    (ρ : SubnormalizedState (Prod a b)) (hρ : 0 < ρ.matrix.trace.re) :
+    (ρ : SubnormalizedState (a × b)) (hρ : 0 < ρ.matrix.trace.re) :
     ρ.conditionalMinEntropyRaw =
       (ρ.normalize hρ.ne').conditionalMinEntropy - log2 ρ.matrix.trace.re := by
   have hscale :
@@ -3773,14 +3737,14 @@ theorem conditionalMinEntropy_eq_normalize_sub_log2_trace
   simpa [hstate] using hscale
 
 theorem generalizedFidelity_toSubnormalized_ofStateScale
-    (ρ σ : State a) {t : ℝ} (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
+    (ρ σ : MState a) {t : ℝ} (ht0 : 0 ≤ t) (ht1 : t ≤ 1) :
     ρ.toSubnormalized.generalizedFidelity
         (SubnormalizedState.ofStateScale σ t ht0 ht1) =
       t * ρ.squaredFidelity σ := by
   rw [SubnormalizedState.generalizedFidelity_eq,
-    State.squaredFidelity_eq_traceNorm_sqrtMatrix_mul_sqrtMatrix_sq]
-  have hρtr : ρ.matrix.trace.re = 1 := by
-    rw [ρ.trace_eq_one]
+    MState.squaredFidelity_eq_traceNorm_sqrtMatrix_mul_sqrtMatrix_sq]
+  have hρtr : ρ.m.trace.re = 1 := by
+    rw [ρ.tr']
     norm_num
   have hσtr :
       (SubnormalizedState.ofStateScale σ t ht0 ht1).matrix.trace.re = t := by
@@ -3788,11 +3752,11 @@ theorem generalizedFidelity_toSubnormalized_ofStateScale
   have hsqrt :
       psdSqrt (SubnormalizedState.ofStateScale σ t ht0 ht1).matrix =
         ((Real.sqrt t : ℝ) : ℂ) • σ.sqrtMatrix := by
-    rw [SubnormalizedState.ofStateScale_matrix, State.sqrtMatrix]
-    exact psdSqrt_real_smul ht0 σ.pos
-  rw [State.toSubnormalized_matrix, hsqrt, hρtr, hσtr]
+    rw [SubnormalizedState.ofStateScale_matrix, MState.sqrtMatrix]
+    exact psdSqrt_real_smul ht0 σ.psd
+  rw [MState.toSubnormalized_matrix, hsqrt, hρtr, hσtr]
   rw [Matrix.mul_smul, traceNorm_real_smul_eq (Real.sqrt_nonneg t)]
-  simp [State.sqrtMatrix]
+  simp [MState.sqrtMatrix]
   nlinarith [Real.sq_sqrt ht0]
 
 /-- Normalizing a positive-trace subnormalized witness around a normalized
@@ -3803,10 +3767,10 @@ For a trace-one center the generalized fidelity of the scaled witness is
 purified distance. This is the source smoothing bridge used in the AFW upper
 half of the asymptotic AEP. -/
 theorem purifiedDistance_normalize_le_of_toSubnormalized
-    (ρ : State a) (τ : SubnormalizedState a) (hτ : 0 < τ.matrix.trace.re) :
+    (ρ : MState a) (τ : SubnormalizedState a) (hτ : 0 < τ.matrix.trace.re) :
     ρ.purifiedDistance (τ.normalize hτ.ne') ≤
       ρ.toSubnormalized.purifiedDistance τ := by
-  let τhat : State a := τ.normalize hτ.ne'
+  let τhat : MState a := τ.normalize hτ.ne'
   let t : ℝ := τ.matrix.trace.re
   have hstate :
       SubnormalizedState.ofStateScale τhat t hτ.le τ.trace_le_one = τ := by
@@ -3817,7 +3781,7 @@ theorem purifiedDistance_normalize_le_of_toSubnormalized
         t * ρ.squaredFidelity τhat :=
     generalizedFidelity_toSubnormalized_ofStateScale ρ τhat hτ.le τ.trace_le_one
   have hfid_nonneg : 0 ≤ ρ.squaredFidelity τhat :=
-    State.squaredFidelity_nonneg ρ τhat
+    MState.squaredFidelity_nonneg ρ τhat
   have hinside :
       1 - ρ.squaredFidelity τhat ≤
         1 - t * ρ.squaredFidelity τhat := by
@@ -3828,7 +3792,7 @@ theorem purifiedDistance_normalize_le_of_toSubnormalized
   calc
     ρ.purifiedDistance (τ.normalize hτ.ne') =
         Real.sqrt (1 - ρ.squaredFidelity τhat) := by
-          simp [τhat, State.purifiedDistance_eq]
+          simp [τhat, MState.purifiedDistance_eq]
     _ ≤ Real.sqrt (1 - t * ρ.squaredFidelity τhat) :=
         Real.sqrt_le_sqrt hinside
     _ = ρ.toSubnormalized.purifiedDistance
@@ -3838,45 +3802,36 @@ theorem purifiedDistance_normalize_le_of_toSubnormalized
           rw [hstate]
 
 theorem purifiedBall_normalize_of_toSubnormalized_purifiedBall
-    {ρ : State a} {τ : SubnormalizedState a} {ε : ℝ}
+    {ρ : MState a} {τ : SubnormalizedState a} {ε : ℝ}
     (hτ : 0 < τ.matrix.trace.re)
     (hball : ρ.toSubnormalized.purifiedBall ε τ) :
     ρ.purifiedBall ε (τ.normalize hτ.ne') :=
   le_trans (purifiedDistance_normalize_le_of_toSubnormalized ρ τ hτ) hball
 
-private theorem rpow_two_neg_sub_log2 (t lam : ℝ) (ht : 0 < t) :
-    Real.rpow 2 (-(lam - log2 t)) = t * Real.rpow 2 (-lam) := by
-  calc
-    Real.rpow 2 (-(lam - log2 t)) =
-        Real.rpow 2 (log2 t + -lam) := by ring_nf
-    _ = Real.rpow 2 (log2 t) * Real.rpow 2 (-lam) := by
-        exact Real.rpow_add (by norm_num : (0 : ℝ) < 2) (log2 t) (-lam)
-    _ = t * Real.rpow 2 (-lam) := by rw [rpow_two_log2_pos ht]
-
 theorem ConditionalMinEntropyFeasible.ofStateScale_shift
-    {ρ : State (Prod a b)} {σ : State b} {t lam : ℝ}
+    {ρ : MState (a × b)} {σ : MState b} {t lam : ℝ}
     (ht : 0 < t) (ht1 : t ≤ 1)
-    (h : State.ConditionalMinEntropyFeasible (a := a) ρ σ lam) :
+    (h : MState.ConditionalMinEntropyFeasible (a := a) ρ σ lam) :
     ConditionalMinEntropyFeasible (a := a)
       (ofStateScale ρ t ht.le ht1) σ.toSubnormalized (lam - log2 t) := by
-  change ρ.matrix ≤
-      (Real.rpow 2 (-lam) : ℂ) • State.identityTensorStateMatrix (a := a) σ at h
-  change t • ρ.matrix ≤
+  change ρ.m ≤
+      (Real.rpow 2 (-lam) : ℂ) • MState.identityTensorStateMatrix (a := a) σ at h
+  change t • ρ.m ≤
       (Real.rpow 2 (-(lam - log2 t)) : ℂ) •
         identityTensorStateMatrix (a := a) σ.toSubnormalized
-  have hscaled := cMatrix_real_smul_le_smul (A := ρ.matrix)
-    (B := (Real.rpow 2 (-lam) : ℂ) • State.identityTensorStateMatrix (a := a) σ)
+  have hscaled := cMatrix_real_smul_le_smul (A := ρ.m)
+    (B := (Real.rpow 2 (-lam) : ℂ) • MState.identityTensorStateMatrix (a := a) σ)
     ht.le h
   convert hscaled using 1
-  rw [rpow_two_neg_sub_log2 t lam ht]
+  rw [show -(lam - log2 t) = log2 t - lam by ring, rpow_two_log2_sub ht]
   ext i j
-  simp [State.toSubnormalized_identityTensorStateMatrix_eq]
+  simp [MState.toSubnormalized_identityTensorStateMatrix_eq]
   ring
 
 theorem conditionalMinEntropyFeasibleExponentValueSet_shift_subset_ofStateScale
-    (ρ : State (Prod a b)) {t : ℝ} (ht : 0 < t) (ht1 : t ≤ 1) :
+    (ρ : MState (a × b)) {t : ℝ} (ht : 0 < t) (ht1 : t ≤ 1) :
     (fun lam : ℝ => lam - log2 t) ''
-        State.conditionalMinEntropyFeasibleExponentValueSet (a := a) ρ ⊆
+        MState.conditionalMinEntropyFeasibleExponentValueSet (a := a) ρ ⊆
       {mu : ℝ | ∃ σ : SubnormalizedState b,
         ConditionalMinEntropyFeasible (a := a)
           (ofStateScale ρ t ht.le ht1) σ mu} := by

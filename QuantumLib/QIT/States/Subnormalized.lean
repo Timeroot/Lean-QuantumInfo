@@ -32,16 +32,20 @@ open scoped ComplexOrder MatrixOrder
 
 open Matrix
 
-namespace QIT
-
+noncomputable section
 universe u v
 
-noncomputable section
+open QIT
+
+namespace QIT
 
 /-- A finite-dimensional subnormalized density state. -/
 structure SubnormalizedState (a : Type u) [Fintype a] [DecidableEq a] where
+  /-- The underlying matrix. -/
   matrix : CMatrix a
+  /-- The matrix is positive semidefinite. -/
   pos : matrix.PosSemidef
+  /-- The trace is at most one, rather than exactly one as for a state. -/
   trace_le_one : matrix.trace.re ≤ 1
 
 namespace SubnormalizedState
@@ -81,23 +85,23 @@ theorem trace_pos_of_trace_ne_zero (ρ : SubnormalizedState a)
   lt_of_le_of_ne ρ.trace_nonneg htr.symm
 
 /-- Normalize a nonzero subnormalized state by dividing by its trace. -/
-def normalize (ρ : SubnormalizedState a) (htr : ρ.matrix.trace.re ≠ 0) : State a where
-  matrix := (ρ.matrix.trace.re)⁻¹ • ρ.matrix
-  pos := Matrix.PosSemidef.smul ρ.pos (inv_nonneg.mpr ρ.trace_nonneg)
-  trace_eq_one := by
+def normalize (ρ : SubnormalizedState a) (htr : ρ.matrix.trace.re ≠ 0) : MState a := .ofMatrix
+  (matrix := (ρ.matrix.trace.re)⁻¹ • ρ.matrix)
+  (pos := Matrix.PosSemidef.smul ρ.pos (inv_nonneg.mpr ρ.trace_nonneg))
+  (trace_eq_one := by
     rw [Matrix.trace_smul]
     apply Complex.ext
     · simp [Complex.real_smul, htr]
-    · simp [Complex.real_smul, ρ.trace_im_zero]
+    · simp [Complex.real_smul, ρ.trace_im_zero])
 
 @[simp]
 theorem normalize_matrix (ρ : SubnormalizedState a) (htr : ρ.matrix.trace.re ≠ 0) :
-    (ρ.normalize htr).matrix = (ρ.matrix.trace.re)⁻¹ • ρ.matrix :=
-  rfl
+    (ρ.normalize htr).m = (ρ.matrix.trace.re)⁻¹ • ρ.matrix :=
+  MState.matrix_ofMatrix _ _ _
 
 /-- Product of subnormalized states as a Kronecker product. -/
 def prod (ρ : SubnormalizedState a) (σ : SubnormalizedState b) :
-    SubnormalizedState (Prod a b) where
+    SubnormalizedState (a × b) where
   matrix := Matrix.kronecker ρ.matrix σ.matrix
   pos := ρ.pos.kronecker σ.pos
   trace_le_one := by
@@ -108,41 +112,41 @@ def prod (ρ : SubnormalizedState a) (σ : SubnormalizedState b) :
 
 /-- `Tr_A` of a product subnormalized state leaves the second factor scaled by
 the trace of the first. -/
-theorem partialTraceA_prod (ρ : SubnormalizedState a) (σ : SubnormalizedState b) :
-    partialTraceA (a := a) (b := b) (ρ.prod σ).matrix =
+theorem traceLeft_prod (ρ : SubnormalizedState a) (σ : SubnormalizedState b) :
+    Matrix.traceLeft (ρ.prod σ).matrix =
       matrixScale ρ.matrix.trace σ.matrix := by
-  rw [prod, partialTraceA_kronecker]
+  rw [prod, traceLeft_kronecker]
 
 /-- `Tr_B` of a product subnormalized state leaves the first factor scaled by
 the trace of the second. -/
-theorem partialTraceB_prod (ρ : SubnormalizedState a) (σ : SubnormalizedState b) :
-    partialTraceB (a := a) (b := b) (ρ.prod σ).matrix =
+theorem traceRight_prod (ρ : SubnormalizedState a) (σ : SubnormalizedState b) :
+    Matrix.traceRight (ρ.prod σ).matrix =
       matrixScale σ.matrix.trace ρ.matrix := by
-  rw [prod, partialTraceB_kronecker]
+  rw [prod, traceRight_kronecker]
 
 /-- Marginal subnormalized state on the first subsystem. -/
-def marginalA (ρ : SubnormalizedState (Prod a b)) : SubnormalizedState a where
-  matrix := partialTraceB (a := a) (b := b) ρ.matrix
-  pos := partialTraceB_posSemidef ρ.pos
+def traceRight (ρ : SubnormalizedState (a × b)) : SubnormalizedState a where
+  matrix := Matrix.traceRight ρ.matrix
+  pos := traceRight_posSemidef ρ.pos
   trace_le_one := by
-    rw [partialTraceB_trace]
+    rw [Matrix.traceRight_trace]
     exact ρ.trace_le_one
 
 /-- Marginal subnormalized state on the second subsystem. -/
-def marginalB (ρ : SubnormalizedState (Prod a b)) : SubnormalizedState b where
-  matrix := partialTraceA (a := a) (b := b) ρ.matrix
-  pos := partialTraceA_posSemidef ρ.pos
+def traceLeft (ρ : SubnormalizedState (a × b)) : SubnormalizedState b where
+  matrix := Matrix.traceLeft ρ.matrix
+  pos := traceLeft_posSemidef ρ.pos
   trace_le_one := by
-    rw [partialTraceA_trace]
+    rw [Matrix.traceLeft_trace]
     exact ρ.trace_le_one
 
 @[simp]
-theorem marginalA_matrix (ρ : SubnormalizedState (Prod a b)) :
-    ρ.marginalA.matrix = partialTraceB (a := a) (b := b) ρ.matrix := rfl
+theorem traceRight_matrix (ρ : SubnormalizedState (a × b)) :
+    ρ.traceRight.matrix = Matrix.traceRight ρ.matrix := rfl
 
 @[simp]
-theorem marginalB_matrix (ρ : SubnormalizedState (Prod a b)) :
-    ρ.marginalB.matrix = partialTraceA (a := a) (b := b) ρ.matrix := rfl
+theorem traceLeft_matrix (ρ : SubnormalizedState (a × b)) :
+    ρ.traceLeft.matrix = Matrix.traceLeft ρ.matrix := rfl
 
 /-- Generalized fidelity for finite-dimensional subnormalized states, following
 the squared convention used by the Tomamichel purified-distance route. -/
@@ -218,7 +222,7 @@ theorem hatFailureBlock_pos (ρ : SubnormalizedState a) :
 /-- The block-diagonal matrix `ρ ⊕ (1 - Tr ρ)` on a one-dimensional failure
 register plus the original system.  The failure register is the `Sum.inl`
 summand; the original system is the `Sum.inr` summand. -/
-def hatExtensionMatrix (ρ : SubnormalizedState a) : CMatrix (Sum PUnit a) :=
+def hatExtensionMatrix (ρ : SubnormalizedState a) : CMatrix (PUnit ⊕ a) :=
   Matrix.fromBlocks ρ.hatFailureBlock 0 0 ρ.matrix
 
 @[simp]
@@ -263,62 +267,19 @@ theorem hatExtensionMatrix_trace (ρ : SubnormalizedState a) :
 one-dimensional failure register with weight `1 - Tr ρ`.  This is the finite
 Lean version of Tomamichel's block-diagonal `ρ̂ = ρ ⊕ (1 - Tr ρ)` construction
 from `metric.tex`, lines 246-248 and 414-416. -/
-def hatExtension (ρ : SubnormalizedState a) : State (Sum PUnit a) where
-  matrix := ρ.hatExtensionMatrix
-  pos := ρ.hatExtensionMatrix_pos
-  trace_eq_one := ρ.hatExtensionMatrix_trace
+def hatExtension (ρ : SubnormalizedState a) : MState (PUnit ⊕ a) := .ofMatrix
+  (matrix := ρ.hatExtensionMatrix)
+  (pos := ρ.hatExtensionMatrix_pos)
+  (trace_eq_one := ρ.hatExtensionMatrix_trace)
 
 @[simp]
 theorem hatExtension_matrix (ρ : SubnormalizedState a) :
-    ρ.hatExtension.matrix = ρ.hatExtensionMatrix :=
-  rfl
+    ρ.hatExtension.m = ρ.hatExtensionMatrix :=
+  MState.matrix_ofMatrix _ _ _
 
 theorem hatExtension_trace_one (ρ : SubnormalizedState a) :
-    ρ.hatExtension.matrix.trace = 1 :=
-  ρ.hatExtension.trace_eq_one
-
-private theorem punit_psdSqrt_const (r : ℝ) (hr : 0 ≤ r) :
-    psdSqrt (Matrix.of fun _ _ : PUnit => ((r : ℝ) : ℂ) : CMatrix PUnit) =
-      (Matrix.of fun _ _ : PUnit => ((Real.sqrt r : ℝ) : ℂ) : CMatrix PUnit) := by
-  let A : CMatrix PUnit := Matrix.of fun _ _ => ((r : ℝ) : ℂ)
-  let S : CMatrix PUnit := Matrix.of fun _ _ => ((Real.sqrt r : ℝ) : ℂ)
-  have hsqrt_sq : ((Real.sqrt r : ℂ) * (Real.sqrt r : ℂ)) = (r : ℂ) := by
-    rw [← Complex.ofReal_mul, Real.mul_self_sqrt hr]
-  have hSsq : S * S = A := by
-    ext i j
-    cases i
-    cases j
-    simp [S, A, Matrix.mul_apply, hsqrt_sq]
-  have hSpos : S.PosSemidef := by
-    have hdiag : S = Matrix.diagonal (fun _ : PUnit => ((Real.sqrt r : ℝ) : ℂ)) := by
-      ext i j
-      cases i
-      cases j
-      simp [S, Matrix.diagonal]
-    rw [hdiag]
-    exact Matrix.PosSemidef.diagonal fun _ =>
-      Complex.nonneg_iff.mpr ⟨Real.sqrt_nonneg r, by simp⟩
-  change psdSqrt A = S
-  simpa [psdSqrt] using (CFC.sqrt_unique (a := A) (b := S) hSsq hSpos.nonneg)
-
-private theorem traceNorm_punit_const_of_nonneg (r : ℝ) (hr : 0 ≤ r) :
-    traceNorm (Matrix.of fun _ _ : PUnit => ((r : ℝ) : ℂ) : CMatrix PUnit) = r := by
-  let A : CMatrix PUnit := Matrix.of fun _ _ => ((r : ℝ) : ℂ)
-  have hgram : Aᴴ * A = (Matrix.of fun _ _ : PUnit => ((r * r : ℝ) : ℂ) : CMatrix PUnit) := by
-    ext i j
-    cases i
-    cases j
-    simp [A, Matrix.mul_apply, ← Complex.ofReal_mul]
-  have hsqrt : psdSqrt (Aᴴ * A) = A := by
-    rw [hgram]
-    rw [punit_psdSqrt_const (r * r) (mul_self_nonneg r)]
-    ext i j
-    cases i
-    cases j
-    simp [A, Real.sqrt_mul_self hr]
-  rw [traceNorm]
-  rw [hsqrt]
-  simp [A, Matrix.trace]
+    ρ.hatExtension.m.trace = 1 :=
+  ρ.hatExtension.tr'
 
 /-- The generalized fidelity of subnormalized states is the squared fidelity of
 their normalized hat extensions.  This is Tomamichel's
@@ -327,7 +288,7 @@ theorem generalizedFidelity_eq_squaredFidelity_hatExtension
     (ρ σ : SubnormalizedState a) :
     ρ.generalizedFidelity σ =
       ρ.hatExtension.squaredFidelity σ.hatExtension := by
-  rw [generalizedFidelity_eq, State.squaredFidelity_eq_traceNorm_sqrtMatrix_mul_sqrtMatrix_sq]
+  rw [generalizedFidelity_eq, MState.squaredFidelity_eq_traceNorm_sqrtMatrix_mul_sqrtMatrix_sq]
   have hρfail : 0 ≤ ρ.hatFailureMass := ρ.hatFailureMass_nonneg
   have hσfail : 0 ≤ σ.hatFailureMass := σ.hatFailureMass_nonneg
   have hρsqrt :
@@ -335,7 +296,7 @@ theorem generalizedFidelity_eq_squaredFidelity_hatExtension
         Matrix.fromBlocks
           (Matrix.of fun _ _ : PUnit => ((Real.sqrt ρ.hatFailureMass : ℝ) : ℂ))
           0 0 (psdSqrt ρ.matrix) := by
-    rw [State.sqrtMatrix, hatExtension_matrix, hatExtensionMatrix]
+    rw [MState.sqrtMatrix, hatExtension_matrix, hatExtensionMatrix]
     rw [Matrix.fromBlocks_diagonal_psdSqrt ρ.hatFailureBlock_pos ρ.pos]
     rw [show psdSqrt ρ.hatFailureBlock =
         (Matrix.of fun _ _ : PUnit => ((Real.sqrt ρ.hatFailureMass : ℝ) : ℂ)) by
@@ -345,7 +306,7 @@ theorem generalizedFidelity_eq_squaredFidelity_hatExtension
         Matrix.fromBlocks
           (Matrix.of fun _ _ : PUnit => ((Real.sqrt σ.hatFailureMass : ℝ) : ℂ))
           0 0 (psdSqrt σ.matrix) := by
-    rw [State.sqrtMatrix, hatExtension_matrix, hatExtensionMatrix]
+    rw [MState.sqrtMatrix, hatExtension_matrix, hatExtensionMatrix]
     rw [Matrix.fromBlocks_diagonal_psdSqrt σ.hatFailureBlock_pos σ.pos]
     rw [show psdSqrt σ.hatFailureBlock =
         (Matrix.of fun _ _ : PUnit => ((Real.sqrt σ.hatFailureMass : ℝ) : ℂ)) by
@@ -358,7 +319,7 @@ theorem generalizedFidelity_eq_squaredFidelity_hatExtension
         Matrix.fromBlocks
           (Matrix.of fun _ _ : PUnit => ((Real.sqrt σ.hatFailureMass : ℝ) : ℂ))
           0 0 (psdSqrt σ.matrix) :
-        CMatrix (Sum PUnit a)) =
+        CMatrix (PUnit ⊕ a)) =
         Matrix.fromBlocks
           ((Matrix.of fun _ _ : PUnit => ((Real.sqrt ρ.hatFailureMass : ℝ) : ℂ)) *
             (Matrix.of fun _ _ : PUnit => ((Real.sqrt σ.hatFailureMass : ℝ) : ℂ)) :
@@ -433,17 +394,15 @@ theorem applyTraceNonincreasingCP_matrix (ρ : SubnormalizedState a)
 theorem hatExtension_applyTraceNonincreasingCP (ρ : SubnormalizedState a)
     (Φ : MatrixMap a b) (hΦ : MatrixMap.TraceNonincreasingCP Φ) :
     (ρ.applyTraceNonincreasingCP Φ hΦ).hatExtension =
-      hΦ.hatCompletion.applyState ρ.hatExtension := by
+      hΦ.hatCompletion ρ.hatExtension := by
   classical
-  apply State.ext
-  change
-    (ρ.applyTraceNonincreasingCP Φ hΦ).hatExtensionMatrix =
-      hΦ.hatCompletion.map ρ.hatExtensionMatrix
+  apply MState.ext
+  simp only [hatExtension_matrix, CPTPOp.mat_coe_eq_apply_mat]
   change
     (Matrix.fromBlocks (ρ.applyTraceNonincreasingCP Φ hΦ).hatFailureBlock 0 0
-        (ρ.applyTraceNonincreasingCP Φ hΦ).matrix : CMatrix (Sum PUnit b)) =
+        (ρ.applyTraceNonincreasingCP Φ hΦ).matrix : CMatrix (PUnit ⊕ b)) =
       (MatrixMap.TraceNonincreasingCP.hatCompletion hΦ).map
-        (Matrix.fromBlocks ρ.hatFailureBlock 0 0 ρ.matrix : CMatrix (Sum PUnit a))
+        (Matrix.fromBlocks ρ.hatFailureBlock 0 0 ρ.matrix : CMatrix (PUnit ⊕ a))
   have hloss_trace :
       (ρ.matrix * hΦ.lossEffect).trace =
         ρ.matrix.trace - (Φ ρ.matrix).trace := by
@@ -523,47 +482,52 @@ theorem hatExtension_applyTraceNonincreasingCP (ρ : SubnormalizedState a)
             (ρ.applyTraceNonincreasingCP Φ hΦ).matrix xi yj =
                 MatrixMap.ofKraus hΦ.kraus ρ.matrix xi yj := by
               simp [applyTraceNonincreasingCP_matrix, hΦ.ofKraus_kraus]
-            _ = (MatrixMap.ofKraus hΦ.hatCompletionKraus
-                (Matrix.fromBlocks ρ.hatFailureBlock 0 0 ρ.matrix))
+            _ = hΦ.hatCompletion.map
+                (Matrix.fromBlocks ρ.hatFailureBlock 0 0 ρ.matrix)
                 (Sum.inr xi) (Sum.inr yj) := by
-              simp [MatrixMap.ofKraus, MatrixMap.TraceNonincreasingCP.hatCompletionKraus,
+              simp [MatrixMap.TraceNonincreasingCP.hatCompletion, MatrixMap.ofKraus,
+                MatrixMap.TraceNonincreasingCP.hatCompletionKraus,
                 Matrix.sum_apply, Matrix.conjTranspose_apply, Matrix.mul_apply,
                 Fintype.sum_sum_type]
 
 end SubnormalizedState
 
-namespace State
+end QIT
+
+namespace MState
 
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
 /-- View a normalized density state as a subnormalized state. -/
-def toSubnormalized (ρ : State a) : SubnormalizedState a where
-  matrix := ρ.matrix
-  pos := ρ.pos
+def toSubnormalized (ρ : MState a) : SubnormalizedState a where
+  matrix := ρ.m
+  pos := ρ.psd
   trace_le_one := by
-    rw [ρ.trace_eq_one]
+    rw [ρ.tr']
     norm_num
 
 @[simp]
-theorem toSubnormalized_matrix (ρ : State a) :
-    ρ.toSubnormalized.matrix = ρ.matrix := rfl
+theorem toSubnormalized_matrix (ρ : MState a) :
+    ρ.toSubnormalized.matrix = ρ.m := rfl
 
-@[simp]
-theorem toSubnormalized_trace (ρ : State a) :
+theorem toSubnormalized_trace (ρ : MState a) :
     ρ.toSubnormalized.matrix.trace = 1 :=
-  ρ.trace_eq_one
+  ρ.tr'
 
-end State
+end MState
 
-theorem State.toSubnormalized_reindex_eq
+namespace QIT
+
+theorem _root_.MState.toSubnormalized_reindex_eq
     {a : Type u} {b : Type v}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
-    (rho : State a) (e : a ≃ b) :
+    (rho : MState a) (e : a ≃ b) :
     (rho.reindex e).toSubnormalized =
       rho.toSubnormalized.applyTraceNonincreasingCP
-        (Channel.reindex e).map (Channel.reindex e).traceNonincreasingCP_map := by
+        (CPTPOp.reindex e).map (CPTPOp.reindex e).traceNonincreasingCP_map := by
   apply SubnormalizedState.ext
-  have h := congrArg State.matrix (Channel.reindex_applyState e rho)
+  have h := congrArg DensityOp.m (CPTPOp.reindex_applyState e rho)
+  rw [CPTPOp.mat_coe_eq_apply_mat] at h
   exact h.symm
 
 namespace SubnormalizedState
@@ -573,7 +537,7 @@ variable {a : Type u} [Fintype a] [DecidableEq a]
 /-- Drop the one-dimensional failure block from the hat extension, recovering a
 subnormalized state on the original system. -/
 def dropHatExtension (ρ : SubnormalizedState a) : SubnormalizedState a :=
-  let ρhat : State (Sum PUnit.{u + 1} a) := ρ.hatExtension
+  let ρhat : MState (PUnit.{u + 1} ⊕ a) := ρ.hatExtension
   ρhat.toSubnormalized.applyTraceNonincreasingCP
     (MatrixMap.sumInrCompression (α := a))
     (MatrixMap.sumInrCompression_traceNonincreasingCP (α := a))
@@ -584,11 +548,9 @@ theorem dropHatExtension_eq (ρ : SubnormalizedState a) :
     ρ.dropHatExtension = ρ := by
   apply SubnormalizedState.ext
   ext i j
-  simp [dropHatExtension, State.toSubnormalized, MatrixMap.sumInrCompression,
+  simp [dropHatExtension, MState.toSubnormalized, MatrixMap.sumInrCompression,
     SubnormalizedState.applyTraceNonincreasingCP]
 
 end SubnormalizedState
-
-end
 
 end QIT

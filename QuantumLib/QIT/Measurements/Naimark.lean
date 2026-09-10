@@ -29,13 +29,13 @@ and [MayersYao2003SelfTesting, mayers-yao-2003-self-testing.tex:307-325].
 
 open scoped ComplexOrder MatrixOrder NNReal
 
-namespace QIT
+namespace POVM
+
+open QIT
 
 universe u v w
 
 noncomputable section
-
-namespace POVM
 
 variable {y : Type u} {a : Type v}
 variable [Fintype y] [DecidableEq y] [Fintype a] [DecidableEq a]
@@ -249,64 +249,64 @@ theorem naimark_compression_projector (M : POVM y a) (outcome : y) :
           rw [psdSqrt_mul_self_of_posSemidef (M.pos outcome)]
 
 /-- The lifted state in the Naimark dilation space. -/
-def naimarkLiftState (M : POVM y a) (rho : State a) : State M.NaimarkSpace where
-  matrix := M.naimarkEmbedding * rho.matrix * Matrix.conjTranspose M.naimarkEmbedding
-  pos := rho.pos.mul_mul_conjTranspose_same M.naimarkEmbedding
-  trace_eq_one := by
-    rw [Matrix.trace_mul_cycle, M.naimarkEmbedding_isometry, Matrix.one_mul, rho.trace_eq_one]
+def naimarkLiftState (M : POVM y a) (rho : MState a) : MState M.NaimarkSpace := .ofMatrix
+  (matrix := M.naimarkEmbedding * rho.m * Matrix.conjTranspose M.naimarkEmbedding)
+  (pos := rho.psd.mul_mul_conjTranspose_same M.naimarkEmbedding)
+  (trace_eq_one := by
+    rw [Matrix.trace_mul_cycle, M.naimarkEmbedding_isometry, Matrix.one_mul, rho.tr'])
 
 /-- Matrix formula for the lifted state. -/
 @[simp]
-theorem naimarkLiftState_matrix (M : POVM y a) (rho : State a) :
-    (M.naimarkLiftState rho).matrix =
-      M.naimarkEmbedding * rho.matrix * Matrix.conjTranspose M.naimarkEmbedding :=
-  rfl
+theorem naimarkLiftState_matrix (M : POVM y a) (rho : MState a) :
+    (M.naimarkLiftState rho).m =
+      M.naimarkEmbedding * rho.m * Matrix.conjTranspose M.naimarkEmbedding :=
+  MState.matrix_ofMatrix _ _ _
 
 /-- The Naimark dilation preserves the complex Born-rule trace. -/
-theorem naimark_trace_projector_eq (M : POVM y a) (rho : State a) (outcome : y) :
-    ((M.naimarkLiftState rho).matrix * M.naimarkProjector outcome).trace =
-      (rho.matrix * M.effects outcome).trace := by
+theorem naimark_trace_projector_eq (M : POVM y a) (rho : MState a) (outcome : y) :
+    ((M.naimarkLiftState rho).m * M.naimarkProjector outcome).trace =
+      (rho.m * M.effects outcome).trace := by
   calc
-    ((M.naimarkLiftState rho).matrix * M.naimarkProjector outcome).trace
+    ((M.naimarkLiftState rho).m * M.naimarkProjector outcome).trace
         =
-          (rho.matrix *
+          (rho.m *
             (Matrix.conjTranspose M.naimarkEmbedding * M.naimarkProjector outcome *
               M.naimarkEmbedding)).trace := by
             rw [naimarkLiftState_matrix]
             calc
-              ((M.naimarkEmbedding * rho.matrix *
+              ((M.naimarkEmbedding * rho.m *
                       Matrix.conjTranspose M.naimarkEmbedding) *
                     M.naimarkProjector outcome).trace
                   =
-                    (M.naimarkEmbedding * rho.matrix *
+                    (M.naimarkEmbedding * rho.m *
                       (Matrix.conjTranspose M.naimarkEmbedding *
                         M.naimarkProjector outcome)).trace := by
                     rw [Matrix.mul_assoc, Matrix.mul_assoc]
               _ =
-                    (rho.matrix *
+                    (rho.m *
                       ((Matrix.conjTranspose M.naimarkEmbedding *
                           M.naimarkProjector outcome) *
                         M.naimarkEmbedding)).trace := by
                     rw [Matrix.trace_mul_cycle]
                     rw [Matrix.trace_mul_comm]
               _ =
-                    (rho.matrix *
+                    (rho.m *
                       (Matrix.conjTranspose M.naimarkEmbedding *
                         M.naimarkProjector outcome *
                         M.naimarkEmbedding)).trace := by
                     rw [Matrix.mul_assoc]
-    _ = (rho.matrix * M.effects outcome).trace := by
+    _ = (rho.m * M.effects outcome).trace := by
           rw [M.naimark_compression_projector outcome]
 
 /-- The single-POVM Naimark lift preserves Born-rule outcome probabilities. -/
-theorem naimark_prob_eq (M : POVM y a) (rho : State a) (outcome : y) :
+theorem naimark_prob_eq (M : POVM y a) (rho : MState a) (outcome : y) :
     (M.naimarkProjectiveMeasurement.toPOVM).prob (M.naimarkLiftState rho) outcome =
       M.prob rho outcome := by
   apply NNReal.eq
   rw [POVM.prob_eq_trace_re, POVM.prob_eq_trace_re]
-  change Complex.re (((M.naimarkLiftState rho).matrix *
+  change Complex.re (((M.naimarkLiftState rho).m *
       M.naimarkProjector outcome).trace) =
-    Complex.re ((rho.matrix * M.effects outcome).trace)
+    Complex.re ((rho.m * M.effects outcome).trace)
   rw [M.naimark_trace_projector_eq rho outcome]
 
 private theorem starMap_conjTranspose_mul_self {n : Type _} [Fintype n] [DecidableEq n]
@@ -484,66 +484,66 @@ theorem fixedNaimark_compression_projector [Inhabited y] (M : POVM y a) (outcome
     _ = M.effects outcome := M.naimark_compression_projector outcome
 
 /-- The lifted state for the fixed-base Naimark dilation. -/
-def fixedNaimarkLiftState [Inhabited y] (M : POVM y a) (rho : State a) :
-    State M.FixedNaimarkSpace where
-  matrix := M.fixedNaimarkEmbedding * rho.matrix * Matrix.conjTranspose M.fixedNaimarkEmbedding
-  pos := rho.pos.mul_mul_conjTranspose_same M.fixedNaimarkEmbedding
-  trace_eq_one := by
-    rw [Matrix.trace_mul_cycle, M.fixedNaimarkEmbedding_isometry, Matrix.one_mul, rho.trace_eq_one]
+def fixedNaimarkLiftState [Inhabited y] (M : POVM y a) (rho : MState a) :
+    MState M.FixedNaimarkSpace := .ofMatrix
+  (matrix := M.fixedNaimarkEmbedding * rho.m * Matrix.conjTranspose M.fixedNaimarkEmbedding)
+  (pos := rho.psd.mul_mul_conjTranspose_same M.fixedNaimarkEmbedding)
+  (trace_eq_one := by
+    rw [Matrix.trace_mul_cycle, M.fixedNaimarkEmbedding_isometry, Matrix.one_mul, rho.tr'])
 
 @[simp]
-theorem fixedNaimarkLiftState_matrix [Inhabited y] (M : POVM y a) (rho : State a) :
-    (M.fixedNaimarkLiftState rho).matrix =
-      M.fixedNaimarkEmbedding * rho.matrix * Matrix.conjTranspose M.fixedNaimarkEmbedding :=
-  rfl
+theorem fixedNaimarkLiftState_matrix [Inhabited y] (M : POVM y a) (rho : MState a) :
+    (M.fixedNaimarkLiftState rho).m =
+      M.fixedNaimarkEmbedding * rho.m * Matrix.conjTranspose M.fixedNaimarkEmbedding :=
+  MState.matrix_ofMatrix _ _ _
 
 theorem fixedNaimark_trace_projector_eq [Inhabited y]
-    (M : POVM y a) (rho : State a) (outcome : y) :
-    ((M.fixedNaimarkLiftState rho).matrix * M.fixedNaimarkProjector outcome).trace =
-      (rho.matrix * M.effects outcome).trace := by
+    (M : POVM y a) (rho : MState a) (outcome : y) :
+    ((M.fixedNaimarkLiftState rho).m * M.fixedNaimarkProjector outcome).trace =
+      (rho.m * M.effects outcome).trace := by
   calc
-    ((M.fixedNaimarkLiftState rho).matrix * M.fixedNaimarkProjector outcome).trace
+    ((M.fixedNaimarkLiftState rho).m * M.fixedNaimarkProjector outcome).trace
         =
-          (rho.matrix *
+          (rho.m *
             (Matrix.conjTranspose M.fixedNaimarkEmbedding *
               M.fixedNaimarkProjector outcome *
               M.fixedNaimarkEmbedding)).trace := by
             rw [fixedNaimarkLiftState_matrix]
             calc
-              ((M.fixedNaimarkEmbedding * rho.matrix *
+              ((M.fixedNaimarkEmbedding * rho.m *
                       Matrix.conjTranspose M.fixedNaimarkEmbedding) *
                     M.fixedNaimarkProjector outcome).trace
                   =
-                    (M.fixedNaimarkEmbedding * rho.matrix *
+                    (M.fixedNaimarkEmbedding * rho.m *
                       (Matrix.conjTranspose M.fixedNaimarkEmbedding *
                         M.fixedNaimarkProjector outcome)).trace := by
                     rw [Matrix.mul_assoc, Matrix.mul_assoc]
               _ =
-                    (rho.matrix *
+                    (rho.m *
                       ((Matrix.conjTranspose M.fixedNaimarkEmbedding *
                           M.fixedNaimarkProjector outcome) *
                         M.fixedNaimarkEmbedding)).trace := by
                     rw [Matrix.trace_mul_cycle]
                     rw [Matrix.trace_mul_comm]
               _ =
-                    (rho.matrix *
+                    (rho.m *
                       (Matrix.conjTranspose M.fixedNaimarkEmbedding *
                         M.fixedNaimarkProjector outcome *
                         M.fixedNaimarkEmbedding)).trace := by
                     rw [Matrix.mul_assoc]
-    _ = (rho.matrix * M.effects outcome).trace := by
+    _ = (rho.m * M.effects outcome).trace := by
           rw [M.fixedNaimark_compression_projector outcome]
 
 /-- The fixed-base Naimark dilation preserves Born-rule outcome probabilities. -/
-theorem fixedNaimark_prob_eq [Inhabited y] (M : POVM y a) (rho : State a) (outcome : y) :
+theorem fixedNaimark_prob_eq [Inhabited y] (M : POVM y a) (rho : MState a) (outcome : y) :
     (M.fixedNaimarkProjectiveMeasurement.toPOVM).prob
         (M.fixedNaimarkLiftState rho) outcome =
       M.prob rho outcome := by
   apply NNReal.eq
   rw [POVM.prob_eq_trace_re, POVM.prob_eq_trace_re]
-  change Complex.re (((M.fixedNaimarkLiftState rho).matrix *
+  change Complex.re (((M.fixedNaimarkLiftState rho).m *
       M.fixedNaimarkProjector outcome).trace) =
-    Complex.re ((rho.matrix * M.effects outcome).trace)
+    Complex.re ((rho.m * M.effects outcome).trace)
   rw [M.fixedNaimark_trace_projector_eq rho outcome]
 
 variable {settings : Type w}
@@ -611,27 +611,27 @@ theorem familyNaimark_compression_projector_eq [Inhabited y]
 
 /-- The shared lifted state for a family Naimark dilation. -/
 def familyNaimarkLiftState [Inhabited y]
-    (M : settings → POVM y a) (rho : State a) :
-    State (FamilyNaimarkSpace M) where
-  matrix := familyNaimarkEmbedding M * rho.matrix * Matrix.conjTranspose (familyNaimarkEmbedding M)
-  pos := rho.pos.mul_mul_conjTranspose_same (familyNaimarkEmbedding M)
-  trace_eq_one := by
+    (M : settings → POVM y a) (rho : MState a) :
+    MState (FamilyNaimarkSpace M) := .ofMatrix
+  (matrix := familyNaimarkEmbedding M * rho.m * Matrix.conjTranspose (familyNaimarkEmbedding M))
+  (pos := rho.psd.mul_mul_conjTranspose_same (familyNaimarkEmbedding M))
+  (trace_eq_one := by
     rw [Matrix.trace_mul_cycle, familyNaimarkEmbedding_isometry M, Matrix.one_mul,
-      rho.trace_eq_one]
+      rho.tr'])
 
 @[simp]
 theorem familyNaimarkLiftState_matrix [Inhabited y]
-    (M : settings → POVM y a) (rho : State a) :
-    (familyNaimarkLiftState M rho).matrix =
-      familyNaimarkEmbedding M * rho.matrix * Matrix.conjTranspose (familyNaimarkEmbedding M) :=
-  rfl
+    (M : settings → POVM y a) (rho : MState a) :
+    (familyNaimarkLiftState M rho).m =
+      familyNaimarkEmbedding M * rho.m * Matrix.conjTranspose (familyNaimarkEmbedding M) :=
+  MState.matrix_ofMatrix _ _ _
 
 /--
 The shared family dilation preserves Born-rule probabilities for every setting
 and outcome.
 -/
 theorem familyNaimark_prob_eq [Inhabited y]
-    (M : settings → POVM y a) (rho : State a) (setting : settings) (outcome : y) :
+    (M : settings → POVM y a) (rho : MState a) (setting : settings) (outcome : y) :
     (familyNaimarkProjectiveMeasurement M setting).toPOVM.prob
         (familyNaimarkLiftState M rho) outcome =
       (M setting).prob rho outcome := by
@@ -639,8 +639,6 @@ theorem familyNaimark_prob_eq [Inhabited y]
     fixedNaimarkLiftState, fixedNaimarkEmbedding] using
       (M setting).fixedNaimark_prob_eq rho outcome
 
-end POVM
-
 end
 
-end QIT
+end POVM

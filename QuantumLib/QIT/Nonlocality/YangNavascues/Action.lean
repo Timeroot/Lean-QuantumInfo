@@ -12,8 +12,8 @@ public import QuantumLib.QIT.Nonlocality.YangNavascues.Coherence
 # Branch-sum action lemmas for the CGS Yang-Navascues local isometry
 
 This module exposes the finite branch-sum expansion layer needed before the
-final CGS density calculation.  It does not identify the sum with the residual
-garbage tensor target; that calculation remains a downstream theorem.
+final CGS density calculation.  It stops short of identifying the sum with the
+residual garbage tensor target.
 -/
 
 @[expose] public section
@@ -150,79 +150,6 @@ private theorem weightedProjection_mul {H : Type u} [Fintype H] [DecidableEq H]
   · intro hi
     exact (hi (Finset.mem_univ i)).elim
 
-private theorem weightedProjection_left_complement {H : Type u}
-    [Fintype H] [DecidableEq H] {d : ℕ} [NeZero d] (P : Fin d → CMatrix H)
-    (c : Fin d → ℂ)
-    (hIdem : ∀ k, P k * P k = P k)
-    (hOrth : ∀ i j, i ≠ j → P i * P j = 0) :
-    (∑ k : Fin d, c k • P k) * (1 - ∑ k : Fin d, P k) = 0 := by
-  classical
-  rw [Finset.sum_mul]
-  refine Finset.sum_eq_zero fun i _ => ?_
-  calc
-    (c i • P i) * (1 - ∑ k : Fin d, P k)
-        = c i • (P i * (1 - ∑ k : Fin d, P k)) := by rw [Matrix.smul_mul]
-    _ = 0 := by
-      rw [Matrix.mul_sub]
-      have hsum : P i * (∑ k : Fin d, P k) = P i := by
-        rw [Matrix.mul_sum]
-        rw [Finset.sum_eq_single i]
-        · exact hIdem i
-        · intro j _ hji
-          exact hOrth i j (fun h => hji h.symm)
-        · intro hi
-          exact (hi (Finset.mem_univ i)).elim
-      rw [hsum]
-      simp
-
-private theorem weightedProjection_right_complement {H : Type u}
-    [Fintype H] [DecidableEq H] {d : ℕ} [NeZero d] (P : Fin d → CMatrix H)
-    (c : Fin d → ℂ)
-    (hIdem : ∀ k, P k * P k = P k)
-    (hOrth : ∀ i j, i ≠ j → P i * P j = 0) :
-    (1 - ∑ k : Fin d, P k) * (∑ k : Fin d, c k • P k) = 0 := by
-  classical
-  rw [Matrix.mul_sum]
-  refine Finset.sum_eq_zero fun i _ => ?_
-  calc
-    (1 - ∑ k : Fin d, P k) * (c i • P i)
-        = c i • ((1 - ∑ k : Fin d, P k) * P i) := by rw [Matrix.mul_smul]
-    _ = 0 := by
-      rw [Matrix.sub_mul]
-      have hsum : (∑ k : Fin d, P k) * P i = P i := by
-        rw [Finset.sum_mul]
-        rw [Finset.sum_eq_single i]
-        · exact hIdem i
-        · intro j _ hji
-          exact hOrth j i hji
-        · intro hi
-          exact (hi (Finset.mem_univ i)).elim
-      rw [hsum]
-      simp
-
-private theorem projection_complement_idempotent {H : Type u}
-    [Fintype H] [DecidableEq H] {d : ℕ} [NeZero d] (P : Fin d → CMatrix H)
-    (hIdem : ∀ k, P k * P k = P k)
-    (hOrth : ∀ i j, i ≠ j → P i * P j = 0) :
-    (1 - ∑ k : Fin d, P k) * (1 - ∑ k : Fin d, P k) =
-      1 - ∑ k : Fin d, P k := by
-  have hsum : (∑ k : Fin d, P k) * (∑ k : Fin d, P k) = ∑ k : Fin d, P k := by
-    rw [Matrix.mul_sum]
-    refine Finset.sum_congr rfl ?_
-    intro i _
-    rw [Finset.sum_mul]
-    rw [Finset.sum_eq_single i]
-    · exact hIdem i
-    · intro j _ hji
-      exact hOrth j i hji
-    · intro hi
-      exact (hi (Finset.mem_univ i)).elim
-  calc
-    (1 - ∑ k : Fin d, P k) * (1 - ∑ k : Fin d, P k)
-        = 1 - ∑ k : Fin d, P k - ∑ k : Fin d, P k +
-            (∑ k : Fin d, P k) * (∑ k : Fin d, P k) := by noncomm_ring
-    _ = 1 - ∑ k : Fin d, P k := by rw [hsum]; noncomm_ring
-
 /-- Expansion of a CGS phase operator power on an orthogonal projection family. -/
 theorem phaseOperator_pow_eq
     {H : Type u} [Fintype H] [DecidableEq H]
@@ -241,11 +168,11 @@ theorem phaseOperator_pow_eq
       have hmul := weightedProjection_mul P
         (fun m : Fin d => (fourierRoot d) ^ ((m : ℕ) * n))
         (fun m : Fin d => (fourierRoot d) ^ (m : ℕ)) hIdem hOrth
-      have hlc := weightedProjection_left_complement P
+      have hlc := weightedProjectionFamily_left_complement P
         (fun m : Fin d => (fourierRoot d) ^ ((m : ℕ) * n)) hIdem hOrth
-      have hrc := weightedProjection_right_complement P
+      have hrc := weightedProjectionFamily_right_complement P
         (fun m : Fin d => (fourierRoot d) ^ (m : ℕ)) hIdem hOrth
-      have hc := projection_complement_idempotent P hIdem hOrth
+      have hc := projectionFamily_complement_idempotent P hIdem hOrth
       calc
         ((∑ m : Fin d, fourierRoot d ^ (↑m * n) • P m) + (1 - ∑ m : Fin d, P m)) *
             ((∑ k : Fin d, fourierRoot d ^ ↑k • P k) + (1 - ∑ k : Fin d, P k))
@@ -452,7 +379,7 @@ theorem aliceSideMatrix_mulVec_apply
     have hsum :
         (∑ l : Fin (Fintype.card ι), data.aliceProjection.effects (B.toEquiv.symm l)) =
           (1 : CMatrix HA) := by
-      rw [← data.aliceProjection.sum_effects]
+      rw [← data.aliceProjection.sum_eq_one]
       exact (Fintype.sum_equiv B.toEquiv
         (fun i : ι => data.aliceProjection.effects i)
         (fun l : Fin (Fintype.card ι) => data.aliceProjection.effects (B.toEquiv.symm l))
@@ -488,42 +415,42 @@ abbrev CGSOutput (ι : Type u) (HA : Type v) (HB : Type w) [Fintype ι] :=
   (HA × Fin (Fintype.card ι)) × (HB × Fin (Fintype.card ι))
 
 /-- The full output vector after applying the assembled CGS local isometry. -/
-def cgsActionVector {rho : State (HA × HB)}
+def cgsActionVector {rho : MState (HA × HB)}
     (B : SchmidtTarget.BaseReindexToFin data.target)
-    (W : BobLocalOrthogonalization data rho) (ψ : PureVector (HA × HB)) :
+    (W : BobLocalOrthogonalization data rho) (ψ : Ket (HA × HB)) :
     CGSOutput ι HA HB → ℂ :=
-  (data.cgsLocalIsometry B W).matrix.mulVec ψ.amp
+  (data.cgsLocalIsometry B W).matrix.mulVec ψ.vec
 
 /--
 The `k`th explicit branch of the CGS output vector, selected by the Alice
 ancilla register after the assembled local isometry.
 -/
-def cgsActionBranchVector {rho : State (HA × HB)}
+def cgsActionBranchVector {rho : MState (HA × HB)}
     (B : SchmidtTarget.BaseReindexToFin data.target)
-    (W : BobLocalOrthogonalization data rho) (ψ : PureVector (HA × HB))
+    (W : BobLocalOrthogonalization data rho) (ψ : Ket (HA × HB))
     (k : Fin (Fintype.card ι)) : CGSOutput ι HA HB → ℂ :=
   fun x => if x.1.2 = k then data.cgsActionVector B W ψ x else 0
 
 /-- The rank-one/cross block between two explicit CGS branches. -/
-def cgsActionBranchBlock {rho : State (HA × HB)}
+def cgsActionBranchBlock {rho : MState (HA × HB)}
     (B : SchmidtTarget.BaseReindexToFin data.target)
-    (W : BobLocalOrthogonalization data rho) (ψ : PureVector (HA × HB))
+    (W : BobLocalOrthogonalization data rho) (ψ : Ket (HA × HB))
     (i j : Fin (Fintype.card ι)) : CMatrix (CGSOutput ι HA HB) :=
   YNData.rankOneCoherence
     (data.cgsActionBranchVector B W ψ i)
     (data.cgsActionBranchVector B W ψ j)
 
 /-- The explicit finite double-sum branch expansion of the CGS output density. -/
-def cgsActionBranchSumMatrix {rho : State (HA × HB)}
+def cgsActionBranchSumMatrix {rho : MState (HA × HB)}
     (B : SchmidtTarget.BaseReindexToFin data.target)
-    (W : BobLocalOrthogonalization data rho) (ψ : PureVector (HA × HB)) :
+    (W : BobLocalOrthogonalization data rho) (ψ : Ket (HA × HB)) :
     CMatrix (CGSOutput ι HA HB) :=
   ∑ i : Fin (Fintype.card ι),
     ∑ j : Fin (Fintype.card ι), data.cgsActionBranchBlock B W ψ i j
 
-private theorem cgsActionVector_eq_sum_branches {rho : State (HA × HB)}
+private theorem cgsActionVector_eq_sum_branches {rho : MState (HA × HB)}
     (B : SchmidtTarget.BaseReindexToFin data.target)
-    (W : BobLocalOrthogonalization data rho) (ψ : PureVector (HA × HB)) :
+    (W : BobLocalOrthogonalization data rho) (ψ : Ket (HA × HB)) :
     data.cgsActionVector B W ψ =
       ∑ k : Fin (Fintype.card ι), data.cgsActionBranchVector B W ψ k := by
   classical
@@ -567,13 +494,13 @@ private theorem localIsometry_applyMatrix_rankOne
 The assembled CGS local isometry sends a pure input density to the explicit
 finite double-sum over its branch blocks.
 -/
-theorem cgsLocalIsometry_applyMatrix_eq_actionBranchSum {rho : State (HA × HB)}
+theorem cgsLocalIsometry_applyMatrix_eq_actionBranchSum {rho : MState (HA × HB)}
     (B : SchmidtTarget.BaseReindexToFin data.target)
-    (W : BobLocalOrthogonalization data rho) (ψ : PureVector (HA × HB)) :
-    (data.cgsLocalIsometry B W).applyMatrix ψ.state.matrix =
+    (W : BobLocalOrthogonalization data rho) (ψ : Ket (HA × HB)) :
+    (data.cgsLocalIsometry B W).applyMatrix ψ.state.m =
       data.cgsActionBranchSumMatrix B W ψ := by
   classical
-  rw [PureVector.state_matrix]
+  rw [Ket.state_matrix]
   rw [localIsometry_applyMatrix_rankOne]
   unfold cgsActionBranchSumMatrix cgsActionBranchBlock
   rw [← rankOneCoherence_sum_sum
@@ -583,13 +510,13 @@ theorem cgsLocalIsometry_applyMatrix_eq_actionBranchSum {rho : State (HA × HB)}
   rfl
 
 /-- The explicit branch-sum density is the rank-one density of the CGS output vector. -/
-theorem cgsActionBranchSumMatrix_eq_rankOneActionVector {rho : State (HA × HB)}
+theorem cgsActionBranchSumMatrix_eq_rankOneActionVector {rho : MState (HA × HB)}
     (B : SchmidtTarget.BaseReindexToFin data.target)
-    (W : BobLocalOrthogonalization data rho) (ψ : PureVector (HA × HB)) :
+    (W : BobLocalOrthogonalization data rho) (ψ : Ket (HA × HB)) :
     data.cgsActionBranchSumMatrix B W ψ =
       rankOneMatrix (data.cgsActionVector B W ψ) := by
   rw [← data.cgsLocalIsometry_applyMatrix_eq_actionBranchSum B W ψ]
-  rw [PureVector.state_matrix]
+  rw [Ket.state_matrix]
   rw [localIsometry_applyMatrix_rankOne]
   rfl
 
@@ -600,7 +527,7 @@ namespace BobLocalOrthogonalization
 variable {ι : Type u} {HA : Type v} {HB : Type w}
 variable [Fintype ι] [DecidableEq ι]
 variable [Fintype HA] [DecidableEq HA] [Fintype HB] [DecidableEq HB]
-variable {data : YNData ι HA HB} {rho : State (HA × HB)}
+variable {data : YNData ι HA HB} {rho : MState (HA × HB)}
 
 variable (W : BobLocalOrthogonalization data rho)
 
@@ -711,15 +638,15 @@ variable [Fintype HA] [DecidableEq HA] [Fintype HB] [DecidableEq HB]
 variable (data : YNData ι HA HB)
 
 /-- Coordinate form of the assembled CGS action through the collapsed branch operators. -/
-theorem cgsActionVector_apply_branchOperators {rho : State (HA × HB)}
+theorem cgsActionVector_apply_branchOperators {rho : MState (HA × HB)}
     (B : SchmidtTarget.BaseReindexToFin data.target)
-    (W : BobLocalOrthogonalization data rho) (ψ : PureVector (HA × HB))
+    (W : BobLocalOrthogonalization data rho) (ψ : Ket (HA × HB))
     (ha : HA) (hb : HB) (ka kb : Fin (Fintype.card ι)) :
     data.cgsActionVector B W ψ ((ha, ka), (hb, kb)) =
-      ((data.aliceBranchOperator B ka ⊗ₖ W.bobBranchOperator B kb).mulVec ψ.amp) (ha, hb) := by
+      ((data.aliceBranchOperator B ka ⊗ₖ W.bobBranchOperator B kb).mulVec ψ.vec) (ha, hb) := by
   unfold cgsActionVector
-  change (((data.aliceSideMatrix B) ⊗ₖ (W.bobSideMatrix B)).mulVec ψ.amp) ((ha, ka), (hb, kb)) =
-    ((data.aliceBranchOperator B ka ⊗ₖ W.bobBranchOperator B kb).mulVec ψ.amp) (ha, hb)
+  change (((data.aliceSideMatrix B) ⊗ₖ (W.bobSideMatrix B)).mulVec ψ.vec) ((ha, ka), (hb, kb)) =
+    ((data.aliceBranchOperator B ka ⊗ₖ W.bobBranchOperator B kb).mulVec ψ.vec) (ha, hb)
   rw [kronecker_mulVec_apply
     (A := data.aliceSideMatrix B) (B := W.bobSideMatrix B)]
   simp_rw [W.bobSideMatrix_mulVec_apply B]
@@ -734,7 +661,7 @@ namespace YNPhaseAlignedConditions
 variable {ι : Type u} {HA : Type v} {HB : Type w}
 variable [Fintype ι] [DecidableEq ι]
 variable [Fintype HA] [DecidableEq HA] [Fintype HB] [DecidableEq HB]
-variable {data : YNData ι HA HB} {ψ : PureVector (HA × HB)}
+variable {data : YNData ι HA HB} {ψ : Ket (HA × HB)}
 
 /--
 The phase-aligned YN witness consumes the same branch-sum expansion through its
@@ -743,7 +670,7 @@ Bob-local orthogonalization witness.
 theorem cgsLocalIsometry_applyMatrix_eq_actionBranchSum
     (h : YNPhaseAlignedConditions data ψ)
     (B : SchmidtTarget.BaseReindexToFin data.target) :
-    (data.cgsLocalIsometry B h.toBobLocalOrthogonalization).applyMatrix ψ.state.matrix =
+    (data.cgsLocalIsometry B h.toBobLocalOrthogonalization).applyMatrix ψ.state.m =
       data.cgsActionBranchSumMatrix B h.toBobLocalOrthogonalization ψ :=
   data.cgsLocalIsometry_applyMatrix_eq_actionBranchSum B h.toBobLocalOrthogonalization ψ
 

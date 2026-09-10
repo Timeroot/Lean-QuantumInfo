@@ -35,54 +35,52 @@ abbrev Basis := Bool
 /-- A qubit system for BB84. -/
 abbrev Qubit := Bool
 
-/-- |0> amplitude. -/
-def computationalZero : Qubit -> Complex := fun
+/-- `|0⟩` amplitude. -/
+def computationalZero : Qubit → ℂ := fun
   | false => 1
   | true => 0
 
-/-- |1> amplitude. -/
-def computationalOne : Qubit -> Complex := fun
+/-- `|1⟩` amplitude. -/
+def computationalOne : Qubit → ℂ := fun
   | false => 0
   | true => 1
 
-/-- |+> = (|0> + |1>)/sqrt(2). -/
-def hadamardPlus : Qubit -> Complex := fun
+/-- `|+⟩ = (|0⟩ + |1⟩)/√2`. -/
+def hadamardPlus : Qubit → ℂ := fun
   | false => TwoQubit.invSqrtTwo
   | true => TwoQubit.invSqrtTwo
 
-/-- |-> = (|0> - |1>)/sqrt(2). -/
-def hadamardMinus : Qubit -> Complex := fun
+/-- `|-⟩ = (|0⟩ - |1⟩)/√2`. -/
+def hadamardMinus : Qubit → ℂ := fun
   | false => TwoQubit.invSqrtTwo
   | true => -TwoQubit.invSqrtTwo
 
 /-- Prepare a BB84 state amplitude from (bit, basis). -/
-def prepareAmp : Bit -> Basis -> Qubit -> Complex
+def prepareAmp : Bit → Basis → Qubit → ℂ
   | false, false => computationalZero
   | true, false => computationalOne
   | false, true => hadamardPlus
   | true, true => hadamardMinus
 
 /-- The squared modulus of the Hadamard amplitude. -/
-@[simp]
 theorem invSqrtTwo_mul_star_invSqrtTwo :
-    TwoQubit.invSqrtTwo * star TwoQubit.invSqrtTwo = (1 / 2 : Complex) := by
+    TwoQubit.invSqrtTwo * star TwoQubit.invSqrtTwo = (1 / 2 : ℂ) := by
   rw [TwoQubit.star_invSqrtTwo, TwoQubit.invSqrtTwo_mul_self]
 
 /-- The squared modulus of the Hadamard amplitude, with conjugate first. -/
-@[simp]
 theorem star_invSqrtTwo_mul_invSqrtTwo :
-    star TwoQubit.invSqrtTwo * TwoQubit.invSqrtTwo = (1 / 2 : Complex) := by
+    star TwoQubit.invSqrtTwo * TwoQubit.invSqrtTwo = (1 / 2 : ℂ) := by
   rw [TwoQubit.star_invSqrtTwo, TwoQubit.invSqrtTwo_mul_self]
 
 /-- The squared modulus of the Hadamard amplitude, conjugate first in `starRingEnd` form. -/
 @[simp]
 theorem starRingEnd_invSqrtTwo_mul_invSqrtTwo :
-    (starRingEnd ℂ) TwoQubit.invSqrtTwo * TwoQubit.invSqrtTwo = (1 / 2 : Complex) := by
-  change star TwoQubit.invSqrtTwo * TwoQubit.invSqrtTwo = (1 / 2 : Complex)
+    (starRingEnd ℂ) TwoQubit.invSqrtTwo * TwoQubit.invSqrtTwo = (1 / 2 : ℂ) := by
+  change star TwoQubit.invSqrtTwo * TwoQubit.invSqrtTwo = (1 / 2 : ℂ)
   rw [TwoQubit.star_invSqrtTwo, TwoQubit.invSqrtTwo_mul_self]
 
 /-- Squared norm trace term for a Bool-indexed amplitude. -/
-def selfOverlap (psi : Qubit -> Complex) : Complex :=
+def selfOverlap (psi : Qubit → ℂ) : ℂ :=
   psi ⬝ᵥ fun i => star (psi i)
 
 /-- Born-rule correctness: each BB84 preparation amplitude is normalized.
@@ -95,15 +93,15 @@ theorem prepare_normalized (bit : Bit) (basis : Basis) :
       hadamardPlus, hadamardMinus, dotProduct,
       TwoQubit.invSqrtTwo_mul_starRingEnd_invSqrtTwo] <;> norm_num
 
-/-- The prepare-state as a State. -/
-def prepareState (bit : Bit) (basis : Basis) : State Qubit where
-  matrix := rankOneMatrix (prepareAmp bit basis)
-  pos := rankOneMatrix_pos (prepareAmp bit basis)
-  trace_eq_one := by
-    simpa [selfOverlap] using prepare_normalized bit basis
+/-- The prepare-state as an `MState`. -/
+def prepareState (bit : Bit) (basis : Basis) : MState Qubit := .ofMatrix
+  (matrix := rankOneMatrix (prepareAmp bit basis))
+  (pos := rankOneMatrix_pos (prepareAmp bit basis))
+  (trace_eq_one := by
+    simpa [selfOverlap] using prepare_normalized bit basis)
 
 /-- Same-basis orthogonality: distinct bits in the same basis give
-orthogonal states (<psi|phi> = 0). -/
+orthogonal states (`⟨ψ|φ⟩ = 0`). -/
 theorem same_basis_orthogonal (basis : Basis) :
     star (prepareAmp false basis false) * (prepareAmp true basis false) +
     star (prepareAmp false basis true) * (prepareAmp true basis true) = 0 := by
@@ -149,7 +147,7 @@ theorem projectiveMeasurement_effects (basis : Basis) (outcome : Bit) :
 
 /-- In the matched basis, the Born-rule trace for Alice's bit is one. -/
 theorem matched_basis_trace_self (bit basis : Bit) :
-    Complex.re (((prepareState bit basis).matrix * measurementEffect basis bit).trace) = 1 := by
+    Complex.re (((prepareState bit basis).m * measurementEffect basis bit).trace) = 1 := by
   cases bit <;> cases basis <;>
     simp [prepareState, measurementEffect, prepareAmp, computationalZero, computationalOne,
       hadamardPlus, hadamardMinus, Matrix.mul_apply, Matrix.trace,
@@ -157,7 +155,7 @@ theorem matched_basis_trace_self (bit basis : Bit) :
 
 /-- In the matched basis, the Born-rule trace for the complementary bit is zero. -/
 theorem matched_basis_trace_compl (bit basis : Bit) :
-    Complex.re (((prepareState bit basis).matrix * measurementEffect basis (!bit)).trace) = 0 := by
+    Complex.re (((prepareState bit basis).m * measurementEffect basis (!bit)).trace) = 0 := by
   cases bit <;> cases basis <;>
     simp [prepareState, measurementEffect, prepareAmp, computationalZero, computationalOne,
       hadamardPlus, hadamardMinus, Matrix.mul_apply, Matrix.trace]
@@ -178,19 +176,23 @@ theorem matched_basis_prob_compl (bit basis : Bit) :
 
 /-- A BB84 round record. -/
 structure Round where
+  /-- The bit Alice encodes. -/
   aliceBit : Bit
+  /-- The basis Alice prepares in. -/
   aliceBasis : Basis
+  /-- The basis Bob measures in. -/
   bobBasis : Basis
+  /-- The bit Bob's measurement returns. -/
   bobOutcome : Bit
 
 /-- Sifted output: keep a key bit, or abort. -/
 inductive SiftOutput where
-  | keep : Bit -> SiftOutput
+  | keep : Bit → SiftOutput
   | abort : SiftOutput
 deriving DecidableEq, Repr
 
 /-- Extract the kept bit, if the round was retained after sifting. -/
-def SiftOutput.toOption : SiftOutput -> Option Bit
+def SiftOutput.toOption : SiftOutput → Option Bit
   | SiftOutput.keep bit => some bit
   | SiftOutput.abort => none
 
@@ -205,7 +207,7 @@ theorem SiftOutput.toOption_abort :
   rfl
 
 /-- Predicate for the explicit abort output. -/
-def SiftOutput.isAbort : SiftOutput -> Bool
+def SiftOutput.isAbort : SiftOutput → Bool
   | SiftOutput.abort => true
   | SiftOutput.keep _ => false
 
@@ -243,7 +245,7 @@ def keptBits (rounds : List Round) : List Bit :=
   (processRounds rounds).filterMap SiftOutput.toOption
 
 /-- Count the explicit abort outputs in a list of processed rounds. -/
-def abortCount (rounds : List Round) : Nat :=
+def abortCount (rounds : List Round) : ℕ :=
   ((processRounds rounds).filter fun output => output.isAbort).length
 
 /-- Sift a single tuple of announced bases and Bob's outcome. -/
@@ -260,10 +262,14 @@ def sift (rounds : List Round) : List Bit :=
 
 /-- A sifted transcript: the list of kept bits plus abort count. -/
 structure Transcript where
+  /-- The key bits retained after sifting. -/
   siftedBits : List Bit
+  /-- The sifting result of each round, in order. -/
   outputs : List SiftOutput
-  aborts : Nat
-  roundsProcessed : Nat
+  /-- The number of discarded rounds. -/
+  aborts : ℕ
+  /-- The total number of rounds. -/
+  roundsProcessed : ℕ
 
 /-- Build a transcript from a list of rounds. -/
 def buildTranscript (rounds : List Round) : Transcript :=
@@ -293,14 +299,11 @@ theorem buildTranscript_roundsProcessed (rounds : List Round) :
   rfl
 
 /-!
-## Prepare-measure to entanglement-based route
+## Scope
 
-The declarations above provide the prepare-and-measure side of BB84:
-state preparation, the two projective measurements, ideal matched-basis
-Born-rule correctness, and a classical sifting transcript with explicit aborts.
-The future entanglement-based route still needs an EPR-pair formulation,
-Alice-side measurement equivalence, and a security proof on the
-entanglement-based side.
+The declarations above are the prepare-and-measure side of BB84: state
+preparation, the two projective measurements, ideal matched-basis Born-rule
+correctness, and a classical sifting transcript with explicit aborts.
 -/
 
 end QIT.Security.BB84

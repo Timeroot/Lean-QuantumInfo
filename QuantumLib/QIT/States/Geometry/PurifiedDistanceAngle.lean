@@ -18,11 +18,12 @@ inequality in Tomamichel, `metric.tex:537-573`.
 
 @[expose] public section
 
-namespace QIT
-
+noncomputable section
 universe u
 
-noncomputable section
+open QIT
+
+namespace QIT
 
 namespace PurifiedDistanceAngle
 
@@ -53,15 +54,16 @@ private theorem star_unitPhase_mul_self (z : ℂ) :
 
 end PurifiedDistanceAngle
 
-namespace PureVector
+end QIT
 
-/-- Multiply a pure vector by a global unit phase. -/
+namespace Ket
+
+/-- Multiply a ket by a global unit phase. -/
 private def phase {a : Type u} [Fintype a] [DecidableEq a]
-    (Ψ : PureVector a) (c : ℂ) (hc : Complex.normSq c = 1) : PureVector a where
-  amp i := c * Ψ.amp i
-  trace_rankOne_eq_one := by
-    have hmatrix : rankOneMatrix (fun i => c * Ψ.amp i) =
-        (c * star c : ℂ) • rankOneMatrix Ψ.amp := by
+    (Ψ : Ket a) (c : ℂ) (hc : Complex.normSq c = 1) : Ket a :=
+  Ket.ofRankOne (fun i => c * Ψ.vec i) <| by
+    have hmatrix : rankOneMatrix (fun i => c * Ψ.vec i) =
+        (c * star c : ℂ) • rankOneMatrix Ψ.vec := by
       ext i j
       simp [rankOneMatrix_apply, mul_assoc, mul_left_comm]
     rw [hmatrix, Matrix.trace_smul, Ψ.trace_rankOne_eq_one]
@@ -72,65 +74,41 @@ private def phase {a : Type u} [Fintype a] [DecidableEq a]
     rw [hunit, one_mul]
 
 @[simp]
-private theorem phase_amp {a : Type u} [Fintype a] [DecidableEq a]
-    (Ψ : PureVector a) (c : ℂ) (hc : Complex.normSq c = 1) (i : a) :
-    (phase Ψ c hc).amp i = c * Ψ.amp i :=
+private theorem phase_vec {a : Type u} [Fintype a] [DecidableEq a]
+    (Ψ : Ket a) (c : ℂ) (hc : Complex.normSq c = 1) (i : a) :
+    (phase Ψ c hc).vec i = c * Ψ.vec i :=
   rfl
 
-private theorem phase_state {a : Type u} [Fintype a] [DecidableEq a]
-    (Ψ : PureVector a) (c : ℂ) (hc : Complex.normSq c = 1) :
-    (phase Ψ c hc).state = Ψ.state := by
-  apply State.ext
-  ext i j
-  have hunit : c * star c = 1 := by
-    have hcC : (Complex.normSq c : ℂ) = 1 := by exact_mod_cast hc
-    rw [Complex.normSq_eq_conj_mul_self] at hcC
-    simpa [mul_comm] using hcC
-  change c * Ψ.amp i * star (c * Ψ.amp j) = Ψ.amp i * star (Ψ.amp j)
-  rw [star_mul]
-  calc
-    c * Ψ.amp i * (star (Ψ.amp j) * star c) =
-        (c * star c) * (Ψ.amp i * star (Ψ.amp j)) := by ring
-    _ = Ψ.amp i * star (Ψ.amp j) := by rw [hunit, one_mul]
-
-private theorem phase_purifies {r a : Type u}
-    [Fintype r] [DecidableEq r] [Fintype a] [DecidableEq a]
-    {Ψ : PureVector (Prod r a)} {ρ : State a}
-    (hΨ : Ψ.Purifies ρ) (c : ℂ) (hc : Complex.normSq c = 1) :
-    (phase Ψ c hc).Purifies ρ := by
-  rw [PureVector.purifies_iff, phase_state]
-  exact hΨ
-
 private theorem overlap_phase_left {a : Type u} [Fintype a] [DecidableEq a]
-    (Ψ Φ : PureVector a) (c : ℂ) (hc : Complex.normSq c = 1) :
+    (Ψ Φ : Ket a) (c : ℂ) (hc : Complex.normSq c = 1) :
     (phase Ψ c hc).overlap Φ = star c * Ψ.overlap Φ := by
-  simp [PureVector.overlap, phase_amp, Finset.mul_sum, mul_assoc]
+  simp [Ket.overlap, phase_vec, Finset.mul_sum, mul_assoc]
 
 private theorem overlap_phase_right {a : Type u} [Fintype a] [DecidableEq a]
-    (Ψ Φ : PureVector a) (c : ℂ) (hc : Complex.normSq c = 1) :
+    (Ψ Φ : Ket a) (c : ℂ) (hc : Complex.normSq c = 1) :
     Ψ.overlap (phase Φ c hc) = c * Ψ.overlap Φ := by
-  simp [PureVector.overlap, phase_amp, Finset.mul_sum, mul_left_comm]
+  simp [Ket.overlap, phase_vec, Finset.mul_sum, mul_left_comm]
 
-/-- The projective angle between two pure vectors. -/
+/-- The projective angle between two kets. -/
 noncomputable def projectiveAngle {a : Type u} [Fintype a] [DecidableEq a]
-    (Ψ Φ : PureVector a) : ℝ :=
+    (Ψ Φ : Ket a) : ℝ :=
   Real.arccos ‖Ψ.overlap Φ‖
 
 private def ampVector {a : Type u} [Fintype a] [DecidableEq a]
-    (Ψ : PureVector a) : EuclideanSpace ℂ a :=
-  WithLp.toLp 2 Ψ.amp
+    (Ψ : Ket a) : EuclideanSpace ℂ a :=
+  WithLp.toLp 2 Ψ.vec
 
 private theorem inner_ampVector {a : Type u} [Fintype a] [DecidableEq a]
-    (Ψ Φ : PureVector a) :
+    (Ψ Φ : Ket a) :
     inner ℂ (ampVector Ψ) (ampVector Φ) = Ψ.overlap Φ := by
   rw [ampVector, ampVector, EuclideanSpace.inner_toLp_toLp]
-  simp [PureVector.overlap, dotProduct, mul_comm]
+  simp [Ket.overlap, dotProduct, mul_comm]
 
 private theorem norm_ampVector {a : Type u} [Fintype a] [DecidableEq a]
-    (Ψ : PureVector a) : ‖ampVector Ψ‖ = 1 := by
+    (Ψ : Ket a) : ‖ampVector Ψ‖ = 1 := by
   have hinner : inner ℂ (ampVector Ψ) (ampVector Ψ) = 1 := by
     rw [inner_ampVector]
-    simpa [PureVector.overlap, rankOneMatrix_trace, dotProduct, mul_comm] using
+    simpa [Ket.overlap, rankOneMatrix_trace, dotProduct, mul_comm] using
       Ψ.trace_rankOne_eq_one
   have hsqC : ((‖ampVector Ψ‖ : ℂ) ^ 2) = 1 := by
     have h := inner_self_eq_norm_sq_to_K (𝕜 := ℂ) (ampVector Ψ)
@@ -139,26 +117,18 @@ private theorem norm_ampVector {a : Type u} [Fintype a] [DecidableEq a]
   have hsq : ‖ampVector Ψ‖ ^ 2 = (1 : ℝ) := by exact_mod_cast hsqC
   nlinarith [norm_nonneg (ampVector Ψ)]
 
-private theorem overlap_norm_le_one {a : Type u} [Fintype a] [DecidableEq a]
-    (Ψ Φ : PureVector a) : ‖Ψ.overlap Φ‖ ≤ 1 := by
-  have hsq : Ψ.overlapSq Φ ≤ 1 :=
-    (PureVector.overlapSq_le_state_squaredFidelity Ψ Φ).trans
-      (State.squaredFidelity_le_one_of_uhlmann Ψ.state Φ.state)
-  rw [PureVector.overlapSq_eq_normSq, Complex.normSq_eq_norm_sq] at hsq
-  nlinarith [norm_nonneg (Ψ.overlap Φ)]
-
 theorem sin_projectiveAngle {a : Type u} [Fintype a] [DecidableEq a]
-    (Ψ Φ : PureVector a) :
+    (Ψ Φ : Ket a) :
     Real.sin (projectiveAngle Ψ Φ) = Real.sqrt (1 - Ψ.overlapSq Φ) := by
   rw [projectiveAngle, Real.sin_arccos]
-  rw [PureVector.overlapSq_eq_normSq, Complex.normSq_eq_norm_sq]
+  rw [Ket.overlapSq_eq_normSq, Complex.normSq_eq_norm_sq]
 
 theorem projectiveAngle_nonneg {a : Type u} [Fintype a] [DecidableEq a]
-    (Ψ Φ : PureVector a) : 0 ≤ projectiveAngle Ψ Φ :=
+    (Ψ Φ : Ket a) : 0 ≤ projectiveAngle Ψ Φ :=
   Real.arccos_nonneg _
 
 theorem projectiveAngle_le_pi_div_two {a : Type u} [Fintype a] [DecidableEq a]
-    (Ψ Φ : PureVector a) : projectiveAngle Ψ Φ ≤ Real.pi / 2 := by
+    (Ψ Φ : Ket a) : projectiveAngle Ψ Φ ≤ Real.pi / 2 := by
   rw [projectiveAngle, Real.arccos_le_pi_div_two]
   exact norm_nonneg _
 
@@ -166,7 +136,7 @@ theorem projectiveAngle_le_pi_div_two {a : Type u} [Fintype a] [DecidableEq a]
 the two adjacent overlaps and then applies the real inner-product angle
 triangle inequality. -/
 theorem projectiveAngle_triangle {a : Type u} [Fintype a] [DecidableEq a]
-    (Ψ Φ Ω : PureVector a) :
+    (Ψ Φ Ω : Ket a) :
     projectiveAngle Ψ Ω ≤ projectiveAngle Ψ Φ + projectiveAngle Φ Ω := by
   by_cases hΨΦ : Ψ.overlap Φ = 0
   · have hright : projectiveAngle Ψ Φ = Real.pi / 2 := by
@@ -194,8 +164,8 @@ theorem projectiveAngle_triangle {a : Type u} [Fintype a] [DecidableEq a]
     change Complex.normSq q = 1 at hq
     rw [Complex.normSq_apply] at hq
     nlinarith
-  let Ψ' : PureVector a := phase Ψ c hc
-  let Ω' : PureVector a := phase Ω d hd
+  let Ψ' : Ket a := phase Ψ c hc
+  let Ω' : Ket a := phase Ω d hd
   let x : EuclideanSpace ℂ a := ampVector Ψ'
   let y : EuclideanSpace ℂ a := ampVector Φ
   let z : EuclideanSpace ℂ a := ampVector Ω'
@@ -259,66 +229,68 @@ theorem projectiveAngle_triangle {a : Type u} [Fintype a] [DecidableEq a]
     _ = projectiveAngle Ψ Φ + projectiveAngle Φ Ω := by
       rw [hangle_xy, hangle_yz]
 
-end PureVector
+end Ket
 
-namespace State
+namespace MState
 
 /-- Two purified-distance bounds expressed as angles compose by addition.
 This is Eq. `pd-triangle-eps` in Tomamichel, `metric.tex:567-573`. -/
 theorem purifiedDistance_le_sin_add {a : Type u} [Fintype a] [DecidableEq a]
-    (ρ σ τ : State a) {φ θ : ℝ}
+    (ρ σ τ : MState a) {φ θ : ℝ}
     (hφ : 0 ≤ φ) (hθ : 0 ≤ θ) (hsum : φ + θ < Real.pi / 2)
     (hρσ : ρ.purifiedDistance σ ≤ Real.sin φ)
     (hστ : σ.purifiedDistance τ ≤ Real.sin θ) :
     ρ.purifiedDistance τ ≤ Real.sin (φ + θ) := by
-  let Ψ : PureVector (Prod a a) := ρ.canonicalPurification
+  let Ψ : Ket (a × a) := ρ.canonicalPurification
   have hΨ : Ψ.Purifies ρ := by
     simpa [Ψ] using ρ.canonicalPurification_purifies
   obtain ⟨Φ, hΦ, hρσeq⟩ :=
-    State.exists_purification_purifiedDistance_eq_sqrt_one_sub_overlapSq
+    MState.exists_purification_purifiedDistance_eq_sqrt_one_sub_overlapSq
       (ρ := ρ) (σ := σ) hΨ (le_refl (Fintype.card a))
   obtain ⟨Ω, hΩ, hστeq⟩ :=
-    State.exists_purification_purifiedDistance_eq_sqrt_one_sub_overlapSq
+    MState.exists_purification_purifiedDistance_eq_sqrt_one_sub_overlapSq
       (ρ := σ) (σ := τ) hΦ (le_refl (Fintype.card a))
   have hφ_lt : φ < Real.pi / 2 := by linarith
   have hθ_lt : θ < Real.pi / 2 := by linarith
-  have hangle_ΨΦ : PureVector.projectiveAngle Ψ Φ ≤ φ := by
-    have hsin : Real.sin (PureVector.projectiveAngle Ψ Φ) ≤ Real.sin φ := by
-      rw [PureVector.sin_projectiveAngle, ← hρσeq]
+  have hangle_ΨΦ : Ket.projectiveAngle Ψ Φ ≤ φ := by
+    have hsin : Real.sin (Ket.projectiveAngle Ψ Φ) ≤ Real.sin φ := by
+      rw [Ket.sin_projectiveAngle, ← hρσeq]
       exact hρσ
     exact (Real.strictMonoOn_sin.le_iff_le
-      ⟨by linarith [PureVector.projectiveAngle_nonneg Ψ Φ],
-        PureVector.projectiveAngle_le_pi_div_two Ψ Φ⟩
+      ⟨by linarith [Ket.projectiveAngle_nonneg Ψ Φ],
+        Ket.projectiveAngle_le_pi_div_two Ψ Φ⟩
       ⟨by linarith, hφ_lt.le⟩).mp hsin
-  have hangle_ΦΩ : PureVector.projectiveAngle Φ Ω ≤ θ := by
-    have hsin : Real.sin (PureVector.projectiveAngle Φ Ω) ≤ Real.sin θ := by
-      rw [PureVector.sin_projectiveAngle, ← hστeq]
+  have hangle_ΦΩ : Ket.projectiveAngle Φ Ω ≤ θ := by
+    have hsin : Real.sin (Ket.projectiveAngle Φ Ω) ≤ Real.sin θ := by
+      rw [Ket.sin_projectiveAngle, ← hστeq]
       exact hστ
     exact (Real.strictMonoOn_sin.le_iff_le
-      ⟨by linarith [PureVector.projectiveAngle_nonneg Φ Ω],
-        PureVector.projectiveAngle_le_pi_div_two Φ Ω⟩
+      ⟨by linarith [Ket.projectiveAngle_nonneg Φ Ω],
+        Ket.projectiveAngle_le_pi_div_two Φ Ω⟩
       ⟨by linarith, hθ_lt.le⟩).mp hsin
-  have hangle : PureVector.projectiveAngle Ψ Ω ≤ φ + θ :=
-    (PureVector.projectiveAngle_triangle Ψ Φ Ω).trans
+  have hangle : Ket.projectiveAngle Ψ Ω ≤ φ + θ :=
+    (Ket.projectiveAngle_triangle Ψ Φ Ω).trans
       (add_le_add hangle_ΨΦ hangle_ΦΩ)
   have hsin_angle :
-      Real.sin (PureVector.projectiveAngle Ψ Ω) ≤ Real.sin (φ + θ) :=
+      Real.sin (Ket.projectiveAngle Ψ Ω) ≤ Real.sin (φ + θ) :=
     (Real.strictMonoOn_sin.le_iff_le
-      ⟨by linarith [PureVector.projectiveAngle_nonneg Ψ Ω],
-        PureVector.projectiveAngle_le_pi_div_two Ψ Ω⟩
+      ⟨by linarith [Ket.projectiveAngle_nonneg Ψ Ω],
+        Ket.projectiveAngle_le_pi_div_two Ψ Ω⟩
       ⟨by linarith, hsum.le⟩).mpr hangle
   calc
     ρ.purifiedDistance τ ≤ Real.sqrt (1 - Ψ.overlapSq Ω) :=
-      State.purifiedDistance_le_sqrt_one_sub_overlapSq_of_purifies hΨ hΩ
-    _ = Real.sin (PureVector.projectiveAngle Ψ Ω) :=
-      (PureVector.sin_projectiveAngle Ψ Ω).symm
+      MState.purifiedDistance_le_sqrt_one_sub_overlapSq_of_purifies hΨ hΩ
+    _ = Real.sin (Ket.projectiveAngle Ψ Ω) :=
+      (Ket.sin_projectiveAngle Ψ Ω).symm
     _ ≤ Real.sin (φ + θ) := hsin_angle
 
-end State
+end MState
+
+namespace QIT
 
 namespace SubnormalizedState
 
-/-- Subnormalized version of `State.purifiedDistance_le_sin_add`, obtained
+/-- Subnormalized version of `MState.purifiedDistance_le_sin_add`, obtained
 through normalized hat extensions. -/
 theorem purifiedDistance_le_sin_add {a : Type u} [Fintype a] [DecidableEq a]
     (ρ σ τ : SubnormalizedState a) {φ θ : ℝ}
@@ -326,9 +298,9 @@ theorem purifiedDistance_le_sin_add {a : Type u} [Fintype a] [DecidableEq a]
     (hρσ : ρ.purifiedDistance σ ≤ Real.sin φ)
     (hστ : σ.purifiedDistance τ ≤ Real.sin θ) :
     ρ.purifiedDistance τ ≤ Real.sin (φ + θ) := by
-  let ρhat : State (Sum PUnit.{u + 1} a) := ρ.hatExtension
-  let σhat : State (Sum PUnit.{u + 1} a) := σ.hatExtension
-  let τhat : State (Sum PUnit.{u + 1} a) := τ.hatExtension
+  let ρhat : MState (PUnit.{u + 1} ⊕ a) := ρ.hatExtension
+  let σhat : MState (PUnit.{u + 1} ⊕ a) := σ.hatExtension
+  let τhat : MState (PUnit.{u + 1} ⊕ a) := τ.hatExtension
   have hρσhat : ρhat.purifiedDistance σhat ≤ Real.sin φ := by
     have heq : ρ.purifiedDistance σ = ρhat.purifiedDistance σhat := by
       simpa [ρhat, σhat] using
@@ -341,7 +313,7 @@ theorem purifiedDistance_le_sin_add {a : Type u} [Fintype a] [DecidableEq a]
         (SubnormalizedState.purifiedDistance_eq_purifiedDistance_hatExtension σ τ)
     rw [← heq]
     exact hστ
-  have h := State.purifiedDistance_le_sin_add
+  have h := MState.purifiedDistance_le_sin_add
     ρhat σhat τhat hφ hθ hsum hρσhat hστhat
   have heq : ρ.purifiedDistance τ = ρhat.purifiedDistance τhat := by
     simpa [ρhat, τhat] using
@@ -350,7 +322,5 @@ theorem purifiedDistance_le_sin_add {a : Type u} [Fintype a] [DecidableEq a]
   exact h
 
 end SubnormalizedState
-
-end
 
 end QIT

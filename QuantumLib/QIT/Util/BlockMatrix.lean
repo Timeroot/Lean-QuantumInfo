@@ -30,42 +30,42 @@ noncomputable section
 variable {α : Type u} {β : Type v}
 
 /-- The upper-left block of a matrix indexed by `α ⊕ β`. -/
-def sumBlock11 (M : Matrix (Sum α β) (Sum α β) ℂ) : Matrix α α ℂ :=
+def sumBlock11 (M : Matrix (α ⊕ β) (α ⊕ β) ℂ) : Matrix α α ℂ :=
   M.submatrix Sum.inl Sum.inl
 
 /-- The upper-right block of a matrix indexed by `α ⊕ β`. -/
-def sumBlock12 (M : Matrix (Sum α β) (Sum α β) ℂ) : Matrix α β ℂ :=
+def sumBlock12 (M : Matrix (α ⊕ β) (α ⊕ β) ℂ) : Matrix α β ℂ :=
   M.submatrix Sum.inl Sum.inr
 
 /-- The lower-left block of a matrix indexed by `α ⊕ β`. -/
-def sumBlock21 (M : Matrix (Sum α β) (Sum α β) ℂ) : Matrix β α ℂ :=
+def sumBlock21 (M : Matrix (α ⊕ β) (α ⊕ β) ℂ) : Matrix β α ℂ :=
   M.submatrix Sum.inr Sum.inl
 
 /-- The lower-right block of a matrix indexed by `α ⊕ β`. -/
-def sumBlock22 (M : Matrix (Sum α β) (Sum α β) ℂ) : Matrix β β ℂ :=
+def sumBlock22 (M : Matrix (α ⊕ β) (α ⊕ β) ℂ) : Matrix β β ℂ :=
   M.submatrix Sum.inr Sum.inr
 
 /-- Embed a matrix as the upper-left block of a `Sum`-indexed block matrix. -/
-def sumBlockEmbed11 (A : Matrix α α ℂ) : Matrix (Sum α β) (Sum α β) ℂ :=
+def sumBlockEmbed11 (A : Matrix α α ℂ) : Matrix (α ⊕ β) (α ⊕ β) ℂ :=
   Matrix.fromBlocks A 0 0 0
 
 @[simp]
-theorem sumBlock11_apply (M : Matrix (Sum α β) (Sum α β) ℂ) (i j : α) :
+theorem sumBlock11_apply (M : Matrix (α ⊕ β) (α ⊕ β) ℂ) (i j : α) :
     sumBlock11 M i j = M (Sum.inl i) (Sum.inl j) :=
   rfl
 
 @[simp]
-theorem sumBlock12_apply (M : Matrix (Sum α β) (Sum α β) ℂ) (i : α) (j : β) :
+theorem sumBlock12_apply (M : Matrix (α ⊕ β) (α ⊕ β) ℂ) (i : α) (j : β) :
     sumBlock12 M i j = M (Sum.inl i) (Sum.inr j) :=
   rfl
 
 @[simp]
-theorem sumBlock21_apply (M : Matrix (Sum α β) (Sum α β) ℂ) (i : β) (j : α) :
+theorem sumBlock21_apply (M : Matrix (α ⊕ β) (α ⊕ β) ℂ) (i : β) (j : α) :
     sumBlock21 M i j = M (Sum.inr i) (Sum.inl j) :=
   rfl
 
 @[simp]
-theorem sumBlock22_apply (M : Matrix (Sum α β) (Sum α β) ℂ) (i j : β) :
+theorem sumBlock22_apply (M : Matrix (α ⊕ β) (α ⊕ β) ℂ) (i j : β) :
     sumBlock22 M i j = M (Sum.inr i) (Sum.inr j) :=
   rfl
 
@@ -117,18 +117,18 @@ theorem trace_fromBlocks_diagonal [Fintype α] [Fintype β]
   simp [Matrix.trace]
 
 /-- Reassemble a `Sum`-indexed matrix from its four blocks. -/
-theorem fromBlocks_sumBlocks (M : Matrix (Sum α β) (Sum α β) ℂ) :
+theorem fromBlocks_sumBlocks (M : Matrix (α ⊕ β) (α ⊕ β) ℂ) :
     Matrix.fromBlocks (sumBlock11 M) (sumBlock12 M) (sumBlock21 M) (sumBlock22 M) = M := by
   ext (_ | _) (_ | _) <;> rfl
 
 /-- The upper-left block of a positive semidefinite block matrix is positive semidefinite. -/
-theorem sumBlock11_posSemidef {M : Matrix (Sum α β) (Sum α β) ℂ}
+theorem sumBlock11_posSemidef {M : Matrix (α ⊕ β) (α ⊕ β) ℂ}
     (hM : M.PosSemidef) :
     (sumBlock11 M).PosSemidef :=
   hM.submatrix Sum.inl
 
 /-- The lower-right block of a positive semidefinite block matrix is positive semidefinite. -/
-theorem sumBlock22_posSemidef {M : Matrix (Sum α β) (Sum α β) ℂ}
+theorem sumBlock22_posSemidef {M : Matrix (α ⊕ β) (α ⊕ β) ℂ}
     (hM : M.PosSemidef) :
     (sumBlock22 M).PosSemidef :=
   hM.submatrix Sum.inr
@@ -138,7 +138,7 @@ positive semidefinite. -/
 theorem fromBlocks_diagonal_posSemidef [Fintype α] [DecidableEq α]
     [Fintype β] [DecidableEq β] {A : Matrix α α ℂ} {D : Matrix β β ℂ}
     (hA : A.PosSemidef) (hD : D.PosSemidef) :
-    (Matrix.fromBlocks A 0 0 D : Matrix (Sum α β) (Sum α β) ℂ).PosSemidef := by
+    (Matrix.fromBlocks A 0 0 D : Matrix (α ⊕ β) (α ⊕ β) ℂ).PosSemidef := by
   classical
   refine Matrix.PosSemidef.of_dotProduct_mulVec_nonneg ?_ ?_
   · rw [Matrix.IsHermitian.ext_iff]
@@ -173,7 +173,7 @@ definite, even when the two block index types have different dimensions. -/
 theorem fromBlocks_diagonal_posDef [Fintype α] [DecidableEq α]
     [Fintype β] [DecidableEq β] {A : Matrix α α ℂ} {D : Matrix β β ℂ}
     (hA : A.PosDef) (hD : D.PosDef) :
-    (Matrix.fromBlocks A 0 0 D : Matrix (Sum α β) (Sum α β) ℂ).PosDef := by
+    (Matrix.fromBlocks A 0 0 D : Matrix (α ⊕ β) (α ⊕ β) ℂ).PosDef := by
   classical
   refine Matrix.PosDef.of_dotProduct_mulVec_pos
     (fromBlocks_diagonal_posSemidef hA.posSemidef hD.posSemidef).isHermitian ?_
@@ -214,35 +214,26 @@ theorem fromBlocks_diagonal_posDef [Fintype α] [DecidableEq α]
 /-- A congruence block matrix is positive semidefinite.
 
 This is the block factorization
-`[RᴴDR RᴴD; DR D] = [Rᴴ 1] D [R; 1]`, expressed with `Sum` blocks. -/
+`[RᴴDR RᴴD; DR D] = [Rᴴ 1] D [R; 1]`, expressed with `Sum` blocks. Writing `D = BᴴB` makes it the
+Gram matrix of the pair `(B, BR)`, so `Matrix.fromBlocks_gram_posSemidef` applies. -/
 theorem fromBlocks_congruence_posSemidef [Fintype α] [DecidableEq α]
     [Fintype β] [DecidableEq β] {D : Matrix β β ℂ} (hD : D.PosSemidef)
     (R : Matrix β α ℂ) :
     (Matrix.fromBlocks (Rᴴ * D * R) (Rᴴ * D) (D * R) D :
-      Matrix (Sum α β) (Sum α β) ℂ).PosSemidef := by
-  classical
-  let diagD : Matrix (Sum α β) (Sum α β) ℂ := Matrix.fromBlocks 0 0 0 D
-  let T : Matrix (Sum α β) (Sum α β) ℂ := Matrix.fromBlocks 1 0 R 1
-  have hdiagD : diagD.PosSemidef := by
-    simpa [diagD] using
-      fromBlocks_diagonal_posSemidef
-        (A := (0 : Matrix α α ℂ)) (D := D) Matrix.PosSemidef.zero hD
-  have hconj : (Tᴴ * diagD * T).PosSemidef :=
-    hdiagD.conjTranspose_mul_mul_same T
-  have hfactor :
-      Tᴴ * diagD * T =
-        (Matrix.fromBlocks (Rᴴ * D * R) (Rᴴ * D) (D * R) D :
-          Matrix (Sum α β) (Sum α β) ℂ) := by
-    ext (_ | _) (_ | _) <;>
-      simp [diagD, T, Matrix.fromBlocks_multiply, Matrix.fromBlocks_conjTranspose]
-  simpa [hfactor] using hconj
+      Matrix (α ⊕ β) (α ⊕ β) ℂ).PosSemidef := by
+  obtain ⟨B, hB⟩ := CStarAlgebra.nonneg_iff_eq_star_mul_self.mp hD.nonneg
+  rw [star_eq_conjTranspose] at hB
+  subst hB
+  have h := fromBlocks_gram_posSemidef B (B * R)
+  rwa [conjTranspose_mul, Matrix.mul_assoc Rᴴ Bᴴ (B * R), ← Matrix.mul_assoc Bᴴ B R,
+    ← Matrix.mul_assoc Rᴴ (Bᴴ * B) R, Matrix.mul_assoc Rᴴ Bᴴ B] at h
 
 /-- The lower-right Schur complement of a positive semidefinite block matrix is
 positive semidefinite when the lower-right block is positive definite. -/
 theorem fromBlocks_posSemidef_schurComplement22 [Fintype α] [Fintype β] [DecidableEq β]
     {A : Matrix α α ℂ} {B : Matrix α β ℂ} {D : Matrix β β ℂ}
     (hD : D.PosDef)
-    (hM : (Matrix.fromBlocks A B Bᴴ D : Matrix (Sum α β) (Sum α β) ℂ).PosSemidef) :
+    (hM : (Matrix.fromBlocks A B Bᴴ D : Matrix (α ⊕ β) (α ⊕ β) ℂ).PosSemidef) :
     letI : Invertible D := hD.isUnit.invertible
     (A - B * D⁻¹ * Bᴴ).PosSemidef := by
   classical
@@ -263,12 +254,12 @@ equivalent to positivity of the Schur block
 theorem le_parallelSum_iff_fromBlocks_posSemidef [Fintype α] [DecidableEq α]
     {X Y Z : QIT.CMatrix α} (hX : X.IsHermitian) (hXY : (X + Y).PosDef) :
     Z ≤ parallelSum X Y ↔
-      (Matrix.fromBlocks (X - Z) X X (X + Y) : QIT.CMatrix (Sum α α)).PosSemidef := by
+      (Matrix.fromBlocks (X - Z) X X (X + Y) : QIT.CMatrix (α ⊕ α)).PosSemidef := by
   classical
   let : Invertible (X + Y) := hXY.isUnit.invertible
   rw [Matrix.le_iff]
   have hschur :
-      (Matrix.fromBlocks (X - Z) X X (X + Y) : QIT.CMatrix (Sum α α)).PosSemidef ↔
+      (Matrix.fromBlocks (X - Z) X X (X + Y) : QIT.CMatrix (α ⊕ α)).PosSemidef ↔
         (X - Z - X * (X + Y)⁻¹ * X).PosSemidef := by
     simpa [hX.eq] using
       (Matrix.PosDef.fromBlocks₂₂ (X - Z) X (D := X + Y) hXY)
@@ -298,16 +289,16 @@ theorem fromBlocks_parallelSum_hypograph_convex_posSemidef [Fintype α] [Decidab
     {t : ℝ} (ht0 : 0 ≤ t) (ht1 : t ≤ 1)
     (h₁ :
       (Matrix.fromBlocks (X₁ - Z₁) X₁ X₁ (X₁ + Y₁) :
-        QIT.CMatrix (Sum α α)).PosSemidef)
+        QIT.CMatrix (α ⊕ α)).PosSemidef)
     (h₂ :
       (Matrix.fromBlocks (X₂ - Z₂) X₂ X₂ (X₂ + Y₂) :
-        QIT.CMatrix (Sum α α)).PosSemidef) :
+        QIT.CMatrix (α ⊕ α)).PosSemidef) :
     (Matrix.fromBlocks
         ((t • X₁ + (1 - t) • X₂) - (t • Z₁ + (1 - t) • Z₂))
         (t • X₁ + (1 - t) • X₂)
         (t • X₁ + (1 - t) • X₂)
         ((t • X₁ + (1 - t) • X₂) + (t • Y₁ + (1 - t) • Y₂)) :
-      QIT.CMatrix (Sum α α)).PosSemidef := by
+      QIT.CMatrix (α ⊕ α)).PosSemidef := by
   have hconv :=
     Matrix.PosSemidef.add
       (Matrix.PosSemidef.smul h₁ ht0)
@@ -334,11 +325,11 @@ theorem parallelSum_concave_posDef [Fintype α] [DecidableEq α]
     Matrix.PosDef.posSemidef_add hX₂ hY₂
   have hblock₁ :
       (Matrix.fromBlocks (X₁ - parallelSum X₁ Y₁) X₁ X₁ (X₁ + Y₁) :
-        QIT.CMatrix (Sum α α)).PosSemidef :=
+        QIT.CMatrix (α ⊕ α)).PosSemidef :=
     (le_parallelSum_iff_fromBlocks_posSemidef hX₁.isHermitian hXY₁).mp (le_refl _)
   have hblock₂ :
       (Matrix.fromBlocks (X₂ - parallelSum X₂ Y₂) X₂ X₂ (X₂ + Y₂) :
-        QIT.CMatrix (Sum α α)).PosSemidef :=
+        QIT.CMatrix (α ⊕ α)).PosSemidef :=
     (le_parallelSum_iff_fromBlocks_posSemidef hX₂.isHermitian hXY₂).mp (le_refl _)
   have hXbar :
       (t • X₁ + (1 - t) • X₂).PosSemidef :=
@@ -358,7 +349,7 @@ theorem parallelSum_concave_posDef [Fintype α] [DecidableEq α]
           (t • X₁ + (1 - t) • X₂)
           (t • X₁ + (1 - t) • X₂)
           ((t • X₁ + (1 - t) • X₂) + (t • Y₁ + (1 - t) • Y₂)) :
-        QIT.CMatrix (Sum α α)).PosSemidef :=
+        QIT.CMatrix (α ⊕ α)).PosSemidef :=
     fromBlocks_parallelSum_hypograph_convex_posSemidef
       ht0 ht1 hblock₁ hblock₂
   exact
@@ -613,11 +604,11 @@ end AndoResolvent
 
 /-- Off-diagonal blocks of a Hermitian block matrix are adjoints. -/
 theorem sumBlock21_eq_conjTranspose_sumBlock12_of_isHermitian
-    {M : Matrix (Sum α β) (Sum α β) ℂ} (hM : M.IsHermitian) :
+    {M : Matrix (α ⊕ β) (α ⊕ β) ℂ} (hM : M.IsHermitian) :
     sumBlock21 M = (sumBlock12 M)ᴴ := by
   rw [Matrix.IsHermitian] at hM
   ext i j
-  have h := congrArg (fun N : Matrix (Sum α β) (Sum α β) ℂ =>
+  have h := congrArg (fun N : Matrix (α ⊕ β) (α ⊕ β) ℂ =>
     N (Sum.inr i) (Sum.inl j)) hM
   simpa [sumBlock21, sumBlock12, Matrix.conjTranspose_apply] using h.symm
 
@@ -635,10 +626,10 @@ universe u
 theorem cMatrix_fromBlocks_self_le_posSemidef {e : Type u}
     [Fintype e] [DecidableEq e] {A C : CMatrix e}
     (hA : A.PosSemidef) (hCminusA : (C - A).PosSemidef) :
-    (Matrix.fromBlocks A A A C : CMatrix (Sum e e)).PosSemidef := by
+    (Matrix.fromBlocks A A A C : CMatrix (e ⊕ e)).PosSemidef := by
   classical
-  let D : CMatrix (Sum e e) := Matrix.fromBlocks A 0 0 (C - A)
-  let T : CMatrix (Sum e e) := Matrix.fromBlocks 1 1 0 1
+  let D : CMatrix (e ⊕ e) := Matrix.fromBlocks A 0 0 (C - A)
+  let T : CMatrix (e ⊕ e) := Matrix.fromBlocks 1 1 0 1
   have hD : D.PosSemidef := by
     simpa [D] using
       Matrix.fromBlocks_diagonal_posSemidef (A := A) (D := C - A) hA hCminusA
@@ -646,10 +637,65 @@ theorem cMatrix_fromBlocks_self_le_posSemidef {e : Type u}
     simpa [Matrix.mul_assoc] using hD.mul_mul_conjTranspose_same T.conjTranspose
   have hfactor :
       T.conjTranspose * D * T =
-        (Matrix.fromBlocks A A A C : CMatrix (Sum e e)) := by
+        (Matrix.fromBlocks A A A C : CMatrix (e ⊕ e)) := by
     (ext i j; cases i) <;> cases j <;>
       simp [D, T, Matrix.fromBlocks_multiply, Matrix.fromBlocks_conjTranspose,
         sub_eq_add_neg]
   simpa [hfactor] using hconj
+
+/-- Operator Cauchy-Schwarz for a positive semidefinite matrix dominated by a
+multiple of a positive definite one: `A ≤ c • σ` upgrades to
+`A * σ⁻¹ * A ≤ c • A`.  The proof is the Schur complement of the block matrix
+`[[A, A], [A, c • σ]]`. -/
+theorem cMatrix_mul_inv_mul_self_le_smul_of_posSemidef_le_posDef {e : Type u}
+    [Fintype e] [DecidableEq e] {A σ : CMatrix e} {c : ℝ}
+    (hA : A.PosSemidef) (hσ : σ.PosDef) (hc : 0 < c)
+    (hAσ : A ≤ (c : ℂ) • σ) :
+    A * σ⁻¹ * A ≤ (c : ℂ) • A := by
+  classical
+  rw [Matrix.le_iff]
+  let C : CMatrix e := (c : ℂ) • σ
+  have hcC : (0 : ℂ) < (c : ℂ) := by
+    exact_mod_cast hc
+  have hC : C.PosDef := by
+    simpa [C] using hσ.smul hcC
+  have hCminusA : (C - A).PosSemidef := by
+    simpa [C, Matrix.le_iff] using hAσ
+  have hblock :
+      (Matrix.fromBlocks A A A C : CMatrix (e ⊕ e)).PosSemidef :=
+    cMatrix_fromBlocks_self_le_posSemidef hA hCminusA
+  let : Invertible C := hC.isUnit.invertible
+  have hblock' :
+      (Matrix.fromBlocks A A A.conjTranspose C : CMatrix (e ⊕ e)).PosSemidef := by
+    simpa [hA.isHermitian.eq] using hblock
+  have hschur :
+      (A - A * C⁻¹ * A.conjTranspose).PosSemidef :=
+    (Matrix.PosDef.fromBlocks₂₂ A A (D := C) hC).mp hblock'
+  have hC_le :
+      A * C⁻¹ * A ≤ A := by
+    rw [Matrix.le_iff]
+    simpa [hA.isHermitian.eq] using hschur
+  have hcne : (c : ℂ) ≠ 0 := by
+    exact_mod_cast hc.ne'
+  let : Invertible (c : ℂ) := invertibleOfNonzero hcne
+  have hσdet : IsUnit σ.det := (Matrix.isUnit_iff_isUnit_det σ).mp hσ.isUnit
+  have hCinv : C⁻¹ = ((c : ℂ)⁻¹) • σ⁻¹ := by
+    calc
+      C⁻¹ = (((c : ℂ) • σ))⁻¹ := by rfl
+      _ = ⅟(c : ℂ) • σ⁻¹ := by
+        simpa using Matrix.inv_smul σ (c : ℂ) hσdet
+      _ = ((c : ℂ)⁻¹) • σ⁻¹ := by
+        simp [invOf_eq_inv]
+  have hinvScaled :
+      ((c : ℂ)⁻¹) • (A * σ⁻¹ * A) ≤ A := by
+    simpa [hCinv, Matrix.mul_assoc, Matrix.mul_smul, Matrix.smul_mul] using hC_le
+  rw [Matrix.le_iff] at hinvScaled
+  have hcNonneg : (0 : ℂ) ≤ (c : ℂ) := le_of_lt hcC
+  have hscaled := hinvScaled.smul hcNonneg
+  have hscale_eq :
+      (c : ℂ) • (A - ((c : ℂ)⁻¹) • (A * σ⁻¹ * A)) =
+        (c : ℂ) • A - A * σ⁻¹ * A := by
+    rw [smul_sub, smul_smul, mul_inv_cancel₀ hcne, one_smul]
+  simpa [hscale_eq] using hscaled
 
 end QIT

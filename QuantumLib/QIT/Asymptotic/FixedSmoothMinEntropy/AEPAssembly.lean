@@ -9,20 +9,48 @@ module
 public import QuantumLib.QIT.Asymptotic.FixedSmoothMinEntropy.ThresholdProjector
 import QuantumLib.QIT.Util.TensorPower
 
+/-!
+# From the one-shot Petz bound to the fully quantum AEP
+
+The one-shot bound of `ThresholdProjector.lean` becomes an asymptotic statement once it is applied
+to `ρ_AB^{⊗n}` with the reference `σ_B^{⊗n}` and the Rényi parameter is optimized.  Additivity is
+what makes this work: `tensorPowerBipartite_conditionalPetzRenyiEntropyCandidate_additive` shows
+the fixed-reference Petz candidate is `n` times the single-copy one, so the one-shot bound reads
+
+`n H↑_α(A|B) - log₂(2/ε²)/(α-1) ≤ H_min^ε(Aⁿ|Bⁿ)`,
+
+and feeding in the linear lower bound `H↑_α ≥ H(A|B) - 4(α-1)(log₂ η)²` at
+`α = 1 + √(log₂(2/ε²)) / (2 log₂ η √n)` balances the two error terms into `-δ(ε,η)√n`.  That is
+`finiteNAEP_statement`, proved here first for positive definite states and then in general.
+
+Two regularizations remove the rank hypotheses.  White noise
+`finiteAEPFullRankRegularization ρ η = (1-η)ρ + (η/d)·I` makes the joint state positive definite,
+and both the purified distance to `ρ` and the change in conditional entropy vanish as `η → 0`, so a
+bound proved for every `η > 0` passes to the limit; this is packaged as
+`finiteAEPFullRankRegularization_tensorLowerBound_transfer`, which also has to commute the
+regularization with the tensor power.  The conditioning register instead gets compressed to the
+support of `ρ_B`, since none of the quantities involved sees the kernel.
+
+The last section cashes in the finite-`N` theorem.  It supplies the lower half of the smooth-min
+rate; AFW continuity together with `H_min ≤ H` supplies the upper half; and smooth min/max duality
+against conditional-entropy duality converts the min statement into the max one.  Assembling the
+three gives `fullyQuantumAsymptoticEquipartitionProperty_twoStage`
+[TomamichelColbeckRenner2008Fqaep, thm:qaep].
+-/
+
 @[expose] public section
 
 open scoped ComplexOrder MatrixOrder Kronecker NNReal
 open Filter
 
-namespace QIT
-
-universe u v w
-
 noncomputable section
-
+universe u v w
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
-namespace State
+
+open QIT
+
+namespace MState
 /-! ## Finite-AEP assembly core -/
 
 /-! ### Full-rank regularization setup for arbitrary finite states -/
@@ -31,64 +59,64 @@ namespace State
 white noise on `AB`.
 
 For `0 < η ≤ 1`, the associated state below is positive definite, and as
-`η → 0+` this matrix tends back to `ρ.matrix`.  This is the reusable
+`η → 0+` this matrix tends back to `ρ.m`.  This is the reusable
 regularization surface needed before taking the positive-definite finite-AEP
 core to arbitrary states. -/
 def finiteAEPFullRankRegularizationMatrix
-    (ρ : State (Prod a b)) (η : ℝ) : CMatrix (Prod a b) :=
-  (((1 - η : ℝ) : ℂ) • ρ.matrix) +
-    ((((η / (Fintype.card (Prod a b) : ℝ) : ℝ)) : ℂ) •
-      (1 : CMatrix (Prod a b)))
+    (ρ : MState (a × b)) (η : ℝ) : CMatrix (a × b) :=
+  (((1 - η : ℝ) : ℂ) • ρ.m) +
+    ((((η / (Fintype.card (a × b) : ℝ) : ℝ)) : ℂ) •
+      (1 : CMatrix (a × b)))
 
 /-- The fixed direction from `ρ` toward the maximally mixed state used by the
 white-noise regularization. -/
 def finiteAEPFullRankRegularizationDirection
-    (ρ : State (Prod a b)) : CMatrix (Prod a b) :=
-  ((((1 / (Fintype.card (Prod a b) : ℝ) : ℝ) : ℂ) •
-    (1 : CMatrix (Prod a b))) - ρ.matrix)
+    (ρ : MState (a × b)) : CMatrix (a × b) :=
+  ((((1 / (Fintype.card (a × b) : ℝ) : ℝ) : ℂ) •
+    (1 : CMatrix (a × b))) - ρ.m)
 
 /-- The normalized state associated with
 `finiteAEPFullRankRegularizationMatrix` when the regularization weight lies in
 the probability interval. -/
 def finiteAEPFullRankRegularization
-    (ρ : State (Prod a b)) (η : ℝ) (hη0 : 0 ≤ η) (hη1 : η ≤ 1) :
-    State (Prod a b) where
-  matrix := finiteAEPFullRankRegularizationMatrix ρ η
-  pos := by
+    (ρ : MState (a × b)) (η : ℝ) (hη0 : 0 ≤ η) (hη1 : η ≤ 1) :
+    MState (a × b) := .ofMatrix
+  (matrix := finiteAEPFullRankRegularizationMatrix ρ η)
+  (pos := by
     unfold finiteAEPFullRankRegularizationMatrix
     have hleft : (0 : ℂ) ≤ (((1 - η : ℝ) : ℂ)) := by
       exact_mod_cast sub_nonneg.mpr hη1
-    have hright : (0 : ℂ) ≤ (((η / (Fintype.card (Prod a b) : ℝ) : ℝ) : ℂ)) := by
-      exact_mod_cast div_nonneg hη0 (by positivity : (0 : ℝ) ≤ Fintype.card (Prod a b))
+    have hright : (0 : ℂ) ≤ (((η / (Fintype.card (a × b) : ℝ) : ℝ) : ℂ)) := by
+      exact_mod_cast div_nonneg hη0 (by positivity : (0 : ℝ) ≤ Fintype.card (a × b))
     exact Matrix.PosSemidef.add
-      (Matrix.PosSemidef.smul ρ.pos hleft)
-      (Matrix.PosSemidef.smul Matrix.PosSemidef.one hright)
-  trace_eq_one := by
-    let : Nonempty (Prod a b) := ρ.nonempty
-    have hcardR : (Fintype.card (Prod a b) : ℝ) ≠ 0 := by
-      exact_mod_cast (Nat.cast_ne_zero.mpr (Fintype.card_ne_zero : Fintype.card (Prod a b) ≠ 0))
+      (Matrix.PosSemidef.smul ρ.psd hleft)
+      (Matrix.PosSemidef.smul Matrix.PosSemidef.one hright))
+  (trace_eq_one := by
+    let : Nonempty (a × b) := ρ.nonempty
+    have hcardR : (Fintype.card (a × b) : ℝ) ≠ 0 := by
+      exact_mod_cast (Nat.cast_ne_zero.mpr (Fintype.card_ne_zero : Fintype.card (a × b) ≠ 0))
     have hscalar :
-        (1 - η) + (η / (Fintype.card (Prod a b) : ℝ)) *
-            (Fintype.card (Prod a b) : ℝ) = 1 := by
+        (1 - η) + (η / (Fintype.card (a × b) : ℝ)) *
+            (Fintype.card (a × b) : ℝ) = 1 := by
       field_simp [hcardR]
       ring
     unfold finiteAEPFullRankRegularizationMatrix
-    rw [Matrix.trace_add, Matrix.trace_smul, Matrix.trace_smul, ρ.trace_eq_one,
+    rw [Matrix.trace_add, Matrix.trace_smul, Matrix.trace_smul, ρ.tr',
       Matrix.trace_one]
-    simpa [smul_eq_mul] using congrArg (fun x : ℝ => (x : ℂ)) hscalar
+    simpa [smul_eq_mul] using congrArg (fun x : ℝ => (x : ℂ)) hscalar)
 
 @[simp]
 theorem finiteAEPFullRankRegularization_matrix
-    (ρ : State (Prod a b)) (η : ℝ) (hη0 : 0 ≤ η) (hη1 : η ≤ 1) :
-    (ρ.finiteAEPFullRankRegularization η hη0 hη1).matrix =
+    (ρ : MState (a × b)) (η : ℝ) (hη0 : 0 ≤ η) (hη1 : η ≤ 1) :
+    (ρ.finiteAEPFullRankRegularization η hη0 hη1).m =
       finiteAEPFullRankRegularizationMatrix ρ η :=
-  rfl
+  MState.matrix_ofMatrix _ _ _
 
 /-- The full-rank white-noise regularization differs from the original state
 by `η` times a fixed matrix. -/
 theorem finiteAEPFullRankRegularization_matrix_sub
-    (ρ : State (Prod a b)) (η : ℝ) (hη0 : 0 ≤ η) (hη1 : η ≤ 1) :
-    (ρ.finiteAEPFullRankRegularization η hη0 hη1).matrix - ρ.matrix =
+    (ρ : MState (a × b)) (η : ℝ) (hη0 : 0 ≤ η) (hη1 : η ≤ 1) :
+    (ρ.finiteAEPFullRankRegularization η hη0 hη1).m - ρ.m =
       ((η : ℂ) • ρ.finiteAEPFullRankRegularizationDirection) := by
   ext i j
   simp [finiteAEPFullRankRegularization_matrix,
@@ -103,21 +131,21 @@ theorem finiteAEPFullRankRegularization_matrix_sub
 /-- The normalized trace distance from the white-noise regularization to the
 original state is at most linear in the regularization weight. -/
 theorem finiteAEPFullRankRegularization_normalizedTraceDistance_le
-    (ρ : State (Prod a b)) (η : ℝ) (hη0 : 0 ≤ η) (hη1 : η ≤ 1) :
+    (ρ : MState (a × b)) (η : ℝ) (hη0 : 0 ≤ η) (hη1 : η ≤ 1) :
     (ρ.finiteAEPFullRankRegularization η hη0 hη1).normalizedTraceDistance ρ ≤
       η * (1 / 2 : ℝ) *
         traceNorm ρ.finiteAEPFullRankRegularizationDirection := by
-  rw [State.normalizedTraceDistance_eq_matrix, QIT.normalizedTraceDistance_eq,
+  rw [MState.normalizedTraceDistance_eq_matrix, QIT.normalizedTraceDistance_eq,
     QIT.traceNormDistance]
   rw [finiteAEPFullRankRegularization_matrix_sub ρ η hη0 hη1]
-  have hnorm := traceNorm_real_smul_le (a := Prod a b) hη0
+  have hnorm := traceNorm_real_smul_le (a := a × b) hη0
     ρ.finiteAEPFullRankRegularizationDirection
   nlinarith
 
 /-- The purified distance from the white-noise regularization to the original
 state is controlled by the square root of the regularization weight. -/
 theorem finiteAEPFullRankRegularization_purifiedDistance_le
-    (ρ : State (Prod a b)) (η : ℝ) (hη0 : 0 ≤ η) (hη1 : η ≤ 1) :
+    (ρ : MState (a × b)) (η : ℝ) (hη0 : 0 ≤ η) (hη1 : η ≤ 1) :
     (ρ.finiteAEPFullRankRegularization η hη0 hη1).purifiedDistance ρ ≤
       Real.sqrt
         (η *
@@ -132,52 +160,40 @@ theorem finiteAEPFullRankRegularization_purifiedDistance_le
   refine le_trans hP (Real.sqrt_le_sqrt ?_)
   nlinarith
 
-private theorem cMatrix_real_smul_one_posDef_forFiniteAEP
-    {ι : Type*} [Fintype ι] [DecidableEq ι] {r : ℝ} (hr : 0 < r) :
-    (r • (1 : CMatrix ι)).PosDef := by
-  rw [show r • (1 : CMatrix ι) = Matrix.diagonal (fun _ : ι => (r : ℂ)) by
-    ext i j
-    by_cases hij : i = j
-    · subst j
-      simp
-    · simp [hij]]
-  rw [Matrix.posDef_diagonal_iff]
-  intro i
-  exact_mod_cast hr
-
 /-- Positive regularization weight makes the white-noise regularization
 positive definite, even when the original state is singular. -/
 theorem finiteAEPFullRankRegularization_posDef
-    (ρ : State (Prod a b)) {η : ℝ} (hη0 : 0 ≤ η) (hη1 : η ≤ 1)
+    (ρ : MState (a × b)) {η : ℝ} (hη0 : 0 ≤ η) (hη1 : η ≤ 1)
     (hηpos : 0 < η) :
-    (ρ.finiteAEPFullRankRegularization η hη0 hη1).matrix.PosDef := by
-  let : Nonempty (Prod a b) := ρ.nonempty
-  unfold finiteAEPFullRankRegularization finiteAEPFullRankRegularizationMatrix
+    (ρ.finiteAEPFullRankRegularization η hη0 hη1).m.PosDef := by
+  let : Nonempty (a × b) := ρ.nonempty
+  rw [finiteAEPFullRankRegularization_matrix]
+  unfold finiteAEPFullRankRegularizationMatrix
   have hleft : (0 : ℂ) ≤ (((1 - η : ℝ) : ℂ)) := by
     exact_mod_cast sub_nonneg.mpr hη1
-  have hright : 0 < η / (Fintype.card (Prod a b) : ℝ) := by
-    exact div_pos hηpos (by exact_mod_cast (Fintype.card_pos : 0 < Fintype.card (Prod a b)))
+  have hright : 0 < η / (Fintype.card (a × b) : ℝ) := by
+    exact div_pos hηpos (by exact_mod_cast (Fintype.card_pos : 0 < Fintype.card (a × b)))
   exact Matrix.PosDef.posSemidef_add
-    (Matrix.PosSemidef.smul ρ.pos hleft)
-    (cMatrix_real_smul_one_posDef_forFiniteAEP hright)
+    (Matrix.PosSemidef.smul ρ.psd hleft)
+    (cMatrix_real_smul_one_posDef hright)
 
-private theorem partialTraceA_one_forFiniteAEP
+private theorem traceLeft_one_forFiniteAEP
     (a : Type u) (b : Type v) [Fintype a] [DecidableEq a]
     [Fintype b] [DecidableEq b] :
-    partialTraceA (a := a) (b := b) (1 : CMatrix (Prod a b)) =
+    Matrix.traceLeft (1 : CMatrix (a × b)) =
       ((Fintype.card a : ℂ) • (1 : CMatrix b)) := by
   ext i j
   by_cases hij : i = j
   · subst j
-    simp [partialTraceA]
-  · simp [partialTraceA, hij]
+    simp [Matrix.traceLeft]
+  · simp [Matrix.traceLeft, hij]
 
-private theorem finiteAEPFullRankRegularization_whiteNoise_marginalB_scalar
-    (ρ : State (Prod a b)) (η : ℝ) :
-    ((η / (Fintype.card (Prod a b) : ℝ) : ℝ) *
+private theorem finiteAEPFullRankRegularization_whiteNoise_traceLeft_scalar
+    (ρ : MState (a × b)) (η : ℝ) :
+    ((η / (Fintype.card (a × b) : ℝ) : ℝ) *
         (Fintype.card a : ℝ)) =
       η / (Fintype.card b : ℝ) := by
-  let : Nonempty (Prod a b) := ρ.nonempty
+  let : Nonempty (a × b) := ρ.nonempty
   let : Nonempty a := ⟨(Classical.choice ρ.nonempty).1⟩
   let : Nonempty b := ⟨(Classical.choice ρ.nonempty).2⟩
   have ha : (Fintype.card a : ℝ) ≠ 0 := by
@@ -185,7 +201,7 @@ private theorem finiteAEPFullRankRegularization_whiteNoise_marginalB_scalar
   have hb : (Fintype.card b : ℝ) ≠ 0 := by
     exact_mod_cast (Nat.cast_ne_zero.mpr (Fintype.card_ne_zero : Fintype.card b ≠ 0))
   have hprod :
-      (Fintype.card (Prod a b) : ℝ) =
+      (Fintype.card (a × b) : ℝ) =
         (Fintype.card a : ℝ) * (Fintype.card b : ℝ) := by
     exact_mod_cast (Fintype.card_prod a b)
   rw [hprod]
@@ -193,53 +209,52 @@ private theorem finiteAEPFullRankRegularization_whiteNoise_marginalB_scalar
 
 /-- The `B` marginal of the white-noise regularization is the matching
 white-noise regularization of `ρ_B`. -/
-theorem finiteAEPFullRankRegularization_marginalB_matrix
-    (ρ : State (Prod a b)) (η : ℝ) (hη0 : 0 ≤ η) (hη1 : η ≤ 1) :
-    (ρ.finiteAEPFullRankRegularization η hη0 hη1).marginalB.matrix =
-      (((1 - η : ℝ) : ℂ) • ρ.marginalB.matrix) +
+theorem finiteAEPFullRankRegularization_traceLeft_matrix
+    (ρ : MState (a × b)) (η : ℝ) (hη0 : 0 ≤ η) (hη1 : η ≤ 1) :
+    (ρ.finiteAEPFullRankRegularization η hη0 hη1).traceLeft.m =
+      (((1 - η : ℝ) : ℂ) • ρ.traceLeft.m) +
         ((((η / (Fintype.card b : ℝ) : ℝ)) : ℂ) • (1 : CMatrix b)) := by
-  unfold finiteAEPFullRankRegularization
-  simp only [State.marginalB_matrix]
+  simp only [MState.traceLeft_m, finiteAEPFullRankRegularization_matrix]
   unfold finiteAEPFullRankRegularizationMatrix
-  rw [partialTraceA_add, partialTraceA_smul, partialTraceA_smul,
-    partialTraceA_one_forFiniteAEP]
+  rw [Matrix.traceLeft_add, Matrix.traceLeft_smul, Matrix.traceLeft_smul,
+    traceLeft_one_forFiniteAEP]
   rw [smul_smul]
   have hscalar :
-      (((η / (Fintype.card (Prod a b) : ℝ) : ℝ) : ℂ) *
+      (((η / (Fintype.card (a × b) : ℝ) : ℝ) : ℂ) *
           (Fintype.card a : ℂ)) =
         (((η / (Fintype.card b : ℝ) : ℝ) : ℂ)) := by
     exact_mod_cast
-      finiteAEPFullRankRegularization_whiteNoise_marginalB_scalar
+      finiteAEPFullRankRegularization_whiteNoise_traceLeft_scalar
         (a := a) (b := b) ρ η
   rw [hscalar]
 
 /-- The `B` marginal of the regularized state is positive definite for every
 positive regularization weight. -/
-theorem finiteAEPFullRankRegularization_marginalB_posDef
-    (ρ : State (Prod a b)) {η : ℝ} (hη0 : 0 ≤ η) (hη1 : η ≤ 1)
+theorem finiteAEPFullRankRegularization_traceLeft_posDef
+    (ρ : MState (a × b)) {η : ℝ} (hη0 : 0 ≤ η) (hη1 : η ≤ 1)
     (hηpos : 0 < η) :
-    (ρ.finiteAEPFullRankRegularization η hη0 hη1).marginalB.matrix.PosDef := by
+    (ρ.finiteAEPFullRankRegularization η hη0 hη1).traceLeft.m.PosDef := by
   let : Nonempty b := ⟨(Classical.choice ρ.nonempty).2⟩
-  rw [finiteAEPFullRankRegularization_marginalB_matrix]
+  rw [finiteAEPFullRankRegularization_traceLeft_matrix]
   have hleft : (0 : ℂ) ≤ (((1 - η : ℝ) : ℂ)) := by
     exact_mod_cast sub_nonneg.mpr hη1
   have hright : 0 < η / (Fintype.card b : ℝ) := by
     exact div_pos hηpos (by exact_mod_cast (Fintype.card_pos : 0 < Fintype.card b))
   exact Matrix.PosDef.posSemidef_add
-    (Matrix.PosSemidef.smul ρ.marginalB.pos hleft)
-    (cMatrix_real_smul_one_posDef_forFiniteAEP hright)
+    (Matrix.PosSemidef.smul ρ.traceLeft.psd hleft)
+    (cMatrix_real_smul_one_posDef hright)
 
 /-- The full-rank regularization matrix tends back to the original state
 matrix as the noise weight tends to zero through positive probabilities. -/
 theorem finiteAEPFullRankRegularizationMatrix_tendsto_zero
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     Filter.Tendsto (fun η : ℝ => finiteAEPFullRankRegularizationMatrix ρ η)
-      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds ρ.matrix) := by
+      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds ρ.m) := by
   have hcont : Continuous fun η : ℝ =>
       finiteAEPFullRankRegularizationMatrix ρ η := by
     unfold finiteAEPFullRankRegularizationMatrix
     fun_prop
-  have h0 : finiteAEPFullRankRegularizationMatrix ρ 0 = ρ.matrix := by
+  have h0 : finiteAEPFullRankRegularizationMatrix ρ 0 = ρ.m := by
     simp [finiteAEPFullRankRegularizationMatrix]
   simpa [h0] using
     (hcont.continuousWithinAt (x := (0 : ℝ)) (s := Set.Ioo (0 : ℝ) 1)).tendsto
@@ -247,21 +262,21 @@ theorem finiteAEPFullRankRegularizationMatrix_tendsto_zero
 /-- The expanded `B`-marginal white-noise regularization matrix tends back to
 the original `B` marginal as the noise weight tends to zero through positive
 probabilities. -/
-theorem finiteAEPFullRankRegularization_marginalB_matrix_path_tendsto_zero
-    (ρ : State (Prod a b)) :
+theorem finiteAEPFullRankRegularization_traceLeft_matrix_path_tendsto_zero
+    (ρ : MState (a × b)) :
     Filter.Tendsto
       (fun η : ℝ =>
-        (((1 - η : ℝ) : ℂ) • ρ.marginalB.matrix) +
+        (((1 - η : ℝ) : ℂ) • ρ.traceLeft.m) +
           ((((η / (Fintype.card b : ℝ) : ℝ)) : ℂ) • (1 : CMatrix b)))
-      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds ρ.marginalB.matrix) := by
+      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds ρ.traceLeft.m) := by
   have hcont : Continuous fun η : ℝ =>
-      (((1 - η : ℝ) : ℂ) • ρ.marginalB.matrix) +
+      (((1 - η : ℝ) : ℂ) • ρ.traceLeft.m) +
         ((((η / (Fintype.card b : ℝ) : ℝ)) : ℂ) • (1 : CMatrix b)) := by
     fun_prop
   have h0 :
-      (((1 - (0 : ℝ) : ℝ) : ℂ) • ρ.marginalB.matrix) +
+      (((1 - (0 : ℝ) : ℝ) : ℂ) • ρ.traceLeft.m) +
           ((((0 / (Fintype.card b : ℝ) : ℝ)) : ℂ) • (1 : CMatrix b)) =
-        ρ.marginalB.matrix := by
+        ρ.traceLeft.m := by
     simp
   simpa [h0] using
     (hcont.continuousWithinAt (x := (0 : ℝ)) (s := Set.Ioo (0 : ℝ) 1)).tendsto
@@ -273,21 +288,21 @@ the original `B` marginal matrix as the noise weight tends to zero through
 Outside the interval the displayed path is filled in with the limiting matrix,
 so it is a total function on `ℝ`; on the `nhdsWithin` filter it is eventually
 equal to the actual regularized marginal. -/
-theorem finiteAEPFullRankRegularization_marginalB_matrix_tendsto_zero
-    (ρ : State (Prod a b)) :
+theorem finiteAEPFullRankRegularization_traceLeft_matrix_tendsto_zero
+    (ρ : MState (a × b)) :
     Filter.Tendsto
       (fun η : ℝ =>
         if hη : η ∈ Set.Ioo (0 : ℝ) 1 then
-          (ρ.finiteAEPFullRankRegularization η hη.1.le hη.2.le).marginalB.matrix
+          (ρ.finiteAEPFullRankRegularization η hη.1.le hη.2.le).traceLeft.m
         else
-          ρ.marginalB.matrix)
-      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds ρ.marginalB.matrix) := by
+          ρ.traceLeft.m)
+      (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds ρ.traceLeft.m) := by
   refine Filter.Tendsto.congr' ?_
-    (finiteAEPFullRankRegularization_marginalB_matrix_path_tendsto_zero ρ)
+    (finiteAEPFullRankRegularization_traceLeft_matrix_path_tendsto_zero ρ)
   filter_upwards [self_mem_nhdsWithin] with η hη
   rw [dif_pos hη]
   exact
-    (finiteAEPFullRankRegularization_marginalB_matrix
+    (finiteAEPFullRankRegularization_traceLeft_matrix
       (a := a) (b := b) ρ η hη.1.le hη.2.le).symm
 
 /-- The full-rank regularized state tends back to the original state as the
@@ -297,7 +312,7 @@ Outside the interval the displayed path is filled in with the limiting state,
 so it is a total function on `ℝ`; on the `nhdsWithin` filter it is eventually
 equal to the actual regularized state. -/
 theorem finiteAEPFullRankRegularization_tendsto_zero
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     Filter.Tendsto
       (fun η : ℝ =>
         if hη : η ∈ Set.Ioo (0 : ℝ) 1 then
@@ -305,23 +320,19 @@ theorem finiteAEPFullRankRegularization_tendsto_zero
         else
           ρ)
       (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds ρ) := by
-  rw [Filter.tendsto_iff_comap]
-  rw [nhds_induced]
-  rw [Filter.comap_comap]
-  rw [← Filter.tendsto_iff_comap]
+  refine tendsto_of_tendsto_m ?_
   refine Filter.Tendsto.congr' ?_ (finiteAEPFullRankRegularizationMatrix_tendsto_zero ρ)
   filter_upwards [self_mem_nhdsWithin] with η hη
   change ρ.finiteAEPFullRankRegularizationMatrix η =
     (if hη' : η ∈ Set.Ioo (0 : ℝ) 1 then
       ρ.finiteAEPFullRankRegularization η hη'.1.le hη'.2.le
-    else ρ).matrix
-  rw [dif_pos hη]
-  rfl
+    else ρ).m
+  rw [dif_pos hη, finiteAEPFullRankRegularization_matrix]
 
 /-- Conditional entropy is continuous along the full-rank white-noise
 regularization path. -/
 theorem finiteAEPFullRankRegularization_conditionalEntropy_tendsto_zero
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     Filter.Tendsto
       (fun η : ℝ =>
         (if hη : η ∈ Set.Ioo (0 : ℝ) 1 then
@@ -329,18 +340,18 @@ theorem finiteAEPFullRankRegularization_conditionalEntropy_tendsto_zero
         else
           ρ).conditionalEntropy)
       (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) (nhds ρ.conditionalEntropy) :=
-  State.conditionalEntropy_continuous.tendsto ρ |>.comp
+  MState.conditionalEntropy_continuous.tendsto ρ |>.comp
     (finiteAEPFullRankRegularization_tendsto_zero ρ)
 
 /-- Fixed tensor powers are continuous as maps of the input density state. -/
 theorem tensorPower_matrix_continuous (n : ℕ) :
-    Continuous (fun ρ : State a => (ρ.tensorPower n).matrix) := by
+    Continuous (fun ρ : MState a => (ρ.tensorPower n).m) := by
   induction n with
   | zero =>
-      change Continuous fun _ : State a => (1 : CMatrix PUnit)
+      simp only [MState.tensorPower_zero_matrix]
       fun_prop
   | succ n ih =>
-      change Continuous fun ρ : State a => (ρ.prod (ρ.tensorPower n)).matrix
+      change Continuous fun ρ : MState a => (ρ.prod (ρ.tensorPower n)).m
       refine continuous_pi ?_
       intro i
       refine continuous_pi ?_
@@ -349,40 +360,38 @@ theorem tensorPower_matrix_continuous (n : ℕ) :
       | mk i0 it =>
         cases j with
         | mk j0 jt =>
-          simp [State.prod, Matrix.kronecker, Matrix.kroneckerMap_apply]
+          simp [Matrix.kroneckerMap_apply]
           exact ((continuous_apply j0).comp
-              ((continuous_apply i0).comp State.continuous_matrix)).mul
+              ((continuous_apply i0).comp MState.continuous_matrix)).mul
             ((continuous_apply jt).comp ((continuous_apply it).comp ih))
 
 /-- Fixed tensor powers are continuous at the state level. -/
 theorem tensorPower_continuous (n : ℕ) :
-    Continuous (fun ρ : State a => ρ.tensorPower n) := by
-  rw [continuous_induced_rng]
-  exact tensorPower_matrix_continuous (a := a) n
+    Continuous (fun ρ : MState a => ρ.tensorPower n) :=
+  continuous_of_continuous_m (tensorPower_matrix_continuous (a := a) n)
 
 /-- Fixed bipartite tensor powers are continuous as matrix-valued maps of the
 input density state. -/
 theorem tensorPowerBipartite_matrix_continuous (n : ℕ) :
-    Continuous (fun ρ : State (Prod a b) => (ρ.tensorPowerBipartite n).matrix) := by
+    Continuous (fun ρ : MState (a × b) => (ρ.tensorPowerBipartite n).m) := by
   refine continuous_pi ?_
   intro i
   refine continuous_pi ?_
   intro j
-  simp [State.tensorPowerBipartite]
+  simp [MState.tensorPowerBipartite]
   exact (continuous_apply ((tensorPowerProdEquiv a b n).symm j)).comp
     ((continuous_apply ((tensorPowerProdEquiv a b n).symm i)).comp
-      (tensorPower_matrix_continuous (a := Prod a b) n))
+      (tensorPower_matrix_continuous (a := a × b) n))
 
 /-- Fixed bipartite tensor powers are continuous at the state level. -/
 theorem tensorPowerBipartite_continuous (n : ℕ) :
-    Continuous (fun ρ : State (Prod a b) => ρ.tensorPowerBipartite n) := by
-  rw [continuous_induced_rng]
-  exact tensorPowerBipartite_matrix_continuous (a := a) (b := b) n
+    Continuous (fun ρ : MState (a × b) => ρ.tensorPowerBipartite n) :=
+  continuous_of_continuous_m (tensorPowerBipartite_matrix_continuous (a := a) (b := b) n)
 
 /-- Bipartite tensor powers of the full-rank white-noise regularization tend
 back to the tensor power of the original state. -/
 theorem finiteAEPFullRankRegularization_tensorPowerBipartite_tendsto_zero
-    (ρ : State (Prod a b)) (n : ℕ) :
+    (ρ : MState (a × b)) (n : ℕ) :
     Filter.Tendsto
       (fun η : ℝ =>
         (if hη : η ∈ Set.Ioo (0 : ℝ) 1 then
@@ -397,7 +406,7 @@ theorem finiteAEPFullRankRegularization_tensorPowerBipartite_tendsto_zero
 /-- Bipartite tensor powers of the full-rank regularization approach the
 original tensor power in normalized trace distance. -/
 theorem finiteAEPFullRankRegularization_tensorPowerBipartite_normalizedTraceDistance_tendsto_zero
-    (ρ : State (Prod a b)) (n : ℕ) :
+    (ρ : MState (a × b)) (n : ℕ) :
     Filter.Tendsto
       (fun η : ℝ =>
         ((if hη : η ∈ Set.Ioo (0 : ℝ) 1 then
@@ -415,7 +424,7 @@ theorem finiteAEPFullRankRegularization_tensorPowerBipartite_normalizedTraceDist
 /-- Bipartite tensor powers of the full-rank regularization approach the
 original tensor power in purified distance. -/
 theorem finiteAEPFullRankRegularization_tensorPowerBipartite_purifiedDistance_tendsto_zero
-    (ρ : State (Prod a b)) (n : ℕ) :
+    (ρ : MState (a × b)) (n : ℕ) :
     Filter.Tendsto
       (fun η : ℝ =>
         ((if hη : η ∈ Set.Ioo (0 : ℝ) 1 then
@@ -443,7 +452,7 @@ theorem finiteAEPFullRankRegularization_tensorPowerBipartite_purifiedDistance_te
             ρ).tensorPowerBipartite n).normalizedTraceDistance
               (ρ.tensorPowerBipartite n))))
     (fun η => ?_) (fun η => ?_) ?_
-  · simp [State.purifiedDistance_eq]
+  · simp [MState.purifiedDistance_eq]
   · exact purifiedDistance_le_sqrt_two_mul_normalizedTraceDistance
       (((if hη : η ∈ Set.Ioo (0 : ℝ) 1 then
         ρ.finiteAEPFullRankRegularization η hη.1.le hη.2.le
@@ -455,7 +464,7 @@ theorem finiteAEPFullRankRegularization_tensorPowerBipartite_purifiedDistance_te
 /-- The same convergence after viewing normalized states as subnormalized
 states, matching the smoothing-ball center-migration API. -/
 theorem finiteAEPFullRankRegularization_tensorPowerBipartite_toSubnormalized_purifiedDistance_tendsto_zero
-    (ρ : State (Prod a b)) (n : ℕ) :
+    (ρ : MState (a × b)) (n : ℕ) :
     Filter.Tendsto
       (fun η : ℝ =>
         (((if hη : η ∈ Set.Ioo (0 : ℝ) 1 then
@@ -468,12 +477,12 @@ theorem finiteAEPFullRankRegularization_tensorPowerBipartite_toSubnormalized_pur
     (finiteAEPFullRankRegularization_tensorPowerBipartite_purifiedDistance_tendsto_zero
       (a := a) (b := b) ρ n)
   filter_upwards with η
-  rw [State.toSubnormalized_purifiedDistance_eq]
+  rw [MState.toSubnormalized_purifiedDistance_eq]
 
 /-- Eventually the regularized tensor power lies in any prescribed
 subnormalized purified-distance ball around the original tensor power. -/
 theorem finiteAEPFullRankRegularization_tensorPowerBipartite_toSubnormalized_purifiedDistance_eventually_le
-    (ρ : State (Prod a b)) (n : ℕ) {δ : ℝ} (hδ : 0 < δ) :
+    (ρ : MState (a × b)) (n : ℕ) {δ : ℝ} (hδ : 0 < δ) :
     ∀ᶠ η in nhdsWithin (0 : ℝ) (Set.Ioo 0 1),
       (((if hη : η ∈ Set.Ioo (0 : ℝ) 1 then
         ρ.finiteAEPFullRankRegularization η hη.1.le hη.2.le
@@ -502,12 +511,13 @@ analysis: once the regularized conditional-entropy and eta penalty are shown
 to dominate the target right-hand side, center migration supplies the smooth
 min-entropy part. -/
 theorem finiteAEPFullRankRegularization_tensorLowerBound_transfer
-    (ρ : State (Prod a b)) (n : ℕ)
+    (ρ : MState (a × b)) (n : ℕ)
     {ξ ε δ targetL regL : ℝ} (hξ : ξ ∈ Set.Ioo (0 : ℝ) 1)
     (hε_nonneg : 0 ≤ ε)
     (hεδ_nonneg : 0 ≤ ε + δ) (hεδ_lt : ε + δ < 1)
     (hcenter :
-      ((ρ.finiteAEPFullRankRegularization ξ hξ.1.le hξ.2.le).tensorPowerBipartite n).toSubnormalized.purifiedDistance
+      ((ρ.finiteAEPFullRankRegularization ξ hξ.1.le hξ.2.le).tensorPowerBipartite
+          n).toSubnormalized.purifiedDistance
         (ρ.tensorPowerBipartite n).toSubnormalized ≤ δ)
     (hreg :
       regL ≤
@@ -528,7 +538,7 @@ This is the arbitrary-state assembly shell: subsequent support/regularization
 work only has to provide the displayed tensor lower bound for each admissible
 positive smoothing parameter and blocklength. -/
 theorem finiteNAEP_statement_of_explicitEta_tensorLowerBound
-    (ρ : State (Prod a b)) (ε η : ℝ) (hε_nonneg : 0 ≤ ε) (hε_lt : ε < 1) (n : ℕ)
+    (ρ : MState (a × b)) (ε η : ℝ) (hε_nonneg : 0 ≤ ε) (hε_lt : ε < 1) (n : ℕ)
     (hcore :
       ∀ (_hε_pos : 0 < ε)
         (_hn : 0 < n)
@@ -561,8 +571,8 @@ the one-shot smooth-min/Petz bridge produces a subnormalized nearby witness,
 while the alpha-to-von-Neumann estimate is the positive-definite core from
 `AlphaEntropyContinuity`. -/
 theorem relativeFiniteAEP_core_posDef_of_smoothMinPetzBound_subnormalized
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef)
     (ε α : ℝ)
     (_hε_pos : 0 < ε)
     (hα_gt : 1 < α) (_hα_le_two : α ≤ 2)
@@ -596,8 +606,8 @@ This combines the source-aligned smooth-min lower bound (`thm:entropy-ineq`)
 with the support-indexed alpha-to-von-Neumann bound (`lemma:alpha-bound`) in the
 full-rank-reference branch. -/
 theorem relativeFiniteAEP_core_fullReference
-    (ρ : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef)
     (ε α : ℝ)
     (hε_pos : 0 < ε) (hε_lt : ε < 1)
     (hα_gt : 1 < α) (hα_le_two : α ≤ 2)
@@ -630,8 +640,8 @@ theorem relativeFiniteAEP_core_fullReference
 `GρG†` smooth-min construction, reducing the remaining one-shot estimate to
 the single Petz positive-part trace bound. -/
 theorem relativeFiniteAEP_core_posDef_of_fixedPetzSmoothMinG_petzTrace
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef)
     (ε α : ℝ)
     (hε_pos : 0 < ε) (hε_lt : ε < 1)
     (hα_gt : 1 < α) (hα_le_two : α ≤ 2)
@@ -659,8 +669,8 @@ theorem relativeFiniteAEP_core_posDef_of_fixedPetzSmoothMinG_petzTrace
 `GρG†` smooth-min construction, exposing the remaining noncommutative source
 step as the Petz effect-variational inequality. -/
 theorem relativeFiniteAEP_core_posDef_of_fixedPetzSmoothMinG_effectVariational
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef)
     (ε α : ℝ)
     (hε_pos : 0 < ε) (hε_lt : ε < 1)
     (hα_gt : 1 < α) (hα_le_two : α ≤ 2)
@@ -671,7 +681,7 @@ theorem relativeFiniteAEP_core_posDef_of_fixedPetzSmoothMinG_effectVariational
       let lam : ℝ :=
         ρ.petzSmoothMinThresholdScale hρ σ hσ ε α
           (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm)
-      cMatrixPetzTraceEffectVariational ρ.matrix
+      cMatrixPetzTraceEffectVariational ρ.m
         (identityTensorStateMatrix (a := a) σ) lam α) :
     ρ.smoothConditionalMinEntropyFixedSubnormalized σ.toSubnormalized ε ≥
       ρ.conditionalEntropyRelative hρ σ hσ -
@@ -688,8 +698,8 @@ theorem relativeFiniteAEP_core_posDef_of_fixedPetzSmoothMinG_effectVariational
 `GρG†` smooth-min construction, exposing the remaining noncommutative source
 step as the Hilbert-Schmidt kernel dephasing monotonicity inequality. -/
 theorem relativeFiniteAEP_core_posDef_of_fixedPetzSmoothMinG_kernelDephaseMonotone
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef)
     (ε α : ℝ)
     (hε_pos : 0 < ε) (hε_lt : ε < 1)
     (hα_gt : 1 < α) (hα_le_two : α ≤ 2)
@@ -703,14 +713,14 @@ theorem relativeFiniteAEP_core_posDef_of_fixedPetzSmoothMinG_kernelDephaseMonoto
         ρ.petzSmoothMinThresholdScale hρ σ hσ ε α hα_pos hα_ne_one
       let hB : (identityTensorStateMatrix (a := a) σ).PosDef :=
         identityTensorStateMatrix_posDef_of_posDef (a := a) σ hσ
-      let H : CMatrix (Prod a b) :=
-        ρ.matrix - lam • identityTensorStateMatrix (a := a) σ
+      let H : CMatrix (a × b) :=
+        ρ.m - lam • identityTensorStateMatrix (a := a) σ
       let hH : H.IsHermitian :=
         hρ.isHermitian.sub ((Matrix.PosDef.smul hB
           (ρ.petzSmoothMinThresholdScale_pos hρ σ hσ ε α hα_pos hα_ne_one)
         ).isHermitian)
-      let U : Matrix.unitaryGroup (Prod a b) ℂ := hH.eigenvectorUnitary
-      cMatrixPetzTraceKernelDephaseMonotone ρ.matrix
+      let U : Matrix.unitaryGroup (a × b) ℂ := hH.eigenvectorUnitary
+      cMatrixPetzTraceKernelDephaseMonotone ρ.m
         (identityTensorStateMatrix (a := a) σ) U α) :
     ρ.smoothConditionalMinEntropyFixedSubnormalized σ.toSubnormalized ε ≥
       ρ.conditionalEntropyRelative hρ σ hσ -
@@ -729,8 +739,8 @@ theorem relativeFiniteAEP_core_posDef_of_fixedPetzSmoothMinG_kernelDephaseMonoto
 This is only a specialization of the fixed-reference core above.  The
 positive-definiteness of `ρ_B` and the Petz trace bound remain assumptions. -/
 theorem finiteAEP_core_posDef_of_fixedPetzSmoothMinG_petzTrace
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef)
     (ε α : ℝ)
     (hε_pos : 0 < ε) (hε_lt : ε < 1)
     (hα_gt : 1 < α) (hα_le_two : α ≤ 2)
@@ -739,18 +749,18 @@ theorem finiteAEP_core_posDef_of_fixedPetzSmoothMinG_petzTrace
         (4 * log2 (ρ.finiteAEPEta hρ hρB)))
     (hpetz :
       let lam : ℝ :=
-        ρ.petzSmoothMinThresholdScale hρ ρ.marginalB hρB ε α
+        ρ.petzSmoothMinThresholdScale hρ ρ.traceLeft hρB ε α
           (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm)
-      (ρ.fixedPetzThresholdPositivePart ρ.marginalB lam).trace.re ≤
-        lam ^ (1 - α) * ρ.conditionalPetzRenyiTraceTerm ρ.marginalB α) :
-    ρ.smoothConditionalMinEntropyFixedSubnormalized ρ.marginalB.toSubnormalized ε ≥
+      (ρ.fixedPetzThresholdPositivePart ρ.traceLeft lam).trace.re ≤
+        lam ^ (1 - α) * ρ.conditionalPetzRenyiTraceTerm ρ.traceLeft α) :
+    ρ.smoothConditionalMinEntropyFixedSubnormalized ρ.traceLeft.toSubnormalized ε ≥
       ρ.conditionalEntropy -
         4 * (α - 1) *
           (log2 (ρ.finiteAEPEta hρ hρB)) ^ 2 -
         (1 / (α - 1)) * log2 (2 / ε ^ 2) := by
   have hcore :=
     ρ.relativeFiniteAEP_core_posDef_of_fixedPetzSmoothMinG_petzTrace
-      hρ ρ.marginalB hρB ε α hε_pos hε_lt hα_gt hα_le_two
+      hρ ρ.traceLeft hρB ε α hε_pos hε_lt hα_gt hα_le_two
       (by simpa [finiteAEPEta_eq] using hα_lt) hpetz
   rw [ρ.conditionalEntropyRelative_to_conditionalEntropy hρ hρB] at hcore
   simpa [finiteAEPEta_eq] using hcore
@@ -759,8 +769,8 @@ theorem finiteAEP_core_posDef_of_fixedPetzSmoothMinG_petzTrace
 `σ = ρ_B`, with the remaining source step expressed as the Petz
 effect-variational inequality. -/
 theorem finiteAEP_core_posDef_of_fixedPetzSmoothMinG_effectVariational
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef)
     (ε α : ℝ)
     (hε_pos : 0 < ε) (hε_lt : ε < 1)
     (hα_gt : 1 < α) (hα_le_two : α ≤ 2)
@@ -769,18 +779,18 @@ theorem finiteAEP_core_posDef_of_fixedPetzSmoothMinG_effectVariational
         (4 * log2 (ρ.finiteAEPEta hρ hρB)))
     (hvar :
       let lam : ℝ :=
-        ρ.petzSmoothMinThresholdScale hρ ρ.marginalB hρB ε α
+        ρ.petzSmoothMinThresholdScale hρ ρ.traceLeft hρB ε α
           (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm)
-      cMatrixPetzTraceEffectVariational ρ.matrix
-        (identityTensorStateMatrix (a := a) ρ.marginalB) lam α) :
-    ρ.smoothConditionalMinEntropyFixedSubnormalized ρ.marginalB.toSubnormalized ε ≥
+      cMatrixPetzTraceEffectVariational ρ.m
+        (identityTensorStateMatrix (a := a) ρ.traceLeft) lam α) :
+    ρ.smoothConditionalMinEntropyFixedSubnormalized ρ.traceLeft.toSubnormalized ε ≥
       ρ.conditionalEntropy -
         4 * (α - 1) *
           (log2 (ρ.finiteAEPEta hρ hρB)) ^ 2 -
         (1 / (α - 1)) * log2 (2 / ε ^ 2) := by
   have hcore :=
     ρ.relativeFiniteAEP_core_posDef_of_fixedPetzSmoothMinG_effectVariational
-      hρ ρ.marginalB hρB ε α hε_pos hε_lt hα_gt hα_le_two
+      hρ ρ.traceLeft hρB ε α hε_pos hε_lt hα_gt hα_le_two
       (by simpa [finiteAEPEta_eq] using hα_lt) hvar
   rw [ρ.conditionalEntropyRelative_to_conditionalEntropy hρ hρB] at hcore
   simpa [finiteAEPEta_eq] using hcore
@@ -789,8 +799,8 @@ theorem finiteAEP_core_posDef_of_fixedPetzSmoothMinG_effectVariational
 `σ = ρ_B`, with the remaining source step expressed as the Hilbert-Schmidt
 kernel dephasing monotonicity inequality. -/
 theorem finiteAEP_core_posDef_of_fixedPetzSmoothMinG_kernelDephaseMonotone
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef)
     (ε α : ℝ)
     (hε_pos : 0 < ε) (hε_lt : ε < 1)
     (hα_gt : 1 < α) (hα_le_two : α ≤ 2)
@@ -801,26 +811,26 @@ theorem finiteAEP_core_posDef_of_fixedPetzSmoothMinG_kernelDephaseMonotone
       let hα_pos : 0 < α := lt_trans zero_lt_one hα_gt
       let hα_ne_one : α ≠ 1 := (ne_of_lt hα_gt).symm
       let lam : ℝ :=
-        ρ.petzSmoothMinThresholdScale hρ ρ.marginalB hρB ε α hα_pos hα_ne_one
-      let hB : (identityTensorStateMatrix (a := a) ρ.marginalB).PosDef :=
-        identityTensorStateMatrix_posDef_of_posDef (a := a) ρ.marginalB hρB
-      let H : CMatrix (Prod a b) :=
-        ρ.matrix - lam • identityTensorStateMatrix (a := a) ρ.marginalB
+        ρ.petzSmoothMinThresholdScale hρ ρ.traceLeft hρB ε α hα_pos hα_ne_one
+      let hB : (identityTensorStateMatrix (a := a) ρ.traceLeft).PosDef :=
+        identityTensorStateMatrix_posDef_of_posDef (a := a) ρ.traceLeft hρB
+      let H : CMatrix (a × b) :=
+        ρ.m - lam • identityTensorStateMatrix (a := a) ρ.traceLeft
       let hH : H.IsHermitian :=
         hρ.isHermitian.sub ((Matrix.PosDef.smul hB
-          (ρ.petzSmoothMinThresholdScale_pos hρ ρ.marginalB hρB ε α hα_pos hα_ne_one)
+          (ρ.petzSmoothMinThresholdScale_pos hρ ρ.traceLeft hρB ε α hα_pos hα_ne_one)
         ).isHermitian)
-      let U : Matrix.unitaryGroup (Prod a b) ℂ := hH.eigenvectorUnitary
-      cMatrixPetzTraceKernelDephaseMonotone ρ.matrix
-        (identityTensorStateMatrix (a := a) ρ.marginalB) U α) :
-    ρ.smoothConditionalMinEntropyFixedSubnormalized ρ.marginalB.toSubnormalized ε ≥
+      let U : Matrix.unitaryGroup (a × b) ℂ := hH.eigenvectorUnitary
+      cMatrixPetzTraceKernelDephaseMonotone ρ.m
+        (identityTensorStateMatrix (a := a) ρ.traceLeft) U α) :
+    ρ.smoothConditionalMinEntropyFixedSubnormalized ρ.traceLeft.toSubnormalized ε ≥
       ρ.conditionalEntropy -
         4 * (α - 1) *
           (log2 (ρ.finiteAEPEta hρ hρB)) ^ 2 -
         (1 / (α - 1)) * log2 (2 / ε ^ 2) := by
   have hcore :=
     ρ.relativeFiniteAEP_core_posDef_of_fixedPetzSmoothMinG_kernelDephaseMonotone
-      hρ ρ.marginalB hρB ε α hε_pos hε_lt hα_gt hα_le_two
+      hρ ρ.traceLeft hρB ε α hε_pos hε_lt hα_gt hα_le_two
       (by simpa [finiteAEPEta_eq] using hα_lt) hkernel
   rw [ρ.conditionalEntropyRelative_to_conditionalEntropy hρ hρB] at hcore
   simpa [finiteAEPEta_eq] using hcore
@@ -832,8 +842,8 @@ The state `ρn` is intentionally arbitrary: downstream tensor-power work should
 instantiate it with `ρ_AB^{⊗ n}` and prove the displayed entropy and eta-growth
 hypotheses.  The Petz positive-part trace estimate is still explicit. -/
 theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_petzTrace
-    (ρn : State (Prod a b)) (hρn : ρn.matrix.PosDef)
-    (hρnB : ρn.marginalB.matrix.PosDef)
+    (ρn : MState (a × b)) (hρn : ρn.m.PosDef)
+    (hρnB : ρn.traceLeft.m.PosDef)
     (ε η α H : ℝ) {n : ℕ}
     (hM : 0 < log2 (2 / ε ^ 2))
     (hL : 0 < log2 η)
@@ -867,11 +877,11 @@ theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_petzTrace
           div_pos hnum hden
         linarith
       let lam : ℝ :=
-        ρn.petzSmoothMinThresholdScale hρn ρn.marginalB hρnB ε α
+        ρn.petzSmoothMinThresholdScale hρn ρn.traceLeft hρnB ε α
           (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm)
-      (ρn.fixedPetzThresholdPositivePart ρn.marginalB lam).trace.re ≤
-        lam ^ (1 - α) * ρn.conditionalPetzRenyiTraceTerm ρn.marginalB α) :
-    ρn.smoothConditionalMinEntropyFixedSubnormalized ρn.marginalB.toSubnormalized ε ≥
+      (ρn.fixedPetzThresholdPositivePart ρn.traceLeft lam).trace.re ≤
+        lam ^ (1 - α) * ρn.conditionalPetzRenyiTraceTerm ρn.traceLeft α) :
+    ρn.smoothConditionalMinEntropyFixedSubnormalized ρn.traceLeft.toSubnormalized ε ≥
       (n : ℝ) * H - QIT.finiteAEPDelta ε η * Real.sqrt (n : ℝ) := by
   subst α
   have hden :
@@ -892,7 +902,7 @@ theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_petzTrace
     linarith
   have hcore :
       ρn.smoothConditionalMinEntropyFixedSubnormalized
-          ρn.marginalB.toSubnormalized ε ≥
+          ρn.traceLeft.toSubnormalized ε ≥
         ρn.conditionalEntropy -
           4 *
               (1 + Real.sqrt (log2 (2 / ε ^ 2)) /
@@ -998,8 +1008,8 @@ theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_petzTrace
 /-- Optimized scalar-choice finite-AEP core with the remaining source step
 expressed as the Petz effect-variational inequality. -/
 theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_effectVariational
-    (ρn : State (Prod a b)) (hρn : ρn.matrix.PosDef)
-    (hρnB : ρn.marginalB.matrix.PosDef)
+    (ρn : MState (a × b)) (hρn : ρn.m.PosDef)
+    (hρnB : ρn.traceLeft.m.PosDef)
     (ε η α H : ℝ) {n : ℕ}
     (hM : 0 < log2 (2 / ε ^ 2))
     (hL : 0 < log2 η)
@@ -1033,11 +1043,11 @@ theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_effectVariational
           div_pos hnum hden
         linarith
       let lam : ℝ :=
-        ρn.petzSmoothMinThresholdScale hρn ρn.marginalB hρnB ε α
+        ρn.petzSmoothMinThresholdScale hρn ρn.traceLeft hρnB ε α
           (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm)
-      cMatrixPetzTraceEffectVariational ρn.matrix
-        (identityTensorStateMatrix (a := a) ρn.marginalB) lam α) :
-    ρn.smoothConditionalMinEntropyFixedSubnormalized ρn.marginalB.toSubnormalized ε ≥
+      cMatrixPetzTraceEffectVariational ρn.m
+        (identityTensorStateMatrix (a := a) ρn.traceLeft) lam α) :
+    ρn.smoothConditionalMinEntropyFixedSubnormalized ρn.traceLeft.toSubnormalized ε ≥
       (n : ℝ) * H - QIT.finiteAEPDelta ε η * Real.sqrt (n : ℝ) := by
   have hα_gt : 1 < α := by
     rw [hα_opt]
@@ -1054,21 +1064,21 @@ theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_effectVariational
       div_pos hnum hden
     linarith
   let lam : ℝ :=
-    ρn.petzSmoothMinThresholdScale hρn ρn.marginalB hρnB ε α
+    ρn.petzSmoothMinThresholdScale hρn ρn.traceLeft hρnB ε α
       (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm)
   have hlam : 0 < lam := by
     simpa [lam] using
-      ρn.petzSmoothMinThresholdScale_pos hρn ρn.marginalB hρnB ε α
+      ρn.petzSmoothMinThresholdScale_pos hρn ρn.traceLeft hρnB ε α
         (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm)
   have hvar_lam :
-      cMatrixPetzTraceEffectVariational ρn.matrix
-        (identityTensorStateMatrix (a := a) ρn.marginalB) lam α := by
+      cMatrixPetzTraceEffectVariational ρn.m
+        (identityTensorStateMatrix (a := a) ρn.traceLeft) lam α := by
     simpa [lam, hα_gt] using hvar
   have hpetz :
-      (ρn.fixedPetzThresholdPositivePart ρn.marginalB lam).trace.re ≤
-        lam ^ (1 - α) * ρn.conditionalPetzRenyiTraceTerm ρn.marginalB α :=
+      (ρn.fixedPetzThresholdPositivePart ρn.traceLeft lam).trace.re ≤
+        lam ^ (1 - α) * ρn.conditionalPetzRenyiTraceTerm ρn.traceLeft α :=
     ρn.fixedPetzThresholdPositivePart_trace_re_le_petzTrace_of_effect_variational
-      hρn ρn.marginalB hρnB hlam hα_gt hα_le_two hvar_lam
+      hρn ρn.traceLeft hρnB hlam hα_gt hα_le_two hvar_lam
   exact
     ρn.finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_petzTrace
       hρn hρnB ε η α H hM hL hn hα_opt hε_pos hε_lt hα_le_two hα_lt
@@ -1084,8 +1094,8 @@ it isolates the noncommutative Appendix input as the source-shaped
 `cMatrixPetzTraceUnitaryDephaseMonotone` predicate instead of the stronger
 effect-variational package. -/
 theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_unitaryDephaseMonotone
-    (ρn : State (Prod a b)) (hρn : ρn.matrix.PosDef)
-    (hρnB : ρn.marginalB.matrix.PosDef)
+    (ρn : MState (a × b)) (hρn : ρn.m.PosDef)
+    (hρnB : ρn.traceLeft.m.PosDef)
     (ε η α H : ℝ) {n : ℕ}
     (hM : 0 < log2 (2 / ε ^ 2))
     (hL : 0 < log2 η)
@@ -1121,20 +1131,20 @@ theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_unitaryDephaseMon
       let hα_pos : 0 < α := lt_trans zero_lt_one hα_gt
       let hα_ne_one : α ≠ 1 := (ne_of_lt hα_gt).symm
       let lam : ℝ :=
-        ρn.petzSmoothMinThresholdScale hρn ρn.marginalB hρnB ε α hα_pos
+        ρn.petzSmoothMinThresholdScale hρn ρn.traceLeft hρnB ε α hα_pos
           hα_ne_one
-      let hB : (identityTensorStateMatrix (a := a) ρn.marginalB).PosDef :=
-        identityTensorStateMatrix_posDef_of_posDef (a := a) ρn.marginalB hρnB
-      let Hmat : CMatrix (Prod a b) :=
-        ρn.matrix - lam • identityTensorStateMatrix (a := a) ρn.marginalB
+      let hB : (identityTensorStateMatrix (a := a) ρn.traceLeft).PosDef :=
+        identityTensorStateMatrix_posDef_of_posDef (a := a) ρn.traceLeft hρnB
+      let Hmat : CMatrix (a × b) :=
+        ρn.m - lam • identityTensorStateMatrix (a := a) ρn.traceLeft
       let hH : Hmat.IsHermitian :=
         hρn.isHermitian.sub ((Matrix.PosDef.smul hB
-          (ρn.petzSmoothMinThresholdScale_pos hρn ρn.marginalB hρnB ε α
+          (ρn.petzSmoothMinThresholdScale_pos hρn ρn.traceLeft hρnB ε α
             hα_pos hα_ne_one)).isHermitian)
-      let U : Matrix.unitaryGroup (Prod a b) ℂ := hH.eigenvectorUnitary
-      cMatrixPetzTraceUnitaryDephaseMonotone ρn.matrix
-        (identityTensorStateMatrix (a := a) ρn.marginalB) U α) :
-    ρn.smoothConditionalMinEntropyFixedSubnormalized ρn.marginalB.toSubnormalized ε ≥
+      let U : Matrix.unitaryGroup (a × b) ℂ := hH.eigenvectorUnitary
+      cMatrixPetzTraceUnitaryDephaseMonotone ρn.m
+        (identityTensorStateMatrix (a := a) ρn.traceLeft) U α) :
+    ρn.smoothConditionalMinEntropyFixedSubnormalized ρn.traceLeft.toSubnormalized ε ≥
       (n : ℝ) * H - QIT.finiteAEPDelta ε η * Real.sqrt (n : ℝ) := by
   have hα_gt : 1 < α := by
     rw [hα_opt]
@@ -1153,97 +1163,50 @@ theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_unitaryDephaseMon
   let hα_pos : 0 < α := lt_trans zero_lt_one hα_gt
   let hα_ne_one : α ≠ 1 := (ne_of_lt hα_gt).symm
   let lam : ℝ :=
-    ρn.petzSmoothMinThresholdScale hρn ρn.marginalB hρnB ε α hα_pos hα_ne_one
+    ρn.petzSmoothMinThresholdScale hρn ρn.traceLeft hρnB ε α hα_pos hα_ne_one
   have hlam : 0 < lam := by
     simpa [lam, hα_pos, hα_ne_one] using
-      ρn.petzSmoothMinThresholdScale_pos hρn ρn.marginalB hρnB ε α
+      ρn.petzSmoothMinThresholdScale_pos hρn ρn.traceLeft hρnB ε α
         hα_pos hα_ne_one
   have hmono_lam :
-      let hB : (identityTensorStateMatrix (a := a) ρn.marginalB).PosDef :=
-        identityTensorStateMatrix_posDef_of_posDef (a := a) ρn.marginalB hρnB
-      let Hmat : CMatrix (Prod a b) :=
-        ρn.matrix - lam • identityTensorStateMatrix (a := a) ρn.marginalB
+      let hB : (identityTensorStateMatrix (a := a) ρn.traceLeft).PosDef :=
+        identityTensorStateMatrix_posDef_of_posDef (a := a) ρn.traceLeft hρnB
+      let Hmat : CMatrix (a × b) :=
+        ρn.m - lam • identityTensorStateMatrix (a := a) ρn.traceLeft
       let hH : Hmat.IsHermitian :=
         hρn.isHermitian.sub ((Matrix.PosDef.smul hB hlam).isHermitian)
-      let U : Matrix.unitaryGroup (Prod a b) ℂ := hH.eigenvectorUnitary
-      cMatrixPetzTraceUnitaryDephaseMonotone ρn.matrix
-        (identityTensorStateMatrix (a := a) ρn.marginalB) U α := by
+      let U : Matrix.unitaryGroup (a × b) ℂ := hH.eigenvectorUnitary
+      cMatrixPetzTraceUnitaryDephaseMonotone ρn.m
+        (identityTensorStateMatrix (a := a) ρn.traceLeft) U α := by
     simpa [lam, hα_gt, hα_pos, hα_ne_one, hlam] using hmono
   have hpetz :
-      (ρn.fixedPetzThresholdPositivePart ρn.marginalB lam).trace.re ≤
-        lam ^ (1 - α) * ρn.conditionalPetzRenyiTraceTerm ρn.marginalB α :=
+      (ρn.fixedPetzThresholdPositivePart ρn.traceLeft lam).trace.re ≤
+        lam ^ (1 - α) * ρn.conditionalPetzRenyiTraceTerm ρn.traceLeft α :=
     ρn.fixedPetzThresholdPositivePart_trace_re_le_petzTrace_of_unitaryDephaseMonotone
-      hρn ρn.marginalB hρnB hlam hα_gt hα_le_two hmono_lam
+      hρn ρn.traceLeft hρnB hlam hα_gt hα_le_two hmono_lam
   exact
     ρn.finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_petzTrace
       hρn hρnB ε η α H hM hL hn hα_opt hε_pos hε_lt hα_le_two hα_lt
       hentropy_tensor heta_tensor
       (by simpa [lam, hα_gt, hα_pos, hα_ne_one] using hpetz)
 
-theorem tensorPowerBipartite_posDef_forFiniteAEP
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef) (n : ℕ) :
-    (ρ.tensorPowerBipartite n).matrix.PosDef :=
-  State.tensorPowerBipartite_posDef_forAEP ρ hρ n
-
-theorem tensorPowerBipartite_marginalB_posDef_forFiniteAEP
-    (ρ : State (Prod a b)) (_hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef) (n : ℕ) :
-    (ρ.tensorPowerBipartite n).marginalB.matrix.PosDef :=
-  State.tensorPowerBipartite_marginalB_posDef_forAEP ρ _hρ hρB n
-
-theorem tensorPowerBipartite_marginalB_posDef_fullReference_forFiniteAEP
-    (ρ : State (Prod a b))
-    (hρB : ρ.marginalB.matrix.PosDef) (n : ℕ) :
-    (ρ.tensorPowerBipartite n).marginalB.matrix.PosDef := by
-  rw [State.tensorPowerBipartite_marginalB ρ n]
-  exact State.tensorPower_posDef hρB n
-
-theorem tensorPowerBipartite_succ_grouped
-    (ρ : State (Prod a b)) (n : ℕ) :
-    ρ.tensorPowerBipartite (n + 1) =
-      (ρ.prod (ρ.tensorPowerBipartite n)).reindex
-        (conditionalPetzRenyiProductGroupingEquiv
-          a b (TensorPower a n) (TensorPower b n)) := by
-  ext x y
-  rcases x with ⟨⟨xA, xsA⟩, ⟨xB, xsB⟩⟩
-  rcases y with ⟨⟨yA, ysA⟩, ⟨yB, ysB⟩⟩
-  simp [State.tensorPowerBipartite, State.tensorPower_succ,
-    conditionalPetzRenyiProductGroupingEquiv, tensorPowerProdEquiv,
-    State.prod, State.reindex, Matrix.kronecker]
-  rfl
-
-theorem tensorPowerBipartite_succ_grouped_marginalB
-    (ρ : State (Prod a b)) (n : ℕ) :
-    (((ρ.prod (ρ.tensorPowerBipartite n)).reindex
-        (conditionalPetzRenyiProductGroupingEquiv
-          a b (TensorPower a n) (TensorPower b n))).marginalB) =
-      ρ.marginalB.prod (ρ.tensorPowerBipartite n).marginalB := by
-  ext x y
-  rcases x with ⟨xB, xsB⟩
-  rcases y with ⟨yB, ysB⟩
-  simp [State.marginalB, partialTraceA, State.prod, State.reindex,
-    conditionalPetzRenyiProductGroupingEquiv, Matrix.kronecker,
-        Matrix.kroneckerMap_apply, Fintype.sum_prod_type, Finset.sum_mul,
-    Finset.mul_sum]
-  rw [Finset.sum_comm]
-
 /-- Every state on a one-element system is the `1 x 1` identity matrix. -/
 private theorem matrix_eq_one_of_card_eq_one {c : Type w} [Fintype c] [DecidableEq c]
-    (hc : Fintype.card c = 1) (σ : State c) : σ.matrix = 1 := by
+    (hc : Fintype.card c = 1) (σ : MState c) : σ.m = 1 := by
   have hsub : Subsingleton c := Fintype.card_le_one_iff_subsingleton.mp hc.le
   ext i j
   have huniv : (Finset.univ : Finset c) = {i} :=
     Finset.eq_singleton_iff_unique_mem.mpr
       ⟨Finset.mem_univ i, fun x _ => Subsingleton.elim x i⟩
-  have h := σ.trace_eq_one
+  have h := σ.tr'
   simp only [Matrix.trace, Matrix.diag_apply, huniv, Finset.sum_singleton] at h
   rw [Subsingleton.elim j i, Matrix.one_apply_eq]
   exact h
 
 /-- A one-element system carries a unique state. -/
 private theorem eq_of_card_eq_one {c : Type w} [Fintype c] [DecidableEq c]
-    (hc : Fintype.card c = 1) (σ τ : State c) : σ = τ :=
-  State.ext ((matrix_eq_one_of_card_eq_one hc σ).trans
+    (hc : Fintype.card c = 1) (σ τ : MState c) : σ = τ :=
+  MState.ext ((matrix_eq_one_of_card_eq_one hc σ).trans
     (matrix_eq_one_of_card_eq_one hc τ).symm)
 
 omit [DecidableEq a] in
@@ -1254,7 +1217,7 @@ private theorem card_tensorPower_zero : Fintype.card (TensorPower a 0) = 1 := by
 omit [DecidableEq a] [DecidableEq b] in
 /-- The zeroth bipartite tensor power is a one-element system. -/
 private theorem card_tensorPower_zero_prod :
-    Fintype.card (Prod (TensorPower a 0) (TensorPower b 0)) = 1 := by
+    Fintype.card (TensorPower a 0 × TensorPower b 0) = 1 := by
   simp [tensorPower_card]
 
 /-- Applying two right-reference isometries before taking a product state is
@@ -1263,20 +1226,20 @@ theorem conditioningIsometryApply_prod_reindex_grouped
     {a' : Type*} {c : Type*} {bPlus : Type*} {cPlus : Type*}
     [Fintype a'] [DecidableEq a'] [Fintype c] [DecidableEq c]
     [Fintype bPlus] [DecidableEq bPlus] [Fintype cPlus] [DecidableEq cPlus]
-    (ρ : State (Prod a b)) (σ : State (Prod a' c))
+    (ρ : MState (a × b)) (σ : MState (a' × c))
     (V : ReferenceIsometry b bPlus) (W : ReferenceIsometry c cPlus) :
     ((ρ.conditioningIsometryApply V).prod (σ.conditioningIsometryApply W)).reindex
-        (conditionalPetzRenyiProductGroupingEquiv a bPlus a' cPlus) =
-      State.conditioningIsometryApply
-        ((ρ.prod σ).reindex (conditionalPetzRenyiProductGroupingEquiv a b a' c))
+        (Equiv.prodProdProdComm a bPlus a' cPlus) =
+      MState.conditioningIsometryApply
+        ((ρ.prod σ).reindex (Equiv.prodProdProdComm a b a' c))
         (V.prod W) := by
-  apply State.ext
+  apply MState.ext
   ext x y
   rcases x with ⟨⟨xA, xA'⟩, ⟨xB, xC⟩⟩
   rcases y with ⟨⟨yA, yA'⟩, ⟨yB, yC⟩⟩
-  simp [State.prod, State.reindex, State.conditioningIsometryApply_matrix,
+  simp [MState.conditioningIsometryApply_matrix,
     ReferenceIsometry.applyMatrixRight, ReferenceIsometry.rightBlock,
-    ReferenceIsometry.prod, conditionalPetzRenyiProductGroupingEquiv,
+    ReferenceIsometry.prod, Equiv.prodProdProdComm,
     Matrix.kronecker, Matrix.kroneckerMap_apply, Matrix.mul_apply,
     Matrix.conjTranspose, Fintype.sum_prod_type, Finset.sum_mul,
     Finset.mul_sum]
@@ -1301,238 +1264,210 @@ theorem conditioningIsometryApply_prod_reindex_grouped
 conditioning register, using the tensor-power product isometry on `B^n`. -/
 theorem conditioningIsometryApply_tensorPowerBipartite
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    (ρ : State (Prod a b)) (V : ReferenceIsometry b bPlus) :
+    (ρ : MState (a × b)) (V : ReferenceIsometry b bPlus) :
     ∀ n : ℕ,
       (ρ.conditioningIsometryApply V).tensorPowerBipartite n =
         (ρ.tensorPowerBipartite n).conditioningIsometryApply (V.tensorPower n)
   | 0 => eq_of_card_eq_one card_tensorPower_zero_prod _ _
   | n + 1 => by
       have ih := conditioningIsometryApply_tensorPowerBipartite ρ V n
-      rw [State.tensorPowerBipartite_succ_grouped]
+      rw [MState.tensorPowerBipartite_succ_grouped_forAlphaContinuity]
       rw [ih]
       rw [conditioningIsometryApply_prod_reindex_grouped]
-      rw [← State.tensorPowerBipartite_succ_grouped]
+      rw [← MState.tensorPowerBipartite_succ_grouped_forAlphaContinuity]
       rfl
 
 /-- Embedding normalized states as subnormalized states commutes with applying
 a right-reference isometry. -/
 theorem toSubnormalized_conditioningIsometryApply
     {bPlus : Type*} [Fintype bPlus] [DecidableEq bPlus]
-    (ρ : State (Prod a b)) (V : ReferenceIsometry b bPlus) :
+    (ρ : MState (a × b)) (V : ReferenceIsometry b bPlus) :
     (ρ.conditioningIsometryApply V).toSubnormalized =
       ρ.toSubnormalized.conditioningIsometryApply V := by
   apply SubnormalizedState.ext
-  rw [State.toSubnormalized_matrix]
+  rw [MState.toSubnormalized_matrix]
   rw [SubnormalizedState.conditioningIsometryApply_matrix]
-  rw [State.conditioningIsometryApply_matrix]
+  rw [MState.conditioningIsometryApply_matrix]
   rfl
 
 theorem tensorPowerBipartite_conditionalPetzRenyiEntropyCandidate_succ_of_regroupedCandidate
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) (n : ℕ)
     (hregroup :
       (ρ.tensorPowerBipartite (n + 1)).conditionalPetzRenyiEntropyCandidate
-          (tensorPowerBipartite_posDef_forFiniteAEP ρ hρ (n + 1))
-          (ρ.tensorPowerBipartite (n + 1)).marginalB
-          (tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB (n + 1))
+          (tensorPowerBipartite_posDef ρ hρ (n + 1))
+          (ρ.tensorPowerBipartite (n + 1)).traceLeft
+          (tensorPowerBipartite_traceLeft_posDef ρ hρB (n + 1))
           α hα_pos hα_ne_one =
         (((ρ.prod (ρ.tensorPowerBipartite n)).reindex
-            (conditionalPetzRenyiProductGroupingEquiv
+            (Equiv.prodProdProdComm
               a b (TensorPower a n) (TensorPower b n))).conditionalPetzRenyiEntropyCandidate
-            (State.reindex_posDef_of_posDef
+            (MState.reindex_posDef
               (ρ.prod (ρ.tensorPowerBipartite n))
-              (State.prod_posDef hρ
-                (tensorPowerBipartite_posDef_forFiniteAEP ρ hρ n))
-              (conditionalPetzRenyiProductGroupingEquiv
-                a b (TensorPower a n) (TensorPower b n)))
-            (ρ.marginalB.prod (ρ.tensorPowerBipartite n).marginalB)
-            (State.prod_posDef hρB
-              (tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB n))
+              (Equiv.prodProdProdComm
+                a b (TensorPower a n) (TensorPower b n))
+              (MState.PosDef.kron hρ
+                (tensorPowerBipartite_posDef ρ hρ n)))
+            (ρ.traceLeft.prod (ρ.tensorPowerBipartite n).traceLeft)
+            (MState.PosDef.kron hρB
+              (tensorPowerBipartite_traceLeft_posDef ρ hρB n))
             α hα_pos hα_ne_one)) :
     (ρ.tensorPowerBipartite (n + 1)).conditionalPetzRenyiEntropyCandidate
-        (tensorPowerBipartite_posDef_forFiniteAEP ρ hρ (n + 1))
-        (ρ.tensorPowerBipartite (n + 1)).marginalB
-        (tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB (n + 1))
+        (tensorPowerBipartite_posDef ρ hρ (n + 1))
+        (ρ.tensorPowerBipartite (n + 1)).traceLeft
+        (tensorPowerBipartite_traceLeft_posDef ρ hρB (n + 1))
         α hα_pos hα_ne_one =
       ρ.conditionalPetzRenyiEntropyCandidate
-          hρ ρ.marginalB hρB α hα_pos hα_ne_one +
+          hρ ρ.traceLeft hρB α hα_pos hα_ne_one +
         (ρ.tensorPowerBipartite n).conditionalPetzRenyiEntropyCandidate
-          (tensorPowerBipartite_posDef_forFiniteAEP ρ hρ n)
-          (ρ.tensorPowerBipartite n).marginalB
-          (tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB n)
+          (tensorPowerBipartite_posDef ρ hρ n)
+          (ρ.tensorPowerBipartite n).traceLeft
+          (tensorPowerBipartite_traceLeft_posDef ρ hρB n)
           α hα_pos hα_ne_one := by
   have hprod :=
     conditionalPetzRenyiEntropyCandidate_prod_grouped_posDef
-      (ρ₁ := ρ) (σ₁ := ρ.marginalB)
+      (ρ₁ := ρ) (σ₁ := ρ.traceLeft)
       (ρ₂ := ρ.tensorPowerBipartite n)
-      (σ₂ := (ρ.tensorPowerBipartite n).marginalB)
+      (σ₂ := (ρ.tensorPowerBipartite n).traceLeft)
       hρ hρB
-      (tensorPowerBipartite_posDef_forFiniteAEP ρ hρ n)
-      (tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB n)
+      (tensorPowerBipartite_posDef ρ hρ n)
+      (tensorPowerBipartite_traceLeft_posDef ρ hρB n)
       α hα_pos hα_ne_one
   exact hregroup.trans hprod
 
 theorem tensorPowerBipartite_conditionalPetzRenyiEntropyCandidate_succ
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) (n : ℕ) :
     (ρ.tensorPowerBipartite (n + 1)).conditionalPetzRenyiEntropyCandidate
-        (tensorPowerBipartite_posDef_forFiniteAEP ρ hρ (n + 1))
-        (ρ.tensorPowerBipartite (n + 1)).marginalB
-        (tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB (n + 1))
+        (tensorPowerBipartite_posDef ρ hρ (n + 1))
+        (ρ.tensorPowerBipartite (n + 1)).traceLeft
+        (tensorPowerBipartite_traceLeft_posDef ρ hρB (n + 1))
         α hα_pos hα_ne_one =
       ρ.conditionalPetzRenyiEntropyCandidate
-          hρ ρ.marginalB hρB α hα_pos hα_ne_one +
+          hρ ρ.traceLeft hρB α hα_pos hα_ne_one +
         (ρ.tensorPowerBipartite n).conditionalPetzRenyiEntropyCandidate
-          (tensorPowerBipartite_posDef_forFiniteAEP ρ hρ n)
-          (ρ.tensorPowerBipartite n).marginalB
-          (tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB n)
+          (tensorPowerBipartite_posDef ρ hρ n)
+          (ρ.tensorPowerBipartite n).traceLeft
+          (tensorPowerBipartite_traceLeft_posDef ρ hρB n)
           α hα_pos hα_ne_one := by
   refine
     tensorPowerBipartite_conditionalPetzRenyiEntropyCandidate_succ_of_regroupedCandidate
       ρ hρ hρB α hα_pos hα_ne_one n ?_
-  let τ : State (Prod (Prod a (TensorPower a n)) (Prod b (TensorPower b n))) :=
+  let τ : MState ((a × TensorPower a n) × (b × TensorPower b n)) :=
     (ρ.prod (ρ.tensorPowerBipartite n)).reindex
-      (conditionalPetzRenyiProductGroupingEquiv
+      (Equiv.prodProdProdComm
         a b (TensorPower a n) (TensorPower b n))
   have hτ :
       ρ.tensorPowerBipartite (n + 1) = τ :=
-    tensorPowerBipartite_succ_grouped ρ n
+    tensorPowerBipartite_succ_grouped_forAlphaContinuity ρ n
   have hτB :
-      τ.marginalB = ρ.marginalB.prod (ρ.tensorPowerBipartite n).marginalB := by
-    simpa [τ] using tensorPowerBipartite_succ_grouped_marginalB ρ n
+      τ.traceLeft = ρ.traceLeft.prod (ρ.tensorPowerBipartite n).traceLeft := by
+    simpa [τ] using tensorPowerBipartite_succ_grouped_traceLeft_forAlphaContinuity ρ n
   have hτ_matrix :
-      (ρ.tensorPowerBipartite (n + 1)).matrix = τ.matrix :=
-    congrArg State.matrix hτ
-  have hτ_matrix' :
-      Matrix.submatrix (ρ.tensorPower (n + 1)).matrix
-          (tensorPowerProdEquiv a b (n + 1)).symm
-          (tensorPowerProdEquiv a b (n + 1)).symm =
-        Matrix.submatrix (ρ.prod (ρ.tensorPowerBipartite n)).matrix
-          (conditionalPetzRenyiProductGroupingEquiv
-            a b (TensorPower a n) (TensorPower b n)).symm
-          (conditionalPetzRenyiProductGroupingEquiv
-            a b (TensorPower a n) (TensorPower b n)).symm := by
-    simpa [State.tensorPowerBipartite_matrix, τ, State.reindex_matrix] using hτ_matrix
+      (ρ.tensorPowerBipartite (n + 1)).m = τ.m :=
+    congrArg DensityOp.m hτ
   have hτB_matrix :
-      (ρ.tensorPowerBipartite (n + 1)).marginalB.matrix =
-        (ρ.marginalB.prod (ρ.tensorPowerBipartite n).marginalB).matrix := by
+      (ρ.tensorPowerBipartite (n + 1)).traceLeft.m =
+        (ρ.traceLeft.prod (ρ.tensorPowerBipartite n).traceLeft).m := by
     rw [hτ]
-    exact congrArg State.matrix hτB
+    exact congrArg DensityOp.m hτB
   have hτB_ref :
       identityTensorStateMatrix (a := TensorPower a (n + 1))
-          (ρ.tensorPowerBipartite (n + 1)).marginalB =
-        identityTensorStateMatrix (a := Prod a (TensorPower a n))
-          (ρ.marginalB.prod (ρ.tensorPowerBipartite n).marginalB) := by
+          (ρ.tensorPowerBipartite (n + 1)).traceLeft =
+        identityTensorStateMatrix (a := a × TensorPower a n)
+          (ρ.traceLeft.prod (ρ.tensorPowerBipartite n).traceLeft) := by
     unfold identityTensorStateMatrix
     rw [hτB_matrix]
     rfl
   dsimp [conditionalPetzRenyiEntropyCandidate, conditionalPetzRenyiTraceTerm]
-  rw [hτ_matrix', hτB_ref]
+  rw [hτ_matrix, hτB_ref]
   rfl
 
 theorem tensorPowerBipartite_conditionalPetzRenyiEntropyCandidateFullReference_succ
-    (ρ : State (Prod a b)) (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρB : ρ.traceLeft.m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) (n : ℕ) :
     (ρ.tensorPowerBipartite (n + 1)).conditionalPetzRenyiEntropyCandidateFullReference
-        (ρ.tensorPowerBipartite (n + 1)).marginalB
-        (tensorPowerBipartite_marginalB_posDef_fullReference_forFiniteAEP ρ hρB (n + 1))
+        (ρ.tensorPowerBipartite (n + 1)).traceLeft
+        (tensorPowerBipartite_traceLeft_posDef ρ hρB (n + 1))
         α hα_pos hα_ne_one =
       ρ.conditionalPetzRenyiEntropyCandidateFullReference
-          ρ.marginalB hρB α hα_pos hα_ne_one +
+          ρ.traceLeft hρB α hα_pos hα_ne_one +
         (ρ.tensorPowerBipartite n).conditionalPetzRenyiEntropyCandidateFullReference
-          (ρ.tensorPowerBipartite n).marginalB
-          (tensorPowerBipartite_marginalB_posDef_fullReference_forFiniteAEP ρ hρB n)
+          (ρ.tensorPowerBipartite n).traceLeft
+          (tensorPowerBipartite_traceLeft_posDef ρ hρB n)
           α hα_pos hα_ne_one := by
-  let τ : State (Prod (Prod a (TensorPower a n)) (Prod b (TensorPower b n))) :=
+  let τ : MState ((a × TensorPower a n) × (b × TensorPower b n)) :=
     (ρ.prod (ρ.tensorPowerBipartite n)).reindex
-      (conditionalPetzRenyiProductGroupingEquiv
+      (Equiv.prodProdProdComm
         a b (TensorPower a n) (TensorPower b n))
   have hτ :
       ρ.tensorPowerBipartite (n + 1) = τ :=
-    tensorPowerBipartite_succ_grouped ρ n
+    tensorPowerBipartite_succ_grouped_forAlphaContinuity ρ n
   have hτB :
-      τ.marginalB = ρ.marginalB.prod (ρ.tensorPowerBipartite n).marginalB := by
-    simpa [τ] using tensorPowerBipartite_succ_grouped_marginalB ρ n
+      τ.traceLeft = ρ.traceLeft.prod (ρ.tensorPowerBipartite n).traceLeft := by
+    simpa [τ] using tensorPowerBipartite_succ_grouped_traceLeft_forAlphaContinuity ρ n
   have hregroup :
       (ρ.tensorPowerBipartite (n + 1)).conditionalPetzRenyiEntropyCandidateFullReference
-          (ρ.tensorPowerBipartite (n + 1)).marginalB
-          (tensorPowerBipartite_marginalB_posDef_fullReference_forFiniteAEP ρ hρB (n + 1))
+          (ρ.tensorPowerBipartite (n + 1)).traceLeft
+          (tensorPowerBipartite_traceLeft_posDef ρ hρB (n + 1))
           α hα_pos hα_ne_one =
         τ.conditionalPetzRenyiEntropyCandidateFullReference
-          (ρ.marginalB.prod (ρ.tensorPowerBipartite n).marginalB)
-          (State.prod_posDef hρB
-            (tensorPowerBipartite_marginalB_posDef_fullReference_forFiniteAEP ρ hρB n))
+          (ρ.traceLeft.prod (ρ.tensorPowerBipartite n).traceLeft)
+          (MState.PosDef.kron hρB
+            (tensorPowerBipartite_traceLeft_posDef ρ hρB n))
           α hα_pos hα_ne_one := by
     have hτ_matrix :
-        (ρ.tensorPowerBipartite (n + 1)).matrix = τ.matrix :=
-      congrArg State.matrix hτ
-    have hτ_matrix' :
-        Matrix.submatrix (ρ.tensorPower (n + 1)).matrix
-            (tensorPowerProdEquiv a b (n + 1)).symm
-            (tensorPowerProdEquiv a b (n + 1)).symm =
-          Matrix.submatrix (ρ.prod (ρ.tensorPowerBipartite n)).matrix
-            (conditionalPetzRenyiProductGroupingEquiv
-              a b (TensorPower a n) (TensorPower b n)).symm
-            (conditionalPetzRenyiProductGroupingEquiv
-              a b (TensorPower a n) (TensorPower b n)).symm := by
-      simpa [State.tensorPowerBipartite_matrix, τ, State.reindex_matrix] using hτ_matrix
-    have hτ_matrix_def :
-        τ.matrix =
-          Matrix.submatrix (ρ.prod (ρ.tensorPowerBipartite n)).matrix
-            (conditionalPetzRenyiProductGroupingEquiv
-              a b (TensorPower a n) (TensorPower b n)).symm
-            (conditionalPetzRenyiProductGroupingEquiv
-              a b (TensorPower a n) (TensorPower b n)).symm := by
-      simp [τ, State.reindex_matrix]
+        (ρ.tensorPowerBipartite (n + 1)).m = τ.m :=
+      congrArg DensityOp.m hτ
     have hτB_matrix :
-        (ρ.tensorPowerBipartite (n + 1)).marginalB.matrix =
-          (ρ.marginalB.prod (ρ.tensorPowerBipartite n).marginalB).matrix := by
+        (ρ.tensorPowerBipartite (n + 1)).traceLeft.m =
+          (ρ.traceLeft.prod (ρ.tensorPowerBipartite n).traceLeft).m := by
       rw [hτ]
-      exact congrArg State.matrix hτB
+      exact congrArg DensityOp.m hτB
     have hτB_ref :
         identityTensorStateMatrix (a := TensorPower a (n + 1))
-            (ρ.tensorPowerBipartite (n + 1)).marginalB =
-          identityTensorStateMatrix (a := Prod a (TensorPower a n))
-            (ρ.marginalB.prod (ρ.tensorPowerBipartite n).marginalB) := by
+            (ρ.tensorPowerBipartite (n + 1)).traceLeft =
+          identityTensorStateMatrix (a := a × TensorPower a n)
+            (ρ.traceLeft.prod (ρ.tensorPowerBipartite n).traceLeft) := by
       unfold identityTensorStateMatrix
       rw [hτB_matrix]
       rfl
     dsimp [conditionalPetzRenyiEntropyCandidateFullReference, conditionalPetzRenyiTraceTerm]
-    rw [hτ_matrix', hτB_ref, hτ_matrix_def]
+    rw [hτ_matrix, hτB_ref]
     rfl
   have hprod :=
     conditionalPetzRenyiEntropyCandidateFullReference_prod_grouped
-      (ρ₁ := ρ) (σ₁ := ρ.marginalB)
+      (ρ₁ := ρ) (σ₁ := ρ.traceLeft)
       (ρ₂ := ρ.tensorPowerBipartite n)
-      (σ₂ := (ρ.tensorPowerBipartite n).marginalB)
+      (σ₂ := (ρ.tensorPowerBipartite n).traceLeft)
       hρB
-      (tensorPowerBipartite_marginalB_posDef_fullReference_forFiniteAEP ρ hρB n)
+      (tensorPowerBipartite_traceLeft_posDef ρ hρB n)
       α hα_pos hα_ne_one
   exact hregroup.trans hprod
 
 theorem tensorPowerBipartite_conditionalPetzRenyiEntropyCandidate_zero
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     (ρ.tensorPowerBipartite 0).conditionalPetzRenyiEntropyCandidate
-        (tensorPowerBipartite_posDef_forFiniteAEP ρ hρ 0)
-        (ρ.tensorPowerBipartite 0).marginalB
-        (tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB 0)
+        (tensorPowerBipartite_posDef ρ hρ 0)
+        (ρ.tensorPowerBipartite 0).traceLeft
+        (tensorPowerBipartite_traceLeft_posDef ρ hρB 0)
         α hα_pos hα_ne_one = 0 := by
   have hmat :
-      (ρ.tensorPowerBipartite 0).matrix =
-        (1 : CMatrix (Prod (TensorPower a 0) (TensorPower b 0))) :=
+      (ρ.tensorPowerBipartite 0).m =
+        (1 : CMatrix (TensorPower a 0 × TensorPower b 0)) :=
     matrix_eq_one_of_card_eq_one card_tensorPower_zero_prod _
   have hBmat :
-      (ρ.tensorPowerBipartite 0).marginalB.matrix =
+      (ρ.tensorPowerBipartite 0).traceLeft.m =
         (1 : CMatrix (TensorPower b 0)) :=
     matrix_eq_one_of_card_eq_one card_tensorPower_zero _
   have href :
       identityTensorStateMatrix (a := TensorPower a 0)
-          (ρ.tensorPowerBipartite 0).marginalB =
-        (1 : CMatrix (Prod (TensorPower a 0) (TensorPower b 0))) := by
+          (ρ.tensorPowerBipartite 0).traceLeft =
+        (1 : CMatrix (TensorPower a 0 × TensorPower b 0)) := by
     unfold identityTensorStateMatrix
     rw [hBmat]
     exact Matrix.one_kronecker_one
@@ -1540,53 +1475,53 @@ theorem tensorPowerBipartite_conditionalPetzRenyiEntropyCandidate_zero
   rw [hmat, href]
   dsimp only
   change 1 / (1 - α) *
-      log2 ((((1 : CMatrix (Prod (TensorPower a 0) (TensorPower b 0))) ^ α) *
-        ((1 : CMatrix (Prod (TensorPower a 0) (TensorPower b 0))) ^ (1 - α))).trace.re) =
+      log2 ((((1 : CMatrix (TensorPower a 0 × TensorPower b 0)) ^ α) *
+        ((1 : CMatrix (TensorPower a 0 × TensorPower b 0)) ^ (1 - α))).trace.re) =
     0
-  rw [show ((1 : CMatrix (Prod (TensorPower a 0) (TensorPower b 0))) ^ α) = 1 by
+  rw [show ((1 : CMatrix (TensorPower a 0 × TensorPower b 0)) ^ α) = 1 by
       exact CFC.one_rpow,
-    show ((1 : CMatrix (Prod (TensorPower a 0) (TensorPower b 0))) ^ (1 - α)) = 1 by
+    show ((1 : CMatrix (TensorPower a 0 × TensorPower b 0)) ^ (1 - α)) = 1 by
       exact CFC.one_rpow,
     one_mul, Matrix.trace_one]
-  have hcard : Fintype.card (Prod (TensorPower a 0) (TensorPower b 0)) = 1 := by
+  have hcard : Fintype.card (TensorPower a 0 × TensorPower b 0) = 1 := by
     change Fintype.card (PUnit × PUnit) = 1
     simp
   simp [hcard, log2]
 
 theorem tensorPowerBipartite_conditionalPetzRenyiEntropyCandidateFullReference_zero
-    (ρ : State (Prod a b)) (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρB : ρ.traceLeft.m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) :
     (ρ.tensorPowerBipartite 0).conditionalPetzRenyiEntropyCandidateFullReference
-        (ρ.tensorPowerBipartite 0).marginalB
-        (tensorPowerBipartite_marginalB_posDef_fullReference_forFiniteAEP ρ hρB 0)
+        (ρ.tensorPowerBipartite 0).traceLeft
+        (tensorPowerBipartite_traceLeft_posDef ρ hρB 0)
         α hα_pos hα_ne_one = 0 := by
   have hmat :
-      (ρ.tensorPowerBipartite 0).matrix =
-        (1 : CMatrix (Prod (TensorPower a 0) (TensorPower b 0))) :=
+      (ρ.tensorPowerBipartite 0).m =
+        (1 : CMatrix (TensorPower a 0 × TensorPower b 0)) :=
     matrix_eq_one_of_card_eq_one card_tensorPower_zero_prod _
   have hBmat :
-      (ρ.tensorPowerBipartite 0).marginalB.matrix =
+      (ρ.tensorPowerBipartite 0).traceLeft.m =
         (1 : CMatrix (TensorPower b 0)) :=
     matrix_eq_one_of_card_eq_one card_tensorPower_zero _
   have href :
       identityTensorStateMatrix (a := TensorPower a 0)
-          (ρ.tensorPowerBipartite 0).marginalB =
-        (1 : CMatrix (Prod (TensorPower a 0) (TensorPower b 0))) := by
+          (ρ.tensorPowerBipartite 0).traceLeft =
+        (1 : CMatrix (TensorPower a 0 × TensorPower b 0)) := by
     unfold identityTensorStateMatrix
     rw [hBmat]
     exact Matrix.one_kronecker_one
   unfold conditionalPetzRenyiEntropyCandidateFullReference conditionalPetzRenyiTraceTerm
   rw [hmat, href]
   change 1 / (1 - α) *
-      log2 ((((1 : CMatrix (Prod (TensorPower a 0) (TensorPower b 0))) ^ α) *
-        ((1 : CMatrix (Prod (TensorPower a 0) (TensorPower b 0))) ^ (1 - α))).trace.re) =
+      log2 ((((1 : CMatrix (TensorPower a 0 × TensorPower b 0)) ^ α) *
+        ((1 : CMatrix (TensorPower a 0 × TensorPower b 0)) ^ (1 - α))).trace.re) =
     0
-  rw [show ((1 : CMatrix (Prod (TensorPower a 0) (TensorPower b 0))) ^ α) = 1 by
+  rw [show ((1 : CMatrix (TensorPower a 0 × TensorPower b 0)) ^ α) = 1 by
       exact CFC.one_rpow,
-    show ((1 : CMatrix (Prod (TensorPower a 0) (TensorPower b 0))) ^ (1 - α)) = 1 by
+    show ((1 : CMatrix (TensorPower a 0 × TensorPower b 0)) ^ (1 - α)) = 1 by
       exact CFC.one_rpow,
     one_mul, Matrix.trace_one]
-  have hcard : Fintype.card (Prod (TensorPower a 0) (TensorPower b 0)) = 1 := by
+  have hcard : Fintype.card (TensorPower a 0 × TensorPower b 0) = 1 := by
     change Fintype.card (PUnit × PUnit) = 1
     simp
   simp [hcard, log2]
@@ -1594,17 +1529,17 @@ theorem tensorPowerBipartite_conditionalPetzRenyiEntropyCandidateFullReference_z
 /-- Conditional Petz alpha-entropy candidate is additive on bipartite tensor
 powers relative to the corresponding tensor-power marginal reference. -/
 theorem tensorPowerBipartite_conditionalPetzRenyiEntropyCandidate_additive
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) (n : ℕ) :
     (ρ.tensorPowerBipartite n).conditionalPetzRenyiEntropyCandidate
-        (tensorPowerBipartite_posDef_forFiniteAEP ρ hρ n)
-        (ρ.tensorPowerBipartite n).marginalB
-        (tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB n)
+        (tensorPowerBipartite_posDef ρ hρ n)
+        (ρ.tensorPowerBipartite n).traceLeft
+        (tensorPowerBipartite_traceLeft_posDef ρ hρB n)
         α hα_pos hα_ne_one =
       (n : ℝ) *
         ρ.conditionalPetzRenyiEntropyCandidate
-          hρ ρ.marginalB hρB α hα_pos hα_ne_one := by
+          hρ ρ.traceLeft hρB α hα_pos hα_ne_one := by
   induction n with
   | zero =>
       rw [tensorPowerBipartite_conditionalPetzRenyiEntropyCandidate_zero
@@ -1621,15 +1556,15 @@ theorem tensorPowerBipartite_conditionalPetzRenyiEntropyCandidate_additive
 bipartite tensor powers relative to the corresponding tensor-power marginal
 reference, without requiring the left state to be full-rank. -/
 theorem tensorPowerBipartite_conditionalPetzRenyiEntropyCandidateFullReference_additive
-    (ρ : State (Prod a b)) (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρB : ρ.traceLeft.m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1) (n : ℕ) :
     (ρ.tensorPowerBipartite n).conditionalPetzRenyiEntropyCandidateFullReference
-        (ρ.tensorPowerBipartite n).marginalB
-        (tensorPowerBipartite_marginalB_posDef_fullReference_forFiniteAEP ρ hρB n)
+        (ρ.tensorPowerBipartite n).traceLeft
+        (tensorPowerBipartite_traceLeft_posDef ρ hρB n)
         α hα_pos hα_ne_one =
       (n : ℝ) *
         ρ.conditionalPetzRenyiEntropyCandidateFullReference
-          ρ.marginalB hρB α hα_pos hα_ne_one := by
+          ρ.traceLeft hρB α hα_pos hα_ne_one := by
   induction n with
   | zero =>
       rw [tensorPowerBipartite_conditionalPetzRenyiEntropyCandidateFullReference_zero
@@ -1649,17 +1584,17 @@ This is the source-shaped route for TCR finite AEP: apply the one-copy
 alpha-bound and then use additivity of the fixed-reference conditional Petz
 candidate, instead of bounding the tensor-power convergence parameter. -/
 theorem tensorPower_conditionalPetzRenyiEntropyCandidate_alpha_bound_posDef
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef)
     (α : ℝ) {n : ℕ}
     (hα_gt : 1 < α)
     (hα_lt :
       α < 1 + log2 3 /
         (4 * log2 (ρ.finiteAEPEta hρ hρB))) :
     (ρ.tensorPowerBipartite n).conditionalPetzRenyiEntropyCandidate
-        (tensorPowerBipartite_posDef_forFiniteAEP ρ hρ n)
-        (ρ.tensorPowerBipartite n).marginalB
-        (tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB n)
+        (tensorPowerBipartite_posDef ρ hρ n)
+        (ρ.tensorPowerBipartite n).traceLeft
+        (tensorPowerBipartite_traceLeft_posDef ρ hρB n)
         α (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm) ≥
       (n : ℝ) * ρ.conditionalEntropy -
         4 * (α - 1) * (n : ℝ) *
@@ -1668,12 +1603,12 @@ theorem tensorPower_conditionalPetzRenyiEntropyCandidate_alpha_bound_posDef
   let hα_ne_one : α ≠ 1 := (ne_of_lt hα_gt).symm
   have hsingle :
       ρ.conditionalPetzRenyiEntropyCandidate
-          hρ ρ.marginalB hρB α hα_pos hα_ne_one ≥
+          hρ ρ.traceLeft hρB α hα_pos hα_ne_one ≥
         ρ.conditionalEntropy -
           4 * (α - 1) * (log2 (ρ.finiteAEPEta hρ hρB)) ^ 2 := by
     have h :=
       conditionalPetzRenyiEntropyCandidate_alpha_bound_posDef
-        (ρ := ρ) hρ (σ := ρ.marginalB) hρB α hα_gt
+        (ρ := ρ) hρ (σ := ρ.traceLeft) hρB α hα_gt
         (by simpa [finiteAEPEta_eq] using hα_lt)
     rw [ρ.conditionalEntropyRelative_to_conditionalEntropy hρ hρB] at h
     simpa [finiteAEPEta_eq, hα_pos, hα_ne_one] using h
@@ -1684,17 +1619,17 @@ theorem tensorPower_conditionalPetzRenyiEntropyCandidate_alpha_bound_posDef
             4 * (α - 1) * (log2 (ρ.finiteAEPEta hρ hρB)) ^ 2) ≤
         (n : ℝ) *
           ρ.conditionalPetzRenyiEntropyCandidate
-            hρ ρ.marginalB hρB α hα_pos hα_ne_one :=
+            hρ ρ.traceLeft hρB α hα_pos hα_ne_one :=
     mul_le_mul_of_nonneg_left hsingle hn_nonneg
   calc
     (ρ.tensorPowerBipartite n).conditionalPetzRenyiEntropyCandidate
-        (tensorPowerBipartite_posDef_forFiniteAEP ρ hρ n)
-        (ρ.tensorPowerBipartite n).marginalB
-        (tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB n)
+        (tensorPowerBipartite_posDef ρ hρ n)
+        (ρ.tensorPowerBipartite n).traceLeft
+        (tensorPowerBipartite_traceLeft_posDef ρ hρB n)
         α (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm)
         = (n : ℝ) *
             ρ.conditionalPetzRenyiEntropyCandidate
-              hρ ρ.marginalB hρB α hα_pos hα_ne_one := by
+              hρ ρ.traceLeft hρB α hα_pos hα_ne_one := by
           simpa [hα_pos, hα_ne_one] using
             tensorPowerBipartite_conditionalPetzRenyiEntropyCandidate_additive
               ρ hρ hρB α hα_pos hα_ne_one n
@@ -1716,16 +1651,16 @@ This is the arbitrary-left-state analogue of
 joint tensor-power state is not assumed full-rank, while the canonical side
 reference is propagated as a full-rank marginal reference. -/
 theorem tensorPower_conditionalPetzRenyiEntropyCandidateFullReference_alpha_bound
-    (ρ : State (Prod a b))
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b))
+    (hρB : ρ.traceLeft.m.PosDef)
     (α : ℝ) {n : ℕ}
     (hα_gt : 1 < α)
     (hα_lt :
       α < 1 + log2 3 /
         (4 * log2 ρ.finiteAEPEtaTrace)) :
     (ρ.tensorPowerBipartite n).conditionalPetzRenyiEntropyCandidateFullReference
-        (ρ.tensorPowerBipartite n).marginalB
-        (tensorPowerBipartite_marginalB_posDef_fullReference_forFiniteAEP ρ hρB n)
+        (ρ.tensorPowerBipartite n).traceLeft
+        (tensorPowerBipartite_traceLeft_posDef ρ hρB n)
         α (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm) ≥
       (n : ℝ) * ρ.conditionalEntropy -
         4 * (α - 1) * (n : ℝ) *
@@ -1734,12 +1669,12 @@ theorem tensorPower_conditionalPetzRenyiEntropyCandidateFullReference_alpha_boun
   let hα_ne_one : α ≠ 1 := (ne_of_lt hα_gt).symm
   have hsingle :
       ρ.conditionalPetzRenyiEntropyCandidateFullReference
-          ρ.marginalB hρB α hα_pos hα_ne_one ≥
+          ρ.traceLeft hρB α hα_pos hα_ne_one ≥
         ρ.conditionalEntropy -
           4 * (α - 1) * (log2 ρ.finiteAEPEtaTrace) ^ 2 := by
     have h :=
       conditionalPetzRenyiEntropyCandidateFullReference_alpha_bound
-        (ρ := ρ) (σ := ρ.marginalB) hρB α hα_gt
+        (ρ := ρ) (σ := ρ.traceLeft) hρB α hα_gt
         (by simpa [finiteAEPEtaTrace] using hα_lt)
     rw [ρ.conditionalEntropyRelativeFullReference_to_conditionalEntropy hρB] at h
     simpa [finiteAEPEtaTrace, hα_pos, hα_ne_one] using h
@@ -1750,16 +1685,16 @@ theorem tensorPower_conditionalPetzRenyiEntropyCandidateFullReference_alpha_boun
             4 * (α - 1) * (log2 ρ.finiteAEPEtaTrace) ^ 2) ≤
         (n : ℝ) *
           ρ.conditionalPetzRenyiEntropyCandidateFullReference
-            ρ.marginalB hρB α hα_pos hα_ne_one :=
+            ρ.traceLeft hρB α hα_pos hα_ne_one :=
     mul_le_mul_of_nonneg_left hsingle hn_nonneg
   calc
     (ρ.tensorPowerBipartite n).conditionalPetzRenyiEntropyCandidateFullReference
-        (ρ.tensorPowerBipartite n).marginalB
-        (tensorPowerBipartite_marginalB_posDef_fullReference_forFiniteAEP ρ hρB n)
+        (ρ.tensorPowerBipartite n).traceLeft
+        (tensorPowerBipartite_traceLeft_posDef ρ hρB n)
         α (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm)
         = (n : ℝ) *
             ρ.conditionalPetzRenyiEntropyCandidateFullReference
-              ρ.marginalB hρB α hα_pos hα_ne_one := by
+              ρ.traceLeft hρB α hα_pos hα_ne_one := by
           simpa [hα_pos, hα_ne_one] using
             tensorPowerBipartite_conditionalPetzRenyiEntropyCandidateFullReference_additive
               ρ hρB α hα_pos hα_ne_one n
@@ -1780,8 +1715,8 @@ The left state is arbitrary.  The only reference-side hypothesis is that the
 fixed side reference is full-rank, which is enough for the full-reference
 smooth-min/Petz lower bound. -/
 theorem finiteAEP_core_fullReference_optimized_petzAlphaBound
-    (ρn : State (Prod a b))
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρn : MState (a × b))
+    (σ : MState b) (hσ : σ.m.PosDef)
     (ε η α H : ℝ) {n : ℕ}
     (hM : 0 < log2 (2 / ε ^ 2))
     (hL : 0 < log2 η)
@@ -1912,8 +1847,8 @@ This is the full-reference source route: smooth-min is bounded by the
 full-reference Petz candidate, while the Petz alpha term is tensorized by
 additivity and the one-copy trace eta. -/
 theorem tensorPowerFiniteAEP_core_fullReference_optimized_additivePetz
-    (ρ : State (Prod a b))
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b))
+    (hρB : ρ.traceLeft.m.PosDef)
     (ε α : ℝ) {n : ℕ}
     (hM : 0 < log2 (2 / ε ^ 2))
     (hn : 0 < n)
@@ -1927,14 +1862,14 @@ theorem tensorPowerFiniteAEP_core_fullReference_optimized_additivePetz
       α < 1 + log2 3 /
         (4 * log2 ρ.finiteAEPEtaTrace)) :
     (ρ.tensorPowerBipartite n).smoothConditionalMinEntropyFixedSubnormalized
-        (ρ.tensorPowerBipartite n).marginalB.toSubnormalized ε ≥
+        (ρ.tensorPowerBipartite n).traceLeft.toSubnormalized ε ≥
       (n : ℝ) * ρ.conditionalEntropy -
         QIT.finiteAEPDelta ε ρ.finiteAEPEtaTrace *
           Real.sqrt (n : ℝ) := by
   have hη3 : 3 ≤ ρ.finiteAEPEtaTrace := by
     simpa [finiteAEPEtaTrace] using
       conditionalAlphaConvergenceParameterTrace_ge_three
-        (ρ := ρ) (σ := ρ.marginalB) hρB
+        (ρ := ρ) (σ := ρ.traceLeft) hρB
   have hL : 0 < log2 ρ.finiteAEPEtaTrace := by
     unfold log2
     exact div_pos
@@ -1956,8 +1891,8 @@ theorem tensorPowerFiniteAEP_core_fullReference_optimized_additivePetz
     linarith
   have hpetz_alpha :
       (ρ.tensorPowerBipartite n).conditionalPetzRenyiEntropyCandidateFullReference
-          (ρ.tensorPowerBipartite n).marginalB
-          (tensorPowerBipartite_marginalB_posDef_fullReference_forFiniteAEP ρ hρB n)
+          (ρ.tensorPowerBipartite n).traceLeft
+          (tensorPowerBipartite_traceLeft_posDef ρ hρB n)
           α (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm) ≥
         (n : ℝ) * ρ.conditionalEntropy -
           4 * (α - 1) * (n : ℝ) *
@@ -1966,16 +1901,16 @@ theorem tensorPowerFiniteAEP_core_fullReference_optimized_additivePetz
       hρB α hα_gt hα_lt
   exact
     (ρ.tensorPowerBipartite n).finiteAEP_core_fullReference_optimized_petzAlphaBound
-      (ρ.tensorPowerBipartite n).marginalB
-      (tensorPowerBipartite_marginalB_posDef_fullReference_forFiniteAEP ρ hρB n)
+      (ρ.tensorPowerBipartite n).traceLeft
+      (tensorPowerBipartite_traceLeft_posDef ρ hρB n)
       ε ρ.finiteAEPEtaTrace α ρ.conditionalEntropy hM hL hn hα_opt
       hε_pos hε_lt hα_le_two hpetz_alpha
 
 /-- Tensor-power optimized finite-AEP core for optimized subnormalized smooth
 min-entropy, using only a full-rank canonical marginal reference. -/
 theorem tensorPowerFiniteAEP_core_fullReference_optimized_subnormalizedSmooth_additivePetz
-    (ρ : State (Prod a b))
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b))
+    (hρB : ρ.traceLeft.m.PosDef)
     (ε α : ℝ) {n : ℕ}
     (hM : 0 < log2 (2 / ε ^ 2))
     (hn : 0 < n)
@@ -1994,7 +1929,7 @@ theorem tensorPowerFiniteAEP_core_fullReference_optimized_subnormalizedSmooth_ad
           Real.sqrt (n : ℝ) := by
   have hfixedCore :
       (ρ.tensorPowerBipartite n).smoothConditionalMinEntropyFixedSubnormalized
-          (ρ.tensorPowerBipartite n).marginalB.toSubnormalized ε ≥
+          (ρ.tensorPowerBipartite n).traceLeft.toSubnormalized ε ≥
         (n : ℝ) * ρ.conditionalEntropy -
           QIT.finiteAEPDelta ε ρ.finiteAEPEtaTrace *
             Real.sqrt (n : ℝ) :=
@@ -2002,16 +1937,16 @@ theorem tensorPowerFiniteAEP_core_fullReference_optimized_subnormalizedSmooth_ad
       hρB ε α hM hn hα_opt hε_pos hε_lt hα_le_two hα_lt
   have hbridge :
       (ρ.tensorPowerBipartite n).smoothConditionalMinEntropyFixedSubnormalized
-          (ρ.tensorPowerBipartite n).marginalB.toSubnormalized ε ≤
+          (ρ.tensorPowerBipartite n).traceLeft.toSubnormalized ε ≤
         ρ.tensorPowerSubnormalizedSmoothConditionalMinEntropy ε n hε_pos.le hε_lt :=
     (ρ.tensorPowerBipartite n)
       |>.smoothConditionalMinEntropyFixedSubnormalized_le_subnormalizedSmoothConditionalMinEntropy
-        (ρ.tensorPowerBipartite n).marginalB.toSubnormalized ε
+        (ρ.tensorPowerBipartite n).traceLeft.toSubnormalized ε
         hε_pos.le hε_lt
         (fun ρ' _hball =>
           SubnormalizedState.conditionalMinEntropyFixed_feasibleSet_nonempty_of_posDef_reference
-            (a := TensorPower a n) ρ' (ρ.tensorPowerBipartite n).marginalB
-            (tensorPowerBipartite_marginalB_posDef_fullReference_forFiniteAEP ρ hρB n))
+            (a := TensorPower a n) ρ' (ρ.tensorPowerBipartite n).traceLeft
+            (tensorPowerBipartite_traceLeft_posDef ρ hρB n))
   exact le_trans hfixedCore hbridge
 
 /-- Optimized scalar-choice finite-AEP core from a tensor/source-shaped Petz
@@ -2023,8 +1958,8 @@ assembly lemma does not assume a tensor-power eta growth estimate.  It only
 needs the already tensorized alpha-to-von-Neumann lower bound with the
 single-copy eta parameter. -/
 theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_effectVariational_petzAlphaBound
-    (ρn : State (Prod a b)) (hρn : ρn.matrix.PosDef)
-    (hρnB : ρn.marginalB.matrix.PosDef)
+    (ρn : MState (a × b)) (hρn : ρn.m.PosDef)
+    (hρnB : ρn.traceLeft.m.PosDef)
     (ε η α H : ℝ) {n : ℕ}
     (hM : 0 < log2 (2 / ε ^ 2))
     (hL : 0 < log2 η)
@@ -2037,7 +1972,7 @@ theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_effectVariational
     (hα_le_two : α ≤ 2)
     (hpetz_alpha :
       ρn.conditionalPetzRenyiEntropyCandidate
-          hρn ρn.marginalB hρnB α
+          hρn ρn.traceLeft hρnB α
           (by
             rw [hα_opt]
             have hden :
@@ -2085,11 +2020,11 @@ theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_effectVariational
           div_pos hnum hden
         linarith
       let lam : ℝ :=
-        ρn.petzSmoothMinThresholdScale hρn ρn.marginalB hρnB ε α
+        ρn.petzSmoothMinThresholdScale hρn ρn.traceLeft hρnB ε α
           (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm)
-      cMatrixPetzTraceEffectVariational ρn.matrix
-        (identityTensorStateMatrix (a := a) ρn.marginalB) lam α) :
-    ρn.smoothConditionalMinEntropyFixedSubnormalized ρn.marginalB.toSubnormalized ε ≥
+      cMatrixPetzTraceEffectVariational ρn.m
+        (identityTensorStateMatrix (a := a) ρn.traceLeft) lam α) :
+    ρn.smoothConditionalMinEntropyFixedSubnormalized ρn.traceLeft.toSubnormalized ε ≥
       (n : ℝ) * H - QIT.finiteAEPDelta ε η * Real.sqrt (n : ℝ) := by
   subst α
   have hden :
@@ -2110,7 +2045,7 @@ theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_effectVariational
     linarith
   have hsmooth :
       (ρn.conditionalPetzRenyiEntropyCandidate
-          hρn ρn.marginalB hρnB
+          hρn ρn.traceLeft hρnB
           (1 + Real.sqrt (log2 (2 / ε ^ 2)) /
             (2 * log2 η * Real.sqrt (n : ℝ)))
           (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm)) -
@@ -2119,17 +2054,17 @@ theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_effectVariational
               (2 * log2 η * Real.sqrt (n : ℝ)) - 1)) *
           log2 (2 / ε ^ 2) ≤
         ρn.smoothConditionalMinEntropyFixedSubnormalized
-          ρn.marginalB.toSubnormalized ε := by
+          ρn.traceLeft.toSubnormalized ε := by
     exact
       ρn.smoothConditionalMinEntropyFixedSubnormalized_lower_bound_of_fixedPetzSmoothMinG_effectVariational
-        hρn ρn.marginalB hρnB ε
+        hρn ρn.traceLeft hρnB ε
         (1 + Real.sqrt (log2 (2 / ε ^ 2)) /
           (2 * log2 η * Real.sqrt (n : ℝ)))
         hε_pos hε_lt hα_gt hα_le_two
         (by simpa [hα_gt] using hvar)
   have hpetz_alpha' :
       ρn.conditionalPetzRenyiEntropyCandidate
-          hρn ρn.marginalB hρnB
+          hρn ρn.traceLeft hρnB
           (1 + Real.sqrt (log2 (2 / ε ^ 2)) /
             (2 * log2 η * Real.sqrt (n : ℝ)))
           (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm) ≥
@@ -2156,7 +2091,7 @@ theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_effectVariational
       QIT.finiteAEP_penalty_optimized_eq ε η (n := n) hM hL hn
   calc
     ρn.smoothConditionalMinEntropyFixedSubnormalized
-        ρn.marginalB.toSubnormalized ε ≥
+        ρn.traceLeft.toSubnormalized ε ≥
       (n : ℝ) * H -
         (4 *
             (1 + Real.sqrt (log2 (2 / ε ^ 2)) /
@@ -2183,8 +2118,8 @@ It keeps the remaining noncommutative Appendix input at the dephasing
 monotonicity level, without asking callers to provide the stronger
 effect-variational package. -/
 theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_unitaryDephaseMonotone_petzAlphaBound
-    (ρn : State (Prod a b)) (hρn : ρn.matrix.PosDef)
-    (hρnB : ρn.marginalB.matrix.PosDef)
+    (ρn : MState (a × b)) (hρn : ρn.m.PosDef)
+    (hρnB : ρn.traceLeft.m.PosDef)
     (ε η α H : ℝ) {n : ℕ}
     (hM : 0 < log2 (2 / ε ^ 2))
     (hL : 0 < log2 η)
@@ -2197,7 +2132,7 @@ theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_unitaryDephaseMon
     (hα_le_two : α ≤ 2)
     (hpetz_alpha :
       ρn.conditionalPetzRenyiEntropyCandidate
-          hρn ρn.marginalB hρnB α
+          hρn ρn.traceLeft hρnB α
           (by
             rw [hα_opt]
             have hden :
@@ -2247,20 +2182,20 @@ theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_unitaryDephaseMon
       let hα_pos : 0 < α := lt_trans zero_lt_one hα_gt
       let hα_ne_one : α ≠ 1 := (ne_of_lt hα_gt).symm
       let lam : ℝ :=
-        ρn.petzSmoothMinThresholdScale hρn ρn.marginalB hρnB ε α hα_pos
+        ρn.petzSmoothMinThresholdScale hρn ρn.traceLeft hρnB ε α hα_pos
           hα_ne_one
-      let hB : (identityTensorStateMatrix (a := a) ρn.marginalB).PosDef :=
-        identityTensorStateMatrix_posDef_of_posDef (a := a) ρn.marginalB hρnB
-      let Hmat : CMatrix (Prod a b) :=
-        ρn.matrix - lam • identityTensorStateMatrix (a := a) ρn.marginalB
+      let hB : (identityTensorStateMatrix (a := a) ρn.traceLeft).PosDef :=
+        identityTensorStateMatrix_posDef_of_posDef (a := a) ρn.traceLeft hρnB
+      let Hmat : CMatrix (a × b) :=
+        ρn.m - lam • identityTensorStateMatrix (a := a) ρn.traceLeft
       let hH : Hmat.IsHermitian :=
         hρn.isHermitian.sub ((Matrix.PosDef.smul hB
-          (ρn.petzSmoothMinThresholdScale_pos hρn ρn.marginalB hρnB ε α
+          (ρn.petzSmoothMinThresholdScale_pos hρn ρn.traceLeft hρnB ε α
             hα_pos hα_ne_one)).isHermitian)
-      let U : Matrix.unitaryGroup (Prod a b) ℂ := hH.eigenvectorUnitary
-      cMatrixPetzTraceUnitaryDephaseMonotone ρn.matrix
-        (identityTensorStateMatrix (a := a) ρn.marginalB) U α) :
-    ρn.smoothConditionalMinEntropyFixedSubnormalized ρn.marginalB.toSubnormalized ε ≥
+      let U : Matrix.unitaryGroup (a × b) ℂ := hH.eigenvectorUnitary
+      cMatrixPetzTraceUnitaryDephaseMonotone ρn.m
+        (identityTensorStateMatrix (a := a) ρn.traceLeft) U α) :
+    ρn.smoothConditionalMinEntropyFixedSubnormalized ρn.traceLeft.toSubnormalized ε ≥
       (n : ℝ) * H - QIT.finiteAEPDelta ε η * Real.sqrt (n : ℝ) := by
   subst α
   have hden :
@@ -2281,7 +2216,7 @@ theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_unitaryDephaseMon
     linarith
   have hsmooth :
       (ρn.conditionalPetzRenyiEntropyCandidate
-          hρn ρn.marginalB hρnB
+          hρn ρn.traceLeft hρnB
           (1 + Real.sqrt (log2 (2 / ε ^ 2)) /
             (2 * log2 η * Real.sqrt (n : ℝ)))
           (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm)) -
@@ -2290,17 +2225,17 @@ theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_unitaryDephaseMon
               (2 * log2 η * Real.sqrt (n : ℝ)) - 1)) *
           log2 (2 / ε ^ 2) ≤
         ρn.smoothConditionalMinEntropyFixedSubnormalized
-          ρn.marginalB.toSubnormalized ε := by
+          ρn.traceLeft.toSubnormalized ε := by
     exact
       ρn.smoothConditionalMinEntropyFixedSubnormalized_lower_bound_of_fixedPetzSmoothMinG_unitaryDephaseMonotone
-        hρn ρn.marginalB hρnB ε
+        hρn ρn.traceLeft hρnB ε
         (1 + Real.sqrt (log2 (2 / ε ^ 2)) /
           (2 * log2 η * Real.sqrt (n : ℝ)))
         hε_pos hε_lt hα_gt hα_le_two
         (by simpa [hα_gt] using hmono)
   have hpetz_alpha' :
       ρn.conditionalPetzRenyiEntropyCandidate
-          hρn ρn.marginalB hρnB
+          hρn ρn.traceLeft hρnB
           (1 + Real.sqrt (log2 (2 / ε ^ 2)) /
             (2 * log2 η * Real.sqrt (n : ℝ)))
           (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm) ≥
@@ -2327,7 +2262,7 @@ theorem finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_unitaryDephaseMon
       QIT.finiteAEP_penalty_optimized_eq ε η (n := n) hM hL hn
   calc
     ρn.smoothConditionalMinEntropyFixedSubnormalized
-        ρn.marginalB.toSubnormalized ε ≥
+        ρn.traceLeft.toSubnormalized ε ≥
       (n : ℝ) * H -
         (4 *
             (1 + Real.sqrt (log2 (2 / ε ^ 2)) /
@@ -2352,8 +2287,8 @@ threshold eigenbasis for the tensor-power state.  This is the narrow
 source-shaped replacement for the `hvar` assumption in
 `tensorPowerFiniteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_effectVariational_additivePetz`. -/
 theorem tensorPowerFiniteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_unitaryDephaseMonotone_additivePetz
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef)
     (ε α : ℝ) {n : ℕ}
     (hM : 0 < log2 (2 / ε ^ 2))
     (hn : 0 < n)
@@ -2367,10 +2302,10 @@ theorem tensorPowerFiniteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_unitar
       α < 1 + log2 3 /
         (4 * log2 (ρ.finiteAEPEta hρ hρB)))
     (hmono :
-      let hρn : (ρ.tensorPowerBipartite n).matrix.PosDef :=
-        tensorPowerBipartite_posDef_forFiniteAEP ρ hρ n
-      let hρnB : (ρ.tensorPowerBipartite n).marginalB.matrix.PosDef :=
-        tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB n
+      let hρn : (ρ.tensorPowerBipartite n).m.PosDef :=
+        tensorPowerBipartite_posDef ρ hρ n
+      let hρnB : (ρ.tensorPowerBipartite n).traceLeft.m.PosDef :=
+        tensorPowerBipartite_traceLeft_posDef ρ hρB n
       let hα_gt : 1 < α := by
         rw [hα_opt]
         have hL : 0 < log2 (ρ.finiteAEPEta hρ hρB) :=
@@ -2391,27 +2326,27 @@ theorem tensorPowerFiniteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_unitar
       let hα_ne_one : α ≠ 1 := (ne_of_lt hα_gt).symm
       let lam : ℝ :=
         (ρ.tensorPowerBipartite n).petzSmoothMinThresholdScale
-          hρn (ρ.tensorPowerBipartite n).marginalB hρnB ε α hα_pos hα_ne_one
+          hρn (ρ.tensorPowerBipartite n).traceLeft hρnB ε α hα_pos hα_ne_one
       let hB : (identityTensorStateMatrix (a := TensorPower a n)
-          (ρ.tensorPowerBipartite n).marginalB).PosDef :=
+          (ρ.tensorPowerBipartite n).traceLeft).PosDef :=
         identityTensorStateMatrix_posDef_of_posDef (a := TensorPower a n)
-          (ρ.tensorPowerBipartite n).marginalB hρnB
-      let Hmat : CMatrix (Prod (TensorPower a n) (TensorPower b n)) :=
-        (ρ.tensorPowerBipartite n).matrix -
+          (ρ.tensorPowerBipartite n).traceLeft hρnB
+      let Hmat : CMatrix (TensorPower a n × TensorPower b n) :=
+        (ρ.tensorPowerBipartite n).m -
           lam • identityTensorStateMatrix (a := TensorPower a n)
-            (ρ.tensorPowerBipartite n).marginalB
+            (ρ.tensorPowerBipartite n).traceLeft
       let hH : Hmat.IsHermitian :=
         hρn.isHermitian.sub ((Matrix.PosDef.smul hB
           ((ρ.tensorPowerBipartite n).petzSmoothMinThresholdScale_pos
-            hρn (ρ.tensorPowerBipartite n).marginalB hρnB ε α hα_pos hα_ne_one)
+            hρn (ρ.tensorPowerBipartite n).traceLeft hρnB ε α hα_pos hα_ne_one)
         ).isHermitian)
-      let U : Matrix.unitaryGroup (Prod (TensorPower a n) (TensorPower b n)) ℂ :=
+      let U : Matrix.unitaryGroup (TensorPower a n × TensorPower b n) ℂ :=
         hH.eigenvectorUnitary
-      cMatrixPetzTraceUnitaryDephaseMonotone (ρ.tensorPowerBipartite n).matrix
+      cMatrixPetzTraceUnitaryDephaseMonotone (ρ.tensorPowerBipartite n).m
         (identityTensorStateMatrix (a := TensorPower a n)
-          (ρ.tensorPowerBipartite n).marginalB) U α) :
+          (ρ.tensorPowerBipartite n).traceLeft) U α) :
     (ρ.tensorPowerBipartite n).smoothConditionalMinEntropyFixedSubnormalized
-        (ρ.tensorPowerBipartite n).marginalB.toSubnormalized ε ≥
+        (ρ.tensorPowerBipartite n).traceLeft.toSubnormalized ε ≥
       (n : ℝ) * ρ.conditionalEntropy -
         QIT.finiteAEPDelta ε (ρ.finiteAEPEta hρ hρB) *
           Real.sqrt (n : ℝ) := by
@@ -2433,9 +2368,9 @@ theorem tensorPowerFiniteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_unitar
     linarith
   have hpetz_alpha :
       (ρ.tensorPowerBipartite n).conditionalPetzRenyiEntropyCandidate
-          (tensorPowerBipartite_posDef_forFiniteAEP ρ hρ n)
-          (ρ.tensorPowerBipartite n).marginalB
-          (tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB n)
+          (tensorPowerBipartite_posDef ρ hρ n)
+          (ρ.tensorPowerBipartite n).traceLeft
+          (tensorPowerBipartite_traceLeft_posDef ρ hρB n)
           α (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm) ≥
         (n : ℝ) * ρ.conditionalEntropy -
           4 * (α - 1) * (n : ℝ) *
@@ -2445,8 +2380,8 @@ theorem tensorPowerFiniteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_unitar
   exact
     finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_unitaryDephaseMonotone_petzAlphaBound
       (ρ.tensorPowerBipartite n)
-      (tensorPowerBipartite_posDef_forFiniteAEP ρ hρ n)
-      (tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB n)
+      (tensorPowerBipartite_posDef ρ hρ n)
+      (tensorPowerBipartite_traceLeft_posDef ρ hρB n)
       ε (ρ.finiteAEPEta hρ hρB) α ρ.conditionalEntropy hM hL hn hα_opt
       hε_pos hε_lt hα_le_two hpetz_alpha hmono
 
@@ -2459,8 +2394,8 @@ smoothing.  The fixed-reference feasible-set nonemptiness is supplied by the
 positive-definite tensor-power marginal, so the remaining source-shaped
 assumption is Petz dephasing monotonicity in the threshold eigenbasis. -/
 theorem tensorPowerFiniteAEP_core_posDef_optimized_subnormalizedSmooth_of_unitaryDephaseMonotone_additivePetz
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef)
     (ε α : ℝ) {n : ℕ}
     (hM : 0 < log2 (2 / ε ^ 2))
     (hn : 0 < n)
@@ -2474,10 +2409,10 @@ theorem tensorPowerFiniteAEP_core_posDef_optimized_subnormalizedSmooth_of_unitar
       α < 1 + log2 3 /
         (4 * log2 (ρ.finiteAEPEta hρ hρB)))
     (hmono :
-      let hρn : (ρ.tensorPowerBipartite n).matrix.PosDef :=
-        tensorPowerBipartite_posDef_forFiniteAEP ρ hρ n
-      let hρnB : (ρ.tensorPowerBipartite n).marginalB.matrix.PosDef :=
-        tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB n
+      let hρn : (ρ.tensorPowerBipartite n).m.PosDef :=
+        tensorPowerBipartite_posDef ρ hρ n
+      let hρnB : (ρ.tensorPowerBipartite n).traceLeft.m.PosDef :=
+        tensorPowerBipartite_traceLeft_posDef ρ hρB n
       let hα_gt : 1 < α := by
         rw [hα_opt]
         have hL : 0 < log2 (ρ.finiteAEPEta hρ hρB) :=
@@ -2498,32 +2433,32 @@ theorem tensorPowerFiniteAEP_core_posDef_optimized_subnormalizedSmooth_of_unitar
       let hα_ne_one : α ≠ 1 := (ne_of_lt hα_gt).symm
       let lam : ℝ :=
         (ρ.tensorPowerBipartite n).petzSmoothMinThresholdScale
-          hρn (ρ.tensorPowerBipartite n).marginalB hρnB ε α hα_pos hα_ne_one
+          hρn (ρ.tensorPowerBipartite n).traceLeft hρnB ε α hα_pos hα_ne_one
       let hB : (identityTensorStateMatrix (a := TensorPower a n)
-          (ρ.tensorPowerBipartite n).marginalB).PosDef :=
+          (ρ.tensorPowerBipartite n).traceLeft).PosDef :=
         identityTensorStateMatrix_posDef_of_posDef (a := TensorPower a n)
-          (ρ.tensorPowerBipartite n).marginalB hρnB
-      let Hmat : CMatrix (Prod (TensorPower a n) (TensorPower b n)) :=
-        (ρ.tensorPowerBipartite n).matrix -
+          (ρ.tensorPowerBipartite n).traceLeft hρnB
+      let Hmat : CMatrix (TensorPower a n × TensorPower b n) :=
+        (ρ.tensorPowerBipartite n).m -
           lam • identityTensorStateMatrix (a := TensorPower a n)
-            (ρ.tensorPowerBipartite n).marginalB
+            (ρ.tensorPowerBipartite n).traceLeft
       let hH : Hmat.IsHermitian :=
         hρn.isHermitian.sub ((Matrix.PosDef.smul hB
           ((ρ.tensorPowerBipartite n).petzSmoothMinThresholdScale_pos
-            hρn (ρ.tensorPowerBipartite n).marginalB hρnB ε α hα_pos hα_ne_one)
+            hρn (ρ.tensorPowerBipartite n).traceLeft hρnB ε α hα_pos hα_ne_one)
         ).isHermitian)
-      let U : Matrix.unitaryGroup (Prod (TensorPower a n) (TensorPower b n)) ℂ :=
+      let U : Matrix.unitaryGroup (TensorPower a n × TensorPower b n) ℂ :=
         hH.eigenvectorUnitary
-      cMatrixPetzTraceUnitaryDephaseMonotone (ρ.tensorPowerBipartite n).matrix
+      cMatrixPetzTraceUnitaryDephaseMonotone (ρ.tensorPowerBipartite n).m
         (identityTensorStateMatrix (a := TensorPower a n)
-          (ρ.tensorPowerBipartite n).marginalB) U α) :
+          (ρ.tensorPowerBipartite n).traceLeft) U α) :
     ρ.tensorPowerSubnormalizedSmoothConditionalMinEntropy ε n hε_pos.le hε_lt ≥
       (n : ℝ) * ρ.conditionalEntropy -
         QIT.finiteAEPDelta ε (ρ.finiteAEPEta hρ hρB) *
           Real.sqrt (n : ℝ) := by
   have hfixedCore :
       (ρ.tensorPowerBipartite n).smoothConditionalMinEntropyFixedSubnormalized
-          (ρ.tensorPowerBipartite n).marginalB.toSubnormalized ε ≥
+          (ρ.tensorPowerBipartite n).traceLeft.toSubnormalized ε ≥
         (n : ℝ) * ρ.conditionalEntropy -
           QIT.finiteAEPDelta ε (ρ.finiteAEPEta hρ hρB) *
             Real.sqrt (n : ℝ) :=
@@ -2531,16 +2466,16 @@ theorem tensorPowerFiniteAEP_core_posDef_optimized_subnormalizedSmooth_of_unitar
       hρ hρB ε α hM hn hα_opt hε_pos hε_lt hα_le_two hα_lt hmono
   have hbridge :
       (ρ.tensorPowerBipartite n).smoothConditionalMinEntropyFixedSubnormalized
-          (ρ.tensorPowerBipartite n).marginalB.toSubnormalized ε ≤
+          (ρ.tensorPowerBipartite n).traceLeft.toSubnormalized ε ≤
         ρ.tensorPowerSubnormalizedSmoothConditionalMinEntropy ε n hε_pos.le hε_lt :=
     (ρ.tensorPowerBipartite n)
       |>.smoothConditionalMinEntropyFixedSubnormalized_le_subnormalizedSmoothConditionalMinEntropy
-        (ρ.tensorPowerBipartite n).marginalB.toSubnormalized ε
+        (ρ.tensorPowerBipartite n).traceLeft.toSubnormalized ε
         hε_pos.le hε_lt
         (fun ρ' _hball =>
           SubnormalizedState.conditionalMinEntropyFixed_feasibleSet_nonempty_of_posDef_reference
-            (a := TensorPower a n) ρ' (ρ.tensorPowerBipartite n).marginalB
-            (tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB n))
+            (a := TensorPower a n) ρ' (ρ.tensorPowerBipartite n).traceLeft
+            (tensorPowerBipartite_traceLeft_posDef ρ hρB n))
   exact le_trans hfixedCore hbridge
 
 /-- Tensor-power optimized finite-AEP core from a global finite-uniform Petz
@@ -2551,8 +2486,8 @@ perspective/joint-convexity theorem still needed for the source proof route.
 All tensor-power bookkeeping, alpha-continuity, scalar optimization, and
 subnormalized smoothing bridges are discharged here. -/
 theorem tensorPowerFiniteAEP_core_posDef_optimized_subnormalizedSmooth_of_uniformJointConvex_all_additivePetz
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef)
     (ε α : ℝ) {n : ℕ}
     (hM : 0 < log2 (2 / ε ^ 2))
     (hn : 0 < n)
@@ -2567,7 +2502,7 @@ theorem tensorPowerFiniteAEP_core_posDef_optimized_subnormalizedSmooth_of_unifor
         (4 * log2 (ρ.finiteAEPEta hρ hρB)))
     (hjoint :
       ∀ {κ : Type (max u v)} [Fintype κ] [Nonempty κ],
-        (Aκ Bκ : κ → CMatrix (Prod (TensorPower a n) (TensorPower b n))) →
+        (Aκ Bκ : κ → CMatrix (TensorPower a n × TensorPower b n)) →
           cMatrixPetzTraceUniformJointConvex Aκ Bκ α) :
     ρ.tensorPowerSubnormalizedSmoothConditionalMinEntropy ε n hε_pos.le hε_lt ≥
       (n : ℝ) * ρ.conditionalEntropy -
@@ -2577,10 +2512,10 @@ theorem tensorPowerFiniteAEP_core_posDef_optimized_subnormalizedSmooth_of_unifor
     ρ.tensorPowerFiniteAEP_core_posDef_optimized_subnormalizedSmooth_of_unitaryDephaseMonotone_additivePetz
       hρ hρB ε α hM hn hα_opt hε_pos hε_lt hα_le_two hα_lt ?_
   dsimp
-  let hρn : (ρ.tensorPowerBipartite n).matrix.PosDef :=
-    tensorPowerBipartite_posDef_forFiniteAEP ρ hρ n
-  let hρnB : (ρ.tensorPowerBipartite n).marginalB.matrix.PosDef :=
-    tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB n
+  let hρn : (ρ.tensorPowerBipartite n).m.PosDef :=
+    tensorPowerBipartite_posDef ρ hρ n
+  let hρnB : (ρ.tensorPowerBipartite n).traceLeft.m.PosDef :=
+    tensorPowerBipartite_traceLeft_posDef ρ hρB n
   let hα_gt : 1 < α := by
     rw [hα_opt]
     have hL : 0 < log2 (ρ.finiteAEPEta hρ hρB) :=
@@ -2601,33 +2536,33 @@ theorem tensorPowerFiniteAEP_core_posDef_optimized_subnormalizedSmooth_of_unifor
   let hα_ne_one : α ≠ 1 := (ne_of_lt hα_gt).symm
   let lam : ℝ :=
     (ρ.tensorPowerBipartite n).petzSmoothMinThresholdScale
-      hρn (ρ.tensorPowerBipartite n).marginalB hρnB ε α hα_pos hα_ne_one
+      hρn (ρ.tensorPowerBipartite n).traceLeft hρnB ε α hα_pos hα_ne_one
   let hB : (identityTensorStateMatrix (a := TensorPower a n)
-      (ρ.tensorPowerBipartite n).marginalB).PosDef :=
+      (ρ.tensorPowerBipartite n).traceLeft).PosDef :=
     identityTensorStateMatrix_posDef_of_posDef (a := TensorPower a n)
-      (ρ.tensorPowerBipartite n).marginalB hρnB
-  let Hmat : CMatrix (Prod (TensorPower a n) (TensorPower b n)) :=
-    (ρ.tensorPowerBipartite n).matrix -
+      (ρ.tensorPowerBipartite n).traceLeft hρnB
+  let Hmat : CMatrix (TensorPower a n × TensorPower b n) :=
+    (ρ.tensorPowerBipartite n).m -
       lam • identityTensorStateMatrix (a := TensorPower a n)
-        (ρ.tensorPowerBipartite n).marginalB
+        (ρ.tensorPowerBipartite n).traceLeft
   let hH : Hmat.IsHermitian :=
     hρn.isHermitian.sub ((Matrix.PosDef.smul hB
       ((ρ.tensorPowerBipartite n).petzSmoothMinThresholdScale_pos
-        hρn (ρ.tensorPowerBipartite n).marginalB hρnB ε α hα_pos hα_ne_one)
+        hρn (ρ.tensorPowerBipartite n).traceLeft hρnB ε α hα_pos hα_ne_one)
     ).isHermitian)
-  let U : Matrix.unitaryGroup (Prod (TensorPower a n) (TensorPower b n)) ℂ :=
+  let U : Matrix.unitaryGroup (TensorPower a n × TensorPower b n) ℂ :=
     hH.eigenvectorUnitary
   exact cMatrixPetzTraceUnitaryDephaseMonotone_of_uniformJointConvex_all
-    (ρ.tensorPowerBipartite n).matrix
+    (ρ.tensorPowerBipartite n).m
     (identityTensorStateMatrix (a := TensorPower a n)
-      (ρ.tensorPowerBipartite n).marginalB)
+      (ρ.tensorPowerBipartite n).traceLeft)
     hρn.posSemidef hB U hα_gt hα_le_two hjoint
 
 /-- Tensor-power optimized finite-AEP core with the Petz joint-convexity input
 discharged by the finite-dimensional rpow perspective theorem. -/
 theorem tensorPowerFiniteAEP_core_posDef_optimized_subnormalizedSmooth_of_rpow_perspective_additivePetz
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef)
     (ε α : ℝ) {n : ℕ}
     (hM : 0 < log2 (2 / ε ^ 2))
     (hn : 0 < n)
@@ -2659,12 +2594,12 @@ finite-uniform joint convexity of the Petz trace on the tensor-power matrix
 dimension; the optimized alpha choice, source blocklength condition, and
 normalization by `n` are all discharged here. -/
 theorem finiteNAEP_statement_posDef_of_uniformJointConvex_all
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef)
     (ε : ℝ) (hε_nonneg : 0 ≤ ε) (hε_lt : ε < 1) (n : ℕ)
     (hjoint :
       ∀ {κ : Type (max u v)} [Fintype κ] [Nonempty κ],
-        (Aκ Bκ : κ → CMatrix (Prod (TensorPower a n) (TensorPower b n))) →
+        (Aκ Bκ : κ → CMatrix (TensorPower a n × TensorPower b n)) →
           cMatrixPetzTraceUniformJointConvex Aκ Bκ
             (1 + Real.sqrt (log2 (2 / ε ^ 2)) /
               (2 * log2 (ρ.finiteAEPEta hρ hρB) * Real.sqrt (n : ℝ)))) :
@@ -2704,13 +2639,13 @@ theorem finiteNAEP_statement_posDef_of_uniformJointConvex_all
             Real.sqrt (n : ℝ) :=
     have hjointAlpha :
         ∀ {κ : Type (max u v)} [Fintype κ] [Nonempty κ],
-          (Aκ Bκ : κ → CMatrix (Prod (TensorPower a n) (TensorPower b n))) →
+          (Aκ Bκ : κ → CMatrix (TensorPower a n × TensorPower b n)) →
             cMatrixPetzTraceUniformJointConvex Aκ Bκ α := by
       intro κ _ _ Aκ Bκ
       simpa [α] using hjoint (κ := κ) Aκ Bκ
     ρ.tensorPowerFiniteAEP_core_posDef_optimized_subnormalizedSmooth_of_uniformJointConvex_all_additivePetz
       hρ hρB ε α hM hn hα_opt hε_pos hε_lt hα_le_two hα_lt hjointAlpha
-  simpa [State.tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw_eq] using
+  simpa [MState.tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw_eq] using
     finiteAEP_normalized_rate_of_tensor_lower_bound
       (S := ρ.tensorPowerSubnormalizedSmoothConditionalMinEntropy ε n hε_pos.le hε_lt)
       (H := ρ.conditionalEntropy)
@@ -2720,8 +2655,8 @@ theorem finiteNAEP_statement_posDef_of_uniformJointConvex_all
 /-- Finite-N AEP statement using only the full-rank marginal reference and the
 trace-term eta parameter. -/
 theorem finiteNAEP_statement_traceEta_of_marginal_posDef
-    (ρ : State (Prod a b))
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b))
+    (hρB : ρ.traceLeft.m.PosDef)
     (ε : ℝ) (hε_nonneg : 0 ≤ ε) (hε_lt : ε < 1) (n : ℕ) :
     QIT.finiteNAEP_statement ρ ε ρ.finiteAEPEtaTrace n hε_nonneg hε_lt := by
   intro hε_pos hn_ge
@@ -2734,7 +2669,7 @@ theorem finiteNAEP_statement_traceEta_of_marginal_posDef
   have hη3 : 3 ≤ ρ.finiteAEPEtaTrace := by
     simpa [finiteAEPEtaTrace] using
       conditionalAlphaConvergenceParameterTrace_ge_three
-        (ρ := ρ) (σ := ρ.marginalB) hρB
+        (ρ := ρ) (σ := ρ.traceLeft) hρB
   have hL : 0 < log2 ρ.finiteAEPEtaTrace := by
     unfold log2
     exact div_pos
@@ -2764,7 +2699,7 @@ theorem finiteNAEP_statement_traceEta_of_marginal_posDef
             Real.sqrt (n : ℝ) :=
     ρ.tensorPowerFiniteAEP_core_fullReference_optimized_subnormalizedSmooth_additivePetz
       hρB ε α hM hn hα_opt hε_pos hε_lt hα_le_two hα_lt
-  simpa [State.tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw_eq] using
+  simpa [MState.tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw_eq] using
     finiteAEP_normalized_rate_of_tensor_lower_bound
       (S := ρ.tensorPowerSubnormalizedSmoothConditionalMinEntropy ε n hε_pos.le hε_lt)
       (H := ρ.conditionalEntropy)
@@ -2775,24 +2710,24 @@ theorem finiteNAEP_statement_traceEta_of_marginal_posDef
 the conditioning register to the support of the canonical marginal and applying
 the tensor-power support isometry back, with the same smoothing radius. -/
 theorem tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw_conditioningSupportCompressedState
-    (ρ : State (Prod a b)) (ε : ℝ) (hε0 : 0 ≤ ε) (hε_lt : ε < 1) (n : ℕ) :
+    (ρ : MState (a × b)) (ε : ℝ) (hε0 : 0 ≤ ε) (hε_lt : ε < 1) (n : ℕ) :
     ρ.conditioningSupportCompressedState.tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw ε n =
       ρ.tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw ε n := by
   let ρc := ρ.conditioningSupportCompressedState
-  let V : ReferenceIsometry (psdSupportIndex ρ.marginalB.matrix ρ.marginalB.pos) b :=
-    psdSupportReferenceIsometry ρ.marginalB.matrix ρ.marginalB.pos
+  let V : ReferenceIsometry (psdSupportIndex ρ.traceLeft.m ρ.traceLeft.psd) b :=
+    psdSupportReferenceIsometry ρ.traceLeft.m ρ.traceLeft.psd
   have : Nonempty a := ⟨(Classical.choice ρ.nonempty).1⟩
   have : Nonempty b := ⟨(Classical.choice ρ.nonempty).2⟩
-  have : Nonempty (psdSupportIndex ρ.marginalB.matrix ρ.marginalB.pos) :=
+  have : Nonempty (psdSupportIndex ρ.traceLeft.m ρ.traceLeft.psd) :=
     ⟨(Classical.choice ρc.nonempty).2⟩
   have : Nonempty (TensorPower a n) := tensorPower_nonempty_of_nonempty n
   have : Nonempty (TensorPower b n) := tensorPower_nonempty_of_nonempty n
   have :
-      Nonempty (TensorPower (psdSupportIndex ρ.marginalB.matrix ρ.marginalB.pos) n) :=
+      Nonempty (TensorPower (psdSupportIndex ρ.traceLeft.m ρ.traceLeft.psd) n) :=
     tensorPower_nonempty_of_nonempty n
   have hε_sqrt :
       ε < Real.sqrt ((ρc.tensorPowerBipartite n).toSubnormalized.matrix.trace.re) := by
-    rw [State.toSubnormalized_trace]
+    rw [MState.toSubnormalized_trace]
     norm_num
     exact hε_lt
   have hsmooth :=
@@ -2806,26 +2741,25 @@ theorem tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw_conditioningSuppo
     calc
       (ρc.tensorPowerBipartite n).conditioningIsometryApply (V.tensorPower n) =
           (ρc.conditioningIsometryApply V).tensorPowerBipartite n := by
-            rw [State.conditioningIsometryApply_tensorPowerBipartite]
+            rw [MState.conditioningIsometryApply_tensorPowerBipartite]
       _ = ρ.tensorPowerBipartite n := by
             rw [show ρc.conditioningIsometryApply V = ρ from by
-              simpa [ρc, V] using
-                State.conditioningSupportCompressedState_conditioningIsometryApply (ρ := ρ)]
+              simp [ρc, V]]
   have hsubState :
       (ρc.tensorPowerBipartite n).toSubnormalized.conditioningIsometryApply
           (V.tensorPower n) =
         (ρ.tensorPowerBipartite n).toSubnormalized := by
-    rw [← State.toSubnormalized_conditioningIsometryApply]
+    rw [← MState.toSubnormalized_conditioningIsometryApply]
     rw [htensorState]
-  rw [State.tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw_eq,
-    State.tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw_eq]
+  rw [MState.tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw_eq,
+    MState.tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw_eq]
   rw [← hsubState]
   exact hsmooth.symm
 
 /-- Canonical finite-domain support-compression invariance for the tensor-power
 smooth conditional min-entropy. -/
 theorem tensorPowerSubnormalizedSmoothConditionalMinEntropy_conditioningSupportCompressedState
-    (ρ : State (Prod a b)) (ε : ℝ) (hε0 : 0 ≤ ε) (hε_lt : ε < 1) (n : ℕ) :
+    (ρ : MState (a × b)) (ε : ℝ) (hε0 : 0 ≤ ε) (hε_lt : ε < 1) (n : ℕ) :
     ρ.conditioningSupportCompressedState.tensorPowerSubnormalizedSmoothConditionalMinEntropy
         ε n hε0 hε_lt =
       ρ.tensorPowerSubnormalizedSmoothConditionalMinEntropy ε n hε0 hε_lt := by
@@ -2840,13 +2774,13 @@ theorem tensorPowerSubnormalizedSmoothConditionalMinEntropy_conditioningSupportC
 from the full-rank-marginal theorem by support compression of the conditioning
 register. -/
 theorem finiteNAEP_statement_traceEta
-    (ρ : State (Prod a b)) (ε : ℝ) (hε_nonneg : 0 ≤ ε) (hε_lt : ε < 1) (n : ℕ) :
+    (ρ : MState (a × b)) (ε : ℝ) (hε_nonneg : 0 ≤ ε) (hε_lt : ε < 1) (n : ℕ) :
     QIT.finiteNAEP_statement ρ ε ρ.finiteAEPEtaTrace n hε_nonneg hε_lt := by
   let ρc := ρ.conditioningSupportCompressedState
   have hcompressed :
       QIT.finiteNAEP_statement ρc ε ρc.finiteAEPEtaTrace n hε_nonneg hε_lt :=
     finiteNAEP_statement_traceEta_of_marginal_posDef
-      (ρ := ρc) (State.conditioningSupportCompressedState_marginalB_posDef ρ)
+      (ρ := ρc) (MState.conditioningSupportCompressedState_traceLeft_posDef ρ)
       ε hε_nonneg hε_lt n
   intro hε_pos hn_ge
   have hε0 : 0 ≤ ε := le_of_lt hε_pos
@@ -2860,10 +2794,10 @@ theorem finiteNAEP_statement_traceEta
     (1 / (n : ℝ)) * ρ.tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw ε n ≥
       ρ.conditionalEntropy -
         finiteAEPDelta ε ρ.finiteAEPEtaTrace / Real.sqrt (n : ℝ)
-  rw [← State.tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw_conditioningSupportCompressedState
+  rw [← MState.tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw_conditioningSupportCompressedState
     ρ ε hε0 hε_lt n]
-  rw [← State.conditionalEntropy_conditioningSupportCompressedState ρ]
-  rw [← State.finiteAEPEtaTrace_conditioningSupportCompressedState ρ]
+  rw [← MState.conditionalEntropy_conditioningSupportCompressedState ρ]
+  rw [← MState.finiteAEPEtaTrace_conditioningSupportCompressedState ρ]
   exact hbound
 
 /-- The finite-N AEP theorem supplies the lower half of the source proof of
@@ -2874,7 +2808,7 @@ This is the Lean version of the first step in TCR 2008, proof of
 positive smoothing radii and sufficiently large blocklengths, the normalized
 smooth-min rate is at least `H(A|B)_ρ` up to that tolerance. -/
 theorem SmoothMinRateLowerFromFiniteNAEP_traceEta
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     ρ.SmoothMinRateLowerFromFiniteNAEP := by
   intro γ hγ
   have hε_pos :
@@ -2917,9 +2851,9 @@ The endpoint ordering `H_min ≤ H` is the only order input needed by
 `AEP.lean`; the preceding support-log residual and padding lemmas prove it for
 the optimized conditional min-entropy without a full-rank assumption. -/
 theorem SmoothMinRateUpperFromContinuity.afw
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     ρ.SmoothMinRateUpperFromContinuity :=
-  State.SmoothMinRateUpperFromContinuity.afw_of_tensorPower_ordering ρ
+  MState.SmoothMinRateUpperFromContinuity.afw_of_tensorPower_ordering ρ
     (by
       intro n τ
       exact τ.conditionalMinEntropy_le_conditionalEntropy)
@@ -2928,7 +2862,7 @@ theorem SmoothMinRateUpperFromContinuity.afw
 lower bound discharged by the finite-AEP theorem and the AFW/Fannes upper
 handoff left explicit. -/
 theorem asymptoticAEPMin_statement_of_traceEta_and_continuity
-    (ρ : State (Prod a b))
+    (ρ : MState (a × b))
     (hupper : ρ.SmoothMinRateUpperFromContinuity) :
     SourceFiniteDomainTwoStageLimitTo
       (fun ε hε_nonneg hε_lt_one n =>
@@ -2942,12 +2876,12 @@ theorem asymptoticAEPMin_statement_of_traceEta_and_continuity
 `thm:qaep` once the min-entropy half is available on every finite complement. -/
 theorem SmoothMaxRateFromMinDuality.smoothDuality
     [Nonempty a] [Nonempty b]
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     ρ.SmoothMaxRateFromMinDuality := by
-  refine State.SmoothMaxRateFromMinDuality.of_all_min ρ ?_
+  refine MState.SmoothMaxRateFromMinDuality.of_all_min ρ ?_
   intro c _ _ _ σ
   exact σ.asymptoticAEPMin_statement_of_traceEta_and_continuity
-    (State.SmoothMinRateUpperFromContinuity.afw σ)
+    (MState.SmoothMinRateUpperFromContinuity.afw σ)
 
 /-- Source-aligned assembly theorem for the asymptotic fully quantum AEP.
 
@@ -2956,7 +2890,7 @@ two inputs are exactly the source proof's later ingredients: ordering plus
 AFW/Fannes continuity for the min upper half, and smooth min/max plus von
 Neumann duality for the max half. -/
 theorem asymptoticAEPTwoStage_statement_of_traceEta_continuity_and_duality
-    (ρ : State (Prod a b))
+    (ρ : MState (a × b))
     (hupper : ρ.SmoothMinRateUpperFromContinuity)
     (hmax : ρ.SmoothMaxRateFromMinDuality) :
     QIT.asymptoticAEPTwoStage_statement ρ :=
@@ -2970,7 +2904,7 @@ limit, AFW continuity and `H_min ≤ H` give the smooth-min upper limit, and
 smooth min/max duality plus conditional-entropy duality gives the max-entropy
 limit. -/
 theorem fullyQuantumAsymptoticEquipartitionProperty_twoStage
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     QIT.asymptoticAEPTwoStage_statement ρ := by
   let : Nonempty a := by
     rcases ρ.nonempty with ⟨x⟩
@@ -2979,20 +2913,20 @@ theorem fullyQuantumAsymptoticEquipartitionProperty_twoStage
     rcases ρ.nonempty with ⟨x⟩
     exact ⟨x.2⟩
   exact ρ.asymptoticAEPTwoStage_statement_of_traceEta_continuity_and_duality
-    (State.SmoothMinRateUpperFromContinuity.afw ρ)
-    (State.SmoothMaxRateFromMinDuality.smoothDuality ρ)
+    (MState.SmoothMinRateUpperFromContinuity.afw ρ)
+    (MState.SmoothMaxRateFromMinDuality.smoothDuality ρ)
 
 /-- Positive-definite finite-N AEP statement with Petz joint convexity
 discharged by the finite-dimensional rpow perspective theorem. -/
 theorem finiteNAEP_statement_posDef_of_rpow_perspective_one_two
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef)
     (ε : ℝ) (hε_nonneg : 0 ≤ ε) (hε_lt : ε < 1) (n : ℕ) :
     QIT.finiteNAEP_statement ρ ε (ρ.finiteAEPEta hρ hρB) n hε_nonneg hε_lt :=
   ρ.finiteNAEP_statement_posDef_of_uniformJointConvex_all
     hρ hρB ε hε_nonneg hε_lt n
     (fun {κ} [Fintype κ] [Nonempty κ]
-        (Aκ Bκ : κ → CMatrix (Prod (TensorPower a n) (TensorPower b n))) =>
+        (Aκ Bκ : κ → CMatrix (TensorPower a n × TensorPower b n)) =>
       cMatrixPetzTraceUniformJointConvex_of_rpow_perspective_one_two Aκ Bκ)
 
 /-- Explicit-`η` spelling of the positive-definite finite-N AEP theorem.
@@ -3000,8 +2934,8 @@ theorem finiteNAEP_statement_posDef_of_rpow_perspective_one_two
 This keeps the public statement parameter separate from the current
 positive-definite implementation of the source convergence parameter. -/
 theorem finiteNAEP_statement_posDef_explicitEta_of_rpow_perspective_one_two
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef)
     (η ε : ℝ) (hη : η = ρ.finiteAEPEta hρ hρB)
     (hε_nonneg : 0 ≤ ε) (hε_lt : ε < 1) (n : ℕ) :
     QIT.finiteNAEP_statement ρ ε η n hε_nonneg hε_lt := by
@@ -3012,8 +2946,8 @@ theorem finiteNAEP_statement_posDef_explicitEta_of_rpow_perspective_one_two
 /-- Positive-definite finite-N AEP using the arbitrary-state trace-term eta
 spelling of `Upsilon(A|B)_{rho|rho}`. -/
 theorem finiteNAEP_statement_posDef_traceEta_of_rpow_perspective_one_two
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef)
     (ε : ℝ) (hε_nonneg : 0 ≤ ε) (hε_lt : ε < 1) (n : ℕ) :
     QIT.finiteNAEP_statement ρ ε ρ.finiteAEPEtaTrace n hε_nonneg hε_lt := by
   rw [← ρ.finiteAEPEta_eq_trace hρ hρB]
@@ -3027,8 +2961,8 @@ The remaining assumptions are the single-copy alpha window and the one-shot
 Petz effect-variational inequality.  No tensor-power eta square bound is
 assumed. -/
 theorem tensorPowerFiniteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_effectVariational_additivePetz
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef)
     (ε α : ℝ) {n : ℕ}
     (hM : 0 < log2 (2 / ε ^ 2))
     (hn : 0 < n)
@@ -3042,10 +2976,10 @@ theorem tensorPowerFiniteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_effect
       α < 1 + log2 3 /
         (4 * log2 (ρ.finiteAEPEta hρ hρB)))
     (hvar :
-      let hρn : (ρ.tensorPowerBipartite n).matrix.PosDef :=
-        tensorPowerBipartite_posDef_forFiniteAEP ρ hρ n
-      let hρnB : (ρ.tensorPowerBipartite n).marginalB.matrix.PosDef :=
-        tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB n
+      let hρn : (ρ.tensorPowerBipartite n).m.PosDef :=
+        tensorPowerBipartite_posDef ρ hρ n
+      let hρnB : (ρ.tensorPowerBipartite n).traceLeft.m.PosDef :=
+        tensorPowerBipartite_traceLeft_posDef ρ hρB n
       let hα_gt : 1 < α := by
         rw [hα_opt]
         have hL : 0 < log2 (ρ.finiteAEPEta hρ hρB) :=
@@ -3064,13 +2998,13 @@ theorem tensorPowerFiniteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_effect
         linarith
       let lam : ℝ :=
         (ρ.tensorPowerBipartite n).petzSmoothMinThresholdScale
-          hρn (ρ.tensorPowerBipartite n).marginalB hρnB ε α
+          hρn (ρ.tensorPowerBipartite n).traceLeft hρnB ε α
           (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm)
-      cMatrixPetzTraceEffectVariational (ρ.tensorPowerBipartite n).matrix
+      cMatrixPetzTraceEffectVariational (ρ.tensorPowerBipartite n).m
         (identityTensorStateMatrix (a := TensorPower a n)
-          (ρ.tensorPowerBipartite n).marginalB) lam α) :
+          (ρ.tensorPowerBipartite n).traceLeft) lam α) :
     (ρ.tensorPowerBipartite n).smoothConditionalMinEntropyFixedSubnormalized
-        (ρ.tensorPowerBipartite n).marginalB.toSubnormalized ε ≥
+        (ρ.tensorPowerBipartite n).traceLeft.toSubnormalized ε ≥
       (n : ℝ) * ρ.conditionalEntropy -
         QIT.finiteAEPDelta ε (ρ.finiteAEPEta hρ hρB) *
           Real.sqrt (n : ℝ) := by
@@ -3092,9 +3026,9 @@ theorem tensorPowerFiniteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_effect
     linarith
   have hpetz_alpha :
       (ρ.tensorPowerBipartite n).conditionalPetzRenyiEntropyCandidate
-          (tensorPowerBipartite_posDef_forFiniteAEP ρ hρ n)
-          (ρ.tensorPowerBipartite n).marginalB
-          (tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB n)
+          (tensorPowerBipartite_posDef ρ hρ n)
+          (ρ.tensorPowerBipartite n).traceLeft
+          (tensorPowerBipartite_traceLeft_posDef ρ hρB n)
           α (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm) ≥
         (n : ℝ) * ρ.conditionalEntropy -
           4 * (α - 1) * (n : ℝ) *
@@ -3103,8 +3037,8 @@ theorem tensorPowerFiniteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_effect
       hρ hρB α hα_gt hα_lt
   exact
     (ρ.tensorPowerBipartite n).finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_effectVariational_petzAlphaBound
-      (tensorPowerBipartite_posDef_forFiniteAEP ρ hρ n)
-      (tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB n)
+      (tensorPowerBipartite_posDef ρ hρ n)
+      (tensorPowerBipartite_traceLeft_posDef ρ hρB n)
       ε (ρ.finiteAEPEta hρ hρB) α ρ.conditionalEntropy hM hL hn hα_opt
       hε_pos hε_lt hα_le_two hpetz_alpha hvar
 
@@ -3115,8 +3049,8 @@ This theorem discharges the tensor-power positive-definiteness bookkeeping for
 `ρ_AB^{⊗ n}`, its `B^n` marginal, and conditional entropy additivity.  The eta
 growth, alpha-window, and Petz effect-variational inputs remain explicit. -/
 theorem tensorPowerFiniteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_effectVariational
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (hρB : ρ.marginalB.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (hρB : ρ.traceLeft.m.PosDef)
     (ε η α : ℝ) {n : ℕ}
     (hM : 0 < log2 (2 / ε ^ 2))
     (hL : 0 < log2 η)
@@ -3130,18 +3064,18 @@ theorem tensorPowerFiniteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_effect
     (hα_lt :
       α < 1 + log2 3 /
         (4 * log2 ((ρ.tensorPowerBipartite n).finiteAEPEta
-          (tensorPowerBipartite_posDef_forFiniteAEP ρ hρ n)
-          (tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB n))))
+          (tensorPowerBipartite_posDef ρ hρ n)
+          (tensorPowerBipartite_traceLeft_posDef ρ hρB n))))
     (heta_tensor :
       (log2 ((ρ.tensorPowerBipartite n).finiteAEPEta
-        (tensorPowerBipartite_posDef_forFiniteAEP ρ hρ n)
-        (tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB n))) ^ 2 ≤
+        (tensorPowerBipartite_posDef ρ hρ n)
+        (tensorPowerBipartite_traceLeft_posDef ρ hρB n))) ^ 2 ≤
           (n : ℝ) * (log2 η) ^ 2)
     (hvar :
-      let hρn : (ρ.tensorPowerBipartite n).matrix.PosDef :=
-        tensorPowerBipartite_posDef_forFiniteAEP ρ hρ n
-      let hρnB : (ρ.tensorPowerBipartite n).marginalB.matrix.PosDef :=
-        tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB n
+      let hρn : (ρ.tensorPowerBipartite n).m.PosDef :=
+        tensorPowerBipartite_posDef ρ hρ n
+      let hρnB : (ρ.tensorPowerBipartite n).traceLeft.m.PosDef :=
+        tensorPowerBipartite_traceLeft_posDef ρ hρB n
       let hα_gt : 1 < α := by
         rw [hα_opt]
         have hden :
@@ -3158,32 +3092,32 @@ theorem tensorPowerFiniteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_effect
         linarith
       let lam : ℝ :=
         (ρ.tensorPowerBipartite n).petzSmoothMinThresholdScale
-          hρn (ρ.tensorPowerBipartite n).marginalB hρnB ε α
+          hρn (ρ.tensorPowerBipartite n).traceLeft hρnB ε α
           (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm)
-      cMatrixPetzTraceEffectVariational (ρ.tensorPowerBipartite n).matrix
+      cMatrixPetzTraceEffectVariational (ρ.tensorPowerBipartite n).m
         (identityTensorStateMatrix (a := TensorPower a n)
-          (ρ.tensorPowerBipartite n).marginalB) lam α) :
+          (ρ.tensorPowerBipartite n).traceLeft) lam α) :
     (ρ.tensorPowerBipartite n).smoothConditionalMinEntropyFixedSubnormalized
-        (ρ.tensorPowerBipartite n).marginalB.toSubnormalized ε ≥
+        (ρ.tensorPowerBipartite n).traceLeft.toSubnormalized ε ≥
       (n : ℝ) * ρ.conditionalEntropy -
         QIT.finiteAEPDelta ε η * Real.sqrt (n : ℝ) := by
   exact
     (ρ.tensorPowerBipartite n).finiteAEP_core_posDef_optimized_of_fixedPetzSmoothMinG_effectVariational
-      (tensorPowerBipartite_posDef_forFiniteAEP ρ hρ n)
-      (tensorPowerBipartite_marginalB_posDef_forFiniteAEP ρ hρ hρB n)
+      (tensorPowerBipartite_posDef ρ hρ n)
+      (tensorPowerBipartite_traceLeft_posDef ρ hρB n)
       ε η α ρ.conditionalEntropy hM hL hn hα_opt hε_pos hε_lt hα_le_two hα_lt
-      (State.tensorPowerBipartite_conditionalEntropy ρ n) heta_tensor hvar
+      (MState.tensorPowerBipartite_conditionalEntropy ρ n) heta_tensor hvar
 
-/-- Honest positive-definite fixed-reference finite-AEP core.
+/-- Positive-definite fixed-reference finite-AEP core.
 
 This combines the TCR alpha-to-von-Neumann estimate already proved in
 `conditionalPetzRenyiEntropyCandidate_alpha_bound_posDef` with an explicit
 one-shot smooth-min/Petz lower-bound hypothesis.  That hypothesis is precisely
-the missing fixed-reference analogue of TCR 2008 `thm:entropy-ineq`, lines
-630--633; this theorem does not claim that bridge as proved. -/
+the fixed-reference analogue of TCR 2008 `thm:entropy-ineq`, lines 630--633;
+it enters here as a hypothesis, not as a result. -/
 theorem relativeFiniteAEP_core_posDef_of_smoothMinPetzBound
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef)
     (ε α : ℝ)
     (_hε_pos : 0 < ε)
     (hα_gt : 1 < α) (_hα_le_two : α ≤ 2)
@@ -3218,8 +3152,8 @@ removes the broad smooth-min/Petz lower-bound hypothesis and leaves the smaller
 source construction: find `ρ'` in the purified ball below the fixed-reference
 Petz threshold scale. -/
 theorem relativeFiniteAEP_core_posDef_of_petz_feasible_witness
-    (ρ : State (Prod a b)) (hρ : ρ.matrix.PosDef)
-    (σ : State b) (hσ : σ.matrix.PosDef)
+    (ρ : MState (a × b)) (hρ : ρ.m.PosDef)
+    (σ : MState b) (hσ : σ.m.PosDef)
     (ε α : ℝ)
     (hε_pos : 0 < ε)
     (hε_lt : ε < 1)
@@ -3228,8 +3162,8 @@ theorem relativeFiniteAEP_core_posDef_of_petz_feasible_witness
       α < 1 + log2 3 /
         (4 * log2 (ρ.conditionalAlphaConvergenceParameter hρ σ hσ)))
     (hconstruct :
-      ∃ ρ' : State (Prod a b), ρ.purifiedBall ε ρ' ∧
-        ρ'.matrix ≤
+      ∃ ρ' : MState (a × b), ρ.purifiedBall ε ρ' ∧
+        ρ'.m ≤
           ((ρ.petzSmoothMinThresholdScale hρ σ hσ ε α
             (lt_trans zero_lt_one hα_gt) ((ne_of_lt hα_gt).symm) : ℝ) : ℂ) •
             identityTensorStateMatrix (a := a) σ) :
@@ -3245,7 +3179,4 @@ theorem relativeFiniteAEP_core_posDef_of_petz_feasible_witness
       (ρ := ρ) hρ (σ := σ) hσ ε α hε_pos hε_lt hα_gt hα_le_two
       ρ' hball hbound)
 
-end State
-end
-
-end QIT
+end MState

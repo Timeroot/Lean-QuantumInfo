@@ -42,8 +42,11 @@ variable {a : Type u} [Fintype a] [DecidableEq a]
 /-- A single finite-dimensional orthogonal projection, represented as a
 Hermitian idempotent matrix. -/
 structure ProjectionMatrix (a : Type u) [Fintype a] [DecidableEq a] where
+  /-- The underlying matrix. -/
   matrix : CMatrix a
+  /-- The matrix is Hermitian. -/
   isHermitian : matrix.IsHermitian
+  /-- The matrix is idempotent. -/
   idempotent : matrix * matrix = matrix
 
 namespace ProjectionMatrix
@@ -74,7 +77,6 @@ theorem posSemidef : P.matrix.PosSemidef := by
   rw [P.isHermitian, P.idempotent] at hpsd
   exact hpsd
 
-@[simp]
 theorem mulVec_idempotent (v : a → ℂ) :
     P.matrix.mulVec (P.matrix.mulVec v) = P.matrix.mulVec v := by
   calc
@@ -83,7 +85,6 @@ theorem mulVec_idempotent (v : a → ℂ) :
     _ = P.matrix.mulVec v := by
       rw [P.idempotent]
 
-@[simp]
 theorem mul_compl :
     P.matrix * P.compl.matrix = 0 := by
   calc
@@ -95,7 +96,6 @@ theorem mul_compl :
       rw [P.idempotent]
       noncomm_ring
 
-@[simp]
 theorem compl_mul :
     P.compl.matrix * P.matrix = 0 := by
   calc
@@ -107,7 +107,6 @@ theorem compl_mul :
       rw [P.idempotent]
       noncomm_ring
 
-@[simp]
 theorem compl_posSemidef : P.compl.matrix.PosSemidef :=
   P.compl.posSemidef
 
@@ -241,6 +240,7 @@ theorem vecNormSq_sub_le_weighted (v w : a → ℂ) {c : ℝ} (hc : 0 < c) :
     _ = (1 + c) * ‖V‖ ^ 2 + (1 + c⁻¹) * ‖W‖ ^ 2 := by ring
 
 omit [DecidableEq a] in
+/-- The real part of the Euclidean inner product of two coordinate vectors. -/
 def vecInnerRe (v w : a → ℂ) : ℝ :=
   RCLike.re (inner ℂ (WithLp.toLp 2 v : EuclideanSpace ℂ a)
     (WithLp.toLp 2 w : EuclideanSpace ℂ a))
@@ -402,8 +402,9 @@ theorem vecNormSq_projection_add_compl (P : ProjectionMatrix a) (ψ : a → ℂ)
     _ = (dotProduct (star ψ) ψ).re := by
         rw [dotProduct_comm]
 
-theorem PureVector.vecNormSq_amp (ψ : PureVector a) :
-    vecNormSq ψ.amp = 1 := by
+omit [DecidableEq a] in
+theorem _root_.Ket.vecNormSq_vec (ψ : Ket a) :
+    vecNormSq ψ.vec = 1 := by
   unfold vecNormSq
   have h := ψ.trace_rankOne_eq_one
   rw [rankOneMatrix_trace] at h
@@ -412,142 +413,142 @@ theorem PureVector.vecNormSq_amp (ψ : PureVector a) :
 
 /-- The real trace of an effect against a state.  This is the convention used
 by the hypothesis-testing API, repeated here for local source readability. -/
-def effectTrace (ρ : State a) (E : CMatrix a) : ℝ :=
+def effectTrace (ρ : MState a) (E : CMatrix a) : ℝ :=
   effectAcceptProbability ρ E
 
 theorem vecNormSq_projection_mulVec_eq_effectTrace_pure
-    (P : ProjectionMatrix a) (ψ : PureVector a) :
-    vecNormSq (P.matrix.mulVec ψ.amp) = effectTrace ψ.state P.matrix := by
+    (P : ProjectionMatrix a) (ψ : Ket a) :
+    vecNormSq (P.matrix.mulVec ψ.vec) = effectTrace ψ.state P.matrix := by
   rw [vecNormSq_mulVec_eq_trace]
   unfold effectTrace effectAcceptProbability
-  rw [PureVector.state_matrix]
-  have htrace : (P.matrix * rankOneMatrix ψ.amp * Matrix.conjTranspose P.matrix).trace =
-      (rankOneMatrix ψ.amp * P.matrix).trace := by
+  rw [Ket.state_matrix]
+  have htrace : (P.matrix * rankOneMatrix ψ.vec * Matrix.conjTranspose P.matrix).trace =
+      (rankOneMatrix ψ.vec * P.matrix).trace := by
     rw [P.isHermitian]
     calc
-      (P.matrix * rankOneMatrix ψ.amp * P.matrix).trace =
-          ((P.matrix * rankOneMatrix ψ.amp) * P.matrix).trace := by rfl
-      _ = (P.matrix * (P.matrix * rankOneMatrix ψ.amp)).trace := by
+      (P.matrix * rankOneMatrix ψ.vec * P.matrix).trace =
+          ((P.matrix * rankOneMatrix ψ.vec) * P.matrix).trace := by rfl
+      _ = (P.matrix * (P.matrix * rankOneMatrix ψ.vec)).trace := by
         rw [Matrix.trace_mul_comm]
-      _ = ((P.matrix * P.matrix) * rankOneMatrix ψ.amp).trace := by
+      _ = ((P.matrix * P.matrix) * rankOneMatrix ψ.vec).trace := by
         rw [Matrix.mul_assoc]
-      _ = (P.matrix * rankOneMatrix ψ.amp).trace := by
+      _ = (P.matrix * rankOneMatrix ψ.vec).trace := by
         rw [P.idempotent]
-      _ = (rankOneMatrix ψ.amp * P.matrix).trace := by
+      _ = (rankOneMatrix ψ.vec * P.matrix).trace := by
         rw [Matrix.trace_mul_comm]
   rw [htrace]
 
 theorem vecNormSq_projection_compl_mulVec_eq_effectTrace_pure
-    (P : ProjectionMatrix a) (ψ : PureVector a) :
-    vecNormSq (P.compl.matrix.mulVec ψ.amp) = effectTrace ψ.state P.compl.matrix :=
+    (P : ProjectionMatrix a) (ψ : Ket a) :
+    vecNormSq (P.compl.matrix.mulVec ψ.vec) = effectTrace ψ.state P.compl.matrix :=
   vecNormSq_projection_mulVec_eq_effectTrace_pure P.compl ψ
 
 theorem effectTrace_nonneg_of_posSemidef
-    (ρ : State a) {E : CMatrix a} (hE : E.PosSemidef) :
+    (ρ : MState a) {E : CMatrix a} (hE : E.PosSemidef) :
     0 ≤ effectTrace ρ E := by
   unfold effectTrace effectAcceptProbability
-  exact cMatrix_trace_mul_posSemidef_re_nonneg ρ.pos hE
+  exact cMatrix_trace_mul_posSemidef_re_nonneg ρ.psd hE
 
-theorem effectTrace_add (ρ : State a) (E F : CMatrix a) :
+theorem effectTrace_add (ρ : MState a) (E F : CMatrix a) :
     effectTrace ρ (E + F) = effectTrace ρ E + effectTrace ρ F := by
   unfold effectTrace effectAcceptProbability
   rw [Matrix.mul_add, Matrix.trace_add]
   simp
 
 @[simp]
-theorem effectTrace_zero (ρ : State a) :
+theorem effectTrace_zero (ρ : MState a) :
     effectTrace ρ (0 : CMatrix a) = 0 := by
   unfold effectTrace effectAcceptProbability
   simp
 
-theorem effectTrace_projection_nonneg (ρ : State a) (P : ProjectionMatrix a) :
+theorem effectTrace_projection_nonneg (ρ : MState a) (P : ProjectionMatrix a) :
     0 ≤ effectTrace ρ P.matrix :=
   effectTrace_nonneg_of_posSemidef ρ P.posSemidef
 
-theorem effectTrace_projection_compl_nonneg (ρ : State a) (P : ProjectionMatrix a) :
+theorem effectTrace_projection_compl_nonneg (ρ : MState a) (P : ProjectionMatrix a) :
     0 ≤ effectTrace ρ P.compl.matrix :=
   effectTrace_nonneg_of_posSemidef ρ P.compl_posSemidef
 
-theorem effectTrace_spectral (ρ : State a) (E : CMatrix a) :
+theorem effectTrace_spectral (ρ : MState a) (E : CMatrix a) :
     effectTrace ρ E =
-      ∑ i : a, ρ.pos.isHermitian.eigenvalues i *
-        effectTrace (ρ.spectralPureVector i).state E := by
+      ∑ i : a, ρ.psd.isHermitian.eigenvalues i *
+        effectTrace (ρ.spectralKet i).state E := by
   unfold effectTrace effectAcceptProbability
-  have hmatrix := ρ.matrix_eq_sum_spectralPureVector
+  have hmatrix := ρ.matrix_eq_sum_spectralKet
   conv_lhs =>
     rw [hmatrix]
   simp [Matrix.sum_mul, Matrix.trace_sum, Matrix.trace_smul]
 
-theorem projection_trace_conj_eq_effect (P : ProjectionMatrix a) (ρ : State a) :
-    ((P.matrix * ρ.matrix * Matrix.conjTranspose P.matrix).trace).re =
+theorem projection_trace_conj_eq_effect (P : ProjectionMatrix a) (ρ : MState a) :
+    ((P.matrix * ρ.m * Matrix.conjTranspose P.matrix).trace).re =
       effectTrace ρ P.matrix := by
   unfold effectTrace effectAcceptProbability
-  have htrace : (P.matrix * ρ.matrix * Matrix.conjTranspose P.matrix).trace =
-      (ρ.matrix * P.matrix).trace := by
+  have htrace : (P.matrix * ρ.m * Matrix.conjTranspose P.matrix).trace =
+      (ρ.m * P.matrix).trace := by
     rw [P.isHermitian]
     calc
-      (P.matrix * ρ.matrix * P.matrix).trace =
-          ((P.matrix * ρ.matrix) * P.matrix).trace := by rfl
-      _ = (P.matrix * (P.matrix * ρ.matrix)).trace := by
+      (P.matrix * ρ.m * P.matrix).trace =
+          ((P.matrix * ρ.m) * P.matrix).trace := by rfl
+      _ = (P.matrix * (P.matrix * ρ.m)).trace := by
         rw [Matrix.trace_mul_comm]
-      _ = ((P.matrix * P.matrix) * ρ.matrix).trace := by
+      _ = ((P.matrix * P.matrix) * ρ.m).trace := by
         rw [Matrix.mul_assoc]
-      _ = (P.matrix * ρ.matrix).trace := by
+      _ = (P.matrix * ρ.m).trace := by
         rw [P.idempotent]
-      _ = (ρ.matrix * P.matrix).trace := by
+      _ = (ρ.m * P.matrix).trace := by
         rw [Matrix.trace_mul_comm]
   rw [htrace]
 
-theorem effectTrace_add_compl (ρ : State a) (P : ProjectionMatrix a) :
+theorem effectTrace_add_compl (ρ : MState a) (P : ProjectionMatrix a) :
     effectTrace ρ P.matrix + effectTrace ρ P.compl.matrix = 1 := by
   unfold effectTrace effectAcceptProbability
   rw [ProjectionMatrix.compl_matrix]
   calc
-    ((ρ.matrix * P.matrix).trace).re +
-        ((ρ.matrix * (1 - P.matrix)).trace).re =
-          (((ρ.matrix * P.matrix).trace) +
-            ((ρ.matrix * (1 - P.matrix)).trace)).re := by
+    ((ρ.m * P.matrix).trace).re +
+        ((ρ.m * (1 - P.matrix)).trace).re =
+          (((ρ.m * P.matrix).trace) +
+            ((ρ.m * (1 - P.matrix)).trace)).re := by
             simp
-    _ = ((ρ.matrix * P.matrix + ρ.matrix * (1 - P.matrix)).trace).re := by
+    _ = ((ρ.m * P.matrix + ρ.m * (1 - P.matrix)).trace).re := by
         rw [Matrix.trace_add]
-    _ = ρ.matrix.trace.re := by
-        have hmat : ρ.matrix * P.matrix + ρ.matrix * (1 - P.matrix) = ρ.matrix := by
+    _ = ρ.m.trace.re := by
+        have hmat : ρ.m * P.matrix + ρ.m * (1 - P.matrix) = ρ.m := by
           noncomm_ring
         rw [hmat]
     _ = 1 := by
-        rw [ρ.trace_eq_one]
+        rw [ρ.tr']
         norm_num
 
 /-- Acceptance probability after applying the ordered projector sequence
 `P_N ... P₁`. -/
-def sequenceAcceptTrace (P : ProjectionSequence a n) (ρ : State a) : ℝ :=
-  ((P.reverseProduct * ρ.matrix * Matrix.conjTranspose P.reverseProduct).trace).re
+def sequenceAcceptTrace (P : ProjectionSequence a n) (ρ : MState a) : ℝ :=
+  ((P.reverseProduct * ρ.m * Matrix.conjTranspose P.reverseProduct).trace).re
 
 theorem sequenceAcceptTrace_pure_eq_vecNormSq
-    (P : ProjectionSequence a n) (ψ : PureVector a) :
-    sequenceAcceptTrace P ψ.state = vecNormSq (P.reverseProduct.mulVec ψ.amp) := by
+    (P : ProjectionSequence a n) (ψ : Ket a) :
+    sequenceAcceptTrace P ψ.state = vecNormSq (P.reverseProduct.mulVec ψ.vec) := by
   unfold sequenceAcceptTrace
   rw [vecNormSq_mulVec_eq_trace]
-  rw [PureVector.state_matrix]
+  rw [Ket.state_matrix]
 
-theorem sequenceAcceptTrace_spectral (P : ProjectionSequence a n) (ρ : State a) :
+theorem sequenceAcceptTrace_spectral (P : ProjectionSequence a n) (ρ : MState a) :
     sequenceAcceptTrace P ρ =
-      ∑ i : a, ρ.pos.isHermitian.eigenvalues i *
-        sequenceAcceptTrace P (ρ.spectralPureVector i).state := by
+      ∑ i : a, ρ.psd.isHermitian.eigenvalues i *
+        sequenceAcceptTrace P (ρ.spectralKet i).state := by
   unfold sequenceAcceptTrace
-  have hmatrix := ρ.matrix_eq_sum_spectralPureVector
+  have hmatrix := ρ.matrix_eq_sum_spectralKet
   conv_lhs =>
     rw [hmatrix]
   simp [Matrix.mul_sum, Matrix.sum_mul, Matrix.trace_sum, Matrix.trace_smul]
 
 /-- Source-shaped message error for an ordered projector sequence. -/
-def sequenceError (P : ProjectionSequence a n) (ρ : State a) : ℝ :=
+def sequenceError (P : ProjectionSequence a n) (ρ : MState a) : ℝ :=
   1 - sequenceAcceptTrace P ρ
 
 /-- Right-hand side of the OMW/Khatri--Wilde quantum union bound for a nonempty
 projector sequence.  The sequence has length `n+1`; the final term uses the
 last projector, and the sum ranges over the earlier projectors. -/
-def quantumUnionBoundRHS (P : ProjectionSequence a (n + 1)) (ρ : State a) (c : ℝ) : ℝ :=
+def quantumUnionBoundRHS (P : ProjectionSequence a (n + 1)) (ρ : MState a) (c : ℝ) : ℝ :=
   (1 + c) * effectTrace ρ (P (Fin.last n)).compl.matrix
     + (2 + c + c⁻¹) *
       ∑ i : Fin n, effectTrace ρ (P (Fin.castSucc i)).compl.matrix
@@ -862,13 +863,13 @@ theorem sequentialAcceptEffect_compl_posSemidef (P : ProjectionSequence a n) :
 /-- Binary POVM that accepts an ordered sequential projector test.  The `true`
 outcome is the coherent sequential accept effect `RᴴR`; the `false` outcome is
 its complement. -/
-def sequentialAcceptPOVM (P : ProjectionSequence a n) : POVM Bool a where
-  effects accept := if accept then sequentialAcceptEffect P else 1 - sequentialAcceptEffect P
-  pos accept := by
-    by_cases h : accept
-    · simp [h, sequentialAcceptEffect_posSemidef P]
-    · simp [h, sequentialAcceptEffect_compl_posSemidef P]
-  sum_eq_one := by
+def sequentialAcceptPOVM (P : ProjectionSequence a n) : POVM Bool a :=
+  .ofMatrices
+    (fun accept => if accept then sequentialAcceptEffect P else 1 - sequentialAcceptEffect P)
+    (fun accept => by
+      by_cases h : accept
+      · simp [h, sequentialAcceptEffect_posSemidef P]
+      · simp [h, sequentialAcceptEffect_compl_posSemidef P]) <| by
     rw [Fintype.sum_bool]
     simp [sequentialAcceptEffect]
 
@@ -883,46 +884,46 @@ theorem sequentialAcceptPOVM_false_effect (P : ProjectionSequence a n) :
   simp [sequentialAcceptPOVM]
 
 theorem sequenceAcceptTrace_eq_effectTrace_accept (P : ProjectionSequence a n)
-    (ρ : State a) :
+    (ρ : MState a) :
     sequenceAcceptTrace P ρ =
       effectTrace ρ (sequentialAcceptEffect P) := by
   unfold sequenceAcceptTrace effectTrace effectAcceptProbability sequentialAcceptEffect
   calc
-    ((P.reverseProduct * ρ.matrix * Matrix.conjTranspose P.reverseProduct).trace).re =
-        ((ρ.matrix * Matrix.conjTranspose P.reverseProduct * P.reverseProduct).trace).re := by
+    ((P.reverseProduct * ρ.m * Matrix.conjTranspose P.reverseProduct).trace).re =
+        ((ρ.m * Matrix.conjTranspose P.reverseProduct * P.reverseProduct).trace).re := by
           have h₁ :
-              (P.reverseProduct * ρ.matrix * Matrix.conjTranspose P.reverseProduct).trace =
+              (P.reverseProduct * ρ.m * Matrix.conjTranspose P.reverseProduct).trace =
                 (Matrix.conjTranspose P.reverseProduct * P.reverseProduct *
-                  ρ.matrix).trace :=
-            Matrix.trace_mul_cycle P.reverseProduct ρ.matrix
+                  ρ.m).trace :=
+            Matrix.trace_mul_cycle P.reverseProduct ρ.m
               (Matrix.conjTranspose P.reverseProduct)
           have h₂ :
               (Matrix.conjTranspose P.reverseProduct * P.reverseProduct *
-                  ρ.matrix).trace =
-                (ρ.matrix * (Matrix.conjTranspose P.reverseProduct) *
+                  ρ.m).trace =
+                (ρ.m * (Matrix.conjTranspose P.reverseProduct) *
                   P.reverseProduct).trace :=
             Matrix.trace_mul_cycle (Matrix.conjTranspose P.reverseProduct)
-              P.reverseProduct ρ.matrix
+              P.reverseProduct ρ.m
           exact congrArg Complex.re (h₁.trans h₂)
-    _ = ((ρ.matrix * (Matrix.conjTranspose P.reverseProduct * P.reverseProduct)).trace).re := by
+    _ = ((ρ.m * (Matrix.conjTranspose P.reverseProduct * P.reverseProduct)).trace).re := by
           rw [Matrix.mul_assoc]
 
 theorem sequentialAcceptPOVM_true_prob_eq_sequenceAcceptTrace
-    (P : ProjectionSequence a n) (ρ : State a) :
+    (P : ProjectionSequence a n) (ρ : MState a) :
     ((sequentialAcceptPOVM P).prob ρ true : ℝ) =
       sequenceAcceptTrace P ρ := by
   rw [POVM.prob_eq_trace_re]
   exact (sequenceAcceptTrace_eq_effectTrace_accept P ρ).symm
 
 theorem sequentialAcceptPOVM_error_eq_sequenceError
-    (P : ProjectionSequence a n) (ρ : State a) :
+    (P : ProjectionSequence a n) (ρ : MState a) :
     1 - ((sequentialAcceptPOVM P).prob ρ true : ℝ) =
       sequenceError P ρ := by
   rw [sequentialAcceptPOVM_true_prob_eq_sequenceAcceptTrace]
   rfl
 
 theorem sequentialAcceptPOVM_error_le_sequenceError
-    (P : ProjectionSequence a n) (ρ : State a) :
+    (P : ProjectionSequence a n) (ρ : MState a) :
     1 - ((sequentialAcceptPOVM P).prob ρ true : ℝ) ≤
       sequenceError P ρ := by
   rw [sequentialAcceptPOVM_error_eq_sequenceError]
@@ -1040,19 +1041,26 @@ theorem sequentialDecoderEffectsList_sum_add_failure
               rw [ProjectionMatrix.compl_matrix]
               abel
 
+/-- The projector sequence as a source-ordered list, so that the list-recursive decoder
+constructions apply to it. -/
 def sequentialDecoderProjectorList (A : ProjectionSequence a (n + 1)) :
     List (ProjectionMatrix a) :=
   List.ofFn fun i : Fin (n + 1) => A i
 
+/-- The `j`-th base effect of the sequential decoder built from `A`: accept at step `j` after
+rejecting every earlier projector. -/
 def sequentialDecoderBaseEffect (A : ProjectionSequence a (n + 1))
     (j : Fin (n + 1)) : CMatrix a :=
   (sequentialDecoderEffectsList (sequentialDecoderProjectorList A)).get
     ⟨j.val, by
       simpa [sequentialDecoderProjectorList] using j.isLt⟩
 
+/-- The effect of rejecting every projector of `A`. -/
 def sequentialDecoderFailure (A : ProjectionSequence a (n + 1)) : CMatrix a :=
   sequentialDecoderFailureEffect (sequentialDecoderProjectorList A)
 
+/-- The sequential decoder POVM: the base effects of `A`, with the all-reject failure effect
+folded into the outcome `0` so that the effects sum to the identity. -/
 def sequentialDecoderEffect (A : ProjectionSequence a (n + 1))
     (j : Fin (n + 1)) : CMatrix a :=
   sequentialDecoderBaseEffect A j +
@@ -1123,10 +1131,9 @@ leftover reject-all effect is assigned to message `0`, which can only increase
 that message's success probability and keeps the decoder a genuine POVM over
 the message register. -/
 def sequentialDecoderPOVM (A : ProjectionSequence a (n + 1)) :
-    POVM (Fin (n + 1)) a where
-  effects := sequentialDecoderEffect A
-  pos := sequentialDecoderEffect_posSemidef A
-  sum_eq_one := sequentialDecoderEffect_sum A
+    POVM (Fin (n + 1)) a :=
+  .ofMatrices (sequentialDecoderEffect A) (sequentialDecoderEffect_posSemidef A)
+    (sequentialDecoderEffect_sum A)
 
 @[simp]
 theorem sequentialDecoderPOVM_effects
@@ -1206,48 +1213,48 @@ theorem reverseProduct_fixed_by_last
   simp [Matrix.mulVec_mulVec]
   rw [← Matrix.mul_assoc, (P (Fin.last n)).idempotent]
 
-theorem pureVector_loss_eq_prefixMissed_sum
-    (P : ProjectionSequence a (n + 1)) (ψ : PureVector a) :
-    1 - vecNormSq (P.reverseProduct.mulVec ψ.amp) =
-      ∑ i : Fin (n + 1), prefixMissedNormSq P i ψ.amp := by
-  rw [← PureVector.vecNormSq_amp ψ]
-  rw [reverseProduct_loss_telescope P ψ.amp]
-  exact projectionListLossSum_ofFn P ψ.amp
+theorem ket_loss_eq_prefixMissed_sum
+    (P : ProjectionSequence a (n + 1)) (ψ : Ket a) :
+    1 - vecNormSq (P.reverseProduct.mulVec ψ.vec) =
+      ∑ i : Fin (n + 1), prefixMissedNormSq P i ψ.vec := by
+  rw [← Ket.vecNormSq_vec ψ]
+  rw [reverseProduct_loss_telescope P ψ.vec]
+  exact projectionListLossSum_ofFn P ψ.vec
 
 theorem missedPrefixGap_sum_le_early
-    (P : ProjectionSequence a (n + 1)) (ψ : PureVector a) :
-    (∑ i : Fin (n + 1), missedPrefixGapNormSq P i ψ.amp) ≤
-      ∑ i : Fin n, missedNormSq P (Fin.castSucc i) ψ.amp := by
+    (P : ProjectionSequence a (n + 1)) (ψ : Ket a) :
+    (∑ i : Fin (n + 1), missedPrefixGapNormSq P i ψ.vec) ≤
+      ∑ i : Fin n, missedNormSq P (Fin.castSucc i) ψ.vec := by
   rw [missedPrefixGap_sum_expand]
   rw [prefixMissedVector_cross_telescope]
-  rw [← pureVector_loss_eq_prefixMissed_sum]
-  rw [vecInnerRe_self, PureVector.vecNormSq_amp]
+  rw [← ket_loss_eq_prefixMissed_sum]
+  rw [vecInnerRe_self, Ket.vecNormSq_vec]
   rw [Fin.sum_univ_castSucc]
   have hlast_decomp :
-      missedNormSq P (Fin.last n) ψ.amp =
-        1 - vecNormSq ((P (Fin.last n)).matrix.mulVec ψ.amp) := by
+      missedNormSq P (Fin.last n) ψ.vec =
+        1 - vecNormSq ((P (Fin.last n)).matrix.mulVec ψ.vec) := by
     unfold missedNormSq
-    have hdecomp := vecNormSq_projection_add_compl (P (Fin.last n)) ψ.amp
-    rw [PureVector.vecNormSq_amp] at hdecomp
+    have hdecomp := vecNormSq_projection_add_compl (P (Fin.last n)) ψ.vec
+    rw [Ket.vecNormSq_vec] at hdecomp
     nlinarith
   rw [hlast_decomp]
   have hfixed :
-      (P (Fin.last n)).matrix.mulVec (P.reverseProduct.mulVec ψ.amp) =
-        P.reverseProduct.mulVec ψ.amp :=
-    reverseProduct_fixed_by_last P ψ.amp
+      (P (Fin.last n)).matrix.mulVec (P.reverseProduct.mulVec ψ.vec) =
+        P.reverseProduct.mulVec ψ.vec :=
+    reverseProduct_fixed_by_last P ψ.vec
   have hinner :
-      vecInnerRe ψ.amp (P.reverseProduct.mulVec ψ.amp) =
-        vecInnerRe ((P (Fin.last n)).matrix.mulVec ψ.amp)
-          (P.reverseProduct.mulVec ψ.amp) := by
+      vecInnerRe ψ.vec (P.reverseProduct.mulVec ψ.vec) =
+        vecInnerRe ((P (Fin.last n)).matrix.mulVec ψ.vec)
+          (P.reverseProduct.mulVec ψ.vec) := by
     rw [vecInnerRe_mulVec_projection_left]
     rw [hfixed]
   have hquad := two_vecInnerRe_sub_norm_le_norm
-    ((P (Fin.last n)).matrix.mulVec ψ.amp) (P.reverseProduct.mulVec ψ.amp)
+    ((P (Fin.last n)).matrix.mulVec ψ.vec) (P.reverseProduct.mulVec ψ.vec)
   rw [← hinner] at hquad
   nlinarith
 
 /-- Vector-form right-hand side of the quantum union bound.  This is the
-larger RHS used in Theorem `thm-q_union_bd` after the sharper pure-vector T1
+larger RHS used in Theorem `thm-q_union_bd` after the sharper ket T1
 estimate has been averaged over a spectral decomposition. -/
 def quantumUnionBoundVectorRHS
     (P : ProjectionSequence a (n + 1)) (ψ : a → ℂ) (c : ℝ) : ℝ :=
@@ -1257,47 +1264,47 @@ def quantumUnionBoundVectorRHS
 
 /-- Vector-form source theorem for the OMW/Khatri--Wilde quantum union bound. -/
 def VectorQuantumUnionBound (P : ProjectionSequence a (n + 1)) : Prop :=
-  ∀ ψ : PureVector a, ∀ c : ℝ, 0 < c →
-    1 - vecNormSq (P.reverseProduct.mulVec ψ.amp) ≤
-      quantumUnionBoundVectorRHS P ψ.amp c
+  ∀ ψ : Ket a, ∀ c : ℝ, 0 < c →
+    1 - vecNormSq (P.reverseProduct.mulVec ψ.vec) ≤
+      quantumUnionBoundVectorRHS P ψ.vec c
 
-/-- OMW/Khatri--Wilde quantum union bound in pure-vector form.  This is the
+/-- OMW/Khatri--Wilde quantum union bound in ket form.  This is the
 finite-dimensional vector proof route behind `thm-q_union_bd`: the sequential
 loss telescope is bounded by the source weighted missed/gap inequality, and
 the auxiliary gap sum is controlled by the earlier missed-detection terms. -/
 theorem vectorQuantumUnionBound (P : ProjectionSequence a (n + 1)) :
     VectorQuantumUnionBound P := by
   intro ψ c hc
-  rw [pureVector_loss_eq_prefixMissed_sum]
-  have hweighted := prefixMissed_sum_le_weighted P ψ.amp hc
+  rw [ket_loss_eq_prefixMissed_sum]
+  have hweighted := prefixMissed_sum_le_weighted P ψ.vec hc
   have hgap := missedPrefixGap_sum_le_early P ψ
   have hcoef : 0 ≤ 1 + c⁻¹ := by
     have hcinv : 0 < c⁻¹ := inv_pos.mpr hc
     linarith
   calc
-    (∑ i : Fin (n + 1), prefixMissedNormSq P i ψ.amp)
-        ≤ (1 + c) * (∑ i : Fin (n + 1), missedNormSq P i ψ.amp)
+    (∑ i : Fin (n + 1), prefixMissedNormSq P i ψ.vec)
+        ≤ (1 + c) * (∑ i : Fin (n + 1), missedNormSq P i ψ.vec)
           + (1 + c⁻¹) *
-            (∑ i : Fin (n + 1), missedPrefixGapNormSq P i ψ.amp) := hweighted
-    _ ≤ (1 + c) * (∑ i : Fin (n + 1), missedNormSq P i ψ.amp)
+            (∑ i : Fin (n + 1), missedPrefixGapNormSq P i ψ.vec) := hweighted
+    _ ≤ (1 + c) * (∑ i : Fin (n + 1), missedNormSq P i ψ.vec)
           + (1 + c⁻¹) *
-            (∑ i : Fin n, missedNormSq P (Fin.castSucc i) ψ.amp) := by
+            (∑ i : Fin n, missedNormSq P (Fin.castSucc i) ψ.vec) := by
           exact add_le_add (le_refl _)
             (mul_le_mul_of_nonneg_left hgap hcoef)
-    _ = quantumUnionBoundVectorRHS P ψ.amp c := by
+    _ = quantumUnionBoundVectorRHS P ψ.vec c := by
           unfold quantumUnionBoundVectorRHS
           rw [Fin.sum_univ_castSucc]
           ring
 
 theorem quantumUnionBoundRHS_pure_eq_vector
-    (P : ProjectionSequence a (n + 1)) (ψ : PureVector a) (c : ℝ) :
+    (P : ProjectionSequence a (n + 1)) (ψ : Ket a) (c : ℝ) :
     quantumUnionBoundRHS P ψ.state c =
-      quantumUnionBoundVectorRHS P ψ.amp c := by
+      quantumUnionBoundVectorRHS P ψ.vec c := by
   unfold quantumUnionBoundRHS quantumUnionBoundVectorRHS missedNormSq
   rw [← vecNormSq_projection_compl_mulVec_eq_effectTrace_pure (P (Fin.last n)) ψ]
   have hsum :
       (∑ i : Fin n, effectTrace ψ.state (P (Fin.castSucc i)).compl.matrix) =
-        ∑ i : Fin n, vecNormSq ((P (Fin.castSucc i)).compl.matrix.mulVec ψ.amp) := by
+        ∑ i : Fin n, vecNormSq ((P (Fin.castSucc i)).compl.matrix.mulVec ψ.vec) := by
     refine Finset.sum_congr rfl ?_
     intro i _
     exact (vecNormSq_projection_compl_mulVec_eq_effectTrace_pure (P (Fin.castSucc i)) ψ).symm
@@ -1307,14 +1314,14 @@ theorem quantumUnionBoundRHS_pure_eq_vector
 predicate.  Proving this predicate from the projector hypotheses is the
 mathematical core of the OMW Appendix route. -/
 def QuantumUnionBound (P : ProjectionSequence a (n + 1)) : Prop :=
-  ∀ ρ : State a, ∀ c : ℝ, 0 < c →
+  ∀ ρ : MState a, ∀ c : ℝ, 0 < c →
     sequenceError P ρ ≤ quantumUnionBoundRHS P ρ c
 
 /-- Pure-state version of the source-shaped quantum union bound.  The OMW
 appendix first proves a vector theorem and then averages over a spectral
 decomposition of `ρ`; this predicate isolates the vector theorem. -/
 def PureQuantumUnionBound (P : ProjectionSequence a (n + 1)) : Prop :=
-  ∀ ψ : PureVector a, ∀ c : ℝ, 0 < c →
+  ∀ ψ : Ket a, ∀ c : ℝ, 0 < c →
     sequenceError P ψ.state ≤ quantumUnionBoundRHS P ψ.state c
 
 theorem PureQuantumUnionBound.of_vector
@@ -1326,10 +1333,10 @@ theorem PureQuantumUnionBound.of_vector
     quantumUnionBoundRHS_pure_eq_vector P ψ c]
   exact hP ψ c hc
 
-theorem sequenceError_spectral (P : ProjectionSequence a n) (ρ : State a) :
+theorem sequenceError_spectral (P : ProjectionSequence a n) (ρ : MState a) :
     sequenceError P ρ =
-      ∑ i : a, ρ.pos.isHermitian.eigenvalues i *
-        sequenceError P (ρ.spectralPureVector i).state := by
+      ∑ i : a, ρ.psd.isHermitian.eigenvalues i *
+        sequenceError P (ρ.spectralKet i).state := by
   unfold sequenceError
   rw [sequenceAcceptTrace_spectral]
   conv_lhs =>
@@ -1340,15 +1347,15 @@ theorem sequenceError_spectral (P : ProjectionSequence a n) (ρ : State a) :
   ring
 
 theorem quantumUnionBoundRHS_spectral
-    (P : ProjectionSequence a (n + 1)) (ρ : State a) (c : ℝ) :
+    (P : ProjectionSequence a (n + 1)) (ρ : MState a) (c : ℝ) :
     quantumUnionBoundRHS P ρ c =
-      ∑ i : a, ρ.pos.isHermitian.eigenvalues i *
-        quantumUnionBoundRHS P (ρ.spectralPureVector i).state c := by
-  let lam : a → ℝ := fun i => ρ.pos.isHermitian.eigenvalues i
+      ∑ i : a, ρ.psd.isHermitian.eigenvalues i *
+        quantumUnionBoundRHS P (ρ.spectralKet i).state c := by
+  let lam : a → ℝ := fun i => ρ.psd.isHermitian.eigenvalues i
   let last : a → ℝ := fun i =>
-    effectTrace (ρ.spectralPureVector i).state (P (Fin.last n)).compl.matrix
+    effectTrace (ρ.spectralKet i).state (P (Fin.last n)).compl.matrix
   let early : a → Fin n → ℝ := fun i j =>
-    effectTrace (ρ.spectralPureVector i).state (P (Fin.castSucc j)).compl.matrix
+    effectTrace (ρ.spectralKet i).state (P (Fin.castSucc j)).compl.matrix
   have hlast :
       effectTrace ρ (P (Fin.last n)).compl.matrix =
         ∑ i : a, lam i * last i := by
@@ -1378,9 +1385,9 @@ theorem quantumUnionBoundRHS_spectral
   intro i _
   ring
 
-/-- Spectral-decomposition lift from the pure-vector OMW theorem to the
+/-- Spectral-decomposition lift from the ket OMW theorem to the
 source-shaped state theorem.  This formalizes the reduction in
-Khatri--Wilde 2024, `EA_capacity.tex:1706-1728`; it turns a pure-vector
+Khatri--Wilde 2024, `EA_capacity.tex:1706-1728`; it turns a ket
 union bound into the state theorem by averaging over a spectral decomposition. -/
 theorem quantumUnionBound_of_pure
     (P : ProjectionSequence a (n + 1)) (hP : PureQuantumUnionBound P) :
@@ -1388,8 +1395,8 @@ theorem quantumUnionBound_of_pure
   intro ρ c hc
   rw [sequenceError_spectral P ρ, quantumUnionBoundRHS_spectral P ρ c]
   exact Finset.sum_le_sum fun i _ =>
-    mul_le_mul_of_nonneg_left (hP (ρ.spectralPureVector i) c hc)
-      (ρ.pos.eigenvalues_nonneg i)
+    mul_le_mul_of_nonneg_left (hP (ρ.spectralKet i) c hc)
+      (ρ.psd.eigenvalues_nonneg i)
 
 /-- End-to-end reduction from the vector OMW theorem to the state theorem used
 by the sequential decoder. -/
@@ -1405,36 +1412,36 @@ theorem quantumUnionBound (P : ProjectionSequence a (n + 1)) :
   quantumUnionBound_of_vector P (vectorQuantumUnionBound P)
 
 theorem missedNormSq_eq_effectTrace_pure
-    (P : ProjectionSequence a (n + 1)) (i : Fin (n + 1)) (ψ : PureVector a) :
-    missedNormSq P i ψ.amp = effectTrace ψ.state (P i).compl.matrix :=
+    (P : ProjectionSequence a (n + 1)) (i : Fin (n + 1)) (ψ : Ket a) :
+    missedNormSq P i ψ.vec = effectTrace ψ.state (P i).compl.matrix :=
   vecNormSq_projection_compl_mulVec_eq_effectTrace_pure (P i) ψ
 
 theorem vectorQuantumUnionBound_one (P : ProjectionSequence a 1) :
     VectorQuantumUnionBound P := by
   intro ψ c hc
   have haccept :
-      vecNormSq (P.reverseProduct.mulVec ψ.amp) =
+      vecNormSq (P.reverseProduct.mulVec ψ.vec) =
         effectTrace ψ.state (P 0).matrix := by
     rw [ProjectionSequence.reverseProduct_one]
     exact vecNormSq_projection_mulVec_eq_effectTrace_pure (P 0) ψ
   have hmiss :
-      missedNormSq P 0 ψ.amp = effectTrace ψ.state (P 0).compl.matrix :=
+      missedNormSq P 0 ψ.vec = effectTrace ψ.state (P 0).compl.matrix :=
     missedNormSq_eq_effectTrace_pure P 0 ψ
   have hdecomp : effectTrace ψ.state (P 0).matrix +
       effectTrace ψ.state (P 0).compl.matrix = 1 :=
     effectTrace_add_compl ψ.state (P 0)
-  have hmiss_nonneg : 0 ≤ missedNormSq P 0 ψ.amp := by
+  have hmiss_nonneg : 0 ≤ missedNormSq P 0 ψ.vec := by
     rw [hmiss]
     exact effectTrace_projection_compl_nonneg ψ.state (P 0)
-  have hrhs : quantumUnionBoundVectorRHS P ψ.amp c =
-      (1 + c) * missedNormSq P 0 ψ.amp := by
+  have hrhs : quantumUnionBoundVectorRHS P ψ.vec c =
+      (1 + c) * missedNormSq P 0 ψ.vec := by
     simp [quantumUnionBoundVectorRHS]
   rw [haccept, hrhs]
-  have hmiss' : 1 - effectTrace ψ.state (P 0).matrix = missedNormSq P 0 ψ.amp := by
+  have hmiss' : 1 - effectTrace ψ.state (P 0).matrix = missedNormSq P 0 ψ.vec := by
     rw [hmiss]
     nlinarith
   rw [hmiss']
-  have hmul : 0 ≤ c * missedNormSq P 0 ψ.amp :=
+  have hmul : 0 ≤ c * missedNormSq P 0 ψ.vec :=
     mul_nonneg (le_of_lt hc) hmiss_nonneg
   nlinarith
 
@@ -1479,7 +1486,7 @@ def decoderTestSequence (A : ProjectionSequence a (n + 1)) :
 
 /-- Source-shaped sequential-decoding error RHS:
 miss the transmitted projector, plus false-alarm traces for earlier messages. -/
-def decoderErrorRHS (A : ProjectionSequence a (n + 1)) (ρ : State a) (c : ℝ) : ℝ :=
+def decoderErrorRHS (A : ProjectionSequence a (n + 1)) (ρ : MState a) (c : ℝ) : ℝ :=
   (1 + c) * effectTrace ρ (A (Fin.last n)).compl.matrix
     + (2 + c + c⁻¹) *
       ∑ i : Fin n, effectTrace ρ (A (Fin.castSucc i)).matrix
@@ -1631,13 +1638,13 @@ theorem sequentialDecoderBaseEffect_eq_prefixSequentialAcceptEffect
           exact (sequentialAcceptEffect_decoderTestSequence_tail B).symm
 
 theorem sequenceError_eq_one_sub_effectTrace_accept
-    (P : ProjectionSequence a n) (ρ : State a) :
+    (P : ProjectionSequence a n) (ρ : MState a) :
     sequenceError P ρ = 1 - effectTrace ρ (sequentialAcceptEffect P) := by
   unfold sequenceError
   rw [sequenceAcceptTrace_eq_effectTrace_accept P ρ]
 
 theorem sequentialDecoderPOVM_last_prob_ge_sequenceAcceptTrace
-    (A : ProjectionSequence a (n + 1)) (ρ : State a) :
+    (A : ProjectionSequence a (n + 1)) (ρ : MState a) :
     sequenceAcceptTrace (decoderTestSequence A) ρ ≤
       ((sequentialDecoderPOVM A).prob ρ (Fin.last n) : ℝ) := by
   rw [sequenceAcceptTrace_eq_effectTrace_accept]
@@ -1660,7 +1667,7 @@ message-indexed POVM succeeds on the final message at least as often as the
 binary coherent sequential test accepts.  The reject-all leftover outcome is
 assigned to message `0`, so no external sequentiality hypothesis is needed. -/
 theorem sequentialDecoderPOVM_last_error_le_sequenceError
-    (A : ProjectionSequence a (n + 1)) (ρ : State a) :
+    (A : ProjectionSequence a (n + 1)) (ρ : MState a) :
     1 - ((sequentialDecoderPOVM A).prob ρ (Fin.last n) : ℝ) ≤
       sequenceError (decoderTestSequence A) ρ := by
   have hprob := sequentialDecoderPOVM_last_prob_ge_sequenceAcceptTrace A ρ
@@ -1668,7 +1675,7 @@ theorem sequentialDecoderPOVM_last_error_le_sequenceError
   linarith
 
 theorem sequentialDecoderPOVM_prob_ge_prefixSequenceAcceptTrace
-    (A : ProjectionSequence a (n + 1)) (ρ : State a) (j : Fin (n + 1)) :
+    (A : ProjectionSequence a (n + 1)) (ρ : MState a) (j : Fin (n + 1)) :
     sequenceAcceptTrace (decoderTestSequence (prefixProjectionSequence A j)) ρ ≤
       ((sequentialDecoderPOVM A).prob ρ j : ℝ) := by
   rw [sequenceAcceptTrace_eq_effectTrace_accept]
@@ -1690,7 +1697,7 @@ theorem sequentialDecoderPOVM_prob_ge_prefixSequenceAcceptTrace
 decoder.  Outcome `j` succeeds at least as often as the coherent sequential
 test over the prefix `0, ..., j`, with `j` treated as the final acceptor. -/
 theorem sequentialDecoderPOVM_error_le_prefixSequenceError
-    (A : ProjectionSequence a (n + 1)) (ρ : State a) (j : Fin (n + 1)) :
+    (A : ProjectionSequence a (n + 1)) (ρ : MState a) (j : Fin (n + 1)) :
     1 - ((sequentialDecoderPOVM A).prob ρ j : ℝ) ≤
       sequenceError (decoderTestSequence (prefixProjectionSequence A j)) ρ := by
   have hprob := sequentialDecoderPOVM_prob_ge_prefixSequenceAcceptTrace A ρ j
@@ -1700,7 +1707,7 @@ theorem sequentialDecoderPOVM_error_le_prefixSequenceError
 /-- The quantum-union-bound RHS for the instantiated sequential test sequence
 is the source sequential-decoding RHS. -/
 theorem quantumUnionBoundRHS_decoderTestSequence
-    (A : ProjectionSequence a (n + 1)) (ρ : State a) (c : ℝ) :
+    (A : ProjectionSequence a (n + 1)) (ρ : MState a) (c : ℝ) :
     quantumUnionBoundRHS (decoderTestSequence A) ρ c =
       decoderErrorRHS A ρ c := by
   simp [quantumUnionBoundRHS, decoderErrorRHS]
@@ -1712,7 +1719,7 @@ This theorem is deliberately conditional on `QuantumUnionBound`; the uncondition
 OMW/Khatri--Wilde quantum-union-bound theorem below supplies the source-shaped
 instantiation used by the sequential decoder. -/
 theorem decoderError_le_of_quantumUnionBound
-    (A : ProjectionSequence a (n + 1)) (ρ : State a) {c : ℝ} (hc : 0 < c)
+    (A : ProjectionSequence a (n + 1)) (ρ : MState a) {c : ℝ} (hc : 0 < c)
     (hqub : QuantumUnionBound (decoderTestSequence A)) :
     sequenceError (decoderTestSequence A) ρ ≤ decoderErrorRHS A ρ c := by
   rw [← quantumUnionBoundRHS_decoderTestSequence A ρ c]
@@ -1722,7 +1729,7 @@ theorem decoderError_le_of_quantumUnionBound
 the finite quantum union bound to the reject-earlier / accept-current test
 sequence. -/
 theorem decoderError_le
-    (A : ProjectionSequence a (n + 1)) (ρ : State a) {c : ℝ} (hc : 0 < c) :
+    (A : ProjectionSequence a (n + 1)) (ρ : MState a) {c : ℝ} (hc : 0 < c) :
     sequenceError (decoderTestSequence A) ρ ≤ decoderErrorRHS A ρ c :=
   decoderError_le_of_quantumUnionBound A ρ hc (quantumUnionBound (decoderTestSequence A))
 

@@ -11,6 +11,8 @@ public import Mathlib.Algebra.Order.BigOperators.Group.Finset
 public import Mathlib.Data.Fintype.Pi
 public import Mathlib.Data.NNReal.Basic
 public import Mathlib.Data.Real.Basic
+public import QuantumLib.QIT.Classical.Channel
+public import QuantumLib.QIT.Classical.Distribution
 public import QuantumLib.QIT.Symmetry.SymmetricSubspace
 
 /-!
@@ -37,40 +39,6 @@ universe u v
 
 noncomputable section
 
-/-- A finite classical probability distribution. -/
-structure FiniteDistribution (α : Type u) [Fintype α] where
-  prob : α → ℝ≥0
-  sum_eq_one : ∑ x, prob x = 1
-
-namespace FiniteDistribution
-
-variable {α : Type u} [Fintype α]
-
-theorem prob_le_one (p : FiniteDistribution α) (x : α) :
-    p.prob x ≤ 1 := by
-  have hx : p.prob x ≤ ∑ y : α, p.prob y := by
-    exact Finset.single_le_sum (fun y _ => by positivity) (Finset.mem_univ x)
-  simpa [p.sum_eq_one] using hx
-
-end FiniteDistribution
-
-/-- A finite stochastic kernel `α → β`. -/
-structure StochasticKernel (α : Type u) (β : Type v) [Fintype β] where
-  prob : α → β → ℝ≥0
-  sum_eq_one : ∀ x, ∑ z, prob x z = 1
-
-namespace StochasticKernel
-
-variable {α : Type u} {β : Type v} [Fintype β]
-
-theorem prob_le_one (K : StochasticKernel α β) (x : α) (z : β) :
-    K.prob x z ≤ 1 := by
-  have hz : K.prob x z ≤ ∑ y : β, K.prob x y := by
-    exact Finset.single_le_sum (fun y _ => by positivity) (Finset.mem_univ z)
-  simpa [K.sum_eq_one x] using hz
-
-end StochasticKernel
-
 namespace ClassicalTypicality
 
 variable {α : Type u} {β : Type v}
@@ -96,54 +64,52 @@ def pairFreq [DecidableEq α] [DecidableEq β] {n : ℕ}
 /-- Strong typicality of a word relative to a finite distribution, using an
 absolute per-symbol frequency tolerance. -/
 def StrongTypical [Fintype α] [DecidableEq α] {n : ℕ}
-    (p : QIT.FiniteDistribution α) (w : Fin n → α) (δ : ℝ) : Prop :=
-  ∀ x, |wordFreq w x - (p.prob x : ℝ)| ≤ δ
+    (p : ProbDistribution α) (w : Fin n → α) (δ : ℝ) : Prop :=
+  ∀ x, |wordFreq w x - (p.nnprob x : ℝ)| ≤ δ
 
 /-- I.i.d. product mass of an input word under a finite distribution. -/
 def iidProductMass [Fintype α] {n : ℕ}
-    (p : QIT.FiniteDistribution α) (w : Fin n → α) : ℝ≥0 :=
-  ∏ i : Fin n, p.prob (w i)
+    (p : ProbDistribution α) (w : Fin n → α) : ℝ≥0 :=
+  ∏ i : Fin n, p.nnprob (w i)
 
 /-- The i.i.d. product law over length-`n` words is normalized. -/
 theorem iidProductMass_sum_eq_one [Fintype α] [DecidableEq α] {n : ℕ}
-    (p : QIT.FiniteDistribution α) :
+    (p : ProbDistribution α) :
     ∑ w : Fin n → α, iidProductMass p w = 1 := by
   classical
   unfold iidProductMass
   calc
-    ∑ w : Fin n → α, ∏ i : Fin n, p.prob (w i)
+    ∑ w : Fin n → α, ∏ i : Fin n, p.nnprob (w i)
         = ∑ w ∈ Fintype.piFinset (fun _ : Fin n => (Finset.univ : Finset α)),
-            ∏ i : Fin n, p.prob (w i) := by
+            ∏ i : Fin n, p.nnprob (w i) := by
               rw [Fintype.piFinset_univ]
-      _ = ∏ i : Fin n, ∑ x ∈ (Finset.univ : Finset α), p.prob x := by
+      _ = ∏ i : Fin n, ∑ x ∈ (Finset.univ : Finset α), p.nnprob x := by
               rw [Finset.sum_prod_piFinset]
       _ = ∏ _i : Fin n, (1 : ℝ≥0) := by
               refine Finset.prod_congr rfl fun _i _ => ?_
-              simpa using p.sum_eq_one
+              simpa using p.sum_nnprob
       _ = 1 := by simp
 
 /-- Finite event mass under the i.i.d. input product law. -/
 def iidEventMass [Fintype α] {n : ℕ}
-    (p : QIT.FiniteDistribution α) (event : (Fin n → α) → Prop)
+    (p : ProbDistribution α) (event : (Fin n → α) → Prop)
     [DecidablePred event] : ℝ≥0 :=
   ∑ w : Fin n → α, if event w then iidProductMass p w else 0
 
-/-- View a finite distribution as a stochastic kernel from the one-point
-alphabet.  This lets the ordinary i.i.d. typical-set estimate reuse the
-conditional-product Chebyshev/union-bound API below. -/
-def distributionKernel [Fintype α] (p : QIT.FiniteDistribution α) :
-    QIT.StochasticKernel Unit α where
-  prob _ x := p.prob x
-  sum_eq_one _ := p.sum_eq_one
+/-- View a finite distribution as a channel from the one-point alphabet.  This
+lets the ordinary i.i.d. typical-set estimate reuse the conditional-product
+Chebyshev/union-bound API below. -/
+def distributionChannel [Fintype α] (p : ProbDistribution α) : DMChannel Unit α :=
+  .ofNNReal (fun _ x => p.nnprob x) fun _ => p.sum_nnprob
 
 @[simp]
-theorem distributionKernel_prob [Fintype α] (p : QIT.FiniteDistribution α)
+theorem distributionChannel_nnprob [Fintype α] (p : ProbDistribution α)
     (x : Unit) (a : α) :
-    (distributionKernel p).prob x a = p.prob a :=
+    (distributionChannel p).nnprob x a = p.nnprob a :=
   rfl
 
 /-- The subtype of length-`n` words strongly typical with respect to `p`. -/
-def StrongTypicalWord [Fintype α] [DecidableEq α] (p : QIT.FiniteDistribution α)
+def StrongTypicalWord [Fintype α] [DecidableEq α] (p : ProbDistribution α)
     (n : ℕ) (δ : ℝ) : Type u :=
   { w : Fin n → α // StrongTypical p w δ }
 
@@ -151,25 +117,25 @@ namespace StrongTypicalWord
 
 variable [Fintype α] [DecidableEq α] {n : ℕ}
 
-instance (p : QIT.FiniteDistribution α) (δ : ℝ) :
+instance (p : ProbDistribution α) (δ : ℝ) :
     Fintype (StrongTypicalWord p n δ) :=
   by
     classical
     exact inferInstanceAs (Fintype { w : Fin n → α // StrongTypical p w δ })
 
-instance (p : QIT.FiniteDistribution α) (δ : ℝ) :
+instance (p : ProbDistribution α) (δ : ℝ) :
     DecidableEq (StrongTypicalWord p n δ) :=
   by
     classical
     exact inferInstanceAs (DecidableEq { w : Fin n → α // StrongTypical p w δ })
 
 /-- Inclusion of the strongly typical subtype into all words. -/
-def codeword (p : QIT.FiniteDistribution α) (δ : ℝ)
+def codeword (p : ProbDistribution α) (δ : ℝ)
     (x : StrongTypicalWord p n δ) : Fin n → α :=
   x.1
 
 @[simp]
-theorem strongTypical (p : QIT.FiniteDistribution α) (δ : ℝ)
+theorem strongTypical (p : ProbDistribution α) (δ : ℝ)
     (x : StrongTypicalWord p n δ) :
     StrongTypical p (codeword p δ x) δ :=
   x.2
@@ -178,13 +144,13 @@ end StrongTypicalWord
 
 /-- I.i.d. mass of the strongly typical set. -/
 def strongTypicalMass [Fintype α] [DecidableEq α] {n : ℕ}
-    (p : QIT.FiniteDistribution α) (δ : ℝ) : ℝ≥0 :=
+    (p : ProbDistribution α) (δ : ℝ) : ℝ≥0 :=
   ∑ x : StrongTypicalWord p n δ, iidProductMass p (StrongTypicalWord.codeword p δ x)
 
 /-- The sum over the strongly typical subtype is the strongly typical event mass. -/
 theorem sum_iidProductMass_strongTypicalWord_eq_mass
     [Fintype α] [DecidableEq α] {n : ℕ}
-    (p : QIT.FiniteDistribution α) (δ : ℝ) :
+    (p : ProbDistribution α) (δ : ℝ) :
     (∑ x : StrongTypicalWord p n δ,
         iidProductMass p (StrongTypicalWord.codeword p δ x)) =
       strongTypicalMass (n := n) p δ := by
@@ -194,7 +160,7 @@ theorem sum_iidProductMass_strongTypicalWord_eq_mass
 the strongly-typical predicate. -/
 theorem strongTypicalMass_eq_iidEventMass
     [Fintype α] [DecidableEq α] {n : ℕ}
-    (p : QIT.FiniteDistribution α) (δ : ℝ) :
+    (p : ProbDistribution α) (δ : ℝ) :
     strongTypicalMass (n := n) p δ =
       @iidEventMass α _ n p (fun w : Fin n → α => StrongTypical p w δ)
         (Classical.decPred _) := by
@@ -207,12 +173,12 @@ theorem strongTypicalMass_eq_iidEventMass
 normalizing mass is explicit because the HSW proof obtains positivity from the
 high-probability typical-set estimate. -/
 def prunedStrongTypicalDistribution [Fintype α] [DecidableEq α] {n : ℕ}
-    (p : QIT.FiniteDistribution α) (δ : ℝ)
+    (p : ProbDistribution α) (δ : ℝ)
     (hmass : 0 < strongTypicalMass (n := n) p δ) :
-    QIT.FiniteDistribution (StrongTypicalWord p n δ) where
-  prob x := iidProductMass p (StrongTypicalWord.codeword p δ x) /
-    strongTypicalMass (n := n) p δ
-  sum_eq_one := by
+    ProbDistribution (StrongTypicalWord p n δ) :=
+  ProbDistribution.ofNNReal
+    (fun x => iidProductMass p (StrongTypicalWord.codeword p δ x) /
+      strongTypicalMass (n := n) p δ) <| by
     classical
     have hmass_ne : strongTypicalMass (n := n) p δ ≠ 0 := ne_of_gt hmass
     calc
@@ -232,15 +198,15 @@ def prunedStrongTypicalDistribution [Fintype α] [DecidableEq α] {n : ℕ}
 /-- Pointwise domination of the pruned strongly-typical law by the renormalized
 i.i.d. product law.  This is the classical probability kernel behind the HSW
 `(1 - ε)⁻¹` pruned-distribution prefactor. -/
-theorem prunedStrongTypicalDistribution_prob_le_inv_one_sub
+theorem prunedStrongTypicalDistribution_nnprob_le_inv_one_sub
     [Fintype α] [DecidableEq α] {n : ℕ}
-    (p : QIT.FiniteDistribution α) {δ pruneε : ℝ}
+    (p : ProbDistribution α) {δ pruneε : ℝ}
     (hmass_pos : 0 < strongTypicalMass (n := n) p δ)
     (hmass_lower : (1 - pruneε : ℝ) ≤ (strongTypicalMass (n := n) p δ : ℝ))
     (hprune : pruneε < 1) (x : StrongTypicalWord p n δ) :
-    ((prunedStrongTypicalDistribution p δ hmass_pos).prob x : ℝ) ≤
+    ((prunedStrongTypicalDistribution p δ hmass_pos).nnprob x : ℝ) ≤
       (1 - pruneε)⁻¹ *
-        ∏ i : Fin n, (p.prob (StrongTypicalWord.codeword p δ x i) : ℝ) := by
+        ∏ i : Fin n, (p.nnprob (StrongTypicalWord.codeword p δ x i) : ℝ) := by
   classical
   have hpos : 0 < 1 - pruneε := by linarith
   have hmass_real_pos : 0 < (strongTypicalMass (n := n) p δ : ℝ) := by
@@ -249,23 +215,23 @@ theorem prunedStrongTypicalDistribution_prob_le_inv_one_sub
   have hinv_le : ((strongTypicalMass (n := n) p δ : ℝ))⁻¹ ≤ (1 - pruneε)⁻¹ :=
     inv_anti₀ hpos hden_le
   have hprod_nonneg :
-      0 ≤ ∏ i : Fin n, (p.prob (StrongTypicalWord.codeword p δ x i) : ℝ) := by
+      0 ≤ ∏ i : Fin n, (p.nnprob (StrongTypicalWord.codeword p δ x i) : ℝ) := by
     refine Finset.prod_nonneg fun i _ => ?_
     exact NNReal.coe_nonneg _
   calc
-    ((prunedStrongTypicalDistribution p δ hmass_pos).prob x : ℝ)
+    ((prunedStrongTypicalDistribution p δ hmass_pos).nnprob x : ℝ)
         =
-      (∏ i : Fin n, (p.prob (StrongTypicalWord.codeword p δ x i) : ℝ)) *
+      (∏ i : Fin n, (p.nnprob (StrongTypicalWord.codeword p δ x i) : ℝ)) *
         ((strongTypicalMass (n := n) p δ : ℝ))⁻¹ := by
         unfold prunedStrongTypicalDistribution iidProductMass
         simp [div_eq_mul_inv]
     _ ≤
-      (∏ i : Fin n, (p.prob (StrongTypicalWord.codeword p δ x i) : ℝ)) *
+      (∏ i : Fin n, (p.nnprob (StrongTypicalWord.codeword p δ x i) : ℝ)) *
         (1 - pruneε)⁻¹ :=
         mul_le_mul_of_nonneg_left hinv_le hprod_nonneg
     _ =
       (1 - pruneε)⁻¹ *
-        ∏ i : Fin n, (p.prob (StrongTypicalWord.codeword p δ x i) : ℝ) := by
+        ∏ i : Fin n, (p.nnprob (StrongTypicalWord.codeword p δ x i) : ℝ) := by
         ring
 
 /-- Conditional strong typicality in the form needed for the deterministic
@@ -275,63 +241,62 @@ frequency times the channel law `K(z|x)`.
 This is the finite-count form of the conditional-typicality output produced by
 the source's conditional LLN step. -/
 def StrongConditionallyTypical [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
-    {n : ℕ} (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (zseq : Fin n → β)
+    {n : ℕ} (K : DMChannel α β) (xseq : Fin n → α) (zseq : Fin n → β)
     (δ : ℝ) : Prop :=
-  ∀ x z, |pairFreq xseq zseq x z - wordFreq xseq x * (K.prob x z : ℝ)| ≤ δ
+  ∀ x z, |pairFreq xseq zseq x z - wordFreq xseq x * (K.nnprob x z : ℝ)| ≤ δ
 
 /-- Marginal output distribution induced by an input distribution and a
-stochastic kernel. -/
+channel. -/
 def inducedMarginal [Fintype α] [Fintype β]
-    (p : QIT.FiniteDistribution α) (K : QIT.StochasticKernel α β) :
-    QIT.FiniteDistribution β where
-  prob z := ∑ x, p.prob x * K.prob x z
-  sum_eq_one := by
+    (p : ProbDistribution α) (K : DMChannel α β) :
+    ProbDistribution β :=
+  ProbDistribution.ofNNReal (fun z => ∑ x, p.nnprob x * K.nnprob x z) <| by
     classical
     calc
-      ∑ z : β, ∑ x : α, p.prob x * K.prob x z
-          = ∑ x : α, ∑ z : β, p.prob x * K.prob x z := by
+      ∑ z : β, ∑ x : α, p.nnprob x * K.nnprob x z
+          = ∑ x : α, ∑ z : β, p.nnprob x * K.nnprob x z := by
               rw [Finset.sum_comm]
-      _ = ∑ x : α, p.prob x * ∑ z : β, K.prob x z := by
+      _ = ∑ x : α, p.nnprob x * ∑ z : β, K.nnprob x z := by
               refine Finset.sum_congr rfl fun x _ => ?_
               rw [Finset.mul_sum]
-      _ = ∑ x : α, p.prob x := by
+      _ = ∑ x : α, p.nnprob x := by
               refine Finset.sum_congr rfl fun x _ => ?_
-              rw [K.sum_eq_one x, mul_one]
-      _ = 1 := p.sum_eq_one
+              rw [K.sum_nnprob x, mul_one]
+      _ = 1 := p.sum_nnprob
 
 @[simp]
-theorem inducedMarginal_prob [Fintype α] [Fintype β]
-    (p : QIT.FiniteDistribution α) (K : QIT.StochasticKernel α β) (z : β) :
-    (inducedMarginal p K).prob z = ∑ x, p.prob x * K.prob x z := rfl
+theorem inducedMarginal_nnprob [Fintype α] [Fintype β]
+    (p : ProbDistribution α) (K : DMChannel α β) (z : β) :
+    (inducedMarginal p K).nnprob z = ∑ x, p.nnprob x * K.nnprob x z := rfl
 
 /-- Conditional product mass of an output word `zseq` given a fixed input word
 `xseq` through the memoryless kernel `K`. -/
 def conditionalProductMass [Fintype β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (zseq : Fin n → β) :
+    (K : DMChannel α β) (xseq : Fin n → α) (zseq : Fin n → β) :
     ℝ≥0 :=
-  ∏ i : Fin n, K.prob (xseq i) (zseq i)
+  ∏ i : Fin n, K.nnprob (xseq i) (zseq i)
 
 /-- Finite event mass under the conditional product law. -/
 def conditionalEventMass [Fintype β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (event : (Fin n → β) → Prop)
+    (K : DMChannel α β) (xseq : Fin n → α) (event : (Fin n → β) → Prop)
     [DecidablePred event] : ℝ≥0 :=
   ∑ zseq : Fin n → β, if event zseq then conditionalProductMass K xseq zseq else 0
 
 theorem conditionalProductMass_sum_eq_one [Fintype β] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) :
+    (K : DMChannel α β) (xseq : Fin n → α) :
     ∑ zseq : Fin n → β, conditionalProductMass K xseq zseq = 1 := by
   classical
   unfold conditionalProductMass
   calc
-    ∑ zseq : Fin n → β, ∏ i : Fin n, K.prob (xseq i) (zseq i)
+    ∑ zseq : Fin n → β, ∏ i : Fin n, K.nnprob (xseq i) (zseq i)
         = ∑ zseq ∈ Fintype.piFinset (fun _ : Fin n => (Finset.univ : Finset β)),
-            ∏ i : Fin n, K.prob (xseq i) (zseq i) := by
+            ∏ i : Fin n, K.nnprob (xseq i) (zseq i) := by
               rw [Fintype.piFinset_univ]
-      _ = ∏ i : Fin n, ∑ z ∈ (Finset.univ : Finset β), K.prob (xseq i) z := by
+      _ = ∏ i : Fin n, ∑ z ∈ (Finset.univ : Finset β), K.nnprob (xseq i) z := by
               rw [Finset.sum_prod_piFinset]
       _ = ∏ i : Fin n, (1 : ℝ≥0) := by
                   refine Finset.prod_congr rfl fun i _ => ?_
-                  simpa using K.sum_eq_one (xseq i)
+                  simpa using K.sum_nnprob (xseq i)
       _ = 1 := by simp
 
 @[simp]
@@ -362,18 +327,18 @@ theorem pairFreq_unit_left [DecidableEq β] {n : ℕ}
   unfold pairFreq wordFreq
   rw [pairCount_unit_left]
 
-theorem conditionalProductMass_distributionKernel_eq_iidProductMass
-    [Fintype β] {n : ℕ} (p : QIT.FiniteDistribution β)
+theorem conditionalProductMass_distributionChannel_eq_iidProductMass
+    [Fintype β] {n : ℕ} (p : ProbDistribution β)
     (xseq : Fin n → Unit) (zseq : Fin n → β) :
-    conditionalProductMass (distributionKernel p) xseq zseq =
+    conditionalProductMass (distributionChannel p) xseq zseq =
       iidProductMass p zseq := by
-  unfold conditionalProductMass iidProductMass distributionKernel
+  unfold conditionalProductMass iidProductMass distributionChannel
   simp
 
-theorem strongConditionallyTypical_distributionKernel_iff_strongTypical
-    [Fintype β] [DecidableEq β] {n : ℕ} (p : QIT.FiniteDistribution β)
+theorem strongConditionallyTypical_distributionChannel_iff_strongTypical
+    [Fintype β] [DecidableEq β] {n : ℕ} (p : ProbDistribution β)
     (xseq : Fin n → Unit) (zseq : Fin n → β) {δ : ℝ} (hn : 0 < n) :
-    StrongConditionallyTypical (distributionKernel p) xseq zseq δ ↔
+    StrongConditionallyTypical (distributionChannel p) xseq zseq δ ↔
       StrongTypical p zseq δ := by
   constructor
   · intro h z
@@ -384,18 +349,18 @@ theorem strongConditionallyTypical_distributionKernel_iff_strongTypical
     simpa [pairFreq_unit_left, wordFreq_unit xseq hn] using h z
 
 theorem conditionalProductMass_expect_coordinate [Fintype β] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (i : Fin n) (f : β → ℝ) :
+    (K : DMChannel α β) (xseq : Fin n → α) (i : Fin n) (f : β → ℝ) :
     ∑ zseq : Fin n → β, (conditionalProductMass K xseq zseq : ℝ) * f (zseq i) =
-      ∑ z : β, (K.prob (xseq i) z : ℝ) * f z := by
+      ∑ z : β, (K.nnprob (xseq i) z : ℝ) * f z := by
   classical
   unfold conditionalProductMass
   calc
-    ∑ zseq : Fin n → β, ((∏ j : Fin n, K.prob (xseq j) (zseq j) : ℝ≥0) : ℝ) *
+    ∑ zseq : Fin n → β, ((∏ j : Fin n, K.nnprob (xseq j) (zseq j) : ℝ≥0) : ℝ) *
         f (zseq i)
         =
       ∑ zseq ∈ Fintype.piFinset (fun _ : Fin n => (Finset.univ : Finset β)),
         ∏ j : Fin n,
-          ((K.prob (xseq j) (zseq j) : ℝ) *
+          ((K.nnprob (xseq j) (zseq j) : ℝ) *
             if j = i then f (zseq j) else 1) := by
         rw [Fintype.piFinset_univ]
         refine Finset.sum_congr rfl fun zseq _ => ?_
@@ -404,40 +369,40 @@ theorem conditionalProductMass_expect_coordinate [Fintype β] [DecidableEq β] {
         simp
     _ =
       ∏ j : Fin n, ∑ z ∈ (Finset.univ : Finset β),
-        ((K.prob (xseq j) z : ℝ) * if j = i then f z else 1) := by
+        ((K.nnprob (xseq j) z : ℝ) * if j = i then f z else 1) := by
         exact Finset.sum_prod_piFinset
           (s := (Finset.univ : Finset β))
-          (g := fun j z => ((K.prob (xseq j) z : ℝ) * if j = i then f z else 1))
+          (g := fun j z => ((K.nnprob (xseq j) z : ℝ) * if j = i then f z else 1))
     _ =
       ∏ j : Fin n, ∑ z : β,
-        ((K.prob (xseq j) z : ℝ) * if j = i then f z else 1) := by
+        ((K.nnprob (xseq j) z : ℝ) * if j = i then f z else 1) := by
         simp
-    _ = ∑ z : β, (K.prob (xseq i) z : ℝ) * f z := by
+    _ = ∑ z : β, (K.nnprob (xseq i) z : ℝ) * f z := by
         rw [Finset.prod_eq_single i]
         · simp
         · intro j _ hj
-          have hsum : ∑ z : β, (K.prob (xseq j) z : ℝ) = 1 := by
-            exact_mod_cast K.sum_eq_one (xseq j)
+          have hsum : ∑ z : β, (K.nnprob (xseq j) z : ℝ) = 1 := by
+            exact_mod_cast K.sum_nnprob (xseq j)
           simp [hj, hsum]
         · simp
 
 theorem conditionalProductMass_expect_two_coordinates [Fintype β] [DecidableEq β]
-    {n : ℕ} (K : QIT.StochasticKernel α β) (xseq : Fin n → α)
+    {n : ℕ} (K : DMChannel α β) (xseq : Fin n → α)
     {i j : Fin n} (hij : i ≠ j) (f g : β → ℝ) :
     ∑ zseq : Fin n → β,
         (conditionalProductMass K xseq zseq : ℝ) * (f (zseq i) * g (zseq j)) =
-      (∑ z : β, (K.prob (xseq i) z : ℝ) * f z) *
-        (∑ z : β, (K.prob (xseq j) z : ℝ) * g z) := by
+      (∑ z : β, (K.nnprob (xseq i) z : ℝ) * f z) *
+        (∑ z : β, (K.nnprob (xseq j) z : ℝ) * g z) := by
   classical
   unfold conditionalProductMass
   calc
     ∑ zseq : Fin n → β,
-        ((∏ l : Fin n, K.prob (xseq l) (zseq l) : ℝ≥0) : ℝ) *
+        ((∏ l : Fin n, K.nnprob (xseq l) (zseq l) : ℝ≥0) : ℝ) *
           (f (zseq i) * g (zseq j))
         =
       ∑ zseq ∈ Fintype.piFinset (fun _ : Fin n => (Finset.univ : Finset β)),
         ∏ l : Fin n,
-          (((K.prob (xseq l) (zseq l) : ℝ) *
+          (((K.nnprob (xseq l) (zseq l) : ℝ) *
               (if l = i then f (zseq l) else 1)) *
             (if l = j then g (zseq l) else 1)) := by
         rw [Fintype.piFinset_univ]
@@ -449,34 +414,34 @@ theorem conditionalProductMass_expect_two_coordinates [Fintype β] [DecidableEq 
         simp [mul_assoc, mul_left_comm, mul_comm]
     _ =
       ∏ l : Fin n, ∑ z ∈ (Finset.univ : Finset β),
-        (((K.prob (xseq l) z : ℝ) *
+        (((K.nnprob (xseq l) z : ℝ) *
             (if l = i then f z else 1)) *
           (if l = j then g z else 1)) := by
         exact Finset.sum_prod_piFinset
           (s := (Finset.univ : Finset β))
           (g := fun l z =>
-            (((K.prob (xseq l) z : ℝ) * (if l = i then f z else 1)) *
+            (((K.nnprob (xseq l) z : ℝ) * (if l = i then f z else 1)) *
               (if l = j then g z else 1)))
     _ =
       ∏ l : Fin n, ∑ z : β,
-        (((K.prob (xseq l) z : ℝ) *
+        (((K.nnprob (xseq l) z : ℝ) *
             (if l = i then f z else 1)) *
           (if l = j then g z else 1)) := by
         simp
     _ =
-      (∑ z : β, (K.prob (xseq i) z : ℝ) * f z) *
-        (∑ z : β, (K.prob (xseq j) z : ℝ) * g z) := by
+      (∑ z : β, (K.nnprob (xseq i) z : ℝ) * f z) *
+        (∑ z : β, (K.nnprob (xseq j) z : ℝ) * g z) := by
         let F : Fin n → ℝ := fun l =>
           ∑ z : β,
-            (((K.prob (xseq l) z : ℝ) *
+            (((K.nnprob (xseq l) z : ℝ) *
                 (if l = i then f z else 1)) *
               (if l = j then g z else 1))
         change (∏ l : Fin n, F l) =
-          (∑ z : β, (K.prob (xseq i) z : ℝ) * f z) *
-            (∑ z : β, (K.prob (xseq j) z : ℝ) * g z)
-        have hFi : F i = ∑ z : β, (K.prob (xseq i) z : ℝ) * f z := by
+          (∑ z : β, (K.nnprob (xseq i) z : ℝ) * f z) *
+            (∑ z : β, (K.nnprob (xseq j) z : ℝ) * g z)
+        have hFi : F i = ∑ z : β, (K.nnprob (xseq i) z : ℝ) * f z := by
           simp [F, hij]
-        have hFj : F j = ∑ z : β, (K.prob (xseq j) z : ℝ) * g z := by
+        have hFj : F j = ∑ z : β, (K.nnprob (xseq j) z : ℝ) * g z := by
           simp [F, hij.symm, mul_assoc]
         have hFrest : ∀ l ∈ (Finset.univ.erase i).erase j, F l = 1 := by
           intro l hl
@@ -484,8 +449,8 @@ theorem conditionalProductMass_expect_two_coordinates [Fintype β] [DecidableEq 
             exact (Finset.mem_erase.mp (Finset.mem_of_mem_erase hl)).1
           have hlj : l ≠ j := by
             exact (Finset.mem_erase.mp hl).1
-          have hsum : ∑ z : β, (K.prob (xseq l) z : ℝ) = 1 := by
-            exact_mod_cast K.sum_eq_one (xseq l)
+          have hsum : ∑ z : β, (K.nnprob (xseq l) z : ℝ) = 1 := by
+            exact_mod_cast K.sum_nnprob (xseq l)
           simp [F, hli, hlj, hsum]
         rw [Finset.prod_eq_mul_prod_sdiff_singleton_of_mem (Finset.mem_univ i)]
         rw [Finset.sdiff_singleton_eq_erase]
@@ -498,7 +463,7 @@ theorem conditionalProductMass_expect_two_coordinates [Fintype β] [DecidableEq 
         ring
 
 theorem conditionalEventMass_le_one [Fintype β] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α)
+    (K : DMChannel α β) (xseq : Fin n → α)
     (event : (Fin n → β) → Prop) [DecidablePred event] :
     conditionalEventMass K xseq event ≤ 1 := by
   classical
@@ -511,7 +476,7 @@ theorem conditionalEventMass_le_one [Fintype β] [DecidableEq β] {n : ℕ}
     _ = 1 := conditionalProductMass_sum_eq_one K xseq
 
 theorem conditionalEventMass_add_compl_eq_one [Fintype β] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α)
+    (K : DMChannel α β) (xseq : Fin n → α)
     (event : (Fin n → β) → Prop) [DecidablePred event] :
     (conditionalEventMass K xseq event : ℝ) +
       (conditionalEventMass K xseq (fun zseq => ¬ event zseq) : ℝ) = 1 := by
@@ -532,7 +497,7 @@ theorem conditionalEventMass_add_compl_eq_one [Fintype β] [DecidableEq β] {n :
 
 /-- Conditional-typical event mass for the finite conditional product law. -/
 def conditionalTypicalMass [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (δ : ℝ) : ℝ≥0 :=
+    (K : DMChannel α β) (xseq : Fin n → α) (δ : ℝ) : ℝ≥0 :=
   by
     classical
     exact conditionalEventMass K xseq
@@ -540,30 +505,30 @@ def conditionalTypicalMass [Fintype α] [DecidableEq α] [Fintype β] [Decidable
 
 /-- Complementary mass of the conditionally non-typical event. -/
 def conditionalNontypicalMass [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
-    {n : ℕ} (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (δ : ℝ) : ℝ≥0 :=
+    {n : ℕ} (K : DMChannel α β) (xseq : Fin n → α) (δ : ℝ) : ℝ≥0 :=
   by
     classical
     exact conditionalEventMass K xseq
       (fun zseq => ¬ StrongConditionallyTypical K xseq zseq δ)
 
-theorem conditionalTypicalMass_distributionKernel_eq_strongTypicalMass
-    [Fintype β] [DecidableEq β] {n : ℕ} (p : QIT.FiniteDistribution β)
+theorem conditionalTypicalMass_distributionChannel_eq_strongTypicalMass
+    [Fintype β] [DecidableEq β] {n : ℕ} (p : ProbDistribution β)
     (xseq : Fin n → Unit) (δ : ℝ) (hn : 0 < n) :
-    conditionalTypicalMass (distributionKernel p) xseq δ =
+    conditionalTypicalMass (distributionChannel p) xseq δ =
       strongTypicalMass (n := n) p δ := by
   classical
   rw [strongTypicalMass_eq_iidEventMass]
   unfold conditionalTypicalMass conditionalEventMass iidEventMass
   refine Finset.sum_congr rfl fun zseq _ => ?_
-  rw [conditionalProductMass_distributionKernel_eq_iidProductMass]
+  rw [conditionalProductMass_distributionChannel_eq_iidProductMass]
   have hiff :=
-    strongConditionallyTypical_distributionKernel_iff_strongTypical
+    strongConditionallyTypical_distributionChannel_iff_strongTypical
       p xseq zseq (δ := δ) hn
   by_cases htyp : StrongTypical p zseq δ
-  · have hcond : StrongConditionallyTypical (distributionKernel p) xseq zseq δ :=
+  · have hcond : StrongConditionallyTypical (distributionChannel p) xseq zseq δ :=
       hiff.mpr htyp
     simp [htyp, hcond]
-  · have hcond : ¬ StrongConditionallyTypical (distributionKernel p) xseq zseq δ := by
+  · have hcond : ¬ StrongConditionallyTypical (distributionChannel p) xseq zseq δ := by
       intro h'
       exact htyp (hiff.mp h')
     simp [htyp, hcond]
@@ -572,10 +537,10 @@ theorem conditionalTypicalMass_distributionKernel_eq_strongTypicalMass
 product law.  Coordinates whose input symbol is not `x` contribute zero; the
 remaining coordinates are Bernoulli indicators centered at `K(z|x)`. -/
 def centeredPairIndicator [Fintype β] [DecidableEq α] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (x : α) (z : β)
+    (K : DMChannel α β) (xseq : Fin n → α) (x : α) (z : β)
     (i : Fin n) (zseq : Fin n → β) : ℝ :=
   if xseq i = x then
-    (if zseq i = z then (1 : ℝ) else 0) - (K.prob x z : ℝ)
+    (if zseq i = z then (1 : ℝ) else 0) - (K.nnprob x z : ℝ)
   else 0
 
 theorem sum_pairIndicator_eq_pairCount
@@ -646,10 +611,10 @@ If every symbol frequency is within `δ` of `p`, then the deviation of the
 observable sum from its distributional expectation is bounded by
 `n δ ∑x |f x|`. -/
 theorem strongTypical_sum_observable_deviation_le [Fintype α] [DecidableEq α] {n : ℕ}
-    (p : QIT.FiniteDistribution α) (xseq : Fin n → α) {δ : ℝ}
+    (p : ProbDistribution α) (xseq : Fin n → α) {δ : ℝ}
     (hn : 0 < n) (hδ : 0 ≤ δ) (hx : StrongTypical p xseq δ) (f : α → ℝ) :
     |(∑ i : Fin n, f (xseq i)) -
-        (n : ℝ) * ∑ x : α, (p.prob x : ℝ) * f x| ≤
+        (n : ℝ) * ∑ x : α, (p.nnprob x : ℝ) * f x| ≤
       (n : ℝ) * δ * ∑ x : α, |f x| := by
   classical
   have hnR : (n : ℝ) ≠ 0 := by exact_mod_cast Nat.ne_of_gt hn
@@ -659,22 +624,22 @@ theorem strongTypical_sum_observable_deviation_le [Fintype α] [DecidableEq α] 
     field_simp [hnR]
   have hrewrite :
       (∑ i : Fin n, f (xseq i)) -
-          (n : ℝ) * ∑ x : α, (p.prob x : ℝ) * f x =
-        (n : ℝ) * ∑ x : α, (wordFreq xseq x - (p.prob x : ℝ)) * f x := by
+          (n : ℝ) * ∑ x : α, (p.nnprob x : ℝ) * f x =
+        (n : ℝ) * ∑ x : α, (wordFreq xseq x - (p.nnprob x : ℝ)) * f x := by
     calc
       (∑ i : Fin n, f (xseq i)) -
-          (n : ℝ) * ∑ x : α, (p.prob x : ℝ) * f x =
+          (n : ℝ) * ∑ x : α, (p.nnprob x : ℝ) * f x =
           (∑ x : α, (wordCount xseq x : ℝ) * f x) -
-            (n : ℝ) * ∑ x : α, (p.prob x : ℝ) * f x := by
+            (n : ℝ) * ∑ x : α, (p.nnprob x : ℝ) * f x := by
             rw [sum_eq_sum_wordCount_mul xseq f]
       _ = (∑ x : α, ((n : ℝ) * wordFreq xseq x) * f x) -
-            (n : ℝ) * ∑ x : α, (p.prob x : ℝ) * f x := by
+            (n : ℝ) * ∑ x : α, (p.nnprob x : ℝ) * f x := by
             refine congrArg₂ Sub.sub ?_ rfl
             refine Finset.sum_congr rfl fun x _ => ?_
             rw [hcount x]
       _ = (n : ℝ) *
             (∑ x : α, wordFreq xseq x * f x -
-              ∑ x : α, (p.prob x : ℝ) * f x) := by
+              ∑ x : α, (p.nnprob x : ℝ) * f x) := by
             have hleft :
                 (∑ x : α, ((n : ℝ) * wordFreq xseq x) * f x) =
                   (n : ℝ) * ∑ x : α, wordFreq xseq x * f x := by
@@ -683,7 +648,7 @@ theorem strongTypical_sum_observable_deviation_le [Fintype α] [DecidableEq α] 
               ring
             rw [hleft]
             ring
-      _ = (n : ℝ) * ∑ x : α, (wordFreq xseq x - (p.prob x : ℝ)) * f x := by
+      _ = (n : ℝ) * ∑ x : α, (wordFreq xseq x - (p.nnprob x : ℝ)) * f x := by
             rw [← Finset.sum_sub_distrib]
             refine congrArg ((n : ℝ) * ·) ?_
             refine Finset.sum_congr rfl fun x _ => ?_
@@ -691,14 +656,14 @@ theorem strongTypical_sum_observable_deviation_le [Fintype α] [DecidableEq α] 
   rw [hrewrite]
   have hn_nonneg : 0 ≤ (n : ℝ) := Nat.cast_nonneg n
   calc
-    |(n : ℝ) * ∑ x : α, (wordFreq xseq x - (p.prob x : ℝ)) * f x|
-        = (n : ℝ) * |∑ x : α, (wordFreq xseq x - (p.prob x : ℝ)) * f x| := by
+    |(n : ℝ) * ∑ x : α, (wordFreq xseq x - (p.nnprob x : ℝ)) * f x|
+        = (n : ℝ) * |∑ x : α, (wordFreq xseq x - (p.nnprob x : ℝ)) * f x| := by
           rw [abs_mul, abs_of_nonneg hn_nonneg]
     _ ≤ (n : ℝ) *
-          ∑ x : α, |(wordFreq xseq x - (p.prob x : ℝ)) * f x| :=
+          ∑ x : α, |(wordFreq xseq x - (p.nnprob x : ℝ)) * f x| :=
           mul_le_mul_of_nonneg_left
             (Finset.abs_sum_le_sum_abs (s := Finset.univ)
-              (f := fun x : α => (wordFreq xseq x - (p.prob x : ℝ)) * f x))
+              (f := fun x : α => (wordFreq xseq x - (p.nnprob x : ℝ)) * f x))
             hn_nonneg
     _ ≤ (n : ℝ) * ∑ x : α, δ * |f x| := by
           refine mul_le_mul_of_nonneg_left ?_ hn_nonneg
@@ -713,21 +678,21 @@ theorem strongTypical_sum_observable_deviation_le [Fintype α] [DecidableEq α] 
 
 theorem sum_centeredPairIndicator_eq_deviation_numer
     [Fintype β] [DecidableEq α] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (zseq : Fin n → β)
+    (K : DMChannel α β) (xseq : Fin n → α) (zseq : Fin n → β)
     (x : α) (z : β) :
     (∑ i : Fin n, centeredPairIndicator K xseq x z i zseq) =
       (pairCount xseq zseq x z : ℝ) -
-        (wordCount xseq x : ℝ) * (K.prob x z : ℝ) := by
+        (wordCount xseq x : ℝ) * (K.nnprob x z : ℝ) := by
   classical
   unfold centeredPairIndicator
   calc
     (∑ i : Fin n,
         if xseq i = x then
-          (if zseq i = z then (1 : ℝ) else 0) - (K.prob x z : ℝ)
+          (if zseq i = z then (1 : ℝ) else 0) - (K.nnprob x z : ℝ)
         else 0)
         =
           (∑ i : Fin n, if xseq i = x ∧ zseq i = z then (1 : ℝ) else 0) -
-            (∑ i : Fin n, if xseq i = x then (K.prob x z : ℝ) else 0) := by
+            (∑ i : Fin n, if xseq i = x then (K.nnprob x z : ℝ) else 0) := by
             rw [← Finset.sum_sub_distrib]
             refine Finset.sum_congr rfl fun i _ => ?_
             by_cases hx : xseq i = x
@@ -735,12 +700,12 @@ theorem sum_centeredPairIndicator_eq_deviation_numer
             · simp [hx]
     _ =
           (pairCount xseq zseq x z : ℝ) -
-            (wordCount xseq x : ℝ) * (K.prob x z : ℝ) := by
+            (wordCount xseq x : ℝ) * (K.nnprob x z : ℝ) := by
             rw [sum_pairIndicator_eq_pairCount]
             have hconst :
-                (∑ i : Fin n, if xseq i = x then (K.prob x z : ℝ) else 0) =
+                (∑ i : Fin n, if xseq i = x then (K.nnprob x z : ℝ) else 0) =
                   (∑ i : Fin n, if xseq i = x then (1 : ℝ) else 0) *
-                    (K.prob x z : ℝ) := by
+                    (K.nnprob x z : ℝ) := by
               rw [Finset.sum_mul]
               refine Finset.sum_congr rfl fun i _ => ?_
               by_cases hx : xseq i = x <;> simp [hx]
@@ -750,9 +715,9 @@ theorem sum_centeredPairIndicator_eq_deviation_numer
 
 theorem pairFreq_deviation_eq_centeredPairIndicator_average
     [Fintype β] [DecidableEq α] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (zseq : Fin n → β)
+    (K : DMChannel α β) (xseq : Fin n → α) (zseq : Fin n → β)
     (x : α) (z : β) :
-    pairFreq xseq zseq x z - wordFreq xseq x * (K.prob x z : ℝ) =
+    pairFreq xseq zseq x z - wordFreq xseq x * (K.nnprob x z : ℝ) =
       (∑ i : Fin n, centeredPairIndicator K xseq x z i zseq) / (n : ℝ) := by
   classical
   unfold pairFreq wordFreq
@@ -761,7 +726,7 @@ theorem pairFreq_deviation_eq_centeredPairIndicator_average
 
 theorem centeredPairIndicator_expect_eq_zero
     [Fintype β] [DecidableEq α] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (x : α) (z : β)
+    (K : DMChannel α β) (xseq : Fin n → α) (x : α) (z : β)
     (i : Fin n) :
     ∑ zseq : Fin n → β,
         (conditionalProductMass K xseq zseq : ℝ) *
@@ -769,25 +734,25 @@ theorem centeredPairIndicator_expect_eq_zero
   classical
   by_cases hx : xseq i = x
   · have hcoord := conditionalProductMass_expect_coordinate
-      K xseq i (fun y : β => (if y = z then (1 : ℝ) else 0) - (K.prob x z : ℝ))
+      K xseq i (fun y : β => (if y = z then (1 : ℝ) else 0) - (K.nnprob x z : ℝ))
     calc
       ∑ zseq : Fin n → β,
           (conditionalProductMass K xseq zseq : ℝ) *
             centeredPairIndicator K xseq x z i zseq
           =
-        ∑ y : β, (K.prob (xseq i) y : ℝ) *
-          ((if y = z then (1 : ℝ) else 0) - (K.prob x z : ℝ)) := by
+        ∑ y : β, (K.nnprob (xseq i) y : ℝ) *
+          ((if y = z then (1 : ℝ) else 0) - (K.nnprob x z : ℝ)) := by
           simpa [centeredPairIndicator, hx] using hcoord
       _ =
-        ∑ y : β, (K.prob x y : ℝ) *
-          ((if y = z then (1 : ℝ) else 0) - (K.prob x z : ℝ)) := by
+        ∑ y : β, (K.nnprob x y : ℝ) *
+          ((if y = z then (1 : ℝ) else 0) - (K.nnprob x z : ℝ)) := by
           simp [hx]
       _ = 0 := by
           simp_rw [mul_sub]
           rw [Finset.sum_sub_distrib]
           have hindicator :
-              ∑ y : β, (K.prob x y : ℝ) * (if y = z then (1 : ℝ) else 0) =
-                (K.prob x z : ℝ) := by
+              ∑ y : β, (K.nnprob x y : ℝ) * (if y = z then (1 : ℝ) else 0) =
+                (K.nnprob x z : ℝ) := by
             rw [Finset.sum_eq_single z]
             · simp
             · intro y _ hy
@@ -795,11 +760,11 @@ theorem centeredPairIndicator_expect_eq_zero
             · intro hz
               exact (hz (Finset.mem_univ z)).elim
           have hconst :
-              ∑ y : β, (K.prob x y : ℝ) * (K.prob x z : ℝ) =
-                (K.prob x z : ℝ) := by
+              ∑ y : β, (K.nnprob x y : ℝ) * (K.nnprob x z : ℝ) =
+                (K.nnprob x z : ℝ) := by
             rw [← Finset.sum_mul]
-            have hsum : ∑ y : β, (K.prob x y : ℝ) = 1 := by
-              exact_mod_cast K.sum_eq_one x
+            have hsum : ∑ y : β, (K.nnprob x y : ℝ) = 1 := by
+              exact_mod_cast K.sum_nnprob x
             rw [hsum, one_mul]
           rw [hindicator, hconst, sub_self]
   · refine Finset.sum_eq_zero fun zseq _ => ?_
@@ -807,7 +772,7 @@ theorem centeredPairIndicator_expect_eq_zero
 
 theorem centeredPairIndicator_cross_expect_eq_zero
     [Fintype β] [DecidableEq α] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (x : α) (z : β)
+    (K : DMChannel α β) (xseq : Fin n → α) (x : α) (z : β)
     {i j : Fin n} (hij : i ≠ j) :
     ∑ zseq : Fin n → β,
         (conditionalProductMass K xseq zseq : ℝ) *
@@ -815,17 +780,17 @@ theorem centeredPairIndicator_cross_expect_eq_zero
             centeredPairIndicator K xseq x z j zseq) = 0 := by
   classical
   let fi : β → ℝ := fun y =>
-    if xseq i = x then (if y = z then (1 : ℝ) else 0) - (K.prob x z : ℝ) else 0
+    if xseq i = x then (if y = z then (1 : ℝ) else 0) - (K.nnprob x z : ℝ) else 0
   let gj : β → ℝ := fun y =>
-    if xseq j = x then (if y = z then (1 : ℝ) else 0) - (K.prob x z : ℝ) else 0
+    if xseq j = x then (if y = z then (1 : ℝ) else 0) - (K.nnprob x z : ℝ) else 0
   have htwo := conditionalProductMass_expect_two_coordinates
     (K := K) (xseq := xseq) (hij := hij) (f := fi) (g := gj)
   have hi_zero :
-      ∑ y : β, (K.prob (xseq i) y : ℝ) * fi y = 0 := by
+      ∑ y : β, (K.nnprob (xseq i) y : ℝ) * fi y = 0 := by
     have hcoord := conditionalProductMass_expect_coordinate K xseq i fi
     have hcenter := centeredPairIndicator_expect_eq_zero K xseq x z i
     calc
-      ∑ y : β, (K.prob (xseq i) y : ℝ) * fi y
+      ∑ y : β, (K.nnprob (xseq i) y : ℝ) * fi y
           =
         ∑ zseq : Fin n → β, (conditionalProductMass K xseq zseq : ℝ) * fi (zseq i) := hcoord.symm
       _ =
@@ -836,11 +801,11 @@ theorem centeredPairIndicator_cross_expect_eq_zero
           simp [fi, centeredPairIndicator]
       _ = 0 := hcenter
   have hj_zero :
-      ∑ y : β, (K.prob (xseq j) y : ℝ) * gj y = 0 := by
+      ∑ y : β, (K.nnprob (xseq j) y : ℝ) * gj y = 0 := by
     have hcoord := conditionalProductMass_expect_coordinate K xseq j gj
     have hcenter := centeredPairIndicator_expect_eq_zero K xseq x z j
     calc
-      ∑ y : β, (K.prob (xseq j) y : ℝ) * gj y
+      ∑ y : β, (K.nnprob (xseq j) y : ℝ) * gj y
           =
         ∑ zseq : Fin n → β, (conditionalProductMass K xseq zseq : ℝ) * gj (zseq j) := hcoord.symm
       _ =
@@ -861,30 +826,30 @@ theorem centeredPairIndicator_cross_expect_eq_zero
         refine Finset.sum_congr rfl fun zseq _ => ?_
         simp [fi, gj, centeredPairIndicator]
     _ =
-      (∑ y : β, (K.prob (xseq i) y : ℝ) * fi y) *
-        (∑ y : β, (K.prob (xseq j) y : ℝ) * gj y) := htwo
+      (∑ y : β, (K.nnprob (xseq i) y : ℝ) * fi y) *
+        (∑ y : β, (K.nnprob (xseq j) y : ℝ) * gj y) := htwo
     _ = 0 := by rw [hi_zero, zero_mul]
 
 theorem centeredPairIndicator_sq_le_inputIndicator
     [Fintype β] [DecidableEq α] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (x : α) (z : β)
+    (K : DMChannel α β) (xseq : Fin n → α) (x : α) (z : β)
     (i : Fin n) (zseq : Fin n → β) :
     (centeredPairIndicator K xseq x z i zseq) ^ 2 ≤
       if xseq i = x then (1 : ℝ) else 0 := by
   classical
   by_cases hx : xseq i = x
-  · have hq0 : 0 ≤ (K.prob x z : ℝ) := by positivity
-    have hq1 : (K.prob x z : ℝ) ≤ 1 := by
-      exact_mod_cast K.prob_le_one x z
+  · have hq0 : 0 ≤ (K.nnprob x z : ℝ) := by positivity
+    have hq1 : (K.nnprob x z : ℝ) ≤ 1 := by
+      exact_mod_cast K.nnprob_le_one x z
     have habs :
-        |(if zseq i = z then (1 : ℝ) else 0) - (K.prob x z : ℝ)| ≤ 1 := by
+        |(if zseq i = z then (1 : ℝ) else 0) - (K.nnprob x z : ℝ)| ≤ 1 := by
       by_cases hz : zseq i = z
       · simp [hz]
         rw [abs_le]
         constructor <;> nlinarith
       · simp [hz]
         exact hq1
-    have hsq : ((if zseq i = z then (1 : ℝ) else 0) - (K.prob x z : ℝ)) ^ 2 ≤ 1 := by
+    have hsq : ((if zseq i = z then (1 : ℝ) else 0) - (K.nnprob x z : ℝ)) ^ 2 ≤ 1 := by
       rw [sq_le_one_iff_abs_le_one]
       exact habs
     simpa [centeredPairIndicator, hx] using hsq
@@ -892,7 +857,7 @@ theorem centeredPairIndicator_sq_le_inputIndicator
 
 theorem centeredPairIndicator_sq_expect_le_inputIndicator
     [Fintype β] [DecidableEq α] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (x : α) (z : β)
+    (K : DMChannel α β) (xseq : Fin n → α) (x : α) (z : β)
     (i : Fin n) :
     ∑ zseq : Fin n → β,
         (conditionalProductMass K xseq zseq : ℝ) *
@@ -922,7 +887,7 @@ theorem centeredPairIndicator_sq_expect_le_inputIndicator
 
 theorem centeredPairIndicator_sum_sq_expect_le_wordCount
     [Fintype β] [DecidableEq α] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (x : α) (z : β) :
+    (K : DMChannel α β) (xseq : Fin n → α) (x : α) (z : β) :
     ∑ zseq : Fin n → β,
         (conditionalProductMass K xseq zseq : ℝ) *
           (∑ i : Fin n, centeredPairIndicator K xseq x z i zseq) ^ 2
@@ -1008,24 +973,24 @@ theorem centeredPairIndicator_sum_sq_expect_le_wordCount
 /-- Second moment of one pair-frequency deviation under the conditional product
 law `Z^n | X^n = x^n`. -/
 def pairDeviationSecondMoment [Fintype β] [DecidableEq α] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (x : α) (z : β) : ℝ :=
+    (K : DMChannel α β) (xseq : Fin n → α) (x : α) (z : β) : ℝ :=
   ∑ zseq : Fin n → β,
     (conditionalProductMass K xseq zseq : ℝ) *
-      (pairFreq xseq zseq x z - wordFreq xseq x * (K.prob x z : ℝ)) ^ 2
+      (pairFreq xseq zseq x z - wordFreq xseq x * (K.nnprob x z : ℝ)) ^ 2
 
 /-- Mass of the event where one pair-frequency deviation is at least `δ`. -/
 def pairDeviationBadMass [Fintype β] [DecidableEq α] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (x : α) (z : β) (δ : ℝ) :
+    (K : DMChannel α β) (xseq : Fin n → α) (x : α) (z : β) (δ : ℝ) :
     ℝ≥0 :=
   by
     classical
     exact conditionalEventMass K xseq
       (fun zseq =>
-        δ ≤ |pairFreq xseq zseq x z - wordFreq xseq x * (K.prob x z : ℝ)|)
+        δ ≤ |pairFreq xseq zseq x z - wordFreq xseq x * (K.nnprob x z : ℝ)|)
 
 theorem pairDeviationSecondMoment_nonneg
     [Fintype β] [DecidableEq α] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (x : α) (z : β) :
+    (K : DMChannel α β) (xseq : Fin n → α) (x : α) (z : β) :
     0 ≤ pairDeviationSecondMoment K xseq x z := by
   classical
   unfold pairDeviationSecondMoment
@@ -1034,7 +999,7 @@ theorem pairDeviationSecondMoment_nonneg
 
 theorem pairDeviationSecondMoment_le_wordCount_div_sq
     [Fintype β] [DecidableEq α] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (x : α) (z : β)
+    (K : DMChannel α β) (xseq : Fin n → α) (x : α) (z : β)
     (hn : 0 < n) :
     pairDeviationSecondMoment K xseq x z ≤
       (wordCount xseq x : ℝ) / (n : ℝ) ^ 2 := by
@@ -1044,7 +1009,7 @@ theorem pairDeviationSecondMoment_le_wordCount_div_sq
   calc
     ∑ zseq : Fin n → β,
         (conditionalProductMass K xseq zseq : ℝ) *
-          (pairFreq xseq zseq x z - wordFreq xseq x * (K.prob x z : ℝ)) ^ 2
+          (pairFreq xseq zseq x z - wordFreq xseq x * (K.nnprob x z : ℝ)) ^ 2
         =
       (∑ zseq : Fin n → β,
         (conditionalProductMass K xseq zseq : ℝ) *
@@ -1064,7 +1029,7 @@ pure finite-sum probability: bad-event mass times `δ²` is bounded by the secon
 moment of the deviation. -/
 theorem pairDeviationBadMass_mul_sq_le_secondMoment
     [Fintype β] [DecidableEq α] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (x : α) (z : β)
+    (K : DMChannel α β) (xseq : Fin n → α) (x : α) (z : β)
     {δ : ℝ} (hδ : 0 < δ) :
     (pairDeviationBadMass K xseq x z δ : ℝ) * δ ^ 2 ≤
       pairDeviationSecondMoment K xseq x z := by
@@ -1073,7 +1038,7 @@ theorem pairDeviationBadMass_mul_sq_le_secondMoment
   rw [NNReal.coe_sum]
   rw [Finset.sum_mul]
   refine Finset.sum_le_sum fun zseq _ => ?_
-  set d : ℝ := pairFreq xseq zseq x z - wordFreq xseq x * (K.prob x z : ℝ)
+  set d : ℝ := pairFreq xseq zseq x z - wordFreq xseq x * (K.nnprob x z : ℝ)
   change ((if δ ≤ |d| then conditionalProductMass K xseq zseq else 0 : ℝ≥0) : ℝ) *
       δ ^ 2 ≤ (conditionalProductMass K xseq zseq : ℝ) * d ^ 2
   by_cases hbad : δ ≤ |d|
@@ -1090,7 +1055,7 @@ theorem pairDeviationBadMass_mul_sq_le_secondMoment
 
 theorem pairDeviationBadMass_le_one_div_length_mul_sq
     [Fintype β] [DecidableEq α] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (x : α) (z : β)
+    (K : DMChannel α β) (xseq : Fin n → α) (x : α) (z : β)
     {δ : ℝ} (hn : 0 < n) (hδ : 0 < δ) :
     (pairDeviationBadMass K xseq x z δ : ℝ) ≤
       1 / ((n : ℝ) * δ ^ 2) := by
@@ -1121,7 +1086,7 @@ theorem pairDeviationBadMass_le_one_div_length_mul_sq
 
 theorem pairDeviationBadMass_sum_le_card_bound
     [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α)
+    (K : DMChannel α β) (xseq : Fin n → α)
     {δ : ℝ} (hn : 0 < n) (hδ : 0 < δ) :
     ∑ x : α, ∑ z : β, (pairDeviationBadMass K xseq x z δ : ℝ) ≤
       (Fintype.card α : ℝ) * (Fintype.card β : ℝ) /
@@ -1141,7 +1106,7 @@ theorem pairDeviationBadMass_sum_le_card_bound
 
 theorem conditionalNontypicalMass_le_pairDeviationBadMass_sum
     [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (δ : ℝ) :
+    (K : DMChannel α β) (xseq : Fin n → α) (δ : ℝ) :
     (conditionalNontypicalMass K xseq δ : ℝ)
       ≤ ∑ x : α, ∑ z : β, (pairDeviationBadMass K xseq x z δ : ℝ) := by
   classical
@@ -1154,7 +1119,7 @@ theorem conditionalNontypicalMass_le_pairDeviationBadMass_sum
         ≤
       ∑ zseq : Fin n → β, ∑ x : α, ∑ z : β,
         ((if δ ≤
-              |pairFreq xseq zseq x z - wordFreq xseq x * (K.prob x z : ℝ)| then
+              |pairFreq xseq zseq x z - wordFreq xseq x * (K.nnprob x z : ℝ)| then
             conditionalProductMass K xseq zseq else 0 : ℝ≥0) : ℝ) := by
         refine Finset.sum_le_sum fun zseq _ => ?_
         by_cases htyp : StrongConditionallyTypical K xseq zseq δ
@@ -1162,78 +1127,78 @@ theorem conditionalNontypicalMass_le_pairDeviationBadMass_sum
           exact Finset.sum_nonneg fun x _ =>
             Finset.sum_nonneg fun z _ => by
               by_cases hbad : δ ≤
-                  |pairFreq xseq zseq x z - wordFreq xseq x * (K.prob x z : ℝ)| <;>
+                  |pairFreq xseq zseq x z - wordFreq xseq x * (K.nnprob x z : ℝ)| <;>
                 simp [hbad]
         · have hx_exists : ∃ x : α, ¬ ∀ z : β,
-              |pairFreq xseq zseq x z - wordFreq xseq x * (K.prob x z : ℝ)| ≤ δ := by
+              |pairFreq xseq zseq x z - wordFreq xseq x * (K.nnprob x z : ℝ)| ≤ δ := by
             simpa [StrongConditionallyTypical] using not_forall.mp htyp
           rcases hx_exists with ⟨x0, hx0⟩
           have hz_exists : ∃ z : β,
-              ¬ |pairFreq xseq zseq x0 z - wordFreq xseq x0 * (K.prob x0 z : ℝ)| ≤ δ :=
+              ¬ |pairFreq xseq zseq x0 z - wordFreq xseq x0 * (K.nnprob x0 z : ℝ)| ≤ δ :=
             not_forall.mp hx0
           rcases hz_exists with ⟨z0, hz0⟩
           have hbad : δ ≤
-              |pairFreq xseq zseq x0 z0 - wordFreq xseq x0 * (K.prob x0 z0 : ℝ)| := by
+              |pairFreq xseq zseq x0 z0 - wordFreq xseq x0 * (K.nnprob x0 z0 : ℝ)| := by
             exact le_of_lt (lt_of_not_ge hz0)
           have hinner :
               (conditionalProductMass K xseq zseq : ℝ) ≤
                 ∑ z : β,
                   ((if δ ≤
-                        |pairFreq xseq zseq x0 z - wordFreq xseq x0 * (K.prob x0 z : ℝ)| then
+                        |pairFreq xseq zseq x0 z - wordFreq xseq x0 * (K.nnprob x0 z : ℝ)| then
                       conditionalProductMass K xseq zseq else 0 : ℝ≥0) : ℝ) := by
             calc
               (conditionalProductMass K xseq zseq : ℝ)
                   =
                 ((if δ ≤
                       |pairFreq xseq zseq x0 z0 -
-                        wordFreq xseq x0 * (K.prob x0 z0 : ℝ)| then
+                        wordFreq xseq x0 * (K.nnprob x0 z0 : ℝ)| then
                     conditionalProductMass K xseq zseq else 0 : ℝ≥0) : ℝ) := by
                     simp [hbad]
               _ ≤
                 ∑ z : β,
                   ((if δ ≤
-                        |pairFreq xseq zseq x0 z - wordFreq xseq x0 * (K.prob x0 z : ℝ)| then
+                        |pairFreq xseq zseq x0 z - wordFreq xseq x0 * (K.nnprob x0 z : ℝ)| then
                       conditionalProductMass K xseq zseq else 0 : ℝ≥0) : ℝ) := by
                     exact Finset.single_le_sum
                       (s := (Finset.univ : Finset β))
                       (f := fun z : β =>
                         ((if δ ≤
                               |pairFreq xseq zseq x0 z -
-                                wordFreq xseq x0 * (K.prob x0 z : ℝ)| then
+                                wordFreq xseq x0 * (K.nnprob x0 z : ℝ)| then
                             conditionalProductMass K xseq zseq else 0 : ℝ≥0) : ℝ))
                       (fun z _ => by
                         by_cases hbadz : δ ≤
                             |pairFreq xseq zseq x0 z -
-                              wordFreq xseq x0 * (K.prob x0 z : ℝ)| <;>
+                              wordFreq xseq x0 * (K.nnprob x0 z : ℝ)| <;>
                           simp [hbadz])
                       (Finset.mem_univ z0)
           have houter :
               (∑ z : β,
                   ((if δ ≤
-                        |pairFreq xseq zseq x0 z - wordFreq xseq x0 * (K.prob x0 z : ℝ)| then
+                        |pairFreq xseq zseq x0 z - wordFreq xseq x0 * (K.nnprob x0 z : ℝ)| then
                       conditionalProductMass K xseq zseq else 0 : ℝ≥0) : ℝ))
                 ≤
                 ∑ x : α, ∑ z : β,
                   ((if δ ≤
-                        |pairFreq xseq zseq x z - wordFreq xseq x * (K.prob x z : ℝ)| then
+                        |pairFreq xseq zseq x z - wordFreq xseq x * (K.nnprob x z : ℝ)| then
                       conditionalProductMass K xseq zseq else 0 : ℝ≥0) : ℝ) := by
             exact Finset.single_le_sum
               (s := (Finset.univ : Finset α))
               (f := fun x : α =>
                 ∑ z : β,
                   ((if δ ≤
-                        |pairFreq xseq zseq x z - wordFreq xseq x * (K.prob x z : ℝ)| then
+                        |pairFreq xseq zseq x z - wordFreq xseq x * (K.nnprob x z : ℝ)| then
                       conditionalProductMass K xseq zseq else 0 : ℝ≥0) : ℝ))
               (fun x _ => Finset.sum_nonneg fun z _ => by
                 by_cases hbadz : δ ≤
-                    |pairFreq xseq zseq x z - wordFreq xseq x * (K.prob x z : ℝ)| <;>
+                    |pairFreq xseq zseq x z - wordFreq xseq x * (K.nnprob x z : ℝ)| <;>
                   simp [hbadz])
               (Finset.mem_univ x0)
           simpa [htyp] using le_trans hinner houter
     _ =
       ∑ x : α, ∑ z : β, ∑ zseq : Fin n → β,
         ((if δ ≤
-              |pairFreq xseq zseq x z - wordFreq xseq x * (K.prob x z : ℝ)| then
+              |pairFreq xseq zseq x z - wordFreq xseq x * (K.nnprob x z : ℝ)| then
             conditionalProductMass K xseq zseq else 0 : ℝ≥0) : ℝ) := by
         rw [Finset.sum_comm]
         refine Finset.sum_congr rfl fun x _ => ?_
@@ -1241,7 +1206,7 @@ theorem conditionalNontypicalMass_le_pairDeviationBadMass_sum
 
 theorem conditionalTypicalMass_ge_one_sub_pairDeviationBadMass_sum
     [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α) (δ : ℝ) :
+    (K : DMChannel α β) (xseq : Fin n → α) (δ : ℝ) :
     1 - (∑ x : α, ∑ z : β, (pairDeviationBadMass K xseq x z δ : ℝ)) ≤
       (conditionalTypicalMass K xseq δ : ℝ) := by
   classical
@@ -1257,7 +1222,7 @@ theorem conditionalTypicalMass_ge_one_sub_pairDeviationBadMass_sum
 
 theorem conditionalTypicalMass_ge_one_sub_card_bound
     [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α)
+    (K : DMChannel α β) (xseq : Fin n → α)
     {δ : ℝ} (hn : 0 < n) (hδ : 0 < δ) :
     1 - ((Fintype.card α : ℝ) * (Fintype.card β : ℝ) /
         ((n : ℝ) * δ ^ 2)) ≤
@@ -1275,19 +1240,19 @@ This is obtained as the one-point-input special case of
 shared with the conditional typicality route used in HSW pack-1. -/
 theorem strongTypicalMass_ge_one_sub_card_bound
     [Fintype α] [DecidableEq α] {n : ℕ}
-    (p : QIT.FiniteDistribution α) {δ : ℝ} (hn : 0 < n) (hδ : 0 < δ) :
+    (p : ProbDistribution α) {δ : ℝ} (hn : 0 < n) (hδ : 0 < δ) :
     1 - ((Fintype.card α : ℝ) / ((n : ℝ) * δ ^ 2)) ≤
       (strongTypicalMass (n := n) p δ : ℝ) := by
   let xseq : Fin n → Unit := fun _ => ()
   have hcond :=
     conditionalTypicalMass_ge_one_sub_card_bound
-      (K := distributionKernel p) (xseq := xseq) hn hδ
-  rw [conditionalTypicalMass_distributionKernel_eq_strongTypicalMass p xseq δ hn] at hcond
+      (K := distributionChannel p) (xseq := xseq) hn hδ
+  rw [conditionalTypicalMass_distributionChannel_eq_strongTypicalMass p xseq δ hn] at hcond
   simpa using hcond
 
 theorem conditionalTypicalMass_ge_one_sub_epsilon_of_card_bound
     [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β] {n : ℕ}
-    (K : QIT.StochasticKernel α β) (xseq : Fin n → α)
+    (K : DMChannel α β) (xseq : Fin n → α)
     {δ ε : ℝ} (hn : 0 < n) (hδ : 0 < δ)
     (hlarge :
       (Fintype.card α : ℝ) * (Fintype.card β : ℝ) /
@@ -1299,7 +1264,7 @@ theorem conditionalTypicalMass_ge_one_sub_epsilon_of_card_bound
 /-- Marginal-typical event mass of `Z^n | X^n = x^n`, with typicality tested
 against the induced output marginal `p_Z`. -/
 def marginalTypicalMass [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β] {n : ℕ}
-    (p : QIT.FiniteDistribution α) (K : QIT.StochasticKernel α β)
+    (p : ProbDistribution α) (K : DMChannel α β)
     (xseq : Fin n → α) (δ : ℝ) : ℝ≥0 :=
   by
     classical
@@ -1329,20 +1294,15 @@ theorem wordFreq_eq_sum_pairFreq
   rw [wordCount_real_eq_sum_pairCount_real xseq zseq z]
   rw [Finset.sum_div]
 
-theorem finset_abs_sum_le_sum_abs {ι : Type*} [Fintype ι] (f : ι → ℝ) :
-    |∑ i, f i| ≤ ∑ i, |f i| := by
-  classical
-  simpa using Finset.abs_sum_le_sum_abs (s := Finset.univ) (f := f)
-
 /-- Strong input typicality plus conditional strong typicality implies marginal
 output strong typicality, with the explicit finite-alphabet slack
 `|α| * (δx + δc)`.
 
-This is the deterministic `conditional + marginal -> marginal` bridge used in
+This is the deterministic `conditional + marginal → marginal` bridge used in
 Wilde's proof after the conditional LLN step. -/
 theorem strongTypical_inducedMarginal_of_strongConditionallyTypical
     [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β] {n : ℕ}
-    (p : QIT.FiniteDistribution α) (K : QIT.StochasticKernel α β)
+    (p : ProbDistribution α) (K : DMChannel α β)
     (xseq : Fin n → α) (zseq : Fin n → β) {δx δc : ℝ}
     (hδx : 0 ≤ δx) (_hδc : 0 ≤ δc)
     (hx : StrongTypical p xseq δx)
@@ -1352,45 +1312,45 @@ theorem strongTypical_inducedMarginal_of_strongConditionallyTypical
   classical
   intro z
   have hrewrite :
-      wordFreq zseq z - ((inducedMarginal p K).prob z : ℝ) =
+      wordFreq zseq z - ((inducedMarginal p K).nnprob z : ℝ) =
         ∑ x : α,
-          (pairFreq xseq zseq x z - (p.prob x : ℝ) * (K.prob x z : ℝ)) := by
-    rw [inducedMarginal_prob]
+          (pairFreq xseq zseq x z - (p.nnprob x : ℝ) * (K.nnprob x z : ℝ)) := by
+    rw [inducedMarginal_nnprob]
     rw [wordFreq_eq_sum_pairFreq xseq zseq z]
     simp only [NNReal.coe_sum, NNReal.coe_mul]
     rw [← Finset.sum_sub_distrib]
   rw [hrewrite]
-  refine le_trans (finset_abs_sum_le_sum_abs (fun x : α =>
-      pairFreq xseq zseq x z - (p.prob x : ℝ) * (K.prob x z : ℝ))) ?_
+  refine le_trans (Finset.abs_sum_le_sum_abs (fun x : α =>
+      pairFreq xseq zseq x z - (p.nnprob x : ℝ) * (K.nnprob x z : ℝ)) Finset.univ) ?_
   calc
-    ∑ x : α, |pairFreq xseq zseq x z - (p.prob x : ℝ) * (K.prob x z : ℝ)|
+    ∑ x : α, |pairFreq xseq zseq x z - (p.nnprob x : ℝ) * (K.nnprob x z : ℝ)|
         ≤ ∑ x : α,
             (δc + δx) := by
           refine Finset.sum_le_sum fun x _ => ?_
           have hsplit :
-              pairFreq xseq zseq x z - (p.prob x : ℝ) * (K.prob x z : ℝ) =
-                (pairFreq xseq zseq x z - wordFreq xseq x * (K.prob x z : ℝ)) +
-                (wordFreq xseq x - (p.prob x : ℝ)) * (K.prob x z : ℝ) := by
+              pairFreq xseq zseq x z - (p.nnprob x : ℝ) * (K.nnprob x z : ℝ) =
+                (pairFreq xseq zseq x z - wordFreq xseq x * (K.nnprob x z : ℝ)) +
+                (wordFreq xseq x - (p.nnprob x : ℝ)) * (K.nnprob x z : ℝ) := by
             ring
           rw [hsplit]
           have h1 := hcond x z
-          have h2abs : |(wordFreq xseq x - (p.prob x : ℝ)) * (K.prob x z : ℝ)| ≤ δx := by
+          have h2abs : |(wordFreq xseq x - (p.nnprob x : ℝ)) * (K.nnprob x z : ℝ)| ≤ δx := by
             rw [abs_mul]
-            have hKnonneg : 0 ≤ (K.prob x z : ℝ) := by positivity
-            have hKle : (K.prob x z : ℝ) ≤ 1 := by
-              exact_mod_cast K.prob_le_one x z
+            have hKnonneg : 0 ≤ (K.nnprob x z : ℝ) := by positivity
+            have hKle : (K.nnprob x z : ℝ) ≤ 1 := by
+              exact_mod_cast K.nnprob_le_one x z
             have hxabs := hx x
             calc
-              |wordFreq xseq x - (p.prob x : ℝ)| * |(K.prob x z : ℝ)|
-                  = |wordFreq xseq x - (p.prob x : ℝ)| * (K.prob x z : ℝ) := by
+              |wordFreq xseq x - (p.nnprob x : ℝ)| * |(K.nnprob x z : ℝ)|
+                  = |wordFreq xseq x - (p.nnprob x : ℝ)| * (K.nnprob x z : ℝ) := by
                       rw [abs_of_nonneg hKnonneg]
               _ ≤ δx * 1 := mul_le_mul hxabs hKle hKnonneg hδx
               _ = δx := by ring
           calc
-            |(pairFreq xseq zseq x z - wordFreq xseq x * (K.prob x z : ℝ)) +
-                (wordFreq xseq x - (p.prob x : ℝ)) * (K.prob x z : ℝ)|
-                ≤ |pairFreq xseq zseq x z - wordFreq xseq x * (K.prob x z : ℝ)| +
-                    |(wordFreq xseq x - (p.prob x : ℝ)) * (K.prob x z : ℝ)| :=
+            |(pairFreq xseq zseq x z - wordFreq xseq x * (K.nnprob x z : ℝ)) +
+                (wordFreq xseq x - (p.nnprob x : ℝ)) * (K.nnprob x z : ℝ)|
+                ≤ |pairFreq xseq zseq x z - wordFreq xseq x * (K.nnprob x z : ℝ)| +
+                    |(wordFreq xseq x - (p.nnprob x : ℝ)) * (K.nnprob x z : ℝ)| :=
                     abs_add_le _ _
             _ ≤ δc + δx := add_le_add h1 h2abs
             _ = δc + δx := rfl
@@ -1401,7 +1361,7 @@ theorem strongTypical_inducedMarginal_of_strongConditionallyTypical
 
 theorem conditionalTypicalMass_le_marginalTypicalMass
     [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β] {n : ℕ}
-    (p : QIT.FiniteDistribution α) (K : QIT.StochasticKernel α β)
+    (p : ProbDistribution α) (K : DMChannel α β)
     (xseq : Fin n → α) {δx δc : ℝ}
     (hδx : 0 ≤ δx) (hδc : 0 ≤ δc)
     (hx : StrongTypical p xseq δx) :
@@ -1421,7 +1381,7 @@ theorem conditionalTypicalMass_le_marginalTypicalMass
 
 theorem marginalTypicalMass_ge_of_conditionalTypicalMass_ge
     [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β] {n : ℕ}
-    (p : QIT.FiniteDistribution α) (K : QIT.StochasticKernel α β)
+    (p : ProbDistribution α) (K : DMChannel α β)
     (xseq : Fin n → α) {δx δc η : ℝ}
     (hδx : 0 ≤ δx) (hδc : 0 ≤ δc)
     (hx : StrongTypical p xseq δx)
@@ -1441,7 +1401,7 @@ The tolerance in the marginal typicality test is the deterministic bridge slack
 `|α||β| / (n δc²) ≤ ε`; this is a concrete "sufficiently large `n`" hypothesis. -/
 theorem marginalTypicalMass_ge_one_sub_epsilon_of_conditionalTypicality
     [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β] {n : ℕ}
-    (p : QIT.FiniteDistribution α) (K : QIT.StochasticKernel α β)
+    (p : ProbDistribution α) (K : DMChannel α β)
     (xseq : Fin n → α) {δx δc ε : ℝ}
     (hn : 0 < n) (hδx : 0 ≤ δx) (hδc : 0 < δc)
     (hx : StrongTypical p xseq δx)

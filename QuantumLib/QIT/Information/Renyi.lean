@@ -27,7 +27,7 @@ public import QuantumLib.QIT.Information.Renyi.FrankLieb
 public import QuantumLib.QIT.Information.Renyi.AlphaEntropyContinuity
 public import QuantumLib.QIT.Information.Renyi.DirectSumMean
 public import QuantumLib.QIT.Information.Renyi.IsometryImageMean
-public import QuantumLib.QIT.Information.Renyi.RpowOperatorConvex
+public import QuantumLib.QIT.Util.RpowOperatorConvex
 public import QuantumLib.QIT.Information.Renyi.SandwichedMutualInformation
 public import QuantumLib.QIT.Information.Renyi.SandwichedRenyiMonotonicity
 public import QuantumLib.QIT.Information.Renyi.SandwichedRenyiOptimizedUSC
@@ -40,13 +40,3 @@ public import QuantumLib.QIT.Information.Renyi.RenyiOrderParameter
 Renyi divergences, conditional Renyi quantities, data-processing interfaces,
 limit bridges, and sandwiched-Renyi support tools.
 -/
-
-@[expose] public section
-
-namespace QIT
-namespace Information
-namespace Renyi
-
-end Renyi
-end Information
-end QIT

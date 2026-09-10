@@ -8,35 +8,41 @@ module
 
 public import QuantumLib.QIT.Asymptotic.FixedSmoothMinEntropy.PetzKernel
 
+/-!
+# Keeping the conditioning state fixed
+
+`MState.conditionalMinEntropyFixed ρ σ = sup {λ | ρ_AB ≤ 2^(-λ) (I_A ⊗ σ_B)}` is the min-entropy
+program with the reference `σ_B` frozen, and `smoothConditionalMinEntropyFixed` smooths the joint
+state in purified distance while keeping that same `σ_B` for every witness.  Optimizing over `σ_B`
+recovers the usual quantities, so each fixed-reference value is a lower bound on its optimized
+counterpart -- which is the direction the AEP needs, since the Petz route produces one explicit
+reference and must not be charged for the optimization.
+
+Each of the three variants (normalized, subnormalized, and normalized center with subnormalized
+witnesses) gets its candidate predicate, its `sSup` definition, the boundedness lemma that makes
+the `sSup` meaningful, and the comparison with the optimized quantity.  Boundedness is where the
+subnormalized case is delicate: it needs a positive lower bound on `Tr σ_B`, supplied here by
+`ConditionalMinEntropyFeasible_le_log2_card_sub_log2_trace_lower`.
+
+Two facts of independent interest fall out along the way:
+`conditionalMinEntropy_le_conditionalEntropy`, proved by perturbing an arbitrary feasible reference
+to a positive definite one, and the center migration lemmas that move a subnormalized smoothing
+ball from a subnormalized center to a normalized one.
+-/
+
 @[expose] public section
 
 open scoped ComplexOrder MatrixOrder Kronecker NNReal
 open Filter
 
-namespace QIT
-
-universe u v w
-
 noncomputable section
-
+universe u v w
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
-namespace State
 
-theorem fixedSmooth_trace_re_le_of_le {ι : Type*} [Fintype ι] {X Y : CMatrix ι}
-    (hXY : X ≤ Y) :
-    X.trace.re ≤ Y.trace.re := by
-  have hnon : 0 ≤ (Y - X).trace.re := (Matrix.PosSemidef.trace_nonneg hXY).1
-  have htrace : (Y - X).trace.re = Y.trace.re - X.trace.re := by
-    simp [Matrix.trace_sub]
-  linarith
+open QIT
 
-theorem fixedSmooth_identityTensorStateMatrix_trace_re (σ : State b) :
-    (identityTensorStateMatrix (a := a) σ).trace.re = (Fintype.card a : ℝ) := by
-  change (Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix a) σ.matrix).trace.re =
-    (Fintype.card a : ℝ)
-  rw [Matrix.trace_kronecker, σ.trace_eq_one, Matrix.trace_one]
-  norm_num
+namespace MState
 
 theorem rpow_two_mul_log2_pos {x gamma : ℝ} (hx : 0 < x) :
     Real.rpow 2 (gamma * log2 x) = x ^ gamma := by
@@ -77,17 +83,17 @@ theorem trace_conjTranspose_mul_hermitian_re_eq
 /-- Fuchs--van de Graaf lower bound gives a trace-distance control on
 purified distance. -/
 theorem purifiedDistance_le_sqrt_two_mul_normalizedTraceDistance
-    (ρ σ : State (Prod a b)) :
+    (ρ σ : MState (a × b)) :
     ρ.purifiedDistance σ ≤
       Real.sqrt (2 * ρ.normalizedTraceDistance σ) := by
   have hF_nonneg : 0 ≤ ρ.fidelity σ := ρ.fidelity_nonneg σ
   have hF_sq_le : ρ.fidelity σ ^ 2 ≤ 1 := by
-    simpa [State.squaredFidelity_eq_fidelity_sq] using
-      ρ.squaredFidelity_le_one_of_uhlmann σ
+    simpa [MState.squaredFidelity_eq_fidelity_sq] using
+      ρ.squaredFidelity_le_one σ
   have hF_le_one : ρ.fidelity σ ≤ 1 := by
     nlinarith [hF_nonneg, hF_sq_le]
   have hD_nonneg : 0 ≤ ρ.normalizedTraceDistance σ :=
-    State.normalizedTraceDistance_nonneg ρ σ
+    MState.normalizedTraceDistance_nonneg ρ σ
   have hlow : 1 - ρ.fidelity σ ≤ ρ.normalizedTraceDistance σ :=
     ρ.fuchs_van_de_graaf_lower σ
   have hprod :
@@ -97,53 +103,29 @@ theorem purifiedDistance_le_sqrt_two_mul_normalizedTraceDistance
     · nlinarith [hF_le_one]
     · nlinarith [hF_nonneg]
   have hsf_le_one : ρ.squaredFidelity σ ≤ 1 :=
-    ρ.squaredFidelity_le_one_of_uhlmann σ
+    ρ.squaredFidelity_le_one σ
   have harg_nonneg : 0 ≤ 1 - ρ.squaredFidelity σ := by
     linarith
-  rw [State.purifiedDistance_eq]
+  rw [MState.purifiedDistance_eq]
   refine Real.le_sqrt_of_sq_le ?_
   rw [Real.sq_sqrt harg_nonneg]
-  rw [State.squaredFidelity_eq_fidelity_sq]
+  rw [MState.squaredFidelity_eq_fidelity_sq]
   nlinarith [hprod]
-
-/-- The trace norm is continuous on finite-dimensional complex matrices.
-
-This local copy keeps the finite-AEP regularization path from importing the heavier
-trace-norm continuity dependencies into the basic trace-distance API. -/
-theorem finiteAEPTraceNorm_continuous
-    {ι : Type*} [Fintype ι] [DecidableEq ι] :
-    Continuous (traceNorm : CMatrix ι → ℝ) := by
-  have hgram : Continuous (fun M : CMatrix ι => star M * M) := by
-    exact (Continuous.star continuous_id).matrix_mul continuous_id
-  have hnonneg : ∀ M : CMatrix ι, (star M * M) ∈ {A : CMatrix ι | 0 ≤ A} := by
-    intro M
-    exact Matrix.nonneg_iff_posSemidef.mpr
-      (Matrix.posSemidef_conjTranspose_mul_self M)
-  have hsqrtOn :
-      ContinuousOn (CFC.sqrt : CMatrix ι → CMatrix ι) {A : CMatrix ι | 0 ≤ A} := by
-    exact CFC.continuousOn_sqrt
-  have hsqrt : Continuous (fun M : CMatrix ι => CFC.sqrt (star M * M)) := by
-    exact hsqrtOn.comp_continuous hgram hnonneg
-  have htrace : Continuous (fun M : CMatrix ι => (CFC.sqrt (star M * M)).trace) :=
-    Continuous.matrix_trace hsqrt
-  have hcont := Complex.continuous_re.comp htrace
-  simp only [Function.comp_def] at hcont
-  exact hcont
 
 /-- Normalized trace distance from a fixed state is continuous. -/
 theorem finiteAEP_normalizedTraceDistance_continuous_left
-    (σ : State (Prod a b)) :
-    Continuous fun ρ : State (Prod a b) => ρ.normalizedTraceDistance σ := by
-  rw [show (fun ρ : State (Prod a b) => ρ.normalizedTraceDistance σ) =
-      fun ρ : State (Prod a b) =>
-        (1 / 2 : ℝ) * traceNorm (ρ.matrix - σ.matrix) by
+    (σ : MState (a × b)) :
+    Continuous fun ρ : MState (a × b) => ρ.normalizedTraceDistance σ := by
+  rw [show (fun ρ : MState (a × b) => ρ.normalizedTraceDistance σ) =
+      fun ρ : MState (a × b) =>
+        (1 / 2 : ℝ) * traceNorm (ρ.m - σ.m) by
     funext ρ
-    rw [State.normalizedTraceDistance_eq_matrix, QIT.normalizedTraceDistance_eq,
+    rw [MState.normalizedTraceDistance_eq_matrix, QIT.normalizedTraceDistance_eq,
       QIT.traceNormDistance]]
   exact continuous_const.mul
-    (finiteAEPTraceNorm_continuous.comp (by fun_prop))
+    (QIT.traceNorm_continuous.comp (by fun_prop))
 
-private theorem log2_card_left_nonneg (ρ : State (Prod a b)) :
+private theorem log2_card_left_nonneg (ρ : MState (a × b)) :
     0 ≤ log2 (Fintype.card a : ℝ) := by
   have : Nonempty a := ⟨(Classical.choice ρ.nonempty).1⟩
   have hcard_one : 1 ≤ (Fintype.card a : ℝ) := by
@@ -152,55 +134,33 @@ private theorem log2_card_left_nonneg (ρ : State (Prod a b)) :
     (le_of_lt (Real.log_pos one_lt_two))
 
 theorem ConditionalMinEntropyFeasible_scale_lower_bound
-    {ρ : State (Prod a b)} {σ : State b} {lam : ℝ}
+    {ρ : MState (a × b)} {σ : MState b} {lam : ℝ}
     (h : ConditionalMinEntropyFeasible (a := a) ρ σ lam) :
     (Fintype.card a : ℝ)⁻¹ ≤ Real.rpow 2 (-lam) := by
   have : Nonempty a := ⟨(Classical.choice ρ.nonempty).1⟩
-  have htrace := fixedSmooth_trace_re_le_of_le h
-  have hleft : ρ.matrix.trace.re = 1 := by
-    rw [ρ.trace_eq_one]
+  have htrace := cMatrix_trace_re_le_of_le h
+  have hleft : ρ.m.trace.re = 1 := by
+    rw [ρ.tr']
     norm_num
   have hright :
       (((Real.rpow 2 (-lam) : ℂ) • identityTensorStateMatrix (a := a) σ).trace).re =
         Real.rpow 2 (-lam) * (Fintype.card a : ℝ) := by
     rw [Matrix.trace_smul]
-    simp [fixedSmooth_identityTensorStateMatrix_trace_re (a := a) σ]
+    simp [identityTensorStateMatrix_trace_re (a := a) σ]
   rw [hleft, hright] at htrace
   have hcard_pos : 0 < (Fintype.card a : ℝ) := by
     exact_mod_cast Fintype.card_pos_iff.mpr inferInstance
   rw [inv_le_iff_one_le_mul₀ hcard_pos]
   simpa [mul_comm] using htrace
 
-theorem ConditionalMinEntropyFeasible_le_log2_card_left
-    {ρ : State (Prod a b)} {σ : State b} {lam : ℝ}
-    (h : ConditionalMinEntropyFeasible (a := a) ρ σ lam) :
-    lam ≤ log2 (Fintype.card a : ℝ) := by
-  have : Nonempty a := ⟨(Classical.choice ρ.nonempty).1⟩
-  have hscale := ConditionalMinEntropyFeasible_scale_lower_bound (a := a) h
-  have hcard_pos : 0 < (Fintype.card a : ℝ) := by
-    exact_mod_cast Fintype.card_pos_iff.mpr inferInstance
-  have hlog := Real.log_le_log (inv_pos.mpr hcard_pos) hscale
-  have hlog2_nonneg : 0 ≤ Real.log 2 := le_of_lt (Real.log_pos one_lt_two)
-  have hdiv := div_le_div_of_nonneg_right hlog hlog2_nonneg
-  change log2 ((Fintype.card a : ℝ)⁻¹) ≤
-    log2 (Real.rpow 2 (-lam)) at hdiv
-  have hneg := neg_le_neg hdiv
-  have hcard :
-      -log2 ((Fintype.card a : ℝ)⁻¹) = log2 (Fintype.card a : ℝ) := by
-    unfold log2
-    rw [Real.log_inv]
-    ring
-  rw [neg_log2_rpow_two_neg lam, hcard] at hneg
-  exact hneg
-
 private theorem conditionalMinEntropyFeasibleSet_bddAbove
-    (ρ : State (Prod a b)) :
-    BddAbove {lam : ℝ | ∃ τ : State b,
+    (ρ : MState (a × b)) :
+    BddAbove {lam : ℝ | ∃ τ : MState b,
       ConditionalMinEntropyFeasible (a := a) ρ τ lam} := by
   refine ⟨log2 (Fintype.card a : ℝ), ?_⟩
   intro lam hlam
   rcases hlam with ⟨τ, hτ⟩
-  exact ConditionalMinEntropyFeasible_le_log2_card_left (a := a) hτ
+  exact conditionalMinEntropyFeasible_le_log2_card_left (a := a) hτ
 
 /-! ## Fixed-reference conditional min-entropy -/
 
@@ -208,12 +168,12 @@ private theorem conditionalMinEntropyFeasibleSet_bddAbove
 
 This is the fixed-reference candidate
 `sup {λ | ρ_AB ≤ 2^{-λ} (I_A ⊗ σ_B)}`.  Optimizing this quantity over `σ_B`
-recovers the candidate set used by `State.conditionalMinEntropy`. -/
-def conditionalMinEntropyFixed (ρ : State (Prod a b)) (σ : State b) : ℝ :=
+recovers the candidate set used by `MState.conditionalMinEntropy`. -/
+def conditionalMinEntropyFixed (ρ : MState (a × b)) (σ : MState b) : ℝ :=
   sSup {lam : ℝ | ConditionalMinEntropyFeasible (a := a) ρ σ lam}
 
 @[simp]
-theorem conditionalMinEntropyFixed_eq (ρ : State (Prod a b)) (σ : State b) :
+theorem conditionalMinEntropyFixed_eq (ρ : MState (a × b)) (σ : MState b) :
     ρ.conditionalMinEntropyFixed σ =
       sSup {lam : ℝ | ConditionalMinEntropyFeasible (a := a) ρ σ lam} :=
   rfl
@@ -225,7 +185,7 @@ The nonemptiness hypothesis is necessary for this real-valued `sSup` API:
 if the fixed `σ_B` has no feasible exponent, the mathematical value should be
 `-∞`, while Lean's real `sSup ∅` is `0`. -/
 theorem conditionalMinEntropyFixed_le_conditionalMinEntropy
-    (ρ : State (Prod a b)) (σ : State b)
+    (ρ : MState (a × b)) (σ : MState b)
     (hfixed : ({lam : ℝ |
       ConditionalMinEntropyFeasible (a := a) ρ σ lam}).Nonempty) :
     ρ.conditionalMinEntropyFixed σ ≤ ρ.conditionalMinEntropy := by
@@ -233,37 +193,24 @@ theorem conditionalMinEntropyFixed_le_conditionalMinEntropy
   refine csSup_le hfixed ?_
   intro lam hlam
   exact le_csSup (conditionalMinEntropyFeasibleSet_bddAbove (a := a) ρ)
-    (show ∃ τ : State b, ConditionalMinEntropyFeasible (a := a) ρ τ lam from
+    (show ∃ τ : MState b, ConditionalMinEntropyFeasible (a := a) ρ τ lam from
       ⟨σ, hlam⟩)
 
 /-- Fixed-reference conditional min-entropy is bounded above by the left-system
 dimension. -/
 theorem conditionalMinEntropyFixed_le_log2_card_left
-    (ρ : State (Prod a b)) (σ : State b) :
+    (ρ : MState (a × b)) (σ : MState b) :
     ρ.conditionalMinEntropyFixed σ ≤ log2 (Fintype.card a : ℝ) := by
   rw [conditionalMinEntropyFixed_eq]
   by_cases hne :
       ({lam : ℝ | ConditionalMinEntropyFeasible (a := a) ρ σ lam}).Nonempty
   · exact csSup_le hne fun lam hlam =>
-      ConditionalMinEntropyFeasible_le_log2_card_left (a := a) hlam
-  · rw [Set.not_nonempty_iff_eq_empty.mp hne, Real.sSup_empty]
-    exact log2_card_left_nonneg (a := a) ρ
-
-private theorem conditionalMinEntropy_le_log2_card_left_of_fixedSmooth
-    (ρ : State (Prod a b)) :
-    ρ.conditionalMinEntropy ≤ log2 (Fintype.card a : ℝ) := by
-  rw [conditionalMinEntropy_eq]
-  by_cases hne :
-      ({lam : ℝ | ∃ τ : State b,
-        ConditionalMinEntropyFeasible (a := a) ρ τ lam}).Nonempty
-  · exact csSup_le hne fun lam hlam =>
-      let ⟨_, hτ⟩ := hlam
-      ConditionalMinEntropyFeasible_le_log2_card_left (a := a) hτ
+      conditionalMinEntropyFeasible_le_log2_card_left (a := a) hlam
   · rw [Set.not_nonempty_iff_eq_empty.mp hne, Real.sSup_empty]
     exact log2_card_left_nonneg (a := a) ρ
 
 theorem ConditionalMinEntropyFeasible_le_conditionalEntropy_of_posDef_reference
-    (ρ : State (Prod a b)) (σ : State b) (hσ : σ.matrix.PosDef) {lam : ℝ}
+    (ρ : MState (a × b)) (σ : MState b) (hσ : σ.m.PosDef) {lam : ℝ}
     (hfeas : ConditionalMinEntropyFeasible (a := a) ρ σ lam) :
     lam ≤ ρ.conditionalEntropy :=
   conditionalMinEntropyFeasible_le_conditionalEntropy_of_supportTraceLog_nonneg
@@ -272,10 +219,10 @@ theorem ConditionalMinEntropyFeasible_le_conditionalEntropy_of_posDef_reference
       (ρ := ρ) (σ := σ) hσ hfeas)
 
 private theorem ConditionalMinEntropyFeasible.exists_posDef_reference_below
-    {ρ : State (Prod a b)} {σ : State b} {lam μ : ℝ}
+    {ρ : MState (a × b)} {σ : MState b} {lam μ : ℝ}
     (hfeas : ConditionalMinEntropyFeasible (a := a) ρ σ lam)
     (hμ : μ < lam) :
-    ∃ σ' : State b, σ'.matrix.PosDef ∧
+    ∃ σ' : MState b, σ'.m.PosDef ∧
       ConditionalMinEntropyFeasible (a := a) ρ σ' μ := by
   classical
   let : Nonempty b := σ.nonempty
@@ -296,18 +243,18 @@ private theorem ConditionalMinEntropyFeasible.exists_posDef_reference_below
   have hp_pos : 0 < p := by
     dsimp [p]
     linarith
-  let m : State b := State.maximallyMixed b
-  let σ' : State b := State.regularizedWithState σ m p hp0 hp1
-  have hσ'pos : σ'.matrix.PosDef := by
+  let m : MState b := (MState.uniform : MState b)
+  let σ' : MState b := MState.regularizedWithState σ m p hp0 hp1
+  have hσ'pos : σ'.m.PosDef := by
     simpa [σ'] using
-      State.regularizedWithState_posDef_of_noise σ m
-        (State.maximallyMixed_posDef (a := b)) hp0 hp1 hp_pos
+      MState.regularizedWithState_posDef_of_noise σ m
+        (MState.uniform_posDef (d := b)) hp0 hp1 hp_pos
   refine ⟨σ', hσ'pos, ?_⟩
   rw [ConditionalMinEntropyFeasible] at hfeas ⊢
   let cμ : ℝ := Real.rpow 2 (-μ)
   let cLam : ℝ := Real.rpow 2 (-lam)
-  let Tσ : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) σ
-  let Tm : CMatrix (Prod a b) := identityTensorStateMatrix (a := a) m
+  let Tσ : CMatrix (a × b) := identityTensorStateMatrix (a := a) σ
+  let Tm : CMatrix (a × b) := identityTensorStateMatrix (a := a) m
   have hcμ_nonneg : 0 ≤ cμ := by
     dsimp [cμ]
     exact Real.rpow_nonneg (by norm_num : (0 : ℝ) ≤ 2) (-μ)
@@ -329,7 +276,7 @@ private theorem ConditionalMinEntropyFeasible.exists_posDef_reference_below
       identityTensorStateMatrix (a := a) σ' =
         ((1 - p : ℝ) : ℂ) • Tσ + ((p : ℝ) : ℂ) • Tm := by
     ext x y
-    simp [σ', State.regularizedWithState_matrix, State.regularizedStateMatrix,
+    simp [σ', MState.regularizedWithState_matrix, MState.regularizedStateMatrix,
       Tσ, Tm, identityTensorStateMatrix, Matrix.kronecker, Matrix.kroneckerMap_apply,
       Complex.real_smul]
     ring
@@ -348,11 +295,11 @@ private theorem ConditionalMinEntropyFeasible.exists_posDef_reference_below
     have hscaleC : (0 : ℂ) ≤ ((cμ * p : ℝ) : ℂ) := by
       exact_mod_cast mul_nonneg hcμ_nonneg hp_nonneg
     simpa [Matrix.le_iff, Tm] using
-      Matrix.PosSemidef.smul (identityTensorStateMatrix_posSemidef_of_state (a := a) m)
+      Matrix.PosSemidef.smul (identityTensorStateMatrix_posSemidef (a := a) m)
         hscaleC)
 
 theorem ConditionalMinEntropyFeasible_le_conditionalEntropy
-    (ρ : State (Prod a b)) (σ : State b) {lam : ℝ}
+    (ρ : MState (a × b)) (σ : MState b) {lam : ℝ}
     (hfeas : ConditionalMinEntropyFeasible (a := a) ρ σ lam) :
     lam ≤ ρ.conditionalEntropy := by
   by_contra hnot
@@ -373,7 +320,7 @@ theorem ConditionalMinEntropyFeasible_le_conditionalEntropy
   linarith
 
 theorem conditionalMinEntropy_le_conditionalEntropy
-    (ρ : State (Prod a b)) :
+    (ρ : MState (a × b)) :
     ρ.conditionalMinEntropy ≤ ρ.conditionalEntropy := by
   classical
   let : Nonempty b := by
@@ -395,22 +342,22 @@ theorem conditionalMinEntropy_le_conditionalEntropy
 The nearby state is smoothed in purified distance, while the side-information
 reference `σ_B` is kept fixed in the unsmoothed min-entropy of each witness. -/
 def SmoothConditionalMinEntropyFixedCandidate
-    (ρ : State (Prod a b)) (σ : State b) (ε h : ℝ) : Prop :=
-  ∃ ρ' : State (Prod a b), ρ.purifiedBall ε ρ' ∧
+    (ρ : MState (a × b)) (σ : MState b) (ε h : ℝ) : Prop :=
+  ∃ ρ' : MState (a × b), ρ.purifiedBall ε ρ' ∧
     h = ρ'.conditionalMinEntropyFixed σ
 
 @[simp]
 theorem SmoothConditionalMinEntropyFixedCandidate_eq
-    (ρ : State (Prod a b)) (σ : State b) (ε h : ℝ) :
+    (ρ : MState (a × b)) (σ : MState b) (ε h : ℝ) :
     SmoothConditionalMinEntropyFixedCandidate (a := a) ρ σ ε h ↔
-      ∃ ρ' : State (Prod a b), ρ.purifiedBall ε ρ' ∧
+      ∃ ρ' : MState (a × b), ρ.purifiedBall ε ρ' ∧
         h = ρ'.conditionalMinEntropyFixed σ :=
   Iff.rfl
 
 /-- Fixed-reference smooth min-entropy candidates are monotone in the smoothing
 radius. -/
 theorem SmoothConditionalMinEntropyFixedCandidate_mono
-    {ρ : State (Prod a b)} {σ : State b} {ε δ h : ℝ} (hεδ : ε ≤ δ) :
+    {ρ : MState (a × b)} {σ : MState b} {ε δ h : ℝ} (hεδ : ε ≤ δ) :
     SmoothConditionalMinEntropyFixedCandidate (a := a) ρ σ ε h →
       SmoothConditionalMinEntropyFixedCandidate (a := a) ρ σ δ h := by
   rintro ⟨ρ', hball, hh⟩
@@ -419,11 +366,11 @@ theorem SmoothConditionalMinEntropyFixedCandidate_mono
 /-- Fixed-reference smooth conditional min-entropy as the supremum of
 fixed-reference min-entropies over the purified-distance epsilon ball. -/
 def smoothConditionalMinEntropyFixed
-    (ρ : State (Prod a b)) (σ : State b) (ε : ℝ) : ℝ :=
+    (ρ : MState (a × b)) (σ : MState b) (ε : ℝ) : ℝ :=
   sSup {h : ℝ | SmoothConditionalMinEntropyFixedCandidate (a := a) ρ σ ε h}
 
 theorem smoothConditionalMinEntropyFixed_eq_sSup_candidates
-    (ρ : State (Prod a b)) (σ : State b) (ε : ℝ) :
+    (ρ : MState (a × b)) (σ : MState b) (ε : ℝ) :
     ρ.smoothConditionalMinEntropyFixed σ ε =
       sSup {h : ℝ |
         SmoothConditionalMinEntropyFixedCandidate (a := a) ρ σ ε h} :=
@@ -431,17 +378,17 @@ theorem smoothConditionalMinEntropyFixed_eq_sSup_candidates
 
 @[simp]
 theorem smoothConditionalMinEntropyFixed_eq
-    (ρ : State (Prod a b)) (σ : State b) (ε : ℝ) :
+    (ρ : MState (a × b)) (σ : MState b) (ε : ℝ) :
     ρ.smoothConditionalMinEntropyFixed σ ε =
       sSup {h : ℝ |
-        ∃ ρ' : State (Prod a b), ρ.purifiedBall ε ρ' ∧
+        ∃ ρ' : MState (a × b), ρ.purifiedBall ε ρ' ∧
           h = ρ'.conditionalMinEntropyFixed σ} :=
   rfl
 
 /-- Fixed-reference smooth min-entropy candidates are bounded above by the
 left-system dimension. -/
 theorem SmoothConditionalMinEntropyFixedCandidate_bddAbove
-    (ρ : State (Prod a b)) (σ : State b) (ε : ℝ) :
+    (ρ : MState (a × b)) (σ : MState b) (ε : ℝ) :
     BddAbove {h : ℝ |
       SmoothConditionalMinEntropyFixedCandidate (a := a) ρ σ ε h} := by
   refine ⟨log2 (Fintype.card a : ℝ), ?_⟩
@@ -452,14 +399,14 @@ theorem SmoothConditionalMinEntropyFixedCandidate_bddAbove
 /-- Fixed-reference smooth conditional min-entropy is monotone in the smoothing
 radius. -/
 theorem smoothConditionalMinEntropyFixed_mono
-    {ρ : State (Prod a b)} {σ : State b} {ε δ : ℝ}
+    {ρ : MState (a × b)} {σ : MState b} {ε δ : ℝ}
     (hε : 0 ≤ ε) (hεδ : ε ≤ δ) :
     ρ.smoothConditionalMinEntropyFixed σ ε ≤
       ρ.smoothConditionalMinEntropyFixed σ δ := by
   rw [smoothConditionalMinEntropyFixed_eq_sSup_candidates,
     smoothConditionalMinEntropyFixed_eq_sSup_candidates]
   refine csSup_le ?_ ?_
-  · exact ⟨ρ.conditionalMinEntropyFixed σ, ρ, State.purifiedBall_self_of_nonneg ρ hε, rfl⟩
+  · exact ⟨ρ.conditionalMinEntropyFixed σ, ρ, MState.purifiedBall_self_of_nonneg ρ hε, rfl⟩
   intro h hh
   exact le_csSup
     (SmoothConditionalMinEntropyFixedCandidate_bddAbove (a := a) ρ σ δ)
@@ -469,16 +416,16 @@ theorem smoothConditionalMinEntropyFixed_mono
 /-- Fixed-reference smooth min-entropy is bounded by the normalized-candidate
 optimized smooth min-entropy variant. -/
 theorem smoothConditionalMinEntropyFixed_le_smoothConditionalMinEntropyNormalizedCandidates
-    (ρ : State (Prod a b)) (σ : State b) (ε : ℝ)
+    (ρ : MState (a × b)) (σ : MState b) (ε : ℝ)
     (hε : 0 ≤ ε)
-    (hfixed : ∀ ρ' : State (Prod a b), ρ.purifiedBall ε ρ' →
+    (hfixed : ∀ ρ' : MState (a × b), ρ.purifiedBall ε ρ' →
       ({lam : ℝ | ConditionalMinEntropyFeasible (a := a) ρ' σ lam}).Nonempty) :
     ρ.smoothConditionalMinEntropyFixed σ ε ≤
       ρ.smoothConditionalMinEntropyNormalizedCandidates ε := by
   rw [smoothConditionalMinEntropyFixed_eq_sSup_candidates,
     smoothConditionalMinEntropyNormalizedCandidates_eq_sSup_candidates]
   refine csSup_le ?_ ?_
-  · exact ⟨ρ.conditionalMinEntropyFixed σ, ρ, State.purifiedBall_self_of_nonneg ρ hε, rfl⟩
+  · exact ⟨ρ.conditionalMinEntropyFixed σ, ρ, MState.purifiedBall_self_of_nonneg ρ hε, rfl⟩
   intro h hh
   rcases hh with ⟨ρ', hball, rfl⟩
   exact le_trans
@@ -488,18 +435,11 @@ theorem smoothConditionalMinEntropyFixed_le_smoothConditionalMinEntropyNormalize
       (show SmoothConditionalMinEntropyCandidate (a := a) ρ ε
         ρ'.conditionalMinEntropy from ⟨ρ', hball, rfl⟩))
 
-end State
+end MState
+
+namespace QIT
 
 namespace SubnormalizedState
-
-
-private theorem trace_re_le_of_le {ι : Type*} [Fintype ι] {X Y : CMatrix ι}
-    (hXY : X ≤ Y) :
-    X.trace.re ≤ Y.trace.re := by
-  have hnon : 0 ≤ (Y - X).trace.re := (Matrix.PosSemidef.trace_nonneg hXY).1
-  have htrace : (Y - X).trace.re = Y.trace.re - X.trace.re := by
-    simp [Matrix.trace_sub]
-  linarith
 
 private theorem identityTensorStateMatrix_trace_re_le_card
     (σ : SubnormalizedState b) :
@@ -514,12 +454,12 @@ private theorem identityTensorStateMatrix_trace_re_le_card
 
 private theorem ConditionalMinEntropyFeasible_scale_lower_bound_of_trace_lower
     [Nonempty a]
-    {ρ : SubnormalizedState (Prod a b)} {σ : SubnormalizedState b}
+    {ρ : SubnormalizedState (a × b)} {σ : SubnormalizedState b}
     {lam δ : ℝ}
     (_hδ : 0 < δ) (hδρ : δ ≤ ρ.matrix.trace.re)
     (h : ConditionalMinEntropyFeasible (a := a) ρ σ lam) :
     δ / (Fintype.card a : ℝ) ≤ Real.rpow 2 (-lam) := by
-  have htrace := trace_re_le_of_le h
+  have htrace := cMatrix_trace_re_le_of_le h
   have hright_le :
       (((Real.rpow 2 (-lam) : ℂ) • identityTensorStateMatrix (a := a) σ).trace).re ≤
         Real.rpow 2 (-lam) * (Fintype.card a : ℝ) := by
@@ -534,105 +474,22 @@ private theorem ConditionalMinEntropyFeasible_scale_lower_bound_of_trace_lower
     exact_mod_cast Fintype.card_pos_iff.mpr inferInstance
   exact (div_le_iff₀ hcard_pos).mpr hδ_le
 
-/-- Every subnormalized finite-dimensional state is bounded above by the
-identity operator. -/
-theorem matrix_le_one_forFixedSmooth (ρ : SubnormalizedState a) :
-    ρ.matrix ≤ 1 := by
-  have htrace :
-      ρ.matrix ≤ (((ρ.matrix.trace.re : ℝ) : ℂ) • (1 : CMatrix a)) :=
-    State.posSemidef_le_trace_re_smul_one ρ.pos
-  have htrace_le_one :
-      (((ρ.matrix.trace.re : ℝ) : ℂ) • (1 : CMatrix a)) ≤ 1 := by
-    rw [Matrix.le_iff]
-    have hdiff :
-        (1 : CMatrix a) - (((ρ.matrix.trace.re : ℝ) : ℂ) • (1 : CMatrix a)) =
-          (((1 - ρ.matrix.trace.re : ℝ) : ℂ) • (1 : CMatrix a)) := by
-      ext i j
-      by_cases hij : i = j
-      · subst hij
-        simp
-      · simp [hij]
-    rw [hdiff]
-    have hscalar : (0 : ℂ) ≤ (((1 - ρ.matrix.trace.re : ℝ) : ℝ) : ℂ) := by
-      exact_mod_cast sub_nonneg.mpr ρ.trace_le_one
-    exact Matrix.PosSemidef.smul Matrix.PosSemidef.one hscalar
-  exact le_trans htrace htrace_le_one
-
-private theorem exists_pos_scalar_smul_one_le_matrix_of_posDef_forFixedSmooth
-    (σ : State b) (hσ : σ.matrix.PosDef) :
-    ∃ c : ℝ, 0 < c ∧ c • (1 : CMatrix b) ≤ σ.matrix := by
-  classical
-  have : Nonempty b := σ.nonempty
-  let c : ℝ := Finset.univ.inf' Finset.univ_nonempty
-    (fun i : b => hσ.1.eigenvalues i)
-  have hc_pos : 0 < c := by
-    dsimp [c]
-    rw [Finset.lt_inf'_iff]
-    intro i _hi
-    exact hσ.eigenvalues_pos i
-  have hc_le_eig : ∀ i : b, c ≤ hσ.1.eigenvalues i := by
-    intro i
-    exact Finset.inf'_le (f := fun i : b => hσ.1.eigenvalues i) (Finset.mem_univ i)
-  refine ⟨c, hc_pos, ?_⟩
-  rw [Matrix.le_iff]
-  let U : Matrix.unitaryGroup b ℂ := hσ.1.eigenvectorUnitary
-  let D : CMatrix b := Matrix.diagonal fun i => ((hσ.1.eigenvalues i : ℝ) : ℂ)
-  have hdiag : σ.matrix = (U : CMatrix b) * D * star (U : CMatrix b) := by
-    simpa [U, D, Matrix.IsHermitian.spectral_theorem, Unitary.conjStarAlgAut_apply,
-      Function.comp_def] using hσ.1.spectral_theorem
-  have hUstar : (U : CMatrix b) * star (U : CMatrix b) = 1 := by
-    simp
-  have hscalar :
-      (U : CMatrix b) * (c • (1 : CMatrix b)) * star (U : CMatrix b) =
-        c • (1 : CMatrix b) := by
-    calc
-      (U : CMatrix b) * (c • (1 : CMatrix b)) * star (U : CMatrix b) =
-          c • ((U : CMatrix b) * (1 : CMatrix b) * star (U : CMatrix b)) := by
-            simp
-      _ = c • (1 : CMatrix b) := by
-            rw [Matrix.mul_one, hUstar]
-  have hsub :
-      σ.matrix - c • (1 : CMatrix b) =
-        (U : CMatrix b) * (D - c • (1 : CMatrix b)) * star (U : CMatrix b) := by
-    calc
-      σ.matrix - c • (1 : CMatrix b) =
-          (U : CMatrix b) * D * star (U : CMatrix b) -
-            (U : CMatrix b) * (c • (1 : CMatrix b)) * star (U : CMatrix b) := by
-            rw [hdiag, hscalar]
-      _ = (U : CMatrix b) * (D - c • (1 : CMatrix b)) * star (U : CMatrix b) := by
-            rw [Matrix.mul_sub, Matrix.sub_mul]
-  have hdiag_sub :
-      D - c • (1 : CMatrix b) =
-        Matrix.diagonal fun i => (((hσ.1.eigenvalues i : ℝ) - c : ℝ) : ℂ) := by
-    ext i j
-    by_cases hij : i = j
-    · subst hij
-      simp [D]
-    · simp [D, Matrix.diagonal, hij]
-  rw [hsub]
-  rw [Matrix.IsUnit.posSemidef_star_right_conjugate_iff (Unitary.isUnit_coe :
-    IsUnit (U : CMatrix b))]
-  rw [hdiag_sub]
-  rw [Matrix.posSemidef_diagonal_iff]
-  intro i
-  exact_mod_cast sub_nonneg.mpr (hc_le_eig i)
-
 private theorem one_le_inv_smul_identityTensorStateMatrix_toSubnormalized_of_posDef
-    (σ : State b) (hσ : σ.matrix.PosDef) :
+    (σ : MState b) (hσ : σ.m.PosDef) :
     ∃ c : ℝ, 0 < c ∧
-      (1 : CMatrix (Prod a b)) ≤
+      (1 : CMatrix (a × b)) ≤
         ((c⁻¹ : ℝ) : ℂ) • identityTensorStateMatrix (a := a) σ.toSubnormalized := by
-  rcases exists_pos_scalar_smul_one_le_matrix_of_posDef_forFixedSmooth σ hσ
+  rcases MState.exists_pos_scalar_smul_one_le_matrix_of_posDef σ hσ
     with ⟨c, hc_pos, hc_le⟩
   refine ⟨c, hc_pos, ?_⟩
-  have hdiffB : (σ.matrix - c • (1 : CMatrix b)).PosSemidef := by
+  have hdiffB : (σ.m - c • (1 : CMatrix b)).PosSemidef := by
     simpa [Matrix.le_iff] using hc_le
   rw [Matrix.le_iff]
   have hdiff :
       ((c⁻¹ : ℝ) : ℂ) • identityTensorStateMatrix (a := a) σ.toSubnormalized -
-          (1 : CMatrix (Prod a b)) =
+          (1 : CMatrix (a × b)) =
         ((c⁻¹ : ℝ) : ℂ) •
-          Matrix.kronecker (1 : CMatrix a) (σ.matrix - c • (1 : CMatrix b)) := by
+          Matrix.kronecker (1 : CMatrix a) (σ.m - c • (1 : CMatrix b)) := by
     ext x y
     rcases x with ⟨xa, xb⟩
     rcases y with ⟨ya, yb⟩
@@ -656,7 +513,7 @@ private theorem one_le_inv_smul_identityTensorStateMatrix_toSubnormalized_of_pos
 subnormalized joint witness feasible for some fixed-reference min-entropy
 exponent. -/
 theorem conditionalMinEntropyFixed_feasibleSet_nonempty_of_posDef_reference
-    (ρ : SubnormalizedState (Prod a b)) (σ : State b) (hσ : σ.matrix.PosDef) :
+    (ρ : SubnormalizedState (a × b)) (σ : MState b) (hσ : σ.m.PosDef) :
     ({lam : ℝ |
       ConditionalMinEntropyFeasible (a := a) ρ σ.toSubnormalized lam}).Nonempty := by
   rcases one_le_inv_smul_identityTensorStateMatrix_toSubnormalized_of_posDef
@@ -666,7 +523,7 @@ theorem conditionalMinEntropyFixed_feasibleSet_nonempty_of_posDef_reference
   have hρ_le :
       ρ.matrix ≤
         ((c⁻¹ : ℝ) : ℂ) • identityTensorStateMatrix (a := a) σ.toSubnormalized :=
-    le_trans ρ.matrix_le_one_forFixedSmooth hone_le
+    le_trans ρ.matrix_le_one hone_le
   have hrpow : Real.rpow 2 (-lam) = c⁻¹ := by
     dsimp [lam]
     rw [neg_neg]
@@ -678,7 +535,7 @@ theorem conditionalMinEntropyFixed_feasibleSet_nonempty_of_posDef_reference
 
 private theorem ConditionalMinEntropyFeasible_le_log2_card_sub_log2_trace_lower
     [Nonempty a]
-    {ρ : SubnormalizedState (Prod a b)} {σ : SubnormalizedState b}
+    {ρ : SubnormalizedState (a × b)} {σ : SubnormalizedState b}
     {lam δ : ℝ}
     (hδ : 0 < δ) (hδρ : δ ≤ ρ.matrix.trace.re)
     (h : ConditionalMinEntropyFeasible (a := a) ρ σ lam) :
@@ -712,12 +569,12 @@ private theorem ConditionalMinEntropyFeasible_le_log2_card_sub_log2_trace_lower
 Both the joint witness and the side reference are subnormalized, matching the
 subnormalized `ConditionalMinEntropyFeasible` API in `Smooth.lean`. -/
 def conditionalMinEntropyFixed
-    (ρ : SubnormalizedState (Prod a b)) (σ : SubnormalizedState b) : ℝ :=
+    (ρ : SubnormalizedState (a × b)) (σ : SubnormalizedState b) : ℝ :=
   sSup {lam : ℝ | ConditionalMinEntropyFeasible (a := a) ρ σ lam}
 
 @[simp]
 theorem conditionalMinEntropyFixed_eq
-    (ρ : SubnormalizedState (Prod a b)) (σ : SubnormalizedState b) :
+    (ρ : SubnormalizedState (a × b)) (σ : SubnormalizedState b) :
     ρ.conditionalMinEntropyFixed σ =
       sSup {lam : ℝ | ConditionalMinEntropyFeasible (a := a) ρ σ lam} :=
   rfl
@@ -726,7 +583,7 @@ theorem conditionalMinEntropyFixed_eq
 when the joint state has a positive trace lower bound. -/
 theorem conditionalMinEntropyFixed_feasibleSet_bddAbove_of_trace_lower
     [Nonempty a]
-    (ρ : SubnormalizedState (Prod a b)) (σ : SubnormalizedState b)
+    (ρ : SubnormalizedState (a × b)) (σ : SubnormalizedState b)
     {δ : ℝ} (hδ : 0 < δ) (hδρ : δ ≤ ρ.matrix.trace.re) :
     BddAbove {lam : ℝ | ConditionalMinEntropyFeasible (a := a) ρ σ lam} := by
   refine ⟨log2 (Fintype.card a : ℝ) - log2 δ, ?_⟩
@@ -738,7 +595,7 @@ theorem conditionalMinEntropyFixed_feasibleSet_bddAbove_of_trace_lower
 state has a positive trace lower bound. -/
 theorem conditionalMinEntropyFixed_le_of_trace_lower_bound
     [Nonempty a]
-    (ρ : SubnormalizedState (Prod a b)) (σ : SubnormalizedState b)
+    (ρ : SubnormalizedState (a × b)) (σ : SubnormalizedState b)
     {δ : ℝ} (hδ : 0 < δ) (hδρ : δ ≤ ρ.matrix.trace.re)
     (hδ_le_one : δ ≤ 1) :
     ρ.conditionalMinEntropyFixed σ ≤ log2 (Fintype.card a : ℝ) - log2 δ := by
@@ -766,7 +623,7 @@ theorem conditionalMinEntropyFixed_le_of_trace_lower_bound
 when the joint state has a positive trace lower bound. -/
 theorem conditionalMinEntropy_feasibleSet_bddAbove_of_trace_lower
     [Nonempty a]
-    (ρ : SubnormalizedState (Prod a b))
+    (ρ : SubnormalizedState (a × b))
     {δ : ℝ} (hδ : 0 < δ) (hδρ : δ ≤ ρ.matrix.trace.re) :
     BddAbove {lam : ℝ | ∃ σ : SubnormalizedState b,
       ConditionalMinEntropyFeasible (a := a) ρ σ lam} := by
@@ -783,7 +640,7 @@ The nonempty hypothesis mirrors the normalized fixed-reference API and avoids
 assigning artificial finite content to zero-support corner cases. -/
 theorem conditionalMinEntropyFixed_le_conditionalMinEntropy
     [Nonempty a]
-    (ρ : SubnormalizedState (Prod a b)) (σ : SubnormalizedState b)
+    (ρ : SubnormalizedState (a × b)) (σ : SubnormalizedState b)
     (hfixed : ({lam : ℝ |
       ConditionalMinEntropyFeasible (a := a) ρ σ lam}).Nonempty)
     (hρtr : 0 < ρ.matrix.trace.re) :
@@ -803,7 +660,7 @@ trace.  The trace hypothesis is the real-valued `sSup` replacement for the
 usual extended-real `-∞` zero-trace corner. -/
 theorem le_conditionalMinEntropyFixed_of_feasible
     [Nonempty a]
-    {ρ : SubnormalizedState (Prod a b)} {σ : SubnormalizedState b} {lam : ℝ}
+    {ρ : SubnormalizedState (a × b)} {σ : SubnormalizedState b} {lam : ℝ}
     (hρtr : 0 < ρ.matrix.trace.re)
     (hfeas : ConditionalMinEntropyFeasible (a := a) ρ σ lam) :
     lam ≤ ρ.conditionalMinEntropyFixed σ := by
@@ -815,23 +672,25 @@ theorem le_conditionalMinEntropyFixed_of_feasible
 
 end SubnormalizedState
 
-namespace State
+end QIT
+
+namespace MState
 
 /-! ## Fixed-reference smooth min-entropy with subnormalized witnesses -/
 
 /-- Candidate values for fixed-reference smooth conditional min-entropy around
 a normalized center, allowing subnormalized witnesses in the purified ball. -/
 def SmoothConditionalMinEntropyFixedSubnormalizedCandidate
-    (ρ : State (Prod a b)) (σ : SubnormalizedState b) (ε h : ℝ) : Prop :=
-  ∃ ρ' : SubnormalizedState (Prod a b),
+    (ρ : MState (a × b)) (σ : SubnormalizedState b) (ε h : ℝ) : Prop :=
+  ∃ ρ' : SubnormalizedState (a × b),
     ρ.toSubnormalized.purifiedBall ε ρ' ∧
       h = ρ'.conditionalMinEntropyFixed σ
 
 @[simp]
 theorem SmoothConditionalMinEntropyFixedSubnormalizedCandidate_eq
-    (ρ : State (Prod a b)) (σ : SubnormalizedState b) (ε h : ℝ) :
+    (ρ : MState (a × b)) (σ : SubnormalizedState b) (ε h : ℝ) :
     SmoothConditionalMinEntropyFixedSubnormalizedCandidate (a := a) ρ σ ε h ↔
-      ∃ ρ' : SubnormalizedState (Prod a b),
+      ∃ ρ' : SubnormalizedState (a × b),
         ρ.toSubnormalized.purifiedBall ε ρ' ∧
           h = ρ'.conditionalMinEntropyFixed σ :=
   Iff.rfl
@@ -839,12 +698,12 @@ theorem SmoothConditionalMinEntropyFixedSubnormalizedCandidate_eq
 /-- Fixed-reference smooth conditional min-entropy with subnormalized witnesses
 and a fixed subnormalized side reference. -/
 def smoothConditionalMinEntropyFixedSubnormalized
-    (ρ : State (Prod a b)) (σ : SubnormalizedState b) (ε : ℝ) : ℝ :=
+    (ρ : MState (a × b)) (σ : SubnormalizedState b) (ε : ℝ) : ℝ :=
   sSup {h : ℝ |
     SmoothConditionalMinEntropyFixedSubnormalizedCandidate (a := a) ρ σ ε h}
 
 theorem smoothConditionalMinEntropyFixedSubnormalized_eq_sSup_candidates
-    (ρ : State (Prod a b)) (σ : SubnormalizedState b) (ε : ℝ) :
+    (ρ : MState (a × b)) (σ : SubnormalizedState b) (ε : ℝ) :
     ρ.smoothConditionalMinEntropyFixedSubnormalized σ ε =
       sSup {h : ℝ |
         SmoothConditionalMinEntropyFixedSubnormalizedCandidate (a := a) ρ σ ε h} :=
@@ -852,10 +711,10 @@ theorem smoothConditionalMinEntropyFixedSubnormalized_eq_sSup_candidates
 
 @[simp]
 theorem smoothConditionalMinEntropyFixedSubnormalized_eq
-    (ρ : State (Prod a b)) (σ : SubnormalizedState b) (ε : ℝ) :
+    (ρ : MState (a × b)) (σ : SubnormalizedState b) (ε : ℝ) :
     ρ.smoothConditionalMinEntropyFixedSubnormalized σ ε =
       sSup {h : ℝ |
-        ∃ ρ' : SubnormalizedState (Prod a b),
+        ∃ ρ' : SubnormalizedState (a × b),
           ρ.toSubnormalized.purifiedBall ε ρ' ∧
             h = ρ'.conditionalMinEntropyFixed σ} :=
   rfl
@@ -863,7 +722,7 @@ theorem smoothConditionalMinEntropyFixedSubnormalized_eq
 /-- Subnormalized fixed-reference smooth-min candidates around a normalized
 center are bounded above for radii below one. -/
 theorem SmoothConditionalMinEntropyFixedSubnormalizedCandidate_bddAbove
-    (ρ : State (Prod a b)) (σ : SubnormalizedState b) {ε : ℝ}
+    (ρ : MState (a × b)) (σ : SubnormalizedState b) {ε : ℝ}
     (hε_nonneg : 0 ≤ ε) (hε_lt : ε < 1) :
     BddAbove {h : ℝ |
       SmoothConditionalMinEntropyFixedSubnormalizedCandidate (a := a) ρ σ ε h} := by
@@ -879,12 +738,12 @@ theorem SmoothConditionalMinEntropyFixedSubnormalizedCandidate_bddAbove
   intro h hh
   rcases hh with ⟨ρ', hball, rfl⟩
   have hε_sqrt : ε < Real.sqrt ρ.toSubnormalized.matrix.trace.re := by
-    rw [State.toSubnormalized_trace]
+    rw [MState.toSubnormalized_trace]
     norm_num
     exact hε_lt
   have hδρ' : δ ≤ ρ'.matrix.trace.re := by
-    have hcenter_trace : ρ.matrix.trace.re = 1 := by
-      rw [ρ.trace_eq_one]
+    have hcenter_trace : ρ.m.trace.re = 1 := by
+      rw [ρ.tr']
       norm_num
     simpa [δ, hcenter_trace] using
       ρ.toSubnormalized.purifiedBall_trace_lower_bound ρ' hε_sqrt hball
@@ -894,7 +753,7 @@ theorem SmoothConditionalMinEntropyFixedSubnormalizedCandidate_bddAbove
 /-- Subnormalized smooth min-entropy candidates around a normalized center are
 bounded above for radii below one. -/
 theorem SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw_bddAbove_of_state_center
-    (ρ : State (Prod a b)) {ε : ℝ}
+    (ρ : MState (a × b)) {ε : ℝ}
     (hε_nonneg : 0 ≤ ε) (hε_lt : ε < 1) :
     BddAbove {h : ℝ |
       SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw (a := a)
@@ -911,12 +770,12 @@ theorem SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw_bddAbove_of_s
   intro h hh
   rcases hh with ⟨ρ', hball, rfl⟩
   have hε_sqrt : ε < Real.sqrt ρ.toSubnormalized.matrix.trace.re := by
-    rw [State.toSubnormalized_trace]
+    rw [MState.toSubnormalized_trace]
     norm_num
     exact hε_lt
   have hδρ' : δ ≤ ρ'.matrix.trace.re := by
-    have hcenter_trace : ρ.matrix.trace.re = 1 := by
-      rw [ρ.trace_eq_one]
+    have hcenter_trace : ρ.m.trace.re = 1 := by
+      rw [ρ.tr']
       norm_num
     simpa [δ, hcenter_trace] using
       ρ.toSubnormalized.purifiedBall_trace_lower_bound ρ' hε_sqrt hball
@@ -945,7 +804,7 @@ theorem SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw_bddAbove_of_s
 subnormalized smooth min-entropy.  This is the `sSup`-level form of
 `SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw_center_migration`. -/
 theorem subnormalizedSmoothConditionalMinEntropyRaw_center_migration
-    (ρ η : State (Prod a b)) {ε δ : ℝ}
+    (ρ η : MState (a × b)) {ε δ : ℝ}
     (hε_nonneg : 0 ≤ ε)
     (hεδ_nonneg : 0 ≤ ε + δ) (hεδ_lt : ε + δ < 1)
     (hcenter : η.toSubnormalized.purifiedDistance ρ.toSubnormalized ≤ δ) :
@@ -967,7 +826,7 @@ theorem subnormalizedSmoothConditionalMinEntropyRaw_center_migration
 smooth-min helper. Source-facing finite-AEP statements use the canonical
 finite-domain API instead. -/
 theorem tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw_center_migration
-    (ρ η : State (Prod a b)) (n : ℕ) {ε δ : ℝ}
+    (ρ η : MState (a × b)) (n : ℕ) {ε δ : ℝ}
     (hε_nonneg : 0 ≤ ε)
     (hεδ_nonneg : 0 ≤ ε + δ) (hεδ_lt : ε + δ < 1)
     (hcenter :
@@ -975,7 +834,7 @@ theorem tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw_center_migration
         (ρ.tensorPowerBipartite n).toSubnormalized ≤ δ) :
     η.tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw ε n ≤
       ρ.tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw (ε + δ) n := by
-  simpa [State.tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw_eq] using
+  simpa [MState.tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw_eq] using
     subnormalizedSmoothConditionalMinEntropyRaw_center_migration
       (a := TensorPower a n) (b := TensorPower b n)
       (ρ := ρ.tensorPowerBipartite n) (η := η.tensorPowerBipartite n)
@@ -984,7 +843,7 @@ theorem tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw_center_migration
 /-- Transfer a tensor-power smooth-min lower bound across nearby centers by
 paying the purified-distance gap in the smoothing radius. -/
 theorem tensorPowerSubnormalizedSmoothConditionalMinEntropyRaw_lower_bound_of_center_migration
-    (ρ η : State (Prod a b)) (n : ℕ) {ε δ L : ℝ}
+    (ρ η : MState (a × b)) (n : ℕ) {ε δ L : ℝ}
     (hε_nonneg : 0 ≤ ε)
     (hεδ_nonneg : 0 ≤ ε + δ) (hεδ_lt : ε + δ < 1)
     (hcenter :
@@ -1005,16 +864,16 @@ center.
 The fixed-reference nonempty hypothesis is local to each subnormalized witness,
 matching the unsmoothed comparison. -/
 theorem smoothConditionalMinEntropyFixedSubnormalized_le_subnormalizedSmoothConditionalMinEntropy
-    (ρ : State (Prod a b)) (σ : SubnormalizedState b) (ε : ℝ)
+    (ρ : MState (a × b)) (σ : SubnormalizedState b) (ε : ℝ)
     (hε_nonneg : 0 ≤ ε) (hε_lt : ε < 1)
-    (hfixed : ∀ ρ' : SubnormalizedState (Prod a b),
+    (hfixed : ∀ ρ' : SubnormalizedState (a × b),
       ρ.toSubnormalized.purifiedBall ε ρ' →
         ({lam : ℝ |
           SubnormalizedState.ConditionalMinEntropyFeasible (a := a)
             ρ' σ lam}).Nonempty) :
     ρ.smoothConditionalMinEntropyFixedSubnormalized σ ε ≤
       ρ.toSubnormalized.smoothConditionalMinEntropy ε hε_nonneg
-        (by rw [State.toSubnormalized_trace]; simpa using hε_lt) := by
+        (by rw [MState.toSubnormalized_trace]; simpa using hε_lt) := by
   have : Nonempty a := ⟨(Classical.choice ρ.nonempty).1⟩
   rw [smoothConditionalMinEntropyFixedSubnormalized_eq_sSup_candidates,
     SubnormalizedState.smoothConditionalMinEntropy_eq_sSup_candidates]
@@ -1025,7 +884,7 @@ theorem smoothConditionalMinEntropyFixedSubnormalized_le_subnormalizedSmoothCond
   intro h hh
   rcases hh with ⟨ρ', hball, rfl⟩
   have hε_sqrt : ε < Real.sqrt ρ.toSubnormalized.matrix.trace.re := by
-    rw [State.toSubnormalized_trace]
+    rw [MState.toSubnormalized_trace]
     norm_num
     exact hε_lt
   have hρ'tr : 0 < ρ'.matrix.trace.re :=
@@ -1045,7 +904,7 @@ theorem smoothConditionalMinEntropyFixedSubnormalized_le_subnormalizedSmoothCond
 exponent gives a lower bound on normalized-center, subnormalized-witness smooth
 min-entropy. -/
 theorem le_smoothConditionalMinEntropyFixedSubnormalized_of_feasible_witness
-    {ρ : State (Prod a b)} {ρ' : SubnormalizedState (Prod a b)}
+    {ρ : MState (a × b)} {ρ' : SubnormalizedState (a × b)}
     {σ : SubnormalizedState b} {ε lam lower : ℝ}
     (hε_nonneg : 0 ≤ ε) (hε_lt : ε < 1)
     (hball : ρ.toSubnormalized.purifiedBall ε ρ')
@@ -1054,7 +913,7 @@ theorem le_smoothConditionalMinEntropyFixedSubnormalized_of_feasible_witness
     lower ≤ ρ.smoothConditionalMinEntropyFixedSubnormalized σ ε := by
   have : Nonempty a := ⟨(Classical.choice ρ.nonempty).1⟩
   have hε_sqrt : ε < Real.sqrt ρ.toSubnormalized.matrix.trace.re := by
-    rw [State.toSubnormalized_trace]
+    rw [MState.toSubnormalized_trace]
     norm_num
     exact hε_lt
   have hρ'tr : 0 < ρ'.matrix.trace.re :=
@@ -1074,8 +933,4 @@ theorem le_smoothConditionalMinEntropyFixedSubnormalized_of_feasible_witness
         (ρ'.conditionalMinEntropyFixed σ) from ⟨ρ', hball, rfl⟩)
   exact le_trans hlower (le_trans hmin hsmooth)
 
-end State
-
-end
-
-end QIT
+end MState

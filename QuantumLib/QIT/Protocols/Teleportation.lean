@@ -79,7 +79,7 @@ def teleportationPhase
 /-- Finite Weyl operator `U^(i,j) = Z(j) X(i)`. -/
 def teleportationWeyl
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
-    (outcome : Prod d d) : CMatrix d :=
+    (outcome : d × d) : CMatrix d :=
   teleportationPhase d outcome.2 * teleportationShift d outcome.1
 
 private theorem star_stdAddChar_mul_self
@@ -88,11 +88,6 @@ private theorem star_stdAddChar_mul_self
   rw [ZMod.stdAddChar_apply, Complex.star_def, ← Circle.coe_inv_eq_conj]
   rw [← Circle.coe_mul]
   simp
-
-private theorem stdAddChar_mul_star_self
-    {n : ℕ} [NeZero n] (x : ZMod n) :
-    ZMod.stdAddChar x * star (ZMod.stdAddChar x) = 1 := by
-  simpa [mul_comm] using star_stdAddChar_mul_self x
 
 private theorem star_stdAddChar_eq_neg
     {n : ℕ} [NeZero n] (x : ZMod n) :
@@ -143,7 +138,7 @@ theorem teleportationShift_conjTranspose_mul_self
 
 theorem teleportationWeyl_conjTranspose_mul_self
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
-    (outcome : Prod d d) :
+    (outcome : d × d) :
     Matrix.conjTranspose (teleportationWeyl d outcome) *
         teleportationWeyl d outcome = 1 := by
   rw [teleportationWeyl, Matrix.conjTranspose_mul]
@@ -163,7 +158,7 @@ theorem teleportationWeyl_conjTranspose_mul_self
 
 theorem teleportationWeyl_mul_conjTranspose_self
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
-    (outcome : Prod d d) :
+    (outcome : d × d) :
     teleportationWeyl d outcome *
         Matrix.conjTranspose (teleportationWeyl d outcome) = 1 := by
   rw [← Matrix.star_eq_conjTranspose, ← Matrix.mem_unitaryGroup_iff]
@@ -173,7 +168,7 @@ theorem teleportationWeyl_mul_conjTranspose_self
 
 theorem teleportationWeyl_apply
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
-    (outcome : Prod d d) (x y : d) :
+    (outcome : d × d) (x y : d) :
     teleportationWeyl d outcome x y =
       ZMod.stdAddChar
           (cyclicBasisEquiv d outcome.2 * cyclicBasisEquiv d x) *
@@ -191,39 +186,39 @@ theorem teleportationWeyl_apply
 /-- The Weyl operator bundled as a reference isometry. -/
 def teleportationWeylIsometry
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
-    (outcome : Prod d d) : ReferenceIsometry d d where
+    (outcome : d × d) : ReferenceIsometry d d where
   matrix := teleportationWeyl d outcome
   isometry := teleportationWeyl_conjTranspose_mul_self d outcome
 
 /-- Generalized Bell vector `(U^(i,j) tensor I)|Phi>` for outcome `(i,j)`. -/
-def generalizedBellPureVector
+def generalizedBellKet
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
-    (outcome : Prod d d) : PureVector (Prod d d) :=
-  (teleportationWeylIsometry d outcome).applyPureVector
-    (PureVector.maximallyEntangled (Equiv.refl d))
+    (outcome : d × d) : Ket (d × d) :=
+  (teleportationWeylIsometry d outcome).applyKet
+    (Ket.maximallyEntangled (Equiv.refl d))
 
-theorem generalizedBellPureVector_eq_weyl_apply_maximallyEntangled
+theorem generalizedBellKet_eq_weyl_apply_maximallyEntangled
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
-    (outcome : Prod d d) :
-    generalizedBellPureVector d outcome =
-      (teleportationWeylIsometry d outcome).applyPureVector
-        (PureVector.maximallyEntangled (Equiv.refl d)) := by
+    (outcome : d × d) :
+    generalizedBellKet d outcome =
+      (teleportationWeylIsometry d outcome).applyKet
+        (Ket.maximallyEntangled (Equiv.refl d)) := by
   rfl
 
-theorem generalizedBellPureVector_amp
+theorem generalizedBellKet_vec
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
-    (outcome : Prod d d) (x : Prod d d) :
-    (generalizedBellPureVector d outcome).amp x =
+    (outcome : d × d) (x : d × d) :
+    (generalizedBellKet d outcome).vec x =
       if cyclicBasisEquiv d x.1 =
           cyclicBasisEquiv d x.2 + cyclicBasisEquiv d outcome.1 then
         ((Real.sqrt (Fintype.card d : ℝ) : ℂ)⁻¹) *
           ZMod.stdAddChar
             (cyclicBasisEquiv d outcome.2 * cyclicBasisEquiv d x.1)
       else 0 := by
-  rw [generalizedBellPureVector, ReferenceIsometry.applyPureVector_amp,
+  rw [generalizedBellKet, ReferenceIsometry.applyKet_vec,
     ReferenceIsometry.applyAmp, Matrix.mulVec, dotProduct]
   rw [Finset.sum_eq_single x.2]
-  · rw [PureVector.maximallyEntangled_amp]
+  · rw [Ket.maximallyEntangled_vec]
     change (teleportationWeyl d outcome x.1 x.2 *
         if (Equiv.refl d) (x.2, x.2).1 = (x.2, x.2).2 then
           ((Real.sqrt (Fintype.card d : ℝ) : ℂ)⁻¹) else 0) =
@@ -253,21 +248,21 @@ theorem generalizedBellPureVector_amp
       · simp
       · exact fun h' => h (hsupport.mp h')
   · intro y _ hy
-    simp [PureVector.maximallyEntangled_amp, hy]
+    simp [Ket.maximallyEntangled_vec, hy]
   · simp
 
-theorem generalizedBellPureVector_inner
+theorem generalizedBellKet_inner
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
-    (outcome other : Prod d d) :
-    (∑ x : Prod d d,
-      star ((generalizedBellPureVector d outcome).amp x) *
-        (generalizedBellPureVector d other).amp x) =
+    (outcome other : d × d) :
+    (∑ x : d × d,
+      star ((generalizedBellKet d outcome).vec x) *
+        (generalizedBellKet d other).vec x) =
       if outcome = other then 1 else 0 := by
   by_cases hout : outcome = other
   · subst other
     rw [if_pos rfl]
     simpa [rankOneMatrix_trace, dotProduct, mul_comm] using
-      (generalizedBellPureVector d outcome).trace_rankOne_eq_one
+      (generalizedBellKet d outcome).trace_rankOne_eq_one
   · rw [if_neg hout]
     rcases outcome with ⟨i, j⟩
     rcases other with ⟨i', j'⟩
@@ -287,8 +282,8 @@ theorem generalizedBellPureVector_inner
       rw [Fintype.sum_prod_type]
       calc
         (∑ x : d, ∑ y : d,
-            star ((generalizedBellPureVector d (i, j)).amp (x, y)) *
-              (generalizedBellPureVector d (i, j')).amp (x, y)) =
+            star ((generalizedBellKet d (i, j)).vec (x, y)) *
+              (generalizedBellKet d (i, j')).vec (x, y)) =
             c * c * ∑ x : d, ZMod.stdAddChar (t * e x) := by
               rw [Finset.mul_sum]
               apply Finset.sum_congr rfl
@@ -296,8 +291,8 @@ theorem generalizedBellPureVector_inner
               let y0 : d := e.symm (e x - e i)
               rw [Finset.sum_eq_single y0]
               · have hxy : e x = e y0 + e i := by simp [y0, e]
-                rw [generalizedBellPureVector_amp,
-                  generalizedBellPureVector_amp, if_pos hxy, if_pos hxy]
+                rw [generalizedBellKet_vec,
+                  generalizedBellKet_vec, if_pos hxy, if_pos hxy]
                 have hcstar : star c = c := by simp [c]
                 calc
                   star (c * ZMod.stdAddChar (e j * e x)) *
@@ -320,7 +315,7 @@ theorem generalizedBellPureVector_inner
                   apply hy
                   apply e.injective
                   simpa [y0] using congrArg (fun z => z - e i) hxy.symm
-                rw [generalizedBellPureVector_amp, if_neg hne]
+                rw [generalizedBellKet_vec, if_neg hne]
                 simp
               · simp
         _ = 0 := by
@@ -339,17 +334,17 @@ theorem generalizedBellPureVector_inner
           apply (cyclicBasisEquiv d).injective
           have := hxy.symm.trans h'
           exact add_left_cancel this
-        rw [generalizedBellPureVector_amp, generalizedBellPureVector_amp,
+        rw [generalizedBellKet_vec, generalizedBellKet_vec,
           if_pos hxy, if_neg hxy']
         simp
-      · rw [generalizedBellPureVector_amp, if_neg hxy]
+      · rw [generalizedBellKet_vec, if_neg hxy]
         simp
 
 /-- Matrix whose columns are the generalized Bell vectors. -/
 def generalizedBellBasisMatrix
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d] :
-    Matrix (Prod d d) (Prod d d) ℂ :=
-  fun physical outcome => (generalizedBellPureVector d outcome).amp physical
+    Matrix (d × d) (d × d) ℂ :=
+  fun physical outcome => (generalizedBellKet d outcome).vec physical
 
 theorem generalizedBellBasisMatrix_conjTranspose_mul_self
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d] :
@@ -358,7 +353,7 @@ theorem generalizedBellBasisMatrix_conjTranspose_mul_self
   ext outcome other
   rw [Matrix.mul_apply]
   simpa [generalizedBellBasisMatrix, Matrix.conjTranspose, Matrix.one_apply] using
-    generalizedBellPureVector_inner d outcome other
+    generalizedBellKet_inner d outcome other
 
 theorem generalizedBellBasisMatrix_mul_conjTranspose_self
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d] :
@@ -372,13 +367,12 @@ theorem generalizedBellBasisMatrix_mul_conjTranspose_self
 /-- Alice's projective generalized Bell measurement. -/
 def generalizedBellPOVM
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d] :
-    POVM (Prod d d) (Prod d d) where
-  effects outcome := rankOneMatrix (generalizedBellPureVector d outcome).amp
-  pos outcome := rankOneMatrix_pos _
-  sum_eq_one := by
+    POVM (d × d) (d × d) :=
+  .ofMatrices (fun outcome => rankOneMatrix (generalizedBellKet d outcome).vec)
+    (fun _ => rankOneMatrix_pos _) <| by
     calc
-      (∑ outcome : Prod d d,
-          rankOneMatrix (generalizedBellPureVector d outcome).amp) =
+      (∑ outcome : d × d,
+          rankOneMatrix (generalizedBellKet d outcome).vec) =
           generalizedBellBasisMatrix d *
             Matrix.conjTranspose (generalizedBellBasisMatrix d) := by
               ext x y
@@ -388,25 +382,25 @@ def generalizedBellPOVM
       _ = 1 := generalizedBellBasisMatrix_mul_conjTranspose_self d
 
 /-- Every generalized Bell vector is maximally entangled. -/
-theorem generalizedBellPureVector_isMaximallyEntangled
+theorem generalizedBellKet_isMaximallyEntangled
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
-    (outcome : Prod d d) :
-    (generalizedBellPureVector d outcome).IsMaximallyEntangled := by
-  apply PureVector.HasMaximallyMixedMarginals.isMaximallyEntangled
+    (outcome : d × d) :
+    (generalizedBellKet d outcome).IsMaximallyEntangled := by
+  apply Ket.HasMaximallyMixedMarginals.isMaximallyEntangled
   constructor
-  · apply State.ext
-    rw [generalizedBellPureVector, ReferenceIsometry.marginalA_applyPureVector]
-    rw [PureVector.maximallyEntangled_marginalA (Equiv.refl d)]
-    rw [State.maximallyMixed_matrix]
+  · apply MState.ext
+    rw [generalizedBellKet, ReferenceIsometry.traceRight_applyKet]
+    rw [Ket.maximallyEntangled_traceRight (Equiv.refl d)]
+    rw [MState.uniform_matrix]
     simp [teleportationWeylIsometry, teleportationWeyl_mul_conjTranspose_self]
-  · apply State.ext
-    rw [State.marginalB_matrix, generalizedBellPureVector, PureVector.state_matrix,
-      ReferenceIsometry.applyPureVector_amp,
+  · apply MState.ext
+    rw [MState.traceLeft_m, generalizedBellKet, Ket.state_matrix,
+      ReferenceIsometry.applyKet_vec,
       (teleportationWeylIsometry d outcome).rankOne_applyAmp,
-      (teleportationWeylIsometry d outcome).partialTraceA_applyMatrix]
-    rw [← PureVector.state_matrix, ← State.marginalB_matrix]
-    exact congrArg State.matrix
-      (PureVector.maximallyEntangled_marginalB (Equiv.refl d))
+      (teleportationWeylIsometry d outcome).traceLeft_applyMatrix]
+    rw [← Ket.state_matrix, ← MState.traceLeft_m]
+    exact congrArg DensityOp.m
+      (Ket.maximallyEntangled_traceLeft (Equiv.refl d))
 
 private theorem inv_sqrt_mul_self_eq_card_inv
     (d : Type u) [Fintype d] [Nonempty d] :
@@ -428,32 +422,33 @@ fixes the two rank-`d` local registers, and its state is derived rather than
 stored as an unconstrained field. -/
 structure TeleportationEntanglementResource
     (d : Type u) [Fintype d] [DecidableEq d] where
+  /-- The identification of Alice's and Bob's halves of the pair. -/
   pairing : d ≃ d
 
 namespace TeleportationEntanglementResource
 
-/-- The actual pure vector supplied by a maximally entangled resource pair. -/
-def pureVector
+/-- The actual ket supplied by a maximally entangled resource pair. -/
+def ket
     {d : Type u} [Fintype d] [DecidableEq d] [Nonempty d]
-    (resource : TeleportationEntanglementResource d) : PureVector (Prod d d) :=
-  PureVector.maximallyEntangled resource.pairing
+    (resource : TeleportationEntanglementResource d) : Ket (d × d) :=
+  Ket.maximallyEntangled resource.pairing
 
 /-- The density state supplied by a maximally entangled resource pair. -/
 def state
     {d : Type u} [Fintype d] [DecidableEq d] [Nonempty d]
-    (resource : TeleportationEntanglementResource d) : State (Prod d d) :=
-  resource.pureVector.state
+    (resource : TeleportationEntanglementResource d) : MState (d × d) :=
+  resource.ket.state
 
 /-- Schmidt rank represented by the paired local registers. -/
 def rank
     {d : Type u} [Fintype d] [DecidableEq d]
-    (_resource : TeleportationEntanglementResource d) : Nat :=
+    (_resource : TeleportationEntanglementResource d) : ℕ :=
   Fintype.card d
 
 /-- Entanglement cost, in ebits, of one maximally entangled pair. -/
 def entanglementCost
     {d : Type u} [Fintype d] [DecidableEq d]
-    (resource : TeleportationEntanglementResource d) : Real :=
+    (resource : TeleportationEntanglementResource d) : ℝ :=
   log2 resource.rank
 
 end TeleportationEntanglementResource
@@ -469,42 +464,42 @@ def teleportationEntanglementResource
 with her half of the shared maximally entangled pair. -/
 def bellContractionKraus
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
-    (outcome : Prod d d) : CMatrix d :=
+    (outcome : d × d) : CMatrix d :=
   fun bob input =>
     ∑ alice : d,
-      star ((generalizedBellPureVector d outcome).amp (input, alice)) *
-        (teleportationEntanglementResource d).pureVector.amp (alice, bob)
+      star ((generalizedBellKet d outcome).vec (input, alice)) *
+        (teleportationEntanglementResource d).ket.vec (alice, bob)
 
-theorem teleportationEntanglementResource_pureVector
+theorem teleportationEntanglementResource_ket
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d] :
-    (teleportationEntanglementResource d).pureVector =
-      PureVector.maximallyEntangled (Equiv.refl d) := by
+    (teleportationEntanglementResource d).ket =
+      Ket.maximallyEntangled (Equiv.refl d) := by
   rfl
 
 theorem teleportationEntanglementResource_state
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d] :
     (teleportationEntanglementResource d).state =
-      (teleportationEntanglementResource d).pureVector.state := by
+      (teleportationEntanglementResource d).ket.state := by
   rfl
 
 theorem teleportationEntanglementResource_state_eq_maximallyEntangled
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d] :
     (teleportationEntanglementResource d).state =
-      State.maximallyEntangled (Equiv.refl d) := by
+      MState.maximallyEntangled (Equiv.refl d) := by
   rfl
 
 theorem bellContractionKraus_uses_entanglementResource
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
-    (outcome : Prod d d) :
+    (outcome : d × d) :
     bellContractionKraus d outcome = fun bob input =>
       ∑ alice : d,
-        star ((generalizedBellPureVector d outcome).amp (input, alice)) *
-          (teleportationEntanglementResource d).pureVector.amp (alice, bob) := by
+        star ((generalizedBellKet d outcome).vec (input, alice)) *
+          (teleportationEntanglementResource d).ket.vec (alice, bob) := by
   rfl
 
 theorem bellContractionKraus_eq_card_inv_smul_conjTranspose_weyl
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
-    (outcome : Prod d d) :
+    (outcome : d × d) :
     bellContractionKraus d outcome =
       (Fintype.card d : ℂ)⁻¹ •
         Matrix.conjTranspose (teleportationWeyl d outcome) := by
@@ -512,10 +507,10 @@ theorem bellContractionKraus_eq_card_inv_smul_conjTranspose_weyl
   rw [bellContractionKraus]
   simp only [Matrix.smul_apply, Matrix.conjTranspose_apply]
   rw [Finset.sum_eq_single bob]
-  · simp only [TeleportationEntanglementResource.pureVector,
-      teleportationEntanglementResource, PureVector.maximallyEntangled]
+  · simp only [TeleportationEntanglementResource.ket,
+      teleportationEntanglementResource, Ket.maximallyEntangled]
     simp only [Equiv.refl_apply, if_true]
-    rw [generalizedBellPureVector_amp, teleportationWeyl_apply]
+    rw [generalizedBellKet_vec, teleportationWeyl_apply]
     have hsupport :
         cyclicBasisEquiv d input =
             cyclicBasisEquiv d bob + cyclicBasisEquiv d outcome.1 ↔
@@ -552,13 +547,13 @@ theorem bellContractionKraus_eq_card_inv_smul_conjTranspose_weyl
       · simp
       · exact fun h' => h (hsupport.mpr h')
   · intro alice _ halice
-    simp [TeleportationEntanglementResource.pureVector,
-      teleportationEntanglementResource, PureVector.maximallyEntangled, halice]
+    simp [TeleportationEntanglementResource.ket,
+      teleportationEntanglementResource, Ket.maximallyEntangled, halice]
   · simp
 
 theorem bellContractionKraus_conjTranspose_mul_self
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
-    (outcome : Prod d d) :
+    (outcome : d × d) :
     Matrix.conjTranspose (bellContractionKraus d outcome) *
         bellContractionKraus d outcome =
       ((Fintype.card d : ℂ)⁻¹ * (Fintype.card d : ℂ)⁻¹) •
@@ -589,25 +584,23 @@ theorem bellContractionKraus_krausAdjoint_one
 /-- The physical channel obtained after Alice's Bell measurement when Bob
 forgets the outcome and applies no correction. -/
 def uncorrectedTeleportationChannel
-    (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d] : Channel d d where
-  map := MatrixMap.ofKraus (bellContractionKraus d)
-  completelyPositive := MatrixMap.ofKraus_completelyPositive _
-  tracePreserving :=
-    MatrixMap.ofKraus_isTracePreserving_of_krausAdjoint_one _
-      (bellContractionKraus_krausAdjoint_one d)
-  mapsPositive := MatrixMap.ofKraus_mapsPositive _
+    (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d] : CPTPMap d d :=
+  CPTPOp.ofMat
+    (MatrixMap.ofKraus (bellContractionKraus d))
+    (MatrixMap.ofKraus_completelyPositive _)
+    (MatrixMap.ofKraus_isTracePreserving_of_krausAdjoint_one _
+      (bellContractionKraus_krausAdjoint_one d))
 
 theorem uncorrectedTeleportationChannel_offDiagonal
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
     (x y : d) (hxy : x ≠ y) :
     (uncorrectedTeleportationChannel d).map
-        (Matrix.single x y (1 : Complex)) x y = 0 := by
-  change (MatrixMap.ofKraus (bellContractionKraus d)
-    (Matrix.single x y (1 : Complex))) x y = 0
-  simp only [MatrixMap.ofKraus, LinearMap.coe_mk, AddHom.coe_mk, Matrix.sum_apply]
+        (Matrix.single x y (1 : ℂ)) x y = 0 := by
+  simp only [uncorrectedTeleportationChannel, CPTPOp.map_ofMat, MatrixMap.ofKraus,
+    LinearMap.coe_mk, AddHom.coe_mk, Matrix.sum_apply]
   simp_rw [bellContractionKraus_eq_card_inv_smul_conjTranspose_weyl]
-  have hstar : star ((Fintype.card d : Complex)⁻¹) =
-      (Fintype.card d : Complex)⁻¹ := by simp
+  have hstar : star ((Fintype.card d : ℂ)⁻¹) =
+      (Fintype.card d : ℂ)⁻¹ := by simp
   simp only [Matrix.conjTranspose_smul, hstar,
     Matrix.conjTranspose_conjTranspose, Matrix.smul_mul, Matrix.mul_smul,
     Matrix.smul_apply]
@@ -639,7 +632,7 @@ theorem uncorrectedTeleportationChannel_offDiagonal
       apply (cyclicBasisEquiv d).injective
       exact (sub_eq_zero.mp ht0).symm
     have hchar (j : d) :
-        (starRingEnd Complex) (ZMod.stdAddChar
+        (starRingEnd ℂ) (ZMod.stdAddChar
             (cyclicBasisEquiv d j * cyclicBasisEquiv d x)) *
           ZMod.stdAddChar
             (cyclicBasisEquiv d j * cyclicBasisEquiv d y) =
@@ -665,41 +658,39 @@ is not the identity in every nontrivial finite dimension. -/
 theorem uncorrectedTeleportationChannel_ne_idChannel
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
     (hcard : 1 < Fintype.card d) :
-    uncorrectedTeleportationChannel d ≠ Channel.idChannel d := by
+    uncorrectedTeleportationChannel d ≠ CPTPOp.id (dIn := d) := by
   let x : d := Classical.choice inferInstance
   obtain ⟨y, hyx⟩ := Fintype.exists_ne_of_one_lt_card hcard x
   have hxy : x ≠ y := Ne.symm hyx
   intro hchannel
-  have hmap := congrArg Channel.map hchannel
-  have hentry := congrArg
-    (fun Phi : MatrixMap d d => Phi (Matrix.single x y (1 : Complex)) x y) hmap
-  change (uncorrectedTeleportationChannel d).map
-      (Matrix.single x y (1 : Complex)) x y =
-    (Channel.idChannel d).map (Matrix.single x y (1 : Complex)) x y at hentry
+  have hentry : (uncorrectedTeleportationChannel d).map
+      (Matrix.single x y (1 : ℂ)) x y =
+      (CPTPOp.id (dIn := d)).map (Matrix.single x y (1 : ℂ)) x y := by
+    rw [hchannel]
   rw [uncorrectedTeleportationChannel_offDiagonal d x y hxy] at hentry
-  simp [Channel.idChannel, MatrixMap.ofKraus, Matrix.single] at hentry
+  simp [CPTPOp.id_map, Matrix.single] at hentry
 
 /-- Bob's outcome-conditioned Weyl correction channel. -/
 def teleportationCorrection
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
-    (outcome : Prod d d) : Channel d d where
-  map := MatrixMap.ofKraus (fun _ : Unit => teleportationWeyl d outcome)
-  completelyPositive := MatrixMap.ofKraus_completelyPositive _
-  tracePreserving := by
-    apply MatrixMap.ofKraus_isTracePreserving_of_krausAdjoint_one
-    simp [MatrixMap.krausAdjoint, teleportationWeyl_conjTranspose_mul_self]
-  mapsPositive := MatrixMap.ofKraus_mapsPositive _
+    (outcome : d × d) : CPTPMap d d :=
+  CPTPOp.ofMat
+    (MatrixMap.ofKraus (fun _ : Unit => teleportationWeyl d outcome))
+    (MatrixMap.ofKraus_completelyPositive _)
+    (by
+      apply MatrixMap.ofKraus_isTracePreserving_of_krausAdjoint_one
+      simp [MatrixMap.krausAdjoint, teleportationWeyl_conjTranspose_mul_self])
 
 /-- Corrected branch Kraus operator: Bob applies the Weyl correction after
 Alice's Bell outcome. -/
 def correctedTeleportationKraus
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
-    (outcome : Prod d d) : CMatrix d :=
+    (outcome : d × d) : CMatrix d :=
   teleportationWeyl d outcome * bellContractionKraus d outcome
 
 theorem correctedTeleportationKraus_eq_card_inv_smul_one
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
-    (outcome : Prod d d) :
+    (outcome : d × d) :
     correctedTeleportationKraus d outcome =
       (Fintype.card d : ℂ)⁻¹ • (1 : CMatrix d) := by
   rw [correctedTeleportationKraus,
@@ -709,7 +700,7 @@ theorem correctedTeleportationKraus_eq_card_inv_smul_one
 theorem correctedTeleportationMap_eq_idChannel_map
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d] :
     MatrixMap.ofKraus (correctedTeleportationKraus d) =
-      (Channel.idChannel d).map := by
+      (CPTPOp.id (dIn := d)).map := by
   apply LinearMap.ext
   intro X
   ext x y
@@ -718,61 +709,49 @@ theorem correctedTeleportationMap_eq_idChannel_map
   simp_rw [correctedTeleportationKraus_eq_card_inv_smul_one]
   have hcard : (Fintype.card d : ℂ) ≠ 0 := by
     exact_mod_cast Nat.ne_of_gt (fintype_card_pos d)
-  simp [Channel.idChannel, MatrixMap.ofKraus, Matrix.mul_apply,
-    Matrix.one_apply, Fintype.card_prod]
+  simp [CPTPOp.id_map, Matrix.mul_apply, Matrix.one_apply, Fintype.card_prod]
   field_simp [hcard]
 
 /-- The channel computed by all corrected teleportation branches. -/
 def teleportationChannel
-    (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d] : Channel d d where
-  map := MatrixMap.ofKraus (correctedTeleportationKraus d)
-  completelyPositive := MatrixMap.ofKraus_completelyPositive _
-  tracePreserving := by
-    rw [correctedTeleportationMap_eq_idChannel_map]
-    exact (Channel.idChannel d).tracePreserving
-  mapsPositive := MatrixMap.ofKraus_mapsPositive _
-
-private theorem channel_eq_of_map_eq
-    {a : Type u} [Fintype a] [DecidableEq a]
-    {b : Type v} [Fintype b] [DecidableEq b]
-    {Phi Psi : Channel a b} (h : Phi.map = Psi.map) : Phi = Psi := by
-  cases Phi with
-  | mk phi phiCP phiTP phiPos =>
-      cases Psi with
-      | mk psi psiCP psiTP psiPos =>
-          dsimp only at h
-          cases h
-          rfl
+    (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d] : CPTPMap d d :=
+  CPTPOp.ofMat
+    (MatrixMap.ofKraus (correctedTeleportationKraus d))
+    (MatrixMap.ofKraus_completelyPositive _)
+    (by
+      rw [correctedTeleportationMap_eq_idChannel_map]
+      exact (CPTPOp.id (dIn := d)).map_TP)
 
 /-- The Bell-measurement and correction calculation implements the identity channel. -/
 theorem teleportationChannel_eq_idChannel
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d] :
-    teleportationChannel d = Channel.idChannel d := by
-  apply channel_eq_of_map_eq
+    teleportationChannel d = CPTPOp.id (dIn := d) := by
+  refine CPTPOp.ext_map ?_
+  rw [teleportationChannel, CPTPOp.map_ofMat]
   exact correctedTeleportationMap_eq_idChannel_map d
 
 private theorem idChannel_prod_idChannel_applyState
     (d : Type u) [Fintype d] [DecidableEq d]
     (r : Type v) [Fintype r] [DecidableEq r]
-    (rho : State (Prod r d)) :
-    ((Channel.idChannel r).prod (Channel.idChannel d)).applyState rho = rho := by
-  apply State.ext
-  change MatrixMap.kron (Channel.idChannel r).map (Channel.idChannel d).map rho.matrix =
-    rho.matrix
-  ext x y
-  simp [Channel.idChannel, MatrixMap.ofKraus, MatrixMap.kron, Matrix.single, ite_and]
+    (rho : MState (r × d)) :
+    ((CPTPOp.id (dIn := r)).prod (CPTPOp.id (dIn := d))) rho = rho := by
+  apply MState.ext
+  rw [CPTPOp.mat_coe_eq_apply_mat, CPTPOp.prod_map]
+  simp only [CPTPOp.id_map]
+  rw [MatrixMap.kron_id_id]
+  rfl
 
 /-- Teleportation preserves every joint state with an inaccessible reference system. -/
 theorem teleportation_preserves_reference
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d]
     (r : Type v) [Fintype r] [DecidableEq r]
-    (rho : State (Prod r d)) :
-    ((Channel.idChannel r).prod (teleportationChannel d)).applyState rho = rho := by
+    (rho : MState (r × d)) :
+    ((CPTPOp.id (dIn := r)).prod (teleportationChannel d)) rho = rho := by
   rw [teleportationChannel_eq_idChannel]
   exact idChannel_prod_idChannel_applyState d r rho
 
 /-- Alice's generalized Bell measurement has two `d`-valued classical outcomes. -/
-abbrev TeleportationOutcome (d : Type u) := Prod d d
+abbrev TeleportationOutcome (d : Type u) := (d × d)
 
 theorem teleportationOutcome_card
     (d : Type u) [Fintype d] :
@@ -781,21 +760,21 @@ theorem teleportationOutcome_card
 
 /-- The rank-`d` maximally entangled resource costs `log2 d` ebits. -/
 def teleportationEntanglementCost
-    (d : Type u) [Fintype d] [DecidableEq d] : Real :=
+    (d : Type u) [Fintype d] [DecidableEq d] : ℝ :=
   (teleportationEntanglementResource d).entanglementCost
 
 /-- The Bell outcome costs the logarithm of its `d^2`-element alphabet. -/
 def teleportationClassicalCommunication
-    (d : Type u) [Fintype d] : Real :=
-  log2 (Fintype.card (TeleportationOutcome d) : Real)
+    (d : Type u) [Fintype d] : ℝ :=
+  log2 (Fintype.card (TeleportationOutcome d) : ℝ)
 
 theorem teleportationClassicalCommunication_eq_two_log2
     (d : Type u) [Fintype d] [Nonempty d] :
     teleportationClassicalCommunication d =
-      2 * log2 (Fintype.card d : Real) := by
+      2 * log2 (Fintype.card d : ℝ) := by
   rw [teleportationClassicalCommunication, teleportationOutcome_card]
   rw [Nat.cast_pow]
-  have hcard : (Fintype.card d : Real) ≠ 0 := by
+  have hcard : (Fintype.card d : ℝ) ≠ 0 := by
     exact_mod_cast Nat.ne_of_gt (fintype_card_pos d)
   unfold log2
   rw [pow_two, Real.log_mul hcard hcard]
@@ -805,15 +784,15 @@ theorem teleportationClassicalCommunication_eq_two_log2
 one of `d^2` Bell outcomes, matching Wilde's qudit resource inequality. -/
 theorem teleportation_resource_costs
     (d : Type u) [Fintype d] [DecidableEq d] [Nonempty d] :
-    (teleportationEntanglementResource d).pureVector =
-        PureVector.maximallyEntangled (Equiv.refl d) ∧
+    (teleportationEntanglementResource d).ket =
+        Ket.maximallyEntangled (Equiv.refl d) ∧
       (teleportationEntanglementResource d).state =
-        State.maximallyEntangled (Equiv.refl d) ∧
+        MState.maximallyEntangled (Equiv.refl d) ∧
       (teleportationEntanglementResource d).rank = Fintype.card d ∧
-      teleportationEntanglementCost d = log2 (Fintype.card d : Real) ∧
+      teleportationEntanglementCost d = log2 (Fintype.card d : ℝ) ∧
       teleportationClassicalCommunication d =
-        2 * log2 (Fintype.card d : Real) := by
-  exact ⟨teleportationEntanglementResource_pureVector d,
+        2 * log2 (Fintype.card d : ℝ) := by
+  exact ⟨teleportationEntanglementResource_ket d,
     teleportationEntanglementResource_state_eq_maximallyEntangled d, rfl, rfl,
     teleportationClassicalCommunication_eq_two_log2 d⟩
 

@@ -16,9 +16,7 @@ public import QuantumLib.QIT.Coding.EntanglementAssisted.Renyi.Sandwiched.Limit
 # Asymptotic upper-bound input structures
 
 This module is part of the entanglement-assisted classical communication
-asymptotic proof spine.  It was split out mechanically from the historical
-`EntanglementAssistedAsymptotic` files; theorem statements and proof routes are
-unchanged.
+asymptotic proof spine.
 -/
 
 @[expose] public section
@@ -26,18 +24,18 @@ unchanged.
 open scoped ComplexOrder MatrixOrder NNReal Topology
 open Filter
 
-namespace QIT
-
 universe u v w x y
 
 noncomputable section
 
+namespace CPTPOp
+
+open QIT
+
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-namespace Channel
-
-variable (N : Channel a b)
+variable (N : CPTPMap a b)
 
 /-- Source-shaped input expected from the Khatri--Wilde sandwiched-Renyi
 asymptotic upper-bound route.
@@ -122,13 +120,13 @@ theorem entanglementAssisted_sourceAsymptoticUpperInput_of_sandwichedLimit
     exact EReal.coe_lt_coe_iff.mpr (by dsimp [δ]; linarith)
   have hlim := N.sandwichedRenyiMutualInformationE_tendsto_information
   have hα_eventually :
-      ∀ᶠ alpha in State.relativeEntropyHighAlphaRightToOne,
+      ∀ᶠ alpha in MState.relativeEntropyHighAlphaRightToOne,
         N.sandwichedRenyiMutualInformationE alpha.1 <
           ((N.entanglementAssistedInformation + δ : ℝ) : EReal) := by
     exact (tendsto_order.mp hlim).2
       ((N.entanglementAssistedInformation + δ : ℝ) : EReal) htarget_lt
-  have : Filter.NeBot State.relativeEntropyHighAlphaRightToOne :=
-    State.relativeEntropyHighAlphaRightToOne_neBot
+  have : Filter.NeBot MState.relativeEntropyHighAlphaRightToOne :=
+    MState.relativeEntropyHighAlphaRightToOne_neBot
   obtain ⟨alpha, hα_lt⟩ := hα_eventually.exists
   refine ⟨alpha.1, alpha.2, ?_⟩
   let penalty : ℝ :=
@@ -182,8 +180,6 @@ theorem entanglementAssisted_sourceAsymptoticUpperInput_of_sandwichedLimit
             rw [← EReal.coe_mul, ← EReal.coe_add, hreal_tail]
             simp [EReal.coe_mul, EReal.coe_add]
 
-end Channel
+end CPTPOp
 
 end
-
-end QIT

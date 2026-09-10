@@ -12,9 +12,7 @@ public import QuantumLib.QIT.Coding.EntanglementAssisted.Asymptotic.ProtocolLift
 # Asymptotic converse witness normalization
 
 This module is part of the entanglement-assisted classical communication
-asymptotic proof spine.  It was split out mechanically from the historical
-`EntanglementAssistedAsymptotic` files; theorem statements and proof routes are
-unchanged.
+asymptotic proof spine.
 -/
 
 @[expose] public section
@@ -22,18 +20,18 @@ unchanged.
 open scoped ComplexOrder MatrixOrder NNReal Topology
 open Filter
 
-namespace QIT
-
 universe u v w x y
 
 noncomputable section
 
+namespace CPTPOp
+
+open QIT
+
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-namespace Channel
-
-variable (N : Channel a b)
+variable (N : CPTPMap a b)
 
 /-- Source-consistent converse witness family from eventual `n`-use
 log-cardinality upper bounds.
@@ -73,8 +71,6 @@ theorem entanglementAssisted_sourceConverseWitnessFamily_of_logCardUpperBounds
       linarith
     exact lt_of_le_of_lt hrate_le hstrict
 
-end Channel
+end CPTPOp
 
 end
-
-end QIT

@@ -13,25 +13,37 @@ public import QuantumLib.QIT.States.MaximallyEntangled
 public import QuantumLib.QIT.States.MaximallyMixed
 
 /-!
-# FQSW core operational API
+# Fully quantum Slepian--Wolf: protocol data, errors, and rates
 
-This file is a dependency-ordered leaf of `QIT.Protocols.FQSW`.  Declaration
-names, namespaces, statements, and proof terms are preserved from the original
-monolithic module.
+An FQSW protocol starts from a pure tripartite source `ψ_ABR`, with `A` at Alice, `B` at Bob and
+`R` an untouched reference.  Alice splits `A` into a message register `A₁` and a local register
+`A₂`, sends `A₁` to Bob, and Bob applies an isometry to `A₁B`; the protocol succeeds when the
+result is the source state, with Alice's share now held by Bob, tensored with a maximally entangled
+pair between `A₂` and Bob's fresh register.  `FQSWOneShotProtocol` records only that data -- the
+two isometries and the pairing of the ebit registers -- and computes `outputState` and
+`targetState` from it, so `normalizedError`, `traceNormError`, `communicationCost` and `ebitYield`
+are functions of the protocol alone.
+
+`FQSWBlockProtocol` is the `n`-copy counterpart.  There Alice's operation is a channel rather than
+an isometry, because Schumacher compression of `A^n` into its typical register needs a
+trace-preserving completion off that subspace, and costs are replaced by rates.  `ofOneShot` reads
+a one-shot protocol on `ψ^{⊗n}` as a block protocol.
+
+The two rates in play are `fqswCommunicationRate = I(A;R)_ψ / 2` and
+`fqswEbitYieldRate = I(A;B)_ψ / 2`, both computed from `coherentTransferReferenceState`, the `AR`
+marginal of the source.  `Ket.IsAchievableFQSW` is the operational statement they enter: for every
+rate slack and error tolerance, all sufficiently long blocks carry a protocol meeting those rates
+up to the slack with error below the tolerance.  It is proved in `IIDDirect.lean`.
 -/
 
 @[expose] public section
 
 open scoped ComplexOrder MatrixOrder
 
-namespace QIT
-
+noncomputable section
 universe u v w x y z p u1 v1 w1
 universe ua0 ub0 ur0 ua1 ub1 ur1
 universe uq0 ue0 ubq0 urq0 uq1 ue1 ubq1 urq1
-
-noncomputable section
-
 variable {a : Type u} {b : Type v} {r : Type w}
 variable {q : Type x} {e : Type y} {et : Type z}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
@@ -40,120 +52,116 @@ variable [Fintype q] [DecidableEq q]
 variable [Fintype e] [DecidableEq e] [Nonempty e]
 variable [Fintype et] [DecidableEq et]
 
-namespace State
+open QIT
+
+namespace MState
 
 /-- Marginal state on `A × R` used by coherent state transfer/FQSW. -/
 def coherentTransferReferenceState
-    (ρ : State (Prod (Prod a b) r)) : State (Prod a r) where
-  matrix := Matrix.of fun ar ar' =>
-    Finset.univ.sum fun j : b => ρ.matrix ((ar.1, j), ar.2) ((ar'.1, j), ar'.2)
-  pos := by
-    let block : b → CMatrix (Prod a r) := fun j =>
-      ρ.matrix.submatrix
-        (fun ar : Prod a r => ((ar.1, j), ar.2))
-        (fun ar : Prod a r => ((ar.1, j), ar.2))
+    (ρ : MState ((a × b) × r)) : MState (a × r) := .ofMatrix
+  (matrix := Matrix.of fun ar ar' =>
+    Finset.univ.sum fun j : b => ρ.m ((ar.1, j), ar.2) ((ar'.1, j), ar'.2))
+  (pos := by
+    let block : b → CMatrix (a × r) := fun j =>
+      ρ.m.submatrix
+        (fun ar : a × r => ((ar.1, j), ar.2))
+        (fun ar : a × r => ((ar.1, j), ar.2))
     have hsum : (∑ j : b, block j).PosSemidef := by
       classical
       refine Finset.induction_on (s := Finset.univ) ?_ ?_
-      · simpa using (Matrix.PosSemidef.zero : (0 : CMatrix (Prod a r)).PosSemidef)
+      · simpa using (Matrix.PosSemidef.zero : (0 : CMatrix (a × r)).PosSemidef)
       · intro j s hjs hs
         simpa [Finset.sum_insert hjs, block] using
-          (ρ.pos.submatrix (fun ar : Prod a r => ((ar.1, j), ar.2))).add hs
+          (ρ.psd.submatrix (fun ar : a × r => ((ar.1, j), ar.2))).add hs
     convert hsum using 1
     ext ar ar'
-    simp [block, Matrix.of_apply, Matrix.sum_apply]
-  trace_eq_one := by
-    rw [← ρ.trace_eq_one]
+    simp [block, Matrix.of_apply, Matrix.sum_apply])
+  (trace_eq_one := by
+    rw [← ρ.tr']
     rw [Matrix.trace]
     change
-      (∑ ar : Prod a r, ∑ j : b,
-        ρ.matrix ((ar.1, j), ar.2) ((ar.1, j), ar.2)) =
-      ∑ x : Prod (Prod a b) r, ρ.matrix x x
+      (∑ ar : a × r, ∑ j : b,
+        ρ.m ((ar.1, j), ar.2) ((ar.1, j), ar.2)) =
+      ∑ x : (a × b) × r, ρ.m x x
     calc
-      (∑ ar : Prod a r, ∑ j : b,
-          ρ.matrix ((ar.1, j), ar.2) ((ar.1, j), ar.2)) =
-          ∑ j : b, ∑ ar : Prod a r,
-            ρ.matrix ((ar.1, j), ar.2) ((ar.1, j), ar.2) := by
+      (∑ ar : a × r, ∑ j : b,
+          ρ.m ((ar.1, j), ar.2) ((ar.1, j), ar.2)) =
+          ∑ j : b, ∑ ar : a × r,
+            ρ.m ((ar.1, j), ar.2) ((ar.1, j), ar.2) := by
         rw [Finset.sum_comm]
       _ = ∑ j : b, ∑ i : a, ∑ k : r,
-            ρ.matrix ((i, j), k) ((i, j), k) := by
+            ρ.m ((i, j), k) ((i, j), k) := by
         simp [Fintype.sum_prod_type]
       _ = ∑ i : a, ∑ j : b, ∑ k : r,
-            ρ.matrix ((i, j), k) ((i, j), k) := by
+            ρ.m ((i, j), k) ((i, j), k) := by
         rw [Finset.sum_comm]
-      _ = ∑ x : Prod (Prod a b) r, ρ.matrix x x := by
-        simp [Fintype.sum_prod_type]
+      _ = ∑ x : (a × b) × r, ρ.m x x := by
+        simp [Fintype.sum_prod_type])
 
 /-- Reference mutual information `I(A;R)` for coherent state transfer/FQSW. -/
 def coherentTransferReferenceMutualInformation
-    (ρ : State (Prod (Prod a b) r)) : ℝ :=
+    (ρ : MState ((a × b) × r)) : ℝ :=
   mutualInformation ρ.coherentTransferReferenceState
 
 /-- Coherent state-transfer quantum communication rate `(1/2) I(A;R)`. -/
-def coherentTransferRate (ρ : State (Prod (Prod a b) r)) : ℝ :=
+def coherentTransferRate (ρ : MState ((a × b) × r)) : ℝ :=
   (1 / 2 : ℝ) * ρ.coherentTransferReferenceMutualInformation
 
-end State
+end MState
 
-/-- The canonical equivalence adding a right unit tensor factor. -/
-def fqswAppendRightUnitEquiv (α : Type u) : α ≃ Prod α PUnit.{u + 1} where
-  toFun x := (x, PUnit.unit)
-  invFun x := x.1
-  left_inv := by intro x; rfl
-  right_inv := by intro x; cases x; rfl
+namespace QIT
 
 /-- Reindexing along the right-unit equivalence is the same state as tensoring
 with the unit-system state. -/
-theorem state_reindex_fqswAppendRightUnitEquiv_eq_prod_unit
-    {α : Type u} [Fintype α] [DecidableEq α] (ρ : State α) :
-    ρ.reindex (fqswAppendRightUnitEquiv α) =
-      ρ.prod (State.unit : State PUnit.{u + 1}) := by
-  apply State.ext
+theorem state_reindex_prodPUnit_symm_eq_prod_unit
+    {α : Type u} [Fintype α] [DecidableEq α] (ρ : MState α) :
+    ρ.reindex (Equiv.prodPUnit α).symm =
+      ρ.prod (MState.unit : MState PUnit.{u + 1}) := by
+  apply MState.ext
   ext i j
-  simp [fqswAppendRightUnitEquiv, State.reindex, State.prod, State.unit,
-    Matrix.kronecker, Matrix.kroneckerMap_apply]
+  simp [MState.unit, Matrix.kroneckerMap_apply]
 
 /-- Append a fixed right-hand state by first adjoining the unit system and then
 preparing the target state on that factor. -/
 def fqswAppendStateRight
     {α : Type u} {β : Type v}
     [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
-    (τ : State β) : Channel α (Prod α β) :=
-  ((Channel.idChannel α).prod (Channel.prepare (fun _ : PUnit.{u + 1} => τ))).comp
-    (Channel.reindex (fqswAppendRightUnitEquiv α))
+    (τ : MState β) : CPTPMap α (α × β) :=
+  ((CPTPOp.id (dIn := α)).prod (CPTPOp.prepare (fun _ : PUnit.{u + 1} => τ))) ∘ₘ
+    (CPTPOp.reindex (Equiv.prodPUnit α).symm)
 
 /-- The append-state channel sends `ρ` to the product state `ρ ⊗ τ`. -/
 theorem fqswAppendStateRight_applyState
     {α : Type u} {β : Type v}
     [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
-    (τ : State β) (ρ : State α) :
-    (fqswAppendStateRight (α := α) τ).applyState ρ = ρ.prod τ := by
+    (τ : MState β) (ρ : MState α) :
+    (fqswAppendStateRight (α := α) τ) ρ = ρ.prod τ := by
   unfold fqswAppendStateRight
-  rw [Channel.applyState_comp, Channel.reindex_applyState]
-  rw [state_reindex_fqswAppendRightUnitEquiv_eq_prod_unit]
-  rw [Channel.applyState_prod]
+  rw [CPTPOp.compose_eq, CPTPOp.reindex_applyState]
+  rw [state_reindex_prodPUnit_symm_eq_prod_unit]
+  rw [CPTPOp.prod_apply_prod]
   congr
-  · apply State.ext
-    change (Channel.idChannel α).map ρ.matrix = ρ.matrix
-    simp [Channel.idChannel, MatrixMap.ofKraus]
-  · apply State.ext
+  · apply MState.ext
+    rw [CPTPOp.mat_coe_eq_apply_mat]
+    simp [CPTPOp.id_map]
+  · apply MState.ext
     ext i j
-    simp [Channel.applyState, Channel.prepare_map, State.unit]
+    simp [CPTPOp.mat_coe_eq_apply_mat, CPTPOp.prepare_map]
 
 /-- Appending a fixed right-hand state is a channel, hence it cannot increase
 normalized trace distance. -/
 theorem fqswProdRight_normalizedTraceDistance_le
     {α : Type u} {β : Type v}
     [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
-    (ρ σ : State α) (τ : State β) :
+    (ρ σ : MState α) (τ : MState β) :
     (ρ.prod τ).normalizedTraceDistance (σ.prod τ) ≤
       ρ.normalizedTraceDistance σ := by
-  let Φ : Channel α (Prod α β) := fqswAppendStateRight τ
-  have hρ : Φ.applyState ρ = ρ.prod τ := by
+  let Φ : CPTPMap α (α × β) := fqswAppendStateRight τ
+  have hρ : Φ ρ = ρ.prod τ := by
     simpa [Φ] using fqswAppendStateRight_applyState (α := α) τ ρ
-  have hσ : Φ.applyState σ = σ.prod τ := by
+  have hσ : Φ σ = σ.prod τ := by
     simpa [Φ] using fqswAppendStateRight_applyState (α := α) τ σ
-  have h := Channel.normalizedTraceDistance_applyState_le Φ ρ σ
+  have h := CPTPOp.normalizedTraceDistance_applyState_le Φ ρ σ
   simpa [hρ, hσ] using h
 
 /-- Appending a fixed right-hand state cannot increase the source trace-norm
@@ -161,200 +169,145 @@ distance between density matrices. -/
 theorem fqswProdRight_traceNormDistance_le
     {α : Type u} {β : Type v}
     [Fintype α] [DecidableEq α] [Fintype β] [DecidableEq β]
-    (ρ σ : State α) (τ : State β) :
+    (ρ σ : MState α) (τ : MState β) :
     (ρ.prod τ).traceNormDistance (σ.prod τ) ≤ ρ.traceNormDistance σ := by
   have h := fqswProdRight_normalizedTraceDistance_le ρ σ τ
-  unfold State.normalizedTraceDistance normalizedTraceDistance at h
-  unfold State.traceNormDistance
+  unfold MState.normalizedTraceDistance normalizedTraceDistance at h
+  unfold MState.traceNormDistance
   nlinarith
 
 /-- The channel induced by an isometry on a finite system. -/
 def fqswChannelOfReferenceIsometry
     {r₁ : Type u} {r₂ : Type v}
     [Fintype r₁] [DecidableEq r₁] [Fintype r₂] [DecidableEq r₂]
-    (V : ReferenceIsometry r₁ r₂) : Channel r₁ r₂ where
-  map := MatrixMap.ofReferenceIsometry V
-  completelyPositive := MatrixMap.ofReferenceIsometry_isCompletelyPositive V
-  tracePreserving := MatrixMap.ofReferenceIsometry_isTracePreserving V
-  mapsPositive :=
-    MatrixMap.isCompletelyPositive_mapsPositive
-      (MatrixMap.ofReferenceIsometry V)
-      (MatrixMap.ofReferenceIsometry_isCompletelyPositive V)
+    (V : ReferenceIsometry r₁ r₂) : CPTPMap r₁ r₂ :=
+  CPTPOp.ofMat
+    (MatrixMap.ofReferenceIsometry V)
+    (MatrixMap.ofReferenceIsometry_isCompletelyPositive V)
+    (MatrixMap.ofReferenceIsometry_isTracePreserving V)
+
+/-- The isometry channel acts by the isometry's matrix map. -/
+@[simp]
+theorem fqswChannelOfReferenceIsometry_map
+    {r₁ : Type u} {r₂ : Type v}
+    [Fintype r₁] [DecidableEq r₁] [Fintype r₂] [DecidableEq r₂]
+    (V : ReferenceIsometry r₁ r₂) :
+    (fqswChannelOfReferenceIsometry V).map = MatrixMap.ofReferenceIsometry V :=
+  CPTPOp.map_ofMat _ _ _
 
 /-- Applying an isometry channel to the left half of a pure bipartite state
-agrees with applying the isometry to the underlying pure vector. -/
+agrees with applying the isometry to the underlying ket. -/
 theorem fqswChannelOfReferenceIsometry_prod_id_applyState_pure
     {r₁ : Type u} {r₂ : Type v} {s : Type w}
     [Fintype r₁] [DecidableEq r₁] [Fintype r₂] [DecidableEq r₂]
     [Fintype s] [DecidableEq s]
-    (V : ReferenceIsometry r₁ r₂) (Ψ : PureVector (Prod r₁ s)) :
-    ((fqswChannelOfReferenceIsometry V).prod (Channel.idChannel s)).applyState Ψ.state =
-      (V.applyPureVector Ψ).state := by
-  apply State.ext
-  change
-    MatrixMap.kron (MatrixMap.ofReferenceIsometry V) (Channel.idChannel s).map
-        Ψ.state.matrix =
-      rankOneMatrix (V.applyAmp Ψ.amp)
-  rw [PureVector.state_matrix]
-  rw [MatrixMap.kron_ofReferenceIsometry_idChannel_apply_eq_applyMatrixLeft]
-  exact (V.rankOne_applyAmp Ψ.amp).symm
-
-/-- Regroup a left-associated tripartite source `(A × B) × R` so Alice's
-system is the left factor. -/
-def fqswSourceToAliceInputEquiv (a : Type u) (b : Type v) (r : Type w) :
-    Prod (Prod a b) r ≃ Prod a (Prod b r) where
-  toFun x := (x.1.1, (x.1.2, x.2))
-  invFun x := ((x.1, x.2.1), x.2.2)
-  left_inv := by intro x; rfl
-  right_inv := by intro x; rfl
-
-/-- Regroup a left-associated tripartite source `(A × B) × R` as
-`(A × R) × B`, exposing the subsystem complementary to Bob. -/
-def fqswSourceToARBEquiv (a : Type u) (b : Type v) (r : Type w) :
-    Prod (Prod a b) r ≃ Prod (Prod a r) b where
-  toFun x := ((x.1.1, x.2), x.1.2)
-  invFun x := ((x.1.1, x.2), x.1.2)
-  left_inv := by intro x; rfl
-  right_inv := by intro x; rfl
+    (V : ReferenceIsometry r₁ r₂) (Ψ : Ket (r₁ × s)) :
+    ((fqswChannelOfReferenceIsometry V).prod (CPTPOp.id (dIn := s))) Ψ.state =
+      (V.applyKet Ψ).state := by
+  apply MState.ext
+  rw [CPTPOp.mat_coe_eq_apply_mat, CPTPOp.prod_map,
+    fqswChannelOfReferenceIsometry_map, Ket.state_matrix, Ket.state_matrix,
+    MatrixMap.kron_ofReferenceIsometry_idChannel_apply_eq_applyMatrixLeft]
+  exact (V.rankOne_applyAmp Ψ.vec).symm
 
 /-- Regroup Alice's output so Bob's input register `A₁ × B` is the left
 factor and the untouched reference `R × A₂` is the right factor. -/
 def fqswAliceOutputToBobInputEquiv
     (q : Type x) (e : Type y) (b : Type v) (r : Type w) :
-    Prod (Prod q e) (Prod b r) ≃ Prod (Prod q b) (Prod r e) where
+    ((q × e) × (b × r)) ≃ ((q × b) × (r × e)) where
   toFun x := ((x.1.1, x.2.1), (x.2.2, x.1.2))
   invFun x := ((x.1.1, x.2.2), (x.1.2, x.2.1))
   left_inv := by intro x; rfl
   right_inv := by intro x; rfl
 
-/-- Regroup Alice's one-shot output so the discarded `A₁B` side is separated
-from the decoupled `A₂R` side used in ADHW fqsw.tex lines 580-841. -/
-def fqswAliceOutputToA2REquiv
-    (q : Type x) (e : Type y) (b : Type v) (r : Type w) :
-    Prod (Prod q e) (Prod b r) ≃ Prod (Prod q b) (Prod e r) where
-  toFun x := ((x.1.1, x.2.1), (x.1.2, x.2.2))
-  invFun x := ((x.1.1, x.2.1), (x.1.2, x.2.2))
-  left_inv := by intro x; rfl
-  right_inv := by intro x; rfl
+@[simp]
+theorem fqswAliceOutputToBobInputEquiv_apply
+    {q : Type x} {e : Type y} {b : Type v} {r : Type w}
+    (z : (q × e) × (b × r)) :
+    fqswAliceOutputToBobInputEquiv q e b r z = ((z.1.1, z.2.1), (z.2.2, z.1.2)) :=
+  rfl
 
 /-- Apply the source split `A ≃ A₁ × A₂` on the `A` side of the one-shot
 `AR` marginal.  This explicit equivalence avoids universe inference issues
 from using `Equiv.prodCongr` directly in the FQSW bridge lemmas. -/
-def fqswARSplitEquiv (split : a ≃ Prod q e) :
-    Prod a r ≃ Prod (Prod q e) r where
+def fqswARSplitEquiv (split : a ≃ (q × e)) :
+    (a × r) ≃ ((q × e) × r) where
   toFun x := (split x.1, x.2)
   invFun x := (split.symm x.1, x.2)
   left_inv := by intro x; simp
   right_inv := by intro x; simp
 
-/-- Regroup a split `AR` marginal from `(A₁ × A₂) × R` into
-`A₁ × (A₂ × R)`, the order used by the ADHW decoupling marginal
-`σ^{A₂R}` after tracing out `A₁`. -/
-def fqswQERToA2REquiv (q : Type x) (e : Type y) (r : Type w) :
-    Prod (Prod q e) r ≃ Prod q (Prod e r) where
-  toFun x := (x.1.1, (x.1.2, x.2))
-  invFun x := ((x.1, x.2.1), x.2.2)
-  left_inv := by intro x; rfl
-  right_inv := by intro x; rfl
-
-/-- Regroup Bob's output into the final FQSW comparison order:
-transferred source against the distilled ebit. -/
-def fqswBobOutputToFinalEquiv
-    (a : Type u) (b : Type v) (et : Type z) (r : Type w) (e : Type y) :
-    Prod (Prod (Prod a b) et) (Prod r e) ≃
-      Prod (Prod (Prod a b) r) (Prod e et) where
-  toFun x := ((x.1.1, x.2.1), (x.2.2, x.1.2))
-  invFun x := ((x.1.1, x.2.2), (x.1.2, x.2.1))
-  left_inv := by intro x; rfl
-  right_inv := by intro x; rfl
-
-omit [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b] [Fintype r] [DecidableEq r]
-    [Fintype e] [DecidableEq e] [Nonempty e] [Fintype et] [DecidableEq et] in
-@[simp]
-theorem fqswBobOutputToFinalEquiv_apply
-    (x : Prod (Prod (Prod a b) et) (Prod r e)) :
-    fqswBobOutputToFinalEquiv a b et r e x =
-      ((x.1.1, x.2.1), (x.2.2, x.1.2)) :=
-  rfl
-
-/-- Regroup the tensor power of a left-associated tripartite system as
-`(A^n × B^n) × R^n`. -/
-def fqswTensorPowerTripartiteEquiv (a : Type u) (b : Type v) (r : Type w)
-    [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
-    [Fintype r] [DecidableEq r] (n : ℕ) :
-    TensorPower (Prod (Prod a b) r) n ≃
-      Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n) :=
-  (tensorPowerProdEquiv (Prod a b) r n).trans
-    (Equiv.prodCongr (tensorPowerProdEquiv a b n) (Equiv.refl (TensorPower r n)))
-
 /-- One-shot FQSW protocol data.  The final states are intentionally not
 fields: they are computed from the source and the two source operations below. -/
-structure FQSWOneShotProtocol (ψ : PureVector (Prod (Prod a b) r))
+structure FQSWOneShotProtocol (ψ : Ket ((a × b) × r))
     (q : Type x) (e : Type y) (et : Type z)
     [Fintype q] [DecidableEq q]
     [Fintype e] [DecidableEq e] [Nonempty e]
     [Fintype et] [DecidableEq et] where
-  aliceIsometry : ReferenceIsometry a (Prod q e)
-  bobIsometry : ReferenceIsometry (Prod q b) (Prod (Prod a b) et)
+  /-- Alice's isometry, splitting her register into the part she sends and her ebit half. -/
+  aliceIsometry : ReferenceIsometry a (q × e)
+  /-- Bob's isometry, acting on what he receives together with his own register. -/
+  bobIsometry : ReferenceIsometry (q × b) ((a × b) × et)
+  /-- The identification of Alice's and Bob's ebit halves. -/
   ebitPairing : e ≃ et
 
 namespace FQSWOneShotProtocol
 
-variable {ψ : PureVector (Prod (Prod a b) r)}
+variable {ψ : Ket ((a × b) × r)}
 variable (C : FQSWOneShotProtocol ψ q e et)
 
 /-- Computed FQSW output for an explicit source state.  This is the mixed-state
-counterpart of `outputPureVector`: Alice applies her isometry, the registers
+counterpart of `outputKet`: Alice applies her isometry, the registers
 are regrouped so `A₁B` is Bob's input, Bob applies his isometry, and the final
 state is compared in the source order `ABR × A₂B~`. -/
 def outputStateOfState (C : FQSWOneShotProtocol ψ q e et)
-    (ρ : State (Prod (Prod a b) r)) :
-    State (Prod (Prod (Prod a b) r) (Prod e et)) :=
-  let ρA : State (Prod a (Prod b r)) :=
-    ρ.reindex (fqswSourceToAliceInputEquiv a b r)
-  let ρU : State (Prod (Prod q e) (Prod b r)) :=
+    (ρ : MState ((a × b) × r)) :
+    MState (((a × b) × r) × (e × et)) :=
+  let ρA : MState (a × (b × r)) :=
+    ρ.reindex (Equiv.prodAssoc a b r)
+  let ρU : MState ((q × e) × (b × r)) :=
     ((fqswChannelOfReferenceIsometry C.aliceIsometry).prod
-      (Channel.idChannel (Prod b r))).applyState ρA
-  let ρBobIn : State (Prod (Prod q b) (Prod r e)) :=
+      (CPTPOp.id (dIn := b × r))) ρA
+  let ρBobIn : MState ((q × b) × (r × e)) :=
     ρU.reindex (fqswAliceOutputToBobInputEquiv q e b r)
-  let ρV : State (Prod (Prod (Prod a b) et) (Prod r e)) :=
+  let ρV : MState (((a × b) × et) × (r × e)) :=
     ((fqswChannelOfReferenceIsometry C.bobIsometry).prod
-      (Channel.idChannel (Prod r e))).applyState ρBobIn
-  ρV.reindex (fqswBobOutputToFinalEquiv a b et r e)
+      (CPTPOp.id (dIn := r × e))) ρBobIn
+  ρV.reindex (fqswAliceOutputToBobInputEquiv (a × b) et r e)
 
 /-- The pure output state obtained by applying Alice's isometry, transmitting
 `A₁`, and applying Bob's isometry. -/
-def outputPureVector :
-    PureVector (Prod (Prod (Prod a b) r) (Prod e et)) :=
-  let ψA : PureVector (Prod a (Prod b r)) :=
-    ψ.reindex (fqswSourceToAliceInputEquiv a b r)
-  let ψU : PureVector (Prod (Prod q e) (Prod b r)) :=
-    C.aliceIsometry.applyPureVector ψA
-  let ψBobIn : PureVector (Prod (Prod q b) (Prod r e)) :=
+def outputKet :
+    Ket (((a × b) × r) × (e × et)) :=
+  let ψA : Ket (a × (b × r)) :=
+    ψ.reindex (Equiv.prodAssoc a b r)
+  let ψU : Ket ((q × e) × (b × r)) :=
+    C.aliceIsometry.applyKet ψA
+  let ψBobIn : Ket ((q × b) × (r × e)) :=
     ψU.reindex (fqswAliceOutputToBobInputEquiv q e b r)
-  let ψV : PureVector (Prod (Prod (Prod a b) et) (Prod r e)) :=
-    C.bobIsometry.applyPureVector ψBobIn
-  ψV.reindex (fqswBobOutputToFinalEquiv a b et r e)
+  let ψV : Ket (((a × b) × et) × (r × e)) :=
+    C.bobIsometry.applyKet ψBobIn
+  ψV.reindex (fqswAliceOutputToBobInputEquiv (a × b) et r e)
 
 /-- Computed FQSW output state. -/
-def outputState : State (Prod (Prod (Prod a b) r) (Prod e et)) :=
-  C.outputPureVector.state
+def outputState : MState (((a × b) × r) × (e × et)) :=
+  C.outputKet.state
 
 /-- The mixed-state operational path on the source pure state agrees with the
-pure-vector definition of the computed one-shot output. -/
+ket definition of the computed one-shot output. -/
 theorem outputStateOfState_source_eq_outputState :
     C.outputStateOfState ψ.state = C.outputState := by
-  unfold outputStateOfState outputState outputPureVector
+  unfold outputStateOfState outputState outputKet
   dsimp only
-  rw [← PureVector.reindex_state]
+  rw [← Ket.reindex_state]
   rw [fqswChannelOfReferenceIsometry_prod_id_applyState_pure]
-  rw [← PureVector.reindex_state]
+  rw [← Ket.reindex_state]
   rw [fqswChannelOfReferenceIsometry_prod_id_applyState_pure]
-  rw [PureVector.reindex_state]
+  rw [Ket.reindex_state]
 
 /-- Source-shaped target: transferred `ABR` source tensor a canonical ebit. -/
-def targetState : State (Prod (Prod (Prod a b) r) (Prod e et)) :=
-  ψ.state.prod (State.maximallyEntangled C.ebitPairing)
+def targetState : MState (((a × b) × r) × (e × et)) :=
+  ψ.state.prod (MState.maximallyEntangled C.ebitPairing)
 
 /-- Normalized trace-distance protocol error, matching existing Lean protocol
 conventions. -/
@@ -363,13 +316,13 @@ def normalizedError : ℝ :=
 
 /-- Source trace-norm error `||ρ_out - ρ_target||₁`. -/
 def traceNormError : ℝ :=
-  traceNormDistance C.outputState.matrix C.targetState.matrix
+  traceNormDistance C.outputState.m C.targetState.m
 
 /-- Source trace-norm error against `C.targetState` for an explicit source
 state argument. -/
 def traceNormErrorOfState (C : FQSWOneShotProtocol ψ q e et)
-    (ρ : State (Prod (Prod a b) r)) : ℝ :=
-  traceNormDistance (C.outputStateOfState ρ).matrix C.targetState.matrix
+    (ρ : MState ((a × b) × r)) : ℝ :=
+  traceNormDistance (C.outputStateOfState ρ).m C.targetState.m
 
 /-- Number of qubits communicated in the one-shot protocol. -/
 def communicationCost (_C : FQSWOneShotProtocol ψ q e et) : ℝ :=
@@ -380,7 +333,7 @@ def ebitYield (_C : FQSWOneShotProtocol ψ q e et) : ℝ :=
   log2 (Fintype.card e : ℝ)
 
 theorem normalizedError_nonneg : 0 ≤ C.normalizedError :=
-  State.normalizedTraceDistance_nonneg _ _
+  MState.normalizedTraceDistance_nonneg _ _
 
 theorem traceNormError_nonneg : 0 ≤ C.traceNormError :=
   traceNormDistance_nonneg _ _
@@ -398,94 +351,100 @@ isometry: Schumacher compression maps the full `A^n` register into its smaller
 typical register and therefore needs a trace-preserving completion away from
 the typical support.  Output and error states are computed from these two
 operations and the source; they are not protocol fields. -/
-structure FQSWBlockProtocol (ψ : PureVector (Prod (Prod a b) r)) (n : ℕ)
+structure FQSWBlockProtocol (ψ : Ket ((a × b) × r)) (n : ℕ)
     (q : Type x) (e : Type y) (et : Type z)
     [Fintype q] [DecidableEq q]
     [Fintype e] [DecidableEq e] [Nonempty e]
     [Fintype et] [DecidableEq et] where
-  aliceOperation : Channel (TensorPower a n) (Prod q e)
+  /-- Alice's channel, compressing `A^n` into what she sends and her ebit half. -/
+  aliceOperation : CPTPMap (TensorPower a n) (q × e)
+  /-- Bob's channel, acting on what he receives together with his own registers. -/
   bobOperation :
-    Channel (Prod q (TensorPower b n))
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) et)
+    CPTPMap (q × TensorPower b n)
+      ((TensorPower a n × TensorPower b n) × et)
+  /-- The identification of Alice's and Bob's ebit halves. -/
   ebitPairing : e ≃ et
 
 namespace FQSWBlockProtocol
 
-variable {ψ : PureVector (Prod (Prod a b) r)} {n : ℕ}
+variable {ψ : Ket ((a × b) × r)} {n : ℕ}
 variable (C : FQSWBlockProtocol ψ n q e et)
 
 /-- Run a block protocol on an explicit state of the grouped block source. -/
 def outputStateOfBlockState (C : FQSWBlockProtocol ψ n q e et)
-    (ρ : State
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n))) :
-    State (Prod
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n))
-      (Prod e et)) :=
-  let ρA : State
-      (Prod (TensorPower a n) (Prod (TensorPower b n) (TensorPower r n))) :=
+    (ρ : MState
+      ((TensorPower a n × TensorPower b n) × TensorPower r n)) :
+    MState (((TensorPower a n × TensorPower b n) × TensorPower r n) ×
+      (e × et)) :=
+  let ρA : MState
+      (TensorPower a n × (TensorPower b n × TensorPower r n)) :=
     ρ.reindex
-      (fqswSourceToAliceInputEquiv
+      (Equiv.prodAssoc
         (TensorPower a n) (TensorPower b n) (TensorPower r n))
-  let ρU : State
-      (Prod (Prod q e) (Prod (TensorPower b n) (TensorPower r n))) :=
+  let ρU : MState
+      ((q × e) × (TensorPower b n × TensorPower r n)) :=
     (C.aliceOperation.prod
-      (Channel.idChannel (Prod (TensorPower b n) (TensorPower r n)))).applyState ρA
-  let ρBobIn : State
-      (Prod (Prod q (TensorPower b n)) (Prod (TensorPower r n) e)) :=
+      (CPTPOp.id (dIn := TensorPower b n × TensorPower r n))) ρA
+  let ρBobIn : MState
+      ((q × TensorPower b n) × (TensorPower r n × e)) :=
     ρU.reindex
       (fqswAliceOutputToBobInputEquiv q e (TensorPower b n) (TensorPower r n))
-  let ρV : State
-      (Prod
-        (Prod (Prod (TensorPower a n) (TensorPower b n)) et)
-        (Prod (TensorPower r n) e)) :=
+  let ρV : MState
+      (((TensorPower a n × TensorPower b n) × et) ×
+        (TensorPower r n × e)) :=
     (C.bobOperation.prod
-      (Channel.idChannel (Prod (TensorPower r n) e))).applyState ρBobIn
+      (CPTPOp.id (dIn := TensorPower r n × e))) ρBobIn
   ρV.reindex
-    (fqswBobOutputToFinalEquiv
-      (TensorPower a n) (TensorPower b n) et (TensorPower r n) e)
+    (fqswAliceOutputToBobInputEquiv
+      (TensorPower a n × TensorPower b n) et (TensorPower r n) e)
 
 /-- Run a block protocol on the tensor power of an explicit single-copy
 source state. -/
 def outputStateOfState (C : FQSWBlockProtocol ψ n q e et)
-    (ρ : State (Prod (Prod a b) r)) :
-    State (Prod
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n))
-      (Prod e et)) :=
+    (ρ : MState ((a × b) × r)) :
+    MState (((TensorPower a n × TensorPower b n) × TensorPower r n) ×
+      (e × et)) :=
   C.outputStateOfBlockState
-    ((ρ.tensorPower n).reindex (fqswTensorPowerTripartiteEquiv a b r n))
+    ((ρ.tensorPower n).reindex (tensorPowerProdProdEquiv a b r n))
 
 /-- Computed output on the IID source `ψ^{⊗n}`. -/
 def outputState :
-    State (Prod
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n))
-      (Prod e et)) :=
+    MState (((TensorPower a n × TensorPower b n) × TensorPower r n) ×
+      (e × et)) :=
   C.outputStateOfState ψ.state
 
+/-- The ideal output the protocol is compared against: the source `ψ^{⊗n}` regrouped so that the
+`B` registers sit with Bob, tensored with a maximally entangled state on the ebit registers. -/
 def targetState :
-  State (Prod
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n))
-      (Prod e et)) :=
-  ((ψ.tensorPower n).reindex (fqswTensorPowerTripartiteEquiv a b r n)).state.prod
-    (State.maximallyEntangled C.ebitPairing)
+  MState (((TensorPower a n × TensorPower b n) × TensorPower r n) ×
+      (e × et)) :=
+  ((ψ.tensorPower n).reindex (tensorPowerProdProdEquiv a b r n)).state.prod
+    (MState.maximallyEntangled C.ebitPairing)
 
+/-- The protocol error, as the normalized trace distance between the output and the target. -/
 def normalizedError : ℝ :=
   C.outputState.normalizedTraceDistance C.targetState
 
+/-- The protocol error in the unnormalized trace norm, which is twice `normalizedError`. -/
 def traceNormError : ℝ :=
-  traceNormDistance C.outputState.matrix C.targetState.matrix
+  traceNormDistance C.outputState.m C.targetState.m
 
+/-- The trace-norm error incurred when the protocol is run on an arbitrary input state `ρ` rather
+than on the IID source. -/
 def traceNormErrorOfState (C : FQSWBlockProtocol ψ n q e et)
-    (ρ : State (Prod (Prod a b) r)) : ℝ :=
-  traceNormDistance (C.outputStateOfState ρ).matrix C.targetState.matrix
+    (ρ : MState ((a × b) × r)) : ℝ :=
+  traceNormDistance (C.outputStateOfState ρ).m C.targetState.m
 
+/-- Qubits of quantum communication per copy of the source, `log₂ |q| / n`, and `0` when `n = 0`. -/
 def communicationRate (_C : FQSWBlockProtocol ψ n q e et) : ℝ :=
   if n = 0 then 0 else log2 (Fintype.card q : ℝ) / (n : ℝ)
 
+/-- Ebits generated per copy of the source, `log₂ |e| / n`, and `0` when `n = 0`. -/
 def ebitYieldRate (_C : FQSWBlockProtocol ψ n q e et) : ℝ :=
   if n = 0 then 0 else log2 (Fintype.card e : ℝ) / (n : ℝ)
 
 theorem normalizedError_nonneg : 0 ≤ C.normalizedError :=
-  State.normalizedTraceDistance_nonneg _ _
+  MState.normalizedTraceDistance_nonneg _ _
 
 theorem traceNormError_nonneg : 0 ≤ C.traceNormError :=
   traceNormDistance_nonneg _ _
@@ -493,57 +452,6 @@ theorem traceNormError_nonneg : 0 ≤ C.traceNormError :=
 theorem normalizedError_eq_half_traceNormError :
     C.normalizedError = (1 / 2 : ℝ) * C.traceNormError := by
   rfl
-
-private theorem fqswChannel_reindex_map
-    {alpha : Type*} {beta : Type*}
-    [Fintype alpha] [DecidableEq alpha] [Fintype beta] [DecidableEq beta]
-    (E : alpha ≃ beta) (X : CMatrix alpha) :
-    (Channel.reindex E).map X = X.submatrix E.symm E.symm := by
-  ext i j
-  simp [Channel.reindex, MatrixMap.ofReferenceIsometry_apply,
-    ReferenceIsometry.ofEquiv, Matrix.mul_apply]
-  rw [Finset.sum_eq_single (E.symm j)]
-  · rw [Finset.sum_eq_single (E.symm i)]
-    · simp
-    · intro x _ hx
-      have hne : i ≠ E x := by
-        intro hi
-        apply hx
-        simp [hi]
-      simp [hne]
-    · simp
-  · intro x _ hx
-    have hne : j ≠ E x := by
-      intro hj
-      apply hx
-      simp [hj]
-    simp [hne]
-  · simp
-
-private theorem fqswChannel_reindex_map_single
-    {alpha : Type*} {beta : Type*}
-    [Fintype alpha] [DecidableEq alpha] [Fintype beta] [DecidableEq beta]
-    (E : alpha ≃ beta) (i j : alpha) :
-    (Channel.reindex E).map (Matrix.single i j (1 : Complex)) =
-      Matrix.single (E i) (E j) (1 : Complex) := by
-  rw [fqswChannel_reindex_map]
-  ext x y
-  simp only [Matrix.submatrix_apply, Matrix.single_apply]
-  have hx : i = E.symm x ↔ E i = x := by
-    constructor
-    · intro h
-      rw [h, E.apply_symm_apply]
-    · intro h
-      apply E.injective
-      rw [E.apply_symm_apply, h]
-  have hy : j = E.symm y ↔ E j = y := by
-    constructor
-    · intro h
-      rw [h, E.apply_symm_apply]
-    · intro h
-      apply E.injective
-      rw [E.apply_symm_apply, h]
-  simp only [hx, hy]
 
 /-- Regrouping a tripartite source commutes with independent local channels. -/
 public theorem fqswSourceToAliceInput_naturality
@@ -555,59 +463,55 @@ public theorem fqswSourceToAliceInput_naturality
     [Fintype alpha'] [DecidableEq alpha']
     [Fintype beta'] [DecidableEq beta']
     [Fintype gamma'] [DecidableEq gamma']
-    (PhiA : Channel alpha alpha') (PhiB : Channel beta beta')
-    (PhiR : Channel gamma gamma') :
-    (PhiA.prod (PhiB.prod PhiR)).comp
-        (Channel.reindex (fqswSourceToAliceInputEquiv alpha beta gamma)) =
-      (Channel.reindex (fqswSourceToAliceInputEquiv alpha' beta' gamma')).comp
+    (PhiA : CPTPMap alpha alpha') (PhiB : CPTPMap beta beta')
+    (PhiR : CPTPMap gamma gamma') :
+    (PhiA.prod (PhiB.prod PhiR)) ∘ₘ
+        (CPTPOp.reindex (Equiv.prodAssoc alpha beta gamma)) =
+      (CPTPOp.reindex (Equiv.prodAssoc alpha' beta' gamma')) ∘ₘ
         ((PhiA.prod PhiB).prod PhiR) := by
-  rw [Channel.mk.injEq]
+  refine CPTPOp.ext_map ?_
   apply LinearMap.ext
   intro X
   rw [MatrixMap.map_eq_sum_single
-    ((PhiA.prod (PhiB.prod PhiR)).comp
-      (Channel.reindex (fqswSourceToAliceInputEquiv alpha beta gamma))).map X]
+    ((PhiA.prod (PhiB.prod PhiR)) ∘ₘ
+      (CPTPOp.reindex (Equiv.prodAssoc alpha beta gamma))).map X]
   rw [MatrixMap.map_eq_sum_single
-    ((Channel.reindex (fqswSourceToAliceInputEquiv alpha' beta' gamma')).comp
+    ((CPTPOp.reindex (Equiv.prodAssoc alpha' beta' gamma')) ∘ₘ
       ((PhiA.prod PhiB).prod PhiR)).map X]
   refine Finset.sum_congr rfl fun i _ => ?_
   refine Finset.sum_congr rfl fun j _ => ?_
   congr 1
-  change MatrixMap.kron PhiA.map (MatrixMap.kron PhiB.map PhiR.map)
-      ((Channel.reindex (fqswSourceToAliceInputEquiv alpha beta gamma)).map
-        (Matrix.single i j (1 : Complex))) =
-    (Channel.reindex (fqswSourceToAliceInputEquiv alpha' beta' gamma')).map
-      (MatrixMap.kron (MatrixMap.kron PhiA.map PhiB.map) PhiR.map
-        (Matrix.single i j (1 : Complex)))
-  rw [fqswChannel_reindex_map_single]
+  simp only [CPTPOp.compose_map, CPTPOp.prod_map,
+    LinearMap.comp_apply]
+  rw [CPTPOp.reindex_map_single]
   rw [show Matrix.single
-      (fqswSourceToAliceInputEquiv alpha beta gamma i)
-      (fqswSourceToAliceInputEquiv alpha beta gamma j) (1 : Complex) =
-        Matrix.kronecker
-          (Matrix.single i.1.1 j.1.1 (1 : Complex))
-          (Matrix.single (i.1.2, i.2) (j.1.2, j.2) (1 : Complex)) by
+      (Equiv.prodAssoc alpha beta gamma i)
+      (Equiv.prodAssoc alpha beta gamma j) (1 : ℂ) =
+        Matrix.kroneckerMap (· * ·)
+          (Matrix.single i.1.1 j.1.1 (1 : ℂ))
+          (Matrix.single (i.1.2, i.2) (j.1.2, j.2) (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
-  rw [MatrixMap.kron_apply_kronecker]
-  rw [show Matrix.single (i.1.2, i.2) (j.1.2, j.2) (1 : Complex) =
-        Matrix.kronecker
-          (Matrix.single i.1.2 j.1.2 (1 : Complex))
-          (Matrix.single i.2 j.2 (1 : Complex)) by
+  rw [MatrixMap.kron_map_of_kron_state]
+  rw [show Matrix.single (i.1.2, i.2) (j.1.2, j.2) (1 : ℂ) =
+        Matrix.kroneckerMap (· * ·)
+          (Matrix.single i.1.2 j.1.2 (1 : ℂ))
+          (Matrix.single i.2 j.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
-  rw [MatrixMap.kron_apply_kronecker]
-  rw [show Matrix.single i j (1 : Complex) =
-        Matrix.kronecker
-          (Matrix.single i.1 j.1 (1 : Complex))
-          (Matrix.single i.2 j.2 (1 : Complex)) by
+  rw [MatrixMap.kron_map_of_kron_state]
+  rw [show Matrix.single i j (1 : ℂ) =
+        Matrix.kroneckerMap (· * ·)
+          (Matrix.single i.1 j.1 (1 : ℂ))
+          (Matrix.single i.2 j.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
-  rw [MatrixMap.kron_apply_kronecker]
-  rw [show Matrix.single i.1 j.1 (1 : Complex) =
-        Matrix.kronecker
-          (Matrix.single i.1.1 j.1.1 (1 : Complex))
-          (Matrix.single i.1.2 j.1.2 (1 : Complex)) by
+  rw [MatrixMap.kron_map_of_kron_state]
+  rw [show Matrix.single i.1 j.1 (1 : ℂ) =
+        Matrix.kroneckerMap (· * ·)
+          (Matrix.single i.1.1 j.1.1 (1 : ℂ))
+          (Matrix.single i.1.2 j.1.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
-  rw [MatrixMap.kron_apply_kronecker, fqswChannel_reindex_map]
+  rw [MatrixMap.kron_map_of_kron_state, CPTPOp.reindex_map]
   ext k l
-  simp [fqswSourceToAliceInputEquiv, Matrix.kronecker, mul_assoc]
+  simp [Equiv.prodAssoc, mul_assoc]
 
 /-- Regrouping Alice's output into Bob's input commutes with independent local
 channels on the four registers. -/
@@ -622,80 +526,73 @@ public theorem fqswAliceOutputToBobInput_naturality
     [Fintype e1] [DecidableEq e1]
     [Fintype b1] [DecidableEq b1]
     [Fintype r1] [DecidableEq r1]
-    (PhiQ : Channel q0 q1) (PhiE : Channel e0 e1)
-    (PhiB : Channel b0 b1) (PhiR : Channel r0 r1) :
-    ((PhiQ.prod PhiB).prod (PhiR.prod PhiE)).comp
-        (Channel.reindex (fqswAliceOutputToBobInputEquiv q0 e0 b0 r0)) =
-      (Channel.reindex (fqswAliceOutputToBobInputEquiv q1 e1 b1 r1)).comp
+    (PhiQ : CPTPMap q0 q1) (PhiE : CPTPMap e0 e1)
+    (PhiB : CPTPMap b0 b1) (PhiR : CPTPMap r0 r1) :
+    ((PhiQ.prod PhiB).prod (PhiR.prod PhiE)) ∘ₘ
+        (CPTPOp.reindex (fqswAliceOutputToBobInputEquiv q0 e0 b0 r0)) =
+      (CPTPOp.reindex (fqswAliceOutputToBobInputEquiv q1 e1 b1 r1)) ∘ₘ
         ((PhiQ.prod PhiE).prod (PhiB.prod PhiR)) := by
-  rw [Channel.mk.injEq]
+  refine CPTPOp.ext_map ?_
   apply LinearMap.ext
   intro X
   rw [MatrixMap.map_eq_sum_single
-    (((PhiQ.prod PhiB).prod (PhiR.prod PhiE)).comp
-      (Channel.reindex (fqswAliceOutputToBobInputEquiv q0 e0 b0 r0))).map X]
+    (((PhiQ.prod PhiB).prod (PhiR.prod PhiE)) ∘ₘ
+      (CPTPOp.reindex (fqswAliceOutputToBobInputEquiv q0 e0 b0 r0))).map X]
   rw [MatrixMap.map_eq_sum_single
-    ((Channel.reindex (fqswAliceOutputToBobInputEquiv q1 e1 b1 r1)).comp
+    ((CPTPOp.reindex (fqswAliceOutputToBobInputEquiv q1 e1 b1 r1)) ∘ₘ
       ((PhiQ.prod PhiE).prod (PhiB.prod PhiR))).map X]
   refine Finset.sum_congr rfl fun i _ => ?_
   refine Finset.sum_congr rfl fun j _ => ?_
   congr 1
-  change MatrixMap.kron (MatrixMap.kron PhiQ.map PhiB.map)
-      (MatrixMap.kron PhiR.map PhiE.map)
-      ((Channel.reindex (fqswAliceOutputToBobInputEquiv q0 e0 b0 r0)).map
-        (Matrix.single i j (1 : Complex))) =
-    (Channel.reindex (fqswAliceOutputToBobInputEquiv q1 e1 b1 r1)).map
-      (MatrixMap.kron (MatrixMap.kron PhiQ.map PhiE.map)
-        (MatrixMap.kron PhiB.map PhiR.map)
-        (Matrix.single i j (1 : Complex)))
-  rw [fqswChannel_reindex_map_single]
+  simp only [CPTPOp.compose_map, CPTPOp.prod_map,
+    LinearMap.comp_apply]
+  rw [CPTPOp.reindex_map_single]
   rw [show Matrix.single
       (fqswAliceOutputToBobInputEquiv q0 e0 b0 r0 i)
-      (fqswAliceOutputToBobInputEquiv q0 e0 b0 r0 j) (1 : Complex) =
-        Matrix.kronecker
-          (Matrix.single (i.1.1, i.2.1) (j.1.1, j.2.1) (1 : Complex))
-          (Matrix.single (i.2.2, i.1.2) (j.2.2, j.1.2) (1 : Complex)) by
+      (fqswAliceOutputToBobInputEquiv q0 e0 b0 r0 j) (1 : ℂ) =
+        Matrix.kroneckerMap (· * ·)
+          (Matrix.single (i.1.1, i.2.1) (j.1.1, j.2.1) (1 : ℂ))
+          (Matrix.single (i.2.2, i.1.2) (j.2.2, j.1.2) (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
-  rw [MatrixMap.kron_apply_kronecker]
-  rw [show Matrix.single (i.1.1, i.2.1) (j.1.1, j.2.1) (1 : Complex) =
-        Matrix.kronecker
-          (Matrix.single i.1.1 j.1.1 (1 : Complex))
-          (Matrix.single i.2.1 j.2.1 (1 : Complex)) by
+  rw [MatrixMap.kron_map_of_kron_state]
+  rw [show Matrix.single (i.1.1, i.2.1) (j.1.1, j.2.1) (1 : ℂ) =
+        Matrix.kroneckerMap (· * ·)
+          (Matrix.single i.1.1 j.1.1 (1 : ℂ))
+          (Matrix.single i.2.1 j.2.1 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
-  rw [MatrixMap.kron_apply_kronecker]
-  rw [show Matrix.single (i.2.2, i.1.2) (j.2.2, j.1.2) (1 : Complex) =
-        Matrix.kronecker
-          (Matrix.single i.2.2 j.2.2 (1 : Complex))
-          (Matrix.single i.1.2 j.1.2 (1 : Complex)) by
+  rw [MatrixMap.kron_map_of_kron_state]
+  rw [show Matrix.single (i.2.2, i.1.2) (j.2.2, j.1.2) (1 : ℂ) =
+        Matrix.kroneckerMap (· * ·)
+          (Matrix.single i.2.2 j.2.2 (1 : ℂ))
+          (Matrix.single i.1.2 j.1.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
-  rw [MatrixMap.kron_apply_kronecker]
-  rw [show Matrix.single i j (1 : Complex) =
-        Matrix.kronecker
-          (Matrix.single i.1 j.1 (1 : Complex))
-          (Matrix.single i.2 j.2 (1 : Complex)) by
+  rw [MatrixMap.kron_map_of_kron_state]
+  rw [show Matrix.single i j (1 : ℂ) =
+        Matrix.kroneckerMap (· * ·)
+          (Matrix.single i.1 j.1 (1 : ℂ))
+          (Matrix.single i.2 j.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
-  rw [MatrixMap.kron_apply_kronecker]
-  rw [show Matrix.single i.1 j.1 (1 : Complex) =
-        Matrix.kronecker
-          (Matrix.single i.1.1 j.1.1 (1 : Complex))
-          (Matrix.single i.1.2 j.1.2 (1 : Complex)) by
+  rw [MatrixMap.kron_map_of_kron_state]
+  rw [show Matrix.single i.1 j.1 (1 : ℂ) =
+        Matrix.kroneckerMap (· * ·)
+          (Matrix.single i.1.1 j.1.1 (1 : ℂ))
+          (Matrix.single i.1.2 j.1.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
-  rw [MatrixMap.kron_apply_kronecker]
-  rw [show Matrix.single i.2 j.2 (1 : Complex) =
-        Matrix.kronecker
-          (Matrix.single i.2.1 j.2.1 (1 : Complex))
-          (Matrix.single i.2.2 j.2.2 (1 : Complex)) by
+  rw [MatrixMap.kron_map_of_kron_state]
+  rw [show Matrix.single i.2 j.2 (1 : ℂ) =
+        Matrix.kroneckerMap (· * ·)
+          (Matrix.single i.2.1 j.2.1 (1 : ℂ))
+          (Matrix.single i.2.2 j.2.2 (1 : ℂ)) by
       exact single_prod_eq_kronecker_single _ _ _ _]
-  rw [MatrixMap.kron_apply_kronecker, fqswChannel_reindex_map]
+  rw [MatrixMap.kron_map_of_kron_state, CPTPOp.reindex_map]
   ext k l
-  simp [fqswAliceOutputToBobInputEquiv, Matrix.kronecker, mul_assoc, mul_comm,
-    mul_left_comm]
+  simp [fqswAliceOutputToBobInputEquiv, mul_assoc, mul_comm, mul_left_comm]
 
 /-- Regard an isometric one-shot protocol on the grouped IID source as a
 physical block protocol. -/
 def ofOneShot
     (C : FQSWOneShotProtocol
-      ((ψ.tensorPower n).reindex (fqswTensorPowerTripartiteEquiv a b r n))
+      ((ψ.tensorPower n).reindex (tensorPowerProdProdEquiv a b r n))
       q e et) :
     FQSWBlockProtocol ψ n q e et where
   aliceOperation := fqswChannelOfReferenceIsometry C.aliceIsometry
@@ -704,18 +601,20 @@ def ofOneShot
 
 theorem outputStateOfBlockState_ofOneShot
     (C : FQSWOneShotProtocol
-      ((ψ.tensorPower n).reindex (fqswTensorPowerTripartiteEquiv a b r n))
+      ((ψ.tensorPower n).reindex (tensorPowerProdProdEquiv a b r n))
       q e et)
-    (ρ : State
-      (Prod (Prod (TensorPower a n) (TensorPower b n)) (TensorPower r n))) :
+    (ρ : MState
+      ((TensorPower a n × TensorPower b n) × TensorPower r n)) :
     (ofOneShot C).outputStateOfBlockState ρ = C.outputStateOfState ρ := by
-  rfl
+  simp only [outputStateOfBlockState, ofOneShot, FQSWOneShotProtocol.outputStateOfState]
 
 end FQSWBlockProtocol
 
-namespace PureVector
+end QIT
 
-variable (ψ : PureVector (Prod (Prod a b) r))
+namespace Ket
+
+variable (ψ : Ket ((a × b) × r))
 
 /-- FQSW communication rate `(1/2) I(A;R)_ψ`. -/
 def fqswCommunicationRate : ℝ :=
@@ -723,7 +622,7 @@ def fqswCommunicationRate : ℝ :=
 
 /-- FQSW ebit-yield rate `(1/2) I(A;B)_ψ`. -/
 def fqswEbitYieldRate : ℝ :=
-  (1 / 2 : ℝ) * mutualInformation ψ.state.marginalA
+  (1 / 2 : ℝ) * mutualInformation ψ.state.traceRight
 
 /-- Operational FQSW achievability with computed protocols: for every positive
 rate slack and error tolerance, all sufficiently large block lengths have an
@@ -741,8 +640,4 @@ def IsAchievableFQSW : Prop :=
                   ψ.fqswEbitYieldRate - δ ≤ C.ebitYieldRate ∧
                     C.normalizedError ≤ εerr
 
-end PureVector
-
-end
-
-end QIT
+end Ket

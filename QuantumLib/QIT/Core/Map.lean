@@ -7,6 +7,7 @@ Authors: QuAIR Team
 module
 
 public import QuantumLib.QIT.Core.State
+public import QuantumInfo.Channels.Unbundled
 
 /-!
 # Matrix maps
@@ -30,30 +31,24 @@ noncomputable section
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
 
-/-- A complex-linear map between finite matrix spaces. -/
+/-- A complex-linear map between finite matrix spaces: physlib's `MatrixMap` over `ℂ`, with the
+finiteness assumptions that the rest of Lean-QIT works under. Complete positivity and trace
+preservation are physlib's `MatrixMap.IsCompletelyPositive` and `MatrixMap.IsTracePreserving`. -/
 abbrev MatrixMap (a : Type u) (b : Type v) [Fintype a] [DecidableEq a]
     [Fintype b] [DecidableEq b] :=
-  CMatrix a →ₗ[Complex] CMatrix b
+  _root_.MatrixMap a b ℂ
 
 namespace MatrixMap
 
 /-- Choi matrix of a finite-dimensional matrix map. -/
-def choi (Phi : MatrixMap a b) : CMatrix (Prod a b) :=
-  fun ij kl => Phi (Matrix.single ij.1 kl.1 (1 : Complex)) ij.2 kl.2
-
-/-- Choi-positive formulation of complete positivity. -/
-def IsCompletelyPositive (Phi : MatrixMap a b) : Prop :=
-  (choi Phi).PosSemidef
-
-/-- Trace-preserving condition. -/
-def IsTracePreserving (Phi : MatrixMap a b) : Prop :=
-  forall X : CMatrix a, (Phi X).trace = X.trace
+def choi (Phi : MatrixMap a b) : CMatrix (a × b) :=
+  fun ij kl => Phi (Matrix.single ij.1 kl.1 (1 : ℂ)) ij.2 kl.2
 
 /-- The matrix map whose Choi matrix is the prescribed finite matrix.
 
 This is the explicit inverse to `MatrixMap.choi`, obtained by expanding the
 input matrix in matrix units. -/
-def ofChoiMatrix (J : CMatrix (Prod a b)) : MatrixMap a b where
+def ofChoiMatrix (J : CMatrix (a × b)) : MatrixMap a b where
   toFun X := Matrix.of fun j j' => ∑ i : a, ∑ i' : a, X i i' * J (i, j) (i', j')
   map_add' X Y := by
     ext j j'
@@ -63,38 +58,48 @@ def ofChoiMatrix (J : CMatrix (Prod a b)) : MatrixMap a b where
     simp [Finset.mul_sum, mul_assoc]
 
 @[simp]
-theorem ofChoiMatrix_apply (J : CMatrix (Prod a b)) (X : CMatrix a)
+theorem ofChoiMatrix_apply (J : CMatrix (a × b)) (X : CMatrix a)
     (j j' : b) :
     ofChoiMatrix J X j j' =
       ∑ i : a, ∑ i' : a, X i i' * J (i, j) (i', j') := by
   rfl
 
+/-- Lean-QIT indexes the Choi matrix by `input × output` and physlib by `output × input`, so the two
+differ by `Prod.swap` on both indices. -/
+theorem choi_eq_submatrix (Phi : MatrixMap a b) :
+    Phi.choi = (_root_.MatrixMap.choi_matrix Phi).submatrix Prod.swap Prod.swap :=
+  rfl
+
+/-- The mirror image of `QIT.MatrixMap.choi_eq_submatrix`. -/
+theorem choi_matrix_eq_submatrix (Phi : MatrixMap a b) :
+    _root_.MatrixMap.choi_matrix Phi = Phi.choi.submatrix Prod.swap Prod.swap :=
+  rfl
+
+/-- Reconstructing a map from a Choi matrix agrees on the two conventions. -/
+theorem ofChoiMatrix_eq (J : CMatrix (a × b)) :
+    ofChoiMatrix J = _root_.MatrixMap.of_choi_matrix (J.submatrix Prod.swap Prod.swap) := by
+  ext X j j'
+  rfl
+
+/-- Complete positivity, which physlib states as positivity of every ampliation, is positive
+semidefiniteness of the Choi matrix in Lean-QIT's index convention. -/
+theorem isCompletelyPositive_iff_choi (Phi : MatrixMap a b) :
+    MatrixMap.IsCompletelyPositive Phi ↔ Phi.choi.PosSemidef := by
+  rw [_root_.MatrixMap.choi_PSD_iff_CP_map, choi_eq_submatrix]
+  exact ⟨fun h => h.submatrix Prod.swap, fun h => by simpa using h.submatrix Prod.swap⟩
+
 /-- `ofChoiMatrix` is a right inverse to the Choi construction. -/
-theorem choi_ofChoiMatrix (J : CMatrix (Prod a b)) :
+theorem choi_ofChoiMatrix (J : CMatrix (a × b)) :
     choi (ofChoiMatrix J) = J := by
-  ext ij kl
-  rcases ij with ⟨i, j⟩
-  rcases kl with ⟨i', j'⟩
-  simp only [choi, ofChoiMatrix, LinearMap.coe_mk, AddHom.coe_mk, Matrix.of_apply]
-  rw [Finset.sum_eq_single i]
-  · rw [Finset.sum_eq_single i']
-    · simp [Matrix.single]
-    · intro y _ hy
-      have hy' : i' ≠ y := hy.symm
-      simp [Matrix.single, hy']
-    · intro hnot
-      simp at hnot
-  · intro x _ hx
-    have hxi : i ≠ x := hx.symm
-    simp [Matrix.single, hxi]
-  · intro hnot
-    simp at hnot
+  rw [choi_eq_submatrix, ofChoiMatrix_eq, _root_.MatrixMap.map_choi_inv]
+  ext ⟨i, j⟩ ⟨i', j'⟩
+  rfl
 
 /-- A positive semidefinite Choi matrix defines a completely positive map. -/
-theorem ofChoiMatrix_isCompletelyPositive {J : CMatrix (Prod a b)}
+theorem ofChoiMatrix_isCompletelyPositive {J : CMatrix (a × b)}
     (hJ : J.PosSemidef) :
-    IsCompletelyPositive (ofChoiMatrix J) := by
-  rwa [IsCompletelyPositive, choi_ofChoiMatrix]
+    MatrixMap.IsCompletelyPositive (ofChoiMatrix J) := by
+  rwa [isCompletelyPositive_iff_choi, choi_ofChoiMatrix]
 
 /-- The unique linear matrix map between unit systems. -/
 def unit : MatrixMap PUnit.{u + 1} PUnit.{v + 1} where
@@ -106,10 +111,10 @@ def unit : MatrixMap PUnit.{u + 1} PUnit.{v + 1} where
     ext i j
     rfl
 
-/-- The unit-system matrix map is Choi-positive. -/
+/-- The unit-system matrix map is completely positive. -/
 theorem unit_isCompletelyPositive :
-    IsCompletelyPositive (unit : MatrixMap PUnit.{u + 1} PUnit.{v + 1}) := by
-  change (choi (unit : MatrixMap PUnit.{u + 1} PUnit.{v + 1})).PosSemidef
+    MatrixMap.IsCompletelyPositive (unit : MatrixMap PUnit.{u + 1} PUnit.{v + 1}) := by
+  rw [isCompletelyPositive_iff_choi]
   have hchoi :
       choi (unit : MatrixMap PUnit.{u + 1} PUnit.{v + 1}) =
         (1 : CMatrix (PUnit.{u + 1} × PUnit.{v + 1})) := by
@@ -122,34 +127,20 @@ theorem unit_isCompletelyPositive :
 
 /-- The unit-system matrix map is trace-preserving. -/
 theorem unit_isTracePreserving :
-    IsTracePreserving (unit : MatrixMap PUnit.{u + 1} PUnit.{v + 1}) := by
+    MatrixMap.IsTracePreserving (unit : MatrixMap PUnit.{u + 1} PUnit.{v + 1}) := by
   intro X
   simp [unit, Matrix.trace]
-
-/-- The unit-system matrix map preserves positive semidefinite matrices. -/
-theorem unit_mapsPositive :
-    forall X : CMatrix PUnit.{u + 1}, X.PosSemidef ->
-      ((unit : MatrixMap PUnit.{u + 1} PUnit.{v + 1}) X).PosSemidef := by
-  intro X hX
-  have hsub :
-      (unit : MatrixMap PUnit.{u + 1} PUnit.{v + 1}) X =
-        X.submatrix (fun _ : PUnit.{v + 1} => PUnit.unit)
-          (fun _ : PUnit.{v + 1} => PUnit.unit) := by
-    ext i j
-    rfl
-  rw [hsub]
-  exact hX.submatrix _
 
 /-- Expand a matrix map over matrix units. -/
 theorem map_eq_sum_single (Phi : MatrixMap a b) (X : CMatrix a) :
     Phi X = ∑ i : a, ∑ i' : a,
-      X i i' • Phi (Matrix.single i i' (1 : Complex)) := by
+      X i i' • Phi (Matrix.single i i' (1 : ℂ)) := by
   calc
     Phi X = Phi (∑ i : a, ∑ i' : a, Matrix.single i i' (X i i')) := by
       congr
       exact Matrix.matrix_eq_sum_single X
     _ = ∑ i : a, ∑ i' : a,
-        X i i' • Phi (Matrix.single i i' (1 : Complex)) := by
+        X i i' • Phi (Matrix.single i i' (1 : ℂ)) := by
       simp only [map_sum]
       refine Finset.sum_congr rfl ?_
       intro i _
@@ -157,7 +148,7 @@ theorem map_eq_sum_single (Phi : MatrixMap a b) (X : CMatrix a) :
       intro i' _
       have hsingle :
           Matrix.single i i' (X i i') =
-            X i i' • Matrix.single i i' (1 : Complex) := by
+            X i i' • Matrix.single i i' (1 : ℂ) := by
         ext r s
         simp [Matrix.single]
       rw [hsingle, map_smul]
@@ -165,12 +156,12 @@ theorem map_eq_sum_single (Phi : MatrixMap a b) (X : CMatrix a) :
 /-- Trace expansion of a matrix map over matrix units. -/
 theorem trace_map_eq_sum_single (Phi : MatrixMap a b) (X : CMatrix a) :
     (Phi X).trace = ∑ i : a, ∑ i' : a,
-      X i i' * (Phi (Matrix.single i i' (1 : Complex))).trace := by
+      X i i' * (Phi (Matrix.single i i' (1 : ℂ))).trace := by
   rw [map_eq_sum_single Phi X]
   simp [Matrix.trace_sum, Matrix.trace_smul]
 
 /-- Kraus-form matrix map `X ↦ ∑ k, K k * X * (K k)ᴴ`. -/
-def ofKraus {κ : Type w} [Fintype κ] (K : κ -> Matrix b a Complex) : MatrixMap a b where
+def ofKraus {κ : Type w} [Fintype κ] (K : κ → Matrix b a ℂ) : MatrixMap a b where
   toFun X := ∑ k : κ, K k * X * (K k).conjTranspose
   map_add' X Y := by
     ext i j
@@ -179,13 +170,16 @@ def ofKraus {κ : Type w} [Fintype κ] (K : κ -> Matrix b a Complex) : MatrixMa
     ext i j
     simp [Matrix.sum_apply, Matrix.mul_apply, Finset.mul_sum]
 
+/-- Lean-QIT's one-family Kraus form is physlib's two-family form with both families equal. -/
+theorem ofKraus_eq_of_kraus {κ : Type w} [Fintype κ] (K : κ → Matrix b a ℂ) :
+    ofKraus K = _root_.MatrixMap.of_kraus K K :=
+  LinearMap.ext fun X => (_root_.MatrixMap.of_kraus_apply K K X).symm
+
 /-- Kraus-form maps preserve positive semidefinite matrices. -/
-theorem ofKraus_mapsPositive {κ : Type w} [Fintype κ] (K : κ -> Matrix b a Complex) :
-    forall X : CMatrix a, X.PosSemidef -> (ofKraus K X).PosSemidef := by
-  intro X hX
-  rw [ofKraus]
-  exact Matrix.posSemidef_sum Finset.univ
-    (fun k _ => hX.mul_mul_conjTranspose_same (K k))
+theorem ofKraus_mapsPositive {κ : Type w} [Fintype κ] (K : κ → Matrix b a ℂ) :
+    ∀ X : CMatrix a, X.PosSemidef → (ofKraus K X).PosSemidef := fun _ hX => by
+  rw [ofKraus_eq_of_kraus]
+  exact _root_.MatrixMap.of_kraus_isPositive K hX
 
 /-- Heisenberg adjoint of a Kraus-form map. -/
 def krausAdjoint {κ : Type w} [Fintype κ]
@@ -258,7 +252,7 @@ theorem ofKraus_conjugated_apply {κ : Type w} [Fintype κ]
 
 /-- A trace-preserving Kraus map has unital Heisenberg adjoint. -/
 theorem krausAdjoint_one_of_tracePreserving {κ : Type w} [Fintype κ]
-    (K : κ → Matrix b a ℂ) (hTP : IsTracePreserving (ofKraus K)) :
+    (K : κ → Matrix b a ℂ) (hTP : MatrixMap.IsTracePreserving (ofKraus K)) :
     krausAdjoint K (1 : CMatrix b) = 1 := by
   apply Matrix.ext
   intro i j
@@ -299,7 +293,7 @@ theorem krausAdjoint_one_of_tracePreserving {κ : Type w} [Fintype κ]
 /-- A Kraus map is trace-preserving when its Heisenberg adjoint is unital. -/
 theorem ofKraus_isTracePreserving_of_krausAdjoint_one {κ : Type w} [Fintype κ]
     (K : κ → Matrix b a ℂ) (hK : krausAdjoint K (1 : CMatrix b) = 1) :
-    IsTracePreserving (ofKraus K) := by
+    MatrixMap.IsTracePreserving (ofKraus K) := by
   intro X
   have hdual := ofKraus_trace_duality K X (1 : CMatrix b)
   rw [Matrix.mul_one] at hdual
@@ -309,7 +303,7 @@ theorem ofKraus_isTracePreserving_of_krausAdjoint_one {κ : Type w} [Fintype κ]
 /-- A trace-preserving Kraus map has a unital positive Heisenberg adjoint, so
 effects are pulled back to effects. -/
 theorem krausAdjoint_effect_of_tracePreserving {κ : Type w} [Fintype κ]
-    (K : κ → Matrix b a ℂ) (hTP : IsTracePreserving (ofKraus K))
+    (K : κ → Matrix b a ℂ) (hTP : MatrixMap.IsTracePreserving (ofKraus K))
     {E : CMatrix b} (hEpos : E.PosSemidef) (hEle : E ≤ 1) :
     (krausAdjoint K E).PosSemidef ∧ krausAdjoint K E ≤ 1 := by
   refine ⟨krausAdjoint_mapsPositive K E hEpos, ?_⟩
@@ -337,16 +331,7 @@ theorem posSemidef_one_sub_of_posSemidef_idempotent
   have hQherm : Q.IsHermitian := by
     dsimp [Q]
     exact Matrix.IsHermitian.sub (by simp [Matrix.IsHermitian]) hPherm
-  have hQid : Q * Q = Q := by
-    dsimp [Q]
-    calc
-      (1 - P) * (1 - P) = (1 - P) * 1 - (1 - P) * P := by
-        rw [Matrix.mul_sub]
-      _ = (1 - P) - (1 * P - P * P) := by
-        rw [Matrix.mul_one, Matrix.sub_mul]
-      _ = 1 - P := by
-        rw [Matrix.one_mul, hPid]
-        abel
+  have hQid : Q * Q = Q := projection_complement_idempotent hPid
   have hPSD : (Matrix.conjTranspose Q * Q).PosSemidef :=
     Matrix.posSemidef_conjTranspose_mul_self Q
   convert hPSD using 1
@@ -533,7 +518,7 @@ theorem krausAdjoint_conjTranspose_mul_self_le_of_krausAdjoint_one
 /-- Kadison-Schwarz inequality for trace-preserving Kraus maps, stated from
 the Schrödinger-picture trace-preservation hypothesis. -/
 theorem krausAdjoint_conjTranspose_mul_self_le_of_tracePreserving
-    (K : κ → Matrix b a ℂ) (hTP : IsTracePreserving (ofKraus K))
+    (K : κ → Matrix b a ℂ) (hTP : MatrixMap.IsTracePreserving (ofKraus K))
     (E : CMatrix b) :
     Matrix.conjTranspose (krausAdjoint K E) * krausAdjoint K E ≤
       krausAdjoint K (Matrix.conjTranspose E * E) :=
@@ -584,7 +569,7 @@ theorem krausAdjoint_mul_self_le_of_krausAdjoint_one
 /-- Kadison inequality for trace-preserving Kraus maps, stated directly from
 the Schrödinger-picture trace-preservation hypothesis. -/
 theorem krausAdjoint_mul_self_le_of_tracePreserving
-    (K : κ → Matrix b a ℂ) (hTP : IsTracePreserving (ofKraus K))
+    (K : κ → Matrix b a ℂ) (hTP : MatrixMap.IsTracePreserving (ofKraus K))
     {E : CMatrix b} (hE : E.IsHermitian) :
     krausAdjoint K E * krausAdjoint K E ≤ krausAdjoint K (E * E) :=
   krausAdjoint_mul_self_le_of_krausAdjoint_one K
@@ -592,7 +577,7 @@ theorem krausAdjoint_mul_self_le_of_tracePreserving
 
 /-- Kadison inequality specialized to positive semidefinite effects. -/
 theorem krausAdjoint_posSemidef_mul_self_le_of_tracePreserving
-    (K : κ → Matrix b a ℂ) (hTP : IsTracePreserving (ofKraus K))
+    (K : κ → Matrix b a ℂ) (hTP : MatrixMap.IsTracePreserving (ofKraus K))
     {E : CMatrix b} (hE : E.PosSemidef) :
     krausAdjoint K E * krausAdjoint K E ≤ krausAdjoint K (E * E) :=
   krausAdjoint_mul_self_le_of_tracePreserving K hTP hE.isHermitian
@@ -600,101 +585,45 @@ theorem krausAdjoint_posSemidef_mul_self_le_of_tracePreserving
 end KrausKadison
 
 /-- Choi matrix of a Kraus-form matrix map, as a sum of rank-one projectors. -/
-theorem choi_ofKraus {κ : Type w} [Fintype κ] (K : κ -> Matrix b a Complex) :
+theorem choi_ofKraus {κ : Type w} [Fintype κ] (K : κ → Matrix b a ℂ) :
     choi (ofKraus K) =
       ∑ k : κ, Matrix.vecMulVec
         (fun x : a × b => K k x.2 x.1)
         (fun x : a × b => star (K k x.2 x.1)) := by
+  rw [choi_eq_submatrix, ofKraus_eq_of_kraus, _root_.MatrixMap.choi_of_kraus]
   ext x y
-  simp only [choi, ofKraus, LinearMap.coe_mk, AddHom.coe_mk, Matrix.sum_apply,
-    Matrix.mul_apply, Matrix.of_apply, Matrix.conjTranspose_apply, Matrix.single,
-    Matrix.vecMulVec]
-  refine Finset.sum_congr rfl ?_
-  intro k _
-  refine (Finset.sum_eq_single y.1 ?_ ?_).trans ?_
-  · intro y' _ hy'
-    simp [hy', eq_comm]
-  · intro hnot
-    simp at hnot
-  · have hsum :
-        (∑ x' : a, K k x.2 x' *
-          (if x.1 = x' ∧ y.1 = y.1 then (1 : Complex) else 0)) =
-          K k x.2 x.1 := by
-      calc
-        (∑ x' : a, K k x.2 x' *
-          (if x.1 = x' ∧ y.1 = y.1 then (1 : Complex) else 0)) =
-            K k x.2 x.1 *
-              (if x.1 = x.1 ∧ y.1 = y.1 then (1 : Complex) else 0) := by
-          refine Finset.sum_eq_single x.1 ?_ ?_
-          · intro x' _ hx'
-            have hxne : x.1 ≠ x' := by
-              intro h
-              exact hx' h.symm
-            simp [hxne]
-          · intro hnot
-            simp at hnot
-        _ = K k x.2 x.1 := by
-          simp
-    rw [hsum]
+  simp [Matrix.sum_apply, Matrix.vecMulVec]
 
-/-- Kraus-form maps are completely positive in the Choi-positive formulation. -/
+/-- Kraus-form maps are completely positive. -/
 theorem ofKraus_completelyPositive {κ : Type w} [Fintype κ]
-    (K : κ -> Matrix b a Complex) :
-    IsCompletelyPositive (ofKraus K) := by
-  rw [IsCompletelyPositive, choi_ofKraus]
-  exact Matrix.posSemidef_sum Finset.univ (fun _ _ =>
-    Matrix.posSemidef_vecMulVec_self_star _)
+    (K : κ → Matrix b a ℂ) :
+    MatrixMap.IsCompletelyPositive (ofKraus K) := by
+  rw [ofKraus_eq_of_kraus]
+  exact _root_.MatrixMap.of_kraus_isCompletelyPositive K
 
 /-- Choi matrices determine finite-dimensional matrix maps. -/
 theorem choi_inj {Phi Psi : MatrixMap a b} (h : choi Phi = choi Psi) :
-    Phi = Psi := by
-  apply LinearMap.ext
-  intro X
-  rw [map_eq_sum_single Phi X, map_eq_sum_single Psi X]
-  refine Finset.sum_congr rfl ?_
-  intro i _
-  refine Finset.sum_congr rfl ?_
-  intro i' _
-  have hbasis :
-      Phi (Matrix.single i i' (1 : Complex)) =
-        Psi (Matrix.single i i' (1 : Complex)) := by
-    ext p q
-    have hij := congrFun (congrFun h (i, p)) (i', q)
-    simpa [choi] using hij
-  rw [hbasis]
+    Phi = Psi :=
+  _root_.MatrixMap.choi_matrix_inj <| by
+    rw [choi_matrix_eq_submatrix, choi_matrix_eq_submatrix, h]
 
-/-- Choi-positive maps have a finite Kraus representation
+/-- Completely positive maps have a finite Kraus representation
 [Wilde2011Qst, qit-notes.tex:8242-8262]. -/
 theorem exists_kraus_of_choi_psd (Phi : MatrixMap a b)
-    (hPhi : IsCompletelyPositive Phi) :
-    ∃ K : (a × b) -> Matrix b a Complex, Phi = ofKraus K := by
-  let K : (a × b) -> Matrix b a Complex := fun k y x =>
-    (hPhi.1.eigenvectorUnitary.val : Matrix (a × b) (a × b) Complex) (x, y) k *
-      (Real.sqrt (hPhi.1.eigenvalues k) : Complex)
-  use K
-  apply choi_inj
-  rw [choi_ofKraus]
-  convert Matrix.IsHermitian.spectral_theorem hPhi.1 using 1
-  ext x y
-  simp [K, Matrix.mul_apply, Matrix.vecMulVec]
-  ring_nf
-  simp [Matrix.sum_apply, Matrix.diagonal]
-  refine Finset.sum_congr rfl fun k _ => ?_
-  have hsqrt :
-      ((Real.sqrt (hPhi.1.eigenvalues k) : Complex) ^ 2) =
-        (hPhi.1.eigenvalues k : Complex) := by
-    rw [← Complex.ofReal_pow, Real.sq_sqrt (hPhi.eigenvalues_nonneg k)]
-  rw [hsqrt]
+    (hPhi : MatrixMap.IsCompletelyPositive Phi) :
+    ∃ K : (a × b) → Matrix b a ℂ, Phi = ofKraus K := by
+  obtain ⟨K, hK⟩ :=
+    _root_.MatrixMap.IsCompletelyPositive.exists_kraus Phi hPhi
+  refine ⟨K ∘ ⇑(Equiv.prodComm a b), ?_⟩
+  rw [hK, ofKraus_eq_of_kraus]
+  exact (_root_.MatrixMap.of_kraus_comp_equiv (Equiv.prodComm a b) K K).symm
 
-/-- Choi-positive complete positivity maps positive semidefinite inputs to
-positive semidefinite outputs via the finite Kraus representation. -/
+/-- A completely positive map takes positive semidefinite inputs to positive
+semidefinite outputs. -/
 theorem isCompletelyPositive_mapsPositive (Phi : MatrixMap a b)
-    (hPhi : IsCompletelyPositive Phi) :
-    forall X : CMatrix a, X.PosSemidef -> (Phi X).PosSemidef := by
-  obtain ⟨K, hK⟩ := exists_kraus_of_choi_psd Phi hPhi
-  intro X hX
-  rw [hK]
-  exact ofKraus_mapsPositive K X hX
+    (hPhi : MatrixMap.IsCompletelyPositive Phi) :
+    ∀ X : CMatrix a, X.PosSemidef → (Phi X).PosSemidef :=
+  fun _ hX => hPhi.IsPositive hX
 
 variable {c : Type w}
 variable [Fintype c] [DecidableEq c]
@@ -702,7 +631,7 @@ variable [Fintype c] [DecidableEq c]
 /-- Composition of Kraus-form maps is again a Kraus-form map, with pairwise
 products of Kraus operators. -/
 theorem ofKraus_comp_ofKraus {κ : Type x} {ι : Type y} [Fintype κ] [Fintype ι]
-    (L : ι -> Matrix c b Complex) (K : κ -> Matrix b a Complex) :
+    (L : ι → Matrix c b ℂ) (K : κ → Matrix b a ℂ) :
     (ofKraus L).comp (ofKraus K) =
       ofKraus (fun kl : κ × ι => L kl.2 * K kl.1) := by
   ext X i j
@@ -712,108 +641,99 @@ theorem ofKraus_comp_ofKraus {κ : Type x} {ι : Type y} [Fintype κ] [Fintype �
 
 /-- Complete positivity is stable under composition of finite matrix maps. -/
 theorem isCompletelyPositive_comp (Psi : MatrixMap b c) (Phi : MatrixMap a b)
-    (hPsi : IsCompletelyPositive Psi) (hPhi : IsCompletelyPositive Phi) :
-    IsCompletelyPositive (Psi.comp Phi) := by
-  obtain ⟨K, hK⟩ := exists_kraus_of_choi_psd Phi hPhi
-  obtain ⟨L, hL⟩ := exists_kraus_of_choi_psd Psi hPsi
-  rw [hL, hK, ofKraus_comp_ofKraus]
-  exact ofKraus_completelyPositive _
+    (hPsi : MatrixMap.IsCompletelyPositive Psi) (hPhi : MatrixMap.IsCompletelyPositive Phi) :
+    MatrixMap.IsCompletelyPositive (Psi.comp Phi) :=
+  hPhi.comp hPsi
 
 /-- Trace preservation is stable under composition of finite matrix maps. -/
 theorem isTracePreserving_comp (Psi : MatrixMap b c) (Phi : MatrixMap a b)
-    (hPsi : IsTracePreserving Psi) (hPhi : IsTracePreserving Phi) :
-    IsTracePreserving (Psi.comp Phi) := by
-  intro X
-  exact (hPsi (Phi X)).trans (hPhi X)
+    (hPsi : MatrixMap.IsTracePreserving Psi) (hPhi : MatrixMap.IsTracePreserving Phi) :
+    MatrixMap.IsTracePreserving (Psi.comp Phi) :=
+  _root_.MatrixMap.IsTracePreserving.comp hPhi hPsi
 
 variable {c : Type w} {d : Type x}
 variable [Fintype c] [DecidableEq c] [Fintype d] [DecidableEq d]
 
-/-- Matrix-map Kronecker product. This is the linear-map layer for
-tensor-product channels [HolevoGiovannetti2012QuantumChannels,
-arxive.tex:965-974]. -/
-def kron (Phi : MatrixMap a b) (Psi : MatrixMap c d) : MatrixMap (Prod a c) (Prod b d) where
-  toFun X := Matrix.of fun bd bd' =>
-    Finset.univ.sum fun j : c =>
-    Finset.univ.sum fun j' : c =>
-    Finset.univ.sum fun i : a =>
-    Finset.univ.sum fun i' : a =>
-      X (i, j) (i', j') * Phi (Matrix.single i i' (1 : Complex)) bd.1 bd'.1 *
-        Psi (Matrix.single j j' (1 : Complex)) bd.2 bd'.2
-  map_add' X Y := by
-    ext bd bd'
-    simp [add_mul, Finset.sum_add_distrib]
-  map_smul' r X := by
-    ext bd bd'
-    simp [mul_assoc, Finset.mul_sum]
+/-- Entrywise action of a Kronecker product of matrix maps, with the output indices given by
+their projections rather than as explicit pairs. This is `MatrixMap.kron_def` reassociated so
+that the input entry comes first. -/
+theorem kron_apply (Phi : MatrixMap a b) (Psi : MatrixMap c d) (X : CMatrix (a × c))
+    (bd bd' : b × d) :
+    MatrixMap.kron Phi Psi X bd bd' =
+      ∑ j : c, ∑ j' : c, ∑ i : a, ∑ i' : a,
+        X (i, j) (i', j') * Phi (Matrix.single i i' (1 : ℂ)) bd.1 bd'.1 *
+          Psi (Matrix.single j j' (1 : ℂ)) bd.2 bd'.2 := by
+  obtain ⟨y, w⟩ := bd
+  obtain ⟨y', w'⟩ := bd'
+  rw [MatrixMap.kron_def]
+  symm
+  simp only [Finset.sum_comm (s := (Finset.univ : Finset c)) (t := (Finset.univ : Finset a))]
+  exact Finset.sum_congr rfl fun _ _ => Finset.sum_congr rfl fun _ _ =>
+    Finset.sum_congr rfl fun _ _ => Finset.sum_congr rfl fun _ _ => by ring
 
-/-- The Kronecker product of matrix maps acts componentwise on Kronecker
-products of matrices. -/
-theorem kron_apply_kronecker (Phi : MatrixMap a b) (Psi : MatrixMap c d)
-    (X : CMatrix a) (Y : CMatrix c) :
-    kron Phi Psi (Matrix.kronecker X Y) =
-      Matrix.kronecker (Phi X) (Psi Y) := by
-  ext bd bd'
-  have hPhi := congrFun (congrFun (map_eq_sum_single Phi X) bd.1) bd'.1
-  have hPsi := congrFun (congrFun (map_eq_sum_single Psi Y) bd.2) bd'.2
-  simp only [Matrix.sum_apply] at hPhi hPsi
-  simp only [Matrix.kronecker, Matrix.kroneckerMap_apply]
-  rw [hPhi, hPsi]
-  simp [kron, Finset.sum_mul, Finset.mul_sum, mul_assoc, mul_left_comm]
+/-- Entrywise action of a matrix map tensored with the identity map: the
+`((j, r0), (l, s0))` entry is the sum of the `((i, r0), (i', s0))` entries
+weighted by the `(j, l)` entries of the images of the matrix units. -/
+theorem kron_id_apply (Phi : MatrixMap a b) (X : CMatrix (a × c))
+    (j l : b) (r0 s0 : c) :
+    MatrixMap.kron Phi LinearMap.id X (j, r0) (l, s0) =
+      ∑ i : a, ∑ i' : a, X (i, r0) (i', s0) *
+        (Phi (Matrix.single i i' (1 : ℂ))) j l := by
+  rw [MatrixMap.kron_def]
+  refine Finset.sum_congr rfl fun i _ => ?_
+  refine Finset.sum_congr rfl fun i' _ => ?_
+  rw [Finset.sum_eq_single r0]
+  · rw [Finset.sum_eq_single s0]
+    · simp [Matrix.single, mul_comm]
+    · intro s1 _ hs1
+      simp [Matrix.single, hs1]
+    · intro hnot
+      simp at hnot
+  · intro r1 _ hr1
+    refine Finset.sum_eq_zero fun s1 _ => ?_
+    simp [Matrix.single, hr1]
+  · intro hnot
+    simp at hnot
 
 /-- Trace of the product map on a product matrix unit. -/
 theorem trace_kron_single (Phi : MatrixMap a b) (Psi : MatrixMap c d)
     (i i' : a) (j j' : c) :
-    (kron Phi Psi (Matrix.single (i, j) (i', j') (1 : Complex))).trace =
-      (Phi (Matrix.single i i' (1 : Complex))).trace *
-        (Psi (Matrix.single j j' (1 : Complex))).trace := by
-  rw [single_prod_eq_kronecker_single, kron_apply_kronecker]
+    (MatrixMap.kron Phi Psi (Matrix.single (i, j) (i', j') (1 : ℂ))).trace =
+      (Phi (Matrix.single i i' (1 : ℂ))).trace *
+        (Psi (Matrix.single j j' (1 : ℂ))).trace := by
+  rw [single_prod_eq_kronecker_single]
+  simp only [Matrix.kronecker]
+  rw [MatrixMap.kron_map_of_kron_state]
   exact Matrix.trace_kronecker _ _
-
-/-- Trace preservation is stable under the Kronecker product of matrix maps. -/
-theorem isTracePreserving_kron (Phi : MatrixMap a b) (Psi : MatrixMap c d)
-    (hPhi : IsTracePreserving Phi) (hPsi : IsTracePreserving Psi) :
-    IsTracePreserving (kron Phi Psi) := by
-  intro X
-  rw [trace_map_eq_sum_single (kron Phi Psi) X]
-  calc
-    (∑ ac : Prod a c, ∑ ac' : Prod a c,
-        X ac ac' * (kron Phi Psi
-          (Matrix.single ac ac' (1 : Complex))).trace) =
-        ∑ ac : Prod a c, ∑ ac' : Prod a c,
-          X ac ac' * ((if ac.1 = ac'.1 then (1 : Complex) else 0) *
-            (if ac.2 = ac'.2 then (1 : Complex) else 0)) := by
-      refine Finset.sum_congr rfl ?_
-      intro ac _
-      refine Finset.sum_congr rfl ?_
-      intro ac' _
-      cases ac with
-      | mk i j =>
-        cases ac' with
-        | mk i' j' =>
-          rw [trace_kron_single, hPhi, hPsi, trace_single_one, trace_single_one]
-    _ = X.trace := sum_delta_trace X
 
 /-- Choi matrix of a Kronecker product of matrix maps, up to the product-index
 reordering between `((a × c) × (b × d))` and `((a × b) × (c × d))`. -/
 theorem choi_kron (Phi : MatrixMap a b) (Psi : MatrixMap c d) :
-    choi (kron Phi Psi) =
+    choi (MatrixMap.kron Phi Psi) =
       (Matrix.kronecker (choi Phi) (choi Psi)).submatrix
         (fun x : (a × c) × (b × d) => ((x.1.1, x.2.1), (x.1.2, x.2.2)))
         (fun x : (a × c) × (b × d) => ((x.1.1, x.2.1), (x.1.2, x.2.2))) := by
   ext acbd acbd'
   simp only [choi, Matrix.submatrix_apply, Matrix.kronecker, Matrix.kroneckerMap_apply]
-  rw [single_prod_eq_kronecker_single acbd.1.1 acbd'.1.1 acbd.1.2 acbd'.1.2,
-    kron_apply_kronecker]
+  rw [single_prod_eq_kronecker_single acbd.1.1 acbd'.1.1 acbd.1.2 acbd'.1.2]
+  simp only [Matrix.kronecker]
+  rw [MatrixMap.kron_map_of_kron_state]
   rfl
 
-/-- Complete positivity is stable under the Kronecker product of matrix maps
-in the Choi-positive formulation. -/
-theorem isCompletelyPositive_kron (Phi : MatrixMap a b) (Psi : MatrixMap c d)
-    (hPhi : IsCompletelyPositive Phi) (hPsi : IsCompletelyPositive Psi) :
-    IsCompletelyPositive (kron Phi Psi) := by
-  rw [IsCompletelyPositive, choi_kron]
-  exact (hPhi.kronecker hPsi).submatrix _
+/-- The Kronecker product distributes over a finite sum in its left factor. -/
+theorem kron_sum_left {ι : Type y} [Fintype ι]
+    (Phi : ι → MatrixMap a b) (Psi : MatrixMap c d) :
+    MatrixMap.kron (∑ i, Phi i) Psi = ∑ i, MatrixMap.kron (Phi i) Psi := by
+  classical
+  have hsum : ∀ s : Finset ι,
+      MatrixMap.kron (∑ i ∈ s, Phi i) Psi = ∑ i ∈ s, MatrixMap.kron (Phi i) Psi := by
+    intro s
+    induction s using Finset.induction_on with
+    | empty => simp [MatrixMap.zero_kron]
+    | @insert i s hi ih =>
+        simp only [Finset.sum_insert hi]
+        rw [MatrixMap.add_kron, ih]
+  simpa using hsum Finset.univ
 
 end MatrixMap
 

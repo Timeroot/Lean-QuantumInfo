@@ -169,13 +169,13 @@ detection probability is at most one: `Re Tr(E ρ) ≤ 1`. The deficit
 and conjugation by `√ρ` preserves positivity, so
 `Re Tr((I-E) ρ) = Re Tr(√ρ (I-E) √ρ) ≥ 0`. -/
 private lemma re_trace_effect_state_le_one {a : Type u} [Fintype a] [DecidableEq a]
-    (E : CMatrix a) (hEle : E ≤ 1) (ρ : State a) :
-    ((E * ρ.matrix).trace).re ≤ 1 := by
+    (E : CMatrix a) (hEle : E ≤ 1) (ρ : MState a) :
+    ((E * ρ.m).trace).re ≤ 1 := by
   -- `D := I - E` is PSD (effect hypothesis); conjugate by `√ρ`.
   have hD_psd : (1 - E).PosSemidef := hEle
-  set S : CMatrix a := psdSqrt ρ.matrix
-  have hS_herm : S.IsHermitian := psdSqrt_isHermitian ρ.matrix
-  have hSS : S * S = ρ.matrix := psdSqrt_mul_self_of_posSemidef ρ.pos
+  set S : CMatrix a := psdSqrt ρ.m
+  have hS_herm : S.IsHermitian := psdSqrt_isHermitian ρ.m
+  have hSS : S * S = ρ.m := psdSqrt_mul_self_of_posSemidef ρ.psd
   have hconj_psd : (S * (1 - E) * S).PosSemidef := by
     have h := hD_psd.mul_mul_conjTranspose_same S
     rw [show Matrix.conjTranspose S = S from hS_herm.eq] at h
@@ -183,18 +183,18 @@ private lemma re_trace_effect_state_le_one {a : Type u} [Fintype a] [DecidableEq
   have htr_nonneg : 0 ≤ ((S * (1 - E) * S).trace).re :=
     (Matrix.PosSemidef.trace_nonneg hconj_psd).1
   -- `Re Tr(√ρ (I-E) √ρ) = Re Tr((I-E) ρ) = Re Tr(ρ) - Re Tr(E ρ)`.
-  have hcyc : (S * (1 - E) * S).trace = (ρ.matrix * (1 - E)).trace := by
+  have hcyc : (S * (1 - E) * S).trace = (ρ.m * (1 - E)).trace := by
     rw [Matrix.trace_mul_cycle, ← hSS]
   rw [hcyc] at htr_nonneg
-  have hDr_comm : (ρ.matrix * (1 - E)).trace = ((1 - E) * ρ.matrix).trace := by
+  have hDr_comm : (ρ.m * (1 - E)).trace = ((1 - E) * ρ.m).trace := by
     rw [Matrix.trace_mul_comm]
   rw [hDr_comm] at htr_nonneg
   -- `((1-E) ρ).trace = ρ.trace - (E ρ).trace` via `sub_mul` / `one_mul`.
-  have hsplit : ((1 - E) * ρ.matrix).trace = ρ.matrix.trace - (E * ρ.matrix).trace := by
+  have hsplit : ((1 - E) * ρ.m).trace = ρ.m.trace - (E * ρ.m).trace := by
     rw [Matrix.sub_mul, Matrix.one_mul, Matrix.trace_sub]
   rw [hsplit, Complex.sub_re] at htr_nonneg
   -- `ρ.trace = 1`, so `0 ≤ 1 - Re Tr(E ρ)`, i.e. `Re Tr(E ρ) ≤ 1`.
-  have hρ_one : ρ.matrix.trace.re = 1 := by rw [ρ.trace_eq_one]; simp
+  have hρ_one : ρ.m.trace.re = 1 := by rw [ρ.tr']; simp
   linarith
 
 /-- **Own-codeword error bound** (Wilde's packing lemma, first term). For a
@@ -214,18 +214,18 @@ theorem PackingLemma.ownTerm_bound {a : Type u} {𝒳 : Type v}
     (P : CMatrix a) (hP : P.PosSemidef) (hPid : P * P = P)
     (Px : 𝒳 → CMatrix a) (hPx : ∀ x, (Px x).PosSemidef)
     (hPxid : ∀ x, Px x * Px x = Px x)
-    (σ : 𝒳 → State a) (ε : ℝ) (hε : 0 ≤ ε)
-    (h1 : ∀ x, 1 - ε ≤ ((P * (σ x).matrix).trace).re)
-    (h2 : ∀ x, 1 - ε ≤ ((Px x * (σ x).matrix).trace).re) :
-    ∀ x, (((1 - PackingLemma.coatedOp P Px x) * (σ x).matrix).trace).re
+    (σ : 𝒳 → MState a) (ε : ℝ) (hε : 0 ≤ ε)
+    (h1 : ∀ x, 1 - ε ≤ ((P * (σ x).m).trace).re)
+    (h2 : ∀ x, 1 - ε ≤ ((Px x * (σ x).m).trace).re) :
+    ∀ x, (((1 - PackingLemma.coatedOp P Px x) * (σ x).m).trace).re
         ≤ ε + 2 * Real.sqrt ε := by
   intro x
   -- Shorthand for the coated operator and the codeword state's matrix.
   set U : CMatrix a := P * Px x * P with hU_def
-  set ρx : CMatrix a := (σ x).matrix
+  set ρx : CMatrix a := (σ x).m
   -- Hermiticity needed for the trace-ineq-herm step.
   have hP_herm : P.IsHermitian := hP.isHermitian
-  have hρx_herm : ρx.IsHermitian := (σ x).pos.isHermitian
+  have hρx_herm : ρx.IsHermitian := (σ x).psd.isHermitian
   -- The deviation `X := P ρ P − ρ` is Hermitian (`(P ρ P)ᴴ = Pᴴ ρᴴ Pᴴ = P ρ P`).
   have hX_herm : (P * ρx * P - ρx).IsHermitian := by
     have h1 : (P * ρx * P).IsHermitian := by
@@ -308,7 +308,7 @@ theorem PackingLemma.ownTerm_bound {a : Type u} {𝒳 : Type v}
     rw [Matrix.sub_mul, Matrix.one_mul, Matrix.trace_sub]
   calc (((1 - U) * ρx).trace).re
       = (ρx.trace - (U * ρx).trace).re := by rw [hsplit_one_minus]
-    _ = 1 - ((U * ρx).trace).re := by rw [(σ x).trace_eq_one]; simp
+    _ = 1 - ((U * ρx).trace).re := by rw [(σ x).tr']; simp
     _ ≤ 1 - ((1 - ε) - 2 * Real.sqrt ε) := by linarith
     _ = ε + 2 * Real.sqrt ε := by ring
 
@@ -498,15 +498,15 @@ theorem PackingLemma.crossTerm_expectation_bound
     {a : Type u} {𝒳 : Type uAux} {M : Type uMessage}
     [Fintype a] [DecidableEq a] [Fintype 𝒳] [DecidableEq 𝒳]
     [Fintype M] [DecidableEq M]
-    (E : Ensemble 𝒳 a) (P : CMatrix a) (_hP : P.PosSemidef) (_hPid : P * P = P)
+    (E : MEnsemble a 𝒳) (P : CMatrix a) (_hP : P.PosSemidef) (_hPid : P * P = P)
     (hP_le_one : P ≤ 1)
     (Px : 𝒳 → CMatrix a) (hPx : ∀ x, (Px x).PosSemidef)
     (d D : ℝ) (hD : 0 < D)
     (hpack3 : ∀ x, ((Px x).trace).re ≤ d)
-    (hpack4 : P * E.averageState.matrix * P ≤ ((D : ℝ)⁻¹) • P)
+    (hpack4 : P * E.averageState.m * P ≤ ((D : ℝ)⁻¹) • P)
     (m : M) (m' : M) (hmm' : m ≠ m') :
     codeExpectation (fun x => (E.probs x : ℝ))
-      (fun C => ((coatedOp P Px (C m') * (E.states (C m)).matrix).trace).re) ≤ d / D := by
+      (fun C => ((coatedOp P Px (C m') * (E.states (C m)).m).trace).re) ≤ d / D := by
   -- Distribution `p x = (E.probs x : ℝ)`; its mass sums to `1` (`weights_sum`).
   set p : 𝒳 → ℝ := fun x => (E.probs x : ℝ) with hp_def
   have hpsum : ∑ x, p x = 1 := by
@@ -514,7 +514,7 @@ theorem PackingLemma.crossTerm_expectation_bound
     exact_mod_cast E.weights_sum
   have hp_nonneg : ∀ x, 0 ≤ p x := fun x => NNReal.coe_nonneg (E.probs x)
   -- Codeword states `σ_x` as matrices.
-  set σx : 𝒳 → CMatrix a := fun x => (E.states x).matrix with hσx_def
+  set σx : 𝒳 → CMatrix a := fun x => (E.states x).m with hσx_def
   -- Step 1: marginalize the random code via pair-independence. The functional
   -- depends only on `(𝒞_m, 𝒞_m')`, so `𝔼_𝒞{g(𝒞_m,𝒞_m')} = Σ_{x,x'} p x p x' g x x'`.
   set g : 𝒳 → 𝒳 → ℝ := fun x x' =>
@@ -536,8 +536,8 @@ theorem PackingLemma.crossTerm_expectation_bound
   -- `Φ = Σ_{x'} p(x') · Px x'` and `σ̄ = Σ_x p(x) · σ_x` (both as `CMatrix`).
   set Φ : CMatrix a := ∑ x', p x' • Px x' with hΦ_def
   set σbar : CMatrix a := ∑ x, p x • σx x with hσbar_def
-  -- `σ̄` coincides with `E.averageState.matrix` (the ensemble's mean state).
-  have hσbar_avg : σbar = E.averageState.matrix := by
+  -- `σ̄` coincides with `E.averageState.m` (the ensemble's mean state).
+  have hσbar_avg : σbar = E.averageState.m := by
     rw [hσbar_def, E.averageState_matrix, hp_def, hσx_def]
     simp only [NNReal.smul_def]
   -- Step 3 (key ℂ-level identity): `Σ_{x,x'} p x p x' Tr(Px x' P σ_x P) = Tr(Φ P σ̄ P)`,
@@ -607,11 +607,8 @@ theorem PackingLemma.crossTerm_expectation_bound
   rw [hsum_re]
   clear hsum_re hg_rew hinner hre_smul
   -- Step 5: pack-4 `P σ̄ P ≤ D⁻¹ · P` ⇒ `Re Tr(Φ P σ̄ P) ≤ Re Tr(Φ (D⁻¹ · P))`.
-  have hDiff_psd : (((D : ℝ)⁻¹) • P - P * E.averageState.matrix * P).PosSemidef := by
-    have heq : ((D : ℝ)⁻¹) • P - P * E.averageState.matrix * P =
-        ((D : ℝ)⁻¹) • P - P * σbar * P := by rw [hσbar_avg]
-    rw [heq]
-    exact Matrix.le_iff.mp hpack4
+  have hDiff_psd : (((D : ℝ)⁻¹) • P - P * E.averageState.m * P).PosSemidef :=
+    Matrix.le_iff.mp hpack4
   have hΦ_psd : Φ.PosSemidef := by
     have hΦ_nonneg : 0 ≤ (∑ x', p x' • Px x') :=
       Finset.sum_nonneg (fun i _ =>
@@ -619,17 +616,17 @@ theorem PackingLemma.crossTerm_expectation_bound
     have hΦ_eq : (∑ x', p x' • Px x') = Φ := hΦ_def.symm
     rw [hΦ_eq] at hΦ_nonneg
     exact Matrix.nonneg_iff_posSemidef.mp hΦ_nonneg
-  have hΦDiff : ((Φ * (((D : ℝ)⁻¹) • P - P * E.averageState.matrix * P)).trace).re ≥ 0 :=
+  have hΦDiff : ((Φ * (((D : ℝ)⁻¹) • P - P * E.averageState.m * P)).trace).re ≥ 0 :=
     cMatrix_trace_mul_posSemidef_re_nonneg hΦ_psd hDiff_psd
   have htr_split : (Φ * (((D : ℝ)⁻¹) • P)).trace.re -
-        (Φ * (P * E.averageState.matrix * P)).trace.re =
-      ((Φ * (((D : ℝ)⁻¹) • P - P * E.averageState.matrix * P)).trace).re := by
+        (Φ * (P * E.averageState.m * P)).trace.re =
+      ((Φ * (((D : ℝ)⁻¹) • P - P * E.averageState.m * P)).trace).re := by
     rw [Matrix.mul_sub, Matrix.trace_sub, Complex.sub_re]
-  have heq_LHS : (Φ * P * σbar * P).trace = (Φ * (P * E.averageState.matrix * P)).trace := by
+  have heq_LHS : (Φ * P * σbar * P).trace = (Φ * (P * E.averageState.m * P)).trace := by
     rw [hσbar_avg]
     ac_rfl
   rw [heq_LHS]
-  have hstep5 : (Φ * (P * E.averageState.matrix * P)).trace.re ≤
+  have hstep5 : (Φ * (P * E.averageState.m * P)).trace.re ≤
       (Φ * (((D : ℝ)⁻¹) • P)).trace.re := by linarith
   -- Step 6: `Re Tr(Φ (D⁻¹ · P)) = D⁻¹ · Re Tr(Φ P)` by cyclicity + `ℂ`-linearity.
   have htr_Dinv : (Φ * (((D : ℝ)⁻¹) • P)).trace = ((D : ℝ)⁻¹) • (Φ * P).trace := by
@@ -664,7 +661,7 @@ theorem PackingLemma.crossTerm_expectation_bound
       mul_le_mul_of_nonneg_left (hpack3 x') (hp_nonneg x'))) ?_
     rw [← Finset.sum_mul, hpsum, one_mul]
   -- Final: `Re Tr(Φ P σ̄ P) ≤ Re Tr(Φ (D⁻¹ P)) = D⁻¹ · Re Tr(Φ P) ≤ D⁻¹ · d = d/D`.
-  calc (Φ * (P * E.averageState.matrix * P)).trace.re
+  calc (Φ * (P * E.averageState.m * P)).trace.re
       ≤ (Φ * (((D : ℝ)⁻¹) • P)).trace.re := hstep5
     _ = ((D : ℝ)⁻¹) * (Φ * P).trace.re := by
       rw [htr_Dinv, Complex.real_smul, Complex.mul_re]
@@ -700,17 +697,17 @@ theorem PackingLemma.lemma_avgError
     {a : Type u} {𝒳 : Type uAux} {M : Type uMessage}
     [Fintype a] [DecidableEq a] [Fintype 𝒳] [DecidableEq 𝒳]
     [Fintype M] [DecidableEq M] [Nonempty M]
-    (E : Ensemble 𝒳 a) (P : CMatrix a) (hP : P.PosSemidef) (hPid : P * P = P)
+    (E : MEnsemble a 𝒳) (P : CMatrix a) (hP : P.PosSemidef) (hPid : P * P = P)
     (hP_le_one : P ≤ 1)
     (Px : 𝒳 → CMatrix a) (hPx : ∀ x, (Px x).PosSemidef)
     (d D : ℝ) (hD : 0 < D) (ε : ℝ)
     (hpack3 : ∀ x, ((Px x).trace).re ≤ d)
-    (hpack4 : P * E.averageState.matrix * P ≤ ((D : ℝ)⁻¹) • P)
+    (hpack4 : P * E.averageState.m * P ≤ ((D : ℝ)⁻¹) • P)
     (p_e : (M → 𝒳) → M → ℝ)
     (hpe : ∀ C m, p_e C m ≤
       2 * (ε + 2 * Real.sqrt ε) +
         4 * ∑ m' ∈ (Finset.univ : Finset M).erase m,
-          ((coatedOp P Px (C m') * (E.states (C m)).matrix).trace).re) :
+          ((coatedOp P Px (C m') * (E.states (C m)).m).trace).re) :
     codeExpectation (fun x => (E.probs x : ℝ))
       (fun C => (Fintype.card M : ℝ)⁻¹ * ∑ m, p_e C m) ≤
     2 * (ε + 2 * Real.sqrt ε) + 4 * ((Fintype.card M : ℝ) - 1) * (d / D) := by
@@ -770,19 +767,19 @@ theorem PackingLemma.lemma_avgError
     have hsplit : codeExpectation p (fun C =>
         2 * (ε + 2 * Real.sqrt ε) +
           4 * ∑ m' ∈ (Finset.univ : Finset M).erase m,
-            ((coatedOp P Px (C m') * (E.states (C m)).matrix).trace).re) =
+            ((coatedOp P Px (C m') * (E.states (C m)).m).trace).re) =
         2 * (ε + 2 * Real.sqrt ε) +
           4 * ∑ m' ∈ (Finset.univ : Finset M).erase m,
             codeExpectation p (fun C =>
-              ((coatedOp P Px (C m') * (E.states (C m)).matrix).trace).re) := by
+              ((coatedOp P Px (C m') * (E.states (C m)).m).trace).re) := by
       have h1 : codeExpectation p (fun C =>
           2 * (ε + 2 * Real.sqrt ε) +
             4 * ∑ m' ∈ (Finset.univ : Finset M).erase m,
-              ((coatedOp P Px (C m') * (E.states (C m)).matrix).trace).re) =
+              ((coatedOp P Px (C m') * (E.states (C m)).m).trace).re) =
           codeExpectation p (fun _ => 2 * (ε + 2 * Real.sqrt ε)) +
             codeExpectation p (fun C =>
               4 * ∑ m' ∈ (Finset.univ : Finset M).erase m,
-                ((coatedOp P Px (C m') * (E.states (C m)).matrix).trace).re) :=
+                ((coatedOp P Px (C m') * (E.states (C m)).m).trace).re) :=
         hadd _ _
       rw [h1, hconst]
       congr 1
@@ -794,14 +791,14 @@ theorem PackingLemma.lemma_avgError
     -- Each cross-codeword expectation `≤ d/D` via `crossTerm_expectation_bound`.
     have hcross : ∀ m' ∈ (Finset.univ : Finset M).erase m,
         codeExpectation p (fun C =>
-          ((coatedOp P Px (C m') * (E.states (C m)).matrix).trace).re) ≤ d / D := by
+          ((coatedOp P Px (C m') * (E.states (C m)).m).trace).re) ≤ d / D := by
       intro m' hm'
       exact crossTerm_expectation_bound E P hP hPid hP_le_one Px hPx d D hD
         hpack3 hpack4 m m' (Finset.mem_erase.mp hm').1.symm
     -- Sum over `|M|−1` off-diagonal messages, then scale by `4`.
     have hsum_bound : (∑ m' ∈ (Finset.univ : Finset M).erase m,
         codeExpectation p (fun C =>
-          ((coatedOp P Px (C m') * (E.states (C m)).matrix).trace).re)) ≤
+          ((coatedOp P Px (C m') * (E.states (C m)).m).trace).re)) ≤
         ((Fintype.card M : ℝ) - 1) * (d / D) := by
       refine le_trans (Finset.sum_le_sum hcross) ?_
       have hcard_erase : ((Finset.univ : Finset M).erase m).card = Fintype.card M - 1 :=
@@ -922,23 +919,23 @@ private lemma pgm_hn_operator {a : Type u} {ι : Type*}
 because `B − A` is PSD and `ρ` is PSD, so `Re Tr((B−A)·ρ) ≥ 0` by
 `cMatrix_trace_mul_posSemidef_re_nonneg`, and trace commutativity moves the
 state to the right. -/
-private lemma trace_re_le_of_le {a : Type u} [Fintype a] [DecidableEq a]
-    (A B : CMatrix a) (hAB : A ≤ B) (ρ : State a) :
-    ((ρ.matrix * A).trace).re ≤ ((ρ.matrix * B).trace).re := by
+private lemma trace_mul_state_re_le_of_le {a : Type u} [Fintype a] [DecidableEq a]
+    (A B : CMatrix a) (hAB : A ≤ B) (ρ : MState a) :
+    ((ρ.m * A).trace).re ≤ ((ρ.m * B).trace).re := by
   have hDiff_psd : (B - A).PosSemidef := hAB
-  have hρ_psd : ρ.matrix.PosSemidef := ρ.pos
+  have hρ_psd : ρ.m.PosSemidef := ρ.psd
   -- `Re Tr((B−A)·ρ) ≥ 0` by PSD-PSD trace duality.
-  have hBA_nonneg : 0 ≤ (((B - A) * ρ.matrix).trace).re :=
+  have hBA_nonneg : 0 ≤ (((B - A) * ρ.m).trace).re :=
     cMatrix_trace_mul_posSemidef_re_nonneg hDiff_psd hρ_psd
   -- Expand `(B−A)·ρ = B·ρ − A·ρ` and split the real trace.
-  have hmul : ((B - A) * ρ.matrix).trace = (B * ρ.matrix).trace - (A * ρ.matrix).trace := by
+  have hmul : ((B - A) * ρ.m).trace = (B * ρ.m).trace - (A * ρ.m).trace := by
     rw [Matrix.sub_mul, Matrix.trace_sub]
   rw [hmul, Complex.sub_re] at hBA_nonneg
   -- Move the state to the right via trace commutativity (real parts agree).
-  have hBA : ((B * ρ.matrix).trace).re = ((ρ.matrix * B).trace).re :=
-    congrArg Complex.re (Matrix.trace_mul_comm B ρ.matrix)
-  have hAA : ((A * ρ.matrix).trace).re = ((ρ.matrix * A).trace).re :=
-    congrArg Complex.re (Matrix.trace_mul_comm A ρ.matrix)
+  have hBA : ((B * ρ.m).trace).re = ((ρ.m * B).trace).re :=
+    congrArg Complex.re (Matrix.trace_mul_comm B ρ.m)
+  have hAA : ((A * ρ.m).trace).re = ((ρ.m * A).trace).re :=
+    congrArg Complex.re (Matrix.trace_mul_comm A ρ.m)
   rw [hBA, hAA] at hBA_nonneg
   linarith
 
@@ -962,43 +959,43 @@ private theorem PackingLemma.pgmError_bound
     (P : CMatrix a) (hP : P.PosSemidef) (hPid : P * P = P)
     (Px : 𝒳 → CMatrix a) (hPx : ∀ x, (Px x).PosSemidef)
     (hPxid : ∀ x, Px x * Px x = Px x)
-    (σ : 𝒳 → State a) (ε : ℝ) (hε : 0 ≤ ε)
-    (h1 : ∀ x, 1 - ε ≤ ((P * (σ x).matrix).trace).re)
-    (h2 : ∀ x, 1 - ε ≤ ((Px x * (σ x).matrix).trace).re)
+    (σ : 𝒳 → MState a) (ε : ℝ) (hε : 0 ≤ ε)
+    (h1 : ∀ x, 1 - ε ≤ ((P * (σ x).m).trace).re)
+    (h2 : ∀ x, 1 - ε ≤ ((Px x * (σ x).m).trace).re)
     (C : M → 𝒳) (m : M) :
     1 - (((pgmEffect (fun m' => coatedOp P Px (C m'))
         (fun m' => coatedOp_posSemidef P hP Px hPx (C m')) m)
-        * (σ (C m)).matrix).trace).re ≤
+        * (σ (C m)).m).trace).re ≤
       2 * (ε + 2 * Real.sqrt ε) +
         4 * ∑ m' ∈ (Finset.univ : Finset M).erase m,
-          ((coatedOp P Px (C m') * (σ (C m)).matrix).trace).re := by
+          ((coatedOp P Px (C m') * (σ (C m)).m).trace).re := by
   -- The coated-operator family `Υ_{C_m'} = Π Π_{C_m'} Π`, indexed by messages.
   set Sf : M → CMatrix a := fun m' => coatedOp P Px (C m') with hSf_def
   have hSf : ∀ m', (Sf m').PosSemidef := fun m' => coatedOp_posSemidef P hP Px hPx (C m')
   -- `Υ_{C_m} ≤ 1` (a coated projector is an effect).
   have hPxle1 : ∀ x, Px x ≤ 1 := fun x => projector_le_one (Px x) (hPx x) (hPxid x)
   have hSm_le_one : Sf m ≤ 1 := coatedOp_le_one P hP hPid Px hPxle1 (C m)
-  set ρ : State a := σ (C m) with hρ_def
-  have hρ_one : (ρ.matrix.trace).re = 1 := by rw [ρ.trace_eq_one]; simp
+  set ρ : MState a := σ (C m) with hρ_def
+  have hρ_one : (ρ.m.trace).re = 1 := by rw [ρ.tr']; simp
   -- Per-codeword Hayashi–Nagaoka operator inequality for the PGM on `{Υ_{C_m'}}`.
   have hHN := pgm_hn_operator Sf hSf m hSm_le_one
   -- Trace against `ρ` on the LEFT (ρ·X order): `Re Tr(ρ (1−Λ_m)) ≤ Re Tr(ρ RHS)`.
-  have hmono_σ : ((ρ.matrix * (1 - pgmEffect Sf hSf m)).trace).re ≤
-      ((ρ.matrix * ((2 : ℝ) • (1 - Sf m) +
+  have hmono_σ : ((ρ.m * (1 - pgmEffect Sf hSf m)).trace).re ≤
+      ((ρ.m * ((2 : ℝ) • (1 - Sf m) +
         (4 : ℝ) • (∑ m' ∈ (Finset.univ : Finset M).erase m, Sf m'))).trace).re :=
-    trace_re_le_of_le _ _ (Matrix.le_iff.mp hHN) ρ
+    trace_mul_state_re_le_of_le _ _ (Matrix.le_iff.mp hHN) ρ
   -- Commute each `ρ·X` to `X·ρ` (real parts agree by `trace_mul_comm`).
   have hcomm (X : CMatrix a) :
-      ((ρ.matrix * X).trace).re = ((X * ρ.matrix).trace).re :=
-    congrArg Complex.re (Matrix.trace_mul_comm ρ.matrix X)
+      ((ρ.m * X).trace).re = ((X * ρ.m).trace).re :=
+    congrArg Complex.re (Matrix.trace_mul_comm ρ.m X)
   rw [hcomm (1 - pgmEffect Sf hSf m),
       hcomm ((2 : ℝ) • (1 - Sf m) + (4 : ℝ) •
         (∑ m' ∈ (Finset.univ : Finset M).erase m, Sf m'))] at hmono_σ
   -- Expand `Re Tr((1−Λ_m) ρ) = Re Tr(ρ) − Re Tr(Λ_m ρ) = 1 − Re Tr(Λ_m ρ)`.
-  have hLHS_eq : (((1 - pgmEffect Sf hSf m) * ρ.matrix).trace).re =
-      1 - ((pgmEffect Sf hSf m * ρ.matrix).trace).re := by
-    have hsplit : ((1 - pgmEffect Sf hSf m) * ρ.matrix).trace =
-        ρ.matrix.trace - (pgmEffect Sf hSf m * ρ.matrix).trace := by
+  have hLHS_eq : (((1 - pgmEffect Sf hSf m) * ρ.m).trace).re =
+      1 - ((pgmEffect Sf hSf m * ρ.m).trace).re := by
+    have hsplit : ((1 - pgmEffect Sf hSf m) * ρ.m).trace =
+        ρ.m.trace - (pgmEffect Sf hSf m * ρ.m).trace := by
       rw [Matrix.sub_mul, Matrix.one_mul, Matrix.trace_sub]
     rw [hsplit, Complex.sub_re, hρ_one]
   -- Expand the RHS real trace by `ℝ`-linearity.
@@ -1007,13 +1004,13 @@ private theorem PackingLemma.pgmError_bound
     simp
   have hRHS_expand :
       ((((2 : ℝ) • (1 - Sf m) + (4 : ℝ) •
-          (∑ m' ∈ (Finset.univ : Finset M).erase m, Sf m')) * ρ.matrix).trace).re =
-        2 * (((1 - Sf m) * ρ.matrix).trace).re +
+          (∑ m' ∈ (Finset.univ : Finset M).erase m, Sf m')) * ρ.m).trace).re =
+        2 * (((1 - Sf m) * ρ.m).trace).re +
           4 * ∑ m' ∈ (Finset.univ : Finset M).erase m,
-            ((Sf m' * ρ.matrix).trace).re := by
+            ((Sf m' * ρ.m).trace).re := by
     -- Distribute the matrix product over the sum and smul, then traces.
-    have hcross : ((∑ m' ∈ (Finset.univ : Finset M).erase m, Sf m') * ρ.matrix).trace =
-        ∑ m' ∈ (Finset.univ : Finset M).erase m, (Sf m' * ρ.matrix).trace := by
+    have hcross : ((∑ m' ∈ (Finset.univ : Finset M).erase m, Sf m') * ρ.m).trace =
+        ∑ m' ∈ (Finset.univ : Finset M).erase m, (Sf m' * ρ.m).trace := by
       rw [Finset.sum_mul, Matrix.trace_sum]
     rw [Matrix.add_mul, Matrix.smul_mul, Matrix.smul_mul,
         Matrix.trace_add, Matrix.trace_smul, Matrix.trace_smul, hcross]
@@ -1021,7 +1018,7 @@ private theorem PackingLemma.pgmError_bound
   rw [hRHS_expand] at hmono_σ
   rw [hLHS_eq] at hmono_σ
   -- Own-codeword term `Re Tr((1 − Υ_{C_m}) ρ) ≤ ε + 2√ε` (ownTerm_bound).
-  have hown : (((1 - Sf m) * ρ.matrix).trace).re ≤ ε + 2 * Real.sqrt ε :=
+  have hown : (((1 - Sf m) * ρ.m).trace).re ≤ ε + 2 * Real.sqrt ε :=
     ownTerm_bound P hP hPid Px hPx hPxid σ ε hε h1 h2 (C m)
   -- The PGM effect equals the goal's literal form (defeq after `Sf` unfolds).
   have hEff_eq : pgmEffect Sf hSf m =
@@ -1029,11 +1026,11 @@ private theorem PackingLemma.pgmError_bound
         (fun m' => coatedOp_posSemidef P hP Px hPx (C m')) m := by
     rfl
   have hcross_eq : ∀ m' ∈ (Finset.univ : Finset M).erase m,
-      ((Sf m' * ρ.matrix).trace).re = ((coatedOp P Px (C m') * ρ.matrix).trace).re := by
+      ((Sf m' * ρ.m).trace).re = ((coatedOp P Px (C m') * ρ.m).trace).re := by
     intro m' _
     rw [hSf_def]
-  have hcross_sum : (∑ m' ∈ (Finset.univ : Finset M).erase m, ((Sf m' * ρ.matrix).trace).re) =
-      ∑ m' ∈ (Finset.univ : Finset M).erase m, ((coatedOp P Px (C m') * ρ.matrix).trace).re :=
+  have hcross_sum : (∑ m' ∈ (Finset.univ : Finset M).erase m, ((Sf m' * ρ.m).trace).re) =
+      ∑ m' ∈ (Finset.univ : Finset M).erase m, ((coatedOp P Px (C m') * ρ.m).trace).re :=
     Finset.sum_congr rfl (fun m' hm' => hcross_eq m' hm')
   rw [hEff_eq, hρ_def, hcross_sum] at hmono_σ
   linarith
@@ -1105,7 +1102,6 @@ private theorem PackingLemma.exists_code_le_expectation
   rw [hsplit, hsum_eta] at hsum_pos
   linarith
 
-set_option maxHeartbeats 1000000 in
 /-- **Derandomized average-error packing-lemma corollary** (Wilde 2011). For an
 ensemble `E` of codeword states satisfying the packing hypotheses `pack-1`–`pack-4`,
 there exists a code `𝒞₀ : M → 𝒳` and a square-root-measurement decoder POVM
@@ -1126,15 +1122,15 @@ theorem PackingLemma.packingLemma_avgError
     {a : Type u} {𝒳 : Type uAux} {M : Type uMessage}
     [Fintype a] [DecidableEq a] [Fintype 𝒳] [DecidableEq 𝒳]
     [Fintype M] [DecidableEq M] [Nonempty M]
-    (E : Ensemble 𝒳 a) (P : CMatrix a) (hP : P.PosSemidef) (hPid : P * P = P)
+    (E : MEnsemble a 𝒳) (P : CMatrix a) (hP : P.PosSemidef) (hPid : P * P = P)
     (hP_le_one : P ≤ 1)
     (Px : 𝒳 → CMatrix a)
     (hPx : ∀ x, (Px x).PosSemidef ∧ Px x * Px x = Px x ∧ Px x ≤ 1)
     (d D ε : ℝ) (hD : 0 < D) (hε : 0 ≤ ε)
-    (h1 : ∀ x, 1 - ε ≤ ((P * (E.states x).matrix).trace).re)
-    (h2 : ∀ x, 1 - ε ≤ ((Px x * (E.states x).matrix).trace).re)
+    (h1 : ∀ x, 1 - ε ≤ ((P * (E.states x).m).trace).re)
+    (h2 : ∀ x, 1 - ε ≤ ((Px x * (E.states x).m).trace).re)
     (h3 : ∀ x, ((Px x).trace).re ≤ d)
-    (h4 : P * E.averageState.matrix * P ≤ ((D : ℝ)⁻¹) • P) :
+    (h4 : P * E.averageState.m * P ≤ ((D : ℝ)⁻¹) • P) :
     ∃ (C : M → 𝒳) (dec : POVM M a),
       let code : DecoderCode M a := ⟨fun m => E.states (C m), dec⟩
       code.averageErrorAtMost
@@ -1155,12 +1151,12 @@ theorem PackingLemma.packingLemma_avgError
     coatedOp_posSemidef P hP Px hPx_psd (C m')
   set p_e : (M → 𝒳) → M → ℝ := fun C m =>
     1 - (((pgmEffect (fun m' => coatedOp P Px (C m')) (hCoated_psd C) m
-          * (E.states (C m)).matrix).trace).re)
+          * (E.states (C m)).m).trace).re)
   -- The Hayashi–Nagaoka per-codeword split: `p_e C m ≤ 2(ε+2√ε) + 4 Σ_cross`.
   have hpe : ∀ (C : M → 𝒳) (m : M), p_e C m ≤
       2 * (ε + 2 * Real.sqrt ε) +
         4 * ∑ m' ∈ (Finset.univ : Finset M).erase m,
-          ((coatedOp P Px (C m') * (E.states (C m)).matrix).trace).re := by
+          ((coatedOp P Px (C m') * (E.states (C m)).m).trace).re := by
     intro C m
     exact pgmError_bound P hP hPid Px hPx_psd hPx_id (E.states ·) ε hε h1 h2 C m
   -- Randomized average-error bound: `𝔼_C{(1/|M|) Σ_m p_e C m} ≤ η`.
@@ -1214,15 +1210,15 @@ theorem PackingLemma.packingLemma_avgError
     have h2 : (∑ m, pgmEffect Sf₀ hSf₀ m) = ∑ m', pgmEffect Sf₀ hSf₀ m' := rfl
     rw [h2]
     abel
-  let dec : POVM M a := ⟨decEffects, hdec_pos, hdec_sum⟩
+  let dec : POVM M a := .ofMatrices decEffects hdec_pos hdec_sum
   -- The decoder's per-message error is at most `p_e C₀ m` (absorbing `none` only
   -- helps message `m₀`).
   have herr_le : ∀ m, 1 - (dec.prob (E.states (C₀ m)) m : ℝ) ≤ p_e C₀ m := by
     intro m
     rw [POVM.prob_eq_trace_re]
     -- Unfold the decoder effect field to `decEffects m`.
-    show 1 - (((E.states (C₀ m)).matrix * decEffects m).trace).re ≤ p_e C₀ m
-    have hσ_psd : (E.states (C₀ m)).matrix.PosSemidef := (E.states (C₀ m)).pos
+    show 1 - (((E.states (C₀ m)).m * decEffects m).trace).re ≤ p_e C₀ m
+    have hσ_psd : (E.states (C₀ m)).m.PosSemidef := (E.states (C₀ m)).psd
     have hextra_psd : (if m = m₀ then failMass else (0 : CMatrix a)).PosSemidef := by
       by_cases hm : m = m₀
       · simp [hm]
@@ -1233,21 +1229,21 @@ theorem PackingLemma.packingLemma_avgError
         pgmEffect Sf₀ hSf₀ m + (if m = m₀ then failMass else (0 : CMatrix a)) := rfl
     rw [heff_split, Matrix.mul_add, Matrix.trace_add, Complex.add_re]
     have hextra_nonneg : (0 : ℝ) ≤
-        (((E.states (C₀ m)).matrix *
+        (((E.states (C₀ m)).m *
           (if m = m₀ then failMass else (0 : CMatrix a))).trace).re :=
       cMatrix_trace_mul_posSemidef_re_nonneg hσ_psd hextra_psd
     -- `p_e C₀ m` uses effect-first order `Re Tr(pgmEffect · σ)`; the goal LHS (from
     -- `prob_eq_trace_re`) uses state-first `Re Tr(σ · pgmEffect)`. These real parts
     -- agree by trace commutativity.
-    have hcomm_pgm : (((E.states (C₀ m)).matrix * pgmEffect Sf₀ hSf₀ m).trace).re =
-        ((pgmEffect Sf₀ hSf₀ m * (E.states (C₀ m)).matrix).trace).re :=
-      congrArg Complex.re (Matrix.trace_mul_comm (E.states (C₀ m)).matrix _)
+    have hcomm_pgm : (((E.states (C₀ m)).m * pgmEffect Sf₀ hSf₀ m).trace).re =
+        ((pgmEffect Sf₀ hSf₀ m * (E.states (C₀ m)).m).trace).re :=
+      congrArg Complex.re (Matrix.trace_mul_comm (E.states (C₀ m)).m _)
     -- The PGM effect on `Sf₀` equals the `p_e`-form effect (same family/witness).
     have hpgm_eq : pgmEffect Sf₀ hSf₀ m =
         pgmEffect (fun m' => coatedOp P Px (C₀ m')) (hCoated_psd C₀) m := rfl
     rw [show p_e C₀ m =
         1 - (((pgmEffect (fun m' => coatedOp P Px (C₀ m')) (hCoated_psd C₀) m
-              * (E.states (C₀ m)).matrix).trace).re) from rfl, ← hpgm_eq, ← hcomm_pgm]
+              * (E.states (C₀ m)).m).trace).re) from rfl, ← hpgm_eq, ← hcomm_pgm]
     linarith
   -- Assemble the average-error bound.
   refine ⟨C₀, dec, ?_⟩
@@ -1286,18 +1282,18 @@ theorem PackingLemma.hswCode_averageErrorAtMost_of_packing
     {a : Type uIn} {b : Type uOut} {𝒳 : Type uAux} {M : Type uMessage}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype 𝒳] [DecidableEq 𝒳] [Fintype M] [DecidableEq M] [Nonempty M]
-    (N : Channel a b) (n : ℕ)
-    (E : Ensemble 𝒳 (TensorPower b n)) (P : CMatrix (TensorPower b n))
+    (N : CPTPMap a b) (n : ℕ)
+    (E : MEnsemble (TensorPower b n) 𝒳) (P : CMatrix (TensorPower b n))
     (hP : P.PosSemidef) (hPid : P * P = P) (hP_le_one : P ≤ 1)
     (Px : 𝒳 → CMatrix (TensorPower b n))
     (hPx : ∀ x, (Px x).PosSemidef ∧ Px x * Px x = Px x ∧ Px x ≤ 1)
-    (φ : 𝒳 → State (TensorPower a n))
-    (houtput : ∀ x, (N.tensorPower n).applyState (φ x) = E.states x)
+    (φ : 𝒳 → MState (TensorPower a n))
+    (houtput : ∀ x, (N.tensorPower n) (φ x) = E.states x)
     (d D ε : ℝ) (hD : 0 < D) (hε : 0 ≤ ε)
-    (h1 : ∀ x, 1 - ε ≤ ((P * (E.states x).matrix).trace).re)
-    (h2 : ∀ x, 1 - ε ≤ ((Px x * (E.states x).matrix).trace).re)
+    (h1 : ∀ x, 1 - ε ≤ ((P * (E.states x).m).trace).re)
+    (h2 : ∀ x, 1 - ε ≤ ((Px x * (E.states x).m).trace).re)
     (h3 : ∀ x, ((Px x).trace).re ≤ d)
-    (h4 : P * E.averageState.matrix * P ≤ ((D : ℝ)⁻¹) • P) :
+    (h4 : P * E.averageState.m * P ≤ ((D : ℝ)⁻¹) • P) :
     ∃ (C : HSWClassicalCode N n M),
       C.toPackingDecoderCode.averageErrorAtMost
         (2 * (ε + 2 * Real.sqrt ε) + 4 * ((Fintype.card M : ℝ) - 1) * (d / D)) := by
@@ -1320,7 +1316,7 @@ theorem PackingLemma.hswCode_averageErrorAtMost_of_packing
       myCode.toPackingDecoderCode.successProbability m =
         (dec.prob (E.states (C₀ m)) m : ℝ) := by
     intro m
-    show (dec.prob ((N.tensorPower n).applyState (φ (C₀ m))) m : ℝ) =
+    show (dec.prob ((N.tensorPower n) (φ (C₀ m))) m : ℝ) =
         (dec.prob (E.states (C₀ m)) m : ℝ)
     rw [houtput (C₀ m)]
   -- The packing-lemma bound unfolds to the same average over `E.states (C₀ m)`.
@@ -1348,19 +1344,19 @@ theorem PackingLemma.hswAverageErrorPackingWitness_of_packing
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Fintype ι] [DecidableEq ι] [Fintype 𝒳] [DecidableEq 𝒳]
     [Fintype M] [DecidableEq M] [Nonempty M]
-    (N : Channel a b) (E₀ : Ensemble ι a) (n : ℕ) (δ : ℝ)
-    (E : Ensemble 𝒳 (TensorPower b n)) (P : CMatrix (TensorPower b n))
+    (N : CPTPMap a b) (E₀ : MEnsemble a ι) (n : ℕ) (δ : ℝ)
+    (E : MEnsemble (TensorPower b n) 𝒳) (P : CMatrix (TensorPower b n))
     (hP : P.PosSemidef) (hPid : P * P = P) (hP_le_one : P ≤ 1)
     (Px : 𝒳 → CMatrix (TensorPower b n))
     (hPx : ∀ x, (Px x).PosSemidef ∧ Px x * Px x = Px x ∧ Px x ≤ 1)
-    (φ : 𝒳 → State (TensorPower a n))
-    (houtput : ∀ x, (N.tensorPower n).applyState (φ x) = E.states x)
+    (φ : 𝒳 → MState (TensorPower a n))
+    (houtput : ∀ x, (N.tensorPower n) (φ x) = E.states x)
     (d D ε : ℝ) (hD : 0 < D) (hε : 0 ≤ ε)
-    (h1 : ∀ x, 1 - ε ≤ ((P * (E.states x).matrix).trace).re)
-    (h2 : ∀ x, 1 - ε ≤ ((Px x * (E.states x).matrix).trace).re)
+    (h1 : ∀ x, 1 - ε ≤ ((P * (E.states x).m).trace).re)
+    (h2 : ∀ x, 1 - ε ≤ ((Px x * (E.states x).m).trace).re)
     (h3 : ∀ x, ((Px x).trace).re ≤ d)
-    (h4 : P * E.averageState.matrix * P ≤ ((D : ℝ)⁻¹) • P)
-    (hrate : hswMessageRate M n ≥ N.hswHolevoRate E₀ - δ) :
+    (h4 : P * E.averageState.m * P ≤ ((D : ℝ)⁻¹) • P)
+    (hrate : messageRate M n ≥ N.hswHolevoRate E₀ - δ) :
     Nonempty
       (HSWAverageErrorPackingWitness N E₀ n δ
         (2 * (ε + 2 * Real.sqrt ε) + 4 * ((Fintype.card M : ℝ) - 1) * (d / D)) M) := by

@@ -10,6 +10,8 @@ public import QuantumLib.QIT.States.PosSqrt
 public import QuantumLib.QIT.States.Purification.Gram
 public import QuantumLib.QIT.States.TraceNorm.Distance
 public import QuantumLib.QIT.States.Topology
+public import QuantumLib.QIT.Util.MatrixInstances
+public import QuantumInfo.Entropy.VonNeumann
 public import Mathlib.Analysis.Matrix.PosDef
 public import Mathlib.Analysis.CStarAlgebra.Classes
 public import Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Basic
@@ -34,34 +36,36 @@ renyi.tex:679-693], [Tomamichel2015FiniteResources, cond.tex:28-39], and
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator
+open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator QIT.MatrixL2
 
 open Matrix
 
-namespace QIT
-
-universe u v w
-
 noncomputable section
-
+universe u v w
 variable {a : Type u} [Fintype a] [DecidableEq a]
 
-noncomputable local instance matrixCStarAlgebra {n : Type u} [Fintype n] [DecidableEq n] :
-    CStarAlgebra (Matrix n n ℂ) where
+open QIT
 
-noncomputable local instance matrixNormalCFC {n : Type u} [Fintype n] [DecidableEq n] :
-    ContinuousFunctionalCalculus ℂ (Matrix n n ℂ) IsStarNormal :=
-  IsStarNormal.instContinuousFunctionalCalculus
-
-noncomputable local instance matrixNormalIsometricCFC {n : Type u} [Fintype n] [DecidableEq n] :
-    IsometricContinuousFunctionalCalculus ℂ (Matrix n n ℂ) IsStarNormal :=
-  IsStarNormal.instIsometricContinuousFunctionalCalculus
+namespace QIT
 
 /-- log base 2. -/
 def log2 (x : ℝ) : ℝ := Real.log x / Real.log 2
 
 /-- x log_2 x with the 0 log 0 := 0 convention. -/
 def xlog2 (x : ℝ) : ℝ := if x = 0 then 0 else x * log2 x
+
+/-- The `x log₂ x` convention agrees with `x log x` after multiplying by
+`Real.log 2`, including at `x = 0`. -/
+theorem xlog2_mul_log2_self {x : ℝ} (hx : 0 ≤ x) :
+    xlog2 x * Real.log 2 = x * Real.log x := by
+  by_cases hzx : x = 0
+  · simp [xlog2, hzx, Real.log_zero]
+  · have hxp : 0 < x := lt_of_le_of_ne hx (Ne.symm hzx)
+    simp only [xlog2, if_neg hzx, log2]
+    field_simp
+
+/-- Binary entropy in bits, with the repository's `0 log 0 = 0` convention. -/
+def binaryEntropy (ε : ℝ) : ℝ := -xlog2 ε - xlog2 (1 - ε)
 
 /-! ## Order-theoretic logarithm transport
 
@@ -125,6 +129,25 @@ theorem rpow_two_log2_pos {x : ℝ} (hx : 0 < x) :
   have hlog2 : Real.log 2 ≠ 0 := (Real.log_pos one_lt_two).ne'
   field_simp [hlog2]
 
+/-- Subtracting from a base-2 logarithm splits off a multiplicative factor:
+`2 ^ (log₂ x - h) = x * 2 ^ (-h)` for positive `x`. -/
+theorem rpow_two_log2_sub {x h : ℝ} (hx : 0 < x) :
+    Real.rpow 2 (log2 x - h) = x * Real.rpow 2 (-h) := by
+  have hadd : Real.rpow 2 (log2 x + -h) = Real.rpow 2 (log2 x) * Real.rpow 2 (-h) :=
+    Real.rpow_add (by norm_num : (0 : ℝ) < 2) (log2 x) (-h)
+  rw [sub_eq_add_neg, hadd, rpow_two_log2_pos hx]
+
+/-- `-log₂ q ≤ C` is the exponential lower bound `2 ^ (-C) ≤ q` on positive `q`. -/
+theorem rpow_two_neg_le_of_neg_log2_le {q C : ℝ} (hq : 0 < q)
+    (h : -log2 q ≤ C) :
+    Real.rpow 2 (-C) ≤ q := by
+  have hexp : -C ≤ log2 q := by linarith
+  have hpow :=
+    Real.rpow_le_rpow_of_exponent_le (x := (2 : ℝ))
+      (by norm_num : (1 : ℝ) ≤ 2) hexp
+  rw [← rpow_two_log2_pos hq]
+  exact hpow
+
 theorem mul_sSup_image_eq {s : Set ℝ} {c : ℝ}
     (hne : s.Nonempty) (hbdd : BddAbove s) (hc : 0 < c) :
     sSup ((fun x : ℝ => c * x) '' s) = c * sSup s := by
@@ -145,20 +168,137 @@ def eigenvalueMultiset {n : Type u} [Fintype n] [DecidableEq n]
     {M : CMatrix n} (hM : M.IsHermitian) : Multiset ℝ :=
   Multiset.map hM.eigenvalues Finset.univ.val
 
-namespace State
+/-- `xlog2` is physlib's `Real.negMulLog`, negated and rescaled to base two. -/
+theorem neg_xlog2_eq_negMulLog_div (t : ℝ) : -xlog2 t = Real.negMulLog t / Real.log 2 := by
+  rw [xlog2]
+  by_cases ht : t = 0
+  · simp [ht]
+  · rw [if_neg ht, log2, Real.negMulLog]
+    ring
+
+/-- Finite weighted Jensen inequality for the scalar function `x log x`. -/
+theorem weighted_sum_mul_log_le_sum_weighted_mul_log
+    {idx : Type*} [Fintype idx] (w x : idx → ℝ)
+    (hw_nonneg : ∀ i, 0 ≤ w i) (hw_sum : ∑ i, w i = 1)
+    (hx_nonneg : ∀ i, 0 ≤ x i) :
+    (∑ i, w i * x i) * Real.log (∑ i, w i * x i) ≤
+      ∑ i, w i * (x i * Real.log (x i)) := by
+  classical
+  have hw_nonneg' : ∀ i ∈ (Finset.univ : Finset idx), 0 ≤ w i :=
+    fun i _ => hw_nonneg i
+  have hx_mem : ∀ i ∈ (Finset.univ : Finset idx), x i ∈ Set.Ici (0 : ℝ) :=
+    fun i _ => hx_nonneg i
+  have hjensen :=
+    Real.convexOn_mul_log.map_sum_le
+      (t := (Finset.univ : Finset idx)) (w := w) (p := x)
+      hw_nonneg' (by simpa using hw_sum) hx_mem
+  simpa [smul_eq_mul, mul_comm, mul_left_comm, mul_assoc] using hjensen
+
+/-- Base-two version of `weighted_sum_mul_log_le_sum_weighted_mul_log`. -/
+theorem weighted_sum_mul_log2_le_sum_weighted_mul_log2
+    {idx : Type*} [Fintype idx] (w x : idx → ℝ)
+    (hw_nonneg : ∀ i, 0 ≤ w i) (hw_sum : ∑ i, w i = 1)
+    (hx_nonneg : ∀ i, 0 ≤ x i) :
+    (∑ i, w i * x i) * log2 (∑ i, w i * x i) ≤
+      ∑ i, w i * (x i * log2 (x i)) := by
+  classical
+  have hnat :=
+    weighted_sum_mul_log_le_sum_weighted_mul_log w x hw_nonneg hw_sum hx_nonneg
+  have hscale : 0 ≤ (Real.log 2)⁻¹ :=
+    inv_nonneg.mpr (le_of_lt (Real.log_pos one_lt_two))
+  have hscaled := mul_le_mul_of_nonneg_right hnat hscale
+  simpa [log2, div_eq_mul_inv, Finset.mul_sum, smul_eq_mul, mul_comm, mul_left_comm,
+    mul_assoc] using hscaled
+
+/-- Finite-dimensional vector-state Jensen inequality for a positive
+semidefinite matrix.
+
+Each diagonal entry in a Hermitian eigenbasis is a convex combination of the
+eigenvalues, so scalar Jensen for `g x = x log x` transfers to the matrix. -/
+theorem posSemidef_diagonal_re_mul_log_le_eigenvalue_weighted_mul_log
+    {B : CMatrix a} (hB : B.PosSemidef) (i : a) :
+    (B i i).re * Real.log (B i i).re ≤
+      ∑ j, Complex.normSq ((hB.isHermitian.eigenvectorUnitary : CMatrix a) i j) *
+        (hB.isHermitian.eigenvalues j * Real.log (hB.isHermitian.eigenvalues j)) := by
+  classical
+  let w : a → ℝ := fun j =>
+    Complex.normSq ((hB.isHermitian.eigenvectorUnitary : CMatrix a) i j)
+  let evals : a → ℝ := fun j => hB.isHermitian.eigenvalues j
+  have hw_nonneg : ∀ j, 0 ≤ w j := fun j => Complex.normSq_nonneg _
+  have hw_sum : ∑ j, w j = 1 := by
+    simpa [w] using unitary_row_normSq_sum hB.isHermitian.eigenvectorUnitary i
+  have hevals_nonneg : ∀ j, 0 ≤ evals j := fun j => hB.eigenvalues_nonneg j
+  have hjensen :=
+    weighted_sum_mul_log_le_sum_weighted_mul_log w evals hw_nonneg hw_sum hevals_nonneg
+  have hdiag :
+      (B i i).re = ∑ j, w j * evals j := by
+    simpa [w, evals, mul_comm] using
+      posSemidef_diagonal_re_eq_eigenvalue_weighted_sum hB i
+  rw [hdiag]
+  simpa [w, evals, smul_eq_mul, mul_comm, mul_left_comm, mul_assoc] using hjensen
+
+/-- Base-two form of
+`posSemidef_diagonal_re_mul_log_le_eigenvalue_weighted_mul_log`, rescaled by
+the positive constant `1 / log 2`. -/
+theorem posSemidef_diagonal_re_mul_log2_le_eigenvalue_weighted_mul_log2
+    {B : CMatrix a} (hB : B.PosSemidef) (i : a) :
+    (B i i).re * log2 (B i i).re ≤
+      ∑ j, Complex.normSq ((hB.isHermitian.eigenvectorUnitary : CMatrix a) i j) *
+        (hB.isHermitian.eigenvalues j * log2 (hB.isHermitian.eigenvalues j)) := by
+  classical
+  have hnat :=
+    posSemidef_diagonal_re_mul_log_le_eigenvalue_weighted_mul_log (B := B) hB i
+  have hscale : 0 ≤ (Real.log 2)⁻¹ :=
+    inv_nonneg.mpr (le_of_lt (Real.log_pos one_lt_two))
+  have hscaled := mul_le_mul_of_nonneg_right hnat hscale
+  simpa [log2, div_eq_mul_inv, Finset.mul_sum, mul_comm, mul_left_comm, mul_assoc] using
+    hscaled
+
+end QIT
+
+namespace MState
+
+open Set
 
 /-- Von Neumann entropy S(ρ) = -Σ λᵢ log₂ λᵢ over the eigenvalues of ρ,
 with 0 log 0 := 0. -/
-def vonNeumann (ρ : State a) : ℝ :=
-  -(Finset.univ.sum fun i => xlog2 ((ρ.pos.isHermitian).eigenvalues i))
+def vonNeumann (ρ : MState a) : ℝ :=
+  -(Finset.univ.sum fun i => xlog2 ((ρ.psd.isHermitian).eigenvalues i))
 
 /-- The von Neumann entropy, rewritten as a multiset sum over the
 eigenvalue multiset: `S(ρ) = -∑_{λ ∈ spec(ρ)} xlog2 λ`. -/
-lemma vonNeumann_eq_neg_sum_eigenvalueMultiset (ρ : State a) :
-    vonNeumann ρ = -((eigenvalueMultiset ρ.pos.isHermitian).map xlog2).sum := by
-  show -(Finset.univ.sum fun i => xlog2 (ρ.pos.isHermitian.eigenvalues i)) = _
+lemma vonNeumann_eq_neg_sum_eigenvalueMultiset (ρ : MState a) :
+    vonNeumann ρ = -((eigenvalueMultiset ρ.psd.isHermitian).map xlog2).sum := by
+  show -(Finset.univ.sum fun i => xlog2 (ρ.psd.isHermitian.eigenvalues i)) = _
   rw [eigenvalueMultiset, Finset.sum_eq_multiset_sum, Multiset.map_map]
   rfl
+
+private theorem eigenvalues_congr {M N : CMatrix a} (hM : M.IsHermitian) (hN : N.IsHermitian)
+    (h : M = N) : hM.eigenvalues = hN.eigenvalues := by
+  subst h
+  rfl
+
+/-- Both libraries take the eigenvalues of the same matrix. -/
+theorem eigenvalues_M (ρ : MState a) :
+    ρ.M.H.eigenvalues = ρ.psd.isHermitian.eigenvalues :=
+  eigenvalues_congr _ _ (DensityOp.mat_M ρ)
+
+theorem coe_spectrum (ρ : MState a) (i : a) :
+    (ρ.spectrum i : ℝ) = ρ.psd.isHermitian.eigenvalues i :=
+  congrFun (eigenvalues_M ρ) i
+
+/-- physlib's von Neumann entropy, as the eigenvalue sum that `vonNeumann` starts from. -/
+theorem Sᵥₙ_eq_sum_negMulLog (ρ : MState a) :
+    Sᵥₙ ρ = ∑ i, Real.negMulLog (ρ.psd.isHermitian.eigenvalues i) := by
+  rw [Sᵥₙ_eq_Hₛ_spectrum, Hₛ]
+  exact Finset.sum_congr rfl fun i _ =>
+    congrArg Real.negMulLog (coe_spectrum ρ i)
+
+/-- `vonNeumann` is measured in bits and physlib's `Sᵥₙ` in nats. -/
+theorem vonNeumann_eq_Sᵥₙ_div_log_two (ρ : MState a) :
+    ρ.vonNeumann = Sᵥₙ ρ / Real.log 2 := by
+  rw [vonNeumann, Sᵥₙ_eq_sum_negMulLog, Finset.sum_div, ← Finset.sum_neg_distrib]
+  exact Finset.sum_congr rfl fun i _ => neg_xlog2_eq_negMulLog_div _
 
 private noncomputable def entropyCfcScalar (x : ℝ) : ℝ :=
   -(x * Real.log x / Real.log 2)
@@ -182,18 +322,18 @@ private theorem continuous_entropyCfcComplex : Continuous entropyCfcComplex := b
   unfold entropyCfcComplex
   exact Complex.continuous_ofReal.comp (continuous_entropyCfcScalar.comp Complex.continuous_re)
 
-private theorem vonNeumann_eq_cfc_trace (ρ : State a) :
-    ρ.vonNeumann = ((cfc entropyCfcComplex ρ.matrix).trace).re := by
-  rw [State.vonNeumann]
+private theorem vonNeumann_eq_cfc_trace (ρ : MState a) :
+    ρ.vonNeumann = ((cfc entropyCfcComplex ρ.m).trace).re := by
+  rw [MState.vonNeumann]
   have hreal :
-      cfc entropyCfcScalar ρ.matrix = cfc entropyCfcComplex ρ.matrix :=
-    cfc_real_eq_complex (a := ρ.matrix) entropyCfcScalar
-      (ha := ρ.pos.isHermitian.isSelfAdjoint)
+      cfc entropyCfcScalar ρ.m = cfc entropyCfcComplex ρ.m :=
+    cfc_real_eq_complex (a := ρ.m) entropyCfcScalar
+      (ha := ρ.psd.isHermitian.isSelfAdjoint)
   rw [← hreal]
   have hcfc :
-      cfc entropyCfcScalar ρ.matrix =
-        ρ.pos.isHermitian.cfc entropyCfcScalar :=
-    Matrix.IsHermitian.cfc_eq (𝕜 := ℂ) ρ.pos.isHermitian entropyCfcScalar
+      cfc entropyCfcScalar ρ.m =
+        ρ.psd.isHermitian.cfc entropyCfcScalar :=
+    Matrix.IsHermitian.cfc_eq (𝕜 := ℂ) ρ.psd.isHermitian entropyCfcScalar
   rw [hcfc]
   unfold Matrix.IsHermitian.cfc
   rw [Unitary.conjStarAlgAut_apply, Matrix.trace_mul_cycle,
@@ -202,203 +342,63 @@ private theorem vonNeumann_eq_cfc_trace (ρ : State a) :
   simp only [Function.comp_apply, entropyCfcScalar_eq_neg_xlog2]
   simp [Finset.sum_neg_distrib]
 
-/-- Eigenvalues of a state sum to one. -/
-private lemma eigenvalue_sum (ρ : State a) :
-    ∑ i, ρ.pos.isHermitian.eigenvalues i = 1 := by
-  have hc : (∑ i, ((ρ.pos.isHermitian.eigenvalues i : ℝ) : ℂ)) = 1 := by
-    exact ρ.pos.isHermitian.trace_eq_sum_eigenvalues.symm.trans ρ.trace_eq_one
-  exact Complex.ofReal_injective (by simpa using hc)
-
 /-- Eigenvalues of a state are bounded above by one. -/
-private lemma eigenvalue_le_one (ρ : State a) (i : a) :
-    ρ.pos.isHermitian.eigenvalues i ≤ 1 := by
-  have hnonneg (j : a) : 0 ≤ ρ.pos.isHermitian.eigenvalues j :=
-    ρ.pos.eigenvalues_nonneg j
-  have hsum : ∑ j, ρ.pos.isHermitian.eigenvalues j = 1 :=
-    eigenvalue_sum ρ
-  calc ρ.pos.isHermitian.eigenvalues i
-      ≤ ρ.pos.isHermitian.eigenvalues i
-        + ∑ j ∈ Finset.univ.erase i, ρ.pos.isHermitian.eigenvalues j :=
+private lemma eigenvalue_le_one (ρ : MState a) (i : a) :
+    ρ.psd.isHermitian.eigenvalues i ≤ 1 := by
+  have hnonneg (j : a) : 0 ≤ ρ.psd.isHermitian.eigenvalues j :=
+    ρ.psd.eigenvalues_nonneg j
+  have hsum : ∑ j, ρ.psd.isHermitian.eigenvalues j = 1 :=
+    ρ.sum_eigenvalues_eq_one
+  calc ρ.psd.isHermitian.eigenvalues i
+      ≤ ρ.psd.isHermitian.eigenvalues i
+        + ∑ j ∈ Finset.univ.erase i, ρ.psd.isHermitian.eigenvalues j :=
           le_add_of_nonneg_right (Finset.sum_nonneg (fun j _ => hnonneg j))
-    _ = ∑ j, ρ.pos.isHermitian.eigenvalues j := by
+    _ = ∑ j, ρ.psd.isHermitian.eigenvalues j := by
           rw [add_comm]
           exact Finset.sum_erase_add (s := Finset.univ)
-            (f := fun j => ρ.pos.isHermitian.eigenvalues j) (Finset.mem_univ i)
+            (f := fun j => ρ.psd.isHermitian.eigenvalues j) (Finset.mem_univ i)
     _ = 1 := hsum
 
-private theorem spectrum_subset_stateInterval (ρ : State a) :
-    spectrum ℂ ρ.matrix ⊆ Complex.ofReal '' Set.Icc (0 : ℝ) 1 := by
+private theorem spectrum_subset_stateInterval (ρ : MState a) :
+    _root_.spectrum ℂ ρ.m ⊆ Complex.ofReal '' Set.Icc (0 : ℝ) 1 := by
   intro z hz
-  rw [ρ.pos.isHermitian.spectrum_eq_image_range] at hz
+  rw [ρ.psd.isHermitian.spectrum_eq_image_range] at hz
   rcases hz with ⟨x, ⟨i, rfl⟩, rfl⟩
-  exact ⟨ρ.pos.isHermitian.eigenvalues i,
-    ⟨ρ.pos.eigenvalues_nonneg i, eigenvalue_le_one ρ i⟩, rfl⟩
+  exact ⟨ρ.psd.isHermitian.eigenvalues i,
+    ⟨ρ.psd.eigenvalues_nonneg i, eigenvalue_le_one ρ i⟩, rfl⟩
 
 /-- Von Neumann entropy is continuous on finite-dimensional density states. -/
-theorem vonNeumann_continuous : Continuous (fun ρ : State a => ρ.vonNeumann) := by
+theorem vonNeumann_continuous : Continuous (fun ρ : MState a => ρ.vonNeumann) := by
   let K : Set ℂ := Complex.ofReal '' Set.Icc (0 : ℝ) 1
   have hK : IsCompact K :=
     CompactIccSpace.isCompact_Icc.image Complex.continuous_ofReal
-  have hcfc : Continuous fun ρ : State a =>
-      (cfc entropyCfcComplex (ρ.matrix : Matrix a a ℂ) : Matrix a a ℂ) := by
+  have hcfc : Continuous fun ρ : MState a =>
+      (cfc entropyCfcComplex (ρ.m : Matrix a a ℂ) : Matrix a a ℂ) := by
     exact Continuous.cfc' (A := Matrix a a ℂ) (p := IsStarNormal)
-      (s := K) hK entropyCfcComplex State.continuous_matrix
+      (s := K) hK entropyCfcComplex MState.continuous_matrix
       (fun ρ => spectrum_subset_stateInterval ρ)
       (continuous_entropyCfcComplex.continuousOn)
-      (fun ρ => ρ.pos.isHermitian.isSelfAdjoint.isStarNormal)
-  have htrace : Continuous fun ρ : State a =>
-      ((cfc entropyCfcComplex ρ.matrix).trace).re :=
+      (fun ρ => ρ.psd.isHermitian.isSelfAdjoint.isStarNormal)
+  have htrace : Continuous fun ρ : MState a =>
+      ((cfc entropyCfcComplex ρ.m).trace).re :=
     Complex.continuous_re.comp (Continuous.matrix_trace hcfc)
   exact htrace.congr fun ρ => (vonNeumann_eq_cfc_trace ρ).symm
 
-/-- Von Neumann entropy is nonnegative: S(rho) >= 0. -/
-theorem vonNeumann_nonneg (ρ : State a) : 0 ≤ vonNeumann ρ := by
-  let hH : ρ.matrix.IsHermitian := ρ.pos.isHermitian
-  have hnonneg (i : a) : 0 ≤ hH.eigenvalues i := ρ.pos.eigenvalues_nonneg i
-  have hle1 (i : a) : hH.eigenvalues i ≤ 1 := eigenvalue_le_one ρ i
-  apply neg_nonneg.mpr
-  apply Finset.sum_nonpos
-  intro i _
-  by_cases hl : hH.eigenvalues i = 0
-  · simp only [xlog2, if_pos hl]
-    exact le_rfl
-  · simp only [xlog2, if_neg hl]
-    have hpos : 0 < hH.eigenvalues i := lt_of_le_of_ne (hnonneg i) (Ne.symm hl)
-    have hlog2le : log2 (hH.eigenvalues i) ≤ 0 := by
-      unfold log2
-      exact div_nonpos_of_nonpos_of_nonneg
-        (Real.log_nonpos (hnonneg i) (hle1 i)) (le_of_lt (Real.log_pos one_lt_two))
-    exact mul_nonpos_of_nonneg_of_nonpos (le_of_lt hpos) hlog2le
-
-/-- For x >= 0, x * Real.log x >= x - 1. -/
-private lemma xlog_self_ge_sub_one {x : ℝ} (hx : 0 ≤ x) :
-    x * Real.log x ≥ x - 1 := by
-  rcases lt_or_eq_of_le hx with h | h
-  · have hl := Real.one_sub_inv_le_log_of_pos h
-    nlinarith [hl, mul_inv_cancel₀ (ne_of_gt h)]
-  · rw [← h]
-    norm_num
+/-- Von Neumann entropy is nonnegative: S(rho) ≥ 0. -/
+theorem vonNeumann_nonneg (ρ : MState a) : 0 ≤ vonNeumann ρ := by
+  rw [vonNeumann_eq_Sᵥₙ_div_log_two]
+  exact div_nonneg (Sᵥₙ_nonneg _) (Real.log_nonneg one_le_two)
 
 /-- Von Neumann entropy is bounded by log2(dim).
 
-S(rho) <= log2(Fintype.card a).
+S(rho) ≤ log2(Fintype.card a).
 -/
-theorem vonNeumann_le_log_card (ρ : State a) :
+theorem vonNeumann_le_log_card (ρ : MState a) :
     vonNeumann ρ ≤ log2 (Fintype.card a) := by
-  let hH : ρ.matrix.IsHermitian := ρ.pos.isHermitian
-  have hnonneg (i : a) : 0 ≤ hH.eigenvalues i := ρ.pos.eigenvalues_nonneg i
-  have hsum : ∑ i, hH.eigenvalues i = 1 := eigenvalue_sum ρ
-  have hcard_pos : 0 < Fintype.card a := by
-    by_contra hcard
-    have hcard_zero : Fintype.card a = 0 := Nat.eq_zero_of_not_pos hcard
-    have : IsEmpty a := Fintype.card_eq_zero_iff.mp hcard_zero
-    have hsum_zero : ∑ i, hH.eigenvalues i = 0 := by simp
-    have : (0 : ℝ) = 1 := hsum_zero.symm.trans hsum
-    norm_num at this
-  have hnreal : (0 : ℝ) < Fintype.card a := Nat.cast_pos.mpr hcard_pos
-  have hlog2_pos : 0 < Real.log 2 := Real.log_pos one_lt_two
-  -- Key identity: xlog2(x) * Real.log 2 = x * Real.log x for x >= 0
-  have hxlog2_mul (x : ℝ) (hx : 0 ≤ x) : xlog2 x * Real.log 2 = x * Real.log x := by
-    by_cases h : x = 0
-    · simp [xlog2, h]
-    · simp only [xlog2, if_neg h, log2]
-      field_simp [ne_of_gt hlog2_pos]
-  -- Suffices: vonNeumann ρ * Real.log 2 ≤ Real.log n
-  -- Because: vonNeumann ≤ log2 n = Real.log n / Real.log 2
-  --   iff (le_div_iff₀ hlog2_pos): vonNeumann * Real.log 2 ≤ Real.log n
-  rw [show log2 (Fintype.card a) = Real.log (Fintype.card a) / Real.log 2 from rfl]
-  rw [le_div_iff₀ hlog2_pos]
-  -- Goal: vonNeumann ρ * Real.log 2 ≤ Real.log (Fintype.card a)
-  -- vonNeumann = -(∑ xlog2(λᵢ))
-  -- So vonNeumann * Real.log 2 = -(∑ xlog2(λᵢ)) * Real.log 2 = -(∑ xlog2(λᵢ) * Real.log 2)
-  have hvn_mul : vonNeumann ρ * Real.log 2 =
-      -∑ i, hH.eigenvalues i * Real.log (hH.eigenvalues i) := by
-    rw [vonNeumann]
-    calc
-      (-(∑ i, xlog2 (hH.eigenvalues i))) * Real.log 2
-          = -((∑ i, xlog2 (hH.eigenvalues i)) * Real.log 2) := by ring
-      _ = -(∑ i, xlog2 (hH.eigenvalues i) * Real.log 2) := by
-        rw [Finset.sum_mul]
-      _ = -∑ i, hH.eigenvalues i * Real.log (hH.eigenvalues i) := by
-        congr 1
-        apply Finset.sum_congr rfl
-        intro i _
-        exact hxlog2_mul _ (hnonneg i)
-  rw [hvn_mul]
-  -- Now: -(∑ λᵢ ln λᵢ) ≤ Real.log n
-  -- KL divergence: ∑ λᵢ * ln(λᵢ * n) ≥ 0, which expands to ∑ λᵢ ln λᵢ ≥ -ln n
-  -- So -(∑ λᵢ ln λᵢ) ≤ ln n
-  -- Prove KL ≥ 0 via: λᵢ * ln(λᵢ * n) ≥ λᵢ - 1/n for each i
-  have hKL : 0 ≤ ∑ i, hH.eigenvalues i
-      * Real.log (hH.eigenvalues i * ↑(Fintype.card a)) := by
-    have hbound : ∀ i, hH.eigenvalues i
-        * Real.log (hH.eigenvalues i * ↑(Fintype.card a))
-        ≥ hH.eigenvalues i - 1 / ↑(Fintype.card a) := by
-      intro i
-      by_cases hl : hH.eigenvalues i = 0
-      · simp [hl, Real.log_zero]
-      · have hlpos : 0 < hH.eigenvalues i := lt_of_le_of_ne (hnonneg i) (Ne.symm hl)
-        have hprod : 0 < hH.eigenvalues i * ↑(Fintype.card a) :=
-          mul_pos hlpos hnreal
-        have hxi := xlog_self_ge_sub_one (le_of_lt hprod)
-        have : hH.eigenvalues i * Real.log (hH.eigenvalues i * ↑(Fintype.card a))
-            ≥ hH.eigenvalues i - 1 / ↑(Fintype.card a) := by
-          have hdiv :
-              (hH.eigenvalues i * ↑(Fintype.card a) - 1) / ↑(Fintype.card a)
-                ≤ (hH.eigenvalues i * ↑(Fintype.card a)
-                    * Real.log (hH.eigenvalues i * ↑(Fintype.card a)))
-                    / ↑(Fintype.card a) :=
-            div_le_div_of_nonneg_right hxi (le_of_lt hnreal)
-          calc
-            hH.eigenvalues i - 1 / ↑(Fintype.card a)
-                = (hH.eigenvalues i * ↑(Fintype.card a) - 1)
-                    / ↑(Fintype.card a) := by
-                    field_simp [ne_of_gt hnreal]
-            _ ≤ (hH.eigenvalues i * ↑(Fintype.card a)
-                    * Real.log (hH.eigenvalues i * ↑(Fintype.card a)))
-                    / ↑(Fintype.card a) := hdiv
-            _ = hH.eigenvalues i
-                    * Real.log (hH.eigenvalues i * ↑(Fintype.card a)) := by
-                    field_simp [ne_of_gt hnreal]
-        exact this
-    calc (0 : ℝ)
-        = ∑ i, (hH.eigenvalues i - 1 / ↑(Fintype.card a)) := by
-          rw [Finset.sum_sub_distrib]
-          rw [hsum, Finset.sum_const]
-          simp
-          field_simp [ne_of_gt hnreal]
-          ring
-      _ ≤ ∑ i, hH.eigenvalues i
-          * Real.log (hH.eigenvalues i * ↑(Fintype.card a)) :=
-        Finset.sum_le_sum (fun i _ => hbound i)
-  have hexpand_KL : ∑ i, hH.eigenvalues i
-      * Real.log (hH.eigenvalues i * ↑(Fintype.card a))
-    = ∑ i, hH.eigenvalues i * Real.log (hH.eigenvalues i)
-      + Real.log ↑(Fintype.card a) := by
-    calc
-      ∑ i, hH.eigenvalues i * Real.log (hH.eigenvalues i * ↑(Fintype.card a))
-          = ∑ i, (hH.eigenvalues i * Real.log (hH.eigenvalues i)
-              + hH.eigenvalues i * Real.log ↑(Fintype.card a)) := by
-            apply Finset.sum_congr rfl
-            intro i _
-            by_cases hl : hH.eigenvalues i = 0
-            · simp [hl, Real.log_zero]
-            · have hlpos : 0 < hH.eigenvalues i :=
-                lt_of_le_of_ne (hnonneg i) (Ne.symm hl)
-              rw [Real.log_mul (ne_of_gt hlpos) (ne_of_gt hnreal)]
-              ring
-      _ = ∑ i, hH.eigenvalues i * Real.log (hH.eigenvalues i)
-          + ∑ i, hH.eigenvalues i * Real.log ↑(Fintype.card a) := by
-            rw [Finset.sum_add_distrib]
-      _ = ∑ i, hH.eigenvalues i * Real.log (hH.eigenvalues i)
-          + (∑ i, hH.eigenvalues i) * Real.log ↑(Fintype.card a) := by
-            rw [Finset.sum_mul]
-      _ = ∑ i, hH.eigenvalues i * Real.log (hH.eigenvalues i)
-          + Real.log ↑(Fintype.card a) := by
-            rw [hsum]
-            ring
-  -- From KL: sum λᵢ ln λᵢ ≥ -ln n
-  linarith [hKL, hexpand_KL]
+  have h : Sᵥₙ ρ ≤ Real.log (Fintype.card a) := by
+    simpa [Finset.card_univ] using Sᵥₙ_le_log_d ρ
+  rw [vonNeumann_eq_Sᵥₙ_div_log_two, log2]
+  exact div_le_div_of_nonneg_right h (Real.log_nonneg one_le_two)
 
 /-- The natural log of a positive-definite matrix via continuous functional
 calculus. Requires `PosDef` (invertible, strictly positive spectrum) so that
@@ -412,30 +412,30 @@ D(ρ‖σ) in bits.
 Both states must be positive-definite (full-rank) for CFC.log to apply. The
 CFC logarithm is the natural logarithm, so the trace expression is divided by
 `Real.log 2` to match the base-2 entropy convention. -/
-def relativeEntropyPosDefFinite (ρ σ : State a)
-    (hρ : ρ.matrix.PosDef) (hσ : σ.matrix.PosDef) : ℝ :=
-  ((ρ.matrix * psdLog ρ.matrix hρ).trace.re
-    - (ρ.matrix * psdLog σ.matrix hσ).trace.re) / Real.log 2
+def relativeEntropyPosDefFinite (ρ σ : MState a)
+    (hρ : ρ.m.PosDef) (hσ : σ.m.PosDef) : ℝ :=
+  ((ρ.m * psdLog ρ.m hρ).trace.re
+    - (ρ.m * psdLog σ.m hσ).trace.re) / Real.log 2
 
 /-- The matrix-log trace expression for a positive-definite state expands to
 the spectral `λ log λ` sum. -/
 theorem trace_mul_psdLog_eq_sum_eigenvalues_mul_log
-    (ρ : State a) (hρ : ρ.matrix.PosDef) :
-    ((ρ.matrix * psdLog ρ.matrix hρ).trace).re =
+    (ρ : MState a) (hρ : ρ.m.PosDef) :
+    ((ρ.m * psdLog ρ.m hρ).trace).re =
       ∑ i, hρ.1.eigenvalues i * Real.log (hρ.1.eigenvalues i) := by
   classical
   let U : Matrix.unitaryGroup a ℂ := hρ.1.eigenvectorUnitary
   let D : CMatrix a := Matrix.diagonal fun i => ((hρ.1.eigenvalues i : ℝ) : ℂ)
   let L : CMatrix a := Matrix.diagonal fun i => ((Real.log (hρ.1.eigenvalues i) : ℝ) : ℂ)
-  have hmat : ρ.matrix = (U : CMatrix a) * D * star (U : CMatrix a) := by
+  have hmat : ρ.m = (U : CMatrix a) * D * star (U : CMatrix a) := by
     simpa [U, D, Function.comp_def, Matrix.IsHermitian.spectral_theorem,
       Unitary.conjStarAlgAut_apply] using hρ.1.spectral_theorem
-  have hlog : psdLog ρ.matrix hρ = (U : CMatrix a) * L * star (U : CMatrix a) := by
+  have hlog : psdLog ρ.m hρ = (U : CMatrix a) * L * star (U : CMatrix a) := by
     rw [psdLog, hρ.1.cfc_eq]
     simp [U, L, Matrix.IsHermitian.cfc, Unitary.conjStarAlgAut_apply, Function.comp_def]
   calc
-    ((ρ.matrix * psdLog ρ.matrix hρ).trace).re =
-        ((ρ.matrix * ((U : CMatrix a) * L * star (U : CMatrix a))).trace).re := by
+    ((ρ.m * psdLog ρ.m hρ).trace).re =
+        ((ρ.m * ((U : CMatrix a) * L * star (U : CMatrix a))).trace).re := by
       rw [hlog]
     _ = ((((U : CMatrix a) * D * star (U : CMatrix a)) *
           ((U : CMatrix a) * L * star (U : CMatrix a))).trace).re := by
@@ -460,14 +460,14 @@ theorem trace_mul_psdLog_eq_sum_eigenvalues_mul_log
 /-- Positive-definite states have the expected matrix-log trace formula for
 von Neumann entropy. -/
 theorem vonNeumann_eq_neg_trace_mul_psdLog_div_log_two
-    (ρ : State a) (hρ : ρ.matrix.PosDef) :
+    (ρ : MState a) (hρ : ρ.m.PosDef) :
     ρ.vonNeumann =
-      -((ρ.matrix * psdLog ρ.matrix hρ).trace.re) / Real.log 2 := by
+      -((ρ.m * psdLog ρ.m hρ).trace.re) / Real.log 2 := by
   classical
   have htrace := trace_mul_psdLog_eq_sum_eigenvalues_mul_log ρ hρ
-  have hHerm : hρ.1 = ρ.pos.isHermitian := Subsingleton.elim _ _
+  have hHerm : hρ.1 = ρ.psd.isHermitian := Subsingleton.elim _ _
   have hxlog (i : a) :
-      xlog2 (ρ.pos.isHermitian.eigenvalues i) =
+      xlog2 (ρ.psd.isHermitian.eigenvalues i) =
         hρ.1.eigenvalues i * Real.log (hρ.1.eigenvalues i) / Real.log 2 := by
     rw [← hHerm]
     unfold xlog2 log2
@@ -483,144 +483,81 @@ theorem vonNeumann_eq_neg_trace_mul_psdLog_div_log_two
 variable {b : Type v} [Fintype b] [DecidableEq b]
 
 /-- Conditional von Neumann entropy `H(A|B)_ρ = H(AB)_ρ - H(B)_ρ`. -/
-def conditionalEntropy (ρ : State (Prod a b)) : ℝ :=
-  vonNeumann ρ - vonNeumann ρ.marginalB
+def conditionalEntropy (ρ : MState (a × b)) : ℝ :=
+  vonNeumann ρ - vonNeumann ρ.traceLeft
 
 @[simp]
-theorem conditionalEntropy_eq (ρ : State (Prod a b)) :
-    ρ.conditionalEntropy = vonNeumann ρ - vonNeumann ρ.marginalB := rfl
+theorem conditionalEntropy_eq (ρ : MState (a × b)) :
+    ρ.conditionalEntropy = vonNeumann ρ - vonNeumann ρ.traceLeft := rfl
 
 /-- Conditional entropy is continuous on finite-dimensional bipartite states. -/
 theorem conditionalEntropy_continuous :
-    Continuous (fun ρ : State (Prod a b) => ρ.conditionalEntropy) := by
+    Continuous (fun ρ : MState (a × b) => ρ.conditionalEntropy) := by
   unfold conditionalEntropy
-  exact State.vonNeumann_continuous.sub
-    (State.vonNeumann_continuous.comp State.marginalB_continuous)
+  exact MState.vonNeumann_continuous.sub
+    (MState.vonNeumann_continuous.comp MState.traceLeft_continuous)
 
 variable {c : Type w} [Fintype c] [DecidableEq c]
 
 /-- Conditional mutual information
 `I(A:C|B)_ρ = H(AB)_ρ + H(BC)_ρ - H(B)_ρ - H(ABC)_ρ`
-for a left-associated tripartite state `ρ : State ((A × B) × C)`. -/
-def condMutualInfo (ρ : State (Prod (Prod a b) c)) : ℝ :=
+for a left-associated tripartite state `ρ : MState ((A × B) × C)`. -/
+def condMutualInfo (ρ : MState ((a × b) × c)) : ℝ :=
   vonNeumann ρ.marginalAB + vonNeumann ρ.marginalBC
     - vonNeumann ρ.marginalBOfABC - vonNeumann ρ
 
 @[simp]
-theorem condMutualInfo_eq (ρ : State (Prod (Prod a b) c)) :
+theorem condMutualInfo_eq (ρ : MState ((a × b) × c)) :
     ρ.condMutualInfo =
       vonNeumann ρ.marginalAB + vonNeumann ρ.marginalBC
         - vonNeumann ρ.marginalBOfABC - vonNeumann ρ := rfl
 
-private theorem roots_X_pow_map_re_xlog2_sum_zero (n : ℕ) :
-    ((Polynomial.X ^ n : Polynomial ℂ).roots.map fun z : ℂ => xlog2 z.re).sum = 0 := by
-  rw [Polynomial.roots_X_pow, Multiset.map_nsmul, Multiset.sum_nsmul,
-    Multiset.map_singleton, Multiset.sum_singleton]
-  simp [xlog2]
-
-private theorem roots_re_xlog2_sum_eq_of_X_pow_mul_eq
-    {P Q : Polynomial ℂ} (m n : ℕ) (hP : P ≠ 0) (hQ : Q ≠ 0)
-    (h : Polynomial.X ^ m * P = Polynomial.X ^ n * Q) :
-    (P.roots.map fun z : ℂ => xlog2 z.re).sum =
-      (Q.roots.map fun z : ℂ => xlog2 z.re).sum := by
-  have hXm : (Polynomial.X ^ m : Polynomial ℂ) ≠ 0 := by simp
-  have hXn : (Polynomial.X ^ n : Polynomial ℂ) ≠ 0 := by simp
-  have hleft_ne : (Polynomial.X ^ m : Polynomial ℂ) * P ≠ 0 := mul_ne_zero hXm hP
-  have hright_ne : (Polynomial.X ^ n : Polynomial ℂ) * Q ≠ 0 := mul_ne_zero hXn hQ
-  have hroots := congrArg Polynomial.roots h
-  rw [Polynomial.roots_mul hleft_ne, Polynomial.roots_mul hright_ne] at hroots
-  have hsum :=
-    congrArg (fun s : Multiset ℂ => (s.map fun z : ℂ => xlog2 z.re).sum) hroots
-  simp only [Multiset.map_add, Multiset.sum_add] at hsum
-  rw [roots_X_pow_map_re_xlog2_sum_zero m,
-    roots_X_pow_map_re_xlog2_sum_zero n] at hsum
-  simpa using hsum
-
-private theorem pureVector_marginalA_matrix_eq_conjTranspose_mul_amplitudeMatrix
-    {r : Type u} {α : Type v} [Fintype r] [DecidableEq r] [Fintype α] [DecidableEq α]
-    (Ψ : PureVector (Prod r α)) :
-    Ψ.state.marginalA.matrix =
-      Matrix.transpose Ψ.amplitudeMatrix *
-        Matrix.conjTranspose (Matrix.transpose Ψ.amplitudeMatrix) := by
-  ext i j
-  simp [PureVector.amplitudeMatrix, State.marginalA, QIT.partialTraceB,
-    Matrix.mul_apply, Matrix.conjTranspose_apply, Matrix.transpose_apply,
-    PureVector.state_matrix, rankOneMatrix_apply]
-
 /-- Complementary marginals of a finite-dimensional pure bipartite state have
 the same von Neumann entropy. -/
-theorem pureVector_marginalA_vonNeumann_eq_marginalB
+theorem ket_traceRight_vonNeumann_eq_traceLeft
     {r : Type u} {α : Type v} [Fintype r] [DecidableEq r] [Fintype α] [DecidableEq α]
-    (Ψ : PureVector (Prod r α)) :
-    Ψ.state.marginalA.vonNeumann = Ψ.state.marginalB.vonNeumann := by
-  let A : Matrix α r ℂ := Ψ.amplitudeMatrix
-  let AT : Matrix r α ℂ := Matrix.transpose A
-  have hA :
-      Ψ.state.marginalA.matrix = AT * Matrix.conjTranspose AT := by
-    simpa [A, AT] using pureVector_marginalA_matrix_eq_conjTranspose_mul_amplitudeMatrix Ψ
-  have hB :
-      Ψ.state.marginalB.matrix = A * Matrix.conjTranspose A := by
-    rw [State.marginalB_matrix, PureVector.state_matrix]
-    simpa [A] using
-      PureVector.partialTraceA_rankOneMatrix_eq_amplitudeMatrix_mul_conjTranspose Ψ
-  have hright_matrix :
-      Matrix.conjTranspose AT * AT =
-        Matrix.transpose (A * Matrix.conjTranspose A) := by
-    ext i j
-    simp [A, AT, Matrix.mul_apply, Matrix.conjTranspose_apply, Matrix.transpose_apply,
-      mul_comm]
-  rw [vonNeumann_eq_neg_sum_eigenvalueMultiset,
-    vonNeumann_eq_neg_sum_eigenvalueMultiset]
-  congr 1
-  have hchar :
-      Polynomial.X ^ Fintype.card α * Ψ.state.marginalA.matrix.charpoly =
-        Polynomial.X ^ Fintype.card r * Ψ.state.marginalB.matrix.charpoly := by
-    rw [hA, hB]
-    have hcomm :=
-      Matrix.charpoly_mul_comm' (A := AT) (B := Matrix.conjTranspose AT)
-    rw [hright_matrix, Matrix.charpoly_transpose] at hcomm
-    simpa [A, AT, Matrix.mul_assoc] using hcomm
-  have hP : Ψ.state.marginalA.matrix.charpoly ≠ 0 :=
-    (Matrix.charpoly_monic _).ne_zero
-  have hQ : Ψ.state.marginalB.matrix.charpoly ≠ 0 :=
-    (Matrix.charpoly_monic _).ne_zero
-  have hroot :=
-    roots_re_xlog2_sum_eq_of_X_pow_mul_eq
-      (P := Ψ.state.marginalA.matrix.charpoly)
-      (Q := Ψ.state.marginalB.matrix.charpoly)
-      (Fintype.card α) (Fintype.card r) hP hQ hchar
-  have hrootsA := Ψ.state.marginalA.pos.isHermitian.roots_charpoly_eq_eigenvalues
-  have hrootsB := Ψ.state.marginalB.pos.isHermitian.roots_charpoly_eq_eigenvalues
-  rw [hrootsA, hrootsB] at hroot
-  simpa [eigenvalueMultiset, Multiset.map_map, Function.comp_def] using hroot
+    (Ψ : Ket (r × α)) :
+    Ψ.state.traceRight.vonNeumann = Ψ.state.traceLeft.vonNeumann := by
+  rw [vonNeumann_eq_Sᵥₙ_div_log_two, vonNeumann_eq_Sᵥₙ_div_log_two, Ket.state_eq_pure,
+    Sᵥₙ_of_partial_eq]
 
 /-- The von Neumann entropy of a one-dimensional (`PUnit`) state is zero. -/
-theorem vonNeumann_punit_eq_zero (ρ : State PUnit.{u + 1}) :
+theorem vonNeumann_punit_eq_zero (ρ : MState PUnit.{u + 1}) :
     ρ.vonNeumann = 0 := by
   exact le_antisymm (by simpa [log2] using vonNeumann_le_log_card ρ) (vonNeumann_nonneg ρ)
 
-end State
+end MState
+
+namespace QIT
+
+open Set
 
 /-- Quantum mutual information I(X;B) of a bipartite state. -/
 def mutualInformation {ι : Type u} {α : Type v} [Fintype ι] [Fintype α]
-    [DecidableEq α] [DecidableEq ι] (ρ : State (Prod ι α)) : ℝ :=
-  State.vonNeumann ρ.marginalA + State.vonNeumann ρ.marginalB
-    - State.vonNeumann ρ
+    [DecidableEq α] [DecidableEq ι] (ρ : MState (ι × α)) : ℝ :=
+  MState.vonNeumann ρ.traceRight + MState.vonNeumann ρ.traceLeft
+    - MState.vonNeumann ρ
 
-namespace State
+end QIT
+
+namespace MState
+
+open Set
 
 /-- The quantum mutual information of a `PUnit × PUnit` state is zero. -/
 theorem mutualInformation_punit_punit_eq_zero
-    (ρ : State (Prod PUnit.{u + 1} PUnit.{v + 1})) :
+    (ρ : MState (PUnit.{u + 1} × PUnit.{v + 1})) :
     QIT.mutualInformation ρ = 0 := by
-  have hA : ρ.marginalA.vonNeumann = 0 := vonNeumann_punit_eq_zero ρ.marginalA
-  have hB : ρ.marginalB.vonNeumann = 0 := vonNeumann_punit_eq_zero ρ.marginalB
+  have hA : ρ.traceRight.vonNeumann = 0 := vonNeumann_punit_eq_zero ρ.traceRight
+  have hB : ρ.traceLeft.vonNeumann = 0 := vonNeumann_punit_eq_zero ρ.traceLeft
   have hAB : ρ.vonNeumann = 0 := by
     exact le_antisymm (by simpa [log2] using vonNeumann_le_log_card ρ) (vonNeumann_nonneg ρ)
   simp [QIT.mutualInformation, hA, hB, hAB]
 
-end State
+end MState
 
-end
+namespace QIT
+
+open Set
 
 end QIT

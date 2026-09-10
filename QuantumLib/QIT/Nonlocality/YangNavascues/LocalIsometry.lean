@@ -165,18 +165,11 @@ private theorem matrix_smul_mul_smul {n : Type u} [Fintype n]
   ext i j
   simp [Matrix.mul_apply, Finset.mul_sum, mul_comm, mul_left_comm]
 
-private theorem circle_star_mul_self_local (z : Circle) :
-    star (z : ℂ) * (z : ℂ) = 1 := by
-  have h : (Complex.normSq (z : ℂ) : ℂ) = star (z : ℂ) * (z : ℂ) :=
-    Complex.normSq_eq_conj_mul_self
-  rw [Circle.normSq_coe] at h
-  simpa [Complex.star_def] using h.symm
-
 private theorem fourierRoot_pow_star_mul_self (d : ℕ) [NeZero d] (n : ℕ) :
     star ((fourierRoot d) ^ n) * (fourierRoot d) ^ n = 1 := by
   have hroot : star (fourierRoot d) * fourierRoot d = 1 := by
     dsimp [fourierRoot]
-    exact circle_star_mul_self_local (ZMod.toCircle 1)
+    exact circle_star_mul_self (ZMod.toCircle 1)
   rw [star_pow, ← mul_pow, hroot, one_pow]
 
 private theorem projectionFamily_sum_idempotent {H : Type u} [Fintype H] [DecidableEq H]
@@ -248,7 +241,9 @@ private theorem weightedProjectionFamily_isometry {H : Type u} [Fintype H] [Deci
   · intro hi
     exact (hi (Finset.mem_univ i)).elim
 
-private theorem weightedProjectionFamily_left_complement {H : Type u}
+/-- Any weighted combination of an orthogonal family of idempotents annihilates the
+complement `1 - ∑ k, P k` on the right. -/
+theorem weightedProjectionFamily_left_complement {H : Type u}
     [Fintype H] [DecidableEq H] {d : ℕ} [NeZero d] (P : Fin d → CMatrix H)
     (c : Fin d → ℂ)
     (hIdem : ∀ k, P k * P k = P k)
@@ -265,7 +260,9 @@ private theorem weightedProjectionFamily_left_complement {H : Type u}
             rw [Matrix.mul_sub, projectionFamily_sum_right P hIdem hOrth i]
             simp
 
-private theorem weightedProjectionFamily_right_complement {H : Type u}
+/-- The complement `1 - ∑ k, P k` of an orthogonal family of idempotents annihilates
+any weighted combination of the family on the right. -/
+theorem weightedProjectionFamily_right_complement {H : Type u}
     [Fintype H] [DecidableEq H] {d : ℕ} [NeZero d] (P : Fin d → CMatrix H)
     (c : Fin d → ℂ)
     (hIdem : ∀ k, P k * P k = P k)
@@ -282,7 +279,9 @@ private theorem weightedProjectionFamily_right_complement {H : Type u}
             rw [Matrix.sub_mul, projectionFamily_sum_left P hIdem hOrth i]
             simp
 
-private theorem projectionFamily_complement_idempotent {H : Type u}
+/-- The complement `1 - ∑ k, P k` of an orthogonal family of idempotents is itself
+idempotent. -/
+theorem projectionFamily_complement_idempotent {H : Type u}
     [Fintype H] [DecidableEq H] {d : ℕ} [NeZero d] (P : Fin d → CMatrix H)
     (hIdem : ∀ k, P k * P k = P k)
     (hOrth : ∀ i j, i ≠ j → P i * P j = 0) :
@@ -519,7 +518,7 @@ namespace BobLocalOrthogonalization
 variable {ι : Type u} {HA : Type v} {HB : Type w}
 variable [Fintype ι] [DecidableEq ι]
 variable [Fintype HA] [DecidableEq HA] [Fintype HB] [DecidableEq HB]
-variable {data : YNData ι HA HB} {rho : State (HA × HB)}
+variable {data : YNData ι HA HB} {rho : MState (HA × HB)}
 
 variable (W : BobLocalOrthogonalization data rho)
 
@@ -602,7 +601,7 @@ variable [Fintype HA] [DecidableEq HA] [Fintype HB] [DecidableEq HB]
 variable (data : YNData ι HA HB)
 
 /-- The assembled CGS local isometry from Alice and Bob side operators. -/
-def cgsLocalIsometry {rho : State (HA × HB)}
+def cgsLocalIsometry {rho : MState (HA × HB)}
     (B : SchmidtTarget.BaseReindexToFin data.target)
     (W : BobLocalOrthogonalization data rho) :
     TwoQubit.LocalIsometry HA (HA × Fin (Fintype.card ι))

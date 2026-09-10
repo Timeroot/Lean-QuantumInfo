@@ -46,14 +46,14 @@ open scoped ComplexOrder MatrixOrder
 
 open Matrix Polynomial
 
-namespace QIT
-
-universe u v
-
 noncomputable section
-
+universe u v
 variable {a : Type u} {b : Type v}
 variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+
+open QIT
+
+namespace QIT
 
 /-! ## Eigenvalue multisets of Hermitian matrices -/
 
@@ -155,12 +155,12 @@ theorem eigenvalueMultiset_kronecker (A : CMatrix a) (B : CMatrix b)
   -- Diagonalize both factors spectrally.
   let UA : Matrix.unitaryGroup a ℂ := hA.eigenvectorUnitary
   let UB : Matrix.unitaryGroup b ℂ := hB.eigenvectorUnitary
-  let U : Matrix.unitaryGroup (Prod a b) ℂ :=
+  let U : Matrix.unitaryGroup (a × b) ℂ :=
     ⟨Matrix.kronecker (UA : CMatrix a) (UB : CMatrix b),
       Matrix.kronecker_mem_unitary UA.2 UB.2⟩
   let α : a → ℝ := hA.eigenvalues
   let β : b → ℝ := hB.eigenvalues
-  let dprod : Prod a b → ℝ := fun i => α i.1 * β i.2
+  let dprod : a × b → ℝ := fun i => α i.1 * β i.2
   have hA_spec : A = Unitary.conjStarAlgAut ℂ _ UA
       (Matrix.diagonal fun i => (α i : ℂ)) := by
     simpa [UA, α, Function.comp_def] using hA.spectral_theorem
@@ -175,8 +175,8 @@ theorem eigenvalueMultiset_kronecker (A : CMatrix a) (B : CMatrix b)
       U, Matrix.kronecker, ← Matrix.conjTranspose_kronecker,
       Matrix.mul_kronecker_mul, Matrix.diagonal_kronecker_diagonal,
       Complex.ofReal_mul]
-  have hDprod_self : IsSelfAdjoint fun i : Prod a b => (dprod i : ℂ) := by
-    show star ((fun i : Prod a b => (dprod i : ℂ))) = (fun i => (dprod i : ℂ))
+  have hDprod_self : IsSelfAdjoint fun i : a × b => (dprod i : ℂ) := by
+    show star ((fun i : a × b => (dprod i : ℂ))) = (fun i => (dprod i : ℂ))
     funext i
     show (starRingEnd ℂ) ((dprod i : ℝ) : ℂ) = ((dprod i : ℝ) : ℂ)
     exact Complex.conj_ofReal _
@@ -199,14 +199,14 @@ theorem eigenvalueMultiset_kronecker (A : CMatrix a) (B : CMatrix b)
   rw [hEigEq]
   -- Fold LHS into the `eigenvalueMultiset` form so the diagonal lemma applies.
   show eigenvalueMultiset hDiagDprod =
-      (eigenvalueMultiset hA).bind fun α_ =>
-        (eigenvalueMultiset hB).map fun β_ => α_ * β_
+      (eigenvalueMultiset hA).bind fun α' =>
+        (eigenvalueMultiset hB).map fun β' => α' * β'
   rw [eigenvalueMultiset_diagonal_ofReal dprod hDiagDprod]
   -- Convert `map dprod univ_{a×b}` to the bind over the factor multisets.
-  show Multiset.map dprod (Finset.univ : Finset (Prod a b)).val =
+  show Multiset.map dprod (Finset.univ : Finset (a × b)).val =
       (Multiset.map hA.eigenvalues (Finset.univ : Finset a).val).bind
-        fun α_ => (Multiset.map hB.eigenvalues (Finset.univ : Finset b).val).map
-          fun β_ => α_ * β_
+        fun α' => (Multiset.map hB.eigenvalues (Finset.univ : Finset b).val).map
+          fun β' => α' * β'
   rw [← Finset.univ_product_univ, Finset.product_val]
   -- Unfold `s ×ˢ t = s.bind fun a => t.map (Prod.mk a)` (definition of
   -- `Multiset.product`) and push the maps through the binds until both sides
@@ -329,59 +329,64 @@ theorem eigenvalueMultiset_smul_ofReal (c : ℝ) (A : CMatrix a)
 
 /-! ## The tensor-power spectrum -/
 
-namespace State
+end QIT
+
+namespace MState
 
 /-- Eigenvalues of an IID tensor-power density matrix: the spectrum of
 `ρ.tensorPower n` is the `n`-fold pairwise-product multiset of the spectrum
 of `ρ` [Wilde2011Qst, qit-notes.tex:1888-1920]. -/
-theorem eigenvalueMultiset_tensorPower (ρ : State a) :
+theorem eigenvalueMultiset_tensorPower (ρ : MState a) :
     (n : ℕ) →
-      eigenvalueMultiset ((ρ.tensorPower n).pos.isHermitian) =
-        tensorPowerMultiset (eigenvalueMultiset ρ.pos.isHermitian) n
+      eigenvalueMultiset ((ρ.tensorPower n).psd.isHermitian) =
+        tensorPowerMultiset (eigenvalueMultiset ρ.psd.isHermitian) n
   | 0 => by
-      -- `ρ.tensorPower 0 = State.unit` on the unit system; its sole eigenvalue
+      -- `ρ.tensorPower 0 = MState.unit` on the unit system; its sole eigenvalue
       -- is `1`, matching `tensorPowerMultiset s 0 = {1}`.
-      rw [State.tensorPower_zero, tensorPowerMultiset_zero]
-      have hUnit : (State.unit.matrix : CMatrix PUnit).IsHermitian :=
-        State.unit.pos.isHermitian
+      rw [MState.tensorPower_zero, tensorPowerMultiset_zero]
+      have hUnit : (MState.unit.m : CMatrix PUnit).IsHermitian :=
+        MState.unit.psd.isHermitian
       -- The unit state's 1×1 identity matrix has trace 1; its single eigenvalue
       -- is therefore 1.
-      have hTraceEq : (State.unit.matrix : CMatrix PUnit).trace =
+      have hTraceEq : (MState.unit.m : CMatrix PUnit).trace =
           ∑ i : PUnit, (hUnit.eigenvalues i : ℂ) :=
         hUnit.trace_eq_sum_eigenvalues
-      have hTraceOne : (State.unit.matrix : CMatrix PUnit).trace = 1 :=
-        State.unit.trace_eq_one
+      have hTraceOne : (MState.unit.m : CMatrix PUnit).trace = 1 :=
+        MState.unit.tr'
       have hEig : hUnit.eigenvalues PUnit.unit = (1 : ℝ) := by
         have hSum : ∑ i : PUnit, (hUnit.eigenvalues i : ℂ) = 1 := by
           rw [← hTraceEq, hTraceOne]
         simpa using hSum
       show eigenvalueMultiset hUnit = ({1} : Multiset ℝ)
-      rw [eigenvalueMultiset]
-      simp [hEig]
+      rw [eigenvalueMultiset, show (Finset.univ : Finset PUnit).val = {PUnit.unit} from rfl,
+        Multiset.map_singleton, hEig]
   | n + 1 => by
       -- `ρ.tensorPower (n+1) = ρ.prod (ρ.tensorPower n)`; the product state's
       -- matrix is the Kronecker product, so apply the Kronecker spectrum lemma
       -- and the induction hypothesis.
-      rw [State.tensorPower_succ, tensorPowerMultiset_succ]
+      rw [MState.tensorPower_succ, tensorPowerMultiset_succ]
       have hIH := eigenvalueMultiset_tensorPower ρ n
       -- The two sides share the same Kronecker matrix, so transport the
-      -- `eigenvalueMultiset_kronecker` statement across the `State.prod` def.
+      -- `eigenvalueMultiset_kronecker` statement across the `MState.prod` def.
       have hKron : eigenvalueMultiset
-          (kronecker_isHermitian ρ.matrix (ρ.tensorPower n).matrix
-            ρ.pos.isHermitian (ρ.tensorPower n).pos.isHermitian) =
-          (eigenvalueMultiset ρ.pos.isHermitian).bind fun α =>
-            (eigenvalueMultiset (ρ.tensorPower n).pos.isHermitian).map
+          (kronecker_isHermitian ρ.m (ρ.tensorPower n).m
+            ρ.psd.isHermitian (ρ.tensorPower n).psd.isHermitian) =
+          (eigenvalueMultiset ρ.psd.isHermitian).bind fun α =>
+            (eigenvalueMultiset (ρ.tensorPower n).psd.isHermitian).map
               fun β => α * β :=
-        eigenvalueMultiset_kronecker ρ.matrix (ρ.tensorPower n).matrix
-          ρ.pos.isHermitian (ρ.tensorPower n).pos.isHermitian
-      -- `(ρ.prod (ρ.tensorPower n))` unfolds to a Kronecker product; its
-      -- `.pos.isHermitian` witness is definitionally the same matrix as
-      -- `kronecker_isHermitian`, so `eigenvalueMultiset` agrees.
-      show eigenvalueMultiset (kronecker_isHermitian ρ.matrix (ρ.tensorPower n).matrix
-          ρ.pos.isHermitian (ρ.tensorPower n).pos.isHermitian) = _
+        eigenvalueMultiset_kronecker ρ.m (ρ.tensorPower n).m
+          ρ.psd.isHermitian (ρ.tensorPower n).psd.isHermitian
+      -- `(ρ.prod (ρ.tensorPower n)).m` is the Kronecker product, so the
+      -- eigenvalue multiset transports across that matrix equation.
+      have hprod : (ρ.prod (ρ.tensorPower n)).m =
+          Matrix.kronecker ρ.m (ρ.tensorPower n).m :=
+        MState.prod_m ρ (ρ.tensorPower n)
+      refine Eq.trans (eigenvalueMultiset_eq_of_eq hprod _
+        (kronecker_isHermitian ρ.m (ρ.tensorPower n).m
+          ρ.psd.isHermitian (ρ.tensorPower n).psd.isHermitian)) ?_
       rw [hKron, hIH]
 
-end State
+end MState
 
 /-! ## Von Neumann entropy additivity under tensor powers
 
@@ -393,74 +398,38 @@ each single-system eigenvalue then appears in `|spec(ρ)|^{n-1}` tuples and
 the trace-1 normalization `Σ λ = 1` collapses the cross-terms, leaving
 `n · S(ρ)` [Wilde2011Qst, qit-notes.tex:1888-1920]. -/
 
-/-- `Multiset.sum (s.bind f) = (s.map (Multiset.sum ∘ f)).sum`. Standard
-sum-over-disjoint-union identity for multisets (mathlib does not name it
-for the additive fold). -/
-lemma multiset_sum_bind {α : Type*} {β : Type*} [AddCommMonoid β]
-    (s : Multiset α) (f : α → Multiset β) :
-    (s.bind f).sum = (s.map fun a => (f a).sum).sum := by
-  induction s using Multiset.induction_on with
-  | empty => simp
-  | cons a s ih =>
-    rw [Multiset.cons_bind, Multiset.sum_add, ih,
-        Multiset.map_cons, Multiset.sum_cons]
-
-/-- `(s.map (· * c)).sum = s.sum * c` for a non-unital semiring. mathlib's
-`Multiset.sum_mul` exists only for the additive monoid of multisets, not as
-this pointwise-scaling identity, so we name it here. -/
-lemma multiset_sum_mul_const {α : Type*} {R : Type*} [NonUnitalNonAssocSemiring R]
-    (s : Multiset α) (f : α → R) (c : R) :
-    (s.map fun a => f a * c).sum = (s.map f).sum * c := by
-  induction s using Multiset.induction_on with
-  | empty => simp
-  | cons a s ih =>
-    simp only [Multiset.map_cons, Multiset.sum_cons]
-    rw [ih, show (f a + (Multiset.map f s).sum) * c =
-        f a * c + (Multiset.map f s).sum * c from add_mul _ _ _]
-
-/-- `(s.map (f + g)).sum = (s.map f).sum + (s.map g).sum`. The Multiset
-analogue of `Finset.sum_add_distrib`. -/
-lemma multiset_sum_add_distrib {α : Type*} {R : Type*} [AddCommMonoid R]
-    (s : Multiset α) (f g : α → R) :
-    (s.map fun a => f a + g a).sum = (s.map f).sum + (s.map g).sum := by
-  induction s using Multiset.induction_on with
-  | empty => simp
-  | cons a s ih =>
-    simp only [Multiset.map_cons, Multiset.sum_cons]
-    rw [ih, add_add_add_comm]
-
-namespace State
+namespace MState
 
 /-! ### Bridges between `vonNeumann` and the eigenvalue multiset -/
 
 /-- Von Neumann entropy is invariant under a finite basis relabeling. -/
 theorem vonNeumann_reindex {β : Type v} [Fintype β] [DecidableEq β]
-    (ρ : State a) (e : a ≃ β) :
+    (ρ : MState a) (e : a ≃ β) :
     vonNeumann (ρ.reindex e) = vonNeumann ρ := by
   rw [vonNeumann_eq_neg_sum_eigenvalueMultiset,
     vonNeumann_eq_neg_sum_eigenvalueMultiset]
   exact congrArg (fun s : Multiset ℝ => -((s.map xlog2).sum))
-    (by simpa [State.reindex] using
-      eigenvalueMultiset_reindex ρ.matrix ρ.pos.isHermitian e)
+    (by simpa using
+      eigenvalueMultiset_reindex ρ.m ρ.psd.isHermitian e)
 
 /-- The eigenvalue multiset of a density state sums to 1 (trace-1). -/
-lemma eigenvalueMultiset_sum (ρ : State a) :
-    (eigenvalueMultiset ρ.pos.isHermitian).sum = 1 := by
-  have hc : ∑ i, ((ρ.pos.isHermitian.eigenvalues i : ℝ) : ℂ) = 1 :=
-    ρ.pos.isHermitian.trace_eq_sum_eigenvalues.symm.trans ρ.trace_eq_one
-  have hreal : ∑ i, ρ.pos.isHermitian.eigenvalues i = 1 :=
+lemma eigenvalueMultiset_sum (ρ : MState a) :
+    (eigenvalueMultiset ρ.psd.isHermitian).sum = 1 := by
+  have hc : ∑ i, ((ρ.psd.isHermitian.eigenvalues i : ℝ) : ℂ) = 1 :=
+    ρ.psd.isHermitian.trace_eq_sum_eigenvalues.symm.trans ρ.tr'
+  have hreal : ∑ i, ρ.psd.isHermitian.eigenvalues i = 1 :=
     Complex.ofReal_injective (by simpa using hc)
-  show (Multiset.map ρ.pos.isHermitian.eigenvalues Finset.univ.val).sum = 1
+  show (Multiset.map ρ.psd.isHermitian.eigenvalues Finset.univ.val).sum = 1
   exact (Finset.sum_eq_multiset_sum (s := Finset.univ)
-            (f := ρ.pos.isHermitian.eigenvalues)).symm.trans hreal
+            (f := ρ.psd.isHermitian.eigenvalues)).symm.trans hreal
 
 /-- All eigenvalues of a density state are nonneg. -/
-lemma eigenvalueMultiset_nonneg (ρ : State a) :
-    ∀ x ∈ eigenvalueMultiset ρ.pos.isHermitian, 0 ≤ x := by
+lemma eigenvalueMultiset_nonneg (ρ : MState a) :
+    ∀ x ∈ eigenvalueMultiset ρ.psd.isHermitian, 0 ≤ x := by
   rw [eigenvalueMultiset]
   simp only [Multiset.mem_map, Finset.mem_val]
   rintro x ⟨i, _, rfl⟩
-  exact ρ.pos.eigenvalues_nonneg i
+  exact ρ.psd.eigenvalues_nonneg i
 
 /-- **Diagonal-state entropy bridge.** If a state's matrix is the real
 diagonal matrix `Matrix.diagonal (fun i => (p i : ℂ))`, then its von Neumann
@@ -469,17 +438,17 @@ entropy equals the Shannon entropy of the diagonal distribution:
 
 The spectrum of a real diagonal matrix is its diagonal entries (with
 multiplicity) via `eigenvalueMultiset_diagonal_ofReal`; `eigenvalueMultiset_eq_of_eq`
-transports that statement across the propositional equality `ρ.matrix = …`,
+transports that statement across the propositional equality `ρ.m = …`,
 and `vonNeumann_eq_neg_sum_eigenvalueMultiset` turns the entropy into a
 multiset sum. This is the bridge used by the maximally-correlated and
 classical-quantum mutual-information computations. -/
 lemma vonNeumann_eq_neg_sum_xlog2_of_diagonal
-    (ρ : State a) (p : a → ℝ)
-    (hρ : ρ.matrix = Matrix.diagonal fun i => (p i : ℂ)) :
+    (ρ : MState a) (p : a → ℝ)
+    (hρ : ρ.m = Matrix.diagonal fun i => (p i : ℂ)) :
     vonNeumann ρ = -(∑ i, xlog2 (p i)) := by
-  have hD : (Matrix.diagonal fun i => (p i : ℂ)).IsHermitian := hρ ▸ ρ.pos.isHermitian
-  have hSpec : eigenvalueMultiset ρ.pos.isHermitian = Multiset.map p Finset.univ.val := by
-    rw [eigenvalueMultiset_eq_of_eq hρ ρ.pos.isHermitian hD,
+  have hD : (Matrix.diagonal fun i => (p i : ℂ)).IsHermitian := hρ ▸ ρ.psd.isHermitian
+  have hSpec : eigenvalueMultiset ρ.psd.isHermitian = Multiset.map p Finset.univ.val := by
+    rw [eigenvalueMultiset_eq_of_eq hρ ρ.psd.isHermitian hD,
       eigenvalueMultiset_diagonal_ofReal p hD]
   rw [vonNeumann_eq_neg_sum_eigenvalueMultiset, hSpec]
   simp only [Multiset.map_map, Finset.sum_eq_multiset_sum]
@@ -491,15 +460,6 @@ Multiplying by `Real.log 2 ≠ 0` eliminates the `if x = 0` branch in `xlog2`
 and lets us use `Real.log_mul`, the cleanest way to split `xlog2 (x * y)`.
 The `0 log 0 := 0` convention holds because `Real.log 0 = 0` and so
 `0 * log 0 = 0`, removing the need for case analysis on zero eigenvalues. -/
-
-/-- `xlog2 x * Real.log 2 = x * Real.log x` for `0 ≤ x`. -/
-private lemma xlog2_mul_log2_self {x : ℝ} (hx : 0 ≤ x) :
-    xlog2 x * Real.log 2 = x * Real.log x := by
-  by_cases hzx : x = 0
-  · simp [xlog2, hzx, Real.log_zero]
-  · have hxp : 0 < x := lt_of_le_of_ne hx (Ne.symm hzx)
-    simp only [xlog2, if_neg (ne_of_gt hxp), log2]
-    field_simp
 
 /-- For nonneg `x, y`, the entropy-split identity (each side times
 `Real.log 2`):
@@ -530,52 +490,52 @@ private lemma xlog2_sum_inner (t : Multiset ℝ) (x : ℝ)
       x * ((t.map xlog2).sum * Real.log 2) +
         t.sum * (xlog2 x * Real.log 2) := by
   -- (1) Pull the `· Real.log 2` inside the sum.
-  rw [← multiset_sum_mul_const]
+  rw [← Multiset.sum_map_mul_right]
   -- (2) Per-element congruence via the product-split identity.
   rw [Multiset.map_congr rfl (fun y hy => xlog2_mul_split hx (ht y hy))]
   -- (3) Distribute over `+`, then factor each summand by a constant.
-  rw [multiset_sum_add_distrib]
+  rw [Multiset.sum_map_add]
   · -- First summand: Σ_y y * (xlog2 x * log 2) = (Σ_y y) * (xlog2 x * log 2)
-    rw [multiset_sum_mul_const, Multiset.map_id']
+    rw [Multiset.sum_map_mul_right, Multiset.map_id']
     -- Second summand: reorder x * (xlog2 y * log 2) into xlog2 y * (x * log 2),
-    -- then factor out (x * log 2) via `multiset_sum_mul_const`.
+    -- then factor out (x * log 2) via `Multiset.sum_map_mul_right`.
     rw [Multiset.map_congr rfl (fun y _ =>
         (by ring : x * (xlog2 y * Real.log 2) = xlog2 y * (x * Real.log 2)))]
-    rw [multiset_sum_mul_const]
+    rw [Multiset.sum_map_mul_right]
     ring
 
 /-- Entropy summand for a scaled state spectrum:
 `Σ_λ xlog₂ (pλ) = p Σ_λ xlog₂ λ + xlog₂ p` for a trace-one spectrum. -/
-private lemma xlog2_sum_scaled_state_spectrum (p : ℝ) (ρ : State a) (hp : 0 ≤ p) :
+private lemma xlog2_sum_scaled_state_spectrum (p : ℝ) (ρ : MState a) (hp : 0 ≤ p) :
     (Multiset.map (fun (x : ℝ) => xlog2 (p * x))
-        (eigenvalueMultiset ρ.pos.isHermitian)).sum =
-      p * (Multiset.map xlog2 (eigenvalueMultiset ρ.pos.isHermitian)).sum +
+        (eigenvalueMultiset ρ.psd.isHermitian)).sum =
+      p * (Multiset.map xlog2 (eigenvalueMultiset ρ.psd.isHermitian)).sum +
         xlog2 p := by
-  let s : Multiset ℝ := eigenvalueMultiset ρ.pos.isHermitian
+  let s : Multiset ℝ := eigenvalueMultiset ρ.psd.isHermitian
   have hLog2 : Real.log 2 ≠ 0 := (Real.log_pos one_lt_two).ne'
   have hScaled :
       (Multiset.map (fun (x : ℝ) => xlog2 (p * x)) s).sum * Real.log 2 =
         (p * (Multiset.map xlog2 s).sum + xlog2 p) * Real.log 2 := by
     have hInner := xlog2_sum_inner s p hp (by
       intro y hy
-      exact State.eigenvalueMultiset_nonneg ρ y (by simpa [s] using hy))
-    rw [show s.sum = 1 by simpa [s] using State.eigenvalueMultiset_sum ρ] at hInner
+      exact MState.eigenvalueMultiset_nonneg ρ y (by simpa [s] using hy))
+    rw [show s.sum = 1 by simpa [s] using MState.eigenvalueMultiset_sum ρ] at hInner
     simpa [s, add_mul, mul_assoc] using hInner
   exact mul_right_cancel₀ hLog2 hScaled
 
 /-- Sum of `xlog₂` over a cq block spectrum, written as a finite sum over
 classical labels. -/
 private lemma xlog2_sum_cq_block_spectrum {ι : Type v}
-    [Fintype ι] [DecidableEq ι] (p : ι → ℝ) (σ : ι → State a)
+    [Fintype ι] [DecidableEq ι] (p : ι → ℝ) (σ : ι → MState a)
     (hp : ∀ x, 0 ≤ p x) :
     (Multiset.map xlog2
         (Finset.univ.val.bind fun x =>
           Multiset.map (fun (y : ℝ) => p x * y)
-            (eigenvalueMultiset (σ x).pos.isHermitian))).sum =
+            (eigenvalueMultiset (σ x).psd.isHermitian))).sum =
       ∑ x, (p x *
-          (Multiset.map xlog2 (eigenvalueMultiset (σ x).pos.isHermitian)).sum +
+          (Multiset.map xlog2 (eigenvalueMultiset (σ x).psd.isHermitian)).sum +
         xlog2 (p x)) := by
-  rw [Multiset.map_bind, multiset_sum_bind]
+  rw [Multiset.map_bind, Multiset.sum_bind]
   simp only [Multiset.map_map, Function.comp_def]
   rw [Finset.sum_eq_multiset_sum]
   exact congrArg Multiset.sum (Multiset.map_congr rfl fun x _ =>
@@ -585,29 +545,29 @@ private lemma xlog2_sum_cq_block_spectrum {ι : Type v}
 `S(Σ_x p_x |x⟩⟨x| ⊗ σ_x) = H(p) + Σ_x p_x S(σ_x)`.
 
 This form is stated for `Matrix.blockDiagonal` on the product index
-`Prod a ι`; a cq state on `Prod ι a` can use `State.vonNeumann_reindex` and
+`(a × ι`); a cq state on `(ι × a`) can use `MState.vonNeumann_reindex` and
 the swap equivalence to put the quantum index first. -/
 theorem vonNeumann_eq_shannon_add_average_of_blockDiagonal {ι : Type v}
     [Fintype ι] [DecidableEq ι]
-    (ρ : State (Prod a ι)) (p : ι → ℝ) (σ : ι → State a)
+    (ρ : MState (a × ι)) (p : ι → ℝ) (σ : ι → MState a)
     (hp : ∀ x, 0 ≤ p x)
-    (hρ : ρ.matrix = Matrix.blockDiagonal fun x => (p x : ℂ) • (σ x).matrix) :
+    (hρ : ρ.m = Matrix.blockDiagonal fun x => (p x : ℂ) • (σ x).m) :
     ρ.vonNeumann = -(∑ x, xlog2 (p x)) + ∑ x, p x * (σ x).vonNeumann := by
-  let blocks : ι → CMatrix a := fun x => (p x : ℂ) • (σ x).matrix
+  let blocks : ι → CMatrix a := fun x => (p x : ℂ) • (σ x).m
   let hBlocks : ∀ x, (blocks x).IsHermitian :=
-    fun x => smul_isHermitian_ofReal (p x) (σ x).matrix (σ x).pos.isHermitian
+    fun x => smul_isHermitian_ofReal (p x) (σ x).m (σ x).psd.isHermitian
   have hBD : (Matrix.blockDiagonal blocks).IsHermitian :=
     blockDiagonal_isHermitian blocks hBlocks
   have hSpec :
-      eigenvalueMultiset ρ.pos.isHermitian =
+      eigenvalueMultiset ρ.psd.isHermitian =
         Finset.univ.val.bind fun x =>
           Multiset.map (fun (y : ℝ) => p x * y)
-            (eigenvalueMultiset (σ x).pos.isHermitian) := by
-    rw [eigenvalueMultiset_eq_of_eq hρ ρ.pos.isHermitian hBD]
+            (eigenvalueMultiset (σ x).psd.isHermitian) := by
+    rw [eigenvalueMultiset_eq_of_eq hρ ρ.psd.isHermitian hBD]
     rw [eigenvalueMultiset_blockDiagonal blocks hBlocks]
     exact Multiset.bind_congr fun x _ => by
       simpa [blocks, hBlocks] using
-        eigenvalueMultiset_smul_ofReal (p x) (σ x).matrix (σ x).pos.isHermitian
+        eigenvalueMultiset_smul_ofReal (p x) (σ x).m (σ x).psd.isHermitian
   rw [vonNeumann_eq_neg_sum_eigenvalueMultiset, hSpec]
   rw [xlog2_sum_cq_block_spectrum p σ hp]
   simp_rw [vonNeumann_eq_neg_sum_eigenvalueMultiset]
@@ -621,21 +581,21 @@ theorem vonNeumann_eq_shannon_add_average_of_blockDiagonal {ι : Type v}
 /-- The classical-register marginal of a cq state has Shannon entropy:
 `S(ω_X) = -Σ_x xlog₂ p_x` (the base-2 Shannon entropy of the ensemble's
 distribution). -/
-theorem cqState_marginalA_vonNeumann {ι : Type v}
-    [Fintype ι] [DecidableEq ι] (E : Ensemble ι a) :
-    State.vonNeumann E.cqState.marginalA = -(∑ x, xlog2 ((E.probs x : ℝ))) := by
-  have hρ : E.cqState.marginalA.matrix =
+theorem cqState_traceRight_vonNeumann {ι : Type v}
+    [Fintype ι] [DecidableEq ι] (E : MEnsemble a ι) :
+    MState.vonNeumann E.cqState.traceRight = -(∑ x, xlog2 ((E.probs x : ℝ))) := by
+  have hρ : E.cqState.traceRight.m =
       Matrix.diagonal fun x => ((E.probs x : ℝ) : ℂ) := by
-    rw [State.marginalA_matrix, Ensemble.partialTraceB_cqState]
-  rw [State.vonNeumann_eq_neg_sum_xlog2_of_diagonal E.cqState.marginalA
+    rw [MState.traceRight_m, MEnsemble.traceRight_cqState]
+  rw [MState.vonNeumann_eq_neg_sum_xlog2_of_diagonal E.cqState.traceRight
       (fun x => (E.probs x : ℝ)) hρ]
 
 /-- Reindexing a cq state by swapping the product factors gives the standard
 homogeneous `Matrix.blockDiagonal` form over the classical label. -/
 theorem cqState_reindex_prodComm_matrix {ι : Type v}
-    [Fintype ι] [DecidableEq ι] (E : Ensemble ι a) :
-    (E.cqState.reindex (Equiv.prodComm ι a)).matrix =
-      Matrix.blockDiagonal fun x => ((E.probs x : ℝ) : ℂ) • (E.states x).matrix := by
+    [Fintype ι] [DecidableEq ι] (E : MEnsemble a ι) :
+    (E.cqState.reindex (Equiv.prodComm ι a)).m =
+      Matrix.blockDiagonal fun x => ((E.probs x : ℝ) : ℂ) • (E.states x).m := by
   ext i j
   rcases i with ⟨i, x⟩
   rcases j with ⟨j, y⟩
@@ -643,21 +603,21 @@ theorem cqState_reindex_prodComm_matrix {ι : Type v}
   · subst hxy
     have hblock := Classical.cqState_block_self E x
     have hentry := congrFun (congrFun hblock i) j
-    simpa [State.reindex_matrix, Classical.block, Matrix.blockDiagonal_apply] using hentry
+    simpa [MState.reindex_matrix, Classical.block, Matrix.blockDiagonal_apply] using hentry
   · have hblock := Classical.cqState_block_ne (E := E) hxy
     have hentry := congrFun (congrFun hblock i) j
-    simpa [State.reindex_matrix, Classical.block, Matrix.blockDiagonal_apply, hxy] using hentry
+    simpa [MState.reindex_matrix, Classical.block, Matrix.blockDiagonal_apply, hxy] using hentry
 
 /-- Entropy of an ensemble cq state:
 `S(Σ_x p_x |x⟩⟨x| ⊗ ρ_x) = H(p) + Σ_x p_x S(ρ_x)`. -/
 theorem cqState_vonNeumann {ι : Type v}
-    [Fintype ι] [DecidableEq ι] (E : Ensemble ι a) :
-    State.vonNeumann E.cqState =
+    [Fintype ι] [DecidableEq ι] (E : MEnsemble a ι) :
+    MState.vonNeumann E.cqState =
       -(∑ x, xlog2 ((E.probs x : ℝ))) +
-        ∑ x, (E.probs x : ℝ) * State.vonNeumann (E.states x) := by
-  have hswap := State.vonNeumann_reindex E.cqState (Equiv.prodComm ι a)
+        ∑ x, (E.probs x : ℝ) * MState.vonNeumann (E.states x) := by
+  have hswap := MState.vonNeumann_reindex E.cqState (Equiv.prodComm ι a)
   rw [← hswap]
-  exact State.vonNeumann_eq_shannon_add_average_of_blockDiagonal
+  exact MState.vonNeumann_eq_shannon_add_average_of_blockDiagonal
     (E.cqState.reindex (Equiv.prodComm ι a))
     (fun x => (E.probs x : ℝ)) E.states
     (fun x => NNReal.coe_nonneg (E.probs x))
@@ -673,43 +633,43 @@ private lemma xlog2_sum_kroneckerBind_mul_log2 (s t : Multiset ℝ)
       t.sum * ((s.map xlog2).sum * Real.log 2) +
         s.sum * ((t.map xlog2).sum * Real.log 2) := by
   -- Expand the outer map over the bind, then sum the inner maps via
-  -- `multiset_sum_bind`, then pull `· Real.log 2` inside the outer sum so the
+  -- `Multiset.sum_bind`, then pull `· Real.log 2` inside the outer sum so the
   -- per-element `xlog2_sum_inner` identity applies directly.
-  rw [Multiset.map_bind, multiset_sum_bind, ← multiset_sum_mul_const]
+  rw [Multiset.map_bind, Multiset.sum_bind, ← Multiset.sum_map_mul_right]
   rw [Multiset.map_congr rfl (fun x hx =>
       Eq.trans
         (congrArg (fun m => m.sum * Real.log 2)
           (Multiset.map_map xlog2 (fun y => x * y) t))
         (xlog2_sum_inner t x (hs x hx) ht))]
-  rw [multiset_sum_add_distrib]
+  rw [Multiset.sum_map_add]
   · -- First summand: Σ_x x * ((t.map xlog2).sum * log 2) = (s.sum) * (...).
-    rw [multiset_sum_mul_const, Multiset.map_id']
+    rw [Multiset.sum_map_mul_right, Multiset.map_id']
     -- Second summand: reorder t.sum * (xlog2 x * log 2) into xlog2 x * (t.sum * log 2),
-    -- then factor out (t.sum * log 2) via `multiset_sum_mul_const`.
+    -- then factor out (t.sum * log 2) via `Multiset.sum_map_mul_right`.
     rw [Multiset.map_congr rfl (fun x _ =>
         (by ring : t.sum * (xlog2 x * Real.log 2) = xlog2 x * (t.sum * Real.log 2)))]
-    rw [multiset_sum_mul_const]
+    rw [Multiset.sum_map_mul_right]
     ring
 
 /-! ### Product-state entropy -/
 
 /-- Von Neumann entropy is additive on product states:
 `S(ρ ⊗ σ) = S(ρ) + S(σ)`. -/
-theorem vonNeumann_prod (ρ : State a) (σ : State b) :
+theorem vonNeumann_prod (ρ : MState a) (σ : MState b) :
     vonNeumann (ρ.prod σ) = vonNeumann ρ + vonNeumann σ := by
   rw [vonNeumann_eq_neg_sum_eigenvalueMultiset,
       vonNeumann_eq_neg_sum_eigenvalueMultiset,
       vonNeumann_eq_neg_sum_eigenvalueMultiset]
   have hspec :
-      eigenvalueMultiset (ρ.prod σ).pos.isHermitian =
-        (eigenvalueMultiset ρ.pos.isHermitian).bind fun x =>
-          (eigenvalueMultiset σ.pos.isHermitian).map fun y => x * y := by
-    simpa [State.prod] using
-      eigenvalueMultiset_kronecker ρ.matrix σ.matrix
-        ρ.pos.isHermitian σ.pos.isHermitian
+      eigenvalueMultiset (ρ.prod σ).psd.isHermitian =
+        (eigenvalueMultiset ρ.psd.isHermitian).bind fun x =>
+          (eigenvalueMultiset σ.psd.isHermitian).map fun y => x * y := by
+    simpa using
+      eigenvalueMultiset_kronecker ρ.m σ.m
+        ρ.psd.isHermitian σ.psd.isHermitian
   rw [hspec]
-  let s : Multiset ℝ := eigenvalueMultiset ρ.pos.isHermitian
-  let t : Multiset ℝ := eigenvalueMultiset σ.pos.isHermitian
+  let s : Multiset ℝ := eigenvalueMultiset ρ.psd.isHermitian
+  let t : Multiset ℝ := eigenvalueMultiset σ.psd.isHermitian
   have hLog2 : Real.log 2 ≠ 0 := (Real.log_pos one_lt_two).ne'
   have hScale :
       (Multiset.map xlog2 (s.bind fun x => t.map fun y => x * y)).sum *
@@ -736,27 +696,27 @@ theorem vonNeumann_prod (ρ : State a) (σ : State b) :
 /-- The n-fold pairwise-product multiset of a density state's spectrum sums
 to 1 (trace-1 normalization, `Σ λ = 1`, raised to the `n`-th Kronecker
 power). -/
-lemma tensorPowerMultiset_sum (ρ : State a) (n : ℕ) :
-    (tensorPowerMultiset (eigenvalueMultiset ρ.pos.isHermitian) n).sum = 1 := by
+lemma tensorPowerMultiset_sum (ρ : MState a) (n : ℕ) :
+    (tensorPowerMultiset (eigenvalueMultiset ρ.psd.isHermitian) n).sum = 1 := by
   induction n with
   | zero => simp [tensorPowerMultiset_zero]
   | succ k ih =>
-    rw [tensorPowerMultiset_succ, multiset_sum_bind]
+    rw [tensorPowerMultiset_succ, Multiset.sum_bind]
     -- Inner sum: Σ_y (x * y) = x * (Σ_y y).
-    have hInner : ∀ x, ((tensorPowerMultiset (eigenvalueMultiset ρ.pos.isHermitian) k).map
+    have hInner : ∀ x, ((tensorPowerMultiset (eigenvalueMultiset ρ.psd.isHermitian) k).map
         (fun y => x * y)).sum =
-        x * (tensorPowerMultiset (eigenvalueMultiset ρ.pos.isHermitian) k).sum := by
+        x * (tensorPowerMultiset (eigenvalueMultiset ρ.psd.isHermitian) k).sum := by
       intro x
       rw [Multiset.map_congr rfl (fun y _ =>
-            (by ring : x * y = y * x)), multiset_sum_mul_const, Multiset.map_id']
+            (by ring : x * y = y * x)), Multiset.sum_map_mul_right, Multiset.map_id']
       ring
     rw [Multiset.map_congr rfl (fun x _ => hInner x)]
-    rw [multiset_sum_mul_const, Multiset.map_id', ih, eigenvalueMultiset_sum]
+    rw [Multiset.sum_map_mul_right, Multiset.map_id', ih, eigenvalueMultiset_sum]
     ring
 
 /-- All entries of the tensor-power spectrum multiset are nonneg. -/
-lemma tensorPowerMultiset_nonneg (ρ : State a) (n : ℕ) :
-    ∀ z ∈ tensorPowerMultiset (eigenvalueMultiset ρ.pos.isHermitian) n, 0 ≤ z := by
+lemma tensorPowerMultiset_nonneg (ρ : MState a) (n : ℕ) :
+    ∀ z ∈ tensorPowerMultiset (eigenvalueMultiset ρ.psd.isHermitian) n, 0 ≤ z := by
   induction n with
   | zero =>
     simp only [tensorPowerMultiset_zero, Multiset.mem_singleton, forall_eq]
@@ -771,11 +731,11 @@ lemma tensorPowerMultiset_nonneg (ρ : State a) (n : ℕ) :
 /-- Sum of `xlog2` over the tensor-power spectrum, scaled by `Real.log 2`,
 equals `n · (∑_s xlog2 · Real.log 2)`. This is the workhorse; the factor
 `Real.log 2` is removed in `vonNeumann_tensorPower`. -/
-private lemma xlog2_sum_tensorPower_mul_log2 (ρ : State a) (n : ℕ) :
+private lemma xlog2_sum_tensorPower_mul_log2 (ρ : MState a) (n : ℕ) :
     (Multiset.map xlog2
-        (tensorPowerMultiset (eigenvalueMultiset ρ.pos.isHermitian) n)).sum
+        (tensorPowerMultiset (eigenvalueMultiset ρ.psd.isHermitian) n)).sum
       * Real.log 2 =
-      n * ((eigenvalueMultiset ρ.pos.isHermitian).map xlog2).sum * Real.log 2 := by
+      n * ((eigenvalueMultiset ρ.psd.isHermitian).map xlog2).sum * Real.log 2 := by
   induction n with
   | zero =>
     -- `tensorPowerMultiset s 0 = {1}`; `xlog2 1 * log 2 = 1 * log 1 = 0`.
@@ -788,8 +748,8 @@ private lemma xlog2_sum_tensorPower_mul_log2 (ρ : State a) (n : ℕ) :
     -- Apply the Kronecker-pair identity with outer = base spectrum,
     -- inner = `tensorPowerMultiset s k`.
     rw [xlog2_sum_kroneckerBind_mul_log2
-        (eigenvalueMultiset ρ.pos.isHermitian)
-        (tensorPowerMultiset (eigenvalueMultiset ρ.pos.isHermitian) k)
+        (eigenvalueMultiset ρ.psd.isHermitian)
+        (tensorPowerMultiset (eigenvalueMultiset ρ.psd.isHermitian) k)
         (eigenvalueMultiset_nonneg ρ)
         (tensorPowerMultiset_nonneg ρ k)]
     -- Substitute the trace-1 sums (`s.sum = 1`, `t.sum = 1`) and the IH.
@@ -809,7 +769,7 @@ swap in the n-fold pairwise-product multiset, then expands
 `0 log 0 := 0` convention absorbs zero eigenvalues). Each single-system
 eigenvalue then appears in `|spec(ρ)|^{n-1}` tuples and the trace-1
 normalization `Σ λ = 1` collapses the cross-terms, leaving `n · S(ρ)`. -/
-theorem vonNeumann_tensorPower (ρ : State a) (n : ℕ) :
+theorem vonNeumann_tensorPower (ρ : MState a) (n : ℕ) :
     vonNeumann (ρ.tensorPower n) = n * vonNeumann ρ := by
   -- Reduce both entropies to multiset sums over their spectra.
   rw [vonNeumann_eq_neg_sum_eigenvalueMultiset,
@@ -821,35 +781,10 @@ theorem vonNeumann_tensorPower (ρ : State a) (n : ℕ) :
   have hScale := xlog2_sum_tensorPower_mul_log2 ρ n
   -- `(T.map xlog2).sum * log2 = n * (s.map xlog2).sum * log2`
   -- with `log2 ≠ 0` gives `(T.map xlog2).sum = n * (s.map xlog2).sum`.
-  have hEq : ((tensorPowerMultiset (eigenvalueMultiset ρ.pos.isHermitian) n).map xlog2).sum =
-      n * ((eigenvalueMultiset ρ.pos.isHermitian).map xlog2).sum :=
+  have hEq : ((tensorPowerMultiset (eigenvalueMultiset ρ.psd.isHermitian) n).map xlog2).sum =
+      n * ((eigenvalueMultiset ρ.psd.isHermitian).map xlog2).sum :=
     mul_right_cancel₀ hLog2 hScale
   rw [hEq]
   ring
 
-end State
-
-/-- Top-level alias for the classical-register entropy of a cq state. -/
-theorem cqState_marginalA_vonNeumann {ι : Type v}
-    [Fintype ι] [DecidableEq ι] (E : Ensemble ι a) :
-    State.vonNeumann E.cqState.marginalA = -(∑ x, xlog2 ((E.probs x : ℝ))) :=
-  State.cqState_marginalA_vonNeumann E
-
-/-- Top-level alias for the block-diagonal form of a swapped cq state. -/
-theorem cqState_reindex_prodComm_matrix {ι : Type v}
-    [Fintype ι] [DecidableEq ι] (E : Ensemble ι a) :
-    (E.cqState.reindex (Equiv.prodComm ι a)).matrix =
-      Matrix.blockDiagonal fun x => ((E.probs x : ℝ) : ℂ) • (E.states x).matrix :=
-  State.cqState_reindex_prodComm_matrix E
-
-/-- Top-level alias for the entropy expansion of an ensemble cq state. -/
-theorem cqState_vonNeumann {ι : Type v}
-    [Fintype ι] [DecidableEq ι] (E : Ensemble ι a) :
-    State.vonNeumann E.cqState =
-      -(∑ x, xlog2 ((E.probs x : ℝ))) +
-        ∑ x, (E.probs x : ℝ) * State.vonNeumann (E.states x) :=
-  State.cqState_vonNeumann E
-
-end
-
-end QIT
+end MState

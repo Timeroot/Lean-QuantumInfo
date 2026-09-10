@@ -33,7 +33,7 @@ namespace SmoothNormalizedExtension
 /-- Distribute a direct sum of two joint systems over their common right
 factor. -/
 def sourceSumEquiv (extra : Type w) (a : Type u) (b : Type v) :
-    Sum (Prod extra b) (Prod a b) ≃ Prod (Sum extra a) b where
+    ((extra × b) ⊕ (a × b)) ≃ ((extra ⊕ a) × b) where
   toFun
     | Sum.inl eb => (Sum.inl eb.1, eb.2)
     | Sum.inr ab => (Sum.inr ab.1, ab.2)
@@ -42,17 +42,6 @@ def sourceSumEquiv (extra : Type w) (a : Type u) (b : Type v) :
     | (Sum.inr x, y) => Sum.inr (x, y)
   left_inv x := by cases x <;> rfl
   right_inv x := by rcases x with ⟨x | x, y⟩ <;> rfl
-
-private theorem submatrix_equiv_mul {ι κ : Type*} [Fintype ι] [Fintype κ]
-    [DecidableEq ι] [DecidableEq κ] (e : ι ≃ κ) (A B : CMatrix κ) :
-    (A * B).submatrix e e = A.submatrix e e * B.submatrix e e := by
-  classical
-  ext i j
-  simp only [Matrix.submatrix_apply, Matrix.mul_apply]
-  exact (Fintype.sum_equiv e
-    (fun x => A (e i) (e x) * B (e x) (e j))
-    (fun y => A (e i) y * B y (e j))
-    (by simp)).symm
 
 /-- Positive square roots commute with relabeling along a finite equivalence. -/
 theorem psdSqrt_submatrix_equiv {ι κ : Type*} [Fintype ι] [Fintype κ]
@@ -70,17 +59,24 @@ theorem psdSqrt_submatrix_equiv {ι κ : Type*} [Fintype ι] [Fintype κ]
       hSsq hSpos.nonneg)
 
 /-- Root fidelity is invariant under a simultaneous finite basis relabeling. -/
-theorem State.fidelity_reindex {ι κ : Type*} [Fintype ι] [Fintype κ]
-    [DecidableEq ι] [DecidableEq κ] (ρ σ : State ι) (e : ι ≃ κ) :
+theorem _root_.MState.fidelity_reindex {ι κ : Type*} [Fintype ι] [Fintype κ]
+    [DecidableEq ι] [DecidableEq κ] (ρ σ : MState ι) (e : ι ≃ κ) :
     (ρ.reindex e).fidelity (σ.reindex e) = ρ.fidelity σ := by
-  rw [State.fidelity, State.fidelity]
+  rw [MState.fidelity, MState.fidelity]
   change traceNorm
-      (psdSqrt (ρ.reindex e).matrix * psdSqrt (σ.reindex e).matrix) =
-    traceNorm (psdSqrt ρ.matrix * psdSqrt σ.matrix)
-  rw [State.reindex_matrix, State.reindex_matrix]
-  rw [psdSqrt_submatrix_equiv e ρ.pos, psdSqrt_submatrix_equiv e σ.pos]
+      (psdSqrt (ρ.reindex e).m * psdSqrt (σ.reindex e).m) =
+    traceNorm (psdSqrt ρ.m * psdSqrt σ.m)
+  rw [MState.reindex_matrix, MState.reindex_matrix]
+  rw [psdSqrt_submatrix_equiv e ρ.psd, psdSqrt_submatrix_equiv e σ.psd]
   rw [← submatrix_equiv_mul e.symm]
-  exact traceNorm_submatrix_equiv e.symm (psdSqrt ρ.matrix * psdSqrt σ.matrix)
+  exact traceNorm_submatrix_equiv e.symm (psdSqrt ρ.m * psdSqrt σ.m)
+
+/-- Squared fidelity is invariant under a simultaneous finite basis relabeling. -/
+theorem _root_.MState.squaredFidelity_reindex {ι κ : Type*} [Fintype ι] [Fintype κ]
+    [DecidableEq ι] [DecidableEq κ] (ρ σ : MState ι) (e : ι ≃ κ) :
+    (ρ.reindex e).squaredFidelity (σ.reindex e) = ρ.squaredFidelity σ := by
+  rw [MState.squaredFidelity_eq_fidelity_sq, MState.squaredFidelity_eq_fidelity_sq,
+    MState.fidelity_reindex]
 
 /-- The direct-sum state before distributing the common side-information
 factor over the enlarged source register. -/
@@ -88,19 +84,18 @@ def blockExtensionCoarseState
     {extra : Type w} {a : Type u} {b : Type v}
     [Fintype extra] [DecidableEq extra] [Fintype a] [DecidableEq a]
     [Fintype b] [DecidableEq b]
-    (ρ : SubnormalizedState (Prod a b)) (failure : State (Prod extra b)) :
-    State (Sum (Prod extra b) (Prod a b)) :=
+    (ρ : SubnormalizedState (a × b)) (failure : MState (extra × b)) :
+    MState ((extra × b) ⊕ (a × b)) :=
   let q := 1 - ρ.matrix.trace.re
-  {
-    matrix := Matrix.fromBlocks (q • failure.matrix) 0 0 ρ.matrix
-    pos := Matrix.fromBlocks_diagonal_posSemidef
-      (Matrix.PosSemidef.smul failure.pos (sub_nonneg.mpr ρ.trace_le_one)) ρ.pos
-    trace_eq_one := by
-      rw [Matrix.trace_fromBlocks_diagonal, Matrix.trace_smul, failure.trace_eq_one]
+  .ofMatrix
+    (matrix := Matrix.fromBlocks (q • failure.m) 0 0 ρ.matrix)
+    (pos := Matrix.fromBlocks_diagonal_posSemidef
+      (Matrix.PosSemidef.smul failure.psd (sub_nonneg.mpr ρ.trace_le_one)) ρ.pos)
+    (trace_eq_one := by
+      rw [Matrix.trace_fromBlocks_diagonal, Matrix.trace_smul, failure.tr']
       apply Complex.ext
       · simp [q]
-      · simpa using ρ.trace_im_zero
-  }
+      · simpa using ρ.trace_im_zero)
 
 /-- The direct-sum normalized extension with an arbitrary normalized failure
 state on the orthogonal source summand. -/
@@ -108,8 +103,8 @@ def blockExtensionState
     {extra : Type w} {a : Type u} {b : Type v}
     [Fintype extra] [DecidableEq extra] [Fintype a] [DecidableEq a]
     [Fintype b] [DecidableEq b]
-    (ρ : SubnormalizedState (Prod a b)) (failure : State (Prod extra b)) :
-    State (Prod (Sum extra a) b) :=
+    (ρ : SubnormalizedState (a × b)) (failure : MState (extra × b)) :
+    MState ((extra ⊕ a) × b) :=
   (blockExtensionCoarseState ρ failure).reindex (sourceSumEquiv extra a b)
 
 @[simp]
@@ -117,22 +112,24 @@ theorem blockExtensionCoarseState_matrix
     {extra : Type w} {a : Type u} {b : Type v}
     [Fintype extra] [DecidableEq extra] [Fintype a] [DecidableEq a]
     [Fintype b] [DecidableEq b]
-    (ρ : SubnormalizedState (Prod a b)) (failure : State (Prod extra b)) :
-    (blockExtensionCoarseState ρ failure).matrix =
-      Matrix.fromBlocks ((1 - ρ.matrix.trace.re) • failure.matrix) 0 0 ρ.matrix :=
-  rfl
+    (ρ : SubnormalizedState (a × b)) (failure : MState (extra × b)) :
+    (blockExtensionCoarseState ρ failure).m =
+      Matrix.fromBlocks ((1 - ρ.matrix.trace.re) • failure.m) 0 0 ρ.matrix := by
+  unfold blockExtensionCoarseState
+  exact MState.matrix_ofMatrix _ _ _
 
 @[simp]
 theorem blockExtensionState_matrix
     {extra : Type w} {a : Type u} {b : Type v}
     [Fintype extra] [DecidableEq extra] [Fintype a] [DecidableEq a]
     [Fintype b] [DecidableEq b]
-    (ρ : SubnormalizedState (Prod a b)) (failure : State (Prod extra b)) :
-    (blockExtensionState ρ failure).matrix =
+    (ρ : SubnormalizedState (a × b)) (failure : MState (extra × b)) :
+    (blockExtensionState ρ failure).m =
       (Matrix.fromBlocks
-        ((1 - ρ.matrix.trace.re) • failure.matrix) 0 0 ρ.matrix).submatrix
-          (sourceSumEquiv extra a b).symm (sourceSumEquiv extra a b).symm :=
-  rfl
+        ((1 - ρ.matrix.trace.re) • failure.m) 0 0 ρ.matrix).submatrix
+          (sourceSumEquiv extra a b).symm (sourceSumEquiv extra a b).symm := by
+  unfold blockExtensionState
+  rw [MState.reindex_matrix, blockExtensionCoarseState_matrix]
 
 /-- Adding missing trace in an orthogonal source summand does not alter root
 fidelity against a normalized center. -/
@@ -140,31 +137,31 @@ theorem blockExtensionState_fidelity
     {extra : Type w} {a : Type u} {b : Type v}
     [Fintype extra] [DecidableEq extra] [Fintype a] [DecidableEq a]
     [Fintype b] [DecidableEq b]
-    (ρ : State (Prod a b)) (σ : SubnormalizedState (Prod a b))
-    (failure : State (Prod extra b)) :
+    (ρ : MState (a × b)) (σ : SubnormalizedState (a × b))
+    (failure : MState (extra × b)) :
     (blockExtensionState ρ.toSubnormalized failure).fidelity
         (blockExtensionState σ failure) =
       traceNorm (ρ.sqrtMatrix * psdSqrt σ.matrix) := by
   rw [blockExtensionState, blockExtensionState]
-  rw [State.fidelity_reindex]
-  rw [State.fidelity]
+  rw [MState.fidelity_reindex]
+  rw [MState.fidelity]
   change traceNorm
-      (psdSqrt (blockExtensionCoarseState ρ.toSubnormalized failure).matrix *
-        psdSqrt (blockExtensionCoarseState σ failure).matrix) = _
+      (psdSqrt (blockExtensionCoarseState ρ.toSubnormalized failure).m *
+        psdSqrt (blockExtensionCoarseState σ failure).m) = _
   rw [blockExtensionCoarseState_matrix, blockExtensionCoarseState_matrix]
   have hq : 0 ≤ 1 - σ.matrix.trace.re := sub_nonneg.mpr σ.trace_le_one
   rw [show 1 - ρ.toSubnormalized.matrix.trace.re = 0 by
-    rw [State.toSubnormalized_trace]
+    rw [MState.toSubnormalized_trace]
     norm_num]
   simp only [zero_smul]
-  rw [State.toSubnormalized_matrix]
-  rw [Matrix.fromBlocks_diagonal_psdSqrt Matrix.PosSemidef.zero ρ.pos]
+  rw [MState.toSubnormalized_matrix]
+  rw [Matrix.fromBlocks_diagonal_psdSqrt Matrix.PosSemidef.zero ρ.psd]
   rw [Matrix.fromBlocks_diagonal_psdSqrt
-    (Matrix.PosSemidef.smul failure.pos hq) σ.pos]
+    (Matrix.PosSemidef.smul failure.psd hq) σ.pos]
   rw [Matrix.fromBlocks_multiply]
   simp only [psdSqrt_zero, Matrix.zero_mul, Matrix.mul_zero, add_zero, zero_add]
   rw [Matrix.traceNorm_fromBlocks_diagonal]
-  simp [State.sqrtMatrix]
+  simp [MState.sqrtMatrix]
 
 /-- The direct-sum extension preserves purified distance from a normalized
 center, even when the candidate on the original summand is subnormalized. -/
@@ -172,17 +169,17 @@ theorem blockExtensionState_purifiedDistance
     {extra : Type w} {a : Type u} {b : Type v}
     [Fintype extra] [DecidableEq extra] [Fintype a] [DecidableEq a]
     [Fintype b] [DecidableEq b]
-    (ρ : State (Prod a b)) (σ : SubnormalizedState (Prod a b))
-    (failure : State (Prod extra b)) :
+    (ρ : MState (a × b)) (σ : SubnormalizedState (a × b))
+    (failure : MState (extra × b)) :
     (blockExtensionState ρ.toSubnormalized failure).purifiedDistance
         (blockExtensionState σ failure) =
       ρ.toSubnormalized.purifiedDistance σ := by
-  rw [State.purifiedDistance_eq, SubnormalizedState.purifiedDistance_eq]
-  rw [State.squaredFidelity_eq_fidelity_sq]
+  rw [MState.purifiedDistance_eq, SubnormalizedState.purifiedDistance_eq]
+  rw [MState.squaredFidelity_eq_fidelity_sq]
   rw [blockExtensionState_fidelity]
   rw [SubnormalizedState.generalizedFidelity_eq]
-  rw [State.toSubnormalized_matrix, ρ.trace_re_eq_one]
-  simp [State.sqrtMatrix]
+  rw [MState.toSubnormalized_matrix, ρ.trace_re_eq_one]
+  simp [MState.sqrtMatrix]
 
 /-- A candidate in the original subnormalized purified-distance ball remains
 in the same ball after the source direct-sum normalized extension. -/
@@ -190,12 +187,12 @@ theorem blockExtensionState_purifiedBall
     {extra : Type w} {a : Type u} {b : Type v}
     [Fintype extra] [DecidableEq extra] [Fintype a] [DecidableEq a]
     [Fintype b] [DecidableEq b]
-    (ρ : State (Prod a b)) (σ : SubnormalizedState (Prod a b))
-    (failure : State (Prod extra b)) {ε : ℝ}
+    (ρ : MState (a × b)) (σ : SubnormalizedState (a × b))
+    (failure : MState (extra × b)) {ε : ℝ}
     (hball : ρ.toSubnormalized.purifiedBall ε σ) :
     (blockExtensionState ρ.toSubnormalized failure).purifiedBall ε
       (blockExtensionState σ failure) := by
-  rw [State.purifiedBall_eq]
+  rw [MState.purifiedBall_eq]
   rw [blockExtensionState_purifiedDistance]
   exact hball
 
@@ -205,7 +202,7 @@ theorem blockExtensionState_toSubnormalized_center
     {extra : Type w} {a : Type u} {b : Type v}
     [Fintype extra] [DecidableEq extra] [Fintype a] [DecidableEq a]
     [Fintype b] [DecidableEq b]
-    (ρ : State (Prod a b)) (failure : State (Prod extra b)) :
+    (ρ : MState (a × b)) (failure : MState (extra × b)) :
     (blockExtensionState ρ.toSubnormalized failure).toSubnormalized =
       ρ.toSubnormalized.sourceIsometryApply
         (ReferenceIsometry.sumInr extra a) := by
@@ -217,7 +214,7 @@ theorem blockExtensionState_toSubnormalized_center
     simp [blockExtensionState_matrix, sourceSumEquiv,
       SubnormalizedState.sourceIsometryApply_matrix,
       ReferenceIsometry.applyMatrix, ReferenceIsometry.targetBlock,
-      ReferenceIsometry.sumInr, Matrix.mul_apply, ρ.trace_re_eq_one]
+      ReferenceIsometry.sumInr, Matrix.mul_apply]
 
 /-- If the extra source dimension dilutes the missing trace below the optimal
 conditional-min scale, the direct-sum extension is feasible for the same side
@@ -226,61 +223,61 @@ theorem blockExtensionState_scaleFeasible
     {extra : Type w} {a : Type u} {b : Type v}
     [Fintype extra] [DecidableEq extra] [Fintype a] [DecidableEq a]
     [Fintype b] [DecidableEq b] [Nonempty extra]
-    (ρ : SubnormalizedState (Prod a b)) (T : CMatrix b) (σ : State b)
+    (ρ : SubnormalizedState (a × b)) (T : CMatrix b) (σ : MState b)
     (hT : SubnormalizedState.ConditionalMinEntropyScaleFeasible (a := a) ρ T)
-    (hnormalize : ((T.trace.re : ℂ) • σ.matrix) = T)
+    (hnormalize : ((T.trace.re : ℂ) • σ.m) = T)
     (hdim : 1 - ρ.matrix.trace.re ≤ (Fintype.card extra : ℝ) * T.trace.re) :
-    State.ConditionalMinEntropyScaleFeasible (a := Sum extra a)
-      (blockExtensionState ρ ((State.maximallyMixed extra).prod σ)) T := by
+    MState.ConditionalMinEntropyScaleFeasible (a := extra ⊕ a)
+      (blockExtensionState ρ ((MState.uniform : MState extra).prod σ)) T := by
   constructor
   · exact hT.1
   · rw [Matrix.le_iff]
-    let failure : State (Prod extra b) := (State.maximallyMixed extra).prod σ
-    let topDiff : CMatrix (Prod extra b) :=
+    let failure : MState (extra × b) := (MState.uniform : MState extra).prod σ
+    let topDiff : CMatrix (extra × b) :=
       Matrix.kronecker (1 : CMatrix extra) T -
-        (1 - ρ.matrix.trace.re) • failure.matrix
-    let bottomDiff : CMatrix (Prod a b) :=
+        (1 - ρ.matrix.trace.re) • failure.m
+    let bottomDiff : CMatrix (a × b) :=
       Matrix.kronecker (1 : CMatrix a) T - ρ.matrix
     have hfailure :
-        State.identityTensorStateMatrix (a := extra) σ =
-          ((Fintype.card extra : ℝ) : ℂ) • failure.matrix := by
+        MState.identityTensorStateMatrix (a := extra) σ =
+          ((Fintype.card extra : ℝ) : ℂ) • failure.m := by
       simpa [failure] using
-        State.identityTensorStateMatrix_eq_card_smul_maximallyMixed_prod
+        MState.identityTensorStateMatrix_eq_card_smul_uniform_prod
           (a := extra) σ
     have htop_eq :
         topDiff =
           ((Fintype.card extra : ℝ) * T.trace.re -
-              (1 - ρ.matrix.trace.re)) • failure.matrix := by
+              (1 - ρ.matrix.trace.re)) • failure.m := by
       dsimp [topDiff]
       calc
         Matrix.kronecker (1 : CMatrix extra) T -
-              (1 - ρ.matrix.trace.re) • failure.matrix =
+              (1 - ρ.matrix.trace.re) • failure.m =
             Matrix.kronecker (1 : CMatrix extra)
-                ((T.trace.re : ℂ) • σ.matrix) -
-              (1 - ρ.matrix.trace.re) • failure.matrix := by rw [hnormalize]
-        _ = (T.trace.re : ℂ) • State.identityTensorStateMatrix (a := extra) σ -
-              (1 - ρ.matrix.trace.re) • failure.matrix := by
+                ((T.trace.re : ℂ) • σ.m) -
+              (1 - ρ.matrix.trace.re) • failure.m := by rw [hnormalize]
+        _ = (T.trace.re : ℂ) • MState.identityTensorStateMatrix (a := extra) σ -
+              (1 - ρ.matrix.trace.re) • failure.m := by
               congr 1
               ext i j
-              simp [State.identityTensorStateMatrix, Matrix.kronecker,
+              simp [MState.identityTensorStateMatrix, Matrix.kronecker,
                 Matrix.kroneckerMap_apply]
               ring
         _ = ((Fintype.card extra : ℝ) * T.trace.re -
-              (1 - ρ.matrix.trace.re)) • failure.matrix := by
+              (1 - ρ.matrix.trace.re)) • failure.m := by
               rw [hfailure]
               module
     have htop : topDiff.PosSemidef := by
       rw [htop_eq]
-      exact Matrix.PosSemidef.smul failure.pos (sub_nonneg.mpr hdim)
+      exact Matrix.PosSemidef.smul failure.psd (sub_nonneg.mpr hdim)
     have hbottom : bottomDiff.PosSemidef := by
       simpa [bottomDiff, Matrix.le_iff] using hT.2
     have hcoarse :
         (Matrix.fromBlocks topDiff 0 0 bottomDiff :
-          CMatrix (Sum (Prod extra b) (Prod a b))).PosSemidef :=
+          CMatrix ((extra × b) ⊕ (a × b))).PosSemidef :=
       Matrix.fromBlocks_diagonal_posSemidef htop hbottom
     have hmatrix :
-        Matrix.kronecker (1 : CMatrix (Sum extra a)) T -
-            (blockExtensionState ρ failure).matrix =
+        Matrix.kronecker (1 : CMatrix (extra ⊕ a)) T -
+            (blockExtensionState ρ failure).m =
           (Matrix.fromBlocks topDiff 0 0 bottomDiff).submatrix
             (sourceSumEquiv extra a b).symm (sourceSumEquiv extra a b).symm := by
       ext i j
@@ -300,13 +297,13 @@ theorem exists_normalizedExtension_smoothConditionalMinEntropy
     {a : Type u} {b : Type v}
     [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
     [Nonempty a] [Nonempty b]
-    (ρ : State (Prod a b)) {ε : ℝ} (hε0 : 0 ≤ ε) (hε1 : ε < 1) :
-    ∃ (n : ℕ) (Tmin : CMatrix b) (σB : State b)
-      (ρhat : State (Prod (Sum (Fin (n + 1)) a) b)),
+    (ρ : MState (a × b)) {ε : ℝ} (hε0 : 0 ≤ ε) (hε1 : ε < 1) :
+    ∃ (n : ℕ) (Tmin : CMatrix b) (σB : MState b)
+      (ρhat : MState ((Fin (n + 1) ⊕ a) × b)),
       0 < Tmin.trace.re ∧
-        ((Tmin.trace.re : ℂ) • σB.matrix) = Tmin ∧
-          State.ConditionalMinEntropyScaleFeasible
-            (a := Sum (Fin (n + 1)) a) ρhat Tmin ∧
+        ((Tmin.trace.re : ℂ) • σB.m) = Tmin ∧
+          MState.ConditionalMinEntropyScaleFeasible
+            (a := Fin (n + 1) ⊕ a) ρhat Tmin ∧
             (ρ.toSubnormalized.sourceIsometryApply
               (ReferenceIsometry.sumInr (Fin (n + 1)) a)).purifiedBall
                 ε ρhat.toSubnormalized ∧
@@ -325,15 +322,15 @@ theorem exists_normalizedExtension_smoothConditionalMinEntropy
     have hscale_pos :=
       ρmin.conditionalMinEntropyScale_pos_of_trace_pos (a := a) hρmin_trace_pos
     rwa [hscale_eq] at hscale_pos
-  let σB : State b :=
-    State.ofPosSemidefTracePos Tmin hTmin_feas.1 hTmin_trace_pos
-  have hnormalize : ((Tmin.trace.re : ℂ) • σB.matrix) = Tmin := by
-    exact State.smul_ofPosSemidefTracePos_matrix
+  let σB : MState b :=
+    MState.ofPosSemidefTracePos Tmin hTmin_feas.1 hTmin_trace_pos
+  have hnormalize : ((Tmin.trace.re : ℂ) • σB.m) = Tmin := by
+    exact MState.smul_ofPosSemidefTracePos_matrix
       Tmin hTmin_feas.1 hTmin_trace_pos
   let n : ℕ := Nat.ceil (Tmin.trace.re)⁻¹
   let extra := Fin (n + 1)
-  let failure : State (Prod extra b) := (State.maximallyMixed extra).prod σB
-  let ρhat : State (Prod (Sum extra a) b) :=
+  let failure : MState (extra × b) := (MState.uniform : MState extra).prod σB
+  let ρhat : MState ((extra ⊕ a) × b) :=
     blockExtensionState ρmin failure
   have hdim :
       1 - ρmin.matrix.trace.re ≤ (Fintype.card extra : ℝ) * Tmin.trace.re := by
@@ -352,8 +349,8 @@ theorem exists_normalizedExtension_smoothConditionalMinEntropy
       simpa [mul_comm] using hmul
     exact hmissing.trans hone_le
   have hρhat_feas :
-      State.ConditionalMinEntropyScaleFeasible
-        (a := Sum extra a) ρhat Tmin := by
+      MState.ConditionalMinEntropyScaleFeasible
+        (a := extra ⊕ a) ρhat Tmin := by
     exact blockExtensionState_scaleFeasible ρmin Tmin σB hTmin_feas hnormalize hdim
   have hball_state :
       (blockExtensionState ρ.toSubnormalized failure).purifiedBall ε ρhat := by
@@ -362,44 +359,44 @@ theorem exists_normalizedExtension_smoothConditionalMinEntropy
       (ρ.toSubnormalized.sourceIsometryApply
         (ReferenceIsometry.sumInr extra a)).purifiedBall ε ρhat.toSubnormalized := by
     have h :=
-      (State.purifiedBall_iff_toSubnormalized_purifiedBall
+      (MState.purifiedBall_iff_toSubnormalized_purifiedBall
         (blockExtensionState ρ.toSubnormalized failure) ρhat ε).mp hball_state
     rwa [blockExtensionState_toSubnormalized_center] at h
   have hscale_hat_le :
-      ρhat.conditionalMinEntropyScale (a := Sum extra a) ≤ Tmin.trace.re := by
-    rw [State.conditionalMinEntropyScale_eq_sInf_scaleValueSet]
+      ρhat.conditionalMinEntropyScale (a := extra ⊕ a) ≤ Tmin.trace.re := by
+    rw [MState.conditionalMinEntropyScale_eq_sInf_scaleValueSet]
     have hbdd :
-        BddBelow (ρhat.conditionalMinEntropyScaleValueSet (a := Sum extra a)) := by
+        BddBelow (ρhat.conditionalMinEntropyScaleValueSet (a := extra ⊕ a)) := by
       rw [ρhat.conditionalMinEntropyScaleValueSet_eq_normalizedScaleValueSet
-        (a := Sum extra a)]
+        (a := extra ⊕ a)]
       exact ρhat.conditionalMinEntropyNormalizedScaleValueSet_bddBelow
-        (a := Sum extra a)
+        (a := extra ⊕ a)
     exact csInf_le hbdd ⟨Tmin, hρhat_feas, rfl⟩
   have hmin_lower : ρmin.conditionalMinEntropyRaw ≤ ρhat.conditionalMinEntropy := by
     rw [ρmin.conditionalMinEntropy_eq_neg_log2_scale_of_trace_pos
       (a := a) hρmin_trace_pos]
     rw [ρhat.conditionalMinEntropy_eq_neg_log2_scale_of_nonempty
-      (a := Sum extra a)]
+      (a := extra ⊕ a)]
     rw [hscale_eq]
     unfold log2
     exact neg_le_neg (div_le_div_of_nonneg_right
       (Real.log_le_log
-        (ρhat.conditionalMinEntropyScale_eq_normalizedScale (a := Sum extra a) ▸
-          ρhat.conditionalMinEntropyNormalizedScale_inf_pos (a := Sum extra a))
+        (ρhat.conditionalMinEntropyScale_eq_normalizedScale (a := extra ⊕ a) ▸
+          ρhat.conditionalMinEntropyNormalizedScale_inf_pos (a := extra ⊕ a))
         hscale_hat_le)
       (le_of_lt (Real.log_pos one_lt_two)))
   have hmin_upper : ρhat.conditionalMinEntropy ≤ ρmin.conditionalMinEntropyRaw := by
     have hcand :
         SubnormalizedState.SmoothConditionalMinEntropyCandidateRaw
-          (a := Sum extra a)
+          (a := extra ⊕ a)
           (ρ.toSubnormalized.sourceIsometryApply
             (ReferenceIsometry.sumInr extra a)) ε
           ρhat.conditionalMinEntropy :=
       ⟨ρhat.toSubnormalized, hball_sub,
-        (State.toSubnormalized_conditionalMinEntropyRaw_eq ρhat).symm⟩
+        (MState.toSubnormalized_conditionalMinEntropyRaw_eq ρhat).symm⟩
     have hle :=
       SubnormalizedState.le_smoothConditionalMinEntropy_of_candidate_of_lt_sqrt_trace
-        (a := Sum extra a) hε0 (by
+        (a := extra ⊕ a) hε0 (by
           rwa [SubnormalizedState.sourceIsometryApply_trace_re]) hcand
     rw [ρ.toSubnormalized.smoothConditionalMinEntropy_sourceIsometryApply
       (a := a) (ReferenceIsometry.sumInr extra a) hε0 hεsub] at hle
@@ -413,7 +410,7 @@ theorem exists_normalizedExtension_smoothConditionalMinEntropy
       _ = -log2 Tmin.trace.re := by
         rw [ρmin.conditionalMinEntropy_eq_neg_log2_scale_of_trace_pos
           (a := a) hρmin_trace_pos, hscale_eq]
-  · rw [State.smoothConditionalMinEntropy_eq_toSubnormalized]
+  · rw [MState.smoothConditionalMinEntropy_eq_toSubnormalized]
     rw [hsmooth_eq]
     exact le_antisymm hmin_upper hmin_lower
 
@@ -422,9 +419,9 @@ theorem sourceIsometryApply_sumInr_matrix
     {extra : Type w} {a : Type u} {b : Type v}
     [Fintype extra] [DecidableEq extra] [Fintype a] [DecidableEq a]
     [Fintype b] [DecidableEq b]
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     (ρ.sourceIsometryApply (ReferenceIsometry.sumInr extra a)).matrix =
-      (Matrix.fromBlocks (0 : CMatrix (Prod extra b)) 0 0 ρ.matrix).submatrix
+      (Matrix.fromBlocks (0 : CMatrix (extra × b)) 0 0 ρ.matrix).submatrix
         (sourceSumEquiv extra a b).symm (sourceSumEquiv extra a b).symm := by
   ext i j
   rcases i with ⟨i, ib⟩
@@ -441,7 +438,7 @@ theorem identityTensorStateMatrix_sourceSumEquiv
     [Fintype extra] [DecidableEq extra] [Fintype a] [DecidableEq a]
     [Fintype b] [DecidableEq b]
     (σ : SubnormalizedState b) :
-    SubnormalizedState.identityTensorStateMatrix (a := Sum extra a) σ =
+    SubnormalizedState.identityTensorStateMatrix (a := extra ⊕ a) σ =
       (Matrix.fromBlocks
         (SubnormalizedState.identityTensorStateMatrix (a := extra) σ) 0 0
         (SubnormalizedState.identityTensorStateMatrix (a := a) σ)).submatrix
@@ -459,12 +456,12 @@ theorem traceNorm_sourceIsometryApply_sumInr_mul_sqrt_identityTensorStateMatrix
     {extra : Type w} {a : Type u} {b : Type v}
     [Fintype extra] [DecidableEq extra] [Fintype a] [DecidableEq a]
     [Fintype b] [DecidableEq b]
-    (ρ : SubnormalizedState (Prod a b)) (σ : SubnormalizedState b) :
+    (ρ : SubnormalizedState (a × b)) (σ : SubnormalizedState b) :
     traceNorm
         (psdSqrt
             (ρ.sourceIsometryApply (ReferenceIsometry.sumInr extra a)).matrix *
           psdSqrt
-            (SubnormalizedState.identityTensorStateMatrix (a := Sum extra a) σ)) =
+            (SubnormalizedState.identityTensorStateMatrix (a := extra ⊕ a) σ)) =
       traceNorm
         (psdSqrt ρ.matrix *
           psdSqrt (SubnormalizedState.identityTensorStateMatrix (a := a) σ)) := by
@@ -495,7 +492,7 @@ theorem conditionalMaxEntropyRaw_sourceIsometryApply_sumInr
     {extra : Type w} {a : Type u} {b : Type v}
     [Fintype extra] [DecidableEq extra] [Fintype a] [DecidableEq a]
     [Fintype b] [DecidableEq b]
-    (ρ : SubnormalizedState (Prod a b)) :
+    (ρ : SubnormalizedState (a × b)) :
     (ρ.sourceIsometryApply
       (ReferenceIsometry.sumInr extra a)).conditionalMaxEntropyRaw =
         ρ.conditionalMaxEntropyRaw := by

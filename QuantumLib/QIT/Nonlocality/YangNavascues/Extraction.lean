@@ -41,42 +41,41 @@ variable (data : YNData ι HA HB)
 The source residual/garbage vector from the CGS calculation:
 `c_0^{-1} P_A^(0) |ψ⟩`.
 -/
-def cgsExtraVector (ψ : PureVector (HA × HB)) : HA × HB → ℂ :=
+def cgsExtraVector (ψ : Ket (HA × HB)) : HA × HB → ℂ :=
   (((data.target.coeff data.target.base)⁻¹ : ℝ) : ℂ) • data.baseBranchVector ψ
 
 /--
-Package the source residual vector as a pure vector once its normalization has
+Package the source residual vector as a ket once its normalization has
 been proved from the YN hypotheses.
 -/
-def cgsExtraPureVectorOfTrace (ψ : PureVector (HA × HB))
+def cgsExtraKetOfTrace (ψ : Ket (HA × HB))
     (hTrace : (rankOneMatrix (data.cgsExtraVector ψ)).trace = 1) :
-    PureVector (HA × HB) where
-  amp := data.cgsExtraVector ψ
-  trace_rankOne_eq_one := hTrace
+    Ket (HA × HB) :=
+  Ket.ofRankOne (data.cgsExtraVector ψ) hTrace
 
 /--
 The source target vector, reindexed into the concrete ancilla basis used by
 the assembled CGS local isometry.
 -/
-def cgsTargetPureVector (B : SchmidtTarget.BaseReindexToFin data.target) :
-    PureVector (Fin (Fintype.card ι) × Fin (Fintype.card ι)) :=
-  data.target.pureVector.reindex (Equiv.prodCongr B.toEquiv B.toEquiv)
+def cgsTargetKet (B : SchmidtTarget.BaseReindexToFin data.target) :
+    Ket (Fin (Fintype.card ι) × Fin (Fintype.card ι)) :=
+  data.target.ket.reindex (Equiv.prodCongr B.toEquiv B.toEquiv)
 
 /-- Coordinate form of the reindexed diagonal target vector. -/
-theorem cgsTargetPureVector_amp_apply
+theorem cgsTargetKet_amp_apply
     (B : SchmidtTarget.BaseReindexToFin data.target)
     (ka kb : Fin (Fintype.card ι)) :
-    (data.cgsTargetPureVector B).amp (ka, kb) =
+    (data.cgsTargetKet B).vec (ka, kb) =
       if ka = kb then (data.target.coeff (B.toEquiv.symm ka) : ℂ) else 0 := by
   by_cases h : ka = kb
   · subst kb
-    simp [cgsTargetPureVector, SchmidtTarget.amp]
-  · simp [cgsTargetPureVector, SchmidtTarget.amp, h]
+    simp [cgsTargetKet, SchmidtTarget.amp]
+  · simp [cgsTargetKet, SchmidtTarget.amp, h]
 
 /-- The source target state in the concrete CGS ancilla basis. -/
 def cgsTargetState (B : SchmidtTarget.BaseReindexToFin data.target) :
-    State (Fin (Fintype.card ι) × Fin (Fintype.card ι)) :=
-  (data.cgsTargetPureVector B).state
+    MState (Fin (Fintype.card ι) × Fin (Fintype.card ι)) :=
+  (data.cgsTargetKet B).state
 
 /--
 The residual tensor output vector in local-isometry output order:
@@ -84,11 +83,11 @@ physical garbage on `(HA × HB)` tensored with the reindexed target ancillas.
 -/
 def cgsResidualTensorVector
     (B : SchmidtTarget.BaseReindexToFin data.target)
-    (extra : PureVector (HA × HB)) :
+    (extra : Ket (HA × HB)) :
     CGSOutput ι HA HB → ℂ :=
   fun x =>
-    extra.amp (x.1.1, x.2.1) *
-      (data.cgsTargetPureVector B).amp (x.1.2, x.2.2)
+    extra.vec (x.1.1, x.2.1) *
+      (data.cgsTargetKet B).vec (x.1.2, x.2.2)
 
 /--
 The explicit residual tensor vector has exactly the matrix representation used
@@ -96,16 +95,16 @@ by the source-strength auxiliary extraction predicate.
 -/
 theorem garbageTensorTargetState_matrix_eq_rankOne_cgsResidualTensorVector
     (B : SchmidtTarget.BaseReindexToFin data.target)
-    (extra : PureVector (HA × HB)) :
-    (Bell.garbageTensorTargetState extra.state (data.cgsTargetState B)).matrix =
+    (extra : Ket (HA × HB)) :
+    (Bell.garbageTensorTargetState extra.state (data.cgsTargetState B)).m =
       rankOneMatrix (data.cgsResidualTensorVector B extra) := by
   ext x y
   rcases x with ⟨⟨ha, ka⟩, ⟨hb, kb⟩⟩
   rcases y with ⟨⟨ha', ka'⟩, ⟨hb', kb'⟩⟩
   simp [Bell.garbageTensorTargetState, Bell.reindexState,
-    Bell.garbageTensorTargetEquiv, State.prod, cgsTargetState,
-    cgsTargetPureVector, cgsResidualTensorVector, PureVector.state,
-    rankOneMatrix_apply, Matrix.kronecker]
+    cgsTargetState,
+    cgsTargetKet, cgsResidualTensorVector, Ket.state,
+    rankOneMatrix_apply]
   ring
 
 /--
@@ -114,15 +113,15 @@ Residual tensor algebra bridge: once the CGS action vector has the explicit
 garbage-tensor-target matrix.
 -/
 theorem cgsActionBranchSumMatrix_eq_garbageTensorTargetState_of_actionVector_eq
-    {rho : State (HA × HB)}
+    {rho : MState (HA × HB)}
     (B : SchmidtTarget.BaseReindexToFin data.target)
-    (W : BobLocalOrthogonalization data rho) (ψ : PureVector (HA × HB))
-    (extra : PureVector (HA × HB))
+    (W : BobLocalOrthogonalization data rho) (ψ : Ket (HA × HB))
+    (extra : Ket (HA × HB))
     (hVec :
       data.cgsActionVector B W ψ =
         data.cgsResidualTensorVector B extra) :
     data.cgsActionBranchSumMatrix B W ψ =
-      (Bell.garbageTensorTargetState extra.state (data.cgsTargetState B)).matrix := by
+      (Bell.garbageTensorTargetState extra.state (data.cgsTargetState B)).m := by
   rw [data.cgsActionBranchSumMatrix_eq_rankOneActionVector B W ψ]
   rw [hVec]
   rw [← data.garbageTensorTargetState_matrix_eq_rankOne_cgsResidualTensorVector B extra]
@@ -132,19 +131,19 @@ Source-shaped residual tensor bridge with the CGS garbage vector
 `c_0^{-1} P_A^0 ψ`.
 -/
 theorem cgsActionBranchSumMatrix_eq_garbageTensorTargetState_of_extraActionVector_eq
-    {rho : State (HA × HB)}
+    {rho : MState (HA × HB)}
     (B : SchmidtTarget.BaseReindexToFin data.target)
-    (W : BobLocalOrthogonalization data rho) (ψ : PureVector (HA × HB))
+    (W : BobLocalOrthogonalization data rho) (ψ : Ket (HA × HB))
     (hTrace : (rankOneMatrix (data.cgsExtraVector ψ)).trace = 1)
     (hVec :
       data.cgsActionVector B W ψ =
-        data.cgsResidualTensorVector B (data.cgsExtraPureVectorOfTrace ψ hTrace)) :
+        data.cgsResidualTensorVector B (data.cgsExtraKetOfTrace ψ hTrace)) :
     data.cgsActionBranchSumMatrix B W ψ =
       (Bell.garbageTensorTargetState
-        (data.cgsExtraPureVectorOfTrace ψ hTrace).state
-        (data.cgsTargetState B)).matrix :=
+        (data.cgsExtraKetOfTrace ψ hTrace).state
+        (data.cgsTargetState B)).m :=
   data.cgsActionBranchSumMatrix_eq_garbageTensorTargetState_of_actionVector_eq
-    B W ψ (data.cgsExtraPureVectorOfTrace ψ hTrace) hVec
+    B W ψ (data.cgsExtraKetOfTrace ψ hTrace) hVec
 
 end YNData
 
@@ -153,7 +152,7 @@ namespace YNPhaseAlignedConditions
 variable {ι : Type u} {HA : Type v} {HB : Type w}
 variable [Fintype ι] [DecidableEq ι]
 variable [Fintype HA] [DecidableEq HA] [Fintype HB] [DecidableEq HB]
-variable {data : YNData ι HA HB} {ψ : PureVector (HA × HB)}
+variable {data : YNData ι HA HB} {ψ : Ket (HA × HB)}
 
 /-- The source residual vector `c_0^{-1} P_A^0 ψ` is normalized. -/
 theorem cgsExtraVector_trace_rankOne
@@ -180,10 +179,10 @@ theorem cgsExtraVector_trace_rankOne
     ne_of_gt (data.target.coeff_pos data.target.base)
   field_simp [hbase_ne]
 
-/-- The normalized CGS residual/garbage pure vector. -/
-def cgsExtraPureVector (h : YNPhaseAlignedConditions data ψ) :
-    PureVector (HA × HB) :=
-  data.cgsExtraPureVectorOfTrace ψ h.cgsExtraVector_trace_rankOne
+/-- The normalized CGS residual/garbage ket. -/
+def cgsExtraKet (h : YNPhaseAlignedConditions data ψ) :
+    Ket (HA × HB) :=
+  data.cgsExtraKetOfTrace ψ h.cgsExtraVector_trace_rankOne
 
 /--
 Conditional bridge from the YN branch-sum calculation to the source-strength
@@ -195,14 +194,14 @@ explicit branch-sum matrix with `garbage tensor target`.
 theorem extractsBipartiteStateWithAux_of_actionBranchSum_eq
     (h : YNPhaseAlignedConditions data ψ)
     (B : SchmidtTarget.BaseReindexToFin data.target)
-    (garbage : State (HA × HB))
-    (targetState : State (Fin (Fintype.card ι) × Fin (Fintype.card ι)))
+    (garbage : MState (HA × HB))
+    (targetState : MState (Fin (Fintype.card ι) × Fin (Fintype.card ι)))
     (hTensor :
       data.cgsActionBranchSumMatrix B h.toBobLocalOrthogonalization ψ =
-        (Bell.garbageTensorTargetState garbage targetState).matrix) :
+        (Bell.garbageTensorTargetState garbage targetState).m) :
     Bell.ExtractsBipartiteStateWithAux ψ.state garbage targetState := by
   refine ⟨data.cgsLocalIsometry B h.toBobLocalOrthogonalization, ?_⟩
-  apply State.ext
+  apply MState.ext
   rw [TwoQubit.LocalIsometry.applyState_matrix]
   rw [h.cgsLocalIsometry_applyMatrix_eq_actionBranchSum B]
   exact hTensor
@@ -217,7 +216,7 @@ vector claim that the CGS action is `extra ⊗ target` in output order.
 theorem extractsBipartiteStateWithAux_of_actionVector_eq
     (h : YNPhaseAlignedConditions data ψ)
     (B : SchmidtTarget.BaseReindexToFin data.target)
-    (extra : PureVector (HA × HB))
+    (extra : Ket (HA × HB))
     (hVec :
       data.cgsActionVector B h.toBobLocalOrthogonalization ψ =
         data.cgsResidualTensorVector B extra) :
@@ -237,11 +236,11 @@ theorem extractsBipartiteStateWithAux_of_extraActionVector_eq
     (hTrace : (rankOneMatrix (data.cgsExtraVector ψ)).trace = 1)
     (hVec :
       data.cgsActionVector B h.toBobLocalOrthogonalization ψ =
-        data.cgsResidualTensorVector B (data.cgsExtraPureVectorOfTrace ψ hTrace)) :
+        data.cgsResidualTensorVector B (data.cgsExtraKetOfTrace ψ hTrace)) :
     Bell.ExtractsBipartiteStateWithAux ψ.state
-      (data.cgsExtraPureVectorOfTrace ψ hTrace).state (data.cgsTargetState B) := by
+      (data.cgsExtraKetOfTrace ψ hTrace).state (data.cgsTargetState B) := by
   apply h.extractsBipartiteStateWithAux_of_actionBranchSum_eq
-    B (data.cgsExtraPureVectorOfTrace ψ hTrace).state (data.cgsTargetState B)
+    B (data.cgsExtraKetOfTrace ψ hTrace).state (data.cgsTargetState B)
   exact data.cgsActionBranchSumMatrix_eq_garbageTensorTargetState_of_extraActionVector_eq
     B h.toBobLocalOrthogonalization ψ hTrace hVec
 
@@ -254,21 +253,21 @@ theorem extractsBipartiteStateWithAux_of_normalizedExtraActionVector_eq
     (B : SchmidtTarget.BaseReindexToFin data.target)
     (hVec :
       data.cgsActionVector B h.toBobLocalOrthogonalization ψ =
-        data.cgsResidualTensorVector B h.cgsExtraPureVector) :
+        data.cgsResidualTensorVector B h.cgsExtraKet) :
     Bell.ExtractsBipartiteStateWithAux ψ.state
-      h.cgsExtraPureVector.state (data.cgsTargetState B) := by
+      h.cgsExtraKet.state (data.cgsTargetState B) := by
   exact h.extractsBipartiteStateWithAux_of_actionVector_eq
-    B h.cgsExtraPureVector hVec
+    B h.cgsExtraKet hVec
 
 private theorem aliceProjectionOp_mul_bobLocalBranch_mulVec
     (h : YNPhaseAlignedConditions data ψ) (i j : ι) :
     ((data.aliceProjectionOp i *
-        data.bobLocalOp ((h.toBobLocalOrthogonalization.bobLocal j).matrix)).mulVec ψ.amp) =
-      if i = j then (data.aliceProjectionOp i).mulVec ψ.amp else 0 := by
+        data.bobLocalOp ((h.toBobLocalOrthogonalization.bobLocal j).matrix)).mulVec ψ.vec) =
+      if i = j then (data.aliceProjectionOp i).mulVec ψ.vec else 0 := by
   rw [← Matrix.mulVec_mulVec]
   change Matrix.mulVec (data.aliceProjectionOp i)
-      (Matrix.mulVec (bobLocalOp HA h.toBobLocalOrthogonalization.bobLocal j) ψ.amp) =
-    if i = j then Matrix.mulVec (data.aliceProjectionOp i) ψ.amp else 0
+      (Matrix.mulVec (bobLocalOp HA h.toBobLocalOrthogonalization.bobLocal j) ψ.vec) =
+    if i = j then Matrix.mulVec (data.aliceProjectionOp i) ψ.vec else 0
   rw [h.bobLocalOrthogonalization_mulVec_eq_bobProjectionOp j]
   rw [← h.projectionAligned j]
   rw [Matrix.mulVec_mulVec]
@@ -286,7 +285,7 @@ private theorem aliceProjectionOp_mul_bobLocalComplement_mulVec
         (1 - ∑ l : Fin (Fintype.card ι),
           data.bobLocalOp
             ((h.toBobLocalOrthogonalization.bobLocal (B.toEquiv.symm l)).matrix))).mulVec
-        ψ.amp) = 0 := by
+        ψ.vec) = 0 := by
   classical
   rw [Matrix.mul_sub, Matrix.mul_one, Matrix.mul_sum]
   rw [Matrix.sub_mulVec, Matrix.sum_mulVec]
@@ -295,8 +294,8 @@ private theorem aliceProjectionOp_mul_bobLocalComplement_mulVec
           ((data.aliceProjectionOp i *
             data.bobLocalOp
               ((h.toBobLocalOrthogonalization.bobLocal (B.toEquiv.symm l)).matrix)).mulVec
-              ψ.amp)) =
-        (data.aliceProjectionOp i).mulVec ψ.amp := by
+              ψ.vec)) =
+        (data.aliceProjectionOp i).mulVec ψ.vec := by
     rw [Finset.sum_eq_single (B.toEquiv i)]
     · have hbranch :=
         aliceProjectionOp_mul_bobLocalBranch_mulVec (h := h) i (B.toEquiv.symm (B.toEquiv i))
@@ -327,8 +326,8 @@ private theorem aliceProjection_kronecker_bobLocalBranch_mulVec
     (h : YNPhaseAlignedConditions data ψ) (i j : ι) :
     (Matrix.kroneckerMap (fun x1 x2 : ℂ => x1 * x2)
         (data.aliceProjection.effects i)
-        ((h.toBobLocalOrthogonalization.bobLocal j).matrix)).mulVec ψ.amp =
-      if i = j then (data.aliceProjectionOp i).mulVec ψ.amp else 0 := by
+        ((h.toBobLocalOrthogonalization.bobLocal j).matrix)).mulVec ψ.vec =
+      if i = j then (data.aliceProjectionOp i).mulVec ψ.vec else 0 := by
   rw [aliceProjection_kronecker_bobMatrix_eq (data := data)]
   exact aliceProjectionOp_mul_bobLocalBranch_mulVec (h := h) i j
 
@@ -339,7 +338,7 @@ private theorem aliceProjection_kronecker_bobLocalComplement_mulVec
         (data.aliceProjection.effects i)
         (1 - ∑ l : Fin (Fintype.card ι),
           (h.toBobLocalOrthogonalization.bobLocal (B.toEquiv.symm l)).matrix)).mulVec
-        ψ.amp = 0 := by
+        ψ.vec = 0 := by
   rw [aliceProjection_kronecker_bobMatrix_eq (data := data)]
   have hBob :
       data.bobLocalOp
@@ -366,8 +365,8 @@ private theorem aliceBobBranchOperator_mulVec_eq_transformedBobProjectionOp
     (B : SchmidtTarget.BaseReindexToFin data.target)
     (k : Fin (Fintype.card ι)) :
     ((data.aliceBranchOperator B k ⊗ₖ
-        h.toBobLocalOrthogonalization.bobBranchOperator B k).mulVec ψ.amp) =
-      (data.transformedBobProjectionOp (B.toEquiv.symm k)).mulVec ψ.amp := by
+        h.toBobLocalOrthogonalization.bobBranchOperator B k).mulVec ψ.vec) =
+      (data.transformedBobProjectionOp (B.toEquiv.symm k)).mulVec ψ.vec := by
   classical
   by_cases hkbase : k = data.target.baseIndex
   · subst k
@@ -385,8 +384,8 @@ private theorem aliceBobBranchOperator_mulVec_eq_transformedBobProjectionOp
             ((h.toBobLocalOrthogonalization.bobLocal data.target.base).matrix +
               (1 - ∑ l : Fin (Fintype.card ι),
                 (h.toBobLocalOrthogonalization.bobLocal (B.toEquiv.symm l)).matrix))).mulVec
-            ψ.amp =
-          (data.bobProjectionOp data.target.base).mulVec ψ.amp := by
+            ψ.vec =
+          (data.bobProjectionOp data.target.base).mulVec ψ.vec := by
       rw [Matrix.kronecker_add, Matrix.add_mulVec]
       rw [aliceProjection_kronecker_bobLocalBranch_mulVec (h := h)
         data.target.base data.target.base]
@@ -405,8 +404,8 @@ private theorem aliceBobBranchOperator_mulVec_eq_transformedBobProjectionOp
         (Matrix.kroneckerMap (fun x1 x2 : ℂ => x1 * x2)
             (data.aliceProjection.effects (B.toEquiv.symm k))
             (h.toBobLocalOrthogonalization.bobLocal (B.toEquiv.symm k)).matrix).mulVec
-            ψ.amp =
-          (data.bobProjectionOp (B.toEquiv.symm k)).mulVec ψ.amp := by
+            ψ.vec =
+          (data.bobProjectionOp (B.toEquiv.symm k)).mulVec ψ.vec := by
       rw [aliceProjection_kronecker_bobLocalBranch_mulVec (h := h)
         (B.toEquiv.symm k) (B.toEquiv.symm k)]
       simpa [YNData.aliceProjectionOp, YNData.bobProjectionOp] using
@@ -420,7 +419,7 @@ private theorem aliceBobBranchOperator_mulVec_eq_zero_of_ne
     (B : SchmidtTarget.BaseReindexToFin data.target)
     (ka kb : Fin (Fintype.card ι)) (hneq : ka ≠ kb) :
     ((data.aliceBranchOperator B ka ⊗ₖ
-        h.toBobLocalOrthogonalization.bobBranchOperator B kb).mulVec ψ.amp) = 0 := by
+        h.toBobLocalOrthogonalization.bobBranchOperator B kb).mulVec ψ.vec) = 0 := by
   classical
   by_cases hkbbase : kb = data.target.baseIndex
   · subst kb
@@ -442,7 +441,7 @@ private theorem aliceBobBranchOperator_mulVec_eq_zero_of_ne
             ((h.toBobLocalOrthogonalization.bobLocal data.target.base).matrix +
               (1 - ∑ l : Fin (Fintype.card ι),
                 (h.toBobLocalOrthogonalization.bobLocal (B.toEquiv.symm l)).matrix))).mulVec
-            ψ.amp = 0 := by
+            ψ.vec = 0 := by
       rw [Matrix.kronecker_add, Matrix.add_mulVec]
       rw [aliceProjection_kronecker_bobLocalBranch_mulVec (h := h)
         (B.toEquiv.symm ka) data.target.base]
@@ -461,7 +460,7 @@ private theorem aliceBobBranchOperator_mulVec_eq_zero_of_ne
         (Matrix.kroneckerMap (fun x1 x2 : ℂ => x1 * x2)
             (data.aliceProjection.effects (B.toEquiv.symm ka))
             (h.toBobLocalOrthogonalization.bobLocal (B.toEquiv.symm kb)).matrix).mulVec
-            ψ.amp = 0 := by
+            ψ.vec = 0 := by
       rw [aliceProjection_kronecker_bobLocalBranch_mulVec (h := h)
         (B.toEquiv.symm ka) (B.toEquiv.symm kb)]
       simp [hsymm_ne]
@@ -476,7 +475,7 @@ theorem cgsActionVector_eq_residualTensorVector
     (h : YNPhaseAlignedConditions data ψ)
     (B : SchmidtTarget.BaseReindexToFin data.target) :
     data.cgsActionVector B h.toBobLocalOrthogonalization ψ =
-      data.cgsResidualTensorVector B h.cgsExtraPureVector := by
+      data.cgsResidualTensorVector B h.cgsExtraKet := by
   classical
   ext x
   rcases x with ⟨⟨ha, ka⟩, ⟨hb, kb⟩⟩
@@ -485,11 +484,11 @@ theorem cgsActionVector_eq_residualTensorVector
   · subst kb
     rw [aliceBobBranchOperator_mulVec_eq_transformedBobProjectionOp (h := h) B ka]
     rw [h.phaseAligned (B.toEquiv.symm ka)]
-    simp [YNData.cgsResidualTensorVector, YNData.cgsTargetPureVector_amp_apply,
-      cgsExtraPureVector, YNData.cgsExtraPureVectorOfTrace, YNData.cgsExtraVector]
+    simp [YNData.cgsResidualTensorVector, YNData.cgsTargetKet_amp_apply,
+      cgsExtraKet, YNData.cgsExtraKetOfTrace, YNData.cgsExtraVector]
     ring_nf
   · rw [aliceBobBranchOperator_mulVec_eq_zero_of_ne (h := h) B ka kb hkk]
-    simp [YNData.cgsResidualTensorVector, YNData.cgsTargetPureVector_amp_apply, hkk]
+    simp [YNData.cgsResidualTensorVector, YNData.cgsTargetKet_amp_apply, hkk]
 
 /--
 The phase-aligned YN source hypotheses extract the target state with the CGS
@@ -498,7 +497,7 @@ garbage vector as auxiliary state.
 theorem extractsBipartiteStateWithAux
     (h : YNPhaseAlignedConditions data ψ)
     (B : SchmidtTarget.BaseReindexToFin data.target) :
-    Bell.ExtractsBipartiteStateWithAux ψ.state h.cgsExtraPureVector.state
+    Bell.ExtractsBipartiteStateWithAux ψ.state h.cgsExtraKet.state
       (data.cgsTargetState B) := by
   exact h.extractsBipartiteStateWithAux_of_normalizedExtraActionVector_eq B
     (h.cgsActionVector_eq_residualTensorVector B)

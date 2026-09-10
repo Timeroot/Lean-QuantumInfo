@@ -14,6 +14,7 @@ public import Mathlib.LinearAlgebra.Dimension.Constructions
 public import Mathlib.MeasureTheory.Function.L2Space
 public import Mathlib.MeasureTheory.Integral.Average
 public import QuantumLib.QIT.Util.SDP.HermitianPSDTraceDuality
+public import QuantumLib.QIT.Util.MatrixInstances
 
 /-!
 # Spectral trace-norm bridge
@@ -26,17 +27,17 @@ variational route. The source claim is registered as
 
 @[expose] public section
 
-open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator
+open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator QIT.MatrixL2
 
 open Matrix
 
-namespace QIT
-
-universe u
-
 noncomputable section
-
+universe u
 variable {a : Type u} [Fintype a] [DecidableEq a]
+
+open QIT
+
+namespace QIT
 
 /-- Finite singular-value sum for a square complex matrix, expressed through
 the local matrix spectral convention for `Mᴴ * M`. This is the same ordering as
@@ -230,6 +231,21 @@ theorem hilbertSchmidtSq_eq_trace_mul_self_of_isHermitian [Fintype a] [Decidable
   rw [show star M = M by simpa [Matrix.star_eq_conjTranspose] using hM.eq]
 
 omit [Fintype a] [DecidableEq a] in
+/-- Hermitian expansion of the Hilbert--Schmidt square of a difference:
+`‖X - M‖₂² = Tr[X²] - 2 Tr[X M] + ‖M‖₂²`. -/
+theorem hilbertSchmidtSq_sub_of_isHermitian [Fintype a] [DecidableEq a]
+    (X M : CMatrix a) (hX : X.IsHermitian) (hM : M.IsHermitian) :
+    hilbertSchmidtSq (X - M) =
+      (X * X).trace.re - (2 : ℝ) * (X * M).trace.re + hilbertSchmidtSq M := by
+  have hcomm : (M * X).trace = (X * M).trace := Matrix.trace_mul_comm M X
+  unfold hilbertSchmidtSq
+  simp only [Matrix.star_eq_conjTranspose]
+  rw [Matrix.conjTranspose_sub, hX.eq, hM.eq, Matrix.sub_mul, Matrix.mul_sub, Matrix.mul_sub,
+    Matrix.trace_sub, Matrix.trace_sub, Matrix.trace_sub, hcomm]
+  simp [Complex.sub_re]
+  ring
+
+omit [Fintype a] [DecidableEq a] in
 theorem traceNorm_sq_le_card_mul_hilbertSchmidtSq [Fintype a] [DecidableEq a]
     (M : CMatrix a) :
     traceNorm M ^ 2 ≤ (Fintype.card a : ℝ) * hilbertSchmidtSq M := by
@@ -246,43 +262,43 @@ theorem traceNorm_sq_le_card_mul_hilbertSchmidtSq [Fintype a] [DecidableEq a]
 omit [Fintype a] [DecidableEq a] in
 /-- A trace-one positive semidefinite matrix has purity at least `1 / d`.
 This is the Hilbert--Schmidt Cauchy--Schwarz estimate in trace-norm form. -/
-theorem State.one_le_card_mul_hilbertSchmidtSq_matrix [Fintype a] [DecidableEq a]
-    (ρ : State a) :
-    (1 : ℝ) ≤ (Fintype.card a : ℝ) * hilbertSchmidtSq ρ.matrix := by
-  have htn : traceNorm ρ.matrix = 1 := by
-    rw [traceNorm_posSemidef_eq_trace_re ρ.matrix ρ.pos]
+theorem _root_.MState.one_le_card_mul_hilbertSchmidtSq_matrix [Fintype a] [DecidableEq a]
+    (ρ : MState a) :
+    (1 : ℝ) ≤ (Fintype.card a : ℝ) * hilbertSchmidtSq ρ.m := by
+  have htn : traceNorm ρ.m = 1 := by
+    rw [traceNorm_posSemidef_eq_trace_re ρ.m ρ.psd]
     exact ρ.trace_re_eq_one
-  have h := traceNorm_sq_le_card_mul_hilbertSchmidtSq ρ.matrix
+  have h := traceNorm_sq_le_card_mul_hilbertSchmidtSq ρ.m
   nlinarith
 
 omit [Fintype a] [DecidableEq a] in
 /-- If a state is bounded above by `c • I`, then its Hilbert--Schmidt purity is
 at most `c`. -/
-theorem State.hilbertSchmidtSq_matrix_le_of_le_smul_one [Fintype a] [DecidableEq a]
-    (ρ : State a) {c : ℝ} (hc : 0 ≤ c)
-    (hρ : ρ.matrix ≤ ((c : ℂ) • (1 : CMatrix a))) :
-    hilbertSchmidtSq ρ.matrix ≤ c := by
+theorem _root_.MState.hilbertSchmidtSq_matrix_le_of_le_smul_one [Fintype a] [DecidableEq a]
+    (ρ : MState a) {c : ℝ} (hc : 0 ≤ c)
+    (hρ : ρ.m ≤ ((c : ℂ) • (1 : CMatrix a))) :
+    hilbertSchmidtSq ρ.m ≤ c := by
   have _hcC : (0 : ℂ) ≤ (c : ℂ) := by
     exact_mod_cast hc
   have hpair :=
     cMatrix_trace_mul_le_of_le_posSemidef_left
-      (A := ρ.matrix) (B := ((c : ℂ) • (1 : CMatrix a))) (W := ρ.matrix)
-      ρ.pos hρ
+      (A := ρ.m) (B := ((c : ℂ) • (1 : CMatrix a))) (W := ρ.m)
+      ρ.psd hρ
   have hright :
-      ((ρ.matrix * ((c : ℂ) • (1 : CMatrix a))).trace).re = c := by
+      ((ρ.m * ((c : ℂ) • (1 : CMatrix a))).trace).re = c := by
     calc
-      ((ρ.matrix * ((c : ℂ) • (1 : CMatrix a))).trace).re =
-          (((c : ℂ) • ρ.matrix).trace).re := by
+      ((ρ.m * ((c : ℂ) • (1 : CMatrix a))).trace).re =
+          (((c : ℂ) • ρ.m).trace).re := by
             rw [Matrix.mul_smul, Matrix.mul_one]
-      _ = ((c : ℂ) * ρ.matrix.trace).re := by
+      _ = ((c : ℂ) * ρ.m.trace).re := by
             simp [Matrix.trace_smul]
       _ = c := by
-            rw [ρ.trace_eq_one]
+            rw [ρ.tr']
             simp
   calc
-    hilbertSchmidtSq ρ.matrix = (ρ.matrix * ρ.matrix).trace.re :=
-      hilbertSchmidtSq_eq_trace_mul_self_of_isHermitian ρ.pos.isHermitian
-    _ ≤ ((ρ.matrix * ((c : ℂ) • (1 : CMatrix a))).trace).re := hpair
+    hilbertSchmidtSq ρ.m = (ρ.m * ρ.m).trace.re :=
+      hilbertSchmidtSq_eq_trace_mul_self_of_isHermitian ρ.psd.isHermitian
+    _ ≤ ((ρ.m * ((c : ℂ) • (1 : CMatrix a))).trace).re := hpair
     _ = c := hright
 
 omit [Fintype a] [DecidableEq a] in
@@ -300,12 +316,9 @@ theorem traceNorm_sq_le_card_mul_hilbertSchmidt {a : Type u}
       (Fintype.card a : ℝ) * ((star M * M).trace).re :=
   traceNorm_sq_le_card_mul_hilbertSchmidtSq M
 
-namespace State
+end QIT
 
-/-- Canonical non-unital C⋆-algebra structure on finite complex matrices,
-needed locally for the operator-norm bound below; carried by the L2-operator
-norm scope opened above. -/
-noncomputable local instance : NonUnitalCStarAlgebra (CMatrix a) := ⟨⟩
+namespace MState
 
 /-- A positive semidefinite finite matrix is bounded above by its trace times the
 identity. -/
@@ -376,7 +389,6 @@ theorem posSemidef_le_trace_re_smul_one {A : CMatrix a} (hA : A.PosSemidef) :
   intro i
   exact_mod_cast sub_nonneg.mpr (heig_le_trace i)
 
-set_option maxHeartbeats 900000 in
 /-- The operator norm of a PSD matrix is controlled by its trace. -/
 theorem norm_le_trace_re_mul_norm_one_of_posSemidef {A : CMatrix a} (hA : A.PosSemidef) :
     ‖A‖ ≤ A.trace.re * ‖(1 : CMatrix a)‖ := by
@@ -395,7 +407,9 @@ theorem norm_le_trace_re_mul_norm_one_of_posSemidef {A : CMatrix a} (hA : A.PosS
       have htr_nonneg : 0 ≤ A.trace.re := (Matrix.PosSemidef.trace_nonneg hA).1
       rw [Complex.norm_of_nonneg htr_nonneg]
 
-end State
+end MState
+
+namespace QIT
 
 section MeasureTheoryIntegrals
 
@@ -543,7 +557,5 @@ theorem integral_traceNorm_le_sqrt_integral_hilbertSchmidtSq
   exact hholder_nat.trans hsqrt_step
 
 end MeasureTheoryIntegrals
-
-end
 
 end QIT

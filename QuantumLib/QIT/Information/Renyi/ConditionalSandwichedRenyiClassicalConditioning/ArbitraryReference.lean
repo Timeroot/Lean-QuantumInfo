@@ -18,10 +18,10 @@ public import QuantumLib.QIT.Information.Renyi.ConditionalSandwichedRenyiClassic
 public import QuantumLib.QIT.Information.Renyi.ConditionalSandwichedRenyiClassicalConditioning.RegularizedSourceWrappers
 
 /-!
-# public source-shaped wrappers (arbitrary reference)
+# Source-shaped wrappers: arbitrary reference
 
-Responsibility layer of the sandwiched conditional Renyi classical-conditioning
-source route.
+The upward classical-conditioning formulas for an arbitrary PSD reference,
+obtained from the fixed full-rank reference results by coordinate-`Y` pinching.
 -/
 
 @[expose] public section
@@ -29,49 +29,46 @@ source route.
 open scoped ComplexOrder MatrixOrder NNReal Pointwise
 open Matrix
 
-namespace QIT
-
-universe u v w
-
 noncomputable section
-
+universe u v w
 variable {A : Type u} {B : Type v} {Y : Type w}
 variable [Fintype A] [DecidableEq A]
 variable [Fintype B] [DecidableEq B]
 variable [Fintype Y] [DecidableEq Y]
 
-namespace State
+open QIT
 
-/-! The high-order source branch uses the same normalized full-rank path as the
-low-order branch.  The support hypothesis is kept explicit so that no
-undefined zero-eigenvalue power is introduced at the limiting reference. -/
+namespace MState
 
+/-- For `α > 1` and a supported reference, the candidates along the full-rank approximation path
+`fullRankApproxMaximallyMixedStatePath σ` converge to the candidate at `σ`.  The support hypothesis
+is what keeps the limiting reference free of undefined zero-eigenvalue powers. -/
 theorem conditionalSandwichedRenyiUp_candidateE_fullRankApprox_tendsto_of_highAlpha
     [Nonempty B]
-    (E : Ensemble Y (A × B)) (σ : State (B × Y)) (α : ℝ)
+    (E : MEnsemble (A × B) Y) (σ : MState (B × Y)) (α : ℝ)
     (hα_gt_one : 1 < α)
     (hSupport : Matrix.Supports
-      (State.cqConditioningState E).matrix
+      (MState.cqConditioningState E).m
       (identityTensorStateMatrix (a := A) σ)) :
     Filter.Tendsto
       (fun δ : ℝ =>
         -sandwichedRenyiPSDReferenceE
-          (State.cqConditioningState E)
+          (MState.cqConditioningState E)
           (identityTensorStateMatrix (a := A)
             (fullRankApproxMaximallyMixedStatePath σ δ))
-          (identityTensorStateMatrix_posSemidef_of_state (a := A)
+          (identityTensorStateMatrix_posSemidef (a := A)
             (fullRankApproxMaximallyMixedStatePath σ δ)) α)
       (nhdsWithin (0 : ℝ) (Set.Ioo 0 1))
       (nhds (-sandwichedRenyiPSDReferenceE
-        (State.cqConditioningState E)
+        (MState.cqConditioningState E)
         (identityTensorStateMatrix (a := A) σ)
-        (identityTensorStateMatrix_posSemidef_of_state (a := A) σ) α)) := by
+        (identityTensorStateMatrix_posSemidef (a := A) σ) α)) := by
   classical
-  let : Nonempty Y := Ensemble.index_nonempty E
+  let : Nonempty Y := MEnsemble.index_nonempty E
   let : Nonempty (B × Y) := inferInstance
-  let ρ := State.cqConditioningState E
+  let ρ := MState.cqConditioningState E
   let τ := identityTensorStateMatrix (a := A) σ
-  let hτ : τ.PosSemidef := identityTensorStateMatrix_posSemidef_of_state (a := A) σ
+  let hτ : τ.PosSemidef := identityTensorStateMatrix_posSemidef (a := A) σ
   let ε : ℝ → ℝ := fun δ =>
     δ / ((1 - δ) * (Fintype.card (B × Y) : ℝ))
   let scale : ℝ → ℝ := fun δ => 1 - δ
@@ -101,7 +98,7 @@ theorem conditionalSandwichedRenyiUp_candidateE_fullRankApprox_tendsto_of_highAl
         -sandwichedRenyiPSDReferenceE ρ
           (identityTensorStateMatrix (a := A)
             (fullRankApproxMaximallyMixedStatePath σ δ))
-            (identityTensorStateMatrix_posSemidef_of_state (a := A)
+            (identityTensorStateMatrix_posSemidef (a := A)
             (fullRankApproxMaximallyMixedStatePath σ δ)) α) δ =
         ((-(sandwichedRenyiPSDReferenceHighAlphaFiniteRegularizedInputCurve
             ρ hτ α (ε δ)) + log2 (scale δ) : ℝ) : EReal) := by
@@ -121,21 +118,21 @@ theorem conditionalSandwichedRenyiUp_candidateE_fullRankApprox_tendsto_of_highAl
           (fullRankApproxMaximallyMixedStatePath σ δ) =
           scale δ • sandwichedRenyiReferenceRegularization τ (ε δ) := by
       change Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix A)
-        (fullRankApproxMaximallyMixedStatePath σ δ).matrix = _
+        (fullRankApproxMaximallyMixedStatePath σ δ).m = _
       rw [hpath_matrix]
       calc
         Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix A)
               (((1 - δ : ℝ) : ℂ) •
-                sandwichedRenyiReferenceRegularization σ.matrix
+                sandwichedRenyiReferenceRegularization σ.m
                   (δ / ((1 - δ) * (Fintype.card (B × Y) : ℝ)))) =
             Matrix.kroneckerMap (fun x y => x * y) (1 : CMatrix A)
-              ((1 - δ) • sandwichedRenyiReferenceRegularization σ.matrix
+              ((1 - δ) • sandwichedRenyiReferenceRegularization σ.m
                 (δ / ((1 - δ) * (Fintype.card (B × Y) : ℝ)))) := by
           ext i j
           simp [Matrix.smul_apply]
         _ = (1 - δ) • Matrix.kroneckerMap (fun x y => x * y)
               (1 : CMatrix A)
-              (sandwichedRenyiReferenceRegularization σ.matrix
+              (sandwichedRenyiReferenceRegularization σ.m
                 (δ / ((1 - δ) * (Fintype.card (B × Y) : ℝ)))) := by
           exact kroneckerMap_one_real_smul (A := A) (B := B) (Y := Y)
             (1 - δ) _
@@ -147,19 +144,19 @@ theorem conditionalSandwichedRenyiUp_candidateE_fullRankApprox_tendsto_of_highAl
           simp [Matrix.smul_apply]
           field_simp [ne_of_gt hscale_pos]
     have hpath_pd :
-        (fullRankApproxMaximallyMixedStatePath σ δ).matrix.PosDef := by
+        (fullRankApproxMaximallyMixedStatePath σ δ).m.PosDef := by
       simpa [fullRankApproxMaximallyMixedStatePath, fullRankApproxStatePath,
         hδ] using
         (fullRankApproxState_posDef_of_noise σ
-          (State.maximallyMixed (B × Y))
-          (State.maximallyMixed_posDef)
+          (MState.uniform : MState (B × Y))
+          (MState.uniform_posDef)
           hδ.1.le hδ.2.le hδ.1)
     have href_pd :
         (identityTensorStateMatrix (a := A)
           (fullRankApproxMaximallyMixedStatePath σ δ)).PosDef :=
       identityTensorStateMatrix_posDef_of_posDef (a := A)
         (fullRankApproxMaximallyMixedStatePath σ δ) hpath_pd
-    have hpath_support : Matrix.Supports ρ.matrix
+    have hpath_support : Matrix.Supports ρ.m
         (identityTensorStateMatrix (a := A)
           (fullRankApproxMaximallyMixedStatePath σ δ)) :=
       Matrix.Supports.of_right_posDef _ _ href_pd
@@ -206,17 +203,18 @@ theorem conditionalSandwichedRenyiUp_candidateE_fullRankApprox_tendsto_of_highAl
   have hpath' := hpath.mono (fun _ h => h.symm)
   exact Filter.Tendsto.congr' hpath' (EReal.tendsto_coe.mpr hreal)
 
-/-! Pinching closes the non-singular arbitrary-reference branch. -/
+/-- For `1/2 < α < 1`, an arbitrary state reference whose coordinate-`Y` pinching is positive
+definite gives a candidate below the classical closed form. -/
 theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_of_half_lt_lt_one_of_pinched_posDef
     [Nonempty B]
-    (E : Ensemble Y (A × B)) (σ : State (B × Y))
+    (E : MEnsemble (A × B) Y) (σ : MState (B × Y))
     (hF : ((coordinateYPinchedEnsemble (B := B) (Y := Y) σ).cqState.reindex
-      (Equiv.prodComm Y B)).matrix.PosDef)
+      (Equiv.prodComm Y B)).m.PosDef)
     (α : ℝ) (hα_half : 1 / 2 < α) (hα_lt_one : α < 1) :
     -sandwichedRenyiPSDReferenceE
-        (State.cqConditioningState E)
+        (MState.cqConditioningState E)
         (identityTensorStateMatrix (a := A) σ)
-        (identityTensorStateMatrix_posSemidef_of_state (a := A) σ) α ≤
+        (identityTensorStateMatrix_posSemidef (a := A) σ) α ≤
       (sandwichedUpClassicalFormulaReal E α hα_half.le
         (ne_of_lt hα_lt_one) : EReal) := by
   have hpinch := conditionalSandwichedRenyiUp_candidate_le_of_coordinateYPinching
@@ -226,9 +224,9 @@ theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_of_
       E (coordinateYPinchedEnsemble (B := B) (Y := Y) σ) hF α hα_half hα_lt_one
   have hclassical' :
       -sandwichedRenyiPSDReferenceE
-          (State.cqConditioningState E)
+          (MState.cqConditioningState E)
           (identityTensorStateMatrix (a := A) (coordinateYPinchedState σ))
-          (identityTensorStateMatrix_posSemidef_of_state
+          (identityTensorStateMatrix_posSemidef
             (a := A) (coordinateYPinchedState σ)) α ≤
         (sandwichedUpClassicalFormulaReal E α hα_half.le
           (ne_of_lt hα_lt_one) : EReal) := by
@@ -236,14 +234,14 @@ theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_of_
   exact hpinch.trans hclassical'
 
 theorem sandwichedRenyiPSDReferenceE_cq_fullrank_reference_le_classicalFormula_of_one_lt
-    (E : Ensemble Y (A × B)) (F : Ensemble Y B)
-    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).matrix.PosDef)
+    (E : MEnsemble (A × B) Y) (F : MEnsemble B Y)
+    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).m.PosDef)
     (α : ℝ) (hα_gt_one : 1 < α) :
     -sandwichedRenyiPSDReferenceE
-        (State.cqConditioningState E)
+        (MState.cqConditioningState E)
         (identityTensorStateMatrix (a := A)
           (F.cqState.reindex (Equiv.prodComm Y B)))
-        (identityTensorStateMatrix_posSemidef_of_state
+        (identityTensorStateMatrix_posSemidef
           (a := A) (F.cqState.reindex (Equiv.prodComm Y B))) α ≤
       (sandwichedUpClassicalFormulaReal E α (by linarith)
         (ne_of_gt hα_gt_one) : EReal) := by
@@ -274,7 +272,7 @@ theorem sandwichedRenyiPSDReferenceE_cq_fullrank_reference_le_classicalFormula_o
       sandwichedFixedReferenceBranchValue E F y α hF hα_pos hα_ne_one ≤
         sandwichedConditionalBranch E y α (by linarith) hα_ne_one := by
     intro y
-    have hyF : (F.states y).matrix.PosDef :=
+    have hyF : (F.states y).m.PosDef :=
       sandwiched_reference_cq_state_posDef F hF y
     have hsource_bdd :=
       (E.states y).conditionalSandwichedRenyiUpSourceValueSet_bddAbove_of_one_lt
@@ -409,14 +407,14 @@ theorem sandwichedRenyiPSDReferenceE_cq_fullrank_reference_le_classicalFormula_o
 
 theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_of_one_lt_of_pinched_posDef
     [Nonempty B]
-    (E : Ensemble Y (A × B)) (σ : State (B × Y))
+    (E : MEnsemble (A × B) Y) (σ : MState (B × Y))
     (hF : ((coordinateYPinchedEnsemble (B := B) (Y := Y) σ).cqState.reindex
-      (Equiv.prodComm Y B)).matrix.PosDef)
+      (Equiv.prodComm Y B)).m.PosDef)
     (α : ℝ) (hα_gt_one : 1 < α) :
     -sandwichedRenyiPSDReferenceE
-        (State.cqConditioningState E)
+        (MState.cqConditioningState E)
         (identityTensorStateMatrix (a := A) σ)
-        (identityTensorStateMatrix_posSemidef_of_state (a := A) σ) α ≤
+        (identityTensorStateMatrix_posSemidef (a := A) σ) α ≤
       (sandwichedUpClassicalFormulaReal E α (by linarith)
         (ne_of_gt hα_gt_one) : EReal) := by
   have hpinch := conditionalSandwichedRenyiUp_candidate_le_of_coordinateYPinching
@@ -426,9 +424,9 @@ theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_of_
       E (coordinateYPinchedEnsemble (B := B) (Y := Y) σ) hF α hα_gt_one
   have hclassical' :
       -sandwichedRenyiPSDReferenceE
-          (State.cqConditioningState E)
+          (MState.cqConditioningState E)
           (identityTensorStateMatrix (a := A) (coordinateYPinchedState σ))
-          (identityTensorStateMatrix_posSemidef_of_state
+          (identityTensorStateMatrix_posSemidef
             (a := A) (coordinateYPinchedState σ)) α ≤
         (sandwichedUpClassicalFormulaReal E α (by linarith)
           (ne_of_gt hα_gt_one) : EReal) := by
@@ -437,38 +435,38 @@ theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_of_
 
 theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_of_one_lt
     [Nonempty B]
-    (E : Ensemble Y (A × B)) (σ : State (B × Y))
+    (E : MEnsemble (A × B) Y) (σ : MState (B × Y))
     (α : ℝ) (hα_gt_one : 1 < α) :
     -sandwichedRenyiPSDReferenceE
-        (State.cqConditioningState E)
+        (MState.cqConditioningState E)
         (identityTensorStateMatrix (a := A) σ)
-        (identityTensorStateMatrix_posSemidef_of_state (a := A) σ) α ≤
+        (identityTensorStateMatrix_posSemidef (a := A) σ) α ≤
       (sandwichedUpClassicalFormulaReal E α (by linarith)
         (ne_of_gt hα_gt_one) : EReal) := by
   classical
-  let : Nonempty Y := Ensemble.index_nonempty E
+  let : Nonempty Y := MEnsemble.index_nonempty E
   let σc := coordinateYPinchedState σ
   have hpinch := conditionalSandwichedRenyiUp_candidate_le_of_coordinateYPinching
     E σ α (by linarith) (ne_of_gt hα_gt_one)
   have hc_le :
       -sandwichedRenyiPSDReferenceE
-          (State.cqConditioningState E)
+          (MState.cqConditioningState E)
           (identityTensorStateMatrix (a := A) σc)
-          (identityTensorStateMatrix_posSemidef_of_state (a := A) σc) α ≤
+          (identityTensorStateMatrix_posSemidef (a := A) σc) α ≤
         (sandwichedUpClassicalFormulaReal E α (by linarith)
           (ne_of_gt hα_gt_one) : EReal) := by
     by_cases hSupport : Matrix.Supports
-        (State.cqConditioningState E).matrix
+        (MState.cqConditioningState E).m
         (identityTensorStateMatrix (a := A) σc)
     · have htend :=
         conditionalSandwichedRenyiUp_candidateE_fullRankApprox_tendsto_of_highAlpha
           E σc α hα_gt_one hSupport
       have hevent : ∀ᶠ δ in nhdsWithin (0 : ℝ) (Set.Ioo 0 1),
           -sandwichedRenyiPSDReferenceE
-              (State.cqConditioningState E)
+              (MState.cqConditioningState E)
               (identityTensorStateMatrix (a := A)
                 (fullRankApproxMaximallyMixedStatePath σc δ))
-              (identityTensorStateMatrix_posSemidef_of_state (a := A)
+              (identityTensorStateMatrix_posSemidef (a := A)
                 (fullRankApproxMaximallyMixedStatePath σc δ)) α ≤
             (sandwichedUpClassicalFormulaReal E α (by linarith)
               (ne_of_gt hα_gt_one) : EReal) := by
@@ -477,10 +475,10 @@ theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_of_
         have hF' :
             ((coordinateYPinchedEnsemble (B := B) (Y := Y)
               (fullRankApproxMaximallyMixedStatePath σc δ)).cqState.reindex
-                (Equiv.prodComm Y B)).matrix.PosDef := by
+                (Equiv.prodComm Y B)).m.PosDef := by
           simpa [fullRankApproxMaximallyMixedStatePath,
             fullRankApproxStatePath, hδ,
-            coordinateYPinchedState_regularized_maximallyMixed_fixed,
+            coordinateYPinchedState_regularized_uniform_fixed,
             coordinateYPinchedState_fixed] using hF
         have hclass :=
           sandwichedRenyiPSDReferenceE_cq_fullrank_reference_le_classicalFormula_of_one_lt
@@ -495,7 +493,7 @@ theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_of_
             simpa [σc] using coordinateYPinchedState_fixed σ
           simpa [σc, hσc_fixed, fullRankApproxMaximallyMixedStatePath,
             fullRankApproxStatePath, hδ] using
-            (coordinateYPinchedState_regularized_maximallyMixed_fixed
+            (coordinateYPinchedState_regularized_uniform_fixed
               σc δ hδ.1.le hδ.2.le)
         simpa [hfixed] using hclass
       have : Filter.NeBot (nhdsWithin (0 : ℝ) (Set.Ioo 0 1)) :=
@@ -503,20 +501,20 @@ theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_of_
       exact le_of_tendsto htend hevent
     · rw [sandwichedRenyiPSDReferenceE_eq_highAlphaE_of_one_lt _ _ hα_gt_one,
       sandwichedRenyiPSDReferenceHighAlphaE_eq_top_of_not_supports
-        _ (identityTensorStateMatrix_posSemidef_of_state (a := A) σc)
+        _ (identityTensorStateMatrix_posSemidef (a := A) σc)
         α hSupport]
       simp
   exact hpinch.trans hc_le
 
 theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_half_of_pinched_posDef
     [Nonempty B]
-    (E : Ensemble Y (A × B)) (σ : State (B × Y))
+    (E : MEnsemble (A × B) Y) (σ : MState (B × Y))
     (hF : ((coordinateYPinchedEnsemble (B := B) (Y := Y) σ).cqState.reindex
-      (Equiv.prodComm Y B)).matrix.PosDef) :
+      (Equiv.prodComm Y B)).m.PosDef) :
     -sandwichedRenyiPSDReferenceE
-        (State.cqConditioningState E)
+        (MState.cqConditioningState E)
         (identityTensorStateMatrix (a := A) σ)
-        (identityTensorStateMatrix_posSemidef_of_state (a := A) σ)
+        (identityTensorStateMatrix_posSemidef (a := A) σ)
         (1 / 2 : ℝ) ≤
       (sandwichedUpClassicalFormulaReal E (1 / 2 : ℝ) (by norm_num)
         (by norm_num) : EReal) := by
@@ -527,9 +525,9 @@ theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_hal
       E (coordinateYPinchedEnsemble (B := B) (Y := Y) σ) hF
   have hclassical' :
       -sandwichedRenyiPSDReferenceE
-          (State.cqConditioningState E)
+          (MState.cqConditioningState E)
           (identityTensorStateMatrix (a := A) (coordinateYPinchedState σ))
-          (identityTensorStateMatrix_posSemidef_of_state
+          (identityTensorStateMatrix_posSemidef
             (a := A) (coordinateYPinchedState σ)) (1 / 2 : ℝ) ≤
         (sandwichedUpClassicalFormulaReal E (1 / 2 : ℝ) (by norm_num)
           (by norm_num) : EReal) := by
@@ -538,12 +536,12 @@ theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_hal
 
 theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_of_half_lt_lt_one
     [Nonempty B]
-    (E : Ensemble Y (A × B)) (σ : State (B × Y))
+    (E : MEnsemble (A × B) Y) (σ : MState (B × Y))
     (α : ℝ) (hα_half : 1 / 2 < α) (hα_lt_one : α < 1) :
     -sandwichedRenyiPSDReferenceE
-        (State.cqConditioningState E)
+        (MState.cqConditioningState E)
         (identityTensorStateMatrix (a := A) σ)
-        (identityTensorStateMatrix_posSemidef_of_state (a := A) σ) α ≤
+        (identityTensorStateMatrix_posSemidef (a := A) σ) α ≤
       (sandwichedUpClassicalFormulaReal E α hα_half.le
         (ne_of_lt hα_lt_one) : EReal) := by
   classical
@@ -551,24 +549,24 @@ theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_of_
   have hpinch := conditionalSandwichedRenyiUp_candidate_le_of_coordinateYPinching
     E σ α hα_half.le (ne_of_lt hα_lt_one)
   have hQzero_or_pos :
-      sandwichedRenyiQ (State.cqConditioningState E).matrix
+      sandwichedRenyiQ (MState.cqConditioningState E).m
           (identityTensorStateMatrix (a := A) σc)
-          (State.cqConditioningState E).pos
-          (identityTensorStateMatrix_posSemidef_of_state (a := A) σc) α = 0 ∨
-        0 < sandwichedRenyiQ (State.cqConditioningState E).matrix
+          (MState.cqConditioningState E).psd
+          (identityTensorStateMatrix_posSemidef (a := A) σc) α = 0 ∨
+        0 < sandwichedRenyiQ (MState.cqConditioningState E).m
           (identityTensorStateMatrix (a := A) σc)
-          (State.cqConditioningState E).pos
-          (identityTensorStateMatrix_posSemidef_of_state (a := A) σc) α := by
-    have hnonneg := sandwichedRenyiQ_nonneg (State.cqConditioningState E).pos
-      (identityTensorStateMatrix_posSemidef_of_state (a := A) σc) α
+          (MState.cqConditioningState E).psd
+          (identityTensorStateMatrix_posSemidef (a := A) σc) α := by
+    have hnonneg := sandwichedRenyiQ_nonneg (MState.cqConditioningState E).psd
+      (identityTensorStateMatrix_posSemidef (a := A) σc) α
     rcases lt_or_eq_of_le hnonneg with hpos | hzero
     · exact Or.inr hpos
     · exact Or.inl hzero.symm
   have hc_le :
       -sandwichedRenyiPSDReferenceE
-          (State.cqConditioningState E)
+          (MState.cqConditioningState E)
           (identityTensorStateMatrix (a := A) σc)
-          (identityTensorStateMatrix_posSemidef_of_state (a := A) σc) α ≤
+          (identityTensorStateMatrix_posSemidef (a := A) σc) α ≤
         (sandwichedUpClassicalFormulaReal E α hα_half.le
           (ne_of_lt hα_lt_one) : EReal) := by
     rcases hQzero_or_pos with hQzero | hQpos
@@ -576,23 +574,23 @@ theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_of_
         sandwichedRenyiPSDReferenceLowAlphaE_eq_top_of_Q_eq_zero
           _ _ _ hQzero]
       simp
-    · let path : ℝ → State (B × Y) := fun δ =>
+    · let path : ℝ → MState (B × Y) := fun δ =>
         fullRankApproxMaximallyMixedStatePath σc δ
       have htend :=
         conditionalSandwichedRenyiUp_candidateE_fullRankApprox_tendsto_of_lowAlpha
           E σc α hα_half hα_lt_one hQpos
       have hevent : ∀ᶠ δ in nhdsWithin (0 : ℝ) (Set.Ioo 0 1),
           -sandwichedRenyiPSDReferenceE
-              (State.cqConditioningState E)
+              (MState.cqConditioningState E)
               (identityTensorStateMatrix (a := A) (path δ))
-              (identityTensorStateMatrix_posSemidef_of_state (a := A) (path δ)) α ≤
+              (identityTensorStateMatrix_posSemidef (a := A) (path δ)) α ≤
             (sandwichedUpClassicalFormulaReal E α hα_half.le
               (ne_of_lt hα_lt_one) : EReal) := by
         filter_upwards [self_mem_nhdsWithin] with δ hδ
         have hF := coordinateYPinchedFullRankPath_posDef σ hδ
         have hF' :
             ((coordinateYPinchedEnsemble (B := B) (Y := Y) (path δ)).cqState.reindex
-              (Equiv.prodComm Y B)).matrix.PosDef := by
+              (Equiv.prodComm Y B)).m.PosDef := by
           simpa [path, σc, coordinateYPinchedState_fixed] using hF
         exact sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_of_half_lt_lt_one_of_pinched_posDef
           E (path δ) hF' α hα_half hα_lt_one
@@ -602,45 +600,44 @@ theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_of_
       exact hc_le'
   exact hpinch.trans hc_le
 
-
 theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_half
     [Nonempty B]
-    (E : Ensemble Y (A × B)) (σ : State (B × Y)) :
+    (E : MEnsemble (A × B) Y) (σ : MState (B × Y)) :
     -sandwichedRenyiPSDReferenceE
-        (State.cqConditioningState E)
+        (MState.cqConditioningState E)
         (identityTensorStateMatrix (a := A) σ)
-        (identityTensorStateMatrix_posSemidef_of_state (a := A) σ)
+        (identityTensorStateMatrix_posSemidef (a := A) σ)
         (1 / 2 : ℝ) ≤
       (sandwichedUpClassicalFormulaReal E (1 / 2 : ℝ) (by norm_num)
         (by norm_num) : EReal) := by
   classical
-  let : Nonempty Y := Ensemble.index_nonempty E
+  let : Nonempty Y := MEnsemble.index_nonempty E
   let : Nonempty (B × Y) := inferInstance
   let σc := coordinateYPinchedState σ
   have hpinch := conditionalSandwichedRenyiUp_candidate_le_of_coordinateYPinching
     E σ (1 / 2 : ℝ) (by norm_num) (by norm_num)
   have hQzero_or_pos :
-      sandwichedRenyiQ (State.cqConditioningState E).matrix
+      sandwichedRenyiQ (MState.cqConditioningState E).m
           (identityTensorStateMatrix (a := A) σc)
-          (State.cqConditioningState E).pos
-          (identityTensorStateMatrix_posSemidef_of_state (a := A) σc)
+          (MState.cqConditioningState E).psd
+          (identityTensorStateMatrix_posSemidef (a := A) σc)
           (1 / 2 : ℝ) = 0 ∨
-        0 < sandwichedRenyiQ (State.cqConditioningState E).matrix
+        0 < sandwichedRenyiQ (MState.cqConditioningState E).m
           (identityTensorStateMatrix (a := A) σc)
-          (State.cqConditioningState E).pos
-          (identityTensorStateMatrix_posSemidef_of_state (a := A) σc)
+          (MState.cqConditioningState E).psd
+          (identityTensorStateMatrix_posSemidef (a := A) σc)
           (1 / 2 : ℝ) := by
-    have hnonneg := sandwichedRenyiQ_nonneg (State.cqConditioningState E).pos
-      (identityTensorStateMatrix_posSemidef_of_state (a := A) σc)
+    have hnonneg := sandwichedRenyiQ_nonneg (MState.cqConditioningState E).psd
+      (identityTensorStateMatrix_posSemidef (a := A) σc)
       (1 / 2 : ℝ)
     rcases lt_or_eq_of_le hnonneg with hpos | hzero
     · exact Or.inr hpos
     · exact Or.inl hzero.symm
   have hc_le :
       -sandwichedRenyiPSDReferenceE
-          (State.cqConditioningState E)
+          (MState.cqConditioningState E)
           (identityTensorStateMatrix (a := A) σc)
-          (identityTensorStateMatrix_posSemidef_of_state (a := A) σc)
+          (identityTensorStateMatrix_posSemidef (a := A) σc)
           (1 / 2 : ℝ) ≤
         (sandwichedUpClassicalFormulaReal E (1 / 2 : ℝ) (by norm_num)
           (by norm_num) : EReal) := by
@@ -649,22 +646,22 @@ theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_hal
         sandwichedRenyiPSDReferenceLowAlphaE_eq_top_of_Q_eq_zero
           _ _ _ hQzero]
       simp
-    · let path : ℝ → State (B × Y) := fun δ =>
+    · let path : ℝ → MState (B × Y) := fun δ =>
         fullRankApproxMaximallyMixedStatePath σc δ
       let l : Filter ℝ := nhdsWithin (0 : ℝ) (Set.Ioo 0 1)
       have hmatrix :
           Filter.Tendsto
-            (fun δ : ℝ => (path δ).matrix) l (nhds σc.matrix) := by
+            (fun δ : ℝ => (path δ).m) l (nhds σc.m) := by
         refine Filter.Tendsto.congr' ?_
           (fullRankApproxMatrix_tendsto_zero σc
-            (State.maximallyMixed (B × Y)))
+            (MState.uniform : MState (B × Y)))
         filter_upwards [self_mem_nhdsWithin] with δ hδ
         change fullRankApproxMatrix σc
-            (State.maximallyMixed (B × Y)) δ = _
+            (MState.uniform : MState (B × Y)) δ = _
         dsimp [path, fullRankApproxMaximallyMixedStatePath,
           fullRankApproxStatePath]
         rw [dif_pos hδ]
-        rfl
+        exact (fullRankApproxState_matrix σc (MState.uniform : MState (B × Y)) δ _ _).symm
       have hreference :
           Filter.Tendsto
             (fun δ : ℝ => identityTensorStateMatrix (a := A) (path δ)) l
@@ -674,49 +671,49 @@ theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_hal
         apply tendsto_pi_nhds.2
         intro j
         simp only [identityTensorStateMatrix]
-        have hi : Filter.Tendsto (fun δ : ℝ => (path δ).matrix i.2) l
-            (nhds (σc.matrix i.2)) :=
-          ((continuous_apply i.2).tendsto σc.matrix).comp hmatrix
-        have hij : Filter.Tendsto (fun δ : ℝ => (path δ).matrix i.2 j.2) l
-            (nhds (σc.matrix i.2 j.2)) :=
-          ((continuous_apply j.2).tendsto (σc.matrix i.2)).comp hi
+        have hi : Filter.Tendsto (fun δ : ℝ => (path δ).m i.2) l
+            (nhds (σc.m i.2)) :=
+          ((continuous_apply i.2).tendsto σc.m).comp hmatrix
+        have hij : Filter.Tendsto (fun δ : ℝ => (path δ).m i.2 j.2) l
+            (nhds (σc.m i.2 j.2)) :=
+          ((continuous_apply j.2).tendsto (σc.m i.2)).comp hi
         have hc : Filter.Tendsto (fun _ : ℝ => (1 : CMatrix A) i.1 j.1)
             l (nhds ((1 : CMatrix A) i.1 j.1)) := tendsto_const_nhds
         simpa using hc.mul hij
       have hQ_tend :
           Filter.Tendsto
             (fun δ : ℝ => sandwichedRenyiQ
-              (State.cqConditioningState E).matrix
+              (MState.cqConditioningState E).m
               (identityTensorStateMatrix (a := A) (path δ))
-              (State.cqConditioningState E).pos
-              (identityTensorStateMatrix_posSemidef_of_state (a := A) (path δ))
+              (MState.cqConditioningState E).psd
+              (identityTensorStateMatrix_posSemidef (a := A) (path δ))
               (1 / 2 : ℝ)) l
             (nhds (sandwichedRenyiQ
-              (State.cqConditioningState E).matrix
+              (MState.cqConditioningState E).m
               (identityTensorStateMatrix (a := A) σc)
-              (State.cqConditioningState E).pos
-          (identityTensorStateMatrix_posSemidef_of_state (a := A) σc)
+              (MState.cqConditioningState E).psd
+          (identityTensorStateMatrix_posSemidef (a := A) σc)
               (1 / 2 : ℝ))) := by
         exact sandwichedRenyiQ_tendsto_of_tendsto_posSemidef
           (by norm_num) (by norm_num) tendsto_const_nhds hreference
-          (fun _ => (State.cqConditioningState E).pos)
-          (fun δ => identityTensorStateMatrix_posSemidef_of_state
+          (fun _ => (MState.cqConditioningState E).psd)
+          (fun δ => identityTensorStateMatrix_posSemidef
             (a := A) (path δ))
-          (State.cqConditioningState E).pos
-          (identityTensorStateMatrix_posSemidef_of_state (a := A) σc)
+          (MState.cqConditioningState E).psd
+          (identityTensorStateMatrix_posSemidef (a := A) σc)
       have hlog_tend :
           Filter.Tendsto
             (fun δ : ℝ => log2 (sandwichedRenyiQ
-              (State.cqConditioningState E).matrix
+              (MState.cqConditioningState E).m
               (identityTensorStateMatrix (a := A) (path δ))
-              (State.cqConditioningState E).pos
-              (identityTensorStateMatrix_posSemidef_of_state (a := A) (path δ))
+              (MState.cqConditioningState E).psd
+              (identityTensorStateMatrix_posSemidef (a := A) (path δ))
               (1 / 2 : ℝ))) l
             (nhds (log2 (sandwichedRenyiQ
-              (State.cqConditioningState E).matrix
+              (MState.cqConditioningState E).m
               (identityTensorStateMatrix (a := A) σc)
-              (State.cqConditioningState E).pos
-          (identityTensorStateMatrix_posSemidef_of_state (a := A) σc)
+              (MState.cqConditioningState E).psd
+          (identityTensorStateMatrix_posSemidef (a := A) σc)
               (1 / 2 : ℝ)))) := by
         have hraw := Filter.Tendsto.log hQ_tend hQpos.ne'
         simpa [log2, Pi.div_def] using
@@ -724,15 +721,15 @@ theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_hal
       have hreal :
           Filter.Tendsto
             (fun δ : ℝ => -(1 / ((1 / 2 : ℝ) - 1)) * log2 (sandwichedRenyiQ
-              (State.cqConditioningState E).matrix
+              (MState.cqConditioningState E).m
               (identityTensorStateMatrix (a := A) (path δ))
-              (State.cqConditioningState E).pos
-              (identityTensorStateMatrix_posSemidef_of_state (a := A) (path δ))
+              (MState.cqConditioningState E).psd
+              (identityTensorStateMatrix_posSemidef (a := A) (path δ))
               (1 / 2 : ℝ))) l
             (nhds (-sandwichedRenyiPSDReferenceLowAlpha
-              (State.cqConditioningState E)
+              (MState.cqConditioningState E)
               (identityTensorStateMatrix (a := A) σc)
-          (identityTensorStateMatrix_posSemidef_of_state (a := A) σc)
+          (identityTensorStateMatrix_posSemidef (a := A) σc)
               (1 / 2 : ℝ))) := by
         have h := hlog_tend.const_mul (-1 / ((1 / 2 : ℝ) - 1))
         convert h using 1 <;>
@@ -740,46 +737,46 @@ theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_hal
       have hcandidate_tend :
           Filter.Tendsto
             (fun δ : ℝ => -sandwichedRenyiPSDReferenceE
-              (State.cqConditioningState E)
+              (MState.cqConditioningState E)
               (identityTensorStateMatrix (a := A) (path δ))
-              (identityTensorStateMatrix_posSemidef_of_state (a := A) (path δ))
+              (identityTensorStateMatrix_posSemidef (a := A) (path δ))
               (1 / 2 : ℝ)) l
             (nhds (-sandwichedRenyiPSDReferenceLowAlpha
-              (State.cqConditioningState E)
+              (MState.cqConditioningState E)
               (identityTensorStateMatrix (a := A) σc)
-          (identityTensorStateMatrix_posSemidef_of_state (a := A) σc)
+          (identityTensorStateMatrix_posSemidef (a := A) σc)
               (1 / 2 : ℝ) : EReal)) := by
         have heq : ∀ᶠ δ in l,
             (fun δ : ℝ => -sandwichedRenyiPSDReferenceE
-              (State.cqConditioningState E)
+              (MState.cqConditioningState E)
               (identityTensorStateMatrix (a := A) (path δ))
-              (identityTensorStateMatrix_posSemidef_of_state (a := A) (path δ))
+              (identityTensorStateMatrix_posSemidef (a := A) (path δ))
               (1 / 2 : ℝ)) δ =
             (((-(1 / ((1 / 2 : ℝ) - 1)) * log2 (sandwichedRenyiQ
-              (State.cqConditioningState E).matrix
+              (MState.cqConditioningState E).m
               (identityTensorStateMatrix (a := A) (path δ))
-              (State.cqConditioningState E).pos
-              (identityTensorStateMatrix_posSemidef_of_state (a := A) (path δ))
+              (MState.cqConditioningState E).psd
+              (identityTensorStateMatrix_posSemidef (a := A) (path δ))
               (1 / 2 : ℝ))) : ℝ) : EReal) := by
           filter_upwards [self_mem_nhdsWithin] with δ hδ
-          have hpath_pd : (path δ).matrix.PosDef := by
+          have hpath_pd : (path δ).m.PosDef := by
             dsimp [path]
             rw [fullRankApproxMaximallyMixedStatePath,
               fullRankApproxStatePath, dif_pos hδ]
             exact fullRankApproxState_posDef_of_noise σc
-              (State.maximallyMixed (B × Y))
-              State.maximallyMixed_posDef hδ.1.le hδ.2.le hδ.1
+              (MState.uniform : MState (B × Y))
+              MState.uniform_posDef hδ.1.le hδ.2.le hδ.1
           have hreference_pd :
               (identityTensorStateMatrix (a := A) (path δ)).PosDef :=
             identityTensorStateMatrix_posDef_of_posDef (a := A) (path δ) hpath_pd
           have hQδpos : 0 < sandwichedRenyiQ
-              (State.cqConditioningState E).matrix
+              (MState.cqConditioningState E).m
               (identityTensorStateMatrix (a := A) (path δ))
-              (State.cqConditioningState E).pos
-              (identityTensorStateMatrix_posSemidef_of_state (a := A) (path δ))
+              (MState.cqConditioningState E).psd
+              (identityTensorStateMatrix_posSemidef (a := A) (path δ))
               (1 / 2 : ℝ) :=
             sandwichedRenyiQ_pos_of_state_posDef_reference
-              (State.cqConditioningState E) hreference_pd (1 / 2 : ℝ)
+              (MState.cqConditioningState E) hreference_pd (1 / 2 : ℝ)
           rw [sandwichedRenyiPSDReferenceE_eq_lowAlphaE_of_lt_one _ _ (by norm_num),
             sandwichedRenyiPSDReferenceLowAlphaE_eq_coe_of_Q_ne_zero
               _ _ _ hQδpos.ne']
@@ -790,9 +787,9 @@ theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_hal
         exact Filter.Tendsto.congr' (heq.mono fun _ h => h.symm) hreal'
       have hevent : ∀ᶠ δ in l,
           -sandwichedRenyiPSDReferenceE
-              (State.cqConditioningState E)
+              (MState.cqConditioningState E)
               (identityTensorStateMatrix (a := A) (path δ))
-              (identityTensorStateMatrix_posSemidef_of_state (a := A) (path δ))
+              (identityTensorStateMatrix_posSemidef (a := A) (path δ))
               (1 / 2 : ℝ) ≤
             (sandwichedUpClassicalFormulaReal E (1 / 2 : ℝ) (by norm_num)
               (by norm_num) : EReal) := by
@@ -802,7 +799,7 @@ theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_hal
           dsimp [path]
           rw [fullRankApproxMaximallyMixedStatePath,
             fullRankApproxStatePath, dif_pos hδ]
-          exact coordinateYPinchedState_regularized_maximallyMixed_fixed
+          exact coordinateYPinchedState_regularized_uniform_fixed
             σ δ hδ.1.le hδ.2.le
         simpa [hcoord] using
           (sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_half_of_pinched_posDef
@@ -810,14 +807,14 @@ theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_hal
       have : Filter.NeBot l := left_nhdsWithin_Ioo_neBot zero_lt_one
       have htarget :
           -sandwichedRenyiPSDReferenceE
-              (State.cqConditioningState E)
+              (MState.cqConditioningState E)
               (identityTensorStateMatrix (a := A) σc)
-              (identityTensorStateMatrix_posSemidef_of_state (a := A) σc)
+              (identityTensorStateMatrix_posSemidef (a := A) σc)
               (1 / 2 : ℝ) =
             (-sandwichedRenyiPSDReferenceLowAlpha
-              (State.cqConditioningState E)
+              (MState.cqConditioningState E)
               (identityTensorStateMatrix (a := A) σc)
-              (identityTensorStateMatrix_posSemidef_of_state (a := A) σc)
+              (identityTensorStateMatrix_posSemidef (a := A) σc)
               (1 / 2 : ℝ) : EReal) := by
         rw [sandwichedRenyiPSDReferenceE_eq_lowAlphaE_of_lt_one _ _ (by norm_num),
           sandwichedRenyiPSDReferenceLowAlphaE_eq_coe_of_Q_ne_zero
@@ -826,14 +823,12 @@ theorem sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_hal
       exact le_of_tendsto hcandidate_tend hevent
   exact hpinch.trans hc_le
 
-/-! Every full-rank classical reference ensemble supplies an actual member of
-the global source supremum.  This is the lower-bound direction needed when
-assembling branchwise source candidates; it keeps the source formula visible
-and does not assume that the supremum is attained. -/
-
+/-- Every full-rank classical reference ensemble is an admissible candidate, so its fixed-reference
+value lower-bounds the upward entropy.  This is the direction used when assembling branchwise
+candidates, and it does not assume that the supremum is attained. -/
 theorem sandwichedUpFixedReferenceFormulaReal_le_conditionalSandwichedRenyiUpE
-    (E : Ensemble Y (A × B)) (F : Ensemble Y B)
-    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).matrix.PosDef)
+    (E : MEnsemble (A × B) Y) (F : MEnsemble B Y)
+    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).m.PosDef)
     (α : ℝ) (hα_half : 1 / 2 ≤ α) (hα_pos : 0 < α)
     (hα_ne_one : α ≠ 1) :
     (sandwichedUpFixedReferenceFormulaReal E F α : EReal) ≤
@@ -844,18 +839,16 @@ theorem sandwichedUpFixedReferenceFormulaReal_le_conditionalSandwichedRenyiUpE
   unfold conditionalSandwichedRenyiUpE
   exact le_sSup ⟨F.cqState.reindex (Equiv.prodComm Y B), rfl⟩
 
-/-! The arbitrary-reference upper bound is the `csSup` half of the
-source proof.  The endpoint and the two open parameter ranges are kept as
-separate cases because the source divergence has different support
-conventions at those boundaries. -/
-
+/-- The supremum over arbitrary positive semidefinite references is at most the classical closed
+form.  The endpoint `α = 1/2` and the two open ranges are treated separately, because the
+divergence has different support conventions there. -/
 theorem conditionalSandwichedRenyiUpE_le_classicalFormula
-    (E : Ensemble Y (A × B)) (α : ℝ) (hα : 1 / 2 ≤ α)
+    (E : MEnsemble (A × B) Y) (α : ℝ) (hα : 1 / 2 ≤ α)
     (hα_ne_one : α ≠ 1) :
     conditionalSandwichedRenyiUpE E α hα hα_ne_one ≤
       (sandwichedUpClassicalFormulaReal E α hα hα_ne_one : EReal) := by
   classical
-  let : Nonempty Y := Ensemble.index_nonempty E
+  let : Nonempty Y := MEnsemble.index_nonempty E
   let : Nonempty B := by
     rcases (E.states (Classical.choice (inferInstance : Nonempty Y))).nonempty with
       ⟨⟨a, b⟩⟩
@@ -866,11 +859,11 @@ theorem conditionalSandwichedRenyiUpE_le_classicalFormula
     exact ⟨a⟩
   unfold conditionalSandwichedRenyiUpE
   refine csSup_le ?_ ?_
-  · let σ₀ : State (B × Y) := State.maximallyMixed (B × Y)
+  · let σ₀ : MState (B × Y) := (MState.uniform : MState (B × Y))
     refine ⟨-sandwichedRenyiPSDReferenceE
-        (State.cqConditioningState E)
+        (MState.cqConditioningState E)
         (identityTensorStateMatrix (a := A) σ₀)
-        (identityTensorStateMatrix_posSemidef_of_state (a := A) σ₀) α, ?_⟩
+        (identityTensorStateMatrix_posSemidef (a := A) σ₀) α, ?_⟩
     exact ⟨σ₀, rfl⟩
   · rintro z ⟨σ, rfl⟩
     by_cases hhalf : α = (1 / 2 : ℝ)
@@ -887,14 +880,13 @@ theorem conditionalSandwichedRenyiUpE_le_classicalFormula
       · exact sandwichedRenyiPSDReferenceE_arbitrary_reference_le_classicalFormula_of_one_lt
           E σ α hα_gt_one
 
-/-! A source-shaped optimizer candidate.  The strict positivity hypothesis on
-the classical weights is temporary local data for this full-rank candidate;
-zero-weight labels are removed by `conditionalRenyiSupport` in the closure
-argument. -/
-
+/-- A full-rank reference whose classical weights realize the scalar optimizer, and whose branch
+values agree with the conditional branches, lower-bounds the upward entropy by the optimized
+formula.  The strict positivity of the weights is local to this candidate; zero-weight labels are
+removed by `conditionalRenyiSupport` in the closure argument. -/
 theorem sandwichedUpSourceOptimizerFixedReference_le_conditionalSandwichedRenyiUpE
-    (E : Ensemble Y (A × B)) (F : Ensemble Y B)
-    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).matrix.PosDef)
+    (E : MEnsemble (A × B) Y) (F : MEnsemble B Y)
+    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).m.PosDef)
     (α : ℝ) (hα_half : 1 / 2 ≤ α) (hα_pos : 0 < α)
     (hα_ne_one : α ≠ 1)
     (hEpos : ∀ y, 0 < (E.probs y : ℝ))
@@ -910,7 +902,7 @@ theorem sandwichedUpSourceOptimizerFixedReference_le_conditionalSandwichedRenyiU
     (sandwichedUpClassicalFormulaReal E α hα_half hα_ne_one : EReal) ≤
       conditionalSandwichedRenyiUpE E α hα_half hα_ne_one := by
   classical
-  let : Nonempty Y := Ensemble.index_nonempty E
+  let : Nonempty Y := MEnsemble.index_nonempty E
   let p : Y → ℝ := fun y => (E.probs y : ℝ)
   let h : Y → ℝ := fun y =>
     sandwichedConditionalBranch E y α hα_half hα_ne_one
@@ -962,7 +954,7 @@ theorem sandwichedUpSourceOptimizerFixedReference_le_conditionalSandwichedRenyiU
     ring
   have hsupport : E.conditionalRenyiSupport = (Finset.univ : Finset Y) := by
     ext y
-    rw [Ensemble.mem_conditionalRenyiSupport_iff]
+    rw [MEnsemble.mem_conditionalRenyiSupport_iff]
     have hpy : E.probs y ≠ 0 := by
       intro hpy
       have hpy' : (E.probs y : ℝ) = 0 := by simp [hpy]
@@ -992,8 +984,8 @@ theorem sandwichedUpSourceOptimizerFixedReference_le_conditionalSandwichedRenyiU
     E F hF α hα_half hα_pos hα_ne_one
 
 theorem sandwichedUpFixedReferenceFormulaReal_eq_candidateFormula
-    (E : Ensemble Y (A × B)) (F : Ensemble Y B)
-    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).matrix.PosDef)
+    (E : MEnsemble (A × B) Y) (F : MEnsemble B Y)
+    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1)
     (hEpos : ∀ y, 0 < (E.probs y : ℝ)) (c : Y → ℝ)
     (hbranch : ∀ y,
@@ -1005,7 +997,7 @@ theorem sandwichedUpFixedReferenceFormulaReal_eq_candidateFormula
       (α / (1 - α)) * log2 (∑ y, (E.probs y : ℝ) *
         Real.rpow 2 (((1 - α) / α) * c y)) := by
   classical
-  let : Nonempty Y := Ensemble.index_nonempty E
+  let : Nonempty Y := MEnsemble.index_nonempty E
   let p : Y → ℝ := fun y => (E.probs y : ℝ)
   let r : Y → ℝ := fun y =>
     sandwichedScalarOptimizerWeight (p y) (c y) α
@@ -1055,8 +1047,8 @@ theorem sandwichedUpFixedReferenceFormulaReal_eq_candidateFormula
   ring
 
 theorem sandwichedUpFixedReferenceFormulaReal_eq_candidateFormula_nonneg
-    (E : Ensemble Y (A × B)) (F : Ensemble Y B)
-    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).matrix.PosDef)
+    (E : MEnsemble (A × B) Y) (F : MEnsemble B Y)
+    (hF : (F.cqState.reindex (Equiv.prodComm Y B)).m.PosDef)
     (α : ℝ) (hα_pos : 0 < α) (hα_ne_one : α ≠ 1)
     (hp : ∀ y, 0 ≤ (E.probs y : ℝ))
     (c : Y → ℝ)
@@ -1071,7 +1063,7 @@ theorem sandwichedUpFixedReferenceFormulaReal_eq_candidateFormula_nonneg
       (α / (1 - α)) * log2 (∑ y, (E.probs y : ℝ) *
         Real.rpow 2 (((1 - α) / α) * c y)) := by
   classical
-  let : Nonempty Y := Ensemble.index_nonempty E
+  let : Nonempty Y := MEnsemble.index_nonempty E
   let p : Y → ℝ := fun y => (E.probs y : ℝ)
   let r : Y → ℝ := fun y =>
     sandwichedScalarOptimizerWeight (p y) (c y) α
@@ -1119,19 +1111,19 @@ theorem sandwichedUpFixedReferenceFormulaReal_eq_candidateFormula_nonneg
   unfold r sandwichedScalarOptimizerWeight
   ring
 
-/-! Zero-probability labels are made harmless before taking a full-rank
-reference limit.  The optimizer is mixed with the uniform distribution, while
-labels outside the source support receive the maximally mixed side state. -/
-
 omit [DecidableEq Y] in
+/-- A full-rank reference ensemble whose weights are the optimizer mixed with the uniform
+distribution at ratio `δ`, and whose side states are the given `s y` on the support of `E` and
+maximally mixed elsewhere.  This makes zero-probability labels harmless before a full-rank limit is
+taken. -/
 theorem sandwichedSourceOptimizerRegularizedEnsemble
     [Nonempty B] [Nonempty Y]
-    (E : Ensemble Y (A × B)) (α : ℝ) (_hα_pos : 0 < α)
-    (h : Y → ℝ) (s : Y → State B) (δ : ℝ)
+    (E : MEnsemble (A × B) Y) (α : ℝ) (_hα_pos : 0 < α)
+    (h : Y → ℝ) (s : Y → MState B) (δ : ℝ)
     (hδ_pos : 0 < δ) (hδ_lt_one : δ < 1)
     (hden : 0 < ∑ y,
       sandwichedScalarOptimizerWeight (E.probs y : ℝ) (h y) α) :
-    ∃ F : Ensemble Y B,
+    ∃ F : MEnsemble B Y,
       (∀ y, 0 < F.probs y) ∧
       (∀ y,
         (F.probs y : ℝ) =
@@ -1139,7 +1131,7 @@ theorem sandwichedSourceOptimizerRegularizedEnsemble
               (fun z => (E.probs z : ℝ)) h α y +
             δ / (Fintype.card Y : ℝ)) ∧
       (∀ y, E.probs y ≠ 0 → F.states y = s y) ∧
-      (∀ y, E.probs y = 0 → F.states y = State.maximallyMixed B) := by
+      (∀ y, E.probs y = 0 → F.states y = (MState.uniform : MState B)) := by
   classical
   let p : Y → ℝ := fun y => (E.probs y : ℝ)
   let q : Y → ℝ := sandwichedScalarOptimizerDistribution p h α
@@ -1168,16 +1160,17 @@ theorem sandwichedSourceOptimizerRegularizedEnsemble
     rw [← Finset.sum_div, Finset.sum_const, Finset.card_univ]
     field_simp [hcard_pos.ne']
     ring
-  let states : Y → State B := fun y =>
-    if E.probs y = 0 then State.maximallyMixed B else s y
+  let states : Y → MState B := fun y =>
+    if E.probs y = 0 then (MState.uniform : MState B) else s y
   let qδnn : Y → NNReal := fun y => ⟨qδ y, (hqδ_pos y).le⟩
-  let F : Ensemble Y B :=
-    { probs := qδnn
-      weights_sum := by
+  let F : MEnsemble B Y :=
+    .ofProbs
+      qδnn
+      (by
         apply NNReal.eq
         rw [NNReal.coe_sum]
-        exact hqδ_sum
-      states := states }
+        exact hqδ_sum)
+      states
   refine ⟨F, ?_, ?_, ?_, ?_⟩
   · intro y
     exact NNReal.coe_pos.mpr (hqδ_pos y)
@@ -1188,9 +1181,8 @@ theorem sandwichedSourceOptimizerRegularizedEnsemble
   · intro y hzero
     simp [F, states, hzero]
 
-/-! Finite support choices can approach the sum of branch suprema without
-assuming that any branch supremum is attained. -/
-
+/-- The supremum of the sumset of finitely many bounded nonempty sets is approached to within `ε`
+by an explicit selection, with no assumption that any individual supremum is attained. -/
 theorem finiteSelectionSumSet_exists_lt_sSup_additive
     {ι : Type*} [DecidableEq ι] (s : Finset ι) (S : ι → Set ℝ)
     (hs : s.Nonempty) (hne : ∀ i ∈ s, (S i).Nonempty)
@@ -1231,11 +1223,8 @@ theorem finiteSelectionSumSet_exists_lt_sSup_additive
       field_simp [hn.ne']
     _ < ∑ i ∈ s, g i := hsum_lt
 
-/-! A finite family of branch suprema can be approached from below after
-the source scalar transform.  This is the numerical part of the source
-argument; it deliberately uses neighbourhoods rather than an assumed
-maximizer. -/
-
+/-- The scalar transform `c ↦ (α / (1 - α)) log₂ (∑ i, p i * 2 ^ (((1 - α) / α) * c i))` of a finite
+family of suprema is approached from below by admissible selections `c i ∈ S i`. -/
 theorem finiteSourceLogRpow_approximation
     {ι : Type*} [Fintype ι] [DecidableEq ι]
     (S : ι → Set ℝ) (p : ι → ℝ) (α : ℝ)
@@ -1314,13 +1303,13 @@ theorem finiteSourceLogRpow_approximation
   exact hδ_subset (Metric.mem_ball'.mpr (by simpa [dist_comm] using hdist))
 
 theorem conditionalSandwichedRenyiUp_classicalConditioning_of_ne_half_of_positive
-    (E : Ensemble Y (A × B)) (α : ℝ) (hα : 1 / 2 ≤ α)
+    (E : MEnsemble (A × B) Y) (α : ℝ) (hα : 1 / 2 ≤ α)
     (hα_ne_one : α ≠ 1) (hα_ne_half : α ≠ (1 / 2 : ℝ))
     (hEpos : ∀ y, 0 < (E.probs y : ℝ)) :
     conditionalSandwichedRenyiUpE E α hα hα_ne_one =
       (sandwichedUpClassicalFormulaReal E α hα hα_ne_one : EReal) := by
   classical
-  let : Nonempty Y := Ensemble.index_nonempty E
+  let : Nonempty Y := MEnsemble.index_nonempty E
   let : Nonempty B := by
     rcases (E.states (Classical.choice (inferInstance : Nonempty Y))).nonempty with
       ⟨⟨a, b⟩⟩
@@ -1363,17 +1352,17 @@ theorem conditionalSandwichedRenyiUp_classicalConditioning_of_ne_half_of_positiv
   apply le_antisymm hupper
   unfold conditionalSandwichedRenyiUpE
   have hs_eq : sSup {h : EReal |
-      ∃ σ : State (B × Y), h = -sandwichedRenyiPSDReferenceE
-        (State.cqConditioningState E)
+      ∃ σ : MState (B × Y), h = -sandwichedRenyiPSDReferenceE
+        (MState.cqConditioningState E)
         (identityTensorStateMatrix (a := A) σ)
-        (identityTensorStateMatrix_posSemidef_of_state (a := A) σ) α} =
+        (identityTensorStateMatrix_posSemidef (a := A) σ) α} =
       (sandwichedUpClassicalFormulaReal E α hα hα_ne_one : EReal) := by
     apply csSup_eq_of_forall_le_of_forall_lt_exists_gt
-    · let σ₀ : State (B × Y) := State.maximallyMixed (B × Y)
+    · let σ₀ : MState (B × Y) := (MState.uniform : MState (B × Y))
       exact ⟨-sandwichedRenyiPSDReferenceE
-          (State.cqConditioningState E)
+          (MState.cqConditioningState E)
           (identityTensorStateMatrix (a := A) σ₀)
-          (identityTensorStateMatrix_posSemidef_of_state (a := A) σ₀) α,
+          (identityTensorStateMatrix_posSemidef (a := A) σ₀) α,
         σ₀, rfl⟩
     · intro z hz
       rcases hz with ⟨σ, rfl⟩
@@ -1440,14 +1429,15 @@ theorem conditionalSandwichedRenyiUp_classicalConditioning_of_ne_half_of_positiv
         dsimp [q]
         exact sandwichedScalarOptimizerDistribution_sum_one p c α hden.ne'
       let qnn : Y → NNReal := fun y => ⟨q y, (hqpos y).le⟩
-      let F : Ensemble Y B :=
-        { probs := qnn
-          weights_sum := by
+      let F : MEnsemble B Y :=
+        .ofProbs
+          qnn
+          (by
             apply NNReal.eq
             rw [NNReal.coe_sum]
-            exact hqsum
-          states := s }
-      have hF : (F.cqState.reindex (Equiv.prodComm Y B)).matrix.PosDef := by
+            exact hqsum)
+          s
+      have hF : (F.cqState.reindex (Equiv.prodComm Y B)).m.PosDef := by
         apply sandwiched_reference_cq_posDef_of_positive F
         · intro y
           exact_mod_cast hqpos y
@@ -1466,10 +1456,10 @@ theorem conditionalSandwichedRenyiUp_classicalConditioning_of_ne_half_of_positiv
       have hvalue := sandwichedRenyiPSDReferenceE_cq_fullrank_reference_formula
         E F hF α hα_pos hα_ne_one
       refine ⟨-sandwichedRenyiPSDReferenceE
-          (State.cqConditioningState E)
+          (MState.cqConditioningState E)
           (identityTensorStateMatrix (a := A)
             (F.cqState.reindex (Equiv.prodComm Y B)))
-          (identityTensorStateMatrix_posSemidef_of_state
+          (identityTensorStateMatrix_posSemidef
             (a := A) (F.cqState.reindex (Equiv.prodComm Y B))) α,
         ⟨F.cqState.reindex (Equiv.prodComm Y B), rfl⟩, ?_⟩
       rw [hvalue, hfixed]
@@ -1477,12 +1467,12 @@ theorem conditionalSandwichedRenyiUp_classicalConditioning_of_ne_half_of_positiv
   exact hs_eq.symm.le
 
 theorem conditionalSandwichedRenyiUp_classicalConditioning_exact
-    (E : Ensemble Y (A × B)) (α : ℝ) (hα : 1 / 2 ≤ α)
+    (E : MEnsemble (A × B) Y) (α : ℝ) (hα : 1 / 2 ≤ α)
     (hα_ne_one : α ≠ 1) :
     conditionalSandwichedRenyiUpE E α hα hα_ne_one =
       (sandwichedUpClassicalFormulaReal E α hα hα_ne_one : EReal) := by
   classical
-  let : Nonempty Y := Ensemble.index_nonempty E
+  let : Nonempty Y := MEnsemble.index_nonempty E
   let : Nonempty B := by
     rcases (E.states (Classical.choice (inferInstance : Nonempty Y))).nonempty with
       ⟨⟨a, b⟩⟩
@@ -1537,18 +1527,18 @@ theorem conditionalSandwichedRenyiUp_classicalConditioning_exact
   apply le_antisymm hupper
   unfold conditionalSandwichedRenyiUpE
   refine (show sSup {h : EReal |
-      ∃ σ : State (B × Y), h = -sandwichedRenyiPSDReferenceE
-        (State.cqConditioningState E)
+      ∃ σ : MState (B × Y), h = -sandwichedRenyiPSDReferenceE
+        (MState.cqConditioningState E)
         (identityTensorStateMatrix (a := A) σ)
-        (identityTensorStateMatrix_posSemidef_of_state
+        (identityTensorStateMatrix_posSemidef
           (a := A) σ) α} =
       (sandwichedUpClassicalFormulaReal E α hα hα_ne_one : EReal) from ?_).symm.le
   apply csSup_eq_of_forall_le_of_forall_lt_exists_gt
-  · let σ₀ : State (B × Y) := State.maximallyMixed (B × Y)
+  · let σ₀ : MState (B × Y) := (MState.uniform : MState (B × Y))
     exact ⟨-sandwichedRenyiPSDReferenceE
-        (State.cqConditioningState E)
+        (MState.cqConditioningState E)
         (identityTensorStateMatrix (a := A) σ₀)
-        (identityTensorStateMatrix_posSemidef_of_state (a := A) σ₀) α,
+        (identityTensorStateMatrix_posSemidef (a := A) σ₀) α,
       σ₀, rfl⟩
   · intro z hz
     rcases hz with ⟨σ, rfl⟩
@@ -1690,12 +1680,12 @@ theorem conditionalSandwichedRenyiUp_classicalConditioning_exact
     have hδlt : δ < 1 := hδmem.2
     obtain ⟨F, hFprob, hFq, hFstate, hFzero⟩ := sandwichedSourceOptimizerRegularizedEnsemble
       E α hα_pos h s δ hδpos hδlt hden
-    have hF : (F.cqState.reindex (Equiv.prodComm Y B)).matrix.PosDef := by
+    have hF : (F.cqState.reindex (Equiv.prodComm Y B)).m.PosDef := by
       apply sandwiched_reference_cq_posDef_of_positive F
       · exact hFprob
       · intro y
         by_cases hp0 : E.probs y = 0
-        · simpa [hFzero y hp0] using State.maximallyMixed_posDef (a := B)
+        · simpa [hFzero y hp0] using MState.uniform_posDef (d := B)
         · simpa [hFstate y hp0] using hs y
     have hbranch_pos : ∀ y, E.probs y ≠ 0 →
         sandwichedFixedReferenceBranchValue E F y α hF hα_pos hα_ne_one = c y := by
@@ -1727,10 +1717,10 @@ theorem conditionalSandwichedRenyiUp_classicalConditioning_exact
     have hvalue := sandwichedRenyiPSDReferenceE_cq_fullrank_reference_formula
       E F hF α hα_pos hα_ne_one
     refine ⟨-sandwichedRenyiPSDReferenceE
-        (State.cqConditioningState E)
+        (MState.cqConditioningState E)
         (identityTensorStateMatrix (a := A)
           (F.cqState.reindex (Equiv.prodComm Y B)))
-        (identityTensorStateMatrix_posSemidef_of_state
+        (identityTensorStateMatrix_posSemidef
           (a := A) (F.cqState.reindex (Equiv.prodComm Y B))) α,
       ⟨F.cqState.reindex (Equiv.prodComm Y B), rfl⟩, ?_⟩
     rw [hvalue, hfixed]
@@ -1738,20 +1728,15 @@ theorem conditionalSandwichedRenyiUp_classicalConditioning_exact
 
 /-- The sandwiched up-arrow conditional entropy under a classical `Y`. -/
 theorem conditionalSandwichedRenyiUp_classicalConditioning
-    (E : Ensemble Y (A × B)) (α : ℝ) (hα : 1 / 2 ≤ α)
-    (hα_ne_one : α ≠ 1) (σ : State (B × Y)) :
+    (E : MEnsemble (A × B) Y) (α : ℝ) (hα : 1 / 2 ≤ α)
+    (hα_ne_one : α ≠ 1) (σ : MState (B × Y)) :
     -sandwichedRenyiPSDReferenceE
-        (State.cqConditioningState E)
+        (MState.cqConditioningState E)
         (identityTensorStateMatrix (a := A) σ)
-        (identityTensorStateMatrix_posSemidef_of_state
+        (identityTensorStateMatrix_posSemidef
           (a := A) σ) α ≤
       conditionalSandwichedRenyiUpE E α hα hα_ne_one := by
   unfold conditionalSandwichedRenyiUpE
   exact le_sSup ⟨σ, rfl⟩
 
-
-end State
-
-end
-
-end QIT
+end MState
