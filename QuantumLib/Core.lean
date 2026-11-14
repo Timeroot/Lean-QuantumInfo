@@ -34,3 +34,7 @@ import QuantumLib.Core.QECC.TransversalCNOT
 import QuantumLib.Core.QECC.ConcatDistance
 import QuantumLib.Core.QECC.RandomErrors
 import QuantumLib.Core.QECC.Threshold
+import QuantumLib.Core.States.Qudit
+import QuantumLib.Core.Channels.Superoperator
+import QuantumLib.Core.ForMathlib.CFCDeriv
+import QuantumLib.Core.ForMathlib.TensorCFC
