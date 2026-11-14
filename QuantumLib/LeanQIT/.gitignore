@@ -1,0 +1,6 @@
+# Lean/Lake build artifacts
+.lake/
+
+# Local OS/editor noise
+.DS_Store
+Thumbs.db

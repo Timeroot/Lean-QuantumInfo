@@ -1,0 +1,158 @@
+name: Mirror Public Activity
+
+on:
+  issues:
+    types: [opened, edited, reopened, closed]
+  pull_request_target:
+    types: [opened, edited, reopened, closed, ready_for_review, converted_to_draft]
+  issue_comment:
+    types: [created, edited, deleted]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    name: mirror public activity
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.issue || github.event.pull_request }}
+    steps:
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.LEAN_AUTOMATION_APP_CLIENT_ID }}
+          private-key: ${{ secrets.LEAN_AUTOMATION_APP_PRIVATE_KEY }}
+          owner: ${{ vars.MIRROR_TARGET_OWNER }}
+          repositories: ${{ vars.MIRROR_TARGET_REPOSITORY }}
+          permission-issues: write
+          permission-pull-requests: read
+
+      - name: Mirror issue or pull request metadata
+        uses: actions/github-script@v7
+        env:
+          TARGET_OWNER: ${{ vars.MIRROR_TARGET_OWNER }}
+          TARGET_REPOSITORY: ${{ vars.MIRROR_TARGET_REPOSITORY }}
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const appGithub = github;
+            const targetOwner = process.env.TARGET_OWNER;
+            const targetRepo = process.env.TARGET_REPOSITORY;
+            const sourceRepo = context.repo;
+            const event = context.payload;
+
+            if (!targetOwner || !targetRepo) {
+              core.setFailed('MIRROR_TARGET_OWNER and MIRROR_TARGET_REPOSITORY must be configured.');
+              return;
+            }
+
+            const sourceItem = event.issue || event.pull_request;
+            if (!sourceItem) {
+              core.info('No issue or pull request payload to mirror.');
+              return;
+            }
+
+            const isPull = Boolean(event.pull_request || sourceItem.pull_request);
+            const sourceType = isPull ? 'pull-request' : 'issue';
+            const markerToken = `public-mirror-${sourceRepo.owner}-${sourceRepo.repo}-${sourceItem.number}`;
+            const marker = `<!-- ${markerToken} -->`;
+            const titlePrefix = isPull ? '[Public PR]' : '[Public issue]';
+            const title = `${titlePrefix} ${sourceItem.title}`;
+
+            const markerQuery = `${markerToken} repo:${targetOwner}/${targetRepo} in:body`;
+            const search = await appGithub.rest.search.issuesAndPullRequests({ q: markerQuery });
+            let targetIssue = search.data.items.find((item) => item.body && item.body.includes(marker));
+
+            const body = [
+              marker,
+              '',
+              `Mirrored from public ${sourceType} ${sourceRepo.owner}/${sourceRepo.repo}#${sourceItem.number}.`,
+              '',
+              `Source URL: ${sourceItem.html_url}`,
+              `Source state: ${sourceItem.state}`,
+              `Source author: ${sourceItem.user?.login || 'unknown'}`,
+              `Source updated at: ${sourceItem.updated_at}`,
+              '',
+              '## Public body',
+              '',
+              sourceItem.body || '_No public body._',
+              '',
+              '<!-- public-mirror:end -->',
+            ].join('\n');
+
+            if (targetIssue) {
+              await appGithub.rest.issues.update({
+                owner: targetOwner,
+                repo: targetRepo,
+                issue_number: targetIssue.number,
+                title,
+                body,
+              });
+            } else {
+              const created = await appGithub.rest.issues.create({
+                owner: targetOwner,
+                repo: targetRepo,
+                title,
+                body,
+                labels: ['mirror'],
+              });
+              targetIssue = created.data;
+            }
+
+            if (context.eventName !== 'issue_comment' || !event.comment) {
+              return;
+            }
+
+            const comment = event.comment;
+            const commentMarkerToken = `public-mirror-comment-${sourceRepo.owner}-${sourceRepo.repo}-${sourceItem.number}-${comment.id}`;
+            const commentMarker = `<!-- ${commentMarkerToken} -->`;
+            const comments = await appGithub.paginate(appGithub.rest.issues.listComments, {
+              owner: targetOwner,
+              repo: targetRepo,
+              issue_number: targetIssue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((item) => item.body && item.body.includes(commentMarker));
+
+            if (event.action === 'deleted') {
+              if (existing) {
+                await appGithub.rest.issues.deleteComment({
+                  owner: targetOwner,
+                  repo: targetRepo,
+                  comment_id: existing.id,
+                });
+              }
+              return;
+            }
+
+            const commentBody = [
+              commentMarker,
+              '',
+              `Mirrored public comment by ${comment.user?.login || 'unknown'} at ${comment.updated_at}.`,
+              '',
+              `Source URL: ${comment.html_url}`,
+              '',
+              '## Public comment',
+              '',
+              comment.body || '_No public comment body._',
+              '',
+              '<!-- public-mirror-comment:end -->',
+            ].join('\n');
+
+            if (existing) {
+              await appGithub.rest.issues.updateComment({
+                owner: targetOwner,
+                repo: targetRepo,
+                comment_id: existing.id,
+                body: commentBody,
+              });
+            } else {
+              await appGithub.rest.issues.createComment({
+                owner: targetOwner,
+                repo: targetRepo,
+                issue_number: targetIssue.number,
+                body: commentBody,
+              });
+            }
