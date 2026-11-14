@@ -1236,7 +1236,7 @@ def pauliSpaceEquivFin (m : ℕ) : PauliSpace m ≃+ (Fin (2 * m) → ZMod 2) wh
 
 /-- **The Pauli group modulo its center is elementary abelian of rank `2n`:** the quotient is the
 phase space `(ZMod 2) ^ (2n)`, with the group law given by addition of `x`- and `z`-parts. -/
-noncomputable def pauliModCenter_equiv (m : ℕ) :
+noncomputable def pauliModCenterEquiv (m : ℕ) :
     (PauliOp m ⧸ Subgroup.center (PauliOp m)) ≃* Multiplicative (Fin (2 * m) → ZMod 2) :=
   ((QuotientGroup.quotientMulEquivOfEq (ker_toSymHom (m := m)).symm).trans
     (QuotientGroup.quotientKerEquivOfSurjective _ toSymHom_surjective)).trans

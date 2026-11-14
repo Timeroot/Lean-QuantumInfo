@@ -1,0 +1,28 @@
+/-
+Copyright (c) 2026 QuAIR.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: QuAIR Team
+-/
+
+module
+
+public import QuantumLib.LeanQIT.Coding.Classical.HSWDirect.TensorPower
+public import QuantumLib.LeanQIT.Coding.Classical.HSWDirect.Rates
+public import QuantumLib.LeanQIT.Coding.Classical.HSWDirect.CodeTransforms
+public import QuantumLib.LeanQIT.Coding.Classical.HSWDirect.WitnessAssembly
+public import QuantumLib.LeanQIT.Coding.Classical.HSWDirect.RegularizedAssembly
+
+/-!
+# HSW direct-achievability bridge
+
+This module sits after the HSW packing and conditional-typicality layers.  It
+does not prove new typicality estimates; it packages a completed
+`HSWPackingHypothesesSpectral` bundle into the average-error coding witness
+used by the operational direct-achievability assembly.
+
+What it proves is the operational assembly and the block-channel
+rate-normalization transport; supplying such a bundle for every block-channel
+ensemble, with the accompanying message-size and packing-error asymptotics, is
+the job of the packing and conditional-typicality layers it sits on.
+[Wilde2011Qst, qit-notes.tex:33634-33808]
+-/

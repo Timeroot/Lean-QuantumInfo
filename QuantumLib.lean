@@ -1,6 +1,5 @@
 import QuantumLib.Core
+import QuantumLib.LeanQIT
+import QuantumLib.LeanQIT.Bridge
 
-/-! # QuantumLib
-
-Shared infrastructure is collected in `QuantumLib.Core`.
--/
+/-! # QuantumLib and the LeanQIT development -/

@@ -1,0 +1,844 @@
+/-
+Copyright (c) 2026 QuAIR.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: QuAIR Team
+-/
+
+module
+
+public import QuantumLib.LeanQIT.States.Geometry.Fidelity
+public import QuantumLib.LeanQIT.Core.Channel
+public import QuantumLib.LeanQIT.States.Purification.Canonical
+public import QuantumLib.LeanQIT.States.Purification.Equivalence
+public import QuantumLib.LeanQIT.States.Purification.PureGeometry
+public import QuantumLib.LeanQIT.States.Purification.ReferenceUnitary
+public import QuantumLib.LeanQIT.States.TraceNorm.Variational
+public import Mathlib.Data.Fintype.EquivFin
+
+/-!
+# Uhlmann theorem for canonical purifications
+
+This module proves the canonical-purification Uhlmann route registered from
+[Wilde2011Qst, qit-notes.tex:15060-15093] and the overlap-to-trace calculation
+from [Wilde2011Qst, qit-notes.tex:15114-15127].  It uses the local
+`MState.squaredFidelity` convention and the trace-norm variational bridge from
+`QIT.States.TraceNorm.Variational`.
+-/
+
+@[expose] public section
+
+open scoped ComplexOrder MatrixOrder
+
+noncomputable section
+universe u
+universe v
+universe w
+
+open QIT
+
+namespace QIT
+
+namespace ReferenceIsometry
+
+variable {r₁ : Type u} {r₂ : Type v} {a : Type*}
+variable [Fintype r₁] [DecidableEq r₁]
+variable [Fintype r₂] [DecidableEq r₂]
+variable [Fintype a] [DecidableEq a]
+
+/-- A reference-side isometry preserves ket overlaps. -/
+theorem overlap_applyKet (V : ReferenceIsometry r₁ r₂)
+    (Ψ Φ : Ket (r₁ × a)) :
+    (V.applyKet Ψ).overlap (V.applyKet Φ) = Ψ.overlap Φ := by
+  classical
+  have hsum :
+      (∑ k : r₂, ∑ z : a, ∑ i : r₁, ∑ j : r₁,
+        V.matrix k j *
+          (Φ.vec (j, z) * (star (V.matrix k i) * star (Ψ.vec (i, z))))) =
+        ∑ i : r₁, ∑ z : a, Φ.vec (i, z) * star (Ψ.vec (i, z)) := by
+    let F : r₂ → a → ℂ := fun k z =>
+      ∑ i : r₁, ∑ j : r₁,
+        V.matrix k j *
+          (Φ.vec (j, z) * (star (V.matrix k i) * star (Ψ.vec (i, z))))
+    change (∑ k : r₂, ∑ z : a, F k z) =
+      ∑ i : r₁, ∑ z : a, Φ.vec (i, z) * star (Ψ.vec (i, z))
+    rw [show (∑ k : r₂, ∑ z : a, F k z) = ∑ z : a, ∑ k : r₂, F k z by
+      simpa using (Finset.sum_comm :
+        (∑ k : r₂, ∑ z : a, F k z) = ∑ z : a, ∑ k : r₂, F k z)]
+    rw [show (∑ i : r₁, ∑ z : a, Φ.vec (i, z) * star (Ψ.vec (i, z))) =
+        ∑ z : a, ∑ i : r₁, Φ.vec (i, z) * star (Ψ.vec (i, z)) by
+      simpa using (Finset.sum_comm :
+        (∑ i : r₁, ∑ z : a, Φ.vec (i, z) * star (Ψ.vec (i, z))) =
+          ∑ z : a, ∑ i : r₁, Φ.vec (i, z) * star (Ψ.vec (i, z)))]
+    refine Finset.sum_congr rfl ?_
+    intro z _
+    let G : r₂ → r₁ → ℂ := fun k i =>
+      ∑ j : r₁,
+        V.matrix k j *
+          (Φ.vec (j, z) * (star (V.matrix k i) * star (Ψ.vec (i, z))))
+    change (∑ k : r₂, ∑ i : r₁, G k i) =
+      ∑ i : r₁, Φ.vec (i, z) * star (Ψ.vec (i, z))
+    rw [show (∑ k : r₂, ∑ i : r₁, G k i) = ∑ i : r₁, ∑ k : r₂, G k i by
+      simpa using (Finset.sum_comm :
+        (∑ k : r₂, ∑ i : r₁, G k i) = ∑ i : r₁, ∑ k : r₂, G k i)]
+    refine Finset.sum_congr rfl ?_
+    intro i _
+    let H : r₂ → r₁ → ℂ := fun k j =>
+      V.matrix k j *
+        (Φ.vec (j, z) * (star (V.matrix k i) * star (Ψ.vec (i, z))))
+    change (∑ k : r₂, ∑ j : r₁, H k j) =
+      Φ.vec (i, z) * star (Ψ.vec (i, z))
+    rw [show (∑ k : r₂, ∑ j : r₁, H k j) = ∑ j : r₁, ∑ k : r₂, H k j by
+      simpa using (Finset.sum_comm :
+        (∑ k : r₂, ∑ j : r₁, H k j) = ∑ j : r₁, ∑ k : r₂, H k j)]
+    rw [Finset.sum_eq_single i]
+    · have hfactor :
+          (∑ k : r₂,
+            V.matrix k i *
+              (Φ.vec (i, z) * (star (V.matrix k i) * star (Ψ.vec (i, z))))) =
+            (∑ k : r₂, V.matrix k i * star (V.matrix k i)) *
+              (Φ.vec (i, z) * star (Ψ.vec (i, z))) := by
+        calc
+          (∑ k : r₂,
+            V.matrix k i *
+              (Φ.vec (i, z) * (star (V.matrix k i) * star (Ψ.vec (i, z))))) =
+              ∑ k : r₂,
+                (V.matrix k i * star (V.matrix k i)) *
+                  (Φ.vec (i, z) * star (Ψ.vec (i, z))) := by
+                refine Finset.sum_congr rfl ?_
+                intro k _
+                ring
+          _ = (∑ k : r₂, V.matrix k i * star (V.matrix k i)) *
+              (Φ.vec (i, z) * star (Ψ.vec (i, z))) := by
+                rw [Finset.sum_mul]
+      change
+        (∑ k : r₂,
+          V.matrix k i *
+            (Φ.vec (i, z) * (star (V.matrix k i) * star (Ψ.vec (i, z))))) =
+          Φ.vec (i, z) * star (Ψ.vec (i, z))
+      rw [hfactor, V.sum_mul_star i i]
+      simp
+    · intro j _ hj
+      have hfactor :
+          (∑ k : r₂,
+            V.matrix k j *
+              (Φ.vec (j, z) * (star (V.matrix k i) * star (Ψ.vec (i, z))))) =
+            (∑ k : r₂, V.matrix k j * star (V.matrix k i)) *
+              (Φ.vec (j, z) * star (Ψ.vec (i, z))) := by
+        calc
+          (∑ k : r₂,
+            V.matrix k j *
+              (Φ.vec (j, z) * (star (V.matrix k i) * star (Ψ.vec (i, z))))) =
+              ∑ k : r₂,
+                (V.matrix k j * star (V.matrix k i)) *
+                  (Φ.vec (j, z) * star (Ψ.vec (i, z))) := by
+                refine Finset.sum_congr rfl ?_
+                intro k _
+                ring
+          _ = (∑ k : r₂, V.matrix k j * star (V.matrix k i)) *
+              (Φ.vec (j, z) * star (Ψ.vec (i, z))) := by
+                rw [Finset.sum_mul]
+      change
+        (∑ k : r₂,
+          V.matrix k j *
+            (Φ.vec (j, z) * (star (V.matrix k i) * star (Ψ.vec (i, z))))) = 0
+      rw [hfactor, V.sum_mul_star j i]
+      simp [hj]
+    · intro hi
+      simp at hi
+  simp [Ket.overlap, ReferenceIsometry.applyKet_vec,
+    ReferenceIsometry.applyAmp, Matrix.mulVec, dotProduct, Finset.sum_mul,
+    Finset.mul_sum, mul_assoc, mul_comm]
+  conv_lhs =>
+    rw [← Finset.univ_product_univ]
+    rw [Finset.sum_product]
+  conv_rhs =>
+    rw [← Finset.univ_product_univ]
+    rw [Finset.sum_product]
+  exact hsum
+
+/-- A reference-side isometry preserves squared ket overlaps. -/
+theorem overlapSq_applyKet (V : ReferenceIsometry r₁ r₂)
+    (Ψ Φ : Ket (r₁ × a)) :
+    (V.applyKet Ψ).overlapSq (V.applyKet Φ) = Ψ.overlapSq Φ := by
+  rw [Ket.overlapSq_eq_normSq, Ket.overlapSq_eq_normSq,
+    V.overlap_applyKet Ψ Φ]
+
+end ReferenceIsometry
+
+namespace MatrixMap
+
+variable {κ : Type w}
+variable [Fintype κ] [DecidableEq κ]
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+
+/-- Stinespring isometry associated to a trace-preserving Kraus family. -/
+def krausStinespringIsometry (K : κ → Matrix b a ℂ)
+    (hTP : MatrixMap.IsTracePreserving (ofKraus K)) : ReferenceIsometry a (b × κ) where
+  matrix := Matrix.of fun yx x => K yx.2 yx.1 x
+  isometry := by
+    have hone := krausAdjoint_one_of_tracePreserving K hTP
+    ext i j
+    have hentry := congrFun (congrFun hone i) j
+    simp only [krausAdjoint, Matrix.sum_apply, Matrix.mul_apply,
+      Matrix.conjTranspose_apply, Matrix.one_apply] at hentry
+    simp only [Matrix.mul_apply, Matrix.of_apply, Matrix.conjTranspose_apply, Matrix.one_apply]
+    rw [Fintype.sum_prod_type]
+    rw [Finset.sum_comm]
+    simpa [mul_comm] using hentry
+
+/-- Tracing the Stinespring environment recovers the original Kraus map. -/
+theorem traceRight_krausStinespringIsometry
+    (K : κ → Matrix b a ℂ) (hTP : MatrixMap.IsTracePreserving (ofKraus K)) (X : CMatrix a) :
+    Matrix.traceRight
+      ((krausStinespringIsometry K hTP).matrix * X *
+        Matrix.conjTranspose (krausStinespringIsometry K hTP).matrix) =
+      ofKraus K X := by
+  ext y y'
+  simp [Matrix.traceRight, ofKraus, krausStinespringIsometry, Matrix.sum_apply,
+    Matrix.mul_apply, Matrix.conjTranspose_apply, Finset.sum_mul, mul_assoc]
+
+/-- The output marginal of the Stinespring lift is the original Kraus-map
+output. -/
+theorem traceRight_traceLeft_applyKetRight_krausStinespringIsometry
+    {r : Type _} [Fintype r] [DecidableEq r]
+    (K : κ → Matrix b a ℂ) (hTP : MatrixMap.IsTracePreserving (ofKraus K))
+    {Ψ : Ket (r × a)} {ρ : MState a} (hΨ : Ψ.Purifies ρ) :
+    ((krausStinespringIsometry K hTP).applyKetRight Ψ).state.traceLeft.traceRight.m =
+      ofKraus K ρ.m := by
+  let V := krausStinespringIsometry K hTP
+  rw [MState.traceRight_m, MState.traceLeft_m]
+  rw [V.rankOne_applyKetRight]
+  rw [V.traceLeft_applyMatrixRight]
+  rw [hΨ]
+  exact traceRight_krausStinespringIsometry K hTP ρ.m
+
+end MatrixMap
+
+end QIT
+
+namespace MState
+
+variable {a : Type u} [Fintype a] [DecidableEq a]
+
+/-- The canonical-purification overlap after a reference unitary is the trace
+of `√ρ * √σ * Uᵀ`. -/
+theorem canonicalPurification_overlap_applyReferenceUnitary_eq_trace
+    (ρ σ : MState a) (U : ReferenceUnitary a) :
+    ρ.canonicalPurification.overlap (U.applyKet σ.canonicalPurification) =
+      (ρ.sqrtMatrix * σ.sqrtMatrix * Matrix.transpose U.matrix).trace := by
+  classical
+  simp [Ket.overlap, MState.canonicalPurification, MState.canonicalPurificationAmp,
+    ReferenceUnitary.applyKet, ReferenceUnitary.toReferenceIsometry,
+    ReferenceIsometry.applyKet, ReferenceIsometry.applyAmp, Matrix.trace,
+    Matrix.mul_apply, Matrix.mulVec, dotProduct, Matrix.transpose, Finset.mul_sum, mul_assoc,
+    ρ.sqrtMatrix_isHermitian.apply]
+  conv_lhs =>
+    rw [← Finset.univ_product_univ, Finset.sum_product]
+  simp [mul_comm]
+
+/-- Squared canonical-purification overlaps unfold to the squared trace
+expression used by the trace-norm variational bridge. -/
+theorem canonicalPurification_overlapSq_applyReferenceUnitary_eq_normSq_trace
+    (ρ σ : MState a) (U : ReferenceUnitary a) :
+    ρ.canonicalPurification.overlapSq (U.applyKet σ.canonicalPurification) =
+      Complex.normSq ((ρ.sqrtMatrix * σ.sqrtMatrix * Matrix.transpose U.matrix).trace) := by
+  rw [Ket.overlapSq_eq_normSq]
+  rw [canonicalPurification_overlap_applyReferenceUnitary_eq_trace]
+
+/-- Canonical-purification form of Uhlmann's theorem: squared fidelity is
+attained by some reference unitary and bounds every reference-unitary overlap. -/
+theorem exists_referenceUnitary_canonicalPurification_overlapSq_eq_squaredFidelity
+    (ρ σ : MState a) :
+    ∃ U : ReferenceUnitary a,
+      ρ.squaredFidelity σ =
+        ρ.canonicalPurification.overlapSq (U.applyKet σ.canonicalPurification) ∧
+      ∀ V : ReferenceUnitary a,
+        ρ.canonicalPurification.overlapSq (V.applyKet σ.canonicalPurification) ≤
+      ρ.squaredFidelity σ := by
+  classical
+  obtain ⟨U, hU⟩ :=
+    traceNorm_variational_exists_referenceUnitary_sq (ρ.sqrtMatrix * σ.sqrtMatrix)
+  refine ⟨U, ?_, ?_⟩
+  · rw [canonicalPurification_overlapSq_applyReferenceUnitary_eq_normSq_trace, hU,
+      MState.squaredFidelity_eq_traceNorm_sqrtMatrix_mul_sqrtMatrix_sq]
+  · intro V
+    rw [canonicalPurification_overlapSq_applyReferenceUnitary_eq_normSq_trace,
+      MState.squaredFidelity_eq_traceNorm_sqrtMatrix_mul_sqrtMatrix_sq]
+    exact traceNorm_variational_referenceUnitary_sq_le (ρ.sqrtMatrix * σ.sqrtMatrix) V
+
+end MState
+
+namespace Ket
+
+variable {r : Type v} {a : Type u}
+variable [Fintype r] [DecidableEq r] [Fintype a] [DecidableEq a]
+
+omit [DecidableEq r] [DecidableEq a] in
+theorem overlap_eq_trace_conjTranspose_amplitudeMatrix_mul
+    (Ψ Φ : Ket (r × a)) :
+    Ψ.overlap Φ = (Matrix.conjTranspose Ψ.amplitudeMatrix * Φ.amplitudeMatrix).trace := by
+  classical
+  simp [Ket.overlap, Ket.amplitudeMatrix, Matrix.trace, Matrix.mul_apply,
+    Matrix.conjTranspose, mul_comm]
+  conv_lhs =>
+    rw [← Finset.univ_product_univ]
+    rw [Finset.sum_product]
+
+omit [DecidableEq a] in
+/-- Relabeling both kets preserves their overlap. -/
+theorem overlap_reindex {β : Type w} [Fintype β] [DecidableEq β]
+    (Ψ Φ : Ket a) (e : a ≃ β) :
+    (Ψ.reindex e).overlap (Φ.reindex e) = Ψ.overlap Φ := by
+  classical
+  simpa [Ket.overlap] using
+    Fintype.sum_equiv e.symm
+    (fun j : β => star (Ψ.vec (e.symm j)) * Φ.vec (e.symm j))
+    (fun i : a => star (Ψ.vec i) * Φ.vec i)
+    (by intro j; simp)
+
+omit [DecidableEq a] in
+/-- Relabeling both kets preserves squared overlap. -/
+theorem overlapSq_reindex {β : Type w} [Fintype β] [DecidableEq β]
+    (Ψ Φ : Ket a) (e : a ≃ β) :
+    (Ψ.reindex e).overlapSq (Φ.reindex e) = Ψ.overlapSq Φ := by
+  rw [Ket.overlapSq_eq_normSq, Ket.overlapSq_eq_normSq,
+    overlap_reindex]
+
+/-- A bipartite ket purifies its target marginal. -/
+theorem purifies_traceLeft (Ψ : Ket (r × a)) :
+    Ψ.Purifies Ψ.state.traceLeft := by
+  rw [Ket.purifies_iff, MState.traceLeft_m]
+
+/-- Regrouping a purification so that the `a` marginal is isolated:
+`r × (a × b) ≃ (r × b) × a`. -/
+def marginalAReferenceEquiv (r a b : Type*) :
+    (r × (a × b)) ≃ ((r × b) × a) where
+  toFun x := ((x.1, x.2.2), x.2.1)
+  invFun x := (x.1.1, (x.2, x.1.2))
+  left_inv x := by
+    cases x with
+    | mk i xb =>
+      cases xb
+      rfl
+  right_inv x := by
+    cases x with
+    | mk ib j =>
+      cases ib
+      rfl
+
+/-- Reassociating a purification of `ρAB` as `(reference × B) × A`
+purifies the `A` marginal. -/
+theorem reindex_marginalAReferenceEquiv_purifies_traceRight
+    {b : Type w} [Fintype b] [DecidableEq b]
+    {Ψ : Ket (r × (a × b))} {ρ : MState (a × b)}
+    (hΨ : Ψ.Purifies ρ) :
+    (Ψ.reindex (marginalAReferenceEquiv r a b)).Purifies ρ.traceRight := by
+  rw [Ket.purifies_iff]
+  rw [MState.traceRight_m, ← hΨ]
+  ext x y
+  simp [Ket.reindex_state, Matrix.traceLeft,
+    Matrix.traceRight, Ket.state_matrix, rankOneMatrix_apply, marginalAReferenceEquiv]
+  rw [Fintype.sum_prod_type, Finset.sum_comm]
+
+/-- Reassociating a purification of `ρAB` as `(reference × A) × B`
+purifies the `B` marginal. -/
+theorem reindex_prodAssoc_symm_purifies_traceLeft
+    {b : Type w} [Fintype b] [DecidableEq b]
+    {Ψ : Ket (r × (a × b))} {ρ : MState (a × b)}
+    (hΨ : Ψ.Purifies ρ) :
+    (Ψ.reindex (Equiv.prodAssoc r a b).symm).Purifies ρ.traceLeft := by
+  rw [Ket.purifies_iff]
+  rw [MState.traceLeft_m, ← hΨ]
+  ext x y
+  simp [Ket.reindex_state, Matrix.traceLeft,
+    Ket.state_matrix, rankOneMatrix_apply]
+  rw [Finset.sum_comm]
+  rw [Fintype.sum_prod_type]
+
+/-- A purification amplitude factors through the positive square root of the
+purified state when the reference register is at least as large as the target. -/
+theorem exists_referenceIsometry_amplitudeMatrix_eq_sqrtMatrix_mul_transpose
+    {Ψ : Ket (r × a)} {ρ : MState a}
+    (hΨ : Ψ.Purifies ρ) (hcard : Fintype.card a ≤ Fintype.card r) :
+    ∃ V : ReferenceIsometry a r,
+      Ψ.amplitudeMatrix = ρ.sqrtMatrix * Matrix.transpose V.matrix := by
+  classical
+  have hGram :
+      ρ.sqrtMatrix * Matrix.conjTranspose ρ.sqrtMatrix =
+        Ψ.amplitudeMatrix * Matrix.conjTranspose Ψ.amplitudeMatrix := by
+    calc
+      ρ.sqrtMatrix * Matrix.conjTranspose ρ.sqrtMatrix = ρ.sqrtMatrix * ρ.sqrtMatrix := by
+        rw [ρ.sqrtMatrix_isHermitian.eq]
+      _ = ρ.m := ρ.sqrtMatrix_mul_self
+      _ = Ψ.amplitudeMatrix * Matrix.conjTranspose Ψ.amplitudeMatrix := by
+        rw [← purifies_amplitudeMatrix_mul_conjTranspose_eq hΨ]
+  exact ReferenceIsometry.exists_eq_mul_transpose_of_mul_conjTranspose_eq
+    ρ.sqrtMatrix Ψ.amplitudeMatrix hGram hcard
+
+private theorem referenceIsometry_transpose_mul_conjTranspose
+    (V : ReferenceIsometry a r) :
+    Matrix.transpose V.matrix * Matrix.conjTranspose (Matrix.transpose V.matrix) =
+      (1 : CMatrix a) := by
+  ext i j
+  have h := V.sum_mul_star i j
+  simpa [Matrix.mul_apply, Matrix.transpose, Matrix.conjTranspose, Matrix.one_apply,
+    eq_comm, mul_comm] using h
+
+private theorem referenceIsometry_transpose_cross_contraction
+    (V W : ReferenceIsometry a r) :
+    Matrix.conjTranspose
+        (Matrix.transpose W.matrix * Matrix.conjTranspose (Matrix.transpose V.matrix)) *
+        (Matrix.transpose W.matrix * Matrix.conjTranspose (Matrix.transpose V.matrix))
+      ≤ (1 : CMatrix a) := by
+  classical
+  let TV : Matrix a r ℂ := Matrix.transpose V.matrix
+  let TW : Matrix a r ℂ := Matrix.transpose W.matrix
+  have hTV : TV * Matrix.conjTranspose TV = (1 : CMatrix a) := by
+    simpa [TV] using referenceIsometry_transpose_mul_conjTranspose V
+  have hTW : TW * Matrix.conjTranspose TW = (1 : CMatrix a) := by
+    simpa [TW] using referenceIsometry_transpose_mul_conjTranspose W
+  have hproj_le : Matrix.conjTranspose TW * TW ≤ (1 : CMatrix r) := by
+    have hP : (Matrix.conjTranspose TW * TW).PosSemidef :=
+      Matrix.posSemidef_conjTranspose_mul_self TW
+    have hdiff_pos : ((1 : CMatrix r) - Matrix.conjTranspose TW * TW).PosSemidef := by
+      have hidem :
+          (Matrix.conjTranspose TW * TW) * (Matrix.conjTranspose TW * TW) =
+            Matrix.conjTranspose TW * TW := by
+        calc
+          (Matrix.conjTranspose TW * TW) * (Matrix.conjTranspose TW * TW) =
+              Matrix.conjTranspose TW * (TW * Matrix.conjTranspose TW) * TW := by
+            simp [Matrix.mul_assoc]
+          _ = Matrix.conjTranspose TW * (1 : CMatrix a) * TW := by
+            rw [hTW]
+          _ = Matrix.conjTranspose TW * TW := by
+            simp
+      exact MatrixMap.posSemidef_one_sub_of_posSemidef_idempotent
+        (Matrix.conjTranspose TW * TW) hP hidem
+    exact sub_nonneg.mp (Matrix.nonneg_iff_posSemidef.mpr hdiff_pos)
+  have hconj :
+      TV * (Matrix.conjTranspose TW * TW) * Matrix.conjTranspose TV ≤
+        TV * (1 : CMatrix r) * Matrix.conjTranspose TV := by
+    have hnon : 0 ≤ (1 : CMatrix r) - Matrix.conjTranspose TW * TW :=
+      sub_nonneg.mpr hproj_le
+    have hpos :
+        0 ≤ TV * ((1 : CMatrix r) - Matrix.conjTranspose TW * TW) *
+            Matrix.conjTranspose TV := by
+      have h :=
+        (Matrix.nonneg_iff_posSemidef.mp hnon).conjTranspose_mul_mul_same
+          (Matrix.conjTranspose TV)
+      simpa [Matrix.conjTranspose_conjTranspose] using
+        (Matrix.nonneg_iff_posSemidef.mpr h)
+    have hdiff :
+        TV * ((1 : CMatrix r) - Matrix.conjTranspose TW * TW) *
+            Matrix.conjTranspose TV =
+          TV * (1 : CMatrix r) * Matrix.conjTranspose TV -
+            TV * (Matrix.conjTranspose TW * TW) * Matrix.conjTranspose TV := by
+      rw [Matrix.mul_sub, Matrix.sub_mul]
+    exact sub_nonneg.mp (by simpa [hdiff] using hpos)
+  have hK :
+      Matrix.conjTranspose (TW * Matrix.conjTranspose TV) *
+          (TW * Matrix.conjTranspose TV) =
+        TV * (Matrix.conjTranspose TW * TW) * Matrix.conjTranspose TV := by
+    simp [TV, TW, Matrix.conjTranspose_mul, Matrix.mul_assoc]
+  rw [hK]
+  calc
+    TV * (Matrix.conjTranspose TW * TW) * Matrix.conjTranspose TV ≤
+        TV * (1 : CMatrix r) * Matrix.conjTranspose TV := hconj
+    _ = 1 := by
+      simp [hTV]
+
+/-- Any two purifications on a sufficiently large common reference have squared
+overlap bounded by the squared fidelity of their target states.
+
+This is the "only if" side of Uhlmann's variational characterization, stated
+for arbitrary purifications rather than only canonical purifications. -/
+theorem overlapSq_le_squaredFidelity_of_purifies_of_card_le
+    {Ψ Φ : Ket (r × a)} {ρ σ : MState a}
+    (hΨ : Ψ.Purifies ρ) (hΦ : Φ.Purifies σ)
+    (hcard : Fintype.card a ≤ Fintype.card r) :
+    Ψ.overlapSq Φ ≤ ρ.squaredFidelity σ := by
+  classical
+  obtain ⟨V, hV⟩ :=
+    exists_referenceIsometry_amplitudeMatrix_eq_sqrtMatrix_mul_transpose hΨ hcard
+  obtain ⟨W, hW⟩ :=
+    exists_referenceIsometry_amplitudeMatrix_eq_sqrtMatrix_mul_transpose hΦ hcard
+  let K : CMatrix a :=
+    Matrix.transpose W.matrix * Matrix.conjTranspose (Matrix.transpose V.matrix)
+  have hK : Matrix.conjTranspose K * K ≤ (1 : CMatrix a) := by
+    simpa [K] using referenceIsometry_transpose_cross_contraction V W
+  have hoverlap :
+      Ψ.overlap Φ = ((ρ.sqrtMatrix * σ.sqrtMatrix) * K).trace := by
+    calc
+      Ψ.overlap Φ =
+          (Matrix.conjTranspose Ψ.amplitudeMatrix * Φ.amplitudeMatrix).trace := by
+        rw [overlap_eq_trace_conjTranspose_amplitudeMatrix_mul]
+      _ =
+          (Matrix.conjTranspose (ρ.sqrtMatrix * Matrix.transpose V.matrix) *
+              (σ.sqrtMatrix * Matrix.transpose W.matrix)).trace := by
+        rw [hV, hW]
+      _ =
+          (Matrix.conjTranspose (Matrix.transpose V.matrix) *
+              (ρ.sqrtMatrix * σ.sqrtMatrix) * Matrix.transpose W.matrix).trace := by
+        simp [Matrix.conjTranspose_mul, ρ.sqrtMatrix_isHermitian.eq,
+          Matrix.mul_assoc]
+      _ =
+          ((ρ.sqrtMatrix * σ.sqrtMatrix) * Matrix.transpose W.matrix *
+              Matrix.conjTranspose (Matrix.transpose V.matrix)).trace := by
+        calc
+          (Matrix.conjTranspose (Matrix.transpose V.matrix) *
+              (ρ.sqrtMatrix * σ.sqrtMatrix) * Matrix.transpose W.matrix).trace =
+              (Matrix.conjTranspose (Matrix.transpose V.matrix) *
+                ((ρ.sqrtMatrix * σ.sqrtMatrix) * Matrix.transpose W.matrix)).trace := by
+            simp [Matrix.mul_assoc]
+          _ =
+              (((ρ.sqrtMatrix * σ.sqrtMatrix) * Matrix.transpose W.matrix) *
+                Matrix.conjTranspose (Matrix.transpose V.matrix)).trace := by
+            exact Matrix.trace_mul_comm _ _
+          _ =
+              ((ρ.sqrtMatrix * σ.sqrtMatrix) * Matrix.transpose W.matrix *
+                Matrix.conjTranspose (Matrix.transpose V.matrix)).trace := by
+            simp [Matrix.mul_assoc]
+      _ = ((ρ.sqrtMatrix * σ.sqrtMatrix) * K).trace := by
+        simp [K, Matrix.mul_assoc]
+  have habs :
+       ‖Ψ.overlap Φ‖ ≤ traceNorm (ρ.sqrtMatrix * σ.sqrtMatrix) := by
+    rw [hoverlap]
+    exact traceNorm_variational_contraction_abs_trace_le
+      (ρ.sqrtMatrix * σ.sqrtMatrix) K hK
+  rw [Ket.overlapSq_eq_normSq,
+    MState.squaredFidelity_eq_traceNorm_sqrtMatrix_mul_sqrtMatrix_sq]
+  exact complex_normSq_le_sq_of_abs_le habs
+
+/-- Any two purifications have squared overlap bounded by the squared fidelity
+of their target states.
+
+This removes the auxiliary large-reference side condition by padding the
+reference register with a right-summand embedding before applying the large
+reference version. -/
+theorem overlapSq_le_squaredFidelity_of_purifies
+    {Ψ Φ : Ket (r × a)} {ρ σ : MState a}
+    (hΨ : Ψ.Purifies ρ) (hΦ : Φ.Purifies σ) :
+    Ψ.overlapSq Φ ≤ ρ.squaredFidelity σ := by
+  classical
+  let V := ReferenceIsometry.sumInr a r
+  have hΨ' : (V.applyKet Ψ).Purifies ρ := V.applyKet_purifies hΨ
+  have hΦ' : (V.applyKet Φ).Purifies σ := V.applyKet_purifies hΦ
+  have hcard : Fintype.card a ≤ Fintype.card (a ⊕ r) := by
+    simp [Fintype.card_sum]
+  have hbound :=
+    overlapSq_le_squaredFidelity_of_purifies_of_card_le hΨ' hΦ' hcard
+  rwa [V.overlapSq_applyKet Ψ Φ] at hbound
+
+/-- The absolute overlap of two purifications is bounded by the root fidelity
+of their target states. -/
+theorem abs_overlap_le_fidelity
+    {Ψ Φ : Ket (r × a)} {ρ σ : MState a}
+    (hΨ : Ψ.Purifies ρ) (hΦ : Φ.Purifies σ) :
+     ‖Ψ.overlap Φ‖ ≤ ρ.fidelity σ := by
+  have hsq := overlapSq_le_squaredFidelity_of_purifies hΨ hΦ
+  rw [Ket.overlapSq_eq_normSq, MState.squaredFidelity_eq_fidelity_sq] at hsq
+  have hleft_nonneg : 0 ≤ ‖Ψ.overlap Φ‖ := norm_nonneg _
+  have hfid_nonneg : 0 ≤ ρ.fidelity σ := MState.fidelity_nonneg ρ σ
+  rw [Complex.normSq_eq_norm_sq] at hsq
+  exact (sq_le_sq₀ hleft_nonneg hfid_nonneg).mp hsq
+
+/-- Build a ket from an amplitude matrix whose Gram trace is one.
+
+The matrix is indexed by target rows and reference columns, matching
+`Ket.amplitudeMatrix`. -/
+def ofAmplitudeMatrix {r : Type u} {α : Type v}
+    [Fintype r] [DecidableEq r] [Fintype α] [DecidableEq α]
+    (A : Matrix α r ℂ) (htrace : (A * Matrix.conjTranspose A).trace = 1) :
+    Ket (r × α) :=
+  Ket.ofRankOne (fun x => A x.2 x.1) <| by
+    classical
+    calc
+      (rankOneMatrix (fun x : r × α => A x.2 x.1)).trace =
+          ∑ x : r × α, A x.2 x.1 * star (A x.2 x.1) := by
+            simp [Matrix.trace, rankOneMatrix_apply]
+      _ = ∑ i : α, ∑ j : r, A i j * star (A i j) := by
+            rw [Fintype.sum_prod_type]
+            rw [Finset.sum_comm]
+      _ = (A * Matrix.conjTranspose A).trace := by
+            simp [Matrix.trace, Matrix.mul_apply, Matrix.conjTranspose_apply]
+      _ = 1 := htrace
+
+@[simp]
+theorem ofAmplitudeMatrix_amplitudeMatrix {r : Type u} {α : Type v}
+    [Fintype r] [DecidableEq r] [Fintype α] [DecidableEq α]
+    (A : Matrix α r ℂ) (htrace : (A * Matrix.conjTranspose A).trace = 1) :
+    (ofAmplitudeMatrix A htrace).amplitudeMatrix = A := by
+  ext x i
+  rfl
+
+/-- The ket built from an amplitude matrix purifies the state whose
+matrix is the amplitude Gram. -/
+theorem ofAmplitudeMatrix_purifies {r : Type u} {α : Type v}
+    [Fintype r] [DecidableEq r] [Fintype α] [DecidableEq α]
+    {A : Matrix α r ℂ} {ρ : MState α}
+    (hgram : A * Matrix.conjTranspose A = ρ.m)
+    (htrace : (A * Matrix.conjTranspose A).trace = 1) :
+    (ofAmplitudeMatrix A htrace).Purifies ρ := by
+  rw [Ket.purifies_iff]
+  rw [Ket.state_matrix]
+  rw [Ket.traceLeft_rankOneMatrix_eq_amplitudeMatrix_mul_conjTranspose]
+  simpa [ofAmplitudeMatrix_amplitudeMatrix] using hgram
+
+/-- Uhlmann extension theorem for an arbitrary sufficiently large reference
+register: given a purification `Ψ` of `ρ` on reference `r`, every target state
+`σ` has a purification on the same reference whose squared overlap with `Ψ`
+attains `ρ.squaredFidelity σ`.
+
+This is the normalized finite-dimensional form of the source Uhlmann extension
+step [Tomamichel2015FiniteResources, metric.tex:314-327]. -/
+theorem exists_purification_with_overlapSq_eq_squaredFidelity
+    {Ψ : Ket (r × a)} {ρ σ : MState a}
+    (hΨ : Ψ.Purifies ρ) (hcard : Fintype.card a ≤ Fintype.card r) :
+    ∃ Φ : Ket (r × a),
+      Φ.Purifies σ ∧ Ψ.overlapSq Φ = ρ.squaredFidelity σ := by
+  classical
+  obtain ⟨U, hUeq, _hUle⟩ :=
+    MState.exists_referenceUnitary_canonicalPurification_overlapSq_eq_squaredFidelity ρ σ
+  let Θ : Ket (a × a) := U.applyKet σ.canonicalPurification
+  have hΘ : Θ.Purifies σ :=
+    U.toReferenceIsometry.applyKet_purifies σ.canonicalPurification_purifies
+  obtain ⟨V, hV⟩ :=
+    exists_referenceIsometry_applyKet_eq_of_purifies_same_state
+      ρ.canonicalPurification_purifies hΨ hcard
+  refine ⟨V.applyKet Θ, ?_, ?_⟩
+  · exact V.applyKet_purifies hΘ
+  · rw [hV, V.overlapSq_applyKet ρ.canonicalPurification Θ]
+    exact hUeq.symm
+
+end Ket
+
+namespace QIT
+
+namespace ReferenceIsometry
+
+variable {r₁ : Type u} {r₂ : Type v} {a : Type w}
+variable [Fintype r₁] [DecidableEq r₁] [Fintype r₂] [DecidableEq r₂]
+variable [Fintype a] [DecidableEq a]
+
+/-- A right-reference-side isometry preserves squared ket overlaps. -/
+theorem overlapSq_applyKetRight (V : ReferenceIsometry r₁ r₂)
+    (Ψ Φ : Ket (a × r₁)) :
+    (V.applyKetRight Ψ).overlapSq (V.applyKetRight Φ) =
+      Ψ.overlapSq Φ := by
+  rw [ReferenceIsometry.applyKetRight, ReferenceIsometry.applyKetRight]
+  rw [Ket.overlapSq_reindex]
+  rw [V.overlapSq_applyKet]
+  rw [Ket.overlapSq_reindex]
+
+end ReferenceIsometry
+
+end QIT
+
+namespace MState
+
+variable {r : Type v}
+variable [Fintype r] [DecidableEq r]
+variable {a : Type u}
+variable [Fintype a] [DecidableEq a]
+
+/-- Every finite-dimensional state has a purification on any reference register
+whose cardinality is at least the target cardinality. -/
+theorem exists_purification_on_reference_of_card_le
+    (ρ : MState a) (hcard : Fintype.card a ≤ Fintype.card r) :
+    ∃ Ψ : Ket (r × a), Ψ.Purifies ρ := by
+  classical
+  let emb : a ↪ r := Classical.choice (Function.Embedding.nonempty_of_card_le hcard)
+  let V : ReferenceIsometry a r := {
+    matrix := Matrix.of fun x i => if x = emb i then 1 else 0
+    isometry := by
+      ext i j
+      simp only [Matrix.mul_apply, Matrix.of_apply, Matrix.conjTranspose_apply, Matrix.one_apply]
+      by_cases hij : i = j
+      · subst hij
+        rw [Finset.sum_eq_single (emb i)]
+        · simp
+        · intro y _ hy
+          simp [hy]
+        · simp
+      · rw [Finset.sum_eq_zero]
+        · simp [hij]
+        · intro y _
+          by_cases hyj : y = emb j
+          · subst hyj
+            have hne : emb j ≠ emb i := fun h => hij ((emb.injective h).symm)
+            simp [hne]
+          · simp [hyj] }
+  refine ⟨V.applyKet ρ.canonicalPurification, ?_⟩
+  exact V.applyKet_purifies ρ.canonicalPurification_purifies
+
+variable {a : Type u} {b : Type v}
+variable [Fintype a] [DecidableEq a] [Fintype b] [DecidableEq b]
+
+omit [DecidableEq a] [DecidableEq b] in
+private theorem card_le_prod_prod_right [Nonempty b] :
+    Fintype.card a ≤ Fintype.card ((a × b) × b) := by
+  have hbpos : 0 < Fintype.card b := Fintype.card_pos_iff.mpr inferInstance
+  have h1 : Fintype.card a ≤ Fintype.card a * Fintype.card b :=
+    Nat.le_mul_of_pos_right (Fintype.card a) hbpos
+  have h2 : Fintype.card a * Fintype.card b ≤
+      (Fintype.card a * Fintype.card b) * Fintype.card b :=
+    Nat.le_mul_of_pos_right (Fintype.card a * Fintype.card b) hbpos
+  simpa [Fintype.card_prod, Nat.mul_assoc] using h1.trans h2
+
+omit [DecidableEq a] [DecidableEq b] in
+private theorem card_le_prod_prod_left [Nonempty a] :
+    Fintype.card b ≤ Fintype.card ((a × b) × a) := by
+  have hapos : 0 < Fintype.card a := Fintype.card_pos_iff.mpr inferInstance
+  have h1 : Fintype.card b ≤ Fintype.card b * Fintype.card a :=
+    Nat.le_mul_of_pos_right (Fintype.card b) hapos
+  have h2 : Fintype.card b * Fintype.card a ≤
+      (Fintype.card b * Fintype.card a) * Fintype.card a :=
+    Nat.le_mul_of_pos_right (Fintype.card b * Fintype.card a) hapos
+  calc
+    Fintype.card b ≤ Fintype.card b * Fintype.card a := h1
+    _ ≤ (Fintype.card b * Fintype.card a) * Fintype.card a := h2
+    _ = Fintype.card ((a × b) × a) := by
+      simp [Fintype.card_prod, Nat.mul_comm]
+
+/-- Squared fidelity cannot decrease when tracing out the second subsystem. -/
+theorem squaredFidelity_le_traceRight_squaredFidelity [Nonempty b]
+    (ρ σ : MState (a × b)) :
+    ρ.squaredFidelity σ ≤ ρ.traceRight.squaredFidelity σ.traceRight := by
+  classical
+  obtain ⟨U, hUeq, _hUle⟩ :=
+    MState.exists_referenceUnitary_canonicalPurification_overlapSq_eq_squaredFidelity ρ σ
+  let Ψ : Ket ((a × b) × (a × b)) := ρ.canonicalPurification
+  let Φ : Ket ((a × b) × (a × b)) :=
+    U.applyKet σ.canonicalPurification
+  let e := Ket.marginalAReferenceEquiv (a × b) a b
+  have hΨ : Ψ.Purifies ρ := by
+    simpa [Ψ] using ρ.canonicalPurification_purifies
+  have hΦ : Φ.Purifies σ :=
+    U.toReferenceIsometry.applyKet_purifies σ.canonicalPurification_purifies
+  have hΨA : (Ψ.reindex e).Purifies ρ.traceRight := by
+    simpa [e] using
+      Ket.reindex_marginalAReferenceEquiv_purifies_traceRight hΨ
+  have hΦA : (Φ.reindex e).Purifies σ.traceRight := by
+    simpa [e] using
+      Ket.reindex_marginalAReferenceEquiv_purifies_traceRight hΦ
+  have hcard : Fintype.card a ≤ Fintype.card ((a × b) × b) := by
+    simpa using card_le_prod_prod_right (a := a) (b := b)
+  have hbound :=
+    Ket.overlapSq_le_squaredFidelity_of_purifies_of_card_le
+      hΨA hΦA hcard
+  rw [Ket.overlapSq_reindex] at hbound
+  rw [← hUeq] at hbound
+  simpa [Ψ, Φ] using hbound
+
+/-- Squared fidelity cannot decrease when tracing out the first subsystem. -/
+theorem squaredFidelity_le_traceLeft_squaredFidelity [Nonempty a]
+    (ρ σ : MState (a × b)) :
+    ρ.squaredFidelity σ ≤ ρ.traceLeft.squaredFidelity σ.traceLeft := by
+  classical
+  obtain ⟨U, hUeq, _hUle⟩ :=
+    MState.exists_referenceUnitary_canonicalPurification_overlapSq_eq_squaredFidelity ρ σ
+  let Ψ : Ket ((a × b) × (a × b)) := ρ.canonicalPurification
+  let Φ : Ket ((a × b) × (a × b)) :=
+    U.applyKet σ.canonicalPurification
+  let e := (Equiv.prodAssoc (a × b) a b).symm
+  have hΨ : Ψ.Purifies ρ := by
+    simpa [Ψ] using ρ.canonicalPurification_purifies
+  have hΦ : Φ.Purifies σ :=
+    U.toReferenceIsometry.applyKet_purifies σ.canonicalPurification_purifies
+  have hΨB : (Ψ.reindex e).Purifies ρ.traceLeft := by
+    simpa [e] using
+      Ket.reindex_prodAssoc_symm_purifies_traceLeft hΨ
+  have hΦB : (Φ.reindex e).Purifies σ.traceLeft := by
+    simpa [e] using
+      Ket.reindex_prodAssoc_symm_purifies_traceLeft hΦ
+  have hcard : Fintype.card b ≤ Fintype.card ((a × b) × a) := by
+    simpa using card_le_prod_prod_left (a := a) (b := b)
+  have hbound :=
+    Ket.overlapSq_le_squaredFidelity_of_purifies_of_card_le
+      hΨB hΦB hcard
+  rw [Ket.overlapSq_reindex] at hbound
+  rw [← hUeq] at hbound
+  simpa [Ψ, Φ] using hbound
+
+/-- Squared fidelity cannot decrease under a finite-dimensional channel. -/
+theorem squaredFidelity_le_applyState_squaredFidelity
+    (Φ : CPTPMap a b) (ρ σ : MState a) :
+    ρ.squaredFidelity σ ≤
+      MState.squaredFidelity (Φ ρ) (Φ σ) := by
+  classical
+  obtain ⟨K, hK⟩ := MatrixMap.exists_kraus_of_choi_psd Φ.map Φ.map_cp
+  have hTPK : MatrixMap.IsTracePreserving (MatrixMap.ofKraus K) := by
+    rw [← hK]
+    exact Φ.map_TP
+  let V := MatrixMap.krausStinespringIsometry K hTPK
+  obtain ⟨U, hUeq, _hUle⟩ :=
+    MState.exists_referenceUnitary_canonicalPurification_overlapSq_eq_squaredFidelity ρ σ
+  let Ψ : Ket (a × a) := ρ.canonicalPurification
+  let Θ : Ket (a × a) := U.applyKet σ.canonicalPurification
+  let Ψout : Ket (a × (b × (a × b))) := V.applyKetRight Ψ
+  let Θout : Ket (a × (b × (a × b))) := V.applyKetRight Θ
+  let τρ : MState (b × (a × b)) := Ψout.state.traceLeft
+  let τσ : MState (b × (a × b)) := Θout.state.traceLeft
+  have hΨpur : Ψ.Purifies ρ := by
+    simpa [Ψ] using ρ.canonicalPurification_purifies
+  have hΘpur : Θ.Purifies σ :=
+    U.toReferenceIsometry.applyKet_purifies σ.canonicalPurification_purifies
+  have hΨoutpur : Ψout.Purifies τρ := by
+    simp [Ψout, τρ]
+  have hΘoutpur : Θout.Purifies τσ := by
+    simp [Θout, τσ]
+  have hoverlap_bound : Ψout.overlapSq Θout ≤ τρ.squaredFidelity τσ :=
+    Ket.overlapSq_le_squaredFidelity_of_purifies hΨoutpur hΘoutpur
+  have hoverlap_pres : Ψout.overlapSq Θout = Ψ.overlapSq Θ := by
+    simpa [Ψout, Θout, V] using V.overlapSq_applyKetRight Ψ Θ
+  have : Nonempty (a × b) :=
+    ⟨(Classical.choice ρ.nonempty, Classical.choice (MState.nonempty (Φ ρ)))⟩
+  have htrace_env : τρ.squaredFidelity τσ ≤
+      τρ.traceRight.squaredFidelity τσ.traceRight :=
+    MState.squaredFidelity_le_traceRight_squaredFidelity τρ τσ
+  have hτρm : τρ.traceRight = Φ ρ := by
+    apply MState.ext
+    calc
+      τρ.traceRight.m = MatrixMap.ofKraus K ρ.m := by
+        simpa [τρ, Ψout, V] using
+          MatrixMap.traceRight_traceLeft_applyKetRight_krausStinespringIsometry
+            K hTPK hΨpur
+      _ = (Φ ρ).m := by
+        simp [CPTPOp.mat_coe_eq_apply_mat, hK]
+  have hτσm : τσ.traceRight = Φ σ := by
+    apply MState.ext
+    calc
+      τσ.traceRight.m = MatrixMap.ofKraus K σ.m := by
+        simpa [τσ, Θout, V] using
+          MatrixMap.traceRight_traceLeft_applyKetRight_krausStinespringIsometry
+            K hTPK hΘpur
+      _ = (Φ σ).m := by
+        simp [CPTPOp.mat_coe_eq_apply_mat, hK]
+  calc
+    ρ.squaredFidelity σ = Ψ.overlapSq Θ := by
+      simpa [Ψ, Θ] using hUeq
+    _ = Ψout.overlapSq Θout := hoverlap_pres.symm
+    _ ≤ τρ.squaredFidelity τσ := hoverlap_bound
+    _ ≤ τρ.traceRight.squaredFidelity τσ.traceRight := htrace_env
+    _ = MState.squaredFidelity (Φ ρ) (Φ σ) := by
+      rw [hτρm, hτσm]
+
+/-- Squared fidelity between normalized finite-dimensional states is at most
+one.  This follows from Uhlmann's overlap maximizer and nonnegativity of the
+pure-state overlap deficit. -/
+theorem squaredFidelity_le_one (ρ σ : MState a) :
+    ρ.squaredFidelity σ ≤ 1 := by
+  classical
+  obtain ⟨U, hUeq, _⟩ :=
+    MState.exists_referenceUnitary_canonicalPurification_overlapSq_eq_squaredFidelity ρ σ
+  have hdeficit :
+      0 ≤ 1 -
+        ρ.canonicalPurification.overlapSq
+          (U.applyKet σ.canonicalPurification) :=
+    Ket.one_sub_overlapSq_nonneg ρ.canonicalPurification
+      (U.applyKet σ.canonicalPurification)
+  rw [← hUeq] at hdeficit
+  linarith
+
+end MState

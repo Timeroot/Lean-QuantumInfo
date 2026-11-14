@@ -238,6 +238,7 @@ theorem fiveQubitCode_isLogical_iff {P : PauliOp 5} :
       ¬ ∃ a, (genSpan fiveQubitGens a).x = P.x ∧ (genSpan fiveQubitGens a).z = P.z :=
   StabGroup.isLogical_iff_of_gens fiveQubitGens_isGenFamily rfl
 
+set_option maxRecDepth 8000 in
 theorem fiveQubitCode_distance : fiveQubitCode.distance = 3 := by
   refine StabGroup.distance_eq _ 3
     ⟨⟨0, ![0,0,0,0,1], ![0,1,1,0,1]⟩, by rw [fiveQubitCode_isLogical_iff]; decide, by decide⟩ ?_
@@ -245,13 +246,13 @@ theorem fiveQubitCode_distance : fiveQubitCode.distance = 3 := by
       ¬ ∃ a, (genSpan fiveQubitGens a).x = P.x ∧ (genSpan fiveQubitGens a).z = P.z) →
       3 ≤ weight P by
     exact fun P hP => h P (fiveQubitCode_isLogical_iff.mp hP)
-  native_decide
+  decide +kernel
 
 /-- The five-qubit code is a *perfect* code: it saturates the quantum Hamming bound. -/
 theorem fiveQubitCode_perfect :
     (∑ j ∈ Finset.range 2, Nat.choose 5 j * 3 ^ j) * 2 ^ fiveQubitCode.numLogical = 2 ^ 5 := by
   simp [fiveQubitCode_numLogical]
-  native_decide
+  decide
 
 /-! ### Shor's nine-qubit code `⟦9,1,3⟧` -/
 
@@ -266,6 +267,7 @@ def shorZCheck : Fin 6 → (Fin 9 → ZMod 2) :=
      ![0,0,0,1,1,0,0,0,0], ![0,0,0,0,1,1,0,0,0],
      ![0,0,0,0,0,0,1,1,0], ![0,0,0,0,0,0,0,1,1] ]
 
+/-- Shor's nine-qubit code, the CSS code built from `shorXCheck` and `shorZCheck`. -/
 def shorCode : StabGroup 9 := cssCode shorXCheck shorZCheck (by decide)
 
 @[simp] theorem shorCode_numPhysical : shorCode.numPhysical = 9 := rfl
@@ -290,7 +292,7 @@ theorem shorCode_isLogical_x : shorCode.IsLogical ⟨0, ![1,1,1,0,0,0,0,0,0], 0�
 theorem shorCode_distance : shorCode.distance = 3 := by
   refine StabGroup.distance_eq _ 3 ⟨_, shorCode_isLogical_x, by decide⟩ fun P hP => ?_
   exact StabGroup.cssCode_le_weight_of_isLogical (hx := shorXCheck) (hz := shorZCheck) _ 3
-    (by native_decide) (by native_decide) hP
+    (by decide +kernel) (by decide +kernel) hP
 
 /-! ### The Steane seven-qubit code `⟦7,1,3⟧` -/
 
@@ -324,7 +326,7 @@ theorem steaneCode_isLogical_x : steaneCode.IsLogical ⟨0, ![1,1,1,0,0,0,0], 0�
 theorem steaneCode_distance : steaneCode.distance = 3 := by
   refine StabGroup.distance_eq _ 3 ⟨_, steaneCode_isLogical_x, by decide⟩ fun P hP => ?_
   exact StabGroup.cssCode_le_weight_of_isLogical (hx := hammingCheck) (hz := hammingCheck) _ 3
-    (by native_decide) (by native_decide) hP
+    (by decide +kernel) (by decide +kernel) hP
 
 end PauliOp
 end QuantumLib

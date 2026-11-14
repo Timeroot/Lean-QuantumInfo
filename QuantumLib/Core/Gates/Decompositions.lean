@@ -9,7 +9,7 @@ import QuantumLib.Core.Gates.DSL
 # Gate decompositions
 
 This file proves that various named gates are equal to explicit circuits written in the
-`qasm%` DSL of `QuantumLib.Gates.DSL`, using only Clifford+T gates.
+`qasm%` DSL of `QuantumLib.Core.Gates.DSL`, using only Clifford+T gates.
 
 The key tool is that embedding a gate into a register is a *monoid homomorphism*
 (`embedGate_mul`, `embedGate_one`): a product of gates acting on the *same* qubit(s) is
