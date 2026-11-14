@@ -1,0 +1,21 @@
+QuantumLib
+Copyright (c) 2024-2026 Alex Meiburg and the QuantumLib contributors
+
+Licensed under the Apache License, Version 2.0 (see the LICENSE file).
+
+QuantumLib includes software borrowed from other projects, all of it under the
+Apache License, Version 2.0. PORTING_NOTES.md lists them and records what was
+taken from each and how it was changed; per-file copyright notices are retained
+in the file headers. Section 4(d) of the license asks derivative works to carry
+the attribution notices of the works they build on, so the NOTICE files of the
+borrowed projects that ship one are reproduced below.
+
+--------------------------------------------------------------------------------
+
+Lean-QEC
+Copyright 2026 The Lean-QEC Authors (Mattias Ehatamm, Yi Lee, Xiaodi Wu, Runzhou Tao)
+
+This product includes software developed as part of the paper
+"End-to-End Formalization of Quantum Error Correction" (arXiv:2605.16523).
+
+Licensed under the Apache License, Version 2.0 (see the LICENSE file).

@@ -1,6 +1,4 @@
 import QuantumLib.Core
+import QuantumLib.LeanQEC
 
-/-! # QuantumLib
-
-Shared infrastructure is collected in `QuantumLib.Core`.
--/
+/-! # QuantumLib and the LeanQEC development -/

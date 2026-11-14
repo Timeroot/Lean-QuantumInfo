@@ -34,3 +34,5 @@ import QuantumLib.Core.QECC.TransversalCNOT
 import QuantumLib.Core.QECC.ConcatDistance
 import QuantumLib.Core.QECC.RandomErrors
 import QuantumLib.Core.QECC.Threshold
+import QuantumLib.Core.ForMathlib.DistanceLB
+import QuantumLib.Core.ForMathlib.RowspaceKernel
