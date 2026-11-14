@@ -1,0 +1,117 @@
+name: Compile blueprint
+
+on:
+  push:
+    branches:
+      - main # Trigger on pushes to the default branch
+  workflow_dispatch:        # Allow manual triggering of the workflow from the GitHub Actions interface
+
+# Cancel previous runs if a new commit is pushed to the same PR or branch
+concurrency:
+  group: ${{ github.ref }}  # Group runs by the ref (branch or PR)
+  cancel-in-progress: true  # Cancel any ongoing runs in the same group
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read          # Read access to repository contents
+  pages: write            # Write access to GitHub Pages
+  id-token: write         # Write access to ID tokens
+  issues: write           # Write access to issues
+  pull-requests: write    # Write access to pull requests
+
+jobs:
+  build_project:
+    runs-on: ubuntu-latest
+    name: Build project
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0 # Fetch all history for all branches and tags
+
+      - name: Build project
+        uses: leanprover/lean-action@434f25c2f80ded67bba02502ad3a86f25db50709 # 2025-07-02
+        with:
+          build: true
+          lint: false
+          auto-config: false
+          use-mathlib-cache: true
+
+      - name: Free disk space
+        run: |
+          df -h
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/ghc || true
+          sudo apt-get clean
+          df -h
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            make \
+            git \
+            pkg-config \
+            graphviz \
+            libgraphviz-dev \
+            gcc \
+            g++ \
+            python3-venv \
+            latexmk \
+            texlive-xetex \
+            texlive-lang-cjk \
+            texlive-lang-japanese \
+            texlive-lang-chinese \
+            texlive-latex-base \
+            texlive-latex-recommended \
+            texlive-latex-extra \
+            texlive-fonts-recommended \
+            texlive-pictures \
+            texlive-plain-generic
+          sudo apt-get clean
+
+      - name: Mark workspace as safe for git
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$(pwd)"
+
+      - name: Create virtualenv and install Python dependencies
+        run: |
+          python -m venv env
+          . env/bin/activate
+          python -m pip install --upgrade pip wheel requests
+          python -m pip install leanblueprint
+
+      - name: Build PDF
+        run: |
+          . env/bin/activate
+          leanblueprint pdf
+
+      - name: Build web
+        run: |
+          . env/bin/activate
+          leanblueprint web
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p docs
+          cp blueprint/print/print.pdf docs/blueprint.pdf
+          cp -r blueprint/web docs/blueprint
+
+      - name: Check declarations mentioned in the blueprint exist in Lean code
+        run: lake exe checkdecls blueprint/lean_decls
+
+      - name: Upload blueprint artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blueprint-output
+          path: |
+            docs/
+            blueprint/print/print.pdf

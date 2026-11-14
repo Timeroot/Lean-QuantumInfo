@@ -1,0 +1,29 @@
+% This file makes a web version of the blueprint
+% It should include all the \usepackage needed for this version.
+% The template includes standard AMS packages.
+% It is otherwise a very minimal preamble (you should probably at least
+% add cleveref and tikz-cd).
+
+% \documentclass{report}
+\documentclass[xelatex,ja=standard]{bxjsreport} %%% 日本語対応（xelatex でコンパイルする）
+
+
+\usepackage{amssymb, amsthm, amsmath}
+\usepackage{hyperref}
+\usepackage[showmore, dep_graph]{blueprint}
+
+
+\input{macros/common}
+\input{macros/web}
+
+\home{https://Hayata-Yamasaki-Group.github.io/lean-quantum}
+\github{https://github.com/Hayata-Yamasaki-Group/lean-quantum}
+\dochome{https://Hayata-Yamasaki-Group.github.io/lean-quantum/docs}
+
+\title{Lean Quantum}
+\author{AutoRes}
+
+\begin{document}
+\maketitle
+\input{content}
+\end{document}
