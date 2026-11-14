@@ -3,7 +3,7 @@ Copyright (c) 2026 Alex Meiburg. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Alex Meiburg
 -/
-import QuantumLib.ForMathlib.Exponential
+import QuantumLib.Core.ForMathlib.Exponential
 import Mathlib.Analysis.Calculus.InverseFunctionTheorem.FDeriv
 import Mathlib.LinearAlgebra.Projection
 import Mathlib.Topology.Algebra.Module.FiniteDimension

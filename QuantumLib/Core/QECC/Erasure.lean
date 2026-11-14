@@ -3,9 +3,9 @@ Copyright (c) 2026 Alex Meiburg. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Alex Meiburg
 -/
-import QuantumLib.QECC.PiKron
-import QuantumLib.QECC.UnitaryBasis
-import QuantumLib.QECC.KnillLaflamme
+import QuantumLib.Core.QECC.PiKron
+import QuantumLib.Core.QECC.UnitaryBasis
+import QuantumLib.Core.QECC.KnillLaflamme
 
 /-!
 # Correcting `d` errors implies correcting the erasure of `2d` qudits

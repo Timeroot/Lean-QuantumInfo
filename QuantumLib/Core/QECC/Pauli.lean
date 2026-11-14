@@ -1,4 +1,4 @@
-import QuantumLib.QECC.Stabilizer
+import QuantumLib.Core.QECC.Stabilizer
 
 /-!
 # The n-qubit Pauli group (faithful model)

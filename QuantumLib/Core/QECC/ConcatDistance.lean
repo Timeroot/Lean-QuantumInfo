@@ -3,9 +3,9 @@ Copyright (c) 2026 Alex Meiburg. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Alex Meiburg
 -/
-import QuantumLib.QECC.Codes
-import QuantumLib.QECC.Concatenation
-import QuantumLib.QECC.StabilizerCorrection
+import QuantumLib.Core.QECC.Codes
+import QuantumLib.Core.QECC.Concatenation
+import QuantumLib.Core.QECC.StabilizerCorrection
 
 /-!
 # Concatenation multiplies the distance

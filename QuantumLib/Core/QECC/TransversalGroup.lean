@@ -3,9 +3,9 @@ Copyright (c) 2026 Alex Meiburg. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Alex Meiburg
 -/
-import QuantumLib.QECC.Transversal
-import QuantumLib.QECC.PauliDiscretization
-import QuantumLib.ForMathlib.Cartan
+import QuantumLib.Core.QECC.Transversal
+import QuantumLib.Core.QECC.PauliDiscretization
+import QuantumLib.Core.ForMathlib.Cartan
 
 /-!
 # The group of code-preserving transversal gates

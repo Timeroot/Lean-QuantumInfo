@@ -5,7 +5,7 @@ Status legend: ✅ stated & proved · 🟡 proved in a restated or weaker form (
 The Lean development contains **no `sorry`** and introduces no new axioms: every theorem below
 marked ✅ or 🟡 compiles down to `propext`/`Classical.choice`/`Quot.sound` only.
 
-Names in `code font` are the Lean identifiers (in `QuantumInfo/QECC/*` = `QuantumLib/QECC/*`).
+Names in `code font` are the Lean identifiers (in `QuantumInfo/QECC/*` = `QuantumLib/Core/QECC/*`).
 
 ## A. Pauli group structure
 1. ✅ The `n`-qubit Paulis form a group. — `PauliOp`, `instGroup`
