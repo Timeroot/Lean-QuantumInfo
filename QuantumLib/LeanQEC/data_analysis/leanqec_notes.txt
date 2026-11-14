@@ -1,0 +1,65 @@
+Putting things together:
+We have been able to fully verify the [[144, 12, 12]] BB code (Gross code) distance using bv_decide in about 30 minutes.
+We seek to verify the distance of larger BB codes, which involves scaling up bv_decide. This can involve optimising bv_decide itself, or optimising the formula that is passed to the solver in Lean, or changing the solver used. It may also involve improving Lean's simplification routines to prepare formulas faster.
+
+The formula: the only formula that takes any time is the statement `lt_dist_sat`, which proves that the X or Z distance of a CSS code is lower bounded by a given value. It is defined as follows:
+```
+def lt_dist_sat
+  {n stabdim kerdim : ℕ}
+  [NeZero n]
+  (stabs : BitVec (stabdim * n))
+  (ker : BitVec (kerdim * n))
+  (k nlog : ℕ) : Prop :=
+  ∀ (locs : (BitVec (k * nlog))) (errs : BitVec n),
+  ¬ (loc_constraints locs errs ∧ symmetry_constraints locs ∧ parity_constraints stabs errs ∧ rowspace_constraints ker errs)
+```
+
+It quantifies over `locs` and `errs` given `stabs` (the X or Z parity-check matrix for the code), `ker` (generators for the kernel of the Z or X matrix of the code, respectively), and `k` (the code distance lower bound). 
+
+`locs` and `errs` are meant to represent both the index-form and full vector form of an error vector. `errs` is a `BitVec n`, meaning it is a length-n binary string. There are 2^n length n binary strings, however we only care about error vectors with Hamming weight at most k (low relative to n), meaning that we could also track the indices of the k errors with a vector of `ceil(log n) * k` bits, every `ceil(log n)` bits indicating an index in the vector. `loc_constraints` is thus ensuring this conversion. In pseudocode (the functional implementation of these formulas is harder to read, but evaluate to the same thing):
+
+```
+def loc_constraints := ∀ i : [n], errs[i] = OR (∀ j : [k], locs[j*nlog, (j+1)*nlog] = i)
+```
+
+This is checking that the OR over all k locations in locs is equal to i when i is 1 in the error vector.
+
+`symmetry_constraints` enforces symmetry-breaking, ensuring that the indices provided in `locs` come in a monotonic order. In pseudocode:
+
+```
+def symmetry_constraints := ∀ i : [n-1]`, locs[i*nlog, (i+1)*nlog] ≤ locs[(i+1)*nlog, (i+2)*nlog]
+```
+
+`parity_constraints` enforces that the error vector has dot product 0 (commutes) with every stabilizer from the parity-check matrix. It uses a dot product helper, which is also used by `rowspace_constraints`, the checker that the error vector is orthogonal to the rowspace of the other parity-check matrix (that it has a nonzero dot product with a generator of its kernel):
+
+```
+def BitVec.dot_product {n : ℕ} [NeZero n] (x y : BitVec n) := XOR (∀ i : [n], x[i] && y[i])
+
+def parity_constraints := ∀ i : [stabdim], errs.dot_product stabs.row[i] = 0
+
+def rowspace_constraints := OR (∀ i : [kerdim], errs.dot_product ker.row[i] = 1)
+```
+
+This summarizes how the formula is presented to `bv_decide`, though what exactly happens to the formula through the normalization/aig procedures I am not entirely sure. To obtain the .cnf formula sent to the external solver, modify bv_decide's options with `--set_option sat.solver "./logger.bat"`, which redirects the solver to a custom logger that spits out the .cnf query to the `bv_decide_queries` folder and then errors. For the internal action of `bv_decide` itself, I have written a tracker that analyzes the runtimes of various parts of `bv_decide`.
+
+From a high level, there are five parts to `bv_decide`.
+1. Normalization: `bv_decide` runs the `bv_normalize` procedure on the in-Lean goal, which "normalizes subexpressions up to associativity and commutativity" and "collects terms to maximize sharing in the AIG". 
+2. AIG: Converts the formula as interpreted from Lean into an and-inverter graph
+3. CNF: Converts the and-inverter graph into a formula in conjunctive normal form.
+4. Solving: Sends the cnf formula, in .cnf file form, to the external solver, waits until it returns a .lrat file.
+5. Translating: Translates the .lrat proof of UNSAT back into Lean form, and checks it using the Lean kernel.
+
+This can be timed for a given run using the custom tactic `bv_decidet` with an additional argument of a .csv file, where the times of each individual step are written. I am not totally certain about the correctness of this tactic, due to the suspiciously low solve times. The results look like (in ms): 
+code:   normalize   aig   cnf   solve    end
+BB70       22028     8    68      10  22186
+BB90       45914     4   118      15  50244
+BB72       14758     2    33       6   1583
+BB144	   69438     3   121      19  273718
+
+Likely, the "solve" time is bleeding into the translation time, but what this does demonstrate is that normalization time is still a significant factor before any SAT solver is called.
+
+Experiments on the cnf files with different solvers and seeds (kissat, cadical) showed a strong correlation between size of minimum unsatisfiable core and time to solve, which suggests that optimizing solve time and unsatisfiable core size are roughly similar. 
+
+An issue I have had is that the supercomputing cluster provided by UMD is on an older linux distribution which doesn't allow me to run Lean files. This has prevented me from generating the .cnf file for the 288 qubit gross code, or accurately estimating build times (I am just using my laptop). In the Examples/BB/ folder, there are files that should generate the .cnf files for BB162, BB180, and BB288 when run. I have similarly been unable to analyze parallel computing possibilities for Lean due to the cluster issues, which is another angle to consider. Generating these cnf files doesn't just depend on `bv_decide`, but also on the speed of Lean's simplification routines, which provide the initial formula given a list of identities to apply. It would be useful to explore speeding up these routines as well, as they represent a large portion of the overhead of distance verification. An analysis showed that "Formula Preparation Time" (the simplification routine) dominates `bv_decide` overhead in smaller cases, but is eventually overshadowed. Regardless, it represents a significant portion of runtime in many cases, and is more affected by code size, where solve time is more affected by code distance.
+
+As the goal of the project is to scale up distance verification, a first step would be generating the .cnf files for larger codes, then scaling the verification routine to allow them to be proved in Lean in a reasonable time. A major goal would be fully verifying the 288-qubit Gross Code in Lean, which would represent a very well-scaled verification routine.

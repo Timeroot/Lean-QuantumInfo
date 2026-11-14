@@ -1,0 +1,7 @@
+Lean-QEC
+Copyright 2026 The Lean-QEC Authors (Mattias Ehatamm, Yi Lee, Xiaodi Wu, Runzhou Tao)
+
+This product includes software developed as part of the paper
+"End-to-End Formalization of Quantum Error Correction" (arXiv:2605.16523).
+
+Licensed under the Apache License, Version 2.0 (see the LICENSE file).
